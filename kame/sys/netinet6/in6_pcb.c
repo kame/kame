@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.73 2000/11/29 16:45:05 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.74 2000/11/30 16:00:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -573,7 +573,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	if (PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) {
 		fport = 0;
 		lport = 0;
-		bzero((caddr_t)laddr6, sizeof(*laddr6));
+		bzero((caddr_t)&laddr6, sizeof(laddr6));
 
 		if (cmd != PRC_HOSTDEAD)
 			notify = in6_rtchange;
@@ -617,8 +617,8 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &faddr6) ||
 		    in6p->in6p_socket == 0 ||
 		    (lport && in6p->in6p_lport != lport) ||
-		    (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
-		     !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6)) ||
+		    (!IN6_IS_ADDR_UNSPECIFIED(&laddr6) &&
+		     !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &laddr6)) ||
 		    (fport && in6p->in6p_fport != fport))
 			continue;
 
