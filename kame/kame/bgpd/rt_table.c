@@ -295,9 +295,10 @@ set_nexthop(dst, ret_rte)
      struct in6_addr *dst;
      struct rt_entry *ret_rte;
 {
-  struct ifinfo   *ife;
-  struct rt_entry *rte;
+  struct ifinfo   *ife, *bestife = NULL;
+  struct rt_entry *rte, *bestrte = NULL;
   struct ripif    *ripif;
+  struct ripif *bestif = NULL;
 
   extern byte           ripyes;
   extern struct ifinfo *ifentry;
@@ -317,11 +318,12 @@ set_nexthop(dst, ret_rte)
 			     &rte->rt_ripinfo.rip6_dest,
 			     rte->rt_ripinfo.rip6_plen)  &&
 	  (rte->rt_flags & RTF_UP)) {
-	memcpy(&ret_rte->rt_gw, &rte->rt_gw, sizeof(struct in6_addr));
-	ret_rte->rt_gwif = ife;
-	ret_rte->rt_gwsrc_type = RTPROTO_IF;
-	ret_rte->rt_gwsrc_entry = rte;
-	return 1;
+	if (bestrte == NULL ||
+	    bestrte->rt_ripinfo.rip6_plen < rte->rt_ripinfo.rip6_plen) {
+	  /* keep the route if its the 1st one or has a longer prefix */
+	  bestrte = rte;
+	  bestife = ife;
+	}
       }
       if ((rte = rte->rt_next) == ife->ifi_rte)
 	break;
@@ -331,9 +333,6 @@ set_nexthop(dst, ret_rte)
   }
 
   if (ripyes) {
-    struct rt_entry *bestrte = NULL;
-    struct ripif *bestif = NULL;
-
     ripif = ripifs; /* global */
     while(ripif) {
       rte = ripif->rip_adj_ribs_in;
@@ -343,14 +342,11 @@ set_nexthop(dst, ret_rte)
 			       rte->rt_ripinfo.rip6_plen)  &&
 	    (rte->rt_flags & RTF_UP) &&
 	    rte->rt_ripinfo.rip6_metric != RIPNG_METRIC_UNREACHABLE) {
-	  if (bestrte == NULL) {
+	  if (bestrte == NULL ||
+	      bestrte->rt_ripinfo.rip6_plen < rte->rt_ripinfo.rip6_plen) {
+	    /* keep the route if its the 1st one or has a longer prefix */
 	    bestrte = rte;
-	    bestif = ripif;
-	  }
-	  else if (bestrte->rt_ripinfo.rip6_plen < rte->rt_ripinfo.rip6_plen) {
-	    /* prefer the route that matches longer */
-	    bestrte = rte;
-	    bestif = ripif;
+	    bestife = ripif->rip_ife;
 	  }
 	}
 	if ((rte = rte->rt_next) == ripif->rip_adj_ribs_in)
@@ -359,15 +355,31 @@ set_nexthop(dst, ret_rte)
       if ((ripif = ripif->rip_next) == ripifs)
 	break;
     }
+  }
 
-    if (bestrte) {
-	  memcpy(&ret_rte->rt_gw, &bestrte->rt_gw, sizeof(struct in6_addr));
-	  ret_rte->rt_gwif = bestif->rip_ife;
-	  ret_rte->rt_gwsrc_type = RTPROTO_RIP;
-	  ret_rte->rt_gwsrc_entry = bestrte;
-	  return 1;
+  if (bestrte) {
+    ret_rte->rt_gwif = bestif->rip_ife;
+    ret_rte->rt_gwsrc_type = bestrte->rt_proto.rtp_type;
+    ret_rte->rt_gwsrc_entry = bestrte;
+    switch(bestrte->rt_proto.rtp_type) {
+    case RTPROTO_IF:
+      /*
+       * If the destination resides in a local network, just use the
+       * destination as gateway.
+       * XXX: this might cause non-link-local gateway to be installed
+       *      in the kernel. Should we look up the neighbor cache??
+       */
+      memcpy(&ret_rte->rt_gw, dst, sizeof(struct in6_addr));
+      break;
+    case RTPROTO_RIP:
+      memcpy(&ret_rte->rt_gw, &bestrte->rt_gw, sizeof(struct in6_addr));
+      break;
+    default:
+      fatalx("<set_nexthop>: BUG(bogus gwsrc protocol");
+      /* NOTREACHED */
     }
-    return 0;
+
+    return 1;			/* success */
   }
 
   return 0;  /* not found */
