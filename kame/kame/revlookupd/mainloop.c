@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.6 2002/05/24 04:37:29 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.7 2002/05/24 06:38:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -665,7 +665,7 @@ ptr2in(n, in)
 	const char *top = "in-addr.arpa.";
 
 	l = strlen(n);
-	if (l > strlen(top) && strcasecmp(n + l - strlen(top), top) == 0)
+	if (l > strlen(top) && strcmp(n + l - strlen(top), top) == 0)
 		ep = n + l - strlen(top);
 	else
 		return -1;
@@ -712,9 +712,9 @@ ptr2in6(n, in6)
 		;
 	else
 		return -1;
-	if (l > strlen(top1) && strcasecmp(n + l - strlen(top1), top1) == 0)
+	if (l > strlen(top1) && strcmp(n + l - strlen(top1), top1) == 0)
 		ep = n + l - strlen(top1);
-	if (l > strlen(top2) && strcasecmp(n + l - strlen(top2), top2) == 0)
+	else if (l > strlen(top2) && strcmp(n + l - strlen(top2), top2) == 0)
 		ep = n + l - strlen(top2);
 	else
 		return -1;
