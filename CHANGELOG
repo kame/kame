@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.182 1999/10/10 15:40:11 itojun Exp $
+$Id: CHANGELOG,v 1.183 1999/10/12 10:13:37 itojun Exp $
 
 <199910>
+Tue Oct 12 19:14:53 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/ethereal: ethereal port for version 0.7.5.
+
 Mon Oct 11 00:40:52 JST 1999  itojun@iijlab.net
 	* freebsd2/ports/fwtk6: use latest IPv6 patch.
 	  From: Hajimu UMEMOTO <ume@mahoroba.org>
