@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.24 2000/06/04 00:59:50 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.25 2000/06/04 01:03:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -256,6 +256,11 @@ main(argc, argv)
 			p = hostnamebuf + strlen(hostnamebuf);
 			*p++ = '.';
 			*p = '\0';
+		}
+		if (iscanon(hostnamebuf) == 0) {
+			errx(1, "%s: hostname is not a canonical name",
+			    hostnamebuf);
+			/*NOTREACHED*/
 		}
 
 		hostname = hostnamebuf;
