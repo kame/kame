@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.6 2000/06/08 21:28:33 itojun Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.7 2000/07/05 06:14:35 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -136,8 +136,7 @@ session(void)
 		case SIGHUP:
 			if (cfreparse()) {
 				plog(logp, LOCATION, NULL,
-					"configuration read failed");
-				/* XXX exit ? */
+					"ERROR: configuration read failed\n");
 				exit(1);
 			}
 			sigreq = 0;
