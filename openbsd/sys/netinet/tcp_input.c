@@ -2211,25 +2211,8 @@ dodata:							/* XXX */
 			break;
 		}
 	}
-<<<<<<< tcp_input.c
 	if (so->so_options & SO_DEBUG)
 		tcp_trace(TA_INPUT, ostate, tp, tcp_saveti, 0, tlen);
-=======
-	if (so->so_options & SO_DEBUG) {
-		switch (tp->pf) {
-#ifdef INET6
-		case PF_INET6:
-			tcp_trace(TA_INPUT, ostate, tp, (caddr_t) &tcp_saveti6,
-			    0, tlen);
-			break;
-#endif /* INET6 */
-		case PF_INET:
-			tcp_trace(TA_INPUT, ostate, tp, (caddr_t) &tcp_saveti,
-			    0, tlen);
-			break;
-		}
-	}
->>>>>>> 1.1.1.10
 
 	/*
 	 * Return any desired output.
