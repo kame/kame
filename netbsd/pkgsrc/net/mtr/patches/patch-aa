@@ -1,7 +1,7 @@
 $NetBSD$
 
---- configure-	Fri Sep  3 00:38:23 1999
-+++ configure	Fri Sep  3 00:38:41 1999
+--- configure.orig	Tue Oct 12 14:41:13 1999
++++ configure	Tue Oct 12 14:42:56 1999
 @@ -726,13 +726,13 @@
  # Run test in a subshell; some versions of sh will print an error if
  # an executable is not found, even if stderr is redirected.
@@ -21,3 +21,40 @@ $NetBSD$
  
  echo $ac_n "checking for working autoconf""... $ac_c" 1>&6
  echo "configure:739: checking for working autoconf" >&5
+@@ -752,26 +752,26 @@
+ # Run test in a subshell; some versions of sh will print an error if
+ # an executable is not found, even if stderr is redirected.
+ # Redirect stdin to placate older versions of autoconf.  Sigh.
+-if (automake --version) < /dev/null > /dev/null 2>&1; then
+-   AUTOMAKE=automake
+-   echo "$ac_t""found" 1>&6
+-else
++#if (automake --version) < /dev/null > /dev/null 2>&1; then
++#   AUTOMAKE=automake
++#   echo "$ac_t""found" 1>&6
++#else
+    AUTOMAKE="$missing_dir/missing automake"
+    echo "$ac_t""missing" 1>&6
+-fi
++#fi
+ 
+ echo $ac_n "checking for working autoheader""... $ac_c" 1>&6
+ echo "configure:765: checking for working autoheader" >&5
+ # Run test in a subshell; some versions of sh will print an error if
+ # an executable is not found, even if stderr is redirected.
+ # Redirect stdin to placate older versions of autoconf.  Sigh.
+-if (autoheader --version) < /dev/null > /dev/null 2>&1; then
+-   AUTOHEADER=autoheader
+-   echo "$ac_t""found" 1>&6
+-else
++#if (autoheader --version) < /dev/null > /dev/null 2>&1; then
++#   AUTOHEADER=autoheader
++#   echo "$ac_t""found" 1>&6
++#else
+    AUTOHEADER="$missing_dir/missing autoheader"
+    echo "$ac_t""missing" 1>&6
+-fi
++#fi
+ 
+ echo $ac_n "checking for working makeinfo""... $ac_c" 1>&6
+ echo "configure:778: checking for working makeinfo" >&5
