@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.34 2001/05/21 07:48:30 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.35 2001/05/21 12:28:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -106,7 +106,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.34 2001/05/21 07:48:30 jinmei Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.35 2001/05/21 12:28:47 jinmei Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
@@ -270,7 +270,17 @@ usage()
 static void
 printversion()
 {
-	printf("%s\n", versionstr);
+	char *ver, *beg, *end;
+
+	if ((ver = strdup(versionstr)) == NULL)
+		errx(1, "strdup failed");
+
+	if ((beg = strchr(ver, ':')) == NULL)
+		beg = ver;
+ 	else if ((end = strchr(beg + 1, '$')) != NULL)
+		*end = '\0';
+	printf("%s\n", beg + 1);
+	free(ver);
 }
 
 static struct addrinfo *
