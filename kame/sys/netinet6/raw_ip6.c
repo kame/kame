@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.30 2000/06/08 13:27:17 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.31 2000/06/12 09:24:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,16 +160,8 @@ rip6_input(mp, offp, proto)
 	bzero(&rip6src, sizeof(rip6src));
 	rip6src.sin6_len = sizeof(struct sockaddr_in6);
 	rip6src.sin6_family = AF_INET6;
-	rip6src.sin6_addr = ip6->ip6_src;
-	if (IN6_IS_SCOPE_LINKLOCAL(&rip6src.sin6_addr))
-		rip6src.sin6_addr.s6_addr16[1] = 0;
-	if (m->m_pkthdr.rcvif) {
-		if (IN6_IS_SCOPE_LINKLOCAL(&rip6src.sin6_addr))
-			rip6src.sin6_scope_id = m->m_pkthdr.rcvif->if_index;
-		else
-			rip6src.sin6_scope_id = 0;
-	} else
-		rip6src.sin6_scope_id = 0;
+	/* KAME hack: recover scopeid */
+	(void)in6_recoverscope(&rip6src, &ip6->ip6_src, m->m_pkthdr.rcvif);
 
 	for (in6p = rawin6pcb.in6p_next;
 	     in6p != &rawin6pcb; in6p = in6p->in6p_next) {

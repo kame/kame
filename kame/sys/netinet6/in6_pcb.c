@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.49 2000/06/09 00:22:16 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.50 2000/06/09 00:24:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -461,12 +461,8 @@ in6_setsockaddr(in6p, nam)
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = in6p->in6p_lport;
 	sin6->sin6_addr = in6p->in6p_laddr;
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
-	else
-		sin6->sin6_scope_id = 0;	/*XXX*/
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_addr.s6_addr16[1] = 0;
+	/* KAME hack: recover scopeid */
+	(void)in6_recoverscope(sin6, &in6p->in6p_laddr, NULL);
 }
 
 void
@@ -483,12 +479,8 @@ in6_setpeeraddr(in6p, nam)
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = in6p->in6p_fport;
 	sin6->sin6_addr = in6p->in6p_faddr;
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
-	else
-		sin6->sin6_scope_id = 0;	/*XXX*/
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_addr.s6_addr16[1] = 0;
+	/* KAME hack: recover scopeid */
+	(void)in6_recoverscope(sin6, &in6p->in6p_faddr, NULL);
 }
 
 /*

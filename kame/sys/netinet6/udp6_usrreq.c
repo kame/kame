@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.53 2000/06/05 05:42:52 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.54 2000/06/12 09:24:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -263,17 +263,10 @@ udp6_input(mp, offp, proto)
 		udp_in6.sin6_len = sizeof(struct sockaddr_in6);
 		udp_in6.sin6_family = AF_INET6;
 		udp_in6.sin6_port = uh->uh_sport;
-		udp_in6.sin6_addr = ip6->ip6_src;
-		if (IN6_IS_SCOPE_LINKLOCAL(&udp_in6.sin6_addr))
-			udp_in6.sin6_addr.s6_addr16[1] = 0;
-		if (m->m_pkthdr.rcvif) {
-			if (IN6_IS_SCOPE_LINKLOCAL(&udp_in6.sin6_addr)) {
-				udp_in6.sin6_scope_id =
-					m->m_pkthdr.rcvif->if_index;
-			} else
-				udp_in6.sin6_scope_id = 0;
-		} else
-			udp_in6.sin6_scope_id = 0;
+		/* KAME hack: recover scopeid */
+		(void)in6_recoverscope(&udp_in6, &ip6->ip6_src,
+		    m->m_pkthdr.rcvif);
+
 		/*
 		 * KAME note: usually we drop udphdr from mbuf here.
 		 * We need udphdr for IPsec processing so we do that later.
@@ -451,16 +444,8 @@ udp6_input(mp, offp, proto)
 	udp_in6.sin6_len = sizeof(struct sockaddr_in6);
 	udp_in6.sin6_family = AF_INET6;
 	udp_in6.sin6_port = uh->uh_sport;
-	udp_in6.sin6_addr = ip6->ip6_src;
-	if (IN6_IS_SCOPE_LINKLOCAL(&udp_in6.sin6_addr))
-		udp_in6.sin6_addr.s6_addr16[1] = 0;
-	if (m->m_pkthdr.rcvif) {
-		if (IN6_IS_SCOPE_LINKLOCAL(&udp_in6.sin6_addr))
-			udp_in6.sin6_scope_id = m->m_pkthdr.rcvif->if_index;
-		else
-			udp_in6.sin6_scope_id = 0;
-	} else
-		udp_in6.sin6_scope_id = 0;
+	/* KAME hack: recover scopeid */
+	(void)in6_recoverscope(&udp_in6, &ip6->ip6_src, m->m_pkthdr.rcvif);
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS
 #ifdef SO_TIMESTAMP
 	 || in6p->in6p_socket->so_options & SO_TIMESTAMP
