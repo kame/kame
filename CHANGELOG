@@ -1,8 +1,28 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1643 2001/04/10 15:08:30 suz Exp $
+$KAME: CHANGELOG,v 1.1644 2001/04/10 16:00:28 thorpej Exp $
 
 <200104>
+2001-04-10  Jason R. Thorpe  <thorpej@zembu.com>
+
+	* racoon/pfkey.c: pk_recvacquire(): Make sure the phase1
+	and phase2 handlers are unbound before the phase 2 handler
+	is deleted.
+	* racoon/isakmp.c: ph1_main(), quick_main(): Add the message
+	to the received-list before processing to ensure the packet
+	isn't processed twice in case of an error.
+	isakmp_post_acquire(): Don't unbind the phase1/phase2 handlers;
+	let the caller do it.
+	isakmp_newcookie(): Plug memory leaks.
+	From George Yang <gyang@zembu.com>.
+	* racoon/ipsec_doi.c: get_ph2approvalx(): When we find a
+	matching saprop, make sure to flushsaprop(pr0), as the returned
+	saprop is a copy.  Fixes a memory leak.
+	From George Yang <gyang@zembu.com>.
+	* racoon/isakmp_quick.c: quick_r2send(): Make sure to vfree(data)
+	if we fail to allocate a new body.  Fixes a memory leak.
+	From George Yang <gyang@zembu.com>.
+
 Tue Apr 10 22:51:26 JST 2001	suz@sdl.hitachi.co.jp
 	* rtadvd/config.c, rtadvd/rtadvd.h, rtadvd/rtadvd.conf.5
 	you can advertise route information option as stated in 
