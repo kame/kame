@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.3 2000/04/16 17:43:58 itojun Exp $
+ *	$Id: main.c,v 1.4 2000/04/16 18:00:56 itojun Exp $
  */
 
 #include <stdio.h>
@@ -146,7 +146,7 @@ parseArgument(int argc, char *argv[])
 
 	  default:
 	    log(LOG_ERR, "Illegal option name `-%c\'\n", ch);
-	    exit (1);
+	    exit(1);
 	}
     }
 
