@@ -282,6 +282,16 @@ server6_init()
 		err(1, "setsockopt(IPV6_PKTINFO)");
 	}
 #endif
+	if (setsockopt(insock, SOL_SOCKET, SO_REUSEPORT,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(insock, SO_REUSEPORT)");
+		/* NOTREACHED */
+	}
+	if (setsockopt(insock, SOL_SOCKET, SO_REUSEADDR,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(insock, SO_REUSEADDR)");
+		/* NOTREACHED */
+	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
 		err(1, "bind(insock)");
 		/* NOTREACHED */

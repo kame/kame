@@ -313,7 +313,18 @@ relay6_init()
 		err(1, "socket(csock)");
 		/* NOTREACHED */
 	}
-	if (csock > maxfd) maxfd = csock;
+	if (csock > maxfd)
+		maxfd = csock;
+	if (setsockopt(csock, SOL_SOCKET, SO_REUSEPORT,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(csock, SO_REUSEPORT)");
+		/* NOTREACHED */
+	}
+	if (setsockopt(csock, SOL_SOCKET, SO_REUSEADDR,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(csock, SO_REUSEADDR)");
+		/* NOTREACHED */
+	}
 	if (bind(csock, res->ai_addr, res->ai_addrlen) < 0) {
 		err(1, "bind(csock)");
 		/* NOTREACHED */
@@ -364,14 +375,15 @@ relay6_init()
 		err(1, "socket(outsock)");
 		/* NOTREACHED */
 	}
-	if (ssock > maxfd) maxfd = ssock;
-	if (bind(ssock, res->ai_addr, res->ai_addrlen) < 0) {
-		err(1, "bind(ssock)");
-		/* NOTREACHED */
-	}
+	if (ssock > maxfd)
+		maxfd = ssock;
 	if (setsockopt(ssock, SOL_SOCKET, SO_REUSEPORT,
 		       &on, sizeof(on)) < 0) {
 		err(1, "setsockopt(ssock, SO_REUSEPORT)");
+		/* NOTREACHED */
+	}
+	if (bind(ssock, res->ai_addr, res->ai_addrlen) < 0) {
+		err(1, "bind(ssock)");
 		/* NOTREACHED */
 	}
 	memcpy(&sa6_client, res->ai_addr, sizeof(sa6_client));
