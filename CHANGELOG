@@ -1,10 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1059 2000/06/23 10:51:33 sumikawa Exp $
+$Id: CHANGELOG,v 1.1060 2000/06/23 17:22:43 sumikawa Exp $
 
 <200006>
+Sat Jun 24 02:20:33 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/wyvern: new port, a simple web server
+	* freebsd3/ports/tcpd: new tcpd from Artur Frysiak <wiget@pld.org.pl>
+	* freebsd3/ports/wget: fix security hole and use latest IPv6 patch
+	* freebsd3/ports/vnc: use latest IPv6 patch
+
 Fri Jun 23 19:49:28 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd3/ports/gbatnav: new port: a battleship game
+	* freebsd3/ports/gbatnav: new port, a battleship game
 	* freebsd3/ports/mmosaic: upgrade to 3.6.2.
 
 Thu Jun 22 17:40:37 JST 2000 sakane@ydc.co.jp
