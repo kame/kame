@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1699 2001/05/31 14:07:13 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1700 2001/05/31 15:45:10 sakane Exp $
 
 <200105>
+Fri Jun  1 00:44:00 JST 2001 sakane@kame.net
+	* sys/netkey/key.c:
+	Fixed to make a response in key_spdadd().
+	reported by <R.P.Koster@kpn.com>
+
 2001-05-31  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_trans.c:
 	- translate LPRT -> PORT.
