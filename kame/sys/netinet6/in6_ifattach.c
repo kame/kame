@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.64 2000/08/12 08:08:00 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.65 2000/08/22 08:31:58 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -469,6 +469,9 @@ in6_ifattach_addaddr(ifp, ia)
 			break;
 		}
 	}
+
+	/* announce prefix assignment if someone is watching routing socket */
+	rt_newaddrmsg(RTM_ADD, &ia->ia_ifa, 0, 0);
 
 	/* add route to the interface. */
 	{
