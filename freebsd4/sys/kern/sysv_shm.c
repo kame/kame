@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45 2000/03/10 09:11:24 alc Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45.2.6 2002/10/22 20:45:03 fjoe Exp $ */
 /*	$NetBSD: sysv_shm.c,v 1.23 1994/07/04 23:25:12 glass Exp $	*/
 
 /*
@@ -32,18 +32,20 @@
  */
 
 #include "opt_compat.h"
-#include "opt_rlimit.h"
+#include "opt_sysvipc.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/kernel.h>
+#include <sys/sysctl.h>
 #include <sys/shm.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/sysent.h>
+#include <sys/jail.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -54,24 +56,11 @@
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
 
-#ifndef _SYS_SYSPROTO_H_
-struct shmat_args;
-extern int shmat __P((struct proc *p, struct shmat_args *uap));
-struct shmctl_args;
-extern int shmctl __P((struct proc *p, struct shmctl_args *uap));
-struct shmdt_args;
-extern int shmdt __P((struct proc *p, struct shmdt_args *uap));
-struct shmget_args;
-extern int shmget __P((struct proc *p, struct shmget_args *uap));
-#endif
-
 static MALLOC_DEFINE(M_SHM, "shm", "SVID compatible shared memory segments");
-
-static void shminit __P((void *));
-SYSINIT(sysv_shm, SI_SUB_SYSV_SHM, SI_ORDER_FIRST, shminit, NULL)
 
 struct oshmctl_args;
 static int oshmctl __P((struct proc *p, struct oshmctl_args *uap));
+
 static int shmget_allocate_segment __P((struct proc *p, struct shmget_args *uap, int mode));
 static int shmget_existing __P((struct proc *p, struct shmget_args *uap, int mode, int segnum));
 
@@ -87,8 +76,8 @@ static sy_call_t *shmcalls[] = {
 #define	SHMSEG_ALLOCATED	0x0800
 #define	SHMSEG_WANTED		0x1000
 
-static int shm_last_free, shm_nused, shm_committed;
-struct shmid_ds	*shmsegs;
+static int shm_last_free, shm_nused, shm_committed, shmalloced;
+static struct shmid_ds	*shmsegs;
 
 struct shm_handle {
 	/* vm_offset_t kva; */
@@ -104,6 +93,54 @@ static void shm_deallocate_segment __P((struct shmid_ds *));
 static int shm_find_segment_by_key __P((key_t));
 static struct shmid_ds *shm_find_segment_by_shmid __P((int));
 static int shm_delete_mapping __P((struct proc *, struct shmmap_state *));
+static void shmrealloc __P((void));
+static void shminit __P((void *));
+
+/*
+ * Tuneable values
+ */
+#ifndef SHMMAXPGS
+#define	SHMMAXPGS	8192	/* note: sysv shared memory is swap backed */
+#endif
+#ifndef SHMMAX
+#define	SHMMAX	(SHMMAXPGS*PAGE_SIZE)
+#endif
+#ifndef SHMMIN
+#define	SHMMIN	1
+#endif
+#ifndef SHMMNI
+#define	SHMMNI	192
+#endif
+#ifndef SHMSEG
+#define	SHMSEG	128
+#endif
+#ifndef SHMALL
+#define	SHMALL	(SHMMAXPGS)
+#endif
+
+struct	shminfo shminfo = {
+	SHMMAX,
+	SHMMIN,
+	SHMMNI,
+	SHMSEG,
+	SHMALL
+};
+
+static int shm_use_phys;
+
+TUNABLE_INT("kern.ipc.shmmin", &shminfo.shmmin);
+TUNABLE_INT("kern.ipc.shmmni", &shminfo.shmmni);
+TUNABLE_INT("kern.ipc.shmseg", &shminfo.shmseg);
+TUNABLE_INT("kern.ipc.shmmaxpgs", &shminfo.shmall);
+TUNABLE_INT("kern.ipc.shm_use_phys", &shm_use_phys);
+
+SYSCTL_DECL(_kern_ipc);
+SYSCTL_INT(_kern_ipc, OID_AUTO, shmmax, CTLFLAG_RW, &shminfo.shmmax, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, shmmin, CTLFLAG_RW, &shminfo.shmmin, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, shmmni, CTLFLAG_RD, &shminfo.shmmni, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, shmseg, CTLFLAG_RW, &shminfo.shmseg, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, shmall, CTLFLAG_RW, &shminfo.shmall, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, shm_use_phys, CTLFLAG_RW, &shm_use_phys, 0, "");
 
 static int
 shm_find_segment_by_key(key)
@@ -111,7 +148,7 @@ shm_find_segment_by_key(key)
 {
 	int i;
 
-	for (i = 0; i < shminfo.shmmni; i++)
+	for (i = 0; i < shmalloced; i++)
 		if ((shmsegs[i].shm_perm.mode & SHMSEG_ALLOCATED) &&
 		    shmsegs[i].shm_perm.key == key)
 			return i;
@@ -126,7 +163,7 @@ shm_find_segment_by_shmid(shmid)
 	struct shmid_ds *shmseg;
 
 	segnum = IPCID_TO_IX(shmid);
-	if (segnum < 0 || segnum >= shminfo.shmmni)
+	if (segnum < 0 || segnum >= shmalloced)
 		return NULL;
 	shmseg = &shmsegs[segnum];
 	if ((shmseg->shm_perm.mode & (SHMSEG_ALLOCATED | SHMSEG_REMOVED))
@@ -192,6 +229,9 @@ shmdt(p, uap)
 	struct shmmap_state *shmmap_s;
 	int i;
 
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
+
 	shmmap_s = (struct shmmap_state *)p->p_vmspace->vm_shm;
  	if (shmmap_s == NULL)
  	    return EINVAL;
@@ -225,6 +265,9 @@ shmat(p, uap)
 	vm_prot_t prot;
 	vm_size_t size;
 	int rv;
+
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
 
 	shmmap_s = (struct shmmap_state *)p->p_vmspace->vm_shm;
 	if (shmmap_s == NULL) {
@@ -267,7 +310,7 @@ shmat(p, uap)
 			return EINVAL;
 	} else {
 		/* This is just a hint to vm_map_find() about where to put it. */
-		attach_va = round_page((vm_offset_t)p->p_vmspace->vm_taddr + MAXTSIZ + MAXDSIZ);
+		attach_va = round_page((vm_offset_t)p->p_vmspace->vm_taddr + maxtsiz + maxdsiz);
 	}
 
 	shm_handle = shmseg->shm_internal;
@@ -275,6 +318,7 @@ shmat(p, uap)
 	rv = vm_map_find(&p->p_vmspace->vm_map, shm_handle->shm_object,
 		0, &attach_va, size, (flags & MAP_FIXED)?0:1, prot, prot, 0);
 	if (rv != KERN_SUCCESS) {
+		vm_object_deallocate(shm_handle->shm_object);
 		return ENOMEM;
 	}
 	vm_map_inherit(&p->p_vmspace->vm_map,
@@ -316,6 +360,9 @@ oshmctl(p, uap)
 	int error;
 	struct shmid_ds *shmseg;
 	struct oshmid_ds outbuf;
+
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
 
 	shmseg = shm_find_segment_by_shmid(uap->shmid);
 	if (shmseg == NULL)
@@ -364,6 +411,9 @@ shmctl(p, uap)
 	int error;
 	struct shmid_ds inbuf;
 	struct shmid_ds *shmseg;
+
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
 
 	shmseg = shm_find_segment_by_shmid(uap->shmid);
 	if (shmseg == NULL)
@@ -473,11 +523,12 @@ shmget_allocate_segment(p, uap, mode)
 	if (shm_committed + btoc(size) > shminfo.shmall)
 		return ENOMEM;
 	if (shm_last_free < 0) {
-		for (i = 0; i < shminfo.shmmni; i++)
+		shmrealloc();	/* maybe expand the shmsegs[] array */
+		for (i = 0; i < shmalloced; i++)
 			if (shmsegs[i].shm_perm.mode & SHMSEG_FREE)
 				break;
-		if (i == shminfo.shmmni)
-			panic("shmseg free count inconsistent");
+		if (i == shmalloced)
+			return ENOSPC;
 		segnum = i;
 	} else  {
 		segnum = shm_last_free;
@@ -499,8 +550,13 @@ shmget_allocate_segment(p, uap, mode)
 	 * We make sure that we have allocated a pager before we need
 	 * to.
 	 */
-	shm_handle->shm_object =
-		vm_pager_allocate(OBJT_SWAP, 0, size, VM_PROT_DEFAULT, 0);
+	if (shm_use_phys) {
+		shm_handle->shm_object =
+		    vm_pager_allocate(OBJT_PHYS, 0, size, VM_PROT_DEFAULT, 0);
+	} else {
+		shm_handle->shm_object =
+		    vm_pager_allocate(OBJT_SWAP, 0, size, VM_PROT_DEFAULT, 0);
+	}
 	vm_object_clear_flag(shm_handle->shm_object, OBJ_ONEMAPPING);
 	vm_object_set_flag(shm_handle->shm_object, OBJ_NOSPLIT);
 
@@ -535,6 +591,9 @@ shmget(p, uap)
 {
 	int segnum, mode, error;
 
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
+
 	mode = uap->shmflg & ACCESSPERMS;
 	if (uap->key != IPC_PRIVATE) {
 	again:
@@ -562,6 +621,9 @@ shmsys(p, uap)
 		int	a4;
 	} */ *uap;
 {
+
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
 
 	if (uap->which >= sizeof(shmcalls)/sizeof(shmcalls[0]))
 		return EINVAL;
@@ -600,12 +662,41 @@ shmexit(p)
 	p->p_vmspace->vm_shm = NULL;
 }
 
-void
+static void
+shmrealloc(void)
+{
+	int i;
+	struct shmid_ds *newsegs;
+
+	if (shmalloced >= shminfo.shmmni)
+		return;
+
+	newsegs = malloc(shminfo.shmmni * sizeof(*newsegs), M_SHM, M_WAITOK);
+	if (newsegs == NULL)
+		return;
+	for (i = 0; i < shmalloced; i++)
+		bcopy(&shmsegs[i], &newsegs[i], sizeof(newsegs[0]));
+	for (; i < shminfo.shmmni; i++) {
+		shmsegs[i].shm_perm.mode = SHMSEG_FREE;
+		shmsegs[i].shm_perm.seq = 0;
+	}
+	free(shmsegs, M_SHM);
+	shmsegs = newsegs;
+	shmalloced = shminfo.shmmni;
+}
+
+static void
 shminit(dummy)
 	void *dummy;
 {
 	int i;
-	for (i = 0; i < shminfo.shmmni; i++) {
+
+	shminfo.shmmax = shminfo.shmall * PAGE_SIZE;
+	shmalloced = shminfo.shmmni;
+	shmsegs = malloc(shmalloced * sizeof(shmsegs[0]), M_SHM, M_WAITOK);
+	if (shmsegs == NULL)
+		panic("cannot allocate initial memory for sysvshm");
+	for (i = 0; i < shmalloced; i++) {
 		shmsegs[i].shm_perm.mode = SHMSEG_FREE;
 		shmsegs[i].shm_perm.seq = 0;
 	}
@@ -613,3 +704,4 @@ shminit(dummy)
 	shm_nused = 0;
 	shm_committed = 0;
 }
+SYSINIT(sysv_shm, SI_SUB_SYSV_SHM, SI_ORDER_FIRST, shminit, NULL);
