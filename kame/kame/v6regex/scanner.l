@@ -28,16 +28,18 @@
  * SUCH DAMAGE.
  */
 /*
- * KAME $Id: scanner.l,v 1.2 2000/02/04 04:50:03 itojun Exp $
+ * KAME $Id: scanner.l,v 1.3 2000/02/04 04:51:41 itojun Exp $
  */
 
 /*
  * The following regular expression tries to identify IPv6 address (possibly
  * with scope identifier extension) as correct as possible.
  *
- * There are possible loose ends, though.  While we can exactly identify IPv4
- * address with regular expression, it is impossible to identify IPv6 address
- * with scope identifiers.  This is because:
+ * There are possible loose ends, though.  This is inherently difficult
+ * for a parser to tackle.
+ * While we can exactly identify IPv4 address with regular expression,
+ * it is impossible to identify IPv6 address with scope identifiers.
+ * This is because:
  * - interface identifier portion is determined by kernel configuration.
  *   If you say fe80::1@1000 and you only have 10 interfaces, it is invalid.
  *   If you say fe80::1@ether0 and your kernel has no "ether0" interface, it is
