@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6sctl.c,v 1.9 2004/07/29 23:39:27 jinmei Exp $	*/
+/*	$KAME: dhcp6sctl.c,v 1.10 2004/08/01 07:34:34 suz Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -46,6 +46,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <netdb.h>
 #include <err.h>
 

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.31 2004/06/11 12:22:55 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.32 2004/08/01 07:34:34 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -38,6 +38,7 @@
 
 #include <arpa/inet.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "dhcp6.h"
@@ -88,6 +89,7 @@ struct cf_list *cf_sip_list, *cf_sip_name_list;
 long long cf_lifetime = -1;
 
 extern int yylex __P((void));
+static int add_namelist __P((struct cf_namelist *, struct cf_namelist **));
 static void cleanup __P((void));
 static void cleanup_namelist __P((struct cf_namelist *));
 static void cleanup_cflist __P((struct cf_list *));
