@@ -131,7 +131,6 @@ extern struct callout	 pf_expire_to;
 struct pf_rule		 pf_default_rule;
 
 #define	TAGID_MAX	 50000
-static u_int16_t	 tagid = 0;
 TAILQ_HEAD(pf_tags, pf_tagname)	pf_tags = TAILQ_HEAD_INITIALIZER(pf_tags);
 
 #define DPFPRINTF(n, x) if (pf_status.debug >= (n)) printf x
@@ -468,10 +467,10 @@ pf_rm_rule(struct pf_rulequeue *rulequeue, struct pf_rule *rule)
 		rule->entries.tqe_prev = NULL;
 		rule->nr = -1;
 	}
-	pf_tag_unref(rule->tag);
-	pf_tag_unref(rule->match_tag);
 	if (rule->states > 0 || rule->entries.tqe_prev != NULL)
 		return;
+	pf_tag_unref(rule->tag);
+	pf_tag_unref(rule->match_tag);
 	pf_dynaddr_remove(&rule->src.addr);
 	pf_dynaddr_remove(&rule->dst.addr);
 	if (rulequeue == NULL) {
@@ -489,37 +488,45 @@ pf_rm_rule(struct pf_rulequeue *rulequeue, struct pf_rule *rule)
 u_int16_t
 pf_tagname2tag(char *tagname)
 {
-	struct pf_tagname	*tag, *p;
-	int			 wrapped = 0;
+	struct pf_tagname	*tag, *p = NULL;
+	u_int16_t		 new_tagid = 1;
 
 	TAILQ_FOREACH(tag, &pf_tags, entries)
 		if (strcmp(tagname, tag->name) == 0) {
 			tag->ref++;
 			return (tag->tag);
 		}
-	/* new entry */
-	if (++tagid > TAGID_MAX)	/* > 50000 reserved for special use */
-		tagid = wrapped = 1;
-	for (p = TAILQ_FIRST(&pf_tags); p != NULL; p = TAILQ_NEXT(p, entries))
-		if (p->tag == tagid) {
-			if (++tagid > TAGID_MAX) {
-				if (wrapped)
-					return (0);
-				else
-					tagid = wrapped = 1;
-			}
-			p = TAILQ_FIRST(&pf_tags);
-		}
 
+	/*
+	 * to avoid fragmentation, we do a linear search from the beginning
+	 * and take the first free slot we find. if there is none or the list
+	 * is empty, append a new entry at the end.
+	 */
+
+	/* new entry */
+	if (!TAILQ_EMPTY(&pf_tags))
+		for (p = TAILQ_FIRST(&pf_tags); p != NULL &&
+		    p->tag == new_tagid; p = TAILQ_NEXT(p, entries))
+			new_tagid = p->tag + 1;
+
+	if (new_tagid > TAGID_MAX)
+		return (0);
+
+	/* allocate and fill new struct pf_tagname */
 	tag = (struct pf_tagname *)malloc(sizeof(struct pf_tagname),
 	    M_TEMP, M_NOWAIT);
 	if (tag == NULL)
 		return (0);
 	bzero(tag, sizeof(struct pf_tagname));
 	strlcpy(tag->name, tagname, sizeof(tag->name));
-	tag->tag = tagid;
+	tag->tag = new_tagid;
 	tag->ref++;
-	TAILQ_INSERT_TAIL(&pf_tags, tag, entries);
+
+	if (p != NULL)	/* insert new entry before p */
+		TAILQ_INSERT_BEFORE(p, tag, entries);
+	else	/* either list empty or no free slot in between */
+		TAILQ_INSERT_TAIL(&pf_tags, tag, entries);
+
 	return (tag->tag);
 }
 
@@ -538,28 +545,19 @@ pf_tag2tagname(u_int16_t tagid, char *p)
 void
 pf_tag_unref(u_int16_t tag)
 {
-	struct pf_tagname	*p;
-
-	if (tag > 0)
-		TAILQ_FOREACH(p, &pf_tags, entries)
-			if (tag == p->tag) {
-				p->ref--;
-				return;
-			}
-}
-
-void
-pf_tag_purge(void)
-{
 	struct pf_tagname	*p, *next;
 
-	for (p = TAILQ_LAST(&pf_tags, pf_tags); p != NULL; p = next) {
-		next = TAILQ_PREV(p, pf_tags, entries);
-		if (p->ref == 0) {
-			if (p->tag == tagid)
-				tagid--;
-			TAILQ_REMOVE(&pf_tags, p, entries);
-			free(p, M_TEMP);
+	if (tag == 0)
+		return;
+
+	for (p = TAILQ_FIRST(&pf_tags); p != NULL; p = next) {
+		next = TAILQ_NEXT(p, entries);
+		if (tag == p->tag) {
+			if (--p->ref == 0) {
+				TAILQ_REMOVE(&pf_tags, p, entries);
+				free(p, M_TEMP);
+			}
+			break;
 		}
 	}
 }
@@ -869,7 +867,6 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			pf_rm_rule(old_rules, rule);
 		pf_remove_if_empty_ruleset(ruleset);
 		pf_update_anchor_rules();
-		pf_tag_purge();
 		splx(s);
 		break;
 	}
@@ -1054,6 +1051,15 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 					newrule->pqid = newrule->qid;
 			}
 #endif
+			if (newrule->tagname[0])
+				if ((newrule->tag =
+				    pf_tagname2tag(newrule->tagname)) == 0)
+					error = EBUSY;
+			if (newrule->match_tagname[0])
+				if ((newrule->match_tag = pf_tagname2tag(
+				    newrule->match_tagname)) == 0)
+					error = EBUSY;
+
 			if (newrule->rt && !newrule->direction)
 				error = EINVAL;
 			if (pf_dynaddr_setup(&newrule->src.addr, newrule->af))
@@ -1304,6 +1310,12 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		break;
 	}
 
+	case DIOCGETSTATUS: {
+		struct pf_status *s = (struct pf_status *)addr;
+		bcopy(&pf_status, s, sizeof(struct pf_status));
+		break;
+	}
+
 	case DIOCSETSTATUSIF: {
 		struct pfioc_if	*pi = (struct pfioc_if *)addr;
 		struct ifnet	*ifp;
@@ -1311,26 +1323,15 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		if (pi->ifname[0] == 0) {
 			status_ifp = NULL;
 			bzero(pf_status.ifname, IFNAMSIZ);
-		} else
-			if ((ifp = ifunit(pi->ifname)) == NULL)
-				error = EINVAL;
-			else {
-				status_ifp = ifp;
-#ifdef __FreeBSD__
-				snprintf(pf_status.ifname, IFNAMSIZ, "%s%d",
-				    status_ifp->if_name, status_ifp->if_unit);
-#else
-				strlcpy(pf_status.ifname, ifp->if_xname,
-				    IFNAMSIZ);
-#endif
-			}
-		break;
-	}
-
-	case DIOCGETSTATUS: {
-		struct pf_status *s = (struct pf_status *)addr;
-		bcopy(&pf_status, s, sizeof(struct pf_status));
-		break;
+			break;
+		}
+		if ((ifp = ifunit(pi->ifname)) == NULL) {
+			error = EINVAL;
+			break;
+		} else if (ifp == status_ifp)
+			break;
+		status_ifp = ifp;
+		/* fallthrough into DIOCCLRSTATUS */
 	}
 
 	case DIOCCLRSTATUS: {
