@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.39 2001/06/25 05:58:56 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.40 2001/06/25 06:01:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -109,7 +109,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.39 2001/06/25 05:58:56 itojun Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.40 2001/06/25 06:01:09 itojun Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
@@ -278,7 +278,7 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: bindtest [-[1|2]6APlstv] [-o IPv4address] -p port\n");
+		"usage: bindtest [-6APlstv] [-1|-2] [-o IPv4address] -p port\n");
 }
 
 static void
