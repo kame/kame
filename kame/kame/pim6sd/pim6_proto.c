@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.55 2002/09/17 09:59:56 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.56 2002/12/06 07:42:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1543,7 +1543,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	!IN6_IS_ADDR_UNSPECIFIED(&uni_target_addr.unicast_addr))
     {
 
-	/* if I am not the targer of the join message */
+	/* if I am not the target of the join message */
 	/*
 	 * Join/Prune suppression code. This either modifies the J/P timers
 	 * or triggers an overriding Join.
