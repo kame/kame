@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.106 2000/05/27 10:12:43 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.107 2000/05/28 00:57:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2698,9 +2698,9 @@ ratecheck(last, limit)
 		nextsend.tv_sec += (nextsend.tv_usec / 1000000);
 		nextsend.tv_usec %= 1000000;
 
-		if (nextsend.tv_sec <= tp.tv_sec)
+		if (nextsend.tv_sec == tp.tv_sec && nextsend.tv_usec <= tp.tv_usec)
 			;
-		else if (nextsend.tv_sec == tp.tv_sec && nextsend.tv_usec <= tp.tv_usec)
+		else if (nextsend.tv_sec <= tp.tv_sec)
 			;
 		else {
 			/* The packet is subject to rate limit */
