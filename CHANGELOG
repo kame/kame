@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2421 2003/06/29 04:52:44 sakane Exp $
+$KAME: CHANGELOG,v 1.2422 2003/06/29 07:05:41 sakane Exp $
 
 <200306>
+Sun Jun 29 16:01:35 JST 2003 sakane@kame.net
+	* kame/sys/netkey/{key.[ch],keydb.[ch]}
+	* kame/sys/netinet6/ipsec.[ch]:
+	an user can define a policy-id between 1 and IPSEC_MANUAL_POLICYID_MAX.
+	when an user specifies 0 as a policy-id, the kernel assigns a policy-id
+	for the security policy.
+
 Sun Jun 29 13:51:55 JST 2003 sakane@kame.net
 	* kame/racoon
 	- fixed to get a subjectaltname from a x509 certificate.
