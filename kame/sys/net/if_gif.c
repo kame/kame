@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.65 2001/07/28 01:12:11 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.66 2001/07/29 04:36:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,8 +112,8 @@ void gifattach __P((void *));
 void gifattach __P((int));
 #endif
 #if defined(__NetBSD__) && defined(ISO)
-static int gif_eon_encap(struct mbuf **);
-static int gif_eon_decap(struct ifnet *, struct mbuf **);
+static struct mbuf *gif_eon_encap(struct mbuf *);
+static struct mbuf *gif_eon_decap(struct ifnet *, struct mbuf *);
 #endif
 
 /*
@@ -367,9 +367,11 @@ gif_output(ifp, m, dst, rt)
 	switch (dst->sa_family) {
 #if defined(__NetBSD__) && defined(ISO)
 	case AF_ISO:
-		error = gif_eon_encap(&m);
-		if (error)
+		m = gif_eon_encap(m);
+		if (!m) {
+			error = ENOBUFS;
 			goto end;
+		}
 		break;
 #endif
 	default:
@@ -471,7 +473,8 @@ gif_input(m, af, gifp)
 #endif
 #if defined(__NetBSD__) && defined(ISO)
 	case AF_ISO:
-		if (gif_eon_decap(gifp, &m) != 0)
+		m = gif_eon_decap(gifp, m);
+		if (!m)
 			return;
 		ifq = &clnlintrq;
 		isr = NETISR_ISO;
@@ -912,17 +915,17 @@ struct eonhdr {
 /*
  * prepend EON header to ISO PDU
  */
-static int
-gif_eon_encap(struct mbuf **m)
+static struct mbuf *
+gif_eon_encap(struct mbuf *m)
 {
 	struct eonhdr *ehdr;
 
-	M_PREPEND(*m, sizeof(*ehdr), M_DONTWAIT);
-	if (*m && (*m)->m_len < sizeof(*ehdr))
-		*m = m_pullup(*m, sizeof(*ehdr));
-	if (*m == NULL)
-		return ENOBUFS;
-	ehdr = mtod(*m, struct eonhdr *);
+	M_PREPEND(m, sizeof(*ehdr), M_DONTWAIT);
+	if (m && m->m_len < sizeof(*ehdr))
+		m = m_pullup(m, sizeof(*ehdr));
+	if (m == NULL)
+		return NULL;
+	ehdr = mtod(m, struct eonhdr *);
 	ehdr->version = 1;
 	ehdr->class = 0;		/* always unicast */
 #if 0
@@ -941,29 +944,28 @@ gif_eon_encap(struct mbuf **m)
 	/* since the data is always constant we'll just plug the value in */
 	ehdr->cksum = htons(0xfc02);
 #endif
-	return (0);
+	return m;
 }
 
 /*
  * remove EON header and check checksum
  */
-static int
-gif_eon_decap(struct ifnet *gifp, struct mbuf **m)
+static struct mbuf *
+gif_eon_decap(struct ifnet *gifp, struct mbuf *m)
 {
 	struct eonhdr *ehdr;
 
-	if ((*m)->m_len < sizeof(*ehdr) &&
-	    (*m = m_pullup(*m, sizeof(*ehdr))) == 0) {
+	if (m->m_len < sizeof(*ehdr) &&
+	    (m = m_pullup(m, sizeof(*ehdr))) == NULL) {
 		gifp->if_ierrors++;
-		return (EINVAL);
+		return NULL;
 	}
-	if (iso_check_csum(*m, sizeof(struct eonhdr))) {
-		m_freem(*m);
-		*m = NULL;
-		return (EINVAL);
+	if (iso_check_csum(m, sizeof(struct eonhdr))) {
+		m_freem(m);
+		return NULL;
 	}
-	m_adj(*m, sizeof(*ehdr));
-	return (0);
+	m_adj(m, sizeof(*ehdr));
+	return m;
 }
 #endif /*ISO*/
 #endif /*NGIF > 0*/
