@@ -1,8 +1,20 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1583 2001/03/02 15:07:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.1584 2001/03/03 13:21:42 fujisawa Exp $
 
 <200103>
+2001-03-03  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* sys/netinet6/natpt_usrreq.c (natpt_uattach) call natpt_attach if
+	  privileged process.
+	* sys/netinet6/natpt_rule.c (natpt_in4_len2mask): convert host
+	  byte order of calculated mask.
+	* sys/conf/options (freebsd4): add NATPT_NAT
+	* kame/natptconfig/show.c: Fix struct nlist symbol name.  Change
+	  string compare method, check string length in the first place.
+
+	  TODO: It is not so good to read '/dev/kmem', I need to think about
+	  another method to read these variables from kernel.
+
 2001-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (prelist_update): clarified the
 	update routine for an existing prefix.  It now tries to update
