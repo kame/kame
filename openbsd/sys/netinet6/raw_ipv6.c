@@ -541,14 +541,6 @@ rip6_output(m, so, dst, control)
   } else
     optp = NULL;
 
-  in6a = in6_selectsrc(dst, optp, inp->inp_moptions6,
-		       &inp->inp_route6, &inp->inp_laddr6, &error);
-  if (in6a == NULL) {
-    if (error == 0)
-      error = EADDRNOTAVAIL;
-    goto bad;
-  }
-
   /*
    * For an ICMPv6 packet, we should know its type and code
    * to update statistics.
