@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.954 2000/05/30 06:26:56 jinmei Exp $
+$Id: CHANGELOG,v 1.955 2000/05/30 11:59:12 itojun Exp $
 
 <200005>
+Tue May 30 20:54:23 JST 2000  itojun@iijlab.net
+	* libinet6/resolv/res_send.c: with #define MULTICASTQUERY6, allow
+	  multicast address into /etc/resolv.conf "nameserver" line.
+		nameserver ff02::1%wi0
+	  will reach nameserver(s) on the link.
+	  The behavior change has two parts:
+	  - do not check src/dst pair match if we have multicast address in
+	    resolv.conf.
+	  - do not use connected udp socket for multicast query.
+
+	  highly experimental - this is NOT multicast DNS as drafted in
+	  draft-aboba-dnsext-mdns-00.
+
 2000-05-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/faithd/faithd.c (main): allocated enough memory for
 	serverpath and serverarg to prevent possible buffer overrun.
