@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.25 2001/01/31 09:09:34 itojun Exp $	*/
+/*	$KAME: proposal.c,v 1.26 2001/02/02 05:44:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -49,6 +49,8 @@
 #include "sockmisc.h"
 #include "debug.h"
 
+#include "policy.h"
+#include "pfkey.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "ipsec_doi.h"
@@ -879,3 +881,123 @@ print_proppair(pri, p)
 	print_proppair0(pri, p, 1);
 }
 
+int
+set_proposal_from_policy(iph2, sp_in, sp_out)
+	struct ph2handle *iph2;
+	struct secpolicy *sp_in, *sp_out;
+{
+	struct saprop *newpp;
+	struct secpolicy *sp, *sp2;
+	struct ipsecrequest *req;
+
+	if (iph2->side == INITIATOR) {
+		sp = sp_out;
+		sp2 = sp_in;
+	} else {
+		sp = sp_in;
+		sp2 = sp_out;
+	}
+
+	newpp = newsaprop();
+	if (newpp == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to allocate saprop.\n");
+		goto err;
+	}
+	newpp->prop_no = 1;
+	newpp->lifetime = iph2->sainfo->lifetime;
+	newpp->lifebyte = iph2->sainfo->lifebyte;
+	newpp->pfs_group = iph2->sainfo->pfs_group;
+
+	for (req = sp->req; req; req = req->next) {
+		struct saproto *newpr;
+		struct sockaddr *psaddr = NULL;
+		struct sockaddr *pdaddr = NULL;
+
+		/* check if SA bundle ? */
+		if (req->saidx.src.ss_len && req->saidx.dst.ss_len) {
+
+			psaddr = (struct sockaddr *)&req->saidx.src;
+			pdaddr = (struct sockaddr *)&req->saidx.dst;
+
+			/* check end addresses of SA */
+			if (memcmp(iph2->src, psaddr, iph2->src->sa_len)
+			 || memcmp(iph2->dst, pdaddr, iph2->dst->sa_len)){
+
+				/* XXX why ?? */
+				if (iph2->side == RESPONDER)
+					break;
+
+				/*
+				 * XXX nested SAs with each destination
+				 * address are different.
+				 *       me +--- SA1 ---+ peer1
+				 *       me +--- SA2 --------------+ peer2
+				 */
+
+				/* check first ph2's proposal */
+				if (iph2->proposal == NULL) {
+					plog(LLV_ERROR, LOCATION, NULL,
+						"SA addresses mismatch.\n");
+					goto err;
+				}
+
+				/* XXX new ph2 should be alloated. */
+				
+				plog(LLV_ERROR, LOCATION, NULL,
+					"not supported nested SA. Ignore.\n");
+				break;
+			}
+		}
+
+		/* allocate ipsec sa protocol */
+		newpr = newsaproto();
+		if (newpr == NULL) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"failed to allocate saproto.\n");
+			goto err;
+		}
+
+		newpr->proto_id = ipproto2doi(req->saidx.proto);
+		newpr->spisize = 4;
+		newpr->encmode = pfkey2ipsecdoi_mode(req->saidx.mode);
+		if (iph2->side == INITIATOR)
+			newpr->reqid_out = req->saidx.reqid;
+		else
+			newpr->reqid_in = req->saidx.reqid;
+
+		if (set_satrnsbysainfo(newpr, iph2->sainfo) < 0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"failed to get algorithms.\n");
+			goto err;
+		}
+
+		/* set new saproto */
+		inssaproto(newpp, newpr);
+	}
+
+	/* get reqid_in from inbound policy */
+	if (sp2) {
+		struct saproto *pr;
+
+		req = sp2->req;
+		pr = newpp->head;
+		while (req && pr) {
+			pr->reqid_in = req->saidx.reqid;
+			pr = pr->next;
+			req = req->next;
+		}
+		if (pr || req) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"There is a difference "
+				"between the in/out bound policies.\n");
+			goto err;
+		}
+	}
+
+	iph2->proposal = newpp;
+
+	return 0;
+err:
+	return -1;
+}

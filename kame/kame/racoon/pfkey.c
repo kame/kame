@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.102 2001/02/02 05:07:03 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.103 2001/02/02 05:44:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1422,11 +1422,9 @@ pk_recvacquire(mhp)
 {
 	struct sadb_msg *msg;
 	struct sadb_x_policy *xpl;
-	struct secpolicy *sp, *sp_in = NULL;
+	struct secpolicy *sp_out = NULL, *sp_in = NULL;
 #define MAXNESTEDSA	5	/* XXX */
 	struct ph2handle *iph2[MAXNESTEDSA];
-	struct ipsecrequest *req;
-	struct saprop *newpp = NULL;
 	int n;	/* # of phase 2 handler */
 
 	/* ignore this message because of local test mode. */
@@ -1497,8 +1495,8 @@ pk_recvacquire(mhp)
 	}
 
 	/* search for proper policyindex */
-	sp = getspbyspid(xpl->sadb_x_policy_id);
-	if (sp == NULL) {
+	sp_out = getspbyspid(xpl->sadb_x_policy_id);
+	if (sp_out == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL, "no policy found: id:%d.\n",
 			xpl->sadb_x_policy_id);
 		return -1;
@@ -1509,22 +1507,22 @@ pk_recvacquire(mhp)
 	struct policyindex spidx;
 
 	spidx.dir = IPSEC_DIR_INBOUND;
-	memcpy(&spidx.src, &sp->spidx.dst, sizeof(spidx.src));
-	memcpy(&spidx.dst, &sp->spidx.src, sizeof(spidx.dst));
-	spidx.prefs = sp->spidx.prefd;
-	spidx.prefd = sp->spidx.prefs;
-	spidx.ul_proto = sp->spidx.ul_proto;
+	memcpy(&spidx.src, &sp_out->spidx.dst, sizeof(spidx.src));
+	memcpy(&spidx.dst, &sp_out->spidx.src, sizeof(spidx.dst));
+	spidx.prefs = sp_out->spidx.prefd;
+	spidx.prefd = sp_out->spidx.prefs;
+	spidx.ul_proto = sp_out->spidx.ul_proto;
 
 	sp_in = getsp_r(&spidx);
 	if (!sp_in) {
-		plog(LLV_ERROR, LOCATION, NULL,
+		plog(LLV_WARNING, LOCATION, NULL,
 			"no in-bound policy found: %s\n",
 			spidx2str(&spidx));
 	}
     }
 
 	plog(LLV_DEBUG, LOCATION, NULL,
-		"policy found: %s.\n", spidx2str(&sp->spidx));
+		"suitable SP found: %s.\n", spidx2str(&sp_out->spidx));
 
 	memset(iph2, 0, MAXNESTEDSA);
 
@@ -1555,27 +1553,27 @@ pk_recvacquire(mhp)
 	}
 
 	plog(LLV_DEBUG, LOCATION, NULL,
-		"new acquire %s\n", spidx2str(&sp->spidx));
+		"new acquire %s\n", spidx2str(&sp_out->spidx));
 
 	/* get sainfo */
     {
 	vchar_t *idsrc, *iddst;
 
-	idsrc = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.src,
-				sp->spidx.prefs, sp->spidx.ul_proto);
+	idsrc = ipsecdoi_sockaddr2id((struct sockaddr *)&sp_out->spidx.src,
+				sp_out->spidx.prefs, sp_out->spidx.ul_proto);
 	if (idsrc == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get ID for %s\n",
-			spidx2str(&sp->spidx));
+			spidx2str(&sp_out->spidx));
 		delph2(iph2[n]);
 		return -1;
 	}
-	iddst = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.dst,
-				sp->spidx.prefd, sp->spidx.ul_proto);
+	iddst = ipsecdoi_sockaddr2id((struct sockaddr *)&sp_out->spidx.dst,
+				sp_out->spidx.prefd, sp_out->spidx.ul_proto);
 	if (iddst == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get ID for %s\n",
-			spidx2str(&sp->spidx));
+			spidx2str(&sp_out->spidx));
 		vfree(idsrc);
 		delph2(iph2[n]);
 		return -1;
@@ -1592,101 +1590,13 @@ pk_recvacquire(mhp)
 	}
     }
 
-	/* allocate first proposal */
-	newpp = newsaprop();
-	if (newpp == NULL) {
+	if (set_proposal_from_policy(iph2[n], sp_in, sp_out) < 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"failed to allocate saprop.\n");
+			"failed to create saprop.\n");
 		delph2(iph2[n]);
 		return -1;
 	}
-	newpp->prop_no = 1;
-	newpp->lifetime = iph2[n]->sainfo->lifetime;
-	newpp->lifebyte = iph2[n]->sainfo->lifebyte;
-	newpp->pfs_group = iph2[n]->sainfo->pfs_group;
-
-	/* set new saprop */
-	inssaprop(&iph2[n]->proposal, newpp);
-
 	insph2(iph2[n]);
-
-	for (req = sp->req; req; req = req->next) {
-		struct saproto *newpr;
-		struct sockaddr *psaddr = NULL;
-		struct sockaddr *pdaddr = NULL;
-
-		/* check if SA bundle ? */
-		if (req->saidx.src.ss_len && req->saidx.dst.ss_len) {
-
-			psaddr = (struct sockaddr *)&req->saidx.src;
-			pdaddr = (struct sockaddr *)&req->saidx.dst;
-
-			/* check end addresses of SA */
-			if (memcmp(iph2[n]->src, psaddr, iph2[n]->src->sa_len)
-			 || memcmp(iph2[n]->dst, pdaddr, iph2[n]->dst->sa_len)){
-				/*
-				 * XXX nested SAs with each destination
-				 * address are different.
-				 *       me +--- SA1 ---+ peer1
-				 *       me +--- SA2 --------------+ peer2
-				 */
-
-				/* check first ph2's proposal */
-				if (iph2[0]->proposal == NULL) {
-					plog(LLV_ERROR, LOCATION, NULL,
-						"SA addresses mismatch.\n");
-					goto err;
-				}
-
-				/* XXX new ph2 should be alloated. */
-				
-				plog(LLV_ERROR, LOCATION, NULL,
-					"not supported nested SA. Ignore.\n");
-				break;
-			}
-		}
-
-		/* allocate ipsec sa protocol */
-		newpr = newsaproto();
-		if (newpr == NULL) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to allocate saproto.\n");
-			goto err;
-		}
-
-		newpr->proto_id = ipproto2doi(req->saidx.proto);
-		newpr->spisize = 4;
-		newpr->encmode = pfkey2ipsecdoi_mode(req->saidx.mode);
-		newpr->reqid_out = req->saidx.reqid;
-
-		if (set_satrnsbysainfo(newpr, iph2[n]->sainfo) < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to get algorithms.\n");
-			goto err;
-		}
-
-		/* set new saproto */
-		inssaproto(newpp, newpr);
-	}
-
-	/* get reqid_in from inbound policy */
-	if (sp_in) {
-		struct saproto *pr;
-
-		req = sp_in->req;
-		pr = newpp->head;
-		while (req && pr) {
-			pr->reqid_in = req->saidx.reqid;
-			pr = pr->next;
-			req = req->next;
-		}
-		if (pr || req) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"There is a difference "
-				"between the policies.\n");
-			goto err;
-		}
-	}
 
 	/* start isakmp initiation by using ident exchange */
 	/* XXX should be looped if there are multiple phase 2 handler. */
