@@ -682,7 +682,7 @@ in6_control(so, cmd, data, ifp)
 		break;
  
 	case SIOCGIFSTAT_IN6:
-		if (ifp == NULL || ifp->if_index >= if_index)
+		if (ifp == NULL || ifp->if_index > if_index)
 			return EINVAL;
 		if (in6_ifstat == NULL || ifp->if_index >= in6_ifstatmax
 		 || in6_ifstat[ifp->if_index] == NULL) {
