@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.227 2002/01/31 14:14:57 jinmei Exp $	*/
+/*	$KAME: key.c,v 1.228 2002/01/31 14:51:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -166,18 +166,18 @@ static LIST_HEAD(_spacqtree, secspacq) spacqtree;	/* SP acquiring list */
 struct key_cb key_cb;
 
 /* search order for SAs */
-static u_int saorder_state_valid[] = {
+static const u_int saorder_state_valid[] = {
 	SADB_SASTATE_DYING, SADB_SASTATE_MATURE,
 	/*
 	 * This order is important because we must select a oldest SA
 	 * for outbound processing.  For inbound, This is not important.
 	 */
 };
-static u_int saorder_state_alive[] = {
+static const u_int saorder_state_alive[] = {
 	/* except DEAD */
 	SADB_SASTATE_MATURE, SADB_SASTATE_DYING, SADB_SASTATE_LARVAL
 };
-static u_int saorder_state_any[] = {
+static const u_int saorder_state_any[] = {
 	SADB_SASTATE_MATURE, SADB_SASTATE_DYING,
 	SADB_SASTATE_LARVAL, SADB_SASTATE_DEAD
 };
@@ -1704,6 +1704,7 @@ key_gather_mbuf(m, mhp, ndeep, nitem, va_alist)
 	return result;
 
 fail:
+	va_end(ap);
 	m_freem(result);
 	return NULL;
 }
@@ -4321,7 +4322,8 @@ key_bbcmp(p1, p2, bits)
  * XXX: year 2038 problem may remain.
  */
 void
-key_timehandler(void)
+key_timehandler(arg)
+	void *arg;
 {
 	u_int dir;
 	int s;
@@ -4585,10 +4587,9 @@ key_timehandler(void)
 	 * we don't bother to do that yet.
 	 */
 #ifdef __NetBSD__
-	callout_reset(&key_timehandler_ch, hz,
-	    (void *)key_timehandler, (void *)0);
+	callout_reset(&key_timehandler_ch, hz, key_timehandler, (void *)0);
 #else
-	(void)timeout((void *)key_timehandler, (void *)0, hz);
+	(void)timeout(key_timehandler, (void *)0, hz);
 #endif
 
 	splx(s);
@@ -7468,10 +7469,9 @@ key_init()
 #endif
 
 #ifdef __NetBSD__
-	callout_reset(&key_timehandler_ch, hz,
-	    (void *)key_timehandler, (void *)0);
+	callout_reset(&key_timehandler_ch, hz, key_timehandler, (void *)0);
 #else
-	timeout((void *)key_timehandler, (void *)0, hz);
+	timeout(key_timehandler, (void *)0, hz);
 #endif
 
 	/* initialize key statistics */
