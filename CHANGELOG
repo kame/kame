@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1412 2000/12/01 05:47:28 jinmei Exp $
+$KAME: CHANGELOG,v 1.1413 2000/12/01 05:55:40 jinmei Exp $
 
 <200012>
+2000-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *BSD/sys/netinet6/in6_pcb.c (in6_pcbnotify):
+	* *BSD/sys/netinet[6]/{tcp, udp, raw}XXX.c (ctlinput functions):
+	added clarifications and improvements:
+	- made the ctlinput mechanism more scope aware.
+	- considered flow label to detect PCBs to which should be notified a
+	  given error (as well as usual detection items such as port
+	  numbers).
+	- removed meaningless special considerations for PRC_HOSTDEAD
+	  cases.
+
 2000-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/esp_input.c (esp6_ctlinput): called
 	pfctlinput2 to tell applications minimum information about an
