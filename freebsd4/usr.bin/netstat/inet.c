@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)inet.c	8.5 (Berkeley) 5/24/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.37.2.12 2004/03/30 09:18:15 des Exp $";
+  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.37.2.13 2004/06/16 21:57:55 fjoe Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -333,7 +333,7 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			printf("Some %s sockets may have been created.\n",
 			       name);
 		} else {
-			printf("Some %s sockets may have been created or deleted",
+			printf("Some %s sockets may have been created or deleted.\n",
 			       name);
 		}
 	}

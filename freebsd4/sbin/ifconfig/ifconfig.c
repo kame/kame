@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.21 2004/03/15 07:25:30 ru Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.23 2004/12/12 20:12:50 brooks Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -285,6 +285,8 @@ struct	cmd {
 	{ "-txcsum",	-IFCAP_TXCSUM,	setifcap },
 	{ "netcons",	IFCAP_NETCONS,	setifcap },
 	{ "-netcons",	-IFCAP_NETCONS,	setifcap },
+	{ "polling",	IFCAP_POLLING,	setifcap },
+	{ "-polling",	-IFCAP_POLLING,	setifcap },
 	{ "normal",	-IFF_LINK0,	setifflags },
 	{ "compress",	IFF_LINK0,	setifflags },
 	{ "noicmp",	IFF_LINK1,	setifflags },
@@ -578,7 +580,10 @@ main(argc, argv)
 		ifm = (struct if_msghdr *)next;
 		
 		if (ifm->ifm_type == RTM_IFINFO) {
-			sdl = (struct sockaddr_dl *)(ifm + 1);
+			if (ifm->ifm_data.ifi_datalen == 0)
+				ifm->ifm_data.ifi_datalen = sizeof(struct if_data);
+			sdl = (struct sockaddr_dl *)((char *)ifm + sizeof(struct if_msghdr) -
+			    sizeof(struct if_data) + ifm->ifm_data.ifi_datalen);
 			flags = ifm->ifm_flags;
 		} else {
 			fprintf(stderr, "out of sync parsing NET_RT_IFLIST\n");
@@ -1140,7 +1145,7 @@ setifmtu(val, dummy, s, afp)
 "\20MULTICAST\21POLLING\24STATICARP"
 
 #define	IFCAPBITS \
-"\020\1RXCSUM\2TXCSUM\3NETCONS"
+"\020\1RXCSUM\2TXCSUM\3NETCONS\7POLLING"
 
 /*
  * Print the status of the interface.  If an address family was

@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 #
 #	@(#)rc	5.27 (Berkeley) 6/5/91
-# $FreeBSD: src/etc/rc,v 1.212.2.51 2002/10/17 17:25:07 schweikh Exp $
+# $FreeBSD: src/etc/rc,v 1.212.2.51.8.1 2005/01/13 22:09:17 anholt Exp $
 #
 
 # System startup script run by init on autoboot
@@ -370,8 +370,8 @@ esac
 # after a system crash.
 #
 rm -f /tmp/.X*-lock
-rm -fr /tmp/.X11-unix
-mkdir -m 1777 /tmp/.X11-unix
+rm -fr /tmp/.X11-unix /tmp/.ICE-unix /tmp/.font-unix /tmp/.XIM-unix
+mkdir -m 1777 /tmp/.X11-unix /tmp/.ICE-unix /tmp/.font-unix /tmp/.XIM-unix
 
 # Snapshot any kernel -c changes back to disk here <someday>.
 # This has changed with ELF and /kernel.config.
