@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.378 2004/07/12 05:31:25 suz Exp $	*/
+/*	$KAME: in6.c,v 1.379 2004/07/14 16:44:48 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1157,7 +1157,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			oia->ia_next = ia;
 		} else
 			in6_ifaddr = ia;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 		/* gain a refcnt for the link from in6_ifaddr */
 		IFAREF(&ia->ia_ifa);
 #endif
