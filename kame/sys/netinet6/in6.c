@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.139 2001/01/22 12:30:01 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.140 2001/01/22 13:12:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -859,6 +859,13 @@ in6_update_ifa(ifp, ifra, ia)
 	if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
 	    && lt->ia6t_vltime + time_second < time_second) {
 		return EINVAL;
+	}
+	if (lt->ia6t_vltime == 0) {
+		/*
+		 * the following log might be noisy, but this is a typical
+		 * configuration mistake or a tool's bug.
+		 */
+		log(LOG_INFO, "in6_update_ifa: valid lifetime is 0.\n");
 	}
 	if (lt->ia6t_pltime != ND6_INFINITE_LIFETIME
 	    && lt->ia6t_pltime + time_second < time_second) {
