@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.231 2002/03/20 22:47:12 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.232 2002/03/25 08:00:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -890,6 +890,13 @@ nd6_purge(ifp)
 		}
 		ln = nln;
 	}
+
+	/*
+	 * Reset the ND info so that the entry can be reinitialized for another
+	 * entry later.  Note that the basereachable member is used as a flag
+	 * to determine whether the structure should be initialized.
+	 */
+	bzero(&nd_ifinfo[ifp->if_index], sizeof(struct nd_ifinfo));
 }
 
 struct rtentry *
