@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.h,v 1.15 2004/06/15 09:55:43 suz Exp $	*/
+/*	$KAME: mld6_proto.h,v 1.16 2004/06/15 16:41:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -34,12 +34,12 @@
  *
  */
 /*
- * This program has been derived from pim6dd.        
+ * This program has been derived from pim6dd.
  * The pim6dd program is covered by the license in the accompanying file
  * named "LICENSE.pim6dd".
  */
 /*
- * This program has been derived from pimd.        
+ * This program has been derived from pimd.
  * The pimd program is covered by the license in the accompanying file
  * named "LICENSE.pimd".
  *
@@ -72,7 +72,7 @@ typedef struct
 
 #define MLD6_ROBUSTNESS_VARIABLE	v->uv_mld_robustness
 #define MLD6_QUERY_INTERVAL		v->uv_mld_query_interval
-#define MLD6_QUERY_RESPONSE_INTERVAL 	v->uv_mld_query_rsp_interval
+#define MLD6_QUERY_RESPONSE_INTERVAL	v->uv_mld_query_rsp_interval
 #define MLD6_LAST_LISTENER_QUERY_INTERVAL	v->uv_mld_llqi
 #ifndef MLD6_TIMER_SCALE
 #define MLD6_TIMER_SCALE 1000
@@ -84,8 +84,8 @@ typedef struct
  *  - Multicast Address Listening Interval (MLDv2, RFC3810 sec 9.4)
  */
 #define MLD6_LISTENER_INTERVAL (MLD6_ROBUSTNESS_VARIABLE * \
-                MLD6_QUERY_INTERVAL + \
-                MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)
+		MLD6_QUERY_INTERVAL + \
+		MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)
 #define MLD6_LAST_LISTENER_QUERY_COUNT      MLD6_ROBUSTNESS_VARIABLE
 #define MLD6_LAST_LISTENER_QUERY_TIMER \
 	(MLD6_LAST_LISTENER_QUERY_COUNT * \
@@ -99,28 +99,28 @@ typedef struct
 		MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)
 
 extern void     query_groups            __P((struct uvif *v));
-extern int      check_grp_membership    __P((struct uvif *v, 
-                                             struct sockaddr_in6 *group));
+extern int      check_grp_membership    __P((struct uvif *v,
+					     struct sockaddr_in6 *group));
 extern void     accept_listener_query   __P((struct sockaddr_in6 *src,
-                                             struct in6_addr *dst,
-                                             struct in6_addr *group,
-                                             int tmo));
+					     struct in6_addr *dst,
+					     struct in6_addr *group,
+					     int tmo));
 extern void     accept_listener_report  __P((struct sockaddr_in6 *src,
-                                             struct in6_addr *dst,
-                                             struct in6_addr *group));
+					     struct in6_addr *dst,
+					     struct in6_addr *group));
 extern void     accept_listener_done    __P((struct sockaddr_in6 *src,
-                                             struct in6_addr *dst,
-                                             struct in6_addr *group));
+					     struct in6_addr *dst,
+					     struct in6_addr *group));
 extern struct listaddr *check_multicast_listener __P((struct uvif *v,
 					     struct sockaddr_in6 *group));
 
 extern void     recv_listener_report	__P((mifi_t,
 					     struct sockaddr_in6 *src,
-                                             struct sockaddr_in6 *group,
+					     struct sockaddr_in6 *group,
 					     int mld_version));
 extern void     recv_listener_done      __P((mifi_t,
 					     struct sockaddr_in6 *src,
-                                             struct sockaddr_in6 *group));
+					     struct sockaddr_in6 *group));
 extern int	SetTimer __P((int mifi, struct listaddr * g));
 extern void	DelVif __P((void *));
 

@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.47 2004/06/15 10:03:28 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.48 2004/06/15 16:41:05 suz Exp $
  */
 
 /*
@@ -80,12 +80,12 @@
   *   - CHANGE_TO_INCLUDE:
   *	    regarded as (S,G)
   *
-  * If the Multicast Interface is configured to 
+  * If the Multicast Interface is configured to
   *	- any(both): goes to MLDv1-compat mode if MLDv1 is received.
   *	  (default)
   *	- MLDv1 only: ignores MLDv2 messages
   *	- MLDv2 only: ignores MLDv1 messages
-  */  
+  */
 
 /*
  * Forward declarations.
@@ -107,7 +107,7 @@ query_groupsV2(v)
 
     v->uv_gq_timer = v->uv_mld_query_interval;
     if ((v->uv_flags & VIFF_QUERIER) &&
-    	(v->uv_flags & VIFF_NOLISTENER) == 0) {
+	(v->uv_flags & VIFF_NOLISTENER) == 0) {
 	int ret;
 
 	if (v->uv_stquery_cnt)
@@ -154,18 +154,18 @@ Send_GSS_QueryV2(arg)
     }
 
     ret = send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-    		      NULL, &cbk->g->al_addr, v->uv_ifindex,
+		      NULL, &cbk->g->al_addr, v->uv_ifindex,
 		      MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
 		      v->uv_mld_robustness, v->uv_mld_query_interval, TRUE);
     if (ret == TRUE)
-    	v->uv_out_mld_query++;
+	v->uv_out_mld_query++;
 
     ret = send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-    		      NULL, &cbk->g->al_addr, v->uv_ifindex,
+		      NULL, &cbk->g->al_addr, v->uv_ifindex,
 		      MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGYES,
 		      v->uv_mld_robustness, v->uv_mld_query_interval, TRUE);
     if (ret == TRUE)
-    	v->uv_out_mld_query++;
+	v->uv_out_mld_query++;
 
     cbk->g->al_rob--;
 
@@ -174,10 +174,10 @@ Send_GSS_QueryV2(arg)
      * is received or timer expired ( XXX: The timer granularity is 1s !!)
      */
     if (cbk->g->al_rob > 0) {
-        timer_setTimer(MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
-                       Send_GSS_QueryV2, cbk);
+	timer_setTimer(MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
+		       Send_GSS_QueryV2, cbk);
     } else
-        free(cbk);
+	free(cbk);
 }
 
 /*
@@ -199,11 +199,11 @@ Send_GS_QueryV2(arg)
     }
 
     if (cbk->g->al_timer > MLD6_LAST_LISTENER_QUERY_TIMER &&
-        cbk->g->comp_mode == MLDv2)
-    	sflag = SFLAGYES;
+	cbk->g->comp_mode == MLDv2)
+	sflag = SFLAGYES;
 
     ret = send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-    		      NULL, &cbk->g->al_addr, v->uv_ifindex,
+		      NULL, &cbk->g->al_addr, v->uv_ifindex,
 		      MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, sflag,
 		      v->uv_mld_robustness, v->uv_mld_query_interval, FALSE);
     if (ret == TRUE)
@@ -215,10 +215,10 @@ Send_GS_QueryV2(arg)
      * is received or timer expired ( XXX: The timer granularity is 1s !!)
      */
     if (cbk->g->al_rob > 0) {
-        timer_setTimer(MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
-                       Send_GS_QueryV2, cbk);
+	timer_setTimer(MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
+		       Send_GS_QueryV2, cbk);
     } else
-        free(cbk);
+	free(cbk);
 }
 
 /*
@@ -250,8 +250,8 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     u_int8_t        sflag;
 
     /*
-     * Ignore my own listener v2 query 
-     * since they are processed in the kernel 
+     * Ignore my own listener v2 query
+     * since they are processed in the kernel
      */
 
     if (local_address(src) != NO_VIF)
@@ -276,7 +276,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     group = &mldh->mld_addr;
 
     /*
-     * XXX Hard Coding 
+     * XXX Hard Coding
      */
 
     if ((tmo = ntohs(mldh->mld_maxdelay)) >= 32768)
@@ -298,15 +298,15 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 
     /*
      * According to RFC2710 : when a query received from a router with a
-     * lower IPv6 address than me  : 
-     *   - start other Querier present. 
+     * lower IPv6 address than me  :
+     *   - start other Querier present.
      *   - pass (or stay in the Non Querier state) .
      */
 
     if (inet6_lessthan(src, &v->uv_linklocal->pa_addr)) {
 	IF_DEBUG(DEBUG_MLD)
 	    if (!inet6_equal(src, &v->uv_querier->al_addr))
-	    	log_msg(LOG_DEBUG, 0, "new querier %s (was %s) on vif %d",
+		log_msg(LOG_DEBUG, 0, "new querier %s (was %s) on vif %d",
 			sa6_fmt(src), sa6_fmt(&v->uv_querier->al_addr), vifi);
 
 	/* I'm not the querier anymore */
@@ -316,7 +316,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 	time(&v->uv_querier->al_ctime);
     }
     /*
-     * else nothing : the new router will receive a query one day... 
+     * else nothing : the new router will receive a query one day...
      */
 
     /*
@@ -327,7 +327,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 	return;
 
     /*
-     * routers adopt the most recent value of QRV and QQI unless 
+     * routers adopt the most recent value of QRV and QQI unless
      * this value is null
      */
     if (qrv != 0) {
@@ -349,14 +349,14 @@ accept_listenerV2_query(src, dst, query_message, datalen)
      */
     if (sflag == TRUE) {
 	log_msg(LOG_DEBUG, 0, "MLDv2 Query processing is suppressed");
-    	return;
+	return;
     }
 
     if (IN6_IS_ADDR_UNSPECIFIED(group)) {
 	log_msg(LOG_DEBUG, 0,
 		"nothing to do with general-query on router-side, "
 		"except for querier-election");
-    	return;
+	return;
     }
 
     IF_DEBUG(DEBUG_MLD)
@@ -368,7 +368,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     group_sa.sin6_addr = *group;
     group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
-    /* 
+    /*
      * group-specific query:
      * Filter Timer should be lowered to [Last Listener Query Interval].
      */
@@ -385,10 +385,10 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 
 	/* setup a timeout to remove the multicast record */
 	if (timer_leftTimer(g->al_timerid) >
-            (int) (MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE)) {
+	    (int) (MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE)) {
 	    timer_clearTimer(g->al_timerid);
 	    SET_TIMER(g->al_timer,
-	    	MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE);
+		MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE);
 	    g->al_timerid = SetTimer(vifi, g);
 	}
 
@@ -399,7 +399,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 	return;
     }
 
-    /* 
+    /*
      * group-source-specific query:
      * for each sources in the Specific Query
      * message, lower our membership timer to [Last Listener Query Interval]
@@ -410,10 +410,10 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 	source_sa.sin6_addr = mldh->mld_src[i];
 	source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
-        log_msg(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
+	log_msg(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
 
 	/*
-	 * Section 7.6.1 draft-vida-mld-v2-08.txt : When a router 
+	 * Section 7.6.1 draft-vida-mld-v2-08.txt : When a router
 	 * receive a query with clear router Side Processing flag,
 	 * it must update it's timer to reflect the correct
 	 * timeout values : source timer for sources are lowered to LLQI
@@ -425,10 +425,10 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 
 	/* setup a timeout to remove the source/group membership */
 	if (timer_leftTimer(s->al_timerid) >
-            (int) (MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE)) {
+	    (int) (MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE)) {
 	    timer_clearTimer(s->al_timerid);
 	    SET_TIMER(s->al_timer,
-	    	MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE);
+		MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE);
 	    s->al_timerid = SetTimerV2(vifi, g, s);
 	}
 
@@ -489,15 +489,15 @@ accept_listenerV2_report(src, dst, report_message, datalen)
     v->uv_in_mld_report++;
 
     /*
-     * loop through each multicast record 
+     * loop through each multicast record
      */
 
     totsrc = 0;
     for (i = 0; i < nummard; i++) {
 	struct mld_group_record_hdr *mard0 = (struct mld_group_record_hdr *)(report + 1);
- 	p = (char *)(mard0 + i) - sizeof(struct in6_addr) * i
+	p = (char *)(mard0 + i) - sizeof(struct in6_addr) * i
 		+ totsrc * sizeof(struct in6_addr);
-        mard= (struct mld_group_record_hdr *) p;
+	mard= (struct mld_group_record_hdr *) p;
 	numsrc = ntohs(mard->numsrc);
 	totsrc += numsrc;
 
@@ -531,13 +531,13 @@ accept_multicast_record(vifi, mard, src, grp)
 	int numsrc = ntohs(mard->numsrc);
 	int j;
 	struct sockaddr_in6 source_sa = { sizeof(source_sa), AF_INET6 };
-    	struct listaddr *s = NULL;
-    	struct listaddr *g = NULL;
+	struct listaddr *s = NULL;
+	struct listaddr *g = NULL;
 	cbk_t *cbk;
 
 	/* sanity check */
 	if (v->uv_flags & VIFF_NOLISTENER)
-	 	return;
+		return;
 	if (grp == NULL)
 		return;
 
@@ -547,21 +547,21 @@ accept_multicast_record(vifi, mard, src, grp)
 	switch (mard->record_type) {
 	case CHANGE_TO_INCLUDE_MODE:
 	    if (numsrc == 0) {
-	        if (g == NULL) {
+		if (g == NULL) {
 			log_msg(LOG_DEBUG, 0,
 				"impossible to delete non-existent record");
 			return;
 		}
 		g->filter_mode = MODE_IS_INCLUDE;
 		recv_listener_done(vifi, src, grp);
-	        break;
+		break;
 	    }
 	    /* FALLTHOUGH */
 	case MODE_IS_INCLUDE:
 	case ALLOW_NEW_SOURCES:
 	    for (j = 0; j < numsrc; j++) {
 		/*
-		 * Look for the src/group 
+		 * Look for the src/group
 		 * in our src/group list; if found, reset its timer.
 		 * (B)=MALI implementation
 		 */
@@ -577,7 +577,7 @@ accept_multicast_record(vifi, mard, src, grp)
 			log_msg(LOG_DEBUG, 0, "The Source/group already exist");
 
 		    /*
-		     * delete old timers , set a timer for expiration 
+		     * delete old timers , set a timer for expiration
 		     * => start timer for this source/group
 		     */
 
@@ -587,15 +587,15 @@ accept_multicast_record(vifi, mard, src, grp)
 
 		    /*
 		     * If in the checking Listener : notify the timer is > LLQI
-		     * for this source/group 
-                     * If we have specific queries for this source/group
-                     * pending they will be sent with the S flag set.
-                     */
+		     * for this source/group
+		     * If we have specific queries for this source/group
+		     * pending they will be sent with the S flag set.
+		     */
 
-                    if (s->al_rob > 0)
-                        s->al_checklist = MORETHANLLQI;
-                    else
-                        s->al_checklist = FALSE;
+		    if (s->al_rob > 0)
+			s->al_checklist = MORETHANLLQI;
+		    else
+			s->al_checklist = FALSE;
 		} else {
 		    /*
 		     * If not found, add it to the list and update kernel cache.
@@ -611,8 +611,8 @@ accept_multicast_record(vifi, mard, src, grp)
 		    s->sources = NULL;
 
 		    /*
-		     * if the group doesn't exist 
-		     * link it to the chain of group 
+		     * if the group doesn't exist
+		     * link it to the chain of group
 		     */
 
 		    if (g == NULL) {
@@ -635,7 +635,7 @@ accept_multicast_record(vifi, mard, src, grp)
 		    }
 
 		    /*
-		     * start timer for this source/group 
+		     * start timer for this source/group
 		     */
 
 		    s->al_checklist = FALSE;
@@ -643,7 +643,7 @@ accept_multicast_record(vifi, mard, src, grp)
 		    s->al_timerid = SetTimerV2(vifi, g, s);
 
 		    /*
-		     * link it to the chain of sources 
+		     * link it to the chain of sources
 		     */
 
 		    s->al_next = g->sources;
@@ -651,7 +651,7 @@ accept_multicast_record(vifi, mard, src, grp)
 		    time(&s->al_ctime);
 
 		    /*
-		     * this is protocol specific 
+		     * this is protocol specific
 		     */
 		    IF_DEBUG(DEBUG_MLD)
 			log_msg(LOG_DEBUG, 0,
@@ -668,25 +668,25 @@ accept_multicast_record(vifi, mard, src, grp)
 
 	case BLOCK_OLD_SOURCES:
 	    if (g == NULL) {
-	    	log_msg(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 			"cannot accept BLOCK_OLD_SOURCE record"
 			"for non-existent group");
-	    	return;
+		return;
 	    }
 	    if (g->comp_mode == MLDv1) {
-	    	log_msg(LOG_DEBUG, 0, "ignores BLOCK msg in MLDv1-compat-mode");
+		log_msg(LOG_DEBUG, 0, "ignores BLOCK msg in MLDv1-compat-mode");
 		return;
 	    }
 
 	    /*
-	     * Unlike RFC2710 section 4 p.7 (Routers in Non-Querier state 
-	     * MUST ignore Done messages), MLDv2 non-querier should 
+	     * Unlike RFC2710 section 4 p.7 (Routers in Non-Querier state
+	     * MUST ignore Done messages), MLDv2 non-querier should
 	     * accept BLOCK_OLD_SOURCES message to support fast-leave
 	     * (although it's not explcitly mentioned).
 	     */
 	    for (j = 0; j < numsrc; j++) {
 		/*
-		 * Look for the src/group 
+		 * Look for the src/group
 		 * in our src/group list; in order to set up a short-timeout
 		 * group/source specific query.
 		 */
@@ -700,8 +700,8 @@ accept_multicast_record(vifi, mard, src, grp)
 			break;
 		}
 		/*
-		 * the source exist , so according to the spec, we will always 
-		 * send a source specific query here : A*B is true here 
+		 * the source exist , so according to the spec, we will always
+		 * send a source specific query here : A*B is true here
 		 */
 		/** => start timer **/
 		/** timer updates are done in send_mldv2 **/
@@ -709,24 +709,24 @@ accept_multicast_record(vifi, mard, src, grp)
 			s->al_checklist = LESSTHANLLQI;
 			s->al_rob = MLD6_ROBUSTNESS_VARIABLE;
 		} else {
-                        s = NULL;
+			s = NULL;
 		}
 	    }
 
 	    /* scheduling MLD6_ROBUSTNESS_VAR specific queries to send */
-            /* => send a m-a-s	*/
-            /* start rxmt timer */
+	    /* => send a m-a-s	*/
+	    /* start rxmt timer */
 	    if (s) {
-	    	cbk = (cbk_t *)malloc(sizeof(cbk_t));
+		cbk = (cbk_t *)malloc(sizeof(cbk_t));
 		if (cbk == NULL)
 			log_msg(LOG_ERR, 0, "ran out of memory"); /* fatal */
 		g->al_rob = MLD6_ROBUSTNESS_VARIABLE;
-	    	cbk->g = g;
-	    	cbk->s = NULL;
-	    	cbk->q_time = MLD6_LAST_LISTENER_QUERY_INTERVAL;
- 	    	cbk->mifi = vifi;
+		cbk->g = g;
+		cbk->s = NULL;
+		cbk->q_time = MLD6_LAST_LISTENER_QUERY_INTERVAL;
+		cbk->mifi = vifi;
 
-	    	Send_GSS_QueryV2(cbk);
+		Send_GSS_QueryV2(cbk);
 	    }
 	    break;
 
@@ -736,13 +736,13 @@ accept_multicast_record(vifi, mard, src, grp)
 	    break;
 
 	case CHANGE_TO_EXCLUDE_MODE:
-	    /* 
-	     * RFC3810 8.3.2 says "MLDv2 BLOCK messages are ignored, as are 
+	    /*
+	     * RFC3810 8.3.2 says "MLDv2 BLOCK messages are ignored, as are
 	     * source-lists in TO_EX() messages".  But pim6sd does nothing,
 	     * since it always ignores the source-list in a TO_EX message.
 	     */
 	    if (g->comp_mode == MLDv1) {
-	    	log_msg(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "ignores TO_EX source list in MLDv1-compat-mode");
 	    }
 	    /* just regard as (*,G) but not shift to mldv1-compat-mode */
@@ -776,7 +776,7 @@ DelVifV2(arg)
      */
 
     /*
-     * protocol specific 
+     * protocol specific
      */
 
     IF_DEBUG(DEBUG_MLD)
@@ -788,15 +788,15 @@ DelVifV2(arg)
     delete_leaf(vifi, &s->al_addr, &g->al_addr);
 
     /*
-     * increment statistics 
+     * increment statistics
      */
     v->uv_listener_timo++;
 
     anp = &(v->uv_groups);
 
     /*
-     * unlink it from the chain 
-     * if there is no more source,delete the group 
+     * unlink it from the chain
+     * if there is no more source,delete the group
      */
 
     while ((a = *anp) != NULL) {
@@ -818,7 +818,7 @@ DelVifV2(arg)
 	}
 
 	/*
- 	 * no more sources, delete the group
+	 * no more sources, delete the group
 	 * clear the checklist state for this group
 	 */
 
@@ -834,7 +834,7 @@ DelVifV2(arg)
 
 /*
  * Set a timer to delete the record of a source/group membership on a vif.
- * typically used when report with record type 
+ * typically used when report with record type
  * -BLOCK_OLD_SOURCES,MODE_IS_INCLUDE,ALLOW_NEW_SOURCES  or  m-a-s source/group is received
  */
 
@@ -849,7 +849,7 @@ SetTimerV2(vifi, g, s)
 
     cbk = (cbk_t *) malloc(sizeof(cbk_t));
     if (cbk == NULL)
- 	log_msg(LOG_ERR, 0, "ran out of memory");	/*fatal */
+	log_msg(LOG_ERR, 0, "ran out of memory");	/*fatal */
     cbk->mifi = vifi;
     cbk->g = g;
     cbk->s = s;
@@ -860,7 +860,7 @@ SetTimerV2(vifi, g, s)
  * Checks for MLDv2 listeners: returns a pointer on the source/group if there
  * is a receiver for the group on the given uvif, or returns NULL otherwise.
  *
- * *g points the group if it exists on the given uvif. if the group does not 
+ * *g points the group if it exists on the given uvif. if the group does not
  * exist, *g is NULL.
  */
 struct listaddr *
@@ -902,7 +902,7 @@ mld_shift_to_v2mode(arg)
 	void *arg;
 {
 	cbk_t *cbk = (cbk_t *) arg;
-	
+
 	struct sockaddr_in6 *grp = &cbk->g->al_addr;
 	mifi_t mifi = cbk->mifi;
 	struct uvif *v = &uvifs[mifi];

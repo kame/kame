@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.43 2004/06/15 09:55:43 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.44 2004/06/15 16:41:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -139,7 +139,7 @@ query_groups(v)
 	v->uv_gq_timer = MLD6_QUERY_INTERVAL;
 	if (v->uv_flags & VIFF_QUERIER &&
 	    (v->uv_flags & VIFF_NOLISTENER) == 0) {
-	    	int ret;
+		int ret;
 
 		if (v->uv_stquery_cnt)
 			v->uv_stquery_cnt--;
@@ -147,7 +147,7 @@ query_groups(v)
 			v->uv_gq_timer = MLD6_STARTUP_QUERY_INTERVAL;
 		else
 			v->uv_gq_timer = MLD6_QUERY_INTERVAL;
-		ret = send_mld6(MLD_LISTENER_QUERY, 0, 
+		ret = send_mld6(MLD_LISTENER_QUERY, 0,
 			&v->uv_linklocal->pa_addr, NULL,
 			(struct in6_addr *)&in6addr_any, v->uv_ifindex,
 			MLD6_QUERY_RESPONSE_INTERVAL, 0, 1);
@@ -342,10 +342,10 @@ recv_listener_report(mifi, src, grp, mld_version)
 	register struct listaddr *g;
 
 	/*
-	 * Look for the group in our group list; if found, 
+	 * Look for the group in our group list; if found,
 	 *  1) if necessary, shift to MLDv1-compat-mode
-	 *  2) just reset MLD-related timers (nothing special is necessary 
-	 *     regarding compat-mode, since an MLDv2 TO_EX{NULL} message 
+	 *  2) just reset MLD-related timers (nothing special is necessary
+	 *     regarding compat-mode, since an MLDv2 TO_EX{NULL} message
 	 *     is also handled in here in the same manner as MLDv1 report).
 	 */
 	for (g = v->uv_groups; g != NULL; g = g->al_next) {
@@ -466,8 +466,8 @@ accept_listener_done(src, dst, group)
 	/*
 	 * MLD done does not affeect mld-compatibility;
 	 * draft-vida-mld-v2-05.txt section 7.3.2 says:
-	 *  The Multicast Address Compatibility Mode variable is based 
-	 *  on whether an older version report was heard in the last 
+	 *  The Multicast Address Compatibility Mode variable is based
+	 *  on whether an older version report was heard in the last
 	 *  Older Version Host Present Timeout seconds.
 	 */
 	if ((v->uv_mld_version & MLDv1) == 0) {
@@ -526,7 +526,7 @@ recv_listener_done(mifi, src, grp)
 
 		/* send a group specific query */
 		g->al_timer = (MLD6_LAST_LISTENER_QUERY_INTERVAL /
-			       MLD6_TIMER_SCALE) * 
+			       MLD6_TIMER_SCALE) *
 			       (MLD6_LAST_LISTENER_QUERY_COUNT + 1);
 
 		if ((v->uv_flags & VIFF_QUERIER) == 0 ||
@@ -534,11 +534,11 @@ recv_listener_done(mifi, src, grp)
 			goto set_timer;
 
 		/*
-		 * if an interface is configure in MLDv2, query is done 
+		 * if an interface is configure in MLDv2, query is done
 		 * by MLDv2, regardless of compat-mode.
 		 * (draft-vida-mld-v2-05.txt section 7.3.2 page 39)
 		 *
-		 * if an interface is configured only with MLDv1, query 
+		 * if an interface is configured only with MLDv1, query
 		 * is done by MLDv1.
 		 */
 #ifdef MLDV2_LISTENER_REPORT
@@ -549,7 +549,7 @@ recv_listener_done(mifi, src, grp)
 					  MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE,
 					  SFLAGNO, v->uv_mld_robustness,
 					  v->uv_mld_query_interval, FALSE);
-		} else if (v->uv_mld_version & MLDv1) 
+		} else if (v->uv_mld_version & MLDv1)
 #endif
 		{
 			ret = send_mld6(MLD_LISTENER_QUERY, 0,
@@ -636,10 +636,10 @@ DeleteTimer(id)
 }
 
 /*
- * Send a group-specific query.  This function shouldn't be called when 
+ * Send a group-specific query.  This function shouldn't be called when
  * the interface is configured with MLDv2, to prevent MLDv2 hosts from
  * shifting to MLDv1-compatible mode unnecessarily.
- * (now it's called only from SetQueryTimer() when the interface is 
+ * (now it's called only from SetQueryTimer() when the interface is
  *  configured in MLDv1, so the above condition is satisfied)
  */
 static void
@@ -658,7 +658,7 @@ SendQuery(arg)
 	}
 	if (v->uv_flags & VIFF_QUERIER &&
 	    (v->uv_flags & VIFF_NOLISTENER) == 0) {
-	    	int ret;
+		int ret;
 		ret = send_mld6(MLD_LISTENER_QUERY, 0,
 				&v->uv_linklocal->pa_addr, NULL,
 				&cbk->g->al_addr.sin6_addr, v->uv_ifindex,
