@@ -140,7 +140,6 @@ in_addmultisrc(inm, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 	u_int16_t i, j;
 	int ref_count;
 	int error = 0;
-	extern int igmpmaxsrcfilter;
 
 	if (mode != MCAST_INCLUDE && mode != MCAST_EXCLUDE)
 		return EOPNOTSUPP;
@@ -2096,9 +2095,6 @@ ip_setmopt_srcfilter(sop, imsfp)
 	int error = 0;
 	int init, final;
 	int s;
-#ifdef MROUTING
-	extern struct socket *ip_mrouter;
-#endif
 
 	if (*imsfp == NULL)
 		return EINVAL;
@@ -2680,9 +2676,6 @@ sock_setmopt_srcfilter(sop, grpfp)
 	int error = 0;
 	int init, final;
 	int s;
-#ifdef MROUTING
-	extern struct socket *ip_mrouter;
-#endif
 
 	if (*grpfp == NULL)
 		return EINVAL;
