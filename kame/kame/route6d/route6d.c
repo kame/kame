@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.59 2001/02/09 15:51:10 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.60 2001/03/08 02:15:42 onoe Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.59 2001/02/09 15:51:10 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.60 2001/03/08 02:15:42 onoe Exp $";
 #endif
 
 #include <stdio.h>
@@ -2690,6 +2690,8 @@ delroute(np, gw)
 	rtm->rtm_seq = ++seq;
 	rtm->rtm_pid = pid;
 	rtm->rtm_flags = RTF_UP | RTF_GATEWAY;
+	if (np->rip6_plen == sizeof(struct in6_addr) * 8)
+		rtm->rtm_flags |= RTF_HOST;
 	rtm->rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
 	sin = (struct sockaddr_in6 *)&buf[sizeof(struct rt_msghdr)];
 	/* Destination */
