@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.41 2004/06/08 09:22:26 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.42 2004/06/10 07:28:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -91,6 +91,7 @@ extern char *configfilename;
 
 extern int base64_decodestring __P((const char *, char *, size_t));
 
+static struct keyinfo *find_keybyname __P((struct keyinfo *, char *));
 static int add_pd_pif __P((struct iapd_conf *, struct cf_list *));
 static int add_options __P((int, struct dhcp6_ifconf *, struct cf_list *));
 static int add_prefix __P((struct dhcp6_list *, char *,
@@ -463,6 +464,26 @@ configure_host(hostlist)
 					goto bad;
 				}
 				break;
+			case DECL_DELAYEDKEY:
+				if (hconf->delayedkey != NULL) {
+					dprintf(LOG_WARNING, FNAME,
+					    "%s:%d: duplicate key %s for %s"
+					    " (ignored)", configfilename,
+					    cfl->line, cfl->ptr, host->name);
+					continue;
+				}
+				if ((hconf->delayedkey =
+				    find_keybyname(key_list0, cfl->ptr))
+				    == NULL) {
+					dprintf(LOG_ERR, FNAME, "failed to "
+					    "find key information for %s",
+					    cfl->ptr);
+					goto bad;
+				}
+				dprintf(LOG_DEBUG, FNAME, "configure key for "
+				    "delayed auth with %s (keyid=%08x)",
+				    host->name, hconf->delayedkey->keyid);
+				break;
 			default:
 				dprintf(LOG_ERR, FNAME, "%s:%d "
 				    "invalid host configuration for %s",
@@ -616,6 +637,7 @@ configure_keys(keylist)
 			    "key ID not specified for key %s", key->name);
 			goto bad;
 		}
+		kinfo->keyid = keyid;
 		if (kinfo->secret == NULL) {
 			dprintf(LOG_ERR, FNAME,
 			    "secret not specified for key %s", key->name);
@@ -638,6 +660,21 @@ configure_keys(keylist)
 	if (expire != NULL)
 		free(expire);
 	return (-1);
+}
+
+static struct keyinfo *
+find_keybyname(head, kname)
+	struct keyinfo *head;
+	char *kname;
+{
+	struct keyinfo *kinfo;
+
+	for (kinfo = head; kinfo != NULL; kinfo = kinfo->next) {
+		if (strcmp(kname, kinfo->name) == 0)
+			return (kinfo);
+	}
+
+	return (NULL);
 }
 
 int
@@ -1523,6 +1560,25 @@ find_prefix6(list, prefix)
 			return (&v->val_prefix6);
 		}
 	}
+	return (NULL);
+}
+
+struct keyinfo *
+find_key(realm, realmlen, id)
+	char *realm;
+	size_t realmlen;
+	u_int32_t id;
+{
+	struct keyinfo *key;
+
+	for (key = key_list; key; key = key->next) {
+		if (key->realmlen == realmlen &&
+		    memcmp(key->realm, realm, realmlen) == 0 &&
+		    key->keyid == id) {
+			return (key);
+		}
+	}
+
 	return (NULL);
 }
 

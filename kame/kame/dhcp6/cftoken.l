@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.30 2004/06/08 07:27:59 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.31 2004/06/10 07:28:28 jinmei Exp $	*/
 
 %{
 /*
@@ -147,6 +147,8 @@ ecl		\}
 <S_CNF>preference { DECHO; return (PREFERENCE); }
 
 <S_CNF>script { DECHO; return (SCRIPT); }
+
+<S_CNF>delayedkey { DECHO; return (DELAYEDKEY); }
 
 	/* request */
 <S_CNF>request { DECHO; return (REQUEST); }

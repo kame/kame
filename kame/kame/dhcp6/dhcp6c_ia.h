@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.h,v 1.5 2003/02/06 07:06:30 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.h,v 1.6 2004/06/10 07:28:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -52,5 +52,5 @@ struct iactl {
 };
 
 extern void update_ia __P((iatype_t, struct dhcp6_list *,
-    struct dhcp6_if *, struct duid *));
+    struct dhcp6_if *, struct duid *, struct authparam *));
 extern void release_all_ia __P((struct dhcp6_if *));

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.118 2004/05/13 14:05:56 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.119 2004/06/10 07:28:29 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -69,6 +69,7 @@
 #include <config.h>
 #include <common.h>
 #include <timer.h>
+#include <auth.h>
 
 typedef enum { DHCP6_BINDING_IA } dhcp6_bindingtype_t;
 
@@ -135,24 +136,24 @@ static void free_relayinfo __P((struct relayinfo *));
 static int process_relayforw __P((struct dhcp6 **, struct dhcp6opt **,
     struct relayinfolist *, struct sockaddr *));
 static int set_statelessinfo __P((struct dhcp6_optinfo *));
-static int react_solicit __P((struct dhcp6_if *, struct dhcp6 *,
+static int react_solicit __P((struct dhcp6_if *, struct dhcp6 *, ssize_t,
     struct dhcp6_optinfo *, struct sockaddr *, int, struct relayinfolist *));
 static int react_request __P((struct dhcp6_if *, struct in6_pktinfo *,
-    struct dhcp6 *, struct dhcp6_optinfo *, struct sockaddr *, int,
+    struct dhcp6 *, ssize_t, struct dhcp6_optinfo *, struct sockaddr *, int,
     struct relayinfolist *));
 static int react_renew __P((struct dhcp6_if *, struct in6_pktinfo *,
-    struct dhcp6 *, struct dhcp6_optinfo *, struct sockaddr *, int,
+    struct dhcp6 *, ssize_t, struct dhcp6_optinfo *, struct sockaddr *, int,
     struct relayinfolist *));
-static int react_rebind __P((struct dhcp6_if *, struct dhcp6 *,
+static int react_rebind __P((struct dhcp6_if *, struct dhcp6 *, ssize_t,
     struct dhcp6_optinfo *, struct sockaddr *, int, struct relayinfolist *));
 static int react_release __P((struct dhcp6_if *, struct in6_pktinfo *,
-    struct dhcp6 *, struct dhcp6_optinfo *, struct sockaddr *, int,
+    struct dhcp6 *, ssize_t, struct dhcp6_optinfo *, struct sockaddr *, int,
     struct relayinfolist *));
-static int react_informreq __P((struct dhcp6_if *, struct dhcp6 *,
+static int react_informreq __P((struct dhcp6_if *, struct dhcp6 *, ssize_t,
     struct dhcp6_optinfo *, struct sockaddr *, int, struct relayinfolist *));
 static int server6_send __P((int, struct dhcp6_if *, struct dhcp6 *,
     struct dhcp6_optinfo *, struct sockaddr *, int, struct dhcp6_optinfo *,
-    struct relayinfolist *));
+    struct relayinfolist *, struct host_conf *));
 static int make_ia_stcode __P((int, u_int32_t, u_int16_t,
     struct dhcp6_list *));
 static int make_binding_ia __P((int, struct dhcp6_listval *,
@@ -177,6 +178,9 @@ static struct dhcp6_timer *binding_timo __P((void *));
 static struct dhcp6_listval *find_binding_ia __P((struct dhcp6_listval *,
     struct dhcp6_binding *));
 static char *bindingstr __P((struct dhcp6_binding *));
+static int process_auth __P((struct dhcp6 *, ssize_t, struct host_conf *,
+    struct dhcp6_optinfo *, struct dhcp6_optinfo *));
+static inline char *clientstr __P((struct host_conf *, struct duid *));
 
 int
 main(argc, argv)
@@ -631,27 +635,27 @@ server6_recv(s)
 
 	switch (dh6->dh6_msgtype) {
 	case DH6_SOLICIT:
-		(void)react_solicit(ifp, dh6, &optinfo,
+		(void)react_solicit(ifp, dh6, len, &optinfo,
 		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_REQUEST:
-		(void)react_request(ifp, pi, dh6, &optinfo,
+		(void)react_request(ifp, pi, dh6, len, &optinfo,
 		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_RENEW:
-		(void)react_renew(ifp, pi, dh6, &optinfo,
+		(void)react_renew(ifp, pi, dh6, len, &optinfo,
 		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_REBIND:
-		(void)react_rebind(ifp, dh6, &optinfo,
+		(void)react_rebind(ifp, dh6, len, &optinfo,
 		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_RELEASE:
-		(void)react_release(ifp, pi, dh6, &optinfo,
+		(void)react_release(ifp, pi, dh6, len, &optinfo,
 		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	case DH6_INFORM_REQ:
-		(void)react_informreq(ifp, dh6, &optinfo,
+		(void)react_informreq(ifp, dh6, len, &optinfo,
 		    (struct sockaddr *)&from, fromlen, &relayinfohead);
 		break;
 	default:
@@ -824,9 +828,10 @@ set_statelessinfo(optinfo)
 }
 
 static int
-react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
+react_solicit(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
+	ssize_t len;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
@@ -859,6 +864,14 @@ react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	 * configure necessary options based on the options in solicit.
 	 */
 	dhcp6_init_options(&roptinfo);
+
+	/* process authentication */
+	if (process_auth(dh6, len, client_conf, optinfo, &roptinfo)) {
+		dprintf(LOG_INFO, FNAME, "failed to process authentication "
+		    "information for %s",
+		    clientstr(client_conf, &optinfo->clientID));
+		goto fail;
+	}
 
 	/* server information option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
@@ -894,8 +907,7 @@ react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	/*
 	 * The delegating router MUST include an IA_PD option, identifying any
 	 * prefix(es) that the delegating router will delegate to the
-	 * requesting router.
-	 * [dhcpv6-opt-prefix-delegation-01 Section 10.2]
+	 * requesting router.  [RFC3633 Section 11.2]
 	 */
 	if (!TAILQ_EMPTY(&optinfo->iapd_list)) {
 		int found = 0;
@@ -959,7 +971,7 @@ react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 		resptype = DH6_ADVERTISE;
 
 	error = server6_send(resptype, ifp, dh6, optinfo, from, fromlen,
-			     &roptinfo, relayinfohead);
+			     &roptinfo, relayinfohead, client_conf);
 	dhcp6_clear_options(&roptinfo);
 	return (error);
 
@@ -969,10 +981,11 @@ react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 }
 
 static int
-react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
+react_request(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct in6_pktinfo *pi;
 	struct dhcp6 *dh6;
+	ssize_t len;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
@@ -1015,6 +1028,20 @@ react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 		goto fail;
 	}
 
+	/* get per-host configuration for the client, if any. */
+	if ((client_conf = find_hostconf(&optinfo->clientID))) {
+		dprintf(LOG_DEBUG, FNAME,
+		    "found a host configuration named %s", client_conf->name);
+	}
+
+	/* process authentication */
+	if (process_auth(dh6, len, client_conf, optinfo, &roptinfo)) {
+		dprintf(LOG_INFO, FNAME, "failed to process authentication "
+		    "information for %s",
+		    clientstr(client_conf, &optinfo->clientID));
+		goto fail;
+	}
+
 	/*
 	 * When the server receives a Request message via unicast from a
 	 * client to which the server has not sent a unicast option, the server
@@ -1036,14 +1063,8 @@ react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 			goto fail;
 		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
-		    fromlen, &roptinfo, relayinfohead);
+		    fromlen, &roptinfo, relayinfohead, client_conf);
 		goto end;
-	}
-
-	/* get per-host configuration for the client, if any. */
-	if ((client_conf = find_hostconf(&optinfo->clientID))) {
-		dprintf(LOG_DEBUG, FNAME,
-		    "found a host configuration named %s", client_conf->name);
 	}
 
 	/*
@@ -1134,7 +1155,7 @@ react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 
 	/* send a reply message. */
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-	    &roptinfo, relayinfohead);
+	    &roptinfo, relayinfohead, client_conf);
 
   end:
 	dhcp6_clear_options(&roptinfo);
@@ -1146,10 +1167,11 @@ react_request(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 }
 
 static int
-react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
+react_renew(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct in6_pktinfo *pi;
 	struct dhcp6 *dh6;
+	ssize_t len;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
@@ -1157,6 +1179,7 @@ react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 {
 	struct dhcp6_optinfo roptinfo;
 	struct dhcp6_listval *iapd;
+	struct host_conf *client_conf;
 
 	/* message validation according to Section 15.6 of RFC3315 */
 
@@ -1192,6 +1215,20 @@ react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 		goto fail;
 	}
 
+	/* get per-host configuration for the client, if any. */
+	if ((client_conf = find_hostconf(&optinfo->clientID))) {
+		dprintf(LOG_DEBUG, FNAME,
+		    "found a host configuration named %s", client_conf->name);
+	}
+
+	/* process authentication */
+	if (process_auth(dh6, len, client_conf, optinfo, &roptinfo)) {
+		dprintf(LOG_INFO, FNAME, "failed to process authentication "
+		    "information for %s",
+		    clientstr(client_conf, &optinfo->clientID));
+		goto fail;
+	}
+
 	/*
 	 * When the server receives a Renew message via unicast from a
 	 * client to which the server has not sent a unicast option, the server
@@ -1213,7 +1250,7 @@ react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 			goto fail;
 		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
-		    fromlen, &roptinfo, relayinfohead);
+		    fromlen, &roptinfo, relayinfohead, client_conf);
 		goto end;
 	}
 
@@ -1238,7 +1275,7 @@ react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	}
 
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-	    &roptinfo, relayinfohead);
+	    &roptinfo, relayinfohead, client_conf);
 
   end:
 	dhcp6_clear_options(&roptinfo);
@@ -1250,9 +1287,10 @@ react_renew(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 }
 
 static int
-react_rebind(ifp, dh6, optinfo, from, fromlen, relayinfohead)
+react_rebind(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
+	ssize_t len;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
@@ -1260,6 +1298,7 @@ react_rebind(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 {
 	struct dhcp6_optinfo roptinfo;
 	struct dhcp6_listval *iapd;
+	struct host_conf *client_conf;
 
 	/* message validation according to Section 15.7 of RFC3315 */
 
@@ -1289,6 +1328,20 @@ react_rebind(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	/* copy client information back */
 	if (duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
 		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
+		goto fail;
+	}
+
+	/* get per-host configuration for the client, if any. */
+	if ((client_conf = find_hostconf(&optinfo->clientID))) {
+		dprintf(LOG_DEBUG, FNAME,
+		    "found a host configuration named %s", client_conf->name);
+	}
+
+	/* process authentication */
+	if (process_auth(dh6, len, client_conf, optinfo, &roptinfo)) {
+		dprintf(LOG_INFO, FNAME, "failed to process authentication "
+		    "information for %s",
+		    clientstr(client_conf, &optinfo->clientID));
 		goto fail;
 	}
 
@@ -1325,7 +1378,7 @@ react_rebind(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 	}
 
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-	    &roptinfo, relayinfohead);
+	    &roptinfo, relayinfohead, client_conf);
 
 	dhcp6_clear_options(&roptinfo);
 	return (0);
@@ -1336,10 +1389,11 @@ react_rebind(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 }
 
 static int
-react_release(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
+react_release(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	struct dhcp6_if *ifp;
 	struct in6_pktinfo *pi;
 	struct dhcp6 *dh6;
+	ssize_t len;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
@@ -1347,6 +1401,7 @@ react_release(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 {
 	struct dhcp6_optinfo roptinfo;
 	struct dhcp6_listval *iapd;
+	struct host_conf *client_conf;
 	u_int16_t stcode;
 
 	/* message validation according to Section 15.9 of RFC3315 */
@@ -1383,6 +1438,20 @@ react_release(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 		goto fail;
 	}
 
+	/* get per-host configuration for the client, if any. */
+	if ((client_conf = find_hostconf(&optinfo->clientID))) {
+		dprintf(LOG_DEBUG, FNAME,
+		    "found a host configuration named %s", client_conf->name);
+	}
+
+	/* process authentication */
+	if (process_auth(dh6, len, client_conf, optinfo, &roptinfo)) {
+		dprintf(LOG_INFO, FNAME, "failed to process authentication "
+		    "information for %s",
+		    clientstr(client_conf, &optinfo->clientID));
+		goto fail;
+	}
+
 	/*
 	 * When the server receives a Release message via unicast from a
 	 * client to which the server has not sent a unicast option, the server
@@ -1404,7 +1473,7 @@ react_release(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 			goto fail;
 		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
-		    fromlen, &roptinfo, relayinfohead);
+		    fromlen, &roptinfo, relayinfohead, client_conf);
 		goto end;
 	}
 
@@ -1432,11 +1501,78 @@ react_release(ifp, pi, dh6, optinfo, from, fromlen, relayinfohead)
 	}
 
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-	    &roptinfo, relayinfohead);
+	    &roptinfo, relayinfohead, client_conf);
 
   end:
 	dhcp6_clear_options(&roptinfo);
 	return (0);
+
+  fail:
+	dhcp6_clear_options(&roptinfo);
+	return (-1);
+}
+
+static int
+react_informreq(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
+	struct dhcp6_if *ifp;
+	struct dhcp6 *dh6;
+	ssize_t len;
+	struct dhcp6_optinfo *optinfo;
+	struct sockaddr *from;
+	int fromlen;
+	struct relayinfolist *relayinfohead;
+{
+	struct dhcp6_optinfo roptinfo;
+	int error;
+
+	/*
+	 * An IA option is not allowed to appear in an Information-request
+	 * message.  Such a message SHOULD be discarded.
+	 * [RFC3315 Section 15]
+	 */
+	if (!TAILQ_EMPTY(&optinfo->iapd_list)) {
+		dprintf(LOG_INFO, FNAME,
+		    "information request contains an IA_PD option");
+		return (-1);
+	}
+
+	/* if a server information is included, it must match ours. */
+	if (optinfo->serverID.duid_len &&
+	    duidcmp(&optinfo->serverID, &server_duid)) {
+		dprintf(LOG_INFO, FNAME, "server DUID mismatch");
+		return (-1);
+	}
+
+	/*
+	 * configure necessary options based on the options in request.
+	 */
+	dhcp6_init_options(&roptinfo);
+
+	/* server information option */
+	if (duidcpy(&roptinfo.serverID, &server_duid)) {
+		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
+		goto fail;
+	}
+
+	/* copy client information back (if provided) */
+	if (optinfo->clientID.duid_id &&
+	    duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
+		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
+		goto fail;
+	}
+
+	/* set stateless information */
+	if (set_statelessinfo(&roptinfo)) {
+		dprintf(LOG_ERR, FNAME,
+		    "failed to set other stateless information");
+		goto fail;
+	}
+
+	error = server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
+	    &roptinfo, relayinfohead, NULL);
+
+	dhcp6_clear_options(&roptinfo);
+	return (error);
 
   fail:
 	dhcp6_clear_options(&roptinfo);
@@ -1640,74 +1776,8 @@ release_binding_ia(iapd, retlist, optinfo)
 }
 
 static int
-react_informreq(ifp, dh6, optinfo, from, fromlen, relayinfohead)
-	struct dhcp6_if *ifp;
-	struct dhcp6 *dh6;
-	struct dhcp6_optinfo *optinfo;
-	struct sockaddr *from;
-	int fromlen;
-	struct relayinfolist *relayinfohead;
-{
-	struct dhcp6_optinfo roptinfo;
-	int error;
-
-	/*
-	 * An IA option is not allowed to appear in an Information-request
-	 * message.  Such a message SHOULD be discarded.
-	 * [RFC3315 Section 15]
-	 */
-	if (!TAILQ_EMPTY(&optinfo->iapd_list)) {
-		dprintf(LOG_INFO, FNAME,
-		    "information request contains an IA_PD option");
-		return (-1);
-	}
-
-	/* if a server information is included, it must match ours. */
-	if (optinfo->serverID.duid_len &&
-	    duidcmp(&optinfo->serverID, &server_duid)) {
-		dprintf(LOG_INFO, FNAME, "server DUID mismatch");
-		return (-1);
-	}
-
-	/*
-	 * configure necessary options based on the options in request.
-	 */
-	dhcp6_init_options(&roptinfo);
-
-	/* server information option */
-	if (duidcpy(&roptinfo.serverID, &server_duid)) {
-		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
-		goto fail;
-	}
-
-	/* copy client information back (if provided) */
-	if (optinfo->clientID.duid_id &&
-	    duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
-		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
-		goto fail;
-	}
-
-	/* set stateless information */
-	if (set_statelessinfo(&roptinfo)) {
-		dprintf(LOG_ERR, FNAME,
-		    "failed to set other stateless information");
-		goto fail;
-	}
-
-	error = server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
-	    &roptinfo, relayinfohead);
-
-	dhcp6_clear_options(&roptinfo);
-	return (error);
-
-  fail:
-	dhcp6_clear_options(&roptinfo);
-	return (-1);
-}
-
-static int
 server6_send(type, ifp, origmsg, optinfo, from, fromlen,
-    roptinfo, relayinfohead)
+    roptinfo, relayinfohead, client_conf)
 	int type;
 	struct dhcp6_if *ifp;
 	struct dhcp6 *origmsg;
@@ -1715,6 +1785,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen,
 	struct sockaddr *from;
 	int fromlen;
 	struct relayinfolist *relayinfohead;
+	struct host_conf *client_conf;
 {
 	char replybuf[BUFSIZ];
 	struct sockaddr_in6 dst;
@@ -1741,6 +1812,27 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen,
 		return (-1);
 	}
 	len += optlen;
+
+	/* calculate MAC if necessary, and put it to the message */
+	switch (roptinfo->authproto) {
+	case DHCP6_AUTHPROTO_DELAYED:
+		if (client_conf == NULL || client_conf->delayedkey == NULL) {
+			/* This case should have been caught earlier */
+			dprintf(LOG_ERR, FNAME, "authentication required "
+			    "but not key provided");
+			break;
+		}
+		if (dhcp6_calc_mac((char *)dh6, len, roptinfo->authproto,
+		    roptinfo->authalgorithm,
+		    roptinfo->delayedauth_offset + sizeof(*dh6),
+		    client_conf->delayedkey)) {
+			dprintf(LOG_WARNING, FNAME, "failed to calculate MAC");
+			return (-1);
+		}
+		break;
+	default:
+		break;		/* do nothing */
+	}
 
 	/* construct a relay chain, if necessary */
 	for (relayinfo = TAILQ_FIRST(relayinfohead); relayinfo;
@@ -2345,4 +2437,207 @@ bindingstr(binding)
 	}
 
 	return (strbuf);
+}
+
+static int
+process_auth(dh6, len, client_conf, optinfo, roptinfo)
+	struct dhcp6 *dh6;
+	ssize_t len;
+	struct host_conf *client_conf;
+	struct dhcp6_optinfo *optinfo, *roptinfo;
+{
+	u_int8_t msgtype = dh6->dh6_msgtype;
+	int authenticated = 0;
+	struct keyinfo *key;
+
+	/*
+	 * if the client wanted DHCPv6 authentication, check if a secret
+	 * key is available for the client.
+	 */
+	switch (optinfo->authproto) {
+	case DHCP6_AUTHPROTO_UNDEF:
+		/*
+		 * The client did not include authentication option.  What if
+		 * we had sent authentication information?  The specification
+		 * is not clear, but we should probably accept it, since the
+		 * client MAY ignore the information in advertise messages.
+		 */
+		return (0);
+	case DHCP6_AUTHPROTO_DELAYED:
+		if (optinfo->authalgorithm != DHCP6_AUTHALG_HMACMD5) {
+			dprintf(LOG_INFO, FNAME, "unknown authentication "
+			    "algorithm (%d) required by %s",
+			    optinfo->authalgorithm,
+			    clientstr(client_conf, &optinfo->clientID));
+			break;	/* give up with this authentication */
+		}
+
+		if (optinfo->authrdm != DHCP6_AUTHRDM_MONOCOUNTER) {
+			dprintf(LOG_INFO, FNAME,
+			    "unknown RDM (%d) required by %s",
+			    optinfo->authrdm,
+			    clientstr(client_conf, &optinfo->clientID));
+			break;	/* give up with this authentication */
+		}
+
+		/* see if we have a key for the client */
+		if (client_conf == NULL || client_conf->delayedkey == NULL) {
+			dprintf(LOG_INFO, FNAME, "client %s wanted "
+			    "authentication, but no key found",
+			    clientstr(client_conf, &optinfo->clientID));
+			break;
+		}
+		key = client_conf->delayedkey;
+		dprintf(LOG_DEBUG, FNAME, "found key %s for client %s",
+		    key->name, clientstr(client_conf, &optinfo->clientID));
+
+		if (msgtype == DH6_SOLICIT) {
+			if (!(optinfo->authflags & DHCP6OPT_AUTHFLAG_NOINFO)) {
+				/*
+				 * A solicit message should not contain
+				 * authentication information.
+				 */
+				dprintf(LOG_INFO, FNAME,
+				    "authentication information "
+				    "provided in solicit from %s",
+				    clientstr(client_conf,
+				    &optinfo->clientID)); 
+				/* accept it anyway. (or discard?) */
+			}
+		} else {
+			/* replay protection */
+			if (!client_conf->saw_previous_rd) {
+				dprintf(LOG_WARNING, FNAME,
+				    "previous RD value for %s is unknown "
+				    "(accept it)", clientstr(client_conf,
+				    &optinfo->clientID));
+			} else {
+				if (dhcp6_auth_replaycheck(optinfo->authrdm,
+				    client_conf->previous_rd,
+				    optinfo->authrd)) {
+					dprintf(LOG_INFO, FNAME,
+					    "possible replay attack detected "
+					    "for client %s",
+					    clientstr(client_conf,
+					    &optinfo->clientID));
+					break;
+				}
+			}
+
+			if ((optinfo->authflags & DHCP6OPT_AUTHFLAG_NOINFO)) {
+				dprintf(LOG_INFO, FNAME,
+				    "client %s did not provide authentication "
+				    "information in %s",
+				    clientstr(client_conf, &optinfo->clientID),
+				    dhcp6msgstr(msgtype));
+				break;
+			}
+
+			/*
+			 * The client MUST use the same key used by the server
+			 * to generate the authentication information.
+			 * [RFC3315 Section 21.4.4.3]
+			 * The RFC does not say what the server should do if
+			 * the client breaks this rule, but it should be
+			 * natural to interpret this as authentication failure.
+			 */
+			if (optinfo->delayedauth_keyid != key->keyid ||
+			    optinfo->delayedauth_realmlen != key->realmlen ||
+			    memcmp(optinfo->delayedauth_realmval, key->realm,
+			    key->realmlen) != 0) {
+				dprintf(LOG_INFO, FNAME, "authentication key "
+				    "mismatch with client %s",
+				    clientstr(client_conf,
+				    &optinfo->clientID));
+				break;
+			}
+
+			/* check for the key lifetime */
+			if (dhcp6_validate_key(key)) {
+				dprintf(LOG_INFO, FNAME, "key %s has expired",
+				    key->name);
+				break;
+			}
+
+			/* validate MAC */
+			if (dhcp6_verify_mac((char *)dh6, len,
+			    optinfo->authproto, optinfo->authalgorithm,
+			    optinfo->delayedauth_offset + sizeof(*dh6), key)
+			    == 0) {
+				dprintf(LOG_DEBUG, FNAME,
+				    "message authentication validated for "
+				    "client %s", clientstr(client_conf,
+				    &optinfo->clientID));
+			} else {
+				dprintf(LOG_INFO, FNAME, "invalid message "
+				    "authentication");
+				break;
+			}
+		}
+
+		roptinfo->authproto = optinfo->authproto;
+		roptinfo->authalgorithm = optinfo->authalgorithm;
+		roptinfo->authrdm = optinfo->authrdm;
+
+		if (get_rdvalue(roptinfo->authrdm, &roptinfo->authrd,
+		    sizeof(roptinfo->authrd))) {
+			dprintf(LOG_ERR, FNAME, "failed to get a replay "
+			    "detection value for %s",
+			    clientstr(client_conf, &optinfo->clientID));
+			break;	/* XXX: try to recover? */
+		}
+
+		roptinfo->delayedauth_keyid = key->keyid;
+		roptinfo->delayedauth_realmval =
+		    malloc(roptinfo->delayedauth_realmlen);
+		if (roptinfo->delayedauth_realmval == NULL) {
+			dprintf(LOG_ERR, FNAME, "failed to allocate memory "
+			    "for authentication realm for %s",
+			    clientstr(client_conf, &optinfo->clientID));
+			break;
+		}
+		roptinfo->delayedauth_realmlen = key->realmlen;
+		memcpy(roptinfo->delayedauth_realmval, key->realm,
+		    roptinfo->delayedauth_realmlen);
+
+		authenticated = 1;
+
+		break;
+	default:
+		dprintf(LOG_INFO, FNAME, "client %s wanted authentication "
+		    "with unsupported protocol (%d)",
+		    clientstr(client_conf, &optinfo->clientID),
+		    optinfo->authproto);
+		return (-1);	/* or simply ignore it? */
+	}
+
+	if (authenticated == 0) {
+		if (msgtype != DH6_SOLICIT) {
+			/*
+			 * If the message fails to pass the validation test,
+			 * the server MUST discard the message.
+			 * [RFC3315 Section 21.4.5.2]
+			 */
+			return (-1);
+		}
+	} else {
+		/* Message authenticated.  Update RD counter. */
+		if (msgtype != DH6_SOLICIT && client_conf != NULL) {
+			client_conf->previous_rd = optinfo->authrd;
+			client_conf->saw_previous_rd = 1;
+		}
+	}
+
+	return (0);
+}
+
+static inline char *
+clientstr(conf, duid)
+	struct host_conf *conf;
+	struct duid *duid;
+{
+	if (conf != NULL)
+		return (conf->name);
+
+	return (duidstr(duid));
 }

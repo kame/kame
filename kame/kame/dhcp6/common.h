@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.37 2004/03/31 14:47:21 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.38 2004/06/10 07:28:29 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -66,6 +66,9 @@ extern int dhcp6_vbuf_cmp __P((struct dhcp6_vbuf *, struct dhcp6_vbuf *));
 extern struct dhcp6_event *dhcp6_create_event __P((struct dhcp6_if *, int));
 extern void dhcp6_remove_event __P((struct dhcp6_event *));
 extern void dhcp6_remove_evdata __P((struct dhcp6_event *));
+extern struct authparam *new_authparam __P((int, int, int));
+extern struct authparam *copy_authparam __P((struct authparam *));
+extern int dhcp6_auth_replaycheck __P((int, u_int64_t, u_int64_t));
 extern int getifaddr __P((struct in6_addr *, char *, struct in6_addr *,
 			  int, int, int));
 extern int getifidfromaddr __P((struct in6_addr *, unsigned int *));
@@ -95,6 +98,8 @@ extern char *dhcp6msgstr __P((int));
 extern char *dhcp6_stcodestr __P((u_int16_t));
 extern char *duidstr __P((struct duid *));
 extern char *dhcp6_event_statestr __P((struct dhcp6_event *));
+extern int dhcp6_validate_key __P((struct keyinfo *));
+extern int get_rdvalue __P((int, void *, size_t));
 extern int duidcpy __P((struct duid *, struct duid *));
 extern int duidcmp __P((struct duid *, struct duid *));
 extern void duidfree __P((struct duid *));

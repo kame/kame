@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.29 2004/06/08 07:27:59 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.30 2004/06/10 07:28:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -70,6 +70,18 @@ struct dhcp6_if {
 	int authrdm;		/* replay attack detection method */
 };
 
+/* run-time authentication parameters */
+struct authparam {
+	int authproto;
+	int authalgorithm;
+	int authrdm;
+	struct keyinfo *key;
+	int flags;
+#define AUTHPARAM_FLAGS_NOPREVRD	0x1
+
+	u_int64_t prevrd;	/* previous RD value provided by the peer */
+};
+
 struct dhcp6_event {
 	TAILQ_ENTRY(dhcp6_event) link;
 
@@ -95,6 +107,9 @@ struct dhcp6_event {
 	struct dhcp6_serverinfo *current_server;
 	struct dhcp6_serverinfo *servers;
 
+	/* authentication parameters */
+	struct authparam *authparam;
+
 	TAILQ_HEAD(, dhcp6_eventdata) data_list;
 };
 
@@ -119,6 +134,9 @@ struct dhcp6_serverinfo {
 
 	int pref;		/* preference */
 	int active;		/* bool; if this server is active or not */
+
+	struct authparam *authparam; /* authentication parameters */
+
 	/* TODO: remember available information from the server */
 };
 
@@ -174,6 +192,12 @@ struct host_conf {
 
 	/* bindings of delegated prefixes */
 	struct dhcp6_list prefix_binding_list;
+
+	/* secret key shared with the client for delayed authentication */
+	struct keyinfo *delayedkey;
+	/* previous replay detection value from the client */
+	int saw_previous_rd;	/* if we remember the previous value */
+	u_int64_t previous_rd;
 };
 
 /* DHCPv6 authentication information */
@@ -189,7 +213,7 @@ struct authinfo {
 	/* keys specific to this info? */
 };
 
-/* secret key information */
+/* secret key information for delayed authentication */
 struct keyinfo {
 	struct keyinfo *next;
 
@@ -224,7 +248,7 @@ struct cf_list {
 };
 
 enum { DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
-       DECL_PREFIX, DECL_PREFERENCE, DECL_SCRIPT,
+       DECL_PREFIX, DECL_PREFERENCE, DECL_SCRIPT, DECL_DELAYEDKEY,
        IFPARAM_SLA_ID, IFPARAM_SLA_LEN,
        DHCPOPT_RAPID_COMMIT, DHCPOPT_AUTHINFO,
        DHCPOPT_DNS, DHCPOPT_DNSNAME,
@@ -269,3 +293,4 @@ extern struct authinfo *find_authinfo __P((struct authinfo *, char *));
 extern struct dhcp6_prefix *find_prefix6 __P((struct dhcp6_list *,
 					      struct dhcp6_prefix *));
 extern struct ia_conf *find_iaconf __P((struct ia_conflist *, int, u_int32_t));
+extern struct keyinfo *find_key __P((char *, size_t, u_int32_t));

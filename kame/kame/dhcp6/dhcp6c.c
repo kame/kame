@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.134 2004/06/08 07:27:59 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.135 2004/06/10 07:28:29 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -66,13 +66,14 @@
 #include <err.h>
 #include <ifaddrs.h>
 
-#include "dhcp6.h"
-#include "config.h"
-#include "common.h"
-#include "timer.h"
-#include "dhcp6c.h"
-#include "dhcp6c_ia.h"
-#include "prefixconf.h"
+#include <dhcp6.h>
+#include <config.h>
+#include <common.h>
+#include <timer.h>
+#include <dhcp6c.h>
+#include <dhcp6c_ia.h>
+#include <prefixconf.h>
+#include <auth.h>
 
 static int debug = 0;
 static int exit_ok = 0;
@@ -115,10 +116,12 @@ static int construct_reqdata __P((struct dhcp6_if *, struct dhcp6_optinfo *,
     struct dhcp6_event *));
 static void destruct_iadata __P((struct dhcp6_eventdata *));
 static void tv_sub __P((struct timeval *, struct timeval *, struct timeval *));
-
 static struct dhcp6_timer *client6_expire_lifetime __P((void *));
-struct dhcp6_timer *client6_timo __P((void *));
+static int process_auth __P((struct authparam *, struct dhcp6 *dh6, ssize_t,
+    struct dhcp6_optinfo *));
+static int set_auth __P((struct dhcp6_event *, struct dhcp6_optinfo *));
 
+struct dhcp6_timer *client6_timo __P((void *));
 int client6_ifinit __P((struct dhcp6_if *));
 
 extern int client6_script __P((char *, int, struct dhcp6_optinfo *));
@@ -412,9 +415,19 @@ client6_ifinit(ifp)
 		return (-1);
 	}
 	TAILQ_INSERT_TAIL(&ifp->event_list, ev, link);
+
+	if ((ev->authparam = new_authparam(ifp->authproto,
+	    ifp->authalgorithm, ifp->authrdm)) == NULL) {
+		dprintf(LOG_WARNING, FNAME, "failed to allocate "
+		    "authentication parameters");
+		dhcp6_remove_event(ev);
+		return (NULL);
+	}
+
 	if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
 		dprintf(LOG_NOTICE, FNAME, "failed to add a timer for %s",
 		    ifp->ifname);
+		dhcp6_remove_event(ev);
 		return (-1);
 	}
 	dhcp6_reset_timer(ev);
@@ -630,6 +643,11 @@ client6_timo(arg)
 			ev->timeouts = 0;
 			ev->state = DHCP6S_REQUEST;
 			dhcp6_set_timeoparam(ev);
+
+			if (ev->authparam != NULL)
+				free(ev->authparam);
+			ev->authparam = ev->current_server->authparam;
+			ev->current_server->authparam = NULL;
 
 			if (construct_reqdata(ifp,
 			    &ev->current_server->optinfo, ev)) {
@@ -993,12 +1011,10 @@ client6_send(ev)
 	}
 
 	/* authentication information */
-	if (ev->state == DHCP6S_SOLICIT &&
-	    ifp->authproto != DHCP6_AUTHPROTO_UNDEF) {
-		optinfo.authflags = DHCP6OPT_AUTHFLAG_NOINFO;
-		optinfo.authproto = ifp->authproto;
-		optinfo.authalgorithm = ifp->authalgorithm;
-		optinfo.authrdm = ifp->authrdm;
+	if (set_auth(ev, &optinfo)) {
+		dprintf(LOG_INFO, FNAME,
+		    "failed to set authentication option");
+		goto end;
 	}
 
 	/* set options in the message */
@@ -1008,6 +1024,27 @@ client6_send(ev)
 		goto end;
 	}
 	len += optlen;
+
+	/* calculate MAC if necessary, and put it to the message */
+	if (ev->authparam != NULL) {
+		switch (ev->authparam->authproto) {
+		case DHCP6_AUTHPROTO_DELAYED:
+			if (ev->authparam->key == NULL)
+				break;
+
+			if (dhcp6_calc_mac((char *)dh6, len,
+			    optinfo.authproto, optinfo.authalgorithm,
+			    optinfo.delayedauth_offset + sizeof(*dh6),
+			    ev->authparam->key)) {
+				dprintf(LOG_WARNING, FNAME,
+				    "failed to calculate MAC");
+				goto end;
+			}
+			break;
+		default:
+			break;	/* do nothing */
+		}
+	}
 
 	/*
 	 * Unless otherwise specified in this document or in a document that
@@ -1148,15 +1185,16 @@ client6_recv()
 }
 
 static int
-client6_recvadvert(ifp, dh6, len, optinfo0)
+client6_recvadvert(ifp, dh6, len, optinfo)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
 	ssize_t len;
-	struct dhcp6_optinfo *optinfo0;
+	struct dhcp6_optinfo *optinfo;
 {
 	struct dhcp6_serverinfo *newserver, **sp;
 	struct dhcp6_event *ev;
 	struct dhcp6_eventdata *evd;
+	struct authparam *authparam = NULL, authparam0;
 
 	/* find the corresponding event based on the received xid */
 	ev = find_event_withid(ifp, ntohl(dh6->dh6_xid) & DH6_XIDMASK);
@@ -1166,20 +1204,27 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	}
 
 	/* packet validation based on Section 15.3 of RFC3315. */
-	if (optinfo0->serverID.duid_len == 0) {
+	if (optinfo->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, FNAME, "no server ID option");
 		return (-1);
 	} else {
 		dprintf(LOG_DEBUG, FNAME, "server ID: %s, pref=%d",
-		    duidstr(&optinfo0->serverID),
-		    optinfo0->pref);
+		    duidstr(&optinfo->serverID),
+		    optinfo->pref);
 	}
-	if (optinfo0->clientID.duid_len == 0) {
+	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, FNAME, "no client ID option");
 		return (-1);
 	}
-	if (duidcmp(&optinfo0->clientID, &client_duid)) {
+	if (duidcmp(&optinfo->clientID, &client_duid)) {
 		dprintf(LOG_INFO, FNAME, "client DUID mismatch");
+		return (-1);
+	}
+
+	/* validate authentication */
+	authparam0 = *ev->authparam;
+	if (process_auth(&authparam0, dh6, len, optinfo)) {
+		dprintf(LOG_INFO, FNAME, "failed to process authentication");
 		return (-1);
 	}
 
@@ -1197,7 +1242,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	if (evd) {
 		u_int16_t stcode = DH6OPT_STCODE_NOPREFIXAVAIL;
 
-		if (dhcp6_find_listval(&optinfo0->stcode_list,
+		if (dhcp6_find_listval(&optinfo->stcode_list,
 		    DHCP6_LISTVAL_STCODE, &stcode, 0)) {
 			dprintf(LOG_INFO, FNAME,
 			    "advertise contains NoPrefixAvail status");
@@ -1216,7 +1261,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	if (ev->state != DHCP6S_SOLICIT ||
 	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
 		/*
-		 * We expect a reply message, but does actually receive an
+		 * We expected a reply message, but do actually receive an
 		 * Advertise message.  The server should be configured not to
 		 * allow the Rapid Commit option.
 		 * We process the message as if we expected the Advertise.
@@ -1227,26 +1272,47 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	}
 
 	/* ignore the server if it is known */
-	if (find_server(ev, &optinfo0->serverID)) {
+	if (find_server(ev, &optinfo->serverID)) {
 		dprintf(LOG_INFO, FNAME, "duplicated server (ID: %s)",
-		    duidstr(&optinfo0->serverID));
+		    duidstr(&optinfo->serverID));
 		return (-1);
 	}
 
 	/* keep the server */
 	if ((newserver = malloc(sizeof(*newserver))) == NULL) {
-		dprintf(LOG_ERR, FNAME, "memory allocation failed for server");
+		dprintf(LOG_WARNING, FNAME,
+		    "memory allocation failed for server");
 		return (-1);
 	}
 	memset(newserver, 0, sizeof(*newserver));
-	dhcp6_init_options(&newserver->optinfo);
-	if (dhcp6_copy_options(&newserver->optinfo, optinfo0)) {
-		dprintf(LOG_ERR, FNAME, "failed to copy options");
+
+	/* remember authentication parameters */
+	newserver->authparam = ev->authparam;
+	newserver->authparam->flags = authparam0.flags;
+	newserver->authparam->prevrd = authparam0.prevrd;
+	newserver->authparam->key = authparam0.key;
+
+	/* allocate new authentication parameter for the soliciting event */
+	if ((authparam = new_authparam(ev->authparam->authproto,
+	    ev->authparam->authalgorithm, ev->authparam->authrdm)) == NULL) {
+		dprintf(LOG_WARNING, FNAME, "memory allocation failed "
+		    "for authentication parameters");
 		free(newserver);
 		return (-1);
 	}
-	if (optinfo0->pref != DH6OPT_PREF_UNDEF)
-		newserver->pref = optinfo0->pref;
+	ev->authparam = authparam;
+
+	/* copy options */
+	dhcp6_init_options(&newserver->optinfo);
+	if (dhcp6_copy_options(&newserver->optinfo, optinfo)) {
+		dprintf(LOG_ERR, FNAME, "failed to copy options");
+		if (newserver->authparam != NULL)
+			free(newserver->authparam);
+		free(newserver);
+		return (-1);
+	}
+	if (optinfo->pref != DH6OPT_PREF_UNDEF)
+		newserver->pref = optinfo->pref;
 	newserver->active = 1;
 	for (sp = &ev->servers; *sp; sp = &(*sp)->next) {
 		if ((*sp)->pref != DH6OPT_PREF_MAX &&
@@ -1279,6 +1345,10 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 
 		ev->timeouts = 0;
 		ev->state = DHCP6S_REQUEST;
+
+		free(ev->authparam);
+		ev->authparam = newserver->authparam;
+		newserver->authparam = NULL;
 
 		client6_send(ev);
 
@@ -1374,6 +1444,12 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	}
 	if (duidcmp(&optinfo->clientID, &client_duid)) {
 		dprintf(LOG_INFO, FNAME, "client DUID mismatch");
+		return (-1);
+	}
+
+	/* validate authentication */
+	if (process_auth(ev->authparam, dh6, len, optinfo)) {
+		dprintf(LOG_INFO, FNAME, "failed to process authentication");
 		return (-1);
 	}
 
@@ -1506,7 +1582,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	/* update stateful configuration information */
 	if (state != DHCP6S_RELEASE) {
 		update_ia(IATYPE_PD, &optinfo->iapd_list, ifp,
-		    &optinfo->serverID);
+		    &optinfo->serverID, ev->authparam);
 	}
 
 	dhcp6_remove_event(ev);
@@ -1541,4 +1617,178 @@ find_event_withid(ifp, xid)
 	}
 
 	return (NULL);
+}
+
+static int
+process_auth(authparam, dh6, len, optinfo)
+	struct authparam *authparam;
+	struct dhcp6 *dh6;
+	ssize_t len;
+	struct dhcp6_optinfo *optinfo;
+{
+	struct keyinfo *key = NULL;
+	int authenticated = 0;
+
+	switch (optinfo->authproto) {
+	case DHCP6_AUTHPROTO_UNDEF:
+		/* server did not provide authentication option */
+		break;
+	case DHCP6_AUTHPROTO_DELAYED:
+		if ((optinfo->authflags & DHCP6OPT_AUTHFLAG_NOINFO)) {
+			dprintf(LOG_INFO, FNAME, "server did not include "
+			    "authentication information");
+			break;
+		}
+
+		if (optinfo->authalgorithm != DHCP6_AUTHALG_HMACMD5) {
+			dprintf(LOG_INFO, FNAME, "unknown authentication "
+			    "algorithm (%d)", optinfo->authalgorithm);
+			break;
+		}
+
+		if (optinfo->authrdm != DHCP6_AUTHRDM_MONOCOUNTER) {
+			dprintf(LOG_INFO, FNAME,"unknown RDM (%d)",
+			    optinfo->authrdm);
+			break;
+		}
+
+		/*
+		 * Replay protection.  If we do not know the previous RD value,
+		 * we accept the message anyway (XXX).
+		 */
+		if ((authparam->flags & AUTHPARAM_FLAGS_NOPREVRD)) {
+			dprintf(LOG_WARNING, FNAME, "previous RD value is "
+			    "unknown (accept it)");
+		} else {
+			if (dhcp6_auth_replaycheck(optinfo->authrdm,
+			    authparam->prevrd, optinfo->authrd)) {
+				dprintf(LOG_INFO, FNAME,
+				    "possible replay attack detected");
+				break;
+			}
+		}
+
+		/* identify the secret key */
+		key = find_key(optinfo->delayedauth_realmval,
+		    optinfo->delayedauth_realmlen,
+		    optinfo->delayedauth_keyid);
+		if (key == NULL) {
+			dprintf(LOG_INFO, FNAME, "failed to find key "
+			    "provided by the server (ID: %x)",
+			    optinfo->delayedauth_keyid);
+			break;
+		} else {
+			dprintf(LOG_DEBUG, FNAME, "found key for "
+			    "authentication: %s", key->name);
+		}
+		authparam->key = key;
+
+		/* check for the key lifetime */
+		if (dhcp6_validate_key(key)) {
+			dprintf(LOG_INFO, FNAME, "key %s has expired",
+			    key->name);
+			break;
+		}
+
+		/* validate MAC */
+		if (dhcp6_verify_mac((char *)dh6, len, optinfo->authproto,
+		    optinfo->authalgorithm,
+		    optinfo->delayedauth_offset + sizeof(*dh6), key) == 0) {
+			dprintf(LOG_DEBUG, FNAME, "message authentication "
+			    "validated");
+			authenticated = 1;
+		} else {
+			dprintf(LOG_INFO, FNAME, "invalid message "
+			    "authentication");
+		}
+
+		break;
+	default:
+		dprintf(LOG_INFO, FNAME, "server sent unsupported "
+		    "authentication protocol (%d)", optinfo->authproto);
+		break;
+	}
+
+	if (authenticated == 0) {
+		if (authparam->authproto != DHCP6_AUTHPROTO_UNDEF) {
+			dprintf(LOG_INFO, FNAME, "message not authenticated "
+			    "while authentication required");
+
+			/*
+			 * Right now, we simply discard unauthenticated
+			 * messages.
+			 */
+			return (-1);
+		}
+	} else {
+		/* if authenticated, update the "previous" RD value */
+		authparam->prevrd = optinfo->authrd;
+		authparam->flags &= ~AUTHPARAM_FLAGS_NOPREVRD;
+	}
+
+	return (0);
+}
+
+static int
+set_auth(ev, optinfo)
+	struct dhcp6_event *ev;
+	struct dhcp6_optinfo *optinfo;
+{
+	struct authparam *authparam = ev->authparam;
+
+	if (authparam == NULL)
+		return (0);
+
+	optinfo->authproto = authparam->authproto;
+	optinfo->authalgorithm = authparam->authalgorithm;
+	optinfo->authrdm = authparam->authrdm;
+
+	switch (authparam->authproto) {
+	case DHCP6_AUTHPROTO_UNDEF: /* we simply do not need authentication */
+		return (0);
+	case DHCP6_AUTHPROTO_DELAYED:
+		if (ev->state == DHCP6S_SOLICIT) {
+			optinfo->authflags |= DHCP6OPT_AUTHFLAG_NOINFO;
+			return (0); /* no auth information is needed */
+		}
+
+		if (authparam->key == NULL) {
+			dprintf(LOG_INFO, FNAME, "no authentication for %s",
+			    dhcp6_event_statestr(ev));
+			break;
+		}
+
+		if (dhcp6_validate_key(authparam->key)) {
+			dprintf(LOG_INFO, FNAME, "key %s is invalid",
+			    authparam->key->name);
+			return (-1);
+		}
+
+		if (get_rdvalue(optinfo->authrdm, &optinfo->authrd,
+		    sizeof(optinfo->authrd))) {
+			dprintf(LOG_ERR, FNAME, "failed to get a replay "
+			    "detection value");
+			return (-1);
+		}
+
+		optinfo->delayedauth_keyid = authparam->key->keyid;
+		optinfo->delayedauth_realmlen = authparam->key->realmlen;
+		optinfo->delayedauth_realmval =
+		    malloc(optinfo->delayedauth_realmlen);
+		if (optinfo->delayedauth_realmval == NULL) {
+			dprintf(LOG_ERR, FNAME, "failed to allocate memory "
+			    "for authentication realm");
+			return (-1);
+		}
+		memcpy(optinfo->delayedauth_realmval, authparam->key->realm,
+		    optinfo->delayedauth_realmlen);
+
+		break;
+	default:
+		dprintf(LOG_ERR, FNAME, "unsupported authentication protocol "
+		    "%d", authparam->authproto);
+		return (-1);
+	}
+
+	return (0);
 }

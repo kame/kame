@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.48 2004/06/08 07:27:59 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.49 2004/06/10 07:28:29 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -167,19 +167,30 @@ struct dhcp6_optinfo {
 
 	u_int authflags;
 #define DHCP6OPT_AUTHFLAG_NOINFO	0x1
-#define DHCP6OPT_AUTHFLAG_INVALID	0x2
 	int authproto;
 	int authalgorithm;
 	int authrdm;
 	/* the followings are effective only when NOINFO is unset */
 	u_int64_t authrd;
-	u_int32_t authkeyid;
-	struct dhcp6_vbuf authkey;
-#define authopt_keylen authkey.dv_len
-#define authopt_keyval authkey.dv_buf
-	struct dhcp6_vbuf authrealm;
-#define authopt_realmlen authrealm.dv_len
-#define authopt_realmval authrealm.dv_buf
+	union {
+		struct {
+			u_int32_t keyid;
+			struct dhcp6_vbuf realm;
+			int offset; /* offset to the HMAC field */
+		} aiu_delayed;
+		struct {
+			int type;
+			int offset; /* offset to the HMAC field */
+			char val[16]; /* key value */
+		} aiu_reconfig;
+	} authinfo;
+#define delayedauth_keyid authinfo.aiu_delayed.keyid
+#define delayedauth_realmlen authinfo.aiu_delayed.realm.dv_len
+#define delayedauth_realmval authinfo.aiu_delayed.realm.dv_buf
+#define delayedauth_offset authinfo.aiu_delayed.offset
+#define reconfigauth_type authinfo.aiu_reconfig.type
+#define reconfigauth_offset authinfo.aiu_reconfig.offset
+#define reconfigauth_val authinfo.aiu_reconfig.val
 };
 
 /* DHCP6 base packet format */

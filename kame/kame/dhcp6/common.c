@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.105 2004/06/08 11:05:35 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.106 2004/06/10 07:28:28 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -92,6 +92,8 @@ static int copyin_option __P((int, struct dhcp6opt *, struct dhcp6opt *,
 static ssize_t gethwid __P((char *, int, const char *, u_int16_t *));
 static int get_delegated_prefixes __P((char *, char *,
 				       struct dhcp6_optinfo *));
+static char *sprint_uint64 __P((char *, int, u_int64_t));
+static char *sprint_auth __P((struct dhcp6_optinfo *));
 
 int
 dhcp6_copy_list(dst, src)
@@ -362,8 +364,13 @@ dhcp6_remove_event(ev)
 		dprintf(LOG_DEBUG, FNAME, "removing server (ID: %s)",
 		    duidstr(&sp->optinfo.serverID));
 		dhcp6_clear_options(&sp->optinfo);
+		if (sp->authparam != NULL)
+			free(sp->authparam);
 		free(sp);
 	}
+
+	if (ev->authparam != NULL)
+		free(ev->authparam);
 
 	free(ev);
 }
@@ -381,6 +388,87 @@ dhcp6_remove_evdata(ev)
 		else
 			free(evd);
 	}
+}
+
+struct authparam *
+new_authparam(proto, alg, rdm)
+	int proto, alg, rdm;
+{
+	struct authparam *authparam;
+
+	if ((authparam = malloc(sizeof(*authparam))) == NULL)
+		return (NULL);
+
+	memset(authparam, 0, sizeof(*authparam));
+
+	authparam->authproto = proto;
+	authparam->authalgorithm = alg;
+	authparam->authrdm = rdm;
+	authparam->key = NULL;
+	authparam->flags |= AUTHPARAM_FLAGS_NOPREVRD;
+	authparam->prevrd = 0;
+
+	return (authparam);
+}
+
+struct authparam *
+copy_authparam(authparam)
+	struct authparam *authparam;
+{
+	struct authparam *dst;
+
+	if ((dst = malloc(sizeof(*dst))) == NULL)
+		return (NULL);
+
+	memcpy(dst, authparam, sizeof(*dst));
+
+	return (dst);
+}
+
+/*
+ * Home-brew function of a 64-bit version of ntohl.
+ * XXX: is there any standard for this?
+ */
+#if (BYTE_ORDER == LITTLE_ENDIAN)
+static __inline u_int64_t
+ntohq(u_int64_t x)
+{
+	return (u_int64_t)ntohl((u_int32_t)(x >> 32)) |
+	    (int64_t)ntohl((u_int32_t)(x & 0xffffffff)) << 32;
+}
+#else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
+#define ntohq(x) (x)
+#endif
+
+int
+dhcp6_auth_replaycheck(method, prev, current)
+	int method;
+	u_int64_t prev, current;
+{
+	char bufprev[] = "ffff ffff ffff ffff";
+	char bufcurrent[] = "ffff ffff ffff ffff";
+
+	if (method != DHCP6_AUTHRDM_MONOCOUNTER) {
+		dprintf(LOG_ERR, FNAME, "unsupported replay detection "
+		    "method (%d)", method);
+		return (-1);
+	}
+
+	(void)sprint_uint64(bufprev, sizeof(bufprev), prev);
+	(void)sprint_uint64(bufcurrent, sizeof(bufcurrent), current);
+	dprintf(LOG_DEBUG, FNAME, "previous: %s, current: %s",
+	    bufprev, bufcurrent);
+
+	prev = ntohq(prev);
+	current = ntohq(current);
+
+	/* we call the singular point guilty */
+        if (prev == (current ^ 8000000000000000UL)) {
+		dprintf(LOG_INFO, FNAME, "detected a singular point");
+		return (1);
+	}
+
+	return (((int64_t)(current - prev) > 0) ? 0 : 1);
 }
 
 int
@@ -862,6 +950,13 @@ void
 dhcp6_clear_options(optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
+	switch (optinfo->authproto) {
+	case DHCP6_AUTHPROTO_DELAYED:
+		if (optinfo->delayedauth_realmval != NULL) {
+			free(optinfo->delayedauth_realmval);
+		}
+		break;
+	}
 
 	duidfree(&optinfo->clientID);
 	duidfree(&optinfo->serverID);
@@ -881,12 +976,6 @@ dhcp6_clear_options(optinfo)
 
 	if (optinfo->ifidopt_id != NULL)
 		free(optinfo->ifidopt_id);
-
-	if (optinfo->authopt_keyval != NULL)
-		free(optinfo->authopt_keyval);
-
-	if (optinfo->authopt_realmval != NULL)
-		free(optinfo->authopt_realmval);
 
 	dhcp6_init_options(optinfo);
 }
@@ -943,24 +1032,28 @@ dhcp6_copy_options(dst, src)
 	dst->authalgorithm = src->authalgorithm;
 	dst->authrdm = src->authrdm;
 	dst->authrd = src->authrd;
-	dst->authkeyid = src->authkeyid;
-	if (src->authopt_keyval != NULL) {
-		if ((dst->authopt_keyval = malloc(src->authopt_keylen))
-		    == NULL) {
-			goto fail;
+
+	switch (src->authproto) {
+	case DHCP6_AUTHPROTO_DELAYED:
+		dst->delayedauth_keyid = src->delayedauth_keyid;
+		dst->delayedauth_offset = src->delayedauth_offset;
+		dst->delayedauth_realmlen = src->delayedauth_realmlen;
+		if (src->delayedauth_realmval != NULL) {
+			if ((dst->delayedauth_realmval =
+			    malloc(src->delayedauth_realmlen)) == NULL) {
+				goto fail;
+			}
+			memcpy(dst->delayedauth_realmval,
+			    src->delayedauth_realmval,
+			    src->delayedauth_realmlen);
 		}
-		dst->authopt_keylen = src->authopt_keylen;
-		memcpy(dst->authopt_keyval, src->authopt_keyval,
-		    src->authopt_keylen);
-	}
-	if (src->authopt_realmval != NULL) {
-		if ((dst->authopt_realmval = malloc(src->authopt_realmlen))
-		    == NULL) {
-			goto fail;
-		}
-		dst->authopt_realmval = src->authopt_realmval;
-		memcpy(dst->authopt_realmval, src->authopt_realmval,
-		    src->authopt_realmlen);
+		break;
+	case DHCP6_AUTHPROTO_RECONFIG:
+		dst->reconfigauth_type = src->reconfigauth_type;
+		dst->reconfigauth_offset = src->reconfigauth_offset;
+		memcpy(dst->reconfigauth_val, src->reconfigauth_val,
+		    sizeof(dst->reconfigauth_val));
+		break;
 	}
 
 	return (0);
@@ -979,14 +1072,16 @@ dhcp6_get_options(p, ep, optinfo)
 	struct dhcp6opt *np, opth;
 	int i, opt, optlen, reqopts;
 	u_int16_t num;
-	char *cp, *val;
+	char *bp, *cp, *val;
 	u_int16_t val16;
 	u_int32_t val32;
 	struct in6_addr valaddr;
 	struct dhcp6opt_ia optia;
 	struct dhcp6_ia ia;
 	struct dhcp6_list sublist;
+	int authinfolen;
 
+	bp = (char *)p;
 	for (; p + 1 <= ep; p = np) {
 		struct duid duid0;
 
@@ -1115,6 +1210,83 @@ dhcp6_get_options(p, ep, optinfo)
 				goto fail;
 			memcpy(optinfo->relaymsg_msg, cp, optlen);
 			optinfo->relaymsg_len = optlen;
+			break;
+		case DH6OPT_AUTH:
+			if (optlen < sizeof(struct dhcp6opt_auth) - 4)
+				goto malformed;
+
+			/*
+			 * Any DHCP message that includes more than one
+			 * authentication option MUST be discarded.
+			 * [RFC3315 Section 21.4.2]
+			 */
+			if (optinfo->authproto != DHCP6_AUTHPROTO_UNDEF) {
+				dprintf(LOG_INFO, FNAME, "found more than one "
+				    "authentication option");
+				goto fail;
+			}
+
+			optinfo->authproto = *cp++;
+			optinfo->authalgorithm = *cp++;
+			optinfo->authrdm = *cp++;
+			memcpy(&optinfo->authrd, cp, sizeof(optinfo->authrd));
+			cp += sizeof(optinfo->authrd);
+
+			dprintf(LOG_DEBUG, "", "  %s", sprint_auth(optinfo));
+
+			authinfolen =
+			    optlen - (sizeof(struct dhcp6opt_auth) - 4);
+			switch (optinfo->authproto) {
+			case DHCP6_AUTHPROTO_DELAYED:
+				if (authinfolen == 0) {
+					optinfo->authflags |=
+					    DHCP6OPT_AUTHFLAG_NOINFO;
+					break;
+				}
+				/* XXX: should we reject an empty realm? */
+				if (authinfolen <
+				    sizeof(optinfo->delayedauth_keyid) + 16) {
+					goto malformed;
+				}
+
+				optinfo->delayedauth_realmlen = authinfolen -
+				    (sizeof(optinfo->delayedauth_keyid) + 16);
+				optinfo->delayedauth_realmval =
+				    malloc(optinfo->delayedauth_realmlen);
+				if (optinfo->delayedauth_realmval == NULL) {
+					dprintf(LOG_WARNING, FNAME, "failed "
+					    "allocate memory for auth realm");
+					goto fail;
+				}
+				memcpy(optinfo->delayedauth_realmval, cp,
+				    optinfo->delayedauth_realmlen);
+				cp += optinfo->delayedauth_realmlen;
+
+				memcpy(&optinfo->delayedauth_keyid, cp,
+				    sizeof(optinfo->delayedauth_keyid));
+				optinfo->delayedauth_keyid =
+				    ntohl(optinfo->delayedauth_keyid);
+				cp += sizeof(optinfo->delayedauth_keyid);
+
+				optinfo->delayedauth_offset = cp - bp;
+				cp += 16;
+
+				dprintf(LOG_DEBUG, "", "  auth key ID: %x, "
+				    "offset=%d, realmlen=%d",
+				    optinfo->delayedauth_keyid,
+				    optinfo->delayedauth_offset,
+				    optinfo->delayedauth_realmlen);
+				break;
+#ifdef notyet
+			case DHCP6_AUTHPROTO_RECONFIG:
+				break;
+#endif
+			default:
+				dprintf(LOG_INFO, FNAME,
+				    "unsupported authentication protocol: %d",
+				    *cp);
+				goto fail;
+			}
 			break;
 		case DH6OPT_RAPID_COMMIT:
 			if (optlen != 0)
@@ -1619,6 +1791,76 @@ get_delegated_prefixes(p, ep, optinfo)
 	return (-1);
 }
 
+static char *
+sprint_uint64(buf, buflen, i64)
+	char *buf;
+	int buflen;
+	u_int64_t i64;
+{
+	u_int16_t rd0, rd1, rd2, rd3;
+
+	rd0 = ntohs(*(u_int16_t *)&i64);
+	rd1 = ntohs(*((u_int16_t *)&i64 + 1));
+	rd2 = ntohs(*((u_int16_t *)&i64 + 2));
+	rd3 = ntohs(*((u_int16_t *)&i64 + 3));
+
+	snprintf(buf, buflen, "%04x %04x %04x %04x", rd0, rd1, rd2, rd3);
+
+	return (buf);
+}
+
+static char *
+sprint_auth(optinfo)
+	struct dhcp6_optinfo *optinfo;
+{
+	static char ret[1024];	/* XXX: thread unsafe */
+	char *proto, proto0[] = "unknown(255)";
+	char *alg, alg0[] = "unknown(255)";
+	char *rdm, rdm0[] = "unknown(255)";
+	char rd[] = "ffff ffff ffff ffff";
+
+	switch (optinfo->authproto) {
+	case DHCP6_AUTHPROTO_DELAYED:
+		proto = "delayed";
+		break;
+	case DHCP6_AUTHPROTO_RECONFIG:
+		proto = "reconfig";
+		break;
+	default:
+		snprintf(proto0, sizeof(proto0), "unknown(%d)",
+		    optinfo->authproto & 0xff);
+		proto = proto0;
+		break;
+	}
+
+	switch (optinfo->authalgorithm) {
+	case DHCP6_AUTHALG_HMACMD5:
+		alg = "HMAC-MD5";
+		break;
+	default:
+		snprintf(alg0, sizeof(alg0), "unknown(%d)",
+		    optinfo->authalgorithm & 0xff);
+		alg = alg0;
+		break;
+	}
+
+	switch (optinfo->authrdm) {
+	case DHCP6_AUTHRDM_MONOCOUNTER:
+		rdm = "mono counter";
+		break;
+	default:
+		snprintf(rdm0, sizeof(rdm0), "unknown(%d)", optinfo->authrdm);
+		rdm = rdm0;
+	}
+
+	(void)sprint_uint64(rd, sizeof(rd), optinfo->authrd);
+
+	snprintf(ret, sizeof(ret), "proto: %s, alg: %s, RDM: %s, RD: %s",
+	    proto, alg, rdm, rd);
+
+	return (ret);
+}
+
 #define COPY_OPTION(t, l, v, p) do { \
 	if ((void *)(ep) - (void *)(p) < (l) + sizeof(struct dhcp6opt)) { \
 		dprintf(LOG_INFO, FNAME, "option buffer short for %s", dhcp6optstr((t))); \
@@ -1919,11 +2161,6 @@ dhcp6_set_options(bp, ep, optinfo)
 		COPY_OPTION(DH6OPT_LIFETIME, sizeof(p32), &p32, p);
 	}
 
-	/*
-	 * Add authentication information, if necessary.  This must be done
-	 * after adding all other options since we may have to calculate
-	 * authentication code over the entire message including the options.
-	 */
 	if (optinfo->authproto != DHCP6_AUTHPROTO_UNDEF) {
 		struct dhcp6opt_auth *auth;
 		int authlen;
@@ -1934,8 +2171,8 @@ dhcp6_set_options(bp, ep, optinfo)
 			switch (optinfo->authproto) {
 			case DHCP6_AUTHPROTO_DELAYED:
 				/* Realm + key ID + HMAC-MD5 */
-				authlen += optinfo->authopt_realmlen +
-				    sizeof(optinfo->authkeyid) + 16;
+				authlen += optinfo->delayedauth_realmlen +
+				    sizeof(optinfo->delayedauth_keyid) + 16;
 				break;
 #ifdef notyet
 			case DHCP6_AUTHPROTO_RECONFIG:
@@ -1964,22 +2201,31 @@ dhcp6_set_options(bp, ep, optinfo)
 		    sizeof(auth->dh6_auth_rdinfo));
 
 		if (!(optinfo->authflags & DHCP6OPT_AUTHFLAG_NOINFO)) {
+			u_int32_t p32;
+
 			switch (optinfo->authproto) {
 			case DHCP6_AUTHPROTO_DELAYED:
 				authinfo = (char *)(auth + 1);
 
 				/* copy realm */
-				memcpy(authinfo, optinfo->authopt_realmval,
-				    optinfo->authopt_realmlen);
-				authinfo += optinfo->authopt_realmlen;
+				memcpy(authinfo, optinfo->delayedauth_realmval,
+				    optinfo->delayedauth_realmlen);
+				authinfo += optinfo->delayedauth_realmlen;
 
 				/* copy key ID (need memcpy for alignment) */
-				memcpy(authinfo, &optinfo->authkey,
-				    sizeof(optinfo->authkey));
+				p32 = htonl(optinfo->delayedauth_keyid);
+				memcpy(authinfo, &p32, sizeof(p32));
+
+				/*
+				 * Set the offset so that the caller can
+				 * calculate the HMAC.
+				 */
+				optinfo->delayedauth_offset =
+				    ((char *)p - (char *)bp) + authlen - 16;
+
+				dprintf(LOG_DEBUG, FNAME, "key ID %x, offset %d",
+				    optinfo->delayedauth_keyid, optinfo->delayedauth_offset); 
 				break;
-
-				/* calculate HMAC (not yet) */
-
 #ifdef notyet
 			case DHCP6_AUTHPROTO_RECONFIG:
 #endif
@@ -2313,6 +2559,62 @@ duidfree(duid)
 		free(duid->duid_id);
 	duid->duid_id = NULL;
 	duid->duid_len = 0;
+}
+
+/*
+ * Provide an NTP-format timestamp as a replay detection counter
+ * as mentioned in RFC3315.
+ */
+#define JAN_1970        2208988800UL        /* 1970 - 1900 in seconds */
+int
+get_rdvalue(rdm, rdvalue, rdsize)
+	int rdm;
+	void *rdvalue;
+	size_t rdsize;
+{
+	struct timespec tp;
+	u_int32_t u32, l32;
+	double nsec;
+
+	if (rdm != DHCP6_AUTHRDM_MONOCOUNTER) {
+		dprintf(LOG_INFO, FNAME, "unsupported RDM (%d)", rdm);
+		return (-1);
+	}
+	if (rdsize != sizeof(u_int64_t)) {
+		dprintf(LOG_INFO, FNAME, "unsupported RD size (%d)", rdsize);
+		return (-1);
+	}
+
+	if (clock_gettime(CLOCK_REALTIME, &tp)) {
+		dprintf(LOG_WARNING, FNAME, "clock_gettime failed: %s",
+		    strerror(errno));
+		return (-1);
+	}
+
+	u32 = (u_int32_t)tp.tv_sec;
+	u32 += JAN_1970;
+
+	nsec = (double)tp.tv_nsec / 1e9 * 0x100000000UL;
+	/* nsec should be smaller than 2^32 */
+	l32 = (u_int32_t)nsec;
+
+	u32 = htonl(u32);
+	l32 = htonl(l32);
+
+	memcpy(rdvalue, &u32, sizeof(u32));
+	memcpy((char *)rdvalue + sizeof(u32), &l32, sizeof(l32));
+
+	return (0);
+}
+
+int
+dhcp6_validate_key(key)
+	struct keyinfo *key;
+{
+	if (key->expire == 0)	/* never expire */
+		return (0);
+
+	return (-1);
 }
 
 char *

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.28 2004/06/08 07:27:59 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.29 2004/06/10 07:28:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -101,7 +101,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %token OPTION RAPID_COMMIT IA_PD DNS_SERVERS DNS_NAME NTP_SERVERS LIFETIME
 %token SIP_SERVERS SIP_NAME
 %token INFO_ONLY
-%token SCRIPT
+%token SCRIPT DELAYEDKEY
 %token AUTHINFO PROTOCOL ALGORITHM DELAYED RECONFIG HMACMD5 MONOCOUNTER
 %token AUTHNAME RDM KEY
 %token KEYINFO REALM KEYID SECRET KEYNAME EXPIRE
@@ -414,6 +414,14 @@ declaration:
 			struct cf_list *l;
 
 			MAKE_CFLIST(l, DECL_SCRIPT, $2, NULL);
+
+			$$ = l;
+		}
+	|	DELAYEDKEY STRING EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DECL_DELAYEDKEY, $2, NULL);
 
 			$$ = l;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.20 2003/12/16 10:31:48 suz Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.21 2004/06/10 07:28:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -71,8 +71,12 @@ struct ia {
 
 	/* control information shared with each particular config routine */
 	struct iactl *ctl;
+
+	/* authentication parameters for transaction with servers on this IA */
+	struct authparam *authparam;
 };
 
+static int update_authparam __P((struct ia *, struct authparam *));
 static void reestablish_ia __P((struct ia *));
 static void callback __P((struct ia *));
 static int release_ia __P((struct ia *));
@@ -86,11 +90,12 @@ static char *iastr __P((iastate_t));
 static char *statestr __P((iastate_t));
 
 void
-update_ia(iatype, ialist, ifp, serverid)
+update_ia(iatype, ialist, ifp, serverid, authparam)
 	iatype_t iatype;
 	struct dhcp6_list *ialist;
 	struct dhcp6_if *ifp;
 	struct duid *serverid;
+	struct authparam *authparam;
 {
 	struct ia *ia;
 	struct ia_conf *iac;
@@ -121,8 +126,22 @@ update_ia(iatype, ialist, ifp, serverid)
 			continue;
 		}
 
-		/* locate or make the local IA */
+		/* locate the local IA or make a new one */
 		ia = get_ia(iatype, ifp, iac, iav, serverid);
+		if (ia == NULL) {
+			dprintf(LOG_WARNING, FNAME, "failed to get an IA "
+			    "type: %s, ID: %u", iac->type, iac->iaid);
+			continue;
+		}
+
+		/* update authentication parameters */
+		if (update_authparam(ia, authparam)) {
+			dprintf(LOG_WARNING, FNAME, "failed to update "
+			    "authentication param for IA "
+			    "type: %s, ID: %u", iac->type, iac->iaid);
+			remove_ia(ia);
+			continue;
+		}
 
 		/* update IA configuration information */
 		for (siav = TAILQ_FIRST(&iav->sublist); siav;
@@ -249,6 +268,30 @@ update_ia(iatype, ialist, ifp, serverid)
 	}
 }
 
+static int
+update_authparam(ia, authparam)
+	struct ia *ia;
+	struct authparam *authparam;
+{
+	if (authparam == NULL)
+		return (0);
+
+	if (ia->authparam == NULL) {
+		if ((ia->authparam = copy_authparam(authparam)) == NULL) {
+			dprintf(LOG_WARNING, FNAME,
+			    "failed to copy authparam");
+			return (-1);
+		}
+		return (0);
+	}
+
+	/* update the previous RD value and flags */
+	ia->authparam->prevrd = authparam->prevrd;
+	ia->authparam->flags = authparam->flags;
+
+	return (0);
+}
+
 static void
 reestablish_ia(ia)
 	struct ia *ia;
@@ -314,6 +357,14 @@ reestablish_ia(ia)
 		    &ia->evdata, evd)) {
 			dprintf(LOG_NOTICE, FNAME,
 			    "failed to make reestablish data");
+			goto fail;
+		}
+	}
+
+	if (ia->authparam != NULL) {
+		if ((ev->authparam = copy_authparam(ia->authparam)) == NULL) {
+			dprintf(LOG_WARNING, FNAME,
+			    "failed to copy authparam");
 			goto fail;
 		}
 	}
@@ -426,6 +477,14 @@ release_ia(ia)
 	dhcp6_set_timeoparam(ev);
 	dhcp6_reset_timer(ev);
 
+	if (ia->authparam != NULL) {
+		if ((ev->authparam = copy_authparam(ia->authparam)) == NULL) {
+			dprintf(LOG_WARNING, FNAME,
+			    "failed to copy authparam");
+			goto fail;
+		}
+	}
+
 	client6_send(ev);
 
 	return (0);
@@ -465,6 +524,9 @@ remove_ia(ia)
 
 	if (ia->ctl && ia->ctl->cleanup)
 		(*ia->ctl->cleanup)(ia->ctl);
+
+	if (ia->authparam != NULL)
+		free(ia->authparam);
 
 	free(ia);
 
@@ -580,6 +642,14 @@ ia_timo(arg)
 	ev->timeouts = 0;
 	dhcp6_set_timeoparam(ev);
 	dhcp6_reset_timer(ev);
+
+	if (ia->authparam != NULL) {
+		if ((ev->authparam = copy_authparam(ia->authparam)) == NULL) {
+			dprintf(LOG_WARNING, FNAME,
+			    "failed to copy authparam");
+			goto fail;
+		}
+	}
 
 	ia->evdata = evd;
 
