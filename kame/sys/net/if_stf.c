@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.15 2000/03/12 10:46:11 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.16 2000/03/12 10:47:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -161,7 +161,11 @@ static struct in6_ifaddr *stf_getsrcifa6 __P((struct ifnet *));
 static int stf_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
 static int stf_checkinner __P((struct in6_addr *in6, struct ifnet *));
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+static void stf_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
+#else
 static void stf_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 static int stf_ioctl __P((struct ifnet *, int, caddr_t));
 #else
@@ -604,7 +608,11 @@ static void
 stf_rtrequest(cmd, rt, sa)
 	int cmd;
 	struct rtentry *rt;
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+	struct rt_addrinfo *sa;
+#else
 	struct sockaddr *sa;
+#endif
 {
 
 	if (rt)
