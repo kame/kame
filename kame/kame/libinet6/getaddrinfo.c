@@ -519,7 +519,7 @@ explore_null(pai, hostname, servname, res)
 	afd = find_afd(pai->ai_family);
 
 	if (pai->ai_flags & AI_PASSIVE) {
-		GET_AI(*res, afd, afd->a_addrany);
+		GET_AI(cur->ai_next, afd, afd->a_addrany);
 		/* xxx meaningless?
 		 * GET_CANONNAME(cur->ai_next, "anyaddr");
 		 */
