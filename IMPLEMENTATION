@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.206 2001/04/24 20:24:09 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.207 2001/04/24 20:30:24 jinmei Exp $
 
 1. IPv6
 
@@ -115,15 +115,15 @@ draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
       (and extensions can appear unaligned).  our code follows the comment.
 draft-itojun-ipv6-tcp-to-anycast-00.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
-draft-ietf-ipngwg-rfc2553bis-00.txt:
+draft-ietf-ipngwg-rfc2553bis-03.txt:
 	Basic Socket Interface Extensions for IPv6 (revised)
-draft-ietf-ipngwg-rfc2292bis-01.txt:
+draft-ietf-ipngwg-rfc2292bis-02.txt:
 	Advanced Sockets API for IPv6 (revised)
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
-draft-ietf-mobileip-ipv6-09.txt: Mobility Support in IPv6
+draft-ietf-mobileip-ipv6-13.txt: Mobility Support in IPv6
     * See section 6.
-draft-ietf-ngtrans-tcpudp-relay-02.txt:
+draft-ietf-ngtrans-tcpudp-relay-04.txt:
 	An IPv6-to-IPv4 transport relay translator
     * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
       details.
@@ -138,8 +138,8 @@ draft-ietf-ipngwg-scoping-arch-02.txt:
 draft-ietf-pim-sm-v2-new-02.txt
 	A revised version of RFC2362, which includes the IPv6 specific
 	packet format and protocol descriptions.
-draft-itojun-ipv6-transition-abuse-01.txt:
-	Possible abuse against IPv6 transition technologies
+draft-itojun-ipv6-transition-abuse-02.txt:
+	Possible abuse against IPv6 transition technologies (expired)
     * KAME does not implement RFC1933/2893 automatic tunnel.
     * "stf" interface implements some address filters.  Refer to stf(4)
       for details.  Since there's no way to make 6to4 interface 100% secure,
@@ -147,11 +147,11 @@ draft-itojun-ipv6-transition-abuse-01.txt:
     * kame/openbsd completely disables IPv4 mapped address support.
     * kame/netbsd makes IPv4 mapped address support off by default.
     * See section 1.12.6 and 1.14 for more details.
-draft-aboba-dnsext-mdns-00.txt: Multicast DNS
+draft-ietf-dnsext-mdns-00.txt: Multicast DNS
     * kame/mdnsd has test implementation, which will not be built in
       default compilation.  The draft will experience a major change in the
       near future, so don't rely upon it.
-draft-itojun-ipv6-tclass-api-01.txt: Socket API for IPv6 traffic class field
+draft-itojun-ipv6-tclass-api-02.txt: Socket API for IPv6 traffic class field
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
 
