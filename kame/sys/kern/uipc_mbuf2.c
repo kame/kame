@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.15 2000/02/22 14:01:37 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.16 2000/07/12 13:01:02 jinmei Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -79,7 +79,10 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#if defined(PULLDOWN_STAT) && defined(INET6)
+#if defined(PULLDOWN_STAT) && defined(INET6) /* XXX */
+#include <sys/socket.h>
+#include <net/route.h>
+
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
