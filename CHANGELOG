@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.236 1999/10/29 17:06:21 itojun Exp $
+$Id: CHANGELOG,v 1.237 1999/10/31 00:47:15 itojun Exp $
 
 <199910>
 Fri Oct 29 21:17:10 JST 1999  itojun@iijlab.net
@@ -16,7 +16,9 @@ Fri Oct 29 21:17:10 JST 1999  itojun@iijlab.net
 		127.0.0.1 stream/tcp port 7
 	  This fixes KAME PR 141.
 	  (2) fix memory leak on failure cases
-	  (3) clarify non-udp/tcp protocol cases.
+	  (3) clarify non-udp/tcp protocol cases.  at this moment SOCK_RAW
+	  is the only one allowed.  we may need to loosen the restriction
+	  further.
 	* kame/libinet6/getnamenfo.c: clarify non-udp/tcp protocol cases.
 
 1999-10-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
