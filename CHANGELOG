@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.835 2000/04/28 17:16:20 itojun Exp $
+$Id: CHANGELOG,v 1.836 2000/04/28 17:17:06 itojun Exp $
 
 <200004>
 Sat Apr 29 02:11:18 JST 2000  itojun@iijlab.net
@@ -16,7 +16,8 @@ Sat Apr 29 02:11:18 JST 2000  itojun@iijlab.net
 	<togni@dpt-info.u-strasbg.fr>.
 
 Fri Apr 28 19:30:18 JST 2000  itojun@iijlab.net
-	* ports/pkgsrc for zebra (freebsd[23], netbsd): upgrade to 0.86.
+	* ports/pkgsrc for zebra (openbsd, freebsd[23], netbsd):
+	  upgrade to 0.86.
 
 2000-04-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/traceroute6/traceroute6.c (main): always printed the
