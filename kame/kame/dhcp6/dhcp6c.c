@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.129 2004/03/21 15:04:33 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.130 2004/03/22 05:06:42 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -401,6 +401,10 @@ client6_ifinit(ifp)
 	struct dhcp6_if *ifp;
 {
 	struct dhcp6_event *ev;
+
+	/* make sure that the interface does not have a timer */
+	if (ifp->timer != NULL)
+		dhcp6_remove_timer(&ifp->timer);
 
 	/* create an event for the initial delay */
 	if ((ev = dhcp6_create_event(ifp, DHCP6S_INIT)) == NULL) {
