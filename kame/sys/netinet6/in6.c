@@ -1149,7 +1149,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			 * address.  hostid points to the first link-local
 			 * address attached to the interface.
 			 */
-			ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp);
+			ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp, 0);
 			if (!ifa)
 				return EADDRNOTAVAIL;
 			hostid = IFA_IN6(ifa);
@@ -1730,8 +1730,9 @@ in6_delmulti(in6m)
  * Find an IPv6 interface link-local address specific to an interface.
  */
 struct in6_ifaddr *
-in6ifa_ifpforlinklocal(ifp)
+in6ifa_ifpforlinklocal(ifp, ignoreflags)
 	struct ifnet *ifp;
+	int ignoreflags;
 {
 	register struct ifaddr *ifa;
 
@@ -1745,8 +1746,12 @@ in6ifa_ifpforlinklocal(ifp)
 			continue;	/* just for safety */
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
-		if (IN6_IS_ADDR_LINKLOCAL(IFA_IN6(ifa)))
+		if (IN6_IS_ADDR_LINKLOCAL(IFA_IN6(ifa))) {
+			if ((((struct in6_ifaddr *)ifa)->ia6_flags &
+			     ignoreflags) != 0)
+				continue;
 			break;
+		}
 	}
 
 	return((struct in6_ifaddr *)ifa);

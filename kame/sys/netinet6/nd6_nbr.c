@@ -219,7 +219,8 @@ nd6_ns_input(m, off, icmp6len)
 			 * search link local addr for ifp, and use it for
 			 * proxy NA.
 			 */
-			ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp);
+			ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp,
+								      IN6_IFF_NOTREADY|IN6_IFF_ANYCAST);
 			if (ifa)
 				proxy = 1;
 		}

@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_ha.c,v 1.3 2000/02/09 09:03:50 jinmei Exp $
+ * $Id: mip6_ha.c,v 1.4 2000/02/09 09:56:19 jinmei Exp $
  *
  */
 
@@ -490,7 +490,8 @@ struct in6_addr  *anycast_addr;   /* Home Agents anycast address */
         return NULL;
 
     /* Use link local address to identify my own home agent list entry */
-    ia_ll = in6ifa_ifpforlinklocal(ifp);
+    /* XXX: I'm not sure if the 2nd arg is OK(jinmei@kame) */
+    ia_ll = in6ifa_ifpforlinklocal(ifp, 0);
     if (ia_ll == NULL)
 	    return NULL;
     halp = mip6_hal_find(llp->ha_list, &ia_ll->ia_addr.sin6_addr);

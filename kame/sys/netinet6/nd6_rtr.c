@@ -1326,7 +1326,7 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 	in6_len2mask(&mask, prefixlen);
 
 	/* find link-local address (will be interface ID) */
-	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp);
+	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp, 0);/* 0 is OK? */
 	if (ifa)
 		ib = (struct in6_ifaddr *)ifa;
 	else

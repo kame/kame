@@ -417,7 +417,8 @@ mld6_sendpkt(in6m, type, dst)
 	 * At first, find a link local address on the outgoing interface
 	 * to use as the source address of the MLD packet.
 	 */
-	if ((ia = in6ifa_ifpforlinklocal(ifp)) == NULL)
+	if ((ia = in6ifa_ifpforlinklocal(ifp, IN6_IFF_NOTREADY|IN6_IFF_ANYCAST))
+	    == NULL)
 		return;
 
 	/*

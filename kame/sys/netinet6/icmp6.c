@@ -2005,8 +2005,10 @@ icmp6_redirect_output(m0, rt)
 
 	{
 		/* get ip6 linklocal address for ifp(my outgoing interface). */
-		struct in6_ifaddr *ia = in6ifa_ifpforlinklocal(ifp);
-		if (ia == NULL)
+		struct in6_ifaddr *ia;
+		if ((ia = in6ifa_ifpforlinklocal(ifp,
+						 IN6_IFF_NOTREADY|
+						 IN6_IFF_ANYCAST)) == NULL)
 			goto fail;
 		ifp_ll6 = &ia->ia_addr.sin6_addr;
 	}
