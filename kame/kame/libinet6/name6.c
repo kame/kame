@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.23 2000/05/08 13:41:20 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.26.2.1 2000/07/03 02:41:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1200,21 +1200,23 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 		} \
 	} while (0)
 
+/* XXX do {} while (0) cannot be put here */
 #define DNS_ASSERT(x) \
-	do {				\
+	{				\
 		if (!(x)) {		\
 			cp += n;	\
 			continue;	\
 		}			\
-	} while (0)
+	}
 
+/* XXX do {} while (0) cannot be put here */
 #define DNS_FATAL(x) \
-	do {				\
+	{				\
 		if (!(x)) {		\
 			had_error++;	\
 			continue;	\
 		}			\
-	} while (0)
+	}
 
 	tname = qname;
 	template->h_name = NULL;
@@ -1334,7 +1336,7 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 				continue;
 			}
 			strcpy(bp, tbuf);
-			tname = bp;
+			template->h_name = bp;
 			bp += n;
 			buflen -= n;
 			continue;
@@ -1474,6 +1476,8 @@ _dns_ghbyname(const char *name, int af, int *errp)
 		return NULL;
 	}
 	hp = getanswer(&buf, n, name, qtype, &hbuf, errp);
+	if (!hp)
+		return NULL;
 	return _hpcopy(&hbuf, errp);
 }
 
@@ -1548,6 +1552,8 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		return NULL;
 	}
 	hp = getanswer(&buf, n, qbuf, T_PTR, &hbuf, errp);
+	if (!hp)
+		return NULL;
 	hbuf.h_addrtype = af;
 	hbuf.h_length = addrlen;
 	hbuf.h_addr_list = hlist;
