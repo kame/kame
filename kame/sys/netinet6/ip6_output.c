@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.88 2000/03/29 03:45:57 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.89 2000/03/30 06:26:45 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -686,8 +686,7 @@ skip_ipsec2:;
 				/* XXX correct ifp? */
 				in6_ifstat_inc(ifp, ifs6_out_discard);
 				goto bad;
-			}
-			else {
+			} else {
 #ifdef __bsdi__
 				ifp = loifp;
 #else
@@ -983,16 +982,13 @@ skip_ipsec2:;
 		if (exthdrs.ip6e_rthdr) {
 			nextproto = *mtod(exthdrs.ip6e_rthdr, u_char *);
 			*mtod(exthdrs.ip6e_rthdr, u_char *) = IPPROTO_FRAGMENT;
-		}
-		else if (exthdrs.ip6e_dest1) {
+		} else if (exthdrs.ip6e_dest1) {
 			nextproto = *mtod(exthdrs.ip6e_dest1, u_char *);
 			*mtod(exthdrs.ip6e_dest1, u_char *) = IPPROTO_FRAGMENT;
-		}
-		else if (exthdrs.ip6e_hbh) {
+		} else if (exthdrs.ip6e_hbh) {
 			nextproto = *mtod(exthdrs.ip6e_hbh, u_char *);
 			*mtod(exthdrs.ip6e_hbh, u_char *) = IPPROTO_FRAGMENT;
-		}
-		else {
+		} else {
 			nextproto = ip6->ip6_nxt;
 			ip6->ip6_nxt = IPPROTO_FRAGMENT;
 		}
@@ -1076,8 +1072,7 @@ sendorfree:
 #else
 			error = nd6_output(ifp, m, dst, ro->ro_rt);
 #endif
-		}
-		else
+		} else
 			m_freem(m);
 	}
 
@@ -1166,8 +1161,7 @@ ip6_insert_jumboopt(exthdrs, plen)
 		optbuf = mtod(mopt, u_char *);
 		optbuf[1] = 0;	/* = ((JUMBOOPTLEN) >> 3) - 1 */
 		exthdrs->ip6e_hbh = mopt;
-	}
-	else {
+	} else {
 		struct ip6_hbh *hbh;
 
 		mopt = exthdrs->ip6e_hbh;
@@ -1184,8 +1178,7 @@ ip6_insert_jumboopt(exthdrs, plen)
 			bcopy(oldoptp, mtod(mopt, caddr_t), oldoptlen);
 			optbuf = mtod(mopt, caddr_t) + oldoptlen;
 			mopt->m_len = oldoptlen + JUMBOOPTLEN;
-		}
-		else {
+		} else {
 			optbuf = mtod(mopt, u_char *) + mopt->m_len;
 			mopt->m_len += JUMBOOPTLEN;
 		}
@@ -1229,8 +1222,7 @@ ip6_insertfraghdr(m0, m, hlen, frghdrp)
 		if (n == 0)
 			return(ENOBUFS);
 		m->m_next = n;
-	}
-	else
+	} else
 		n = m;
 
 	/* Search for the last mbuf of unfragmentable part. */
@@ -1244,8 +1236,7 @@ ip6_insertfraghdr(m0, m, hlen, frghdrp)
 			(struct ip6_frag *)(mtod(mlast, caddr_t) + mlast->m_len);
 		mlast->m_len += sizeof(struct ip6_frag);
 		m->m_pkthdr.len += sizeof(struct ip6_frag);
-	}
-	else {
+	} else {
 		/* allocate a new mbuf for the fragment header */
 		struct mbuf *mfrg;
 
@@ -1595,8 +1586,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 					if (m) {
 						optbuf = mtod(m, u_char *);
 						optlen = m->m_len;
-					}
-					else {
+					} else {
 						optbuf = NULL;
 						optlen = 0;
 					}
@@ -2120,8 +2110,7 @@ ip6_pcbopts(pktopt, m, so)
 		    printf("ip6_pcbopts: all specified options are cleared.\n");
 #endif
 		ip6_clearpktopts(opt, 1, -1);
-	}
-	else
+	} else
 		opt = malloc(sizeof(*opt), M_IP6OPT, M_WAITOK);
 	*pktopt = NULL;
 
@@ -2699,8 +2688,7 @@ ip6_setmoptions(optname, im6op, m)
 #else
 				ifp = &loif[0];
 #endif
-			}
-			else {
+			} else {
 				ro.ro_rt = NULL;
 				dst = (struct sockaddr_in6 *)&ro.ro_dst;
 				bzero(dst, sizeof(*dst));
@@ -2960,8 +2948,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 					       M_IP6OPT, M_WAITOK);
 				*opt->ip6po_pktinfo =
 					*(struct in6_pktinfo *)CMSG_DATA(cm);
-			}
-			else
+			} else
 				opt->ip6po_pktinfo =
 					(struct in6_pktinfo *)CMSG_DATA(cm);
 			if (opt->ip6po_pktinfo->ipi6_ifindex &&
@@ -3018,8 +3005,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 				bcopy(CMSG_DATA(cm),
 				      opt->ip6po_nexthop,
 				      *CMSG_DATA(cm));
-			}
-			else
+			} else
 				opt->ip6po_nexthop =
 					(struct sockaddr *)CMSG_DATA(cm);
 			break;
@@ -3040,8 +3026,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 				opt->ip6po_hbh =
 					malloc(hbhlen, M_IP6OPT, M_WAITOK);
 				bcopy(hbh, opt->ip6po_hbh, hbhlen);
-			}
-			else
+			} else
 				opt->ip6po_hbh = hbh;
 			break;
 		}
@@ -3070,18 +3055,15 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 						malloc(destlen, M_IP6OPT,
 						       M_WAITOK);
 					bcopy(dest, opt->ip6po_dest1, destlen);
-				}
-				else
+				} else
 					opt->ip6po_dest1 = dest;
-			}
-			else {
+			} else {
 				if (needcopy) {
 					opt->ip6po_dest2 =
 						malloc(destlen, M_IP6OPT,
 						       M_WAITOK);
 					bcopy(dest, opt->ip6po_dest2, destlen);
-				}
-				else
+				} else
 					opt->ip6po_dest2 = dest;
 			}
 			break;
@@ -3118,8 +3100,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 				opt->ip6po_rthdr = malloc(rthlen, M_IP6OPT,
 							  M_WAITOK);
 				bcopy(rth, opt->ip6po_rthdr, rthlen);
-			}
-			else
+			} else
 				opt->ip6po_rthdr = rth;
 
 			break;
