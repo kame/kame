@@ -15,7 +15,12 @@ libexec
 	rshd:
 	tftpd:
 ports
-	bump the major version of several shared libraries:
+	bump the major version of several shared libraries: done
+	sync with ports-current
+		ssh:
+		vic6:
+		vat6:
+		ruby:
 
 sbin
 	ifconfig:
