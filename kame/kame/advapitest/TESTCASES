@@ -1,0 +1,7 @@
+XXX: these tests should be done automatically.
+
+1. Specifying outgoing hop limit
+% ./sender -l 10 -L 20 ::1
+should send a packet with the hop limit field being 10, while
+% ./sender -L 20 ::1
+should send with 20.
