@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.912 2000/05/22 04:22:09 itojun Exp $
+$Id: CHANGELOG,v 1.913 2000/05/22 07:46:39 jinmei Exp $
 
 <200005>
+2000-05-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/scopedaddrtest/scopedaddrtest.c: a new option "-N" was
+	added to specify the NI_NUMERICSCOPE flag for getnameinfo().
+
+2000-05-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getnameinfo.c (ip6_sa2str): supported
+	the NI_NUMERICSCOPE flag if available.
+
+2000-05-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {freebsd[234],bsdi3,{net,open}bsd}/include/netdb.h
+	(NI_NUMERICSCOPE):
+	* bsdi4/contrib/bind/src/include/netdb.h (NI_NUMERICSCOPE):
+	the new flag was added as specified in rfc2553bis-00.
+
 Mon May 22 13:19:29 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: to conform better with icmp-name-lookup-05,
 	  make the validation rule more strict for node information query.
