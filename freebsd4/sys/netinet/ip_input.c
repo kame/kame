@@ -1876,10 +1876,12 @@ ip_forward(m, srcrt)
 		break;
 
 	case ENOBUFS:
-#ifdef ALTQ
+#if 1
 		/*
-		 * don't generate ICMP_SOURCEQUENCH
-		 * (RFC1812 Requirements for IP Version 4 Routers)
+		 * a router should not generate ICMP_SOURCEQUENCH as
+		 * required in RFC1812 Requirements for IP Version 4 Routers.
+		 * source quench could be a big problem under DoS attacks,
+		 * or the underlying interface is rate-limited.
 		 */
 		if (mcopy)
 			m_freem(mcopy);
