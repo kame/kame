@@ -5,7 +5,8 @@ SRCS=	main.c natptconfig.y.c natptconfig.l.c misc.c show.c yylex.c
 
 MAN=	natptconfig.8
 
-CPPFLAGS+=	-g -I. -DYYDEBUG -Wall -DreadKMEM
+CPPFLAGS+=	-I. -DYYDEBUG -DreadKMEM
+CFLAGS+=	-g -Wall
 CLEANFILES+=	natptconfig.y.c natptconfig.y.h natptconfig.l.c
 CLEANFILES+=	natptconfig.cat8
 
@@ -22,8 +23,7 @@ DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 
 YFLAGS= -d
 
-natptconfig.y.c \
-natptconfig.y.h:	natptconfig.y showvar.h
+natptconfig.y.c natptconfig.y.h:	natptconfig.y showvar.h
 		${YACC} ${YFLAGS} ${SRCDIR}/natptconfig.y
 		mv y.tab.c natptconfig.y.c
 		mv y.tab.h natptconfig.y.h
