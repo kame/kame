@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.322 2002/08/06 11:00:54 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.323 2002/08/26 14:26:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -315,10 +315,10 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	/* for AH processing. stupid to have "socket" variable in IP layer... */
 	so = ipsec_getsocket(m);
 	(void)ipsec_setsocket(m, NULL);
-	ip6 = mtod(m, struct ip6_hdr *);
 #endif
 #endif /* IPSEC */
 
+	ip6 = mtod(m, struct ip6_hdr *);
 	bzero(&finaldst_sa, sizeof(finaldst_sa));
 
 #define MAKE_EXTHDR(hp, mp)						\
