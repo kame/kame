@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.100 2004/12/09 02:19:01 t-momose Exp $	*/
+/*	$KAME: ip_encap.c,v 1.101 2004/12/27 05:41:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -874,6 +874,7 @@ encap6_ctlinput(cmd, sa, d0)
 		cmdarg = NULL;
 		sa6_src = &sa6_any;
 		nxt = -1;
+		off = 0;
 	}
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)

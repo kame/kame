@@ -7,7 +7,7 @@
 # that use the opencrypto framework, should list opencrypto as a dependency
 # to pull in the framework.
 
-define	opencrypto: blowfish, des, cast128, rijndael, ripemd160, sha2, skipjack
+define	opencrypto: blowfish, des, cast128, rijndael, ripemd160, sha2, skipjack, twofish
 
 
 file	opencrypto/criov.c		opencrypto	needs-flag

@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.83 2004/06/02 10:32:36 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.84 2004/12/27 05:41:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,6 +69,10 @@
 #endif
 
 #ifdef __FreeBSD__
+MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
+#endif
+
+#ifdef __NetBSD__
 MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
 #endif
 

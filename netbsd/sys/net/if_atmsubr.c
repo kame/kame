@@ -190,7 +190,7 @@ atm_output(ifp, m0, dst, rt0)
 			 * assuming dst contains 12 bytes (atm pseudo
 			 * header (4) + LLC/SNAP (8))
 			 */
-			if (dst->sa_len + 2 < sizeof(atmdst) + sizeof(*llc_hdr))
+			if (dst->sa_len + 2 < sizeof(atmdst) + 8 /*sizeof(*llc_hdr)*/)
 				senderr(EINVAL);
 			bcopy(dst->sa_data, &atmdst, sizeof(atmdst));
 			break;

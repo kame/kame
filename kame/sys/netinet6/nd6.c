@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.367 2004/12/09 02:19:23 t-momose Exp $	*/
+/*	$KAME: nd6.c,v 1.368 2004/12/27 05:41:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -195,6 +195,10 @@ static int fill_prlist __P((struct sysctl_req *));
 #else
 static int fill_drlist __P((void *, size_t *, size_t));
 static int fill_prlist __P((void *, size_t *, size_t));
+#endif
+
+#ifdef __NetBSD__
+MALLOC_DEFINE(M_IP6NDP, "NDP", "IPv6 Neighbour Discovery");
 #endif
 
 void

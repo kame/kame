@@ -681,7 +681,6 @@ udp4_realinput(src, dst, m, off)
 			if (match_msf4_per_socket(inp, src4, dst4) == 0)
 				continue;
 #endif
-			last = inp;
 			udp4_sendup(m, off, (struct sockaddr *)src,
 				inp->inp_socket);
 			rcvcnt++;
@@ -751,8 +750,6 @@ udp6_realinput(af, src, dst, m, off)
 
 	if (IN6_IS_ADDR_MULTICAST(&dst->sin6_addr) ||
 	    (af == AF_INET && IN_MULTICAST(dst4->s_addr))) {
-		struct in6pcb *last;
-
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
 		 * for which the local and remote addresses and ports match
@@ -811,7 +808,6 @@ udp6_realinput(af, src, dst, m, off)
 			    &dst->sin6_addr) == 0)
 				continue;
 #endif
-			last = in6p;
 			udp6_sendup(m, off, (struct sockaddr *)src,
 				in6p->in6p_socket);
 			rcvcnt++;

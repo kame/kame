@@ -693,8 +693,10 @@ kernfs_lookup(v)
 #endif
 
 	default:
-		return (ENOTDIR);
+		break;
 	}
+
+	return (ENOTDIR);
 }
 
 int

@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.156 2004/11/30 18:05:41 suz Exp $	*/
+/*	$KAME: in6.h,v 1.157 2004/12/27 05:41:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -871,7 +871,7 @@ in6_cksum_phdr(const struct in6_addr *src, const struct in6_addr *dst,
 #endif
 
 int	in6_cksum __P((struct mbuf *, u_int8_t, u_int32_t, u_int32_t));
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 int	in6_localaddr __P((struct in6_addr *));
 #endif
 int	in6_addrscope __P((struct in6_addr *));

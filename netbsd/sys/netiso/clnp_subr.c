@@ -466,7 +466,7 @@ clnp_route(dst, ro, flags, first_hop, ifa)
 					 * firsthop */
 	struct iso_ifaddr **ifa;/* result: fill in with ptr to interface */
 {
-	struct sockaddr_iso *siso;
+	struct sockaddr_iso *siso = NULL;
 
 	if (flags & SO_DONTROUTE) {
 		struct iso_ifaddr *ia;

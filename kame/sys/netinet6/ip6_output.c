@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.459 2004/12/09 02:19:07 t-momose Exp $	*/
+/*	$KAME: ip6_output.c,v 1.460 2004/12/27 05:41:18 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -279,6 +279,8 @@ extern struct ifnet loif[NLOOP];
 int
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 ip6_output(m0, opt, ro, flags, im6o, ifpp, inp)
+#elif defined(__NetBSD__)
+ip6_output(m0, opt, ro, flags, im6o, so, ifpp)
 #else
 ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
@@ -291,6 +293,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 	int flags;
 	struct ip6_moptions *im6o;
+#ifdef __NetBSD__
+	struct socket *so;
+#endif
 	struct ifnet **ifpp;		/* XXX: just for statistics */
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 	struct inpcb *inp;
@@ -348,10 +353,12 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		panic("ip6_output: IPv4 pcb is passed");
 #else
 	int needipsectun = 0;
+#ifndef __NetBSD__
 	struct socket *so = NULL;
+#endif
 	struct secpolicy *sp = NULL;
 
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000) && !defined(__NetBSD__)
 	/* for AH processing. stupid to have "socket" variable in IP layer... */
 	so = ipsec_getsocket(m);
 	(void)ipsec_setsocket(m, NULL);

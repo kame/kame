@@ -931,6 +931,9 @@ struct	m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #define	PACKET_TAG_IPSEC_SOCKET			22 /* IPSEC socket ref */
 #define	PACKET_TAG_IPSEC_HISTORY		23 /* IPSEC history */
 
+#define PACKET_TAG_INET6			24 /* IPv6 info */
+#define PACKET_TAG_GIF				25 /* gif infinite loop check */
+
 /*
  * Return the number of bytes in the mbuf chain, m.
  */

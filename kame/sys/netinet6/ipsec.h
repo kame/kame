@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.75 2004/11/22 06:40:08 t-momose Exp $	*/
+/*	$KAME: ipsec.h,v 1.76 2004/12/27 05:41:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,6 +143,9 @@ struct inpcbpolicy {
 	int cacheflags;
 #define IPSEC_PCBSP_CONNECTED	1
 };
+
+/* FAST_IPSEC taint */
+#define IPSEC_PCB_SKIP_IPSEC(inpp, dir)		0
 
 /* SP acquiring list table. */
 struct secspacq {

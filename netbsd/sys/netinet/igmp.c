@@ -287,7 +287,7 @@ rti_delete(ifp)
 {
 	struct router_info *rti, *nxt;
 
-	for (rti = LIST_HEAD(&rti_head, rti_link); rti; rti = nxt) {
+	for (rti = LIST_FIRST(&rti_head); rti; rti = nxt) {
 		nxt = LIST_NEXT(rti, rti_link);
 		if (rti->rti_ifp == ifp) {
 			LIST_REMOVE(rti, rti_link);
@@ -409,7 +409,7 @@ igmp_input(m, va_alist)
 	/*
 	 * Check length and validate checksum
 	 */
-	if (ip->ip_len > ifp->if_mtu) {
+	if (ip->ip_len > ifp->if_mtu)
 		++igmpstat.igps_rcv_toolong;
 	minlen = iphlen + IGMP_MINLEN;
 	ip_len = ntohs(ip->ip_len);
@@ -2024,6 +2024,7 @@ next_multi:
 }
 #endif /* IGMPV3 */
 
+#ifdef __OpenBSD__
 int
 igmp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	int *name;
@@ -2066,6 +2067,7 @@ igmp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	}
 	return error;
 }
+#endif
 
 void
 igmp_purgeif(ifp)

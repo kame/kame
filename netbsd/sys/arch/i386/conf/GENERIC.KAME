@@ -9,7 +9,7 @@ options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 
 #options 	ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
 
-options 	SCTP		# adds SCTP stack to kernel - requires INET6
+#options 	SCTP		# adds SCTP stack to kernel - requires INET6
 #options 	SCTP_DEBUG	# adds debugging support for SCTP
 #options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
 #options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
@@ -18,20 +18,20 @@ options 	SCTP		# adds SCTP stack to kernel - requires INET6
 #options 	RTPREF
 
 # ALTQ options
-options 	ALTQ		#alternate queueing
-options 	ALTQ_CBQ	#class based queueing
-options 	ALTQ_WFQ	#weighted fair queueing
-options 	ALTQ_FIFOQ	#fifo queueing
-options 	ALTQ_RED	#random early detection
+#options 	ALTQ		#alternate queueing
+#options 	ALTQ_CBQ	#class based queueing
+#options 	ALTQ_WFQ	#weighted fair queueing
+#options 	ALTQ_FIFOQ	#fifo queueing
+#options 	ALTQ_RED	#random early detection
 #options 	ALTQ_FLOWVALVE	#flowvalve for RED (needs RED)
-options 	ALTQ_RIO	#triple red for diffserv (needs RED)
+#options 	ALTQ_RIO	#triple red for diffserv (needs RED)
 #options 	ALTQ_LOCALQ	#local use
-options 	ALTQ_HFSC	#hierarchical fair service curve
-options 	ALTQ_JOBS	#joint buffer management and scheduling
+#options 	ALTQ_HFSC	#hierarchical fair service curve
+#options 	ALTQ_JOBS	#joint buffer management and scheduling
 #options 	ALTQ_IPSEC	#check ipsec in IPv4
-options 	ALTQ_CDNR	#diffserv traffic conditioner
+#options 	ALTQ_CDNR	#diffserv traffic conditioner
 #options 	ALTQ_BLUE	#blue by wu-chang feng
-options 	ALTQ_PRIQ	#priority queue
+#options 	ALTQ_PRIQ	#priority queue
 #options 	ALTQ_NOPCC	#don't use processor cycle counter
 #options 	ALTQ_DEBUG	#for debugging
 
@@ -52,11 +52,11 @@ options 	RADIX_MPATH
 #pseudo-device	mip	1		# required for a mobile node
 #options 	MIP6_DEBUG
 
-pseudo-device 	pf			# PF packet filter
-pseudo-device 	pflog
-pseudo-device 	pfsync
+#pseudo-device 	pf			# PF packet filter
+#pseudo-device 	pflog
+#pseudo-device 	pfsync
 pseudo-device 	ist	1		# ISATAP
 
 # Datagram Congestion Control Protocol
-options 	DCCP
+#options 	DCCP
 #options 	DCCP_TFRC

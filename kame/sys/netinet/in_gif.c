@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.95 2004/06/02 06:01:24 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.96 2004/12/27 05:41:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -533,8 +533,10 @@ gif_validate4(ip, sc, ifp)
 		return 0;
 	}
 	/* reject packets with broadcast on source */
-#if defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__)
 	for (ia4 = in_ifaddr.tqh_first; ia4; ia4 = ia4->ia_list.tqe_next)
+#elif defined(__NetBSD__)
+	TAILQ_FOREACH(ia4, &in_ifaddrhead, ia_list)
 #elif defined(__FreeBSD__)
 	for (ia4 = TAILQ_FIRST(&in_ifaddrhead); ia4;
 	     ia4 = TAILQ_NEXT(ia4, ia_link))

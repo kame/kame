@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.109 2004/10/27 08:08:39 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.110 2004/12/27 05:41:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -668,11 +668,15 @@ mld_sendpkt(in6m, type, dst)
 		break;
 	}
 
-	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL
 #ifdef __FreeBSD__
-		   ,NULL
+	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL,
+	    NULL);
+#elif defined(__NetBSD__)
+	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL,
+	    NULL);
+#else
+	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
 #endif
-		   );
 }
 
 static struct mld_hdr *

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.39 2004/12/16 11:29:28 t-momose Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.40 2004/12/27 05:41:16 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -168,7 +168,6 @@ SYSCTL_INT(_net_inet_dccp, OID_AUTO, dccp_log_in_vain, CTLFLAG_RW,
 #endif
 
 struct	inpcbhead dccpb;		/* from dccp_var.h */
-struct	in6pcb dccpb6;
 #ifdef __FreeBSD__
 struct	inpcbinfo dccpbinfo;
 #else
@@ -251,9 +250,6 @@ dccp_init()
 	in_pcbinit(&dccpbtable, DCCPBHASHSIZE, DCCPBHASHSIZE);
 #else /* OpenBSD */
 	in_pcbinit(&dccpbtable, DCCPBHASHSIZE);
-#endif
-#if defined(INET6) && defined(__NetBSD__)
-	dccpb6.in6p_next = dccpb6.in6p_prev = &dccpb6;
 #endif
 #endif
 }
@@ -455,11 +451,11 @@ dccp_input(struct mbuf *m, ...)
 		    dh->dh_sport, &ip6->ip6_dst, dh->dh_dport, 1,
 		    m->m_pkthdr.rcvif);
 #elif defined(__NetBSD__)
-		in6p = in6_pcblookup_connect(&dccpb6, &ip6->ip6_src,
+		in6p = in6_pcblookup_connect(&dccpbtable, &ip6->ip6_src,
 		    dh->dh_sport, &ip6->ip6_dst, dh->dh_dport, 0);
 		if (in6p == 0) {
 			/* XXX stats increment? */
-			in6p = in6_pcblookup_bind(&dccpb6, &ip6->ip6_dst,
+			in6p = in6_pcblookup_bind(&dccpbtable, &ip6->ip6_dst,
 			    dh->dh_dport, 0);
 		}
 #else /* OpenBSD */
@@ -2055,7 +2051,7 @@ dccp_attach(struct socket *so, int proto, struct proc *td)
 		error = soreserve(so, dccp_sendspace, dccp_recvspace);
 		if (error)
 			goto out;
-		error = in6_pcballoc(so, &dccpb6);
+		error = in6_pcballoc(so, &dccpbtable);
 		if (error)
 			goto out;
 		in6p = sotoin6pcb(so);

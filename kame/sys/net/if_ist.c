@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.5 2004/12/18 02:08:37 suz Exp $	*/
+/*	$KAME: if_ist.c,v 1.6 2004/12/27 05:41:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -742,8 +742,10 @@ ist_checkaddr4(sc, in, inifp)
 	/*
 	 * reject packets with broadcast
 	 */
-#if defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__)
 	for (ia4 = in_ifaddr.tqh_first; ia4; ia4 = ia4->ia_list.tqe_next)
+#elif defined(__NetBSD__)
+	TAILQ_FOREACH(ia4, &in_ifaddrhead, ia_list)
 #else
 	for (ia4 = TAILQ_FIRST(&in_ifaddrhead);
 	     ia4;

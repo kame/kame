@@ -210,7 +210,7 @@ struct protosw inetsw[] = {
 	PR_CONNREQUIRED|PR_WANTRCVD|PR_ATOMIC|PR_LISTEN|PR_ABRTACPTDIS,
   dccp_input,	0,		dccp_ctlinput,	dccp_ctloutput,
   dccp_usrreq,
-  dccp_init,	0,              0,              0,		dccp_sysctl
+  dccp_init,	0,              0,              0,		0
 },
 #endif /* DCCP */
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
@@ -288,7 +288,7 @@ struct protosw inetsw[] = {
 { SOCK_RAW,	&inetdomain,	IPPROTO_IGMP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   igmp_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
-  igmp_init,	igmp_fasttimo,	igmp_slowtimo,	0,		igmp_sysctl
+  igmp_init,	igmp_fasttimo,	igmp_slowtimo,	0,		0
 },
 #ifdef TPIP
 { SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN|PR_LASTHDR|PR_ABRTACPTDIS,

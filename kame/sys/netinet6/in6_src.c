@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.151 2004/12/09 02:19:05 t-momose Exp $	*/
+/*	$KAME: in6_src.c,v 1.152 2004/12/27 05:41:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -905,17 +905,18 @@ in6_pcbsetport(laddr, in6p, p)
 	struct proc *p;
 {
 	struct socket *so = in6p->in6p_socket;
-	struct in6pcb *head = in6p->in6p_head;
-	u_int16_t last_port, lport = 0;
+	struct inpcbtable *table = in6p->in6p_table;
+	int cnt;
+	u_int16_t min, max;
+	u_int16_t lport, *lastport;
 	int wild = 0;
 	void *t;
-	u_int16_t min, max;
 
 	/* XXX: this is redundant when called from in6_pcbbind */
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
 	   ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
 	    (so->so_options & SO_ACCEPTCONN) == 0))
-		wild = IN6PLOOKUP_WILDCARD;
+		wild = 1;
 
 	if (in6p->in6p_flags & IN6P_LOWPORT) {
 #ifndef IPNOPRIVPORTS
@@ -924,43 +925,46 @@ in6_pcbsetport(laddr, in6p, p)
 #endif
 		min = ip6_lowportmin;
 		max = ip6_lowportmax;
+		lastport = &table->inpt_lastlow;
 	} else {
 		min = ip6_anonportmin;
 		max = ip6_anonportmax;
+		lastport = &table->inpt_lastport;
 	}
 
-	/* value out of range */
-	if (head->in6p_lport < min)
-		head->in6p_lport = min;
-	else if (head->in6p_lport > max)
-		head->in6p_lport = min;
-	last_port = head->in6p_lport;
-	goto startover;	/*to randomize*/
-	for (;;) {
-		lport = htons(head->in6p_lport);
+	if (min > max) {	/* sanity check */
+		u_int16_t swp;
+		
+		swp = min;
+		min = max;
+		max = swp;
+	}
+
+	lport = *lastport - 1;
+	for (cnt = max - min + 1; cnt; cnt--, lport--) {
+		if (lport < min || lport > max)
+			lport = max;
+#ifdef INET
 		if (IN6_IS_ADDR_V4MAPPED(laddr)) {
-#if 0
-			t = in_pcblookup_bind(&tcbtable,
-			    (struct in_addr *)&laddr->s6_addr32[3], lport);
-#else
-			t = NULL;
+			t = in_pcblookup_port(table,
+			    *(struct in_addr *)&laddr->s6_addr32[3],
+			    lport, wild);
+		} else
 #endif
-		} else {
-			t = in6_pcblookup(head, &zeroin6_addr, 0, laddr, lport,
-			    wild);
+		{
+			t = in6_pcblookup_port(table, laddr, lport, wild);
 		}
 		if (t == 0)
-			break;
-	  startover:
-		if (head->in6p_lport >= max)
-			head->in6p_lport = min;
-		else
-			head->in6p_lport++;
-		if (head->in6p_lport == last_port)
-			return (EADDRINUSE);
+			goto found;
 	}
 
-	in6p->in6p_lport = lport;
+	return (EAGAIN);
+
+found:
+	in6p->in6p_flags |= IN6P_ANONPORT;
+	*lastport = lport;
+	in6p->in6p_lport = htons(lport);
+	in6_pcbstate(in6p, IN6P_BOUND);
 	return (0);		/* success */
 }
 #endif

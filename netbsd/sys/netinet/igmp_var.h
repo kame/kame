@@ -205,18 +205,18 @@ extern	struct igmpstat igmpstat;
 #define	IGMP_HDR_ALIGNED_P(ig)	((((vaddr_t) (ig)) & 3) == 0)
 #endif
 
-void	igmp_init __P((void));
-struct	router_info * rti_init __P((struct ifnet *));
-void	igmp_input __P((struct mbuf *, ...));
-int	igmp_joingroup __P((struct in_multi *));
-void	igmp_leavegroup __P((struct in_multi *));
-void	igmp_sendbuf __P((struct mbuf *, struct ifnet *));
-void	igmp_fasttimo __P((void));
-void	igmp_slowtimo __P((void));
-int	igmp_get_router_alert __P((struct mbuf *));
-void	igmp_send_state_change_report __P((struct mbuf **, int *,
+extern void	igmp_init __P((void));
+extern struct	router_info *rti_init __P((struct ifnet *));
+extern void	igmp_input __P((struct mbuf *, ...));
+extern int	igmp_joingroup __P((struct in_multi *));
+extern void	igmp_leavegroup __P((struct in_multi *));
+extern void	igmp_sendbuf __P((struct mbuf *, struct ifnet *));
+extern void	igmp_fasttimo __P((void));
+extern void	igmp_slowtimo __P((void));
+extern int	igmp_get_router_alert __P((struct mbuf *));
+extern void	igmp_send_state_change_report __P((struct mbuf **, int *,
 				struct in_multi *, u_int8_t, int));
-int	igmp_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
+extern int	igmp_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 extern void igmp_purgeif __P((struct ifnet *));
 #endif /* _KERNEL */
 

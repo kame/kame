@@ -1188,8 +1188,8 @@ send:
 #endif
 		}
 		tcp_trace(TA_OUTPUT, tp->t_state, tp, m, 0);
-#endif
 	}
+#endif
 
 	/*
 	 * Fill in IP length and desired time to live and
@@ -1296,7 +1296,7 @@ send:
 		else
 			opts = NULL;
 		error = ip6_output(m, opts, (struct route_in6 *)ro,
-		    ip6oflags, 0, NULL);
+		    ip6oflags, 0, so, NULL);
 		break;
 	    }
 #endif

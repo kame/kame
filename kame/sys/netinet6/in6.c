@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.385 2004/12/09 02:19:03 t-momose Exp $	*/
+/*	$KAME: in6.c,v 1.386 2004/12/27 05:41:17 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -182,6 +182,9 @@
 
 #ifdef __FreeBSD__
 MALLOC_DEFINE(M_IPMADDR, "in6_multi", "internet multicast address");
+#endif
+#ifdef __NetBSD__
+MALLOC_DEFINE(M_IP6OPT, "ip6_options", "IPv6 options");
 #endif
 
 /*
@@ -2180,7 +2183,7 @@ ip6_sprintf(addr)
 	return (ip6buf[ip6round]);
 }
 
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 int
 in6_localaddr(in6)
 	struct in6_addr *in6;

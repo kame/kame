@@ -101,6 +101,7 @@ include "crypto/rijndael/files.rijndael"
 include "crypto/ripemd160/files.ripemd160"
 include "crypto/sha2/files.sha2"
 include "crypto/skipjack/files.skipjack"
+include "crypto/twofish/files.twofish"
 
 # General-purpose crypto processing framework.
 include "opencrypto/files.opencrypto"
@@ -124,6 +125,7 @@ include "netiso/files.netiso"
 include "netnatm/files.netnatm"
 include "netns/files.netns"
 include "netsmb/files.netsmb"
+include "net/files.pf"
 
 defflag				IPX		# IPX network stack
 defflag				PFIL_HOOKS	# pfil(9)
@@ -1043,12 +1045,12 @@ defpseudo gif:		ifnet
 defpseudo faith:	ifnet
 defpseudo stf:		ifnet
 defpseudo ist:		ifnet
-defpseudo irframetty:	irframedrv, irdasir
+#defpseudo irframetty:	irframedrv, irdasir
 defpseudo mip:		ifnet
 defpseudo nemo:		ifnet
-defpseudo pf:		ifnet
-defpseudo pflog:	ifnet
-defpseudo pfsync:	ifnet
+#defpseudo pf:		ifnet
+#defpseudo pflog:	ifnet
+#defpseudo pfsync:	ifnet
 
 defpseudo sequencer
 defpseudo clockctl
@@ -1270,7 +1272,8 @@ file	net/if_ist.c			ist			needs-count
 file	net/if_loop.c			loop			needs-count
 file	net/if_media.c
 file	net/if_ppp.c			ppp			needs-count
-file	net/if_stf.c			stf & inet & inet6	needs-count
+#file	net/if_stf.c			stf & inet & inet6	needs-count
+file	net/if_stf.c			stf			needs-count
 file	net/if_sl.c			sl			needs-count
 file	net/if_spppsubr.c		sppp
 file	net/if_strip.c			strip			needs-count

@@ -22,6 +22,7 @@ file	netinet6/nd6_nbr.c		inet6
 file	netinet6/nd6_rtr.c		inet6
 file	netinet6/raw_ip6.c		inet6
 file	netinet6/route6.c		inet6
+file	netinet6/scope6.c		inet6
 
 file	netinet6/udp6_output.c		inet6
 file	netinet6/udp6_usrreq.c		inet6

@@ -1,5 +1,5 @@
 /*	$NetBSD: in6_pcb.c,v 1.61.2.1 2004/04/28 05:56:07 jmc Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.1 2004/12/22 08:23:48 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.2 2004/12/27 05:41:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -228,7 +228,7 @@ in6_pcbbind(v, nam, p)
 #endif
 
 		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0)
+		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
 			return EINVAL;
 		/* this must be cleared for ifa_ifwithaddr() */
 		sin6->sin6_scope_id = 0;
@@ -398,7 +398,7 @@ in6_pcbconnect(v, nam)
 	sin6 = &tmp;
 
 	/* KAME hack: embed scopeid */
-	if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, &ifp) != 0)
+	if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
 		return EINVAL;
 
 	/* Source address selection. */
@@ -434,9 +434,8 @@ in6_pcbconnect(v, nam)
 		 * Is it the intended behavior?
 		 */
 		in6a = in6_selectsrc(sin6, in6p->in6p_outputopts,
-				     in6p->in6p_moptions,
-				     &in6p->in6p_route,
-				     &in6p->in6p_laddr, &error);
+		    in6p->in6p_moptions, &in6p->in6p_route,
+		    &in6p->in6p_laddr, &ifp, &error);
 		if (in6a == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -507,19 +506,12 @@ in6_pcbdetach(in6p)
 #endif /* IPSEC */
 	sotoin6pcb(so) = 0;
 	sofree(so);
-	if (in6p->in6p_options)
-		m_freem(in6p->in6p_options);
-	if (in6p->in6p_outputopts) {
-		if (in6p->in6p_outputopts->ip6po_rthdr &&
-		    in6p->in6p_outputopts->ip6po_route.ro_rt)
-			RTFREE(in6p->in6p_outputopts->ip6po_route.ro_rt);
-		if (in6p->in6p_outputopts->ip6po_m)
-			(void)m_free(in6p->in6p_outputopts->ip6po_m);
-		free(in6p->in6p_outputopts, M_IP6OPT);
-	}
+
+	ip6_freepcbopts(in6p->in6p_outputopts);
+	ip6_freemoptions(in6p->in6p_moptions);
+
 	if (in6p->in6p_route.ro_rt)
 		rtfree(in6p->in6p_route.ro_rt);
-	ip6_freemoptions(in6p->in6p_moptions);
 	s = splnet();
 	in6_pcbstate(in6p, IN6P_ATTACHED);
 	LIST_REMOVE(&in6p->in6p_head, inph_lhash);

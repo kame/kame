@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.124 2004/06/02 05:53:17 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.125 2004/12/27 05:41:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,6 +79,7 @@
 #include <sys/systm.h>
 #ifdef __NetBSD__
 #include <sys/proc.h>
+#include <sys/sysctl.h>
 #endif
 #include <sys/syslog.h>
 
@@ -115,9 +116,12 @@
  * Per RFC 768, August, 1980.
  */
 
+#ifdef __NetBSD__
+extern struct inpcbtable udbtable;
+#else
 struct	in6pcb *udp6_last_in6pcb = &udb6;
+#endif
 
-static	void udp6_detach __P((struct in6pcb *));
 static	void udp6_notify __P((struct in6pcb *, int));
 
 #ifdef __FreeBSD__
@@ -127,7 +131,12 @@ extern int udp_log_in_vain;
 void
 udp6_init()
 {
+
+#ifdef __NetBSD__
+	/* initialization done in udp_input() due to initialization order */
+#else
 	udb6.in6p_next = udb6.in6p_prev = &udb6;
+#endif
 }
 
 #ifndef __NetBSD__
@@ -503,6 +512,7 @@ udp6_ctlinput(cmd, sa, d)
 		ip6 = NULL;
 		cmdarg = NULL;
 		sa6_src = &sa6_any;
+		off = 0;
 	}
 
 	if (ip6) {
@@ -531,7 +541,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcblookup_connect(&udb6, &sa6->sin6_addr,
+			if (in6_pcblookup_connect(&udbtable, &sa6->sin6_addr,
 			    uh.uh_dport,
 			    (struct in6_addr *)&sa6_src->sin6_addr,
 			    uh.uh_sport, 0))
@@ -544,7 +554,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * We should at least check if the local address (= s)
 			 * is really ours.
 			 */
-			else if (in6_pcblookup_bind(&udb6, &sa6->sin6_addr,
+			else if (in6_pcblookup_bind(&udbtable, &sa6->sin6_addr,
 			    uh.uh_dport, 0))
 				valid++;
 #endif
@@ -569,12 +579,12 @@ udp6_ctlinput(cmd, sa, d)
 		}
 #endif
 
-		(void) in6_pcbnotify(&udb6, sa, uh.uh_dport,
+		(void) in6_pcbnotify(&udbtable, sa, uh.uh_dport,
 		    (struct sockaddr *)sa6_src, uh.uh_sport, cmd, cmdarg,
 		    notify);
 	} else {
-		(void) in6_pcbnotify(&udb6, sa, 0, (struct sockaddr *)sa6_src,
-		    0, cmd, cmdarg, notify);
+		(void) in6_pcbnotify(&udbtable, sa, 0,
+		    (struct sockaddr *)sa6_src, 0, cmd, cmdarg, notify);
 	}
 }
 
@@ -619,9 +629,9 @@ udp6_usrreq(so, req, m, addr6, control)
 
 #ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
-		in6_pcbpurgeif0(&udb6, (struct ifnet *)control);
+		in6_pcbpurgeif0(&udbtable, (struct ifnet *)control);
 		in6_purgeif((struct ifnet *)control);
-		in6_pcbpurgeif(&udb6, (struct ifnet *)control);
+		in6_pcbpurgeif(&udbtable, (struct ifnet *)control);
 		return (0);
 	}
 #endif
@@ -659,7 +669,7 @@ udp6_usrreq(so, req, m, addr6, control)
 		break;
 
 	case PRU_DETACH:
-		udp6_detach(in6p);
+		in6_pcbdetach(in6p);
 		break;
 
 	case PRU_BIND:
@@ -730,7 +740,7 @@ udp6_usrreq(so, req, m, addr6, control)
 
 	case PRU_ABORT:
 		soisdisconnected(so);
-		udp6_detach(in6p);
+		in6_pcbdetach(in6p);
 		break;
 
 	case PRU_SOCKADDR:
@@ -771,49 +781,39 @@ release:
 	return (error);
 }
 
-static void
-udp6_detach(in6p)
-	struct in6pcb *in6p;
-{
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	int s = splsoftnet();
-#else
-	int s = splnet();
-#endif
-
-	if (in6p == udp6_last_in6pcb)
-		udp6_last_in6pcb = &udb6;
-	in6_pcbdetach(in6p);
-	splx(s);
-}
-
 #ifdef __NetBSD__
-#include <sys/sysctl.h>
-
-int
-udp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
+SYSCTL_SETUP(sysctl_net_inet6_udp6_setup, "sysctl net.inet6.udp6 subtree setup")
 {
-	/* All sysctl names at this level are terminal. */
-	if (namelen != 1)
-		return ENOTDIR;
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "net", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "inet6", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, PF_INET6, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "udp6",
+		       SYSCTL_DESCR("UDPv6 related settings"),
+		       NULL, 0, NULL, 0,
+		       CTL_NET, PF_INET6, IPPROTO_UDP, CTL_EOL);
 
-	switch (name[0]) {
-
-	case UDP6CTL_SENDSPACE:
-		return sysctl_int(oldp, oldlenp, newp, newlen,
-		    &udp6_sendspace);
-	case UDP6CTL_RECVSPACE:
-		return sysctl_int(oldp, oldlenp, newp, newlen,
-		    &udp6_recvspace);
-	default:
-		return ENOPROTOOPT;
-	}
-	/* NOTREACHED */
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "sendspace",
+		       SYSCTL_DESCR("Default UDP send buffer size"),
+		       NULL, 0, &udp6_sendspace, 0,
+		       CTL_NET, PF_INET6, IPPROTO_UDP, UDP6CTL_SENDSPACE,
+		       CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "recvspace",
+		       SYSCTL_DESCR("Default UDP receive buffer size"),
+		       NULL, 0, &udp6_recvspace, 0,
+		       CTL_NET, PF_INET6, IPPROTO_UDP, UDP6CTL_RECVSPACE,
+		       CTL_EOL);
 }
 #endif

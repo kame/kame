@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.155 2004/12/16 11:29:28 t-momose Exp $	*/
+/*	$KAME: in6_proto.c,v 1.156 2004/12/27 05:41:17 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -229,9 +229,9 @@ struct ip6protosw inet6sw[] = {
   0,		0,		0,		0,
   0,
   ip6_init,	0,		frag6_slowtimo,	frag6_drain,
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
   ip6_sysctl,
-#else
+#elif defined(__FreeBSD__)
   &nousrreqs,
 #endif
 },
@@ -245,13 +245,9 @@ struct ip6protosw inet6sw[] = {
  udp6_usrreq,	udp6_init,
 #endif
   0,		0,		0,
-#ifndef __FreeBSD__
-#ifdef HAVE_NRL_INPCB
+#ifdef __OpenBSD__
   udp_sysctl,
-#else
-  udp6_sysctl,
-#endif
-#else
+#elif defined(__FreeBSD__)
   &udp6_usrreqs,
 #endif
 },
@@ -270,7 +266,7 @@ struct ip6protosw inet6sw[] = {
   tcp_init,	tcp_fasttimo,	tcp_slowtimo,
 #endif
 #ifdef __NetBSD__
-  tcp6_drain,
+  tcp_drain,
 #else
 #ifdef INET
   0,
@@ -278,9 +274,9 @@ struct ip6protosw inet6sw[] = {
   tcp_drain,
 #endif
 #endif
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
   tcp_sysctl,
-#else
+#elif defined(__FreeBSD__)
   &tcp6_usrreqs,
 #endif
 },
@@ -293,9 +289,9 @@ struct ip6protosw inet6sw[] = {
   sctp6_usrreq,
 #endif
   0,		0,		0,		sctp_drain,
-#ifndef __FreeBSD__
+#ifndef __OpenBSD__
   sctp_sysctl,
-#else
+#elif defined(__FreeBSD__)
   &sctp6_usrreqs
 #endif
 },
@@ -307,9 +303,9 @@ struct ip6protosw inet6sw[] = {
   sctp6_usrreq,
 #endif
   0,		0,		0,		sctp_drain,
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
   sctp_sysctl,
-#else
+#elif defined(__FreeBSD__)
   &sctp6_usrreqs
 #endif
 },
@@ -321,9 +317,9 @@ struct ip6protosw inet6sw[] = {
   sctp6_usrreq,
 #endif
   0,		0,		0,		sctp_drain,
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
   sctp_sysctl,
-#else
+#elif defined(__FreeBSD__)
   &sctp6_usrreqs
 #endif
 },
@@ -341,12 +337,10 @@ struct ip6protosw inet6sw[] = {
 #else
   dccp_init,	0,		0,		0,
 #endif
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
   dccp_sysctl
-#else
-#ifdef __FreeBSD__
+#elif defined(__FreeBSD__)
   &dccp6_usrreqs
-#endif
 #endif
 },
 #endif /* DCCP */
@@ -374,9 +368,9 @@ struct ip6protosw inet6sw[] = {
 #else
   icmp6_init,	icmp6_fasttimo,	0,		nd6_drain,
 #endif
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
   icmp6_sysctl,
-#else
+#elif defined(__FreeBSD__)
   &rip6_usrreqs
 #endif
 },
@@ -413,12 +407,10 @@ struct ip6protosw inet6sw[] = {
   rip6_usrreq,
 #endif
   0,		0,		0,		0,
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
   mip6_sysctl,
-#else
-# if __FreeBSD__ >= 3
+#elif defined(__FreeBSD__)
   &rip6_usrreqs,
-# endif
 #endif
 },
 #endif /* MIP6 */
@@ -435,9 +427,7 @@ struct ip6protosw inet6sw[] = {
   0,		0,		0,		0,
 #ifdef __OpenBSD__
   ah_sysctl,
-#elif !defined(__FreeBSD__)
-  ipsec6_sysctl,
-#else
+#elif defined(__FreeBSD__)
   &nousrreqs,
 #endif
 },
@@ -450,9 +440,7 @@ struct ip6protosw inet6sw[] = {
   0,		0,		0,		0,
 #ifdef __OpenBSD__
   esp_sysctl,
-#elif !defined(__FreeBSD__)
-  ipsec6_sysctl,
-#else
+#elif defined(__FreeBSD__)
   &nousrreqs,
 #endif
 },
@@ -462,9 +450,9 @@ struct ip6protosw inet6sw[] = {
   ipcomp6_input, 0,	 	0,		0,
   0,
   0,		0,		0,		0,
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
   ipsec6_sysctl,
-#else
+#elif defined(__FreeBSD__)
   &nousrreqs,
 #endif
 },
@@ -513,7 +501,7 @@ struct ip6protosw inet6sw[] = {
   0,            0,              0,              0,
 #ifdef __FreeBSD__
   &rip6_usrreqs
-# endif
+#endif
 },
 /* raw wildcard */
 { SOCK_RAW,	&inet6domain,	0,		PR_ATOMIC|PR_ADDR|PR_LASTHDR,
@@ -535,13 +523,13 @@ struct ip6protosw inet6sw[] = {
 struct ip6protosw mip6_tunnel_protosw =
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   mip6_tunnel_input, rip6_output,	0,	rip6_ctloutput,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
   0,
 #else
   rip6_usrreq,
 #endif
   0,            0,              0,              0,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
   &rip6_usrreqs
 #endif
 };

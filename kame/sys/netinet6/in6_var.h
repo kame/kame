@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.105 2004/12/09 02:19:06 t-momose Exp $	*/
+/*	$KAME: in6_var.h,v 1.106 2004/12/27 05:41:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -495,6 +495,10 @@ struct	in6_rrenumreq {
 #endif
 
 #ifdef _KERNEL
+#ifdef __NetBSD__
+MALLOC_DECLARE(M_IP6OPT);
+#endif
+
 extern struct in6_ifaddr *in6_ifaddr;
 
 extern struct icmp6stat icmp6stat;

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.128 2004/12/09 02:19:08 t-momose Exp $	*/
+/*	$KAME: ip6_var.h,v 1.129 2004/12/27 05:41:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -412,6 +412,10 @@ int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			int,
 			struct ip6_moptions *, struct ifnet **));
 #endif
+#elif defined(__NetBSD__)
+int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
+			struct route_in6 *, int, struct ip6_moptions *,
+			struct socket *, struct ifnet **));
 #else
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route_in6 *,

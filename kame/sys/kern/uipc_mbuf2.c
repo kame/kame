@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.45 2004/07/22 08:00:45 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.46 2004/12/27 05:41:16 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -90,6 +90,10 @@ static struct mbuf *m_dup1 __P((struct mbuf *, int, int, int));
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 MALLOC_DEFINE(M_PACKET_TAGS, "packet tags", "Packet tags");
+#endif
+
+#ifdef __NetBSD__
+MALLOC_DEFINE(M_PACKET_TAGS, "packet tags", "Packet-attached information");
 #endif
 
 /*
@@ -480,6 +484,22 @@ m_tag_delete_chain(m, t)
 		m_tag_delete(m, q);
 	m_tag_delete(m, p);
 }
+
+#ifdef __NetBSD__
+/*
+ * Strip off all tags that would normally vanish when
+ * passing through a network interface.  Only persistent
+ * tags will exist after this; these are expected to remain
+ * so long as the mbuf chain exists, regardless of the
+ * path the mbufs take.
+ */
+void
+m_tag_delete_nonpersistent(struct mbuf *m)
+{
+	/* NetBSD has no persistent tags yet, so just delete all tags. */
+	return m_tag_delete_chain(m, NULL);
+}
+#endif
 
 /* Find a tag, starting from a given position. */
 struct m_tag *

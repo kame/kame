@@ -866,7 +866,7 @@ sys_getsockopt(struct lwp *l, void *v, register_t *retval)
 	int		error;
 	int		used_my_mbuf;
 	int		s;
-	struct mbuf	*msav;
+	struct mbuf	*msav = NULL;
 
 	used_my_mbuf = 0;
 	p = l->l_proc;
@@ -1186,14 +1186,15 @@ getsock(struct filedesc *fdp, int fdes, struct file **fpp)
 
 
 int
-sctp_peeloff(p, v, retval)
-     struct proc *p;
-     void *v;
-     register_t *retval;
+sctp_peeloff(l, v, retval)
+	struct lwp *l;
+	void *v;
+	register_t *retval;
 {
 #ifdef SCTP
+	struct proc *p;
 	struct sctp_peeloff_args *uap;
-	struct filedesc *fdp = p->p_fd;
+	struct filedesc *fdp;
 	struct file *lfp = NULL;
 	struct file *nfp = NULL;
 	int error, s;
@@ -1201,6 +1202,8 @@ sctp_peeloff(p, v, retval)
 	int fd;
 	short fflag;		/* type must match fp->f_flag */
 
+	p = l->l_proc;
+	fdp = p->p_fd;
 	uap = (struct sctp_peeloff_args *)v;
 	if (error)
 		return(error);

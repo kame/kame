@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.134 2004/11/11 22:34:46 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.135 2004/12/27 05:41:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1784,12 +1784,16 @@ phyint_send(ip6, mifp, m)
 		/* XXX: ip6_output will override ip6->ip6_hlim */
 		im6o.im6o_multicast_hlim = ip6->ip6_hlim;
 		im6o.im6o_multicast_loop = 1;
-		error = ip6_output(mb_copy, NULL, &ro,
-				   IPV6_FORWARDING, &im6o, NULL
 #ifdef __FreeBSD__
-				   , NULL
+		error = ip6_output(mb_copy, NULL, &ro, IPV6_FORWARDING,
+		    &im6o, NULL, NULL);
+#elif defined(__NetBSD__)
+		error = ip6_output(mb_copy, NULL, &ro, IPV6_FORWARDING,
+		    &im6o, NULL, NULL);
+#else
+		error = ip6_output(mb_copy, NULL, &ro, IPV6_FORWARDING,
+		    &im6o, NULL);
 #endif
-				  );
 
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)

@@ -259,7 +259,6 @@ static u_int if_index = 1;
 struct ifnet_head ifnet;
 size_t if_indexlim = 0;
 struct ifaddr **ifnet_addrs = NULL;
-size_t if_indexlim = 0;
 struct ifnet **ifindex2ifnet = NULL;
 
 /*

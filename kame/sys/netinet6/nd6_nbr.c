@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.152 2004/12/09 02:19:25 t-momose Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.153 2004/12/27 05:41:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -610,11 +610,13 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
 #endif
-	ip6_output(m, NULL, &ro, dad ? IPV6_UNSPECSRC : 0, &im6o, NULL
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		   ,NULL
+	ip6_output(m, NULL, &ro, dad ? IPV6_UNSPECSRC : 0, &im6o, NULL, NULL);
+#elif defined(__NetBSD__)
+	ip6_output(m, NULL, &ro, dad ? IPV6_UNSPECSRC : 0, &im6o, NULL, NULL);
+#else
+	ip6_output(m, NULL, &ro, dad ? IPV6_UNSPECSRC : 0, &im6o, NULL);
 #endif
-		  );
 	icmp6_ifstat_inc(ifp, ifs6_out_msg);
 	icmp6_ifstat_inc(ifp, ifs6_out_neighborsolicit);
 	icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT]++;
@@ -1111,11 +1113,13 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
 #endif
-	ip6_output(m, NULL, &ro, 0, &im6o, NULL
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		   ,NULL
+	ip6_output(m, NULL, &ro, 0, &im6o, NULL, NULL);
+#elif defined(__NetBSD__)
+	ip6_output(m, NULL, &ro, 0, &im6o, NULL, NULL);
+#else
+	ip6_output(m, NULL, &ro, 0, &im6o, NULL);
 #endif
-		  );
 
 	icmp6_ifstat_inc(ifp, ifs6_out_msg);
 	icmp6_ifstat_inc(ifp, ifs6_out_neighboradvert);

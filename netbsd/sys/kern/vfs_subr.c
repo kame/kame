@@ -2343,7 +2343,7 @@ vfs_free_netcred(rn, w)
 	struct radix_node_head *rnh = (struct radix_node_head *)w;
 	struct netcred *np = (struct netcred *)(void *)rn;
 
-	(*rnh->rnh_deladdr)(rn->rn_key, rn->rn_mask, rnh);
+	(*rnh->rnh_deladdr)(rn->rn_key, rn->rn_mask, rnh, 0);
 	if (--(np->netc_refcnt) <= 0)
 		free(np, M_NETADDR);
 	return (0);

@@ -3997,7 +3997,7 @@ syn_cache_respond(sc, m)
 		}
 
 		error = ip6_output(m, NULL /*XXX*/, (struct route_in6 *)ro,
-		    ip6oflags, so, NULL);
+		    ip6oflags, NULL, so, NULL);
 		break;
 #endif
 	default:

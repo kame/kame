@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.113 2004/12/09 02:19:03 t-momose Exp $	*/
+/*	$KAME: in6_gif.c,v 1.114 2004/12/27 05:41:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -251,9 +251,13 @@ in6_gif_output(ifp, family, m)
 #ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif
+	int flags;
 #ifdef MIP6
-        struct ip6_pktopts  pktopt;
+        struct ip6_pktopts pktopt;
+#endif
+        struct ip6_pktopts *p;
 
+#ifdef MIP6
 	bzero(&pktopt, sizeof(pktopt));
 	pktopt.ip6po_hlim = -1;   /* -1 means default hop limit */
 #endif /* MIP6 */
@@ -389,26 +393,21 @@ in6_gif_output(ifp, family, m)
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-#ifndef MIP6
-	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL
+	flags = IPV6_MINMTU;
 #else
-	error = ip6_output(m, (pktopt.ip6po_nexthop) ? &pktopt : NULL, 
-		&sc->gif_ro6, IPV6_MINMTU, 0, NULL
-#endif /* MIP6 */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-			   , NULL
+	flags = 0;
 #endif
-			   );
-#else
 #ifndef MIP6
-	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL
+	p = NULL;
 #else
-	error = ip6_output(m, (pktopt.ip6po_nexthop) ? &pktopt : NULL, 
-		&sc->gif_ro6, 0, 0, NULL
-#endif /* MIP6 */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-			   , NULL
+	p = (pktopt.ip6po_nexthop) ? &pktopt : NULL;
 #endif
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+	error = ip6_output(m, p, &sc->gif_ro6, flags, 0, NULL, NULL);
+#elif defined(__NetBSD__)
+	error = ip6_output(m, p, &sc->gif_ro6, flags, 0, NULL, NULL);
+#else
+	error = ip6_output(m, p, &sc->gif_ro6, flags, 0, NULL);
 #endif
 
 	/*
@@ -620,10 +619,10 @@ in6_gif_attach(sc)
 		return EINVAL;
 	sc->encap_cookie6 = encap_attach(AF_INET6, -1, sc->gif_psrc,
 	    (struct sockaddr *)&mask6, sc->gif_pdst, (struct sockaddr *)&mask6,
-	    (struct protosw *)&in6_gif_protosw, sc);
+	    (void *)&in6_gif_protosw, sc);
 #else
 	sc->encap_cookie6 = encap_attach_func(AF_INET6, -1, gif_encapcheck,
-	    (struct protosw *)&in6_gif_protosw, sc);
+	    (void *)&in6_gif_protosw, sc);
 #endif
 	if (sc->encap_cookie6 == NULL)
 		return EEXIST;

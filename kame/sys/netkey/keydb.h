@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.27 2004/12/02 08:39:18 itojun Exp $	*/
+/*	$KAME: keydb.h,v 1.28 2004/12/27 05:41:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -49,6 +49,10 @@ union sockaddr_union {
 };
 #endif	/* _SOCKADDR_UNION_DEFINED */
 #endif  /* defined(__FreeBSD__) && __FreeBSD_version >= 503000 */
+
+#ifdef __NetBSD__
+MALLOC_DECLARE(M_SECA);
+#endif
 
 /* Security Assocciation Index */
 /* NOTE: Ensure to be same address family */

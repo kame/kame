@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.81 2004/11/11 22:34:47 suz Exp $	*/
+/*	$KAME: udp6_output.c,v 1.82 2004/12/27 05:41:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -436,12 +436,17 @@ udp6_output(in6p, m, addr6, control)
 			goto release;
 		}
 #endif /* IPSEC */
+#ifdef __FreeBSD__
 		error = ip6_output(m, optp, &in6p->in6p_route,
-		    flags, in6p->in6p_moptions, NULL
-#if defined(__FreeBSD__)
-				   ,NULL
+		    flags, in6p->in6p_moptions, NULL, NULL);
+#elif defined(__NetBSD__)
+		error = ip6_output(m, optp, &in6p->in6p_route,
+		    flags, in6p->in6p_moptions, in6p->in6p_socket, NULL);
+#else
+		error = ip6_output(m, optp, &in6p->in6p_route,
+		    flags, in6p->in6p_moptions, NULL);
 #endif
-				   );
+
 		break;
 	case AF_INET:
 #if defined(INET) && defined(__NetBSD__)

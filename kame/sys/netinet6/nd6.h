@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.114 2004/12/09 02:19:24 t-momose Exp $	*/
+/*	$KAME: nd6.h,v 1.115 2004/12/27 05:41:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -336,6 +336,11 @@ struct nd_pfxrouter {
 };
 
 LIST_HEAD(nd_prhead, nd_prefix);
+
+#ifdef __NetBSD__
+#include <sys/mallocvar.h>
+MALLOC_DECLARE(M_IP6NDP);
+#endif
 
 /* nd6.c */
 extern int nd6_prune;

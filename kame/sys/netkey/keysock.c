@@ -743,7 +743,7 @@ struct protosw keysw[] = {
 #endif
   raw_init,	0,		0,		0,
 #ifdef __NetBSD__
-  key_sysctl,
+  0,
 #elif defined(__FreeBSD__)
   &key_usrreqs
 #endif
