@@ -253,6 +253,7 @@ if_nulldrain(ifp)
 int if_index = 1;
 struct ifnet_head ifnet;
 struct ifaddr **ifnet_addrs = NULL;
+size_t if_indexlim = 0;
 struct ifnet **ifindex2ifnet = NULL;
 
 /*
@@ -349,7 +350,6 @@ void
 if_attach(ifp)
 	struct ifnet *ifp;
 {
-	static size_t if_indexlim = 0;
 	int indexlim = 0;
 
 	if (if_indexlim == 0) {

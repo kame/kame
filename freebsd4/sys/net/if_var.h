@@ -499,6 +499,7 @@ struct ifmultiaddr {
 	} while (0)
 
 extern	struct ifnethead ifnet;
+extern int if_indexlim;
 extern struct	ifnet	**ifindex2ifnet;
 extern	int ifqmaxlen;
 extern	struct ifnet loif[];

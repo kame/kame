@@ -527,6 +527,7 @@ do {									\
 #define	IFQ_SET_MAXLEN(ifq, len)	((ifq)->ifq_maxlen = (len))
 
 extern struct ifnet_head ifnet;
+extern int if_indexlim;
 extern struct ifnet **ifindex2ifnet;
 extern struct ifnet *lo0ifp;
 extern int if_index;

@@ -726,6 +726,7 @@ do {									\
 #define	IFQ_SET_MAXLEN(ifq, len)	((ifq)->ifq_maxlen = (len))
 
 extern struct ifnet_head ifnet;
+extern size_t if_indexlim;
 extern struct ifnet **ifindex2ifnet;
 #if 0
 struct ifnet loif[];

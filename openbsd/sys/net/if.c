@@ -136,6 +136,7 @@ ifinit()
 
 int if_index = 0;
 struct ifaddr **ifnet_addrs = NULL;
+int if_indexlim = 8;
 struct ifnet **ifindex2ifnet = NULL;
 struct ifnet_head ifnet;
 struct ifnet *lo0ifp;
@@ -149,7 +150,6 @@ if_attachsetup(ifp)
 	struct ifnet *ifp;
 {
 	struct ifaddr *ifa;
-	static int if_indexlim = 8;
 
 	ifp->if_index = ++if_index;
 

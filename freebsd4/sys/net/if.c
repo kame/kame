@@ -137,6 +137,7 @@ ifinit(dummy)
 
 int if_index = 0;
 struct ifaddr **ifnet_addrs;
+int if_indexlim = 8;
 struct ifnet **ifindex2ifnet = NULL;
 
 
@@ -153,7 +154,6 @@ if_attach(ifp)
 	char workbuf[64];
 	register struct sockaddr_dl *sdl;
 	register struct ifaddr *ifa;
-	static int if_indexlim = 8;
 	static int inited;
 
 	if (!inited) {

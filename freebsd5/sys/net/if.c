@@ -106,7 +106,7 @@ struct	mtx ifnet_lock;
 static int	if_cloners_count;
 LIST_HEAD(, if_clone) if_cloners = LIST_HEAD_INITIALIZER(if_cloners);
 
-static int	if_indexlim = 8;
+int	if_indexlim = 8;
 static struct	klist ifklist;
 
 static void	filt_netdetach(struct knote *kn);
