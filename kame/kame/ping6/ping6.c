@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.159 2002/09/08 14:26:53 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.160 2002/09/08 14:28:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1409,19 +1409,18 @@ dnsdecode(sp, ep, base, buf, bufsiz)
 			if (dnsdecode(&comp, cp, base, cresult,
 			    sizeof(cresult)) == NULL)
 				return NULL;
-			if (strlcat(buf, (char *)cresult, bufsiz) >= bufsiz)
+			if (strlcat(buf, cresult, bufsiz) >= bufsiz)
 				return NULL;	/*result overrun*/
 			break;
 		} else if ((i & 0x3f) == i) {
 			if (i > ep - cp)
 				return NULL;	/*source overrun*/
 			while (i-- > 0 && cp < ep) {
-				l = snprintf((char *)cresult, sizeof(cresult),
+				l = snprintf(cresult, sizeof(cresult),
 				    isprint(*cp) ? "%c" : "\\%03o", *cp & 0xff);
 				if (l >= sizeof(cresult) || l < 0)
 					return NULL;
-				if (strlcat(buf, (char *)cresult,
-				    bufsiz) >= bufsiz)
+				if (strlcat(buf, cresult, bufsiz) >= bufsiz)
 					return NULL;	/*result overrun*/
 				cp++;
 			}
