@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.19 2003/01/22 16:51:39 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.20 2003/02/07 12:22:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -95,7 +95,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %token ID_ASSOC IA_PD IAID
 %token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
-%token OPTION RAPID_COMMIT PREFIX_DELEGATION IA_PD DNS_SERVERS
+%token OPTION RAPID_COMMIT IA_PD DNS_SERVERS
 %token INFO_ONLY
 %token NUMBER SLASH EOS BCL ECL STRING PREFIX INFINITY
 %token COMMA
@@ -316,14 +316,6 @@ dhcpoption:
 
 			MAKE_CFLIST(l, DHCPOPT_RAPID_COMMIT, NULL, NULL);
 			/* no value */
-			$$ = l;
-		}
-	|	PREFIX_DELEGATION	
-		{
-			struct cf_list *l;
-
-			MAKE_CFLIST(l, DHCPOPT_PREFIX_DELEGATION, NULL, NULL);
-			/* currently no value */
 			$$ = l;
 		}
 	|	IA_PD NUMBER

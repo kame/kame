@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.17 2003/01/22 07:24:15 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.18 2003/02/07 12:22:03 jinmei Exp $	*/
 
 %{
 /*
@@ -143,7 +143,6 @@ ecl		\}
 <S_CNF>option { DECHO; return (OPTION); }
 
 <S_CNF>rapid-commit { DECHO; return (RAPID_COMMIT); }
-<S_CNF>prefix-delegation { DECHO; return (PREFIX_DELEGATION); }
 <S_CNF>ia-pd { DECHO; return (IA_PD); }
 <S_CNF>domain-name-servers { DECHO; return (DNS_SERVERS); }
 

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.26 2003/01/27 13:21:52 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.27 2003/02/07 12:22:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -833,25 +833,6 @@ add_options(opcode, ifc, cfl0)
 				TAILQ_INSERT_TAIL(&ifc->iaconf_list,
 				    iac, link);
 
-				break;
-			default:
-				dprintf(LOG_ERR, "%s" "invalid operation (%d) "
-					"for option type (%d)",
-					FNAME, opcode, cfl->type);
-				break;
-			}
-			break;
-		case DHCPOPT_PREFIX_DELEGATION:
-			switch(opcode) {
-			case DHCPOPTCODE_REQUEST:
-				opttype = DH6OPT_PREFIX_DELEGATION;
-				if (dhcp6_add_listval(&ifc->reqopt_list,
-				    DHCP6_LISTVAL_NUM, &opttype, NULL)
-				    == NULL) {
-					dprintf(LOG_ERR, "%s" "failed to "
-					    "configure an option", FNAME);
-					return (-1);
-				}
 				break;
 			default:
 				dprintf(LOG_ERR, "%s" "invalid operation (%d) "
