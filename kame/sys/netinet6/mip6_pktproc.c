@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.107 2003/02/12 08:31:05 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.108 2003/02/12 09:27:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -526,6 +526,10 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	return (0);
 }
 
+#define IS_REQUEST_TO_CACHE(lifetime, hoa, coa)	\
+	(((lifetime) != 0) &&			\
+	 (!SA6_ARE_ADDR_EQUAL((hoa), (coa))))
+
 int
 mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	struct mbuf *m;
@@ -678,7 +682,10 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	if (!bu_safe && 
 	    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, 
-			     &bi.mbc_phaddr, &bi.mbc_pcoa, &bi.mbc_status)) {
+			     &bi.mbc_phaddr, &bi.mbc_pcoa,
+			     IS_REQUEST_TO_CACHE(bi.mbc_lifetime,
+				&bi.mbc_phaddr, &bi.mbc_pcoa), 
+			     &bi.mbc_status)) {
 		mip6log((LOG_ERR,
 			 "%s:%d: RR authentication was failed.\n",
 			 __FILE__, __LINE__));
@@ -725,10 +732,6 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			goto send_ba;
 		}
 	}
-
-#define IS_REQUEST_TO_CACHE(lifetime, hoa, coa)	\
-	(((lifetime) != 0) &&			\
-	 (!SA6_ARE_ADDR_EQUAL((hoa), (coa))))
 
 	if (ip6mu->ip6mu_flags & IP6MU_HOME) {
 		/* request for the home (un)registration. */
@@ -1733,7 +1736,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime, re
 	    (mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) &&
 	    mip6_calculate_kbm_from_index(dst, dstcoa, 
 		mopt->mopt_ho_nonce_idx, mopt->mopt_co_nonce_idx, 
-		key_bm) == 0) {
+		0, key_bm) == 0) {
 		need_auth = 1;
 		/* Binding Auth Option no longer require any alignment. 
 		   (6.2.7) */

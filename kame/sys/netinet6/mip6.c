@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.198 2003/02/07 09:34:39 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.199 2003/02/12 09:27:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2640,12 +2640,13 @@ mip6_get_nodekey(index, nodekey)
  *	Check a Binding Update packet whether it is valid 
  */
 int
-mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, status)
+mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, cache_req, status)
 	struct ip6_hdr *ip6;
 	struct ip6m_binding_update *ip6mu;
 	int ip6mulen;
 	struct mip6_mobility_options *mopt;
 	struct sockaddr_in6 *hoa_sa, *coa_sa;
+	int cache_req;	/* true if this request is cacheing */
 	u_int8_t *status;
 {
 	u_int8_t key_bm[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
@@ -2661,7 +2662,7 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, status)
 		return (EINVAL);
 	}
 	if ((*status = mip6_calculate_kbm_from_index(hoa_sa, coa_sa, mopt->mopt_ho_nonce_idx, 
-			mopt->mopt_co_nonce_idx, key_bm))) {
+			mopt->mopt_co_nonce_idx, !cache_req, key_bm))) {
 		return (EINVAL);
 	}
 
@@ -2771,11 +2772,12 @@ mip6_create_keygen_token(addr, nodekey, nonce, hc, token)
 
 /* For CN side function */
 int
-mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, key_bm)
+mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, ignore_co_nonce, key_bm)
 	struct sockaddr_in6 *hoa_sa;
 	struct sockaddr_in6 *coa_sa;
 	u_int16_t ho_nonce_idx;	/* Home Nonce Index */
 	u_int16_t co_nonce_idx;	/* Care-of Nonce Index */
+	int ignore_co_nonce;
 	u_int8_t *key_bm;	/* needs at least MIP6_KBM_LEN bytes */
 {
 	mip6_nonce_t home_nonce, careof_nonce;
@@ -2817,17 +2819,18 @@ mip6_hexdump("CN: Careof Nodekey: ", sizeof(coa_nodekey), &coa_nodekey);
 mip6_hexdump("CN: Home keygen token: ", sizeof(home_token), (u_int8_t *)&home_token);
 #endif
 
-	/* Calculate care-of keygen token */
-	mip6_create_keygen_token(&coa_sa->sin6_addr,
+	if (!ignore_co_nonce) {
+		/* Calculate care-of keygen token */
+		mip6_create_keygen_token(&coa_sa->sin6_addr,
 			   &coa_nodekey, &careof_nonce, 1, &careof_token);
 #ifdef RR_DBG
 mip6_hexdump("CN: Care-of keygen token: ", sizeof(careof_token), (u_int8_t *)&careof_token);
 #endif
+	}
 
 	/* Calculate K_bm */
 	mip6_calculate_kbm(&home_token,
-			   SA6_ARE_ADDR_EQUAL(hoa_sa, coa_sa) ? NULL : &careof_token,
-			   key_bm);
+			   ignore_co_nonce ? NULL : &careof_token, key_bm);
 #ifdef RR_DBG
 mip6_hexdump("CN: K_bm: ", sizeof(key_bm), key_bm);
 #endif
