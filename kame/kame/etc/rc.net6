@@ -94,6 +94,10 @@ $route add -inet6 2002:7f00:: -prefixlen 24 ::1 -reject
 $route add -inet6 2002:0000:: -prefixlen 24 ::1 -reject
 $route add -inet6 2002:ff00:: -prefixlen 24 ::1 -reject
 
+$route add -inet6 2002:0a00:: -prefixlen 24 ::1 -reject
+$route add -inet6 2002:ac10:: -prefixlen 28 ::1 -reject
+$route add -inet6 2002:c0a8:: -prefixlen 32 ::1 -reject
+
 # Completely disallow packets to IPv4 compatible prefix.
 # This may conflict with RFC1933 under following circumstances:
 # (1) An IPv6-only KAME node tries to originate packets to IPv4 comatible
