@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.106 2000/05/28 15:44:11 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.107 2000/05/30 10:16:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -538,6 +538,11 @@ skip_ipsec2:;
 		dst->sin6_family = AF_INET6;
 		dst->sin6_len = sizeof(struct sockaddr_in6);
 		dst->sin6_addr = ip6->ip6_dst;
+#ifdef SCOPEDROUTING
+		/* XXX: sin6_scope_id should already be fixed at this point */
+		if (IN6_IS_SCOPE_LINKLOCAL(&dst->sin6_addr))
+			dst->sin6_scope_id = ntohs(dst->sin6_addr.s6_addr16[1]);
+#endif
 	}
 #ifdef IPSEC
 	if (needipsec && needipsectun) {

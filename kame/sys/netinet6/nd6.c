@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.63 2000/05/17 12:35:59 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.64 2000/05/30 10:16:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -707,6 +707,9 @@ nd6_lookup(addr6, create, ifp)
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_addr = *addr6;
+#ifdef SCOPEDROUTING
+	sin6.sin6_scope_id = in6_addr2scopeid(ifp, addr6);
+#endif
 	rt = rtalloc1((struct sockaddr *)&sin6, create
 #ifdef __FreeBSD__
 		      , 0UL

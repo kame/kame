@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.14 2000/05/28 14:54:24 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.15 2000/05/30 10:16:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,6 +307,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			ro->ro_dst.sin6_family = AF_INET6;
 			ro->ro_dst.sin6_len = sizeof(struct sockaddr_in6);
 			ro->ro_dst.sin6_addr = *dst;
+			ro->ro_dst.sin6_scope_id = dstsock->sin6_scope_id;
 			if (IN6_IS_ADDR_MULTICAST(dst)) {
 #ifdef __FreeBSD__
 				ro->ro_rt = rtalloc1(&((struct route *)ro)

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.89 2000/05/19 19:59:05 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.90 2000/05/30 10:16:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -535,6 +535,10 @@ ip6_input(m)
 		ip6_forward_rt.ro_dst.sin6_len = sizeof(struct sockaddr_in6);
 		ip6_forward_rt.ro_dst.sin6_family = AF_INET6;
 		ip6_forward_rt.ro_dst.sin6_addr = ip6->ip6_dst;
+#ifdef SCOPEDROUTING
+		ip6_forward_rt.ro_dst.sin6_scope_id =
+			in6_addr2scopeid(m->m_pkthdr.rcvif, &ip6->ip6_dst);
+#endif
 
 #ifdef __FreeBSD__
 		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.81 2000/05/17 05:07:26 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.82 2000/05/30 10:16:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -593,6 +593,7 @@ in6_control(so, cmd, data, ifp)
 			ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 			ia->ia_addr.sin6_family = AF_INET6;
 			ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
+#if 1
 			if (ifp->if_flags & IFF_POINTOPOINT) {
 				ia->ia_ifa.ifa_dstaddr
 					= (struct sockaddr *)&ia->ia_dstaddr;
@@ -602,6 +603,10 @@ in6_control(so, cmd, data, ifp)
 				ia->ia_ifa.ifa_dstaddr = NULL;
 				bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
 			}
+#else  /* always initilize by NULL */
+			ia->ia_ifa.ifa_dstaddr = NULL;
+			bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
+#endif
 			ia->ia_ifa.ifa_netmask
 				= (struct sockaddr *)&ia->ia_prefixmask;
 
@@ -688,6 +693,10 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGIFDSTADDR_IN6:
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0)
 			return(EINVAL);
+		/*
+		 * XXX: should we check if ifa_dstaddr is NULL and return
+		 * an error?
+		 */
 		ifr->ifr_dstaddr = ia->ia_dstaddr;
 		break;
 
@@ -749,6 +758,7 @@ in6_control(so, cmd, data, ifp)
 			ia->ia_dstaddr = oldaddr;
 			return(error);
 		}
+		ia->ia_ifa.ifa_dstaddr = (struct sockaddr *)&ia->ia_dstaddr;
 		if (ia->ia_flags & IFA_ROUTE) {
 			ia->ia_ifa.ifa_dstaddr = (struct sockaddr *)&oldaddr;
 			rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST);
