@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.37 2003/05/21 06:54:34 suz Exp $	*/
+/*	$KAME: vif.c,v 1.38 2003/09/02 07:48:33 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -929,7 +929,7 @@ find_vif(ifname, create, default_policy)
 	v = &uvifs[numvifs++];
 	strncpy(v->uv_name, ifname, IFNAMSIZ);
 	v->uv_ifindex = ifindex;
-	v->uv_flags = VIFF_DOWN | default_policy;
+	v->uv_flags = VIFF_DOWN;
 	return v;
 }
 
