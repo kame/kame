@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1144 2000/07/21 16:06:02 sakane Exp $
+$Id: CHANGELOG,v 1.1145 2000/07/23 05:36:37 itojun Exp $
 
 <200006>
 Sat Jul 22 01:05:03 JST 2000 sakane@ydc.co.jp
@@ -8,6 +8,12 @@ Sat Jul 22 01:05:03 JST 2000 sakane@ydc.co.jp
 	Trying to conform with draft-ietf-mobileip-ipv6-12.  If "support_mip6"
 	in remote directive is on, both values of ID payloads in phase 2
 	exchange are always used as the addresses of end-point of IPsec-SAs.
+
+Sat Jul 22 JST 2000  itojun@iijlab.net
+	* sys/netinet6/esp_core.c: cache intermediate key for ESP encryption
+	  algorithms, into SAs.  this will drastically improve performance
+	  for algorithms with long key setup time (blowfish).
+	  KAME PR 229.  suggested by sommerfeld.
 
 Fri Jul 21 22:37:44 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/sendmail.beta: use 8.11.0.
