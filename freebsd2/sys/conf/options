@@ -128,6 +128,9 @@ IPV6FIREWALL_DEFAULT_TO_ACCEPT	opt_ip6fw.h
 #temp option to change ipfw/divert semantics. Should become standard.
 IPV6FW_DIVERT_RESTART	opt_ip6fw.h
 
+# Network Address Translation - Protocol Translation (NAT-PT)
+NATPT			opt_natpt.h
+
 # DPT SCSI RAID Controller 
 DPT_VERIFY_HINTR         opt_dpt.h
 DPT_RESTRICTED_FREELIST  opt_dpt.h
