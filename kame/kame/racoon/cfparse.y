@@ -959,6 +959,11 @@ remote_spec
 				prhead->lifetime = $3 * $4;
 			else {
 				prhead->lifebyte = $3 * $4;
+				/*
+				 * check size.
+				 * Must be more thatn 1024B because its unit
+				 * is kilobytes.  That is defined RFC2407.
+				 */
 				if (prhead->lifebyte < 1024) {
 					yyerror("byte size should be more "
 						"than 1024B.");
@@ -1036,6 +1041,11 @@ isakmpproposal_spec
 				prhead->spspec->lifetime = $3 * $4;
 			else {
 				prhead->spspec->lifebyte = $3 * $4;
+				/*
+				 * check size.
+				 * Must be more thatn 1024B because its unit
+				 * is kilobytes.  That is defined RFC2407.
+				 */
 				if (prhead->spspec->lifebyte < 1024) {
 					yyerror("byte size should be "
 						"more than 1024B.");
