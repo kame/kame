@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.93 2004/02/05 10:09:24 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.94 2004/02/05 10:32:11 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -68,9 +68,6 @@
  *	@(#)igmp.c	8.1 (Berkeley) 7/19/93
  */
 
-#ifdef MLDV2
-/* mldv2.c is used on behalf of this, if MLDv2 is enabled */
-#else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
@@ -79,6 +76,9 @@
 #include "opt_inet.h"
 #endif
 
+#ifdef MLDV2
+/* mldv2.c is used on behalf of this, if MLDv2 is enabled */
+#else
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
