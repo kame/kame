@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.29 1999/11/30 17:11:23 sakane Exp $ */
+/* KAME $Id: key.c,v 1.30 1999/12/02 05:32:13 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -4360,6 +4360,7 @@ key_acquire(saidx, spidx)
 	                    IPSEC_ULPROTO_ANY);
 
 	/* set sadb_address for spidx's. */
+	bzero(&id, sizeof(id));
 	id.sadb_x_ident_id_addr.prefix = spidx->prefs;
 	id.sadb_x_ident_id_addr.ul_proto = spidx->ul_proto;
 	p = key_setsadbident(p,
@@ -4369,6 +4370,7 @@ key_acquire(saidx, spidx)
 			    spidx->src.__ss_len,
 			    *(u_int64_t *)&id);
 
+	bzero(&id, sizeof(id));
 	id.sadb_x_ident_id_addr.prefix = spidx->prefd;
 	id.sadb_x_ident_id_addr.ul_proto = spidx->ul_proto;
 	p = key_setsadbident(p,
