@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.41 2002/04/04 06:44:40 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.42 2002/04/04 07:08:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -54,6 +54,7 @@
 #include <sys/socketvar.h>
 #include <sys/sockio.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/syslog.h>
 
