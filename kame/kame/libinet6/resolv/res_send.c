@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.14 2000/06/19 00:02:12 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.15 2000/08/07 14:59:28 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -604,7 +604,7 @@ read_len:
 			/*
 			 * Use datagrams.
 			 */
-			struct timeval timeout;
+			struct timeval timeout, finish, now;
 			fd_set dsmask;
 			struct sockaddr_storage from;
 			int fromlen;
@@ -732,6 +732,9 @@ read_len:
 			if ((long) timeout.tv_sec <= 0)
 				timeout.tv_sec = 1;
 			timeout.tv_usec = 0;
+			gettimeofday(&now, NULL);
+			finish.tv_sec = now.tv_sec + timeout.tv_sec;
+			finish.tv_usec = now.tv_usec + timeout.tv_usec;
     wait:
 			if (s < 0 || s >= FD_SETSIZE) {
 				Perror(stderr, "s out-of-bounds", EMFILE);
@@ -743,8 +746,26 @@ read_len:
 			n = select(s+1, &dsmask, (fd_set *)NULL,
 				   (fd_set *)NULL, &timeout);
 			if (n < 0) {
-				if (errno == EINTR)
-					goto wait;
+				if (errno == EINTR) {
+					gettimeofday(&now, NULL);
+					if (finish.tv_sec > now.tv_sec) {
+						timeout = finish;
+						timeout.tv_sec -= now.tv_sec;
+						if (timeout.tv_usec < now.tv_usec) {
+							timeout.tv_sec--;
+							timeout.tv_usec += 1000000;
+						}
+						timeout.tv_usec -= now.tv_usec;
+						goto wait;
+					} else if (finish.tv_sec == now.tv_sec &&
+						   finish.tv_usec > now.tv_usec)
+					{
+						timeout.tv_sec = 0;
+						timeout.tv_usec =
+						    finish.tv_usec - now.tv_usec;
+						goto wait;
+					}
+				}
 				Perror(stderr, "select", errno);
 				res_close();
 				goto next_ns;
