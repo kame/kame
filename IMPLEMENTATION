@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.161 2000/09/20 23:45:21 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.162 2000/09/22 05:01:17 itojun Exp $
 
 1. IPv6
 
@@ -1671,22 +1671,22 @@ coverage for IPsec crypto algorithms documented in RFC (we do not cover
 algorithms with intellectual property issues, though).
 
 Here are (some of) platforms we have tested IPsec/IKE interoperability
-in the past, in no particular order.  Note that both ends (KAME and
+in the past, no particular order.  Note that both ends (KAME and
 others) may have modified their implementation, so use the following
 list just for reference purposes.
-
 	ACC, allied-telesis, Altiga, Ashley-laurent (vpcom.com), BlueSteel,
 	CISCO IOS, Cryptek, Checkpoint FW-1, Data Fellows (F-Secure),
-	Ericsson, Fitel, FreeS/WAN, hifn, HITACHI, IBM AIX, IIJ, Intel Canada,
-	Intel Packet Protect, MEW NetCocoon , MGCS, Microsoft WinNT/2000,
+	Ericsson, Fitel, FreeS/WAN, HiFn, HITACHI, IBM AIX, IIJ, Intel Canada,
+	Intel Packet Protect, MEW NetCocoon, MGCS, Microsoft WinNT/2000,
 	NAI PGPnet, NetLock, NIST (linux IPsec + plutoplus), NEC IX5000,
 	Netscreen, NxNetworks, OpenBSD isakmpd, Pivotal, Radguard, RapidStream,
-	RedCreek, Routerware, SSH (both IPv4/IPv6), Secure Computing, Soliton,
-	Sun Solaris8, TIS/NAI Gauntret, Toshiba, VPNet, Yamaha RT series
+	RedCreek, Routerware, RSA, SSH (both IPv4/IPv6), Secure Computing,
+	Soliton, Sun Solaris8, TIS/NAI Gauntret, Toshiba, VPNet,
+	Yamaha RT series
 
 Here are (some of) platforms we have tested IPComp/IKE interoperability
 in the past, in no particular order.
-	IRE
+	IRE, SSH (both IPv4/IPv6), NetLock
 
 5. ALTQ
 
