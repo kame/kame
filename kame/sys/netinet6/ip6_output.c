@@ -763,6 +763,12 @@ skip_ipsec2:;
 		*ifpp = ifp;
 
 	/*
+	 * Upper-layer reachability confirmation
+	 */
+	if (opt && (opt->ip6po_flags & IP6PO_REACHCONF))
+		nd6_nud_hint(ro->ro_rt, NULL);
+
+	/*
 	 * Determine path MTU.
 	 */
 	if (ro_pmtu != ro) {
@@ -2461,6 +2467,12 @@ ip6_setpktoptions(control, opt, priv)
 			default:
 				return(EINVAL);
 			}
+			break;
+
+		case IPV6_REACHCONF:
+			if (cm->cmsg_len != CMSG_LEN(0))
+				return(EINVAL);
+			opt->ip6po_flags |= IP6PO_REACHCONF;
 			break;
 
 		default:

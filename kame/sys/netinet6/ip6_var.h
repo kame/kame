@@ -134,6 +134,8 @@ struct	ip6_pktopts {
 	struct	ip6_dest *ip6po_dest1; /* Destination options header(1st part) */
 	struct	ip6po_rhinfo ip6po_rhinfo; /* Routing header related info. */
 	struct	ip6_dest *ip6po_dest2; /* Destination options header(2nd part) */
+	int ip6po_flags;
+#define IP6PO_REACHCONF	0x01		/* upper-layer reach. confirmation */
 };
 
 struct	ip6stat {

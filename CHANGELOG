@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.369 1999/12/23 06:17:07 jinmei Exp $
+$Id: CHANGELOG,v 1.370 1999/12/23 17:19:44 itojun Exp $
 
 <199912>
+Fri Dec 24 02:21:30 JST 1999  itojun@iijlab.net
+	* implement 2292bis IPV6_REACHCONF (trivial).
+
 1999-12-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_free): call pfctlinput with
 	PRC_HOSTDEAD in order to remove all cached routes to the
