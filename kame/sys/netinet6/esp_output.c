@@ -416,6 +416,14 @@ esp_output(m, nexthdrp, md, isr, af)
 	if (!(n->m_flags & M_EXT) && extendsiz < M_TRAILINGSPACE(n)) {
 		switch (sav->flags & SADB_X_EXT_PMASK) {
 		case SADB_X_EXT_PRAND:
+		    {
+			int i;
+			u_char *p;
+			p = mtod(n, u_char *) + n->m_len;
+			for (i = 0; i < extendsiz; i++)
+				p[i] = random() & 0xff;
+			break;
+		    }
 			break;
 		case SADB_X_EXT_PZERO:
 			bzero((caddr_t)(mtod(n, u_int8_t *) + n->m_len),
@@ -446,6 +454,14 @@ esp_output(m, nexthdrp, md, isr, af)
 		nn->m_len = extendsiz;
 		switch (sav->flags & SADB_X_EXT_PMASK) {
 		case SADB_X_EXT_PRAND:
+		    {
+			int i;
+			u_char *p;
+			p = mtod(nn, u_char *);
+			for (i = 0; i < extendsiz; i++)
+				p[i] = random() & 0xff;
+			break;
+		    }
 			break;
 		case SADB_X_EXT_PZERO:
 			bzero(mtod(nn, caddr_t), extendsiz);
