@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.132 2001/07/24 06:02:31 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.133 2001/07/24 06:04:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2155,14 +2155,14 @@ summary()
 }
 
 /*subject type*/
-static char *niqcode[] = {
+static const char *niqcode[] = {
 	"IPv6 address",
 	"DNS label",	/*or empty*/
 	"IPv4 address",
 };
 
 /*result code*/
-static char *nircode[] = {
+static const char *nircode[] = {
 	"Success", "Refused", "Unknown",
 };
 
