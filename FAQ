@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.27 2001/07/13 03:16:23 jinmei Exp $
+$KAME: FAQ,v 1.28 2001/07/13 03:47:24 jinmei Exp $
 
 
 GENERAL
@@ -155,7 +155,8 @@ kernel.
 	/etc/rc.local, and remove all network configurations from /etc/rc.conf
 	and/or /etc/netstart.
 
-Q: Why link-local address in the kernel structure have s6_addr16[1] filled?
+Q: Why do link-local addresses in the kernel structure have
+s6_addr16[1] filled?
 	Due to the "scoped address" design in the IPv6 spec, the
 	kernel must treat link-local addresses in a special manner.
 	Link-local address has to be memorized with the incoming
