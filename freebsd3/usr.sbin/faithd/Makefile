@@ -1,5 +1,5 @@
 PROG=	faithd
-SRCS=	faithd.c tcp.c ftp.c rsh.c prefix.c
+SRCS=	faithd.c tcp.c ftp.c prefix.c
 
 MAN8=	faithd.8
 
