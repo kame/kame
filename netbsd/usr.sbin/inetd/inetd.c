@@ -1062,7 +1062,8 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 	 && sep->se_policy) {
 		syslog(LOG_ERR, "%s/%s: ipsec setup failed",
 		    sep->se_service, sep->se_proto);
-		close(sep->se_fd);
+		(void)close(sep->se_fd);
+		sep->se_fd = -1;
 		return;
 	}
 #endif
