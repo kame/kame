@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.21 2003/11/06 06:32:53 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.22 2004/04/20 05:09:08 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -90,6 +90,8 @@ static void	tbr_timeout(void *);
 int (*altq_input)(struct mbuf *, int) = NULL;
 static int tbr_timer = 0;	/* token bucket regulator timer */
 static struct callout tbr_callout = CALLOUT_INITIALIZER;
+
+int pfaltq_running;	/* keep track of running state */
 
 #ifdef ALTQ3_CLFIER_COMPAT
 static int 	extract_ports4(struct mbuf *, struct ip *, struct flowinfo_in *);
@@ -455,7 +457,9 @@ tbr_get(ifq, profile)
 int
 altq_pfattach(struct pf_altq *a)
 {
-	int error = 0;
+	struct ifnet *ifp;
+	struct tb_profile tb;
+	int s, error = 0;
 
 	switch (a->scheduler) {
 	case ALTQT_NONE:
@@ -477,6 +481,23 @@ altq_pfattach(struct pf_altq *a)
 #endif
 	default:
 		error = ENXIO;
+	}
+
+	ifp = ifunit(a->ifname);
+
+	/* if the state is running, enable altq */
+	if (error == 0 && pfaltq_running &&
+	    ifp != NULL && ifp->if_snd.altq_type != ALTQT_NONE &&
+	    !ALTQ_IS_ENABLED(&ifp->if_snd))
+			error = altq_enable(&ifp->if_snd);
+
+	/* if altq is already enabled, reset set tokenbucket regulator */
+	if (error == 0 && ifp != NULL && ALTQ_IS_ENABLED(&ifp->if_snd)) {
+		tb.rate = a->ifbandwidth;
+		tb.depth = a->tbrsize;
+		s = splimp();
+		error = tbr_set(&ifp->if_snd, &tb);
+		splx(s);
 	}
 
 	return (error);

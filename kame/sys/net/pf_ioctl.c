@@ -133,9 +133,15 @@ extern struct callout	 pf_expire_to;
 struct pf_rule		 pf_default_rule;
 
 #define	TAGID_MAX	 50000
-TAILQ_HEAD(pf_tags, pf_tagname)	pf_tags = TAILQ_HEAD_INITIALIZER(pf_tags);
+TAILQ_HEAD(pf_tags, pf_tagname)	pf_tags = TAILQ_HEAD_INITIALIZER(pf_tags),
+				pf_qids = TAILQ_HEAD_INITIALIZER(pf_qids);
 
-static	int pf_altq_running;	/* altq running state */
+#if (PF_QNAME_SIZE != PF_TAG_NAME_SIZE)
+#error PF_QNAME_SIZE must be equal to PF_TAG_NAME_SIZE
+#endif
+static u_int16_t	 tagname2tag(struct pf_tags *, char *);
+static void		 tag2tagname(struct pf_tags *, u_int16_t, char *);
+static void		 tag_unref(struct pf_tags *, u_int16_t);
 
 #define DPFPRINTF(n, x) if (pf_status.debug >= (n)) printf x
 
@@ -492,13 +498,13 @@ pf_rm_rule(struct pf_rulequeue *rulequeue, struct pf_rule *rule)
 	pool_put(&pf_rule_pl, rule);
 }
 
-u_int16_t
-pf_tagname2tag(char *tagname)
+static	u_int16_t
+tagname2tag(struct pf_tags *head, char *tagname)
 {
 	struct pf_tagname	*tag, *p = NULL;
 	u_int16_t		 new_tagid = 1;
 
-	TAILQ_FOREACH(tag, &pf_tags, entries)
+	TAILQ_FOREACH(tag, head, entries)
 		if (strcmp(tagname, tag->name) == 0) {
 			tag->ref++;
 			return (tag->tag);
@@ -511,8 +517,8 @@ pf_tagname2tag(char *tagname)
 	 */
 
 	/* new entry */
-	if (!TAILQ_EMPTY(&pf_tags))
-		for (p = TAILQ_FIRST(&pf_tags); p != NULL &&
+	if (!TAILQ_EMPTY(head))
+		for (p = TAILQ_FIRST(head); p != NULL &&
 		    p->tag == new_tagid; p = TAILQ_NEXT(p, entries))
 			new_tagid = p->tag + 1;
 
@@ -532,36 +538,36 @@ pf_tagname2tag(char *tagname)
 	if (p != NULL)	/* insert new entry before p */
 		TAILQ_INSERT_BEFORE(p, tag, entries);
 	else	/* either list empty or no free slot in between */
-		TAILQ_INSERT_TAIL(&pf_tags, tag, entries);
+		TAILQ_INSERT_TAIL(head, tag, entries);
 
 	return (tag->tag);
 }
 
-void
-pf_tag2tagname(u_int16_t tagid, char *p)
+static	void
+tag2tagname(struct pf_tags *head, u_int16_t tagid, char *p)
 {
 	struct pf_tagname	*tag;
 
-	TAILQ_FOREACH(tag, &pf_tags, entries)
+	TAILQ_FOREACH(tag, head, entries)
 		if (tag->tag == tagid) {
 			strlcpy(p, tag->name, PF_TAG_NAME_SIZE);
 			return;
 		}
 }
 
-void
-pf_tag_unref(u_int16_t tag)
+static	void
+tag_unref(struct pf_tags *head, u_int16_t tag)
 {
 	struct pf_tagname	*p, *next;
 
 	if (tag == 0)
 		return;
 
-	for (p = TAILQ_FIRST(&pf_tags); p != NULL; p = next) {
+	for (p = TAILQ_FIRST(head); p != NULL; p = next) {
 		next = TAILQ_NEXT(p, entries);
 		if (tag == p->tag) {
 			if (--p->ref == 0) {
-				TAILQ_REMOVE(&pf_tags, p, entries);
+				TAILQ_REMOVE(head, p, entries);
 				free(p, M_TEMP);
 			}
 			break;
@@ -569,30 +575,43 @@ pf_tag_unref(u_int16_t tag)
 	}
 }
 
-#if 1
-/*
- * temporarily use tagname functions for qnames until we have a common
- * framework for both tagname and qname.
- */
+u_int16_t
+pf_tagname2tag(char *tagname)
+{
+	return (tagname2tag(&pf_tags, tagname));
+}
 
+void
+pf_tag2tagname(u_int16_t tagid, char *p)
+{
+	return (tag2tagname(&pf_tags, tagid, p));
+}
+
+void
+pf_tag_unref(u_int16_t tag)
+{
+	return (tag_unref(&pf_tags, tag));
+}
+
+#ifdef ALTQ
 u_int32_t
 pf_qname2qid(char *qname)
 {
-	return ((u_int32_t)pf_tagname2tag(qname));
+	return ((u_int32_t)tagname2tag(&pf_qids, qname));
 }
 
 void
 pf_qid2qname(u_int32_t qid, char *p)
 {
-	pf_tag2tagname((u_int16_t)qid, p);
+	return (tag2tagname(&pf_qids, (u_int16_t)qid, p));
 }
 
 void
 pf_qid_unref(u_int32_t qid)
 {
-	pf_tag_unref((u_int32_t)qid);
+	return (tag_unref(&pf_qids, (u_int16_t)qid));
 }
-#endif
+#endif /* ALTQ */
 
 int
 pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
@@ -1501,6 +1520,71 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 	}
 
 #ifdef ALTQ
+	case DIOCSTARTALTQ: {
+		struct pf_altq		*altq;
+		struct ifnet		*ifp;
+		struct tb_profile	 tb;
+
+		/* enable all altq interfaces on active list */
+		s = splsoftnet();
+		TAILQ_FOREACH(altq, pf_altqs_active, entries) {
+			if (altq->qname[0] == 0) {
+				if ((ifp = ifunit(altq->ifname)) == NULL) {
+					error = EINVAL;
+					break;
+				}
+				if (ifp->if_snd.altq_type != ALTQT_NONE)
+					error = altq_enable(&ifp->if_snd);
+				if (error != 0)
+					break;
+				/* set tokenbucket regulator */
+				tb.rate = altq->ifbandwidth;
+				tb.depth = altq->tbrsize;
+				error = tbr_set(&ifp->if_snd, &tb);
+				if (error != 0)
+					break;
+			}
+		}
+		if (error == 0)
+			pfaltq_running = 1;
+		splx(s);
+		DPFPRINTF(PF_DEBUG_MISC, ("altq: started\n"));
+		break;
+	}
+
+	case DIOCSTOPALTQ: {
+		struct pf_altq		*altq;
+		struct ifnet		*ifp;
+		struct tb_profile	 tb;
+		int			 err;
+
+		/* disable all altq interfaces on active list */
+		s = splsoftnet();
+		TAILQ_FOREACH(altq, pf_altqs_active, entries) {
+			if (altq->qname[0] == 0) {
+				if ((ifp = ifunit(altq->ifname)) == NULL) {
+					error = EINVAL;
+					break;
+				}
+				if (ifp->if_snd.altq_type != ALTQT_NONE) {
+					err = altq_disable(&ifp->if_snd);
+					if (err != 0 && error == 0)
+						error = err;
+				}
+				/* clear tokenbucket regulator */
+				tb.rate = 0;
+				err = tbr_set(&ifp->if_snd, &tb);
+				if (err != 0 && error == 0)
+					error = err;
+			}
+		}
+		if (error == 0)
+			pfaltq_running = 0;
+		splx(s);
+		DPFPRINTF(PF_DEBUG_MISC, ("altq: stopped\n"));
+		break;
+	}
+
 	case DIOCBEGINALTQS: {
 		u_int32_t	*ticket = (u_int32_t *)addr;
 		struct pf_altq	*altq;
@@ -1606,74 +1690,6 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			pool_put(&pf_altq_pl, altq);
 		}
 		splx(s);
-
-		if (pf_altq_running == 0)
-			break;
-		/* fall through...  when altq is already running, enable it */
-	}
-
-	case DIOCSTARTALTQ: {
-		struct pf_altq		*altq;
-		struct ifnet		*ifp;
-		struct tb_profile	 tb;
-
-		/* enable all altq interfaces on active list */
-		s = splsoftnet();
-		TAILQ_FOREACH(altq, pf_altqs_active, entries) {
-			if (altq->qname[0] == 0) {
-				if ((ifp = ifunit(altq->ifname)) == NULL) {
-					error = EINVAL;
-					break;
-				}
-				if (ifp->if_snd.altq_type != ALTQT_NONE)
-					error = altq_enable(&ifp->if_snd);
-				if (error != 0)
-					break;
-				/* set tokenbucket regulator */
-				tb.rate = altq->ifbandwidth;
-				tb.depth = altq->tbrsize;
-				error = tbr_set(&ifp->if_snd, &tb);
-				if (error != 0)
-					break;
-			}
-		}
-		if (error == 0)
-			pf_altq_running = 1;
-		splx(s);
-		DPFPRINTF(PF_DEBUG_MISC, ("altq: started\n"));
-		break;
-	}
-
-	case DIOCSTOPALTQ: {
-		struct pf_altq		*altq;
-		struct ifnet		*ifp;
-		struct tb_profile	 tb;
-		int			 err;
-
-		/* disable all altq interfaces on active list */
-		s = splsoftnet();
-		TAILQ_FOREACH(altq, pf_altqs_active, entries) {
-			if (altq->qname[0] == 0) {
-				if ((ifp = ifunit(altq->ifname)) == NULL) {
-					error = EINVAL;
-					break;
-				}
-				if (ifp->if_snd.altq_type != ALTQT_NONE) {
-					err = altq_disable(&ifp->if_snd);
-					if (err != 0 && error == 0)
-						error = err;
-				}
-				/* clear tokenbucket regulator */
-				tb.rate = 0;
-				err = tbr_set(&ifp->if_snd, &tb);
-				if (err != 0 && error == 0)
-					error = err;
-			}
-		}
-		if (error == 0)
-			pf_altq_running = 0;
-		splx(s);
-		DPFPRINTF(PF_DEBUG_MISC, ("altq: stopped\n"));
 		break;
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: altq_var.h,v 1.16 2003/10/03 05:05:15 kjc Exp $	*/
+/*	$KAME: altq_var.h,v 1.17 2004/04/20 05:09:08 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2003
@@ -209,6 +209,8 @@ typedef void (timeout_t)(void *);
 #endif
 
 #define	m_pktlen(m)		((m)->m_pkthdr.len)
+
+extern int pfaltq_running;
 
 struct ifnet; struct mbuf;
 struct pf_altq;
