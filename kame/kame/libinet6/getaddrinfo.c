@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.120 2001/07/20 16:45:14 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.121 2001/07/20 17:55:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -206,7 +206,8 @@ struct ai_order {
 	u_int32_t aio_srcflag;
 	int aio_srcscope;
 	int aio_dstscope;
-	struct addrinfo *aio_ai; 
+	struct addrinfo *aio_ai;
+	int *aio_rulestat;	/* XXX for statistics only */
 };
 
 /* types for OS dependent portion */
@@ -253,16 +254,12 @@ static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
 static int addrconfig __P((int));
-static int reorder __P((struct addrinfo *));
 static void set_source __P((struct ai_order *));
 static int comp_dst __P((const void *, const void *));
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
 static int gai_addr2scopetype __P((struct sockaddr *));
-#ifdef USE_LOG_REORDER
-static void log_reorder __P((struct timeval *, struct timeval *, int, int));
-#endif
 
 /* functions in OS dependent portion */
 static int explore_fqdn __P((const struct addrinfo *, const char *,
@@ -274,6 +271,22 @@ static int explore_fqdn __P((const struct addrinfo *, const char *,
 #undef USE_GETIPNODEBY
 #else
 #undef USE_FQDN_UNSPEC_LOOKUP
+#endif
+
+struct gai_orderstat		/* XXX: for statistics only */
+{
+	struct timeval start0;
+	struct timeval end0;
+	struct timeval start1;
+	struct timeval end1;
+	pid_t pid;
+	int numeric;
+	int entries;
+	int rulestat[16];
+};
+static int reorder __P((struct addrinfo *, struct gai_orderstat *));
+#ifdef USE_LOG_REORDER
+static void log_reorder __P((struct gai_orderstat *));
 #endif
 
 static struct ai_errlist {
@@ -668,6 +681,8 @@ globcopy:
 	 */
 	if (error == 0) {
 		if (sentinel.ai_next) {
+			struct gai_orderstat gstat; /* XXX for statistics */
+
 			/*
 			 * If the returned entry is for an active connection,
 			 * and the given name is not numeric, reorder the
@@ -676,20 +691,21 @@ globcopy:
 			 */
 			if (hints == NULL || !(hints->ai_flags & AI_PASSIVE)) {
 				int n;
-#ifdef USE_LOG_REORDER
-				struct timeval start, end;
-#endif
+
+				memset(&gstat, 0, sizeof(gstat));
+				gstat.numeric = numeric;
 
 #ifdef USE_LOG_REORDER
-				gettimeofday(&start, NULL);
+				gettimeofday(&gstat.start0, NULL);
 #endif
+#if 0 /* XXX: see comments at the head of reorder() */
 				if (!numeric)
-					n = reorder(&sentinel);
-				else
-					n = 0;
+#endif
+					n = reorder(&sentinel, &gstat);
 #ifdef USE_LOG_REORDER
-				gettimeofday(&end, NULL);
-				log_reorder(&start, &end, numeric, n);
+				gettimeofday(&gstat.end0, NULL);
+				gstat.entries = n;
+				log_reorder(&gstat);
 #endif
 			}
 			*res = sentinel.ai_next;
@@ -711,9 +727,16 @@ bad:
 	return error;
 }
 
+/*
+ * XXX: the argument "gstat" is only for statistics collection; for example,
+ *      we should just skip calling this function in "numeric" cases.
+ *      "rulestat" array is for statistics only, too.
+ *      After the evaluation period, we should clarify them.
+ */
 static int
-reorder(sentinel)
+reorder(sentinel, gstat)
 	struct addrinfo *sentinel;
+	struct gai_orderstat *gstat;
 {
 	struct addrinfo *ai, **aip;
 	struct ai_order *aio;
@@ -729,6 +752,9 @@ reorder(sentinel)
 	if (n <= 1)
 		return(n);
 
+	if (gstat->numeric)	/* XXX see the beginning comments */
+		return(n);
+
 	/* allocate a temporary array for sort and initialization of it. */
 	if ((aio = malloc(sizeof(*aio) * n)) == NULL)
 		return(n);	/* give up reordering */
@@ -736,8 +762,18 @@ reorder(sentinel)
 	for (i = 0, ai = sentinel->ai_next; i < n; ai = ai->ai_next, i++) {
 		aio[i].aio_ai = ai;
 		aio[i].aio_dstscope = gai_addr2scopetype(ai->ai_addr);
+		aio[i].aio_rulestat = gstat->rulestat;
+#ifndef USE_LOG_REORDER
+		set_source(&aio[i]);
+#endif
+	}
+#ifdef USE_LOG_REORDER
+	gettimeofday(&gstat->start1, NULL);
+	for (i = 0, ai = sentinel->ai_next; i < n; ai = ai->ai_next, i++) {
 		set_source(&aio[i]);
 	}
+	gettimeofday(&gstat->end1, NULL);	
+#endif
 
 	/* perform sorting. */
 	qsort(aio, n, sizeof(*aio), comp_dst);
@@ -808,6 +844,10 @@ set_source(aio)
 	return;
 }
 
+/*
+ * XXX: incrementing aio_rulestat is just for statistics collection.
+ * we should eventually cleanup the code after the evaluation process.
+ */
 static int
 comp_dst(arg1, arg2)
 	const void *arg1, *arg2;
@@ -819,29 +859,41 @@ comp_dst(arg1, arg2)
 	 * XXX: we currently do not consider if an appropriate route exists.
 	 */
 	if (dst1->aio_srcsa.sa_family != AF_UNSPEC &&
-	    dst2->aio_srcsa.sa_family == AF_UNSPEC)
+	    dst2->aio_srcsa.sa_family == AF_UNSPEC) {
+		dst1->aio_rulestat[1]++;
 		return(-1);
+	}
 	if (dst1->aio_srcsa.sa_family == AF_UNSPEC &&
-	    dst2->aio_srcsa.sa_family != AF_UNSPEC)
+	    dst2->aio_srcsa.sa_family != AF_UNSPEC) {
+		dst1->aio_rulestat[1]++;
 		return(1);
+	}
 
 	/* Rule 2: Prefer matching scope. */
 	if (dst1->aio_dstscope == dst1->aio_srcscope &&
-	    dst2->aio_dstscope != dst2->aio_srcscope)
+	    dst2->aio_dstscope != dst2->aio_srcscope) {
+		dst1->aio_rulestat[2]++;
 		return(-1);
+	}
 	if (dst1->aio_dstscope != dst1->aio_srcscope &&
-	    dst2->aio_dstscope == dst2->aio_srcscope)
+	    dst2->aio_dstscope == dst2->aio_srcscope) {
+		dst1->aio_rulestat[2]++;
 		return(1);
+	}
 
 	/* Rule 3: Avoid deprecated addresses. */
 	if (dst1->aio_srcsa.sa_family != AF_UNSPEC &&
 	    dst2->aio_srcsa.sa_family != AF_UNSPEC) {
 		if (!(dst1->aio_srcflag & AIO_SRCFLAG_DEPRECATED) &&
-		    (dst2->aio_srcflag & AIO_SRCFLAG_DEPRECATED))
+		    (dst2->aio_srcflag & AIO_SRCFLAG_DEPRECATED)) {
+			dst1->aio_rulestat[3]++;
 			return(-1);
+		}
 		if ((dst1->aio_srcflag & AIO_SRCFLAG_DEPRECATED) &&
-		    !(dst2->aio_srcflag & AIO_SRCFLAG_DEPRECATED))
+		    !(dst2->aio_srcflag & AIO_SRCFLAG_DEPRECATED)) {
+			dst1->aio_rulestat[3]++;
 			return(1);
+		}
 	}
 
 	/* Rule 4: Prefer home addresses. */
@@ -857,53 +909,47 @@ comp_dst(arg1, arg2)
 	 * draft-ietf-ipngwg-default-addr-select.
 	 */
 	if (dst1->aio_srcsa.sa_family == AF_INET6 &&
-	    dst2->aio_srcsa.sa_family == AF_INET)
+	    dst2->aio_srcsa.sa_family == AF_INET) {
+		dst1->aio_rulestat[6]++;
 		return(-1);
+	}
 	if (dst1->aio_srcsa.sa_family == AF_INET &&
-	    dst2->aio_srcsa.sa_family == AF_INET6)
+	    dst2->aio_srcsa.sa_family == AF_INET6) {
+		dst1->aio_rulestat[6]++;
 		return(1);
+	}
 
 	/* Rule 7: Prefer smaller scope. */
 	if (dst1->aio_dstscope >= 0 &&
-	    dst1->aio_dstscope < dst2->aio_dstscope)
+	    dst1->aio_dstscope < dst2->aio_dstscope) {
+		dst1->aio_rulestat[7]++;
 		return(-1);
+	}
 	if (dst2->aio_dstscope >= 0 &&
-	    dst2->aio_dstscope < dst1->aio_dstscope)
+	    dst2->aio_dstscope < dst1->aio_dstscope) {
+		dst1->aio_rulestat[7]++;
 		return(1);
+	}
 
 	/* Rule 8: Use longest matching prefix. */
 	/* XXX: not implemented yet */
 
 	/* Rule 9: Otherwise, leave the order unchanged. */
+	dst1->aio_rulestat[9]++;
 	return(-1);
 }
 
 #ifdef USE_LOG_REORDER
-struct gai_orderstat
-{
-	struct timeval start;
-	struct timeval end;
-	pid_t pid;
-	int numeric;
-	int entries;
-};
 #define PATH_STATFILE "/var/run/gaistat"
 
 static void
-log_reorder(start, end, numeric, n)
-	struct timeval *start, *end;
-	int numeric, n;
+log_reorder(gstat)
+	struct gai_orderstat *gstat;
 {
-	struct gai_orderstat stat;
 	struct sockaddr_un sun;
 	int s;
 
-	memset(&stat, 0, sizeof(stat));
-	stat.start = *start;
-	stat.end = *end;
-	stat.pid = getpid();
-	stat.numeric = numeric;
-	stat.entries = n;
+	gstat->pid = getpid();
 
 	if ((s = socket(AF_LOCAL, SOCK_DGRAM, 0)) < 0)
 		return;
@@ -911,7 +957,7 @@ log_reorder(start, end, numeric, n)
 	sun.sun_family = AF_LOCAL;
 	sun.sun_len = sizeof(sun);
 	strncpy(sun.sun_path, PATH_STATFILE, sizeof(sun.sun_path));
-	sendto(s, &stat, sizeof(stat), 0, (struct sockaddr *)&sun,
+	sendto(s, gstat, sizeof(*gstat), 0, (struct sockaddr *)&sun,
 	       sizeof(sun));
 
 	close(s);
