@@ -370,9 +370,8 @@ main(argc, argv)
 	struct addrinfo hints, *res;
 	extern char *optarg;
 	extern int optind;
-	int ch, i, on, probe, seq, hops;
-	static u_char rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))
-				+ CMSG_SPACE(sizeof(int))];
+	int ch, i, on, probe, seq, hops, rcvcmsglen;
+	static u_char *rcvcmsgbuf;
 	char hbuf[NI_MAXHOST];
 
 	on = 1;
@@ -534,8 +533,14 @@ main(argc, argv)
 	rcvmhdr.msg_namelen = sizeof(*rcv);
 	rcvmhdr.msg_iov = rcviov;
 	rcvmhdr.msg_iovlen = 1;
+	rcvcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo))
+		+ CMSG_SPACE(sizeof(int));
+	if ((rcvcmsgbuf = malloc(rcvcmsglen)) == NULL) {
+		Fprintf(stderr, "traceroute6: malloc failed\n");
+		exit(1);
+	}
 	rcvmhdr.msg_control = (caddr_t) rcvcmsgbuf;
-	rcvmhdr.msg_controllen = sizeof(rcvcmsgbuf);
+	rcvmhdr.msg_controllen = rcvcmsglen;
 
 	/* specify to tell receiving interface */
 #ifdef IPV6_RECVPKTINFO
