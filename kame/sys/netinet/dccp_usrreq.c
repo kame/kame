@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.33 2004/10/28 04:27:23 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.34 2004/12/07 05:12:25 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1156,8 +1156,8 @@ dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 		in_pcbnotify(&dccpbtable, faddr, dh->dh_dport,
 		    ip->ip_src, dh->dh_sport, inetctlerrmap[cmd], notify); 
 #else
-		in_pcbnotify(&dccpbtable, sa, dh->dh_dport,
-		    ip->ip_src, dh->dh_sport, inetctlerrmap[cmd], notify); 
+		if (inp)
+			(*notify)(inp, inetctlerrmap[cmd]); 
 #endif
 		if (inp != NULL) {
 			INP_LOCK(inp);
