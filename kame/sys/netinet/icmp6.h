@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.58 2001/07/24 01:52:53 jinmei Exp $	*/
+/*	$KAME: icmp6.h,v 1.59 2001/07/24 01:55:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -631,9 +631,8 @@ struct icmp6stat {
 	u_quad_t icp6s_checksum;	/* bad checksum */
 	u_quad_t icp6s_badlen;		/* calculated bound mismatch */
 	/*
-	 * number of responses: this member is inherited from IPv4, but
-	 * has less meaning in the latest IPv6 code.  (although it is still
-	 * incremented)
+	 * number of responses: this member is inherited from netinet code, but
+	 * for netinet6 code, it is already available in icp6s_outhist[].
 	 */
 	u_quad_t icp6s_reflect;
 	u_quad_t icp6s_inhist[256];	
