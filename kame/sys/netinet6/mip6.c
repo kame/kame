@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.50 2001/09/12 10:58:22 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.51 2001/09/14 16:10:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -701,6 +701,11 @@ mip6_select_coa(preferedifp)
 		ret = -1;
 		goto select_coa_end;
 	}
+
+	mip6log((LOG_INFO,
+		 "%s: prefered ifp is %s(%p)\n",
+		 __FUNCTION__,
+		 preferedifp->if_name, preferedifp));
 	
 	hcoa = hif_coa_list_find_withifp(&hif_coa_list, preferedifp);
 	if (hcoa == NULL) {
@@ -714,6 +719,9 @@ mip6_select_coa(preferedifp)
 			goto select_coa_end;
 		}
 	}
+	mip6log((LOG_INFO,
+		 "%s: hifcoa = %p, hifcoa->ifp = %s(%p)\n",
+		 __FUNCTION__, hcoa, hcoa->hcoa_ifp->if_name, hcoa->hcoa_ifp));
 
 	/*
 	 * XXX TODO
@@ -724,6 +732,9 @@ mip6_select_coa(preferedifp)
 		ret = -1;
 		goto select_coa_end;
 	}
+	mip6log((LOG_INFO,
+		 "%s: new CoA is %s\n",
+		 __FUNCTION__, ip6_sprintf(&ia6->ia_addr.sin6_addr)));
 
 	if (!IN6_ARE_ADDR_EQUAL(&hif_coa, &ia6->ia_addr.sin6_addr)) {
 		hif_coa = ia6->ia_addr.sin6_addr;
@@ -1118,17 +1129,18 @@ mip6_create_ip6hdr(ip6_src, ip6_dst, next, plen)
 
 int
 mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
-	struct mbuf *m;
-	struct ip6_pktopts *opt;
-	struct ip6_rthdr **pktopt_rthdr;
-	struct ip6_dest **pktopt_haddr;
-	struct ip6_dest **pktopt_binding;
+	struct mbuf *m;                   /* ip datagram */
+	struct ip6_pktopts *opt;          /* pktopt passed to ip6_output */
+	struct ip6_rthdr **pktopt_rthdr;  /* rthdr to be returned */
+	struct ip6_dest **pktopt_haddr;   /* hoa destopt to be returned */
+	struct ip6_dest **pktopt_binding; /* destination opt to be returned */
 {
 	struct ip6_hdr *ip6;
 	struct in6_addr *src;
 	struct in6_addr *dst;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
+	struct mip6_bc *mbc;
 	int error = 0;
 
 	*pktopt_rthdr = NULL;
@@ -1136,8 +1148,8 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 	*pktopt_binding = NULL;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	src = &ip6->ip6_src;
-	dst = &ip6->ip6_dst;
+	src = &ip6->ip6_src; /* if this node is MN, src = HoA */
+	dst = &ip6->ip6_dst; /* final destination */
 
 	/*
 	 * create a rthdr if an BC entry for the destination address exists.
@@ -1162,6 +1174,14 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 	 * insert BA/BR if pending BA/BR exist.
 	 */
 	/* XXX */
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, dst);
+	if (mbc) {
+		/*
+		 * there is a binding cache for the src host.  check
+		 * its status and insert BR/BA if needed.
+		 */
+		
+	}
 
 	/* following stuff is applied only for MN. */
 	if (!MIP6_IS_MN)
@@ -1230,7 +1250,7 @@ mip6_rthdr_create(pktopt_rthdr, coa)
 	len = sizeof(struct ip6_rthdr0) + sizeof(struct in6_addr);
 	rthdr0 = malloc(len, M_TEMP, M_NOWAIT);
 	if (rthdr0 == NULL) {
-		return (-1);
+		return (ENOMEM);
 	}
 	bzero(rthdr0, len);
 

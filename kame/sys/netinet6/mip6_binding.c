@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.11 2001/09/12 10:58:22 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.12 2001/09/14 16:10:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -88,7 +88,11 @@ struct callout mip6_bc_ch = CALLOUT_INITIALIZER;
 struct callout mip6_bu_ch;
 struct callout mip6_bc_ch;
 #endif
+#ifndef BUOLDTIMER
+int mip6_bu_count = 0;
+#else
 int mip6_bu_timer_running = 0;
+#endif
 int mip6_bc_count = 0;
 
 /* binding update functions. */
@@ -201,10 +205,10 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	} else {
 		/* registration. */
 		mbu->mbu_coa = *coa;
+		mbu->mbu_reg_state = MIP6_BU_REG_STATE_REGWAITACK;
 	}
 	if (coa_lifetime < mpfx->mpfx_lifetime) {
 		mbu->mbu_lifetime = coa_lifetime;
-		mbu->mbu_reg_state = MIP6_BU_REG_STATE_REGWAITACK;
 	} else {
 		mbu->mbu_lifetime = mpfx->mpfx_lifetime;
 	}
@@ -220,11 +224,159 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	return (mbu);
 }
 
+int
+mip6_home_registration(sc)
+	struct hif_softc *sc;
+{
+	struct mip6_bu *mbu;
+	struct hif_subnet *hs;
+	struct mip6_subnet *ms;
+	struct mip6_subnet_ha *msha;
+
+	/* find the subnet info of this home link. */
+	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
+	if (hs == NULL) {
+		mip6log((LOG_ERR,
+			 "%s: no home subnet\n",
+			 __FUNCTION__));
+		return (EINVAL);
+	}
+	if ((ms = hs->hs_ms) == NULL) {
+		/* must not happen */
+		return (EINVAL);
+	}
+
+	/* check each BU entry that has a BUF flag on. */
+	for (mbu = LIST_FIRST(&sc->hif_bu_list);
+	     mbu;
+	     mbu = LIST_NEXT(mbu, mbu_entry)) {
+		if ((mbu->mbu_flags & IP6_BUF_HOME) == 0)
+			continue;
+
+		/*
+		 * check if this BU entry is home registration to the
+		 * HA or home registration to the AR of a foreign
+		 * network.  if paddr of the BU is one of the HAs of
+		 * our home link, this BU is home registration to the
+		 * HA.
+		 */
+		msha = mip6_subnet_ha_list_find_withhaaddr(&ms->ms_msha_list,
+							   &mbu->mbu_paddr);
+		if (msha) {
+			/* this BU is a home registration to our HA */
+			break;
+		}
+			
+	}
+	if (mbu == NULL) {
+		struct in6_addr *haaddr;
+		struct mip6_ha *mha;
+		struct mip6_subnet_prefix *mspfx;
+		struct mip6_prefix *mpfx;
+
+		/*
+		 * no home registration found.  create a new binding
+		 * update entry.
+		 */
+
+		/* pick the preferable HA from the list. */
+		msha = mip6_subnet_ha_list_find_preferable(&ms->ms_msha_list);
+		if (msha == NULL) {
+			/*
+			 * if no HA is found, try to find a HA using
+			 * Dynamic Home Agent Discovery.
+			 */
+			mip6log((LOG_INFO,
+				 "%s: no home agent.  start ha discovery.\n",
+				 __FUNCTION__));
+			mip6_icmp6_ha_discov_req_output(sc);
+			haaddr = &in6addr_any;
+		} else {
+			if ((mha = msha->msha_mha) == NULL) {
+				return (EINVAL);
+			}
+			haaddr = &mha->mha_gaddr;
+		}
+
+		/*
+		 * pick one home prefix up to determine the home
+		 * address of this MN.
+		 */
+		/* 
+		 * XXX: which prefix to use to get a home address when
+		 * we have multiple home prefixes.
+		 */
+		if ((mspfx = TAILQ_FIRST(&ms->ms_mspfx_list)) == NULL) {
+			mip6log((LOG_ERR,
+				 "%s: we don't have any home prefix.\n",
+				 __FUNCTION__));
+			return (EINVAL);
+		}
+		if ((mpfx = mspfx->mspfx_mpfx) == NULL)
+			return (EINVAL);
+		mip6log((LOG_INFO,
+			 "%s: home address is %s\n",
+			 __FUNCTION__,
+			 ip6_sprintf(&mpfx->mpfx_haddr)));
+
+		mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
+				     IP6_BUF_ACK|IP6_BUF_HOME, sc);
+		if (mbu == NULL)
+			return (ENOMEM);
+
+		LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
+		/* XXX mip6_bu_list_insert(&sc->hif_bu_list, mbu); */
+	} else {
+		int32_t coa_lifetime, prefix_lifetime;
+
+		/* a BU entry exists.  update information. */
+
+		/* update coa. */
+		if (sc->hif_location == HIF_LOCATION_HOME) {
+			/* un-registration. */
+			mbu->mbu_coa = mbu->mbu_haddr;
+			mbu->mbu_reg_state = MIP6_BU_REG_STATE_DEREGWAITACK;
+		} else {
+			/* registration. */
+			mbu->mbu_coa = hif_coa;
+			mbu->mbu_reg_state = MIP6_BU_REG_STATE_REGWAITACK;
+		}
+
+		/* update lifetime. */
+		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa);
+		prefix_lifetime
+			= mip6_subnet_prefix_list_get_minimum_lifetime(&ms->ms_mspfx_list);
+		if (coa_lifetime < prefix_lifetime) {
+			mbu->mbu_lifetime = coa_lifetime;
+		} else {
+			mbu->mbu_lifetime = prefix_lifetime;
+		}
+		mbu->mbu_remain = mbu->mbu_lifetime;
+		mbu->mbu_refresh = mbu->mbu_lifetime;
+		mbu->mbu_refremain = mbu->mbu_refresh;
+		mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
+		mbu->mbu_ackremain = mbu->mbu_acktimeout;
+		/* mbu->mbu_seqno++; */
+		/* XXX mbu->mbu_flags |= IP6_BUF_DAD */
+	}
+	mbu->mbu_state = MIP6_BU_STATE_WAITACK | MIP6_BU_STATE_WAITSENT;
+
+	/*
+	 * XXX
+	 * register to a previous ar.
+	 */
+
+	/* start BU timer if it hasn't started already */
+	mip6_bu_starttimer();
+
+	return (0);
+}
+
 /*
  * home (un)registration
  */
 int
-mip6_home_registration(sc)
+mip6_home_registration_old(sc)
 	struct hif_softc *sc;
 {
 	struct hif_subnet *hs;
@@ -256,7 +408,7 @@ mip6_home_registration(sc)
 	}
 
 	/*
-	 * pick one home agent that seems preferable from our home
+ 	 * pick one home agent that seems preferable from our home
 	 * subnet.
 	 */
 	msha = mip6_subnet_ha_list_find_preferable(&ms->ms_msha_list);
@@ -313,19 +465,22 @@ mip6_home_registration(sc)
 		if (mbu == NULL)
 			return (ENOMEM);
 
+#ifndef BUOLDTIMER
+		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
+#else
 		LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
-		/* XXX mip6_bu_list_insert(&sc->hif_bu_list, mbu); */
+#endif
 	} else {
 		/*
 		 * an BU entry for home registration already exists.
 		 */
 		if (sc->hif_location == HIF_LOCATION_HOME) {
 			/* un-registration. */
-			mbu->mbu_coa = hif_coa;
+			mbu->mbu_coa = mbu->mbu_haddr;
 			mbu->mbu_reg_state = MIP6_BU_REG_STATE_DEREGWAITACK;
 		} else {
 			/* registration. */
-			mbu->mbu_coa = mbu->mbu_haddr;
+			mbu->mbu_coa = hif_coa;
 			mbu->mbu_reg_state = MIP6_BU_REG_STATE_REGWAITACK;
 		}
 		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa);
@@ -349,8 +504,10 @@ mip6_home_registration(sc)
 	 * register to a previous ar.
 	 */
 
+#ifdef BUOLDTIMER
 	/* start BU timer if it hasn't started already */
 	mip6_bu_starttimer();
+#endif
 
 	return 0;
 }
@@ -411,6 +568,16 @@ mip6_bu_list_notify_binding_change(sc)
 static void
 mip6_bu_starttimer()
 {
+#ifndef BUOLDTIMER 
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_reset(&mip6_bu_ch,
+		      MIP6_BU_TIMEOUT_INTERVAL * hz,
+		      mip6_bu_timeout, NULL);
+#else
+	timeout(mip6_bu_timeout, (void *)0,
+		MIP6_BU_TIMEOUT_INTERVAL * hz);
+#endif
+#else
 	struct hif_softc *sc;
 
 	if (mip6_bu_timer_running == 0) {
@@ -427,6 +594,7 @@ mip6_bu_starttimer()
 			break;
 		}
 	}
+#endif
 }
 
 static void
@@ -450,7 +618,9 @@ mip6_bu_stoptimer()
 #else
 	untimeout(mip6_bu_timeout, (void *)0);
 #endif
+#ifdef BUOLDTIMER
 	mip6_bu_timer_running = 0;
+#endif
 }
 
 static void
@@ -466,7 +636,11 @@ mip6_bu_timeout(arg)
 #else
 	s = splnet();
 #endif
+#ifndef BUOLDTIMER
+	mip6_bu_starttimer();
+#else
 	mip6_bu_restarttimer();
+#endif
 
 	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
@@ -586,10 +760,21 @@ mip6_bu_list_insert(bu_list, mbu)
 	struct mip6_bu_list *bu_list;
 	struct mip6_bu *mbu;
 {
+#ifndef BUOLDTIMER
+	LIST_INSERT_HEAD(bu_list, mbu, mbu_entry);
+
+	if (mip6_bu_count == 0) {
+		mip6log((LOG_INFO, "%s: BU timer started.\n",
+			__FUNCTION__));
+		mip6_bu_starttimer();
+	}
+	mip6_bu_count++;
+		
+#else
 	LIST_INSERT_HEAD(bu_list, mbu, mbu_entry);
 
 	mip6_bu_starttimer();
-
+#endif
 	return (0);
 }
 
@@ -608,8 +793,18 @@ mip6_bu_list_remove(mbu_list, mbu)
 	mip6log((LOG_INFO,
 		 "%s: removing a BU entry (0x%p).\n",
 		 __FUNCTION__, mbu));
-	mip6_bu_print(mbu);
 
+#ifndef BUOLDTIMER
+	LIST_REMOVE(mbu, mbu_entry);
+	FREE(mbu, M_TEMP);
+
+	mip6_bu_count--;
+	if (mip6_bu_count == 0) {
+		mip6_bu_stoptimer();
+		mip6log((LOG_INFO, "%s: BU timer stopped.\n",
+			__FUNCTION__));
+	}
+#else
 	LIST_REMOVE(mbu, mbu_entry);
 	FREE(mbu, M_TEMP);
 
@@ -624,6 +819,7 @@ mip6_bu_list_remove(mbu_list, mbu)
 			 __FUNCTION__));
 		mip6_bu_stoptimer();
 	}
+#endif
 
 	return (0);
 }
@@ -1251,11 +1447,13 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		return (-1);
 	}
 
+#if 0
 	/* create a rthdr. */
 	if (mip6_rthdr_create(&pktopt_rthdr, dstcoa)) {
 		return (-1);
 	}
 	opt.ip6po_rthdr = pktopt_rthdr;
+#endif
 
 	if(mip6_ba_destopt_create(&pktopt_badest2,
 				  status, seqno, lifetime, refresh)) {
@@ -1814,6 +2012,10 @@ mip6_bc_list_remove(mbc_list, mbc)
 	struct mip6_bc_list *mbc_list;
 	struct mip6_bc *mbc;
 {
+	if ((mbc_list == NULL) || (mbc == NULL)) {
+		return (EINVAL);
+	}
+
 	LIST_REMOVE(mbc, mbc_entry);
 	FREE(mbc, M_TEMP);
 
@@ -1885,6 +2087,9 @@ mip6_bc_timeout(dummy)
 		   piggybacked before */
 
 		/* XXX set BR_WAITSENT when BC is going to expire */
+		if (mbc->mbc_remain < (mbc->mbc_lifetime / 4)) { /* XXX */
+			mbc->mbc_flags &= MIP6_BC_STATE_BR_WAITSENT;
+		}
 
 		/* XXX send BA if BA_WAITSENT is remained not
 		   piggybacked before */
@@ -2324,7 +2529,11 @@ mip6_route_optimize(m)
 			}
 			mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
 
+#ifndef BUOLDTIMER
+			mip6_bu_list_insert(&sc->hif_bu_list, mbu);
+#else
 			LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
+#endif
 			/* XXX mip6_bu_list_insert(&sc->hif_bu_list, mbu); */
 		} else {
 			mbu->mbu_coa = hif_coa;

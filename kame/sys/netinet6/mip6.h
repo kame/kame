@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.18 2001/08/14 12:59:39 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.19 2001/09/14 16:10:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -211,6 +211,8 @@ struct mip6_subnet_prefix *mip6_subnet_prefix_list_find_withmpfx
 struct mip6_subnet_prefix *mip6_subnet_prefix_list_find_withprefix
 					__P((struct mip6_subnet_prefix_list *,
 					     struct in6_addr *, u_int8_t));
+int32_t mip6_subnet_prefix_list_get_minimum_lifetime
+					__P((struct mip6_subnet_prefix_list *));
 struct mip6_subnet_ha *mip6_subnet_ha_create
 					__P((struct mip6_ha *));
 int mip6_subnet_ha_list_insert		__P((struct mip6_subnet_ha_list *,
