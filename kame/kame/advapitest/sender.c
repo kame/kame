@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.33 2003/11/03 01:25:30 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.34 2004/04/05 12:46:39 suz Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -309,8 +309,8 @@ main(argc, argv)
 		inet6_rth_init((void *)rthdr, rthlen, IPV6_RTHDR_TYPE_0, hops);
 
 		for (i = 0; i < hops; i++) {
-			inet_pton(AF_INET6, argv[i], &middle);
-
+			if (inet_pton(AF_INET6, argv[i], &middle) != 1)
+				errx(1, "invalid IPv6 address %s", argv[i]);
 			if (inet6_rth_add(rthdr, &middle))
 				errx(1, "inet6_rth_add failed");
 		}
