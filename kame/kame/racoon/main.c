@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.23 2001/01/10 02:30:20 sakane Exp $	*/
+/*	$KAME: main.c,v 1.24 2001/01/10 02:58:58 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,7 +62,6 @@
 #include "random.h"
 
 int f_foreground = 0;	/* force running in foreground. */
-int f_debugcmd = 0;	/* specifyed debug level by command line. */
 int f_local = 0;	/* local test mode.  behave like a wall. */
 int vflag = 1;		/* for print-isakmp.c */
 
@@ -213,7 +212,6 @@ parse(ac, av)
 		switch (c) {
 		case 'd':
 			loglevel++;
-			f_debugcmd++;
 			break;
 		case 'F':
 			printf("Foreground mode.\n");
