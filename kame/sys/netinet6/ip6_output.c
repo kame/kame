@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.143 2000/12/12 10:54:06 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.144 2000/12/20 06:27:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,6 +160,7 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_dest2;
 };
 
+static void init_ip6pktopts __P((struct ip6_pktopts *));
 static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **, int));
 static int ip6_getpcbopt __P((struct ip6_pktopts *, int, void **, int *));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -2690,6 +2691,16 @@ ip6_pcbopts(pktopt, m, so)
  * specifying behavior of outgoing packets.
  * XXX: The logic of this function is very similar to ip6_setpktoptions().
  */
+static void
+init_ip6pktopts(opt)
+	struct ip6_pktopts *opt;
+{
+	bzero(opt, sizeof(*opt));
+	opt->ip6po_hlim = -1;	/* -1 means default hop limit */
+	opt->ip6po_mtu = -1;	/* -1 means not to specify the MTU */
+	opt->ip6po_tclass = 0x00;
+}
+
 static int
 ip6_pcbopt(optname, buf, len, pktopt, priv)
 	int optname, len, priv;
@@ -2702,9 +2713,7 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 	if (*pktopt == NULL) {
 		*pktopt = malloc(sizeof(struct ip6_pktopts), M_IP6OPT,
 				 M_WAITOK);
-		bzero(*pktopt, sizeof(struct ip6_pktopts));
-		(*pktopt)->ip6po_hlim = -1;
-		(*pktopt)->ip6po_tclass = 0x00;
+		init_ip6pktopts(*pktopt);
 		(*pktopt)->needfree = 1;
 	}
 	opt = *pktopt;
@@ -3515,10 +3524,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 	if (control == 0 || opt == 0)
 		return(EINVAL);
 
-	bzero(opt, sizeof(*opt));
-	opt->ip6po_hlim = -1; /* -1 means to use default hop limit */
-	opt->ip6po_mtu = -1; /* -1 means not to specify the MTU */
-	opt->ip6po_tclass = 0x00;
+	init_ip6pktopts(opt);
 	opt->needfree = needcopy;
 
 	/*
