@@ -1,9 +1,9 @@
 # $NetBSD$
 
-DISTNAME=	bind-9.0.0rc5
-PKGNAME=	bind-9.0.0.rc5
+DISTNAME=	bind-9.0.0
+PKGNAME=	bind-9.0.0
 CATEGORIES=	net
-MASTER_SITES=	ftp://ftp.isc.org/isc/bind9/9.0.0rc5/
+MASTER_SITES=	ftp://ftp.isc.org/isc/bind9/9.0.0/
 
 MAINTAINER=	itojun@kame.net
 HOMEPAGE=	http://www.isc.org/
