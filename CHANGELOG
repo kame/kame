@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2073 2002/02/09 07:36:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.2074 2002/02/09 10:00:14 jinmei Exp $
 
 <200202>
 2002-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -8,7 +8,7 @@ $KAME: CHANGELOG,v 1.2073 2002/02/09 07:36:55 jinmei Exp $
 	address.  Related functions were also modified accordingly.
 
 	* kame/kame/ifmcstat/ifmcstat.c (in6_multientry):
-	* netbsd/usr.bin/netstat/if.c (intpr):
+	* {netbsd, openbsd}/usr.bin/netstat/if.c (intpr):
 	Modified according to the change above.  These tools should
 	be rebuilt as well as the kernel.
 
