@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.20 2000/05/05 07:40:21 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.21 2000/06/15 04:27:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1287,25 +1287,25 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	switch (pai->ai_family) {
 	case AF_UNSPEC:
 		/* prefer IPv6 */
-		q.class = C_IN;
-		q.type = T_AAAA;
+		q.qclass = C_IN;
+		q.qtype = T_AAAA;
 		q.answer = buf.buf;
 		q.anslen = sizeof(buf);
 		q.next = &q2;
-		q2.class = C_IN;
-		q2.type = T_A;
+		q2.qclass = C_IN;
+		q2.qtype = T_A;
 		q2.answer = buf2.buf;
 		q2.anslen = sizeof(buf2);
 		break;
 	case AF_INET:
-		q.class = C_IN;
-		q.type = T_A;
+		q.qclass = C_IN;
+		q.qtype = T_A;
 		q.answer = buf.buf;
 		q.anslen = sizeof(buf);
 		break;
 	case AF_INET6:
-		q.class = C_IN;
-		q.type = T_AAAA;
+		q.qclass = C_IN;
+		q.qtype = T_AAAA;
 		q.answer = buf.buf;
 		q.anslen = sizeof(buf);
 		break;
@@ -1314,14 +1314,14 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	}
 	if (res_searchN(name, &q) < 0)
 		return NS_NOTFOUND;
-	ai = getanswer(&buf, q.n, q.name, q.type, pai);
+	ai = getanswer(&buf, q.n, q.name, q.qtype, pai);
 	if (ai) {
 		cur->ai_next = ai;
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
 	}
 	if (q.next) {
-		ai = getanswer(&buf2, q2.n, q2.name, q2.type, pai);
+		ai = getanswer(&buf2, q2.n, q2.name, q2.qtype, pai);
 		if (ai)
 			cur->ai_next = ai;
 	}
@@ -1659,8 +1659,8 @@ res_queryN(name, target)
 		hp->rcode = NOERROR;	/* default */
 
 		/* make it easier... */
-		class = t->class;
-		type = t->type;
+		class = t->qclass;
+		type = t->qtype;
 		answer = t->answer;
 		anslen = t->anslen;
 #ifdef DEBUG
