@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.1 2000/02/07 17:22:52 itojun Exp $
+ * $Id: mip6.c,v 1.2 2000/02/07 17:48:30 itojun Exp $
  *
  */
 
@@ -2501,7 +2501,7 @@ mip6_ioctl(so, cmd, data, ifp)
             return res;
 
         default:
-            res = ERR_UNKNOWNCMD;
+            res = EOPNOTSUPP;
             break;
     }
 
@@ -2525,7 +2525,7 @@ mip6_ioctl(so, cmd, data, ifp)
                 break;
 
             default:
-                res = ERR_UNKNOWNCMD;
+                res = EOPNOTSUPP;
                 break;
         }
     }
@@ -2560,7 +2560,7 @@ mip6_ioctl(so, cmd, data, ifp)
                 break;
 
             default:
-                res = ERR_UNKNOWNCMD;
+                res = EOPNOTSUPP;
                 break;
         }
     }

@@ -34,7 +34,7 @@
  * Author:     Hesham Soliman <hesham.soliman@ericsson.com.au>
  *             Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- *  $Id: mip6_common.h,v 1.1 2000/02/07 17:22:53 itojun Exp $
+ *  $Id: mip6_common.h,v 1.2 2000/02/07 17:48:32 itojun Exp $
  */
 
 
@@ -104,11 +104,11 @@
 #define SIOCSFORADDRFLUSH_MIP6   _IOWR('M', 10, int)
 #define SIOCSHADDRFLUSH_MIP6     _IOWR('M', 11, int)
 #define SIOCSBULISTFLUSH_MIP6    _IOWR('M', 12, int)
-#define SIOCACOADDR_MIP6         _IOWR('M', 13, struct input_data)
-#define SIOCAHOMEADDR_MIP6       _IOWR('M', 14, struct input_data)
+#define SIOCACOADDR_MIP6         _IOWR('M', 13, struct mip6_input_data)
+#define SIOCAHOMEADDR_MIP6       _IOWR('M', 14, struct mip6_input_data)
 #define SIOCSBULIFETIME_MIP6     _IOWR('M', 15, int)
 #define SIOCSHRLIFETIME_MIP6     _IOWR('M', 16, int)
-#define SIOCDCOADDR_MIP6         _IOWR('M', 17, struct input_data)
+#define SIOCDCOADDR_MIP6         _IOWR('M', 17, struct mip6_input_data)
 #define SIOCSPROMMODE_MIP6       _IOWR('M', 18, int)
 #define SIOCSBU2CN_MIP6          _IOWR('M', 19, int)
 #define SIOCSREVTUNNEL_MIP6      _IOWR('M', 20, int)
@@ -116,7 +116,6 @@
 #define SIOCSEAGERMD_MIP6        _IOWR('M', 22, int)
 #define SIOCSATTACH_MIP6         _IOWR('M', 23, int)
 #define SIOCSRELEASE_MIP6        _IOWR('M', 24, int)
-
 
 /*
  * Code below taken from common.h
@@ -127,37 +126,12 @@
 #include <net/if.h>
 #include <netinet6/in6.h>
 
-struct input_data {
+struct mip6_input_data {
 	char             if_name[IFNAMSIZ]; /* Interface name */
 	u_int8_t         prefix_len;        /* Prefix length for address */
 	struct in6_addr  ip6_addr;          /* Address */
 	struct in6_addr  ha_addr;           /* Corresponding Home Agent */
-    u_int32_t        value;             /* Value */
+	u_int32_t        value;             /* Value */
 };
-
-
-/*
- * Code below taken from error.h
- */
-
-extern int error_code;
-
-void print_err(int);
-
-#define ERR_OUTOFMEM            1
-#define ERR_ATTACHED            2
-#define ERR_RELEASED            3
-#define ERR_PERMDENIED          4
-#define ERR_UNKNOWNCMD          5
-#define ERR_LAST                6
-#define ADDR_NOT_FOUND          7
-#define WRITE_ERROR             8
-#define FILE_OPEN_ERR           9
-#define SYS_CALL_FAILED        10
-#define INVALID_IFNAME         11
-#define MN_HA_FUNC_NOT_ALLOWED 12
-#define FUNC_NOT_ALLOWED       13
-#define FUNC_ALREADY_CONFIG    14
-
 
 #endif /* not _NETINET6_MIP6_COMMON_H_ */

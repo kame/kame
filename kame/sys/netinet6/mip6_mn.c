@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_mn.c,v 1.1 2000/02/07 17:22:54 itojun Exp $
+ * $Id: mip6_mn.c,v 1.2 2000/02/07 17:48:33 itojun Exp $
  *
  */
 
@@ -2979,7 +2979,7 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 {
     struct mip6_esm         *p;
     struct ifnet            *ifp;
-    struct input_data       *input;
+    struct mip6_input_data  *input;
     struct mip6_static_addr *np;
     char                     ifn[10];
     int                      retval = 0;
@@ -2987,7 +2987,7 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 
     switch (cmd) {
     case SIOCACOADDR_MIP6:
-	input = (struct input_data *) arg;
+	input = (struct mip6_input_data *) arg;
 	np = (struct mip6_static_addr *)
 	    malloc(sizeof(struct mip6_static_addr), M_TEMP, M_WAITOK);
 		    if (np == NULL)
@@ -3004,7 +3004,7 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 	break;
 
     case SIOCAHOMEADDR_MIP6:
-	input = (struct input_data *) arg;
+	input = (struct mip6_input_data *) arg;
 	ifp = ifunit(input->if_name);
 	if (ifp == NULL)
 	    return INVALID_IFNAME;
@@ -3018,15 +3018,15 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 	break;
 
     case SIOCSBULIFETIME_MIP6:
-	mip6_config.bu_lifetime = ((struct input_data *)arg)->value;
+	mip6_config.bu_lifetime = ((struct mip6_input_data *)arg)->value;
 	break;
 
     case SIOCSHRLIFETIME_MIP6:
-	mip6_config.hr_lifetime = ((struct input_data *)arg)->value;
+	mip6_config.hr_lifetime = ((struct mip6_input_data *)arg)->value;
 	break;
 
     case SIOCDCOADDR_MIP6:
-	input = (struct input_data *) arg;           
+	input = (struct mip6_input_data *) arg;           
 	for (np = mip6_config.fna_list.lh_first; np != NULL;
 	     np = np->addr_entry.le_next){
 	    if (IN6_ARE_ADDR_EQUAL(&input->ip6_addr, &np->ip6_addr))
@@ -3097,7 +3097,7 @@ int mip6_enable_func_mn(u_long cmd, caddr_t data)
     int enable;
     int retval = 0;
 
-    enable = ((struct input_data *)data)->value;
+    enable = ((struct mip6_input_data *)data)->value;
 
     switch (cmd) {
     case SIOCSPROMMODE_MIP6:

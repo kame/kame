@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_ha.c,v 1.1 2000/02/07 17:22:53 itojun Exp $
+ * $Id: mip6_ha.c,v 1.2 2000/02/07 17:48:33 itojun Exp $
  *
  */
 
@@ -1111,7 +1111,7 @@ int mip6_write_config_data_ha(u_long cmd, void *arg)
 
     switch (cmd) {
         case SIOCSHAPREF_MIP6:
-            mip6_config.ha_pref = ((struct input_data *)arg)->value;
+            mip6_config.ha_pref = ((struct mip6_input_data *)arg)->value;
             break;
     }
     return retval;
@@ -1159,7 +1159,7 @@ int mip6_enable_func_ha(u_long cmd, caddr_t data)
     int enable;
     int retval = 0;
 
-    enable = ((struct input_data *)data)->value;
+    enable = ((struct mip6_input_data *)data)->value;
 
     switch (cmd) {
         case SIOCSFWDSLUNICAST_MIP6:
