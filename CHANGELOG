@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.577 2000/02/19 13:13:45 itojun Exp $
+$Id: CHANGELOG,v 1.578 2000/02/20 15:04:46 sumikawa Exp $
 
 <200002>
+Sun Feb 20 23:45:24 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/ports/{tcpdump,libpcap}: upgrade to 2/14 weekly snapshot.
+	* freebsd[23]/ports/apache13: upgrade to latest IPv6 patch.
+
 Sat Feb 19 22:12:10 JST 2000  itojun@iijlab.net
 	* sys/netinet6: sync with latest ericsson mobile-ip6.
 	* sys/netinet/ip_encap.[ch]: struct encaptab is now visible to
