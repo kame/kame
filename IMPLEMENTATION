@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/19 01:52:01 $
+			$Date: 1999/10/24 16:18:01 $
 
 1. IPv6
 
@@ -95,6 +95,8 @@ draft-itojun-ipv6-tcp-to-anycast-00:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-yamamoto-wideipv6-comm-model-00
     * See 1.6 in this document for details.
+draft-ietf-ipngwg-scopedaddr-format-00.txt:
+	An Extension of Format for IPv6 Scoped Addresses
 
 1.2 Neighbor Discovery
 
@@ -190,6 +192,16 @@ In general, if a command does not have command line option to specify
 outgoing interface, that command is not ready to accept scoped address.
 This may seem to be opposite from IPv6's premise to support "dentist office"
 situation.  We believe that specifications need some improvements for this.
+
+Some of the userland tools support extended numeric IPv6 syntax, as
+documented in draft-ietf-ipngwg-scopedaddr-format-00.txt.  You can specify
+outgoing link, by using name of the outgoing interface like "fe80::1@ne0".
+This way you will be able to specify link-local scoped address without much
+trouble.
+To use this extension in your program, you'll need to use getaddrinfo(3),
+and getnameinfo(3) with NI_WITHSCOPEID.
+The implementation currently assumes 1-to-1 relationship between a link and an
+interface, which is stronger than specs assume.
 
 1.4 Plug and Play
 
