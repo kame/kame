@@ -580,35 +580,35 @@ make_mld(char *name)
 {
 	char mldbuf[BUFSIZ], area[BUFSIZ];
 	char *bp = area, *target;
-	struct mld6_hdr *mld = (struct mld6_hdr *)pbp;
+	struct mld_hdr *mld = (struct mld_hdr *)pbp;
     
 	if (tgetent(mldbuf, name) <= 0) {
 		fprintf(stderr, "v6test: unknown header %s\n", name);
 		exit(1);
 	}
-	MUSTHAVE(mld->mld6_type, "mld_type", mldbuf);
-	MAYHAVE(mld->mld6_code, "mld_code", 0, mldbuf);
-	MAYHAVE(mld->mld6_cksum, "mld_cksum", 0, mldbuf);
-	HTONS(mld->mld6_cksum);
-	MAYHAVE(mld->mld6_reserved, "mld_rsv", 0, mldbuf);
+	MUSTHAVE(mld->mld_type, "mld_type", mldbuf);
+	MAYHAVE(mld->mld_code, "mld_code", 0, mldbuf);
+	MAYHAVE(mld->mld_cksum, "mld_cksum", 0, mldbuf);
+	HTONS(mld->mld_cksum);
+	MAYHAVE(mld->mld_reserved, "mld_rsv", 0, mldbuf);
 	if ((target = tgetstr("mld_addr", &bp, mldbuf)) == NULL) {
 		fprintf(stderr, "v6test: needs addr for MLD\n");
 		exit(1);
 	}
-	if (inet_pton(AF_INET6, target, &mld->mld6_addr) != 1) {
+	if (inet_pton(AF_INET6, target, &mld->mld_addr) != 1) {
 		perror("inet_pton");
 		exit(1);
 	}
 
-	switch(mld->mld6_type) {
-	case MLD6_LISTENER_QUERY:
-		MUSTHAVE(mld->mld6_maxdelay, "mld_maxdelay", mldbuf);
-		HTONS(mld->mld6_maxdelay);
+	switch(mld->mld_type) {
+	case MLD_LISTENER_QUERY:
+		MUSTHAVE(mld->mld_maxdelay, "mld_maxdelay", mldbuf);
+		HTONS(mld->mld_maxdelay);
 		break;
-	case MLD6_LISTENER_REPORT:
-	case MLD6_LISTENER_DONE:
-		MAYHAVE(mld->mld6_maxdelay, "mld_maxdelay", 0, mldbuf);
-		HTONS(mld->mld6_maxdelay);
+	case MLD_LISTENER_REPORT:
+	case MLD_LISTENER_DONE:
+		MAYHAVE(mld->mld_maxdelay, "mld_maxdelay", 0, mldbuf);
+		HTONS(mld->mld_maxdelay);
 		break;
 	default:
 		break;

@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.48 2001/11/27 07:03:30 suz Exp $	*/
+/*	$KAME: debug.c,v 1.49 2001/12/18 03:10:42 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -149,11 +149,11 @@ packet_kind(proto, type, code)
     case IPPROTO_ICMPV6:
 	switch (type)
 	{
-	case MLD6_LISTENER_QUERY:
+	case MLD_LISTENER_QUERY:
 	    return "Multicast Listener Query    ";
-	case MLD6_LISTENER_REPORT:
+	case MLD_LISTENER_REPORT:
 	    return "Multicast Listener Report   ";
-	case MLD6_LISTENER_DONE:
+	case MLD_LISTENER_DONE:
 	    return "Multicast Listener Done     ";
 	default:
 	    snprintf(unknown, sizeof(unknown),
@@ -210,11 +210,11 @@ debug_kind(proto, type, code)
     case IPPROTO_ICMPV6:
 	switch (type)
 	{
-	case MLD6_LISTENER_QUERY:
+	case MLD_LISTENER_QUERY:
 	    return DEBUG_MLD;
-	case MLD6_LISTENER_REPORT:
+	case MLD_LISTENER_REPORT:
 	    return DEBUG_MLD;
-	case MLD6_LISTENER_DONE:
+	case MLD_LISTENER_DONE:
 	    return DEBUG_MLD;
 	default:
 	    return DEBUG_MLD;

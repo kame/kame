@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.6 2001/11/27 07:23:28 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.7 2001/12/18 03:10:43 jinmei Exp $
  */
 
 /*
@@ -109,7 +109,7 @@ query_groupsV2(v)
 	 * S Flag not set.
 	 */
 
-	send_mld6v2(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+	send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		    NULL, (struct sockaddr_in6 *) NULL, v->uv_ifindex,
 		    MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
 		    v->uv_mld_robustness, v->uv_mld_query_interval);
@@ -140,13 +140,13 @@ SendQueryV2spec(arg)
     cbk_t          *cbk = (cbk_t *) arg;
     register struct uvif *v = &uvifs[cbk->mifi];
 
-    send_mld6v2(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+    send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		NULL, &cbk->g->al_addr, v->uv_ifindex,
 		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
 		v->uv_mld_robustness, v->uv_mld_query_interval);
     v->uv_out_mld_query++;
 
-    send_mld6v2(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+    send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		NULL, &cbk->g->al_addr, v->uv_ifindex,
 		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGYES,
 		v->uv_mld_robustness, v->uv_mld_query_interval);
@@ -188,7 +188,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     struct sockaddr_in6 group_sa = { sizeof(group_sa), AF_INET6 };
     struct sockaddr_in6 source_sa = { sizeof(source_sa), AF_INET6 };
     struct in6_addr *group;
-    struct mld6v2_hdr *mldh;
+    struct mldv2_hdr *mldh;
     int             tmo;
     int             numsrc;
     int             i;
@@ -221,18 +221,18 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 	return;
     }
 
-    mldh = (struct mld6v2_hdr *) query_message;
-    group = &mldh->mld6_addr;
+    mldh = (struct mldv2_hdr *) query_message;
+    group = &mldh->mld_addr;
 
     /*
      * XXX Hard Coding 
      */
 
-    if ((tmo = ntohs(mldh->mld6_maxdelay)) >= 32768)
-	tmo = decodeafloat(ntohs(mldh->mld6_maxdelay), 3, 12);
-    numsrc = ntohs(mldh->mld6_numsrc);
-    if ((qqi = mldh->mld6_qqi) >= 128)
-	qqi = decodeafloat(mldh->mld6_qqi, 3, 4);
+    if ((tmo = ntohs(mldh->mld_maxdelay)) >= 32768)
+	tmo = decodeafloat(ntohs(mldh->mld_maxdelay), 3, 12);
+    numsrc = ntohs(mldh->mld_numsrc);
+    if ((qqi = mldh->mld_qqi) >= 128)
+	qqi = decodeafloat(mldh->mld_qqi, 3, 4);
 
     qrv = MLD6_QRV(mldh);
     sflag = MLD6_SFLAG(mldh);
@@ -325,7 +325,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 		log(LOG_DEBUG,0,"List of sources :");
 	    for (i = 0; i < numsrc; i++)
 	    {
-		source_sa.sin6_addr = mldh->mld6_sources[i];
+		source_sa.sin6_addr = mldh->mld_sources[i];
 		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
 	        log(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
@@ -392,8 +392,8 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 
     register mifi_t vifi;
     register struct uvif *v;
-    struct mld6_report *report;
-    struct mld6_maddr_rec *mard;
+    struct mld_report *report;
+    struct mld_maddr_rec *mard;
     int             i, j, nummard, numsrc, totsrc;
     struct listaddr *g = NULL;
     struct listaddr *s = NULL;
@@ -424,7 +424,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	    "accepting multicast listener V2 report: "
 	    "src %s,dst %s", sa6_fmt(src), inet6_fmt(dst));
 
-    report = (struct mld6_report *) report_message;
+    report = (struct mld_report *) report_message;
     nummard = ntohs(report->mr_numgrps);
 
     v->uv_in_mld_report++;
@@ -438,7 +438,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
     {
  	p = (char *)&report->mr_maddr[i] - sizeof(struct in6_addr) * i
 		+ totsrc * sizeof(struct in6_addr);
-        mard= (struct mld6_maddr_rec *) p;
+        mard= (struct mld_maddr_rec *) p;
 	numsrc = ntohs(mard->mmr_numsrc);
 	totsrc += numsrc;
 

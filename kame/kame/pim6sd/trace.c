@@ -1,4 +1,4 @@
-/*	$KAME: trace.c,v 1.14 2001/08/09 08:46:58 suz Exp $	*/
+/*	$KAME: trace.c,v 1.15 2001/12/18 03:10:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -304,7 +304,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		log(LOG_DEBUG, 0, "Sending traceroute response");
     
 	/* copy the packet to the sending buffer */
-	p = mld6_send_buf + sizeof(struct mld6_hdr);
+	p = mld6_send_buf + sizeof(struct mld_hdr);
 	bcopy(data, p, datalen);
 	p += datalen;
 
@@ -324,7 +324,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	 */
 	resp = (struct tr6_resp *)p;
 	bzero(resp, sizeof(struct tr6_resp));
-	datalen += (RLEN + sizeof(struct mld6_hdr));
+	datalen += (RLEN + sizeof(struct mld_hdr));
 
 	resp->tr_qarr    = htonl(((tp.tv_sec + JAN_1970) << 16) + 
 				 ((tp.tv_usec << 10) / 15625));
@@ -456,7 +456,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 
 	ovifi = NO_VIF;		/* unspecified */
 	if ((rcount + 1 == no) || (mrt == NULL) || (mrt->metric == 1)) {
-		resptype = MLD6_MTRACE_RESP;
+		resptype = MLD_MTRACE_RESP;
 		resp_sa6.sin6_addr = qry->tr_raddr;
 		if (IN6_IS_ADDR_LINKLOCAL(&resp_sa6.sin6_addr) ||
 		    IN6_IS_ADDR_MC_LINKLOCAL(&resp_sa6.sin6_addr)) {
@@ -474,7 +474,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		if (!can_mtrace(rt->rt_parent, rt->rt_gateway)) {
 			resp_sa6.sin6_addr = qry->tr_raddr;
 			resp->tr_rflags = TR_OLD_ROUTER;
-			resptype = MLD6_MTRACE_RESP;
+			resptype = MLD_MTRACE_RESP;
 		} else
 #endif /* 0 */
 		if (mrt->incoming &&
@@ -483,7 +483,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 			    "incoming i/f is for register. "
 			    "Can't be forwarded anymore.");
 				resp_sa6.sin6_addr = qry->tr_raddr;
-				resptype = MLD6_MTRACE_RESP;
+				resptype = MLD_MTRACE_RESP;
 		} else {
 			if (mrt->upstream != (pim_nbr_entry_t *)NULL)
 				parent_address =
@@ -492,7 +492,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 				parent_address = allrouters_group.sin6_addr;
 			resp_sa6.sin6_addr = parent_address;
 			ovifi = mrt->incoming;
-			resptype = MLD6_MTRACE;
+			resptype = MLD_MTRACE;
 		}
 	}
 
@@ -540,7 +540,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 
 		IF_DEBUG(DEBUG_TRACE)
 			log(LOG_DEBUG, 0, "Sending %s to %s from %s",
-			    resptype == MLD6_MTRACE_RESP ?
+			    resptype == MLD_MTRACE_RESP ?
 			    "reply" : "request on",
 			    inet6_fmt(dst),
 			    sa6 ? inet6_fmt(&sa6->sin6_addr) : "unspecified");

@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.6 2001/11/28 03:38:41 itojun Exp $
+ * $KAME: mld6v2.c,v 1.7 2001/12/18 03:10:43 jinmei Exp $
  */
 
 /*
@@ -106,7 +106,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 		int qrv, int qqic)
 {
     static struct sockaddr_in6 dst_sa = { sizeof(dst_sa), AF_INET6 };
-    struct mld6v2_hdr *mhp = (struct mld6v2_hdr *) mld6_send_buf;
+    struct mldv2_hdr *mhp = (struct mldv2_hdr *) mld6_send_buf;
     int             ctllen, hbhlen = 0;
     int             nbsrc = 0;
     struct listaddr *lstsrc = NULL;
@@ -153,7 +153,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
                 IF_DEBUG(DEBUG_MLD)
                     log(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
 
-                mhp->mld6_sources[nbsrc] = lstsrc->al_addr.sin6_addr;
+                mhp->mld_sources[nbsrc] = lstsrc->al_addr.sin6_addr;
                 nbsrc++;
                 lstsrc->al_rob--;
                 if (timer_leftTimer(lstsrc->al_timerid) >
@@ -182,7 +182,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 
                 IF_DEBUG(DEBUG_MLD)
                     log(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
-                mhp->mld6_sources[nbsrc] = lstsrc->al_addr.sin6_addr;
+                mhp->mld_sources[nbsrc] = lstsrc->al_addr.sin6_addr;
                 nbsrc++;
                 lstsrc->al_rob--;
 	    nextsrc2:
@@ -216,16 +216,16 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
      */
 
     datalen = 28 + nbsrc * sizeof(struct in6_addr);
-    mhp->mld6_type = type;
-    mhp->mld6_code = code;
-    mhp->mld6_maxdelay = htons(codafloat(delay, &realnbr, 3, 12));
+    mhp->mld_type = type;
+    mhp->mld_code = code;
+    mhp->mld_maxdelay = htons(codafloat(delay, &realnbr, 3, 12));
     if (group!=NULL)
-	mhp->mld6_addr = group->sin6_addr;
+	mhp->mld_addr = group->sin6_addr;
     else
-	mhp->mld6_addr = in6addr_any;
-    mhp->mld6_misc = misc;
-    mhp->mld6_qqi = codafloat(qqic, &realnbr, 3, 4);
-    mhp->mld6_numsrc = htons(nbsrc);
+	mhp->mld_addr = in6addr_any;
+    mhp->mld_misc = misc;
+    mhp->mld_qqi = codafloat(qqic, &realnbr, 3, 4);
+    mhp->mld_numsrc = htons(nbsrc);
 
     sndiov[0].iov_len = datalen;
 

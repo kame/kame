@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.9 2001/04/17 18:33:37 jinmei Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.10 2001/12/18 03:10:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -110,7 +110,7 @@ query_groups(v)
 {
 	v->uv_gq_timer = MLD6_QUERY_INTERVAL;
 	if (v->uv_flags & VIFF_QUERIER && (v->uv_flags & VIFF_NOLISTENER) == 0)
-		send_mld6(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+		send_mld6(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 			  NULL, (struct in6_addr *)&in6addr_any,
 			  v->uv_ifindex, MLD6_QUERY_RESPONSE_INTERVAL, 0, 1);
 }
@@ -362,7 +362,7 @@ accept_listener_done(src, dst, group)
 				(MLD6_LAST_LISTENER_QUERY_COUNT + 1);
 			if (v->uv_flags & VIFF_QUERIER &&
 			    (v->uv_flags & VIFF_NOLISTENER) == 0)
-				send_mld6(MLD6_LISTENER_QUERY, 0,
+				send_mld6(MLD_LISTENER_QUERY, 0,
 					  &v->uv_linklocal->pa_addr, NULL,
 					  &g->al_addr.sin6_addr,
 					  v->uv_ifindex,
@@ -452,7 +452,7 @@ SendQuery(arg)
 	register struct uvif *v = &uvifs[cbk->mifi];
 
 	if (v->uv_flags & VIFF_QUERIER && (v->uv_flags & VIFF_NOLISTENER) == 0)
-		send_mld6(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+		send_mld6(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 			  NULL, &cbk->g->al_addr.sin6_addr,
 			  v->uv_ifindex, cbk->q_time, 0, 1);
 	cbk->g->al_query = 0;

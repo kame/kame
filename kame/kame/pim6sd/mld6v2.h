@@ -45,18 +45,18 @@
  * Multicast Listener Discovery v.2
  * XXX: this portion will be merged into system include file
  */
-struct mld6v2_hdr {	/* MLDv2 Header */
-    struct icmp6_hdr mld6_icmp6_hdr;	/* Standard ICMP header */
-    struct in6_addr mld6_addr;	/* Multicast Address */
-    u_int8          mld6_misc;	/* Resv+S+QRV */
-    u_int8          mld6_qqi;	/* QQIC */
-    u_int16         mld6_numsrc;	/* Number of Sources */
-    struct in6_addr mld6_sources[1];	/* Sources Addresses List */
+struct mldv2_hdr {	/* MLDv2 Header */
+    struct icmp6_hdr mld_icmp6_hdr;	/* Standard ICMP header */
+    struct in6_addr mld_addr;	/* Multicast Address */
+    u_int8          mld_misc;	/* Resv+S+QRV */
+    u_int8          mld_qqi;	/* QQIC */
+    u_int16         mld_numsrc;	/* Number of Sources */
+    struct in6_addr mld_sources[1];	/* Sources Addresses List */
 };
 
-#define MLD6_QRV(x) ((x)->mld6_misc & (0x07))
+#define MLD6_QRV(x) ((x)->mld_misc & (0x07))
 
-struct mld6_maddr_rec {		/* Multicast Address Record  */
+struct mld_maddr_rec {		/* Multicast Address Record  */
     u_int8          mmr_type;	/* Multicast Address Record Type */
     u_int8          mmr_datalen;/* Aux Data Length */
     u_int16         mmr_numsrc;	/* Number of Sources */
@@ -64,15 +64,15 @@ struct mld6_maddr_rec {		/* Multicast Address Record  */
     struct in6_addr mmr_sources[1];	/* Sources Addresses List */
 };
 
-#define nmcastrcd mld6v2_hdr.icmp6_data16[1]
+#define nmcastrcd mldv2_hdr.icmp6_data16[1]
 
-struct mld6_report {	/* Multicast Report */
+struct mld_report {	/* Multicast Report */
     u_int8_t  mr_type;	/* Multicast Report Type */
     u_int8_t  mr_rsv1;	/* Reserved */
     u_int16_t mr_cksum;	/* Checksum */
     u_int16_t mr_rsv2;	/* Reserved */
     u_int16_t mr_numgrps;	/* Number of Multicast Address Records */
-    struct mld6_maddr_rec mr_maddr[1];	/* Multicast Records */
+    struct mld_maddr_rec mr_maddr[1];	/* Multicast Records */
 };
 
 #define MLD6_MINLEN 8		/* Minimal Message Length */
@@ -86,7 +86,7 @@ struct mld6_report {	/* Multicast Report */
 
 #define SFLAGYES		0x08
 #define SFLAGNO			0x0
-#define MLD6_SFLAG(x) ((x)->mld6_misc &(0x08))
+#define MLD6_SFLAG(x) ((x)->mld_misc &(0x08))
 
 /*
  * Multicast Address Record Types 

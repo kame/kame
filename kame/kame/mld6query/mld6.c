@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.12 2001/11/21 08:55:15 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.13 2001/12/18 03:10:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -54,7 +54,7 @@
 
 struct msghdr m;
 struct sockaddr_in6 dst;
-struct mld6_hdr mldh;
+struct mld_hdr mldh;
 struct in6_addr maddr = IN6ADDR_ANY_INIT, any = IN6ADDR_ANY_INIT;
 struct ipv6_mreq mreq;
 u_short ifindex;
@@ -78,14 +78,14 @@ main(int argc, char *argv[])
 	u_int type;
 	int ch;
 
-	type = MLD6_LISTENER_QUERY;
+	type = MLD_LISTENER_QUERY;
 	while ((ch = getopt(argc, argv, "dr")) != -1) {
 		switch (ch) {
 		case 'd':
-			type = MLD6_LISTENER_DONE;
+			type = MLD_LISTENER_DONE;
 			break;
 		case 'r':
-			type = MLD6_LISTENER_REPORT;
+			type = MLD_LISTENER_REPORT;
 			break;
 		default:
 			usage();
@@ -183,9 +183,9 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	m.msg_iovlen = 1;
 
 	bzero(&mldh, sizeof(mldh));
-	mldh.mld6_type = type & 0xff;
-	mldh.mld6_maxdelay = htons(QUERY_RESPONSE_INTERVAL);
-	mldh.mld6_addr = *addr;
+	mldh.mld_type = type & 0xff;
+	mldh.mld_maxdelay = htons(QUERY_RESPONSE_INTERVAL);
+	mldh.mld_addr = *addr;
 
 #ifdef USE_RFC2292BIS
 	if ((hbhlen = inet6_opt_init(NULL, 0)) == -1)
@@ -246,7 +246,7 @@ void
 dump(int s)
 {
 	int i;
-	struct mld6_hdr *mld;
+	struct mld_hdr *mld;
 	u_char buf[1024];
 	struct sockaddr_in6 from;
 	int from_len = sizeof(from);
@@ -257,17 +257,17 @@ dump(int s)
 			  &from_len)) < 0)
 		return;
 
-	if (i < sizeof(struct mld6_hdr)) {
+	if (i < sizeof(struct mld_hdr)) {
 		printf("too short!\n");
 		return;
 	}
 
-	mld = (struct mld6_hdr *)buf;
+	mld = (struct mld_hdr *)buf;
 
 	printf("from %s, ", inet_ntop(AF_INET6, &from.sin6_addr,
 				      ntop_buf, sizeof(ntop_buf)));
 
-	switch (mld->mld6_type) {
+	switch (mld->mld_type) {
 	case ICMP6_MEMBERSHIP_QUERY:
 		printf("type=Multicast Listener Query, ");
 		break;
@@ -278,7 +278,7 @@ dump(int s)
 		printf("type=Multicast Listener Done, ");
 		break;
 	}
-	printf("addr=%s\n", inet_ntop(AF_INET6, &mld->mld6_addr,
+	printf("addr=%s\n", inet_ntop(AF_INET6, &mld->mld_addr,
 				    ntop_buf, sizeof(ntop_buf)));
 	
 	fflush(stdout);

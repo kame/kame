@@ -13,14 +13,14 @@
 /*
  *	Multicast Listener Discovery
  */
-struct mld6_hdr {
-        struct icmp6_hdr        mld6_hdr;
-        struct in6_addr         mld6_addr; /* multicast address */
+struct mld_hdr {
+        struct icmp6_hdr        mld_icmp6_hdr;
+        struct in6_addr         mld_addr; /* multicast address */
 };
 
-#define mld6_type       mld6_hdr.icmp6_type
-#define mld6_code       mld6_hdr.icmp6_code
-#define mld6_cksum      mld6_hdr.icmp6_cksum
-#define mld6_maxdelay   mld6_hdr.icmp6_data16[0]
-#define mld6_reserved   mld6_hdr.icmp6_data16[1]
+#define mld_type       mld_icmp6_hdr.icmp6_type
+#define mld_code       mld_icmp6_hdr.icmp6_code
+#define mld_cksum      mld_icmp6_hdr.icmp6_cksum
+#define mld_maxdelay   mld_icmp6_hdr.icmp6_data16[0]
+#define mld_reserved   mld_icmp6_hdr.icmp6_data16[1]
 

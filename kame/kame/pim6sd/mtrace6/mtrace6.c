@@ -1,4 +1,4 @@
-/*	$KAME: mtrace6.c,v 1.18 2001/11/13 12:38:50 jinmei Exp $	*/
+/*	$KAME: mtrace6.c,v 1.19 2001/12/18 03:10:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -206,7 +206,7 @@ setqid(family, query)
 
 	switch(family) {
 	case AF_INET6:
-		q6 = (struct tr6_query *)((struct mld6_hdr *)query + 1);
+		q6 = (struct tr6_query *)((struct mld_hdr *)query + 1);
 		q6->tr_qid = (u_int32_t)random();
 	}
 }
@@ -293,8 +293,8 @@ show_ip6_result(from6, datalen)
 	struct sockaddr_in6 *from6;
 	int datalen;
 {
-	struct mld6_hdr *mld6_tr_resp = (struct mld6_hdr *)frombuf;
-	struct mld6_hdr *mld6_tr_query = (struct mld6_hdr *)querypacket;
+	struct mld_hdr *mld6_tr_resp = (struct mld_hdr *)frombuf;
+	struct mld_hdr *mld6_tr_query = (struct mld_hdr *)querypacket;
 	struct tr6_query *tr6_rquery = (struct tr6_query *)(mld6_tr_resp + 1);
 	struct tr6_query *tr6_query = (struct tr6_query *)(mld6_tr_query + 1);
 	struct tr6_resp *tr6_resp = (struct tr6_resp *)(tr6_rquery + 1),
@@ -308,8 +308,8 @@ show_ip6_result(from6, datalen)
 		return;
 	}
 
-	switch(mld6_tr_resp->mld6_type) {
-	case MLD6_MTRACE_RESP:
+	switch(mld6_tr_resp->mld_type) {
+	case MLD_MTRACE_RESP:
 		if ((datalen - sizeof(*mld6_tr_resp) - sizeof(*tr6_rquery)) %
 		    sizeof(*tr6_resp)) {
 			warnx("show_ip6_result: incomplete response (%d bytes)",
@@ -356,7 +356,7 @@ show_ip6_result(from6, datalen)
 		break;
 	default:		/* impossible... */
 		warnx("show_ip6_result: invalid ICMPv6 type(%d)",
-		      mld6_tr_resp->mld6_type); /* assert? */
+		      mld6_tr_resp->mld_type); /* assert? */
 		break;
 	}
 }
@@ -585,7 +585,7 @@ set_filter(s, family)
 	switch(family) {
 	case AF_INET6:
 		ICMP6_FILTER_SETBLOCKALL(&filter6);
-		ICMP6_FILTER_SETPASS(MLD6_MTRACE_RESP, &filter6);
+		ICMP6_FILTER_SETPASS(MLD_MTRACE_RESP, &filter6);
 		if (setsockopt(s, IPPROTO_ICMPV6, ICMP6_FILTER, &filter6,
 			       sizeof(filter6)) < 0)
 			err(1, "setsockopt(ICMP6_FILTER)");
@@ -675,7 +675,7 @@ open_socket()
 static void
 make_ip6_packet()
 {
-	struct mld6_hdr *mld6_tr_query;
+	struct mld_hdr *mld6_tr_query;
 	struct tr6_query *tr6_query;
 
 	querylen = sizeof(*mld6_tr_query) + sizeof(*tr6_query);
@@ -684,10 +684,10 @@ make_ip6_packet()
 	memset(querypacket, 0, querylen);
 
 	/* fill in MLD header */
-	mld6_tr_query = (struct mld6_hdr *)querypacket;
-	mld6_tr_query->mld6_type = MLD6_MTRACE;
-	mld6_tr_query->mld6_code = maxhops & 0xff;
-	mld6_tr_query->mld6_addr = ((struct sockaddr_in6 *)grp_sock)->sin6_addr;
+	mld6_tr_query = (struct mld_hdr *)querypacket;
+	mld6_tr_query->mld_type = MLD_MTRACE;
+	mld6_tr_query->mld_code = maxhops & 0xff;
+	mld6_tr_query->mld_addr = ((struct sockaddr_in6 *)grp_sock)->sin6_addr;
 
 	/* fill in mtrace query fields */
 	tr6_query = (struct tr6_query *)(mld6_tr_query + 1);
