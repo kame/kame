@@ -1,4 +1,4 @@
-$Id: TODO,v 1.10 2000/07/15 12:38:05 sakane Exp $
+$Id: TODO,v 1.11 2000/07/16 04:18:55 sakane Exp $
 
 Sorry that `racoon' is not stable yet.  But she can exchange the key
 in limited environment.  Try to run with racoon.conf in the case
@@ -34,6 +34,7 @@ o Dynamically retry to exchange and resend the packet per nodes.
 o Remote maintenance with secure connection.
 o To make the list of supported algorithm by sadb_supported payload
   in the SADB_REGISTER message which happens asynchronously.
+o support DN type of ID payload.
 o fix the structure of ph2handle.
   We can handle the below case.
 
