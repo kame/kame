@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1135 2000/07/16 18:32:49 sumikawa Exp $
+$Id: CHANGELOG,v 1.1136 2000/07/17 05:23:14 jinmei Exp $
 
 <200006>
 Mon Jul 17 03:31:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -108,7 +108,7 @@ Thu Jul 13 01:39:26 JST 2000  itojun@iijlab.net
 2000-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/route6d/route6d.c: removed "ifndef ADVAPI"
 	parts. Since the advanced API has already been standardized,
-	implemented, and deployed, we don't need to take care the older
+	implemented, and deployed, we don't need to take care of the older
 	kernel behavior (which is even confusing).
 	* *BSD/usr.sbin/route6d/Makefile: removed the -DADVAPI flag
 	according the change.
