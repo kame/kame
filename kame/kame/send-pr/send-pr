@@ -52,7 +52,7 @@ GNATS_SITE=berkeley
 # this has to be kept in sync with
 # orange.kame.net:/usr/local/share/gnats/gnats-db/gnats-adm.
 # must be sorted.
-CATEGORIES="bsdi doc fbsd2 fbsd3 kit netbsd pending sys test"
+CATEGORIES="bsdi doc fbsd2 fbsd3 kit netbsd openbsd pending sys test"
 
 # Newer config information?
 [ -f ${GNATS_ROOT}/gnats-adm/config ] && . ${GNATS_ROOT}/gnats-adm/config
