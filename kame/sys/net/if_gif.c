@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.99 2003/01/23 04:44:57 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.100 2003/02/07 10:17:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,7 +204,9 @@ gifattach0(sc)
 }
 
 #ifdef __FreeBSD__
+#if !(__FreeBSD_version >= 500000)
 PSEUDO_SET(gifattach, if_gif);
+#endif
 #endif
 
 #ifdef __OpenBSD__
@@ -354,7 +356,11 @@ gif_output(ifp, m, dst, rt)
 
 	mtag = m_tag_get(PACKET_TAG_GIF, sizeof(struct ifnet *), M_NOWAIT);
 	if (!mtag) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		_IF_DROP(&ifp->if_snd);
+#else
 		IF_DROP(&ifp->if_snd);
+#endif
 		m_freem(m);
 		error = ENOMEM;
 		goto end;
@@ -511,7 +517,10 @@ gif_input(m, af, ifp)
 	int af;
 	struct ifnet *ifp;
 {
-	int s, isr;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	int s;
+#endif
+	int isr;
 	struct ifqueue *ifq = NULL;
 
 	if (ifp == NULL) {
@@ -586,9 +595,17 @@ gif_input(m, af, ifp)
 
 #ifdef __NetBSD__
 	s = splnet();
-#else
+#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	s = splimp();
 #endif
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	/*
+	 * Queue message on interface, update output statistics if
+	 * successful, and start output if interface not yet active.
+	 */
+	IF_HANDOFF(&ifp->if_snd, m, ifp);
+	return;
+#else
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);	/* update statistics */
 		m_freem(m);
@@ -601,6 +618,7 @@ gif_input(m, af, ifp)
 	/* we need schednetisr since the address family may change */
 	schednetisr(isr);
 	splx(s);
+#endif
 }
 #endif /*!OpenBSD*/
 

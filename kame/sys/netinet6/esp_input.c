@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.76 2003/02/07 09:34:38 jinmei Exp $	*/
+/*	$KAME: esp_input.c,v 1.77 2003/02/07 10:17:08 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,7 +133,9 @@ esp4_input(m, va_alist)
 	int ivlen;
 	size_t hlen;
 	size_t esplen;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
+#endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_list ap;
 	int off;
@@ -420,18 +422,28 @@ noreplaycheck:
 
 #ifdef __NetBSD__
 		s = splnet();
-#else
+#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		s = splimp();
 #endif
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		if (!IF_HANDOFF(&ipintrq, m, NULL)) {
+			ipsecstat.in_inval++;
+			m = NULL;
+			goto bad;
+		}
+#else
 		if (IF_QFULL(&ipintrq)) {
 			ipsecstat.in_inval++;
 			splx(s);
 			goto bad;
 		}
 		IF_ENQUEUE(&ipintrq, m);
+#endif
 		m = NULL;
 		schednetisr(NETISR_IP); /* can be skipped but to make sure */
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		splx(s);
+#endif
 		nxt = IPPROTO_DONE;
 	} else {
 		/*
@@ -574,7 +586,9 @@ esp6_input(mp, offp, proto)
 	const struct esp_algorithm *algo;
 	int ivlen;
 	size_t esplen;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
+#endif
 
 	/* sanity check for alignment. */
 	if (off % 4 != 0 || m->m_pkthdr.len % 4 != 0) {
@@ -857,18 +871,29 @@ noreplaycheck:
 
 #ifdef __NetBSD__
 		s = splnet();
-#else
+#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		s = splimp();
 #endif
+
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		if (!IF_HANDOFF(&ip6intrq, m, NULL)) {
+			ipsec6stat.in_inval++;
+			m = NULL;
+			goto bad;
+		}
+#else
 		if (IF_QFULL(&ip6intrq)) {
 			ipsec6stat.in_inval++;
 			splx(s);
 			goto bad;
 		}
 		IF_ENQUEUE(&ip6intrq, m);
+#endif
 		m = NULL;
 		schednetisr(NETISR_IPV6); /* can be skipped but to make sure */
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		splx(s);
+#endif
 		nxt = IPPROTO_DONE;
 	} else {
 		/*

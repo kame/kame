@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.116 2003/02/07 09:51:37 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.117 2003/02/07 10:17:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,7 +109,9 @@ extern struct mip6_bc_list mip6_bc_list;
 
 #include <net/net_osdep.h>
 
+#if defined(__FreeBSD__) && __FreeBSD__ > 4 && __FreeBSD_version < 500000
 extern int (*fr_checkp) __P((struct ip *, int, struct ifnet *, int, struct mbuf **));
+#endif
 
 #ifdef NEW_STRUCT_ROUTE
 struct	route ip6_forward_rt;
@@ -140,8 +142,8 @@ ip6_forward(m, srcrt)
 	int srcrt;
 {
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	struct sockaddr_in6 *dst;
-	struct rtentry *rt;
+	struct sockaddr_in6 *dst = NULL;
+	struct rtentry *rt = NULL;
 	int error, type = 0, code = 0;
 	struct mbuf *mcopy = NULL;
 	struct ifnet *origifp;	/* maybe unnecessary */
@@ -741,13 +743,13 @@ ip6_forward(m, srcrt)
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* PFIL_HOOKS */
 
-#if defined(__FreeBSD__) && __FreeBSD__ > 4
-	/*
+#if defined(__FreeBSD__) && __FreeBSD__ > 4 && __FreeBSD_version < 500000
+	/* 
 	 * Check if we want to allow this packet to be processed.
 	 * Consider it to be bad if not.
 	 */
 	if (fr_checkp) {
-		struct	mbuf	*m1 = m;
+		struct mbuf	*m1 = m;
 
 		if ((*fr_checkp)((struct ip *)ip6, sizeof(*ip6),
 				 rt->rt_ifp, 1, &m1) != 0)

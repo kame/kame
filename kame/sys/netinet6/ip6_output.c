@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.357 2003/02/07 09:34:38 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.358 2003/02/07 10:17:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,7 +249,11 @@ extern struct ifnet loif[NLOOP];
  * which is rt_rmx.rmx_mtu.
  */
 int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+ip6_output(m0, opt, ro, flags, im6o, ifpp, inp)
+#else
 ip6_output(m0, opt, ro, flags, im6o, ifpp)
+#endif
 	struct mbuf *m0;
 	struct ip6_pktopts *opt;
 #ifdef NEW_STRUCT_ROUTE
@@ -260,6 +264,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	int flags;
 	struct ip6_moptions *im6o;
 	struct ifnet **ifpp;		/* XXX: just for statistics */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct inpcb *inp;
+#endif
 {
 	struct ip6_hdr *ip6, *mhip6;
 	struct ifnet *ifp, *origifp = NULL;
@@ -1948,14 +1955,22 @@ ip6_ctloutput(op, so, level, optname, mp)
 	int error, optval;
 	int level, op, optname;
 	int optlen;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 
 	if (sopt) {
 		level = sopt->sopt_level;
 		op = sopt->sopt_dir;
 		optname = sopt->sopt_name;
 		optlen = sopt->sopt_valsize;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		p = sopt->sopt_td;
+#else
 		p = sopt->sopt_p;
+#endif
 	} else {
 		panic("ip6_ctloutput: arg soopt is NULL");
 	}
@@ -1970,7 +1985,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 	int error, optval;
 	int optlen;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct thread *td = curthread;	/* XXX */
+#else
 	struct proc *p = curproc;	/* XXX */
+#endif
 #endif
 
 	optlen = m ? m->m_len : 0;
@@ -2403,13 +2422,21 @@ do { \
 					break;
 				}
 				/* XXX */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+				MGET(m, sopt->sopt_td ? M_WAIT : M_DONTWAIT, MT_HEADER);
+#else
 				MGET(m, sopt->sopt_p ? M_WAIT : M_DONTWAIT, MT_HEADER);
+#endif
 				if (m == 0) {
 					error = ENOBUFS;
 					break;
 				}
 				if (sopt->sopt_valsize > MLEN) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+					MCLGET(m, sopt->sopt_td ? M_WAIT : M_DONTWAIT);
+#else
 					MCLGET(m, sopt->sopt_p ? M_WAIT : M_DONTWAIT);
+#endif
 					if ((m->m_flags & M_EXT) == 0) {
 						m_free(m);
 						error = ENOBUFS;
@@ -3037,7 +3064,11 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	int level, op, optname;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 #else
 	struct mbuf *m = *mp;
 #endif /* FreeBSD >= 3 */
@@ -3048,7 +3079,11 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 		op = sopt->sopt_dir;
 		optname = sopt->sopt_name;
 		optlen = sopt->sopt_valsize;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		p = sopt->sopt_td;
+#else
 		p = sopt->sopt_p;
+#endif
 	} else {
 		panic("ip6_ctloutput: arg soopt is NULL");
 	}
@@ -3165,7 +3200,11 @@ ip6_pcbopts(pktopt, m, so)
 	struct ip6_pktopts *opt = *pktopt;
 	int error = 0;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct thread *p = sopt->sopt_td;
+#else
 	struct proc *p = sopt->sopt_p;
+#endif
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802
 	struct proc *p = PCPU(curproc);	/* XXX */
 #else
@@ -3530,6 +3569,8 @@ ip6_setmoptions(optname, im6op, m)
 	struct in6_multi_mship *imm;
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802
 	struct proc *p = PCPU(curproc);	/* XXX */
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct thread *p = curthread;
 #else
 	struct proc *p = curproc;	/* XXX */
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.336 2003/01/20 15:50:03 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.337 2003/02/07 10:17:08 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -174,7 +174,10 @@ const struct sockaddr_in6 sa6_any = {sizeof(sa6_any), AF_INET6,
 extern int	mld_sendbuf(struct mbuf *, struct ifnet *);
 #endif
 
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+static int in6_lifaddr_ioctl(struct socket *, u_long, caddr_t,
+	struct ifnet *, struct thread *);
+#elif !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
 	struct ifnet *, struct proc *));
 #else
@@ -397,7 +400,14 @@ in6_mask2len(mask, lim0)
 #define ia62ifa(ia6)	(&((ia6)->ia_ifa))
 
 int
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+in6_control(so, cmd, data, ifp, p)
+	struct	socket *so;
+	u_long cmd;
+	caddr_t	data;
+	struct ifnet *ifp;
+	struct thread *p;
+#elif !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 in6_control(so, cmd, data, ifp, p)
 	struct	socket *so;
 	u_long cmd;
@@ -1667,7 +1677,14 @@ in6_purgeif(ifp)
  * address encoding scheme. (see figure on page 8)
  */
 static int
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+in6_lifaddr_ioctl(so, cmd, data, ifp, p)
+	struct socket *so;
+	u_long cmd;
+	caddr_t	data;
+	struct ifnet *ifp;
+	struct thread *p;
+#elif !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 in6_lifaddr_ioctl(so, cmd, data, ifp, p)
 	struct socket *so;
 	u_long cmd;

@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.29 2003/01/08 05:36:56 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.30 2003/02/07 10:17:11 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,7 +57,9 @@
 #endif
 
 #ifdef __FreeBSD__
-#if __FreeBSD__ >= 3
+#if __FreeBSD_version >= 500000
+ /* include nothing */
+#elif __FreeBSD__ >= 3
 #include <machine/ipl.h>
 #else
 #include <machine/spl.h>
@@ -439,7 +441,11 @@ key_abort(struct socket *so)
  * derived from net/rtsock.c:rts_attach()
  */
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+key_attach(struct socket *so, int proto, struct thread *p)
+#else
 key_attach(struct socket *so, int proto, struct proc *p)
+#endif
 {
 	struct keycb *kp;
 	int s, error;
@@ -488,7 +494,11 @@ key_attach(struct socket *so, int proto, struct proc *p)
  * derived from net/rtsock.c:rts_bind()
  */
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+key_bind(struct socket *so, struct sockaddr *nam, struct thread *p)
+#else
 key_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
+#endif
 {
 	int s, error;
 	s = splnet();
@@ -502,7 +512,11 @@ key_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
  * derived from net/rtsock.c:rts_connect()
  */
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+key_connect(struct socket *so, struct sockaddr *nam, struct thread *p)
+#else
 key_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
+#endif
 {
 	int s, error;
 	s = splnet();
@@ -568,8 +582,13 @@ key_peeraddr(struct socket *so, struct sockaddr **nam)
  * derived from net/rtsock.c:rts_send()
  */
 static int
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+key_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
+	 struct mbuf *control, struct thread *p)
+#else
 key_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	 struct mbuf *control, struct proc *p)
+#endif
 {
 	int s, error;
 	s = splnet();
@@ -607,7 +626,9 @@ key_sockaddr(struct socket *so, struct sockaddr **nam)
 }
 
 struct pr_usrreqs key_usrreqs = {
-	key_abort, pru_accept_notsupp, key_attach, key_bind,
+	key_abort, pru_accept_notsupp, 
+	key_attach, 
+	key_bind,
 	key_connect,
 	pru_connect2_notsupp, pru_control_notsupp, key_detach,
 	key_disconnect, pru_listen_notsupp, key_peeraddr,
@@ -630,7 +651,13 @@ extern struct domain keydomain;
 
 struct protosw keysw[] = {
 { SOCK_RAW,	&keydomain,	PF_KEY_V2,	PR_ATOMIC|PR_ADDR,
-  0,		key_output,	raw_ctlinput,	0,
+  0,		
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+  (pr_output_t *)key_output,
+#else
+  key_output,
+#endif
+  raw_ctlinput,	0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else

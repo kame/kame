@@ -1,4 +1,4 @@
-/*	$KAME: if_altq.h,v 1.9 2002/11/29 04:36:25 kjc Exp $	*/
+/*	$KAME: if_altq.h,v 1.10 2003/02/07 10:17:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -34,6 +34,12 @@
 #endif
 #endif
 
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#include <sys/lock.h>		/* XXX */
+#include <sys/mutex.h>		/* XXX */
+#include <sys/event.h>		/* XXX */
+#endif
+
 struct altq_pktattr; struct tb_regulator; struct top_cdnr;
 
 /*
@@ -46,6 +52,9 @@ struct	ifaltq {
 	int	ifq_len;
 	int	ifq_maxlen;
 	int	ifq_drops;
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	struct	mtx ifq_mtx;
+#endif
 
 	/* alternate queueing related fields */
 	int	altq_type;		/* discipline type */

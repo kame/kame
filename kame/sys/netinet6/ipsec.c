@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.178 2003/02/07 09:34:39 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.179 2003/02/07 10:17:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,6 +108,9 @@
 extern struct mip6_bc_list mip6_bc_list;
 #endif /* MIP6 */
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#include <machine/in_cksum.h>
+#endif
 #include <net/net_osdep.h>
 
 #ifdef HAVE_NRL_INPCB

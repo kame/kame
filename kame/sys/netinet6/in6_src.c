@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.126 2002/12/10 11:47:58 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.127 2003/02/07 10:17:08 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1068,7 +1068,11 @@ int
 in6_pcbsetport(laddr, inp, p)
 	struct sockaddr_in6 *laddr;
 	struct inpcb *inp;
+#if __FreeBSD_version >= 500000
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	struct socket *so = inp->inp_socket;
 	u_int16_t lport = 0, first, last, *lastport;

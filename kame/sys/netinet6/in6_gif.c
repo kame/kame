@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.102 2003/02/07 09:34:38 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.103 2003/02/07 10:17:08 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -230,9 +230,17 @@ in6_gif_output(ifp, family, m)
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL);
+	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
+			  );
 #else
-	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL);
+	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
+			  );
 #endif
 
 	if (sc->gif_ro6.ro_rt && mono_time.tv_sec >= sc->rtcache_expire)
@@ -360,9 +368,16 @@ in6_gif_output(ifp, family, m)
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL);
+	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
+			   );
 #else
-	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL);
+	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
 #endif
 
 	/*

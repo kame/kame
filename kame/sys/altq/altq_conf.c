@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.17 2002/11/29 04:36:23 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.18 2003/02/07 10:17:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -199,11 +199,16 @@ static struct cdevsw altq_cdevsw =
         { altqopen,	altqclose,	noread,	        nowrite,
 	  altqioctl,	nostop,		nullreset,	nodevtotty,
  	  seltrue,	nommap,		NULL,	"altq",	NULL,	  -1 };
-#else
+#elif (__FreeBSD_version < 500000)
 static struct cdevsw altq_cdevsw =
         { altqopen,	altqclose,	noread,	        nowrite,
 	  altqioctl,	seltrue,	nommap,		nostrategy,
 	  "altq",	CDEV_MAJOR,	nodump,		nopsize,  0,  -1 };
+#else
+static struct cdevsw altq_cdevsw =
+        { altqopen,	altqclose,	noread,	        nowrite,
+	  altqioctl,	seltrue,	nommap,		nostrategy,
+	  "altq",	CDEV_MAJOR,	nodump,		nopsize,  0 };
 #endif
 #elif defined(__NetBSD__)
 static struct cdevsw altq_cdevsw = cdev__oci_init(1,altq);
@@ -216,7 +221,11 @@ int
 altqopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	int unit = minor(dev);
 
@@ -235,7 +244,11 @@ int
 altqclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	int unit = minor(dev);
 
@@ -256,7 +269,11 @@ altqioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	int unit = minor(dev);
 

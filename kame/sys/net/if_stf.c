@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.103 2003/01/17 03:23:56 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.104 2003/02/07 10:17:07 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -318,7 +318,9 @@ stfattach(dummy)
 }
 
 #ifdef __FreeBSD__
+#if !(__FreeBSD_version >= 500000)
 PSEUDO_SET(stfattach, if_stf);
+#endif
 #endif
 
 static int
@@ -793,7 +795,11 @@ stf_output(ifp, m, dst, rt)
 	}
 
 	ifp->if_opackets++;
-	return ip_output(m, NULL, &sc->sc_ro, 0, NULL);
+	return ip_output(m, NULL, &sc->sc_ro, 0, NULL
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+			, NULL
+#endif
+			);
 #endif
 }
 
@@ -1029,7 +1035,10 @@ in_stf_input(m, va_alist)
 	struct ip *ip;
 	struct ip6_hdr *ip6;
 	u_int8_t otos, itos;
-	int s, isr;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	int s;
+#endif
+	int isr;
 	struct ifqueue *ifq = NULL;
 	struct ifnet *ifp;
 
@@ -1142,9 +1151,17 @@ in_stf_input(m, va_alist)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splnet();
-#else
+#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	s = splimp();
 #endif
+
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	/*
+	 * Queue message on interface, update output statistics if
+	 * successful, and start output if interface not yet active.
+	 */
+	IF_HANDOFF(&ifp->if_snd, m, ifp);
+#else
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);	/* update statistics */
 		m_freem(m);
@@ -1156,6 +1173,7 @@ in_stf_input(m, va_alist)
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
 	splx(s);
+#endif
 }
 
 /* ARGSUSED */

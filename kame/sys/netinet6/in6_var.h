@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.88 2002/11/09 03:21:00 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.89 2003/02/07 10:17:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -595,6 +595,22 @@ struct	in6_multistep {
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 
+#if __FreeBSD_version >= 500000
+#define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
+/* struct in6_addr addr; */					\
+/* struct ifnet *ifp; */					\
+/* struct in6_multi *in6m; */					\
+do { \
+	struct ifmultiaddr *ifma; \
+	TAILQ_FOREACH(ifma, &(ifp)->if_multiaddrs, ifma_link) { \
+		if (ifma->ifma_addr->sa_family == AF_INET6 \
+		    && SA6_ARE_ADDR_EQUAL(((struct sockaddr_in6 *)ifma->ifma_addr), \
+					  (addr))) \
+			break; \
+	} \
+	(in6m) = (struct in6_multi *)(ifma ? ifma->ifma_protospec : 0); \
+} while(0)
+#else
 #define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
 /* struct sockaddr_in6 *addr; */					\
 /* struct ifnet *ifp; */					\
@@ -610,6 +626,7 @@ do { \
 	} \
 	(in6m) = (struct in6_multi *)(ifma ? ifma->ifma_protospec : 0); \
 } while(0)
+#endif /* not FreeBSD5 */
 
 /*
  * Macro to step through all of the in6_multi records, one at a time.
@@ -710,7 +727,10 @@ struct in6_multi_mship *in6_joingroup __P((struct ifnet *,
 	struct sockaddr_in6 *, int *));
 int	in6_leavegroup __P((struct in6_multi_mship *));
 int	in6_mask2len __P((struct in6_addr *, u_char *));
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+int	in6_control(struct socket *, u_long, caddr_t, struct ifnet *,
+		    struct thread *);
+#elif !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 int	in6_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
 	struct proc *));
 #else

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.304 2003/02/07 09:34:38 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.305 2003/02/07 10:17:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -274,6 +274,9 @@ ip6_init()
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	register_netisr(NETISR_IPV6, ip6intr);
 #endif
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	mtx_init(&ip6intrq.ifq_mtx, "ip6_inq", NULL, MTX_DEF);
+#endif
 	scope6_init();
 	addrsel_policy_init();
 	nd6_init();
@@ -323,7 +326,10 @@ ip6_init2(dummy)
 {
 
 	/* nd6_timer_init */
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&nd6_timer_ch, 0);
+	callout_reset(&nd6_timer_ch, hz, nd6_timer, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_init(&nd6_timer_ch);
 	callout_reset(&nd6_timer_ch, hz, nd6_timer, NULL);
 #elif defined(__OpenBSD__)
@@ -335,7 +341,13 @@ ip6_init2(dummy)
 #endif
 
 	/* timer for regeneranation of temporary addresses randomize ID */
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&in6_tmpaddrtimer_ch, 0);
+	callout_reset(&in6_tmpaddrtimer_ch,
+		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
+		       ip6_temp_regen_advance) * hz,
+		      in6_tmpaddrtimer, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_init(&in6_tmpaddrtimer_ch);
 	callout_reset(&in6_tmpaddrtimer_ch,
 		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
@@ -420,6 +432,11 @@ ip6_input(m)
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
+#ifdef  PFIL_HOOKS
+	struct packet_filter_hook *pfh;
+	struct mbuf *m0;
+	int rv;
+#endif  /* PFIL_HOOKS */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 	/*
@@ -533,7 +550,8 @@ ip6_input(m)
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif
 
-#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+#ifdef PFIL_HOOKS
+#if defined(__NetBSD__)
 	/*
 	 * Run through list of hooks for input packets.  If there are any
 	 * filters which require that additional packets in the flow are
@@ -558,6 +576,21 @@ ip6_input(m)
 			return;
 		ip6 = mtod(m, struct ip6_hdr *);
 	}
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	m0 = m;
+	pfh = pfil_hook_get(PFIL_IN, &inet6sw[ip6_protox[IPPROTO_IPV6]].pr_pfh);
+	for (; pfh; pfh = pfh->pfil_link.tqe_next)
+		if (pfh->pfil_func) {
+			rv = pfh->pfil_func(ip6, sizeof(*ip6),
+					    m->m_pkthdr.rcvif, 0, &m0);
+			if (rv)
+				return;
+			m = m0;
+			if (m == NULL)
+				return;
+			ip6 = mtod(m, struct ip6_hdr *);
+		}
+#endif /* FreeBSD5 */
 #endif /* PFIL_HOOKS */
 
 	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
@@ -1573,7 +1606,11 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 # define in6p_flags	inp_flags
 #endif
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct thread *p = curthread;	/* XXX */
+#else
 	struct proc *p = curproc;	/* XXX */
+#endif
 #endif
 #ifdef __bsdi__
 # define sbcreatecontrol	so_cmsg

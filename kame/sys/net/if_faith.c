@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.32 2003/01/10 08:41:23 suz Exp $	*/
+/*	$KAME: if_faith.c,v 1.33 2003/02/07 10:17:07 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -123,7 +123,9 @@ static void faithrtrequest __P((int, struct rtentry *, struct sockaddr *));
 
 #if defined(__FreeBSD__)
 void faithattach __P((void *));
+#if __FreeBSD_version < 500000
 PSEUDO_SET(faithattach, if_faith);
+#endif
 #else
 void faithattach __P((int));
 #endif
@@ -188,7 +190,10 @@ faithoutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	struct rtentry *rt;
 {
-	int s, isr;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	int s;
+#endif
+	int isr;
 	struct ifqueue *ifq = 0;
 
 	if ((m->m_flags & M_PKTHDR) == 0)
@@ -255,9 +260,17 @@ faithoutput(ifp, m, dst, rt)
 	m->m_pkthdr.rcvif = ifp;
 #ifdef __NetBSD__
 	s = splnet();
-#else
+#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	s = splimp();
 #endif
+
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	/*
+	 * Queue message on interface, update output statistics if
+	 * successful, and start output if interface not yet active.
+	 */
+	return (IF_HANDOFF(&ifp->if_snd, m, ifp) ? 0 : ENOBUFS);
+#else
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
 		m_freem(m);
@@ -270,6 +283,7 @@ faithoutput(ifp, m, dst, rt)
 	ifp->if_ibytes += m->m_pkthdr.len;
 	splx(s);
 	return (0);
+#endif
 }
 
 /* ARGSUSED */

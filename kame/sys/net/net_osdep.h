@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.75 2002/12/02 14:28:57 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.76 2003/02/07 10:17:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -318,7 +318,7 @@ extern const char *if_name __P((struct ifnet *));
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #define HAVE_NEW_BPFATTACH
 #endif
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version < 500000
 #define HAVE_NEW_BPF
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.89 2002/11/11 18:25:25 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.90 2003/02/07 10:17:08 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,7 +110,13 @@ SYSCTL_INT(_net_inet_ip, IPCTL_GIF_TTL, gifttl, CTLFLAG_RW,
 extern struct domain inetdomain;
 struct protosw in_gif_protosw =
 { SOCK_RAW,	&inetdomain,	0/* IPPROTO_IPV[46] */,	PR_ATOMIC|PR_ADDR,
-  in_gif_input, rip_output,	0,		rip_ctloutput,
+  in_gif_input, 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+  (pr_output_t*)rip_output, 
+#else
+  rip_output,
+#endif
+  0,		rip_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
@@ -368,7 +374,11 @@ in_gif_output(ifp, family, m)
 		sc->rtcache_expire = mono_time.tv_sec + in_gif_rtcachettl;
 	}
 
-	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);
+	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+			 , NULL
+#endif
+			 );
 	return (error);
 #endif /* OpenBSD */
 }

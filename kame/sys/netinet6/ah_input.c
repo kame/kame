@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.79 2003/02/07 09:34:37 jinmei Exp $	*/
+/*	$KAME: ah_input.c,v 1.80 2003/02/07 10:17:08 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -126,7 +126,9 @@ ah4_input(m, va_alist)
 	struct secasvar *sav = NULL;
 	u_int16_t nxt;
 	size_t hlen;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
+#endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	int off, proto;
 	va_list ap;
@@ -495,18 +497,29 @@ ah4_input(m, va_alist)
 
 #ifdef __NetBSD__
 		s = splnet();
-#else
+#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		s = splimp();
 #endif
+
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		if (!IF_HANDOFF(&ipintrq, m, NULL)) {
+			ipsecstat.in_inval++;
+			m = NULL;
+			goto fail;
+		}
+#else
 		if (IF_QFULL(&ipintrq)) {
 			ipsecstat.in_inval++;
 			splx(s);
 			goto fail;
 		}
 		IF_ENQUEUE(&ipintrq, m);
+#endif
 		m = NULL;
 		schednetisr(NETISR_IP);	/* can be skipped but to make sure */
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		splx(s);
+#endif
 		nxt = IPPROTO_DONE;
 	} else {
 		/*
@@ -684,7 +697,9 @@ ah6_input(mp, offp, proto)
 	u_int8_t cksum[AH_MAXSUMSIZE];
 	struct secasvar *sav = NULL;
 	u_int16_t nxt;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	int s;
+#endif
 	size_t stripsiz = 0;
 
 #ifndef PULLDOWN_TEST
@@ -964,18 +979,28 @@ ah6_input(mp, offp, proto)
 
 #ifdef __NetBSD__
 		s = splnet();
-#else
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		s = splimp();
 #endif
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		if (!IF_HANDOFF(&ip6intrq, m, NULL)) {
+			ipsec6stat.in_inval++;
+			m = NULL;
+			goto fail;
+		}
+#else
 		if (IF_QFULL(&ip6intrq)) {
 			ipsec6stat.in_inval++;
 			splx(s);
 			goto fail;
 		}
 		IF_ENQUEUE(&ip6intrq, m);
+#endif
 		m = NULL;
 		schednetisr(NETISR_IPV6); /* can be skipped but to make sure */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		splx(s);
+#endif
 		nxt = IPPROTO_DONE;
 	} else {
 		/*

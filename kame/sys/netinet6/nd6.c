@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.312 2003/02/07 09:34:39 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.313 2003/02/07 10:17:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,9 +84,15 @@
 #ifndef __NetBSD__
 #include <netinet/if_ether.h>
 #endif
-#ifdef __FreeBSD__
+
+#if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#include <net/fddi.h>
+#else
 #include <netinet/if_fddi.h>
 #endif
+#endif
+
 #ifdef __OpenBSD__
 #include <netinet/ip_ipsp.h>
 #endif

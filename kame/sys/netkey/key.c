@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.268 2003/02/03 10:49:14 keiichi Exp $	*/
+/*	$KAME: key.c,v 1.269 2003/02/07 10:17:10 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4542,6 +4542,8 @@ key_randomfill(p, l)
 #elif defined(__OpenBSD__)
 	get_random_bytes(p, l);
 	n = l;
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	n = (size_t)read_random(p, (u_int)l);
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 	n = (size_t)read_random_unlimited(p, (u_int)l);
 #elif !defined(__bsdi__)
@@ -7284,7 +7286,7 @@ key_validate_ext(ext, len)
 {
 	struct sockaddr *sa;
 	enum { NONE, ADDR } checktype = NONE;
-	int baselen;
+	int baselen = 0;
 	const int sal = offsetof(struct sockaddr, sa_len) + sizeof(sa->sa_len);
 
 	if (len != PFKEY_UNUNIT64(ext->sadb_ext_len))

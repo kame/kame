@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.74 2002/11/11 10:43:39 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.75 2003/02/07 10:17:09 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -613,7 +613,9 @@ mldv1_query:
 			timer = 1;
 
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+#elif defined(__FreeBSD__)
 		for (ifma = LIST_FIRST(&ifp->if_multiaddrs);
 		     ifma;
 		     ifma = LIST_NEXT(ifma, ifma_link))
@@ -1056,7 +1058,11 @@ mld6_sendpkt(in6m, type, dst)
 		break;
 	}
 
-	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
+	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		   ,NULL
+#endif
+		   );
 }
 
 static struct mld_hdr *

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.107 2003/02/07 09:34:39 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.108 2003/02/07 10:17:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -420,15 +420,31 @@ void	ip6_forward __P((struct mbuf *, int));
 
 void	ip6_mloopback __P((struct ifnet *, struct mbuf *, struct sockaddr_in6 *));
 #if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__OpenBSD__)  || defined(__FreeBSD__)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
+			struct route *,
+			int,
+			struct ip6_moptions *, struct ifnet **,
+			struct inpcb *));
+#else
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route *,
 			int,
 			struct ip6_moptions *, struct ifnet **));
+#endif
+#else
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
+			struct route_in6 *,
+			int,
+			struct ip6_moptions *, struct ifnet **,
+			struct inpcb *));
 #else
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route_in6 *,
 			int,
 			struct ip6_moptions *, struct ifnet **));
+#endif
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
@@ -466,7 +482,7 @@ int	rip6_ctloutput __P((struct socket *so, struct sockopt *sopt));
 #else
 int	rip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4 && __FreeBSD_version < 500000)
 int	rip6_output __P((struct mbuf *, struct socket *,
 			 struct sockaddr_in6 *, struct mbuf *));
 #else
