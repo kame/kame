@@ -305,10 +305,7 @@ p_sockaddr(sa, flags, width)
 	    {
 		struct sockaddr_in6 *sin = (struct sockaddr_in6 *)sa;
 
-		cp = (sin->sin6_addr.s6_addr32[0] == 0 &&
-		      sin->sin6_addr.s6_addr32[1] == 0 &&
-		      sin->sin6_addr.s6_addr32[2] == 0 &&
-		      sin->sin6_addr.s6_addr32[3] == 0) ? "default" :
+		cp = IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr) ? "default" :
 			((flags & RTF_HOST) ?
 			routename(sa) :	netname(sa));
 		break;

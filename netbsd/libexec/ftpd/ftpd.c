@@ -305,13 +305,14 @@ main(argc, argv)
 		 * I hate to do this, but this is the easiest solution.
 		 */
 		union sockunion tmp_addr;
+		const int off = sizeof(struct in6_addr) - sizeof(struct in_addr);
 
 		tmp_addr = his_addr;
 		memset(&his_addr, 0, sizeof(his_addr));
 		his_addr.su_sin.sin_family = AF_INET;
 		his_addr.su_sin.sin_len = sizeof(his_addr.su_sin);
 		memcpy(&his_addr.su_sin.sin_addr,
-			&tmp_addr.su_sin6.sin6_addr.s6_addr32[3],
+			&tmp_addr.su_sin6.sin6_addr.s6_addr[off],
 			sizeof(his_addr.su_sin.sin_addr));
 		his_addr.su_sin.sin_port = tmp_addr.su_sin6.sin6_port;
 
@@ -320,7 +321,7 @@ main(argc, argv)
 		ctrl_addr.su_sin.sin_family = AF_INET;
 		ctrl_addr.su_sin.sin_len = sizeof(ctrl_addr.su_sin);
 		memcpy(&ctrl_addr.su_sin.sin_addr,
-			&tmp_addr.su_sin6.sin6_addr.s6_addr32[3],
+			&tmp_addr.su_sin6.sin6_addr.s6_addr[off],
 			sizeof(ctrl_addr.su_sin.sin_addr));
 		ctrl_addr.su_sin.sin_port = tmp_addr.su_sin6.sin6_port;
 #else

@@ -776,12 +776,11 @@ netname6(in6, mask)
 	u_char *p;
 	u_char *lim;
 	int masklen, final = 0, illegal = 0;
+	int i;
 
 	net6 = *in6;
-	net6.s6_addr32[0] &= mask->s6_addr32[0];
-	net6.s6_addr32[1] &= mask->s6_addr32[1];
-	net6.s6_addr32[2] &= mask->s6_addr32[2];
-	net6.s6_addr32[3] &= mask->s6_addr32[3];
+	for (i = 0; i < sizeof(net6); i++)
+		net6.s6_addr[i] &= mask->s6_addr[i];
 	
 	masklen = 0;
 	lim = (u_char *)mask + 16;
