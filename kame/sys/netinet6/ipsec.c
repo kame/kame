@@ -927,6 +927,7 @@ ipsec4_setspidx_ipaddr(m, spidx)
 	struct secpolicyindex *spidx;
 {
 	struct ip *ip = NULL;
+	struct ip ipbuf;
 
 	/* sanity check 1 for minimum ip header length */
 	if (m == NULL)
@@ -944,8 +945,6 @@ ipsec4_setspidx_ipaddr(m, spidx)
 	if (m->m_len >= sizeof(*ip))
 		ip = mtod(m, struct ip *);
 	else {
-		struct ip ipbuf;
-
 		m_copydata(m, 0, sizeof(ipbuf), (caddr_t)&ipbuf);
 		ip = &ipbuf;
 	}
@@ -1006,6 +1005,7 @@ ipsec6_setspidx_ipaddr(m, spidx)
 	struct secpolicyindex *spidx;
 {
 	struct ip6_hdr *ip6_hdr = NULL;
+	struct ip6_hdr ip6buf;
 
 	/* sanity check 1 for minimum ip header length */
 	if (m == NULL)
@@ -1023,8 +1023,6 @@ ipsec6_setspidx_ipaddr(m, spidx)
 	if (m->m_len >= sizeof(*ip6_hdr))
 		ip6_hdr = mtod(m, struct ip6_hdr *);
 	else {
-		struct ip6_hdr ip6buf;
-
 		m_copydata(m, 0, sizeof(ip6buf), (caddr_t)&ip6buf);
 		ip6_hdr = &ip6buf;
 	}
