@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1047 2000/06/20 06:31:27 suz Exp $
+$Id: CHANGELOG,v 1.1048 2000/06/20 08:40:07 sumikawa Exp $
 
 <200006>
 2000-06-20  SUZUKI Shinsuke  <suz@sdl.hitachi.co.jp>
@@ -10,6 +10,8 @@ $Id: CHANGELOG,v 1.1047 2000/06/20 06:31:27 suz Exp $
 Tue Jun 20 14:55:10 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/openssh: upgrade to 2.1.0
 	* freebsd3/ports/bind9: upgrade to 9.0.0b4
+	* freebsd3/ports/lftp: upgrade to 2.2.3
+	* freebsd3/ports/mozilla: upgrade to M16
 
 Tue Jun 20 12:49:28 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_proto.c: disable rate limitation for ICMPv6 error,
