@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.15 2003/09/05 23:17:05 itojun Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.16 2003/09/29 09:41:06 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -559,7 +559,7 @@ mip6_bc_proxy_control(target, local, cmd)
 	return (error);
 }
 
-void
+struct mip6_bc *
 mip6_restore_proxynd_entry(m)
 	struct mbuf *m;
 {
@@ -568,6 +568,8 @@ mip6_restore_proxynd_entry(m)
 	mbc = mip6_temp_deleted_proxy(m);
 	if (mbc)
 		mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr, RTM_ADD);
+
+	return (mbc);
 }
 
 struct mip6_bc *

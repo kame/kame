@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.333 2003/08/26 04:42:27 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.334 2003/09/29 09:41:06 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -590,7 +590,13 @@ nd6_llinfo_timer(arg)
 		} else {
 			struct mbuf *m = ln->ln_hold;
 #if defined(MIP6) && defined(MIP6_HOME_AGENT)
-			mip6_restore_proxynd_entry(m);
+			if (m)
+				ln->ln_hold = NULL;
+			if (mip6_restore_proxynd_entry(m)) {
+				m_freem(m);
+				m = NULL;
+				rt = 0;
+			}
 #endif
 			if (m) {
 				ln->ln_hold = NULL;
@@ -606,7 +612,8 @@ nd6_llinfo_timer(arg)
 				icmp6_error(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_ADDR, 0);
 			}
-			(void)nd6_free(rt, 0);
+			if (rt)
+				(void)nd6_free(rt, 0);
 			ln = NULL;
 		}
 		break;
