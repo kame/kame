@@ -6,8 +6,8 @@
 # $FreeBSD$
 #
 
-DISTNAME=	tcpdump-2000_03_27
-PKGNAME=	tcpdump-20000327
+DISTNAME=	tcpdump-2000_04_03
+PKGNAME=	tcpdump-20000403
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
