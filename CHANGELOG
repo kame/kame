@@ -1,9 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.94 1999/09/03 05:33:56 jinmei Exp $
+$Id: CHANGELOG,v 1.95 1999/09/03 14:17:22 jinmei Exp $
 
 
 <199909>
+1999-09-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6: changed the semantics of `-a A' option. It now
+	specifies to require the responder's anycast addresses.
+
+1999-09-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.h (NI_NODEADDR_FLAG_ANYCAST): added
+	in order to get/tell a node's anycast addresses.
+	Note that this is not in the specification, just for experimental
+	use.
+
 1999-09-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/udp6_usrreq.c (udp6_output): embedded
 	interface index to a link-local destination. This fix solved a
