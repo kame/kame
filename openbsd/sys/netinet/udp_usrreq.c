@@ -172,6 +172,7 @@ udp_input(m, va_alist)
 	} srcsa, dstsa;
 #ifdef INET6
 	struct ip6_hdr *ipv6;
+	struct ip6_recvpktopts opts6;
 #endif /* INET6 */
 #ifdef IPSEC
 	struct tdb  *tdb = NULL;
@@ -182,6 +183,9 @@ udp_input(m, va_alist)
 	va_end(ap);
 
 	udpstat.udps_ipackets++;
+#ifdef INET6
+	bzero(&opts6, sizeof(opts6));
+#endif 
 
 #ifdef IPSEC
 	/* Save the last SA which was used to process the mbuf */
@@ -428,8 +432,11 @@ udp_input(m, va_alist)
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
 					opts = NULL;
 #ifdef INET6
-					if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS))
-						ip6_savecontrol(inp, &opts, ipv6, n);
+					if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
+						ip6_savecontrol(inp, ipv6, n,
+								&opts6, NULL);
+						opts = opts6.head;
+					}
 #endif /* INET6 */
 					m_adj(n, iphlen);
 					if (sbappendaddr(&last->so_rcv,
@@ -441,6 +448,9 @@ udp_input(m, va_alist)
 					} else
 						sorwakeup(last);
 					opts = NULL;
+#ifdef INET6			/* XXX */
+					bzero(&opts6, sizeof(opts6));
+#endif 
 				}
 			}
 			last = inp->inp_socket;
@@ -468,8 +478,10 @@ udp_input(m, va_alist)
 
 		opts = NULL;
 #ifdef INET6
-		if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS))
-			ip6_savecontrol(inp, &opts, ipv6, m);
+		if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
+			ip6_savecontrol(inp, ipv6, m, &opts6, NULL);
+			opts = opts6.head;
+		}
 #endif /* INET6 */
 		m_adj(m, iphlen);
 		if (sbappendaddr(&last->so_rcv, 
@@ -553,8 +565,10 @@ udp_input(m, va_alist)
 
 	opts = NULL;
 #ifdef INET6
-	if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS))
-		ip6_savecontrol(inp, &opts, ipv6, m);
+	if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
+		ip6_savecontrol(inp, ipv6, m, &opts6, NULL);
+		opts = opts6.head;
+	}
 #endif /* INET6 */
 	if (ip && (inp->inp_flags & INP_CONTROLOPTS)) {
 		struct mbuf **mp = &opts;

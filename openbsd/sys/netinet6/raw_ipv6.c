@@ -270,7 +270,8 @@ rip6_input(mp, offp, proto)
   register struct inpcb *inp;
   int nexthdr, icmp6type;
   int foundone = 0;
-  struct mbuf *m2 = NULL, *opts = NULL;
+  struct mbuf *m2 = NULL;
+  struct ip6_recvpktopts opts = NULL;
   struct sockaddr_in6 srcsa;
 #ifdef IPSEC
   struct sockaddr_in6 dstsa;
@@ -293,6 +294,7 @@ rip6_input(mp, offp, proto)
 		goto ret;
 	}
 
+  bzero(&opts, sizeof(opts));
   bzero(&srcsa, sizeof(struct sockaddr_in6));
   srcsa.sin6_family = AF_INET6;
   srcsa.sin6_len = sizeof(struct sockaddr_in6);
@@ -396,15 +398,14 @@ rip6_input(mp, offp, proto)
       m_adj(m2, extra);
       DP(FINISHED, m2->m_pkthdr.len, d);
       if (inp->inp_flags & IN6P_CONTROLOPTS)
-	ip6_savecontrol(inp, &opts, ip6, m);
-      else
-        opts = NULL;
+	ip6_savecontrol(inp, ip6, m, &opts, NULL);
       if (sbappendaddr(&inp->inp_socket->so_rcv, (struct sockaddr *)&srcsa, m2,
-                       opts)) {
+                       opts.head)) {
         sorwakeup(inp->inp_socket);
       } else {
         m_freem(m2);
       };
+      bzero(&opts, sizeof(opts));
     };
   };
 
