@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.141 1999/09/27 13:25:52 itojun Exp $
+$Id: CHANGELOG,v 1.142 1999/09/29 07:25:51 jinmei Exp $
 
 <199909>
+1999-09-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/if.c (get_32id): fixed a bug that 127.0.0.1 was
+	chosen as the BGP identifier if it was the only IPv4 address on
+	the router.
+
 Mon Sep 27 22:25:00 JST 1999  itojun@iijlab.net
 	* kame/{libpcap,tcpdump}: support OpenBSD.
 
