@@ -87,10 +87,11 @@ int	maxtimeout = 5*TIMEOUT;
 #define	PKTSIZE	SEGSIZE+4
 char	buf[PKTSIZE];
 char	ackbuf[PKTSIZE];
-struct	sockaddr_in from;
+struct	sockaddr_storage from;
 int	fromlen;
 
 void	tftp __P((struct tftphdr *, int));
+static char *verifyhost __P((struct sockaddr *));
 
 /*
  * Null-terminated directory prefix list for absolute pathname requests and
@@ -118,7 +119,8 @@ main(argc, argv)
 	register struct tftphdr *tp;
 	register int n;
 	int ch, on;
-	struct sockaddr_in sin;
+ 	struct sockaddr_storage me;
+	int len;
 	char *chroot_dir = NULL;
 	struct passwd *nobody;
 	char *chuser = "nobody";
@@ -242,22 +244,37 @@ main(argc, argv)
 		setuid(nobody->pw_uid);
 	}
 
-	from.sin_family = AF_INET;
+	len = sizeof(me);
+ 	if (getsockname(0, (struct sockaddr *)&me, &len) == 0) {
+		switch (me.ss_family) {
+ 		case AF_INET:
+ 			((struct sockaddr_in *)&me)->sin_port = 0;
+ 			break;
+		case AF_INET6:
+ 			((struct sockaddr_in6 *)&me)->sin6_port = 0;
+ 			break;
+ 		default:
+ 			/* unsupported */
+ 			break;
+ 		}
+ 	} else {
+ 		memset(&me, 0, sizeof(me));
+ 		me.ss_family = from.ss_family;
+ 		me.ss_len = from.ss_len;
+  	}
 	alarm(0);
 	close(0);
 	close(1);
-	peer = socket(AF_INET, SOCK_DGRAM, 0);
+ 	peer = socket(from.ss_family, SOCK_DGRAM, 0);
 	if (peer < 0) {
 		syslog(LOG_ERR, "socket: %m");
 		exit(1);
 	}
-	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
-	if (bind(peer, (struct sockaddr *)&sin, sizeof (sin)) < 0) {
+ 	if (bind(peer, (struct sockaddr *)&me, me.ss_len) < 0) {
 		syslog(LOG_ERR, "bind: %m");
 		exit(1);
 	}
-	if (connect(peer, (struct sockaddr *)&from, sizeof(from)) < 0) {
+ 	if (connect(peer, (struct sockaddr *)&from, from.ss_len) < 0) {
 		syslog(LOG_ERR, "connect: %m");
 		exit(1);
 	}
@@ -329,11 +346,8 @@ again:
 	}
 	ecode = (*pf->f_validate)(&filename, tp->th_opcode);
 	if (logging) {
-		char host[MAXHOSTNAMELEN];
-
-		realhostname(host, sizeof(host) - 1, &from.sin_addr);
-		host[sizeof(host) - 1] = '\0';
-		syslog(LOG_INFO, "%s: %s request for %s: %s", host,
+                syslog(LOG_INFO, "%s: %s request for %s: %s",
+			verifyhost((struct sockaddr *)&from),
 			tp->th_opcode == WRQ ? "write" : "read",
 			filename, errtomsg(ecode));
 	}
@@ -676,4 +690,14 @@ nak(error)
 	length += 5;
 	if (send(peer, buf, length, 0) != length)
 		syslog(LOG_ERR, "nak: %m");
+}
+
+static char *
+verifyhost(fromp)
+	struct sockaddr *fromp;
+{
+        static char hbuf[MAXHOSTNAMELEN];
+
+        getnameinfo(fromp, fromp->sa_len, hbuf, sizeof(hbuf), NULL, 0, 0);
+        return hbuf;
 }
