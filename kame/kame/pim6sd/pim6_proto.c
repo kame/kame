@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.67 2003/10/14 08:46:59 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.68 2003/10/17 04:03:16 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -640,6 +640,15 @@ parse_pim6_hello(pim_message, datalen, src, opts)
 		    continue;
 		}
 
+		/* ignore the duplicated address */
+		for (addr = opts->addrs; addr != NULL; addr = addr->pa_next) {
+		    if (IN6_ARE_ADDR_EQUAL(&addr->pa_addr.sin6_addr,
+					   &encod_uniaddr.unicast_addr)) {
+			log_msg(LOG_DEBUG, 0, "skip the existing address");
+			goto next_addr;
+		    }
+		}
+
 		if ((addr = (struct phaddr *)malloc(sizeof(*addr))) == NULL)
 		    log_msg(LOG_ERR, errno, "malloc failed in pim6 hello parsing");
 
@@ -650,6 +659,9 @@ parse_pim6_hello(pim_message, datalen, src, opts)
 		addr->pa_addr.sin6_addr = encod_uniaddr.unicast_addr;
 		addr->pa_next = opts->addrs;
 		opts->addrs = addr;
+
+	    next_addr:
+		;
 	    }
 	    break;
 	default:
