@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.h,v 1.5 2000/12/02 13:44:40 kjc Exp $	*/
+/*	$KAME: altq_rmclass.h,v 1.6 2000/12/09 09:22:44 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -81,7 +81,7 @@ struct red;
 		switch (xxs) { \
 		default: \
 			if (xxs < 0) \
-				printf("rm_class: bogus time values"); \
+				printf("rm_class: bogus time values\n"); \
 			delta = 0; \
 			/* fall through */ \
 		case 2: \
