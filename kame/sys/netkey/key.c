@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.125 2000/06/11 23:50:01 itojun Exp $	*/
+/*	$KAME: key.c,v 1.126 2000/06/12 05:19:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4645,7 +4645,7 @@ key_do_getnewspi(spirange, saidx)
  *       key(AE), (identity(SD),) (sensitivity)>
  * from the ikmpd, and update a secasvar entry whose status is SADB_SASTATE_LARVAL.
  * and send
- *   <base, SA, (lifetime(HSC),) address(SD), (address(P),)
+ *   <base, SA, (SA2), (lifetime(HSC),) address(SD), (address(P),)
  *       (identity(SD),) (sensitivity)>
  * to the ikmpd.
  *
@@ -4853,7 +4853,7 @@ key_getsavbyseq(sah, seq)
  *       key(AE), (identity(SD),) (sensitivity)>
  * from the ikmpd,
  * and send
- *   <base, SA, (lifetime(HSC),) address(SD), (address(P),)
+ *   <base, SA, (SA2), (lifetime(HSC),) address(SD), (address(P),)
  *       (identity(SD),) (sensitivity)>
  * to the ikmpd.
  *
@@ -5090,8 +5090,9 @@ key_getmsgbuf_x1(m, mhp)
 		panic("key_getmsgbuf_x1: NULL pointer is passed.\n");
 
 	/* create new sadb_msg to reply. */
-	n = key_gather_mbuf(m, mhp, 1, 8, SADB_EXT_RESERVED,
-	    SADB_EXT_SA, SADB_EXT_ADDRESS_SRC, SADB_EXT_ADDRESS_DST,
+	n = key_gather_mbuf(m, mhp, 1, 9, SADB_EXT_RESERVED,
+	    SADB_EXT_SA, SADB_X_EXT_SA2,
+	    SADB_EXT_ADDRESS_SRC, SADB_EXT_ADDRESS_DST,
 	    SADB_EXT_LIFETIME_HARD, SADB_EXT_LIFETIME_SOFT,
 	    SADB_EXT_IDENTITY_SRC, SADB_EXT_IDENTITY_DST);
 	if (!n)
