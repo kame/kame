@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.20 2003/02/03 02:55:24 suz Exp $	*/
+/*	$KAME: if_dummy.c,v 1.21 2003/02/06 16:09:48 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -107,7 +107,7 @@
 #ifdef NETATALK
 #include <netatalk/at.h>
 #include <netatalk/at_var.h>
-#endif NETATALK
+#endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 #include "bpf.h"
@@ -286,7 +286,7 @@ dummyoutput(ifp, m, dst, rt)
 	        ifq = &atintrq2;
 		isr = NETISR_ATALK;
 		break;
-#endif NETATALK
+#endif
 	default:
 		printf("%s: can't handle af%d\n",
 		       if_name(ifp), dst->sa_family);
