@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.48 2000/02/22 14:04:24 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.49 2000/02/23 08:52:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1113,8 +1113,6 @@ ipsec_init_policy(so, pcb_sp)
 		new->priv = 1;
 	else
 		new->priv = 0;
-#elif defined(HAVE_NRL_INPCB)
-	new->priv = so->so_state & SS_PRIV;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 	if (so->so_cred != 0 && so->so_cred->pc_ucred->cr_uid == 0)
 		new->priv = 1;
