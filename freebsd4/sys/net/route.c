@@ -61,11 +61,19 @@ static int	rttrash;		/* routes not in table but not freed */
 
 static struct callout rt_timer_ch;
 
+/* XXX do these values make any sense? */
+static int rt_cache_hiwat = 4096;
+static int rt_cache_lowat = 1024;
+
+static int rt_cachetimeout = 3600;	/* should be configurable */
+static struct rttimer_queue *rt_cache_timeout_q = NULL;
+
 static void rt_maskedcopy __P((struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *));
 static void rtable_init __P((void **));
 
 static void rt_timer_init __P((void));
+static void rt_draincache __P((void));
 
 static void
 rtable_init(table)
@@ -83,6 +91,8 @@ route_init()
 {
 	rn_init();	/* initialize all zeroes, all ones, mask table */
 	rtable_init((void **)rt_tables);
+
+	rt_cache_timeout_q = rt_timer_queue_create(rt_cachetimeout);
 }
 
 /*
@@ -151,7 +161,7 @@ rtalloc1(dst, report, ignflags)
 			 * (This implies it wasn't a HOST route.)
 			 */
 			err = rtrequest(RTM_RESOLVE, dst, SA(0),
-					      SA(0), 0, &newrt);
+					      SA(0), RTF_CACHE, &newrt);
 			if (err) {
 				/*
 				 * If the cloning didn't succeed, maybe
@@ -552,6 +562,7 @@ rtrequest1(req, info, ret_nrt)
 	struct rtentry **ret_nrt;
 {
 	int s = splnet(); int error = 0;
+	int cache = 0;
 	register struct rtentry *rt;
 	register struct radix_node *rn;
 	register struct radix_node_head *rnh;
@@ -572,6 +583,8 @@ rtrequest1(req, info, ret_nrt)
 		netmask = 0;
 		flags &= ~(RTF_CLONING | RTF_PRCLONING);
 	}
+	if (flags & RTF_CACHE)
+		cache = 1;
 	switch (req) {
 	case RTM_DELETE:
 		/*
@@ -660,6 +673,18 @@ rtrequest1(req, info, ret_nrt)
 		ifa = info->rti_ifa;
 
 	makeroute:
+		if (cache) {
+			unsigned long rtcount;
+
+			rtcount = rt_timer_count(rt_cache_timeout_q);
+			if (0 <= rt_cache_hiwat && rtcount > rt_cache_hiwat) {
+				senderr(ENOBUFS);
+			} else if (0 <= rt_cache_lowat &&
+				   rtcount > rt_cache_lowat) {
+				/* remove stale routes */
+				rt_draincache();
+			}
+		}
 		R_Malloc(rt, struct rtentry *, sizeof(*rt));
 		if (rt == 0)
 			senderr(ENOBUFS);
@@ -783,6 +808,9 @@ rtrequest1(req, info, ret_nrt)
 			*ret_nrt = rt;
 			rt->rt_refcnt++;
 		}
+
+		if (cache)
+			rt_timer_add(rt, NULL, rt_cache_timeout_q);
 		break;
 	default:
 		error = EOPNOTSUPP;
@@ -1343,6 +1371,7 @@ rt_timer_timer(arg)
 	     rtq = LIST_NEXT(rtq, rtq_link)) {
 		while ((r = TAILQ_FIRST(&rtq->rtq_head)) != NULL &&
 		    (r->rtt_time + rtq->rtq_timeout) < current_time) {
+			printf("rt_timer_timer: remove an entry: %p\n", r);
 			LIST_REMOVE(r, rtt_link);
 			TAILQ_REMOVE(&rtq->rtq_head, r, rtt_next);
 			RTTIMER_CALLOUT(r);
@@ -1356,6 +1385,29 @@ rt_timer_timer(arg)
 	splx(s);
 
 	callout_reset(&rt_timer_ch, hz, rt_timer_timer, NULL);
+}
+
+static void
+rt_draincache()
+{
+	int s;
+	struct rttimer *r, *r_next;
+
+	s = splnet();
+
+	for (r = TAILQ_FIRST(&rt_cache_timeout_q->rtq_head); r; r = r_next) {
+		r_next = TAILQ_NEXT(r, rtt_next);
+
+		if (r->rtt_rt->rt_refcnt == 0) {
+			/*
+			 * we expect RTTIMER_CALLOUT calls rtrequest(DELETE),
+			 * which will remove the associated route and unlink
+			 * the timer entry.
+			 */
+			RTTIMER_CALLOUT(r);
+		}
+	}
+	splx(s);
 }
 
 /* This must be before ip6_init2(), which is now SI_ORDER_MIDDLE */
