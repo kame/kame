@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.112 2001/12/21 04:30:24 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.113 2001/12/21 08:14:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -327,7 +327,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 /*
  * Multicast Scope
  */
-#ifdef _KERNEL	/* refers nonstandard items  */
+#ifdef _KERNEL	/* refers nonstandard items */
 #define IN6_IS_ADDR_MC_NODELOCAL(a)	\
 	(IN6_IS_ADDR_MULTICAST(a) &&	\
 	 (IPV6_ADDR_MC_SCOPE(a) == IPV6_ADDR_SCOPE_NODELOCAL))
@@ -421,7 +421,7 @@ struct route_in6 {
 #endif
 #define IPV6_SOCKOPT_RESERVED1	3  /* reserved for future use */
 #define IPV6_UNICAST_HOPS	4  /* int; IP6 hops */
-#define IPV6_MULTICAST_IF	9  /* u_int; set/get IP6 multicast i/f  */
+#define IPV6_MULTICAST_IF	9  /* u_int; set/get IP6 multicast i/f */
 #define IPV6_MULTICAST_HOPS	10 /* int; set/get IP6 multicast hops */
 #define IPV6_MULTICAST_LOOP	11 /* u_int; set/get IP6 multicast loopback */
 #define IPV6_JOIN_GROUP		12 /* ip6_mreq; join a group membership */
@@ -517,8 +517,8 @@ struct route_in6 {
 /*
  * Defaults and limits for options
  */
-#define IPV6_DEFAULT_MULTICAST_HOPS 1	/* normally limit m'casts to 1 hop  */
-#define IPV6_DEFAULT_MULTICAST_LOOP 1	/* normally hear sends if a member  */
+#define IPV6_DEFAULT_MULTICAST_HOPS 1	/* normally limit m'casts to 1 hop */
+#define IPV6_DEFAULT_MULTICAST_LOOP 1	/* normally hear sends if a member */
 
 /*
  * Argument structure for IPV6_JOIN_GROUP and IPV6_LEAVE_GROUP.
