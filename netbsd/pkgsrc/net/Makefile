@@ -6,6 +6,7 @@
 
     SUBDIR += altq
     SUBDIR += bind8
+    SUBDIR += ethereal
     SUBDIR += gated-ipv6
     SUBDIR += irc
     SUBDIR += mrt
