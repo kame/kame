@@ -5,5 +5,6 @@
 .include "../mk/bsd.prefs.mk"
 
     SUBDIR += boehm-gc
+    SUBDIR += ipv6socket_scrub
 
 .include "../mk/bsd.pkg.subdir.mk"
