@@ -695,13 +695,6 @@ rtrequest1(req, info, ret_nrt)
 			rt->rt_rmx = (*ret_nrt)->rt_rmx; /* copy metrics */
 			rt->rt_parent = *ret_nrt;
 			rt->rt_parent->rt_refcnt++;
-		} else if (rt->rt_rmx.rmx_mtu == 0
-			    && !(rt->rt_rmx.rmx_locks & RTV_MTU)) { /* XXX */
-			if (rt->rt_gwroute != NULL) {
-				rt->rt_rmx.rmx_mtu = rt->rt_gwroute->rt_rmx.rmx_mtu;
-			} else {
-				rt->rt_rmx.rmx_mtu = ifa->ifa_ifp->if_mtu;
-			}
 		}
 #ifdef RADIX_MPATH
 		/* do not permit exactly the same dst/mask/gw pair */
