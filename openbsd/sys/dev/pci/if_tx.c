@@ -261,6 +261,7 @@ epic_openbsd_attach(
 	ifp->if_ioctl = epic_ifioctl;
 	ifp->if_start = epic_ifstart;
 	ifp->if_watchdog = epic_ifwatchdog;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Fetch card id */
 	sc->cardvend = pci_conf_read(pc, pa->pa_tag, PCI_SUBVEND_0);
