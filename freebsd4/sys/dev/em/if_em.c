@@ -480,16 +480,16 @@ em_start(struct ifnet *ifp)
         s = splimp();
 	while (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 
-                IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
                 
                 if (m_head == NULL) break;
                         
                 if (em_encap(adapter, m_head)) { 
                         ifp->if_flags |= IFF_OACTIVE;
-                        IF_PREPEND(&ifp->if_snd, m_head);
                         break;
                 }
 
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
                 /* Send a copy of the frame to the BPF listener */
 #if __FreeBSD_version < 500000
@@ -1374,6 +1374,7 @@ em_setup_interface(device_t dev, struct adapter * adapter)
 	ifp->if_watchdog = em_watchdog;
 	IFQ_SET_MAXLEN(&ifp->if_snd, adapter->num_tx_desc - 1);
 	IFQ_SET_READY(&ifp->if_snd);
+
 #if __FreeBSD_version < 500000 
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 #else
