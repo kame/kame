@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.3 2000/02/07 18:17:32 itojun Exp $
+ * $Id: mip6.c,v 1.4 2000/02/08 04:03:53 itojun Exp $
  *
  */
 
@@ -1506,9 +1506,13 @@ mip6_add_ifaddr(struct in6_addr *addr,
 
     /* "ifconfig ifp inet6 Home_Address prefixlen 64/128 (alias?)" */ 
     
-    s =splnet();
+    s = splnet();
     if (in6_control(NULL, SIOCAIFADDR_IN6,
-                    (caddr_t)&in6_addreq, ifp, NULL)) {		/*XXXXX*/
+                    (caddr_t)&in6_addreq, ifp
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+		    , NULL	/*XXXX security problem*/
+#endif
+		    )) {
 #ifdef MIP6_DEBUG
         mip6_debug("%s: failed to add home address with pfxlen = %d.\n",
                    __FUNCTION__, plen);
@@ -1591,7 +1595,11 @@ mip6_gifconfig(struct in6_addr *psrc,
     /* "gifconfig (gifX, inet6, HA_Global_Addr, MN_Care-of_Addr)" */
     s = splnet();
     error = in6_control(NULL, SIOCSIFPHYADDR_IN6,
-                        (caddr_t)&in6_addreq, ifp, NULL);	/*XXXXX*/
+                        (caddr_t)&in6_addreq, ifp
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+			, NULL	/*XXXX security problem*/
+#endif
+			);
     splx(s);
     
 #ifdef MIP6_DEBUG
@@ -1658,13 +1666,21 @@ mip6_ifconfig(struct in6_addr *ha_addr,
         /* "ifconfig gifX inet6 HA_Global_Addr MN_Home_Addr" */
         s = splnet();
         return in6_control(NULL, SIOCAIFADDR_IN6,
-                           (caddr_t)&in6_addreq, ifp, NULL);	/*XXXXX*/
+                           (caddr_t)&in6_addreq, ifp
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+			   , NULL	/*XXXX security problem*/
+#endif
+			   );
         splx(s);
     }
     else {
         s = splnet();
         return in6_control(NULL, SIOCDIFADDR_IN6,
-                           (caddr_t)&in6_addreq, ifp, NULL);	/*XXXXX*/
+                           (caddr_t)&in6_addreq, ifp
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+			   , NULL	/*XXXX security problem*/
+#endif
+			   );
         splx(s);
     }
 }
