@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.129 2004/06/17 13:11:28 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.130 2004/06/17 23:48:03 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -70,6 +70,7 @@
 #include <common.h>
 #include <timer.h>
 #include <auth.h>
+#include <base64.h>
 #include <control.h>
 #include <dhcp6_ctl.h>
 
