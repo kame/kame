@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.23 2001/08/31 14:43:41 keiichi Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.24 2001/09/05 02:35:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -139,10 +139,6 @@ struct ip6protosw {
 			__P((struct mbuf **, int *, int));
 #ifdef __bsdi__
 	int	(*pr_output)();		/* output to protocol (from above) */
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	int	(*pr_output)		/* output to protocol (from above) */
-			__P((struct mbuf *, struct socket *,
-			     struct sockaddr_in6 *, struct mbuf *));
 #else
 	int	(*pr_output)		/* output to protocol (from above) */
 			__P((struct mbuf *, ...));
