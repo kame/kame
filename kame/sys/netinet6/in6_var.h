@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.87 2002/11/06 07:43:55 suz Exp $	*/
+/*	$KAME: in6_var.h,v 1.88 2002/11/09 03:21:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -709,7 +709,6 @@ void	in6_delmulti __P((struct in6_multi *));
 struct in6_multi_mship *in6_joingroup __P((struct ifnet *,
 	struct sockaddr_in6 *, int *));
 int	in6_leavegroup __P((struct in6_multi_mship *));
-int	in6_ifindex2scopeid __P((int));
 int	in6_mask2len __P((struct in6_addr *, u_char *));
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 int	in6_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
@@ -738,7 +737,6 @@ int	in6_are_prefix_equal __P((struct in6_addr *, struct in6_addr *, int));
 void	in6_prefixlen2mask __P((struct in6_addr *, int));
 void	in6_purgeprefix __P((struct ifnet *));
 
-int	in6_is_addr_deprecated __P((struct sockaddr_in6 *));
 int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *));
 int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
 	struct ifnet *));

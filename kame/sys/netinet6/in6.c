@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.330 2002/11/06 08:27:46 suz Exp $	*/
+/*	$KAME: in6.c,v 1.331 2002/11/09 03:21:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -353,42 +353,6 @@ in6_ifremloop(struct ifaddr *ifa)
 			in6_ifloop_request(RTM_DELETE, ifa);
 		}
 	}
-}
-
-int
-in6_ifindex2scopeid(idx)
-	int idx;
-{
-	struct ifnet *ifp;
-	struct ifaddr *ifa;
-	struct sockaddr_in6 *sin6;
-
-	if (idx < 0 || if_index < idx)
-		return -1;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-	ifp = ifnet_byindex(idx);
-#else
-	ifp = ifindex2ifnet[idx];
-#endif
-	if (!ifp)
-		return -1;
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
-	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
-#else
-	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
-#endif
-	{
-		if (ifa->ifa_addr->sa_family != AF_INET6)
-			continue;
-		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
-		if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))
-			return sin6->sin6_scope_id & 0xffff;
-	}
-
-	return -1;
 }
 
 int
@@ -3819,27 +3783,6 @@ in6_localaddr(sa6)
 	return (0);
 }
 #endif
-
-int
-in6_is_addr_deprecated(sa6)
-	struct sockaddr_in6 *sa6;
-{
-	struct in6_ifaddr *ia;
-
-	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-		if (IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
-		    &sa6->sin6_addr) &&
-#ifdef SCOPEDROUTING
-		    ia->ia_addr.sin6_scope_id == sa6->sin6_scope_id &&
-#endif
-		    (ia->ia6_flags & IN6_IFF_DEPRECATED) != 0)
-			return (1); /* true */
-
-		/* XXX: do we still have to go thru the rest of the list? */
-	}
-
-	return (0);		/* false */
-}
 
 /*
  * return length of part which dst and src are equal
