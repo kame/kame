@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.99 2001/11/12 11:11:23 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.100 2001/11/12 11:30:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -518,6 +518,7 @@ rip6_output(m, va_alist)
 	ip6 = mtod(m, struct ip6_hdr *);
 
 	/* KAME hack: embed scopeid */
+	dst = &dstsock->sin6_addr;
 	if ((error = in6_embedscope(dst, dstsock)) != 0)
 		goto bad;
 
@@ -952,7 +953,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 	 * routine handles any messaging necessary.
 	 */
 	case PRU_SEND:
-	    {
+	{
 		struct sockaddr_in6 tmp;
 		struct sockaddr_in6 *dst;
 
@@ -974,8 +975,12 @@ rip6_usrreq(so, req, m, nam, control, p)
 				error = ENOTCONN;
 				break;
 			}
+			if (nam->m_len != sizeof(tmp))
+				return(EINVAL);
 			tmp = *mtod(nam, struct sockaddr_in6 *);
 			dst = &tmp;
+			if (dst->sin6_family != AF_INET6)
+				return(EAFNOSUPPORT);
 		}
 		if (ip6_use_defzone && dst->sin6_scope_id == 0) {
 			dst->sin6_scope_id =
@@ -984,7 +989,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		error = rip6_output(m, so, dst, control);
 		m = NULL;
 		break;
-	    }
+	}
 
 	case PRU_SENSE:
 		/*
