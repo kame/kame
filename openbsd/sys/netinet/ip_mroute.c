@@ -758,7 +758,7 @@ vif_delete(ifp)
 	numvifs = i;
 
 	for (i = 0; i < MFCTBLSIZ; i++) {
-		for (rt = mfchashtbl[hash].lh_first; rt; rt = rt->mfc_hash.le_next) {
+		for (rt = mfchashtbl[i].lh_first; rt; rt = rt->mfc_hash.le_next) {
 			for (rte = rt->mfc_stall; rte; rte = rte->next) {
 				if (rte->ifp == ifp)
 					rte->ifp = NULL;
