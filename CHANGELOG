@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.670 2000/03/09 09:10:04 itojun Exp $
+$Id: CHANGELOG,v 1.671 2000/03/09 09:15:21 itojun Exp $
 
 <200003>
+Thu Mar  9 18:13:23 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/zebra: upgrade to 0.85.
+
 Thu Mar  9 18:06:30 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ah_output.c: avoid mbuf memory leak, or unauthenticated
 	  packet transmission, on IPv6 AH checksum failure.
