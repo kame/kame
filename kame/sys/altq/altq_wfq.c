@@ -1,4 +1,4 @@
-/*	$KAME: altq_wfq.c,v 1.12 2003/07/10 12:07:49 kjc Exp $	*/
+/*	$KAME: altq_wfq.c,v 1.13 2004/04/17 10:54:49 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -671,7 +671,8 @@ wfqclose(dev, flag, fmt, p)
 #endif
 	while ((wfqp = wfq_list) != NULL) {
 		ifp = wfqp->ifq->altq_ifp;
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)\
+    || (defined(__FreeBSD__) && __FreeBSD_version >= 501113)
 		sprintf(iface.wfq_ifacename, "%s", ifp->if_xname);
 #else
 		sprintf(iface.wfq_ifacename, "%s%d",

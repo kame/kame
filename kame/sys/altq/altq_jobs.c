@@ -1,4 +1,4 @@
-/*	$KAME: altq_jobs.c,v 1.7 2003/07/10 12:07:48 kjc Exp $	*/
+/*	$KAME: altq_jobs.c,v 1.8 2004/04/17 10:54:48 kjc Exp $	*/
 /*
  * Copyright (c) 2001, the Rector and Board of Visitors of the
  * University of Virginia.
@@ -80,7 +80,7 @@
 #include <sys/kernel.h>
 #include <sys/queue.h>
 
-#include <machine/limits.h>
+#include <sys/limits.h>
 
 #include <net/if.h>
 #include <net/if_types.h>

@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.c,v 1.18 2003/09/05 22:40:36 itojun Exp $	*/
+/*	$KAME: altq_red.c,v 1.19 2004/04/17 10:54:49 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -305,6 +305,11 @@ red_alloc(int weight, int inv_pmax, int th_min, int th_max, int flags,
 	rp->red_wtab = wtab_alloc(rp->red_weight);
 
 	microtime(&rp->red_last);
+#ifdef ALTQ_FLOWVALVE
+	if (flags & REDF_FLOWVALVE)
+		rp->red_flowvalve = fv_alloc(rp);
+	/* if fv_alloc failes, flowvalve is just disabled */
+#endif
 	return (rp);
 }
 

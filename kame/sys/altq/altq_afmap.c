@@ -1,4 +1,4 @@
-/*	$KAME: altq_afmap.c,v 1.10 2003/07/10 12:07:47 kjc Exp $	*/
+/*	$KAME: altq_afmap.c,v 1.11 2004/04/17 10:54:48 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -337,7 +337,11 @@ int
 afmopen(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	return 0;
 }
@@ -346,7 +350,11 @@ int
 afmclose(dev, flag, fmt, p)
 	dev_t dev;
 	int flag, fmt;
+#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	int err, error = 0;
 	struct atm_flowmap fmap;
@@ -356,7 +364,8 @@ afmclose(dev, flag, fmt, p)
 	     head = head->afh_chain.le_next) {
 
 		/* call interface to clean up maps */
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)\
+    || (defined(__FreeBSD__) && __FreeBSD_version >= 501113)
 		sprintf(fmap.af_ifname, "%s", head->afh_ifp->if_xname);
 #else
 		sprintf(fmap.af_ifname, "%s%d",
@@ -376,7 +385,11 @@ afmioctl(dev, cmd, addr, flag, p)
 	ioctlcmd_t cmd;
 	caddr_t addr;
 	int flag;
+#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
+	struct thread *p;
+#else
 	struct proc *p;
+#endif
 {
 	int	error = 0;
 	struct atm_flowmap *flowmap;

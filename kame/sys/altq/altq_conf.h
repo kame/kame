@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.h,v 1.8 2003/07/10 12:07:48 kjc Exp $	*/
+/*	$KAME: altq_conf.h,v 1.9 2004/04/17 10:54:48 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -75,6 +75,9 @@ struct altqsw {
 	d_open_t	*d_open;
 	d_close_t	*d_close;
 	d_ioctl_t	*d_ioctl;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502103
+	dev_t		 dev;	/* make_dev result for later destroy_dev */
+#endif
 };
 
 #define	altqdev_decl(n) \
