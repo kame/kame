@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: natptconfig.8,v 1.2 2000/02/18 11:39:54 fujisawa Exp $
+.\"	$Id: natptconfig.8,v 1.3 2000/02/20 21:15:37 fujisawa Exp $
 .\"
 .\" Note: The date here should be updated whenever a non-trivial
 .\" change is made to the manual page.
@@ -50,14 +50,14 @@ configures and control the IPv6-to-IPv4 translator implemented in the
 kernel.
 .Pp
 .Nm Natptconfig
-has two format of command line araguments.  First one has the
+has two format of command line arguments.  First one has the
 following options.
 .Bl -tag -width Ds
 .It Fl f Ar configfile
 Evaluate the content of file specified by configfile, as configuration
 directives.  By specifying
 .Dq Li - ,
-standard inpt can be used.
+standard input is used.
 .Pp
 .El
 The second form is ...
@@ -67,7 +67,7 @@ The second form is ...
 Each rule processed by translater is added in the kernel internal
 lists if there is no parsing problems.	Rules are added to the end of
 the internal lists using "map" natptconfig directive, matching the
-order in which they apper when given in natptconfig.
+order in which they appear when given in natptconfig.
 .Pp
 The following directives are available.
 .Bl -tag -width Ds
@@ -75,7 +75,7 @@ The following directives are available.
 .It Xo
 .Li ?
 .Xc
-Show abailable actions on each stage.
+Show available actions on each stage.
 .\"
 .It Xo
 .Li interface
@@ -96,11 +96,11 @@ Set NAT-PT prefix, and packet addressed to this prefix will subject to
 translate.
 .\"
 .It Xo
-.Li map outbound from <v6addr> to <v4addr> port
+.Li map {inbound|outbound} from <v6addr> [port] to <v4addr> port
 .Xc
-Add translate rule into the kernel internal lists.  First outgoing
-packet mathes this rule will subject to translate.  The rules for
-returning packet is not apper in this map list.
+Add translater rule into the kernel internal lists.  Outgoing or
+incoming packet mathes this rule will subject to translate.  The rules
+for returning packet is not appear in this map list.
 .\"
 .It Xo
 .Li map {enable|disable}
@@ -117,7 +117,7 @@ of the
 .Nm
 command:
 .Pp
-.Dl % natptconfig -f natptconfig.cf
+.Dl % natptconfig -f natpt.conf
 .Pp
 The following is an example of a content of the
 .Nm
@@ -156,8 +156,10 @@ default memory file
 .Xr natptlog 8
 .Rs
 .%A George Tsirtsis
-.%T Network Address Translation - Protocol Translation (NAT-PT)
-.%O <draft-ietf-ngtrans-natpt-07.txt>
+.%R RFC
+.%N 2766
+.%D February 2000
+.%T "Network Address Translation - Protocol Translation (NAT-PT)"
 .Re
 .El
 .\"
