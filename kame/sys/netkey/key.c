@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.266 2002/12/06 11:08:05 sakane Exp $	*/
+/*	$KAME: key.c,v 1.267 2003/01/06 21:45:19 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1632,7 +1632,7 @@ fail:
 
 /*
  * SADB_X_SPDADD, SADB_X_SPDSETIDX or SADB_X_SPDUPDATE processing
- * add a entry to SP database, when received
+ * add an entry to SP database, when received
  *   <base, address(SD), (lifetime(H),) policy>
  * from the user(?).
  * Adding to SP database,
@@ -5080,7 +5080,7 @@ key_getsavbyseq(sah, seq)
 
 /*
  * SADB_ADD processing
- * add a entry to SA database, when received
+ * add an entry to SA database, when received
  *   <base, SA, (SA2), (lifetime(HSC),) address(SD), (address(P),)
  *       key(AE), (identity(SD),) (sensitivity)>
  * from the ikmpd,
@@ -5894,7 +5894,7 @@ key_acquire(saidx, sp)
 	 * getting something message from IKEd.  In later case, to be
 	 * managed with ACQUIRING list.
 	 */
-	/* get a entry to check whether sending message or not. */
+	/* get an entry to check whether sending message or not. */
 	if ((newacq = key_getacq(saidx)) != NULL) {
 		if (key_blockacq_count < newacq->count) {
 			/* reset counter and do send message. */
