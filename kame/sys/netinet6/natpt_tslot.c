@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.6 2000/02/22 14:04:29 itojun Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.7 2000/03/09 06:05:43 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_tslot.c,v 1.6 2000/02/22 14:04:29 itojun Exp $
+ *	$Id: natpt_tslot.c,v 1.7 2000/03/09 06:05:43 fujisawa Exp $
  */
 
 #include <sys/param.h>
@@ -260,23 +260,48 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 
     bzero(ats, sizeof(struct _tSlot));
 
-    local = &ats->local;
-    local->ip_p = IPPROTO_IPV6;
-    local->sa_family = AF_INET6;
-    local->in6src = natpt_prefix;
-    local->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
-    local->in6dst = acs->local.in6src;
-    if ((cv4->ip_payload == IPPROTO_TCP)
-	|| (cv4->ip_payload == IPPROTO_UDP))
-    {
-	local->_sport = cv4->_payload._tcp4->th_sport;
-	local->_dport = cv4->_payload._tcp4->th_dport;
+    local  = &ats->local;
+    remote = &ats->remote;
 
-	if (acs->map & NATPT_PORT_MAP)
+#ifdef NATPT_NAT
+    if (acs->local.sa_family == AF_INET)
+    {
+	local->ip_p = IPPROTO_IPV4;
+	local->sa_family = AF_INET;
+	local->in4src = cv4->_ip._ip4->ip_src;
+	local->in4dst = acs->local.in4Addr;
+	if ((cv4->ip_payload == IPPROTO_TCP)
+	    || (cv4->ip_payload == IPPROTO_UDP))
 	{
-	    local->_dport = acs->local._port0;
+	    local->_sport = cv4->_payload._tcp4->th_sport;
+	    local->_dport = cv4->_payload._tcp4->th_dport;
+	    if (acs->map & NATPT_PORT_MAP)
+	    {
+		local->_dport = acs->local._port0;
+	    }
 	}
     }
+    else
+#else
+    {
+	local->ip_p = IPPROTO_IPV6;
+	local->sa_family = AF_INET6;
+	local->in6src = natpt_prefix;
+	local->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
+	local->in6dst = acs->local.in6src;
+	if ((cv4->ip_payload == IPPROTO_TCP)
+	    || (cv4->ip_payload == IPPROTO_UDP))
+	{
+	    local->_sport = cv4->_payload._tcp4->th_sport;
+	    local->_dport = cv4->_payload._tcp4->th_dport;
+
+	    if (acs->map & NATPT_PORT_MAP)
+	    {
+		local->_dport = acs->local._port0;
+	    }
+	}
+    }
+#endif
 
     remote = &ats->remote;
     remote->ip_p = IPPROTO_IPV4;
@@ -299,8 +324,14 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
     ats->session = sess;
     registTSlotEntry(ats);						/* XXX	*/
 
-    hv6 = _hash_pat6(local);
     hv4 = _hash_pat4(remote);
+#ifdef NATPT_NAT
+    if (acs->local.sa_family == AF_INET)
+	hv6 = _hash_pat4(local);
+    else
+#else
+	hv6 = _hash_pat6(local);
+#endif
 
     s = splnet();
     LST_hookup_list(&_insideHash [hv6], ats);
@@ -337,50 +368,67 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	local->_dport = cv4->_payload._tcp4->th_sport;
     }
 
-    if (acs->flags == NATPT_FAITH)
-    {
-	local->in4src = cv4->_ip._ip4->ip_dst;
-	local->in4dst = cv4->_ip._ip4->ip_src;
-    }
-    else
-    {
-	local->in4src = acs->local.in4src;
-	local->in4dst = cv4->_ip._ip4->ip_src;
-    }
+    local->in4src = cv4->_ip._ip4->ip_dst;
+    local->in4dst = cv4->_ip._ip4->ip_src;
 
     remote = &ats->remote;
-    remote->ip_p = IPPROTO_IPV6;
-    remote->sa_family = AF_INET6;
-    if ((cv4->ip_payload == IPPROTO_TCP)
-	|| (cv4->ip_payload == IPPROTO_UDP))
+#ifdef NATPT_NAT
+    if (acs->remote.sa_family == AF_INET)
     {
-	remote->_sport = cv4->_payload._tcp4->th_sport;
-	remote->_dport = cv4->_payload._tcp4->th_dport;
-    }
-
-    if (acs->flags == NATPT_FAITH)
-    {
-	struct in6_ifaddr	*ia6;
-
-	remote->in6dst.s6_addr32[0] = faith_prefix.s6_addr32[0];
-	remote->in6dst.s6_addr32[1] = faith_prefix.s6_addr32[1];
-	remote->in6dst.s6_addr32[3] = cv4->_ip._ip4->ip_dst.s_addr;
-
-	ia6 = in6_ifawithscope(natpt_ip6src, &remote->in6dst);
-	remote->in6src = ia6->ia_addr.sin6_addr;
+	remote->ip_p = IPPROTO_IPV4;
+	remote->sa_family = AF_INET;
+	if ((cv4->ip_payload == IPPROTO_TCP)
+	    || (cv4->ip_payload == IPPROTO_UDP))
+	{
+	    remote->_sport = cv4->_payload._tcp4->th_sport;
+	    remote->_dport = cv4->_payload._tcp4->th_dport;
+	}
+	remote->in4src = acs->remote.in4src;
+	remote->in4dst = cv4->_ip._ip4->ip_dst;
     }
     else
+#else								/* need check	*/
     {
-	remote->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
-	remote->in6dst = acs->remote.in6src;
+	remote->ip_p = IPPROTO_IPV6;
+	remote->sa_family = AF_INET6;
+	if ((cv4->ip_payload == IPPROTO_TCP)
+	    || (cv4->ip_payload == IPPROTO_UDP))
+	{
+	    remote->_sport = cv4->_payload._tcp4->th_sport;
+	    remote->_dport = cv4->_payload._tcp4->th_dport;
+	}
+
+	if (acs->flags == NATPT_FAITH)
+	{
+	    struct in6_ifaddr	*ia6;
+
+	    remote->in6dst.s6_addr32[0] = faith_prefix.s6_addr32[0];
+	    remote->in6dst.s6_addr32[1] = faith_prefix.s6_addr32[1];
+	    remote->in6dst.s6_addr32[3] = cv4->_ip._ip4->ip_dst.s_addr;
+
+	    ia6 = in6_ifawithscope(natpt_ip6src, &remote->in6dst);
+	    remote->in6src = ia6->ia_addr.sin6_addr;
+	}
+	else
+	{
+	    remote->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
+	    remote->in6dst = acs->remote.in6src;
+	}
     }
+#endif
 
     ats->ip_payload = cv4->ip_payload;
     ats->session = sess;
     registTSlotEntry(ats);						/* XXX	*/
 
     hv4 = _hash_pat4(local);
-    hv6 = _hash_pat6(remote);
+#ifdef NATPT_NAT
+    if (acs->remote.sa_family == AF_INET)
+	hv6 = _hash_pat4(remote);
+    else
+#else
+	hv6 = _hash_pat6(remote);
+#endif
 
     s = splnet();
     LST_hookup_list(&_insideHash [hv4], ats);

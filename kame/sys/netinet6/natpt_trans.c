@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.10 2000/03/09 04:39:11 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.11 2000/03/09 06:05:43 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_trans.c,v 1.10 2000/03/09 04:39:11 fujisawa Exp $
+ *	$Id: natpt_trans.c,v 1.11 2000/03/09 06:05:43 fujisawa Exp $
  */
 
 #include <sys/param.h>
@@ -90,6 +90,8 @@ int		 ip6_protocol_tr;
 extern	struct in6_addr	 natpt_prefix;
 extern	struct in6_addr	 natpt_prefixmask;
 
+struct mbuf	*translatingTCPUDPv4To4		__P((struct _cv *, struct pAddr *, struct _cv *));
+
 void		 tr_icmp4EchoReply		__P((struct _cv *, struct _cv *));
 void		 tr_icmp4Unreach		__P((struct _cv *, struct _cv *, struct pAddr *));
 void		 tr_icmp4Echo			__P((struct _cv *, struct _cv *));
@@ -104,6 +106,8 @@ void		 tr_icmp6ParamProb		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6EchoRequest		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6EchoReply		__P((struct _cv *, struct _cv *));
 
+static	void	 _recalculateTCP4Checksum	__P((struct _cv *));
+
 static	int	 updateTcpStatus		__P((struct _cv *));
 static	int	 _natpt_tcpfsm			__P((int, int, u_short, u_char));
 static	int	 _natpt_tcpfsmSessOut		__P((int, short, u_char));
@@ -116,6 +120,159 @@ static	int	 adjustChecksum			__P((int, u_char *, int, u_char *, int));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static	MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
 #endif
+
+
+#ifdef NATPT_NAT
+/*
+ *	Translating From IPv4 to IPv4
+ */
+
+struct mbuf *
+translatingIPv4To4(struct _cv *cv4, struct pAddr *pad)
+{
+    struct timeval	 atv;
+    struct mbuf		*m4 = NULL;
+
+    if (isDump(D_TRANSLATINGIPV4))
+	natpt_logIp4(LOG_DEBUG, cv4->_ip._ip4);
+
+    microtime(&atv);
+    cv4->ats->tstamp = atv.tv_sec;
+
+    switch (cv4->ip_payload)
+    {
+      case IPPROTO_ICMP:
+	m4 = translatingICMPv4To4(cv4, pad);
+	break;
+
+      case IPPROTO_TCP:
+	m4 = translatingTCPv4To4(cv4, pad);
+	break;
+
+      case IPPROTO_UDP:
+	m4 = translatingUDPv4To4(cv4, pad);
+	break;
+    }
+
+    if (m4)
+    {
+	struct ip	*ip4;
+
+	ip4 = mtod(m4, struct ip *);
+	ip4->ip_sum = 0;			/* Header checksum	*/
+	ip4->ip_sum = in_cksum(m4, sizeof(struct ip));
+	m4->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
+	
+	m4->m_pkthdr.len = cv4->m->m_pkthdr.len;
+    }
+
+    return (m4);
+}
+
+
+struct mbuf *
+translatingICMPv4To4(struct _cv *cv4from, struct pAddr *pad)
+{
+    struct _cv		 cv4to;
+    struct mbuf		*m4;
+    struct ip		*ip4from, *ip4to;
+    struct icmp		*icmp4from;
+
+    ip4from = mtod(cv4from->m, struct ip *);
+    icmp4from = cv4from->_payload._icmp4;
+
+    m4 = m_copym(cv4from->m,0, M_COPYALL, M_NOWAIT);
+    ReturnEnobufs(m4);
+
+    bzero(&cv4to, sizeof(struct _cv));
+    cv4to.m = m4;
+    cv4to._ip._ip4 = ip4to = mtod(m4, struct ip *);
+    cv4to._payload._caddr = (caddr_t)cv4to._ip._ip4 + (ip4from->ip_hl << 2);
+
+    ip4to->ip_src = pad->in4src;	/* source address		*/
+    ip4to->ip_dst = pad->in4dst;	/* destination address		*/
+
+    switch (icmp4from->icmp_type)
+    {
+      case ICMP_ECHOREPLY:
+      case ICMP_ECHO:
+	break;
+
+      default:
+	m_freem(m4);
+	return (NULL);
+    }
+    
+    m4->m_len = cv4from->m->m_len;
+    return (m4);
+}
+
+
+struct mbuf *
+translatingTCPv4To4(struct _cv *cv4from, struct pAddr *pad)
+{
+    struct _cv		 cv4to;
+    struct mbuf		*m4;
+
+    bzero(&cv4to, sizeof(struct _cv));
+    m4 = translatingTCPUDPv4To4(cv4from, pad, &cv4to);
+    cv4to.ip_p = cv4to.ip_payload = IPPROTO_TCP;
+
+    updateTcpStatus(&cv4to);
+    adjustUpperLayerChecksum(IPPROTO_IPV4, IPPROTO_TCP, cv4from, &cv4to);
+
+#ifdef recalculateTCP4Checksum
+    _recalculateTCP4Checksum(&cv4to);
+#endif
+
+    return (m4);
+}
+
+
+struct mbuf *
+translatingUDPv4To4(struct _cv *cv4from, struct pAddr *pad)
+{
+    struct _cv		 cv4to;
+    struct mbuf		*m4;
+
+    bzero(&cv4to, sizeof(struct _cv));
+    m4 = translatingTCPUDPv4To4(cv4from, pad, &cv4to);
+    cv4to.ip_p = cv4to.ip_payload = IPPROTO_UDP;
+    
+    adjustUpperLayerChecksum(IPPROTO_IPV4, IPPROTO_UDP, cv4from, &cv4to);
+
+    return (m4);
+}
+
+
+struct mbuf *
+translatingTCPUDPv4To4(struct _cv *cv4from, struct pAddr *pad, struct _cv *cv4to)
+{
+    struct mbuf		*m4;
+    struct ip		*ip4to;
+    struct tcphdr	*tcp4to;
+
+    m4 = m_copym(cv4from->m,0, M_COPYALL, M_NOWAIT);
+    ReturnEnobufs(m4);
+
+    ip4to = mtod(m4, struct ip *);
+
+    ip4to->ip_src = pad->in4src;
+    ip4to->ip_dst = pad->in4dst;
+    
+    tcp4to = (struct tcphdr *)((caddr_t)ip4to + (ip4to->ip_hl << 2));
+    tcp4to->th_sport = pad->_sport;
+    tcp4to->th_dport = pad->_dport;
+
+    cv4to->m = m4;
+    cv4to->_ip._ip4 = ip4to;
+    cv4to->_payload._tcp4 = tcp4to;
+    cv4to->ats = cv4from->ats;
+
+    return (m4);
+}
+
+#endif	/* ifdef NATPT_NAT	*/
 
 
 /*
@@ -971,49 +1128,8 @@ translatingTCPv6To4(struct _cv *cv6, struct pAddr *pad)
     updateTcpStatus(cv6);
     adjustUpperLayerChecksum(IPPROTO_IPV6, IPPROTO_TCP, cv6, &cv4);
 
-    /*
-     * Itojun said 'code fragment in "#ifdef recalculateTCP4Checksum"
-     * does not make sense to me'.  I agree, but
-     * adjustUpperLayerChecksum() cause checksum error sometime but
-     * not always, so I left its code.  After I fixed it, this code
-     * will become vanish.
-     */
-
 #ifdef recalculateTCP4Checksum
-    {
-	int		 cksumAdj, cksumCks;
-	int		 iphlen;
-	struct ip	*ip4 = cv4._ip._ip4;
-	struct ip	 save_ip;
-	struct tcpiphdr	*ti;
-
-	cksumAdj = cv4._payload._tcp4->th_sum;
-
-	ti = mtod(cv4.m, struct tcpiphdr *);
-	iphlen = ip4->ip_hl << 2;
-
-	save_ip = *cv4._ip._ip4;
-#ifdef ti_next
-	ti->ti_next = ti->ti_prev = 0;
-	ti->ti_x1 = 0;
-#else
-	bzero(ti->ti_x1, 9);
-#endif
-	ti->ti_pr = IPPROTO_TCP;
-	ti->ti_len = htons(cv4.m->m_pkthdr.len - iphlen);
-	ti->ti_src = save_ip.ip_src;
-	ti->ti_dst = save_ip.ip_dst;
-
-	ti->ti_sum = 0;
-	ti->ti_sum = in_cksum(cv4.m, cv4.m->m_pkthdr.len);
-	*cv4._ip._ip4 = save_ip;
-
-	cksumCks = ti->ti_sum;
-#if	0
-	printf("translatingTCPv6To4: TCP6->TCP4: %04x, %04x, %04x %d\n",
-	       cksumOrg, cksumAdj, cksumCks, cv4.m->m_pkthdr.len);
-#endif
-    }
+    _recalculateTCP4Checksum(&cv4);
 #endif
 
     return (m4);
@@ -1074,7 +1190,7 @@ translatingTCPUDPv6To4(struct _cv *cv6, struct pAddr *pad, struct _cv *cv4)
     struct mbuf		*m4;
     struct ip		*ip4;
     struct ip6_hdr	*ip6;
-    struct tcpiphdr	*ti;
+    struct tcphdr	*th;
 
     m4 = m_copym(cv6->m, 0, M_COPYALL, M_NOWAIT);
     ReturnEnobufs(m4);
@@ -1104,11 +1220,57 @@ translatingTCPUDPv6To4(struct _cv *cv6, struct pAddr *pad, struct _cv *cv4)
     ip4->ip_src = pad->in4src;		/* source addresss			*/
     ip4->ip_dst = pad->in4dst;		/* destination address			*/
 
-    ti = (struct tcpiphdr *)ip4;
-    ti->ti_sport = pad->_sport;
-    ti->ti_dport = pad->_dport;
+    th = (struct tcphdr *)(ip4 + 1);
+    th->th_sport = pad->_sport;
+    th->th_dport = pad->_dport;
 
     return (m4);
+}
+
+
+/*
+ * Itojun said 'code fragment in "#ifdef recalculateTCP4Checksum"
+ * does not make sense to me'.  I agree, but
+ * adjustUpperLayerChecksum() cause checksum error sometime but
+ * not always, so I left its code.  After I fixed it, this code
+ * will become vanish.
+ */
+
+static void
+_recalculateTCP4Checksum(struct _cv *cv4)
+{
+    int			 cksumAdj, cksumCks;
+    int			 iphlen;
+    struct ip		*ip4 = cv4->_ip._ip4;
+    struct ip		 save_ip;
+    struct tcpiphdr	*ti;
+
+    cksumAdj = cv4->_payload._tcp4->th_sum;
+
+    ti = mtod(cv4->m, struct tcpiphdr *);
+    iphlen = ip4->ip_hl << 2;
+
+    save_ip = *cv4->_ip._ip4;
+#ifdef ti_next
+    ti->ti_next = ti->ti_prev = 0;
+    ti->ti_x1 = 0;
+#else
+    bzero(ti->ti_x1, 9);
+#endif
+    ti->ti_pr = IPPROTO_TCP;
+    ti->ti_len = htons(cv4->m->m_pkthdr.len - iphlen);
+    ti->ti_src = save_ip.ip_src;
+    ti->ti_dst = save_ip.ip_dst;
+
+    ti->ti_sum = 0;
+    ti->ti_sum = in_cksum(cv4->m, cv4->m->m_pkthdr.len);
+    *cv4->_ip._ip4 = save_ip;
+
+    cksumCks = ti->ti_sum;
+#if	0
+    printf("translatingTCPv6To4: TCP6->TCP4: %04x, %04x, %04x %d\n",
+	   cksumOrg, cksumAdj, cksumCks, cv4->m->m_pkthdr.len);
+#endif
 }
 
 

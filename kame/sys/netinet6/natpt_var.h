@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.4 2000/02/22 14:04:30 itojun Exp $	*/
+/*	$KAME: natpt_var.h,v 1.5 2000/03/09 06:05:43 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_var.h,v 1.4 2000/02/22 14:04:30 itojun Exp $
+ *	$Id: natpt_var.h,v 1.5 2000/03/09 06:05:43 fujisawa Exp $
  */
 
 
@@ -70,17 +70,14 @@ int		 _natptBreak			__P((void));
 struct ifBox	*natpt_asIfBox			__P((char *));
 struct ifBox	*natpt_setIfBox			__P((char *));
 
-/*	natpt_tslot.c		*/
-struct _tSlot	*lookingForOutgoingV4Hash	__P((struct _cv *));
-struct _tSlot	*lookingForIncomingV4Hash	__P((struct _cv *));
-struct _tSlot	*lookingForOutgoingV6Hash	__P((struct _cv *));
-struct _tSlot	*lookingForIncomingV6Hash	__P((struct _cv *));
-struct _tSlot	*internIncomingV4Hash		__P((int, struct _cSlot *, struct _cv *));
-struct _tSlot	*internOutgoingV4Hash		__P((int, struct _cSlot *, struct _cv *));
-struct _tSlot	*internIncomingV6Hash		__P((int, struct _cSlot *, struct _cv *));
-struct _tSlot	*internOutgoingV6Hash		__P((int, struct _cSlot *, struct _cv *));
 
-struct _tSlot	*checkTraceroute6Return		__P((struct _cv *));
+/*	natpt_trans.c		*/
+#ifdef NATPT_NAT
+struct mbuf	*translatingIPv4To4		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingICMPv4To4		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingTCPv4To4		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingUDPv4To4		__P((struct _cv *, struct pAddr *));
+#endif
 
 struct mbuf	*translatingIPv4To6		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingICMPv4To6		__P((struct _cv *, struct pAddr *));
@@ -93,6 +90,19 @@ struct mbuf	*translatingICMPv6To4		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingTCPv6To4		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingUDPv6To4		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingTCPUDPv6To4		__P((struct _cv *, struct pAddr *, struct _cv *));
+
+
+/*	natpt_tslot.c		*/
+struct _tSlot	*lookingForOutgoingV4Hash	__P((struct _cv *));
+struct _tSlot	*lookingForIncomingV4Hash	__P((struct _cv *));
+struct _tSlot	*lookingForOutgoingV6Hash	__P((struct _cv *));
+struct _tSlot	*lookingForIncomingV6Hash	__P((struct _cv *));
+struct _tSlot	*internIncomingV4Hash		__P((int, struct _cSlot *, struct _cv *));
+struct _tSlot	*internOutgoingV4Hash		__P((int, struct _cSlot *, struct _cv *));
+struct _tSlot	*internIncomingV6Hash		__P((int, struct _cSlot *, struct _cv *));
+struct _tSlot	*internOutgoingV6Hash		__P((int, struct _cSlot *, struct _cv *));
+
+struct _tSlot	*checkTraceroute6Return		__P((struct _cv *));
 
 void		 init_hash			__P((void));
 void		 init_tslot			__P((void));

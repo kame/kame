@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.7 2000/02/23 12:53:18 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.8 2000/03/09 06:05:43 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_rule.c,v 1.7 2000/02/23 12:53:18 fujisawa Exp $
+ *	$Id: natpt_rule.c,v 1.8 2000/03/09 06:05:43 fujisawa Exp $
  */
 
 #include <sys/errno.h>
@@ -210,7 +210,7 @@ lookingForOutgoingV6Rule(struct _cv *cv)
 int
 matchIn4addr(struct _cv *cv4, struct pAddr *from)
 {
-    struct in_addr	in4from = cv4->_ip._ip4->ip_dst;
+    struct in_addr	in4from = cv4->_ip._ip4->ip_src;
     struct in_addr	in4masked;
 
     if (from->sa_family != AF_INET)

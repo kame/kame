@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.7 2000/03/08 04:00:17 itojun Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.8 2000/03/09 06:05:42 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_dispatch.c,v 1.7 2000/03/08 04:00:17 itojun Exp $
+ *	$Id: natpt_dispatch.c,v 1.8 2000/03/09 06:05:42 fujisawa Exp $
  */
 
 #include <sys/param.h>
@@ -280,8 +280,18 @@ natpt_incomingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
     if (checkMTU(&cv) != IPPROTO_IPV4)
 	return (IPPROTO_DONE);		/* discard this packet without free	*/
 
-    if ((*m6 = translatingIPv4To6(&cv, &cv.ats->local)) != NULL)
-	return (IPPROTO_IPV6);
+#ifdef NATPT_NAT
+    if (cv.ats->local.sa_family == AF_INET)
+    {
+	if ((*m6 = translatingIPv4To4(&cv, &cv.ats->local)) != NULL)
+	    return (IPPROTO_IPV4);
+    }
+    else
+#endif
+    {
+	if ((*m6 = translatingIPv4To6(&cv, &cv.ats->local)) != NULL)
+	    return (IPPROTO_IPV6);
+    }
     
     return (IPPROTO_MAX);				/* discard this packet	*/
 }
@@ -316,8 +326,18 @@ natpt_outgoingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
 	    return (IPPROTO_IP);			/* goto ours		*/
     }
 
-    if ((*m6 = translatingIPv4To6(&cv, &cv.ats->remote)) != NULL)
-	return (IPPROTO_IPV6);
+#ifdef NATPT_NAT
+    if (cv.ats->remote.sa_family == AF_INET)
+    {
+	if ((*m6 = translatingIPv4To4(&cv, &cv.ats->remote)) != NULL)
+	    return (IPPROTO_IPV4);
+    }
+    else
+#endif
+    {
+	if ((*m6 = translatingIPv4To6(&cv, &cv.ats->remote)) != NULL)
+	    return (IPPROTO_IPV6);
+    }
     
     return (IPPROTO_MAX);				/* discard this packet	*/
 }
