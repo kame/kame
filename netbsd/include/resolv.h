@@ -1,4 +1,4 @@
-/*	$NetBSD: resolv.h,v 1.17 1999/01/17 05:08:10 lukem Exp $	*/
+/*	$NetBSD: resolv.h,v 1.18 1999/07/01 18:15:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

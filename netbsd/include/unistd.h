@@ -1,7 +1,7 @@
-/*	$NetBSD: unistd.h,v 1.73 1999/03/26 22:23:57 sommerfe Exp $	*/
+/*	$NetBSD: unistd.h,v 1.84 2000/04/21 16:24:22 minoura Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -74,6 +74,7 @@
 #ifndef _UNISTD_H_
 #define	_UNISTD_H_
 
+#include <machine/ansi.h>
 #include <sys/cdefs.h>
 #include <sys/featuretest.h>
 #include <sys/types.h>
@@ -87,9 +88,7 @@
 #define	STDOUT_FILENO	1	/* standard output file descriptor */
 #define	STDERR_FILENO	2	/* standard error file descriptor */
 
-#ifndef NULL
-#define	NULL		0	/* null pointer constant */
-#endif
+#include <sys/null.h>
 
 __BEGIN_DECLS
 __dead	 void _exit __P((int)) __attribute__((__noreturn__));
@@ -150,7 +149,7 @@ ssize_t	 write __P((int, const void *, size_t));
  */
 #if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
     (_POSIX_C_SOURCE - 0) >= 2 || (_XOPEN_SOURCE - 0) >= 4
-int	 getopt __P((int, char * const *, const char *));
+int	 getopt __P((int, char * const [], const char *));
 
 extern	 char *optarg;			/* getopt(3) external variables */
 extern	 int opterr;
@@ -216,6 +215,11 @@ pid_t	 getsid __P((pid_t));
 #if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
     (defined(_XOPEN_SOURCE) && defined(_XOPEN_SOURCE_EXTENDED)) || \
     (_XOPEN_SOURCE - 0) >= 500
+#ifdef  _BSD_INTPTR_T_
+typedef _BSD_INTPTR_T_	intptr_t;
+#undef  _BSD_INTPTR_T_
+#endif
+
 #define F_ULOCK		0
 #define F_LOCK		1
 #define F_TLOCK		2
@@ -241,7 +245,7 @@ int	 lchown __P((const char *, uid_t, gid_t));
 #endif
 int	 lockf __P((int, int, off_t));
 int	 readlink __P((const char *, char *, size_t));
-char	*sbrk __P((int));
+void	*sbrk __P((intptr_t));
 /* XXX prototype wrong! */
 int	 setpgrp __P((pid_t pid, pid_t pgrp));	/* obsoleted by setpgid() */
 int	 setregid __P((gid_t, gid_t));
@@ -264,7 +268,7 @@ char	*getwd __P((char *));			/* obsoleted by getcwd() */
 #endif
 
 /* FIXME: this should go to <sys/time.h>! */
-#ifdef __STDC__
+#if __STDC__
 struct timeval;				/* select(2) XXX */
 #endif
 int	 select __P((int, fd_set *, fd_set *, fd_set *, struct timeval *));
@@ -298,6 +302,7 @@ int	 getsubopt __P((char **, char * const *, char **));
 __aconst char *getusershell __P((void));
 int	 initgroups __P((const char *, gid_t));
 int	 iruserok __P((u_int32_t, int, const char *, const char *));
+int      issetugid __P((void));
 int	 nfssvc __P((int, void *));
 int	 profil __P((char *, size_t, u_long, u_int));
 void	 psignal __P((unsigned int, const char *));

@@ -1,4 +1,4 @@
-/*	$NetBSD: netdb.h,v 1.11 1998/05/10 17:32:39 kleink Exp $	*/
+/*	$NetBSD: netdb.h,v 1.18.2.2 2000/07/30 06:31:53 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,10 +88,14 @@
 #ifndef _NETDB_H_
 #define _NETDB_H_
 
+#include <machine/ansi.h>
 #include <sys/cdefs.h>
-#include <sys/types.h>
-
 #include <inttypes.h>
+
+#ifdef  _BSD_SIZE_T_
+typedef _BSD_SIZE_T_	size_t;
+#undef  _BSD_SIZE_T_
+#endif
 
 #if !defined(_XOPEN_SOURCE)
 #define	_PATH_HEQUIV	"/etc/hosts.equiv"
@@ -164,7 +168,7 @@ struct addrinfo {
 #define	NETDB_SUCCESS	0	/* no problem */
 #endif
 #define	HOST_NOT_FOUND	1 /* Authoritative Answer Host not found */
-#define	TRY_AGAIN	2 /* Non-Authoritive Host not found, or SERVERFAIL */
+#define	TRY_AGAIN	2 /* Non-Authoritative Host not found, or SERVERFAIL */
 #define	NO_RECOVERY	3 /* Non recoverable errors, FORMERR, REFUSED, NOTIMP */
 #define	NO_DATA		4 /* Valid name, no data record of requested type */
 #if !defined(_XOPEN_SOURCE)
@@ -231,22 +235,22 @@ struct addrinfo {
 #define	NI_NAMEREQD	0x00000004
 #define	NI_NUMERICSERV	0x00000008
 #define	NI_DGRAM	0x00000010
-#define NI_WITHSCOPEID	0x00000020
+#define NI_WITHSCOPEID	0x00000020	/*KAME extension*/
 #define NI_NUMERICSCOPE	0x00000040
 
 /*
  * Scope delimit character
  */
-#define SCOPE_DELIMITER '%'
+#define SCOPE_DELIMITER '%'		/*KAME extension*/
 #endif /* !_XOPEN_SOURCE */
 
 /*
- * data types - basically forward decl for getnameinfo()
+ * Data types
  */
-/* in both sys/socket.h and netdb.h */
-#ifndef __SOCKLEN_T_DEFINED
-typedef	unsigned int	socklen_t;
-#define __SOCKLEN_T_DEFINED
+#include <sys/ansi.h>
+#ifndef socklen_t
+typedef __socklen_t	socklen_t;
+#define socklen_t	socklen_t
 #endif
 
 __BEGIN_DECLS
@@ -264,8 +268,10 @@ struct hostent	*gethostbyname2 __P((const char *, int));
 #endif
 struct hostent	*gethostent __P((void));
 #if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
+#if 1 /* libinet6.a */
 struct hostent	*getipnodebyaddr __P((const void *, size_t, int, int *));
 struct hostent	*getipnodebyname __P((const char *, int, int, int *));
+#endif
 #endif
 struct netent	*getnetbyaddr __P((unsigned long, int));
 struct netent	*getnetbyname __P((const char *));
