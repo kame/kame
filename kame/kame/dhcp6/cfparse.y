@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.5 2002/05/01 14:46:06 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.6 2002/05/01 15:03:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -35,6 +35,16 @@
 
 extern int lineno;
 extern int cfdebug;
+
+#define MAKE_CFLIST(l, t) do { \
+	(l) = (struct cf_list *)malloc(sizeof(*(l))); \
+	if ((l) == NULL) { \
+		yywarn("can't allocate memory"); \
+		return(-1); \
+	} \
+	memset((l), 0, sizeof(*(l))); \
+	l->type = (t); \
+	} while (0)
 
 static struct cf_iflist *iflist_head, *piflist_head; 
 
@@ -121,13 +131,7 @@ declaration:
 		{
 			struct cf_list *l;
 
-			l = (struct cf_list *)malloc(sizeof(*l));
-			if (l == NULL) {
-				yywarn("can't allocate memory");
-				return(-1);
-			}
-			memset(l, 0, sizeof(*l));
-			l->type = DECL_SEND;
+			MAKE_CFLIST(l, DECL_SEND);
 			l->list = $2;
 			$$ = l;
 		}
@@ -135,13 +139,7 @@ declaration:
 		{
 			struct cf_list *l;
 
-			l = (struct cf_list *)malloc(sizeof(*l));
-			if (l == NULL) {
-				yywarn("can't allocate memory");
-				return(-1);
-			}
-			memset(l, 0, sizeof(*l));
-			l->type = DECL_INFO_ONLY;
+			MAKE_CFLIST(l, DECL_INFO_ONLY);
 			/* no value */
 			$$ = l;
 		}
@@ -149,13 +147,7 @@ declaration:
 		{
 			struct cf_list *l;
 
-			l = (struct cf_list *)malloc(sizeof(*l));
-			if (l == NULL) {
-				yywarn("can't allocate memory");
-				return(-1);
-			}
-			memset(l, 0, sizeof(*l));
-			l->type = DECL_ALLOW;
+			MAKE_CFLIST(l, DECL_ALLOW);
 			l->list = $2;
 			$$ = l;
 		}
@@ -166,13 +158,7 @@ dhcpoption:
 	{
 		struct cf_list *l;
 
-		if ((l = (struct cf_list *)malloc(sizeof(*l)))
-		    == NULL) {
-			yywarn("can't allocate memory");
-			return(-1);
-		}
-		memset(l, 0, sizeof(*l));
-		l->type = DHCPOPT_RAPID_COMMIT;
+		MAKE_CFLIST(l, DHCPOPT_RAPID_COMMIT);
 		/* no value */
 		$$ = l;
 	}
@@ -192,13 +178,7 @@ ifparam:
 	{
 		struct cf_list *l;
 
-		l = (struct cf_list *)malloc(sizeof(*l));
-		if (l == NULL) {
-			yywarn("can't allocate memory");
-			return(-1);
-		}
-		memset(l, 0, sizeof(*l));
-		l->type = IFPARAM_SLA_ID;
+		MAKE_CFLIST(l, IFPARAM_SLA_ID);
 		l->num = $2;
 		$$ = l;
 	}
