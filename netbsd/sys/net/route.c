@@ -643,6 +643,10 @@ rtrequest1(req, info, ret_nrt)
 			rt = rt->rt_gwroute; RTFREE(rt);
 			(rt = (struct rtentry *)rn)->rt_gwroute = 0;
 		}
+		if (rt->rt_parent) {
+			rt->rt_parent->rt_refcnt--;
+			rt->rt_parent = NULL;
+		}
 		rt->rt_flags &= ~RTF_UP;
 		if ((ifa = rt->rt_ifa) && ifa->ifa_rtrequest)
 			ifa->ifa_rtrequest(RTM_DELETE, rt, info);
