@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2662 2004/08/12 03:56:47 keiichi Exp $
+$KAME: CHANGELOG,v 1.2663 2004/08/12 07:26:34 jinmei Exp $
 
 <200408>
 Thu Aug 12 12:54:25 JST 2004	keiichi@iij.ad.jp
@@ -32,6 +32,7 @@ Thu Aug 12 12:54:25 JST 2004	keiichi@iij.ad.jp
 	- determine the appropriate length based on the link type, rather
 	  than on the prefix value (visible behavior should be same
 	  though)
+
 2004-08-10  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/pmsft: protocol-independent Multicast-Source-Filter
 	testing tool to test IGMPv3/MLDv2.
