@@ -560,8 +560,8 @@ client6_recvadvert(s, serv)
 	 */
 	memcpy(&solid, &dh6a->dh6adv_rsv_id, sizeof(solid));
 	dprintf((stderr, "solicit ID: %d (expected %d)\n",
-		 (ntohs(solid) & DH6SOL_SOLICIT_ID_MASK), current_solicit_id));
-	if ((ntohs(solid) & DH6SOL_SOLICIT_ID_MASK) != current_solicit_id) {
+		 DH6SOL_SOLICIT_ID(ntohs(solid)), current_solicit_id));
+	if (DH6SOL_SOLICIT_ID(ntohs(solid)) != current_solicit_id) {
 		dprintf((stderr, "client6_recvadvert: solicit ID mismatch\n"));
 		return(-1);
 	}
