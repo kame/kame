@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.74 2002/01/28 07:57:06 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.75 2002/01/29 01:41:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1963,6 +1963,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		mip6log((LOG_ERR,
 			 "%s:%d: ba destopt creation error (%d)\n",
 			 __FILE__, __LINE__, error));
+		m_freem(m);
  		goto free_ip6pktopts;
 	}
 	opt.ip6po_dest2 = pktopt_badest2;
@@ -1976,6 +1977,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 				 __FILE__, __LINE__, error));
  			goto free_ip6pktopts;
 		}
+		m_freem(m);
 		opt.ip6po_rthdr = pktopt_rthdr;
 	}
 
