@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.26 2002/05/17 05:56:39 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.27 2002/05/30 06:42:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -310,6 +310,8 @@ showVariables(char *word)
 			type = NATPTCTL_ALL;
 		else if (strncasecmp(word, "tslot", strlen("tslot")) == 0)
 			type = NATPTCTL_TSLOT;
+		else if (strncasecmp(word, "caddr", strlen("caddr")) == 0)
+			type = NATPTCTL_CADDR;
 		else
 			return (1);
 	}
@@ -320,8 +322,10 @@ showVariables(char *word)
 		else if (type == NATPTCTL_TSLOT) {
 			if ((ctlnames[idx].ctl_attr & NATPTCTL_TSLOT) == 0)
 				continue;
-			else
-				;
+		}
+		else if (type == NATPTCTL_CADDR) {
+			if ((ctlnames[idx].ctl_attr & NATPTCTL_CADDR) == 0)
+				continue;
 		}
 		else if ((ctlnames[idx].ctl_attr & NATPTCTL_DEFAULT) == 0)
 			continue;
@@ -341,6 +345,10 @@ showVariables(char *word)
 		case NATPTCTL_IN6ADDR:
 			inet_ntop(AF_INET6, &Bow, Wow, sizeof(Wow));
 			printf("%s", Wow);
+			break;
+
+		case NATPTCTL_CADDR_T:
+			printf("%p", *(caddr_t *)&Bow);
 			break;
 		}
 

@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.27 2002/02/01 15:05:42 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.28 2002/05/30 06:42:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -301,6 +301,10 @@ getValue(int ctlName, caddr_t val)
 
 	case NATPTCTL_IN6ADDR:
 		*(struct in6_addr *)val = mBox.m_in6addr;
+		break;
+
+	case NATPTCTL_CADDR_T:
+		*(caddr_t *)val = mBox.m_caddr;
 		break;
 	}
 
