@@ -227,8 +227,10 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		strcpy(host, numaddr);
 #if defined(INET6) && defined(NI_WITHSCOPEID)
 		if (afd->a_af == AF_INET6 &&
+#ifdef DONT_OPAQUE_SCOPEID
 		    (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)addr) ||
 		     IN6_IS_ADDR_MULTICAST((struct in6_addr *)addr)) &&
+#endif
 		    ((struct sockaddr_in6 *)sa)->sin6_scope_id) {
 #ifndef ALWAYS_WITHSCOPE
 			if (flags & NI_WITHSCOPEID)
@@ -334,11 +336,8 @@ ip6_sa2str(sa6, buf, flags)
 	if (IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6))
 		return(if_indextoname(ifindex, buf));
 
-	if (IN6_IS_ADDR_SITELOCAL(a6) || IN6_IS_ADDR_MC_SITELOCAL(a6))
-		return(NULL);	/* XXX */
-	if (IN6_IS_ADDR_MC_ORGLOCAL(a6))
-		return(NULL);	/* XXX */
-
-	return(NULL);		/* XXX */
+	/* last resort */
+	sprintf(buf, "%d", sa6->sin6_scope_id);
+	return(buf);
 }
 #endif 
