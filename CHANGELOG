@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1936 2001/10/24 15:44:23 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1937 2001/10/25 07:17:09 jinmei Exp $
 
 <200110>
+2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_is_addr_neighbor): corrected an
+	expression in nd6_is_addr_neighbor to detected whether a given
+	address matches an on-link prefix.  The previous one detected
+	every address as on-link.
+
 2001-10-25 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{rule,tslot}.c:
 	  kame/kame/natptconfig/{misc,showsubs}.c:
