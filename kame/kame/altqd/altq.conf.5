@@ -1,4 +1,4 @@
-.\"	$KAME: altq.conf.5,v 1.6 2000/10/18 09:15:15 kjc Exp $
+.\"	$KAME: altq.conf.5,v 1.7 2000/11/09 02:50:45 itojun Exp $
 .\"
 .\" Copyright (C) 2000
 .\" Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -48,7 +48,7 @@ HFSC (Hierarchical Fair Service Curve), PRIQ (Priority Queueing),
 RED (Random Early Detection), RIO (RED with IN/OUT),
 WFQ (Weighted Fair Queueing), 
 and CDNR (Diffserv Traffic Conditioner) can be configured in this file.
-
+.Pp
 .Sh Interface Commands
 .Bl -tag -width interface -offset indent
 .It Nm interface
@@ -58,14 +58,14 @@ and CDNR (Diffserv Traffic Conditioner) can be configured in this file.
 .Op Ar sched_type
 .Op Ar discipline-specific-options
 .El
-
+.Pp
 The 
 .Sy interface
 command specifies a network interface to be under control of ALTQ.
 One interface specification is provided for each network interface
 under control of ALTQ.  A system configured as a router may have
 multiple interface specifications.
-
+.\"
 .Bl -tag -width 8n -offset indent
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
@@ -96,7 +96,6 @@ or
 If the interface has only traffic conditioners and no queueing
 discipline, sched_type can be omitted.
 .El
-
 .Pp
 .Sh Class Command
 .Bl -tag -width class -offset indent
@@ -110,12 +109,11 @@ discipline, sched_type can be omitted.
 .Op Cm cleardscp
 .Op Ar discipline-specific-options
 .El
-
+.Pp
 The 
 .Sy class
 command specifies a packet scheduling class for CBQ, HFSC, or PRIQ.
 A class specifier must be provided for each packet scheduling class.
-
 .Bl -tag -width 8n -offset indent
 .It Em sched_type
 Type of queueing discipline.  Must correspond to the discipline name
@@ -142,9 +140,8 @@ class queue (experimental implementation).  ECN implies RED.
 .It Sy cleardscp
 Clear diffserv codepoint in the IP header.
 .El
-
+.Pp
 .Sh Filter Commands
-
 .Bl -tag -width filter -offset indent
 .It Nm filter
 .Ar if_name
@@ -153,14 +150,13 @@ Clear diffserv codepoint in the IP header.
 .Op Cm ruleno Ar num
 .Ar filter_values
 .El
-
+.Pp
 The 
 .Sy filter
 command specifies a filter to classify packets into
 a scheduling class.
 A filter specifier determines any statically-defined packet
 classification rules.  
-
 .Bl -tag -width 10n -offset indent
 .It Em if_name
 Name of a network interface (e.g., fxp0).
@@ -172,10 +168,9 @@ Add an arbitrary name to the filter for a future refenece.
 Specifies explicit order of filter matching.  Filter matching is performed
 from a filter with a larger ruleno.  Default is 0.
 .El
-
+.Pp
 .Em filter_value
 should be in the following format:
-
 .Bl -tag -width filter -offset indent
 .It filter_values:
 .Ad dst_addr Op Cm netmask Ar mask
@@ -190,7 +185,7 @@ should be in the following format:
 .Oc
 .Op Cm gpi Ar value
 .El
-
+.Pp
 Here 
 .Ad dst_addr
 and
@@ -211,9 +206,8 @@ keyword can be used to specify the type of service field value.
 .Sy gpi
 keyword can be used to specify the Security Parameter Index value for 
 IPSec.
-
+.Pp
 When filter value 0 is used, it is taken as a wildcard.
-
 .Bl -tag -width filter6 -offset indent
 .It Nm filter6
 .Ar if_name
@@ -222,13 +216,12 @@ When filter value 0 is used, it is taken as a wildcard.
 .Op Cm ruleno Ar num
 .Ar filter6_values
 .El
-
+.Pp
 The 
 .Sy filter6
 command is for IPv6. 
 .Em filter6_value
 should be in the following format:
-
 .Bl -tag -width filter6 -offset indent
 .It filter6_values:
 .Ad dst_addr[/prefix_len]
@@ -244,7 +237,7 @@ should be in the following format:
 .Oc
 .Op Cm gpi Ar value
 .El
-
+.Pp
 Here 
 .Ad dst_addr
 and
@@ -265,17 +258,15 @@ keyword can be used to specify the traffic class field value.
 .Sy gpi
 keyword can be used to specify the Security Parameter Index value for
 IPSec.
-
+.Pp
 When filter value 0 is used, it is taken as a wildcard.
-
+.Pp
 .Sh CBQ Commands
-
 CBQ (Class Based Queueing) achieves both partitioning and sharing of
 link bandwidth  by hierarchically structured classes.  
 Each class has its own queue and is assigned its share of bandwidth.
 A child class can borrow bandwidth from its parent class as long as
 excess bandwidth is available. 
-
 .Bl -tag -width interface -offset indent
 .It Nm interface
 .Ar if_name
@@ -284,7 +275,7 @@ excess bandwidth is available.
 .Op Ar sched_type
 .Op Cm efficient
 .El
-
+.Pp
 .Bl -tag -width 8n -offset indent
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
@@ -313,7 +304,7 @@ By default, this mode is turned off.  By adding the keyword
 .Sy efficient
 to the interface specification line, enables this mode.
 .El
-
+.Pp
 .Bl -tag -width class -offset indent
 .It Nm class
 .Ar sched_type
@@ -339,13 +330,12 @@ to the interface specification line, enables this mode.
 .Op Cm flowvalve
 .Op Cm cleardscp
 .El
-
+.Pp
 The 
 .Sy class
 command specifies a CBQ class.
 The classes are organized as a hierarchy, and every class, except
 for the root class, has a parent.
-
 .Bl -tag -width 8n -offset indent
 .It Em sched_type
 must be
@@ -436,9 +426,8 @@ enables RED/flow-valve (a.k.a. red-penalty-box) on this class queue.
 .It Sy cleardscp
 clears diffserv codepoint in the IP header.
 .El
-
+.Pp
 .Sh HFSC Commands
-
 HFSC (Hierarchical Fair Service Curve) supports both link-sharing and
 guaranteed real-time services.  H-FSC employs a service curve based QoS
 model, and its unique feature is an ability to decouple delay and
@@ -452,7 +441,6 @@ When dequeueing a packet, HFSC always tries real-time scheduling
 first.  If no packet is eligible for real-time scheduling,
 link-sharing scheduling is performed.
 HFSC does not use class hierarchy for real-time scheduling.
-
 .Bl -tag -width interface -offset indent
 .It Nm interface
 .Ar if_name
@@ -460,7 +448,7 @@ HFSC does not use class hierarchy for real-time scheduling.
 .Op Cm tbrsize Ar bytes
 .Op Ar sched_type
 .El
-
+.Pp
 .Bl -tag -width 8n -offset indent
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
@@ -473,7 +461,7 @@ must be
 .Sy hfsc
 for HFSC.
 .El
-
+.Pp
 .Bl -tag -width class -offset indent
 .It Nm class
 .Ar sched_type
@@ -492,7 +480,7 @@ for HFSC.
 .Op Cm ecn
 .Op Cm cleardscp
 .El
-
+.Pp
 The 
 .Sy class
 command specifies a HFSC class.
@@ -521,7 +509,6 @@ is the x-projection of the intersection point of the 2 segments
 specified in milli-second.
 .Em m2 
 is the slope of the second segment specified in bits-per-second.
-
 .Bl -tag -width 8n -offset indent
 .It Em sched_type
 must be
@@ -575,13 +562,11 @@ enables RED/ECN on this class queue.
 .It Sy cleardscp
 clears diffserv codepoint in the IP header.
 .El
-
+.Pp
 .Sh PRIQ Commands
-
 PRIQ (Priority Queueing) implements a simple priority-based queueing.
 A higher priority class is always served first.
 Up to 16 priorities can be used with PRIQ.
-
 .Bl -tag -width interface -offset indent
 .It Nm interface
 .Ar if_name
@@ -589,7 +574,7 @@ Up to 16 priorities can be used with PRIQ.
 .Op Cm tbrsize Ar bytes
 .Op Ar sched_type
 .El
-
+.Pp
 .Bl -tag -width 8n -offset indent
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
@@ -602,7 +587,7 @@ must be
 .Sy priq
 for PRIQ.
 .El
-
+.Pp
 .Bl -tag -width class -offset indent
 .It Nm class
 .Ar sched_type
@@ -616,7 +601,7 @@ for PRIQ.
 .Op Cm ecn
 .Op Cm cleardscp
 .El
-
+.Pp
 .Bl -tag -width 8n -offset indent
 .It Em sched_type
 must be 
@@ -650,9 +635,8 @@ enables RED/ECN on this class queue.
 .It Sy cleardscp
 clears diffserv codepoint in the IP header.
 .El
-
+.Pp
 .Sh WFQ Commands
-
 WFQ (Weighted Fair Queueing) implements a weighted-round robin
 scheduler for a set of queue.
 A weight can be assigned to each queue to give a
@@ -660,7 +644,6 @@ different proportion of the link capacity.
 A hash function is used to map a flow to one of a set of queues, and
 thus, it is possible for two different flows to be mapped into the same
 queue.
-
 .Bl -tag -width interface -offset indent
 .It Nm interface
 .Ar if_name
@@ -671,7 +654,7 @@ queue.
 .Op Cm qsize Ar bytes
 .Op Cm hash Ar policy
 .El
-
+.Pp
 .Bl -tag -width 8n -offset indent
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
@@ -697,15 +680,13 @@ specifies a hashing policy by IP addresses and ports.
 specifies a hashing policy by IP source port number.  Default is
 .Sy dstaddr
 .El
-
+.Pp
 .Sh FIFOQ Commands
-
 FIFOQ (First-In First-Out Queueing) is a simple tail-drop FIFO queue.
 FIFOQ is the simplest possible implementation of a queueing discipline
 in ALTQ, and can be used to compare with other queueing disciplines.
 FIFOQ can be also used as a template for those who want to write their
 own queueing disciplines.
-
 .Bl -tag -width interface -offset indent
 .It Nm interface
 .Ar if_name
@@ -714,7 +695,7 @@ own queueing disciplines.
 .Op Ar sched_type
 .Op Cm qlimit Ar count
 .El
-
+.Pp
 .Bl -tag -width 8n -offset indent
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
@@ -730,22 +711,20 @@ for FIFOQ.
 The maxium queue size in number of packets.  
 Default value is 50.
 .El
-
+.Pp
 .Sh RED Commands
-
 RED (Random Early Detection) is an implicit congestion notification
 mechanism that exercises packet dropping or packet marking
 stochastically according to the average queue length.   
 RED can be viewed as a buffer management mechanism
 and can be integrated into other packet scheduling schemes.
-
 .Bl -tag -width red -offset indent
 .It Nm red
 .Ar min_th
 .Ar max_th
 .Ar inv_pmax
 .El
-
+.Pp
 The
 .Sy red
 command sets the default RED paramters.
@@ -756,7 +735,6 @@ are the minimum and the maximum threshold values.
 .Em inv_pmax
 is the inverse (reciprocal) of the maximum drop probability.  
 For example, 10 means the maximum drop probability of 1/10.
-
 .Bl -tag -width interface -offset indent
 .It Nm interface
 .Ar if_name
@@ -772,7 +750,7 @@ For example, 10 means the maximum drop probability of 1/10.
 .Op Cm ecn
 .Op Cm flowvalve
 .El
-
+.Pp
 .Bl -tag -width 8n -offset indent
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
@@ -803,15 +781,14 @@ enables ECN.
 .It Sy flowvalve
 enables flowvalve.
 .El
-
+.Pp
 .Sh RIO Commands
-
 ALTQ/RIO has 3 drop precedence levels defined for the Assured
 Forwarding of DiffServ (RFC2597). 
 Since adaptive flows are likely to stay under
 the medium drop precedence level under congestion, the medium drop
 precedence would protect adaptive flows from unadaptive flows. 
-
+.Pp
 The original RIO has 2 sets of RED parameters; one for in-profile
 packets and the other for out-of-profile packets.
 At the ingress of the network, profile meters tag packets as IN
@@ -825,7 +802,6 @@ Thus, RIO can be used to provide a service that statistically assures
 capacity allocated for users.
 This mechanism can be extended to support an arbitrary number of drop
 precedence levels.  ALTQ supports 3 drop precedence levels.
-
 .Bl -tag -width rio -offset indent
 .It Nm rio
 .Ar low_min_th
@@ -838,12 +814,11 @@ precedence levels.  ALTQ supports 3 drop precedence levels.
 .Ar high_max_th
 .Ar high_inv_pmax
 .El
-
+.Pp
 The
 .Sy rio
 command sets the default RIO paramters.  The parameters are
 RED parameters for 3 (low, medium, high) drop precedence.
-
 .Bl -tag -width interface -offset indent
 .It Nm interface
 .Ar if_name
@@ -864,7 +839,7 @@ RED parameters for 3 (low, medium, high) drop precedence.
 .Op Cm hi_invpmax Ar n
 .Op Cm ecn
 .El
-
+.Pp
 .Bl -tag -width 8n -offset indent
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
@@ -905,7 +880,7 @@ The inverse of the maximum drop probability for high drop precedence.
 .It Sy ecn
 enables ECN.
 .El
-
+.Pp
 .Sh BLUE Commands
 .Bl -tag -width interface -offset indent
 .It Nm interface
@@ -919,7 +894,7 @@ enables ECN.
 .Op Cm holdtime Ar usec
 .Op Cm ecn
 .El
-
+.Pp
 .Bl -tag -width 8n -offset indent
 .It Em if_name
 specifies the name of a network interface (e.g., fxp0).
@@ -943,9 +918,8 @@ specifies the hold time in usec.
 .It Sy ecn
 enables ECN.
 .El
-
+.Pp
 .Sh CDNR Commands
-
 The
 .Sy conditioner 
 command specifies a diffserv traffic conditioner.  A traffic
@@ -957,25 +931,23 @@ incoming packets at an input interface.
 If no queueing discipline (e.g., CBQ) is used for the interface,
 a null interface command should be used to specify an input network
 interface.
-
 .Bl -tag -width interface -offset indent
 .It Nm interface
 .Ar if_name
 .Op Cm bandwidth Ar bps
 .Op Cm tbrsize Ar bytes
 .El
-
+.Pp
 The
 .Sy conditioner
 command has the following syntax.
-
 .Bl -tag -width conditioner -offset indent
 .It Nm conditioner
 .Ar if_name
 .Ar cdnr_name
 .Aq action
 .El
-
+.Pp
 .Bl -tag -width 10n -offset indent
 .It Em if_name
 Interface name. Must correspond to name in interface specification.
@@ -985,10 +957,9 @@ interface.
 .It Em action
 Action of the conditioner.  
 .El
-
+.Pp
 An action can be a recursively defined action. The following actions
 are defined.
-
 .Bl -tag -width pass -offset indent
 .It Nm pass
 .Bl -inset -offset indent
@@ -996,7 +967,7 @@ are defined.
 allows the packet to go through without any modification to the packet.
 .El
 .El
-
+.Pp
 .Bl -tag -width drop -offset indent
 .It Nm drop
 .Bl -inset -offset indent
@@ -1004,7 +975,7 @@ allows the packet to go through without any modification to the packet.
 rejects the packet.  The packet is immediately discarded.
 .El
 .El
-
+.Pp
 .Bl -tag -width mark -offset indent
 .It Nm mark
 .Ar value
@@ -1014,13 +985,13 @@ sets the specified value to the ds field in the IP header.  Then, the
 packet is allowed to go through.
 .El
 .El
-
+.Pp
 .Bl -tag -width tbmeter -offset indent
 .It Nm tbmeter
 .Ar rate depth 
 .Aq in_action
 .Aq out_action
-
+.Pp
 .Bl -inset -offset indent
 .It Sy tbmeter
 is a token bucket meter configured with rate and depth parameters.
@@ -1030,7 +1001,7 @@ the packet size), tbmeter takes in_action.
 Otherwise, tbmeter takes out_action.
 .El
 .El
-
+.Pp
 .Bl -tag -width trtcm -offset indent
 .It Nm trtcm
 .Ar cmtd_rate cmtd_depth peak_rate peak_depth 
@@ -1052,7 +1023,7 @@ not raise the color (ds field value), that is, a yellow packet can be
 yellow or red but can not be blue.  Default is color-blind.
 .El
 .El
-
+.Pp
 .Bl -tag -width tswtcm -offset indent
 .It Nm tswtcm
 .Ar cmtd_rate peak_rate avg_interval 
@@ -1076,7 +1047,7 @@ rate, and is specified in milli-second.  500 msec is ok for normal
 settings.
 .El
 .El
-
+.Pp
 .Sh EXAMPLES
 .nf
 
@@ -1194,9 +1165,8 @@ conditioner fxp0 af1x_cdnr <trtcm 3M 32K 10M 64K <mark 0x28><mark 0x30><mark 0x3
         filter fxp0 af1x_cdnr 0 0 192.168.0.178 0 0
 
 .fi
-
+.Pp
 .Sh SEE ALSO
 .Xr altqd 8
 .Sh BUGS
 This man page is incomplete. For more information read the source.
-
