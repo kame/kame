@@ -271,7 +271,7 @@ struct	route;
 #ifdef IGMPV3
 struct	in_multi * in_addmulti(struct in_addr *, struct ifnet *,
 	    u_int16_t, struct sockaddr_storage *, u_int, int, int *);
-void	in_delmulti((struct in_multi *, u_int16_t,
+void	in_delmulti(struct in_multi *, u_int16_t,
 	    struct sockaddr_storage *, u_int, int, int *);
 struct	in_multi * in_modmulti(struct in_addr *, struct ifnet *, u_int16_t,
 	    struct sockaddr_storage *, u_int, u_int16_t,

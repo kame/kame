@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.75 2003/02/07 10:17:09 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.76 2003/02/09 15:49:11 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1217,7 +1217,11 @@ mld_sendbuf(mh, ifp)
 
 	/* XXX: ToDo: create MLDv2 statistics field */
 	icmp6_ifstat_inc(ifp, ifs6_out_mldreport);
-	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
+	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		   , NULL
+#endif
+		  );
 }
 
 

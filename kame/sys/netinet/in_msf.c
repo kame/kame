@@ -2752,8 +2752,13 @@ sock_setmopt_srcfilter(sop, grpfp)
 			return EADDRNOTAVAIL;
 		ifp = ro.ro_rt->rt_ifp;
 		rtfree(ro.ro_rt);
-	} else
+	} else {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		ifp = ifnet_byindex(grpf->gf_interface);
+#else
 		ifp = ifindex2ifnet[grpf->gf_interface];
+#endif
+	}
 	if (ifp == NULL || (ifp->if_flags & IFF_MULTICAST) == 0)
 		return EADDRNOTAVAIL;
 
@@ -3161,7 +3166,11 @@ sock_getmopt_srcfilter(sop, grpfp)
 	if (grpf->gf_interface == 0)
 		ifp = NULL;
 	else {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		ifp = ifnet_byindex(grpf->gf_interface);
+#else
 		ifp = ifindex2ifnet[grpf->gf_interface];
+#endif
 		if (ifp == NULL)
 			return EINVAL;
 	}
