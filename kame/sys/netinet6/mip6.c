@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.187 2002/12/13 10:32:54 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.188 2002/12/14 06:47:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -707,7 +707,7 @@ mip6_haddr_config(sc)
 		/*
 		 * attach all home addresses to the hif interface.
 		 * before attach home addresses, remove home addresses
-		 * from physical i/f to avoid the dupulication of
+		 * from physical i/f to avoid the duplication of
 		 * address.
 		 */
 		error = mip6_attach_haddrs(sc);
