@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1688 2001/05/24 08:23:17 itojun Exp $
+$KAME: CHANGELOG,v 1.1689 2001/05/24 09:21:22 sakane Exp $
 
 <200105>
+Thu May 24 18:18:24 JST 2001 sakane@ydc.co.jp
+	* kame/racoon:
+	Enabled passive mode.  Racoon never initiate IKE session
+	if passive mode is defined in the configuration file.
+
+Thu May 24 17:59:51 JST 2001 sakane@ydc.co.jp
+	* sys/netkey/key.c:
+	Fixed to get a SA to be used when of SADB_ADD, SADB_UPDATE
+	and SADB_GETSPI. In the case of add, update and getspi, "reqid"
+	must to be take care when of looking for a SA.
+
 Thu May 24 17:21:05 JST 2001  itojun@iijlab.net
 	* sys/netinet6/in6_rmx.c (freebsd[34]): do not configure tcp
 	  send/receive buffer size onto routing table.  honor socket buffer
