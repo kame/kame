@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.9 2000/01/11 19:09:37 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.10 2000/01/11 19:22:29 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -441,7 +441,8 @@ quick_i2recv(iph2, msg0)
 	/* payload existency check */
 	if (hash == NULL || sa_tmp == NULL || iph2->nonce_p == NULL) {
 		plog(logp, LOCATION, iph2->ph1->remote,
-			"few isakmp message received.\n");
+			"few isakmp message received: %p %p %p.\n",
+			hash, sa_tmp, iph2->nonce_p);
 		goto end;
 	}
 
@@ -715,7 +716,8 @@ quick_i3recv(iph2, msg0)
 	/* payload existency check */
 	if (hash == NULL) {
 		plog(logp, LOCATION, iph2->ph1->remote,
-			"few isakmp message received.\n");
+			"few isakmp message received: %p.\n",
+			hash);
 		goto end;
 	}
 
@@ -995,7 +997,8 @@ quick_r1recv(iph2, msg0)
 	/* payload existency check */
 	if (hash == NULL || sa_tmp == NULL || iph2->nonce_p == NULL) {
 		plog(logp, LOCATION, iph2->ph1->remote,
-			"few isakmp message received.\n");
+			"few isakmp message received: %p %p %p.\n",
+			hash, sa_tmp, iph2->nonce_p);
 		error = ISAKMP_NTYPE_PAYLOAD_MALFORMED;
 		goto end;
 	}
@@ -1375,7 +1378,8 @@ quick_r3recv(iph2, msg0)
 	/* payload existency check */
 	if (hash == NULL) {
 		plog(logp, LOCATION, iph2->ph1->remote,
-			"few isakmp message received.\n");
+			"few isakmp message received.: %p\n",
+			hash);
 		goto end;
 	}
 
