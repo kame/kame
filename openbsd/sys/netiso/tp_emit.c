@@ -199,6 +199,7 @@ tp_emit(dutype, tpcb, seq, eot, data)
 			m->m_nextpkt = MNULL;
 			m->m_data = m->m_pktdat;
 			m->m_flags = M_PKTHDR;
+			bzero(&m->m_pkthdr, sizeof(m->m_pkthdr));
 		}
 	} else {
 		MGETHDR(m, M_DONTWAIT, TPMT_TPHDR);
