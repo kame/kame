@@ -120,6 +120,7 @@ MALLOC_DEFINE(M_MSFILTER, "msfilter", "multicast source filter");
 static struct router_info	*find_rti(struct ifnet *ifp);
 static void	igmp_sendpkt(struct in_multi *, int, unsigned long);
 
+SLIST_HEAD(, router_info) router_info_head;
 static struct igmpstat igmpstat;
 int igmpmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int igmpsomaxsrc = SO_MAX_SOURCE_FILTER;
@@ -134,7 +135,6 @@ SYSCTL_INT(_net_inet_igmp, IGMPCTL_SOMAXSRC, somaxsrc, CTLFLAG_RW,
 SYSCTL_INT(_net_inet_igmp, IGMPCTL_ALWAYS_V3, always_v3, CTLFLAG_RW,
 	&igmpalways_v3, 0, "");
 
-static SLIST_HEAD(, router_info) router_info_head;
 static int igmp_timers_are_running;
 static int interface_timers_are_running;
 static int state_change_timers_are_running;
@@ -214,7 +214,6 @@ void igmp_cancel_pending_response(struct ifnet *, struct router_info *);
 static u_long igmp_all_hosts_group;
 static u_long igmp_all_rtrs_group;
 static struct mbuf *router_alert;
-struct router_info *Head;
 static struct route igmprt;
 
 #ifdef IGMP_DEBUG
@@ -754,7 +753,7 @@ igmp_fasttimo(void)
 #ifdef IGMPV3
 	if (interface_timers_are_running) {
 		interface_timers_are_running = 0;
-		for (rti = Head; rti; rti = rti->rti_next) {
+		SLIST_FOREACH(rti, &router_info_head, rti_list) {
 			if (rti->rti_timer3 == 0)
 				; /* do nothing */
 			else if (--rti->rti_timer3 == 0)
