@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.1 2000/01/09 01:31:30 itojun Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.2 2000/01/11 00:15:27 itojun Exp $ */
 
 #include <sys/queue.h>
 
@@ -81,7 +81,10 @@ struct ipsecsa {
 };
 
 extern struct policyindex *getspidx __P((struct policyindex *spidx));
+struct policyindex *getspidx_r __P((struct policyindex *spidx,
+	struct ph2handle *iph2));
 extern int cmpspidx __P((struct policyindex *a, struct policyindex *b));
+extern int cmpspidx_wild __P((struct policyindex *a, struct policyindex *b));
 extern struct policyindex *newspidx __P((void));
 extern void delspidx __P((struct policyindex *spidx));
 extern void insspidx __P((struct policyindex *spidx));

@@ -26,11 +26,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.3 2000/01/10 22:38:39 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.4 2000/01/11 00:15:27 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/queue.h>
+
+#include <netkey/key_var.h>
+#include <netinet/in.h>
+#include <netinet6/ipsec.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -47,8 +51,13 @@
 #include "policy.h"
 #include "localconf.h"
 
+#include "isakmp_var.h"
+#include "isakmp.h"
+#include "handler.h"
+
 static LIST_HEAD(_sptree, policyindex) sptree;
 
+/* perform exact match against security policy table. */
 struct policyindex *
 getspidx(spidx)
 	struct policyindex *spidx;
@@ -57,6 +66,41 @@ getspidx(spidx)
 
 	LIST_FOREACH(p, &sptree, chain) {
 		if (!cmpspidx(spidx, p))
+			return p;
+	}
+
+	return NULL;
+}
+
+/*
+ * perform non-exact match against security policy table, only if this is
+ * transport mode SA negotiation.  for example, 0.0.0.0/0 -> 0.0.0.0/0
+ * entry in policy.txt can be returned when we're negotiating transport
+ * mode SA.  this is how the kernel works.
+ */
+struct policyindex *
+getspidx_r(spidx, iph2)
+	struct policyindex *spidx;	/* from peer */
+	struct ph2handle *iph2;
+{
+	struct policyindex *p;
+
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "checking for transport mode\n"););
+
+	/* is it transport mode SA negotiation? */
+	if (cmpsaddrwop(iph2->src, (struct sockaddr *)&spidx->src)
+	 || spidx->prefs != _INALENBYAF(spidx->src.ss_family) * 8)
+		return NULL;
+	if (cmpsaddrwop(iph2->dst, (struct sockaddr *)&spidx->dst)
+	 || spidx->prefd != _INALENBYAF(spidx->dst.ss_family) * 8)
+		return NULL;
+
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "looks to be transport mode\n"););
+
+	LIST_FOREACH(p, &sptree, chain) {
+		if (!cmpspidx_wild(p, spidx))
 			return p;
 	}
 
@@ -88,6 +132,65 @@ cmpspidx(a, b)
 		return 0;
 	if (cmpsaddr((struct sockaddr *)&a->dst, (struct sockaddr *)&b->dst))
 		return 0;
+
+	return 0;
+}
+
+/*
+ * compare policyindex, with wildcard address/protocol match.
+ * "a" (first argument) can contain wildcard things.
+ * OUT:	0:	equal
+ *	1:	not equal
+ */
+int
+cmpspidx_wild(a, b)
+	struct policyindex *a, *b;
+{
+	struct sockaddr_storage sa1, sa2;
+
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "comparing %p and %p\n");
+		plog(logp, LOCATION, NULL, "%p: %s\n", a, spidx2str(a));
+		plog(logp, LOCATION, NULL, "%p: %s\n", b, spidx2str(b)););
+
+	if (!(a->dir == IPSEC_DIR_ANY || a->dir == b->dir))
+		return 1;
+	if (!(a->ul_proto == IPSEC_PROTO_ANY || a->ul_proto == b->ul_proto))
+		return 1;
+	if (a->action != b->action)
+		return 1;
+
+	if (sizeof(sa1) < a->src.ss_len || sizeof(sa2) < b->src.ss_len) {
+		plog(logp, LOCATION, NULL, "unexpected error\n");
+		exit(1);
+	}
+	mask_sockaddr((struct sockaddr *)&sa1, (struct sockaddr *)&a->src,
+		a->prefs);
+	mask_sockaddr((struct sockaddr *)&sa2, (struct sockaddr *)&b->src,
+		a->prefs);
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "a masked with %d: %s\n",
+			a->prefs, saddr2str((struct sockaddr *)&sa1));
+		plog(logp, LOCATION, NULL, "b masked with %d: %s\n",
+			a->prefs, saddr2str((struct sockaddr *)&sa2)););
+	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
+		return 1;
+
+	if (sizeof(sa1) < a->dst.ss_len || sizeof(sa2) < b->dst.ss_len) {
+		plog(logp, LOCATION, NULL, "unexpected error\n");
+		exit(1);
+	}
+	mask_sockaddr((struct sockaddr *)&sa1, (struct sockaddr *)&a->dst,
+		a->prefd);
+	mask_sockaddr((struct sockaddr *)&sa2, (struct sockaddr *)&b->dst,
+		a->prefd);
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "a masked with %d: %s\n",
+			a->prefd, saddr2str((struct sockaddr *)&sa1));
+		plog(logp, LOCATION, NULL, "b masked with %d: %s\n",
+			a->prefd, saddr2str((struct sockaddr *)&sa2)););
+	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
+		return 1;
 
 	return 0;
 }

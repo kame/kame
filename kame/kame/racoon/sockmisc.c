@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.4 2000/01/10 23:28:36 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.5 2000/01/11 00:15:27 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -575,3 +575,24 @@ saddrwop2str(saddr)
 	return buf;
 }
 
+void
+mask_sockaddr(a, b, l)
+	struct sockaddr *a;
+	struct sockaddr *b;
+	size_t l;
+{
+	size_t i;
+	u_int8_t *p;
+
+	if (_INALENBYAF(b->sa_family) * 8 < l) {
+		plog(logp, LOCATION, NULL,
+			"unexpected inconsistency: %d %d\n", b->sa_family, l);
+		exit(1);
+	}
+
+	memcpy(a, b, b->sa_len);
+	p = (u_int8_t *)_INADDRBYSA(a);
+	p[l / 8] &= (0xff00 >> (l % 8)) & 0xff;
+	for (i = l / 8 + 1; i < _INALENBYAF(a->sa_family); i++)
+		p[i] = 0x00;
+}

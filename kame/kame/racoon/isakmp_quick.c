@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.5 2000/01/10 21:08:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.6 2000/01/11 00:15:26 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1087,6 +1087,8 @@ quick_r1recv(iph2, msg0)
 
 	/* search for proper policyindex */
 	iph2->spidx = getspidx(&spidxtmp);
+	if (iph2->spidx == NULL)
+		iph2->spidx = getspidx_r(&spidxtmp, iph2);
 	if (iph2->spidx == NULL) {
 		plog(logp, LOCATION, NULL,
 			"no policy found %s.\n", spidx2str(&spidxtmp));

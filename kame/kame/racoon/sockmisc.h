@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.h,v 1.1 2000/01/09 01:31:33 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.h,v 1.2 2000/01/11 00:15:27 itojun Exp $ */
 
 extern int cmpsaddrwop __P((struct sockaddr *addr1, struct sockaddr *addr2));
 extern int cmpsaddr __P((struct sockaddr *addr1, struct sockaddr *addr2));
@@ -44,3 +44,5 @@ extern struct sockaddr *newsaddr __P((int len));
 extern struct sockaddr *dupsaddr __P((struct sockaddr *src));
 extern char *saddr2str __P((struct sockaddr *saddr));
 extern char *saddrwop2str __P((struct sockaddr *saddr));
+extern void mask_sockaddr __P((struct sockaddr *a, struct sockaddr *b,
+	size_t l));
