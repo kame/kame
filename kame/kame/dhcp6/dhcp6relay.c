@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.43 2003/07/20 11:43:47 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.44 2003/07/31 21:41:54 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -58,7 +58,7 @@
 #include <config.h>
 #include <common.h>
 
-static int ssock;		/* socket for servers */
+static int ssock;		/* socket for relaying to servers */
 static int csock;		/* socket for clients */
 static int maxfd;		/* maxi file descriptor for select(2) */
 
@@ -69,11 +69,12 @@ static char *relaydevice;
 static char *boundaddr;
 static char *serveraddr = DH6ADDR_ALLSERVER;
 
-static char *rmsgctlbuf, *smsgctlbuf;
-static int rmsgctllen, smsgctllen;
-static struct msghdr rmh, smh;
+static char *rmsgctlbuf;
+static socklen_t rmsgctllen, smsgctllen;
+static struct msghdr rmh;
 static char rdatabuf[BUFSIZ];
 static struct in6_pktinfo *spktinfo;
+static int relayifid;
 
 static int mhops = DHCP6_RELAY_MULTICAST_HOPS;
 
@@ -95,6 +96,8 @@ static struct prefix_list *make_prefix __P((char *));
 static void relay6_init __P((void));
 static void relay6_loop __P((void));
 static void relay6_recv __P((int, int));
+static int make_msgcontrol __P((struct msghdr *, void *, socklen_t,
+    struct in6_pktinfo *, int));
 static void relay_to_server __P((struct dhcp6 *, ssize_t,
     struct sockaddr_in6 *, char *, unsigned int));
 static void relay_to_client __P((struct dhcp6_relay *, ssize_t,
@@ -248,7 +251,7 @@ relay6_init()
 {
 	struct addrinfo hints;
 	struct addrinfo *res, *res2;
-	int i, ifidx, error;
+	int i, ifid, error;
 	struct ipv6_mreq mreq6;
 	int type, on;
 	static struct iovec iov[2];
@@ -292,28 +295,17 @@ relay6_init()
 	iov[0].iov_len = sizeof (rdatabuf);
 	rmh.msg_iov = iov;
 	rmh.msg_iovlen = 1;
-	rmsgctllen = smsgctllen = CMSG_SPACE(sizeof (struct in6_pktinfo));
+	rmsgctllen = CMSG_SPACE(sizeof (struct in6_pktinfo));
 	if ((rmsgctlbuf = (char *)malloc(rmsgctllen)) == NULL) {
 		dprintf(LOG_ERR, FNAME, "memory allocation failed");
 		goto failexit;
 	}
-	if ((smsgctlbuf = (char *)malloc(smsgctllen)) == NULL) {
-		dprintf(LOG_ERR, FNAME, "memory allocation failed");
-		goto failexit;
-	}
-	smh.msg_controllen = smsgctllen;
-	smh.msg_control = smsgctlbuf;
-	cm = (struct cmsghdr *)CMSG_FIRSTHDR(&smh);
-	cm->cmsg_len = CMSG_LEN(sizeof (*spktinfo));
-	cm->cmsg_level = IPPROTO_IPV6;
-	cm->cmsg_type = IPV6_PKTINFO;
-	spktinfo = (struct in6_pktinfo *)CMSG_DATA((struct cmsghdr *)cm);
 
 	/*
 	 * Setup a socket to communicate with clients.
 	 */
-	ifidx = if_nametoindex(device);
-	if (ifidx == 0)
+	ifid = if_nametoindex(device);
+	if (ifid == 0)
 		dprintf(LOG_ERR, FNAME, "invalid interface %s", device);
 
 	memset(&hints, 0, sizeof (hints));
@@ -334,20 +326,6 @@ relay6_init()
 	}
 	if (csock > maxfd)
 		maxfd = csock;
-	on = 1;
-	if (setsockopt(csock, SOL_SOCKET, SO_REUSEPORT,
-	    &on, sizeof (on)) < 0) {
-		dprintf(LOG_ERR, FNAME, "setsockopt(csock, SO_REUSEPORT): %s",
-		    strerror(errno));
-		goto failexit;
-	}
-	on = 1;
-	if (setsockopt(csock, SOL_SOCKET, SO_REUSEADDR,
-	    &on, sizeof (on)) < 0) {
-		dprintf(LOG_ERR, FNAME, "setsockopt(csock, SO_REUSEADDR): %s",
-		    strerror(errno));
-		goto failexit;
-	}
 	on = 1;
 	if (setsockopt(csock, IPPROTO_IPV6, IPV6_V6ONLY,
 	    &on, sizeof (on)) < 0) {
@@ -385,7 +363,7 @@ relay6_init()
 		goto failexit;
 	}
 	memset(&mreq6, 0, sizeof (mreq6));
-	mreq6.ipv6mr_interface = ifidx;
+	mreq6.ipv6mr_interface = ifid;
 	memcpy(&mreq6.ipv6mr_multiaddr,
 	    &((struct sockaddr_in6 *)res2->ai_addr)->sin6_addr,
 	    sizeof (mreq6.ipv6mr_multiaddr));
@@ -397,12 +375,16 @@ relay6_init()
 	freeaddrinfo(res2);
 
 	/*
-	 * Setup a socket to communicate with servers.
+	 * Setup a socket to relay to servers.
 	 */
-	ifidx = if_nametoindex(relaydevice);
-	if (ifidx == 0)
+	relayifid = if_nametoindex(relaydevice);
+	if (relayifid == 0)
 		dprintf(LOG_ERR, FNAME, "invalid interface %s", device);
-
+	/*
+	 * We are not really sure if we need to listen on the downstream
+	 * port to receive packets from serves.  We'll need to clarify the
+	 * specification, but we do for now.
+	 */
 	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(boundaddr, DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
@@ -420,6 +402,10 @@ relay6_init()
 	if (ssock > maxfd)
 		maxfd = ssock;
 	on = 1;
+	/*
+	 * Both a relay and a client may run on a single node.  If we need to
+	 * listen on the downstream port, we need REUSEPORT to avoid conflict.
+	 */
 	if (setsockopt(ssock, SOL_SOCKET, SO_REUSEPORT,
 	    &on, sizeof (on)) < 0) {
 		dprintf(LOG_ERR, FNAME, "setsockopt(ssock, SO_REUSEPORT): %s",
@@ -439,22 +425,6 @@ relay6_init()
 	}
 	freeaddrinfo(res);
 
-	if (IN6_IS_ADDR_MULTICAST(&sa6_server.sin6_addr)) {
-		if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mhops,
-		    sizeof (mhops)) < 0) {
-			dprintf(LOG_ERR, FNAME,
-			    "setsockopt(ssock, IPV6_MULTICAST_HOPS(%d)): %s",
-			    mhops, strerror(errno));
-			goto failexit;
-		}
-		if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
-		    &ifidx, sizeof (ifidx)) < 0) {
-			dprintf(LOG_ERR, FNAME,
-			    "setsockopt(IPV6_MULTICAST_IF, %d): %s",
-			    ifidx, strerror(errno));
-			goto failexit;
-		}
-	}
 	on = 1;
 #ifdef IPV6_RECVPKTINFO
 	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
@@ -626,6 +596,52 @@ relay6_recv(s, fromclient)
 	}
 }
 
+static int
+make_msgcontrol(mh, ctlbuf, buflen, pktinfo, hlim)
+	struct msghdr *mh;
+	void *ctlbuf;
+	socklen_t buflen;
+	struct in6_pktinfo *pktinfo;
+	int hlim;
+{
+	struct cmsghdr *cm;
+	socklen_t controllen;
+
+	controllen = 0;
+	if (pktinfo)
+		controllen += CMSG_SPACE(sizeof (*pktinfo));
+	if (hlim > 0)
+		controllen += CMSG_SPACE(sizeof (hlim));
+	if (buflen < controllen)
+		return (-1);
+
+	memset(ctlbuf, 0, buflen);
+	mh->msg_controllen = controllen;
+	mh->msg_control = ctlbuf;
+
+	cm = (struct cmsghdr *)CMSG_FIRSTHDR(mh);
+	if (pktinfo) {
+		cm->cmsg_len = CMSG_LEN(sizeof (*pktinfo));
+		cm->cmsg_level = IPPROTO_IPV6;
+		cm->cmsg_type = IPV6_PKTINFO;
+		memcpy(CMSG_DATA((struct cmsghdr *)cm), pktinfo,
+		    sizeof (*pktinfo));
+
+		cm = CMSG_NXTHDR(mh, cm);
+	}
+
+	if (hlim > 0) {
+		cm->cmsg_len = CMSG_LEN(sizeof (hlim));
+		cm->cmsg_level = IPPROTO_IPV6;
+		cm->cmsg_type = IPV6_HOPLIMIT;
+		*(int *)CMSG_DATA((struct cmsghdr *)cm) = hlim;
+
+		cm = CMSG_NXTHDR(mh, cm); /* just in case */
+	}
+
+	return (0);
+}
+
 static void
 relay_to_server(dh6, len, from, ifname, ifid)
 	struct dhcp6 *dh6;
@@ -638,10 +654,14 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	struct dhcp6_relay *dh6relay;
 	struct in6_addr linkaddr;
 	struct prefix_list *p;
-	struct sockaddr_in6 next_agent;
 	int optlen, relaylen;
 	int cc;
+	struct msghdr mh;
+	static struct iovec iov[2];
 	u_char relaybuf[sizeof (*dh6relay) + BUFSIZ];
+	struct in6_pktinfo pktinfo;
+	char ctlbuf[CMSG_SPACE(sizeof (struct in6_pktinfo))
+	    + CMSG_SPACE(sizeof (int))];
 
 	/*
 	 * Prepare a relay forward option.
@@ -742,20 +762,36 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	/*
 	 * Forward the message.
 	 */
-	next_agent = sa6_server;
-	if ((cc = sendto(ssock, relaybuf, relaylen, 0,
-	    (struct sockaddr *)&next_agent, sizeof (sa6_server))) < 0) {
+	memset(&mh, 0, sizeof (mh));
+	iov[0].iov_base = relaybuf;
+	iov[0].iov_len = relaylen;
+	mh.msg_iov = iov;
+	mh.msg_iovlen = 1;
+	mh.msg_name = &sa6_server;
+	mh.msg_namelen = sizeof (sa6_server);
+	if (IN6_IS_ADDR_MULTICAST(&sa6_server.sin6_addr)) {
+		memset(&pktinfo, 0, sizeof (pktinfo));
+		pktinfo.ipi6_ifindex = relayifid;
+		if (make_msgcontrol(&mh, ctlbuf, sizeof (ctlbuf),
+		    &pktinfo, mhops)) {
+			dprintf(LOG_WARNING, FNAME,
+			    "failed to make message control data");
+			goto out;
+		}
+	}
+
+	if ((cc = sendmsg(ssock, &mh, 0)) < 0) {
 		dprintf(LOG_WARNING, FNAME,
-		    "sendto %s failed: %s",
-		    addr2str((struct sockaddr *)&next_agent), strerror(errno));
+		    "sendmsg %s failed: %s",
+		    addr2str((struct sockaddr *)&sa6_server), strerror(errno));
 	} else if (cc != relaylen) {
 		dprintf(LOG_WARNING, FNAME,
 		    "failed to send a complete packet to %s",
-		    addr2str((struct sockaddr *)&next_agent));
+		    addr2str((struct sockaddr *)&sa6_server));
 	} else {
 		dprintf(LOG_DEBUG, FNAME,
 		    "relay a message to a server %s",
-		    addr2str((struct sockaddr *)&next_agent));
+		    addr2str((struct sockaddr *)&sa6_server));
 	}
 
   out:
@@ -773,7 +809,10 @@ relay_to_client(dh6relay, len, from)
 	unsigned int ifid;
 	char ifnamebuf[IFNAMSIZ];
 	int cc;
+	struct msghdr mh;
+	struct in6_pktinfo pktinfo;
 	static struct iovec iov[2];
+	char ctlbuf[CMSG_SPACE(sizeof (struct in6_pktinfo))];
 
 	dprintf(LOG_DEBUG, FNAME,
 	    "dhcp6 relay reply: hop=%d, linkaddr=%s, peeraddr=%s",
@@ -795,14 +834,14 @@ relay_to_client(dh6relay, len, from)
 	if (optinfo.relaymsg_msg == NULL) {
 		dprintf(LOG_INFO, FNAME, "relay reply message from %s "
 		    "without a relay message", addr2str(from));
-		goto end;
+		goto out;
 	}
 
 	/* minimum validation for the inner message */
 	if (optinfo.relaymsg_len < sizeof (struct dhcp6)) {
 		dprintf(LOG_INFO, FNAME, "short relay message from %s",
 		    addr2str(from));
-		goto end;
+		goto out;
 	}
 
 	/*
@@ -846,7 +885,7 @@ relay_to_client(dh6relay, len, from)
 
 	if (ifid == 0) {
 		dprintf(LOG_INFO, FNAME, "failed to determine relay link");
-		goto end;
+		goto out;
 	}
 
 	peer = sa6_client;
@@ -856,16 +895,23 @@ relay_to_client(dh6relay, len, from)
 		peer.sin6_scope_id = ifid; /* XXX: we assume a 1to1 map */
 
 	/* construct a message structure specifying the outgoing interface */
+	memset(&mh, 0, sizeof (mh));
 	iov[0].iov_base = optinfo.relaymsg_msg;
 	iov[0].iov_len = optinfo.relaymsg_len;
-	smh.msg_iov = iov;
-	smh.msg_iovlen = 1;
-	smh.msg_name = &peer;
-	smh.msg_namelen = sizeof (peer);
-	memset(spktinfo, 0, sizeof (*spktinfo));
-	spktinfo->ipi6_ifindex = ifid;
+	mh.msg_iov = iov;
+	mh.msg_iovlen = 1;
+	mh.msg_name = &peer;
+	mh.msg_namelen = sizeof (peer);
+	memset(&pktinfo, 0, sizeof (pktinfo));
+	pktinfo.ipi6_ifindex = ifid;
+	if (make_msgcontrol(&mh, ctlbuf, sizeof (ctlbuf), &pktinfo, 0)) {
+		dprintf(LOG_WARNING, FNAME,
+		    "failed to make message control data");
+		goto out;
+	}
 
-	if ((cc = sendmsg(csock, &smh, 0)) < 0) {
+	/* send packet */
+	if ((cc = sendmsg(csock, &mh, 0)) < 0) {
 		dprintf(LOG_WARNING, FNAME,
 		    "sendmsg to %s failed: %s",
 		    addr2str((struct sockaddr *)&peer), strerror(errno));
@@ -879,7 +925,7 @@ relay_to_client(dh6relay, len, from)
 		    addr2str((struct sockaddr *)&peer));
 	}
 
-  end:
+  out:
 	dhcp6_clear_options(&optinfo);
 	return;
 }
