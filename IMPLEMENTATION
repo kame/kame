@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/08 01:34:09 $
+			$Date: 1999/10/11 13:13:12 $
 
 1. IPv6
 
@@ -215,7 +215,7 @@ fe80:1::/64                   link#1                    UC           ed0
 fe80:2::/64                   link#2                    UC           ep0
 
 Interfaces that has no IEEE802 address (pseudo interfaces like tunnel
-interfaces, or ppp interfaces) will bollow IEEE802 address from other
+interfaces, or ppp interfaces) will borrow IEEE802 address from other
 interfaces, such as ethernet interfaces, whenever possible.
 If there is no IEEE802 hardware attached, last-resort pseudorandom value,
 which is from MD5(hostname), will be used as source of link-local address.
