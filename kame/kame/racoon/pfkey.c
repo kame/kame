@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.86 2000/10/04 17:41:02 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.87 2000/10/19 03:34:01 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1093,7 +1093,7 @@ pk_recvupdate(mhp)
 			YIPSDEBUG(DEBUG_PFKEY,
 				plog(logp, LOCATION, NULL,
 					"pfkey UPDATE succeeded: %s\n",
-					sadbsecas2str(iph2->src, iph2->dst,
+					sadbsecas2str(iph2->dst, iph2->src,
 					    msg->sadb_msg_satype,
 					    sa->sadb_sa_spi,
 					    sa_mode)));
