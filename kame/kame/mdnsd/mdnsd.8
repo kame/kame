@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.32 2001/05/02 12:13:26 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.33 2001/05/02 12:44:08 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -221,11 +221,14 @@ For example, if you specify unicast DNS servers by
 .Ar userv
 argument,
 .Nm
-will transmit DNS queries to both multicast and unicast servers at the
-same time.
+will transmit DNS queries every time a client asks
+.Nm
+about the record.
 Instead,
 .Nm
-should add some delay between subsequent transmissions.
+should add some delay between subsequent transmissions,
+and implement cache mechanisms
+.Pq both positive and negative .
 .Pp
 .Nm
 requires interface
