@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1308 2000/10/02 05:03:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.1309 2000/10/02 08:45:59 jinmei Exp $
 
 <200010>
+2000-10-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_savecontrol): check if a
+	routing header is contained, in order to store destination option
+	headers at proper postions.
+	XXX: the check routine is not very efficient.
+
 2000-10-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi[34]/sys/kern/uipc_syscalls.c (sendit): check if cmsg_len is
 	0, in order to avoid an infinite loop.
