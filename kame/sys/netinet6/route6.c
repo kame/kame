@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.39 2002/09/27 09:17:43 keiichi Exp $	*/
+/*	$KAME: route6.c,v 1.40 2002/12/17 07:48:33 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -431,7 +431,8 @@ ip6_rthdr2(m, ip6, rh2)
 	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) ||
 	    IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_dst) ||
 	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst) ||
-	    IN6_IS_ADDR_V4COMPAT(&ip6->ip6_dst)) {
+	    IN6_IS_ADDR_V4COMPAT(&ip6->ip6_dst) ||
+	    IN6_IS_ADDR_LOOPBACK(&ip6->ip6_dst)) {
 		ip6stat.ip6s_badoptions++;
 		goto bad;
 	}

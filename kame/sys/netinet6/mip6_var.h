@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.75 2002/12/13 10:32:55 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.76 2002/12/17 07:48:33 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -370,6 +370,7 @@ struct mip6stat {
 	u_quad_t mip6s_seqno;		/* seqno mismatch */
 	u_quad_t mip6s_paramprobhao;	/* ICMP paramprob for HAO received */
 	u_quad_t mip6s_paramprobmh;	/* ICMP paramprob for MH received */
+	u_quad_t mip6s_invalidcoa;	/* Invalid Care-of address */
 };
 
 #ifdef _KERNEL

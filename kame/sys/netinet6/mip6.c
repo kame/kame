@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.188 2002/12/14 06:47:58 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.189 2002/12/17 07:48:32 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -731,6 +731,10 @@ mip6_process_movement(void)
 {
 	int error = 0;
 	int coa_changed = 0;
+
+	/* sanity check */
+	if (LIST_EMPTY(&mip6_prefix_list))
+		return (ENOENT);
 
 	hif_save_location();
 	coa_changed = mip6_select_coa2();

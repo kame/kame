@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.90 2002/12/13 10:43:27 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.91 2002/12/17 07:48:32 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -222,6 +222,12 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 		return (EINVAL);
 	}
 
+	if (IN6_IS_ADDR_UNSPECIFIED(&src_sa->sin6_addr) ||
+	    IN6_IS_ADDR_LOOPBACK(&src_sa->sin6_addr)) {
+		m_freem(m);
+		return (EINVAL);
+	}
+
 	/* packet length check. */
 	if (ip6mcilen < sizeof(struct ip6m_careof_test_init)) {
 		mip6log((LOG_NOTICE,
@@ -412,6 +418,12 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		m_freem(m);
+		return (EINVAL);
+	}
+
+	if (IN6_IS_ADDR_UNSPECIFIED(&src_sa->sin6_addr) ||
+	    IN6_IS_ADDR_LOOPBACK(&src_sa->sin6_addr)) {
 		m_freem(m);
 		return (EINVAL);
 	}
@@ -617,6 +629,17 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	if (mopt.valid_options & MOPT_ALTCOA)
 		bi.mbc_pcoa.sin6_addr = mopt.mopt_altcoa;
+
+	if (IN6_IS_ADDR_MULTICAST(&bi.mbc_pcoa.sin6_addr) ||
+	    IN6_IS_ADDR_UNSPECIFIED(&bi.mbc_pcoa.sin6_addr) ||
+	    IN6_IS_ADDR_V4MAPPED(&bi.mbc_pcoa.sin6_addr) ||
+	    IN6_IS_ADDR_V4COMPAT(&bi.mbc_pcoa.sin6_addr) ||
+	    IN6_IS_ADDR_LOOPBACK(&bi.mbc_pcoa.sin6_addr)) {
+		/* discard. */
+		m_freem(m);
+		mip6stat.mip6s_invalidcoa++;
+		return (EINVAL);
+	}
 
 	bi.mbc_seqno = ntohs(ip6mu->ip6mu_seqno);
 	bi.mbc_lifetime = ntohs(ip6mu->ip6mu_lifetime) << 2;	/* units of 4 secs */

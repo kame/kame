@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.308 2002/11/22 12:13:03 k-sugyou Exp $	*/
+/*	$KAME: nd6.c,v 1.309 2002/12/17 07:48:33 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -540,6 +540,7 @@ nd6_timer(ignored_arg)
 			} else {
 				struct mbuf *m = ln->ln_hold;
 				if (m) {
+					ln->ln_hold = NULL;
 					/*
 					 * Fake rcvif to make the ICMP error
 					 * more helpful in diagnosing for the
@@ -551,7 +552,6 @@ nd6_timer(ignored_arg)
 
 					icmp6_error(m, ICMP6_DST_UNREACH,
 						    ICMP6_DST_UNREACH_ADDR, 0);
-					ln->ln_hold = NULL;
 				}
 				next = nd6_free(rt, 0);
 			}
