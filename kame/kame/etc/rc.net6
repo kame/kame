@@ -3,6 +3,7 @@
 ip6router=NO
 ip6mrouter=NO
 inet6d_enable=NO
+ipv6rtsold=NO
 mip6_enable=NO
 mip6_home_prefix="2001:200:0:4819::/64"
 
@@ -205,7 +206,14 @@ else
 		$mip6control -m
 	fi
 
-	$rtsol $iface
+	# send router solicitation messages.
+	if [ X"${ipv6rtsold}" = X"YES" ]; then
+		$rtsold -a
+	else
+		if [ X"${iface}" != X ] ; then
+			$rtsol $iface
+		fi
+	fi
 
 	# install the "default interface" to kernel, which will be used 
 	# as the default route when there's no router.
