@@ -1,0 +1,240 @@
+.\"	$KAME: revlookupd.8,v 1.1 2002/05/22 15:09:27 itojun Exp $
+.\"
+.\" Copyright (C) 2000 WIDE Project.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd May 22, 2002
+.Dt REVLOOKUPD 8
+.Os KAME
+.Sh NAME
+.Nm revlookupd
+.Nd reverse lookup via ICMPv6 node information query
+.\"
+.Sh SYNOPSIS
+.Nm revlookupd
+.Bk -words
+.Op Fl 46Dfl
+.Ek
+.Bk -words
+.Op Fl h Ar hostname
+.Ek
+.Bk -words
+.Op Fl p Ar inport
+.Ek
+.Bk -words
+.Op Fl P Ar outport
+.Ek
+.Bk -words
+.Fl i Ar intface
+.Ek
+.Bk -words
+.Ar server...
+.Ek
+.\"
+.Sh DESCRIPTION
+.Nm
+works as a DNS relay server/resolver, and performs reverse address lookup
+.Pq address-to-name translation
+via ICMPv6 node information query.
+.Pp
+.Nm
+will receive unicast DNS queries,
+and generates ICMPv6 node information query if the query is a reverse lookup
+attempt against IPv6 address
+.Pq query for PTR record .
+It forwards DNS queries to unicast DNS
+.Ar servers
+as well.
+Whenever a reply comes back against ICMPv6 node information query or
+DNS query,
+.Nm
+will forward the reply to the original querier as a DNS packet.
+.Pp
+.Nm
+will try to respond to DNS queries by itself, Whenever possible.
+.Bl -tag -width Ds
+.It Fl 4
+.It Fl 6
+Controls the address family to use for DNS transport.
+By default
+.Nm
+will listen to all the available address families.
+.It Fl D
+Enable trace messages for debugging.
+.It Fl f
+Run in foreground mode.
+Do not daemonize on invocation.
+.It Fl h Ar hostname
+.Ar hostname
+specifies local hostname that
+.Nm
+will serve against incoming queries.
+If ommitted, result from
+.Xr gethostname 3
+will be used.
+.Ar hostname
+must be an FQDN, terminated by dot.
+.It Fl i Ar intface
+.Ar intface
+specifies outgoing interface for ICMPv6 node information queries,
+if the queried address is a link-local address.
+The flag is mandatory.
+.It Fl l
+Advertise scoped addresses against queries from IPv6 link-local address,
+or loopback address.
+Care must be taken if you enable it,
+scoped address and DNS are not really compatible.
+.It Fl p Ar inport
+.Nm
+listens to UDP port
+.Ar inport
+for incoming DNS multicast/unicast queries, or unicast replies.
+By default,
+.Ar inport
+will be 53.
+.Fl p
+is for debugging purposes only.
+.It Fl P Ar outport
+.Nm
+transmits UDP multicast queries to UDP port
+.Ar outport.
+By default,
+.Ar outport
+will be 53.
+.Fl P
+is for debugging purposes only
+.Po
+for running two daemons on a single node
+.Pc .
+.It Ar server
+Specify unicast DNS servers we may want to try sending queries.
+Users can list multiple DNS servers.
+.El
+.Pp
+.Nm
+will generate status dump file on signal
+.Dv SIGUSR1 .
+.\"
+.Sh FILES
+.Bl -tag -width /var/run/revlookupd.dump -compact
+.It Pa /var/run/revlookupd.dump
+Status dump file.
+.El
+.\"
+.Sh EXAMPLES
+First, run
+.Nm
+on UDP port 53
+.Pq standard DNS UDP port .
+You need to be root to issue
+.Xr bind 2
+on privileged port.
+Specify a DNS server on the command line, like
+.Li 1.2.3.4 .
+.Bd -literal -offset indent
+# revlookupd -6 -i wi0 1.2.3.4
+.Ed
+.Pp
+Then, configure
+.Xr resolv.conf 5
+to resolve IP addresses from names using
+.Nm Ns .
+.Bd -literal -offset indent
+nameserver ::1
+.Ed
+.Pp
+Here is the sequence of events which would happen on a reverse name lookup:
+.Bl -bullet
+.It
+An application on node A queries PTR record that corresponds to an IPv6 address
+of node B.
+The query is transmitted toward the address configured in
+.Pa /etc/resolv.conf ,
+which is the loopback address.
+.It
+The query reaches
+.Nm
+on node A.
+.It
+.Nm
+on node A relays the query out as an ICMPv6 node information query packet.
+.It
+.Nm
+responds to the ICMPv6 node information query, with its FQDN.
+.It
+.Nm
+on node A gets the reply from node B.
+.It
+.Nm
+on node A relays the response back to the application.
+.El
+.\"
+.Sh SEE ALSO
+.Rs
+.%A Matt Crawford
+.%T IPv6 Node Information Queries
+.%R internet draft
+.%B draft-ietf-ipngwg-icmp-name-lookups-07.txt
+.%O work in progress material
+.%D August 2000
+.Re
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+Specification conformance is still very low.
+.Pp
+.Nm
+is too aggressive when sending queries.
+.Nm
+will transmit DNS queries every time a client asks
+.Nm
+about the record.
+Instead,
+.Nm
+should add some delay between subsequent transmissions,
+and implement cache mechanisms
+.Pq both positive and negative .
+.Pp
+.Nm
+requires interface
+.Ar intface
+to be available and in
+.Dv IFF_UP
+state, on invocation.
+This may be too much to ask for laptop usage.
+.Pp
+.Nm
+relays EDNS0 pseudo RR from a original querier,
+while it should decide EDNS0 independently from the querier.
+Imagine cases where the original querier supports EDNS0,
+while multicast/unicast nameservers
+.Pq which are the destination of the relayed packet
+do not.
