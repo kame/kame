@@ -1,8 +1,23 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.409 2000/01/06 07:45:17 itojun Exp $
+$Id: CHANGELOG,v 1.410 2000/01/06 09:35:52 jinmei Exp $
 
 <200001>
+2000-01-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_input): upper layer detection
+	in notifying an icmp6 error was improved:
+	- if the erroneous packet contains a routing header, examine the
+	header to determine the final destination and use it to update
+	path MTU.
+	- if an erroneous packet contians a fragment header, stop
+	examination of the header chain unless it is the first fragment.
+
+	With the former fix the kernel will perform path MTU discovery
+	correctly even if triggered packets contain a routing header.
+
+	* A new function icmp6_mtudisc_update() was added to cleanup the
+	code.
+
 Thu Jan  6 16:43:52 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: when searching IPsec SA for inbound IPsec traffic,
 	  do not check src match according to RFC2401.  it looks that IPsec
