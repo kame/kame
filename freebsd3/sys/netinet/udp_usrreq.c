@@ -87,9 +87,15 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#include <netinet/ip6.h>
+#endif
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#include <netinet6/ip6_var.h>
+#endif
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp_var.h>
 #include <netinet/udp.h>
@@ -129,9 +135,22 @@ SYSCTL_STRUCT(_net_inet_udp, UDPCTL_STATS, stats, CTLFLAG_RD,
 
 static struct	sockaddr_in udp_in = { sizeof(udp_in), AF_INET };
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
-static struct	sockaddr_in6 udp_in6;
-static int udp_in6_init_done;
+struct udp_in6 {
+	struct sockaddr_in6	uin6_sin;
+	u_char			uin6_init_done : 1;
+} udp_in6 = {
+	{ sizeof(udp_in6.uin6_sin), AF_INET6 },
+	0
+};
+struct udp_ip6 {
+	struct ip6_hdr		uip6_ip6;
+	u_char			uip6_init_done : 1;
+} udp_ip6;
 #endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+
+static void udp_append __P((struct inpcb *last, struct ip *ip,
+			    struct mbuf *n));
+static void ip_2_ip6_hdr __P((struct ip6_hdr *ip6, struct ip *ip));
 
 static int udp_detach __P((struct socket *so));
 static int udp_output __P((struct inpcb *, struct mbuf *, struct sockaddr *,
@@ -161,7 +180,7 @@ udp_input(m, off, proto)
 	struct mbuf *opts = 0;
 	int len;
 	struct ip save_ip;
-	struct sockaddr *append_sa = (struct sockaddr *)&udp_in;
+	struct sockaddr *append_sa;
 
 	udpstat.udps_ipackets++;
 
@@ -254,7 +273,7 @@ udp_input(m, off, proto)
 		 */
 		last = NULL;
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
-		udp_in6_init_done = NULL;
+		udp_in6.uin6_init_done = udp_ip6.uip6_init_done = 0;
 #endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
 		LIST_FOREACH(inp, &udb, inp_list) {
 			if ((inp->inp_vflag & INP_IPV4) == NULL)
@@ -284,33 +303,8 @@ udp_input(m, off, proto)
 					/* do not inject data to pcb */
 				} else
 #endif /*IPSEC*/
-				if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
-					if (last->inp_flags & INP_CONTROLOPTS
-					    || last->inp_socket->so_options & SO_TIMESTAMP)
-						ip_savecontrol(last, &opts, ip, n);
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
-					if (last->inp_vflag & INP_IPV6) {
-						if (udp_in6_init_done == NULL) {
-							in6_sin_2_v4mapsin6(&udp_in, &udp_in6);
-							udp_in6_init_done = 1;
-						}
-						append_sa = (struct sockaddr *)
-							&udp_in6;
-					} else
-						append_sa = (struct sockaddr *)
-							&udp_in;
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
-					if (sbappendaddr(&last->inp_socket->so_rcv,
-							 append_sa, n, opts)
-					    == 0) {
-						m_freem(n);
-						if (opts)
-						    m_freem(opts);
-						udpstat.udps_fullsock++;
-					} else
-						sorwakeup(last->inp_socket);
-					opts = 0;
-				}
+				if ((n = m_copy(m, 0, M_COPYALL)) != NULL)
+					udp_append(last, ip, n);
 			}
 			last = inp;
 			/*
@@ -341,24 +335,7 @@ udp_input(m, off, proto)
 			goto bad;
 		}
 #endif /*IPSEC*/
-		if (last->inp_flags & INP_CONTROLOPTS
-		    || last->inp_socket->so_options & SO_TIMESTAMP)
-			ip_savecontrol(last, &opts, ip, m);
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
-		if (last->inp_vflag & INP_IPV6) {
-			if (udp_in6_init_done == NULL) {
-				in6_sin_2_v4mapsin6(&udp_in, &udp_in6);
-				udp_in6_init_done = 1;
-			}
-			append_sa = (struct sockaddr *)&udp_in6;
-		}
-#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
-		if (sbappendaddr(&last->inp_socket->so_rcv, append_sa, m, opts)
-		    == 0) {
-			udpstat.udps_fullsock++;
-			goto bad;
-		}
-		sorwakeup(last->inp_socket);
+		udp_append(last, ip, m);
 		return;
 	}
 	/*
@@ -403,18 +380,31 @@ udp_input(m, off, proto)
 	udp_in.sin_port = uh->uh_sport;
 	udp_in.sin_addr = ip->ip_src;
 	if (inp->inp_flags & INP_CONTROLOPTS
-	    || inp->inp_socket->so_options & SO_TIMESTAMP)
+	    || inp->inp_socket->so_options & SO_TIMESTAMP) {
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+		if (inp->inp_vflag & INP_IPV6) {
+			int savedflags;
+
+			ip_2_ip6_hdr(&udp_ip6.uip6_ip6, ip);
+			savedflags = inp->inp_flags;
+			inp->inp_flags &= ~INP_UNMAPPABLEOPTS;
+			ip6_savecontrol(inp, &opts, &udp_ip6.uip6_ip6, m);
+			inp->inp_flags = savedflags;
+		} else
+#endif
 		ip_savecontrol(inp, &opts, ip, m);
+	}
 	iphlen += sizeof(struct udphdr);
 	m->m_len -= iphlen;
 	m->m_pkthdr.len -= iphlen;
 	m->m_data += iphlen;
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
-		if (inp->inp_vflag & INP_IPV6) {
-			in6_sin_2_v4mapsin6(&udp_in, &udp_in6);
-			append_sa = (struct sockaddr *)&udp_in6;
-		}
+	if (inp->inp_vflag & INP_IPV6) {
+		in6_sin_2_v4mapsin6(&udp_in, &udp_in6.uin6_sin);
+		append_sa = (struct sockaddr *)&udp_in6;
+	} else
 #endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+	append_sa = (struct sockaddr *)&udp_in;
 	if (sbappendaddr(&inp->inp_socket->so_rcv, append_sa, m, opts) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
@@ -426,6 +416,74 @@ bad:
 	if (opts)
 		m_freem(opts);
 	return;
+}
+
+static void
+ip_2_ip6_hdr(ip6, ip)
+	struct ip6_hdr *ip6;
+	struct ip *ip;
+{
+	bzero(ip6, sizeof(*ip6));
+
+	ip6->ip6_vfc = IPV6_VERSION;
+	ip6->ip6_plen = ip->ip_len;
+	ip6->ip6_nxt = ip->ip_p;
+	ip6->ip6_hlim = ip->ip_ttl;
+	ip6->ip6_src.s6_addr32[2] = ip6->ip6_dst.s6_addr32[2] =
+		IPV6_ADDR_INT32_SMP;
+	ip6->ip6_src.s6_addr32[3] = ip->ip_src.s_addr;
+	ip6->ip6_dst.s6_addr32[3] = ip->ip_dst.s_addr;
+}
+
+/*
+ * subroutine of udp_input(), mainly for source code readability.
+ * caller must properly init udp_ip6 and udp_in6 beforehand.
+ */
+static void
+udp_append(last, ip, n)
+	struct inpcb *last;
+	struct ip *ip;
+	struct mbuf *n;
+{
+	struct sockaddr *append_sa;
+	struct mbuf *opts = 0;
+
+	if (last->inp_flags & INP_CONTROLOPTS ||
+	    last->inp_socket->so_options & SO_TIMESTAMP) {
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+		if (last->inp_vflag & INP_IPV6) {
+			int savedflags;
+
+			if (udp_ip6.uip6_init_done = 0) {
+				ip_2_ip6_hdr(&udp_ip6.uip6_ip6, ip);
+				udp_ip6.uip6_init_done = 1;
+			}
+			savedflags = last->inp_flags;
+			last->inp_flags &= ~INP_UNMAPPABLEOPTS;
+			ip6_savecontrol(last, &opts, &udp_ip6.uip6_ip6, n);
+			last->inp_flags = savedflags;
+		} else
+#endif
+		ip_savecontrol(last, &opts, ip, n);
+	}
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+	if (last->inp_vflag & INP_IPV6) {
+		if (udp_in6.uin6_init_done = 0) {
+			in6_sin_2_v4mapsin6(&udp_in, &udp_in6.uin6_sin);
+			udp_in6.uin6_init_done = 1;
+		}
+		append_sa = (struct sockaddr *)&udp_in6.uin6_sin;
+	} else
+#endif
+	append_sa = (struct sockaddr *)&udp_in;
+
+	if (sbappendaddr(&last->inp_socket->so_rcv, append_sa, n, opts) == 0) {
+		m_freem(n);
+		if (opts)
+			m_freem(opts);
+		udpstat.udps_fullsock++;
+	} else
+		sorwakeup(last->inp_socket);
 }
 
 /*
