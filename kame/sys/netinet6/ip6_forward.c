@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.71 2001/06/11 09:17:30 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.72 2001/06/11 13:29:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -616,7 +616,7 @@ ip6_forward(m, srcrt)
 		    	rv = pfh->pfil_func(ip6, sizeof(*ip6), rt->rt_ifp, 1, &m1);
 			if (rv) {
 				error = EHOSTUNREACH;
-				goto freecopy;
+				goto senderr;
 			}
 			m = m1;
 			if (m == NULL)
@@ -643,6 +643,7 @@ ip6_forward(m, srcrt)
 	if (mcopy == NULL)
 		return;
 
+ senderr:
 	switch (error) {
 	case 0:
 #if 1
