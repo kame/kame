@@ -1,4 +1,4 @@
-.\"	$KAME: inet6_option_space.3,v 1.6 2000/05/17 14:22:26 itojun Exp $
+.\"	$KAME: inet6_option_space.3,v 1.7 2000/05/17 14:32:13 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -177,7 +177,8 @@ before calling this function.
 The option type must have a value from
 .Li 2
 to
-.Li 255 , inclusive.
+.Li 255 ,
+inclusive.
 .Po
 .Li 0
 and
@@ -403,7 +404,8 @@ on an error.
 .Pp
 .Fn inet6_option_alloc
 returns
-.Dv NULL on an error.
+.Dv NULL
+on an error.
 .Pp
 On errors,
 .Fn inet6_option_next
