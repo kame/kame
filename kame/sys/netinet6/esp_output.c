@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.20 2000/05/19 04:01:47 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.21 2000/05/22 08:49:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -541,8 +541,24 @@ esp_output(m, nexthdrp, md, isr, af)
 	if (AH_MAXSUMSIZE < siz)
 		panic("assertion failed for AH_MAXSUMSIZE");
 
-	if (esp_auth(m, espoff, m->m_pkthdr.len - espoff, sav, authbuf))
-		goto noantireplay;
+	if (esp_auth(m, espoff, m->m_pkthdr.len - espoff, sav, authbuf)) {
+		ipseclog((LOG_ERR, "ESP checksum generation failure\n"));
+		m_freem(m);
+		error = EINVAL;
+		switch (af) {
+#ifdef INET
+		case AF_INET:
+			ipsecstat.out_inval++;
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
+			ipsec6stat.out_inval++;
+			break;
+#endif
+		}
+		goto fail;
+	}
 
 	n = m;
 	while (n->m_next)
