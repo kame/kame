@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.50 2001/06/01 22:54:39 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.51 2001/06/14 09:07:19 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -119,14 +119,18 @@ struct icmp6_hdr {
 #define ICMP6_NI_QUERY			139	/* node information request */
 #define ICMP6_NI_REPLY			140	/* node information reply */
 
-/* The definitions below are experimental. TBA */
-#define MLD6_MTRACE_RESP		141	/* mtrace response(to sender) */
-#define MLD6_MTRACE			142	/* mtrace messages */
+/* The belows are not yet defined in 2292bis. They will be renamed */
+#define IND_SOLICIT			141	/* inverse neighbor solicitation */
+#define IND_ADVERT			142	/* inverse neighbor advertisment */
 
-#define ICMP6_HADISCOV_REQUEST		143	/* XXX To be defined */
-#define ICMP6_HADISCOV_REPLY		144	/* XXX To be defined */
+/* The definitions below are experimental. TBA */
+#define MLD6_MTRACE_RESP		200	/* mtrace response(to sender) */
+#define MLD6_MTRACE			201	/* mtrace messages */
+
+#define ICMP6_HADISCOV_REQUEST		202	/* XXX To be defined */
+#define ICMP6_HADISCOV_REPLY		203	/* XXX To be defined */
   
-#define ICMP6_MAXTYPE			144
+#define ICMP6_MAXTYPE			203
 
 #define ICMP6_DST_UNREACH_NOROUTE	0	/* no route to destination */
 #define ICMP6_DST_UNREACH_ADMIN	 	1	/* administratively prohibited */
@@ -297,13 +301,12 @@ struct nd_opt_hdr {		/* Neighbor discovery option header */
 #define ND_OPT_PREFIX_INFORMATION	3
 #define ND_OPT_REDIRECTED_HEADER	4
 #define ND_OPT_MTU			5
-#if 0
-#define ND_OPT_ADV_INTERVAL		7	/* KAME local, MIP6 - compat */
-#define ND_OPT_HA_INFORMATION		8	/* KAME local, MIP6 - compat */
-#endif
 #define ND_OPT_ADVINTERVAL		7	/* 2292bis-02 */
 #define ND_OPT_HOMEAGENT_INFO		8	/* 2292bis-02 */
-#define ND_OPT_ROUTE_INFO		9	/* draft-ietf-ipngwg-router-preference, not officially assigned yet */
+#deifne ND_OPT_SOURCE_ADDRLIST		9	/* will be renamed */
+#deifne ND_OPT_TARGET_ADDRLIST		10	/* will be renamed */
+
+#define ND_OPT_ROUTE_INFO		200	/* draft-ietf-ipngwg-router-preference, not officially assigned yet */
 
 struct nd_opt_prefix_info {	/* prefix information */
 	u_int8_t	nd_opt_pi_type;
