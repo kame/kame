@@ -15,8 +15,9 @@ SRCS+=	getaddrinfo.c
 .endif
 SRCS+=	if_indextoname.c if_nameindex.c if_nametoindex.c
 SRCS+=	rthdr.c ip6opt.c
-SRCS+=	base64.c herror.c nsap_addr.c 
+SRCS+=	base64.c nsap_addr.c 
 .if !defined(USE_LIBBIND6) || ${USE_LIBBIND6} == NO
+SRCS+=	herror.c
 SRCS+=	name6.c
 SRCS+=	res_comp.c res_data.c res_debug.c
 SRCS+=	res_init.c res_mkquery.c res_query.c 
