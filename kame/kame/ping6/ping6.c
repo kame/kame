@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.99 2000/11/08 09:55:45 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.100 2000/11/14 12:44:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -987,7 +987,7 @@ main(argc, argv)
 		if ((cc = recvmsg(s, &m, 0)) < 0) {
 			if (errno == EINTR)
 				continue;
-			warn("recvfrom");
+			warn("recvmsg");
 			continue;
 		}
 
