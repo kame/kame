@@ -106,7 +106,7 @@ struct	mtx ifnet_lock;
 static int	if_cloners_count;
 LIST_HEAD(, if_clone) if_cloners = LIST_HEAD_INITIALIZER(if_cloners);
 
-int	if_indexlim = 8;
+int	if_indexlim = 0;
 static struct	klist ifklist;
 
 static void	filt_netdetach(struct knote *kn);
@@ -267,7 +267,10 @@ if_grow(void)
 	u_int n;
 	struct ifindex_entry *e;
 
-	if_indexlim <<= 1;
+	if (if_indexlim)
+		if_indexlim <<= 1;
+	else
+		if_indexlim = 8;
 	n = if_indexlim * sizeof(*e);
 	e = malloc(n, M_IFADDR, M_WAITOK | M_ZERO);
 	if (ifindex_table != NULL) {

@@ -136,7 +136,7 @@ ifinit()
 
 static int if_index = 0;
 struct ifaddr **ifnet_addrs = NULL;
-int if_indexlim = 8;
+int if_indexlim = 0;
 struct ifnet **ifindex2ifnet = NULL;
 struct ifnet_head ifnet;
 struct ifnet *lo0ifp;
@@ -164,6 +164,8 @@ if_attachsetup(ifp)
 		caddr_t q;
 		
 		oldlim = if_indexlim;
+		if (if_indexlim == 0)
+			if_indexlim = 8;
 		while (if_index >= if_indexlim)
 			if_indexlim <<= 1;
 

@@ -137,7 +137,7 @@ ifinit(dummy)
 
 static int if_index = 0;
 struct ifaddr **ifnet_addrs;
-int if_indexlim = 8;
+int if_indexlim = 0;
 struct ifnet **ifindex2ifnet = NULL;
 
 
@@ -174,8 +174,15 @@ if_attach(ifp)
 	LIST_INIT(&ifp->if_multiaddrs);
 	getmicrotime(&ifp->if_lastchange);
 	if (ifnet_addrs == 0 || if_index >= if_indexlim) {
-		unsigned n = (if_indexlim <<= 1) * sizeof(ifa);
-		caddr_t q = malloc(n, M_IFADDR, M_WAITOK);
+		unsigned n;
+		caddr_t q;
+
+		if (if_indexlim)
+			n = (if_indexlim <<= 1) * sizeof(ifa);
+		else
+			n = if_indexlim = 8;
+		q = malloc(n, M_IFADDR, M_WAITOK);
+
 		bzero(q, n);
 		if (ifnet_addrs) {
 			bcopy((caddr_t)ifnet_addrs, (caddr_t)q, n/2);
