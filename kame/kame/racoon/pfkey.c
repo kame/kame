@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.48 2000/06/12 17:57:59 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.49 2000/06/14 09:48:29 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1082,6 +1082,9 @@ pk_recvupdate(mhp)
 	
 	/* update status */
 	iph2->status = PHASE2ST_ESTABLISHED;
+
+	/* count up */
+	iph2->ph1->ph2cnt++;
 
 	/*
 	 * since we are going to reuse the phase2 handler, we need to

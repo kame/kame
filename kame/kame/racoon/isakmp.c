@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.66 2000/06/12 18:17:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.67 2000/06/14 09:48:29 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -617,6 +617,7 @@ isakmp_ph1begin_i(rmconf, remote)
 	iph1->version = ISAKMP_VERSION_NUMBER;
 	iph1->msgid = 0;
 	iph1->flags = 0;
+	iph1->ph2cnt = 0;
 
 	/* XXX copy remote address */
 	if (copy_ph1addresses(iph1, rmconf, remote) < 0)

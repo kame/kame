@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.23 2000/06/08 06:43:51 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.24 2000/06/14 09:48:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -146,6 +146,7 @@ dumpph1()
 		pd->version = iph1->version;
 		pd->etype = iph1->etype;
 		pd->created = iph1->created;
+		pd->ph2cnt = iph1->ph2cnt;
 		pd++;
 	}
 

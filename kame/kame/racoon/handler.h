@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.22 2000/06/12 05:35:59 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.23 2000/06/14 09:48:29 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -114,9 +114,6 @@ struct ph1handle {
 	u_int8_t flags;			/* Flags */
 	u_int32_t msgid;		/* message id */
 
-	int inuse;			/* received EXPIRE message */
-					/* 0: init, 1: grace, 2: sa require */
-
 	struct sched *sce;		/* schedule for expire */
 	struct sched *scr;		/* schedule for resend */
 	struct sched *scg;		/* schedule for release half connect */
@@ -162,6 +159,7 @@ struct ph1handle {
 	time_t created;			/* timestamp for establish */
 
 	u_int32_t msgid2;		/* msgid counter for Phase 2 */
+	int ph2cnt;			/* count to negotiate phase 2. */
 	LIST_HEAD(_ph2ofph1_, ph2handle) ph2tree;
 
 	LIST_ENTRY(ph1handle) chain;
@@ -278,8 +276,8 @@ struct ph1dump {
 	struct sockaddr_storage local;
 	u_int8_t version;
 	u_int8_t etype;	
-	int inuse;
 	time_t created;
+	int ph2cnt;
 };
 
 struct sockaddr;
