@@ -63,7 +63,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: mld6.c,v 1.7 2000/01/04 17:17:21 jinmei Exp $
+ *  $Id: mld6.c,v 1.8 2000/01/27 10:44:02 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -114,6 +114,10 @@ static void mld6_read __P((int i, fd_set * fds));
 static void accept_mld6 __P((int len));
 static void make_mld6_msg __P((int, int, struct sockaddr_in6 *,
 	struct sockaddr_in6 *, struct in6_addr *, int, int, int, int));
+
+#ifndef IP6OPT_ROUTER_ALERT	/* XXX to be compatible older systems */
+#define IP6OPT_ROUTER_ALERT IP6OPT_RTALERT
+#endif
 
 /*
  * Open and initialize the MLD socket.

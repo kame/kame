@@ -130,6 +130,10 @@ static u_short rtalert_code;
 static void mld6_read __P((int i, fd_set * fds));
 static void accept_mld6 __P((int len));
 
+#ifndef IP6OPT_ROUTER_ALERT	/* XXX to be compatible older systems */
+#define IP6OPT_ROUTER_ALERT IP6OPT_RTALERT
+#endif
+
 /*
  * Open and initialize the MLD socket.
  */
