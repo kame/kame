@@ -1,12 +1,8 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1057 2000/06/22 20:20:55 itojun Exp $
+$Id: CHANGELOG,v 1.1058 2000/06/23 06:46:05 itojun Exp $
 
 <200006>
-Fri Jun 23 05:17:41 JST 2000  itojun@iijlab.net
-	* kame/rtadvd/rtadvd.c: on reception of RS, send unicast RA to the
-	  querier as well as multicast RA to all-nodes.
-
 Thu Jun 22 17:40:37 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey:
 	delete sadb_x_ident_id_addr.  don't send a pair of addresses
