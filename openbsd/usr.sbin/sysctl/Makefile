@@ -3,4 +3,6 @@
 PROG=	sysctl
 MAN=	sysctl.8
 
+CPPFLAGS+=	-DINET6
+
 .include <bsd.prog.mk>
