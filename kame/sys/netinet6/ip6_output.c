@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.216 2001/08/16 13:33:04 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.217 2001/08/28 08:51:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -943,8 +943,9 @@ skip_ipsec2:;
 		if ((zone = in6_addr2zoneid(ifp0, &src.sin6_addr)) < 0 ||
 		    zone != src.sin6_scope_id) {
 #ifdef SCOPEDEBUG		/* will be removed shortly */
-			printf("ip6 output: bad source scope %s on %s\n",
-			       ip6_sprintf(&ip6->ip6_src), if_name(ifp0));
+			printf("ip6 output: bad source scope %s for %s on %s\n",
+			       ip6_sprintf(&ip6->ip6_src),
+			       ip6_sprintf(&ip6->ip6_dst), if_name(ifp0));
 #endif
 			goto badscope;
 		}
