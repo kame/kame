@@ -31,6 +31,7 @@ option		ALTQ_PRIQ	#priority queue
 # NOTE: may not work due to prefix management changes (Feb2001)
 #option		MIP6
 #option		MIP6_DEBUG
+#rmoption 	IPSEC
 
 # ART routing table lookup algorithm (inet/inet6)
 #option		RADIX_ART
