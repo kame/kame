@@ -1241,6 +1241,7 @@ bgp_config()
 
 		/* peer address setting */
 		bnp->rp_addr = info->peeraddr;
+		bnp->rp_addr.sin6_port = htons(BGP_PORT);
 		if (IN6_IS_ADDR_LINKLOCAL(&bnp->rp_addr.sin6_addr))
 			bnp->rp_laddr = bnp->rp_addr.sin6_addr; /* copy  */
 		else
