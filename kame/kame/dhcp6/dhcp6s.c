@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.151 2005/03/26 15:52:31 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.152 2005/03/27 03:07:49 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2517,7 +2517,7 @@ calc_ia_timo(ia, ialist, client_conf)
 	case DHCP6_LISTVAL_STATEFULADDR6:
 		/*
 		 * Configure the timeout parameters as recommended in
-		 * Section 8 of dhcpv6-opt-prefix-delegation-01.
+		 * Section 22.4 of RFC3315 and Section 9 of RFC3633.
 		 * We could also set the parameters to 0 if we let the client
 		 * decide the renew timing (not implemented yet).
 		 */
