@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.67 2001/01/23 14:47:08 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.68 2001/01/23 15:32:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1433,6 +1433,20 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 	 * Is it really mandatory? Theoretically, a global or a site-local
 	 * address can be configured without a link-local address, if we
 	 * have a unique interface identifier...
+	 *
+	 * it is not mandatory to have link-local address, we can generate
+	 * interface identifier on the fly.  we do this because:
+	 * (1) it should be the easiest way to find interface identifier.
+	 * (2) RFC2462 5.4 suggesting the use of the same interface identifier
+	 * for multiple addresses on a single interface, and possible shortcut
+	 * of DAD.  we omitted DAD for this reason in the past.
+	 * (3) a user can prevent autoconfiguration of global address 
+	 * by removing link-local address by hand (this is partly because we
+	 * don't have other way to control the use of IPv6 on a interface.
+	 * this has been our design choice - cf. NRL's "ifconfig auto").
+	 * (4) it is easier to manage when an interface has addresses
+	 * with the same interface identifier, than to have multiple addresses
+	 * with different interface identifiers.
 	 */
 	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp, 0);/* 0 is OK? */
 	if (ifa)
