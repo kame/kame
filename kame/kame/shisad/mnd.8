@@ -1,4 +1,4 @@
-.\"	$KAME: mnd.8,v 1.2 2005/01/05 07:23:44 itojun Exp $
+.\"	$KAME: mnd.8,v 1.3 2005/01/22 12:55:56 t-momose Exp $
 .\"
 .\" Copyright (C) 2004 WIDE Project.
 .\" All rights reserved.
@@ -38,6 +38,7 @@
 .Nm
 .Op Fl d
 .Op Fl i Ar interface
+.Op Fl l Ar lifetime
 .\"
 .Sh DESCRIPTION
 .Nm
@@ -52,7 +53,7 @@ Correspondent node functionality isn't provided with
 .Nm .
 You have to start
 .Xr cnd 8
-separately.
+separately if you need.
 .Pp
 The command line options are:
 .Bl -tag -width indent
@@ -63,6 +64,8 @@ A home address is taken from attched this interface.
 .It Fl d
 Output debugging messages to 
 .Xr syslogd 8
+.It Fl l Ar lifetime
+Specify default home registration lifetime value. The unit is second.
 .El
 .Pp
 Telnet interface to see the status of the mobile node is provided on port 7778.
