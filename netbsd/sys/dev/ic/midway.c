@@ -1327,6 +1327,22 @@ caddr_t data;
 			error = en_pvctx(sc, (struct pvctxreq *)data);
 		break;
 
+	case SIOCGPVCFWD:
+	{
+		struct pvcfwdreq *req = (struct pvcfwdreq *)data;
+		error = pvc_set_fwd(req->pvc_ifname, req->pvc_ifname2, 2);
+		break;
+	}	
+
+	case SIOCSPVCFWD:
+	{
+		struct pvcfwdreq *req = (struct pvcfwdreq *)data;
+		if ((error = suser(curproc->p_ucred, &curproc->p_acflag)) == 0)
+			error = pvc_set_fwd(req->pvc_ifname, req->pvc_ifname2,
+					    req->pvc_op);
+		break;
+	}
+
 #endif /* ATM_PVCEXT */
 
 	default: 
