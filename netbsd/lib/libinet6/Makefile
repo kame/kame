@@ -1,3 +1,5 @@
+SRCDIR=	${.CURDIR}/../../kame/libinet6
+
 LIB=	inet6
 CPPFLAGS+=-DDNS
 CPPFLAGS+=-DINET6 -DUSE_GETIPNODEBY
@@ -20,7 +22,7 @@ MLINKS+=	getipnodebyname.3 getipnodebyaddr.3 \
 		if_indextoname.3 if_nameindex.3 \
 		if_indextoname.3 if_freenameindex.3
 
-.PATH:	${.CURDIR}/resolv
+.PATH:	${SRCDIR} ${SRCDIR}/resolv
 
 # If you attempt to build shared library, enable the following lines.
 # Do it at your own risk!  libinet6 is updated frequently so version
