@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.30 2004/04/22 02:44:28 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.31 2004/04/27 11:45:06 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2714,8 +2714,12 @@ match_msf6_per_if(in6m, src, dst)
 		mldlog((LOG_DEBUG, "grp found, but src is NULL. impossible"));
 		return 0;
 	}
-	if (in6ms->i6ms_grpjoin > 0)
-		return 1;
+	if (in6ms->i6ms_grpjoin != 0) {
+		if (in6ms->i6ms_mode != MCAST_EXCLUDE)
+			return 0;	/* XXX: impossible */
+		if (in6ms->i6ms_cur == NULL || in6ms->i6ms_cur->numsrc == 0)
+			return 1;
+	}
 
 	if (in6ms->i6ms_cur == NULL || in6ms->i6ms_cur->head == NULL)
 		return 0;
