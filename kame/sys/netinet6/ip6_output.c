@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.411 2004/01/19 04:56:15 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.412 2004/01/19 04:58:40 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -575,10 +575,13 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	/* Fall through to the routing/multicast handling code */
  done_spd:
 #else
+	if ((flags & IPV6_FORWARDING) != 0) {
+		needipsec = 0;
+		goto skippolicycheck;
+	}
+
 	/* get a security policy for this packet */
-	if ((flags & IPV6_FORWARDING) != 0)
-		sp = NULL;
-	else if (so == NULL)
+	if (so == NULL)
 		sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, 0, &error);
 	else
 		sp = ipsec6_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
@@ -618,6 +621,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	default:
 		printf("ip6_output: Invalid policy found. %d\n", sp->policy);
 	}
+
+  skippolicycheck:;
 #endif /* OpenBSD */
 #endif /* IPSEC */
 
