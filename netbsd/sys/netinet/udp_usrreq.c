@@ -547,7 +547,7 @@ udp4_realinput(src, dst, m, off)
 	dst4 = &dst->sin_addr;
 	dport = &dst->sin_port;
 
-	if (IN_MULTICAST(src4->s_addr) ||
+	if (IN_MULTICAST(dst4->s_addr) ||
 	    in_broadcast(*dst4, m->m_pkthdr.rcvif)) {
 		struct inpcb *last;
 		/*
@@ -714,7 +714,7 @@ udp6_realinput(af, src, dst, m, off)
 	src4 = (struct in_addr *)&src->sin6_addr.s6_addr32[12];
 
 	if (IN6_IS_ADDR_MULTICAST(dst6)
-	 || (af == AF_INET && IN_MULTICAST(src4->s_addr))) {
+	 || (af == AF_INET && IN_MULTICAST(dst4->s_addr))) {
 		struct in6pcb *last;
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
