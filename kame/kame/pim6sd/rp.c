@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.30 2003/08/15 06:02:27 suz Exp $	*/
+/*	$KAME: rp.c,v 1.31 2003/08/15 06:03:56 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1294,6 +1294,19 @@ create_pim6_bootstrap_message(send_buff)
     for (grp_mask_ptr = grp_mask_list; grp_mask_ptr != (grp_mask_t *) NULL;
 	 grp_mask_ptr = grp_mask_ptr->next)
     {
+	int bsr_entry = 0;
+
+	/* You don't have to redistribute Static-RP configuration by BSR */
+	for (grp_rp_entry_ptr = grp_mask_ptr->grp_rp_next;
+	     grp_rp_entry_ptr != (rp_grp_entry_t *) NULL;
+	     grp_rp_entry_ptr = grp_rp_entry_ptr->grp_rp_next) {
+	    if (grp_rp_entry_ptr->origin != RP_ORIGIN_BSR)
+	    	continue;
+	    bsr_entry = 1;
+	}
+	if (bsr_entry == 0)
+		continue;
+
 	MASK_TO_MASKLEN6(grp_mask_ptr->group_mask, masklen);
 	PUT_EGADDR6(grp_mask_ptr->group_addr.sin6_addr, masklen, 0, data_ptr);
 	PUT_BYTE(grp_mask_ptr->group_rp_number, data_ptr);
