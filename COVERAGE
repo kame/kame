@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.1 2000/02/17 07:07:47 itojun Exp $
+$Id: COVERAGE,v 1.2 2000/02/17 07:12:33 itojun Exp $
 
 
 x: supported/integrated
@@ -24,6 +24,8 @@ NAT/PT		(*1)	(*1)	x	(*1)	(*1)	(*1)
 
 mobile-ip6	(*1)	(*1)	(*1)	(*1)	(*1)	(*1)
     (*1) compilable but not tested
+
+2292bis on TCP	x	-	x	x	x	-
 
 
 		merged *-current	merged
