@@ -1,6 +1,9 @@
-$Id: CHANGELOG,v 1.502 2000/01/31 16:13:17 itojun Exp $
+$Id: CHANGELOG,v 1.503 2000/01/31 16:53:08 sumikawa Exp $
 
 <200002>
+Tue Feb  1 01:52:20 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/echoping: echoping 2.2.0 with IPv6 support.
+
 Tue Feb  1 01:11:34 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/solidpop3d: pop3 daemon from poland.
 	* kame/racoon: simplify the configure process.  allow it to be compiled
@@ -64,10 +67,11 @@ Fri Jan 28 15:37:46 JST 2000  itojun@iijlab.net
 	  userland applications with this fix.
 
 Thu Jan 27 15:04:12 JST 2000  itojun@iiljab.net
-	* netbsd/pkgsrc/net/rsync: upgrade to 2.3.2 with latest IPv6 patch.
+	* netbsd/pkgsrc/net/rsync, freebsd[23]/ports/rsync: upgrade to
+	  2.3.2 with latest IPv6 patch.
 
 Thu Jan 27 06:20:08 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd3/ports/irc: upgrade to 2.10.3.
+	* freebsd[23]/ports/irc: upgrade to 2.10.3.
 
 Thu Jan 27 00:29:51 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/in6_pcb.c: make IPV6_PORTRANGE actually work.
