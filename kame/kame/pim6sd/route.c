@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.24 2002/12/24 04:43:12 suz Exp $	*/
+/*	$KAME: route.c,v 1.25 2003/02/05 15:30:33 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -47,6 +47,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <net/route.h>

@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.22 2003/01/30 04:04:37 suz Exp $	*/
+/*	$KAME: rp.c,v 1.23 2003/02/05 15:30:33 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -75,6 +75,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <net/route.h>

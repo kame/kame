@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.32 2002/12/15 04:23:23 suz Exp $	*/
+/*	$KAME: config.c,v 1.33 2003/02/05 15:30:32 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -58,6 +58,7 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
 #include <net/if.h>

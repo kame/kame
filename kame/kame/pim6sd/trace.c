@@ -1,4 +1,4 @@
-/*	$KAME: trace.c,v 1.17 2002/06/26 12:44:30 jinmei Exp $	*/
+/*	$KAME: trace.c,v 1.18 2003/02/05 15:30:33 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -68,6 +68,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>

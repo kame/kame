@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.28 2003/01/30 04:04:37 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.29 2003/02/05 15:30:32 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -30,6 +30,7 @@
  */
 %{
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <net/route.h>

@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.57 2003/01/23 00:26:46 suz Exp $	*/
+/*	$KAME: debug.c,v 1.58 2003/02/05 15:30:33 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -66,6 +66,7 @@
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/pim6.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <syslog.h>
 #include <errno.h>
 #include "defs.h"

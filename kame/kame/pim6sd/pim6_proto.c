@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.57 2002/12/09 06:49:58 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.58 2003/02/05 15:30:33 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -103,6 +103,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <net/route.h>

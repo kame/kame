@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.14 2002/12/24 11:08:03 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.15 2003/02/05 15:30:33 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -47,6 +47,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <net/route.h>
