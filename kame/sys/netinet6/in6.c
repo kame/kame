@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.186 2001/05/17 07:15:51 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.187 2001/05/24 07:43:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1246,6 +1246,13 @@ in6_update_ifa(ifp, ifra, ia)
 			if (in6m == NULL && ia != NULL) {
 				(void)in6_addmulti(&mltaddr.sin6_addr,
 				    ifp, &error);
+				if (error != 0) {
+					log(LOG_WARNING, "in6_update_ifa: "
+					    "addmulti failed for "
+					    "%s on %s (errno=%d)\n",
+					    ip6_sprintf(&mltaddr.sin6_addr), 
+					    if_name(ifp), error);
+				}
 			}
 		}
 #ifdef __FreeBSD__

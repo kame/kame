@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.117 2001/04/24 15:50:03 sumikawa Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.118 2001/05/24 07:44:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -782,8 +782,14 @@ in6_nigroup_attach(name, namelen)
 	{
 		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
 		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
-		if (!in6m)
-			(void)in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
+		if (!in6m) {
+			if (!in6_addmulti(&mltaddr.sin6_addr, ifp, &error)) {
+				nd6log((LOG_ERR, "%s: failed to join %s "
+				    "(errno=%d)\n", if_name(ifp),
+				    ip6_sprintf(&mltaddr.sin6_addr), 
+				    error));
+			}
+		}
 	}
 }
 

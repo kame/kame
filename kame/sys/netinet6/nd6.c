@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.143 2001/05/17 05:57:15 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.144 2001/05/24 07:44:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1448,10 +1448,11 @@ nd6_rtrequest(req, rt, sa)
 				llsol.s6_addr32[2] = htonl(1);
 				llsol.s6_addr8[12] = 0xff;
 
-				(void)in6_addmulti(&llsol, ifp, &error);
-				if (error)
-					printf(
-"nd6_rtrequest: could not join solicited node multicast (errno=%d)\n", error);
+				if (!in6_addmulti(&llsol, ifp, &error)) {
+					nd6log((LOG_ERR, "%s: failed to join "
+					    "%s (errno=%d)\n", if_name(ifp),
+					    ip6_sprintf(&llsol), error));
+				}
 			}
 		}
 		break;
