@@ -1,4 +1,4 @@
-SUBDIR+=libinet6
-#SUBDIR+=libpcap libwrap
+SUBDIR+=libinet6 libpcap
+#SUBDIR+=libwrap
 
 .include <bsd.subdir.mk>
