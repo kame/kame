@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.30 2000/04/26 09:23:28 itojun Exp $
+$Id: COVERAGE,v 1.31 2000/04/26 09:24:31 itojun Exp $
 
 
 x: supported/integrated
@@ -96,7 +96,7 @@ scoped addr in /etc/hosts (getaddrinfo)
 		(+)	x	x	-	notyet	notyet	-
 
 scoped addr in /etc/resolv.conf "nameserver" line
-		(+)	-	-	-	notyet	notyet	-
+		(+)	x	-	-	notyet	notyet	-
 
 ipsec socket passing to ip{6,}_output
 		aux	aux	-	rcvif	notyet	notyet	rcvif
