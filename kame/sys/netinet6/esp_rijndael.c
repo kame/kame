@@ -1,4 +1,4 @@
-/*	$KAME: esp_rijndael.c,v 1.11 2003/07/15 15:26:08 itojun Exp $	*/
+/*	$KAME: esp_rijndael.c,v 1.12 2003/07/15 17:38:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,7 +55,7 @@
 
 #include <net/net_osdep.h>
 
-/* as rijndael uses assymetric scheduled keys, we need to do it twice. */
+/* as rijndael uses asymmetric scheduled keys, we need to do it twice. */
 
 typedef struct {
 	u_int32_t	r_ek[(RIJNDAEL_MAXNR+1)*4];
