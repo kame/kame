@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.102 2003/01/10 09:32:53 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.103 2003/01/17 03:23:56 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1223,7 +1223,7 @@ stf_ioctl(ifp, cmd, data)
 		}
 
 		ifa->ifa_rtrequest = stf_rtrequest;
-		ifp->if_flags |= IFF_UP;
+		ifp->if_flags |= IFF_UP | IFF_RUNNING;
 		break;
 
 	case SIOCADDMULTI:
