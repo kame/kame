@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.17 2002/02/05 04:14:45 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.18 2002/02/05 04:30:25 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -107,6 +107,25 @@ The following directives are available in interactive use.
 .It Xo Sy \&?
 .Xc
 Show available actions on each stage.
+.\"
+.It Xo Sy delete Ar number
+.Xc
+Delete translation rule specified by
+.Ar number .
+Error does not occur even if specified rule does not exist.
+.\"
+.It Xo Sy map renum Op Ar number1 Op Ar number2
+.Xc
+Renumber translation rule.  The
+.Ar number1
+is the start number of rule
+number.  The
+.Ar number2
+is interval of rule number.  When
+.Ar number1
+or
+.Ar number2
+is omitted, "100" is used.
 .\"
 .It Xo Sy show Ar subcommand
 .Op Ar args ...
