@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.46 2002/01/24 16:40:42 sumikawa Exp $	*/
+/*	$KAME: faithd.c,v 1.47 2002/04/24 12:06:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -430,7 +430,9 @@ again:
 		len = sizeof(srcaddr);
 		s_src = accept(s_wld, (struct sockaddr *)&srcaddr,
 			&len);
-		if (s_src == -1) {
+		if (s_src < 0) {
+			if (errno == ECONNABORTED)
+				goto again;
 			exit_failure("socket: %s", strerror(errno));
 			/*NOTREACHED*/
 		}
