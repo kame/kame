@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.137 2003/01/09 10:47:56 suz Exp $	*/
+/*	$KAME: in6.h,v 1.138 2003/06/18 02:51:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -499,7 +499,7 @@ struct route_in6 {
 #define IPV6_PATHMTU		44 /* mtuinfo; get the current path MTU (sopt),
 				      4 bytes int; MTU notification (cmsg) */
 #define IPV6_REACHCONF		45 /* no data; ND reachability confirm
-				      (cmsg only) */
+				      (cmsg only/not in of RFC3542) */
 
 /* more new socket options introduced in RFC2292bis */
 #define IPV6_PKTINFO		46 /* in6_pktinfo; send if, src addr */
