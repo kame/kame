@@ -5,7 +5,7 @@ SRCS=	v6test.c cksum.c testcap.c getconfig.c
 MAN=	v6test.1 v6test.conf.5
 
 CPPFLAGS+=-I${SRCDIR} -DIPSEC
-CPPFLAGS+=-Duint8_t=u_int8_t -Duint16_t=u_int16_t -Duint32_t=u_int32_t
+#CPPFLAGS+=-Duint8_t=u_int8_t -Duint16_t=u_int16_t -Duint32_t=u_int32_t
 CPPFLAGS+=-DSTDC_HEADERS=1 
 CPPFLAGS+=-I${.CURDIR}/../../kame/libpcap -DHAVE_LIBPCAP
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
