@@ -14,7 +14,7 @@ options 	IPSEC_ESP	# IP security (encryption part; define w/ IPSEC)
 
 # for IPv6
 pseudo-device	gif		4
-pseudo-device	dummy		1
+#pseudo-device	dummy		1
 #pseudo-device	faith		1
 #options 	PULLDOWN_TEST	# enable m_pulldown test code
 
