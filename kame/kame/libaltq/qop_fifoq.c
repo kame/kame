@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop_fifoq.c,v 1.1 2000/01/18 07:29:06 kjc Exp $
+ * $Id: qop_fifoq.c,v 1.2 2000/07/28 09:56:22 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -88,6 +88,7 @@ int
 fifoq_interface_parser(const char *ifname, int argc, char **argv)
 {
 	u_int  	bandwidth = 10000000;	/* 10Mbps */
+	u_int	tbrsize = 0;
 	int	qlimit = 50;
 
 	/*
@@ -98,6 +99,10 @@ fifoq_interface_parser(const char *ifname, int argc, char **argv)
 			argc--; argv++;
 			if (argc > 0)
 				bandwidth = atobps(*argv);
+		} else if (EQUAL(*argv, "tbrsize")) {
+			argc--; argv++;
+			if (argc > 0)
+				tbrsize = atobytes(*argv);
 		} else if (EQUAL(*argv, "qlimit")) {
 			argc--; argv++;
 			if (argc > 0)
@@ -110,6 +115,9 @@ fifoq_interface_parser(const char *ifname, int argc, char **argv)
 		}
 		argc--; argv++;
 	}
+
+	if (qcmd_tbr_register(ifname, bandwidth, tbrsize) != 0)
+		return (0);
 
 	if (qcmd_fifoq_add_if(ifname, bandwidth, qlimit) != 0)
 		return (0);

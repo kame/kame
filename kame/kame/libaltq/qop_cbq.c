@@ -1,4 +1,4 @@
-/* $Id: qop_cbq.c,v 1.1 2000/01/18 07:29:05 kjc Exp $ */
+/* $Id: qop_cbq.c,v 1.2 2000/07/28 09:56:22 kjc Exp $ */
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
  *
@@ -114,6 +114,7 @@ int
 cbq_interface_parser(const char *ifname, int argc, char **argv)
 {
 	u_int  	bandwidth = 0;
+	u_int	tbrsize = 0;
 	u_int	is_efficient = 0;
 	u_int	is_wrr = 1;	/* weighted round-robin is default */
 
@@ -125,6 +126,10 @@ cbq_interface_parser(const char *ifname, int argc, char **argv)
 			argc--; argv++;
 			if (argc > 0)
 				bandwidth = atobps(*argv);
+		} else if (EQUAL(*argv, "tbrsize")) {
+			argc--; argv++;
+			if (argc > 0)
+				tbrsize = atobytes(*argv);
 		} else if (EQUAL(*argv, "efficient")) {
 			is_efficient = 1;
 		} else if (EQUAL(*argv, "cbq")) {
@@ -139,6 +144,9 @@ cbq_interface_parser(const char *ifname, int argc, char **argv)
 		}
 		argc--; argv++;
 	}
+
+	if (qcmd_tbr_register(ifname, bandwidth, tbrsize) != 0)
+		return (0);
 
 	if (qcmd_cbq_add_if(ifname, bandwidth,
 			    is_wrr, is_efficient) != 0)

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop_rio.c,v 1.1 2000/01/18 07:29:07 kjc Exp $
+ * $Id: qop_rio.c,v 1.2 2000/07/28 09:56:22 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -89,6 +89,7 @@ int
 rio_interface_parser(const char *ifname, int argc, char **argv)
 {
 	u_int  	bandwidth = 10000000;	/* 10Mbps */
+	u_int	tbrsize = 0;
 	int	weight = 0;		/* 0: use default */
 	int	lo_inv_pmax = 0;	/* 0: use default */
 	int	lo_th_min = 0;		/* 0: use default */
@@ -112,6 +113,10 @@ rio_interface_parser(const char *ifname, int argc, char **argv)
 			argc--; argv++;
 			if (argc > 0)
 				bandwidth = atobps(*argv);
+		} else if (EQUAL(*argv, "tbrsize")) {
+			argc--; argv++;
+			if (argc > 0)
+				tbrsize = atobytes(*argv);
 		} else if (EQUAL(*argv, "packetsize")) {
 			argc--; argv++;
 			if (argc > 0)
@@ -170,6 +175,9 @@ rio_interface_parser(const char *ifname, int argc, char **argv)
 		}
 		argc--; argv++;
 	}
+
+	if (qcmd_tbr_register(ifname, bandwidth, tbrsize) != 0)
+		return (0);
 
 	pkttime = packet_size * 8 * 1000 / (bandwidth / 1000);
 	if (weight != 0) {

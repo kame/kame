@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop_wfq.c,v 1.1 2000/01/18 07:29:08 kjc Exp $
+ * $Id: qop_wfq.c,v 1.2 2000/07/28 09:56:23 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -86,6 +86,7 @@ int
 wfq_interface_parser(const char *ifname, int argc, char **argv)
 {
 	u_int  	bandwidth = 10000000;	/* 10Mbps */
+	u_int	tbrsize = 0;
 	int	hash_policy = 0;	/* 0: use default */
 	int	nqueues = 0;		/* 0: use default */
 	int	qsize = 0;		/* 0: use default */
@@ -98,6 +99,10 @@ wfq_interface_parser(const char *ifname, int argc, char **argv)
 			argc--; argv++;
 			if (argc > 0)
 				bandwidth = atobps(*argv);
+		} else if (EQUAL(*argv, "tbrsize")) {
+			argc--; argv++;
+			if (argc > 0)
+				tbrsize = atobytes(*argv);
 		} else if (EQUAL(*argv, "nqueues")) {
 			argc--; argv++;
 			if (argc > 0)
@@ -131,6 +136,9 @@ wfq_interface_parser(const char *ifname, int argc, char **argv)
 		argc--; argv++;
 	}
 	
+	if (qcmd_tbr_register(ifname, bandwidth, tbrsize) != 0)
+		return (0);
+
 	if (qsize != 0 && qsize < 1500) {
 		LOG(LOG_ERR, 0, "qsize too small: %d bytes", qsize);
 		return (0);

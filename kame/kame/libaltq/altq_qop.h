@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_qop.h,v 1.2 2000/03/03 09:26:16 kjc Exp $
+ * $Id: altq_qop.h,v 1.3 2000/07/28 09:56:21 kjc Exp $
  */
 #ifndef _ALTQ_QOP_H_
 #define _ALTQ_QOP_H_
@@ -147,6 +147,7 @@ int qcmd_add_filter(const char *ifname, const char *clname, const char *flname,
 		    const struct flow_filter *fltr);
 int qcmd_delete_filter(const char *ifname, const char *clname,
 		       const char *flname);
+int qcmd_tbr_register(const char *ifname, u_int rate, u_int size);
 int qop_enable(struct ifinfo *ifinfo);
 int qop_disable(struct ifinfo *ifinfo);
 int qop_acc_enable(struct ifinfo *ifinfo);

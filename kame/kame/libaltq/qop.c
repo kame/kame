@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop.c,v 1.4 2000/03/03 09:26:17 kjc Exp $
+ * $Id: qop.c,v 1.5 2000/07/28 09:56:22 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -56,6 +56,7 @@
 #include "altq_qop.h"
 #include "qop_cdnr.h"
 
+#define	ALTQ_DEVICE	"/dev/altq/altq"
 #define RED_DEVICE	"/dev/altq/red"
 #define RIO_DEVICE	"/dev/altq/rio"
 #define CDNR_DEVICE	"/dev/altq/cdnr"
@@ -65,16 +66,30 @@
 #endif
 
 /*
+ * token bucket regulator information
+ */
+struct tbrinfo {
+	LIST_ENTRY(tbrinfo) link;
+	char	ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
+	struct tb_profile tb_prof, otb_prof;
+	int installed;
+};
+
+/*
  * Static globals
  */
 /* a list of configured interfaces */
 LIST_HEAD(qop_iflist, ifinfo)	qop_iflist = LIST_HEAD_INITIALIZER(&iflist);
+/* a list of configured token bucket regulators */
+LIST_HEAD(tbr_list, tbrinfo)	tbr_list = LIST_HEAD_INITIALIZER(&tbr_list);
 int	Debug_mode = 0;		/* nosched (dummy mode) */
 
 /*
  * internal functions
  */
 static int get_ifmtu(const char *ifname);
+static void tbr_install(const char *ifname);
+static void tbr_deinstall(const char *ifname);
 static int add_filter_rule(struct ifinfo *ifinfo, struct fltrinfo *fltrinfo,
 			   struct fltrinfo **conflict);
 static int remove_filter_rule(struct ifinfo *ifinfo,
@@ -322,6 +337,22 @@ qcmd_delete_filter(const char *ifname, const char *clname, const char *flname)
 	return (error);
 }
 
+int
+qcmd_tbr_register(const char *ifname, u_int rate, u_int size)
+{
+	struct tbrinfo *info;
+
+	if ((info = calloc(1, sizeof(struct tbrinfo))) == NULL)
+		return (QOPERR_NOMEM);
+
+	strcpy(info->ifname, ifname);
+	info->tb_prof.rate = rate;
+	info->tb_prof.depth = size;
+	info->installed = 0;
+	LIST_INSERT_HEAD(&tbr_list, info, link);
+	return (0);
+}
+
 /*
  * QOP (Queue Operation) API
  */
@@ -359,7 +390,10 @@ qop_add_if(struct ifinfo **rp, const char *ifname, u_int bandwidth,
 
 	/* Link the interface info structure */
 	LIST_INSERT_HEAD(&qop_iflist, ifinfo, next);
-	
+
+	/* install token bucket regulator, if necessary */
+	tbr_install(ifname);
+
 	/* attach the discipline to the interface */
 	if ((error = (*ifinfo->qdisc->attach)(ifinfo)) != 0)
 		goto err_ret;
@@ -399,6 +433,9 @@ qop_delete_if(struct ifinfo *ifinfo)
 	LIST_REMOVE(ifinfo, next);
 
 	(void)(*ifinfo->qdisc->detach)(ifinfo);
+
+	/* deinstall token bucket regulator, if necessary */
+	tbr_deinstall(ifinfo->ifname);
 
 	if (ifinfo->private != NULL)
 		free(ifinfo->private);
@@ -879,6 +916,107 @@ get_ifmtu(const char *ifname)
 #endif
 	close(s);
 	return (mtu);
+}
+
+static void
+tbr_install(const char *ifname)
+{
+	struct tbrinfo *info;
+	struct tbrreq req;
+	int fd;
+
+	LIST_FOREACH(info, &tbr_list, link)
+	    if (strcmp(info->ifname, ifname) == 0)
+		    break;
+	if (info == NULL)
+		return;
+	if (info->tb_prof.rate == 0 || info->installed)
+		return;
+
+	/* get the current token bucket regulator */
+	if ((fd = open(ALTQ_DEVICE, O_RDWR)) < 0)
+		err(1, "can't open altq device");
+	strncpy(req.ifname, ifname, IFNAMSIZ-1);
+	if (ioctl(fd, ALTQTBRGET, &req) < 0)
+		err(1, "ALTQTBRGET for interface %s", req.ifname);
+
+	/* save the current values */
+	info->otb_prof.rate = req.tb_prof.rate;
+	info->otb_prof.depth = req.tb_prof.depth;
+	
+	/*
+	 * if tbr is not specified in the config file and tbr is already
+	 * configured, do not change.
+	 */
+	if (req.tb_prof.rate != 0) {
+		LOG(LOG_INFO, 0,
+		    "tbr is already installed on %s,\n"
+		    "  using the current setting (rate:%.2fM  size:%.2fK).\n",
+		    info->ifname,
+		    (double)req.tb_prof.rate/1000000.0,
+		    (double)req.tb_prof.depth/1024.0);
+		close (fd);
+		return;
+	}
+
+	/* if the new size is not specified, use heuristics */
+	if (info->tb_prof.depth == 0) {
+		u_int rate, size;
+		
+		rate = info->tb_prof.rate;
+		if (rate <= 1*1000*1000)
+			size = 1;
+		else if (rate <= 10*1000*1000)
+			size = 4;
+		else if (rate <= 200*1000*1000)
+			size = 8;
+		else
+			size = 24;
+		size = size * 1500;  /* assume the default mtu is 1500 */
+		info->tb_prof.depth = size;
+	}
+
+	/* install the new tbr */
+	strncpy(req.ifname, ifname, IFNAMSIZ-1);
+	req.tb_prof.rate = info->tb_prof.rate;
+	req.tb_prof.depth = info->tb_prof.depth;
+	if (ioctl(fd, ALTQTBRSET, &req) < 0)
+		err(1, "ALTQTBRSET for interface %s", req.ifname);
+	LOG(LOG_INFO, 0,
+	    "tbr installed on %s (rate:%.2fM  size:%.2fK)\n",
+	    info->ifname,
+	    (double)info->tb_prof.rate/1000000.0,
+	    (double)info->tb_prof.depth/1024.0);
+	close(fd);
+	info->installed = 1;
+}
+
+static void
+tbr_deinstall(const char *ifname)
+{
+	struct tbrinfo *info;
+	struct tbrreq req;
+	int fd;
+
+	LIST_FOREACH(info, &tbr_list, link)
+	    if (strcmp(info->ifname, ifname) == 0)
+		    break;
+	if (info == NULL)
+		return;
+
+	/* if we installed tbr, restore the old values */
+	if (info->installed != 0) {
+		strncpy(req.ifname, ifname, IFNAMSIZ-1);
+		req.tb_prof.rate = info->otb_prof.rate;
+		req.tb_prof.depth = info->otb_prof.depth;
+		if ((fd = open(ALTQ_DEVICE, O_RDWR)) < 0)
+			err(1, "can't open altq device");
+		if (ioctl(fd, ALTQTBRSET, &req) < 0)
+			err(1, "ALTQTBRSET for interface %s", req.ifname);
+		close(fd);
+	}
+	LIST_REMOVE(info, link);
+	free(info);
 }
 
 void
