@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/12/21 11:35:48 $
+			$Date: 1999/12/21 11:36:44 $
 
 1. IPv6
 
@@ -632,7 +632,7 @@ getipnodebyname().  Note that getipnodebyname() itself is not recommended as
 it does not handle scoped IPv6 addresses at all.  For IPv6 name resolution
 getaddrinfo() is the preferred API.
 
-When writing applications that makes outgoing connection, story goes much
+When writing applications that make outgoing connections, story goes much
 simpler if you treat AF_INET and AF_INET6 as totally seaprate address family.
 {set,get}sockopt issue goes simpler, DNS issue will be made simpler.  We do
 not recommend you to rely upon IPv4 mapped address.
