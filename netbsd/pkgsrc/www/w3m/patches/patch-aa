@@ -1,7 +1,8 @@
-$NetBSD$
---- configure.orig	Fri Jan 21 17:06:21 2000
-+++ configure	Fri Mar  3 00:12:58 2000
-@@ -252,13 +252,13 @@
+$NetBSD: patch-aa,v 1.5 2000/06/21 08:22:11 itohy Exp $
+
+--- configure.orig	Mon Jun  5 18:41:35 2000
++++ configure	Tue Jun 20 21:19:13 2000
+@@ -310,13 +310,13 @@
  echo "Which language do you prefer?"
  echo "  1 - Japanese (charset ISO-2022-JP, EUC-JP, Shift_JIS)"
  echo "  2 - English (charset US_ASCII, ISO-8859-1, etc.)"
@@ -22,7 +23,7 @@ $NetBSD$
  while :
  do
    readanswer lg_ans "$def_lg"
-@@ -664,14 +665,14 @@
+@@ -784,7 +784,7 @@
  gclib=''
  gcinclude=''
  gctarget=''
@@ -31,8 +32,8 @@ $NetBSD$
  do
    if [ -f $libdir/libgc.a -o -f $libdir/libgc.so ] ; then 
      echo "$libdir/libgc found"
--    gclib="-lgc"
-+    gclib="-L$libdir -lgc"
+@@ -792,7 +792,7 @@
+     break
    fi
  done
 -for inc in /usr/include /usr/include/gc /usr/local/include /usr/local/include/gc ${HOME}/include
@@ -40,3 +41,11 @@ $NetBSD$
  do
    if [ -f $inc/gc.h ]; then
      echo "$inc/gc.h found"
+@@ -1553,6 +1553,7 @@
+ if [ `expr "$perl" : 'not found'` != 0 ]; then
+   perl=/usr/local/bin/perl
+ fi
++perl=/usr/pkg/bin/perl
+ if [ $sysname = CYGWIN ]; then
+   cygwin=1
+ else
