@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.11 2000/03/25 07:23:34 sumikawa Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.12 2000/05/07 14:59:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: pfkeyv2.h,v 1.11 2000/03/25 07:23:34 sumikawa Exp $ */
+/* $Id: pfkeyv2.h,v 1.12 2000/05/07 14:59:43 itojun Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -216,7 +216,7 @@ struct sadb_x_kmprivate {
 };
 
 /* XXX Policy Extension */
-/* sizeof(struct sadb_x_policy) == 8 */
+/* sizeof(struct sadb_x_policy) == 16 */
 struct sadb_x_policy {
   u_int16_t sadb_x_policy_len;
   u_int16_t sadb_x_policy_exttype;
