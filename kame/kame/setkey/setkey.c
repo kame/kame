@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.33 2003/09/08 15:43:40 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.34 2003/09/12 03:31:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -34,11 +34,13 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
 #include <err.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
+#include <netkey/key_var.h>
 #include <netkey/key_debug.h>
 #include <netinet6/ipsec.h>
 
@@ -64,6 +66,7 @@ int sendkeymsg __P((char *, size_t));
 int postproc __P((struct sadb_msg *, int));
 int fileproc __P((const char *));
 int dumpkernfs __P((const char *));
+int sysctldump __P((u_int, u_int8_t));
 const char *numstr __P((int));
 void shortdump_hdr __P((void));
 void shortdump __P((struct sadb_msg *));
@@ -113,6 +116,7 @@ main(argc, argv)
 	FILE *fp = stdin;
 	int c;
 	struct stat sb;
+	int error;
 
 	if (argc == 1) {
 		usage();
@@ -171,7 +175,7 @@ main(argc, argv)
 	if (argc > 0) {
 		while (argc--)
 			if (fileproc(*argv++) < 0) {
-				errx(1, "%s: processing failed", *argv[-1]);
+				err(1, "%s", argv[-1]);
 				/*NOTREACHED*/
 			}
 		exit(0);
@@ -189,10 +193,25 @@ main(argc, argv)
 
 	switch (f_mode) {
 	case MODE_CMDDUMP:
-		if (kernfs)
+		if (kernfs) {
 			dumpkernfs(f_policy ? "/kern/ipsecsp" : "/kern/ipsecsa");
-		else
-			sendkeyshort(f_policy ? SADB_X_SPDDUMP: SADB_DUMP);
+			break;
+		}
+
+		error = sysctldump(f_policy ? SADB_X_SPDDUMP : SADB_DUMP,
+		    SADB_SATYPE_UNSPEC);
+		if (error == 0)
+			break;
+		if (error < 0) {
+			if (errno == ENOENT) {
+				printf("No S%cD entries.\n",
+				    f_policy ? 'P' : 'A');
+				break;
+			} else if (errno != 0)
+				err(1, "sysctl");
+		}
+
+		sendkeyshort(f_policy ? SADB_X_SPDDUMP : SADB_DUMP);
 		break;
 	case MODE_CMDFLUSH:
 		sendkeyshort(f_policy ? SADB_X_SPDFLUSH: SADB_FLUSH);
@@ -502,6 +521,7 @@ fileproc(filename)
 
 	if (l < sizeof(struct sadb_msg)) {
 		close(fd);
+		errno = EINVAL;
 		return -1;
 	}
 	close(fd);
@@ -539,6 +559,49 @@ dumpkernfs(dir)
 	}
 
 	closedir(p);
+	return (0);
+}
+
+int
+sysctldump(type, satype)
+	u_int type;
+	u_int8_t satype;
+{
+	int mib[] = { CTL_NET, PF_KEY, KEYCTL_DUMPSA, 0 };
+	size_t len, l;
+	char *buf, *p, *ep;
+	struct sadb_msg *msg;
+
+	if (type == SADB_DUMP) {
+		mib[2] = KEYCTL_DUMPSA;
+		mib[3] = satype;
+		l = 4;
+	} else if (type == SADB_X_SPDDUMP) {
+		mib[2] = KEYCTL_DUMPSP;
+		l = 3;
+	} else
+		return (EINVAL);
+
+	if (sysctl(mib, l, NULL, &len, NULL, 0) < 0)
+		return (-1);
+	buf = malloc(len);
+	if (!buf)
+		return (ENOBUFS);
+	if (sysctl(mib, l, buf, &len, NULL, 0) < 0) {
+		free(buf);
+		return (-1);
+	}
+
+	p = buf;
+	ep = buf + len;
+	while (p < ep) {
+		msg = (struct sadb_msg *)p;
+		l = PFKEY_UNUNIT64(msg->sadb_msg_len);
+		postproc(msg, l);
+		p += l;
+	}
+
+	free(buf);
 	return (0);
 }
 

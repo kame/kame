@@ -1,4 +1,4 @@
-/*	$KAME: key_var.h,v 1.12 2001/11/06 03:48:29 itojun Exp $	*/
+/*	$KAME: key_var.h,v 1.13 2003/09/12 03:31:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -51,7 +51,9 @@
 #define KEYCTL_ESP_AUTH			10
 #define KEYCTL_AH_KEYMIN		11
 #define KEYCTL_PREFERED_OLDSA		12
-#define KEYCTL_MAXID			13
+#define KEYCTL_DUMPSA			13
+#define KEYCTL_DUMPSP			14
+#define KEYCTL_MAXID			15
 
 #define KEYCTL_NAMES { \
 	{ 0, 0 }, \
