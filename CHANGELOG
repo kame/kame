@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.612 2000/02/24 18:09:22 jinmei Exp $
+$Id: CHANGELOG,v 1.613 2000/02/24 18:20:57 itojun Exp $
 
 <200002>
 2000-02-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -18,13 +18,6 @@ $Id: CHANGELOG,v 1.612 2000/02/24 18:09:22 jinmei Exp $
 	  - always print scope_id of an IPv6 address with non-zero
 	    sin6_scope_id (by default), even for a global unicast address.
 	  - use numeric numbers as the last resort of a scope_id string.
-
-Fri Feb 25 02:26:07 JST 2000  itojun@iijlab.net
-	* kame/rtadvd/rtadvd.c: on startup, transmit multicast RA.
-	  without this, reboot of a router will result in absense of router
-	  for unnecessarily long period of time.
-	  TODO: check spec carefully to confirm that it does not violate the
-	  spec.
 
 Fri Feb 25 01:49:00 JST 2000  itojun@iijlab.net
 	* */sys/net/rtsock.c: wrap BBN hack (honor ifp/ifa on RTM_ADD),
