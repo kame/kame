@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.h,v 1.6 2001/07/25 00:55:48 itojun Exp $	*/
+/*	$KAME: in_gif.h,v 1.7 2001/08/16 16:26:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,7 +38,7 @@ extern int ip_gif_ttl;
 
 struct gif_softc;
 void in_gif_input __P((struct mbuf *, ...));
-int in_gif_output __P((struct ifnet *, int, struct mbuf *, struct rtentry *));
+int in_gif_output __P((struct ifnet *, int, struct mbuf *));
 int gif_encapcheck4 __P((const struct mbuf *, int, int, void *));
 int in_gif_attach __P((struct gif_softc *));
 int in_gif_detach __P((struct gif_softc *));

@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.63 2001/07/29 04:53:32 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.64 2001/08/16 16:26:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,11 +95,10 @@ extern struct ip6protosw in6_gif_protosw;
 #endif
 
 int
-in6_gif_output(ifp, family, m, rt)
+in6_gif_output(ifp, family, m)
 	struct ifnet *ifp;
 	int family; /* family of the packet to be encapsulate. */
 	struct mbuf *m;
-	struct rtentry *rt;
 {
 #ifdef __OpenBSD__
 	struct gif_softc *sc = (struct gif_softc*)ifp;

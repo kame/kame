@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.67 2001/08/14 08:29:02 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.68 2001/08/16 16:26:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,11 +112,10 @@ extern struct protosw in_gif_protosw;
 #endif
 
 int
-in_gif_output(ifp, family, m, rt)
+in_gif_output(ifp, family, m)
 	struct ifnet	*ifp;
 	int		family;
 	struct mbuf	*m;
-	struct rtentry *rt;
 {
 #ifdef __OpenBSD__
 	struct gif_softc *sc = (struct gif_softc*)ifp;
