@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.21 2002/01/31 17:24:04 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.22 2002/02/01 05:50:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -100,6 +100,7 @@ yyerror(char *msg, ...)
 %token		SANY6
 %token		SBREAK
 %token		SBIDIR
+%token		SCUI
 %token		SDADDR
 %token		SDISABLE
 %token		SDPORT
@@ -158,6 +159,7 @@ yyerror(char *msg, ...)
 %type	<Char>	name
 %type	<UInt>	opt_all
 %type	<UInt>	opt_bidir
+%type	<UInt>	opt_cui
 %type	<UInt>	opt_decimal
 %type	<UInt>	opt_long
 %type	<UShrt>	opt_ports
@@ -374,7 +376,7 @@ show
 		    { printHelp(SSHOW, NULL); }
 		| SSHOW SPREFIX
 		    { showPrefix(); }
-		| SSHOW SRULES opt_all
+		| SSHOW SRULES opt_cui
 		    { showRules($3); }
 		| SSHOW SXLATE opt_long opt_decimal
 		    { showXlate($3, $4); }
@@ -451,6 +453,13 @@ opt_bidir
 		:
 		    { $$ = 0; }
 		| SBIDIR
+		    { $$ = 1; }
+		;
+
+opt_cui
+		:
+		    { $$ = 0; }
+		| SCUI
 		    { $$ = 1; }
 		;
 

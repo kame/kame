@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.12 2002/01/31 16:08:17 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.13 2002/02/01 05:50:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -55,6 +55,8 @@
  *
  */
 
+int	cslmode;
+
 struct logmsg
 {
 	int		 lmsg_size;	/* data byte count			*/
@@ -71,6 +73,9 @@ extern char	*tcpstates[];
  */
 
 void	 makeCSlotLine		__P((char *, int, struct cSlot *));
+void	 makeCUILine		__P((char *, int, struct cSlot *));
+void	 makeCUI64Line		__P((struct logmsg *, struct cSlot *));
+void	 makeCUI46Line		__P((struct logmsg *, struct cSlot *));
 void	 appendPAddr		__P((struct logmsg *, struct cSlot *, struct mAddr *));
 void	 appendPAddr4		__P((struct logmsg *, struct cSlot *, struct mAddr *));
 void	 appendPAddr6		__P((struct logmsg *, struct cSlot *, struct mAddr *));
@@ -97,8 +102,9 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 {
 	struct logmsg	lmsg;
 
-	bzero(&lmsg, sizeof(struct logmsg));
+	cslmode = 1;
 
+	bzero(&lmsg, sizeof(struct logmsg));
 	lmsg.lmsg_size = size;
 	lmsg.lmsg_data = wow;
 	lmsg.lmsg_last = lmsg.lmsg_data;
@@ -129,6 +135,75 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 
 
 void
+makeCUILine(char *wow, int size, struct cSlot *csl)
+{
+	struct logmsg	lmsg;
+
+	cslmode = 0;
+
+	bzero(&lmsg, sizeof(struct logmsg));
+	lmsg.lmsg_size = size;
+	lmsg.lmsg_data = wow;
+	lmsg.lmsg_last = lmsg.lmsg_data;
+
+	/*
+	 * Translation rule supports onln v6->v4 and v4->v6 translation
+	 * when use Character-based User Interface.
+	 */
+	if (csl->local.saddr.sa_family == AF_INET6)
+		makeCUI64Line(&lmsg, csl);
+	else
+		makeCUI46Line(&lmsg, csl);
+
+	*lmsg.lmsg_last =  '\0';
+}
+
+
+void
+makeCUI64Line(struct logmsg *lmsg, struct cSlot *csl)
+{
+	/* In case v6->v4, assume NAPT-PT or One-on-one translation	*/
+	if (csl->remote.Port[0]) {
+		/* in case NAPT-PT	*/
+		concat(lmsg, "masquerade");
+		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->remote);
+		appendProto(lmsg, csl);
+	} else {
+		/* in case One-on-one translation */
+		concat(lmsg, "stataic");
+		appendPAddr6(lmsg, csl, (struct mAddr *)&csl->local);
+		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->remote);
+		appendProto(lmsg, csl);
+
+		if (csl->map & NATPT_BIDIR) {
+			concat(lmsg, " bidir");
+		} else {
+			concat(lmsg, " 6to4");
+		}
+	}
+}
+
+
+void
+makeCUI46Line(struct logmsg *lmsg, struct cSlot *csl)
+{
+	/* In case v4->v6, assume port redirect or One-on-one translation */
+
+	if (csl->remote.dport == 0) {
+		concat(lmsg, "static");
+		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->local);
+		appendPAddr6(lmsg, csl, (struct mAddr *)&csl->remote);
+		concat(lmsg, " 4to6");
+	} else {
+		concat(lmsg, "redirect");
+		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->local);
+		appendPAddr6(lmsg, csl, (struct mAddr *)&csl->remote);
+		appendProto(lmsg, csl);
+	}
+}
+
+
+void
 appendPAddr(struct logmsg *lmsg, struct cSlot *csl, struct mAddr *mpad)
 {
 	if (mpad->saddr.sa_family == AF_INET)
@@ -155,12 +230,13 @@ appendPAddr4(struct logmsg *lmsg, struct cSlot *csl, struct mAddr *mpad)
 		concat(lmsg, " - %s",
 		       inet_ntop(AF_INET, &mpad->saddr.in4RangeEnd, Wow, sizeof(Wow)));
 
-	appendPort(lmsg, mpad);
-
 	if (csl->map & NATPT_REDIRECT_ADDR) {
-		concat(lmsg, " daddr %s",
+		concat(lmsg, (cslmode ? " daddr " : " "));
+		concat(lmsg, "%s",
 		       inet_ntop(AF_INET, &mpad->daddr, Wow, sizeof(Wow)));
 	}
+
+	appendPort(lmsg, mpad);
 }
 
 
@@ -179,12 +255,13 @@ appendPAddr6(struct logmsg *lmsg, struct cSlot *csl, struct mAddr *mpad)
 	if (mpad->saddr.prefix != 0)
 		concat(lmsg, "/%d", mpad->saddr.prefix);
 
-	appendPort(lmsg, mpad);
-
 	if (csl->map & NATPT_REDIRECT_ADDR) {
-		concat(lmsg, " daddr %s",
+		concat(lmsg, (cslmode ? " daddr " : " "));
+		concat(lmsg, "%s",
 		       inet_ntop(AF_INET6, &mpad->daddr, Wow, sizeof(Wow)));
 	}
+
+	appendPort(lmsg, mpad);
 }
 
 
@@ -203,7 +280,8 @@ appendPort(struct logmsg *lmsg, struct mAddr *mpad)
 	}
 
 	if (mpad->dport) {
-		concat(lmsg, " dport %d", ntohs(mpad->dport));
+		concat(lmsg, (cslmode ? " dport " : " "));
+		concat(lmsg, "%d", ntohs(mpad->dport));
 	}
 }
 
@@ -214,7 +292,7 @@ appendProto(struct logmsg *lmsg, struct cSlot *csl)
 	int	found = 0;
 
 	if (csl->proto) {
-		concat(lmsg, " proto ");
+		concat(lmsg, (cslmode ? " proto " : " "));
 		if (csl->proto & NATPT_ICMP) {
 			concat(lmsg, "icmp");
 			found++;
