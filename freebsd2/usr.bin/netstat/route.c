@@ -825,8 +825,11 @@ routename6(sa6)
 	static char line[MAXHOSTNAMELEN + 1];
 	int flag = NI_WITHSCOPEID;
 	/* use local variable for safety */
-	struct sockaddr_in6 sa6_local = {AF_INET6, sizeof(sa6_local),};
+	struct sockaddr_in6 sa6_local;
 
+	memset(&sa6_local, 0, sizeof(sa6_local));
+	sa6_local.sin6_family = AF_INET6;
+	sa6_local.sin6_len = sizeof(struct sockaddr_in6);
 	sa6_local.sin6_addr = sa6->sin6_addr;
 
 	if (nflag)
