@@ -10,7 +10,7 @@ static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-1995 Darren Reed
 static const char rcsid[] = "@(#)$Id: ip_fil.c,v 1.7 1998/12/04 22:54:54 archie Exp $";
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(_KERNEL) || defined(KERNEL)) && defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #endif
 #include "opt_ipfilter.h"

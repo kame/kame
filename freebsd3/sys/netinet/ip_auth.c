@@ -14,7 +14,7 @@ static const char rcsid[] = "@(#)$Id: ip_auth.c,v 1.6 1998/11/26 18:54:51 eivind
 #endif
 #define __FreeBSD_version 300000	/* just a hack - no <sys/osreldate.h> */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(_KERNEL) || defined(KERNEL)) && defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #endif
 
