@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.117 2000/06/27 06:26:53 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.118 2000/07/03 13:23:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -117,7 +117,6 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
-#include <netkey/key_debug.h>
 #endif
 
 #include "faith.h"

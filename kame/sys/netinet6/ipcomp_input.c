@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.14 2000/05/08 08:19:21 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.15 2000/07/03 13:23:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -75,7 +75,6 @@
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #include <netkey/keydb.h>
-#include <netkey/key_debug.h>
 
 #include <machine/stdarg.h>
 

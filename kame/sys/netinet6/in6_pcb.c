@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.54 2000/06/13 04:05:29 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.55 2000/07/02 07:50:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,7 +104,6 @@ extern struct ifnet loif[NLOOP];
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
-#include <netkey/key_debug.h>
 #endif /* IPSEC */
 
 struct in6_addr zeroin6_addr;

@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.21 2000/05/22 08:49:40 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.22 2000/07/03 13:23:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,7 +73,6 @@
 #include <netinet6/esp.h>
 #include <netkey/key.h>
 #include <netkey/keydb.h>
-#include <netkey/key_debug.h>
 
 #include <net/net_osdep.h>
 
