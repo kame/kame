@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2530 2004/01/20 10:20:43 suz Exp $
+$KAME: CHANGELOG,v 1.2531 2004/01/22 09:52:32 t-momose Exp $
 
 <200401>
+2004-01-22  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
+	* kame/kame/had/haadic.c:
+	A global home agent address is registerred even
+	if on-link flag in a prefix information option
+	isn't set. The problem is found and discussed at
+	the 5th TAHI introp test event.
+
 2003-01-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/dhcp6
 	supported DHCPv6 option for SIP servers (RFC3319).
