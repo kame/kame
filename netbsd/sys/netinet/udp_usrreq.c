@@ -138,6 +138,7 @@ __KERNEL_RCSID(0, "$NetBSD: udp_usrreq.c,v 1.93 2002/05/12 20:33:51 matt Exp $")
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
+#include <netinet6/mld6_var.h>
 #include <netinet6/udp6_var.h>
 #endif
 
@@ -935,10 +936,8 @@ udp6_realinput(af, src, dst, m, off)
 					continue;
 				
 				if (imm->i6mm_msf == NULL) {
-#ifdef MLDV2_DEBUG
-					printf("XXX: unexpected case occured at %s:%d",
-					       __FILE__, __LINE__);
-#endif
+					mldlog((LOG_DEBUG, "unexpected case occured at %s:%d",
+					       __FILE__, __LINE__));
 					continue;
 				}
 				 				

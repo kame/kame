@@ -121,6 +121,7 @@
 #include <netinet/in_pcb.h>
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
+#include <netinet6/mld6_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
@@ -656,10 +657,8 @@ scan_ipv6:
 				
 				msf = imm->i6mm_msf;
 				if (msf == NULL) {
-#ifdef MLDV2_DEBUG
-					printf("XXX: unexpected case occured at %s:%d",
-					       __FILE__, __LINE__);
-#endif
+					mldlog((LOG_DEBUG, "unexpected case occured at %s:%d",
+					       __FILE__, __LINE__));
 					continue;
 				}
 				/* receive data from any source */

@@ -102,6 +102,7 @@
 #include <netinet6/ip6protosw.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
+#include <netinet6/mld6_var.h>
 #ifdef MLDV2
 #include <netinet6/in6_msf.h>
 #endif
@@ -344,10 +345,8 @@ udp6_input(mp, offp, proto)
 
 				msf = imm->i6mm_msf;
 				if (msf == NULL) {
-#ifdef MLDV2_DEBUG
-					printf("XXX: unexpected case occured at %s:%d",
-					       __FILE__, __LINE__);
-#endif
+					mldlog((LOG_DEBUG, "unexpected case occured at %s:%d",
+					       __FILE__, __LINE__));
 					continue;
 				}
 

@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.67 2003/09/21 09:34:18 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.68 2003/12/22 05:14:28 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -128,6 +128,7 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
+#include <netinet6/mld6_var.h>
 #ifdef MLDV2
 #include <netinet6/in6_msf.h>
 #endif
@@ -372,10 +373,8 @@ udp6_input(mp, offp, proto)
 
 				msf = imm->i6mm_msf;
 				if (msf == NULL) {
-#ifdef MLDV2_DEBUG
-					printf("XXX: unexpected case occured at %s:%d",
-					       __FILE__, __LINE__);
-#endif
+					mldlog((LOG_DEBUG, "unexpected case occured at %s:%d\n",
+					       __FILE__, __LINE__));
 					continue;
 				}
 
