@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.82 2001/06/28 06:22:04 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.83 2001/07/09 08:10:32 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1052,10 +1052,15 @@ quick_r1recv(iph2, msg0)
 	}
 
 	/* check KE and attribute of PFS */
-	if ((iph2->dhpub_p != NULL && iph2->approval->pfs_group == 0)
-	 || (iph2->dhpub_p == NULL && iph2->approval->pfs_group != 0)) {
+	if (iph2->dhpub_p != NULL && iph2->approval->pfs_group == 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"KE payload and PFS attribute mismatched.\n");
+			"no PFS is specified, but peer sends KE.\n");
+		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
+		goto end;
+	}
+	if (iph2->dhpub_p == NULL && iph2->approval->pfs_group != 0) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"PFS is specified, but peer doesn't sends KE.\n");
 		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
 	}
