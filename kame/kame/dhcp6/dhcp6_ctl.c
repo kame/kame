@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6_ctl.c,v 1.1 2004/06/12 10:46:00 jinmei Exp $	*/
+/*	$KAME: dhcp6_ctl.c,v 1.2 2004/06/12 10:56:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -157,6 +157,13 @@ dhcp6_ctl_closecommand(ctx)
 {
 	close(ctx->s);
 	free(ctx);
+
+	if (commands == 0) {
+		dprintf(LOG_ERR, FNAME, "assumption error: "
+		    "command queue is empty?");
+		exit(1);	/* XXX */
+	}
+	commands--;
 
 	return;
 }
