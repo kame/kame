@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 2000/03/07 21:23:44 $
+			$Date: 2000/03/08 10:00:51 $
 
 <<<Project Overview>>>
 
@@ -84,10 +84,11 @@ If you track the bugs, please notice the following items:
 - be sure to use "ping6 -n", not "ping6", when you probe reachability.
 - read IMPLEMENTATION chapter 1.3 if you try link-local addresses on your tests.
 
-Submit your bug report by using bug database, 
-or you may want to submit that to snap-users mailing list.
-	bug database: http://www.kame.net/. 
+Submit your bug report by using bug database, or you may want to submit
+it to snap-users mailing list.
+	bug database: http://www.kame.net/, or /usr/local/v6/bin/kame-send-pr
 	snap-users mailing list: http://www.kame.net/snap-users/
+
 Thanks for your feedbacks!
 
 <<<Contact Points>>
