@@ -5,7 +5,8 @@ SUBDIR+=bgpd dtcp faithd icmp6dump ifmcstat mld6query mping \
 	traceroute6 rtsold rtadvd rip6query dhcp6 pppd
 SUBDIR+=natptconfig natptd natptlog
 SUBDIR+=racoon
-SUBDIR+=pvcbridge pvcsif pvctxctl
+#SUBDIR+=pvcbridge
+SUBDIR+=pvcsif pvctxctl
 SUBDIR+=altqd tbrconfig
 #SUBDIR+=inet6d
 
