@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.94 2002/06/23 05:42:23 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.95 2002/06/23 07:30:18 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -125,7 +125,9 @@ main(argc, argv)
 	char *progname, *conffile = DHCP6C_CONF;
 	FILE *pidfp;
 
+#ifndef HAVE_ARC4RANDOM
 	srandom(time(NULL) & getpid());
+#endif
 
 	if ((progname = strrchr(*argv, '/')) == NULL)
 		progname = *argv;
@@ -665,10 +667,18 @@ client6_send(ev)
 	}
 	if (ev->timeouts == 0) {
 		/*
+		 * A client SHOULD generate a random number that cannot easily
+		 * be guessed or predicted to use as the transaction ID for
+		 * each new message it sends.
+		 *
 		 * A client MUST leave the transaction-ID unchanged in
 		 * retransmissions of a message. [dhcpv6-26 15.1]
 		 */
+#ifdef HAVE_ARC4RANDOM
+		ev->xid = arc4random() & DH6_XIDMASK;
+#else
 		ev->xid = random() & DH6_XIDMASK;
+#endif
 		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
 			FNAME, ev->xid);
 	}
@@ -773,7 +783,11 @@ client6_send_renew(ev)
 	memset(dh6, 0, sizeof(*dh6));
 	dh6->dh6_msgtype = DH6_RENEW;
 	if (ev->timeouts == 0) {
+#ifdef HAVE_ARC4RANDOM
+		ev->xid = arc4random() & DH6_XIDMASK;
+#else
 		ev->xid = random() & DH6_XIDMASK;
+#endif
 		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
 			FNAME, ev->xid);
 	}
@@ -870,7 +884,11 @@ client6_send_rebind(ev)
 	memset(dh6, 0, sizeof(*dh6));
 	dh6->dh6_msgtype = DH6_REBIND;
 	if (ev->timeouts == 0) {
+#ifdef HAVE_ARC4RANDOM
+		ev->xid = arc4random() & DH6_XIDMASK;
+#else
 		ev->xid = random() & DH6_XIDMASK;
+#endif
 		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
 			FNAME, ev->xid);
 	}
