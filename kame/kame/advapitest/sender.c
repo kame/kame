@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.19 2001/09/18 03:00:32 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.20 2001/09/18 09:45:33 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -57,6 +57,7 @@ int hlim;
 
 struct msghdr msg;
 struct sockaddr *sa_next;
+int nextlen = 0;
 struct sockaddr_storage ss_next;
 struct cmsghdr *cmsgp = NULL;
 
@@ -155,10 +156,11 @@ main(argc, argv)
 			     gai_strerror(error));
 		}
 		memcpy(&ss_next, res->ai_addr, res->ai_addrlen);
+		nextlen = res->ai_addrlen;
 		sa_next = (struct sockaddr *)&ss_next;
 		freeaddrinfo(res);
 
-		ip6optlen += CMSG_SPACE(sa_next->sa_len);
+		ip6optlen += CMSG_SPACE(nextlen);
 	}
 	if (argc > 1) {		/* intermediate node(s) exist(s) */
 		hops = argc - 1;
@@ -191,10 +193,10 @@ main(argc, argv)
 	if (dsthdr1len > 0) setopthdr(dsthdr1len, IPV6_RTHDRDSTOPTS);
 	if (dsthdr2len > 0) setopthdr(dsthdr2len, IPV6_DSTOPTS);
 	if (sa_next != NULL) {
-		cmsgp->cmsg_len = CMSG_LEN(sa_next->sa_len);
+		cmsgp->cmsg_len = CMSG_LEN(nextlen);
 		cmsgp->cmsg_level = IPPROTO_IPV6;
 		cmsgp->cmsg_type = IPV6_NEXTHOP;
-		memcpy(CMSG_DATA(cmsgp), sa_next, sa_next->sa_len);
+		memcpy(CMSG_DATA(cmsgp), sa_next, nextlen);
 		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
 	}
 	if (argc > 1) {

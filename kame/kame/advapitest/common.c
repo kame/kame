@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.7 2001/02/09 08:31:24 jinmei Exp $ */
+/*	$KAME: common.c,v 1.8 2001/09/18 09:45:33 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -60,7 +60,7 @@ ip6str(sa6)
 	ip6round = (ip6round + 1) & 7;
 	cp = ip6buf[ip6round];
 	
-	if (getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, cp,
+	if (getnameinfo((struct sockaddr *)sa6, sizeof(*sa6), cp,
 			NI_MAXHOST, NULL, 0, flags))
 		return(invalid);
 
