@@ -326,6 +326,9 @@ route_output(m, so)
 	struct rt_addrinfo info;
 	int len, error = 0;
 	struct ifnet *ifp = 0;
+#ifdef MIP6
+	struct ifaddr *ifa = 0;
+#endif
 
 #define senderr(e) { error = e; goto flush;}
 	if (m == 0 || ((m->m_len < sizeof(long)) &&
