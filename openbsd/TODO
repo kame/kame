@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.19 1999/10/06 12:53:16 itojun Exp $
+$Id: TODO,v 1.20 1999/10/07 00:30:56 itojun Exp $
 
 
 Things we can do with the current code:
@@ -33,6 +33,7 @@ Things we can't do with the current code:
   workaround: run sshd -4, then sshd -6.  this way IPv4 traffic will be
   captured by prior one (AF_INET socket) and IPv6 traffic will be captured by
   the latter one (AF_INET6 socket).
+- ipv6 path mtu discovery (as end node) does not work at this moment.
 
 Cleanup todo:
 - move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere
