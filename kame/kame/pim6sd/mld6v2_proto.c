@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.5 2001/08/14 06:16:44 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.6 2001/11/27 07:23:28 suz Exp $
  */
 
 /*
@@ -77,15 +77,14 @@
   * If the Multicast Interface is configured in version 1, none
   * of MLDv2 messages are processed
   * If the interface is configured in version 2 , and MLDv1 messages
-  * arrives,process like the draft says
+  * arrives,process like the draft says (TODO: implement compatibility
+  * mode)
   */  
 
 /*
  * Forward declarations.
  */
 static void DelVifV2 __P((void *arg));
-static int      SetTimerV2
-__P((int vifi, struct listaddr * g, struct listaddr * s));
 static void SendQueryV2spec __P((void *arg));
 
 /*
@@ -111,9 +110,9 @@ query_groupsV2(v)
 	 */
 
 	send_mld6v2(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-		    NULL, (struct in6_addr *) &in6addr_any, v->uv_ifindex,
+		    NULL, (struct sockaddr_in6 *) NULL, v->uv_ifindex,
 		    MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
-		    v->uv_mld_robustness, v->uv_mld_query_interval, NULL);
+		    v->uv_mld_robustness, v->uv_mld_query_interval);
 	v->uv_out_mld_query++;
     }
     /*
@@ -130,7 +129,8 @@ query_groupsV2(v)
  * is null , it is a group-specific query
  * according to the spec : Two specific query are built and sent : the first
  * one with the S flag set contain source who has timer <=LLQI, the second
- * with S flag cleared contain source who has timer >LLQI : not possible
+ * with S flag cleared contain source who has timer >LLQI
+ * So we call send_mldv2 two times
  */
 
 static void
@@ -138,51 +138,34 @@ SendQueryV2spec(arg)
     void           *arg;
 {
     cbk_t          *cbk = (cbk_t *) arg;
-    struct listaddr *sources = cbk->s;
-    struct listaddr *logsrc = cbk->s;
     register struct uvif *v = &uvifs[cbk->mifi];
 
-    /* we use the check list var for the group  to see */
-    /* if we are in state checking listener for this group/source(s)*/
-    
-    if(cbk->g->al_checklist == FALSE)
-    {
-	while(logsrc)
-	{
-		sources=logsrc->al_next;
-		log(LOG_DEBUG,0,"Freed %s",sa6_fmt(&logsrc->al_addr));
-		free(logsrc);
-		logsrc=sources;
-	}	
-	free(cbk);
-	return;
-    }
-
-    IF_DEBUG(DEBUG_MLD)
-	log(LOG_DEBUG, 0,
-	    "sending multicast listener specific query V2 on : %s ,grp(%s)",
-	    v->uv_name, inet6_fmt(&cbk->g->al_addr.sin6_addr));
-
-    IF_DEBUG(DEBUG_MLD) if (sources)
-    {
-	log(LOG_DEBUG, 0, "list of sources :");
-	while (logsrc)
-	{
-	    log(LOG_DEBUG, 0, "%s", sa6_fmt(&logsrc->al_addr));
-	    logsrc = logsrc->al_next;
-	}
-    }
     send_mld6v2(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-		NULL, &cbk->g->al_addr.sin6_addr, v->uv_ifindex,
+		NULL, &cbk->g->al_addr, v->uv_ifindex,
 		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
-		v->uv_mld_robustness, v->uv_mld_query_interval, sources);
+		v->uv_mld_robustness, v->uv_mld_query_interval);
     v->uv_out_mld_query++;
 
-    /* Schedule another specific query until a INCLUDE state 
-     * is received or timer expired ( XXX: not conform )
+    send_mld6v2(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+		NULL, &cbk->g->al_addr, v->uv_ifindex,
+		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGYES,
+		v->uv_mld_robustness, v->uv_mld_query_interval);
+    v->uv_out_mld_query++;
+
+    cbk->g->al_rob--;
+
+    /*
+     * Schedule MLD6_ROBUSTNESS_VARIABLE specific queries.
+     * is received or timer expired ( XXX: The timer granularity is 1s !!)
      */
 
-    timer_setTimer(MLD6_LAST_LISTENER_QUERY_INTERVAL/MLD6_TIMER_SCALE,SendQueryV2spec,cbk);
+    if (cbk->g->al_rob > 0) {
+        timer_setTimer((MLD6_LAST_LISTENER_QUERY_INTERVAL /
+                        MLD6_TIMER_SCALE) / MLD6_ROBUSTNESS_VARIABLE,
+                       SendQueryV2spec, cbk);
+    }
+    else
+        free(cbk);
 
 }
 
@@ -239,17 +222,17 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     }
 
     mldh = (struct mld6v2_hdr *) query_message;
-    group = &mldh->mld6v2_addr;
+    group = &mldh->mld6_addr;
 
     /*
      * XXX Hard Coding 
      */
 
-    if ((tmo = ntohs(mldh->mld6v2_maxrc)) >= 32768)
-	tmo = decodeafloat(ntohs(mldh->mld6v2_maxrc), 3, 12);
-    numsrc = ntohs(mldh->mld6v2_numsrc);
-    if ((qqi = mldh->mld6v2_qqi) >= 128)
-	qqi = decodeafloat(mldh->mld6v2_qqi, 3, 4);
+    if ((tmo = ntohs(mldh->mld6_maxdelay)) >= 32768)
+	tmo = decodeafloat(ntohs(mldh->mld6_maxdelay), 3, 12);
+    numsrc = ntohs(mldh->mld6_numsrc);
+    if ((qqi = mldh->mld6_qqi) >= 128)
+	qqi = decodeafloat(mldh->mld6_qqi, 3, 4);
 
     qrv = MLD6_QRV(mldh);
     sflag = MLD6_SFLAG(mldh);
@@ -322,7 +305,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
      * query. (they are no group specific query : we are in SSM)
      */
 
-    if (sflag == 0)
+    if (sflag == FALSE)
     {
 	if (!IN6_IS_ADDR_UNSPECIFIED(group))
 	{
@@ -342,7 +325,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 		log(LOG_DEBUG,0,"List of sources :");
 	    for (i = 0; i < numsrc; i++)
 	    {
-		source_sa.sin6_addr = mldh->mld6v2_sources[i];
+		source_sa.sin6_addr = mldh->mld6_sources[i];
 		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
 	        log(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
@@ -351,29 +334,32 @@ accept_listenerV2_query(src, dst, query_message, datalen)
                 * I'm not the querier but maybe I'm still in the state Checking listener
                 * for this Group/Source we verify this with the al_checklist var
                 */
+                /*
+                 * Section 6.6.1 draft-vida-mld-v2-00.txt : When a router 
+		 * receive a query with clear router Side Processing flag,
+                 * it must update it's timer to reflect the correct
+                 * timeout values : source timer for sources are lowered to LLQI
+                 */
 
 		if ((s =
 		     check_multicastV2_listener(v, &group_sa, &g,
-						&source_sa)) != NULL
-		    && s->al_checklist == FALSE)
+						&source_sa)) != NULL)
 		{
 		    /*
 		     * setup a timeout to remove the source/group
 		     * membership
 		     */
-		    timer_clearTimer(s->al_timerid);
-		    SET_TIMER(s->al_timer,
-			      MLD6_LAST_LISTENER_QUERY_INTERVAL /
-			      MLD6_TIMER_SCALE);
+                    if (timer_leftTimer(s->al_timerid) >
+                        (int) (MLD6_LAST_LISTENER_QUERY_INTERVAL /
+                               MLD6_TIMER_SCALE)) 
+		    {
+		        timer_clearTimer(s->al_timerid);
+		        SET_TIMER(s->al_timer,
+			          MLD6_LAST_LISTENER_QUERY_INTERVAL /
+			          MLD6_TIMER_SCALE);
+		        s->al_timerid = SetTimerV2(vifi, g, s);
+		    }
 
-		    s->al_timerid = SetTimerV2(vifi, g, s);
-
-		    /*
-		     * use al_checklist to record our presence in
-		     * last-member state
-		     */
-
-		    s->al_checklist = TRUE;
 		    IF_DEBUG(DEBUG_MLD)
 			log(LOG_DEBUG, 0,
 			    "timer for grp %s src %s on vif %d "
@@ -406,16 +392,15 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 
     register mifi_t vifi;
     register struct uvif *v;
-    struct mld6v2_report *report;
-    struct mld6v2_maddr_rec *mard;
-    int             i, j, nummard, numsrc;
-    struct listaddr *g;
-    struct listaddr *s;
-    struct listaddr *spec;
-    struct listaddr *tmp;
+    struct mld6_report *report;
+    struct mld6_maddr_rec *mard;
+    int             i, j, nummard, numsrc, totsrc;
+    struct listaddr *g = NULL;
+    struct listaddr *s = NULL;
     struct sockaddr_in6 group_sa = { sizeof(group_sa), AF_INET6 };
     struct sockaddr_in6 source_sa = { sizeof(source_sa), AF_INET6 };
     cbk_t	*cbk;
+    char *p;
 
     if ((vifi = find_vif_direct_local(src)) == NO_VIF)
     {
@@ -439,8 +424,8 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	    "accepting multicast listener V2 report: "
 	    "src %s,dst %s", sa6_fmt(src), inet6_fmt(dst));
 
-    report = (struct mld6v2_report *) report_message;
-    nummard = ntohs(report->nmcastrcd);
+    report = (struct mld6_report *) report_message;
+    nummard = ntohs(report->mr_numgrps);
 
     v->uv_in_mld_report++;
 
@@ -448,12 +433,16 @@ accept_listenerV2_report(src, dst, report_message, datalen)
      * loop through each multicast record 
      */
 
+    totsrc = 0;
     for (i = 0; i < nummard; i++)
     {
-	mard = &report->mr_maddr[i];
+ 	p = (char *)&report->mr_maddr[i] - sizeof(struct in6_addr) * i
+		+ totsrc * sizeof(struct in6_addr);
+        mard= (struct mld6_maddr_rec *) p;
 	numsrc = ntohs(mard->mmr_numsrc);
+	totsrc += numsrc;
 
-	group_sa.sin6_addr = mard->mmar_maddr;
+	group_sa.sin6_addr = mard->mmr_maddr;
 	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
 	if (IN6_IS_ADDR_MC_LINKLOCAL(&group_sa.sin6_addr))
@@ -482,7 +471,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
                  * (B)=MALI implementation
 		 */
 
-		source_sa.sin6_addr = mard->mmar_sources[j];
+		source_sa.sin6_addr = mard->mmr_sources[j];
 		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
 		IF_DEBUG(DEBUG_MLD)
@@ -507,15 +496,16 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 		    s->al_timerid = SetTimerV2(vifi, g, s);
 
 		    /*
-		     * If in the checking Listener : clear rmxt timer 
+		     * If in the checking Listener : notify the timer is > LLQI
 		     * for this source/group 
-		     */
+                     * If we have specific queries for this source/group
+                     * pending they will be sent with the S flag set.
+                     */
 
-		    if (s->al_checklist)
-		    {
-			timer_clearTimer(s->al_checklist);
-			s->al_checklist = FALSE;
-		    }
+                    if (s->al_rob > 0)
+                        s->al_checklist = MORETHANLLQI;
+                    else
+                        s->al_checklist = FALSE;
 
 		}
 		else
@@ -556,7 +546,6 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 			time(&g->al_ctime);
 		    }
 
-		     /** set a timer for expiration **/
 		    /*
 		     * start timer for this source/group 
 		     */
@@ -591,22 +580,20 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	case BLOCK_OLD_SOURCES:
 	    /*
 	     * Routers in Non-Querier state MUST ignore BLOCK_OLD_SOURCES message ? 
-	     * like rfc 2710 ? 
+	     * like rfc 2710 ? assume yes
 	     */
 	    if (!(v->uv_flags & (VIFF_QUERIER))
 		|| v->uv_flags & VIFF_NOLISTENER)
 		continue;
 
-	    spec = NULL;
-
 	    for (j = 0; j < numsrc; j++)
 	    {
 		/*
 		 * Look for the src/group 
-		 * in our scr/group list; in order to set up a short-timeout group/source specific query.
+		 * in our src/group list; in order to set up a short-timeout group/source specific query.
 		 */
 
-		source_sa.sin6_addr = mard->mmar_sources[j];
+		source_sa.sin6_addr = mard->mmr_sources[j];
 		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
 		if ((s =
@@ -618,50 +605,14 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 		     * send a source specific query here : A*B is true here 
 		     */
 
-		    /*
-		     * still waiting for a reply to a query, ignore the block source 
-		     * - we are in state "checking listener"
-		     * - we are the querier
-		     * so ignore the block old source message for this group/source
-                     * TODO :If g->al_checklist there is a pending query for the 
-                     * same group, we have to merge it!
-		     */
-
-		    if (s->al_checklist)
-			continue;
-
-		    s->al_checklist = TRUE;
-
-		    /** delete old timer set a timer for expiration **/
 		    /** => start timer **/
-		    /* XXX : not conform to the spec : we should send LLQC
-                     * specific queries in LLQI.
-		     */
-
-		    timer_clearTimer(s->al_timerid);
-		    SET_TIMER(s->al_timer,
-			      MIN(s->al_timer,
-				  MLD6_LAST_LISTENER_QUERY_INTERVAL /
-				  MLD6_TIMER_SCALE) *
-			      (MLD6_LAST_LISTENER_QUERY_COUNT));
-		    s->al_timerid = SetTimerV2(vifi, g, s);
-
-		    /** prepare the list for the source specific query **/
-
-		    /*
-		     * copy it 
-		     */
-		    tmp = (struct listaddr *) malloc(sizeof(struct listaddr));
-		    if (tmp == NULL)
-			log(LOG_ERR, 0, "ran out of memory");	/*fatal */
-		    tmp->al_addr = s->al_addr;
-		    tmp->sources = NULL;
-		    tmp->al_checklist = TRUE;
-		    /*
-		     * link it 
-		     */
-		    tmp->al_next = spec;
-		    spec = tmp;
+		    /** timer updates are done in send_mldv2 **/
+                   if (s->al_checklist != LESSTHANLLQI) {
+                        s->al_checklist = LESSTHANLLQI;
+                        s->al_rob = MLD6_ROBUSTNESS_VARIABLE;
+                    }
+                    else
+                        s = NULL;
 		}
 		/*
 		 * else warning ? 
@@ -669,16 +620,18 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 
 	    }
 
-	    /* scheduling specific queries send */
+	    /* scheduling MLD6_ROBUSTNESS_VAR specific queries to send */
             /* => send a m-a-s	*/
             /* start rxmt timer */
 
-	    if(spec!=NULL)
+	    if (s)
 	    {
-		g->al_checklist=TRUE;
 	    	cbk=(cbk_t *)malloc(sizeof(cbk_t));
+		if (cbk == NULL)
+			log(LOG_ERR, 0, "ran out of memory");	/*fatal */
+		g->al_rob=MLD6_ROBUSTNESS_VARIABLE;
 	    	cbk->g=g;
-	  	cbk->s=spec;
+	    	cbk->s=NULL;
 	    	cbk->q_time=MLD6_LAST_LISTENER_QUERY_INTERVAL;
  	    	cbk->mifi=vifi;
 
@@ -714,10 +667,7 @@ DelVifV2(arg)
     /*
      * Source(s)/Group has expired delete all kernel cache entries with this
      * group
-     * If coming from Checking Listener state clear rxmt timer.
      */
-
-     g->al_checklist = FALSE;
 
     /*
      * protocol specific 
@@ -773,24 +723,23 @@ DelVifV2(arg)
 	    {
 		*anp = a->al_next;
 		free(a);
-		timer_clearTimer(g->al_checklist);
-		g->al_checklist=FALSE;
-    		free(cbk);
 	    }
 	    break;
 	}
 	else
 	    anp = &a->al_next;
     }
+    free(cbk);
 
 }
 
 /*
  * Set a timer to delete the record of a source/group membership on a vif.
- * typically used when report with record type BLOCK_OLD_SOURCES or  m-a-s source/group is received
+ * typically used when report with record type 
+ * -BLOCK_OLD_SOURCES,MODE_IS_INCLUDE,ALLOW_NEW_SOURCES  or  m-a-s source/group is received
  */
 
-static int
+int
 SetTimerV2(vifi, g, s)
     mifi_t          vifi;
     struct listaddr *g;
@@ -800,6 +749,8 @@ SetTimerV2(vifi, g, s)
     cbk_t          *cbk;
 
     cbk = (cbk_t *) malloc(sizeof(cbk_t));
+    if (cbk == NULL)
+ 	log(LOG_ERR, 0, "ran out of memory");	/*fatal */
     cbk->mifi = vifi;
     cbk->g = g;
     cbk->s = s;
@@ -827,10 +778,12 @@ check_multicastV2_listener(v, group, g, source)
      * Look for the source/group in our listener list;
      */
 
-    for (*g = v->uv_groups; *g != NULL; *g = (*g)->al_next)
+    for (s = (*g)->sources; s != NULL; s = s->al_next)
     {
 	if (inet6_equal(group, &(*g)->al_addr))
 	{
+	    if (source == NULL)
+		return NULL;
 
 	    for (s = (*g)->sources; s != NULL; s = s->al_next)
 	    {

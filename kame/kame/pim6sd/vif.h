@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.17 2001/08/09 08:46:58 suz Exp $	*/
+/*	$KAME: vif.h,v 1.18 2001/11/27 07:23:29 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -144,9 +144,11 @@ struct listaddr {
 	u_long al_timerid; /* timer for group membership */
 	u_long al_query; /* timer for repeated leave query */
 	u_long al_checklist; /* TRUE I'm in checking listener state */
+	int32_t al_rob;	  /* robustness */
 	u_int16 al_flags; /* flags related to this neighbor */
 };
 
+enum { LESSTHANLLQI = 1, MORETHANLLQI };
 #define al_genid al_alu.alu_genid
 #define al_reporter al_alu.alu_reporter
 

@@ -41,50 +41,44 @@
 
 #ifndef MLD6V2_H
 #define MLD6V2_H
-/**************** LIP6 DEV *******************/
-
-struct mld6v2_hdr
-{				/* MLDv2 Header */
-    struct icmp6_hdr mld6v2_hdr;	/* Standard ICMP header */
-    struct in6_addr mld6v2_addr;	/* Multicast Address */
-    u_int8          mld6v2_misc;	/* Resv+S+QRV */
-    u_int8          mld6v2_qqi;	/* QQIC */
-    u_int16         mld6v2_numsrc;	/* Number of Sources */
-    struct in6_addr mld6v2_sources[1];	/* Sources Addresses List */
+/* 
+ * Multicast Listener Discovery v.2
+ * XXX: this portion will be merged into system include file
+ */
+struct mld6v2_hdr {	/* MLDv2 Header */
+    struct icmp6_hdr mld6_hdr;	/* Standard ICMP header */
+    struct in6_addr mld6_addr;	/* Multicast Address */
+    u_int8          mld6_misc;	/* Resv+S+QRV */
+    u_int8          mld6_qqi;	/* QQIC */
+    u_int16         mld6_numsrc;	/* Number of Sources */
+    struct in6_addr mld6_sources[1];	/* Sources Addresses List */
 };
 
-#define mld6v2_type	mld6v2_hdr.icmp6_type
-#define mld6v2_code	mld6v2_hdr.icmp6_code
-#define mld6v2_cksum	mld6v2_hdr.icmp6_cksum
-#define mld6v2_maxrc	mld6v2_hdr.icmp6_data16[0]
-#define mld6v2_reserved	mld6v2_hdr.icmp6_data16[1]
+#define MLD6_QRV(x) ((x)->mld6_misc & (0x07))
 
-struct mld6v2_maddr_rec
-{				/* Multicast Address Record  */
+struct mld6_maddr_rec {		/* Multicast Address Record  */
     u_int8          mmr_type;	/* Multicast Address Record Type */
-    u_int8          mmr_datalen;	/* Aux Data Length */
+    u_int8          mmr_datalen;/* Aux Data Length */
     u_int16         mmr_numsrc;	/* Number of Sources */
-    struct in6_addr mmar_maddr;	/* Multicast Address */
-    struct in6_addr mmar_sources[1];	/* Sources Addresses List */
+    struct in6_addr mmr_maddr;	/* Multicast Address */
+    struct in6_addr mmr_sources[1];	/* Sources Addresses List */
 };
 
 #define nmcastrcd mld6v2_hdr.icmp6_data16[1]
 
-struct mld6v2_report
-{				/* Multicast Report */
-    struct icmp6_hdr mld6v2_hdr;	/* Standard ICMP header */
-    struct mld6v2_maddr_rec mr_maddr[1];	/* Multicast Records */
+struct mld6_report {	/* Multicast Report */
+    u_int8_t  mr_type;	/* Multicast Report Type */
+    u_int8_t  mr_rsv1;	/* Reserved */
+    u_int16_t mr_cksum;	/* Checksum */
+    u_int16_t mr_rsv2;	/* Reserved */
+    u_int16_t mr_numgrps;	/* Number of Multicast Address Records */
+    struct mld6_maddr_rec mr_maddr[1];	/* Multicast Records */
 };
 
-
-#define MLD6_QRV(x) ((x)->mld6v2_misc & (0x07))
-#define MLD6_SFLAG(x) ((x)->mld6v2_misc &(0x08))
-
-
-#define MLD6_MINLEN 24;		/* Minimal Message Length */
-#define MLD6_HDRLEN 24;		/* Minimal Header Length */
-#define MLD6_MADDR_REC_HDRLEN 20;	/* Minimal Multicast Addresses Length */
-#define MLD6_PREPEND 0;		/* Allocation for low level use  */
+#define MLD6_MINLEN 8		/* Minimal Message Length */
+#define MLD6_HDRLEN 8		/* Minimal Header Length */
+#define MLD6_MADDR_REC_HDRLEN 20	/* Minimal Multicast Addresses Length */
+#define MLD6_PREPEND 0		/* Allocation for low level use  */
 
 #define MLD6_MAXSOURCES(len)  (((len)-28)>>2)
 
@@ -92,6 +86,7 @@ struct mld6v2_report
 
 #define SFLAGYES		0x08
 #define SFLAGNO			0x0
+#define MLD6_SFLAG(x) ((x)->mld6_misc &(0x08))
 
 /*
  * Multicast Address Record Types 
@@ -111,17 +106,15 @@ unsigned int    codafloat(unsigned int nbr, unsigned int *realnbr,
 			  unsigned int sizeexp, unsigned int sizemant);
 unsigned int	decodeafloat(unsigned int nbr,unsigned int sizeexp,
 			     unsigned int sizemant);
-void            make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
+int		make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 				struct sockaddr_in6 *dst,
-				struct in6_addr *group, int ifindex,
+				struct sockaddr_in6 *group, int ifindex,
 				unsigned int delay, int datalen, int alert,
-				int sflag, int qrv, int qqic,
-				struct listaddr *sources);
+				int sflag, int qrv, int qqic);
 void            send_mld6v2(int type, int code, struct sockaddr_in6 *src,
-			    struct sockaddr_in6 *dst, struct in6_addr *group,
+			    struct sockaddr_in6 *dst, struct sockaddr_in6 *group,
 			    int ifindex, unsigned int delay, int datalen,
-			    int alert, int sflag, int qrv, int qqic,
-			    struct listaddr *sources);
+			    int alert, int sflag, int qrv, int qqic);
 
 
 

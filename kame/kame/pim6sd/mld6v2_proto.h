@@ -62,5 +62,6 @@ extern struct listaddr *check_multicastV2_listener __P((struct uvif * v,
 							struct listaddr ** g,
 							struct sockaddr_in6 *
 							source));
+extern int SetTimerV2 __P((int vifi, struct listaddr * g, struct listaddr * s));
 
 #endif

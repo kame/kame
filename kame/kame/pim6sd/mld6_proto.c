@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.22 2001/08/14 06:16:43 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.23 2001/11/27 07:23:28 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -174,8 +174,6 @@ accept_listener_query(src, dst, group, tmo)
 		return;
 	}
 	v = &uvifs[mifi];
-	v->uv_in_mld_query++;
-
 	if(v->uv_mld_version == MLDv2)
 	{
 		log(LOG_WARNING,0,
@@ -191,6 +189,7 @@ accept_listener_query(src, dst, group, tmo)
 		    v->uv_name,
 		    inet6_fmt(&src->sin6_addr), inet6_fmt(dst),
 		    inet6_fmt(group));
+	v->uv_in_mld_query++;
 
 	if (!inet6_equal(&v->uv_querier->al_addr, src)) {
 		/*
@@ -306,6 +305,16 @@ accept_listener_report(src, dst, group)
 		return;
 	}
 
+	v = &uvifs[mifi];
+	if(v->uv_mld_version == MLDv2)
+	{
+		log(LOG_WARNING, 0,
+		    "Mif %s configured in MLDv2 received MLDv1 report (src %s)!"
+		    "(compat mode not implemented)",
+		    v->uv_name, sa6_fmt(src));
+		return;
+	}
+
 	IF_DEBUG(DEBUG_MLD)
 		log(LOG_DEBUG, 0,
 		    "accepting multicast listener report: "
@@ -313,7 +322,6 @@ accept_listener_report(src, dst, group)
 		    inet6_fmt(&src->sin6_addr),inet6_fmt(dst),
 		    inet6_fmt(group));
 
-	v = &uvifs[mifi];
 	v->uv_in_mld_report++;
 
 	/*
@@ -415,13 +423,21 @@ accept_listener_done(src, dst, group)
 		return;
 	}
 
+	v = &uvifs[mifi];
+	if(v->uv_mld_version == MLDv2)
+	{
+		log(LOG_WARNING, 0,
+		    "Mif %s configured in MLDv2 received MLDv1 done (src %s)!"
+		    "(compat mode not implemented)",
+		    v->uv_name, sa6_fmt(src));
+		return;
+	}
+
 	IF_DEBUG(DEBUG_MLD)
 		log(LOG_INFO, 0,
 		    "accepting listener done message: src %s, dst %s, grp %s",
 		    inet6_fmt(&src->sin6_addr),
 		    inet6_fmt(dst), inet6_fmt(group));
-
-	v = &uvifs[mifi];
 	v->uv_in_mld_done++;
 
 	if (!(v->uv_flags & (VIFF_QUERIER | VIFF_DR)))

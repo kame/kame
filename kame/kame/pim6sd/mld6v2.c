@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.4 2001/08/09 08:46:57 suz Exp $
+ * $KAME: mld6v2.c,v 1.5 2001/11/27 07:23:28 suz Exp $
  */
 
 /*
@@ -64,6 +64,10 @@
 #include "inet6.h"
 #include "mld6.h"
 #include "mld6v2.h"
+#include "mld6_proto.h"
+#include "mld6v2_proto.h"
+#include "callout.h"
+#include "timer.h"
 
 #ifndef USE_RFC2292BIS
 extern u_int8_t raopt[IP6OPT_RTALERT_LEN];
@@ -77,31 +81,127 @@ extern struct msghdr sndmh;
 
 
 /*
+ * this function build three type of messages : 
+ *	- general queries
+ *	- source/group spec. query S flag set
+ *	- source/group spec. queries S flag not set
+ *
+ * specific queries are created in the following manner:
+ *	- clear S flag
+ *	- look up the source list of the group 
+ *	- send a specific query with all the sources satisfying either
+ *	  of the two conditions
+ *		* state == LESSTHANLLQI && this is a specific query
+ *		* state == MORETHANLLQI 
+ * 	- set S flag
+ *	if there something to send, return TRUE.
  * initialisation, and reading are done in mld6.c (it's just another icmp6 filtering) 
- */
-/*
  * only used for mldv2 query messages 
  */
 
-void
+int
 make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
-		struct sockaddr_in6 *dst, struct in6_addr *group, int ifindex,
+		struct sockaddr_in6 *dst, struct sockaddr_in6 *group, int ifindex,
 		unsigned int delay, int datalen, int alert, int sflag,
-		int qrv, int qqic, struct listaddr *sources)
+		int qrv, int qqic)
 {
     static struct sockaddr_in6 dst_sa = { sizeof(dst_sa), AF_INET6 };
     struct mld6v2_hdr *mhp = (struct mld6v2_hdr *) mld6_send_buf;
     int             ctllen, hbhlen = 0;
     int             nbsrc = 0;
-    struct listaddr *lstsrc;
+    struct listaddr *lstsrc = NULL;
     u_int8_t        misc = 0;	/*Resv+S flag + QRV */
-    int             i;
     unsigned int    realnbr;
+    register int    vifi;
+    struct uvif    *v;
+    struct listaddr *g = NULL;
 
-    if (IN6_IS_ADDR_UNSPECIFIED(group))
+    if ((vifi = local_address(src)) == NO_VIF) {
+        IF_DEBUG(DEBUG_MLD)
+            log(LOG_INFO, 0, "make_mld6v2_msg: can't find a vif");
+        return FALSE;
+    }
+    v = &uvifs[vifi];
+
+    if (group==NULL)
 	dst_sa.sin6_addr = allnodes_group.sin6_addr;
-    else
-	dst_sa.sin6_addr = *group;
+    else 
+    {
+        lstsrc = check_multicastV2_listener(v, group, &g, NULL);
+        if (g == NULL) {
+            IF_DEBUG(DEBUG_MLD)
+                log(LOG_WARNING, 0,
+                   "trying to build group specific query without state for it");
+            return FALSE;
+        }
+
+        if (sflag == SFLAGNO) 
+        {
+
+            lstsrc = g->sources;
+            while (lstsrc) {
+                /*
+                 * Section 6.6.1 draft-vida-mld-v2-00.txt : When a router send 
+		 * a query with clear router Side Processing flag,
+                 * it must update its timer to reflect the correct timeout 
+                 * values: source timer for sources are lowered to LLQI
+                 */
+                if (lstsrc->al_checklist != LESSTHANLLQI)
+		    goto nextsrc;
+                if (lstsrc->al_rob <= 0)
+		    goto nextsrc;	/* the source will be deleted */
+                IF_DEBUG(DEBUG_MLD)
+                    log(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
+
+                mhp->mld6_sources[nbsrc] = lstsrc->al_addr.sin6_addr;
+                nbsrc++;
+                lstsrc->al_rob--;
+                if (timer_leftTimer(lstsrc->al_timerid) >
+                    MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE) {
+                         timer_clearTimer(lstsrc->al_timerid);
+                         SET_TIMER(lstsrc->al_timer,
+                                   MLD6_LAST_LISTENER_QUERY_INTERVAL /
+                                   MLD6_TIMER_SCALE);
+                         lstsrc->al_timerid = SetTimerV2(vifi, g, lstsrc);
+                }
+	    nextsrc:
+                lstsrc = lstsrc->al_next;
+            }
+        }
+        if (sflag == SFLAGYES) 
+        {
+            lstsrc = g->sources;
+            while (lstsrc) {
+                if (lstsrc->al_checklist != MORETHANLLQI)
+		    goto nextsrc2;
+
+                if (lstsrc->al_rob <= 0) {
+                    lstsrc->al_checklist = FALSE;
+		    goto nextsrc2;
+		}
+
+                IF_DEBUG(DEBUG_MLD)
+                    log(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
+                mhp->mld6_sources[nbsrc] = lstsrc->al_addr.sin6_addr;
+                nbsrc++;
+                lstsrc->al_rob--;
+	    nextsrc2:
+                lstsrc = lstsrc->al_next;
+            }
+        }
+        if (nbsrc == 0)
+            return FALSE;
+        IF_DEBUG(DEBUG_MLD) {
+            if (sflag == SFLAGYES)
+                log(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag SET",
+                    sa6_fmt(group));
+            if (sflag == SFLAGNO)
+                log(LOG_DEBUG, 0, "==>(%s) Query Sent With S flag NOT SET",
+                    sa6_fmt(group));
+        }
+        dst_sa.sin6_addr = group->sin6_addr;
+    }
+
     sndmh.msg_name = (caddr_t) & dst_sa;
 
     /*
@@ -112,35 +212,20 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 	misc |= qrv;
 
     /*
-     * compute number of src 
-     */
-    lstsrc = sources;
-    while (lstsrc)
-    {
-	nbsrc++;
-	lstsrc = lstsrc->al_next;
-    }
-
-    /*
      * XXX : hard-coding , 28 is the minimal size of the mldv2 query header
      */
 
     datalen = 28 + nbsrc * sizeof(struct in6_addr);
-    bzero(mhp, datalen);
-    mhp->mld6v2_type = type;
-    mhp->mld6v2_code = code;
-    mhp->mld6v2_maxrc = htons(codafloat(delay, &realnbr, 3, 12));
-    mhp->mld6v2_addr = *group;
-    mhp->mld6v2_misc = misc;
-    mhp->mld6v2_qqi = codafloat(qqic, &realnbr, 3, 4);
-    mhp->mld6v2_numsrc = htons(nbsrc);
-
-    lstsrc = sources;
-    for (i = 0; i < nbsrc; i++)
-    {
-	mhp->mld6v2_sources[i] = lstsrc->al_addr.sin6_addr;
-	lstsrc = lstsrc->al_next;
-    }
+    mhp->mld6_type = type;
+    mhp->mld6_code = code;
+    mhp->mld6_maxdelay = htons(codafloat(delay, &realnbr, 3, 12));
+    if (group!=NULL)
+	mhp->mld6_addr = group->sin6_addr;
+    else
+	mhp->mld6_addr = in6addr_any;
+    mhp->mld6_misc = misc;
+    mhp->mld6_qqi = codafloat(qqic, &realnbr, 3, 4);
+    mhp->mld6_numsrc = htons(nbsrc);
 
     sndiov[0].iov_len = datalen;
 
@@ -242,18 +327,21 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
     }
     else
 	sndmh.msg_control = NULL;	/* clear for safety */
+
+    return TRUE;
 }
 
 void
 send_mld6v2(int type, int code, struct sockaddr_in6 *src,
-	    struct sockaddr_in6 *dst, struct in6_addr *group, int index,
+	    struct sockaddr_in6 *dst, struct sockaddr_in6 *group, int index,
 	    unsigned int delay, int datalen, int alert, int sflag, int qrv,
-	    int qqic, struct listaddr *sources)
+	    int qqic)
 {
     struct sockaddr_in6 *dstp;
 
-    make_mld6v2_msg(type, code, src, dst, group, index, delay, datalen, alert,
-		    sflag, qrv, qqic, sources);
+    if (make_mld6v2_msg(type, code, src, dst, group, index, delay, 
+			datalen, alert, sflag, qrv, qqic) == FALSE)
+	return;
 
     dstp = (struct sockaddr_in6 *) sndmh.msg_name;
 
@@ -270,7 +358,7 @@ send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 
 	return;
     }
-    IF_DEBUG(DEBUG_PKT | debug_kind(IPPROTO_IGMP, type, 0))
+    IF_DEBUG(DEBUG_PKT)
 	log(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
 	    packet_kind(IPPROTO_ICMPV6, type, 0),
 	    src ? inet6_fmt(&src->sin6_addr) : "unspec",
