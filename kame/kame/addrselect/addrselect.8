@@ -1,4 +1,4 @@
-.\"	$KAME: addrselect.8,v 1.1 2001/09/24 16:01:24 jinmei Exp $
+.\"	$KAME: addrselect.8,v 1.2 2001/12/20 09:05:04 jinmei Exp $
 .\"
 .\" Copyright (C) 2001 WIDE Project.
 .\" All rights reserved.
@@ -33,14 +33,11 @@
 .\"
 .Sh NAME
 .Nm addrselect
-.Nd configure address selection policy
+.Nd configure address selection policy for IPv6 and IPv4
 .\"
 .Sh SYNOPSIS
 .Nm addrselect
-.Fl c
-.Ar configfile
-.Nm addrselect
-.Op show
+.Op Cm show
 .Nm addrselect
 .Cm add
 .Ar prefix precedence label
@@ -49,14 +46,65 @@
 .Ar prefix
 .Nm addrselect
 .Cm flush
+.Nm addrselect
+.Cm install
+.Ar configfile
 .\"
 .Sh DESCRIPTION
-To be written.
+The
+.Nm
+command manages the policy table of source and destination address
+selection for outgoing IPv4 and IPv6 packets.
+When
+.Nm
+is invoked without an argument or with a single argument
+.Cm show ,
+it prints the content of the policy table currently installed in the
+kernel.
+.Pp
+To modify the table, the following operations are available:
+.Bl -tag -width Ds
+.It Cm add Ar prefix precedence label
+add a policy entry.
+.Ar Prefix
+is an IPv6 prefix, which is a key for the entry.
+An IPv4 prefix should be specified with an IPv6 prefix using an
+IPv4-mapped IPv6 address.
+.Ar Precedence
+and
+.Ar label
+are decimal numbers, which specify the precedence and label values
+for the entry, respectively.
+This operation should be performed without an existing entry for the
+prefix.
+.It Cm delete Ar prefix
+delete a policy entry specified by
+.Ar prefix ,
+which should be an IPv6 prefix.
+A corresponding entry for the prefix should have already been
+installed.
+.It Cm flush
+delete all existing policy entries in the kernel.
+.It Cm install Ar configfile
+install policy entries from a configuration file named
+.Ar configfile .
+The configuration file should contain a set of policy entries.
+Each entry is specified in a single line which contain an IPv6 prefix,
+a decimal precedence value, and a decimal label value, separated with
+white space or tab characters.
+In the configuration file, lines beginning with the pound-sign (#) are
+comments and are ignored.
+.El
 .\"
 .Sh RETURN VALUES
 The program exits with 0 on success, non-zero on failures.
 .\"
-.\".Sh SEE ALSO
+.Sh SEE ALSO
+Richard Draves,
+.Do
+Default Address Selection for IPv6
+.Dc ,
+draft-ietf-ipngwg-default-addr-select-xx.txt
 .\"
 .Sh HISTORY
 The
