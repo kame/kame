@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.24 1999/12/14 05:27:38 jinmei Exp $
+	$Id: PORTABILITY,v 1.25 2000/01/06 14:20:46 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -54,6 +54,11 @@ across those possibilities.
   It is also advised to add extra comment to help paren match,
   if you need to write widow paren in string.  For example:
 	printf("(");		/* ) */
+
+- Avoid use of "#if" as much as possible, stick to "#ifdef" or "#ifndef"
+  if possible (Avoid "#if defined(foo)" if you only have single "foo").
+  "#if" is relatively new syntax and is not friendly with old tools like
+  unifdef(1).
 
 - Follow NetBSD KNF.
   They are the most strict guys about source code formatting.
