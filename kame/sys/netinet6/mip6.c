@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.158 2002/08/20 04:46:55 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.159 2002/08/26 12:59:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -159,6 +159,8 @@ extern struct mip6_bc_list mip6_bc_list;
 extern struct mip6_unuse_hoa_list mip6_unuse_hoa;
 
 struct mip6_config mip6_config;
+
+struct mip6stat mip6stat;
 
 /*
  * XXX should we dynamically allocate the space to support any number
@@ -1837,6 +1839,8 @@ mip6_rthdr_create_withdst(pktopt_rthdr, dst, opt)
 		return (error);
 	}
 
+	mip6stat.mip6s_orthdr2++;
+
 	return (0);
 }
 
@@ -1884,6 +1888,8 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	mip6_align_destopt(&optbuf);
 
 	*pktopt_haddr = (struct ip6_dest *)optbuf.buf;
+
+	mip6stat.mip6s_ohao++;
 
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.36 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.37 2002/08/26 12:59:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -372,6 +372,8 @@ ip6_rthdr2(m, ip6, rh2)
 				if (!SA6_ARE_ADDR_EQUAL(dst_sa,
 							&mbu->mbu_haddr))
 					continue;
+
+				mip6stat.mip6s_rthdr2++;
 
 				/*
 				 * if the previous hop is the coa that

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.48 2002/08/14 05:51:48 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.49 2002/08/26 12:59:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -282,6 +282,49 @@ struct mip6_unuse_hoa {
 };
 LIST_HEAD(mip6_unuse_hoa_list, mip6_unuse_hoa);
 
+/*
+ * Mobile IPv6 related statistics.
+ */
+struct mip6stat {
+	u_quad_t mip6s_mobility;	/* Mobility Header recieved */
+	u_quad_t mip6s_omobility;	/* Mobility Header sent */
+	u_quad_t mip6s_hoti;		/* HoTI recieved */
+	u_quad_t mip6s_ohoti;		/* HoTI sent */
+	u_quad_t mip6s_coti;		/* CoTI received */
+	u_quad_t mip6s_ocoti;		/* CoTI sent */
+	u_quad_t mip6s_hot;		/* HoT received */
+	u_quad_t mip6s_ohot;		/* HoT sent */
+	u_quad_t mip6s_cot;		/* CoT received */
+	u_quad_t mip6s_ocot;		/* CoT sent */
+	u_quad_t mip6s_bu;		/* BU received */
+	u_quad_t mip6s_obu;		/* BU sent */
+	u_quad_t mip6s_ba;		/* BA received */
+	u_quad_t mip6s_ba_hist[256];	/* BA status input histgram */
+	u_quad_t mip6s_oba;		/* BA sent */
+	u_quad_t mip6s_br;		/* BR received */
+	u_quad_t mip6s_obr;		/* BR sent */
+	u_quad_t mip6s_be;		/* BE received */
+	u_quad_t mip6s_be_hist[256];	/* BE status input histogram */
+	u_quad_t mip6s_obe;		/* BE sent */
+	u_quad_t mip6s_obe_hist[256];	/* BE status output histogram */
+	u_quad_t mip6s_hao;		/* HAO received */
+	u_quad_t mip6s_unverifiedhao;	/* unverified HAO received */
+	u_quad_t mip6s_ohao;		/* HAO sent */
+	u_quad_t mip6s_rthdr2;		/* RTHDR2 received */
+	u_quad_t mip6s_orthdr2;		/* RTHDR2 sent */
+	u_quad_t mip6s_checksum;	/* bad checksum */
+	u_quad_t mip6s_payloadproto;	/* payload proto != no nxt header */
+	u_quad_t mip6s_unknowntype;	/* unknown MH type value */
+	u_quad_t mip6s_nohif;		/* not my home address */
+	u_quad_t mip6s_nobue;		/* no related BUE */
+	u_quad_t mip6s_hotcookie;	/* HoT cookie mismatch */
+	u_quad_t mip6s_cotcookie;	/* CoT cookie mismatch */
+	u_quad_t mip6s_unprotected;	/* not IPseced signaling */
+	u_quad_t mip6s_haopolicy;	/* BU is discarded due to bad HAO */
+	u_quad_t mip6s_rrauthfail;	/* RR authentication failed */
+	u_quad_t mip6s_seqno;		/* seqno mismatch */
+};
+
 #ifdef _KERNEL
 struct encaptab;
 
@@ -290,6 +333,7 @@ extern struct mip6_ha_list mip6_ha_list; /* Global val holding all HAs */
 #ifdef MIP6_DRAFT18
 extern u_int16_t nonce_index;		/* Current noce index */
 #endif /* MIP6_DRAFT18 */
+extern struct mip6stat mip6stat;	/* statistics */
 
 void mip6_init __P((void));
 

@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.9 2002/08/06 11:00:55 k-sugyou Exp $	*/
+/*	$KAME: mobility6.c,v 1.10 2002/08/26 12:59:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,6 +82,8 @@ mobility6_input(mp, offp, proto)
 	int off = *offp, mh6len;
 	int sum;
 
+	mip6stat.mip6s_mobility++;
+
 	ip6 = mtod(m, struct ip6_hdr *);
 
 	/* validation of the length of the header */
@@ -97,14 +99,16 @@ mobility6_input(mp, offp, proto)
 	if (mh6len < IP6M_MINLEN) {
 		/* too small */
 		m_freem(m);
+		ip6stat.ip6s_toosmall++;
 		return (IPPROTO_DONE);
 	}
 
 	if (mh6->ip6m_pproto != IPPROTO_NONE) {
 		mip6log((LOG_INFO, "%s:%d: Payload Proto %d.\n",
 			__FILE__, __LINE__, mh6->ip6m_pproto));
-		/* 9.2.1 silent discard */
+		/* 9.2.1 silently discard */
 		m_freem(m);
+		mip6stat.mip6s_payloadproto++;
 		return (IPPROTO_DONE);
 	}
 
@@ -125,6 +129,7 @@ mobility6_input(mp, offp, proto)
 		    __FILE__, __LINE__,
 		    mh6->ip6m_type, sum, ip6_sprintf(&ip6->ip6_src)));
 		m_freem(m);
+		mip6stat.mip6s_checksum++;
 		return (IPPROTO_DONE);
 	}
 
@@ -190,6 +195,7 @@ mobility6_input(mp, offp, proto)
 	default:
 		/* XXX */
 		m_freem(m);
+		mip6stat.mip6s_unknowntype++;
 		return (IPPROTO_DONE);
 		break;
 	}

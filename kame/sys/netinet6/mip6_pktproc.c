@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.42 2002/08/13 05:31:59 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.43 2002/08/26 12:59:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -110,6 +110,8 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 	struct ip6_pktopts opt;
 	int error = 0;
 
+	mip6stat.mip6s_hoti++;
+
 	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa)) {
 		/* must not happen. */
 		m_freem(m0);
@@ -126,6 +128,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
 		m_freem(m0);
+		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
 	}
 
@@ -149,6 +152,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
  		goto free_ip6pktopts;
 	}
 
+	mip6stat.mip6s_ohot++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -217,6 +221,8 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 	struct ip6_pktopts opt;
 	int error = 0;
 
+	mip6stat.mip6s_coti++;
+
 	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa)) {
 		/* must not happen. */
 		m_freem(m0);
@@ -233,6 +239,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
 		m_freem(m0);
+		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
 	}
 
@@ -256,6 +263,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
  		goto free_ip6pktopts;
 	}
 
+	mip6stat.mip6s_ocot++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -325,6 +333,8 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 	struct mip6_bu *mbu;
 	int error = 0;
 
+	mip6stat.mip6s_hot++;
+
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
 		m_freem(m);
@@ -341,6 +351,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
 		m_freem(m);
+		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
 	}
 
@@ -351,6 +362,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		    "for %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&dst_sa->sin6_addr)));
 		m_freem(m);
+		mip6stat.mip6s_nohif++;
                 return (EINVAL);
 	}
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, src_sa, dst_sa);
@@ -360,6 +372,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		    "this HoT for %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
 		m_freem(m);
+		mip6stat.mip6s_nobue++;
 		return (EINVAL);
 	}
 
@@ -370,6 +383,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		    "%s:%d: HoT mobile cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
 		m_freem(m);
+		mip6stat.mip6s_hotcookie++;
 		return (EINVAL);
 	}
 
@@ -401,6 +415,8 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	struct mip6_bu *mbu = NULL;
 	int error = 0;
 
+	mip6stat.mip6s_cot++;
+
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
 		m_freem(m);
@@ -417,6 +433,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
 		m_freem(m);
+		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
 	}
 
@@ -437,6 +454,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		    "this CoT for %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
 		m_freem(m);
+		mip6stat.mip6s_nobue++;
 		return (EINVAL);
 	}
 
@@ -447,6 +465,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		    "%s:%d: CoT mobile cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
 		m_freem(m);
+		mip6stat.mip6s_cotcookie++;
 		return (EINVAL);
 	}
 
@@ -488,6 +507,8 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	u_int8_t bu_safe = 0;	/* To accept bu always without authentication, this value is set to non-zero */
 	struct mip6_mobility_options mopt;
 
+	mip6stat.mip6s_bu++;
+
 #ifdef IPSEC
 	/*
 	 * Check ESP(IPsec)
@@ -495,6 +516,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	if (ipsec6_in_reject(m, NULL)) {
 		ipsec6stat.in_polvio++;
 		m_freem(m);
+		mip6stat.mip6s_unprotected++;
 		return (EINVAL);	/* XXX */
 	}
 #endif /* IPSEC */
@@ -516,6 +538,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
 		m_freem(m);
+		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
 	}
 
@@ -569,6 +592,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	/* otherwise, discard this packet. */
 	m_freem(m);
+	mip6stat.mip6s_haopolicy++;
 	return (EINVAL);
 
  accept_binding_update:
@@ -603,6 +627,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 				 "%s:%d: RR authentication was failed.\n",
 				 __FILE__, __LINE__));
 			m_freem(m);
+			mip6stat.mip6s_rrauthfail++;
 			return (EINVAL);
 		}
 	} else {
@@ -633,6 +658,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 			/* discard. */
 			m_freem(m);
+			mip6stat.mip6s_seqno++;
 			return (EINVAL);
 		}
 	}
@@ -754,6 +780,8 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 #endif
 	int error = 0;
 
+	mip6stat.mip6s_ba++;
+
 #ifdef IPSEC
 	/*
 	 * Check ESP(IPsec)
@@ -782,10 +810,13 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
 		m_freem(m);
+		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
 	}
 
 	/* XXX autorization */
+
+	mip6stat.mip6s_ba_hist[ip6ma->ip6ma_status]++;
 
 	/*
          * check if the sequence number of the binding update sent ==
@@ -811,6 +842,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                          __FILE__, __LINE__));
                 /* silently ignore */
 		m_freem(m);
+		mip6stat.mip6s_nobue++;
                 return (EINVAL);
 	}
 	seqno = htons(ip6ma->ip6ma_seqno);
@@ -836,6 +868,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                 /* silently ignore. */
                 /* discard */
 		m_freem(m);
+		mip6stat.mip6s_seqno++;
                 return (EINVAL);
 	}
 
@@ -1065,6 +1098,7 @@ mip6_bu_send_hoti(mbu)
  		goto free_ip6pktopts;
 	}
 
+	mip6stat.mip6s_ohoti++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -1108,6 +1142,8 @@ mip6_bu_send_coti(mbu)
 		m_freem(m);
  		goto free_ip6pktopts;
 	}
+
+	mip6stat.mip6s_ocoti++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -1155,6 +1191,7 @@ mip6_bu_send_cbu(mbu)
 		goto free_ip6pktopts;
 	}
 
+	mip6stat.mip6s_obu++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -1224,6 +1261,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		opt.ip6po_rthdr2 = pktopt_rthdr;
 	}
 
+	mip6stat.mip6s_oba++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -1622,6 +1660,8 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	struct mip6_bu *mbu;
 	int error = 0;
 
+	mip6stat.mip6s_be++;
+
 	/* get packet source and destination addrresses. */
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
@@ -1636,6 +1676,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 		    __FILE__, __LINE__,
 		    ip6melen, ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard. */
+		ip6stat.ip6s_toosmall++;
 		goto bad;
 	}
 
@@ -1659,10 +1700,12 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	sc = hif_list_find_withhaddr(&hoa);
 	if (sc == NULL) {
 		/* we have no such home address. */
+		mip6stat.mip6s_nohif++;
 		goto bad;
 	}
 
 	/* find the corresponding binding update entry. */
+	mip6stat.mip6s_be_hist[ip6me->ip6me_status]++;
 	switch (ip6me->ip6me_status) {
 	case IP6ME_STATUS_NO_BINDING:
 	case IP6ME_STATUS_UNKNOWN_MH_TYPE:

@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.48 2002/08/08 07:51:40 k-sugyou Exp $	*/
+/*	$KAME: dest6.c,v 1.49 2002/08/26 12:59:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,6 +197,8 @@ dest6_input(mp, offp, proto)
 			    sizeof(ip6a->ip6a_coa));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
 
+			mip6stat.mip6s_hao++;
+
 			/* check whether this HAO is 'verified'. */
 			if ((mbc = mip6_bc_list_find_withphaddr(
 				&mip6_bc_list, &home_sa)) != NULL) {
@@ -370,6 +372,7 @@ int mhoff, nxt;
 		return dest6_swap_hao(ip6, ip6a, &haopt);
 
 	/* reject */
+	mip6stat.mip6s_unverifiedhao++;
 	home_sa = ip6a->ip6a_src;
 	home_sa.sin6_addr = *(struct in6_addr *)haopt.ip6oh_addr;
 	dest6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src, &home_sa);
@@ -408,6 +411,7 @@ dest6_send_be(src, dst, home)
 	}
 
 	/* output a binding missing message. */
+	mip6stat.mip6s_obe++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error)
 		goto free_ip6pktopts;
