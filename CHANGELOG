@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2355 2003/03/10 06:03:04 itojun Exp $
+$KAME: CHANGELOG,v 1.2356 2003/03/12 16:03:32 jinmei Exp $
 
 <200303>
+2003-03-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rafixd: this is a new application.  The rafixd daemon
+	invalidates bogus RAs by overriding them with the 0 router
+	lifetime.  This is particularly useful on an event network that
+	contains mis-configured "routers".
+
 Mon Mar 10 15:02:05 JST 2003  itojun@iijlab.net
 	* sctp: merged patch 7 from randall.
 
