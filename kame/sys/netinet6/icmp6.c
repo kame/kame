@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.315 2002/07/10 05:03:57 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.316 2002/07/10 09:08:03 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -629,6 +629,7 @@ icmp6_input(mp, offp, proto)
 
 #ifdef MIP6
 	if (mip6_icmp6_tunnel_input(m, off, icmp6len)) {
+		m = NULL;
 		goto freeit;
 	}
 #endif /* MIP6 */
@@ -636,8 +637,10 @@ icmp6_input(mp, offp, proto)
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
 #ifdef MIP6
-		if (mip6_icmp6_input(m, off, icmp6len))
+		if (mip6_icmp6_input(m, off, icmp6len)) {
+			m = NULL;
 			goto freeit;
+		}
 #endif /* MIP6 */
 		switch (code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
@@ -703,8 +706,10 @@ icmp6_input(mp, offp, proto)
 	case ICMP6_PARAM_PROB:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_paramprob);
 #ifdef MIP6
-		if (mip6_icmp6_input(m, off, icmp6len))
+		if (mip6_icmp6_input(m, off, icmp6len)) {
+			m = NULL;
 			goto freeit;
+		}
 #endif /* MIP6 */
 		switch (code) {
 		case ICMP6_PARAMPROB_NEXTHEADER:
@@ -829,8 +834,10 @@ icmp6_input(mp, offp, proto)
 			goto badlen;
 		if (code != 0)
 			goto badcode;
-		if (mip6_icmp6_input(m, off, icmp6len))
+		if (mip6_icmp6_input(m, off, icmp6len)) {
+			m = NULL;
 			goto freeit;
+		}
 		break;
 
 	case ICMP6_MOBILEPREFIX_SOLICIT:
@@ -838,8 +845,10 @@ icmp6_input(mp, offp, proto)
 			goto badlen;
 		if (code != 0)
 			goto badcode;
-		if (mip6_icmp6_input(m, off, icmp6len))
+		if (mip6_icmp6_input(m, off, icmp6len)) {
+			m = NULL;
 			goto freeit;
+		}
 		break;
 
 	case ICMP6_MOBILEPREFIX_ADVERT:
@@ -847,8 +856,10 @@ icmp6_input(mp, offp, proto)
 			goto badlen;
 		if (code != 0)
 			goto badcode;
-		if (mip6_icmp6_input(m, off, icmp6len))
+		if (mip6_icmp6_input(m, off, icmp6len)) {
+			m = NULL;
 			goto freeit;
+		}
 		break;
 #endif /* MIP6 */
 

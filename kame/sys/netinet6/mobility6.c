@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.5 2002/06/18 13:52:13 k-sugyou Exp $	*/
+/*	$KAME: mobility6.c,v 1.6 2002/07/10 09:08:04 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,7 +95,8 @@ mobility6_input(mp, offp, proto)
 	mh6len = mh6->ip6m_len << 3;
 	if (mh6len < IP6M_MINLEN) {
 		/* too small */
-		goto bad;
+		m_freem(m);
+		return (IPPROTO_DONE);
 	}
 
 #ifndef PULLDOWN_TEST
@@ -113,30 +114,30 @@ mobility6_input(mp, offp, proto)
 	switch (mh6->ip6m_type) {
 	case IP6M_HOME_TEST_INIT:
 		if (mip6_ip6mhi_input(m, (struct ip6m_home_test_init *)mh6,
-		    mh6len) < 0)
-			goto bad;
+		    mh6len) != 0)
+			return (IPPROTO_DONE);
 		break;
 
 	case IP6M_CAREOF_TEST_INIT:
 		if (mip6_ip6mci_input(m, (struct ip6m_careof_test_init *)mh6,
-		    mh6len) < 0)
-			goto bad;
+		    mh6len) != 0)
+			return (IPPROTO_DONE);
 		break;
 
 	case IP6M_HOME_TEST:
 		if (!MIP6_IS_MN)
 			break;
 		if (mip6_ip6mh_input(m, (struct ip6m_home_test *)mh6,
-		    mh6len) < 0)
-			goto bad;
+		    mh6len) != 0)
+			return (IPPROTO_DONE);
 		break;
 
 	case IP6M_CAREOF_TEST:
 		if (!MIP6_IS_MN)
 			break;
 		if (mip6_ip6mc_input(m, (struct ip6m_careof_test *)mh6,
-		    mh6len) < 0)
-			goto bad;
+		    mh6len) != 0)
+			return (IPPROTO_DONE);
 		break;
 
 	case IP6M_BINDING_REQUEST:
@@ -147,16 +148,16 @@ mobility6_input(mp, offp, proto)
 
 	case IP6M_BINDING_UPDATE:
 		if (mip6_ip6mu_input(m, (struct ip6m_binding_update *)mh6,
-		    mh6len) < 0)
-			goto bad;
+		    mh6len) != 0)
+			return (IPPROTO_DONE);
 		break;
 
 	case IP6M_BINDING_ACK:
 		if (!MIP6_IS_MN)
 			break;
 		if (mip6_ip6ma_input(m, (struct ip6m_binding_ack *)mh6,
-		    mh6len) < 0)
-			goto bad;
+		    mh6len) != 0)
+			return (IPPROTO_DONE);
 		break;
 
 	case IP6M_BINDING_ERROR:
@@ -165,7 +166,8 @@ mobility6_input(mp, offp, proto)
 
 	default:
 		/* XXX */
-		goto bad;
+		m_freem(m);
+		return (IPPROTO_DONE);
 		break;
 	}
 
@@ -174,10 +176,6 @@ mobility6_input(mp, offp, proto)
 		mip6log((LOG_INFO, "%s:%d: Payload Proto %d.\n",
 			__FILE__, __LINE__, mh6->ip6m_pproto));
 	}
+
 	return (mh6->ip6m_pproto);
-
- bad:
-	m_freem(m);
-	return (IPPROTO_DONE);
 }
-

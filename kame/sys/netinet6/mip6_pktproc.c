@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.17 2002/07/09 04:50:04 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.18 2002/07/10 09:08:04 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -112,6 +112,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 
 	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		m_freem(m0);
 		return (EINVAL);
 	}
 
@@ -124,6 +125,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 			 ip6mhilen,
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
+		m_freem(m0);
 		return (EINVAL);
 	}
 
@@ -134,7 +136,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 		mip6log((LOG_ERR,
 		    "%s:%d: creating ip6hdr failed.\n",
 		    __FILE__, __LINE__));
-		return (ENOMEM);
+ 		goto free_ip6pktopts;
 	}
 
 	error = mip6_ip6mh_create(&opt.ip6po_mobility, dst_sa, src_sa,
@@ -156,7 +158,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 	}
 
  free_ip6pktopts:
-	if (opt.ip6po_mobility)
+	if (opt.ip6po_mobility != NULL)
 		free(opt.ip6po_mobility, M_IP6OPT);
 
 	return (0);
@@ -210,6 +212,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 
 	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		m_freem(m0);
 		return (EINVAL);
 	}
 
@@ -222,6 +225,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 			 ip6mcilen,
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
+		m_freem(m0);
 		return (EINVAL);
 	}
 
@@ -232,7 +236,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 		mip6log((LOG_ERR,
 		    "%s:%d: creating ip6hdr failed.\n",
 		    __FILE__, __LINE__));
-		return (ENOMEM);
+ 		goto free_ip6pktopts;
 	}
 
 	error = mip6_ip6mc_create(&opt.ip6po_mobility, dst_sa, src_sa,
@@ -254,7 +258,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 	}
 
  free_ip6pktopts:
-	if (opt.ip6po_mobility)
+	if (opt.ip6po_mobility != NULL)
 		free(opt.ip6po_mobility, M_IP6OPT);
 
 	return (0);
@@ -309,6 +313,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -321,6 +326,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 			 ip6mhlen,
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -330,6 +336,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		    "%s:%d: no related hif interface found with this HoT "
 		    "for %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&dst_sa->sin6_addr)));
+		m_freem(m);
                 return (EINVAL);
 	}
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, src_sa, dst_sa);
@@ -338,6 +345,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		    "%s:%d: no related binding update entry found with "
 		    "this HoT for %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -346,6 +354,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		mip6log((LOG_INFO,
 		    "%s:%d: HoT mobile cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -354,6 +363,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		mip6log((LOG_ERR,
 		    "%s:%d: state transition failed. (%d)\n",
 		    __FILE__, __LINE__, error));
+		m_freem(m);
 		return (error);
 	}
 
@@ -373,6 +383,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -385,6 +396,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 			 ip6mclen,
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -404,6 +416,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		    "%s:%d: no related binding update entry found with "
 		    "this CoT for %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -412,6 +425,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		mip6log((LOG_INFO,
 		    "%s:%d: CoT mobile cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -420,6 +434,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		mip6log((LOG_ERR,
 		    "%s:%d: state transition failed. (%d)\n",
 		    __FILE__, __LINE__, error));
+		m_freem(m);
 		return (error);
 	}
 
@@ -451,6 +466,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	 */
 	if (ipsec6_in_reject(m, NULL)) {
 		ipsec6stat.in_polvio++;
+		m_freem(m);
 		return (EINVAL);	/* XXX */
 	}
 #endif /* IPSEC */
@@ -458,6 +474,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -470,6 +487,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			 ip6mulen,
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -517,6 +535,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 						 * with RR later */
 
 	/* otherwise, discard this packet. */
+	m_freem(m);
 	return (EINVAL);
 
  accept_binding_update:
@@ -529,8 +548,10 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		hoa_sa.sin6_addr = ip6mu->ip6mu_addr;
 	}
 
-	if ((error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt)))
+	if ((error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt))) {
+		m_freem(m);
 		return (error);
+	}
 
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
@@ -539,6 +560,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			mip6log((LOG_ERR,
 				 "%s:%d: RR authentication was failed.\n",
 				 __FILE__, __LINE__));
+			m_freem(m);
 			return (EINVAL);
 		}
 	} else {
@@ -569,6 +591,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			}
 
 			/* discard. */
+			m_freem(m);
 			return (EINVAL);
 		}
 	}
@@ -595,14 +618,19 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		m_freem(m);
 		return (EINVAL);
 	}
 	n = ip6_findaux(m);
-	if (!n)
+	if (!n) {
+		m_freem(m);
 		return (EINVAL);
+	}
 	ip6a = mtod(n, struct ip6aux *);
-	if (ip6a == NULL)
+	if (ip6a == NULL) {
+		m_freem(m);
 		return (EINVAL);
+	}
 
 	/* XXX find alt CoA. */
 	coa_storage = *src_sa;
@@ -714,6 +742,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	 */
 	if (ipsec6_in_reject(m, NULL)) {
 		ipsec6stat.in_polvio++;
+		m_freem(m);
 		return (EINVAL);	/* XXX */
 	}
 #endif /* IPSEC */
@@ -721,6 +750,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -733,6 +763,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			 ip6malen,
 			 ip6_sprintf(&src_sa->sin6_addr)));
 		/* discard */
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -752,6 +783,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                          "%s:%d: no hif interface found.\n",
                          __FILE__, __LINE__));
                 /* silently ignore. */
+		m_freem(m);
                 return (EINVAL);
 	}
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, src_sa, dst_sa);
@@ -760,6 +792,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                          "%s:%d: no matching binding update entry found.\n",
                          __FILE__, __LINE__));
                 /* silently ignore */
+		m_freem(m);
                 return (EINVAL);
 	}
 	seqno = htons(ip6ma->ip6ma_seqno);
@@ -784,6 +817,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                          ip6_sprintf(&ip6->ip6_src)));
                 /* silently ignore. */
                 /* discard */
+		m_freem(m);
                 return (EINVAL);
 	}
 
@@ -811,6 +845,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -820,6 +855,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
                 mip6log((LOG_NOTICE,
                          "%s:%d: no hif interface found.\n",
                          __FILE__, __LINE__, ip6_sprintf(&ip6->ip6_src)));
+		m_freem(m);
 		return (EINVAL);
 	}
 
@@ -830,6 +866,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 			 "from host %s.\n",
                          __FILE__, __LINE__, ip6_sprintf(&ip6->ip6_src)));
                 /* ignore */
+		m_freem(m);
                 return (EINVAL);
 	}
 
@@ -857,6 +894,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
                         mip6log((LOG_ERR,
                                  "%s:%d: can't remove BU.\n",
                                  __FILE__, __LINE__));
+			m_freem(m);
                         return (error);
                 }
                 /* XXX some error recovery process needed. */
@@ -896,6 +934,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				mip6log((LOG_ERR,
 					 "%s:%d: removing the bining cache entries of all CNs failed.\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return (error);
 			}
 
@@ -908,6 +947,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				mip6log((LOG_ERR,
 					 "%s:%d: tunnel removal failed.\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return (error);
 			}
 
@@ -916,6 +956,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				mip6log((LOG_ERR,
 					 "%s:%d: BU remove all failed.\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return (error);
 			}
 
@@ -938,6 +979,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				mip6log((LOG_ERR,
 					 "%s:%d: can't find CoA interface\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return(EINVAL);	/* XXX */
 			}
 
@@ -951,6 +993,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				mip6log((LOG_ERR,
 					 "%s:%d: in6_addr2zoneid failed\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return(EIO);
 			}
 			if ((error = in6_embedscope(&daddr.sin6_addr,
@@ -959,6 +1002,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				mip6log((LOG_ERR,
 					 "%s:%d: in6_embedscope failed\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return(error);
 			}
 
@@ -995,6 +1039,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				mip6log((LOG_ERR,
 					 "%s:%d: tunnel move failed.\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return (error);
 			}
 
@@ -1004,6 +1049,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				mip6log((LOG_ERR,
 					 "%s:%d: updating the bining cache entries of all CNs failed.\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return (error);
 			}
 		} else if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND) {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.48 2002/06/17 08:43:07 k-sugyou Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.49 2002/07/10 09:08:04 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -125,9 +125,6 @@ static const struct sockaddr_in6 haanyaddr_ifidnn = {
 static void mip6_icmp6_find_addr __P((struct mbuf *, int, int,
 				      struct sockaddr_in6 *,
 				      struct sockaddr_in6 *));
-#ifdef MIP6_KERNEL_DHAAD
-static int mip6_icmp6_ha_discov_req_input __P((struct mbuf *, int, int));
-#endif
 static int mip6_icmp6_ha_discov_rep_input __P((struct mbuf *, int, int));
 static int mip6_ha_discov_ha_list_insert __P((struct hif_softc *,
 					      struct mip6_ha *));
@@ -164,6 +161,7 @@ mip6_icmp6_input(m, off, icmp6len)
 		 * binding cache entry immediately.  should we be more
 		 * patient?
 		 */
+		IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
 		mip6_icmp6_find_addr(m, off, icmp6len, &laddr, &paddr);
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &paddr);
 		if (mbc && (mbc->mbc_flags & IP6MU_HOME) == 0) {
@@ -227,6 +225,7 @@ mip6_icmp6_input(m, off, icmp6len)
 				 * all IPv6 nodes must support a home
 				 * address destination option.
 				 */
+				IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
 				mip6_icmp6_find_addr(m, off, icmp6len,
 						     &laddr, &paddr);
 				mip6log((LOG_NOTICE,
@@ -259,6 +258,7 @@ mip6_icmp6_input(m, off, icmp6len)
 				 * the peer doesn't recognize mobility header.
 				 */
 
+				IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
 				mip6_icmp6_find_addr(m, off, icmp6len,
 						     &laddr, &paddr);
 				mip6log((LOG_NOTICE,
@@ -343,13 +343,13 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	}
 
 #ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off + sizeof(*icmp6), sizeof(*otip6), -1);
+	IP6_EXTHDR_CHECK(m, off + sizeof(*icmp6), sizeof(*otip6), EINVAL);
 	otip6 = (struct ip6_hdr *)(mtod(m, caddr_t) + off + sizeof(*icmp6));
 #else
 	IP6_EXTHDR_GET(otip6, struct ip6_hdr *, m, off + sizeof(*icmp6),
 		       sizeof(*otip6));
 	if (otip6 == NULL)
-		return (-1);
+		return (EINVAL);
 #endif
 	otip6off = off + sizeof(*icmp6) + sizeof(*otip6);
 	nxt = otip6->ip6_nxt;
@@ -459,7 +459,7 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 	struct ip6_ext *ehdr;                   /* Extension header */
 	struct in6_addr *la;                    /* Local home address */
 	struct in6_addr *pa;                    /* Peer home address */
-	struct ip6_rthdr0 *rh;                  /* Routing header */
+	struct ip6_rthdr2 *rh;                  /* Routing header */
 	u_int8_t *eopt, nxt, optlen;
 	int off, elen, eoff;
 	int rlen, addr_off;
@@ -507,20 +507,20 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 			continue;
 		}
 		if (nxt == IPPROTO_ROUTING) {
-			rh = (struct ip6_rthdr0 *)(icmp6 + off);
-			rlen = (rh->ip6r0_len + 1) << 3;
+			rh = (struct ip6_rthdr2 *)(icmp6 + off);
+			rlen = (rh->ip6r2_len + 1) << 3;
 			if ((off + rlen) > icmp6len) break;
-			if ((rh->ip6r0_type != 2) || (rh->ip6r0_len % 2)) {
-				nxt = rh->ip6r0_nxt;
-				off += (rh->ip6r0_len + 1) << 3;
+			if ((rh->ip6r2_type != 2) || (rh->ip6r2_len % 2)) {
+				nxt = rh->ip6r2_nxt;
+				off += (rh->ip6r2_len + 1) << 3;
 				continue;
 			}
 
-			addr_off = 8 + (((rh->ip6r0_len / 2) - 1) << 3);
+			addr_off = 8 + (((rh->ip6r2_len / 2) - 1) << 3);
 			pa = (struct in6_addr *)(icmp6 + off + addr_off);
 
-			nxt = rh->ip6r0_nxt;
-			off += (rh->ip6r0_len + 1) << 3;
+			nxt = rh->ip6r2_nxt;
+			off += (rh->ip6r2_len + 1) << 3;
 			continue;
 		}
 		if (nxt == IPPROTO_HOPOPTS) {
@@ -566,8 +566,10 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	struct mip6_bu *mbu;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &sin6src, &sin6dst))
+	if (ip6_getpktaddrs(m, &sin6src, &sin6dst)) {
+		m_freem(m);
 		return (EINVAL);
+	}
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
 	hdrep = (struct ha_discov_rep *)((caddr_t)ip6 + off);
@@ -583,8 +585,10 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	haaddrs = (struct in6_addr *)(hdrep + 1);
 
 	/* sainty check. */
-	if (hdrep->discov_rep_code != 0)
+	if (hdrep->discov_rep_code != 0) {
+		m_freem(m);
 		return (EINVAL);
+	}
 
 	/* find hif that matches this receiving hadiscovid of DHAAD reply. */
 	hdrep_id = hdrep->discov_rep_id;
@@ -677,6 +681,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 				mip6log((LOG_ERR,
 					 "%s:%d: mip6_ha create failed\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return (ENOMEM);
 			}
 			mip6_ha_list_insert(&mip6_ha_list, mha);
@@ -724,6 +729,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 				mip6log((LOG_ERR,
 					 "%s:%d: mip6_ha create failed\n",
 					 __FILE__, __LINE__));
+				m_freem(m);
 				return (ENOMEM);
 			}
 			mip6_ha_list_insert(&mip6_ha_list, mha);
@@ -753,6 +759,18 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 		    && SA6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
 			/* home registration. */
 			mbu->mbu_paddr = mha_prefered->mha_gaddr;
+			if ((mbu->mbu_state & MIP6_BU_STATE_WAITSENT) != 0) {
+				if (mip6_bu_send_bu(mbu)) {
+					mip6log((LOG_ERR,
+						 "%s:%d: "
+						 "sending a binding update "
+						 "from %s(%s) to %s failed.\n",
+						 __FILE__, __LINE__,
+						 ip6_sprintf(&mbu->mbu_haddr.sin6_addr),
+						 ip6_sprintf(&mbu->mbu_coa.sin6_addr),
+						 ip6_sprintf(&mbu->mbu_paddr.sin6_addr)));
+				}
+			}
 		}
 	}
 
