@@ -350,10 +350,9 @@ struct ip_opts {
 #define IP_PORTRANGE		19   /* int; range to choose for unspec port */
 #define	IP_RECVIF		20   /* bool; receive reception if w/dgram */
 #if 1	/*IPSEC*/
-#define IP_IPSEC_POLICY_IN	21   /* int; set/get security policy */
-#define IP_IPSEC_POLICY_OUT	22   /* int; set/get security policy */
+#define IP_IPSEC_POLICY		21   /* int; set/get security policy */
 #endif
-#define IP_FAITH		23   /* bool; accept FAITH'ed connections */
+#define IP_FAITH		22   /* bool; accept FAITH'ed connections */
 
 #define IP_FW_ADD     		50   /* add a firewall rule to chain */
 #define IP_FW_DEL    		51   /* delete a firewall rule from chain */

@@ -958,30 +958,18 @@ ip_ctloutput(op, so, level, optname, mp)
 			break;
 
 #ifdef IPSEC
-		case IP_IPSEC_POLICY_IN:
-		case IP_IPSEC_POLICY_OUT:
-		    {
+		case IP_IPSEC_POLICY:
+		{
 			caddr_t req = NULL;
-			int len = 0;
 			int priv;
-			struct secpolicy **spp;
 
 			priv = inp->inp_socket->so_state & SS_PRIV ? 1 : 0;
 			if (m != 0) {
 				req = mtod(m, caddr_t);
-				len = m->m_len;
 			}
-			switch (optname) {
-			case IP_IPSEC_POLICY_IN:
-				spp = &inp->inp_sp_in;
-				break;
-			case IP_IPSEC_POLICY_OUT:
-				spp = &inp->inp_sp_out;
-				break;
-			}
-			error = ipsec_set_policy(spp, optname, req, len, priv);
+			error = ipsec4_set_policy(inp, optname, req, priv);
 			break;
-		    }
+		}
 #endif /*IPSEC*/
 
 		default:
@@ -1073,12 +1061,15 @@ ip_ctloutput(op, so, level, optname, mp)
 			break;
 
 #ifdef IPSEC
-		case IP_IPSEC_POLICY_IN:
-			error = ipsec_get_policy(inp->inp_sp_in, mp);
+		case IP_IPSEC_POLICY:
+		{
+			caddr_t req = NULL;
+
+			if (m != 0)
+				req = mtod(m, caddr_t);
+			error = ipsec4_get_policy(inp, req, mp);
 			break;
-		case IP_IPSEC_POLICY_OUT:
-			error = ipsec_get_policy(inp->inp_sp_out, mp);
-			break;
+		}
 #endif /*IPSEC*/
 
 		default:
