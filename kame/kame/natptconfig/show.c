@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.34 2002/12/16 04:41:19 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.35 2002/12/16 07:43:18 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -374,8 +374,6 @@ showVariables(char *word)
 				}
 			}
 		}
-		return (1);
-
 	}
 
 	for (idx = 0; ctlnames[idx].ctl_name; idx++) {
