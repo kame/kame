@@ -850,6 +850,8 @@ in_ifinit(ifp, ia, sin, scrub)
 	u_int32_t i = sin->sin_addr.s_addr;
 	struct sockaddr_in oldaddr;
 	int s = splimp(), flags = RTF_UP, error;
+	int ifacount;
+	struct ifaddr *ifa;
 
 	/*
 	 * Set up new addresses.
@@ -865,7 +867,15 @@ in_ifinit(ifp, ia, sin, scrub)
 	 * if this is its first address,
 	 * and to validate the address if necessary.
 	 */
-	if (ifp->if_ioctl &&
+	ifacount = 0;
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
+		if (ifa->ifa_addr == NULL)
+			continue;
+		if (ifa->ifa_addr->sa_family != AF_INET)
+			continue;
+		ifacount++;
+	}
+	if (ifacount <= 1 && ifp->if_ioctl &&
 	    (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (caddr_t)ia)))
 		goto bad;
 	splx(s);
