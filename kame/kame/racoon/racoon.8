@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.8,v 1.24 2001/01/31 06:08:36 sakane Exp $
+.\"	$KAME: racoon.8,v 1.25 2001/02/22 00:41:38 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -73,7 +73,8 @@ install SA(s) from the file which is specified in
 .It Fl l Ar logfile
 use
 .Ar logfile
-as the logging file.
+as the logging file instead of
+.Xr syslogd 8 .
 .It Fl p Ar isakmp-port
 listen for ISAKMP key exchange on port
 .Ar isakmp-port
@@ -92,8 +93,6 @@ at
 .Bl -tag -width /usr/local/v6/etc/racoon.conf -compact
 .It Pa /usr/local/v6/etc/racoon.conf
 default configuration file.
-.It Pa /var/log/racoon.log
-default log file.
 .El
 .\"
 .Sh RETURN VALUES
