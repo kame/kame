@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.28 2000/07/30 04:28:55 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.29 2000/08/05 17:57:17 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,6 +72,9 @@
 #endif
 
 #include <netinet6/ipsec.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include <netinet6/ipsec6.h>
+#endif
 #include <netinet6/ah.h>
 #include <netinet6/esp.h>
 #include <netkey/key.h>

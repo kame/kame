@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.147 2000/08/02 23:27:05 itojun Exp $	*/
+/*	$KAME: key.c,v 1.148 2000/08/05 17:58:38 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,6 +95,9 @@
 #include <netkey/key_debug.h>
 
 #include <netinet6/ipsec.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4 && defined(INET6)
+#include <netinet6/ipsec6.h>
+#endif
 #include <netinet6/ah.h>
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>

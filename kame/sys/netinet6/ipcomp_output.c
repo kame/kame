@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_output.c,v 1.15 2000/07/03 13:23:28 itojun Exp $	*/
+/*	$KAME: ipcomp_output.c,v 1.16 2000/08/05 17:57:17 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -73,6 +73,9 @@
 #include <netinet6/ipcomp.h>
 
 #include <netinet6/ipsec.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4 && defined(INET6)
+#include <netinet6/ipsec6.h>
+#endif
 #include <netkey/key.h>
 #include <netkey/keydb.h>
 

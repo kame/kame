@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.23 2000/07/15 16:07:48 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.24 2000/08/05 17:57:16 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,6 +70,9 @@
 #endif
 
 #include <netinet6/ipsec.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include <netinet6/ipsec6.h>
+#endif
 #include <netinet6/ah.h>
 #include <netkey/key.h>
 #include <netkey/keydb.h>

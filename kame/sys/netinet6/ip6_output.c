@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.118 2000/07/29 23:28:20 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.119 2000/08/05 17:57:17 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,6 +118,9 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4 && defined(INET6)
+#include <netinet6/ipsec6.h>
+#endif
 #include <netkey/key.h>
 #endif /* IPSEC */
 

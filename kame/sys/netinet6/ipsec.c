@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.68 2000/07/12 12:58:04 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.69 2000/08/05 17:57:17 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,6 +90,9 @@
 #endif
 
 #include <netinet6/ipsec.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4 && defined(INET6)
+#include <netinet6/ipsec6.h>
+#endif
 #include <netinet6/ah.h>
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
