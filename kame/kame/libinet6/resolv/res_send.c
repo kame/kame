@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.9 2000/05/30 11:55:48 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.10 2000/06/04 13:30:30 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -248,16 +248,6 @@ res_isourserver(inp)
 				ret++;
 				break;
 			}
-#ifdef MULTICASTQUERY6
-			/* XXX scopeid check is questionable */
-			if (srv6->sin6_family == in6p->sin6_family &&
-			    srv6->sin6_port == in6p->sin6_port &&
-			    srv6->sin6_scope_id == in6p->sin6_scope_id &&
-			    IN6_IS_ADDR_MULTICAST(&srv6->sin6_addr)) {
-				ret++;
-				break;
-			}
-#endif
 		}
 		break;
 #endif
@@ -644,14 +634,7 @@ read_len:
 			 * as we wish to receive answers from the first
 			 * server to respond.
 			 */
-#ifndef MULTICASTQUERY6
-			if (_res.nscount == 1 || (try == 0 && ns == 0))
-#else
-			if ((_res.nscount == 1 || (try == 0 && ns == 0)) &&
-			    nsap->sa_family == AF_INET6 &&
-			    !IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)nsap)->sin6_addr))
-#endif
-			{
+			if (_res.nscount == 1 || (try == 0 && ns == 0)) {
 				/*
 				 * Connect only if we are sure we won't
 				 * receive a response from another server.
