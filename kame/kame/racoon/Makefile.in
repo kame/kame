@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.22 2000/06/08 21:30:38 itojun Exp $
+# YIPS $Id: Makefile.in,v 1.23 2000/06/13 05:01:41 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -29,7 +29,7 @@ OBJS=	main.o session.o isakmp.o handler.o \
 	policy.o localconf.o remoteconf.o crypto_openssl.o algorithm.o \
 	proposal.o sainfo.o cfparse.o cftoken.o strnames.o \
 	vmbuf.o plog.o logger.o schedule.o str2val.o misc.o sockmisc.o \
-	@LIBOBJS@
+	safefile.o @LIBOBJS@
 # under samples
 CONF=	psk.txt racoon.conf remote.conf
 

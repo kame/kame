@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.13 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.14 2000/06/13 05:01:41 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -52,6 +52,7 @@
 #include "grabmyaddr.h"
 #include "vendorid.h"
 #include "str2val.h"
+#include "safefile.h"
 
 struct localconf *lcconf;
 
@@ -173,7 +174,10 @@ getpsk(str, len)
 	char *p, *q;
 	int keylen;
 
-	fp = fopen(lcconf->pathinfo[LC_PATHTYPE_PSK], "r");
+	if (safefile(lcconf->pathinfo[LC_PATHTYPE_PSK], 1) == 0)
+		fp = fopen(lcconf->pathinfo[LC_PATHTYPE_PSK], "r");
+	else
+		fp = NULL;
 	if (fp == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to open pre_share_key file %s\n",
