@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.221 2001/09/14 06:05:10 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.222 2001/09/19 10:05:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -888,7 +888,9 @@ skip_ipsec2:;
 	/* if specified, fill in the traffic class field. */
 	if (opt) {
 		ip6->ip6_flow &= ~htonl(0xff << 20);
-		ip6->ip6_flow |= htonl(opt->ip6po_tclass << 20);
+		if (opt->ip6po_tclass >= 0)
+			ip6->ip6_flow |=
+			    htonl((opt->ip6po_tclass & 0xff) << 20);
 	}
 	/* fill in or override the hop limit field, if necessary. */
 	if (opt && opt->ip6po_hlim != -1)
@@ -2073,8 +2075,38 @@ do { \
 				}
 				break;
 
+			case IPV6_OTCLASS:
+			{
+				struct ip6_pktopts **optp;
+				u_int8_t tclass;
+
+				if (optlen != sizeof(tclass)) {
+					error = EINVAL;
+					break;
+				}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				error = sooptcopyin(sopt, &tclass,
+					sizeof tclass, sizeof tclass);
+				if (error)
+					break;
+#else
+				tclass = *mtod(m, u_int8_t *);
+#endif
+#ifdef HAVE_NRL_INPCB
+				optp = &inp->inp_outputopts6;
+#else
+				optp = &in6p->in6p_outputopts;
+#endif
+				error = ip6_pcbopt(optname,
+						   (u_char *)&tclass,
+						   sizeof(tclass),
+						   optp,
+						   privileged);
+				break;
+			}
+
 			case IPV6_TCLASS:
-				if (optlen != sizeof(u_int8_t)) {
+				if (optlen != sizeof(optval)) {
 					error = EINVAL;
 					break;
 				}
@@ -2084,20 +2116,18 @@ do { \
 				if (error)
 					break;
 #else
-				optval = *mtod(m, u_int8_t *);
+				optval = *mtod(m, int *);
 #endif
 				{
 					struct ip6_pktopts **optp;
-					u_int8_t tclass;
 #ifdef HAVE_NRL_INPCB
 					optp = &inp->inp_outputopts6;
 #else
 					optp = &in6p->in6p_outputopts;
 #endif
-					tclass = (u_int8_t) optval;
 					error = ip6_pcbopt(optname,
-							   (u_char *)&tclass,
-							   sizeof(tclass),
+							   (u_char *)&optval,
+							   sizeof(optval),
 							   optp,
 							   privileged);
 					break;
@@ -2597,6 +2627,12 @@ do { \
 					error = ip6_getpcbopt(in6p->in6p_outputopts,
 							      optname, &optdata,
 							      &optdatalen);
+					if (error)
+						break;
+					if (optdatalen != sizeof(int)) {
+						error = EINVAL;
+						break;
+					}
 					optval = *((int *)optdata);
 					break;
 #ifdef HAVE_NRL_INPCB
@@ -2604,6 +2640,8 @@ do { \
 #undef in6p_outputopts
 #endif
 				}
+				if (error)
+					break;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				error = sooptcopyout(sopt, &optval,
 					sizeof optval);
@@ -2611,6 +2649,20 @@ do { \
 				*mp = m = m_get(M_WAIT, MT_SOOPTS);
 				m->m_len = sizeof(int);
 				*mtod(m, int *) = optval;
+#endif
+				break;
+
+			case IPV6_OTCLASS:
+				error = ip6_getpcbopt(in6p->in6p_outputopts,
+				    optname, &optdata, &optdatalen);
+				if (error)
+					break;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				error = sooptcopyout(sopt, optdata, optdatalen);
+#else
+				*mp = m = m_get(M_WAIT, MT_SOOPTS);
+				m->m_len = optdatalen;
+				bcopy(optdata, mtod(m, caddr_t), optdatalen);
 #endif
 				break;
 
@@ -2913,7 +2965,7 @@ init_ip6pktopts(opt)
 
 	bzero(opt, sizeof(*opt));
 	opt->ip6po_hlim = -1;	/* -1 means default hop limit */
-	opt->ip6po_tclass = 0x00;
+	opt->ip6po_tclass = -1;	/* -1 means default traffic class */
 }
 
 #define sin6tosa(sin6)	((struct sockaddr *)(sin6)) /* XXX */
@@ -2945,6 +2997,7 @@ ip6_getpcbopt(pktopt, optname, datap, datalenp)
 	void *optdata = NULL;
 	struct ip6_ext *ip6e;
 	int optdatalen = 0;
+	int error = 0;
 
 	if (pktopt == NULL)
 		goto end;
@@ -2960,6 +3013,10 @@ ip6_getpcbopt(pktopt, optname, datap, datalenp)
 		optdata = (void *)&pktopt->ip6po_hlim;
 		optdatalen = sizeof(int);
 		break;
+	case IPV6_OTCLASS:
+		/* XXX */
+		error = EINVAL;
+		goto end;
 	case IPV6_TCLASS:
 		optdata = (void *)&pktopt->ip6po_tclass;
 		optdatalen = sizeof(pktopt->ip6po_tclass);
@@ -2998,7 +3055,7 @@ ip6_getpcbopt(pktopt, optname, datap, datalenp)
 	*datap = optdata;
 	*datalenp = optdatalen;
 
-	return(0);
+	return error;
 }
 
 void
@@ -3028,7 +3085,7 @@ ip6_clearpktopts(pktopt, needfree, optname)
 	if (optname == -1 || optname == IPV6_HOPLIMIT)
 		pktopt->ip6po_hlim = -1;
 	if (optname == -1 || optname == IPV6_TCLASS)
-		pktopt->ip6po_tclass = 0x00;
+		pktopt->ip6po_tclass = -1;
 	if (optname == -1 || optname == IPV6_NEXTHOP) {
 		if (pktopt->ip6po_nextroute.ro_rt) {
 			RTFREE(pktopt->ip6po_nextroute.ro_rt);
@@ -3743,8 +3800,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		break;
 	}
 
-	case IPV6_TCLASS:
-	{
+	case IPV6_OTCLASS:
 		if (cmsg) {
 			if (len != CMSG_LEN(sizeof(u_int8_t)))
 				return(EINVAL);
@@ -3752,6 +3808,22 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			return(EINVAL);
 
 		opt->ip6po_tclass = *(u_int8_t *)buf;
+		break;
+
+	case IPV6_TCLASS:
+	{
+		int tclass;
+
+		if (cmsg) {
+			if (len != CMSG_LEN(sizeof(int)))
+				return(EINVAL);
+		} else if (len != sizeof(int))
+			return(EINVAL);
+		tclass = *(int *)buf;
+		if (tclass < -1 || tclass > 255)
+			return(EINVAL);
+
+		opt->ip6po_tclass = tclass;
 		break;
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.68 2001/08/31 01:03:33 keiichi Exp $	*/
+/*	$KAME: ip6_var.h,v 1.69 2001/09/19 10:05:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,7 +163,7 @@ struct	ip6_pktopts {
 	struct	ip6_dest *ip6po_dest2;
 
 	/* traffic class */
-	u_int8_t	ip6po_tclass;
+	int		ip6po_tclass;
 
 	int ip6po_flags;
 #define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation */

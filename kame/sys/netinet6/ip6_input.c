@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.218 2001/09/12 16:52:39 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.219 2001/09/19 10:05:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1683,7 +1683,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 	if ((in6p->in6p_flags & IN6P_TCLASS) != 0) {
 		u_int32_t flowinfo;
 		int oflowinfo = -1;
-		u_int8_t v;
+		int v;
 
 		flowinfo = (u_int32_t)ntohl(ip6->ip6_flow & IPV6_FLOWINFO_MASK);
 		flowinfo >>= 20;
