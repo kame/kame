@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: bindtest.c,v 1.6 1999/10/06 08:07:24 itojun Exp $
+ * $Id: bindtest.c,v 1.7 1999/10/06 08:08:22 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -166,14 +166,18 @@ test(title, a, b)
 
 	printf("%s\n", title);
 
+#if 0
 	printf("\tallocating socket for %s\n", printres(a));
+#endif
 	sa = socket(a->ai_family, a->ai_socktype, a->ai_protocol);
 	if (sa < 0) {
 		printf("\tfailed socket for %s, %s\n",
 			printres(a), strerror(errno));
 		goto fail;
 	}
+#if 0
 	printf("\tallocating socket for %s\n", printres(b));
+#endif
 	sb = socket(b->ai_family, b->ai_socktype, b->ai_protocol);
 	if (sb < 0) {
 		printf("\tfailed socket for %s, %s\n",
