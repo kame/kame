@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1119 2000/07/10 12:45:35 jinmei Exp $
+$Id: CHANGELOG,v 1.1120 2000/07/11 02:33:18 jinmei Exp $
 
 <200006>
+2000-07-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.h: corrected the type of a member
+	of if_set{} from fd_mask to if_mask.
+	In response to PR sys/266 from pavlin@catarina.usc.edu.
+
 2000-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (rt6_deleteroute): do not
 	(automatically) delete the static route in rt6_deleteroute(), even
