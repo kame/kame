@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.189 2001/05/31 15:02:56 sakane Exp $	*/
+/*	$KAME: key.c,v 1.190 2001/06/04 22:35:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1915,7 +1915,7 @@ key_getnewspid()
 
 	/* when requesting to allocate spi ranged */
 	while (count--) {
-		newid = (policy_id = (policy_id == ~0 ? 1 : ++policy_id));
+		newid = (policy_id = (policy_id == ~0 ? 1 : policy_id + 1));
 
 		if ((sp = key_getspbyid(newid)) == NULL)
 			break;
