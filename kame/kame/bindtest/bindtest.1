@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.24 2001/07/02 17:22:25 jinmei Exp $
+.\"	$KAME: bindtest.1,v 1.25 2001/09/10 08:24:35 jinmei Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -38,6 +38,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl 126APlstv
+.Op Fl b Ar IPv4broadcast
 .Op Fl o Ar IPv4address
 .Fl p Ar port
 .\"
@@ -105,6 +106,15 @@ socket option for all the sockets.
 Set
 .Dv SO_REUSEPORT
 socket option for all the sockets.
+.It Fl b Ar IPv4broadcast
+Specifies an additional broadcast address to test if UDP datagram to
+.Ar IPv4broadcast ,
+which is an IPv4 broadcast address, can be sent on an AF_INET6 socket
+as an IPv4-mapped IPv6 address.
+This option can only be specified for UDP.
+Currently, the
+.Fl s
+option and this option cannot coexist.
 .It Fl l
 With TCP test, normally
 .Nm
