@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.151 2000/08/23 03:32:13 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.152 2000/08/26 01:49:49 itojun Exp $
 
 1. IPv6
 
@@ -23,12 +23,7 @@ RFC1639: FTP Operation Over Big Address Records (FOOBAR)
     * RFC2428 is preferred over RFC1639.  ftp clients will first try RFC2428,
       then RFC1639 if failed.
 RFC1886: DNS Extensions to support IPv6
-RFC1933: Transition Mechanisms for IPv6 Hosts and Routers
-    * IPv4 compatible address is not supported.
-    * automatic tunneling (4.3) is not supported.
-    * "gif" interface implements IPv[46]-over-IPv[46] tunnel in a generic way,
-      and it covers "configured tunnel" described in the spec.
-      See 1.5 in this document for details.
+RFC1933: (see RFC2893)
 RFC1981: Path MTU Discovery for IPv6
 RFC2080: RIPng for IPv6
     * KAME-supplied route6d, bgpd and hroute6d support this.
@@ -90,6 +85,12 @@ RFC2732: Format for Literal IPv6 Addresses in URL's
       (like freebsd ftpio(3) and fetch(1), or netbsd ftp(1))
 RFC2766: Network Address Translation - Protocol Translation (NAT-PT)
     * Section 4.2 is implemented by totd (see ports/totd, or pkgsrc/net/totd).
+RFC2893: Transition Mechanisms for IPv6 Hosts and Routers
+    * IPv4 compatible address is not supported.
+    * automatic tunneling (4.3) is not supported.
+    * "gif" interface implements IPv[46]-over-IPv[46] tunnel in a generic way,
+      and it covers "configured tunnel" described in the spec.
+      See 1.5 in this document for details.
 RFC2894: Router renumbering for IPv6
 draft-ietf-ipngwg-icmp-name-lookups-06: IPv6 Name Lookups Through ICMP
 draft-ietf-pim-ipv6-03.txt: PIM for IPv6
@@ -121,7 +122,7 @@ draft-ietf-ngtrans-6to4-06.txt:
       configuring it, there are security issues.
 draft-itojun-ipv6-transition-abuse-01.txt:
 	Possible abuse against IPv6 transition technologies
-    * KAME does not implement RFC1933 automatic tunnel.
+    * KAME does not implement RFC1933/2893 automatic tunnel.
     * "stf" interface implements some address filters.  Refer to stf(4)
       for details.  Since there's no way to make 6to4 interface 100% secure,
       we do not include "stf" interface into GENERIC.v6 compilation.
@@ -1092,12 +1093,12 @@ or bypass security controls:
 	2002:c0a8::/32
 - IPv4 compatible address that embeds unspecified/multicast/loopback/broadcast
   IPv4 address (if they are in IPv6 native packet header, they are malicious).
-  Note that, since KAME doe snot support RFC1933 auto tunnels, KAME nodes are
-  not vulnerable to these packets.
+  Note that, since KAME doe snot support RFC1933/2893 auto tunnels, KAME nodes
+  are not vulnerable to these packets.
 	::0.0.0.0/104	::127.0.0.0/104	::224.0.0.0/100	::255.0.0.0/104 
 
-Also, since KAME does not support RFC1933 auto tunnels, seeing IPv4 compatible
-is very rare.  You should take caution if you see those on the wire.
+Also, since KAME does not support RFC1933/2893 auto tunnels, seeing IPv4
+compatible is very rare.  You should take caution if you see those on the wire.
 
 If we see IPv6 packets with IPv4 mapped address (::ffff:0.0.0.0/96) in the
 header in dual-stack environment (not in SIIT environment), they indicate
