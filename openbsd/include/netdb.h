@@ -184,9 +184,11 @@ struct	protoent {
 /* Values for getaddrinfo() and getnameinfo() */
 #define AI_PASSIVE	1	/* socket address is intended for bind() */
 #define AI_CANONNAME	2	/* request for canonical name */
-#define AI_NUMERICHOST	4	/* don't ever try nameservice */
+#define AI_NUMERICHOST	4	/* don't ever try hostname reverse lookup */
+#define AI_NUMERICSERV	8	/* don't ever try service name lookup */
 /* valid flags for addrinfo */
-#define AI_MASK		(AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST)
+#define AI_MASK \
+    (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_NUMERICSERV)
 
 #define NI_NUMERICHOST	1	/* return the host address, not the name */
 #define NI_NUMERICSERV	2	/* return the service address, not the name */
