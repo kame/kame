@@ -1,5 +1,5 @@
 /* 
- * $Id: rip6admin.c,v 1.1 1999/08/08 23:29:37 itojun Exp $
+ * $Id: rip6admin.c,v 1.2 1999/10/26 09:05:42 itojun Exp $
  */
 
 /*
@@ -148,7 +148,7 @@ parse(int argc, char *argv[])
 			bzero(&infodetail.id_addr, sizeof(struct in6_addr));
 		else
 			if ((inet_pton(AF_INET6, argv[2],
-				       (void *)&(infodetail.id_addr))) <= 0)
+				       (void *)&(infodetail.id_addr))) != 1)
 				return(-1);
 
 		i = (len - 1) / 8 + 1;

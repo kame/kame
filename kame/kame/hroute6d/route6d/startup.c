@@ -1,5 +1,5 @@
 /* 
- * $Id: startup.c,v 1.3 1999/10/04 14:55:42 itojun Exp $
+ * $Id: startup.c,v 1.4 1999/10/26 09:05:45 itojun Exp $
  */
 
 /*
@@ -95,7 +95,7 @@ initialize_dctlout(void)
 	dctlout.ctl_addr.sin6_family  = AF_INET6;
 	dctlout.ctl_addr.sin6_port = htons(RIP6_PORT);
 	if (inet_pton(AF_INET6, ALL_RIP6_ROUTER,
-		      &dctlout.ctl_addr.sin6_addr) < 1) {
+		      &dctlout.ctl_addr.sin6_addr) != 1) {
 		fprintf(stderr, "can't initialize dctlout\n");
 		exit(1);
 	}
@@ -1203,7 +1203,7 @@ drop_multicast_group(struct interface *ifp)
 {
 	struct ipv6_mreq mr;
 
-	if (inet_pton(AF_INET6, ALL_RIP6_ROUTER, &(mr.ipv6mr_multiaddr)) <= 0)
+	if (inet_pton(AF_INET6, ALL_RIP6_ROUTER, &(mr.ipv6mr_multiaddr)) != 1)
 		return -1;	/* WHO CARES? */
 	mr.ipv6mr_interface = if_index(ifp);
 	if (setsockopt(rip6_sock, IPPROTO_IPV6, IPV6_LEAVE_GROUP,

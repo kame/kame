@@ -1,5 +1,5 @@
 /* 
- * $Id: rip6query.c,v 1.1 1999/08/08 23:29:44 itojun Exp $
+ * $Id: rip6query.c,v 1.2 1999/10/26 09:05:43 itojun Exp $
  */
 
 /*
@@ -295,7 +295,7 @@ validate_arguments(int argc, char *argv[])
 			target_prefix = argv[2];
 			prefix_len = atoi(argv[3]);
 			if (inet_pton(AF_INET6, target_prefix,
-				      (void *)(tgt_p.s6_addr)) <= 0) {
+				      (void *)(tgt_p.s6_addr)) != 1) {
 #ifdef DEBUG_QUERY
 				printf("target prefix validation fails..\n");
 #endif
@@ -312,7 +312,7 @@ validate_arguments(int argc, char *argv[])
 		target_prefix = argv[4];
 		prefix_len = atoi(argv[5]);
 		if (inet_pton(AF_INET6, target_prefix,
-			      (void *)(tgt_p.s6_addr)) <= 0) {
+			      (void *)(tgt_p.s6_addr)) != 1) {
 #ifdef DEBUG_QUERY
 			printf("[auth] target prefix validation fails..\n");
 #endif
@@ -327,7 +327,7 @@ validate_arguments(int argc, char *argv[])
 	printf("target %s\n", target_router);
 #endif
 
-	if (inet_pton(AF_INET6, target_router, (void *)(tgt_r.s6_addr)) <= 0) {
+	if (inet_pton(AF_INET6, target_router, (void *)(tgt_r.s6_addr)) != 1) {
 		struct hostent *hp;
 		int i;
 #ifdef DEBUG_QUERY

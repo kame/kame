@@ -1,5 +1,5 @@
 /* 
- * $Id: parse.c,v 1.1 1999/08/08 23:29:48 itojun Exp $
+ * $Id: parse.c,v 1.2 1999/10/26 09:05:44 itojun Exp $
  */
 
 /*
@@ -435,7 +435,8 @@ interface_part(void)
 		ctl->ctl_addr.sin6_len = sizeof(struct sockaddr_in6);
 		ctl->ctl_addr.sin6_family = AF_INET6;
 		ctl->ctl_addr.sin6_flowinfo = 0;
-		inet_pton(AF_INET6, ALL_RIP6_ROUTER, &ctl->ctl_addr.sin6_addr);
+		(void)inet_pton(AF_INET6, ALL_RIP6_ROUTER,
+			&ctl->ctl_addr.sin6_addr);
 		ctl->ctl_pass = CTL_SEND;
 		ctl->ctl_next = ifc->int_ctlout;
 		ifc->int_ctlout = ctl;
@@ -839,7 +840,7 @@ prefix(pref)
 		jp = 1;
 	}
 	if (strcasecmp(now, "default")) {
-		if ((ret = inet_pton(AF_INET6, now, &pref->prf_addr)) < 1)
+		if ((ret = inet_pton(AF_INET6, now, &pref->prf_addr)) != 1)
 			goto end;
 	} else {
 		pref->prf_addr = any;
@@ -889,7 +890,7 @@ address(addr, opt)
 		*np = '\0';
 		jp = 1;
 	}
-	if ((ret = inet_pton(AF_INET6, now, addr)) < 1)
+	if ((ret = inet_pton(AF_INET6, now, addr)) != 1)
 		goto err;
 	if (jp)
 		np++; 
