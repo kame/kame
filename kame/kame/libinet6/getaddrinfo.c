@@ -186,7 +186,7 @@ static int get_addr0 __P((const char *, const char *, int, struct addrinfo **,
 static int get_canonname __P((const struct addrinfo *,
 	struct addrinfo *, const char *));
 static struct addrinfo *get_ai __P((const struct addrinfo *,
-	const struct afd *, const char *, const u_short));
+	const struct afd *, const char *));
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
@@ -217,7 +217,7 @@ static char *ai_errlist[] = {
 #define GET_AI(ai, afd, addr) \
 do { \
 	/* external reference: pai, error, and label free */ \
-	(ai) = get_ai(pai, (afd), (addr), 0); \
+	(ai) = get_ai(pai, (afd), (addr)); \
 	if ((ai) == NULL) { \
 		error = EAI_MEMORY; \
 		goto free; \
@@ -347,7 +347,7 @@ getaddrinfo(hostname, servname, hints, res)
 		memcpy(pai, hints, sizeof(*pai));
 
 		/*
-		 * if both socktype/protocol is specified, check if they
+		 * if both socktype/protocol are specified, check if they
 		 * are meaningful combination.
 		 */
 		if (pai->ai_socktype != ANY && pai->ai_protocol != ANY) {
@@ -366,7 +366,11 @@ getaddrinfo(hostname, servname, hints, res)
 		}
 	}
 
-	/* check for special cases */
+	/*
+	 * check for special cases.  (1) numeric servname is disallowed if
+	 * socktype/protocol are left unspecified. (2) servname is disallowed
+	 * for raw and other inet{,6} sockets.
+	 */
 	if (MATCH_FAMILY(pai->ai_family, PF_INET)
 	 || MATCH_FAMILY(pai->ai_family, PF_INET6)) {
 		ai0 = *pai;
@@ -951,11 +955,10 @@ get_canonname(pai, ai, str)
 }
 
 static struct addrinfo *
-get_ai(pai, afd, addr, port)
+get_ai(pai, afd, addr)
 	const struct addrinfo *pai;
 	const struct afd *afd;
 	const char *addr;
-	const u_short port;
 {
 	char *p;
 	struct addrinfo *ai;
@@ -973,7 +976,6 @@ get_ai(pai, afd, addr, port)
 #endif
 	ai->ai_addrlen = afd->a_socklen;
 	ai->ai_addr->sa_family = ai->ai_family = afd->a_af;
-	((struct sockinet *)ai->ai_addr)->si_port = port;
 	p = (char *)(ai->ai_addr);
 	memcpy(p + afd->a_off, addr, afd->a_addrlen);
 	return ai;
