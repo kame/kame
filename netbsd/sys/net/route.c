@@ -744,19 +744,8 @@ unsigned long
 rt_timer_count(rtq)
 	struct rttimer_queue *rtq;
 {
-#if 1
+
 	return rtq->rtq_count;
-#else
-	struct rttimer *r;
-	unsigned long cnt;
-
-	cnt = 0;
-	for (r = TAILQ_FIRST(&rtq->rtq_head); r != NULL;
-	     r = TAILQ_NEXT(r, rtt_next))
-		cnt++;
-
-	return cnt;
-#endif
 }
 
 void     
@@ -768,11 +757,11 @@ rt_timer_remove_all(rt)
 	while ((r = LIST_FIRST(&rt->rt_timer)) != NULL) {
 		LIST_REMOVE(r, rtt_link);
 		TAILQ_REMOVE(&r->rtt_queue->rtq_head, r, rtt_next);
-		pool_put(&rttimer_pool, r);
 		if (r->rtt_queue->rtq_count > 0)
 			r->rtt_queue->rtq_count--;
 		else
 			printf("rt_timer_remove_all: rtq_count reached 0\n");
+		pool_put(&rttimer_pool, r);
 	}
 }
 
@@ -799,11 +788,11 @@ rt_timer_add(rt, func, queue)
 		if (r->rtt_func == func) {
 			LIST_REMOVE(r, rtt_link);
 			TAILQ_REMOVE(&r->rtt_queue->rtq_head, r, rtt_next);
-			pool_put(&rttimer_pool, r);
 			if (r->rtt_queue->rtq_count > 0)
 				r->rtt_queue->rtq_count--;
 			else
 				printf("rt_timer_add: rtq_count reached 0\n");
+			pool_put(&rttimer_pool, r);
 			break;  /* only one per list, so we can quit... */
 		}
 	}
