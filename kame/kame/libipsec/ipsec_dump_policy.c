@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_dump_policy.c,v 1.8 2000/05/07 05:25:03 itojun Exp $	*/
+/*	$KAME: ipsec_dump_policy.c,v 1.9 2000/05/07 05:26:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -58,7 +58,8 @@ static const char *ipsp_policy_strs[] = {
 
 static char *ipsec_dump_ipsecrequest __P((char *, size_t,
 	struct sadb_x_ipsecrequest *, size_t));
-static int set_addresses __P((char *, size_t, struct sockaddr *, struct sockaddr *));
+static int set_addresses __P((char *, size_t, struct sockaddr *,
+	struct sockaddr *));
 static char *set_address __P((char *, size_t, struct sockaddr *));
 
 /*
