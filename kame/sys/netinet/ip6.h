@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.52 2003/12/05 01:35:16 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.53 2004/01/08 04:02:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,6 +110,18 @@ struct ip6_hdr {
 #define IP6TOS_CE		0x01	/* congestion experienced */
 #define IP6TOS_ECT		0x02	/* ECN-capable transport */
 #endif
+
+/*
+ * for IPv6 pseudo header checksum
+ * XXX nonstandard
+ */
+struct ip6_hdr_pseudo {
+	struct in6_addr ip6ph_src;
+	struct in6_addr ip6ph_dst;
+	u_int32_t	ip6ph_len;
+	u_int8_t	ip6ph_zero[3];
+	u_int8_t	ip6ph_nxt;
+} __packed;
 
 /*
  * Extension Headers
