@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.21 2001/08/15 09:55:19 sakane Exp $
+$KAME: helsinki-result.jp,v 1.22 2001/08/15 10:18:35 itojun Exp $
 
 
 generic
@@ -161,6 +161,19 @@ Oullim information technologies SECUREWORKS VPN gateway 3.0
 	phase 2 AES, group 2, lifetime = 2min
 
 	IKE的には大丈夫。IPsec的にまだ駄目。
+
+	Wed Aug 15 19:09:05 JST 2001
+	IPv4, ESP, tunnel mode
+	phase 1 3DES + SHA1, group 2, lifetime = 10min
+	phase 2 AES, group 2, lifetime = 2min
+
+	IPv4, ESP, tunnel mode
+	phase 1 3DES + SHA1, group 2, lifetime = 10min
+	phase 2 AES + SHA1, group 2, lifetime = 2min
+
+	向こうがAES codeを修正した。IKE的にもIPsec的にも大丈夫。
+	rekeyも一応成功(向こうはreal lifetime == soft, real * 1.2 == hardとかに
+	設定しているのでちょっとヘンだったけど)。
 
 
 Trilogy AdmitOne 2.6
