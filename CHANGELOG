@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1896 2001/10/02 08:58:52 suz Exp $
+$KAME: CHANGELOG,v 1.1897 2001/10/04 11:15:40 jinmei Exp $
 
 <200110>
+2001-10-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/contrib/bind/src/lib/irs/dns_ho.c (add_hostent):
+	calculated alignment correctly.  Without this fix, gethostbyname()
+	would not work correctly when the function handles more than one
+	address.
+	This is a back merge of a fix from bsdi to BSD/OS 4.3 (beta).
+
 2001-10-02	suz@sdl.hitachi.co.jp
 	* freebsd4/lib/libinet6/Makefile
 	- Dynamic DNS Discovery is available on FreeBSD4-KAME, too.
