@@ -8,8 +8,3 @@ this will use only normally available kernel access functions (and is due
 to that more limited in the different machines it support). Please note
 that this daemon used to be called pauthd but has changed name to better
 reflect what it does (and to conform to the new RFC).
-
-This port enables IPv6.
-Spported plathome:
-	KAME for FreeBSD 2.2.8
-	Linux (RedHat 5.1 with kernel 2.1.126)

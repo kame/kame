@@ -1,1 +1,2 @@
-sbin/ident6d
+sbin/identd
+sbin/idecrypt
