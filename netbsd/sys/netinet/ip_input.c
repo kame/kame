@@ -207,7 +207,7 @@ u_int16_t	ip_id;
 struct ipqhead ipq;
 int	ipq_locked;
 int	ip_nfragpackets = 0;
-int	ip_maxfragpackets = -1;
+int	ip_maxfragpackets = 200;
 
 static __inline int ipq_lock_try __P((void));
 static __inline void ipq_unlock __P((void));
