@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.15 2000/08/07 14:59:28 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.16 2000/09/04 07:44:22 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -628,7 +628,7 @@ read_len:
 					goto next_ns;
 #endif
 				}
-#ifdef IPV6_MINMTU
+#ifdef IPV6_USE_MIN_MTU
 				if (af == AF_INET6) {
 					const int yes = 1;
 					(void)setsockopt(s, IPPROTO_IPV6,
