@@ -1120,16 +1120,16 @@ send:
 #ifdef INET6
 	case AF_INET6:
 		{
-			struct ip6_hdr *ipv6;
+			struct ip6_hdr *ip6;
 			
-			ipv6 = mtod(m, struct ip6_hdr *);
-			ipv6->ip6_plen = m->m_pkthdr.len -
+			ip6 = mtod(m, struct ip6_hdr *);
+			ip6->ip6_plen = m->m_pkthdr.len -
 				sizeof(struct ip6_hdr);
-			ipv6->ip6_nxt = IPPROTO_TCP;
-			ipv6->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
+			ip6->ip6_nxt = IPPROTO_TCP;
+			ip6->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
 #ifdef TCP_ECN
 			if (needect)
-				ipv6->ip6_flow |= htonl(IPTOS_ECN_ECT0 << 20);
+				ip6->ip6_flow |= htonl(IPTOS_ECN_ECT0 << 20);
 #endif
 		}
 		ip6oflags = so->so_options & SO_DONTROUTE;

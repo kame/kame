@@ -216,7 +216,7 @@ udp_input(struct mbuf *m, ...)
 #endif /* INET6 */
 	} srcsa, dstsa;
 #ifdef INET6
-	struct ip6_hdr *ipv6;
+	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src_sa6, src_sa6_storage,
 		*dst_sa6, dst_sa6_storage;
 	struct ip6_recvpktopts opts6;
@@ -249,14 +249,14 @@ udp_input(struct mbuf *m, ...)
 	case 4:
 		ip = mtod(m, struct ip *);
 #ifdef INET6
-		ipv6 = NULL;
+		ip6 = NULL;
 #endif /* INET6 */
 		srcsa.sa.sa_family = AF_INET;
 		break;
 #ifdef INET6
 	case 6:
 		ip = NULL;
-		ipv6 = mtod(m, struct ip6_hdr *);
+		ip6 = mtod(m, struct ip6_hdr *);
 		srcsa.sa.sa_family = AF_INET6;
 		break;
 #endif /* INET6 */
@@ -289,8 +289,8 @@ udp_input(struct mbuf *m, ...)
 			return;
 		}
 #ifdef INET6
-		if (ipv6) {
-			ipv6 = mtod(m, struct ip6_hdr *);
+		if (ip6) {
+			ip6 = mtod(m, struct ip6_hdr *);
 			/*
 			 * extract full sockaddr structures for the src/dst
 			 * addresses, and make local copies of them.
@@ -345,10 +345,10 @@ udp_input(struct mbuf *m, ...)
 	 */
 	savesum = uh->uh_sum;
 #ifdef INET6
-	if (ipv6) {
+	if (ip6) {
 		/* Be proactive about malicious use of IPv4 mapped address */
-		if (IN6_IS_ADDR_V4MAPPED(&ipv6->ip6_src) ||
-		    IN6_IS_ADDR_V4MAPPED(&ipv6->ip6_dst)) {
+		if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
+		    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
 			/* XXX stat */
 			goto bad;
 		}
@@ -409,7 +409,7 @@ udp_input(struct mbuf *m, ...)
 		srcsa.sin6.sin6_family = AF_INET6;
 		srcsa.sin6.sin6_port = uh->uh_sport;
 #if 0 /*XXX inbound flowinfo */
-		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ipv6->ip6_flow;
+		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ip6->ip6_flow;
 #endif
 		sa6_copy_addr(src_sa6, &srcsa.sin6);
 		/*
@@ -430,7 +430,7 @@ udp_input(struct mbuf *m, ...)
 	}
 
 #ifdef INET6
-	if ((ipv6 && IN6_IS_ADDR_MULTICAST(&ipv6->ip6_dst)) ||
+	if ((ip6 && IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) ||
 	    (ip && IN_MULTICAST(ip->ip_dst.s_addr)) ||
 	    (ip && in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif)))
 #else /* INET6 */
@@ -467,15 +467,15 @@ udp_input(struct mbuf *m, ...)
 		    inp = inp->inp_queue.cqe_next) {
 #ifdef INET6
 			/* don't accept it if AF does not match */
-			if (ipv6 && !(inp->inp_flags & INP_IPV6))
+			if (ip6 && !(inp->inp_flags & INP_IPV6))
 				continue;
-			if (!ipv6 && (inp->inp_flags & INP_IPV6))
+			if (!ip6 && (inp->inp_flags & INP_IPV6))
 				continue;
 #endif
 			if (inp->inp_lport != uh->uh_dport)
 				continue;
 #ifdef INET6
-			if (ipv6) {
+			if (ip6) {
 				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
 					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa,
 								dst_sa6))
@@ -488,7 +488,7 @@ udp_input(struct mbuf *m, ...)
 					continue;
 			}
 #ifdef INET6
-			if (ipv6) {
+			if (ip6) {
 				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
 					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa,
 								src_sa6)  ||
@@ -650,8 +650,8 @@ udp_input(struct mbuf *m, ...)
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
 					opts = NULL;
 #ifdef INET6
-					if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-						ip6_savecontrol(inp, ipv6,
+					if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
+						ip6_savecontrol(inp, ip6,
 								n, &opts6);
 						opts = opts6.head;
 					}
@@ -711,8 +711,8 @@ udp_input(struct mbuf *m, ...)
 
 		opts = NULL;
 #ifdef INET6
-		if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-			ip6_savecontrol(inp, ipv6, m, &opts6);
+		if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
+			ip6_savecontrol(inp, ip6, m, &opts6);
 			opts = opts6.head;
 		}
 #endif /* INET6 */
@@ -729,7 +729,7 @@ udp_input(struct mbuf *m, ...)
 	 * Locate pcb for datagram.
 	 */
 #ifdef INET6
-	if (ipv6)
+	if (ip6)
 		inp = in6_pcbhashlookup(&udbtable, src_sa6, uh->uh_sport,
 		    dst_sa6, uh->uh_dport);
 	else
@@ -739,7 +739,7 @@ udp_input(struct mbuf *m, ...)
 	if (inp == 0) {
 		++udpstat.udps_pcbhashmiss;
 #ifdef INET6
-		if (ipv6) {
+		if (ip6) {
 			inp = in_pcblookup(&udbtable,
 			    src_sa6, uh->uh_sport, dst_sa6,
 			    uh->uh_dport, INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
@@ -754,7 +754,7 @@ udp_input(struct mbuf *m, ...)
 				goto bad;
 			}
 #ifdef INET6
-			if (ipv6) {
+			if (ip6) {
 				icmp6_error(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_NOPORT,0);
 			} else
@@ -817,8 +817,8 @@ udp_input(struct mbuf *m, ...)
 
 	opts = NULL;
 #ifdef INET6
-	if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-		ip6_savecontrol(inp, ipv6, m, &opts6);
+	if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
+		ip6_savecontrol(inp, ip6, m, &opts6);
 		opts = opts6.head;
 	}
 #endif /* INET6 */

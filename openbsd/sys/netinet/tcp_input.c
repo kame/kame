@@ -421,7 +421,7 @@ tcp_input(struct mbuf *m, ...)
 	va_list ap;
 	struct tcphdr *th;
 #ifdef INET6
-	struct ip6_hdr *ipv6 = NULL;
+	struct ip6_hdr *ip6 = NULL;
 	struct sockaddr_in6 *src_sa6, *dst_sa6, lsa6;
 #endif /* INET6 */
 #ifdef IPSEC
@@ -515,7 +515,7 @@ tcp_input(struct mbuf *m, ...)
 
 	ip = NULL;
 #ifdef INET6
-	ipv6 = NULL;
+	ip6 = NULL;
 #endif
 	switch (af) {
 	case AF_INET:
@@ -559,15 +559,15 @@ tcp_input(struct mbuf *m, ...)
 	    }
 #ifdef INET6
 	case AF_INET6:
-		ipv6 = mtod(m, struct ip6_hdr *);
+		ip6 = mtod(m, struct ip6_hdr *);
 		tlen = m->m_pkthdr.len - iphlen;
 #ifdef TCP_ECN
-		iptos = (ntohl(ipv6->ip6_flow) >> 20) & 0xff;
+		iptos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
 #endif
 
 		/* Be proactive about malicious use of IPv4 mapped address */
-		if (IN6_IS_ADDR_V4MAPPED(&ipv6->ip6_src) ||
-		    IN6_IS_ADDR_V4MAPPED(&ipv6->ip6_dst)) {
+		if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
+		    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
 			/* XXX stat */
 			goto drop;
 		}
@@ -580,7 +580,7 @@ tcp_input(struct mbuf *m, ...)
 		 * Note that packets with unspecified IPv6 destination is
 		 * already dropped in ip6_input.
 		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ipv6->ip6_src)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
 			/* XXX stat */
 			goto drop;
 		}
@@ -621,7 +621,7 @@ tcp_input(struct mbuf *m, ...)
 				break;
 #ifdef INET6
 			case AF_INET6:
-				ipv6 = mtod(m, struct ip6_hdr *);
+				ip6 = mtod(m, struct ip6_hdr *);
 				break;
 #endif
 			}
@@ -692,7 +692,7 @@ findpcb:
 #ifdef INET6
 			flags = INPLOOKUP_WILDCARD | INPLOOKUP_IPV6;
 #if defined(NFAITH) && NFAITH > 0
-			if (faithprefix(&ipv6->ip6_dst))
+			if (faithprefix(&ip6->ip6_dst))
 				flags |= INPLOOKUP_FAITH;
 #endif
 			inp = in_pcblookup(&tcbtable, src_sa6,
@@ -778,7 +778,7 @@ findpcb:
 			 * handling - worse, they are not exactly the same.
 			 * I believe 5.5.4 is the best one, so we follow 5.5.4.
 			 */
-			if (ipv6 && !ip6_use_deprecated) {
+			if (ip6 && !ip6_use_deprecated) {
 				struct in6_ifaddr *ia6;
 
 				if ((ia6 = ip6_getdstifaddr(m)) &&
@@ -866,7 +866,7 @@ findpcb:
 			   * inherit socket options from the listening
 			   * socket.
 			   */
-			  if (ipv6) {
+			  if (ip6) {
 			    inp->inp_flags |=
 				(oldinpcb->inp_flags & IN6P_CONTROLOPTS);
 			    if (inp->inp_flags & IN6P_CONTROLOPTS) {
@@ -1187,7 +1187,7 @@ findpcb:
 		switch (af) {
 #ifdef INET6
 		case AF_INET6:
-			if (IN6_IS_ADDR_MULTICAST(&ipv6->ip6_dst))
+			if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 				goto drop;
 			break;
 #endif /* INET6 */
@@ -2327,7 +2327,7 @@ dropwithreset:
 #ifdef INET6
 	case AF_INET6:
 		/* For following calls to tcp_respond */
-		if (IN6_IS_ADDR_MULTICAST(&ipv6->ip6_dst))
+		if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 			goto drop;
 		break;
 #endif /* INET6 */
