@@ -1,0 +1,158 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"	$Id: natptd.8,v 1.1 2000/01/07 15:08:35 fujisawa Exp $
+.\"
+.\" Note: The date here should be updated whenever a non-trivial
+.\" change is made to the manual page.
+.Dd December 25, 1999
+.Dt NATPTD 8
+.\" Note: Only specify the operating system when the command
+.\" is FreeBSD specific, otherwise use the .Os macro with no
+.\" arguments.
+.Os KAME
+.\"
+.Sh NAME
+.Nm natptd
+.Nd small DNS proxy nameserver that supports IPv6 only hosts/networks
+.\"
+.Sh SYNOPSIS
+.Nm
+.Op Fl bd
+.Fl f Ar configfile
+.\"
+.Sh DESCRIPTION
+The options are as follows:
+.Bl -tag -width Fl
+.It Fl bd
+Run as a daemon.
+.It Fl f Ar configfile
+Evaluate the content of file specified by configfile, as configuration
+directives.
+.El
+.\"
+.Sh DIRECTIVES
+The following directives are available.
+.Bl -tag -width Ds
+.\"
+.It Xo
+.Li Outside:	<interfaceName>
+.Xc
+Mark interface as outside.  Outside (external) means that the
+interface is on the Internet side.
+.\"
+.It Xo
+.Li Inside:	<interfaceName>
+.Xc
+Mark interface as inside.  Inside (internal) means that the interface
+is on the private side.
+.\"
+.It Xo
+.Li serverOutside:	<v4address> or <v6address>
+.Xc
+Mark specified nameserver as inside.
+.\"
+.It Xo
+.Li NATPTprefix:	<v6addr>
+.Xc
+Specify 96 bit IPv6 prefix to constructs fake IPv6 address when natptd
+cannot find AAAA record for AAAA query.
+.\"
+.It Xo
+.Li dumpFile:		<filename>
+.Xc
+Specify the filename to record nameserver database.
+.\"
+.It Xo
+.Li pidFile:		<filename>
+.Xc
+Specify the filename to record daemon's process id.
+.\"
+.Sh EXAMPLES
+The following is an example of a typical usage
+of the
+.Nm
+command:
+.Pp
+.Dl % natptd -bd -f natptd.conf
+.Pp
+The following is an example of a content of the
+.Nm
+configuration file.
+.Pp
+.Bd -literal -offset indent
+% cat natptd.conf
+Outside:	fxp0				# This interface marked as outside
+Inside:		ed1			\\
+						# This interface marked as inside
+
+serverOutside:	203.178.141.194				# orange.kame.net
+serverOutside:	3ffe:0501:4819::42			# paradise.v6.kame.net
+serveroutside:	3ffe:0501:4819:2000:5254:ff:fedc:5217	# paradise.v6.kame.net
+
+NATPTprefix:	3ffe:0501:4819:c1ad::0			# NATPT prefix
+
+dumpFile:	/usr/tmp/ptrd.dump
+pidFile:	/var/run/ptrd.pid
+
+# Local Variables:
+# version-control:nil
+# End:
+%
+.Ed
+.\"
+.Sh SEE ALSO
+.Xr natptconfig 8 ,
+.Xr natptlog 8
+.Re
+.\"
+.Sh DIAGNOSTICS
+Needs to be run as root for act as nameserver.
+.Pp
+Messages are sent to the syslog daemon using facility LOG_DAEMON.
+.\"
+.Sh NOTES
+The following signals have the specified effect when sent to
+.Nm
+using the
+.Xr kill 1
+command.
+.Pp
+.Bl -tag -width Ds
+SHGHUP
+.Ed
+.\"
+.Sh BUGS
+The
+.Nm
+command is now under development.  It's user interface and overall
+functionality are subjects to future improvements and changes.
+.\"
+.Sh HISTORY
+.Nm Natptd
+are implemented by Shin-ichi Fujisawa
+.Li <fujisawa@kame.net> .
