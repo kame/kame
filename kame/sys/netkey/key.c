@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.236 2002/05/14 05:01:25 itojun Exp $	*/
+/*	$KAME: key.c,v 1.237 2002/05/18 23:16:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4070,8 +4070,7 @@ key_cmpsaidx(saidx0, saidx1, flag)
 	} else {
 
 		/* CMP_MODE_REQID, CMP_REQID, CMP_HEAD */
-		if (flag == CMP_MODE_REQID
-		  ||flag == CMP_REQID) {
+		if (flag == CMP_MODE_REQID || flag == CMP_REQID) {
 			/*
 			 * If reqid of SPD is non-zero, unique SA is required.
 			 * The result must be of same reqid in this case.
@@ -4081,8 +4080,8 @@ key_cmpsaidx(saidx0, saidx1, flag)
 		}
 
 		if (flag == CMP_MODE_REQID) {
-			if (saidx0->mode != IPSEC_MODE_ANY
-			 && saidx0->mode != saidx1->mode)
+			if (saidx0->mode != IPSEC_MODE_ANY &&
+			    saidx0->mode != saidx1->mode)
 				return 0;
 		}
 
