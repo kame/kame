@@ -1,4 +1,4 @@
-/*	$KAME: debugrm.c,v 1.5 2001/12/07 21:37:07 sakane Exp $	*/
+/*	$KAME: debugrm.c,v 1.6 2001/12/13 16:07:46 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -182,10 +182,11 @@ DRM_realloc(file, line, func, ptr, size)
 	p = realloc(ptr, size);
 	if (p) {
 		char buf[1024];
-		if (ptr && p != ptr)
+		if (ptr && p != ptr) {
 			DRM_del(ptr);
-		DRM_setmsg(buf, sizeof(buf), p, size, file, line, func);
-		DRM_add(p, buf);
+			DRM_setmsg(buf, sizeof(buf), p, size, file, line, func);
+			DRM_add(p, buf);
+		}
 	}
 
 	return p;
@@ -234,10 +235,11 @@ DRM_vrealloc(file, line, func, ptr, size)
 	p = vrealloc(ptr, size);
 	if (p) {
 		char buf[1024];
-		if (ptr && p != ptr)
+		if (ptr && p != ptr) {
 			DRM_del(ptr);
-		DRM_setmsg(buf, sizeof(buf), p, size, file, line, func);
-		DRM_add(p, buf);
+			DRM_setmsg(buf, sizeof(buf), p, size, file, line, func);
+			DRM_add(p, buf);
+		}
 	}
 
 	return p;
