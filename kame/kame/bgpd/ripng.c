@@ -697,7 +697,6 @@ rip_process_response(ripif, nn)
 
   task            *lifetime,  *garbage;       /*  may be registered          */
   byte             lifeyes,    garbageyes;
-  char             in6txt[INET6_ADDRSTRLEN];
   char *ifname = ripif->rip_ife->ifi_ifn->if_name; /* for debugging use */
 
   extern struct ifinfo    *ifentry;
@@ -707,8 +706,6 @@ rip_process_response(ripif, nn)
 
   IFLOG(LOG_RIP)
     syslog(LOG_DEBUG, "<rip_process_response>: invoked, nn=%d", nn);
-
-  memset(in6txt, 0, INET6_ADDRSTRLEN);
 
   uprtehead = NULL;
   unn = dnn = 0;
