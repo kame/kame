@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.57 2002/08/05 05:26:06 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.58 2002/08/16 08:35:29 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #define	NATPTHASHSZ	(397)
-#define	MAXTSLOTENTRY	(4096)
+#define	MAXTSLOTENTRY	(32767)
 
 #define	NATPT_FRGHDRSZ	(sizeof(struct ip6_hdr) + sizeof(struct ip6_frag))
 #define	NATPT_MAXULP	(IPV6_MMTU - NATPT_FRGHDRSZ)

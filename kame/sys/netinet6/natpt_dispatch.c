@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.68 2002/08/15 05:25:09 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.69 2002/08/16 08:35:29 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -154,7 +154,7 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 				if ((acs = natpt_lookForRule6(&cv6)) == NULL)
 					return (IPPROTO_IP);
 				if ((cv6.ats = natpt_internHash6(acs, &cv6)) == NULL)
-					return (IPPROTO_IP);
+					return (IPPROTO_MAX);
 			}
 			if ((frg = natpt_internFragment6(&cv6)) == NULL)
 				return (IPPROTO_IP);
@@ -176,7 +176,7 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 			if ((acs = natpt_lookForRule6(&cv6)) == NULL)
 				return (IPPROTO_IP);
 			if ((cv6.ats = natpt_internHash6(acs, &cv6)) == NULL)
-				return (IPPROTO_IP);
+				return (IPPROTO_MAX);
 		}
 	}
 
@@ -247,7 +247,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 				if ((acs = natpt_lookForRule4(&cv4)) == NULL)
 					return (IPPROTO_IP);
 				if ((cv4.ats = natpt_internHash4(acs, &cv4)) == NULL)
-					return (IPPROTO_IP);
+					return (IPPROTO_MAX);
 			}
 			if ((frg = natpt_internFragment4(&cv4)) == NULL)
 				return (IPPROTO_IP);
@@ -273,7 +273,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 			if ((csl = natpt_lookForRule4(&cv4)) == NULL)
 				return (IPPROTO_IP);
 			if ((cv4.ats = natpt_internHash4(csl, &cv4)) == NULL)
-				return (IPPROTO_IP);
+				return (IPPROTO_MAX);
 		}
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.64 2002/08/16 02:38:07 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.65 2002/08/16 08:35:29 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -62,6 +62,7 @@
 static int		*tSlotEntry;
 static int		 tSlotEntryMax;
 static int		 tSlotEntryUsed;
+static int		 tSlotEntryPeak;
 
 static time_t		 maxFragment;
 static time_t		 frgmntTimer;		/* [sec] */
@@ -150,8 +151,16 @@ natpt_lookForHash4(struct pcv *cv)
 struct tSlot *
 natpt_internHash6(struct cSlot *acs, struct pcv *cv6)
 {
+	const char	*fn = __FUNCTION__;
+
 	struct pAddr	*local, *remote;
 	struct tSlot	*ats;
+
+	if (tSlotEntryUsed >= tSlotEntryMax) {
+		natpt_logMsg(LOG_ERR, "%s(): tSlot limit (%d) exceeded",
+			     fn, tSlotEntryMax);
+		return (NULL);
+	}
 
 	MALLOC(ats, struct tSlot *, sizeof(struct tSlot), M_NATPT, M_NOWAIT);
 	if (ats == NULL) {
@@ -196,8 +205,16 @@ natpt_internHash6(struct cSlot *acs, struct pcv *cv6)
 struct tSlot *
 natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 {
+	const char	*fn = __FUNCTION__;
+
 	struct pAddr	*local, *remote;
 	struct tSlot	*ats;
+
+	if (tSlotEntryUsed >= tSlotEntryMax) {
+		natpt_logMsg(LOG_ERR, "%s(): tSlot limit (%d) exceeded",
+			     fn, tSlotEntryMax);
+		return (NULL);
+	}
 
 	MALLOC(ats, struct tSlot *, sizeof(struct tSlot), M_NATPT, M_NOWAIT);
 	if (ats == NULL) {
@@ -284,8 +301,16 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 struct tSlot *
 natpt_openIncomingV4Conn(int proto, struct pAddr *local, struct pAddr *remote)
 {
+	const char	*fn = __FUNCTION__;
+
 	struct tSlot	*ats;
 	struct tcpstate	*ts;
+
+	if (tSlotEntryUsed >= tSlotEntryMax) {
+		natpt_logMsg(LOG_ERR, "%s(): tSlot limit (%d) exceeded",
+			     fn, tSlotEntryMax);
+		return (NULL);
+	}
 
 	MALLOC(ats, struct tSlot *, sizeof(struct tSlot), M_NATPT, M_NOWAIT);
 	if (ats == NULL)
@@ -924,6 +949,7 @@ natpt_appendTSlot(struct tSlot *ats)
 	splx(s);
 
 	tSlotEntryUsed++;
+	tSlotEntryPeak = max(tSlotEntryPeak, tSlotEntryUsed);
 	natpt_logTSlot(LOG_INFO, ats, '+', tSlotEntryUsed);
 }
 
