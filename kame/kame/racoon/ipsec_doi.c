@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.167 2003/11/13 20:44:39 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.168 2004/03/03 02:28:46 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1721,7 +1721,7 @@ check_spi_size(proto_id, size)
 	case IPSECDOI_PROTO_ISAKMP:
 		if (size != 0) {
 			/* WARNING */
-			plog(LLV_WARNING, LOCATION, NULL,
+			plog(LLV_DEBUG, LOCATION, NULL,
 				"SPI size isn't zero, but IKE proposal.\n");
 		}
 		return 0;
