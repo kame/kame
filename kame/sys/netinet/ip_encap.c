@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.40 2001/02/21 01:34:12 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.41 2001/03/15 08:35:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -259,7 +259,7 @@ encap4_input(m, va_alist)
 #  define COMPATFUNC	ip4_input
 # endif
 #elif defined(__NetBSD__)
-# ifdef MROUTING
+# if 0 /*def MROUTING*/
 	if (proto == IPPROTO_IPV4 && mrt_ipip_input(m, off)) {
 		/*
 		 * Multicast routing code claimed this one.  No

@@ -120,6 +120,7 @@ struct mrtstat {
 /*
  * The kernel's virtual-interface structure.
  */
+struct encaptab;
 struct vif {
 	struct	  mbuf *tbf_q, **tbf_t;	/* packet queue */
 	struct	  timeval tbf_last_pkt_t; /* arr. time of last pkt */
@@ -143,6 +144,7 @@ struct vif {
 	int	  v_rsvp_on;		/* # RSVP listening on this vif */
 	struct	  socket *v_rsvpd;	/* # RSVPD daemon */
 #endif /* RSVP_ISI */
+	const struct encaptab *v_encap_cookie;
 };
 
 /*
@@ -218,7 +220,6 @@ void rsvp_input __P((struct mbuf *, int, int));
 #else
 int ip_mforward __P((struct mbuf *, struct ifnet *));
 #endif
-int mrt_ipip_input __P((struct mbuf *, int));
 
 #endif /* _KERNEL */
 
