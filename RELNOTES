@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/02 15:36:25 $
+		     $Date: 2000/04/13 14:23:16 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -46,5 +46,8 @@ and the next STABLE release,
   specific operating system platform (openbsd, and maybe freebsd[23]).
   It is not KAME problem, it is problem in fxp driver.
   KAME/OpenBSD contains workaround for this.
+- Alignment constraints were changed in SIOCGIFCONF, ancillary data and
+  couple of other places.  You may experience some trouble running non-KAME
+  binaries (like those shipped with stock *BSD) on top of KAME kernel.
 
 							<end of RELNOTES>
