@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/12/20 08:23:13 $
+			$Date: 1999/12/21 03:31:04 $
 
 1. IPv6
 
@@ -861,10 +861,13 @@ The following table lists the network drivers we have tried so far.
 						support?
 	---		---	---		---
 	(Ethernet)
-	ne pci/i386	ok	ok		yes
+	awi pcmcia/i386	ok	ok		-
+	bah zbus/amiga	NG(*)
+	cnw pcmcia/i386	ok	ok		yes
 	ep pcmcia/i386	ok	ok		-
 	le sbus/sparc	ok	ok		yes
-	bah zbus/amiga	NG(*)
+	ne pci/i386	ok	ok		yes
+	wi pcmcia/i386	ok	ok		yes
 	(ATM)
 	en pci/i386	ok	ok		-
 
@@ -902,9 +905,13 @@ Here is a list of OpenBSD 2.x drivers and its conditions:
 							support?
 	---		---		---		---
 	(Ethernet)
+	le sbus/sparc	ok		ok		yes
+	fxp pci/i386	NG(*)
 	ne pci/i386	ok		ok		yes
 	ne pcmcia/i386	ok		ok		yes
-	le sbus/sparc	ok		ok		yes
+
+(*) There seem to be some problem in driver, with multicast filter
+configuration.  This happens with certain revision of chipset on the card.
 
 3. Translator
 
