@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1448 2000/12/22 09:46:36 jinmei Exp $
+$KAME: CHANGELOG,v 1.1449 2000/12/22 13:16:31 jinmei Exp $
 
 <200012>
+2000-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/pim6_proto.c: fixed typo in J/P message
+	handling.
+	* kame/kame/pim6sd/routesock.c: fixed alignment bugs for no SA_LEN
+	cases (nothing to do with BSD, though).
+	Both fixes were based on KAME PR sys/308 from
+	pavlin@catarina.usc.edu.
+
 2000-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): correctly initialized
 	the "must be zero" field of upcall data. This fix is essential to
