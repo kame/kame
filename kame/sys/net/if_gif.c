@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.25 2000/05/16 16:13:56 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.26 2000/05/17 01:09:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -506,7 +506,6 @@ gif_ioctl(ifp, cmd, data)
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif /* INET6 */
-		/* can't configure same pair of address onto two gifs */
 		src = (struct sockaddr *)
 			&(((struct in_aliasreq *)data)->ifra_addr);
 		dst = (struct sockaddr *)
@@ -517,15 +516,39 @@ gif_ioctl(ifp, cmd, data)
 				continue;
 			if (!sc2->gif_pdst || !sc2->gif_psrc)
 				continue;
-			if (sc2->gif_pdst->sa_family == dst->sa_family &&
-			    sc2->gif_pdst->sa_len == dst->sa_family &&
-			    bcmp(sc2->gif_pdst, dst, dst->sa_len) == 0 &&
-			    sc2->gif_psrc->sa_family == src->sa_family &&
-			    sc2->gif_psrc->sa_len == src->sa_family &&
+			if (sc2->gif_pdst->sa_family != dst->sa_family ||
+			    sc2->gif_pdst->sa_len != dst->sa_len ||
+			    sc2->gif_psrc->sa_family != src->sa_family ||
+			    sc2->gif_psrc->sa_len != src->sa_len)
+				continue;
+#ifndef XBONEHACK
+			/* can't configure same pair of address onto two gifs */
+			if (bcmp(sc2->gif_pdst, dst, dst->sa_len) == 0 &&
 			    bcmp(sc2->gif_psrc, src, src->sa_len) == 0) {
 				error = EADDRNOTAVAIL;
 				goto bad;
 			}
+#endif
+
+			/* can't configure multiple multi-dest interfaces */
+#define multidest(x) \
+	(((struct sockaddr_in *)(x))->sin_addr.s_addr == INADDR_ANY)
+#ifdef INET6
+#define multidest6(x) \
+	(IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)(x))->sin6_addr))
+#endif
+			if (dst->sa_family == AF_INET &&
+			    multidest(dst) && multidest(sc2->gif_pdst)) {
+				error = EADDRNOTAVAIL;
+				goto bad;
+			}
+#ifdef INET6
+			if (dst->sa_family == AF_INET6 &&
+			    multidest6(dst) && multidest6(sc2->gif_pdst)) {
+				error = EADDRNOTAVAIL;
+				goto bad;
+			}
+#endif
 		}
 
 		if (src->sa_family != dst->sa_family ||
