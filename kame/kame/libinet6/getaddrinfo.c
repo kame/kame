@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.138 2002/07/01 21:57:27 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.139 2002/07/25 21:53:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1522,7 +1522,7 @@ get_canonname(pai, ai, str)
 		ai->ai_canonname = (char *)malloc(strlen(str) + 1);
 		if (ai->ai_canonname == NULL)
 			return EAI_MEMORY;
-		strcpy(ai->ai_canonname, str);
+		strlcpy(ai->ai_canonname, str, strlen(str) + 1);
 	}
 	return 0;
 }
@@ -2139,7 +2139,7 @@ getanswer(answer, anslen, qname, qtype, pai)
 				had_error++;
 				continue;
 			}
-			strcpy(bp, tbuf);
+			strlcpy(bp, tbuf, ep - bp);
 			canonname = bp;
 			bp += n;
 			continue;
@@ -3162,7 +3162,7 @@ getanswer(answer, anslen, qname, qtype, pai)
 				had_error++;
 				continue;
 			}
-			strcpy(bp, tbuf);
+			strlcpy(bp, tbuf, ep - bp);
 			canonname = bp;
 			bp += n;
 			continue;
@@ -4371,7 +4371,7 @@ getanswer(answer, anslen, qname, qtype, pai)
 				had_error++;
 				continue;
 			}
-			strcpy(bp, tbuf);
+			strlcpy(bp, tbuf, ep - bp);
 			canonname = bp;
 			bp += n;
 			continue;
