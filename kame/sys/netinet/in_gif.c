@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.30 2000/04/14 08:42:50 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.31 2000/04/14 08:43:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -384,7 +384,7 @@ gif_encapcheck4(m, off, proto, arg)
 	if (addrmatch != 3)
 		return 0;
 
-	/* martian filters on outer address - NOT done in ip_input! */
+	/* martian filters on outer source - NOT done in ip_input! */
 	if (IN_CLASSD(&ip.ip_src.s_addr))
 		return 0;
 	switch ((ntohl(&ip.ip_src.s_addr) & 0xff000000) >> 24) {
@@ -392,7 +392,7 @@ gif_encapcheck4(m, off, proto, arg)
 		return 0;
 	}
 
-	/* ingress filters on outer address */
+	/* ingress filters on outer source */
 	if ((m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.rcvif) {
 		struct sockaddr_in sin;
 		struct rtentry *rt;
