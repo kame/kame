@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.46 2001/08/16 08:52:42 keiichi Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.47 2001/11/06 08:05:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -116,31 +116,7 @@
  */
 
 extern	struct protosw inetsw[];
-static	int in6_mcmatch __P((struct inpcb *, struct in6_addr *, struct ifnet *));
 static	int udp6_detach __P((struct socket *so));
-
-static int
-in6_mcmatch(in6p, ia6, ifp)
-	struct inpcb *in6p;
-	register struct in6_addr *ia6;
-	struct ifnet *ifp;
-{
-	struct ip6_moptions *im6o = in6p->in6p_moptions;
-	struct in6_multi_mship *imm;
-
-	if (im6o == NULL)
-		return 0;
-
-	for (imm = im6o->im6o_memberships.lh_first; imm != NULL;
-	     imm = imm->i6mm_chain.le_next) {
-		if ((ifp == NULL ||
-		     imm->i6mm_maddr->in6m_ifp == ifp) &&
-		    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
-				       ia6))
-			return 1;
-	}
-	return 0;
-}
 
 int
 udp6_input(mp, offp, proto)
@@ -242,9 +218,7 @@ udp6_input(mp, offp, proto)
 				continue;
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
-							&ip6->ip6_dst) &&
-				    !in6_mcmatch(in6p, &ip6->ip6_dst,
-						 m->m_pkthdr.rcvif))
+							&ip6->ip6_dst))
 					continue;
 			}
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
