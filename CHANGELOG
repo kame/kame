@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1012 2000/06/13 12:13:15 itojun Exp $
+$Id: CHANGELOG,v 1.1013 2000/06/14 11:16:28 itojun Exp $
 
 <200006>
+Wed Jun 14 20:14:47 JST 2000  itojun@iijlab.net
+	* sys/netinet6/esp_core.c: pass encryption failure code up to ESP
+	  engine, just in case the encryption routine fails.
+
 Tue Jun 13 21:11:28 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/zebra: upgrade to 0.87.
 
