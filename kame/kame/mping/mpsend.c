@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: mpsend.c,v 1.1 1999/12/06 06:26:33 jinmei Exp $	*/
+/*	$Id: mpsend.c,v 1.2 1999/12/07 14:03:58 itojun Exp $	*/
 
 #include "mping.h"
 
@@ -43,7 +43,7 @@ char *argv0;
 
 void usage __P((void));
 
-void
+int
 main(argc, argv)
 	int argc;
 	char **argv;
@@ -198,6 +198,7 @@ main(argc, argv)
 	}
 	freeaddrinfo(res);
 	exit(0);
+	/*NOTREACHED*/
 }
 
 void

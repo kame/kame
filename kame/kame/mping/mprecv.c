@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: mprecv.c,v 1.1 1999/12/06 06:26:33 jinmei Exp $	*/
+/*	$Id: mprecv.c,v 1.2 1999/12/07 14:03:57 itojun Exp $	*/
 
 #include "mping.h"
 
@@ -94,7 +94,7 @@ void log_output __P((int));
 void clear_interval __P((int));
 void usage __P((void));
 
-void
+int
 main(argc, argv)
 	int argc;
 	char **argv;
@@ -235,6 +235,9 @@ main(argc, argv)
 	for (;;) {
 		receive(s);
 	}
+
+	exit(0);
+	/*NOTREACHED*/
 }
 
 void
@@ -376,6 +379,7 @@ log_sp(sp, force)
 {
 	int i;
 	double mean, mean2, sd;
+	time_t t;
 	struct tm *tm;
 	struct lost_history *lhp;
 	char buf[BUFSIZ];
@@ -384,7 +388,8 @@ log_sp(sp, force)
 		buf, sizeof(buf), NULL, 0, NI_NUMERICHOST);
 	fprintf(lfp, "[%02ld] host %s (%lu)\n", sp->s_rid,
 		buf, sp->s_id);
-	tm = localtime(&sp->st_last.tv_sec);
+	t = (time_t)sp->st_last.tv_sec;
+	tm = localtime(&t);
 	fprintf(lfp, "[%02ld] last read %s %2d %02d:%02d:%02d,",
 		sp->s_rid, month[tm->tm_mon],
 		tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
