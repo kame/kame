@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.21 2002/12/24 09:21:14 suz Exp $	*/
+/*	$KAME: rp.c,v 1.22 2003/01/30 04:04:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -173,6 +173,7 @@ init_rp6()
 	    log(LOG_WARNING, 0,
 		"cand_rp '%s' is not configured. "
 		"take the max local address the router..", cand_rp_ifname);
+	free(cand_rp_ifname);
     }
     if (!sa6)
 	sa6 = max_global_address(); /* this MUST succeed */
@@ -244,6 +245,7 @@ init_bsr6()
 	if (!sa6)
 	     log(LOG_WARNING, 0, "bsr '%s' is not configured. "
 	        "take the max local address the router..", cand_bsr_ifname);
+	free(cand_bsr_ifname);
     }
     if (!sa6)
 	sa6 = max_global_address(); /* this MUST succeed */

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.27 2002/12/24 09:21:14 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.28 2003/01/30 04:04:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -1100,8 +1100,6 @@ cf_post_config()
 
   cleanup:
 	/* cleanup temporary variables */
-	if (cand_rp_ifname) free(cand_rp_ifname);
-	if (cand_bsr_ifname) free(cand_bsr_ifname);
 	if (rp_attr) free_attr_list(rp_attr);
 	if (bsr_attr) free_attr_list(bsr_attr);
 	if (regthres_attr) free_attr_list(regthres_attr);
