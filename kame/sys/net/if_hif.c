@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.17 2002/01/17 06:05:10 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.18 2002/01/26 04:45:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -482,6 +482,27 @@ hif_subnet_list_remove(hs_list, hs)
 	if (ms->ms_refcnt < 0) {
 		/* must not happen. */
 		return (EINVAL);
+	}
+
+	return (0);
+}
+
+int
+hif_subnet_list_remove_all(hs_list)
+	struct hif_subnet_list *hs_list;
+{
+	struct hif_subnet *hs;
+	int error = 0;
+
+	while ((hs = TAILQ_FIRST(hs_list)) != NULL) {
+		error = hif_subnet_list_remove(hs_list, hs);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: "
+				 "removing hif_subnet from hif_list failed.\n",
+				 __FILE__, __LINE__));
+			return (EINVAL);
+		}
 	}
 
 	return (0);
@@ -1022,6 +1043,7 @@ contiguousfail:
 	}
 #endif
 	/* XXX encapsulate to our home link ? */
+	printf("ouch!\n");
 	m_freem(m);
 	return(0);
 

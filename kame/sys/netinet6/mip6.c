@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.107 2002/01/22 08:46:25 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.108 2002/01/26 04:45:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1193,8 +1193,20 @@ mip6_ioctl(cmd, data)
 			for (sc = TAILQ_FIRST(&hif_softc_list);
 			     sc;
 			     sc = TAILQ_NEXT(sc, hif_entry)) {
+				struct mip6_subnet *ms;
+
 				mip6_detach_haddrs(sc);
 				mip6_bu_list_remove_all(&sc->hif_bu_list);
+				hif_subnet_list_remove_all(
+					&sc->hif_hs_list_home);
+				hif_subnet_list_remove_all(
+					&sc->hif_hs_list_foreign);
+				while (!LIST_EMPTY(&mip6_subnet_list)) {
+					ms = LIST_FIRST(&mip6_subnet_list);
+					mip6_subnet_list_remove(
+						&mip6_subnet_list,
+						ms);
+				}
 			}
 			hif_coa = in6addr_any;
 			mip6_config.mcfg_type = 0;
