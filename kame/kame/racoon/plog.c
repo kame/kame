@@ -1,4 +1,4 @@
-/*	$KAME: plog.c,v 1.19 2001/09/23 12:40:32 itojun Exp $	*/
+/*	$KAME: plog.c,v 1.20 2001/10/19 03:31:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -123,28 +123,9 @@ void
 plog(int pri, const char *func, struct sockaddr *sa, const char *fmt, ...)
 {
 	va_list ap;
-	char *newfmt;
-
-	if (pri > loglevel)
-		return;
-
-	newfmt = plog_common(pri, fmt, func);
-
-	if (f_foreground) {
-		va_start(ap, fmt);
-		vprintf(newfmt, ap);
-		va_end(ap);
-	}
 
 	va_start(ap, fmt);
-	if (logfile) {
-		log_vaprint(logp, newfmt, ap);
-	} else {
-		if (pri < ARRAYLEN(ptab))
-			vsyslog(ptab[pri].priority, newfmt, ap);
-		else
-			vsyslog(LOG_ALERT, newfmt, ap);
-	}
+	plogv(pri, func, sa, fmt, ap);
 	va_end(ap);
 }
 
