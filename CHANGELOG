@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.804 2000/04/24 04:09:05 itojun Exp $
+$Id: CHANGELOG,v 1.805 2000/04/24 08:25:02 sakane Exp $
 
 <200004>
+Mon Apr 24 17:22:51 JST 2000 sakane@kame.net
+	* kame/kame/racoon:
+	improve phase 2 configuration and parse phase 2 SA payload.
+	Racoon takes security protocols to be negotiated at phase 2 from
+	kernel's SPD.
+	User can define algorithms, lifetime and pfs by "sainfo" directive.
+
+	XXX At the moment, racoon can NOT negotiate the SA for VPN.  Because
+	I don't clarify to define the relation between the values of ID
+	payloads and a pair of src/dst which cause the SA negotiation to
+	begin. Also racoon can NOT negotiate the socket based SA.  Because
+	there is not any SP entry for socket in the kernel's SPD.
+
 Mon Apr 24 13:08:42 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.3.8.
 
