@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-#	$Id: Makefile,v 1.1 1999/12/06 06:26:33 jinmei Exp $
+#	$Id: Makefile,v 1.1.1.1 1999/12/06 06:26:33 jinmei Exp $
 
 .ifndef PREFIX
 PREFIX=/usr/local/v6

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: mprecv.c,v 1.1 1999/12/06 06:26:33 jinmei Exp $	*/
+/*	$Id: mprecv.c,v 1.1.1.1 1999/12/06 06:26:33 jinmei Exp $	*/
 
 #include "mping.h"
 
