@@ -1,0 +1,14 @@
+*** src/gui-popup.c.orig	Thu Apr 13 20:10:20 2000
+--- src/gui-popup.c	Thu Apr 13 20:11:14 2000
+***************
+*** 241,246 ****
+--- 241,249 ----
+    {Separator, E_IMAGE, TIGHT, moMODE_ALL, LOOSE, "Separator", 
+     {0, NULL, NULL}, NULL, 0, NULL, NULL, NULL, NULL, 1}, 
+  
++   {PushButton, E_IMAGE, TIGHT, moMODE_ALL, LOOSE, "Save", 
++    { (XtCallbackProc)I_Save, NULL, NULL}, image_cb, 0, NULL, NULL, NULL, NULL, 1},
++ 
+    {PushButton, E_IMAGE, TIGHT, moMODE_ALL, LOOSE, "Reload", 
+     { (XtCallbackProc)I_Reload, NULL, NULL},
+     image_cb, 0, NULL, NULL, NULL,  NULL, 1},

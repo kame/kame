@@ -1,0 +1,13 @@
+mMosaic is a derivative work of NCSA XMosaic 2.7b4. You can use it as
+a simple browser. 'Multithread-like' browsing is enable:
+Simultaneously browsing in multiple window and/or download. This is
+the major works since the last.  Cache was revisited.
+
+All thoses goodies would like to be multicasted. This is the real
+target of mMosaic (else why call it m-Mosaic?). mMosaic is possibly a
+good companion for the Whiteboard.
+
+WWW: http://sig.enst.fr/~dauphin/mMosaic/index.html
+
+---
+sumikawa@FreeBSD.org
