@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.13 2001/08/14 19:00:11 sakane Exp $
+$KAME: helsinki-result.jp,v 1.14 2001/08/14 19:43:52 sakane Exp $
 
 
 generic
@@ -140,7 +140,7 @@ WindowsXP
 	phase2 esp, 3des, sha1, transport
 
 	modp3072やろうよとナンパされる。
-	dhの計算: fbsd43 Celeron 400MHz でdhの計算に約7(s)
+	dhの計算: fbsd43 P100MHzで約7(s)
 	          XP P2 200MHzで約9(s)
 
 	明日夕方 RSA signature modeで再戦
