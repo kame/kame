@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2321 2003/01/23 09:12:50 keiichi Exp $
+$KAME: CHANGELOG,v 1.2322 2003/01/27 15:50:21 jinmei Exp $
 
 <200301>
+2003-01-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: added some minor bug fixes and clarifications:
+	- let the event structure to have IA for solicit and request so
+	  that it is easier to handle each IA separately
+	- fixed a bug that the server ID was not copied to request when
+	  receiving an advertisement with the highest preference
+	- fixed a bug of moving tailq list entries.  Introduced a new
+	  library dhcp6_move_list() to address this problem.
+
 Thu Jan 23 18:09:14 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/ip6_output.c:
 	leave mtags in the original mbuf when copying the mbuf in
