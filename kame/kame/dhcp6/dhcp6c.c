@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.132 2004/05/13 14:05:56 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.133 2004/05/22 04:50:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1176,8 +1176,8 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 
 	/*
 	 * The requesting router MUST ignore any Advertise message that
-	 * includes a Status Code option containing the value NoPrefixAvail.
-	 * [dhc-dhcpv6-opt-prefix-delegation-01 Section 10.1].
+	 * includes a Status Code option containing the value NoPrefixAvail
+	 * [RFC3633 Section 11.1].
 	 * We only apply this when we are requiring prefixes to be delegated.
 	 */
 	for (evd = TAILQ_FIRST(&ev->data_list); evd;
