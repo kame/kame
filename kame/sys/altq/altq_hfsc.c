@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.16 2002/11/29 04:36:23 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.17 2002/11/29 07:48:33 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -301,7 +301,9 @@ hfsc_class_create(hif, sc, parent, qlimit, flags)
 
 #ifndef ALTQ_RED
 	if (flags & HFCF_RED) {
+#ifdef ALTQ_DEBUG
 		printf("hfsc_class_create: RED not configured for HFSC!\n");
+#endif
 		return (NULL);
 	}
 #endif
@@ -1694,7 +1696,7 @@ hfscioctl(dev, cmd, addr, flag, p)
 
 		case HFSC_ENABLE:
 			if (hif->hif_defaultclass == NULL) {
-#if 1
+#ifdef ALTQ_DEBUG
 				printf("hfsc: no default class\n");
 #endif
 				error = EINVAL;
@@ -1870,7 +1872,7 @@ hfsccmd_add_filter(ap)
 		return (EINVAL);
 
 	if (is_a_parent_class(cl)) {
-#if 1
+#ifdef ALTQ_DEBUG
 		printf("hfsccmd_add_filter: not a leaf class!\n");
 #endif
 		return (EINVAL);
@@ -2016,7 +2018,7 @@ clh_to_clp(hif, chandle)
 
 	cl = (struct hfsc_class *)chandle;
 	if (chandle != ALIGN(cl)) {
-#if 1
+#ifdef ALTQ_DEBUG
 		printf("clh_to_cl: unaligned pointer %p\n", cl);
 #endif
 		return (NULL);

@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.c,v 1.5 2002/11/29 04:36:24 kjc Exp $	*/
+/*	$KAME: altq_priq.c,v 1.6 2002/11/29 07:48:33 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -205,7 +205,9 @@ priq_class_create(pif, pri, qlimit, flags)
 
 #ifndef ALTQ_RED
 	if (flags & PRCF_RED) {
+#ifdef ALTQ_DEBUG
 		printf("priq_class_create: RED not configured for PRIQ!\n");
+#endif
 		return (NULL);
 	}
 #endif
@@ -582,7 +584,7 @@ priqioctl(dev, cmd, addr, flag, p)
 		switch (cmd) {
 		case PRIQ_ENABLE:
 			if (pif->pif_default == NULL) {
-#if 1
+#ifdef ALTQ_DEBUG
 				printf("priq: no default class\n");
 #endif
 				error = EINVAL;
@@ -840,7 +842,7 @@ clh_to_clp(pif, chandle)
 
 	cl = (struct priq_class *)chandle;
 	if (chandle != ALIGN(cl)) {
-#if 1
+#ifdef ALTQ_DEBUG
 		printf("clh_to_cl: unaligned pointer %p\n", cl);
 #endif
 		return (NULL);

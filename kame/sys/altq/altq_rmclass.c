@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.c,v 1.13 2002/11/29 04:36:24 kjc Exp $	*/
+/*	$KAME: altq_rmclass.c,v 1.14 2002/11/29 07:48:33 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -211,13 +211,17 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 		return (NULL);
 #ifndef ALTQ_RED
 	if (flags & RMCF_RED) {
+#ifdef ALTQ_DEBUG
 		printf("rmc_newclass: RED not configured for CBQ!\n");
+#endif
 		return (NULL);
 	}
 #endif
 #ifndef ALTQ_RIO
 	if (flags & RMCF_RIO) {
+#ifdef ALTQ_DEBUG
 		printf("rmc_newclass: RIO not configured for CBQ!\n");
+#endif
 		return (NULL);
 	}
 #endif
