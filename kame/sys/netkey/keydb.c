@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.15 1999/10/20 13:26:27 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.16 1999/10/25 13:27:01 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -367,7 +367,15 @@ key_allocsp(spidx, dir)
 #else
 	s = splnet();	/*called from softclock()*/
 #endif
+	KEYDEBUG(KEYDEBUG_IPSEC_DATA,
+		printf("*** objects\n");
+		kdebug_secpolicyindex(spidx));
+
 	__LIST_FOREACH(sp, &sptree[dir], chain) {
+		KEYDEBUG(KEYDEBUG_IPSEC_DATA,
+			printf("*** in SPD\n");
+			kdebug_secpolicyindex(&sp->spidx));
+
 		if (sp->state == IPSEC_SPSTATE_DEAD)
 			continue;
 		if (key_cmpspidx_withmask(&sp->spidx, spidx))
@@ -871,7 +879,6 @@ key_msg2sp(xpl0)
 		int tlen;
 		struct sadb_x_ipsecrequest *xisr;
 		struct ipsecrequest **p_isr = &newsp->req;
-		caddr_t paddr;
 
 		/* validity check */
 		if (PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
@@ -885,16 +892,6 @@ key_msg2sp(xpl0)
 
 		while (tlen > 0) {
 
-			KMALLOC(*p_isr, struct ipsecrequest *, sizeof(**p_isr));
-			if ((*p_isr) == NULL) {
-				printf("key_msg2sp: No more memory.\n");
-				key_freesp(newsp);
-				return NULL;
-			}
-			bzero(*p_isr, sizeof(**p_isr));
-
-			(*p_isr)->next = NULL;
-
 			/* length check */
 			if (xisr->sadb_x_ipsecrequest_len < sizeof(*xisr)) {
 				printf("key_msg2sp: "
@@ -903,32 +900,17 @@ key_msg2sp(xpl0)
 				return NULL;
 			}
 
-			/* copy into saidx */
-			paddr = (caddr_t)xisr + sizeof(*xisr);
-
-			/* validity check */
-			if (((struct sockaddr *)paddr)->sa_len
-			    > sizeof(struct sockaddr_storage)) {
-				printf("key_msg2sp: "
-					"invalid request address length.\n");
+			/* allocate request buffer */
+			KMALLOC(*p_isr, struct ipsecrequest *, sizeof(**p_isr));
+			if ((*p_isr) == NULL) {
+				printf("key_msg2sp: No more memory.\n");
 				key_freesp(newsp);
 				return NULL;
 			}
-			bcopy(paddr, &(*p_isr)->saidx.src,
-				((struct sockaddr *)paddr)->sa_len);
+			bzero(*p_isr, sizeof(**p_isr));
 
-			paddr += ((struct sockaddr *)paddr)->sa_len;
-
-			/* validity check */
-			if (((struct sockaddr *)paddr)->sa_len
-			    > sizeof(struct sockaddr_storage)) {
-				printf("key_msg2sp: "
-					"invalid request address length.\n");
-				key_freesp(newsp);
-				return NULL;
-			}
-			bcopy(paddr, &(*p_isr)->saidx.dst,
-				((struct sockaddr *)paddr)->sa_len);
+			/* set values */
+			(*p_isr)->next = NULL;
 
 			switch (xisr->sadb_x_ipsecrequest_proto) {
 			case IPPROTO_ESP:
@@ -971,6 +953,38 @@ key_msg2sp(xpl0)
 			}
 			(*p_isr)->level = xisr->sadb_x_ipsecrequest_level;
 
+			/* set IP addresses if there */
+			if (xisr->sadb_x_ipsecrequest_len > sizeof(*xisr)) {
+				struct sockaddr *paddr;
+
+				paddr = (struct sockaddr *)(xisr + 1);
+
+				/* validity check */
+				if (paddr->sa_len
+				    > sizeof((*p_isr)->saidx.src)) {
+					printf("key_msg2sp: invalid request "
+						"address length.\n");
+					key_freesp(newsp);
+					return NULL;
+				}
+				bcopy(paddr, &(*p_isr)->saidx.src,
+					paddr->sa_len);
+
+				paddr = (struct sockaddr *)((caddr_t)paddr
+							+ paddr->sa_len);
+
+				/* validity check */
+				if (paddr->sa_len
+				    > sizeof((*p_isr)->saidx.dst)) {
+					printf("key_msg2sp: invalid request "
+						"address length.\n");
+					key_freesp(newsp);
+					return NULL;
+				}
+				bcopy(paddr, &(*p_isr)->saidx.dst,
+					paddr->sa_len);
+			}
+
 			(*p_isr)->sav = NULL;
 			(*p_isr)->sp = newsp;
 
@@ -978,7 +992,7 @@ key_msg2sp(xpl0)
 			p_isr = &(*p_isr)->next;
 			tlen -= xisr->sadb_x_ipsecrequest_len;
 
-			/* sanity check */
+			/* validity check */
 			if (tlen < 0) {
 				printf("key_msg2sp: becoming tlen < 0.\n");
 				key_freesp(newsp);
