@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.277 2002/02/02 13:15:30 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.278 2002/02/03 09:50:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -210,8 +210,9 @@ static void icmp6_errcount __P((struct icmp6errstat *, int, int));
 static int icmp6_rip6_input __P((struct mbuf **, int, struct sockaddr_in6 *,
 				 struct sockaddr_in6 *));
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
-static const char *icmp6_redirect_diag __P((struct in6_addr *,
-	struct in6_addr *, struct in6_addr *));
+static const char *icmp6_redirect_diag __P((struct sockaddr_in6 *,
+					    struct sockaddr_in6 *,
+					    struct sockaddr_in6 *));
 #ifndef HAVE_PPSRATECHECK
 static int ppsratecheck __P((struct timeval *, int *, int));
 #endif
@@ -2599,17 +2600,17 @@ icmp6_fasttimo()
 
 static const char *
 icmp6_redirect_diag(src6, dst6, tgt6)
-	struct in6_addr *src6;
-	struct in6_addr *dst6;
-	struct in6_addr *tgt6;
+	struct sockaddr_in6 *src6, *dst6, *tgt6;
 {
 	static char buf[1024];
 #ifndef __bsdi__
 	snprintf(buf, sizeof(buf), "(src=%s dst=%s tgt=%s)",
-		ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
+		 ip6_sprintf(&src6->sin6_addr), ip6_sprintf(&dst6->sin6_addr),
+		 ip6_sprintf(&tgt6->sin6_addr));
 #else
 	sprintf(buf, "(src=%s dst=%s tgt=%s)",
-		ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
+		ip6_sprintf(&src6->sin6_addr), ip6_sprintf(&dst6->sin6_addr),
+		ip6_sprintf(&tgt6->sin6_addr));
 #endif
 	return buf;
 }
@@ -2630,9 +2631,7 @@ icmp6_redirect_input(m, off)
 	struct rtentry *rt = NULL;
 	int is_router;
 	int is_onlink;
-	struct in6_addr src6 = ip6->ip6_src;
-	struct in6_addr redtgt6;
-	struct in6_addr reddst6;
+	struct sockaddr_in6 *src_sa, reddst6, redtgt6, rodst;
 	union nd_opts ndopts;
 
 	if (!m || !ifp)
@@ -2654,61 +2653,93 @@ icmp6_redirect_input(m, off)
 		return;
 	}
 #endif
-	redtgt6 = nd_rd->nd_rd_target;
-	reddst6 = nd_rd->nd_rd_dst;
 
-	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6))
-		redtgt6.s6_addr16[1] = htons(ifp->if_index);
-	if (IN6_IS_ADDR_LINKLOCAL(&reddst6))
-		reddst6.s6_addr16[1] = htons(ifp->if_index);
+	/*
+	 * extract address parameters from the packet and convert them to a
+	 * sockaddr_in6 form.
+	 */
+	if (ip6_getpktaddrs(m, &src_sa, NULL))
+		goto freeit;
+	bzero(&redtgt6, sizeof(redtgt6));
+	bzero(&reddst6, sizeof(reddst6));
+	redtgt6.sin6_family = reddst6.sin6_family = AF_INET6;
+	redtgt6.sin6_len = reddst6.sin6_len = sizeof(struct sockaddr_in6);
+	redtgt6.sin6_addr = nd_rd->nd_rd_target;
+	reddst6.sin6_addr = nd_rd->nd_rd_dst;
+	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &redtgt6.sin6_addr,
+			    &redtgt6.sin6_scope_id) ||
+	    in6_addr2zoneid(m->m_pkthdr.rcvif, &reddst6.sin6_addr,
+			    &reddst6.sin6_scope_id)) {
+		goto freeit;	/* XXX impossible */
+	}
+	if (in6_embedscope(&redtgt6.sin6_addr, &redtgt6) ||
+	    in6_embedscope(&reddst6.sin6_addr, &reddst6)) {
+		goto freeit;	/* XXX impossible */
+	}
 
 	/* validation */
-	if (!IN6_IS_ADDR_LINKLOCAL(&src6)) {
+	if (!IN6_IS_ADDR_LINKLOCAL(&src_sa->sin6_addr)) {
 		nd6log((LOG_ERR,
 			"ICMP6 redirect sent from %s rejected; "
-			"must be from linklocal\n", ip6_sprintf(&src6)));
+			"must be from linklocal\n",
+			ip6_sprintf(&src_sa->sin6_addr)));
 		goto bad;
 	}
 	if (ip6->ip6_hlim != 255) {
 		nd6log((LOG_ERR,
 			"ICMP6 redirect sent from %s rejected; "
 			"hlim=%d (must be 255)\n",
-			ip6_sprintf(&src6), ip6->ip6_hlim));
+			ip6_sprintf(&src_sa->sin6_addr), ip6->ip6_hlim));
 		goto bad;
 	}
-    {
-	/* ip6->ip6_src must be equal to gw for icmp6->icmp6_reddst */
-	struct sockaddr_in6 sin6;
-	struct in6_addr *gw6;
 
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	bcopy(&reddst6, &sin6.sin6_addr, sizeof(reddst6));
-	rt = rtalloc1((struct sockaddr *)&sin6, 0
+	if (IN6_IS_ADDR_MULTICAST(&reddst6.sin6_addr)) {
+		nd6log((LOG_ERR,
+			"ICMP6 redirect rejected; "
+			"redirect dst must be unicast: %s\n",
+			icmp6_redirect_diag(src_sa, &reddst6, &redtgt6)));
+		goto bad;
+	}
+
+	/* ip6->ip6_src must be equal to gw for icmp6->icmp6_reddst */
+	rodst = reddst6; /* XXX: we don't need rodst if SCOPEDROUTING */
+#ifndef SCOPEDROUTING
+	rodst.sin6_scope_id = 0;
+#endif
+	rt = rtalloc1((struct sockaddr *)&rodst, 0
 #ifdef __FreeBSD__
 		      , 0UL
 #endif
 		      );
 	if (rt) {
+		struct sockaddr_in6 *gw6;
+
 		if (rt->rt_gateway == NULL ||
 		    rt->rt_gateway->sa_family != AF_INET6) {
 			nd6log((LOG_ERR,
 			    "ICMP6 redirect rejected; no route "
 			    "with inet6 gateway found for redirect dst: %s\n",
-			    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+			    icmp6_redirect_diag(src_sa, &reddst6, &redtgt6)));
 			RTFREE(rt);
 			goto bad;
 		}
 
-		gw6 = &(((struct sockaddr_in6 *)rt->rt_gateway)->sin6_addr);
-		if (bcmp(&src6, gw6, sizeof(struct in6_addr)) != 0) {
+		gw6 = (struct sockaddr_in6 *)rt->rt_gateway;
+		if (
+#ifdef SCOPEDROUTING
+			!SA6_ARE_ADDR_EQUAL(gw6, src_sa)
+#else
+			!IN6_ARE_ADDR_EQUAL(&gw6->sin6_addr,
+					    &src_sa->sin6_addr)
+#endif
+			) {
 			nd6log((LOG_ERR,
 				"ICMP6 redirect rejected; "
 				"not equal to gw-for-src=%s (must be same): "
 				"%s\n",
-				ip6_sprintf(gw6),
-				icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+				ip6_sprintf(&gw6->sin6_addr),
+				icmp6_redirect_diag(src_sa, &reddst6,
+						    &redtgt6)));
 			RTFREE(rt);
 			goto bad;
 		}
@@ -2716,30 +2747,22 @@ icmp6_redirect_input(m, off)
 		nd6log((LOG_ERR,
 			"ICMP6 redirect rejected; "
 			"no route found for redirect dst: %s\n",
-			icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+			icmp6_redirect_diag(src_sa, &reddst6, &redtgt6)));
 		goto bad;
 	}
 	RTFREE(rt);
 	rt = NULL;
-    }
-	if (IN6_IS_ADDR_MULTICAST(&reddst6)) {
-		nd6log((LOG_ERR,
-			"ICMP6 redirect rejected; "
-			"redirect dst must be unicast: %s\n",
-			icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
-		goto bad;
-	}
 
 	is_router = is_onlink = 0;
-	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6))
+	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6.sin6_addr))
 		is_router = 1;	/* router case */
-	if (bcmp(&redtgt6, &reddst6, sizeof(redtgt6)) == 0)
+	if (SA6_ARE_ADDR_EQUAL(&redtgt6, &reddst6))
 		is_onlink = 1;	/* on-link destination case */
 	if (!is_router && !is_onlink) {
 		nd6log((LOG_ERR,
 			"ICMP6 redirect rejected; "
 			"neither router case nor onlink case: %s\n",
-			icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+			icmp6_redirect_diag(src_sa, &reddst6, &redtgt6)));
 		goto bad;
 	}
 	/* validation passed */
@@ -2749,7 +2772,7 @@ icmp6_redirect_input(m, off)
 	if (nd6_options(&ndopts) < 0) {
 		nd6log((LOG_INFO, "icmp6_redirect_input: "
 			"invalid ND option, rejected: %s\n",
-			icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+			icmp6_redirect_diag(src_sa, &reddst6, &redtgt6)));
 		/* nd6_options have incremented stats */
 		goto freeit;
 	}
@@ -2768,13 +2791,15 @@ icmp6_redirect_input(m, off)
 		nd6log((LOG_INFO,
 			"icmp6_redirect_input: lladdrlen mismatch for %s "
 			"(if %d, icmp6 packet %d): %s\n",
-			ip6_sprintf(&redtgt6), ifp->if_addrlen, lladdrlen - 2,
-			icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+			ip6_sprintf(&redtgt6.sin6_addr),
+			ifp->if_addrlen, lladdrlen - 2,
+			icmp6_redirect_diag(src_sa, &reddst6, &redtgt6)));
 		goto bad;
 	}
 
 	/* RFC 2461 8.3 */
-	nd6_cache_lladdr(ifp, &redtgt6, lladdr, lladdrlen, ND_REDIRECT,
+	nd6_cache_lladdr(ifp, &redtgt6.sin6_addr, lladdr, lladdrlen,
+			 ND_REDIRECT,
 			 is_onlink ? ND_REDIRECT_ONLINK : ND_REDIRECT_ROUTER);
 
 	if (!is_onlink) {	/* better router case.  perform rtredirect. */
@@ -2808,15 +2833,14 @@ icmp6_redirect_input(m, off)
 		}
 #endif
 
-		bzero(&sdst, sizeof(sdst));
-		bzero(&sgw, sizeof(sgw));
-		bzero(&ssrc, sizeof(ssrc));
-		sdst.sin6_family = sgw.sin6_family = ssrc.sin6_family = AF_INET6;
-		sdst.sin6_len = sgw.sin6_len = ssrc.sin6_len =
-			sizeof(struct sockaddr_in6);
-		bcopy(&redtgt6, &sgw.sin6_addr, sizeof(struct in6_addr));
-		bcopy(&reddst6, &sdst.sin6_addr, sizeof(struct in6_addr));
-		bcopy(&src6, &ssrc.sin6_addr, sizeof(struct in6_addr));
+		sgw = redtgt6;
+		sdst = reddst6;
+		ssrc = *src_sa;
+#ifndef SCOPEDROUTING		/* XXX */
+		sgw.sin6_scope_id = sdst.sin6_scope_id =
+			ssrc.sin6_scope_id = 0;
+#endif
+
 		rtredirect((struct sockaddr *)&sdst, (struct sockaddr *)&sgw,
 			   (struct sockaddr *)NULL, RTF_GATEWAY | RTF_HOST,
 			   (struct sockaddr *)&ssrc,
@@ -2838,18 +2862,10 @@ icmp6_redirect_input(m, off)
 #endif
 	}
 	/* finally update cached route in each socket via pfctlinput */
-	{
-		struct sockaddr_in6 sdst;
-
-		bzero(&sdst, sizeof(sdst));
-		sdst.sin6_family = AF_INET6;
-		sdst.sin6_len = sizeof(struct sockaddr_in6);
-		bcopy(&reddst6, &sdst.sin6_addr, sizeof(struct in6_addr));
-		pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&sdst);
+	pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&reddst6);
 #ifdef IPSEC
-		key_sa_routechange((struct sockaddr *)&sdst);
+	key_sa_routechange((struct sockaddr *)&reddst6);
 #endif
-	}
 
  freeit:
 	m_freem(m);
