@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.44 2004/06/16 11:26:42 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.45 2004/06/16 11:55:36 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -293,7 +293,7 @@ certtest(ac, av)
 		}
 	    }
 
-		error = eay_check_x509cert(&c, certpath);
+		error = eay_check_x509cert(&c, certpath, 1);
 		if (error)
 			printf("ERROR: cert is invalid.\n");
 		printf("\n");
