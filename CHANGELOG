@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2261 2002/10/26 07:19:53 kjc Exp $
+$KAME: CHANGELOG,v 1.2262 2002/10/27 04:34:51 itojun Exp $
 
 <200210>
+Sun Oct 27 13:33:01 JST 2002  itojun@iijlab.net
+	* sys/net/if_sec.c: obsolete "pseudo-device sec" support.  the design
+	  does only half of what i intended to accomplish.
+
 Sat Oct 26 16:14:22 JST 2002	kjc@csl.sony.co.jp
 	* add a new queueing discipline, JoBS, to ALTQ
 	JoBS is contributed by Nicolas Christin <nicolas@cs.virginia.edu>
