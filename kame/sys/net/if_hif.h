@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.15 2003/07/07 11:39:06 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.16 2003/07/24 07:11:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,11 +101,11 @@ struct hif_ifreq {
 	} ifr_ifru;
 };
 
-struct hif_subnet {
-	TAILQ_ENTRY(hif_subnet) hs_entry;
-	struct mip6_subnet      *hs_ms;
+struct hif_ha {
+	LIST_ENTRY(hif_ha) hha_entry;
+	struct mip6_ha     *hha_mha;
 };
-TAILQ_HEAD(hif_subnet_list, hif_subnet);
+LIST_HEAD(hif_ha_list, hif_ha);
 
 struct hif_softc {
 	struct ifnet hif_if;
@@ -113,10 +113,8 @@ struct hif_softc {
 	int                    hif_location;             /* cur location */
 	int                    hif_location_prev; /* XXX */
 	LIST_HEAD(mip6_bu_list, mip6_bu) hif_bu_list;    /* list of BUs */
-	struct hif_subnet_list hif_hs_list_home;
-	struct hif_subnet_list hif_hs_list_foreign;
-	struct hif_subnet      *hif_hs_current;
-	struct hif_subnet      *hif_hs_prev;
+	struct hif_ha_list     hif_ha_list_home;
+	struct hif_ha_list     hif_ha_list_foreign;
 	u_int16_t              hif_dhaad_id;
 	long                   hif_dhaad_lastsent;
 	u_int8_t               hif_dhaad_count;
@@ -130,34 +128,26 @@ extern struct sockaddr_in6 hif_coa;
 extern struct hif_softc_list hif_softc_list;
 extern struct hif_coa_list hif_coa_list;
 
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-int hif_ioctl				__P((struct ifnet *, int, caddr_t));
-#else
-int hif_ioctl				__P((struct ifnet *, u_long, caddr_t));
-#endif
-int hif_output				__P((struct ifnet *, struct mbuf *,
-					     struct sockaddr *,
-					     struct rtentry *));
-void hif_save_location __P((void));
-void hif_restore_location __P((void));
-
-/* hif_subnet management. */
-struct hif_subnet *hif_subnet_create	__P((struct mip6_subnet *));
-int hif_subnet_list_insert		__P((struct hif_subnet_list *,
-					     struct hif_subnet *));
-int hif_subnet_list_remove		__P((struct hif_subnet_list *,
-					      struct hif_subnet *));
-int hif_subnet_list_remove_all		__P((struct hif_subnet_list *));
-struct hif_subnet *hif_subnet_list_find_withprefix
-					__P((struct hif_subnet_list *,
-					     struct sockaddr_in6 *,
-					     u_int8_t));
-struct hif_subnet *hif_subnet_list_find_withhaaddr
-					__P((struct hif_subnet_list *,
-					     struct sockaddr_in6 *));
-
-
 struct hif_softc *hif_list_find_withhaddr __P((struct sockaddr_in6 *));
+
+int hif_ioctl(struct ifnet *, u_long, caddr_t);
+int hif_output(struct ifnet *, struct mbuf *, struct sockaddr *,
+    struct rtentry *);
+void hif_save_location(void);
+void hif_restore_location(void);
+
+struct hif_ha *hif_ha_list_insert(struct hif_ha_list *,	struct mip6_ha *);
+void hif_ha_list_remove(struct hif_ha_list *, struct hif_ha *);
+struct mip6_ha *hif_ha_list_find_withprefix(struct hif_ha_list *,
+    struct sockaddr_in6 *, int);
+struct mip6_ha *hif_ha_list_find_withaddr(struct hif_ha_list *,
+    struct sockaddr_in6 *);
+struct mip6_ha *hif_ha_list_find_withmpfx(struct hif_ha_list *,
+    struct mip6_prefix *);
+struct mip6_ha *hif_ha_list_find_withmha(struct hif_ha_list *,
+    struct mip6_ha *);
+struct mip6_ha *hif_ha_list_find_preferable(struct hif_ha_list *,
+    struct mip6_prefix *);
 
 #endif /* _KERNEL */
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.15 2003/07/23 04:56:17 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.16 2003/07/24 07:11:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -311,20 +311,16 @@ mip6_ioctl(cmd, data)
 			for (sc = TAILQ_FIRST(&hif_softc_list);
 			     sc;
 			     sc = TAILQ_NEXT(sc, hif_entry)) {
-				struct mip6_subnet *ms;
-
 				mip6_detach_haddrs(sc);
 				mip6_bu_list_remove_all(&sc->hif_bu_list, 1);
-				hif_subnet_list_remove_all(
-					&sc->hif_hs_list_home);
-				hif_subnet_list_remove_all(
-					&sc->hif_hs_list_foreign);
-				while (!LIST_EMPTY(&mip6_subnet_list)) {
-					ms = LIST_FIRST(&mip6_subnet_list);
-					mip6_subnet_list_remove(
-						&mip6_subnet_list,
-						ms);
-				}
+				while (!LIST_EMPTY(&mip6_prefix_list))
+					mip6_prefix_list_remove(
+					    &mip6_prefix_list,
+					    LIST_FIRST(&mip6_prefix_list));
+				while (!LIST_EMPTY(&mip6_ha_list))
+					mip6_ha_list_remove(
+					    &mip6_ha_list,
+					    LIST_FIRST(&mip6_ha_list));
 			}
 			bzero(&hif_coa, sizeof(hif_coa));
 			hif_coa.sin6_len = sizeof(hif_coa);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.47 2003/07/09 09:39:25 sakane Exp $	*/
+/*	$KAME: ip6.h,v 1.48 2003/07/24 07:11:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -439,7 +439,7 @@ struct ip6m_opt {
 struct ip6m_opt_altcoa {
 	u_int8_t ip6moa_type;
 	u_int8_t ip6moa_len;
-	u_int8_t ip6moa_addr[16];		/* Alternate Care-of Address */
+	u_int8_t ip6moa_addr[16];	/* Alternate Care-of Address */
 } __attribute__((__packed__));
 
 /* Nonce Indices */

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.48 2003/07/07 11:39:06 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.49 2003/07/24 07:11:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -152,7 +152,7 @@ t.
 
 #if NHIF > 0
 
-static int hif_subnet_list_update_withmpfx __P((struct hif_softc *, caddr_t));
+static int hif_ha_list_update_withmpfx __P((struct hif_softc *, caddr_t));
 static int hif_ha_list_update_withioctl __P((struct hif_softc *, caddr_t));
 
 struct sockaddr_in6 hif_coa;
@@ -223,10 +223,6 @@ hifattach(dummy)
 
 		/* Initialize home prefix list, HA list, BU list */
 		LIST_INIT(&sc->hif_bu_list);
-		TAILQ_INIT(&sc->hif_hs_list_home);
-		TAILQ_INIT(&sc->hif_hs_list_foreign);
-		sc->hif_hs_current = NULL;
-		sc->hif_hs_prev = NULL;
 
 		sc->hif_dhaad_id = 0;
 		sc->hif_dhaad_lastsent = 0;
@@ -287,40 +283,37 @@ hif_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCAHOMEPREFIX_HIF:
-		error = hif_subnet_list_update_withmpfx(sc, data);
+		error = hif_ha_list_update_withmpfx(sc, data);
 		break;
 
 	case SIOCGHOMEPREFIX_HIF:
 		{
-			struct hif_subnet *hs;
-			struct mip6_subnet *ms;
-			struct mip6_subnet_prefix *mspfx;
-			struct mip6_prefix *mpfx = hifr->ifr_ifru.ifr_mpfx;
+			struct mip6_prefix_ha *mpfxha;
+			struct mip6_prefix *mpfx, *retmpfx;
 			int i;
 
+			retmpfx = hifr->ifr_ifru.ifr_mpfx;
 			i = 0;
-			for (hs = TAILQ_FIRST(&sc->hif_hs_list_home);
-			     hs;
-			     hs = TAILQ_NEXT(hs, hs_entry)) {
-				ms = hs->hs_ms;
-				if (ms == NULL) {
-					error = EINVAL;
-					goto hif_ioctl_done;
-				}
-				for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
-				     mspfx;
-				     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
-					if (mspfx->mspfx_mpfx == NULL) {
-						error = EINVAL;
-						goto hif_ioctl_done;
+			for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+			    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
+				for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list);
+				    mpfxha;
+				    mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+					if (mpfxha->mpfxha_mha == NULL)
+						continue;
+					if (hif_ha_list_find_withmha(
+					    &sc->hif_ha_list_home,
+					    mpfxha->mpfxha_mha)) {
+						*retmpfx = *mpfx;
+						i++;
+						if (i > hifr->ifr_count)
+							goto ghomeprefix_done;
+						retmpfx++;
+						break;
 					}
-					*mpfx = *mspfx->mspfx_mpfx;
-					i++;
-					if (i > hifr->ifr_count)
-						goto ghomeprefix_done;
-					mpfx++;
-				}
+				}	
 			}
+			     
 		ghomeprefix_done:
 			hifr->ifr_count = i;
 		}
@@ -333,41 +326,29 @@ hif_ioctl(ifp, cmd, data)
 
 	case SIOCGHOMEAGENT_HIF:
 		{
-			struct hif_subnet_list *hs_list;
-			struct hif_subnet *hs;
-			struct mip6_subnet *ms;
-			struct mip6_subnet_ha *msha;
-			struct mip6_ha *mha = hifr->ifr_ifru.ifr_mha;
+			struct hif_ha *hha;
+			struct mip6_ha *retmha;
 			int i;
 
 			i = 0;
-			hs_list = &sc->hif_hs_list_home;
-			for (hs = TAILQ_FIRST(hs_list); hs;
-			     hs = TAILQ_NEXT(hs, hs_entry)) {
-				ms = hs->hs_ms;
-				for (msha = TAILQ_FIRST(&ms->ms_msha_list);
-				     msha;
-				     msha = TAILQ_NEXT(msha, msha_entry)) {
-					*mha = *msha->msha_mha;
-					i++;
-					if (i > hifr->ifr_count)
-						goto ghomeagent_done;
-					mha++;
-				}
+			retmha = hifr->ifr_ifru.ifr_mha;
+			for (hha = LIST_FIRST(&sc->hif_ha_list_home); hha;
+			    hha = LIST_NEXT(hha, hha_entry)) {
+				if (hha->hha_mha == NULL)
+					continue;
+				*retmha = *hha->hha_mha;
+				i++;
+				if (i > hifr->ifr_count)
+					goto ghomeagent_done;
+				retmha++;
 			}
-			hs_list = &sc->hif_hs_list_foreign;
-			for (hs = TAILQ_FIRST(hs_list); hs;
-			     hs = TAILQ_NEXT(hs, hs_entry)) {
-				ms = hs->hs_ms;
-				for (msha = TAILQ_FIRST(&ms->ms_msha_list);
-				     msha;
-				     msha = TAILQ_NEXT(msha, msha_entry)) {
-					*mha = *msha->msha_mha;
-					i++;
-					if (i > hifr->ifr_count)
-						goto ghomeagent_done;
-					mha++;
-				}
+			for (hha = LIST_FIRST(&sc->hif_ha_list_foreign); hha;
+			    hha = LIST_NEXT(hha, hha_entry)) {
+				*retmha = *hha->hha_mha;
+				i++;
+				if (i > hifr->ifr_count)
+					goto ghomeagent_done;
+				retmha++;
 			}
 		ghomeagent_done:
 			hifr->ifr_count = i;
@@ -426,7 +407,6 @@ hif_save_location(void)
 	     sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		sc->hif_location_prev = sc->hif_location;
-		sc->hif_hs_prev = sc->hif_hs_current;
 	}
 }
 
@@ -439,166 +419,155 @@ hif_restore_location(void)
 	     sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		sc->hif_location = sc->hif_location_prev;
-		sc->hif_hs_current = sc->hif_hs_prev;
 	}
 }
 
-struct hif_subnet *
-hif_subnet_create(ms)
-     struct mip6_subnet *ms;
+struct hif_ha *
+hif_ha_list_insert(hha_list, mha)
+	struct hif_ha_list *hha_list;
+	struct mip6_ha *mha;
 {
-	struct hif_subnet *hs;
+	struct hif_ha *hha;
 
-	MALLOC(hs, struct hif_subnet *, sizeof(struct hif_subnet),
-	       M_TEMP, M_NOWAIT);
-	if (hs == NULL) {
-		mip6log((LOG_ERR, "%s:%d: hif_subnet memory allocation failed.\n",
-			 __FILE__, __LINE__));
+	MALLOC(hha, struct hif_ha *, sizeof(struct hif_ha), M_TEMP, M_NOWAIT);
+	if (hha == NULL) {
+		mip6log((LOG_ERR, "%s:%d: memory allocation failed.\n",
+		    __FILE__, __LINE__));
 		return (NULL);
 	}
-	hs->hs_ms = ms;
-
-	return (hs);
+	hha->hha_mha = mha;
+	MIP6_HA_REF(mha);
+	LIST_INSERT_HEAD(hha_list, hha, hha_entry);
+	return (hha);
 }
 
-int
-hif_subnet_list_insert(hs_list, hs)
-     struct hif_subnet_list *hs_list;
-     struct hif_subnet *hs;
+void
+hif_ha_list_remove(hha_list, hha)
+	struct hif_ha_list *hha_list;
+	struct hif_ha *hha;
 {
-	struct mip6_subnet* ms;
-
-	if ((hs_list == NULL) || (hs == NULL) || (hs->hs_ms == NULL)) {
-		return (EINVAL);
-	}
-
-	ms = hs->hs_ms;
-	if (ms ==  NULL) {
-		mip6log((LOG_ERR, "%s:%d: invalid mip6_subnet pointer.\n",
-			 __FILE__, __LINE__));
-		return (EINVAL);
-	}
-
-	ms->ms_refcnt++;
-	TAILQ_INSERT_TAIL(hs_list, hs, hs_entry);
-
-	return (0);
+	LIST_REMOVE(hha, hha_entry);
+	MIP6_HA_FREE(hha->hha_mha);
+	FREE(hha, M_TEMP);
 }
 
-int
-hif_subnet_list_remove(hs_list, hs)
-     struct hif_subnet_list *hs_list;
-     struct hif_subnet *hs;
+/*
+ * return the pointer of the entity of mip6_ha structure advertising
+ * the specified prefix, which is listed in hif_ha_list structure.
+ * even if there are more than one entitiy, return the first found
+ * one.
+ */
+struct mip6_ha *
+hif_ha_list_find_withprefix(hif_ha_list, prefix, prefixlen)
+	struct hif_ha_list *hif_ha_list;
+	struct sockaddr_in6 *prefix;
+	int prefixlen;
 {
-	struct mip6_subnet *ms;
+	struct hif_ha *hha;
+	struct mip6_prefix_ha *mpfxha;
+	struct mip6_prefix *mpfx;
 
-	if ((hs_list == NULL) || (hs == NULL) || (hs->hs_ms == NULL)) {
-		return (EINVAL);
-	}
-	
-	ms = hs->hs_ms;
-	TAILQ_REMOVE(hs_list, hs, hs_entry);
-	FREE(hs, M_TEMP);
-
-	/*
-	 * do not remove mip6_subnet pointed from this hif_subnet,
-	 * because mip6_subnet may be pointed from another hif_subnet.
-	 * only refcnt is decremented.
-	 * mip6_subnet is deleted by timer function.
-	 */
-	ms->ms_refcnt--;
-	if (ms->ms_refcnt < 0) {
-		/* must not happen. */
-		return (EINVAL);
-	}
-
-	return (0);
-}
-
-int
-hif_subnet_list_remove_all(hs_list)
-	struct hif_subnet_list *hs_list;
-{
-	struct hif_subnet *hs;
-	int error = 0;
-
-	while ((hs = TAILQ_FIRST(hs_list)) != NULL) {
-		error = hif_subnet_list_remove(hs_list, hs);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: "
-				 "removing hif_subnet from hif_list failed.\n",
-				 __FILE__, __LINE__));
-			return (EINVAL);
+	for (hha = LIST_FIRST(hif_ha_list); hha;
+	    hha = LIST_NEXT(hha, hha_entry)) {
+		if (hha->hha_mha == NULL)
+			continue;
+		for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+		    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
+			if (!in6_are_prefix_equal(&mpfx->mpfx_prefix.sin6_addr,
+				&prefix->sin6_addr, prefixlen))
+				continue;
+			for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
+			    mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+				if (mpfxha->mpfxha_mha == NULL)
+					continue;
+				if (hha->hha_mha == mpfxha->mpfxha_mha) {
+					/* found. */
+					return (hha->hha_mha);
+				}
+			}
 		}
 	}
-
-	return (0);
-}
-
-struct hif_subnet *
-hif_subnet_list_find_withprefix(hs_list, prefix, prefixlen)
-     struct hif_subnet_list *hs_list;
-     struct sockaddr_in6 *prefix;
-     u_int8_t prefixlen;
-{
-	struct hif_subnet *hs;
-	struct mip6_subnet *ms;
-
-	/*
-	 * walk hif_subnet_list and check each mip6_subnet (which is a
-	 * member of hif_subnet as a pointer) if it contains specified
-	 * prefix or not.
-	 */
-	for (hs = TAILQ_FIRST(hs_list); hs; hs = TAILQ_NEXT(hs, hs_entry)) {
-		if ((ms = hs->hs_ms) == NULL) {
-			/* this must not happen. */
-			mip6log((LOG_ERR,
-				 "%s:%d: hs_ms is a NULL pointer.\n",
-				 __FILE__, __LINE__));
-			return (NULL);
-		}
-		if (mip6_subnet_prefix_list_find_withprefix(&ms->ms_mspfx_list,
-							    prefix,
-							    prefixlen)) {
-			/* found. */
-			return (hs);
-		}
-	}
-
 	/* not found. */
 	return (NULL);
 }
 
-struct hif_subnet *
-hif_subnet_list_find_withhaaddr(hs_list, haaddr)
-     struct hif_subnet_list *hs_list;
-     struct sockaddr_in6 *haaddr;
+/*
+ * return the pointer of the entity of mip6_ha structure which has the
+ * specified address (either link-local address or global address).
+ * even if there are more than one entitiy, return the first found
+ * one.
+ */    
+struct mip6_ha *
+hif_ha_list_find_withaddr(hif_ha_list, addr)
+	struct hif_ha_list *hif_ha_list;
+	struct sockaddr_in6 *addr;
 {
-	struct hif_subnet *hs;
-	struct mip6_subnet *ms;
+	struct hif_ha *hha;
 
-	if ((hs_list == NULL) || (haaddr == NULL)) {
-		return (NULL);
+	for (hha = LIST_FIRST(hif_ha_list); hha;
+	    hha = LIST_NEXT(hha, hha_entry)) {
+		if (hha->hha_mha == NULL)
+			continue;
+		if (SA6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_lladdr, addr))
+			return (hha->hha_mha);
+		/* XXX for each gaddr. */
+		if (SA6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_gaddr, addr))
+			return (hha->hha_mha);
 	}
-
-	for (hs = TAILQ_FIRST(hs_list); hs; hs = TAILQ_NEXT(hs, hs_entry)) {
-		ms = hs->hs_ms;
-		if (ms == NULL) {
-			/* must not happen. */
-			mip6log((LOG_ERR,
-				 "%s:%d: hs_ms is a NULL pointer.\n",
-				 __FILE__, __LINE__));
-			return (NULL);
-		}
-		if (mip6_subnet_ha_list_find_withhaaddr(&ms->ms_msha_list,
-							haaddr)) {
-			/* found. */
-			return (hs);
-		}
-	}
-
 	/* not found. */
+	return (NULL);
+}
+
+struct mip6_ha *
+hif_ha_list_find_withmpfx(hif_ha_list, mpfx)
+	struct hif_ha_list *hif_ha_list;
+	struct mip6_prefix *mpfx;
+{
+	struct mip6_prefix_ha *mpfxha;
+	struct mip6_ha *mha;
+
+	for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
+	     mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+		if (mpfxha->mpfxha_mha == NULL)
+			continue;
+		mha = hif_ha_list_find_withmha(hif_ha_list,
+		    mpfxha->mpfxha_mha);
+		if (mha)
+			return (mha);
+	}
+	/* not found. */
+	return (NULL);
+}
+
+struct mip6_ha *
+hif_ha_list_find_withmha(hif_ha_list, mha)
+	struct hif_ha_list *hif_ha_list;
+	struct mip6_ha *mha;
+{
+	struct hif_ha *hha;
+
+	for (hha = LIST_FIRST(hif_ha_list); hha;
+	    hha = LIST_NEXT(hha, hha_entry)) {
+		if (hha->hha_mha == NULL)
+			continue;
+		if (hha->hha_mha == mha)
+			return (hha->hha_mha);
+	}
+	/* not found. */
+	return (NULL);
+}
+
+struct mip6_ha *
+hif_ha_list_find_preferable(hif_ha_list, mpfx)
+	struct hif_ha_list *hif_ha_list;
+	struct mip6_prefix *mpfx;
+{
+	struct hif_ha *hha;
+
+	/* XXX */
+	hha = LIST_FIRST(hif_ha_list);
+	if (hha)
+		return(hha->hha_mha);
 	return (NULL);
 }
 
@@ -608,9 +577,6 @@ hif_ha_list_update_withioctl(sc, data)
      caddr_t data;
 {
 	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
-	struct hif_subnet *hs;
-	struct mip6_subnet *ms;
-	struct mip6_subnet_ha *msha;
 	struct mip6_ha *nmha = (struct mip6_ha *)data;
 	struct mip6_ha *mha;
 	int error = 0;
@@ -625,67 +591,20 @@ hif_ha_list_update_withioctl(sc, data)
 		return (EINVAL);
 	}
 
-	hs = hif_subnet_list_find_withhaaddr(&sc->hif_hs_list_home,
-					     &nmha->mha_lladdr);
-	if (hs == NULL) {
-		/* find mip6_subnet that includes this ha's prefix. */
-		hs = hif_subnet_list_find_withprefix(&sc->hif_hs_list_home,
-						     &nmha->mha_gaddr,
-						     64); /* XXX */
-		if (hs == NULL) {
-			/*
-			 * there is no mip6_subnet that has the same
-			 * prefix with this updating homeagent.
-			 */
-			mip6log((LOG_ERR,
-				 "%s:%d: no hif_subnet.  you must specify "
-				 "at least one prefix before setting "
-				 "a home agent manually.\n",
-				 __FILE__, __LINE__));
-			return (EINVAL);
-		}
-	}
-	if ((ms = hs->hs_ms) == NULL) {
-		/* must not happen. */
-		return (EINVAL);
-	}
-	
-	msha = mip6_subnet_ha_list_find_withhaaddr(&ms->ms_msha_list,
-						   &nmha->mha_lladdr);
-	if (msha == NULL) {
-		mha = mip6_ha_create(&nmha->mha_lladdr,
-				     &nmha->mha_gaddr,
-				     nmha->mha_flags,
-				     nmha->mha_pref,
-				     nmha->mha_lifetime);
+	mha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home,
+	    &nmha->mha_lladdr);
+	if (mha == NULL) {
+		mha = mip6_ha_create(&nmha->mha_lladdr, &nmha->mha_gaddr,
+		    nmha->mha_flags, nmha->mha_pref, nmha->mha_lifetime);
 		if (mha == NULL) {
 			mip6log((LOG_ERR,
-				 "%s:%d: mip6_ha memory allocation failed.\n",
-				 __FILE__, __LINE__));
+			    "%s:%d: mip6_ha memory allocation failed.\n",
+			    __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 		error = mip6_ha_list_insert(&mip6_ha_list, mha);
 		if (error) {
 			return (error);
-		}
-		msha = mip6_subnet_ha_create(mha);
-		if (msha == NULL) {
-			mip6log((LOG_ERR,
-				 "%s:%d: mip6_subnet_ha memory allocation "
-				 "failed.\n",
-				 __FILE__, __LINE__));
-			return (ENOMEM);
-		}
-		error = mip6_subnet_ha_list_insert(&ms->ms_msha_list, msha);
-		if (error) {
-			return (error);
-		}
-	} else {
-		/* there is mip6_subnet_ha. */
-		mha = msha->msha_mha;
-		if (mha == NULL) {
-			/* must not happen. */
-			return (EINVAL);
 		}
 	}
 
@@ -704,46 +623,39 @@ hif_list_find_withhaddr(haddr)
      struct sockaddr_in6 *haddr;
 {
 	struct hif_softc *sc;
-	struct hif_subnet *hs;
-	struct mip6_subnet *ms;
-	struct mip6_subnet_prefix *mspfx;
 	struct mip6_prefix *mpfx;
+	struct mip6_prefix_ha *mpfxha;
 
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		for (hs = TAILQ_FIRST(&sc->hif_hs_list_home); hs;
-		     hs = TAILQ_NEXT(hs, hs_entry)) {
-			if ((ms = hs->hs_ms) == NULL)
+	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
+		if (!SA6_ARE_ADDR_EQUAL(&mpfx->mpfx_haddr, haddr))
+			continue;
+		for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
+		     mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+			if (mpfxha->mpfxha_mha == NULL)
 				continue;
-			for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list); mspfx;
-			     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
-				if((mpfx = mspfx->mspfx_mpfx) == NULL)
-					continue;
-				if (SA6_ARE_ADDR_EQUAL(haddr,
-						       &mpfx->mpfx_haddr)) {
-					/* found. */
-					return (sc);
-				}
+			for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+			    sc = TAILQ_NEXT(sc, hif_entry)) {
+				if (hif_ha_list_find_withmha(
+				    &sc->hif_ha_list_home,
+				    mpfxha->mpfxha_mha))
+				    return (sc);
 			}
 		}
 	}
-
 	/* not found. */
 	return (NULL);
 }
 
 static int
-hif_subnet_list_update_withmpfx(sc, data)
+hif_ha_list_update_withmpfx(sc, data)
      struct hif_softc *sc;
      caddr_t data;
 {
-	struct hif_softc *othersc;
 	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
-	struct hif_subnet *hs;
-	struct mip6_subnet *ms;
-	struct mip6_prefix *nmpfx;
-	struct mip6_prefix *mpfx;
-	struct mip6_subnet_prefix *mspfx;
+	struct mip6_prefix *nmpfx, *mpfx;
+	int mpfx_is_new = 0;
+	struct mip6_ha *mha;
 	int error = 0;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
@@ -756,134 +668,39 @@ hif_subnet_list_update_withmpfx(sc, data)
 		return (EINVAL);
 	}
 
-	hs = hif_subnet_list_find_withprefix(&sc->hif_hs_list_home,
-					     &nmpfx->mpfx_prefix,
-					     nmpfx->mpfx_prefixlen);
-	if (hs == NULL) {
-		/* find mip6_subnet that includes this prefix. */
-		ms = mip6_subnet_list_find_withprefix(&mip6_subnet_list,
-						      &nmpfx->mpfx_prefix,
-						      nmpfx->mpfx_prefixlen);
-		if (ms == NULL) {
-			ms = mip6_subnet_create();
-			if (ms == NULL) {
-				mip6log((LOG_ERR,
-					 "%s:%d: mip6_subnet memory allocation "
-					 "failed.\n",
-					 __FILE__, __LINE__));
-				return (ENOMEM);
-			}
-			error = mip6_subnet_list_insert(&mip6_subnet_list,
-							ms);
-			if (error) {
-				return (error);
-			}
-
-			mpfx = mip6_prefix_create(&nmpfx->mpfx_prefix,
-						  nmpfx->mpfx_prefixlen,
-						  nmpfx->mpfx_vltime,
-						  nmpfx->mpfx_pltime);
-			if (mpfx == NULL) {
-				mip6log((LOG_ERR,
-					 "%s:%d: mip6_prefix memory allocation "
-					 "failed.\n",
-					 __FILE__, __LINE__));
-				return (ENOMEM);
-			}
-			error = mip6_prefix_list_insert(&mip6_prefix_list,
-							mpfx);
-			if (error) {
-				return (error);
-			}
-
-			mspfx = mip6_subnet_prefix_create(mpfx);
-			if (mspfx == NULL) {
-				mip6log((LOG_ERR,
-					 "%s:%d: mip6_subnet_prefix memory "
-					 "allocation failed.\n",
-					 __FILE__, __LINE__));
-				return (ENOMEM);
-			}
-			error = mip6_subnet_prefix_list_insert(&ms->ms_mspfx_list,
-							       mspfx);
-			if (error) {
-				return (error);
-			}
-
-			/*
-			 * add this newly created mip6_subnet into the
-			 * other hif interface's foreign subnet list.
-			 */
-			for (othersc = TAILQ_FIRST(&hif_softc_list); othersc;
-			     othersc = TAILQ_NEXT(othersc, hif_entry)) {
-				if (othersc == sc)
-					continue;
-				hs = hif_subnet_create(ms);
-				if (hs == NULL) {
-					return (ENOMEM);
-				}
-				error = hif_subnet_list_insert(&othersc->hif_hs_list_foreign,
-							       hs);
-				if (error)
-					return (error);
-			}
-		} else {
-			/*
-			 * there is a mip6_subnet which contains specified
-			 * prefix.
-			 */
-			mspfx = mip6_subnet_prefix_list_find_withprefix
-				(&ms->ms_mspfx_list,
-				 &nmpfx->mpfx_prefix,
-				 nmpfx->mpfx_prefixlen);
-			if (mspfx == NULL) {
-				/* this must not happen. */
-				return (EINVAL);
-			}
-			mpfx = mspfx->mspfx_mpfx;
-			if (mpfx == NULL) {
-				return (EINVAL);
-			}
-			mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
-			mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
-			mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
-			mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
-		}
-		hs = hif_subnet_create(ms);
-		if (hs == NULL) {
+	mpfx = mip6_prefix_list_find(nmpfx);
+	if (mpfx == NULL) {
+		mpfx = mip6_prefix_create(&nmpfx->mpfx_prefix,
+		    nmpfx->mpfx_prefixlen, nmpfx->mpfx_vltime,
+		    nmpfx->mpfx_pltime);
+		if (mpfx == NULL) {
 			mip6log((LOG_ERR,
-				 "%s:%d: hif_subnet memory allocation failed.\n",
-				 __FILE__, __LINE__));
+			    "%s:%d: mip6_prefix memory allocation failed.\n",
+			     __FILE__, __LINE__));
 			return (ENOMEM);
 		}
-		error = hif_subnet_list_insert(&sc->hif_hs_list_home,
-					       hs);
+		mpfx_is_new = 1;
+		error = mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
 		if (error) {
 			return (error);
 		}
-	} else {
-		/* there is a hif_subnet that contains specified prefix. */
-		ms = hs->hs_ms;
-		if (ms == NULL) {
-			/* must not happen. */
-			return (EINVAL);
-		}
-		mspfx = mip6_subnet_prefix_list_find_withprefix
-			(&ms->ms_mspfx_list,
-			 &nmpfx->mpfx_prefix,
-			 nmpfx->mpfx_prefixlen);
-		if (mspfx == NULL) {
-			return (EINVAL);
-		}
-		mpfx = mspfx->mspfx_mpfx;
-		if (mpfx == NULL) {
-			return (EINVAL);
-		}
-		mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
-		mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
-		mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
-		mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 	}
+
+	mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
+	mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
+	mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
+	mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
+
+	if (mpfx_is_new) {
+		mha = hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx);
+		if (mha == NULL) {
+			mha = mip6_ha_create(&sa6_any, NULL, 0, 0,
+			    MIP6_HA_DEFAULT_LIFETIME);
+			hif_ha_list_insert(&sc->hif_ha_list_home, mha);
+		}
+		mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
+	}
+
 	return (0);
 }
 

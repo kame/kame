@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.2 2003/06/03 06:44:36 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.3 2003/07/24 07:11:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -151,6 +151,7 @@ mip6_ha_list_insert(mha_list, mha)
 	}
 
 	LIST_INSERT_HEAD(mha_list, mha, mha_entry);
+	MIP6_HA_REF(mha);
 
 	return (0);
 }
@@ -160,31 +161,16 @@ mip6_ha_list_remove(mha_list, mha)
 	struct mip6_ha_list *mha_list;
 	struct mip6_ha *mha;
 {
-	struct mip6_subnet *ms;
-	struct mip6_subnet_ha *msha;
-
 	if ((mha_list == NULL) || (mha == NULL)) {
 		return (EINVAL);
 	}
 
+#ifdef MIP6_DEBUG
 	mip6_ha_print(mha);
-
-	/* walk all mip6_subnet and remove corresponding mip6_ha pointers. */
-	for (ms = LIST_FIRST(&mip6_subnet_list); ms;
-	     ms = LIST_NEXT(ms, ms_entry)) {
-		msha = mip6_subnet_ha_list_find_withmha(&ms->ms_msha_list, mha);
-		if (msha) {
-			/*
-			 * do not call mip6_subnet_ha_list_remove().
-			 * otherwise, you will fall into an infinite loop...
-			 */
-			TAILQ_REMOVE(&ms->ms_msha_list, msha, msha_entry);
-			FREE(msha, M_TEMP);
-		}
-	}
+#endif
 
 	LIST_REMOVE(mha, mha_entry);
-	FREE(mha, M_TEMP);
+	MIP6_HA_FREE(mha);
 
 	return (0);
 }
@@ -195,9 +181,6 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	struct nd_defrouter *dr;
 	struct nd_opt_homeagent_info *hai;
 {
-#if 0
-	struct in6_addr lladdr;
-#endif
 	int16_t pref = 0;
 	u_int16_t lifetime;
 	struct mip6_ha *mha;
@@ -218,11 +201,6 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	}
 
 	/* find an exising entry. */
-#if 0
-	lladdr = dr->rtaddr.sin6_addr; /* XXX: scope */
-	/* XXX: KAME link-local hack; remove ifindex */
-	lladdr.s6_addr16[1] = 0;
-#endif
 	mha = mip6_ha_list_find_withaddr(mha_list, &dr->rtaddr);
 	if (mha == NULL) {
 		/* an entry must exist at this point. */

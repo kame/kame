@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.68 2003/05/09 19:33:26 t-momose Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.69 2003/07/24 07:11:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -498,12 +498,14 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 						    haaddrptr);
 			in6_addr2zoneid(m->m_pkthdr.rcvif, &lladdr.sin6_addr,
 					&lladdr.sin6_scope_id);
+			in6_embedscope(&lladdr.sin6_addr, &lladdr);
 			bzero(&haaddr, sizeof(haaddr));
 			haaddr.sin6_len = sizeof(haaddr);
 			haaddr.sin6_family = AF_INET6;
 			haaddr.sin6_addr = *haaddrptr;
 			in6_addr2zoneid(m->m_pkthdr.rcvif, &haaddr.sin6_addr,
 					&haaddr.sin6_scope_id);
+			in6_embedscope(&haaddr.sin6_addr, &haaddr);
 			mha = mip6_ha_create(&lladdr, &haaddr,
 					     ND_RA_FLAG_HOME_AGENT,
 					     0, MIP6_HA_DEFAULT_LIFETIME);
@@ -564,37 +566,16 @@ mip6_dhaad_ha_list_insert(sc, mha)
 	struct hif_softc *sc;
 	struct mip6_ha *mha;
 {
-	struct hif_subnet *hs;
-	struct mip6_subnet *ms;
-	struct mip6_subnet_ha *msha;
-	int error = 0;
+	struct mip6_prefix *mpfx;
 
-	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
-	if (hs == NULL) {
-		/* must not happen. */
-		mip6log((LOG_ERR,
-			 "%s:%d: receive a DHAAD reply.  "
-			 "but we have no home subnet???\n",
-			 __FILE__, __LINE__));
-		return (EINVAL);
-	}
-	if ((ms = hs->hs_ms) == NULL)
-		return (EINVAL);
+	hif_ha_list_insert(&sc->hif_ha_list_home, mha);
 
-	msha = mip6_subnet_ha_create(mha);
-	if (msha == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: can't create msha\n",
-			 __FILE__, __LINE__));
-		return (ENOMEM);
-	}
-
-	error = mip6_subnet_ha_list_insert(&ms->ms_msha_list, msha);
-	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: insert msha entry to msha_list failed.\n",
-			 __FILE__, __LINE__));
-		return (EINVAL);
+	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
+		if (in6_are_prefix_equal(&mha->mha_gaddr.sin6_addr,
+		    &mpfx->mpfx_prefix.sin6_addr, mpfx->mpfx_prefixlen)) {
+			mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
+		}
 	}
 
 	return (0);
@@ -605,8 +586,6 @@ mip6_icmp6_dhaad_req_output(sc)
 	struct hif_softc *sc;
 {
 	struct sockaddr_in6 haanyaddr;
-	struct hif_subnet *hs;
-	struct mip6_subnet_prefix *mspfx;
 	struct mip6_prefix *mpfx;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
@@ -617,13 +596,6 @@ mip6_icmp6_dhaad_req_output(sc)
 	long time_second = time.tv_sec;
 #endif
 
-	/* pick up one home subnet. */
-	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
-	if ((hs == NULL) || (hs->hs_ms == NULL)) {
-		/* we must have at least one home subnet. */
-		return (EINVAL);
-	}
-
 	/* rate limitation. */
 	if (sc->hif_dhaad_count != 0) {
 		if (sc->hif_dhaad_lastsent + (1 << sc->hif_dhaad_count)
@@ -633,11 +605,16 @@ mip6_icmp6_dhaad_req_output(sc)
 
 	/*
 	 * we must determine the home agent subnet anycast address.
-	 * to do this, we pick up one home prefix from the home subnet
-	 * information.
+	 * to do this, we pick up one home prefix from the prefix
+	 * list.
 	 */
-	mspfx = TAILQ_FIRST(&hs->hs_ms->ms_mspfx_list);
-	if ((mspfx == NULL) || ((mpfx = mspfx->mspfx_mpfx) == NULL)) {
+	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
+		if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx))
+			break;
+	}
+	if (mpfx == NULL) {
+		/* we must have at least one home subnet. */
 		return (EINVAL);
 	}
 	if (mip6_icmp6_create_haanyaddr(&haanyaddr, mpfx))

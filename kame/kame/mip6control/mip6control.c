@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.45 2003/07/23 04:56:17 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.46 2003/07/24 07:11:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,10 +112,12 @@ struct nlist nl[] = {
 #define N_HIF_SOFTC_LIST 1
 	{ "_mip6_bc_list" },
 #define N_MIP6_BC_LIST 2
+	{ "_mip6_prefix_list" },
+#define N_MIP6_PREFIX_LIST 3
 	{ "_mip6_unuse_hoa" },
-#define N_MIP6_UNUSE_HOA 3
+#define N_MIP6_UNUSE_HOA 4
 	{ "_mip6_preferred_ifnames" },
-#define N_MIP6_PREFERRED_IFNAMES 4
+#define N_MIP6_PREFERRED_IFNAMES 5
 	{ "" },
 };
 
@@ -395,10 +397,8 @@ main(argc, argv)
 	}
 
 	if (gmhp) {
+		struct mip6_prefix_list mip6_prefix_list;
 		struct hif_softc *sc;
-		struct hif_subnet *hs, hif_subnet;
-		struct mip6_subnet *ms, mip6_subnet;
-		struct mip6_subnet_prefix *mspfx, mip6_subnet_prefix;
 		struct mip6_prefix *mpfx, mip6_prefix;
 		struct timeval time;
 
@@ -406,32 +406,24 @@ main(argc, argv)
 
 		sc = get_hif_softc(ifnarg);
 		printf(pfx_desc[longdisp]);
-		for (hs = TAILQ_FIRST(&sc->hif_hs_list_home);
-		     hs;
-		     hs = TAILQ_NEXT(hs, hs_entry)) {
-			KREAD(hs, &hif_subnet, hif_subnet);
-			hs = &hif_subnet;
-			KREAD(hs->hs_ms, &mip6_subnet, mip6_subnet);
-			ms = &mip6_subnet;
-			for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
-			     mspfx;
-			     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
-				KREAD(mspfx, &mip6_subnet_prefix, mip6_subnet_prefix);
-				mspfx = &mip6_subnet_prefix;
-				KREAD(mspfx->mspfx_mpfx, &mip6_prefix, mip6_prefix);
-				mpfx = &mip6_prefix;
-				printf(ipaddr_fmt[longdisp],
-				       ip6_sprintf(&mpfx->mpfx_prefix));
-				printf("%7u %7u %7ld %7u %7ld ",
-				       mpfx->mpfx_prefixlen,
-				       mpfx->mpfx_vltime,
-				       mpfx->mpfx_vlexpire - time.tv_sec,
-				       mpfx->mpfx_pltime,
-				       mpfx->mpfx_plexpire - time.tv_sec);
-				printf(ipaddr_fmt[longdisp],
-				       ip6_sprintf(&mpfx->mpfx_haddr));
-				printf("\n");
-			}
+		/* XXX */
+		KREAD(nl[N_MIP6_PREFIX_LIST].n_value,
+		    &mip6_prefix_list, struct mip6_prefix_list);
+		for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+		     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
+			KREAD(mpfx, &mip6_prefix, mip6_prefix);
+			mpfx = &mip6_prefix;
+			printf(ipaddr_fmt[longdisp],
+			    ip6_sprintf(&mpfx->mpfx_prefix));
+			printf("%7u %7u %7ld %7u %7ld ",
+			    mpfx->mpfx_prefixlen,
+			    mpfx->mpfx_vltime,
+			    mpfx->mpfx_vlexpire - time.tv_sec,
+			    mpfx->mpfx_pltime,
+			    mpfx->mpfx_plexpire - time.tv_sec);
+			printf(ipaddr_fmt[longdisp],
+			    ip6_sprintf(&mpfx->mpfx_haddr));
+			printf("\n");
 		}
 	}
 
@@ -470,45 +462,35 @@ main(argc, argv)
 
 	if (gha) {
 		struct hif_softc *sc;
-		struct hif_subnet *hs, hif_subnet;
-		struct mip6_subnet *ms, mip6_subnet;
-		struct mip6_subnet_ha *msha, mip6_subnet_ha;
 		struct mip6_ha *mha, mip6_ha;
-		struct hif_subnet *hsl[2];
+		struct hif_ha *hhal[2], *hha, hif_ha;
 		int i;
 		struct timeval time;
 
 		gettimeofday(&time, 0);
 
 		sc = get_hif_softc(ifnarg);
-		hsl[0] = TAILQ_FIRST(&sc->hif_hs_list_home);
-		hsl[1] = TAILQ_FIRST(&sc->hif_hs_list_foreign);
+		hhal[0] = LIST_FIRST(&sc->hif_ha_list_home);
+		hhal[1] = LIST_FIRST(&sc->hif_ha_list_foreign);
 		printf(ha_desc[longdisp]);
 		for (i = 0; i < 2; i++) {
-			for (hs = hsl[i];
-			     hs;
-			     hs = TAILQ_NEXT(hs, hs_entry)) {
-				KREAD(hs, &hif_subnet, hif_subnet);
-				hs = &hif_subnet;
-				KREAD(hs->hs_ms, &mip6_subnet, mip6_subnet);
-				ms = &mip6_subnet;
-				for (msha = TAILQ_FIRST(&ms->ms_msha_list);
-				     msha;
-				     msha = TAILQ_NEXT(msha, msha_entry)) {
-					KREAD(msha, &mip6_subnet_ha, mip6_subnet_ha);
-					msha = &mip6_subnet_ha;
-					KREAD(msha->msha_mha, &mip6_ha, mip6_ha);
-					mha = &mip6_ha;
-					printf(ipaddr_fmt[longdisp],
-					       ip6_sprintf(&mha->mha_lladdr));
-					printf(ipaddr_fmt[longdisp],
-					       ip6_sprintf(&mha->mha_gaddr));
-					printf("%-7s %7d %7d %7ld\n",
-					       raflg_sprintf(mha->mha_flags),
-					       mha->mha_pref,
-					       mha->mha_lifetime,
-					       mha->mha_expire - time.tv_sec);
-				}
+			for (hha = hhal[i];
+			     hha;
+			     hha = LIST_NEXT(hha, hha_entry)) {
+				KREAD(hha, &hif_ha, hif_ha);
+				hha = &hif_ha;
+				mha = hha->hha_mha;
+				KREAD(mha, &mip6_ha, mip6_ha);
+				mha = &mip6_ha;
+				printf(ipaddr_fmt[longdisp],
+				    ip6_sprintf(&mha->mha_lladdr));
+				printf(ipaddr_fmt[longdisp],
+				    ip6_sprintf(&mha->mha_gaddr));
+				printf("%-7s %7d %7d %7ld\n",
+				    raflg_sprintf(mha->mha_flags),
+				    mha->mha_pref,
+				    mha->mha_lifetime,
+				    mha->mha_expire - time.tv_sec);
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.92 2003/07/23 04:56:18 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.93 2003/07/24 07:11:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -242,8 +242,16 @@ struct mip6_ha {
 	u_int16_t           mha_pref;      /* preference */
 	u_int16_t           mha_lifetime;  /* HA lifetime */
 	time_t              mha_expire;    /* expiration time of this HA. */
+	u_int32_t           mha_refcnt;
 };
 LIST_HEAD(mip6_ha_list, mip6_ha);
+#define MIP6_HA_REF(mha) do {(mha)->mha_refcnt++;} while(0);
+#define MIP6_HA_FREE(mha) do {if(((mha)->mha_refcnt--) == 0) FREE(mha, M_TEMP); /* XXX */} while(0);
+
+struct mip6_prefix_ha {
+	LIST_ENTRY(mip6_prefix_ha) mpfxha_entry;
+	struct mip6_ha             *mpfxha_mha;
+};
 
 struct mip6_prefix {
 	LIST_ENTRY(mip6_prefix) mpfx_entry;
@@ -256,32 +264,9 @@ struct mip6_prefix {
 	struct sockaddr_in6     mpfx_haddr;
 	u_int16_t		mpfx_mpsid;	/* Used for MPS */
 	u_int8_t		mpfx_sentmps;	/* 1: sent MPS to HA with above ID */
+	LIST_HEAD(mip6_prefix_ha_list, mip6_prefix_ha) mpfx_ha_list;
 };
 LIST_HEAD(mip6_prefix_list, mip6_prefix);
-
-struct mip6_subnet_prefix {
-	TAILQ_ENTRY(mip6_subnet_prefix) mspfx_entry;
-	struct mip6_prefix              *mspfx_mpfx;
-};
-
-struct mip6_subnet_ha {
-	TAILQ_ENTRY(mip6_subnet_ha) msha_entry;
-	struct mip6_ha              *msha_mha;
-};
-
-/*
- * the subnet infomation.  this entry includes the routers and the
- * prefixes those have some relations each other.
- */
-struct mip6_subnet {
-	LIST_ENTRY(mip6_subnet)                         ms_entry;
-	TAILQ_HEAD(mip6_subnet_prefix_list, mip6_subnet_prefix) ms_mspfx_list;
-	TAILQ_HEAD(mip6_subnet_ha_list, mip6_subnet_ha) ms_msha_list;
-	int ms_refcnt;
-};
-LIST_HEAD(mip6_subnet_list, mip6_subnet);
-
-#define MIP6_SUBNET_TIMEOUT_INTERVAL 10
 
 /* packet options used by the mip6 packet output processing routine. */
 struct mip6_pktopts {

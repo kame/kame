@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.4 2003/06/11 11:32:28 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.5 2003/07/24 07:11:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -53,7 +53,6 @@ struct mip6_buffer {
 
 extern struct mip6_ha_list mip6_ha_list;
 extern struct mip6_prefix_list mip6_prefix_list;
-extern struct mip6_subnet_list mip6_subnet_list;
 extern struct mip6_unuse_hoa_list mip6_unuse_hoa;
 extern struct mip6_preferred_ifnames mip6_preferred_ifnames;
 
@@ -63,7 +62,6 @@ void mip6_mn_init(void);
 void mip6_bu_init(void);
 void mip6_halist_init(void);
 void mip6_prefix_init(void);
-void mip6_subnet_init(void);
 
 /* movement processing. */
 int mip6_prelist_update(struct sockaddr_in6 *, union nd_opts *,
@@ -111,45 +109,19 @@ int mip6_prefix_list_insert(struct mip6_prefix_list *, struct mip6_prefix *);
 int mip6_prefix_list_remove(struct mip6_prefix_list *,
     struct mip6_prefix *mpfx);
 struct mip6_prefix *mip6_prefix_list_find(struct mip6_prefix *);
+struct mip6_prefix *mip6_prefix_list_find_withhaddr(struct mip6_prefix_list *,
+    struct sockaddr_in6 *);
 int mip6_prefix_haddr_assign(struct mip6_prefix *, struct hif_softc *);
 
-/* subnet list processing. */
-struct mip6_subnet *mip6_subnet_create(void);
-int mip6_subnet_delete(struct mip6_subnet *);
-int mip6_subnet_list_insert(struct mip6_subnet_list *, struct mip6_subnet *);
-int mip6_subnet_list_remove(struct mip6_subnet_list *, struct mip6_subnet *);
-struct mip6_subnet *mip6_subnet_list_find_withprefix(struct mip6_subnet_list *,
-    struct sockaddr_in6 *, u_int8_t);
-struct mip6_subnet *mip6_subnet_list_find_withhaaddr(struct mip6_subnet_list *,
-    struct sockaddr_in6 *);
-struct mip6_subnet *mip6_subnet_list_find_withmpfx(struct mip6_subnet_list *,
-    struct mip6_prefix *);
-
-/* subnet_ha list processing. */
-struct mip6_subnet_ha *mip6_subnet_ha_create(struct mip6_ha *);
-int mip6_subnet_ha_list_insert(struct mip6_subnet_ha_list *,
-    struct mip6_subnet_ha *);
-struct mip6_subnet_ha *mip6_subnet_ha_list_find_preferable(
-    struct mip6_subnet_ha_list *);
-struct mip6_subnet_ha *mip6_subnet_ha_list_find_withmha(
-    struct mip6_subnet_ha_list *, struct mip6_ha *);
-struct mip6_subnet_ha *mip6_subnet_ha_list_find_withhaaddr(
-    struct mip6_subnet_ha_list *, struct sockaddr_in6 *haaddr);
-
-/* subnet_prefix list processing. */
-struct mip6_subnet_prefix *mip6_subnet_prefix_create(struct mip6_prefix *);
-int mip6_subnet_prefix_list_insert(struct mip6_subnet_prefix_list *,
-    struct mip6_subnet_prefix *);
-int mip6_subnet_prefix_list_remove(struct mip6_subnet_prefix_list *,
-    struct mip6_subnet_prefix *);
-struct mip6_subnet_prefix *mip6_subnet_prefix_list_find_withprefix(
-    struct mip6_subnet_prefix_list *, struct sockaddr_in6 *, u_int8_t);
-struct mip6_subnet_prefix *mip6_subnet_prefix_list_find_withmpfx(
-    struct mip6_subnet_prefix_list *, struct mip6_prefix *mpfx);
-struct mip6_prefix *mip6_prefix_list_find_withhaddr(struct mip6_prefix_list *,
-    struct sockaddr_in6 *haddr);
-int32_t mip6_subnet_prefix_list_get_minimum_lifetime(
-    struct mip6_subnet_prefix_list *);
+/* advertising router list management. */
+struct mip6_prefix_ha *mip6_prefix_ha_list_insert(struct mip6_prefix_ha_list *,
+    struct mip6_ha *);
+void mip6_prefix_ha_list_remove(struct mip6_prefix_ha_list *,
+    struct mip6_prefix_ha *);
+struct mip6_prefix_ha *mip6_prefix_ha_list_find_withaddr(
+    struct mip6_prefix_ha_list *, struct sockaddr_in6 *);
+struct mip6_prefix_ha *mip6_prefix_ha_list_find_withmha(
+    struct mip6_prefix_ha_list *, struct mip6_ha *);
 
 /* IPv6 extention header processing. */
 int mip6_haddr_destopt_create(struct ip6_dest **, struct sockaddr_in6 *,

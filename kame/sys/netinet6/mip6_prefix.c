@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.20 2003/04/23 09:15:51 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.21 2003/07/24 07:11:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -121,6 +121,7 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 	mpfx->mpfx_pltime = pltime;
 	mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 	/* XXX mpfx->mpfx_haddr; */
+	LIST_INIT(&mpfx->mpfx_ha_list);
 
 	return (mpfx);
 }
@@ -174,25 +175,15 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 	struct mip6_prefix_list *mpfx_list;
 	struct mip6_prefix *mpfx;
 {
-	struct mip6_subnet *ms;
-	struct mip6_subnet_prefix *mspfx;
+	struct mip6_prefix_ha *mpfxha;
 
 	if ((mpfx_list == NULL) || (mpfx == NULL)) {
 		return (EINVAL);
 	}
 
-	for (ms = LIST_FIRST(&mip6_subnet_list); ms;
-	     ms = LIST_NEXT(ms, ms_entry)) {
-		mspfx = mip6_subnet_prefix_list_find_withmpfx(&ms->ms_mspfx_list,
-							      mpfx);
-		if (mspfx) {
-			/*
-			 * do not call mip6_subnet_prefix_list_remove().
-			 * otherwise, you will fall into an infinite loop...
-			 */
-			TAILQ_REMOVE(&ms->ms_mspfx_list, mspfx, mspfx_entry);
-			FREE(mspfx, M_TEMP);
-		}
+	while (!LIST_EMPTY(&mpfx->mpfx_ha_list)) {
+		mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list);
+		mip6_prefix_ha_list_remove(&mpfx->mpfx_ha_list, mpfxha);
 	}
 
 	LIST_REMOVE(mpfx, mpfx_entry);
@@ -243,5 +234,75 @@ mip6_prefix_list_find_withhaddr(mpfx_list, haddr)
 	}
 
 	/* not found. */
+	return (NULL);
+}
+
+struct mip6_prefix_ha *
+mip6_prefix_ha_list_insert(mpfxha_list, mha)
+	struct mip6_prefix_ha_list *mpfxha_list;
+	struct mip6_ha *mha;
+{
+	struct mip6_prefix_ha *mpfxha;
+
+	if ((mpfxha_list == NULL) || (mha == NULL))
+		return (NULL);
+
+	MALLOC(mpfxha, struct mip6_prefix_ha *, sizeof(struct mip6_prefix_ha),
+	    M_TEMP, M_NOWAIT);
+	if (mpfxha == NULL) {
+		mip6log((LOG_ERR, "%s:%d: memory allocation failed.\n",
+		    __FILE__, __LINE__));
+		return (NULL);
+	}
+	mpfxha->mpfxha_mha = mha;
+	MIP6_HA_REF(mha);
+	LIST_INSERT_HEAD(mpfxha_list, mpfxha, mpfxha_entry);
+	return (mpfxha);
+}
+
+void
+mip6_prefix_ha_list_remove(mpfxha_list, mpfxha)
+	struct mip6_prefix_ha_list *mpfxha_list;
+	struct mip6_prefix_ha *mpfxha;
+{
+	LIST_REMOVE(mpfxha, mpfxha_entry);
+	MIP6_HA_FREE(mpfxha->mpfxha_mha);
+	FREE(mpfxha, M_TEMP);
+}
+
+struct mip6_prefix_ha *
+mip6_prefix_ha_list_find_withaddr(mpfxha_list, addr)
+	struct mip6_prefix_ha_list *mpfxha_list;
+	struct sockaddr_in6 *addr;
+{
+	struct mip6_prefix_ha *mpfxha;
+	struct sockaddr_in6 *tmpaddr;
+
+	for (mpfxha = LIST_FIRST(mpfxha_list); mpfxha;
+	     mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+		if (mpfxha->mpfxha_mha == NULL)
+			continue;
+
+		if (SA6_ARE_ADDR_EQUAL(&mpfxha->mpfxha_mha->mha_lladdr, addr))
+			return (mpfxha);
+		/* XXX multiple gaddrs */
+		if (SA6_ARE_ADDR_EQUAL(&mpfxha->mpfxha_mha->mha_gaddr, addr))
+			return (mpfxha);
+	}
+	return (NULL);
+}
+
+struct mip6_prefix_ha *
+mip6_prefix_ha_list_find_withmha(mpfxha_list, mha)
+	struct mip6_prefix_ha_list *mpfxha_list;
+	struct mip6_ha *mha;
+{
+	struct mip6_prefix_ha *mpfxha;
+
+	for (mpfxha = LIST_FIRST(mpfxha_list); mpfxha;
+	     mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+		if (mpfxha->mpfxha_mha && (mpfxha->mpfxha_mha == mha))
+			return (mpfxha);
+	}
 	return (NULL);
 }
