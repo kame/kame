@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.3 2000/02/18 11:39:53 fujisawa Exp $
+ *	$Id: main.c,v 1.4 2000/04/16 18:01:54 itojun Exp $
  */
 
 #include <stdio.h>
@@ -142,7 +142,7 @@ parseArgument(int argc, char *argv[])
 	switch (ch)
 	{
 	  case 'd':
-	    _debug = strtoul(optarg+5, NULL, 0);
+	    _debug = strtoul(optarg, NULL, 0);
 #ifdef YYDEBUG
 	    {
 		extern	int	yydebug;
