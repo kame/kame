@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.80 2002/11/05 08:23:59 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.81 2002/11/09 13:49:52 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1016,6 +1016,8 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	if (mbu->mbu_flags & IP6MU_HOME) {
 		/* this is from our home agent. */
 		if (mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITD) {
+			struct sockaddr_in6 sa6_coa, sa6_hoa;
+
 			/* home unregsitration has completed. */
 
 			/* notify all the CNs that we are home. */
@@ -1041,6 +1043,10 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				return (error);
 			}
 
+			/* save coa/hoa */
+			sa6_coa = mbu->mbu_coa;
+			sa6_hoa = mbu->mbu_haddr;
+
 			error = mip6_bu_list_remove_all(&sc->hif_bu_list);
 			if (error) {
 				mip6log((LOG_ERR,
@@ -1049,22 +1055,14 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				m_freem(m);
 				return (error);
 			}
+			mbu = NULL; /* free in mip6_bu_list_remove_all() */
 
 			/* XXX: send a unsolicited na. */
 		{
-			struct sockaddr_in6 sa6, daddr, taddr; /* XXX */
+			struct sockaddr_in6 daddr; /* XXX */
 			struct ifaddr *ifa;
 
-			bzero(&sa6, sizeof(sa6));
-			sa6.sin6_family = AF_INET6;
-			sa6.sin6_len = sizeof(sa6);
-			/* XXX or mbu_haddr.  XXX scope consideration  */
-			sa6_copy_addr(&mbu->mbu_coa, &sa6);
-#ifndef SCOPEDROUTING
-			sa6.sin6_scope_id = 0;
-#endif
-
-			if ((ifa = ifa_ifwithaddr((struct sockaddr *)&sa6))
+			if ((ifa = ifa_ifwithaddr((struct sockaddr *)&sa6_coa))
 			    == NULL) {
 				mip6log((LOG_ERR,
 					 "%s:%d: can't find CoA interface\n",
@@ -1096,13 +1094,8 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				return (error);
 			}
 
-			bzero(&taddr, sizeof(taddr));
-			taddr.sin6_family = AF_INET6;
-			taddr.sin6_len = sizeof(taddr);
-			sa6_copy_addr(&mbu->mbu_haddr, &taddr);
-
 			nd6_na_output(ifa->ifa_ifp, &daddr,
-					      &taddr,
+					      &sa6_hoa,
 					      ND_NA_FLAG_OVERRIDE,
 					      1, NULL);
 			mip6log((LOG_INFO,
