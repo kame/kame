@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.71 2000/03/21 09:19:28 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.72 2000/03/21 09:23:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -434,7 +434,11 @@ ip6_input(m)
 #endif
 #if 0
 	/*
-	 * We don't support it, so it is strange to get this.
+	 * Reject packets with IPv4 compatible addresses (auto tunnel).
+	 *
+	 * The code forbids auto tunnel relay case in RFC1933 (the check is
+	 * stronger than RFC1933).  We may want to re-enable it if mech-xx
+	 * is revised to forbid relaying case.
 	 */
 	if (IN6_IS_ADDR_V4COMPAT(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_V4COMPAT(&ip6->ip6_dst)) {
