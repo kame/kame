@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.77 2003/04/28 06:42:55 suz Exp $	*/
+/*	$KAME: net_osdep.h,v 1.78 2003/08/01 01:24:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,6 +303,8 @@
  *	OpenBSD 3.0 and NetBSD 1.6 has it.
  *	FreeBSD 4.x uses M_WRITABLE() macro, which is opposite (NIH!).
  *	KAME tree has it for all platforms except FreeBSD 4.x.
+ * - TAILQ_EMPTY
+ *	BSD/OS 4.x does not have this macro.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
