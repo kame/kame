@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.16 2002/09/08 01:22:33 itojun Exp $	*/
+/*	$KAME: rip6query.c,v 1.17 2002/09/08 01:35:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,7 +151,7 @@ main(argc, argv)
 	np->rip6_plen = 0;
 	np->rip6_metric = HOPCNT_INFINITY6;
 	if (sendto(s, ripbuf, RIPSIZE(1), 0, (struct sockaddr *)&sin6,
-			sizeof(struct sockaddr_in6)) < 0) {
+	    sizeof(struct sockaddr_in6)) < 0) {
 		err(1, "send");
 		/*NOTREACHED*/
 	}
@@ -160,19 +160,19 @@ main(argc, argv)
 		flen = sizeof(fsock);
 		alarm(query_wait);
 		if ((len = recvfrom(s, ripbuf, BUFSIZ, 0,
-				(struct sockaddr *)&fsock, &flen)) < 0) {
+		    (struct sockaddr *)&fsock, &flen)) < 0) {
 			err(1, "recvfrom");
 			/*NOTREACHED*/
 		}
 		alarm(0);
 		printf("Response from %s len %d\n",
-			sa_n2a((struct sockaddr *)&fsock), len);
+		    sa_n2a((struct sockaddr *)&fsock), len);
 		n = (len - sizeof(struct rip6) + sizeof(struct netinfo6)) /
-			sizeof(struct netinfo6);
+		    sizeof(struct netinfo6);
 		np = ripbuf->rip6_nets;
 		for (i = 0; i < n; i++, np++) {
 			printf("\t%s/%d [%d]", inet6_n2a(&np->rip6_dest),
-				np->rip6_plen, np->rip6_metric);
+			    np->rip6_plen, np->rip6_metric);
 			if (np->rip6_tag)
 				printf(" tag=0x%x", ntohs(np->rip6_tag));
 			printf("\n");
@@ -196,7 +196,7 @@ sa_n2a(sa)
 	static char buf[NI_MAXHOST];
 
 	if (getnameinfo(sa, sa->sa_len, buf, sizeof(buf),
-			NULL, 0, NI_NUMERICHOST) != 0) {
+	    NULL, 0, NI_NUMERICHOST) != 0) {
 		snprintf(buf, sizeof(buf), "%s", "(invalid)");
 	}
 	return buf;
@@ -216,5 +216,5 @@ sigalrm_handler(sig)
 	int sig;
 {
 
-	exit(0);
+	_exit(0);
 }
