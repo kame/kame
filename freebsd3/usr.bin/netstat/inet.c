@@ -175,8 +175,14 @@ protopr(proto, name, af)
 
 		if ((af == AF_INET && (inp->inp_vflag & INP_IPV4) == 0)
 #ifdef INET6
-		    ||(af == AF_INET6 && (inp->inp_vflag & INP_IPV6) == 0)
+		    || (af == AF_INET6 && (inp->inp_vflag & INP_IPV6) == 0)
 #endif /* INET6 */
+		    || (af == AF_UNSPEC && ((inp->inp_vflag & INP_IPV4) == 0
+#ifdef INET6
+					    && (inp->inp_vflag &
+						INP_IPV6) == 0)
+#endif /* INET6 */
+			)
 		    )
 			continue;
 		if (!aflag &&
@@ -184,10 +190,17 @@ protopr(proto, name, af)
 		     (af == AF_INET &&
 		      inet_lnaof(inp->inp_laddr) == INADDR_ANY)
 #ifdef INET6
-		     ||
-		     (af == AF_INET6 &&		    
-		      IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
+		     || (af == AF_INET6 &&
+			 IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
 #endif /* INET6 */
+		     || (af == AF_UNSPEC &&
+			 (((inp->inp_vflag & INP_IPV4) != 0 &&
+			   inet_lnaof(inp->inp_laddr) == INADDR_ANY)
+#ifdef INET6
+			  || ((inp->inp_vflag & INP_IPV6) != 0 &&
+			      IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
+#endif
+			  ))
 		     ))
 			continue;
 
