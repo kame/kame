@@ -43,6 +43,7 @@
 #include <sys/sockio.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
+#include <sys/protosw.h>
 #include <sys/errno.h>
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
@@ -719,6 +720,12 @@ nd6_free(rt)
 	struct sockaddr_dl *sdl;
 	struct in6_addr in6 = ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 	struct nd_defrouter *dr;
+
+	/*
+	 * Clear all distination cache entries for the neighbor.
+	 * XXX: is it better to restrict this to hosts?
+	 */
+	pfctlinput(PRC_HOSTDEAD, rt_key(rt));
 
 	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
 		int s;

@@ -437,11 +437,18 @@ icmp6_input(mp, offp, proto)
 			code = PRC_UNREACH_PROTOCOL; /* is this a good code? */
 			break;
 		case ICMP6_DST_UNREACH_ADDR:
-			code = PRC_UNREACH_HOST;
+			code = PRC_HOSTDEAD;
 			break;
+#ifdef COMPAT_RFC1885
 		case ICMP6_DST_UNREACH_NOTNEIGHBOR:
 			code = PRC_UNREACH_SRCFAIL;
 			break;
+#else
+		case ICMP6_DST_UNREACH_BEYONDSCOPE:
+			/* I mean "source address was incorrect." */
+			code = PRC_PARAMPROB;
+			break;
+#endif 
 		case ICMP6_DST_UNREACH_NOPORT:
 			code = PRC_UNREACH_PORT;
 			break;
