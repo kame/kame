@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.144 2005/03/19 07:18:28 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.145 2005/03/19 13:10:20 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1147,9 +1147,8 @@ react_solicit(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 		goto fail;
 	}
 
-	/* copy client information back (if provided) */
-	if (optinfo->clientID.duid_id &&
-	    duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
+	/* copy client information back */
+	if (duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
 		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
 		goto fail;
 	}
