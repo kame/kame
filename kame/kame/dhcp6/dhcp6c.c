@@ -147,13 +147,13 @@ main(argc, argv)
 	}
 	device = argv[0];
 
-	client6_init();
-
 	if (foreground == 0) {
-		openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 		if (daemon(0, 0) < 0)
 			err(1, "daemon");
+		openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 	}
+
+	client6_init();
 
 	setloglevel(debug);
 

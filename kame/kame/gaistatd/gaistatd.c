@@ -1,4 +1,4 @@
-/*	$KAME: gaistatd.c,v 1.8 2001/07/23 03:47:54 itojun Exp $	*/
+/*	$KAME: gaistatd.c,v 1.9 2002/01/11 08:01:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -76,6 +76,9 @@ main()
 
 	unlink(PATH_STATFILE);
 
+	/* daemonize */
+	daemon(0, 0);
+
 	if ((s = socket(AF_LOCAL, SOCK_DGRAM, 0)) < 0)
 		err(1, "socket");
 	memset(&sun, 0, sizeof(sun));
@@ -87,9 +90,6 @@ main()
 
 	if ((kvmd  = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, buf)) == NULL)
 		errx(1, "kvm_openfiles failed");
-
-	/* daemonize */
-	daemon(0, 0);
 
 	while(1) {
 		int cc, cnt;
