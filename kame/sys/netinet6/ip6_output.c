@@ -318,11 +318,12 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	/*
 	 * Concatenate headers and fill in next header fields.
 	 * Here we have, on "m"
-	 *	IPv6 payload  or
-	 *	IPv6 [esp* dest2 payload]
+	 *	IPv6 payload
 	 * and we insert headers accordingly.  Finally, we should be getting:
-	 *	IPv6 hbh dest1 rthdr ah* dest2 payload  or
 	 *	IPv6 hbh dest1 rthdr ah* [esp* dest2 payload]
+	 *
+	 * during the header composing process, "m" points to IPv6 header.
+	 * "mprev" points to an extension header prior to esp.
 	 */
 	{
 		u_char *nexthdrp = &ip6->ip6_nxt;
@@ -331,10 +332,15 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		/*
 		 * we treat dest2 specially.  this makes IPsec processing
 		 * much easier.
+		 *
+		 * result: IPv6 dest2 payload
+		 * m and mprev will point to IPv6 header.
 		 */
 		if (exthdrs.ip6e_dest2) {
 			if (!hdrsplit)
 				panic("assumption failed: hdr not split");
+			exthdrs.ip6e_dest2->m_next = m->m_next;
+			m->m_next = exthdrs.ip6e_dest2->m_next;
 			*mtod(exthdrs.ip6e_dest2, u_char *) = ip6->ip6_nxt;
 			ip6->ip6_nxt = IPPROTO_DSTOPTS;
 		}
@@ -352,6 +358,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		(mp) = (m);\
 	}\
     }
+		/*
+		 * result: IPv6 hbh dest1 rthdr dest2 payload
+		 * m will point to IPv6 header.  mprev will point to the
+		 * extension header prior to dest2 (rthdr in the above case).
+		 */
 		MAKE_CHAIN(exthdrs.ip6e_hbh, mprev,
 			   nexthdrp, IPPROTO_HOPOPTS);
 		MAKE_CHAIN(exthdrs.ip6e_dest1, mprev,
