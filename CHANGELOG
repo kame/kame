@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1116 2000/07/10 05:58:20 sumikawa Exp $
+$Id: CHANGELOG,v 1.1117 2000/07/10 07:31:56 jinmei Exp $
 
 <200006>
+2000-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/route6d/route6d.c: removed "ifndef ADVAPI"
+	parts. Since the advanced API has already been standardized,
+	implemented, and deployed, we don't need to take care the older
+	kernel behavior (which is even confusing).
+	* *BSD/usr.sbin/route6d/Makefile: removed the -DADVAPI flag
+	according the change.
+
 Mon Jul 10 14:43:40 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/{libpcap,tcpdump}: use 7/3 snapshot.
 	* freebsd3/ports/w3m: upgrade to 0.1.11.p.
