@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.13 2001/09/06 09:46:05 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.14 2001/10/25 07:18:25 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -96,9 +96,11 @@ yyerror(char *msg, ...)
 
 /* Key words, list alphabetically order */
 %token		SALL
+%token		SANY4
 %token		SANY6
 %token		SBREAK
 %token		SBIDIR
+%token		SDADDR
 %token		SDISABLE
 %token		SDPORT
 %token		SENABLE
@@ -152,6 +154,7 @@ yyerror(char *msg, ...)
 %type	<Ainfo>	ipv6addr
 %type	<Char>	name
 %type	<UInt>	opt_all
+%type	<UInt>	opt_bidir
 %type	<UInt>	opt_decimal
 %type	<UInt>	opt_long
 %type	<UShrt>	opt_ports
@@ -247,50 +250,57 @@ rules
 			setRules(NATPT_MAP64, &ruletab);
 		    }
 
-		| map SFROM ipv6addrs STO ipv4addrs opt_ports opt_proto
+		| map SFROM ipv6addrs STO ipv4addr opt_ports opt_proto opt_bidir
 		    {
 			ruletab.from   = $3;
-			ruletab.to     = $5;
+			ruletab.to     = getAddrs(AF_INET, ADDR_SINGLE, $5, 0);
 			ruletab.sports = $6;
 			ruletab.proto  = $7;
 			setRules(NATPT_MAP64, &ruletab);
 		    }
 
-		/* IPv4 -> IPv6 */
-		| map SFROM ipv4addrs STO ipv6addrs opt_proto
-		    {
-			ruletab.from  = $3;
-			ruletab.to    = $5;
-			ruletab.proto = $6;
-			setRules(NATPT_MAP46, &ruletab);
-		    }
-
-		| map SFROM ipv4addr dport STO ipv6addr dport opt_proto
+		/* IPv4 -> IPv6 (for backword compatibility) */
+		| map SFROM ipv4addrs dport STO ipv6addr dport opt_proto
 		    {
 			u_short *us = (u_short *)malloc(sizeof(u_short[2]));
 
+			if ($3->aType != ADDR_SINGLE) {
+				yyerror("More than one IPv4 address is specified.");
+				return (-1);
+			}
+
 			us[0] = $4;
 			us[1] = $7;
-			ruletab.from = getAddrs(AF_INET,  ADDR_SINGLE, $3, 0);
+			ruletab.from = $3;
 			ruletab.to   = getAddrs(AF_INET6, ADDR_SINGLE, $6, 0);
 			ruletab.dports = us;
 			ruletab.proto = $8;
 			setRules(NATPT_MAP46, &ruletab);
 		    }
 
-		/* IPv4 -> IPv4 (outbound) */
-		| map SFROM ipv4addrs STO ipv4addrs opt_ports opt_proto opt_bidir
+		/* IPv4 -> IPv6 */
+		| map SFROM SANY4     daddr4       STO daddr6       opt_proto
+		| map SFROM SANY4     daddr4 dport STO daddr6 dport opt_proto
+		| map SFROM ipv4addrs daddr4       STO daddr6       opt_proto
+		| map SFROM ipv4addrs daddr4 dport STO daddr6 dport opt_proto
+		| map SFROM ipv4addrs        dport STO daddr6 dport opt_proto
+
+		/* IPv4 -> IPv4 */
+		| map SFROM SANY4     daddr4       STO daddr4       opt_proto
+		| map SFROM SANY4     daddr4 dport STO daddr4 dport opt_proto
+		| map SFROM ipv4addrs daddr4       STO daddr4       opt_proto
+		| map SFROM ipv4addrs daddr4 dport STO daddr4 dport opt_proto
+		| map SFROM ipv4addrs        dport STO daddr4 dport opt_proto
+
+		| map SFROM SANY4     STO ipv4addr opt_ports opt_proto
+		| map SFROM ipv4addrs STO ipv4addr opt_ports opt_proto opt_bidir
 		    {
 			ruletab.from   = $3;
-			ruletab.to     = $5;
+			ruletab.to     = getAddrs(AF_INET, ADDR_SINGLE, $5, 0);
 			ruletab.sports = $6;
 			ruletab.proto  =  $7;
 			setRules(NATPT_MAP44, &ruletab);
 		    }
-
-
-		/* IPv4 -> IPv4 (inbound) */
-		| map SFROM ipv4addr dport STO ipv4addr dport opt_proto
 
 		| map SFLUSH opt_all
 		    { flushRules($3); }
@@ -403,7 +413,9 @@ opt_all
 
 opt_bidir
 		:
+		    { $$ = 0; }
 		| SBIDIR
+		    { $$ = 1; }
 		;
 
 opt_long
@@ -418,6 +430,14 @@ opt_decimal
 		    { $$ = 0; }
 		| SDECIMAL
 		    { $$ = $1; }
+		;
+
+daddr4
+		: SDADDR ipv4addr
+		;
+
+daddr6
+		: SDADDR ipv6addr
 		;
 
 dport

@@ -1,4 +1,4 @@
-/*	$KAME: yylex.c,v 1.9 2001/09/21 08:27:52 fujisawa Exp $	*/
+/*	$KAME: yylex.c,v 1.10 2001/10/25 07:18:25 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -52,6 +52,7 @@ struct
 {
 	{ "any6",	SANY6,		"SANY6",	},
 	{ "break",	SBREAK,		"SBREAK",	},
+	{ "daddr",	SDADDR,		"SDADDR",	},
 	{ "disable",	SDISABLE,	"SDISABLE",	},
 	{ "dport",	SDPORT,		"SDPORT",	},
 	{ "enable",	SENABLE,	"SENABLE",	},
