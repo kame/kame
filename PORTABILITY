@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.43 2000/05/25 02:06:22 itojun Exp $
+	$Id: PORTABILITY,v 1.44 2000/05/27 07:39:06 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -300,3 +300,7 @@ across those possibilities.
 - freebsd and bsdi3 do not have satosin() in sys/netinet/in.h.  not sure
   where is the origin for this macro.  do not use it, or define it locally
   in C source if you don't have one (#ifndef - #define).
+
+- Location of MD5 library.
+  netbsd/openbsd: header is <md5.h>, libc.
+  freebsd: header is <md5.h>, libcrypt
