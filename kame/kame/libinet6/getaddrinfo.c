@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.88 2001/01/09 04:23:24 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.89 2001/01/09 04:28:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,12 +40,9 @@
  *   classful form as a result).
  *   current code - disallow classful form for IPv4 (due to use of inet_pton).
  * - freeaddrinfo(NULL).  RFC2553 is silent about it.  XNET 5.2 says it is
- *   invalid.
- *   current code - SEGV on freeaddrinfo(NULL)
+ *   invalid.  current code - SEGV on freeaddrinfo(NULL)
+ *
  * Note:
- * - We use getipnodebyname() just for thread-safeness.  There's no intent
- *   to let it do PF_UNSPEC (actually we never pass PF_UNSPEC to
- *   getipnodebyname().
  * - The code filters out AFs that are not supported by the kernel,
  *   when globbing NULL hostname (to loopback, or wildcard).  Is it the right
  *   thing to do?  What is the relationship with post-RFC2553 AI_ADDRCONFIG
@@ -54,6 +51,11 @@
  *   (1) what should we do against numeric hostname (2) what should we do
  *   against NULL hostname (3) what is AI_ADDRCONFIG itself.  AF not ready?
  *   non-loopback address configured?  global address configured?
+ *
+ * OS specific notes for bsdi3/freebsd2:
+ * - We use getipnodebyname() just for thread-safeness.  There's no intent
+ *   to let it do PF_UNSPEC (actually we never pass PF_UNSPEC to
+ *   getipnodebyname().
  * - The code makes use of following calls when asked to resolver with
  *   ai_family  = PF_UNSPEC:
  *	getipnodebyname(host, AF_INET6);
@@ -69,6 +71,13 @@
  *   PF_UNSPEC lookup (lookup both) and return chain of addrinfos.
  *   This would result in a bit of code duplicate with _dns_ghbyname() and
  *   friends.
+ *
+ * OS specific notes for netbsd/openbsd/freebsd4/bsdi4:
+ * - To avoid search order issue, we have a big amount of code duplicate
+ *   from gethnamaddr.c and some other places.  The issues that there's no
+ *   lower layer function to lookup "IPv4 or IPv6" record.  Calling
+ *   gethostbyname2 from getaddrinfo will end up in wrong search order, as
+ *   presented above.
  */
 
 #include <sys/types.h>
