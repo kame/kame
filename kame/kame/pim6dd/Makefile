@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.5 2003/07/30 06:49:21 itojun Exp $
+#	$KAME: Makefile,v 1.6 2003/09/23 11:10:08 itojun Exp $
 #
 # Copyright (c) 1998 WIDE Project. All rights reserved.
 #
@@ -91,9 +91,9 @@ CC=	gcc
 CFLAGS+=-Wall
 .endif
 .if (${OPSYS} != "NetBSD")
-CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DHAVE_GETIFADDRS
+CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET
 .else
-CPPFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DHAVE_GETIFADDRS
+CPPFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET
 .endif
 .if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
