@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1173 2000/08/02 15:52:31 sakane Exp $
+$KAME: CHANGELOG,v 1.1174 2000/08/02 18:00:20 sakane Exp $
 
 <200007>
+Thu Aug  3 03:00:36 JST 2000 sakane@ydc.co.jp
+	* kame/sys/{netkey/{key.c,keydb.h},netinet6/ipsec.h}:
+	Improved lifetime handling.  It uses real time instead of tick.
+	XXX 2039 problem remains.
+
 Thu Aug  3 00:49:58 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Tryed sending DELETE message against ISAKMP/IPsec SAs deleted
