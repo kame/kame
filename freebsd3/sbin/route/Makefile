@@ -7,6 +7,13 @@ CFLAGS+=-I. -Wall -DNS -DINET6
 CLEANFILES+=keywords.h
 BINMODE=4555
 
+LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
+	-L${.OBJDIR}/../../lib/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a \
+	${.OBJDIR}/../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
+
 keywords.h: keywords
 	sed -e '/^#/d' -e '/^$$/d' ${.CURDIR}/keywords > _keywords.tmp
 	tr a-z A-Z < _keywords.tmp | paste _keywords.tmp - | \
