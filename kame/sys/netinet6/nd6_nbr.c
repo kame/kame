@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.93 2002/02/08 04:51:13 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.94 2002/02/18 07:05:22 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,6 +125,7 @@ nd6_ns_input(m, off, icmp6len)
 	struct ifaddr *ifa;
 	int lladdrlen = 0;
 	int anycast = 0, proxy = 0, tentative = 0;
+	int router = ip6_forwarding;
 	int tlladdr;
 	union nd_opts ndopts;
 	struct sockaddr_dl *proxydl = NULL;
@@ -255,6 +256,7 @@ nd6_ns_input(m, off, icmp6len)
 			if (ifa) {
 				proxy = 1;
 				proxydl = SDL(rt->rt_gateway);
+				router = 0;	/* XXX */
 			}
 		}
 		if (rt)
@@ -343,7 +345,7 @@ nd6_ns_input(m, off, icmp6len)
 		nd6_na_output(ifp, &sa6_all, &taddr6,
 			      ((anycast || proxy || !tlladdr)
 				      ? 0 : ND_NA_FLAG_OVERRIDE)
-			      	| (ip6_forwarding ? ND_NA_FLAG_ROUTER : 0),
+			      	| (router ? ND_NA_FLAG_ROUTER : 0),
 			      tlladdr, (struct sockaddr *)proxydl);
 		goto freeit;
 	}
@@ -353,7 +355,7 @@ nd6_ns_input(m, off, icmp6len)
 
 	nd6_na_output(ifp, saddr6, &taddr6,
 		      ((anycast || proxy || !tlladdr) ? 0 : ND_NA_FLAG_OVERRIDE)
-			| (ip6_forwarding ? ND_NA_FLAG_ROUTER : 0)
+			| (router ? ND_NA_FLAG_ROUTER : 0)
 			| ND_NA_FLAG_SOLICITED,
 		      tlladdr, (struct sockaddr *)proxydl);
  freeit:
