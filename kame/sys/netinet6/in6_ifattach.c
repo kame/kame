@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.84 2001/01/23 09:03:34 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.85 2001/01/24 02:08:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -535,6 +535,9 @@ in6_ifattach_loopback(ifp)
 
 	/* we don't need to perfrom DAD on loopback interfaces. */
 	ifra.ifra_flags |= IN6_IFF_NODAD;
+
+	/* skip registration to the prefix list. XXX should be temporary. */
+	ifra.ifra_flags |= IN6_IFF_NOPFX;
 
 	/*
 	 * We can set NULL to the 3rd arg. See comments in
