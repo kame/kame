@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2333 2003/02/06 07:08:52 jinmei Exp $
+$KAME: CHANGELOG,v 1.2334 2003/02/06 07:09:11 jinmei Exp $
 
 <200302>
 2003-02-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/kame/dhcp6: the client now sends Request to establish an IA
-	when receiving a NoBinding for the IA in response to a Renew or
+	* kame/kame/dhcp6: the client now sends a Request to establish an
+	IA when receiving a NoBinding for the IA in response to a Renew or
 	Reply.  The behavior is compliant to Section 18.1.8 of dhcpv6-28.
 
 Thu Feb  6 01:36:12 JST 2003	suz@crl.hitachi.co.jp
