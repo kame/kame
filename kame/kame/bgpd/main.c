@@ -387,8 +387,8 @@ main_listen_accept()
  *   alarm_handler()
  */
 void 
-alarm_handler() {
-
+alarm_handler()
+{
   switch (taskhead->tsk_timename) {
   case BGP_CONNECT_TIMER:
     switch (taskhead->tsk_bgp->rp_state) {
