@@ -1,0 +1,11 @@
+--- src/ftpclass.cc	Sat Oct  9 07:14:51 1999
++++ ftpclass.cc	Sun Jan 16 08:07:45 2000
+@@ -148,7 +148,7 @@
+    if(d.sa.sa_family==AF_INET && c.sa.sa_family==AF_INET6
+       && IN6_IS_ADDR_V4MAPPED(&c.in6.sin6_addr))
+    {
+-      if(memcmp(&d.in.sin_addr,&c.in6.sin6_addr.s6_addr32[3],4))
++      if(memcmp(&d.in.sin_addr,&c.in6.sin6_addr.s6_addr[12],4))
+ 	 goto address_mismatch;
+       if(d.in.sin_port!=htons(FTP_DATA_PORT))
+ 	 goto wrong_port;

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.15 2000/01/19 11:22:03 kjc Exp $
+# $Id: Makefile,v 1.16 2000/01/21 17:00:06 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -20,6 +20,7 @@ SUBDIR+=	ja-mnews
 SUBDIR+=	ja-w3m
 SUBDIR+=	ja-w3m-ssl
 SUBDIR+=	kaffe
+SUBDIR+=	lftp
 SUBDIR+=	libident6
 SUBDIR+=	lynx
 SUBDIR+=	mediator

@@ -1,0 +1,11 @@
+--- src/Resolver.cc	Tue Jul 20 17:34:54 1999
++++ /home/andy/tmp/wrk/src/Resolver.cc	Wed Aug 11 18:19:43 1999
+@@ -34,7 +34,7 @@
+ #include <fcntl.h>
+ 
+ #include <netinet/in.h>
+-#include <arpa/nameser.h>
++#include "nameser.h"
+ #include <resolv.h>
+ 
+ #include "xstring.h"

@@ -1,0 +1,20 @@
+bin/lftp
+bin/ftpget
+bin/lftpget
+etc/lftp.conf.sample
+share/doc/lftp/COPYING
+share/doc/lftp/FAQ
+share/doc/lftp/NEWS
+share/doc/lftp/README
+share/doc/lftp/THANKS
+share/doc/lftp/TODO
+share/lftp/import-ncftp
+share/lftp/import-netscape
+share/locale/de/LC_MESSAGES/lftp.mo
+share/locale/es/LC_MESSAGES/lftp.mo
+share/locale/it/LC_MESSAGES/lftp.mo
+share/locale/pl/LC_MESSAGES/lftp.mo
+share/locale/pt_BR/LC_MESSAGES/lftp.mo
+share/locale/ru/LC_MESSAGES/lftp.mo
+@dirrm share/lftp
+@dirrm share/doc/lftp

@@ -1,0 +1,12 @@
+--- configure-	Sat Jan 22 01:35:21 2000
++++ configure	Sat Jan 22 01:39:31 2000
+@@ -6169,6 +6169,9 @@
+       fi
+    fi
+ 
++LDFLAGS="$LDFLAGS -L/usr/local/v6/lib" 
++LIBS="$LIBS -linet6"
++
+ for ac_func in strdup strstr lstat select regexec glob\
+  killpg setpgid tcgetattr ftruncate vsnprintf gettimeofday strptime\
+  gethostbyname2 getaddrinfo getnameinfo setsid
