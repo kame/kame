@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.333 2002/11/21 01:18:50 k-sugyou Exp $	*/
+/*	$KAME: in6.c,v 1.334 2002/12/05 15:33:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -762,6 +762,9 @@ in6_control(so, cmd, data, ifp)
 	{
 		int i, error = 0;
 		struct nd_prefix pr0, *pr;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		long time_second;
+#endif
 
 		/* reject read-only flags */
 		if ((ifra->ifra_flags & IN6_IFF_READONLY))
@@ -835,6 +838,19 @@ in6_control(so, cmd, data, ifp)
 		    ((ifra->ifra_flags & IN6_IFF_AUTOCONF) != 0);
 		pr0.ndpr_vltime = ifra->ifra_lifetime.ia6t_vltime;
 		pr0.ndpr_pltime = ifra->ifra_lifetime.ia6t_pltime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		time_second = time.tv_sec;
+#endif
+		pr0.ndpr_lastupdate = time_second;
+		if ((error = in6_init_prefix_ltimes(&pr0)) != 0) {
+			/*
+			 * Validation for lifetimes should have been done, so
+			 * this should always succeed.
+			 */
+			log(LOG_ERR, "in6_control: failed to initialize prefix"
+			    " lifetimes\n");
+			return (error);
+		}
 
 		/* add the prefix if not yet. */
 		if ((pr = nd6_prefix_lookup(&pr0)) == NULL) {
@@ -883,8 +899,7 @@ in6_control(so, cmd, data, ifp)
 
 	case SIOCDIFADDR_IN6:
 	{
-		int i = 0, purgeprefix = 0;
-		struct nd_prefix pr0, *pr = NULL;
+		struct nd_prefix *pr;
 
 		/*
 		 * If the address being deleted is the only one that owns
@@ -894,29 +909,11 @@ in6_control(so, cmd, data, ifp)
 		 * and the prefix management.  We do this, however, to provide
 		 * as much backward compatibility as possible in terms of
 		 * the ioctl operation.
+		 * Note that in6_purgeaddr() will decrement ndpr_refcnt.
 		 */
-		bzero(&pr0, sizeof(pr0));
-		pr0.ndpr_ifp = ifp;
-		pr0.ndpr_plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr,
-		    NULL);
-		if (pr0.ndpr_plen == 128)
-			goto purgeaddr;
-		pr0.ndpr_prefix = ia->ia_addr;
-		pr0.ndpr_mask = ia->ia_prefixmask.sin6_addr;
-		for (i = 0; i < 4; i++) {
-			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
-			    ia->ia_prefixmask.sin6_addr.s6_addr32[i];
-		}
-		if ((pr = nd6_prefix_lookup(&pr0)) != NULL &&
-		    pr == ia->ia6_ndpr) {
-			pr->ndpr_refcnt--;
-			if (pr->ndpr_refcnt == 0)
-				purgeprefix = 1;
-		}
-
-	  purgeaddr:
+		pr = ia->ia6_ndpr;
 		in6_purgeaddr(&ia->ia_ifa);
-		if (pr && purgeprefix)
+		if (pr && pr->ndpr_refcnt == 0)
 			prelist_remove(pr);
 		break;
 	}
@@ -1606,24 +1603,25 @@ in6_unlink_ifa(ia, ifp)
 #endif
 
 	/*
-	 * When an autoconfigured address is being removed, release the
-	 * reference to the base prefix.  Also, since the release might
-	 * affect the status of other (detached) addresses, call
-	 * pfxlist_onlink_check().
+	 * Release the reference to the base prefix.  There should be a
+	 * positive reference.
 	 */
-	if ((oia->ia6_flags & IN6_IFF_AUTOCONF) != 0) {
-		if (oia->ia6_ndpr == NULL) {
-			nd6log((LOG_NOTICE,
-			    "in6_unlink_ifa: autoconf'ed address "
-			    "%p has no prefix\n", oia));
-		} else {
-			oia->ia6_ndpr->ndpr_refcnt--;
-			oia->ia6_flags &= ~IN6_IFF_AUTOCONF;
-			oia->ia6_ndpr = NULL;
-		}
-
-		pfxlist_onlink_check();
+	if (oia->ia6_ndpr == NULL) {
+		nd6log((LOG_NOTICE,
+		    "in6_unlink_ifa: autoconf'ed address "
+		    "%p has no prefix\n", oia));
+	} else {
+		oia->ia6_ndpr->ndpr_refcnt--;
+		oia->ia6_ndpr = NULL;
 	}
+
+	/*
+	 * Also, if the address being removed is autoconf'ed, call
+	 * pfxlist_onlink_check() since the release might affect the status of
+	 * other (detached) addresses. 
+	 */
+	if ((oia->ia6_flags & IN6_IFF_AUTOCONF))
+		pfxlist_onlink_check();
 
 	/*
 	 * release another refcnt for the link from in6_ifaddr.
