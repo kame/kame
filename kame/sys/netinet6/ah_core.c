@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.45 2001/07/26 06:53:14 jinmei Exp $	*/
+/*	$KAME: ah_core.c,v 1.46 2001/10/29 04:37:05 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1607,8 +1607,15 @@ ah6_calccksum(m, ahdat, len, algo, sav)
 				}
 				optlen = optp[1] + 2;
 
-				if (optp[0] & IP6OPT_MUTABLE)
+				if (optp[0] & IP6OPT_MUTABLE) {
+					if (optp + optlen > optend) {
+						error = EINVAL;
+						m_free(n);
+						n = NULL;
+						goto fail;
+					}
 					bzero(optp + 2, optlen - 2);
+				}
 			}
 
 			optp += optlen;
