@@ -1,4 +1,4 @@
-.\"	$KAME: ipsec.4,v 1.8 2000/04/20 14:25:46 itojun Exp $
+.\"	$KAME: ipsec.4,v 1.9 2000/06/12 10:27:22 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -208,6 +208,7 @@ routines from looking into IP payload.
 .Xr sysctl 8 ,
 .Xr racoon 8
 .Pp
+.Sh STANDARDS
 .Rs
 .%A Daniel L. McDonald
 .%A Craig Metz
@@ -223,7 +224,9 @@ routines from looking into IP payload.
 .%N "draft-mcdonald-simple-ipsec-api-03.txt"
 .%O work in progress material
 .Re
-.Sh CAVEAT
+.Sh HISTORY
+The implementation described herein appeared in WIDE/KAME IPv6/IPsec stack.
+.Sh BUGS
 The IPsec support is subject to change as the IPsec protocols develop.
 .Pp
 There is no single standard for policy engine API,
@@ -238,6 +241,3 @@ This is because AH authenticates encapsulating
 packet, not the encapsulated
 .Pq inner
 packet.
-.\"
-.Sh HISTORY
-The implementation described herein appeared in WIDE/KAME IPv6/IPsec stack.
