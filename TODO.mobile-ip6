@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.23 2001/12/27 02:46:05 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.24 2001/12/28 06:34:47 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -84,12 +84,15 @@ provided home agent node functions
 
 <<Security mechanisms>>
 
-KAME/MIP6 supports both IPsec and authentication data (appered in
-draft-15) mechanism.  Since we do not provide any key distribution
-mechanism, setting SAs must be done by hand.  If you use IPsec, you
-just set up IPsec spd/sa database as usual.  If you choose authdata
-sub-option, set up spd with protocol number 60(ipv6-opts, this is
-subject to change), and set up sa with protocol AH.  for example,
+KAME/MIP6 supports both the IPsec and the authentication data
+sub-option (appered in draft-15) mechanism.  Since we do not provide
+any key distribution mechanisms, setting SAs must be done by hand.  If
+you use the IPsec, you just set up IPsec spd/sa database as usual.
+Since the IPsec protection is disabled by default, you must modify
+kernel code to enable the IPsec. See mip6.c:mip6_init().  We must
+provide a sysctl switch soon. If you choose authdata sub-option, set
+up spd with protocol number 60(ipv6-opts, this is subject to change),
+and set up sa with protocol AH.  for example,
 
 add mn::host hacn::host ah 1500 -m transport -A hmac-sha1
 	"AH SA configuration!";
