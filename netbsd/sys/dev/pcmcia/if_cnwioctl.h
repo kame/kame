@@ -57,21 +57,21 @@ struct cnwstatus {
 };
 
 struct cnwstats {
-	u_int	nws_rx;
-	u_int	nws_rxerr;
-	u_int	nws_rxoverflow;
-	u_int	nws_rxoverrun;
-	u_int	nws_rxcrcerror;
-	u_int	nws_rxframe;
-	u_int	nws_rxerrors;
-	u_int	nws_rxavail;
-	u_int	nws_rxone;
-	u_int	nws_tx;
-	u_int	nws_txokay;
-	u_int	nws_txabort;
-	u_int	nws_txlostcd;
-	u_int	nws_txerrors;
-	u_int	nws_txretries[16];
+	u_quad_t nws_rx;
+	u_quad_t nws_rxerr;
+	u_quad_t nws_rxoverflow;
+	u_quad_t nws_rxoverrun;
+	u_quad_t nws_rxcrcerror;
+	u_quad_t nws_rxframe;
+	u_quad_t nws_rxerrors;
+	u_quad_t nws_rxavail;
+	u_quad_t nws_rxone;
+	u_quad_t nws_tx;
+	u_quad_t nws_txokay;
+	u_quad_t nws_txabort;
+	u_quad_t nws_txlostcd;
+	u_quad_t nws_txerrors;
+	u_quad_t nws_txretries[16];
 };
 
 struct cnwistats {
