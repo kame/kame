@@ -938,7 +938,7 @@ cvthname(f)
 	static char host[NI_MAXHOST], ip[NI_MAXHOST];
 
 	error = getnameinfo((struct sockaddr*)f, ((struct sockaddr*)f)->sa_len,
-			ip, NI_MAXHOST, NULL, 0, NI_NUMERICHOST|niflag);
+			ip, sizeof ip, NULL, 0, NI_NUMERICHOST|niflag);
 
 	dprintf("cvthname(%s)\n", ip);
 
@@ -948,7 +948,7 @@ cvthname(f)
 	}
 
 	error = getnameinfo((struct sockaddr*)f, ((struct sockaddr*)f)->sa_len,
-			host, NI_MAXHOST, NULL, 0, niflag);
+			host, sizeof host, NULL, 0, niflag);
 	if (error) {
 		dprintf("Host name for your address (%s) unknown\n", ip);
 		return (ip);
