@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_blue.c,v 1.3 2001/08/15 12:51:58 kjc Exp $	*/
+/*	$KAME: qdisc_blue.c,v 1.4 2002/10/27 03:19:35 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -52,6 +52,7 @@ blue_stat_loop(int fd, const char *ifname, int count, int interval)
 	u_int64_t last_bytes;
 	double sec;
 	int cnt = count;
+	sigset_t		omask;
 
 	strlcpy(blue_stats.iface.blue_ifname, ifname,
 		sizeof(blue_stats.iface.blue_ifname));
@@ -85,6 +86,9 @@ blue_stat_loop(int fd, const char *ifname, int count, int interval)
 
 		last_bytes = blue_stats.xmit_bytes;
 		last_time = cur_time;
-		sleep(interval);
+
+		/* wait for alarm signal */
+		if (sigprocmask(SIG_BLOCK, NULL, &omask) == 0)
+			sigsuspend(&omask);
 	}
 }

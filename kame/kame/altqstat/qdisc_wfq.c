@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_wfq.c,v 1.3 2001/08/15 12:51:59 kjc Exp $	*/
+/*	$KAME: qdisc_wfq.c,v 1.4 2002/10/27 03:19:36 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 #include <math.h>
 #include <errno.h>
 #include <err.h>
@@ -66,6 +67,7 @@ wfq_stat_loop(int fd, const char *ifname, int count, int interval)
 	double sec;
 	struct wfqinfo *qinfo, **top;
 	int cnt = count;
+	sigset_t		omask;
 
 	strlcpy(wfq_stats.iface.wfq_ifacename, ifname,
 		sizeof(wfq_stats.iface.wfq_ifacename));
@@ -162,7 +164,10 @@ wfq_stat_loop(int fd, const char *ifname, int count, int interval)
 #endif
 
 		last_time = cur_time;
-		sleep(interval);
+
+		/* wait for alarm signal */
+		if (sigprocmask(SIG_BLOCK, NULL, &omask) == 0)
+			sigsuspend(&omask);
 	}
 
 }

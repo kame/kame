@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_hfsc.c,v 1.4 2001/08/15 12:51:59 kjc Exp $	*/
+/*	$KAME: qdisc_hfsc.c,v 1.5 2002/10/27 03:19:36 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 #include <math.h>
 #include <errno.h>
 #include <err.h>
@@ -58,6 +59,7 @@ hfsc_stat_loop(int fd, const char *ifname, int count, int interval)
 	int			i;
 	double			sec;
 	int			cnt = count;
+	sigset_t		omask;
 	
 	strlcpy(get_stats.iface.hfsc_ifname, ifname,
 		sizeof(get_stats.iface.hfsc_ifname));
@@ -125,6 +127,9 @@ hfsc_stat_loop(int fd, const char *ifname, int count, int interval)
 		new = tmp;
 
 		last_time = cur_time;
-		sleep(interval);
+
+		/* wait for alarm signal */
+		if (sigprocmask(SIG_BLOCK, NULL, &omask) == 0)
+			sigsuspend(&omask);
 	}
 }

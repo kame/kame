@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_cbq.c,v 1.5 2001/11/07 04:56:08 kjc Exp $	*/
+/*	$KAME: qdisc_cbq.c,v 1.6 2002/10/27 03:19:35 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 #include <math.h>
 #include <errno.h>
 #include <err.h>
@@ -66,6 +67,7 @@ cbq_stat_loop(int fd, const char *ifname, int count, int interval)
 	int			i;
 	double			flow_bps, sec;
 	int cnt = count;
+	sigset_t		omask;
 
 	strlcpy(get_stats.iface.cbq_ifacename, ifname,
 		sizeof(get_stats.iface.cbq_ifacename));
@@ -155,6 +157,9 @@ cbq_stat_loop(int fd, const char *ifname, int count, int interval)
 		new = tmp;
 
 		last_time = cur_time;
-		sleep(interval);
+
+		/* wait for alarm signal */
+		if (sigprocmask(SIG_BLOCK, NULL, &omask) == 0)
+			sigsuspend(&omask);
 	}
 }
