@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.316 2002/07/10 09:08:03 k-sugyou Exp $	*/
+/*	$KAME: icmp6.c,v 1.317 2002/07/30 23:26:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2704,7 +2704,7 @@ icmp6_redirect_input(m, off)
 	struct sockaddr_in6 *src_sa, reddst6, redtgt6, rodst;
 	union nd_opts ndopts;
 
-	if (!m || !ifp)
+	if (!ifp)
 		return;
 
 	/* XXX if we are router, we don't update route by icmp6 redirect */
