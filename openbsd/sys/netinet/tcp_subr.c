@@ -919,7 +919,7 @@ tcp_mtudisc_callback(faddr)
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_addr = *faddr;
 	(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sin6, 0,
-	    (struct sockaddr *)&sa6_any, 0, EMSGSIZE, NULL, tcp_mtudisc);
+	    (struct sockaddr *)&sa6_any, 0, PRC_MSGSIZE, NULL, tcp_mtudisc);
 }
 #endif /* INET6 && !TCP6 */
 
