@@ -2285,6 +2285,57 @@ tn(argc, argv)
 	    if (srp && setsockopt(net, proto, opt, srp, srlen) < 0)
 		perror("setsockopt (source route)");
 	}
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+    {
+	int len;
+	char *buf;
+	int level;
+	int optname;
+
+    	if (ipsec_policy_in != NULL) {
+		if ((len = ipsec_get_policylen(ipsec_policy_in)) < 0) {
+			printf("%s\n", ipsec_strerror());
+			return 0;
+		}
+		if ((buf = (char *)malloc(len)) == NULL) {
+			perror("malloc");
+			return 0;
+		}
+		if ((len = ipsec_set_policy(buf, len, ipsec_policy_in)) < 0) {
+			printf("%s\n", ipsec_strerror());
+			return 0;
+		}
+		level = res->ai_family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
+		optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY_IN : IPV6_IPSEC_POLICY_IN;
+		if (setsockopt(net, level, optname, buf, len) < 0){
+			perror("setsockopt");
+			return 0;
+		}
+		free(buf);
+	}
+    	if (ipsec_policy_out != NULL) {
+		if ((len = ipsec_get_policylen(ipsec_policy_out)) < 0) {
+			printf("%s\n", ipsec_strerror());
+			return 0;
+		}
+		if ((buf = (char *)malloc(len)) == NULL) {
+			perror("malloc");
+			return 0;
+		}
+		if ((len = ipsec_set_policy(buf, len, ipsec_policy_out)) < 0) {
+			printf("%s\n", ipsec_strerror());
+			return 0;
+		}
+		level = res->ai_family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
+		optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY_IN : IPV6_IPSEC_POLICY_IN;
+		if (setsockopt(net, level, optname, buf, len) < 0){
+			perror("setsockopt");
+			return 0;
+		}
+		free(buf);
+	}
+    }
+#endif
 
 	if (connect(net, res->ai_addr, res->ai_addrlen) < 0) {
 	    if (res->ai_next) {
