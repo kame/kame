@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.63 2003/09/02 23:31:26 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.64 2003/09/02 23:31:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -472,7 +472,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	tv.tv_usec = 0;
 
 	getnameinfo(srcaddr, srcaddr->sa_len,
-		src, sizeof(src), NULL, 0, NI_NUMERICHOST);
+	    src, sizeof(src), NULL, 0, NI_NUMERICHOST);
 	syslog(LOG_INFO, "accepted a client from %s", src);
 
 	error = getsockname(s_src, (struct sockaddr *)&dstaddr6, &len);
