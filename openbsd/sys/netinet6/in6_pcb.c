@@ -1016,6 +1016,16 @@ in6_setsockaddr(inp, nam)
   sin6->sin6_len = sizeof(struct sockaddr_in6);
   sin6->sin6_port = inp->inp_lport;
   sin6->sin6_addr = inp->inp_laddr6;
+  /* XXX: KAME specific: move embedded link ID to sin6_scope_id */
+  if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)  ||
+      IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr)) {
+      sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
+  }
+  else
+      sin6->sin6_scope_id = 0;	/* XXX */
+  if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)  ||
+      IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr))
+      sin6->sin6_addr.s6_addr16[1] = 0;
 
   return 0;
 }
