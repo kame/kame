@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.303 2002/05/31 03:21:28 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.304 2002/05/31 04:11:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -205,10 +205,10 @@ static int ip6_insert_jumboopt __P((struct ip6_exthdrs *, u_int32_t));
 static int ip6_splithdr __P((struct mbuf *, struct ip6_exthdrs *));
 #ifdef NEW_STRUCT_ROUTE
 static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
-			    struct sockaddr_in6 *, u_long *));
+			    struct sockaddr_in6 *, u_long *, int *));
 #else
 static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
-			    struct sockaddr_in6 *, u_long *));
+			    struct sockaddr_in6 *, u_long *, int *));
 #endif
 
 #ifdef __bsdi__
@@ -262,6 +262,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	int error = 0;
 	struct in6_ifaddr *ia = NULL;
 	u_long mtu;
+	int alwaysfrag, dontfrag;
 	u_int32_t optlen = 0, plen = 0, unfragpartlen = 0;
 	struct ip6_exthdrs exthdrs;
 	int clone = 0;
@@ -1232,7 +1233,8 @@ skip_ipsec2:;
 		nd6_nud_hint(rt, NULL, 0);
 
 	/* Determine path MTU. */
-	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst_sa, &mtu)) != 0)
+	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst_sa, &mtu,
+	    &alwaysfrag)) != 0)
 		goto bad;
 
 	/*
@@ -1357,18 +1359,42 @@ skip_ipsec2:;
 	/*
 	 * Send the packet to the outgoing interface.
 	 * If necessary, do IPv6 fragmentation before sending.
+	 *
+	 * the logic here is rather complex:
+	 * 1: normal case (dontfrag == 0, alwaysfrag == 0)
+	 * 1-a:	send as is if tlen <= path mtu
+	 * 1-b:	fragment if tlen > path mtu
+	 *
+	 * 2: if user asks us not to fragment (dontfrag == 1)
+	 * 2-a:	send as is if tlen <= interface mtu
+	 * 2-b:	error if tlen > interface mtu
+	 *
+	 * 3: if we always need to attach fragment header (alwaysfrag == 1)
+	 *	always fragment
+	 *
+	 * 4: if dontfrag == 1 && alwaysfrag == 1
+	 *	error, as we cannot handle this conflicting request
 	 */
 	tlen = m->m_pkthdr.len;
-	/*
-	 * Even if the DONTFRAG option is specified, we cannot send the packet
-	 * when the data length is larger than the MTU of the outgoing
-	 * interface.
-	 * Notify the error by sending IPV6_PATHMTU ancillary data as well
-	 * as returning an error code (the latter is not described in the API
-	 * spec.)
-	 */
-	if (opt && (opt->ip6po_flags & IP6PO_DONTFRAG) &&
-	    tlen > IN6_LINKMTU(ifp)) {
+
+	if (opt && (opt->ip6po_flags & IP6PO_DONTFRAG))
+		dontfrag = 1;
+	else
+		dontfrag = 0;
+	if (dontfrag && alwaysfrag) {	/* case 4 */
+		/* conflicting request - can't transmit */
+		error = EMSGSIZE;
+		goto bad;
+	}
+	if (dontfrag && tlen > IN6_LINKMTU(ifp)) {	/* case 2-b */
+		/*
+		 * Even if the DONTFRAG option is specified, we cannot send the
+		 * packet when the data length is larger than the MTU of the
+		 * outgoing interface.
+		 * Notify the error by sending IPV6_PATHMTU ancillary data as
+		 * well as returning an error code (the latter is not described
+		 * in the API spec.)
+		 */
 		u_int32_t mtu32;
 		struct ip6ctlparam ip6cp;
 
@@ -1380,7 +1406,11 @@ skip_ipsec2:;
 		error = EMSGSIZE;
 		goto bad;
 	}
-	if (tlen <= mtu || (opt && (opt->ip6po_flags & IP6PO_DONTFRAG))) {
+
+	/*
+	 * transmit packet without fragmentation
+	 */
+	if (dontfrag || (!alwaysfrag && tlen <= mtu)) {	/* case 1-a and 2-a */
 		struct in6_ifaddr *ia6;
 
 		ip6 = mtod(m, struct ip6_hdr *);
@@ -1404,15 +1434,18 @@ skip_ipsec2:;
 #endif
 		error = nd6_output(ifp, origifp, m, dst, rt);
 		goto done;
-	} else if (mtu < IPV6_MMTU) {
-		/*
-		 * note that path MTU is never less than IPV6_MMTU
-		 * (see icmp6_input).
-		 */
+	}
+
+	/*
+	 * try to fragment the packet.  case 1-b and 3
+	 */
+	if (mtu < IPV6_MMTU) {
+		/* path MTU cannot be less than IPV6_MMTU */
 		error = EMSGSIZE;
 		in6_ifstat_inc(ifp, ifs6_out_fragfail);
 		goto bad;
-	} else if (ip6->ip6_plen == 0) { /* jumbo payload cannot be fragmented */
+	} else if (ip6->ip6_plen == 0) {
+		/* jumbo payload cannot be fragmented */
 		error = EMSGSIZE;
 		in6_ifstat_inc(ifp, ifs6_out_fragfail);
 		goto bad;
@@ -1776,7 +1809,7 @@ ip6_insertfraghdr(m0, m, hlen, frghdrp)
 }
 
 static int
-ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
+ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 #ifdef NEW_STRUCT_ROUTE
 	struct route *ro_pmtu, *ro;
 #else
@@ -1785,8 +1818,10 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 	struct ifnet *ifp;
 	struct sockaddr_in6 *dst;
 	u_long *mtup;
+	int *alwaysfragp;
 {
 	u_int32_t mtu = 0;
+	int alwaysfrag = 0;
 	int error = 0;
 
 	if (ro_pmtu != ro) {
@@ -1827,7 +1862,18 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 		mtu = ro_pmtu->ro_rt->rt_rmx.rmx_mtu;
 		if (mtu == 0)
 			mtu = ifmtu;
-		else if (mtu > ifmtu) {
+		else if (mtu < IPV6_MMTU) {
+			/*
+			 * RFC2460 section 5, last paragraph:
+			 * if we record ICMPv6 too big message with
+			 * mtu < IPV6_MMTU, transmit packets sized IPV6_MMTU
+			 * or smaller, with framgent header attached.
+			 * (fragment header is needed regardless from the
+			 * packet size, for translators to identify packets)
+			 */
+			alwaysfrag = 1;
+			mtu = IPV6_MMTU;
+		} else if (mtu > ifmtu) {
 			/*
 			 * The MTU on the route is larger than the MTU on
 			 * the interface!  This shouldn't happen, unless the
@@ -1849,6 +1895,8 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 		error = EHOSTUNREACH; /* XXX */
 
 	*mtup = mtu;
+	if (alwaysfragp)
+		*alwaysfragp = alwaysfrag;
 	return(error);
 }
 
@@ -2676,7 +2724,7 @@ do { \
 				 * the outgoing interface.
 				 */
 				error = ip6_getpmtu(ro, NULL, NULL,
-						    &in6p->in6p_fsa, &pmtu);
+				    &in6p->in6p_fsa, &pmtu, NULL);
 				if (error)
 					break;
 				if (pmtu > IPV6_MAXPACKET)

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.310 2002/05/29 15:02:40 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.311 2002/05/31 04:11:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -674,15 +674,25 @@ icmp6_input(mp, offp, proto)
 		if (code != 0)
 			goto badcode;
 
+#if 0
 		/*
-		 * RFC 1981 says that we may receive a Too Big message
-		 * reporting a next-hop MTU that is less than the minimum MTU,
-		 * but this can only happen when using an SIIT style
-		 * translation.
-		 * Since we do not support SIIT, it should be better to ignore
-		 * those messages.
+		 * RFC2460 section 5, last paragraph.
+		 * even though minimum link MTU for IPv6 is IPV6_MMTU,
+		 * we may see ICMPv6 too big with mtu < IPV6_MMTU
+		 * due to packet translator in the middle.
+		 * see ip6_output() and ip6_getpmtu() "alwaysfrag" case for
+		 * special handling.
 		 */
 		if (ntohl(icmp6->icmp6_mtu) < IPV6_MMTU)
+			break;	/* or just drop it? */
+#endif
+
+		/*
+		 * we reject ICMPv6 too big with abnormally small value.
+		 * XXX what is the good definition of "abnormally small"?
+		 */
+		if (ntohl(icmp6->icmp6_mtu) <
+		    sizeof(struct ip6_hdr) + sizeof(struct ip6_frag) + 8)
 			break;	/* or just drop it? */
 
 		code = PRC_MSGSIZE;
