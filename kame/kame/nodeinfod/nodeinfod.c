@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.20 2001/10/24 07:32:35 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.21 2001/10/24 07:41:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -599,7 +599,7 @@ ni6_input(from, fromlen, buf, l)
 				goto bad;
 			break;
 
-		case ICMP6_NI_SUBJ_IPV4:	/* XXX: to be implemented? */
+		case ICMP6_NI_SUBJ_IPV4:
 			if (subjlen != sizeof(sin.sin_addr))
 				goto bad;
 
