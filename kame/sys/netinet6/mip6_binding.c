@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.45 2001/12/06 06:53:52 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.46 2001/12/07 10:30:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -365,7 +365,8 @@ mip6_home_registration(sc)
 			 ip6_sprintf(&mpfx->mpfx_haddr)));
 
 		mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
-				     IP6_BUF_ACK|IP6_BUF_HOME, sc);
+				     IP6_BUF_ACK|IP6_BUF_HOME|IP6_BUF_DAD,
+				     sc);
 		if (mbu == NULL)
 			return (ENOMEM);
 
@@ -373,7 +374,7 @@ mip6_home_registration(sc)
 	} else {
 		int32_t coa_lifetime, prefix_lifetime;
 
-		/* a BU entry exists.  update information. */
+		/* a binding update entry exists.  update information. */
 
 		/* update coa. */
 		if (sc->hif_location == HIF_LOCATION_HOME) {
@@ -400,8 +401,7 @@ mip6_home_registration(sc)
 		mbu->mbu_refremain = mbu->mbu_refresh;
 		mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
 		mbu->mbu_ackremain = mbu->mbu_acktimeout;
-		/* mbu->mbu_seqno++; */
-		/* XXX mbu->mbu_flags |= IP6_BUF_DAD */
+		/* mbu->mbu_flags |= IP6_BUF_DAD ;*/
 	}
 	mbu->mbu_state = MIP6_BU_STATE_WAITACK | MIP6_BU_STATE_WAITSENT;
 
@@ -455,15 +455,9 @@ mip6_bu_list_notify_binding_change(sc)
 		mbu->mbu_remain = mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
 		mbu->mbu_refremain = mbu->mbu_refresh;
-		/* mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT; */
-		/* mbu->mbu_ackremain = mbu->mbu_acktimeout; */
-		mbu->mbu_seqno++;
 		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 		mip6_bu_send_bu(mbu);
 	}
-
-	/* start BU timer if it hasn't started already */
-	/* mip6_bu_starttimer(); */
 
 	return (0);
 }
@@ -2130,15 +2124,6 @@ success:
 	 * status.
 	 */
 	mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK;
-
-	/*
-	 * increment seqno of this binding update entry that matches
-	 * with this receiving binding ack.  note that we already have
-	 * incremented the seqno of the other binding update entries
-	 * those don't require binding acks (the binding update
-	 * entries that IP6_BUF_ACK flags are not set.)
-	 */
-	mbu->mbu_seqno++;
 
 	/* update lifetime and refresh time. */
 	lifetime = ntohl(*(u_int32_t *)ba_opt->ip6oa_lifetime);

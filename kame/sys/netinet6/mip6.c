@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.85 2001/12/07 07:07:09 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.86 2001/12/07 10:30:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1518,6 +1518,9 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		return (0);
 	}
 
+	/* update sequence number of this binding update entry. */
+	mbu->mbu_seqno++;
+
 	bzero(&bu_opt, sizeof(struct ip6_opt_binding_update));
 	bu_opt.ip6ou_type = IP6OPT_BINDING_UPDATE;
 	bu_opt.ip6ou_len = IP6OPT_BULEN;
@@ -1555,16 +1558,6 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 #else
 	bu_opt.ip6ou_seqno = mbu->mbu_seqno;
 #endif /* MIP6_DRAFT13 */
-	if ((mbu->mbu_flags & IP6_BUF_ACK) == 0) {
-		/*
-		 * increase the sequence number of the binding update
-		 * entries without the IP6_BUF_ACK flag set.  the
-		 * seqno of the binding update entries with
-		 * IP6_BUF_ACK flag set will be incremented when
-		 * matching binding acks has been received.
-		 */
-		mbu->mbu_seqno++;
-	}
 
 	/* XXX MIP6_BUFFER_SIZE = IPV6_MIMMTU is OK?? */
 	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
