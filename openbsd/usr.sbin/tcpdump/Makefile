@@ -29,6 +29,8 @@ DEFS =  -DHAVE_FCNTL_H=1 -DHAVE_MEMORY_H=1 -DTIME_WITH_SYS_TIME=1 -DHAVE_NET_SLI
 CFLAGS+=	-O2
 CPPFLAGS+=	${DEFS} ${INCLS}
 
+# crypto support is not enabled due to differences in include file placement.
+
 LDADD+=	-lz
 DPADD+=	${LIBZ}
 LDADD+=	-L${.CURDIR}/../../lib/libpcap -lpcap
