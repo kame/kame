@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.96 2005/01/26 03:42:08 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.97 2005/04/01 07:31:01 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -849,7 +849,8 @@ struct icmp6stat {
 #define ICMPV6CTL_MLD_MAXSRCFILTER	21
 #define ICMPV6CTL_MLD_SOMAXSRC	22
 #define ICMPV6CTL_MLD_VERSION	23
-#define ICMPV6CTL_MAXID		24
+#define ICMPV6CTL_ND6_MAXQLEN	24
+#define ICMPV6CTL_MAXID		25
 
 #define ICMPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -876,6 +877,7 @@ struct icmp6stat {
 	{ "mldmaxsrcfilter", CTLTYPE_INT }, \
 	{ "mldsomaxsrc", CTLTYPE_INT }, \
 	{ "mldalwaysv2", CTLTYPE_INT }, \
+	{ "nd6_maxqueuelen", CTLTYPE_INT }, \
 }
 
 #define RTF_PROBEMTU	RTF_PROTO1

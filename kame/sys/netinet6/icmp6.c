@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.399 2005/01/24 03:42:17 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.400 2005/04/01 07:31:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3630,6 +3630,7 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return sysctl_int(oldp, oldlenp, newp, newlen, &nd6_debug);
 	case ICMPV6CTL_ND6_DRLIST:
 	case ICMPV6CTL_ND6_PRLIST:
+	case ICMPV6CTL_ND6_MAXQLEN:
 		return nd6_sysctl(name[0], oldp, oldlenp, newp, newlen);
 
 #ifdef MLDV2
@@ -3667,6 +3668,7 @@ SYSCTL_SETUP(sysctl_net_inet6_icmp6_setup,
 #ifdef MLDV2
 	extern int mld_version;	/* defined in mldv2.c */
 #endif
+	extern int nd6_maxqueuelen; /* defined in nd6.c */
 
 	sysctl_createv(clog, 0, NULL, NULL,
 		       CTLFLAG_PERMANENT,
@@ -3813,6 +3815,14 @@ SYSCTL_SETUP(sysctl_net_inet6_icmp6_setup,
 		       sysctl_net_inet6_icmp6_nd6, 0, NULL, 0,
 		       CTL_NET, PF_INET6, IPPROTO_ICMPV6,
 		       ICMPV6CTL_ND6_PRLIST, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "maxqueuelen",
+		       SYSCTL_DESCR("max packet queue len for a unresolved ND"),
+		       NULL, 1, &ip6_forwarding, 0,
+		       CTL_NET, PF_INET6, IPPROTO_ICMPV6,
+		       ICMPV6CTL_ND6_MAXQLEN, CTL_EOL);
+
 #ifdef MLDV2
 	sysctl_createv(clog, 0, NULL, NULL,
 		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,

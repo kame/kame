@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.372 2005/03/14 09:45:39 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.373 2005/04/01 07:31:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,6 +145,8 @@ int	nd6_gctimer	= (60 * 60 * 24); /* 1 day: garbage collection timer */
 int nd6_maxndopt = 10;	/* max # of ND options allowed */
 
 int nd6_maxnudhint = 0;	/* max # of subsequent upper layer hints */
+
+int nd6_maxqueuelen = 1; /* max # of packets cached in unresolved ND entries */
 
 #ifdef ND6_DEBUG
 int nd6_debug = 1;
@@ -2545,19 +2547,24 @@ again:
 	/*
 	 * There is a neighbor cache entry, but no ethernet address
 	 * response yet.  Append this latest packet to the end of the
-	 * packet queue in the mbuf
+	 * packet queue in the mbuf, unless the number of the packet
+	 * does not exceed nd6_maxqueuelen.
 	 */
 	if (ln->ln_state == ND6_LLINFO_NOSTATE)
 		ln->ln_state = ND6_LLINFO_INCOMPLETE;
 	if (ln->ln_hold) {
 		struct mbuf *m_hold, *m_hold_last; 
+		int i;
 
 		m_hold = m_hold_last = ln->ln_hold;
-		while (m_hold) {
+		for (i = 0; i < nd6_maxqueuelen; i++) {
+			if (m_hold == NULL) {
+				m_hold_last->m_nextpkt = m;
+				break;
+			}
 			m_hold_last = m_hold;
 			m_hold = m_hold->m_nextpkt;
 		}
-		m_hold_last->m_nextpkt = m;
 	} else {
 		ln->ln_hold = m;
 	}
@@ -2798,6 +2805,11 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 			error = copyout(p, oldp, *oldlenp);
 		break;
 
+	case ICMPV6CTL_ND6_MAXQLEN:
+		error = sysctl_int(oldp, oldlenp, newp, newlen,
+		    &nd6_maxqueulen);
+		break;
+
 	default:
 		error = ENOPROTOOPT;
 		break;
@@ -2817,6 +2829,8 @@ SYSCTL_NODE(_net_inet6_icmp6, ICMPV6CTL_ND6_DRLIST, nd6_drlist,
 	CTLFLAG_RD, nd6_sysctl_drlist, "");
 SYSCTL_NODE(_net_inet6_icmp6, ICMPV6CTL_ND6_PRLIST, nd6_prlist,
 	CTLFLAG_RD, nd6_sysctl_prlist, "");
+SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_MAXQLEN, nd6_maxqueuelen,
+	CTLFLAG_RW, &nd6_maxqueuelen, 1, "");
 
 static int
 nd6_sysctl_drlist(SYSCTL_HANDLER_ARGS)

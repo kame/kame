@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2740 2005/04/01 06:04:36 suz Exp $
+$KAME: CHANGELOG,v 1.2741 2005/04/01 07:31:00 suz Exp $
 
 <200504>
+2005-04-01  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/sys/netinet/icmp6.h, kame/sys/netinet6/icmp6.c, nd6.c: limits 
+	the number of fragmented packets stored in a NDP cache.
+	(To prevent a DoS attack using 2005-01-21's change)
+
 2005-04-01  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/kame/rtadvd/configc, rtadvd.[ch]: reflect router-variables
 	in RA configuration into host-variables in kernel.
