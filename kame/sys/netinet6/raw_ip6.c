@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.125 2002/06/07 21:36:44 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.126 2002/06/07 22:09:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,6 +161,7 @@ struct rip6stat rip6stat;
 void
 rip6_init()
 {
+
 #ifdef __OpenBSD__
 	in_pcbinit(&rawin6pcbtable, 1);
 #else
