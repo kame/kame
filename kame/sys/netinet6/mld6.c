@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.63 2002/10/17 13:54:14 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.64 2002/10/22 06:21:14 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -387,16 +387,28 @@ mld6_start_listening(in6m)
 	if (SA6_ARE_ADDR_EQUAL(&in6m->in6m_sa, &all_sa) ||
 	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_sa.sin6_addr) <
 	    IPV6_ADDR_SCOPE_LINKLOCAL) {
+#ifdef MLDV2_DEBUG
+		printf("mld_start_listening: not send report for %s\n",
+			ip6_sprintf(&in6m->in6m_sa.sin6_addr));
+#endif
 		in6m->in6m_timer = 0;
 		in6m->in6m_state = MLD_OTHERLISTENER;
 	} else {
 #ifdef MLDV2
-		if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER)
+		if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
+#ifdef MLDV2_DEBUG
+			printf("mld_start_listening: send v2 report for %s\n",
+				ip6_sprintf(&in6m->in6m_sa.sin6_addr));
+#endif
 			mld_send_state_change_report(&m, &buflen, in6m,
 						     type, timer_init);
-		else
+		} else
 #endif
 		{
+#ifdef MLDV2_DEBUG
+			printf("mld_start_listening: send v1 report for %s\n",
+				ip6_sprintf(&in6m->in6m_sa.sin6_addr));
+#endif
 			mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
 			in6m->in6m_timer =
 				MLD_RANDOM_DELAY(MLD_UNSOLICITED_REPORT_INTERVAL *
@@ -557,9 +569,14 @@ mld6_input(m, off)
 		 * octets of the query message)
 		 */
 		mldlen = m->m_pkthdr.len - off;
-		if (mldlen == MLD_MINLEN)
+		if (mldlen == MLD_MINLEN) {
 			query_type = MLD_V1_QUERY;
-		else if (mldlen > MLD_MINLEN && mldlen < MLD_V2_QUERY_MINLEN) {
+#ifdef MLDV2_DEBUG
+			printf("mld_input(): regard it as MLDv1 Query from %s for %s\n",
+			       ip6_sprintf(&ip6->ip6_src),
+			       ip6_sprintf(&mldh->mld_addr));
+#endif
+		} else if (mldlen > MLD_MINLEN && mldlen < MLD_V2_QUERY_MINLEN) {
 #ifdef MLDV2_DEBUG
 			printf("mld_input: ignores MLD packet with improper length (%d)\n", mldlen);
 #endif
@@ -568,15 +585,24 @@ mld6_input(m, off)
 		} else {
 			/* mldlen >= MLD_V2_QUERY_MINLEN */
 			if (IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
-			    mldv2h->mld_numsrc == 0)
+			    mldv2h->mld_numsrc == 0) {
 				query_type = MLD_V2_GENERAL_QUERY;
-			else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
-				 mldv2h->mld_numsrc == 0)
+#ifdef MLDV2_DEBUG
+				printf("mld_input(): regard it as MLDv2 general Query\n");
+#endif
+			} else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
+				 mldv2h->mld_numsrc == 0) {
 				query_type = MLD_V2_GROUP_QUERY;
-			else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
-				 ntohs(mldv2h->mld_numsrc) > 0)
+#ifdef MLDV2_DEBUG
+				printf("mld_input(): regard it as MLDv2 group Query\n");
+#endif
+			} else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
+				 ntohs(mldv2h->mld_numsrc) > 0) {
 				query_type = MLD_V2_GROUP_SOURCE_QUERY;
-			else {
+#ifdef MLDV2_DEBUG
+				printf("mld_input(): regard it as MLDv2 source-group Query\n");
+#endif
+			} else {
 #ifdef MLDV2_DEBUG
 				printf("mld_input: ignores MLD packet with invalid format(%d)\n", mldlen);
 #endif
@@ -612,7 +638,7 @@ mld6_input(m, off)
 			if (mld_set_timer(ifp, rt6i, mldh, mldlen, query_type)
 			    != 0) {
 #ifdef MLDV2_DEBUG
-				printf("XXX: mld_input: receive bad query\n");
+				printf("mld_input: receive bad query\n");
 #endif
 				m_freem(m);
 				return;
@@ -651,12 +677,18 @@ mld6_input(m, off)
 				continue;
 
 			if (timer == 0) {
+#ifdef MLDV2_DEBUG
+				printf("mld_input: send a report immediately\n");
+#endif
 				/* send a report immediately */
 				mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
 				in6m->in6m_timer = 0; /* reset timer */
 				in6m->in6m_state = MLD_IREPORTEDLAST;
 			} else if (in6m->in6m_timer == 0 || /*idle state*/
 				   in6m->in6m_timer > timer) {
+#ifdef MLDV2_DEBUG
+				printf("mld_input: invoke a timer\n");
+#endif
 				in6m->in6m_timer = MLD_RANDOM_DELAY(timer);
 				mld_group_timers_are_running = 1;
 			}
@@ -669,8 +701,12 @@ mld6_input(m, off)
 		 * is received.
 		 */
 		if (mldalways_v2 == 0 &&
-		    IN6_ARE_ADDR_EQUAL(&mldh->mld_addr, &in6addr_any))
+		    IN6_ARE_ADDR_EQUAL(&mldh->mld_addr, &in6addr_any)) {
+#ifdef MLDV2_DEBUG
+			printf("mld_input: shift to v1-compat mode\n");
+#endif
 			mld_set_hostcompat(ifp, rt6i, query_type);
+		}
 #endif
 		break;
 
@@ -794,6 +830,9 @@ mld6_fasttimeo()
 #ifdef MLDV2
 		if (in6m->in6m_rti->rt6i_type == MLD_V1_ROUTER) {
 #endif
+#ifdef MLDV2_DEBUG
+			printf("mld_fasttimeo: v1 report\n");
+#endif
 			mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
 			in6m->in6m_state = MLD_IREPORTEDLAST;
 #ifdef MLDV2
@@ -802,6 +841,9 @@ mld6_fasttimeo()
 			   (in6m->in6m_state
 			    == MLD_SG_QUERY_PENDING_MEMBER)) {
 			if ((cm != NULL) && (ifp != in6m->in6m_ifp)) {
+#ifdef MLDV2_DEBUG
+				printf("mld_fasttimeo: v2 report\n");
+#endif
 				mld_sendbuf(cm, ifp);
 				cm = NULL;
 			}
@@ -841,6 +883,9 @@ mld6_fasttimeo()
 		 * not reduced here. (XXX rarely, QRV may be changed
 		 * in a same timing.)
 		 */
+#ifdef MLDV2_DEBUG
+		printf("mld_fasttimeo: handles pending report\n");
+#endif
 		if (in6m->in6m_source->i6ms_robvar
 		    == in6m->in6m_rti->rt6i_qrv) {
 			mld_send_state_change_report(&sm, &sbuflen,
@@ -1210,6 +1255,10 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 		timer = (MLD_MRC_MANT(mldh->mld_maxdelay) | 0x1000)
 			<< (MLD_MRC_EXP(mldh->mld_maxdelay) + 3);
 
+#ifdef MLDV2_DEBUG
+	printf("mld_set_timer: qrv=%d,qqi=%d,qri=%d,timer=%d\n",
+		rti->rt6i_qrv, rti->rt6i_qqi, rti->rt6i_qri, timer);
+#endif
 	/*
 	 * Set interface timer if the query is Generic Query.
 	 * Get group timer if the query is not Generic Query.
@@ -1218,15 +1267,24 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 		timer_i = timer * PR_FASTHZ / MLD_TIMER_SCALE;
 		timer_i = MLD_RANDOM_DELAY(timer_i);
 		if (mld_interface_timers_are_running &&
-		    (rti->rt6i_timer2 != 0) && (rti->rt6i_timer2 < timer_i))
+		    (rti->rt6i_timer2 != 0) && (rti->rt6i_timer2 < timer_i)) {
+#ifdef MLDV2_DEBUG
+			printf("mld_set_timer: don't do anything as appropriate I/F timer (%d) is already running (planned=%d)\n", rti->rt6i_timer2, timer_i);
+#endif
 		    	; /* don't need to update interface timer */
-		else {
+		} else {
+#ifdef MLDV2_DEBUG
+			printf("mld_set_timer: set I/F timer to %d\n", timer_i);
+#endif
 			rti->rt6i_timer2 = timer_i;
 			mld_interface_timers_are_running = 1;
 		}
 	} else { /* G or SG query */
 		timer_g = timer * PR_FASTHZ / MLD_TIMER_SCALE;
 		timer_g = MLD_RANDOM_DELAY(timer_g);
+#ifdef MLDV2_DEBUG
+		printf("mld_set_timer: set group timer to %d\n", timer_g);
+#endif
 	}
 
 	IN6_FIRST_MULTI(step, in6m);
@@ -1249,6 +1307,9 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 				goto next_multi;
 			if (in6m->in6m_timer <= rti->rt6i_timer2)
 				goto next_multi;
+#ifdef MLDV2_DEBUG
+			printf("mld_set_timer: clears pending response\n");
+#endif
 			in6m->in6m_state = MLD_OTHERLISTENER;
 			in6m->in6m_timer = 0;
 			in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
@@ -1339,10 +1400,16 @@ mld_set_hostcompat(ifp, rti, query_ver)
 	int s = splnet();
 #endif
 
+#ifdef MLDV2_DEBUG
+	printf("mld_set_compat: query_ver=%d for %s\n", query_ver, if_name(ifp));
+#endif
 	/*
 	 * Keep Older Version Querier Present timer.
 	 */
 	if (query_ver == MLD_V1_ROUTER) {
+#ifdef MLDV2_DEBUG
+		printf("mld_set_compat: just keep the timer\n");
+#endif
 		rti->rt6i_timer1 = rti->rt6i_qrv * rti->rt6i_qqi + rti->rt6i_qri;
 		rti->rt6i_timer1 *= PR_SLOWHZ;
 	}
@@ -1352,8 +1419,14 @@ mld_set_hostcompat(ifp, rti, query_ver)
 	 * its compatability mode, cancel all its pending response and
 	 * retransmission timers.
 	 */
+#ifdef MLDV2_DEBUG
+	printf("mld_set_compat: timer=%d\n", rti->rt6i_timer1);
+#endif
 	if (rti->rt6i_timer1 > 0) {
 		if (rti->rt6i_type != MLD_V1_ROUTER) {
+#ifdef MLDV2_DEBUG
+			printf("mld_set_compat: set timer to MLDv1-compat mode\n");
+#endif
 			rti->rt6i_type = MLD_V1_ROUTER;
 			mld_cancel_pending_response(ifp, rti);
 		}
@@ -1906,6 +1979,9 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		if (numsrc > src_done) {
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
+#ifdef MLDV2_DEBUG
+			printf("mld_send_current_state_report: re-allocbuf4\n");
+#endif
 			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
