@@ -1,4 +1,4 @@
-$Id: question,v 1.8 2000/01/12 19:22:30 itojun Exp $
+$Id: question,v 1.9 2000/01/12 21:53:43 sakane Exp $
 
 HOW DO I DO ?
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
@@ -30,12 +30,14 @@ Q. What is the perpose of exchange of DH attribute on quick mode ?
 Q. Should I do acceptable check of phase 2 pfs group ?.
    If initiator requests PFS, should we accept without acceptable check.
 	-> well-known issue
-Q. base mode
-   3.1. Base Mode Authenticated with Signatures
-   HDR, SA, Idii, Ni_b     =>
-                  Ni ???
-                           <= HDR, SA, Idir, Nr_b
-                                             Nr ?
+
+Q. Is it typo that a body of nonce payload during base mode exchange.
+            HDR, SA, Idii, Ni_b     =>
+                           Ni ???
+                                    <= HDR, SA, Idir, Nr_b
+                                                      Nr ???
+A. Yes, typo. (by network associates.)
+
 Q. What's proto_id in notify message of responder 2nd message with commit bit
   processing when multiple different SA applyed ?
 Q. Is it forbidden to clear commit bit during phase2 negotiation ?
