@@ -148,45 +148,44 @@ print_filterinfo(FILE *fp, struct filtinfo *top, int type)
 }
 
 static void
-dump_rip_filterinfo(FILE *fp, struct ripif *ripif)
+dump_filterinfo(FILE *fp, char *indent, struct filterset *filterset)
 {
 	struct filtinfo *filter;
-
-	fprintf(fp, "  RIPng filter information\n");
-
-	if ((filter = ripif->rip_filterin) != NULL) {
-		fprintf(fp, "    Input filter:\n");
+	
+	if ((filter = filterset->filterin) != NULL) {
+		fprintf(fp, "%s  Input filter:\n", indent);
 		print_filterinfo(fp, filter, FILTERTYPE_FILTER);
 	}
-	if ((filter = ripif->rip_filterout) != NULL) {
-		fprintf(fp, "    Output filter:\n");
+	if ((filter = filterset->filterout) != NULL) {
+		fprintf(fp, "%s  Output filter:\n", indent);
 		print_filterinfo(fp, filter, FILTERTYPE_FILTER);
 	}
-	if ((filter = ripif->rip_restrictin) != NULL) {
-		fprintf(fp, "    Input restriction:\n");
+	if ((filter = filterset->restrictin) != NULL) {
+		fprintf(fp, "%s  Input restriction:\n", indent);
 		print_filterinfo(fp, filter, FILTERTYPE_RESTRICTION);
 	}
-	if ((filter = ripif->rip_restrictout) != NULL) {
-		fprintf(fp, "    Output restriction:\n");
+	if ((filter = filterset->restrictout) != NULL) {
+		fprintf(fp, "%s  Output restriction:\n", indent);
 		print_filterinfo(fp, filter, FILTERTYPE_RESTRICTION);
 	}
 
-	if (ripif->rip_mode & IFS_DEFAULT_FILTERIN)
-		fprintf(fp, "    %d incoming default routes were filtered\n",
-			ripif->rip_filtered_indef);
-	if (ripif->rip_mode & IFS_DEFAULT_FILTEROUT)
-		fprintf(fp, "    %d outgoing default routes were filtered\n",
-			ripif->rip_filtered_outdef);
-	if ((ripif->rip_mode & IFS_DEFAULT_RESTRICTIN) ||
-	    ripif->rip_restrictin)
+	if (filterset->deffilterflags & DEFAULT_FILTERIN)
 		fprintf(fp,
-			"    %d incoming routes were filtered by restriction\n",
-			ripif->rip_input_restrected);
-	if ((ripif->rip_mode & IFS_DEFAULT_RESTRICTOUT) ||
-	    ripif->rip_restrictout)
+			"%s  %d incoming default routes were filtered\n",
+			indent,	filterset->filtered_indef);
+	if (filterset->deffilterflags & DEFAULT_FILTEROUT)
+		fprintf(fp, "%s  %d outgoing default routes were filtered\n",
+			indent, filterset->filtered_outdef);
+	if ((filterset->deffilterflags & DEFAULT_RESTRICTIN) ||
+	    filterset->restrictin)
 		fprintf(fp,
-			"    %d outgoing routes were filtered by restriction\n",
-			ripif->rip_output_restrected);
+			"%s  %d incoming routes were filtered by "
+			"restriction\n", indent, filterset->input_restrected);
+	if ((filterset->deffilterflags & DEFAULT_RESTRICTOUT) ||
+	    filterset->restrictout)
+		fprintf(fp,
+			"%s  %d outgoing routes were filtered by "
+			"restriction\n", indent, filterset->output_restrected);
 }
 
 static void
@@ -450,13 +449,13 @@ print_rip_dump(FILE *fp)
 			fprintf(fp, " NORIPIN");
 		if (ripif->rip_mode & IFS_NORIPOUT)
 			fprintf(fp, " NORIPOUT");
-		if (ripif->rip_mode & IFS_DEFAULT_FILTERIN)
+		if (ripif->rip_filterset.deffilterflags & DEFAULT_FILTERIN)
 			fprintf(fp, " FILTERIN_DEFAULT");
-		if (ripif->rip_mode & IFS_DEFAULT_FILTEROUT)
+		if (ripif->rip_filterset.deffilterflags & DEFAULT_FILTEROUT)
 			fprintf(fp, " FILTEROUT_DEFAULT");
-		if (ripif->rip_mode & IFS_DEFAULT_RESTRICTIN)
+		if (ripif->rip_filterset.deffilterflags & DEFAULT_RESTRICTIN)
 			fprintf(fp, " RESTRICTIN_DEFAULT");
-		if (ripif->rip_mode & IFS_DEFAULT_RESTRICTOUT)
+		if (ripif->rip_filterset.deffilterflags & DEFAULT_RESTRICTOUT)
 			fprintf(fp, " RESTRICTOUT_DEFAULT");
 		if (ripif->rip_mode & IFS_DEFAULTORIGINATE)
 			fprintf(fp, " DEFRT_ORIGINATE");
@@ -466,7 +465,8 @@ print_rip_dump(FILE *fp)
 		fprintf(fp, "  RIPng routing table\n");		
 		dump_rip_rtable(fp, ripif->rip_adj_ribs_in);
 		/* RIPng filter statistics */
-		dump_rip_filterinfo(fp, ripif);
+		fprintf(fp, "  RIPng filter information\n");
+		dump_filterinfo(fp, "  ", &ripif->rip_filterset);
 
 		if ((ripif = ripif->rip_next) == ripifs)
 			break;
@@ -691,6 +691,7 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 				   "IDLE", "CONNECT", "ACTIVE",
 				   "OPENSENT", "OPENCONFERM",
 				   "ESTABLISHED"};
+	struct rpcb *abnp = find_aopen_peer(bnp);
 
 	fprintf(fp, "%sAS: %d, ", indent, bnp->rp_as);
 	fprintf(fp, "Router Id: %s, ",
@@ -711,6 +712,16 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 	if (bnp->rp_mode & BGPO_IDSTATIC) fprintf(fp, " IDSTATIC");
 	if (bnp->rp_mode & BGPO_NOSYNC) fprintf(fp, " NOSYNC");
 	if (bnp->rp_mode & BGPO_NEXTHOPSELF) fprintf(fp, " NEXTHOPSELF");
+	if (abnp) {
+		if (abnp->rp_filterset.deffilterflags & DEFAULT_FILTERIN)
+			fprintf(fp, " FILTERIN_DEFAULT");
+		if (abnp->rp_filterset.deffilterflags & DEFAULT_FILTEROUT)
+			fprintf(fp, " FILTEROUT_DEFAULT");
+		if (abnp->rp_filterset.deffilterflags & DEFAULT_RESTRICTIN)
+			fprintf(fp, " RESTRICTIN_DEFAULT");
+		if (abnp->rp_filterset.deffilterflags & DEFAULT_RESTRICTOUT)
+			fprintf(fp, " RESTRICTOUT_DEFAULT");
+	}
 	fputc('\n', fp);
 
 	fprintf(fp, "%sHis global addr: %s\n", indent, bgp_peerstr(bnp));
@@ -734,6 +745,19 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 	fprintf(fp, "%sStatistics:\n", indent);
 	fprintf(fp, "%s Connection retries: %d\n",
 		indent, bnp->rp_stat.rps_connretry);
+	/*
+	 * Dump filter information if
+	 * - there is an actively opened peer (it must be, though), and
+	 *   + bnp is active, or
+	 *   + it is an actively opend peer and there is no other active peer.
+	 */
+	if (abnp &&
+	    (bnp->rp_state != BGPSTATE_IDLE ||
+	     ((bnp->rp_mode & BGPO_PASSIVE) == 0 &&
+	      find_active_peer(bnp) == NULL))) {
+		fprintf(fp, "%sFilters:\n", indent);
+		dump_filterinfo(fp, indent, &abnp->rp_filterset);
+	}
 	if (bnp->rp_ebgp_as_prepends)
 		fprintf(fp, "%sour own AS number will be prepended "
 			"to each advertised AS path %d time%s\n", indent,

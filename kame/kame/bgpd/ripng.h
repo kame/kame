@@ -39,12 +39,26 @@ struct ripif {
   byte              rip_mode;         /* info bit                        */
 #define IFS_NORIPIN          0x80
 #define IFS_NORIPOUT         0x40
-#define IFS_DEFAULT_FILTERIN 0x20
 #define IFS_DEFAULTORIGINATE 0x10
+#if 0
+#define IFS_DEFAULT_FILTERIN 0x20
 #define IFS_DEFAULT_FILTEROUT    0x08
 #define IFS_DEFAULT_RESTRICTIN   0x04
 #define IFS_DEFAULT_RESTRICTOUT  0x02
+#endif
   int		    rip_metricin; /* added to incoming routes */
+  u_long rip_defaultfilter;
+  struct filterset  rip_filterset;
+#define rip_filterin rip_filterset.filterin
+#define rip_filterout rip_filterset.filterout
+#define rip_restrictin rip_filterset.restrictin
+#define rip_restrictout rip_filterset.restrictout
+
+#define rip_filtered_indef rip_filterset.filtered_indef
+#define rip_filtered_outdef rip_filterset.filtered_outdef
+#define rip_input_restrected rip_filterset.input_restrected
+#define rip_output_restrected rip_filterset.output_restrected
+#if 0
   struct filtinfo   *rip_filterin;  /* incoming filter list */
   struct filtinfo   *rip_filterout; /* outgoing filter list */
   struct filtinfo   *rip_restrictin; /* incoming restriction list */
@@ -57,6 +71,7 @@ struct ripif {
   u_int32_t	rip_input_restrected;
   /* # of filtered outgoing routes by restriction: */
   u_int32_t	rip_output_restrected;
+#endif
 };
 
 #define RIPNG_VERSION            1

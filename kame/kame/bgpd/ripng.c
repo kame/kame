@@ -754,6 +754,13 @@ rip_process_response(ripif, nn)
       continue;
     }
 
+    if (!IN6_IS_ADDR_ROUTABLE(&np->rip6_dest)) {
+	    syslog(LOG_NOTICE,
+		   "<%s>: non-routable address(%s/%d) on %s",
+		   __FUNCTION__, ip6str(&np->rip6_dest, 0), np->rip6_plen,
+		   ripif->rip_ife->ifi_ifn->if_name);
+	    continue;  /* ignore */
+    }
     /*
      * Check route filter and restriction.
      * 1. If we specify to restrict rotes to the default, ignore all
@@ -766,6 +773,7 @@ rip_process_response(ripif, nn)
      *    at least one entry of the list.
      */
 
+#ifdef old
     /* 1st step: restrict to the default */
     if ((ripif->rip_mode & IFS_DEFAULT_RESTRICTIN) &&
 	(np->rip6_plen || !IN6_IS_ADDR_UNSPECIFIED(&np->rip6_dest))) {
@@ -852,19 +860,13 @@ rip_process_response(ripif, nn)
 	    }
     }
 
-    if (!IN6_IS_ADDR_ROUTABLE(&np->rip6_dest)) {
-	    syslog(LOG_NOTICE,
-		   "<%s>: non-routable address(%s/%d) on %s",
-		   __FUNCTION__, ip6str(&np->rip6_dest, 0), np->rip6_plen,
-		   ripif->rip_ife->ifi_ifn->if_name);
-	    continue;  /* ignore */
-    }
     if (!rip_use_sitelocal && IN6_IS_ADDR_SITELOCAL(&np->rip6_dest)) {
 	    syslog(LOG_NOTICE,
 		   "<%s>: site-local prefix(%s/%d) on %s(discard)",
 		   __FUNCTION__, ip6str(&np->rip6_dest, 0), np->rip6_plen,
 		   ripif->rip_ife->ifi_ifn->if_name);
     }
+#endif
 
     if (np->rip6_metric == 0 ||
 	np->rip6_metric > RIPNG_METRIC_UNREACHABLE) { 
@@ -1905,108 +1907,18 @@ rip_garbage_expired() {
 int
 rip_output_filter(struct ripif *ripif, struct ripinfo6 *ripinfo)
 {
-#ifdef DEBUG_RIP
-	char filt6txt[INET6_ADDRSTRLEN];
-	char in6txt[INET6_ADDRSTRLEN];
-	char *ifname = ripif->rip_ife->ifi_ifn->if_name;
-#endif 
+	struct filterset *f = &ripif->rip_filterset;
 
-	/* 1st step: restrict to the default */
-	if ((ripif->rip_mode & IFS_DEFAULT_RESTRICTOUT) &&
-	    (ripinfo->rip6_plen ||
-	     !IN6_IS_ADDR_UNSPECIFIED(&ripinfo->rip6_dest))) {
+	if (output_filter_check(f, rip_use_sitelocal, ripinfo)) {
 #ifdef DEBUG_RIP
 		syslog(LOG_DEBUG,
-		       "<%s>: route %s/%d on %s was filtered because "
-		       "it is not the default route",
+		       "<%s>: output route %s/%d on %s was filtered"
 		       __FUNCTION__,
-		       inet_ntop(AF_INET6, &ripinfo->rip6_dest, in6txt,
-				 INET6_ADDRSTRLEN),
-		       ripinfo->rip6_plen, ifname);
-#endif
-		ripif->rip_output_restrected++;
-		return(1);
-	}
-
-	/* 2nd step: generic restriction */
-	if (ripif->rip_restrictout) {
-		struct filtinfo *filter;
-
-		if ((filter = restrict_check(ripif->rip_restrictout,
-					    &ripinfo->rip6_dest,
-					    ripinfo->rip6_plen)) != NULL) {
-#ifdef DEBUG_RIP
-			syslog(LOG_DEBUG,
-			   "<%s>: route %s/%d on %s matched a restriction(%s/%d)",
-			   __FUNCTION__,
-			   inet_ntop(AF_INET6, &ripinfo->rip6_dest, in6txt,
-				     INET6_ADDRSTRLEN),
-			   ripinfo->rip6_plen, ifname,
-			   inet_ntop(AF_INET6, &filter->filtinfo_addr,
-				     filt6txt, INET6_ADDRSTRLEN),
-			   filter->filtinfo_plen);
-#endif
-		}
-		else {
-#ifdef DEBUG_RIP
-			syslog(LOG_DEBUG,
-			       "<%s>: route %s/%d on %s was filtered by restriction",
-			       __FUNCTION__,
-			       inet_ntop(AF_INET6, &ripinfo->rip6_dest, in6txt,
-					 INET6_ADDRSTRLEN),
-			       ripinfo->rip6_plen, ifname);
-#endif
-			ripif->rip_output_restrected++;
-			return(1);
-		}
-	}
-
-	/* 3rd step: filter default */
-	if ((ripinfo->rip6_plen == 0 &&
-	     IN6_IS_ADDR_UNSPECIFIED(&ripinfo->rip6_dest)) &&
-	    (ripif->rip_mode & IFS_DEFAULT_FILTEROUT)) {
-#ifdef DEBUG_RIP
-		syslog(LOG_DEBUG, "<%s>: Default route on %s was ignored",
-		       __FUNCTION__, ifname);
-#endif
-		ripif->rip_filtered_outdef++;
-		return(1);
-	}
-
-	/* 4th step: filter site-local */
-	if (!rip_use_sitelocal && IN6_IS_ADDR_SITELOCAL(&ripinfo->rip6_dest)) {
-#ifdef DEBUG_RIP
-		syslog(LOG_DEBUG, "<%s>: site-local prefix(%s/%d) was ignored",
-		       __FUNCTION__, ip6str(&ripinfo->rip6_dest, 0),
-		       ripinfo->rip6_plen);
+		       ip6str(&ripinfo->rip6_dest, 0),
+		       ripinfo->rip6_plen,
+		       ripif->rip_ife->ifi_ifn->if_name);
 #endif
 		return(1);
 	}
-
-	/* 5th step: generic filter */
-	if (ripif->rip_filterout) {
-		struct filtinfo *filter;
-
-		if ((filter = filter_check(ripif->rip_filterout,
-					  &ripinfo->rip6_dest,
-					  ripinfo->rip6_plen)) != NULL) {
-#ifdef DEBUG_RIP
-			char filt6txt[INET6_ADDRSTRLEN];
-
-			syslog(LOG_DEBUG,
-			       "<%s>: route %s/%d was filtered by the "
-			       "filter %s/%d",
-			       __FUNCTION__,
-			       inet_ntop(AF_INET6, &ripinfo->rip6_dest, in6txt,
-					 INET6_ADDRSTRLEN),
-			       ripinfo->rip6_plen,
-			       inet_ntop(AF_INET6, &filter->filtinfo_addr,
-					 filt6txt, INET6_ADDRSTRLEN),
-			       filter->filtinfo_plen);
-#endif
-			return(1);
-		}
-	}
-
-	return(0);		/* no filter is applied. can be advertised */
+	return(0);
 }

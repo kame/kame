@@ -698,6 +698,7 @@ conf_check(char *filename)
 		if (strncasecmp(&buf[i], sysatom[C_ORIGINATE], strlen(sysatom[C_ORIGINATE]))
 		    == 0) {
 		    ripif->rip_mode |= IFS_DEFAULTORIGINATE;
+		    ripif->rip_filterset.deffilterflags |= DEFAULT_FILTERIN;
 		    i += strlen(sysatom[C_ORIGINATE]);
 		} else {
 		  syslog(LOG_ERR,
@@ -736,7 +737,8 @@ conf_check(char *filename)
 			       * non zero return value means exact match
 			       * to default route
 			       */
-			      ripif->rip_mode |= IFS_DEFAULT_FILTERIN;
+			      ripif->rip_filterset.deffilterflags
+				      |= DEFAULT_FILTERIN;
 		      }
 			      
 		      continue;
@@ -748,7 +750,8 @@ conf_check(char *filename)
 		      SKIP_WHITE(i); READ_ATOM(i, j);
 		      if (set_filter(&ripif->rip_restrictin, atom,
 				     filename, line))
-			      ripif->rip_mode |= IFS_DEFAULT_RESTRICTIN;
+			      ripif->rip_filterset.deffilterflags
+				      |= DEFAULT_RESTRICTIN;
 
 		      continue;
 	      }
@@ -759,7 +762,8 @@ conf_check(char *filename)
 		      SKIP_WHITE(i); READ_ATOM(i, j);
 		      if (set_filter(&ripif->rip_filterout, atom,
 				     filename, line))
-			      ripif->rip_mode |= IFS_DEFAULT_FILTEROUT;
+			      ripif->rip_filterset.deffilterflags
+				      |= DEFAULT_FILTEROUT;
 
 		      continue;
 	      }
@@ -770,8 +774,8 @@ conf_check(char *filename)
 		      SKIP_WHITE(i); READ_ATOM(i, j);
 		      if (set_filter(&ripif->rip_restrictout, atom,
 				     filename, line))
-			      ripif->rip_mode |= IFS_DEFAULT_RESTRICTOUT;
-
+			      ripif->rip_filterset.deffilterflags
+				      |= DEFAULT_RESTRICTOUT;
 		      continue;
 	      }
 	      break; /* while */ /* No match. */

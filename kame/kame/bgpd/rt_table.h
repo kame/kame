@@ -50,6 +50,12 @@ struct filtinfo {		/* XXX: we may need more information */
 	u_char		filtinfo_plen; /* prefix length to be filtered */
 };
 
+/* flags for filters agains the default route */
+#define DEFAULT_FILTERIN    0x1
+#define DEFAULT_FILTEROUT   0x2
+#define DEFAULT_RESTRICTIN  0x4
+#define DEFAULT_RESTRICTOUT 0x8
+
 struct rt_entry {
   struct rt_entry     *rt_next;
   struct rt_entry     *rt_prev;
@@ -102,3 +108,4 @@ int              aggr_advable   __P((struct rt_entry *, struct rtproto *));
 int		 find_filter  __P((struct filtinfo *, struct filtinfo *));
 struct filtinfo *filter_check __P((struct filtinfo *, struct in6_addr *, int));
 struct filtinfo *restrict_check __P((struct filtinfo *, struct in6_addr *, int));
+int output_filter_check __P((struct filterset *, int, struct ripinfo6 *));

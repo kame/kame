@@ -31,6 +31,23 @@ struct rpstat {
   int rps_connretry;
 };
 
+/* XXX: we have to define this structure here since rpcb use it */
+struct filterset {
+	u_long deffilterflags;
+	struct filtinfo *filterin; /* input filter */
+	struct filtinfo *filterout; /* output filter */
+	struct filtinfo *restrictin; /* input restriction */
+	struct filtinfo *restrictout; /* output restriction */
+
+	/* statistics: */
+	u_int32_t filtered_indef; /* # of filtered incoming defaults */
+	u_int32_t filtered_outdef; /* # of filtered outgoing defaults */
+	/* # of filtered incoming routes by restriction: */
+	u_int32_t input_restrected; 
+	/* # of filtered outgoing routes by restriction: */
+	u_int32_t output_restrected;
+};
+
 struct rpcb {
   struct  rpcb        *rp_next;
   struct  rpcb        *rp_prev;
@@ -65,6 +82,7 @@ struct rpcb {
 
   u_long               rp_mode;         /* info bit                        */
   struct rpstat        rp_stat;         /* statistics                      */
+  struct filterset     rp_filterset;    /* filter list */
 #define                    BGPO_PASSIVE      0x01
 #define                    BGPO_IFSTATIC     0x02
 #define                    BGPO_IGP          0x04

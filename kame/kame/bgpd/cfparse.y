@@ -159,6 +159,8 @@ enum {RIPIFA_DEFAULT, RIPIFA_NORIPIN, RIPIFA_NORIPOUT, RIPIFA_METRICIN,
       RIPIFA_FILINPFX, RIPIFA_FILOUTPFX, RIPIFA_RESINPFX, RIPIFA_RESOUTPFX,
       RIPIFA_DESCR, BGPPA_IFNAME, BGPPA_NOSYNC, BGPPA_NEXTHOPSELF,
       BGPPA_LCLADDR, BGPPA_PREFERENCE, BGPPA_PREPEND, BGPPA_DESCR,
+      BGPPA_FILINDEF, BGPPA_FILOUTDEF, BGPPA_RESINDEF, BGPPA_RESOUTDEF,
+      BGPPA_FILINPFX, BGPPA_FILOUTPFX, BGPPA_RESINPFX, BGPPA_RESOUTPFX,
       EXPA_PROTO, AGGA_PROTO, AGGA_EXPFX, STATICA_RTE};
 enum {ATTR_FLAG, ATTR_PREFIX, ATTR_STRING, ATTR_ADDR, ATTR_NUMBER,
       ATTR_DATA, ATTR_LIST};
@@ -653,6 +655,54 @@ peerattributes:
 		{
 			if (($$ = add_attribute($1, ATTR_STRING,
 						BGPPA_DESCR, $3.v)) == NULL)
+				return(-1);
+		}
+	|	peerattributes FILTERIN DEFAULT
+		{
+			if (($$ = add_attribute($1, ATTR_FLAG,
+						BGPPA_FILINDEF, 0)) == NULL)
+				return(-1);
+		}
+	|	peerattributes FILTEROUT DEFAULT
+		{
+			if (($$ = add_attribute($1, ATTR_FLAG,
+						BGPPA_FILOUTDEF, 0)) == NULL)
+				return(-1);
+		}
+	|	peerattributes RESTRICTIN DEFAULT
+		{
+			if (($$ = add_attribute($1, ATTR_FLAG,
+						BGPPA_RESINDEF, 0)) == NULL)
+				return(-1);
+		}
+	|	peerattributes RESTRICTOUT DEFAULT
+		{
+			if (($$ = add_attribute($1, ATTR_FLAG,
+						BGPPA_RESOUTDEF, 0)) == NULL)
+				return(-1);
+		}
+	|	peerattributes FILTERIN prefix
+		{
+			if (($$ = add_attribute($1, ATTR_PREFIX,
+						BGPPA_FILINPFX, $3)) == NULL)
+				return(-1);
+		}
+	|	peerattributes FILTEROUT prefix
+		{
+			if (($$ = add_attribute($1, ATTR_PREFIX,
+						BGPPA_FILOUTPFX, $3)) == NULL)
+				return(-1);
+		}
+	|	peerattributes RESTRICTIN prefix
+		{
+			if (($$ = add_attribute($1, ATTR_PREFIX,
+						BGPPA_RESINPFX, $3)) == NULL)
+				return(-1);
+		}
+	|	peerattributes RESTRICTOUT prefix
+		{
+			if (($$ = add_attribute($1, ATTR_PREFIX,
+						BGPPA_RESOUTPFX, $3)) == NULL)
 				return(-1);
 		}
 	;
@@ -1273,6 +1323,8 @@ rip_config()
 			switch(attr->code) {
 			case RIPIFA_DEFAULT:
 				ripif->rip_mode |= IFS_DEFAULTORIGINATE;
+				ripif->rip_filterset.deffilterflags
+					|= DEFAULT_FILTERIN;
 				cprint("default_originate ");
 				break;
 			case RIPIFA_NORIPIN:
@@ -1288,19 +1340,23 @@ rip_config()
 				cprint("metricin %d ", attr->attru.number);
 				break;
 			case RIPIFA_FILINDEF:
-				ripif->rip_mode |= IFS_DEFAULT_FILTERIN;
+				ripif->rip_filterset.deffilterflags
+					|= DEFAULT_FILTERIN;
 				cprint("input_filter_default ");
 				break;
 			case RIPIFA_FILOUTDEF:
-				ripif->rip_mode |= IFS_DEFAULT_FILTEROUT;
+				ripif->rip_filterset.deffilterflags
+					|= DEFAULT_FILTEROUT;
 				cprint("output_filter_default ");
 				break;
 			case RIPIFA_RESINDEF:
-				ripif->rip_mode |= IFS_DEFAULT_RESTRICTIN;
+				ripif->rip_filterset.deffilterflags
+					|= DEFAULT_RESTRICTIN;
 				cprint("input_restriction_default ");
 				break;
 			case RIPIFA_RESOUTDEF:
-				ripif->rip_mode |= IFS_DEFAULT_RESTRICTOUT;
+				ripif->rip_filterset.deffilterflags
+					|= DEFAULT_RESTRICTOUT;
 				cprint("output_restriction_default ");
 				break;
 			case RIPIFA_FILINPFX:
@@ -1479,6 +1535,62 @@ bgp_config()
 			case BGPPA_DESCR:
 				cprint("descr=%s ", attr->attru.str);
 				bnp->rp_descr = strdup(attr->attru.str);
+				break;
+			case BGPPA_FILINDEF:
+				bnp->rp_filterset.deffilterflags |=
+				  DEFAULT_FILTERIN;
+				cprint("input_filter_default ");
+				break;
+			case BGPPA_FILOUTDEF:
+				bnp->rp_filterset.deffilterflags |=
+				  DEFAULT_FILTEROUT;
+				cprint("output_filter_default ");
+				break;
+			case BGPPA_RESINDEF:
+				bnp->rp_filterset.deffilterflags |=
+				  DEFAULT_RESTRICTIN;
+				cprint("input_restriction_default ");
+				break;
+			case BGPPA_RESOUTDEF:
+				bnp->rp_filterset.deffilterflags |=
+				  DEFAULT_RESTRICTOUT;
+				cprint("output_restriction_default ");
+				break;
+			case BGPPA_FILINPFX:
+				if (set_filter(&bnp->rp_filterset.filterin,
+					       &attr->attru.prefix,
+					       attr->line))
+					return(-1);
+				cprint("input_filter(%s/%d) ",
+				       ip6str2(&attr->attru.prefix.paddr),
+				       attr->attru.prefix.plen);
+				break;
+			case BGPPA_FILOUTPFX:
+				if (set_filter(&bnp->rp_filterset.filterout,
+					       &attr->attru.prefix,
+					       attr->line))
+					return(-1);
+				cprint("output_filter(%s/%d) ",
+				       ip6str2(&attr->attru.prefix.paddr),
+				       attr->attru.prefix.plen);
+				break;
+			case BGPPA_RESINPFX:
+				if (set_filter(&bnp->rp_filterset.restrictin,
+					       &attr->attru.prefix,
+					       attr->line))
+					return(-1);
+				cprint("input_restriction(%s/%d) ",
+				       ip6str2(&attr->attru.prefix.paddr),
+				       attr->attru.prefix.plen);
+				break;
+			case BGPPA_RESOUTPFX:
+				if (set_filter(&bnp->rp_filterset.restrictout,
+					       &attr->attru.prefix,
+					       attr->line))
+					return(-1);
+				cprint("output_restriction(%s/%d) ",
+				       ip6str2(&attr->attru.prefix.paddr),
+				       attr->attru.prefix.plen);
 				break;
 			default:
 				cprint("unknown_attribute(%d) ", attr->code);

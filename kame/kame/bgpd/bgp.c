@@ -1307,6 +1307,10 @@ bgp_process_update(struct rpcb *bnp)
 	}
 
 	if (bgp_input_filter(bnp, rte)) {
+	  syslog(LOG_DEBUG, "<%s>: NLRI %s/%d from %s was filtered",
+		 __FUNCTION__,
+		 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		 rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
 	  free(rte);
 	  continue;		/* to next rte */
 	}
@@ -1472,6 +1476,25 @@ bgp_process_update(struct rpcb *bnp)
 			 in6txt, INET6_ADDRSTRLEN),
 	       rte->rt_ripinfo.rip6_plen);
 #endif
+
+	if (!IN6_IS_ADDR_ROUTABLE(&rte->rt_ripinfo.rip6_dest)) {
+	  syslog(LOG_DEBUG,
+		 "<%s>: Invalid prefix(%s/%d) in UNLRI (ignored) from %s",
+		 __FUNCTION__,
+		 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		 rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
+	  free(rte);
+	  continue;  /* to next rte */
+	}
+
+	if (bgp_input_filter(bnp, rte)) {
+	  syslog(LOG_DEBUG, "<%s>: UNLRI %s/%d from %s was filtered",
+		 __FUNCTION__,
+		 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		 rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
+	  free(rte);
+	  continue;		/* to next rte */
+	}
 
 	rte->rt_proto.rtp_type      = RTPROTO_BGP;
 	rte->rt_proto.rtp_bgp       = bnp; /* for each RTE, each RTP exists. */
@@ -2216,7 +2239,7 @@ bgp_cease(struct rpcb *bnp)
 
     /*
      * If there is an RPCB whose state is IDLE for the peer and
-     * there is no active other peer, retry connecting to it
+     * there is no other active peer, retry connecting to it
      * (after waiting for ConnectRetryTimer).
      * It must not be an already opened passive connection(should we check it?)
      */

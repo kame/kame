@@ -170,8 +170,10 @@ main(argc, argv)
     rip_sockinit();
     rip_import_init();
   }
-  if (bgpyes)
+  if (bgpyes) {
+    bgp_paraminit();
     bgp_sockinit();
+  }
 #else
   conf_check(conf ? conf : CONFFILENAME);
 #endif

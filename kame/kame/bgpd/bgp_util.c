@@ -777,6 +777,28 @@ find_active_peer(key)
 	return(NULL);
 }
 
+/* search for an actively opened peer */
+struct rpcb *
+find_aopen_peer(key)
+	struct rpcb *key;
+{
+	struct rpcb *bnp = NULL;
+
+	if ((key->rp_mode & BGPO_PASSIVE) == 0)
+		return(key);
+
+	if ((bnp = find_apeer_by_addr(&key->rp_gaddr)) == NULL)
+		bnp = find_apeer_by_addr(&key->rp_laddr);
+
+	if (bnp == NULL) {
+		syslog(LOG_NOTICE,
+		       "<%s>: can't find an actively opened peer for %s",
+		       __FUNCTION__, bgp_peerstr(key));
+	}
+
+	return(bnp);
+}
+
 struct rpcb *
 find_idle_peer(key)
 	struct rpcb *key;
@@ -821,7 +843,8 @@ find_idle_peer(key)
  *                   we need I/F information. (e.g. LLADDRHACK)
  */
 struct rpcb *
-find_apeer_by_addr(struct in6_addr *addr) {
+find_apeer_by_addr(struct in6_addr *addr)
+{
   struct rpcb        *bnp;
   struct in6_addr     llhackaddr;
   extern struct rpcb *bgb;
@@ -1185,14 +1208,7 @@ bgp_peerstr(bnp)
 	if (cp == NULL)		/* XXX */
 		return(NULL);
 
-	if ((bnp->rp_mode & BGPO_PASSIVE) == 0)
-		abnp = bnp;
-	else {
-		if ((abnp = find_apeer_by_addr(&bnp->rp_gaddr)) == NULL)
-			abnp = find_apeer_by_addr(&bnp->rp_laddr);
-	}
-
-	if (abnp && abnp->rp_descr) {
+	if ((abnp = find_aopen_peer(bnp)) && abnp->rp_descr) {
 		int cplen = strlen(cp), space = MAXHOSTNAMELEN - cplen;
 		int desclen = strlen(abnp->rp_descr);
 
@@ -1246,42 +1262,66 @@ free_bgpcb_list(head)
 
 /*
  * Check an incoming BGP route to be filtered or not.
- * XXX: currently only site-local addresses are filtered.
  */
 int
 bgp_input_filter(bnp, rte)
 	struct rpcb *bnp;	/* unused */
 	struct rt_entry *rte;
 {
-	if (IN6_IS_ADDR_SITELOCAL(&rte->rt_ripinfo.rip6_dest)) {
-		syslog(LOG_NOTICE,
-		       "<%s>: site-local prefix(%s/%d) from %s was discarded",
-		       __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-		       rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
-		return 1;	/* to be filtered */
-	}
+	struct rpcb *abnp;
 
-	return 0;		/* accept it */
+	if ((abnp = find_aopen_peer(bnp)) == NULL)
+		return(1);	/* treat it as filtered */
+
+	/* Check filters. Site-locals are always filtered. */
+	if (input_filter_check(&abnp->rp_filterset, 0,
+				&rte->rt_ripinfo.rip6_dest)) {
+		syslog(LOG_DEBUG,
+		       "<%s>: input route %s/%d to %s was filtered",
+		       __FUNCTION__, &rte->rt_ripinfo.rip6_dest,
+		       rte->rt_ripinfo.rip6_plen,
+		       bgp_peerstr(bnp));
+		return(1);
+	}
+	return 0;
 }
 
 /*
  * Check an outoging BGP route to be filtered or not.
- * XXX: currently only site-local addresses are filtered.
+ * XXX: the routine is (currently) almost same as bgp_input_filter().
  */
 int
 bgp_output_filter(bnp, rte)
 	struct rpcb *bnp;
 	struct rt_entry *rte;
 {
-	if (IN6_IS_ADDR_SITELOCAL(&rte->rt_ripinfo.rip6_dest)) {
-		syslog(LOG_NOTICE,
-		       "<%s>: site-local prefix(%s/%d) to %s was filtered",
-		       __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-		       rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
-		return 1;	/* to be filtered */
-	}
+	struct rpcb *abnp;
 
-	return 0;		/* accept it */
+	if ((abnp = find_aopen_peer(bnp)) == NULL)
+		return(1);	/* treat it as filtered */
+
+	/* Check filters. Site-locals are always filtered. */
+	if (output_filter_check(&abnp->rp_filterset, 0,
+				&rte->rt_ripinfo.rip6_dest)) {
+		syslog(LOG_DEBUG,
+		       "<%s>: output route %s/%d to %s was filtered",
+		       __FUNCTION__, &rte->rt_ripinfo.rip6_dest,
+		       rte->rt_ripinfo.rip6_plen,
+		       bgp_peerstr(bnp));
+		return(1);
+	}
+	return 0;
+}
+
+void
+bgp_paraminit()
+{
+	extern u_int32_t bgpIdentifier;
+
+	if (bgpIdentifier == 0 &&
+	    (bgpIdentifier = get_32id()) == 0)
+	    fatalx("<bgp_paraminit>: no 32bit ID was found."
+		   " bgpIdentifier should be defined by hand");
 }
 
 void

@@ -62,6 +62,7 @@ int		 bgp_preferred_rte __P((struct rt_entry *, struct rt_entry *));
 /*
  *   initialization
  */
+void bgp_paraminit __P((void));
 void bgp_sockinit __P((void));
 
 /*
@@ -140,6 +141,7 @@ struct rpcb	*find_active_peer   __P((struct rpcb *));
 struct rpcb	*find_idle_peer     __P((struct rpcb *));
 struct rpcb	*find_epeer_by_addr __P((struct in6_addr *));
 struct rpcb	*find_epeer_by_rpcb __P((struct rpcb *));
+struct rpcb	*find_aopen_peer __P((struct rpcb *));
 
 int		 bgp_rpcb_isvalid __P((struct rpcb *));
 

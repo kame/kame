@@ -934,6 +934,168 @@ restrict_check(head, addr, plen)
 	return(NULL);
 }
 
+/* return 1 if filtered. Otherwise return 0 */
+int
+input_filter_check(filters, sitelocal_ok, prefix)
+	struct filterset *filters;
+	int sitelocal_ok;
+	struct ripinfo6 *prefix;
+{
+	/* 1st step: restrict to the default */
+	if ((filters->deffilterflags & DEFAULT_RESTRICTIN) &&
+	    (prefix->rip6_plen || !IN6_IS_ADDR_UNSPECIFIED(&prefix->rip6_dest))) {
+		syslog(LOG_DEBUG,
+		       "<%s>: route %s/%d was filtered because "
+		       "it is not the default route",
+		       __FUNCTION__,
+		       ip6str(&prefix->rip6_dest, 0),
+		       prefix->rip6_plen);
+		filters->input_restrected++;
+		return(1);
+	}
+
+	/* 2nd step: generic restriction */
+	if (filters->restrictin) {
+		struct filtinfo *filter;
+
+		if ((filter = restrict_check(filters->restrictin,
+					     &prefix->rip6_dest, prefix->rip6_plen))
+		    != NULL) {
+			syslog(LOG_DEBUG,
+			       "<%s>: route %s/%d matched a restriction(%s/%d)",
+			       __FUNCTION__, ip6str(&prefix->rip6_dest, 0),
+			       prefix->rip6_plen,
+			       ip6str(&filter->filtinfo_addr, 0),
+			       filter->filtinfo_plen);
+		}
+		else {
+			syslog(LOG_DEBUG,
+			       "<%s> : route %s/%d was filtered by restriction",
+			       __FUNCTION__,
+			       ip6str(&prefix->rip6_dest, 0),
+			       prefix->rip6_plen);
+			filters->input_restrected++; 
+			return(1);
+		}
+	}
+
+	/* 3rd step: filter default */
+	if ((prefix->rip6_plen == 0 &&       /* "default" route */
+	     IN6_IS_ADDR_UNSPECIFIED(&prefix->rip6_dest)) &&
+	    (filters->deffilterflags & DEFAULT_FILTERIN)) {
+		syslog(LOG_DEBUG, "<%s>: Default route was ignored", __FUNCTION__);
+		return(1);
+	}
+
+	/* 4th step: generic filter */
+	if (filters->filterin) {
+		struct filtinfo *filter;
+
+		if ((filter = filter_check(filters->filterin,
+					   &prefix->rip6_dest, prefix->rip6_plen))
+		    != NULL) {
+			syslog(LOG_DEBUG,
+			       "<%s>: route %s/%d was filtered by the filter "
+			       "%s/%d", __FUNCTION__,
+			       ip6str(&prefix->rip6_dest, 0), prefix->rip6_plen,
+			       ip6str(&filter->filtinfo_addr, 0),
+			       filter->filtinfo_plen);
+			return(1);
+		}
+	}
+
+	return(0);
+}
+
+/* return 1 if filtered. Otherwise return 0 */
+int
+output_filter_check(filters, sitelocal_ok, prefix)
+	struct filterset *filters;
+	int sitelocal_ok;
+	struct ripinfo6 *prefix;
+{
+	/* 1st step: restrict to the default */
+	if ((filters->deffilterflags & DEFAULT_RESTRICTOUT) &&
+	    (prefix->rip6_plen ||
+	     !IN6_IS_ADDR_UNSPECIFIED(&prefix->rip6_dest))) {
+		syslog(LOG_DEBUG,
+		       "<%s>: route %s/%d was filtered because "
+		       "it is not the default route",
+		       __FUNCTION__,
+		       ip6str(&prefix->rip6_dest, 0),
+		       prefix->rip6_plen);
+		filters->output_restrected++;
+		return(1);
+	}
+
+	/* 2nd step: generic restriction */
+	if (filters->restrictout) {
+		struct filtinfo *filter;
+
+		if ((filter = restrict_check(filters->restrictout,
+					    &prefix->rip6_dest,
+					    prefix->rip6_plen)) != NULL) {
+			syslog(LOG_DEBUG,
+			       "<%s>: route %s/%d matched a "
+			       "restriction(%s/%d)",
+			       __FUNCTION__,
+			       ip6str(&prefix->rip6_dest, 0),
+			       prefix->rip6_plen,
+			       ip6str(&filter->filtinfo_addr, 0),
+			       filter->filtinfo_plen);
+		}
+		else {
+			syslog(LOG_DEBUG,
+			       "<%s>: route %s/%d was filtered by restriction",
+			       __FUNCTION__,
+			       ip6str(&prefix->rip6_dest, 0),
+			       prefix->rip6_plen);
+
+			filters->output_restrected++;
+			return(1);
+		}
+	}
+
+	/* 3rd step: filter default */
+	if ((prefix->rip6_plen == 0 &&
+	     IN6_IS_ADDR_UNSPECIFIED(&prefix->rip6_dest)) &&
+	    (filters->deffilterflags & DEFAULT_FILTEROUT)) {
+		syslog(LOG_DEBUG, "<%s>: Default route was ignored",
+		       __FUNCTION__);
+		filters->filtered_outdef++;
+		return(1);
+	}
+
+	/* 4th step: filter site-local */
+	if (!sitelocal_ok && IN6_IS_ADDR_SITELOCAL(&prefix->rip6_dest)) {
+		syslog(LOG_DEBUG, "<%s>: site-local prefix(%s/%d) was ignored",
+		       __FUNCTION__, ip6str(&prefix->rip6_dest, 0),
+		       prefix->rip6_plen);
+		return(1);
+	}
+
+	/* 5th step: generic filter */
+	if (filters->filterout) {
+		struct filtinfo *filter;
+
+		if ((filter = filter_check(filters->filterout,
+					  &prefix->rip6_dest,
+					  prefix->rip6_plen)) != NULL) {
+			syslog(LOG_DEBUG,
+			       "<%s>: route %s/%d was filtered by the "
+			       "filter %s/%d",
+			       __FUNCTION__,
+			       ip6str(&prefix->rip6_dest, 0),
+			       prefix->rip6_plen,
+			       ip6str(&filter->filtinfo_addr, 0),
+			       filter->filtinfo_plen);
+			return(1);
+		}
+	}
+
+	return(0);		/* no filter is applied. can be advertised */
+}
+
 void
 aggr_ckconf(rte)
      struct rt_entry *rte;    /* some specific route */
