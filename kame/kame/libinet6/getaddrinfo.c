@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.71 2000/04/27 03:36:25 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.72 2000/05/01 00:20:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -735,7 +735,6 @@ explore_null(pai, servname, res)
 	const char *servname;
 	struct addrinfo **res;
 {
-	int s;
 	const struct afd *afd;
 	struct addrinfo *cur;
 	struct addrinfo sentinel;
@@ -749,12 +748,8 @@ explore_null(pai, servname, res)
 	 * filter out AFs that are not supported by the kernel
 	 * XXX errno?
 	 */
-	s = socket(pai->ai_family, SOCK_DGRAM, 0);
-	if (s < 0) {
-		if (errno != EMFILE)
-			return 0;
-	} else
-		close(s);
+	if (!addrconfig(pai))
+		return 0;
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
@@ -1105,8 +1100,10 @@ addrconfig(pai)
 
 	/* XXX errno */
 	s = socket(pai->ai_family, SOCK_DGRAM, 0);
-	if (s < 0)
-		return 0;
+	if (s < 0) {
+		if (errno != EMFILE)
+			return 0;
+	}
 	close(s);
 	return 1;
 #endif
