@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.189 2004/05/30 08:49:05 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.190 2004/06/15 07:55:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,10 +93,6 @@
  * - EDNS0 support is not available due to resolver differences.
  */
 
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
-#include "port_before.h"
-#endif
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -104,7 +100,7 @@
 #include <netinet/in.h>
 #ifdef INET6
 #include <sys/queue.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <sys/sysctl.h>
@@ -240,7 +236,6 @@ struct ai_order {
 };
 
 /* types for OS dependent portion */
-#if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #if 0
 struct res_target {
 	struct res_target *next;
@@ -258,7 +253,6 @@ typedef union {
 	HEADER hdr;
 	u_char buf[MAXPACKET];
 } querybuf;
-#endif
 
 /* functions in OS independent portion */
 static int str2number __P((const char *));
@@ -3821,7 +3815,7 @@ error:
 	return (net_data);
 }
 
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#elif defined(__FreeBSD__)
 
 static struct addrinfo *getanswer __P((const querybuf *, int, const char *,
 	int, const struct addrinfo *));
