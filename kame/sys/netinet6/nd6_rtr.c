@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.58 2001/01/17 11:26:58 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.59 2001/01/21 11:24:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1484,7 +1484,9 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 		in6_ifaddr = ia;
 	}
 	/* gain a refcnt for the link from in6_ifaddr */
+#ifdef __NetBSD__
 	IFAREF(&ia->ia_ifa);
+#endif
 
 	/* link to if_addrlist */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -1501,8 +1503,11 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 #else
 	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
+
 	/* gain another refcnt for the link from if_addrlist */
+#ifdef __NetBSD__
 	IFAREF(&ia->ia_ifa);
+#endif
 
 	/* new address */
 	ia->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
@@ -1652,7 +1657,9 @@ in6_ifdel(ifp, in6)
 #else
 	TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
+#ifdef __NetBSD__
 	IFAFREE(&ia->ia_ifa);
+#endif
 
 	/* lladdr is never deleted */
 	oia = ia;
@@ -1670,6 +1677,8 @@ in6_ifdel(ifp, in6)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	in6_savemkludge(oia);
 #endif
+
+	/* we should decrement the refcnt at least once for all *BSD. */
 	IFAFREE((&oia->ia_ifa));
 /* xxx
 	rtrequest(RTM_DELETE,
