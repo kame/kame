@@ -53,7 +53,7 @@
 static void usage(), open_socket(), make_packet(), mtrace_loop(), show_result();
 
 static char *gateway, *intface, *source, *group, *receiver, *destination;
-static int mldsoc, hops = 64, maxhops = 127, waittime, querylen, opt_n;
+static int mldsoc, hops = 64, maxhops = 127, waittime = 3, querylen, opt_n;
 static struct sockaddr *gw_sock, *src_sock, *grp_sock, *dst_sock, *rcv_sock; 
 static char *querypacket;
 static char frombuf[1024];	/* XXX: enough size? */
@@ -212,6 +212,11 @@ mtrace_loop()
 
 		if ((nsoc = select(mldsoc + 1, &fds, NULL, NULL, &tv_wait)) < 0)
 			err(1, "select");
+
+		if (nsoc == 0) {
+			printf("Timeout\n");
+			exit(0); /* XXX try again? */
+		}
 
 		if ((rcvcc = recvfrom(mldsoc, frombuf, sizeof(frombuf),  0,
 				      from_sock, &fromlen))
@@ -645,6 +650,6 @@ static void
 usage()
 {
 	errx(1,
-	     "[-d destination] [-g gateway] [-i interface] [-m maxhops] [-n] "
-	     "[-r response_addr] [-w waittime] source group");
+	     "[-d destination] [-g gateway] [-h hops] [-i interface] "
+	     "[-m maxhops] [-n] [-r response_addr] [-w waittime] source group");
 }
