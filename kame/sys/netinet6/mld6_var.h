@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.6 2002/09/05 08:09:37 suz Exp $	*/
+/*	$KAME: mld6_var.h,v 1.7 2002/10/02 11:24:48 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -64,14 +64,17 @@
 /*
  * MLDv2 default variables
  */
+#define MLD_TIMER_SCALE		1000
 #define	MLD_DEF_RV		2	/* Default Robustness Variable */
 #define	MLD_DEF_QI		125	/* Query Interval (125 sec.) */
-#define	MLD_DEF_QRI		100	/* Query Response Interval (10 sec.) */
-#define	MLD_OQPI		((MLD_DEF_RV * MLD_DEF_QI) + MLD_DEF_QRI/2)
-#define	MLD_GMI			((MLD_DEF_RV * MLD_DEF_QI) + MLD_DEF_QRI)
+#define	MLD_DEF_QRI		10000	/* Query Response Interval (10 sec.) */
+#define	MLD_OQPT ((MLD_DEF_RV * MLD_DEF_QI) + MLD_DEF_QRI/MLD_TIMER_SCALE/2)
+		/* Other Querier Present Timer */
+#define	MLD_MALI ((MLD_DEF_RV * MLD_DEF_QI) + MLD_DEF_QRI/MLD_TIMER_SCALE)
+		/* Multicast Address Listener Interval */
 #define	MLD_START_INTVL		MLD_DEF_QI/4
 #define	MLD_START_CNT		MLD_DEF_RV
-#define	MLD_LAST_INTVL		1	/* Last Member Query Interval (sec.) */
+#define	MLD_LAST_INTVL		1000	/* Last Member Query Interval (1 sec) */
 #define	MLD_LAST_CNT		MLD_DEF_RV
 #define MLD_UNSOL_INTVL         10      /* Unsolicited Report Interval (sec) */
 #define	MLDV2_UNSOL_INTVL	1	/* Unsolicited Report Interval (sec) */

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.60 2002/09/19 03:15:58 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.61 2002/10/02 11:24:48 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -159,8 +159,6 @@ static MALLOC_DEFINE(M_MRTABLE, "mrt", "multicast routing table");
  * Protocol constants
  */
 
-/* denotes that the MLD max response delay field specifies time in milliseconds */
-#define MLD_TIMER_SCALE	1000
 /*
  * time between repetitions of a node's initial report of interest in a
  * multicast address(in seconds)
@@ -1186,6 +1184,7 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 	if (((rti->rt6i_qrv = MLD_QRV(mldh->mld_rtval)) == 0) ||
 	    (rti->rt6i_qrv > 7))
 		rti->rt6i_qrv = MLD_DEF_RV;
+
 	if ((mldh->mld_qqi > 0) && (mldh->mld_qqi < 128))
 		rti->rt6i_qqi = mldh->mld_qqi;
 	else if (mldh->mld_qqi >= 128)
@@ -1193,18 +1192,20 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 				<< (MLD_QQIC_EXP(mldh->mld_qqi) + 3));
 	else
 		rti->rt6i_qqi = MLD_DEF_QI;
-	rti->rt6i_qri = mldh->mld_code;
-	if (rti->rt6i_qri >= rti->rt6i_qqi)
-		rti->rt6i_qri = (rti->rt6i_qqi - 1) / MLD_TIMER_SCALE;
+
+	rti->rt6i_qri = ntohs(mldh->mld_maxdelay);
+	if (rti->rt6i_qri >= rti->rt6i_qqi * MLD_TIMER_SCALE)
+		rti->rt6i_qri = (rti->rt6i_qqi - 1);
 		/* XXX tentatively adjusted */
 	else
 		rti->rt6i_qri /= MLD_TIMER_SCALE;
 
-	if ((mldh->mld_code > 0) && (mldh->mld_code < 32768))
-		timer = mldh->mld_code;
+	if ((ntohs(mldh->mld_maxdelay) > 0) &&
+	    (ntohs(mldh->mld_maxdelay) < 32768))
+		timer = ntohs(mldh->mld_maxdelay);
 	else
-		timer = (MLD_MRC_MANT(mldh->mld_code) | 0x1000)
-			<< (MLD_MRC_EXP(mldh->mld_code) + 3);
+		timer = (MLD_MRC_MANT(mldh->mld_maxdelay) | 0x1000)
+			<< (MLD_MRC_EXP(mldh->mld_maxdelay) + 3);
 
 	/*
 	 * Set interface timer if the query is Generic Query.
