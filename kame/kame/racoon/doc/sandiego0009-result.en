@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.15 2000/09/20 15:44:22 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.16 2000/09/20 16:16:14 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -24,7 +24,7 @@ vs XXX
 	phase 1: initiate/responder, main/aggressive
 	    preshared, 3des-cbc, md5, DH group 2, lifetime 600
 	    preshared, des-cbc, sha1, DH group 2, lifetime 1000
-	    RSAsig, 3des-cbc, sha1, DH group 2, lifetime 600
+	    rsasig, 3des-cbc, sha1, DH group 2, lifetime 600
 	phase 2: PFS group 2
 	    ESP blowfish-cbc, transport mode, lifetime 600
 	    ESP 3des-cbc, transport mode, lifetime 600
@@ -93,7 +93,7 @@ vs SSH (IPv6)
 
 vs RapidStream (CONTINUE)
 	phase 1: responder, main
-	    RSAsig, 3des-cbc, md5, DH group 1, lifetime 600
+	    rsasig, 3des-cbc, md5, DH group 1, lifetime 600
 	phase 2:
 	Notes:
 	- racoon crashed due to unkown problem.  I may be incorrect to use
@@ -103,7 +103,7 @@ vs RapidStream (CONTINUE)
 
 vs HITACHI
 	phase 1: responder, main
-	    RSAsig, 3des-cbc, sha1, DH group 2, lifetime 600
+	    rsasig, 3des-cbc, sha1, DH group 2, lifetime 600
 	    both subjectAltName and DN are OK.
 	    multiple subjectAltName is OK.
 	phase 2:
@@ -143,6 +143,25 @@ vs Linux FreeSWAN
 	  linux: uses latest key possible, and assumes that phase 2 responder
 		will install inbound SA on reception of 1st packet
 
+vs HiFn
+	phase 1: initiator, main
+	    rsasig, 3des-cbc, md5, DH group 2, lifetime 180 <== choiced
+	    rsasig, 3des-cbc, sha1, DH group 2, lifetime 600
+	phase 2: PFS group 2
+	    ESP 3des-cbc, hmac-sha1, tunnel mode, lifetime 600
+	Notes:
+	- defined "verify_cert off;"
+
+	rekey test:
+	phase 1: initiator, main
+	    rsasig, 3des-cbc, sha1, DH group 2, lifetime 60
+	phase 2: PFS group 2
+	    ESP 3des-cbc, hmac-sha1, tunnel mode, lifetime 30
+	Notes:
+	- large ping (8k) test.
+	- when rekeying started, sometime ok but sometime HiFn did not
+	  response last phase 2 packet.
+
 vs NxNetworks
 	phase 1: responder, main
 	    preshared, 3des-cbc, sha1, DH group 2
@@ -158,4 +177,3 @@ vs NxNetworks
 	- fragmented packets did not get through NxNet gw.
 	- phase 2 ID: (KAME) the gw itself (NxNet) net10 addr behind NxNet
 
-vs HiFn
