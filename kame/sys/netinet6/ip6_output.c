@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.258 2001/12/21 08:34:47 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.259 2001/12/24 12:59:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3936,7 +3936,6 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		 * doing a "regular" setsockopt with ipi6_addr being
 		 * in6addr_any and ipi6_ifindex being zero.
 		 * [rfc2292bis-02, Section 6]
-		 * XXX: Is this a good feature?? (jinmei@kame.net)
 		 */
 		if (sticky && optname == IPV6_PKTINFO && opt->ip6po_pktinfo) {
 			if (pktinfo->ipi6_ifindex == 0 &&
@@ -3946,7 +3945,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			}
 		}
 
-		/* valid the interface index if specified. */
+		/* validate the interface index if specified. */
 		if (pktinfo->ipi6_ifindex > if_index ||
 		    pktinfo->ipi6_ifindex < 0) {
 			 return(ENXIO);
