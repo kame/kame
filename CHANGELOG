@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2417 2003/06/27 02:17:28 itojun Exp $
+$KAME: CHANGELOG,v 1.2418 2003/06/27 11:52:09 sakane Exp $
 
 <200306>
+Fri Jun 27 20:47:07 JST 2003 sakane@kame.net
+	* kame/racoon
+	- fixed that the configure program did not work.
+	- the configure program checks if racoon's sha2 can work on an openssl.
+	- racoon supports the "proxy mode" SA negotiation.  it is useful
+	for MIP6 security.  patch from <Francis.Dupont@enst-bretagne.fr>
+
 Fri Jun 27 11:16:32 JST 2003  itojun@iijlab.net
 	* kame/sys/net/pf.c: PF from openbsd-current 2002/6/26.
 	  compilable on openbsd/netbsd.  the goal would be to integrate PF
