@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.88 2001/01/23 15:23:35 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.89 2001/01/23 18:13:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1665,6 +1665,8 @@ ipsec_in_reject(sp, m)
 	need_auth = 0;
 	need_conf = 0;
 	need_icv = 0;
+
+	/* XXX should compare policy against ipsec header history */
 
 	for (isr = sp->req; isr != NULL; isr = isr->next) {
 
