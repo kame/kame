@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.23 2001/10/24 08:35:22 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.24 2001/10/24 08:43:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -80,9 +80,6 @@ static ssize_t ni6_addrs __P((struct icmp6_nodeinfo *, char *, char *,
 static int ismyaddr __P((struct sockaddr *, socklen_t));
 static int getflags6 __P((const char *, const struct sockaddr *, socklen_t));
 static time_t getlifetime __P((const char *, const struct sockaddr *, socklen_t));
-#if 0
-static const char *getifname __P((const struct sockaddr *, socklen_t));
-#endif
 static void setkernmode __P((int));
 
 int s;
@@ -1213,45 +1210,6 @@ getlifetime(ifname, sa, salen)
 	close(sock);
 	return ifr6.ifr_ifru.ifru_lifetime.ia6t_expire;
 }
-
-#if 0
-static const char *
-getifname(sa, salen)
-	const struct sockaddr *sa;
-	socklen_t salen;
-{
-	struct ifaddrs *ifap, *ifa;
-	char h1[NI_MAXHOST], h2[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
-	const int niflags = NI_NUMERICHOST;
-#endif
-	static char ifname[IFNAMSIZ];
-
-	if (getifaddrs(&ifap) < 0)
-		return NULL;
-
-	if (getnameinfo(sa, salen, h1, sizeof(h1), NULL, 0, niflags))
-		return NULL;
-	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-		if (sa->sa_family != ifa->ifa_addr->sa_family)
-			continue;
-		if (getnameinfo(ifa->ifa_addr, ifa->ifa_addr->sa_len,
-		    h2, sizeof(h2), NULL, 0, niflags))
-			continue;
-		if (strcmp(h1, h2) != 0)
-			continue;
-		/* XXX ifnet.if_xname termination rule? */
-		strlcpy(ifname, ifa->ifa_name, sizeof(ifname));
-		freeifaddrs(ifap);
-		return ifname;
-	}
-
-	freeifaddrs(ifap);
-	return NULL;
-}
-#endif
 
 static void
 setkernmode(m)
