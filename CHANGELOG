@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2665 2004/09/04 09:31:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.2666 2004/09/07 05:15:13 jinmei Exp $
 
 <200409>
+2004-09-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: provided a new command "dhcp6ctl", deprecating
+	dhcp6sctl.  This new command controls the client as well as the
+	server.  For the client, the "start" and "stop" (which can specify
+	a particular interface) commands are available.
+
 2004-09-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: added the ability of dhcp6c to work on multiple
 	interfaces simultaneously.
