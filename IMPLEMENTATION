@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.226 2001/07/05 06:26:03 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.227 2001/07/07 05:44:29 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1898,6 +1898,16 @@ to make the distributed develoment smooth.
 
 - the tab character should be 8 columns wide (tabstops are at 8, 16, 24, ...
   column).  With vi, use ":set ts=8 sw=8".
+  With GNU Emacs 20 and later, the easiest way is to use the "bsd" style of
+  cc-mode with the variable "c-basic-offset" being 8;
+  (add-hook 'c-mode-common-hook
+	    (function
+	     (lambda ()
+	       (c-set-style "bsd")
+	       (setq c-basic-offset 8)  ; for Emacs 20 only
+	       )))
+  The "bsd" style in GNU Emacs 21 sets 8 to the variable by default, so this
+  configuration is not necessary if you only use GNU Emacs 21.
 - each line should be within 80 characters.
 - keep a single open/close bracket in a comment such as in the following
   line:
