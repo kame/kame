@@ -22,6 +22,7 @@ if test "x$otheraddr" = "x" -o "x$otheraddr" = "x127.0.0.1" ; then
 	echo "sample usage: sh test.sh -o 10.0.0.1 result.txt"
 	exit 1
 fi
+otheraddr6=::ffff:$otheraddr
 
 # In the following sequence, the order of TCP tests is important.
 # Since -1 or -2 options would make some TIME_WAIT sockets, tests without the
@@ -46,9 +47,13 @@ $bindtest -t -A -1 -6 -p $port
 $bindtest -l -t -A -1 -6 -p $port
 
 $bindtest -t -A -o $otheraddr -p $port
+$bindtest -t -A -o $otheraddr6 -p $port
 $bindtest -l -t -A -o $otheraddr -p $port
+$bindtest -l -t -A -o $otheraddr6 -p $port
 $bindtest -t -A -o $otheraddr -6 -p $port
+$bindtest -t -A -o $otheraddr6 -6 -p $port
 $bindtest -l -t -A -o $otheraddr -6 -p $port
+$bindtest -l -t -A -o $otheraddr6 -6 -p $port
 
 $bindtest -t -A -2 -p $port
 $bindtest -l -t -A -2 -p $port
@@ -56,9 +61,13 @@ $bindtest -t -A -2 -6 -p $port
 $bindtest -l -t -A -2 -6 -p $port
 
 $bindtest -t -A -o $otheraddr -p $port
+$bindtest -t -A -o $otheraddr6 -p $port
 $bindtest -l -t -A -o $otheraddr -p $port
+$bindtest -l -t -A -o $otheraddr6 -p $port
 $bindtest -t -A -o $otheraddr -6 -p $port
+$bindtest -t -A -o $otheraddr6 -6 -p $port
 $bindtest -l -t -A -o $otheraddr -6 -p $port
+$bindtest -l -t -A -o $otheraddr6 -6 -p $port
 
 $bindtest -t -P -1 -p $port
 $bindtest -l -t -P -1 -p $port
@@ -66,9 +75,13 @@ $bindtest -t -P -1 -6 -p $port
 $bindtest -l -t -P -1 -6 -p $port
 
 $bindtest -t -P -o $otheraddr -p $port
+$bindtest -t -P -o $otheraddr6 -p $port
 $bindtest -l -t -P -o $otheraddr -p $port
+$bindtest -l -t -P -o $otheraddr6 -p $port
 $bindtest -t -P -o $otheraddr -6 -p $port
+$bindtest -t -P -o $otheraddr6 -6 -p $port
 $bindtest -l -t -P -o $otheraddr -6 -p $port
+$bindtest -l -t -P -o $otheraddr6 -6 -p $port
 
 $bindtest -t -P -2 -p $port
 $bindtest -l -t -P -2 -p $port
@@ -76,9 +89,13 @@ $bindtest -t -P -2 -6 -p $port
 $bindtest -l -t -P -2 -6 -p $port
 
 $bindtest -t -P -o $otheraddr -p $port
+$bindtest -t -P -o $otheraddr6 -p $port
 $bindtest -l -t -P -o $otheraddr -p $port
+$bindtest -l -t -P -o $otheraddr6 -p $port
 $bindtest -t -P -o $otheraddr -6 -p $port
+$bindtest -t -P -o $otheraddr6 -6 -p $port
 $bindtest -l -t -P -o $otheraddr -6 -p $port
+$bindtest -l -t -P -o $otheraddr6 -6 -p $port
 
 $bindtest -t -AP -1 -p $port
 $bindtest -l -t -AP -1 -p $port
@@ -86,9 +103,13 @@ $bindtest -t -AP -1 -6 -p $port
 $bindtest -l -t -AP -1 -6 -p $port
 
 $bindtest -t -AP -o $otheraddr -p $port
+$bindtest -t -AP -o $otheraddr6 -p $port
 $bindtest -l -t -AP -o $otheraddr -p $port
+$bindtest -l -t -AP -o $otheraddr6 -p $port
 $bindtest -t -AP -o $otheraddr -6 -p $port
+$bindtest -t -AP -o $otheraddr6 -6 -p $port
 $bindtest -l -t -AP -o $otheraddr -6 -p $port
+$bindtest -l -t -AP -o $otheraddr6 -6 -p $port
 
 $bindtest -t -AP -2 -p $port
 $bindtest -l -t -AP -2 -p $port
@@ -96,8 +117,12 @@ $bindtest -t -AP -2 -6 -p $port
 $bindtest -l -t -AP -2 -6 -p $port
 
 $bindtest -t -AP -o $otheraddr -p $port
+$bindtest -t -AP -o $otheraddr6 -p $port
 $bindtest -l -t -AP -o $otheraddr -p $port
+$bindtest -l -t -AP -o $otheraddr6 -p $port
 $bindtest -t -AP -o $otheraddr -6 -p $port
+$bindtest -t -AP -o $otheraddr6 -6 -p $port
 $bindtest -l -t -AP -o $otheraddr -6 -p $port
+$bindtest -l -t -AP -o $otheraddr6 -6 -p $port
 echo
 uname -a) > $platform

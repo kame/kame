@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.33 2001/05/18 08:43:03 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.34 2001/05/21 07:48:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -106,10 +106,11 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.33 2001/05/18 08:43:03 jinmei Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.34 2001/05/21 07:48:30 jinmei Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
+static struct addrinfo *oai6;
 static int socktype = SOCK_DGRAM;
 static int v6only = 0;
 static int summary = 0;
@@ -127,6 +128,7 @@ main(argc, argv)
 	int ch;
 	extern char *optarg;
 	struct testitem *testi, *testj;
+	char otheraddr6[NI_MAXHOST];
 
 	while ((ch = getopt(argc, argv, "126Alo:Pp:stv")) != -1) {
 		switch (ch) {
@@ -202,8 +204,21 @@ main(argc, argv)
 	}
 
 	if (otheraddr != NULL) {
-		if ((oai = getres(AF_INET, otheraddr, port, 0)) == NULL)
-			errx(1, "getaddrinfo failed");
+		if ((oai = getres(AF_INET, otheraddr, port, 0)) == NULL) {
+			if ((oai6 = getres(AF_INET6, otheraddr, port, 0))
+			    == NULL)
+				errx(1, "getaddrinfo failed");
+		} else if (socktype == SOCK_DGRAM) {
+			if (strlen("::ffff:") + strlen(otheraddr) + 1 >
+			    sizeof(otheraddr6))
+				errx(1, "too long hostname %s",
+				     otheraddr);
+			strcpy(otheraddr6, "::ffff:");
+			strcat(otheraddr6, otheraddr);
+			if ((oai6 = getres(AF_INET6, otheraddr6, port, 0))
+			    == NULL)
+				errx(1, "getaddrinfo failed");
+		}
 	}
 
 	printf("starting tests, socktype = %s%s%s",
@@ -220,8 +235,10 @@ main(argc, argv)
 			printf("1st");
 		if (connect2nd != 0)
 			printf("2nd");
-		if (otheraddr != NULL)
+		if (oai != NULL)
 			printf("other");
+		if (oai6 != NULL)
+			printf("other6");
 	}
 	if (socktype == SOCK_STREAM && delayedlisten == 1)
 		printf(", delayed listen");
@@ -279,7 +296,7 @@ printsa(sa, salen)
 	struct sockaddr *sa;
 	socklen_t salen;
 {
-	char hbuf[MAXHOSTNAMELEN], pbuf[10];
+	char hbuf[NI_MAXHOST], pbuf[10];
 	static char buf[sizeof(hbuf) + sizeof(pbuf)];
 
 	getnameinfo(sa, salen, hbuf, sizeof(hbuf),
@@ -473,6 +490,8 @@ test(t1, t2)
 			putchar('-');
 		if (oai != NULL)
 			sendtest(sa, sb, oai);
+		if (oai6 != NULL)
+			sendtest(sa, sb, oai6);
 		else if (summary)
 			putchar('-');
 	} else if (reuseaddr != 0 || reuseport != 0) {
@@ -491,6 +510,10 @@ test(t1, t2)
 			putchar('-');
 		if (oai != NULL)
 			conntest(sa, sb, oai);
+		else if (summary)
+			putchar('-');
+		if (oai6 != NULL)
+			conntest(sa, sb, oai6);
 		else if (summary)
 			putchar('-');
 	}
@@ -532,9 +555,25 @@ sendtest(sa, sb, ai)
 			printf("\tfailed to open a socket for sending: %s\n",
 			       strerror(errno));
 		} else
-			putchar('x');
+			putchar('s');
 		goto done;
 	}
+#ifdef IPV6_V6ONLY
+	if (v6only && ai->ai_family == AF_INET6) {
+		int on = 1;
+
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on))
+		    < 0) {
+			if (!summary) {
+				printf("\tfailed setsockopt(IPV6_V6ONLY) "
+				       "for %s, %s\n", printres(ai),
+				       strerror(errno));
+			} else
+				putchar('6');
+			goto done;
+		}
+	}
+#endif
 	if ((sendto(s, buf, sizeof(buf), 0, ai->ai_addr,
 		    ai->ai_addrlen)) < 0) {
 		if (!summary) {
@@ -666,6 +705,22 @@ conntest(sa, sb, ai)
 			putchar('s');
 		goto done;
 	}
+#ifdef IPV6_V6ONLY
+	if (v6only && ai->ai_family == AF_INET6) {
+		int on = 1;
+
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on))
+		    < 0) {
+			if (!summary) {
+				printf("\tfailed setsockopt(IPV6_V6ONLY) "
+				       "for %s, %s\n", printres(ai),
+				       strerror(errno));
+			} else
+				putchar('6');
+			goto done;
+		}
+	}
+#endif
 	flags = fcntl(s, F_GETFL, 0);
 	flags |= O_NONBLOCK;
 	if (fcntl(s, F_SETFL, flags) < 0) {
