@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.308 2002/09/21 06:53:46 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.309 2002/09/22 01:55:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1231,10 +1231,17 @@ in6_update_ifa(ifp, ifra, ia)
 		goto unlink;
 
 	/*
-	 * Make the address tentative before joining multicast addresses,
-	 * so that corresponding MLD responses would not have a tentative
-	 * source address.
+	 * configure address flags.
 	 */
+	/* reject read-only flags */
+	if ((ifra->ifra_flags & IN6_IFF_DUPLICATED) != 0 ||
+	    (ifra->ifra_flags & IN6_IFF_DETACHED) != 0 ||
+	    (ifra->ifra_flags & IN6_IFF_NODAD) != 0 ||
+	    (ifra->ifra_flags & IN6_IFF_AUTOCONF) != 0 ||
+	    (ifra->ifra_flags & IN6_IFF_TEMPORARY) != 0) {
+		error = EINVAL;
+		goto unlink;
+	}
 	ia->ia6_flags = ifra->ifra_flags;
 	/*
 	 * backward compatibility - if IN6_IFF_DEPRECATED is set from the
@@ -1244,6 +1251,11 @@ in6_update_ifa(ifp, ifra, ia)
 		ia->ia6_lifetime.ia6t_pltime = 0;
 		ia->ia6_lifetime.ia6t_preferred = time_second;
 	}
+	/*
+	 * Make the address tentative before joining multicast addresses,
+	 * so that corresponding MLD responses would not have a tentative
+	 * source address.
+	 */
 	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/* safety */
 #ifdef MIP6
 	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia))
