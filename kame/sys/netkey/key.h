@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.25 2002/06/12 03:45:51 itojun Exp $	*/
+/*	$KAME: key.h,v 1.26 2003/02/03 10:49:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,6 +73,13 @@ extern int key_checktunnelsanity __P((struct secasvar *, u_int,
 extern void key_sa_recordxfer __P((struct secasvar *, struct mbuf *));
 extern void key_sa_routechange __P((struct sockaddr *));
 extern void key_sa_stir_iv __P((struct secasvar *));
+
+#if defined(MIP6) && defined(MIP6_HAIPSEC)
+int key_mip6_update_mobile_node_ipsecdb(struct sockaddr_in6 *,
+    struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
+int key_mip6_update_home_agent_ipsecdb(struct sockaddr_in6 *,
+    struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
+#endif
 
 #ifdef __FreeBSD__
 #ifdef MALLOC_DECLARE
