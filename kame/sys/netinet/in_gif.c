@@ -145,7 +145,7 @@ in_gif_output(ifp, family, m, rt)
 	    }
 #endif /*INET6*/
 	default:
-#ifdef DIAGNOSTIC
+#ifdef DEBUG
 		printf("in_gif_output: warning: unknown family %d passed\n",
 			family);
 #endif

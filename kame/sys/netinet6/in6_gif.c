@@ -123,7 +123,7 @@ in6_gif_output(ifp, family, m, rt)
 	    }
 #endif
 	default:
-#ifdef DIAGNOSTIC
+#ifdef DEBUG
 		printf("in6_gif_output: warning: unknown family %d passed\n",
 			family);
 #endif
