@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.200 2004/11/28 09:18:12 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.201 2004/11/30 10:23:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -760,7 +760,7 @@ init(ac, flags)
 
 		case AF_INET6:
 			if (ac->inet6_config == 1)
-				continue; /* don't need further checks  */
+				continue; /* don't need further checks */
 
 			sa6 = (struct sockaddr_in6 *)ifap->ifa_addr;
 
