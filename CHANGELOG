@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2154 2002/05/17 02:17:47 jinmei Exp $
+$KAME: CHANGELOG,v 1.2155 2002/05/17 07:00:33 jinmei Exp $
 
 <200205>
+2002-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c: when constructing a reply message,
+	included prefixes given in the corresponding advertisement message.
+	* kame/kame/dhcp6/dhcp6s.c (server6_react_request): chose
+	delegated prefixes based on the ones specified in the request
+	message.
+
 2002-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6.h: changed option type values that have
 	not been officially assigned to the values documented in NTTC's
