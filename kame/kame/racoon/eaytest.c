@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: eaytest.c,v 1.3 2000/01/09 01:31:22 itojun Exp $ */
+/* YIPS @(#)$Id: eaytest.c,v 1.4 2000/08/09 20:14:58 sakane Exp $ */
 
 #include <sys/types.h>
 
@@ -36,13 +36,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
-
-#define TEST_RAND	0x00000001
-#define TEST_DH		0x00000002
-#define TEST_MD5	0x00000004
-#define TEST_SHA1	0x00000008
-#define TEST_HMAC	0x00000010
-#define TEST_CIPHER	0x00000020
 
 #include "var.h"
 #include "vmbuf.h"
@@ -63,6 +56,8 @@ ciphertest()
 	vchar_t key;
 	vchar_t *res1, *res2;
 	char iv[8];
+
+	printf("\n**Test for CIPHER.**\n");
 
 	data.v = str2val("a7c3a855 a328a6d4 b1bd9c06 c5bd5c17 b8c5f657 bd8ea245 2a6726d0 ce3689f5", 16, &data.l);
 	key.v = str2val("fadc3844 61d6114e fadc3844 61d6114e fadc3844 61d6114e", 16, &key.l);
@@ -185,6 +180,8 @@ hmactest()
 	vchar_t kir, ki, kr;
 	vchar_t *key, *data, *res, *data2;
 
+	printf("\n**Test for HMAC MD5 & SHA1.**\n");
+
 	kir.v = str2val("d7e6a6c1876ef0488bb74958b9fee94efdb563d4e18de4ec03a4a1842d432985", 16, &kir.l);
 	ki.v = str2val("d7e6a6c1876ef0488bb74958b9fee94e", 16, &ki.l);
 	kr.v = str2val("fdb563d4e18de4ec03a4a1842d432985", 16, &kr.l);
@@ -230,6 +227,8 @@ sha1test()
 	caddr_t ctx;
 	vchar_t *buf, *res;
 
+	printf("\n**Test for SHA1.**\n");
+
 	ctx = eay_sha1_init();
 	buf = vmalloc(strlen(word1));
 	memcpy(buf->v, word1, buf->l);
@@ -261,6 +260,8 @@ md5test()
 	caddr_t ctx;
 	vchar_t *buf, *res;
 
+	printf("\n**Test for MD5.**\n");
+
 	ctx = eay_md5_init();
 	buf = vmalloc(strlen(word1));
 	memcpy(buf->v, word1, buf->l);
@@ -290,6 +291,8 @@ dhtest(f)
 	int f;
 {
 	vchar_t p1, p2, *pub1, *priv1, *pub2, *priv2, *key;
+
+	printf("\n**Test for DH.**\n");
 
 	switch (f) {
 	case 0:
@@ -349,6 +352,8 @@ bntest()
 {
 	vchar_t *rn;
 
+	printf("\n**Test for generate a random number.**\n");
+
 	rn = eay_set_random((u_int32_t)96);
 	PVDUMP(rn);
 	vfree(rn);
@@ -359,55 +364,33 @@ main(ac, av)
 	int ac;
 	char **av;
 {
-	int mode = 0;
-
-	if (ac == 1)
-		mode = ~0;
-	else {
-		for (av++; ac-- > 0; av++) {
-			if (strcmp(*av, "random") == 0)
-				mode |= TEST_RAND;
-			else if (strcmp(*av, "dh") == 0)
-				mode |= TEST_DH;
-			else if (strcmp(*av, "md5") == 0)
-				mode |= TEST_MD5;
-			else if (strcmp(*av, "sha1") == 0)
-				mode |= TEST_SHA1;
-			else if (strcmp(*av, "hmac") == 0)
-				mode |= TEST_HMAC;
-			else if (strcmp(*av, "cipher") == 0)
-				mode |= TEST_CIPHER;
-		}
+	if (strcmp(*av, "-h") == 0) {
+		printf("Usage: eaytest [dh|md5|sha1|hmac|cipher]\n");
+		exit(0);
 	}
 
-	if (mode & TEST_RAND) {
-		printf("\n**Test for generate a random number.**\n");
+	if (ac == 1) {
 		bntest();
-	}
-
-	if (mode & TEST_DH) {
-		printf("\n**Test for DH.**\n");
-		dhtest(0);
-	}
-
-	if (mode & TEST_MD5) {
-		printf("\n**Test for MD5.**\n");
+		dhtest();
 		md5test();
-	}
-
-	if (mode & TEST_SHA1) {
-		printf("\n**Test for SHA1.**\n");
 		sha1test();
-	}
-
-	if (mode & TEST_HMAC) {
-		printf("\n**Test for HMAC MD5 & SHA1.**\n");
 		hmactest();
-	}
-
-	if (mode & TEST_CIPHER) {
-		printf("\n**Test for CIPHER.**\n");
 		ciphertest();
+	} else {
+		for (av++; *av != '\0'; av++) {
+			if (strcmp(*av, "random") == 0)
+				bntest();
+			else if (strcmp(*av, "dh") == 0)
+				dhtest(0);
+			else if (strcmp(*av, "md5") == 0)
+				md5test();
+			else if (strcmp(*av, "sha1") == 0)
+				sha1test();
+			else if (strcmp(*av, "hmac") == 0)
+				hmactest();
+			else if (strcmp(*av, "cipher") == 0)
+				ciphertest();
+		}
 	}
 
 	exit(0);
