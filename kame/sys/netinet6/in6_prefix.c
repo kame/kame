@@ -403,7 +403,11 @@ assigne_ra_entry(struct rr_prefix *rpp, int iilen, struct in6_ifaddr *ia)
 #if 0 /* Can't do this now, because rpp may be on th stack. should fix it? */
 	ia->ia6_ifpr = rp2ifpr(rpp);
 #endif
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	LIST_INSERT_HEAD(&rpp->rp_addrhead, rap, ra_entry);
 	splx(s);
 
@@ -501,7 +505,11 @@ in6_prefix_remove_ifid(int iilen, struct in6_ifaddr *ia)
 		return;
 	rap = search_ifidwithprefix(ifpr2rp(ia->ia6_ifpr), IA6_IN6(ia));
 	if (rap != NULL) {
+#ifdef __NetBSD__
+		int s = splsoftnet();
+#else
 		int s = splnet();
+#endif
 		LIST_REMOVE(rap, ra_entry);
 		splx(s);
 		free(rap, M_RR_ADDR);
@@ -642,7 +650,11 @@ rrpr_update(struct socket *so, struct rr_prefix *new)
 				free(rap, M_RR_ADDR);
 				continue;
 			}
+#ifdef __NetBSD__
+			s = splsoftnet();
+#else
 			s = splnet();
+#endif
 			LIST_INSERT_HEAD(&rpp->rp_addrhead, rap, ra_entry);
 			splx(s);
 		}
@@ -691,7 +703,11 @@ rrpr_update(struct socket *so, struct rr_prefix *new)
 			rp2ifpr(rpp)->ifpr_type = IN6_PREFIX_RR;
 		}
 		/* link rr_prefix entry to rr_prefix list */
+#ifdef __NetBSD__
+		s = splsoftnet();
+#else
 		s = splnet();
+#endif
 		LIST_INSERT_HEAD(&rr_prefix, rpp, rp_entry);
 		splx(s);
 	}
@@ -728,7 +744,11 @@ rp_remove(struct rr_prefix *rpp)
 {
 	int s;
 
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	/* unlink rp_entry from if_prefixlist */
 	{
 		struct ifnet *ifp = rpp->rp_ifp;
@@ -894,7 +914,11 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 		struct rp_addr *rap;
 		int s;
 
+#ifdef __NetBSD__
+		s = splsoftnet();
+#else
 		s = splnet();
+#endif
 		rap = LIST_FIRST(&rpp->rp_addrhead);
 		if (rap == NULL)
 			break;
@@ -1120,7 +1144,11 @@ in6_rr_timer(void *ignored_arg)
 
 	timeout(in6_rr_timer, (caddr_t)0, ip6_rr_prune * hz);
 
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	/* expire */
 	rpp = LIST_FIRST(&rr_prefix);
 	while (rpp) {
