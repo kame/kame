@@ -740,7 +740,7 @@ export_statement:
 	;
 
 export_list:
-		{ $$ = NULL; };	/* empty */
+		{ $$ = NULL; }	/* empty */
 	|	export_list protocol
 		{
 			if (($$ = add_attribute($1, ATTR_DATA, EXPA_PROTO,
