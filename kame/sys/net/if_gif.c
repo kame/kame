@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.49 2001/06/04 12:03:41 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.50 2001/06/08 10:09:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -518,11 +518,11 @@ gif_input(m, af, gifp)
 		splx(s);
 		return;
 	}
+	gifp->if_ipackets++;
+	gifp->if_ibytes += m->m_pkthdr.len;
 	IF_ENQUEUE(ifq, m);
 	/* we need schednetisr since the address family may change */
 	schednetisr(isr);
-	gifp->if_ipackets++;
-	gifp->if_ibytes += m->m_pkthdr.len;
 	splx(s);
 
 	return;
