@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.297 2002/01/16 17:11:40 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.298 2002/03/02 10:04:24 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1427,6 +1427,12 @@ compatibility support in KAME tree.  To enumerate:
   strict/loose bitmap.  2292bis document is based on RFC2460 IPv6, and it has
   no strict/loose bitmap (it was removed from RFC2460).  KAME tree obeys
   RFC2460 IPv6, and lacks support for strict/loose bitmap.
+
+The 2292bis documents leave some particular cases unspecified.  The
+KAME implementation treats them as follows:
+- The IPV6_DONTFRAG and IPV6_RECVPATHMTU socket options for TCP
+  sockets are ignored.  That is, the setsocktopt() call will succeed
+  but the specified value will have no effect.
 
 1.17 DNS resolver
 
