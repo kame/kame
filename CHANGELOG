@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.601 2000/02/24 05:59:07 jinmei Exp $
+$Id: CHANGELOG,v 1.602 2000/02/24 08:43:34 jinmei Exp $
 
 <200002>
+2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/usr.sbin/vmstat: was just imported. We don't have to
+	modify the code, but it should be recompiled to support additional
+	memory types used in the kernel.
+
 2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_control): clarified address
 	management ioctls:
