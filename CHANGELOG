@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1944 2001/10/25 09:51:16 jinmei Exp $
+$KAME: CHANGELOG,v 1.1945 2001/10/25 09:52:07 jinmei Exp $
 
 <200110>
 2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -8,8 +8,8 @@ $KAME: CHANGELOG,v 1.1944 2001/10/25 09:51:16 jinmei Exp $
 	Checked if the cached route (per gif) is up before using it.
 	This should be verified for all type of cached routes, but we've
 	forgotten the check.  With this change, FreeBSD and BSD/OS will be
-	able to catch a more specific route for the destination as soon as
-	possible.
+	able to catch a more specific route for the other end point of the
+	tunnel as soon as possible.
 
 	(OpenBSD IPv6 only)merged recent changes into the openbsd specific
 	code path.
