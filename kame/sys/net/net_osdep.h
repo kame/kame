@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.44 2001/05/16 03:13:40 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.45 2001/06/14 04:24:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -227,6 +227,12 @@
  *		use IFAFREE once when ifaddr is disconnected from
  *		ifp->if_addrlist and in_ifaddr.  IFAFREE frees ifaddr when
  *		ifa_refcnt goes negative.
+ *
+ * - ifnet.if_lastchange
+ *	freebsd, bsdi: updated only when IFF_UP changes.
+ *		(RFC1573 ifLastChange interpretation)
+ *	netbsd, openbsd: updated whenever packet goes through the interface
+ *		(4.4BSD interpretation)
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
