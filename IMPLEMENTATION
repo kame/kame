@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.198 2001/03/12 11:33:44 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.199 2001/03/21 17:51:34 jinmei Exp $
 
 1. IPv6
 
@@ -149,6 +149,9 @@ draft-aboba-dnsext-mdns-00.txt: Multicast DNS
 draft-itojun-ipv6-tclass-api-01.txt: Socket API for IPv6 traffic class field
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
+draft-draves-ipngwg-router-selection-01.txt:
+	Default Router Preferences and More-Specific Routes
+    * router-side, router preferences only.
 
 1.2 Neighbor Discovery
 
