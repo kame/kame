@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.3 2001/08/03 14:22:30 itojun Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.4 2001/08/03 14:31:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -26,6 +26,15 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+
+/*
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
+ * All rights reserved.
+ *
+ * Authors: Conny Larsson <Conny.Larsson@era.ericsson.se>
+ *          Mattias Pettersson <Mattias.Pettersson@era.ericsson.se>
+ *
  */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
