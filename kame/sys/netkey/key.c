@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.158 2000/09/22 15:13:23 sakane Exp $	*/
+/*	$KAME: key.c,v 1.159 2000/09/22 15:39:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -453,6 +453,7 @@ static int key_delete __P((struct socket *, struct mbuf *,
 static int key_get __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
 
+static void key_getcomb_setlifetime __P((struct sadb_comb *));
 #ifdef IPSEC_ESP
 static struct mbuf *key_getcomb_esp __P((void));
 #endif
@@ -5357,6 +5358,22 @@ key_get(so, m, mhp)
     }
 }
 
+/* XXX make it sysctl-configurable? */
+static void
+key_getcomb_setlifetime(comb)
+	struct sadb_comb *comb;
+{
+
+	comb->sadb_comb_soft_allocations = 1;
+	comb->sadb_comb_hard_allocations = 1;
+	comb->sadb_comb_soft_bytes = 0;
+	comb->sadb_comb_hard_bytes = 0;
+	comb->sadb_comb_hard_addtime = 86400;	/* 1 day */
+	comb->sadb_comb_soft_addtime = comb->sadb_comb_soft_addtime * 80 / 100;
+	comb->sadb_comb_soft_usetime = 28800;	/* 8 hours */
+	comb->sadb_comb_hard_usetime = comb->sadb_comb_hard_usetime * 80 / 100;
+}
+
 #ifdef IPSEC_ESP
 /*
  * XXX reorder combinations by preference
@@ -5420,6 +5437,8 @@ key_getcomb_esp()
 				goto fail;
 			}
 			comb = (struct sadb_comb *)(mtod(n, caddr_t) + o);
+			bzero(comb, sizeof(*comb));
+			key_getcomb_setlifetime(comb);
 			comb->sadb_comb_encrypt = i;
 			comb->sadb_comb_encrypt_minbits = encmin;
 			comb->sadb_comb_encrypt_maxbits = algo->keymax;
@@ -5490,6 +5509,7 @@ key_getcomb_ah()
 
 		comb = mtod(m, struct sadb_comb *);
 		bzero(comb, sizeof(*comb));
+		key_getcomb_setlifetime(comb);
 		comb->sadb_comb_auth = i;
 		comb->sadb_comb_auth_minbits = min;
 		comb->sadb_comb_auth_maxbits = algo->keymax;
