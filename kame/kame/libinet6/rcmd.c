@@ -582,8 +582,7 @@ __icheckhost(raddr, lhost, af, len)
 	int match;
 
 	/* Try for raw ip address first. */
-	if (isdigit(*lhost)) {
-		inet_pton(af, lhost, laddr);
+	if (inet_pton(af, lhost, laddr) == 1) {
 		if (memcmp(raddr, laddr, len) == 0)
 			return (1);
 		else

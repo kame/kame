@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.7 1999/10/13 02:04:42 k-sugyou Exp $ */
+/* $Id: name6.c,v 1.8 1999/10/26 08:57:53 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -333,7 +333,7 @@ getipnodebyname(const char *name, int af, int flags, int *errp)
 
 #ifdef INET6
 	/* special case for literal address */
-	if (inet_pton(AF_INET6, name, &addrbuf) > 0) {
+	if (inet_pton(AF_INET6, name, &addrbuf) == 1) {
 		if (af != AF_INET6) {
 			*errp = HOST_NOT_FOUND;
 			return NULL;
@@ -341,7 +341,7 @@ getipnodebyname(const char *name, int af, int flags, int *errp)
 		return _hpaddr(af, name, &addrbuf, errp);
 	}
 #endif 
-	if (inet_pton(AF_INET, name, &addrbuf) > 0) {
+	if (inet_pton(AF_INET, name, &addrbuf) == 1) {
 		if (af != AF_INET) {
 			if (MAPADDRENABLED(flags)) {
 				MAPADDR(&addrbuf, &addrbuf.in_addr);
@@ -472,7 +472,7 @@ gethostbyname2(const char *name, int af)
 	/* special case for literal address */
 	/* XXX: use inet_aton to handle nonstandard format for IPv4 */
 	if ((af == AF_INET ? inet_aton(name, &addrbuf.in_addr) :
-			     inet_pton(af, name, &addrbuf)) > 0)
+			     inet_pton(af, name, &addrbuf)) == 1)
 		return _hpaddr(af, name, &addrbuf, &h_errno);
 
 	h_errno = HOST_NOT_FOUND;
@@ -895,7 +895,7 @@ _files_ghbyname(const char *name, int af, int *errp)
 		}
 		if (!match)
 			continue;
-		if (inet_pton(af, addrstr, &addrbuf) <= 0) {
+		if (inet_pton(af, addrstr, &addrbuf) != 1) {
 			*errp = NO_DATA;	/* name found */
 			continue;
 		}
@@ -932,7 +932,7 @@ _files_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	while (fgets(buf, sizeof(buf), fp)) {
 		line = buf;
 		if ((p = _hgetword(&line)) == NULL
-		||  inet_pton(af, p, &addrbuf) <= 0
+		||  inet_pton(af, p, &addrbuf) != 1
 		||  memcmp(addr, &addrbuf, addrlen) != 0
 		||  (p = _hgetword(&line)) == NULL)
 			continue;
@@ -1002,13 +1002,13 @@ gethostent(void)
 		line = buf;
 		if ((p = _hgetword(&line)) == NULL)
 			continue;
-		if (inet_pton((af = AF_INET), p, &addrbuf) <= 0) {
+		if (inet_pton((af = AF_INET), p, &addrbuf) != 1) {
 #ifdef notdef
 			/*
 			 * For compatibility, gethostent should not return
 			 * IPv6 addresses.
 			 */
-			if (inet_pton((af = AF_INET6), p, &addrbuf) <= 0)
+			if (inet_pton((af = AF_INET6), p, &addrbuf) != 1)
 #endif
 				continue;
 		}

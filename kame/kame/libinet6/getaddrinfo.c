@@ -439,7 +439,7 @@ getaddrinfo(hostname, servname, hints, res)
 	
 	/* hostname as numeric name */
 	for (i = 0; afdl[i].a_af; i++) {
-		if (inet_pton(afdl[i].a_af, hostname, pton)) {
+		if (inet_pton(afdl[i].a_af, hostname, pton) == 1) {
 			u_long v4a;
 			u_char pfx;
 
@@ -502,7 +502,7 @@ getaddrinfo(hostname, servname, hints, res)
 				 }
 				 /* terminate at the delimiter */
 				 hostname2[cp - hostname] = '\0';
-				 if (inet_pton(AF_INET6, hostname2, pton)) {
+				 if (inet_pton(AF_INET6, hostname2, pton) == 1) {
 					 if (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)pton) ||
 					     IN6_IS_ADDR_MC_LINKLOCAL((struct in6_addr *)pton)) {
 						 char *ifname = cp + 1;
