@@ -157,7 +157,7 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.167.2.5 1999/07/02 17:53:31 perry Exp 
 # ifndef INET
 #  include <netinet/in.h>
 # endif
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif
 #ifdef NS

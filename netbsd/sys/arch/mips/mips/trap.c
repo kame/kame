@@ -109,7 +109,7 @@ __KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.107 1999/03/24 05:51:05 mrg Exp $");
 # ifndef INET
 #  include <netinet/in.h>
 # endif
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif
 
