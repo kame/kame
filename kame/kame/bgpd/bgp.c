@@ -121,7 +121,6 @@ connect_try(struct rpcb *bnp)
   int                 on;
 #endif
   int                 optval, optlen;
-  char                in6txt[INET6_ADDRSTRLEN];/* length of my address  */
   int                 childpid;
 
   extern task   *taskhead;
@@ -204,18 +203,16 @@ connect_try(struct rpcb *bnp)
 		sizeof(bnp->rp_addr)) == 0)    {
 
       syslog(LOG_DEBUG,
-	     "<connect_try>: <child>: connection succeed with %s (%s AS %d)",
-	     inet_ntop(AF_INET6, &bnp->rp_addr.sin6_addr,
-		       in6txt, INET6_ADDRSTRLEN),
+	     "<%s>: <child>: connection succeed with %s (%s AS %d)",
+	     __FUNCTION__, ip6str(&bnp->rp_addr.sin6_addr, 0),
 	     ((bnp->rp_mode & BGPO_IGP) ? "Internal" : "External"),
 	     bnp->rp_as);
     } else {
 #ifdef DEBUG
-      syslog(LOG_ERR, "<connect_try>: <child>: connect failed: %s",
+      syslog(LOG_ERR, "<%s>: <child>: connect failed: %s", __FUNCTION__,
 	     strerror(errno));
       syslog(LOG_DEBUG, "\t\t\t by %s %s",
-	     inet_ntop(AF_INET6, &bnp->rp_addr.sin6_addr,
-		       in6txt, INET6_ADDRSTRLEN),
+	     ip6str(&bnp->rp_addr.sin6_addr, 0),
 	     (bnp->rp_mode & BGPO_IFSTATIC) ?
 	       bnp->rp_ife->ifi_ifn->if_name : "");
 #endif
