@@ -554,7 +554,7 @@ dump_mldqueriers(fp)
 				v->uv_name);
 
 			fprintf(fp, " %-40s %5lu %15s\n",
-				inet6_fmt(&v->uv_querier->al_addr.sin6_addr),
+				sa6_fmt(&v->uv_querier->al_addr),
 				(u_long)v->uv_querier->al_timer,
 				sec2str(now - v->uv_querier->al_ctime));
 		}
