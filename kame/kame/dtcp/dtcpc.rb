@@ -32,7 +32,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: dtcpc.rb,v 1.1 1999/08/08 23:29:23 itojun Exp $
+# $Id: dtcpc.rb,v 1.2 2000/01/10 17:25:01 jinmei Exp $
 #
 
 require "socket"
@@ -189,8 +189,8 @@ if (t =~ /^\+OK/)
   STDERR.print "ifconfig #{intface} up\n" if $debug
   system("ifconfig #{intface} up")
   STDERR.print "tunnel to #{a[2]} established.\n"
-  STDERR.print "route add -inet6 default -interface #{intface}\n" if $debug
-  system("route add -inet6 default -interface #{intface}")
+  STDERR.print "route add -inet6 default ::1 -ifp #{intface}\n" if $debug
+  system("route add -inet6 default ::1 -ifp #{intface}")
   STDERR.print "default route was configured.\n"
   begin
     while TRUE
