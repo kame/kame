@@ -46,6 +46,9 @@ __RCSID("$NetBSD: hosts_access.c,v 1.5 1999/01/18 20:21:19 christos Exp $");
 #include <netgroup.h>
 #include <rpcsvc/ypclnt.h>
 #endif
+#ifdef INET6
+#include <sys/socket.h>
+#endif
 
 extern int errno;
 
@@ -96,6 +99,9 @@ static int host_match __P((char *, struct host_info *));
 static int rbl_match __P((char *, char *));
 static int string_match __P((char *, char *));
 static int masked_match __P((char *, char *, char *));
+#ifdef INET6
+static int masked_match6 __P((char *, char *, char *));
+#endif
 
 /* Size of logical line buffer. */
 
@@ -295,7 +301,8 @@ struct host_info *host;
     } else if (strncmp(tok, "{RBL}.", 6) == 0) { /* RBL lookup in domain */
 	return rbl_match(tok+6, eval_hostaddr(host));
     } else if ((mask = split_at(tok, '/')) != 0) {	/* net/mask */
-	return (masked_match(tok, mask, eval_hostaddr(host)));
+	return (masked_match(tok, mask, eval_hostaddr(host))
+	    || masked_match6(tok, mask, eval_hostaddr(host)));
     } else {					/* anything else */
 	return (string_match(tok, eval_hostaddr(host))
 	    || (NOT_INADDR(tok) && string_match(tok, eval_hostname(host))));
@@ -386,3 +393,47 @@ char   *string;
     }
     return ((addr & mask) == net);
 }
+
+#ifdef INET6
+static int masked_match6(net_tok, mask_tok, string)
+char   *net_tok;
+char   *mask_tok;
+char   *string;
+{
+    struct in6_addr net;
+    struct in6_addr mask;
+    struct in6_addr addr;
+    int masklen;
+    int fail;
+    int i;
+
+    if (inet_pton(AF_INET6, string, &addr) != 1)
+	return (NO);
+    fail = 0;
+    if (inet_pton(AF_INET6, net_tok, &net) != 1)
+	fail++;
+    if (strchr(mask_tok, ':') == NULL) {
+	masklen = atoi(mask_tok);
+	if (0 <= masklen && masklen <= 128) {
+	    memset(&mask, 0, sizeof(mask));
+	    memset(&mask, 0xff, masklen / 8);
+	    if (masklen % 8) {
+		((u_char *)&mask)[masklen / 8] =
+			(0xff00 >> (masklen % 8)) & 0xff;
+	    }
+	} else
+	    fail++;
+    } else {
+	if (inet_pton(AF_INET6, mask_tok, &mask) != 1)
+	    fail++;
+    }
+    if (fail) {
+	tcpd_warn("bad net/mask expression: %s/%s", net_tok, mask_tok);
+	return (NO);				/* not tcpd_jump() */
+    }
+
+    for (i = 0; i < sizeof(addr); i++)
+	addr.s6_addr[i] &= mask.s6_addr[i];
+    return (memcmp(&addr, &net, sizeof(addr)) == 0);
+}
+#endif
