@@ -117,17 +117,17 @@
 #include <netns/ns_if.h>
 #endif
 
-#if defined(PM)
+#ifdef PM
 void	pm_init		__P((void));
 void	pm_input	__P((struct mbuf *, int));
 int	pm_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
 struct pr_usrreqs pm_usrreqs;
 #endif
 
-#if defined(PTR)
-void	ptr_init	__P((void));
-int	ptr_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
-struct pr_usrreqs ptr_usrreqs;
+#ifdef NATPT
+void	natpt_init	__P((void));
+int	natpt_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
+struct pr_usrreqs natpt_usrreqs;
 #endif
 
 extern	struct domain inetdomain;
@@ -261,7 +261,7 @@ struct protosw inetsw[] = {
   &rip_usrreqs
 },
 #endif
-#if defined(PM)
+#ifdef PM
 { SOCK_RAW,	&inetdomain,	IPPROTO_PM,	PR_ATOMIC|PR_ADDR,
   pm_input,	0,		0,		pm_ctloutput,
   0,
@@ -269,12 +269,12 @@ struct protosw inetsw[] = {
   &pm_usrreqs
 },
 # endif
-#if defined(PTR)
-{ SOCK_RAW,	&inetdomain,	IPPROTO_PTR,	PR_ATOMIC|PR_ADDR,
+#ifdef NATPT
+{ SOCK_RAW,	&inetdomain,	IPPROTO_AHIP,	PR_ATOMIC|PR_ADDR,
   0,		0,		0,		0,
   0,
-  ptr_init,	0,		0,		0,
- &ptr_usrreqs
+  natpt_init,	0,		0,		0,
+ &natpt_usrreqs
 },
 #endif
 	/* raw wildcard */

@@ -258,10 +258,10 @@ struct sockaddr_in *ip_fw_fwd_addr;
 
 static void save_rte __P((u_char *, struct in_addr));
 static int	 ip_dooptions __P((struct mbuf *));
-#ifndef PTR
+#ifndef NATPT
 static
 #endif
-void	 ip_forward __P((struct mbuf *, int));
+       void	 ip_forward __P((struct mbuf *, int));
 static void	 ip_freef __P((struct ipq *));
 static struct mbuf *
 	 ip_reass __P((struct mbuf *, struct ipq *, struct ipq *));
@@ -269,7 +269,7 @@ static struct in_ifaddr *
 	 ip_rtaddr __P((struct in_addr));
 static void	ipintr __P((void));
 
-#if defined(PM)
+#ifdef PM
 extern	int	doNatFil;
 extern	int	doRoute;
 
@@ -277,12 +277,12 @@ extern	int		 pm_in	    __P((struct ifnet *, struct ip *, struct mbuf *));
 extern	struct route	*pm_route   __P((struct mbuf *));
 #endif
 
-#if defined(PTR)
+#ifdef NATPT
 extern	int		ip6_protocol_tr;
 
-int	 ptr_in4	__P((struct mbuf *, struct mbuf **));
-void	 ip6_forward	__P((struct mbuf *, int));
-#endif
+int	 natpt_in4	__P((struct mbuf *, struct mbuf **));
+
+#endif	/* NATPT	*/
 
 /*
  * IP initialization: fill in IP protocol switch table.
@@ -530,7 +530,7 @@ pass:
 	}
 #endif	/* !COMPAT_IPFW */
 
-#if defined(PM)
+#ifdef PM
 	/*
 	 * Process ip-filter/NAT.
 	 * Return TRUE  if this packed is discarded.
@@ -541,7 +541,7 @@ pass:
 	    return;
 #endif
 
-#if defined(PTR)
+#ifdef NATPT
 	/*
 	 *
 	 */
@@ -549,7 +549,7 @@ pass:
 	{
 	    struct mbuf	*m1 = NULL;
 	    
-	    switch (ptr_in4(m, &m1))
+	    switch (natpt_in4(m, &m1))
 	    {
 	      case IPPROTO_IP:					goto dooptions;
 	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
@@ -1531,7 +1531,7 @@ u_char inetctlerrmap[PRC_NCMDS] = {
  * The srcrt parameter indicates whether the packet is being forwarded
  * via a source route.
  */
-#ifndef PTR
+#ifndef NATPT
 static
 #endif
 void
@@ -1578,7 +1578,7 @@ ip_forward(m, srcrt)
 	}
 #endif
 
-#if defined(PM)
+#ifdef PM
 	if (doRoute)
 	{
 	    struct  route   *ipfw_rt;
@@ -1659,7 +1659,7 @@ ip_forward(m, srcrt)
 #endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt, 
 			  IP_FORWARDING, 0);
-#if defined(PM)
+#ifdef PM
       clearAway:;
 #endif
 	if (error)
