@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.61 2002/05/01 08:05:08 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.62 2002/05/01 08:06:44 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -364,7 +364,6 @@ server6_react(siz, from, fromlen)
 	}
 
 	dh6 = (struct dhcp6 *)rdatabuf;
-	dprintf(LOG_DEBUG, "msgtype=%d", dh6->dh6_msgtype);
 
 	switch (dh6->dh6_msgtype) {
 	case DH6_INFORM_REQ:
