@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.3 2005/01/24 04:14:44 ryuji Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.4 2005/03/02 19:18:40 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -57,11 +57,8 @@
 #define NEMO_TUNOPTNUM 3
 #define NEMO_TUNNAME "nemo"
 
-#ifdef MIP_MCOA
-#define NEMO_OPTNUM 5
-#else
+#define NEMO_OPTNUM_MCOA 5
 #define NEMO_OPTNUM 4
-#endif /* MIP_MCOA */
 
 
 #include "callout.h"
@@ -73,54 +70,49 @@ struct nemo_if {
 	char ifname[IFNAMSIZ];
 	struct in6_addr hoa;
 	struct in6_addr coa;
-#ifdef MIP_MCOA
 	u_int16_t bid;
-#endif /* MIP_MCOA */
 };
 LIST_HEAD(nemo_if_head, nemo_if) nemo_ifhead;
 
-/* Those info is retrieved from prefix_table */
+/* This info is retrieved from prefix_table */
 struct nemo_mnpt {
 	LIST_ENTRY(nemo_mnpt) nemo_mnptentry;
 	struct in6_addr hoa;
 	struct in6_addr nemo_prefix;
 	int nemo_prefixlen;
-#ifdef MIP_MCOA
 	u_int16_t bid;
-#endif /* MIP_MCOA */
 	struct nemo_if *nemo_if;
 };
 LIST_HEAD(nemo_mnpt_head, nemo_mnpt) nemo_mnpthead;
 
 int mode;
 int debug = 0;
+int foreground = 0;
 int numerichost = 0;
 int staticmode = 0;
+int multiplecoa = 0;
 
 /* Functions */
 static int set_nemo_ifinfo();
 static void mainloop();
-static void terminate(int);
+static void nemo_terminate(int);
 static int ha_parse_ptconf(char *);
 static int mr_parse_ptconf(char *);
 static struct nemo_if *find_nemo_if_from_name(char *);
 static void set_static_tun(char *);
-#ifndef MIP_MCOA 
-static struct nemo_if *nemo_setup_forwarding (struct sockaddr *, struct sockaddr *, 
-					      struct in6_addr *);
-static struct nemo_if *nemo_destroy_forwarding(struct in6_addr *);
-#else
 static struct nemo_if *nemo_setup_forwarding (struct sockaddr *, struct sockaddr *, 
 					      struct in6_addr *, u_int16_t);
 static struct nemo_if *nemo_destroy_forwarding(struct in6_addr *, u_int16_t);
-#endif /* MIP_MCOA */
+
 
 void
-usage() {
-	fprintf(stderr, "nemonetd -d [-h or -m] -f prefix_table.conf -t static_tun.conf\n");
+nemo_usage() {
+	fprintf(stderr, "nemonetd -d -D -M [-h or -m] -f prefix_table.conf -t static_tun.conf\n");
 	fprintf(stderr, "\t-d: Verbose Debug messages \n");
+	fprintf(stderr, "\t-D: Verbose Debug messages + foreground\n");
 	fprintf(stderr, "\t-h: when Home Agent\n");
 	fprintf(stderr, "\t-m: when Mobile Router\n");
+	fprintf(stderr, "\t-M: Multiple CoA Registration Support\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Note: If prefixtable is not specified, ");
 	fprintf(stderr, "nemonetd will read /etc/prefix_table.conf\n");
@@ -143,13 +135,20 @@ main (argc, argv)
 	LIST_INIT(&nemo_ifhead);
 
 	mode = 0;
-	while ((ch = getopt(argc, argv, "dnhmf:t:")) != -1) {
+	while ((ch = getopt(argc, argv, "dDMnhmf:t:")) != -1) {
 		switch (ch) {
 		case 'd':
 			debug = 1;
 			break;
+		case 'D':
+			debug = 1;
+			foreground = 1;
+			break;
 		case 'n':
 			numerichost = 1;
+			break;
+		case 'n':
+			multiplecoa = 1;
 			break;
 		case 'h':
 			mode = MODE_HA;
@@ -166,28 +165,33 @@ main (argc, argv)
 			break;
 		default:
 			fprintf(stderr, "unknown execution option\n");
-			usage();
+			nemo_usage();
 		}
 	}
 	argc -= optind;
 	argv += optind;
 
 	if (mode == 0)
-		usage();
+		nemo_usage();
 
 	/* open syslog */
 	openlog("shisad(nemonet)", 0, LOG_DAEMON);
 	syslog(LOG_INFO, "start NEMO Network daemon\n");
 
-	// parse prefix table
-	if (mode == MODE_HA) {
+	/* parse prefix table */
+	switch (mode) {
+	case MODE_HA:
 		ha_parse_ptconf((pt_filename)?pt_filename:NEMO_PTFILE);
-	} else if (mode == MODE_MR) {
+		break;
+	case MODE_MR:
 		mr_parse_ptconf((pt_filename)?pt_filename:NEMO_PTFILE);
-	} else /* never reach here */
-		usage ();
+		break;
+	default:
+		nemo_usage ();
+		exit(0);
+	}
 
-	//get nemotun from the kernel and flush all states
+	/* get nemotun from the kernel and flush all states */
 	if (set_nemo_ifinfo()) {
 		syslog(LOG_ERR, "set_nemo_ifinfo %s\n", strerror(errno));
 		return (-1);
@@ -205,16 +209,19 @@ main (argc, argv)
 		exit(0);
 	} 
 	
+	/* statically tunnel mode setting */
 	if (staticmode && tun_filename) 
 		set_static_tun(tun_filename);
 
-	signal(SIGTERM, terminate);
-	signal(SIGINT, terminate);
+	signal(SIGTERM, nemo_terminate);
+	signal(SIGHUP, nemo_terminate);
+	signal(SIGKILL, nemo_terminate);
+	signal(SIGINT, nemo_terminate);
 
-	if (debug == 0) {
+	if (!foreground) {
 		if (daemon(0, 0) < 0) {
 			syslog(LOG_ERR, "daemon execution %s\n", strerror(errno));
-			terminate(0);
+			nemo_terminate(0);
 			exit(-1);
 		}
 	}
@@ -262,7 +269,7 @@ ha_parse_ptconf(filename)
                         option[i] = '\0';
                 head = buf;
                 for (i = 0, head = buf; 
-                     (head != NULL) && (i < NEMO_OPTNUM); 
+                     (head != NULL) && (i < (multiplecoa)?NEMO_OPTNUM:NEMO_OPTNUM_MCOA); 
                      head = ++spacer, i ++) {
 
                         spacer = strchr(head, ' ');
@@ -298,12 +305,13 @@ ha_parse_ptconf(filename)
                 }
 		pt->nemo_prefixlen = atoi(option[2]);  
 
-#ifdef MIP_MCOA 
-		if (option[4])
-			pt->bid = atoi(option[4]);
-		else 
-			pt->bid = 0;
-#endif /* MIP_MCOA */
+		if (multiplecoa) {
+			if (option[4])
+				pt->bid = atoi(option[4]);
+			else 
+				pt->bid = 0;
+		}
+
 
 		LIST_INSERT_HEAD(&nemo_mnpthead, pt, nemo_mnptentry);
 
@@ -354,7 +362,7 @@ mr_parse_ptconf(filename)
                         option[i] = '\0';
                 head = buf;
                 for (i = 0, head = buf; 
-                     (head != NULL) && (i < NEMO_OPTNUM); 
+                     (head != NULL) && (i < (multiplecoa)?NEMO_OPTNUM:NEMO_OPTNUM_MCOA); 
                      head = ++spacer, i ++) {
 
                         spacer = strchr(head, ' ');
@@ -368,7 +376,7 @@ mr_parse_ptconf(filename)
                 }
 
                 if (debug) {
-                        for (i = 0; i < NEMO_OPTNUM; i ++) {
+                        for (i = 0; i < (multiplecoa)?NEMO_OPTNUM:NEMO_OPTNUM_MCOA; i ++) {
 				if (option[i])
 						syslog(LOG_INFO, "\t%d=%s\n", i, option[i]);
 			}
@@ -392,12 +400,12 @@ mr_parse_ptconf(filename)
 		}
 		pt->nemo_prefixlen = atoi(option[2]);
 
-#ifdef MIP_MCOA 
-		if (option[4])
-			pt->bid = atoi(option[4]);
-		else 
-			pt->bid = 0;
-#endif /* MIP_MCOA */
+		if (multiplecoa) {
+			if (option[4])
+				pt->bid = atoi(option[4]);
+			else 
+				pt->bid = 0;
+		}
 
 		LIST_INSERT_HEAD(&nemo_mnpthead, pt, nemo_mnptentry);
 		memset(buf, 0, sizeof(buf));
@@ -499,7 +507,7 @@ set_static_tun(filename)
 	if(file == NULL) {
 		syslog(LOG_ERR, "opening %s is failed: %s\n", 
 			filename, strerror(errno));
-		usage();
+		nemo_usage();
 		exit(-1);
 	} 
 	
@@ -548,12 +556,12 @@ set_static_tun(filename)
 			exit(-1);
 		} 
 		
-#ifdef MIP_MCOA
-		if (option[2])
-			nif->bid = atoi(option[2]);
-		else 
-			nif->bid = 0;
-#endif /* MIP_MCOA */
+		if (multiplecoa) {
+			if (option[2])
+				nif->bid = atoi(option[2]);
+			else 
+				nif->bid = 0;
+		}
 	} 
 	
 	return; 
@@ -563,29 +571,24 @@ set_static_tun(filename)
 
 
 static struct nemo_if *
-#ifndef MIP_MCOA
-find_nemo_if(hoa)
-	struct in6_addr *hoa;
-#else
 find_nemo_if(hoa, bid)
 	struct in6_addr *hoa;
 	u_int16_t bid; 
-#endif /* MIP_MCOA */
 {
 	struct nemo_if *nif;
 	short flags;
 	
 	LIST_FOREACH(nif, &nemo_ifhead, nemo_ifentry) {
-#ifndef MIP_MCOA
-		if (hoa && IN6_ARE_ADDR_EQUAL(hoa, &nif->hoa)) {  
+		if (multiplecoa) {
+			if (hoa && IN6_ARE_ADDR_EQUAL(hoa, &nif->hoa)) {
+				if ((bid > 0) && (bid == nif->bid)) 
+					return (nif);
+			}
+		} else {
+			if (hoa && IN6_ARE_ADDR_EQUAL(hoa, &nif->hoa)) {  
 				return (nif);
-		} 
-#else
-		if (hoa && IN6_ARE_ADDR_EQUAL(hoa, &nif->hoa)) {
-			if ((bid > 0) && (bid == nif->bid)) 
-				return (nif);
+			} 
 		}
-#endif /* MIP_MCOA */
 	}
 
 	if (staticmode)
@@ -629,9 +632,7 @@ mainloop() {
 	struct nemo_if *nif;
 	struct mipm_bul_info *mbu;
 	struct mipm_bc_info *mbc;
-#ifdef MIP_MCOA
 	u_int16_t bid = 0;
-#endif /* MIP_MCOA */
 
 	memset(&def, 0, sizeof(def));
 	memset(&local_in6, 0, sizeof(local_in6));
@@ -696,15 +697,13 @@ mainloop() {
 					syslog(LOG_INFO, "BUL_ADD src %s\n", 
 					       ip6_sprintf(&src.sin6_addr));
 				}
-#ifndef MIP_MCOA
-				nif = nemo_setup_forwarding((struct sockaddr *)&src, 
-						(struct sockaddr *)&dst, hoa);
-#else
 
-				bid = mbu->mipu_bid;
+				if (multiplecoa)
+					bid = mbu->mipu_bid;
 				nif = nemo_setup_forwarding((struct sockaddr *)&src, 
 							    (struct sockaddr *)&dst, hoa, bid);
-#endif /* MIP_MCOA */
+
+
 				if (nif == NULL) 
 					break;
 
@@ -718,19 +717,16 @@ mainloop() {
 					if (!IN6_ARE_ADDR_EQUAL(hoa, &npt->hoa)) 
 						continue;
 
-#ifdef MIP_MCOA
-					if (bid <= 0) {
-#endif /* MIP_MCOA */
-					/* remove default route */
-					route_del(0);
-					/* add default route */
-					route_add(&def, &local_in6, NULL, 0,
-						if_nametoindex(nif->ifname));
-
-					syslog(LOG_INFO, "route add default to %s\n", nif->ifname);
-#ifdef MIP_MCOA
+					if ((multiplecoa && bid <= 0) || multiplecoa == 0) {
+						/* remove default route */
+						route_del(0);
+						/* add default route */
+						route_add(&def, &local_in6, NULL, 0,
+							  if_nametoindex(nif->ifname));
+						
+						syslog(LOG_INFO, "route add default to %s\n", 
+						       nif->ifname);
 					}
-#endif /* MIP_MCOA */
 					
 					npt->nemo_if = nif;
 					break;
@@ -750,12 +746,9 @@ mainloop() {
 				if (hoa == NULL)
 					break;
 
-#ifndef MIP_MCOA
-				nif = nemo_destroy_forwarding(hoa);
-#else
-				bid = mbu->mipu_bid;
+				if (multiplecoa) 
+					bid = mbu->mipu_bid;
 				nif = nemo_destroy_forwarding(hoa, bid);
-#endif /* MIP_MCOA */
 
 				for (npt = LIST_FIRST(&nemo_mnpthead); npt; npt = nptn) {
 					nptn = LIST_NEXT(npt, nemo_mnptentry);
@@ -766,13 +759,9 @@ mainloop() {
 					if (npt->nemo_if) {
 						npt->nemo_if = NULL; 
 						/* remove default route */
-#ifdef MIP_MCOA
-						if (bid <= 0) {
-#endif /* MIP_MCOA */
-						route_del(0);
-#ifdef MIP_MCOA						
-						}
-#endif /* MIP_MCOA */
+						if ((multiplecoa && (bid <= 0)) || multiplecoa == 0) 
+							route_del(0);
+						
 					}
                                 }
                                 break;
@@ -798,14 +787,11 @@ mainloop() {
 				dst.sin6_addr = 
        					((struct sockaddr_in6 *)MIPC_COA(mbc))->sin6_addr;
 
-#ifndef MIP_MCOA
+				if (multiplecoa) 
+					bid = mbc->mipc_bid;
+
 				nif = nemo_setup_forwarding((struct sockaddr *)&src, 
-						(struct sockaddr *)&dst, hoa);
-#else
-				bid = mbc->mipc_bid;
-				nif = nemo_setup_forwarding((struct sockaddr *)&src, 
-						(struct sockaddr *)&dst, hoa, bid);
-#endif /* MIP_MCOA */
+							    (struct sockaddr *)&dst, hoa, bid);
 				if (nif == NULL) 
 					break;
 
@@ -835,12 +821,9 @@ mainloop() {
 				if (hoa == NULL)
 					break;
 
-#ifndef MIP_MCOA
-				nif = nemo_destroy_forwarding(hoa);
-#else
-				bid = mbc->mipc_bid;
+				if (multiplecoa) 
+					bid = mbc->mipc_bid;
 				nif = nemo_destroy_forwarding(hoa, bid);
-#endif /* MIP_MCOA */
 
 				route_del(if_nametoindex(nif->ifname));
 
@@ -866,24 +849,14 @@ mainloop() {
  * Setup bi-directional tunnel between HA and CoA
  */ 
 static struct nemo_if *
-#ifndef MIP_MCOA 
-nemo_setup_forwarding (src, dst, hoa)
-#else
 nemo_setup_forwarding (src, dst, hoa, bid) 
-#endif /* MIP_MCOA */
 	struct sockaddr *src, *dst;
 	struct in6_addr *hoa;
-#ifdef MIP_MCOA
 	u_int16_t bid;
-#endif /* MIP_MCOA */
 {
 	struct nemo_if *nif = NULL;
 
-#ifndef MIP_MCOA
-	nif = find_nemo_if(hoa);
-#else
 	nif = find_nemo_if(hoa, bid);
-#endif /* MIP_MCOA */
 	if (nif == NULL) {
 		syslog(LOG_ERR, 
 		       "No more available nemo interfaces\n");
@@ -891,22 +864,20 @@ nemo_setup_forwarding (src, dst, hoa, bid)
 	}
 	
 	nif->hoa = *hoa;
-#ifdef MIP_MCOA
-	if (bid)
+	if (multiplecoa && bid)
 		nif->bid = bid;
-#endif /* MIP_MCOA */
 
        /* If CoA is not changed, don't touch tunnel  */
-#ifdef MIP_MCOA
-	if (IN6_ARE_ADDR_EQUAL(&nif->coa, 
-		(mode == MODE_HA) ?  
-			&((struct sockaddr_in6 *)dst)->sin6_addr :
-			&((struct sockaddr_in6 *)src)->sin6_addr)) { 
-		/*nemo_gif_ar_set(nif->ifname, &((struct sockaddr_in6 *)src)->sin6_addr);*/ 
-		
-		return (nif);
+	if (multiplecoa) {
+		if (IN6_ARE_ADDR_EQUAL(&nif->coa, 
+				       (mode == MODE_HA) ?  
+				       &((struct sockaddr_in6 *)dst)->sin6_addr :
+				       &((struct sockaddr_in6 *)src)->sin6_addr)) { 
+			/*nemo_gif_ar_set(nif->ifname, &((struct sockaddr_in6 *)src)->sin6_addr);*/ 
+			
+			return (nif);
+		}
 	}
-#endif
 
 	/* tunnel disable (just for safety) */
 	nemo_tun_del(nif->ifname);
@@ -938,24 +909,14 @@ nemo_setup_forwarding (src, dst, hoa, bid)
 }
 
 static struct nemo_if *
-#ifndef MIP_MCOA 
-nemo_destroy_forwarding (hoa)
-#else
 nemo_destroy_forwarding (hoa, bid) 
-#endif /* MIP_MCOA */
 	struct in6_addr *hoa;
-#ifdef MIP_MCOA
 	u_int16_t bid;
-#endif /* MIP_MCOA */
 {
 	struct nemo_if *nif = NULL;
 	short flags;
 
-#ifndef MIP_MCOA
-	nif = find_nemo_if(hoa);
-#else
 	nif = find_nemo_if(hoa, bid);
-#endif /* MIP_MCOA */
 	if (nif == NULL) {
 		syslog(LOG_ERR, 
 		       "No associated nemo interfaces for %s\n", ip6_sprintf(hoa));
@@ -972,9 +933,8 @@ nemo_destroy_forwarding (hoa, bid)
 
 	if (staticmode == 0) {
 		memset(&nif->hoa, 0, sizeof(*hoa));
-#ifdef MIP_MCOA
-		nif->bid = 0;
-#endif /* MIP_MCOA */
+		if (multiplecoa)
+			nif->bid = 0;
 	}
         memset(&nif->coa, 0, sizeof(nif->coa));
 
@@ -983,7 +943,7 @@ nemo_destroy_forwarding (hoa, bid)
 
 
 static void
-terminate(dummy)
+nemo_terminate(dummy)
 	int dummy;
 {
 	static struct nemo_if *nif;
@@ -998,16 +958,16 @@ terminate(dummy)
 			nemo_ifflag_set(nif->ifname, 
 					(flags &= ~IFF_UP));
 
-#ifndef MIP_MCOA
-		if (mode == MODE_HA)
-			route_del(if_nametoindex(nif->ifname));
-#endif /* MIP_MCOA */
+		if (multiplecoa == 0) {
+			if (mode == MODE_HA)
+				route_del(if_nametoindex(nif->ifname));
+		}
 	}
 
-#ifndef MIP_MCOA
-	if (mode == MODE_MR)
-		route_del(0);
-#endif /* MIP_MCOA */
+	if (multiplecoa == 0) {
+		if (mode == MODE_MR)
+			route_del(0);
+	}
 
 	exit(-1);
 }
