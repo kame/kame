@@ -2739,7 +2739,7 @@ sock_setmopt_srcfilter(sop, grpfp)
 	/*
 	 * Get a pointer of ifnet structure to the interface.
 	 */
-	if ((grpf->gf_interface < 0) || (if_index < grpf->gf_interface))
+	if ((grpf->gf_interface < 0) || (if_indexlim <= grpf->gf_interface))
 		return ENXIO;	/* XXX EINVAL? */
 	/*
 	 * If no interface was explicitly specified, choose an appropriate
@@ -3168,7 +3168,7 @@ sock_getmopt_srcfilter(sop, grpfp)
 	/*
 	 * Get a pointer of ifnet structure to the interface.
 	 */
-	if ((grpf->gf_interface < 0) || (if_index < grpf->gf_interface))
+	if ((grpf->gf_interface < 0) || (if_indexlim <= grpf->gf_interface))
 		return EADDRNOTAVAIL;
 	if (grpf->gf_interface == 0)
 		ifp = NULL;

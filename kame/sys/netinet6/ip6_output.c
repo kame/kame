@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.406 2003/12/05 01:35:17 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.407 2003/12/08 10:05:53 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3639,7 +3639,7 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 		bcopy(mtod(m, u_int *), &ifindex, sizeof(ifindex));
-		if (ifindex < 0 || if_index < ifindex) {
+		if (ifindex < 0 || if_indexlim <= ifindex) {
 			error = ENXIO;	/* XXX EINVAL? */
 			break;
 		}
@@ -3733,7 +3733,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * If the interface is specified, validate it.
 		 */
 		if (mreq->ipv6mr_interface < 0 ||
-		    if_index < mreq->ipv6mr_interface) {
+		    if_indexlim <= mreq->ipv6mr_interface) {
 			error = ENXIO;	/* XXX EINVAL? */
 			break;
 		}
@@ -3854,8 +3854,8 @@ ip6_setmoptions(optname, im6op, m)
 		 * If an interface address was specified, get a pointer
 		 * to its ifnet structure.
 		 */
-		if (mreq->ipv6mr_interface < 0
-		 || if_index < mreq->ipv6mr_interface) {
+		if (mreq->ipv6mr_interface < 0 ||
+		    if_indexlim <= mreq->ipv6mr_interface) {
 			error = ENXIO;	/* XXX EINVAL? */
 			break;
 		}
@@ -4536,7 +4536,7 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		}
 
 		/* validate the interface index if specified. */
-		if (pktinfo->ipi6_ifindex > if_index ||
+		if (pktinfo->ipi6_ifindex >= if_indexlim ||
 		    pktinfo->ipi6_ifindex < 0) {
 			 return (ENXIO);
 		}
@@ -4986,7 +4986,7 @@ in6_getmopt_ifargs(optname, ifp, ia_grp, index)
 	/*
 	 * If the interface is specified, validate it.
 	 */
-	if (index < 0 || if_index < index)
+	if (index < 0 || if_indexlim <= index)
 		return ENXIO;	/* XXX EINVAL? */
 
 	switch (optname) {

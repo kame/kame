@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.113 2003/12/05 03:14:17 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.114 2003/12/08 10:05:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -760,7 +760,7 @@ add_m6if(mifcp)
 	mifp = mif6table + mifcp->mif6c_mifi;
 	if (mifp->m6_ifp)
 		return (EADDRINUSE); /* XXX: is it appropriate? */
-	if (mifcp->mif6c_pifi == 0 || mifcp->mif6c_pifi > if_index)
+	if (mifcp->mif6c_pifi == 0 || mifcp->mif6c_pifi >= if_indexlim)
 		return (ENXIO);
 	/*
 	 * XXX: some OSes can remove ifp and clear ifindex2ifnet[id]

@@ -970,7 +970,8 @@ ifa_ifwithnet(addr)
 
 	if (af == AF_LINK) {
 		sdl = (struct sockaddr_dl *)addr;
-		if (sdl->sdl_index && sdl->sdl_index <= if_index &&
+		if (sdl->sdl_index && sdl->sdl_index < if_indexlim &&
+		    ifindex2ifnet[sdl->sdl_index] &&
 		    ifindex2ifnet[sdl->sdl_index]->if_output != if_nulloutput)
 			return (ifnet_addrs[sdl->sdl_index]);
 	}
@@ -1286,7 +1287,7 @@ ifunit(name)
 	 * If the number took all of the name, then it's a valid ifindex.
 	 */
 	if (i == IFNAMSIZ || (cp != name && *cp == '\0')) {
-		if (unit >= if_index)
+		if (unit >= if_indexlim)
 			return (NULL);
 		ifp = ifindex2ifnet[unit];
 		if (ifp == NULL || ifp->if_output == if_nulloutput)

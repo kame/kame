@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.38 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.39 2003/12/08 10:05:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -140,16 +140,23 @@ scope6_set(ifp, idlist)
 				return (EINVAL);
 			}
 
-			if (i == IPV6_ADDR_SCOPE_LINKLOCAL &&
-			    idlist->s6id_list[i] > if_index) {
-				/*
-				 * XXX: theoretically, there should be no
-				 * relationship between link IDs and interface
-				 * IDs, but we check the consistency for
-				 * safety in later use.
-				 */
-				splx(s);
-				return (EINVAL);
+			if (i == IPV6_ADDR_SCOPE_LINKLOCAL) {
+				if (idlist->s6id_list[i] >= if_indexlim ||
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+				    !ifnet_byindex(idlist->s6id_list[i])
+#else
+				    !ifindex2ifnet[idlist->s6id_list[i]]
+#endif
+				    ) {
+					/*
+					 * XXX: theoretically, there should be
+					 * no relationship between link IDs and
+					 * interface IDs, but we check the
+					 * consistency for safety in later use.
+					 */
+					splx(s);
+					return (EINVAL);
+				}
 			}
 
 			/*
@@ -417,7 +424,7 @@ scope6_check_id(sin6, defaultok)
 		 */
 		if (IN6_IS_SCOPE_LINKLOCAL(in6) ||
 		    IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
-			if (if_index < zoneid)
+			if (if_indexlim <= zoneid)
 				return (ENXIO);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
 			ifp = ifnet_byindex(zoneid);

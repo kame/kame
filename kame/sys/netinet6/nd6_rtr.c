@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.239 2003/10/13 06:27:54 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.240 2003/12/08 10:05:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2421,7 +2421,13 @@ nd6_setdefaultiface(ifindex)
 {
 	int error = 0;
 
-	if (ifindex < 0 || if_index < ifindex)
+	if (ifindex < 0 || if_indexlim <= ifindex)
+		return (EINVAL);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	if (!ifnet_byindex(ifindex))
+#else
+	if (!ifindex2ifnet[ifindex])
+#endif
 		return (EINVAL);
 
 	if (nd6_defifindex != ifindex) {

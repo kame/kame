@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.132 2003/08/26 04:42:27 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.133 2003/12/08 10:05:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1219,7 +1219,7 @@ in6_embedscope(in6, sin6)
 	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
 		/* KAME assumption: link id == interface id */
 		if (zoneid) {
-			if (if_index < zoneid)
+			if (if_indexlim <= zoneid)
 				return (ENXIO);  /* XXX EINVAL? */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
 			ifp = ifnet_byindex(zoneid);
@@ -1268,7 +1268,13 @@ in6_recoverscope(sin6, in6, ifp)
 		zoneid = ntohs(sin6->sin6_addr.s6_addr16[1]);
 		if (zoneid) {
 			/* sanity check */
-			if (zoneid < 0 || if_index < zoneid)
+			if (zoneid < 0 || if_indexlim <= zoneid)
+				return ENXIO;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			if (!ifnet_byindex(zoneid))
+#else
+			if (!ifindex2ifnet[zoneid])
+#endif
 				return ENXIO;
 			if (ifp && ifp->if_index != zoneid)
 				return ENXIO;
