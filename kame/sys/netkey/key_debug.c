@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.18 2000/05/23 13:34:38 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.19 2000/05/23 13:58:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -673,31 +673,32 @@ void
 kdebug_sockaddr(addr)
 	struct sockaddr *addr;
 {
+	struct sockaddr_in *sin;
+#ifdef INET6
+	struct sockaddr_in6 *sin6;
+#endif
+
 	/* sanity check */
 	if (addr == NULL)
 		panic("kdebug_sockaddr: NULL pointer was passed.\n");
 
 	/* NOTE: We deal with port number as host byte order. */
-	printf("sockaddr{ len=%u family=%u port=%u\n",
-		addr->sa_len, addr->sa_family, ntohs(_INPORTBYSA(addr)));
-
-#ifdef INET6
-	if (addr->sa_family == PF_INET6) {
-		struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)addr;
-		printf("  flowinfo=0x%08x, scope_id=0x%08x\n",
-		    in6->sin6_flowinfo, in6->sin6_scope_id);
-	}
-#endif
+	printf("sockaddr{ len=%u family=%u", addr->sa_len, addr->sa_family);
 
 	switch (addr->sa_family) {
 	case AF_INET:
-		ipsec_hexdump((caddr_t)&((struct sockaddr_in *)addr)->sin_addr,
-		    sizeof(((struct sockaddr_in *)addr)->sin_addr));
+		sin = (struct sockaddr_in *)addr;
+		printf(" port=%u\n", ntohs(sin->sin_port));
+		ipsec_hexdump((caddr_t)&sin->sin_addr, sizeof(sin->sin_addr));
 		break;
 #ifdef INET6
 	case AF_INET6:
-		ipsec_hexdump((caddr_t)&((struct sockaddr_in6 *)addr)->sin6_addr,
-		    sizeof(((struct sockaddr_in6 *)addr)->sin6_addr));
+		sin6 = (struct sockaddr_in6 *)addr;
+		printf(" port=%u\n", ntohs(sin6->sin6_port));
+		printf("  flowinfo=0x%08x, scope_id=0x%08x\n",
+		    sin6->sin6_flowinfo, sin6->sin6_scope_id);
+		ipsec_hexdump((caddr_t)&sin6->sin6_addr,
+		    sizeof(sin6->sin6_addr));
 		break;
 #endif
 	}
