@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1571 2001/02/26 09:26:04 itojun Exp $
+$KAME: CHANGELOG,v 1.1572 2001/02/26 13:54:08 sumikawa Exp $
 
 <200102>
+Mon Feb 26 22:53:02 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* sys/netinet6/nd6.c : do not overwrite llcache if static ndp is
+	  set
+
 Mon Feb 26 18:21:08 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_{in,out}put.c: support 2553bis-03 IPV6_V6ONLY
 	  socket option (not finished yet).
