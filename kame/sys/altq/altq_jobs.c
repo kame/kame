@@ -1,4 +1,4 @@
-/*	$KAME: altq_jobs.c,v 1.9 2004/04/18 06:02:21 suz Exp $	*/
+/*	$KAME: altq_jobs.c,v 1.10 2004/04/18 11:00:36 jinmei Exp $	*/
 /*
  * Copyright (c) 2001, the Rector and Board of Visitors of the
  * University of Virginia.
@@ -80,8 +80,12 @@
 #include <sys/kernel.h>
 #include <sys/queue.h>
 
-#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
 #include <sys/limits.h>
+#elif __FreeBSD_version >= 490000
+#include <machine/limits.h>
+#endif
 #endif
 
 #include <net/if.h>
