@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.49 2001/01/31 05:43:42 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.50 2001/02/21 05:19:11 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -133,6 +133,9 @@ octetstring	{octet}({dot}{octet})+
 	/* self information */
 <S_INI>identifier	{ BEGIN S_INF; YYDB; yywarn("it is obsoleted.  use \"my_identifier\" in each remote directives."); return(IDENTIFIER); }
 <S_INF>{semi}		{ BEGIN S_INI; return(EOS); }
+
+	/* special */
+<S_INI>complex_bundle	{ YYDB; return(COMPLEX_BUNDLE); }
 
 	/* logging */
 <S_INI>log		{ BEGIN S_LOG; YYDB; return(LOGGING); }

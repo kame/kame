@@ -1,4 +1,4 @@
-/*	$KAME: proposal.h,v 1.13 2001/02/02 05:44:05 sakane Exp $	*/
+/*	$KAME: proposal.h,v 1.14 2001/02/21 05:19:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -180,6 +180,7 @@ extern struct saprop *newsaprop __P((void));
 extern struct saproto *newsaproto __P((void));
 extern void inssaprop __P((struct saprop **, struct saprop *));
 extern void inssaproto __P((struct saprop *, struct saproto *));
+extern void inssaprotorev __P((struct saprop *, struct saproto *));
 extern struct satrns *newsatrns __P((void));
 extern void inssatrns __P((struct saproto *, struct satrns *));
 extern struct saprop *cmpsaprop_alloc __P((struct ph1handle *,

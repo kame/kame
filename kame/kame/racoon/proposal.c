@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.26 2001/02/02 05:44:04 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.27 2001/02/21 05:19:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,7 +110,7 @@ inssaprop(head, new)
 	return;
 }
 
-/* set saproto to last part of the proto tree in saprop */
+/* set saproto to the end of the proto tree in saprop */
 void
 inssaproto(pp, new)
 	struct saprop *pp;
@@ -126,6 +126,18 @@ inssaproto(pp, new)
 		p->next = new;
 
 	return;
+}
+
+/* set saproto to the top of the proto tree in saprop */
+void
+inssaprotorev(pp, new)
+      struct saprop *pp;
+      struct saproto *new;
+{
+      new->next = pp->head;
+      pp->head = new;
+
+      return;
 }
 
 struct satrns *
@@ -889,6 +901,7 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 	struct saprop *newpp;
 	struct secpolicy *sp, *sp2;
 	struct ipsecrequest *req;
+	int encmodesv;
 
 	if (iph2->side == INITIATOR) {
 		sp = sp_out;
@@ -909,12 +922,27 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 	newpp->lifebyte = iph2->sainfo->lifebyte;
 	newpp->pfs_group = iph2->sainfo->pfs_group;
 
+	encmodesv = IPSECDOI_ATTR_ENC_MODE_ANY;
+
+	if (lcconf->complex_bundle)
+		goto skip1;
+
+	/* decide encryption mode */
+	for (req = sp->req; req; req = req->next) {
+		if (req->saidx.mode == IPSEC_MODE_TUNNEL) {
+			encmodesv = pfkey2ipsecdoi_mode(req->saidx.mode);
+			break;
+		}
+		encmodesv = pfkey2ipsecdoi_mode(req->saidx.mode);
+	}
+
+    skip1:
 	for (req = sp->req; req; req = req->next) {
 		struct saproto *newpr;
 		struct sockaddr *psaddr = NULL;
 		struct sockaddr *pdaddr = NULL;
 
-		/* check if SA bundle ? */
+		/* XXX check if SA bundle ? */
 		if (req->saidx.src.ss_len && req->saidx.dst.ss_len) {
 
 			psaddr = (struct sockaddr *)&req->saidx.src;
@@ -923,27 +951,12 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 			/* check end addresses of SA */
 			if (memcmp(iph2->src, psaddr, iph2->src->sa_len)
 			 || memcmp(iph2->dst, pdaddr, iph2->dst->sa_len)){
-
-				/* XXX why ?? */
-				if (iph2->side == RESPONDER)
-					break;
-
 				/*
 				 * XXX nested SAs with each destination
 				 * address are different.
 				 *       me +--- SA1 ---+ peer1
 				 *       me +--- SA2 --------------+ peer2
 				 */
-
-				/* check first ph2's proposal */
-				if (iph2->proposal == NULL) {
-					plog(LLV_ERROR, LOCATION, NULL,
-						"SA addresses mismatch.\n");
-					goto err;
-				}
-
-				/* XXX new ph2 should be alloated. */
-				
 				plog(LLV_ERROR, LOCATION, NULL,
 					"not supported nested SA. Ignore.\n");
 				break;
@@ -960,7 +973,11 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 
 		newpr->proto_id = ipproto2doi(req->saidx.proto);
 		newpr->spisize = 4;
-		newpr->encmode = pfkey2ipsecdoi_mode(req->saidx.mode);
+		if (lcconf->complex_bundle)
+			newpr->encmode = pfkey2ipsecdoi_mode(req->saidx.mode);
+		else
+			newpr->encmode = encmodesv;
+
 		if (iph2->side == INITIATOR)
 			newpr->reqid_out = req->saidx.reqid;
 		else
@@ -973,7 +990,7 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 		}
 
 		/* set new saproto */
-		inssaproto(newpp, newpr);
+		inssaprotorev(newpp, newpr);
 	}
 
 	/* get reqid_in from inbound policy */

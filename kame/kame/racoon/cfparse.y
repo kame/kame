@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.85 2001/01/29 11:26:50 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.86 2001/02/21 05:19:11 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -208,6 +208,7 @@ statement
 	|	sainfo_statement
 	|	remote_statement
 	|	staticsa_statement
+	|	special_statement
 	;
 
 	/* path */
@@ -227,6 +228,11 @@ path_statement
 			lcconf->pathinfo[$2] = strdup($3->v);
 			vfree($3);
 		}
+	;
+
+	/* special */
+special_statement
+	:	COMPLEX_BUNDLE SWITCH EOS { lcconf->complex_bundle = $2; }
 	;
 
 	/* include */

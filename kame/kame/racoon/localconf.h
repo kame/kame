@@ -1,4 +1,4 @@
-/*	$KAME: localconf.h,v 1.23 2001/01/31 05:32:56 sakane Exp $	*/
+/*	$KAME: localconf.h,v 1.24 2001/02/21 05:19:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,6 +96,16 @@ struct localconf {
 		/*
 		 * There is a different both of the number and the kind of
 		 * algorithms between oakley's and ipsec_doi's.
+		 */
+
+	int complex_bundle;
+		/*
+		 * If we want "IP2 AH ESP IP1 ULP", KAME's SPD expresses AH
+		 * transport + ESP tunnel.  So racoon sent a proposal which
+		 * was the format in above order.
+		 * But lots of implementation interprets AH tunnel + ESP tunnel
+		 * in this case.  racoon usually uses this format usually.
+		 * If the option is enable, racoon uses old format.
 		 */
 };
 
