@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.80 2003/06/27 07:15:45 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.81 2003/07/01 04:01:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -856,11 +856,7 @@ setkeymsg_spdaddr_tag(type, tag, policy)
 	char buf[BUFSIZ];
 	int l, l0;
 	struct sadb_x_tag m_tag;
-	struct addrinfo *s, *d;
 	int n;
-	int plen;
-	struct sockaddr *sa;
-	int salen;
 
 	msg = (struct sadb_msg *)buf;
 
@@ -1072,32 +1068,32 @@ setkeymsg_add(type, satype, srcs, dsts)
 	/* set lifetime for HARD */
 	if (p_lt_hard != 0) {
 		struct sadb_lifetime m_lt;
-		u_int len = sizeof(struct sadb_lifetime);
+		u_int slen = sizeof(struct sadb_lifetime);
 
-		m_lt.sadb_lifetime_len = PFKEY_UNIT64(len);
+		m_lt.sadb_lifetime_len = PFKEY_UNIT64(slen);
 		m_lt.sadb_lifetime_exttype = SADB_EXT_LIFETIME_HARD;
 		m_lt.sadb_lifetime_allocations = 0;
 		m_lt.sadb_lifetime_bytes = 0;
 		m_lt.sadb_lifetime_addtime = p_lt_hard;
 		m_lt.sadb_lifetime_usetime = 0;
 
-		memcpy(buf + l, &m_lt, len);
+		memcpy(buf + l, &m_lt, slen);
 		l += len;
 	}
 
 	/* set lifetime for SOFT */
 	if (p_lt_soft != 0) {
 		struct sadb_lifetime m_lt;
-		u_int len = sizeof(struct sadb_lifetime);
+		u_int slen = sizeof(struct sadb_lifetime);
 
-		m_lt.sadb_lifetime_len = PFKEY_UNIT64(len);
+		m_lt.sadb_lifetime_len = PFKEY_UNIT64(slen);
 		m_lt.sadb_lifetime_exttype = SADB_EXT_LIFETIME_SOFT;
 		m_lt.sadb_lifetime_allocations = 0;
 		m_lt.sadb_lifetime_bytes = 0;
 		m_lt.sadb_lifetime_addtime = p_lt_soft;
 		m_lt.sadb_lifetime_usetime = 0;
 
-		memcpy(buf + l, &m_lt, len);
+		memcpy(buf + l, &m_lt, slen);
 		l += len;
 	}
 
