@@ -288,12 +288,12 @@ rip6_input(mp, offp, proto)
   DDO(GROSSEVENT, dump_ipv6(ipv6));
 #endif
 
-	/* Be proactive about malicious use of IPv4 mapped address */
-	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
-	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
-		/* XXX stat */
-		goto ret;
-	}
+  /* Be proactive about malicious use of IPv4 mapped address */
+  if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
+      IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
+    /* XXX stat */
+    goto ret;
+  }
 
   bzero(&opts, sizeof(opts));
   bzero(&srcsa, sizeof(struct sockaddr_in6));
@@ -636,11 +636,21 @@ rip6_output(m, so, dst, control)
     };
   };
 
-  return ip6_output(m, optp, &inp->inp_route6, flags, inp->inp_moptions6, &oifp);
+  error = ip6_output(m, optp, &inp->inp_route6, flags, inp->inp_moptions6, &oifp);
+
+  goto freectl;
 
 bad:
   if (m)
     m_freem(m);
+
+freectl:
+  if (control) {
+    if (optp == &opt)
+      ip6_clearpktopts(optp, 0, -1);
+    m_freem(control);
+  }
+
   return error;
 }
 
