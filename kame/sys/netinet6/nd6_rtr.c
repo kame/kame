@@ -72,7 +72,8 @@ static void nd6_detach_prefix __P((struct nd_prefix *));
 static void nd6_attach_prefix __P((struct nd_prefix *));
 
 static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
-					 struct in6_addrlifetime *lt6));
+					 struct in6_addrlifetime *lt6,
+					 int update_vltime));
 
 static int rt6_deleteroute __P((struct radix_node *, void *));
 
@@ -811,7 +812,7 @@ prelist_update(new, dr, m)
 			/* address lifetime <= prefix lifetime */
 			lt6->ia6t_vltime = new->ndpr_vltime;
 			lt6->ia6t_pltime = new->ndpr_pltime;
-			in6_init_address_ltimes(new, lt6);
+			in6_init_address_ltimes(new, lt6, 1);
 		} else {
 #define TWOHOUR		(120*60)
 			/*
@@ -845,7 +846,6 @@ prelist_update(new, dr, m)
 			/* 2 hour rule is not imposed for pref lifetime */
 			new->ndpr_apltime = new->ndpr_pltime;
 			lt6->ia6t_pltime = new->ndpr_pltime;
-			update++;
 #else	/* update from Jim Bound, (ipng 6712) */
 			if (TWOHOUR < new->ndpr_vltime
 			 || lt6->ia6t_vltime < new->ndpr_vltime) {
@@ -858,10 +858,8 @@ prelist_update(new, dr, m)
 
 			/* jim bound rule is not imposed for pref lifetime */
 			lt6->ia6t_pltime = new->ndpr_pltime;
-			update++;
 #endif
-			if (update)
-				in6_init_address_ltimes(new, lt6);
+			in6_init_address_ltimes(new, lt6, update);
 		}
 
  noautoconf1:
@@ -911,7 +909,7 @@ prelist_update(new, dr, m)
 		/* address lifetime <= prefix lifetime */
 		lt6->ia6t_vltime = new->ndpr_vltime;
 		lt6->ia6t_pltime = new->ndpr_pltime;
-		in6_init_address_ltimes(new, lt6);
+		in6_init_address_ltimes(new, lt6, 1);
 
  noautoconf2:
 		error_tmp = prelist_add(new, dr);
@@ -1351,19 +1349,29 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 }
 
 static void
-in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
+in6_init_address_ltimes(struct nd_prefix *new,
+			struct in6_addrlifetime *lt6,
+			int update_vltime)
 {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
 
-	/* init ia6t_expire */
-	if (lt6->ia6t_vltime == ND6_INFINITE_LIFETIME)
-		lt6->ia6t_expire = 0;
-	else {
-		lt6->ia6t_expire = time_second;
-		lt6->ia6t_expire += lt6->ia6t_vltime;
+	/* Valid lifetime must not be updated unless explicitly specified. */
+	if (update_vltime) {
+		/* init ia6t_expire */
+		if (lt6->ia6t_vltime == ND6_INFINITE_LIFETIME)
+			lt6->ia6t_expire = 0;
+		else {
+			lt6->ia6t_expire = time_second;
+			lt6->ia6t_expire += lt6->ia6t_vltime;
+		}
+		/* Ensure addr lifetime <= prefix lifetime. */
+		if (new->ndpr_expire && lt6->ia6t_expire &&
+		    new->ndpr_expire < lt6->ia6t_expire)
+			lt6->ia6t_expire = new->ndpr_expire;
 	}
+
 	/* init ia6t_preferred */
 	if (lt6->ia6t_pltime == ND6_INFINITE_LIFETIME)
 		lt6->ia6t_preferred = 0;
@@ -1371,10 +1379,7 @@ in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
 		lt6->ia6t_preferred = time_second;
 		lt6->ia6t_preferred += lt6->ia6t_pltime;
 	}
-	/* ensure addr lifetime <= prefix lifetime */
-	if (new->ndpr_expire && lt6->ia6t_expire &&
-	    new->ndpr_expire < lt6->ia6t_expire)
-		lt6->ia6t_expire = new->ndpr_expire;
+	 /* Ensure addr lifetime <= prefix lifetime. */
 	if (new->ndpr_preferred && lt6->ia6t_preferred
 	    && new->ndpr_preferred < lt6->ia6t_preferred)
 		lt6->ia6t_preferred = new->ndpr_preferred;
