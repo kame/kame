@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2694 2004/12/02 06:22:09 jinmei Exp $
+$KAME: CHANGELOG,v 1.2695 2004/12/02 06:22:58 jinmei Exp $
 
 <200412>
+2004-12-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd/sys/netinet/tcp_subr.c (tcp[6]_notify):  implemented quick
+	fall-back optimization as described in
+	draft-gont-tcpm-tcp-soft-errors-01.
+
 2004-12-01 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* freebsd5/sys/netinet/tcp_subr.c,
 	  kame/sys/netinet6/ah_core.c,
@@ -17,11 +22,6 @@ $KAME: CHANGELOG,v 1.2694 2004/12/02 06:22:09 jinmei Exp $
 	revived ISATAP, since the IPR issue has been solved!
 
 <200411>
-2004-11-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* freebsd4/sys/netinet/tcp_subr.c (tcp_notify): implemented quick
-	fall-back optimization as described in
-	draft-gont-tcpm-tcp-soft-errors-01.
-
 2004-11-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: catch up draft-ietf-dhc-lifetime-02.
 	Specifically,
