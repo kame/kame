@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_hfsc.c,v 1.7 2003/06/27 09:43:59 kjc Exp $	*/
+/*	$KAME: qdisc_hfsc.c,v 1.8 2003/07/10 12:09:38 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -99,7 +99,7 @@ hfsc_stat_loop(int fd, const char *ifname, int count, int interval)
 				continue;
 			}
 
-			printf("[%2d %s] handle:%#lx [rt %s %ums %s][ls %s %ums %s]",
+			printf("[%2d %s] handle:%#x [rt %s %ums %s][ls %s %ums %s]",
 			       sp->class_id, clnames[i], sp->class_handle,
 			       rate2str((double)sp->rsc.m1), sp->rsc.d,
 			       rate2str((double)sp->rsc.m2),

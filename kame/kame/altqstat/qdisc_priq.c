@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_priq.c,v 1.5 2003/06/27 09:44:00 kjc Exp $	*/
+/*	$KAME: qdisc_priq.c,v 1.6 2003/07/10 12:09:38 kjc Exp $	*/
 /*
  * Copyright (C) 2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -91,7 +91,7 @@ priq_stat_loop(int fd, const char *ifname, int count, int interval)
 				continue;
 			}
 
-			printf("[%s] handle:%#lx pri:%d\n",
+			printf("[%s] handle:%#x pri:%d\n",
 			       clnames[i], sp->class_handle, i);
 			printf("  measured: %sbps qlen:%2d period:%u\n",
 			       rate2str(calc_rate(sp->xmitcnt.bytes,
