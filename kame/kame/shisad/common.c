@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.12 2005/02/17 10:17:21 t-momose Exp $  */
+/*      $KAME: common.c,v 1.13 2005/02/17 12:38:54 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -577,7 +577,7 @@ icmp6_input_common(fd)
 			hai_pfxlen = ndopts.ndpi->nd_opt_pi_prefix_len;
 			in6_gladdr = &ndopts.ndpi->nd_opt_pi_prefix;
 			if (hai_lifetime == 0)
-				hai_lifetime = ntohs(ndopts.ndpi->nd_opt_pi_valid_time);
+				hai_lifetime = ntohl(ndopts.ndpi->nd_opt_pi_valid_time);
 			
 /*
 			if (debug)
@@ -682,6 +682,11 @@ icmp6_input_common(fd)
 #endif /* MIP_HA */
 		}
 #ifdef MIP_HA
+		if (ndopts.ndpi) {
+			hpfx->hpfx_vltime = ntohl(ndopts.ndpi->nd_opt_pi_valid_time);
+			hpfx->hpfx_pltime = ntohl(ndopts.ndpi->nd_opt_pi_preferred_time);
+		}
+		
 		/* add or update home agent list */
 		hal = had_add_hal(hpfx, in6_gladdr, 
 				  in6_lladdr, hai_lifetime, hai_preference, 0);

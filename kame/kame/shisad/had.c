@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.8 2005/02/17 10:17:21 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.9 2005/02/17 12:38:54 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -64,10 +64,6 @@
 #include "shisad.h"
 #include "fdlist.h"
 #include "command.h"
-
-#ifdef TEST
-#include <arpa/inet.h>
-#endif
 
 /* Global Variables */
 int mipsock, icmp6sock, mhsock;
@@ -696,7 +692,6 @@ terminate(dummy)
 	unlink(pid_file);
 	exit(1);
 }
-
 
 int
 send_mpa(dst, mps_id, ifindex)
