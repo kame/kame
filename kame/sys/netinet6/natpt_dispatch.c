@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.69 2002/08/16 08:35:29 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.70 2002/08/19 10:24:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -156,9 +156,8 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 				if ((cv6.ats = natpt_internHash6(acs, &cv6)) == NULL)
 					return (IPPROTO_MAX);
 			}
-			if ((frg = natpt_internFragment6(&cv6)) == NULL)
+			if ((frg = natpt_internFragment6(&cv6, cv6.ats)) == NULL)
 				return (IPPROTO_IP);
-			frg->tslot = cv6.ats;
 		} else {
 			/* fragmented packet after the first */
 			if ((cv6.ats = natpt_lookForFragment6(&cv6)) == NULL)
@@ -249,9 +248,8 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 				if ((cv4.ats = natpt_internHash4(acs, &cv4)) == NULL)
 					return (IPPROTO_MAX);
 			}
-			if ((frg = natpt_internFragment4(&cv4)) == NULL)
+			if ((frg = natpt_internFragment4(&cv4, cv4.ats)) == NULL)
 				return (IPPROTO_IP);
-			frg->tslot = cv4.ats;
 		} else {
 			/* fragmented packet after the first */
 			if ((cv4.ats = natpt_lookForFragment4(&cv4)) == NULL)

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.65 2002/08/16 08:35:29 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.66 2002/08/19 10:24:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -565,7 +565,7 @@ natpt_remapRemote4Port(struct cSlot *acs, struct pAddr *remote)
  */
 
 struct fragment *
-natpt_internFragment6(struct pcv *cv6)
+natpt_internFragment6(struct pcv *cv6, struct tSlot *tsl)
 {
 	int			 s;
 	struct fragment		*frg;
@@ -581,6 +581,8 @@ natpt_internFragment6(struct pcv *cv6)
 	frg->fg_family = AF_INET6;
 	frg->fg_src.in6 = cv6->ip.ip6->ip6_src;
 	frg->fg_dst.in6 = cv6->ip.ip6->ip6_dst;
+	frg->tslot = tsl;
+	tsl->frg = frg;
 	microtime(&atv);
 	frg->tstamp = atv.tv_sec;
 
@@ -588,12 +590,14 @@ natpt_internFragment6(struct pcv *cv6)
 	TAILQ_INSERT_TAIL(&frg_head, frg, frg_list);
 	splx(s);
 
+	natpt_logFSlot(LOG_INFO, frg, '+');
+
 	return (frg);
 }
 
 
 struct fragment *
-natpt_internFragment4(struct pcv *cv4)
+natpt_internFragment4(struct pcv *cv4, struct tSlot *tsl)
 {
 	int			 s;
 	struct fragment		*frg;
@@ -611,12 +615,16 @@ natpt_internFragment4(struct pcv *cv4)
 	frg->fg_id = cv4->ip.ip4->ip_id;
 	frg->fg_src.in4 = cv4->ip.ip4->ip_src;
 	frg->fg_dst.in4 = cv4->ip.ip4->ip_dst;
+	frg->tslot = tsl;
+	tsl->frg = frg;
 	microtime(&atv);
 	frg->tstamp = atv.tv_sec;
 
 	s = splnet();
 	TAILQ_INSERT_HEAD(&frg_head, frg, frg_list);
 	splx(s);
+
+	natpt_logFSlot(LOG_INFO, frg, '+');
 
 	return (frg);
 }
@@ -681,16 +689,26 @@ natpt_expireFragment(void *ignored_arg)
 	while (frg) {
 		frgn = TAILQ_NEXT(frg, frg_list);
 		if ((atv.tv_sec - frg->tstamp) >= maxFragment) {
-			int	 s;
-
-			s = splnet();
-			TAILQ_REMOVE(&frg_head, frg, frg_list);
-			splx(s);
-			FREE(frg, M_NATPT);
+			natpt_removeFragmentEntry(frg);
 		}
 		frg = frgn;
 	}
 
+}
+
+
+void
+natpt_removeFragmentEntry(struct fragment *frg)
+{
+	int	 s;
+
+	s = splnet();
+	TAILQ_REMOVE(&frg_head, frg, frg_list);
+	splx(s);
+
+	natpt_logFSlot(LOG_INFO, frg, '-');
+
+	FREE(frg, M_NATPT);
 }
 
 
@@ -1032,6 +1050,9 @@ natpt_removeTSlotEntry(struct tSlot *ats)
 	if ((ats->ip_p == IPPROTO_TCP)
 	    && (ats->suit.tcps != NULL))
 		FREE(ats->suit.tcps, M_NATPT);
+
+	if (ats->frg)
+		natpt_removeFragmentEntry(ats->frg);
 
 	s = splnet();
 	TAILQ_REMOVE(&tsl_head, ats, tsl_list);

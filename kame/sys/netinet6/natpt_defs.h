@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.58 2002/08/16 08:35:29 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.59 2002/08/19 10:24:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -325,6 +325,7 @@ struct tSlot {
 	 * server when FTP non passive mode.
 	 */
 	struct cSlot	*csl;
+	struct fragment *frg;
 	union {
 		struct {
 			n_short		 icd_id;

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.c,v 1.17 2002/08/16 02:38:07 fujisawa Exp $	*/
+/*	$KAME: natpt_log.c,v 1.18 2002/08/19 10:24:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -281,7 +281,6 @@ natpt_logTSlot(int priorities, struct tSlot *tsl, char dir, int num)
 
 		rv = natpt_logpAddr(", from=", &tsl->local,  &wp, &wl);
 		rv = natpt_logpAddr(", to=", &tsl->remote, &wp, &wl);
-		wp += rv;
 	}
 
 	rv = wp - wow;
@@ -297,6 +296,61 @@ natpt_logTSlot(int priorities, struct tSlot *tsl, char dir, int num)
 }
 
 
+void
+natpt_logFSlot(int priority, struct fragment *frg, char dir)
+{
+	int		 wl, rv;
+	u_char		*pr;
+	u_char		*wp;
+	u_char		 wow[SZWOW+SZGETA];
+
+	if ((natpt_usesyslog == 0) && (natpt_uselog == 0))
+		return ;
+
+	wl = SZWOW;
+	wp = wow;
+
+	rv = snprintf(wp, wl, "%cfSlot=%p", dir, frg);
+	wp += rv;
+	wl -= rv;
+
+	if (dir == '+') {
+		switch (frg->fg_proto) {
+		case IPPROTO_ICMP:	pr = "icmp";	break;
+		case IPPROTO_TCP:	pr = "tcp";	break;
+		case IPPROTO_UDP:	pr = "udp";	break;
+		case IPPROTO_ICMPV6:	pr = "icmp6";	break;
+		default:		pr = "unknown";	break;
+		}
+		rv = snprintf(wp, wl, ", proto=%s", pr);
+		wp += rv;
+		wl -= rv;
+
+		rv = snprintf(wp, wl, ", src="); wp += rv; wl -= rv;
+		rv = natpt_ntop(frg->fg_family, (const void *)&frg->fg_src, wp, wl);
+		wp += rv; wl -= rv;
+
+		rv = snprintf(wp, wl, ", dst="); wp += rv; wl -= rv;
+		rv = natpt_ntop(frg->fg_family, (const void *)&frg->fg_dst, wp, wl);
+		wp += rv; wl -= rv;
+
+		rv = snprintf(wp, wl, ", tSlot=%p", frg->tslot);
+		wp += rv; wl -= rv;
+	}
+
+	rv = wp - wow;
+	if (natpt_uselog) {
+		wow[rv] = '\0';
+		natpt_log(LOG_MSG, priority, (void *)wow, rv+1);
+	}
+	if (natpt_usesyslog) {
+		wow[rv] = '\n';
+		wow[rv+1] = '\0';
+		log(priority, wow);
+	}
+}
+
+
 static int
 natpt_logpAddr(char *from, struct pAddr *src, u_char **wp, size_t *wl)
 {
@@ -308,11 +362,12 @@ natpt_logpAddr(char *from, struct pAddr *src, u_char **wp, size_t *wl)
 	*wl -= rv;
 	rv = natpt_ntop(src->sa_family, (const void *)&src->addr[0], *wp, *wl);
 	*wp += rv;
+	*wl -= rv;
 
 	if (src->port[0] != 0) {
-		*wl -= rv;
 		rv = snprintf(*wp, *wl, ", port=%d", ntohs(src->port[0]));
 		*wp += rv;
+		*wl -= rv;
 	}
 
 	return (*wp - wps);

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.34 2002/08/16 02:38:07 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.35 2002/08/19 10:24:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -58,6 +58,7 @@ int		 natpt_break		__P((void));
 
 /*  natpt_log.c */
 void		 natpt_logTSlot		__P((int, struct tSlot *, char, int));
+void		 natpt_logFSlot		__P((int, struct fragment *, char));
 void		 natpt_logMsg		__P((int, char *, ...));
 void		 natpt_logMBuf		__P((int, struct mbuf *, ...));
 void		 natpt_logIp4		__P((int, struct ip *, ...));
@@ -101,10 +102,11 @@ struct tSlot	*natpt_checkICMP6return	__P((struct pcv *));
 struct tSlot	*natpt_checkICMP	__P((struct pcv *));
 struct pAddr	*natpt_remapRemote4Port	__P((struct cSlot *, struct pAddr *));
 
-struct fragment	*natpt_internFragment6	__P((struct pcv *));
-struct fragment	*natpt_internFragment4	__P((struct pcv *));
+struct fragment	*natpt_internFragment6	__P((struct pcv *, struct tSlot *));
+struct fragment	*natpt_internFragment4	__P((struct pcv *, struct tSlot *));
 struct tSlot	*natpt_lookForFragment6	__P((struct pcv *));
 struct tSlot	*natpt_lookForFragment4	__P((struct pcv *));
+void		 natpt_removeFragmentEntry __P((struct fragment *));
 
 void		 natpt_init_tslot	__P((void));
 
