@@ -445,7 +445,7 @@ vlan_unconfig(struct ifnet *ifp)
         ifv->ifv_if.if_mtu = ETHERMTU;
 
         /* Clear our MAC address. */
-        ifa = ifnet_addrs[ifv->ifv_if.if_index - 1];
+        ifa = ifnet_addrs[ifv->ifv_if.if_index];
         sdl = (struct sockaddr_dl *)ifa->ifa_addr;
         sdl->sdl_type = IFT_ETHER;
         sdl->sdl_alen = ETHER_ADDR_LEN;
