@@ -1,10 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1510 2001/01/25 15:14:30 itojun Exp $
+$KAME: CHANGELOG,v 1.1511 2001/01/25 16:41:07 itojun Exp $
 
 <200101>
 Fri Jan 26 00:12:48 JST 2001  itojun@iijlab.net
 	* bsdi3: support ART routing table lookup algorithm.
+	* bsdi4: support ART routing table lookup algorithm.  inet6 only
+	  due to the use of custom host lookup logic in inet.
 
 Thu Jan 25 12:26:32 JST 2001 sakane@ydc.co.jp
 	* racoon:
