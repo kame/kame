@@ -53,11 +53,11 @@
 #include <netinet6/icmp6.h>
 #include <netinet6/nd6.h>
 
-#ifdef notyet /*IPSEC*/
+#ifdef IPSEC_IPV6FWD
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #include <netkey/key_debug.h>
-#endif /* IPSEC */
+#endif /* IPSEC_IPV6FWD */
 
 #ifdef IPV6FIREWALL
 #include <netinet6/ip6_fw.h>
@@ -90,14 +90,14 @@ ip6_forward(m, srcrt)
 	register struct rtentry *rt;
 	int error, type = 0, code = 0;
 	struct mbuf *mcopy;
-#ifdef notyet /*IPSEC*/
+#ifdef IPSEC_IPV6FWD
 	struct secpolicy *sp = NULL;
 #endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
 
-#ifdef notyet /*IPSEC*/
+#ifdef IPSEC_IPV6FWD
 	/*
 	 * Check AH/ESP integrity.
 	 */
@@ -110,7 +110,7 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-#endif /*IPSEC*/
+#endif /*IPSEC_IPV6FWD*/
 
 	if (m->m_flags & (M_BCAST|M_MCAST) ||
 	   in6_canforward(&ip6->ip6_src, &ip6->ip6_dst) == 0) {
@@ -140,7 +140,7 @@ ip6_forward(m, srcrt)
 	}
 	ip6->ip6_hlim -= IPV6_HLIMDEC;
 
-#ifdef notyet /*IPSEC*/
+#ifdef IPSEC_IPV6FWD
 	/* get a security policy for this packet */
 	sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, 0, &error);
 	if (sp == NULL) {
@@ -221,11 +221,12 @@ ip6_forward(m, srcrt)
 	error = ipsec6_output_tunnel(&state, sp, 0);
 
 	m = state.m;
-	/* XXX allocate a route (ro, dst) again later */
-#if 0
+#if 0	/* XXX allocate a route (ro, dst) again later */
 	ro = (struct route_in6 *)state.ro;
 	dst = (struct sockaddr_in6 *)state.dst;
 #endif
+	key_freesp(sp);
+
 	if (error) {
 		/* mbuf is already reclaimed in ipsec6_output_tunnel. */
 		switch (error) {
@@ -243,7 +244,6 @@ ip6_forward(m, srcrt)
 			break;
 		}
 		ip6stat.ip6s_cantforward++;
-		key_freesp(sp);
 #if 0
 		/* XXX: what icmp ? */
 #else
@@ -253,7 +253,7 @@ ip6_forward(m, srcrt)
 	}
     }
     skip_ipsec:
-#endif /* IPSEC */
+#endif /* IPSEC_IPV6FWD */
 
 	dst = &ip6_forward_rt.ro_dst;
 	if (!srcrt) {
