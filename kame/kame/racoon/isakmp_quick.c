@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.91 2001/12/31 20:13:41 thorpej Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.92 2002/03/05 15:34:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2055,7 +2055,7 @@ get_proposal_r(iph2)
 		"suitable SP found:%s\n", spidx2str(&spidx));
 
 	/*
-	 * In the responder side, the inbound policy should be using IPSec.
+	 * In the responder side, the inbound policy should be using IPsec.
 	 * outbound policy is not checked currently.
 	 */
 	if (sp_in->policy != IPSEC_POLICY_IPSEC) {

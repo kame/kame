@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.43 2001/11/16 04:34:57 sakane Exp $	*/
+/*	$KAME: main.c,v 1.44 2002/03/05 15:34:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,6 +83,7 @@ static char version[] = "@(#)internal version " RACOON_VERSION ;
 #else
 static char version[] = "@(#)racoon 20001216 " RACOON_VERSION ;
 #endif
+static pid_t racoon_pid = 0;
 
 int main __P((int, char **));
 static void usage __P((void));
@@ -201,7 +202,6 @@ main(ac, av)
 		close(0);
 	else {
 		const char *pid_file = _PATH_VARRUN "racoon.pid";
-		pid_t pid;
 		FILE *fp;
 
 		if (daemon(0, 0) < 0) {
@@ -218,7 +218,7 @@ main(ac, av)
 				"cannot clear logname: %s\n", strerror(errno));
 			/* no big deal if it fails.. */
 		}
-		pid = getpid();
+		racoon_pid = getpid();
 		fp = fopen(pid_file, "w");
 		if (fp) {
 			if (fchmod(fileno(fp),
@@ -227,7 +227,7 @@ main(ac, av)
 				fclose(fp);
 				exit(1);
 			}
-			fprintf(fp, "%ld\n", (long)pid);
+			fprintf(fp, "%ld\n", (long)racoon_pid);
 			fclose(fp);
 		} else {
 			plog(LLV_ERROR, LOCATION, NULL,
@@ -249,9 +249,14 @@ main(ac, av)
 static void
 cleanup_pidfile()
 {
-	const char *pid_file = _PATH_VARRUN "racoon.pid";
+	pid_t p = getpid();
 
-	(void) unlink(pid_file);
+	/* if it's not child process, clean everything */
+	if (racoon_pid == p) {
+		const char *pid_file = _PATH_VARRUN "racoon.pid";
+
+		(void) unlink(pid_file);
+	}
 }
 
 static void
