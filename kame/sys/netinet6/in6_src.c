@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.87 2001/11/04 16:16:33 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.88 2001/11/10 10:02:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,9 +103,7 @@
 #endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
-#ifdef ENABLE_DEFAULT_SCOPE
 #include <netinet6/scope6_var.h> 
-#endif
 
 #ifdef MIP6
 #include <netinet6/mip6.h>
@@ -124,6 +122,18 @@ extern struct ifnet loif[NLOOP];
 struct in6_addrpolicy defaultaddrpolicy;
 
 int ip6_prefer_tempaddr = 0;
+
+#ifdef NEW_STRUCT_ROUTE
+static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+			     struct ip6_moptions *, 
+			     struct route *ro,
+			     struct ifnet **));
+#else
+static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+			     struct ip6_moptions *, 
+			     struct route_in6 *ro,
+			     struct ifnet **));
+#endif
 
 static struct in6_addrpolicy *lookup_addrsel_policy __P((struct sockaddr_in6 *));
 
@@ -184,8 +194,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	struct ifnet *ifp = NULL;
 	struct in6_ifaddr *ia = NULL, *ia_best = NULL;
 	struct in6_pktinfo *pi = NULL;
-	struct rtentry *rt = NULL;
-	int clone;
 	int dst_scope = -1, best_scope = -1, best_matchlen = -1;
 	struct in6_addrpolicy *dst_policy = NULL, *best_policy = NULL;
 #ifdef MIP6
@@ -201,34 +209,70 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 
 	/*
 	 * If the source address is explicitly specified by the caller,
-	 * or the socket is already bound, just use the address.
-	 * ip6_output() will check scope validity.
+	 * check if the requested source address is indeed a unicast address
+	 * assigned to the node, and can be used as the packet's source
+	 * address.  If everything is okay, use the address as source.
 	 */
 	if (opts && (pi = opts->ip6po_pktinfo) &&
 	    !IN6_IS_ADDR_UNSPECIFIED(&pi->ipi6_addr)) {
+		struct sockaddr_in6 srcsock;
+		struct in6_ifaddr *ia6;
+
+		/* get the outgoing interface */
+		if ((*errorp = in6_selectif(dstsock, opts, mopts, ro, &ifp))
+		    != 0) {
+			return(NULL);
+		}
+
+		/*
+		 * determine the appropriate zone id of the source based on
+		 * the zone of the destination and the outgoing interface.
+		 */
+		bzero(&srcsock, sizeof(srcsock));
+		srcsock.sin6_family = AF_INET6;
+		srcsock.sin6_len = sizeof(srcsock);
+		srcsock.sin6_addr = pi->ipi6_addr;
+		if (ifp) {
+			int64_t zone;
+
+			zone = in6_addr2zoneid(ifp, &pi->ipi6_addr);
+			if (zone < 0) { /* XXX: this should not happen */
+				*errorp = EINVAL;
+				return(NULL);
+			}
+			srcsock.sin6_scope_id = zone;
+		}
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&srcsock.sin6_addr, &srcsock, NULL, NULL)) {
+			*errorp = EINVAL;
+			return(NULL);
+		}
+		srcsock.sin6_scope_id = 0; /* XXX */
+#endif
+		ia6 = (struct in6_ifaddr *)ifa_ifwithaddr((struct sockaddr *)(&srcsock));
+		if (ia6 == NULL ||
+		    (ia6->ia6_flags & (IN6_IFF_ANYCAST | IN6_IFF_NOTREADY))
+		    != 0) {
+			*errorp = EADDRNOTAVAIL;
+			return(NULL);
+		}
+		pi->ipi6_addr = srcsock.sin6_addr; /* XXX: this overrides pi */
 		return(&pi->ipi6_addr);
 	}
+
+	/*
+	 * Otherwise, if the socket has already bound the source, just use it.
+	 */
 	if (laddr && !IN6_IS_ADDR_UNSPECIFIED(laddr))
 		return(laddr);
+
 	/*
 	 * If the address is not specified, choose the best one based on
 	 * the outgoing interface and the destination address.
 	 */
 	/* get the outgoing interface */
-	clone = IN6_IS_ADDR_MULTICAST(&dstsock->sin6_addr) ? 0 : 1;
-	if ((*errorp = in6_selectroute(dstsock, opts, mopts,
-				       ro, &ifp, &rt, clone)) != 0) {
+	if ((*errorp = in6_selectif(dstsock, opts, mopts, ro, &ifp)) != 0)
 		return(NULL);
-	}
-	/*
-	 * Adjust the "outgoing" interface.  If we're going to loop the packet
-	 * back to ourselves, the ifp would be the loopback interface.
-	 * However, we'd rather know the interface associated to the
-	 * destination address (which should probably be one of our own
-	 * addresses.)
-	 */
-	if (rt && rt->rt_ifa && rt->rt_ifa->ifa_ifp)
-		ifp = rt->rt_ifa->ifa_ifp;
 
 #ifdef MIP6
 #ifdef MIP6_ALLOW_COA_FALLBACK
@@ -538,6 +582,39 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 #undef REPLACE
 #undef BREAK
 #undef NEXT
+
+static int
+in6_selectif(dstsock, opts, mopts, ro, retifp)
+	struct sockaddr_in6 *dstsock;
+	struct ip6_pktopts *opts;
+	struct ip6_moptions *mopts;
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro;
+#else
+	struct route_in6 *ro;
+#endif
+	struct ifnet **retifp;
+{
+	int error, clone;
+	struct rtentry *rt = NULL;
+
+	clone = IN6_IS_ADDR_MULTICAST(&dstsock->sin6_addr) ? 0 : 1;
+	if ((error = in6_selectroute(dstsock, opts, mopts, ro, retifp,
+				     &rt, clone)) != 0) {
+		return(error);
+	}
+	/*
+	 * Adjust the "outgoing" interface.  If we're going to loop the packet
+	 * back to ourselves, the ifp would be the loopback interface.
+	 * However, we'd rather know the interface associated to the
+	 * destination address (which should probably be one of our own
+	 * addresses.)
+	 */
+	if (rt && rt->rt_ifa && rt->rt_ifa->ifa_ifp)
+		*retifp = rt->rt_ifa->ifa_ifp;
+
+	return(0);
+}
 
 int
 in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
@@ -1028,10 +1105,9 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 	 * ask us to overwrite existing sockaddr_in6
 	 */
 
-#ifdef ENABLE_DEFAULT_SCOPE
-	if (scopeid == 0)
+	/* XXX: a valid ID should already be filled. */
+	if (ip6_use_defzone && scopeid == 0)
 		scopeid = scope6_addr2default(in6);
-#endif
 
 	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
 		struct in6_pktinfo *pi;
