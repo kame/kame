@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.7 2004/03/10 09:14:51 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.8 2004/03/10 09:24:29 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -718,10 +718,6 @@ mld_fasttimeo()
 	struct in6_multi *in6m;
 	struct in6_multistep step;
 	struct ifnet *ifp = NULL;
-	/*
-	 * Both of Current-State Record timer and State-Change Record timer
-	 * are controled.
-	 */
 	struct router6_info *rt6i;
 	struct mbuf *cm, *sm;
 	int cbuflen, sbuflen;
@@ -779,8 +775,10 @@ mld_fasttimeo()
 		--in6m->in6m_timer;
 		if (in6m->in6m_timer > 0) {
 			mld_group_timers_are_running = 1;
-			goto bypass_state_transition;
+			goto state_changetimer;
 		}
+
+		/* Current-State Record timer */
 		if (in6m->in6m_rti->rt6i_type == MLD_V1_ROUTER) {
 			mldlog((LOG_DEBUG, "mld_fasttimeo: v1 report\n"));
 			mld_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
@@ -797,7 +795,8 @@ mld_fasttimeo()
 			in6m->in6m_state = MLD_OTHERLISTENER;
 		}
 
-	bypass_state_transition:
+	state_change_timer:
+		/* State-Change Record timer */
 		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr))
 			goto next_in6m; /* skip */
 
@@ -827,6 +826,11 @@ mld_fasttimeo()
 		mldlog((LOG_DEBUG, "mld_fasttimeo: handles pending report\n"));
 		if (in6m->in6m_source->i6ms_robvar
 		    == in6m->in6m_rti->rt6i_qrv) {
+		    	/* 
+			 * immediately advertise the calculated MLD report,
+			 * so you don't have to update ifp for the buffered 
+			 * MLD report message.
+			 */
 			mld_send_state_change_report(&sm, &sbuflen, in6m, 0, 1);
 			sm = NULL;
 		} else if (in6m->in6m_source->i6ms_robvar > 0) {
