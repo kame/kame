@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.32 2001/08/16 07:57:44 itojun Exp $
+$KAME: helsinki-result.jp,v 1.33 2001/08/16 11:19:53 sakane Exp $
 
 
 generic
@@ -302,6 +302,7 @@ Fitec
 	他の実装とうまくいかないのは、これが原因か？
 	そうでもなさそう、opensslの問題かも。
 
+	openssl 0.9.6 にしたら成功。違いが分からず。
 
 SSH
 	ssh solaris version:
