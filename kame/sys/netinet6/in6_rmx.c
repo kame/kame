@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.8 2000/07/05 01:38:51 itojun Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.9 2000/08/20 04:30:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -256,7 +256,9 @@ in6_matroute(void *v_arg, struct radix_node_head *head)
 	return rn;
 }
 
+#ifdef SYSCTL_DECL
 SYSCTL_DECL(_net_inet6_ip6);
+#endif
 
 static int rtq_reallyold = 60*60;
 	/* one hour is ``really old'' */
