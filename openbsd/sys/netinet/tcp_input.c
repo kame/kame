@@ -761,6 +761,7 @@ findpcb:
 		}
 	}
 
+#ifdef INET6
 	/* save IPv6 packet options if user wanted */
 	if (is_ipv6 && inp->inp_flags & IN6P_CONTROLOPTS) {
 		struct ip6_recvpktopts opts;
@@ -776,6 +777,7 @@ findpcb:
 				m_freem(opts.head);
 		}
 	}
+#endif
 
 #ifdef IPSEC
 	/* Check if this socket requires security for incoming packets */
