@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.67 2001/09/21 12:26:44 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.68 2001/09/25 14:15:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -64,6 +64,7 @@ time_t p_lt_hard, p_lt_soft;
 static int p_aiflags = 0, p_aifamily = PF_UNSPEC;
 
 static struct addrinfo *parse_addr __P((char *, char *));
+static int fix_portstr __P((vchar_t *, vchar_t *, vchar_t *));
 static int setvarbuf __P((char *, int *, struct sadb_ext *, int, caddr_t, int));
 void parse_init __P((void));
 void free_buffer __P((void));
@@ -113,7 +114,7 @@ extern void yyerror __P((const char *));
 %type <val> policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
 %type <val> F_AIFLAGS
-%type <val> policy_spec
+%type <val> upper_misc_spec policy_spec
 %type <res> ipaddr
 
 %%
@@ -453,25 +454,19 @@ extension
 	/* definition about command for SPD management */
 	/* spdadd */
 spdadd_command
-	:	SPDADD ipaddropts STRING prefix portstr STRING prefix portstr upper_spec policy_spec EOT
+	:	SPDADD ipaddropts STRING prefix portstr STRING prefix portstr upper_spec upper_misc_spec policy_spec EOT
 		{
 			int status;
 			struct addrinfo *src, *dst;
 
-			/* fixed port fields */
-			if (strcmp($5.buf, "any") == 0) {
+			/* fixed port fields if ulp is icmpv6 */
+			if ($10.buf != NULL) {
+				if ($9 != IPPROTO_ICMPV6)
+					return -1;
 				free($5.buf);
-				if ($9 == IPPROTO_ICMPV6)
-					$5.buf = strdup("65535");
-				else
-					$5.buf = strdup("0");
-			}
-			if (strcmp($8.buf, "any") == 0) {
 				free($8.buf);
-				if ($9 == IPPROTO_ICMPV6)
-					$8.buf = strdup("65535");
-				else
-					$8.buf = strdup("0");
+				if (fix_portstr(&$10, &$5, &$8))
+					return -1;
 			}
 
 			src = parse_addr($3.buf, $5.buf);
@@ -487,7 +482,7 @@ spdadd_command
 				return -1;
 			}
 
-			status = setkeymsg_spdaddr(SADB_X_SPDADD, $9, &$10,
+			status = setkeymsg_spdaddr(SADB_X_SPDADD, $9, &$11,
 			    src, $4, dst, $7);
 			if (status < 0)
 				return -1;
@@ -497,25 +492,19 @@ spdadd_command
 	;
 
 spddelete_command
-	:	SPDDELETE ipaddropts STRING prefix portstr STRING prefix portstr upper_spec policy_spec EOT
+	:	SPDDELETE ipaddropts STRING prefix portstr STRING prefix portstr upper_spec upper_misc_spec policy_spec EOT
 		{
 			int status;
 			struct addrinfo *src, *dst;
 
-			/* fixed port fields */
-			if (strcmp($5.buf, "any") == 0) {
+			/* fixed port fields if ulp is icmpv6 */
+			if ($10.buf != NULL) {
+				if ($9 != IPPROTO_ICMPV6)
+					return -1;
 				free($5.buf);
-				if ($9 == IPPROTO_ICMPV6)
-					$5.buf = strdup("65535");
-				else
-					$5.buf = strdup("0");
-			}
-			if (strcmp($8.buf, "any") == 0) {
 				free($8.buf);
-				if ($9 == IPPROTO_ICMPV6)
-					$8.buf = strdup("65535");
-				else
-					$8.buf = strdup("0");
+				if (fix_portstr(&$10, &$5, &$8))
+					return -1;
 			}
 
 			src = parse_addr($3.buf, $5.buf);
@@ -531,7 +520,7 @@ spddelete_command
 				return -1;
 			}
 
-			status = setkeymsg_spdaddr(SADB_X_SPDDELETE, $9, &$10,
+			status = setkeymsg_spdaddr(SADB_X_SPDDELETE, $9, &$11,
 			    src, $4, dst, $7);
 			if (status < 0)
 				return -1;
@@ -610,12 +599,12 @@ prefix
 portstr
 	:	/*NOTHING*/
 		{
-			$$.buf = strdup("any");
+			$$.buf = strdup("0");
 			$$.len = strlen($$.buf);
 		}
 	|	BLCL ANY ELCL
 		{
-			$$.buf = strdup("any");
+			$$.buf = strdup("0");
 			$$.len = strlen($$.buf);
 		}
 	|	BLCL DECSTRING ELCL
@@ -652,6 +641,19 @@ upper_spec
 				}
 			}
 			endprotoent();
+		}
+	;
+
+upper_misc_spec
+	:	/*NOTHING*/
+		{
+			$$.buf = NULL;
+			$$.len = 0;
+		}
+	|	STRING
+		{
+			$$.buf = strdup($1.buf);
+			$$.len = strlen($$.buf);
 		}
 	;
 
@@ -1110,6 +1112,39 @@ parse_addr(host, port)
 		return NULL;
 	}
 	return res;
+}
+
+static int
+fix_portstr(spec, sport, dport)
+	vchar_t *spec, *sport, *dport;
+{
+	char *p, *p2;
+	int l;
+
+	l = 0;
+	for (p = spec->buf; *p != ',' && *p != '\0' && l < spec->len; p++, l++)
+		;
+	if (*p == '\0') {
+		p2 = "0";
+	} else {
+		if (*p == ',') {
+			*p = '\0';
+			p2 = ++p;
+		}
+		for (p = p2; *p != '\0' && l < spec->len; p++, l++)
+			;
+		if (*p != '\0' || *p2 == '\0') {
+			yyerror("invalid an upper layer protocol spec");
+			return -1;
+		}
+	}
+
+	sport->buf = strdup(spec->buf);
+	sport->len = strlen(sport->buf);
+	dport->buf = strdup(p2);
+	dport->len = strlen(dport->buf);
+
+	return 0;
 }
 
 static int

@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.33 2001/08/17 06:21:57 itojun Exp $	*/
+/*	$KAME: token.l,v 1.34 2001/09/25 14:15:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -235,6 +235,12 @@ any		{ return(ANY); }
 		}
 
 [A-Za-z0-9:][A-Za-z0-9:%\.-]* {
+			yylval.val.len = yyleng;
+			yylval.val.buf = strdup(yytext);
+			return(STRING);
+		}
+
+[0-9,]+ {
 			yylval.val.len = yyleng;
 			yylval.val.buf = strdup(yytext);
 			return(STRING);
