@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.151 2000/08/28 05:24:02 itojun Exp $	*/
+/*	$KAME: key.c,v 1.152 2000/09/19 17:38:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -457,6 +457,7 @@ static int key_get __P((struct socket *, struct mbuf *,
 static struct mbuf *key_getcomb_esp __P((void));
 #endif
 static struct mbuf *key_getcomb_ah __P((void));
+static struct mbuf *key_getcomb_ipcomp __P((void));
 static struct mbuf *key_getprop __P((const struct secasindex *));
 
 static int key_acquire __P((struct secasindex *, struct secpolicy *));
@@ -5464,6 +5465,16 @@ key_getcomb_ah()
 }
 
 /*
+ * XXX TBD
+ */
+static struct mbuf *
+key_getcomb_ipcomp()
+{
+
+	return NULL;
+}
+
+/*
  * XXX no way to pass mode (transport/tunnel) to userland
  * XXX replay checking?
  * XXX sysctl interface to ipsec_{ah,esp}_keymin
@@ -5485,6 +5496,9 @@ key_getprop(saidx)
 #endif
 	case IPPROTO_AH:
 		m = key_getcomb_ah();
+		break;
+	case IPPROTO_IPCOMP:
+		m = key_getcomb_ipcomp();
 		break;
 	default:
 		return NULL;
@@ -5520,7 +5534,9 @@ key_getprop(saidx)
  *   <base, src address, dst address, (SPI range)> with SADB_GETSPI
  * from KMD by PF_KEY.
  *
- * sensitivity is not supported.
+ * XXX sensitivity is not supported.
+ * XXX proposal is considered to be optional for now, due to the lack of
+ * ipcomp support in RFC2367.
  *
  * OUT:
  *    0     : succeed
@@ -5662,11 +5678,24 @@ key_acquire(saidx, sp)
 
 	/* create proposal/combination extension */
 	m = key_getprop(saidx);
+#if 0
+	/*
+	 * spec conformant: always attach proposal/combination extension,
+	 * the problem is that we have no way to attach it for ipcomp,
+	 * due to the way sadb_comb is declared in RFC2367.
+	 */
 	if (!m) {
 		error = ENOBUFS;
 		goto fail;
 	}
 	m_cat(result, m);
+#else
+	/*
+	 * outside of spec; make proposal/combination extension optional.
+	 */
+	if (m)
+		m_cat(result, m);
+#endif
 
 	if ((result->m_flags & M_PKTHDR) == 0) {
 		error = EINVAL;
