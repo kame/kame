@@ -1,4 +1,4 @@
-/*	$KAME: radixwalk.c,v 1.5 2001/07/17 14:55:36 jinmei Exp $	*/
+/*	$KAME: radixwalk.c,v 1.6 2001/07/20 10:56:43 itojun Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -83,6 +83,7 @@ int af = AF_INET6;
 int rtoffset;
 int printdepth;
 static kvm_t *kvmd;
+const char *kernelfile = NULL;
 
 struct rdtree *get_tree __P((struct radix_node *));
 struct sockaddr *kgetsa __P((struct sockaddr *));
@@ -103,7 +104,7 @@ void
 usage()
 {
 	fprintf(stderr,
-		"usage: radixwalk [-a] [-f inet[46]] [-i indenttype]\n");
+		"usage: radixwalk [-a] [-f inet[46]] [-i indenttype] [-N kernel]\n");
 	exit(1);
 }
 
@@ -119,7 +120,7 @@ main(argc, argv)
 
 	indenttype = LINE;
 
-	while ((ch = getopt(argc, argv, "adhf:i:")) != -1) {
+	while ((ch = getopt(argc, argv, "adf:i:N:")) != -1) {
 		switch(ch) {
 		case 'a':
 			af = AF_UNSPEC;
@@ -146,10 +147,21 @@ main(argc, argv)
 			else
 				errx(1, "unsuported indent type: %s", optarg);
 			break;
-		case 'h':
+		case 'N':
+			kernelfile = optarg;
+			break;
 		default:
 			usage();
+			/* NOTREACHED */
 		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc > 0) {
+		usage();
+		/* NOTREACHED */
 	}
 
 	topaddr = kinit();
@@ -297,7 +309,7 @@ kinit()
 	char buf[_POSIX2_LINE_MAX];
 	struct nlist nl[] = {{"_rt_tables"}, {""}};
 
-	kvmd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, buf);
+	kvmd = kvm_openfiles(kernelfile, NULL, NULL, O_RDONLY, buf);
 	if (kvmd != NULL) {
 		if (kvm_nlist(kvmd, nl) < 0)
 			errx(1, "kvm_nlist: %s", kvm_geterr(kvmd));
