@@ -1358,15 +1358,23 @@ expand_ipsecspec(prop_no, trns_no, types,
 		return trns_no + 1;
 	}
 
-	for (i = 0; i < bl; i++) {
-		if (b & 1) {
-			tmpalgtype[class] = i + 1;
-			trns_no = expand_ipsecspec(prop_no, trns_no, types,
-					class + 1, last, p, s, ipsp);
-			if (trns_no == -1)
-				return -1;
+	if (b != 0) {
+		for (i = 0; i < bl; i++) {
+			if (b & 1) {
+				tmpalgtype[class] = i + 1;
+				trns_no = expand_ipsecspec(prop_no, trns_no,
+				    types, class + 1, last, p, s, ipsp);
+				if (trns_no == -1)
+					return -1;
+			}
+			b >>= 1;
 		}
-		b >>= 1;
+	} else {
+		tmpalgtype[class] = 0;
+		trns_no = expand_ipsecspec(prop_no, trns_no, types, class + 1,
+		    last, p, s, ipsp);
+		if (trns_no == -1)
+			return -1;
 	}
 
 	return trns_no;
