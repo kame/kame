@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.21 2000/12/17 21:17:53 sakane Exp $
+# $KAME: racoon.conf.sample,v 1.22 2000/12/19 08:07:33 sakane Exp $
 
 # "path" affects "include" directive.  "path" must be specified before any
 # "include" directive with relative file path.
@@ -41,7 +41,7 @@ remote anonymous
 	# the configuration makes racoon (as a responder) to obey the
 	# initiator's lifetime and PFS group proposal.
 	# this makes testing so much easier.
-	#proposal_check obey;
+	proposal_check obey;
 }
 
 # phase 2 proposal (for IPsec SA).
