@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.67 2002/01/21 11:37:51 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.68 2002/01/23 02:17:50 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1426,6 +1426,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+#ifdef MIP6_DRAFT13
+	struct nd_prefix *home_pr;
+#endif
 
 	/* find the home ifp of this homeaddress. */
 	for(pr = nd_prefix.lh_first;
@@ -1435,6 +1438,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 					 &pr->ndpr_prefix.sin6_addr,
 					 pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
+#ifdef MIP6_DRAFT13
+			home_pr = pr;
+#endif
 		}
 	}
 	/* XXX really stupid to loop twice? */
@@ -1470,7 +1476,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		return (0); /* XXX is 0 OK? */
 	}
 #ifdef MIP6_DRAFT13
-	if (pr->ndpr_plen != bu_opt->ip6ou_prefixlen) {
+	if (home_pr->ndpr_plen != bu_opt->ip6ou_prefixlen) {
 		/* the haddr has an incorrect prefix length. */
 		/* XXX return 136 INCORRECT SUBNET PREFIX LENGTH */
 		if (mip6_bc_send_ba(haaddr, haddr0, coa,
