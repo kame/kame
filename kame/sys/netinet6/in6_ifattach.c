@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.142 2001/08/23 02:56:32 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.143 2001/08/31 05:13:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -127,6 +127,8 @@ static int in6_ifattach_loopback __P((struct ifnet *));
 #define IFID_LOCAL(in6)		(!EUI64_LOCAL(in6))
 #define IFID_UNIVERSAL(in6)	(!EUI64_UNIVERSAL(in6))
 
+#define GEN_TEMPID_RETRY_MAX 5
+
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 /*
  * Generate a last-resort interface identifier from hostid.
@@ -224,6 +226,15 @@ generate_tmp_ifid(seed0, seed1, ret)
 #ifndef __OpenBSD__
 	struct timeval tv;
 #endif
+	/*
+	 * interface ID for subnet anycast addresses.
+	 * XXX: we assume the unicast address range that requires IDs
+	 * in EUI-64 format.
+	 */
+	const u_int8_t anycast_id[8] = {0xfd, 0xff, 0xff, 0xff,
+					0xff, 0xff, 0xff, 0x80};
+	const u_int8_t isatap_id[4] = {0x00, 0x00, 0x5e, 0xfe};
+	int badid, retry = 0; 
 
 	/* If there's no hisotry, start with a random seed. */
 	bzero(nullbuf, sizeof(nullbuf));
@@ -239,13 +250,15 @@ generate_tmp_ifid(seed0, seed1, ret)
 #endif
 			bcopy(&val32, seed + sizeof(val32) * i, sizeof(val32));
 		}
-	} else
+	} else {
 		bcopy(seed0, seed, 8);
+	}
 
 	/* copy the right-most 64-bits of the given address */
 	/* XXX assumption on the size of IFID */
 	bcopy(seed1, &seed[8], 8);
 
+  again:
 	if (0) {		/* for debugging purposes only */
 		int i;
 
@@ -262,7 +275,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 	MD5Final(digest, &ctxt);
 
 	/*
-	 * RFC 3041 3.2.1. (3)
+	 * draft-ietf-ipngwg-temp-addresses-v2-00.txt 3.2.1. (3)
 	 * Take the left-most 64-bits of the MD5 digest and set bit 6 (the
 	 * left-most bit is numbered 0) to zero.
 	 */
@@ -270,25 +283,67 @@ generate_tmp_ifid(seed0, seed1, ret)
 	ret[0] &= ~EUI64_UBIT;
 
 	/*
-	 * XXX: we'd like to ensure that the generated value is not zero
-	 * for simplicity.  If the caclculated digest happens to be zero,
-	 * use a random non-zero value as the last resort.
+	 * Reject inappropriate identifiers according to
+	 * draft-ietf-ipngwg-temp-addresses-v2-00.txt 3.2.1. (4)
+	 * At this moment, we reject following cases:
+	 * - all 0 identifier
+	 * - identifiers that conflict with reserved subnet anycast addresses,
+	 *   which are defined in RFC 2526.
+	 * - identifiers that conflict with ISATAP addresses
+	 * - identifiers used in our own addresses
 	 */
-	if (bcmp(nullbuf, ret, sizeof(nullbuf)) == 0) {
-		log(LOG_INFO,
-		    "generate_tmp_ifid: computed MD5 value is zero.\n");
+	badid = 0;
+	if (bcmp(nullbuf, ret, sizeof(nullbuf)) == 0)
+		badid = 1;
+	else if (bcmp(anycast_id, ret, 7) == 0 &&
+	    (anycast_id[7] & ret[7]) == anycast_id[7]) {
+		badid = 1;
+	} else if (bcmp(isatap_id, ret, sizeof(isatap_id)) == 0)
+		badid = 1;
+	else {
+		struct in6_ifaddr *ia;
 
-#ifndef __OpenBSD__
-		microtime(&tv);
-		val32 = random() ^ tv.tv_usec;
-#else
-		val32 = arc4random();
-#endif
-		val32 = 1 + (val32 % (0xffffffff - 1));
+		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+			if (bcmp(&ia->ia_addr.sin6_addr.s6_addr[8], ret, 8)
+				== 0) {
+				badid = 1;
+				break;
+			}
+		}
 	}
 
 	/*
-	 * RFC 3041 3.2.1. (4)
+	 * In the event that an unacceptable identifier has been generated,
+	 * restart the process, using the right-most 64 bits of the MD5 digest
+	 * obtained in place of the history value.
+	 */
+	if (badid) {
+		if (0) {	/* for debugging purposes only */
+			int i;
+
+			printf("unacceptable random ID: ");
+			for (i = 0; i < 16; i++)
+				printf("%02x", digest[i]);
+			printf("\n");
+		}
+
+		if (++retry < GEN_TEMPID_RETRY_MAX) {
+			bcopy(&digest[8], seed, 8);
+			goto again;
+		} else {
+			/*
+			 * We're so unlucky.  Give up for now, and return
+			 * all 0 IDs to tell the caller not to make a
+			 * temporary address.
+			 */
+			nd6log((LOG_NOTICE,
+				"generate_tmp_ifid: never found a good ID\n"));
+			bzero(ret, 8);
+		}
+	}
+
+	/*
+	 * draft-ietf-ipngwg-temp-addresses-v2-00.txt 3.2.1. (6)
 	 * Take the rightmost 64-bits of the MD5 digest and save them in
 	 * stable storage as the history value to be used in the next
 	 * iteration of the algorithm. 
@@ -1177,7 +1232,7 @@ in6_ifdetach(ifp)
 }
 #endif
 
-void
+int
 in6_get_tmpifid(ifp, retbuf, baseid, generate)
 	struct ifnet *ifp;
 	u_int8_t *retbuf;
@@ -1201,6 +1256,12 @@ in6_get_tmpifid(ifp, retbuf, baseid, generate)
 					ndi->randomid);
 	}
 	bcopy(ndi->randomid, retbuf, 8);
+	if (generate && bcmp(retbuf, nullbuf, sizeof(nullbuf)) == 0) {
+		/* generate_tmp_ifid could not found a good ID. */
+		return(-1);
+	}
+
+	return(0);
 }
 
 void

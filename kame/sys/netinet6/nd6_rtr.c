@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.161 2001/08/30 11:45:27 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.162 2001/08/31 05:13:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1433,23 +1433,28 @@ prelist_update(new, dr, m)
 		in6_init_address_ltimes(pr, &lt6_tmp);
 
 		/*
-		 * When adjusting the lifetimes of an existing temporary
-		 * address, only lower the lifetimes.
-		 * RFC 3041 3.3. (1).
+		 * We need to treat lifetimes for temporary addresses
+		 * differently, according to
+		 * draft-ietf-ipngwg-temp-addresses-v2-00.txt 3.3 (1);
+		 * we only update the lifetimes when they are in the maximum
+		 * intervals.
 		 * XXX: how should we modify ia6t_[pv]ltime?
 		 */
 		if ((ifa6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
+			time_t maxexpire, maxpreferred;
+
+			maxexpire = ifa6->ia6_createtime +
+				ip6_temp_valid_lifetime;
+			maxpreferred = ifa6->ia6_createtime +
+				ip6_temp_preferred_lifetime - ip6_desync_factor;
+
 			if (lt6_tmp.ia6t_expire == 0 || /* no expire */
-			    lt6_tmp.ia6t_expire >
-			    ifa6->ia6_lifetime.ia6t_expire) {
-				lt6_tmp.ia6t_expire =
-					ifa6->ia6_lifetime.ia6t_expire;
+			    lt6_tmp.ia6t_expire > maxexpire) {
+				lt6_tmp.ia6t_expire = maxexpire;
 			}
 			if (lt6_tmp.ia6t_preferred == 0 || /* no expire */
-			    lt6_tmp.ia6t_preferred >
-			    ifa6->ia6_lifetime.ia6t_preferred) {
-				lt6_tmp.ia6t_preferred =
-					ifa6->ia6_lifetime.ia6t_preferred;
+			    lt6_tmp.ia6t_preferred > maxpreferred) {
+				lt6_tmp.ia6t_preferred = maxpreferred;
 			}
 		}
 
@@ -1473,11 +1478,11 @@ prelist_update(new, dr, m)
 #endif
 
 			/*
-			 * RFC 3041 3.3 (2).
+			 * draft-ietf-ipngwg-temp-addresses-v2-00 3.3 (2).
 			 * When a new public address is created as described
 			 * in RFC2462, also create a new temporary address.
 			 *
-			 * RFC 3041 3.5.
+			 * draft-ietf-ipngwg-temp-addresses-v2-00 3.5.
 			 * When an interface connects to a new link, a new
 			 * randomized interface identifier should be generated
 			 * immediately together with a new set of temporary
@@ -2050,7 +2055,7 @@ in6_tmpifadd(ia0, forcegen)
 	int forcegen;
 {
 	struct ifnet *ifp = ia0->ia_ifa.ifa_ifp;
-	struct in6_ifaddr *newia;
+	struct in6_ifaddr *newia, *ia;
 	struct in6_aliasreq ifra;
 	int i, error;
 	int trylimit = 3;	/* XXX: adhoc value */
@@ -2072,28 +2077,39 @@ in6_tmpifadd(ia0, forcegen)
 	}
 
   again:
-	in6_get_tmpifid(ifp, (u_int8_t *)randid,
-			(const u_int8_t *)&ia0->ia_addr.sin6_addr.s6_addr[8],
-			forcegen);
+	if (in6_get_tmpifid(ifp, (u_int8_t *)randid,
+			    (const u_int8_t *)&ia0->ia_addr.sin6_addr.s6_addr[8],
+			    forcegen)) {
+		nd6log((LOG_NOTICE, "in6_tmpifadd: failed to find a good "
+			"random IFID\n"));
+		return(EINVAL);
+	}
 	ifra.ifra_addr.sin6_addr.s6_addr32[2]
 		|= (randid[0] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[2]));
 	ifra.ifra_addr.sin6_addr.s6_addr32[3]
 		|= (randid[1] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[3]));
 
 	/*
-	 * If by chance the new temporary address is the same as an address
-	 * already assigned to the interface, generate a new randomized
-	 * interface identifier and repeat this step.
-	 * RFC 3041 3.3 (4).
+	 * in6_get_tmpifid() quite likely provided a unique interface ID.
+	 * However, we may still have a chance to see collision, because
+	 * there may be a time lag between generation of the ID and generation
+	 * of the address.  So, we'll do one more sanity check.
 	 */
-	if (in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr) != NULL) {
-		if (trylimit-- == 0) {
-			nd6log((LOG_NOTICE, "in6_tmpifadd: failed to find "
-			    "a unique random IFID\n"));
-			return(EEXIST);
+	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+		if (SA6_ARE_ADDR_EQUAL(&ia->ia_addr,
+				       &ifra.ifra_addr)) {
+			if (trylimit-- == 0) {
+				/*
+				 * Give up.  Something strange should have
+				 * happened.
+				 */
+				nd6log((LOG_NOTICE, "in6_tmpifadd: failed to "
+					"find a unique random IFID\n"));
+				return(EEXIST);
+			}
+			forcegen = 1;
+			goto again;
 		}
-		forcegen = 1;
-		goto again;
 	}
 
 	/*

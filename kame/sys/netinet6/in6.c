@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.228 2001/08/21 06:31:51 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.229 2001/08/31 05:13:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1042,10 +1042,11 @@ in6_update_ifa(ifp, ifra, ia)
 			return (ENOBUFS);
 		bzero((caddr_t)ia, sizeof(*ia));
 		LIST_INIT(&ia->ia6_memberships);
-		/* Initialize the address and masks */
+		/* Initialize the address and masks, and put time stamp */
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 		ia->ia_addr.sin6_family = AF_INET6;
 		ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
+		ia->ia6_createtime = time_second;
 		if ((ifp->if_flags & (IFF_POINTOPOINT | IFF_LOOPBACK)) != 0) {
 			/*
 			 * XXX: some functions expect that ifa_dstaddr is not

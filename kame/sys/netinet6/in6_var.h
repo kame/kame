@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.64 2001/08/03 10:40:20 keiichi Exp $	*/
+/*	$KAME: in6_var.h,v 1.65 2001/08/31 05:13:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -120,6 +120,9 @@ struct	in6_ifaddr {
 	int	ia6_flags;
 
 	struct in6_addrlifetime ia6_lifetime;
+	time_t	ia6_createtime; /* the creation time of this address, which is
+				 * currently used for temporary addresses only.
+				 */
 
 	/* back pointer to the ND prefix (for autoconfigured addresses only) */
 	struct nd_prefix *ia6_ndpr;

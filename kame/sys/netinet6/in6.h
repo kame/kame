@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.99 2001/08/22 07:34:20 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.100 2001/08/31 05:13:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -643,7 +643,8 @@ struct ip6_mtuinfo {
 #define IPV6CTL_LOWPORTMIN	30	/* minimum reserved port */
 #define IPV6CTL_LOWPORTMAX	31	/* maximum reserved port */
 #endif
-#define IPV6CTL_USETEMPADDR	32	/* use temporary addresses (RFC3041) */
+#define IPV6CTL_USETEMPADDR	32	/* use temporary addresses for
+					   privacy extension */
 #define IPV6CTL_TEMPPLTIME	33	/* preferred lifetime for tmpaddrs */
 #define IPV6CTL_TEMPVLTIME	34	/* valid lifetime for tmpaddrs */
 #define IPV6CTL_AUTO_LINKLOCAL	35	/* automatic link-local addr assign */
