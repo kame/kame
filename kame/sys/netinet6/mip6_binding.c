@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.62 2002/01/17 05:24:02 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.63 2002/01/17 10:12:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1352,8 +1352,8 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		mip6log((LOG_ERR,
 			 "%s:%d: sending BA to %s(%s) failed.  send it later.\n",
 			 __FILE__, __LINE__,
-			 ip6_sprintf(&mbc->mbc_phaddr),
-			 ip6_sprintf(&mbc->mbc_pcoa)));
+			 ip6_sprintf(haddr0),
+			 ip6_sprintf(coa)));
 	}
 
 	return (0);
