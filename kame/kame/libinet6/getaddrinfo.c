@@ -520,6 +520,7 @@ explore_fqdn(pai, hostname, servname, res)
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
 
+#if 0
 	/*
 	 * filter out AFs that are not supported by the kernel
 	 * XXX errno?
@@ -530,6 +531,7 @@ explore_fqdn(pai, hostname, servname, res)
 			return 0;
 	} else
 		close(s);
+#endif
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
