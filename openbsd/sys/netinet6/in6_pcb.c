@@ -614,7 +614,8 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 		if (cmd == PRC_MSGSIZE && (inp->inp_flags & IN6P_MTU) != 0 &&
 		    (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6) ||
 		     IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr))) {
-			ip6_notify_pmtu(inp, dst, (u_int32_t *)cmdarg);
+			ip6_notify_pmtu(inp, (struct sockaddr_in6 *)dst,
+			    (u_int32_t *)cmdarg);
 		}
 
 		if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
