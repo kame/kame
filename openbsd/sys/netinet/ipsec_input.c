@@ -202,10 +202,17 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto)
 	return ENXIO;
     }
 
-    if (tdbp->tdb_interface)
-      m->m_pkthdr.rcvif = (struct ifnet *) tdbp->tdb_interface;
-    else
-      m->m_pkthdr.rcvif = &encif[0].sc_if;
+    if (tdbp->tdb_dst.sa.sa_family == AF_INET)
+    {
+	/*
+	 * XXX The fragment conflicts with scoped nature of IPv6, so do it for
+	 * only for IPv4 for now
+	 */
+	if (tdbp->tdb_interface)
+	  m->m_pkthdr.rcvif = (struct ifnet *) tdbp->tdb_interface;
+	else
+	  m->m_pkthdr.rcvif = &encif[0].sc_if;
+    }
 
     /* Register first use, setup expiration timer */
     if (tdbp->tdb_first_use == 0)
@@ -251,6 +258,9 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
     caddr_t sport = 0, dport = 0;
     int prot, af, sproto;
     struct flow *flow;
+#if NBPFILTER > 0
+    struct ifnet *bpfif;
+#endif
 
 #ifdef INET
     struct ip *ip, ipn;
@@ -565,7 +575,11 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
       m->m_flags |= M_AUTH;
 
 #if NBPFILTER > 0
-    if (m->m_pkthdr.rcvif->if_bpf) 
+    if (tdbp->tdb_interface)
+	bpfif = (struct ifnet *) tdbp->tdb_interface;
+    else
+	bpfif = &encif[0].sc_if;
+    if (bpfif->if_bpf) 
     {
         /*
          * We need to prepend the address family as
@@ -585,7 +599,7 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
         m1.m_len = ENC_HDRLEN;
         m1.m_data = (char *) &hdr;
         
-        bpf_mtap(m->m_pkthdr.rcvif->if_bpf, &m1);
+        bpf_mtap(bpfif->if_bpf, &m1);
     }
 #endif
 
