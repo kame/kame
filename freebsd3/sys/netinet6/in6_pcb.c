@@ -667,18 +667,17 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 
 /*
  * Default hop limit selection. The precedence is as follows:
- * 1. The hop limit field of the template header.
- * 2. Hoplimit valued specified via ioctl.
- * 3. (If the outgoing interface is detected) the current
+ * 1. Hoplimit valued specified via ioctl.
+ * 2. (If the outgoing interface is detected) the current
  *     hop limit of the interface specified by router advertisement.
- * 4. The system default hoplimit.
+ * 3. The system default hoplimit.
 */
 int
 in6_selecthlim(in6p, ifp)
 	struct in6pcb *in6p;
 	struct ifnet *ifp;
 {
-	if (in6p->in6p_hops >= 0)
+	if (in6p && in6p->in6p_hops >= 0)
 		return(in6p->in6p_hops);
 	else if (ifp)
 		return(nd_ifinfo[ifp->if_index].chlim);
