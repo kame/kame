@@ -1,4 +1,4 @@
-/*	$Id: if_mip.c,v 1.2 2005/02/03 14:16:24 mitsuya Exp $	*/
+/*	$Id: if_mip.c,v 1.3 2005/03/01 18:17:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -106,8 +106,10 @@ mipattach(dummy)
 	sc = malloc(NMIP * sizeof(struct mip_softc), M_DEVBUF, M_WAITOK);
 	bzero(sc, NMIP * sizeof(struct mip_softc));
 	for (i = 0 ; i < NMIP; sc++, i++) {
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
 		sprintf(sc->mip_if.if_xname, "mip%d", i);
+#elif defined(__OpenBSD__)
+		snprintf(sc->mip_if.if_xname, sizeof sc->mip_if.if_xname, "mip%d", i);
 #elif defined(__FreeBSD__) && __FreeBSD_version > 501000
 		if_initname(&sc->mip_if, "mip", i);
 #else
@@ -125,6 +127,9 @@ mipattach(dummy)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 		IFQ_SET_MAXLEN(&sc->mip_if.if_snd, ifqmaxlen);
 		IFQ_SET_READY(&sc->mip_if.if_snd);
+#endif
+#ifdef __OpenBSD__
+		IFQ_SET_READY(&ifp->if_snd);
 #endif
 		if_attach(&sc->mip_if);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -184,6 +189,8 @@ mip_output(ifp, m, dst, rt)
 		if (n)
 #ifdef __FreeBSD__
 			m_dup_pkthdr(n, m);
+#elif defined(__OpenBSD__)
+			M_DUP_PKTHDR(n, m);
 #else
 			M_COPY_PKTHDR(n, m);
 #endif
@@ -364,7 +371,7 @@ mip_ioctl(ifp, cmd, data)
 		
 #ifdef __FreeBSD__
 		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
-#elif defined(__NetBSD__)
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) 
 #endif
 		{

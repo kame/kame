@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.215 2005/02/21 09:54:43 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.216 2005/03/01 18:17:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -77,6 +77,10 @@
 #include <netkey/key.h>
 #include <netkey/keydb.h>
 #endif /* IPSEC && !__OpenBSD__ */
+
+#ifdef __OpenBSD__
+#include <netinet/ip_ipsp.h>
+#endif
 
 #include "mip.h"
 
@@ -953,13 +957,13 @@ mip6_bul_remove_all()
 #endif /* __FreeBSD__ && __FreeBSD_version >= 502000 */
 #ifdef __FreeBSD__
 	TAILQ_FOREACH(ifp, &ifnet, if_link)
-#elif defined(__NetBSD__)
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
 	TAILQ_FOREACH(ifp, &ifnet, if_list)
 #endif
 	 {
 #ifdef __FreeBSD__
 		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
-#elif defined(__NetBSD__)
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) 
 #endif
 		{

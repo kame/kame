@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.8 2005/03/01 00:42:47 keiichi Exp $ */
+/* $Id: mipsock.c,v 1.9 2005/03/01 18:17:22 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -46,6 +46,9 @@
 #include <sys/domain.h>
 #include <sys/protosw.h>
 #include <sys/syslog.h>
+#ifdef __OpenBSD__
+#include <sys/proc.h>
+#endif /* __OpenBSD__ */
 
 #include <net/if.h>
 #include <net/mipsock.h>
@@ -71,7 +74,6 @@ static struct	sockproto mips_proto = { PF_MOBILITY, };
 
 #ifdef __FreeBSD__
 static int mips_abort(struct socket *);
-#endif
 #if __FreeBSD_version >= 503000
 static int mips_attach(struct socket *, int, struct thread *);
 static int mips_bind(struct socket *, struct sockaddr *, struct thread *);
@@ -90,15 +92,18 @@ static int mips_disconnect(struct socket *);
 static int mips_peeraddr(struct socket *, struct sockaddr **);
 static int mips_shutdown(struct socket *);
 static int mips_sockaddr(struct socket *, struct sockaddr **);
+#endif
 #ifdef __FreeBSD__
 static int mips_output(struct mbuf *, struct socket *);
 #else
 static int mips_output(struct mbuf *, ...);
 #endif
 static struct mbuf *mips_msg1(int type, int len);
-#ifdef __NetBSD__
-int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *,
-    struct mbuf *, struct proc *);
+
+#if defined(__NetBSD__)
+int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
+#elif defined(__OpenBSD__)
+int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *);
 #endif
 
 #ifdef __FreeBSD__
@@ -313,16 +318,24 @@ static struct pr_usrreqs mip_usrreqs = {
 };
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 /*ARGSUSED*/
 int
+#ifdef __NetBSD__
 mips_usrreq(so, req, m, nam, control, p)
+#else
+mips_usrreq(so, req, m, nam, control)
+#endif
 	struct socket *so;
 	int req;
 	struct mbuf *m;
 	struct mbuf *nam;
 	struct mbuf *control;
+#ifdef __NetBSD__
 	struct proc *p;
+#else
+#define p curproc
+#endif
 {
 	int error = 0;
 	struct rawcb *rp = sotorawcb(so);
@@ -351,7 +364,11 @@ mips_usrreq(so, req, m, nam, control, p)
 		else
 			error = raw_attach(so, (int)(long)nam);
 	} else
+#ifdef __OpenBSD__
+		error = raw_usrreq(so, req, m, nam, control);
+#else
 		error = raw_usrreq(so, req, m, nam, control, p);
+#endif
 
 	rp = sotorawcb(so);
 	if (req == PRU_ATTACH && rp) {
@@ -369,6 +386,9 @@ mips_usrreq(so, req, m, nam, control, p)
 	splx(s);
 	return (error);
 }
+#ifdef __OpenBSD__
+#undef p
+#endif
 #endif
 
 /*ARGSUSED*/
