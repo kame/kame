@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.42 2000/09/23 07:01:24 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.43 2000/09/29 18:28:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.42 2000/09/23 07:01:24 itojun Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.43 2000/09/29 18:28:53 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -885,7 +885,7 @@ eay_des_weakkey(key)
 	return des_is_weak_key((void *)key->v);
 }
 
-#ifdef HAVE_IDEA_H
+#ifdef HAVE_OPENSSL_IDEA_H
 /*
  * IDEA-CBC
  */
@@ -992,7 +992,7 @@ eay_bf_weakkey(key)
 	return 0;	/* XXX to be done. refer to RFC 2451 */
 }
 
-#ifdef HAVE_RC5_H
+#ifdef HAVE_OPENSSL_RC5_H
 /*
  * RC5-CBC
  */

@@ -33,8 +33,23 @@ AC_MSG_RESULT($enable_pedant)
 AC_MSG_CHECKING(if --enable-adminport option is specified)
 AC_ARG_ENABLE(adminport,
 	[  --enable-adminport      enable admin port (INSECURE!)],
-	[AC_DEFINE(ENABLE_ADMINPORT)])
+	[], [enable_adminport=no])
+if test $enable_adminport = "yes"; then
+	AC_DEFINE(ENABLE_ADMINPORT)
+fi
 AC_MSG_RESULT($enable_adminport)
+
+AC_MSG_CHECKING(if --enable-rc5 option is specified)
+AC_ARG_ENABLE(rc5,
+	[  --enable-rc5            enable RC5 encryption (patented)],
+	[], [enable_rc5=no])
+AC_MSG_RESULT($enable_rc5)
+
+AC_MSG_CHECKING(if --enable-idea option is specified)
+AC_ARG_ENABLE(idea,
+	[  --enable-idea           enable IDEA encryption (patented)],
+	[], [enable_idea=no])
+AC_MSG_RESULT($enable_idea)
 
 efence_dir=
 AC_MSG_CHECKING(if --with-efence option is specified)
@@ -543,12 +558,32 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(limits.h sys/time.h unistd.h stdarg.h varargs.h)
 signing=yes
 if test "x$include_path_openssl" = "x"; then
-	AC_CHECK_HEADERS(idea.h rc5.h rsa.h pem.h evp.h x509.h,
+	if test "$enable_rc5" = "yes"; then
+		rc5header=rc5.h
+	else
+		rc5header=
+	fi
+	if test "$enable_idea" = "yes"; then
+		ideaheader=idea.h
+	else
+		ideaheader=
+	fi
+	AC_CHECK_HEADERS($ideaheader $rc5header rsa.h pem.h evp.h x509.h,
 		[], [nosymbol=`echo $ac_hdr | sed -e 's/.h$//' -e 's/^/NO_/' | tr 'a-z' 'A-Z'`
 		CPPFLAGS="$CPPFLAGS -D$nosymbol=1"
 		signing=no])
 else
-	AC_CHECK_HEADERS(openssl/idea.h openssl/rc5.h openssl/rsa.h openssl/pem.h openssl/evp.h openssl/x509.h,
+	if test "$enable_rc5" = "yes"; then
+		rc5header=openssl/rc5.h
+	else
+		rc5header=
+	fi
+	if test "$enable_idea" = "yes"; then
+		ideaheader=openssl/idea.h
+	else
+		ideaheader=
+	fi
+	AC_CHECK_HEADERS($ideaheader $rc5header openssl/rsa.h openssl/pem.h openssl/evp.h openssl/x509.h,
 		[], [nosymbol=`echo $ac_hdr | sed -e 's/.h$//' -e 's/^openssl.//' -e 's/^/NO_/' | tr 'a-z' 'A-Z'`
 		CPPFLAGS="$CPPFLAGS -D$nosymbol=1"
 		signing=no])

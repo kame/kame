@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.64 2000/09/22 07:00:07 itojun Exp $	*/
+/*	$KAME: oakley.c,v 1.65 2000/09/29 18:28:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.64 2000/09/22 07:00:07 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.65 2000/09/29 18:28:53 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -95,13 +95,13 @@ static vchar_t oakley_prime1536;
 static struct cipher_algorithm cipher[] = {
 { "NULL",	NULL,			NULL,			NULL, },
 { "des",	eay_des_encrypt,	eay_des_decrypt,	eay_des_weakkey, },
-#ifdef HAVE_IDEA_H
+#ifdef HAVE_OPENSSL_IDEA_H
 { "idea",	eay_idea_encrypt,	eay_idea_decrypt,	eay_idea_weakkey, },
 #else
 { "*dummy*",	NULL,			NULL,			NULL, },
 #endif
 { "blowfish",	eay_bf_encrypt,		eay_bf_decrypt,		eay_bf_weakkey, },
-#ifdef HAVE_RC5_H
+#ifdef HAVE_OPENSSL_RC5_H
 { "rc5",	eay_rc5_encrypt,	eay_rc5_decrypt,	eay_rc5_weakkey, },
 #else
 { "*dummy*",	NULL,			NULL,			NULL, },
