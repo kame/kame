@@ -1,12 +1,23 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1405 2000/11/27 14:21:16 jinmei Exp $
+$KAME: CHANGELOG,v 1.1406 2000/11/28 08:40:41 jinmei Exp $
 
 <200011>
+2000-11-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c ({get, set}_pathmtu): newly added to
+	support application-level path MTU discovery. If the -m option is
+	specified, ping6 will try to discover path MTU for the destination
+	using the IPV6_RECVPATHMTU socket option, and adjust the MTU using
+	the IPV6_USE_MTU socket option. This would be useful for those
+	OSes that do not perform path MTU discovery unless corresponding
+	connected socket exists, like recent versions of NetBSD and
+	OpenBSD.
+
 2000-11-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c: added a new ancillary data item
 	"IPV6_USE_MTU," which allows an application to specify the MTU of
-	the outgoing packet. This item is currently experimental.
+	the outgoing packet. This item is currently experimental (i.e. not
+	described in a standard document.)
 
 Mon Nov 27 04:20:40 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/lftp: upgrade to 2.3.5.
