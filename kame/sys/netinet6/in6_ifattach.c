@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.141 2001/08/03 13:24:11 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.142 2001/08/23 02:56:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -865,12 +865,16 @@ in6_ifattach(ifp, altifp)
 	case IFT_BRIDGE:
 		return;
 #endif
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 	case IFT_PROPVIRTUAL:
 		if (strncmp("bridge", ifp->if_xname, sizeof("bridge")) == 0 &&
 		    '0' <= ifp->if_xname[sizeof("bridge")] &&
 		    ifp->if_xname[sizeof("bridge")] <= '9')
 			return;
+		break;
+#endif
+#ifdef IFT_PFLOG
+	case IFT_PFLOG:
 		break;
 #endif
 	}
