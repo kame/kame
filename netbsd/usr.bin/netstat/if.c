@@ -286,12 +286,8 @@ intpr(interval, ifnetaddr, pfunc)
 						kread(multiaddr, (char *)&inm,
 						   sizeof inm);
 						memset(&sin6, 0, sizeof(sin6));
-						sin6.sin6_len = sizeof(struct sockaddr_in6);
-						sin6.sin6_family = AF_INET6;
-						sin6.sin6_addr = inm.in6m_addr;
-						sin6.sin6_scope_id =
-						    ntohs(*(u_int16_t *)
-							&sin6.sin6_addr.s6_addr[2]);
+						sin6 = inm.in6m_sa;
+						/* XXX: KAME embeds zone ID */
 						sin6.sin6_addr.s6_addr[2] = 0;
 						sin6.sin6_addr.s6_addr[3] = 0;
 						if (getnameinfo((struct sockaddr *)&sin6,
