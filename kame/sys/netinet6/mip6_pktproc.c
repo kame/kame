@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.86 2002/11/29 11:18:48 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.87 2002/11/29 11:46:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -82,22 +82,15 @@
 extern struct mip6_bc_list mip6_bc_list;
 extern struct mip6_prefix_list mip6_prefix_list;
 
-static int mip6_ip6mh_create __P((struct ip6_mobility **,
-				  struct sockaddr_in6 *,
-				  struct sockaddr_in6 *,
-				  u_int8_t *));
-static int mip6_ip6mc_create __P((struct ip6_mobility **,
-				  struct sockaddr_in6 *,
-				  struct sockaddr_in6 *,
-				  u_int8_t *));
-static int mip6_ip6mhi_create __P((struct ip6_mobility **,
-				   struct mip6_bu *));
-static int mip6_ip6mci_create __P((struct ip6_mobility **,
-				   struct mip6_bu *));
+static int mip6_ip6mh_create(struct ip6_mobility **,
+    struct sockaddr_in6 *, struct sockaddr_in6 *, u_int8_t *);
+static int mip6_ip6mc_create(struct ip6_mobility **,
+    struct sockaddr_in6 *, struct sockaddr_in6 *, u_int8_t *);
+static int mip6_ip6mhi_create(struct ip6_mobility **, struct mip6_bu *);
+static int mip6_ip6mci_create(struct ip6_mobility **, struct mip6_bu *);
 
-static int mip6_cksum __P((struct sockaddr_in6 *,
-			   struct sockaddr_in6 *,
-			   u_int32_t, u_int8_t,	char *));
+static int mip6_cksum(struct sockaddr_in6 *, struct sockaddr_in6 *, u_int32_t,
+    u_int8_t, char *);
 
 int
 mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
@@ -1445,7 +1438,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	long time_second = time.tv_sec;
 #endif
 #ifdef RR_DBG
-	extern void ipsec_hexdump __P((caddr_t, int));
+	extern void ipsec_hexdump(caddr_t, int);
 #define mip6_hexdump(m,l,a)			\
 		do {				\
 			printf("%s", (m));	\

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.153 2002/11/29 09:42:43 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.154 2002/11/29 11:46:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -125,33 +125,32 @@ static void mip6_bu_starttimer __P((void));
 static void mip6_bu_stoptimer __P((void));
 
 /* binding cache functions. */
-static struct mip6_bc *mip6_bc_create
-    __P((struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *,
-	 u_int8_t, u_int16_t, u_int32_t, struct ifnet *));
-static int mip6_bc_list_insert __P((struct mip6_bc_list *, struct mip6_bc *));
-static int mip6_bc_proxy_control __P((struct sockaddr_in6 *,
-				      struct sockaddr_in6 *,
-				      int));
-static void mip6_bc_timeout __P((void *));
-static void mip6_bc_starttimer __P((void));
-static void mip6_bc_stoptimer __P((void));
-static int mip6_bc_encapcheck __P((const struct mbuf *, int, int, void *));
+static struct mip6_bc *mip6_bc_create(struct sockaddr_in6 *,
+    struct sockaddr_in6 *, struct sockaddr_in6 *, u_int8_t, u_int16_t,
+    u_int32_t, struct ifnet *);
+static int mip6_bc_list_insert(struct mip6_bc_list *, struct mip6_bc *);
+static int mip6_bc_proxy_control(struct sockaddr_in6 *, struct sockaddr_in6 *,
+    int);
+static void mip6_bc_timeout(void *);
+static void mip6_bc_starttimer(void);
+static void mip6_bc_stoptimer(void);
+static int mip6_bc_encapcheck(const struct mbuf *, int, int, void *);
 
 #ifdef MIP6_CALLOUTTEST
-static struct mip6_timeout_entry *mip6_timeoutentry_insert __P((time_t, caddr_t));
-static int mip6_timeoutentry_insert_with_mtoe __P((time_t, struct mip6_timeout_entry *));
-static void mip6_timeoutentry_remove __P((struct mip6_timeout_entry *));
-static void mip6_timeoutentry_update __P((struct mip6_timeout_entry *, time_t));
+static struct mip6_timeout_entry *mip6_timeoutentry_insert(time_t, caddr_t);
+static int mip6_timeoutentry_insert_with_mtoe(time_t,
+    struct mip6_timeout_entry *);
+static void mip6_timeoutentry_remove(struct mip6_timeout_entry *);
+static void mip6_timeoutentry_update(struct mip6_timeout_entry *, time_t);
 #endif /* MIP6_CALLOUTTEST */
 
-static int mip6_dad_start __P((struct mip6_bc *));
-static int mip6_dad_stop __P((struct mip6_bc *));
-static int mip6_bdt_delete __P((struct sockaddr_in6 *));
-static int mip6_are_ifid_equal __P((struct in6_addr *, struct in6_addr *,
-				    u_int8_t));
+static int mip6_dad_start(struct mip6_bc *);
+static int mip6_dad_stop(struct mip6_bc *);
+static int mip6_bdt_delete(struct sockaddr_in6 *);
+static int mip6_are_ifid_equal(struct in6_addr *, struct in6_addr *, u_int8_t);
 
 #ifdef MIP6_DEBUG
-void mip6_bu_print __P((struct mip6_bu *));
+void mip6_bu_print(struct mip6_bu *);
 #endif /* MIP6_DEBUG */
 
 static const struct sockaddr_in6 sin6_any = {
@@ -2579,7 +2578,7 @@ int
 mip6_tunnel_control(action, entry, func, ep)
 	int action;
 	void *entry;
-	int (*func) __P((const struct mbuf *, int, int, void *));
+	int (*func)(const struct mbuf *, int, int, void *);
 	const struct encaptab **ep;
 {
 	if ((entry == NULL) && (ep == NULL)) {

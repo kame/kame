@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.24 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.25 2002/11/29 11:46:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -76,12 +76,12 @@ static int mip6_subnet_count = 0;
 
 extern struct mip6_prefix_list mip6_prefix_list;
 
-static void mip6_subnet_ha_timeout __P((struct mip6_subnet_ha *));
-static void mip6_subnet_prefix_timeout __P((struct mip6_subnet_prefix *,
-					    struct mip6_subnet_ha *));
-static void mip6_subnet_timeout __P((void *));
-static void mip6_subnet_starttimer __P((void));
-static void mip6_subnet_stoptimer __P((void));
+static void mip6_subnet_ha_timeout(struct mip6_subnet_ha *);
+static void mip6_subnet_prefix_timeout(struct mip6_subnet_prefix *,
+    struct mip6_subnet_ha *);
+static void mip6_subnet_timeout(void *);
+static void mip6_subnet_starttimer(void);
+static void mip6_subnet_stoptimer(void);
 
 #ifdef __NetBSD__
 struct callout mip6_subnet_ch = CALLOUT_INITIALIZER;

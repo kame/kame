@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.57 2002/11/01 10:10:09 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.58 2002/11/29 11:46:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -122,16 +122,13 @@ static const struct sockaddr_in6 haanyaddr_ifidnn = {
 	0				/* sin6_scope_id */
 };
 
-static void mip6_icmp6_find_addr __P((struct mbuf *, int, int,
-				      struct sockaddr_in6 *,
-				      struct sockaddr_in6 *));
-static int mip6_icmp6_dhaad_rep_input __P((struct mbuf *, int, int));
-static int mip6_dhaad_ha_list_insert __P((struct hif_softc *,
-					      struct mip6_ha *));
-static int mip6_icmp6_create_haanyaddr __P((struct sockaddr_in6 *,
-					    struct mip6_prefix *));
-static int mip6_icmp6_create_linklocal __P((struct in6_addr *,
-					    struct in6_addr *));
+static void mip6_icmp6_find_addr(struct mbuf *, int, int,
+    struct sockaddr_in6 *,  struct sockaddr_in6 *);
+static int mip6_icmp6_dhaad_rep_input(struct mbuf *, int, int);
+static int mip6_dhaad_ha_list_insert(struct hif_softc *, struct mip6_ha *);
+static int mip6_icmp6_create_haanyaddr(struct sockaddr_in6 *,
+    struct mip6_prefix *);
+static int mip6_icmp6_create_linklocal(struct in6_addr *, struct in6_addr *);
 
 int
 mip6_icmp6_input(m, off, icmp6len)
@@ -1022,114 +1019,3 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 
 	return (error);
 }
-
-#if 0
-int
-mip6_tunneled_rs_output(sc, mpfx)
-	struct hif_softc *sc;
-	struct mip6_pfx *mpfx;
-{
-	struct mbuf *m;
-	struct ip6_hdr *ip6;
-	struct nd_router_solicit *nd_rs;
-	int icmp6len;
-	int maxlen;
-
-	/* estimate the size of message. */
-	maxlen = sizeof(*ip6) + sizeof(*nd_rs);
-	/* XXX we must determine the link type of our home address
-	   instead using hardcoded '6' */
-	maxlen += (sizeof(struct nd_opt_hdr) + 6 + 7) & ~7;
-	if (max_linkhdr + maxlen >= MCLBYTES) {
-#ifdef DIAGNOSTIC
-		printf("%s:%d: max_linkhdr + maxlen >= MCLBYTES (%d + %d > %d)\n",
-		       __FILE__, __LINE__, max_linkhdr, maxlen, MCLBYTES);
-#endif /* DIAGNOSTIC */
-		return (-1);
-	}
-
-	/* get inner packet header. */
-	MGETHDR(m, M_DONTWAIT, MT_HEADER);
-	if (m && max_linkhdr + maxlen >= MHLEN) {
-		MCLGET(m, M_DONTWAIT);
-		if ((m->m_flags & M_EXT) == 0) {
-			m_free(m);
-			m = NULL;
-		}
-	}
-	if (m == NULL)
-		return (-1);
-	m->m_pkthdr.rcvif = NULL;
-
-	icmp6len = sizeof(*nd_rs);
-	m->m_pkthdr.len = m->m_len = sizeof(*ip6) + icmp6len;
-	m->m_data += max_linkhdr;
-
-	/* fill router solicitation packet */
-	ip6 = mtod(m, struct ip6_hdr *);
-	ip6->ip6_flow = 0;
-	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
-	ip6->ip6_vfc |= IPV6_VERSION;
-	/* ip6->ip6_plen will be set later */
-	ip6->ip6_nxt = IPPROTO_ICMPV6;
-	ip6->ip6_hlim = 255;
-	ip6->ip6_src = mpfx->mpfx_haddr;
-	ip6->ip6_dst = mpfx->mpfx_haaddr;
-	mip6log((LOG_INFO, "%s:%d: inner src %s\ninner dst%s\n",
-		 __FILE__, __LINE__,
-		 ip6_sprintf(&ip6->ip6_src),
-		 ip6_sprintf(&ip6->ip6_dst)));
-
-	nd_rs = (struct nd_router_solicit *)(ip6 + 1);
-	nd_rs->nd_rs_type = ND_ROUTER_SOLICIT;
-	nd_rs->nd_rs_code = 0;
-	nd_rs->nd_rs_reserved = 0;
-
-	/*
-	 * XXX
-	 * source link layer address option
-	 */
-
-	ip6->ip6_plen = htons((u_short)icmp6len);
-	nd_rs->nd_rs_cksum = 0;
-	nd_rs->nd_rs_cksum
-		= in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6), icmp6len);
-
-#ifdef IPSEC
-	/* Don't lookup socket */
-	(void)ipsec_setsocket(m, NULL);
-#endif /* IPSEC */
-
-	/* prepend outer packet header. */
-	M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
-	if (m && m->m_len < sizeof(struct ip6_hdr))
-		m = m_pullup(m, sizeof(struct ip6_hdr));
-	if (m == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: mbuf allocation falied\n",
-			 __FILE__, __LINE__));
-		return (-1);
-	}
-
-	ip6 = mtod(m, struct ip6_hdr *);
-	ip6->ip6_flow = 0;
-	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
-	ip6->ip6_vfc |= IPV6_VERSION;
-	ip6->ip6_plen = htons((u_short)m->m_pkthdr.len);
-	ip6->ip6_nxt = IPPROTO_IPV6;
-	ip6->ip6_hlim = IPV6_DEFHLIM;
-	ip6->ip6_src = hif_coa;
-	ip6->ip6_dst = mpfx->mpfx_haaddr;
-	mip6log((LOG_INFO, "%s:%d: outer src %s\nouter dst%s\n",
-		 __FILE__, __LINE__,
-		 ip6_sprintf(&ip6->ip6_src),
-		 ip6_sprintf(&ip6->ip6_dst)));
-
-	if ((mip6_setpktaddrs(m)) != 0) { /* XXX */
-		m_freem(m);
-		return (-1);
-	}
-	return (ip6_output(m, 0, 0, 0, 0,NULL));
-}
-
-#endif /* 0 tunneled rs */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.183 2002/11/29 09:42:43 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.184 2002/11/29 11:46:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -185,41 +185,34 @@ struct callout mip6_nonce_upd_ch;
 #endif
 #endif /* MIP6_DRAFT18 */
 
-static int mip6_prefix_list_update_sub __P((struct hif_softc *,
-					    struct sockaddr_in6 *,
-					    struct nd_prefix *,
-					    struct nd_defrouter *));
-static int mip6_register_current_location __P((void));
-static int mip6_haddr_config __P((struct hif_softc *));
-static int mip6_attach_haddrs __P((struct hif_softc *));
-static int mip6_detach_haddrs __P((struct hif_softc *));
-static int mip6_add_haddrs __P((struct hif_softc *, struct ifnet *));
-static int mip6_remove_haddrs __P((struct hif_softc *, struct ifnet *));
-static int mip6_remove_addr __P((struct ifnet *, struct in6_ifaddr *));
-
-/* ipv6 header manipuration functions */
-static int mip6_rthdr_create_withdst __P((struct ip6_rthdr **,
-					  struct sockaddr_in6 *,
-					  struct ip6_pktopts *));
-static int mip6_haddr_destopt_create __P((struct ip6_dest **,
-					  struct sockaddr_in6 *,
-					  struct sockaddr_in6 *,
-					  struct hif_softc *));
-#ifdef MIP6_DRAFT18
-static void mip6_create_nonce __P((mip6_nonce_t *));
-static void mip6_create_nodekey __P((mip6_nodekey_t *));
+static int mip6_prefix_list_update_sub(struct hif_softc *,
+    struct sockaddr_in6 *, struct nd_prefix *, struct nd_defrouter *);
+static int mip6_register_current_location(void);
+static int mip6_haddr_config(struct hif_softc *);
+static int mip6_attach_haddrs(struct hif_softc *);
+static int mip6_detach_haddrs(struct hif_softc *);
+static int mip6_add_haddrs(struct hif_softc *, struct ifnet *);
+static int mip6_remove_haddrs(struct hif_softc *, struct ifnet *);
+static int mip6_remove_addr(struct ifnet *, struct in6_ifaddr *);
+static void mip6_create_nonce(mip6_nonce_t *);
+static void mip6_create_nodekey(mip6_nodekey_t *);
 static void mip6_update_nonce_nodekey(void *);
-#endif /* MIP6_DRAFT18 */
 
-/* using for return routability */
+/* ipv6 header manipuration functions. */
+static int mip6_rthdr_create_withdst(struct ip6_rthdr **,
+    struct sockaddr_in6 *, struct ip6_pktopts *);
+static int mip6_haddr_destopt_create(struct ip6_dest **,
+    struct sockaddr_in6 *, struct sockaddr_in6 *, struct hif_softc *);
+
+/* used for the return routability procedure. */
 /* This macro will be deleted after release of MIP6 */
 #ifdef RR_DBG
 	extern void ipsec_hexdump __P((caddr_t, int));
-#define mip6_hexdump(m,l,a)			\
-		do {				\
-			printf("%s", (m));	\
-			ipsec_hexdump((caddr_t)(a),(l)); \
-			printf("\n");		\
+#define mip6_hexdump(m,l,a)					\
+		do {						\
+			printf("%s", (m));			\
+			ipsec_hexdump((caddr_t)(a),(l));	\
+			printf("\n");				\
 		} while (/*CONSTCOND*/ 0)
 #endif
 #if defined(IPSEC) && !defined(__OpenBSD__)
@@ -1719,7 +1712,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 	 * binding cache entry created on the correspondent node), the
 	 * source address of CoTI and the home address are same.
 	 */
-	if ((opt != NULL) && (opt->ip6po_mobility != NULL)) {
+	if ((opt != NULL) &&
+	    (opt->ip6po_mobility != NULL)) {
 		if (opt->ip6po_mobility->ip6m_type == IP6M_HOME_TEST ||
 		    opt->ip6po_mobility->ip6m_type == IP6M_CAREOF_TEST)
 			goto skip_rthdr2;
@@ -1741,13 +1735,13 @@ mip6_exthdr_create(m, opt, mip6opt)
 	error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr2, dst, opt);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s:%d: rthdr creation failed.\n",
-			 __FILE__, __LINE__));
+		    "%s:%d: rthdr creation failed.\n",
+		    __FILE__, __LINE__));
 		goto bad;
 	}
  skip_rthdr2:
 
-	/* following stuff is applied only for MN. */
+	/* the following stuff is applied only for a mobile node. */
 	if (!MIP6_IS_MN) {
 		goto noneed;
 	}
