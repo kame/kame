@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.11 2000/05/27 11:30:43 jinmei Exp $	*/
+/*	$KAME: dump.c,v 1.12 2000/07/20 10:13:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,6 +30,7 @@
  */
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

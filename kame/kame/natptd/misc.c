@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.6 2000/06/04 13:55:16 fujisawa Exp $
+ *	$Id: misc.c,v 1.7 2000/07/20 10:14:00 itojun Exp $
  */
 
 #include <stdio.h>
@@ -42,6 +42,7 @@
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: defs.h,v 1.7 2000/04/30 13:01:36 itojun Exp $
+ *  $Id: defs.h,v 1.8 2000/07/20 10:09:59 itojun Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -63,6 +63,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <sys/queue.h>
 #include <fcntl.h>
 #if ((defined(SYSV)) || (defined(__bsdi__)) || ((defined SunOS) && (SunOS < 50)))
 #include <sys/sockio.h>

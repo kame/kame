@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: trace.c,v 1.8 2000/07/14 08:48:01 itojun Exp $
+ *  $Id: trace.c,v 1.9 2000/07/20 10:11:55 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -78,6 +78,7 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
+#include <sys/queue.h>
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
