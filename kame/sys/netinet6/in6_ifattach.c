@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.134 2001/07/24 10:06:43 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.135 2001/07/24 10:08:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -594,7 +594,7 @@ in6_ifattach_linklocal(ifp, altifp)
 		 * XXX: When the interface does not support IPv6, this call
 		 * would fail in the SIOCSIFADDR ioctl.  I believe the
 		 * notification is rather confusing in this case, so just
-		 * supress it.  (jinmei@kame.net 20010130)
+		 * suppress it.  (jinmei@kame.net 20010130)
 		 */
 		if (error != EAFNOSUPPORT)
 			log(LOG_NOTICE, "in6_ifattach_linklocal: failed to "
@@ -613,7 +613,7 @@ in6_ifattach_linklocal(ifp, altifp)
 #ifdef DIAGNOSTIC
 	if (!ia) {
 		panic("ia == NULL in in6_ifattach_linklocal");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 #endif
 	if (in6if_do_dad(ifp) && (ifp->if_flags & IFF_POINTOPOINT) == 0) {
