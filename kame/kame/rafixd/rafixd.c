@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.c,v 1.3 2003/03/14 11:53:54 jinmei Exp $	*/
+/*	$KAME: rafixd.c,v 1.4 2003/03/14 11:58:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -735,21 +735,39 @@ sockopen()
 
 	/* specify to tell receiving interface */
 	on = 1;
+#ifdef IPV6_RECVPKTINFO
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
 	    sizeof(on)) < 0) {
 		dprintf(LOG_ERR, FNAME, "IPV6_RECVPKTINFO: %s",
 		    strerror(errno));
 		goto bad;
 	}
+#else
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &on,
+	    sizeof(on)) < 0) {
+		dprintf(LOG_ERR, FNAME, "IPV6_PKTINFO: %s",
+		    strerror(errno));
+		goto bad;
+	}
+#endif
 
 	/* specify to tell value of hoplimit field of received IP6 hdr */
 	on = 1;
+#ifdef IPV6_RECVHOPLIMIT
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
 	    sizeof(on)) < 0) {
 		dprintf(LOG_ERR, FNAME, "IPV6_RECVHOPLIMIT: %s",
 		    strerror(errno));
 		goto bad;
 	}
+#else
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
+	    sizeof(on)) < 0) {
+		dprintf(LOG_ERR, FNAME, "IPV6_HOPLIMIT: %s",
+		    strerror(errno));
+		goto bad;
+	}
+#endif
 
 	/* specfiy to accept only router advertisements on the socket */
 	ICMP6_FILTER_SETBLOCKALL(&filt);
