@@ -154,6 +154,7 @@ struct	ipstat {
 	u_quad_t ips_rcvmemdrop;	/* frags dropped for lack of memory */
 	u_quad_t ips_toolong;		/* ip length > max ip packet size */
 	u_quad_t ips_nogif;		/* no match gif found */
+	u_quad_t ips_badaddr;		/* invalid address on header */
 };
 
 #define	IPFLOW_HASHBITS			6 /* should not be a multiple of 8 */
