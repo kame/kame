@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.39 2002/08/17 19:11:15 ache Exp $
+# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.40 2003/02/14 22:38:14 nectar Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -924,6 +924,26 @@
             zh_CN.eucCN
             ..
             zh_TW.Big5
+            ..
+        ..
+        openssl
+            man
+/set uname=man
+                cat1
+                ..
+                cat3
+                ..
+                en.ISO8859-1    uname=root
+                    cat1
+                    ..
+                    cat3
+                    ..
+                ..
+/set uname=root
+                man1
+                ..
+                man3
+                ..
             ..
         ..
         pcvt
