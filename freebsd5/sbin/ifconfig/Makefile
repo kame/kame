@@ -21,9 +21,6 @@ CFLAGS+=-DUSE_IEEE80211
 SRCS+=	ifmac.c
 CFLAGS+=-DUSE_MAC
 
-#comment out to exclude ISATAP support
-CFLAGS+=-DUSE_ISATAP
-
 MAN=	ifconfig.8
 
 .if defined(RELEASE_CRUNCH)

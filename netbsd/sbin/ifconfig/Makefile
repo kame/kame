@@ -15,9 +15,6 @@ DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 
 CPPFLAGS+=-DINET6
 
-# comment out to disable ISATAP feature
-CPPFLAGS+=-DUSE_ISATAP
-
 # KAME scope id hack
 CPPFLAGS+=-DKAME_SCOPEID
 
