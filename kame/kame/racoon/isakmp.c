@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.5 1999/08/20 07:14:13 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.6 1999/09/01 05:39:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1080,9 +1080,9 @@ isakmp_quick_i3(msg0, from, iph2)
 
 	/* XXX save ipsec_sa into pfkey_st */
 	iph2->pst->spi_p = *(u_int32_t *)iph2->isa->spi->v;
-	iph2->pst->mode_t = iph2->isa->mode_t;
-	iph2->pst->cipher_t = iph2->isa->cipher_t;
-	iph2->pst->hash_t = iph2->isa->hash_t;
+	iph2->pst->mode = iph2->isa->mode;
+	iph2->pst->enctype = iph2->isa->enctype;
+	iph2->pst->hashtype = iph2->isa->hashtype;
 	iph2->pst->ld_time = iph2->isa->ld_time;
 	iph2->pst->ld_bytes = iph2->isa->ld_bytes;
 
@@ -1805,8 +1805,8 @@ isakmp_quick_r1(msg0, from, iph2)
 		ul_proto = 0;
 	}
 
-	/* if mode_t == IPSECDOI_ATTR_ENC_MODE_TUNNEL */
-	if (iph2->isa->mode_t == IPSECDOI_ATTR_ENC_MODE_TUNNEL)
+	/* if mode == IPSECDOI_ATTR_ENC_MODE_TUNNEL */
+	if (iph2->isa->mode == IPSECDOI_ATTR_ENC_MODE_TUNNEL)
 		proxy = iph2->ph1->remote;
 	else
 		proxy = NULL;
@@ -1830,9 +1830,9 @@ isakmp_quick_r1(msg0, from, iph2)
 	/* XXX save ipsec_sa into pfkey_st */
 	iph2->pst->dir = iph2->dir;
 	iph2->pst->spi_p = *(u_int32_t *)iph2->isa->spi->v;
-	iph2->pst->mode_t = iph2->isa->mode_t;
-	iph2->pst->cipher_t = iph2->isa->cipher_t;
-	iph2->pst->hash_t = iph2->isa->hash_t;
+	iph2->pst->mode = iph2->isa->mode;
+	iph2->pst->enctype = iph2->isa->enctype;
+	iph2->pst->hashtype = iph2->isa->hashtype;
 	iph2->pst->ld_time = iph2->isa->ld_time;
 	iph2->pst->ld_bytes = iph2->isa->ld_bytes;
 
@@ -4531,7 +4531,7 @@ isakmp_compute_skeyids(iph1)
 		goto end;
 
 	/* SKEYID */
-	switch(iph1->isa->auth_t) {
+	switch(iph1->isa->authtype) {
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
 		/* SKEYID = prf(pre-shared-key, Ni_b | Nr_b) */
 		if ((key = iph1->cfp->ph[0]->pskey) == 0) {
@@ -4570,7 +4570,7 @@ isakmp_compute_skeyids(iph1)
 	case OAKLEY_ATTR_AUTH_METHOD_RSA:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		plog(LOCATION,
-		    "authentication method %d isn't supported\n", iph1->isa->auth_t);
+		    "authentication method %d isn't supported\n", iph1->isa->authtype);
 		break;
 	default:
 		break;
@@ -4680,7 +4680,7 @@ isakmp_compute_enckey(iph1)
 	int error = -1;
 
 	/* RFC2409 p39 */
-	switch (iph1->isa->enc_t) {
+	switch (iph1->isa->enctype) {
 	case OAKLEY_ATTR_ENC_ALG_DES:
 		keylen = 8;
 		break;
@@ -4700,13 +4700,13 @@ isakmp_compute_enckey(iph1)
 	default:
 		plog(LOCATION,
 			"encryption algoritym %d isn't supported.\n",
-			iph1->isa->enc_t);
+			iph1->isa->enctype);
 		goto end;
 	}
 
-	switch (iph1->isa->prf_t) {
+	switch (iph1->isa->prftype) {
 	default:
-		switch (iph1->isa->hash_t) {
+		switch (iph1->isa->hashtype) {
 		case OAKLEY_ATTR_HASH_ALG_MD5:
 			prflen = 16;
 			break;
@@ -4716,7 +4716,7 @@ isakmp_compute_enckey(iph1)
 		default:
 			plog(LOCATION,
 				"hash type %d isn't supported.\n",
-				iph1->isa->hash_t);
+				iph1->isa->hashtype);
 			return 0;
 			break;
 		}
@@ -4801,10 +4801,10 @@ isakmp_compute_enckey(iph1)
 	}
 
 	/* weakkey check */
-	if (iph1->isa->enc_t > ARRAYSIZE(cipher))
+	if (iph1->isa->enctype > ARRAYSIZE(cipher))
 		goto end;
-	if (cipher[iph1->isa->enc_t].weakkey == NULL
-	 && (cipher[iph1->isa->enc_t].weakkey)(iph1->key)) {
+	if (cipher[iph1->isa->enctype].weakkey == NULL
+	 && (cipher[iph1->isa->enctype].weakkey)(iph1->key)) {
 		plog(LOCATION, "weakkey was generated.\n");
 		goto end;
 	}
@@ -5070,9 +5070,9 @@ isakmp_prf(key, buf, iph1)
 {
 	vchar_t *res;
 
-	switch (iph1->isa->prf_t) {
+	switch (iph1->isa->prftype) {
 	default:
-		switch (iph1->isa->hash_t) {
+		switch (iph1->isa->hashtype) {
 		case OAKLEY_ATTR_HASH_ALG_MD5:
 			YIPSDEBUG(DEBUG_KEY, plog(LOCATION, "hmac-md5 used.\n"));
 			res = eay_hmacmd5_one(key, buf);
@@ -5083,7 +5083,7 @@ isakmp_prf(key, buf, iph1)
 			break;
 		default:
 			plog(LOCATION,
-			    "hash type %d isn't supported.\n", iph1->isa->hash_t);
+			    "hash type %d isn't supported.\n", iph1->isa->hashtype);
 			return NULL;
 			break;
 		}
@@ -5102,9 +5102,9 @@ isakmp_hash(buf, iph1)
 {
 	vchar_t *res;
 
-	switch (iph1->isa->prf_t) {
+	switch (iph1->isa->prftype) {
 	default:
-		switch (iph1->isa->hash_t) {
+		switch (iph1->isa->hashtype) {
 		case OAKLEY_ATTR_HASH_ALG_MD5:
 			YIPSDEBUG(DEBUG_KEY, plog(LOCATION, "md5 used.\n"));
 			res = eay_md5_one(buf);
@@ -5115,7 +5115,7 @@ isakmp_hash(buf, iph1)
 			break;
 		default:
 			plog(LOCATION,
-			    "hash type %d isn't supported.\n", iph1->isa->hash_t);
+			    "hash type %d isn't supported.\n", iph1->isa->hashtype);
 			return NULL;
 			break;
 		}
@@ -5240,8 +5240,8 @@ isakmp_do_decrypt(iph1, msg, ivdp, ivep)
 	memcpy(buf->v, pl, len);
 
 	/* do decrypt */
-	if (iph1->isa->enc_t > ARRAYSIZE(cipher)
-	 && cipher[iph1->isa->enc_t].decrypt == NULL) {
+	if (iph1->isa->enctype > ARRAYSIZE(cipher)
+	 && cipher[iph1->isa->enctype].decrypt == NULL) {
 		plog(LOCATION,
 			"invalid cipher algoriym was passed.\n");
 		goto end;
@@ -5250,13 +5250,13 @@ isakmp_do_decrypt(iph1, msg, ivdp, ivep)
 	YIPSDEBUG(DEBUG_CRYPT,
 		plog(LOCATION,
 			"decrypt(%s) called.\n",
-			cipher[iph1->isa->enc_t].name));
+			cipher[iph1->isa->enctype].name));
 	YIPSDEBUG(DEBUG_DCRYPT,
 		plog(LOCATION,
 			"with key:\n");
 		pvdump(iph1->key));
 
-	new = (cipher[iph1->isa->enc_t].decrypt)(buf, iph1->key, ivdp->v);
+	new = (cipher[iph1->isa->enctype].decrypt)(buf, iph1->key, ivdp->v);
 	vfree(buf);
 	buf = NULL;
 	if (new == NULL)
@@ -5366,8 +5366,8 @@ isakmp_do_encrypt(iph1, msg, ivep, ivp)
 	YIPSDEBUG(DEBUG_DCRYPT, pvdump(buf));
 
 	/* do encrypt */
-	if (iph1->isa->enc_t > ARRAYSIZE(cipher)
-	 && cipher[iph1->isa->enc_t].encrypt == NULL) {
+	if (iph1->isa->enctype > ARRAYSIZE(cipher)
+	 && cipher[iph1->isa->enctype].encrypt == NULL) {
 		plog(LOCATION,
 			"invalid cipher algoriym was passed.\n");
 		goto end;
@@ -5376,13 +5376,13 @@ isakmp_do_encrypt(iph1, msg, ivep, ivp)
 	YIPSDEBUG(DEBUG_CRYPT,
 		plog(LOCATION,
 			"encrypt(%s) called.\n",
-			cipher[iph1->isa->enc_t].name));
+			cipher[iph1->isa->enctype].name));
 	YIPSDEBUG(DEBUG_DCRYPT,
 		plog(LOCATION,
 			"with key:\n");
 		pvdump(iph1->key));
 
-	new = (cipher[iph1->isa->enc_t].encrypt)(buf, iph1->key, ivep->v);
+	new = (cipher[iph1->isa->enctype].encrypt)(buf, iph1->key, ivep->v);
 	vfree(buf);
 	buf = NULL;
 	if (new == NULL)

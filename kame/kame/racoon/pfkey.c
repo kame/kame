@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.3 1999/08/23 02:49:54 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.4 1999/09/01 05:39:40 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -83,11 +83,12 @@ u_int pfkey_send_try = 2;
 static struct pfkey_st *pfkey_new_pst_wrap __P((caddr_t *mhp));
 
 static int admin2pfkey_proto __P((u_int proto));
-static u_int ipsecdoi2pfkey_aalg __P((u_int hash_t));
+static u_int ipsecdoi2pfkey_aalg __P((u_int hashtype));
 static u_int ipsecdoi2pfkey_ealg __P((u_int t_id));
 static u_int ipsecdoi2pfkey_calg __P((u_int t_id));
 static u_int ipsecdoi2pfkey_proto __P((u_int proto));
-static u_int keylen_aalg __P((u_int hash_t));
+static u_int ipsecdoi2pfkey_mode __P((u_int mode));
+static u_int keylen_aalg __P((u_int hashtype));
 static u_int keylen_ealg __P((u_int t_id));
 
 static struct sadb_msg *racoon_pfkey_recv __P((int, int *));
@@ -132,7 +133,7 @@ pfkey_handler()
 	}
 
 	/* check pfkey message. */
-	if (pfkey_check(msg, mhp)) {
+	if (pfkey_align(msg, mhp) || pfkey_check(mhp)) {
 		plog(LOCATION, "pfkey_check (%s)\n", ipsec_strerror());
 		goto end;
 	}
@@ -997,21 +998,21 @@ pfkey_send_getspi_wrap(sock_pfkey, iph2)
 	int sock_pfkey;
 	struct isakmp_ph2 *iph2;
 {
-	u_int proto;
+	u_int satype, mode;
 
 	/* validity check */
-	if ((proto = ipsecdoi2pfkey_proto(iph2->pst->ipsec_proto)) == ~0)
+	if ((satype = ipsecdoi2pfkey_proto(iph2->pst->ipsec_proto)) == ~0)
+		return -1;
+	if ((mode = ipsecdoi2pfkey_mode(iph2->pst->mode)) == ~0)
 		return -1;
 
 	/* if responder's request, MUST iph2->pst->seq == 0 */
 	if (pfkey_send_getspi(
 			sock_pfkey,
-			proto,
+			satype,
+			mode,
 			iph2->pst->dst,
-			iph2->pst->prefd,
 			iph2->pst->src,
-			iph2->pst->prefs,
-			iph2->pst->ul_proto,
 			0, 0, iph2->pst->seq) < 0) {
 		plog(LOCATION, "%s.\n", ipsec_strerror());
 		return -1;
@@ -1052,31 +1053,31 @@ pfkey_send_update_wrap(sock_pfkey, iph2)
 	struct isakmp_ph2 *iph2;
 {
 	int e_type, e_keylen, a_type, a_keylen, flags;
-	u_int proto;
+	u_int satype, mode;
 
 	/* validity check */
-	if ((proto = ipsecdoi2pfkey_proto(iph2->pst->ipsec_proto)) == ~0)
+	if ((satype = ipsecdoi2pfkey_proto(iph2->pst->ipsec_proto)) == ~0)
+		return -1;
+	if ((mode = ipsecdoi2pfkey_mode(iph2->pst->mode)) == ~0)
 		return -1;
 
 	/* set algorithm type and key length */
 	if (pfkey_convertfromipsecdoi(
 			iph2->isa->proto_id,
-			iph2->isa->cipher_t,
-			iph2->isa->hash_t,
+			iph2->isa->enctype,
+			iph2->isa->hashtype,
 			&e_type, &e_keylen, &a_type, &a_keylen, &flags) < 0)
 		return -1;
 
 	/* I believe that proxy address is always equal to iph1->local. */
 	if (pfkey_send_update(
 			sock_pfkey,
-			proto,
+			satype,
+			mode,
 			iph2->pst->dst,
-			iph2->pst->prefd,
 			iph2->pst->src,
-			iph2->pst->prefs,
-			iph2->pst->ul_proto,
-			iph2->pst->proxy == NULL ? 0 : iph2->ph1->local,
 			iph2->pst->spi,
+			4,	/* XXX static size of window */
 			iph2->pst->keymat->v,
 			e_type, e_keylen, a_type, a_keylen, flags,
 			0, iph2->pst->ld_bytes, iph2->pst->ld_time, 0,
@@ -1096,31 +1097,31 @@ pfkey_send_add_wrap(sock_pfkey, iph2)
 	struct isakmp_ph2 *iph2;
 {
 	int e_type, e_keylen, a_type, a_keylen, flags;
-	u_int proto;
+	u_int satype, mode;
 
 	/* validity check */
-	if ((proto = ipsecdoi2pfkey_proto(iph2->pst->ipsec_proto)) == ~0)
+	if ((satype = ipsecdoi2pfkey_proto(iph2->pst->ipsec_proto)) == ~0)
+		return -1;
+	if ((mode = ipsecdoi2pfkey_mode(iph2->pst->mode)) == ~0)
 		return -1;
 
 	/* set algorithm type and key length */
 	if (pfkey_convertfromipsecdoi(
 			iph2->isa->proto_id,
-			iph2->isa->cipher_t,
-			iph2->isa->hash_t,
+			iph2->isa->enctype,
+			iph2->isa->hashtype,
 			&e_type, &e_keylen, &a_type, &a_keylen, &flags) < 0)
 		return -1;
 
 	/* I believe that proxy address is always equal to iph1->remote. */
 	if (pfkey_send_add(
 			sock_pfkey,
-			proto,
+			satype,
+			mode,
 			iph2->pst->src,
-			iph2->pst->prefs,
 			iph2->pst->dst,
-			iph2->pst->prefd,
-			iph2->pst->ul_proto,
-			iph2->pst->proxy == NULL ? 0 : iph2->ph1->remote,
 			iph2->pst->spi_p,
+			4,	/* XXX static size of window */
 			iph2->pst->keymat_p->v,
 			e_type, e_keylen, a_type, a_keylen, flags,
 			0, iph2->pst->ld_bytes, iph2->pst->ld_time, 0,
@@ -1156,10 +1157,10 @@ admin2pfkey_proto(proto)
 
 /* IPSECDOI_ATTR_AUTH -> SADB_AALG */
 static u_int
-ipsecdoi2pfkey_aalg(hash_t)
-	u_int hash_t;
+ipsecdoi2pfkey_aalg(hashtype)
+	u_int hashtype;
 {
-	switch (hash_t) {
+	switch (hashtype) {
 	case IPSECDOI_ATTR_AUTH_HMAC_MD5:
 		return SADB_AALG_MD5HMAC;
 	case IPSECDOI_ATTR_AUTH_HMAC_SHA1:
@@ -1170,7 +1171,7 @@ ipsecdoi2pfkey_aalg(hash_t)
 	/* not supported */
 	case IPSECDOI_ATTR_AUTH_DES_MAC:
 		plog(LOCATION,
-			"Not supported hash type: %u\n", hash_t);
+			"Not supported hash type: %u\n", hashtype);
 		return ~0;
 
 	case 0: /* reserved */
@@ -1178,7 +1179,7 @@ ipsecdoi2pfkey_aalg(hash_t)
 		return SADB_AALG_NONE;
 
 		plog(LOCATION,
-			"Invalid hash type: %u\n", hash_t);
+			"Invalid hash type: %u\n", hashtype);
 		return ~0;
 	}
 	/*NOTREACHED*/
@@ -1268,14 +1269,31 @@ ipsecdoi2pfkey_proto(proto)
 		return ~0;
 	}
 	/*NOTREACHED*/
-};
+}
+
+/* IPSECDOI_ATTR_ENC_MODE -> IPSEC_MODE */
+static u_int
+ipsecdoi2pfkey_mode(mode)
+	u_int mode;
+{
+	switch (mode) {
+	case IPSECDOI_ATTR_ENC_MODE_TUNNEL:
+		return IPSEC_MODE_TUNNEL;
+	case IPSECDOI_ATTR_ENC_MODE_TRNS:
+		return IPSEC_MODE_TRANSPORT;
+	default:
+		plog(LOCATION, "Invalid mode type: %u\n", mode);
+		return ~0;
+	}
+	/*NOTREACHED*/
+}
 
 /* SADB_SATYPE -> IPSECDOI_PROTO */
 u_int
-pfkey2ipsecdoi_proto(proto)
-	u_int proto;
+pfkey2ipsecdoi_proto(satype)
+	u_int satype;
 {
-	switch (proto) {
+	switch (satype) {
 	case SADB_SATYPE_AH:
 		return IPSECDOI_PROTO_IPSEC_AH;
 	case SADB_SATYPE_ESP:
@@ -1285,18 +1303,18 @@ pfkey2ipsecdoi_proto(proto)
 
 	default:
 		plog(LOCATION,
-			"Invalid pfkey proto: %u\n", proto);
+			"Invalid pfkey proto: %u\n", satype);
 		return ~0;
 	}
 	/*NOTREACHED*/
-};
+}
 
 /* default key length for encryption algorithm */
 static u_int
-keylen_aalg(hash_t)
-	u_int hash_t;
+keylen_aalg(hashtype)
+	u_int hashtype;
 {
-	switch (hash_t) {
+	switch (hashtype) {
 	case IPSECDOI_ATTR_AUTH_HMAC_MD5:
 		return 128;
 	case IPSECDOI_ATTR_AUTH_HMAC_SHA1:
@@ -1307,7 +1325,7 @@ keylen_aalg(hash_t)
 	/* not supported */
 	case IPSECDOI_ATTR_AUTH_DES_MAC:
 		plog(LOCATION,
-			"Not supported hash type: %u\n", hash_t);
+			"Not supported hash type: %u\n", hashtype);
 		return ~0;
 
 	case 0: /* reserved */
@@ -1315,7 +1333,7 @@ keylen_aalg(hash_t)
 		return SADB_AALG_NONE;
 
 		plog(LOCATION,
-			"Invalid hash type: %u\n", hash_t);
+			"Invalid hash type: %u\n", hashtype);
 		return ~0;
 	}
 	/*NOTREACHED*/
@@ -1364,11 +1382,11 @@ keylen_ealg(t_id)
 #include "isakmp.h"
 #include "ipsec_doi.h"
 
-int pfkey_convertfromipsecdoi(proto_id, t_id, hash_t,
+int pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
 		e_type, e_keylen, a_type, a_keylen, flags)
 	u_int proto_id;
 	u_int t_id;
-	u_int hash_t;
+	u_int hashtype;
 	u_int *e_type;
 	u_int *e_keylen;
 	u_int *a_type;
@@ -1384,9 +1402,9 @@ int pfkey_convertfromipsecdoi(proto_id, t_id, hash_t,
 			goto bad;
 		*e_keylen >>= 3;
 
-		if ((*a_type = ipsecdoi2pfkey_aalg(hash_t)) == ~0)
+		if ((*a_type = ipsecdoi2pfkey_aalg(hashtype)) == ~0)
 			goto bad;
-		if ((*a_keylen = keylen_aalg(hash_t)) == ~0)
+		if ((*a_keylen = keylen_aalg(hashtype)) == ~0)
 			goto bad;
 		*a_keylen >>= 3;
 
@@ -1397,14 +1415,14 @@ int pfkey_convertfromipsecdoi(proto_id, t_id, hash_t,
 		break;
 
 	case IPSECDOI_PROTO_IPSEC_AH:
-		if ((*a_type = ipsecdoi2pfkey_aalg(hash_t)) == ~0)
+		if ((*a_type = ipsecdoi2pfkey_aalg(hashtype)) == ~0)
 			goto bad;
-		if ((*a_keylen = keylen_aalg(hash_t)) == ~0)
+		if ((*a_keylen = keylen_aalg(hashtype)) == ~0)
 			goto bad;
 		*a_keylen >>= 3;
 
 		if (t_id == IPSECDOI_ATTR_AUTH_HMAC_MD5 
-		 && hash_t == IPSECDOI_ATTR_AUTH_KPDK) {
+		 && hashtype == IPSECDOI_ATTR_AUTH_KPDK) {
 			/* AH_MD5 + Auth(KPDK) = RFC1826 keyed-MD5 */
 			*a_type = SADB_AALG_MD5;
 			*flags |= SADB_X_EXT_OLD;

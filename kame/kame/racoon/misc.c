@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.4 1999/08/23 02:49:54 sakane Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.5 1999/09/01 05:39:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -657,19 +657,17 @@ int
 setsockopt_bypass(so, family)
 	int so, family;
 {
-	int level, optname;
+	int level;
 	char buf[16];
 	int len;
 
 	switch (family) {
 	case AF_INET:
 		level = IPPROTO_IP;
-		optname = IP_IPSEC_POLICY;
 		break;
 #ifdef INET6
 	case AF_INET6:
 		level = IPPROTO_IPV6;
-		optname = IPV6_IPSEC_POLICY;
 		break;
 #endif
 	default:
@@ -678,12 +676,29 @@ setsockopt_bypass(so, family)
 		return -1;
 	}
 
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "bypass")) < 0) {
+	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0) {
 		plog(LOCATION, "ipsec_set_policy (%s)\n",
 			ipsec_strerror());
 		return -1;
 	}
-	if (setsockopt(so, level, optname, buf, len) < 0) {
+	if (setsockopt(so, level,
+	               (level == IPPROTO_IP ?
+	                         IP_IPSEC_POLICY_IN : IPV6_IPSEC_POLICY_IN),
+	               buf, len) < 0) {
+		plog(LOCATION, "setsockopt (%s)\n",
+			strerror(errno));
+		return -1;
+	}
+
+	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0) {
+		plog(LOCATION, "ipsec_set_policy (%s)\n",
+			ipsec_strerror());
+		return -1;
+	}
+	if (setsockopt(so, level,
+	               (level == IPPROTO_IP ?
+	                         IP_IPSEC_POLICY_OUT : IPV6_IPSEC_POLICY_OUT),
+	               buf, len) < 0) {
 		plog(LOCATION, "setsockopt (%s)\n",
 			strerror(errno));
 		return -1;

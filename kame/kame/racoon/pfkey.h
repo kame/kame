@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.1 1999/08/08 23:31:24 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.h,v 1.2 1999/09/01 05:39:40 sakane Exp $ */
 
 #if !defined(_PFKEY_H_)
 #define _PFKEY_H_
@@ -57,9 +57,9 @@ struct pfkey_st {
 	u_int32_t spi;			/* SPI decided by me. i.e. ->me */
 	u_int32_t spi_p;		/* SPI decided by peer. i.e. me-> */
 
-	u_int8_t cipher_t;		/* cipher type and transform id */
-	u_int8_t hash_t;		/* hash type */
-	u_int8_t mode_t;		/* tunnel or transport */
+	u_int8_t enctype;		/* cipher type and transform id */
+	u_int8_t hashtype;		/* hash type */
+	u_int8_t mode;			/* tunnel or transport */
 	struct sockaddr *proxy;		/* proxy address */
 	u_int32_t ld_time;		/* life time for seconds */
 	u_int32_t ld_bytes;		/* life time for bytes */
@@ -121,7 +121,7 @@ extern int pfkey_send_add_wrap __P((int sock_pfkey, struct isakmp_ph2 *iph2));
 extern u_int pfkey2ipsecdoi_proto __P((u_int proto));
 
 extern int pfkey_convertfromipsecdoi __P((
-	u_int proto_id, u_int t_id, u_int hash_t,
+	u_int proto_id, u_int t_id, u_int hashtype,
 	u_int *e_type, u_int *e_keylen, u_int *a_type, u_int *a_keylen,
 	u_int *flags));
 #endif /* defined(_PFKEY_H_) */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.h,v 1.1 1999/08/08 23:31:25 itojun Exp $ */
+/* YIPS @(#)$Id: schedule.h,v 1.2 1999/09/01 05:39:40 sakane Exp $ */
 
 typedef u_int32_t sched_index;
 
@@ -38,8 +38,8 @@ struct sched {
 	int (*f_try)();		/* pointer to the function when tick over */
 	int try;		/* try counter */
 	int (*f_over)();	/* pointer to the function when try over */
-	caddr_t ptr1;		/* buffer 1 */
-	caddr_t ptr2;		/* buffer 2 */
+	void *ptr1;		/* buffer 1 */
+	void *ptr2;		/* buffer 2 */
 	struct sched *next;
 	struct sched *prev;
 

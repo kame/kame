@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.1 1999/08/08 23:31:22 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.2 1999/09/01 05:39:36 sakane Exp $ */
 
 /* conformed to RFC2407 */
 
@@ -156,9 +156,9 @@ struct ipsec_sa {
 	int port;			/* port number */
 	vchar_t *spi;			/* spi to receive, network byte order */
 	vchar_t *spi_p;			/* spi to send, network byte order */
-	u_int8_t mode_t;		/* tunnel or transport */
-	u_int8_t cipher_t;		/* cipher type and transform id */
-	u_int8_t hash_t;		/* type of hash */
+	u_int8_t mode;			/* tunnel or transport */
+	u_int8_t enctype;		/* cipher type and transform id */
+	u_int8_t hashtype;		/* type of hash */
 	u_int32_t ld_bytes;		/* life duration by byte count */
 	u_int32_t ld_time;		/* life duration by timer */
 	u_int8_t dhgrp;			/* DH; group */

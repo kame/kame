@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.1 1999/08/08 23:31:24 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.2 1999/09/01 05:39:39 sakane Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -140,10 +140,10 @@ struct oakley_sa {
 	u_int8_t t_id;			/* IKE */
 	u_int16_t dhgrp;		/* DH: group */
 	struct dh *dh;
-	u_int8_t auth_t;		/* method of authentication */
-	u_int8_t prf_t;			/* type of prf */
-	u_int8_t hash_t;		/* type of hash */
-	u_int8_t enc_t;			/* type of cipher */
+	u_int8_t authtype;		/* method of authentication */
+	u_int8_t prftype;			/* type of prf */
+	u_int8_t hashtype;		/* type of hash */
+	u_int8_t enctype;			/* type of cipher */
 	u_int8_t keylen;		/* cipher key length */
 	u_int32_t ld_time;
 	u_int32_t ld_bytes;

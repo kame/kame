@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.1 1999/08/08 23:31:21 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.2 1999/09/01 05:39:36 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1570,7 +1570,7 @@ ipsecdoi_get_ipsec(sap)
 
 		/* get transform */
 		trns = (struct isakmp_pl_t *)bp;
-		(*isap)->cipher_t = trns->t_id;
+		(*isap)->enctype = trns->t_id;
 
 		YIPSDEBUG(DEBUG_SA,
 			plog(LOCATION,
@@ -1678,15 +1678,15 @@ get_attr_isakmp(bp, sa, tlen)
 
 		switch (type) {
 		case OAKLEY_ATTR_ENC_ALG:
-			sa->enc_t = (u_int8_t)lorv;
+			sa->enctype = (u_int8_t)lorv;
 			break;
 
 		case OAKLEY_ATTR_HASH_ALG:
-			sa->hash_t = (u_int8_t)lorv;
+			sa->hashtype = (u_int8_t)lorv;
 			break;
 
 		case OAKLEY_ATTR_AUTH_METHOD:
-			sa->auth_t = (u_int8_t)lorv;
+			sa->authtype = (u_int8_t)lorv;
 			break;
 
 		case OAKLEY_ATTR_GRP_DESC:
@@ -1837,13 +1837,13 @@ get_attr_isakmp(bp, sa, tlen)
 
 	/* key length must not be specified on some algorithms */
 	if (keylen) {
-		switch (sa->enc_t) {
+		switch (sa->enctype) {
 		case OAKLEY_ATTR_ENC_ALG_DES:
 		case OAKLEY_ATTR_ENC_ALG_IDEA:
 		case OAKLEY_ATTR_ENC_ALG_3DES:
 			plog(LOCATION,
 				"keylen must not be specified for encryption algorithm %d\n",
-				sa->enc_t);
+				sa->enctype);
 			goto end;
 		case OAKLEY_ATTR_ENC_ALG_BLOWFISH:
 		case OAKLEY_ATTR_ENC_ALG_RC5:
@@ -1852,7 +1852,7 @@ get_attr_isakmp(bp, sa, tlen)
 		default:
 			plog(LOCATION,
 				"unknown encryption algorithm %d\n",
-				sa->enc_t);
+				sa->enctype);
 			goto end;
 		}
 	}
@@ -1977,11 +1977,11 @@ get_attr_ipsec(bp, sa, tlen)
 			break;
 
 		case IPSECDOI_ATTR_ENC_MODE:
-			sa->mode_t = (u_int8_t)lorv;
+			sa->mode = (u_int8_t)lorv;
 			break;
 
 		case IPSECDOI_ATTR_AUTH:
-			sa->hash_t = (u_int8_t)lorv;
+			sa->hashtype = (u_int8_t)lorv;
 			break;
 
 		case IPSECDOI_ATTR_KEY_LENGTH:

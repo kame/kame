@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.3 1999/08/20 07:14:14 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.4 1999/09/01 05:39:38 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -196,7 +196,7 @@ int isakmp_info_send_d2_pf(msg)
 		return EINVAL;
 	}
 
-	if (pfkey_check(msg, mhp)) {
+	if (pfkey_align(msg, mhp) || pfkey_check(mhp)) {
 		plog(LOCATION, "pfkey_check (%s)\n", ipsec_strerror());
 		return EINVAL;
 	}
@@ -768,7 +768,7 @@ purge_spi(proto, spi, n)
 			continue;
 		}
 
-		if (pfkey_check(msg, mhp)) {
+		if (pfkey_align(msg, mhp) || pfkey_check(mhp)) {
 			plog(LOCATION, "pfkey_check (%s)\n", ipsec_strerror());
 			msg = next;
 			continue;
@@ -794,11 +794,9 @@ purge_spi(proto, spi, n)
 						ntohl(spi[i])));
 				pfkey_send_delete(sock_pfkey,
 					msg->sadb_msg_satype,
+					msg->sadb_msg_mode,
 					(struct sockaddr *)(src + 1),
-					src->sadb_address_prefixlen,
 					(struct sockaddr *)(dst + 1),
-					dst->sadb_address_prefixlen,
-					src->sadb_address_proto,
 					sa->sadb_sa_spi);
 			}
 		}
