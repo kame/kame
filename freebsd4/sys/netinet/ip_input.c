@@ -2246,8 +2246,9 @@ ip_savecontrol(inp, mp, ip, m)
 		struct sockaddr_dl *sdp;
 		struct sockaddr_dl *sdl2 = &sdlbuf.sdl;
 
-		if (((ifp = m->m_pkthdr.rcvif)) 
-		&& ( ifp->if_index && (ifp->if_index <= if_index))) {
+		if (((ifp = m->m_pkthdr.rcvif)) &&
+		    (ifp->if_index && (ifp->if_index < if_indexlim) &&
+		     ifindex2ifnet[ifp->if_index])) {
 			sdp = (struct sockaddr_dl *)(ifnet_addrs
 					[ifp->if_index - 1]->ifa_addr);
 			/*
