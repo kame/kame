@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.68 2002/11/04 04:26:06 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.69 2002/11/04 06:26:36 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2063,6 +2063,7 @@ mld_create_group_record(mh, buflenp, in6m, numsrc, done, type)
 	mld_ghdr->auxlen = 0;
 	mld_ghdr->numsrc = 0;
 	bcopy(&in6m->in6m_sa.sin6_addr, &mld_ghdr->group, sizeof(mld_ghdr->group));
+	in6_clearscope(&mld_ghdr->group); /* XXX */
 	*buflenp += ghdrlen;
 	md->m_len += ghdrlen;
 	iplen += ghdrlen;
@@ -2079,9 +2080,11 @@ mld_create_group_record(mh, buflenp, in6m, numsrc, done, type)
 		/* Insert source address to mbuf */
 		for (; i < numsrc && ias != NULL && mfreelen > addrlen;
 				i++, total++, mfreelen -= addrlen,
-				ias = LIST_NEXT(ias, i6as_list))
+				ias = LIST_NEXT(ias, i6as_list)) {
 			bcopy(&ias->i6as_addr.sin6_addr,
 			      &mld_ghdr->src[i], sizeof(mld_ghdr->src[i]));
+			in6_clearscope(&mld_ghdr->src[i]); /* XXX */
+		}
 	}
 
 	*done = total;

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.325 2002/10/28 04:07:46 suz Exp $	*/
+/*	$KAME: in6.c,v 1.326 2002/11/04 06:26:36 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2265,7 +2265,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	IN6_LOOKUP_MULTI(maddr6, ifp, in6m);
 	if (in6m != NULL) {
 #ifdef MLDV2
-		if (IN6_IS_ADDR_MC_NODELOCAL(&in6m->in6m_sa.sin6_addr)) {
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa.sin6_addr)) {
 			++in6m->in6m_refcount;
 			splx(s);
 			return in6m;
@@ -2411,7 +2411,7 @@ in6_addmulti(maddr6, ifp, errorp)
 		}
 
 		in6m->in6m_source = NULL;
-		if (IN6_IS_ADDR_MC_NODELOCAL(&in6m->in6m_sa.sin6_addr)) {
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa.sin6_addr)) {
 			splx(s);
 			return in6m;
 		}
@@ -2504,7 +2504,7 @@ in6_delmulti(in6m)
 		return;
 	}
 
-	if (IN6_IS_ADDR_MC_NODELOCAL(&in6m->in6m_sa.sin6_addr)) {
+	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa.sin6_addr)) {
 		if (--in6m->in6m_refcount == 0) {
 			/*
 			 * Unlink from list.

@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.5 2002/09/19 05:00:57 suz Exp $	*/
+/* $KAME: in_msf.h,v 1.6 2002/11/04 06:26:36 suz Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -204,8 +204,8 @@ struct in_multi_source {
 #define SIN_ADDR(x)	(SIN(x)->sin_addr.s_addr)
 #define SIN6(x)		((struct sockaddr_in6 *)(x))
 #define SIN6_ADDR(x)	(&(SIN6(x)->sin6_addr))
-#define SIN6_ADDR32(x, y) \
-	(ntohl(*(const u_int32_t *)(const void *)(&(SIN6_ADDR(x)->s6_addr[y * 4]))))
+#define SIN6_ADDR16(x, y) \
+	(ntohs(*(const u_int16_t *)(const void *)(&(SIN6_ADDR(x)->s6_addr[y * 2]))))
 
 /*
  * Compares two sockaddrs;
@@ -230,9 +230,15 @@ struct in_multi_source {
 	(((struct sockaddr *)(x))->sa_family == AF_INET ?		\
 	    ((ntohl(SIN_ADDR(x)) & 0xffffff00) == 0xe0000000) :		\
 	 ((struct sockaddr *)(x))->sa_family == AF_INET6 ?		\
-	    (IN6_IS_ADDR_MC_LINKLOCAL(SIN6_ADDR(x)) ||			\
-	     IN6_IS_ADDR_MC_INTFACELOCAL(SIN6_ADDR(x))) :		\
-	  0)
+	    ((IPV6_ADDR_MC_SCOPE(SIN6_ADDR(x)) < IPV6_ADDR_SCOPE_LINKLOCAL) || \
+	     (SIN6_ADDR16(x, 0) == 0xff02 && \
+	      SIN6_ADDR16(x, 2) == 0 && \
+	      SIN6_ADDR16(x, 3) == 0 && \
+	      SIN6_ADDR16(x, 4) == 0 && \
+	      SIN6_ADDR16(x, 5) == 0 && \
+	      SIN6_ADDR16(x, 6) == 0 && \
+	      SIN6_ADDR16(x, 7) == 1) \
+	  ) : 0)
 
 #define SS_CMP(a, op, b) \
 	(sa_cmp((struct sockaddr *)(a), (struct sockaddr *)(b)) op 0)
