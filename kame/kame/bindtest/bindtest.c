@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.47 2001/06/28 01:51:25 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.48 2001/06/28 02:47:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -99,6 +99,11 @@ static struct testitem{
 #define __P(x)	x
 #endif
 
+#ifdef _AIX43
+/* XXX AIX does not have sockaddr_storage */
+#define sockaddr_storage sockaddr_in6
+#endif
+
 int main __P((int, char **));
 static void usage __P((void));
 static void printversion __P((void));
@@ -109,7 +114,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.47 2001/06/28 01:51:25 itojun Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.48 2001/06/28 02:47:27 jinmei Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
