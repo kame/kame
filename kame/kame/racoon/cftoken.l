@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.65 2001/09/26 05:30:34 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.66 2001/12/07 03:35:14 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -95,7 +95,6 @@ hexstring	0x{hexdigit}+
 
 %s S_INI S_PTH S_INF S_LOG S_PAD S_LST S_RTRY
 %s S_ALGST S_ALGCL
-%s S_PLCY S_PLCYS S_PLCYP S_PLCYT
 %s S_SAINF S_SAINFS
 %s S_RMT S_RMTS S_RMTP
 %s S_SA
@@ -167,44 +166,6 @@ hexstring	0x{hexdigit}+
 <S_RTRY>phase1		{ YYD; return(RETRY_PHASE1); }
 <S_RTRY>phase2		{ YYD; return(RETRY_PHASE2); }
 <S_RTRY>{ecl}		{ BEGIN S_INI; return(EOC); }
-
-	/* policy */
-<S_INI>policy		{ BEGIN S_PLCY; YYDB; yywarn("it is obsoleted"); return(POLICY); }
-<S_PLCY>any		{ YYD; return(ANY); }
-<S_PLCY>{blcl}any{elcl}	{ YYD; return(PORTANY); }
-<S_PLCY>in		{ YYD; yylval.num = IPSEC_DIR_INBOUND; return(DIRTYPE); }
-<S_PLCY>out		{ YYD; yylval.num = IPSEC_DIR_OUTBOUND; return(DIRTYPE); }
-<S_PLCY>inout		{ YYD; /* XXX */ yylval.num = IPSEC_DIR_ANY; return(DIRTYPE); }
-<S_PLCY>discard		{ YYD; yylval.num = IPSEC_POLICY_DISCARD; return(ACTION); }
-<S_PLCY>none		{ YYD; yylval.num = IPSEC_POLICY_NONE; return(ACTION); }
-<S_PLCY>ipsec		{ YYD; yylval.num = IPSEC_POLICY_IPSEC; return(ACTION); }
-	/* policy spec */
-<S_PLCY>{bcl}		{ BEGIN S_PLCYS; return(BOC); }
-<S_PLCY>{semi}		{ BEGIN S_INI; return(EOS); }
-<S_PLCYS>{ecl}		{ BEGIN S_INI; return(EOC); }
-<S_PLCYS>pfs_group	{ YYD; return(PFS_GROUP); }
-	/* policy proposal */
-<S_PLCYS>proposal	{ BEGIN S_PLCYP; YYDB; return(PROPOSAL); }
-<S_PLCYP>{bcl}		{ return(BOC); }
-<S_PLCYP>{ecl}		{ BEGIN S_PLCYS; return(EOC); }
-<S_PLCYP>lifetime	{ YYD; return(LIFETIME); }
-<S_PLCYP>time		{ YYD; return(LIFETYPE_TIME); }
-<S_PLCYP>byte		{ YYD; return(LIFETYPE_BYTE); }
-	/* policy protocol */
-<S_PLCYP>protocol	{ BEGIN S_PLCYT; YYDB; return(PROTOCOL); }
-<S_PLCYT>{bcl}		{ return(BOC); }
-<S_PLCYT>{ecl}		{ BEGIN S_PLCYP; return(EOC); }
-<S_PLCYT>level		{ YYD; return(SECLEVEL); }
-<S_PLCYT>require	{ YYD; yylval.num = IPSEC_LEVEL_REQUIRE; return(SECLEVELTYPE); }
-<S_PLCYT>use		{ YYD; yylval.num = IPSEC_LEVEL_USE; return(SECLEVELTYPE); }
-<S_PLCYT>default	{ YYD; yylval.num = IPSEC_LEVEL_DEFAULT; return(SECLEVELTYPE); }
-<S_PLCYT>unique		{ YYD; yylval.num = IPSEC_LEVEL_UNIQUE; return(SECLEVELTYPE); }
-<S_PLCYT>mode		{ YYD; return(SECMODE); }
-<S_PLCYT>tunnel		{ YYD; yylval.num = IPSECDOI_ATTR_ENC_MODE_TUNNEL; return(SECMODETYPE); }
-<S_PLCYT>transport	{ YYD; yylval.num = IPSECDOI_ATTR_ENC_MODE_TRNS; return(SECMODETYPE); }
-<S_PLCYT>encryption_algorithm { YYD; yylval.num = algclass_ipsec_enc; return(ALGORITHM_CLASS); }
-<S_PLCYT>authentication_algorithm { YYD; yylval.num = algclass_ipsec_auth; return(ALGORITHM_CLASS); }
-<S_PLCYT>compression_algorithm	{ YYD; yylval.num = algclass_ipsec_comp; return(ALGORITHM_CLASS); }
 
 	/* sainfo */
 <S_INI>sainfo		{ BEGIN S_SAINF; YYDB; return(SAINFO); }
