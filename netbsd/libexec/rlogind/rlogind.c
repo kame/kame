@@ -1,4 +1,4 @@
-/*	$NetBSD: rlogind.c,v 1.18 1998/08/29 17:31:56 tsarna Exp $	*/
+/*	$NetBSD: rlogind.c,v 1.21 2000/04/14 12:29:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -73,7 +73,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1988, 1989, 1993\n\
 #if 0
 static char sccsid[] = "@(#)rlogind.c	8.2 (Berkeley) 4/28/95";
 #else
-__RCSID("$NetBSD: rlogind.c,v 1.18 1998/08/29 17:31:56 tsarna Exp $");
+__RCSID("$NetBSD: rlogind.c,v 1.21 2000/04/14 12:29:49 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -338,6 +338,7 @@ doit(f, fromp)
 						    : saddr);
 					hostname = naddr;
 				}
+				freeaddrinfo(res0);
 			}
 		}
 		hostname = strncpy(hostnamebuf, hostname,

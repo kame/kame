@@ -1,4 +1,4 @@
-/*	$NetBSD: rshd.c,v 1.16 1998/08/10 02:57:24 perry Exp $	*/
+/*	$NetBSD: rshd.c,v 1.19.4.1 2000/10/17 22:41:49 tv Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -73,7 +73,7 @@ __COPYRIGHT("@(#) Copyright (c) 1988, 1989, 1992, 1993, 1994\n\
 #if 0
 static char sccsid[] = "@(#)rshd.c	8.2 (Berkeley) 4/6/94";
 #else
-__RCSID("$NetBSD: rshd.c,v 1.16 1998/08/10 02:57:24 perry Exp $");
+__RCSID("$NetBSD: rshd.c,v 1.19.4.1 2000/10/17 22:41:49 tv Exp $");
 #endif
 #endif /* not lint */
 
@@ -104,6 +104,9 @@ __RCSID("$NetBSD: rshd.c,v 1.16 1998/08/10 02:57:24 perry Exp $");
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
+#ifdef  LOGIN_CAP
+#include <login_cap.h>
+#endif
 
 int	keepalive = 1;
 int	check_all;
@@ -111,7 +114,8 @@ int	log_success;		/* If TRUE, log all successful accesses */
 int	sent_null;
 
 void	 doit __P((struct sockaddr *));
-void	 error __P((const char *, ...));
+void	 error __P((const char *, ...))
+     __attribute__((__format__(__printf__, 1, 2)));
 void	 getstr __P((char *, int, char *));
 int	 local_domain __P((char *));
 char	*topdomain __P((char *));
@@ -232,6 +236,9 @@ doit(fromp)
 	char cmdbuf[NCARGS+1], locuser[16], remuser[16];
 	char remotehost[2 * MAXHOSTNAMELEN + 1];
 	char hostnamebuf[2 * MAXHOSTNAMELEN + 1];
+#ifdef  LOGIN_CAP
+	login_cap_t *lc;
+#endif
 	char naddr[NI_MAXHOST];
 	char saddr[NI_MAXHOST];
 	char raddr[NI_MAXHOST];
@@ -408,6 +415,7 @@ doit(fromp)
 					    "Host address mismatch for %s\n";
 					hostname = naddr;
 				}
+				freeaddrinfo(res0);
 			}
 		}
 		hostname = strncpy(hostnamebuf, hostname,
@@ -434,7 +442,21 @@ doit(fromp)
 			errorstr = "Login incorrect.\n";
 		goto fail;
 	}
+#ifdef LOGIN_CAP
+	lc = login_getclass(pwd ? pwd->pw_class : NULL);
+#endif	
+
 	if (chdir(pwd->pw_dir) < 0) {
+#ifdef LOGIN_CAP
+		if (chdir("/") < 0 ||
+		    login_getcapbool(lc, "requirehome", pwd->pw_uid ? 1 : 0)) {
+			syslog(LOG_INFO|LOG_AUTH,
+			    "%s@%s as %s: no home directory. cmd='%.80s'",
+			    remuser, hostname, locuser, cmdbuf);
+			error("No remote home directory.\n");
+			exit(0);
+		}
+#else
 		(void) chdir("/");
 #ifdef notdef
 		syslog(LOG_INFO|LOG_AUTH,
@@ -442,7 +464,8 @@ doit(fromp)
 		    remuser, hostname, locuser, cmdbuf);
 		error("No remote directory.\n");
 		exit(1);
-#endif
+#endif /* notdef */
+#endif /* LOGIN_CAP */
 	}
 
 
@@ -538,30 +561,53 @@ fail:
 		dup2(pv[1], 2);
 		close(pv[1]);
 	}
-	if (*pwd->pw_shell == '\0')
-		pwd->pw_shell = _PATH_BSHELL;
 #if	BSD > 43
 	if (setlogin(pwd->pw_name) < 0)
 		syslog(LOG_ERR, "setlogin() failed: %m");
 #endif
-	(void) setgid((gid_t)pwd->pw_gid);
-	initgroups(pwd->pw_name, pwd->pw_gid);
-	(void) setuid((uid_t)pwd->pw_uid);
+
+	if (*pwd->pw_shell == '\0')
+		pwd->pw_shell = _PATH_BSHELL;
+#ifdef LOGIN_CAP
+	{
+	char *sh;
+	
+	if((sh = login_getcapstr(lc, "shell", NULL, NULL))) {
+		if(!(sh = strdup(sh))) {
+                	syslog(LOG_NOTICE, "Cannot alloc mem");
+                	exit(1);
+		}
+		pwd->pw_shell = sh;
+	}
+	}
+#endif
 	environ = envinit;
 	strncat(homedir, pwd->pw_dir, sizeof(homedir)-6);
 	strcat(path, _PATH_DEFPATH);
 	strncat(shell, pwd->pw_shell, sizeof(shell)-7);
 	strncat(username, pwd->pw_name, sizeof(username)-6);
-	cp = strrchr(pwd->pw_shell, '/');
-	if (cp)
-		cp++;
-	else
-		cp = pwd->pw_shell;
+#ifdef LOGIN_CAP
+	if (setusercontext(lc, pwd, pwd->pw_uid, LOGIN_SETALL) != 0) {
+		syslog(LOG_ERR, "setusercontext: %m");
+		exit(1);
+		}
+	login_close(lc);
+#else
+	(void) setgid((gid_t)pwd->pw_gid);
+	initgroups(pwd->pw_name, pwd->pw_gid);
+	(void) setuid((uid_t)pwd->pw_uid);
+#endif
+
 	endpwent();
 	if (log_success || pwd->pw_uid == 0) {
 		syslog(LOG_INFO|LOG_AUTH, "%s@%s as %s: cmd='%.80s'",
 		    remuser, hostname, locuser, cmdbuf);
 	}
+	cp = strrchr(pwd->pw_shell, '/');
+	if (cp)
+		cp++;
+	else
+		cp = pwd->pw_shell;
 	execl(pwd->pw_shell, cp, "-c", cmdbuf, 0);
 	perror(pwd->pw_shell);
 	exit(1);

@@ -1,3 +1,5 @@
+/*	$NetBSD: telnetd.c,v 1.20.4.1 2000/06/22 07:09:05 thorpej Exp $	*/
+
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
  * All rights reserved.
@@ -26,8 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/*	$NetBSD: telnetd.c,v 1.15 1999/02/12 05:30:12 dean Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -69,7 +69,7 @@ __COPYRIGHT("@(#) Copyright (c) 1989, 1993\n\
 #if 0
 static char sccsid[] = "@(#)telnetd.c	8.4 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: telnetd.c,v 1.15 1999/02/12 05:30:12 dean Exp $");
+__RCSID("$NetBSD: telnetd.c,v 1.20.4.1 2000/06/22 07:09:05 thorpej Exp $");
 #endif
 #endif /* not lint */
 
@@ -80,6 +80,8 @@ __RCSID("$NetBSD: telnetd.c,v 1.15 1999/02/12 05:30:12 dean Exp $");
 
 #include <err.h>
 #include <termcap.h>
+
+#include <limits.h>
 
 #define P __P
 
@@ -110,10 +112,26 @@ struct	socket_security ss;
 # endif /* SO_SEC_MULTI */
 #endif	/* _SC_CRAY_SECURE_SYS */
 
+#if	defined(KRB5)
+#define	Authenticator	k5_Authenticator
+#include <krb5.h>
+#undef	Authenticator
+#include <com_err.h>
+#endif
+
 #if	defined(AUTHENTICATION)
 #include <libtelnet/auth.h>
 int	auth_level = 0;
 #endif
+
+#if defined(ENCRYPTION)
+#include <libtelnet/encrypt.h>
+#endif
+
+#if	defined(AUTHENTICATION) || defined(ENCRYPTION)
+#include <libtelnet/misc.h>
+#endif
+
 #if	defined(SECURELOGIN)
 int	require_secure_login = 0;
 #endif
@@ -136,7 +154,7 @@ int	registerd_host_only = 0;
 long	ptyibufbuf[BUFSIZ/sizeof(long)+1];
 char	*ptyibuf = ((char *)&ptyibufbuf[1])-1;
 char	*ptyip = ((char *)&ptyibufbuf[1])-1;
-char	ptyibuf2[BUFSIZ];
+char	ptyibuf2[BUFSIZ*4];
 unsigned char ctlbuf[BUFSIZ];
 struct	strbuf strbufc, strbufd;
 
@@ -189,6 +207,9 @@ char valid_opts[] = {
 #ifdef BFTPDAEMON
 	'B',
 #endif
+#ifdef	ENCRYPTION
+	'e', ':',
+#endif
 #ifdef DIAGNOSTICS
 	'D', ':',
 #endif
@@ -203,6 +224,9 @@ char valid_opts[] = {
 #endif
 #ifdef	SECURELOGIN
 	's',
+#endif
+#ifdef	KRB5
+	'R', ':', 'H',
 #endif
 	'\0'
 };
@@ -224,6 +248,9 @@ main(argc, argv)
 	pfrontp = pbackp = ptyobuf;
 	netip = netibuf;
 	nfrontp = nbackp = netobuf;
+#ifdef	ENCRYPTION
+	nclearto = 0;
+#endif	/* ENCRYPTION */
 
 	progname = *argv;
 
@@ -303,6 +330,18 @@ main(argc, argv)
 			break;
 #endif /* DIAGNOSTICS */
 
+#ifdef	ENCRYPTION
+		case 'e':
+			if (strcmp(optarg, "debug") == 0) {
+				extern int encrypt_debug_mode;
+				encrypt_debug_mode = 1;
+				break;
+			}
+			usage();
+			/* NOTREACHED */
+			break;
+#endif	/* ENCRYPTION */
+
 		case 'g':
 			gettyname = optarg;
 			break;
@@ -310,6 +349,15 @@ main(argc, argv)
 		case 'h':
 			hostinfo = 0;
 			break;
+
+#ifdef	KRB5
+		case 'H':
+		    {
+			extern int require_hwpreauth;
+			require_hwpreauth = 1;
+			break;
+		    }
+#endif	/* KRB5 */
 
 #if	defined(CRAY) && defined(NEWINIT)
 		case 'I':
@@ -366,6 +414,25 @@ main(argc, argv)
 		    }
 #endif	/* CRAY */
 
+#ifdef	KRB5
+		case 'R':
+		    {
+			extern krb5_context telnet_context;
+			krb5_error_code retval;
+
+			if (telnet_context == 0) {
+				retval = krb5_init_context(&telnet_context);
+				if (retval) {
+					com_err("telnetd", retval,
+					    "while initializing krb5");
+					exit(1);
+				}
+			}
+			krb5_set_default_realm(telnet_context, optarg);
+			break;
+		    }
+#endif	/* KRB5 */
+
 #ifdef	SECURELOGIN
 		case 's':
 			/* Secure login required */
@@ -404,11 +471,11 @@ main(argc, argv)
 		case '4':
 			family = AF_INET;
 			break;
-			
+
 		case '6':
 			family = AF_INET6;
 			break;
-			
+
 		default:
 			fprintf(stderr, "telnetd: %c: unknown option\n", ch);
 			/* FALLTHROUGH */
@@ -440,8 +507,8 @@ main(argc, argv)
 	    error = getaddrinfo(NULL, service, &hints, &res);
 
 	    if (error) {
-		fprintf(stderr, "tcp/%s: %s\n", service, gai_strerror(error));
-		exit(1);
+		errx(1, "tcp/%s: %s\n", service, gai_strerror(error));
+		usage();
 	    }
 
 	    s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
@@ -647,12 +714,18 @@ getterminaltype(name)
     }
 #endif
 
+#ifdef	ENCRYPTION
+    send_will(TELOPT_ENCRYPT, 1);
+#endif	/* ENCRYPTION */
     send_do(TELOPT_TTYPE, 1);
     send_do(TELOPT_TSPEED, 1);
     send_do(TELOPT_XDISPLOC, 1);
     send_do(TELOPT_NEW_ENVIRON, 1);
     send_do(TELOPT_OLD_ENVIRON, 1);
     while (
+#ifdef	ENCRYPTION
+	   his_do_dont_is_changing(TELOPT_ENCRYPT) ||
+#endif	/* ENCRYPTION */
 	   his_will_wont_is_changing(TELOPT_TTYPE) ||
 	   his_will_wont_is_changing(TELOPT_TSPEED) ||
 	   his_will_wont_is_changing(TELOPT_XDISPLOC) ||
@@ -668,6 +741,15 @@ getterminaltype(name)
 	nfrontp += sizeof sb;
 	DIAG(TD_OPTIONS, printsub('>', sb + 2, sizeof sb - 2););
     }
+#ifdef	ENCRYPTION
+    /*
+     * Wait for the negotiation of what type of encryption we can
+     * send with.  If autoencrypt is not set, this will just return.
+     */
+    if (his_state_is_will(TELOPT_ENCRYPT)) {
+	encrypt_wait();
+    }
+#endif	/* ENCRYPTION */
     if (his_state_is_will(TELOPT_XDISPLOC)) {
 	static unsigned char sb[] =
 			{ IAC, SB, TELOPT_XDISPLOC, TELQUAL_SEND, IAC, SE };
@@ -726,12 +808,14 @@ getterminaltype(name)
 	 * we have to just go with what we (might) have already gotten.
 	 */
 	if (his_state_is_will(TELOPT_TTYPE) && !terminaltypeok(terminaltype)) {
-	    (void) strncpy(first, terminaltype, sizeof(first));
+	    (void) strncpy(first, terminaltype, sizeof(first) - 1);
+	    first[sizeof(first) - 1] = '\0';
 	    for(;;) {
 		/*
 		 * Save the unknown name, and request the next name.
 		 */
-		(void) strncpy(last, terminaltype, sizeof(last));
+		(void) strncpy(last, terminaltype, sizeof(last) - 1);
+		last[sizeof(last) - 1] = '\0';
 		_gettermname();
 		if (terminaltypeok(terminaltype))
 		    break;
@@ -749,8 +833,10 @@ getterminaltype(name)
 		     * the start of the list.
 		     */
 		     _gettermname();
-		    if (strncmp(first, terminaltype, sizeof(first)) != 0)
-			(void) strncpy(terminaltype, first, sizeof(first));
+		    if (strncmp(first, terminaltype, sizeof(first)) != 0) {
+			(void) strncpy(terminaltype, first, sizeof(first) - 1);
+			terminaltype[sizeof(terminaltype) - 1] = '\0';
+		    }
 		    break;
 		}
 	    }
@@ -884,7 +970,7 @@ doit(who)
 	host_name[sizeof(host_name) - 1] = '\0';
 	hostname = host_name;
 
-#if	defined(AUTHENTICATION)
+#if	defined(AUTHENTICATION) || defined(ENCRYPTION)
 	auth_encrypt_init(hostname, host, "TELNETD", 1);
 #endif
 
@@ -953,9 +1039,7 @@ telnet(f, p, host)
 	char	defent[TABBUFSIZ];
 	char	defstrs[TABBUFSIZ];
 #undef	TABBUFSIZ
-	char *HE;
-	char *HN;
-	char *IM;
+	char *HE, *HN, *IM, *IF, *ptyibuf2ptr;
 	int nfd;
 
 	/*
@@ -1153,6 +1237,7 @@ telnet(f, p, host)
 		HE = getstr("he", &cp);
 		HN = getstr("hn", &cp);
 		IM = getstr("im", &cp);
+		IF = getstr("if", &cp);
 		if (HN && *HN)
 			(void) strcpy(host_name, HN);
 		if (IM == 0)
@@ -1162,11 +1247,24 @@ telnet(f, p, host)
 		HE = 0;
 	}
 	edithost(HE, host_name);
-	if (hostinfo && *IM)
-		putf(IM, ptyibuf2);
+	ptyibuf2ptr = ptyibuf2;
+	if (hostinfo) {
+		if (IF)	{
+			char buf[_POSIX2_LINE_MAX];
+			FILE *fd;
+                        
+			if ((fd = fopen(IF, "r")) != NULL) {
+				while (fgets(buf, sizeof(buf) - 1, fd) != NULL)
+					ptyibuf2ptr = putf(buf, ptyibuf2ptr);
+				fclose(fd);
+			}
+		}
+		if (*IM)
+			ptyibuf2ptr = putf(IM, ptyibuf2ptr);
+	}
 
 	if (pcc)
-		(void) strncat(ptyibuf2, ptyip, pcc+1);
+		strncpy(ptyibuf2ptr, ptyip, pcc+1);
 	ptyip = ptyibuf2;
 	pcc = strlen(ptyip);
 #ifdef	LINEMODE
