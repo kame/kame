@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.78 2004/05/20 08:15:55 suz Exp $	*/
+/*	$KAME: udp6_output.c,v 1.79 2004/05/25 02:03:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,7 @@
  *	@(#)udp_var.h	8.1 (Berkeley) 6/10/93
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined (__NetBSD__)
+#if defined(__FreeBSD__) || defined (__NetBSD__)
 #include "opt_ipsec.h"
 #include "opt_inet.h"
 #endif
@@ -75,7 +75,7 @@
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include <sys/sysctl.h>
 #endif
 #include <sys/errno.h>
@@ -130,13 +130,13 @@
 #define udp6stat	udpstat
 #define udp6s_opackets	udps_opackets
 #endif
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 #define in6pcb		inpcb
 #define udp6stat	udpstat
 #define udp6s_opackets	udps_opackets
 #endif
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 int
 udp6_output(in6p, m, addr6, control, p)
 	struct in6pcb *in6p;
@@ -169,7 +169,7 @@ udp6_output(in6p, m, addr6, control)
 	struct in6_addr *laddr6 = NULL, *faddr6 = NULL;
 	struct sockaddr_in6 *fsa6 = NULL;
 	struct ifnet *oifp = NULL;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__ 
 	struct sockaddr_in6 lsa6_mapped; /* XXX ugly */
 #endif
 	u_int16_t fport;
@@ -178,24 +178,22 @@ udp6_output(in6p, m, addr6, control)
 	int priv;
 	int af = AF_INET6, hlen = sizeof(struct ip6_hdr);
 #ifdef INET
-#if defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if defined(__NetBSD__)
 	struct ip *ip;
 	struct udpiphdr *ui;
 #endif
 #endif
 	int flags = 0;
 	struct sockaddr_in6 tmp;
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION < 199802)
+#if defined(__OpenBSD__)
 	struct proc *p = curproc;	/* XXX */
-#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
-	struct proc *p = PCPU(curproc);
 #endif
 
 	priv = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
+#if defined(__NetBSD__)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		priv = 1;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#elif defined(__FreeBSD__)
 	if (p && !suser(p))
 		priv = 1;
 #else
@@ -204,7 +202,7 @@ udp6_output(in6p, m, addr6, control)
 #endif
 
 	if (addr6) {
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 		/* addr6 has been validated in udp6_send(). */
 		fsa6 = (struct sockaddr_in6 *)addr6;
 #else
@@ -302,7 +300,7 @@ udp6_output(in6p, m, addr6, control)
 				goto release;
 			}
 		} else {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 			/*
 			 * XXX: freebsd[34] does not have in_selectsrc, but
 			 * we can omit the whole part because freebsd4 calls
@@ -337,7 +335,7 @@ udp6_output(in6p, m, addr6, control)
 				      sizeof(sinp->sin_addr));
 				laddr6 = &lsa6_mapped.sin6_addr;
 			} else
-#endif /* !(freebsd3 and later) */
+#endif /* !freebsd */
 			{
 				laddr6 = &in6p->in6p_laddr;
 			}
@@ -434,13 +432,13 @@ udp6_output(in6p, m, addr6, control)
 #endif /* IPSEC */
 		error = ip6_output(m, optp, &in6p->in6p_route,
 		    flags, in6p->in6p_moptions, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#if defined(__FreeBSD__)
 				   ,NULL
 #endif
 				   );
 		break;
 	case AF_INET:
-#if defined(INET) && (defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
+#if defined(INET) && defined(__NetBSD__)
 		/* can't transmit jumbogram over IPv4 */
 		if (plen > 0xffff) {
 			error = EMSGSIZE;
@@ -449,13 +447,7 @@ udp6_output(in6p, m, addr6, control)
 
 		ip = mtod(m, struct ip *);
 		ui = (struct udpiphdr *)ip;
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
-		ui->ui_x00 = 0;
-		ui->ui_x01 = 0;
-		ui->ui_x1 = 0;
-#else
 		bzero(ui->ui_x1, sizeof ui->ui_x1);
-#endif
 		ui->ui_pr = IPPROTO_UDP;
 		ui->ui_len = htons(plen);
 		bcopy(&laddr6->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
@@ -467,37 +459,6 @@ udp6_output(in6p, m, addr6, control)
 		bcopy(&fsa6->sin6_addr.s6_addr[12],
 		      &ui->ui_dst, sizeof(ui->ui_dst));
 		udp6->uh_sum = in_cksum(m, hlen + plen);
-#elif (defined(__bsdi__) && _BSDI_VERSION >= 199802)
-		flags = (in6p->inp_socket->so_options &
-			 (SO_DONTROUTE | SO_BROADCAST));
-
-		if (in6p->inp_flags & INP_ONESBCAST) {
-			struct inhash *ih;
-
-			/*
-			 * If configured for an all-ones broadcast, determine
-			 * if this packet is destined for a subnet broadcast
-			 * address.
-			 */
-			ih = inh_lookup_bcast(ui->ui_dst);
-			if (ih != NULL &&
-			    (ih->inh_flags & (INH_BCAST|INH_LBCAST)) ==
-			    INH_BCAST)
-				flags |= IP_SENDONES;
-		}
-		if (flags & IP_SENDONES) {
-			/* See the comment in udp_output(). */
-			ui->ui_dst.s_addr = INADDR_BROADCAST;
-			udp6->uh_sum = in_cksum(m, hlen + plen);
-			bcopy(&fsa6->sin6_addr.s6_addr[12], &ui->ui_dst,
-			    sizeof(ui->ui_dst));
-		} else {
-			bcopy(&fsa6->sin6_addr.s6_addr[12], &ui->ui_dst,
-			    sizeof(ui->ui_dst));
-			udp6->uh_sum = in_cksum(m, hlen + plen);
-		}
-#else
-#error OS not supported
 #endif
 		if (udp6->uh_sum == 0)
 			udp6->uh_sum = 0xffff;
@@ -514,12 +475,7 @@ udp6_output(in6p, m, addr6, control)
 #endif /* IPSEC */
 #ifdef __NetBSD__
 		error = ip_output(m, NULL, &in6p->in6p_route, flags /* XXX */);
-#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
-		error = ip_output(m, NULL, (struct route *)&in6p->in6p_route,
-				  flags, NULL);
-#else
-#error OS not supported
-#endif /* INET && (freebsd || bsdi4) */
+#endif
 		break;
 #else
 		error = EAFNOSUPPORT;
