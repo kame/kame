@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.76 2004/01/03 00:06:12 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.77 2004/01/03 01:35:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -874,7 +874,7 @@ autoifprobe(void)
 		argv = a;
 		argv[n] = strdup(ifa->ifa_name);
 		if (!argv[n])
-			err(1, "malloc");
+			err(1, "strdup");
 		n++;
 		argv[n] = NULL;
 	}
