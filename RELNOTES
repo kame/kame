@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.62 2000/10/08 04:27:45 itojun Exp $
+	$KAME: RELNOTES,v 1.63 2000/10/10 12:47:06 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -35,8 +35,11 @@ SECURITY FIXES
 ==============
 Note that the KAME tree MAY NOT include all the security fixes from
 *BSD, or some other advisories.  So, some portion of KAME code may
-be vulnerable to attacks.  Please let developers know if you notice
-any issues.
+be vulnerable to attacks.  If you run KAME code on production system,
+real-world routers and other realworld use, you may want to check *BSD
+advisories and other announcements.
+
+Please let developers know if you notice significant issues.
 
 KNOWN BUGS/TWISTS
 =================
