@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.51 2001/08/16 20:59:11 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.52 2001/08/16 21:01:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -91,7 +91,6 @@ extern void yyerror __P((const char *));
 	unsigned long num;
 	unsigned int intnum;
 	vchar_t val;
-	struct sockaddr *sa;
 	struct addrinfo *res;
 }
 
@@ -120,7 +119,6 @@ extern void yyerror __P((const char *));
 %type <val> QUOTEDSTRING HEXSTRING STRING
 %type <val> F_AIFLAGS
 %type <val> policy_spec
-%type <sa> ipaddress
 %type <res> ipaddr
 
 %%
@@ -515,36 +513,6 @@ ipaddropt
 					yyerror("invalid flag");
 					return -1;
 				}
-		}
-	;
-
-ipaddress
-	:	STRING
-		{
-			struct addrinfo *res;
-
-			res = parse_addr($1.buf, NULL);
-			if (res == NULL) {
-				free($1.buf);
-				/* yyerror already called by parse_addr */
-				return -1;
-			}
-			if (res->ai_next != NULL) {
-				free($1.buf);
-				freeaddrinfo(res);
-				yyerror("resolved to multiple address");
-				return -1;
-			}
-			$$ = malloc(res->ai_addrlen);
-			if (!$$) {
-				freeaddrinfo(res);
-				free($1.buf);
-				yyerror("not enough core");
-				return -1;
-			}
-			memcpy($$, res->ai_addr, res->ai_addrlen);
-			freeaddrinfo(res);
-			free($1.buf);
 		}
 	;
 
