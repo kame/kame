@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.12 2001/09/14 16:10:52 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.13 2001/09/17 12:42:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -102,7 +102,9 @@ static int mip6_bu_list_notify_binding_change __P((struct hif_softc *));
 static int mip6_bu_send_bu __P((struct mip6_bu *));
 static void mip6_bu_timeout __P((void *));
 static void mip6_bu_starttimer __P((void));
+#ifdef BUOLDTIMER
 static void mip6_bu_restarttimer __P((void));
+#endif
 static void mip6_bu_stoptimer __P((void));
 static int mip6_bu_encapcheck __P((const struct mbuf *, int, int, void *));
 
@@ -111,14 +113,27 @@ static struct mip6_bc *mip6_bc_create
     __P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
 	 u_int8_t, u_int8_t, u_int8_t, u_int32_t));
 static int mip6_bc_list_insert __P((struct mip6_bc_list *, struct mip6_bc *));
+static int mip6_bc_send_ba __P((struct in6_addr *, struct in6_addr *,
+				struct in6_addr *, u_int8_t, u_int8_t,
+				u_int32_t, u_int32_t));
+static int mip6_bc_proxy_control __P((struct in6_addr *, struct in6_addr *,
+				      int));
 static void mip6_bc_timeout __P((void *));
 static void mip6_bc_starttimer __P((void));
 static void mip6_bc_stoptimer __P((void));
 static int mip6_bc_encapcheck __P((const struct mbuf *, int, int, void *));
 
+static int mip6_process_hrbu __P((struct in6_addr *, struct in6_addr *,
+				  struct ip6_opt_binding_update *,
+				  u_int8_t, u_int32_t, struct in6_addr *));
+static int mip6_process_hurbu __P((struct in6_addr *, struct in6_addr *,
+				   struct ip6_opt_binding_update *,
+				   u_int8_t, u_int32_t, struct in6_addr *));
 static int mip6_tunnel_control __P((int, void *, 
 				    int (*) __P((const struct mbuf *, int, int, void *)),
 				    const struct encaptab **));
+static int mip6_are_ifid_equal __P((struct in6_addr *, struct in6_addr *,
+				    u_int8_t));
 
 
 #ifdef MIP6_DEBUG
@@ -372,6 +387,7 @@ mip6_home_registration(sc)
 	return (0);
 }
 
+#if MIP6_OLD
 /*
  * home (un)registration
  */
@@ -511,6 +527,7 @@ mip6_home_registration_old(sc)
 
 	return 0;
 }
+#endif /* MIP6_OLD */
 
 static int
 mip6_bu_list_notify_binding_change(sc)
@@ -597,6 +614,7 @@ mip6_bu_starttimer()
 #endif
 }
 
+#ifdef BUOLDTIMER
 static void
 mip6_bu_restarttimer()
 {
@@ -609,6 +627,7 @@ mip6_bu_restarttimer()
 		MIP6_BU_TIMEOUT_INTERVAL * hz);
 #endif
 }
+#endif
 
 static void
 mip6_bu_stoptimer()
@@ -783,8 +802,10 @@ mip6_bu_list_remove(mbu_list, mbu)
 	struct mip6_bu_list *mbu_list;
 	struct mip6_bu *mbu;
 {
+#ifdef BUOLDTIMER
 	struct hif_softc *sc;
 	int empty = 1;
+#endif
 
 	if ((mbu_list == NULL) || (mbu == NULL)) {
 		return (EINVAL);
@@ -1104,7 +1125,7 @@ mip6_process_bu(m, opt)
 	return (0);
 }
 
-int
+static int
 mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	struct in6_addr *haddr0;
 	struct in6_addr *coa;
@@ -1214,7 +1235,7 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	return (0);
 }
 
-int
+static int
 mip6_are_ifid_equal(addr1, addr2, prefixlen)
 	struct in6_addr *addr1;
 	struct in6_addr *addr2;
@@ -1250,7 +1271,7 @@ mip6_are_ifid_equal(addr1, addr2, prefixlen)
 	return (1);
 }
 
-int
+static int
 mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	struct in6_addr *haddr0;
 	struct in6_addr *coa;
@@ -1261,7 +1282,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 {
 	struct nd_prefix *pr;
 	struct in6_addr haddr;
-	struct mip6_bc *mbc;
+	struct mip6_bc *mbc = NULL;
 	u_int32_t prlifetime;
 	int found = 0;
 
@@ -1422,7 +1443,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	return (0);
 }
 
-int
+static int
 mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	struct in6_addr *src;
 	struct in6_addr *dst;
@@ -1434,7 +1455,9 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
+#if 0
 	struct ip6_rthdr *pktopt_rthdr;
+#endif
 	struct ip6_dest *pktopt_badest2;
 
 	init_ip6pktopts(&opt);
@@ -1447,7 +1470,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		return (-1);
 	}
 
-#if 0
+#if 0 /* rthdr will be added in ip6_output. */
 	/* create a rthdr. */
 	if (mip6_rthdr_create(&pktopt_rthdr, dstcoa)) {
 		return (-1);
@@ -1471,7 +1494,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	return (0);
 }
 
-int
+static int
 mip6_bc_proxy_control(target, local, cmd)
 	struct in6_addr *target;
 	struct in6_addr *local;
@@ -1760,7 +1783,6 @@ mip6_process_ba(m, opt)
 	struct ip6_opt_binding_ack *ba_opt;
 	struct mip6_bu *mbu;
 	u_int32_t lifetime;
-	struct mip6_pfx *mpfx;
 	int error = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);

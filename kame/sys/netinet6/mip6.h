@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.19 2001/09/14 16:10:51 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.20 2001/09/17 12:42:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -101,6 +101,7 @@ void mip6_init __P((void));
 /*
  * mip6_pfx_list functions
  */
+#if MIP6_OLD
 int mip6_pfx_list_insert __P((struct mip6_pfx_list *, struct mip6_pfx *));
 struct mip6_pfx *mip6_pfx_list_find_withhaddr
 					__P((struct mip6_pfx_list *,
@@ -113,6 +114,7 @@ struct mip6_pfx *mip6_pfx_list_find_primary
 					__P((struct mip6_pfx_list *));
 int mip6_pfx_list_update_withndpr	__P((struct mip6_pfx_list *,
 					     struct nd_prefix *, int));
+#endif /* MIP6_OLD */
 
 
 int mip6_process_nd_prefix		__P((struct in6_addr *,
@@ -165,9 +167,12 @@ int mip6_tunnel_output			__P((struct mbuf **,
 					      struct mip6_bc *));
 int mip6_route_optimize			__P((struct mbuf *));
 int mip6_icmp6_input			__P((struct mbuf *, int, int));
+int mip6_icmp6_tunnel_input		__P((struct mbuf *, int, int));
 int mip6_icmp6_ha_discov_req_output	__P((struct hif_softc *));
+#ifdef MIP6_OLD
 int mip6_tunneled_rs_output		__P((struct hif_softc *,
 					     struct mip6_pfx *));
+#endif
 
 /* mip6_prefix management */
 void mip6_prefix_init			__P((void));
@@ -290,7 +295,6 @@ struct mip6_bc *mip6_bc_list_find_withpcoa
 
 
 #define mip6log(arg) do { if (mip6_config.mcfg_debug) log arg;} while (0)
-void mip6_pfx_print __P((struct mip6_pfx *));
 void mip6_ha_print __P((struct mip6_ha *));
 
 #endif /* _KERNEL */

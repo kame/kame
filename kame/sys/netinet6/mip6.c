@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.51 2001/09/14 16:10:51 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.52 2001/09/17 12:42:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -305,8 +305,8 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 {
 	struct hif_subnet *hs, *hsbypfx, *hsbyha;
 	struct mip6_subnet *ms;
-	struct mip6_subnet_prefix *mspfx;
-	struct mip6_subnet_ha *msha;
+	struct mip6_subnet_prefix *mspfx = NULL;
+	struct mip6_subnet_ha *msha = NULL;
 	struct mip6_prefix tmpmpfx, *mpfx;
 	struct mip6_ha *mha;
 	int mpfx_is_new, mha_is_new;
@@ -354,7 +354,7 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 		/* found an existing entry.  just update it. */
 		mpfx->mpfx_lifetime = ndpr->ndpr_vltime;
 		mpfx->mpfx_remain = mpfx->mpfx_lifetime;
-		mpfx->mpfx_haddr; /* XXX */
+		/* XXX mpfx->mpfx_haddr; */
 	} else {
 		/* this is a new prefix. */
 		mpfx_is_new = 1;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.7 2001/09/12 10:58:23 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.8 2001/09/17 12:42:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -59,6 +59,7 @@
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/in6_ifattach.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
@@ -112,7 +113,7 @@ mip6_prefix_create(prefix, prefixlen, lifetime)
 	mpfx->mpfx_prefixlen = prefixlen;
 	mpfx->mpfx_lifetime = lifetime;
 	mpfx->mpfx_remain = mpfx->mpfx_lifetime;
-	mpfx->mpfx_haddr; /* XXX */
+	/* XXX mpfx->mpfx_haddr; */
 
 	return (mpfx);
 }
