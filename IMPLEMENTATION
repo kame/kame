@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.313 2002/09/06 02:50:51 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.314 2002/09/09 05:35:38 keiichi Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -80,9 +80,10 @@ Table of Contents
 	4.8.2 draft-touch-ipsec-vpn approach
 	4.8.3 Heterogeneous approach
 	5. ALTQ
-	6. mobile-ip6
+	6. Mobile IPv6
 	6.1 KAME node as correspondent node
 	6.2 KAME node as home agent/mobile node
+	6.3 Old Mobile IPv6 code
 	7. Routing table extensions
 	7.1 ART routing table lookup algorithm
 	7.2 Multipath routing support
@@ -1353,7 +1354,7 @@ Here are couple of comments:
   The form can be used as a trigger for TCP DoS attack.  KAME code already
   filters them out.
 - The following examples are seemingly illegal.  It seems that there's general
-  consensus among ipngwg for those.  (1) mobile-ip6 home address option,
+  consensus among ipngwg for those.  (1) Mobile IPv6 home address option,
   (2) offlink packets (so routers should not forward them).
   KAME implmements (2) already.
 
@@ -2183,22 +2184,26 @@ compile ALTQ-ready kernel for other archititectures, take the following steps:
 - before building userland, change netbsd/{lib,usr.sbin,usr.bin}/Makefile
   (or openbsd/foobaa) so that it will visit altq-related sub directories.
 
-6. mobile-ip6
+6. Mobile IPv6
 
 6.1 KAME node as correspondent node
 
-Default installation recognizes home address option (in destination
-options header).  No sub-options are supported.  interaction with
-IPsec, and/or 2292bis API, needs further study.
+With the latest Mobile IPv6 draft, no requirements for IPv6 nodes to
+be a correspondent node.  So, basically all IPv6 nodes can
+communicates with any mobile node using reverse tunneling from a
+mobilenode to a home agent.
+
+In addition, KAME is developping more Mobile IPv6 code for all
+correspondent/mobile/home agent.
 
 6.2 KAME node as home agent/mobile node
 
-KAME mobile-ip6 code is now under reconstruction.  The code contributed
-by Ericsson integrated before has been removed.
+Currently, the draft-18 based Mobile IPv6 code is under developping.
 
-The last snap that includes Ericsson mobile-ip6 code is 20010604.  We at
-least will provide the mobile-ip6 patch for the snap 20010611.  The Ericsson
-mobile-ip6 patch is available from the location shown bellow.
+6.3 Old Mobile IPv6 code
+
+The very old Mobile IPv6 code contributed from the Ericsson can be
+found at the following URL. It doesn't work with the current KAME.
 
 	ftp://ftp.kame.net/kame/contrib/mip6/ericsson/
 
