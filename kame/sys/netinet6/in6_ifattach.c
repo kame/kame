@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.101 2001/02/07 11:00:10 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.102 2001/02/07 11:01:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -248,7 +248,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 	 * use a random non-zero value as the last resort.
 	 */
 	if (bcmp(nullbuf, ret, sizeof(nullbuf)) == 0) {
-		log( LOG_INFO,
+		log(LOG_INFO,
 		    "generate_tmp_ifid: computed MD5 value is zero.\n");
 
 #ifndef __OpenBSD__
