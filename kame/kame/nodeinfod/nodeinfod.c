@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.21 2001/10/24 07:41:16 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.22 2001/10/24 07:55:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -668,13 +668,15 @@ ni6_input(from, fromlen, buf, l)
 		break;
 	default:
 		/*
-		 * XXX: We must return a reply with the ICMP6 code
-		 * `unknown Qtype' in this case. However we regard the case
+		 * XXX: specwise, we should return a reply with the ICMP6 code
+		 * `unknown Qtype' in this case.  However we regard the case
 		 * as an FQDN query for backward compatibility.
 		 * Older versions set a random value to this field,
 		 * so it rarely varies in the defined qtypes.
 		 * But the mechanism is not reliable...
 		 * maybe we should obsolete older versions.
+		 *
+		 * "Unknown Qtype" response may not be the best idea...
 		 */
 		qtype = NI_QTYPE_FQDN;
 		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_namelen);
@@ -719,11 +721,10 @@ ni6_input(from, fromlen, buf, l)
 	case NI_QTYPE_NODEADDR:
 	case NI_QTYPE_IPV4ADDR:
 	{
-		int lenlim, copied;
+		int copied;
 
 		nni6->ni_code = ICMP6_NI_SUCCESS;
 		replylen = sizeof(struct icmp6_nodeinfo);
-		lenlim = sizeof(replybuf);
 		copied = ni6_addrs(nni6, (char *)(nni6 + 1), replybuf,
 		    sizeof(replybuf), from, fromlen, ifname,
 		    (qtype == NI_QTYPE_NODEADDR) ? AF_INET6 : AF_INET);
