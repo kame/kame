@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.22 2000/03/12 12:49:28 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.23 2000/03/12 17:23:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -166,7 +166,8 @@ static int stf_encapcheck __P((const struct mbuf *, int, int, void *));
 static struct in6_ifaddr *stf_getsrcifa6 __P((struct ifnet *));
 static int stf_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
-static int stf_checkinner __P((struct in6_addr *in6, struct ifnet *));
+static int stf_checkaddr4 __P((struct in_addr *, struct ifnet *));
+static int stf_checkaddr6 __P((struct in6_addr *, struct ifnet *));
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802
 static void stf_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #else
@@ -427,22 +428,15 @@ stf_output(ifp, m, dst, rt)
 }
 
 static int
-stf_checkinner(in6, ifp)
-	struct in6_addr *in6;
+stf_checkaddr4(in, ifp)
+	struct in_addr *in;
 	struct ifnet *ifp;	/* incoming interface */
 {
-	struct in_addr *in;
 	struct in_ifaddr *ia4;
-
-	/* for now, we only check 6to4 addresses */
-	if (!IN6_IS_ADDR_6TO4(in6))
-		return 0;
-
-	in = GET_V4(in6);
 
 	/*
 	 * reject packets with the following address:
-	 * 6to4(multicast) 6to4(0.0.0.0) 6to4(255.255.255.255)
+	 * 224.0.0.0/4 0.0.0.0/32 255.255.255.255/32
 	 */
 	if (IN_MULTICAST(in->s_addr) || in->s_addr == INADDR_ANY ||
 	    in->s_addr == INADDR_BROADCAST) {
@@ -450,7 +444,7 @@ stf_checkinner(in6, ifp)
 	}
 
 	/*
-	 * reject packets with 6to4(broadcast)
+	 * reject packets with broadcast
 	 */
 #if defined(__OpenBSD__) || defined(__NetBSD__)
 	for (ia4 = in_ifaddr.tqh_first; ia4; ia4 = ia4->ia_list.tqe_next)
@@ -489,6 +483,18 @@ stf_checkinner(in6, ifp)
 	}
 
 	return 0;
+}
+
+static int
+stf_checkaddr6(in6, ifp)
+	struct in6_addr *in6;
+	struct ifnet *ifp;	/* incoming interface */
+{
+	/* for now, we only check 6to4 addresses */
+	if (!IN6_IS_ADDR_6TO4(in6))
+		return 0;
+
+	return stf_checkaddr4(GET_V4(in6), ifp);
 }
 
 void
@@ -530,8 +536,12 @@ in_stf_input(m, va_alist)
 
 	ifp = &sc->sc_if;
 
-	/* reject packets with multicast outer destination */
-	if (IN_MULTICAST(ip->ip_dst.s_addr)) {
+	/*
+	 * perform sanity check against outer src/dst.
+	 * for source, perform ingress filter as well.
+	 */
+	if (stf_checkaddr4(&ip->ip_dst, NULL) < 0 ||
+	    stf_checkaddr4(&ip->ip_src, m->m_pkthdr.rcvif) < 0) {
 		m_freem(m);
 		return;
 	}
@@ -550,8 +560,8 @@ in_stf_input(m, va_alist)
 	 * perform sanity check against inner src/dst.
 	 * for source, perform ingress filter as well.
 	 */
-	if (stf_checkinner(&ip6->ip6_dst, NULL) < 0 ||
-	    stf_checkinner(&ip6->ip6_src, m->m_pkthdr.rcvif) < 0) {
+	if (stf_checkaddr6(&ip6->ip6_dst, NULL) < 0 ||
+	    stf_checkaddr6(&ip6->ip6_src, m->m_pkthdr.rcvif) < 0) {
 		m_freem(m);
 		return;
 	}
