@@ -50,13 +50,16 @@ $ifconfig lo0 up
 # comment out the 1st two lines, and enable the lines after them.
 $route add -inet6 fe80:: -prefixlen 10 ::1 -reject
 $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
-#for i in $iface; do
-#    if [ X"$defaultiface" = X"" ]; then
+#if [ X"$defaultiface" = X"" ]; then
+#    for i in $iface; do # use the 1st interface in the list
 #	defaultiface=$iface
-#	$route add -inet6 fe80:: -prefixlen 10 -interface $defaultiface -cloning
-#	$route add -inet6 fec0:: -prefixlen 10 -interface $defaultiface -cloning
-#    fi
-#done
+#	break
+#    done
+#fi
+#if [ X"$defaultiface" = X"" ]; then
+#    $route add -inet6 fe80:: -prefixlen 10 -interface $defaultiface -cloning
+#    $route add -inet6 fec0:: -prefixlen 10 -interface $deafultiface -cloning
+#fi
 
 # disallow "internal" addresses to appear on the wire
 $route add -inet6 ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject
