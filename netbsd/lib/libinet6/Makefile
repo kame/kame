@@ -9,7 +9,7 @@ CPPFLAGS+=-DINET6 -DHAVE_SOCKADDR_SA_LEN \
 	-DHAVE_RES_STATE_EXT -DHAVE_NEW_RES_STATE -DHAVE_H_ERRNO \
 	-DHAVE_IF_NAMEINDEX -DFILTER_V4MAPPED -DHAVE_SOCKLEN_T \
 	-DDEBUG
-#CPPFLAGS+=-DUSE_LOG_REORDER
+CPPFLAGS+=-DUSE_LOG_REORDER
 CFLAGS+=	-g -Wall -Werror -Dlint
 
 SRCS=	getaddrinfo.c getnameinfo.c vars.c rresvport_af.c rcmd.c
@@ -22,6 +22,7 @@ SRCS+=	res_init.c res_mkquery.c res_query.c
 SRCS+=	res_send.c
 SRCS+=	inet_pton.c inet_addr.c
 SRCS+=	bindresvport.c
+SRCS+=	getrrsetbyname.c
 
 MAN=	getaddrinfo.3 getnameinfo.3 gethostbyname.3 resolver.3 \
 	rresvport_af.3 if_indextoname.3 getipnodebyname.3 inet6_option_space.3 \
