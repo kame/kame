@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.55 2001/12/20 02:09:37 k-sugyou Exp $	*/
+/*	$KAME: rtadvd.c,v 1.56 2002/01/11 02:29:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,10 +239,11 @@ main(argc, argv)
 		fprintf(stderr, "fatal: inet_pton failed\n");
 		exit(1);
 	}
-	sock_open();
 
 	if (!fflag)
 		daemon(1, 0);
+
+	sock_open();
 
 	/* record the current PID */
 	pid = getpid();
