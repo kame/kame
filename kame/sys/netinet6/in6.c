@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.233 2001/09/21 09:58:36 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.234 2001/09/25 08:07:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1028,6 +1028,8 @@ in6_update_ifa(ifp, ifra, ia)
 	 * must be 128.
 	 */
 	if (ifra->ifra_dstaddr.sin6_family == AF_INET6) {
+		int i;
+
 		if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) == 0) {
 			/* XXX: noisy message */
 			log(LOG_INFO, "in6_update_ifa: a destination can be "
@@ -1039,10 +1041,24 @@ in6_update_ifa(ifp, ifra, ia)
 			 * The following message seems noisy, but we dare to
 			 * add it for diagnosis.
 			 */
-			log(LOG_INFO, "in6_update_ifa: prefixlen must be 128 "
-			    "when dstaddr is specified\n");
-			return(EINVAL);
+			log(LOG_INFO, "in6_update_ifa: prefixlen should be "
+			    "128 when dstaddr is specified\n");
 		}
+#ifdef FORCE_P2PPLEN
+		/*
+		 * To be compatible with old configurations, such as
+		 * ifconfig gif0 inet6 2001::1 2001::2 prefixlen 126,
+		 * we override the specified prefixmask as if the prefix length
+		 * was 128.
+		 */
+		ifra->ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6); 
+		for (i = 0; i < 4; i++)
+			ifra->ifra_prefixmask.sin6_addr.s6_addr32[i] =
+				0xffffffff;
+		plen =128;
+#else
+		return(EINVAL);
+#endif
 	}
 	/* lifetime consistency check */
 	lt = &ifra->ifra_lifetime;
