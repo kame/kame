@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.79 1999/08/30 04:10:59 itojun Exp $
+$Id: CHANGELOG,v 1.80 1999/08/30 13:04:39 jinmei Exp $
 
 <199908>
+1999-08-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6: changed to use nd6_output() instead of
+	ifp->if_output() when sending a packet to a link-layer in various
+	cases. This change might affect some fundamental parts of sending
+	IPv6 packets such as forwarding a packet and neighbor
+	discovery. If you find instability, please let me know.
+
 Mon Aug 30 13:10:15 JST 1999  itojun@iijlab.net
 	* kame/rtsold: check for invalid RAs, like non-zero icmp6 code or
 	  non-linklocal source address.  Found by TAHI team.
