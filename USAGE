@@ -1,6 +1,6 @@
 	USAGE
 	KAME Project
-	$KAME: USAGE,v 1.33 2000/11/22 10:22:57 itojun Exp $
+	$KAME: USAGE,v 1.34 2002/01/31 09:44:02 k-sugyou Exp $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -503,7 +503,7 @@ to be AH transport mode inner ESP tunnel mode like below.
 <<<mobile-ip6>>>
 
 KAME kit includes mobile-ip6 code.  For more details, please look at
-kame/kame/mip6config/QUICKSTART,README_MIP6.txt} and manpages.
+TODO.mobile-ip6.
 
 
 <<<altq>>>
