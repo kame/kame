@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.19 2002/05/29 12:02:11 suz Exp $	*/
+/*	$KAME: vif.h,v 1.20 2002/06/28 09:03:13 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -277,4 +277,5 @@ extern int vif_forwarder __P((if_set *p1 ,if_set *p2));
 extern if_set *vif_and __P((if_set *p1, if_set *p2, if_set *result)); 
 extern if_set *vif_xor __P((if_set *p1, if_set *p2, if_set *result));
 extern struct uvif *find_vif __P((char *ifname));
+extern char *mif_name __P((mifi_t));
 #endif

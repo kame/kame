@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.25 2002/05/29 12:02:11 suz Exp $	*/
+/*	$KAME: vif.c,v 1.26 2002/06/28 09:03:13 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -900,4 +900,14 @@ find_vif(ifname)
 	}
 
 	return(NULL);
+}
+
+char *
+mif_name(mifi)
+	mifi_t mifi;
+{
+	if (mifi < numvifs)
+		return(uvifs[mifi].uv_name);
+	else
+		return("???");
 }

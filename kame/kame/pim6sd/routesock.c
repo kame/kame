@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.18 2002/06/28 08:48:52 jinmei Exp $	*/
+/*	$KAME: routesock.c,v 1.19 2002/06/28 09:03:13 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -405,7 +405,7 @@ getmsg(rtm, msglen, rpfinfop)
 	    break;
 
     IF_DEBUG(DEBUG_RPF)
-	log(LOG_DEBUG, 0, " iif is %d", vifi);
+	log(LOG_DEBUG, 0, " iif is %s", mif_name(vifi));
 
     rpfinfop->iif = vifi;
 

@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.20 2002/06/26 10:24:48 jinmei Exp $	*/
+/*	$KAME: route.c,v 1.21 2002/06/28 09:03:13 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -233,8 +233,8 @@ set_incoming(srcentry_ptr, srctype)
 	    srcentry_ptr->upstream = n;
 	    IF_DEBUG(DEBUG_RPF)
 		log(LOG_DEBUG, 0,
-		    "For src %s, iif is %d, next hop router is %s",
-		    sa6_fmt(&source), srcentry_ptr->incoming,
+		    "For src %s, iif is %s, next hop router is %s",
+		    sa6_fmt(&source), mif_name(srcentry_ptr->incoming),
 		    sa6_fmt(&neighbor_addr));
 	    return (TRUE);
 	}
@@ -251,9 +251,9 @@ set_incoming(srcentry_ptr, srctype)
 	    if (inet6_equal(&neighbor_addr, &pa->pa_addr)) {
 		IF_DEBUG(DEBUG_RPF)
 		    log(LOG_DEBUG, 0,
-			"For src %s, iif is %d, next hop router is %s"
+			"For src %s, iif is %s, next hop router is %s"
 			" (aux_addr match)",
-			sa6_fmt(&source), srcentry_ptr->incoming,
+			sa6_fmt(&source), mif_name(srcentry_ptr->incoming),
 			sa6_fmt(&neighbor_addr));
 
 		srcentry_ptr->upstream = n;
@@ -264,8 +264,9 @@ set_incoming(srcentry_ptr, srctype)
 
     /* TODO: control the number of messages! */
     log(LOG_INFO, 0,
-	"For src %s, iif is %d, next hop router is %s: NOT A PIM ROUTER",
-	sa6_fmt(&source), srcentry_ptr->incoming, sa6_fmt(&neighbor_addr));
+	"For src %s, iif is %s, next hop router is %s: NOT A PIM ROUTER",
+	sa6_fmt(&source), mif_name(srcentry_ptr->incoming),
+	sa6_fmt(&neighbor_addr));
 
     srcentry_ptr->upstream = (pim_nbr_entry_t *) NULL;
 
