@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.295 2003/07/07 11:23:44 keiichi Exp $	*/
+/*	$KAME: key.c,v 1.296 2003/07/08 22:01:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2518,7 +2518,7 @@ key_setdumpsp(sp, type, seq, pid)
 		if (!m)
 			goto fail;
 		m_cat(result, m);
-	} else {
+	} else if (sp->tag) {
 		m = key_setsadbxtag(sp->tag);
 		if (!m)
 			goto fail;
@@ -2681,7 +2681,7 @@ key_spdexpire(sp)
 			goto fail;
 		}
 		m_cat(result, m);
-	} else {
+	} else if (sp->tag) {
 		m = key_setsadbxtag(sp->tag);
 		if (!m) {
 			error = ENOBUFS;
@@ -6139,6 +6139,16 @@ key_acquire(saidx, sp)
 	/* set sadb_x_policy */
 	if (sp) {
 		m = key_setsadbxpolicy(sp->policy, sp->dir, sp->id);
+		if (!m) {
+			error = ENOBUFS;
+			goto fail;
+		}
+		m_cat(result, m);
+	}
+
+	/* set sadb_x_tag */
+	if (sp && sp->tag) {
+		m = key_setsadbxtag(sp->tag);
 		if (!m) {
 			error = ENOBUFS;
 			goto fail;
