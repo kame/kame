@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.35 2000/05/15 11:39:07 itojun Exp $
+$Id: COVERAGE,v 1.36 2000/05/15 11:41:36 itojun Exp $
 
 
 x: supported/integrated
@@ -37,97 +37,97 @@ KAME extended resolver (IPv6 transport, EDNS0, bogus address filtering)
 
 
 		KAME	merged *-current	merged
-		*BSD	net	open	free	net15	open27?	free40
+		*BSD	net	open	free	net15	open27	free40
 		--	--	--	--	--	--	--
-KAME IPv6 as of	latest	late	late	early	notyet	notyet	early
-			dec99	dec99	nov99			nov99
-			(*1)	(*1)
+KAME IPv6 as of	latest	late	late	early	notyet	late	early
+			dec99	dec99	nov99		dec99	nov99
+			(*1)	(*1)			(*1)
      (*1) many of stabilization/fixes are imported, so we can safely call it
 	"late feb2000 - 2292bis".
 
 KAME IPsec as of
-		latest	late	-	early	notyet	notyet	early
+		latest	late	-	early	notyet	-	early
 			jan00		nov99			nov99
 
 TCP/UDP		see IMPLEMENTATION for details
 
-advanced API	2292bis	2292	2292	2292	notyet	notyet	2292
+advanced API	2292bis	2292	2292	2292	notyet	2292	2292
 
-getifaddrs	x	x	x	-	notyet	notyet	-
+getifaddrs	x	x	x	-	notyet	x	-
 
-icmp6 nodeinfo	05	05-	05-	05-	notyet	notyet	05-
-    (all) spec conformance is still low.
+icmp6 nodeinfo	05	05-	05-	05-	notyet	05-	05-
+    (all) spec conformance is still low.  "05-" means 05/03 chimera.
 
-nd6_proxyall	-	-	-	x	notyet	notyet	x
+nd6_proxyall	-	-	-	x	notyet	-	x
 
-ndp -s proxy	x	x	x	-	notyet	notyet	-
+ndp -s proxy	x	x	x	-	notyet	x	-
 
-ndp -I		x	x	x	-	notyet	notyet	-
+ndp -I		x	x	x	-	notyet	x	-
 
-NUD on p2p	x	x	x	-	notyet	notyet	-
+NUD on p2p	x	x	x	-	notyet	x	-
   (ndp -i)
 
-CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	notyet	notyet	ALIGN
-		(*1)		(*1)	(*2)			(*2)
+CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	notyet	ALIGN	ALIGN
+		(*1)		(*1)	(*2)		(*1)	(*2)
     (*1) has namespace pollution bug, KAME PR 230.
     (*2) requires separate inclusion of machine/param.h.
     (all) backward binary compatibility for old code that uses old CMSG_xx
 	  is not provided (yet).
 
 getaddrinfo obeys configured resolv order
-		(+)	x	x	-	notyet	notyet	-
+		(+)	x	x	-	notyet	x	-
 
 getnameinfo uses addr%numeric for scopeid > maxifindex
-		x	x	x	-	notyet	notyet	-
+		x	x	x	-	notyet	x	-
 
 getnameinfo, 2nd arg type is socklen_t
-		x	-	x	-	notyet	notyet	-
+		x	-	x	-	notyet	-	-
 
-ALTQ		(+)	-	-	-	notyet	notyet	-
+ALTQ		(+)	-	-	-	notyet	-	-
 
-IPsec		(+)	x	(*1)	(*2)	notyet	notyet	(*2)
+IPsec		(+)	x	(*1)	(*2)	notyet	(*1)	(*2)
     (*1) OpenBSD IPsec is available for IPv4 IPsec.  OpenBSD team is working
 	on OpenBSD IPsec support for IPv6 IPsec (no KAME IPsec is integrated)
     (*2) policy management code is different from post-dec99 code
 
-NAT/PT		(+)	-	-	-	notyet	notyet	-
+NAT/PT		(+)	-	-	-	notyet	-	-
 
-mobile-ip6	(+)	-	-	-	notyet	notyet	-
+mobile-ip6	(+)	-	-	-	notyet	-	-
 
 resolver support for IPv6 transport
-		(+)	(*1)	-	-	notyet	notyet	-
+		(+)	(*1)	-	-	notyet	-	-
     (*1) libc resolver can handle IPv6 transport (IPv6 address in
 	/etc/resolv.conf), but not with userland tools like nslookup or dig.
 
 scoped addr in /etc/hosts (getaddrinfo)
-		(+)	x	x	-	notyet	notyet	-
+		(+)	x	x	-	notyet	x	-
 
 scoped addr in /etc/resolv.conf "nameserver" line
-		(+)	x	-	-	notyet	notyet	-
+		(+)	x	-	-	notyet	-	-
 
 ipsec socket passing to ip{6,}_output
-		aux	aux	-	rcvif	notyet	notyet	rcvif
+		aux	aux	-	rcvif	notyet	-	rcvif
 					+ flags			+ flags
 
 source address selection
-		latest	feb00	feb00	nov99	notyet	notyet	nov99
+		latest	feb00	feb00	nov99	notyet	feb00	nov99
 					+ sitelocal		+ sitelocal
 
-6to4 intface	x	x	-	gifhack	notyet	notyet	gifhack
+6to4 intface	x	x	-	gifhack	notyet	-	gifhack
 
-basic userland	x	x	x	x	notyet	notyet	x
+basic userland	x	x	x	x	notyet	x	x
 
-route6d		x	x	x	x	notyet	notyet	x
-hroute6d	x	-	-	-	notyet	notyet	-
-bgpd		x	-	-	-	notyet	notyet	-
-pim6dd		x	x	-	x	notyet	notyet	x
-pim6sd		x	x	-	x	notyet	notyet	x
+route6d		x	x	x	x	notyet	x	x
+hroute6d	x	-	-	-	notyet	-	-
+bgpd		x	-	-	-	notyet	-	-
+pim6dd		x	x	-	x	notyet	-	x
+pim6sd		x	x	-	x	notyet	-	x
 
-rtsol/rtsold	x	x	x	x	notyet	notyet	x
-rtadvd		x	x	x	x	notyet	notyet	x
-rrenumd		x	-	-	x	notyet	notyet	x
+rtsol/rtsold	x	x	x	x	notyet	x	x
+rtadvd		x	x	x	x	notyet	x	x
+rrenumd		x	-	-	x	notyet	-	x
 
-faithd		x	x	x	x	notyet	notyet	x
+faithd		x	x	x	x	notyet	x	x
 
-syslogd		x	x	-	-	notyet	notyet	-
-lpr/lpd		x	x	-	-	notyet	notyet	-
+syslogd		x	x	-	-	notyet	-	-
+lpr/lpd		x	x	-	-	notyet	-	-
