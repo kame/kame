@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.22 2003/04/11 13:11:48 jinmei Exp $
+.\"	$KAME: dhcp6c.8,v 1.23 2003/07/31 22:00:38 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -121,6 +121,13 @@ and thus meaningless.
 A list of available DNS servers,
 each of which is an IPv6 numeric address and is separated by a white
 space character.
+.It Ic new_domain_name
+A list of DNS names,
+which provides DNS name search path.
+.It Ic new_ntp_servers
+A list of available NTP servers,
+each of which is an IPv6 numeric address and is separated by a white
+space character.
 .El
 .Pp
 Note that the daemon does not always provide all the parameters.
@@ -134,11 +141,9 @@ configuration parameter is provided by the DHCPv6 server.
 .Xr dhcp6s 8
 .Rs
 .%A Ralph Droms, Editor
-.%D 2002
+.%D 2003
 .%T Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
-.%R internet draft
-.%N draft-ietf-dhc-dhcpv6-28.txt
-.%O work in progress material
+.%R RFC 3315
 .Re
 .\"
 .Sh HISTORY
@@ -153,3 +158,9 @@ In particular, it does not handle address allocation via DHCPv6.
 This is, however, rather intentional;
 the authors believe stateless address autoconfiguration is enough for
 IPv6 and will not implement the stateful method in the future.
+.Pp
+Most option type values,
+including those related to DNS and prefix delegation,
+are still not officially assigned.
+The current implementation uses experimental values,
+which may cause interoperability problems with other implementations.

@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.8,v 1.24 2003/07/24 17:57:52 jinmei Exp $
+.\"	$KAME: dhcp6s.8,v 1.25 2003/07/31 22:00:38 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -86,11 +86,9 @@ is the default file to store the server's DUID.
 .Xr dhcp6c 8
 .Rs
 .%A Ralph Droms, Editor
-.%D 2002
+.%D 2003
 .%T Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
-.%R internet draft
-.%N draft-ietf-dhc-dhcpv6-28.txt
-.%O work in progress material
+.%R RFC 3315
 .Re
 .\"
 .Sh HISTORY
@@ -110,4 +108,10 @@ To name a few:
 .It
 it does not assign IPv6 addresses
 .Pq nor will .
+.It
+most option type values,
+including those related to DNS and prefix delegation,
+are still not officially assigned.
+The current implementation uses experimental values,
+which may cause interoperability problems with other implementations.
 .El
