@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.16 2001/07/11 09:14:34 suz Exp $	*/
+/*	$KAME: pim6.c,v 1.17 2001/07/11 09:34:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -105,7 +105,7 @@
 struct sockaddr_in6 allpim6routers_group;
 struct sockaddr_in6 ssmtransientprefix;
 struct sockaddr_in6 ssmpermanentprefix;
-struct in6_addr mmask;
+struct in6_addr ssmmask;
 
 int pim6_socket;
 char *pim6_recv_buf;
