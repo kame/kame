@@ -695,7 +695,6 @@ ipsec4_hdrsiz_tcp(tp)
 	ip = mtod(m, struct ip *);
 	ip->ip_vhl = IP_VHL_BORING;
 
-	/* XXX: should use currect direction. */
 	hdrsiz = ipsec4_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
 
 	m_free(m);
