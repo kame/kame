@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.83 2004/01/14 09:15:00 itojun Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.84 2004/01/16 02:24:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -156,27 +156,25 @@ isakmp_info_recv(iph1, msg0)
 		vchar_t *hash, *payload;
 		struct isakmp_gen *nd;
 
-		/*
-		 * XXX: gen->len includes isakmp header length
-		 */
 		p = (caddr_t) gen + sizeof(struct isakmp_gen);
-		nd = (struct isakmp_gen *) ((caddr_t) gen + gen->len);
+		nd = (struct isakmp_gen *) ((caddr_t) gen + ntohs(gen->len));
 
 		/* nd length check */
-		if (nd->len > msg->l - (sizeof(struct isakmp) + gen->len)) {
+		if (ntohs(nd->len) > msg->l - (sizeof(struct isakmp) +
+		    ntohs(gen->len))) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				 "too long payload length (broken message?)\n");
 			goto end;
 		}
 
-		payload = vmalloc(nd->len);
+		payload = vmalloc(ntohs(nd->len));
 		if (payload == NULL) {
 			plog(LLV_ERROR, LOCATION, NULL,
 			    "cannot allocate memory\n");
 			goto end;
 		}
 
-		memcpy(payload->v, (caddr_t) nd, nd->len);
+		memcpy(payload->v, (caddr_t) nd, ntohs(nd->len));
 
 		/* compute HASH */
 		hash = oakley_compute_hash1(iph1, isakmp->msgid, payload);
@@ -188,7 +186,7 @@ isakmp_info_recv(iph1, msg0)
 			goto end;
 		}
 		
-		if (gen->len - sizeof(struct isakmp_gen) != hash->l) {
+		if (ntohs(gen->len) - sizeof(struct isakmp_gen) != hash->l) {
 			plog(LLV_ERROR, LOCATION, NULL,
 			    "ignore information due to hash length mismatch\n");
 
