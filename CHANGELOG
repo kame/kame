@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.666 2000/03/09 04:20:22 jinmei Exp $
+$Id: CHANGELOG,v 1.667 2000/03/09 06:11:21 fujisawa Exp $
 
 <200003>
+Thu Mar  9 15:06:53 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* Add v4 NAT into NATPT.
+	* Now, Options NATPT_NAT is necessary to use this function,
+	  but this option becomes needless soon.
+
 2000-03-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/sys/netinet/tcp_input.c (tcp_input): did not try to
 	access to ip6_inputopts unless it's really an IPv6 packet.
