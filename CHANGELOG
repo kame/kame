@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.736 2000/03/30 14:49:12 sumikawa Exp $
+$Id: CHANGELOG,v 1.737 2000/03/30 17:07:33 sumikawa Exp $
 
 <200003>
 Thu Mar 30 14:10:35 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -10,6 +10,7 @@ Thu Mar 30 14:10:35 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	  (Now I have alpha box only. I do not check it on x86 environment)
 	  TODO:
 	    gif, faith, altq, IPsec(encap4_input), mip6, natpt
+	* freebsd2/ports/emacs20: upgrade to 20.6.
 
 Wed Mar 29 16:34:20 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ncftp3: upgrade to 3.0.0.
