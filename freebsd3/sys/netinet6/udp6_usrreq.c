@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.25 2000/04/04 11:18:10 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.26 2000/04/04 17:19:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -598,7 +598,7 @@ udp6_output(in6p, m, addr6, control, p)
 	}
 
 	flags = 0;
-	if (inp->inp_flags & IN6P_MINMTU)
+	if (in6p->in6p_flags & IN6P_MINMTU)
 		flags |= IPV6_MINMTU;
 
 	udpstat.udps_opackets++;
