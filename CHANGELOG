@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1330 2000/10/10 15:45:26 itojun Exp $
+$KAME: CHANGELOG,v 1.1331 2000/10/10 23:51:54 itojun Exp $
 
 <200010>
+Wed Oct 11 JST 2000  itojun@iijlab.net
+	* sys/net/if_gif.c: fix uninitialized variable, which can lead to
+	  kernel panic.
+
 Tue Oct 10 23:54:17 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_proto.c: don't call tcp_init twice, if
 	  we share tcp stack between IPv4/v6 and we are compiling a kernel
