@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2409 2003/06/14 08:24:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2410 2003/06/16 09:53:39 keiichi Exp $
 
 <200306>
+Mon Jun 16 18:49:02 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/icmp6.c
+	fixed a bug that ICMP error may be sent to mobile node's home
+	address instead of its care-of address.
+	reported by Yukiyo Akisada <Yukiyo.Akisada@jp.yokogawa.com>.
+
 2003-06-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/net/if.c (if_detach): be sure to free the link
 	ifaddr at the end of the function.  (A supplement fix to another
