@@ -963,7 +963,7 @@ ip_ctloutput(op, so, level, optname, mp)
 			caddr_t req = NULL;
 			int priv;
 
-			priv = inp->inp_socket->so_state & SS_PRIV ? 1 : 0;
+			priv = (inp->inp_socket->so_state & SS_PRIV) ? 1 : 0;
 			if (m != 0) {
 				req = mtod(m, caddr_t);
 			}
