@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.29 2000/05/17 11:29:28 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.30 2000/05/23 14:46:22 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -971,21 +971,19 @@ isakmp_info_recv_d(iph1, msg)
 		d = (struct isakmp_pl_d *)pap->ptr;
 
 		if (ntohl(d->doi) != IPSEC_DOI) {
-			YIPSDEBUG(DEBUG_DMISC,
-				plog(logp, LOCATION, iph1->remote,
-					"deletion message received, "
-					"doi=%d proto_id=%d unsupported DOI.\n",
-					ntohl(d->doi), d->proto_id));
+			plog(logp, LOCATION, iph1->remote,
+				"deletion message received, "
+				"doi=%d proto_id=%d unsupported DOI.\n",
+				ntohl(d->doi), d->proto_id);
 			continue;
 		}
 		if (d->spi_size != sizeof(u_int32_t)) {
-			YIPSDEBUG(DEBUG_DMISC,
-				plog(logp, LOCATION, iph1->remote,
-					"deletion message received, "
-					"doi=%d proto_id=%d: strange spi "
-					"size %d.\n",
-					ntohl(d->doi), d->proto_id,
-					d->spi_size));
+			plog(logp, LOCATION, iph1->remote,
+				"deletion message received, "
+				"doi=%d proto_id=%d: strange spi "
+				"size %d.\n",
+				ntohl(d->doi), d->proto_id,
+				d->spi_size);
 			continue;
 		}
 
@@ -1001,12 +999,12 @@ isakmp_info_recv_d(iph1, msg)
 		}
 
 		if (protected) {
-			YIPSDEBUG(DEBUG_MISC, plog(logp, LOCATION, NULL,
+			YIPSDEBUG(DEBUG_NOTIFY, plog(logp, LOCATION, NULL,
 				"packet properly proteted, purge SPIs.\n"));
 			purge_spi(d->proto_id, spi, num_spi);
 		} else {
-			YIPSDEBUG(DEBUG_MISC, plog(logp, LOCATION, NULL,
-				"packet is not proteted, ignored.\n"));
+			plog(logp, LOCATION, NULL,
+				"delete payload is not proteted, ignored.\n");
 		}
 	}
 
