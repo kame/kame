@@ -34,7 +34,7 @@
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
  *
- * $Id: mip6config.c,v 1.2 2000/02/07 17:48:25 itojun Exp $
+ * $Id: mip6config.c,v 1.3 2000/02/07 17:50:08 itojun Exp $
  *
  */
 
@@ -51,6 +51,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet6/mip6_common.h>
+#include <err.h>
 #include "mip6config.h"
 
 static int startmip6;
@@ -173,7 +174,7 @@ set_homeaddr(char *homeaddr, int command)
     int retval;
 
     if (parse_addr(homeaddr, &address, &plen, &interface) < 0) {
-        printf(PROGNAME "error parsing home address %s\n", homeaddr);
+        warnx("error parsing home address %s\n", homeaddr);
         return -1;
     }
 
@@ -188,7 +189,7 @@ set_homeaddr(char *homeaddr, int command)
 #endif /* DEBUG */
 
     if (getaddress(address, &input.ip6_addr) < 0) {
-        printf(PROGNAME "unknown home address %s\n", address);
+        warnx("unknown home address %s\n", address);
         return -1;
     }
 
@@ -196,7 +197,7 @@ set_homeaddr(char *homeaddr, int command)
         input.ha_addr = in6addr_any;
     else {
  	if (getaddress(homeagent, &input.ha_addr) < 0) {
-            printf(PROGNAME "unknown homeagent address %s\n", homeagent);
+            warnx("unknown homeagent address %s\n", homeagent);
             return -1;
         }
     }
@@ -223,7 +224,7 @@ del_coaddr(char *coaddr, int command)
     int retval;
 
     if (parse_addr(coaddr, &address, &plen, &interface) < 0) {
-        printf(PROGNAME "error parsing c/o address %s\n", coaddr);
+        warnx("error parsing c/o address %s\n", coaddr);
         return -1;
     }
 
@@ -233,7 +234,7 @@ del_coaddr(char *coaddr, int command)
 #endif /* DEBUG */
 
     if (getaddress(address, &input.ip6_addr) < 0) {
-        printf(PROGNAME "unknown c/o address %s\n", address);
+        warnx("unknown c/o address %s\n", address);
         return -1;
     }
 
@@ -257,7 +258,7 @@ set_coaddr(char *coaddr, int command)
     int retval;
 
     if (parse_addr(coaddr, &address, &plen, &interface) < 0) {
-        printf(PROGNAME "error parsing c/o address %s\n", coaddr);
+        warnx("error parsing c/o address %s\n", coaddr);
         return -1;
     }
 
@@ -267,7 +268,7 @@ set_coaddr(char *coaddr, int command)
 #endif /* DEBUG */
 
     if (getaddress(address, &input.ip6_addr) < 0) {
-        printf(PROGNAME "unknown c/o address %s\n", address);
+        warnx("unknown c/o address %s\n", address);
         return -1;
     }
 
@@ -370,7 +371,7 @@ mip6_init(void)
     int retval;
     if ((retval = upd_kernel(SIOCSATTACH_MIP6, NULL)) > 0) {
         print_err(retval);
-	printf(PROGNAME "cannot initialize \"mip6\" module.\n");
+	warnx("cannot initialize \"mip6\" module.\n");
 	exit(1);
     }
 }
@@ -413,10 +414,10 @@ read_config()
 	    }
 
  	if (config_mip6[i].comstring == NULL)
-	    printf(PROGNAME "ignored unknown option %s\n", buf);
+	    warnx("ignored unknown option %s\n", buf);
 
  	if (retval < 0) {
-	    printf(PROGNAME "error in %s while parsing %s\n",
+	    warnx("error in %s while parsing %s\n",
 		   configfilename, config_mip6[i].comstring);
 	    break;
 	}
@@ -444,7 +445,7 @@ main(int argc, char *argv[])
     /*signal(SIGTERM, mip6_exit);*/
 
     if (getuid() != 0){
-        printf(PROGNAME "permission denied\n");
+        warnx("permission denied\n");
         exit(1);
     }
 
@@ -579,7 +580,7 @@ main(int argc, char *argv[])
 
     if (configfilename) {
 	if (read_config() < 0) {
-	    printf(PROGNAME "error reading configuration file\n");
+	    warnx("error reading configuration file\n");
 	    exit(1);
 	}
     }
