@@ -66,21 +66,6 @@
 /* special recommended flags for getipnodebyname */
 #define	AI_DEFAULT	(AI_V4MAPPED_CFG | AI_ADDRCONFIG)
 
-/*
- * Constants for getnameinfo()
- */
-#define	NI_MAXHOST	1025
-#define	NI_MAXSERV	32
-
-/*
- * Flag values for getnameinfo()
- */
-#define	NI_NOFQDN	0x00000001
-#define	NI_NUMERICHOST	0x00000002
-#define	NI_NAMEREQD	0x00000004
-#define	NI_NUMERICSERV	0x00000008
-#define	NI_DGRAM	0x00000010
-
 struct addrinfo {
 	int	ai_flags;	/* AI_PASSIVE, AI_CANONNAME */
 	int	ai_family;	/* PF_xxx */
@@ -104,3 +89,22 @@ extern struct hostent *getipnodebyname __P((const char *, int, int, int *));
 extern int inet_pton __P((int, const char *, void *));
 extern const char *inet_ntop __P((int, const void *, char *, size_t));
 #endif /* HAVE_ADDRINFO */
+
+#ifndef NI_MAXSERV
+/*
+ * Constants for getnameinfo()
+ */
+#define	NI_MAXHOST	1025
+#define	NI_MAXSERV	32
+#endif
+
+#ifndef NI_NAMEREQD
+/*
+ * Flag values for getnameinfo()
+ */
+#define	NI_NOFQDN	0x00000001
+#define	NI_NUMERICHOST	0x00000002
+#define	NI_NAMEREQD	0x00000004
+#define	NI_NUMERICSERV	0x00000008
+#define	NI_DGRAM	0x00000010
+#endif

@@ -76,6 +76,20 @@ if test "$ac_cv_addrinfo" = no; then
 fi
 
 dnl
+dnl Checks for NI_MAXSERV
+AC_NI_MAXSERV(ac_cv_maxserv)
+if test "$ac_cv_maxserv" = no; then
+	missing_includes=yes
+fi
+
+dnl
+dnl Checks for NI_NAMEREQD
+AC_NI_NAMEREQD(ac_cv_namereqd)
+if test "$ac_cv_namereqd" = no; then
+	missing_includes=yes
+fi
+
+dnl
 dnl Checks for sockaddr_storage structure
 AC_STRUCT_SA_STORAGE(ac_cv_sa_storage)
 if test "$ac_cv_sa_storage" = no; then

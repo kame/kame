@@ -1863,6 +1863,11 @@ fi
 #define HAVE_ADDRINFO 1
 EOF
 
+	else
+		cat >> confdefs.h <<\EOF
+#define NEED_ADDRINFO_H 1
+EOF
+
 	fi
 
 if test "$ac_cv_addrinfo" = no; then
@@ -1870,13 +1875,89 @@ if test "$ac_cv_addrinfo" = no; then
 fi
 
 
+	echo $ac_n "checking for NI_MAXSERV""... $ac_c" 1>&6
+echo "configure:1880: checking for NI_MAXSERV" >&5
+	if eval "test \"`echo '$''{'ac_cv_maxserv'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  cat > conftest.$ac_ext <<EOF
+#line 1885 "configure"
+#include "confdefs.h"
+#include <netdb.h>
+#ifdef NI_MAXSERV
+yes
+#endif
+EOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  egrep "yes" >/dev/null 2>&1; then
+  rm -rf conftest*
+  ac_cv_maxserv=yes
+else
+  rm -rf conftest*
+  ac_cv_maxserv=no
+fi
+rm -f conftest*
+
+fi
+
+	echo "$ac_t""$ac_cv_maxserv" 1>&6
+	if test $ac_cv_maxserv != yes; then
+		cat >> confdefs.h <<\EOF
+#define NEED_ADDRINFO_H 1
+EOF
+
+	fi
+
+if test "$ac_cv_maxserv" = no; then
+	missing_includes=yes
+fi
+
+
+	echo $ac_n "checking for NI_NAMEREQD""... $ac_c" 1>&6
+echo "configure:1918: checking for NI_NAMEREQD" >&5
+	if eval "test \"`echo '$''{'ac_cv_namereqd'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  cat > conftest.$ac_ext <<EOF
+#line 1923 "configure"
+#include "confdefs.h"
+#include <netdb.h>
+#ifdef NI_NOFQDN
+yes
+#endif
+EOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  egrep "yes" >/dev/null 2>&1; then
+  rm -rf conftest*
+  ac_cv_namereqd=yes
+else
+  rm -rf conftest*
+  ac_cv_namereqd=no
+fi
+rm -f conftest*
+
+fi
+
+	echo "$ac_t""$ac_cv_namereqd" 1>&6
+	if test $ac_cv_namereqd != yes; then
+		cat >> confdefs.h <<\EOF
+#define NEED_ADDRINFO_H 1
+EOF
+
+	fi
+
+if test "$ac_cv_namereqd" = no; then
+	missing_includes=yes
+fi
+
+
 	echo $ac_n "checking for sockaddr_storage""... $ac_c" 1>&6
-echo "configure:1875: checking for sockaddr_storage" >&5
+echo "configure:1956: checking for sockaddr_storage" >&5
 	if eval "test \"`echo '$''{'ac_cv_sa_storage'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1880 "configure"
+#line 1961 "configure"
 #include "confdefs.h"
 
 #		include <sys/types.h>
@@ -1885,7 +1966,7 @@ int main() {
 struct sockaddr_storage s
 ; return 0; }
 EOF
-if { (eval echo configure:1889: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1970: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_sa_storage=yes
 else
@@ -1912,12 +1993,12 @@ fi
 
 	ac_cv_addrsz=yes
 	echo $ac_n "checking for INADDRSZ""... $ac_c" 1>&6
-echo "configure:1916: checking for INADDRSZ" >&5
+echo "configure:1997: checking for INADDRSZ" >&5
 	if eval "test \"`echo '$''{'ac_cv_inaddrsz'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1921 "configure"
+#line 2002 "configure"
 #include "confdefs.h"
 
 #		include <arpa/nameser.h>
@@ -1925,7 +2006,7 @@ int main() {
 int a = INADDRSZ
 ; return 0; }
 EOF
-if { (eval echo configure:1929: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:2010: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_inaddrsz=yes
 else
@@ -1947,12 +2028,12 @@ EOF
 		ac_cv_addrsz=no
 	fi
 	echo $ac_n "checking for IN6ADDRSZ""... $ac_c" 1>&6
-echo "configure:1951: checking for IN6ADDRSZ" >&5
+echo "configure:2032: checking for IN6ADDRSZ" >&5
 	if eval "test \"`echo '$''{'ac_cv_in6addrsz'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1956 "configure"
+#line 2037 "configure"
 #include "confdefs.h"
 
 #		include <arpa/nameser.h>
@@ -1960,7 +2041,7 @@ int main() {
 int a = IN6ADDRSZ
 ; return 0; }
 EOF
-if { (eval echo configure:1964: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:2045: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_in6addrsz=yes
 else
@@ -1988,12 +2069,12 @@ fi
 
 
 	echo $ac_n "checking for RES_USE_INET6""... $ac_c" 1>&6
-echo "configure:1992: checking for RES_USE_INET6" >&5
+echo "configure:2073: checking for RES_USE_INET6" >&5
 	if eval "test \"`echo '$''{'ac_cv_res_inet6'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1997 "configure"
+#line 2078 "configure"
 #include "confdefs.h"
 
 #		include <sys/types.h>
@@ -2003,7 +2084,7 @@ int main() {
 int a = RES_USE_INET6
 ; return 0; }
 EOF
-if { (eval echo configure:2007: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:2088: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_res_inet6=yes
 else
@@ -2029,12 +2110,12 @@ fi
 
 
 	echo $ac_n "checking for AAAA""... $ac_c" 1>&6
-echo "configure:2033: checking for AAAA" >&5
+echo "configure:2114: checking for AAAA" >&5
 	if eval "test \"`echo '$''{'ac_cv_aaaa'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2038 "configure"
+#line 2119 "configure"
 #include "confdefs.h"
 
 #		include <arpa/nameser.h>
@@ -2042,7 +2123,7 @@ int main() {
 int a = T_AAAA
 ; return 0; }
 EOF
-if { (eval echo configure:2046: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:2127: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_aaaa=yes
 else
@@ -2071,12 +2152,12 @@ fi
 
 
 	echo $ac_n "checking for res_state_ext""... $ac_c" 1>&6
-echo "configure:2075: checking for res_state_ext" >&5
+echo "configure:2156: checking for res_state_ext" >&5
 	if eval "test \"`echo '$''{'ac_cv_res_state_ext'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2080 "configure"
+#line 2161 "configure"
 #include "confdefs.h"
 
 #		include <sys/types.h>
@@ -2087,7 +2168,7 @@ int main() {
 struct __res_state_ext e
 ; return 0; }
 EOF
-if { (eval echo configure:2091: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:2172: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_res_state_ext=yes
 else
@@ -2113,12 +2194,12 @@ fi
 
 
 	echo $ac_n "checking for nsort in res_state""... $ac_c" 1>&6
-echo "configure:2117: checking for nsort in res_state" >&5
+echo "configure:2198: checking for nsort in res_state" >&5
 	if eval "test \"`echo '$''{'ac_cv_res_state'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2122 "configure"
+#line 2203 "configure"
 #include "confdefs.h"
 
 #		include <sys/types.h>
@@ -2129,7 +2210,7 @@ int main() {
 struct __res_state e; e.nsort = 0
 ; return 0; }
 EOF
-if { (eval echo configure:2133: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:2214: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_res_state=yes
 else
@@ -2156,12 +2237,12 @@ fi
 
 
 	echo $ac_n "checking for h_errno""... $ac_c" 1>&6
-echo "configure:2160: checking for h_errno" >&5
+echo "configure:2241: checking for h_errno" >&5
 	if eval "test \"`echo '$''{'ac_cv_var_h_errno'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2165 "configure"
+#line 2246 "configure"
 #include "confdefs.h"
 
 #		include <sys/types.h>
@@ -2170,7 +2251,7 @@ int main() {
 int foo = h_errno;
 ; return 0; }
 EOF
-if { (eval echo configure:2174: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:2255: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_var_h_errno=yes
 else
