@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.817 2000/04/26 09:32:42 itojun Exp $
+$Id: CHANGELOG,v 1.818 2000/04/26 10:21:28 itojun Exp $
 
 <200004>
+Wed Apr 26 19:20:54 JST 2000  itojun@iijlab.net
+	* libinet6/resolv/res_{comp,send}.c: incorporate strict boundary
+	  checking from BIND 4.9.7.  simplify #ifdefs.
+
 Wed Apr 26 17:44:18 JST 2000  itojun@iijlab.net
 	* libinet6/resolv/res_query.c: clarify reasons for setbuf().
 	* freebsd4: sync with latest gif and stf code (compiled, need more
