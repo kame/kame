@@ -84,6 +84,9 @@ __KERNEL_RCSID(0, "$NetBSD: ip_mroute.c,v 1.59.8.1 2002/08/02 00:39:23 lukem Exp
 #include <netinet/igmp_var.h>
 #include <netinet/ip_mroute.h>
 #include <netinet/ip_encap.h>
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif
 
 #include <machine/stdarg.h>
 
