@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.312 2002/05/31 06:10:57 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.313 2002/05/31 08:22:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -674,26 +674,7 @@ icmp6_input(mp, offp, proto)
 		if (code != 0)
 			goto badcode;
 
-#if 0
-		/*
-		 * RFC2460 section 5, last paragraph.
-		 * even though minimum link MTU for IPv6 is IPV6_MMTU,
-		 * we may see ICMPv6 too big with mtu < IPV6_MMTU
-		 * due to packet translator in the middle.
-		 * see ip6_output() and ip6_getpmtu() "alwaysfrag" case for
-		 * special handling.
-		 */
-		if (ntohl(icmp6->icmp6_mtu) < IPV6_MMTU)
-			break;	/* or just drop it? */
-#endif
-
-		/*
-		 * we reject ICMPv6 too big with abnormally small value.
-		 * XXX what is the good definition of "abnormally small"?
-		 */
-		if (ntohl(icmp6->icmp6_mtu) <
-		    sizeof(struct ip6_hdr) + sizeof(struct ip6_frag) + 8)
-			break;	/* or just drop it? */
+		/* validation is made in icmp6_mtudisc_update */
 
 		code = PRC_MSGSIZE;
 
@@ -1401,14 +1382,26 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #endif
 #endif
 
+#if 0
 	/*
-	 * Ignore MTU less than the minimum link MTU.  See comments in
-	 * icmp6_input().  Although the function drops such a case from the
-	 * wire, we may also fall into the situation if we're called from
-	 * ip6_output() via pfctlinput2(), perhaps due to an internal bug.
+	 * RFC2460 section 5, last paragraph.
+	 * even though minimum link MTU for IPv6 is IPV6_MMTU,
+	 * we may see ICMPv6 too big with mtu < IPV6_MMTU
+	 * due to packet translator in the middle.
+	 * see ip6_output() and ip6_getpmtu() "alwaysfrag" case for
+	 * special handling.
 	 */
 	if (mtu < IPV6_MMTU)
 		return;
+#endif
+
+	/*
+	 * we reject ICMPv6 too big with abnormally small value.
+	 * XXX what is the good definition of "abnormally small"?
+	 */
+	if (mtu < sizeof(struct ip6_hdr) + sizeof(struct ip6_frag) + 8)
+		return;
+
 
 #ifdef __NetBSD__
 	;
