@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.168 2000/12/05 15:19:34 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.169 2000/12/07 11:51:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2112,6 +2112,7 @@ icmp6_reflect(m, off)
 	int plen;
 	int type, code;
 	struct ifnet *outif = NULL;
+	struct sockaddr_in6 sa6_src, sa6_dst;
 #ifdef COMPAT_RFC1885
 	int mtu = IPV6_MMTU;
 	struct sockaddr_in6 *sin6 = &icmp6_reflect_rt.ro_dst;
@@ -2168,12 +2169,24 @@ icmp6_reflect(m, off)
 	 */
 	ip6->ip6_dst = ip6->ip6_src;
 
-	/* XXX hack for link-local addresses */
-	if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst))
-		ip6->ip6_dst.s6_addr16[1] =
-			htons(m->m_pkthdr.rcvif->if_index);
-	if (IN6_IS_ADDR_LINKLOCAL(&t))
-		t.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+	/*
+	 * XXX: make sure to embed scope zone information, using
+	 * already embedded IDs or the received interface (if any).
+	 * Note that rcvif may be NULL.
+	 * TODO: scoped routing case (XXX).
+	 */
+	bzero(&sa6_src, sizeof(sa6_src));
+	sa6_src.sin6_family = AF_INET6;
+	sa6_src.sin6_len = sizeof(sa6_src);
+	sa6_src.sin6_addr = ip6->ip6_dst;
+	in6_recoverscope(&sa6_src, &ip6->ip6_dst, m->m_pkthdr.rcvif);
+	in6_embedscope(&ip6->ip6_dst, &sa6_src, NULL, NULL);
+	bzero(&sa6_dst, sizeof(sa6_dst));
+	sa6_dst.sin6_family = AF_INET6;
+	sa6_dst.sin6_len = sizeof(sa6_dst);
+	sa6_dst.sin6_addr = t;
+	in6_recoverscope(&sa6_dst, &t, m->m_pkthdr.rcvif);
+	in6_embedscope(&t, &sa6_dst, NULL, NULL);
 
 #ifdef COMPAT_RFC1885
 	/*
@@ -2238,19 +2251,30 @@ icmp6_reflect(m, off)
 		src = &t;
 	}
 
-	if (src == 0)
+	if (src == 0) {
+		int e;
+#ifdef NEW_STRUCT_ROUTE
+		struct route ro;
+#else
+		struct route_in6 ro;
+#endif
+
 		/*
 		 * This case matches to multicasts, our anycast, or unicasts
-		 * that we do not own. Select a source address which has the
-		 * same scope.
-		 * XXX: for (non link-local) multicast addresses, this might
-		 * not be a good choice.
+		 * that we do not own. Select a source address based on the
+		 * source address of the erroneous packet.
 		 */
-		if ((ia = in6_ifawithscope(m->m_pkthdr.rcvif, &t)) != 0)
-			src = &IA6_SIN6(ia)->sin6_addr;
-
-	if (src == 0)
-		goto bad;
+		bzero(&ro, sizeof(ro));
+		src = in6_selectsrc(&sa6_src, NULL, NULL, &ro, NULL, &e);
+		if (ro.ro_rt)
+			RTFREE(ro.ro_rt); /* XXX: we could use this */
+		if (src == NULL) {
+			printf("icmp6_reflect: source can't be determined: "
+			       "dst=%s, error=%d\n",
+			       ip6_sprintf(&sa6_src.sin6_addr), e);
+			goto bad;
+		}
+	}
 
 	ip6->ip6_src = *src;
 
