@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1441 2000/12/20 05:45:52 itojun Exp $
+$KAME: CHANGELOG,v 1.1442 2000/12/20 06:11:48 itojun Exp $
 
 <200012>
 Wed Dec 20 14:41:11 JST 2000  itojun@iijlab.net
 	* netbsd/lib/libinet6/getaddrinfo.c: experimental support for A6
 	  records, only for cases where all 128 bits are supplied in a single
-	  A6 record (like "A6 0 ::1").  netbsd only.
+	  A6 record (like "A6 0 ::1").  netbsd only.  disabled by default.
 
 Mon Dec 18 01:41:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4/usr.sbin/{syslogd, lpr}, freebsd4/usr.bin/logger: sync
