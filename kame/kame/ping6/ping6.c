@@ -171,6 +171,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define F_REACHCONF	0x8000
 #endif
 #define F_HOSTNAME	0x10000
+#define F_FQDNOLD	0x20000
 u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
@@ -417,8 +418,10 @@ main(argc, argv)
 			options |= F_VERBOSE;
 			break;
 		case 'w':
-		case 'W':
 			options |= F_FQDN;
+			break;
+		case 'W':
+			options |= F_FQDNOLD;
 			break;
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
@@ -545,7 +548,8 @@ main(argc, argv)
 	struct icmp6_filter filt;
 	if (!(options & F_VERBOSE)) {
 		ICMP6_FILTER_SETBLOCKALL(&filt);
-		if ((options & F_FQDN) || (options & F_NODEADDR))
+		if ((options & F_FQDN) || (options & F_FQDNOLD) ||
+		    (options & F_NODEADDR))
 			ICMP6_FILTER_SETPASS(ICMP6_NI_REPLY, &filt);
 		else
 			ICMP6_FILTER_SETPASS(ICMP6_ECHO_REPLY, &filt);
@@ -941,6 +945,18 @@ pinger()
 
 	if (options & F_FQDN) {
 		icp->icmp6_type = ICMP6_NI_QUERY;
+		icp->icmp6_code = 0;	/* Subject is IPv6 address */
+		/* XXX: overwrite icmp6_id */
+		icp->icmp6_data16[0] = htons(NI_QTYPE_FQDN);
+		if (timing)
+			(void)gettimeofday((struct timeval *)
+					   &outpack[ICMP6ECHOLEN], NULL);
+		memcpy(&outpack[ICMP6_NIQLEN], &dst.sin6_addr,
+		    sizeof(dst.sin6_addr));
+		cc = ICMP6_NIQLEN + sizeof(dst.sin6_addr);
+		datalen = 0;
+	} else if (options & F_FQDNOLD) {
+		icp->icmp6_type = ICMP6_NI_QUERY;
 		/* code field is always 0 */
 		/* XXX: overwrite icmp6_id */
 		icp->icmp6_data16[0] = htons(NI_QTYPE_FQDN);
@@ -951,13 +967,15 @@ pinger()
 		datalen = 0;
 	} else if (options & F_NODEADDR) {
 		icp->icmp6_type = ICMP6_NI_QUERY;
-		/* code field is always 0 */
+		icp->icmp6_code = 0;	/* Subject is IPv6 address */
 		/* XXX: overwrite icmp6_id */
 		icp->icmp6_data16[0] = htons(NI_QTYPE_NODEADDR);
 		if (timing)
 			(void)gettimeofday((struct timeval *)
 					   &outpack[ICMP6ECHOLEN], NULL);
-		cc = ICMP6_NIQLEN;
+		memcpy(&outpack[ICMP6_NIQLEN], &dst.sin6_addr,
+		    sizeof(dst.sin6_addr));
+		cc = ICMP6_NIQLEN + sizeof(dst.sin6_addr);
 		datalen = 0;
 		((struct icmp6_nodeinfo *)icp)->ni_flags = naflags;
 	}
