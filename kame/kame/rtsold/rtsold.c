@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.56 2002/09/20 21:18:36 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.57 2002/09/20 21:59:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,9 +33,6 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/param.h>
-#ifdef HAVE_SYS_POLL_H
-#include <sys/poll.h>
-#endif
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -55,6 +52,9 @@
 #include <ifaddrs.h>
 #if (defined(__NetBSD__) && __NetBSD_Version__ >= 106010000) || defined(__OpenBSD__)
 #include <util.h>
+#endif
+#ifdef HAVE_POLL_H
+#include <poll.h>
 #endif
 
 #include "rtsold.h"
@@ -119,7 +119,7 @@ main(argc, argv)
 	int s, ch, once = 0;
 	struct timeval *timeout;
 	char *argv0, *opts;
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 	struct pollfd set[2];
 #else
 	fd_set *fdsetp, *selectfdp;
@@ -220,14 +220,14 @@ main(argc, argv)
 		exit(1);
 		/*NOTREACHED*/
 	}
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 	set[0].fd = s;
 	set[0].events = POLLIN;
 #else
 	maxfd = s;
 #endif
 
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 	set[1].fd = -1;
 #endif
 
@@ -237,7 +237,7 @@ main(argc, argv)
 		exit(1);
 		/*NOTREACHED*/
 	}
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 	set[1].fd = rtsock;
 	set[1].events = POLLIN;
 #else
@@ -246,7 +246,7 @@ main(argc, argv)
 #endif
 #endif
 
-#ifndef HAVE_SYS_POLL_H
+#ifndef HAVE_POLL_H
 	fdmasks = howmany(maxfd + 1, NFDBITS) * sizeof(fd_mask);
 	if ((fdsetp = malloc(fdmasks)) == NULL) {
 		err(1, "malloc");
@@ -310,7 +310,7 @@ main(argc, argv)
 #endif
 	}
 
-#ifndef HAVE_SYS_POLL_H
+#ifndef HAVE_POLL_H
 	memset(fdsetp, 0, fdmasks);
 	FD_SET(s, fdsetp);
 #ifdef USE_RTSOCK
@@ -320,7 +320,7 @@ main(argc, argv)
 	while (1) {		/* main loop */
 		int e;
 
-#ifndef HAVE_SYS_POLL_H
+#ifndef HAVE_POLL_H
 		memcpy(selectfdp, fdsetp, fdmasks);
 #endif
 
@@ -346,7 +346,7 @@ main(argc, argv)
 			if (ifi == NULL)
 				break;
 		}
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 		e = poll(set, 2, timeout ? (timeout->tv_sec * 1000 + timeout->tv_usec / 1000) : INFTIM);
 #else
 		e = select(maxfd + 1, selectfdp, NULL, NULL, timeout);
@@ -361,14 +361,14 @@ main(argc, argv)
 
 		/* packet reception */
 #ifdef USE_RTSOCK
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 		if (set[1].revents & POLLIN)
 #else
 		if (FD_ISSET(rtsock, selectfdp))
 #endif
 			rtsock_input(rtsock);
 #endif
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 		if (set[0].revents & POLLIN)
 #else
 		if (FD_ISSET(s, selectfdp))

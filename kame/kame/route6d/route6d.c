@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.89 2002/09/20 21:10:34 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.90 2002/09/20 21:59:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.89 2002/09/20 21:10:34 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.90 2002/09/20 21:59:55 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -52,6 +52,9 @@ static char _rcsid[] = "$KAME: route6d.c,v 1.89 2002/09/20 21:10:34 itojun Exp $
 #if defined(__OpenBSD__) || defined(__NetBSD__)
 #include <util.h>
 #endif
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -59,9 +62,6 @@ static char _rcsid[] = "$KAME: route6d.c,v 1.89 2002/09/20 21:10:34 itojun Exp $
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/sysctl.h>
-#ifdef HAVE_SYS_POLL_H
-#include <sys/poll.h>
-#endif
 #include <sys/uio.h>
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -143,7 +143,7 @@ int	nifc;		/* number of valid ifc's */
 struct	ifc **index2ifc;
 int	nindex2ifc;
 struct	ifc *loopifcp = NULL;	/* pointing to loopback */
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 struct	pollfd set[2];
 #else
 fd_set	*sockvecp;	/* vector to select() for receiving */
@@ -468,7 +468,7 @@ main(argc, argv)
 			continue;
 		}
 
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 		switch (poll(set, 2, INFTIM))
 #else
 		memcpy(recvecp, sockvecp, fdmasks);
@@ -484,7 +484,7 @@ main(argc, argv)
 		case 0:
 			continue;
 		default:
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 			if (set[0].revents & POLLIN)
 #else
 			if (FD_ISSET(ripsock, recvecp))
@@ -494,7 +494,7 @@ main(argc, argv)
 				riprecv();
 				sigprocmask(SIG_SETMASK, &omask, NULL);
 			}
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 			if (set[1].revents & POLLIN)
 #else
 			if (FD_ISSET(rtsock, recvecp))
@@ -677,7 +677,7 @@ init()
 	}
 	memcpy(&ripsin, res->ai_addr, res->ai_addrlen);
 
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 	set[0].fd = ripsock;
 	set[0].events = POLLIN;
 #else
@@ -689,7 +689,7 @@ init()
 			fatal("route socket");
 			/*NOTREACHED*/
 		}
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 		set[1].fd = rtsock;
 		set[1].events = POLLIN;
 #else
@@ -697,14 +697,14 @@ init()
 			maxfd = rtsock;
 #endif
 	} else {
-#ifdef HAVE_SYS_POLL_H
+#ifdef HAVE_POLL_H
 		set[1].fd = -1;
 #else
 		rtsock = -1;	/*just for safety */
 #endif
 	}
 
-#ifndef HAVE_SYS_POLL_H
+#ifndef HAVE_POLL_H
 	fdmasks = howmany(maxfd + 1, NFDBITS) * sizeof(fd_mask);
 	if ((sockvecp = malloc(fdmasks)) == NULL) {
 		fatal("malloc");
