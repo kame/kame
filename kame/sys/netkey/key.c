@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.281 2003/06/27 06:58:25 itojun Exp $	*/
+/*	$KAME: key.c,v 1.282 2003/06/27 07:00:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1839,9 +1839,9 @@ key_spdadd(so, m, mhp)
 	}
 
 	/* policy requests are mandatory when action is ipsec. */
-        if (mhp->msg->sadb_msg_type != SADB_X_SPDSETIDX &&
-            xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC &&
-            mhp->extlen[SADB_X_EXT_POLICY] <= sizeof(*xpl0)) {
+	if (mhp->msg->sadb_msg_type != SADB_X_SPDSETIDX &&
+	    xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC &&
+	    mhp->extlen[SADB_X_EXT_POLICY] <= sizeof(*xpl0)) {
 		ipseclog((LOG_DEBUG, "key_spdadd: some policy requests part required.\n"));
 		return key_senderror(so, m, EINVAL);
 	}
