@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.264 2001/12/24 18:28:02 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.265 2001/12/24 18:46:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3177,7 +3177,7 @@ ip6_pcbopts(pktopt, m, so)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		priv = 1;
 #endif
-	if ((error = ip6_setpktoptions(m, opt, priv, 1)) != 0) {
+	if ((error = ip6_setpktoptions(m, opt, NULL, priv, 1)) != 0) {
 		ip6_clearpktopts(opt, -1); /* XXX: discard all options */
 		return(error);
 	}
@@ -3803,9 +3803,9 @@ ip6_freemoptions(im6o)
  * Set IPv6 outgoing packet options based on advanced API.
  */
 int
-ip6_setpktoptions(control, opt, priv, needcopy)
+ip6_setpktoptions(control, opt, stickyopt, priv, needcopy)
 	struct mbuf *control;
-	struct ip6_pktopts *opt;
+	struct ip6_pktopts *opt, *stickyopt;
 	int priv, needcopy;
 {
 	struct cmsghdr *cm = 0;
@@ -3813,7 +3813,19 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 	if (control == 0 || opt == 0)
 		return(EINVAL);
 
-	init_ip6pktopts(opt);
+	if (stickyopt) {
+		/*
+		 * If stickyopt is provided, make a local copy of the options
+		 * for this particular packet, then override them by ancillary
+		 * objects.
+		 * XXX: need to gain a reference for the cached route of the
+		 * next hop in case of the overriding.
+		 */
+		*opt = *stickyopt;
+		if (opt->ip6po_nextroute.ro_rt)
+			opt->ip6po_nextroute.ro_rt->rt_refcnt++;
+	} else
+		init_ip6pktopts(opt);
 	opt->needfree = needcopy;
 
 	/*
