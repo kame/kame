@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.36 2004/12/16 08:26:28 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.37 2004/12/16 11:12:14 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -368,7 +368,7 @@ dccp_input(struct mbuf *m, ...)
 		dccp_in.sin_addr = ip->ip_src;
 	}
 
-	DCCP_DEBUG((LOG_INFO, "Header info: cslen = %u ndp = %u, off = %u, type = %u, reserved = %u, seq = %lu\n", dh->dh_cslen, dh->dh_ndp, dh->dh_off, dh->dh_type, dh->dh_res, (unsigned long)ntohl(dh->dh_seq << 8)));
+	DCCP_DEBUG((LOG_INFO, "Header info: cslen = %u, off = %u, type = %u, reserved = %u, seq = %lu\n", dh->dh_cscov, dh->dh_off, dh->dh_type, dh->dh_res, (unsigned long)ntohl(dh->dh_seq << 8)));
 
 	/*
 	 * Make mbuf data length reflect DCCP length.
@@ -405,15 +405,15 @@ dccp_input(struct mbuf *m, ...)
 		ipov = (struct ipovly *)ip;
 	}
 
-	if (dh->dh_cslen == 0) {
+	if (dh->dh_cscov == 0) {
 		cslen = len;
 	} else {
-		cslen = dh->dh_off * 4 + (dh->dh_cslen - 1) * 4;
+		cslen = dh->dh_off * 4 + (dh->dh_cscov - 1) * 4;
 		if (cslen > len)
 			cslen = len;
 	}
 	
-	DCCP_DEBUG((LOG_INFO, "Checksum extend header and data! dh->dh_cslen = %u, cslen = %u, len = %u, dh->dh_sum = 0x%04x\n", dh->dh_cslen, cslen, len, dh->dh_sum));
+	DCCP_DEBUG((LOG_INFO, "Checksum extend header and data! dh->dh_cscov = %u, cslen = %u, len = %u, dh->dh_sum = 0x%04x\n", dh->dh_cscov, cslen, len, dh->dh_sum));
 
 	/*
 	 * Checksum extended DCCP header and data.
@@ -715,7 +715,6 @@ dccp_input(struct mbuf *m, ...)
 	dp->ack_rcv = 0; /* Clear it for now */
 	dp->type_rcv = dh->dh_type;
 	dp->len_rcv = m->m_len - data_off - iphlen; /* Correct length ? */
-	dp->ndp_rcv = dh->dh_ndp;
 	
 	optlen = data_off - (sizeof(struct dccphdr) + extrah_len);
 
@@ -1722,8 +1721,7 @@ again:
 		dh->dh_dport = in6p->in6p_fport;
 	}
 #endif
-	dh->dh_cslen = dp->cslen;
-	dh->dh_ndp = (dp->ndp % 16);
+	dh->dh_cscov = dp->cslen;
 	dh->dh_type = type;
 	dh->dh_res = 0; /* Reserved field should be zero */
 
@@ -1731,6 +1729,7 @@ again:
 
 	dp->seq_snd = (dp->seq_snd + 1) % 16777216;
 	dh->dh_seq = htonl(dp->seq_snd) >> 8;
+	dh->dh_x = 0;	/* short sequene number */
 
 	DCCP_DEBUG((LOG_INFO, "Sending with seq %u, (dp->seq_snd = %u)\n\n", dh->dh_seq, dp->seq_snd));
 
@@ -1767,10 +1766,10 @@ again:
 
 	m->m_pkthdr.len = hdrlen + len;
 
-	if (dh->dh_cslen == 0) {
+	if (dh->dh_cscov == 0) {
 		cslen = (hdrlen - sizeof(struct ip6_hdr)) + len;
 	} else {
-		cslen = dh->dh_off * 4 + (dh->dh_cslen - 1) * 4;
+		cslen = dh->dh_off * 4 + (dh->dh_cscov - 1) * 4;
 		if (cslen > (hdrlen - sizeof(struct ip)) + len)
 			cslen = (hdrlen - sizeof(struct ip)) + len;
 	}
@@ -1812,7 +1811,7 @@ again:
 #endif
 	}
 
-	DCCP_DEBUG((LOG_INFO, "Calculated checksum,  dh->dh_cslen = %u, cslen = %u, len = %li hdrlen = %u, dh->dh_sum = 0x%04x\n", dh->dh_cslen, cslen, len, hdrlen, dh->dh_sum));
+	DCCP_DEBUG((LOG_INFO, "Calculated checksum,  dh->dh_cscov = %u, cslen = %u, len = %li hdrlen = %u, dh->dh_sum = 0x%04x\n", dh->dh_cscov, cslen, len, hdrlen, dh->dh_sum));
 
 	dccpstat.dccps_opackets++;
 	dccpstat.dccps_obytes += m->m_pkthdr.len;

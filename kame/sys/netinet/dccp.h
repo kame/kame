@@ -1,4 +1,4 @@
-/*	$KAME: dccp.h,v 1.3 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp.h,v 1.4 2004/12/16 11:12:14 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -40,26 +40,29 @@
 struct dccphdr {
 	u_short		dh_sport;	/* source port */
 	u_short		dh_dport;	/* destination port */
-#if BYTE_ORDER == LITTLE_ENDIAN
-	u_int32_t	dh_res:4,	/* Reserved */
-			dh_type:4,	/* Type of message */
-			dh_seq:24;	/* Sequence number */
-#else
-	u_int32_t	dh_type:4,
-			dh_res:4,
-			dh_seq:24;	
-#endif
 
 	u_int8_t	dh_off;		/* Data offset */
 #if BYTE_ORDER == LITTLE_ENDIAN
-	u_int8_t	dh_cslen:4,	/* Checksum Length */
-			dh_ndp:4;	/* Number of non data packets */
+	u_int8_t	dh_cscov:4,	/* Checksum Length */
+			dh_ccval:4;	/* Number of non data packets */
 #else
-	u_int8_t	dh_ndp:4,
-			dh_cslen:4;
+	u_int8_t	dh_ccval:4,
+			dh_cscov:4;
 #endif
-
 	u_short		dh_sum;		/* Checksum */
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+	u_int32_t	dh_res:3,	/* Reserved */
+			dh_type:4,	/* Type of message */
+			dh_x:1,		/* long/short sequence number */
+			dh_seq:24;	/* Sequence number */
+#else
+	u_int32_t	dh_x:1,		/* long/short sequence number */
+			dh_type:4,
+			dh_res:3,
+			dh_seq:24;	
+#endif
+	/*u_int32_t	dh_seq2;*/
 };
 
 struct dccp_requesthdr {
