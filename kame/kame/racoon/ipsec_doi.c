@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.7 2000/01/10 17:53:15 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.8 2000/01/10 18:20:36 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2600,7 +2600,7 @@ ipsecdoi_setid1(iph1)
 	}
 
 	memcpy(ret->v, &id_b, sizeof(id_b));
-	memcpy(ret->v, ident->v, ident->l);
+	memcpy(ret->v + sizeof(id_b), ident->v, ident->l);
 
 	iph1->id = ret;
 
