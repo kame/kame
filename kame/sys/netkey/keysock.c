@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.6 2000/01/16 18:21:36 sumikawa Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.7 2000/01/16 18:26:42 sumikawa Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -585,6 +585,91 @@ key_abort(struct socket *so)
 	error = raw_usrreqs.pru_abort(so);
 	splx(s);
 	return error;
+}
+
+/*
+ * key_attach()
+ * derived from net/rtsock.c:rts_attach()
+ */
+static int
+key_attach(struct socket *so, int proto, struct proc *p)
+{
+	struct keycb *kp;
+	int s, error;
+
+	if (sotorawcb(so) != 0)
+		return EISCONN;	/* XXX panic? */
+	MALLOC(kp, struct keycb *, sizeof *kp, M_PCB, M_WAITOK); /* XXX */
+	if (kp == 0)
+		return ENOBUFS;
+	bzero(kp, sizeof *kp);
+
+	/*
+	 * The splnet() is necessary to block protocols from sending
+	 * error notifications (like RTM_REDIRECT or RTM_LOSING) while
+	 * this PCB is extant but incompletely initialized.
+	 * Probably we should try to do more of this work beforehand and
+	 * eliminate the spl.
+	 */
+	s = splnet();
+	so->so_pcb = (caddr_t)kp;
+	error = raw_usrreqs.pru_attach(so, proto, p);
+	kp = (struct keycb *)sotorawcb(so);
+	if (error) {
+		free(kp, M_PCB);
+		so->so_pcb = (caddr_t) 0;
+		splx(s);
+		printf("key_usrreq: key_usrreq results %d\n", error);
+		return error;
+	}
+
+	kp->kp_promisc = kp->kp_registered = 0;
+
+	if (kp->kp_raw.rcb_proto.sp_protocol == PF_KEY) /* XXX: AF_KEY */
+		key_cb.key_count++;
+	key_cb.any_count++;
+#ifndef __bsdi__
+	kp->kp_raw.rcb_laddr = &key_src;
+	kp->kp_raw.rcb_faddr = &key_dst;
+#else
+	/*
+	 * XXX rcb_faddr must be dynamically allocated, otherwise
+	 * raw_disconnect() will be angry.
+	 */
+	{
+		struct mbuf *m, *n;
+		MGET(m, M_WAITOK, MT_DATA);
+		if (!m) {
+			error = ENOBUFS;
+			printf("key_usrreq: key_usrreq results %d\n", error);
+			free((caddr_t)kp, M_PCB);
+			so->so_pcb = (caddr_t) 0;
+			splx(s);
+			return(error);
+		}
+		MGET(n, M_WAITOK, MT_DATA);
+		if (!n) {
+			error = ENOBUFS;
+			m_freem(m);
+			printf("key_usrreq: key_usrreq results %d\n", error);
+			free((caddr_t)kp, M_PCB);
+			so->so_pcb = (caddr_t) 0;
+			splx(s);
+			return(error);
+		}
+		m->m_len = sizeof(key_src);
+		kp->kp_raw.rcb_laddr = mtod(m, struct sockaddr *);
+		bcopy(&key_src, kp->kp_raw.rcb_laddr, sizeof(key_src));
+		n->m_len = sizeof(key_dst);
+		kp->kp_raw.rcb_faddr = mtod(n, struct sockaddr *);
+		bcopy(&key_dst, kp->kp_raw.rcb_faddr, sizeof(key_dst));
+	}
+#endif
+	soisconnected(so);
+	so->so_options |= SO_USELOOPBACK;
+
+	splx(s);
+	return 0;
 }
 
 /*
