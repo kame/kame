@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.177 2001/04/11 01:19:51 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.178 2001/04/24 16:44:11 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -237,7 +237,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 	struct sockaddr_in6 *dst;
 	int error = 0;
-	struct in6_ifaddr *ia;
+	struct in6_ifaddr *ia = NULL;
 	u_long mtu;
 	u_int32_t optlen = 0, plen = 0, unfragpartlen = 0;
 	struct ip6_exthdrs exthdrs;
@@ -1257,6 +1257,13 @@ skip_ipsec2:;
 				m->m_pkthdr.len;
 		}
 #endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+ 		/* Record statistics for this interface address. */
+ 		if (ia && !(flags & IPV6_FORWARDING)) {
+ 			ia->ia_ifa.if_opackets++;
+ 			ia->ia_ifa.if_obytes += m->m_pkthdr.len;
+ 		}
+#endif
 #if defined(IPSEC) && !defined(__OpenBSD__)
 		/* clean ipsec history once it goes out of the node */
 		ipsec_delaux(m);
@@ -1410,6 +1417,13 @@ sendorfree:
 				ia6->ia_ifa.ifa_data.ifad_outbytes +=
 					m->m_pkthdr.len;
 			}
+#endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+ 			/* Record statistics for this interface address. */
+ 			if (ia) {
+ 				ia->ia_ifa.if_opackets++;
+ 				ia->ia_ifa.if_obytes += m->m_pkthdr.len;
+ 			}
 #endif
 #if defined(IPSEC) && !defined(__OpenBSD__)
 			/* clean ipsec history once it goes out of the node */
