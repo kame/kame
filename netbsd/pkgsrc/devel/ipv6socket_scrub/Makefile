@@ -13,6 +13,9 @@ HOMEPAGE=		http://www.sun.com/solaris/ipv6/
 
 EXTRACT_BEFORE_ARGS=	-xf
 WRKSRC=			${WRKDIR}/${DISTNAME}/src
+NO_CDROM=		"not redistributable"
+NO_PACKAGE=		"not redistributable"
+RESTRICTED=		"not redistributable, license agreement required"
 
 do-fetch:
 	@${ECHO} "===> You need to sign the agreement on ${HOMEPAGE}"
