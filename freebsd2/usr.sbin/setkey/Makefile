@@ -1,4 +1,5 @@
 SRCDIR=	${.CURDIR}/../../kame/setkey
+LIBPFKEYDIR=   ${.OBJDIR}/../../lib/libpfkey
 
 PROG=	setkey
 SRCS=	setkey.c parse.y token.l
@@ -19,14 +20,14 @@ all: ${PROG} scriptdump
 
 CFLAGS+=-DIPSEC_DEBUG -DINET6 -DYY_NO_UNPUT
 CFLAGS+=-I${.CURDIR} -I${SRCDIR}
-LDADD+= -L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
-	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
+LDADD+=	-L${LIBPFKEYDIR} -lpfkey
+DPADD+=	${LIBPFKEYDIR}/libpfkey.a
+LDADD+= -L${.OBJDIR}/../../lib/libipsec \
+	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -lipsec -linet6
-DPADD+=	${.CURDIR}/../../lib/libipsec/libipsec.a \
-	${.CURDIR}/../../lib/libipsec/obj/libipsec.a \
+DPADD+=	${.OBJDIR}/../../lib/libipsec/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
-DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
-	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 CLEANFILES+=	scriptdump
 

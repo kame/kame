@@ -1,4 +1,5 @@
 SRCDIR=	${.CURDIR}/../../../kame/racoon
+LIBPFKEYDIR=   ${.OBJDIR}/../../../lib/libpfkey
 
 CFLAGS+=-g -O2
 OPTFLAG+=-DHAVE_PFKEYV2 -DYIPS_DEBUG
@@ -35,6 +36,8 @@ CFLAGS+=-DHAVE_OPENSSL_OPENSSLV_H=1
 
 LDADD+=	-ly -ll
 DPADD+=	${LIBY} ${LIBL}
+LDADD+=	-L${LIBPFKEYDIR} -lpfkey
+DPADD+=	${LIBPFKEYDIR}/libpfkey.a
 LDADD+=	-L${.CURDIR}/../../../lib/libipsec \
 	-L${.CURDIR}/../../../lib/libipsec/obj \
 	-L${.CURDIR}/../../../lib/libinet6 \
