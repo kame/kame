@@ -164,8 +164,6 @@ extern struct ifnet *loifp;
 extern struct ifnet loif[NLOOP];
 #endif
 
-extern struct ifnet **ifindex2ifnet;
-
 /*
  * IP6 output. The packet in mbuf chain m contains a skeletal IP6
  * header (with pri, len, nxt, hlim, src, dst).
