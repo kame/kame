@@ -94,8 +94,8 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 #include <netinet/ip_var.h>
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#endif
 #include <netkey/keysock.h>
+#endif
 
 #include <arpa/inet.h>
 #include <netdb.h>
