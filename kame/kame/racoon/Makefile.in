@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.12 2000/01/10 17:33:01 itojun Exp $
+# YIPS $Id: Makefile.in,v 1.13 2000/01/10 17:38:18 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -79,7 +79,7 @@ install:
 	mkdir -p ${sysconfdir}/racoon
 	for i in $(CONF); do \
 		$(INSTALL) -o bin -g bin -m 444 samples/$$i \
-			${sysconfdir/racoon; \
+			${sysconfdir}/racoon; \
 	done
 
 clean:
