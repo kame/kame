@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/12/22 06:31:38 $
+			$Date: 1999/12/29 07:13:58 $
 
 1. IPv6
 
@@ -947,6 +947,19 @@ Here is a list of OpenBSD 2.x drivers and its conditions:
 
 (*) There seem to be some problem in driver, with multicast filter
 configuration.  This happens with certain revision of chipset on the card.
+
+2.6 BSD/OS 4.x
+
+The following lists BSD/OS 4.x device drivers and its conditions:
+
+	driver	mbuf(1)		multicast(2)	official
+						support?
+	---	---		---		---
+	(Ethernet)
+	de	ok		ok		yes
+
+You may want to use "@insert" directive in /etc/pccard.conf to invoke
+"rtsol" command right after dynamic insertion of PCMCIA ethernet cards.
 
 3. Translator
 
