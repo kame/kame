@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.350 2003/08/06 23:35:52 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.351 2003/08/06 23:37:28 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1842,8 +1842,6 @@ following standards:
     "old IPsec" specification documented in rfc182[5-9].txt
     "new IPsec" specification documented in:
 	rfc240[1-6].txt rfc241[01].txt rfc2451.txt
-	draft-mcdonald-simple-ipsec-api-01.txt
-		(expired, available in ftp://ftp.kame.net/pub/internet-drafts/)
 	draft-ietf-ipsec-ciph-aes-cbc-01.txt
     IPComp:
 	RFC3173: IP Payload Compression Protocol (IPComp)
