@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.74 2001/01/03 08:22:33 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.75 2001/01/05 01:24:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1083,7 +1083,7 @@ in6_ifattach(ifp, altifp)
 		}
 	}
 
-statinit:;
+statinit:
 
 	/* update dynamically. */
 	if (in6_maxmtu < ifp->if_mtu)
