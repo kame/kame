@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.65 2001/05/08 04:36:34 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.66 2001/06/02 08:17:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -603,6 +603,23 @@ again:;
 		rtm = (struct rt_msghdr *)next;
 		sin = (struct sockaddr_in6 *)(rtm + 1);
 		sdl = (struct sockaddr_dl *)((char *)sin + ROUNDUP(sin->sin6_len));
+
+		/*
+		 * Some OSes can produce a route that has the LINK flag but
+		 * has a non-AF_LINK gateway (e.g. fe80::xx%lo0 on FreeBSD
+		 * and BSD/OS, where xx is not the interface identifier on
+		 * lo0).  Such routes entry would annoy getnbrinfo() below,
+		 * so we skip them.
+		 * XXX: such routes should have the GATEWAY flag, not the
+		 * LINK flag.  However, there are rotten routing software
+		 * that advertises all routes that have the GATEWAY flag.
+		 * Thus, KAME kernel intentionally does not set the LINK flag.
+		 * What is to be fixed is not ndp, but such routing software
+		 * (and the kernel workaround)...
+		 */
+		if (sdl->sdl_family != AF_LINK)
+			continue;
+
 		if (addr) {
 			if (!IN6_ARE_ADDR_EQUAL(addr, &sin->sin6_addr))
 				continue;
