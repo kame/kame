@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1541 2001/02/07 12:27:35 jinmei Exp $
+$KAME: CHANGELOG,v 1.1542 2001/02/07 12:36:14 itojun Exp $
 
 <200102>
+Wed Feb  7 21:35:26 JST 2001
+	* sys/kern/uipc_socket.c (netbsd/openbsd/freebsd4/bsdi4):
+	  return ECONNABORTED, if the socket (tcp connection for example)
+	  is disconnected by RST right before accept(2).  fixes PR 10698/12027.
+	  checked with SUSv2, XNET 5.2, and Stevens (unix network programming
+	  vol 1 2nd ed) section 5.11.
+	  bsdi3/freebsd[23] needs some other fix here, so they are left behind.
+
 2001-02-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/netstat/route.c (p_sockaddr): removed special
 	cases of ::/plen (plen > 0).  I believe it is better than the
