@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.20 2003/08/04 05:25:38 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.21 2003/08/05 13:19:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -676,6 +676,7 @@ mip6_select_coa(sc)
 		ia_scope = -1;
 		ia_matchlen = -1;
 
+		/* IFT_HIF has only home addresses. */
 		if (ia->ia_ifp->if_type == IFT_HIF)
 			goto next;
 
@@ -689,7 +690,15 @@ mip6_select_coa(sc)
 		    | IN6_IFF_DUPLICATED))
 			goto next;
 
-		/* tempaddr is not supported. */
+		/* loopback address cannot be used as a CoA. */
+		if (IN6_IS_ADDR_LOOPBACK(&ia->ia_addr.sin6_addr))
+			goto next;
+
+		/* link-locall addr as a CoA is impossible? */
+		if (IN6_IS_ADDR_LINKLOCAL(&ia->ia_addr.sin6_addr))
+			goto next;
+
+		/* tempaddr as a CoA is not supported. */
 		if (ia->ia6_flags & IN6_IFF_TEMPORARY)
 			goto next;
 

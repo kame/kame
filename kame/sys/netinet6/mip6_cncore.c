@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.24 2003/07/31 11:05:31 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.25 2003/08/05 13:19:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1654,7 +1654,8 @@ mip6_calculate_kbm(home_token, careof_token, key_bm)
  *     exclude_offset
  */
 void
-mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen, exclude_offset, exclude_data_len)
+mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen,
+    exclude_offset, exclude_data_len)
 	u_int8_t *key_bm;		/* Kbm */
 	u_int8_t *result;
 	struct in6_addr *addr1, *addr2;
@@ -2266,7 +2267,8 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 
 #define AUTH_SIZE	(sizeof(struct ip6m_opt_authdata) + MIP6_AUTHENTICATOR_LEN)
 int
-mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
+mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime,
+    refresh, mopt)
 	struct ip6_mobility **pktopt_mobility;
 	struct sockaddr_in6 *src;
 	struct sockaddr_in6 *dst;

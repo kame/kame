@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.52 2003/08/04 05:25:38 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.53 2003/08/05 13:19:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -152,8 +152,9 @@ t.
 
 #if NHIF > 0
 
-static int hif_ha_list_update_withmpfx __P((struct hif_softc *, caddr_t));
-static int hif_ha_list_update_withioctl __P((struct hif_softc *, caddr_t));
+static int hif_site_prefix_list_update_withioctl(struct hif_softc *, caddr_t);
+static int hif_ha_list_update_withmpfx(struct hif_softc *, caddr_t);
+static int hif_ha_list_update_withioctl(struct hif_softc *, caddr_t);
 
 struct hif_softc_list hif_softc_list;
 
@@ -744,7 +745,8 @@ hif_ha_list_update_withmpfx(sc, data)
 	if (mpfx_is_new) {
 		hha = hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx);
 		if (hha == NULL) {
-			mha = mip6_ha_create(&sa6_any, NULL, 0, 0,
+			struct sockaddr_in6 any = sa6_any;
+			mha = mip6_ha_create(&any, NULL, 0, 0,
 			    MIP6_HA_DEFAULT_LIFETIME);
 			hif_ha_list_insert(&sc->hif_ha_list_home, mha);
 		} else

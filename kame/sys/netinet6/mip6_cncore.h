@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.3 2003/07/25 08:13:20 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.4 2003/08/05 13:19:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -117,6 +117,7 @@ int mip6_cksum(struct sockaddr_in6 *, struct sockaddr_in6 *, u_int32_t,
 
 /* core functions for mobile node and home agent. */
 #if defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)
+struct nd_prefix;
 void mip6_create_addr(struct sockaddr_in6 *, const struct sockaddr_in6 *,
     struct nd_prefix *);
 int mip6_tunnel_input(struct mbuf **, int *, int);
