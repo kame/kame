@@ -559,6 +559,8 @@ void	m_freem __P((struct mbuf *));
 void	m_reclaim __P((int));
 void	mbinit __P((void));
 
+struct mbuf *m_aux_add2 __P((struct mbuf *, int, int, void *));
+struct mbuf *m_aux_find2 __P((struct mbuf *, int, int, void *));
 struct mbuf *m_aux_add __P((struct mbuf *, int, int));
 struct mbuf *m_aux_find __P((struct mbuf *, int, int));
 void m_aux_delete __P((struct mbuf *, struct mbuf *));

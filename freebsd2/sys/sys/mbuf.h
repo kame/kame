@@ -481,6 +481,8 @@ void	m_copyback __P((struct mbuf *, int, int, caddr_t));
 void	m_copydata __P((struct mbuf *,int,int,caddr_t));
 void	m_freem __P((struct mbuf *));
 
+struct mbuf *m_aux_add2 __P((struct mbuf *, int, int, void *));
+struct mbuf *m_aux_find2 __P((struct mbuf *, int, int, void *));
 struct mbuf *m_aux_add __P((struct mbuf *, int, int));
 struct mbuf *m_aux_find __P((struct mbuf *, int, int));
 void m_aux_delete __P((struct mbuf *, struct mbuf *));

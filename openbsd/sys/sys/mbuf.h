@@ -448,6 +448,8 @@ void	m_zero __P((struct mbuf *));
 int	m_apply __P((struct mbuf *, int, int,
 			int (*)(caddr_t, caddr_t, unsigned int), caddr_t));
 
+struct mbuf *m_aux_add2 __P((struct mbuf *, int, int, void *));
+struct mbuf *m_aux_find2 __P((struct mbuf *, int, int, void *));
 struct mbuf *m_aux_add __P((struct mbuf *, int, int));
 struct mbuf *m_aux_find __P((struct mbuf *, int, int));
 void m_aux_delete __P((struct mbuf *, struct mbuf *));
