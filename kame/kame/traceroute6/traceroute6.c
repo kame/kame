@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.51 2002/05/26 14:42:51 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.52 2002/06/09 02:40:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1158,7 +1158,7 @@ packet_ok(mhdr, cc, seq)
 
 		if (getnameinfo((struct sockaddr *)from, from->sin6_len,
 		    sbuf, sizeof(sbuf), NULL, 0, NI_NUMERICHOST) != 0)
-			strlcpy(sbuf, "invalid", sizeof(hbuf));
+			strlcpy(sbuf, "invalid", sizeof(sbuf));
 		printf("\n%d bytes from %s to %s", cc, sbuf,
 		    rcvpktinfo ? inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
 		    dbuf, sizeof(dbuf)) : "?");
