@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2443 2003/07/25 09:35:04 itojun Exp $
+$KAME: CHANGELOG,v 1.2444 2003/07/28 05:43:54 keiichi Exp $
 
 <200307>
+Mon Jul 28 14:38:11 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_hacore.c,mip6_cncore.c:
+	- fixed a bug not sending a binding ack when DAD for a link-local
+	  address is failed.  (en-bugged during re-structuring BC logic.)
+	- fixed a bug using RTHDR2 with Mobility Headers other than
+	  a binding ack.
+	reported by Yukiyo.Akisada@jp.yokogawa.com.
+
 Fri Jul 25 19:12:15 JST 2003  itojun@iijlab.net
 	* sys/netinet/ah_core.c: hmac-ripemd160 support
 
@@ -81,7 +89,7 @@ Tue Jul  8 12:04:14 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_mncore.c
 	a mobile node must send a multicast neighbor advertisement
 	for its link-local address when returning to home.
-	reported by Yasukawa Information Corp.
+	reported by Yaskawa Information Corp.
 
 Mon Jul  7 20:23:00 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_cncore.c,kame/sys/netkey/key.[ch]
