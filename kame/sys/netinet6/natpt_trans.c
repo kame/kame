@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.115 2002/05/10 11:47:49 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.116 2002/05/21 06:29:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -842,12 +842,6 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	ip6->ip6_nxt  = IPPROTO_ICMPV6;
 	if ((frag6 = natpt_composeIPv6Hdr(cv4, pad, ip6)) != NULL)
 		cv6.pyld.caddr += sizeof(struct ip6_frag);
-	ip6->ip6_src.s6_addr32[0] = natpt_prefix.s6_addr32[0];
-	ip6->ip6_src.s6_addr32[1] = natpt_prefix.s6_addr32[1];
-	ip6->ip6_src.s6_addr32[2] = natpt_prefix.s6_addr32[2];
-	ip6->ip6_src.s6_addr32[3] = ip4->ip_src.s_addr;
-
-	cv6.pyld.icmp6->icmp6_data32[0] = 0;	/* clear unused (maybe) field */
 
 	icmp4 = cv4->pyld.icmp4;
 	icmp6 = cv6.pyld.icmp6;

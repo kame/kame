@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.55 2002/05/15 06:45:57 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.56 2002/05/21 06:29:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -269,8 +269,8 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		}
 	}
 
+	pad = &cv4.ats->remote;
 	if (cv4.fromto == NATPT_FROM) {
-		pad = &cv4.ats->remote;
 		cv4.ats->fromto++;
 	} else {
 		pad = &cv4.ats->local;

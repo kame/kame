@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.49 2002/05/16 06:47:45 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.50 2002/05/21 06:29:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -141,11 +141,16 @@ struct pcv {
 	u_char	 ip_p;		/* IPPROTO_(ICMP[46]|TCP|UDP) */
 
 	u_char	 fromto;
-#define	NATPT_FROM	0
+#define	NATPT_FROM		0
 #define	NATPT_TO		1
 
 	u_char	 flags;
 #define	NATPT_TRACEROUTE	0x01
+#define	NATPT_toIPv4		0x02	/* ipv[46] to ipv4 translation */
+#define	NATPT_REVERSE		0x04	/* reverse direction of "bidir" rule */
+
+#define	isReverse(cv)		((cv)->flags & NATPT_REVERSE)
+#define	isRegular(cv)		(!isReverse(cv))
 
 /* The following flags are used in IPv4->IPv6 translation */
 #define	ZERO_OFFSET		0x08	/* fragment offset == 0 */

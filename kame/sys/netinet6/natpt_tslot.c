@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.45 2002/05/16 06:47:46 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.46 2002/05/21 06:29:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -236,57 +236,60 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 
 	remote = &ats->remote;
 #ifdef NATPT_NAT
-	if ((acs->map & NATPT_BIDIR)
-	    && (cv4->fromto == NATPT_TO)
-	    && (acs->Local.sa_family == AF_INET)) {
+	if (cv4->flags & NATPT_toIPv4) {
 		remote->sa_family = AF_INET;
-		remote->in4src = acs->Local.in4Addr;
-		remote->in4dst = cv4->ip.ip4->ip_src;
-		if ((cv4->ip_p == IPPROTO_TCP)
-		    || (cv4->ip_p == IPPROTO_UDP)) {
-			remote->port[0] = cv4->pyld.tcp4->th_dport;
-			remote->port[1] = cv4->pyld.tcp4->th_sport;
+		if (isRegular(cv4)) {
+			remote->in4src = acs->Remote.in4Addr;
+			remote->in4dst = cv4->ip.ip4->ip_dst;
+		} else {
+			remote->in4src = cv4->ip.ip4->ip_src;
+			remote->in4dst = acs->Local.in4Addr;
 		}
-		cv4->fromto = NATPT_FROM;			/* XXX */
-	} else if (acs->Remote.sa_family == AF_INET) {
-		remote->sa_family = AF_INET;
-		remote->in4src = cv4->ip.ip4->ip_dst;
-		remote->in4dst = acs->Remote.in4Addr;
 		if ((cv4->ip_p == IPPROTO_TCP)
 		    || (cv4->ip_p == IPPROTO_UDP)) {
 			remote->port[0] = cv4->pyld.tcp4->th_dport;
 			remote->port[1] = cv4->pyld.tcp4->th_sport;
-			if (acs->map & NATPT_REMAP_SPORT)
-				natpt_remapRemote4Port(acs, remote);
 		}
 	} else
 #endif
 	{
 		remote->sa_family = AF_INET6;
-		remote->in6src = acs->Remote.in6src;
-		if (acs->map & NATPT_REDIRECT_ADDR)
-			remote->in6src = acs->remote.daddr.in6;
-		remote->in6dst = natpt_prefix;
-		remote->in6dst.s6_addr32[3] = cv4->ip.ip4->ip_src.s_addr;
-		if ((cv4->ip_p == IPPROTO_TCP)
-		    || (cv4->ip_p == IPPROTO_UDP)) {
-			remote->port[0] = cv4->pyld.tcp4->th_dport;
-			remote->port[1] = cv4->pyld.tcp4->th_sport;
+		if (isRegular(cv4)) {
+			remote->in6src = acs->Remote.in6src;
+			if (acs->map & NATPT_REDIRECT_ADDR)
+				remote->in6src = acs->remote.daddr.in6;
+			remote->in6dst = natpt_prefix;
+			remote->in6dst.s6_addr32[3] = cv4->ip.ip4->ip_src.s_addr;
+			if ((cv4->ip_p == IPPROTO_TCP)
+			    || (cv4->ip_p == IPPROTO_UDP)) {
+				remote->port[0] = cv4->pyld.tcp4->th_dport;
+				remote->port[1] = cv4->pyld.tcp4->th_sport;
 
-			if (acs->map & NATPT_REDIRECT_PORT)
-				remote->port[0] = acs->remote.dport;
-			if (acs->map & NATPT_REMAP_SPORT)
-				natpt_remapRemote4Port(acs, remote);
+				if (acs->map & NATPT_REDIRECT_PORT)
+					remote->port[0] = acs->remote.dport;
+				if (acs->map & NATPT_REMAP_SPORT)
+					natpt_remapRemote4Port(acs, remote);
+			}
+		} else {
+			remote->in6dst = natpt_prefix;
+			remote->in6dst.s6_addr32[3] = cv4->ip.ip4->ip_src.s_addr;
+			remote->in6src = acs->Local.in6src;
+			if ((cv4->ip_p == IPPROTO_TCP)
+			    || (cv4->ip_p == IPPROTO_UDP)) {
+				remote->port[0] = cv4->pyld.tcp4->th_dport;
+				remote->port[1] = cv4->pyld.tcp4->th_sport;
+			}
 		}
 	}
 
+	cv4->fromto = NATPT_FROM;
 	ats->ip_p = cv4->ip_p;
 	ats->csl = acs;
 
 	ats->hvl = hvl = natpt_hashPad4(local);
 	thl = &tslhashl[hvl];
 #ifdef NATPT_NAT
-	if (acs->Remote.sa_family == AF_INET)
+	if (remote->sa_family == AF_INET)
 		hvr = natpt_hashPad4(remote);
 	else
 #endif

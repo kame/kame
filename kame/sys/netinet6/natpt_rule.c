@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.47 2002/05/16 08:05:58 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.48 2002/05/21 06:29:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -141,8 +141,7 @@ natpt_lookForRule4(struct pcv *cv4)
 
 	s = splnet();
 	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
-		if (csl->Local.sa_family != AF_INET)
-			continue;
+		struct in_addr in4to;
 
 		if (csl->proto != 0) {
 			switch (cv4->ip_p) {
@@ -163,25 +162,34 @@ natpt_lookForRule4(struct pcv *cv4)
 			}
 		}
 
-		if (natpt_matchIn4addr(cv4, csl, &csl->local) != 0) {
+		if ((csl->Local.sa_family == AF_INET)
+		    && (natpt_matchIn4addr(cv4, csl, &csl->local) != 0)) {
 			if (isDump(D_MATCHINGRULE4))
-				natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
-			cv4->fromto = NATPT_FROM;
+				natpt_logIp4(LOG_DEBUG, cv4->ip.ip4,
+					     "%s(): Regular:", fn);
+			if (csl->Remote.sa_family == AF_INET)
+				cv4->flags |= NATPT_toIPv4;
 			splx(s);
 			return (csl);
 		}
 
-		if (csl->map & NATPT_BIDIR) {
-			struct in_addr in4to = cv4->ip.ip4->ip_dst;
+		if ((csl->map & NATPT_BIDIR) == 0)
+			continue;
 
-			if (in4to.s_addr == csl->Remote.in4Addr.s_addr) {
-				if (isDump(D_MATCHINGRULE4))
-					natpt_logIp4(LOG_DEBUG, cv4->ip.ip4,
-						     "%s():", fn);
-				cv4->fromto = NATPT_TO;
-				splx(s);
-				return (csl);
-			}
+		/* When "bidir" option was specified with this entry. */
+		if (csl->Remote.sa_family != AF_INET)
+			continue;
+
+		in4to = cv4->ip.ip4->ip_dst;
+		if (in4to.s_addr == csl->Remote.in4Addr.s_addr) {
+			if (isDump(D_MATCHINGRULE4))
+				natpt_logIp4(LOG_DEBUG, cv4->ip.ip4,
+					     "%s(): Reverse:", fn);
+			cv4->flags |= NATPT_REVERSE;
+			if (csl->Local.sa_family == AF_INET)
+				cv4->flags |= NATPT_toIPv4;
+			splx(s);
+			return (csl);
 		}
 	}
 	splx(s);
