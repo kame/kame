@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.306 2002/11/21 02:18:28 k-sugyou Exp $	*/
+/*	$KAME: nd6.c,v 1.307 2002/11/22 08:21:42 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1447,9 +1447,9 @@ nd6_rtrequest(req, rt, sa)
 				in6_embedscope(&llsol.sin6_addr,
 					       &llsol); /* XXX */
 #ifdef MLDV2
-				if (in6_addmulti(&llsol, ifp, &error, 0, NULL, MCAST_EXCLUDE, 0))
+				if (in6_addmulti(&llsol, ifp, &error, 0, NULL, MCAST_EXCLUDE, 0) == NULL)
 #else
-				if (in6_addmulti(&llsol, ifp, &error))
+				if (in6_addmulti(&llsol, ifp, &error) == NULL)
 #endif
 				{
 					nd6log((LOG_ERR, "%s: failed to join "
