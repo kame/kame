@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.67 2000/05/22 21:10:28 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.68 2000/05/22 22:37:58 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1729,10 +1729,9 @@ ahmismatch:
 		case IPSECDOI_ATTR_SA_LD:
 			if (flag) {
 				/* i.e. ISAKMP_GEN_TV */
-				/* warning */
-				YIPSDEBUG(DEBUG_NOTIFY,
+				YIPSDEBUG(DEBUG_SA,
 					plog(logp, LOCATION, NULL,
-					"should be TLV when LD.\n"));
+					"life duration was in TLV.\n"));
 			} else {
 				/* i.e. ISAKMP_GEN_TLV */
 				if (lorv == 0) {
@@ -1883,10 +1882,9 @@ check_attr_ipcomp(trns)
 		case IPSECDOI_ATTR_SA_LD:
 			if (flag) {
 				/* i.e. ISAKMP_GEN_TV */
-				/* warning */
-				YIPSDEBUG(DEBUG_NOTIFY,
+				YIPSDEBUG(DEBUG_SA,
 					plog(logp, LOCATION, NULL,
-					"should be TLV when LD.\n"));
+					"life duration was in TLV.\n"));
 			} else {
 				/* i.e. ISAKMP_GEN_TLV */
 				if (lorv == 0) {
