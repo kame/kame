@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.173 2002/09/11 03:22:38 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.174 2002/09/17 05:28:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1004,7 +1004,6 @@ in6_ifdetach(ifp)
 #else
 		next = ifa->ifa_list.tqe_next;
 #endif
-
 
 		if (ifa->ifa_addr->sa_family != AF_INET6
 		 || !IN6_IS_ADDR_LINKLOCAL(&satosin6(&ifa->ifa_addr)->sin6_addr)) {
