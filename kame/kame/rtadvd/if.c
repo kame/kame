@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.30 2003/09/21 07:17:03 itojun Exp $	*/
+/*	$KAME: if.c,v 1.31 2003/09/23 10:58:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -527,7 +527,7 @@ parse_iflist(struct if_msghdr ***ifmlist_p, char *buf, size_t bufsize)
 	 */
 	iflentry_size = sizeof(struct if_msghdr);
 	/* roughly estimate max list size of pointers to each if_msghdr */
-	malloc_size = (bufsize/iflentry_size) * sizeof(size_t);
+	malloc_size = (bufsize/iflentry_size) * sizeof(void *);
 	if ((*ifmlist_p = (struct if_msghdr **)malloc(malloc_size)) == NULL) {
 		syslog(LOG_ERR, "<%s> malloc failed", __func__);
 		exit(1);
