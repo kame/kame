@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.3 1999/12/01 01:41:25 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.4 1999/12/22 16:01:54 itojun Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -978,6 +978,7 @@ isakmp_print(const u_char *bp, u_int length, const u_char *bp2)
 	u_char np;
 	int i;
 	int phase;
+	int major, minor;
 
 	base = (struct isakmp *)bp;
 	ep = (u_char *)snapend;
@@ -988,8 +989,13 @@ isakmp_print(const u_char *bp, u_int length, const u_char *bp2)
 	}
 
 	printf("isakmp");
-	if (vflag)
-		printf(" %d.%d", base->v_maj, base->v_min);
+	if (vflag) {
+		major = (base->vers & ISAKMP_VERS_MAJOR)
+				>> ISAKMP_VERS_MAJOR_SHIFT;
+		minor = (base->vers & ISAKMP_VERS_MINOR)
+				>> ISAKMP_VERS_MINOR_SHIFT;
+		printf(" %d.%d", major, minor);
+	}
 
 	if (vflag) {
 		printf(" msgid ");
