@@ -1,7 +1,14 @@
-$Id: CHANGELOG,v 1.461 2000/01/18 13:49:33 itojun Exp $
+$Id: CHANGELOG,v 1.462 2000/01/18 15:17:25 itojun Exp $
 
 
 <200001>
+Wed Jan 19 00:15:50 JST 2000  itojun@iijlab.net
+	* kame/libinet6/bindresvport.c: bring in bindresvport_af() from
+	  openbsd-current.  the function signature and behavior is under
+	  debate in ipngwg mailing list, so I thought it would be good to
+	  bring it in and try using it, to see any pros/cons we might have
+	  in particular proposal (and other proposals).
+
 Tue Jan 18 22:48:35 JST 2000  itojun@iijlab.net
 	* kame/libinet6/rresvport_af.c: preserve old rresvport() behavior.
 	  it needs to honor parameter (*port) if given.  previous behavior
