@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.13 2002/09/17 09:57:20 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.14 2002/09/19 01:08:46 suz Exp $
  */
 
 /*
@@ -214,7 +214,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     v = &uvifs[vifi];
     v->uv_in_mld_query++;
 
-    if (v->uv_mld_version & MLDv1) {
+    if ((v->uv_mld_version & MLDv2) == 0) {
 	log(LOG_WARNING, 0,
 	    "Mif %s configured in MLDv1 received MLDv2 query (src %s),ignored",
 	    v->uv_name,sa6_fmt(src));
@@ -409,7 +409,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 
     v = &uvifs[vifi];
 
-    if (v->uv_mld_version & MLDv1) {
+    if ((v->uv_mld_version & MLDv2) == 0) {
 	log(LOG_WARNING, 0,
 	    "Mif %s configured in MLDv1 received MLDv2 report,ignored",
 	    v->uv_name);
