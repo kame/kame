@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.964 2000/06/02 12:31:28 jinmei Exp $
+$Id: CHANGELOG,v 1.965 2000/06/02 23:09:15 sumikawa Exp $
 
 <200006>
+Sat Jun  3 08:08:43 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/{libpcap,tcpdump}: use 2000/5/29 weekly snap.
+	* freebsd3/ports/mod_perl: mod_perl-1.24.tar.gz
+
 2000-06-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/tcp_subr.c (tcp6_ctlinput): separated from
 	tcp_ctlinput. We believe a separated function would make sense
