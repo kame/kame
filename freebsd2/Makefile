@@ -1,6 +1,6 @@
 .include <bsd.own.mk>			# for configuration variables.
 
-SUBDIR=	lib libexec sbin usr.bin usr.sbin share
+SUBDIR=	lib include libexec sbin usr.bin usr.sbin share
 
 #build:
 #	$(MAKE) includes
@@ -22,5 +22,9 @@ beforeinstall:
 		[ -d $(PREFIX)/man/man$$i ] || mkdir -p $(PREFIX)/man/man$$i; \
 		[ -d $(PREFIX)/man/cat$$i ] || mkdir -p $(PREFIX)/man/cat$$i; \
 	done
+
+afterinstall:
+	cp kame/rtadvd/rtadvd.conf $(PREFIX)/etc/rtadvd.conf.sample
+	cp kame/bgpd/bgpd.conf $(PREFIX)/etc/bgpd.conf.sample
 
 .include <bsd.subdir.mk>
