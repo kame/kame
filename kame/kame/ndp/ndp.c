@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.107 2004/02/04 04:18:47 suz Exp $	*/
+/*	$KAME: ndp.c,v 1.108 2004/02/10 14:43:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -783,6 +783,7 @@ again:;
 
 	if (repeat) {
 		printf("\n");
+		fflush(stdout);
 		sleep(repeat);
 		goto again;
 	}
