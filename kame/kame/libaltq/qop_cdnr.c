@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop_cdnr.c,v 1.4 2000/03/02 11:55:46 kjc Exp $
+ * $Id: qop_cdnr.c,v 1.5 2000/04/17 11:44:41 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -297,7 +297,6 @@ qcmd_cdnr_delete(const char *ifname, const char *cdnr_name)
 {
 	struct ifinfo		*ifinfo;
 	struct classinfo	*clinfo;
-	int error;
 
 	if ((ifinfo = cdnr_ifname2ifinfo(ifname)) == NULL)
 		return (QOPERR_BADIF);
