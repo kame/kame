@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.42 2001/05/08 04:36:41 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.43 2001/08/20 07:15:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -291,7 +291,6 @@ static char sccsid[] = "@(#)traceroute.c	8.1 (Berkeley) 6/6/93";
 #endif
 
 #define Fprintf (void)fprintf
-#define Sprintf (void)sprintf
 #define Printf (void)printf
 
 #ifndef HAVE_GETIPNODEBYNAME
