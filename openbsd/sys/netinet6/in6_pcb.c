@@ -263,111 +263,121 @@ in6_pcbbind(inp, nam)
 	}
     }
 
-  if (lport == 0) {
-    /* This code block was derived from OpenBSD */
-    uint16_t first, last, old = 0;
-    int count;
-    int loopcount = 0;
-    struct in_addr fa, la;
-    u_int16_t *lastport;
-    lastport = &inp->inp_table->inpt_lastport;
+	if (lport == 0) {
+		error = in6_pcbsetport(&inp->inp_laddr6, inp);
+		if (error != 0)
+			return error;
+	} else
+		inp->inp_lport = lport;
 
-    if (inp->inp_flags & INP_IPV6_MAPPED) {
-      la.s_addr = inp->inp_laddr6.s6_addr32[3];
-      fa.s_addr = 0;
-      wild &= ~INPLOOKUP_IPV6;
-    };
+	in_pcbrehash(inp);
 
-    if (inp->inp_flags & INP_HIGHPORT) {
-      first = ipport_hifirstauto;	/* sysctl */
-      last = ipport_hilastauto;
-    } else if (inp->inp_flags & INP_LOWPORT) {
-      if ((error = suser(p->p_ucred, &p->p_acflag)))
-	return (EACCES);
-      first = IPPORT_RESERVED-1; /* 1023 */
-      last = 600;		   /* not IPPORT_RESERVED/2 */
-    } else {
-      first = ipport_firstauto;	/* sysctl */
-      last  = ipport_lastauto;
-    }
+	return 0;
+}
 
-    /*
-     * Simple check to ensure all ports are not used up causing
-     * a deadlock here.
-     *
-     * We split the two cases (up and down) so that the direction
-     * is not being tested on each round of the loop.
-     */
+int
+in6_pcbsetport(laddr, inp)
+	struct in6_addr *laddr;
+	struct inpcb *inp;
+{
+	struct socket *so = inp->inp_socket;
+	struct inpcbtable *table = inp->inp_table;
+	u_int16_t first, last, old = 0;
+	u_int16_t *lastport = &inp->inp_table->inpt_lastport;
+	u_int16_t lport = 0;
+	int count;
+	int loopcount = 0;
+	int wild = INPLOOKUP_IPV6;
+	struct proc *p = curproc;		/* XXX */
+	int error;
+
+	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
+	    ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
+	     (so->so_options & SO_ACCEPTCONN) == 0))
+		wild |= INPLOOKUP_WILDCARD;
+
+	if (inp->inp_flags & INP_HIGHPORT) {
+		first = ipport_hifirstauto;	/* sysctl */
+		last = ipport_hilastauto;
+	} else if (inp->inp_flags & INP_LOWPORT) {
+		if ((error = suser(p->p_ucred, &p->p_acflag)))
+			return (EACCES);
+		first = IPPORT_RESERVED-1; /* 1023 */
+		last = 600;		   /* not IPPORT_RESERVED/2 */
+	} else {
+		first = ipport_firstauto;	/* sysctl */
+		last  = ipport_lastauto;
+	}
+
+	/*
+	 * Simple check to ensure all ports are not used up causing
+	 * a deadlock here.
+	 *
+	 * We split the two cases (up and down) so that the direction
+	 * is not being tested on each round of the loop.
+	 */
 
 portloop:
-    if (first > last) {
-      /*
-       * counting down
-       */
-      if (loopcount == 0) {	/* only do this once. */
-	old = first;
-	first -= (arc4random() % (first - last));
-      }
-      count = first - last;
-      *lastport = first;		/* restart each time */
-      
-      do {
-	if (count-- <= 0) {	/* completely used? */
-	  if (loopcount == 0) {
-	    last = old;
-	    loopcount++;
-	    goto portloop;
-	  }
-	  return (EADDRNOTAVAIL);
+	if (first > last) {
+		/*
+		 * counting down
+		 */
+		if (loopcount == 0) {	/* only do this once. */
+			old = first;
+			first -= (arc4random() % (first - last));
+		}
+		count = first - last;
+		*lastport = first;		/* restart each time */
+
+		do {
+			if (count-- <= 0) {	/* completely used? */
+				if (loopcount == 0) {
+					last = old;
+					loopcount++;
+					goto portloop;
+				}
+				return (EADDRNOTAVAIL);
+			}
+			--*lastport;
+			if (*lastport > first || *lastport < last)
+				*lastport = first;
+			lport = htons(*lastport);
+		} while (in_baddynamic(*lastport, so->so_proto->pr_protocol) ||
+		    in_pcblookup(table, &zeroin6_addr, 0,
+		    &inp->inp_laddr6, lport, wild));
+	} else {
+		/*
+		 * counting up
+		 */
+		if (loopcount == 0) {	/* only do this once. */
+			old = first;
+			first += (arc4random() % (last - first));
+		}
+		count = last - first;
+		*lastport = first;		/* restart each time */
+
+		do {
+			if (count-- <= 0) {	/* completely used? */
+				if (loopcount == 0) {
+					first = old;
+					loopcount++;
+					goto portloop;
+				}
+				return (EADDRNOTAVAIL);
+			}
+			++*lastport;
+			if (*lastport < first || *lastport > last)
+				*lastport = first;
+			lport = htons(*lastport);
+		} while (in_baddynamic(*lastport, so->so_proto->pr_protocol) ||
+		    in_pcblookup(table, &zeroin6_addr, 0,
+		    &inp->inp_laddr6, lport, wild));
 	}
-	--*lastport;
-	if (*lastport > first || *lastport < last)
-	  *lastport = first;
-	lport = htons(*lastport);
-      } while (in_baddynamic(*lastport, so->so_proto->pr_protocol) ||
-	       ((wild & INPLOOKUP_IPV6) ?
-		in_pcblookup(head, (struct in_addr *)&zeroin6_addr, 0,
-			(struct in_addr *)&inp->inp_laddr6, lport, wild) :
-		in_pcblookup(head, (struct in_addr *)&fa, 0,
-			(struct in_addr *)&la, lport, wild)));
-    } else {
-      /*
-       * counting up
-       */
-      if (loopcount == 0) {	/* only do this once. */
-	old = first;
-	first += (arc4random() % (last - first));
-      }
-      count = last - first;
-      *lastport = first;		/* restart each time */
-      
-      do {
-	if (count-- <= 0) {	/* completely used? */
-	  if (loopcount == 0) {
-	    first = old;
-	    loopcount++;
-	    goto portloop;
-	  }
-	  return (EADDRNOTAVAIL);
-	}
-	++*lastport;
-	if (*lastport < first || *lastport > last)
-	  *lastport = first;
-	lport = htons(*lastport);
-      } while (in_baddynamic(*lastport, so->so_proto->pr_protocol) ||
-	       ((wild & INPLOOKUP_IPV6) ?
-		in_pcblookup(head, (struct in_addr *)&zeroin6_addr, 0,
-			(struct in_addr *)&inp->inp_laddr6, lport, wild) :
-		in_pcblookup(head, (struct in_addr *)&fa, 0,
-			(struct in_addr *)&la, lport, wild)));
-    }
-  }
 
-  inp->inp_lport = lport;
+	inp->inp_lport = lport;
+	in_pcbrehash(inp);
 
-
-  /* XXX hash */
-  return 0;
+	return 0;
 }
 
 /*----------------------------------------------------------------------

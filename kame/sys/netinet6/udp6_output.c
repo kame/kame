@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.1 2000/04/18 03:45:43 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.2 2000/04/18 07:47:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,21 +96,45 @@
 #include <netinet/udp_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#if !(defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
 #include <netinet6/in6_pcb.h>
-#include <netinet/icmp6.h>
 #include <netinet6/udp6_var.h>
+#endif
+#include <netinet/icmp6.h>
 #include <netinet6/ip6protosw.h>
 
+#ifdef __OpenBSD__
+#undef IPSEC
+#else
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #endif /*IPSEC*/
+#endif
 
 #include "faith.h"
+
+#include <net/net_osdep.h>
 
 /*
  * UDP protocol inplementation.
  * Per RFC 768, August, 1980.
  */
+
+#ifdef HAVE_NRL_INPCB
+#define in6pcb		inpcb
+#define in6p_outputopts	inp_outputopts6
+#define in6p_socket	inp_socket
+#define in6p_faddr	inp_faddr6
+#define in6p_laddr	inp_laddr6
+#define in6p_fport	inp_fport
+#define in6p_lport	inp_lport
+#define in6p_flags	inp_flags
+#define in6p_moptions	inp_moptions6
+#define in6p_route	inp_route6
+#define in6p_flowinfo	inp_fflowinfo
+#define udp6stat	udpstat
+#define udp6s_opackets	udps_opackets
+#endif
 
 int
 udp6_output(in6p, m, addr6, control)

@@ -278,4 +278,5 @@ struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct route_in6 *,
 				     struct in6_addr *, int *));
 int	in6_selecthlim __P((struct inpcb *, struct ifnet *));
+int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *));
 #endif

@@ -99,6 +99,10 @@ int	udp6_usrreq __P((struct socket *,
 void	 *udp_ctlinput __P((int, struct sockaddr *, void *));
 void	 udp_init __P((void));
 void	 udp_input __P((struct mbuf *, ...));
+#ifdef INET6
+int	 udp6_output __P((struct inpcb *, struct mbuf *, struct mbuf *,
+	struct mbuf *));
+#endif
 int	 udp_output __P((struct mbuf *, ...));
 int	 udp_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 int	 udp_usrreq __P((struct socket *,

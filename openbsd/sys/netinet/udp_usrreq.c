@@ -1211,7 +1211,15 @@ udp_usrreq(so, req, m, addr, control)
 		if (error)
 			return (error);
 #endif
+#ifdef INET6
+		if ((inp->inp_flags & INP_IPV6) &&
+		    !(inp->inp_flags & INP_IPV6_MAPPED))
+			return (udp6_output(inp, m, addr, control));
+		else
+			return (udp_output(m, inp, addr, control));
+#else
 		return (udp_output(m, inp, addr, control));
+#endif
 
 	case PRU_ABORT:
 		soisdisconnected(so);
