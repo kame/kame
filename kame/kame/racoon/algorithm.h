@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.h,v 1.13 2001/08/09 07:32:19 sakane Exp $	*/
+/*	$KAME: algorithm.h,v 1.14 2001/08/13 13:02:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,10 @@ enum {
 	algtype_modp768 = 1, algtype_modp1024,
 	algtype_ec2n155, algtype_ec2n185,
 	algtype_modp1536,
+	algtype_modp2048,
+	algtype_modp3072,
+	algtype_modp4096,
+	algtype_modp8192,
 };
 
 enum {

@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.15 2001/08/09 07:32:19 sakane Exp $	*/
+/*	$KAME: algorithm.c,v 1.16 2001/08/13 13:02:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,6 +108,10 @@ static const int isakmpdh2doi[] = {
 	OAKLEY_ATTR_GRP_DESC_EC2N155,
 	OAKLEY_ATTR_GRP_DESC_EC2N185,
 	OAKLEY_ATTR_GRP_DESC_MODP1536,
+	OAKLEY_ATTR_GRP_DESC_MODP2048,
+	OAKLEY_ATTR_GRP_DESC_MODP3072,
+	OAKLEY_ATTR_GRP_DESC_MODP4096,
+	OAKLEY_ATTR_GRP_DESC_MODP8192,
 };
 
 /*
