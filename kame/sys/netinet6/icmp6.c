@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.239 2001/08/03 12:37:11 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.240 2001/08/06 05:52:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2076,16 +2076,21 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 			 * Note that we currently do not support stateful
 			 * address configuration by DHCPv6, so the former
 			 * case can't happen.
+			 *
+			 * TTL must be 2^31 > TTL >= 0.
 			 */
 			if (ifa6->ia6_lifetime.ia6t_expire == 0)
 				ltime = ND6_INFINITE_LIFETIME;
 			else {
 				if (ifa6->ia6_lifetime.ia6t_expire >
 				    time_second)
-					ltime = htonl(ifa6->ia6_lifetime.ia6t_expire - time_second);
+					ltime = ifa6->ia6_lifetime.ia6t_expire - time_second;
 				else
 					ltime = 0;
 			}
+			if (ltime > 0x7fffffff)
+				ltime = 0x7fffffff;
+			ltime = htonl(ltime);
 			
 			bcopy(&ltime, cp, sizeof(u_int32_t));
 			cp += sizeof(u_int32_t);
