@@ -243,10 +243,28 @@ rtsol_input(int s)
 		return;
 	}
 
+	if (icp->icmp6_code != 0) {
+		warnmsg(LOG_ERR, __FUNCTION__,
+			"invalid icmp code(%d) from %s on %s", icp->icmp6_code,
+		       inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+				 INET6_ADDRSTRLEN),
+		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
+		return;
+	}
+
 	if (*hlimp != 255) {
 		warnmsg(LOG_NOTICE, __FUNCTION__,
 			"invalid RA with hop limit(%d) from %s on %s",
 		       *hlimp,
+		       inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+				 INET6_ADDRSTRLEN),
+		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
+		return;
+	}
+
+	if (pi && !IN6_IS_ADDR_LINKLOCAL(&from.sin6_addr)) {
+		warnmsg(LOG_NOTICE, __FUNCTION__,
+			"invalid RA with non link-local source from %s on %s",
 		       inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
 				 INET6_ADDRSTRLEN),
 		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
