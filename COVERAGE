@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.129 2002/10/24 10:15:00 suz Exp $
+$KAME: COVERAGE,v 1.130 2002/11/25 05:10:15 itojun Exp $
 
 
 x: supported/integrated
@@ -8,7 +8,7 @@ x: supported/integrated
 
 
 		KAME
-		net15	open29	free228	free35	free47	bsdi31	bsdi42
+		net16	open32	free228	free35	free47	bsdi31	bsdi42
 		--	--	--	--	--	--	--
 TCP/UDP		see IMPLEMENTATION for details
 
@@ -20,7 +20,7 @@ IPsec		x	(*1)	x	x	x	x	x
 	 use unpatched (non-KAME) OpenBSD.
 
 KAME mobile-ip6
-		-	-	-	-	(*1)	-	-
+		?	?	-	-	(*1)	-	-
     (*1) being worked on
 
 NAT/PT		-	-	x	(*1)	x	(*1)	?
@@ -75,7 +75,7 @@ Kernel PPP	x	?	-	-	x	?	?
 (+): see above for KAME/*BSD differences
 
 		KAME	merged *-current	merged
-		*BSD	net	open	free	net152	open29	free47	bsdi42
+		*BSD	net	open	free	net16	open32	free47	bsdi42
 		--	--	--	--	--	--	--	---
 KAME IPv6 as of	latest	early	early	0528	early	early	0528	apr00
 			jun00	jun00	2001	jun00	jun00	2001
@@ -138,14 +138,14 @@ CMSG_FIRSTHDR validates msg_controllen
 
 getifaddrs	x	x	x	x	x	x	x	x
 
-icmp6 nodeinfo	07	07	07	07	06	06	07	?
-					(*1/2)	(*1/2)	(*1)	(*1/2)
+icmp6 nodeinfo	07	07	07	07	07	07	07	?
+					(*1/2)			(*1/2)
     (all) spec conformance is still low.
     (*1) does not join NI group address
     (*2) node addresses reply does not have TTL attached
 
 net.inet6.icmp6.nodeinfo is a bitmap
-		x	-	x	x	-	x	x	-
+		x	x	x	x	x	x	x	-
 
 nd6_proxyall	-	-	-	x	-	-	x	-
 
@@ -160,16 +160,16 @@ NUD on p2p only if real neighbor
 		x	x	x	x	x	x	x	?
 
 ND6 WAITDELETE state (should be removed)
-		-	-	-	x	x	-	x	x
+		-	-	-	x	-	-	x	x
 
 expiration of ND6 STALE entries (nd6_gctimer)
-		x	x	x	x	-	x	x	-
+		x	x	x	x	x	x	x	-
 
-pfctlinput2	(*1)	x	-	?	-	-	?	-
+pfctlinput2	(*1)	x	-	?	x	-	?	-
     (*1) in ip6_input.c
 
 xx_ctlinput scope friendliness
-		x	x	x	x	-	x	x	-
+		x	x	x	x	x	x	x	-
 
 icmp6 beyondscope
 		x	x	x	x	x	x	x	x
@@ -212,12 +212,12 @@ getnameinfo uses EAI_xx as return value (2553bis)
 		x	x	x	x	x	x	x	-
 
 getnameinfo always return a string with scope
-		x	x	x	-	-	-	-	-
+		x	x	x	-	x	x	-	-
 
 'options insecure1' in /etc/resolv.conf
-		x	x	x	-	-	-	-	-
+		x	x	x	-	x	x	-	-
 
-ALTQ		(+)	x	-	-	-	-	-	-
+ALTQ		(+)	x	x	-	x	x	-	-
 
 NAT/PT		(+)	-	-	-	-	-	-	-
 
@@ -287,8 +287,8 @@ basic userland	x	x	x	x	x	x	x	(*1)
 route6d		x	x	x	x	x	x	x	x
 hroute6d	x	-	-	-	-	-	-	x
 bgpd		x	-	-	-	-	-	-	x
-pim6dd		x	-	-	-	-	-	-	x
-pim6sd		x	-	-	-	-	-	-	x
+pim6dd		x	pkgsrc	-	-	pkgsrc	-	-	x
+pim6sd		x	pkgsrc	-	-	pkgsrc	-	-	x
 
 rtsol/rtsold	x	x	x	x	x	x	x	x
 rtadvd		x	x	x	x	x	x	x	x
@@ -308,8 +308,8 @@ default sendmail is IPv6 ready
 default sendmail.cf is IPv6 ready
 		(+)	x	x	-	x	x	-	-
 
-racoon		x	x	-	-	-	-	-	x
-racoon version	latest	001229	-	ports	pkgsrc	-	ports	?
+racoon		x	x/pkg	-	-	x/pkg	-	-	x
+racoon version	latest	021120	-	ports	020507	-	ports	?
 
 Userland PPP	(+)	-	?	x	-	?	-	?
 Kernel PPP	(+)	x	?	x	x	?	x	?
