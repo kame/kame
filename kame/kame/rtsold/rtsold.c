@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.54 2002/07/01 04:14:07 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.55 2002/09/08 01:26:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,7 +105,7 @@ static void TIMEVAL_ADD __P((struct timeval *, struct timeval *,
 static void TIMEVAL_SUB __P((struct timeval *, struct timeval *,
 	struct timeval *));
 
-static void rtsold_set_dump_file __P((void));
+static void rtsold_set_dump_file __P((int));
 static void usage __P((char *));
 
 int
@@ -197,10 +197,7 @@ main(argc, argv)
 		warnx("kernel is configured as a router, not a host");
 
 	/* initialization to dump internal status to a file */
-	if (signal(SIGUSR1, (void *)rtsold_set_dump_file) < 0) {
-		errx(1, "failed to set signal for dump status");
-		/*NOTREACHED*/
-	}
+	signal(SIGUSR1, rtsold_set_dump_file);
 
 	if (!fflag)
 		daemon(0, 0);		/* act as a daemon */
@@ -725,7 +722,8 @@ TIMEVAL_SUB(struct timeval *a, struct timeval *b, struct timeval *result)
 }
 
 static void
-rtsold_set_dump_file()
+rtsold_set_dump_file(sig)
+	int sig;
 {
 	do_dump = 1;
 }
