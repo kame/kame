@@ -1,7 +1,19 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1766 2001/07/11 09:30:40 suz Exp $
+$KAME: CHANGELOG,v 1.1767 2001/07/12 08:00:34 fujisawa Exp $
 
 <200107>
+2001-07-12 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{rule,tslot}.c
+	- You can connect from outside (IPv4 world) to inside (IPv6
+	  world), The following connection is possible.
+
+	  o inbound from 10.0.69.67
+			to 3ffe:501:41c:6000:2a0:24ff:fe95:a4a6
+	  o inbound from any4 port 65303
+			to 3ffe:501:41c:6000:2a0:24ff:fe95:a4a6 port 23
+
+	  This facility did not work for a bug until now.
+
 Wed Jul 11 17:55:33 JST 2001	suz@sdl.hitachi.co.jp
 	* kame/kame/pim6sd: added SSM (Source-Specific-Multicast) mode 
 	  for SSM prefix (ff20::/12 and ff30::/12).
