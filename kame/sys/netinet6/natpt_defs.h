@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.14 2001/05/07 08:49:16 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.15 2001/05/23 12:21:47 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -336,7 +336,7 @@ struct _tcpstate				/* sizeof():  32[byte]	*/
     short	_session;
 
     int		ftpstate;
-    u_long	delta[2];	/*    [0]: outgoingDelta			*/
+    long	delta[2];	/*    [0]: outgoingDelta			*/
 				/*	outgoingSeq	increment		*/
 				/*	incomingAck	decrement		*/
 				/*    [1]: incomingDelta			*/

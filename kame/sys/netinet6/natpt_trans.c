@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.27 2001/05/07 08:49:16 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.28 2001/05/23 12:21:47 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -144,8 +144,6 @@ struct ftpparam *parseFTPdialogue		__P((caddr_t, caddr_t, struct ftpparam *));
 struct sockaddr	*parse227			__P((caddr_t, caddr_t, struct sockaddr_in *));
 int		 rewriteMbuf			__P((struct mbuf *, char *, int , char *,int));
 void		 incrementSeq			__P((struct tcphdr *, int));
-void		 decrementSeq			__P((struct tcphdr *, int));
-void		 incrementAck			__P((struct tcphdr *, int));
 void		 decrementAck			__P((struct tcphdr *, int));
 
 static	void	 _recalculateTCP4Checksum	__P((struct _cv *));
@@ -887,10 +885,11 @@ translatingPYLD4To6(struct _cv *cv6, struct pAddr *pad)
 	if (ts->delta[0]
 	    && (th6->th_flags & TH_ACK)
 	    && (cv6->inout == NATPT_INBOUND))
-	    decrementAck(th6, ts->delta[1]);
+	    decrementAck(th6, ts->delta[0]);
 
-	if ((th6->th_seq != ts->seq[1])
-	    || (th6->th_ack != ts ->ack[1]))
+	if ((delta != 0)
+	    && ((th6->th_seq != ts->seq[1])
+		|| (th6->th_ack != ts ->ack[1])))
 	{
 	    ts->delta[1] += delta;
 	    ts->seq[1] = th6->th_seq;
@@ -915,7 +914,8 @@ translatingFTP4ReplyTo6(struct _cv *cv6, struct pAddr *pad)
 
     kb = (caddr_t)th6 + (th6->th_off << 2);
     kk = (caddr_t)ip6 + sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen);
-    if ((parseFTPdialogue(kb, kk, &ftp6)) == NULL)
+    if (((kk - kb) < FTPMINCMDLEN)
+	|| (parseFTPdialogue(kb, kk, &ftp6) == NULL))
 	return (0);
 
     ats = cv6->ats;
@@ -1473,8 +1473,9 @@ translatingPYLD6To4(struct _cv *cv4, struct pAddr *pad)
 	    && (cv4->inout == NATPT_OUTBOUND))
 	    decrementAck(th4, ts->delta[1]);
 
-	if ((th4->th_seq != ts->seq[0])
-	    || (th4->th_ack != ts->ack[0]))
+	if ((delta != 0)
+	    && ((th4->th_seq != ts->seq[0])
+		|| (th4->th_ack != ts->ack[0])))
 	{
 	    ts->delta[0] += delta;
 	    ts->seq[0] = th4->th_seq;
@@ -1492,17 +1493,16 @@ translatingFTP6CommandTo4(struct _cv *cv4, struct pAddr *pad)
     caddr_t		 kb, kk;
     struct ip		*ip4 = cv4->_ip._ip4;
     struct tcphdr	*th4 = cv4->_payload._tcp4;
-    struct _tSlot	*ats;
     struct _tcpstate	*ts;
     struct ftpparam	 ftp6;
 
     kb = (caddr_t)th4 + (th4->th_off << 2);
     kk = (caddr_t)ip4 + ip4->ip_len;
-    if ((parseFTPdialogue(kb, kk, &ftp6)) == NULL)
-	return (NULL);
+    if (((kk - kb) < FTPMINCMDLEN)
+	|| (parseFTPdialogue(kb, kk, &ftp6) == NULL))
+	return (0);
 
-    ats = cv4->ats;
-    ts  = ats->suit.tcp;
+    ts = cv4->ats->suit.tcp;
     switch(ftp6.cmd)
     {
       case FTP6_EPSV:
@@ -1619,9 +1619,6 @@ parseFTPdialogue(caddr_t kb, caddr_t kk, struct ftpparam *ftp6)
 	u_long	cmd;
     }	u;
 
-    if ((kk - kb) < FTPMINCMDLEN)
-	return (NULL);
-
     while ((kb < kk) && (*kb == ' '))
 	kb++;					/* skip preceding blank	*/
 
@@ -1737,20 +1734,6 @@ void
 incrementSeq(struct tcphdr *th, int delta)
 {
     th->th_seq = htonl(ntohl(th->th_seq) + delta);
-}
-
-
-void
-decrementSeq(struct tcphdr *th, int delta)
-{
-    th->th_seq = htonl(ntohl(th->th_seq) - delta);
-}
-
-
-void
-incrementAck(struct tcphdr *th, int delta)
-{
-    th->th_ack = htonl(ntohl(th->th_ack) + delta);
 }
 
 
