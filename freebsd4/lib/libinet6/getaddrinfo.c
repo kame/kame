@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.1 2000/04/27 02:58:25 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.2 2000/04/27 03:29:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,6 +39,13 @@
  * - Return values.  There are nonstandard return values defined and used
  *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
+ * - IPv4 classful (shortened) form.  RFC2553 is silent about it.  XNET 5.2
+ *   says to use inet_aton() to convert IPv4 numeric to binary (alows
+ *   classful form as a result).
+ *   current code - disallow classful form for IPv4 (due to use of inet_pton).
+ * - freeaddrinfo(NULL).  RFC2553 is silent about it.  XNET 5.2 says it is
+ *   invalid.
+ *   current code - SEGV on freeaddrinfo(NULL)
  * Note:
  * - We use getipnodebyname() just for thread-safeness.  There's no intent
  *   to let it do PF_UNSPEC (actually we never pass PF_UNSPEC to
@@ -47,6 +54,42 @@
  *   when globbing NULL hostname (to loopback, or wildcard).  Is it the right
  *   thing to do?  What is the relationship with post-RFC2553 AI_ADDRCONFIG
  *   in ai_flags?
+ * - (post-2553) semantics of AI_ADDRCONFIG itself is too vague.
+ *   (1) what should we do against numeric hostname (2) what should we do
+ *   against NULL hostname (3) what is AI_ADDRCONFIG itself.  AF not ready?
+ *   non-loopback address configured?  global address configured?
+ * - To avoid search order issue, we have a big amount of code duplicate
+ *   from gethnamaddr.c and some other places.  The issues that there's no
+ *   lower layer function to lookup "IPv4 or IPv6" record.  Calling
+ *   gethostbyname2 from getaddrinfo will end up in wrong search order, as
+ *   follows:
+ *	- The code makes use of following calls when asked to resolver with
+ *	  ai_family  = PF_UNSPEC:
+ *		getipnodebyname(host, AF_INET6);
+ *		getipnodebyname(host, AF_INET);
+ *	  This will result in the following queries if the node is configure to
+ *	  prefer /etc/hosts than DNS:
+ *		lookup /etc/hosts for IPv6 address
+ *		lookup DNS for IPv6 address
+ *		lookup /etc/hosts for IPv4 address
+ *		lookup DNS for IPv4 address
+ *	  which may not meet people's requirement.
+ *	  The right thing to happen is to have underlying layer which does
+ *	  PF_UNSPEC lookup (lookup both) and return chain of addrinfos.
+ *	  This would result in a bit of code duplicate with _dns_ghbyname() and
+ *	  friends.
+ */
+/*
+ * diffs with other KAME platforms:
+ * - other KAME platforms already nuked FAITH ($GAI), but as FreeBSD
+ *   4.0-RELEASE supplies it, we still have the code here.
+ * - EAI_RESNULL support
+ * - AI_ADDRCONFIG support is supplied
+ * - EDNS0 support is not available due to resolver differences
+ * - some of FreeBSD style (#define tabify and others)
+ * diffs with FreeBSD 4.0-RELEASE:
+ * - 4.0-RELEASE turns AI_ADDRCONFIG by default.  the code does not.
+ * - 4.0-RELEASE allows classful IPv4 numeric (127.1), the code does not.
  */
 
 #include <sys/types.h>
@@ -184,7 +227,7 @@ static const struct afd *find_afd __P((int));
 static int addrconfig __P((struct addrinfo *));
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
-#endif 
+#endif
 
 static struct addrinfo *getanswer __P((const querybuf *, int, const char *,
 				       int, const struct addrinfo *));
@@ -283,6 +326,7 @@ do { \
 	/* external reference: error, and label bad */ \
 	error = (err); \
 	goto bad; \
+	/*NOTREACHED*/ \
 } while (/*CONSTCOND*/0)
 
 #define	MATCH_FAMILY(x, y, w) \
@@ -319,7 +363,7 @@ static int
 str_isnumber(p)
 	const char *p;
 {
-	char *q = (char *)p;
+	const char *q = (const char *)p;
 	while (*q) {
 		if (!isdigit(*q))
 			return NO;
@@ -424,14 +468,14 @@ getaddrinfo(hostname, servname, hints, res)
 	 * for raw and other inet{,6} sockets.
 	 */
 	if (MATCH_FAMILY(pai->ai_family, PF_INET, 1)
-#ifdef INET6
+#ifdef PF_INET6
 	    || MATCH_FAMILY(pai->ai_family, PF_INET6, 1)
 #endif
 	    ) {
 		ai0 = *pai;	/* backup *pai */
 
 		if (pai->ai_family == PF_UNSPEC) {
-#ifdef INET6
+#ifdef PF_INET6
 			pai->ai_family = PF_INET6;
 #else
 			pai->ai_family = PF_INET;
@@ -496,11 +540,8 @@ getaddrinfo(hostname, servname, hints, res)
 	if (hostname == NULL)
 		ERR(EAI_NONAME);
 
-#if 1
-	/* XXX: temporarily, behave as if AI_ADDRCONFIG is specified */
-	if (!addrconfig(&ai0))
+	if ((pai->ai_flags & AI_ADDRCONFIG) != 0 && !addrconfig(&ai0))
 		ERR(EAI_FAIL);
-#endif
 
 	/*
 	 * hostname as alphabetical name.
@@ -668,9 +709,12 @@ explore_fqdn(pai, hostname, servname, res)
 			GET_PORT(cur, servname);
 			/* canonname should be filled already */
 		}
-		*res = result;
-		return 0;
+		break;
 	}
+
+	*res = result;
+
+	return 0;
 
 free:
 	if (result)
@@ -774,17 +818,33 @@ explore_numeric(pai, hostname, servname, res)
 	if (afd == NULL)
 		return 0;
 
-	if ((afd->a_af == AF_INET
-	     ? inet_aton(hostname, (struct in_addr *)pton)
-	     : inet_pton(afd->a_af, hostname, pton)) == 1) {
-		if (pai->ai_family == afd->a_af ||
-		    pai->ai_family == PF_UNSPEC /*?*/) {
-			GET_AI(cur->ai_next, afd, pton);
-			GET_PORT(cur->ai_next, servname);
-			while (cur && cur->ai_next)
-				cur = cur->ai_next;
-		} else
-			ERR(EAI_FAMILY);	/*xxx*/
+	switch (afd->a_af) {
+#if 0 /*X/Open spec*/
+	case AF_INET:
+		if (inet_aton(hostname, (struct in_addr *)pton) == 1) {
+			if (pai->ai_family == afd->a_af ||
+			    pai->ai_family == PF_UNSPEC /*?*/) {
+				GET_AI(cur->ai_next, afd, pton);
+				GET_PORT(cur->ai_next, servname);
+				while (cur && cur->ai_next)
+					cur = cur->ai_next;
+			} else
+				ERR(EAI_FAMILY);	/*xxx*/
+		}
+		break;
+#endif
+	default:
+		if (inet_pton(afd->a_af, hostname, pton) == 1) {
+			if (pai->ai_family == afd->a_af ||
+			    pai->ai_family == PF_UNSPEC /*?*/) {
+				GET_AI(cur->ai_next, afd, pton);
+				GET_PORT(cur->ai_next, servname);
+				while (cur && cur->ai_next)
+					cur = cur->ai_next;
+			} else
+				ERR(EAI_FAMILY);	/*xxx*/
+		}
+		break;
 	}
 
 	*res = sentinel.ai_next;
@@ -832,6 +892,18 @@ explore_numeric_scope(pai, hostname, servname, res)
 	if (cp == NULL)
 		return explore_numeric(pai, hostname, servname, res);
 
+#if 0
+	/*
+	 * Handle special case of <scope id><delimiter><scoped_address>
+	 */
+	hostname2 = strdup(hostname);
+	if (hostname2 == NULL)
+		return EAI_MEMORY;
+	/* terminate at the delimiter */
+	hostname2[cp - hostname] = '\0';
+	scope = hostname2;
+	addr = cp + 1;
+#else
 	/*
 	 * Handle special case of <scoped_address><delimiter><scope id>
 	 */
@@ -842,6 +914,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 	hostname2[cp - hostname] = '\0';
 	addr = hostname2;
 	scope = cp + 1;
+#endif
 
 	error = explore_numeric(pai, addr, servname, res);
 	if (error == 0) {
@@ -936,8 +1009,8 @@ get_ai(pai, afd, addr)
 		return NULL;
 
 	memcpy(ai, pai, sizeof(struct addrinfo));
-	ai->ai_addr = (struct sockaddr *)(ai + 1);
-	memset(ai->ai_addr, 0, afd->a_socklen);
+	ai->ai_addr = (struct sockaddr *)(void *)(ai + 1);
+	memset(ai->ai_addr, 0, (size_t)afd->a_socklen);
 	ai->ai_addr->sa_len = afd->a_socklen;
 	ai->ai_addrlen = afd->a_socklen;
 	ai->ai_addr->sa_family = ai->ai_family = afd->a_af;
@@ -957,7 +1030,9 @@ get_portmatch(ai, servname)
 	const struct addrinfo *ai;
 	const char *servname;
 {
+
 	/* get_port does not touch first argument. when matchonly == 1. */
+	/* LINTED const cast */
 	return get_port((struct addrinfo *)ai, servname, 1);
 }
 
@@ -1025,11 +1100,13 @@ get_port(ai, servname, matchonly)
 	if (!matchonly) {
 		switch (ai->ai_family) {
 		case AF_INET:
-			((struct sockaddr_in *)ai->ai_addr)->sin_port = port;
+			((struct sockaddr_in *)(void *)
+			    ai->ai_addr)->sin_port = port;
 			break;
 #ifdef INET6
 		case AF_INET6:
-			((struct sockaddr_in6 *)ai->ai_addr)->sin6_port = port;
+			((struct sockaddr_in6 *)(void *)
+			    ai->ai_addr)->sin6_port = port;
 			break;
 #endif
 		}
@@ -1058,6 +1135,9 @@ find_afd(af)
  * will take care of it.
  * the semantics of AI_ADDRCONFIG is not defined well.  we are not sure
  * if the code is right or not.
+ *
+ * XXX PF_UNSPEC -> PF_INET6 + PF_INET mapping needs to be in sync with
+ * _dns_getaddrinfo.
  */
 static int
 addrconfig(pai)
@@ -1133,7 +1213,7 @@ ip6_str2scopeid(scope, sin6)
 	else
 		return -1;
 }
-#endif 
+#endif
 
 #ifdef DEBUG
 static const char AskedForGot[] =
