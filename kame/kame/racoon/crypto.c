@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto.c,v 1.4 1999/08/16 16:35:02 itojun Exp $ */
+/* YIPS $Id: crypto.c,v 1.5 1999/08/19 15:21:06 itojun Exp $ */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -702,12 +702,14 @@ eay_set_random(size)
 	BIGNUM *r = NULL;
 	vchar_t *res = 0;
 
-	if ((r = BN_new()) == NULL) goto end;
+	if ((r = BN_new()) == NULL)
+		goto end;
 	BN_rand(r, size * 8, 0, 0);
 	eay_bn2v(&res, r);
 
 end:
-	if (r) BN_free(r);
+	if (r)
+		BN_free(r);
 	return(res);
 }
 
@@ -724,21 +726,29 @@ eay_dh_generate(prime, g, publen, pub, priv)
 
 	/* initialize */
 	/* pre-process to generate number */
-	if (eay_v2bn(&p, prime) < 0) goto end;
+	if (eay_v2bn(&p, prime) < 0)
+		goto end;
 
-	if ((dh = DH_new()) == NULL) goto end;
+	if ((dh = DH_new()) == NULL)
+		goto end;
 	dh->p = p;
+	p = NULL;
 	dh->g = NULL;
-	if ((dh->g = BN_new()) == NULL) goto end;
-	if (!BN_set_word(dh->g, g)) goto end;
+	if ((dh->g = BN_new()) == NULL)
+		goto end;
+	if (!BN_set_word(dh->g, g))
+		goto end;
 
-	if (publen != 0) dh->length = publen;
+	if (publen != 0)
+		dh->length = publen;
 
 	/* generate public and private number */
-	if (!DH_generate_key(dh)) goto end;
+	if (!DH_generate_key(dh))
+		goto end;
 
 	/* copy results to buffers */
-	if (eay_bn2v(pub, dh->pub_key) < 0) goto end;
+	if (eay_bn2v(pub, dh->pub_key) < 0)
+		goto end;
 	if (eay_bn2v(priv, dh->priv_key) < 0) {
 		vfree(*pub);
 		goto end;
@@ -747,8 +757,10 @@ eay_dh_generate(prime, g, publen, pub, priv)
 	error = 0;
 
 end:
-	if (dh != NULL) DH_free(dh);
-	if (p->d != 0) BN_free(p);
+	if (dh != NULL)
+		DH_free(dh);
+	if (p != 0)
+		BN_free(p);
 	return(error);
 }
 
@@ -765,23 +777,32 @@ eay_dh_compute(prime, g, pub, priv, pub2, key)
 	int error = -1;
 
 	/* make public number to compute */
-	if (eay_v2bn(&dh_pub, pub2) < 0) goto end;
+	if (eay_v2bn(&dh_pub, pub2) < 0)
+		goto end;
 
 	/* make DH structure */
-	if ((dh = DH_new()) == NULL) goto end;
-	if (eay_v2bn(&dh->p, prime) < 0) goto end;
-	if (eay_v2bn(&dh->pub_key, pub) < 0) goto end;
-	if (eay_v2bn(&dh->priv_key, priv) < 0) goto end;
+	if ((dh = DH_new()) == NULL)
+		goto end;
+	if (eay_v2bn(&dh->p, prime) < 0)
+		goto end;
+	if (eay_v2bn(&dh->pub_key, pub) < 0)
+		goto end;
+	if (eay_v2bn(&dh->priv_key, priv) < 0)
+		goto end;
 	dh->length = pub2->l * 8;
 
 #if 1
 	dh->g = NULL;
-	if ((dh->g = BN_new()) == NULL) goto end;
-	if (!BN_set_word(dh->g, g)) goto end;
+	if ((dh->g = BN_new()) == NULL)
+		goto end;
+	if (!BN_set_word(dh->g, g))
+		goto end;
 #else
-	if ((gv = vmalloc(sizeof(g))) == 0) goto end;
+	if ((gv = vmalloc(sizeof(g))) == 0)
+		goto end;
 	memcpy(gv->v, (caddr_t)&g, sizeof(g));
-	if (eay_v2bn(&dh->g, gv) < 0) goto end;
+	if (eay_v2bn(&dh->g, gv) < 0)
+		goto end;
 #endif
 
 	DH_compute_key((*key)->v, dh_pub, dh);
@@ -792,8 +813,10 @@ end:
 #if 0
 	if (gv) vfree(gv);
 #endif
-	if (dh_pub != NULL) BN_free(dh_pub);
-	if (dh != NULL) DH_free(dh);
+	if (dh_pub != NULL)
+		BN_free(dh_pub);
+	if (dh != NULL)
+		DH_free(dh);
 	return(error);
 }
 
@@ -861,7 +884,8 @@ eay_v2bn(bn, var)
 	return 0;
 
 err:
-	if (*bn) BN_free(*bn);
+	if (*bn)
+		BN_free(*bn);
 	return -1;
 }
 #endif
