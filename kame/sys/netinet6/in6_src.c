@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.61 2001/08/19 07:33:32 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.62 2001/08/28 08:53:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,12 +132,14 @@ int ip6_prefer_tempaddr = 0;
 	if ((r) < sizeof(ip6stat.ip6s_sources_rule) / \
 		sizeof(ip6stat.ip6s_sources_rule[0])) /* check for safety */ \
 		ip6stat.ip6s_sources_rule[(r)]++; \
+	/* printf("in6_selectsrc: replace %s with %s by %d\n", ia_best ? ip6_sprintf(&ia_best->ia_addr.sin6_addr) : "none", ip6_sprintf(&ia->ia_addr.sin6_addr), (r)); */ \
  	goto replace; \
 } while(0)
 #define NEXT(r) do {\
 	if ((r) < sizeof(ip6stat.ip6s_sources_rule) / \
 		sizeof(ip6stat.ip6s_sources_rule[0])) /* check for safety */ \
 		ip6stat.ip6s_sources_rule[(r)]++; \
+	/* printf("in6_selectsrc: keep %s against %s by %d\n", ia_best ? ip6_sprintf(&ia_best->ia_addr.sin6_addr) : "none", ip6_sprintf(&ia->ia_addr.sin6_addr), (r)); */ \
  	goto next; 		/* XXX: we can't use 'continue' here */ \
 } while(0)
 #define BREAK(r) do { \
@@ -349,12 +351,12 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			else
 				NEXT(7);
 		}
-		if (!(ia_best->ia6_flags & IN6_IFF_TEMPORARY) &&
-		    (ia->ia6_flags & IN6_IFF_TEMPORARY)) {
+		if ((ia_best->ia6_flags & IN6_IFF_TEMPORARY) &&
+		    !(ia->ia6_flags & IN6_IFF_TEMPORARY)) {
 			if (ip6_prefer_tempaddr)
-				REPLACE(7);
-			else
 				NEXT(7);
+			else
+				REPLACE(7);
 		}
 
 		/*
