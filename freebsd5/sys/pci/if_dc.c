@@ -3342,7 +3342,7 @@ dc_start(struct ifnet *ifp)
 			} else {
 				m_head = m;
 			}
-		} else
+		}
 
 		if (dc_encap(sc, &m_head)) {
 			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
@@ -3362,10 +3362,6 @@ dc_start(struct ifnet *ifp)
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
-	}
-	if (idx == sc->dc_cdata.dc_tx_prod) {
-		DC_UNLOCK(sc);
-		return;
 	}
 
 	if (queued > 0) {

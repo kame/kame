@@ -713,8 +713,7 @@ sf_attach(dev)
 	ifp->if_watchdog = sf_watchdog;
 	ifp->if_init = sf_init;
 	ifp->if_baudrate = 10000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, SF_TX_DLIST_CNT - 1);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = SF_TX_DLIST_CNT - 1;
 
 	/*
 	 * Call MI attach routine.
@@ -1064,7 +1063,7 @@ sf_intr(arg)
 	/* Re-enable interrupts. */
 	csr_write_4(sc, SF_IMR, SF_INTRS);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		sf_start(ifp);
 
 	SF_UNLOCK(sc);
@@ -1437,7 +1436,7 @@ sf_watchdog(ifp)
 	sf_reset(sc);
 	sf_init(sc);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		sf_start(ifp);
 
 	SF_UNLOCK(sc);

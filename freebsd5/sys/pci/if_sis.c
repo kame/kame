@@ -1991,8 +1991,6 @@ sis_start(ifp)
 		BPF_MTAP(ifp, m_head);
 
 	}
-	if (idx == sc->sis_cdata.sis_tx_prod)
-		return;
 
 	if (queued) {
 		/* Transmit */

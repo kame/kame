@@ -1447,7 +1447,6 @@ rl_start_locked(struct ifnet *ifp)
 {
 	struct rl_softc		*sc = ifp->if_softc;
 	struct mbuf		*m_head = NULL;
-	int			pkts = 0;
 
 	RL_LOCK_ASSERT(sc);
 
@@ -1479,10 +1478,6 @@ rl_start_locked(struct ifnet *ifp)
 
 		/* Set a timeout in case the chip goes out to lunch. */
 		ifp->if_timer = 5;
-	}
-	if (pkts == 0) {
-		RL_UNLOCK(sc);
-		return;
 	}
 
 	/*
