@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.95 2003/05/15 13:47:40 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.96 2003/06/03 10:42:59 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1651,6 +1651,8 @@ ip6_mdq(m, ifp, rt)
 		if (IF_ISSET(mifi, &rt->mf6c_ifset)) {
 			u_int32_t dscopeout, sscopeout;
 
+			if (mif6table[mifi].m6_ifp == NULL)
+				continue;
 			/*
 			 * check if the outgoing packet is going to break
 			 * a scope boundary.
