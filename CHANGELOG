@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1195 2000/08/14 07:08:53 itojun Exp $
+$KAME: CHANGELOG,v 1.1196 2000/08/14 09:20:07 suz Exp $
 
 <200008> 
+Mon Aug 14 18:15:54 JST 2000	suz@kame.net
+	* freebsd{2,3}/sbin/ifconfig/ifconfig.c
+	+ don't assign dummy address to an interface when it's brought
+	  up by "ifconfig up". (same fix has to be done on FreeBSD-4.0)
+
 Mon Aug 14 16:07:45 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/security/openssl: update to 0.9.5a.
 	* netbsd/pkgsrc/mail/postfix-current: postfix 20000531 + IPv6 patch.

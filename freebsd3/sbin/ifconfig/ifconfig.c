@@ -109,7 +109,7 @@ int	setaddr;
 int	setipdst;
 int	doalias;
 int	clearaddr;
-int	newaddr = 1;
+int	newaddr = 0;
 #ifdef INET6
 static int ip6lifetime;
 #endif
@@ -641,6 +641,7 @@ setifaddr(addr, param, s, afp)
 	 * and the flags may change when the address is set.
 	 */
 	setaddr++;
+	newaddr = 1;
 	if (doalias == 0)
 		clearaddr = 1;
 	(*afp->af_getaddr)(addr, (doalias >= 0 ? ADDR : RIDADDR));
@@ -1226,8 +1227,6 @@ in6_getaddr(s, which)
 	int which;
 {
 	register struct sockaddr_in6 *sin = sin6tab[which];
-
-	newaddr &= 1;
 
 	sin->sin6_len = sizeof(*sin);
 	if (which != MASK)
