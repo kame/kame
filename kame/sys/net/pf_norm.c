@@ -348,6 +348,11 @@ pf_remove_fragment(struct pf_fragment *frag)
 	}
 }
 
+#ifdef __OpenBSD__
+#define FR_IP_OFF(fr) ((ntohs((fr)->fr_ip->ip_off) & IP_OFFMASK) << 3)
+#else
+#define FR_IP_OFF(fr) (((fr)->fr_ip->ip_off & IP_OFFMASK) << 3)
+#endif
 struct mbuf *
 pf_reassemble(struct mbuf **m0, struct pf_fragment **frag,
     struct pf_frent *frent, int mff)
@@ -357,8 +362,14 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment **frag,
 	struct pf_frent	*frep = NULL;
 	struct ip	*ip = frent->fr_ip;
 	int		 hlen = ip->ip_hl << 2;
+#ifdef __OpenBSD__
+	u_int16_t	 off = ntohs(ip->ip_off);
+	u_int16_t	 ip_len = ntohs(ip->ip_len) - ip->ip_hl * 4;
+#else
 	u_int16_t	 off = ip->ip_off;
-	u_int16_t	 max = ip->ip_len + off;
+	u_int16_t	 ip_len = ip->ip_len - ip->ip_hl * 4;
+#endif
+	u_int16_t	 max = ip_len + off;
 
 	KASSERT(*frag == NULL || BUFFER_FRAGMENTS(*frag));
 
@@ -409,28 +420,64 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment **frag,
 
 	KASSERT(frep != NULL || frea != NULL);
 
-	if (frep != NULL && frep->fr_ip->ip_off + frep->fr_ip->ip_len > off) {
+#ifdef __OpenBSD__
+	if (frep != NULL &&
+	    FR_IP_OFF(frep) + ntohs(frep->fr_ip->ip_len) - frep->fr_ip->ip_hl *
+	        4 > off)
+#else
+	if (frep != NULL &&
+	    FR_IP_OFF(frep) + frep->fr_ip->ip_len > off)
+#endif
+	{
 		u_int16_t	precut;
 
+#ifdef __OpenBSD__
+		precut = FR_IP_OFF(frep) + ntohs(frep->fr_ip->ip_len) -
+		    frep->fr_ip->ip_hl * 4 - off;
+#else
 		precut = frep->fr_ip->ip_off + frep->fr_ip->ip_len - off;
-		if (precut >= ip->ip_len)
+#endif
+		if (precut >= ip_len)
 			goto drop_fragment;
 		m_adj(frent->fr_m, precut);
 		DPFPRINTF(("overlap -%d\n", precut));
 		/* Enforce 8 byte boundaries */
+#ifdef __OpenBSD__
+		ip->ip_off = htons(ntohs(ip->ip_off) + (precut >> 3));
+		off = (ntohs(ip->ip_off) & IP_OFFMASK) << 3;
+#else
 		off = ip->ip_off += precut;
-		ip->ip_len -= precut;
+#endif
+		ip_len -= precut;
+#ifdef __OpenBSD__
+		ip->ip_len = ntohs(ip_len);
+#else
+		ip->ip_len = ip_len;
+#endif
 	}
 
-	for (; frea != NULL && ip->ip_len + off > frea->fr_ip->ip_off;
+	for (; frea != NULL && ip_len + off > FR_IP_OFF(frea);
 	    frea = next) {
 		u_int16_t	aftercut;
 
-		aftercut = (ip->ip_len + off) - frea->fr_ip->ip_off;
+		aftercut = ip_len + off - FR_IP_OFF(frea);
 		DPFPRINTF(("adjust overlap %d\n", aftercut));
-		if (aftercut < frea->fr_ip->ip_len) {
+#ifdef __OpenBSD__
+		if (aftercut < ntohs(frea->fr_ip->ip_len) - frea->fr_ip->ip_hl
+		    * 4)
+#else
+		if (aftercut < frea->fr_ip->ip_len)
+#endif
+		{
+#ifdef __OpenBSD__
+			frea->fr_ip->ip_len =
+			    htons(ntohs(frea->fr_ip->ip_len) - aftercut);
+			frea->fr_ip->ip_off = htons(ntohs(frea->fr_ip->ip_off) +
+			    (aftercut >> 3));
+#else
 			frea->fr_ip->ip_len -= aftercut;
 			frea->fr_ip->ip_off += aftercut;
+#endif
 			m_adj(frea->fr_m, aftercut);
 			break;
 		}
@@ -465,9 +512,13 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment **frag,
 	for (frep = LIST_FIRST(&(*frag)->fr_queue); frep; frep = next) {
 		next = LIST_NEXT(frep, fr_next);
 
+#ifdef __OpenBSD__
+		off += ntohs(frep->fr_ip->ip_len) - frep->fr_ip->ip_hl * 4;
+#else
 		off += frep->fr_ip->ip_len;
+#endif
 		if (off < (*frag)->fr_max &&
-		    (next == NULL || next->fr_ip->ip_off != off)) {
+		    (next == NULL || FR_IP_OFF(next) != off)) {
 			DPFPRINTF(("missing fragment at %d, next %d, max %d\n",
 			    off, next == NULL ? -1 : next->fr_ip->ip_off,
 			    (*frag)->fr_max));
@@ -514,7 +565,11 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment **frag,
 	*frag = NULL;
 
 	hlen = ip->ip_hl << 2;
+#ifdef __OpenBSD__
+	ip->ip_len = ntohs(off + hlen);
+#else
 	ip->ip_len = off + hlen;
+#endif
 	m->m_len += hlen;
 	m->m_data -= hlen;
 
@@ -527,7 +582,11 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment **frag,
 		m->m_pkthdr.len = plen;
 	}
 
+#ifdef __OpenBSD__
+	DPFPRINTF(("complete: %p(%d)\n", m, ntohs(ip->ip_len)));
+#else
 	DPFPRINTF(("complete: %p(%d)\n", m, ip->ip_len));
+#endif
 	return (m);
 
  drop_fragment:
@@ -544,8 +603,13 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment **frag, int mff,
 {
 	struct mbuf		*m = *m0;
 	struct pf_frcache	*frp, *fra, *cur = NULL;
+#ifdef __OpenBSD__
+	int			 ip_len = ntohs(h->ip_len) - (h->ip_hl << 2);
+	u_int16_t		 off = ntohs(h->ip_off) << 3;
+#else
 	int			 ip_len = h->ip_len - (h->ip_hl << 2);
 	u_int16_t		 off = h->ip_off << 3;
+#endif
 	u_int16_t		 max = ip_len + off;
 	int			 hosed = 0;
 
@@ -674,10 +738,16 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment **frag, int mff,
 
 				h = mtod(m, struct ip *);
 
+#ifdef __OpenBSD__
+				KASSERT((int)m->m_len == ntohs(h->ip_len) - precut);
+				h->ip_off = htons(ntohs(h->ip_off) + (precut >> 3));
+				h->ip_len = htons(ntohs(h->ip_len) - precut);
+#else
 				KASSERT((int)m->m_len == h->ip_len - precut);
 
 				h->ip_off += precut >> 3;
 				h->ip_len -= precut;
+#endif
 			} else {
 				hosed++;
 			}
@@ -730,8 +800,13 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment **frag, int mff,
 					m->m_pkthdr.len = plen;
 				}
 				h = mtod(m, struct ip *);
+#ifdef __OpenBSD__
+				KASSERT((int)m->m_len == ntohs(h->ip_len) - aftercut);
+				h->ip_len = htons(ntohs(h->ip_len) - aftercut);
+#else
 				KASSERT((int)m->m_len == h->ip_len - aftercut);
 				h->ip_len -= aftercut;
+#endif
 			} else {
 				hosed++;
 			}
@@ -851,9 +926,17 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 	struct pf_frent		*frent;
 	struct pf_fragment	*frag = NULL;
 	struct ip		*h = mtod(m, struct ip *);
+#ifdef __OpenBSD__
 	int			 mff = (h->ip_off & IP_MF);
+#else
+	int			 mff = (ntohs(h->ip_off) & IP_MF);
+#endif
 	int			 hlen = h->ip_hl << 2;
+#ifdef __OpenBSD__
+	u_int16_t		 fragoff = (ntohs(h->ip_off) & IP_OFFMASK) << 3;
+#else
 	u_int16_t		 fragoff = (h->ip_off & IP_OFFMASK) << 3;
+#endif
 	u_int16_t		 max;
 	int			 ip_len;
 	int			 ip_off;
@@ -888,12 +971,21 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 	if (hlen < (int)sizeof(struct ip))
 		goto drop;
 
+#ifdef __OpenBSD__
+	if (hlen > ntohs(h->ip_len))
+#else
 	if (hlen > h->ip_len)
+#endif
 		goto drop;
 
 	/* Clear IP_DF if the rule uses the no-df option */
-	if (r->rule_flag & PFRULE_NODF)
+	if (r->rule_flag & PFRULE_NODF) {
+#ifdef __OpenBSD__
+		h->ip_off &= htons(~IP_DF);
+#else
 		h->ip_off &= ~IP_DF;
+#endif
+	}
 
 	/* We will need other tests here */
 	if (!fragoff && !mff)
@@ -903,13 +995,23 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 	 * with IP_DF to enter the cache. If the flag was cleared by
 	 * no-df above, fine. Otherwise drop it.
 	 */
-	if (h->ip_off & IP_DF) {
+#ifdef __OpenBSD__
+	if (h->ip_off & htons(IP_DF))
+#else
+	if (h->ip_off & IP_DF)
+#endif
+	{
 		DPFPRINTF(("IP_DF\n"));
 		goto bad;
 	}
 
+#ifdef __OpenBSD__
+	ip_len = ntohs(h->ip_len) - hlen;
+	ip_off = (ntohs(h->ip_off) & IP_OFFMASK) << 3;
+#else
 	ip_len = h->ip_len - hlen;
 	ip_off = h->ip_off << 3;
+#endif
 
 	/* All fragments are 8 byte aligned */
 	if (mff && (ip_len & 0x7)) {
@@ -922,13 +1024,15 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 		DPFPRINTF(("max packet %d\n", fragoff + ip_len));
 		goto bad;
 	}
-	max = fragoff + ip_len; 
+	max = fragoff + ip_len;
 
 	if ((r->rule_flag & (PFRULE_FRAGCROP|PFRULE_FRAGDROP)) == 0) {
 		/* Fully buffer all of the fragments */
 
+#ifndef __OpenBSD__
 		h->ip_len = ip_len;	/* logic need muddled off/len */
 		h->ip_off = ip_off;
+#endif
 		frag = pf_find_fragment(h, &pf_frag_tree);
 
 		/* Check if we saw the last fragment already */
@@ -1005,7 +1109,11 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 
  no_fragment:
 	/* At this point, only IP_DF is allowed in ip_off */
+#ifdef __OpenBSD__
+	h->ip_off &= htons(IP_DF);
+#else
 	h->ip_off &= IP_DF;
+#endif
 
 	/* Enforce a minimum ttl, may cause endless packet loops */
 	if (r->min_ttl && h->ip_ttl < r->min_ttl)

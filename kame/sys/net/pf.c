@@ -1267,7 +1267,11 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 		h->ip_v = 4;
 		h->ip_hl = sizeof(*h) >> 2;
 		h->ip_tos = IPTOS_LOWDELAY;
+#ifdef __OpenBSD__
+		h->ip_len = htons(len);
+#else
 		h->ip_len = len;
+#endif
 		h->ip_off = ip_mtudisc ? IP_DF : 0;
 		h->ip_ttl = ttl ? ttl : ip_defttl;
 		h->ip_sum = 0;
@@ -4648,7 +4652,12 @@ pf_pull_hdr(struct mbuf *m, int off, void *p, int len,
 			}
 			return (NULL);
 		}
-		if (m->m_pkthdr.len < off + len || h->ip_len < off + len) {
+#ifdef __OpenBSD__
+		if (m->m_pkthdr.len < off + len || h->ip_len < off + len)
+#else
+		if (m->m_pkthdr.len < off + len || intohs(h->ip_len) < off + len)
+#endif
+		{
 			ACTION_SET(actionp, PF_DROP);
 			REASON_SET(reasonp, PFRES_SHORT);
 			return (NULL);
@@ -4815,9 +4824,16 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 #endif
 
 	/* Copied from ip_output. */
-	if (ip->ip_len <= ifp->if_mtu) {
+#ifdef __OpenBSD__
+	if (ntohs(ip->ip_len) <= ifp->if_mtu)
+#else
+	if (ip->ip_len <= ifp->if_mtu)
+#endif
+	{
+#ifndef __OpenBSD__
 		ip->ip_len = htons((u_int16_t)ip->ip_len);
 		ip->ip_off = htons((u_int16_t)ip->ip_off);
+#endif
 #ifdef __OpenBSD__
 		if ((ifp->if_capabilities & IFCAP_CSUM_IPv4) &&
 		    ifp->if_bridge == NULL) {
@@ -5205,10 +5221,19 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 	pd.proto = h->ip_p;
 	pd.af = AF_INET;
 	pd.tos = h->ip_tos;
+#ifdef __OpenBSD__
+	pd.tot_len = ntohs(h->ip_len);
+#else
 	pd.tot_len = h->ip_len;
+#endif
 
 	/* handle fragments that didn't get reassembled by normalization */
-	if (h->ip_off & (IP_MF | IP_OFFMASK)) {
+#ifdef __OpenBSD__
+	if (h->ip_off & htons(IP_MF | IP_OFFMASK))
+#else
+	if (h->ip_off & (IP_MF | IP_OFFMASK))
+#endif
+	{
 		action = pf_test_fragment(&r, dir, ifp, m, h,
 		    &pd, &a, &ruleset);
 		goto done;
@@ -5225,8 +5250,14 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 			log = action != PF_PASS;
 			goto done;
 		}
+#ifdef __OpenBSD__
 		if (dir == PF_IN && pf_check_proto_cksum(m, off,
-		    h->ip_len - off, IPPROTO_TCP, AF_INET)) {
+		    ntohs(h->ip_len) - off, IPPROTO_TCP, AF_INET))
+#else
+		if (dir == PF_IN && pf_check_proto_cksum(m, off,
+		    h->ip_len - off, IPPROTO_TCP, AF_INET))
+#endif
+		{
 			action = PF_DROP;
 			goto done;
 		}
@@ -5256,8 +5287,14 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 			log = action != PF_PASS;
 			goto done;
 		}
+#ifdef __OpenBSD__
 		if (dir == PF_IN && uh.uh_sum && pf_check_proto_cksum(m,
-		    off, h->ip_len - off, IPPROTO_UDP, AF_INET)) {
+		    off, ntohs(h->ip_len) - off, IPPROTO_UDP, AF_INET))
+#else
+		if (dir == PF_IN && uh.uh_sum && pf_check_proto_cksum(m,
+		    off, h->ip_len - off, IPPROTO_UDP, AF_INET))
+#endif
+		{
 			action = PF_DROP;
 			goto done;
 		}
@@ -5281,8 +5318,14 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 			log = action != PF_PASS;
 			goto done;
 		}
+#ifdef __OpenBSD__
 		if (dir == PF_IN && pf_check_proto_cksum(m, off,
-		    h->ip_len - off, IPPROTO_ICMP, AF_INET)) {
+		    ntohs(h->ip_len) - off, IPPROTO_ICMP, AF_INET))
+#else
+		if (dir == PF_IN && pf_check_proto_cksum(m, off,
+		    h->ip_len - off, IPPROTO_ICMP, AF_INET))
+#endif
+		{
 			action = PF_DROP;
 			goto done;
 		}
@@ -5290,11 +5333,19 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 		if (action == PF_PASS) {
 			r = s->rule.ptr;
 			r->packets++;
+#ifdef __OpeNBSD__
+			r->bytes += ntohs(h->ip_len);
+#else
 			r->bytes += h->ip_len;
+#endif
 			a = s->anchor.ptr;
 			if (a != NULL) {
 				a->packets++;
+#ifdef __OpeNBSD__
+				a->bytes += ntohs(h->ip_len);
+#else
 				a->bytes += h->ip_len;
+#endif
 			}
 			log = s->log;
 		} else if (s == NULL)

@@ -67,6 +67,9 @@ struct old_pfloghdr {
 #ifdef _KERNEL
 
 #if NPFLOG > 0
+#ifdef __OpenBSD__
+#define	PFLOG_PACKET(i,x,a,b,c,d,e,f,g)	pflog_packet(i,a,b,c,d,e,f,g)
+#else
 #define	PFLOG_PACKET(i,x,a,b,c,d,e,f,g) \
 	do { \
 		if (b == AF_INET) { \
@@ -79,6 +82,7 @@ struct old_pfloghdr {
 			pflog_packet(i,a,b,c,d,e,f,g); \
 		} \
 	} while (0)
+#endif
 #else
 #define	PFLOG_PACKET(i,x,a,b,c,d,e,f,g)	((void)0)
 #endif /* NPFLOG > 0 */
