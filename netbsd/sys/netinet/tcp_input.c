@@ -3332,6 +3332,10 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 				sizeof(((struct sockaddr_in *)dst)->sin_addr));
 			in6p->in6p_lport = ((struct sockaddr_in *)dst)->sin_port;
 			in6totcpcb(in6p)->t_family = AF_INET;
+			if (sotoin6pcb(oso)->in6p_flags & IN6P_IPV6_V6ONLY)
+				in6p->in6p_flags |= IN6P_IPV6_V6ONLY;
+			else
+				in6p->in6p_flags &= ~IN6P_IPV6_V6ONLY;
 		}
 #endif
 		break;
