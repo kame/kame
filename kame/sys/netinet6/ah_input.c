@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.70 2002/02/28 13:51:11 keiichi Exp $	*/
+/*	$KAME: ah_input.c,v 1.71 2002/03/17 22:02:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1078,7 +1078,6 @@ ah6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	struct ip6ctlparam *ip6cp = NULL;
 	int off;
-	struct sockaddr_in6 sa6_src, sa6_dst;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -1126,8 +1125,8 @@ ah6_ctlinput(cmd, sa, d)
 			 * the address in the ICMP message payload.
 			 */
 			sav = key_allocsa(AF_INET6,
-					  (caddr_t)&sa6_src.sin6_addr,
-					  (caddr_t)&sa6_dst.sin6_addr,
+					  (caddr_t)ip6cp->ip6c_src,
+					  (caddr_t)sa,
 					  IPPROTO_AH, ahp->ah_spi);
 			if (sav) {
 				if (sav->state == SADB_SASTATE_MATURE ||
