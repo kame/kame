@@ -32,7 +32,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: dtcpc.rb,v 1.4 2000/11/22 11:11:08 itojun Exp $
+# $Id: dtcpc.rb,v 1.5 2001/01/20 18:13:15 jinmei Exp $
 #
 
 require "socket"
@@ -187,8 +187,8 @@ if (t =~ /^\+OK/)
   system("gifconfig #{intface} #{a[1]} #{a[2]}")
   # global address for the tunnel is given
   if a.length == 5
-    STDERR.print "ifconfig #{intface} inet6 #{a[3]} #{a[4]} prefixlen 126 alias\n" if $debug
-    system("ifconfig #{intface} inet6 #{a[3]} #{a[4]} prefixlen 126 alias")
+    STDERR.print "ifconfig #{intface} inet6 #{a[3]} #{a[4]} prefixlen 128 alias\n" if $debug
+    system("ifconfig #{intface} inet6 #{a[3]} #{a[4]} prefixlen 128 alias")
   end
   STDERR.print "ifconfig #{intface} up\n" if $debug
   system("ifconfig #{intface} up")
