@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.207 1999/10/22 04:36:09 sumikawa Exp $
+$Id: CHANGELOG,v 1.208 1999/10/22 07:04:46 jinmei Exp $
 
 <199910>
+1999-10-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd: added a configuration option to handle
+	site-local addresses in RIPng. See bgpd.conf(5).
+
 Fri Oct 22 13:35:23 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/lib/libftpio: fix getaddrinfo() loop, so that the code
 	  will try to explore all the addresses returned after query.
