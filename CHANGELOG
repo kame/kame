@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.709 2000/03/21 12:54:07 itojun Exp $
+$Id: CHANGELOG,v 1.710 2000/03/21 12:55:13 jinmei Exp $
 
 <200003>
+2000-03-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): set the
+	INP_IPV6_MCAST flag after ip6_setmoptions() for a NRL pcb
+	Without this, bsdi4/openbsd would panic when an application using
+	IPv6 multicasting is terminated.
+	This fix would solve KAME PR sys/224.
+	
 Tue Mar 21 21:56:04 JST 2000  itojun@iijlab.net
 	* freebsd[23]/sys/kern/uipc_socket.c: correct freebsd bug in sanity
 	  check for socket timeout value.  netbsd uipc_socket.c 1.18 -> 1.19.
