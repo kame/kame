@@ -1124,6 +1124,10 @@ in6_status(s, info)
 		printf(" autoconf");
 	if ((flags6 & IN6_IFF_TEMPORARY) != 0)
 		printf(" temporary");
+#ifdef IN6_IFF_HOME
+	if ((flags6 & IN6_IFF_HOME) != 0)
+		printf("home ");
+#endif
 	
 	if (scopeid)
 		printf(" scopeid 0x%x", scopeid);

@@ -2027,6 +2027,10 @@ in6_alias(creq)
 			printf(" autoconf");
 		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_TEMPORARY) != 0)
 			printf(" temporary");
+#ifdef IN6_IFF_HOME
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_HOME) != 0)
+			printf(" home");
+#endif
 	}
 
 	if (scopeid)
