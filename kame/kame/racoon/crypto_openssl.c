@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.44 2000/10/04 17:40:59 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.45 2000/10/18 13:19:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,6 +92,115 @@ static void eay_setgentype __P((char *, int *));
 static X509 *mem2x509 __P((vchar_t *));
 
 /* X509 Certificate */
+/*
+ * convert the string of the subject name into DER
+ * e.g. str = "C=JP, ST=Kanagawa";
+ */
+vchar_t *
+eay_str2asn1dn(str, len)
+	char *str;
+	int len;
+{
+	X509_NAME *name;
+	char *buf;
+	char *field, *value;
+	int i, j;
+	vchar_t *ret;
+	caddr_t p;
+
+	buf = malloc(len + 1);
+	if (!buf) {
+		printf("failed to allocate buffer\n");
+		return NULL;
+	}
+	memcpy(buf, str, len);
+
+	name = X509_NAME_new();
+
+	field = &buf[0];
+	value = NULL;
+	for (i = 0; i < len; i++) {
+		if (!value && buf[i] == '=') {
+			buf[i] = '\0';
+			value = &buf[i + 1];
+			continue;
+		} else if (buf[i] == ',' || buf[i] == '/') {
+			buf[i] = '\0';
+#if 0
+			printf("[%s][%s]\n", field, value);
+#endif
+			if (!X509_NAME_add_entry_by_txt(name, field,
+					MBSTRING_ASC, value, -1, -1, 0))
+				goto err;
+			for (j = i + 1; j < len; j++) {
+				if (buf[j] != ' ')
+					break;
+			}
+			field = &buf[j];
+			value = NULL;
+			continue;
+		}
+	}
+	buf[len] = '\0';
+#if 0
+	printf("[%s][%s]\n", field, value);
+#endif
+	if (!X509_NAME_add_entry_by_txt(name, field,
+			MBSTRING_ASC, value, -1, -1, 0))
+		goto err;
+
+	i = i2d_X509_NAME(name, NULL);
+	if (!i)
+		goto err;
+	ret = vmalloc(i);
+	if (!ret)
+		goto err;
+	p = ret->v;
+	i = i2d_X509_NAME(name, (unsigned char **)&p);
+	if (!i)
+		goto err;
+
+	return ret;
+
+    err:
+	if (buf)
+		free(buf);
+	if (name)
+		X509_NAME_free(name);
+	return NULL;
+}
+
+/*
+ * compare two subjectNames.
+ * OUT:        0: equal
+ *	positive:
+ *	      -1: other error.
+ */
+int
+eay_cmp_asn1dn(n1, n2)
+	vchar_t *n1, *n2;
+{
+	X509_NAME *a = NULL, *b = NULL;
+	caddr_t p;
+	int i = -1;
+
+	p = n1->v;
+	if (!d2i_X509_NAME(&a, (unsigned char **)&p, n1->l))
+		goto end;
+	p = n2->v;
+	if (!d2i_X509_NAME(&b, (unsigned char **)&p, n2->l))
+		goto end;
+
+	i = X509_NAME_cmp(a, b);
+
+    end:
+	if (a)
+		X509_NAME_free(a);
+	if (b)
+		X509_NAME_free(b);
+	return i;
+}
+
 /*
  * this functions is derived from apps/verify.c in OpenSSL0.9.5
  */

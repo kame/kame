@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.15 2000/10/04 17:40:59 itojun Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.16 2000/10/18 13:19:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,6 +41,8 @@
 #define GENT_IPADD	7
 #define GENT_RID	8
 
+extern vchar_t *eay_str2asn1dn __P((char *, int));
+extern int eay_cmp_asn1dn __P((vchar_t *, vchar_t *));
 extern int eay_check_x509cert __P((vchar_t *, char *));
 extern vchar_t *eay_get_x509asn1subjectname __P((vchar_t *));
 extern int eay_get_x509subjectaltname __P((vchar_t *, char **, int *, int));
