@@ -1814,6 +1814,7 @@ ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 		M_COPY_PKTHDR(mcopy, m);
 		mcopy->m_len = imin((IP_VHL_HL(ip->ip_vhl) << 2) + 8,
 		    (int)ip->ip_len);
+		mcopy->m_pkthdr.len = mcopy->m_len;
 		m_copydata(m, 0, mcopy->m_len, mtod(mcopy, caddr_t));
 	}
 
