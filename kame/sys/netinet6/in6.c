@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.159 2001/02/03 16:23:18 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.160 2001/02/03 20:08:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -536,13 +536,11 @@ in6_control(so, cmd, data, ifp)
 	case SIOCAIFPREFIX_IN6:
 	case SIOCCIFPREFIX_IN6:
 	case SIOCSGIFPREFIX_IN6:
-		if (!privileged)
-			return(EPERM);
-		/*fall through*/
 	case SIOCGIFPREFIX_IN6:
-		if (ip6_forwarding == 0)
-			return(EPERM);
-		return(in6_prefix_ioctl(so, cmd, data, ifp));
+		log(LOG_NOTICE,
+		    "prefix ioctls are now invalidated. "
+		    "please use ifconfig.\n");
+		return(EOPNOTSUPP);
 	}
 
 	switch(cmd) {
