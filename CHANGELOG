@@ -1,8 +1,8 @@
-$KAME: CHANGELOG,v 1.2456 2003/08/10 17:02:40 suz Exp $
+$KAME: CHANGELOG,v 1.2457 2003/08/15 06:06:57 suz Exp $
 
 <200308>
-2003-08-11  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
-	* kame/kame/pim6sd/{cfparse.y, mrt.h, pim6_proto.c, rp.c}
+2003-08-15  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6sd/{cfparse.y, mrt.[ch], pim6_proto.c, rp.c}
 	Now static-RP configuration can work together with bootstrap-
 	message-based RP configuration
 
