@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.148 2002/09/06 10:27:55 suz Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.149 2002/11/27 12:44:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2072,12 +2072,16 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 {
 	int		delta = 0;
 	char		*tstr;
+	u_char		*h, *p;
 	caddr_t		kb, kk;
 	struct ip	*ip4 = cv4->ip.ip4;
 	struct tcphdr	*th4 = cv4->pyld.tcp4;
+	struct tSlot	*ats;
 	struct tcpstate	*ts;
 	struct ftpparam	ftp6;
-	struct sockaddr_in6  sin6;
+	struct pAddr	local, remote;
+	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
 	char		wow[128];
 
 	kb = (caddr_t)th4 + (th4->th_off << 2);
@@ -2091,12 +2095,6 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 	switch (ftp6.cmd) {
 #ifdef NATPT_NAT
 	case FTP4_PORT:
-	    {
-		u_char		*h, *p;
-		struct tSlot	*ats;
-		struct pAddr	local, remote;
-		struct sockaddr_in sin;
-
 		ts->ftpstate = FTPS_PORT;
 		if (natpt_parsePORT(ftp6.arg, kk, &sin) == NULL)
 			return (0);
@@ -2131,58 +2129,51 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 
 		delta = natpt_rewriteMbuf(cv4->m, kb, (kk-kb), wow, strlen(wow));
 		ts->rewrite[cv4->fromto] = 1;
-	    }
 		break;
 #endif
 
 	case FTP6_EPRT:
 	case FTP6_LPRT:
-	    {
-		    u_char		*h, *p;
-		    struct tSlot	*ats;
-		    struct pAddr	local, remote;
+		if (ftp6.cmd == FTP6_LPRT) {
+			ts->ftpstate = FTPS_LPRT;
+			if (natpt_parseLPRT(ftp6.arg, kk, &sin6) == NULL)
+				return (0);
+		} else {
+			ts->ftpstate = FTPS_EPRT;
+			if (natpt_parseEPRT(ftp6.arg, kk, &sin6) == NULL)
+				return (0);
+		}
 
-		    if (ftp6.cmd == FTP6_LPRT) {
-			    ts->ftpstate = FTPS_LPRT;
-			    if (natpt_parseLPRT(ftp6.arg, kk, &sin6) == NULL)
-				    return (0);
-		    } else {
-			    ts->ftpstate = FTPS_EPRT;
-			    if (natpt_parseEPRT(ftp6.arg, kk, &sin6) == NULL)
-				    return (0);
-		    }
-
-		    ats = cv4->ats;
-		    /* v6 client side */
-		    local = ats->local;
-		    local.port[0] = sin6.sin6_port;
-		    local.port[1] = htons(FTP_DATA);
-		    /* v4 server side */
-		    remote = ats->remote;
-		    remote.port[0] = htons(FTP_DATA);
-		    remote.port[1] = sin6.sin6_port;
-		    if ((ats->csl->map & NATPT_REMAP_SPORT)
-			&& (natpt_remapRemote4Port(ats->csl, &remote) == NULL)) {
-			    return (0);
-		    }
+		ats = cv4->ats;
+		/* v6 client side */
+		local = ats->local;
+		local.port[0] = sin6.sin6_port;
+		local.port[1] = htons(FTP_DATA);
+		/* v4 server side */
+		remote = ats->remote;
+		remote.port[0] = htons(FTP_DATA);
+		remote.port[1] = sin6.sin6_port;
+		if ((ats->csl->map & NATPT_REMAP_SPORT)
+		    && (natpt_remapRemote4Port(ats->csl, &remote) == NULL)) {
+			return (0);
+		}
 
 #if useOpenTSlot
-		    /* This connection is established from v4 side. */
-		    if (natpt_openIncomingV4Conn(IPPROTO_TCP, &remote, &local) == NULL)
-			    return (0);
+		/* This connection is established from v4 side. */
+		if (natpt_openIncomingV4Conn(IPPROTO_TCP, &remote, &local) == NULL)
+			return (0);
 #else
-		    if (natpt_openIncomingV4Rule(IPPROTO_TCP, &remote, &local) == 0)
-			    return (0);
+		if (natpt_openIncomingV4Rule(IPPROTO_TCP, &remote, &local) == 0)
+			return (0);
 #endif
 
-		    h = (u_char *)&remote.addr[1];
-		    p = (u_char *)&remote.port[1];
-		    snprintf(wow, sizeof(wow), "PORT %u,%u,%u,%u,%u,%u\r\n",
-			     h[0], h[1], h[2], h[3], p[0], p[1]);
+		h = (u_char *)&remote.addr[1];
+		p = (u_char *)&remote.port[1];
+		snprintf(wow, sizeof(wow), "PORT %u,%u,%u,%u,%u,%u\r\n",
+			 h[0], h[1], h[2], h[3], p[0], p[1]);
 
-		    delta = natpt_rewriteMbuf(cv4->m, kb, (kk-kb), wow, strlen(wow));
-		    ts->rewrite[cv4->fromto] = 1;
-	    }
+		delta = natpt_rewriteMbuf(cv4->m, kb, (kk-kb), wow, strlen(wow));
+		ts->rewrite[cv4->fromto] = 1;
 		break;
 
 	case FTP6_EPSV:
