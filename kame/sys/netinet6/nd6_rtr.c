@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.157 2001/08/03 10:40:22 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.158 2001/08/03 11:56:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,7 +36,6 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
-#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>

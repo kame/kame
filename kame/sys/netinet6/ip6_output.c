@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.209 2001/08/03 10:40:21 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.210 2001/08/03 11:56:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,7 +76,6 @@
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
-#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.50 2001/08/03 10:40:20 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.51 2001/08/03 11:56:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,7 +71,6 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
-#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>

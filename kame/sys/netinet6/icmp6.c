@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.237 2001/08/03 10:40:19 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.238 2001/08/03 11:56:01 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,7 +73,6 @@
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
-#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>

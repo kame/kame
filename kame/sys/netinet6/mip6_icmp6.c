@@ -1,5 +1,7 @@
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/errno.h>
