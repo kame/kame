@@ -487,7 +487,8 @@ main(int argc, char *argv[])
 					fprintf(stderr, "someone wants %s\n",
 					    sep->se_service);
 				if (!sep->se_wait &&
-				    sep->se_socktype == SOCK_STREAM) {
+				    (sep->se_socktype == SOCK_STREAM ||
+				     sep->se_protocol == IPPROTO_DCCP)) {
 					ctrl = gettcp(sep);
 					if (ctrl == -1)
 						continue;
@@ -613,6 +614,7 @@ dg_broadcast(struct in_addr *in)
 	return (0);
 }
 
+/* ARGSUSED */
 void
 reap(int sig)
 {
@@ -659,6 +661,7 @@ doreap(void)
 	}
 }
 
+/* ARGSUSED */
 void
 config(int sig)
 {
@@ -893,6 +896,7 @@ doconfig(void)
 	sigprocmask(SIG_SETMASK, &omask, NULL);
 }
 
+/* ARGSUSED */
 void
 retry(int sig)
 {
@@ -920,6 +924,7 @@ doretry(void)
 	}
 }
 
+/* ARGSUSED */
 void
 die(int sig)
 {
@@ -1012,7 +1017,7 @@ setsockopt(fd, SOL_SOCKET, opt, &on, sizeof (on))
 		}
 		return;
 	}
-	if (sep->se_socktype == SOCK_STREAM)
+	if (sep->se_socktype == SOCK_STREAM || sep->se_protocol == IPPROTO_DCCP)
 		listen(sep->se_fd, 10);
 
 	fd_grow(&allsockp, &allsockn, sep->se_fd);
@@ -1247,6 +1252,14 @@ more:
 		goto more;
 
 	sep->se_proto = newstr(arg);
+	if (strncmp(sep->se_proto, "tcp", 3) == 0)
+		sep->se_protocol = IPPROTO_TCP;
+	else if (strncmp(sep->se_proto, "udp", 3) == 0)
+		sep->se_protocol = IPPROTO_UDP;
+	else if (strncmp(sep->se_proto, "dccp", 4) == 0)
+		sep->se_protocol = IPPROTO_DCCP;
+	else
+		sep->se_protocol = 0;
 
 	if (strcmp(sep->se_proto, "unix") == 0) {
 		sep->se_family = AF_UNIX;
@@ -1295,15 +1308,6 @@ more:
 				sep->se_rpcversh = l;
 			} else if (*ccp != '\0')
 				goto badafterall;
-		} else {
-			if (strncmp(sep->se_proto, "tcp", 3) == 0)
-				sep->se_protocol = IPPROTO_TCP;
-			else if (strncmp(sep->se_proto, "udp", 3) == 0)
-				sep->se_protocol = IPPROTO_UDP;
-			else if (strncmp(sep->se_proto, "dccp", 4) == 0)
-				sep->se_protocol = IPPROTO_DCCP;
-			else
-				sep->se_protocol = 0;
 		}
 	}
 	arg = skip(&cp, 1);
@@ -1390,6 +1394,7 @@ more:
 			memset(&hints, 0, sizeof(hints));
 			hints.ai_family = sep->se_family;
 			hints.ai_socktype = sep->se_socktype;
+			hints.ai_protocol = sep->se_protocol;
 			hints.ai_flags = AI_PASSIVE;
 			port = "0";
 			/* XXX shortened IPv4 syntax is now forbidden */
@@ -1889,7 +1894,8 @@ spawn(struct servtab *sep, int ctrl)
 				sep->se_count = 1;
 			} else {
 				if (!sep->se_wait &&
-				    sep->se_socktype == SOCK_STREAM)
+				    (sep->se_socktype == SOCK_STREAM ||
+				     sep->se_protocol == IPPROTO_DCCP))
 					close(ctrl);
 				if (sep->se_family == AF_INET &&
 				    ntohs(sep->se_ctrladdr_in.sin_port) >=
@@ -1908,7 +1914,8 @@ spawn(struct servtab *sep, int ctrl)
 				    "%s/%s server failing (looping), service terminated",
 				    sep->se_service, sep->se_proto);
 				if (!sep->se_wait &&
-				    sep->se_socktype == SOCK_STREAM)
+				    (sep->se_socktype == SOCK_STREAM ||
+				     sep->se_protocol == IPPROTO_DCCP))
 					close(ctrl);
 				FD_CLR(sep->se_fd, allsockp);
 				(void) close(sep->se_fd);
@@ -1928,7 +1935,8 @@ spawn(struct servtab *sep, int ctrl)
 	}
 	if (pid < 0) {
 		syslog(LOG_ERR, "fork: %m");
-		if (!sep->se_wait && sep->se_socktype == SOCK_STREAM)
+		if (!sep->se_wait && (sep->se_socktype == SOCK_STREAM ||
+		    sep->se_protocol == IPPROTO_DCCP))
 			close(ctrl);
 		sigprocmask(SIG_SETMASK, &emptymask, NULL);
 		sleep(1);
@@ -2011,6 +2019,7 @@ spawn(struct servtab *sep, int ctrl)
 			exit(1);
 		}
 	}
-	if (!sep->se_wait && sep->se_socktype == SOCK_STREAM)
+	if (!sep->se_wait && (sep->se_socktype == SOCK_STREAM ||
+	    sep->se_protocol == IPPROTO_DCCP))
 		close(ctrl);
 }
