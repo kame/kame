@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.221 2001/09/20 07:11:29 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.222 2001/09/24 15:28:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,6 +311,7 @@ ip6_init()
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	register_netisr(NETISR_IPV6, ip6intr);
 #endif
+	addrsel_policy_init();
 	nd6_init();
 	frag6_init();
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -2781,6 +2782,8 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_RIP6STATS:
 		return sysctl_rdtrunc(oldp, oldlenp, newp, &rip6stat,
 		    sizeof(rip6stat));
+	case IPV6CTL_ADDRSELPOLICY:
+		return in6_src_sysctl(oldp, oldlenp, newp, newlen);
 	default:
 		return (sysctl_int_arr(ip6_sysvars, name, namelen,
 				       oldp, oldlenp, newp, newlen));

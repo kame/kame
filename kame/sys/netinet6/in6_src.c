@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.73 2001/09/21 11:56:57 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.74 2001/09/24 15:28:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -120,7 +120,25 @@
 extern struct ifnet loif[NLOOP];
 #endif
 
+#define ADDR_LABEL_NOTAPP (-1)
+struct in6_addrpolicy defaultaddrpolicy;
+
 int ip6_prefer_tempaddr = 0;
+
+static struct in6_addrpolicy *lookup_addrsel_policy __P((struct sockaddr_in6 *));
+
+#ifndef __FreeBSD__
+static int set_addrsel_policy __P((void *, size_t));
+static int get_addrsel_policy __P((void *, size_t *));
+static void clear_addrsel_policy __P((void));
+
+static void init_policy_queue __P((void));
+static int add_addrsel_policyent __P((struct in6_addrpolicy *));
+static int walk_addrsel_policy __P((int (*)(struct in6_addrpolicy *, void *),
+				    void *));
+static int dump_addrsel_policyent __P((struct in6_addrpolicy *, void *));
+static struct in6_addrpolicy *match_addrsel_policy __P((struct sockaddr_in6 *));
+#endif
 
 /*
  * Return an IPv6 address, which is the most appropriate for a given
@@ -169,6 +187,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	struct rtentry *rt = NULL;
 	int clone;
 	int dst_scope = -1, best_scope = -1, best_matchlen = -1;
+	struct in6_addrpolicy *dst_policy = NULL, *new_policy = NULL,
+		*best_policy = NULL;
 
 	dst = &dstsock->sin6_addr;
 	*errorp = 0;
@@ -356,7 +376,18 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		if (ia_best->ia_ifp != ifp && ia->ia_ifp == ifp)
 			REPLACE(5);
 
-		/* Rule 6: Prefer matching label:  XXX not yet */
+		/* Rule 6: Prefer matching label */
+		if (dst_policy == NULL)
+			dst_policy = lookup_addrsel_policy(dstsock);
+		if (dst_policy->label != ADDR_LABEL_NOTAPP) {
+			new_policy = lookup_addrsel_policy(&ia->ia_addr);
+			if (dst_policy->label == best_policy->label &&
+			    dst_policy->label != new_policy->label)
+				NEXT(6);
+			if (dst_policy->label != best_policy->label &&
+			    dst_policy->label == new_policy->label)
+				REPLACE(6);
+		}
 
 		/*
 		 * Rule 7: Prefer public addresses.
@@ -431,6 +462,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		ia_best = ia;
 		best_scope = (new_scope >= 0 ? new_scope :
 			      in6_addrscope(&ia_best->ia_addr.sin6_addr));
+		best_policy = (new_policy ? new_policy :
+			       lookup_addrsel_policy(&ia_best->ia_addr));
 		best_matchlen = (new_matchlen >= 0 ? new_matchlen :
 				 in6_matchlen(&ia_best->ia_addr.sin6_addr,
 					      dst));
@@ -1044,3 +1077,285 @@ in6_clearscope(addr)
 	if (IN6_IS_SCOPE_LINKLOCAL(addr) || IN6_IS_ADDR_MC_INTFACELOCAL(addr))
 		addr->s6_addr16[1] = 0;
 }
+
+void
+addrsel_policy_init()
+{
+	init_policy_queue();
+
+	/* initialize the "last resort" policy */
+	bzero(&defaultaddrpolicy, sizeof(defaultaddrpolicy));
+	defaultaddrpolicy.label = ADDR_LABEL_NOTAPP;
+}
+
+static struct in6_addrpolicy *
+lookup_addrsel_policy(key)
+	struct sockaddr_in6 *key;
+{
+	struct in6_addrpolicy *match = NULL;
+
+#ifndef __FreeBSD__
+	match = match_addrsel_policy(key);
+#endif
+
+	if (match == NULL)
+		match = &defaultaddrpolicy;
+	else
+		match->use++;
+
+	return(match);
+}
+
+/*
+ * Subroutines to manage the address selection policy table via sysctl. 
+ */
+#ifndef __FreeBSD__
+struct walkarg {
+	size_t	w_total;
+	size_t	w_given;
+	caddr_t	w_where;
+	caddr_t w_limit;
+};
+
+int
+in6_src_sysctl(oldp, oldlenp, newp, newlen)
+	void *oldp;
+	size_t *oldlenp;
+	void *newp;
+	size_t newlen;
+{
+	int error = 0;
+	int s = splnet();
+
+	if (oldp && oldlenp == NULL) {
+		error = EINVAL;
+		goto end;
+	}
+	if ((oldp || oldlenp) &&
+	    (error = get_addrsel_policy(oldp, oldlenp)) != 0) {
+		goto end;
+	}
+
+	if (newp) {
+		/* a new set of policy is being specified. */
+		if ((error = set_addrsel_policy(newp, newlen)) != 0)
+			goto end;
+	}
+
+  end:
+	splx(s);
+
+	return(error);
+}
+
+static int
+set_addrsel_policy(buf, buflen)
+	void *buf;
+	size_t buflen;
+{
+	int error = 0;
+	struct in6_addrpolicy *ent, *ep;
+
+	/* before changing the table, validate the specified policy. */
+	ent = (struct in6_addrpolicy *)buf;
+	ep = (struct in6_addrpolicy *)(buf + buflen);
+	for (; ent && ent + 1 <= ep; ent++) {
+		if (ent->label == ADDR_LABEL_NOTAPP)
+			return(EINVAL);
+		/* check if the prefix mask is consecutive. */
+		if (in6_mask2len(&ent->addrmask.sin6_addr, NULL) < 0)
+			return(EINVAL);
+#if 0
+		/*
+		 * The "use" member can only be modified by the kernel.
+		 * Otherwise, we could issue an error, but we just ignore
+		 * the specified value and accept the configuration.
+		 */
+		if (ent->use)
+			return(EINVAL);
+#endif
+	}
+
+	/* clear the entire policy table. */
+	clear_addrsel_policy();
+
+	/* finally, set the new policy. */
+	ent = (struct in6_addrpolicy *)buf;
+	ep = (struct in6_addrpolicy *)(buf + buflen);
+	for (; ent && ent + 1 <= ep; ent++) {
+		struct in6_addrpolicy ent0 = *ent;
+		int i;
+
+		/* clear trailing garbages (if any) of the prefix address. */
+		for (i = 0; i < 4; i++) {
+			ent0.addr.sin6_addr.s6_addr32[i] &=
+				ent0.addrmask.sin6_addr.s6_addr32[i];
+		}
+		
+		ent0.use = 0;	/* just in case */
+
+		if ((error = add_addrsel_policyent(&ent0)) != 0)
+			return(error);
+	}
+
+	return(error);
+}
+
+static int
+get_addrsel_policy(oldp, oldlenp)
+	void *oldp;
+	size_t *oldlenp;
+{
+	int error = 0;
+	struct walkarg w;
+	size_t oldlen = (oldlenp ? *oldlenp : 0);
+
+	bzero(&w, sizeof(w));
+	w.w_given = oldlen;
+	w.w_where = oldp;
+	if (oldp)
+		w.w_limit = oldp + oldlen;
+
+	error = walk_addrsel_policy(dump_addrsel_policyent, &w);
+
+	*oldlenp = w.w_total;
+	if (oldp && w.w_total > oldlen && error == 0) {
+		error = ENOMEM;
+	}
+
+	return(error);
+}
+
+/*
+ * The followings are implementation of the policy table using a
+ * simple tail queue.
+ * XXX such details should be hidden.
+ * XXX implementation using binary tree should be more efficient.
+ */
+struct addrsel_policyent {
+	TAILQ_ENTRY(addrsel_policyent) ape_entry;
+	struct in6_addrpolicy ape_policy;
+};
+
+TAILQ_HEAD(addrsel_policyhead, addrsel_policyent);
+
+struct addrsel_policyhead addrsel_policytab;
+
+static void
+init_policy_queue()
+{
+	TAILQ_INIT(&addrsel_policytab);
+}
+
+static void
+clear_addrsel_policy()
+{
+	struct addrsel_policyent *pol, *next;
+
+	for (pol = TAILQ_FIRST(&addrsel_policytab); pol; pol = next) {
+		next = TAILQ_NEXT(pol, ape_entry);
+
+		TAILQ_REMOVE(&addrsel_policytab, pol, ape_entry);
+		FREE(pol, M_IFADDR);
+	}
+}
+
+static int
+add_addrsel_policyent(newpolicy)
+	struct in6_addrpolicy *newpolicy;
+{
+	struct addrsel_policyent *new;
+
+	MALLOC(new, struct addrsel_policyent *, sizeof(*new), M_IFADDR,
+	       M_WAITOK);
+	bzero(new, sizeof(*new));
+
+	/* XXX: should validate entry */
+	new->ape_policy = *newpolicy;
+
+	TAILQ_INSERT_TAIL(&addrsel_policytab, new, ape_entry);
+
+	return(0);
+}
+
+static int
+walk_addrsel_policy(callback, w)
+	int (*callback) __P((struct in6_addrpolicy *, void *));
+	void *w;
+{
+	struct addrsel_policyent *pol;
+	int error = 0;
+
+	for (pol = TAILQ_FIRST(&addrsel_policytab); pol;
+	     pol = TAILQ_NEXT(pol, ape_entry)) {
+		if ((error = (*callback)(&pol->ape_policy, w)) != 0)
+			return(error);
+	}
+
+	return(error);
+}
+
+static int
+dump_addrsel_policyent(pol, arg)
+	struct in6_addrpolicy *pol;
+	void *arg;
+{
+	int error = 0;
+	struct walkarg *w = arg;
+
+	if (w->w_where && w->w_where + sizeof(*pol) <= w->w_limit) {
+		if ((error = copyout(pol, w->w_where, sizeof(*pol))) != 0)
+			return(error);
+		w->w_where += sizeof(*pol);
+	}
+	w->w_total += sizeof(*pol);
+
+	return(error);
+}
+
+static struct in6_addrpolicy *
+match_addrsel_policy(key)
+	struct sockaddr_in6 *key;
+{
+	struct addrsel_policyent *pent;
+	struct in6_addrpolicy *bestpol = NULL, *pol;
+	int matchlen, bestmatchlen = -1;
+	u_char *mp, *ep, *k, *p, m;
+
+	for (pent = TAILQ_FIRST(&addrsel_policytab); pent;
+	     pent = TAILQ_NEXT(pent, ape_entry)) {
+		matchlen = 0;
+
+		pol = &pent->ape_policy;
+		mp = (u_char *)&pol->addrmask.sin6_addr;
+		ep = mp + 16;	/* XXX: scope field? */
+		k = (u_char *)&key->sin6_addr;
+		p = (u_char *)&pol->addr.sin6_addr;
+		for (; mp < ep && *mp; mp++, k++, p++) {
+			m = *mp;
+			if ((*k & m) != *p)
+				goto next; /* not match */
+			if (m == 0xff) /* short cut for a typical case */
+				matchlen += 8;
+			else {
+				while(m >= 0x80) {
+					matchlen++;
+					m <<= 1;
+				}
+			}
+		}
+
+		/* matched.  check if this is better than the current best. */
+		if (bestpol == NULL ||
+		    matchlen > bestmatchlen) {
+			bestpol = pol;
+			bestmatchlen = matchlen;
+		}
+
+	  next:
+		continue;
+	}
+
+	return(bestpol);
+}
+#endif /* !FreeBSD */

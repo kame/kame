@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.104 2001/09/21 09:58:37 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.105 2001/09/24 15:28:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -658,10 +658,11 @@ struct ip6_mtuinfo {
 #define IPV6CTL_AUTO_LINKLOCAL	35	/* automatic link-local addr assign */
 #define IPV6CTL_RIP6STATS	36	/* raw_ip6 stats */
 #define IPV6CTL_PREFER_TEMPADDR	37	/* prefer temporary addr as src */
+#define IPV6CTL_ADDRSELPOLICY	38	/* get/set address selection policy */
 
 /* New entries should be added here from current IPV6CTL_MAXID value. */
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
-#define IPV6CTL_MAXID		38
+#define IPV6CTL_MAXID		39
 
 #ifdef IPV6CTL_RTEXPIRE
 #define __IPV6CTL_NAMES_RTEXPIRE	"rtexpire"
@@ -773,6 +774,7 @@ struct ip6_mtuinfo {
 	{ "auto_linklocal", CTLTYPE_INT }, \
 	{ 0, 0 }, \
 	{ "prefer_tempaddr", CTLTYPE_INT }, \
+	{ 0, 0 }, \
 }
 
 #ifdef __bsdi__
@@ -815,6 +817,7 @@ struct ip6_mtuinfo {
 	&ip6_auto_linklocal, \
 	0, \
 	&ip6_prefer_tempaddr, \
+	0, \
 }
 #endif
 #endif /* !_XOPEN_SOURCE */
@@ -893,6 +896,11 @@ extern int inet6_rth_add __P((void *, const struct in6_addr *));
 extern int inet6_rth_reverse __P((const void *, void *));
 extern int inet6_rth_segments __P((const void *));
 extern struct in6_addr *inet6_rth_getaddr __P((const void *, int));
+
+#ifndef __FreeBSD__
+extern int in6_src_sysctl __P((void *, size_t *, void *, size_t));
+#endif
+extern void addrsel_policy_init __P((void));
 __END_DECLS
 
 #endif /* !_NETINET6_IN6_H_ */

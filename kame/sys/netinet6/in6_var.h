@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.67 2001/09/21 09:58:37 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.68 2001/09/24 15:28:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -134,6 +134,15 @@ struct	in6_ifaddr {
 
 	/* multicast addresses joined from the kernel */
 	LIST_HEAD(, in6_multi_mship) ia6_memberships;
+};
+
+/* control structure to manage address selection policy */
+struct in6_addrpolicy {
+	struct sockaddr_in6 addr; /* prefix address */
+	struct sockaddr_in6 addrmask; /* prefix mask */
+	int preced;		/* precedence */
+	int label;		/* matching label */
+	u_quad_t use;		/* statistics */
 };
 
 /*
