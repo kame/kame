@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.46 2001/12/07 10:30:32 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.47 2001/12/12 00:36:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -95,9 +95,7 @@ struct timeout mip6_bc_ch;
 static int mip6_bu_count = 0;
 static int mip6_bc_count = 0;
 
-#ifdef MIP6_DRAFT13
 int mip6_use_ipsec = 0;
-#endif
 
 /* binding update functions. */
 static int mip6_bu_list_remove __P((struct mip6_bu_list *, struct mip6_bu *));
@@ -369,6 +367,16 @@ mip6_home_registration(sc)
 				     sc);
 		if (mbu == NULL)
 			return (ENOMEM);
+		/*
+		 * for the first registration to the home agent, the
+		 * ack timeout value should be (retrans *
+		 * dadtransmits) * 1.5.
+		 */
+		/*
+		 * XXX: TODO: KAME has different dad retrans values
+		 * for each interfaces.  which retrans value should be
+		 * selected ?
+		 */
 
 		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
 	} else {
@@ -732,27 +740,38 @@ mip6_validate_bu(m, opt)
 	struct mip6_bc *mbc;
 #ifndef MIP6_DRAFT13
 	int error = 0;
+	int ipsec_protected = 0;
 	struct mip6_subopt_authdata *authdata = NULL;
 #endif /* !MIP6_DRAFT13 */
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	bu_opt = (struct ip6_opt_binding_update *)(opt);
 	    
-#ifdef MIP6_DRAFT13
 	/* Make sure that the BU is protected by an AH (see 4.4, 10.12). */
 #ifdef IPSEC
 #ifndef __OpenBSD__
 	if (!mip6_use_ipsec &&
 	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
-		mip6log((LOG_NOTICE, "%s:%d: an unprotected BU from %s.\n",
+		mip6log((LOG_NOTICE,
+			 "%s:%d: a binding update not protected by ipsec "
+			 "from %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
+#ifdef MIP6_DRAFT13
 		/* silently ignore */
 		return (1);
+#else
+		/*
+		 * if ipsec is available and we can validate this
+		 * packet using ipsec, it is enough to protect the
+		 * binding update.
+		 */
+#endif /* MIP6_DRAFT13 */
+	} else {
+		ipsec_protected = 1;
 	}
 #endif /* __OpenBSD__ */
 #endif /* IPSEC */
-#endif /* MIP6_DRAFT13 */
 
 	/* check if this packet contains a home address destopt. */
 	n = ip6_findaux(m);
@@ -834,18 +853,46 @@ mip6_validate_bu(m, opt)
 		}
 	}
 #ifndef MIP6_DRAFT13
-	if (authdata == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: unprotected binding update from host %s\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&ip6->ip6_src)));
+	if (ipsec_protected == 0) {
+		if (authdata == NULL) {
+			/*
+			 * if the packet is not protected by ipsec and
+			 * do not have a authentication data either,
+			 * this packet is not reliable.
+			 */
+			mip6log((LOG_ERR,
+				 "%s:%d: an unprotected binding update "
+				 "from host %s\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(&ip6->ip6_src)));
+			/* discard. */
+			/* XXX */
+		} else {
+			/*
+			 * if the packet is not protected by the ipsec
+			 * and do * not have a authentication data, we
+			 * think it is * protected by ipsec.  if both
+			 * the ipsec protection * and a authentication
+			 * data exist, check the * authentication
+			 * data.  if it seems good, we think * this
+			 * packet is protected by some week auth *
+			 * mechanism.
+			 */
+			if (mip6_verify_authdata(m, bu_opt, authdata)) {
+				mip6log((LOG_ERR,
+					 "%s:%d: authenticate binding update "
+					 "failed from host %s\n",
+					 __FILE__, __LINE__,
+					 ip6_sprintf(&ip6->ip6_src)));
+				/* discard. */
+				/* XXX */
+			}
+			/* verified. */
+		}
 	}
-	if (mip6_verify_authdata(m, bu_opt, authdata)) {
-		mip6log((LOG_ERR,
-			 "%s:%d: authenticate binding update failed from host %s\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&ip6->ip6_src)));
-	}
+	/*
+	 * if the packet is protected by the ipsec, we believe it.
+	 */
 #endif /* !MIP6_DRAFT13 */
 
 	/* The received BU sequence number > received seqno before. */
@@ -1966,29 +2013,39 @@ mip6_validate_ba(m, opt)
 {
 	struct ip6_hdr *ip6;
 	struct ip6_opt_binding_ack *ba_opt;
-	MIP6_SEQNO_T		   seqno;
-	struct mip6_bu             *mbu;
-	struct hif_softc           *sc;
+	MIP6_SEQNO_T seqno;
+	struct mip6_bu *mbu;
+	struct hif_softc *sc;
+	int ipsec_protected = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	ba_opt = (struct ip6_opt_binding_ack *)(opt);
 
-#ifdef MIP6_DRAFT13	    
 	/* Make sure that the BA is protected by an AH (see 4.4, 10.12). */
 #ifdef IPSEC
 #ifndef __OpenBSD__
 	if (!mip6_use_ipsec &&
 	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
 		mip6log((LOG_NOTICE,
-			 "%s:%d: an unprotected BA from %s.\n",
+			 "%s:%d: a binding ack not protected by ipsec "
+			 "from %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
+#ifdef MIP6_DRAFT13
 		/* silently ignore */
 		return (1);
+#else
+		/*
+		 * if ipsec is available and we can validate this
+		 * packet using ipsec, it is enough to protect the
+		 * binding ack.
+		 */
+#endif /* MIP6_DRAFT13 */
+	} else {
+		ipsec_protected = 1;
 	}
 #endif /* __OpenBSD__ */
 #endif /* IPSEC */
-#endif /* MIP6_DRAFT13 */
 
 	/* Make sure that the length field in the BA is >= IP6OPT_BALEN. */
 	if (ba_opt->ip6oa_len < IP6OPT_BALEN) {
