@@ -49,6 +49,7 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#include <netinet/ip_var.h>
 #include <netinet6/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
@@ -361,10 +362,10 @@ ip6_forward(m, srcrt)
 			 * encapsulated packet as "rt->rt_ifp".
 			 */
 			sp = ipsec6_getpolicybyaddr(mcopy, IPSEC_DIR_OUTBOUND,
-				IP_FORWARING, &ipsecerr);
+				IP_FORWARDING, &ipsecerror);
 			if (sp) {
 				ipsechdrsiz = ipsec6_hdrsiz(mcopy,
-					IPSEC_DIR_OUTBONUD, NULL);
+					IPSEC_DIR_OUTBOUND, NULL);
 				if (ipsechdrsiz < mtu)
 					mtu -= ipsechdrsiz;
 			}
