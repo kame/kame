@@ -89,7 +89,6 @@ int     delimiter;
 	}
     }
     return NULL;
-    return cp;
 #endif
 }
 
