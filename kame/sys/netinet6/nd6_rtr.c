@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.213 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.214 2002/10/28 03:48:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1714,7 +1714,7 @@ pfxlist_onlink_check()
 			if ((e = nd6_prefix_onlink(pr)) != 0) {
 				nd6log((LOG_ERR,
 				    "pfxlist_onlink_check: failed to "
-				    "make %s/%d offlink, errno=%d\n",
+				    "make %s/%d onlink, errno=%d\n",
 				    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 				    pr->ndpr_plen, e));
 			}
