@@ -32,7 +32,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: dtcpc.rb,v 1.2 2000/01/10 17:25:01 jinmei Exp $
+# $Id: dtcpc.rb,v 1.3 2000/05/27 11:45:02 jinmei Exp $
 #
 
 require "socket"
@@ -74,6 +74,7 @@ ousername = username
 password = ''
 intface = 'gif0'
 tuntype = 'tunnelonly'
+route = 'static'
 $debug = DEBUG
 
 # # test pattern
@@ -96,6 +97,9 @@ while ARGV[0] =~ /^-/ do
   when /-p/
     ARGV.shift
     port = ARGV[0]
+  when /-r/
+    ARGV.shift
+    route = ARGV[0]
   when /-t/
     ARGV.shift
     tuntype = ARGV[0]
@@ -189,8 +193,14 @@ if (t =~ /^\+OK/)
   STDERR.print "ifconfig #{intface} up\n" if $debug
   system("ifconfig #{intface} up")
   STDERR.print "tunnel to #{a[2]} established.\n"
-  STDERR.print "route add -inet6 default ::1 -ifp #{intface}\n" if $debug
-  system("route add -inet6 default ::1 -ifp #{intface}")
+  if route == "static"
+    STDERR.print "route add -inet6 default ::1 -ifp #{intface}\n" if $debug
+    system("route add -inet6 default ::1 -ifp #{intface}")
+  end
+  if route == "solicit"
+    STDERR.print "rtsol #{intface}\n" if $debug
+    system("rtsol #{intface}")
+  end
   STDERR.print "default route was configured.\n"
   begin
     while TRUE
@@ -210,8 +220,10 @@ if (t =~ /^\+OK/)
     end
     STDERR.print "ifconfig #{intface} down\n" if $debug
     system("ifconfig #{intface} down")
-    STDERR.print "route delete -inet6 default\n" if $debug
-    system("route delete -inet6 default")
+    if route == "static"
+      STDERR.print "route delete -inet6 default\n" if $debug
+      system("route delete -inet6 default")
+    end
     exit 0
   end
   exit 0
