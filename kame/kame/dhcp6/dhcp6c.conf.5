@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.27 2005/01/12 06:06:11 suz Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.28 2005/02/03 19:37:35 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -542,7 +542,7 @@ If a shared secret should be configured in both the client and the
 server for DHCPv6 authentication,
 it would be specified in the configuration file as follows:
 .Bd -literal -offset
-keyinfo kame {
+keyinfo kame-key {
         realm "kame.net";
         keyid 1;
         secret "5pvW2g48OHPvkYMJSw0vZA==";
