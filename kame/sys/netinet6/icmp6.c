@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.92 2000/05/15 09:25:52 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.93 2000/05/15 09:33:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1223,6 +1223,17 @@ ni6_input(m, off)
 			goto bad;
 
 		case ICMP6_NI_SUBJ_FQDN:
+			/*
+			 * Validate Subject name with gethostname(3).
+			 *
+			 * The behavior may need some debate, since:
+			 * - we are not sure if the node has FQDN as
+			 *   hostname (returned by gethostname(3)).
+			 * - the code does wildcard much for truncated names.
+			 *   however, we are not sure if we want to perform
+			 *   wildcard match, if gethostname(3) side has
+			 *   truncated hostname.
+			 */
 			n = ni6_nametodns(hostname, hostnamelen, 0);
 			if (!n || n->m_next)
 				goto bad;
@@ -1290,6 +1301,9 @@ ni6_input(m, off)
 						sizeof(struct icmp6_nodeinfo));
 		nni6->ni_flags = 0; /* XXX: meaningless TTL */
 		fqdn->ni_fqdn_ttl = 0;	/* ditto. */
+		/*
+		 * XXX do we really have FQDN in variable "hostname"?
+		 */
 		n->m_next = ni6_nametodns(hostname, hostnamelen, oldfqdn);
 		if (n->m_next == NULL)
 			goto bad;
@@ -1333,6 +1347,9 @@ ni6_input(m, off)
 
 /*
  * make a mbuf with DNS-encoded string.  no compression support.
+ *
+ * XXX names with less than 2 dots (like "foo" or "foo.section") will be
+ * treated as truncated name (two \0 at the end).  this is a wild guess.
  */
 static struct mbuf *
 ni6_nametodns(name, namelen, old)
