@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.254 2002/05/26 23:21:53 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.255 2002/05/26 23:24:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2018,6 +2018,7 @@ nd6_slowtimo(ignored_arg)
 #endif
 	int i;
 	struct nd_ifinfo *nd6if;
+	struct ifnet *ifp;
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
@@ -2028,15 +2029,11 @@ nd6_slowtimo(ignored_arg)
 #else
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
 #endif
-	for (i = 1; i < if_index + 1; i++) {
+	for (ifp = ifnet; ifp; ifp = ifp->if_next) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
-		if (!ifindex2ifnet(i))
-			continue;
-		nd6if = NDI(ifindex2ifnet(i));
+		nd6if = NDI(ifp);
 #else
-		if (!ifindex2ifnet[i])
-			continue;
-		nd6if = NDI(ifindex2ifnet[i]);
+		nd6if = NDI(ifp);
 #endif
 		if (nd6if->basereachable && /* already initialized */
 		    (nd6if->recalctm -= ND6_SLOWTIMER_INTERVAL) <= 0) {
