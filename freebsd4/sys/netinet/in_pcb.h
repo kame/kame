@@ -61,13 +61,9 @@ typedef	u_quad_t	inp_gen_t;
  * So, AF_INET6 null laddr is also used as AF_INET null laddr,
  * by utilize following structure. (At last, same as INRIA)
  */
-#ifndef offsetof		/* XXX */
-#define	offsetof(type, member)	((size_t)(&((type *)0)->member))
-#endif
-struct sa_4in6 {
-	u_int8_t sa46_pad1[offsetof(struct sockaddr_in6, sin6_addr)]; /* XXX */
-	u_int32_t sa46_pad2[3];
-	struct in_addr sa46_addr4;
+struct in_addr_4in6 {
+	u_int32_t ia46_pad2[3];
+	struct in_addr ia46_addr4;
 };
 
 /*
@@ -75,31 +71,25 @@ struct sa_4in6 {
  * in_conninfo has some extra padding to accomplish this.
  */
 struct in_endpoints {
+	u_int16_t	ie_fport;	/* foreign port */
+	u_int16_t	ie_lport;	/* local port */
 	/* protocol dependent part, local and foreign addr */
 	union {
 		/* foreign host table entry */
-		struct	sa_4in6 ie46_foreign;
-		struct	sockaddr_in6 ie6_foreign;
+		struct	in_addr_4in6 ie46_foreign;
+		struct	in6_addr ie6_foreign;
 	} ie_dependfaddr;
 	union {
 		/* local host table entry */
-		struct	sa_4in6 ie46_local;
-		struct	sockaddr_in6 ie6_local;
+		struct	in_addr_4in6 ie46_local;
+		struct	in6_addr ie6_local;
 	} ie_dependladdr;
-#define ie_fport	ie_dependfaddr.ie6_foreign.sin6_port
-#define ie_lport	ie_dependladdr.ie6_local.sin6_port
-#define	ie_faddr	ie_dependfaddr.ie46_foreign.sa46_addr4
-#define	ie_laddr	ie_dependladdr.ie46_local.sa46_addr4
-#define	ie6_fsa		ie_dependfaddr.ie6_foreign
-#define	ie6_lsa		ie_dependladdr.ie6_local
+#define	ie_faddr	ie_dependfaddr.ie46_foreign.ia46_addr4
+#define	ie_laddr	ie_dependladdr.ie46_local.ia46_addr4
+#define	ie6_faddr	ie_dependfaddr.ie6_foreign
+#define	ie6_laddr	ie_dependladdr.ie6_local
 };
 
-/*
- * XXX
- * At some point struct route should possibly change to:
- *   struct rtentry *rt
- *   struct in_endpoints *ie; 
- */
 struct in_conninfo {
 	u_int8_t	inc_flags;
 	u_int8_t	inc_len;
@@ -108,7 +98,7 @@ struct in_conninfo {
 	struct	in_endpoints inc_ie;
 	union {
 		/* placeholder for routing entry */
-		struct	route inc4_route;
+		struct  route inc4_route;
 #if 1 /* def NEW_STRUCT_ROUTE */
 		struct  route inc6_route;
 #else
@@ -122,8 +112,8 @@ struct in_conninfo {
 #define	inc_faddr	inc_ie.ie_faddr
 #define	inc_laddr	inc_ie.ie_laddr
 #define	inc_route	inc_dependroute.inc4_route
-#define inc6_fsa	inc_ie.ie6_fsa
-#define inc6_lsa	inc_ie.ie6_lsa
+#define inc6_faddr	inc_ie.ie6_faddr
+#define inc6_laddr	inc_ie.ie6_laddr
 #define	inc6_route	inc_dependroute.inc6_route
 
 /*
@@ -187,10 +177,8 @@ struct inpcb {
 	LIST_ENTRY(inpcb) inp_portlist;
 	struct	inpcbport *inp_phd;	/* head of this list */
 	inp_gen_t	inp_gencnt;	/* generation count of this instance */
-#define	in6p_fsa	inp_inc.inc_ie.ie_dependfaddr.ie6_foreign
-#define	in6p_lsa	inp_inc.inc_ie.ie_dependladdr.ie6_local
-#define	in6p_faddr	inp_inc.inc6_fsa.sin6_addr
-#define	in6p_laddr	inp_inc.inc6_lsa.sin6_addr
+#define	in6p_faddr	inp_inc.inc6_faddr
+#define	in6p_laddr	inp_inc.inc6_laddr
 #define	in6p_route	inp_inc.inc6_route
 #define	in6p_ip6_hlim	inp_depend6.inp6_hlim
 #define	in6p_hops	inp_depend6.inp6_hops	/* default hop limit */

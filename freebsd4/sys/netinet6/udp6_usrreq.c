@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.71 2004/02/02 13:24:54 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.72 2004/02/04 01:01:10 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -167,7 +167,7 @@ udp6_input(mp, offp, proto)
 	register struct inpcb *in6p;
 	int off = *offp;
 	int plen, ulen;
-	struct sockaddr_in6 src, dst, fromsa, tosa;
+	struct sockaddr_in6 fromsa;
 #ifdef MLDV2
 	struct sock_msf *msf;
 	struct ip6_moptions *im6o;
@@ -195,26 +195,6 @@ udp6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 #endif
 
-	/*
-	 * extract full sockaddr structures for the src/dst addresses,
-	 * and make local copies of them.
-	 */
-	if (ip6_getpktaddrs(m, &src, &dst)) {
-		m_freem(m);
-		goto bad;
-	}
-
-	/*
-	 * XXX: the address may have embedded scope zone ID, which should be
-	 * hidden from applications.
-	 */
-	fromsa = src;
-	tosa = dst;
-#ifndef SCOPEDROUTING
-	in6_clearscope(&fromsa.sin6_addr);
-	in6_clearscope(&tosa.sin6_addr);
-#endif
-
 	udpstat.udps_ipackets++;
 
 	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6);
@@ -237,17 +217,7 @@ udp6_input(mp, offp, proto)
 
 	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		struct	inpcb *last;
-		struct	sockaddr_in6 fromsa2, tosa2; /* only with addr info */
 		
-		bzero(&fromsa2, sizeof(fromsa2));
-		bzero(&tosa2, sizeof(tosa2));
-		fromsa2.sin6_family = tosa2.sin6_family = AF_INET6;
-		fromsa2.sin6_len = tosa2.sin6_len = sizeof(struct sockaddr_in6);
-		fromsa2.sin6_addr = fromsa.sin6_addr;
-		tosa2.sin6_addr = tosa.sin6_addr;
-		fromsa2.sin6_scope_id = fromsa.sin6_scope_id;
-		tosa2.sin6_scope_id = tosa.sin6_scope_id;
-
 		/*
 		 * Deliver a multicast datagram to all sockets
 		 * for which the local and remote addresses and ports match
@@ -293,13 +263,14 @@ udp6_input(mp, offp, proto)
 				continue;
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
-			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &tosa))
+			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
+							&ip6->ip6_dst))
 					continue;
 			}
-			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
-							&fromsa) ||
+			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
+							&ip6->ip6_src) ||
 				    in6p->in6p_fport != uh->uh_sport) {
 					continue;
 				}
@@ -496,8 +467,8 @@ udp6_input(mp, offp, proto)
 	/*
 	 * Locate pcb for datagram.
 	 */
-	in6p = in6_pcblookup_hash(&udbinfo, &src, uh->uh_sport,
-				  &dst, uh->uh_dport, 1,
+	in6p = in6_pcblookup_hash(&udbinfo, &ip6->ip6_src, uh->uh_sport,
+				  &ip6->ip6_dst, uh->uh_dport, 1,
 				  m->m_pkthdr.rcvif);
 	if (in6p == 0) {
 		if (log_in_vain) {
@@ -652,8 +623,9 @@ udp6_getcred(SYSCTL_HANDLER_ARGS)
 		return (error);
 	}
 	s = splnet();
-	inp = in6_pcblookup_hash(&udbinfo, &addrs[1], addrs[1].sin6_port,
-				 &addrs[0], addrs[0].sin6_port,
+	inp = in6_pcblookup_hash(&udbinfo, &addrs[1].sin6_addr,
+				 addrs[1].sin6_port,
+				 &addrs[0].sin6_addr, addrs[0].sin6_port,
 				 1, NULL);
 	if (!inp || !inp->inp_socket) {
 		error = ENOENT;
@@ -740,7 +712,7 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 		sin6_p = (struct sockaddr_in6 *)nam;
 
-		if (SA6_IS_ADDR_UNSPECIFIED(sin6_p))
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6_p->sin6_addr))
 			inp->inp_vflag |= INP_IPV4;
 		else if (IN6_IS_ADDR_V4MAPPED(&sin6_p->sin6_addr)) {
 			struct sockaddr_in sin;
@@ -792,7 +764,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 			return error;
 		}
 	}
-	if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
+	if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
 		return EISCONN;
 	s = splnet();
 	error = in6_pcbconnect(inp, nam, p);
@@ -841,12 +813,12 @@ udp6_disconnect(struct socket *so)
 	}
 #endif
 
-	if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
+	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
 		return ENOTCONN;
 
 	s = splnet();
 	in6_pcbdisconnect(inp);
-	sa6_copy_addr(&sa6_any, &inp->in6p_lsa);
+	inp->in6p_laddr = in6addr_any;
 	splx(s);
 	so->so_state &= ~SS_ISCONNECTED;		/* XXX */
 	return 0;
@@ -899,7 +871,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 				 */
 				return EINVAL;
 			}
-			if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)
+			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)
 			    && !IN6_IS_ADDR_V4MAPPED(&inp->in6p_laddr)) {
 				/*
 				 * when remote addr is IPv4-mapped

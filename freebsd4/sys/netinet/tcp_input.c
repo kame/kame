@@ -354,9 +354,6 @@ tcp_input(m, off0)
 	register int thflags;
 	struct socket *so = 0;
 	int todrop, acked, ourfinisacked, needoutput = 0;
-#ifdef INET6
-	struct sockaddr_in6 src_sa6, dst_sa6;
-#endif
 	u_long tiwin;
 	struct tcpopt to;		/* options in this segment */
 	struct rmxp_tao *taop;		/* pointer to our TAO cache entry */
@@ -511,12 +508,6 @@ tcp_input(m, off0)
 		goto drop;
 #endif
 
-	/* extract full sockaddr structures for the src/dst addresses */
-	if (isipv6) {
-		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6))
-			goto drop;
-	}
-
 	/*
 	 * Convert TCP protocol specific fields to host format.
 	 */
@@ -564,8 +555,8 @@ findpcb:
 #ifdef INET6
 		if (isipv6)
 			inp = in6_pcblookup_hash(&tcbinfo,
-						 &src_sa6, th->th_sport,
-						 &dst_sa6, th->th_dport,
+						 &ip6->ip6_src, th->th_sport,
+						 &ip6->ip6_dst, th->th_dport,
 						 1, m->m_pkthdr.rcvif);
 		else
 #endif /* INET6 */
@@ -692,12 +683,8 @@ findpcb:
 		inc.inc_isipv6 = isipv6;
 #endif
 		if (isipv6) {
-			inc.inc6_lsa.sin6_family =
-				inc.inc6_fsa.sin6_family = AF_INET6;
-			inc.inc6_lsa.sin6_len = inc.inc6_fsa.sin6_len =
-				sizeof(struct sockaddr_in6);
-			sa6_copy_addr(&src_sa6, &inc.inc6_fsa);
-			sa6_copy_addr(&dst_sa6, &inc.inc6_lsa);
+			inc.inc6_faddr = ip6->ip6_src;
+			inc.inc6_laddr = ip6->ip6_dst;
 			inc.inc6_route.ro_rt = NULL;		/* XXX */
 		} else {
 			inc.inc_faddr = ip->ip_src;
@@ -823,7 +810,8 @@ findpcb:
 		 */
 		if (th->th_dport == th->th_sport) {
 			if (isipv6) {
-				if (SA6_ARE_ADDR_EQUAL(&src_sa6, &dst_sa6))
+				if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
+						       &ip6->ip6_src))
 					goto drop;
 			} else {
 				if (ip->ip_dst.s_addr == ip->ip_src.s_addr)
@@ -883,7 +871,7 @@ findpcb:
 			if (DELAY_ACK(tp) &&
 			    ((thflags & TH_FIN) ||
 			     (tlen != 0 &&
-			      ((isipv6 && in6_localaddr(&inp->in6p_fsa)) ||
+			      ((isipv6 && in6_localaddr(&inp->in6p_faddr)) ||
 			       (!isipv6 && 
 				in_localaddr(inp->inp_faddr)))))) {
 				callout_reset(tp->tt_delack, tcp_delacktime,  
@@ -2698,7 +2686,7 @@ tcp_mss(tp, offer)
 		mss = (isipv6 ? IN6_LINKMTU(rt->rt_ifp) : ifp->if_mtu)
 			- min_protoh;
 		if (isipv6) {
-			if (!in6_localaddr(&inp->in6p_fsa))
+			if (!in6_localaddr(&inp->in6p_faddr))
 				mss = min(mss, tcp_v6mssdflt);
 		} else {
 			mss = ifp->if_mtu - min_protoh;
@@ -2776,7 +2764,7 @@ tcp_mss(tp, offer)
 	 */
 	if (
 #ifdef INET6
-	    (isipv6 && in6_localaddr(&inp->in6p_fsa)) ||
+	    (isipv6 && in6_localaddr(&inp->in6p_faddr)) ||
 	    (!isipv6 &&
 #endif
 	     in_localaddr(inp->inp_faddr)
