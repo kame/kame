@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet.c,v 1.64 2003/02/19 19:15:13 jason Exp $	*/
+/*	$OpenBSD: inet.c,v 1.68 2003/09/04 20:05:19 tedu Exp $	*/
 /*	$NetBSD: inet.c,v 1.14 1995/10/03 21:42:37 thorpej Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-static char *rcsid = "$OpenBSD: inet.c,v 1.64 2003/02/19 19:15:13 jason Exp $";
+static char *rcsid = "$OpenBSD: inet.c,v 1.68 2003/09/04 20:05:19 tedu Exp $";
 #endif
 #endif /* not lint */
 
@@ -419,7 +415,7 @@ ip_stats(u_long off, char *name)
 #undef p1
 }
 
-static	char *icmpnames[] = {
+static	char *icmpnames[ICMP_MAXTYPE + 1] = {
 	"echo reply",
 	"#1",
 	"#2",
@@ -439,6 +435,28 @@ static	char *icmpnames[] = {
 	"information request reply",
 	"address mask request",
 	"address mask reply",
+	"#19",
+	"#20",
+	"#21",
+	"#22",
+	"#23",
+	"#24",
+	"#25",
+	"#26",
+	"#27",
+	"#28",
+	"#29",
+	"traceroute",
+	"data conversion error",
+	"mobile host redirect",
+	"IPv6 where-are-you",
+	"IPv6 i-am-here",
+	"mobile registration request",
+	"mobile registration reply",
+	"#37",
+	"#38",
+	"SKIP",
+	"Photuris",
 };
 
 /*
@@ -467,8 +485,11 @@ icmp_stats(u_long off, char *name)
 				printf("\tOutput packet histogram:\n");
 				first = 0;
 			}
-			printf("\t\t%s: %lu\n", icmpnames[i],
-			    icmpstat.icps_outhist[i]);
+			if (icmpnames[i])
+				printf("\t\t%s:", icmpnames[i]);
+			else
+				printf("\t\t#%d:", i);
+			printf(" %lu\n", icmpstat.icps_outhist[i]);
 		}
 	p(icps_badcode, "\t%lu message%s with bad code fields\n");
 	p(icps_tooshort, "\t%lu message%s < minimum length\n");
@@ -480,8 +501,11 @@ icmp_stats(u_long off, char *name)
 				printf("\tInput packet histogram:\n");
 				first = 0;
 			}
-			printf("\t\t%s: %lu\n", icmpnames[i],
-			    icmpstat.icps_inhist[i]);
+			if (icmpnames[i])
+				printf("\t\t%s:", icmpnames[i]);
+			else
+				printf("\t\t#%d:", i);
+			printf(" %lu\n", icmpstat.icps_inhist[i]);
 		}
 	p(icps_reflect, "\t%lu message response%s generated\n");
 #undef p
@@ -530,7 +554,7 @@ struct rpcnams {
 	char	*rpcname;
 };
 
-char *
+static char *
 getrpcportnam(in_port_t port, int proto)
 {
 	struct sockaddr_in server_addr;
@@ -788,7 +812,7 @@ esp_stats(u_long off, char *name)
 }
 
 /*
- * Dump ESP statistics structure.
+ * Dump IP-in-IP statistics structure.
  */
 void
 ipip_stats(u_long off, char *name)

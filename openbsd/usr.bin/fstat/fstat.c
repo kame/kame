@@ -1,4 +1,4 @@
-/*	$OpenBSD: fstat.c,v 1.41 2002/08/04 00:48:34 deraadt Exp $	*/
+/*	$OpenBSD: fstat.c,v 1.48 2003/09/09 04:46:44 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,7 +37,7 @@ static char copyright[] =
 
 #ifndef lint
 /*static char sccsid[] = "from: @(#)fstat.c	8.1 (Berkeley) 6/6/93";*/
-static char *rcsid = "$OpenBSD: fstat.c,v 1.41 2002/08/04 00:48:34 deraadt Exp $";
+static char *rcsid = "$OpenBSD: fstat.c,v 1.48 2003/09/09 04:46:44 jmc Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -59,8 +55,8 @@ static char *rcsid = "$OpenBSD: fstat.c,v 1.41 2002/08/04 00:48:34 deraadt Exp $
 #include <sys/unpcb.h>
 #include <sys/sysctl.h>
 #include <sys/filedesc.h>
-#include <sys/mount.h>
 #define	_KERNEL
+#include <sys/mount.h>
 #include <crypto/cryptodev.h>
 #include <dev/systrace.h>
 #include <sys/file.h>
@@ -122,9 +118,9 @@ typedef struct devs {
 } DEVS;
 DEVS *devs;
 
-int	fsflg,	/* show files on same filesystem as file(s) argument */
-	pflg,	/* show files open by a particular pid */
-	uflg;	/* show files open by a particular (effective) user */
+int	fsflg;	/* show files on same filesystem as file(s) argument */
+int	pflg;	/* show files open by a particular pid */
+int	uflg;	/* show files open by a particular (effective) user */
 int	checkfile; /* true if restricting to particular files or filesystems */
 int	nflg;	/* (numerical) display f.s. and rdev as dev_t */
 int	oflg;	/* display file offset */
@@ -164,8 +160,10 @@ void vtrans(struct vnode *, int, int, off_t);
 int getfname(char *);
 void pipetrans(struct pipe *, int);
 void kqueuetrans(struct kqueue *, int);
-void cryptotrans(void *, int i);
-void systracetrans(struct fsystrace *, int i);
+void cryptotrans(void *, int);
+void systracetrans(struct fsystrace *, int);
+char *getmnton(struct mount *);
+const char *inet6_addrstr(struct in6_addr *);
 
 int
 main(int argc, char *argv[])
@@ -317,7 +315,6 @@ dofiles(struct kinfo_proc *kp)
 #define	filed	filed0.fd_fd
 	struct proc *p = &kp->kp_proc;
 	struct eproc *ep = &kp->kp_eproc;
-	extern char *user_from_uid();
 
 	Uname = user_from_uid(ep->e_ucred.cr_uid, 0);
 	Pid = p->p_pid;
@@ -403,7 +400,7 @@ vtrans(struct vnode *vp, int i, int flag, off_t offset)
 	struct vnode vn;
 	struct filestat fst;
 	char rw[3], mode[17];
-	char *badtype = NULL, *filename, *getmnton();
+	char *badtype = NULL, *filename;
 
 	filename = badtype = NULL;
 	if (!KVM_READ(vp, &vn, sizeof (struct vnode))) {
@@ -620,9 +617,7 @@ nfs_filestat(struct vnode *vp, struct filestat *fsp)
 }
 
 int
-xfs_filestat(vp, fsp)
-	struct vnode *vp;
-	struct filestat *fsp;
+xfs_filestat(struct vnode *vp, struct filestat *fsp)
 {
 	struct xfs_node xfs_node;
 
@@ -1105,7 +1100,7 @@ getfname(char *filename)
 void
 usage(void)
 {
-	fprintf(stderr, "usage: fstat [-fnv] [-p pid] [-u user] "
-	    "[-N system] [-M core] [file ...]\n");
+	fprintf(stderr, "usage: fstat [-fnov] [-M core] [-N system] "
+	    "[-p pid] [-u user] [file ...]\n");
 	exit(1);
 }

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.10 2001/07/30 11:42:09 hugh Exp $
+#	$OpenBSD: Makefile,v 1.11 2003/05/14 23:37:05 itojun Exp $
 
 PROG=	netstat
 SRCS=	if.c inet.c inet6.c ipx.c iso.c main.c mbuf.c mroute.c ns.c route.c \

@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.35 2003/02/01 14:09:16 dhartmei Exp $	*/
+/*	$OpenBSD: main.c,v 1.38 2003/06/26 21:59:11 deraadt Exp $	*/
 /*	$NetBSD: main.c,v 1.9 1996/05/07 02:55:02 thorpej Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,7 +40,7 @@ char copyright[] =
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-static char *rcsid = "$OpenBSD: main.c,v 1.35 2003/02/01 14:09:16 dhartmei Exp $";
+static char *rcsid = "$OpenBSD: main.c,v 1.38 2003/06/26 21:59:11 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -183,12 +179,12 @@ struct nlist nl[] = {
 };
 
 struct protox {
-	u_char	pr_index;		/* index into nlist of cb head */
-	u_char	pr_sindex;		/* index into nlist of stat block */
-	u_char	pr_wanted;		/* 1 if wanted, 0 otherwise */
-	void	(*pr_cblocks)();	/* control blocks printing routine */
-	void	(*pr_stats)();		/* statistics printing routine */
-	char	*pr_name;		/* well-known name */
+	u_char	pr_index;			/* index into nlist of cb head */
+	u_char	pr_sindex;			/* index into nlist of stat block */
+	u_char	pr_wanted;			/* 1 if wanted, 0 otherwise */
+	void	(*pr_cblocks)(u_long, char *);	/* control blocks printing routine */
+	void	(*pr_stats)(u_long, char *);	/* statistics printing routine */
+	char	*pr_name;			/* well-known name */
 } protox[] = {
 	{ N_TCBTABLE,	N_TCPSTAT,	1,	protopr,
 	  tcp_stats,	"tcp" },
@@ -549,7 +545,7 @@ main(int argc, char *argv[])
 static void
 printproto(struct protox *tp, char *name)
 {
-	void (*pr)();
+	void (*pr)(u_long, char *);
 	u_char i;
 
 	if (sflag) {
@@ -642,10 +638,12 @@ usage(void)
 	(void)fprintf(stderr,
 "usage: %s [-Aan] [-f address_family] [-M core] [-N system]\n", __progname);
 	(void)fprintf(stderr,
-"       %s [-gimnrs] [-f address_family] [-M core] [-N system]\n", __progname);
+"       %s [-bdgilmnqrstu] [-f address_family] [-M core] [-N system]\n", __progname);
 	(void)fprintf(stderr,
-"       %s [-n] [-I interface] [-M core] [-N system] [-w wait]\n", __progname);
+"       %s [-bdn] [-I interface] [-M core] [-N system] [-w wait]\n", __progname);
 	(void)fprintf(stderr,
 "       %s [-M core] [-N system] [-p protocol]\n", __progname);
+	(void)fprintf(stderr,
+"       %s [-s] [-f address_family] [-i] [-I interface]\n", __progname);
 	exit(1);
 }
