@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.265 2001/12/24 18:46:21 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.266 2001/12/24 18:49:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3984,6 +3984,13 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 	case IPV6_HOPLIMIT:
 	{
 		int *hlimp;
+
+		/*
+		 * rfc2292bis-03 obsoleted the usage of sticky IPV6_HOPLIMIT
+		 * to simplify the ordering among hoplimit options.
+		 */
+		if (optname == IPV6_HOPLIMIT && sticky)
+			return(ENOPROTOOPT);
 
 		if (len != sizeof(int))
 			return(EINVAL);
