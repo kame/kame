@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.10 2000/06/12 05:35:59 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.11 2000/06/15 05:29:17 sakane Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -162,6 +162,7 @@ extern int oakley_getsign __P((struct ph1handle *));
 extern vchar_t *oakley_getcr __P((struct ph1handle *));
 extern int oakley_checkcr __P((struct ph1handle *));
 #endif
+extern int oakley_needcr __P((int));
 struct isakmp_gen;
 extern int oakley_savecert __P((struct ph1handle *, struct isakmp_gen *));
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.37 2000/06/12 05:35:59 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.38 2000/06/15 05:29:16 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1472,6 +1472,23 @@ oakley_checkcr(iph1)
 	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cr_p));
 
 	return 0;
+}
+
+/*
+ * check to need CR payload.
+ */
+int
+oakley_needcr(type)
+	int type;
+{
+	switch (type) {
+	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
+	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+		return 1;
+	default:
+		return 0;
+	}
+	/*NOTREACHED*/
 }
 
 /*

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.32 2000/06/12 05:35:59 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.33 2000/06/15 05:29:16 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -132,7 +132,8 @@ agg_i1send(iph1, msg)
 		goto end;
 
 	/* create CR if need */
-	if (iph1->rmconf->peerscertfile == NULL) {
+	if (oakley_needcr(iph1->rmconf->proposal->authmethod)
+	 && iph1->rmconf->peerscertfile == NULL) {
 		need_cr = 1;
 		cr = oakley_getcr(iph1);
 		if (cr == NULL) {
@@ -695,7 +696,8 @@ agg_r1send(iph1, msg)
 		goto end;
 
 	/* create CR if need */
-	if (iph1->rmconf->peerscertfile == NULL) {
+	if (oakley_needcr(iph1->approval->authmethod)
+	 && iph1->rmconf->peerscertfile == NULL) {
 		need_cr = 1;
 		cr = oakley_getcr(iph1);
 		if (cr == NULL) {

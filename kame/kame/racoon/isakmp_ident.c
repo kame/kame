@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.32 2000/06/12 05:35:59 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.33 2000/06/15 05:29:16 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -1228,6 +1228,7 @@ ident_ir2sendmx(iph1)
 
 	/* create CR if need */
 	if (iph1->side == INITIATOR
+	 && oakley_needcr(iph1->approval->authmethod)
 	 && iph1->rmconf->peerscertfile == NULL) {
 		need_cr = 1;
 		cr = oakley_getcr(iph1);
@@ -1358,6 +1359,7 @@ ident_ir3sendmx(iph1)
 
 		/* create CR if need */
 		if (iph1->side == INITIATOR
+	 	 && oakley_needcr(iph1->approval->authmethod)
 		 && iph1->rmconf->peerscertfile == NULL) {
 			need_cr = 1;
 			cr = oakley_getcr(iph1);
