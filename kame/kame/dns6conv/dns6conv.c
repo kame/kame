@@ -1,4 +1,4 @@
-/*	$KAME: dns6conv.c,v 1.5 2001/01/13 16:41:21 jinmei Exp $ */
+/*	$KAME: dns6conv.c,v 1.6 2001/08/20 07:04:40 itojun Exp $ */
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -217,22 +217,40 @@ print_bitstring(cp, blen)
 {
 	char pbuf[NI_MAXHOST]; /* XXX */
 	char *dn = pbuf, tc;
+	char *ep = &pbuf[sizeof(pbuf)];
 	int b;
+	int n;
 
-	for (b = blen; b > 7; b -= 8, cp++)
-		dn += sprintf(dn, "%02x", *cp & 0xff);
+	for (b = blen; b > 7; b -= 8, cp++) {
+		n = snprintf(dn, ep - dn, "%02x", *cp & 0xff);
+		if (n < 0 || n >= ep - dn)
+			goto fail;
+		dn += n;
+	}
 	if (b > 4) {
 		tc = *cp++;
-		dn += sprintf(dn, "%02x", tc & (0xff << (8 - b)));
+		n = snprintf(dn, ep - dn, "%02x", tc & (0xff << (8 - b)));
+		if (n < 0 || n >= ep - dn)
+			goto fail;
+		dn += n;
 	} else if (b > 0) {
 		tc = *cp++;
-		dn += sprintf(dn, "%1x", ((tc >> 4) & 0x0f) & (0x0f << (4 - b))); 
+		n = snprintf(dn, ep - dn, "%1x",
+		    ((tc >> 4) & 0x0f) & (0x0f << (4 - b))); 
+		if (n < 0 || n >= ep - dn)
+			goto fail;
+		dn += n;
 	}
-	dn += sprintf(dn, "/%d", blen);
+	n = snprintf(dn, ep - dn, "/%d", blen);
+	if (n < 0 || n >= ep - dn)
+		goto fail;
+	dn += n;
 
 	printf("%s\n", pbuf);
-
 	return;
+
+fail:
+	printf("?\n", pbuf);
 }
 
 static void
