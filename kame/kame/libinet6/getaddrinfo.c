@@ -502,9 +502,6 @@ explore_fqdn(pai, hostname, servname, res)
 	const char *servname;
 	struct addrinfo **res;
 {
-#if 0
-	int s;
-#endif
 	struct hostent *hp;
 	int h_error;
 	int af;
@@ -522,18 +519,11 @@ explore_fqdn(pai, hostname, servname, res)
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
 
-#if 0
 	/*
-	 * filter out AFs that are not supported by the kernel
-	 * XXX errno?
+	 * Do not filter unsupported AFs here.  We need to honor content of
+	 * databases (/etc/hosts, DNS and others).  Otherwise we cannot
+	 * replace gethostbyname() by getaddrinfo().
 	 */
-	s = socket(pai->ai_family, SOCK_DGRAM, 0);
-	if (s < 0) {
-		if (errno != EMFILE)
-			return 0;
-	} else
-		close(s);
-#endif
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
