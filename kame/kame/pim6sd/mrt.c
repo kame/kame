@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.13 2002/12/24 04:43:12 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.14 2002/12/24 11:08:03 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -410,21 +410,44 @@ find_route(source, group, flags, create)
 
 	if (mrtentry_ptr->flags & MRTF_NEW)
 	{
+	    /* 
+	     * Copy the oif list from (*,G) or (*,*,RP) entry if it
+	     * exists and G is an non-SSM prefix
+	     */
+
 	    if (SSMGROUP(group))
 		goto not_copy;
 
-	    if ((mrtentry_ptr_2 = grpentry_ptr->grp_route)
-		== (mrtentry_t *) NULL)
-	    {
+	    mrtentry_ptr_2 = grpentry_ptr->grp_route;
+	    if (mrtentry_ptr_2 == NULL) {
+		if (grpentry_ptr->active_rp_grp != NULL) {
+		    rpentry_ptr = grpentry_ptr->active_rp_grp->rp->rpentry;
+		    mrtentry_ptr_2 = rpentry_ptr->mrtlink;
+		    goto found_mrtentry_ptr_2;
+		}
+		rp_grp_entry_ptr = rp_grp_match(group);
+		if (rp_grp_entry_ptr == NULL) {
+		    mrtentry_ptr_2 = NULL;
+		    goto found_mrtentry_ptr_2;
+		}
+
+		rpentry_ptr = rp_grp_entry_ptr->rp->rpentry;
 		mrtentry_ptr_2 = rpentry_ptr->mrtlink;
+
+		grpentry_ptr->active_rp_grp = rp_grp_entry_ptr;
+		grpentry_ptr->rpaddr = rpentry_ptr->address;
+
+		/* Link to the top of the rp_grp_chain */
+	    	grpentry_ptr->rpnext = rp_grp_entry_ptr->grplink;
+		rp_grp_entry_ptr->grplink = grpentry_ptr;
+		if (grpentry_ptr->rpnext != NULL)
+		    grpentry_ptr->rpnext->rpprev = grpentry_ptr;
 	    }
-	    /* Copy the oif list from the existing (*,G) or (*,*,RP) entry */
-	    /* not used in SSM */
-	    if (mrtentry_ptr_2 != (mrtentry_t *) NULL)
-	    {
+
+	found_mrtentry_ptr_2:
+	    if (mrtentry_ptr_2 != NULL) {
 		VOIF_COPY(mrtentry_ptr_2, mrtentry_ptr);
-		if (flags & MRTF_RP)
-		{
+		if (flags & MRTF_RP) {
 		    /* ~(S,G) prune entry */
 		    mrtentry_ptr->incoming = mrtentry_ptr_2->incoming;
 		    mrtentry_ptr->upstream = mrtentry_ptr_2->upstream;
@@ -435,21 +458,24 @@ find_route(source, group, flags, create)
 	    }
 
     not_copy:
-	    if (!(mrtentry_ptr->flags & MRTF_RP))
-	    {
+	    if (!(mrtentry_ptr->flags & MRTF_RP)) {
 		mrtentry_ptr->incoming = srcentry_ptr->incoming;
 		mrtentry_ptr->upstream = srcentry_ptr->upstream;
 		mrtentry_ptr->metric = srcentry_ptr->metric;
 		mrtentry_ptr->preference = srcentry_ptr->preference;
 	    }
-	    if (!SSMGROUP(group))
-	    	move_kernel_cache(mrtentry_ptr, 0);
+	    move_kernel_cache(mrtentry_ptr, 0);
+
+	    /*
+	     * install (S,G) entry when there's no corresponding kernel cache
+	     * for (*,G) nor (*,*,RP), if it's non-RPT route.
+	     */
+	    if ((mrtentry_ptr->flags & (MRTF_RP | MRTF_KERNEL_CACHE)) == 0)
+		add_kernel_cache(mrtentry_ptr, source, group, 0);
 #ifdef RSRR
 	    rsrr_cache_bring_up(mrtentry_ptr);
 #endif				/* RSRR */
 	}
-	if (SSMGROUP(group))
-		add_kernel_cache(mrtentry_ptr, source, group, MFC_MOVE_FORCE);
 	return (mrtentry_ptr);
     }
 
