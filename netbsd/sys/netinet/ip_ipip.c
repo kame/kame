@@ -109,11 +109,12 @@ ipip_input(m, va_alist)
 #if NIPIP > 0
 	struct ipip_softc *sc;
 #endif
-	int hlen;
+	int hlen, proto;
 	va_list ap;
 
 	va_start(ap, m);
 	hlen = va_arg(ap, int);
+	proto = va_arg(ap, int);
 	va_end(ap);
 
 #if NIPIP > 0
@@ -163,7 +164,7 @@ ipip_input(m, va_alist)
 #endif /* MROUTING */
 
 	/* Last try: give it to raw IP. */
-	rip_input(m);
+	rip_input(m, hlen, proto);
 }
 
 #if NIPIP > 0
