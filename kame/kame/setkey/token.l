@@ -260,6 +260,12 @@ any		{ PREPROC; return(ANY); }
 			return(PORT);
 		}
 
+{blcl}any{elcl}	{
+			char *p = yytext;
+			PREPROC;
+			return(PORTANY);
+		}
+
 {hexstring}	{
 			int len = yyleng - 2; /* (str - "0x") */
 			PREPROC;

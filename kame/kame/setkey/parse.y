@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.3 1999/09/09 23:54:16 itojun Exp $ */
+/* KAME $Id: parse.y,v 1.4 1999/10/07 02:21:51 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -93,7 +93,7 @@ extern void yyerror __P((char *));
 
 %token EOT
 %token ADD GET DELETE FLUSH DUMP
-%token IP4_ADDRESS IP6_ADDRESS PREFIX PORT
+%token IP4_ADDRESS IP6_ADDRESS PREFIX PORT PORTANY
 %token UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
 %token F_MODE MODE
@@ -476,6 +476,7 @@ prefix
 port
 	:	/*NOTHING*/ { pp_port = IPSEC_PORT_ANY; }
 	|	PORT { pp_port = $1.num; }
+	|	PORTANY { pp_port = IPSEC_PORT_ANY; }
 	;
 
 upper_spec
