@@ -1,24 +1,14 @@
 TODOs for mobile-ip6
 KAME project
-$Id: TODO.mobile-ip6,v 1.8 2000/02/12 19:36:51 itojun Exp $
+$Id: TODO.mobile-ip6,v 1.9 2000/03/18 02:23:06 itojun Exp $
 
 
-- Nuke in6_control() calls from within the kernel.  it is not supposed to be
-  called.  Ericsson patch that allowed proc == NULL raises big security
-  problem.  I've removed that part so the code may not be functional.
 - Indentation.  mip6*.c is not consistent even within a files.  At least
   rule should be consistent across the file.
 - KLD support for platforms that support it.
-- Remove MIP6_MN and MIP6_HA #ifdef.  Too many #ifdef will kill us, and it is
-  painful to reconfigure kernel every time we switch the operation.  ioctl
-  or sysctl should switch the behavior (it is okay to have one-way switch:
-  if can require reboot to go back to normal stationary node).
-- Make routing table/inpcb refresh code portable.  Use of in6_rtchange with
-  rnh->rnh_walktree is suggested.
 - Test.
 - relationship with IPsec.
 - there's no vprintf() in kernel for bsdi[34].  (sys/netinet6/mip6.c)
-- make use of encap6_attach(), instead of gif interface.
 
 done:
 - ioctl should use error code declared in sys/errno.h, not others.
@@ -32,3 +22,11 @@ done:
   print-{icmp6,ip6opts}.c when we integrate the change into
   tcpdump.org tree.
 - portability fixes for non-freebsd3.
+- Nuke in6_control() calls from within the kernel.
+- Remove MIP6_MN and MIP6_HA #ifdef.  Too many #ifdef will kill us, and it is
+  painful to reconfigure kernel every time we switch the operation.  ioctl
+  or sysctl should switch the behavior (it is okay to have one-way switch:
+  if can require reboot to go back to normal stationary node).
+- Make routing table/inpcb refresh code portable.  Use of in6_rtchange with
+  rnh->rnh_walktree is suggested.
+- make use of encap6_attach(), instead of gif interface.
