@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: str2val.c,v 1.4 2000/04/24 19:57:24 sakane Exp $ */
+/* YIPS @(#)$Id: str2val.c,v 1.5 2000/07/04 15:37:45 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -53,7 +53,7 @@ val2str(buf, mlen)
 	if ((new = malloc(len)) == 0) return(0);
 
 	for (i = 0, j = 0; i < mlen; i++) {
-		snprintf(&new[j], len - j, "%02x", buf[i]);
+		snprintf(&new[j], len - j, "%02x", (u_char)buf[i]);
 		j += 2;
 		if (i % 8 == 7) {
 			new[j++] = ' ';
