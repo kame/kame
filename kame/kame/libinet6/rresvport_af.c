@@ -40,6 +40,7 @@ rresvport_af(port, family)
 {
 	int i, s, len, err;
 	struct sockaddr_storage ss;
+	struct sockaddr *sa;
 	u_short *sport;
 	
 	switch (family) {
@@ -56,8 +57,9 @@ rresvport_af(port, family)
 		return -1;
 	}
 	memset(&ss, 0, sizeof(ss));
-	ss.__ss_len = len;
-	ss.__ss_family = family;
+	sa = (struct sockaddr *)&ss;
+	sa->sa_len = len;
+	sa->sa_family = family;
 
 	for (i = 1023; i > 512; i--) {
 		s = socket(family, SOCK_STREAM, 0);

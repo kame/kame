@@ -228,7 +228,7 @@ again:
 			goto bad;
 		}
 		s3 = accept(s2, (struct sockaddr *)&from, &len);
-		switch (from.__ss_family) {
+		switch (((struct sockaddr *)&from)->sa_family) {
 		case AF_INET:
 			rport = ntohs(((struct sockaddr_in *)&from)->sin_port);
 			break;
