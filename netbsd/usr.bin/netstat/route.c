@@ -141,7 +141,6 @@ static u_long forgemask __P((u_long));
 static void domask __P((char *, size_t, u_long, u_long));
 #ifdef INET6
 char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
-static char ntop_buf[INET6_ADDRSTRLEN];
 #endif 
 
 /*
@@ -793,7 +792,6 @@ netname6(sa6, mask)
 	u_char *p;
 	u_char *lim;
 	int masklen, final = 0, illegal = 0, flag = NI_WITHSCOPEID;
-	int i;
 
 	if (mask) {
 		masklen = 0;
