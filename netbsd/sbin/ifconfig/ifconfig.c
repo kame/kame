@@ -1805,7 +1805,6 @@ in6_getaddr(s, which)
 	struct sockaddr_in6 *sin6 = sin6tab[which];
 	struct addrinfo hints, *res;
 	int error;
-	char hbuf[200];
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
