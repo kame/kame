@@ -1,4 +1,4 @@
-/*	$KAME: ip6_id.c,v 1.2 2003/09/06 02:47:22 itojun Exp $	*/
+/*	$KAME: ip6_id.c,v 1.3 2003/09/06 02:49:26 itojun Exp $	*/
 /*	$OpenBSD: ip_id.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
@@ -100,6 +100,10 @@
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
 
 #ifndef INT32_MAX
 #define INT32_MAX	0x7fffffffU
