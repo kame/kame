@@ -157,11 +157,7 @@ struct inpcb {
 		/* IP options */
 		struct mbuf *inp6_options;
 		/* IP6 options for incoming packets */
-#ifndef INET6
-		struct ip6_recvpktopts *inp6_inputopts;	/* XXX: bad fix, but work anyway */
-#else
-		struct ip6_recvpktopts inp6_inputopts;
-#endif 
+		struct ip6_recvpktopts *inp6_inputopts;
 		/* IP6 options for outgoing packets */
 		struct ip6_pktopts *inp6_outputopts;
 		/* IP multicast options */
