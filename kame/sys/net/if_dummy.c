@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.15 2001/02/20 07:59:26 itojun Exp $	*/
+/*	$KAME: if_dummy.c,v 1.16 2002/06/04 22:10:58 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -318,6 +318,7 @@ dummyrtrequest(cmd, rt, sa)
 {
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
+#ifdef __FreeBSD__
 		/*
 		 * For optimal performance, the send and receive buffers
 		 * should be at least twice the MTU plus a little more for
@@ -325,6 +326,7 @@ dummyrtrequest(cmd, rt, sa)
 		 */
 		rt->rt_rmx.rmx_recvpipe =
 			rt->rt_rmx.rmx_sendpipe = 3 * DUMMYMTU;
+#endif
 	}
 }
 
