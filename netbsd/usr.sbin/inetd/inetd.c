@@ -865,14 +865,27 @@ config(signo)
 			struct addrinfo hints, *res;
 			char *host, *port;
 			int error;
+			int s;
+
+			/* check if the family is supported */
+			s = socket(sep->se_family, SOCK_DGRAM, 0);
+			if (s < 0) {
+				syslog(LOG_WARNING,
+"%s/%s: %s: the address family is not supported by the kernel",
+				    sep->se_service, sep->se_proto,
+				    sep->se_hostaddr);
+				sep->se_checked = 0;
+				continue;
+			}
+			close(s);
 
 			memset(&hints, 0, sizeof(hints));
 			hints.ai_family = sep->se_family;
 			hints.ai_socktype = sep->se_socktype;
-			if (!strcmp(sep->se_hostaddr, "*")) {
-				hints.ai_flags = AI_PASSIVE;
+			hints.ai_flags = AI_PASSIVE;
+			if (!strcmp(sep->se_hostaddr, "*"))
 				host = NULL;
-			} else
+			else
 				host = sep->se_hostaddr;
 			if (isrpcservice(sep) || ISMUX(sep))
 				port = "0";
@@ -880,12 +893,11 @@ config(signo)
 				port = sep->se_service;
 			error = getaddrinfo(host, port, &hints, &res);
 			if (error) {
-				if (host == NULL) {
-					syslog(LOG_WARNING, "%s/%s: %s: "
-					    "the address family is not "
-					    "supported by the kernel",
-					    sep->se_service, sep->se_proto,
-					    sep->se_hostaddr);
+				if (error == EAI_SERVICE) {
+					/* gai_strerror not friendly enough */
+					syslog(LOG_WARNING, "%s/%s: "
+					    "unknown service",
+					    sep->se_service, sep->se_proto);
 				} else {
 					syslog(LOG_ERR, "%s/%s: %s: %s",
 					    sep->se_service, sep->se_proto,
