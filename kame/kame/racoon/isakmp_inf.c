@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.61 2000/11/09 06:28:03 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.62 2000/12/14 01:36:37 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,30 +106,43 @@ isakmp_info_recv(iph1, msg0)
 {
 	vchar_t *msg = NULL;
 	int error = -1;
+	struct isakmp *isakmp;
+	struct isakmp_gen *gen;
 	u_int8_t np;
+	int encrypted;
 
 	YIPSDEBUG(DEBUG_STAMP,
 	    plog(logp, LOCATION, NULL, "receive Information.\n"));
 
-	/* decrypting */
+	encrypted = ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E);
+
 	/* Use new IV to decrypt Informational message. */
-	if (ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
+	if (encrypted) {
 
 		struct isakmp_ivm *ivm;
 
 		/* compute IV */
 		ivm = oakley_newiv2(iph1, ((struct isakmp *)msg0->v)->msgid);
 		if (ivm == NULL)
-			goto end;
+			return -1;
 
 		msg = oakley_do_decrypt(iph1, msg0, ivm->iv, ivm->ive);
 		oakley_delivm(ivm);
 		if (msg == NULL)
-			goto end;
+			return -1;
 
-	} else {
+	} else
+		msg = vdup(msg0);
 
-		/* validation */
+	isakmp = (struct isakmp *)msg->v;
+	gen = (struct isakmp_gen *)((caddr_t)isakmp + sizeof(struct isakmp));
+	if (isakmp->np == ISAKMP_NPTYPE_HASH)
+		np = gen->np;
+	else
+		np = isakmp->np;
+		
+	/* make sure the packet were encrypted. */
+	if (!encrypted) {
 		switch (iph1->etype) {
 		case ISAKMP_ETYPE_AGG:
 		case ISAKMP_ETYPE_BASE:
@@ -141,23 +154,12 @@ isakmp_info_recv(iph1, msg0)
 			/*FALLTHRU*/
 		default:
 			plog(logp, LOCATION, iph1->remote,
-				"ignore, the packet must be encrypted.\n");
+				"%s message must be encrypted\n",
+				s_isakmp_nptype(np));
 			goto end;
 		}
-
-		msg = vdup(msg0);
 	}
 
-    {
-	struct isakmp *isakmp = (struct isakmp *)msg->v;
-	struct isakmp_gen *gen;
-
-	gen = (struct isakmp_gen *)((caddr_t)isakmp + sizeof(struct isakmp));
-	if (isakmp->np == ISAKMP_NPTYPE_HASH)
-		np = gen->np;
-	else
-		np = isakmp->np;
-		
 	switch (np) {
 	case ISAKMP_NPTYPE_N:
 		if (isakmp_info_recv_n(iph1, msg) < 0)
@@ -182,7 +184,6 @@ isakmp_info_recv(iph1, msg0)
 			gen->np);
 		goto end;
 	}
-    }
 
     end:
 	if (msg != NULL)
