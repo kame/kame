@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.182 2001/06/04 12:03:43 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.183 2001/06/16 16:23:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -286,20 +286,19 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		MAKE_EXTHDR(opt->ip6po_hbh, &exthdrs.ip6e_hbh);
 		/* Destination options header(1st part) */
 		MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
-#if 0
-		/* ??????
-		   Is the comment in the if-statement realy true?
-		   If I'm a mobile node, adding a Home Address option
-		   in DH1 I don't think that I need a Routing Header.
-		*/
 		if (opt->ip6po_rthdr) {
 			/*
 			 * Destination options header(1st part)
 			 * This only makes sence with a routing header.
+			 * See Section 9.2 of draft-ietf-ipngwg-2292bis-02.txt.
+			 * Disabling this part just for MIP6 convenience is
+			 * a bad idea.  We need to think carefully about a
+			 * way to make the advanced API coexist with MIP6
+			 * options, which might automatically be inserted in
+			 * the kernel.
 			 */
 			MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
 		}
-#endif
 		/* Routing header */
 		MAKE_EXTHDR(opt->ip6po_rthdr, &exthdrs.ip6e_rthdr);
 		/* Destination options header(2nd part) */
