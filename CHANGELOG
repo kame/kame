@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.576 2000/02/19 10:44:07 jinmei Exp $
+$Id: CHANGELOG,v 1.577 2000/02/19 13:13:45 itojun Exp $
 
 <200002>
+Sat Feb 19 22:12:10 JST 2000  itojun@iijlab.net
+	* sys/netinet6: sync with latest ericsson mobile-ip6.
+	* sys/netinet/ip_encap.[ch]: struct encaptab is now visible to
+	  outside, read-only, on encap_attach().
+
 2000-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sbin/ifconfig/ifconfig.c: enabled KAME original functions.
 
