@@ -70,6 +70,9 @@
 #include <netinet/in.h>
 #include <netinet/ip_var.h>
 
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+
 /*
  * Checksum routine for Internet Protocol family headers (Portable Version).
  * This is only for IPv4 pseudo header checksum.
@@ -108,10 +111,11 @@ in_cksum4(m, nxt, off, len)
 	/* pseudo header */
 	if (off < sizeof(struct ipovly))
 		panic("offset too short");
-	m_copydata(m, 0, sizeof(ipov), (caddr_t)&ipov);
-	bzero(&ipov.ih_x1, sizeof(ipov.ih_x1));
+	bzero(&ipov, sizeof(ipov));
 	ipov.ih_len = htons(len);
 	ipov.ih_pr = nxt;
+	ipov.ih_src = mtod(m, struct ip *)->ip_src;
+	ipov.ih_dst = mtod(m, struct ip *)->ip_dst;
 	w = (u_int16_t *)&ipov;
 	/* assumes sizeof(ipov) == 20 */
 	sum += w[0]; sum += w[1]; sum += w[2]; sum += w[3]; sum += w[4];
@@ -129,7 +133,6 @@ in_cksum4(m, nxt, off, len)
 		if (m->m_len == 0)
 			continue;
 		w = (u_int16_t *)(mtod(m, caddr_t) + off);
-		off = 0;
 		if (mlen == -1) {
 			/*
 			 * The first byte of this mbuf is the continuation
@@ -142,10 +145,11 @@ in_cksum4(m, nxt, off, len)
 			s_util.c[1] = *(u_int8_t *)w;
 			sum += s_util.s;
 			w = (u_int16_t *)((u_int8_t *)w + 1);
-			mlen = m->m_len - 1;
+			mlen = m->m_len - off - 1;
 			len--;
 		} else
-			mlen = m->m_len;
+			mlen = m->m_len - off;
+		off = 0;
 		if (len < mlen)
 			mlen = len;
 		len -= mlen;

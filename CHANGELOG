@@ -1,9 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.205 1999/10/21 15:42:41 itojun Exp $
+$Id: CHANGELOG,v 1.206 1999/10/21 22:01:46 itojun Exp $
 
 <199910>
-Thu Oct 21 08:40:24 PDT 1999  itojun@iijlab.ne
+Thu Oct 21 15:00:15 PDT 1999  itojun@iijlab.net
+	* kame/sys/netinet/in_cksum4.c: fix computation algorithm for big
+	  packet.
+
+Thu Oct 21 08:40:24 PDT 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/udp_usrreq.c: advanced API has been broken for
 	  IPv6 UDP due to a one-letter typo.  it is now fixed.
 

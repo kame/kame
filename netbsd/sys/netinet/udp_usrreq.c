@@ -64,7 +64,7 @@
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
  */
 
-/*#define PULLDOWN_TEST*/
+#define PULLDOWN_TEST
 
 #include "opt_ipsec.h"
 
