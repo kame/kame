@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.52 2002/08/14 06:19:21 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.53 2002/08/15 05:00:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -82,31 +82,25 @@ natpt_lookForRule6(struct pcv *cv6)
 {
 	const char *fn = __FUNCTION__;
 	int s;
+	int proto;
 	struct cSlot *csl;
+
+	proto = 0;
+	if (cv6->ip_p == IPPROTO_ICMPV6)
+		proto |= NATPT_ICMP;
+	else if (cv6->ip_p == IPPROTO_TCP)
+		proto |= NATPT_TCP;
+	else if (cv6->ip_p == IPPROTO_UDP)
+		proto |= NATPT_UDP;
 
 	s = splnet();
 	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
 		if (csl->Local.sa_family != AF_INET6)
 			continue;
 
-		if (csl->proto != 0) {
-			switch (cv6->ip_p) {
-			case IPPROTO_ICMPV6:
-				if ((csl->proto & NATPT_ICMP) == 0)
-					continue;
-				break;
-
-			case IPPROTO_TCP:
-				if ((csl->proto & NATPT_TCP) == 0)
-					continue;
-				break;
-
-			case IPPROTO_UDP:
-				if ((csl->proto & NATPT_UDP) == 0)
-					continue;
-				break;
-			}
-		}
+		if ((csl->proto != 0)
+		    && ((csl->proto & proto) == 0))
+			continue;
 
 		if (natpt_matchIn6addr(cv6, csl, &csl->local) != 0) {
 			if (isDump(D_MATCHINGRULE6))
@@ -166,6 +160,7 @@ natpt_lookForRule4(struct pcv *cv4)
 {
 	const char *fn = __FUNCTION__;
 	int s;
+	int proto;
 	struct cSlot *csl;
 
 	if ((cv4->ip_p == IPPROTO_TCP)
@@ -173,28 +168,21 @@ natpt_lookForRule4(struct pcv *cv4)
 		|| ((cv4->pyld.tcp4->th_flags & TH_ACK) != 0)))
 		return (NULL);
 
+	proto = 0;
+	if (cv4->ip_p == IPPROTO_ICMP)
+		proto |= NATPT_ICMP;
+	else if (cv4->ip_p == IPPROTO_TCP)
+		proto |= NATPT_TCP;
+	else if (cv4->ip_p == IPPROTO_UDP)
+		proto |= NATPT_UDP;
+
 	s = splnet();
 	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
 		struct in_addr in4to;
 
-		if (csl->proto != 0) {
-			switch (cv4->ip_p) {
-			case IPPROTO_ICMP:
-				if ((csl->proto & NATPT_ICMP) == 0)
-					continue;
-				break;
-
-			case IPPROTO_TCP:
-				if ((csl->proto & NATPT_TCP) == 0)
-					continue;
-				break;
-
-			case IPPROTO_UDP:
-				if ((csl->proto & NATPT_UDP) == 0)
-					continue;
-				break;
-			}
-		}
+		if ((csl->proto != 0)
+		    && ((csl->proto & proto) == 0))
+			continue;
 
 		if ((csl->Local.sa_family == AF_INET)
 		    && (natpt_matchIn4addr(cv4, csl, &csl->local) != 0)) {
