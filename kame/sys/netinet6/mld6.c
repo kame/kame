@@ -124,7 +124,7 @@ mld6_init()
 	mld6_timers_are_running = 0;
 
 	/* ip6h_nxt will be fill in later */
-	hbh->ip6h_len = 0;	/* (8 >> 3) - 1*/
+	hbh->ip6h_len = 0;	/* (8 >> 3) - 1 */
 
 	/* XXX: grotty hard coding... */
 	hbh_buf[2] = IP6OPT_PADN;	/* 2 byte padding */
@@ -239,25 +239,25 @@ mld6_input(m, off)
 				htons(ifp->if_index); /* XXX */
 
 		/*
-		* - Start the timers in all of our membership records
-		*   that the query applies to for the interface on
-		*   which the query arrived excl. those that belong
-		*   to the "all-nodes" group (ff02::1).
-		* - Restart any timer that is already running but has
-		*   A value longer than the requested timeout.
-		* - Use the value specified in the query message as
-		*   the maximum timeout.
-		*/
+		 * - Start the timers in all of our membership records
+		 *   that the query applies to for the interface on
+		 *   which the query arrived excl. those that belong
+		 *   to the "all-nodes" group (ff02::1).
+		 * - Restart any timer that is already running but has
+		 *   A value longer than the requested timeout.
+		 * - Use the value specified in the query message as
+		 *   the maximum timeout.
+		 */
 		IFP_TO_IA6(ifp, ia);
 		if (ia == NULL)
 			break;
 
 		/*
-		* XXX: System timer resolution is too low to handle Max
-		* Response Delay, so set 1 to the internal timer even if
-		* the calculated value equals to zero when Max Response
-		* Delay is positive.
-		*/
+		 * XXX: System timer resolution is too low to handle Max
+		 * Response Delay, so set 1 to the internal timer even if
+		 * the calculated value equals to zero when Max Response
+		 * Delay is positive.
+		 */
 		timer = ntohs(mldh->mld6_maxdelay)*PR_FASTHZ/MLD6_TIMER_SCALE;
 		if (timer == 0 && mldh->mld6_maxdelay)
 			timer = 1;
@@ -314,14 +314,14 @@ mld6_input(m, off)
 		break;
 	case MLD6_LISTENER_REPORT:
 		/*
-		* For fast leave to work, we have to know that we are the
-		* last person to send a report for this group.  Reports
-		* can potentially get looped back if we are a multicast
-		* router, so discard reports sourced by me.
-		* Note that it is impossible to check IFF_LOOPBACK flag of
-		* ifp for this purpose, since ip6_mloopback pass the physical
-		* interface to looutput.
-		*/
+		 * For fast leave to work, we have to know that we are the
+		 * last person to send a report for this group.  Reports
+		 * can potentially get looped back if we are a multicast
+		 * router, so discard reports sourced by me.
+		 * Note that it is impossible to check IFF_LOOPBACK flag of
+		 * ifp for this purpose, since ip6_mloopback pass the physical
+		 * interface to looutput.
+		 */
 		if (m->m_flags & M_LOOP) /* XXX: grotty flag, but efficient */
 			break;
 
@@ -332,9 +332,9 @@ mld6_input(m, off)
 			mldh->mld6_addr.s6_addr16[1] =
 				htons(ifp->if_index); /* XXX */
 		/*
-		* If we belong to the group being reported, stop
-		* our timer for that group.
-		*/
+		 * If we belong to the group being reported, stop
+		 * our timer for that group.
+		 */
 		IN6_LOOKUP_MULTI(mldh->mld6_addr, ifp, in6m);
 		if (in6m) {
 			in6m->in6m_timer = 0; /* transit to idle state */
