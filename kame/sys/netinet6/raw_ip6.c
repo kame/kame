@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.73 2001/03/22 15:21:31 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.74 2001/03/24 07:44:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -622,7 +622,7 @@ rip6_ctloutput(op, so, level, optname, mp)
 	int error = 0;
 	int optval;
 	struct in6pcb *in6p;
-	struct mbuf *m;
+	struct mbuf *m = *mp;
 
 	switch (level) {
 	case IPPROTO_IPV6:
