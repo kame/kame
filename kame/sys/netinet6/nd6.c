@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.116 2001/02/08 11:52:20 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.117 2001/02/08 12:12:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1044,10 +1044,9 @@ nd6_free(rt)
 	struct nd_defrouter *dr;
 
 	/*
-	 * Clear all destination cache entries for the neighbor.
-	 * XXX: is it better to restrict this to hosts?
+	 * we used to have pfctlinput(PRC_HOSTDEAD) here. 
+	 * even though it is not harmful, it was not really eecessary.
 	 */
-	pfctlinput(PRC_HOSTDEAD, rt_key(rt));
 
 	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
 		int s;
