@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.230 2002/02/22 16:34:28 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.231 2002/03/20 22:47:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -27,14 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-
-/*
- * XXX
- * KAME 970409 note:
- * BSD/OS version heavily modifies this code, related to llinfo.
- * Since we don't have BSD/OS version of net/route.c in our hand,
- * I left the code mostly as it was in 970310.  -- itojun
  */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
