@@ -244,8 +244,8 @@ AC_MSG_CHECKING(for DHCP Lifetime option)
 AC_ARG_WITH(opt-lifetime,
 [  --with-opt-lifetime=VALUE    specify DHCP option value for lifetime],
     dhcpopt_lifetime="$withval", dhcpopt_lifetime=0)
-if test $dhcpopt_ntp = 0 ; then
-	dhcpopt_ntp=36
+if test $dhcpopt_lifetime = 0 ; then
+	dhcpopt_lifetime=36
 	AC_MSG_RESULT(unspecified and using $dhcpopt_lifetime)
 else
 	AC_MSG_RESULT(using $dhcpopt_lifetime)
