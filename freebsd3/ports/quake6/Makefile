@@ -3,29 +3,30 @@
 # Date created:         Wed Feb  2 01:07:07 JST 2000
 # Whom:                 sumikawa
 #
-# $Id: Makefile,v 1.2 2000/02/01 17:24:41 sumikawa Exp $
+# $Id: Makefile,v 1.3 2000/05/17 10:13:20 sumikawa Exp $
 #
 
-DISTNAME=	quake-v6-bsd-kame
-PKGNAME=	quake6-0.0
+DISTNAME=	qf-current-snapshot
+PKGNAME=	quakeforge-20000512
 CATEGORIES=	games
-MASTER_SITES=	http://www.viagenie.qc.ca/quake/
-
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	quake6-00-v6-20000202a.diff.gz
-PATCH_DIST_STRIP=	-p1
+MASTER_SITES=	http://quake.sourceforge.net/files/
 
 MAINTAINER=	sumikawa@kame.net
 
+USE_BZIP2=	yes
 WRKSRC=		${WRKDIR}/quakeforge
-
-post-extract:
-	(cd ${WRKSRC}; find . -name \*.o -exec ${RM} {} \;)
-	(cd ${WRKSRC}; ${RM} config.cache)
 
 USE_GMAKE=	yes
 GNU_CONFIGURE=	yes
-# "bindir" setting is very non-standard for GNU autoconf
-CONFIGURE_ARGS+=--disable-asmopt --bindir=/bin
+CONFIGURE_ENV+=	"NO_ASMOPT=yes"
+CONFIGURE_ARGS+=--without-opengl --disable-asmopt
+CONFIGURE_ARGS+=--with-ipv6=/usr/local/v6/lib
+
+post-extract:
+	cd ${WRKSRC} && ${MV} acinclude.m4 aclocal.m4
+
+pre-configure:
+	@(cd ${WRKSRC} && ${AUTOCONF})
+	@(cd ${WRKSRC} && autoheader)
 
 .include "bsd.port.mk"

@@ -1,0 +1,12 @@
+--- qw_client/Makefile.in-	Tue May 16 23:11:53 2000
++++ qw_client/Makefile.in	Tue May 16 23:12:12 2000
+@@ -196,6 +196,9 @@
+ $(BUILD_DIR)/in_x11.@OBJEXT@: $(COMMON_DIR)/in_x11.c
+ 	$(CC) $(CFLAGS) $(X11_CFLAGS) -o $@ -c $<
+ 
++$(BUILD_DIR)/dga_check.@OBJEXT@: $(COMMON_DIR)/dga_check.c
++	$(CC) $(CFLAGS) $(X11_CFLAGS) -o $@ -c $<
++
+ $(BUILD_DIR)/context_x11.@OBJEXT@: $(COMMON_DIR)/context_x11.c
+ 	$(CC) $(CFLAGS) $(X11_CFLAGS) -o $@ -c $<
+ 

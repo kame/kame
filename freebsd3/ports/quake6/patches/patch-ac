@@ -1,0 +1,18 @@
+--- uquake/Makefile.in-	Tue May 16 23:17:06 2000
++++ uquake/Makefile.in	Tue May 16 23:20:15 2000
+@@ -199,6 +199,15 @@
+ $(COMMON_DIR)/@X11_VID_SRC@
+ 	$(CC) $(CFLAGS) $(X11_CFLAGS) -o $@ -c $<
+ 
++$(BUILD_DIR)/in_x11.@OBJEXT@: $(COMMON_DIR)/in_x11.c
++	$(CC) $(CFLAGS) $(X11_CFLAGS) -o $@ -c $<
++
++$(BUILD_DIR)/dga_check.@OBJEXT@: $(COMMON_DIR)/dga_check.c
++	$(CC) $(CFLAGS) $(X11_CFLAGS) -o $@ -c $<
++
++$(BUILD_DIR)/context_x11.@OBJEXT@: $(COMMON_DIR)/context_x11.c
++	$(CC) $(CFLAGS) $(X11_CFLAGS) -o $@ -c $<
++
+ $(X11QUAKE): $(BUILD_DIR)/../$(X11QUAKE)
+ 
+ $(BUILD_DIR)/../$(X11QUAKE): $(ALL_X11_OBJS)

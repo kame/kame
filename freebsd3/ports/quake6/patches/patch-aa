@@ -1,0 +1,11 @@
+--- configure.in-	Tue May 16 21:14:07 2000
++++ configure.in	Tue May 16 21:14:18 2000
+@@ -641,7 +641,7 @@
+ 
+ dnl We want warnings, lots of warnings...
+ if test "x$GCC" = xyes; then
+-   CFLAGS="$CFLAGS -Wall -Werror"
++   CFLAGS="$CFLAGS -Wall"
+ fi
+ #   CFLAGS="$CFLAGS -Wall -pedantic"
+ 
