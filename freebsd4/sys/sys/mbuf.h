@@ -694,12 +694,18 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  */
 #define	_m_tag_id	m_hdr.mh_flags
 
+#define PACKET_TAG_PF_GENERATED			11 /* PF generated, pass always */
+#define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
+#define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
+#define PACKET_TAG_PF_QID			14 /* PF queue id */
+#define PACKET_TAG_PF_TAG			15 /* PF tags */
+
 /* Packet tags used in the FreeBSD network stack */
-#define	PACKET_TAG_DUMMYNET			15 /* dummynet info */
-#define	PACKET_TAG_IPFW				16 /* ipfw classification */
-#define	PACKET_TAG_DIVERT			17 /* divert info */
-#define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
-#define PACKET_TAG_INET6			19 /* IPv6 info */
+#define	PACKET_TAG_DUMMYNET			16 /* dummynet info */
+#define	PACKET_TAG_IPFW				17 /* ipfw classification */
+#define	PACKET_TAG_DIVERT			18 /* divert info */
+#define	PACKET_TAG_IPFORWARD			19 /* ipforward info */
+#define PACKET_TAG_INET6			20 /* IPv6 info */
 
 #define	PACKET_TAG_MAX				20
 
