@@ -523,10 +523,14 @@ rip6_usrreq(so, req, m, nam, control, p)
 		in6p->in6p_ip6.ip6_nxt = (long)nam;
 		in6p->in6p_cksum = -1;
 #ifdef IPSEC
-		if ((error = ipsec_init_policy(&in6p->in6p_sp_out)) != 0)
+		if ((error = ipsec_init_policy(&in6p->in6p_sp_out)) != 0) {
+			in6_pcbdetach(in6p);
 			break;
-		if ((error = ipsec_init_policy(&in6p->in6p_sp_in)) != 0)
+		}
+		if ((error = ipsec_init_policy(&in6p->in6p_sp_in)) != 0) {
+			in6_pcbdetach(in6p);
 			break;
+		}
 #endif /*IPSEC*/
 		
 		MALLOC(in6p->in6p_icmp6filt, struct icmp6_filter *,

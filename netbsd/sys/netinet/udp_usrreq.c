@@ -607,11 +607,16 @@ udp_usrreq(so, req, m, nam, control, p)
 		inp = sotoinpcb(so);
 		inp->inp_ip.ip_ttl = ip_defttl;
 #ifdef IPSEC
-		inp = (struct inpcb *)so->so_pcb;
-		if (inp && (error = ipsec_init_policy(&inp->inp_sp_in)) != 0)
+		error = ipsec_init_policy(&inp->inp_sp_in);
+		if (error) {
+			in_pcbdetach(inp);
 			break;
-		if (inp && (error = ipsec_init_policy(&inp->inp_sp_out)) != 0)
+		}
+		error = ipsec_init_policy(&inp->inp_sp_out);
+		if (error) {
+			in_pcbdetach(inp);
 			break;
+		}
 #endif /*IPSEC*/
 		break;
 
