@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2411 2003/06/18 08:29:50 itojun Exp $
+$KAME: CHANGELOG,v 1.2412 2003/06/19 03:38:41 jinmei Exp $
 
 <200306>
+2003-06-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_rtrequest): changed a condition to
+	decide whether to create an empty llinfo stricter so that a user
+	can manually change the link-layer address of an existing neighbor
+	cache.
+	Pointed out by: KIU Shueng Chuan
+
 Wed Jun 18 17:29:31 JST 2003  itojun@iijlab.net
 	* sys/netinet6/nd6.c: have separate timer in each llinfo_nd6
 	  (neighor cache); should allow timeout control in finer granurality.
