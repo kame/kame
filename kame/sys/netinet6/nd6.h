@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.91 2002/05/29 09:32:33 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.92 2002/05/30 04:50:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -394,7 +394,7 @@ void nd6_option_init __P((void *, int, union nd_opts *));
 struct nd_opt_hdr *nd6_option __P((union nd_opts *));
 int nd6_options __P((union nd_opts *));
 struct	rtentry *nd6_lookup __P((struct sockaddr_in6 *, int, struct ifnet *));
-void nd6_setmtu __P((struct ifnet *, struct nd_ifinfo *));
+void nd6_setmtu __P((struct ifnet *));
 void nd6_timer __P((void *));
 void nd6_purge __P((struct ifnet *));
 void nd6_nud_hint __P((struct rtentry *, struct sockaddr_in6 *, int));
