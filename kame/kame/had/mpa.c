@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.2 2003/04/23 10:03:34 keiichi Exp $	*/
+/*	$KAME: mpa.c,v 1.3 2003/08/07 02:05:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.2 2003/04/23 10:03:34 keiichi Exp $
+ * $Id: mpa.c,v 1.3 2003/08/07 02:05:27 t-momose Exp $
  */
 
 #include <sys/param.h>
@@ -113,26 +113,22 @@ extern int sock;
  * Receive Mobile Prefix Solicitation message
  */
 void
-mpi_solicit_input(pi, coaddr, mps)
+mpi_solicit_input(pi, sin6_hoa, mps)
     struct in6_pktinfo *pi;
-    struct sockaddr_in6 *coaddr;
+    struct sockaddr_in6 *sin6_hoa;
     struct mobile_prefix_solicit *mps; 
 {   
     int ifga_index = -1;
-    struct hagent_ifinfo *haif;
     struct in6_addr ha_addr;
-    struct sockaddr_in6 hoaddr;
+    struct hagent_ifinfo *haif;
     struct in6_addr src;
     int error;
    
     if(kvmd == NULL)
 	return;
 
-    bzero(&hoaddr, sizeof(hoaddr)); 
-    hoaddr.sin6_family = AF_INET6;
-    hoaddr.sin6_len = sizeof(struct sockaddr_in6);
     ha_addr = pi->ipi6_addr;
-    /* determine home link by global address */
+    /* determine a home link by the global address */
     haif = haif_findwithunicast(&pi->ipi6_addr, &ifga_index);
 
     if (!haif) {
@@ -140,21 +136,14 @@ mpi_solicit_input(pi, coaddr, mps)
         goto err;
     }
 	
-    /* Pick Home Agent Address */
-    /* 1. pick Home Address by using registerd Care-of Address */
-    error = reg_hoa_pick(&coaddr->sin6_addr, &hoaddr.sin6_addr);
-    if (error) {
-        bcopy(&ha_addr, &src, sizeof(struct in6_addr));
-    } else {
-        /* Home Address is found */
-        /* 2. pick Home Agent address which registers Home Address */
-        /* -- search the HA address whose prefix is same as HoA */
-        if (ha_pick(&hoaddr.sin6_addr, &src, haif)) {
-            /* if HA is not found, copy the default address */
-            bcopy(&ha_addr, &src, sizeof (struct in6_addr));
-        }
+    /* Find a Home Agent Address which hold this home address */
+    if (ha_pick(&sin6_hoa->sin6_addr, &src, haif)) {
+	/* If no appropriate home agent address was found,
+	   use the destination adderss of the mps sol pakcet, which 
+	   shows the current home agent, instead. (XXX) */
+        bcopy(&ha_addr, &src, sizeof (struct in6_addr));
     }
-    mpi_advert_output(&hoaddr, &src, haif, mps->mp_sol_id);
+    mpi_advert_output(sin6_hoa, &src, haif, mps->mp_sol_id);
 err:
 }
 
@@ -351,6 +340,7 @@ ha_pick(home_addr, src_addr, haif)
             return 0;
         }
     }
+
     /* not found */
     return -1;
 }

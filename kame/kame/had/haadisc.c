@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.11 2003/04/11 11:21:39 t-momose Exp $	*/
+/*	$KAME: haadisc.c,v 1.12 2003/08/07 02:05:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.11 2003/04/11 11:21:39 t-momose Exp $
+ * $Id: haadisc.c,v 1.12 2003/08/07 02:05:27 t-momose Exp $
  */
 
 /*
@@ -520,6 +520,11 @@ icmp6_recv()
 
     icp = (struct icmp6_hdr *)rcvmhdr.msg_iov[0].iov_base;
 #endif 
+
+    if (pi == NULL) {
+	syslog(LOG_ERR, "Couldn't acquired packet infomation");
+	return;
+    }
 
     /* dispatch per message routine */
     switch (icp->icmp6_type) {
