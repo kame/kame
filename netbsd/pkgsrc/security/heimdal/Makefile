@@ -1,12 +1,12 @@
 # New ports collection makefile for:	heimdal
-# Version required:	0.2p
+# Version required:	0.2q
 # Date created:		Fri Jun 19 15:07:04 JST 1998
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.6 2000/02/21 06:26:25 itojun Exp $
+# $Id: Makefile,v 1.7 2000/02/25 18:03:56 itojun Exp $
 #
 
-DISTNAME=	heimdal-0.2p
+DISTNAME=	heimdal-0.2q
 CATEGORIES=	security
 MASTER_SITES=	ftp://ftp.pdc.kth.se/pub/heimdal/src/
 
