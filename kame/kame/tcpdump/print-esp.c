@@ -255,7 +255,7 @@ esp_print(register const u_char *bp, register const u_char *bp2, int *nhdr)
 #endif /*CRYPTO*/
 
 	case RC5:
-#if defined(CRYPTO) && defined(HAVE_RC5_H)
+#if defined(CRYPTO) && defined(HAVE_OPENSSL_RC5_H)
 	    {
 		RC5_32_KEY schedule;
 		u_char *p;
@@ -274,7 +274,7 @@ esp_print(register const u_char *bp, register const u_char *bp2, int *nhdr)
 #endif /*CRYPTO*/
 
 	case CAST128:
-#if defined(CRYPTO) && defined(HAVE_CAST_H) && !defined(HAVE_BUGGY_CAST128)
+#if defined(CRYPTO) && defined(HAVE_OPENSSL_CAST_H) && !defined(HAVE_BUGGY_CAST128)
 	    {
 		CAST_KEY schedule;
 		u_char *p;
