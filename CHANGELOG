@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.296 1999/11/25 09:38:48 itojun Exp $
+$Id: CHANGELOG,v 1.297 1999/11/25 11:01:33 sumikawa Exp $
 
 <199911>
+Thu Nov 25 19:57:44 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd2/ports/openssh: IPv6-enable openssh.
+	  obtained from fujiwara@rcac.tdi.co.jp
+
 Thu Nov 25 18:37:59 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/in6_cksum.c: changed length-related argument
 	  type from int to u_int32_t, for (future) jumbogram support.
