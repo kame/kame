@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.37 2001/09/19 04:45:41 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.38 2001/09/19 05:38:36 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -218,15 +218,9 @@ main(argc, argv)
 		errx(1, "failed to initilizatoin interfaces");
 		/*NOTREACHED*/
 	}
-	if (aflag) {
-		argc = 0;	/* just make sure */
+	if (aflag)
 		argv = autoifprobe();
-		if (argv) {
-			for (argc = 0; argv[argc]; argc++)
-				;
-		}
-	}
-	while (argc--) {
+	while (*argv) {
 		if (ifconfig(*argv)) {
 			errx(1, "failed to initialize %s", *argv);
 			/*NOTREACHED*/
@@ -300,7 +294,6 @@ main(argc, argv)
 		if (FD_ISSET(rtsock, &select_fd)) {
 			if (aflag) {
 				iflist_init();
-				argc = 0;
 				argv = autoifprobe();
 				if (argv) {
 					while (*argv) {
