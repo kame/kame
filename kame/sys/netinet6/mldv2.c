@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.17 2004/04/20 08:42:25 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.18 2004/04/20 09:03:28 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3350,6 +3350,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 		bzero(in6m, sizeof(*in6m));
 		in6m->in6m_addr = *ap;
 		in6m->in6m_ifp = ifp;
+		in6m->in6m_refcount = 1;
 		in6m->in6m_ifma = ifma;
 		ifma->ifma_protospec = in6m;
 		LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
