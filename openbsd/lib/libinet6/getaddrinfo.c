@@ -1,5 +1,5 @@
 /*	$OpenBSD: getaddrinfo.c,v 1.23 2000/05/15 10:49:55 itojun Exp $	*/
-/*	$KAME: getaddrinfo.c,v 1.25 2000/07/05 02:59:28 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.26 2000/07/09 04:19:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -288,13 +288,14 @@ static int
 str_isnumber(p)
 	const char *p;
 {
-	const char *q = (const char *)p;
-	while (*q) {
-		if (!isdigit(*q))
-			return NO;
-		q++;
-	}
-	return YES;
+	char *ep;
+
+	ep = NULL;
+	(void)strtoul(p, &ep, 10);
+	if (ep && *ep == '\0')
+		return YES;
+	else
+		return NO;
 }
 
 int

@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.73 2000/07/05 02:29:59 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.74 2000/07/09 04:19:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -289,13 +289,14 @@ static int
 str_isnumber(p)
 	const char *p;
 {
-	const char *q = (const char *)p;
-	while (*q) {
-		if (!isdigit(*q))
-			return NO;
-		q++;
-	}
-	return YES;
+	char *ep;
+
+	ep = NULL;
+	(void)strtoul(p, &ep, 10);
+	if (ep && *ep == '\0')
+		return YES;
+	else
+		return NO;
 }
 
 int
