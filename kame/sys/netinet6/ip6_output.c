@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.239 2001/11/17 09:44:12 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.240 2001/11/26 08:42:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1360,13 +1360,20 @@ skip_ipsec2:;
 			ia6->ia_ifa.ifa_data.ifad_outbytes +=
 				m->m_pkthdr.len;
 		}
-#endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
  		/* Record statistics for this interface address. */
  		if (ia && !(flags & IPV6_FORWARDING)) {
  			ia->ia_ifa.if_opackets++;
  			ia->ia_ifa.if_obytes += m->m_pkthdr.len;
  		}
+#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
+		struct in6_ifaddr *ia6;
+		ip6 = mtod(m, struct ip6_hdr *);
+		ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
+		if (ia6) {
+ 			ia6->ia_ifa.ifa_opackets++;
+ 			ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
+		}
 #endif
 #if defined(IPSEC) && !defined(__OpenBSD__)
 		/* clean ipsec history once it goes out of the node */
@@ -1517,13 +1524,20 @@ sendorfree:
 				ia6->ia_ifa.ifa_data.ifad_outbytes +=
 					m->m_pkthdr.len;
 			}
-#endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
  			/* Record statistics for this interface address. */
  			if (ia) {
  				ia->ia_ifa.if_opackets++;
  				ia->ia_ifa.if_obytes += m->m_pkthdr.len;
  			}
+#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
+			struct in6_ifaddr *ia6;
+			ip6 = mtod(m, struct ip6_hdr *);
+			ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
+			if (ia6) {
+ 				ia6->ia_ifa.ifa_opackets++;
+ 				ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
+			}
 #endif
 #if defined(IPSEC) && !defined(__OpenBSD__)
 			/* clean ipsec history once it goes out of the node */
