@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2725 2005/02/22 14:00:17 suz Exp $
+$KAME: CHANGELOG,v 1.2726 2005/02/28 02:07:30 t-momose Exp $
 
 <200502>
+2005-02-28  Tsuyoshi MOMOSE  <momose@az.jp.nec.com>
+	* kame/sys/net/mipsock.c, kame/kame/shisad/mnd.c: Fixed word alignment
+	problems.
+
 2005-02-22  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/net/pf.c, freebsd5/sys/contrib/pf/net/pf.c: fixed a bug that
 	  PF discards every packet with option headers.
