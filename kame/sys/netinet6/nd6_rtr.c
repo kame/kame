@@ -472,7 +472,7 @@ defrouter_addifreq(ifp)
 {
 	struct sockaddr_in6 def, mask;
 	struct ifaddr *ifa;
-	int flags = 0, error;
+	int error;
 
 	bzero(&def, sizeof(def));
 	bzero(&mask, sizeof(mask));
