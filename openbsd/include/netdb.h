@@ -192,20 +192,6 @@ struct	protoent {
 /* valid flags for addrinfo */
 #define AI_MASK		(AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST)
 
-#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
-#define	AI_ALL		0x00000100 /* IPv6 and IPv4-mapped (with AI_V4MAPPED) */
-#endif
-#if !defined(_XOPEN_SOURCE)
-#define	AI_V4MAPPED_CFG	0x00000200 /* accept IPv4-mapped if kernel supports */
-#endif
-#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
-#define	AI_ADDRCONFIG	0x00000400 /* only if any address is assigned */
-#define	AI_V4MAPPED	0x00000800 /* accept IPv4-mapped IPv6 address */
-/* special recommended flags for getipnodebyname */
-#define	AI_DEFAULT	(AI_V4MAPPED_CFG | AI_ADDRCONFIG)
-#endif
-
-
 #define NI_NUMERICHOST	1	/* return the host address, not the name */
 #define NI_NUMERICSERV	2	/* return the service address, not the name */
 #define NI_NOFQDN	4	/* return a short name if in the local domain */

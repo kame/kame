@@ -2,17 +2,17 @@ SRCDIR=	${.CURDIR}/../../kame/libinet6
 
 LIB=	inet6
 CPPFLAGS+=-DDNS
-CPPFLAGS+=-DINET6 -DUSE_GETIPNODEBY -DHAVE_SOCKADDR_SA_LEN \
+CPPFLAGS+=-DINET6 -DHAVE_SOCKADDR_SA_LEN \
 	-DHAVE_PORTABLE_PROTOTYPE -DHAVE_U_INT8_T -DHAVE_U_INT16_T \
 	-DHAVE_U_INT32_T -DHAVE_ADDRINFO -DHAVE_SOCKADDR_STORAGE \
 	-DHAVE_INADDRSZ -DHAVE_IN6ADDRSZ -DHAVE_RES_USE_INET6 -DHAVE_AAAA \
 	-DHAVE_RES_STATE_EXT -DHAVE_NEW_RES_STATE -DHAVE_H_ERRNO \
 	-DHAVE_IF_NAMEINDEX -DFILTER_V4MAPPED -DHAVE_SOCKLEN_T
 
-SRCS=	getaddrinfo.c getnameinfo.c vars.c rresvport_af.c rcmd.c
+#SRCS=	getaddrinfo.c getnameinfo.c vars.c rresvport_af.c rcmd.c
 #SRCS+=	if_indextoname.c if_nameindex.c if_nametoindex.c
 SRCS+=	rthdr.c ip6opt.c
-SRCS+=	name6.c
+#SRCS+=	name6.c
 #SRCS+=	base64.c herror.c nsap_addr.c 
 #SRCS+=	res_comp.c res_data.c res_debug.c
 #SRCS+=	res_init.c res_mkquery.c res_query.c 
