@@ -1,0 +1,47 @@
+*** src/Makefile.in.orig	Fri Jun 26 01:15:29 1998
+--- src/Makefile.in	Sat Jul  4 11:57:46 1998
+***************
+*** 5,25 ****
+  #
+  #  Uncomment and customize the following to suit your needs:
+  #
+! HOST_OPT	= # -DCACHEMGR_HOSTNAME="getfullhostname()"
+! AUTH_OPT	= # -DUSE_PROXY_AUTH=1
+! LOG_HDRS_OPT	= # -DLOG_FULL_HEADERS=1
+! ICMP_OPT	= # -DUSE_ICMP=1
+! DELAY_HACK      = # -DDELAY_HACK=1
+! USERAGENT_OPT	= # -DUSE_USERAGENT_LOG=1
+! KILL_PARENT_OPT	= # -DKILL_PARENT_OPT
+! USE_POLL_OPT    = # -DUSE_POLL
+  # do NOT define both USE_SPLAY_TREE and USE_BIN_TREE at the same time!
+! USE_SPLAY_TREE  = # -DUSE_SPLAY_TREE
+! USE_BIN_TREE    = # -DUSE_BIN_TREE
+! RELOAD_INTO_IMS	= # -DRELOAD_INTO_IMS
+! UNDERSCORES_OPT = # -DALLOW_HOSTNAME_UNDERSCORES
+! RETRY_PATCH	= -DRETRY_PATCH
+! NO_CACHE_ACL	= # -DNO_CACHE_ACL=1
+  
+  DEFINES         = $(HOST_OPT) $(AUTH_OPT) $(LOG_HDRS_OPT) \
+                    $(ICMP_OPT) $(DELAY_HACK) $(USERAGENT_OPT) \
+--- 5,25 ----
+  #
+  #  Uncomment and customize the following to suit your needs:
+  #
+! #HOST_OPT	= # -DCACHEMGR_HOSTNAME="getfullhostname()"
+! #AUTH_OPT	= # -DUSE_PROXY_AUTH=1
+! #LOG_HDRS_OPT	= # -DLOG_FULL_HEADERS=1
+! #ICMP_OPT	= # -DUSE_ICMP=1
+! #DELAY_HACK      = # -DDELAY_HACK=1
+! #USERAGENT_OPT	= # -DUSE_USERAGENT_LOG=1
+! #KILL_PARENT_OPT	= # -DKILL_PARENT_OPT
+! #USE_POLL_OPT    = # -DUSE_POLL
+  # do NOT define both USE_SPLAY_TREE and USE_BIN_TREE at the same time!
+! #USE_SPLAY_TREE  = # -DUSE_SPLAY_TREE
+! #USE_BIN_TREE    = # -DUSE_BIN_TREE
+! #RELOAD_INTO_IMS	= # -DRELOAD_INTO_IMS
+! #UNDERSCORES_OPT = # -DALLOW_HOSTNAME_UNDERSCORES
+! #RETRY_PATCH	= -DRETRY_PATCH
+! #NO_CACHE_ACL	= # -DNO_CACHE_ACL=1
+  
+  DEFINES         = $(HOST_OPT) $(AUTH_OPT) $(LOG_HDRS_OPT) \
+                    $(ICMP_OPT) $(DELAY_HACK) $(USERAGENT_OPT) \

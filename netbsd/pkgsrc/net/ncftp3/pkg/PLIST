@@ -1,0 +1,6 @@
+bin/ncftp3
+bin/ncftpbatch
+bin/ncftpget
+bin/ncftpls
+bin/ncftpput
+bin/ncftpbookmarks
