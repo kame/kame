@@ -408,19 +408,21 @@ udp_input(struct mbuf *m, ...)
 		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ip6->ip6_flow;
 #endif
 		sa6_copy_addr(&src_sa6, &srcsa.sin6);
-		/*
-		 * XXX: the address may have embedded scope zone ID, which
-		 * should be hidden from applications.
-		 */
-#ifndef SCOPEDROUTING
-		in6_clearscope(&srcsa.sin6.sin6_addr);
-#endif
 
 		bzero(&dstsa, sizeof(struct sockaddr_in6));
 		dstsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
 		dstsa.sin6.sin6_family = AF_INET6;
 		dstsa.sin6.sin6_port = uh->uh_dport;
 		sa6_copy_addr(&dst_sa6, &dstsa.sin6);
+
+		/*
+		 * XXX: the address may have embedded scope zone ID, which
+		 * should be hidden from applications.
+		 */
+#ifndef SCOPEDROUTING
+		in6_clearscope(&srcsa.sin6.sin6_addr);
+		in6_clearscope(&dstsa.sin6.sin6_addr);
+#endif
 		break;
 #endif /* INET6 */
 	}
@@ -473,7 +475,7 @@ udp_input(struct mbuf *m, ...)
 			if (ip6) {
 				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
 					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa,
-								&dst_sa6))
+								&dstsa.sin6))
 						continue;
 			} else
 #endif /* INET6 */
@@ -486,7 +488,7 @@ udp_input(struct mbuf *m, ...)
 			if (ip6) {
 				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
 					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa,
-								&src_sa6)  ||
+								&srcsa.sin6) ||
 					    inp->inp_fport != uh->uh_sport)
 						continue;
 			} else
