@@ -6,6 +6,7 @@ prefix=	@prefix@
 exec_prefix=@exec_prefix@
 libdir=	@libdir@
 mandir=	@mandir@
+includedir=	@includedir@
 
 CC=	@CC@
 CPP=	@CPP@
@@ -63,6 +64,12 @@ libinet6.a: $(OBJS)
 
 install:
 	$(INSTALL_DATA) libinet6.a $(libdir)
+	mkdir -p $(includedir)
+	if test \! -f /usr/include/ifaddrs.h; then \
+		$(INSTALL_DATA) missing/ifaddrs.h $(includedir); \
+	fi
+	$(INSTALL_DATA) missing/addrinfo.h $(includedir)
+	mkdir -p $(mandir)/man3
 	$(INSTALL_DATA) $(MAN3) $(mandir)/man3
 	@set ${MLINKS}; \
 	while test $$# -ge 2; do \
