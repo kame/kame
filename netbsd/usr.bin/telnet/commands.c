@@ -2314,6 +2314,7 @@ tn(argc, argv)
     hints.ai_flags = AI_NUMERICHOST;	/* avoid forward lookup */
     error = getaddrinfo(hostname, portp, &hints, &res0);
     if (!error) {
+	/* numeric */
 	if (getnameinfo(res0->ai_addr, res0->ai_addrlen,
 		_hostname, sizeof(_hostname), NULL, 0, NI_NAMEREQD) == 0)
 	    ; /* okay */
