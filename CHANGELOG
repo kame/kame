@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2465 2003/09/06 02:37:18 itojun Exp $
+$KAME: CHANGELOG,v 1.2466 2003/09/06 15:36:59 jinmei Exp $
 
 <200309>
 Sat Sep  6 11:36:50 JST 2003  itojun@iijlab.net
@@ -38,7 +38,7 @@ Wed Aug 20 22:31:22 JST 2003	keiichi@iij.ad.jp
 
 Sun Aug 17 JST 2003  itojun@iijlab.net
 	* sys/netinet{,6}/in{,6}_proto.c: enforce inbound IPsec policy on
-	  protocols that falls into raw socket as a wildcard case.
+	  protocols that fall into raw socket as a wildcard case.
 
 2003-08-15  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/pim6sd/{cfparse.y, mrt.[ch], pim6_proto.c, rp.c}
