@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.22 2001/06/27 04:07:47 jinmei Exp $
+.\"	$KAME: bindtest.1,v 1.23 2001/06/30 03:47:56 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -196,13 +196,11 @@ The list of addresses to be tested with
 .Xr bind 2
 are as below:
 .Bl -tag -width "loopback"
-.It wildcard
-:: and 0.0.0.0
-.It loopback
-127.0.0.1 and ::1
-.It IPv4 mapped wildcard and loopback
+.It wildcard: Li :: and 0.0.0.0
+.It loopback: Li ::1 and 127.0.0.1
+.It IPv4 mapped wildcard and loopback:
 ::ffff:0.0.0.0 and ::ffff:127.0.0.1
-.It invalid address
+.It invalid address:
 ::ffff:0.0.0.1 and 0.0.0.1.
 Their goal is to test common programming mistakes in the implementation.
 .El
