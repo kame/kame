@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.95 2003/01/06 06:34:41 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.96 2003/01/21 12:05:37 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -121,29 +121,27 @@ static void server6_init __P((void));
 static void server6_mainloop __P((void));
 static int server6_recv __P((int));
 static int server6_react_solicit __P((struct dhcp6_if *, struct dhcp6 *,
-				      struct dhcp6_optinfo *,
-				      struct sockaddr *, int));
+    struct dhcp6_optinfo *, struct sockaddr *, int));
 static int server6_react_request __P((struct dhcp6_if *,
-				      struct in6_pktinfo *, struct dhcp6 *,
-				      struct dhcp6_optinfo *,
-				      struct sockaddr *, int));
+    struct in6_pktinfo *, struct dhcp6 *, struct dhcp6_optinfo *,
+    struct sockaddr *, int));
 static int server6_react_renew __P((struct dhcp6_if *,
-				     struct in6_pktinfo *, struct dhcp6 *,
-				     struct dhcp6_optinfo *,
-				     struct sockaddr *, int));
+    struct in6_pktinfo *, struct dhcp6 *, struct dhcp6_optinfo *,
+    struct sockaddr *, int));
 static int server6_react_rebind __P((struct dhcp6_if *,
-				     struct dhcp6 *, struct dhcp6_optinfo *,
-				     struct sockaddr *, int));
+    struct dhcp6 *, struct dhcp6_optinfo *, struct sockaddr *, int));
+static int server6_react_release __P((struct dhcp6_if *,
+    struct in6_pktinfo *, struct dhcp6 *, struct dhcp6_optinfo *,
+    struct sockaddr *, int));
 static int server6_react_informreq __P((struct dhcp6_if *, struct dhcp6 *,
-					struct dhcp6_optinfo *,
-					struct sockaddr *, int));
+    struct dhcp6_optinfo *, struct sockaddr *, int));
 static int server6_send __P((int, struct dhcp6_if *, struct dhcp6 *,
-			     struct dhcp6_optinfo *,
-			     struct sockaddr *, int,
-			     struct dhcp6_optinfo *));
+    struct dhcp6_optinfo *, struct sockaddr *, int, struct dhcp6_optinfo *));
 static int make_ia_stcode __P((int, u_int32_t, u_int16_t,
     struct dhcp6_list *));
 static int make_binding_ia __P((struct dhcp6_listval *, struct dhcp6_list *,
+    struct dhcp6_optinfo *));
+static int release_binding_ia __P((struct dhcp6_listval *, struct dhcp6_list *,
     struct dhcp6_optinfo *));
 static int make_ia __P((struct dhcp6_listval *, struct dhcp6_list *,
     struct dhcp6_list *, struct host_conf *, int));
@@ -160,6 +158,10 @@ static void update_binding __P((struct dhcp6_binding *));
 static void remove_binding __P((struct dhcp6_binding *));
 static void free_binding __P((struct dhcp6_binding *));
 static struct dhcp6_timer *binding_timo __P((void *));
+static struct dhcp6_listval *find_bindg_ia __P((struct dhcp6_listval *,
+    struct dhcp6_binding *));
+static struct dhcp6_listval *find_binding_ia __P((struct dhcp6_listval *,
+    struct dhcp6_binding *));
 static char *bindingstr __P((struct dhcp6_binding *));
 
 int
@@ -583,12 +585,16 @@ server6_recv(s)
 		(void)server6_react_rebind(ifp, dh6, &optinfo,
 		    (struct sockaddr *)&from, fromlen);
 		break;
+	case DH6_RELEASE:
+		(void)server6_react_release(ifp, pi, dh6, &optinfo,
+		    (struct sockaddr *)&from, fromlen);
+		break;
 	case DH6_INFORM_REQ:
 		(void)server6_react_informreq(ifp, dh6, &optinfo,
 		    (struct sockaddr *)&from, fromlen);
 		break;
 	default:
-		dprintf(LOG_INFO, "%s" "unknown or unsupported msgtype %s",
+		dprintf(LOG_INFO, "%s" "unknown or unsupported msgtype (%s)",
 		    FNAME, dhcp6msgstr(dh6->dh6_msgtype));
 		break;
 	}
@@ -1093,6 +1099,115 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 }
 
 static int
+server6_react_release(ifp, pi, dh6, optinfo, from, fromlen)
+	struct dhcp6_if *ifp;
+	struct in6_pktinfo *pi;
+	struct dhcp6 *dh6;
+	struct dhcp6_optinfo *optinfo;
+	struct sockaddr *from;
+	int fromlen;
+{
+	struct dhcp6_optinfo roptinfo;
+	struct dhcp6_listval *iapd;
+	u_int16_t stcode;
+
+	/* message validation according to Section 15.9 of dhcpv6-28 */
+
+	/* the message must include a Server Identifier option */
+	if (optinfo->serverID.duid_len == 0) {
+		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		return (-1);
+	}
+	/* the contents of the Server Identifier option must match ours */
+	if (duidcmp(&optinfo->serverID, &server_duid)) {
+		dprintf(LOG_INFO, "%s" "server ID mismatch", FNAME);
+		return (-1);
+	}
+	/* the message must include a Client Identifier option */
+	if (optinfo->clientID.duid_len == 0) {
+		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		return (-1);
+	}
+
+	/*
+	 * configure necessary options based on the options in request.
+	 */
+	dhcp6_init_options(&roptinfo);
+
+	/* server information option */
+	if (duidcpy(&roptinfo.serverID, &server_duid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		goto fail;
+	}
+	/* copy client information back */
+	if (duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
+		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		goto fail;
+	}
+
+	/*
+	 * When the server receives a Release message via unicast from a
+	 * client to which the server has not sent a unicast option, the server
+	 * discards the Release message and responds with a Reply message
+	 * containing a Status Code option with value UseMulticast, a Server
+	 * Identifier option containing the server's DUID, the Client
+	 * Identifier option from the client message and no other options.
+	 * [dhcpv6-28 18.2.6]
+	 * (Our current implementation never sends a unicast option.)
+	 */
+	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
+		u_int16_t stcode = DH6OPT_STCODE_USEMULTICAST;
+
+		dprintf(LOG_INFO, "%s" "unexpected unicast message from %s",
+		    FNAME, addr2str(from));
+		if (dhcp6_add_listval(&roptinfo.stcode_list,
+		    DHCP6_LISTVAL_STCODE, &stcode, NULL) == NULL) {
+			dprintf(LOG_ERR, "%s" "failed to add a status code",
+			    FNAME);
+			goto fail;
+		}
+		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
+		    fromlen, &roptinfo);
+		goto end;
+	}
+
+	/*
+	 * Locates the client's binding and verifies that the information
+	 * from the client matches the information stored for that client.
+	 * (Note that our implementation does not assign addresses (nor will)).
+	 */
+	for (iapd = TAILQ_FIRST(&optinfo->iapd_list); iapd;
+	    iapd = TAILQ_NEXT(iapd, link)) {
+		if (release_binding_ia(iapd, &roptinfo.iapd_list, optinfo))
+			goto fail;
+	}
+
+	/*
+	 * After all the addresses have been processed, the server generates a
+	 * Reply message and includes a Status Code option with value Success.
+	 * [dhcpv6-28 Section 18.2.6]
+	 */
+	stcode = DH6OPT_STCODE_SUCCESS;
+	if (dhcp6_add_listval(&roptinfo.stcode_list,
+	    DHCP6_LISTVAL_STCODE, &stcode, NULL) == NULL) {
+		dprintf(LOG_NOTICE, "%s" "failed to add a status code",
+		    FNAME);
+		goto fail;
+	}
+
+	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
+			   &roptinfo);
+
+  end:
+	dhcp6_clear_options(&roptinfo);
+	return (0);
+
+  fail:
+	dhcp6_clear_options(&roptinfo);
+	return (-1);
+}
+
+static int
 make_binding_ia(iapd, retlist, optinfo)
 	struct dhcp6_listval *iapd;
 	struct dhcp6_list *retlist;
@@ -1176,6 +1291,74 @@ make_binding_ia(iapd, retlist, optinfo)
 			return (-1);
 		}
 		dhcp6_clear_list(&ialist);
+	}
+
+	return (0);
+}
+
+static int
+release_binding_ia(iapd, retlist, optinfo)
+	struct dhcp6_listval *iapd;
+	struct dhcp6_list *retlist;
+	struct dhcp6_optinfo *optinfo;
+{
+	struct dhcp6_binding *binding;
+
+	if ((binding = find_binding(&optinfo->clientID, DHCP6_BINDING_IA,
+	    iapd->type, iapd->val_ia.iaid)) == NULL) {
+		struct dhcp6_list *stcode_list;
+
+		/*
+		 * For each IA in the Release message for which the server has
+		 * no binding information, the server adds an IA option using
+		 * the IAID from the Release message and includes a Status Code
+		 * option with the value NoBinding in the IA option.
+		 */
+		if (make_ia_stcode(iapd->type, iapd->val_ia.iaid,
+		    DH6OPT_STCODE_NOBINDING, retlist)) {
+			dprintf(LOG_NOTICE, "%s"
+			    "failed to make an option list" FNAME);
+			return (-1);
+		}
+	} else {
+		struct dhcp6_listval *lv, *lvia;
+
+		/*
+		 * If the IAs in the message are in a binding for the client
+		 * and the addresses in the IAs have been assigned by the
+		 * server to those IAs, the server deletes the addresses from
+		 * the IAs and makes the addresses available for assignment to
+		 * other clients.
+		 * [dhcpv6-28 Section 18.2.6]
+		 * (Though we do not support address assignment, we apply the
+		 * same logic to prefixes)
+		 */
+		for (lv = TAILQ_FIRST(&iapd->sublist); lv;
+		    lv = TAILQ_NEXT(lv, link)) {
+			if ((lvia = find_binding_ia(lv, binding)) != NULL) {
+				switch (binding->iatype) {
+					case DHCP6_LISTVAL_IAPD:
+						dprintf(LOG_DEBUG, "%s"
+						    "bound prefix %s/%d "
+						    "has been released", FNAME,
+						    in6addr2str(&lvia->val_prefix6.addr,
+						    0),
+						    lvia->val_prefix6.plen);
+						break;
+				}
+
+				TAILQ_REMOVE(&binding->val_list, lvia, link);
+				dhcp6_clear_listval(lvia);
+				if (TAILQ_EMPTY(&binding->val_list)) {
+					/*
+					 * if the binding has become empty,
+					 * stop procedure.
+					 */
+					remove_binding(binding);
+					return (0);
+				}
+			}
+		}
 	}
 
 	return (0);
@@ -1737,6 +1920,11 @@ binding_timo(arg)
 			case DHCP6_LISTVAL_IAPD:
 				lifetime = iav->val_prefix6.vltime;
 				break;
+			default:
+				dprintf(LOG_ERR, "%s" "internal error: "
+				    "unknown binding type (%d)", FNAME,
+				    binding->iatype);
+				return (NULL); /* XXX */
 			}
 
 			if (lifetime != DHCP6_DURATITION_INFINITE &&
@@ -1776,6 +1964,24 @@ binding_timo(arg)
 	dhcp6_set_timer(&timo, binding->timer);
 
 	return (binding->timer);
+}
+
+static struct dhcp6_listval *
+find_binding_ia(key, binding)
+	struct dhcp6_listval *key;
+	struct dhcp6_binding *binding;
+{
+	struct dhcp6_list *ia_list = &binding->val_list;
+	struct dhcp6_listval *iav;
+
+	switch (binding->type) {
+	case DHCP6_BINDING_IA:
+		return (dhcp6_find_listval(ia_list, key->type, &key->uv, 0));
+	default:
+		dprintf(LOG_ERR, "%s" "unknown binding type %d", FNAME,
+		    binding->type);
+		return (NULL);	/* XXX */
+	}
 }
 
 static char *

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.4 2003/01/14 07:36:50 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.5 2003/01/21 12:05:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -73,6 +73,7 @@ struct ia {
 static TAILQ_HEAD(, ia) ia_listhead;
 
 static void callback __P((struct ia *));
+static int release_ia __P((struct ia *));
 static void remove_ia __P((struct ia *));
 static struct ia *get_ia __P((iatype_t, struct dhcp6_if *,
     struct dhcp6_listval *, struct duid *));
@@ -85,6 +86,7 @@ static char *statestr __P((iastate_t));
 extern struct dhcp6_timer *client6_timo __P((void *));
 extern void client6_send_renew __P((struct dhcp6_event *));
 extern void client6_send_rebind __P((struct dhcp6_event *));
+extern void client6_send_release __P((struct dhcp6_event *));
 
 void
 init_ia()
@@ -242,6 +244,91 @@ callback(ia)
 }
 
 void
+release_all_ia()
+{
+	struct ia *ia, *ia_next;
+
+	for (ia = TAILQ_FIRST(&ia_listhead); ia; ia = ia_next) {
+		ia_next = TAILQ_NEXT(ia, link);
+
+		(void)release_ia(ia);
+
+		/*
+		 * The client MUST stop using all of the addresses being
+		 * released as soon as the client begins the Release message
+		 * exchange process.
+		 */
+		remove_ia(ia);
+	}
+}
+
+static int
+release_ia(ia)
+	struct ia *ia;
+{
+	struct dhcp6_ia iaparam;
+	struct dhcp6_event *ev;
+	struct dhcp6_eventdata *evd;
+
+	dprintf(LOG_DEBUG, "%s" "release an IA: %s-%lu", FNAME,
+	    iastr(ia->iatype), ia->iaid);
+
+	if ((ev = dhcp6_create_event(ia->ifp, DHCP6S_RELEASE))
+	    == NULL) {
+		dprintf(LOG_NOTICE, "%s" "failed to create a new event",
+		    FNAME);
+		goto fail;
+	}
+	TAILQ_INSERT_TAIL(&ia->ifp->event_list, ev, link);
+
+
+	if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
+		dprintf(LOG_NOTICE, "%s"
+		    "failed to create a new event timer", FNAME);
+		goto fail;
+	}
+
+	if (duidcpy(&ev->serverid, &ia->serverid)) {
+		dprintf(LOG_NOTICE, "%s" "failed to copy server ID",
+		    FNAME);
+		goto fail;
+	}
+
+	if ((evd = malloc(sizeof(*evd))) == NULL) {
+		dprintf(LOG_NOTICE, "%s" "failed to create a new event "
+		    "data", FNAME);
+		goto fail;
+	}
+	memset(evd, 0, sizeof(*evd));
+	iaparam.iaid = ia->iaid;
+	/* XXX: should we set T1/T2 to 0?  spec is silent on this. */
+	iaparam.t1 = ia->t1;
+	iaparam.t2 = ia->t2;
+
+	if (ia->ctl && ia->ctl->release_data)
+		if ((*ia->ctl->release_data)(ia->ctl, &iaparam, NULL, evd)) {
+			dprintf(LOG_NOTICE, "%s" "failed to make "
+			    "release data", FNAME);
+			goto fail;
+		}
+	TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
+
+	ev->timeouts = 0;
+	dhcp6_set_timeoparam(ev);
+	dhcp6_reset_timer(ev);
+
+	client6_send_release(ev);
+
+	return (0);
+
+  fail:
+	if (ev)
+		dhcp6_remove_event(ev);
+
+	return (-1);
+}
+
+void
 remove_all_ia()
 {
 	struct ia *ia, *ia_next;
@@ -333,20 +420,27 @@ ia_timo(arg)
 	}
 
 	if ((ev = dhcp6_create_event(ia->ifp, dhcpstate)) == NULL) {
-		dprintf(LOG_NOTICE, "%s" "failed to create a new event"
+		dprintf(LOG_NOTICE, "%s" "failed to create a new event",
 		    FNAME);
 		goto fail;
 	}
+	TAILQ_INSERT_TAIL(&ia->ifp->event_list, ev, link);
+
 	if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
 		dprintf(LOG_NOTICE, "%s" "failed to create a new event "
 		    "timer", FNAME);
 		goto fail;
 	}
+
 	if ((evd = malloc(sizeof(*evd))) == NULL) {
 		dprintf(LOG_NOTICE, "%s" "failed to create a new event "
 		    "data", FNAME);
 		goto fail;
 	}
+	memset(evd, 0, sizeof(*evd));
+	evd->event = ev;
+	TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
+
 	if (ia->state == IAS_RENEW) {
 		if (duidcpy(&ev->serverid, &ia->serverid)) {
 			dprintf(LOG_NOTICE, "%s" "failed to copy server ID",
@@ -354,7 +448,7 @@ ia_timo(arg)
 			goto fail;
 		}
 	}
-	memset(evd, 0, sizeof(*evd));
+
 	iaparam.iaid = ia->iaid;
 	iaparam.t1 = ia->t1;
 	iaparam.t2 = ia->t2;
@@ -378,10 +472,6 @@ ia_timo(arg)
 			}
 		break;
 	}
-	evd->event = ev;
-	TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
-
-	TAILQ_INSERT_TAIL(&ia->ifp->event_list, ev, link);
 
 	ev->timeouts = 0;
 	dhcp6_set_timeoparam(ev);
@@ -404,12 +494,9 @@ ia_timo(arg)
 	return (ia->timer);
 
   fail:
-	if (ev && ev->timer)
-		dhcp6_remove_timer(&ev->timer);
-	if (ev && &ev->serverid)
-		duidfree(&ev->serverid);
 	if (ev)
-		free(ev);
+		dhcp6_remove_event(ev);
+
 	return (NULL);
 }
 

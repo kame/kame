@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.70 2003/01/15 13:47:32 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.71 2003/01/21 12:05:36 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -280,8 +280,8 @@ dhcp6_remove_event(ev)
 {
 	struct dhcp6_eventdata *evd, *evd_next;
 
-	dprintf(LOG_DEBUG, "%s" "removing an event on %s, state=%d", FNAME,
-		ev->ifp->ifname, ev->state);
+	dprintf(LOG_DEBUG, "%s" "removing an event on %s, state=%s", FNAME,
+		ev->ifp->ifname, dhcp6_event_statestr(ev));
 
 	for (evd = TAILQ_FIRST(&ev->data_list); evd; evd = evd_next) {
 		evd_next = TAILQ_NEXT(evd, link);
@@ -1577,6 +1577,10 @@ dhcp6_set_timeoparam(ev)
 		ev->init_retrans = REB_TIMEOUT;
 		ev->max_retrans_time = REB_MAX_RT;
 		break;
+	case DHCP6S_RELEASE:
+		ev->init_retrans = REL_TIMEOUT;
+		ev->max_retrans_cnt = REL_MAX_RC;
+		break;
 	default:
 		dprintf(LOG_INFO, "%s" "unexpected event state %d on %s",
 		    FNAME, ev->state, ev->ifp->ifname);
@@ -1626,36 +1630,11 @@ dhcp6_reset_timer(ev)
 		break;
 	}
 
-	switch(ev->state) {
-	case DHCP6S_INIT:
-		statestr = "INIT";
-		break;
-	case DHCP6S_SOLICIT:
-		statestr = "SOLICIT";
-		break;
-	case DHCP6S_INFOREQ:
-		statestr = "INFOREQ";
-		break;
-	case DHCP6S_REQUEST:
-		statestr = "REQUEST";
-		break;
-	case DHCP6S_RENEW:
-		statestr = "RENEW";
-		break;
-	case DHCP6S_REBIND:
-		statestr = "REBIND";
-		break;
-	case DHCP6S_IDLE:
-		statestr = "IDLE";
-		break;
-	default:
-		statestr = "???"; /* XXX */
-		break;
-	}
-
 	interval.tv_sec = (ev->retrans * 1000) / 1000000;
 	interval.tv_usec = (ev->retrans * 1000) % 1000000;
 	dhcp6_set_timer(&interval, ev->timer);
+
+	statestr = dhcp6_event_statestr(ev);
 
 	dprintf(LOG_DEBUG, "%s" "reset a timer on %s, "
 		"state=%s, timeo=%d, retrans=%d", FNAME,
@@ -1758,6 +1737,8 @@ dhcp6msgstr(type)
 		return ("rebind");
 	case DH6_REPLY:
 		return ("reply");
+	case DH6_RELEASE:
+		return ("release");
 	case DH6_INFORM_REQ:
 		return ("information request");
 	default:
@@ -1813,6 +1794,31 @@ duidstr(duid)
 		sprintf(cp, "%s", "...");
 
 	return (duidstr);
+}
+
+char *dhcp6_event_statestr(ev)
+	struct dhcp6_event *ev;
+{
+	switch(ev->state) {
+	case DHCP6S_INIT:
+		return ("INIT");
+	case DHCP6S_SOLICIT:
+		return ("SOLICIT");
+	case DHCP6S_INFOREQ:
+		return ("INFOREQ");
+	case DHCP6S_REQUEST:
+		return ("REQUEST");
+	case DHCP6S_RENEW:
+		return ("RENEW");
+	case DHCP6S_REBIND:
+		return ("REBIND");
+	case DHCP6S_RELEASE:
+		return ("RELEASE");
+	case DHCP6S_IDLE:
+		return ("IDLE");
+	default:
+		return ("???"); /* XXX */
+	}
 }
 
 void

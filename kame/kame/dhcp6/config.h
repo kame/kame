@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.19 2003/01/05 17:12:12 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.20 2003/01/21 12:05:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -109,7 +109,7 @@ struct dhcp6_serverinfo {
 
 /* client status code */
 enum {DHCP6S_INIT, DHCP6S_SOLICIT, DHCP6S_INFOREQ, DHCP6S_REQUEST,
-      DHCP6S_RENEW, DHCP6S_REBIND, DHCP6S_IDLE};
+      DHCP6S_RENEW, DHCP6S_REBIND, DHCP6S_RELEASE, DHCP6S_IDLE};
 
 struct prefix_ifconf {
 	TAILQ_ENTRY(prefix_ifconf) link;

@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.19 2003/01/21 07:42:15 jinmei Exp $
+.\"	$KAME: dhcp6c.8,v 1.20 2003/01/21 12:05:37 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -80,10 +80,9 @@ signals,
 will remove all stateful resources from the system.
 In the former case the daemon will then reinvoke itself,
 while it will stop running in the latter case.
-Note that in the former case
+In either case,
 .Nm
-does not send release message to the server,
-the message which the implementation currently does not support.
+will send DHCPv6 Release messages to release resources assigned from servers.
 .\"
 .Sh FILES
 .Bl -tag -width /usr/local/v6/etc/dhcp6c.conf -compact

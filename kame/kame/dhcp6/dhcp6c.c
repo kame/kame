@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.101 2003/01/15 13:57:19 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.102 2003/01/21 12:05:37 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -94,6 +94,7 @@ static void client6_init __P((void));
 static void client6_ifinit __P((void));
 static void free_resources __P((void));
 static void client6_mainloop __P((void));
+static int check_exit __P((void));
 static void process_signals __P((void));
 static struct dhcp6_serverinfo *find_server __P((struct dhcp6_if *,
 						 struct duid *));
@@ -114,6 +115,7 @@ static int sa2plen __P((struct sockaddr_in6 *));
 struct dhcp6_timer *client6_timo __P((void *));
 void client6_send_renew __P((struct dhcp6_event *));
 void client6_send_rebind __P((struct dhcp6_event *));
+void client6_send_release __P((struct dhcp6_event *));
 
 #define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
@@ -416,16 +418,23 @@ free_resources()
 {
 	struct dhcp6_if *ifp;
 
-	/* release all IAs (should send DHCPv6 release accordingly?) */
-	remove_all_ia();
+	/* release all IAs as well as send RELEASE message(s) */
+	release_all_ia();
 
 	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
 		struct dhcp6_event *ev, *ev_next;
 		struct dhcp6_serverinfo *sp, *sp_next;
 
-		/* cancel all outstanding events for each interface */
+		/*
+		 * Cancel all outstanding events for each interface except
+		 * ones being released.
+		 */
 		for (ev = TAILQ_FIRST(&ifp->event_list); ev; ev = ev_next) {
 			ev_next = TAILQ_NEXT(ev, link);
+
+			if (ev->state == DHCP6S_RELEASE)
+				continue; /* keep it for now */
+			
 			dhcp6_remove_event(ev);
 		}
 
@@ -443,14 +452,33 @@ free_resources()
 	}
 }
 
+static int
+check_exit()
+{
+	struct dhcp6_if *ifp;
+
+	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
+		/*
+		 * Check if we have an outstanding event.  If we do, we cannot
+		 * exit for now.
+		 */
+		if (!TAILQ_EMPTY(&ifp->event_list))
+			return (1);
+	}
+
+	/* We have no existing event.  Do exit. */
+	dprintf(LOG_INFO, "%s" "exiting", FNAME);
+
+	exit(0);
+}
+
 static void
 process_signals()
 {
 	if ((sig_flags & SIGF_TERM)) {
-		dprintf(LOG_INFO, FNAME "exiting");
 		free_resources();
 		unlink(DHCP6C_PIDFILE);
-		exit(0);
+		check_exit();
 	}
 	if ((sig_flags & SIGF_HUP)) {
 		dprintf(LOG_INFO, FNAME "restarting");
@@ -501,12 +529,17 @@ client6_timo(arg)
 {
 	struct dhcp6_event *ev = (struct dhcp6_event *)arg;
 	struct dhcp6_if *ifp;
+	int state = ev->state;
 
 	ifp = ev->ifp;
 	ev->timeouts++;
 	if (ev->max_retrans_cnt && ev->timeouts > ev->max_retrans_cnt) {
 		dprintf(LOG_INFO, "%s" "no responses were received", FNAME);
-		dhcp6_remove_event(ev);	/* XXX: should free event data? */
+		dhcp6_remove_event(ev);
+
+		if (state == DHCP6S_RELEASE)
+			check_exit();
+
 		return (NULL);
 	}
 
@@ -522,6 +555,9 @@ client6_timo(arg)
 	case DHCP6S_REQUEST:
 	case DHCP6S_INFOREQ:
 		client6_send(ev);
+		break;
+	case DHCP6S_RELEASE:
+		client6_send_release(ev);
 		break;
 	case DHCP6S_RENEW:
 	case DHCP6S_REBIND:
@@ -678,7 +714,7 @@ client6_send(ev)
 		dh6->dh6_msgtype = DH6_INFORM_REQ;
 		break;
 	default:
-		dprintf(LOG_ERR, "%s" "unexpected state");
+		dprintf(LOG_ERR, "%s" "unexpected state", FNAME);
 		exit(1);	/* XXX */
 	}
 	if (ev->timeouts == 0) {
@@ -1013,6 +1049,99 @@ client6_send_rebind(ev)
 	return;
 }
 
+void
+client6_send_release(ev)
+	struct dhcp6_event *ev;
+{
+	struct dhcp6_if *ifp;
+	struct dhcp6_eventdata *evd;
+	struct dhcp6_optinfo optinfo;
+	struct dhcp6 *dh6;
+	char buf[BUFSIZ];
+	ssize_t optlen, len;
+	struct sockaddr_in6 dst;
+
+	ifp = ev->ifp;
+	
+	dh6 = (struct dhcp6 *)buf;
+	memset(dh6, 0, sizeof(*dh6));
+	dh6->dh6_msgtype = DH6_RELEASE;
+	if (ev->timeouts == 0) {
+#ifdef HAVE_ARC4RANDOM
+		ev->xid = arc4random() & DH6_XIDMASK;
+#else
+		ev->xid = random() & DH6_XIDMASK;
+#endif
+		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
+			FNAME, ev->xid);
+	}
+	dh6->dh6_xid &= ~ntohl(DH6_XIDMASK);
+	dh6->dh6_xid |= htonl(ev->xid);
+	len = sizeof(*dh6);
+
+	/*
+	 * construct options
+	 */
+	dhcp6_init_options(&optinfo);
+
+	/* server ID */
+	if (duidcpy(&optinfo.serverID, &ev->serverid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		goto end;
+	}
+
+	/* client ID */
+	if (duidcpy(&optinfo.clientID, &client_duid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		goto end;
+	}
+
+	/* configuration information to be renewed */
+	for (evd = TAILQ_FIRST(&ev->data_list); evd;
+	     evd = TAILQ_NEXT(evd, link)) {
+		switch(evd->type) {
+		case DHCP6_EVDATA_IAPD:
+			if (dhcp6_copy_list(&optinfo.iapd_list,
+			    (struct dhcp6_list *)evd->data)) {
+				dprintf(LOG_NOTICE, "%s" "failed to add "
+				    "an IAPD", FNAME);
+				goto end;
+			}
+			break;
+		default:
+			dprintf(LOG_ERR, FNAME "unexpected event data (%d)",
+			    evd->type);
+			exit(1);
+		}
+	}
+
+	/* set options in the message */
+	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
+					(struct dhcp6opt *)(buf + sizeof(buf)),
+					&optinfo)) < 0) {
+		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
+		goto end;
+	}
+	len += optlen;
+
+	dst = *sa6_allagent;
+	dst.sin6_scope_id = ifp->linkid;
+
+	if (sendto(ifp->outsock, buf, len, 0, (struct sockaddr *)&dst,
+	    ((struct sockaddr *)&dst)->sa_len) == -1) {
+		dprintf(LOG_ERR, FNAME "transmit failed: %s", strerror(errno));
+		goto end;
+	}
+
+	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
+		dhcp6msgstr(dh6->dh6_msgtype),
+		addr2str((struct sockaddr *)&dst));
+
+  end:
+	dhcp6_clear_options(&optinfo);
+	return;
+}
+
 static void
 client6_recv()
 {
@@ -1277,6 +1406,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	struct dhcp6_listval *lv;
 	struct dhcp6_event *ev;
 	struct dhcp6_eventdata *evd, *evd_next;
+	int state;
 
 	/* find the corresponding event based on the received xid */
 	ev = find_event_withid(ifp, ntohl(dh6->dh6_xid) & DH6_XIDMASK);
@@ -1285,11 +1415,13 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		return (-1);
 	}
 
-	if (ev->state != DHCP6S_INFOREQ &&
-	    ev->state != DHCP6S_REQUEST &&
-	    ev->state != DHCP6S_RENEW &&
-	    ev->state != DHCP6S_REBIND &&
-	    (ev->state != DHCP6S_SOLICIT ||
+	state = ev->state;
+	if (state != DHCP6S_INFOREQ &&
+	    state != DHCP6S_REQUEST &&
+	    state != DHCP6S_RENEW &&
+	    state != DHCP6S_REBIND &&
+	    state != DHCP6S_RELEASE &&
+	    (state != DHCP6S_SOLICIT ||
 	     !(ifp->send_flags & DHCIFF_RAPID_COMMIT))) {
 		dprintf(LOG_INFO, "%s" "unexpected reply", FNAME);
 		return (-1);
@@ -1321,7 +1453,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	 * (should we keep the server otherwise?)
 	 * [dhcpv6-28 Section 17.1.4]
 	 */
-	if (ev->state == DHCP6S_SOLICIT &&
+	if (state == DHCP6S_SOLICIT &&
 	    (ifp->send_flags & DHCIFF_RAPID_COMMIT) &&
 	    !optinfo->rapidcommit) {
 		dprintf(LOG_INFO, "%s" "no rapid commit", FNAME);
@@ -1351,9 +1483,24 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	}
 
 	/* update stateful configuration information */
-	update_ia(IATYPE_PD, &optinfo->iapd_list, ifp, &optinfo->serverID);
+	if (state != DHCP6S_RELEASE) {
+		update_ia(IATYPE_PD, &optinfo->iapd_list, ifp,
+		    &optinfo->serverID);
+	}
 
 	dhcp6_remove_event(ev);
+
+	if (state == DHCP6S_RELEASE) {
+		/*
+		 * When the client receives a valid Reply message in response
+		 * to a Release message, the client considers the Release event
+		 * completed, regardless of the Status Code option(s) returned
+		 * by the server.
+		 * [dhcpv6-28 Section 18.1.8]
+		 */
+		check_exit();
+	}
+
 	dprintf(LOG_DEBUG, "%s" "got an expected reply, sleeping.", FNAME);
 
 	return (0);

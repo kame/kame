@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.15 2003/01/14 17:04:50 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.16 2003/01/21 12:05:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -70,6 +70,7 @@ struct iactl_pd {
 #define iacpd_duration common.duration
 #define iacpd_renew_data common.renew_data
 #define iacpd_rebind_data common.rebind_data
+#define iacpd_release_data common.release_data
 #define iacpd_cleanup common.cleanup
 
 struct siteprefix {
@@ -158,8 +159,8 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 		iac_pd->iacpd_isvalid = isvalid;
 		iac_pd->iacpd_duration = duration;
 		iac_pd->iacpd_cleanup = cleanup;
-		iac_pd->iacpd_renew_data =
-		    iac_pd->iacpd_rebind_data = renew_data;
+		iac_pd->iacpd_renew_data = iac_pd->iacpd_rebind_data =
+		    iac_pd->iacpd_release_data = renew_data;
 
 		iac_pd->pifc_head = pifc;
 		TAILQ_INIT(&iac_pd->siteprefix_head);
@@ -385,7 +386,8 @@ renew_data_free(evd)
 		exit(1);
 	}
 
-	*(struct dhcp6_eventdata **)evd->privdata = NULL;
+	if (evd->privdata)
+		*(struct dhcp6_eventdata **)evd->privdata = NULL;
 	ial = (struct dhcp6_list *)evd->data;
 	dhcp6_clear_list(ial);
 	free(ial);

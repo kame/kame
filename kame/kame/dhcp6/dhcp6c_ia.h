@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.h,v 1.1 2003/01/05 17:12:13 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.h,v 1.2 2003/01/21 12:05:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -43,6 +43,8 @@ struct iactl {
 	int (*renew_data) __P((struct iactl *, struct dhcp6_ia *,
 	    struct dhcp6_eventdata **, struct dhcp6_eventdata *));
 	int (*rebind_data) __P((struct iactl *, struct dhcp6_ia *,
+	    struct dhcp6_eventdata **, struct dhcp6_eventdata *));
+	int (*release_data) __P((struct iactl *, struct dhcp6_ia *,
 	    struct dhcp6_eventdata **, struct dhcp6_eventdata *));
 	void (*cleanup) __P((struct iactl *));
 };
