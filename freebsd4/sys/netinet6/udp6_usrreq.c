@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.28 2001/07/25 03:25:00 sumikawa Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.29 2001/07/25 04:47:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -226,7 +226,7 @@ udp6_input(mp, offp, proto)
 		init_sin6(&udp_in6, m); /* general init */
 		udp_in6.sin6_port = uh->uh_sport;
 		/*
-		 * KAME note: usually we drop udphdr from mbuf here.
+		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
 		 * We need udphdr for IPsec processing so we do that later.
 		 */
 

@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.44 2000/11/30 16:49:46 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.45 2001/07/25 04:47:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -226,7 +226,7 @@ udp6_input(mp, offp, proto)
 		init_sin6(&udp_in6, m); /* general init */
 		udp_in6.sin6_port = uh->uh_sport;
 		/*
-		 * KAME note: usually we drop udphdr from mbuf here.
+		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
 		 * We need udphdr for IPsec processing so we do that later.
 		 */
 

@@ -243,7 +243,7 @@ udp_input(m, off, proto)
 		 */
 
 		/*
-		 * KAME note: usually we drop udpiphdr from mbuf here.
+		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
 		 * We need udpiphdr for IPsec processing so we do that later.
 		 */
 

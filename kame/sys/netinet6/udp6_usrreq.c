@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.87 2001/07/02 08:56:40 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.88 2001/07/25 04:47:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -274,7 +274,7 @@ udp6_input(mp, offp, proto)
 		    m->m_pkthdr.rcvif);
 
 		/*
-		 * KAME note: usually we drop udphdr from mbuf here.
+		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
 		 * We need udphdr for IPsec processing so we do that later.
 		 */
 
