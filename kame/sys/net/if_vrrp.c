@@ -1,4 +1,4 @@
-/*      $KAME: if_vrrp.c,v 1.7 2003/03/19 09:03:09 ono Exp $ */
+/*      $KAME: if_vrrp.c,v 1.8 2003/03/28 08:00:28 ono Exp $ */
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -349,9 +349,7 @@ vrrp_ether_purgemulti(struct ifvrrp *ifv)
 }
 
 #ifdef __FreeBSD__
-#if !(__FreeBSD__ >= 5)
 PSEUDO_SET(vrrpattach, if_vrrp);
-#endif
 #endif
 
 void

@@ -38,6 +38,7 @@
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #include "opt_mac.h"
+#include "vrrp.h"
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -325,6 +326,9 @@ if_findindex(struct ifnet *ifp)
 	case IFT_XETHER:
 	case IFT_ISO88025:
 	case IFT_L2VLAN:
+#if NVRRP > 0
+	case IFT_VRRP:
+#endif
 		snprintf(eaddr, 18, "%6D", 
 		    ((struct arpcom *)ifp->if_softc)->ac_enaddr, ":");
 		break;
@@ -1991,7 +1995,9 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	case IFT_FDDI:
 	case IFT_XETHER:
 	case IFT_ISO88025:
+#if NVRRP > 0
 	case IFT_VRRP:
+#endif
 	case IFT_L2VLAN:
 		bcopy(lladdr, ((struct arpcom *)ifp->if_softc)->ac_enaddr, len);
 		bcopy(lladdr, LLADDR(sdl), len);
