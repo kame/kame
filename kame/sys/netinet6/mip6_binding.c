@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.91 2002/02/27 01:45:29 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.92 2002/02/28 10:31:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -876,7 +876,8 @@ mip6_validate_bu(m, opt)
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
 		/* silently ignore. */
-		return (1);
+		/* discard */
+		return (-1);
 	}
 
 	/*
@@ -891,7 +892,8 @@ mip6_validate_bu(m, opt)
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
 		/* silently ignore. */
-		return (1);
+		/* discard */
+		return (-1);
 	}
 
 	/*
@@ -907,7 +909,8 @@ mip6_validate_bu(m, opt)
 			 bu_opt->ip6ou_len,
 			 ip6_sprintf(&ip6->ip6_src)));
 		/* silently ignore */
-		return (1);
+		/* discard */
+		return (-1);
 	}
 
 	/*
@@ -960,7 +963,8 @@ mip6_validate_bu(m, opt)
 		}
 #endif /* !MIP6_DRAFT13 */
 		/* silently ignore. */
-		return (1);
+		/* discard */
+		return (-1);
 	}
 
  check_suboptions:
@@ -994,6 +998,7 @@ mip6_validate_bu(m, opt)
 						 "%s:%d: "
 						 "alt coa sub-option too small\n",
 						 __FILE__, __LINE__));
+					/* discard */
 					return (-1);
 				}
 				break;
@@ -1007,6 +1012,7 @@ mip6_validate_bu(m, opt)
 						 "%s:%d: "
 						 "auth data sub-option too small\n",
 						 __FILE__, __LINE__));
+					/* discard */
 					return (-1);
 				}
 				authdata = (struct mip6_subopt_authdata *)opt;
@@ -2429,7 +2435,8 @@ mip6_validate_ba(m, opt)
 			 ba_opt->ip6oa_len,
 			 ip6_sprintf(&sin6src->sin6_addr)));
 		/* silently ignore */
-		return (1);
+		/* discard */
+		return (-1);
 	}
 
 	/*
@@ -2485,7 +2492,8 @@ mip6_validate_ba(m, opt)
 			 mbu->mbu_seqno,
 			 ip6_sprintf(&ip6->ip6_src)));
 		/* silently ignore. */
-		return (1);
+		/* discard */
+		return (-1);
 	}
 
 #ifndef MIP6_DRAFT13
@@ -2522,6 +2530,7 @@ mip6_validate_ba(m, opt)
 						 "%s:%d: "
 						 "auth data sub-option too small\n",
 						 __FILE__, __LINE__));
+					/* discard */
 					return (-1);
 				}
 				authdata = (struct mip6_subopt_authdata *)opt;
