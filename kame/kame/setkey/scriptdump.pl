@@ -32,7 +32,7 @@ foreach $_ (<IN>) {
 		$akey =~ s/\s//g;
 		$akey =~ s/^/0x/g;
 	} elsif (/^\tstate=/) {
-		print "$mode $src $src $upper $spi $proxy -p $proto";
+		print "$mode $src $dst $upper $spi $proxy -p $proto";
 		if ($mode eq 'add') {
 			if ($proto eq 'esp') {
 				print " -E $ealgo $ekey" if $ealgo;
