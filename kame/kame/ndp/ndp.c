@@ -820,6 +820,7 @@ rtrlist()
 	for (i = 0 ; DR.if_index && i < PRLSTSIZ ; i++) {
 		struct sockaddr_in6 sin6;
 
+		bzero(&sin6, sizeof(sin6));
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_len = sizeof(sin6);
 		sin6.sin6_addr = DR.rtaddr;
@@ -893,6 +894,7 @@ plist()
 			for (j = 0; j < PR.advrtrs; j++) {
 				struct sockaddr_in6 sin6;
 
+				bzero(&sin6, sizeof(sin6));
 				sin6.sin6_family = AF_INET6;
 				sin6.sin6_len = sizeof(sin6);
 				sin6.sin6_addr = PR.advrtr[j];
