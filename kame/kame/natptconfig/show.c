@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.16 2001/09/03 00:45:18 itojun Exp $	*/
+/*	$KAME: show.c,v 1.17 2001/12/20 04:59:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -240,7 +240,7 @@ showVariable(int n_idx, int type)
 	case TYPE_INT:
 		readNL(&val, sizeof(int), n_idx);
 		printf("%16s: 0x%08x (%d)\n",
-		       nl[n_idx].n_name, val, val);
+		       nl[n_idx].n_name+1, val, val);
 		break;
 	}
 }
