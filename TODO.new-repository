@@ -1,11 +1,15 @@
 TODOs for new repository
 KAME project
-$Id: TODO.new-repository,v 1.2 1999/08/12 08:22:40 itojun Exp $
+$Id: TODO.new-repository,v 1.3 1999/08/12 16:30:28 itojun Exp $
 
 
 kernel part:
 - share sys/netnatm and other atm stuff across platforms
 - share and support netpm (v4-v4 NAT), ptr (v4-v6 NAT)
+	KAME/FreeBSD228 compiles fine
+	KAME/BSDI3 compiles fine
+- update netpm/ptr for KNF
+- update netpm/ptr for better kernel-user interface (do not occupy IPPROTO_xx)
 - merge in recent rrenum fixes to shared tree
 - share and support ALTQ 1.2
 	KAME/FreeBSD228 supports this
@@ -14,5 +18,7 @@ kernel part:
 	KAME/NetBSD is okay
 - fix tcp code in each of operating system to support both AFs
 	KAME/NetBSD is okay
+	KAME/FreeBSD32 is okay
+	(they are totally different, so we need to sync)
 
 userland part:
