@@ -1338,12 +1338,18 @@ rip_sendmsg(sin, pktinfo, len)
 
 
   if ((slen = sendmsg(ripsock, &smsghdr, 0)) != len) {
+    struct sockaddr_in6 sa6;	/* XXX */
+
+    memset(&sa6, 0, sizeof(sa6));
+    sa6.sin6_len = sizeof(sa6);
+    sa6.sin6_family = AF_INET6;
+    sa6.sin6_addr = pktinfo->ipi6_addr;
     syslog(LOG_ERR,                            /* spoofing or misconfig ? */
-	   "<rip_sendmsg>: sendmsg on %s: %s",
-	   if_indextoname(pktinfo->ipi6_ifindex, ifname), strerror(errno));
+	   "<rip_sendmsg>: sendmsg on %s (src=%s): %s",
+	   if_indextoname(pktinfo->ipi6_ifindex, ifname),
+	   ip6str(&sa6, 0), strerror(errno));
     return;
   }
-
 
 #ifdef DEBUG_RIP
   rp = (struct riphdr *)rippkt;    /* RIPng header   */
