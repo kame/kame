@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.6 2003/01/22 08:05:07 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.7 2003/01/22 08:53:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -84,6 +84,7 @@ static char *iastr __P((iatype_t));
 static char *statestr __P((iastate_t));
 
 extern struct dhcp6_timer *client6_timo __P((void *));
+extern int client6_ifinit __P((struct dhcp6_if *));
 extern void client6_send_renew __P((struct dhcp6_event *));
 extern void client6_send_rebind __P((struct dhcp6_event *));
 extern void client6_send_release __P((struct dhcp6_event *));
@@ -235,11 +236,16 @@ static void
 callback(ia)
 	struct ia *ia;
 {
+	struct dhcp6_if *ifp;
+
 	/* see if this IA is still valid.  if not, remove it. */
 	if (ia->ctl == NULL || !(*ia->ctl->isvalid)(ia->ctl)) {
 		dprintf(LOG_DEBUG, "%s" "IA %s-%lu is invalidated",
 		    FNAME, iastr(ia->iatype), ia->iaid);
+		ifp = ia->ifp;
 		remove_ia(ia);
+
+		(void)client6_ifinit(ifp);
 	}
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.104 2003/01/22 07:24:15 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.105 2003/01/22 08:53:24 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -92,7 +92,7 @@ static struct duid client_duid;
 
 static void usage __P((void));
 static void client6_init __P((void));
-static void client6_ifinit __P((void));
+static void ifinit_all __P((void));
 static void free_resources __P((void));
 static void client6_mainloop __P((void));
 static void check_exit __P((void));
@@ -115,6 +115,7 @@ static int sa2plen __P((struct sockaddr_in6 *));
 #endif
 
 struct dhcp6_timer *client6_timo __P((void *));
+int client6_ifinit __P((struct dhcp6_if *));
 void client6_send_renew __P((struct dhcp6_event *));
 void client6_send_rebind __P((struct dhcp6_event *));
 void client6_send_release __P((struct dhcp6_event *));
@@ -192,7 +193,7 @@ main(argc, argv)
 	}
 
 	client6_init();
-	client6_ifinit();
+	ifinit_all();
 
 	client6_mainloop();
 	exit(0);
@@ -392,26 +393,37 @@ client6_init()
 	}
 }
 
-static void
-client6_ifinit()
-{
+int
+client6_ifinit(ifp)
 	struct dhcp6_if *ifp;
+{
 	struct dhcp6_event *ev;
 
+	/* create an event for the initial delay */
+	if ((ev = dhcp6_create_event(ifp, DHCP6S_INIT)) == NULL) {
+		dprintf(LOG_NOTICE, "%s" "failed to create an event",
+		    FNAME);
+		return (-1);
+	}
+	TAILQ_INSERT_TAIL(&ifp->event_list, ev, link);
+	if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
+		dprintf(LOG_NOTICE, "%s" "failed to add a timer for %s",
+		    FNAME, ifp->ifname);
+		return (-1);
+	}
+	dhcp6_reset_timer(ev);
+
+	return (0);
+}
+
+static void
+ifinit_all()
+{
+	struct dhcp6_if *ifp;
+
 	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
-		/* create an event for the initial delay */
-		if ((ev = dhcp6_create_event(ifp, DHCP6S_INIT)) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to create an event",
-				FNAME);
-			exit(1);
-		}
-		TAILQ_INSERT_TAIL(&ifp->event_list, ev, link);
-		if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to add a timer for %s",
-				FNAME, ifp->ifname);
-			exit(1);
-		}
-		dhcp6_reset_timer(ev);
+		if (client6_ifinit(ifp))
+			exit (1); /* initialization failure.  we give up. */
 	}
 }
 
@@ -489,7 +501,7 @@ process_signals()
 	if ((sig_flags & SIGF_HUP)) {
 		dprintf(LOG_INFO, FNAME "restarting");
 		free_resources();
-		client6_ifinit();
+		ifinit_all();
 	}
 
 	sig_flags = 0;
