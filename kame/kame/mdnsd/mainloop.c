@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.9 2000/05/30 18:18:44 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.10 2000/05/31 04:02:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -57,24 +57,9 @@
 #include <arpa/nameser.h>
 
 #include "mdnsd.h"
+#include "db.h"
 
-struct qcache {
-	LIST_ENTRY(qcache) link;
-	struct sockaddr_storage from;
-	char *qbuf;	/* original query packet */
-	int qlen;
-	u_int16_t id;	/* id on relayed query - net endian */
-};
-
-struct acache {
-	LIST_ENTRY(acache) link;
-};
-
-static LIST_HEAD(, qcache) qcache;
-#if 0
-static LIST_HEAD(, acache) acache;
-#endif
-
+static int mainloop0 __P((int));
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
 static int hexdump __P((const char *, const char *, int,
@@ -82,56 +67,88 @@ static int hexdump __P((const char *, const char *, int,
 static int encode_myaddrs __P((const char *, u_int16_t, u_int16_t, char *,
 	int, int, int *));
 static const struct sockaddr *getsa __P((const char *, const char *, int));
-static struct qcache *newqcache __P((const struct sockaddr *, char *, int));
-static void delqcache __P((struct qcache *));
-static int getans __P((char *, int, struct sockaddr *));
-static int relay __P((char *, int, struct sockaddr *));
-static int serve __P((char *, int, struct sockaddr *));
+static int getans __P((int, char *, int, struct sockaddr *));
+static int relay __P((int, char *, int, struct sockaddr *));
+static int serve __P((int, char *, int, struct sockaddr *));
 
 void
 mainloop()
+{
+	int i, fdmax;
+	fd_set rfds, wfds;
+	struct timeval timeo;
+
+	while (1) {
+		FD_ZERO(&rfds);
+		FD_ZERO(&wfds);
+		fdmax =  -1;
+		for (i = 0; i < nsock; i++) {
+			FD_SET(sock[i], &rfds);
+			if (sock[i] > fdmax)
+				fdmax = sock[i];
+		}
+		memset(&timeo, 0, sizeof(timeo));
+		timeo.tv_sec = 1;
+		i = select(fdmax + 1, &rfds, &wfds, NULL, &timeo);
+		if (i < 0) {
+			err(1, "select");
+			/*NOTREACHED*/
+		} else if (i == 0) {
+			dbtimeo();
+			continue;
+		}
+
+		for (i = 0; i < nsock; i++) {
+			if (FD_ISSET(sock[i], &rfds))
+				mainloop0(i);
+		}
+	}
+}
+
+static int
+mainloop0(i)
+	int i;
 {
 	struct sockaddr_storage from;
 	int fromlen;
 	char buf[8 * 1024];
 	int l;
 
-	while (1) {
-		fromlen = sizeof(from);
-		l = recvfrom(insock, buf, sizeof(buf), 0,
-		    (struct sockaddr *)&from, &fromlen);
-		if (l < 0)
-			err(1, "recvfrom");
+	/*
+	 * XXX we need to get destination address of incoming packet.
+	 * reason 1: we need to forbid recursion for multicast query.
+	 *	to check it, we need to know the destination address.
+	 * reason 2: for unicast query, we need to flip the src/dst
+	 *	pair.
+	 * reason 3: we do not want to be hosed by fake multicast reply.
+	 */
+	fromlen = sizeof(from);
+	l = recvfrom(sock[i], buf, sizeof(buf), 0, (struct sockaddr *)&from,
+	    &fromlen);
+	if (l < 0)
+		err(1, "recvfrom");
 
+	if (ismyaddr((struct sockaddr *)&from)) {
 		/*
-		 * XXX we need to get destination address of incoming packet.
-		 * reason 1: we need to forbid recursion for multicast query.
-		 *	to check it, we need to know the destination address.
-		 * reason 2: for unicast query, we need to flip the src/dst
-		 *	pair.
-		 * reason 3: we do not want to be hosed by fake multicast reply.
+		 * if we are the authoritative server, send
+		 * answer back directly.
+		 * otherwise, relay lookup request from local
+		 * node to multicast-capable servers.
 		 */
-
-		if (ismyaddr((struct sockaddr *)&from)) {
-			/*
-			 * if we are the authoritative server, send answer
-			 * back directly.
-			 * otherwise, relay lookup request from local node
-			 * to multicast-capable servers.
-			 */
-			if (serve(buf, l, (struct sockaddr *)&from) != 0)
-				relay(buf, l, (struct sockaddr *)&from);
-		} else {
-			/*
-			 * if got a query from remote, try to transmit answer.
-			 * if we got a reply to our multicast query, fill
-			 * it into our local answer cache and send the reply
-			 * to the originator.
-			 */
-			if (serve(buf, l, (struct sockaddr *)&from) != 0)
-				getans(buf, l, (struct sockaddr *)&from);
-		}
+		if (serve(sock[0], buf, l, (struct sockaddr *)&from) != 0)
+			relay(sock[0], buf, l, (struct sockaddr *)&from);
+	} else {
+		/*
+		 * if got a query from remote, try to transmit answer.
+		 * if we got a reply to our multicast query,
+		 * fill it into our local answer cache and send
+		 * the reply to the originator.
+		 */
+		if (serve(sock[0], buf, l, (struct sockaddr *)&from) != 0)
+			getans(sock[0], buf, l, (struct sockaddr *)&from);
 	}
+
+	return 0;
 }
 
 static char *
@@ -243,7 +260,7 @@ hexdump(title, buf, len, from)
 	const char *d, *n;
 	int count;
 
-	printf("===\n%s\n", title);
+	dprintf("===\n%s\n", title);
 
 	if (getnameinfo(from, from->sa_len, hbuf, sizeof(hbuf),
 	    pbuf, sizeof(pbuf), niflags) != 0) {
@@ -251,26 +268,26 @@ hexdump(title, buf, len, from)
 		strncpy(pbuf, "?", sizeof(pbuf));
 	}
 
-	printf("host %s port %s myaddr %d\n", hbuf, pbuf, ismyaddr(from));
+	dprintf("host %s port %s myaddr %d\n", hbuf, pbuf, ismyaddr(from));
 	for (i = 0; i < len; i++) {
 		if (i % 16 == 0)
-			printf("%08x: ", i);
-		printf("%02x", buf[i] & 0xff);
+			dprintf("%08x: ", i);
+		dprintf("%02x", buf[i] & 0xff);
 		if (i % 16 == 15)
-			printf("\n");
+			dprintf("\n");
 	}
 	if (len % 16 != 0)
-		printf("\n");
+		dprintf("\n");
 
 	if (sizeof(*hp) > len) {
-		printf("packet too short, %d\n", len);
+		dprintf("packet too short, %d\n", len);
 		return -1;
 	}
 	hp = (HEADER *)buf;
-	printf("id: %04x qr: %u opcode: %u rcode: %u %u/%u/%u/%u/%u/%u/%u\n",
+	dprintf("id: %04x qr: %u opcode: %u rcode: %u %u/%u/%u/%u/%u/%u/%u\n",
 	    ntohs(hp->id), hp->qr, hp->opcode, hp->rcode,
 	    hp->qr, hp->aa, hp->tc, hp->rd, hp->ra, hp->ad, hp->cd);
-	printf("qd: %u an: %u ns: %u ar: %u\n",
+	dprintf("qd: %u an: %u ns: %u ar: %u\n",
 	    ntohs(hp->qdcount), ntohs(hp->ancount), ntohs(hp->nscount), 
 	    ntohs(hp->arcount));
 
@@ -280,7 +297,7 @@ hexdump(title, buf, len, from)
 		/* print questions section */
 		count = ntohs(hp->qdcount);
 		if (count)
-			printf("question section:\n");
+			dprintf("question section:\n");
 		while (count--) {
 			if (d - buf > len)
 				break;
@@ -289,8 +306,8 @@ hexdump(title, buf, len, from)
 				break;
 			if (d - buf + 4 > len)
 				break;
-			printf("%s", n);
-			printf(" qtype %u qclass %u\n",
+			dprintf("%s", n);
+			dprintf(" qtype %u qclass %u\n",
 			    ntohs(*(u_int16_t *)&d[0]),
 			    ntohs(*(u_int16_t *)&d[2]));
 			d += 4;
@@ -301,7 +318,7 @@ hexdump(title, buf, len, from)
 		/* print answers section */
 		count = ntohs(hp->ancount);
 		if (count)
-			printf("answers section:\n");
+			dprintf("answers section:\n");
 		while (count--) {
 			if (d - buf > len)
 				break;
@@ -312,18 +329,17 @@ hexdump(title, buf, len, from)
 				break;
 			if (d - buf + 10 + ntohs(*(u_int16_t *)&d[8]) > len)
 				break;
-			printf("%s", n);
-			printf(" qtype %u qclass %u",
+			dprintf("%s", n);
+			dprintf(" qtype %u qclass %u",
 			    ntohs(*(u_int16_t *)&d[0]),
 			    ntohs(*(u_int16_t *)&d[2]));
-			printf(" ttl %d rdlen %u ",
+			dprintf(" ttl %d rdlen %u ",
 			    (int32_t)ntohl(*(u_int32_t *)&d[4]),
 			    ntohs(*(u_int16_t *)&d[8]));
-			for (i = 0; i < ntohs(*(u_int16_t *)&d[8]); i++) {
-				printf("%02x", d[10 + i] & 0xff);
-			}
+			for (i = 0; i < ntohs(*(u_int16_t *)&d[8]); i++)
+				dprintf("%02x", d[10 + i] & 0xff);
 			d += 10 + ntohs(*(u_int16_t *)&d[8]);
-			printf("\n");
+			dprintf("\n");
 
 			/* LINTED const cast */
 			free((char *)n);
@@ -474,47 +490,9 @@ getsa(host, port, socktype)
 	return (const struct sockaddr *)&ss;
 }
 
-static struct qcache *
-newqcache(from, buf, len)
-	const struct sockaddr *from;
-	char *buf;
-	int len;
-{
-	struct qcache *qc;
-
-	if (from->sa_len > sizeof(qc->from))
-		return NULL;
-
-	qc = (struct qcache *)malloc(sizeof(*qc));
-	if (qc == NULL)
-		return NULL;
-	memset(qc, 0, sizeof(*qc));
-	qc->qbuf = (char *)malloc(len);
-	if (qc->qbuf == NULL) {
-		free(qc);
-		return NULL;
-	}
-
-	memcpy(&qc->from, from, from->sa_len);
-	memcpy(qc->qbuf, buf, len);
-	qc->qlen = len;
-
-	LIST_INSERT_HEAD(&qcache, qc, link);
-	return qc;
-}
-
-static void
-delqcache(qc)
-	struct qcache *qc;
-{
-	LIST_REMOVE(qc, link);
-	if (qc->qbuf)
-		free(qc->qbuf);
-	free(qc);
-}
-
 static int
-getans(buf, len, from)
+getans(s, buf, len, from)
+	int s;
 	char *buf;
 	int len;
 	struct sockaddr *from;
@@ -543,9 +521,9 @@ getans(buf, len, from)
 	/* XXX validate reply against original query */
 
 	hp->id = ohp->id;
-	hp->rd = 0;	/* recursion not supported */
+	hp->ra = 0;	/* recursion not supported */
 	hexdump("getans O", buf, len, (struct sockaddr *)&qc->from);
-	if (sendto(insock, buf, len, 0, (struct sockaddr *)&qc->from,
+	if (sendto(s, buf, len, 0, (struct sockaddr *)&qc->from,
 	    qc->from.ss_len) != len) {
 		delqcache(qc);
 		return -1;
@@ -555,7 +533,8 @@ getans(buf, len, from)
 }
 
 static int
-relay(buf, len, from)
+relay(s, buf, len, from)
+	int s;
 	char *buf;
 	int len;
 	struct sockaddr *from;
@@ -585,7 +564,7 @@ relay(buf, len, from)
 			return -1;
 		}
 		hexdump("relay O", buf, len, sa);
-		if (sendto(insock, buf, len, 0, sa, sa->sa_len) != len) {
+		if (sendto(s, buf, len, 0, sa, sa->sa_len) != len) {
 			delqcache(qc);
 			return -1;
 		}
@@ -599,7 +578,8 @@ relay(buf, len, from)
  * replies (mdns-00 page 3)
  */
 static int
-serve(buf, len, from)
+serve(s, buf, len, from)
+	int s;
 	char *buf;
 	int len;
 	struct sockaddr *from;
@@ -656,7 +636,7 @@ serve(buf, len, from)
 
 		hexdump("serve O", replybuf, p - replybuf, from);
 
-		sendto(insock, replybuf, p - replybuf, 0, from, from->sa_len);
+		sendto(s, replybuf, p - replybuf, 0, from, from->sa_len);
 
 		if (n) {
 			/* LINTED const cast */
@@ -704,7 +684,7 @@ serve(buf, len, from)
 
 		hexdump("serve D", replybuf, p - replybuf, from);
 
-		sendto(insock, replybuf, p - replybuf, 0, from, from->sa_len);
+		sendto(s, replybuf, p - replybuf, 0, from, from->sa_len);
 
 		if (n) {
 			/* LINTED const cast */

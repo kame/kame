@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.4 2000/05/31 04:02:42 itojun Exp $	*/
+/*	$KAME: db.h,v 1.1 2000/05/31 04:02:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -29,23 +29,37 @@
  * SUCH DAMAGE.
  */
 
-#define MDNS_PORT	"53"
-#define MDNS_GROUP6	"ff02::1"
+struct qcache {
+	LIST_ENTRY(qcache) link;
+	struct sockaddr_storage from;
+	char *qbuf;	/* original query packet */
+	int qlen;
+	u_int16_t id;	/* id on relayed query - net endian */
+};
 
-extern u_int16_t dnsid;
-extern const char *srcport;
-extern const char *dstport;
-extern const char *dnsserv;
-extern const char *intface;
-extern int sock[];
-extern int nsock;
-extern int family;
-extern const char *hostname;
-extern int dflag;
+struct acache {
+	LIST_ENTRY(acache) link;
+};
 
-/* mdnsd.c */
-extern int ismyaddr __P((const struct sockaddr *));
-extern int dprintf __P((const char *, ...));
+struct scache {
+	LIST_ENTRY(scache) link;
+	struct timeval tts;	/* time to send */
+	char *sbuf;		/* answer to send */
+	int slen;
+	struct sockaddr_storage from;
+	struct sockaddr_storage to;
+	int sockidx;
+};
 
-/* mainloop.c */
-extern void mainloop __P((void));
+extern LIST_HEAD(qchead, qcache) qcache;
+#if 0
+extern LIST_HEAD(achead, acache) acache;
+#endif
+extern LIST_HEAD(schead, scache) scache;
+
+extern int dbtimeo __P((void));
+extern struct qcache *newqcache __P((const struct sockaddr *, char *, int));
+extern void delqcache __P((struct qcache *));
+extern struct scache *newscache __P((int, const struct sockaddr *,
+	const struct sockaddr *, char *, int));
+extern void delscache __P((struct scache *));

@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.5 2000/05/30 18:00:48 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.6 2000/05/31 04:02:42 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -36,7 +36,7 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl 46
+.Op Fl 46D
 .Op Fl d Ar dnsserv
 .Op Fl h Ar hostname
 .Op Fl p Ar inport
@@ -61,6 +61,8 @@ will also reply to multicast DNS queries from other nodes.
 .It Fl 4
 .It Fl 6
 Controls the address family to use for DNS transport.
+.It Fl D
+Enable trace messages for debugging.
 .It Fl d Ar dnsserv
 .Nm
 will advertise DNS server

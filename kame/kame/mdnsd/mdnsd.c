@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.6 2000/05/30 16:03:48 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.7 2000/05/31 04:02:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -42,27 +42,37 @@
 #include <errno.h>
 #include <string.h>
 #include <ifaddrs.h>
+#if __STDC__
+#include <stdarg.h>
+#else
+#include <varargs.h>
+#endif
 
 #include "mdnsd.h"
+
+#define MAXSOCK		20
 
 u_int16_t dnsid;
 const char *srcport = "53";
 const char *dstport = MDNS_PORT;
 const char *dnsserv = NULL;
 const char *intface = NULL;
-int insock;
-int af = AF_INET6;
+int sockaf[MAXSOCK];
+int sock[MAXSOCK];
+int nsock = 0;
+int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
 const char *hostname = NULL;
 static int mcasthops = 1;
 static int mcastloop = 0;
+int dflag = 1;
 
 static void usage __P((void));
-static int getsock __P((int, const char *, int, int));
+static int getsock __P((int, const char *, const char *, int, int));
 static int getsock0 __P((const struct addrinfo *));
-static int join __P((int, const char *));
+static int join __P((int, int, const char *));
 static int join0 __P((int, const struct addrinfo *));
-static int setif __P((int, const char *));
+static int setif __P((int, int, const char *));
 static int iscanon __P((const char *));
 
 int
@@ -71,14 +81,15 @@ main(argc, argv)
 	char **argv;
 {
 	int ch;
+	int i;
 
 	while ((ch = getopt(argc, argv, "46d:h:i:p:P:")) != EOF) {
 		switch (ch) {
 		case '4':
-			af = AF_INET;
+			family = AF_INET;
 			break;
 		case '6':
-			af = AF_INET6;
+			family = AF_INET6;
 			break;
 		case 'd':
 			if (iscanon(optarg) == 0) {
@@ -87,6 +98,8 @@ main(argc, argv)
 			}
 			dnsserv = optarg;
 			break;
+		case 'D':
+			dflag++;
 		case 'h':
 			hostname = optarg;
 			break;
@@ -118,19 +131,27 @@ main(argc, argv)
 	srandom(time(NULL) ^ getpid());
 	dnsid = random() & 0xffff;
 
-	insock = getsock(af, srcport, SOCK_DGRAM, AI_PASSIVE);
-	if (insock < 0) {
+	if (getsock(family, NULL, srcport, SOCK_DGRAM, AI_PASSIVE) != 0) {
 		err(1, "getsock");
 		/*NOTREACHED*/
 	}
+	if (nsock == 0) {
+		errx(1, "no socket");
+		/*NOTREACHED*/
+	}
+	dprintf("%d sockets available\n", nsock);
 
-	if (af == AF_INET6) {
-		if (join(insock, MDNS_GROUP6) < 0) {
-			err(1, "join");
-			/*NOTREACHED*/
+	for (i = 0; i < nsock; i++) {
+		switch (sockaf[i]) {
+		case AF_INET6:
+			if (join(sock[0], sockaf[i], MDNS_GROUP6) < 0) {
+				err(1, "join");
+				/*NOTREACHED*/
+			}
+			break;
 		}
 
-		if (setif(insock, intface) < 0) {
+		if (setif(sock[0], sockaf[i], intface) < 0) {
 			errx(1, "setif");
 			/*NOTREACHED*/
 		}
@@ -143,7 +164,7 @@ main(argc, argv)
 		}
 		hostname = hostnamebuf;
 	}
-	printf("hostname=%s\n", hostname);
+	dprintf("hostname=\"%s\"\n", hostname);
 
 	mainloop();
 	exit(0);
@@ -152,33 +173,41 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: mdnsd [-46] [-d server] [-h hostname] [-p srcport] [-P dstport] -i iface\n");
+	fprintf(stderr, "usage: mdnsd [-46D] [-d server] [-h hostname] [-p srcport] [-P dstport] -i iface\n");
 }
 
-/* XXX todo: multiple sockets */
 static int
-getsock(af, serv, socktype, flags)
+getsock(af, host, serv, socktype, flags)
 	int af;
+	const char *host;
 	const char *serv;
 	int socktype, flags;
 {
-	struct addrinfo hints, *res;
+	struct addrinfo hints, *res, *ai;
 	int error;
-	int ret;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = af;
 	hints.ai_socktype = socktype;
 	hints.ai_flags = flags;
-	error = getaddrinfo(NULL, serv, &hints, &res);
+	error = getaddrinfo(host, serv, &hints, &res);
 	if (error) {
 		errno = EADDRNOTAVAIL;
 		return -1;
 	}
 
-	ret = getsock0(res);
+	for (ai = res; ai; ai = ai->ai_next) {
+		if (nsock < sizeof(sock) / sizeof(sock[0])) {
+			sock[nsock] = getsock0(ai);
+			sockaf[nsock] =ai->ai_family;
+			if (sock[nsock] >= 0)
+				nsock++;
+		} else
+			break;
+	}
+
 	freeaddrinfo(res);
-	return ret;
+	return 0;
 }
 
 static int
@@ -186,11 +215,27 @@ getsock0(ai)
 	const struct addrinfo *ai;
 {
 	int s;
+	const int yes = 1;
+	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+#ifdef IN_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
+
+	if (dflag &&
+	    getnameinfo(ai->ai_addr, ai->ai_addrlen, hbuf, sizeof(hbuf),
+	    sbuf, sizeof(sbuf), niflags) == 0) {
+		dprintf("getsock0: %s %s\n", hbuf, sbuf);
+	}
 
 	s = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-	if (s < 0)
+	if (s < 0) {
+		dprintf("socket: %s\n", strerror(errno));
 		return -1;
+	}
 	if (bind(s, ai->ai_addr, ai->ai_addrlen) < 0) {
+		dprintf("bind: %s\n", strerror(errno));
 		close(s);
 		return -1;
 	}
@@ -201,12 +246,16 @@ getsock0(ai)
 		    &mcasthops, sizeof(mcasthops));
 		(void)setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
 		    &mcastloop, sizeof(mcastloop));
+		(void)setsockopt(s, IPPROTO_IPV6, SO_REUSEPORT,
+		    &yes, sizeof(yes));
 		break;
 	case AF_INET:
 		(void)setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL,
 		    &mcasthops, sizeof(mcasthops));
 		(void)setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP,
 		    &mcastloop, sizeof(mcastloop));
+		(void)setsockopt(s, IPPROTO_IP, SO_REUSEPORT,
+		    &yes, sizeof(yes));
 		break;
 	}
 
@@ -214,8 +263,9 @@ getsock0(ai)
 }
 
 static int
-join(s, group)
+join(s, af, group)
 	int s;
+	int af;
 	const char *group;
 {
 	struct addrinfo hints, *res, *ai;
@@ -270,8 +320,9 @@ join0(s, ai)
 }
 
 static int
-setif(s, iface)
+setif(s, af, iface)
 	int s;
+	int af;
 	const char *iface;
 {
 	unsigned int outif;
@@ -444,5 +495,27 @@ ismyaddr(sa)
 	}
 
 	freeifaddrs(ifap);
+	return ret;
+}
+
+int
+#if __STDC__
+dprintf(const char *fmt, ...)
+#else
+dprintf(fmt, va_alist)
+	char *fmt;
+#endif
+{
+	va_list ap;
+	int ret;
+
+#if __STDC__
+	va_start(ap, fmt);
+#else
+	va_start(ap);
+#endif
+	if (dflag)
+		ret = vfprintf(stderr, fmt, ap);
+	va_end(ap);
 	return ret;
 }

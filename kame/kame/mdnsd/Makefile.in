@@ -1,4 +1,4 @@
-#	$KAME: Makefile.in,v 1.1 2000/05/21 03:18:53 itojun Exp $
+#	$KAME: Makefile.in,v 1.2 2000/05/31 04:02:41 itojun Exp $
 
 srcdir=	@srcdir@
 CFLAGS=	@CFLAGS@ @DEFS@
@@ -17,7 +17,7 @@ bindir=	@bindir@
 sbindir=@sbindir@
 mandir=	@mandir@
 
-OBJS=	mdnsd.o mainloop.o
+OBJS=	mdnsd.o mainloop.o db.o
 
 all:	$(TARGET) 
 mdnsd:	$(OBJS) $(LIBOBJS)
@@ -27,7 +27,7 @@ install::
 
 includes::
 
-clean::
+clean cleandir::
 	/bin/rm -f *.o $(TARGET)
 
 distclean:: clean
