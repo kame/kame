@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.252 2001/12/21 06:26:06 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.253 2001/12/21 07:08:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2048,12 +2048,7 @@ do { \
 						error = EINVAL;
 						break;
 					}
-#ifdef HAVE_NRL_INPCB
-					optp = &inp->inp_outputopts6;
-#else
 					optp = &in6p->in6p_outputopts;
-#endif
-
 					error = ip6_pcbopt(IPV6_HOPLIMIT,
 							   (u_char *)&optval,
 							   sizeof(optval),
