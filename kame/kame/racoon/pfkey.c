@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.110 2001/04/10 15:33:13 thorpej Exp $	*/
+/*	$KAME: pfkey.c,v 1.111 2001/05/02 04:56:38 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -192,16 +192,6 @@ pfkey_handler()
 	plog(LLV_DEBUG, LOCATION, NULL, "get pfkey %s message\n",
 		s_pfkey_type(msg->sadb_msg_type));
 	plogdump(LLV_DEBUG, msg, msg->sadb_msg_len << 3);
-
-	/* is it mine ? */
-	/* XXX should be handled all message in spite of mine */
-	if ((msg->sadb_msg_type == SADB_DELETE && msg->sadb_msg_pid == getpid())
-	 && (msg->sadb_msg_pid != 0 && msg->sadb_msg_pid != getpid())) {
-		plog(LLV_DEBUG, LOCATION, NULL,
-			"pfkey message pid %d not interesting.\n",
-			msg->sadb_msg_pid);
-		goto end;
-	}
 
 	/* validity check */
 	if (msg->sadb_msg_errno) {
@@ -884,6 +874,16 @@ pk_recvgetspi(mhp)
 	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
 	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]); /* note SA dir */
 
+	/* the message has to be processed or not ? */
+	if (msg->sadb_msg_pid != getpid()) {
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"%s message is not interesting "
+			"because pid %d is not mine.\n",
+			s_pfkey_type(msg->sadb_msg_type),
+			msg->sadb_msg_pid);
+		return -1;
+	}
+
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
 		plog(LLV_DEBUG, LOCATION, NULL,
@@ -1082,6 +1082,16 @@ pk_recvupdate(mhp)
 	sa_mode = mhp[SADB_X_EXT_SA2] == NULL
 		? IPSEC_MODE_ANY
 		: ((struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+
+	/* the message has to be processed or not ? */
+	if (msg->sadb_msg_pid != getpid()) {
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"%s message is not interesting "
+			"because pid %d is not mine.\n",
+			s_pfkey_type(msg->sadb_msg_type),
+			msg->sadb_msg_pid);
+		return -1;
+	}
 
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
@@ -1296,6 +1306,16 @@ pk_recvadd(mhp)
 		? IPSEC_MODE_ANY
 		: ((struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
 
+	/* the message has to be processed or not ? */
+	if (msg->sadb_msg_pid != getpid()) {
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"%s message is not interesting "
+			"because pid %d is not mine.\n",
+			s_pfkey_type(msg->sadb_msg_type),
+			msg->sadb_msg_pid);
+		return -1;
+	}
+
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
 		plog(LLV_DEBUG, LOCATION, NULL,
@@ -1348,7 +1368,6 @@ pk_recvexpire(mhp)
 	sa_mode = mhp[SADB_X_EXT_SA2] == NULL
 		? IPSEC_MODE_ANY
 		: ((struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
-
 
 	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 	if (proto_id == ~0) {
@@ -1657,6 +1676,16 @@ pk_recvdelete(mhp)
 	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
 	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
+
+	/* the message has to be processed or not ? */
+	if (msg->sadb_msg_pid == getpid()) {
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"%s message is not interesting "
+			"because the message was originated by me.\n",
+			s_pfkey_type(msg->sadb_msg_type),
+			msg->sadb_msg_pid);
+		return -1;
+	}
 
 	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 	if (proto_id == ~0) {
