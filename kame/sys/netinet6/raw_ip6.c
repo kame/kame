@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.118 2002/02/21 05:15:05 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.119 2002/02/26 02:43:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -438,7 +438,7 @@ rip6_ctlinput(cmd, sa, d)
 		/*
 		 * Depending on the value of "valid" and routing table
 		 * size (mtudisc_{hi,lo}wat), we will:
-		 * - recalcurate the new MTU and create the
+		 * - recalculate the new MTU and create the
 		 *   corresponding routing entry, or
 		 * - ignore the MTU change notification.
 		 */
