@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.755.2.1 2000/04/13 12:01:19 jinmei Exp $
+$Id: CHANGELOG,v 1.755.2.2 2000/04/13 14:16:35 itojun Exp $
 
 <200003>
+Thu Apr 13 23:13:52 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: correct icmp6 extension header traversal,
+	  to avoid sending icmp6 error against icmp6 error.  found by
+	  TAHI test.
+
 2000-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/sys/netinet/tcp_input.c (tcp_input): do not call
 	ND6_HINT() if the connection status is LISTEN.
