@@ -3,7 +3,7 @@
 # Date created:		5 Oct 1998
 # Whom:			k-sugyo/shin
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:04 itojun Exp $
+# $Id: Makefile,v 1.2 1999/12/07 12:09:42 sumikawa Exp $
 #
 
 DISTNAME=	mozilla-19980728
@@ -35,6 +35,10 @@ REQUIRES_MOTIF=	yes
 OSNAME=	`uname -s`
 OSVER=	`uname -r | ${SED} 's/-.*//'`
 OBJDIR=	${WRKSRC}/dist/${OSNAME}${OSVER}_OPT.OBJ
+
+post-install:
+	sed 's/so\.1$$/so.1.0/' ${TMPPLIST} > ${TMPPLIST}.tmp
+	mv ${TMPPLIST}.tmp ${TMPPLIST}
 
 do-install:
 	@${MKDIR} ${PREFIX}/lib/mozilla/bin
