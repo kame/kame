@@ -1,8 +1,8 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1251 2000/09/01 13:16:04 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1252 2000/09/04 00:21:38 itojun Exp $
 
-<200008>
+<200009>
 Fri Sep  1 22:14:27 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/rsync: use latest IPv6 patch.
 	   - freeaddrinfo(NULL) was executed when reverse looking up of
@@ -24,6 +24,7 @@ Fri Sep  1 02:30:02 JST 2000  itojun@iijlab.net
 	  des did not work at all (or behave strange), due to issues in SSLeay.
 	* kame/racoon: allow comment line in pre-shared key setting.
 
+<200008>
 Thu Aug 31 20:04:27 JST 2000  itojun@iijlab.net
 	* freebsd2/ports/sendmail.beta: upgrade to 8.11.0.
 
