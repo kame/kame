@@ -45,6 +45,19 @@ vs ibm
 	先方で試したところ、agressive modeにinterop issueがあるらしい。
 	13日にv4/v6ともテスト予定。
 
+vs radguard
+	gateway: いまいち。原因不明。
+		こっちinitiate: policyのあがりかたがまずい/phase 1 2とも
+			いまいち
+		こっちrespond: phase 1 2ともいまいち。先方gateway裏のnodeから
+			pingが届かない
+
+		phase 1: pre-shared/des/md5/dh1
+		phase 2: esp tun(裏)/3des/sha1/dh2
+	client: ばっちり、ただし先方にfragment問題あり(ping > 1500答えなし)
+		phase 1: pre-shared/3des/sha1/dh2
+		phase 2: esp tun(自分自身)/3des/sha1/dh2
+
 テストするには
 	psk.txtにエントリ追加。
 	samples/Makefileに相手のentryを追加、生成。
