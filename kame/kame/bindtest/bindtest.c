@@ -1,5 +1,5 @@
 /*	$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $	*/
-/*	$KAME: bindtest.c,v 1.52 2001/11/26 07:25:47 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.53 2002/01/09 06:50:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000,2001 USAGI/WIDE Project.
@@ -131,7 +131,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.52 2001/11/26 07:25:47 jinmei Exp $"
+static char *versionstr = "$KAME: bindtest.c,v 1.53 2002/01/09 06:50:18 jinmei Exp $"
 			  "\n"
 			  "$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $";
 static char *port = NULL;
@@ -451,7 +451,7 @@ test(t1, t2)
 #endif
 	sa = socket(a->ai_family, a->ai_socktype, a->ai_protocol);
 	if (sa < 0) {
-		if (summary)
+		if (!summary)
 			printf("\tfailed socket for %s, %s\n",
 			       printres(a), strerror(errno));
 		else
@@ -592,7 +592,7 @@ test(t1, t2)
 	}
 
 	if (summary)
-		printf("\to");
+		printf("\t");
 
 	if (summary)
 		putchar('[');
