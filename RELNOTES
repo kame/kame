@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.57 2000/09/18 00:12:01 itojun Exp $
+	$KAME: RELNOTES,v 1.58 2000/09/18 01:53:17 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -88,5 +88,8 @@ Many of old ones have been solved.
 - Around Aug 28 2000, we found a bug in IPsec blowfish-cbc support.  There is
   no interoperability between systems with old IPsec blowfish-cbc code, and 
   new IPsec blowfish-cbc code.
+
+- freebsd[34], bsdi4, netbsd: IPsec policy lookup does not work right,
+  if you use IPv4 mapped address.  
 
 							<end of RELNOTES>
