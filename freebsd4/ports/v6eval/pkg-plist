@@ -6,24 +6,42 @@ bin/pktrecv
 bin/checker
 bin/autorun
 bin/pktlint
-bin/clearnc.rmt
-bin/clearprefix.rmt
-bin/cleardefr.rmt
-bin/reboot.rmt
-bin/reboot_async.rmt
-bin/loginout.rmt
-bin/manualaddrconf.rmt
-bin/ping6.rmt
-bin/clearroute.rmt
-bin/route.rmt
-bin/rtadvd.rmt
-bin/ipsecClearAll.rmt
-bin/ipsecSetSAD.rmt
-bin/ipsecSetSPD.rmt
-bin/ipsecEnable.rmt
-bin/mtuconfig.rmt
-bin/tunnel.rmt
 bin/00README
+bin/dummy/clearnc.rmt
+bin/dummy/clearprefix.rmt
+bin/dummy/cleardefr.rmt
+bin/dummy/dummy.rmt
+bin/dummy/reboot.rmt
+bin/dummy/reboot_async.rmt
+bin/dummy/loginout.rmt
+bin/dummy/manualaddrconf.rmt
+bin/dummy/ping6.rmt
+bin/dummy/clearroute.rmt
+bin/dummy/route.rmt
+bin/dummy/rtadvd.rmt
+bin/dummy/ipsecClearAll.rmt
+bin/dummy/ipsecSetSAD.rmt
+bin/dummy/ipsecSetSPD.rmt
+bin/dummy/ipsecEnable.rmt
+bin/dummy/mtuconfig.rmt
+bin/dummy/tunnel.rmt
+bin/freebsd-i386/clearnc.rmt
+bin/freebsd-i386/clearprefix.rmt
+bin/freebsd-i386/cleardefr.rmt
+bin/freebsd-i386/reboot.rmt
+bin/freebsd-i386/reboot_async.rmt
+bin/freebsd-i386/loginout.rmt
+bin/freebsd-i386/manualaddrconf.rmt
+bin/freebsd-i386/ping6.rmt
+bin/freebsd-i386/clearroute.rmt
+bin/freebsd-i386/route.rmt
+bin/freebsd-i386/rtadvd.rmt
+bin/freebsd-i386/ipsecClearAll.rmt
+bin/freebsd-i386/ipsecSetSAD.rmt
+bin/freebsd-i386/ipsecSetSPD.rmt
+bin/freebsd-i386/ipsecEnable.rmt
+bin/freebsd-i386/mtuconfig.rmt
+bin/freebsd-i386/tunnel.rmt
 bin/kame-freebsd/clearnc.rmt
 bin/kame-freebsd/clearprefix.rmt
 bin/kame-freebsd/cleardefr.rmt
@@ -41,6 +59,23 @@ bin/kame-freebsd/ipsecSetSPD.rmt
 bin/kame-freebsd/ipsecEnable.rmt
 bin/kame-freebsd/mtuconfig.rmt
 bin/kame-freebsd/tunnel.rmt
+bin/kame-freebsd4/clearnc.rmt
+bin/kame-freebsd4/clearprefix.rmt
+bin/kame-freebsd4/cleardefr.rmt
+bin/kame-freebsd4/reboot.rmt
+bin/kame-freebsd4/reboot_async.rmt
+bin/kame-freebsd4/loginout.rmt
+bin/kame-freebsd4/manualaddrconf.rmt
+bin/kame-freebsd4/ping6.rmt
+bin/kame-freebsd4/clearroute.rmt
+bin/kame-freebsd4/route.rmt
+bin/kame-freebsd4/rtadvd.rmt
+bin/kame-freebsd4/ipsecClearAll.rmt
+bin/kame-freebsd4/ipsecSetSAD.rmt
+bin/kame-freebsd4/ipsecSetSPD.rmt
+bin/kame-freebsd4/ipsecEnable.rmt
+bin/kame-freebsd4/mtuconfig.rmt
+bin/kame-freebsd4/tunnel.rmt
 bin/hitachi-nr60/clearnc.rmt
 bin/hitachi-nr60/clearprefix.rmt
 bin/hitachi-nr60/cleardefr.rmt
@@ -298,6 +333,23 @@ bin/manual/ipsecSetSPD.rmt
 bin/manual/ipsecEnable.rmt
 bin/manual/mtuconfig.rmt
 bin/manual/tunnel.rmt
+bin/unknown/clearnc.rmt
+bin/unknown/clearprefix.rmt
+bin/unknown/cleardefr.rmt
+bin/unknown/reboot.rmt
+bin/unknown/reboot_async.rmt
+bin/unknown/loginout.rmt
+bin/unknown/manualaddrconf.rmt
+bin/unknown/ping6.rmt
+bin/unknown/clearroute.rmt
+bin/unknown/route.rmt
+bin/unknown/rtadvd.rmt
+bin/unknown/ipsecClearAll.rmt
+bin/unknown/ipsecSetSAD.rmt
+bin/unknown/ipsecSetSPD.rmt
+bin/unknown/ipsecEnable.rmt
+bin/unknown/mtuconfig.rmt
+bin/unknown/tunnel.rmt
 man/man1/pktctl.1.gz
 man/man1/pktsend.1.gz
 doc/00README
@@ -317,7 +369,10 @@ include/stdaddr.def
 include/stdpacket.def
 include/stdconst.def
 @unexec rmdir %D/etc 2>/dev/null || true
+@dirrm bin/dummy
+@dirrm bin/freebsd-i386
 @dirrm bin/kame-freebsd
+@dirrm bin/kame-freebsd4
 @dirrm bin/hitachi-nr60
 @dirrm bin/hitachi-nr60-v2
 @dirrm bin/hitachi-gr2k
@@ -333,6 +388,7 @@ include/stdconst.def
 @dirrm bin/mgcs-sj6
 @dirrm bin/telebit-tbc2k
 @dirrm bin/manual
+@dirrm bin/unknown
 @dirrm bin
 @dirrm man/man1
 @dirrm man/cat1
