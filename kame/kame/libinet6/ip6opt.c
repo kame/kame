@@ -430,7 +430,7 @@ int
 inet6_opt_append(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 		 size_t len, u_int8_t align, void **databufp)
 {
-	int currentlen = prevlen;
+	int currentlen = prevlen, padlen;
 
 	/*
 	 * The option type must have a value from 2 to 255, inclusive.
@@ -449,16 +449,17 @@ inet6_opt_append(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 	/*
 	 * The align parameter must have a value of 1, 2, 4, or 8.
 	 * The align value can not exceed the value of len.
-	 * XXX: Is 0 invalid??
 	 */
-	if (align != 0 &&	/* I believe 0 is valid (jinmei@kame.net) */
-	    align != 1 && align != 2 && align != 4 && align != 8)
+	if (align != 1 && align != 2 && align != 4 && align != 8)
 		return(-1);
 	if (align > len)
 		return(-1);
 
+	/* Calculate the padding length. */
+	padlen = currentlen % align;
+
 	/* The option must fit in the extension header buffer. */
-	currentlen += align + 2 + len;
+	currentlen += padlen + 2 + len;
 	if (extlen &&		/* XXX: right? */
 	    currentlen > extlen) /* 2 means "type + len" */
 		return(-1);
@@ -466,17 +467,17 @@ inet6_opt_append(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 	if (extbuf) {
 		u_int8_t *optp = (u_int8_t *)extbuf + prevlen;
 
-		if (align == 1) {
+		if (padlen == 1) {
 			/* insert a Pad1 option */
 			*optp = IP6OPT_PAD1;
 			optp++;
 		}
-		else if (align > 0) {
+		else if (padlen > 0) {
 			/* insert a PadN option for alignment */
 			*optp++ = IP6OPT_PADN;
-			*optp++ = align - 2;
-			memset(optp, 0, align - 2);
-			optp += (align - 2);
+			*optp++ = padlen - 2;
+			memset(optp, 0, padlen - 2);
+			optp += (padlen - 2);
 		}
 
 		*optp++ = type;
