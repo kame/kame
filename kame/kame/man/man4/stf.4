@@ -1,4 +1,4 @@
-.\"     $KAME: stf.4,v 1.16 2000/04/14 09:09:50 itojun Exp $
+.\"     $KAME: stf.4,v 1.17 2000/04/16 17:03:23 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -44,6 +44,18 @@ interface supports
 IPv6 in IPv4 encapsulation.
 It can tunnel IPv6 traffic over IPv4, as specified in
 .Li draft-ietf-ngtrans-6to4-03.txt .
+.Pp
+For ordinary nodes in 6to4 site, you do not need
+.Nm
+interface.
+The
+.Nm
+interface is necessary for site border router
+.Po
+called
+.Dq 6to4 router
+in the specification
+.Pc .
 .Pp
 Due to the way 6to4 protocol is specified,
 .Nm
@@ -106,7 +118,8 @@ It is recommended to filter/audit
 incoming IPv4 packet with IP protocol number 41, as necessary.
 To prevent possible DoS attacks,
 .Nm
-interface filters out the following packets:
+interface filters out the following packets.
+Note that the checks are no way complete:
 .Bl -bullet
 .It
 Packets with IPv4 multicast address as outer IPv4 source/destination
@@ -122,12 +135,8 @@ Packets with subnet broadcast address as outer IPv4 source/destination.
 The check is made against subnet broadcast addresses for
 all of the directly connected subnets.
 .It
-Packets with outer IPv4 source address that does not match the IPv4 topology.
-IPv4 routing table will be queried against inner source.
-If the incoming interface for the packet does not match the IPv4 outgoing
-interface for the IPv4 address derived from the inner source,
-packet will be dropped
-.Pq similar to ingress filters .
+Packets that does not pass ingres filtering.
+Outer IPv4 source address must meet the IPv4 topology on the routing table.
 .It
 The same set of rules are appplied against the IPv4 address embedded into
 inner IPv6 address, if the IPv6 address matches 6to4 prefix.
@@ -137,7 +146,7 @@ You may also want to reject encapsulated IPv6 packets with
 suspicious 6to4 addresses, like
 .Li 2002:7f00::/24.
 You may also want to run normal ingress filter against inner IPv6 address
-and outer IPv4 address, to avoid spoofing.
+to avoid spoofing.
 .\"
 .Sh EXAMPLES
 Note that
