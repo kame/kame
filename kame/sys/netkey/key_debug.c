@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.17 2000/05/05 11:01:05 sumikawa Exp $	*/
+/*	$KAME: key_debug.c,v 1.18 2000/05/23 13:34:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -689,7 +689,18 @@ kdebug_sockaddr(addr)
 	}
 #endif
 
-	ipsec_hexdump(_INADDRBYSA(addr), _INALENBYAF(addr->sa_family));
+	switch (addr->sa_family) {
+	case AF_INET:
+		ipsec_hexdump((caddr_t)&((struct sockaddr_in *)addr)->sin_addr,
+		    sizeof(((struct sockaddr_in *)addr)->sin_addr));
+		break;
+#ifdef INET6
+	case AF_INET6:
+		ipsec_hexdump((caddr_t)&((struct sockaddr_in6 *)addr)->sin6_addr,
+		    sizeof(((struct sockaddr_in6 *)addr)->sin6_addr));
+		break;
+#endif
+	}
 
 	printf("  }\n");
 
