@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.258 2001/08/14 06:02:39 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.259 2001/08/16 06:40:55 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1801,7 +1801,7 @@ following standards:
 	rfc240[1-6].txt rfc241[01].txt rfc2451.txt
 	draft-mcdonald-simple-ipsec-api-01.txt
 		(expired, available in ftp://ftp.kame.net/pub/internet-drafts/)
-	draft-ietf-ipsec-ciph-aes-cbc-00.txt
+	draft-ietf-ipsec-ciph-aes-cbc-01.txt
     IPComp:
 	RFC2393: IP Payload Compression Protocol (IPComp)
 IKE specifications (rfc240[7-9].txt) are implemented in userland
@@ -1834,9 +1834,9 @@ Currently supported algorithms are:
 	3DES-CBC with explicit IV (rfc2451.txt)
 	BLOWFISH CBC (rfc2451.txt)
 	CAST128 CBC (rfc2451.txt)
-	RIJNDAEL/AES CBC (draft-ietf-ipsec-ciph-aes-cbc-00.txt,
+	RIJNDAEL/AES CBC (draft-ietf-ipsec-ciph-aes-cbc-01.txt,
 		uses IANA-assigned protocol number)
-	TWOFISH CBC (draft-ietf-ipsec-ciph-aes-cbc-00.txt)
+	TWOFISH CBC (draft-ietf-ipsec-ciph-aes-cbc-01.txt)
 	each of the above can be combined with:
 	    ESP authentication with HMAC-MD5(96bit)
 	    ESP authentication with HMAC-SHA1(96bit)
