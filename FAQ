@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.52 2001/08/05 19:05:57 jinmei Exp $
+$KAME: FAQ,v 1.53 2001/08/17 11:01:22 itojun Exp $
 
 
 GENERAL
@@ -441,6 +441,23 @@ Q: Why don't KAME's getaddrinfo/getnameinfo support PF_LOCAL?
 	If it is really really necessary to play with it, we can probably
 	do that on KAME tree - but not on *BSD-current nor *BSD official
 	releases.
+
+Q: Is there an API or other mechanism for a user level program (e.g.
+telnet) to inquire of the kernel whether AH/ESP is in use (i.e.
+whether a security association exists between the local host and a
+remote host)?
+	At this moment there's no API to tell if the traffic (packet) was
+	encrypted or not, from the kernel to userland.  It is a bit difficult
+	API to implement/design, as the granuality is different between IP
+	packet and sockets (TCP stream), and it is unclear what to tell the
+	userland (per-packet, or per-stream?).
+
+	What you can do now is to use setsockopt(IP_IPSEC_POLICY) and inject
+	policy like "in ipsec esp/transport//require" (use ipsec_set_policy(3)
+	to convert textual policy representation into binary).  This way, you
+	can make sure that inbound packet is always encrypted (non-encrypted
+	packets get dropped).  See sbin/ping for usage example.
+	This is a KAME-only API.  There's no standard API for this, AFAIK.
 
 LICENSE AND CRYPTO EXPORT
 =========================
