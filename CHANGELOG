@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.689 2000/03/13 10:38:27 sakane Exp $
+$Id: CHANGELOG,v 1.690 2000/03/13 12:31:22 itojun Exp $
 
 <200003>
+Mon Mar 13 21:29:32 JST 2000  itojun@iijlab.net
+	* {netbsd,openbsd}/lib/libinet6/getaddrinfo.c: fix error handling in
+	  YP name lookup.
+	* netbsd/lib/libinet6/getaddrinfo.c, kame/libinet6/name6.c: filter out
+	  IPv4 mapped address in DNS/YP/hosts database, as they are not
+	  supposed to appear on those places.  There are real-world example
+	  with incorrect use exist.
+
 Mon Mar 13 19:36:55 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Add "strict_address" in listen directive.  It requires all addresses
