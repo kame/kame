@@ -1,4 +1,4 @@
-/*	$KAME: mrt.h,v 1.10 2001/08/09 08:46:57 suz Exp $	*/
+/*	$KAME: mrt.h,v 1.11 2001/08/09 10:22:39 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -103,7 +103,6 @@
 					next=next->next;						\
 					free(prev);							\
 				}									\
-				free( (char *)(mrtentry_ptr)->kernel_cache );				\
 				free( (char *)(mrtentry_ptr) );						\
 			} while (0)
 
