@@ -8,3 +8,7 @@ conflict pf_norm.c
 conflict pf_osfp.c
 conflict pf_table.c
 conflict pfvar.h
+conflict if_pflog.c
+conflict if_pflog.h
+conflict if_pfsync.c
+conflict if_pfsync.h
