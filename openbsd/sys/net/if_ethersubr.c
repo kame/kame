@@ -577,17 +577,38 @@ ether_input(ifp, eh, m)
 		m_freem(m);
 		return;
 	}
-	ifp->if_lastchange = time;
-	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*eh);
 	if (eh->ether_dhost[0] & 1) {
+		if ((ifp->if_flags & IFF_SIMPLEX) == 0) {
+			struct ifaddr *ifa;
+			struct sockaddr_dl *sdl = NULL;
+
+			for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
+			    ifa = ifa->ifa_list.tqe_next)
+				if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
+				    sdl->sdl_family == AF_LINK)
+					break;
+
+			/*
+			 * If this is not a simplex interface, drop the packet
+			 * if it came from us.
+			 */
+			if (sdl && memcmp(LLADDR(sdl), eh->ether_shost,
+			    ETHER_ADDR_LEN) == 0) {
+				m_freem(m);
+				return;
+			}
+		}
+
 		if (bcmp((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,
 		    sizeof(etherbroadcastaddr)) == 0)
 			m->m_flags |= M_BCAST;
 		else
 			m->m_flags |= M_MCAST;
-	}
-	if (m->m_flags & (M_BCAST|M_MCAST))
 		ifp->if_imcasts++;
+	}
+
+	ifp->if_lastchange = time;
+	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*eh);
 
 	etype = ntohs(eh->ether_type);
 
