@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.331 2002/09/11 02:40:48 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.332 2002/09/11 03:46:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1759,7 +1759,7 @@ ip6_insert_jumboopt(exthdrs, plen)
 			n->m_len = oldoptlen + JUMBOOPTLEN;
 			bcopy(mtod(mopt, caddr_t), mtod(n, caddr_t),
 			    oldoptlen);
-			optbuf = mtod(n, u_int8_t) + oldoptlen;
+			optbuf = mtod(n, u_int8_t *) + oldoptlen;
 			m_freem(mopt);
 			mopt = exthdrs->ip6e_hbh = n;
 		} else {
