@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.55 2001/10/09 11:56:48 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.56 2001/10/30 04:50:07 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -217,9 +217,10 @@ getconfig(intface)
 	 * explicitly set zero. (see also the above section)
 	 */
 	if (val && forwarding == 0) {
-		syslog(LOG_WARNING,
+		syslog(LOG_ERR,
 		       "<%s> non zero router lifetime is specified for %s, "
-		       "which must not be allowed for hosts.",
+		       "which must not be allowed for hosts.  you must "
+		       "change router lifetime or enable IPv6 forwarding.",
 		       __FUNCTION__, intface);
 		exit(1);
 	}
