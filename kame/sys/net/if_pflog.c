@@ -41,8 +41,9 @@
 #include "opt_inet.h"
 #endif
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 #include "bpf.h"
+#define NBPFILTER NBPF
 #else
 #include "bpfilter.h"
 #endif
@@ -80,6 +81,8 @@
 
 #include <net/pfvar.h>
 #include <net/if_pflog.h>
+
+#include <net/net_osdep.h>
 
 #define PFLOGMTU	(32768 + MHLEN + MLEN)
 
@@ -232,7 +235,12 @@ pflog_packet(struct ifnet *ifp, struct mbuf *m, sa_family_t af, u_int8_t dir,
 	hdr.af = af;
 	hdr.action = rm->action;
 	hdr.reason = reason;
+#ifndef __FreeBSD__
 	memcpy(hdr.ifname, ifp->if_xname, sizeof(hdr.ifname));
+#else
+	snprintf(hdr.ifname, sizeof(hdr.ifname), "%s%d", ifp->if_name,
+	    ifp->if_unit);
+#endif
 
 	if (am == NULL) {
 		hdr.rulenr = htonl(rm->nr);
@@ -267,8 +275,13 @@ pflog_packet(struct ifnet *ifp, struct mbuf *m, sa_family_t af, u_int8_t dir,
 
 	ifn = &(pflogif[0].sc_if);
 
-	if (ifn->if_bpf)
+	if (ifn->if_bpf) {
+#ifndef __FreeBSD__
 		bpf_mtap(ifn->if_bpf, &m1);
+#else
+		bpf_mtap(ifn, &m1);
+#endif
+	}
 #endif
 
 	return (0);

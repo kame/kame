@@ -26,11 +26,20 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef __FreeBSD__
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
 #endif
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include "bpf.h"
+#define NBPFILTER	NBPF
+#else
 #include "bpfilter.h"
+#endif
 #include "pfsync.h"
 
 #include <sys/param.h>
@@ -38,7 +47,12 @@
 #include <sys/time.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
+#else
+#include <sys/kernel.h>
+#include <sys/sockio.h>
+#endif
 #ifdef __OpenBSD__
 #include <sys/timeout.h>
 #else
@@ -65,6 +79,8 @@
 #include <net/pfvar.h>
 #include <net/if_pfsync.h>
 
+#include <net/net_osdep.h>
+
 #define PFSYNC_MINMTU	\
     (sizeof(struct pfsync_header) + sizeof(struct pf_state))
 
@@ -77,7 +93,12 @@ int pfsyncdebug;
 
 struct pfsync_softc pfsyncif;
 
+#if defined(__FreeBSD__)
+void	pfsyncattach(void *);
+PSEUDO_SET(pfsyncattach, if_pfsync);
+#else
 void	pfsyncattach(int);
+#endif
 void	pfsync_setmtu(struct pfsync_softc *sc, int);
 int	pfsyncoutput(struct ifnet *, struct mbuf *, struct sockaddr *,
 	       struct rtentry *);
@@ -88,10 +109,17 @@ struct mbuf *pfsync_get_mbuf(struct pfsync_softc *sc, u_int8_t action);
 int	pfsync_sendout(struct pfsync_softc *sc);
 void	pfsync_timeout(void *v);
 
+#ifndef __FreeBSD__
 extern int ifqmaxlen;
+#endif
 
+#ifdef __FreeBSD__
+void
+pfsyncattach(void *pfsync)
+#else
 void
 pfsyncattach(int npfsync)
+#endif
 {
 	struct ifnet *ifp;
 
@@ -99,7 +127,12 @@ pfsyncattach(int npfsync)
 	pfsyncif.sc_ptr = NULL;
 	pfsyncif.sc_count = 8;
 	ifp = &pfsyncif.sc_if;
+#ifndef __FreeBSD__
 	strlcpy(ifp->if_xname, "pfsync0", sizeof ifp->if_xname);
+#else
+	strlcpy(ifp->if_name, "pfsync", sizeof ifp->if_name);
+	ifp->if_unit = 0;
+#endif
 	ifp->if_softc = &pfsyncif;
 	ifp->if_ioctl = pfsyncioctl;
 	ifp->if_output = pfsyncoutput;
@@ -107,7 +140,11 @@ pfsyncattach(int npfsync)
 	ifp->if_type = IFT_PFSYNC;
 	ifp->if_snd.ifq_maxlen = ifqmaxlen;
 	ifp->if_hdrlen = PFSYNC_HDRLEN;
+#ifndef __FreeBSD__
 	ifp->if_baudrate = IF_Mbps(100);
+#else
+	ifp->if_baudrate = 10000000;
+#endif
 	pfsync_setmtu(&pfsyncif, MCLBYTES);
 #ifdef __OpenBSD__
 	timeout_set(&pfsyncif.sc_tmo, pfsync_timeout, &pfsyncif);
@@ -115,10 +152,12 @@ pfsyncattach(int npfsync)
 	callout_init(&pfsyncif.sc_tmo);
 #endif
 	if_attach(ifp);
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	if_alloc_sadl(ifp);
+#endif
 
 #if NBPFILTER > 0
-#ifdef __OpenBSD__
+#ifndef HAVE_NEW_BPFATTACH
 	bpfattach(&pfsyncif.sc_if.if_bpf, ifp, DLT_PFSYNC, PFSYNC_HDRLEN);
 #else
 	bpfattach(ifp, DLT_PFSYNC, PFSYNC_HDRLEN);
@@ -212,7 +251,9 @@ pfsync_get_mbuf(sc, action)
 	struct pfsync_softc *sc;
 	u_int8_t action;
 {
+#ifndef __FreeBSD__
 	extern int hz;
+#endif
 	struct pfsync_header *h;
 	struct mbuf *m;
 	int len;
@@ -257,7 +298,9 @@ pfsync_pack_state(action, st)
 	u_int8_t action;
 	struct pf_state *st;
 {
+#ifndef __FreeBSD__
 	extern struct timeval time;
+#endif
 	struct ifnet *ifp = &pfsyncif.sc_if;
 	struct pfsync_softc *sc = ifp->if_softc;
 	struct pfsync_header *h;
@@ -302,7 +345,11 @@ pfsync_pack_state(action, st)
 	pf_state_peer_hton(&st->dst, &sp->dst);
 
 	bcopy(&st->rt_addr, &sp->rt_addr, sizeof(sp->rt_addr));
+#ifndef __FreeBSD__
 	secs = time.tv_sec;
+#else
+	secs = time_second;
+#endif
 	sp->creation = htonl(secs - st->creation);
 	if (st->expire <= secs)
 		sp->expire = htonl(0);
