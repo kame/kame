@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.358 2004/02/03 07:25:21 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.359 2004/02/03 22:56:27 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3030,7 +3030,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	bzero(&sa6, sizeof(sa6));
 	sa6.sin6_family = AF_INET6;
 	sa6.sin6_len = sizeof(struct sockaddr_in6);
-	sa6.sin6_addr = maddr6;
+	sa6.sin6_addr = *maddr6;
 	*errorp = if_addmulti(ifp, (struct sockaddr *)&sa6, &ifma);
 	if (*errorp) {
 		splx(s);
@@ -3141,7 +3141,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	}
 
 	bzero(in6m, sizeof *in6m);
-	in6m->in6m_addr = maddr6;
+	in6m->in6m_addr = *maddr6;
 	in6m->in6m_ifp = ifp;
 	in6m->in6m_refcount = 1;
 	in6m->in6m_ifma = ifma;

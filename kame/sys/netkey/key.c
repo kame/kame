@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.325 2004/02/03 07:25:24 itojun Exp $	*/
+/*	$KAME: key.c,v 1.326 2004/02/03 22:58:15 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4239,7 +4239,7 @@ key_ismyaddr6(sin6)
 		 */
 		in6m = NULL;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		IN6_LOOKUP_MULTI(sin6, ia->ia_ifp, in6m);
+		IN6_LOOKUP_MULTI(in6, ia->ia_ifp, in6m);
 #else
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;
 		     (in6m) != NULL &&
