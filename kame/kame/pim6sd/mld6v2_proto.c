@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.48 2004/06/15 16:41:05 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.49 2004/07/16 09:28:15 suz Exp $
  */
 
 /*
@@ -294,7 +294,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 	    "src %s, dst %s, grp %s\n"
 	    "\t     sflag : %s,robustness : %d,qqi : %d maxrd :%d",
 	    v->uv_name, sa6_fmt(src), inet6_fmt(dst), inet6_fmt(group),
-	    sflag ? "YES" : "NO", qrv, qqi, tmo);
+	    sflag == SFLAGYES ? "YES" : "NO", qrv, qqi, tmo);
 
     /*
      * According to RFC2710 : when a query received from a router with a
@@ -347,7 +347,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
      * When S-flag is set, only querier election has to be done.
      * (draft-vida-mld-v2-08.txt section 5.1.7)
      */
-    if (sflag == TRUE) {
+    if (sflag == SFLAGYES) {
 	log_msg(LOG_DEBUG, 0, "MLDv2 Query processing is suppressed");
 	return;
     }
