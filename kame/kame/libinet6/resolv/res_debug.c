@@ -77,7 +77,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_debug.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_debug.c,v 1.3 2000/03/23 08:34:45 itojun Exp $";
+static char rcsid[] = "$Id: res_debug.c,v 1.4 2000/03/27 09:40:06 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/param.h>
@@ -111,7 +111,7 @@ static const char *dewks __P((int));
 static const char *deproto __P((int));
 static const u_char *do_rrset __P((const u_char *, int, const u_char *, int,
 	int, FILE *, const char *));
-static const char *precsize_ntoa __P((u_int8_t));
+static const char *precsize_ntoa __P((u_int));
 static u_int8_t precsize_aton __P((char **));
 static u_int32_t latlon2ul __P((char **, int *));
 
@@ -1136,7 +1136,7 @@ static unsigned int poweroften[10] = {1, 10, 100, 1000, 10000, 100000,
 /* takes an XeY precision/size value, returns a string representation. */
 static const char *
 precsize_ntoa(prec)
-	u_int8_t prec;
+	u_int prec;
 {
 	static char retbuf[sizeof "90000000.00"];
 	unsigned long val;
