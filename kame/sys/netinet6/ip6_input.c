@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.178 2001/02/19 10:12:03 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.179 2001/02/24 00:26:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1967,6 +1967,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 #endif
 		}
 	  loopend:
+		;
 	}
 
 #ifdef __bsdi__
