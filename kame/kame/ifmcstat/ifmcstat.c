@@ -456,7 +456,7 @@ in6_multientry(mc)
 	struct router6_info rt6i;
 
 	KREAD(mc, &multi, struct in6_multi);
-	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_sa));
+	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_addr));
 	printf(" refcnt %u\n", multi.in6m_refcount);
 
 	if (multi.in6m_rti != NULL) {
