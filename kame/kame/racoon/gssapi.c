@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.10 2001/01/29 17:41:20 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.11 2001/01/29 17:55:39 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -111,6 +111,7 @@ gssapi_get_default_name(struct ph1handle *iph1, int remote, gss_name_t *service)
 	    "%s@%s", GSSAPI_DEF_NAME, name);  
 	maj_stat = gss_import_name(&min_stat, &name_token,
 	    GSS_C_NT_HOSTBASED_SERVICE, service);
+	free(name_token.value);
 	if (GSS_ERROR(maj_stat)) {
 		gssapi_error(maj_stat, LOCATION, "import name\n");
 		return -1;
