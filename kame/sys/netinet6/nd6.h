@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.73 2001/10/25 07:54:43 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.74 2001/11/05 02:35:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -244,6 +244,7 @@ struct	nd_defrouter {
 	int	advints_lost;	/* Mobile IPv6 addition */
 	struct  ifnet *ifp;
 	int	installed;	/* is installed into kernel routing table */
+	int	install;	/* to be installed into kernel routing table */
 };
 
 struct nd_prefix {
