@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.2 2002/05/22 12:19:45 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.3 2002/05/22 15:09:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -91,8 +91,6 @@ static int dnsdump __P((const char *, const char *, int,
 static int ptr2in __P((const char *, struct in_addr *));
 static int ptr2in6 __P((const char *, struct in6_addr *));
 static int match_ptrquery __P((const char *));
-static int ismyname __P((const char *));
-static int islocalname __P((const char *));
 static int getans_dns __P((char *, int, struct sockaddr *, int));
 static int getans_icmp6 __P((char *, int, struct sockaddr *, int));
 static int getans_icmp6_fqdn __P((char *, int, struct sockaddr *, int));
@@ -102,10 +100,6 @@ static ssize_t ping6 __P((char *, size_t, const struct qcache *,
 static int serve __P((struct sockdb *, char *, int, struct sockaddr *, int));
 static int serve_query __P((struct sockdb *, char *, int, struct sockaddr *,
 	int, int, int));
-static int serve_update __P((struct sockdb *, char *, int, struct sockaddr *,
-	int, int, int));
-static void reply __P((struct sockdb *, const char *, int, struct sockaddr *,
-	int, int, int, int));
 
 #ifndef INADDR_LOOPBACK
 #define INADDR_LOOPBACK	0x7f000001
@@ -815,32 +809,6 @@ fail:
 	return 0;
 }
 
-static int
-ismyname(n)
-	const char *n;
-{
-
-	if (strcmp(hostname, n) == 0)
-		return 1;
-	else if (islocalname(n) &&
-	    strncmp(n, hostname, strlen(n) - strlen(MDNS_LOCALDOM)) == 0)
-		return 1;
-	else
-		return 0;
-}
-
-static int
-islocalname(n)
-	const char *n;
-{
-
-	if (strlen(n) > strlen(MDNS_LOCALDOM) &&
-	    strcmp(n + strlen(n) - strlen(MDNS_LOCALDOM), MDNS_LOCALDOM) == 0)
-		return 1;
-	else
-		return 0;
-}
-
 /*
  * parse DNS responses to past relay_dns(), and relay them back to the
  * original querier.
@@ -1451,105 +1419,6 @@ fail:
 	return SERVE_DONE;	/* error */
 }
 
-static void
-reply(sd, buf, len, from, fromlen, scoped, loopback, errorcode)
-	struct sockdb *sd;
-	const char *buf;
-	int len;
-	struct sockaddr *from;
-	int fromlen;
-	int scoped;
-	int loopback;
-	int errorcode;
-{
-	char replybuf[RECVBUFSIZ];
-	HEADER *hp;
-
-	memcpy(replybuf, buf, len);
-	hp = (HEADER *)replybuf;
-	hp->qr = 1;
-	hp->aa = 1;
-	hp->ra = 0;
-	hp->rcode = errorcode;
-	hp->ancount = htons(0);
-	hp->nscount = htons(0);
-	hp->arcount = htons(0);
-
-	if (sd->type == S_TCP) {
-		u_int16_t l16;
-
-		l16 = htons(len & 0xffff);
-		(void)write(sd->s, &l16, sizeof(l16));
-	}
-	sendto(sd->s, replybuf, len, 0, from, fromlen);
-}
-
-static int
-serve_update(sd, buf, len, from, fromlen, scoped, loopback)
-	struct sockdb *sd;
-	char *buf;
-	int len;
-	struct sockaddr *from;
-	int fromlen;
-	int scoped;
-	int loopback;
-{
-	HEADER *hp = (HEADER *)buf;
-	const char *n1 = NULL, *n2 = NULL;
-	const char *d;
-	u_int16_t type, class;
-	u_int16_t type_pre, class_pre;
-
-	if (ntohs(hp->qdcount) != 1)
-		return SERVE_DONE;
-	d = (const char *)(hp + 1);
-	n1 = decode_name(&d, len - (d - buf));
-	if (!n1 || len - (d - buf) < 4)
-		goto fail;
-	type = ntohs(*(u_int16_t *)&d[0]);
-	class = ntohs(*(u_int16_t *)&d[2]);
-	d += 4;		/* "d" points to end of zone section */
-	if (class != C_IN)
-		goto fail;
-	if (!ismyname(n1) && !match_ptrquery(n1))
-		goto fail;
-
-	if (hp->qr == 1) {
-		if (hp->rcode == YXRRSET)
-			printf("collision on name %s\n", n1);
-	} else {
-		if (ntohs(hp->ancount) != 1)
-			goto fail;
-
-		/* pre-req section */
-		n2 = decode_name(&d, len - (d - buf));
-		if (!n2 || len - (d - buf) < 4)
-			goto fail;
-		if (strcmp(n1, n2) != 0)
-			goto fail;
-		type_pre = ntohs(*(u_int16_t *)&d[0]);
-		class_pre = ntohs(*(u_int16_t *)&d[2]);
-		d += 4;		/* "d" points to end of zone section */
-
-		if (class_pre == C_NONE) {
-			reply (sd, buf, d - buf, from, fromlen, scoped,
-			    loopback, YXRRSET);
-			goto fail;
-		}
-	}
-	
-fail:
-	if (n1) {
-		/* LINTED const cast */
-		free((char *)n1);
-	}
-	if (n2) {
-		/* LINTED const cast */
-		free((char *)n2);
-	}
-	return SERVE_DONE;	/* error */
-}
-
 /*
  * parse inbound DNS query packet, and try to respond with answer from
  * local configuration (like hostname, ifconfig).
@@ -1592,9 +1461,6 @@ serve(sd, buf, len, from, fromlen)
 	switch (hp->opcode) {
 	case QUERY:
 		return serve_query(sd, buf, len, from, fromlen,
-		    scoped, loopback);
-	case NS_UPDATE_OP:
-		return serve_update(sd, buf, len, from, fromlen,
 		    scoped, loopback);
 	default:
 		return SERVE_DONE; /* drop */
