@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.73 2002/10/28 13:33:29 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.74 2002/10/31 06:34:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -668,6 +668,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			 * might have changed after it had registered before.
 			 */
 			bi.mbc_status = IP6MA_STATUS_SEQNO_TOO_SMALL;
+			bi.mbc_seqno = mbc->mbc_seqno;
 			bi.mbc_send_ba = 1;
 			error = EINVAL;
 
