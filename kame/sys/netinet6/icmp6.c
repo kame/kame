@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.255 2001/10/31 12:00:56 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.256 2001/11/01 13:14:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3203,7 +3203,7 @@ ppsratecheck(lasttime, curpps, maxpps)
 
 	/*
 	 * Check for 0,0 so that the message will be seen at least once.
-	 * If more than one second have passed since the last update of
+	 * If more than one second has passed since the last update of
 	 * lasttime, reset the counter.
 	 *
 	 * We do increment *curpps even in *curpps < maxpps case, as some may

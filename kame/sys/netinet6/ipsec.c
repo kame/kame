@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.129 2001/10/30 01:21:18 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.130 2001/11/01 13:14:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3628,7 +3628,7 @@ ipsec_copypkt(m)
 	for (n = m, mpp = &m; n; n = n->m_next) {
 		if (n->m_flags & M_EXT) {
 			/*
-			 * Make a copy only if there are more than one
+			 * Make a copy only if there is more than one
 			 * references to the cluster.
 			 * XXX: is this approach effective?
 			 */
