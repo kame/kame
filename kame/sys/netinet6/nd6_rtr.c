@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.181 2001/11/05 02:49:16 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.182 2001/11/06 08:14:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2073,12 +2073,6 @@ in6_ifadd(pr)
 	/* XXX: scope zone ID? */
 
 	ifra.ifra_flags |= IN6_IFF_AUTOCONF; /* obey autoconf */
-	/*
-	 * temporarily set the nopfx flag to avoid conflict.
-	 * XXX: we should reconsider the entire mechanism about prefix
-	 * manipulation.
-	 */
-	ifra.ifra_flags |= IN6_IFF_NOPFX;
 
 	/* allocate ifaddr structure, link into chain, etc. */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
