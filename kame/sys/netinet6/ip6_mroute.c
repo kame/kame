@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.135 2004/12/27 05:41:18 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.136 2005/03/18 10:23:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1839,21 +1839,26 @@ phyint_send(ip6, mifp, m)
 			    mifp - mif6table, error);
 #endif
 	} else {
-#ifdef MULTICAST_PMTUD
-		icmp6_error(mb_copy, ICMP6_PACKET_TOO_BIG, 0, linkmtu);
-#else
+		/*
+		 * pMTU discovery is intentionally disabled by default, since
+		 * various router may notify pMTU in multicast, which can be 
+		 * a DDoS to a router
+		 */
+		if (ip6_mcast_pmtu)
+			icmp6_error(mb_copy, ICMP6_PACKET_TOO_BIG, 0, linkmtu);
+		else {
 #ifdef MRT6DEBUG
-		if (mrt6debug & DEBUG_XMIT)
-			log(LOG_DEBUG,
-			    "phyint_send: packet too big on %s o %s g %s"
-			    " size %d(discarded)\n",
-			    if_name(ifp),
-			    ip6_sprintf(&ip6->ip6_src),
-			    ip6_sprintf(&ip6->ip6_dst),
-			    mb_copy->m_pkthdr.len);
+			if (mrt6debug & DEBUG_XMIT)
+				log(LOG_DEBUG,
+				    "phyint_send: packet too big on %s o %s "
+				    "g %s size %d(discarded)\n",
+				    if_name(ifp),
+				    ip6_sprintf(&ip6->ip6_src),
+				    ip6_sprintf(&ip6->ip6_dst),
+				    mb_copy->m_pkthdr.len);
 #endif /* MRT6DEBUG */
-		m_freem(mb_copy); /* simply discard the packet */
-#endif
+			m_freem(mb_copy); /* simply discard the packet */
+		}
 	}
 
 	splx(s);

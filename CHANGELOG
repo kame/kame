@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2736 2005/03/14 09:13:32 suz Exp $
+$KAME: CHANGELOG,v 1.2737 2005/03/18 10:23:04 suz Exp $
 
 <200503>
+2005-03-18  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/sys/netinet6/in6.c, in6_var.h, in6_proto.c, ip6_input.c,
+	  ip6_mroute.c: added a knob to enable path MTU discovery for 
+	  multicast packets. (by default, it is disabled)
+
 2005-03-14  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/ip6_output.c: fixed a kernel crash due to a LOR
 	by a multicast-group join without specifying any receiving interface.

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.129 2004/12/27 05:41:18 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.130 2005/03/18 10:23:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,6 +307,7 @@ extern int	ip6_forward_srcrt;	/* forward src-routed? */
 extern int	ip6_use_deprecated;	/* allow deprecated addr as source */
 extern int	ip6_rr_prune;		/* router renumbering prefix
 					 * walk list every 5 sec.    */
+extern int	ip6_mcast_pmtu;		/* enable pMTU discovery for multicast? */
 #ifdef __OpenBSD__
 extern const int	ip6_v6only;
 #else

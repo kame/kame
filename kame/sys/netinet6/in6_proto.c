@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.157 2004/12/27 06:10:30 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.158 2005/03/18 10:23:05 suz Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -592,6 +592,7 @@ int	ip6_auto_flowlabel = 1;
 int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 int	ip6_rr_prune = 5;	/* router renumbering prefix
 				 * walk list every 5 sec. */
+int	ip6_mcast_pmtu = 0;	/* enable pMTU discovery for multicast? */
 #if defined(__OpenBSD__)
 const int ip6_v6only = 1;
 #else
@@ -798,6 +799,8 @@ SYSCTL_OID(_net_inet6_ip6, IPV6CTL_PMTU_EXPIRE, pmtu_expire,
 #endif
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAXFRAGS,
 	maxfrags, CTLFLAG_RW,		&ip6_maxfrags,	0, "");
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MCAST_PMTU,
+	mcast_pmtu, CTLFLAG_RW, 	&ip6_mcast_pmtu,	0, "");
 
 /* net.inet6.icmp6 */
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRACCEPT,

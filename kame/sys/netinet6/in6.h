@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.157 2004/12/27 05:41:17 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.158 2005/03/18 10:23:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -682,10 +682,10 @@ struct ip6_mtuinfo {
 #define IPV6CTL_MAXFRAGS	41	/* max fragments */
 #define IPV6CTL_IFQ		42	/* ip6intrq node */
 #define IPV6CTL_ISATAPRTR	43	/* isatap router */
-
+#define IPV6CTL_MCAST_PMTU	44	/* enable pMTU discovery for multicast? */
 /* New entries should be added here from current IPV6CTL_MAXID value. */
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
-#define IPV6CTL_MAXID		44
+#define IPV6CTL_MAXID		45
 
 #ifdef IPV6CTL_RTEXPIRE
 #define __IPV6CTL_NAMES_RTEXPIRE	"rtexpire"
@@ -801,6 +801,7 @@ struct ip6_mtuinfo {
 	{ "use_defaultzone", CTLTYPE_INT }, \
 	{ "maxfrags", CTLTYPE_INT }, \
 	{ "ifq", CTLTYPE_NODE }, \
+	( "mcast_pmtu", CTLTYPE_INT }, \
 }
 #endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
 
