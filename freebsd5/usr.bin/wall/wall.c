@@ -33,7 +33,7 @@
 
 #include <sys/cdefs.h>
 
-__FBSDID("$FreeBSD: src/usr.bin/wall/wall.c,v 1.22 2001/12/11 22:22:15 markm Exp $");
+__FBSDID("$FreeBSD: src/usr.bin/wall/wall.c,v 1.23 2003/02/21 08:46:44 tjr Exp $");
 
 #ifndef lint
 static const char copyright[] =
@@ -71,8 +71,6 @@ static const char sccsid[] = "@(#)wall.c	8.2 (Berkeley) 11/16/93";
 
 static void makemsg(char *);
 static void usage(void);
-
-#define	IGNOREUSER	"sleeper"
 
 struct wallgroup {
 	struct wallgroup *next;
@@ -140,8 +138,7 @@ main(int argc, char *argv[])
 	iov.iov_len = mbufsize;
 	/* NOSTRICT */
 	while (fread((char *)&utmp, sizeof(utmp), 1, fp) == 1) {
-		if (!utmp.ut_name[0] ||
-		    !strncmp(utmp.ut_name, IGNOREUSER, sizeof(utmp.ut_name)))
+		if (!utmp.ut_name[0])
 			continue;
 		if (grouplist) {
 			ingroup = 0;

@@ -31,15 +31,13 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-#include <stdlib.h>
-#include <err.h>
-
-__FBSDID("$FreeBSD: src/usr.bin/telnet/sys_bsd.c,v 1.10 2002/09/25 07:53:29 markm Exp $");
-
+#if 0
 #ifndef lint
 static const char sccsid[] = "@(#)sys_bsd.c	8.4 (Berkeley) 5/30/95";
 #endif
+#endif
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/telnet/sys_bsd.c,v 1.11 2003/05/11 18:27:49 markm Exp $");
 
 /*
  * The following routines try to encapsulate what is system dependent
@@ -49,9 +47,11 @@ static const char sccsid[] = "@(#)sys_bsd.c	8.4 (Berkeley) 5/30/95";
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <arpa/telnet.h>
 

@@ -31,13 +31,13 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
-__FBSDID("$FreeBSD: src/usr.bin/telnet/network.c,v 1.5 2002/09/25 07:53:29 markm Exp $");
-
+#if 0
 #ifndef lint
 static const char sccsid[] = "@(#)network.c	8.2 (Berkeley) 12/15/93";
 #endif
+#endif
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/telnet/network.c,v 1.6 2003/05/11 18:27:49 markm Exp $");
 
 #include <sys/types.h>
 #include <sys/socket.h>

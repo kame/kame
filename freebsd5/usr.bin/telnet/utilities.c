@@ -31,13 +31,13 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
-__FBSDID("$FreeBSD: src/usr.bin/telnet/utilities.c,v 1.6 2002/09/25 07:53:29 markm Exp $");
-
+#if 0
 #ifndef lint
 static const char sccsid[] = "@(#)utilities.c	8.3 (Berkeley) 5/30/95";
 #endif
+#endif
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/telnet/utilities.c,v 1.7 2003/05/11 18:27:49 markm Exp $");
 
 #define	TELOPTS
 #define	TELCMDS

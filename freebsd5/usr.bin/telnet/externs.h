@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)externs.h	8.3 (Berkeley) 5/30/95
- *	$FreeBSD: src/usr.bin/telnet/externs.h,v 1.10 2001/11/30 22:37:28 markm Exp $
+ *	$FreeBSD: src/usr.bin/telnet/externs.h,v 1.11 2003/05/11 18:27:49 markm Exp $
  */
 
 #ifndef	BSD
@@ -127,7 +127,7 @@ extern int
     netdata,		/* Print out network data flow */
     prettydump,		/* Print "netdata" output in user readable format */
     termdata,		/* Print out terminal data flow */
-    debug,		/* Debug level */
+    telnet_debug,	/* Debug level */
     doaddrlookup,	/* do a reverse lookup? */
     clienteof;		/* Client received EOF */
 
