@@ -1,3 +1,5 @@
+/*	$KAME: cftoken.l,v 1.35 2000/09/13 06:31:13 itojun Exp $	*/
+
 %{
 #include <sys/types.h>
 #include <sys/param.h>

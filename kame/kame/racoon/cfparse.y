@@ -1,3 +1,5 @@
+/*	$KAME: cfparse.y,v 1.66 2000/09/13 06:31:12 itojun Exp $	*/
+
 %{
 #include <sys/types.h>
 #include <sys/param.h>
