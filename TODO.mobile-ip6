@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.35 2003/01/31 08:12:37 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.36 2003/02/05 11:28:35 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -7,9 +7,6 @@ KAME project
 <<Current status>>
 
 - Known bugs
-
-	- Processing a binding update with S=0 doesn't work as
-	  described in the spec.
 	- Simultaniously use with the privacy extention doesn't work.
 	- Incorrect auth data calculation of the BU message
 	  when a mobile node is home.
@@ -28,10 +25,10 @@ KAME project
 	- Sending a binding update with S=0.
 	- Sending/receiving the binding refresh request message.
 	- Regenerating a new IID when a DAD for a CoA failed.
-	- Multicast
+	- Multicast.
+	- mipv6-ha-ipsec dynamic keying.
 
 - misc.
-	- mip6-ha-ipsec
 	- racoon
 
 <<Usage>>
