@@ -1,13 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.445 2000/01/16 17:27:12 itojun Exp $
+$Id: CHANGELOG,v 1.446 2000/01/16 17:48:51 itojun Exp $
 
 <200001>
 Mon Jan 17 02:25:54 JST 2000  itojun@iijlab.net
-	* {netbsd,bsdi3}/netstat: try to share souce code across OS platforms
-	  as much as possible.  we are able to share ipsec.c without too much
-	  troubles.  will try to do it for other platforms, and other portions
-	  (like inet6.c).
+	* {netbsd,bsdi3,freebsd2}/netstat: try to share souce code across OS
+	  platforms as much as possible.  we are able to share ipsec.c without
+	  too much troubles.  will try to do it for other platforms, and other
+	  portions (like inet6.c).
 
 Sun Jan 16 23:30:16 JST 2000  itojun@iijlab.net
 	* kame/sys/net{inet6,key}: cleanup ipsec logging.  all logs will be
