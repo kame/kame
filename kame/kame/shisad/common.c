@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.7 2005/01/26 07:41:59 t-momose Exp $  */
+/*      $KAME: common.c,v 1.8 2005/01/28 02:07:10 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -66,6 +66,7 @@
 #include "shisad.h"
 #include "fsm.h"
 
+extern struct mip6_mipif_list mipifhead;
 
 static const struct in6_addr haanyaddr_ifid64 = {
         {{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -420,7 +421,7 @@ icmp6_input_common(fd)
 #ifdef MIP_MN
         struct mip6_hoainfo *hoainfo = NULL;
 	struct binding_update_list *bul;
-	struct mip_prefix_advert *mpsadv;
+	struct mip6_prefix_advert *mpsadv;
 	struct mip6_dhaad_rep *dhrep;
 	struct in6_addr *dhrep_addr;
 	struct mip6_mipif *mif = NULL;
@@ -546,8 +547,11 @@ icmp6_input_common(fd)
 	case ND_ROUTER_ADVERT:
 		ra = (struct nd_router_advert *)icp;
 		
-		syslog(LOG_INFO,
-		       "ra lifetime = %d\n", ntohs(ra->nd_ra_router_lifetime));
+/*
+		if (debug)
+			syslog(LOG_INFO,
+		       		"ra lifetime = %d\n", ntohs(ra->nd_ra_router_lifetime));
+*/
 
 		/* parse nd_options */ 
 		memset(&ndopts, 0, sizeof(ndopts));
@@ -575,8 +579,10 @@ icmp6_input_common(fd)
 			if (hai_lifetime == 0)
 				hai_lifetime = ntohs(ndopts.ndpi->nd_opt_pi_valid_time);
 			
+/*
 			if (debug)
 				syslog(LOG_INFO, "prefix lifetime = %d\n", hai_lifetime);
+*/
 
                         /* check H flag */
 			if (!(ndopts.ndpi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
@@ -719,7 +725,7 @@ icmp6_input_common(fd)
 
 		mip6stat.mip6s_dhreply++;
 		dhrep = (struct mip6_dhaad_rep *)msg.msg_iov[0].iov_base;
-		
+
 		/* Is this HAADREPLY mine? */
 		hoainfo = hoainfo_get_withdhaadid(ntohs(dhrep->mip6_dhrep_id));
 		if (hoainfo == NULL) {
@@ -777,7 +783,9 @@ icmp6_input_common(fd)
 		if (bul) {
 			bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
 			bul_kick_fsm(bul, MIP6_BUL_FSM_EVENT_DHAAD_REPLY, NULL);
-			syslog(LOG_INFO, "%s SHSKSLJSKDFJKSDFJ\n",ip6_sprintf(&bul->bul_peeraddr));
+			syslog(LOG_INFO, "DHAAD gets %s\n",
+			       ip6_sprintf(&bul->bul_peeraddr));
+
 #ifdef MIP_MCOA
 			if (!LIST_EMPTY(&bul->bul_mcoa_head)) {
 				struct binding_update_list *mbul;
@@ -819,8 +827,62 @@ icmp6_input_common(fd)
 		}
 		break;
 	case MIP6_PREFIX_ADVERT:
-		mpsadv = (struct mip_prefix_advert *)msg.msg_iov[0].iov_base;
+	{
+		char *options;
+		struct mip6_mipif *mif;
+		struct mip6_hpfx_mn_exclusive mnoption;
+		struct nd_opt_hdr *hdr;
+		struct nd_opt_prefix_info *ndpi;
+		int optlen = 0, total = 0;
+
+		mpsadv = (struct mip6_prefix_advert *)msg.msg_iov[0].iov_base;
+
+		/* Check MPS ID */
+		LIST_FOREACH(mif, &mipifhead, mipif_entry) {
+			if (mif->mipif_mps_id == ntohl(mpsadv->mip6_pa_id))
+				break;
+		}
+		if (mif == NULL)
+			break;
+		
+
+		options = (char *)icp + sizeof(struct mip6_prefix_advert);
+                total = readlen - sizeof(struct mip6_prefix_advert);
+
+		for (;total > 0; total -= optlen) {
+                        options += optlen;
+                        hdr = (struct nd_opt_hdr *)options; 
+                        optlen = hdr->nd_opt_len << 3;
+
+			switch (hdr->nd_opt_type) {
+                        case ND_OPT_PREFIX_INFORMATION:
+                                ndpi = (struct nd_opt_prefix_info *)hdr;
+                                
+				if (IN6_IS_ADDR_MULTICAST(&ndpi->nd_opt_pi_prefix) ||
+				    IN6_IS_ADDR_LINKLOCAL(&ndpi->nd_opt_pi_prefix))
+                                        break;
+
+				/* aggregatable unicast address, rfc2374 XXX */
+				if (ndpi->nd_opt_pi_prefix_len != 64)
+					return (EINVAL);
+
+				memset(&mnoption, 0, sizeof(mnoption)); 
+				mnoption.hpfxlist_vltime = 
+					ntohl(ndpi->nd_opt_pi_valid_time);
+				mnoption.hpfxlist_pltime = 
+					ntohl(ndpi->nd_opt_pi_preferred_time);
+
+				mnd_add_hpfxlist(&ndpi->nd_opt_pi_prefix,
+						 ndpi->nd_opt_pi_prefix_len,
+						 &mnoption,
+						 mif);
+                                break;
+                        default:
+                                break;
+                        }
+                }
 		break;
+	}
 #endif /* MIP_MN */
 	default:
 		break;
