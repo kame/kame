@@ -848,6 +848,47 @@ out:
 SYSCTL_PROC(_net_inet_tcp, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW, 0, 0,
     tcp_getcred, "S,ucred", "Get the ucred of a TCP connection");
 
+#ifdef INET6
+static int
+tcp6_getcred SYSCTL_HANDLER_ARGS
+{
+	struct sockaddr_in6 addrs[2];
+	struct inpcb *inp;
+	int error, s;
+
+	error = suser(req->p->p_ucred, &req->p->p_acflag);
+	if (error)
+		return (error);
+
+	if (req->newlen != sizeof(addrs))
+		return (EINVAL);
+	if (req->oldlen != sizeof(struct ucred))
+		return (EINVAL);
+	error = SYSCTL_IN(req, addrs, sizeof(addrs));
+	if (error)
+		return (error);
+	s = splnet();
+	inp = in6_pcblookup_hash(&tcbinfo, &addrs[1].sin6_addr,
+				 addrs[1].sin6_port,
+				 &addrs[0].sin6_addr, addrs[0].sin6_port,
+				 0, NULL);
+	if (!inp || !inp->inp_socket || !inp->inp_socket->so_cred) {
+		error = ENOENT;
+		goto out;
+	}
+	error = SYSCTL_OUT(req, inp->inp_socket->so_cred->pc_ucred,
+		sizeof(struct ucred));
+
+out:
+	splx(s);
+	return (error);
+}
+
+SYSCTL_PROC(_net_inet6_tcp6, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW,
+	    0, 0,
+	    tcp6_getcred, "S,ucred", "Get the ucred of a TCP6 connection");
+#endif
+
 void
 tcp_ctlinput(cmd, sa, vip)
 	int cmd;

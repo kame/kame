@@ -67,11 +67,13 @@
 #endif
 
 #include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/sysctl.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/systm.h>
@@ -550,6 +552,45 @@ udp6_ctlinput(cmd, sa, ip6, m, off)
 		(void) in6_pcbnotify(&udb, (struct sockaddr *)&sa6, 0,
 				     &zeroin6_addr, 0, cmd, udp_notify);
 }
+
+static int
+udp6_getcred SYSCTL_HANDLER_ARGS
+{
+	struct sockaddr_in6 addrs[2];
+	struct inpcb *inp;
+	int error, s;
+
+	error = suser(req->p->p_ucred, &req->p->p_acflag);
+	if (error)
+		return (error);
+
+	if (req->newlen != sizeof(addrs))
+		return (EINVAL);
+	if (req->oldlen != sizeof(struct ucred))
+		return (EINVAL);
+	error = SYSCTL_IN(req, addrs, sizeof(addrs));
+	if (error)
+		return (error);
+	s = splnet();
+	inp = in6_pcblookup_hash(&udbinfo, &addrs[1].sin6_addr,
+				 addrs[1].sin6_port,
+				 &addrs[0].sin6_addr, addrs[0].sin6_port,
+				 1, NULL);
+	if (!inp || !inp->inp_socket || !inp->inp_socket->so_cred) {
+		error = ENOENT;
+		goto out;
+	}
+	error = SYSCTL_OUT(req, inp->inp_socket->so_cred->pc_ucred,
+			   sizeof(struct ucred));
+
+out:
+	splx(s);
+	return (error);
+}
+
+SYSCTL_PROC(_net_inet6_udp6, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW,
+	    0, 0,
+	    udp6_getcred, "S,ucred", "Get the ucred of a UDP6 connection");
 
 int
 udp6_output(in6p, m, addr6, control, p)
