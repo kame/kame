@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.289 1999/11/24 06:47:27 itojun Exp $
+$Id: CHANGELOG,v 1.290 1999/11/24 09:36:17 itojun Exp $
 
 <199911>
+Wed Nov 24 18:35:01 JST 1999  itojun@iijlab.net:
+	* {freebsd2,bsdi3}/sys/netinet/tcp_input.c,
+	  kame/sys/netinet6/tcp6_input.c: fix handling of ip/tcp header part
+	  on mbuf.  see entry on Tue Nov 23 07:22:45 JST 1999.
+
 Wed Nov 24 15:44:53 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/in6_src.c: share source address selection code
 	  between bsdi4 and openbsd (move it from openbsd/sys/netinet6 to
