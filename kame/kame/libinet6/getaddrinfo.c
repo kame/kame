@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.108 2001/07/03 08:24:15 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.109 2001/07/03 08:47:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,7 +102,6 @@
 #include <net/if_var.h>
 #endif
 #include <sys/ioctl.h>
-#include <net/if.h>
 #include <netinet6/in6_var.h>	/* XXX */
 #endif
 #include <arpa/inet.h>
