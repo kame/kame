@@ -161,8 +161,14 @@ in_pcballoc(so, pcbinfo, p)
 	}
 #endif /*IPSEC*/
 #if defined(INET6)
-	if (INP_SOCKAF(so) == AF_INET6 && !ip6_mapped_addr_on)
-		inp->inp_flags |= IN6P_IPV6_V6ONLY;
+	if (INP_SOCKAF(so) == AF_INET6) {
+		if (!ip6_mapped_addr_on)
+			inp->inp_flags |= IN6P_IPV6_V6ONLY;
+		inp->in6p_fsa.sin6_family =
+			inp->in6p_lsa.sin6_family = AF_INET6;
+		inp->in6p_fsa.sin6_len =
+			inp->in6p_lsa.sin6_len = sizeof(struct sockaddr_in6);
+	}
 #endif
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);
 	pcbinfo->ipi_count++;

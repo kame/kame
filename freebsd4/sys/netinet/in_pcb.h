@@ -61,9 +61,13 @@ typedef	u_quad_t	inp_gen_t;
  * So, AF_INET6 null laddr is also used as AF_INET null laddr,
  * by utilize following structure. (At last, same as INRIA)
  */
-struct in_addr_4in6 {
-	u_int32_t	ia46_pad32[3];
-	struct	in_addr	ia46_addr4;
+#ifndef offsetof		/* XXX */
+#define	offsetof(type, member)	((size_t)(&((type *)0)->member))
+#endif
+struct sa_4in6 {
+	u_int8_t sa46_pad1[offsetof(struct sockaddr_in6, sin6_addr)]; /* XXX */
+	u_int32_t sa46_pad2[3];
+	struct in_addr sa46_addr4;
 };
 
 /*
@@ -76,22 +80,18 @@ struct	icmp6_filter;
 
 struct inpcb {
 	LIST_ENTRY(inpcb) inp_hash; /* hash list */
-	u_short	inp_fport;		/* foreign port */
-	u_short	inp_lport;		/* local port */
 	LIST_ENTRY(inpcb) inp_list; /* list for all PCBs of this proto */
 	u_int32_t	inp_flow;
 
 	/* protocol dependent part, local and foreign addr */
 	union {
-		/* foreign host table entry */
-		struct	in_addr_4in6 inp46_foreign;
-		struct	in6_addr inp6_foreign;
-	} inp_dependfaddr;
+		struct sa_4in6 sa46_foreign;
+		struct sockaddr_in6 sa6_foreign;
+	} inp_dependfsa;
 	union {
-		/* local host table entry */
-		struct	in_addr_4in6 inp46_local;
-		struct	in6_addr inp6_local;
-	} inp_dependladdr;
+		struct sa_4in6 sa46_local;
+		struct sockaddr_in6 sa6_local;
+	} inp_dependlsa;
 
 	caddr_t	inp_ppcb;		/* pointer to per-protocol pcb */
 	struct	inpcbinfo *inp_pcbinfo;	/* PCB list info */
@@ -123,8 +123,10 @@ struct inpcb {
 		struct	mbuf *inp4_options;	/* IP options */
 		struct	ip_moptions *inp4_moptions; /* IP multicast options */
 	} inp_depend4;
-#define	inp_faddr	inp_dependfaddr.inp46_foreign.ia46_addr4
-#define	inp_laddr	inp_dependladdr.inp46_local.ia46_addr4
+#define	inp_faddr	inp_dependfsa.sa46_foreign.sa46_addr4
+#define	inp_laddr	inp_dependlsa.sa46_local.sa46_addr4
+#define	inp_fport	inp_dependfsa.sa6_foreign.sin6_port
+#define	inp_lport	inp_dependlsa.sa6_local.sin6_port
 #define	inp_route	inp_dependroute.inp4_route
 #define	inp_ip_tos	inp_depend4.inp4_ip_tos
 #define	inp_options	inp_depend4.inp4_options
@@ -151,8 +153,10 @@ struct inpcb {
 	LIST_ENTRY(inpcb) inp_portlist;
 	struct	inpcbport *inp_phd;	/* head of this list */
 	inp_gen_t	inp_gencnt;	/* generation count of this instance */
-#define	in6p_faddr	inp_dependfaddr.inp6_foreign
-#define	in6p_laddr	inp_dependladdr.inp6_local
+#define in6p_fsa	inp_dependfsa.sa6_foreign
+#define in6p_lsa	inp_dependlsa.sa6_local
+#define	in6p_faddr	inp_dependfsa.sa6_foreign.sin6_addr
+#define	in6p_laddr	inp_dependlsa.sa6_local.sin6_addr
 #define	in6p_route	inp_dependroute.inp6_route
 #define	in6p_hops	inp_depend6.inp6_hops	/* default hop limit */
 #define	in6p_ip6_nxt	inp_ip_p
