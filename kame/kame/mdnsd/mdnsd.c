@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.8 2000/05/31 05:46:29 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.9 2000/05/31 09:19:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -584,7 +584,7 @@ dprintf(fmt, va_alist)
 #endif
 {
 	va_list ap;
-	int ret;
+	int ret = 0;
 
 #if __STDC__
 	va_start(ap, fmt);

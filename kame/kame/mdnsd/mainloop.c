@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.13 2000/05/31 08:14:22 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.14 2000/05/31 09:19:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -79,6 +79,10 @@ static const struct sockaddr *getsa __P((const char *, const char *, int));
 static int getans __P((int, char *, int, struct sockaddr *));
 static int relay __P((char *, int, struct sockaddr *));
 static int serve __P((int, char *, int, struct sockaddr *));
+
+#ifndef INADDR_LOOPBACK
+#define INADDR_LOOPBACK	0x7f000001
+#endif
 
 void
 mainloop()
