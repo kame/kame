@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.383 2003/07/01 02:56:54 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.384 2003/07/01 03:36:09 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2814,10 +2814,6 @@ do { \
 				case IPV6_AUTOFLOWLABEL:
 					optval = OPTBIT(IN6P_AUTOFLOWLABEL);
 					break;
-
-#define PKTOPTBIT(bit) ((in6p->in6p_outputopts && \
-		         (in6p->in6p_outputopts->ip6po_flags & (bit))) ? 1 : 0)
-#undef PKTOPTBIT
 				}
 				if (error)
 					break;
