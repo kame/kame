@@ -1,9 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.124 1999/09/20 08:42:10 itojun Exp $
+$Id: CHANGELOG,v 1.125 1999/09/21 17:13:31 jinmei Exp $
 
 
 <199909>
+1999-09-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* openbsd/sys/dev/ic/elink3.c (epget): prevented the input routine
+	from deviding two (small) mbufs; the new routine always stores an
+	incoming packet either in a single mbuf or in a chain of mubf
+	clusters.
+
 Mon Sep 20 17:38:03 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/in6_ifattach.c: allow MD5(hostname) to be used
 	  as interface id for pseudo interfaces, when no other choices are
