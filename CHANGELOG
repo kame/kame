@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.771 2000/04/14 04:28:20 itojun Exp $
+$Id: CHANGELOG,v 1.772 2000/04/14 04:29:03 itojun Exp $
 
 <200003>
 Fri Apr 14 13:26:44 JST 2000  itojun@iijlab.net
-	* openbsd/sys/netinet/tcp_input.c: not use path MTU value on routing
+	* openbsd/sys/netinet/tcp_input.c: use path MTU value on routing
 	  table when computing MSS, only if layer 3 supports path MTU
 	  discovery.  (openbsd has no IPv4 path mtu discovery.  a node may
 	  propose too large mss if we use rmx_mtu value)
