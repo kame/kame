@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.78 2001/12/19 18:29:39 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.79 2002/03/26 19:06:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1062,10 +1062,10 @@ info_recv_initialcontact(iph1)
 		 * racoon only deletes SA which is matched both the
 		 * source address and the destination accress.
 		 */
-		if ((cmpsaddrwop(iph1->local, src)
-		  && cmpsaddrwop(iph1->remote, dst))
-		 || (cmpsaddrwop(iph1->remote, src)
-		  && cmpsaddrwop(iph1->local, dst))) {
+		if ((cmpsaddrwop(iph1->local, src) &&
+		     cmpsaddrwop(iph1->remote, dst)) ||
+		    (cmpsaddrwop(iph1->remote, src) &&
+		     cmpsaddrwop(iph1->local, dst))) {
 			msg = next;
 			continue;
 		}
@@ -1080,8 +1080,10 @@ info_recv_initialcontact(iph1)
 			    msg->sadb_msg_satype)
 				break;
 		}
-		if (i == pfkey_nsatypes)
+		if (i == pfkey_nsatypes) {
+			msg = next;
 			continue;
+		}
 
 		plog(LLV_INFO, LOCATION, NULL,
 			"purging spi=%u.\n", ntohl(sa->sadb_sa_spi));
