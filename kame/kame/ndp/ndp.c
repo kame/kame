@@ -113,6 +113,10 @@
 #include <unistd.h>
 #include "gmt2local.h"
 
+#ifndef NI_WITHSCOPEID
+#define NI_WITHSCOPEID	0
+#endif
+
 /* packing rule for routing socket */
 #define ROUNDUP(a) \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
@@ -151,7 +155,9 @@ void plist __P((void));
 void pfx_flush __P((void));
 void rtr_flush __P((void));
 void harmonize_rtr __P((void));
+#ifdef SIOCSDEFIFACE_IN6
 static void setdefif __P((char *));
+#endif
 static char *sec2str __P((time_t t));
 static char *ether_str __P((struct sockaddr_dl *sdl));
 static void ts_print __P((const struct timeval *));
@@ -182,8 +188,13 @@ main(argc, argv)
 			dflag = 1;
 			break;
 		case 'I':
+#ifdef SIOCSDEFIFACE_IN6
 			setdefif(optarg);
 			exit(0);
+#else
+			errx(1, "not supported yet");
+			/*NOTREACHED*/
+#endif
 		case 'i' :
 			if (argc != 3)
 				usage();
@@ -730,7 +741,9 @@ usage()
 	printf("       ndp -d[nt] hostname\n");
 	printf("       ndp -f[nt] filename\n");
 	printf("       ndp -i interface\n");
+#ifdef SIOCSDEFIFACE_IN6
 	printf("       ndp -I interface\n");
+#endif
 	printf("       ndp -p\n");
 	printf("       ndp -r\n");
 	printf("       ndp -s hostname ether_addr [temp]\n");
@@ -1004,6 +1017,7 @@ harmonize_rtr()
 	close(s);
 }
 
+#ifdef SIOCSDEFIFACE_IN6
 static void
 setdefif(ifname)
 	char *ifname;
@@ -1018,6 +1032,7 @@ setdefif(ifname)
 
 	close(s);
 }
+#endif
 
 static char *
 sec2str(total)
