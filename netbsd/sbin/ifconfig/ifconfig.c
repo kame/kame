@@ -599,10 +599,11 @@ printalias(iname, af)
 	ifr = ifc.ifc_req;
 	for (i = 0; i < ifc.ifc_len; ) {
 		ifr = (struct ifreq *)((caddr_t)ifc.ifc_req + i);
-		siz = sizeof(ifr->ifr_name) +
-			(ifr->ifr_addr.sa_len > sizeof(struct sockaddr)
-				? ifr->ifr_addr.sa_len
-				: sizeof(struct sockaddr));
+		memcpy(ifrbuf, ifr, sizeof(*ifr));
+		siz = ((struct ifreq *)ifrbuf)->ifr_addr.sa_len;
+		if (siz < sizeof(ifr->ifr_addr))
+			siz = sizeof(ifr->ifr_addr);
+		siz += sizeof(ifr->ifr_name);
 		i += siz;
 		/* avoid alignment issue */
 		if (sizeof(ifrbuf) < siz)
@@ -644,10 +645,11 @@ printall()
 	ifreq.ifr_name[0] = '\0';
 	for (i = 0, idx = 0; i < ifc.ifc_len; ) {
 		ifr = (struct ifreq *)((caddr_t)ifc.ifc_req + i);
-		siz = sizeof(ifr->ifr_name) +
-			(ifr->ifr_addr.sa_len > sizeof(struct sockaddr)
-				? ifr->ifr_addr.sa_len
-				: sizeof(struct sockaddr));
+		memcpy(ifrbuf, ifr, sizeof(*ifr));
+		siz = ((struct ifreq *)ifrbuf)->ifr_addr.sa_len;
+		if (siz < sizeof(ifr->ifr_addr))
+			siz = sizeof(ifr->ifr_addr);
+		siz += sizeof(ifr->ifr_name);
 		i += siz;
 		/* avoid alignment issue */
 		if (sizeof(ifrbuf) < siz)
