@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.30 2001/05/10 01:40:36 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.31 2001/05/14 14:15:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -250,6 +250,7 @@ getres(af, host, port, flags)
 	int af;
 	const char *host;
 	const char *port;
+	int flags;
 {
 	struct addrinfo hints, *res;
 	int error;
