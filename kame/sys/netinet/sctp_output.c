@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.36 2004/01/26 03:30:44 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.37 2004/01/26 03:42:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -3171,7 +3171,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			} else if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 #ifndef SCTP_BASE_FREEBSD
 				struct sockaddr_in6 src;
-3endif
+#endif
 				/*
 				 * If the new destination is a LINK_LOCAL 
 				 * we must have common both site and local
@@ -3688,8 +3688,12 @@ sctp_prepare_chunk(struct sctp_tmit_chunk *template,
 			SCTP_GETTIME_TIMEVAL(&template->rec.data.timetodrop);
 			tv.tv_sec = srcv->sinfo_timetolive / 1000;
 			tv.tv_usec = (srcv->sinfo_timetolive * 1000) % 1000000;
+#ifndef __FreeBSD__
 			timeradd(&template->rec.data.timetodrop, &tv,
 			    &template->rec.data.timetodrop);
+#else
+			timevaladd(&template->rec.data.timetodrop, &tv);
+#endif
 		}
 	}
 	if ((srcv->sinfo_flags & MSG_UNORDERED) == 0) {

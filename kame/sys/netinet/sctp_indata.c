@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.31 2004/01/26 03:23:20 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.32 2004/01/26 03:42:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -2914,7 +2914,12 @@ sctp_strike_gap_ack_chunks(struct sctp_tcb *tcb, struct sctp_association *asoc,
 		    SCTP_PR_SCTP_ENABLED &&
 		    tp1->sent < SCTP_DATAGRAM_ACKED) {
 			/* Is it expired? */
-			if (timercmp(&now, &tp1->rec.data.timetodrop, >)) {
+#ifndef __FreeBSD__
+			if (timercmp(&now, &tp1->rec.data.timetodrop, >))
+#else
+			if (timevalcmp(&now, &tp1->rec.data.timetodrop, >))
+#endif
+			{
 				/* Yes so drop it */
 				if (tp1->data != NULL) {
 					sctp_release_pr_sctp_chunk(tcb, tp1,
@@ -3161,7 +3166,12 @@ sctp_try_advance_peer_ack_point(struct sctp_tcb *stcb,
 			 * Now is this one marked for resend and its time
 			 * is now up?
 			 */
-			if (timercmp(&now, &tp1->rec.data.timetodrop, >)) {
+#ifndef __FreeBSD__
+			if (timercmp(&now, &tp1->rec.data.timetodrop, >))
+#else
+			if (timevalcmp(&now, &tp1->rec.data.timetodrop, >))
+#endif
+			{
 				/* Yes so drop it */
 				if (tp1->data) {
 					sctp_release_pr_sctp_chunk(stcb, tp1,

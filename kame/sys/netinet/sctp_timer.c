@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.24 2004/01/26 03:23:20 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.25 2004/01/26 03:42:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -414,7 +414,12 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 #endif
 	tv.tv_sec = cur_rto / 1000000;
 	tv.tv_usec = cur_rto % 1000000;
+#ifndef __FreeBSD__
 	timersub(&now, &tv, &min_wait);
+#else
+	min_wait = now;
+	timevalsub(&min_wait, &tv);
+#endif
 	if (min_wait.tv_sec < 0 || min_wait.tv_usec < 0) {
 		/*
 		 * if we hit here, we don't

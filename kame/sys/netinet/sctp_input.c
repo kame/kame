@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.22 2004/01/19 08:39:25 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.23 2004/01/26 03:42:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -2111,7 +2111,12 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 	/* Expire time is in Ticks, so we convert to seconds */
 	time_expires.tv_sec = cookie->time_entered.tv_sec + cookie->cookie_life;
 	time_expires.tv_usec = cookie->time_entered.tv_usec;
-	if (timercmp(&now, &time_expires, >)) {
+#ifndef __FreeBSD__
+	if (timercmp(&now, &time_expires, >))
+#else
+	if (timevalcmp(&now, &time_expires, >))
+#endif
+	{
 		/* cookie is stale! */
 		struct mbuf *op_err;
 		struct sctp_stale_cookie_msg *scm;
