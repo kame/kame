@@ -703,7 +703,7 @@ send:
 			m->m_len += len;
 		} else {
 			m->m_next = m_copy(so->so_snd.sb_mb, off, (int) len);
-			if (m->m_next == 0) {
+			if (m->m_next == NULL) {
 				m_freem(m);
 				error = ENOBUFS;
 				goto out;
