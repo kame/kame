@@ -13,4 +13,4 @@ autoconfig
 #bu_to_cn
 #rev_tunnel
 #enable_br
-#eager_md
+#eager_md 0

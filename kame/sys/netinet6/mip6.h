@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.9 2000/04/06 08:30:44 sumikawa Exp $	*/
+/*	$KAME: mip6.h,v 1.10 2000/06/04 03:31:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -538,6 +538,8 @@ do {						\
 #define MIP6_IS_MN_ACTIVE ((mip6_module & MIP6_MN_MODULE) == MIP6_MN_MODULE)
 #define MIP6_IS_HA_ACTIVE ((mip6_module & MIP6_HA_MODULE) == MIP6_HA_MODULE)
 
+#define MIP6_EAGER_PREFIX 	(mip6_config.eager_md >= 2)
+#define MIP6_EAGER_FREQ		5	 /* Run nd6_timer 5 times more often */
 
 /* External Declaration of Global variables. */
 extern struct mip6_indata  *mip6_inp;     /* Input data rec in one packet */
@@ -691,9 +693,11 @@ extern int mip6_enable_func
 extern void mip6_md_init
 	__P((void));
 extern void mip6_select_defrtr
-	__P((void));
-extern void mip6_prelist_update
 	__P((struct nd_prefix *, struct nd_defrouter *));
+extern void mip6_prelist_update
+	__P((struct nd_prefix *, struct nd_defrouter *, u_char));
+extern void mip6_eager_prefix
+        __P((struct nd_prefix *, struct nd_defrouter *));
 extern void mip6_eager_md
 	__P((int enable));
 extern void mip6_expired_defrouter

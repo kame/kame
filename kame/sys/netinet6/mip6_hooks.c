@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hooks.c,v 1.10 2000/05/05 11:01:02 sumikawa Exp $	*/
+/*	$KAME: mip6_hooks.c,v 1.11 2000/06/04 03:31:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -86,11 +86,15 @@ extern void (*mip6_icmp6_output_hook)(struct mbuf *);
 
 /* Mobile Node-specific hooks */
 extern int  (*mip6_route_optimize_hook)(struct mbuf *);
-extern void (*mip6_select_defrtr_hook)(void);
+extern void (*mip6_select_defrtr_hook)(struct nd_prefix *,
+				       struct nd_defrouter *);
 extern struct nd_prefix * (*mip6_get_home_prefix_hook)(void);
 extern void (*mip6_prelist_update_hook)(struct nd_prefix *,
-					struct nd_defrouter *);
+					struct nd_defrouter *,
+					u_char);
 extern void (*mip6_expired_defrouter_hook)(struct nd_defrouter *);
+extern void (*mip6_eager_prefix_hook)(struct nd_prefix *pr,
+				      struct nd_defrouter *dr);
 extern void (*mip6_probe_pfxrtrs_hook)(void);
 extern void (*mip6_store_advint_hook)(struct nd_opt_advint *,
 				      struct nd_defrouter *);
@@ -234,6 +238,7 @@ mip6_enable_hooks(int scope)
 			mip6_get_home_prefix_hook = mip6_get_home_prefix;
 			mip6_prelist_update_hook = mip6_prelist_update;
 			mip6_expired_defrouter_hook = mip6_expired_defrouter;
+			mip6_eager_prefix_hook = mip6_eager_prefix;
 			mip6_probe_pfxrtrs_hook = mip6_probe_pfxrtrs;
 			mip6_store_advint_hook = mip6_store_advint;
 			mip6_get_md_state_hook = mip6_get_md_state;
@@ -287,6 +292,7 @@ mip6_disable_hooks(int scope)
 			mip6_get_home_prefix_hook = 0;
 			mip6_prelist_update_hook = 0;
 			mip6_expired_defrouter_hook = 0;
+			mip6_eager_prefix_hook = 0;
 			mip6_probe_pfxrtrs_hook = 0;
 			mip6_store_advint_hook = 0;
 			mip6_get_md_state_hook = 0;
@@ -322,19 +328,33 @@ mip6_attach(int module)
 */
 	if (mip6_module) {
 #ifdef MIP6_DEBUG
-		char *old = "?", *new = "?";
-		if (mip6_module == MIP6_HA_MODULE)
-			strcpy(old, "Home Agent");
-		if (mip6_module == MIP6_MN_MODULE)
-			strcpy(old, "Mobile Node");
-		if (module == MIP6_HA_MODULE)
-			strcpy(new, "Home Agent");
-		if (module == MIP6_MN_MODULE)
-			strcpy(new, "Mobile Node");
+		char *hastr = "Home Agent";
+		char *mnstr = "Mobile Node";
 
-		mip6_debug("Can't switch operation mode from %s to %s \n"
-			   "- please deactivate first (\"mip6config -x\")\n",
-			   old, new);
+		mip6_debug("Can't switch operation mode from ");
+		switch (mip6_module) {
+			case MIP6_HA_MODULE:
+				mip6_debug("%s", hastr);
+				break;
+			case MIP6_MN_MODULE:
+				mip6_debug("%s", mnstr);
+				break;
+			default:
+				mip6_debug("?");
+		}
+		mip6_debug(" to ");
+		switch (module) {
+			case MIP6_HA_MODULE:
+				mip6_debug("%s", hastr);
+				break;
+			case MIP6_MN_MODULE:
+				mip6_debug("%s", mnstr);
+				break;
+			default:
+				mip6_debug("?");
+		}
+		mip6_debug(" \n"
+			   "- please deactivate first (\"mip6config -x\")\n");
 #endif		
 		return EINVAL;
 	}

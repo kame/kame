@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.34 2000/05/17 05:20:11 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.35 2000/06/04 03:31:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,10 +103,14 @@ int nd6_defifindex;
 
 
 #ifdef MIP6
-void (*mip6_select_defrtr_hook)(void) = NULL;
+void (*mip6_select_defrtr_hook)(struct nd_prefix *,
+				struct nd_defrouter *) = NULL;
 struct nd_prefix * (*mip6_get_home_prefix_hook)(void) = NULL;
 void (*mip6_prelist_update_hook)(struct nd_prefix *pr,
-				 struct nd_defrouter *dr) = NULL;
+				 struct nd_defrouter *dr,
+				 u_char onlink) = NULL;
+void (*mip6_eager_prefix_hook)(struct nd_prefix *pr,
+			       struct nd_defrouter *dr) = NULL;
 void (*mip6_probe_pfxrtrs_hook)(void) = NULL;
 void (*mip6_store_advint_hook)(struct nd_opt_advint *ai,
 			       struct nd_defrouter *dr) = NULL;
@@ -617,7 +621,7 @@ defrouter_select()
 #ifdef MIP6
 	/* Mobile IPv6 alternative routine */
 	if (mip6_select_defrtr_hook) {
-		(*mip6_select_defrtr_hook)();    /* XXXYYY Temporary? */
+		(*mip6_select_defrtr_hook)(NULL, NULL); /* XXXYYY Temporary? */
 		splx(s);
 		return;
 	}
@@ -846,7 +850,7 @@ prelist_add(pr, dr)
 			 */
 			if ((*mip6_get_md_state_hook)() == MIP6_MD_UNDEFINED) {
 				if (mip6_select_defrtr_hook)
-					(*mip6_select_defrtr_hook)();
+					(*mip6_select_defrtr_hook)(NULL, NULL);
 			}
 		}
 #endif /* MIP6 */
@@ -1061,7 +1065,7 @@ prelist_update(new, dr, m)
 			 * Check for home prefix. It can't be a fresh prefix
 			 * (since it's static), so check here.
 			 */
-			(*mip6_prelist_update_hook)(pr, dr);
+			(*mip6_prelist_update_hook)(pr, dr, onlink);
 		}
 
 		if (mip6_probe_pfxrtrs_hook) {
@@ -1113,6 +1117,10 @@ prelist_update(new, dr, m)
 		error = error_tmp ? error_tmp : error;
 
 #ifdef MIP6
+		if (mip6_eager_prefix_hook)
+			/* New prefix: if eager, try to move */
+			(*mip6_eager_prefix_hook)(new, dr);
+
 		if (mip6_probe_pfxrtrs_hook) {
 			/* This is a new prefix, maybe we have moved. */
 			(*mip6_probe_pfxrtrs_hook)();

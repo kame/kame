@@ -37,7 +37,7 @@
  *       like Binding cache, HA list, BU list. Other functions should be
  *       moved to config program.
  *
- * $Id: mip6stat.c,v 1.5 2000/02/09 16:02:20 itojun Exp $
+ * $Id: mip6stat.c,v 1.6 2000/06/04 03:31:29 itojun Exp $
  *
  */
 
@@ -70,40 +70,44 @@ int aflag, cflag, fflag, hflag, lflag, mflag, nflag, pflag, uflag;
 int Aflag, Cflag, Fflag, Mflag, Pflag, Uflag;
 
 kvm_t *kd;
-int s;
+int s = 0;
 
 struct nlist namelist[] = {
 #define BCACHE      0
-    { "_mip6_bcq" },
+	{ "_mip6_bcq" },
 #define FORADDR     1
-    { "_mip6_config" },
+	{ "_mip6_config" },
 #define HADDR       2
-    { "_mip6_esmq" },
+	{ "_mip6_esmq" },
 #define HALIST      3
-    { "_mip6_llq" },
+	{ "_mip6_llq" },
 #define CONFIG      4
-    { "_mip6_config" },
+	{ "_mip6_config" },
 #define BULIST      5
-    { "_mip6_bulq" },
-#define NEND        5
-    { NULL },
+	{ "_mip6_bulq" },
+#define DEBUGEN     6
+	{ "_mip6_debug_is_enabled" },
+#define MODULE      7
+	{ "_mip6_module" },
+#define NEND        7
+	{ NULL },
 };
 
 static int
 upd_kernel(u_long cmd, void *args)
 {
-    struct mip6_input_data dummy;
+	struct mip6_input_data dummy;
 
-    if (args == NULL) {
-        bzero(&dummy, sizeof(dummy));
-        args = &dummy;    /* ioctl() third argument must be non-NULL */
-    }
+	if (args == NULL) {
+		bzero(&dummy, sizeof(dummy));
+		args = &dummy;    /* ioctl() third argument must be non-NULL */
+	}
 
-    /* Note: max transfer size is PAGE_SIZE (4096 bytes?) */
-    if (ioctl(s, cmd, (caddr_t)args) < 0)
-	perror("ioctl");
+	/* Note: max transfer size is PAGE_SIZE (4096 bytes?) */
+	if (ioctl(s, cmd, (caddr_t)args) < 0)
+		perror("ioctl");
 
-    return 0;
+	return 0;
 }
 
 /*
@@ -112,8 +116,8 @@ upd_kernel(u_long cmd, void *args)
 int
 kread(u_long addr, char *buf, int size)
 {
-    if(kd == NULL)
-        return -1;
+	if(kd == NULL)
+		return -1;
 
 	if(kvm_read(kd, addr, buf, size) != size) {
 		printf("%s\n", kvm_geterr(kd));
@@ -176,7 +180,7 @@ ip6addr_print(struct in6_addr *in6, int plen)
 	register char *cp = 0;
 	static char line[MAXHOSTNAMELEN + 5];
 	struct hostent *hp;
-    char ntop_buf[INET6_ADDRSTRLEN];
+	char ntop_buf[INET6_ADDRSTRLEN];
 
 	if (!nflag) {
 		hp = gethostbyaddr((char *)in6, sizeof(*in6), AF_INET6);
@@ -191,12 +195,12 @@ ip6addr_print(struct in6_addr *in6, int plen)
 		sprintf(line, "%s", inet_ntop(AF_INET6, in6, ntop_buf,
 					      sizeof(ntop_buf)));
 		
-    if(plen >= 0) {
-        char plen_str[5];
+	if(plen >= 0) {
+		char plen_str[5];
 
-        sprintf(plen_str, "/%d", plen);
-        strcat(line, plen_str);
-    }
+		sprintf(plen_str, "/%d", plen);
+		strcat(line, plen_str);
+	}
     
 	return line;
 }
@@ -204,55 +208,55 @@ ip6addr_print(struct in6_addr *in6, int plen)
 int main(int argc,
          char *argv[])
 {
-    int  ch, s = 0;
-    char buf[_POSIX2_LINE_MAX];
+	int  ch;
+	char buf[_POSIX2_LINE_MAX];
 
 	while ((ch = getopt(argc, argv, "aAcCfFhlmMnpPuU")) != -1)
 		switch(ch) {
 		case 'a':
-            aflag = 1;
+			aflag = 1;
 			break;
 		case 'A':
-            Aflag = 1;
+			Aflag = 1;
 			break;
 		case 'c':
-            cflag = 1;
+			cflag = 1;
 			break;
 		case 'C':
-            Cflag = 1;
+			Cflag = 1;
 			break;
 		case 'f':
-            fflag = 1;
+			fflag = 1;
 			break;
 		case 'F':
-            Fflag = 1;
+			Fflag = 1;
 			break;
 		case 'h':
-            hflag = 1;
+			hflag = 1;
 			break;
 		case 'm':
-            mflag = 1;
+			mflag = 1;
 			break;
 		case 'M':
-            Mflag = 1;
+			Mflag = 1;
 			break;
 		case 'l':
-            lflag = 1;
+			lflag = 1;
 			break;
 		case 'n':
-            nflag = 1;
+			nflag = 1;
 			break;
 		case 'p':
-            pflag = 1;
+			pflag = 1;
 			break;
 		case 'P':
-            Pflag = 1;
+			Pflag = 1;
 			break;
 		case 'u':
-            uflag = 1;
+			uflag = 1;
 			break;
 		case 'U':
-            Uflag = 1;
+			Uflag = 1;
 			break;
 		case '?':
 		default:
@@ -261,63 +265,65 @@ int main(int argc,
 	argv += optind;
 	argc -= optind;
 
-    if(optind < 2 || hflag)
-        usage();
+	if(optind < 2 || hflag)
+		usage();
 
-    if (getuid() != 0) {
-		printf("Premission denied.\n");
+	if (getuid() != 0) {
+		printf("Permission denied.\n");
 		exit(1);
-    }
+	}
 
-    if(aflag + cflag + fflag + mflag + pflag + uflag +
-       Aflag + Cflag + Fflag + Mflag + Pflag + Uflag == 0)
-        usage();
+	if(aflag + cflag + fflag + mflag + pflag + uflag +
+	   Aflag + Cflag + Fflag + Mflag + Pflag + Uflag == 0)
+		usage();
 
-    if(aflag + cflag + fflag + mflag + pflag + uflag > 0) {
-        if((kd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, buf)) == NULL) {
-            errx(1, "error opening kernel: %s\n", buf);
-        }
-        if (kvm_nlist(kd, namelist) == -1) {
-            fprintf(stderr, "kvm_nlist: %s", kvm_geterr(kd));
-            exit(1);
-        }
-    }
+	if(aflag + cflag + fflag + mflag + pflag + uflag > 0) {
+		if((kd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, buf)) 
+		   == NULL) {
+			errx(1, "error opening kernel: %s\n", buf);
+		}
+		if (kvm_nlist(kd, namelist) == -1) {
+			fprintf(stderr, "kvm_nlist: %s", kvm_geterr(kd));
+			exit(1);
+		}
+	}
 
-    if(Aflag + Cflag + Fflag + Mflag + Pflag + Uflag > 0)
-        if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-            err(1, "socket");
+	if(Aflag + Cflag + Fflag + Mflag + Pflag + Uflag > 0)
+		if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+			err(1, "socket");
 
-    if(aflag)
-        halistpr(namelist[HALIST].n_value);
-    if(cflag)
-        bcachepr(namelist[BCACHE].n_value);
-    if(fflag)
-        foraddrpr(namelist[FORADDR].n_value);
-    if(mflag)
-        haddrpr(namelist[HADDR].n_value);
-    if(pflag)
-        configpr(namelist[CONFIG].n_value);
-    if(uflag)
-        bulistpr(namelist[BULIST].n_value);
+	if(aflag)
+		halistpr(namelist[HALIST].n_value);
+	if(cflag)
+		bcachepr(namelist[BCACHE].n_value);
+	if(fflag)
+		foraddrpr(namelist[FORADDR].n_value);
+	if(mflag)
+		haddrpr(namelist[HADDR].n_value);
+	if(pflag)
+		configpr(namelist[CONFIG].n_value, namelist[DEBUGEN].n_value,
+			 namelist[MODULE].n_value);
+	if(uflag)
+		bulistpr(namelist[BULIST].n_value);
 
-    if(Aflag)
-        upd_kernel(SIOCSHALISTFLUSH_MIP6, NULL);
-    if(Cflag)
-        upd_kernel(SIOCSBCFLUSH_MIP6, NULL);
-    if(Fflag)
-        upd_kernel(SIOCSFORADDRFLUSH_MIP6, NULL);
-    if(Mflag)
-        upd_kernel(SIOCSHADDRFLUSH_MIP6, NULL);
-    if(Pflag)
-        upd_kernel(SIOCSDEFCONFIG_MIP6, NULL);
-    if(Uflag)
-        upd_kernel(SIOCSBULISTFLUSH_MIP6, NULL);
+	if(Aflag)
+		upd_kernel(SIOCSHALISTFLUSH_MIP6, NULL);
+	if(Cflag)
+		upd_kernel(SIOCSBCFLUSH_MIP6, NULL);
+	if(Fflag)
+		upd_kernel(SIOCSFORADDRFLUSH_MIP6, NULL);
+	if(Mflag)
+		upd_kernel(SIOCSHADDRFLUSH_MIP6, NULL);
+	if(Pflag)
+		upd_kernel(SIOCSDEFCONFIG_MIP6, NULL);
+	if(Uflag)
+		upd_kernel(SIOCSBULISTFLUSH_MIP6, NULL);
 
-    if(kd)
-        kvm_close(kd);
+	if(kd)
+		kvm_close(kd);
 
-    if(s)
-        close(s);
+	if(s)
+		close(s);
 
-    return 0;
+	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.15 2000/05/05 14:45:58 itojun Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.16 2000/06/04 03:31:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -113,7 +113,7 @@ mip6_mn_init(void)
 	callout_handle_init(&mip6_timer_esm_handle);
 #endif
 
-	printf("%s: MIP6 Mobile Node initialized\n", __FUNCTION__);
+	printf("Mobile Node initialized\n");
 }
 
 
@@ -3005,6 +3005,11 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 		}
 		LIST_REMOVE(np, addr_entry);
 		break;
+
+	case SIOCSEAGERMD_MIP6:
+		/* Note: value = 0, 1 or 2. */
+		mip6_eager_md(((struct mip6_input_data *)arg)->value);
+		break;
 	}
 	return retval;
 }
@@ -3081,10 +3086,6 @@ int mip6_enable_func_mn(u_long cmd, caddr_t data)
 
 	case SIOCSAUTOCONFIG_MIP6:
 		mip6_config.autoconfig = enable;
-		break;
-
-	case SIOCSEAGERMD_MIP6:
-		mip6_eager_md(enable);
 		break;
 	}
 	return retval;

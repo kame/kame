@@ -4,7 +4,7 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: mip6stat.h,v 1.3 2000/02/08 02:58:57 itojun Exp $
+ * $Id: mip6stat.h,v 1.4 2000/06/04 03:31:29 itojun Exp $
  *
  */
 
@@ -31,4 +31,4 @@ extern void bulistpr(u_long);
 extern void foraddrpr(u_long);
 extern void haddrpr(u_long);
 extern void halistpr(u_long);
-extern void configpr(u_long);
+extern void configpr(u_long, u_long, u_long);

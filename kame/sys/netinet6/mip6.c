@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.24 2000/05/05 14:45:58 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.25 2000/06/04 03:31:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -36,11 +36,6 @@
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *         Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- */
-
-/*
- * TODO: nuke calls to in6_control, it is not supposed to be called from
- * softintr
  */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -124,17 +119,7 @@ struct mip6_config  mip6_config;      /* Config parameters for MIPv6 */
 struct mip6_link_list  *mip6_llq = NULL;  /* List of links receiving RA's */
 
 
-#if 0  /* Phasing out MIP6_HA and MIP6_MN */
-#ifdef MIP6_HA
-u_int8_t mip6_module = MIP6_HA_MODULE;  /* Info about loaded modules (HA) */
-#elif defined(MIP6_MN)
-u_int8_t mip6_module = MIP6_MN_MODULE;  /* Info about loaded modules (MN) */
-#else
-u_int8_t mip6_module = 0;               /* Info about loaded modules (CN) */
-#endif
-#else /* 0 */
-u_int8_t mip6_module = 0;               /* Info about loaded modules (CN) */
-#endif /* 0 */
+u_int8_t mip6_module = 0;               /* Info about loaded modules */
 
 extern struct ip6protosw mip6_tunnel_protosw;
 
@@ -221,7 +206,7 @@ mip6_init(void)
 	mip6_enable_hooks(MIP6_CONFIG_HOOKS);
 
 	mip6_init_done = 1;
-	printf("%s: MIP6 initialized\n", __FUNCTION__);
+	printf("Initializing Mobile IPv6\n");
 }
 
 
@@ -469,7 +454,8 @@ int          off;   /* Offset from start of mbuf to icmp6 message */
 
 		if (mip6_rec_ra_hook) {
 			res = mip6_rec_ra_hook(m, off);
-			if (res) return res;
+			if (res)
+				return res;
 			break;
 		}
 	}
@@ -2507,7 +2493,10 @@ int              use_link_opt;  /* Include Target link layer address option or
 
 	if (MIP6_IS_MN_ACTIVE) {
 		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
-			if (!pr->ndpr_stateflags.onlink)
+			if ((mip6_config.eager_md && 
+			     (LIST_FIRST(&pr->ndpr_advrtrs) == NULL)) ||
+			    (!mip6_config.eager_md && 
+			     !pr->ndpr_stateflags.onlink))
 				continue;
 			if (in6_are_prefix_equal(home_addr,
 						 &pr->ndpr_prefix.sin6_addr,
@@ -2908,6 +2897,28 @@ struct ifnet   *ifp;
 	/* Note: privileges already checked in in6_control(). */
 
 	res = 0;
+
+	if (MIP6_IS_HA_ACTIVE) {
+		switch (cmd) {
+		case SIOCSHALISTFLUSH_MIP6:
+			if (mip6_clear_config_data_ha_hook)
+				res = (*mip6_clear_config_data_ha_hook)
+					(cmd, data);
+			return res;
+		}
+	}
+
+	if (MIP6_IS_MN_ACTIVE) {
+		switch (cmd) {
+		case SIOCSFORADDRFLUSH_MIP6:
+		case SIOCSHADDRFLUSH_MIP6:
+		case SIOCSBULISTFLUSH_MIP6:
+			if (mip6_clear_config_data_mn_hook)
+				res = (*mip6_clear_config_data_mn_hook)
+					(cmd, data);
+			return res;
+		}
+	}
 	switch (cmd) {
 	case SIOCSBCFLUSH_MIP6:
 	case SIOCSDEFCONFIG_MIP6:
@@ -2923,18 +2934,19 @@ struct ifnet   *ifp;
 		if (mip6_write_config_data_ha_hook)
 			res = (*mip6_write_config_data_ha_hook)
 				(cmd, data);
-		break;
+		return res;
 
 	case SIOCACOADDR_MIP6:
 	case SIOCAHOMEADDR_MIP6:
 	case SIOCSBULIFETIME_MIP6:
 	case SIOCSHRLIFETIME_MIP6:
 	case SIOCDCOADDR_MIP6:
+	case SIOCSEAGERMD_MIP6:
 		/* Note: these can be run before attach. */
 		if (mip6_write_config_data_mn_hook)
 			res = (*mip6_write_config_data_mn_hook)
 				(cmd, data);
-		break;
+		return res;
 
 	case SIOCSDEBUG_MIP6:
 	case SIOCSENABLEBR_MIP6:
@@ -2947,17 +2959,16 @@ struct ifnet   *ifp;
 		/* Note: these can be run before attach. */
 		if (mip6_enable_func_ha_hook)
 			res = (*mip6_enable_func_ha_hook)(cmd, data);
-		break;
+		return res;
 
 	case SIOCSPROMMODE_MIP6:
 	case SIOCSBU2CN_MIP6:
 	case SIOCSREVTUNNEL_MIP6:
 	case SIOCSAUTOCONFIG_MIP6:
-	case SIOCSEAGERMD_MIP6:
 		/* Note: these can be run before attach. */
 		if (mip6_enable_func_mn_hook)
 			res = (*mip6_enable_func_mn_hook)(cmd, data);
-		break;
+		return res;
 
 	case SIOCSRELEASE_MIP6:
 		mip6_release();
@@ -2965,46 +2976,11 @@ struct ifnet   *ifp;
 
 	default:
 		res = EOPNOTSUPP;
-		break;
-	}
-
-	if (MIP6_IS_HA_ACTIVE) {
-		res = 0;
-		switch (cmd) {
-		case SIOCSHALISTFLUSH_MIP6:
-			if (mip6_clear_config_data_ha_hook)
-				res = (*mip6_clear_config_data_ha_hook)
-					(cmd, data);
-			break;
-
-		default:
-			res = EOPNOTSUPP;
-			break;
-		}
-	}
-
-	if (MIP6_IS_MN_ACTIVE) {
-		res = 0;
-		switch (cmd) {
-		case SIOCSFORADDRFLUSH_MIP6:
-		case SIOCSHADDRFLUSH_MIP6:
-		case SIOCSBULISTFLUSH_MIP6:
-			if (mip6_clear_config_data_mn_hook)
-				res = (*mip6_clear_config_data_mn_hook)
-					(cmd, data);
-			break;
-
-		default:
-			res = EOPNOTSUPP;
-			break;
-		}
-	}
-	if (res) {
 #ifdef MIP6_DEBUG
-		printf("%s: unknown command: %lu\n", __FUNCTION__, (u_long)cmd);
+		printf("%s: unknown command: %lx\n", __FUNCTION__, (u_long)cmd);
 #endif
+		return res;
 	}
-	return res;
 }
 
 
@@ -3019,7 +2995,14 @@ struct ifnet   *ifp;
  ******************************************************************************
  */
 #ifdef MIP6_DEBUG
-void mip6_debug(char *fmt, ...)
+void
+#if __STDC__
+mip6_debug(char *fmt, ...)
+#else
+mip6_debug(fmt, va_alist)
+	char *fmt;
+	va_dcl
+#endif
 {
 #ifndef __bsdi__
 	va_list ap;
@@ -3096,6 +3079,15 @@ int mip6_clear_config_data(u_long cmd, caddr_t data)
 		mip6_config.br_update = 60;
 		mip6_config.hr_lifetime = 3600;
 		mip6_config.enable_outq = 1;
+
+		/* XXX Extra action needed? */
+		mip6_config.fwd_sl_unicast = 0;
+		mip6_config.fwd_sl_multicast = 0;
+		mip6_config.enable_prom_mode = 0;
+		mip6_config.enable_bu_to_cn = 0;
+		mip6_config.enable_rev_tunnel = 0;
+		mip6_config.enable_br = 0;
+		mip6_eager_md(0);
 		break;
 	}
 	splx(s);

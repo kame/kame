@@ -1,3 +1,5 @@
+.\"	$KAME: mip6config.8,v 1.2 2000/06/04 03:31:28 itojun Exp $
+.\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
 .\" 
@@ -25,8 +27,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: mip6config.8,v 1.1 2000/02/07 17:27:07 itojun Exp $
-.\"
 .Dd Nov 22, 1999
 .Dt MIP6CONFIG 8
 .Os KAME
@@ -37,36 +37,79 @@
 .\"
 .Sh SYNOPSIS
 .Nm mip6config
+.Bk -words
 .Fl H Ar home_address/plen@if%ha_addr
+.Ek
+.Bk -words
 .Op Fl F Ar foreign_address/plen@if
+.Ek
+.Bk -words
 .Op Fl b Ar bu_lifetime
+.Ek
+.Bk -words
 .Op Fl w Ar br_time
+.Ek
+.Bk -words
 .Op Fl l Ar hr_lifetime
-.Op Fl depqrt Ar 0/1
+.Ek
+.Bk -words
+.Op Fl dpqrt Li 0|1
+.Ek
+.Bk -words
+.Op Fl e Li 0|1|2
+.Ek
 .Nm mip6config
 .Fl a
+.Bk -words
 .Op Fl F Ar foreign_address/plen@if
+.Ek
+.Bk -words
 .Op Fl b Ar bu_lifetime
+.Ek
+.Bk -words
 .Op Fl w Ar br_time
+.Ek
+.Bk -words
 .Op Fl l Ar hr_lifetime
-.Op Fl Ar depqrt Ar 0/1
+.Ek
+.Bk -words
+.Op Fl Ar dpqrt Li 0|1
+.Ek
+.Bk -words
+.Op Fl e Li 0|1|2
+.Ek
 .Nm mip6config
 .Fl g
 .Op Fl w Ar br_time
 .Op Fl y Ar ha_pref
 .Op Fl l Ar hr_lifetime
-.Op Fl mqu Ar 0/1
+.Op Fl mqu Li 0|1
 .Nm mip6config
 .Fl x
 .Nm mip6config
 .Fl f Ar filename
 .Nm mip6config
+.Bk -words
 .Op Fl F Ar foreign_address/plen@if
+.Ek
+.Bk -words
 .Op Fl b Ar bu_lifetime
+.Ek
+.Bk -words
 .Op Fl w Ar br_time
+.Ek
+.Bk -words
 .Op Fl y Ar ha_pref
+.Ek
+.Bk -words
 .Op Fl l Ar hr_lifetime
-.Op Fl dempqrtu Ar 0/1
+.Ek
+.Bk -words
+.Op Fl dmpqrtu Li 0|1
+.Ek
+.Bk -words
+.Op Fl e Li 0|1|2
+.Ek
 .Nm mip6config
 .Fl E Ar address
 .\"
@@ -80,7 +123,7 @@ and is required by a host (router or host) to be able to move between
 different sub-networks while maintaining transport and higher layer 
 connections. A node may not act as mobile node and home agent simultaneously.
 .Pp
-There are two different ways of including the mobile IPv6 software in the
+There are two different ways of including the Mobile IPv6 software in the
 kernel. The first alternative is to add it during compilation. The 
 correspondent node part must always be included and the optional parts can
 be included if desired. The second alternative is to add the correspondent node
@@ -89,7 +132,7 @@ runtime.
 .Pp
 The
 .Nm
-command is used for configuration of the mobile IPv6 code. Depending on which 
+command is used for configuration of the Mobile IPv6 code. Depending on which 
 part of the code that has been loaded in the kernel, different options will 
 be enabled/disabled.
 .\"
@@ -110,10 +153,10 @@ Manually assign a home address and a home agent.
 Enable auto configuration of the home address.
 .It Fl b Ar bu_lifetime
 Set the binding update lifetime.
-.It Fl d Ar 0/1
+.It Fl d Li 0|1
 Disable/Enable debug messages.
-.It Fl e Ar 0/1
-Disable/Enable eager Movement Detection.
+.It Fl e Li 0|1|2
+Disable/Enable eager Movement Detection. Two levels are provided. At level 1 more aggressive parameter settings are used. At level 2, in addition, new prefixes are taken as indication of handover, rather than the expiration of the previous default router.
 .It Fl f Ar filename
 Read configuration from file.
 .It Fl g
@@ -122,17 +165,17 @@ Enable Home Agent functionality.
 Show a simple usage information.
 .It Fl l Ar hr_lifetime
 Set the home registration lifetime.
-.It Fl m Ar 0/1
+.It Fl m Li 0|1
 Disable/Enable forwarding of Site local Multicast dest addresses.
-.It Fl p Ar 0/1
+.It Fl p Li 0|1
 Disable/Enable link layer promiscuous mode.
-.It Fl q Ar 0/1
+.It Fl q Li 0|1
 Disable/Enable sending binding requests to the mobile node.
-.It Fl r Ar 0/1
+.It Fl r Li 0|1
 Disable/Enable sending binding updates to a correspondent node (Route optimisation).
-.It Fl t Ar 0/1
+.It Fl t Li 0|1
 Disable/Enable tunneling of packets from the nobile node to a correspondent node via the home agent
-.It Fl u Ar 0/1
+.It Fl u Li 0|1
 Disable/Enable forwarding of Site local Unicast dest addresses
 .It Fl w Ar br_time
 Set the binding request time.

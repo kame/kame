@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.18 2000/05/05 14:45:58 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.19 2000/06/04 03:31:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -76,6 +76,11 @@
 #endif
 #include <netinet6/in6_pcb.h>
 #include <netinet6/mip6.h>
+
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#endif
 
 #include <net/net_osdep.h>
 
@@ -339,11 +344,19 @@ mip6_md_init()
  *              reconfigures the Home Address with host or network route.
  *              Finally informs the event-state machine about any transitions
  *              and new default routers.
+ *              Hints to a good prefix and default router to choose can be
+ *              provided, which is currently used for Eager Movement Detection
+ *		level 2. A disadvantage of level 2 is that the new default 
+ *		router is chosen before it's two-way reachability is confirmed.
+ *		Only use when you need fast handoffs.
+ *              This function is tightly coupled with mip6_prelist_update().
  * Ret value:   -
  ******************************************************************************
  */
 void
-mip6_select_defrtr()
+mip6_select_defrtr(prhint, drhint)
+	struct nd_prefix    *prhint;
+	struct nd_defrouter *drhint;
 {
 	struct nd_prefix	*pr = NULL/*, *prev_primary_prefix*/;
 	struct nd_defrouter	*dr, anydr;
@@ -369,6 +382,40 @@ mip6_select_defrtr()
 		   dr ? ip6_sprintf(&dr->rtaddr) : "NULL");
 #endif
 
+	if (MIP6_EAGER_PREFIX && prhint && drhint) {
+		if (drhint != dr && 
+		    (prhint = prefix_lookup(prhint)) != pr &&
+		    pfxrtr_lookup(prhint, drhint)) {
+			/*
+			 * Check if hints are ok as the new defualt router
+			 * and primary prefix. Otherwise use ordinary
+			 * selection.
+			 */
+			dr = drhint;
+			pr = prhint;
+
+			/*
+			 * Check Care-of Address of the prefix
+			 */
+			if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr) &&
+			    !IN6_IS_ADDR_MULTICAST(&pr->ndpr_addr) &&
+			    !IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_addr)) {
+				state = MIP6_MD_FOREIGN;
+
+#ifdef MIP6_DEBUG
+				mip6_debug("%s: new probably reachable defrtr %s on foreign subnet selected in eager mode.\n", __FUNCTION__, ip6_sprintf(&dr->rtaddr));
+#endif
+
+				/*
+				 * Place dr first since it's prim.
+				 */
+				TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
+				TAILQ_INSERT_HEAD(&nd_defrouter, dr, dr_entry);
+				goto found;
+			}
+		}
+	}
+		
 	if ( (mip6_md_state == MIP6_MD_HOME) ||
 	     (mip6_md_state == MIP6_MD_UNDEFINED) ) {
 		if ((pr = mip6_home_prefix) == NULL){
@@ -377,7 +424,10 @@ mip6_select_defrtr()
 			return;
 		}
 
-		if ((pfxrtr = find_pfxlist_reachable_router(pr)) != NULL) {
+		if ((MIP6_EAGER_PREFIX &&
+		     ((pfxrtr = LIST_FIRST(&pr->ndpr_advrtrs)) != NULL)) ||
+		    (!MIP6_EAGER_PREFIX &&
+		     ((pfxrtr = find_pfxlist_reachable_router(pr)) != NULL))) {
 #ifdef MIP6_DEBUG
 			mip6_debug("%s: there are (reachable) pfxrtrs at "
 				   "home.\n", __FUNCTION__);
@@ -455,7 +505,7 @@ mip6_select_defrtr()
 
 						/*
 						 * Place dr first since
-						 * its prim.
+						 * it's prim.
 						 */
 						TAILQ_REMOVE(&nd_defrouter,
 							     dr, dr_entry);
@@ -685,11 +735,10 @@ mip6_select_defrtr()
 						 ndpr_plen)) {
 
 			/* Fake an INCOMPLETE neighbor that we're giving up */
-				struct mbuf *m = ln->ln_hold;
-				if (m) {
-					m_freem(m);
+				if (ln->ln_hold) {
+					m_freem(ln->ln_hold);
+					ln->ln_hold = NULL;
 				}
-				ln->ln_hold = NULL;
 
 #ifdef MIP6_DEBUG
 				mip6_debug("Deleting Neighbor %s.\n",
@@ -736,7 +785,6 @@ mip6_select_defrtr()
 		while (ln && ln != &llinfo_nd6) {
 			struct rtentry *rt;
 			struct ifnet *ifp;
-			struct sockaddr_dl *sdl;
 			struct sockaddr_in6 *dst;
 			struct llinfo_nd6 *next = ln->ln_next;
 
@@ -782,8 +830,6 @@ mip6_select_defrtr()
 #endif
 				if (rt && rt->rt_gateway &&
 				    rt->rt_gateway->sa_family == AF_LINK) {
-					sdl = (struct sockaddr_dl *)rt->
-						rt_gateway;
 					rtrequest(RTM_DELETE, rt_key(rt),
 						  (struct sockaddr *)0,
 						  rt_mask(rt), 0,
@@ -838,7 +884,7 @@ mip6_select_defrtr()
 
 /*
  ******************************************************************************
- * Function:    mip6_prelist_update(pr, dr)
+ * Function:    mip6_prelist_update(pr, dr, was_onlink)
  * Description: A hook to ND's prelist_update(). Checks if the Home Prefix
  *              was announced and in that case tries to force the Mobile Node
  *              to select that default router. If the Mobile Node was in
@@ -848,9 +894,10 @@ mip6_select_defrtr()
  ******************************************************************************
  */
 void
-mip6_prelist_update(pr, dr)
+mip6_prelist_update(pr, dr, was_onlink)
 	struct nd_prefix    *pr;
 	struct nd_defrouter *dr;
+	u_char		    was_onlink;
 {
 	if (dr == NULL) {
 		return;
@@ -880,7 +927,7 @@ mip6_prelist_update(pr, dr)
 					   "at this stage.\n", __FUNCTION__);
 #endif
 				/* XXXYYY or use defrouter_select()? */
-				mip6_select_defrtr();
+				mip6_select_defrtr(NULL, NULL);
 			}
 		}
 	}
@@ -898,9 +945,50 @@ mip6_prelist_update(pr, dr)
 				   "at this stage.\n", __FUNCTION__);
 #endif
 			/* XXXYYY or use defrouter_select()? */
-			mip6_select_defrtr();
+			mip6_select_defrtr(NULL, NULL);
 		}
 	}
+	else if (MIP6_EAGER_PREFIX)
+		/*
+		 * Note that transistions from any to home is taken care of at
+		 * code above, even in eager mode.
+		 * Also note that in eager mode we consider a prefix to be
+		 * onlink as soon as we hear it, so onlink flag can't be used
+		 * here.
+		 */
+		if (!was_onlink && LIST_FIRST(&pr->ndpr_advrtrs)) {
+#ifdef MIP6_DEBUG
+			mip6_debug("%s: eager at re-attached prefix.\n",
+				   __FUNCTION__);
+#endif
+			mip6_select_defrtr(pr, dr);
+		}
+}
+
+
+/*
+ ******************************************************************************
+ * Function:    mip6_eager_prefix(pr, dr)
+ * Description:	New prefix is heard. If Eager Movement Detection level 2 is 
+ * 		activated, try to make it the primary one.
+ * Ret value:   -
+ ******************************************************************************
+ */
+void
+mip6_eager_prefix(pr, dr)
+	struct nd_prefix    *pr;
+	struct nd_defrouter *dr;
+{
+	if (!MIP6_EAGER_PREFIX)
+		return;
+
+	if (dr == NULL || pr == NULL) {
+		return;
+	}
+#ifdef MIP6_DEBUG
+	mip6_debug("%s: eager at new prefix.\n", __FUNCTION__);
+#endif
+	mip6_select_defrtr(pr, dr);
 }
 
 
@@ -910,7 +998,12 @@ mip6_prelist_update(pr, dr)
  * Description: If eager Movement Detection is chosen, trim parameters to a
  *              really fast hand-off. The disadvantage is that the detection
  *              becomes very exposed to go into state UNDEFINED if one single
- *              packet is lost.
+ *              packet is lost. Even more eager Movement Detection will make
+ *		the Mobile Node choose new prefixes as the Primary Prefix, even
+ * 		before the previous Default Router disappears.
+ *		Level 0:    eager Movement Detection off
+ *		Level >= 1: eager Movement Detection on, aggressive parameters
+ *		Level >= 2: same, plus handoff as soon as new prefixes appears
  * Ret value:   -
  ******************************************************************************
  */
@@ -1039,7 +1132,7 @@ mip6_probe_defrouter(struct nd_defrouter *dr)
  * Description: If a new or previously detached prefix is heard, probe (NUD)
  *              all prefix routers on the current primary prefix in order to
  *              quickly detect if we have moved. This is only enabled in
- *              eager Movement Detection.
+ *              eager Movement Detection (level 1 and 2).
  * Ret value:   -
  ******************************************************************************
  */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.10 2000/05/05 11:01:02 sumikawa Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.11 2000/06/04 03:31:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -104,6 +104,7 @@ mip6_ha_init(void)
 	/* Initialize handle for timer functions. */
 	callout_handle_init(&mip6_timer_ll_handle);
 #endif
+	printf("Home Agent initialized\n");
 }
 
 

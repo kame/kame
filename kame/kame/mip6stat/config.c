@@ -33,7 +33,7 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: config.c,v 1.2 2000/02/08 02:58:56 itojun Exp $
+ * $Id: config.c,v 1.3 2000/06/04 03:31:28 itojun Exp $
  *
  */
 
@@ -51,26 +51,30 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_common.h>
 #include "mip6stat.h"
 
 void pr_confighdr __P((void));
-void pr_configentry __P((struct mip6_config));
+void pr_configentry __P((struct mip6_config, int, int));
 
 void
-configpr(u_long mip6conf_ptr)
+configpr(u_long mip6conf_ptr, u_long mip6debug_ptr, u_long mip6module_ptr)
 {
 	struct mip6_config mip6config;
+	int mip6debug, mip6module;
 
-	if (mip6conf_ptr == 0) {
+	if (mip6conf_ptr == 0 || mip6debug_ptr == 0 || mip6module_ptr == 0) {
 		printf("symbol not in namelist\n");
 		return;
 	}
 
 	kget(mip6conf_ptr, mip6config);
+	kget(mip6debug_ptr, mip6debug);
+	kget(mip6module_ptr, mip6module);
 
 	pr_confighdr();
 
-	pr_configentry(mip6config);
+	pr_configentry(mip6config, mip6debug, mip6module);
 }
 
 /*
@@ -80,11 +84,11 @@ void
 pr_confighdr()
 {
 	printf("\n");
-	printf("MIPv6 Configuration:\n");
+	printf("Mobile IPv6 Configuration:\n");
 }
 
 void
-pr_configentry(struct mip6_config configentry)
+pr_configentry(struct mip6_config configentry, int mip6debug, int mip6module)
 {
 	char *enabled  = "Enabled ";
 	char *disabled = "Disabled";
@@ -109,7 +113,7 @@ pr_configentry(struct mip6_config configentry)
 	printf("%s  Forwarding of site local multicast destination addresses\n",
 	       BOOLQ(configentry.fwd_sl_multicast));
 
-	printf("%s  Link layer promiscus mode\n",
+	printf("%s  Link layer promiscuous mode\n",
 	       BOOLQ(configentry.enable_prom_mode));
 
 	printf("%s  Route optimization\n", BOOLQ(configentry.enable_bu_to_cn));
@@ -122,7 +126,31 @@ pr_configentry(struct mip6_config configentry)
 
 	printf("%s  Piggybacking\n", BOOLQ(configentry.enable_outq));
 
-	printf("%s  Eager Movement Detection\n", BOOLQ(configentry.eager_md));
+	switch (configentry.eager_md) {
+	case 0:
+		printf("%s  ", disabled);
+		break;
+	case 1:
+		printf("Level 1   ");
+		break;
+	case 2:
+		printf("Level 2   ");
+		break;
+	}
+	printf("Eager Movement Detection\n");
+
+	printf("%s  Debugging output\n", BOOLQ(mip6debug));
+	switch (mip6module) {
+	case MIP6_HA_MODULE:
+		printf("Home Agent activated\n");
+		break;
+	case MIP6_MN_MODULE:
+		printf("Mobile Node activated\n");
+		break;
+	default:
+		printf("Only Correspondent Node functionality activated\n");
+		break;
+	}
 
 	printf("\n");
 }

@@ -34,7 +34,7 @@
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
  *
- * $Id: mip6config.c,v 1.7 2000/04/02 15:24:30 itojun Exp $
+ * $Id: mip6config.c,v 1.8 2000/06/04 03:31:28 itojun Exp $
  *
  */
 
@@ -66,20 +66,20 @@ extern void print_err __P((int));
 static int
 upd_kernel(u_long cmd, struct mip6_input_data *args)
 {
-    struct mip6_input_data dummy;
+	struct mip6_input_data dummy;
 
-    if (args == NULL) {
-        bzero(&dummy, sizeof(dummy));
-        args = &dummy;    /* ioctl() third argument must be non-NULL */
-    }
+	if (args == NULL) {
+		bzero(&dummy, sizeof(dummy));
+		args = &dummy;    /* ioctl() third argument must be non-NULL */
+	}
 
-    /* Note: max transfer size is PAGE_SIZE (4096 bytes?) */
-    if (ioctl(s, cmd, (caddr_t)args) < 0) {
+	/* Note: max transfer size is PAGE_SIZE (4096 bytes?) */
+	if (ioctl(s, cmd, (caddr_t)args) < 0) {
 		perror("ioctl");
-        printf("Make sure kernel supports MIP6.\n");
-        exit(1);
-    }
-    return 0;  /* XXXYYY Better error handling needed? */
+		printf("Make sure kernel supports MIP6.\n");
+		exit(1);
+	}
+	return 0;  /* XXXYYY Better error handling needed? */
 }
 
 /*
@@ -111,17 +111,17 @@ usage()
 {
 	fprintf(stderr, "\n%s\n%s\n%s%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 "usage: mip6config -a [-F foreign_address/plen@if] [-b bu_lifetime]",
-"                     [-w br_time] [-l hr_lifetime] [-depqrt 0/1]",
+"                     [-w br_time] [-l hr_lifetime] [-dpqrt 0/1] [-e 0/1/2]",
 "       mip6config -H home_address/plen@if%ha_addr ",
                      "[-F foreign_address/plen@if]",
 "                     [-b bu_lifetime] [-w br_time] [-l hr_lifetime]",
-"                     [-depqrt 0/1]",
+"                     [-dpqrt 0/1] [-e 0/1/2]",
 "       mip6config -g [-w br_time] [-y ha_pref] [-l hr_lifetime] [-mqu 0/1]",
 "       mip6config -x",
 "       mip6config -E address",
 "       mip6config -f file",
 "       mip6config [-F foreign_address/plen@if] [-b bu_lifetime] [-w br_time]",
-"                  [-y ha_pref] [-l hr_lifetime] [-dempqrtu 0/1]");
+"                  [-y ha_pref] [-l hr_lifetime] [-dmpqrtu 0/1] [-e 0/1/2]");
 	exit(1);
 }
 
@@ -129,246 +129,251 @@ usage()
 static int
 parse_addr(char *addrline, char **addr, int *plen, char **iface)
 {
-    char *plen_ptr;
+	char *plen_ptr;
 
-    *addr = addrline;
+	*addr = addrline;
 
-    if ((plen_ptr = strchr(*addr, '/')) == NULL) {
-        return -1;
-    }
+	if ((plen_ptr = strchr(*addr, '/')) == NULL) {
+		return -1;
+	}
 
-    *plen_ptr = '\0';
-    plen_ptr++;
+	*plen_ptr = '\0';
+	plen_ptr++;
 
-    *plen = atoi(plen_ptr);
+	*plen = atoi(plen_ptr);
 
-    if ((*iface = strchr(plen_ptr, '@')) == NULL) {
-        return -1;
-    }
+	if ((*iface = strchr(plen_ptr, '@')) == NULL) {
+		return -1;
+	}
 
-    **iface = '\0';
-    (*iface)++;
+	**iface = '\0';
+	(*iface)++;
 
-    return 0;
+	return 0;
 }
 
 /* Returns the address in network order */
 static int
 getaddress(char *address, struct in6_addr *in6addr)
 {
-    if (inet_pton(AF_INET6, address, in6addr) == NULL) {
-        struct hostent *hp;
- 	if ((hp = gethostbyname2(address, AF_INET6)) == NULL)
-            return -1;
-        else
-            memcpy(in6addr, hp->h_addr_list[0], sizeof(struct in6_addr));
-    }
-    return 0;
+	if (inet_pton(AF_INET6, address, in6addr) == NULL) {
+		struct hostent *hp;
+		if ((hp = gethostbyname2(address, AF_INET6)) == NULL)
+			return -1;
+		else
+			memcpy(in6addr, hp->h_addr_list[0], 
+			       sizeof(struct in6_addr));
+	}
+	return 0;
 }
 
 /* Parsing functions */
 static int
 set_homeaddr(char *homeaddr, u_long command)
 {
-    struct mip6_input_data input;
-    char *address, *interface, *homeagent = NULL;
-    int   plen;
-    int retval;
+	struct mip6_input_data input;
+	char *address, *interface, *homeagent = NULL;
+	int   plen;
+	int retval;
 
-    if (parse_addr(homeaddr, &address, &plen, &interface) < 0) {
-        warnx("error parsing home address %s\n", homeaddr);
-        return -1;
-    }
+	if (parse_addr(homeaddr, &address, &plen, &interface) < 0) {
+		warnx("error parsing home address %s\n", homeaddr);
+		return -1;
+	}
 
-    if ((homeagent = strchr(interface, '%')) != NULL) {
-        *homeagent = '\0';
-        homeagent++;
-    }
+	if ((homeagent = strchr(interface, '%')) != NULL) {
+		*homeagent = '\0';
+		homeagent++;
+	}
 
 #ifdef DEBUG
-    printf("set_homeaddr: address: %s, plen: %d, interface: %s, homeagent: %s\n",
-           address, plen, interface, homeagent);
+	printf("set_homeaddr: address: %s, plen: %d, interface: %s, homeagent: %s\n",
+	       address, plen, interface, homeagent);
 #endif /* DEBUG */
 
-    if (getaddress(address, &input.ip6_addr) < 0) {
-        warnx("unknown home address %s\n", address);
-        return -1;
-    }
+	if (getaddress(address, &input.ip6_addr) < 0) {
+		warnx("unknown home address %s\n", address);
+		return -1;
+	}
 
-    if (homeagent == NULL || *homeagent == '\0' || *homeagent == ' ')
-        input.ha_addr = in6addr_any;
-    else {
- 	if (getaddress(homeagent, &input.ha_addr) < 0) {
-            warnx("unknown homeagent address %s\n", homeagent);
-            return -1;
-        }
-    }
+	if (homeagent == NULL || *homeagent == '\0' || *homeagent == ' ')
+		input.ha_addr = in6addr_any;
+	else {
+		if (getaddress(homeagent, &input.ha_addr) < 0) {
+			warnx("unknown homeagent address %s\n", homeagent);
+			return -1;
+		}
+	}
 
-    input.prefix_len = plen;
-    strcpy(input.if_name, interface);
+	input.prefix_len = plen;
+	strcpy(input.if_name, interface);
 
-    mip6_module = MIP6_MN_MODULE;
-    startmip6 = 1;
+	mip6_module = MIP6_MN_MODULE;
+	startmip6 = 1;
 
-    if ((retval = upd_kernel(command, (void *)&input)) > 0) {
-        /* error */
-        print_err(retval);
-    }
+	if ((retval = upd_kernel(command, (void *)&input)) > 0) {
+		/* error */
+		print_err(retval);
+	}
 
-    return retval;
+	return retval;
 }
 
 static int
 del_coaddr(char *coaddr, u_long command)
 {
-    struct mip6_input_data input;
-    char *address, *interface;
-    int   plen;
-    int retval;
+	struct mip6_input_data input;
+	char *address, *interface;
+	int   plen;
+	int retval;
 
-    if (parse_addr(coaddr, &address, &plen, &interface) < 0) {
-        warnx("error parsing c/o address %s\n", coaddr);
-        return -1;
-    }
+	if (parse_addr(coaddr, &address, &plen, &interface) < 0) {
+		warnx("error parsing c/o address %s\n", coaddr);
+		return -1;
+	}
 
 #ifdef DEBUG
-    printf("del_coaddr: address: %s, plen: %d, interface: %s\n",
-           address, plen, interface);
+	printf("del_coaddr: address: %s, plen: %d, interface: %s\n",
+	       address, plen, interface);
 #endif /* DEBUG */
 
-    if (getaddress(address, &input.ip6_addr) < 0) {
-        warnx("unknown c/o address %s\n", address);
-        return -1;
-    }
+	if (getaddress(address, &input.ip6_addr) < 0) {
+		warnx("unknown c/o address %s\n", address);
+		return -1;
+	}
 
-    input.prefix_len = plen;
-    strcpy(input.if_name, interface);
+	input.prefix_len = plen;
+	strcpy(input.if_name, interface);
 
-    if ((retval = upd_kernel(command, (void *)&input)) > 0) {
-        /* error */
-        print_err(retval);
-    }
+	if ((retval = upd_kernel(command, (void *)&input)) > 0) {
+		/* error */
+		print_err(retval);
+	}
 
-    return retval;
+	return retval;
 }
 
 static int
 set_coaddr(char *coaddr, u_long command)
 {
-    struct mip6_input_data input;
-    char *address, *interface;
-    int   plen;
-    int retval;
+	struct mip6_input_data input;
+	char *address, *interface;
+	int   plen;
+	int retval;
 
-    if (parse_addr(coaddr, &address, &plen, &interface) < 0) {
-        warnx("error parsing c/o address %s\n", coaddr);
-        return -1;
-    }
+	if (parse_addr(coaddr, &address, &plen, &interface) < 0) {
+		warnx("error parsing c/o address %s\n", coaddr);
+		return -1;
+	}
 
 #ifdef DEBUG
-    printf("set_coaddr: address: %s, plen: %d, interface: %s\n",
-           address, plen, interface);
+	printf("set_coaddr: address: %s, plen: %d, interface: %s\n",
+	       address, plen, interface);
 #endif /* DEBUG */
 
-    if (getaddress(address, &input.ip6_addr) < 0) {
-        warnx("unknown c/o address %s\n", address);
-        return -1;
-    }
+	if (getaddress(address, &input.ip6_addr) < 0) {
+		warnx("unknown c/o address %s\n", address);
+		return -1;
+	}
 
-    input.prefix_len = plen;
-    strcpy(input.if_name, interface);
+	input.prefix_len = plen;
+	strcpy(input.if_name, interface);
 
-    if ((retval = upd_kernel(command, (void *)&input)) > 0) {
-        /* error */
-        print_err(retval);
-    }
+	if ((retval = upd_kernel(command, (void *)&input)) > 0) {
+		/* error */
+		print_err(retval);
+	}
 
-    return retval;
+	return retval;
 }
 
 static int
 set_enable(char *enable, u_long command)
 {
-    struct mip6_input_data input;
-    int retval;
+	struct mip6_input_data input;
+	int retval;
 
 #ifdef DEBUG
-    printf("set_enable: %s, command: %lu\n", enable, command);
+	printf("set_enable: %s, command: %lu\n", enable, command);
 #endif /* DEBUG */
 
-    if ((enable == NULL) || (enable != NULL && atoi(enable) >= 1))
-        input.value = 1;
-    else
-        input.value = 0;
+	if ((enable == NULL) || (enable != NULL && atoi(enable) >= 1))
+		input.value = 1;
+	else
+		input.value = 0;
 
-    if (command == SIOCSAUTOCONFIG_MIP6) {
-	    mip6_module = MIP6_MN_MODULE;
-	    startmip6 = 1;
-    }
+	if (command == SIOCSAUTOCONFIG_MIP6) {
+		mip6_module = MIP6_MN_MODULE;
+		startmip6 = 1;
+	}
 
-    if ((retval = upd_kernel(command, (void *)&input)) > 0) {
-        /* error */
-        print_err(retval);
-    }
+	if ((retval = upd_kernel(command, (void *)&input)) > 0) {
+		/* error */
+		print_err(retval);
+	}
 
-    return retval;
+	return retval;
 }
 
 static int
 set_value(char *value, u_long command)
 {
-    struct mip6_input_data input;
-    int retval;
+	struct mip6_input_data input;
+	int retval;
 
 #ifdef DEBUG
-    printf("set_value: %s, command: %lu\n", value, command);
+	printf("set_value: %s, command: %lu\n", value, command);
 #endif /* DEBUG */
 
-    if (value == NULL)
-        return -1;
+	if (command == SIOCSEAGERMD_MIP6 && value == NULL)
+		input.value = 1;
+	else {
+		if (value == NULL)
+			return -1;
 
-    input.value = atoi(value);
+		input.value = atoi(value);
+	}
 
-    if ((retval = upd_kernel(command, (void *)&input)) > 0) {
-        /* error */
-        print_err(retval);
-    }
+	if ((retval = upd_kernel(command, (void *)&input)) > 0) {
+		/* error */
+		print_err(retval);
+	}
 
-    return retval;
+	return retval;
 }
 
 static int
 set_enable_ha(char *value, u_long command)
 {
 #ifdef DEBUG
-    printf("set_enable_ha: %s, command: %lu\n", value, command);
+	printf("set_enable_ha: %s, command: %lu\n", value, command);
 #endif /* DEBUG */
 
-    mip6_module = MIP6_HA_MODULE;
-    startmip6 = 1;
+	mip6_module = MIP6_HA_MODULE;
+	startmip6 = 1;
 
-    return 0;
+	return 0;
 }
 
 /* Parsing template */
 struct config_tmpl config_mip6[] = {
-    { "homeaddr", set_homeaddr, SIOCAHOMEADDR_MIP6},
-    { "coaddr", set_coaddr, SIOCACOADDR_MIP6},
-    { "enable_ha", set_enable_ha, 0},
-    { "bu_lifetime", set_value, SIOCSBULIFETIME_MIP6},
-    { "br_update", set_value, SIOCSBRUPDATE_MIP6},
-    { "autoconfig", set_enable, SIOCSAUTOCONFIG_MIP6},
-    { "ha_pref", set_value, SIOCSHAPREF_MIP6},
-    { "hr_lifetime", set_value, SIOCSHRLIFETIME_MIP6},
-    { "fwd_sl_unicast", set_enable, SIOCSFWDSLUNICAST_MIP6},
-    { "fwd_sl_multicast", set_enable, SIOCSFWDSLMULTICAST_MIP6},
-    { "prom_mode", set_enable, SIOCSPROMMODE_MIP6},
-    { "bu_to_cn", set_enable, SIOCSBU2CN_MIP6},
-    { "rev_tunnel", set_enable, SIOCSREVTUNNEL_MIP6},
-    { "enable_br", set_enable, SIOCSENABLEBR_MIP6},
-    { "debug", set_enable, SIOCSDEBUG_MIP6},
-    { "eager_md", set_enable, SIOCSEAGERMD_MIP6},
-    { NULL, NULL, -1 }
+	{ "homeaddr", set_homeaddr, SIOCAHOMEADDR_MIP6},
+	{ "coaddr", set_coaddr, SIOCACOADDR_MIP6},
+	{ "enable_ha", set_enable_ha, 0},
+	{ "bu_lifetime", set_value, SIOCSBULIFETIME_MIP6},
+	{ "br_update", set_value, SIOCSBRUPDATE_MIP6},
+	{ "autoconfig", set_enable, SIOCSAUTOCONFIG_MIP6},
+	{ "ha_pref", set_value, SIOCSHAPREF_MIP6},
+	{ "hr_lifetime", set_value, SIOCSHRLIFETIME_MIP6},
+	{ "fwd_sl_unicast", set_enable, SIOCSFWDSLUNICAST_MIP6},
+	{ "fwd_sl_multicast", set_enable, SIOCSFWDSLMULTICAST_MIP6},
+	{ "prom_mode", set_enable, SIOCSPROMMODE_MIP6},
+	{ "bu_to_cn", set_enable, SIOCSBU2CN_MIP6},
+	{ "rev_tunnel", set_enable, SIOCSREVTUNNEL_MIP6},
+	{ "enable_br", set_enable, SIOCSENABLEBR_MIP6},
+	{ "debug", set_enable, SIOCSDEBUG_MIP6},
+	{ "eager_md", set_value, SIOCSEAGERMD_MIP6},
+	{ NULL, NULL, -1 }
 };
 
 static void
@@ -389,57 +394,59 @@ mip6_init(void)
 static int
 read_config()
 {
-    FILE *configfile;
-    char buf[160];
-    int retval = 0;
+	FILE *configfile;
+	char buf[160];
+	int retval = 0;
 
-    if ((configfile = fopen(configfilename, "r")) == NULL) {
-	perror(configfilename);
-	return -1;
-    }
-
-    while(fgets(buf, sizeof(buf), configfile) != NULL) {
-	char *argptr;
-	int   i;
-
-	/* Remove last CR */
- 	if (buf[strlen(buf) - 1] == '\n')
-	    buf[strlen(buf) - 1] = '\0';
-
-	/* Argptr is the second parameter in the config file or NULL */
- 	if ((argptr = strchr(buf, ' ')) != NULL) {
-	    *argptr = '\0';
-	    argptr++;
+	if ((configfile = fopen(configfilename, "r")) == NULL) {
+		perror(configfilename);
+		return -1;
 	}
 
-	/* Ignore empty lines and comments */
- 	if (*buf == '\0' || *buf == '#')
-	    continue;
+	while(fgets(buf, sizeof(buf), configfile) != NULL) {
+		char *argptr;
+		int   i;
 
-	/* Depending on the first paramenter, call the parsing function */
-	for(i = 0; config_mip6[i].comstring != NULL; i++)
-     	if (strcmp(config_mip6[i].comstring, buf) == NULL) {
-		retval = config_mip6[i].parse(argptr, config_mip6[i].command);
-		break;
-	    }
+		/* Remove last CR */
+		if (buf[strlen(buf) - 1] == '\n')
+			buf[strlen(buf) - 1] = '\0';
 
- 	if (config_mip6[i].comstring == NULL)
-	    warnx("ignored unknown option %s\n", buf);
+		/* Argptr is the second parameter in the config file or NULL */
+		if ((argptr = strchr(buf, ' ')) != NULL) {
+			*argptr = '\0';
+			argptr++;
+		}
 
- 	if (retval < 0) {
-	    warnx("error in %s while parsing %s\n",
-		   configfilename, config_mip6[i].comstring);
-	    break;
+		/* Ignore empty lines and comments */
+		if (*buf == '\0' || *buf == '#')
+			continue;
+
+		/* Depending on the first paramenter, call the parsing 
+		   function */
+		for(i = 0; config_mip6[i].comstring != NULL; i++)
+			if (strcmp(config_mip6[i].comstring, buf) == NULL) {
+				retval = config_mip6[i].parse(
+					argptr, config_mip6[i].command);
+				break;
+			}
+
+		if (config_mip6[i].comstring == NULL)
+			warnx("ignored unknown option %s\n", buf);
+
+		if (retval < 0) {
+			warnx("error in %s while parsing %s\n",
+			      configfilename, config_mip6[i].comstring);
+			break;
+		}
 	}
-    }
 
-    if (ferror(configfile)) {
-	perror("read error");
-	retval = -1;
-    }
+	if (ferror(configfile)) {
+		perror("read error");
+		retval = -1;
+	}
 
-    fclose(configfile);
-    return retval;
+	fclose(configfile);
+	return retval;
 }
 
 static char *delcoaddr, *coaddr, *homeaddr, *hr_lifetime, *fwd_sl_unicast;
@@ -450,229 +457,230 @@ static char *enable_rev_tunnel, *br_update, *eager_md, *release;
 int
 main(int argc, char *argv[])
 {
-    int ch;
+	int ch;
 
-    /*signal(SIGTERM, mip6_exit);*/
+	/*signal(SIGTERM, mip6_exit);*/
 
-    if (getuid() != 0){
-        warnx("permission denied\n");
-        exit(1);
-    }
-
-    if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-        err(1, "socket");
-
-    while ((ch = getopt(argc, argv, "F:H:E:f:b:w:y:l:hgxu:m:p:r:t:q:d:ae:")) != -1)
-	switch(ch) {
-	case 'F':
-	    coaddr = optarg;
-	    break;
-	case 'H':
-	    homeaddr = optarg;
-	    break;
-	case 'l':
-	    hr_lifetime = optarg;
-	    break;
-	case 'u':
-	    fwd_sl_unicast = optarg;
-	    break;
-	case 'm':
-	    fwd_sl_multicast = optarg;
-	    break;
-	case 'a':
-	    autoconfig = (char *)1;
-	    break;
-	case 'r':
-	    enable_bu_to_cn = optarg;
-	    break;
-	case 'd':
-	    enable_debug = optarg;
-	    break;
-	case 'E':
-	    delcoaddr = optarg;
-	    break;
-	case 'f':
-	    configfilename = optarg;
-	    break;
-	case 'g':
-	    enable_ha = (void *)1;
-	    mip6_module = MIP6_HA_MODULE;
-	    startmip6 = 1;
-	    break;
-	case 'x':
-	    release = (void *)1;
-	    break;
-	case 'h':
-	    usage();
-	    break;
-	case 'p':
-	    prom_mode = optarg;
-	    break;
-	case 'y':
-	    ha_pref = optarg;
-	    break;
-	case 'q':
-	    enable_br = optarg;
-	    break;
-	case 'w':
-	    br_update = optarg;
-	    break;
-	case 't':
-	    enable_rev_tunnel = optarg;
-	    break;
-	case 'b':
-	    bu_lifetime = optarg;
-	    break;
-	case 'e':
-	    eager_md = optarg;
-	    break;
-	default:
-	    usage();
+	if (getuid() != 0){
+		warnx("permission denied\n");
+		exit(1);
 	}
-    argv += optind;
-    argc -= optind;
 
-    if (optind < 2)
-        usage();
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+		err(1, "socket");
 
-    /* -f is the only switch allowed */
-    if (configfilename &&
-       (delcoaddr || coaddr || homeaddr || hr_lifetime ||
-        fwd_sl_unicast || autoconfig || bu_lifetime || enable_bu_to_cn ||
-        enable_debug || fwd_sl_multicast || prom_mode || enable_br ||
-        enable_rev_tunnel || br_update || ha_pref || eager_md || release))
-        usage();
+	while ((ch = getopt(argc, argv,
+			    "F:H:E:f:b:w:y:l:hgxu:m:p:r:t:q:d:ae:")) != -1)
+		switch(ch) {
+		case 'F':
+			coaddr = optarg;
+			break;
+		case 'H':
+			homeaddr = optarg;
+			break;
+		case 'l':
+			hr_lifetime = optarg;
+			break;
+		case 'u':
+			fwd_sl_unicast = optarg;
+			break;
+		case 'm':
+			fwd_sl_multicast = optarg;
+			break;
+		case 'a':
+			autoconfig = (char *)1;
+			break;
+		case 'r':
+			enable_bu_to_cn = optarg;
+			break;
+		case 'd':
+			enable_debug = optarg;
+			break;
+		case 'E':
+			delcoaddr = optarg;
+			break;
+		case 'f':
+			configfilename = optarg;
+			break;
+		case 'g':
+			enable_ha = (void *)1;
+			mip6_module = MIP6_HA_MODULE;
+			startmip6 = 1;
+			break;
+		case 'x':
+			release = (void *)1;
+			break;
+		case 'h':
+			usage();
+			break;
+		case 'p':
+			prom_mode = optarg;
+			break;
+		case 'y':
+			ha_pref = optarg;
+			break;
+		case 'q':
+			enable_br = optarg;
+			break;
+		case 'w':
+			br_update = optarg;
+			break;
+		case 't':
+			enable_rev_tunnel = optarg;
+			break;
+		case 'b':
+			bu_lifetime = optarg;
+			break;
+		case 'e':
+			eager_md = optarg;
+			break;
+		default:
+			usage();
+		}
+	argv += optind;
+	argc -= optind;
 
-    /* -E is the only switch allowed */
-    if (delcoaddr &&
-       (coaddr || homeaddr || hr_lifetime ||
-        fwd_sl_unicast || autoconfig || bu_lifetime || enable_bu_to_cn ||
-        enable_debug || fwd_sl_multicast || prom_mode || enable_br ||
-        enable_rev_tunnel || br_update || ha_pref || eager_md || release))
-        usage();
+	if (optind < 2)
+		usage();
 
-    /* -x is the only switch allowed */
-    if (release &&
-       (delcoaddr || coaddr || homeaddr || hr_lifetime ||
-        fwd_sl_unicast || autoconfig || bu_lifetime || enable_bu_to_cn ||
-        enable_debug || fwd_sl_multicast || prom_mode || enable_br ||
-        enable_rev_tunnel || br_update || ha_pref || eager_md))
-        usage();
+	/* -f is the only switch allowed */
+	if (configfilename &&
+	    (delcoaddr || coaddr || homeaddr || hr_lifetime ||
+	     fwd_sl_unicast || autoconfig || bu_lifetime || enable_bu_to_cn ||
+	     enable_debug || fwd_sl_multicast || prom_mode || enable_br ||
+	     enable_rev_tunnel || br_update || ha_pref || eager_md || release))
+		usage();
 
-    /* Only one of -a, -H and -g allowed */
-    if (autoconfig &&
-       (homeaddr || enable_ha))
-        usage();
-    if (homeaddr &&
-       (autoconfig || enable_ha))
-        usage();
-    if (enable_ha &&
-       (homeaddr || autoconfig))
-        usage();
+	/* -E is the only switch allowed */
+	if (delcoaddr &&
+	    (coaddr || homeaddr || hr_lifetime ||
+	     fwd_sl_unicast || autoconfig || bu_lifetime || enable_bu_to_cn ||
+	     enable_debug || fwd_sl_multicast || prom_mode || enable_br ||
+	     enable_rev_tunnel || br_update || ha_pref || eager_md || release))
+		usage();
 
-    /* -F or -e not allowed if homeagent */
-    if (enable_ha &&
-       (coaddr || eager_md))
-	usage();
+	/* -x is the only switch allowed */
+	if (release &&
+	    (delcoaddr || coaddr || homeaddr || hr_lifetime ||
+	     fwd_sl_unicast || autoconfig || bu_lifetime || enable_bu_to_cn ||
+	     enable_debug || fwd_sl_multicast || prom_mode || enable_br ||
+	     enable_rev_tunnel || br_update || ha_pref || eager_md))
+		usage();
 
-    /* -m, -u, -y and -t only allowed if homeagent */
-    if (fwd_sl_unicast &&
-       (autoconfig || homeaddr))
-	usage();
-    if (fwd_sl_multicast &&
-       (autoconfig || homeaddr))
-	usage();
-    if (ha_pref &&
-       (autoconfig || homeaddr))
-	usage();
-    if (enable_rev_tunnel &&
-       (autoconfig || homeaddr))
-	usage();
+	/* Only one of -a, -H and -g allowed */
+	if (autoconfig &&
+	    (homeaddr || enable_ha))
+		usage();
+	if (homeaddr &&
+	    (autoconfig || enable_ha))
+		usage();
+	if (enable_ha &&
+	    (homeaddr || autoconfig))
+		usage();
 
-    if (configfilename) {
-	if (read_config() < 0) {
-	    warnx("error reading configuration file\n");
-	    exit(1);
+	/* -F or -e not allowed if homeagent */
+	if (enable_ha &&
+	    (coaddr || eager_md))
+		usage();
+
+	/* -m, -u, -y and -t only allowed if homeagent */
+	if (fwd_sl_unicast &&
+	    (autoconfig || homeaddr))
+		usage();
+	if (fwd_sl_multicast &&
+	    (autoconfig || homeaddr))
+		usage();
+	if (ha_pref &&
+	    (autoconfig || homeaddr))
+		usage();
+	if (enable_rev_tunnel &&
+	    (autoconfig || homeaddr))
+		usage();
+
+	if (configfilename) {
+		if (read_config() < 0) {
+			warnx("error reading configuration file\n");
+			exit(1);
+		}
 	}
-    }
 
-    if (delcoaddr)
- 	if (del_coaddr(delcoaddr, SIOCDCOADDR_MIP6) > 0)
- 	    exit(1);
+	if (delcoaddr)
+		if (del_coaddr(delcoaddr, SIOCDCOADDR_MIP6) > 0)
+			exit(1);
 
-    if (autoconfig)
- 	if (set_enable(NULL, SIOCSAUTOCONFIG_MIP6) > 0)
- 	    exit(1);
+	if (autoconfig)
+		if (set_enable(NULL, SIOCSAUTOCONFIG_MIP6) > 0)
+			exit(1);
 
-    if (homeaddr)
- 	if (set_homeaddr(homeaddr, SIOCAHOMEADDR_MIP6) > 0)
- 	    exit(1);
+	if (homeaddr)
+		if (set_homeaddr(homeaddr, SIOCAHOMEADDR_MIP6) > 0)
+			exit(1);
 
 #if 0
-    /*XXXYYY*/
-    if (enable_ha)
-	if (set_enable(NULL, SIOCSENABLEHA_MIP6) > 0)
-	    exit(1);
+	/*XXXYYY*/
+	if (enable_ha)
+		if (set_enable(NULL, SIOCSENABLEHA_MIP6) > 0)
+			exit(1);
 #endif
 
-    if (release)
-	if (set_enable(NULL, SIOCSRELEASE_MIP6) > 0)
-	exit(1);
+	if (release)
+		if (set_enable(NULL, SIOCSRELEASE_MIP6) > 0)
+			exit(1);
 
-    if (coaddr)
-	if (set_coaddr(coaddr, SIOCACOADDR_MIP6) > 0)
-	    exit(1);
+	if (coaddr)
+		if (set_coaddr(coaddr, SIOCACOADDR_MIP6) > 0)
+			exit(1);
 
-    if (hr_lifetime)
-	if (set_value(hr_lifetime, SIOCSHRLIFETIME_MIP6) > 0)
-	    exit(1);
+	if (hr_lifetime)
+		if (set_value(hr_lifetime, SIOCSHRLIFETIME_MIP6) > 0)
+			exit(1);
 
-    if (fwd_sl_unicast)
-	if (set_enable(fwd_sl_unicast, SIOCSFWDSLUNICAST_MIP6) > 0)
-	    exit(1);
+	if (fwd_sl_unicast)
+		if (set_enable(fwd_sl_unicast, SIOCSFWDSLUNICAST_MIP6) > 0)
+			exit(1);
 
-    if (fwd_sl_multicast)
-	if (set_enable(fwd_sl_multicast, SIOCSFWDSLMULTICAST_MIP6) > 0)
-	    exit(1);
+	if (fwd_sl_multicast)
+		if (set_enable(fwd_sl_multicast, SIOCSFWDSLMULTICAST_MIP6) > 0)
+			exit(1);
 
-    if (enable_bu_to_cn)
-	if (set_enable(enable_bu_to_cn, SIOCSBU2CN_MIP6) > 0)
-	    exit(1);
+	if (enable_bu_to_cn)
+		if (set_enable(enable_bu_to_cn, SIOCSBU2CN_MIP6) > 0)
+			exit(1);
 
-    if (enable_debug)
-	if (set_enable(enable_debug, SIOCSDEBUG_MIP6) > 0)
-	    exit(1);
+	if (enable_debug)
+		if (set_enable(enable_debug, SIOCSDEBUG_MIP6) > 0)
+			exit(1);
 
-    if (prom_mode)
-	if (set_enable(prom_mode, SIOCSPROMMODE_MIP6) > 0)
-	    exit(1);
+	if (prom_mode)
+		if (set_enable(prom_mode, SIOCSPROMMODE_MIP6) > 0)
+			exit(1);
 
-    if (ha_pref)
-	if (set_value(ha_pref, SIOCSHAPREF_MIP6) > 0)
-	    exit(1);
+	if (ha_pref)
+		if (set_value(ha_pref, SIOCSHAPREF_MIP6) > 0)
+			exit(1);
 
-    if (enable_br)
-	if (set_enable(enable_br, SIOCSENABLEBR_MIP6) > 0)
-	    exit(1);
+	if (enable_br)
+		if (set_enable(enable_br, SIOCSENABLEBR_MIP6) > 0)
+			exit(1);
 
-    if (br_update)
-	if (set_value(br_update, SIOCSBRUPDATE_MIP6) > 0)
-	    exit(1);
+	if (br_update)
+		if (set_value(br_update, SIOCSBRUPDATE_MIP6) > 0)
+			exit(1);
 
-    if (enable_rev_tunnel)
-	if (set_enable(enable_rev_tunnel, SIOCSREVTUNNEL_MIP6) > 0)
-	    exit(1);
+	if (enable_rev_tunnel)
+		if (set_enable(enable_rev_tunnel, SIOCSREVTUNNEL_MIP6) > 0)
+			exit(1);
 
-    if (bu_lifetime)
-	if (set_value(bu_lifetime, SIOCSBULIFETIME_MIP6) > 0)
-	    exit(1);
+	if (bu_lifetime)
+		if (set_value(bu_lifetime, SIOCSBULIFETIME_MIP6) > 0)
+			exit(1);
 
-    if (eager_md)
-	if (set_enable(eager_md, SIOCSEAGERMD_MIP6) > 0)
-	    exit(1);
+	if (eager_md)
+		if (set_value(eager_md, SIOCSEAGERMD_MIP6) > 0)
+			exit(1);
 
-    if (startmip6) /* Should be last */
-	mip6_init();
+	if (startmip6) /* Should be last */
+		mip6_init();
 
-    return 0;
+	return 0;
 }
