@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.36 2000/06/17 20:34:24 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.37 2000/07/12 02:20:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -123,8 +123,12 @@ static int mask_match __P((const struct encaptab *, const struct sockaddr *,
 		const struct sockaddr *));
 static void encap_fillarg __P((struct mbuf *, const struct encaptab *));
 
+#ifndef LIST_HEAD_INITIALIZER
 /* rely upon BSS initialization */
 LIST_HEAD(, encaptab) encaptab;
+#else
+LIST_HEAD(, encaptab) encaptab = LIST_HEAD_INITIALIZER(&encaptab);
+#endif
 
 void
 encap_init()
