@@ -7,7 +7,7 @@ MAN=	mld6query.8
 BINOWN=	root
 BINGRP=	bin
 
-CPPFLAGS+= -DINET6
+CPPFLAGS+= -DINET6 -DUSE_RFC2292BIS
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6

@@ -6,7 +6,7 @@ MAN8=	mld6query.8
 BINOWN=	root
 BINGRP=	bin
 
-CFLAGS+= -DINET6 -DIPSEC
+CFLAGS+= -DINET6 -DIPSEC -DUSE_RFC2292BIS
 
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
