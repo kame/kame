@@ -1,8 +1,24 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.66 1999/08/25 13:48:22 itojun Exp $
+$Id: CHANGELOG,v 1.67 1999/08/25 16:38:44 jinmei Exp $
 
 <199908>
+1999-08-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* sys/netinet6/in6_pcb.c (in6_selecthlim): added to select hop
+	limit for an outgoing packet in various situations. The algorithm
+	is as follows:
+	1. The hop limit field of the template header.
+	2. Hoplimit valued specified via ioctl.
+	3. (If the outgoing interface is detected) the current
+	   hop limit of the interface specified by router advertisement.
+	4. The system default hoplimit.
+	UDP6 and raw IP6 directory use this function. TCP6 uses this via
+	in6_pcbconnect.
+	This change fixes the problem that IPV6_UNICAST_HOPS did not work
+	for a UDP6 and raw IP6 socket.
+	Thanks to Tetsuya Isaki <isaki@v6.ipc.hiroshima-u.ac.jp> for
+	finding the problem.
+
 Wed Aug 25 22:45:15 JST 1999  itojun@iijlab.net
 	* kame/rtsold: Fix segv when invoked as normal user, not root.
 	  do not wait forever if -1 is specified (or invoked as rtsol).
