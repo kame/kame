@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1473 2001/01/10 02:40:21 sakane Exp $
+$KAME: CHANGELOG,v 1.1474 2001/01/10 17:47:24 sakane Exp $
 
 <200101>
+Thu Jan 11 02:47:37 JST 2001 sakane@ydc.co.jp
+	* kame/sys/netkey/key.c:
+	- key_acquire() does not require a secpolicy structure.
+	  There was a possibility of kernel panic.
+	  reported by <dwang@iPolicyNet.COM>.
+
+Thu Jan 11 02:46:09 JST 2001 sakane@ydc.co.jp
+	* racoon:
+	- saved the type of SA in PF_KEY acquire message from the kernel
+	  in order to reply a error.
+	- removed from the scheduler immediately if error happened when sending
+	  phase 1 initiation message.
+
 Wed Jan 10 11:41:30 JST 2001 sakane@ydc.co.jp
 	* racoon:
 	- Fixed to configure the logging level.  racoon saves some parameters
