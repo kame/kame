@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.77 2000/08/14 08:54:17 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.78 2000/08/14 13:30:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -264,6 +264,7 @@ void	 pr_pack __P((u_char *, int, struct msghdr *));
 void	 pr_exthdrs __P((struct msghdr *));
 void	 pr_ip6opt __P((void *));
 void	 pr_rthdr __P((void *));
+void	 pr_bitrange __P((u_int32_t, int));
 void	 pr_retip __P((struct ip6_hdr *, u_char *));
 void	 summary __P((void));
 void	 tvsub __P((struct timeval *, struct timeval *));
