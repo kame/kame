@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.19 2000/02/03 06:00:32 jinmei Exp $");
+__RCSID("$Id: inet6.c,v 1.20 2000/02/03 10:38:26 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -684,6 +684,7 @@ ip6_stats(off, name)
 	p(ip6s_exthdrtoolong, "\t%llu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%llu tunneling packet%s that can't find gif\n");
 	p(ip6s_toomanyhdr, "\t%llu packet%s discarded due to too many headers\n");
+
 	p(ip6s_pulldown, "\t%llu call%s to m_pulldown\n");
 	p(ip6s_pulldown_alloc, "\t%llu mbuf allocation%s in m_pulldown\n");
 	if (ip6stat.ip6s_pulldown_copy != 1) {
@@ -691,6 +692,20 @@ ip6_stats(off, name)
 	} else {
 		p1(ip6s_pulldown_copy, "\t%llu mbuf copy in m_pulldown\n");
 	}
+	p(ip6s_pullup_alloc, "\t%llu mbuf allocation%s in m_pullup\n");
+	if (ip6stat.ip6s_pullup_copy != 1) {
+		p1(ip6s_pullup_copy, "\t%llu mbuf copies in m_pullup\n");
+	} else {
+		p1(ip6s_pullup_copy, "\t%llu mbuf copy in m_pullup\n");
+	}
+	p(ip6s_pullup_fail, "\t%llu failures%s in m_pullup\n");
+	p(ip6s_pullup2_alloc, "\t%llu mbuf allocation%s in m_pullup2\n");
+	if (ip6stat.ip6s_pullup2_copy != 1) {
+		p1(ip6s_pullup2_copy, "\t%llu mbuf copies in m_pullup2\n");
+	} else {
+		p1(ip6s_pullup2_copy, "\t%llu mbuf copy in m_pullup2\n");
+	}
+	p(ip6s_pullup2_fail, "\t%llu failures%s in m_pullup2\n");
 
 	/* for debugging source address selection */
 #define PRINT_SCOPESTAT(s,i) do {\
