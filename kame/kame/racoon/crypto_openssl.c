@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.82 2003/10/21 07:18:03 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.83 2003/11/13 19:51:43 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -978,6 +978,9 @@ eay_des_encrypt(data, key, iv)
 #else
 	des_key_schedule ks;
 #endif
+
+	if (data->l % 8)
+		return NULL;
 
 #ifdef USE_NEW_DES_API
 	if (DES_key_sched((void *)key->v, &ks) != 0)

@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.41 2003/07/12 08:44:45 itojun Exp $	*/
+/*	$KAME: eaytest.c,v 1.42 2003/11/13 19:51:43 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -486,6 +486,8 @@ ciphertest(ac, av)
 
 	memcpy(iv->v, iv0.v, 8);
 	res1 = eay_des_encrypt(&data, &key, iv);
+	if (res1 == NULL)
+		errx(1, "length must be 8");
 	printf("encrypto:\n");
 	PVDUMP(res1);
 
