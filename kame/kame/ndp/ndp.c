@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.76 2001/08/20 07:00:11 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.77 2001/08/28 11:46:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -955,6 +955,7 @@ ifinfo(argc, argv)
 		}\
 	} while (0)
 		SETFLAG("nud", ND6_IFF_PERFORMNUD);
+		SETFLAG("accept_rtadv", ND6_IFF_ACCEPT_RTADV);
 
 		ND.flags = newflags;
 		if (ioctl(s, SIOCSIFINFO_FLAGS, (caddr_t)&nd) < 0) {
@@ -1003,8 +1004,10 @@ ifinfo(argc, argv)
 #endif
 	if (ND.flags) {
 		printf("\nFlags: ");
-		if ((ND.flags & ND6_IFF_PERFORMNUD) != 0)
+		if ((ND.flags & ND6_IFF_PERFORMNUD))
 			printf("PERFORMNUD ");
+		if ((ND.flags & ND6_IFF_ACCEPT_RTADV))
+			printf("ACCEPT_RA ");
 	}
 	putc('\n', stdout);
 #undef ND
