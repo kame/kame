@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.15 2000/01/11 15:56:02 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.16 2000/01/11 16:43:10 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -78,15 +78,36 @@
 
 /*
  * prop_pair: (proposal number, transform number)
- *              p[0]    p[1]    p[2]	...
- *      top     (p1,t1) (p2,t1) (p3,t1)
- *      next    (p1,t2) (p2,t2)
- *       :         :       :
+ *
+ *	(SA (P1 (T1 T2)) (P1' (T1' T2')) (P2 (T1" T2")))
+ *
+ *              p[1]      p[2]
+ *      top     (P1,T1)   (P2",T1")
+ *		 |  |tnext     |tnext
+ *		 |  v          v
+ *		 | (P1, T2)   (P2", T2")
+ *		 v next
+ *		(P1', T1')
+ *		    |tnext
+ *		    v
+ *		   (P1', T2')
+ *
+ * when we convert it to ipsecsa in prop2ipsecsa(), it should become like:
+ *	{next	<bundle (P1 T1), (P1', T1')>
+ *		<bundle (P1 T1), (P1', T2')>
+ *		<bundle (P1 T2), (P1', T1')>
+ *		<bundle (P1 T2), (P1', T2')>}
+ *	{next	(P2" T1")
+ *		(P2" T2")}}
+ * what a hard job.
  */
 struct prop_pair {
 	struct isakmp_pl_p *prop;
 	struct isakmp_pl_t *trns;
-	struct prop_pair *next;
+	struct prop_pair *next;	/* next prop_pair with same proposal # */
+				/* (bundle case) */
+	struct prop_pair *tnext; /* next prop_pair in same proposal payload */
+				/* (multiple tranform case) */
 };
 #define MAXPROPPAIRLEN	256	/* It's enough because field size is 1 octet. */
 
@@ -165,6 +186,9 @@ static int mksakeys __P((struct ipsecsa *b, struct ipsecsakeys **keys,
 static void ipsecdoi_printsa_bundle __P((const struct ipsecsa *));
 static void ipsecdoi_printsa_bundle0 __P((const struct ipsecsa *, int));
 static void ipsecdoi_printsa_1 __P((const struct ipsecsa *));
+
+static void print_proppair0 __P((struct prop_pair *, int));
+static void print_proppair __P((struct prop_pair *));
 
 /*%%%*/
 /*
@@ -643,16 +667,19 @@ get_ph2approval(iph2, pair)
 	for (i = 0; i < MAXPROPPAIRLEN; i++) {
 		if (pair[i] == NULL)
 			continue;
-		for (s = pair[i]; s; s = s->next) {
-			prophlen = sizeof(struct isakmp_pl_p)
-					+ s->prop->spi_size;
-			/* compare proposal and select one */
-			if (get_ph2approvalx(iph2, s) == 0)
-				goto found;
-		}
+		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "pair[%d]: %p\n",
+			i, pair[i]);
+			print_proppair(pair[i]););
+
+		s = pair[i];
+		prophlen = sizeof(struct isakmp_pl_p)
+				+ s->prop->spi_size;
+		/* compare proposal and select one */
+		if (get_ph2approvalx(iph2, s) == 0)
+			goto found;
 	}
 
-	plog(logp, LOCATION, NULL, "no suitable policy found.");
+	plog(logp, LOCATION, NULL, "no suitable policy found.\n");
 
 	return NULL;
 
@@ -665,33 +692,129 @@ found:
 }
 
 static struct ipsecsa *
-prop2ipsecsa(p)
+emit1(p)
 	struct prop_pair *p;
 {
+	struct ipsecsa *q;
+
+	YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "param: %p\n", p);
+		print_proppair(p););
+	q = CALLOC(sizeof(struct ipsecsa), struct ipsecsa *);
+	if (q == NULL)
+		return NULL;
+
+	/* XXX structure of ipsecsa may be strange. should be fix ? */
+	q->proto_id = p->prop->proto_id;
+	if (q->proto_id == IPSECDOI_PROTO_IPSEC_ESP)
+		q->enctype = p->trns->t_id;
+	if (q->proto_id == IPSECDOI_PROTO_IPCOMP)
+		q->comptype = p->trns->t_id;
+
+	if (t2ipsecsa(p->trns, q) < 0) {
+		free(q);
+		return NULL;
+	}
+
+	YIPSDEBUG(DEBUG_SA,
+		plog(logp, LOCATION, NULL, "result: %p\n", q);
+		ipsecdoi_printsa(q););
+
+	return q;
+}
+
+static int
+emit(b, max, result)
+	struct prop_pair **b;
+	size_t max;
+	struct ipsecsa **result;
+{
+	size_t i;
 	struct ipsecsa top, *q;
 
+	memset(&top, 0, sizeof(top));
 	q = &top;
-	for (/*nothing*/; p; p = p->next) {
-		q->next = CALLOC(sizeof(struct ipsecsa), struct ipsecsa *);
-		if (q->next == NULL) {
+	for (i = 0; i < max; i++) {
+		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "param[%d]: %p\n", i, b[i]);
+			print_proppair(b[i]););
+		q->bundles = emit1(b[i]);
+		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "got %p from %p\n", q->bundles, b[i]););
+		if (q->bundles == NULL) {
 			delipsecsa(top.next);
-			return NULL;
+			return -1;
 		}
+		q = q->bundles;
+	}
+	top.bundles->next = *result;
+	*result = top.bundles;
 
-		q = q->next;
-		/* XXX structure of ipsecsa may be strange. should be fix ? */
-		q->proto_id = p->prop->proto_id;
-		if (q->proto_id == IPSECDOI_PROTO_IPSEC_ESP)
-			q->enctype = p->trns->t_id;
-		if (q->proto_id == IPSECDOI_PROTO_IPCOMP)
-			q->comptype = p->trns->t_id;
+	YIPSDEBUG(DEBUG_SA,
+		plog(logp, LOCATION, NULL, "%p\n", *result);
+		ipsecdoi_printsa_bundle(*result););
 
-		if (t2ipsecsa(p->trns, q) < 0) {
-			delipsecsa(top.next);
-			return NULL;
+	return 0;
+}
+
+int
+prop2ipsecsa_recurse(b0, b, l, max, result)
+	struct prop_pair **b0;
+	struct prop_pair **b;
+	size_t l;
+	size_t max;
+	struct ipsecsa **result;
+{
+	int ret;
+	size_t i;
+
+	for (b[l] = b0[l]; b[l]; b[l] = b[l]->tnext) {
+		if (l + 1 < max) {
+			ret = prop2ipsecsa_recurse(b0, b, l + 1, max, result);
+			if (ret)
+				break;
+		} else {
+			for (i = 0; i < max; i++)
+				printf(" %d=%p", i, b[i]);
+			printf("\n");
+			ret = emit(b, max, result);
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL, "%p\n", result);
+				ipsecdoi_printsa(*result););
+			if (ret)
+				break;
 		}
 	}
 
+	return ret;
+}
+
+static struct ipsecsa *
+prop2ipsecsa(p)
+	struct prop_pair *p;
+{
+	struct prop_pair **b, **b0;
+	struct prop_pair *q;
+	size_t l, max;
+	struct ipsecsa top;
+
+	max = 0;
+	for (q = p; q; q = q->next)
+		max++;
+	b0 = CALLOC(sizeof(struct prop_pair *) * max, struct prop_pair **);
+	if (b0 == NULL)
+		return NULL;
+	b = CALLOC(sizeof(struct prop_pair *) * max, struct prop_pair **);
+	if (b == NULL)
+		return NULL;
+
+	/* b[n] contains pointer to bundle proposal */
+	l = 0;
+	for (q = p; q; q = q->next)
+		b0[l++] = q;
+
+	memset(&top, 0, sizeof(top));
+	if (prop2ipsecsa_recurse(b0, b, 0, max, &top.next)) {
+		delipsecsa(top.next);
+		return NULL;
+	}
 	return top.next;
 }
 
@@ -1181,13 +1304,18 @@ get_proppair(sa, mode)
 		if (!pair[i])
 			continue;
 
+		YIPSDEBUG(DEBUG_SA,
+			printf("pair %d:\n", i);
+			print_proppair(pair[i]););
+
 		notrans = nprop = 0;
 		for (p = pair[i]; p; p = p->next) {
 			if (p->trns == NULL) {
 				notrans++;
 				break;
 			}
-			nprop++;
+			for (q = p; q; q = q->tnext)
+				nprop++;
 		}
 
 #if 0
@@ -1212,7 +1340,7 @@ get_proppair(sa, mode)
 			pair[i] = NULL;
 			num_p--;
 		} else {
-			YIPSDEBUG(DEBUG_MISC,
+			YIPSDEBUG(DEBUG_SA,
 				plog(logp, LOCATION, NULL,
 					"proposal #%u: %d transform\n",
 					pair[i]->prop->p_no, nprop));
@@ -1312,11 +1440,17 @@ get_transform(prop, pair, num_p)
 		/* need to preserve the order */
 		for (q = pair[prop->p_no]; q && q->next; q = q->next)
 			;
-		if (q)
-			q->next = p;
-		else {
-			pair[prop->p_no] = p;
-			(*num_p)++;
+		if (q && q->prop == p->prop) {
+			for (/*nothing*/; q && q->tnext; q = q->tnext)
+				;
+			q->tnext = p;
+		} else {
+			if (q)
+				q->next = p;
+			else {
+				pair[prop->p_no] = p;
+				(*num_p)++;
+			}
 		}
 	}
 
@@ -3278,4 +3412,26 @@ ipsecdoi_printsa_1(s)
 		s_ipsecdoi_attr_v(IPSECDOI_ATTR_ENC_MODE, s->encmode),
 		s_ipsecdoi_attr_v(IPSECDOI_ATTR_AUTH, s->authtype),
 		s_ipsecdoi_trns(IPSECDOI_PROTO_IPCOMP, s->comptype));
+}
+
+static void
+print_proppair0(p, level)
+	struct prop_pair *p;
+	int level;
+{
+	int i;
+	for (i = 0; i < level; i++)
+		printf("\t");
+	printf("%p: next=%p tnext=%p\n", p, p->next, p->tnext);
+	if (p->next)
+		print_proppair0(p->next, level + 1);
+	if (p->tnext)
+		print_proppair0(p->tnext, level + 1);
+}
+
+static void
+print_proppair(p)
+	struct prop_pair *p;
+{
+	print_proppair0(p, 1);
 }
