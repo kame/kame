@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.108 2003/11/06 08:03:27 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.109 2003/11/09 14:17:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -776,7 +776,8 @@ add_m6if(mifcp)
 
 		if (reg_mif_num == (mifi_t)-1) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-			strcpy(ifp->if_xname, "register_mif"); /* XXX */
+			strlcpy(ifp->if_xname, "register_mif",
+			    sizeof(ifp->if_xname));
 #else
 			ifp->if_name = "register_mif";
 #endif
