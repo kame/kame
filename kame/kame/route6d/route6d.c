@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.55 2001/01/26 09:05:46 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.56 2001/01/29 19:55:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.55 2001/01/26 09:05:46 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.56 2001/01/29 19:55:11 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -229,9 +229,9 @@ int rt_deladdr __P((struct ifc *, const struct sockaddr_in6 *,
 	const struct sockaddr_in6 *));
 void filterconfig __P((void));
 int getifmtu __P((int));
-const char *rttypes __P((struct rt_msghdr *rtm));
-const char *rtflags __P((struct rt_msghdr *rtm));
-const char *ifflags __P((int flags));
+const char *rttypes __P((struct rt_msghdr *));
+const char *rtflags __P((struct rt_msghdr *));
+const char *ifflags __P((int));
 int ifrt __P((struct ifc *, int));
 void ifrt_p2p __P((struct ifc *, int));
 void applymask __P((struct in6_addr *, struct in6_addr *));
@@ -242,9 +242,11 @@ void ifdump0 __P((FILE *, const struct ifc *));
 void rtdump __P((int));
 void rt_entry __P((struct rt_msghdr *, int));
 void rtdexit __P((void));
-void riprequest __P((struct ifc *, struct netinfo6 *, int, struct sockaddr_in6 *));
+void riprequest __P((struct ifc *, struct netinfo6 *, int,
+	struct sockaddr_in6 *));
 void ripflush __P((struct ifc *, struct sockaddr_in6 *));
 void sendrequest __P((struct ifc *));
+int sin6mask2len __P((const struct sockaddr_in6 *));
 int mask2len __P((const struct in6_addr *, int));
 int sendpacket __P((struct sockaddr_in6 *, int));
 int addroute __P((struct riprt *, const struct in6_addr *, struct ifc *));
@@ -970,7 +972,7 @@ sendpacket(sin, len)
 	struct iovec iov[2];
 	u_char cmsgbuf[256];
 	struct in6_pktinfo *pi;
-	int index;
+	int idx;
 	struct sockaddr_in6 sincopy;
 
 	/* do not overwrite the given sin */
@@ -979,10 +981,10 @@ sendpacket(sin, len)
 
 	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)
 	 || IN6_IS_ADDR_MULTICAST(&sin->sin6_addr)) {
-		index = IN6_LINKLOCAL_IFINDEX(sin->sin6_addr);
+		idx = IN6_LINKLOCAL_IFINDEX(sin->sin6_addr);
 		SET_IN6_LINKLOCAL_IFINDEX(sin->sin6_addr, 0);
 	} else
-		index = 0;
+		idx = 0;
 
 	m.msg_name = (caddr_t)sin;
 	m.msg_namelen = sizeof(*sin);
@@ -990,7 +992,7 @@ sendpacket(sin, len)
 	iov[0].iov_len = len;
 	m.msg_iov = iov;
 	m.msg_iovlen = 1;
-	if (!index) {
+	if (!idx) {
 		m.msg_control = NULL;
 		m.msg_controllen = 0;
 	} else {
@@ -1004,7 +1006,7 @@ sendpacket(sin, len)
 		cm->cmsg_type = IPV6_PKTINFO;
 		pi = (struct in6_pktinfo *)CMSG_DATA(cm);
 		memset(&pi->ipi6_addr, 0, sizeof(pi->ipi6_addr)); /*::*/
-		pi->ipi6_ifindex = index;
+		pi->ipi6_ifindex = idx;
 	}
 
 	if (sendmsg(ripsock, &m, 0 /*MSG_DONTROUTE*/) < 0) {
@@ -1028,7 +1030,7 @@ riprecv()
 	struct	rip6 *rp;
 	struct	netinfo6 *np, *nq;
 	struct	riprt *rrt;
-	int	len, nn, need_trigger, index;
+	int	len, nn, need_trigger, idx;
 	char	buf[4 * RIP6_MAXMTU];
 	time_t	t;
 	struct msghdr m;
@@ -1056,19 +1058,19 @@ riprecv()
 		fatal("recvmsg");
 		/*NOTREACHED*/
 	}
-	index = 0;
+	idx = 0;
 	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&m);
 	     cm;
 	     cm = (struct cmsghdr *)CMSG_NXTHDR(&m, cm)) {
-		if (cm->cmsg_level == IPPROTO_IPV6
-		 && cm->cmsg_type == IPV6_PKTINFO) {
+		if (cm->cmsg_level == IPPROTO_IPV6 &&
+		    cm->cmsg_type == IPV6_PKTINFO) {
 			pi = (struct in6_pktinfo *)(CMSG_DATA(cm));
-			index = pi->ipi6_ifindex;
+			idx = pi->ipi6_ifindex;
 			break;
 		}
 	}
-	if (index && IN6_IS_ADDR_LINKLOCAL(&fsock.sin6_addr))
-		SET_IN6_LINKLOCAL_IFINDEX(fsock.sin6_addr, index);
+	if (idx && IN6_IS_ADDR_LINKLOCAL(&fsock.sin6_addr))
+		SET_IN6_LINKLOCAL_IFINDEX(fsock.sin6_addr, idx);
 
 	nh = fsock.sin6_addr;
 	nn = (len - sizeof(struct rip6) + sizeof(struct netinfo6)) /
@@ -1081,8 +1083,8 @@ riprecv()
 		return;
 	}
 	if (rp->rip6_cmd == RIP6_REQUEST) {
-		if (index && index < nindex2ifc) {
-			ifcp = index2ifc[index];
+		if (idx && idx < nindex2ifc) {
+			ifcp = index2ifc[idx];
 			riprequest(ifcp, np, nn, &fsock);
 		} else {
 			riprequest(NULL, np, nn, &fsock);
@@ -1092,13 +1094,13 @@ riprecv()
 
 	if (!IN6_IS_ADDR_LINKLOCAL(&fsock.sin6_addr)) {
 		trace(1, "Packets from non-ll addr: %s\n",
-			inet6_n2p(&fsock.sin6_addr));
+		    inet6_n2p(&fsock.sin6_addr));
 		return;		/* Ignore packets from non-link-local addr */
 	}
-	index = IN6_LINKLOCAL_IFINDEX(fsock.sin6_addr);
-	ifcp = (index < nindex2ifc) ? index2ifc[index] : NULL;
+	idx = IN6_LINKLOCAL_IFINDEX(fsock.sin6_addr);
+	ifcp = (idx < nindex2ifc) ? index2ifc[idx] : NULL;
 	if (!ifcp) {
-		trace(1, "Packets to unknown interface index %d\n", index);
+		trace(1, "Packets to unknown interface index %d\n", idx);
 		return;		/* Ignore it */
 	}
 	if (IN6_ARE_ADDR_EQUAL(&ifcp->ifc_mylladdr, &fsock.sin6_addr))
@@ -1113,7 +1115,7 @@ riprecv()
 		return;
 
 	tracet(1, "Recv(%s): from %s.%d info(%d)\n",
-		ifcp->ifc_name, inet6_n2p(&nh), ntohs(fsock.sin6_port), nn);
+	    ifcp->ifc_name, inet6_n2p(&nh), ntohs(fsock.sin6_port), nn);
 
 	t = time(NULL);
 	t_half_lifetime = t - (RIP_LIFETIME/2);
@@ -1122,7 +1124,7 @@ riprecv()
 			/* modify neighbor address */
 			if (IN6_IS_ADDR_LINKLOCAL(&np->rip6_dest)) {
 				nh = np->rip6_dest;
-				SET_IN6_LINKLOCAL_IFINDEX(nh, index);
+				SET_IN6_LINKLOCAL_IFINDEX(nh, idx);
 				trace(1, "\tNexthop: %s\n", inet6_n2p(&nh));
 			} else if (IN6_IS_ADDR_UNSPECIFIED(&np->rip6_dest)) {
 				nh = fsock.sin6_addr;
@@ -1130,7 +1132,7 @@ riprecv()
 			} else {
 				nh = fsock.sin6_addr;
 				trace(1, "\tInvalid Nexthop: %s\n",
-					inet6_n2p(&np->rip6_dest));
+				    inet6_n2p(&np->rip6_dest));
 			}
 			continue;
 		}
@@ -1562,19 +1564,19 @@ ifconfig1(name, sa, ifcp, s)
 	int	s;
 {
 	struct	in6_ifreq ifr;
-	struct	sockaddr_in6 *sin;
+	const struct sockaddr_in6 *sin;
 	struct	ifac *ifa;
 	int	plen;
 	char	buf[BUFSIZ];
 
-	sin = (struct sockaddr_in6 *)sa;
+	sin = (const struct sockaddr_in6 *)sa;
 	ifr.ifr_addr = *sin;
 	strcpy(ifr.ifr_name, name);
 	if (ioctl(s, SIOCGIFNETMASK_IN6, (char *)&ifr) < 0) {
 		fatal("ioctl: SIOCGIFNETMASK_IN6");
 		/*NOTREACHED*/
 	}
-	plen = mask2len(&ifr.ifr_addr.sin6_addr, 16);
+	plen = sin6mask2len(&ifr.ifr_addr);
 	if ((ifa = ifa_match(ifcp, &sin->sin6_addr, plen)) != NULL) {
 		/* same interface found */
 		/* need check if something changed */
@@ -1708,7 +1710,6 @@ rtrecv()
 		trace(1, "rtsock: %s (addrs=%x)\n",
 			rttypes((struct rt_msghdr *)p), addrs);
 		if (dflag >= 2) {
-			int i;
 			for (i = 0;
 			     i < ((struct rt_msghdr *)p)->rtm_msglen;
 			     i++) {
@@ -1871,11 +1872,10 @@ rt_del(sdst, sgw, smask)
 		return -1;
 	}
 	dst = &sdst->sin6_addr;
-	if (sgw->sin6_family == AF_INET6
-	 && smask->sin6_family == AF_INET6) {
+	if (sgw->sin6_family == AF_INET6) {
 		/* easy case */
 		gw = &sgw->sin6_addr;
-		prefix = mask2len(&smask->sin6_addr, 16);
+		prefix = sin6mask2len(smask);
 	} else if (sgw->sin6_family == AF_LINK) {
 		/*
 		 * Interface route... a hard case.  We need to get the prefix
@@ -1958,12 +1958,12 @@ rt_deladdr(ifcp, sifa, smask)
 	time_t t_lifetime;
 	int updated = 0;
 
-	if (sifa->sin6_family != AF_INET6 || smask->sin6_family != AF_INET6) {
+	if (sifa->sin6_family != AF_INET6) {
 		trace(1, "\tother AF, ignored\n");
 		return -1;
 	}
 	addr = &sifa->sin6_addr;
-	prefix = mask2len(&smask->sin6_addr, 16);
+	prefix = sin6mask2len(smask);
 
 	trace(1, "\tdeleting %s/%d from %s\n",
 		inet6_n2p(addr), prefix, ifcp->ifc_name);
@@ -2630,10 +2630,9 @@ rt_entry(rtm, again)
 	/* Mask or plen */
 	if (rtm->rtm_flags & RTF_HOST)
 		np->rip6_plen = 128;	/* Host route */
-	else if (sin6_mask) {
-		np->rip6_plen = mask2len(&sin6_mask->sin6_addr,
-			sin6_mask->sin6_len - offsetof(struct sockaddr_in6, sin6_addr));
-	} else
+	else if (sin6_mask)
+		np->rip6_plen = sin6mask2len(sin6_mask);
+	else
 		np->rip6_plen = 0;
 
 	if (rtsearch(np, NULL)) {
@@ -2708,7 +2707,7 @@ addroute(rrt, gw, ifcp)
 	int	len;
 
 	np = &rrt->rrt_info;
-	inet_ntop(AF_INET6, (void *)gw, (char *)buf1, sizeof(buf1));
+	inet_ntop(AF_INET6, (const void *)gw, (char *)buf1, sizeof(buf1));
 	inet_ntop(AF_INET6, (void *)&ifcp->ifc_mylladdr, (char *)buf2, sizeof(buf2));
 	tracet(1, "ADD: %s/%d gw %s [%d] ifa %s\n",
 		inet6_n2p(&np->rip6_dest), np->rip6_plen, buf1,
@@ -2888,7 +2887,7 @@ inet6_n2p(p)
 {
 	static char buf[BUFSIZ];
 
-	return inet_ntop(AF_INET6, (void *)p, buf, sizeof(buf));
+	return inet_ntop(AF_INET6, (const void *)p, buf, sizeof(buf));
 }
 
 void
@@ -3139,7 +3138,7 @@ ifonly:
 			 */
 			delroute(&rrt->rrt_info, &gw);
 #else
-			/* it is more safe behavior */
+			/* it is safer behavior */
 			errno = EINVAL;
 			fatal("%s/%u already in routing table, "
 			    "cannot aggregate",
@@ -3189,7 +3188,6 @@ ifa_match(ifcp, ia, plen)
  * matches with the address and prefix length found in the argument.
  * Note: This is not a rtalloc().  Therefore exact match is necessary.
  */
-
 struct riprt *
 rtsearch(np, prev_rrt)
 	struct	netinfo6 *np;
@@ -3213,12 +3211,21 @@ rtsearch(np, prev_rrt)
 }
 
 int
+sin6mask2len(sin6)
+	const struct sockaddr_in6 *sin6;
+{
+
+	return mask2len(&sin6->sin6_addr,
+	    sin6->sin6_len - offsetof(struct sockaddr_in6, sin6_addr));
+}
+
+int
 mask2len(addr, lenlim)
 	const struct in6_addr *addr;
 	int lenlim;
 {
 	int i = 0, j;
-	u_char *p = (u_char *)addr;
+	const u_char *p = (const u_char *)addr;
 	
 	for (j = 0; j < lenlim; j++, p++) {
 		if (*p != 0xff)
@@ -3477,8 +3484,8 @@ iff_find(ifcp, type)
 }
 
 void
-setindex2ifc(index, ifcp)
-	int index;
+setindex2ifc(idx, ifcp)
+	int idx;
 	struct ifc *ifcp;
 {
 	int n;
@@ -3495,7 +3502,7 @@ setindex2ifc(index, ifcp)
 		memset(index2ifc, 0, sizeof(*index2ifc) * nindex2ifc);
 	}
 	n = nindex2ifc;
-	while (nindex2ifc <= index)
+	while (nindex2ifc <= idx)
 		nindex2ifc *= 2;
 	if (n != nindex2ifc) {
 		p = (struct ifc **)realloc(index2ifc,
@@ -3506,5 +3513,5 @@ setindex2ifc(index, ifcp)
 		}
 		index2ifc = p;
 	}
-	index2ifc[index] = ifcp;
+	index2ifc[idx] = ifcp;
 }
