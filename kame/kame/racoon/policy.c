@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.44 2001/10/02 04:10:17 sakane Exp $	*/
+/*	$KAME: policy.c,v 1.45 2001/10/16 14:55:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -218,9 +218,8 @@ cmpspidxwild(a, b)
 	if (!(b->dir == IPSEC_DIR_ANY || a->dir == b->dir))
 		return 1;
 
-	/* IPSEC_ULPROTO_ANY is represented by 0 in ID payload */
-	if (!(a->ul_proto == 0 ||
-	      b->ul_proto == 0 ||
+	if (!(a->ul_proto == IPSEC_ULPROTO_ANY ||
+	      b->ul_proto == IPSEC_ULPROTO_ANY ||
 	      a->ul_proto == b->ul_proto))
 		return 1;
 

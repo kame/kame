@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.83 2001/07/09 08:10:32 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.84 2001/10/16 14:55:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1958,6 +1958,13 @@ get_proposal_r(iph2)
 		"%s prefixlen=%u ul_proto=%u\n",
 		saddr2str((struct sockaddr *)&spidx.dst),
 		spidx.prefd, spidx.ul_proto);
+
+	/*
+	 * convert the ul_proto if it is 0
+	 * because 0 in ID payload means a wild card.
+	 */
+	if (spidx.ul_proto == 0)
+		spidx.ul_proto = IPSEC_ULPROTO_ANY;
 
 	/* get inbound policy */
 	sp_in = getsp_r(&spidx);

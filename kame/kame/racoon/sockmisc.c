@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.30 2001/10/10 08:37:22 sakane Exp $	*/
+/*	$KAME: sockmisc.c,v 1.31 2001/10/16 14:55:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -139,7 +139,9 @@ cmpsaddrwild(addr1, addr2)
 		sa2 = (caddr_t)&((struct sockaddr_in *)addr2)->sin_addr;
 		port1 = ((struct sockaddr_in *)addr1)->sin_port;
 		port2 = ((struct sockaddr_in *)addr2)->sin_port;
-		if (!(port2 == 0 || port1 == port2))
+		if (!(port1 == IPSEC_PORT_ANY ||
+		      port2 == IPSEC_PORT_ANY ||
+		      port1 == port2))
 			return 1;
 		if (memcmp(sa1, sa2, sizeof(struct in_addr)) != 0)
 			return 1;
@@ -150,7 +152,9 @@ cmpsaddrwild(addr1, addr2)
 		sa2 = (caddr_t)&((struct sockaddr_in6 *)addr2)->sin6_addr;
 		port1 = ((struct sockaddr_in6 *)addr1)->sin6_port;
 		port2 = ((struct sockaddr_in6 *)addr2)->sin6_port;
-		if (!(port2 == 0 || port1 == port2))
+		if (!(port1 == IPSEC_PORT_ANY ||
+		      port2 == IPSEC_PORT_ANY ||
+		      port1 == port2))
 			return 1;
 		if (memcmp(sa1, sa2, sizeof(struct in6_addr)) != 0)
 			return 1;
