@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.15 2000/06/19 09:21:25 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.16 2000/07/14 12:54:11 kjc Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -172,7 +172,7 @@ getpsk(str, len)
 	char buf[1024];	/* XXX how is variable length ? */
 	vchar_t *key = NULL;
 	char *p, *q;
-	int keylen;
+	size_t keylen;
 
 	if (safefile(lcconf->pathinfo[LC_PATHTYPE_PSK], 1) == 0)
 		fp = fopen(lcconf->pathinfo[LC_PATHTYPE_PSK], "r");
