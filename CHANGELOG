@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1671 2001/05/13 15:45:06 suz Exp $
+$KAME: CHANGELOG,v 1.1672 2001/05/14 14:03:40 itojun Exp $
 
 <200105>
+Mon May 14 23:01:30 JST 2001  itojun@iijlab.net
+	* sys/netinet/in_gif.c, sys/netinet6/in6_gif.c: drop IFF_LINK0
+	  (multi destination mode) support.
+
 Mon May 14 00:42:52 JST 2001	suz@sdl.hitachi.co.jp
 	* kame/kame/mld6query/mld6.c: fixed a bug in argument handling.
 	from Mickael Hoerdt <hoerdt@clarinet.u-strasbg.fr>
