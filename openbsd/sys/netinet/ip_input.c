@@ -380,8 +380,10 @@ ipv4_input(struct mbuf *m, ...)
 	/* 127/8 must not appear on wire - RFC1122 */
 	if ((ntohl(ip->ip_dst.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET ||
 	    (ntohl(ip->ip_src.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) {
-		if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0)
+		if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
+			ipstat.ips_badaddr++;
 			goto bad;
+		}
 	}
 
 	if ((ip->ip_sum = in_cksum(m, hlen)) != 0) {

@@ -410,6 +410,7 @@ ip_stats(off, name)
 	p1(ips_rcvmemdrop, "\t%lu fragment floods\n");
 	p(ips_toolong, "\t%lu packet%s with ip length > max ip packet size\n");
 	p(ips_nogif, "\t%lu tunneling packet%s that can't find gif\n");
+	p(ips_badaddr, "\t%lu datagram%s with bad address in header\n");
 #undef p
 #undef p1
 }
