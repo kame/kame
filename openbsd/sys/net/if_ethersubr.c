@@ -155,11 +155,6 @@ extern u_char	aarp_org_code[ 3 ];
 #include <sys/socketvar.h>
 #endif
 
-#if 0	/*NRL INET6*/
-#include <netinet6/in6.h>
-#include <netinet6/in6_var.h>
-#endif /* INET6 */
-
 u_char	etherbroadcastaddr[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 #define senderr(e) { error = (e); goto bad;}
 

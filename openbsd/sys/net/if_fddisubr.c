@@ -115,11 +115,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netccitt/dll.h>
 #include <netccitt/llc_var.h>
 
-#ifdef INET6
-#include <netinet6/in6.h>
-#include <netinet6/in6_var.h>
-#endif /* INET6 */
-
 #if defined(CCITT)
 extern struct ifqueue pkintrq;
 #endif
