@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2219 2002/08/23 06:43:09 suz Exp $
+$KAME: CHANGELOG,v 1.2220 2002/08/23 22:19:04 jinmei Exp $
 
 <200208>
+2002-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {freebsd4, netbsd}/sys/net/route.h (RTUSE, RTREUSE, RTRELEASE):
+	avoided overriding invalid memory space by these macros when the
+	system clock was rewinded.  This could really happen for FreeBSD,
+	so the fix should apply to FreeBSD.
+	As reported by Larry Baird <lab@gta.com> in KAME PR 439.
+
 Fri Aug 23 14:39:48 JST 2002	suz@crl.hitachi.co.jp
 	* freebsd4/sys/*: sync with FreeBSD 4.6.2-RELEASE
 
