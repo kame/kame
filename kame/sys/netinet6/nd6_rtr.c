@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.232 2003/05/08 19:53:40 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.233 2003/05/15 14:56:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -555,13 +555,15 @@ nd6_rtmsg(cmd, rt)
 	info.rti_info[RTAX_DST] = rt_key(rt);
 	info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 	info.rti_info[RTAX_NETMASK] = rt_mask(rt);
+	if (rt->rt_ifp) {
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	info.rti_info[RTAX_IFP] = rt->rt_ifp->if_addrlist->ifa_addr;
+		info.rti_info[RTAX_IFP] = rt->rt_ifp->if_addrlist->ifa_addr;
 #else
-	info.rti_info[RTAX_IFP] =
-	    TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
+		info.rti_info[RTAX_IFP] =
+		    TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
 #endif
-	info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
+		info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
+	}
 
 	rt_missmsg(cmd, &info, rt->rt_flags, 0);
 }
