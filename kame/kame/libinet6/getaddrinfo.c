@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.174 2004/04/18 08:19:05 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.175 2004/04/18 10:57:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,10 +35,6 @@
  * - Return values.  There are nonstandard return values defined and used
  *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
- * - IPv4 classful (shortened) form.  RFC2553 is silent about it.  XNET 5.2
- *   says to use inet_aton() to convert IPv4 numeric to binary (allows
- *   classful form as a result).
- *   current code - disallow classful form for IPv4 (due to use of inet_pton).
  * - freeaddrinfo(NULL).  RFC2553 is silent about it.  XNET 5.2 says it is
  *   invalid.  current code - SEGV on freeaddrinfo(NULL)
  *
@@ -1265,8 +1261,14 @@ explore_numeric(pai, hostname, servname, res, canonname)
 		return 0;
 
 	switch (afd->a_af) {
-#if 0 /*X/Open spec*/
 	case AF_INET:
+		/*
+		 * RFC3493 requires getaddrinfo() to accept AF_INET formats
+		 * that are accepted by inet_addr() and its family.  The
+		 * accepted form includes the "classful" one, which inet_pton
+		 * does not accept.  So we need to separate the case for
+		 * AF_INET.
+		 */
 		if (inet_aton(hostname, (struct in_addr *)pton) == 1) {
 			if (pai->ai_family == afd->a_af ||
 			    pai->ai_family == PF_UNSPEC /*?*/) {
@@ -1284,7 +1286,6 @@ explore_numeric(pai, hostname, servname, res, canonname)
 				ERR(EAI_FAMILY);	/*xxx*/
 		}
 		break;
-#endif
 	default:
 		if (inet_pton(afd->a_af, hostname, pton) == 1) {
 			if (pai->ai_family == afd->a_af ||
