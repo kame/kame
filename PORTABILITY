@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.66 2002/06/10 20:02:07 itojun Exp $
+	$KAME: PORTABILITY,v 1.67 2002/06/11 03:03:21 jinmei Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -192,7 +192,7 @@ across those possibilities.
   explicitly.
   __FUNCTION__ macro is not included in the ANSI standard, so it is best to
   avoid __FUNCTION__, or make it optional, for portability.
-  if you ever need to use one, use __func__.
+  if you ever need to use one, use __func__, which is defined in ANSI C99.
 
 - sys/queue.h are very different in each of *BSDs.  Most of macros found in
   FreeBSD3 are not available in other systems.  Simply avoid those, make sure
