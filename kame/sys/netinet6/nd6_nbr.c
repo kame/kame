@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.47 2000/12/05 01:42:31 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.48 2001/01/16 06:09:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,10 +137,12 @@ nd6_ns_input(m, off, icmp6len)
 	taddr6 = nd_ns->nd_ns_target;
 
 	if (ip6->ip6_hlim != 255) {
+#ifdef ND6_DEBUG
 		log(LOG_ERR,
 		    "nd6_ns_input: invalid hlim (%d) from %s to %s on %s\n",
 		    ip6->ip6_hlim, ip6_sprintf(&ip6->ip6_src),
 		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp));
+#endif
 		goto bad;
 	}
 
@@ -565,10 +567,12 @@ nd6_na_input(m, off, icmp6len)
 	union nd_opts ndopts;
 
 	if (ip6->ip6_hlim != 255) {
+#ifdef ND6_DEBUG
 		log(LOG_ERR,
 		    "nd6_na_input: invalid hlim (%d) from %s to %s on %s\n",
 		    ip6->ip6_hlim, ip6_sprintf(&ip6->ip6_src),
 		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp));
+#endif
 		goto freeit;
 	}
 

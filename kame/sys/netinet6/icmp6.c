@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.181 2001/01/09 15:20:05 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.182 2001/01/16 06:09:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -523,7 +523,7 @@ icmp6_input(mp, offp, proto)
 	code = icmp6->icmp6_code;
 
 	if ((sum = in6_cksum(m, IPPROTO_ICMPV6, off, icmp6len)) != 0) {
-#ifdef ND6DEBUG
+#ifdef ND6_DEBUG
 		log(LOG_ERR,
 		    "ICMP6 checksum error(%d|%x) %s\n",
 		    icmp6->icmp6_type, sum, ip6_sprintf(&ip6->ip6_src));
