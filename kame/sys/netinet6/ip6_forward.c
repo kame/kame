@@ -124,13 +124,12 @@ ip6_forward(m, srcrt)
 		ip6stat.ip6s_badscope++;
 		/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard) */
 		if (ip6_log_time + ip6_log_interval < time_second) {
-			char addr[INET6_ADDRSTRLEN];
 			ip6_log_time = time_second;
-			strncpy(addr, ip6_sprintf(&ip6->ip6_src), sizeof(addr));
 			log(LOG_DEBUG,
 			    "cannot forward "
 			    "from %s to %s nxt %d received on %s\n",
-			    addr, ip6_sprintf(&ip6->ip6_dst),
+			    ip6_sprintf(&ip6->ip6_src),
+			    ip6_sprintf(&ip6->ip6_dst),
 			    ip6->ip6_nxt,
 			    if_name(m->m_pkthdr.rcvif));
 		}
