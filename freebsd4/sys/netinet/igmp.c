@@ -508,10 +508,6 @@ igmp_input(m, off)
 					m_freem(m);
 					return;
 				}
-			
-				timer = igmp->igmp_code * PR_FASTHZ / IGMP_TIMER_SCALE;
-				if (timer == 0)
-					timer = 1;
 			}
 		}
 
@@ -521,6 +517,10 @@ igmp_input(m, off)
 		if (query_ver != IGMP_v2_QUERY)
 			goto igmpv3_query;
 
+#ifdef IGMPV3
+igmpv1_query:
+igmpv2_query:
+#endif
 		/*
 		 * - Start the timers in all of our membership records
 		 *   that the query applies to for the interface on
@@ -531,6 +531,9 @@ igmp_input(m, off)
 		 * - Use the value specified in the query message as
 		 *   the maximum timeout.
 		 */
+		timer = igmp->igmp_code * PR_FASTHZ / IGMP_TIMER_SCALE;
+		if (timer == 0)
+			timer = 1;
 		IN_FIRST_MULTI(step, inm);
 		while (inm != NULL) {
 			if (inm->inm_ifp == ifp &&
@@ -606,6 +609,15 @@ igmpv3_query:
 				 * "host-side" processing of a Query */
 			}
 #endif
+
+			/* 
+			 * Dispatch this query to make an appropriate
+			 * version's reply.
+			 */
+			if (rti->rti_type == IGMP_v1_ROUTER)
+				goto igmpv1_query;
+			else if (rti->rti_type == IGMP_v2_ROUTER)
+				goto igmpv2_query;
 
 			if (igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 					!= 0) {

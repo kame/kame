@@ -482,6 +482,9 @@ igmp_input(m, va_alist)
 				return;
 			}
 
+#ifdef IGMPV3
+start_v1:
+#endif
 			/*
 			 * Start the timers in all of our membership records
 			 * for the interface on which the query arrived,
@@ -520,11 +523,6 @@ igmp_input(m, va_alist)
 					m_freem(m);
 					return;
 				}
-
-				timer = igmp->igmp_code
-						* PR_FASTHZ / IGMP_TIMER_SCALE;
-				if (timer == 0)
-					timer = 1;
 			}
 		}
 
@@ -532,6 +530,9 @@ igmp_input(m, va_alist)
 		 * Adjust timer for scheduling responses to IGMPv2 query.
 		 */
 		if (query_ver == IGMP_v2_QUERY) {
+#ifdef IGMPV3
+start_v2:
+#endif
 			/*
 			 * Start the timers in all of our membership records
 			 * for the interface on which the query arrived,
@@ -540,6 +541,9 @@ igmp_input(m, va_alist)
 			 * timers already running, check if they need to be
 			 * reset.
 			 */
+			timer = igmp->igmp_code * PR_FASTHZ / IGMP_TIMER_SCALE;
+			if (timer == 0)
+				timer = 1;
 			IN_FIRST_MULTI(step, inm);
 			while (inm != NULL) {
 				if (inm->inm_ifp == ifp &&
@@ -628,6 +632,15 @@ igmp_input(m, va_alist)
 				 * "host-side" processing of a Query */
 			}
 #endif
+
+			/* 
+			 * Dispatch this query to make an appropriate
+			 * version's reply.
+			 */
+			if (rti->rti_type == IGMP_v1_ROUTER)
+				goto start_v1;
+			else if (rti->rti_type == IGMP_v2_ROUTER) 
+				goto start_v2;
 
 			if (igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 					!= 0) {
