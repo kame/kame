@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.41 2000/07/04 12:54:11 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.42 2000/07/11 03:24:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -648,9 +648,6 @@ again:;
 			switch(nbi->state) {
 			 case ND6_LLINFO_NOSTATE:
 				 printf(" N");
-				 break;
-			 case ND6_LLINFO_WAITDELETE:
-				 printf(" W");
 				 break;
 			 case ND6_LLINFO_INCOMPLETE:
 				 printf(" I");
