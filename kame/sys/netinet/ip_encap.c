@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.73 2001/10/02 08:30:58 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.74 2002/02/04 10:04:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -890,7 +890,8 @@ encap6_ctlinput(cmd, sa, d0)
 		 *   corresponding routing entry, or
 		 * - ignore the MTU change notification.
 		 */
-		icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+		icmp6_mtudisc_update((struct ip6ctlparam *)d,
+				     (struct sockaddr_in6 *)sa, valid);
 	}
 #endif
 
