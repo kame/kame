@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.17 2000/02/16 05:55:44 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.18 2000/02/16 11:28:04 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -716,7 +716,7 @@ agg_r1send(iph1, msg)
 		if (oakley_getsign(iph1) < 0)
 			goto end;
 
-		tlen = + sizeof(*gen) + iph1->sa_ret->l
+		tlen += sizeof(*gen) + iph1->sa_ret->l
 			+ sizeof(*gen) + iph1->dhpub->l
 			+ sizeof(*gen) + iph1->nonce->l
 			+ sizeof(*gen) + iph1->id->l
