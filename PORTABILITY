@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.25 2000/01/06 14:20:46 itojun Exp $
+	$Id: PORTABILITY,v 1.26 2000/01/06 14:45:39 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -206,6 +206,17 @@ across those possibilities.
   In the future, we may provide s6_addr{8,16,32} to the userland when updates
   to RFC2553 defines them.  They are, in fact, very convenient and we would
   like to see them defined in standard document.
+
+- sysctl(3) support in kernel.
+  FreeBSD: linker hack #define in SYSCTL_INT().  no need to recompile sysctl(8).
+	SYSCTL_INT(_net_inet6_tcp6, TCP6CTL_SYN_CACHE_INTER,
+	    syn_cache_interval, CTLFLAG_RW, &tcp6_syn_cache_interval, 0, "");
+  OpenBSD/NetBSD: xx_sysctl() needs to be supplied from inet6sw.
+	xx_sysctl() should implement switch statement to dispatch to all
+	possible leaf nodes available.  symbols must be defined in header file
+	for use from sysctl(8).
+  BSDI: similar to OpenBSD/NetBSD, but sysctl_int_arr() makes xx_sysctl()
+	code much easier for simple integer leaf nodes.
 
 - Developers are advised to use pedantic compilation options (like -Wall
   -Werror).  To configure default make settings, /etc/make.conf (freebsd),
