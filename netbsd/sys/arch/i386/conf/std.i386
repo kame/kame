@@ -1,10 +1,14 @@
-# $NetBSD: std.i386,v 1.13 1999/03/24 06:06:10 mrg Exp $
+# $NetBSD: std.i386,v 1.18.6.1 2000/06/23 14:36:10 fvdl Exp $
 #
 # standard, required NetBSD/i386 'options'
 
 machine i386
 
-options 	PMAP_NEW	# UVM's new pmap interface
-
 options 	EXEC_AOUT	# exec a.out binaries
+options		EXEC_ELF32	# exec ELF binaries
 options 	EXEC_SCRIPT	# exec #! scripts
+
+options 	CRYPTO_MD_DES_ENC	# machine-dependant code for DES
+#options 	CRYPTO_MD_DES_CBC	# machine-dependant DES CBC code
+options 	CRYPTO_MD_BF_ENC	# machine-dependant code for BF_encrypt
+#options 	CRYPTO_MD_BF_CBC	# careful: uses bswapl, requires 486
