@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.42 2003/04/23 10:00:14 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.43 2003/04/24 02:29:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,9 +62,6 @@
 
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
-#include <netinet6/mip6_hacore.h>
-#include <netinet6/mip6_mncore.h>
 
 #define IOC_ENTRY_COUNT 100 /* XXX */
 
