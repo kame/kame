@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.10 1999/09/06 13:09:52 sakane Exp $ */
+/* KAME $Id: key.c,v 1.11 1999/09/07 07:26:40 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -2215,7 +2215,8 @@ key_mature(sav)
 				"protocol and algorithm mismated.\n");
 			return(EINVAL);
 		}
-		if (ntohl(sav->spi) >= 0x10000) {
+		if ((sav->flags & SADB_X_EXT_RAWCPI) == 0
+		 && ntohl(sav->spi) >= 0x10000) {
 			printf("key_mature: invalid cpi for IPComp.\n");
 			return(EINVAL);
 		}
