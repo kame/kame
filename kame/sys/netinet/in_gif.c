@@ -226,7 +226,7 @@ in_gif_output(ifp, family, m, rt)
 			- sizeof(struct ip);
 #endif 
 	}
-	
+
 #ifdef IPSEC
 #ifndef __OpenBSD__	/*KAME IPSEC*/
 	m->m_pkthdr.rcvif = NULL;
