@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.117 2002/02/01 05:22:32 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.118 2002/02/08 09:55:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -877,6 +877,10 @@ extern void addrsel_policy_init __P((void));
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
 #define	sin6tosa(sin6)	((struct sockaddr *)(sin6))
 #define	ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+extern int      (*faithprefix_p)(struct in6_addr *);
+#endif
 #endif /* _KERNEL */
 
 __BEGIN_DECLS

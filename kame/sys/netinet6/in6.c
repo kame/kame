@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.261 2002/02/04 06:51:09 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.262 2002/02/08 09:52:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -174,6 +174,9 @@ static void in6_unlink_ifa __P((struct in6_ifaddr *, struct ifnet *));
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 struct in6_multihead in6_multihead;	/* XXX BSS initialization */
+#if __FreeBSD__ >= 4
+int	(*faithprefix_p)(struct in6_addr *);
+#endif
 #else
 /*
  * This structure is used to keep track of in6_multi chains which belong to
@@ -186,6 +189,7 @@ struct multi6_kludge {
 	struct ifnet *mk_ifp;
 	struct in6_multihead mk_head;
 };
+
 #endif
 
 /*
