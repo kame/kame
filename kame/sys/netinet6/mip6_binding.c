@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.93 2002/03/01 09:37:38 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.94 2002/03/06 03:56:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2232,9 +2232,9 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 			mip6log((LOG_ERR,
 				 "%s:%d: ba rthdr creation error (%d)\n",
 				 __FILE__, __LINE__, error));
+			m_freem(m);
  			goto free_ip6pktopts;
 		}
-		m_freem(m);
 		opt.ip6po_rthdr = pktopt_rthdr;
 	}
 
