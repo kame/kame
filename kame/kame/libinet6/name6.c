@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.44 2004/06/14 05:34:49 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.45 2004/06/29 12:18:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1446,7 +1446,6 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	u_char c, *cp;
 	char *bp;
 	struct hostent hbuf;
-	int na;
 #ifdef INET6
 	static const char hex[] = "0123456789abcdef";
 #endif
@@ -1486,7 +1485,6 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	hbuf.h_name = NULL;
 	hbuf.h_addrtype = af;
 	hbuf.h_length = addrlen;
-	na = 0;
 
 	buf = malloc(sizeof(*buf));
 	if (buf == NULL) {
