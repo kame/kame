@@ -324,7 +324,7 @@ get_32id()
 
 	    /* sanity check for 0.0.0.0 and 127.0.0.1  */
 	    if (id == INADDR_ANY || ntohl(id) == 0x7f000001) {
-		    id == INADDR_ANY;
+		    id = INADDR_ANY;
 		    ifni++;
 	    }
 	    else
