@@ -372,7 +372,7 @@ struct sockaddr_in {
 #define	MCAST_JOIN_SOURCE_GROUP	74   /* group_source_req; */
 #define	MCAST_LEAVE_SOURCE_GROUP 75  /* group_source_req; */
 
-#define	IP_ONESBCAST		23   /* bool: send all-ones broadcast */
+#define	IP_ONESBCAST		27   /* bool: send all-ones broadcast */
 
 #define	IP_FW_ADD     		50   /* add a firewall rule to chain */
 #define	IP_FW_DEL    		51   /* delete a firewall rule from chain */
