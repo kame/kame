@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1572 2001/02/26 13:54:08 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1573 2001/02/28 14:31:20 itojun Exp $
 
 <200102>
+Wed Feb 28 23:26:26 JST 2001  itojun@iijlab.net
+	* sys/netinet6/esp_output.c: support random length padding in ESP,
+	  to avoid traffic analysis on short packets.  by setting
+	  net.inet.ipsec.esp_randpad (or net.inet6.ipsec6.esp_randpad) to
+	  positive value N, you can ask the kernel to randomly pad packets
+	  shorter than N bytes, to random length smaller than or equal to N.
+	  note that N does not include ESP authentication data length.
+	  also note that the random padding is not included in TCP segment
+	  size computation.
+
+	  recommeded value for N is like 128, or 256 (if you use a too big
+	  number as N, you may experience inefficiency due to fragmented
+	  packtes).
+
 Mon Feb 26 22:53:02 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* sys/netinet6/nd6.c : do not overwrite llcache if static ndp is
 	  set
