@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.22 2000/01/11 22:36:24 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.23 2000/01/13 23:12:46 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -269,7 +269,7 @@ isakmp_info_send_d2_pf(msg)
 	d->num_spi = htons(1);
 	memcpy(d + 1, &sa->sadb_sa_spi, sizeof(sa->sadb_sa_spi));
 
-	error = isakmp_info_send_common(iph1, payload, ISAKMP_NPTYPE_D, 0);
+	error = isakmp_info_send_n1(iph1, ISAKMP_NPTYPE_D, payload);
 	vfree(payload);
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
