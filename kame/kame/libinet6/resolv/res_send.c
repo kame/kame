@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.5 2000/04/24 14:07:26 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.6 2000/04/26 10:20:31 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -94,9 +94,7 @@ static char rcsid[] = "$Id: res_send.c,v 1.5 2000/04/24 14:07:26 itojun Exp $";
 static int s = -1;	/* socket used for communications */
 static int connected = 0;	/* is the socket connected */
 static int vc = 0;	/* is the socket a virtual ciruit? */
-#ifdef INET6
 static int af = 0;		/* address family of socket */
-#endif /* INET6 */
 
 #ifndef FD_SET
 /* XXX - should be in portability.h */
@@ -126,13 +124,9 @@ static int af = 0;		/* address family of socket */
 			fprintf args;\
 			__fp_nquery(query, size, stdout);\
 		} else {}
-#ifdef INET6
 static char abuf[NI_MAXHOST];
-static char pbuf[32];
+static char pbuf[NI_MAXSERV];
 static void Aerror __P((FILE *, char *, int, struct sockaddr *));
-#else
-static void Aerror __P((FILE *, char *, int, struct sockaddr_in));
-#endif /* INET6 */
 static void Perror __P((FILE *, char *, int));
 
     static void
@@ -140,28 +134,16 @@ static void Perror __P((FILE *, char *, int));
 	FILE *file;
 	char *string;
 	int error;
-#ifdef INET6
 	struct sockaddr *address;
-#else /* INET6 */
-	struct sockaddr_in address;
-#endif /* INET6 */
     {
 	int save = errno;
 
 	if (_res.options & RES_DEBUG) {
-#ifdef INET6
 		getnameinfo(address, address->sa_len, abuf, sizeof(abuf),
 			    pbuf, sizeof(pbuf),
 			    NI_NUMERICHOST|NI_NUMERICSERV|NI_WITHSCOPEID);
 		fprintf(file, "res_send: %s ([%s].%s): %s\n",
 			string, abuf, pbuf, strerror(error));
-#else /* INET6 */
-		fprintf(file, "res_send: %s ([%s].%u): %s\n",
-			string,
-			inet_ntoa(address.sin_addr),
-			ntohs(address.sin_port),
-			strerror(error));
-#endif /* INET6 */
 	}
 	errno = save;
     }
@@ -200,6 +182,37 @@ res_send_setrhook(hook)
 	Rhook = hook;
 }
 
+#ifdef INET6
+static struct sockaddr * get_nsaddr __P((size_t));
+
+/*
+ * pick appropriate nsaddr_list for use.  see res_init() for initialization.
+ */
+static struct sockaddr *
+get_nsaddr(n)
+	size_t n;
+{
+
+	if (!_res.nsaddr_list[n].sin_family) {
+		/*
+		 * - _res_ext.nsaddr_list[n] holds an address that is larger
+		 *   than struct sockaddr, and
+		 * - user code did not update _res.nsaddr_list[n].
+		 */
+		return (struct sockaddr *)&_res_ext.nsaddr_list[n];
+	} else {
+		/*
+		 * - user code updated _res.nsaddr_list[n], or
+		 * - _res.nsaddr_list[n] has the same content as
+		 *   _res_ext.nsaddr_list[n].
+		 */
+		return (struct sockaddr *)&_res.nsaddr_list[n];
+	}
+}
+#else
+#define get_nsaddr(n)	((struct sockaddr *)&_res.nsaddr_list[(n)])
+#endif
+
 /* int
  * res_isourserver(ina)
  *	looks up "ina" in _res.ns_addr_list[]
@@ -214,20 +227,18 @@ res_isourserver(inp)
 	const struct sockaddr_in *inp;
 {
 #ifdef INET6
-	struct sockaddr_in6 *in6p = (struct sockaddr_in6 *)inp;
+	const struct sockaddr_in6 *in6p = (const struct sockaddr_in6 *)inp;
 	const struct sockaddr_in6 *srv6;
+#endif
 	const struct sockaddr_in *srv;
-#else /* INET6 */
-	struct sockaddr_in ina;
-#endif /* INET6 */
-	register int ns, ret;
+	int ns, ret;
 
-#ifdef INET6
 	ret = 0;
 	switch (inp->sin_family) {
+#ifdef INET6
 	case AF_INET6:
 		for (ns = 0; ns < _res.nscount; ns++) {
-			srv6 = (struct sockaddr_in6 *)&_res_ext.nsaddr_list[ns];
+			srv6 = (struct sockaddr_in6 *)get_nsaddr(ns);
 			if (srv6->sin6_family == in6p->sin6_family &&
 			    srv6->sin6_port == in6p->sin6_port &&
 			    srv6->sin6_scope_id == in6p->sin6_scope_id &&
@@ -240,9 +251,10 @@ res_isourserver(inp)
 			}
 		}
 		break;
+#endif
 	case AF_INET:
 		for (ns = 0; ns < _res.nscount; ns++) {
-			srv = (struct sockaddr_in *)&_res_ext.nsaddr_list[ns];
+			srv = (struct sockaddr_in *)get_nsaddr(ns);
 			if (srv->sin_family == inp->sin_family &&
 			    srv->sin_port == inp->sin_port &&
 			    (srv->sin_addr.s_addr == INADDR_ANY ||
@@ -253,27 +265,14 @@ res_isourserver(inp)
 		}
 		break;
 	}
-#else /* INET6 */
-	ina = *inp;
-	ret = 0;
-	for (ns = 0;  ns < _res.nscount;  ns++) {
-		register const struct sockaddr_in *srv = &_res.nsaddr_list[ns];
-
-		if (srv->sin_family == ina.sin_family &&
-		    srv->sin_port == ina.sin_port &&
-		    (srv->sin_addr.s_addr == INADDR_ANY ||
-		     srv->sin_addr.s_addr == ina.sin_addr.s_addr)) {
-			ret++;
-			break;
-		}
-	}
-#endif /* INET6 */
 	return (ret);
 }
 
 /* int
  * res_nameinquery(name, type, class, buf, eom)
  *	look for (name,type,class) in the query section of packet (buf,eom)
+ * requires:
+ *	buf + HFIXESDZ <= eom
  * returns:
  *	-1 : format error
  *	0  : not found
@@ -298,6 +297,8 @@ res_nameinquery(name, type, class, buf, eom)
 		if (n < 0)
 			return (-1);
 		cp += n;
+		if (cp + 2 * INT16SZ > eom)
+			return (-1);
 		ttype = _getshort(cp); cp += INT16SZ;
 		tclass = _getshort(cp); cp += INT16SZ;
 		if (ttype == type &&
@@ -327,6 +328,9 @@ res_queriesmatch(buf1, eom1, buf2, eom2)
 	register const u_char *cp = buf1 + HFIXEDSZ;
 	int qdcount = ntohs(((HEADER*)buf1)->qdcount);
 
+	if (buf1 + HFIXEDSZ > eom1 || buf2 + HFIXEDSZ > eom2)
+		return (-1);
+
 	if (qdcount != ntohs(((HEADER*)buf2)->qdcount))
 		return (0);
 	while (qdcount-- > 0) {
@@ -337,6 +341,8 @@ res_queriesmatch(buf1, eom1, buf2, eom2)
 		if (n < 0)
 			return (-1);
 		cp += n;
+		if (cp + 2 * INT16SZ > eom1)
+			return (-1);
 		ttype = _getshort(cp);	cp += INT16SZ;
 		tclass = _getshort(cp); cp += INT16SZ;
 		if (!res_nameinquery(tname, ttype, tclass, buf2, eom2))
@@ -362,6 +368,10 @@ res_send(buf, buflen, ans, anssiz)
 		/* errno should have been set by res_init() in this case. */
 		return (-1);
 	}
+	if (anssiz < HFIXEDSZ) {
+		errno = EINVAL;
+		return (-1);
+	}
 	DprintQ((_res.options & RES_DEBUG) || (_res.pfcode & RES_PRF_QUERY),
 		(stdout, ";; res_send()\n"), buf, buflen);
 	v_circuit = (_res.options & RES_USEVC) || buflen > PACKETSZ;
@@ -375,12 +385,8 @@ res_send(buf, buflen, ans, anssiz)
 	 */
 	for (try = 0; try < _res.retry; try++) {
 	    for (ns = 0; ns < _res.nscount; ns++) {
-#ifdef INET6
-		struct sockaddr *nsap = (struct sockaddr *)
-				&_res_ext.nsaddr_list[ns];
-#else /* INET6 */
-		struct sockaddr_in *nsap = &_res.nsaddr_list[ns];
-#endif /* INET6 */
+		struct sockaddr *nsap = get_nsaddr(ns);
+
     same_ns:
 		if (badns & (1 << ns)) {
 			res_close();
@@ -393,12 +399,8 @@ res_send(buf, buflen, ans, anssiz)
 			do {
 				res_sendhookact act;
 
-#ifdef INET6
 				act = (*Qhook)((struct sockaddr_in **)&nsap,
 					       &buf, &buflen,
-#else /* INET6 */
-				act = (*Qhook)(&nsap, &buf, &buflen,
-#endif /* INET6 */
 					       ans, anssiz, &resplen);
 				switch (act) {
 				case res_goahead:
@@ -422,17 +424,11 @@ res_send(buf, buflen, ans, anssiz)
 			} while (!done);
 		}
 
-#ifdef INET6
 		Dprint((_res.options & RES_DEBUG) &&
 		       getnameinfo(nsap, nsap->sa_len, abuf, sizeof(abuf),
 				   NULL, 0, NI_NUMERICHOST | NI_WITHSCOPEID) == 0,
 		       (stdout, ";; Querying server (# %d) address = %s\n",
 			ns + 1, abuf));
-#else /* INET6 */
-		Dprint(_res.options & RES_DEBUG,
-		       (stdout, ";; Querying server (# %d) address = %s\n",
-			ns + 1, inet_ntoa(nsap->sin_addr)));
-#endif /* INET6 */
 
 		if (v_circuit) {
 			int truncated;
@@ -446,20 +442,12 @@ res_send(buf, buflen, ans, anssiz)
 			 */
 			try = _res.retry;
 			truncated = 0;
-#ifdef INET6
 			if ((s < 0) || (!vc) || (af != nsap->sa_family)) {
-#else /* INET6 */
-			if ((s < 0) || (!vc)) {
-#endif /* INET6 */ /*}*/
 				if (s >= 0)
 					res_close();
 
-#ifdef INET6
 				af = nsap->sa_family;
 				s = socket(af, SOCK_STREAM, 0);
-#else /* INET6 */
-				s = socket(PF_INET, SOCK_STREAM, 0);
-#endif /* INET6 */
 				if (s < 0) {
 					terrno = errno;
 					Perror(stderr, "socket(vc)", errno);
@@ -473,18 +461,10 @@ res_send(buf, buflen, ans, anssiz)
 				}
 				errno = 0;
 				if (connect(s, (struct sockaddr *)nsap,
-#ifdef INET6
 					    nsap->sa_len) < 0) {
-#else /* INET6 */
-					    sizeof(struct sockaddr)) < 0) {
-#endif /* INET6 */ /*}*/
 					terrno = errno;
 					Aerror(stderr, "connect/vc",
-#ifdef INET6
 					       errno, nsap);
-#else /* INET6 */
-					       errno, *nsap);
-#endif /* INET6 */
 					badns |= (1 << ns);
 					res_close();
 					goto next_ns;
@@ -547,6 +527,17 @@ read_len:
 				len = anssiz;
 			} else
 				len = resplen;
+			if (len < HFIXEDSZ) {
+				/*
+				 * Undersized message.
+				 */
+				Dprint(_res.options & RES_DEBUG,
+				       (stdout, ";; undersized: %d\n", len));
+				terrno = EMSGSIZE;
+				badns |= (1 << ns);
+				res_close();
+				goto next_ns;
+			}
 			cp = ans;
 			while (len != 0 &&
 			       (n = read(s, (char *)cp, (int)len)) > 0) {
@@ -598,26 +589,14 @@ read_len:
 			 */
 			struct timeval timeout;
 			fd_set dsmask;
-#ifdef INET6
 			struct sockaddr_storage from;
-#else /* INET6 */
-			struct sockaddr_in from;
-#endif /* INET6 */
 			int fromlen;
 
-#ifdef INET6
 			if ((s < 0) || vc || (af != nsap->sa_family)) {
-#else /* INET6 */
-			if ((s < 0) || vc) {
-#endif /* INET6 */ /*}*/
 				if (vc)
 					res_close();
-#ifdef INET6
 				af = nsap->sa_family;
 				s = socket(af, SOCK_DGRAM, 0);
-#else /* INET6 */
-				s = socket(PF_INET, SOCK_DGRAM, 0);
-#endif /* INET6 */
 				if (s < 0) {
 #if !CAN_RECONNECT
  bad_dg_sock:
@@ -656,19 +635,10 @@ read_len:
 				 */
 				if (!connected) {
 					if (connect(s, (struct sockaddr *)nsap,
-#ifdef INET6
-						    nsap->sa_len
-#else /* INET6 */
-						    sizeof(struct sockaddr)
-#endif /* INET6 */
-						    ) < 0) {
+						    nsap->sa_len) < 0) {
 						Aerror(stderr,
 						       "connect(dg)",
-#ifdef INET6
 						       errno, nsap);
-#else /* INET6 */
-						       errno, *nsap);
-#endif /* INET6 */
 						badns |= (1 << ns);
 						res_close();
 						goto next_ns;
@@ -701,11 +671,7 @@ read_len:
 						        &no_addr,
 						       sizeof(no_addr));
 #else
-#ifdef INET6
 					int s1 = socket(af, SOCK_DGRAM,0);
-#else /* INET6 */
-					int s1 = socket(PF_INET, SOCK_DGRAM,0);
-#endif /* INET6 */
 					if (s1 < 0)
 						goto bad_dg_sock;
 					(void) dup2(s1, s);
@@ -718,17 +684,8 @@ read_len:
 				}
 				if (sendto(s, (char*)buf, buflen, 0,
 					   (struct sockaddr *)nsap,
-#ifdef INET6
-					   nsap->sa_len)
-#else /* INET6 */
-					   sizeof(struct sockaddr))
-#endif /* INET6 */ /*}*/
-				    != buflen) {
-#ifdef INET6
+					   nsap->sa_len) != buflen) {
 					Aerror(stderr, "sendto", errno, nsap);
-#else /* INET6 */
-					Aerror(stderr, "sendto", errno, *nsap);
-#endif /* INET6 */
 					badns |= (1 << ns);
 					res_close();
 					goto next_ns;
@@ -744,12 +701,12 @@ read_len:
 			if ((long) timeout.tv_sec <= 0)
 				timeout.tv_sec = 1;
 			timeout.tv_usec = 0;
-			if (s+1 > FD_SETSIZE) {
-				Perror(stderr, "s+1 > FD_SETSIZE", EMFILE);
+    wait:
+			if (s < 0 || s >= FD_SETSIZE) {
+				Perror(stderr, "s out-of-bounds", EMFILE);
 				res_close();
 				goto next_ns;
 			}
-    wait:
 			FD_ZERO(&dsmask);
 			FD_SET(s, &dsmask);
 			n = select(s+1, &dsmask, (fd_set *)NULL,
@@ -772,11 +729,7 @@ read_len:
 				goto next_ns;
 			}
 			errno = 0;
-#ifdef INET6
 			fromlen = sizeof(from);
-#else /* INET6 */
-			fromlen = sizeof(struct sockaddr_in);
-#endif /* INET6 */
 			resplen = recvfrom(s, (char*)ans, anssiz, 0,
 					   (struct sockaddr *)&from, &fromlen);
 			if (resplen <= 0) {
@@ -785,6 +738,18 @@ read_len:
 				goto next_ns;
 			}
 			gotsomewhere = 1;
+			if (resplen < HFIXEDSZ) {
+				/*
+				 * Undersized message.
+				 */
+				Dprint(_res.options & RES_DEBUG,
+				       (stdout, ";; undersized: %d\n",
+					resplen));
+				terrno = EMSGSIZE;
+				badns |= (1 << ns);
+				res_close();
+				goto next_ns;
+			}
 			if (hp->id != anhp->id) {
 				/*
 				 * response from old query, ignore it.
@@ -799,11 +764,7 @@ read_len:
 			}
 #if CHECK_SRVR_ADDR
 			if (!(_res.options & RES_INSECURE1) &&
-#ifdef INET6
 			    !res_isourserver((struct sockaddr_in *)&from)) {
-#else /* INET6 */
-			    !res_isourserver(&from)) {
-#endif /* INET6 */ /*}*/
 				/*
 				 * response from wrong server? ignore it.
 				 * XXX - potential security hazard could
@@ -880,12 +841,8 @@ read_len:
 			do {
 				res_sendhookact act;
 
-#ifdef INET6
 				act = (*Rhook)((struct sockaddr_in *)nsap,
 					       buf, buflen,
-#else /* INET6 */
-				act = (*Rhook)(nsap, buf, buflen,
-#endif /* INET6 */
 					       ans, anssiz, &resplen);
 				switch (act) {
 				case res_goahead:
@@ -938,9 +895,7 @@ res_close()
 		s = -1;
 		connected = 0;
 		vc = 0;
-#ifdef INET6
 		af = 0;
-#endif /* INET6 */
 	}
 }
 
