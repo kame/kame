@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.40 2000/11/30 16:00:06 jinmei Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.41 2000/12/02 07:30:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -199,6 +199,7 @@ int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
 	struct in6pcb *, struct ifnet **));
 int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
 	struct ifnet *));
+void in6_clearscope __P((struct in6_addr *));
 
 #ifndef TCP6
 extern struct rtentry *

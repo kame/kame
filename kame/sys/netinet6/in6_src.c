@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.34 2000/08/26 10:00:45 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.35 2001/01/20 15:53:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -748,4 +748,16 @@ in6_recoverscope(sin6, in6, ifp)
 	}
 
 	return 0;
+}
+
+/*
+ * just clear the embedded scope identifer.
+ * XXX: currently used for bsdi4 only as a supplement function.
+ */
+void
+in6_clearscope(addr)
+	struct in6_addr *addr;
+{
+	if (IN6_IS_SCOPE_LINKLOCAL(addr))
+		addr->s6_addr16[1] = 0;
 }
