@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/11/25 09:40:28 $
+			$Date: 1999/11/26 15:39:27 $
 
 1. IPv6
 
@@ -440,14 +440,19 @@ option as well as AH).
 
 There are fundamental issues in *BSD support for jumbograms.  We would like to
 address those, but we need more time to finalize these.  To name a few:
-- mbuf pkthdr.len field is typed as "int", so it will not hold jumbogram
-  with len > 2G on 32bit architecture CPUs.
-- We (mistakingly) used "int" to hold packet length.  We need to convert them
-  into larger integral type.  It needs a great care (we can't just query-
-  replace them into u_int32_t), as there can be overflow during packet length
-  computation.
-- We (mistakingly) check for ip6_plen field of IPv6 header for packet payload
+- mbuf pkthdr.len field is typed as "int" in 4.4BSD, so it will not hold
+  jumbogram with len > 2G on 32bit architecture CPUs.  If we would like to
+  support jumbogram properly, the field must be expanded to hold 4G +
+  IPv6 header + link-layer header.  Therefore, it must be expanded to at least
+  int64_t (u_int32_t is NOT enough).
+- We mistakingly use "int" to hold packet length in many places.  We need
+  to convert them into larger integral type.  It needs a great care, as we may
+  experience overflow during packet length computation.
+- We mistakingly check for ip6_plen field of IPv6 header for packet payload
   length in various places.  We should be checking mbuf pkthdr.len instead.
+  ip6_input() will perform sanity check on jumbo payload option on input,
+  and we can safely use mbuf pkthdr.len afterwards.
+- TCP code needs a careful update in bunch of places, of course.
 
 1.8 Loop prevention in header processing
 
