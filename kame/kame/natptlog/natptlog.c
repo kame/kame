@@ -1,4 +1,4 @@
-/*	$KAME: natptlog.c,v 1.14 2001/09/02 19:38:47 fujisawa Exp $	*/
+/*	$KAME: natptlog.c,v 1.15 2001/10/29 15:09:15 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -116,6 +116,7 @@ void	 printLogIP4		__P((struct lbuf *));
 void	 printLogIP6		__P((struct lbuf *));
 void	 printLogIN6addr	__P((struct lbuf *));
 void	 printLogCSlot		__P((struct lbuf *));
+void	 printLogTSlot		__P((struct lbuf *));
 void	 printLogTCPFSM		__P((struct lbuf *));
 
 char	*displaySockaddr	__P((struct sockaddr *));
@@ -142,6 +143,8 @@ void	 init_main		__P((void));
 
 
 void	 makeCSlotLine		__P((char *, int, struct cSlot *));
+void	 makeTSlotLine		__P((char *, int, struct tSlot *,
+				     struct tcpstate *, int));
 
 extern	char	*tcpstates[];	/* defined in <netinet/tcp_fsm.h>	*/
 
@@ -260,6 +263,7 @@ recvMesg(int sockfd)
 				case LOG_IP6:		printLogIP6(lbuf);	break;
 				case LOG_IN6ADDR:	printLogIN6addr(lbuf);	break;
 				case LOG_CSLOT:		printLogCSlot(lbuf);	break;
+				case LOG_TSLOT:		printLogTSlot(lbuf);	break;
 				case LOG_TCPFSM:	printLogTCPFSM(lbuf);	break;
 
 				default:
@@ -402,6 +406,19 @@ printLogCSlot(struct lbuf *lbuf)
 	char		 wow[BUFSIZ];
 
 	makeCSlotLine(wow, sizeof(wow), (struct cSlot *)lbuf->l_dat.__buf);
+	log(lbuf->l_hdr.lh_pri, "%s", wow);
+}
+
+
+void
+printLogTSlot(struct lbuf *lbuf)
+{
+	struct tSlot	*tsl = (struct tSlot *)lbuf->l_dat.__buf;
+	struct tcpstate *ts;
+	char		 wow[BUFSIZ];
+
+	ts = tsl->suit.tcps;
+	makeTSlotLine(wow, sizeof(wow), tsl, ts, 0);
 	log(lbuf->l_hdr.lh_pri, "%s", wow);
 }
 
