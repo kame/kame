@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.19 2000/12/02 16:06:49 itojun Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.20 2000/12/02 16:09:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,6 +107,9 @@ struct pr_usrreqs;
  * ip6c_finaldst usually points to ip6c_ip6->ip6_dst.  if the original
  * (internal) packet carries a routing header, it may point the final
  * dstination address in the routing header.
+ *
+ * ip6c_src: ip6c_ip6->ip6_src + scope info
+ * ip6c_dst: ip6c_finaldst + scope info
  */
 struct ip6ctlparam {
 	struct mbuf *ip6c_m;		/* start of mbuf chain */
