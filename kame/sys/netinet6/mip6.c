@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.17 2000/02/26 18:08:38 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.18 2000/02/28 16:36:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.17 2000/02/26 18:08:38 itojun Exp $
+ * $Id: mip6.c,v 1.18 2000/02/28 16:36:01 itojun Exp $
  *
  */
 
@@ -1207,7 +1207,8 @@ u_int8_t        next;      /* Next header following the IPv6 header */
 	bzero(ip6, sizeof(struct ip6_hdr));
 
 	ip6->ip6_flow = 0;
-	ip6->ip6_vfc = IPV6_VERSION;
+	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc |= IPV6_VERSION;
 	ip6->ip6_plen = 0;
 	ip6->ip6_nxt = next;
 	ip6->ip6_hlim = IPV6_DEFHLIM;
