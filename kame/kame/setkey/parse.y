@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.76 2003/05/28 08:15:43 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.77 2003/05/28 08:32:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -622,15 +622,19 @@ portstr
 	:	/*NOTHING*/
 		{
 			$$.buf = strdup("0");
-			if (!$$.buf)
+			if (!$$.buf) {
 				yyerror("insufficient memory");
+				return -1;
+			}
 			$$.len = strlen($$.buf);
 		}
 	|	BLCL ANY ELCL
 		{
 			$$.buf = strdup("0");
-			if (!$$.buf)
+			if (!$$.buf) {
 				yyerror("insufficient memory");
+				return -1;
+			}
 			$$.len = strlen($$.buf);
 		}
 	|	BLCL DECSTRING ELCL
@@ -638,8 +642,10 @@ portstr
 			char buf[20];
 			snprintf(buf, sizeof(buf), "%lu", $2);
 			$$.buf = strdup(buf);
-			if (!$$.buf)
+			if (!$$.buf) {
 				yyerror("insufficient memory");
+				return -1;
+			}
 			$$.len = strlen($$.buf);
 		}
 	|	BLCL STRING ELCL
@@ -681,8 +687,10 @@ upper_misc_spec
 	|	STRING
 		{
 			$$.buf = strdup($1.buf);
-			if (!$$.buf)
+			if (!$$.buf) {
 				yyerror("insufficient memory");
+				return -1;
+			}
 			$$.len = strlen($$.buf);
 		}
 	;
@@ -1171,12 +1179,16 @@ fix_portstr(spec, sport, dport)
 	}
 
 	sport->buf = strdup(spec->buf);
-	if (!sport->buf)
+	if (!sport->buf) {
 		yyerror("insufficient memory");
+		return -1;
+	}
 	sport->len = strlen(sport->buf);
 	dport->buf = strdup(p2);
-	if (!dport->buf)
+	if (!dport->buf) {
 		yyerror("insufficient memory");
+		return -1;
+	}
 	dport->len = strlen(dport->buf);
 
 	return 0;

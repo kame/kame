@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.39 2003/05/28 08:15:43 itojun Exp $	*/
+/*	$KAME: token.l,v 1.40 2003/05/28 08:32:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -134,7 +134,7 @@ spdflush	{ return(SPDFLUSH); }
 			yylval.val.len = strlen(yytext);
 			yylval.val.buf = strdup(yytext);
 			if (!yylval.val.buf)
-				yyerror("insufficient memory");
+				yyfatal("insufficient memory");
 
 			return(PL_REQUESTS);
 		}
@@ -145,7 +145,7 @@ spdflush	{ return(SPDFLUSH); }
 			yylval.val.len = strlen(yytext);
 			yylval.val.buf = strdup(yytext);
 			if (!yylval.val.buf)
-				yyerror("insufficient memory");
+				yyfatal("insufficient memory");
 			return(F_AIFLAGS);
 		}
 
@@ -224,7 +224,7 @@ any		{ return(ANY); }
 {hexstring}	{
 			yylval.val.buf = strdup(yytext + 2);
 			if (!yylval.val.buf)
-				yyerror("insufficient memory");
+				yyfatal("insufficient memory");
 			yylval.val.len = strlen(yylval.val.buf);
 
 			return(HEXSTRING);
@@ -238,7 +238,7 @@ any		{ return(ANY); }
 			yylval.val.len = yyleng - 2;
 			yylval.val.buf = strdup(yytext);
 			if (!yylval.val.buf)
-				yyerror("insufficient memory");
+				yyfatal("insufficient memory");
 
 			return(QUOTEDSTRING);
 		}
@@ -247,7 +247,7 @@ any		{ return(ANY); }
 			yylval.val.len = yyleng;
 			yylval.val.buf = strdup(yytext);
 			if (!yylval.val.buf)
-				yyerror("insufficient memory");
+				yyfatal("insufficient memory");
 			return(STRING);
 		}
 
@@ -255,7 +255,7 @@ any		{ return(ANY); }
 			yylval.val.len = yyleng;
 			yylval.val.buf = strdup(yytext);
 			if (!yylval.val.buf)
-				yyerror("insufficient memory");
+				yyfatal("insufficient memory");
 			return(STRING);
 		}
 
