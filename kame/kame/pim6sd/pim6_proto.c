@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.62 2003/08/10 17:02:41 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.63 2003/08/26 04:08:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -4079,6 +4079,11 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		 grp_rp_entry_ptr = grp_rp_entry_next)
 	    {
 		grp_rp_entry_next = grp_rp_entry_ptr->grp_rp_next;
+
+		/* static-RP entry is free from this management */
+		if (grp_rp_entry_ptr->origin != RP_ORIGIN_BSR)
+			continue;
+
 		if (grp_rp_entry_ptr->fragment_tag != curr_bsr_fragment_tag)
 		    delete_rp_grp_entry(&cand_rp_list, &grp_mask_list,
 					grp_rp_entry_ptr);
@@ -4100,6 +4105,11 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		 grp_rp_entry_ptr = grp_rp_entry_next)
 	    {
 		grp_rp_entry_next = grp_rp_entry_ptr->grp_rp_next;
+
+		/* static-RP entry is free from this management */
+		if (grp_rp_entry_ptr->origin != RP_ORIGIN_BSR)
+			continue;
+
 		if (grp_rp_entry_ptr->fragment_tag != curr_bsr_fragment_tag)
 		    delete_rp_grp_entry(&segmented_cand_rp_list,
 					&segmented_grp_mask_list,
