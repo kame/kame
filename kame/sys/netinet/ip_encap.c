@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.72 2001/09/27 06:36:59 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.73 2001/10/02 08:30:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,8 +38,9 @@
  *	RFC2401 IPsec tunnel
  *	RFC2473 IPv6 generic packet tunnelling
  *	RFC2529 6over4 tunnel
+ *	RFC3056 6to4 tunnel
+ *	isatap tunnel
  *	mobile-ip6 (uses RFC2473)
- *	6to4 tunnel
  * Here's a list of protocol that want protocol #4:
  *	RFC1853 IPv4-in-IPv4 tunnelling
  *	RFC2003 IPv4 encapsulation within IPv4
