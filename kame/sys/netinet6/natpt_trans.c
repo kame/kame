@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.126 2002/06/25 05:34:54 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.127 2002/06/26 05:58:38 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1952,8 +1952,8 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 			ts->rport = remote.port[0];
 		}
 
-		h = (char *)&remote.addr[1];
-		p = (char *)&remote.port[1];
+		h = (u_char *)&remote.addr[1];
+		p = (u_char *)&remote.port[1];
 		snprintf(wow, sizeof(wow), "PORT %u,%u,%u,%u,%u,%u\r\n",
 			 h[0], h[1], h[2], h[3], p[0], p[1]);
 
@@ -1966,7 +1966,7 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 	case FTP6_EPRT:
 	case FTP6_LPRT:
 	    {
-		    char		*h, *p;
+		    u_char		*h, *p;
 		    struct tSlot	*ats;
 		    struct pAddr	local, remote;
 
@@ -1994,8 +1994,8 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		    if (natpt_openIncomingV4Conn(IPPROTO_TCP, &local, &remote) == NULL)
 			    return (0);
 
-		    h = (char *)&remote.addr[1];
-		    p = (char *)&remote.port[1];
+		    h = (u_char *)&remote.addr[1];
+		    p = (u_char *)&remote.port[1];
 		    snprintf(wow, sizeof(wow), "PORT %u,%u,%u,%u,%u,%u\r\n",
 			     h[0], h[1], h[2], h[3], p[0], p[1]);
 
@@ -2075,8 +2075,8 @@ natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 		if (natpt_parse227(ftp4.arg, kk, &sin) == NULL)
 			return (0);
 
-		h = (char *)&ats->local.in6src;
-		p = (char *)&sin.sin_port;
+		h = (u_char *)&ats->local.in6src;
+		p = (u_char *)&sin.sin_port;
 		snprintf(Wow, sizeof(Wow),
 			 "228 Entering Long Passive Mode "
 			 "(%u,%u,"
