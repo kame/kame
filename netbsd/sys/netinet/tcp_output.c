@@ -183,6 +183,12 @@ __KERNEL_RCSID(0, "$NetBSD: tcp_output.c,v 1.79.4.3 2002/11/30 14:31:59 he Exp $
 #include <netinet6/ipsec.h>
 #endif
 
+#if defined(INET6) && defined(MIP6)
+#include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#endif
+
 #include <netinet/tcp.h>
 #define	TCPOUTFLAGS
 #include <netinet/tcp_fsm.h>
@@ -191,6 +197,10 @@ __KERNEL_RCSID(0, "$NetBSD: tcp_output.c,v 1.79.4.3 2002/11/30 14:31:59 he Exp $
 #include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
 #include <netinet/tcp_debug.h>
+
+#if defined(INET6) && defined(MIP6)
+static int mip6_hdrsiz_tcp(struct tcpcb *);
+#endif
 
 #ifdef notyet
 extern struct mbuf *m_copypack();
@@ -353,6 +363,9 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 		optlen += ipsec6_hdrsiz_tcp(tp);
 #endif
 		optlen += ip6_optlen(in6p);
+#ifdef MIP6
+		optlen += mip6_hdrsiz_tcp(tp);
+#endif
 	}
 #endif
 	size -= optlen;
@@ -1309,3 +1322,17 @@ tcp_setpersist(tp)
 	if (tp->t_rxtshift < TCP_MAXRXTSHIFT)
 		tp->t_rxtshift++;
 }
+
+#if defined(INET6) && defined(MIP6)
+static int
+mip6_hdrsiz_tcp(tp)
+	struct tcpcb *tp;
+{
+	struct in6pcb *in6p;
+
+	if ((tp == NULL) || ((in6p = tp->t_in6pcb) == NULL))
+		return (0);
+
+	return (mip6_exthdr_size(&in6p->in6p_lsa, &in6p->in6p_fsa));
+}
+#endif

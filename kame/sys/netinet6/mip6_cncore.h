@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.1 2003/04/23 09:15:51 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.2 2003/06/11 11:32:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -70,9 +70,9 @@ struct mbuf *mip6_create_ip6hdr(struct sockaddr_in6 *, struct sockaddr_in6 *,
     u_int8_t, u_int32_t);
 int mip6_exthdr_create(struct mbuf *, struct ip6_pktopts *,
     struct mip6_pktopts *);
-int
-mip6_rthdr_create(struct ip6_rthdr **, struct sockaddr_in6 *,
+int mip6_rthdr_create(struct ip6_rthdr **, struct sockaddr_in6 *,
     struct ip6_pktopts *);
+int mip6_exthdr_size(struct sockaddr_in6 *, struct sockaddr_in6 *);
 void mip6_destopt_discard(struct mip6_pktopts *);
 
 /* binding cache entry processing. */

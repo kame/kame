@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.4 2003/05/11 23:27:51 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.5 2003/06/11 11:32:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -774,6 +774,28 @@ mip6_rthdr_create_withdst(pktopt_rthdr, dst, opt)
 	}
 
 	return (0);
+}
+
+int
+mip6_exthdr_size(src, dst)
+	struct sockaddr_in6 *src;
+	struct sockaddr_in6 *dst;
+{
+	int hdrsiz;
+	struct mip6_bc *mbc;
+
+	hdrsiz = 0;
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, dst);
+	if (mbc != NULL) {
+		/* a packet will have RTHDR2. */
+		hdrsiz += sizeof(struct ip6_rthdr2) + sizeof(struct in6_addr);
+	}
+
+#ifdef MIP6_MOBILE_NODE
+	hdrsiz += mip6_mobile_node_exthdr_size(src, dst);
+#endif /* MIP6_MOBILE_NODE */
+
+	return (hdrsiz);
 }
 
 void

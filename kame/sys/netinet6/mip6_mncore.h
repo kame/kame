@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.3 2003/06/03 06:44:36 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.4 2003/06/11 11:32:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -154,6 +154,7 @@ int32_t mip6_subnet_prefix_list_get_minimum_lifetime(
 /* IPv6 extention header processing. */
 int mip6_haddr_destopt_create(struct ip6_dest **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, struct hif_softc *);
+int mip6_mobile_node_exthdr_size(struct sockaddr_in6 *, struct sockaddr_in6 *);
 int mip6_addr_exchange(struct mbuf *, struct mbuf *);
 
 /* Mobility Header processing. */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.4 2003/06/03 08:55:23 t-momose Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.5 2003/06/11 11:32:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2495,6 +2495,43 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	mip6stat.mip6s_ohao++;
 
 	return (0);
+}
+
+int
+mip6_mobile_node_exthdr_size(src, dst)
+	struct sockaddr_in6 *src;
+	struct sockaddr_in6 *dst;
+{
+	int hdrsiz;
+	struct hif_softc *sc;
+	struct mip6_bu *mbu;
+
+	if (!MIP6_IS_MN)
+		return (0);
+
+	hdrsiz = 0;
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst, src);
+		if (mbu != NULL) {
+			if (MIP6_IS_BU_BOUND_STATE(mbu)) {
+				/* a packet will have HAO. */
+				/*
+				 * XXX this calculation may cause
+				 * larger result than actually needed,
+				 * if there are some other destination
+				 * options.
+				 */
+				hdrsiz += (((sizeof(struct ip6_dest) + sizeof(struct ip6_opt_home_address)) + 7) / 8) * 8;
+			} else {
+				/* a packet will be encapsulated. */
+				hdrsiz += sizeof(struct ip6_hdr);
+			}
+			break;
+		}
+	}
+
+	return (hdrsiz);
 }
 
 /*

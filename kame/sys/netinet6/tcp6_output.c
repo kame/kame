@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.22 2002/06/09 14:44:03 itojun Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.23 2003/06/11 11:32:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,6 +111,17 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #endif /* IPSEC */
+
+#ifdef MIP6
+#include <net/if.h>
+#include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#endif
+
+#ifdef MIP6
+static int mip6_hdrsiz_tcp(struct tcp6cb *);
+#endif
 
 #ifdef notyet
 extern struct mbuf *m_copypack();
@@ -379,6 +390,9 @@ send:
 	exthdrlen = ip6_optlen(t6p->t_in6pcb);
 #ifdef IPSEC
 	exthdrlen += ipsec6_hdrsiz_tcp(t6p);
+#endif
+#ifdef MIP6
+	exthdrlen += mip6_hdrsiz_tcp(t6p);
 #endif
 
 	/*
@@ -748,3 +762,17 @@ tcp6_setpersist(t6p)
 	if (t6p->t_rxtshift < TCP6_MAXRXTSHIFT)
 		t6p->t_rxtshift++;
 }
+
+#ifdef MIP6
+static int
+mip6_hdrsiz_tcp(t6p)
+	struct tcp6cb *t6p;
+{
+	struct in6pcb *in6p;
+
+	if ((t6p == NULL) || ((in6p = t6p->t_in6pcb) == NULL))
+		return (0);
+
+	return (mip6_exthdr_size(&in6p->in6p_lsa, &in6p->in6p_fsa));
+}
+#endif /* MIP6 */
