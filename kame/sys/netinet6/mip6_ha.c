@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.24 2001/09/12 10:58:22 keiichi Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.25 2001/09/20 07:13:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -312,9 +312,8 @@ mip6_ha_timeout(dummy)
 			/* this HA is not valid any more. */
 			for (sc = TAILQ_FIRST(&hif_softc_list); sc;
 			     /*
-			      * XXX.  no need to walk all hif bacause
-			      * home agent cannot exist on differnt
-			      * two links at the same time.
+			      * set in6addr_any as a home agent
+			      * address for each binding update entry.
 			      */
 			     sc = TAILQ_NEXT(sc, hif_entry)) {
 				for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
