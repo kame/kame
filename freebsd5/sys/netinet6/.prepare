@@ -1,15 +1,3 @@
-exclude tcp6.h
-exclude tcp6_debug.c
-exclude tcp6_debug.h
-exclude tcp6_fsm.h
-exclude tcp6_input.c
-exclude tcp6_output.c
-exclude tcp6_seq.h
-exclude tcp6_subr.c
-exclude tcp6_timer.c
-exclude tcp6_timer.h
-exclude tcp6_usrreq.c
 exclude udp6.h
 conflict udp6_output.c
 conflict raw_ip6.c
-conflict tcp6_var.h
