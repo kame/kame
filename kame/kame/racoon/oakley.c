@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.27 2000/02/28 10:10:07 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.28 2000/04/18 03:57:31 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -64,6 +64,7 @@
 #include "ipsec_doi.h"
 #include "algorithm.h"
 #include "crypto_openssl.h"
+#include "sockmisc.h"
 #include "strnames.h"
 #include "signing.h"
 
@@ -1652,7 +1653,8 @@ oakley_skeyid(iph1)
 			iph1->authstr = getpskbyaddr(iph1->remote);
 			if (iph1->authstr == NULL) {
 				plog(logp, LOCATION, iph1->remote,
-					"couldn't find pskey.\n");
+					"couldn't find pskey for %s.\n",
+					saddrwop2str(iph1->remote));
 				goto end;
 			}
 		}
