@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.342 2002/10/10 06:19:58 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.343 2002/10/22 01:58:06 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3981,7 +3981,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
-		error = in6_setmopt_source_addr(SIN6(&ss_src), msf, optname);
+		error = in6_setmopt_source_addr(&ss_src, msf, optname);
 		if (error != 0) {
 			if (init) {
 				IMO_MSF_FREE(msf);
@@ -4045,7 +4045,7 @@ ip6_setmoptions(optname, im6op, m)
 			error = EINVAL;
 			break;
 		}
-		error = in6_setmopt_source_addr(SIN6(&ss_src), msf, optname);
+		error = in6_setmopt_source_addr(&ss_src, msf, optname);
 		if (error != 0)
 			break;
 		if (msf->msf_numsrc == 0)
@@ -4127,7 +4127,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
-		error = in6_setmopt_source_addr(SIN6(&ss_src), msf, optname);
+		error = in6_setmopt_source_addr(&ss_src, msf, optname);
 		if (error != 0) {
 			if (init)
 				IMO_MSF_FREE(msf);
@@ -4211,7 +4211,7 @@ ip6_setmoptions(optname, im6op, m)
 			error = EINVAL;
 			break;
 		}
-		error = in6_setmopt_source_addr(SIN6(&ss_src), msf, optname);
+		error = in6_setmopt_source_addr(&ss_src, msf, optname);
 		if (error != 0)
 			break;
 		if (msf->msf_blknumsrc == 0)

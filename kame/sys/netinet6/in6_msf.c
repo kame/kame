@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.9 2002/10/18 08:18:05 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.10 2002/10/22 01:58:06 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2758,36 +2758,31 @@ int
 in6_getmopt_source_list(msf, numsrc, oss, mode)
 	struct sock_msf *msf;
 	u_int16_t *numsrc;
-	struct sockaddr_in6 **oss;
+	struct sockaddr_storage **oss;
 	u_int *mode;
 {
-	return (in_getmopt_source_list(msf, numsrc,
-				       (struct sockaddr_storage **) oss,
-				       mode));
+	return (in_getmopt_source_list(msf, numsrc, oss, mode));
 }
 
 int
 in6_setmopt_source_addr(ss, msf, optname)
-	struct sockaddr_in6 *ss;
+	struct sockaddr_storage *ss;
 	struct sock_msf *msf;
 	int optname;
 {
-	return (in_setmopt_source_addr((struct sockaddr_storage *)ss,
-				       msf, optname));
+	return (in_setmopt_source_addr(ss, msf, optname));
 }
 
 int
 in6_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 	struct sock_msf *msf;
 	u_int16_t numsrc;
-	struct sockaddr_in6 *ss, *old_ss;
+	struct sockaddr_storage *ss, *old_ss;
 	u_int mode;
 	u_int16_t *add_num, *old_num;
 {
-	return (in_setmopt_source_list
-			(msf, numsrc, (struct sockaddr_storage *) ss,
-			 mode, add_num, old_num,
-			 (struct sockaddr_storage *) old_ss));
+	return (in_setmopt_source_list(msf, numsrc, ss, mode, add_num,
+				       old_num, old_ss));
 }
 
 void

@@ -1,4 +1,4 @@
-/* $KAME: in6_msf.h,v 1.1 2002/09/05 08:09:36 suz Exp $	*/
+/* $KAME: in6_msf.h,v 1.2 2002/10/22 01:58:06 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -128,12 +128,12 @@ int	in6_merge_msf_source_addr(struct in6_addr_slist *, struct sockaddr_in6 *, in
 int	sock6_setmopt_srcfilter(struct socket *, struct group_filter **);
 int	sock6_getmopt_srcfilter(struct socket *, struct group_filter **);
 int	in6_getmopt_source_list(struct sock_msf *, u_int16_t *,
-				struct sockaddr_in6 **, u_int *);
-int	in6_setmopt_source_addr(struct sockaddr_in6 *,
+				struct sockaddr_storage **, u_int *);
+int	in6_setmopt_source_addr(struct sockaddr_storage *,
 				struct sock_msf *, int);
 int	in6_setmopt_source_list(struct sock_msf *, u_int16_t,
-				struct sockaddr_in6 *, u_int, u_int16_t *,
-				u_int16_t *, struct sockaddr_in6 *);
+				struct sockaddr_storage *, u_int, u_int16_t *,
+				u_int16_t *, struct sockaddr_storage *);
 void	in6_freemopt_source_list(struct sock_msf *, struct msf_head *, struct msf_head *);
 void	in6_cleanmopt_source_addr(struct sock_msf *, int);
 void	in6_undomopt_source_addr(struct sock_msf *, int);
