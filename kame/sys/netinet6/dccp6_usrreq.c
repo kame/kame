@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.2 2003/11/04 10:34:52 ono Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.3 2003/11/05 09:16:46 ono Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -147,7 +147,11 @@ dccp6_bind(struct socket *so, struct mbuf *m, struct proc *td)
 	struct sockaddr_in6 *sin6p;
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp6_bind!\n"));
+#ifdef __FreeBSD__
 	s = splnet();
+#else
+	s = splsoftnet();
+#endif
 	INP_INFO_WLOCK(&dccpbinfo);
 #ifdef __FreeBSD__
 	inp = sotoinpcb(so);
@@ -223,7 +227,11 @@ dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp6_connect!\n"));
 
+#ifdef __FreeBSD__
 	s = splnet();
+#else
+	s = splsoftnet();
+#endif
 
 #ifdef __FreeBSD__
 	INP_INFO_WLOCK(&dccpbinfo);
@@ -324,7 +332,11 @@ dccp6_listen(struct socket *so, struct proc *td)
 #endif
 	struct dccpcb *dp;
 	int error = 0;
+#ifdef __FreeBSD__
 	int s = splnet();
+#else
+	int s = splsoftnet();
+#endif
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp6_listen!\n"));
 
@@ -396,7 +408,11 @@ dccp6_accept(struct socket *so, struct mbuf *m)
 		return ECONNABORTED;
 	}
 
+#ifdef __FreeBSD__
 	s = splnet();
+#else
+	s = splsoftnet();
+#endif
 
 	INP_INFO_RLOCK(&dccpbinfo);
 #ifdef __FreeBSD__
