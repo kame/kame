@@ -1,4 +1,4 @@
-/*	$NetBSD: terminal.c,v 1.7 2000/06/22 06:47:49 thorpej Exp $	*/
+/*	$NetBSD: terminal.c,v 1.14 2004/03/20 23:26:05 heas Exp $	*/
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)terminal.c	8.2 (Berkeley) 2/16/95";
 #else
-__RCSID("$NetBSD: terminal.c,v 1.7 2000/06/22 06:47:49 thorpej Exp $");
+__RCSID("$NetBSD: terminal.c,v 1.14 2004/03/20 23:26:05 heas Exp $");
 #endif
 #endif /* not lint */
 
@@ -59,48 +55,12 @@ unsigned char	ttyobuf[2*BUFSIZ], ttyibuf[BUFSIZ];
 
 int termdata;			/* Debugging flag */
 
-#ifdef	USE_TERMIO
-# ifndef VDISCARD
-cc_t termFlushChar;
-# endif
-# ifndef VLNEXT
-cc_t termLiteralNextChar;
-# endif
-# ifndef VSUSP
-cc_t termSuspChar;
-# endif
-# ifndef VWERASE
-cc_t termWerasChar;
-# endif
-# ifndef VREPRINT
-cc_t termRprntChar;
-# endif
-# ifndef VSTART
-cc_t termStartChar;
-# endif
-# ifndef VSTOP
-cc_t termStopChar;
-# endif
-# ifndef VEOL
-cc_t termForw1Char;
-# endif
-# ifndef VEOL2
-cc_t termForw2Char;
-# endif
-# ifndef VSTATUS
-cc_t termAytChar;
-# endif
-#else
-cc_t termForw2Char;
-cc_t termAytChar;
-#endif
-
 /*
  * initialize the terminal data structures.
  */
 
-    void
-init_terminal()
+void
+init_terminal(void)
 {
     if (ring_init(&ttyoring, ttyobuf, sizeof ttyobuf) != 1) {
 	exit(1);
@@ -113,7 +73,8 @@ init_terminal()
 
 
 /*
- *		Send as much data as possible to the terminal.
+ *		Send as much data as possible to the terminal, else exits if
+ *		it encounters a permanent failure when writing to the tty.
  *
  *		Return value:
  *			-1: No useful work done, data waiting to go out.
@@ -123,11 +84,10 @@ init_terminal()
  */
 
 
-    int
-ttyflush(drop)
-    int drop;
+int
+ttyflush(int drop)
 {
-    register int n, n0, n1;
+    int n, n0, n1;
 
     n0 = ring_full_count(&ttyoring);
     if ((n1 = n = ring_full_consecutive(&ttyoring)) > 0) {
@@ -156,8 +116,18 @@ ttyflush(drop)
 	}
 	ring_consumed(&ttyoring, n);
     }
-    if (n < 0)
-	return -1;
+    if (n < 0) {
+	if (errno == EAGAIN || errno == EINTR) {
+	    return -1;
+	} else {
+	    ring_consumed(&ttyoring, ring_full_count(&ttyoring));
+	    setconnmode(0);
+	    setcommandmode();
+	    NetClose(net);
+	    fprintf(stderr, "Connection closed by foreign host.\n");
+	    exit(1);
+	}
+    }
     if (n == n0) {
 	if (n0)
 	    return -1;
@@ -173,8 +143,8 @@ ttyflush(drop)
  */
 
 
-    int
-getconnmode()
+int
+getconnmode(void)
 {
     extern int linemode;
     int mode = 0;
@@ -213,14 +183,13 @@ getconnmode()
     return(mode);
 }
 
-    void
-setconnmode(force)
-    int force;
+void
+setconnmode(int force)
 {
 #ifdef	ENCRYPTION
     static int enc_passwd = 0;
 #endif
-    register int newmode;
+    int newmode;
 
     newmode = getconnmode()|(force?MODE_FORCE:0);
 
@@ -243,8 +212,8 @@ setconnmode(force)
 }
 
 
-    void
-setcommandmode()
+void
+setcommandmode(void)
 {
     TerminalNewMode(-1);
 }

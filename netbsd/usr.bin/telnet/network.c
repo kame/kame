@@ -1,4 +1,4 @@
-/*	$NetBSD: network.c,v 1.7 2000/06/22 06:47:48 thorpej Exp $	*/
+/*	$NetBSD: network.c,v 1.17 2004/03/20 23:26:05 heas Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)network.c	8.2 (Berkeley) 12/15/93";
 #else
-__RCSID("$NetBSD: network.c,v 1.7 2000/06/22 06:47:48 thorpej Exp $");
+__RCSID("$NetBSD: network.c,v 1.17 2004/03/20 23:26:05 heas Exp $");
 #endif
 #endif /* not lint */
 
@@ -48,14 +44,13 @@ __RCSID("$NetBSD: network.c,v 1.7 2000/06/22 06:47:48 thorpej Exp $");
 
 #include <errno.h>
 #include <unistd.h>
+#include <poll.h>
 
 #include <arpa/telnet.h>
 
 #include "ring.h"
-
 #include "defines.h"
 #include "externs.h"
-#include "fdset.h"
 
 Ring		netoring, netiring;
 unsigned char	netobuf[2*BUFSIZ], netibuf[BUFSIZ];
@@ -64,8 +59,8 @@ unsigned char	netobuf[2*BUFSIZ], netibuf[BUFSIZ];
  * Initialize internal network data structures.
  */
 
-    void
-init_network()
+void
+init_network(void)
 {
     if (ring_init(&netoring, netobuf, sizeof netobuf) != 1) {
 	exit(1);
@@ -82,25 +77,24 @@ init_network()
  * Telnet "synch" processing).
  */
 
-    int
-stilloob()
+int
+stilloob(void)
 {
-    static struct timeval timeout = { 0 };
-    fd_set	excepts;
+    struct pollfd set[1];
     int value;
 
+    set[0].fd = net;
+    set[0].events = POLLPRI;
     do {
-	FD_ZERO(&excepts);
-	FD_SET(net, &excepts);
-	value = select(net+1, (fd_set *)0, (fd_set *)0, &excepts, &timeout);
+	value = poll(set, 1, 0);
     } while ((value == -1) && (errno == EINTR));
 
     if (value < 0) {
-	perror("select");
+	perror("poll");
 	(void) quit(0, NULL);
 	/* NOTREACHED */
     }
-    if (FD_ISSET(net, &excepts)) {
+    if (set[0].revents & POLLPRI) {
 	return 1;
     } else {
 	return 0;
@@ -114,8 +108,8 @@ stilloob()
  *	Sets "neturg" to the current location.
  */
 
-    void
-setneturg()
+void
+setneturg(void)
 {
     ring_mark(&netoring);
 }
@@ -131,10 +125,10 @@ setneturg()
  */
 
 
-    int
-netflush()
+int
+netflush(void)
 {
-    register int n, n1;
+    int n, n1;
 
 #ifdef	ENCRYPTION
     if (encrypt_output)
@@ -161,7 +155,7 @@ netflush()
 	    perror(hostname);
 	    (void)NetClose(net);
 	    ring_clear_mark(&netoring);
-	    longjmp(peerdied, -1);
+	    ExitString("Connection closed by foreign host.\n", 1);
 	    /*NOTREACHED*/
 	}
 	n = 0;

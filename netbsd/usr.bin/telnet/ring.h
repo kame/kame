@@ -1,4 +1,4 @@
-/*	$NetBSD: ring.h,v 1.8 2000/06/22 06:47:48 thorpej Exp $	*/
+/*	$NetBSD: ring.h,v 1.10 2003/08/07 11:16:10 agc Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-#define P __P
 
 /*
  * This defines a structure for a ring buffer.
@@ -75,35 +70,35 @@ extern Ring
 
 /* Initialization routine */
 extern int
-	ring_init P((Ring *ring, unsigned char *buffer, int count));
+	ring_init(Ring *ring, unsigned char *buffer, int count);
 
 /* Data movement routines */
 extern void
-	ring_supply_data P((Ring *ring, unsigned char *buffer, int count));
+	ring_supply_data(Ring *ring, unsigned char *buffer, int count);
 #ifdef notdef
 extern void
-	ring_consume_data P((Ring *ring, unsigned char *buffer, int count));
+	ring_consume_data(Ring *ring, unsigned char *buffer, int count);
 #endif
 
 /* Buffer state transition routines */
 extern void
-	ring_supplied P((Ring *ring, int count)),
-	ring_consumed P((Ring *ring, int count));
+	ring_supplied(Ring *ring, int count),
+	ring_consumed(Ring *ring, int count);
 
 /* Buffer state query routines */
 extern int
-	ring_empty_count P((Ring *ring)),
-	ring_empty_consecutive P((Ring *ring)),
-	ring_full_count P((Ring *ring)),
-	ring_full_consecutive P((Ring *ring)),
-	ring_at_mark P((Ring *ring));
+	ring_empty_count(Ring *ring),
+	ring_empty_consecutive(Ring *ring),
+	ring_full_count(Ring *ring),
+	ring_full_consecutive(Ring *ring),
+	ring_at_mark(Ring *ring);
 
 #ifdef	ENCRYPTION
 extern void
-	ring_encrypt P((Ring *ring, void (*func)(unsigned char *, int))),
-	ring_clearto P((Ring *ring));
+	ring_encrypt(Ring *ring, void (*func)(unsigned char *, int)),
+	ring_clearto(Ring *ring);
 #endif	/* ENCRYPTION */
 
 extern void
-	ring_clear_mark P((Ring *ring)),
-	ring_mark P((Ring *ring));
+	ring_clear_mark(Ring *ring),
+	ring_mark(Ring *ring);

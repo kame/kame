@@ -1,4 +1,4 @@
-/*	$NetBSD: defines.h,v 1.5 1996/02/28 21:03:55 thorpej Exp $	*/
+/*	$NetBSD: defines.h,v 1.8 2003/08/07 11:16:09 agc Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,14 +33,14 @@
 
 #define	settimer(x)	clocks.x = clocks.system++
 
-#if	!defined(TN3270)
+#ifndef TN3270
 
 #define	SetIn3270()
 
 #endif	/* !defined(TN3270) */
 
-#define	NETADD(c)	{ *netoring.supply = c; ring_supplied(&netoring, 1); }
-#define	NET2ADD(c1,c2)	{ NETADD(c1); NETADD(c2); }
+#define	NETADD(c)	{ *netoring.supply = (c); ring_supplied(&netoring, 1); }
+#define	NET2ADD(c1,c2)	{ NETADD((c1)); NETADD((c2)); }
 #define	NETBYTES()	(ring_full_count(&netoring))
 #define	NETROOM()	(ring_empty_count(&netoring))
 

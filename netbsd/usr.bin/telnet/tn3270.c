@@ -1,4 +1,4 @@
-/*	$NetBSD: tn3270.c,v 1.8 1998/03/04 13:51:57 christos Exp $	*/
+/*	$NetBSD: tn3270.c,v 1.21 2003/08/07 11:16:12 agc Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,25 +34,22 @@
 #if 0
 static char sccsid[] = "@(#)tn3270.c	8.2 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: tn3270.c,v 1.8 1998/03/04 13:51:57 christos Exp $");
+__RCSID("$NetBSD: tn3270.c,v 1.21 2003/08/07 11:16:12 agc Exp $");
 #endif
 #endif /* not lint */
 
 #include <sys/types.h>
 #include <sys/time.h>
 #include <arpa/telnet.h>
-#ifdef __STDC__
 #include <unistd.h>
-#endif
+#include <poll.h>
 
 #include "general.h"
-
 #include "defines.h"
 #include "ring.h"
 #include "externs.h"
-#include "fdset.h"
 
-#if	defined(TN3270)
+#ifdef TN3270
 
 #include "../ctlr/screen.h"
 #include "../ctlr/declare.h"
@@ -67,7 +60,6 @@ __RCSID("$NetBSD: tn3270.c,v 1.8 1998/03/04 13:51:57 christos Exp $");
 
 #include "../sys_curses/telextrn.h"
 
-#if	defined(unix)
 int
 	HaveInput,		/* There is input available to scan */
 	cursesdata,		/* Do we dump curses data? */
@@ -75,7 +67,6 @@ int
 
 char	tline[200];
 char	*transcom = 0;	/* transparent mode command (default: none) */
-#endif	/* defined(unix) */
 
 char	Ibuf[8*BUFSIZ], *Ifrontp, *Ibackp;
 
@@ -91,14 +82,12 @@ static int
 #endif	/* defined(TN3270) */
 
 
-#if	defined(TN3270)
-    void
-init_3270()
+#ifdef TN3270
+void
+init_3270(void)
 {
-#if	defined(unix)
     HaveInput = 0;
     sigiocount = 0;
-#endif	/* defined(unix) */
     Sent3270TerminalType = 0;
     Ifrontp = Ibackp = Ibuf;
     init_ctlr();		/* Initialize some things */
@@ -109,7 +98,7 @@ init_3270()
 #endif	/* defined(TN3270) */
 
 
-#if	defined(TN3270)
+#ifdef TN3270
 
 /*
  * DataToNetwork - queue up some data to go to network.  If "done" is set,
@@ -120,13 +109,12 @@ init_3270()
  * only client needs for us to do that.
  */
 
-    int
-DataToNetwork(buffer, count, done)
-    register char *buffer;	/* where the data is */
-    register int  count;	/* how much to send */
-    int		  done;		/* is this the last of a logical block */
+int
+DataToNetwork(char *buffer,	/* where the data is */
+    int  count,	/* how much to send */
+    int		  done)		/* is this the last of a logical block */
 {
-    register int loop, c;
+    int loop, c;
     int origCount;
 
     origCount = count;
@@ -134,14 +122,13 @@ DataToNetwork(buffer, count, done)
     while (count) {
 	/* If not enough room for EORs, IACs, etc., wait */
 	if (NETROOM() < 6) {
-	    fd_set o;
+	    struct pollfd set[1];
 
-	    FD_ZERO(&o);
+	    set[0].fd = net;
+	    set[0].events = POLLOUT;
 	    netflush();
 	    while (NETROOM() < 6) {
-		FD_SET(net, &o);
-		(void) select(net+1, (fd_set *) 0, &o, (fd_set *) 0,
-						(struct timeval *) 0);
+		(void) poll(set, 1, INFTIM);
 		netflush();
 	    }
 	}
@@ -176,18 +163,15 @@ DataToNetwork(buffer, count, done)
 }
 
 
-#if	defined(unix)
-    void
-inputAvailable(signo)
-	int signo;
+void
+inputAvailable(int signo)
 {
     HaveInput = 1;
     sigiocount++;
 }
-#endif	/* defined(unix) */
 
-    void
-outputPurge()
+void
+outputPurge(void)
 {
     (void) ttyflush(1);
 }
@@ -205,30 +189,25 @@ outputPurge()
  * *all* the data at one time (thus the select).
  */
 
-    int
-DataToTerminal(buffer, count)
-    register char	*buffer;		/* where the data is */
-    register int	count;			/* how much to send */
+int
+DataToTerminal(
+    char	*buffer,		/* where the data is */
+    int	count)			/* how much to send */
 {
-    register int c;
+    int c;
     int origCount;
 
     origCount = count;
 
     while (count) {
 	if (TTYROOM() == 0) {
-#if	defined(unix)
-	    fd_set o;
+	    struct pollfd set[1];
 
-	    FD_ZERO(&o);
-#endif	/* defined(unix) */
+	    set[0].fd = tout;
+	    set[0].events = POLLOUT;
 	    (void) ttyflush(0);
 	    while (TTYROOM() == 0) {
-#if	defined(unix)
-		FD_SET(tout, &o);
-		(void) select(tout+1, (fd_set *) 0, &o, (fd_set *) 0,
-						(struct timeval *) 0);
-#endif	/* defined(unix) */
+		(void) poll(set, 1, INFTIM);
 		(void) ttyflush(0);
 	    }
 	}
@@ -248,8 +227,8 @@ DataToTerminal(buffer, count)
  * Push3270 - Try to send data along the 3270 output (to screen) direction.
  */
 
-    int
-Push3270()
+int
+Push3270(void)
 {
     int save = ring_full_count(&netiring);
 
@@ -274,13 +253,11 @@ Push3270()
  *		before quitting.
  */
 
-    void
-Finish3270()
+void
+Finish3270(void)
 {
     while (Push3270() || !DoTerminalOutput()) {
-#if	defined(unix)
 	HaveInput = 0;
-#endif	/* defined(unix) */
 	;
     }
 }
@@ -288,9 +265,8 @@ Finish3270()
 
 /* StringToTerminal - output a null terminated string to the terminal */
 
-    void
-StringToTerminal(s)
-    char *s;
+void
+StringToTerminal(char *s)
 {
     int count;
 
@@ -301,18 +277,14 @@ StringToTerminal(s)
 }
 
 
-#if	((!defined(NOT43)) || defined(PUTCHAR))
 /* _putchar - output a single character to the terminal.  This name is so that
  *	curses(3x) can call us to send out data.
  */
 
-    void
-_putchar(c)
-    char c;
+int
+_putchar(int cc)
 {
-#if	defined(sun)		/* SunOS 4.0 bug */
-    c &= 0x7f;
-#endif	/* defined(sun) */
+    char c = (char)cc;
     if (cursesdata) {
 	Dump('>', &c, 1);
     }
@@ -321,11 +293,12 @@ _putchar(c)
     } else {
 	TTYADD(c);
     }
-}
-#endif	/* ((!defined(NOT43)) || defined(PUTCHAR)) */
 
-    void
-SetIn3270()
+    return (0);
+}
+
+void
+SetIn3270(void)
 {
     if (Sent3270TerminalType && my_want_state_is_will(TELOPT_BINARY)
 		&& my_want_state_is_do(TELOPT_BINARY) && !donebinarytoggle) {
@@ -354,8 +327,8 @@ SetIn3270()
  *	Return '0' if no more responses to send; '1' if a response sent.
  */
 
-    int
-tn3270_ttype()
+int
+tn3270_ttype(void)
 {
     /*
      * Try to send a 3270 type terminal name.  Decide which one based
@@ -398,11 +371,8 @@ tn3270_ttype()
     }
 }
 
-#if	defined(unix)
-	int
-settranscom(argc, argv)
-	int argc;
-	char *argv[];
+int
+settranscom(int argc, char *argv[])
 {
 	int i;
 
@@ -413,13 +383,12 @@ settranscom(argc, argv)
 	   return 1;
 	}
 	transcom = tline;
-	(void) strcpy(transcom, argv[1]);
+	(void) strlcpy(tline, argv[1], sizeof(tline));
 	for (i = 2; i < argc; ++i) {
-	    (void) strcat(transcom, " ");
-	    (void) strcat(transcom, argv[i]);
+	    (void) strlcat(tline, " ", sizeof(tline));
+	    (void) strlcat(tline, argv[i], sizeof(tline));
 	}
 	return 1;
 }
-#endif	/* defined(unix) */
 
 #endif	/* defined(TN3270) */
