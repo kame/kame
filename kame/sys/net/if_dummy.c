@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.22 2003/02/07 10:17:07 suz Exp $	*/
+/*	$KAME: if_dummy.c,v 1.23 2003/02/09 09:26:38 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -206,7 +206,9 @@ dummyoutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	struct rtentry *rt;
 {
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	int error;
+#else
 	int s;
 #endif
 	int isr;
@@ -309,7 +311,8 @@ dummyoutput(ifp, m, dst, rt)
 	 * Queue message on interface, update output statistics if
 	 * successful, and start output if interface not yet active.
 	 */
-	return (IF_HANDOFF(&ifp->if_snd, m, ifp) ? 0 : ENOBUFS);
+	IFQ_HANDOFF(ifp, m, NULL, error);
+	return error;
 #else
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.100 2003/02/07 10:17:07 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.101 2003/02/09 09:26:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -517,7 +517,9 @@ gif_input(m, af, ifp)
 	int af;
 	struct ifnet *ifp;
 {
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	int error;
+#else
 	int s;
 #endif
 	int isr;
@@ -603,7 +605,7 @@ gif_input(m, af, ifp)
 	 * Queue message on interface, update output statistics if
 	 * successful, and start output if interface not yet active.
 	 */
-	IF_HANDOFF(&ifp->if_snd, m, ifp);
+	IFQ_HANDOFF(ifp, m, NULL, error);
 	return;
 #else
 	if (IF_QFULL(ifq)) {
