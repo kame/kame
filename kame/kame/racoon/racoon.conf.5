@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.67 2000/12/12 16:59:43 thorpej Exp $
+.\"	$KAME: racoon.conf.5,v 1.68 2000/12/17 21:17:53 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -530,15 +530,17 @@ Note that the kernel may not support the algorithm you have specified.
 .El
 .El
 .\"
-.Ss Specifying log file
+.Ss Logging level
 .Bl -tag -width Ds -compact
-.It Ic log Pq Ar number \*(Ba Ar level ;
-define dump level.
+.It Ic log Ar level ;
+define logging level.
 .Ar level
 is one of the following:
-.Ic info , notify , debug , debug2 , debug3
+.Ic notify , debug
 and
-.Ic debug4 .
+.Ic debug2 .
+Default is
+.Ic notify .
 .El
 .\"
 .Ss Specifying the way to pad

@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.in,v 1.15 2000/10/11 23:32:27 sakane Exp $
+# $KAME: racoon.conf.in,v 1.16 2000/12/17 21:17:53 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -12,9 +12,9 @@ path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
 # if the certificate/certificate request payload is received.
 path certificate "@sysconfdir_x@/cert" ;
 
-# "log" specifies logging level.  It is followed by either "info", "notify",
-# "debug" or "debug2".
-log debug4;
+# "log" specifies logging level.  It is followed by either "notify", "debug"
+# or "debug2".
+#log debug;
 
 # "padding" defines some parameter of padding.  You should not touch these.
 padding

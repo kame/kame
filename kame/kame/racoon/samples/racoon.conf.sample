@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.20 2000/11/03 15:08:03 sakane Exp $
+# $KAME: racoon.conf.sample,v 1.21 2000/12/17 21:17:53 sakane Exp $
 
 # "path" affects "include" directive.  "path" must be specified before any
 # "include" directive with relative file path.
@@ -14,9 +14,9 @@ path pre_shared_key "/usr/local/v6/etc/psk.txt" ;
 # if the certificate/certificate request payload is received.
 #path certificate "/usr/local/openssl/certs" ;
 
-# "log" specifies logging level.  It is followed by either "info", "notify",
-# "debug" or "debug2".
-#log notify;
+# "log" specifies logging level.  It is followed by either "notify", "debug"
+# or "debug2".
+#log debug;
 
 remote anonymous
 {
