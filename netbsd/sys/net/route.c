@@ -328,6 +328,16 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 	if (rt->rt_flags & RTF_GATEWAY) {
 		if (((rt->rt_flags & RTF_HOST) == 0) && (flags & RTF_HOST)) {
 			/*
+			 * Don't create entry if we are going to set
+			 * rt_key and rt_gateway to the same value.  It will
+			 * only happen when we have manually configured
+			 * network route toward onlink destinations.
+			 */
+			if (equal(dst, gateway)) {
+				error = EINVAL;
+				goto done;
+			}
+			/*
 			 * Changing from route to net => route to host.
 			 * Create new route, rather than smashing route to net.
 			 */
@@ -346,6 +356,25 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 				flags = rt->rt_flags;
 			stat = &rtstat.rts_dynamic;
 		} else {
+			/*
+			 * Ditto (see above), when we update an entry.
+			 * This happens only with manually configured host
+			 * route toward an onlink destination.
+			 *
+			 * In this case, we may be able to nuke the entry
+			 * and then overwrite it with cloned RTF_LLINFO route.
+			 * We don't do that at this moment since (1) we are
+			 * not sure if RTF_CLONING interface route exists, and
+			 * (2) there's no case where RTF_STATIC gets erased
+			 * or overwritten by non-static routes (from within
+			 * the kernel), and (3) assumes too much about L3
+			 * behavior.
+			 * XXX non-IP protocol needs checking
+			 */
+			if (equal(rt_key(rt), gateway)) {
+				error = EINVAL;
+				goto done;
+			}
 			/*
 			 * Smash the current notion of the gateway to
 			 * this destination.  Should check about netmask!!!
