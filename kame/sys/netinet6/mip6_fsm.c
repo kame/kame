@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.23 2003/08/04 05:25:38 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.24 2003/08/26 13:37:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1463,6 +1463,7 @@ static int
 mip6_bu_pri_fsm_home_registration(mbu)
 	struct mip6_bu *mbu;
 {
+	struct mip6_ha *mha;
 	int error;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct timeval mono_time;
@@ -1473,7 +1474,7 @@ mip6_bu_pri_fsm_home_registration(mbu)
 		return (EINVAL);
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	mono_time.tv_sec = time_second;
+	microtime(&mono_time);
 #endif
 
 	error = mip6_home_registration2(mbu);
@@ -1484,8 +1485,20 @@ mip6_bu_pri_fsm_home_registration(mbu)
 		/* continue and try again. */
 	}
 
-	if (mbu->mbu_retrans_count++ > MIP6_BU_MAX_BACKOFF)
-		mbu->mbu_retrans_count = MIP6_BU_MAX_BACKOFF;
+	if (mbu->mbu_retrans_count++ > MIP6_BU_MAX_BACKOFF) {
+		/*
+		 * try another home agent.  if we have no alternative,
+		 * set an unspecified address to trigger DHAAD
+		 * procedure.
+		 */
+		mha = hif_find_next_preferable_ha(mbu->mbu_hif,
+		    &mbu->mbu_paddr);
+		if (mha != NULL)
+			mbu->mbu_paddr = mha->mha_addr;
+		else
+			mbu->mbu_paddr = sa6_any;
+		mbu->mbu_retrans_count = 1;
+	}
 	mbu->mbu_retrans = mono_time.tv_sec + (1 << mbu->mbu_retrans_count);
 
 	return (error);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.78 2003/08/26 11:01:37 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.79 2003/08/26 13:37:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -469,7 +469,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 		bzero(&haaddr, sizeof(haaddr));
 		haaddr.sin6_len = sizeof(haaddr);
 		haaddr.sin6_family = AF_INET6;
-		haaddr.sin6_addr = *haaddrptr;
+		haaddr.sin6_addr = *haaddrptr++;
 		/*
 		 * XXX we cannot get a correct zone id by looking only
 		 * in6_addr structure.
@@ -1111,6 +1111,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		if (mha == NULL) {
 			mha = mip6_ha_create(&prefix_sa,
 			    ND_RA_FLAG_HOME_AGENT, 0, MIP6_HA_DEFAULT_LIFETIME);
+			mip6_ha_list_insert(&mip6_ha_list, mha);
 		} else {
 			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
 			mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.6 2003/08/26 08:44:14 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.7 2003/08/26 13:37:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -126,9 +126,14 @@ mip6_ha_list_insert(mha_list, mha)
 		panic("mip6_ha_list_insert: NULL pointer.");
 	}
 
+	/*
+	 * insert a new entry in a proper place orderd by prefernce
+	 * value.  if prefernce value is same, the new entry is placed
+	 * at the end of the group which has a same prefernce value.
+	 */
 	for (tgtmha = TAILQ_FIRST(mha_list); tgtmha;
 	    tgtmha = TAILQ_NEXT(tgtmha, mha_entry)) {
-		if (tgtmha->mha_pref > mha->mha_pref)
+		if (tgtmha->mha_pref >= mha->mha_pref)
 			continue;
 		TAILQ_INSERT_BEFORE(tgtmha, mha, mha_entry);
 		return;

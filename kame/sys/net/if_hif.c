@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.60 2003/08/26 11:01:36 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.61 2003/08/26 13:37:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -439,6 +439,36 @@ hif_find_preferable_ha(hif)
 	 */
 	for (mha = TAILQ_FIRST(&mip6_ha_list); mha;
 	    mha = TAILQ_NEXT(mha, mha_entry)) {
+		if (!hif_prefix_list_find_withmha(&hif->hif_prefix_list_home,
+		    mha))
+			continue;
+		/* return the entry we have found first. */
+		return (mha);
+	}
+	/* not found. */
+	return (NULL);
+}
+
+/*
+ * return the next preferable home agent entry which can be used as a
+ * home agent of this hif interface.
+ */
+struct mip6_ha *
+hif_find_next_preferable_ha(hif, haaddr)
+	struct hif_softc *hif;
+	struct sockaddr_in6 *haaddr;
+{
+	struct mip6_ha *curmha, *mha;
+
+	curmha = mip6_ha_list_find_withaddr(&mip6_ha_list, haaddr);
+	if (curmha == NULL)
+		return (hif_find_preferable_ha(hif));
+
+	/*
+	 * we assume mip6_ha_list is ordered by a preference value.
+	 */
+	for (mha = TAILQ_NEXT(curmha, mha_entry); mha;
+	     mha = TAILQ_NEXT(mha, mha_entry)) {
 		if (!hif_prefix_list_find_withmha(&hif->hif_prefix_list_home,
 		    mha))
 			continue;

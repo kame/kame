@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.31 2003/08/26 11:01:37 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.32 2003/08/26 13:37:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1702,10 +1702,11 @@ mip6_home_registration(sc)
 				    
 			if (mha == NULL) {
 				/*
-				 * if no HA is found, try to find a HA
-				 * using Dynamic Home Agent Discovery.
+				 * if no home agent is found, set an
+				 * unspecified address for now.  DHAAD
+				 * is triggered when sending a binging
+				 * update message.
 				 */
-				mip6_icmp6_dhaad_req_output(sc);
 				haaddr = &sin6_any;
 			} else {
 				haaddr = &mha->mha_addr;
@@ -2151,33 +2152,24 @@ mip6_bu_send_bu(mbu)
 	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr.sin6_addr)) {
 		/* we do not know where to send a binding update. */
 		if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-			mha = hif_find_preferable_ha(mbu->mbu_hif);
-			if (mha == NULL) {
-				error = mip6_icmp6_dhaad_req_output(
-				    mbu->mbu_hif);
-				if (error) {
-					mip6log((LOG_ERR,
-					    "mip6_bu_send_bu: "
-					    "failed to send a DHAAD request.\n",
-					    __FILE__, __LINE__));
-					/* continue, anyway. */
-				}
-				/*
-				 * a binding update will be sent
-				 * immediately after receiving DHAAD
-				 * reply.
-				 */
-				goto bu_send_bu_end;
-			} else {
-				/* try another home agent. */
-				mbu->mbu_paddr = mha->mha_addr;
-				goto bu_send_bu_continue;
+			error = mip6_icmp6_dhaad_req_output(mbu->mbu_hif);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "mip6_bu_send_bu: "
+				    "failed to send a DHAAD request.\n",
+				    __FILE__, __LINE__));
+				/* continue, anyway. */
 			}
+			/*
+			 * a binding update will be sent
+			 * immediately after receiving DHAAD
+			 * reply.
+			 */
+			goto bu_send_bu_end;
 		}
 		panic("a peer address must be known when sending a binding update.");
 	}
 
- bu_send_bu_continue:
 	/* create an ipv6 header to send a binding update. */
 	m = mip6_create_ip6hdr(&mbu->mbu_haddr, &mbu->mbu_paddr,
 	    IPPROTO_NONE, 0);
