@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.h,v 1.6 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: schedule.h,v 1.7 2000/07/04 00:48:34 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -41,6 +41,7 @@ struct sched {
 	void (*func)();		/* call this function when timeout. */
 	void *param;		/* pointer to parameter */
 
+	int dead;		/* dead or alive */
 	long id;		/* for debug */
 	time_t created;		/* for debug */
 	time_t tick;		/* for debug */

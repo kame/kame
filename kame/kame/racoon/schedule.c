@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.c,v 1.4 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: schedule.c,v 1.5 2000/07/04 00:48:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -70,22 +70,25 @@ struct timeval *
 schedular()
 {
 	time_t now, delta;
-	struct sched *p, *next;
+	struct sched *p, *next = NULL;
 
 	now = current_time();
 
         for (p = TAILQ_FIRST(&sctree); p; p = next) {
-		next = TAILQ_NEXT(p, chain);
+		if (p->dead)
+			goto next_schedule;
 
-		if (now < p->xtime)
+		if (now < p->xtime) {
+			next = TAILQ_NEXT(p, chain);
 			continue;
-
-		/* remove schedule from tree before executing. */
-		TAILQ_REMOVE(&sctree, p, chain);
+		}
 
 		if (p->func != NULL)
 			(p->func)(p->param);
 
+	   next_schedule:
+		next = TAILQ_NEXT(p, chain);
+		TAILQ_REMOVE(&sctree, p, chain);
 		free(p);
 	}
 
@@ -128,6 +131,7 @@ sched_new(tick, func, param)
 	new->tick = tick;
 
 	new->xtime = current_time() + tick;
+	new->dead = 0;
 
 	/* add to schedule table */
 	sched_add(new);
@@ -180,8 +184,7 @@ void
 sched_kill(sc)
 	struct sched *sc;
 {
-	TAILQ_REMOVE(&sctree, sc, chain);
-	free(sc);
+	sc->dead = 1;
 
 	return;
 }
