@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.33 2002/05/23 05:44:12 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.34 2002/05/30 04:34:52 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -73,7 +73,9 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 
-#ifdef __bsdi__
+#ifdef M_READONLY
+#define M_SHAREDCLUSTER(m)	M_READONLY(m)
+#elif defined(__bsdi__)
 #define M_SHAREDCLUSTER(m) \
 	(((m)->m_flags & M_EXT) != 0 && \
 	 ((m)->m_ext.ext_func || mclrefcnt[mtocl((m)->m_ext.ext_buf)] > 1))

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.67 2002/05/30 04:27:32 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.68 2002/05/30 04:34:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -106,7 +106,9 @@
 static MALLOC_DEFINE(M_MRTABLE, "mf6c", "multicast forwarding cache entry");
 #endif
 
-#define M_HASCL(m) ((m)->m_flags & M_EXT)
+#ifndef M_READONLY
+#define M_READONLY(m)	((m)->m_flags & M_EXT)
+#endif
 
 static int ip6_mdq __P((struct mbuf *, struct ifnet *, struct mf6c *));
 static void phyint_send __P((struct ip6_hdr *, struct mif6 *, struct mbuf *,
@@ -1209,7 +1211,7 @@ ip6_mforward(ip6, ifp, m)
 		 * as other references may modify it in the meantime.
 		 */
 		if (mb0 &&
-		    (M_HASCL(mb0) || mb0->m_len < sizeof(struct ip6_hdr)))
+		    (M_READONLY(mb0) || mb0->m_len < sizeof(struct ip6_hdr)))
 			mb0 = m_pullup(mb0, sizeof(struct ip6_hdr));
 		if (mb0 == NULL) {
 			free(rte, M_MRTABLE);
@@ -1509,7 +1511,7 @@ ip6_mdq(m, ifp, rt)
 
 				mm = m_copy_withpktaddrs(m, 0, sizeof(struct ip6_hdr));
 				if (mm &&
-				    (M_HASCL(mm) ||
+				    (M_READONLY(mm) ||
 				     mm->m_len < sizeof(struct ip6_hdr)))
 					mm = m_pullup(mm, sizeof(struct ip6_hdr));
 				if (mm == NULL)
@@ -1658,7 +1660,7 @@ phyint_send(ip6, mifp, m, src, dst)
 	 */
 	mb_copy = m_copy_withpktaddrs(m, 0, M_COPYALL);
 	if (mb_copy &&
-	    (M_HASCL(mb_copy) || mb_copy->m_len < sizeof(struct ip6_hdr)))
+	    (M_READONLY(mb_copy) || mb_copy->m_len < sizeof(struct ip6_hdr)))
 		mb_copy = m_pullup(mb_copy, sizeof(struct ip6_hdr));
 	if (mb_copy == NULL) {
 		splx(s);
