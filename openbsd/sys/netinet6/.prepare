@@ -43,3 +43,7 @@ exclude in6_pcb.h
 exclude udp6.h
 exclude udp6_usrreq.c
 exclude udp6_var.h
+exclude esp_twofish.c
+exclude esp_twofish.h
+exclude esp_rijndael.c
+exclude esp_rijndael.h
