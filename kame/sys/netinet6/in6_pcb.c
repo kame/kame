@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.85 2001/02/23 09:17:48 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.86 2001/02/26 08:02:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -194,8 +194,9 @@ in6_pcbbind(in6p, nam)
 #ifdef __NetBSD__
 		/*
 		 * since we do not check port number duplicate with IPv4 space,
-		 * we reject it at this moment.  If we leave it, we make normal
-		 * user to hijack port number from other users.
+		 * we reject it at this moment.  If we leave it, we would
+		 * mistakenly allow normal users to hijack tcp/udp ports from
+		 * other users.
 		 */
 		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
 			return(EADDRNOTAVAIL);
@@ -236,12 +237,8 @@ in6_pcbbind(in6p, nam)
 			struct ifaddr *ia = NULL;
 
 			sin6->sin6_port = 0;		/* yech... */
-#if defined(NFAITH) && NFAITH > 0
-			if ((in6p->in6p_flags & IN6P_FAITH) == 0
-			 && (ia = ifa_ifwithaddr((struct sockaddr *)sin6)) == 0)
-#else
-			if ((ia = ifa_ifwithaddr((struct sockaddr *)sin6)) == 0)
-#endif
+			if ((in6p->in6p_flags & IN6P_FAITH) == 0 &&
+			    (ia = ifa_ifwithaddr((struct sockaddr *)sin6)) == 0)
 				return(EADDRNOTAVAIL);
 
 			/*
@@ -921,10 +918,8 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 	 	 * find destination match.  exact match is preferred
 		 * against wildcard match.
 		 */
-#if defined(NFAITH) && NFAITH > 0
 		if (faith && (in6p->in6p_flags & IN6P_FAITH) == 0)
 			continue;
-#endif
 		if (in6p->in6p_fport != 0)
 			continue;
 		if (in6p->in6p_lport != lport)

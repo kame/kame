@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.41 2001/03/02 11:43:33 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.42 2001/03/14 05:18:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -224,10 +224,8 @@ tcp6_listen_lookup(dst, dport)
 
 	for (in6p = tcp6_listen_hash[dport % tcp6_listen_hash_size].lh_first; in6p;
 	     in6p = in6p->in6p_hlist.le_next) {
-#if defined(NFAITH) && NFAITH > 0
 		if (faith && !(in6p->in6p_flags & IN6P_FAITH))
 			continue;
-#endif
 		if (in6p->in6p_lport != dport)
 			continue;
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
