@@ -1,3 +1,4 @@
 conflict cast128.c
 conflict cast128.h
 conflict cast128_subkey.h
+conflict cast128sb.h

@@ -1,11 +1,13 @@
-# $FreeBSD: src/sys/modules/Makefile,v 1.323 2003/05/13 11:26:08 nyan Exp $
+# $FreeBSD: src/sys/modules/Makefile,v 1.356 2003/12/03 21:13:06 jhb Exp $
 
-.if exists(${.CURDIR}/../opencrypto) && !defined(NOCRYPT)
+.if !defined(NOCRYPT) || defined(ALL_MODULES)
+.if exists(${.CURDIR}/../opencrypto)
 _crypto=	crypto
 _cryptodev=	cryptodev
 .endif
-.if exists(${.CURDIR}/../crypto) && !defined(NOCRYPT)
+.if exists(${.CURDIR}/../crypto)
 _random=	random
+.endif
 .endif
 
 SUBDIR=	accf_data \
@@ -15,27 +17,36 @@ SUBDIR=	accf_data \
 	aio \
 	amr \
 	an \
+	ath \
 	aue \
 	axe \
+	bfe \
 	bge \
 	bridge \
 	cam \
-	ccd \
 	cd9660 \
+	cd9660_iconv \
 	coda \
+	coda5 \
 	${_crypto} \
 	${_cryptodev} \
 	cue \
 	dc \
+	dcons \
+	dcons_crom \
 	de \
 	digi \
 	dummynet \
 	en \
+	fatm \
 	fdc \
 	fdescfs \
 	firewire \
 	fxp \
+	geom \
 	gx \
+	harp \
+	hatm \
 	hifn \
 	if_disc \
 	if_ef \
@@ -57,6 +68,7 @@ SUBDIR=	accf_data \
 	kue \
 	lge \
 	libiconv \
+	libmbpool \
 	libmchain \
 	lpt \
 	mac_biba \
@@ -68,6 +80,7 @@ SUBDIR=	accf_data \
 	mac_partition \
 	mac_portacl \
 	mac_seeotheruids \
+	mac_stub \
 	mac_test \
 	mcd \
 	md \
@@ -75,13 +88,16 @@ SUBDIR=	accf_data \
 	mlx \
 	mpt \
 	msdosfs \
+	msdosfs_iconv \
 	my \
 	nfsclient \
 	nfsserver \
 	nge \
 	nmdm \
 	ntfs \
+	ntfs_iconv \
 	nullfs \
+	patm \
 	pcn \
 	plip \
 	portalfs \
@@ -90,14 +106,17 @@ SUBDIR=	accf_data \
 	pps \
 	procfs \
 	pseudofs \
+	pst \
 	raidframe \
 	${_random} \
 	rc \
 	rc4 \
+	re \
 	rl \
 	rp \
 	rue \
 	sbsh \
+	scd \
 	sf \
 	sis \
 	sk \
@@ -112,11 +131,13 @@ SUBDIR=	accf_data \
 	twe \
 	tx \
 	txp \
+	uart \
 	ubsa \
 	ubsec \
 	ucom \
 	udbp \
 	udf \
+	udf_iconv \
 	ufm \
 	uftdi \
 	ugen \
@@ -125,6 +146,7 @@ SUBDIR=	accf_data \
 	ulpt \
 	umapfs \
 	umass \
+	umct \
 	umodem \
 	ums \
 	unionfs \
@@ -132,6 +154,7 @@ SUBDIR=	accf_data \
 	urio \
 	usb \
 	uscanner \
+	utopia \
 	uvisor \
 	uvscom \
 	vpo \
@@ -141,11 +164,13 @@ SUBDIR=	accf_data \
 	wlan \
 	xl
 
-.if defined(WANT_EXT2FS_MODULE)
+.if ${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH} == "alpha"
+.if defined(WANT_EXT2FS_MODULE) || defined(ALL_MODULES)
 SUBDIR+=ext2fs
 .endif
+.endif
 
-.if !defined(NO_IPFILTER)
+.if !defined(NO_IPFILTER) || defined(ALL_MODULES)
 SUBDIR+=ipfilter
 .endif
 
@@ -159,10 +184,12 @@ SUBDIR+=syscons
 SUBDIR+=3dfx \
 	agp \
 	aic \
+	amd \
 	aout \
 	apm \
 	ar \
 	arcnet \
+	ath_hal \
 	awi \
 	bktr \
 	coff \
@@ -172,10 +199,9 @@ SUBDIR+=3dfx \
 	em \
 	ep \
 	fe \
-	fpu \
-	gnufpu \
 	hea \
 	hfa \
+	i2c \
 	ibcs2 \
 	ie \
 	linprocfs \
@@ -188,8 +214,10 @@ SUBDIR+=3dfx \
 	nwfs \
 	oltr \
 	pccard \
+	pcfclock \
 	pecoff \
 	ray \
+	safe \
 	sbni \
 	scsi_low \
 	smbfs \
@@ -236,7 +264,7 @@ SUBDIR+=canbepm \
 
 .if ${MACHINE_ARCH} == "ia64"
 # Modules not enabled on ia64 (as compared to i386) include:
-#	aac acpi aout apm atspeaker drm fpu gnufpu ibcs2 linprocfs linux ncv
+#	aac acpi aout apm atspeaker drm ibcs2 linprocfs linux ncv
 #	nsp oltr pecoff s3 sbni stg vesa
 SUBDIR+=aic \
 	ar \
@@ -291,9 +319,18 @@ SUBDIR+=gem
 SUBDIR+=hme
 .endif
 
+.if defined(ALL_MODULES)
+SUBDIR+=null
+SUBDIR+=ufs
+.endif
+
 .if defined(MODULES_OVERRIDE) && !defined(ALL_MODULES)
 SUBDIR=${MODULES_OVERRIDE}
 .endif
+
+# pcic -- currently broken and being worked on out of tree.
+# oldcard -- specialized use for debugging only.
+# owi -- totally unsupported for debugging only.
 
 # Calling kldxref(8) for each module is expensive.
 .if !defined(NO_XREF)

@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD: src/include/Makefile,v 1.197 2003/05/05 12:54:26 bde Exp $
+# $FreeBSD: src/include/Makefile,v 1.207 2003/11/22 06:08:59 scottl Exp $
 #
 # Doing a "make install" builds /usr/include.
 
@@ -14,12 +14,12 @@ INCS=	a.out.h ar.h assert.h bitstring.h complex.h cpio.h ctype.h db.h \
 	pthread.h \
 	pthread_np.h pwd.h ranlib.h readpassphrase.h regex.h regexp.h \
 	resolv.h rune.h runetype.h search.h setjmp.h sgtty.h signal.h stab.h \
-	stdbool.h stddef.h stdio.h stdlib.h strhash.h string.h stringlist.h \
+	stdbool.h stddef.h stdio.h stdlib.h string.h stringlist.h \
 	strings.h sysexits.h tar.h time.h timeconv.h timers.h ttyent.h \
-	ulimit.h unistd.h utime.h utmp.h uuid.h vis.h wchar.h wctype.h \
-	wordexp.h
+	ulimit.h unistd.h utime.h utmp.h uuid.h varargs.h vis.h wchar.h \
+	wctype.h wordexp.h
 
-MHDRS=	float.h floatingpoint.h stdarg.h varargs.h
+MHDRS=	float.h floatingpoint.h stdarg.h
 
 # posix4/mqueue.h is useless without an implementation and isn't installed:
 PHDRS=	sched.h semaphore.h _semaphore.h # mqueue.h
@@ -27,18 +27,19 @@ PHDRS=	sched.h semaphore.h _semaphore.h # mqueue.h
 LHDRS=	aio.h errno.h fcntl.h linker_set.h poll.h stdint.h syslog.h \
 	termios.h ucontext.h
 
-LDIRS=	cam geom net netatalk netatm netgraph netinet netinet6 netipsec \
-	netipx netkey netnatm netncp netsmb nfs nfsclient nfsserver \
+LDIRS=	cam geom net net80211 netatalk netatm netgraph netinet netinet6 \
+	netipsec netipx netkey netnatm netncp netsmb nfs nfsclient nfsserver \
 	pccard posix4 sys vm
 LDIRS+=	altq
 
 LSUBDIRS=	cam/scsi dev/an dev/ic dev/iicbus dev/firewire dev/ofw \
-	dev/ppbus dev/smbus dev/usb dev/wi fs/devfs \
+	dev/ppbus dev/smbus dev/usb dev/wi dev/utopia fs/devfs \
 	fs/fdescfs fs/fifofs fs/msdosfs fs/ntfs fs/nullfs fs/nwfs fs/portalfs \
-	fs/procfs fs/smbfs fs/umapfs fs/unionfs isofs/cd9660 \
+	fs/procfs fs/smbfs fs/udf fs/umapfs fs/unionfs isofs/cd9660 \
 	netatm/ipatm netatm/sigpvc netatm/spans netatm/uni \
-	security/mac_biba security/mac_bsdextended security/mac_lomac\
-	security/mac_mls security/mac_partition ufs/ffs ufs/ufs
+	netgraph/atm security/mac_biba security/mac_bsdextended \
+	security/mac_lomac security/mac_mls security/mac_partition \
+	ufs/ffs ufs/ufs
 
 LSUBSUBDIRS=	netgraph/bluetooth/include
 
@@ -55,7 +56,7 @@ osreldate.h:	${.CURDIR}/../sys/conf/newvers.sh \
 		${.CURDIR}/../sys/sys/param.h \
 		${.CURDIR}/Makefile
 	@${ECHO} creating osreldate.h from newvers.sh
-	setvar PARAMFILE ${.CURDIR}/../sys/sys/param.h; \
+	@setvar PARAMFILE ${.CURDIR}/../sys/sys/param.h; \
 	. ${.CURDIR}/../sys/conf/newvers.sh;			\
 	echo "$$COPYRIGHT" > osreldate.h;			\
 	echo "#ifdef _KERNEL" >> osreldate.h;			\
@@ -105,8 +106,11 @@ copies:
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 $i/*.h \
 	    ${DESTDIR}${INCLUDEDIR}/$i
 .endfor
-	cd ${.CURDIR}/../sys; \
-	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 opencrypto/*.h \
+	cd ${.CURDIR}/../sys/contrib/ipfilter/netinet; \
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
+	    ${DESTDIR}${INCLUDEDIR}/netinet
+	cd ${.CURDIR}/../sys/opencrypto; \
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
 	    ${DESTDIR}${INCLUDEDIR}/crypto
 	cd ${.CURDIR}/../sys/${MACHINE_ARCH}/include; \
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
@@ -137,6 +141,11 @@ symlinks:
 		ln -fs ../../../../../sys/$i/$$h ${DESTDIR}${INCLUDEDIR}/$i; \
 	done
 .endfor
+	cd ${.CURDIR}/../sys/contrib/ipfilter/netinet; \
+	for h in *.h; do \
+		ln -fs ../../../sys/contrib/ipfilter/netinet/$$h \
+		    ${DESTDIR}${INCLUDEDIR}/netinet; \
+	done
 	cd ${.CURDIR}/../sys/opencrypto; \
 	for h in *.h; do \
 		ln -fs ../../../sys/opencrypto/$$h \

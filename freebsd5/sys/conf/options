@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.393 2003/05/18 03:46:30 scottl Exp $
+# $FreeBSD: src/sys/conf/options,v 1.426 2003/11/16 12:26:09 akiyama Exp $
 #
 #        On the handling of kernel options
 #
@@ -74,6 +74,7 @@ ADW_ALLOW_MEMIO		opt_adw.h	# Allow PCI devices to use memory
 # Miscellaneous options.
 ADAPTIVE_MUTEXES
 ALQ
+CODA_COMPAT_5	opt_coda.h
 COMPAT_43	opt_compat.h
 COMPAT_FREEBSD4	opt_compat.h
 COMPAT_SUNOS	opt_compat.h
@@ -90,6 +91,7 @@ GEOM_AES	opt_geom.h
 GEOM_APPLE	opt_geom.h
 GEOM_BDE	opt_geom.h
 GEOM_BSD	opt_geom.h
+GEOM_FOX	opt_geom.h
 GEOM_GPT	opt_geom.h
 GEOM_MBR	opt_geom.h
 GEOM_MIRROR	opt_geom.h
@@ -114,13 +116,12 @@ MAC_NONE	opt_dontuse.h
 MAC_PARTITION	opt_dontuse.h
 MAC_PORTACL	opt_dontuse.h
 MAC_SEEOTHERUIDS	opt_dontuse.h
+MAC_STUB	opt_dontuse.h
 MAC_TEST	opt_dontuse.h
 MD_ROOT		opt_md.h
 MD_ROOT_SIZE	opt_md.h
 NDGBPORTS	opt_dgb.h
-NSWAPDEV	opt_swap.h
 NSWBUF_MIN	opt_swap.h
-NTIMECOUNTER	opt_ntp.h
 PANIC_REBOOT_WAIT_TIME	opt_panic.h
 PPS_SYNC	opt_ntp.h
 PUC_FASTINTR	opt_puc.h
@@ -196,6 +197,12 @@ FFS		opt_ffs_broken_fixme.h
 NFSCLIENT	opt_nfs.h
 NFSSERVER	opt_nfs.h
 
+# filesystems and libiconv bridge
+CD9660_ICONV	opt_dontuse.h
+MSDOSFS_ICONV	opt_dontuse.h
+NTFS_ICONV	opt_dontuse.h
+UDF_ICONV	opt_dontuse.h
+
 # If you are following the conditions in the copyright,
 # you can enable soft-updates which will speed up a lot of thigs
 # and make the system safer from crashes at the same time.
@@ -257,6 +264,8 @@ SCSI_NO_OP_STRINGS	opt_scsi.h
 CHANGER_MIN_BUSY_SECONDS	opt_cd.h
 CHANGER_MAX_BUSY_SECONDS	opt_cd.h
 
+DA_OLD_QUIRKS		opt_da.h
+
 # Options used only in cam/scsi/scsi_sa.c.
 SA_IO_TIMEOUT		opt_sa.h
 SA_SPACE_TIMEOUT	opt_sa.h
@@ -294,13 +303,10 @@ ISP_TARGET_MODE		opt_isp.h
 ISP_FW_CRASH_DUMP	opt_isp.h
 
 # Options used in the 'ata' ATA/ATAPI driver
-ACD_DEBUG		opt_ata.h
-AST_DEBUG		opt_ata.h
-ATAPI_DEBUG		opt_ata.h
-ATA_DEBUG		opt_ata.h
 ATA_STATIC_ID		opt_ata.h
 ATA_NOPCI		opt_ata.h
 DEV_ATADISK		opt_ata.h
+DEV_ATARAID		opt_ata.h
 DEV_ATAPICD		opt_ata.h
 DEV_ATAPIST		opt_ata.h
 DEV_ATAPIFD		opt_ata.h
@@ -339,6 +345,7 @@ ETHER_8023		opt_ef.h
 ETHER_8022		opt_ef.h
 ETHER_SNAP		opt_ef.h
 MROUTING		opt_mrouting.h
+PIM			opt_mrouting.h
 INET			opt_inet.h
 RTPREF			opt_inet.h
 INET6			opt_inet6.h
@@ -372,7 +379,6 @@ IPFIREWALL		opt_ipfw.h
 IPFIREWALL_VERBOSE	opt_ipfw.h
 IPFIREWALL_VERBOSE_LIMIT	opt_ipfw.h
 IPFIREWALL_DEFAULT_TO_ACCEPT	opt_ipfw.h
-IPFIREWALL_FORWARD		opt_ipfw.h
 IPV6FIREWALL		opt_ip6fw.h
 IPV6FIREWALL_VERBOSE	opt_ip6fw.h
 IPV6FIREWALL_VERBOSE_LIMIT	opt_ip6fw.h
@@ -380,6 +386,7 @@ IPV6FIREWALL_DEFAULT_TO_ACCEPT	opt_ip6fw.h
 IPSTEALTH
 IPX
 IPXIP			opt_ipx.h
+LIBMBPOOL
 LIBMCHAIN
 NCP
 NETATALK		opt_atalk.h
@@ -437,6 +444,14 @@ NETGRAPH_TEE		opt_netgraph.h
 NETGRAPH_TTY		opt_netgraph.h
 NETGRAPH_UI		opt_netgraph.h
 NETGRAPH_VJC		opt_netgraph.h
+NETGRAPH_ATM_ATMPIF	opt_netgraph.h
+
+# NgATM options
+NGATM_ATM		opt_netgraph.h
+NGATM_ATMBASE		opt_netgraph.h
+NGATM_SSCOP		opt_netgraph.h
+NGATM_SSCFU		opt_netgraph.h
+NGATM_UNI		opt_netgraph.h
 
 # DRM options
 DRM_DEBUG		opt_drm.h
@@ -456,8 +471,6 @@ ATM_UNI			opt_atm.h
 # This makes "atm.h" unusable.
 NATM
 
-DPT_ALLOW_MEMIO		opt_dpt.h	# Allow PCI devices to use memory
-					# mapped I/O
 # DPT driver debug flags
 DPT_MEASURE_PERFORMANCE	opt_dpt.h
 DPT_HANDLE_TIMEOUTS	opt_dpt.h
@@ -483,6 +496,7 @@ MUTEX_PROFILING		opt_global.h
 NPX_DEBUG		opt_debug_npx.h
 NETATALKDEBUG		opt_atalk.h
 SI_DEBUG		opt_debug_si.h
+WATCHDOG		opt_watchdog.h
 
 # Fb options
 FB_DEBUG		opt_fb.h
@@ -497,6 +511,7 @@ ENABLE_ALART		opt_intpm.h
 
 # These cause changes all over the kernel
 BLKDEV_IOSIZE		opt_global.h
+BURN_BRIDGES		opt_global.h
 DEBUG			opt_global.h
 DEBUG_LOCKS		opt_global.h
 DEBUG_VFS_LOCKS		opt_global.h
@@ -558,6 +573,7 @@ BKTR_NO_MSP_RESET		opt_bktr.h
 BKTR_430_FX_MODE		opt_bktr.h
 BKTR_SIS_VIA_MODE		opt_bktr.h
 BKTR_USE_FREEBSD_SMBUS		opt_bktr.h
+BKTR_NEW_MSP34XX_DRIVER		opt_bktr.h
 
 # meteor opt_meteor.h
 METEOR_ALLOC_PAGES	opt_meteor.h
@@ -572,27 +588,21 @@ COM_MULTIPORT		opt_sio.h
 BREAK_TO_DEBUGGER	opt_comconsole.h
 ALT_BREAK_TO_DEBUGGER	opt_comconsole.h
 
+# Options to support PPS
+UART_PPS_ON_CTS		opt_uart.h
+
 # options for bus/device framework
 BUS_DEBUG		opt_bus.h
 
 # options for USB support
-UHCI_DEBUG		opt_usb.h
-OHCI_DEBUG		opt_usb.h
 USB_DEBUG		opt_usb.h
-UGEN_DEBUG		opt_usb.h
-UHID_DEBUG		opt_usb.h
-UHUB_DEBUG		opt_usb.h
-UKBD_DEBUG		opt_usb.h
-ULPT_DEBUG		opt_usb.h
-UMASS_DEBUG		opt_usb.h
-UMS_DEBUG		opt_usb.h
-URIO_DEBUG		opt_usb.h
 UKBD_DFLT_KEYMAP	opt_ukbd.h
+UPLCOM_INTR_INTERVAL	opt_uplcom.h
 UVSCOM_DEFAULT_OPKTSIZE	opt_uvscom.h
+UVSCOM_INTR_INTERVAL	opt_uvscom.h
 
 # Vinum options
 VINUMDEBUG		opt_vinum.h
-VINUM_AUTOSTART		opt_vinum.h
 
 # Embedded system options
 INIT_PATH		opt_init_path.h
@@ -621,8 +631,9 @@ WITNESS_SKIPSPIN	opt_witness.h
 
 # options for ACPI support
 ACPI_DEBUG		opt_acpi.h
-ACPI_NO_SEMAPHORES	opt_acpi.h
 ACPI_MAX_THREADS	opt_acpi.h
+ACPI_NO_SEMAPHORES	opt_acpi.h
+ACPICA_PEDANTIC		opt_acpi.h
 
 # options for DEVFS, see sys/fs/devfs/devfs.h
 NDEVFSINO		opt_devfs.h
@@ -632,6 +643,9 @@ NDEVFSOVERFLOW		opt_devfs.h
 DEV_ISA			opt_isa.h
 DEV_MCA			opt_mca.h
 DEV_BPF			opt_bpf.h
+DEV_SPLASH		opt_splash.h
+
+EISA_SLOTS		opt_eisa.h
 
 # ed driver
 ED_NO_MIIBUS		opt_ed.h
@@ -641,10 +655,65 @@ WI_SYMBOL_FIRMWARE	opt_wi.h
 
 # XXX bogusly global.
 DEVICE_POLLING		opt_global.h
+
+SOCKBUF_DEBUG		opt_global.h
+
 # options for ubsec driver
 UBSEC_DEBUG		opt_ubsec.h
 UBSEC_RNDTEST		opt_ubsec.h
+UBSEC_NO_RNG		opt_ubsec.h
 
 # options for hifn driver
 HIFN_DEBUG		opt_hifn.h
 HIFN_RNDTEST		opt_hifn.h
+
+# options for safenet driver
+SAFE_DEBUG		opt_safe.h
+SAFE_NO_RNG		opt_safe.h
+SAFE_RNDTEST		opt_safe.h
+
+# syscons options
+MAXCONS			opt_syscons.h
+SC_ALT_MOUSE_IMAGE	opt_syscons.h
+SC_CUT_SPACES2TABS	opt_syscons.h
+SC_CUT_SEPCHARS		opt_syscons.h
+SC_DEBUG_LEVEL		opt_syscons.h
+SC_DFLT_FONT		opt_syscons.h
+SC_DISABLE_DDBKEY	opt_syscons.h
+SC_DISABLE_REBOOT	opt_syscons.h
+SC_HISTORY_SIZE		opt_syscons.h
+SC_KERNEL_CONS_ATTR	opt_syscons.h
+SC_KERNEL_CONS_REV_ATTR	opt_syscons.h
+SC_MOUSE_CHAR		opt_syscons.h
+SC_NO_CUTPASTE		opt_syscons.h
+SC_NO_FONT_LOADING	opt_syscons.h
+SC_NO_HISTORY		opt_syscons.h
+SC_NO_SYSMOUSE		opt_syscons.h
+SC_NORM_ATTR		opt_syscons.h
+SC_NORM_REV_ATTR	opt_syscons.h
+SC_PIXEL_MODE		opt_syscons.h
+SC_RENDER_DEBUG		opt_syscons.h
+SC_TWOBUTTON_MOUSE	opt_syscons.h
+SC_NO_SUSPEND_VTYSWITCH	opt_syscons.h
+
+# kbd options
+KBD_DISABLE_KEYMAP_LOAD	opt_kbd.h
+KBD_INSTALL_CDEV	opt_kbd.h
+KBD_MAXRETRY		opt_kbd.h
+KBD_MAXWAIT		opt_kbd.h
+KBD_RESETDELAY		opt_kbd.h
+KBDIO_DEBUG		opt_kbd.h
+
+# options for the Atheros HAL (only useful with source code)
+AH_SUPPORT_AR5210	opt_ah.h
+AH_SUPPORT_AR5211	opt_ah.h
+AH_SUPPORT_AR5212	opt_ah.h
+AH_DEBUG		opt_ah.h
+AH_DEBUG_ALQ		opt_ah.h
+AH_ASSERT		opt_ah.h
+
+# dcons options 
+DCONS_BUF_SIZE		opt_dcons.h
+DCONS_POLL_HZ		opt_dcons.h
+DCONS_FORCE_CONSOLE	opt_dcons.h
+DCONS_FORCE_GDB		opt_dcons.h

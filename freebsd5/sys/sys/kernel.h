@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kernel.h	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/kernel.h,v 1.109 2003/02/03 19:49:35 phk Exp $
+ * $FreeBSD: src/sys/sys/kernel.h,v 1.113 2003/10/17 15:46:31 ume Exp $
  */
 
 #ifndef _SYS_KERNEL_H_
@@ -112,12 +112,14 @@ enum sysinit_sub_id {
 	SI_SUB_TUNABLES		= 0x0700000,	/* establish tunable values */
 	SI_SUB_CONSOLE		= 0x0800000,	/* console*/
 	SI_SUB_COPYRIGHT	= 0x0800001,	/* first use of console*/
-	SI_SUB_MTX_POOL		= 0x0900000,	/* mutex pool */
+	SI_SUB_MTX_POOL_STATIC	= 0x0900000,	/* static mutex pool */
+	SI_SUB_LOCKMGR		= 0x0980000,	/* lockmgr locks */
 	SI_SUB_VM		= 0x1000000,	/* virtual memory system init*/
 	SI_SUB_KMEM		= 0x1800000,	/* kernel memory*/
 	SI_SUB_KVM_RSRC		= 0x1A00000,	/* kvm operational limits*/
 	SI_SUB_WITNESS		= 0x1A80000,	/* witness initialization */
-	SI_SUB_LOCK		= 0x1B00000,	/* lockmgr locks */
+	SI_SUB_MTX_POOL_DYNAMIC	= 0x1AC0000,	/* dynamic mutex pool */
+	SI_SUB_LOCK		= 0x1B00000,	/* various locks */
 	SI_SUB_EVENTHANDLER	= 0x1C00000,	/* eventhandler init */
 	SI_SUB_KLD		= 0x2000000,	/* KLD and module setup */
 	SI_SUB_CPU		= 0x2100000,	/* CPU resource(s)*/
@@ -147,19 +149,18 @@ enum sysinit_sub_id {
 	SI_SUB_PSEUDO		= 0x7000000,	/* pseudo devices*/
 	SI_SUB_EXEC		= 0x7400000,	/* execve() handlers */
 	SI_SUB_PROTO_BEGIN	= 0x8000000,	/* XXX: set splimp (kludge)*/
-	SI_SUB_PROTO_IFATTACHDOMAIN	= 0x8800001,	/* domain dependent data init*/
 	SI_SUB_PROTO_IF		= 0x8400000,	/* interfaces*/
 	SI_SUB_PROTO_DOMAIN	= 0x8800000,	/* domains (address families?)*/
+	SI_SUB_PROTO_IFATTACHDOMAIN	= 0x8800001,	/* domain dependent data init*/
 	SI_SUB_PROTO_END	= 0x8ffffff,	/* XXX: set splx (kludge)*/
 	SI_SUB_KPROF		= 0x9000000,	/* kernel profiling*/
 	SI_SUB_KICK_SCHEDULER	= 0xa000000,	/* start the timeout events*/
 	SI_SUB_INT_CONFIG_HOOKS	= 0xa800000,	/* Interrupts enabled config */
 	SI_SUB_ROOT_CONF	= 0xb000000,	/* Find root devices */
 	SI_SUB_DUMP_CONF	= 0xb200000,	/* Find dump devices */
-	SI_SUB_VINUM		= 0xb300000,	/* Configure vinum */
-	SI_SUB_RAID		= 0xb380000,	/* Configure RAIDframe */
+	SI_SUB_RAID		= 0xb380000,	/* Configure RAIDframe or Vinum */
 	SI_SUB_MOUNT_ROOT	= 0xb400000,	/* root mount*/
-	SI_SUB_SWAP		= 0xc000000,	/* swap*/
+	SI_SUB_SWAP		= 0xc000000,	/* swap */
 	SI_SUB_INTRINSIC_POST	= 0xd000000,	/* proc 0 cleanup*/
 	SI_SUB_KTHREAD_INIT	= 0xe000000,	/* init process*/
 	SI_SUB_KTHREAD_PAGE	= 0xe400000,	/* pageout daemon*/
