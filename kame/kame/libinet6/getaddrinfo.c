@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.95 2001/01/09 07:49:17 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.96 2001/01/09 08:06:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3336,9 +3336,9 @@ res_querydomainN(name, domain, target)
 
 static struct net_data *init __P((void));
 
-struct addrinfo *hostent2addrinfo __P((struct hostent *,
+struct addrinfo *_hostent2addrinfo __P((struct hostent *,
 				       const struct addrinfo *));
-struct addrinfo *addr2addrinfo __P((const struct addrinfo *,
+struct addrinfo *_addr2addrinfo __P((const struct addrinfo *,
 				    const char *));
 
 /*
@@ -3428,7 +3428,7 @@ free:
 }
 
 struct addrinfo *
-hostent2addrinfo(hp, pai)
+_hostent2addrinfo(hp, pai)
 	struct hostent *hp;
 	const struct addrinfo *pai;
 {
@@ -3492,7 +3492,7 @@ hostent2addrinfo(hp, pai)
 }
 
 struct addrinfo *
-addr2addrinfo(pai, cp)
+_addr2addrinfo(pai, cp)
 	const struct addrinfo *pai;
 	const char *cp;
 {
