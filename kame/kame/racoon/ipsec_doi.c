@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.57 2000/04/24 10:29:25 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.58 2000/04/24 12:09:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2323,7 +2323,7 @@ ipsecdoi_setph2proposal0(iph2, pp, pr)
 
 /*
  * create phase2 proposal from policy configuration.
- * INCLUDING isakmp general header of SA payload.
+ * NOT INCLUDING isakmp general header of SA payload.
  *
  * XXX the routine disagrees with other code in terms of interpretation of
  * "bundle" pointer.  we'll need to have more appropriate structure for
@@ -2336,7 +2336,7 @@ ipsecdoi_setph2proposal(iph2)
 	struct saprop *proposal, *a;
 	struct saproto *b = NULL;
 	vchar_t *mysa, *q;
-	struct ipsecdoi_pl_sa *sa;
+	struct ipsecdoi_sa_b *sab;
 	struct isakmp_pl_p *prop;
 	size_t propoff;
 
@@ -2344,7 +2344,7 @@ ipsecdoi_setph2proposal(iph2)
 			? iph2->proposal
 			: iph2->approval;
 
-	mysa = vmalloc(sizeof(*sa));
+	mysa = vmalloc(sizeof(*sab));
 	if (mysa == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to allocate my sa buffer (%s)\n",
@@ -2353,9 +2353,9 @@ ipsecdoi_setph2proposal(iph2)
 	}
 
 	/* create SA payload */
-	sa = (struct ipsecdoi_pl_sa *)mysa->v;
-	sa->b.doi = htonl(IPSEC_DOI);
-	sa->b.sit = htonl(IPSECDOI_SIT_IDENTITY_ONLY);	/* XXX configurable ? */
+	sab = (struct ipsecdoi_sa_b *)mysa->v;
+	sab->doi = htonl(IPSEC_DOI);
+	sab->sit = htonl(IPSECDOI_SIT_IDENTITY_ONLY);	/* XXX configurable ? */
 
 	prop = NULL;
 	propoff = -1;
@@ -2379,9 +2379,6 @@ ipsecdoi_setph2proposal(iph2)
 			vfree(q);
 		}
 	}
-
-	sa = (struct ipsecdoi_pl_sa *)mysa->v;
-	sa->h.len = htons(mysa->l);
 
 	return mysa;
 }

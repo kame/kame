@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.22 2000/04/24 08:21:16 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.23 2000/04/24 12:09:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -148,7 +148,7 @@ quick_i1send(iph2, msg)
 {
 	vchar_t *body = NULL;
 	struct isakmp_gen *gen;
-	vchar_t *sa;
+	vchar_t *sa_tmp;
 	char *p;
 	int tlen;
 	int error = -1;
@@ -164,8 +164,8 @@ quick_i1send(iph2, msg)
 	}
 
 	/* create SA payload for my proposal */
-	sa = ipsecdoi_setph2proposal(iph2);
-	if (sa == NULL)
+	sa_tmp = ipsecdoi_setph2proposal(iph2);
+	if (sa_tmp == NULL)
 		goto end;
 
 	/* generate NONCE value */
@@ -208,7 +208,7 @@ quick_i1send(iph2, msg)
 		PVDUMP(iph2->id_p));
 
 	/* create SA;NONCE payload, and KE if need, and IDii, IDir. */
-	tlen = sa->l
+	tlen = + sizeof(*gen) + sa_tmp->l
 		+ sizeof(*gen) + iph2->nonce->l
 		+ sizeof(*gen) + iph2->id->l
 		+ sizeof(*gen) + iph2->id_p->l;
@@ -224,10 +224,8 @@ quick_i1send(iph2, msg)
 
 	p = body->v;
 
-	gen = (struct isakmp_gen *)p;
-	memcpy(p, sa->v, sa->l);
-	gen->np = ISAKMP_NPTYPE_NONCE;
-	p += sa->l;
+	/* add SA payload */
+	p = set_isakmp_payload(p, sa_tmp, ISAKMP_NPTYPE_NONCE);
 
 	/* add NONCE payload */
 	p = set_isakmp_payload(p, iph2->nonce,
@@ -1142,6 +1140,7 @@ quick_r2send(iph2, msg)
 {
 	vchar_t *body = NULL;
 	struct isakmp_gen *gen;
+	vchar_t *sa_tmp;
 	char *p;
 	int tlen;
 	int error = -1;
@@ -1156,64 +1155,10 @@ quick_r2send(iph2, msg)
 		goto end;
 	}
 
-#if 0
 	/* create SA payload for my proposal */
-	sa_ret = get_sabysaprop(iph2->approval, iph2->sa);
-	if (sa_ret == NULL)
+	sa_tmp = ipsecdoi_setph2proposal(iph2);
+	if (sa_tmp == NULL)
 		goto end;
-#endif
-
-#if 0 /* XXX delete it !! */
-    {
-	struct isakmp_pl_p *prop;
-	vchar_t *pbuf = NULL;
-	struct isakmp_parse_t *pa;
-
-	pbuf = isakmp_parsewoh(ISAKMP_NPTYPE_P,
-		(struct isakmp_gen *)(iph2->sa_ret->v + sizeof(struct ipsecdoi_sa_b)),
-		iph2->sa_ret->l - sizeof(struct ipsecdoi_sa_b));
-
-	for (pa = (struct isakmp_parse_t *)pbuf->v;
-	     pa->type != ISAKMP_NPTYPE_NONE;
-	     pa++) {
-		/* check the value of next payload */
-		if (pa->type != ISAKMP_NPTYPE_P) {
-			plog(logp, LOCATION, NULL,
-				"Invalid payload type=%u\n", pa->type);
-			goto end;
-		}
-
-		prop = (struct isakmp_pl_p *)pa->ptr;
-
-	    {
-		struct saproto *x;
-		for (x = iph2->approval->head; x != NULL; x = x->next) {
-			if (prop->proto_id != x->proto_id)
-				continue;
-
-			if (prop->spi_size == sizeof(x->keys->spi))
-				memcpy(prop + 1, &x->keys->spi, sizeof(x->keys->spi));
-			else if (prop->spi_size == 2 && prop->proto_id == IPSECDOI_PROTO_IPCOMP)
-				memcpy(prop + 1, (caddr_t)(&x->keys->spi + 1) - 2, 2);
-			else {
-				plog(logp, LOCATION, NULL,
-					"spi size mismatch: %d %d\n",
-					sizeof(x->keys->spi), prop->spi_size);
-			}
-			break;
-		}
-		if (x == NULL) {
-			plog(logp, LOCATION, NULL,
-				"no prop found for %s\n",
-				s_ipsecdoi_proto(prop->proto_id));
-			goto end;
-		}
-	    }
-	}
-	vfree(pbuf);
-	pbuf = NULL;
-    }
-#endif
 
 	/* generate NONCE value */
 	iph2->nonce = eay_set_random(iph2->ph1->rmconf->nonce_size);
@@ -1238,7 +1183,7 @@ quick_r2send(iph2, msg)
 	}
 
 	/* create SA;NONCE payload, and KE and ID if need */
-	tlen = sizeof(*gen) + iph2->sa->l
+	tlen = sizeof(*gen) + sa_tmp->l
 		+ sizeof(*gen) + iph2->nonce->l;
 	if (iph2->dhpub_p != NULL && pfsgroup != 0)
 		tlen += (sizeof(*gen) + iph2->dhpub->l);
@@ -1255,7 +1200,7 @@ quick_r2send(iph2, msg)
 	p = body->v;
 
 	/* make SA payload */ 
-	p = set_isakmp_payload(body->v, iph2->sa, ISAKMP_NPTYPE_NONCE);
+	p = set_isakmp_payload(body->v, sa_tmp, ISAKMP_NPTYPE_NONCE);
 
 	/* add NONCE payload */
 	p = set_isakmp_payload(p, iph2->nonce,
