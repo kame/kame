@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.32 2001/12/11 11:34:09 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.33 2001/12/12 13:14:32 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -149,7 +149,13 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 				return (IPPROTO_MAX);
 		}
 	} else {
-		if ((cv6.ats = natpt_lookForHash6(&cv6)) == NULL) {
+		/* in case of regular packet */
+		if (((cv6.ats = natpt_lookForHash6(&cv6)) == NULL)
+		    && ((cv6.ats = natpt_checkICMP6return(&cv6)) != NULL)) {
+			cv6.fromto = NATPT_TO;
+		}
+
+		if (cv6.ats == NULL) {
 			struct cSlot	*acs;
 
 			if ((acs = natpt_lookForRule6(&cv6)) == NULL)

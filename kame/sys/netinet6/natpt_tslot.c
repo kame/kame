@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.35 2001/12/11 11:34:10 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.36 2001/12/12 13:14:33 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -45,6 +45,7 @@
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip6.h>
+#include <netinet/icmp6.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
 #include <netinet/udp.h>
@@ -360,6 +361,60 @@ natpt_openIncomingV4Conn(int proto, struct pAddr *local, struct pAddr *remote)
 	splx(s);
 
 	return (ats);
+}
+
+
+struct tSlot*
+natpt_checkICMP6return(struct pcv *cv6)
+{
+	int			 hvr;
+	struct ip6_hdr		*icmp6ip;
+	struct tcp6hdr		*icmp6tcp = NULL;
+	struct sockaddr_in6	 src, dst;
+	struct tslhash		*thr;
+	struct tSlot		*ats;
+
+	if (cv6->ip_p != IPPROTO_ICMPV6)
+		return (NULL);
+
+	bzero(&src, sizeof(struct sockaddr_in6));
+	bzero(&dst, sizeof(struct sockaddr_in6));
+	icmp6ip = (struct ip6_hdr *)(cv6->pyld.caddr + sizeof(struct icmp6_hdr));
+	src.sin6_addr = icmp6ip->ip6_src;
+	dst.sin6_addr = icmp6ip->ip6_dst;
+
+	if ((icmp6ip->ip6_nxt == IPPROTO_TCP)
+	    || (icmp6ip->ip6_nxt == IPPROTO_UDP)) {
+		icmp6tcp = (struct tcp6hdr *)(caddr_t)(icmp6ip + 1);
+		src.sin6_port = icmp6tcp->th_sport;
+		dst.sin6_port = icmp6tcp->th_dport;
+	}
+
+	hvr = ((natpt_hashSin6(&src) + natpt_hashSin6(&dst)) % NATPTHASHSZ);
+	thr = &tslhashr[hvr];
+
+	for (ats = TAILQ_FIRST(&thr->tslhead);
+	     ats;
+	     ats = TAILQ_NEXT(ats, tsl_hashr)) {
+		struct pAddr	*pad = &ats->remote;
+
+		if (pad->sa_family != AF_INET6)
+			continue;
+		if (!IN6_ARE_ADDR_EQUAL(&icmp6ip->ip6_src, &pad->in6dst))
+			continue;
+		if (!IN6_ARE_ADDR_EQUAL(&icmp6ip->ip6_dst, &pad->in6src))
+			continue;
+
+		if (icmp6tcp) {
+			if (icmp6tcp->th_sport != pad->port[1])
+				continue;
+			if (icmp6tcp->th_dport != pad->port[0])
+				continue;
+		}
+		return (ats);
+	}
+
+	return (NULL);
 }
 
 

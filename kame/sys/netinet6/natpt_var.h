@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.19 2001/12/11 11:34:10 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.20 2001/12/12 13:14:33 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -80,10 +80,11 @@ struct mbuf	*natpt_translateFragment4to4 __P((struct pcv *, struct pAddr *));
 /*  natpt_tslot.c  */
 struct tSlot	*natpt_lookForHash4	__P((struct pcv *));
 struct tSlot	*natpt_lookForHash6	__P((struct pcv *));
-struct tSlot	*natpt_openIncomingV4Conn __P((int, struct pAddr *, struct pAddr *));
-struct tSlot	*natpt_checkICMP	__P((struct pcv *));
 struct tSlot	*natpt_internHash4	__P((struct cSlot *, struct pcv *));
 struct tSlot	*natpt_internHash6	__P((struct cSlot *, struct pcv *));
+struct tSlot	*natpt_openIncomingV4Conn __P((int, struct pAddr *, struct pAddr *));
+struct tSlot	*natpt_checkICMP6return	__P((struct pcv *));
+struct tSlot	*natpt_checkICMP	__P((struct pcv *));
 struct pAddr	*natpt_remapRemote4Port	__P((struct cSlot *, struct pAddr *));
 
 struct fragment	*natpt_internFragment6	__P((struct pcv *));
