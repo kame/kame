@@ -64,12 +64,12 @@ DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-#.if (${MKKERBEROS} != "no")
-#CPPFLAGS+=-DAUTHENTICATION -DENCRYPTION -DKRB4
-#CPPFLAGS+=-DKRB5 -DFORWARD
-#
-#LDADD+= -lkrb5 -lkrb -lcrypto -lasn1 -lcom_err -lroken
-#DPADD+=	${LIBKRB5} ${LIBKRB} ${LIBCRYPTO} ${LIBASN1} ${LIBCOM_ERR} ${LIBROKEN}
-#.endif
+.if (${MKKERBEROS} != "no")
+CPPFLAGS+=-DAUTHENTICATION -DENCRYPTION -DKRB4
+CPPFLAGS+=-DKRB5 -DFORWARD
+
+LDADD+= -lkrb5 -lkrb -lcrypto -lasn1 -lcom_err -lroken
+DPADD+=	${LIBKRB5} ${LIBKRB} ${LIBCRYPTO} ${LIBASN1} ${LIBCOM_ERR} ${LIBROKEN}
+.endif
 
 .include <bsd.prog.mk>
