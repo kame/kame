@@ -633,7 +633,6 @@ fxp_attach(device_t dev)
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
 	IFQ_SET_READY(&ifp->if_snd);
-	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Attach the interface.
