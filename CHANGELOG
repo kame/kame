@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1146 2000/07/23 23:23:50 sumikawa Exp $
+$Id: CHANGELOG,v 1.1147 2000/07/24 00:34:27 itojun Exp $
 
 <200006>
+Mon Jul 24 09:31:25 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6.h: try to provide binary backward compatibility for
+	  RFC2292 API, deployed into freebsd40/netbsd15/openbsd27.
+	  PLEASE RECOMPILE ALL KAME USERLAND BINARIES.
+
 Mon Jul 24 08:22:29 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/netperf: use the latest IPv6 patch (7/21).
 
