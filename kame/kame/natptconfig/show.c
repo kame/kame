@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.39 2002/12/18 08:50:32 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.40 2002/12/18 10:27:52 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -159,7 +159,7 @@ showSessions(int protos)
 		printf("%9d", sess.tcp);
 		printf("%9d", sess.tcps[TCPS_CLOSED]);
 		printf("%9d", sess.tcps[TCPS_ESTABLISHED]);
-		printf("%9d", sess.tcps[TCPS_FIN_WAIT_1]);
+		printf("%9d", sess.tcps[TCPS_FIN_WAIT_1]+sess.tcps[TCPS_FIN_WAIT_2]);
 		printf("%9d", sess.tcps[TCPS_SYN_SENT]);
 		printf("\n");
 	}
