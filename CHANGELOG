@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1879 2001/09/19 07:02:19 sakane Exp $
+$KAME: CHANGELOG,v 1.1880 2001/09/19 10:06:57 itojun Exp $
 
 <200109>
+Wed Sep 19 19:06:06 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_{in,out}put.c: make IPV6_TCLASS socket option to
+	  take int, not u_int8_t.  follows the latest 2292bis draft.
+	  (backward binary compatibility is provided for bsdi43)
+
 Thu Sep 20 01:00:08 JST 2001 sakane@kame.net
 	* kame/kame/rtsold:
 	improved the -a option.  it can probe a interface automatically when
