@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.19 2000/05/05 11:00:57 sumikawa Exp $	*/
+/*	$KAME: ah_output.c,v 1.20 2000/05/22 08:45:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -299,6 +299,7 @@ ah4_output(m, isr)
 	if (error) {
 		ipseclog((LOG_ERR,
 		    "error after ah4_calccksum, called from ah4_output"));
+		m_freem(m);
 		m = NULL;
 		ipsecstat.out_inval++;
 		return error;
