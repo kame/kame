@@ -1,4 +1,4 @@
-/*	$KAME: bftest.c,v 1.3 2000/11/08 05:58:24 itojun Exp $	*/
+/*	$KAME: bftest.c,v 1.4 2002/02/27 03:49:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -173,7 +173,7 @@ again:
 
 		data[0] = (BF_LONG)ntohl(data[0]);
 		data[1] = (BF_LONG)ntohl(data[1]);
-		BF_encrypt(data, &key, BF_ENCRYPT);
+		BF_encrypt(data, &key);
 		data[0] = (BF_LONG)htonl(data[0]);
 		data[1] = (BF_LONG)htonl(data[1]);
 		if (memcmp(data, cipher, 8) != 0) {
@@ -187,7 +187,7 @@ again:
 
 		data[0] = (BF_LONG)ntohl(data[0]);
 		data[1] = (BF_LONG)ntohl(data[1]);
-		BF_encrypt(data, &key, BF_DECRYPT);
+		BF_decrypt(data, &key);
 		data[0] = (BF_LONG)htonl(data[0]);
 		data[1] = (BF_LONG)htonl(data[1]);
 		if (memcmp(data, plain, 8) != 0) {
