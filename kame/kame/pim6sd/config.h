@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.4 2000/12/04 06:45:29 itojun Exp $	*/
+/*	$KAME: config.h,v 1.5 2001/07/09 10:02:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -66,7 +66,7 @@
 #define PROBE_TIME			15
 #define ASSERT_TIMEOUT			16
 
-#define EQUAL(s1, s2)            (strcmp((s1), (s2)) == 0)
+#define EQUAL(s1, s2) ((strlen(s1) == strlen(s2)) && (strcmp((s1), (s2)) == 0))
 
 void config_vifs_from_kernel __P((void));
 void config_vifs_from_file __P((void));
