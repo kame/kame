@@ -1,8 +1,8 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2659 2004/08/11 09:40:13 suz Exp $
+$KAME: CHANGELOG,v 1.2660 2004/08/11 10:43:12 jinmei Exp $
 
 <200408>
-2004-08-12  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+2004-08-11  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/freebsd5/sbin/ifconfig/ifconfig.c: stopped unnecessary kernel
 	module loading
 
