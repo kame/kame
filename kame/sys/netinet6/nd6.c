@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.260 2002/05/29 03:08:05 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.261 2002/05/29 03:11:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -251,7 +251,7 @@ nd6_setmtu(ifp, ndi)
 	case IFT_ETHER:
 		ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
 		break;
-#if defined(__FreeBSD__) || defined(__bsdi__)
+#ifdef IFT_FDDI
 	case IFT_FDDI:
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802
 		ndi->maxmtu = MIN(FDDIMTU, ifp->if_mtu);
