@@ -438,8 +438,8 @@ rip6_output(m, va_alist)
 	flags = 0;
 	if (in6p->in6p_flags & IN6P_MINMTU)
 		flags |= IPV6_MINMTU;
-	
-	error = ip6_output(m, optp, &in6p->in6p_route, flags,
+
+	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route, flags,
 			   in6p->in6p_moptions, &oifp);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		if (oifp)
