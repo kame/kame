@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.30 2002/06/12 01:14:02 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.31 2002/06/12 01:23:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -471,8 +471,8 @@ kdebug_secpolicy(sp)
 	if (sp == NULL)
 		panic("kdebug_secpolicy: NULL pointer was passed.\n");
 
-	printf("secpolicy{ refcnt=%u state=%u policy=%u\n",
-		sp->refcnt, sp->state, sp->policy);
+	printf("secpolicy{ refcnt=%u state=%u policy=%u dir=%u\n",
+		sp->refcnt, sp->state, sp->policy, sp->dir);
 
 	if (sp->spidx)
 		kdebug_secpolicyindex(sp->spidx);
