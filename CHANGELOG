@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.33 1999/08/19 11:36:03 jinmei Exp $
+$Id: CHANGELOG,v 1.34 1999/08/19 13:03:43 itojun Exp $
 
 <199908>
+Thu Aug 19 21:59:08 JST 1999  itojun@iijlab.net
+	* sys/netinet/in_gif.c: if you run KAME/NetBSD prior to the change
+	  as router, sometimes kernel paniced due to failure to include
+	  opt_ipsec.h into this file.  I really hate opt_xx.h...
+	  From: Kazuto Ushioda <x-y-z@3si.co.jp>
+
 1999-08-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/{ip6_output.c, nd6.c}: use nd6_output by
 	default. Note that some files under sys/net must be updated,
