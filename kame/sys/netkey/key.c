@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.203 2001/07/28 03:12:18 itojun Exp $	*/
+/*	$KAME: key.c,v 1.204 2001/08/05 08:33:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -140,9 +140,7 @@
  *   field hits 0 (= no external reference other than from SA header.
  */
 
-#ifdef IPSEC_DEBUG
 u_int32_t key_debug_level = 0;
-#endif
 static u_int key_spi_trycnt = 1000;
 static u_int32_t key_spi_minval = 0x100;
 static u_int32_t key_spi_maxval = 0x0fffffff;	/* XXX */
@@ -7845,7 +7843,7 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	if (name[0] >= KEYCTL_MAXID)
 		return EOPNOTSUPP;
 	switch (name[0]) {
-#ifdef KEY_DEBUG
+#ifdef IPSEC_DEBUG
 	case KEYCTL_DEBUG_LEVEL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &key_debug_level);
@@ -7873,7 +7871,7 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	if (name[0] >= KEYCTL_MAXID)
 		return EOPNOTSUPP;
 	switch (name[0]) {
-#ifdef KEY_DEBUG
+#ifdef IPSEC_DEBUG
 	case KEYCTL_DEBUG_LEVEL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &key_debug_level);

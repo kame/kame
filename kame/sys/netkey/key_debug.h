@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.h,v 1.8 2001/07/27 04:15:36 itojun Exp $	*/
+/*	$KAME: key_debug.h,v 1.9 2001/08/05 08:33:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,8 +31,6 @@
 
 #ifndef _NETKEY_KEY_DEBUG_H_
 #define _NETKEY_KEY_DEBUG_H_
-
-#if !defined(_KERNEL) || (defined(_KERNEL) && defined(IPSEC_DEBUG))
 
 /* debug flags */
 #define KEYDEBUG_STAMP		0x00000001 /* path */
@@ -85,11 +83,5 @@ extern void kdebug_sockaddr __P((struct sockaddr *));
 
 extern void ipsec_hexdump __P((caddr_t, int));
 extern void ipsec_bindump __P((caddr_t, int));
-
-#else
-
-#define KEYDEBUG(lev,arg)
-
-#endif /*!defined(_KERNEL) || (defined(_KERNEL) && defined(IPSEC_DEBUG))*/
 
 #endif /* _NETKEY_KEY_DEBUG_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.26 2001/06/27 10:46:50 sakane Exp $	*/
+/*	$KAME: key_debug.c,v 1.27 2001/08/05 08:33:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,8 +62,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #endif /* !_KERNEL */
-
-#if !defined(_KERNEL) || (defined(_KERNEL) && defined(IPSEC_DEBUG))
 
 static void kdebug_sadb_prop __P((struct sadb_ext *));
 static void kdebug_sadb_identity __P((struct sadb_ext *));
@@ -753,5 +751,3 @@ ipsec_hexdump(buf, len)
 
 	return;
 }
-
-#endif /* !defined(_KERNEL) || (defined(_KERNEL) && defined(IPSEC_DEBUG)) */
