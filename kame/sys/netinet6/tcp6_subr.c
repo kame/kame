@@ -671,7 +671,12 @@ tcp6_mtudisc(in6p, errno)
 	 */
 	if ((ro->ro_rt->rt_flags & RTF_HOST) == 0) {
 		in6_rtchange(in6p, 0);
+#ifdef __bsdi__			/* bsdi needs rtcalloc to clone a route */
+		rtcalloc((struct route *)ro);
+#else
 		rtalloc((struct route *)ro);
+#endif 
+
 		if (ro->ro_rt == NULL) {
 			printf("tcp6_mtudisc: no new route?\n");
 			tcp6_changemss(t6p, TCP6_MSS);

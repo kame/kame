@@ -779,7 +779,11 @@ skip_ipsec2:;
 			sin6_fin->sin6_len = sizeof(struct sockaddr_in6);
 			sin6_fin->sin6_addr = finaldst;
 
+#ifdef __bsdi__			/* bsdi needs rtcalloc to clone a route. */
+			rtcalloc((struct route *)ro_pmtu);
+#else
 			rtalloc((struct route *)ro_pmtu);
+#endif 
 		}
 	}
 	if (ro_pmtu->ro_rt != NULL) {
