@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.63 2001/08/17 06:54:04 itojun Exp $
+.\"	$KAME: setkey.8,v 1.64 2001/08/17 06:55:44 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -111,9 +111,11 @@ socket.
 makes each timestamps unformatted.
 .El
 .Ss Configuration syntax
-With the
+With
 .Fl c
-flag,
+or 
+.Fl f
+on the command line,
 .Nm
 accepts the following configuration sytnax.
 Lines starting with hash signs ('#') are treated as comment lines.
