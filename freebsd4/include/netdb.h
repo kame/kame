@@ -155,9 +155,10 @@ struct addrinfo {
 #define	EAI_SERVICE	 9	/* servname not supported for ai_socktype */
 #define	EAI_SOCKTYPE	10	/* ai_socktype not supported */
 #define	EAI_SYSTEM	11	/* system error returned in errno */
-#define	EAI_BADHINTS	12
-#define	EAI_PROTOCOL	13
-#define	EAI_MAX		14
+#define	EAI_BADHINTS	12	/* Invalid value for hints */
+#define	EAI_PROTOCOL	13	/* Resolved protocol is unknown */
+#define	EAI_OVERFLOW	14	/* Argument buffer overflow */
+#define	EAI_MAX		15
 
 /*
  * Flag values for getaddrinfo()

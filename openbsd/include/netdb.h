@@ -220,6 +220,7 @@ struct	protoent {
 #define EAI_SYSTEM	-11	/* system error (code indicated in errno) */
 #define EAI_BADHINTS	-12	/* invalid value for hints */
 #define EAI_PROTOCOL	-13	/* resolved protocol is unknown */
+#define	EAI_OVERFLOW	-14	/* argument buffer overflow */
 
 struct addrinfo {
 	int ai_flags;		/* input flags */
