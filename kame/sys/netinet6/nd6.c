@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.53 2000/04/13 10:51:04 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.54 2000/04/13 16:19:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2050,6 +2050,7 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 	}
 	sdl = SDL(rt->rt_gateway);
 	if (sdl->sdl_alen == 0) {
+		/* this should be impossible, but we bark here for debugging */
 		printf("nd6_storelladdr: sdl_alen == 0\n");
 		return(0);
 	}
