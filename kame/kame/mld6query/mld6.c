@@ -75,7 +75,6 @@ main(int argc, char *argv[])
 	struct itimerval itimer;
 	u_int type;
 	int ch;
-	extern int optind;
 
 	type = MLD6_LISTENER_QUERY;
 	while ((ch = getopt(argc, argv, "d")) != EOF) {

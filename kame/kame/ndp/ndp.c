@@ -170,8 +170,6 @@ main(argc, argv)
 	int ch;
 	int aflag = 0, cflag = 0, dflag = 0, sflag = 0, Hflag = 0,
 		pflag = 0, rflag = 0, Pflag = 0, Rflag = 0;
-	extern char *optarg;
-	extern int optind;
 
 	pid = getpid();
 	thiszone = gmt2local(0);

@@ -75,8 +75,6 @@ main(argc, argv)
 	struct sockaddr_in6 fsock;
 	int i, n, len, flen;
 	int c;
-	extern char *optarg;
-	extern int optind;
 	int ifidx = -1;
 	int error;
 	char pbuf[10];

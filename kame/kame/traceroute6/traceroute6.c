@@ -367,8 +367,6 @@ main(argc, argv)
 	struct hostent *hp;
 	int error;
 	struct addrinfo hints, *res;
-	extern char *optarg;
-	extern int optind;
 	int ch, i, on, probe, seq, hops, rcvcmsglen;
 	static u_char *rcvcmsgbuf;
 	char hbuf[NI_MAXHOST];
