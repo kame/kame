@@ -1,7 +1,9 @@
+/*	$KAME: ndp.c,v 1.40 2000/06/20 21:50:17 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -525,7 +527,7 @@ delete:
 		return (1);
 	}
 	if (rtmsg(RTM_DELETE) == 0) {
-	       getnameinfo((struct sockaddr *)sin, 
+	       getnameinfo((struct sockaddr *)sin,
 			   sin->sin6_len, host_buf,
 			   sizeof(host_buf), NULL, 0,
 			   NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
@@ -1066,7 +1068,7 @@ plist()
 						 printf(" (reachable)\n");
 						 break;
 					 default:
-						 printf(" (unreachable)\n"); 
+						 printf(" (unreachable)\n");
 					}
 				}
 				else
@@ -1140,7 +1142,7 @@ setdefif(ifname)
 			err(1, "failed to resolve i/f index for %s", ifname);
 	}
 
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) 
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
 		err(1, "socket");
 
 	strcpy(ndifreq.ifname, "lo0"); /* dummy */
@@ -1158,7 +1160,7 @@ getdefif()
 	struct in6_ndifreq ndifreq;
 	char ifname[IFNAMSIZ+8];
 
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) 
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
 		err(1, "socket");
 
 	memset(&ndifreq, 0, sizeof(ndifreq));
