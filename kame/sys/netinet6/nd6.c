@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.340 2004/02/05 12:38:11 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.341 2004/02/10 03:15:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1554,9 +1554,10 @@ nd6_rtrequest(req, rt, sa)
 				llsol.sin6_addr.s6_addr32[1] = 0;
 				llsol.sin6_addr.s6_addr32[2] = htonl(1);
 				llsol.sin6_addr.s6_addr8[12] = 0xff;
-				error = in6_addr2zoneid(ifp, &llsol.sin6_addr,
-				    &llsol.sin6_scope_id);
-				if (error)
+				if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
+				    &llsol.sin6_scope_id))
+					break;
+				if (in6_embedscope(&llsol.sin6_addr, &llsol))
 					break;
 				if (in6_addmulti(&llsol.sin6_addr, ifp, &error) == NULL)
 				{
