@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.28 2000/12/12 10:54:06 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.29 2001/02/22 03:37:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -242,7 +242,6 @@ frag6_input(mp, offp, proto)
 		 * the first fragment to arrive, create a reassembly queue.
 		 */
 		first_frag = 1;
-		frag6_nfragpackets++;
 
 		/*
 		 * Enforce upper bound on number of fragmented packets
@@ -250,11 +249,11 @@ frag6_input(mp, offp, proto)
 		 * If maxfrag is 0, never accept fragments.
 		 * If maxfrag is -1, accept all fragments without limitation.
 		 */
-		if (frag6_nfragpackets >= (u_int)ip6_maxfragpackets) {
-			ip6stat.ip6s_fragoverflow++;
-			in6_ifstat_inc(dstifp, ifs6_reass_fail);
-			frag6_freef(ip6q.ip6q_prev);
-		}
+		if (ip6_maxfragpackets < 0)
+			;
+		else if (frag6_nfragpackets >= (u_int)ip6_maxfragpackets)
+			goto dropfrag;
+		frag6_nfragpackets++;
 		q6 = (struct ip6q *)malloc(sizeof(struct ip6q), M_FTABLE,
 			M_DONTWAIT);
 		if (q6 == NULL)
