@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.302 2003/01/21 06:33:03 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.303 2003/01/22 00:34:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2182,8 +2182,10 @@ ip6_addaux(m)
 	if (!mtag) {
 		mtag = m_tag_get(PACKET_TAG_INET6, sizeof(struct ip6aux),
 		    M_NOWAIT);
-		if (mtag)
+		if (mtag) {
+			m_tag_prepend(m, mtag);
 			bzero(mtag + 1, sizeof(struct ip6aux));
+		}
 	}
 	return mtag;
 }
