@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.69 2003/06/29 07:00:54 sakane Exp $	*/
+/*	$KAME: keydb.c,v 1.70 2003/06/29 11:47:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,28 +86,25 @@ u_int32_t
 keydb_newspid(id)
 	u_int32_t id;
 {
-	struct secpolicy *np;
 	u_int32_t newid = 0;
+	static u_int32_t lastalloc = IPSEC_MANUAL_POLICYID_MAX;
+	struct secpolicy *sp;
 
-#ifdef TAILQ_EMPTY
-	if (TAILQ_EMPTY(&sptailq))
-#else
-	if (TAILQ_FIRST(&sptailq) == NULL)
-#endif
-	{
-		newid = IPSEC_MANUAL_POLICYID_MAX + 1;
-	} else if (TAILQ_LAST(&sptailq, _sptailq)->id < 0xffffffff) {
-		newid = TAILQ_LAST(&sptailq, _sptailq)->id + 1;
-	} else {
-		TAILQ_FOREACH(np, &sptailq, tailq) {
-			if (np->id + 1 != TAILQ_NEXT(np, tailq)->id) {
-				newid = np->id + 1;
-				break;
-			}
-		}
-		if (!np)
-			newid = 0;
+	newid = lastalloc + 1;
+	/* XXX possible infinite loop */
+again:
+	TAILQ_FOREACH(sp, &sptailq, tailq) {
+		if (sp->id == newid)
+			break;
 	}
+	if (sp != NULL) {
+		if (newid + 1 < newid)	/* wraparound */
+			newid = IPSEC_MANUAL_POLICYID_MAX + 1;
+		else
+			newid++;
+		goto again;
+	}
+	lastalloc = newid;
 
 	return newid;
 }
