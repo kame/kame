@@ -1,0 +1,12 @@
+exclude tcp6.h
+exclude tcp6_debug.c
+exclude tcp6_debug.h
+exclude tcp6_fsm.h
+exclude tcp6_input.c
+exclude tcp6_output.c
+exclude tcp6_seq.h
+exclude tcp6_subr.c
+exclude tcp6_timer.c
+exclude tcp6_timer.h
+exclude tcp6_usrreq.c
+exclude tcp6_var.h
