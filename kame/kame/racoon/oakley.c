@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.110 2001/12/19 21:48:00 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.111 2001/12/20 23:33:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2031,11 +2031,11 @@ oakley_skeyid(iph1)
 			if (iph1->authstr == NULL &&
 			    iph1->rmconf->verify_identifier) {
 				plog(LLV_ERROR, LOCATION, iph1->remote,
-					"couldn't find pskey.\n");
+					"couldn't find the pskey.\n");
 				goto end;
 			}
 			plog(LLV_NOTIFY, LOCATION, iph1->remote,
-				"couldn't find pskey, "
+				"couldn't find the proper pskey, "
 				"try to get one by the peer's address.\n");
 		}
 		if (iph1->authstr == NULL) {
@@ -2047,12 +2047,12 @@ oakley_skeyid(iph1)
 			iph1->authstr = getpskbyaddr(iph1->remote);
 			if (iph1->authstr == NULL) {
 				plog(LLV_ERROR, LOCATION, iph1->remote,
-					"couldn't find pskey for %s.\n",
+					"couldn't find the pskey for %s.\n",
 					saddrwop2str(iph1->remote));
 				goto end;
 			}
 		}
-		plog(LLV_DEBUG, LOCATION, NULL, "psk found.\n");
+		plog(LLV_DEBUG, LOCATION, NULL, "the psk found.\n");
 		/* should be secret PSK */
 		plog(LLV_DEBUG2, LOCATION, NULL, "psk: ");
 		plogdump(LLV_DEBUG2, iph1->authstr->v, iph1->authstr->l);
