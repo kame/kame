@@ -1,12 +1,12 @@
 # New ports collection makefile for:	gated-ipv6
-# Version required:	20000203
+# Version required:	20000309
 # Date created:		Wed Oct 21 11:39:18 JST 1998
 # Whom:			itojun
-# $Id: Makefile,v 1.2 2000/02/08 16:23:59 sumikawa Exp $
+# $Id: Makefile,v 1.3 2000/04/08 02:40:06 itojun Exp $
 #
 
-DISTNAME=	gated-pub-ipv6-snapshot20000203
-PKGNAME=	gated-ipv6-20000203
+DISTNAME=	gated-pub-ipv6-snapshot20000309
+PKGNAME=	gated-ipv6-20000309
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.gated.org/net-research/gated/
 
@@ -15,7 +15,7 @@ MAINTAINER=	itojun@itojun.org
 NO_PACKAGE=	"binary redistribution restricted to members"
 NO_CDROM=	"binary redistribution restricted to members"
 
-WRKSRC=		${WRKDIR}/gated-public-v6-snapshot000203
+WRKSRC=		${WRKDIR}/gated-public-v6-snapshot000309
 GNU_CONFIGURE=	YES
 CONFIGURE_ARGS+=--disable-bgp4mp
 CONFIGURE_ARGS+=--disable-bgp
