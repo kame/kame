@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.296 2001/12/24 04:42:58 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.297 2002/01/16 17:11:40 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -202,7 +202,7 @@ draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
       (and extensions can appear unaligned).  our code follows the comment.
 draft-ietf-ipngwg-rfc2553bis-04.txt:
 	Basic Socket Interface Extensions for IPv6 (revised)
-draft-ietf-ipngwg-rfc2292bis-03.txt:
+draft-ietf-ipngwg-rfc2292bis-04.txt:
 	Advanced Sockets API for IPv6 (revised)
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
