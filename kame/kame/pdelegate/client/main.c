@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.13 2001/09/18 07:32:35 itojun Exp $	*/
+/*	$KAME: main.c,v 1.14 2001/09/26 02:27:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -225,7 +225,7 @@ mainloop(s)
 					/*NOTREACHED*/
 				}
 			} else {
-				/* got discovery reply? */
+				/* got prefix return? */
 				fromlen = sizeof(from);
 				if (receive_initreq(s, (struct sockaddr *)&from,
 				    &fromlen, &ecode) < 0) {
