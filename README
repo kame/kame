@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 2000/01/30 09:45:36 $
+			$Date: 2000/01/30 12:17:38 $
 
 <<<Project Overview>>>
 
@@ -114,7 +114,7 @@ Stump, Hans-Joachim Knobloch, Angelos D. Keromytis, KOIE Hidetaka,
 Markus Friedl, Ryota HIROSE, Shigeya Suzuki, and Assar Westerlund.
 (in no particular order).
 
-We also would like to thank BSDI (http://www.bsdi.com/) for donating
+We would also like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
 
 							<end of README>
