@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 4.x
 KAME project
-$Id: INSTALL,v 1.9 2001/11/22 06:19:05 keiichi Exp $
+$Id: INSTALL,v 1.10 2002/01/11 15:19:44 jinmei Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -85,8 +85,10 @@ D-1. Reboot with the command you like.
 
 E. Configurations, in short
 ===========================
-E-1. Check ${.CURDIR}/etc directory if there are any KAME modified startup
-     scripts.  If they exist, copy them to /etc directory.
+E-1. Check the ${.CURDIR}/etc directory if there are any KAME modified
+     startup scripts.  If they exist and you want the new startup
+     procedures, copy them to the /etc directory.  You may also have
+     to check E-5.
 
 E-2. You should configure IPv6 programs in this snapshot instead of the 
      ones in original FreeBSD 4.x, because some of them do not work 

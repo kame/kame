@@ -89,6 +89,13 @@ network6_pass1() {
 		;;
 	esac
 
+	# install the policy of the address selection algorithm.
+	if [ -f /usr/local/v6/etc/ip6addrctl.conf ]; then
+		ip6addrctl flush
+		ip6addrctl install /usr/local/v6/etc/ip6addrctl.conf
+		ip6addrctl
+	fi
+
 	case ${ipv6_network_interfaces} in
 	[Aa][Uu][Tt][Oo])
 		#
