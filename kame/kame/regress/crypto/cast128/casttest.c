@@ -1,4 +1,4 @@
-/*	$KAME: casttest.c,v 1.4 2001/11/28 01:44:49 itojun Exp $	*/
+/*	$KAME: casttest.c,v 1.5 2001/11/28 03:14:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -164,7 +164,10 @@ again:
 
 		set_cast128_subkey(subkey, k, k_len[z]);
 
-		cast128_encrypt_round16(out, in, subkey);
+		if (k_len[z] * 8 <= 80)
+			cast128_encrypt_round12(out, in, subkey);
+		else
+			cast128_encrypt_round16(out, in, subkey);
 
 		if (memcmp(out, c[z], 8) != 0) {
 			printf("ecb cast error encrypting for keysize %d\n",
@@ -180,7 +183,10 @@ again:
 			printf("\n");
 		}
 
-		cast128_decrypt_round16(out, out, subkey);
+		if (k_len[z] * 8 <= 80)
+			cast128_decrypt_round12(out, out, subkey);
+		else
+			cast128_decrypt_round16(out, out, subkey);
 		if (memcmp(out, in, 8) != 0) {
 			printf("ecb cast error decrypting for keysize %d\n",
 			    k_len[z] * 8);
