@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.43 2001/08/16 18:28:14 itojun Exp $
+$KAME: helsinki-result.jp,v 1.44 2001/08/17 10:04:17 sakane Exp $
 
 
 generic
@@ -127,6 +127,15 @@ F-Secure VPN+ 5.40
 
 	でっかいDH group、phase 1 SHA2-256/AESもできるらしい。後でやりたい。
 
+	Fri Aug 17 11:00 EEST 2001
+	phase1: aggressive mode modp4096, aes 128, sha1, rsa signature
+	phase2: pfs 5, esp tunnel, aes, hmac sha1
+
+	invalid signatureでf-secureに怒られて失敗。原因不明。
+
+	DH公開情報は事前に計算しとく方がいいかも
+	f-secureはsubjectAltNameにアドレス書かないとパケットだせない。
+	f-secureはsubjectAltNameを1つしか受けつけない。
 
 SecGo CryptoIP v3
 	Tue Aug 14 21:41:36 JST 2001
@@ -295,6 +304,8 @@ Ashley
 
 	test-ca1.ssh.comに統一して再戦予約
 
+	Fri Aug 17 10:30
+	ashley実装にpkcs#1paddingの問題あり。ネゴできず。
 
 Netoctave
 	Wed Aug 15 11:00
@@ -321,6 +332,10 @@ isakmpd (jakob@openbsd)
 	sakaneはこれはwgでの合意と思っているが、要確認。
 2001-08-15 21:14:41: ERROR: ipsec_doi.c:3063:ipsecdoi_checkid1(): Expecting IP address type in main mode, but FQDN.
 
+	Fri Aug 17 10:00
+	rsa signature.
+	問題なし。
+	isakmpdは subjectAltNameを1つしか受けつけない。
 
 Fitec
 	Wed Aug 15 13:00
