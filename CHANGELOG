@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2617 2004/06/07 11:38:41 suz Exp $
+$KAME: CHANGELOG,v 1.2618 2004/06/08 04:39:01 suz Exp $
 
 <200406>
+2004-06-08  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* freebsd4/sys/net/rtsock.c: FreeBSD Security Advisory: 
+	FreeBSD-SA-04:12.jailroute
+
 2004-06-07  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/pim6sd/mld6v2_proto.c: discard ALLOW_NEW_SOURCES without 
 	any source in MLDv1 compat mode, since it's a meaningless MLDv2-REPORT.
