@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.1 2000/12/12 16:59:35 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.2 2000/12/12 19:11:26 sakane Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -588,5 +588,5 @@ gssapi_get_default_id(struct ph1handle *iph1)
 	return vmbuf;
 }
 #else
-static int __gssapi_dUmMy;
+int __gssapi_dUmMy;
 #endif

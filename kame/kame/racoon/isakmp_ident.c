@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.48 2000/12/12 16:59:40 thorpej Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.49 2000/12/12 19:11:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -820,7 +820,7 @@ ident_r1send(iph1, msg)
 	caddr_t p;
 	int tlen;
 	int error = -1;
-	vchar_t *gss_sa;
+	vchar_t *gss_sa = NULL;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
