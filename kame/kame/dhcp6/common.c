@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.95 2004/01/20 07:24:45 suz Exp $	*/
+/*	$KAME: common.c,v 1.96 2004/01/20 23:23:37 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1425,7 +1425,10 @@ copyin_option(type, p, ep, list)
 			if (dhcp6_find_listval(list, DHCP6_LISTVAL_PREFIX6,
 			    &iapd_prefix, 0)) {
 				dprintf(LOG_INFO, FNAME, 
-				    "duplicated IA_PD prefix %s/%d",
+				    "duplicated IA_PD prefix "
+				    "%s/%d pltime=%lu vltime=%lu",
+				    in6addr2str(&iapd_prefix.addr, 0),
+				    iapd_prefix.plen,
 				    iapd_prefix.pltime, iapd_prefix.vltime);
 				goto nextoption;
 			}
