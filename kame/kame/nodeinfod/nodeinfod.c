@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.8 2001/10/19 08:01:45 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.9 2001/10/19 08:28:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -779,7 +779,7 @@ ni6_nametodns(name, cp0, buf, buflen, old)
 	/*NOTREACHED*/
 
  fail:
-	return 0;
+	return -1;
 }
 
 /*
