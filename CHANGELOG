@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.671 2000/03/09 09:15:21 itojun Exp $
+$Id: CHANGELOG,v 1.672 2000/03/09 13:09:03 sakane Exp $
 
 <200003>
+Thu Mar  9 22:08:17 JST 2000 sakane@ydc.co.jp
+	* kame/kame/libipsec/pfkey.c:
+	implement pfkey libraries.
+		pfkey_send_spdupdate() replace a policy entry.
+		pfkey_send_spdsetidx() set a policy index.
+		pfkey_send_spdget() gets a policy entry.
+
 Thu Mar  9 18:13:23 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/zebra: upgrade to 0.85.
 
