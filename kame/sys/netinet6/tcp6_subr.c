@@ -297,7 +297,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	m->m_pkthdr.rcvif = t6p ? (struct ifnet *)t6p->t_in6pcb->in6p_socket
 				: NULL;
 #endif /*IPSEC*/
-	return(ip6_output(m, NULL, ro, 0, NULL));
+	return(ip6_output(m, NULL, ro, 0, NULL, NULL));
 }
 
 /*

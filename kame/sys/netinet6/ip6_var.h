@@ -243,7 +243,7 @@ void	ip6_forward __P((struct mbuf *, int));
 void	ip6_mloopback __P((struct ifnet *, struct mbuf *, struct sockaddr_in6 *));
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route_in6 *, int,
-			struct ip6_moptions *));
+			struct ip6_moptions *, struct ifnet **));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
 #else

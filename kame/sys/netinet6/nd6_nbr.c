@@ -322,6 +322,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	struct ip6_moptions im6o;
 	int icmp6len;
 	caddr_t mac;
+	struct ifnet *outif = NULL;
 	
 	if (IN6_IS_ADDR_MULTICAST(taddr6))
 		return;
@@ -459,7 +460,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 #ifdef IPSEC
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
-	ip6_output(m, NULL, NULL, dad ? IPV6_DADOUTPUT : 0, &im6o);
+	ip6_output(m, NULL, NULL, dad ? IPV6_DADOUTPUT : 0, &im6o, &outif);
 	icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT]++;
 }
 
@@ -736,6 +737,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
 	struct ip6_moptions im6o;
 	int icmp6len;
 	caddr_t mac;
+	struct ifnet *outif;
 	
 	if ((m = m_gethdr(M_DONTWAIT, MT_DATA)) == NULL)
 		return;
@@ -813,7 +815,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
 #ifdef IPSEC
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
-	ip6_output(m, NULL, NULL, 0, &im6o);
+	ip6_output(m, NULL, NULL, 0, &im6o, &outif);
 	icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT]++;
 }
 

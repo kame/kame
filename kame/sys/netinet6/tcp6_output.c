@@ -621,10 +621,10 @@ send:
 #if BSD >= 43
 	error = ip6_output(m, t6p->t_in6pcb->in6p_outputopts,
 			   &t6p->t_in6pcb->in6p_route,
-			   so->so_options & SO_DONTROUTE, 0);
+			   so->so_options & SO_DONTROUTE, 0, NULL);
 #else
 	error = ip6_output(m, (struct mbuf *)0, &t6p->t_in6pcb->in6p_route, 
-			   so->so_options & SO_DONTROUTE);
+			   so->so_options & SO_DONTROUTE, NULL);
 #endif
 	if (error) {
 out:

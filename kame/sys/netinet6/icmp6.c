@@ -383,6 +383,7 @@ icmp6_input(mp, offp, proto)
 			code = PRC_UNREACH_NET;
 			break;
 		case ICMP6_DST_UNREACH_ADMIN:
+			icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_adminprohib);
 		case ICMP6_DST_UNREACH_ADDR:
 			code = PRC_UNREACH_HOST;
 			break;
@@ -549,7 +550,7 @@ icmp6_input(mp, offp, proto)
 		if (icmp6->icmp6_type == MLD6_LISTENER_QUERY) /* XXX: ugly... */
 			icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mldquery);
 		else
-			icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mldresponse);
+			icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mldreport);
 		IP6_EXTHDR_CHECK(m, off, icmp6len, IPPROTO_DONE);
 		mld6_input(m, off);
 		/* m stays. */
@@ -1190,6 +1191,8 @@ icmp6_reflect(m, off)
 	struct in6_ifaddr *ia;
 	struct in6_addr t, *src = 0;
 	int plen = m->m_pkthdr.len - sizeof(struct ip6_hdr);
+	int type, code;
+	struct ifnet *outif = NULL;
 #ifdef COMPAT_RFC1885
 	int mtu = IPV6_MMTU;
 	struct sockaddr_in6 *sin6 = &icmp6_reflect_rt.ro_dst;
@@ -1231,6 +1234,8 @@ icmp6_reflect(m, off)
 	}
 
 	icmp6 = (struct icmp6_hdr *)(ip6 + 1);
+	type = icmp6->icmp6_type; /* keep type for statistics */
+	code = icmp6->icmp6_code; /* ditto. */
 
 	t = ip6->ip6_dst;
 	/*
@@ -1343,10 +1348,58 @@ icmp6_reflect(m, off)
 #endif /*IPSEC*/
 
 #ifdef COMPAT_RFC1885
-	ip6_output(m, NULL, &icmp6_reflect_rt, 0, NULL);
+	ip6_output(m, NULL, &icmp6_reflect_rt, 0, NULL, &outif);
 #else
-	ip6_output(m, NULL, NULL, 0, NULL);
-#endif 
+	ip6_output(m, NULL, NULL, 0, NULL, &outif);
+#endif
+	if (outif) {
+		switch(type) {
+		 case ICMP6_DST_UNREACH:
+			 icmp6_ifstat_inc(outif, ifs6_out_dstunreach);
+			 if (code == ICMP6_DST_UNREACH_ADMIN)
+				 icmp6_ifstat_inc(outif, ifs6_out_adminprohib);
+			 break;
+		 case ICMP6_PACKET_TOO_BIG:
+			 icmp6_ifstat_inc(outif, ifs6_out_pkttoobig);
+			 break;
+		 case ICMP6_TIME_EXCEEDED:
+			 icmp6_ifstat_inc(outif, ifs6_out_timeexceed);
+			 break;
+		 case ICMP6_PARAM_PROB:
+			 icmp6_ifstat_inc(outif, ifs6_out_paramprob);
+			 break;
+		 case ICMP6_ECHO_REQUEST:
+			 icmp6_ifstat_inc(outif, ifs6_out_echo);
+			 break;
+		 case ICMP6_ECHO_REPLY:
+			 icmp6_ifstat_inc(outif, ifs6_out_echoreply);
+			 break;
+		 case MLD6_LISTENER_QUERY:
+			 icmp6_ifstat_inc(outif, ifs6_out_mldquery);
+			 break;
+		 case MLD6_LISTENER_REPORT:
+			 icmp6_ifstat_inc(outif, ifs6_out_mldreport);
+			 break;
+		 case MLD6_LISTENER_DONE:
+			 icmp6_ifstat_inc(outif, ifs6_out_mlddone);
+			 break;
+		 case ND_ROUTER_SOLICIT:
+			 icmp6_ifstat_inc(outif, ifs6_out_routersolicit);
+			 break;
+		 case ND_ROUTER_ADVERT:
+			 icmp6_ifstat_inc(outif, ifs6_out_routeradvert);
+			 break;
+		 case ND_NEIGHBOR_SOLICIT:
+			 icmp6_ifstat_inc(outif, ifs6_out_neighborsolicit);
+			 break;
+		 case ND_NEIGHBOR_ADVERT:
+			 icmp6_ifstat_inc(outif, ifs6_out_neighboradvert);
+			 break;
+		 case ND_REDIRECT:
+			 icmp6_ifstat_inc(outif, ifs6_out_redirect);
+			 break;
+		}
+	}
 
 	return;
 
@@ -1573,6 +1626,7 @@ icmp6_redirect_output(m0, rt)
 	struct nd_redirect *nd_rd;
 	size_t maxlen;
 	u_char *p;
+	struct ifnet *outif = NULL;
 
 	/* if we are not router, we don't send icmp6 redirect */
 	if (!ip6_forwarding || ip6_accept_rtadv)
@@ -1801,7 +1855,7 @@ noredhdropt:;
 #ifdef IPSEC
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
-	ip6_output(m, NULL, NULL, 0, NULL);
+	ip6_output(m, NULL, NULL, 0, NULL, &outif);
 	icmp6stat.icp6s_outhist[ND_REDIRECT]++;
 
 	return;

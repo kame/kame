@@ -159,12 +159,13 @@ extern struct ifnet loif[NLOOP];
  * The mbuf opt, if present, will not be freed.
  */
 int
-ip6_output(m0, opt, ro, flags, im6o)
+ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct mbuf *m0;
 	struct ip6_pktopts *opt;
 	struct route_in6 *ro;
 	int flags;
 	struct ip6_moptions *im6o;
+	struct ifnet **ifpp;		/* XXX: just for statistics */
 {
 	struct ip6_hdr *ip6, *mhip6;
 	struct ifnet *ifp;
@@ -724,6 +725,14 @@ skip_ipsec2:;
 			goto done;
 		}
 	}
+
+	/*
+	 * Fill the outgoing inteface to tell the upper layer
+	 * to increment per-interface statistics.
+	 */
+	if (ifpp)
+		*ifpp = ifp;
+
 
 	/*
 	 * Determine path MTU.

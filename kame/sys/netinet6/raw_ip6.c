@@ -382,7 +382,8 @@ rip6_output(m, va_alist)
 	m->m_pkthdr.rcvif = (struct ifnet *)so;
 #endif /*IPSEC*/
 
-	error = ip6_output(m, optp, &in6p->in6p_route, 0, in6p->in6p_moptions);
+	error = ip6_output(m, optp, &in6p->in6p_route, 0, in6p->in6p_moptions,
+			   &oifp);
 	goto freectl;
 
  bad:

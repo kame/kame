@@ -204,7 +204,7 @@ in6_gif_output(ifp, family, m, rt)
 #ifdef IPSEC
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
-	return(ip6_output(m, 0, &sc->gif_ro6, 0, 0));
+	return(ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL));
 }
 
 int in6_gif_input(mp, offp, proto)

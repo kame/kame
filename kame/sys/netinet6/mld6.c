@@ -395,6 +395,7 @@ mld6_sendpkt(in6m, type, dst)
 	struct ip6_moptions im6o;
 	struct in6_ifaddr *ia;
 	struct ifnet *ifp = in6m->in6m_ifp;
+	struct ifnet *outif = NULL;
 
 	/*
 	 * At first, find a link local address on the outgoing interface
@@ -464,5 +465,5 @@ mld6_sendpkt(in6m, type, dst)
 	/* increment output statictics */
 	icmp6stat.icp6s_outhist[type]++;
 
-	ip6_output(mh, &ip6_opts, NULL, 0, &im6o);
+	ip6_output(mh, &ip6_opts, NULL, 0, &im6o, &outif);
 }
