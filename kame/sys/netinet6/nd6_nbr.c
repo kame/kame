@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.96 2002/03/01 09:37:38 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.97 2002/03/15 09:35:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -974,7 +974,7 @@ nd6_na_input(m, off, icmp6len)
 		 */
 		nd6_output(ifp, ifp, ln->ln_hold,
 			   (struct sockaddr_in6 *)rt_key(rt), rt);
-		ln->ln_hold = 0;
+		ln->ln_hold = NULL;
 	}
 
  freeit:
