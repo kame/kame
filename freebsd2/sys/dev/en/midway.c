@@ -1356,7 +1356,8 @@ caddr_t data;
 		    sprintf(ifr->ifr_name, "%s%d",
 			    sifp->if_name, sifp->if_unit);
 #if defined(__KAME__) && defined(INET6)
-		    in6_ifattach(sifp);
+		    /* get EUI64 for PVC, from ATM hardware interface */
+		    in6_ifattach(sifp, ifp);
 #endif
 		  }
 		  else
