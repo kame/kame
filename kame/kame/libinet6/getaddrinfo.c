@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.166 2004/04/13 08:11:01 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.167 2004/04/13 09:31:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1517,7 +1517,7 @@ get_portmatch(ai, servname)
 	const char *servname;
 {
 
-	/* get_port does not touch first argument. when matchonly == 1. */
+	/* get_port does not touch first argument when matchonly == 1. */
 	/* LINTED const cast */
 	return get_port((struct addrinfo *)ai, servname, 1);
 }
@@ -1569,7 +1569,7 @@ get_port(ai, servname, matchonly)
 		port = htons(port);
 	} else {
 		if (ai->ai_flags & AI_NUMERICSERV)
-			return EAI_SERVICE;
+			return EAI_NONAME;
 
 		switch (ai->ai_protocol) {
 		case IPPROTO_UDP:
