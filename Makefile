@@ -82,12 +82,14 @@ autobuild:
 	(cd ${.CURDIR}/${TARGET}; ${MAKE})
 	case ${TARGET} in \
 	bsdi*|freebsd*) \
+		(cd ${.CURDIR}/${TARGET}/sys/compile; /bin/rm -fr ${KERNCONF}); \
 		(cd ${.CURDIR}/${TARGET}/sys/${ARCH}/conf; config ${KERNCONF}); \
-		(cd ${.CURDIR}/${TARGET}/sys/compile/${KERNCONF}; ${MAKE} clean depend; ${MAKE}); \
+		(cd ${.CURDIR}/${TARGET}/sys/compile/${KERNCONF}; ${MAKE} depend; ${MAKE}); \
 		;; \
 	netbsd*|openbsd*) \
+		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/compile; /bin/rm -fr ${KERNCONF}); \
 		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/conf; config ${KERNCONF}); \
-		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/compile/${KERNCONF}; ${MAKE} clean depend; ${MAKE}); \
+		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/compile/${KERNCONF}; ${MAKE} depend; ${MAKE}); \
 		;; \
 	esac
 
