@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2711 2005/01/05 08:04:20 itojun Exp $
+$KAME: CHANGELOG,v 1.2712 2005/01/06 06:57:37 suz Exp $
 
 <200501>
+2005-01-07  suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/{udp6_var.h, udp6_usrreq.c}: fixed a NetBSD
+	  kernel crash by referring to an uninitialized variable.
+
 Wed Jan  5 07:58:00 UTC 2005  itojun@iijlab.net
 	* switch NetBSD base version to 2.0.  todo: dccp, sctp, pf, altq
 

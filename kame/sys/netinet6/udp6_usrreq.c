@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.125 2004/12/27 05:41:19 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.126 2005/01/06 06:57:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -657,7 +657,11 @@ udp6_usrreq(so, req, m, addr6, control)
 #else
 		s = splnet();
 #endif
+#ifdef __NetBSD__
+		error = in6_pcballoc(so, &udbtable);
+#else
 		error = in6_pcballoc(so, &udb6);
+#endif
 		splx(s);
 		if (error)
 			break;

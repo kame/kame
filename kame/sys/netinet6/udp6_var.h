@@ -1,4 +1,4 @@
-/*	$KAME: udp6_var.h,v 1.13 2004/05/21 08:17:58 itojun Exp $	*/
+/*	$KAME: udp6_var.h,v 1.14 2005/01/06 06:57:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,7 +111,9 @@ struct	udp6stat {
 #endif /* __FreeBSD__||__NetBSD__ */
 
 #ifdef _KERNEL
+#ifndef __NetBSD__
 struct	in6pcb udb6;
+#endif
 struct	udp6stat udp6stat;
 
 void	udp6_ctlinput __P((int, struct sockaddr *, void *));
