@@ -1837,6 +1837,10 @@ tcp_twrespond(struct tcptw *tw, struct socket *so, struct mbuf *msrc,
 		    sizeof(struct tcphdr) + optlen);
 		ip6->ip6_hlim = in6_selecthlim(inp, inp->in6p_route.ro_rt ?
 		    inp->in6p_route.ro_rt->rt_ifp : NULL);
+		if (!ip6_setpktaddrs(m, &inp->in6p_lsa, &inp->in6p_fsa)) {
+			m_freem(m);
+			return ENOBUFS;
+		}
 		error = ip6_output(m, inp->in6p_outputopts, &inp->in6p_route,
 		    (tw->tw_so_options & SO_DONTROUTE), NULL, NULL, inp);
 	} else
