@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1229 2000/08/24 00:29:40 itojun Exp $
+$KAME: CHANGELOG,v 1.1230 2000/08/24 07:00:47 sakane Exp $
 
 <200008>
+Thu Aug 24 16:01:26 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Fixed IV processing.  IV mismatching happened when a peer sent a
+	encrypted informational exchange on phase 1.  Also added a comment
+	about IV processing in handler.h.  And deleted ivd in IV hander
+	because it is useless.
+
 Wed Aug 23 22:42:19 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Added the behavior of PFS selection in the case of "strict"/"claim".
