@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.201 2001/09/21 13:46:17 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.202 2001/09/21 14:00:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -167,8 +167,10 @@ extern struct timeout in6_tmpaddrtimer_ch;
 #ifdef __FreeBSD__
 static int fill_drlist __P((struct sysctl_req *));
 static int fill_prlist __P((struct sysctl_req *));
+#else
+static int fill_drlist __P((void *, size_t *, size_t));
+static int fill_prlist __P((void *, size_t *, size_t));
 #endif
-
 
 void
 nd6_init()
@@ -2362,142 +2364,25 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 		return EINVAL;
 	ol = oldlenp ? *oldlenp : 0;
 
+	switch(name) {
 #ifdef ICMPV6CTL_ND6_DRLIST
-	if (name == ICMPV6CTL_ND6_DRLIST) {
-		struct in6_defrouter *d, *de;
-		struct nd_defrouter *dr;
-
-		if (oldp) {
-			d = (struct in6_defrouter *)oldp;
-			de = (struct in6_defrouter *)((caddr_t)oldp + *oldlenp);
-		}
-		l = 0;
-		for (dr = TAILQ_FIRST(&nd_defrouter);
-		     dr;
-		     dr = TAILQ_NEXT(dr, dr_entry)) {
-			if (oldp && d + 1 <= de) {
-				bzero(d, sizeof(*d));
-				d->rtaddr.sin6_family = AF_INET6;
-				d->rtaddr.sin6_len = sizeof(d->rtaddr);
-				if (in6_recoverscope(&d->rtaddr, &dr->rtaddr,
-				    dr->ifp) != 0)
-					log(LOG_ERR,
-					    "scope error in "
-					    "default router list (%s)\n",
-					    ip6_sprintf(&dr->rtaddr));
-				d->flags = dr->flags;
-				d->rtlifetime = dr->rtlifetime;
-				d->expire = dr->expire;
-				d->if_index = dr->ifp->if_index;
-			}
-			l += sizeof(*d);
-			if (d)
-				d++;
-		}
-		if (oldp) {
-			*oldlenp = l;	/* (caddr_t)d - (caddr_t)oldp */
-			if (l > ol)
-				error = ENOMEM;
-		} else
-			*oldlenp = l;
-	} else
+	case ICMPV6CTL_ND6_DRLIST:
+		error = fill_drlist(oldp, oldlenp, ol);
+		break;
 #endif
+
 #ifdef ICMPV6CTL_ND6_PRLIST
-	if (name == ICMPV6CTL_ND6_PRLIST) {
-		struct in6_prefix *p, *pe;
-		struct nd_prefix *pr;
-
-		if (oldp) {
-			p = (struct in6_prefix *)oldp;
-			pe = (struct in6_prefix *)((caddr_t)oldp + *oldlenp);
-		}
-		l = 0;
-		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
-			u_short advrtrs;
-			size_t advance;
-			struct sockaddr_in6 *sin6, *s6;
-			struct nd_pfxrouter *pfr;
-
-			if (oldp && p + 1 <= pe) {
-				bzero(p, sizeof(*p));
-				sin6 = (struct sockaddr_in6 *)(p + 1);
-
-				p->prefix = pr->ndpr_prefix;
-				if (in6_recoverscope(&p->prefix,
-				    &p->prefix.sin6_addr, pr->ndpr_ifp) != 0)
-					log(LOG_ERR,
-					    "scope error in prefix list (%s)\n",
-					    ip6_sprintf(&p->prefix.sin6_addr));
-				p->raflags = pr->ndpr_raf;
-				p->prefixlen = pr->ndpr_plen;
-				p->vltime = pr->ndpr_vltime;
-				p->pltime = pr->ndpr_pltime;
-				p->if_index = pr->ndpr_ifp->if_index;
-				if (pr->ndpr_vltime == ND6_INFINITE_LIFETIME)
-					p->expire = 0;
-				else {
-					time_t maxexpire;
-
-					/* XXX: we assume time_t is signed. */
-					maxexpire = (-1) &
-						~(1 << ((sizeof(maxexpire) * 8) - 1));
-					if (pr->ndpr_vltime <
-					    maxexpire - pr->ndpr_lastupdate) {
-						p->expire = pr->ndpr_lastupdate +
-							pr->ndpr_vltime;
-					} else
-						p->expire = maxexpire;
-				}
-				p->refcnt = pr->ndpr_refcnt;
-				p->flags = pr->ndpr_stateflags;
-				p->origin = PR_ORIG_RA;
-				advrtrs = 0;
-				for (pfr = pr->ndpr_advrtrs.lh_first;
-				     pfr;
-				     pfr = pfr->pfr_next) {
-					if ((void *)&sin6[advrtrs + 1] >
-					    (void *)pe) {
-						advrtrs++;
-						continue;
-					}
-					s6 = &sin6[advrtrs];
-					bzero(s6, sizeof(*s6));
-					s6->sin6_family = AF_INET6;
-					s6->sin6_len = sizeof(*sin6);
-					if (in6_recoverscope(s6,
-					    &pfr->router->rtaddr,
-					    pfr->router->ifp) != 0)
-						log(LOG_ERR,
-						    "scope error in "
-						    "prefix list (%s)\n",
-						    ip6_sprintf(&pfr->router->rtaddr));
-					advrtrs++;
-				}
-				p->advrtrs = advrtrs;
-			} else {
-				advrtrs = 0;
-				for (pfr = pr->ndpr_advrtrs.lh_first;
-				     pfr;
-				     pfr = pfr->pfr_next)
-					advrtrs++;
-			}
-			advance = sizeof(*p) + sizeof(*sin6) * advrtrs;
-			l += advance;
-			if (p)
-				p = (struct in6_prefix *)((caddr_t)p + advance);
-		}
-		if (oldp) {
-			*oldlenp = l;	/* (caddr_t)d - (caddr_t)oldp */
-			if (l > ol)
-				error = ENOMEM;
-		} else
-			*oldlenp = l;
-	} else
+	case ICMPV6CTL_ND6_PRLIST:
+		error = fill_prlist(oldp, oldlenp, ol);
+		break;
 #endif
-	{
+
+	default:
 		error = ENOPROTOOPT;
+		break;
 	}
-	return error;
+
+	return(error);
 }
 #else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
