@@ -52,17 +52,16 @@ bindresvport(sd, sin)
 	int sd;
 	struct sockaddr_in *sin;
 {
-	return bindresvport_af(sd, (struct sockaddr *)sin, AF_INET);
+	return bindresvport_sa(sd, (struct sockaddr *)sin);
 }
 
 /*
  * Bind a socket to a privileged IP port
  */
 int
-bindresvport_af(sd, sa, af)
+bindresvport_sa(sd, sa)
 	int sd;
 	struct sockaddr *sa;
-	int af;
 {
 	int old, error;
 	struct sockaddr_storage myaddr;
@@ -71,11 +70,19 @@ bindresvport_af(sd, sa, af)
 	int proto, portrange, portlow;
 	u_int16_t *portp;
 	int salen;
+	int af;
 
 	if (sa == NULL) {
-		memset(&myaddr, 0, sizeof(myaddr));
+		salen = sizeof(myaddr);
+
 		sa = (struct sockaddr *)&myaddr;
-	}
+		if (getsockname(sd, sa, &salen) == -1)
+			return -1;      /* errno is correctly set */
+
+		af = sa->sa_family;
+		memset(&myaddr, 0, salen);
+	} else
+		af = sa->sa_family;
 
 	if (af == AF_INET) {
 		proto = IPPROTO_IP;
