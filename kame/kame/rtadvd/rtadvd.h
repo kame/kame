@@ -64,6 +64,7 @@
 
 #define PREFIX_FROM_KERNEL 1
 #define PREFIX_FROM_CONFIG 2
+#define PREFIX_FROM_DYNAMIC 3
 
 struct prefix {
 	struct prefix *next;	/* forward link */

@@ -158,6 +158,9 @@ if_dump()
 			case PREFIX_FROM_CONFIG:
 				fprintf(fp, "CONFIG, ");
 				break;
+			case PREFIX_FROM_DYNAMIC:
+				fprintf(fp, "DYNAMIC, ");
+				break;
 			}
 			if (pfx->validlifetime == ND6_INFINITE_LIFETIME)
 				fprintf(fp, "vltime: infinity, ");

@@ -438,6 +438,7 @@ get_prefix(struct rainfo *rai)
 		pp->preflifetime = DEF_ADVPREFERREDLIFETIME;
 		pp->onlinkflg = 1;
 		pp->autoconfflg = 1;
+		pp->origin = PREFIX_FROM_KERNEL;
 
 		/* link into chain */
 		insque(pp, &rai->prefix);
@@ -493,7 +494,7 @@ add_prefix(struct rainfo *rai, struct in6_prefixreq *ipr)
 	prefix->preflifetime = ipr->ipr_pltime;
 	prefix->onlinkflg = ipr->ipr_raf_onlink;
 	prefix->autoconfflg = ipr->ipr_raf_auto;
-	prefix->origin = PREFIX_FROM_KERNEL;
+	prefix->origin = PREFIX_FROM_DYNAMIC;
 
 	insque(prefix, &rai->prefix);
 
@@ -521,7 +522,7 @@ add_prefix(struct rainfo *rai, struct in6_prefixreq *ipr)
 /*
  * Delete a prefix to the list of specified interface and reconstruct
  * the outgoing packet.
- * The prefix must be in the list
+ * The prefix must be in the list.
  */
 void
 delete_prefix(struct rainfo *rai, struct prefix *prefix)
