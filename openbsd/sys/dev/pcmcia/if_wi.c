@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi.c,v 1.3 1999/08/13 20:36:38 fgsch Exp $	*/
+/*	$OpenBSD: if_wi.c,v 1.10 2000/04/24 19:43:36 niklas Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -70,10 +70,6 @@
 #define WI_HERMES_STATS_WAR	/* Work around stats counter bug. */
 
 #include "bpfilter.h"
-#ifdef __FreeBSD__
-#include "card.h"
-#include "wi.h"
-#endif	/* __FreeBSD__ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -81,16 +77,11 @@
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/proc.h>
 #include <sys/socket.h>
-#ifndef __FreeBSD__
 #include <sys/device.h>
-#endif	/* !__FreeBSD__ */
 
 #include <net/if.h>
-#ifdef __FreeBSD__
-#include <net/if_arp.h>
-#include <net/ethernet.h>
-#endif	/* __FreeBSD__ */
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_types.h>
@@ -107,38 +98,9 @@
 #include <net/bpf.h>
 #endif
 
-#ifdef __FreeBSD__
-#include <machine/clock.h>
-#include <machine/md_var.h>
-#include <machine/bus_pio.h>
-#endif	/* __FreeBSD__ */
 #include <machine/bus.h>
 
 #include <i386/isa/icu.h>
-
-#ifdef __FreeBSD__
-
-#include <i386/isa/isa_device.h>
-#include <i386/isa/if_wireg.h>
-#include <machine/if_wavelan_ieee.h>
-
-#if NCARD > 0
-#include <sys/select.h>
-#include <pccard/cardinfo.h>
-#include <pccard/slot.h>
-#endif	/* NCARD > 0 */
-
-static struct wi_softc wi_softc[NWI];
-
-#define TIMEOUT(handle,func,arg,time) (handle) = timeout((func), (arg), (time))
-#define UNTIMEOUT(func,arg,handle) untimeout((func), (arg), (handle))
-#define BPF_MTAP(if,mbuf) bpf_mtap((if), (mbuf))
-#define BPFATTACH(if_bpf,if,dlt,sz) bpfattach((if), (dlt), (sz))
-#define STATIC static
-#define WI_PRT_FMT "wi%d"
-#define WI_PRT_ARG(sc) (sc)->wi_unit
-
-#else	/* !__FreeBSD__ */
 
 #include <dev/pcmcia/pcmciareg.h>
 #include <dev/pcmcia/pcmciavar.h>
@@ -153,8 +115,6 @@ static struct wi_softc wi_softc[NWI];
 #define STATIC
 #define WI_PRT_FMT "%s"
 #define WI_PRT_ARG(sc) (sc)->sc_dev.dv_xname
-
-#endif	/* __FreeBSD__ */
 
 #ifdef WIDEBUG
 
@@ -173,13 +133,9 @@ u_int32_t	widebug = WIDEBUG;
 #define DPRINTF(mask,args)
 #endif	/* WIDEBUG */
 
-#if !defined(lint)
+#if !defined(lint) && !defined(__OpenBSD__)
 static const char rcsid[] =
-#ifdef __FreeBSD__
-	"$Id: if_wi.c,v 1.3 1999/08/13 20:36:38 fgsch Exp $";
-#else	/* !__FreeBSD__ */
-	"$OpenBSD: if_wi.c,v 1.3 1999/08/13 20:36:38 fgsch Exp $";
-#endif	/* __FreeBSD__ */
+	"$OpenBSD: if_wi.c,v 1.10 2000/04/24 19:43:36 niklas Exp $";
 #endif	/* lint */
 
 #ifdef foo
@@ -192,11 +148,7 @@ STATIC void wi_init		__P((void *));
 STATIC void wi_start		__P((struct ifnet *));
 STATIC void wi_stop		__P((struct wi_softc *));
 STATIC void wi_watchdog		__P((struct ifnet *));
-#ifdef __FreeBSD__
-STATIC void wi_shutdown		__P((int, void *));
-#else	/* !__FreeBSD__ */
 STATIC void wi_shutdown		__P((void *));
-#endif	/* __FreeBSD__ */
 STATIC void wi_rxeof		__P((struct wi_softc *));
 STATIC void wi_txeof		__P((struct wi_softc *, int));
 STATIC void wi_update_stats	__P((struct wi_softc *));
@@ -215,242 +167,11 @@ STATIC void wi_inquire		__P((void *));
 STATIC void wi_setdef		__P((struct wi_softc *, struct wi_req *));
 STATIC int wi_mgmt_xmit		__P((struct wi_softc *, caddr_t, int));
 
-#ifdef __FreeBSD__
-
-STATIC int wi_probe		__P((struct isa_device *));
-STATIC int wi_attach		__P((struct isa_device *));
-#ifdef PCCARD_MODULE
-static ointhand2_t		wi_intr;
-#else
-void wi_intr			__P((int));
-#endif	/* PCCARD_MODULE */
-
-struct isa_driver widriver = {
-	wi_probe,
-	wi_attach,
-	"wi",
-	1
-};
-
-#if NCARD > 0
-STATIC int wi_pccard_init	__P((struct pccard_devinfo *));
-STATIC void wi_pccard_unload	__P((struct pccard_devinfo *));
-STATIC int wi_pccard_intr	__P((struct pccard_devinfo *));
-
-#ifdef PCCARD_MODULE
-PCCARD_MODULE(wi, wi_pccard_init, wi_pccard_unload,
-		wi_pccard_intr, 0, net_imask);
-#else
-static struct pccard_device wi_info = {
-	"wi",
-	wi_pccard_init,
-	wi_pccard_unload,
-	wi_pccard_intr,
-	0,			/* Attributes - presently unused */
-	&net_imask		/* Interrupt mask for device */
-				/* XXX - Should this also include net_imask? */
-};
-
-DATA_SET(pccarddrv_set, wi_info);
-#endif
-
-/* Initialize the PCCARD. */
-STATIC int wi_pccard_init(sc_p)
-	struct pccard_devinfo	*sc_p;
-{
-	struct wi_softc		*sc;
-	int			i;
-	u_int32_t		irq;
-
-	if (sc_p->isahd.id_unit >= NWI)
-		return(ENODEV);
-
-	sc = &wi_softc[sc_p->isahd.id_unit];
-	sc->wi_gone = 0;
-	sc->wi_unit = sc_p->isahd.id_unit;
-	sc->wi_bhandle = sc_p->isahd.id_iobase;
-	sc->wi_btag = I386_BUS_SPACE_IO;
-
-	/* Make sure interrupts are disabled. */
-	CSR_WRITE_2(sc, WI_INT_EN, 0);
-	CSR_WRITE_2(sc, WI_EVENT_ACK, 0xFFFF);
-
-	/* Grr. IRQ is encoded as a bitmask. */
-	irq = sc_p->isahd.id_irq;
-	for (i = 0; i < 32; i++) {
-		if (irq & 0x1)
-			break;
-		irq >>= 1;
-	}
-
-	/*
-	 * Print a nice probe message to let the operator
-	 * know something interesting is happening.
-	 */
-	printf("wi%d: <WaveLAN/IEEE 802.11> at 0x%x-0x%x irq %d on isa\n",
-	    sc_p->isahd.id_unit, sc_p->isahd.id_iobase,
-	    sc_p->isahd.id_iobase + WI_IOSIZ - 1, i);
-
-	if (wi_attach(&sc_p->isahd))
-		return(ENXIO);
-
-	return(0);
-}
-
-STATIC void wi_pccard_unload(sc_p)
-	struct pccard_devinfo	*sc_p;
-{
-	struct wi_softc		*sc;
-	struct ifnet		*ifp;
-
-	sc = &wi_softc[sc_p->isahd.id_unit];
-	ifp = &sc->arpcom.ac_if;
-
-	if (sc->wi_gone) {
-		printf("wi%d: already unloaded\n", sc_p->isahd.id_unit);
-		return;
-	}
-
-	ifp->if_flags &= ~IFF_RUNNING;
-	if_down(ifp);
-	sc->wi_gone = 1;
-	printf("wi%d: unloaded\n", sc_p->isahd.id_unit);
-
-	return;
-}
-
-STATIC int wi_pccard_intr(sc_p)
-	struct pccard_devinfo	*sc_p;
-{
-	wi_intr(sc_p->isahd.id_unit);
-	return(1);
-}
-
-#endif
-
-STATIC int wi_probe(isa_dev)
-	struct isa_device	*isa_dev;
-{
-	/*
-	 * The ISA WaveLAN/IEEE card is actually not an ISA card:
-	 * it's a PCMCIA card plugged into a PCMCIA bridge adapter
-	 * that fits into an ISA slot. Consequently, we will always
-	 * be using the pccard support to probe and attach these
-	 * devices, so we can never actually probe one from here.
-	 */
-	return(0);
-}
-
-STATIC int wi_attach(isa_dev)
-	struct isa_device	*isa_dev;
-{
-	struct wi_softc		*sc;
-	struct wi_ltv_macaddr	mac;
-	struct wi_ltv_gen	gen;
-	struct ifnet		*ifp;
-	char			ifname[IFNAMSIZ];
-
-#ifdef PCCARD_MODULE
-	isa_dev->id_ointr = wi_intr;
-#endif
-	sc = &wi_softc[isa_dev->id_unit];
-	ifp = &sc->arpcom.ac_if;
-
-	/* Reset the NIC. */
-	wi_reset(sc);
-
-	/* Read the station address. */
-	mac.wi_type = WI_RID_MAC_NODE;
-	mac.wi_len = 4;
-	wi_read_record(sc, (struct wi_ltv_gen *)&mac);
-	bcopy((char *)&mac.wi_mac_addr,
-	   (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
-
-	printf("wi%d: Ethernet address: %6D\n", sc->wi_unit,
-	    sc->arpcom.ac_enaddr, ":");
-
-	ifp->if_softc = sc;
-	ifp->if_unit = sc->wi_unit;
-	ifp->if_name = "wi";
-	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_ioctl = wi_ioctl;
-	ifp->if_output = ether_output;
-	ifp->if_start = wi_start;
-	ifp->if_watchdog = wi_watchdog;
-	ifp->if_init = wi_init;
-	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
-
-	bzero(sc->wi_node_name, sizeof(sc->wi_node_name));
-	bcopy(WI_DEFAULT_NODENAME, sc->wi_node_name,
-	    sizeof(WI_DEFAULT_NODENAME) - 1);
-
-	bzero(sc->wi_net_name, sizeof(sc->wi_net_name));
-	bcopy(WI_DEFAULT_NETNAME, sc->wi_net_name,
-	    sizeof(WI_DEFAULT_NETNAME) - 1);
-
-	bzero(sc->wi_ibss_name, sizeof(sc->wi_ibss_name));
-	bcopy(WI_DEFAULT_IBSS, sc->wi_ibss_name,
-	    sizeof(WI_DEFAULT_IBSS) - 1);
-
-	sc->wi_portnum = WI_DEFAULT_PORT;
-	sc->wi_ptype = WI_PORTTYPE_ADHOC;
-	sc->wi_ap_density = WI_DEFAULT_AP_DENSITY;
-	sc->wi_rts_thresh = WI_DEFAULT_RTS_THRESH;
-	sc->wi_tx_rate = WI_DEFAULT_TX_RATE;
-	sc->wi_max_data_len = WI_DEFAULT_DATALEN;
-	sc->wi_create_ibss = WI_DEFAULT_CREATE_IBSS;
-	sc->wi_pm_enabled = WI_DEFAULT_PM_ENABLED;
-	sc->wi_max_sleep = WI_DEFAULT_MAX_SLEEP;
-
-	/*
-	 * Read the default channel from the NIC. This may vary
-	 * depending on the country where the NIC was purchased, so
-	 * we can't hard-code a default and expect it to work for
-	 * everyone.
-	 */
-	gen.wi_type = WI_RID_OWN_CHNL;
-	gen.wi_len = 2;
-	wi_read_record(sc, &gen);
-	sc->wi_channel = gen.wi_val;
-
-	bzero((char *)&sc->wi_stats, sizeof(sc->wi_stats));
-
-	wi_init(sc);
-	wi_stop(sc);
-
-	/*
-	 * If this logical interface has already been attached,
-	 * don't attach it again or chaos will ensue.
-	 */
-	sprintf(ifname, "wi%d", sc->wi_unit);
-
-	if (ifunit(ifname) == NULL) {
-		callout_handle_init(&sc->wi_stat_ch);
-		/*
-		 * Call MI attach routines.
-		 */
-		if_attach(ifp);
-		ether_ifattach(ifp);
-
-#if NBPFILTER > 0
-		bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
-
-		at_shutdown(wi_shutdown, sc, SHUTDOWN_POST_SYNC);
-	}
-
-	return(0);
-}
-
-#else	/* !__FreeBSD__ */
-
-int	wi_pcmcia_match __P((struct device *, void *, void *));
-void	wi_pcmcia_attach __P((struct device *, struct device *, void *));
-int	wi_pcmcia_detach __P((struct device *, int));
-int	wi_pcmcia_activate __P((struct device *, enum devact));
-int	wi_intr __P((void *));
+int	wi_pcmcia_match		__P((struct device *, void *, void *));
+void	wi_pcmcia_attach	__P((struct device *, struct device *, void *));
+int	wi_pcmcia_detach	__P((struct device *, int));
+int	wi_pcmcia_activate	__P((struct device *, enum devact));
+int	wi_intr			__P((void *));
 
 /* Autoconfig definition of driver back-end */
 struct cfdriver wi_cd = {
@@ -581,6 +302,14 @@ wi_pcmcia_attach(parent, self, aux)
 	wi_read_record(sc, &gen);
 	sc->wi_channel = gen.wi_val;
 
+	/*
+	 * Find out if we support WEP on this card.
+	 */
+	gen.wi_type = WI_RID_WEP_AVAIL;
+	gen.wi_len = 2;
+	wi_read_record(sc, &gen);
+	sc->wi_has_wep = gen.wi_val;
+
 	bzero((char *)&sc->wi_stats, sizeof(sc->wi_stats));
 
 	/*
@@ -596,8 +325,6 @@ wi_pcmcia_attach(parent, self, aux)
 
 	shutdownhook_establish(wi_shutdown, sc);
 
-	printf("\n");
-
 	/* Establish the interrupt. */
 	sc->sc_ih = pcmcia_intr_establish(pa->pf, IPL_NET, wi_intr, sc);
 	if (sc->sc_ih == NULL) {
@@ -605,17 +332,10 @@ wi_pcmcia_attach(parent, self, aux)
 		    sc->sc_dev.dv_xname);
 		goto bad;
 	}
+	printf("\n");
 
 	wi_init(sc);
 	wi_stop(sc);
-
-#ifdef notyet
-	/*
-	 * XXX This should be done once the framework has enable/disable hooks.
-	 */
-	pcmcia_function_disable(pf);
-#endif	/* notyet */
-
 	return;
 
 bad:
@@ -651,37 +371,36 @@ wi_pcmcia_activate(dev, act)
 	enum devact act;
 {
 	struct wi_softc *sc = (struct wi_softc *)dev;
+	struct ifnet *ifp = &sc->arpcom.ac_if;
 	int s;
 
 	s = splnet();
 	switch (act) {
 	case DVACT_ACTIVATE:
 		pcmcia_function_enable(sc->sc_pf);
+		printf("%s:", WI_PRT_ARG(sc));
 		sc->sc_ih =
 		    pcmcia_intr_establish(sc->sc_pf, IPL_NET, wi_intr, sc);
+		printf("\n");
+		wi_init(sc);
 		break;
 
 	case DVACT_DEACTIVATE:
-		pcmcia_function_disable(sc->sc_pf);
+		ifp->if_timer = 0;
+		if (ifp->if_flags & IFF_RUNNING)
+			wi_stop(sc);
 		pcmcia_intr_disestablish(sc->sc_pf, sc->sc_ih);
+		pcmcia_function_disable(sc->sc_pf);
 		break;
 	}
 	splx(s);
 	return (0);
 }
-#endif	/* __FreeBSD__ */
 
-#ifdef __FreeBSD__
-void wi_intr(unit)
-	int			unit;
-{
-	struct wi_softc		*sc = &wi_softc[unit];
-#else	/* !__FreeBSD__ */
 int wi_intr(vsc)
 	void			*vsc;
 {
 	struct wi_softc		*sc = vsc;
-#endif	/* __FreeBSD__ */
 	struct ifnet		*ifp;
 	u_int16_t		status;
 
@@ -836,15 +555,8 @@ STATIC void wi_rxeof(sc)
 
 #if NBPFILTER > 0
 	/* Handle BPF listeners. */
-	if (ifp->if_bpf) {
+	if (ifp->if_bpf)
 		BPF_MTAP(ifp, m);
-		if (ifp->if_flags & IFF_PROMISC &&
-		    (bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-		    ETHER_ADDR_LEN) && (eh->ether_dhost[0] & 1) == 0)) {
-			m_freem(m);
-			return;
-		}
-	}
 #endif
 
 	/* Receive packet. */
@@ -1195,12 +907,8 @@ STATIC void wi_setmulti(sc)
 	struct ifnet		*ifp;
 	int			i = 0;
 	struct wi_ltv_mcast	mcast;
-#ifdef __FreeBSD__
-	struct ifmultiaddr	*ifma;
-#else
 	struct ether_multistep	step;
 	struct ether_multi	*enm;
-#endif
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -1214,21 +922,6 @@ STATIC void wi_setmulti(sc)
 		return;
 	}
 
-#ifdef __FreeBSD__
-	for (ifma = ifp->if_multiaddrs.lh_first; ifma != NULL;
-				ifma = ifma->ifma_link.le_next) {
-		if (ifma->ifma_addr->sa_family != AF_LINK)
-			continue;
-		if (i < 16) {
-			bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
-			    (char *)&mcast.wi_mcast[i], ETHER_ADDR_LEN);
-			i++;
-		} else {
-			bzero((char *)&mcast, sizeof(mcast));
-			break;
-		}
-	}
-#else	/* !__FreeBSD__ */
 	ETHER_FIRST_MULTI(step, &sc->arpcom, enm);
 	while (enm != NULL) {
 		if (i >= 16) {
@@ -1245,7 +938,6 @@ STATIC void wi_setmulti(sc)
 		i++;
 		ETHER_NEXT_MULTI(step, enm);
 	}
-#endif	/* __FreeBSD__ */
 
 	mcast.wi_len = (i * 3) + 1;
 	wi_write_record(sc, (struct wi_ltv_gen *)&mcast);
@@ -1260,19 +952,17 @@ STATIC void wi_setdef(sc, wreq)
 	struct sockaddr_dl	*sdl;
 	struct ifaddr		*ifa;
 	struct ifnet		*ifp;
-#ifndef __FreeBSD__
 	extern struct ifaddr	**ifnet_addrs;
-#endif	/* !__FreeBSD__ */
 
 	ifp = &sc->arpcom.ac_if;
 
 	switch(wreq->wi_type) {
 	case WI_RID_MAC_NODE:
-		ifa = ifnet_addrs[ifp->if_index - 1];
+		ifa = ifnet_addrs[ifp->if_index];
 		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
 		bcopy((char *)&wreq->wi_val, LLADDR(sdl), ETHER_ADDR_LEN);
 		bcopy((char *)&wreq->wi_val, (char *)&sc->arpcom.ac_enaddr,
-		   ETHER_ADDR_LEN);
+		      ETHER_ADDR_LEN);
 		break;
 	case WI_RID_PORTTYPE:
 		sc->wi_ptype = wreq->wi_val[0];
@@ -1313,6 +1003,16 @@ STATIC void wi_setdef(sc, wreq)
 	case WI_RID_MAX_SLEEP:
 		sc->wi_max_sleep = wreq->wi_val[0];
 		break;
+	case WI_RID_ENCRYPTION:
+		sc->wi_use_wep = wreq->wi_val[0];
+		break;
+	case WI_RID_TX_CRYPT_KEY:
+		sc->wi_tx_key = wreq->wi_val[0];
+		break;
+	case WI_RID_DEFLT_CRYPT_KEYS:
+		bcopy((char *)wreq, (char *)&sc->wi_keys,
+		    sizeof(struct wi_ltv_keys));
+		break;
 	default:
 		break;
 	}
@@ -1332,9 +1032,8 @@ STATIC int wi_ioctl(ifp, command, data)
 	struct wi_softc		*sc;
 	struct wi_req		wreq;
 	struct ifreq		*ifr;
-#ifndef __FreeBSD__
+	struct proc *p = curproc;
 	struct ifaddr		*ifa = (struct ifaddr *)data;
-#endif	/* !__FreeBSD__ */
 
 	s = splimp();
 
@@ -1346,21 +1045,12 @@ STATIC int wi_ioctl(ifp, command, data)
 
 	DPRINTF (WID_IOCTL, ("wi_ioctl: command %lu data %p", command, data));
 
-#ifndef __FreeBSD__
 	if ((error = ether_ioctl(ifp, &sc->arpcom, command, data)) > 0) {
 		splx(s);
 		return error;
 	}
-#endif	/* !__FreeBSD__ */
 
 	switch(command) {
-#ifdef __FreeBSD__
-	case SIOCSIFADDR:
-	case SIOCGIFADDR:
-	case SIOCSIFMTU:
-		error = ether_ioctl(ifp, command, data);
-		break;
-#else	/* !__FreeBSD__ */
 	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 		switch (ifa->ifa_addr->sa_family) {
@@ -1375,7 +1065,6 @@ STATIC int wi_ioctl(ifp, command, data)
 			break;
 		}
 		break;
-#endif	/* __FreeBSD__ */
 
 	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
@@ -1399,8 +1088,18 @@ STATIC int wi_ioctl(ifp, command, data)
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		wi_setmulti(sc);
-		error = 0;
+		/* Update our multicast list. */
+		error = (command == SIOCADDMULTI) ?
+		    ether_addmulti(ifr, &sc->arpcom) :
+		    ether_delmulti(ifr, &sc->arpcom);
+		if (error == ENETRESET) {
+			/*
+			 * Multicast list has changed; set the hardware filter
+                         * accordingly.
+			 */
+			wi_setmulti(sc);
+			error = 0;
+		}
 		break;
 	case SIOCGWAVELAN:
 		error = copyin(ifr->ifr_data, &wreq, sizeof(wreq));
@@ -1410,6 +1109,14 @@ STATIC int wi_ioctl(ifp, command, data)
 			bcopy((char *)&sc->wi_stats, (char *)&wreq.wi_val,
 			    sizeof(sc->wi_stats));
 			wreq.wi_len = (sizeof(sc->wi_stats) / 2) + 1;
+		} else if (wreq.wi_type == WI_RID_DEFLT_CRYPT_KEYS) {
+			/* For non-root user, return all-zeroes keys */
+			if (suser(p->p_ucred, &p->p_acflag))
+				bzero((char *)&wreq,
+			    		sizeof(struct wi_ltv_keys));
+			else
+				bcopy((char *)&sc->wi_keys, (char *)&wreq,
+			    		sizeof(struct wi_ltv_keys));
 		} else {
 			if (wi_read_record(sc, (struct wi_ltv_gen *)&wreq)) {
 				error = EINVAL;
@@ -1419,6 +1126,9 @@ STATIC int wi_ioctl(ifp, command, data)
 		error = copyout(&wreq, ifr->ifr_data, sizeof(wreq));
 		break;
 	case SIOCSWAVELAN:
+		error = suser(p->p_ucred, &p->p_acflag);
+		if (error)
+			break;
 		error = copyin(ifr->ifr_data, &wreq, sizeof(wreq));
 		if (error)
 			break;
@@ -1508,6 +1218,15 @@ STATIC void wi_init(xsc)
 	   (char *)&mac.wi_mac_addr, ETHER_ADDR_LEN);
 	wi_write_record(sc, (struct wi_ltv_gen *)&mac);
 
+	/* Configure WEP. */
+	if (sc->wi_has_wep) {
+		WI_SETVAL(WI_RID_ENCRYPTION, sc->wi_use_wep);
+		WI_SETVAL(WI_RID_TX_CRYPT_KEY, sc->wi_tx_key);
+		sc->wi_keys.wi_len = (sizeof(struct wi_ltv_keys) / 2) + 1;
+		sc->wi_keys.wi_type = WI_RID_DEFLT_CRYPT_KEYS;
+		wi_write_record(sc, (struct wi_ltv_gen *)&sc->wi_keys);
+	}
+
 	/* Initialize promisc mode. */
 	if (ifp->if_flags & IFF_PROMISC) {
 		WI_SETVAL(WI_RID_PROMISC, 1);
@@ -1577,7 +1296,8 @@ STATIC void wi_start(ifp)
 	 */
 	if (ntohs(eh->ether_type) == ETHERTYPE_IP ||
 	    ntohs(eh->ether_type) == ETHERTYPE_ARP ||
-	    ntohs(eh->ether_type) == ETHERTYPE_REVARP) {
+	    ntohs(eh->ether_type) == ETHERTYPE_REVARP ||
+	    ntohs(eh->ether_type) == ETHERTYPE_IPV6) {
 		bcopy((char *)&eh->ether_dhost,
 		    (char *)&tx_frame.wi_addr1, ETHER_ADDR_LEN);
 		bcopy((char *)&eh->ether_shost,
@@ -1712,12 +1432,7 @@ STATIC void wi_watchdog(ifp)
 	return;
 }
 
-#ifdef __FreeBSD__
-STATIC void wi_shutdown(howto, arg)
-	int			howto;
-#else	/* !__FreeBSD__ */
 STATIC void wi_shutdown(arg)
-#endif	/* __FreeBSD__ */
 	void			*arg;
 {
 	struct wi_softc		*sc;
