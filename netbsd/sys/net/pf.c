@@ -602,7 +602,6 @@ pf_tbladdr_copyout(struct pf_addr_wrap *aw)
 int
 pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 {
-#ifdef __OpenBSD__
 	if (aw->type != PF_ADDR_DYNIFTL)
 		return (0);
 	aw->p.dyn = pool_get(&pf_addr_pl, PR_NOWAIT);
@@ -618,6 +617,7 @@ pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 	aw->p.dyn->addr = &aw->v.a.addr;
 	aw->p.dyn->af = af;
 	aw->p.dyn->undefined = 1;
+#ifdef __OpenBSD__
 	aw->p.dyn->hook_cookie = hook_establish(
 	    aw->p.dyn->ifp->if_addrhooks, 1,
 	    pf_dynaddr_update, aw->p.dyn);
@@ -626,17 +626,15 @@ pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 		aw->p.dyn = NULL;
 		return (1);
 	}
+#endif
 	pf_dynaddr_update(aw->p.dyn);
 	return (0);
-#else
 	return (1);
-#endif
 }
 
 void
 pf_dynaddr_update(void *p)
 {
-#ifdef __OpenBSD__
 	struct pf_addr_dyn	*ad = (struct pf_addr_dyn *)p;
 	struct ifaddr		*ia;
 	int			 s, changed = 0;
@@ -677,37 +675,28 @@ pf_dynaddr_update(void *p)
 	if (ia == NULL)
 		ad->undefined = 1;
 	splx(s);
-#else
-	return;
-#endif
 }
 
 void
 pf_dynaddr_remove(struct pf_addr_wrap *aw)
 {
-#ifdef __OpenBSD__
 	if (aw->type != PF_ADDR_DYNIFTL || aw->p.dyn == NULL)
 		return;
+#ifdef __OpenBSD__
 	hook_disestablish(aw->p.dyn->ifp->if_addrhooks,
 	    aw->p.dyn->hook_cookie);
+#endif
 	pool_put(&pf_addr_pl, aw->p.dyn);
 	aw->p.dyn = NULL;
-#else
-	return;
-#endif
 }
 
 void
 pf_dynaddr_copyout(struct pf_addr_wrap *aw)
 {
-#ifdef __OpenBSD__
 	if (aw->type != PF_ADDR_DYNIFTL || aw->p.dyn == NULL)
 		return;
 	bcopy(aw->p.dyn->ifname, aw->v.ifname, sizeof(aw->v.ifname));
 	aw->p.dyn = (struct pf_addr_dyn *)1;
-#else
-	return;
-#endif
 }
 
 void
