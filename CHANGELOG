@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.823 2000/04/27 03:33:44 itojun Exp $
+$Id: CHANGELOG,v 1.824 2000/04/27 09:49:30 jinmei Exp $
 
 <200004>
+2000-04-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {bsdi4, openbsd}/sys/netinet/in_pcb.c (in_pcbnotify):
+	* openbsd/sys/netinet/in_pcb.c (in_pcbnotifyall): 
+	prevented an infinite loop, which could happen when if an IPv6 PCB
+	entry exists and notification to the PCB list occurs.
+	OpenBSD users who use the 20000424 snap release are strognly
+	recommended to apply the fix.
+
 Thu Apr 27 12:32:34 JST 2000  itojun@iijlab.net
 	* freebsd4/lib/libinet6/getaddrinfo.c: getaddrinfo.c obeys
 	  configured resolve order.  From: ume
