@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.373 1999/12/26 15:38:21 sumikawa Exp $
+$Id: CHANGELOG,v 1.374 1999/12/26 18:44:12 sumikawa Exp $
 
 <199912>
+Mon Dec 27 03:42:38 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* {bsdi3,freebsd2}/sys/netinet/udp_usrreq.c: fix data corruption
+	  when multiple listening socket exists for udp multicast.
+
 Mon Dec 27 00:37:04 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/emacs20: upgrade to 20.5. 
 
