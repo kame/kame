@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1826 2001/08/01 16:54:28 jinmei Exp $
+$KAME: CHANGELOG,v 1.1827 2001/08/01 16:57:58 jinmei Exp $
 
 <200108>
+2001-08-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/advapitest/sender.c (main): added a new option '-n
+	nexthop' to test IPV6_NEXTHOP.
+
+2001-08-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/{ip6_output.c, in6_src.c}: supported
+	the IPV6_NEXTHOP ancillary data / socket option.
+	At this moment, the next hop should be an AF_INET6 socket address.
+
 2001-08-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_is_addr_neighbor): check on-link
 	prefixes (not addresses) to see if a given address is a neighbor
