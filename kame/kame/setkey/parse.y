@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.19 2000/05/23 14:17:06 itojun Exp $ */
+/* KAME $Id: parse.y,v 1.20 2000/05/23 14:27:16 itojun Exp $ */
 
 %{
 #include <sys/types.h>
@@ -424,12 +424,46 @@ spdflush_command:
 sp_selector_spec
 	:	ipaddress { p_src = pp_addr; }
 		prefix { p_prefs = pp_prefix; }
-		port { _INPORTBYSA(p_src) = htons(pp_port); }
+		port
+		{
+			switch (p_src->sa_family) {
+			case AF_INET:
+				((struct sockaddr_in *)p_src)->sin_port =
+				    htons(pp_port);
+				break;
+#ifdef INET6
+			case AF_INET6:
+				((struct sockaddr_in6 *)p_src)->sin6_port =
+				    htons(pp_port);
+				break;
+#endif
+			default:
+				/*XXX*/
+			}
+		}
 		ipaddress { p_dst = pp_addr; }
 		prefix { p_prefd = pp_prefix; }
-		port { _INPORTBYSA(p_dst) = htons(pp_port); }
+		port
+		{
+			switch (p_dst->sa_family) {
+			case AF_INET:
+				((struct sockaddr_in *)p_dst)->sin_port =
+				    htons(pp_port);
+				break;
+#ifdef INET6
+			case AF_INET6:
+				((struct sockaddr_in6 *)p_dst)->sin6_port =
+				    htons(pp_port);
+				break;
+#endif
+			default:
+				/*XXX*/
+			}
+		}
 		upper_spec
 		{
+			/* XXX is it something userland should check? */
+#if 0
 			switch (p_upper) {
 			case IPPROTO_ICMP:
 			case IPPROTO_ICMPV6:
@@ -450,6 +484,7 @@ sp_selector_spec
 			default:
 				break;
 			}
+#endif
 		}
 	;
 
@@ -662,8 +697,21 @@ setkeymsg()
 			           + PFKEY_ALIGN8(p_src->sa_len));
 		m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
 		m_addr.sadb_address_proto = IPSEC_ULPROTO_ANY;
-		m_addr.sadb_address_prefixlen =
-			_INALENBYAF(p_src->sa_family) << 3;
+		switch (p_src->sa_family) {
+		case AF_INET:
+			m_addr.sadb_address_prefixlen =
+			    sizeof(struct in_addr) << 3;
+			break;
+#ifdef INET6
+		case AF_INET6:
+			m_addr.sadb_address_prefixlen =
+			    sizeof(struct in6_addr) << 3;
+			break;
+#endif
+		default:
+			yyerror("unsupported address family");
+			exit(1);	/*XXX*/
+		}
 		m_addr.sadb_address_reserved = 0;
 
 		setvarbuf(&m_len,
@@ -676,8 +724,21 @@ setkeymsg()
 			           + PFKEY_ALIGN8(p_dst->sa_len));
 		m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_DST;
 		m_addr.sadb_address_proto = IPSEC_ULPROTO_ANY;
-		m_addr.sadb_address_prefixlen =
-			_INALENBYAF(p_dst->sa_family) << 3;
+		switch (p_dst->sa_family) {
+		case AF_INET:
+			m_addr.sadb_address_prefixlen =
+			    sizeof(struct in_addr) << 3;
+			break;
+#ifdef INET6
+		case AF_INET6:
+			m_addr.sadb_address_prefixlen =
+			    sizeof(struct in6_addr) << 3;
+			break;
+#endif
+		default:
+			yyerror("unsupported address family");
+			exit(1);	/*XXX*/
+		}
 		m_addr.sadb_address_reserved = 0;
 
 		setvarbuf(&m_len,
@@ -695,6 +756,7 @@ setkeymsg()
 	case SADB_X_SPDDELETE:
 	    {
 		struct sadb_address m_addr;
+		u_int8_t plen;
 
 		memcpy(m_buf + m_len, p_policy, p_policy_len);
 		m_len += p_policy_len;
@@ -707,9 +769,21 @@ setkeymsg()
 			           + PFKEY_ALIGN8(p_src->sa_len));
 		m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
 		m_addr.sadb_address_proto = p_upper;
+		switch (p_src->sa_family) {
+		case AF_INET:
+			plen = sizeof(struct in_addr) << 3;
+			break;
+#ifdef INET6
+		case AF_INET6:
+			plen = sizeof(struct in6_addr) << 3;
+			break;
+#endif
+		default:
+			yyerror("unsupported address family");
+			exit(1);	/*XXX*/
+		}
 		m_addr.sadb_address_prefixlen =
-		    (p_prefs != ~0 ? p_prefs :
-		                     _INALENBYAF(p_src->sa_family) << 3);
+		    (p_prefs != ~0 ? p_prefs : plen);
 		m_addr.sadb_address_reserved = 0;
 
 		setvarbuf(&m_len,
@@ -722,9 +796,21 @@ setkeymsg()
 			           + PFKEY_ALIGN8(p_dst->sa_len));
 		m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_DST;
 		m_addr.sadb_address_proto = p_upper;
+		switch (p_dst->sa_family) {
+		case AF_INET:
+			plen = sizeof(struct in_addr) << 3;
+			break;
+#ifdef INET6
+		case AF_INET6:
+			plen = sizeof(struct in6_addr) << 3;
+			break;
+#endif
+		default:
+			yyerror("unsupported address family");
+			exit(1);	/*XXX*/
+		}
 		m_addr.sadb_address_prefixlen =
-		    (p_prefd != ~0 ? p_prefd :
-		                     _INALENBYAF(p_dst->sa_family) << 3);
+		    (p_prefd != ~0 ? p_prefd : plen);
 		m_addr.sadb_address_reserved = 0;
 
 		setvarbuf(&m_len,
