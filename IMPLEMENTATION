@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/04/02 15:41:19 $
+			$Date: 2000/04/05 09:13:44 $
 
 1. IPv6
 
@@ -1368,7 +1368,7 @@ list just for reference purposes.
 	Altiga, Ashley-laurent (vpcom.com), Data Fellows (F-Secure),
 	BlueSteel, CISCO, Ericsson, ACC, Fitel, FreeS/WAN, HITACHI, IBM
 	AIX, IIJ, Intel, Microsoft WinNT, NAI PGPnet,
-	NIST (linux IPsec + plutoplus), Netscreen, OpenBSD, Radguard,
+	NIST (linux IPsec + plutoplus), Netscreen, OpenBSD isakmpd, Radguard,
 	RedCreek, Routerware, SSH, Secure Computing, Soliton, Toshiba,
 	TIS/NAI Gauntret, VPNet, Yamaha RT100i
 
