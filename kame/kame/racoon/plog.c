@@ -1,4 +1,4 @@
-/*	$KAME: plog.c,v 1.12 2000/12/19 04:57:33 sakane Exp $	*/
+/*	$KAME: plog.c,v 1.13 2000/12/19 05:06:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -180,9 +180,9 @@ plogdump(pri, data, len)
 
 	/*
 	 * 2 words a bytes + 1 space 4 bytes + 1 newline 32 bytes
-	 * + 1 newline + '\0'
+	 * + 2 newline + '\0'
 	 */
-	buflen = (len * 2) + (len / 4) + (len / 32) + 2;
+	buflen = (len * 2) + (len / 4) + (len / 32) + 3;
 	buf = malloc(buflen);
 
 	i = 0;
