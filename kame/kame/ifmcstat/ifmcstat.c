@@ -166,7 +166,8 @@ int main(argc, argv)
 	int argc;
 	char **argv;
 {
-	char	buf[_POSIX2_LINE_MAX], ifname[IFNAMSIZ], c;
+	char	buf[_POSIX2_LINE_MAX], ifname[IFNAMSIZ];
+	int c;
 	struct	ifnet	*ifp, *nifp, ifnet;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #ifndef __NetBSD__
