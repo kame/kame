@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.218 2001/07/24 09:51:20 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.219 2001/07/24 13:51:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -813,8 +813,8 @@ in6_control(so, cmd, data, ifp)
 
 	case SIOCDIFADDR_IN6:
 	{
-		int i = 0;
-		struct nd_prefix pr0, *pr;
+		int i = 0, purgeprefix = 0;
+		struct nd_prefix pr0, *pr = NULL;
 
 		/*
 		 * If the address being deleted is the only one that owns
@@ -849,12 +849,13 @@ in6_control(so, cmd, data, ifp)
 		    (((ia->ia6_flags & IN6_IFF_AUTOCONF) != 0 &&
 		      pr->ndpr_refcnt == 1) ||
 		     ((ia->ia6_flags & IN6_IFF_AUTOCONF) == 0 &&
-		      pr->ndpr_refcnt == 0))) {
-			pr->ndpr_expire = 1; /* XXX: just for expiration */
-		}
+		      pr->ndpr_refcnt == 0)))
+			purgeprefix = 1;
 
 	  purgeaddr:
 		in6_purgeaddr(&ia->ia_ifa);
+		if (pr && purgeprefix)
+			prelist_remove(pr);
 		break;
 	}
 
