@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.85 2002/03/25 07:21:14 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.86 2002/03/27 06:31:39 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -821,8 +821,6 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	struct ip	*ip4 = mtod(cv4->m, struct ip *);
 	struct ip6_hdr	*ip6;
 	struct ip6_frag	*frag6;
-	struct icmp	*icmp4;
-	struct icmp6_hdr	*icmp6;
 	caddr_t		icmp4end;
 	int		icmp4len;
 	int		icmp6len = 0;
@@ -850,7 +848,7 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	switch (cv4->pyld.icmp4->icmp_type) {
 	case ICMP_ECHOREPLY:
 		icmp6len = natpt_icmp4EchoReply(cv4, &cv6);
-		if (frag6) {
+		if (frag6 && needFragment(cv4)) {
 			cv6.fh = frag6;
 			natpt_translatePing4to66(cv4, &cv6, icmp6len);
 			return (NULL);
@@ -864,7 +862,7 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 
 	case ICMP_ECHO:
 		icmp6len = natpt_icmp4Echo(cv4, &cv6);
-		if (frag6) {
+		if (frag6 && needFragment(cv4)) {
 			cv6.fh = frag6;
 			natpt_translatePing4to66(cv4, &cv6, icmp6len);
 			return (NULL);
@@ -901,29 +899,25 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 		return (NULL);
 	}
 
-	if (icmp6len != 0) {
-		ip6->ip6_plen = sizeof(struct icmp6_hdr) + icmp6len;
+	{
+		int		hdrsz = 0;
+		u_int32_t	off = sizeof(struct ip6_hdr);
+		u_int32_t	len = sizeof(struct icmp6_hdr) + icmp6len;
+		struct icmp6_hdr *icmp6 = cv6.pyld.icmp6;
+
+		if (frag6) {
+			hdrsz += sizeof(struct ip6_frag);
+			off   += sizeof(struct ip6_frag);
+		}
+
+		icmp6->icmp6_id  = cv4->pyld.icmp4->icmp_id;
+		icmp6->icmp6_seq = cv4->pyld.icmp4->icmp_seq;
+
+		ip6->ip6_plen = hdrsz + len;
 		cv6.m->m_pkthdr.len
 			= cv6.m->m_len
 			= sizeof(struct ip6_hdr) + ip6->ip6_plen;
-	}
 
-	icmp4 = cv4->pyld.icmp4;
-	icmp6 = cv6.pyld.icmp6;
-	icmp6->icmp6_id  = icmp4->icmp_id;
-	icmp6->icmp6_seq = icmp4->icmp_seq;
-
-	{
-		u_int32_t	off = sizeof(struct ip6_hdr);
-		u_int32_t	len = ip6->ip6_plen;
-
-		if (frag6) {
-			cv6.m->m_len += sizeof(struct ip6_frag);
-			cv6.m->m_pkthdr.len += sizeof(struct ip6_frag);
-			ip6->ip6_plen += sizeof(struct ip6_frag);
-
-			off += sizeof(struct ip6_frag);
-		}
 		icmp6->icmp6_cksum = 0;
 		icmp6->icmp6_cksum = in6_cksum(cv6.m, IPPROTO_ICMPV6, off, len);
 	}
