@@ -336,7 +336,7 @@ getsocket()
 	}
 }
 
-struct	sockaddr_in so_mask = {8, 0, 0, { 0xffffffff}};
+struct	sockaddr_in6 so_mask = {sizeof(so_mask), AF_INET6 };
 struct	sockaddr_in6 blank_sin = {sizeof(blank_sin), AF_INET6 }, sin_m;
 struct	sockaddr_dl blank_sdl = {sizeof(blank_sdl), AF_LINK }, sdl_m;
 int	expire_time, flags, found_entry;
@@ -385,7 +385,8 @@ set(argc, argv)
 			struct timeval time;
 			gettimeofday(&time, 0);
 			expire_time = time.tv_sec + 20 * 60;
-		}
+		} else if (strncmp(argv[0], "proxy", 5) == 0)
+			flags |= RTF_ANNOUNCE;
 		argv++;
 	}
 tryagain:
@@ -748,7 +749,7 @@ usage()
 #endif
 	printf("       ndp -p\n");
 	printf("       ndp -r\n");
-	printf("       ndp -s hostname ether_addr [temp]\n");
+	printf("       ndp -s hostname ether_addr [temp] [proxy]\n");
 	printf("       ndp -H\n");
 	printf("       ndp -P\n");
 	printf("       ndp -R\n");
@@ -781,6 +782,10 @@ rtmsg(cmd)
 		rtm->rtm_rmx.rmx_expire = expire_time;
 		rtm->rtm_inits = RTV_EXPIRE;
 		rtm->rtm_flags |= (RTF_HOST | RTF_STATIC);
+		if (rtm->rtm_flags & RTF_ANNOUNCE) {
+			rtm->rtm_flags &= ~RTF_HOST;
+			rtm->rtm_flags |= RTA_NETMASK;
+		}
 		/* FALLTHROUGH */
 	case RTM_GET:
 		rtm->rtm_addrs |= RTA_DST;
@@ -791,6 +796,7 @@ rtmsg(cmd)
 
 	NEXTADDR(RTA_DST, sin_m);
 	NEXTADDR(RTA_GATEWAY, sdl_m);
+	memset(&so_mask.sin6_addr, 0xff, sizeof(so_mask.sin6_addr));
 	NEXTADDR(RTA_NETMASK, so_mask);
 
 	rtm->rtm_msglen = cp - (char *)&m_rtmsg;
