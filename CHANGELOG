@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.14 1999/08/13 12:40:00 itojun Exp $
+$Id: CHANGELOG,v 1.15 1999/08/13 14:01:47 itojun Exp $
 
 <199908>
+Fri Aug 13 23:01:15 JST 1999  itojun@iijlab.net
+	* freebsd2/usr.sbin/inetd: support tcp6, udp6 as protocol type.
+	  now inetd is able to support both address families, so there's no
+	  need to run separate inet6d.  you just need to (1) kill
+	  /usr/sbin/inetd, and (2) run /usr/local/v6/sbin/inetd instead.
+	  /etc/inetd.conf will be used.
+
 Fri Aug 13 21:34:39 JST 1999  itojun@iijlab.net
 	* sys/netinet6: Add net.inet6.ip6.use_deprecated sysctl MIB.
 	  This is for RFC2462 5.5.4, which specifies the use of deprecated
