@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.5 2002/05/15 08:31:56 jinmei Exp $	*/
+/*	$KAME: timer.c,v 1.6 2002/05/15 08:53:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -74,12 +74,12 @@ rtadvd_add_timer(void (*timeout) __P((void *)),
 
 	if (timeout == NULL) {
 		syslog(LOG_ERR,
-		       "<%s> timeout function unspecfied", __FUNCTION__);
+		       "<%s> timeout function unspecified", __FUNCTION__);
 		exit(1);
 	}
 	if (update == NULL) {
 		syslog(LOG_ERR,
-		       "<%s> update function unspecfied", __FUNCTION__);
+		       "<%s> update function unspecified", __FUNCTION__);
 		exit(1);
 	}
 	newtimer->expire = timeout;
