@@ -1,11 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.254 1999/11/04 11:46:55 jinmei Exp $
+$Id: CHANGELOG,v 1.255 1999/11/04 12:20:50 jinmei Exp $
 
 <199911>
 1999-11-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_rtrequest): changed the initial
+	state when creating a neighbor cache entry from INCOMPLETE to
+	NOSTATE, in order to avoid unexpected NSes.
+
+1999-11-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_redirect_output): do not
-	include target link-layer address option unless the address is
+	include a target link-layer address option unless the address is
 	resolved.
 	Thanks to: the TAHI project for finding the problem.
 
