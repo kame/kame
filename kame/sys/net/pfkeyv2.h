@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.35 2003/07/22 03:46:06 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.36 2003/07/25 09:33:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -315,6 +315,7 @@ struct sadb_x_tag {
 #define SADB_X_AALG_SHA2_256	5
 #define SADB_X_AALG_SHA2_384	6
 #define SADB_X_AALG_SHA2_512	7
+#define SADB_X_AALG_RIPEMD160HMAC 8
 #define SADB_X_AALG_AES_XCBC_MAC 9 /* draft-ietf-ipsec-ciph-aes-xcbc-mac-04 */
 /* private allocations should use 249-255 (RFC2407) */
 #define SADB_X_AALG_MD5		249	/* Keyed MD5 */
