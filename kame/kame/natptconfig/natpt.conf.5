@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.16 2002/02/17 14:15:39 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.17 2002/10/02 10:17:39 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -273,7 +273,7 @@ Set the value to the variable.  Value can use decimal or hexadecimal
 The flag which does Protocol translation.  If this value is not zero,
 protocol translation is done.  Otherwise, protocol translation is not
 done.  This value is also set by
-.Sy map
+.Sq map
 subcommand.
 .It Sy debug
 This is for debug.
@@ -282,7 +282,7 @@ When set, dump mbuf or ip packet.  You must run natptlog command to
 show its dump.
 .It Sy prefix
 NAT-PT prefix. This value is set by
-.Sy prefix
+.Sq prefix
 subcommand.
 .El
 .Pp
@@ -291,7 +291,7 @@ command.
 .Dl # natptconfig show variables
 .Pp
 However, you cannot set all of the variables which can appear with
-.Sy show
+.Sq show
 subcommand.
 .El
 .\"
