@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.16 2001/08/01 00:53:50 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.17 2001/08/01 00:57:13 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -559,7 +559,7 @@ phys_status(force)
 	char pdstaddr[256];
 	char hostname[NI_MAXHOST];
 	int flags = NI_NUMERICHOST;
-	char *af;
+	char *af = "";
 #ifndef SIOCGLIFPHYADDR
 	u_long srccmd, dstcmd;
 	struct ifreq *ifrp;
@@ -590,14 +590,19 @@ phys_status(force)
 #endif /* INET6 */
 
 	if (0 <= ioctl(s, srccmd, (caddr_t)ifrp)) {
-#ifdef INET6
-		if (ifrp->ifr_addr.sa_family == AF_INET6)
-			af = "inet6";
-		else
+		switch (ifrp->ifr_addr.sa_family) {
+		case AF_INET:
 			af = "inet";
-#else
-		af = "inet";
-#endif /* INET6 */
+			break;
+#ifdef INET6
+		case AF_INET6:
+			af = "inet6";
+			break;
+#endif
+		default:
+			af = "";
+			break;
+		}
 		if (getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
 		    psrcaddr, sizeof(psrcaddr), 0, 0, flags) != 0)
 			psrcaddr[0] = '\0';
@@ -628,6 +633,9 @@ phys_status(force)
 			af = "inet6";
 			break;
 #endif /* INET6 */
+		default:
+			af = "";
+			break;
 		}
 		if (getnameinfo((struct sockaddr *)&iflr.addr, iflr.addr.ss_len,
 		    psrcaddr, sizeof(psrcaddr), 0, 0, flags) != 0)
