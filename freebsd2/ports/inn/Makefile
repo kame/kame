@@ -3,7 +3,7 @@
 # Date created:		20 Oct 1994 (1.4), 18 Dec 1996 (1.5.1), 14 Feb 1999 (2.2)
 # Whom:			torstenb
 #
-# $Id: Makefile,v 1.3 1999/12/22 12:33:45 itojun Exp $
+# $Id: Makefile,v 1.4 1999/12/25 13:55:27 itojun Exp $
 #
 
 DISTNAME=	inn-2.2.2
@@ -11,7 +11,7 @@ CATEGORIES=	news
 MASTER_SITES=	ftp://ftp.isc.org/isc/inn/
 
 PATCH_SITES=	ftp://ftp.north.ad.jp/pub/IPv6/INN/
-PATCHFILES=	inn-2.2.2-v6-19991221.diff.gz
+PATCHFILES=	inn-2.2.2-v6-19991224.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 # Based on torstenb's port (1999/05/02)
