@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.244 2001/07/22 15:57:29 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.245 2001/07/22 17:08:36 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -57,7 +57,7 @@ RFC2461: Neighbor discovery for IPv6
 RFC2462: IPv6 Stateless Address Autoconfiguration
     * See 1.4 in this document for details.
 RFC2463: ICMPv6 for IPv6 specification
-    * See 1.8 in this document for details.
+    * See 1.9 in this document for details.
 RFC2464: Transmission of IPv6 Packets over Ethernet Networks
 RFC2465: MIB for IPv6: Textual Conventions and General Group
     * Necessary statistics are gathered by the kernel.  Actual IPv6 MIB
