@@ -1136,7 +1136,8 @@ ipsecsetup(sep)
 		buf = ipsec_set_policy(policy_in, strlen(policy_in));
 		if (buf != NULL) {
 			if (setsockopt(sep->se_fd, level, opt,
-					buf, ipsec_get_policylen(buf)) < 0) {
+					buf, ipsec_get_policylen(buf)) < 0
+			 && sep->se_policy) {
 				syslog(LOG_ERR,
 					"%s/%s: ipsec initialization failed",
 					sep->se_service, sep->se_proto,
@@ -1156,7 +1157,8 @@ ipsecsetup(sep)
 		buf = ipsec_set_policy(policy_out, strlen(policy_out));
 		if (buf != NULL) {
 			if (setsockopt(sep->se_fd, level, opt,
-					buf, ipsec_get_policylen(buf)) < 0) {
+					buf, ipsec_get_policylen(buf)) < 0
+			 && sep->se_policy) {
 				syslog(LOG_ERR,
 					"%s/%s: ipsec initialization failed",
 					sep->se_service, sep->se_proto,
