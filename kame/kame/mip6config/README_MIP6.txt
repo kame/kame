@@ -1,3 +1,7 @@
+NOTE: this document is obsolete and out-of-sync with the currently implemented
+KAME mobile-ip6 code.  see mip6control/README instead.
+
+
 			DELIVERY NOTES FOR MOBILE IPv6
 			==============================
 
@@ -274,4 +278,4 @@
 	- Home Subnet Renumbering is not enabled in this first release
 	  (2001-03-16).
 
-$KAME: README_MIP6.txt,v 1.6 2001/05/17 02:20:22 keiichi Exp $
+$KAME: README_MIP6.txt,v 1.7 2001/11/21 06:36:11 itojun Exp $
