@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.29 2001/05/08 22:13:21 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.30 2001/05/10 01:40:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -98,14 +98,16 @@ static struct testitem{
 
 int main __P((int, char **));
 static void usage __P((void));
-static struct addrinfo *getres __P((int, const char *, const char *));
+static struct addrinfo *getres __P((int, const char *, const char *, int));
 static const char *printsa __P((struct sockaddr *, socklen_t));
 static const char *printres __P((struct addrinfo *));
 static int test __P((struct testitem *, struct testitem *));
-static void sendtest __P((int, int, struct testitem *));
-static void conntest __P((int, int, struct testitem *));
+static void sendtest __P((int, int, struct addrinfo *));
+static void conntest __P((int, int, struct addrinfo *));
 
 static char *port = NULL;
+static char *otheraddr = NULL;
+static struct addrinfo *oai;
 static int socktype = SOCK_DGRAM;
 static int v6only = 0;
 static int summary = 0;
@@ -124,7 +126,7 @@ main(argc, argv)
 	extern char *optarg;
 	struct testitem *testi, *testj;
 
-	while ((ch = getopt(argc, argv, "126AlPp:st")) != -1) {
+	while ((ch = getopt(argc, argv, "126Alo:Pp:st")) != -1) {
 		switch (ch) {
 		case '1':
 			connect1st = 1;
@@ -153,6 +155,9 @@ main(argc, argv)
 			errx(1, "SO_REUSEPORT is not supported");
 #endif
 			break;
+		case 'o':
+			otheraddr = optarg;
+			break;
 		case 'p':
 			port = strdup(optarg);
 			break;
@@ -168,8 +173,9 @@ main(argc, argv)
 		}
 	}
 
-	if (connect1st && connect2nd) {
-		fprintf(stderr, "-1 and -2 are exclusive.\n");
+	if ((connect1st && connect2nd) || (connect1st && otheraddr) ||
+	    (connect2nd && otheraddr)){
+		fprintf(stderr, "-1, -2, and -o are exclusive.\n");
 		exit(1);
 	}
 
@@ -184,8 +190,14 @@ main(argc, argv)
 	}
 
 	for (testi = testitems; testi->name; testi++) {
-		testi->res = getres(testi->family, testi->host, port);
+		testi->res = getres(testi->family, testi->host, port,
+				    AI_PASSIVE);
 		if (!testi->res)
+			errx(1, "getaddrinfo failed");
+	}
+
+	if (otheraddr != NULL) {
+		if ((oai = getres(AF_INET, otheraddr, port, 0)) == NULL)
 			errx(1, "getaddrinfo failed");
 	}
 
@@ -196,8 +208,16 @@ main(argc, argv)
 #ifdef IPV6_V6ONLY
 	printf("%s", v6only ? ", V6ONLY" : "");
 #endif
-	if (socktype == SOCK_STREAM && (connect1st != 0 || connect2nd != 0))
-		printf(", connect to %s", (connect1st != 0) ? "1st" : "2nd");
+	if (socktype == SOCK_STREAM &&
+	    (connect1st != 0 || connect2nd != 0 || otheraddr != NULL)) {
+		printf(", connect to ");
+		if (connect1st != 0)
+			printf("1st");
+		if (connect2nd != 0)
+			printf("2nd");
+		if (otheraddr != NULL)
+			printf("other");
+	}
 	if (socktype == SOCK_STREAM && delayedlisten == 1)
 		printf(", delayed listen");
 	putchar('\n');
@@ -221,11 +241,12 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: bindtest [-[1|2]6APlst] -p port\n");
+	fprintf(stderr,
+		"usage: bindtest [-[1|2]6APlst] [-o IPv4address] -p port\n");
 }
 
 static struct addrinfo *
-getres(af, host, port)
+getres(af, host, port, flags)
 	int af;
 	const char *host;
 	const char *port;
@@ -236,7 +257,7 @@ getres(af, host, port)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = af;
 	hints.ai_socktype = socktype;
-	hints.ai_flags = AI_PASSIVE;
+	hints.ai_flags = flags;
 	error = getaddrinfo(host, port, &hints, &res);
 	return res;
 }
@@ -431,11 +452,15 @@ test(t1, t2)
 		putchar('[');
 	if (socktype == SOCK_DGRAM) {
 		if (t1->host != NULL)
-			sendtest(sa, sb, t1);
+			sendtest(sa, sb, t1->res);
 		else if (summary)
 			putchar('-');
 		if (t2->host != NULL)
-			sendtest(sa, sb, t2);
+			sendtest(sa, sb, t2->res);
+		else if (summary)
+			putchar('-');
+		if (oai != NULL)
+			sendtest(sa, sb, oai);
 		else if (summary)
 			putchar('-');
 	} else if (reuseaddr != 0 || reuseport != 0) {
@@ -445,11 +470,15 @@ test(t1, t2)
 		 * succeeding sockets from being bound.
 		 */
 		if (t1->host != NULL && connect1st)
-			conntest(sa, sb, t1);
+			conntest(sa, sb, t1->res);
 		else if (summary)
 			putchar('-');
 		if (t2->host != NULL && connect2nd)
-			conntest(sa, sb, t2);
+			conntest(sa, sb, t2->res);
+		else if (summary)
+			putchar('-');
+		if (oai != NULL)
+			conntest(sa, sb, oai);
 		else if (summary)
 			putchar('-');
 	}
@@ -471,9 +500,9 @@ fail:
 }
 
 static void
-sendtest(sa, sb, t)
+sendtest(sa, sb, ai)
 	int sa, sb;
-	struct testitem *t;
+	struct addrinfo *ai;
 {
 	int s = -1, maxfd;
 	int i, cc, e;
@@ -485,8 +514,8 @@ sendtest(sa, sb, t)
 	struct sockaddr *from = (struct sockaddr *)&ss;
 	socklen_t fromlen;
 
-	if ((s = socket(t->res->ai_family, t->res->ai_socktype,
-			t->res->ai_protocol)) < 0) {
+	if ((s = socket(ai->ai_family, ai->ai_socktype,
+			ai->ai_protocol)) < 0) {
 		if (!summary) {
 			printf("\tfailed to open a socket for sending: %s\n",
 			       strerror(errno));
@@ -494,17 +523,17 @@ sendtest(sa, sb, t)
 			putchar('x');
 		goto done;
 	}
-	if ((sendto(s, buf, sizeof(buf), 0, t->res->ai_addr,
-		    t->res->ai_addrlen)) < 0) {
+	if ((sendto(s, buf, sizeof(buf), 0, ai->ai_addr,
+		    ai->ai_addrlen)) < 0) {
 		if (!summary) {
 			printf("\tfailed to send a packet to %s: %s\n",
-			       printres(t->res), strerror(errno));
+			       printres(ai), strerror(errno));
 		} else
 			putchar('x');
 		goto done;
 	} else if (!summary)
 		printf("\tsend %d bytes to %s\n", sizeof(buf),
-		       printres(t->res));
+		       printres(ai));
 
 	FD_ZERO(&fdset0);
 	FD_SET(sa, &fdset0);
@@ -584,9 +613,9 @@ sendtest(sa, sb, t)
 }
 
 static void
-conntest(sa, sb, t)
+conntest(sa, sb, ai)
 	int sa, sb;
-	struct testitem *t;
+	struct addrinfo *ai;
 {
 	int s = -1, maxfd;
 	int newsa = -1, newsb = -1;
@@ -616,8 +645,8 @@ conntest(sa, sb, t)
 		goto done;
 	}
 	
-	if ((s = socket(t->res->ai_family, t->res->ai_socktype,
-			t->res->ai_protocol)) < 0) {
+	if ((s = socket(ai->ai_family, ai->ai_socktype,
+			ai->ai_protocol)) < 0) {
 		if (!summary) {
 			printf("\tfailed to open a socket for connecting: %s\n",
 			       strerror(errno));
@@ -636,16 +665,16 @@ conntest(sa, sb, t)
 		goto done;
 	}
 
-	if ((connect(s, t->res->ai_addr, t->res->ai_addrlen)) < 0 &&
+	if ((connect(s, ai->ai_addr, ai->ai_addrlen)) < 0 &&
 	    errno != EINPROGRESS) {
 		if (!summary) {
 			printf("\tfailed to connect a packet to %s: %s\n",
-			       printres(t->res), strerror(errno));
+			       printres(ai), strerror(errno));
 		} else
 			putchar('c');
 		goto done;
 	} else if (!summary)
-		printf("\ttried to connect to %s\n", printres(t->res));
+		printf("\ttried to connect to %s\n", printres(ai));
 
 	FD_ZERO(&fdset0);
 	FD_SET(sa, &fdset0);
