@@ -1595,9 +1595,11 @@ icmp6_reflect(m, off)
 
 	if (src == 0)
 		/*
-		 * We have not multicast routing yet. So this case matches
-		 * to our multicast, our anycast or not to our unicast.
-		 * Select a source address which has the same scope.
+		 * This case matches to multicasts, our anycast, or unicasts
+		 * that we do not own. Select a source address which has the
+		 * same scope.
+		 * XXX: for (non link-local) multicast addresses, this might
+		 * not be a good choice.
 		 */
 		if ((ia = in6_ifawithscope(m->m_pkthdr.rcvif, &t)) != 0)
 			src = &IA6_SIN6(ia)->sin6_addr;
