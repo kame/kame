@@ -719,7 +719,8 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 			(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec%60));
 	fputc('\n', fp);
 	fprintf(fp, "%sStatistics:\n", indent);
-	fprintf(fp, "%s Connection retries: %d\n", bnp->rp_stat.rps_connretry);
+	fprintf(fp, "%s Connection retries: %d\n",
+		indent, bnp->rp_stat.rps_connretry);
 	if (bnp->rp_ebgp_as_prepends)
 		fprintf(fp, "%sour own AS number will be prepended "
 			"to each advertised AS path %d time%s\n", indent,
