@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.85 2001/07/17 02:05:20 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.86 2001/08/14 05:58:13 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -121,9 +121,6 @@ and
 is one of following:
 .Ic sec , secs , second , seconds , min , mins , minute , minutes ,
 .Ic hour , hours .
-.It Ar byteunit
-is one of following:
-.Ic B , byte , bytes , KB , MB , TB .
 .El
 .\"
 .Ss Path Specification
@@ -327,13 +324,11 @@ set this to off.
 The default is on.
 .\"
 .It Ic lifetime time Ar number Ar timeunit ;
-.It Ic lifetime byte Ar number Ar byteunit ;
-define a lifetime of a certain time or certain number of bytes
+define a lifetime of a certain time
 which will be proposed in the phase 1 negotiations.
 Any proposal will be accepted, and the attribute(s) will be not proposed to
 the peer if you do not specify it(them).
 They can be individually specified in each proposal.
-Note that the lifetime of bytes is unused right now.
 .\"
 .It Ic initial_contact (on \(ba off) ;
 enable this to send an INITIAL-CONTACT message.
@@ -449,7 +444,6 @@ Or you can define 1, 2, or 5 as the DH group number.
 When you want to use aggressive mode,
 you must define same DH group in each proposal.
 .It Ic lifetime time Ar number Ar timeunit ;
-.It Ic lifetime byte Ar number Ar byteunit ;
 define lifetime of the phase 1 SA proposal.
 Refer to the description of
 .Ic lifetime
@@ -517,8 +511,7 @@ is one of following:
 Or you can define 1, 2, or 5 as the DH group number.
 .\"
 .It Ic lifetime time Ar number Ar timeunit ;
-.It Ic lifetime byte Ar number Ar byteunit ;
-define the lifetime of amount of time or number of bytes
+define the lifetime of amount of time
 which are to be used IPsec-SA.
 Any proposal will be accepted, and no attribute(s) will be proposed to
 the peer if you do not specify it(them).
@@ -684,7 +677,6 @@ sainfo anonymous
 {
 	pfs_group 2;
 	lifetime time 12 hour ;
-	lifetime byte 50 MB ;
 	encryption_algorithm 3des, blowfish, twofish, rijndael ;
 	authentication_algorithm hmac_sha1, hmac_md5 ;
 	compression_algorithm deflate ;
