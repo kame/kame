@@ -45,7 +45,7 @@ LDADD+=-ly -ll
 YFLAGS+=-d
 CLEANFILES+=	y.tab.h
 
-MAN=	pim6sd.8 pim6sd.conf.5
+MAN=	pim6stat.1 pim6sd.8 pim6sd.conf.5
 
 afterinstall:
 	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
