@@ -212,15 +212,18 @@ char *ifname(ifp)
 	struct ifnet *ifp;
 {
 	static char buf[BUFSIZ];
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 	struct ifnet ifnet;
+#if !(defined(__NetBSD__) || defined(__OpenBSD__))
+	char ifnamebuf[IFNAMSIZ];
 #endif
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 	KREAD(ifp, &ifnet, struct ifnet);
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	strncpy(buf, ifnet.if_xname, BUFSIZ);
 #else
-	KREAD(ifp->if_name, buf, IFNAMSIZ);
+	KREAD(ifnet.if_name, ifnamebuf, sizeof(ifnamebuf));
+	snprintf(buf, sizeof(buf), "%s%d", ifnamebuf,
+		 ifnet.if_unit); /* does snprintf allow overlap copy?? */
 #endif
 	return buf;
 }
