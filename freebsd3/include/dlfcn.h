@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: dlfcn.h,v 1.2 1998/02/11 05:19:10 jdp Exp $
+ * $FreeBSD: src/include/dlfcn.h,v 1.2.2.2 1999/12/17 01:39:41 jkh Exp $
  */
 
 #ifndef _DLFCN_H_
@@ -38,10 +38,12 @@
 #include <sys/cdefs.h>
 
 /*
- * Modes for dlopen().
+ * Modes and flags for dlopen().
  */
 #define RTLD_LAZY	1	/* Bind function calls lazily */
 #define RTLD_NOW	2	/* Bind function calls immediately */
+#define RTLD_MODEMASK	0x3
+#define RTLD_GLOBAL	0x100	/* Make symbols globally available */
 
 /*
  * Special handle argument for dlsym().  It causes the search for the

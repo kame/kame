@@ -1,4 +1,4 @@
-/*	$Id: nl_types.h,v 1.5.2.1 1999/05/08 05:50:40 jkh Exp $ */
+/* $FreeBSD: src/include/nl_types.h,v 1.5.2.2 1999/08/29 14:38:53 peter Exp $ */
 
 /***********************************************************
 Copyright 1990, by Alfalfa Software Incorporated, Cambridge, Massachusetts.

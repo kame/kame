@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: elf.h,v 1.2 1998/09/05 00:53:53 jdp Exp $
+ * $FreeBSD: src/include/elf.h,v 1.2.2.1 1999/08/29 14:38:49 peter Exp $
  */
 
 #ifndef	_ELF_H_
