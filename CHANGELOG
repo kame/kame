@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1326 2000/10/09 18:50:36 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1327 2000/10/09 18:53:23 sumikawa Exp $
 
 <200010>
+Tue Oct 10 03:50:32 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/wu-ftpd: upgrade to latest IPv6 patch. EPSV now
+	works. TODO: -s speaks IPv4 only.
+
 Sat Oct  7 16:01:12 JST 2000  itojun@iijlab.net
 	* ping6, traceroute, traceroute6, mtrace6, icmp6dump: plug fd_set hole.
 	  see openbsd select(2).  from deraadt@openbsd.
