@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/07/03 04:52:09 $
+		     $Date: 2000/07/03 05:02:25 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -486,19 +486,6 @@ to be AH transport mode inner ESP tunnel mode like below.
 	    | |                 |                    |
 	    | ======= ESP =======                    |
 	    ==================== AH ==================
-
-
-<<<NATv4>>>
-
-To configure and control NAT, use the "pma" command. 
-
-# pma interface ef1 external
-# pma global ef1 198.76.28.0/24
-# pma nat 172.16.11.1    to 198.76.28.1
-# pma nat 172.16.12.0/24 to 198.76.28.128 port 32768-65535
-# pma nat enable
-
-For more information, please refer to the "pma" man page.
 
 
 <<<mobile-ip6>>>
