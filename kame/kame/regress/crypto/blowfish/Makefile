@@ -1,3 +1,5 @@
+#	$KAME: Makefile,v 1.2 2000/11/01 15:25:50 itojun Exp $
+
 .include "../Makefile.inc"
 .include <bsd.own.mk>
 
