@@ -324,11 +324,15 @@ icmp6_print(register const u_char *bp, register const u_char *bp2)
 	    {
 		int siz;
 		siz = ep - (u_char *)(dp + 1);
+		if (icmp6len > ep - (u_char *)dp) {
+			printf("[|icmp6: who-are-you/FQDN request]");
+			break;
+		}
 		if (siz == 4)
 			printf("icmp6: who-are-you request");
 		else {
 			printf("icmp6: FQDN request");
-			if (vflag) {
+			if (vflag && icmp6len == ep - (u_char *)dp) {
 				if (siz < 8)
 					printf("?(icmp6_data %d bytes)", siz);
 				else if (8 < siz)
@@ -342,19 +346,20 @@ icmp6_print(register const u_char *bp, register const u_char *bp2)
 	case ICMP6_WRUREPLY:	/*ICMP6_FQDN_REPLY*/
 	    {
 		enum { UNKNOWN, WRU, FQDN } mode = UNKNOWN;
-		u_char const *buf;
-		u_char const *cp = NULL;
+		const u_char *buf;
+		const u_char *cp = NULL;
+		const char *modename = NULL;
 
 		buf = (u_char *)(dp + 1);
 
 		/* fair guess */
-		if (buf[12] == ep - buf - 13)
+		if (ep - buf > 12 && buf[12] == ep - buf - 13)
 			mode = FQDN;
 		else if (dp->icmp6_code == 1)
 			mode = FQDN;
 
 		/* wild guess */
-		if (mode == UNKNOWN) {
+		if (mode == UNKNOWN && ep - buf > 4) {
 			cp = buf + 4;
 			while (cp < ep) {
 				if (!isprint(*cp++))
@@ -364,18 +369,29 @@ icmp6_print(register const u_char *bp, register const u_char *bp2)
 #ifndef abs
 #define abs(a)	((0 < (a)) ? (a) : -(a))
 #endif
-		if (mode == UNKNOWN && 2 < abs(buf[12] - (ep - buf - 13)))
+		if (mode == UNKNOWN && ep - buf > 12 &&
+		    2 < abs(buf[12] - (ep - buf - 13))) {
 			mode = WRU;
+		}
 		if (mode == UNKNOWN)
 			mode = FQDN;
 
 		if (mode == WRU) {
-			cp = buf + 4;
-			printf("icmp6: who-are-you reply(\"");
+			if (ep - buf > 12 && buf[12] == ep - buf - 13)
+				cp = buf + 4;
+			else
+				cp = ep + 1;	/*truncated*/
+			modename = "icmp6: who-are-you reply";
 		} else if (mode == FQDN) {
 			cp = buf + 13;
-			printf("icmp6: FQDN reply(\"");
+			modename = "icmp6: FQDN reply";
 		}
+		if (icmp6len > ep - (u_char *)dp) {
+			printf("[|%s]", modename);
+			break;
+		}
+		printf("%s", modename);
+		printf("(\"");	/*)*/
 		for (; cp < ep; cp++)
 			printf((isprint(*cp) ? "%c" : "\\%03o"), *cp);
 		printf("\"");
@@ -397,6 +413,7 @@ icmp6_print(register const u_char *bp, register const u_char *bp2)
 				}
 			}
 		}
+		/*(*/
 		printf(")");
 		break;
 	    }
