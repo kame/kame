@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.2 2001/10/11 12:58:22 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.3 2001/10/24 07:10:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,7 +41,9 @@
 #include <netdb.h>
 
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
+#endif
 #include <net/if_hif.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -67,10 +69,17 @@ static const char *ha_desc[] = {
 	"lladdr\t\tgaddr\t\tflags\tpref\tlifetim\tltrem\n",
 	"lladdr\t\t\t\tgaddr\t\t\t\tflags\tpref\tlifetim\tltrem\n"
 };
+#ifdef MIP6_DRAFT13
 static const char *bc_desc[] = {
 	"phaddr\t\tpcoa\t\taddr\t\tflags\tplen\tseqno\tlifetim\tltrem\tstats\n",
 	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tplen\tseqno\tlifetim\tltrem\tstats\n"
 };
+#else
+static const char *bc_desc[] = {
+	"phaddr\t\tpcoa\t\taddr\t\tflags\tseqno\tlifetim\tltrem\tstats\n",
+	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tseqno\tlifetim\tltrem\tstats\n"
+};
+#endif /* MIP6_DRAFT13 */
 static const char *ipaddr_fmt[] = {
 	"%15.15s ",
 	"%31.31s "
@@ -366,9 +375,16 @@ main(argc, argv)
 			       ip6_sprintf(&mrbc->pcoa.sin6_addr));
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mrbc->addr.sin6_addr));
-			printf("%7x %7u %7u %7u %7qd %7x\n",
+			printf(
+#ifdef MIP6_DRAFT13
+			       "%7x %7u %7u %7u %7qd %7x\n",
+#else
+			       "%7x %7u %7u %7qd %7x\n",
+#endif /* MIP6_DRAFT13 */
 			       mrbc->flags,
+#ifdef MIP6_DRAFT13
 			       mrbc->prefixlen,
+#endif /* MIP6_DRAFT13 */
 			       mrbc->seqno,
 			       mrbc->lifetime,
 			       mrbc->remain,
