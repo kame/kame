@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1281 2000/09/18 22:45:41 itojun Exp $
+$KAME: CHANGELOG,v 1.1282 2000/09/19 18:13:24 itojun Exp $
 
 <200009>
+Wed Sep 20 03:10:09 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: make proposal/combination payload on SADB_ACQUIRE
+	  message (kernel -> userland) optional, to support ipcomp ACQUIRE
+	  messages.  this makes KAME PF_KEY to violate RFC2367.  however,
+	  as ipcomp is not covered by RFC2367, and we have no other choice.
+	* netbsd/sys/netinet/tcp_subr.c: allocate mbuf cluster for tcp header
+	  template, only when necessary.   this avoids too aggressive memory
+	  usage on heavy load web server, for example.
+	  From: Kevin Lahey <kml@dotrocket.com>
+	 
 Tue Sep 19 07:43:42 JST 2000  itojun@iijlab.net
 	* freebsd[234], bsdi[34] tcp code: repair IPsec header size prediction
 	  (which avoids fragmentation on IPsec'ed TCP packet).
