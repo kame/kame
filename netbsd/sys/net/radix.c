@@ -49,6 +49,7 @@ __KERNEL_RCSID(0, "$NetBSD: radix.c,v 1.18 2001/11/12 23:49:47 lukem Exp $");
 #include <sys/malloc.h>
 #define	M_DONTWAIT M_NOWAIT
 #include <sys/domain.h>
+#include <netinet/ip_encap.h>
 #else
 #include <stdlib.h>
 #endif
@@ -962,6 +963,7 @@ rn_init()
 	for (dom = domains; dom; dom = dom->dom_next)
 		if (dom->dom_maxrtkey > max_keylen)
 			max_keylen = dom->dom_maxrtkey;
+	encap_setkeylen();
 #endif
 	if (max_keylen == 0) {
 		log(LOG_ERR,

@@ -41,6 +41,7 @@
 #include <sys/malloc.h>
 #define	M_DONTWAIT M_NOWAIT
 #include <sys/domain.h>
+#include <netinet/ip_encap.h>
 #else
 #include <stdlib.h>
 #include <stdlib.h>
@@ -988,6 +989,7 @@ rn_init()
 	for (dom = domains; dom; dom = dom->dom_next)
 		if (dom->dom_maxrtkey > max_keylen)
 			max_keylen = dom->dom_maxrtkey;
+	encap_setkeylen();
 #endif
 	if (max_keylen == 0) {
 		log(LOG_ERR,
