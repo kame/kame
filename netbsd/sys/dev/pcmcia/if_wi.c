@@ -437,7 +437,18 @@ static void wi_rxeof(sc)
 #endif
 
 	/* Receive packet. */
+#if 0
+	/* NetBSD-current */
 	(*ifp->if_input)(ifp, m);
+#else
+    {
+	/* NetBSD 1.4.1 */
+	struct ether_header *eh;
+	eh = mtod(m, struct ether_header *);
+	m_adj(m, sizeof(struct ether_header));
+	ether_input(ifp, eh, m);
+    }
+#endif
 }
 
 static void wi_txeof(sc, status)

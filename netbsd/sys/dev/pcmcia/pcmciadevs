@@ -55,6 +55,7 @@ vendor MEGAHERTZ2		0x0128	Megahertz Corporation
 vendor ADAPTEC			0x012f	Adaptec Corporation
 vendor LINKSYS			0x0149	Linksys Corporation
 vendor SIMPLETECH		0x014d	Simple Technology
+vendor LUCENT			0x0156	Lucent Technologies
 vendor DAYNA			0x0194	Dayna Corporation
 vendor IODATA			0x01bf	I-O DATA
 vendor COMPEX			0x8a01	Compex Corporation
@@ -156,6 +157,8 @@ vendor SVEC			-1	SVEC/Hawking Technology
 
 product MEGAHERTZ XJ2288 	{ "MEGAHERTZ", "MODEM&spXJ2288", NULL, NULL } Megahertz XJ2288 Modem
 product PREMAX PE200		{ "PMX&sp&sp&sp", "PE-200", NULL, NULL } PreMax PE-200
+/* Lucent WaveLAN/IEEE */
+product LUCENT WAVELAN_IEEE	0x0002	WaveLAN/IEEE
 product PLANET SMARTCOM2000	{ "PCMCIA", "UE2212", NULL, NULL } Planet SmartCOM 2000
 product DLINK DE650		{ "D-Link", "DE-650", NULL, NULL } D-Link DE-650
 product DLINK DE660		{ "D-Link", "DE-660", NULL, NULL } D-Link DE-660

@@ -1,4 +1,4 @@
-/*	$NetBSD: pcmciadevs_data.h,v 1.36.2.1 1999/04/27 13:54:48 perry Exp $	*/
+/*	$NetBSD$	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
@@ -332,6 +332,13 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    "PreMax PE-200"	},
 	},
 	{
+	    PCMCIA_VENDOR_LUCENT, PCMCIA_PRODUCT_LUCENT_WAVELAN_IEEE,
+	    PCMCIA_CIS_LUCENT_WAVELAN_IEEE,
+	    0,
+	    "Lucent Technologies",
+	    "WaveLAN/IEEE"	},
+	},
+	{
 	    PCMCIA_VENDOR_UNKNOWN, PCMCIA_PRODUCT_PLANET_SMARTCOM2000,
 	    PCMCIA_CIS_PLANET_SMARTCOM2000,
 	    0,
@@ -518,6 +525,13 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    PCMCIA_KNOWNDEV_NOPROD,
 	    PCMCIA_CIS_INVALID,
 	    "Simple Technology",
+	    NULL,
+	},
+	{
+	    PCMCIA_VENDOR_LUCENT, 0,
+	    PCMCIA_KNOWNDEV_NOPROD,
+	    PCMCIA_CIS_INVALID,
+	    "Lucent Technologies",
 	    NULL,
 	},
 	{

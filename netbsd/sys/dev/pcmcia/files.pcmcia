@@ -63,3 +63,9 @@ file	dev/pcmcia/pcmcom.c			pcmcom | com_pcmcom needs-flag
 device	cnw: arp, ether, ifnet
 attach	cnw at pcmcia
 file	dev/pcmcia/if_cnw.c			cnw
+
+# Lucent WaveLan IEEE (802.11)
+device wi: arp, ether, ifnet
+attach wi at pcmcia
+file	dev/pcmcia/if_wi.c			wi
+
