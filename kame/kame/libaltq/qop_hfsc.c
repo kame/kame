@@ -1,4 +1,4 @@
-/*	$KAME: qop_hfsc.c,v 1.6 2001/08/16 10:39:14 kjc Exp $	*/
+/*	$KAME: qop_hfsc.c,v 1.7 2001/12/03 08:20:55 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -122,7 +122,7 @@ hfsc_interface_parser(const char *ifname, int argc, char **argv)
 		} else if (EQUAL(*argv, "hfsc")) {
 			/* just skip */
 		} else {
-			LOG(LOG_ERR, 0, "Unknown keyword '%s'", argv);
+			LOG(LOG_ERR, 0, "Unknown keyword '%s'", *argv);
 			return (0);
 		}
 		argc--; argv++;
