@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.242 2002/04/22 09:39:06 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.243 2002/04/22 12:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -251,11 +251,6 @@ nd6_ifattach(ifp)
 		panic("nd6_ifattach: ifindex2ifnet is NULL");
 #endif
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-	ND.linkmtu = ifnet_byindex(ifp->if_index)->if_mtu;
-#else
-	ND.linkmtu = ifindex2ifnet[ifp->if_index]->if_mtu;
-#endif
 	ND.chlim = IPV6_DEFHLIM;
 	ND.basereachable = REACHABLE_TIME;
 	ND.reachable = ND_COMPUTE_RTIME(ND.basereachable);
@@ -268,6 +263,7 @@ nd6_ifattach(ifp)
 	 */
 	ND.flags = ND6_IFF_PERFORMNUD | ND6_IFF_ACCEPT_RTADV;
 	nd6_setmtu(ifp);
+	ND.linkmtu = ND.maxmtu;
 #undef ND
 }
 
@@ -283,8 +279,6 @@ nd6_setmtu(ifp)
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
 	struct nd_ifinfo *ndi = &nd_ifinfo[ifp->if_index];
-	u_long oldmaxmtu = ndi->maxmtu;
-	u_long oldlinkmtu = ndi->linkmtu;
 
 	switch (ifp->if_type) {
 	case IFT_ARCNET:	/* XXX MTU handling needs more work */
@@ -320,29 +314,9 @@ nd6_setmtu(ifp)
 		break;
 	}
 
-	if (oldmaxmtu != ndi->maxmtu) {
-		/*
-		 * If the ND level MTU is not set yet, or if the maxmtu
-		 * is reset to a smaller value than the ND level MTU,
-		 * also reset the ND level MTU.
-		 */
-		if (ndi->linkmtu == 0 ||
-		    ndi->maxmtu < ndi->linkmtu) {
-			ndi->linkmtu = ndi->maxmtu;
-			/* also adjust in6_maxmtu if necessary. */
-			if (oldlinkmtu == 0) {
-				/*
-				 * XXX: the case analysis is grotty, but
-				 * it is not efficient to call in6_setmaxmtu()
-				 * here when we are during the initialization
-				 * procedure.
-				 */
-				if (in6_maxmtu < ndi->linkmtu)
-					in6_maxmtu = ndi->linkmtu;
-			} else
-				in6_setmaxmtu();
-		}
-	}
+	if (ndi->maxmtu > in6_maxmtu)
+		in6_setmaxmtu(); /* check all interfaces just in case */
+
 #undef MIN
 }
 

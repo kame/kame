@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.300 2002/04/12 16:08:22 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.301 2002/04/22 12:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1459,7 +1459,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 	if (rt && (rt->rt_flags & RTF_HOST) &&
 	    !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
 	    mtu < rt->rt_rmx.rmx_mtu) {
-		if (mtu < nd_ifinfo[rt->rt_ifp->if_index].linkmtu) {
+		if (mtu < IN6_LINKMTU(rt->rt_ifp)) {
 			icmp6stat.icp6s_pmtuchg++;
 			rt->rt_rmx.rmx_mtu = mtu;
 
@@ -3661,19 +3661,16 @@ icmp6_mtudisc_timeout(rt, r)
 		panic("icmp6_mtudisc_timeout: bad route to timeout");
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 	if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
-		rt->rt_rmx.rmx_mtu = nd_ifinfo[rt->rt_ifp->if_index].linkmtu;
+		rt->rt_rmx.rmx_mtu = IN6_LINKMTU(rt->rt_ifp);
 #else  /* i.e. netbsd and openbsd */
 	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) ==
 	    (RTF_DYNAMIC | RTF_HOST)) {
 		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
 		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 	} else {
-		if (!(rt->rt_rmx.rmx_locks & RTV_MTU)) {
-			rt->rt_rmx.rmx_mtu =
-				nd_ifinfo[rt->rt_ifp->if_index].linkmtu;
-		}
+		if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
+			rt->rt_rmx.rmx_mtu = IN6_LINKMTU(rt->rt_ifp);
 	}
-
 #endif
 }
 #endif

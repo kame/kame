@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.296 2002/04/19 07:30:00 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.297 2002/04/22 12:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1325,7 +1325,7 @@ skip_ipsec2:;
 	 * spec.)
 	 */
 	if (opt && (opt->ip6po_flags & IP6PO_DONTFRAG) &&
-	    tlen > nd_ifinfo[ifp->if_index].linkmtu
+	    tlen > IN6_LINKMTU(ifp)
 #ifdef notyet
 	    && !(ifp->if_flags & IFF_FRAGMENTABLE)
 #endif
@@ -1799,7 +1799,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 
 		if (ifp == NULL)
 			ifp = ro_pmtu->ro_rt->rt_ifp;
-		ifmtu = nd_ifinfo[ifp->if_index].linkmtu;
+		ifmtu = IN6_LINKMTU(ifp);
 		mtu = ro_pmtu->ro_rt->rt_rmx.rmx_mtu;
 		if (mtu > ifmtu || mtu == 0) {
 			/*
@@ -1820,7 +1820,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 			 }
 		}
 	} else if (ifp) {
-		mtu = nd_ifinfo[ifp->if_index].linkmtu;
+		mtu = IN6_LINKMTU(ifp);
 	} else
 		error = EHOSTUNREACH; /* XXX */
 

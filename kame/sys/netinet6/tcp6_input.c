@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.54 2002/02/08 09:56:03 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.55 2002/04/22 12:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2181,7 +2181,7 @@ tcp6_peer_mss(t6p, offer)
 #endif /* RTV_MTU */
 	{
 #if 1
-		mss = nd_ifinfo[ifp->if_index].linkmtu;
+		mss = IN6_LINKMTU(ifp);
 #else
 		mss = ifp->if_mtu;
 #endif
@@ -2270,7 +2270,7 @@ tcp6_send_mss(t6p)
 			mss = tcp6_mssdflt + sizeof(struct ip6tcp);
 	} else if ((ifp->if_flags & IFF_LOOPBACK) || mss == 0) {
 #if 1
-		mss = nd_ifinfo[ifp->if_index].linkmtu;
+		mss = IN6_LINKMTU(ifp);
 #else
 		mss = ifp->if_mtu;
 #endif

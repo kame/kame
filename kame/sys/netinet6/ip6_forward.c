@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.99 2002/04/12 05:11:46 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.100 2002/04/22 12:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -497,7 +497,7 @@ ip6_forward(m, srcrt)
 		return;
 	}
 
-	if (m->m_pkthdr.len > nd_ifinfo[rt->rt_ifp->if_index].linkmtu) {
+	if (m->m_pkthdr.len > IN6_LINKMTU(rt->rt_ifp)) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_toobig);
 		if (mcopy) {
 			u_long mtu;
@@ -507,7 +507,7 @@ ip6_forward(m, srcrt)
 			size_t ipsechdrsiz;
 #endif
 
-			mtu = nd_ifinfo[rt->rt_ifp->if_index].linkmtu;
+			mtu = IN6_LINKMTU(rt->rt_ifp);
 #ifdef IPSEC
 			/*
 			 * When we do IPsec tunnel ingress, we need to play

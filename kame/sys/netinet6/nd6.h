@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.82 2002/04/22 09:39:06 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.83 2002/04/22 12:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,6 +98,11 @@ struct nd_ifinfo {
 #define ND6_IFF_PERFORMNUD	0x1
 #define ND6_IFF_ACCEPT_RTADV	0x2
 #define ND6_IFF_PREFER_SOURCE	0x4 /* XXX: not related to ND. */
+
+#define IN6_LINKMTU(ifp) ((nd_ifinfo[(ifp)->if_index].linkmtu && \
+			   nd_ifinfo[(ifp)->if_index].linkmtu < (ifp)->if_mtu) ? \
+			  nd_ifinfo[(ifp)->if_index].linkmtu : \
+			  (ifp)->if_mtu)
 
 struct in6_nbrinfo {
 	char ifname[IFNAMSIZ];	/* if name, e.g. "en0" */

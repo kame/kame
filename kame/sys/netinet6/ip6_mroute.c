@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.64 2002/04/12 05:11:46 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.65 2002/04/22 12:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1706,7 +1706,7 @@ phyint_send(ip6, mifp, m, src, dst)
 	 * Put the packet into the sending queue of the outgoing interface
 	 * if it would fit in the MTU of the interface.
 	 */
-	linkmtu = nd_ifinfo[ifp->if_index].linkmtu;
+	linkmtu = IN6_LINKMTU(ifp);
 	if (mb_copy->m_pkthdr.len < linkmtu || linkmtu < IPV6_MMTU) {
 		/*
 		 * We just call if_output instead of nd6_output here, since

@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.14 2002/04/12 05:11:46 jinmei Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.15 2002/04/22 12:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,7 +183,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 
 	if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU)
 	    && rt->rt_ifp)
-		rt->rt_rmx.rmx_mtu = nd_ifinfo[rt->rt_ifp->if_index].linkmtu;
+		rt->rt_rmx.rmx_mtu = IN6_LINKMTU(rt->rt_ifp);
 
 	ret = rn_addroute(v_arg, n_arg, head, treenodes);
 	if (ret == NULL && rt->rt_flags & RTF_HOST) {

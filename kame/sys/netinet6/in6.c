@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.269 2002/03/21 02:47:31 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.270 2002/04/22 12:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2838,10 +2838,10 @@ in6_setmaxmtu()
 #endif
 	{
 		if ((ifp->if_flags & IFF_LOOPBACK) == 0 &&
-		    nd_ifinfo[ifp->if_index].linkmtu > maxmtu)
-			maxmtu =  nd_ifinfo[ifp->if_index].linkmtu;
+		    IN6_LINKMTU(ifp) > maxmtu)
+			maxmtu =  IN6_LINKMTU(ifp);
 	}
-	if (maxmtu)	/* update only when maxmtu is positive */
+	if (maxmtu)	     /* update only when maxmtu is positive */
 		in6_maxmtu = maxmtu;
 }
 
