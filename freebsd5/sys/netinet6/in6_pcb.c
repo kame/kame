@@ -407,6 +407,9 @@ in6_pcbdisconnect(inp)
 	/* clear flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 	inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 	in_pcbrehash(inp);
+#ifdef IPSEC
+	ipsec_pcbdisconn(inp->inp_sp);
+#endif
 	if (inp->inp_socket->so_state & SS_NOFDREF)
 		in6_pcbdetach(inp);
 }

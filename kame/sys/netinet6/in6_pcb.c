@@ -502,11 +502,11 @@ in6_pcbdisconnect(in6p)
 	in6p->in6p_fport = 0;
 	/* clear flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 	in6p->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
-	if (in6p->in6p_socket->so_state & SS_NOFDREF)
-		in6_pcbdetach(in6p);
 #ifdef IPSEC
 	ipsec_pcbdisconn(in6p->in6p_sp);
 #endif
+	if (in6p->in6p_socket->so_state & SS_NOFDREF)
+		in6_pcbdetach(in6p);
 }
 
 void

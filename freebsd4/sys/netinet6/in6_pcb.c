@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.57 2003/09/06 02:49:09 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.58 2003/09/21 09:51:54 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -404,6 +404,9 @@ in6_pcbdisconnect(inp)
 	/* clear flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 	inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 	in_pcbrehash(inp);
+#ifdef IPSEC
+	ipsec_pcbdisconn(inp->inp_sp);
+#endif
 	if (inp->inp_socket->so_state & SS_NOFDREF)
 		in6_pcbdetach(inp);
 }

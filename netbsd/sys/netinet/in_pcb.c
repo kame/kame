@@ -479,11 +479,11 @@ in_pcbdisconnect(v)
 	inp->inp_faddr = zeroin_addr;
 	inp->inp_fport = 0;
 	in_pcbstate(inp, INP_BOUND);
-	if (inp->inp_socket->so_state & SS_NOFDREF)
-		in_pcbdetach(inp);
 #ifdef IPSEC
 	ipsec_pcbdisconn(inp->inp_sp);
 #endif
+	if (inp->inp_socket->so_state & SS_NOFDREF)
+		in_pcbdetach(inp);
 }
 
 void
