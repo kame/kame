@@ -1,3 +1,5 @@
+/*	$KAME: libtest.c,v 1.9 2000/11/23 22:58:55 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -25,9 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-/*
- * $Id: libtest.c,v 1.8 2000/11/09 07:54:52 itojun Exp $
  */
 
 #include <sys/types.h>
