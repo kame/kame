@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.141 2002/08/08 08:49:03 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.142 2002/08/09 11:30:19 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1189,18 +1189,6 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 		icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
 		break;
 
-	case ICMP_UNREACH:
-	case ICMP_TIMXCEED:
-		if ((cv4->flags & NATPT_noFootPrint) == 0) {
-			struct udphdr	*icmpudp6;
-
-			icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 +
-						     sizeof(struct ip6_hdr));
-			icmpudp6->uh_sport = pad->port[0];
-			icmpudp6->uh_dport = pad->port[1];
-		}
-		break;
-
 	case ICMP_PARAMPROB:
 		icmp4 = cv4->pyld.icmp4;
 		icmp6 = cv6->pyld.icmp6;
@@ -1215,6 +1203,18 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 				(sizeof(struct ip6_hdr) - sizeof(struct ip));
 
 		HTONL(icmp6->icmp6_pptr);
+		/* FALLTHROUGH */
+
+	case ICMP_UNREACH:
+	case ICMP_TIMXCEED:
+		if ((cv4->flags & NATPT_noFootPrint) == 0) {
+			struct udphdr	*icmpudp6;
+
+			icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 +
+						     sizeof(struct ip6_hdr));
+			icmpudp6->uh_sport = pad->port[0];
+			icmpudp6->uh_dport = pad->port[1];
+		}
 		break;
 	}
 

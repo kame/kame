@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.65 2002/08/09 11:28:12 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.66 2002/08/09 11:30:19 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -261,7 +261,9 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		/* regular packet */
 		cv4.ats = natpt_lookForHash4(&cv4);
 		if ((cv4.ats == NULL)
-		    && (cv4.ip_p == IPPROTO_ICMP)) {
+		    && (cv4.ip_p == IPPROTO_ICMP)
+		    && (cv4.pyld.icmp4->icmp_type != ICMP_ECHOREPLY)
+		    && (cv4.pyld.icmp4->icmp_type != ICMP_ECHO)) {
 			cv4.ats = natpt_checkICMP(&cv4);
 		}
 
