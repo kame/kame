@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.249 2002/01/11 08:36:30 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.250 2002/01/11 15:49:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1061,30 +1061,6 @@ ip6_input(m)
 	}
 
  processpacket:
-#endif
-
-#if 0
-    {
-	/*
-	 * Last resort: check in6_ifaddr for incoming interface.
-	 * The code is here until I update the "goto ours hack" code above
-	 * working right.
-	 */
-	struct ifaddr *ifa;
-	for (ifa = m->m_pkthdr.rcvif->if_addrlist.tqh_first;
-	     ifa;
-	     ifa = ifa->ifa_list.tqe_next) {
-		if (ifa->ifa_addr == NULL)
-			continue;	/* just for safety */
-		if (ifa->ifa_addr->sa_family != AF_INET6)
-			continue;
-		if (IN6_ARE_ADDR_EQUAL(IFA_IN6(ifa), &ip6->ip6_dst)) {
-			ours = 1;
-			deliverifp = ifa->ifa_ifp;
-			goto hbhcheck;
-		}
-	}
-    }
 #endif
 
 	/*
