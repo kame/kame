@@ -1,4 +1,4 @@
-/*	$KAME: addrselect.c,v 1.8 2001/12/20 08:55:28 jinmei Exp $	*/
+/*	$KAME: addrselect.c,v 1.9 2001/12/21 08:24:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -456,12 +456,12 @@ flush_policy()
 static void
 usage()
 {
-	fprintf(stderr, "usage: addrselect [show]\n");
-	fprintf(stderr, "       addrselect add "
+	fprintf(stderr, "usage: ip6addrctl [show]\n");
+	fprintf(stderr, "       ip6addrctl add "
 		"<prefix> <precedence> <label>\n");
-	fprintf(stderr, "       addrselect delete <prefix>\n");
-	fprintf(stderr, "       addrselect flush\n");
-	fprintf(stderr, "       addrselect install <configfile>\n");
+	fprintf(stderr, "       ip6addrctl delete <prefix>\n");
+	fprintf(stderr, "       ip6addrctl flush\n");
+	fprintf(stderr, "       ip6addrctl install <configfile>\n");
 
 	exit(1);
 }

@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.1 2001/09/24 16:01:23 jinmei Exp $
+#	$KAME: Makefile,v 1.2 2001/12/21 08:24:22 jinmei Exp $
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,8 @@
 .endif
 
 BINDIR=	$(PREFIX)/sbin
-PROG=	addrselect
+SRCS=	addrselect.c
+PROG=	ip6addrctl
 
 .if (${OPSYS} != "NetBSD")
 CFLAGS+=-Wall
