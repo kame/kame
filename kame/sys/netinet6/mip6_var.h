@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.13 2001/11/29 04:38:39 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.14 2001/12/05 08:10:00 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -145,10 +145,12 @@ struct mip6_bc {
 	struct ifnet          *mbc_ifp;      /* ifp that the BC belongs to. */
 	                                     /* valid only when BUF_HOME. */
 	const struct encaptab *mbc_encap;    /* encapsulation from MN */
+	void		      *mbc_dad;	     /* dad handler */
 };
 
 #define MIP6_BC_STATE_BA_WAITSENT 0x01
 #define MIP6_BC_STATE_BR_WAITSENT 0x02
+#define MIP6_BC_STATE_DAD_WAIT	  0x04
 
 #define MIP6_BA_STATUS_ACCEPTED              0
 #define MIP6_BA_STATUS_UNSPECIFIED           128

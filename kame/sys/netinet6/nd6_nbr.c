@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.80 2001/11/21 06:41:12 k-sugyou Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.81 2001/12/05 08:10:00 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -253,6 +253,11 @@ nd6_ns_input(m, off, icmp6len)
 		if (rt)
 			rtfree(rt);
 	}
+#ifdef MIP6
+	if (!ifa) {
+		ifa = mip6_dad_find(&taddr6);
+	}
+#endif
 	if (!ifa) {
 		/*
 		 * We've got an NS packet, and we don't have that adddress
@@ -671,6 +676,11 @@ nd6_na_input(m, off, icmp6len)
 	}
 
 	ifa = (struct ifaddr *)in6ifa_ifpwithaddr(ifp, &taddr6);
+#ifdef MIP6
+	if (!ifa) {
+		ifa = mip6_dad_find(&taddr6);
+	}
+#endif
 
 	/*
 	 * Target address matches one of my interface address.
@@ -1376,6 +1386,9 @@ nd6_dad_timer(ifa)
 			TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 			free(dp, M_IP6NDP);
 			dp = NULL;
+#ifdef MIP6
+			if (mip6_dad_success(ifa) == ENOENT)
+#endif
 			IFAFREE(ifa);
 		}
 	}
@@ -1416,6 +1429,9 @@ nd6_dad_duplicated(ifa)
 	TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 	free(dp, M_IP6NDP);
 	dp = NULL;
+#ifdef MIP6
+	if (mip6_dad_duplicated(ifa) == ENOENT)
+#endif
 	IFAFREE(ifa);
 }
 

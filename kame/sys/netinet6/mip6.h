@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.33 2001/12/04 10:36:57 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.34 2001/12/05 08:09:59 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -298,6 +298,10 @@ struct mip6_subopt_authdata *mip6_authdata_create
 					     struct in6_addr *,
 					     struct in6_addr *,
 					     struct ip6_opt_binding_update *));
+
+int mip6_dad_success			__P((struct ifaddr *));
+int mip6_dad_duplicated			__P((struct ifaddr *));
+struct ifaddr *mip6_dad_find		__P((struct in6_addr *));
 
 #define mip6log(arg) do { if (mip6_config.mcfg_debug) log arg;} while (0)
 void mip6_ha_print __P((struct mip6_ha *));
