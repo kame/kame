@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.10 2001/06/20 12:45:49 jinmei Exp $
+$KAME: FAQ,v 1.11 2001/06/20 12:46:28 jinmei Exp $
 
 
 GENERAL
@@ -404,4 +404,3 @@ Q: How can I differentiate IPv6 http connections from IPv4 ones on my
 web page?  (In other words, how can I provide dancing stuff for IPv6
 users only, like www.kame.net?)
       TBD
-
