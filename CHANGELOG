@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.203 1999/10/21 08:49:59 jinmei Exp $
+$Id: CHANGELOG,v 1.204 1999/10/21 14:59:51 itojun Exp $
 
 <199910>
+Thu Oct 21 07:57:02 PDT 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/ucd-snmp: upgrade to 4.0.1 with IPv6 fixes.
+
 1999-10-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd*/usr.sbin/traceroute/Makefile: added OS-specific
 	compilation options, one of which would fix a problem of bad
@@ -13,8 +16,12 @@ Thu Oct 21 15:12:16 JST 1999 skane@ydc.co.jp
 	Make it compilable on INRIA stack.
 	Patch from <Francis.Dupont@inria.fr>.
 
+Wed Oct 20 23:05:52 PDT 1999  itojun@iijlab.net
+	* freebsd2/lib/libftpio: fix getaddrinfo() loop, so that the code
+	  will try to explore all the addresses returned after query.
+
 Wed Oct 20 09:01:53 PDT 1999  itojun@iijlab.net
-	* netbsd/pkgsrc/net/wu-ftpd: upgrade to 2.5.0 with iPv6 patch.
+	* netbsd/pkgsrc/net/wu-ftpd: upgrade to 2.5.0 with IPv6 patch.
 
 Thu Oct 21 00:19:23 JST 1999 sakane@ydc.co.jp
 	* kame/kame/libipsec:
