@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/07 06:16:28 $
+			$Date: 1999/10/07 06:19:45 $
 
 1. IPv6
 
@@ -877,8 +877,9 @@ and strips off daisy-chained header and padding for ESP/AH.  It is
 safe to strip off the ESP/AH header on packet reception, since we
 will never use the received packet in "as is" form.
 
-By using ESP/AH, TCP4/6 MSS will be affected by extra daisy-chained
-headers inserted by ESP/AH.  Our code takes care of the case.
+By using ESP/AH, TCP4/6 effective data segment size will be affected by
+extra daisy-chained headers inserted by ESP/AH.  Our code takes care of
+the case.
 
 Basic crypto functions can be found in directory "sys/crypto".  ESP/AH
 transform are listed in {esp,ah}_core.c with wrapper functions.  If you
