@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.47 2001/05/01 05:28:42 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.48 2001/06/03 21:27:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -494,6 +494,7 @@ gif_ioctl(ifp, cmd, data)
 	struct sockaddr *dst, *src;
 	struct sockaddr *sa;
 	int i;
+	int s;
 	struct gif_softc *sc2;
 		
 	switch (cmd) {
@@ -680,8 +681,14 @@ gif_ioctl(ifp, cmd, data)
 		bcopy((caddr_t)dst, (caddr_t)sa, dst->sa_len);
 		sc->gif_pdst = sa;
 
-		ifp->if_flags |= (IFF_UP | IFF_RUNNING);
+#ifdef __NetBSD__
+		s = splsoftnet();
+#else
+		s = splnet();
+#endif
+		ifp->if_flags |= IFF_RUNNING;
 		if_up(ifp);		/* send up RTM_IFINFO */
+		splx(s);
 
 		error = 0;
 		break;
