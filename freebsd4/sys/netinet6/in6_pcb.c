@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.42 2001/11/13 03:09:44 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.43 2002/01/31 14:17:14 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -856,8 +856,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		    flowinfo == (inp->in6p_flowinfo & IPV6_FLOWLABEL_MASK) &&
 		    SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa, &sa6_src))
 			goto do_notify;
-		else if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr,
-					     &sa6_dst->sin6_addr) ||
+		else if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa, sa6_dst) ||
 			 inp->inp_socket == 0 ||
 			 (lport && inp->inp_lport != lport) ||
 			 (!IN6_IS_ADDR_UNSPECIFIED(&sa6_src.sin6_addr) &&
