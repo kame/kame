@@ -521,7 +521,19 @@ ip_input(struct mbuf *m)
 	/*
 	 * Check our list of addresses, to see if the packet is for us.
 	 */
-	INADDR_TO_IA(ip->ip_dst, ia);
+	for (ia = IN_IFADDR_HASH(ip->ip_dst.s_addr).lh_first;
+	     ia != NULL;
+	     ia = ia->ia_hash.le_next) {
+		if (in_hosteq(ia->ia_addr.sin_addr, ip->ip_dst)) {
+			if ((ia->ia_ifp->if_flags & IFF_UP) != 0)
+				break;
+			else {
+				icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_HOST,
+				    0, m->m_pkthdr.rcvif);
+				return;
+			}
+		}
+	}
 	if (ia != NULL)
 		goto ours;
 	if (m->m_pkthdr.rcvif->if_flags & IFF_BROADCAST) {
