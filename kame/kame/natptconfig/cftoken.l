@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.4 2001/09/02 19:28:34 fujisawa Exp $	*/
+/*	$KAME: cftoken.l,v 1.5 2002/01/11 10:02:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -58,7 +58,7 @@ dot			"."
 colon			":"
 ipv4addr		{digit}{1,3}({dot}{digit}{1,3}){0,3}
 ipv6addr		{hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,7}
-
+ipv4enbeddedipv6addr	{hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,5}{colon}{ipv4addr}
 
 %%
 
@@ -71,6 +71,7 @@ ipv6addr		{hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,7}
 0x{hexdigit}+			return (getHexadecimal(yytext));
 {ipv4addr}			return (SIPV4ADDR);
 {ipv6addr}			return (SIPV6ADDR);
+{ipv4enbeddedipv6addr}		return (SIPV6ADDR);
 
 "-"				return (SMINUS);
 "/"				return (SSLASH);
