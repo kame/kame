@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.25 2001/02/22 01:39:16 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.26 2001/03/13 02:15:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,6 +162,24 @@ dest6_input(mp, offp, proto)
 			    sizeof(ip6a->ip6a_careof));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
 
+			/*
+			 * reject invalid home-addresses
+			 */
+			/* XXX linklocal-address is not supported */
+			if (IN6_IS_ADDR_MULTICAST(&ip6a->ip6a_home) ||
+			    IN6_IS_ADDR_LINKLOCAL(&ip6a->ip6a_home) ||
+			    IN6_IS_ADDR_V4MAPPED(&ip6a->ip6a_home)  ||
+			    IN6_IS_ADDR_UNSPECIFIED(&ip6a->ip6a_home) ||
+			    IN6_IS_ADDR_LOOPBACK(&ip6a->ip6a_home)) {
+				ip6stat.ip6s_badscope++;
+				goto bad;
+			}
+
+			/*
+			 * Currently, no valid sub-options are
+			 * defined for use in a Home Address option.
+			 */
+
 #ifdef MIP6
 			if (mip6_store_dstopt_pre_hook) {
 				if ((*mip6_store_dstopt_pre_hook)(m, opt,
@@ -203,6 +221,12 @@ dest6_input(mp, offp, proto)
 		    sizeof(haopt->ip6oh_addr));
 		bcopy(&ip6a->ip6a_home, &ip6->ip6_src,
 		    sizeof(ip6->ip6_src));
+#if 0
+		/* XXX linklocal address is (currently) not supported */
+		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
+			ip6->ip6_src.s6_addr16[1]
+				= htons(m->m_pkthdr.rcvif->if_index);
+#endif
 		ip6a->ip6a_flags |= IP6A_SWAP;
 	}
 

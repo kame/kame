@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.22 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.23 2001/03/13 02:15:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,6 +72,17 @@ route6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	struct ip6_rthdr *rh;
 	int off = *offp, rhlen;
+	struct mbuf *n;
+
+	n = ip6_findaux(m);
+	if (n) {
+		struct ip6aux *ip6a = mtod(n, struct ip6aux *);
+		/* XXX reject home-address option before rthdr */
+		if (ip6a->ip6a_flags & IP6A_SWAP) {
+			ip6stat.ip6s_badoptions++;
+			return IPPROTO_DONE;
+		}
+	}
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(*rh), IPPROTO_DONE);
