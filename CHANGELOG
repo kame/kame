@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1248 2000/08/31 17:37:05 itojun Exp $
+$KAME: CHANGELOG,v 1.1249 2000/09/01 01:12:22 itojun Exp $
 
 <200008>
+Fri Sep  1 JST 2000  itojun@iijlab.net
+	* kame/rtsol/if.c: repair interface MTU lookup.  From koji@jp.above.net.
+
 Fri Sep  1 02:30:02 JST 2000  itojun@iijlab.net
 	* {net,open}bsd/lib/libinet6/getaddrinfo.c: on /etc/hosts lookup, set
 	  "official host name" (the leftmost hostname) into ai_canonname.
