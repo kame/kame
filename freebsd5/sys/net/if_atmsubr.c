@@ -31,7 +31,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_atmsubr.c,v 1.18 2002/11/15 00:00:14 sam Exp $
+ * $FreeBSD: src/sys/net/if_atmsubr.c,v 1.26 2003/05/05 16:35:52 harti Exp $
  */
 
 /*
@@ -45,12 +45,15 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/mac.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/malloc.h>
 #include <sys/errno.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #include <net/netisr.h>
@@ -68,6 +71,8 @@
 #ifdef NATM
 #include <netnatm/natm.h>
 #endif
+
+SYSCTL_NODE(_hw, OID_AUTO, atm, CTLFLAG_RW, 0, "ATM hardware");
 
 #ifndef ETHERTYPE_IPV6
 #define ETHERTYPE_IPV6	0x86dd
@@ -92,7 +97,7 @@
 
 int
 atm_output(ifp, m0, dst, rt0)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	struct mbuf *m0;
 	struct sockaddr *dst;
 	struct rtentry *rt0;
@@ -126,29 +131,9 @@ atm_output(ifp, m0, dst, rt0)
 	/*
 	 * check route
 	 */
-	if ((rt = rt0) != NULL) {
-
-		if ((rt->rt_flags & RTF_UP) == 0) { /* route went down! */
-			if ((rt0 = rt = RTALLOC1(dst, 0)) != NULL)
-				rt->rt_refcnt--;
-			else 
-				senderr(EHOSTUNREACH);
-		}
-
-		if (rt->rt_flags & RTF_GATEWAY) {
-			if (rt->rt_gwroute == 0)
-				goto lookup;
-			if (((rt = rt->rt_gwroute)->rt_flags & RTF_UP) == 0) {
-				rtfree(rt); rt = rt0;
-			lookup: rt->rt_gwroute = RTALLOC1(rt->rt_gateway, 0);
-				if ((rt = rt->rt_gwroute) == 0)
-					senderr(EHOSTUNREACH);
-			}
-		}
-
-		/* XXX: put RTF_REJECT code here if doing ATMARP */
-
-	}
+	error = rt_check(&rt, &rt0, dst);
+	if (error)
+		goto bad;
 
 	/*
 	 * check for non-native ATM traffic   (dst != NULL)
@@ -163,9 +148,9 @@ atm_output(ifp, m0, dst, rt0)
 		case AF_INET6:
 #endif
 			if (dst->sa_family == AF_INET6)
-			        etype = htons(ETHERTYPE_IPV6);
+			        etype = ETHERTYPE_IPV6;
 			else
-			        etype = htons(ETHERTYPE_IP);
+			        etype = ETHERTYPE_IP;
 #ifdef ATM_PVCEXT
 			if (ifp->if_flags & IFF_POINTOPOINT) {
 				/* pvc subinterface */
@@ -221,7 +206,7 @@ atm_output(ifp, m0, dst, rt0)
 			        bcopy(ATMLLC_HDR, atmllc->llchdr, 
 				      sizeof(atmllc->llchdr));
 				ATM_LLC_SETTYPE(atmllc, etype); 
-					/* note: already in network order */
+					/* note: in host order */
 			}
 			else
 			        bcopy(llc_hdr, atmllc, sizeof(struct atmllc));
@@ -248,11 +233,11 @@ bad:
 void
 atm_input(ifp, ah, m, rxhand)
 	struct ifnet *ifp;
-	register struct atm_pseudohdr *ah;
+	struct atm_pseudohdr *ah;
 	struct mbuf *m;
 	void *rxhand;
 {
-	register struct ifqueue *inq;
+	int isr;
 	u_int16_t etype = ETHERTYPE_IP; /* default */
 	int s;
 
@@ -271,8 +256,7 @@ atm_input(ifp, ah, m, rxhand)
 		s = splimp();		/* in case 2 atm cards @ diff lvls */
 		npcb->npcb_inq++;	/* count # in queue */
 		splx(s);
-		schednetisr(NETISR_NATM);
-		inq = &natmintrq;
+		isr = NETISR_NATM;
 		m->m_pkthdr.rcvif = rxhand; /* XXX: overload */
 #else
 		printf("atm_input: NATM detected but not configured in kernel\n");
@@ -334,14 +318,12 @@ atm_input(ifp, ah, m, rxhand)
 		switch (etype) {
 #ifdef INET
 		case ETHERTYPE_IP:
-			schednetisr(NETISR_IP);
-			inq = &ipintrq;
+			isr = NETISR_IP;
 			break;
 #endif
 #ifdef INET6
 		case ETHERTYPE_IPV6:
-			schednetisr(NETISR_IPV6);
-			inq = &ip6intrq;
+			isr = NETISR_IPV6;
 			break;
 #endif
 		default:
@@ -349,23 +331,24 @@ atm_input(ifp, ah, m, rxhand)
 			return;
 		}
 	}
-
-	(void) IF_HANDOFF(inq, m, NULL);
+	netisr_dispatch(isr, m);
 }
 
 /*
- * Perform common duties while attaching to interface list
+ * Perform common duties while attaching to interface list.
  */
 void
 atm_ifattach(ifp)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 {
-	register struct ifaddr *ifa;
-	register struct sockaddr_dl *sdl;
+	struct ifaddr *ifa;
+	struct sockaddr_dl *sdl;
+	struct ifatm *ifatm = ifp->if_softc;
 
 	ifp->if_type = IFT_ATM;
 	ifp->if_addrlen = 0;
 	ifp->if_hdrlen = 0;
+	if_attach(ifp);
 	ifp->if_mtu = ATMMTU;
 	ifp->if_output = atm_output;
 #if 0
@@ -391,6 +374,17 @@ atm_ifattach(ifp)
 			break;
 		}
 
+	ifp->if_linkmib = &ifatm->mib;
+	ifp->if_linkmiblen = sizeof(ifatm->mib);
+}
+
+/*
+ * Common stuff for detaching an ATM interface
+ */
+void
+atm_ifdetach(struct ifnet *ifp)
+{
+	if_detach(ifp);
 }
 
 #ifdef ATM_PVCEXT
@@ -475,3 +469,12 @@ pvc_set_fwd(if_name, if_name2, op)
 	return (0);
 }
 #endif /* ATM_PVCEXT */
+
+static moduledata_t atm_mod = {
+        "atm",
+        NULL,
+        0
+};
+                
+DECLARE_MODULE(atm, atm_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+MODULE_VERSION(atm, 1);

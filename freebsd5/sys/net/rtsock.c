@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)rtsock.c	8.7 (Berkeley) 10/12/95
- * $FreeBSD: src/sys/net/rtsock.c,v 1.79 2002/10/01 15:48:31 phk Exp $
+ * $FreeBSD: src/sys/net/rtsock.c,v 1.89 2003/03/05 19:24:22 peter Exp $
  */
 
 #include "opt_sctp.h"
@@ -151,9 +151,6 @@ rts_attach(struct socket *so, int proto, struct thread *td)
 	case AF_IPX:
 		route_cb.ipx_count++;
 		break;
-	case AF_NS:
-		route_cb.ns_count++;
-		break;
 	}
 	rp->rcb_faddr = &route_src;
 	route_cb.any_count++;
@@ -203,9 +200,6 @@ rts_detach(struct socket *so)
 			break;
 		case AF_IPX:
 			route_cb.ipx_count--;
-			break;
-		case AF_NS:
-			route_cb.ns_count--;
 			break;
 		}
 		route_cb.any_count--;
@@ -367,8 +361,7 @@ route_output(m, so)
 	case RTM_DELETE:
 		error = rtrequest1(RTM_DELETE, &info, &saved_nrt);
 		if (error == 0) {
-			if ((rt = saved_nrt))
-				rt->rt_refcnt++;
+			rt = saved_nrt;
 			goto report;
 		}
 		break;
@@ -378,8 +371,11 @@ route_output(m, so)
 	case RTM_LOCK:
 		if ((rnh = rt_tables[dst->sa_family]) == 0) {
 			senderr(EAFNOSUPPORT);
-		} else if ((rt = (struct rtentry *)
-				rnh->rnh_lookup(dst, netmask, rnh)) != NULL) {
+		}
+		RADIX_NODE_HEAD_LOCK(rnh);
+		rt = (struct rtentry *) rnh->rnh_lookup(dst, netmask, rnh);
+		RADIX_NODE_HEAD_UNLOCK(rnh);
+		if (rt != NULL) {
 
 #ifdef RADIX_MPATH
 			/*
@@ -397,13 +393,12 @@ route_output(m, so)
 				if (!rt)
 					senderr(ESRCH);
 			}
-			rt->rt_refcnt++;
 #else
 			rt->rt_refcnt++;
 #endif
-		}
-		else
+		} else
 			senderr(ESRCH);
+
 		switch (rtm->rtm_type) {
 
 		case RTM_GET:
@@ -446,11 +441,12 @@ route_output(m, so)
 			/* new gateway could require new ifaddr, ifp;
 			   flags may also be different; ifp may be specified
 			   by ll sockaddr when protocol address is ambiguous */
-#define	equal(a1, a2) (bcmp((caddr_t)(a1), (caddr_t)(a2), (a1)->sa_len) == 0)
+/* compare two sockaddr structures */
+#define	sa_equal(a1, a2) (bcmp((a1), (a2), (a1)->sa_len) == 0)
 			if ((rt->rt_flags & RTF_GATEWAY && gate != NULL) ||
 			    ifpaddr != NULL ||
 			    (ifaaddr != NULL &&
-			    !equal(ifaaddr, rt->rt_ifa->ifa_addr))) {
+			    !sa_equal(ifaaddr, rt->rt_ifa->ifa_addr))) {
 				if ((error = rt_getifa(&info)) != 0)
 					senderr(error);
 			}
@@ -460,12 +456,14 @@ route_output(m, so)
 			if ((ifa = info.rti_ifa) != NULL) {
 				register struct ifaddr *oifa = rt->rt_ifa;
 				if (oifa != ifa) {
-				    if (oifa && oifa->ifa_rtrequest)
-					oifa->ifa_rtrequest(RTM_DELETE, rt,
-					    &info);
-				    IFAFREE(rt->rt_ifa);
+				    if (oifa) {
+					if (oifa->ifa_rtrequest)
+					    oifa->ifa_rtrequest(RTM_DELETE, rt,
+						&info);
+				        IFAFREE(oifa);
+				    }
+				    IFAREF(ifa);
 				    rt->rt_ifa = ifa;
-				    ifa->ifa_refcnt++;
 				    rt->rt_ifp = info.rti_ifp;
 				}
 			}
@@ -989,6 +987,7 @@ sysctl_iflist(af, w)
 	int	len, error = 0;
 
 	bzero((caddr_t)&info, sizeof(info));
+	/* IFNET_RLOCK(); */		/* could sleep XXX */
 	TAILQ_FOREACH(ifp, &ifnet, if_link) {
 		if (w->w_arg && w->w_arg != ifp->if_index)
 			continue;
@@ -1034,6 +1033,7 @@ sysctl_iflist(af, w)
 		ifaaddr = netmask = brdaddr = 0;
 	}
 done:
+	/* IFNET_RUNLOCK(); */ /* XXX */
 	return (error);
 }
 
@@ -1054,6 +1054,8 @@ sysctl_rtsock(SYSCTL_HANDLER_ARGS)
 	if (namelen != 3)
 		return ((namelen < 3) ? EISDIR : ENOTDIR);
 	af = name[0];
+	if (af > AF_MAX)
+		return (EINVAL);
 	Bzero(&w, sizeof(w));
 	w.w_op = name[1];
 	w.w_arg = name[2];
@@ -1064,11 +1066,25 @@ sysctl_rtsock(SYSCTL_HANDLER_ARGS)
 
 	case NET_RT_DUMP:
 	case NET_RT_FLAGS:
-		for (i = 1; i <= AF_MAX; i++)
-			if ((rnh = rt_tables[i]) && (af == 0 || af == i) &&
-			    (error = rnh->rnh_walktree(rnh,
-							sysctl_dumpentry, &w)))
-				break;
+		if (af != 0) {
+			if ((rnh = rt_tables[af]) != NULL) {
+				/* RADIX_NODE_HEAD_LOCK(rnh); */
+			    	error = rnh->rnh_walktree(rnh,
+				    sysctl_dumpentry, &w);/* could sleep XXX */
+				/* RADIX_NODE_HEAD_UNLOCK(rnh); */
+			} else
+				error = EAFNOSUPPORT;
+		} else {
+			for (i = 1; i <= AF_MAX; i++)
+				if ((rnh = rt_tables[i]) != NULL) {
+					/* RADIX_NODE_HEAD_LOCK(rnh); */
+					error = rnh->rnh_walktree(rnh,
+					    sysctl_dumpentry, &w);
+					/* RADIX_NODE_HEAD_UNLOCK(rnh); */
+					if (error)
+						break;
+				}
+		}
 		break;
 
 	case NET_RT_IFLIST:

@@ -24,7 +24,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $NetBSD: pdq_ifsubr.c,v 1.12 1997/06/05 01:56:35 thomas Exp$
- * $FreeBSD: src/sys/dev/pdq/pdq_ifsubr.c,v 1.19 2002/11/14 23:54:53 sam Exp $
+ * $FreeBSD: src/sys/dev/pdq/pdq_ifsubr.c,v 1.22 2003/03/16 00:24:18 mdodd Exp $
  */
 
 /*
@@ -212,7 +212,7 @@ pdq_os_receive_pdu(
     }
 #endif
     m->m_pkthdr.len = pktlen;
-#if NBPFILTER > 0
+#if NBPFILTER > 0 && defined(__NetBSD__)
     if (sc->sc_bpf != NULL)
 	PDQ_BPF_MTAP(sc, m);
 #endif
@@ -456,8 +456,8 @@ pdq_ifattach(pdq_softc_t *sc)
     }
 #endif
   
-    if_attach(ifp);
 #if defined(__NetBSD__)
+    if_attach(ifp);
     fddi_ifattach(ifp, (caddr_t)&sc->sc_pdq->pdq_hwaddr);
 #else
     fddi_ifattach(ifp, FDDI_BPF_SUPPORTED);

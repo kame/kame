@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/vx/if_vx.c,v 1.40 2002/11/14 23:54:55 sam Exp $
+ * $FreeBSD: src/sys/dev/vx/if_vx.c,v 1.43 2003/04/08 14:25:44 des Exp $
  *
  */
 
@@ -407,8 +407,7 @@ startagain:
 	return;
     }
     /* We need to use m->m_pkthdr.len, so require the header */
-    if ((m->m_flags & M_PKTHDR) == 0)
-	panic("vxstart: no header mbuf");
+    M_ASSERTPKTHDR(m);
     len = m->m_pkthdr.len;
 
     pad = (4 - len) & 3;

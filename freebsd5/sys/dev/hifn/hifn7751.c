@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/hifn/hifn7751.c,v 1.5 2002/10/16 17:07:41 sam Exp $ */
+/* $FreeBSD: src/sys/dev/hifn/hifn7751.c,v 1.13 2003/03/11 22:47:06 sam Exp $ */
 /*	$OpenBSD: hifn7751.c,v 1.120 2002/05/17 00:33:34 deraadt Exp $	*/
 
 /*
@@ -41,11 +41,10 @@
  *
  */
 
-#define HIFN_DEBUG
-
 /*
  * Driver for the Hifn 7751 encryption processor.
  */
+#include "opt_hifn.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -72,6 +71,10 @@
 
 #include <pci/pcivar.h>
 #include <pci/pcireg.h>
+
+#ifdef HIFN_RNDTEST
+#include <dev/rndtest/rndtest.h>
+#endif
 #include <dev/hifn/hifn7751reg.h>
 #include <dev/hifn/hifn7751var.h>
 
@@ -109,6 +112,9 @@ static devclass_t hifn_devclass;
 
 DRIVER_MODULE(hifn, pci, hifn_driver, hifn_devclass, 0, 0);
 MODULE_DEPEND(hifn, crypto, 1, 1, 1);
+#ifdef HIFN_RNDTEST
+MODULE_DEPEND(hifn, rndtest, 1, 1, 1);
+#endif
 
 static	void hifn_reset_board(struct hifn_softc *, int);
 static	void hifn_reset_puc(struct hifn_softc *);
@@ -160,18 +166,20 @@ READ_REG_1(struct hifn_softc *sc, bus_size_t reg)
 }
 #define	WRITE_REG_1(sc, reg, val)	hifn_write_reg_1(sc, reg, val)
 
+SYSCTL_NODE(_hw, OID_AUTO, hifn, CTLFLAG_RD, 0, "Hifn driver parameters");
+
 #ifdef HIFN_DEBUG
 static	int hifn_debug = 0;
-SYSCTL_INT(_debug, OID_AUTO, hifn, CTLFLAG_RW, &hifn_debug,
-	    0, "Hifn driver debugging printfs");
+SYSCTL_INT(_hw_hifn, OID_AUTO, debug, CTLFLAG_RW, &hifn_debug,
+	    0, "control debugging msgs");
 #endif
 
 static	struct hifn_stats hifnstats;
-SYSCTL_STRUCT(_kern, OID_AUTO, hifn_stats, CTLFLAG_RD, &hifnstats,
-	    hifn_stats, "Hifn driver statistics");
-static	int hifn_maxbatch = 2;		/* XXX tune based on part+sys speed */
-SYSCTL_INT(_kern, OID_AUTO, hifn_maxbatch, CTLFLAG_RW, &hifn_maxbatch,
-	    0, "Hifn driver: max ops to batch w/o interrupt");
+SYSCTL_STRUCT(_hw_hifn, OID_AUTO, stats, CTLFLAG_RD, &hifnstats,
+	    hifn_stats, "driver statistics");
+static	int hifn_maxbatch = 1;
+SYSCTL_INT(_hw_hifn, OID_AUTO, maxbatch, CTLFLAG_RW, &hifn_maxbatch,
+	    0, "max ops to batch w/o interrupt");
 
 /*
  * Probe for a supported device.  The PCI vendor and device
@@ -226,6 +234,12 @@ hifn_partname(struct hifn_softc *sc)
 		return "NetSec unknown-part";
 	}
 	return "Unknown-vendor unknown-part";
+}
+
+static void
+default_harvest(struct rndtest_state *rsp, void *buf, u_int count)
+{
+	random_harvest(buf, count, count*NBBY, 0, RANDOM_PURE);
 }
 
 /*
@@ -619,6 +633,15 @@ hifn_init_pubrng(struct hifn_softc *sc)
 	u_int32_t r;
 	int i;
 
+#ifdef HIFN_RNDTEST
+	sc->sc_rndtest = rndtest_attach(sc->sc_dev);
+	if (sc->sc_rndtest)
+		sc->sc_harvest = rndtest_harvest;
+	else
+		sc->sc_harvest = default_harvest;
+#else
+	sc->sc_harvest = default_harvest;
+#endif
 	if ((sc->sc_flags & HIFN_IS_7811) == 0) {
 		/* Reset 7951 public key/rng engine */
 		WRITE_REG_1(sc, HIFN_1_PUB_RESET,
@@ -703,7 +726,8 @@ hifn_rng(void *vsc)
 			if (sc->sc_rngfirst)
 				sc->sc_rngfirst = 0;
 			else
-				random_harvest(num, RANDOM_BITS(2), RANDOM_PURE);
+				(*sc->sc_harvest)(sc->sc_rndtest,
+					num, sizeof (num));
 		}
 	} else {
 		num[0] = READ_REG_1(sc, HIFN_1_RNG_DATA);
@@ -712,7 +736,8 @@ hifn_rng(void *vsc)
 		if (sc->sc_rngfirst)
 			sc->sc_rngfirst = 0;
 		else
-			random_harvest(num, RANDOM_BITS(1), RANDOM_PURE);
+			(*sc->sc_harvest)(sc->sc_rndtest,
+				num, sizeof (num[0]));
 	}
 
 	callout_reset(&sc->sc_rngto, sc->sc_rnghz, hifn_rng, sc);
@@ -1360,7 +1385,6 @@ hifn_init_dma(struct hifn_softc *sc)
 static u_int
 hifn_write_command(struct hifn_command *cmd, u_int8_t *buf)
 {
-#define	MIN(a,b)	((a)<(b)?(a):(b))
 	u_int8_t *buf_pos;
 	hifn_base_command_t *base_cmd;
 	hifn_mac_command_t *mac_cmd;
@@ -1454,7 +1478,6 @@ hifn_write_command(struct hifn_command *cmd, u_int8_t *buf)
 	}
 
 	return (buf_pos - buf);
-#undef	MIN
 }
 
 static int
@@ -1668,6 +1691,10 @@ hifn_crypto(
 			if (cmd->src_m->m_flags & M_PKTHDR) {
 				len = MHLEN;
 				MGETHDR(m0, M_DONTWAIT, MT_DATA);
+				if (m0 && !m_dup_pkthdr(m0, cmd->src_m)) {
+					m_free(m0);
+					m0 = NULL;
+				}
 			} else {
 				len = MLEN;
 				MGET(m0, M_DONTWAIT, MT_DATA);
@@ -1676,9 +1703,6 @@ hifn_crypto(
 				hifnstats.hst_nomem_mbuf++;
 				err = dma->cmdu ? ERESTART : ENOMEM;
 				goto err_srcmap;
-			}
-			if (len == MHLEN) {
-				M_COPY_PKTHDR(m0, cmd->src_m);
 			}
 			if (totlen >= MINCLSIZE) {
 				MCLGET(m0, M_DONTWAIT);

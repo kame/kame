@@ -1,5 +1,4 @@
 /*	$OpenBSD: if_txp.c,v 1.48 2001/06/27 06:34:50 kjc Exp $	*/
-/*	$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.12 2002/11/14 23:54:54 sam Exp $ */
 
 /*
  * Copyright (c) 2001
@@ -38,6 +37,9 @@
 /*
  * Driver for 3c990 (Typhoon) Ethernet ASIC
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.17 2003/04/16 03:16:55 mdodd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,7 +90,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.12 2002/11/14 23:54:54 sam Exp $";
+  "$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.17 2003/04/16 03:16:55 mdodd Exp $";
 #endif
 
 /*
@@ -180,7 +182,9 @@ static driver_t txp_driver = {
 
 static devclass_t txp_devclass;
 
-DRIVER_MODULE(if_txp, pci, txp_driver, txp_devclass, 0, 0);
+DRIVER_MODULE(txp, pci, txp_driver, txp_devclass, 0, 0);
+MODULE_DEPEND(txp, pci, 1, 1, 1);
+MODULE_DEPEND(txp, ether, 1, 1, 1);
 
 static int
 txp_probe(dev)
@@ -208,7 +212,6 @@ txp_attach(dev)
 {
 	struct txp_softc *sc;
 	struct ifnet *ifp;
-	u_int32_t command;
 	u_int16_t p1;
 	u_int32_t p2;
 	int unit, error = 0, rid;
@@ -247,23 +250,6 @@ txp_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef TXP_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		device_printf(dev, "failed to enable I/O ports!\n");
-		error = ENXIO;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		device_printf(dev, "failed to enable memory mapping!\n");
-		error = ENXIO;
-		goto fail;
-	}
-#endif
 
 	rid = TXP_RID;
 	sc->sc_res = bus_alloc_resource(dev, TXP_RES, &rid,

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.218 2002/11/20 19:07:27 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.237 2003/05/06 20:34:04 rwatson Exp $
  */
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -102,7 +102,6 @@
 #include <net/if_dl.h>
 #include <net/route.h>
 #include <net/netisr.h>
-#include <net/intrq.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -167,11 +166,16 @@ SYSCTL_INT(_net_inet_ip, IPCTL_KEEPFAITH, keepfaith, CTLFLAG_RW,
 	&ip_keepfaith,	0,
 	"Enable packet capture for FAITH IPv4->IPv6 translater daemon");
 
-static int	ip_nfragpackets = 0;
-static int	ip_maxfragpackets;	/* initialized in ip_init() */
+static int    nipq = 0;         /* total # of reass queues */
+static int    maxnipq;
 SYSCTL_INT(_net_inet_ip, OID_AUTO, maxfragpackets, CTLFLAG_RW,
-	&ip_maxfragpackets, 0,
+	&maxnipq, 0,
 	"Maximum number of IPv4 fragment reassembly queue entries");
+
+static int    maxfragsperpacket;
+SYSCTL_INT(_net_inet_ip, OID_AUTO, maxfragsperpacket, CTLFLAG_RW,
+	&maxfragsperpacket, 0,
+	"Maximum number of IPv4 fragments allowed per packet");
 
 static int	ip_sendsourcequench = 0;
 SYSCTL_INT(_net_inet_ip, OID_AUTO, sendsourcequench, CTLFLAG_RW,
@@ -199,6 +203,7 @@ SYSCTL_INT(_net_inet_ip, OID_AUTO, check_interface, CTLFLAG_RW,
 static int	ipprintfs = 0;
 #endif
 
+struct ifqueue ipintrq;
 static int	ipqmaxlen = IFQ_MAXLEN;
 
 extern	struct domain inetdomain;
@@ -225,8 +230,6 @@ SYSCTL_STRUCT(_net_inet_ip, IPCTL_STATS, stats, CTLFLAG_RW,
 	(((((x) & 0xF) | ((((x) >> 8) & 0xF) << 4)) ^ (y)) & IPREASS_HMASK)
 
 static TAILQ_HEAD(ipqhead, ipq) ipq[IPREASS_NHASH];
-static int    nipq = 0;         /* total # of reass queues */
-static int    maxnipq;
 
 #ifdef IPCTL_DEFMTU
 SYSCTL_INT(_net_inet_ip, IPCTL_DEFMTU, mtu, CTLFLAG_RW,
@@ -285,7 +288,6 @@ static void	ip_forward(struct mbuf *m, int srcrt,
 static void	ip_freef(struct ipqhead *, struct ipq *);
 static struct	mbuf *ip_reass(struct mbuf *, struct ipqhead *,
 		struct ipq *, u_int32_t *, u_int16_t *);
-static void	ipintr(void);
 
 #ifdef NATPT
 extern	int			natpt_enable;
@@ -318,17 +320,15 @@ ip_init()
 	for (i = 0; i < IPREASS_NHASH; i++)
 	    TAILQ_INIT(&ipq[i]);
 
-	maxnipq = nmbclusters / 4;
-	ip_maxfragpackets = nmbclusters / 4;
+	maxnipq = nmbclusters / 32;
+	maxfragsperpacket = 16;
 
 #ifndef RANDOM_IP_ID
 	ip_id = time_second & 0xffff;
 #endif
 	ipintrq.ifq_maxlen = ipqmaxlen;
 	mtx_init(&ipintrq.ifq_mtx, "ip_inq", NULL, MTX_DEF);
-	ipintrq_present = 1;
-
-	register_netisr(NETISR_IP, ipintr);
+	netisr_register(NETISR_IP, ip_input, &ipintrq);
 }
 
 /*
@@ -394,8 +394,7 @@ ip_input(struct mbuf *m)
 		}
 	}
 
-	KASSERT(m != NULL && (m->m_flags & M_PKTHDR) != 0,
-	    ("ip_input: no HDR"));
+	M_ASSERTPKTHDR(m);
 
 	if (args.rule) {	/* dummynet already filtered us */
 		ip = mtod(m, struct ip *);
@@ -489,6 +488,13 @@ tooshort:
 		} else
 			m_adj(m, ip->ip_len - m->m_pkthdr.len);
 	}
+#if defined(IPSEC) && !defined(IPSEC_FILTERGIF)
+	/*
+	 * Bypass packet filtering for packets from a tunnel (gif).
+	 */
+	if (ipsec_gethist(m, NULL))
+		goto pass;
+#endif
 
 	/*
 	 * IpHack's section.
@@ -870,6 +876,13 @@ ours:
 	 */
 	if (ip->ip_off & (IP_MF | IP_OFFMASK)) {
 
+		/* If maxnipq is 0, never accept fragments. */
+		if (maxnipq == 0) {
+                	ipstat.ips_fragments++;
+			ipstat.ips_fragdropped++;
+			goto bad;
+		}
+
 		sum = IPREASS_HASH(ip->ip_src.s_addr, ip->ip_id);
 		/*
 		 * Look for queue of fragments
@@ -887,8 +900,12 @@ ours:
 
 		fp = 0;
 
-		/* check if there's a place for the new queue */
-		if (nipq > maxnipq) {
+		/*
+		 * Enforce upper bound on number of fragmented packets
+		 * for which we attempt reassembly;
+		 * If maxnipq is -1, accept all fragments without limitation.
+		 */
+		if ((nipq > maxnipq) && (maxnipq > 0)) {
 		    /*
 		     * drop something from the tail of the current queue
 		     * before proceeding further
@@ -898,12 +915,15 @@ ours:
 			for (i = 0; i < IPREASS_NHASH; i++) {
 			    struct ipq *r = TAILQ_LAST(&ipq[i], ipqhead);
 			    if (r) {
+				ipstat.ips_fragtimeout += r->ipq_nfrags;
 				ip_freef(&ipq[i], r);
 				break;
 			    }
 			}
-		    } else
+		    } else {
+			ipstat.ips_fragtimeout += q->ipq_nfrags;
 			ip_freef(&ipq[sum], q);
+		    }
 		}
 found:
 		/*
@@ -1072,22 +1092,6 @@ bad:
 }
 
 /*
- * IP software interrupt routine - to go away sometime soon
- */
-static void
-ipintr(void)
-{
-	struct mbuf *m;
-
-	while (1) {
-		IF_DEQUEUE(&ipintrq, m);
-		if (m == 0)
-			return;
-		ip_input(m);
-	}
-}
-
-/*
  * Take incoming datagram fragment and try to reassemble it into
  * whole datagram.  If a chain for reassembly of this datagram already
  * exists, then it is given as fp; otherwise have to make a chain.
@@ -1120,24 +1124,19 @@ ip_reass(struct mbuf *m, struct ipqhead *head, struct ipq *fp,
 	 * If first fragment to arrive, create a reassembly queue.
 	 */
 	if (fp == 0) {
-		/*
-		 * Enforce upper bound on number of fragmented packets
-		 * for which we attempt reassembly;
-		 * If maxfrag is 0, never accept fragments.
-		 * If maxfrag is -1, accept all fragments without limitation.
-		 */
-		if ((ip_maxfragpackets >= 0) && (ip_nfragpackets >= ip_maxfragpackets))
-			goto dropfrag;
-		ip_nfragpackets++;
 		if ((t = m_get(M_DONTWAIT, MT_FTABLE)) == NULL)
 			goto dropfrag;
 		fp = mtod(t, struct ipq *);
 #ifdef MAC
-		mac_init_ipq(fp);
+		if (mac_init_ipq(fp, M_NOWAIT) != 0) {
+			m_free(t);
+			goto dropfrag;
+		}
 		mac_create_ipq(m, fp);
 #endif
 		TAILQ_INSERT_HEAD(head, fp, ipq_list);
 		nipq++;
+		fp->ipq_nfrags = 1;
 		fp->ipq_ttl = IPFRAGTTL;
 		fp->ipq_p = ip->ip_p;
 		fp->ipq_id = ip->ip_id;
@@ -1151,6 +1150,7 @@ ip_reass(struct mbuf *m, struct ipqhead *head, struct ipq *fp,
 #endif
 		goto inserted;
 	} else {
+		fp->ipq_nfrags++;
 #ifdef MAC
 		mac_update_ipq(m, fp);
 #endif
@@ -1213,8 +1213,7 @@ ip_reass(struct mbuf *m, struct ipqhead *head, struct ipq *fp,
 	 */
 	for (; q != NULL && ip->ip_off + ip->ip_len > GETIP(q)->ip_off;
 	     q = nq) {
-		i = (ip->ip_off + ip->ip_len) -
-		    GETIP(q)->ip_off;
+		i = (ip->ip_off + ip->ip_len) - GETIP(q)->ip_off;
 		if (i < GETIP(q)->ip_len) {
 			GETIP(q)->ip_len -= i;
 			GETIP(q)->ip_off += i;
@@ -1224,6 +1223,8 @@ ip_reass(struct mbuf *m, struct ipqhead *head, struct ipq *fp,
 		}
 		nq = q->m_nextpkt;
 		m->m_nextpkt = nq;
+		ipstat.ips_fragdropped++;
+		fp->ipq_nfrags--;
 		m_freem(q);
 	}
 
@@ -1243,17 +1244,34 @@ inserted:
 #endif
 
 	/*
-	 * Check for complete reassembly.
+	 * Check for complete reassembly and perform frag per packet
+	 * limiting.
+	 *
+	 * Frag limiting is performed here so that the nth frag has
+	 * a chance to complete the packet before we drop the packet.
+	 * As a result, n+1 frags are actually allowed per packet, but
+	 * only n will ever be stored. (n = maxfragsperpacket.)
+	 *
 	 */
 	next = 0;
 	for (p = NULL, q = fp->ipq_frags; q; p = q, q = q->m_nextpkt) {
-		if (GETIP(q)->ip_off != next)
+		if (GETIP(q)->ip_off != next) {
+			if (fp->ipq_nfrags > maxfragsperpacket) {
+				ipstat.ips_fragdropped += fp->ipq_nfrags;
+				ip_freef(head, fp);
+			}
 			return (0);
+		}
 		next += GETIP(q)->ip_len;
 	}
 	/* Make sure the last packet didn't have the IP_MF flag */
-	if (p->m_flags & M_FRAG)
+	if (p->m_flags & M_FRAG) {
+		if (fp->ipq_nfrags > maxfragsperpacket) {
+			ipstat.ips_fragdropped += fp->ipq_nfrags;
+			ip_freef(head, fp);
+		}
 		return (0);
+	}
 
 	/*
 	 * Reassembly is complete.  Make sure the packet is a sane size.
@@ -1262,6 +1280,7 @@ inserted:
 	ip = GETIP(q);
 	if (next + (ip->ip_hl << 2) > IP_MAXPACKET) {
 		ipstat.ips_toolong++;
+		ipstat.ips_fragdropped += fp->ipq_nfrags;
 		ip_freef(head, fp);
 		return (0);
 	}
@@ -1307,7 +1326,6 @@ inserted:
 	TAILQ_REMOVE(head, fp, ipq_list);
 	nipq--;
 	(void) m_free(dtom(fp));
-	ip_nfragpackets--;
 	m->m_len += (ip->ip_hl << 2);
 	m->m_data -= (ip->ip_hl << 2);
 	/* some debugging cruft by sklower, below, will go away soon */
@@ -1321,6 +1339,8 @@ dropfrag:
 	*divert_rule = 0;
 #endif
 	ipstat.ips_fragdropped++;
+	if (fp != 0)
+		fp->ipq_nfrags--;
 	m_freem(m);
 	return (0);
 
@@ -1345,7 +1365,6 @@ ip_freef(fhp, fp)
 	}
 	TAILQ_REMOVE(fhp, fp, ipq_list);
 	(void) m_free(dtom(fp));
-	ip_nfragpackets--;
 	nipq--;
 }
 
@@ -1368,7 +1387,7 @@ ip_slowtimo()
 			fpp = fp;
 			fp = TAILQ_NEXT(fp, ipq_list);
 			if(--fpp->ipq_ttl == 0) {
-				ipstat.ips_fragtimeout++;
+				ipstat.ips_fragtimeout += fpp->ipq_nfrags;
 				ip_freef(&ipq[i], fpp);
 			}
 		}
@@ -1378,11 +1397,11 @@ ip_slowtimo()
 	 * (due to the limit being lowered), drain off
 	 * enough to get down to the new limit.
 	 */
-	for (i = 0; i < IPREASS_NHASH; i++) {
-		if (ip_maxfragpackets >= 0) {
-			while (ip_nfragpackets > ip_maxfragpackets &&
-				!TAILQ_EMPTY(&ipq[i])) {
-				ipstat.ips_fragdropped++;
+	if (maxnipq >= 0 && nipq > maxnipq) {
+		for (i = 0; i < IPREASS_NHASH; i++) {
+			while (nipq > maxnipq && !TAILQ_EMPTY(&ipq[i])) {
+				ipstat.ips_fragdropped +=
+				    TAILQ_FIRST(&ipq[i])->ipq_nfrags;
 				ip_freef(&ipq[i], TAILQ_FIRST(&ipq[i]));
 			}
 		}
@@ -1401,7 +1420,8 @@ ip_drain()
 
 	for (i = 0; i < IPREASS_NHASH; i++) {
 		while(!TAILQ_EMPTY(&ipq[i])) {
-			ipstat.ips_fragdropped++;
+			ipstat.ips_fragdropped +=
+			    TAILQ_FIRST(&ipq[i])->ipq_nfrags;
 			ip_freef(&ipq[i], TAILQ_FIRST(&ipq[i]));
 		}
 	}
@@ -1929,18 +1949,24 @@ ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 	 * data in a cluster may change before we reach icmp_error().
 	 */
 	MGET(mcopy, M_DONTWAIT, m->m_type);
+	if (mcopy != NULL && !m_dup_pkthdr(mcopy, m)) {
+		/*
+		 * It's probably ok if the pkthdr dup fails (because
+		 * the deep copy of the tag chain failed), but for now
+		 * be conservative and just discard the copy since
+		 * code below may some day want the tags.
+		 */
+		m_free(mcopy);
+		mcopy = NULL;
+	}
 	if (mcopy != NULL) {
-		M_COPY_PKTHDR(mcopy, m);
 		mcopy->m_len = imin((ip->ip_hl << 2) + 8,
 		    (int)ip->ip_len);
 		m_copydata(m, 0, mcopy->m_len, mtod(mcopy, caddr_t));
-#ifdef MAC
 		/*
-		 * XXXMAC: This will eventually become an explicit
-		 * labeling point.
+		 * XXXMAC: Eventually, we may have an explict labeling
+		 * point here.
 		 */
-		mac_create_mbuf_from_mbuf(m, mcopy);
-#endif
 	}
 
 #ifdef IPSTEALTH
@@ -2188,6 +2214,12 @@ ip_savecontrol(inp, mp, ip, m)
 	if (inp->inp_flags & INP_RECVDSTADDR) {
 		*mp = sbcreatecontrol((caddr_t) &ip->ip_dst,
 		    sizeof(struct in_addr), IP_RECVDSTADDR, IPPROTO_IP);
+		if (*mp)
+			mp = &(*mp)->m_next;
+	}
+	if (inp->inp_flags & INP_RECVTTL) {
+		*mp = sbcreatecontrol((caddr_t) &ip->ip_ttl,
+		    sizeof(u_char), IP_RECVTTL, IPPROTO_IP);
 		if (*mp)
 			mp = &(*mp)->m_next;
 	}

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.96 2002/07/31 16:45:16 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.104 2003/03/04 23:19:52 jlemon Exp $
  */
 
 /*
@@ -96,14 +96,15 @@ SYSCTL_INT(_net_link_ether_inet, OID_AUTO, host_down_time, CTLFLAG_RW,
 struct llinfo_arp {
 	LIST_ENTRY(llinfo_arp) la_le;
 	struct	rtentry *la_rt;
-	struct	mbuf *la_hold;		/* last packet until resolved/timeout */
-	long	la_asked;		/* last time we QUERIED for this addr */
+	struct	mbuf *la_hold;	/* last packet until resolved/timeout */
+	u_short	la_preempt;	/* countdown for pre-expiry arps */
+	u_short	la_asked;	/* #times we QUERIED following expiration */
 #define la_timer la_rt->rt_rmx.rmx_expire /* deletion time in seconds */
 };
 
 static	LIST_HEAD(, llinfo_arp) llinfo_arp;
 
-struct	ifqueue arpintrq;
+static struct	ifqueue arpintrq;
 static int	arp_inuse, arp_allocated, arpinit_done;
 
 static int	arp_maxtries = 5;
@@ -121,7 +122,7 @@ static void	arp_init(void);
 static void	arp_rtrequest(int, struct rtentry *, struct rt_addrinfo *);
 static void	arprequest(struct ifnet *,
 			struct in_addr *, struct in_addr *, u_char *);
-static void	arpintr(void);
+static void	arpintr(struct mbuf *);
 static void	arptfree(struct llinfo_arp *);
 static void	arptimer(void *);
 static void	arp_rtdrain(struct rtentry *, struct rttimer *);
@@ -139,18 +140,21 @@ static void
 arptimer(ignored_arg)
 	void *ignored_arg;
 {
+	struct llinfo_arp *la, *ola;
 	int s = splnet();
-	register struct llinfo_arp *la = LIST_FIRST(&llinfo_arp);
-	struct llinfo_arp *ola;
 
-	timeout(arptimer, (caddr_t)0, arpt_prune * hz);
-	while ((ola = la) != 0) {
-		register struct rtentry *rt = la->la_rt;
+	RADIX_NODE_HEAD_LOCK(rt_tables[AF_INET]);
+	la = LIST_FIRST(&llinfo_arp);
+	while (la != NULL) {
+		struct rtentry *rt = la->la_rt;
+		ola = la;
 		la = LIST_NEXT(la, la_le);
 		if (rt->rt_expire && rt->rt_expire <= time_second)
-			arptfree(ola); /* timer has expired, clear */
+			arptfree(ola);		/* timer has expired, clear */
 	}
+	RADIX_NODE_HEAD_UNLOCK(rt_tables[AF_INET]);
 	splx(s);
+	timeout(arptimer, NULL, arpt_prune * hz);
 }
 
 /*
@@ -227,6 +231,7 @@ arp_rtrequest(req, rt, info)
 		Bzero(la, sizeof(*la));
 		la->la_rt = rt;
 		rt->rt_flags |= RTF_LLINFO;
+		RADIX_NODE_HEAD_LOCK_ASSERT(rt_tables[AF_INET]);
 		LIST_INSERT_HEAD(&llinfo_arp, la, la_le);
 
 #ifdef INET
@@ -284,6 +289,7 @@ arp_rtrequest(req, rt, info)
 		if (la == 0)
 			break;
 		arp_inuse--;
+		RADIX_NODE_HEAD_LOCK_ASSERT(rt_tables[AF_INET]);
 		LIST_REMOVE(la, la_le);
 		rt->rt_llinfo = 0;
 		rt->rt_flags &= ~RTF_LLINFO;
@@ -411,6 +417,7 @@ arprequest(ifp, sip, tip, enaddr)
 	ah->ar_pln = sizeof(struct in_addr);	/* protocol address length */
 	ah->ar_op = htons(ARPOP_REQUEST);
 	(void)memcpy(ar_sha(ah), enaddr, ah->ar_hln);
+	memset(ar_tha(ah), 0, ah->ar_hln);
 	(void)memcpy(ar_spa(ah), sip, ah->ar_pln);
 	(void)memcpy(ar_tpa(ah), tip, ah->ar_pln);
 
@@ -476,13 +483,12 @@ arpresolve(ifp, rt, m, dst, desten, rt0)
 		 * arpt_down interval.
 		 */
 		if ((rt->rt_expire != 0) &&
-		    (time_second + (arp_maxtries - la->la_asked) * arpt_down >
-		     rt->rt_expire)) {
+		    (time_second + la->la_preempt > rt->rt_expire)) {
 			arprequest(ifp,
 				   &SIN(rt->rt_ifa->ifa_addr)->sin_addr,
 				   &SIN(dst)->sin_addr,
 				   IF_LLADDR(ifp));
-			la->la_asked++;
+			la->la_preempt--;
 		} 
 
 		bcopy(LLADDR(sdl), desten, sdl->sdl_alen);
@@ -510,15 +516,16 @@ arpresolve(ifp, rt, m, dst, desten, rt0)
 		rt->rt_flags &= ~RTF_REJECT;
 		if (la->la_asked == 0 || rt->rt_expire != time_second) {
 			rt->rt_expire = time_second;
-			if (la->la_asked++ < arp_maxtries)
-			    arprequest(ifp,
-			        &SIN(rt->rt_ifa->ifa_addr)->sin_addr,
-				&SIN(dst)->sin_addr,
-				IF_LLADDR(ifp));
-			else {
+			if (la->la_asked++ < arp_maxtries) {
+				arprequest(ifp,
+					   &SIN(rt->rt_ifa->ifa_addr)->sin_addr,
+					   &SIN(dst)->sin_addr,
+					   IF_LLADDR(ifp));
+			} else {
 				rt->rt_flags |= RTF_REJECT;
 				rt->rt_expire += arpt_down;
 				la->la_asked = 0;
+				la->la_preempt = arp_maxtries;
 			}
 
 		}
@@ -531,56 +538,45 @@ arpresolve(ifp, rt, m, dst, desten, rt0)
  * then the protocol-specific routine is called.
  */
 static void
-arpintr()
+arpintr(struct mbuf *m)
 {
-	register struct mbuf *m;
-	register struct arphdr *ar;
-	int s;
+	struct arphdr *ar;
 
 	if (!arpinit_done) {
 		arpinit_done = 1;
 		timeout(arptimer, (caddr_t)0, hz);
 	}
-	while (arpintrq.ifq_head) {
-		s = splimp();
-		IF_DEQUEUE(&arpintrq, m);
-		splx(s);
-		if (m == 0 || (m->m_flags & M_PKTHDR) == 0)
-			panic("arpintr");
-	
-                if (m->m_len < sizeof(struct arphdr) &&
-                    ((m = m_pullup(m, sizeof(struct arphdr))) == NULL)) {
-			log(LOG_ERR, "arp: runt packet -- m_pullup failed\n");
-			continue;
-		}
-		ar = mtod(m, struct arphdr *);
-
-		if (ntohs(ar->ar_hrd) != ARPHRD_ETHER
-		    && ntohs(ar->ar_hrd) != ARPHRD_IEEE802
-		    && ntohs(ar->ar_hrd) != ARPHRD_ARCNET) {
-			log(LOG_ERR,
-			    "arp: unknown hardware address format (0x%2D)\n",
-			    (unsigned char *)&ar->ar_hrd, "");
-			m_freem(m);
-			continue;
-		}
-
-		if (m->m_pkthdr.len < arphdr_len(ar) &&
-		    (m = m_pullup(m, arphdr_len(ar))) == NULL) {
-			log(LOG_ERR, "arp: runt packet\n");
-			m_freem(m);
-			continue;
-		}
-
-		switch (ntohs(ar->ar_pro)) {
-#ifdef INET
-			case ETHERTYPE_IP:
-				in_arpinput(m);
-				continue;
-#endif
-		}
-		m_freem(m);
+	if (m->m_len < sizeof(struct arphdr) &&
+	    ((m = m_pullup(m, sizeof(struct arphdr))) == NULL)) {
+		log(LOG_ERR, "arp: runt packet -- m_pullup failed\n");
+		return;
 	}
+	ar = mtod(m, struct arphdr *);
+
+	if (ntohs(ar->ar_hrd) != ARPHRD_ETHER &&
+	    ntohs(ar->ar_hrd) != ARPHRD_IEEE802 &&
+	    ntohs(ar->ar_hrd) != ARPHRD_ARCNET) {
+		log(LOG_ERR, "arp: unknown hardware address format (0x%2D)\n",
+		    (unsigned char *)&ar->ar_hrd, "");
+		m_freem(m);
+		return;
+	}
+
+	if (m->m_pkthdr.len < arphdr_len(ar) &&
+	    (m = m_pullup(m, arphdr_len(ar))) == NULL) {
+		log(LOG_ERR, "arp: runt packet\n");
+		m_freem(m);
+		return;
+	}
+
+	switch (ntohs(ar->ar_pro)) {
+#ifdef INET
+	case ETHERTYPE_IP:
+		in_arpinput(m);
+		return;
+#endif
+	}
+	m_freem(m);
 }
 
 #ifdef INET
@@ -780,6 +776,7 @@ match:
 			rt->rt_expire = time_second + arpt_keep;
 		rt->rt_flags &= ~RTF_REJECT;
 		la->la_asked = 0;
+		la->la_preempt = arp_maxtries;
 		if (la->la_hold) {
 			(*ifp->if_output)(ifp, la->la_hold,
 				rt_key(rt), rt);
@@ -929,7 +926,7 @@ arptfree(la)
 	if (rt->rt_refcnt > 0 && (sdl = SDL(rt->rt_gateway)) &&
 	    sdl->sdl_family == AF_LINK) {
 		sdl->sdl_alen = 0;
-		la->la_asked = 0;
+		la->la_preempt = la->la_asked = 0;
 		rt->rt_flags &= ~RTF_REJECT;
 		return;
 	}
@@ -991,7 +988,7 @@ arp_init(void)
 	arpintrq.ifq_maxlen = 50;
 	mtx_init(&arpintrq.ifq_mtx, "arp_inq", NULL, MTX_DEF);
 	LIST_INIT(&llinfo_arp);
-	register_netisr(NETISR_ARP, arpintr);
+	netisr_register(NETISR_ARP, arpintr, &arpintrq);
 }
 
 SYSINIT(arp, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY, arp_init, 0);

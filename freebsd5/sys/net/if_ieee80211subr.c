@@ -265,6 +265,7 @@ ieee80211_input(struct ifnet *ifp, struct mbuf *m, int rssi, u_int32_t rstamp)
 	u_int8_t dir, subtype;
 	u_int8_t *bssid;
 	u_int16_t rxseq;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	/* trim CRC here for WEP can find its own CRC at the end of packet. */
 	if (m->m_flags & M_HASFCS) {

@@ -31,11 +31,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.106 2002/10/16 01:54:44 sam Exp $
+ * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.116 2003/04/15 02:14:43 silby Exp $
  */
 
 #include "opt_mac.h"
 #include "opt_param.h"
+#include "opt_mbuf_stress_test.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,6 +53,13 @@ int	max_linkhdr;
 int	max_protohdr;
 int	max_hdr;
 int	max_datalen;
+int	m_defragpackets;
+int	m_defragbytes;
+int	m_defraguseless;
+int	m_defragfailure;
+#ifdef MBUF_STRESS_TEST
+int	m_defragrandomfailures;
+#endif
 
 /*
  * sysctl(8) exported objects
@@ -64,32 +72,82 @@ SYSCTL_INT(_kern_ipc, KIPC_MAX_PROTOHDR, max_protohdr, CTLFLAG_RW,
 SYSCTL_INT(_kern_ipc, KIPC_MAX_HDR, max_hdr, CTLFLAG_RW, &max_hdr, 0, "");
 SYSCTL_INT(_kern_ipc, KIPC_MAX_DATALEN, max_datalen, CTLFLAG_RW,
 	   &max_datalen, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragpackets, CTLFLAG_RD,
+	   &m_defragpackets, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragbytes, CTLFLAG_RD,
+	   &m_defragbytes, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defraguseless, CTLFLAG_RD,
+	   &m_defraguseless, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragfailure, CTLFLAG_RD,
+	   &m_defragfailure, 0, "");
+#ifdef MBUF_STRESS_TEST
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragrandomfailures, CTLFLAG_RW,
+	   &m_defragrandomfailures, 0, "");
+#endif
+
 
 /*
- * Copy mbuf pkthdr from "from" to "to".
+ * "Move" mbuf pkthdr from "from" to "to".
  * "from" must have M_PKTHDR set, and "to" must be empty.
- * aux pointer will be moved to "to".
  */
 void
-m_copy_pkthdr(struct mbuf *to, struct mbuf *from)
+m_move_pkthdr(struct mbuf *to, struct mbuf *from)
 {
 
 #if 0
-	KASSERT(to->m_flags & M_PKTHDR,
-	    ("m_copy_pkthdr() called on non-header"));
+	/* see below for why these are not enabled */
+	M_ASSERTPKTHDR(to);
+	/* Note: with MAC, this may not be a good assertion. */
+	KASSERT(SLIST_EMPTY(&to->m_pkthdr.tags),
+	    ("m_move_pkthdr: to has tags"));
+#endif
+	KASSERT((to->m_flags & M_EXT) == 0, ("m_move_pkthdr: to has cluster"));
+#ifdef MAC
+	/*
+	 * XXXMAC: It could be this should also occur for non-MAC?
+	 */
+	if (to->m_flags & M_PKTHDR)
+		m_tag_delete_chain(to, NULL);
+#endif
+	to->m_flags = from->m_flags & M_COPYFLAGS;
+	to->m_data = to->m_pktdat;
+	to->m_pkthdr = from->m_pkthdr;		/* especially tags */
+	SLIST_INIT(&from->m_pkthdr.tags);	/* purge tags from src */
+	from->m_flags &= ~M_PKTHDR;
+}
+
+/*
+ * Duplicate "from"'s mbuf pkthdr in "to".
+ * "from" must have M_PKTHDR set, and "to" must be empty.
+ * In particular, this does a deep copy of the packet tags.
+ */
+int
+m_dup_pkthdr(struct mbuf *to, struct mbuf *from)	
+	/* XXX: removed the 3rd arg ('how') from original FreeBSD */
+{
+
+#if 0
+	/*
+	 * The mbuf allocator only initializes the pkthdr
+	 * when the mbuf is allocated with MGETHDR. Many users
+	 * (e.g. m_copy*, m_prepend) use MGET and then
+	 * smash the pkthdr as needed causing these
+	 * assertions to trip.  For now just disable them.
+	 */
+	M_ASSERTPKTHDR(to);
+	/* Note: with MAC, this may not be a good assertion. */
+	KASSERT(SLIST_EMPTY(&to->m_pkthdr.tags), ("m_dup_pkthdr: to has tags"));
 #endif
 #ifdef MAC
 	if (to->m_flags & M_PKTHDR)
-		mac_destroy_mbuf(to);
+		m_tag_delete_chain(to, NULL);
 #endif
-	to->m_data = to->m_pktdat;
-	to->m_flags = from->m_flags & M_COPYFLAGS;
+	to->m_flags = (from->m_flags & M_COPYFLAGS) | (to->m_flags & M_EXT);
+	if ((to->m_flags & M_EXT) == 0)
+		to->m_data = to->m_pktdat;
 	to->m_pkthdr = from->m_pkthdr;
-#ifdef MAC
-	mac_init_mbuf(to, 1);			/* XXXMAC no way to fail */
-	mac_create_mbuf_from_mbuf(from, to);
-#endif
-	SLIST_INIT(&from->m_pkthdr.tags);
+	SLIST_INIT(&to->m_pkthdr.tags);
+	return (m_tag_copy_chain(to, from));	/* XXX: removed 'how' here */
 }
 
 /*
@@ -108,7 +166,7 @@ m_prepend(struct mbuf *m, int len, int how)
 		return (NULL);
 	}
 	if (m->m_flags & M_PKTHDR) {
-		M_COPY_PKTHDR(mn, m);
+		M_MOVE_PKTHDR(mn, m);
 #ifdef MAC
 		mac_destroy_mbuf(m);
 #endif
@@ -161,7 +219,8 @@ m_copym(struct mbuf *m, int off0, int len, int wait)
 		if (n == NULL)
 			goto nospace;
 		if (copyhdr) {
-			M_COPY_PKTHDR(n, m);
+			if (!m_dup_pkthdr(n, m))
+				goto nospace;
 			if (len == M_COPYALL)
 				n->m_pkthdr.len -= off0;
 			else
@@ -212,7 +271,8 @@ m_copypacket(struct mbuf *m, int how)
 	if (n == NULL)
 		goto nospace;
 
-	M_COPY_PKTHDR(n, m);
+	if (!m_dup_pkthdr(n, m))
+		goto nospace;
 	n->m_len = m->m_len;
 	if (m->m_flags & M_EXT) {
 		n->m_data = m->m_data;
@@ -295,7 +355,7 @@ m_dup(struct mbuf *m, int how)
 	/* Sanity check */
 	if (m == NULL)
 		return (NULL);
-	KASSERT((m->m_flags & M_PKTHDR) != 0, ("%s: !PKTHDR", __func__));
+	M_ASSERTPKTHDR(m);
 
 	/* While there's more data, get a new mbuf, tack it on, and fill it */
 	remain = m->m_pkthdr.len;
@@ -309,7 +369,8 @@ m_dup(struct mbuf *m, int how)
 		if (n == NULL)
 			goto nospace;
 		if (top == NULL) {		/* first one, must be PKTHDR */
-			M_COPY_PKTHDR(n, m);
+			if (!m_dup_pkthdr(n, m))
+				goto nospace;
 			nsize = MHLEN;
 		} else				/* not the first one */
 			nsize = MLEN;
@@ -485,7 +546,7 @@ m_pullup(struct mbuf *n, int len)
 			goto bad;
 		m->m_len = 0;
 		if (n->m_flags & M_PKTHDR) {
-			M_COPY_PKTHDR(m, n);
+			m_dup_pkthdr(m, n);
 			n->m_flags &= ~M_PKTHDR;
 		}
 	}
@@ -736,4 +797,82 @@ m_length(struct mbuf *m0, struct mbuf **last)
 	if (last != NULL)
 		*last = m;
 	return (len);
+}
+
+/*
+ * Defragment a mbuf chain, returning the shortest possible
+ * chain of mbufs and clusters.  If allocation fails and
+ * this cannot be completed, NULL will be returned, but
+ * the passed in chain will be unchanged.  Upon success,
+ * the original chain will be freed, and the new chain
+ * will be returned.
+ *
+ * If a non-packet header is passed in, the original
+ * mbuf (chain?) will be returned unharmed.
+ */
+struct mbuf *
+m_defrag(struct mbuf *m0, int how)
+{
+	struct mbuf	*m_new = NULL, *m_final = NULL;
+	int		progress = 0, length;
+
+	if (!(m0->m_flags & M_PKTHDR))
+		return (m0);
+
+#ifdef MBUF_STRESS_TEST
+	if (m_defragrandomfailures) {
+		int temp = arc4random() & 0xff;
+		if (temp == 0xba)
+			goto nospace;
+	}
+#endif
+	
+	if (m0->m_pkthdr.len > MHLEN)
+		m_final = m_getcl(how, MT_DATA, M_PKTHDR);
+	else
+		m_final = m_gethdr(how, MT_DATA);
+
+	if (m_final == NULL)
+		goto nospace;
+
+	if (m_dup_pkthdr(m_final, m0) == NULL)
+		goto nospace;
+
+	m_new = m_final;
+
+	while (progress < m0->m_pkthdr.len) {
+		length = m0->m_pkthdr.len - progress;
+		if (length > MCLBYTES)
+			length = MCLBYTES;
+
+		if (m_new == NULL) {
+			if (length > MLEN)
+				m_new = m_getcl(how, MT_DATA, 0);
+			else
+				m_new = m_get(how, MT_DATA);
+			if (m_new == NULL)
+				goto nospace;
+		}
+
+		m_copydata(m0, progress, length, mtod(m_new, caddr_t));
+		progress += length;
+		m_new->m_len = length;
+		if (m_new != m_final)
+			m_cat(m_final, m_new);
+		m_new = NULL;
+	}
+	if (m0->m_next == NULL)
+		m_defraguseless++;
+	m_freem(m0);
+	m0 = m_final;
+	m_defragpackets++;
+	m_defragbytes += m0->m_pkthdr.len;
+	return (m0);
+nospace:
+	m_defragfailure++;
+	if (m_new)
+		m_free(m_new);
+	if (m_final)
+		m_freem(m_final);
+	return (NULL);
 }

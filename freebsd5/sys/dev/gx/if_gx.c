@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/gx/if_gx.c,v 1.7 2002/11/14 23:54:52 sam Exp $
+ *	$FreeBSD: src/sys/dev/gx/if_gx.c,v 1.10 2003/04/15 06:37:24 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -72,6 +72,8 @@
 #include <dev/gx/if_gxreg.h>
 #include <dev/gx/if_gxvar.h>
 
+MODULE_DEPEND(gx, pci, 1, 1, 1);
+MODULE_DEPEND(gx, ether, 1, 1, 1);
 MODULE_DEPEND(gx, miibus, 1, 1, 1);
 #include "miibus_if.h"
 
@@ -196,7 +198,7 @@ static driver_t gx_driver = {
 
 static devclass_t gx_devclass;
 
-DRIVER_MODULE(if_gx, pci, gx_driver, gx_devclass, 0, 0);
+DRIVER_MODULE(gx, pci, gx_driver, gx_devclass, 0, 0);
 DRIVER_MODULE(miibus, gx, miibus_driver, miibus_devclass, 0, 0);
 
 static struct gx_device *

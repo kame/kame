@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/kern/uipc_mbuf2.c,v 1.14 2002/11/26 17:59:16 sam Exp $	*/
+/*	$FreeBSD: src/sys/kern/uipc_mbuf2.c,v 1.19 2003/04/14 20:39:05 rwatson Exp $	*/
 /*	$KAME: uipc_mbuf2.c,v 1.31 2001/11/28 11:08:53 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
@@ -68,10 +68,13 @@
 
 /*#define PULLDOWN_DEBUG*/
 
+#include "opt_mac.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
+#include <sys/mac.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/mutex.h>
@@ -298,8 +301,10 @@ m_dup1(struct mbuf *m, int off, int len, int wait)
 	if (!n)
 		return NULL;
 
-	if (copyhdr)
-		M_COPY_PKTHDR(n, m);
+	if (copyhdr && !m_dup_pkthdr(n, m)) {
+		m_free(n);
+		return NULL;
+	}
 	m_copydata(m, off, len, mtod(n, caddr_t));
 	return n;
 }
@@ -325,6 +330,10 @@ m_tag_alloc(u_int32_t cookie, int type, int len, int wait)
 void
 m_tag_free(struct m_tag *t)
 {
+#ifdef MAC
+	if (t->m_tag_id == PACKET_TAG_MACLABEL)
+		mac_destroy_mbuf_tag(t);
+#endif
 	free(t, M_PACKET_TAGS);
 }
 
@@ -393,6 +402,7 @@ m_tag_locate(struct mbuf *m, u_int32_t cookie, int type, struct m_tag *t)
 /* Copy a single tag. */
 struct m_tag *
 m_tag_copy(struct m_tag *t)
+/* removed the 2nd arg (how) from the original FreeBSD */
 {
 	struct m_tag *p;
 
@@ -400,7 +410,21 @@ m_tag_copy(struct m_tag *t)
 	p = m_tag_alloc(t->m_tag_cookie, t->m_tag_id, t->m_tag_len, M_NOWAIT);
 	if (p == NULL)
 		return (NULL);
-	bcopy(t + 1, p + 1, t->m_tag_len); /* Copy the data */
+#ifdef MAC
+	/*
+	 * XXXMAC: we should probably pass off the initialization, and
+	 * copying here?  can we hide that PACKET_TAG_MACLABEL is
+	 * special from the mbuf code?
+	 */
+	if (t->m_tag_id == PACKET_TAG_MACLABEL) {
+		if (mac_init_mbuf_tag(p, how) != 0) {
+			m_tag_free(p);
+			return (NULL);
+		}
+		mac_copy_mbuf_tag(t, p);
+	} else
+#endif
+		bcopy(t + 1, p + 1, t->m_tag_len); /* Copy the data */
 	return p;
 }
 
@@ -412,6 +436,7 @@ m_tag_copy(struct m_tag *t)
  */
 int
 m_tag_copy_chain(struct mbuf *to, struct mbuf *from)
+/* removed the 3rd arg (how) from the original FreeBSD */
 {
 	struct m_tag *p, *t, *tprev = NULL;
 
@@ -426,10 +451,9 @@ m_tag_copy_chain(struct mbuf *to, struct mbuf *from)
 		}
 		if (tprev == NULL)
 			SLIST_INSERT_HEAD(&to->m_pkthdr.tags, t, m_tag_link);
-		else {
+		else
 			SLIST_INSERT_AFTER(tprev, t, m_tag_link);
-			tprev = t;
-		}
+		tprev = t;
 	}
 	return 1;
 }

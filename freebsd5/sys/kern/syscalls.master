@@ -1,4 +1,4 @@
- $FreeBSD: src/sys/kern/syscalls.master,v 1.137 2002/11/16 06:35:53 deischen Exp $
+ $FreeBSD: src/sys/kern/syscalls.master,v 1.149 2003/04/09 02:55:18 mike Exp $
 ;	from: @(#)syscalls.master	8.2 (Berkeley) 1/13/94
 ;
 ; System call name/number master file.
@@ -352,20 +352,20 @@
 			    union semun *arg); }
 221	MNOSTD	BSD	{ int semget(key_t key, int nsems, int semflg); }
 222	MNOSTD	BSD	{ int semop(int semid, struct sembuf *sops, \
-			    u_int nsops); }
+			    size_t nsops); }
 223	UNIMPL	NOHIDE	semconfig
 224	MNOSTD	BSD	{ int msgctl(int msqid, int cmd, \
 			    struct msqid_ds *buf); }
 225	MNOSTD	BSD	{ int msgget(key_t key, int msgflg); }
-226	MNOSTD	BSD	{ int msgsnd(int msqid, void *msgp, size_t msgsz, \
+226	MNOSTD	BSD	{ int msgsnd(int msqid, const void *msgp, size_t msgsz, \
 			    int msgflg); }
 227	MNOSTD	BSD	{ int msgrcv(int msqid, void *msgp, size_t msgsz, \
 			    long msgtyp, int msgflg); }
-228	MNOSTD	BSD	{ int shmat(int shmid, void *shmaddr, int shmflg); }
+228	MNOSTD	BSD	{ int shmat(int shmid, const void *shmaddr, int shmflg); }
 229	MNOSTD	BSD	{ int shmctl(int shmid, int cmd, \
 			    struct shmid_ds *buf); }
-230	MNOSTD	BSD	{ int shmdt(void *shmaddr); }
-231	MNOSTD	BSD	{ int shmget(key_t key, int size, int shmflg); }
+230	MNOSTD	BSD	{ int shmdt(const void *shmaddr); }
+231	MNOSTD	BSD	{ int shmget(key_t key, size_t size, int shmflg); }
 ;
 232	MSTD	POSIX	{ int clock_gettime(clockid_t clock_id, \
 			    struct timespec *tp); }
@@ -494,8 +494,10 @@
 			    struct sigaction *oact); }
 343	MSTD	POSIX	{ int sigpending(sigset_t *set); }
 344	MCOMPAT4 BSD	{ int sigreturn(const struct ucontext4 *sigcntxp); }
-345	UNIMPL	NOHIDE	sigtimedwait
-346	UNIMPL	NOHIDE	sigwaitinfo
+345	MSTD	NOHIDE	{ int sigtimedwait(const sigset_t *set, \
+			    siginfo_t *info, const struct timespec *timeout); }
+346	MSTD	NOHIDE	{ int sigwaitinfo(const sigset_t *set, \
+			    siginfo_t *info); }
 347	MSTD	BSD	{ int __acl_get_file(const char *path, \
 			    acl_type_t type, struct acl *aclp); }
 348	MSTD	BSD	{ int __acl_set_file(const char *path, \
@@ -550,12 +552,12 @@
 377	UNIMPL	BSD	afs_syscall
 378	STD	BSD	{ int nmount(struct iovec *iovp, unsigned int iovcnt, \
 			    int flags); }
-379	STD	BSD	{ int kse_exit(void); }
-380	STD	BSD	{ int kse_wakeup(struct kse_mailbox *mbx); }
+379	MSTD	BSD	{ int kse_exit(void); }
+380	MSTD	BSD	{ int kse_wakeup(struct kse_mailbox *mbx); }
 381	STD	BSD	{ int kse_create(struct kse_mailbox *mbx, \
 			    int newgroup); }
-382	STD	BSD	{ int kse_thr_interrupt(struct kse_thr_mailbox *tmbx); }
-383	MSTD	BSD	{ int kse_release(void); }
+382	MSTD	BSD	{ int kse_thr_interrupt(struct kse_thr_mailbox *tmbx); }
+383	MSTD	BSD	{ int kse_release(struct timespec *timeout); }
 384	MSTD	BSD	{ int __mac_get_proc(struct mac *mac_p); }
 385	MSTD	BSD	{ int __mac_set_proc(struct mac *mac_p); }
 386	MSTD	BSD	{ int __mac_get_fd(int fd, struct mac *mac_p); }
@@ -612,6 +614,23 @@
 422	MSTD	BSD	{ int setcontext(const struct __ucontext *ucp); }
 423	MSTD	BSD	{ int swapcontext(struct __ucontext *oucp, \
 			    const struct __ucontext *ucp); }
+424	MSTD	BSD	{ int swapoff(const char *name); }
+425	MSTD	BSD	{ int __acl_get_link(const char *path, \
+			    acl_type_t type, struct acl *aclp); }
+426	MSTD	BSD	{ int __acl_set_link(const char *path, \
+			    acl_type_t type, struct acl *aclp); }
+427	MSTD	BSD	{ int __acl_delete_link(const char *path, \
+			    acl_type_t type); }
+428	MSTD	BSD	{ int __acl_aclcheck_link(const char *path, \
+			    acl_type_t type, struct acl *aclp); }
+429	MSTD	NOHIDE	{ int sigwait(const sigset_t *set, int *sig); }
+430	MSTD	BSD	{ int thr_create(ucontext_t *ctx, thr_id_t *id, int flags); }
+431	MSTD	BSD	{ void thr_exit(void); }
+432	MSTD	BSD	{ int thr_self(thr_id_t *id); }
+433	MSTD	BSD	{ int thr_kill(thr_id_t id, int sig); }
+434	MSTD	BSD	{ int _umtx_lock(struct umtx *umtx); }
+435	MSTD	BSD	{ int _umtx_unlock(struct umtx *umtx); }
+436	MSTD	BSD	{ int jail_attach(int jid); }
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/ia64/ia32/syscalls.master  (take a best guess)

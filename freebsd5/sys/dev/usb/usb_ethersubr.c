@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.12 2002/11/14 23:54:55 sam Exp $
  */
 
 /*
@@ -50,6 +48,9 @@
  * properly.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.14 2003/04/03 21:36:32 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -67,18 +68,13 @@
 #include <dev/usb/usb.h>
 #include <dev/usb/usb_ethersubr.h>
 
-#ifndef lint
-Static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.12 2002/11/14 23:54:55 sam Exp $";
-#endif
-
 Static struct ifqueue usbq_rx;
 Static struct ifqueue usbq_tx;
 Static int mtx_inited = 0;
 
 Static void usbintr		(void);
 
-Static void usbintr()
+Static void usbintr(void)
 {
 	struct mbuf		*m;
 	struct usb_qdat		*q;
@@ -118,7 +114,7 @@ void usb_register_netisr()
 {
 	if (mtx_inited)
 		return;
-	register_netisr(NETISR_USB, usbintr);
+	netisr_register(NETISR_USB, (netisr_t *)usbintr, NULL);
 	mtx_init(&usbq_tx.ifq_mtx, "usbq_tx_mtx", NULL, MTX_DEF);
 	mtx_init(&usbq_rx.ifq_mtx, "usbq_rx_mtx", NULL, MTX_DEF);
 	mtx_inited++;
@@ -126,7 +122,7 @@ void usb_register_netisr()
 }
 
 /*
- * Must be called at splusp() (actually splbio()). This should be
+ * Must be called at splusb() (actually splbio()). This should be
  * the case when called from a transfer callback routine.
  */
 void usb_ether_input(m)

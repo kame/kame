@@ -29,7 +29,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_xl.c,v 1.111 2002/11/14 23:49:09 sam Exp $
  */
 
 /*
@@ -55,6 +54,7 @@
  * 3Com 3c980C-TX	10/100Mbps server adapter (Tornado ASIC)
  * 3Com 3cSOHO100-TX	10/100Mbps/RJ-45 (Hurricane ASIC)
  * 3Com 3c450-TX	10/100Mbps/RJ-45 (Tornado ASIC)
+ * 3Com 3c555		10/100Mbps/RJ-45 (MiniPCI, Laptop Hurricane)
  * 3Com 3c556		10/100Mbps/RJ-45 (MiniPCI, Hurricane ASIC)
  * 3Com 3c556B		10/100Mbps/RJ-45 (MiniPCI, Hurricane ASIC)
  * 3Com 3c575TX		10/100Mbps/RJ-45 (Cardbus, Hurricane ASIC)
@@ -79,7 +79,7 @@
  * (3c59x) also supported a bus master mode, however for those chips
  * you could only DMA packets to/from a contiguous memory buffer. For
  * transmission this would mean copying the contents of the queued mbuf
- * chain into a an mbuf cluster and then DMAing the cluster. This extra
+ * chain into an mbuf cluster and then DMAing the cluster. This extra
  * copy would sort of defeat the purpose of the bus master support for
  * any packet that doesn't fit into a single mbuf.
  *
@@ -100,11 +100,14 @@
  * PCI-based NICs.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_xl.c,v 1.143 2003/04/21 18:34:04 imp Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
+#include <sys/endian.h>
 #include <sys/mbuf.h>
-#include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
 
@@ -116,8 +119,6 @@
 
 #include <net/bpf.h>
 
-#include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
 #include <machine/bus_memio.h>
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
@@ -131,29 +132,14 @@
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
 
+MODULE_DEPEND(xl, pci, 1, 1, 1);
+MODULE_DEPEND(xl, ether, 1, 1, 1);
 MODULE_DEPEND(xl, miibus, 1, 1, 1);
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
 
-/*
- * The following #define causes the code to use PIO to access the
- * chip's registers instead of memory mapped mode. The reason PIO mode
- * is on by default is that the Etherlink XL manual seems to indicate
- * that only the newer revision chips (3c905B) support both PIO and
- * memory mapped access. Since we want to be compatible with the older
- * bus master chips, we use PIO here. If you comment this out, the
- * driver will use memory mapped I/O, which may be faster but which
- * might not work on some devices.
- */
-#define XL_USEIOSPACE
-
 #include <pci/if_xlreg.h>
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_xl.c,v 1.111 2002/11/14 23:49:09 sam Exp $";
-#endif
 
 #define XL905B_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP)
 
@@ -187,6 +173,8 @@ static struct xl_type xl_devs[] = {
 		"3Com 3c905B-COMBO Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_TORNADO_10_100BT,
 		"3Com 3c905C-TX Fast Etherlink XL" },
+	{ TC_VENDORID, TC_DEVICEID_TORNADO_10_100BT_920B,
+		"3Com 3c920B-EMB Integrated Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_HURRICANE_10_100BT_SERV,
 		"3Com 3c980 Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_TORNADO_10_100BT_SERV,
@@ -195,6 +183,8 @@ static struct xl_type xl_devs[] = {
 		"3Com 3cSOHO100-TX OfficeConnect" },
 	{ TC_VENDORID, TC_DEVICEID_TORNADO_HOMECONNECT,
 		"3Com 3c450-TX HomeConnect" },
+	{ TC_VENDORID, TC_DEVICEID_HURRICANE_555,
+		"3Com 3c555 Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_HURRICANE_556,
 		"3Com 3c556 Fast Etherlink XL" },
 	{ TC_VENDORID, TC_DEVICEID_HURRICANE_556B,
@@ -222,9 +212,6 @@ static int xl_newbuf		(struct xl_softc *, struct xl_chain_onefrag *);
 static void xl_stats_update	(void *);
 static int xl_encap		(struct xl_softc *, struct xl_chain *,
 						struct mbuf *);
-static int xl_encap_90xB	(struct xl_softc *, struct xl_chain *,
-						struct mbuf *);
-
 static void xl_rxeof		(struct xl_softc *);
 static int xl_rx_resync		(struct xl_softc *);
 static void xl_txeof		(struct xl_softc *);
@@ -263,6 +250,11 @@ static int xl_list_tx_init_90xB	(struct xl_softc *);
 static void xl_wait		(struct xl_softc *);
 static void xl_mediacheck	(struct xl_softc *);
 static void xl_choose_xcvr	(struct xl_softc *, int);
+static void xl_dma_map_addr	(void *, bus_dma_segment_t *, int, int);
+static void xl_dma_map_rxbuf	(void *, bus_dma_segment_t *, int, bus_size_t,
+						int);
+static void xl_dma_map_txbuf	(void *, bus_dma_segment_t *, int, bus_size_t,
+						int);
 #ifdef notdef
 static void xl_testpacket	(struct xl_softc *);
 #endif
@@ -271,14 +263,6 @@ static int xl_miibus_readreg	(device_t, int, int);
 static int xl_miibus_writereg	(device_t, int, int, int);
 static void xl_miibus_statchg	(device_t);
 static void xl_miibus_mediainit	(device_t);
-
-#ifdef XL_USEIOSPACE
-#define XL_RES			SYS_RES_IOPORT
-#define XL_RID			XL_PCI_LOIO
-#else
-#define XL_RES			SYS_RES_MEMORY
-#define XL_RID			XL_PCI_LOMEM
-#endif
 
 static device_method_t xl_methods[] = {
 	/* Device interface */
@@ -310,9 +294,68 @@ static driver_t xl_driver = {
 
 static devclass_t xl_devclass;
 
-DRIVER_MODULE(if_xl, cardbus, xl_driver, xl_devclass, 0, 0);
-DRIVER_MODULE(if_xl, pci, xl_driver, xl_devclass, 0, 0);
+DRIVER_MODULE(xl, cardbus, xl_driver, xl_devclass, 0, 0);
+DRIVER_MODULE(xl, pci, xl_driver, xl_devclass, 0, 0);
 DRIVER_MODULE(miibus, xl, miibus_driver, miibus_devclass, 0, 0);
+
+static void
+xl_dma_map_addr(arg, segs, nseg, error)
+	void *arg;
+	bus_dma_segment_t *segs;
+	int nseg, error;
+{
+	u_int32_t *paddr;
+	
+	paddr = arg;
+	*paddr = segs->ds_addr;
+}
+
+static void
+xl_dma_map_rxbuf(arg, segs, nseg, mapsize, error)
+	void *arg;
+	bus_dma_segment_t *segs;
+	int nseg;
+	bus_size_t mapsize;
+	int error;
+{
+	u_int32_t *paddr;
+
+	if (error)
+		return;
+	KASSERT(nseg == 1, ("xl_dma_map_rxbuf: too many DMA segments"));
+	paddr = arg;
+	*paddr = segs->ds_addr;
+}
+
+static void
+xl_dma_map_txbuf(arg, segs, nseg, mapsize, error)
+	void *arg;
+	bus_dma_segment_t *segs;
+	int nseg;
+	bus_size_t mapsize;
+	int error;
+{
+	struct xl_list *l;
+	int i, total_len;
+
+	if (error)
+		return;
+
+	KASSERT(nseg <= XL_MAXFRAGS, ("too many DMA segments"));
+
+	total_len = 0;
+	l = arg;
+	for (i = 0; i < nseg; i++) {
+		KASSERT(segs[i].ds_len <= MCLBYTES, ("segment size too large"));
+		l->xl_frag[i].xl_addr = htole32(segs[i].ds_addr);
+		l->xl_frag[i].xl_len = htole32(segs[i].ds_len);
+		total_len += segs[i].ds_len;
+	}
+	l->xl_frag[nseg - 1].xl_len = htole32(segs[nseg - 1].ds_len |
+	    XL_LAST_FRAG);
+	l->xl_status = htole32(total_len);
+	l->xl_next = 0;
+}
 
 /*
  * Murphy's law says that it's possible the chip can wedge and
@@ -370,7 +413,9 @@ xl_mii_sync(sc)
 
 	for (i = 0; i < 32; i++) {
 		MII_SET(XL_MII_CLK);
+		MII_SET(XL_MII_DATA);
 		MII_CLR(XL_MII_CLK);
+		MII_SET(XL_MII_DATA);
 	}
 
 	return;
@@ -453,8 +498,8 @@ xl_mii_readreg(sc, frame)
 
 	/* Check for ack */
 	MII_CLR(XL_MII_CLK);
-	MII_SET(XL_MII_CLK);
 	ack = CSR_READ_2(sc, XL_W4_PHY_MGMT) & XL_MII_DATA;
+	MII_SET(XL_MII_CLK);
 
 	/*
 	 * Now try reading data bits. If the ack failed, we still
@@ -1194,6 +1239,7 @@ xl_choose_xcvr(sc, verbose)
 			printf("xl%d: guessing 10baseFL\n", sc->xl_unit);
 		break;
 	case TC_DEVICEID_BOOMERANG_10_100BT:	/* 3c905-TX */
+	case TC_DEVICEID_HURRICANE_555:		/* 3c555 */
 	case TC_DEVICEID_HURRICANE_556:		/* 3c556 */
 	case TC_DEVICEID_HURRICANE_556B:	/* 3c556B */
 	case TC_DEVICEID_HURRICANE_575A:	/* 3c575TX */
@@ -1202,6 +1248,7 @@ xl_choose_xcvr(sc, verbose)
 	case TC_DEVICEID_HURRICANE_656:		/* 3c656 */
 	case TC_DEVICEID_HURRICANE_656B:	/* 3c656B */
 	case TC_DEVICEID_TORNADO_656C:		/* 3c656C */
+	case TC_DEVICEID_TORNADO_10_100BT_920B:	/* 3c920B-EMB */
 		sc->xl_media = XL_MEDIAOPT_MII;
 		sc->xl_xcvr = XL_XCVR_MII;
 		if (verbose)
@@ -1251,26 +1298,29 @@ xl_attach(dev)
 	device_t		dev;
 {
 	u_char			eaddr[ETHER_ADDR_LEN];
-	u_int32_t		command;
+	u_int16_t		xcvr[2];
 	struct xl_softc		*sc;
 	struct ifnet		*ifp;
 	int			media = IFM_ETHER|IFM_100_TX|IFM_FDX;
-	int			unit, error = 0, rid;
+	int			unit, error = 0, rid, res;
 
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
 
 	mtx_init(&sc->xl_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-	XL_LOCK(sc);
+	ifmedia_init(&sc->ifmedia, 0, xl_ifmedia_upd, xl_ifmedia_sts);
 
 	sc->xl_flags = 0;
+	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_555)
+		sc->xl_flags |= XL_FLAG_EEPROM_OFFSET_30 | XL_FLAG_PHYOK;
 	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_556 ||
 	    pci_get_device(dev) == TC_DEVICEID_HURRICANE_556B)
 		sc->xl_flags |= XL_FLAG_FUNCREG | XL_FLAG_PHYOK |
 		    XL_FLAG_EEPROM_OFFSET_30 | XL_FLAG_WEIRDRESET |
 		    XL_FLAG_INVERT_LED_PWR | XL_FLAG_INVERT_MII_PWR;
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_556)
+	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_555 ||
+	    pci_get_device(dev) == TC_DEVICEID_HURRICANE_556)
 		sc->xl_flags |= XL_FLAG_8BITROM;
 	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_556B)
 		sc->xl_flags |= XL_FLAG_NO_XCVR_PWR;
@@ -1294,6 +1344,8 @@ xl_attach(dev)
 	    pci_get_device(dev) == TC_DEVICEID_HURRICANE_656B)
 		sc->xl_flags |= XL_FLAG_INVERT_MII_PWR |
 		    XL_FLAG_INVERT_LED_PWR;
+	if (pci_get_device(dev) == TC_DEVICEID_TORNADO_10_100BT_920B)
+		sc->xl_flags |= XL_FLAG_PHYOK;
 
 	/*
 	 * If this is a 3c905B, we have to check one extra thing.
@@ -1338,32 +1390,29 @@ xl_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
-#ifdef XL_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("xl%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("xl%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#endif
+	rid = XL_PCI_LOMEM;
+	res = SYS_RES_MEMORY;
 
-	rid = XL_RID;
-	sc->xl_res = bus_alloc_resource(dev, XL_RES, &rid,
+	sc->xl_res = bus_alloc_resource(dev, res, &rid,
 	    0, ~0, 1, RF_ACTIVE);
 
-	if (sc->xl_res == NULL) {
-		printf ("xl%d: couldn't map ports/memory\n", unit);
-		error = ENXIO;
-		goto fail;
+	if (sc->xl_res != NULL) {
+		sc->xl_flags |= XL_FLAG_USE_MMIO;
+		if (bootverbose)
+			printf("xl%d: using memory mapped I/O\n", unit);
+	} else {
+		rid = XL_PCI_LOIO;
+		res = SYS_RES_IOPORT;
+		sc->xl_res = bus_alloc_resource(dev, res, &rid,
+		    0, ~0, 1, RF_ACTIVE);
+		if (sc->xl_res == NULL) {
+			printf ("xl%d: couldn't map ports/memory\n", unit);
+			error = ENXIO;
+			goto fail;
+		}
+		if (bootverbose)
+			printf("xl%d: using port I/O\n", unit);
 	}
 
 	sc->xl_btag = rman_get_bustag(sc->xl_res);
@@ -1376,7 +1425,6 @@ xl_attach(dev)
 
 		if (sc->xl_fres == NULL) {
 			printf ("xl%d: couldn't map ports/memory\n", unit);
-			bus_release_resource(dev, XL_RES, XL_RID, sc->xl_res);
 			error = ENXIO;
 			goto fail;
 		}
@@ -1385,30 +1433,13 @@ xl_attach(dev)
 		sc->xl_fhandle = rman_get_bushandle(sc->xl_fres);
 	}
 
+	/* Allocate interrupt */
 	rid = 0;
 	sc->xl_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
 	    RF_SHAREABLE | RF_ACTIVE);
-
 	if (sc->xl_irq == NULL) {
 		printf("xl%d: couldn't map interrupt\n", unit);
-		if (sc->xl_fres != NULL)
-			bus_release_resource(dev, SYS_RES_MEMORY,
-			    XL_PCI_FUNCMEM, sc->xl_fres);
-		bus_release_resource(dev, XL_RES, XL_RID, sc->xl_res);
 		error = ENXIO;
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->xl_irq, INTR_TYPE_NET,
-	    xl_intr, sc, &sc->xl_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->xl_irq);
-		if (sc->xl_fres != NULL)
-			bus_release_resource(dev, SYS_RES_MEMORY,
-			    XL_PCI_FUNCMEM, sc->xl_fres);
-		bus_release_resource(dev, XL_RES, XL_RID, sc->xl_res);
-		printf("xl%d: couldn't set up irq\n", unit);
 		goto fail;
 	}
 
@@ -1420,12 +1451,6 @@ xl_attach(dev)
 	 */
 	if (xl_read_eeprom(sc, (caddr_t)&eaddr, XL_EE_OEM_ADR0, 3, 1)) {
 		printf("xl%d: failed to read station address\n", sc->xl_unit);
-		bus_teardown_intr(dev, sc->xl_irq, sc->xl_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->xl_irq);
-		if (sc->xl_fres != NULL)
-			bus_release_resource(dev, SYS_RES_MEMORY,
-			    XL_PCI_FUNCMEM, sc->xl_fres);
-		bus_release_resource(dev, XL_RES, XL_RID, sc->xl_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -1439,22 +1464,93 @@ xl_attach(dev)
 	callout_handle_init(&sc->xl_stat_ch);
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
-	sc->xl_ldata = contigmalloc(sizeof(struct xl_list_data), M_DEVBUF,
-	    M_NOWAIT, 0, 0xffffffff, PAGE_SIZE, 0);
-
-	if (sc->xl_ldata == NULL) {
-		printf("xl%d: no memory for list buffers!\n", unit);
-		bus_teardown_intr(dev, sc->xl_irq, sc->xl_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->xl_irq);
-		if (sc->xl_fres != NULL)
-			bus_release_resource(dev, SYS_RES_MEMORY,
-			    XL_PCI_FUNCMEM, sc->xl_fres);
-		bus_release_resource(dev, XL_RES, XL_RID, sc->xl_res);
-		error = ENXIO;
+	/*
+	 * Now allocate a tag for the DMA descriptor lists and a chunk
+	 * of DMA-able memory based on the tag.  Also obtain the DMA
+	 * addresses of the RX and TX ring, which we'll need later.
+	 * All of our lists are allocated as a contiguous block
+	 * of memory.
+	 */
+	error = bus_dma_tag_create(NULL, 8, 0,
+	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
+	    XL_RX_LIST_SZ, 1, XL_RX_LIST_SZ, 0, &sc->xl_ldata.xl_rx_tag);
+	if (error) {
+		printf("xl%d: failed to allocate rx dma tag\n", unit);
 		goto fail;
 	}
 
-	bzero(sc->xl_ldata, sizeof(struct xl_list_data));
+	error = bus_dmamem_alloc(sc->xl_ldata.xl_rx_tag,
+	    (void **)&sc->xl_ldata.xl_rx_list, BUS_DMA_NOWAIT,
+	    &sc->xl_ldata.xl_rx_dmamap);
+	if (error) {
+		printf("xl%d: no memory for rx list buffers!\n", unit);
+		bus_dma_tag_destroy(sc->xl_ldata.xl_rx_tag);
+		sc->xl_ldata.xl_rx_tag = NULL;
+		goto fail;
+	}
+
+	error = bus_dmamap_load(sc->xl_ldata.xl_rx_tag,
+	    sc->xl_ldata.xl_rx_dmamap, sc->xl_ldata.xl_rx_list,
+	    XL_RX_LIST_SZ, xl_dma_map_addr,
+	    &sc->xl_ldata.xl_rx_dmaaddr, 0);
+	if (error) {
+		printf("xl%d: cannot get dma address of the rx ring!\n", unit);
+		bus_dmamem_free(sc->xl_ldata.xl_rx_tag, sc->xl_ldata.xl_rx_list,
+		    sc->xl_ldata.xl_rx_dmamap);
+		bus_dma_tag_destroy(sc->xl_ldata.xl_rx_tag);
+		sc->xl_ldata.xl_rx_tag = NULL;
+		goto fail;
+	}
+
+	error = bus_dma_tag_create(NULL, 8, 0,
+	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
+	    XL_TX_LIST_SZ, 1, XL_TX_LIST_SZ, 0, &sc->xl_ldata.xl_tx_tag);
+	if (error) {
+		printf("xl%d: failed to allocate tx dma tag\n", unit);
+		goto fail;
+	}
+
+	error = bus_dmamem_alloc(sc->xl_ldata.xl_tx_tag,
+	    (void **)&sc->xl_ldata.xl_tx_list, BUS_DMA_NOWAIT,
+	    &sc->xl_ldata.xl_tx_dmamap);
+	if (error) {
+		printf("xl%d: no memory for list buffers!\n", unit);
+		bus_dma_tag_destroy(sc->xl_ldata.xl_tx_tag);
+		sc->xl_ldata.xl_tx_tag = NULL;
+		goto fail;
+	}
+
+	error = bus_dmamap_load(sc->xl_ldata.xl_tx_tag,
+	    sc->xl_ldata.xl_tx_dmamap, sc->xl_ldata.xl_tx_list,
+	    XL_TX_LIST_SZ, xl_dma_map_addr,
+	    &sc->xl_ldata.xl_tx_dmaaddr, 0);
+	if (error) {
+		printf("xl%d: cannot get dma address of the tx ring!\n", unit);
+		bus_dmamem_free(sc->xl_ldata.xl_tx_tag, sc->xl_ldata.xl_tx_list,
+		    sc->xl_ldata.xl_tx_dmamap);
+		bus_dma_tag_destroy(sc->xl_ldata.xl_tx_tag);
+		sc->xl_ldata.xl_tx_tag = NULL;
+		goto fail;
+	}
+
+	/*
+	 * Allocate a DMA tag for the mapping of mbufs.
+	 */
+	error = bus_dma_tag_create(NULL, 1, 0,
+	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
+	    MCLBYTES * XL_MAXFRAGS, XL_MAXFRAGS, MCLBYTES, 0, &sc->xl_mtag);
+	if (error) {
+		printf("xl%d: failed to allocate mbuf dma tag\n", unit);
+		goto fail;
+	}
+
+	bzero(sc->xl_ldata.xl_tx_list, XL_TX_LIST_SZ);
+	bzero(sc->xl_ldata.xl_rx_list, XL_RX_LIST_SZ);
+
+	/* We need a spare DMA map for the RX ring. */
+	error = bus_dmamap_create(sc->xl_mtag, 0, &sc->xl_tmpmap);
+	if (error)
+		goto fail;
 
 	/*
 	 * Figure out the card type. 3c905B adapters have the
@@ -1499,7 +1595,8 @@ xl_attach(dev)
 		printf("xl%d: media options word: %x\n", sc->xl_unit,
 							 sc->xl_media);
 
-	xl_read_eeprom(sc, (char *)&sc->xl_xcvr, XL_EE_ICFG_0, 2, 0);
+	xl_read_eeprom(sc, (char *)&xcvr, XL_EE_ICFG_0, 2, 0);
+	sc->xl_xcvr = xcvr[0] | xcvr[1] << 16;
 	sc->xl_xcvr &= XL_ICFG_CONNECTOR_MASK;
 	sc->xl_xcvr >>= XL_ICFG_CONNECTOR_BITS;
 
@@ -1513,11 +1610,6 @@ xl_attach(dev)
 		if (mii_phy_probe(dev, &sc->xl_miibus,
 		    xl_ifmedia_upd, xl_ifmedia_sts)) {
 			printf("xl%d: no PHY found!\n", sc->xl_unit);
-			bus_teardown_intr(dev, sc->xl_irq, sc->xl_intrhand);
-			bus_release_resource(dev, SYS_RES_IRQ, 0, sc->xl_irq);
-			bus_release_resource(dev, XL_RES, XL_RID, sc->xl_res);
-			contigfree(sc->xl_ldata,
-			    sizeof(struct xl_list_data), M_DEVBUF);
 			error = ENXIO;
 			goto fail;
 		}
@@ -1536,9 +1628,6 @@ xl_attach(dev)
 	/*
 	 * Do ifmedia setup.
 	 */
-
-	ifmedia_init(&sc->ifmedia, 0, xl_ifmedia_upd, xl_ifmedia_sts);
-
 	if (sc->xl_media & XL_MEDIAOPT_BT) {
 		if (bootverbose)
 			printf("xl%d: found 10baseT\n", sc->xl_unit);
@@ -1636,46 +1725,90 @@ done:
 	 * Call MI attach routine.
 	 */
 	ether_ifattach(ifp, eaddr);
-	XL_UNLOCK(sc);
-	return(0);
+
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->xl_irq, INTR_TYPE_NET,
+	    xl_intr, sc, &sc->xl_intrhand);
+	if (error) {
+		printf("xl%d: couldn't set up irq\n", unit);
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
-	XL_UNLOCK(sc);
-	mtx_destroy(&sc->xl_mtx);
+	if (error)
+		xl_detach(dev);
 
 	return(error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 xl_detach(dev)
 	device_t		dev;
 {
 	struct xl_softc		*sc;
 	struct ifnet		*ifp;
+	int			rid, res;
 
 	sc = device_get_softc(dev);
+	KASSERT(mtx_initialized(&sc->xl_mtx), ("xl mutex not initialized"));
 	XL_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	xl_reset(sc);
-	xl_stop(sc);
-	ether_ifdetach(ifp);
-
-	/* Delete any miibus and phy devices attached to this interface */
-	if (sc->xl_miibus != NULL) {
-		bus_generic_detach(dev);
-		device_delete_child(dev, sc->xl_miibus);
+	if (sc->xl_flags & XL_FLAG_USE_MMIO) {
+		rid = XL_PCI_LOMEM;  
+		res = SYS_RES_MEMORY;
+	} else {
+		rid = XL_PCI_LOIO;   
+		res = SYS_RES_IOPORT;
 	}
 
-	bus_teardown_intr(dev, sc->xl_irq, sc->xl_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->xl_irq);
+	/* These should only be active if attach succeeded */
+	if (device_is_attached(dev)) {
+		xl_reset(sc);
+		xl_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->xl_miibus)
+		device_delete_child(dev, sc->xl_miibus);
+	bus_generic_detach(dev);
+	ifmedia_removeall(&sc->ifmedia);
+
+	if (sc->xl_intrhand)
+		bus_teardown_intr(dev, sc->xl_irq, sc->xl_intrhand);
+	if (sc->xl_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->xl_irq);
 	if (sc->xl_fres != NULL)
 		bus_release_resource(dev, SYS_RES_MEMORY,
 		    XL_PCI_FUNCMEM, sc->xl_fres);
-	bus_release_resource(dev, XL_RES, XL_RID, sc->xl_res);
+	if (sc->xl_res)
+		bus_release_resource(dev, res, rid, sc->xl_res);
 
-	ifmedia_removeall(&sc->ifmedia);
-	contigfree(sc->xl_ldata, sizeof(struct xl_list_data), M_DEVBUF);
+	if (sc->xl_mtag) {
+		bus_dmamap_destroy(sc->xl_mtag, sc->xl_tmpmap);
+		bus_dma_tag_destroy(sc->xl_mtag);
+	}
+	if (sc->xl_ldata.xl_rx_tag) {
+		bus_dmamap_unload(sc->xl_ldata.xl_rx_tag,
+		    sc->xl_ldata.xl_rx_dmamap);
+		bus_dmamem_free(sc->xl_ldata.xl_rx_tag, sc->xl_ldata.xl_rx_list,
+		    sc->xl_ldata.xl_rx_dmamap);
+		bus_dma_tag_destroy(sc->xl_ldata.xl_rx_tag);
+	}
+	if (sc->xl_ldata.xl_tx_tag) {
+		bus_dmamap_unload(sc->xl_ldata.xl_tx_tag,
+		    sc->xl_ldata.xl_tx_dmamap);
+		bus_dmamem_free(sc->xl_ldata.xl_tx_tag, sc->xl_ldata.xl_tx_list,
+		    sc->xl_ldata.xl_tx_dmamap);
+		bus_dma_tag_destroy(sc->xl_ldata.xl_tx_tag);
+	}
 
 	XL_UNLOCK(sc);
 	mtx_destroy(&sc->xl_mtx);
@@ -1692,12 +1825,18 @@ xl_list_tx_init(sc)
 {
 	struct xl_chain_data	*cd;
 	struct xl_list_data	*ld;
-	int			i;
+	int			error, i;
 
 	cd = &sc->xl_cdata;
-	ld = sc->xl_ldata;
+	ld = &sc->xl_ldata;
 	for (i = 0; i < XL_TX_LIST_CNT; i++) {
 		cd->xl_tx_chain[i].xl_ptr = &ld->xl_tx_list[i];
+		error = bus_dmamap_create(sc->xl_mtag, 0,
+		    &cd->xl_tx_chain[i].xl_map);
+		if (error)
+			return(error);
+		cd->xl_tx_chain[i].xl_phys = ld->xl_tx_dmaaddr +
+		    i * sizeof(struct xl_list);
 		if (i == (XL_TX_LIST_CNT - 1))
 			cd->xl_tx_chain[i].xl_next = NULL;
 		else
@@ -1707,24 +1846,31 @@ xl_list_tx_init(sc)
 	cd->xl_tx_free = &cd->xl_tx_chain[0];
 	cd->xl_tx_tail = cd->xl_tx_head = NULL;
 
+	bus_dmamap_sync(ld->xl_tx_tag, ld->xl_tx_dmamap, BUS_DMASYNC_PREWRITE);
 	return(0);
 }
 
 /*
  * Initialize the transmit descriptors.
  */
-static int xl_list_tx_init_90xB(sc)
+static int
+xl_list_tx_init_90xB(sc)
 	struct xl_softc		*sc;
 {
 	struct xl_chain_data	*cd;
 	struct xl_list_data	*ld;
-	int			i;
+	int			error, i;
 
 	cd = &sc->xl_cdata;
-	ld = sc->xl_ldata;
+	ld = &sc->xl_ldata;
 	for (i = 0; i < XL_TX_LIST_CNT; i++) {
 		cd->xl_tx_chain[i].xl_ptr = &ld->xl_tx_list[i];
-		cd->xl_tx_chain[i].xl_phys = vtophys(&ld->xl_tx_list[i]);
+		error = bus_dmamap_create(sc->xl_mtag, 0,
+		    &cd->xl_tx_chain[i].xl_map);
+		if (error)
+			return(error);
+		cd->xl_tx_chain[i].xl_phys = ld->xl_tx_dmaaddr +
+		    i * sizeof(struct xl_list);
 		if (i == (XL_TX_LIST_CNT - 1))
 			cd->xl_tx_chain[i].xl_next = &cd->xl_tx_chain[0];
 		else
@@ -1737,14 +1883,14 @@ static int xl_list_tx_init_90xB(sc)
 			    &cd->xl_tx_chain[i - 1];
 	}
 
-	bzero((char *)ld->xl_tx_list,
-	    sizeof(struct xl_list) * XL_TX_LIST_CNT);
-	ld->xl_tx_list[0].xl_status = XL_TXSTAT_EMPTY;
+	bzero(ld->xl_tx_list, XL_TX_LIST_SZ);
+	ld->xl_tx_list[0].xl_status = htole32(XL_TXSTAT_EMPTY);
 
 	cd->xl_tx_prod = 1;
 	cd->xl_tx_cons = 1;
 	cd->xl_tx_cnt = 0;
 
+	bus_dmamap_sync(ld->xl_tx_tag, ld->xl_tx_dmamap, BUS_DMASYNC_PREWRITE);
 	return(0);
 }
 
@@ -1759,27 +1905,32 @@ xl_list_rx_init(sc)
 {
 	struct xl_chain_data	*cd;
 	struct xl_list_data	*ld;
-	int			i;
+	int			error, i, next;
+	u_int32_t		nextptr;
 
 	cd = &sc->xl_cdata;
-	ld = sc->xl_ldata;
+	ld = &sc->xl_ldata;
 
 	for (i = 0; i < XL_RX_LIST_CNT; i++) {
-		cd->xl_rx_chain[i].xl_ptr =
-			(struct xl_list_onefrag *)&ld->xl_rx_list[i];
-		if (xl_newbuf(sc, &cd->xl_rx_chain[i]) == ENOBUFS)
-			return(ENOBUFS);
-		if (i == (XL_RX_LIST_CNT - 1)) {
-			cd->xl_rx_chain[i].xl_next = &cd->xl_rx_chain[0];
-			ld->xl_rx_list[i].xl_next =
-			    vtophys(&ld->xl_rx_list[0]);
-		} else {
-			cd->xl_rx_chain[i].xl_next = &cd->xl_rx_chain[i + 1];
-			ld->xl_rx_list[i].xl_next =
-			    vtophys(&ld->xl_rx_list[i + 1]);
-		}
+		cd->xl_rx_chain[i].xl_ptr = &ld->xl_rx_list[i];
+		error = bus_dmamap_create(sc->xl_mtag, 0,
+		    &cd->xl_rx_chain[i].xl_map);
+		if (error)
+			return(error);
+		error = xl_newbuf(sc, &cd->xl_rx_chain[i]);
+		if (error)
+			return(error);
+		if (i == (XL_RX_LIST_CNT - 1))
+			next = 0;
+		else
+			next = i + 1;
+		nextptr = ld->xl_rx_dmaaddr +
+		    next * sizeof(struct xl_list_onefrag);
+		cd->xl_rx_chain[i].xl_next = &cd->xl_rx_chain[next];
+		ld->xl_rx_list[i].xl_next = htole32(nextptr);
 	}
 
+	bus_dmamap_sync(ld->xl_rx_tag, ld->xl_rx_dmamap, BUS_DMASYNC_PREWRITE);
 	cd->xl_rx_head = &cd->xl_rx_chain[0];
 
 	return(0);
@@ -1787,6 +1938,8 @@ xl_list_rx_init(sc)
 
 /*
  * Initialize an RX descriptor and attach an MBUF cluster.
+ * If we fail to do so, we need to leave the old mbuf and
+ * the old DMA map untouched so that it can be reused.
  */
 static int
 xl_newbuf(sc, c)
@@ -1794,27 +1947,36 @@ xl_newbuf(sc, c)
 	struct xl_chain_onefrag	*c;
 {
 	struct mbuf		*m_new = NULL;
+	bus_dmamap_t		map;
+	int			error;
+	u_int32_t		baddr;
 
-	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
+	m_new = m_getcl(M_DONTWAIT, MT_DATA, M_PKTHDR);
 	if (m_new == NULL)
 		return(ENOBUFS);
-
-	MCLGET(m_new, M_DONTWAIT);
-	if (!(m_new->m_flags & M_EXT)) {
-		m_freem(m_new);
-		return(ENOBUFS);
-	}
 
 	m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
 
 	/* Force longword alignment for packet payload. */
 	m_adj(m_new, ETHER_ALIGN);
 
-	c->xl_mbuf = m_new;
-	c->xl_ptr->xl_frag.xl_addr = vtophys(mtod(m_new, caddr_t));
-	c->xl_ptr->xl_frag.xl_len = MCLBYTES | XL_LAST_FRAG;
-	c->xl_ptr->xl_status = 0;
+	error = bus_dmamap_load_mbuf(sc->xl_mtag, sc->xl_tmpmap, m_new,
+	    xl_dma_map_rxbuf, &baddr, 0);
+	if (error) {
+		m_freem(m_new);
+		printf("xl%d: can't map mbuf (error %d)\n", sc->xl_unit, error);
+		return(error);
+	}
 
+	bus_dmamap_unload(sc->xl_mtag, c->xl_map);
+	map = c->xl_map;
+	c->xl_map = sc->xl_tmpmap;
+	sc->xl_tmpmap = map;
+	c->xl_mbuf = m_new;
+	c->xl_ptr->xl_frag.xl_len = htole32(m_new->m_len | XL_LAST_FRAG);
+	c->xl_ptr->xl_status = 0;
+	c->xl_ptr->xl_frag.xl_addr = htole32(baddr);
+	bus_dmamap_sync(sc->xl_mtag, c->xl_map, BUS_DMASYNC_PREREAD);
 	return(0);
 }
 
@@ -1859,7 +2021,9 @@ xl_rxeof(sc)
 
 again:
 
-	while((rxstat = sc->xl_cdata.xl_rx_head->xl_ptr->xl_status)) {
+	bus_dmamap_sync(sc->xl_ldata.xl_rx_tag, sc->xl_ldata.xl_rx_dmamap,
+	    BUS_DMASYNC_POSTREAD);
+	while((rxstat = le32toh(sc->xl_cdata.xl_rx_head->xl_ptr->xl_status))) {
 		cur_rx = sc->xl_cdata.xl_rx_head;
 		sc->xl_cdata.xl_rx_head = cur_rx->xl_next;
 
@@ -1872,6 +2036,8 @@ again:
 		if (rxstat & XL_RXSTAT_UP_ERROR) {
 			ifp->if_ierrors++;
 			cur_rx->xl_ptr->xl_status = 0;
+			bus_dmamap_sync(sc->xl_ldata.xl_rx_tag,
+			    sc->xl_ldata.xl_rx_dmamap, BUS_DMASYNC_PREWRITE);
 			continue;
 		}
 
@@ -1885,12 +2051,17 @@ again:
 			    "packet dropped\n", sc->xl_unit);
 			ifp->if_ierrors++;
 			cur_rx->xl_ptr->xl_status = 0;
+			bus_dmamap_sync(sc->xl_ldata.xl_rx_tag,
+			    sc->xl_ldata.xl_rx_dmamap, BUS_DMASYNC_PREWRITE);
 			continue;
 		}
 
 		/* No errors; receive the packet. */	
+		bus_dmamap_sync(sc->xl_mtag, cur_rx->xl_map,
+		    BUS_DMASYNC_POSTREAD);
 		m = cur_rx->xl_mbuf;
-		total_len = cur_rx->xl_ptr->xl_status & XL_RXSTAT_LENMASK;
+		total_len = le32toh(cur_rx->xl_ptr->xl_status) &
+		    XL_RXSTAT_LENMASK;
 
 		/*
 		 * Try to conjure up a new mbuf cluster. If that
@@ -1899,11 +2070,15 @@ again:
 		 * result in a lost packet, but there's little else we
 		 * can do in this situation.
 		 */
-		if (xl_newbuf(sc, cur_rx) == ENOBUFS) {
+		if (xl_newbuf(sc, cur_rx)) {
 			ifp->if_ierrors++;
 			cur_rx->xl_ptr->xl_status = 0;
+			bus_dmamap_sync(sc->xl_ldata.xl_rx_tag,
+			    sc->xl_ldata.xl_rx_dmamap, BUS_DMASYNC_PREWRITE);
 			continue;
 		}
+		bus_dmamap_sync(sc->xl_ldata.xl_rx_tag,
+		    sc->xl_ldata.xl_rx_dmamap, BUS_DMASYNC_PREWRITE);
 
 		ifp->if_ipackets++;
 		m->m_pkthdr.rcvif = ifp;
@@ -1944,8 +2119,7 @@ again:
 		CSR_READ_4(sc, XL_UPLIST_STATUS) & XL_PKTSTAT_UP_STALLED) {
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_UP_STALL);
 		xl_wait(sc);
-		CSR_WRITE_4(sc, XL_UPLIST_PTR,
-			vtophys(&sc->xl_ldata->xl_rx_list[0]));
+		CSR_WRITE_4(sc, XL_UPLIST_PTR, sc->xl_ldata.xl_rx_dmaaddr);
 		sc->xl_cdata.xl_rx_head = &sc->xl_cdata.xl_rx_chain[0];
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_UP_UNSTALL);
 		goto again;
@@ -1986,6 +2160,9 @@ xl_txeof(sc)
 			break;
 
 		sc->xl_cdata.xl_tx_head = cur_tx->xl_next;
+		bus_dmamap_sync(sc->xl_mtag, cur_tx->xl_map,
+		    BUS_DMASYNC_POSTWRITE);
+		bus_dmamap_unload(sc->xl_mtag, cur_tx->xl_map);
 		m_freem(cur_tx->xl_mbuf);
 		cur_tx->xl_mbuf = NULL;
 		ifp->if_opackets++;
@@ -2001,7 +2178,7 @@ xl_txeof(sc)
 		if (CSR_READ_4(sc, XL_DMACTL) & XL_DMACTL_DOWN_STALLED ||
 			!CSR_READ_4(sc, XL_DOWNLIST_PTR)) {
 			CSR_WRITE_4(sc, XL_DOWNLIST_PTR,
-				vtophys(sc->xl_cdata.xl_tx_head->xl_ptr));
+				sc->xl_cdata.xl_tx_head->xl_phys);
 			CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_UNSTALL);
 		}
 	}
@@ -2009,7 +2186,8 @@ xl_txeof(sc)
 	return;
 }
 
-static void xl_txeof_90xB(sc)
+static void
+xl_txeof_90xB(sc)
 	struct xl_softc		*sc;
 {
 	struct xl_chain		*cur_tx = NULL;
@@ -2018,15 +2196,21 @@ static void xl_txeof_90xB(sc)
 
 	ifp = &sc->arpcom.ac_if;
 
+	bus_dmamap_sync(sc->xl_ldata.xl_tx_tag, sc->xl_ldata.xl_tx_dmamap,
+	    BUS_DMASYNC_POSTREAD);
 	idx = sc->xl_cdata.xl_tx_cons;
 	while(idx != sc->xl_cdata.xl_tx_prod) {
 
 		cur_tx = &sc->xl_cdata.xl_tx_chain[idx];
 
-		if (!(cur_tx->xl_ptr->xl_status & XL_TXSTAT_DL_COMPLETE))
+		if (!(le32toh(cur_tx->xl_ptr->xl_status) &
+		      XL_TXSTAT_DL_COMPLETE))
 			break;
 
 		if (cur_tx->xl_mbuf != NULL) {
+			bus_dmamap_sync(sc->xl_mtag, cur_tx->xl_map,
+			    BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_unload(sc->xl_mtag, cur_tx->xl_map);
 			m_freem(cur_tx->xl_mbuf);
 			cur_tx->xl_mbuf = NULL;
 		}
@@ -2078,7 +2262,7 @@ xl_txeoc(sc)
 			} else {
 				if (sc->xl_cdata.xl_tx_head != NULL)
 					CSR_WRITE_4(sc, XL_DOWNLIST_PTR,
-				vtophys(sc->xl_cdata.xl_tx_head->xl_ptr));
+					    sc->xl_cdata.xl_tx_head->xl_phys);
 			}
 			/*
 			 * Remember to set this for the
@@ -2236,29 +2420,21 @@ xl_encap(sc, c, m_head)
 	struct xl_chain		*c;
 	struct mbuf		*m_head;
 {
-	int			frag = 0;
-	struct xl_frag		*f = NULL;
-	int			total_len;
-	struct mbuf		*m;
+	int			error;
+	u_int32_t		status;
 
 	/*
  	 * Start packing the mbufs in this chain into
 	 * the fragment pointers. Stop when we run out
  	 * of fragments or hit the end of the mbuf chain.
 	 */
-	m = m_head;
-	total_len = 0;
+	error = bus_dmamap_load_mbuf(sc->xl_mtag, c->xl_map, m_head,
+	    xl_dma_map_txbuf, c->xl_ptr, 0);
 
-	for (m = m_head, frag = 0; m != NULL; m = m->m_next) {
-		if (m->m_len != 0) {
-			if (frag == XL_MAXFRAGS)
-				break;
-			total_len+= m->m_len;
-			c->xl_ptr->xl_frag[frag].xl_addr =
-					vtophys(mtod(m, vm_offset_t));
-			c->xl_ptr->xl_frag[frag].xl_len = m->m_len;
-			frag++;
-		}
+	if (error && error != EFBIG) {
+		m_freem(m_head);
+		printf("xl%d: can't map mbuf (error %d)\n", sc->xl_unit, error);
+		return(1);
 	}
 
 	/*
@@ -2269,39 +2445,43 @@ xl_encap(sc, c, m_head)
 	 * pointers/counters; it wouldn't gain us anything,
 	 * and would waste cycles.
 	 */
-	if (m != NULL) {
-		struct mbuf		*m_new = NULL;
+	if (error) {
+		struct mbuf		*m_new;
 
-		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
+		m_new = m_defrag(m_head, M_DONTWAIT);
 		if (m_new == NULL) {
-			printf("xl%d: no memory for tx list\n", sc->xl_unit);
+			m_freem(m_head);
+			return(1);
+		} else {
+			m_head = m_new;
+		}
+
+		error = bus_dmamap_load_mbuf(sc->xl_mtag, c->xl_map,
+			m_head, xl_dma_map_txbuf, c->xl_ptr, 0);
+		if (error) {
+			m_freem(m_head);
+			printf("xl%d: can't map mbuf (error %d)\n",
+			    sc->xl_unit, error);
 			return(1);
 		}
-		if (m_head->m_pkthdr.len > MHLEN) {
-			MCLGET(m_new, M_DONTWAIT);
-			if (!(m_new->m_flags & M_EXT)) {
-				m_freem(m_new);
-				printf("xl%d: no memory for tx list\n",
-						sc->xl_unit);
-				return(1);
-			}
+	}
+
+	if (sc->xl_type == XL_TYPE_905B) {
+		status = XL_TXSTAT_RND_DEFEAT;
+
+		if (m_head->m_pkthdr.csum_flags) {
+			if (m_head->m_pkthdr.csum_flags & CSUM_IP)
+				status |= XL_TXSTAT_IPCKSUM;
+			if (m_head->m_pkthdr.csum_flags & CSUM_TCP)
+				status |= XL_TXSTAT_TCPCKSUM;
+			if (m_head->m_pkthdr.csum_flags & CSUM_UDP)
+				status |= XL_TXSTAT_UDPCKSUM;
 		}
-		m_copydata(m_head, 0, m_head->m_pkthdr.len,	
-					mtod(m_new, caddr_t));
-		m_new->m_pkthdr.len = m_new->m_len = m_head->m_pkthdr.len;
-		m_freem(m_head);
-		m_head = m_new;
-		f = &c->xl_ptr->xl_frag[0];
-		f->xl_addr = vtophys(mtod(m_new, caddr_t));
-		f->xl_len = total_len = m_new->m_len;
-		frag = 1;
+		c->xl_ptr->xl_status = htole32(status);
 	}
 
 	c->xl_mbuf = m_head;
-	c->xl_ptr->xl_frag[frag - 1].xl_len |=  XL_LAST_FRAG;
-	c->xl_ptr->xl_status = total_len;
-	c->xl_ptr->xl_next = 0;
-
+	bus_dmamap_sync(sc->xl_mtag, c->xl_map, BUS_DMASYNC_PREWRITE);
 	return(0);
 }
 
@@ -2318,6 +2498,9 @@ xl_start(ifp)
 	struct xl_softc		*sc;
 	struct mbuf		*m_head = NULL;
 	struct xl_chain		*prev = NULL, *cur_tx = NULL, *start_tx;
+	struct xl_chain		*prev_tx;
+	u_int32_t		status;
+	int			error;
 
 	sc = ifp->if_softc;
 	XL_LOCK(sc);
@@ -2343,18 +2526,23 @@ xl_start(ifp)
 			break;
 
 		/* Pick a descriptor off the free list. */
+		prev_tx = cur_tx;
 		cur_tx = sc->xl_cdata.xl_tx_free;
-		sc->xl_cdata.xl_tx_free = cur_tx->xl_next;
-
-		cur_tx->xl_next = NULL;
 
 		/* Pack the data into the descriptor. */
-		xl_encap(sc, cur_tx, m_head);
+		error = xl_encap(sc, cur_tx, m_head);
+		if (error) {
+			cur_tx = prev_tx;
+			continue;
+		}
+
+		sc->xl_cdata.xl_tx_free = cur_tx->xl_next;
+		cur_tx->xl_next = NULL;
 
 		/* Chain it together. */
 		if (prev != NULL) {
 			prev->xl_next = cur_tx;
-			prev->xl_ptr->xl_next = vtophys(cur_tx->xl_ptr);
+			prev->xl_ptr->xl_next = htole32(cur_tx->xl_phys);
 		}
 		prev = cur_tx;
 
@@ -2380,7 +2568,10 @@ xl_start(ifp)
 	 * get an interupt once for the whole chain rather than
 	 * once for each packet.
 	 */
-	cur_tx->xl_ptr->xl_status |= XL_TXSTAT_DL_INTR;
+	cur_tx->xl_ptr->xl_status = htole32(le32toh(cur_tx->xl_ptr->xl_status) |
+	    XL_TXSTAT_DL_INTR);
+	bus_dmamap_sync(sc->xl_ldata.xl_tx_tag, sc->xl_ldata.xl_tx_dmamap,
+	    BUS_DMASYNC_PREWRITE);
 
 	/*
 	 * Queue the packets. If the TX channel is clear, update
@@ -2392,16 +2583,17 @@ xl_start(ifp)
 	if (sc->xl_cdata.xl_tx_head != NULL) {
 		sc->xl_cdata.xl_tx_tail->xl_next = start_tx;
 		sc->xl_cdata.xl_tx_tail->xl_ptr->xl_next =
-					vtophys(start_tx->xl_ptr);
-		sc->xl_cdata.xl_tx_tail->xl_ptr->xl_status &=
-					~XL_TXSTAT_DL_INTR;
+		    htole32(start_tx->xl_phys);
+		status = sc->xl_cdata.xl_tx_tail->xl_ptr->xl_status;
+		sc->xl_cdata.xl_tx_tail->xl_ptr->xl_status =
+		    htole32(le32toh(status) & ~XL_TXSTAT_DL_INTR);
 		sc->xl_cdata.xl_tx_tail = cur_tx;
 	} else {
 		sc->xl_cdata.xl_tx_head = start_tx;
 		sc->xl_cdata.xl_tx_tail = cur_tx;
 	}
 	if (!CSR_READ_4(sc, XL_DOWNLIST_PTR))
-		CSR_WRITE_4(sc, XL_DOWNLIST_PTR, vtophys(start_tx->xl_ptr));
+		CSR_WRITE_4(sc, XL_DOWNLIST_PTR, start_tx->xl_phys);
 
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_UNSTALL);
 
@@ -2434,58 +2626,15 @@ xl_start(ifp)
 	return;
 }
 
-static int xl_encap_90xB(sc, c, m_head)
-	struct xl_softc		*sc;
-	struct xl_chain		*c;
-	struct mbuf		*m_head;
-{
-	int			frag = 0;
-	struct xl_frag		*f = NULL;
-	struct mbuf		*m;
-	struct xl_list		*d;
-
-	/*
- 	 * Start packing the mbufs in this chain into
-	 * the fragment pointers. Stop when we run out
- 	 * of fragments or hit the end of the mbuf chain.
-	 */
-	d = c->xl_ptr;
-	d->xl_status = 0;
-	d->xl_next = 0;
-
-	for (m = m_head, frag = 0; m != NULL; m = m->m_next) {
-		if (m->m_len != 0) {
-			if (frag == XL_MAXFRAGS)
-				break;
-			f = &d->xl_frag[frag];
-			f->xl_addr = vtophys(mtod(m, vm_offset_t));
-			f->xl_len = m->m_len;
-			frag++;
-		}
-	}
-
-	c->xl_mbuf = m_head;
-	c->xl_ptr->xl_frag[frag - 1].xl_len |= XL_LAST_FRAG;
-	c->xl_ptr->xl_status = XL_TXSTAT_RND_DEFEAT;
-
-	if (m_head->m_pkthdr.csum_flags) {
-		if (m_head->m_pkthdr.csum_flags & CSUM_IP)
-			c->xl_ptr->xl_status |= XL_TXSTAT_IPCKSUM;
-		if (m_head->m_pkthdr.csum_flags & CSUM_TCP)
-			c->xl_ptr->xl_status |= XL_TXSTAT_TCPCKSUM;
-		if (m_head->m_pkthdr.csum_flags & CSUM_UDP)
-			c->xl_ptr->xl_status |= XL_TXSTAT_UDPCKSUM;
-	}
-	return(0);
-}
-
-static void xl_start_90xB(ifp)
+static void
+xl_start_90xB(ifp)
 	struct ifnet		*ifp;
 {
 	struct xl_softc		*sc;
 	struct mbuf		*m_head = NULL;
 	struct xl_chain		*prev = NULL, *cur_tx = NULL, *start_tx;
-	int			idx;
+	struct xl_chain		*prev_tx;
+	int			error, idx;
 
 	sc = ifp->if_softc;
 	XL_LOCK(sc);
@@ -2509,14 +2658,19 @@ static void xl_start_90xB(ifp)
 		if (m_head == NULL)
 			break;
 
+		prev_tx = cur_tx;
 		cur_tx = &sc->xl_cdata.xl_tx_chain[idx];
 
 		/* Pack the data into the descriptor. */
-		xl_encap_90xB(sc, cur_tx, m_head);
+		error = xl_encap(sc, cur_tx, m_head);
+		if (error) {
+			cur_tx = prev_tx;
+			continue;
+		}
 
 		/* Chain it together. */
 		if (prev != NULL)
-			prev->xl_ptr->xl_next = cur_tx->xl_phys;
+			prev->xl_ptr->xl_next = htole32(cur_tx->xl_phys);
 		prev = cur_tx;
 
 		/*
@@ -2544,11 +2698,14 @@ static void xl_start_90xB(ifp)
 	 * get an interupt once for the whole chain rather than
 	 * once for each packet.
 	 */
-	cur_tx->xl_ptr->xl_status |= XL_TXSTAT_DL_INTR;
+	cur_tx->xl_ptr->xl_status = htole32(le32toh(cur_tx->xl_ptr->xl_status) |
+	    XL_TXSTAT_DL_INTR);
+	bus_dmamap_sync(sc->xl_ldata.xl_tx_tag, sc->xl_ldata.xl_tx_dmamap,
+	    BUS_DMASYNC_PREWRITE);
 
 	/* Start transmission */
 	sc->xl_cdata.xl_tx_prod = idx;
-	start_tx->xl_prev->xl_ptr->xl_next = start_tx->xl_phys;
+	start_tx->xl_prev->xl_ptr->xl_next = htole32(start_tx->xl_phys);
 
 	/*
 	 * Set a timeout in case the chip goes out to lunch.
@@ -2566,7 +2723,7 @@ xl_init(xsc)
 {
 	struct xl_softc		*sc = xsc;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
-	int			i;
+	int			error, i;
 	u_int16_t		rxfilt = 0;
 	struct mii_data		*mii = NULL;
 
@@ -2606,9 +2763,10 @@ xl_init(xsc)
 	xl_wait(sc);
 #endif
 	/* Init circular RX list. */
-	if (xl_list_rx_init(sc) == ENOBUFS) {
-		printf("xl%d: initialization failed: no "
-			"memory for rx buffers\n", sc->xl_unit);
+	error = xl_list_rx_init(sc);
+	if (error) {
+		printf("xl%d: initialization of the rx ring failed (%d)\n",
+		    sc->xl_unit, error);
 		xl_stop(sc);
 		XL_UNLOCK(sc);
 		return;
@@ -2616,9 +2774,15 @@ xl_init(xsc)
 
 	/* Init TX descriptors. */
 	if (sc->xl_type == XL_TYPE_905B)
-		xl_list_tx_init_90xB(sc);
+		error = xl_list_tx_init_90xB(sc);
 	else
-		xl_list_tx_init(sc);
+		error = xl_list_tx_init(sc);
+	if (error) {
+		printf("xl%d: initialization of the tx ring failed (%d)\n",
+		    sc->xl_unit, error);
+		xl_stop(sc);
+		XL_UNLOCK(sc);
+	}
 
 	/*
 	 * Set the TX freethresh value.
@@ -2693,7 +2857,7 @@ xl_init(xsc)
 	 */
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_UP_STALL);
 	xl_wait(sc);
-	CSR_WRITE_4(sc, XL_UPLIST_PTR, vtophys(&sc->xl_ldata->xl_rx_list[0]));
+	CSR_WRITE_4(sc, XL_UPLIST_PTR, sc->xl_ldata.xl_rx_dmaaddr);
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_UP_UNSTALL);
 	xl_wait(sc);
 
@@ -2705,7 +2869,7 @@ xl_init(xsc)
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_STALL);
 		xl_wait(sc);
 		CSR_WRITE_4(sc, XL_DOWNLIST_PTR,
-		    vtophys(&sc->xl_ldata->xl_tx_list[0]));
+		    sc->xl_cdata.xl_tx_chain[0].xl_phys);
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_UNSTALL);
 		xl_wait(sc);
 	}
@@ -3025,23 +3189,29 @@ xl_stop(sc)
 	 */
 	for (i = 0; i < XL_RX_LIST_CNT; i++) {
 		if (sc->xl_cdata.xl_rx_chain[i].xl_mbuf != NULL) {
+			bus_dmamap_unload(sc->xl_mtag,
+			    sc->xl_cdata.xl_rx_chain[i].xl_map);
+			bus_dmamap_destroy(sc->xl_mtag,
+			    sc->xl_cdata.xl_rx_chain[i].xl_map);
 			m_freem(sc->xl_cdata.xl_rx_chain[i].xl_mbuf);
 			sc->xl_cdata.xl_rx_chain[i].xl_mbuf = NULL;
 		}
 	}
-	bzero((char *)&sc->xl_ldata->xl_rx_list,
-		sizeof(sc->xl_ldata->xl_rx_list));
+	bzero(sc->xl_ldata.xl_rx_list, XL_RX_LIST_SZ);
 	/*
 	 * Free the TX list buffers.
 	 */
 	for (i = 0; i < XL_TX_LIST_CNT; i++) {
 		if (sc->xl_cdata.xl_tx_chain[i].xl_mbuf != NULL) {
+			bus_dmamap_unload(sc->xl_mtag,
+			    sc->xl_cdata.xl_tx_chain[i].xl_map);
+			bus_dmamap_destroy(sc->xl_mtag,
+			    sc->xl_cdata.xl_tx_chain[i].xl_map);
 			m_freem(sc->xl_cdata.xl_tx_chain[i].xl_mbuf);
 			sc->xl_cdata.xl_tx_chain[i].xl_mbuf = NULL;
 		}
 	}
-	bzero((char *)&sc->xl_ldata->xl_tx_list,
-		sizeof(sc->xl_ldata->xl_tx_list));
+	bzero(sc->xl_ldata.xl_tx_list, XL_TX_LIST_SZ);
 
 	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
 

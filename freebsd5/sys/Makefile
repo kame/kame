@@ -318,13 +318,15 @@ opt_inet6.h:
 .include <bsd.kmod.mk>
 
 
-SUBDIR=	altq_blue altq_cbq altq_cdnr altq_fifoq altq_hfsc altq_jobs altq_localq altq_priq altq_red altq_rio altq_wfq
+SUBDIR+=	altq_blue altq_cbq altq_cdnr altq_fifoq altq_hfsc altq_jobs altq_localq altq_priq altq_red altq_rio altq_wfq
 
-.include <bsd.subdir.mk>
-# $FreeBSD: src/sys/Makefile,v 1.26 2002/04/26 17:55:21 ru Exp $
+# $FreeBSD: src/sys/Makefile,v 1.27 2003/05/08 06:35:39 peter Exp $
 
+SUBDIR=
 # The boot loader
-SUBDIR=	boot
+.if ${MACHINE_ARCH} != "amd64"
+SUBDIR+=boot
+.endif
 
 # KLD modules build for both a.out and ELF
 .if defined(MODULES_WITH_WORLD)

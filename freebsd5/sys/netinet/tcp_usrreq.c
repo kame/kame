@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.84 2002/10/24 02:02:34 iedowse Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.86 2003/03/08 22:07:52 jlemon Exp $
  */
 
 #include "opt_ipsec.h"
@@ -236,7 +236,7 @@ tcp_usr_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	struct inpcb *inp;
 	struct tcpcb *tp;
 	struct sockaddr_in *sinp;
-	const int inirw = INI_READ;
+	const int inirw = INI_WRITE;
 
 	COMMON_START();
 
@@ -265,7 +265,7 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	struct inpcb *inp;
 	struct tcpcb *tp;
 	struct sockaddr_in6 *sin6p;
-	const int inirw = INI_READ;
+	const int inirw = INI_WRITE;
 
 	COMMON_START();
 
@@ -311,7 +311,7 @@ tcp_usr_listen(struct socket *so, struct thread *td)
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
-	const int inirw = INI_READ;
+	const int inirw = INI_WRITE;
 
 	COMMON_START();
 	if (inp->inp_lport == 0)
@@ -329,7 +329,7 @@ tcp6_usr_listen(struct socket *so, struct thread *td)
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
-	const int inirw = INI_READ;
+	const int inirw = INI_WRITE;
 
 	COMMON_START();
 	if (inp->inp_lport == 0) {
@@ -848,7 +848,7 @@ tcp_connect(tp, nam, td)
 {
 	struct inpcb *inp = tp->t_inpcb, *oinp;
 	struct socket *so = inp->inp_socket;
-	struct tcpcb *otp;
+	struct tcptw *otw;
 	struct rmxp_tao *taop;
 	struct rmxp_tao tao_noncached;
 	struct in_addr laddr;
@@ -873,13 +873,13 @@ tcp_connect(tp, nam, td)
 	if (error && oinp == NULL)
 		return error;
 	if (oinp) {
-		if (oinp != inp && (otp = intotcpcb(oinp)) != NULL &&
-		otp->t_state == TCPS_TIME_WAIT &&
-		    (ticks - otp->t_starttime) < tcp_msl &&
-		    (otp->t_flags & TF_RCVD_CC)) {
+		if (oinp != inp &&
+		    (oinp->inp_vflag & INP_TIMEWAIT) &&
+		    (ticks - (otw = intotw(oinp))->t_starttime) < tcp_msl &&
+		    otw->cc_recv != 0) {
 			inp->inp_faddr = oinp->inp_faddr;
 			inp->inp_fport = oinp->inp_fport;
-			otp = tcp_close(otp);
+			(void) tcp_twclose(otw, 0);
 		} else
 			return EADDRINUSE;
 	}
@@ -929,7 +929,7 @@ tcp6_connect(tp, nam, td)
 {
 	struct inpcb *inp = tp->t_inpcb, *oinp;
 	struct socket *so = inp->inp_socket;
-	struct tcpcb *otp;
+	struct tcptw *otw;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
 	struct sockaddr_in6 *addr6;
 #ifndef SCOPEDROUTING
@@ -972,12 +972,14 @@ tcp6_connect(tp, nam, td)
 				  ? addr6 : &inp->in6p_lsa,
 				  inp->inp_lport,  0, NULL);
 	if (oinp) {
-		if (oinp != inp && (otp = intotcpcb(oinp)) != NULL &&
-		    otp->t_state == TCPS_TIME_WAIT &&
-		    (ticks - otp->t_starttime) < tcp_msl &&
-		    (otp->t_flags & TF_RCVD_CC))
-			otp = tcp_close(otp);
-		else
+		if (oinp != inp &&
+		    (oinp->inp_vflag & INP_TIMEWAIT) &&
+		    (ticks - (otw = intotw(oinp))->t_starttime) < tcp_msl &&
+		    otw->cc_recv != 0) {
+			inp->inp_faddr = oinp->inp_faddr;
+			inp->inp_fport = oinp->inp_fport;
+			(void) tcp_twclose(otw, 0);
+		} else
 			return EADDRINUSE;
 	}
 	if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)) {

@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	$Id: if_xe.c,v 1.20 1999/06/13 19:17:40 scott Exp $
- * $FreeBSD: src/sys/dev/xe/if_xe.c,v 1.32 2002/11/14 23:54:55 sam Exp $
+ * $FreeBSD: src/sys/dev/xe/if_xe.c,v 1.36 2003/02/19 05:47:17 imp Exp $
  */
 
 /*
@@ -724,6 +724,8 @@ xe_intr(void *xscp)
 
 	  /* Deliver packet to upper layers */
 	  if (mbp != NULL) {
+	    mbp->m_flags |= M_HASFCS;		/* FCS is included in our
+						 * packet */
 	    mbp->m_pkthdr.len = mbp->m_len = len;
 	    (*ifp->if_input)(ifp, mbp);		/* Send the packet on its way */
 	    ifp->if_ipackets++;			/* Success! */
@@ -1665,9 +1667,9 @@ xe_mii_readreg(struct xe_softc *scp, struct xe_mii_frame *frame) {
   /* Check for ack */
   XE_MII_CLR(XE_MII_CLK);
   DELAY(1);
+  ack = XE_INB(XE_GPR2) & XE_MII_RDD;
   XE_MII_SET(XE_MII_CLK);
   DELAY(1);
-  ack = XE_INB(XE_GPR2) & XE_MII_RDD;
 
   /*
    * Now try reading data bits. If the ack failed, we still

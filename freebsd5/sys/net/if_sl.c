@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_sl.c	8.6 (Berkeley) 2/1/94
- * $FreeBSD: src/sys/net/if_sl.c,v 1.106 2002/11/15 00:00:15 sam Exp $
+ * $FreeBSD: src/sys/net/if_sl.c,v 1.110 2003/03/04 23:19:51 jlemon Exp $
  */
 
 /*
@@ -73,7 +73,6 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/proc.h>
-#include <sys/dkstat.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/fcntl.h>
@@ -978,12 +977,9 @@ slinput(c, tp)
 			m_freem(m);
 			goto newpack;
 		}
-
-		if (! IF_HANDOFF(&ipintrq, m, NULL)) {
+		if (! netisr_queue(NETISR_IP, m)) {
 			sc->sc_if.if_ierrors++;
 			sc->sc_if.if_iqdrops++;
-		} else {
-			schednetisr(NETISR_IP);
 		}
 		goto newpack;
 	}

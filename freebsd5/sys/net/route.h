@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)route.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/route.h,v 1.45 2002/03/24 09:34:04 bde Exp $
+ * $FreeBSD: src/sys/net/route.h,v 1.47 2003/03/05 19:24:22 peter Exp $
  */
 
 #ifndef _NET_ROUTE_H_
@@ -287,7 +287,6 @@ struct route_cb {
 	int	ip_count;
 	int	ip6_count;
 	int	ipx_count;
-	int	ns_count;
 	int	any_count;
 };
 
@@ -388,6 +387,7 @@ void	 rtredirect(struct sockaddr *, struct sockaddr *,
 int	 rtrequest(int, struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *, int, struct rtentry **);
 int	 rtrequest1(int, struct rt_addrinfo *, struct rtentry **);
+int	 rt_check(struct rtentry **, struct rtentry **, struct sockaddr *);
 #endif
 
 #endif

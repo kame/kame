@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_ef.c,v 1.19 2002/11/15 00:00:15 sam Exp $
+ * $FreeBSD: src/sys/net/if_ef.c,v 1.24 2003/03/04 23:19:51 jlemon Exp $
  */
 
 #include "opt_inet.h"
@@ -163,8 +163,9 @@ ef_detach(struct efnet *sc)
 		    }
 		}
 	}
-
+	IFNET_WLOCK();
 	TAILQ_REMOVE(&ifnet, ifp, if_link);
+	IFNET_WUNLOCK();
 	splx(s);
 	return 0;
 }
@@ -241,70 +242,74 @@ ef_start(struct ifnet *ifp)
  * parameter passing but simplify the code
  */
 static int __inline
-ef_inputEII(struct mbuf *m, struct ether_header *eh,
-	u_short ether_type, struct ifqueue **inq)
+ef_inputEII(struct mbuf *m, struct ether_header *eh, u_short ether_type)
 {
+	int isr;
+
 	switch(ether_type) {
 #ifdef IPX
-	    case ETHERTYPE_IPX:
-		schednetisr(NETISR_IPX);
-		*inq = &ipxintrq;
+	case ETHERTYPE_IPX:
+		isr = NETISR_IPX;
 		break;
 #endif
 #ifdef INET
-	    case ETHERTYPE_IP:
+	case ETHERTYPE_IP:
 		if (ipflow_fastforward(m))
-			return 1;
-		schednetisr(NETISR_IP);
-		*inq = &ipintrq;
+			return (0);
+		isr = NETISR_IP;
 		break;
 
-	    case ETHERTYPE_ARP:
-		schednetisr(NETISR_ARP);
-		*inq = &arpintrq;
+	case ETHERTYPE_ARP:
+		isr = NETISR_ARP;
 		break;
 #endif
-	    default:
-		return EPROTONOSUPPORT;
+	default:
+		return (EPROTONOSUPPORT);
 	}
-	return 0;
+	netisr_dispatch(isr, m);
+	return (0);
 }
 
 static int __inline
 ef_inputSNAP(struct mbuf *m, struct ether_header *eh, struct llc* l,
-	u_short ether_type, struct ifqueue **inq)
+	u_short ether_type)
 {
+	int isr;
+
 	switch(ether_type) {
 #ifdef IPX
-	    case ETHERTYPE_IPX:
+	case ETHERTYPE_IPX:
 		m_adj(m, 8);
-		schednetisr(NETISR_IPX);
-		*inq = &ipxintrq;
+		isr = NETISR_IPX;
 		break;
 #endif
-	    default:
-		return EPROTONOSUPPORT;
+	default:
+		return (EPROTONOSUPPORT);
 	}
-	return 0;
+	netisr_dispatch(isr, m);
+	return (0);
 }
 
 static int __inline
 ef_input8022(struct mbuf *m, struct ether_header *eh, struct llc* l,
-	u_short ether_type, struct ifqueue **inq)
+	u_short ether_type)
 {
+	int isr;
+
 	switch(ether_type) {
 #ifdef IPX
-	    case 0xe0:
+	case 0xe0:
 		m_adj(m, 3);
-		schednetisr(NETISR_IPX);
-		*inq = &ipxintrq;
+		isr = NETISR_IPX;
 		break;
 #endif
-	    default:
-		return EPROTONOSUPPORT;
+	default:
+		return (EPROTONOSUPPORT);
 	}
-	return 0;
+	netisr_dispatch(isr, m);
+	return (0);
 }
+
 /*
  * Called from ether_input()
  */
@@ -313,11 +318,11 @@ ef_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 {
 	u_short ether_type;
 	int ft = -1;
-	struct ifqueue *inq;
 	struct efnet *efp;
 	struct ifnet *eifp;
 	struct llc *l;
 	struct ef_link *efl;
+	int isr;
 
 	ether_type = ntohs(eh->ether_type);
 	if (ether_type < ETHERMTU) {
@@ -371,42 +376,35 @@ ef_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 	if (eifp->if_bpf) {
 		struct mbuf m0;
 		m0.m_next = m;
-		m0.m_len = sizeof(struct ether_header);
+		m0.m_len = ETHER_HDR_LEN;
 		m0.m_data = (char *)eh;
 		BPF_MTAP(eifp, &m0);
 	}
 	/*
 	 * Now we ready to adjust mbufs and pass them to protocol intr's
 	 */
-	inq = NULL;
 	switch(ft) {
-	    case ETHER_FT_EII:
-		if (ef_inputEII(m, eh, ether_type, &inq) != 0)
-			return EPROTONOSUPPORT;
+	case ETHER_FT_EII:
+		return (ef_inputEII(m, eh, ether_type));
 		break;
 #ifdef IPX
-	    case ETHER_FT_8023:		/* only IPX can be here */
-		schednetisr(NETISR_IPX);
-		inq = &ipxintrq;
+	case ETHER_FT_8023:		/* only IPX can be here */
+		isr = NETISR_IPX;
 		break;
 #endif
-	    case ETHER_FT_SNAP:
-		if (ef_inputSNAP(m, eh, l, ether_type, &inq) != 0)
-			return EPROTONOSUPPORT;
+	case ETHER_FT_SNAP:
+		return (ef_inputSNAP(m, eh, l, ether_type));
 		break;
-	    case ETHER_FT_8022:
-		if (ef_input8022(m, eh, l, ether_type, &inq) != 0)
-			return EPROTONOSUPPORT;
+	case ETHER_FT_8022:
+		return (ef_input8022(m, eh, l, ether_type));
 		break;
-	}
-
-	if (inq == NULL) {
+	default:
 		EFDEBUG("No support for frame %d and proto %04x\n",
 			ft, ether_type);
-		return EPROTONOSUPPORT;
+		return (EPROTONOSUPPORT);
 	}
-	(void) IF_HANDOFF(inq, m, NULL);
-	return 0;
+	netisr_dispatch(isr, m);
+	return (0);
 }
 
 static int
@@ -510,6 +508,7 @@ ef_load(void)
 	struct ef_link *efl = NULL;
 	int error = 0, d;
 
+	IFNET_RLOCK();
 	TAILQ_FOREACH(ifp, &ifnet, if_link) {
 		if (ifp->if_type != IFT_ETHER) continue;
 		EFDEBUG("Found interface %s%d\n", ifp->if_name, ifp->if_unit);
@@ -540,6 +539,7 @@ ef_load(void)
 		efcount++;
 		SLIST_INSERT_HEAD(&efdev, efl, el_next);
 	}
+	IFNET_RUNLOCK();
 	if (error) {
 		if (efl)
 			SLIST_INSERT_HEAD(&efdev, efl, el_next);

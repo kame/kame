@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.32 2002/10/16 02:25:05 sam Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.33 2003/02/19 22:32:43 jlemon Exp $	*/
 /*	$KAME: udp6_usrreq.c,v 1.27 2001/05/21 05:45:10 jinmei Exp $	*/
 
 /*
@@ -419,7 +419,7 @@ udp6_input(mp, offp, proto)
 				/*
 				 * Check AH/ESP integrity.
 				 */
-				if (ipsec6_in_reject_so(m, last->inp_socket))
+				if (ipsec6_in_reject(m, last))
 					ipsec6stat.in_polvio++;
 					/* do not inject data into pcb */
 				else
@@ -490,7 +490,7 @@ udp6_input(mp, offp, proto)
 		/*
 		 * Check AH/ESP integrity.
 		 */
-		if (ipsec6_in_reject_so(m, last->inp_socket)) {
+		if (ipsec6_in_reject(m, last)) {
 			ipsec6stat.in_polvio++;
 			goto bad;
 		}
@@ -546,7 +546,7 @@ udp6_input(mp, offp, proto)
 	/*
 	 * Check AH/ESP integrity.
 	 */
-	if (ipsec6_in_reject_so(m, in6p->in6p_socket)) {
+	if (ipsec6_in_reject(m, in6p)) {
 		ipsec6stat.in_polvio++;
 		goto bad;
 	}

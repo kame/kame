@@ -29,18 +29,12 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_pcn.c,v 1.29 2002/11/14 23:49:09 sam Exp $
  */
 
 /*
  * AMD Am79c972 fast ethernet PCI NIC driver. Datatheets are available
  * from http://www.amd.com.
  *
- * Written by Bill Paul <wpaul@osd.bsdi.com>
- */
-
-/*
  * The AMD PCnet/PCI controllers are more advanced and functional
  * versions of the venerable 7990 LANCE. The PCnet/PCI chips retain
  * backwards compatibility with the LANCE and thus can be made
@@ -54,6 +48,9 @@
  * allows the receive handler to pass packets to the upper protocol
  * layers without copying on both the x86 and alpha platforms).
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_pcn.c,v 1.45 2003/04/21 18:34:04 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -90,15 +87,12 @@
 
 #include <pci/if_pcnreg.h>
 
+MODULE_DEPEND(pcn, pci, 1, 1, 1);
+MODULE_DEPEND(pcn, ether, 1, 1, 1);
 MODULE_DEPEND(pcn, miibus, 1, 1, 1);
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_pcn.c,v 1.29 2002/11/14 23:49:09 sam Exp $";
-#endif
 
 /*
  * Various supported device vendors/types and their names.
@@ -182,7 +176,7 @@ static driver_t pcn_driver = {
 
 static devclass_t pcn_devclass;
 
-DRIVER_MODULE(if_pcn, pci, pcn_driver, pcn_devclass, 0, 0);
+DRIVER_MODULE(pcn, pci, pcn_driver, pcn_devclass, 0, 0);
 DRIVER_MODULE(miibus, pcn, miibus_driver, miibus_devclass, 0, 0);
 
 #define PCN_CSR_SETBIT(sc, reg, x)			\
@@ -219,6 +213,7 @@ static void
 pcn_csr_write(sc, reg, val)
 	struct pcn_softc	*sc;
 	int			reg;
+	int			val;
 {
 	CSR_WRITE_4(sc, PCN_IO32_RAP, reg);
 	CSR_WRITE_4(sc, PCN_IO32_RDP, val);
@@ -247,6 +242,7 @@ static void
 pcn_bcr_write(sc, reg, val)
 	struct pcn_softc	*sc;
 	int			reg;
+	int			val;
 {
 	CSR_WRITE_4(sc, PCN_IO32_RAP, reg);
 	CSR_WRITE_4(sc, PCN_IO32_BDP, val);
@@ -510,7 +506,6 @@ pcn_attach(dev)
 	device_t		dev;
 {
 	u_int32_t		eaddr[2];
-	u_int32_t		command;
 	struct pcn_softc	*sc;
 	struct ifnet		*ifp;
 	int			unit, error = 0, rid;
@@ -521,7 +516,6 @@ pcn_attach(dev)
 	/* Initialize our mutex. */
 	mtx_init(&sc->pcn_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-	PCN_LOCK(sc);
 
 	/*
 	 * Handle power management nonsense.
@@ -550,23 +544,6 @@ pcn_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef PCN_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("pcn%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("pcn%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;;
-		goto fail;
-	}
-#endif
 
 	rid = PCN_RID;
 	sc->pcn_res = bus_alloc_resource(dev, PCN_RES, &rid,
@@ -588,18 +565,7 @@ pcn_attach(dev)
 
 	if (sc->pcn_irq == NULL) {
 		printf("pcn%d: couldn't map interrupt\n", unit);
-		bus_release_resource(dev, PCN_RES, PCN_RID, sc->pcn_res);
 		error = ENXIO;
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->pcn_irq, INTR_TYPE_NET,
-	    pcn_intr, sc, &sc->pcn_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->pcn_res);
-		bus_release_resource(dev, PCN_RES, PCN_RID, sc->pcn_res);
-		printf("pcn%d: couldn't set up irq\n", unit);
 		goto fail;
 	}
 
@@ -627,9 +593,6 @@ pcn_attach(dev)
 
 	if (sc->pcn_ldata == NULL) {
 		printf("pcn%d: no memory for list buffers!\n", unit);
-		bus_teardown_intr(dev, sc->pcn_irq, sc->pcn_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->pcn_irq);
-		bus_release_resource(dev, PCN_RES, PCN_RID, sc->pcn_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -656,9 +619,6 @@ pcn_attach(dev)
 	if (mii_phy_probe(dev, &sc->pcn_miibus,
 	    pcn_ifmedia_upd, pcn_ifmedia_sts)) {
 		printf("pcn%d: MII without any PHY!\n", sc->pcn_unit);
-		bus_teardown_intr(dev, sc->pcn_irq, sc->pcn_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->pcn_irq);
-		bus_release_resource(dev, PCN_RES, PCN_RID, sc->pcn_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -667,17 +627,31 @@ pcn_attach(dev)
 	 * Call MI attach routine.
 	 */
 	ether_ifattach(ifp, (u_int8_t *) eaddr);
-	callout_handle_init(&sc->pcn_stat_ch);
-	PCN_UNLOCK(sc);
-	return(0);
+
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->pcn_irq, INTR_TYPE_NET,
+	    pcn_intr, sc, &sc->pcn_intrhand);
+
+	if (error) {
+		printf("pcn%d: couldn't set up irq\n", unit);
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
-	PCN_UNLOCK(sc);
-	mtx_destroy(&sc->pcn_mtx);
+	if (error)
+		pcn_detach(dev);
 
 	return(error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 pcn_detach(dev)
 	device_t		dev;
@@ -688,22 +662,30 @@ pcn_detach(dev)
 	sc = device_get_softc(dev);
 	ifp = &sc->arpcom.ac_if;
 
+	KASSERT(mtx_initialized(&sc->pcn_mtx), ("pcn mutex not initialized"));
 	PCN_LOCK(sc);
 
-	pcn_reset(sc);
-	pcn_stop(sc);
-	ether_ifdetach(ifp);
-
-	if (sc->pcn_miibus != NULL) {
-		bus_generic_detach(dev);
-		device_delete_child(dev, sc->pcn_miibus);
+	/* These should only be active if attach succeeded */
+	if (device_is_attached(dev)) {
+		pcn_reset(sc);
+		pcn_stop(sc);
+		ether_ifdetach(ifp);
 	}
+	if (sc->pcn_miibus)
+		device_delete_child(dev, sc->pcn_miibus);
+	bus_generic_detach(dev);
 
-	bus_teardown_intr(dev, sc->pcn_irq, sc->pcn_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->pcn_irq);
-	bus_release_resource(dev, PCN_RES, PCN_RID, sc->pcn_res);
+	if (sc->pcn_intrhand)
+		bus_teardown_intr(dev, sc->pcn_irq, sc->pcn_intrhand);
+	if (sc->pcn_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->pcn_irq);
+	if (sc->pcn_res)
+		bus_release_resource(dev, PCN_RES, PCN_RID, sc->pcn_res);
 
-	contigfree(sc->pcn_ldata, sizeof(struct pcn_list_data), M_DEVBUF);
+	if (sc->pcn_ldata) {
+		contigfree(sc->pcn_ldata, sizeof(struct pcn_list_data),
+		    M_DEVBUF);
+	}
 	PCN_UNLOCK(sc);
 
 	mtx_destroy(&sc->pcn_mtx);
@@ -978,6 +960,8 @@ pcn_intr(arg)
 		return;
 	}
 
+	PCN_LOCK(sc);
+
 	CSR_WRITE_4(sc, PCN_IO32_RAP, PCN_CSR_CSR);
 
 	while ((status = CSR_READ_4(sc, PCN_IO32_RDP)) & PCN_CSR_INTR) {
@@ -998,6 +982,7 @@ pcn_intr(arg)
 	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		pcn_start(ifp);
 
+	PCN_UNLOCK(sc);
 	return;
 }
 
@@ -1412,6 +1397,10 @@ pcn_stop(sc)
 	ifp->if_timer = 0;
 
 	untimeout(pcn_tick, sc, sc->pcn_stat_ch);
+
+	/* Turn off interrupts */
+	PCN_CSR_CLRBIT(sc, PCN_CSR_CSR, PCN_CSR_INTEN);
+	/* Stop adapter */
 	PCN_CSR_SETBIT(sc, PCN_CSR_CSR, PCN_CSR_STOP);
 	sc->pcn_link = 0;
 

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.6 2002/11/14 23:54:54 sam Exp $	*/
+/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.10 2003/04/08 14:25:44 des Exp $	*/
 /*	$NecBSD: dp83932.c,v 1.5 1999/07/29 05:08:44 kmatsuda Exp $	*/
 /*	$NetBSD: if_snc.c,v 1.18 1998/04/25 21:27:40 scottr Exp $	*/
 
@@ -257,7 +257,7 @@ sncioctl(ifp, cmd, data)
 {
 	struct ifreq *ifr;
 	struct snc_softc *sc = ifp->if_softc;
-	int	s = splnet(), err = 0;
+	int	s = splhardnet(), err = 0;
 	int	temp;
 
 	switch (cmd) {
@@ -349,9 +349,7 @@ outloop:
 	}
 
 	/* We need the header for m_pkthdr.len. */
-	if ((m->m_flags & M_PKTHDR) == 0)
-		panic("%s: sncstart: no header mbuf",
-		      device_get_nameunit(sc->sc_dev));
+	M_ASSERTPKTHDR(m);
 
 	/*
 	 * If bpf is listening on this interface, let it
@@ -405,7 +403,7 @@ sncinit(xsc)
 		/* already running */
 		return;
 
-	s = splnet();
+	s = splhardnet();
 
 	NIC_PUT(sc, SNCR_CR, CR_RST);	/* DCR only accessable in reset mode! */
 
@@ -470,7 +468,7 @@ sncstop(sc)
 	struct snc_softc *sc;
 {
 	struct mtd *mtd;
-	int	s = splnet();
+	int	s = splhardnet();
 
 	/* stick chip in reset */
 	NIC_PUT(sc, SNCR_CR, CR_RST);

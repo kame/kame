@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/ip_icmp.h,v 1.19 2002/10/20 22:52:06 phk Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.h,v 1.20 2003/03/21 15:28:10 mdodd Exp $
  */
 
 #ifndef _NETINET_IP_ICMP_H_
@@ -89,10 +89,10 @@ struct icmp {
 #define	icmp_wpa	icmp_hun.ih_rtradv.irt_wpa
 #define	icmp_lifetime	icmp_hun.ih_rtradv.irt_lifetime
 	union {
-		struct id_ts {
-			n_time its_otime;
-			n_time its_rtime;
-			n_time its_ttime;
+		struct id_ts {			/* ICMP Timestamp */
+			n_time its_otime;	/* Originate */
+			n_time its_rtime;	/* Receive */
+			n_time its_ttime;	/* Transmit */
 		} id_ts;
 		struct id_ip  {
 			struct ip idi_ip;

@@ -25,7 +25,7 @@
 #  include <osreldate.h>
 # endif
 #endif
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # define _KMEMUSER
 # include <sys/ptimers.h>
 #endif
@@ -118,13 +118,17 @@
 # include <sys/kernel.h>
 extern	int	ip_optcopy __P((struct ip *, struct ip *));
 #endif
+#if defined(OpenBSD) && (OpenBSD >= 200211) && defined(_KERNEL)
+extern	int	ip6_getpmtu(struct route_in6 *, struct route_in6 *,
+			    struct ifnet *, struct in6_addr *, u_long *);
+#endif
 
 #include <machine/in_cksum.h>
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
 /* static const char rcsid[] = "@(#)$Id: ip_fil.c,v 2.42.2.34 2001/07/23 13:49:57 darrenr Exp $"; */
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.c,v 1.34 2002/08/28 13:41:35 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.c,v 1.38 2003/02/19 05:47:00 imp Exp $";
 #endif
 
 extern	struct	protosw	inetsw[];
@@ -193,6 +197,15 @@ struct timeout ipfr_slowtimer_ch;
 #endif
 #if defined(__sgi) && defined(_KERNEL)
 toid_t ipfr_slowtimer_ch;
+#endif
+
+#if defined(__NetBSD__) && (__NetBSD_Version__ >= 106080000) && \
+    defined(_KERNEL)
+# include <sys/conf.h>
+const struct cdevsw ipl_cdevsw = {
+	iplopen, iplclose, iplread, nowrite, iplioctl,
+	nostop, notty, nopoll, nommap,
+};
 #endif
 
 #if (_BSDI_VERSION >= 199510) && defined(_KERNEL)
@@ -323,7 +336,7 @@ int count;
 # endif
 
 
-# if defined(__NetBSD__)
+# if defined(__NetBSD__) || defined(__OpenBSD__)
 int ipl_enable()
 # else
 int iplattach()
@@ -368,10 +381,13 @@ int iplattach()
 # ifdef NETBSD_PF
 #  if (__NetBSD_Version__ >= 104200000) || (__FreeBSD_version >= 500011)
 #   if __NetBSD_Version__ >= 105110000
-	if (
-	    !(ph_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET))
+	ph_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET);
 #    ifdef USE_INET6
-	    && !(ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6))
+	ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
+#    endif
+	if (ph_inet == NULL
+#    ifdef USE_INET6
+	    && ph_inet6 == NULL
 #    endif
 	   )
 		return ENODEV;
@@ -488,7 +504,7 @@ int ipl_disable()
 int ipldetach()
 # endif
 {
-	int s, i = FR_INQUE|FR_OUTQUE;
+	int s, i;
 #if defined(NETBSD_PF) && \
     ((__NetBSD_Version__ >= 104200000) || (__FreeBSD_version >= 500011))
 	int error = 0;
@@ -530,8 +546,8 @@ int ipldetach()
 	printf("%s unloaded\n", ipfilter_version);
 
 	fr_checkp = fr_savep;
-	i = frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	i += frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	i = frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	i += frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
 	fr_running = 0;
 
 # ifdef NETBSD_PF
@@ -676,7 +692,16 @@ int mode;
 		if (!fr_running)
 			error = EIO;
 		else
-			error = fr_auth_ioctl(data, mode, cmd, NULL, NULL);
+			if ((cmd == SIOCADAFR) || (cmd == SIOCRMAFR)) {
+				if (!(mode & FWRITE))  {
+					error = EPERM;
+				} else {
+					error = frrequest(unit, cmd, data,
+							  fr_active);
+				}
+			} else {
+				error = fr_auth_ioctl(data, mode, cmd);
+			}
 		SPL_X(s);
 		return error;
 	}
@@ -700,7 +725,7 @@ int mode;
 			if (error)
 				break;
 			if (enable)
-# if defined(__NetBSD__)
+# if defined(__NetBSD__) || defined(__OpenBSD__)
 				error = ipl_enable();
 # else
 				error = iplattach();
@@ -773,12 +798,26 @@ int mode;
 		else {
 			error = IRCOPY(data, (caddr_t)&tmp, sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, tmp);
+				tmp = frflush(unit, 4, tmp);
 				error = IWCOPY((caddr_t)&tmp, data,
 					       sizeof(tmp));
 			}
 		}
 		break;
+#ifdef	USE_INET6
+	case	SIOCIPFL6 :
+		if (!(mode & FWRITE))
+			error = EPERM;
+		else {
+			error = IRCOPY(data, (caddr_t)&tmp, sizeof(tmp));
+			if (!error) {
+				tmp = frflush(unit, 6, tmp);
+				error = IWCOPY((caddr_t)&tmp, data,
+					       sizeof(tmp));
+			}
+		}
+		break;
+#endif
 	case SIOCSTLCK :
 		error = IRCOPY(data, (caddr_t)&tmp, sizeof(tmp));
 		if (!error) {
@@ -803,12 +842,6 @@ int mode;
 		if (error)
 			error = EFAULT;
 		break;
-	case SIOCAUTHW :
-	case SIOCAUTHR :
-		if (!(mode & FWRITE)) {
-			error = EPERM;
-			break;
-		}
 	case SIOCFRSYN :
 		if (!(mode & FWRITE))
 			error = EPERM;
@@ -1014,6 +1047,9 @@ caddr_t data;
 				return EBUSY;
 			if (fg && fg->fg_head)
 				fg->fg_head->fr_ref--;
+			if (unit == IPL_LOGAUTH) {
+				return fr_preauthcmd(req, f, ftail);
+			}
 			if (f->fr_grhead)
 				fr_delgroup((u_int)f->fr_grhead, fp->fr_flags,
 					    unit, set);
@@ -1028,6 +1064,9 @@ caddr_t data;
 		if (f)
 			error = EEXIST;
 		else {
+			if (unit == IPL_LOGAUTH) {
+				return fr_preauthcmd(req, fp, ftail);
+			}
 			KMALLOC(f, frentry_t *);
 			if (f != NULL) {
 				if (fg && fg->fg_head)
@@ -1253,7 +1292,8 @@ struct mbuf **mp;
 		ip->ip_tos = oip->ip_tos;
 		ip->ip_id = oip->ip_id;
 
-# if defined(__NetBSD__) || defined(__OpenBSD__)
+# if defined(__NetBSD__) || \
+     (defined(__OpenBSD__) && (OpenBSD >= 200012))
 		if (ip_mtudisc != 0)
 			ip->ip_off = IP_DF;
 # else
@@ -1488,7 +1528,7 @@ void
 iplinit()
 {
 
-#  if defined(__NetBSD__)
+#  if defined(__NetBSD__) || defined(__OpenBSD__)
 	if (ipl_enable() != 0)
 #  else
 	if (iplattach() != 0)
@@ -1593,7 +1633,7 @@ frdest_t *fdp;
 	/*
 	 * Route packet.
 	 */
-#ifdef	__sgi
+#if defined(__sgi) && (IRIX >= 605)
 	ROUTE_RDLOCK();
 #endif
 	bzero((caddr_t)ro, sizeof (*ro));
@@ -1633,7 +1673,7 @@ frdest_t *fdp;
 	rtalloc(ro);
 # endif
 
-#ifdef	__sgi
+#if defined(__sgi) && (IRIX > 602)
 	ROUTE_UNLOCK();
 #endif
 
@@ -1910,6 +1950,12 @@ frdest_t *fdp;
 	struct nd_ifinfo *ndi;
 	struct ifnet *ifp;
 	frentry_t *fr;
+#if defined(OpenBSD) && (OpenBSD >= 200211)
+	struct route_in6 *ro_pmtu = NULL;
+	struct in6_addr finaldst;
+	ip6_t *ip6;
+#endif
+	u_long mtu;
 	int error;
 
 	ifp = NULL;
@@ -1947,13 +1993,27 @@ frdest_t *fdp;
 			dst6 = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
 		ro->ro_rt->rt_use++;
 
-		ndi = ND_IFINFO(ifp);
-		if (ndi != NULL &&
-		    m0->m_pkthdr.len <= ndi[ifp->if_index].linkmtu)
-			error = nd6_output(ifp, fin->fin_ifp, m0, dst6,
-					   ro->ro_rt);
-		else
-			error = EMSGSIZE;
+<<<<<<< ip_fil.c
+=======
+#if defined(OpenBSD) && (OpenBSD >= 200211)
+		ip6 = mtod(m0, ip6_t *);
+		ro_pmtu = ro;
+		finaldst = ip6->ip6_dst;
+		error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst, &mtu);
+		if (error == 0) {
+#else
+			ndi = ND_IFINFO(ifp);
+#endif
+			if (ndi != NULL &&
+			    m0->m_pkthdr.len <= ndi[ifp->if_index].linkmtu)
+				error = nd6_output(ifp, fin->fin_ifp, m0, dst6,
+						   ro->ro_rt);
+			else
+				error = EMSGSIZE;
+
+#if defined(OpenBSD) && (OpenBSD >= 200211)
+		}
+#endif
 	}
 
 	if (ro->ro_rt != NULL) {

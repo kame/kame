@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.83 2002/08/17 18:26:02 dillon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.89 2003/05/07 05:26:27 rwatson Exp $
  */
 
 #ifndef _NETINET_TCP_VAR_H_
@@ -136,7 +136,8 @@ struct tcpcb {
 					 * linear switch
 					 */
 	u_long	snd_bandwidth;		/* calculated bandwidth or 0 */
-	tcp_seq	snd_recover;		/* for use in fast recovery */
+	tcp_seq	snd_recover;		/* for use in NewReno Fast Recovery */
+	tcp_seq snd_high;		/* for use in NewReno Fast Recovery */
 
 	u_int	t_maxopd;		/* mss plus options */
 
@@ -180,7 +181,9 @@ struct tcpcb {
 /* experimental */
 	u_long	snd_cwnd_prev;		/* cwnd prior to retransmit */
 	u_long	snd_ssthresh_prev;	/* ssthresh prior to retransmit */
+	tcp_seq	snd_high_prev;		/* snd_high prior to retransmit */
 	u_long	t_badrxtwin;		/* window for retransmit recovery */
+	u_char	snd_limited;		/* segments limited transmitted */
 };
 
 /*
@@ -240,6 +243,21 @@ struct syncache_head {
 	TAILQ_HEAD(, syncache)	sch_bucket;
 	u_int		sch_length;
 };
+
+struct tcptw {
+	struct inpcb	*tw_inpcb;	/* XXX back pointer to internet pcb */
+	tcp_seq		snd_nxt;
+	tcp_seq		rcv_nxt;
+	tcp_cc		cc_recv;
+	tcp_cc		cc_send;
+	u_short		last_win;	/* cached window value */
+	u_short		tw_so_options;	/* copy of so_options */
+	struct ucred	*tw_cred;	/* user credentials */
+	u_long 		t_recent;
+	u_long		t_starttime;
+	int		tw_time;
+	LIST_ENTRY(tcptw) tw_2msl;
+};
  
 /*
  * The TAO cache entry which is stored in the protocol family specific
@@ -259,6 +277,7 @@ struct rmxp_tao {
 #define rmx_taop(r)	((struct rmxp_tao *)(r).rmx_filler)
 
 #define	intotcpcb(ip)	((struct tcpcb *)(ip)->inp_ppcb)
+#define	intotw(ip)	((struct tcptw *)(ip)->inp_ppcb)
 #define	sototcpcb(so)	(intotcpcb(sotoinpcb(so)))
 
 /*
@@ -465,6 +484,9 @@ extern	int ss_fltsz_local;
 void	 tcp_canceltimers(struct tcpcb *);
 struct tcpcb *
 	 tcp_close(struct tcpcb *);
+void	 tcp_twstart(struct tcpcb *);
+struct tcptw *
+	 tcp_twclose(struct tcptw *_tw, int _reuse);
 void	 tcp_ctlinput(int, struct sockaddr *, void *);
 int	 tcp_ctloutput(struct socket *, struct sockopt *);
 struct tcpcb *
@@ -488,13 +510,14 @@ struct inpcb *
 	 tcp_quench(struct inpcb *, int);
 void	 tcp_respond(struct tcpcb *, void *,
 	    struct tcphdr *, struct mbuf *, tcp_seq, tcp_seq, int);
+int	 tcp_twrespond(struct tcptw *, struct socket *, struct mbuf *, int);
 struct rtentry *
 	 tcp_rtlookup(struct in_conninfo *);
 void	 tcp_setpersist(struct tcpcb *);
 void	 tcp_slowtimo(void);
 struct tcptemp *
-	 tcp_maketemplate(struct tcpcb *);
-void	 tcp_fillheaders(struct tcpcb *, void *, void *);
+	 tcpip_maketemplate(struct inpcb *);
+void	 tcpip_fillheaders(struct inpcb *, void *, void *);
 struct tcpcb *
 	 tcp_timers(struct tcpcb *, int);
 void	 tcp_trace(int, int, struct tcpcb *, void *, struct tcphdr *, int);

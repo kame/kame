@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.57 2002/11/12 20:44:38 hsu Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.61 2003/04/29 21:36:18 mdodd Exp $
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -148,6 +148,8 @@ struct inpcb {
 	u_char	inp_vflag;		/* IP version flag (v4/v6) */
 #define	INP_IPV4	0x1
 #define	INP_IPV6	0x2
+#define INP_IPV6PROTO	0x4		/* opened under IPv6 protocol */
+#define INP_TIMEWAIT	0x8		/* .. probably doesn't go here */
 	u_char	inp_ip_ttl;		/* time to live proto */
 	u_char	inp_ip_p;		/* protocol proto */
 
@@ -289,6 +291,7 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	INP_RECVIF		0x80	/* receive incoming interface */
 #define	INP_MTUDISC		0x100	/* user can do MTU discovery */
 #define	INP_FAITH		0x200	/* accept FAITH'ed connections */
+#define	INP_RECVTTL		0x400	/* receive incoming IP TTL */
 
 #define IN6P_IPV6_V6ONLY	0x008000 /* restrict AF_INET6 socket for v6 */
 
@@ -313,7 +316,7 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define IN6P_MTU                0x80000000 /* receive path MTU */
 
 #define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
-					INP_RECVIF|\
+				 INP_RECVIF|INP_RECVTTL|\
 				 IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
 				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS|\
 				 IN6P_TCLASS|IN6P_AUTOFLOWLABEL|IN6P_RFC2292|\

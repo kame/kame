@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)protosw.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/protosw.h,v 1.39 2002/08/16 09:07:59 alfred Exp $
+ * $FreeBSD: src/sys/sys/protosw.h,v 1.40 2003/01/01 18:48:59 schweikh Exp $
  */
 
 #ifndef _SYS_PROTOSW_H_
@@ -137,7 +137,7 @@ struct protosw {
  * The arguments to usrreq are:
  *	(*protosw[].pr_usrreq)(up, req, m, nam, opt);
  * where up is a (struct socket *), req is one of these requests,
- * m is a optional mbuf chain containing a message,
+ * m is an optional mbuf chain containing a message,
  * nam is an optional mbuf chain containing an address,
  * and opt is a pointer to a socketopt structure or nil.
  * The protocol is responsible for disposal of the mbuf chain m,

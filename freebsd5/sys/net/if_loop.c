@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/if_loop.c,v 1.73.2.1 2002/12/18 21:03:41 rwatson Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.83 2003/05/28 02:04:33 silby Exp $
  */
 
 /*
@@ -80,11 +80,6 @@
 #endif
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
 #endif
 
 #ifdef NETATALK
@@ -204,8 +199,9 @@ looutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	register struct rtentry *rt;
 {
-	if ((m->m_flags & M_PKTHDR) == 0)
-		panic("looutput no HDR");
+	struct mbuf *n;
+
+	M_ASSERTPKTHDR(m); /* check if we have the packet header */
 
 	if (rt && rt->rt_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
 		m_freem(m);
@@ -216,38 +212,22 @@ looutput(ifp, m, dst, rt)
 	 * KAME requires that the packet to be contiguous on the
 	 * mbuf.  We need to make that sure.
 	 * this kind of code should be avoided.
-	 * XXX: fails to join if interface MTU > MCLBYTES.  jumbogram?
+	 *
+	 * XXX: KAME may no longer need contiguous packets.  Once
+	 * that has been verified, the following code _should_ be
+	 * removed.
 	 */
-	if (m && m->m_next != NULL && m->m_pkthdr.len < MCLBYTES) {
-		struct mbuf *n;
 
-		MGETHDR(n, M_DONTWAIT, MT_HEADER);
-		if (!n)
-			goto contiguousfail;
-		MCLGET(n, M_DONTWAIT);
-		if (! (n->m_flags & M_EXT)) {
-			m_freem(n);
-			goto contiguousfail;
+	if (m && m->m_next != NULL) {
+
+		n = m_defrag(m, M_DONTWAIT);
+
+		if (n == NULL) {
+			m_freem(m);
+			return (ENOBUFS);
+		} else {
+			m = n;
 		}
-
-		m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
-		n->m_pkthdr = m->m_pkthdr;
-		n->m_len = m->m_pkthdr.len;
-		SLIST_INIT(&m->m_pkthdr.tags);
-#ifdef MAC
-		/* 
-		 * XXXMAC: Once we put labels in tags and proper
-		 * primitives are used for relocating mbuf header
-		 * data, this will no longer be required.
-		 */
-		m->m_pkthdr.label.l_flags &= ~MAC_FLAG_INITIALIZED;
-#endif
-		m_freem(m);
-		m = n;
-	}
-	if (0) {
-contiguousfail:
-		printf("looutput: mbuf allocation failed\n");
 	}
 
 	ifp->if_opackets++;
@@ -257,7 +237,6 @@ contiguousfail:
 	case AF_INET:
 	case AF_INET6:
 	case AF_IPX:
-	case AF_NS:
 	case AF_APPLETALK:
 		break;
 	default:
@@ -288,9 +267,8 @@ if_simloop(ifp, m, af, hlen)
 	int hlen;
 {
 	int isr;
-	struct ifqueue *inq = 0;
 
-	KASSERT((m->m_flags & M_PKTHDR) != 0, ("if_simloop: no HDR"));
+	M_ASSERTPKTHDR(m);
 	m->m_pkthdr.rcvif = ifp;
 
 	/* BPF write needs to be handled specially */
@@ -373,33 +351,23 @@ if_simloop(ifp, m, af, hlen)
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-		inq = &ipintrq;
 		isr = NETISR_IP;
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
 		m->m_flags |= M_LOOP;
-		inq = &ip6intrq;
 		isr = NETISR_IPV6;
 		break;
 #endif
 #ifdef IPX
 	case AF_IPX:
-		inq = &ipxintrq;
 		isr = NETISR_IPX;
-		break;
-#endif
-#ifdef NS
-	case AF_NS:
-		inq = &nsintrq;
-		isr = NETISR_NS;
 		break;
 #endif
 #ifdef NETATALK
 	case AF_APPLETALK:
-	        inq = &atintrq2;
-		isr = NETISR_ATALK;
+		isr = NETISR_ATALK2;
 		break;
 #endif
 	default:
@@ -409,8 +377,7 @@ if_simloop(ifp, m, af, hlen)
 	}
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
-	(void) IF_HANDOFF(inq, m, NULL);
-	schednetisr(isr);
+	netisr_dispatch(isr, m);
 	return (0);
 }
 

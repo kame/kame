@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan.c,v 1.44 2002/11/14 23:43:16 sam Exp $
+ * $FreeBSD: src/sys/net/if_vlan.c,v 1.49 2003/03/12 14:45:22 sam Exp $
  */
 
 /*
@@ -337,7 +337,7 @@ vlan_start(struct ifnet *ifp)
 			struct m_tag *mtag = m_tag_alloc(MTAG_VLAN,
 							 MTAG_VLAN_TAG,
 							 sizeof (u_int),
-							 M_DONTWAIT);
+							 M_NOWAIT);
 			if (mtag == NULL) {
 				ifp->if_oerrors++;
 				m_freem(m);
@@ -369,7 +369,7 @@ vlan_start(struct ifnet *ifp)
 			 * with 802.1Q encapsulation.
 			 */
 			bcopy(mtod(m, char *) + ifv->ifv_encaplen,
-			      mtod(m, char *), sizeof(struct ether_header));
+			      mtod(m, char *), ETHER_HDR_LEN);
 			evl = mtod(m, struct ether_vlan_header *);
 			evl->evl_proto = evl->evl_encap_proto;
 			evl->evl_encap_proto = htons(ETHERTYPE_VLAN);
@@ -461,7 +461,7 @@ vlan_input(struct ifnet *ifp, struct mbuf *m)
 		 */
 		bcopy(mtod(m, caddr_t),
 		      mtod(m, caddr_t) + ETHER_VLAN_ENCAP_LEN,
-		      sizeof (struct ether_header));
+		      ETHER_HDR_LEN);
 		m_adj(m, ETHER_VLAN_ENCAP_LEN);
 	}
 
@@ -692,6 +692,29 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			bcopy(((struct arpcom *)ifp->if_softc)->ac_enaddr,
 			      (caddr_t) sa->sa_data, ETHER_ADDR_LEN);
 		}
+		break;
+
+	case SIOCGIFMEDIA:
+		if (ifv->ifv_p != NULL) {
+			error = (ifv->ifv_p->if_ioctl)(ifv->ifv_p, SIOCGIFMEDIA, data);
+			/* Limit the result to the parent's current config. */
+			if (error == 0) {
+				struct ifmediareq *ifmr;
+
+				ifmr = (struct ifmediareq *) data;
+				if (ifmr->ifm_count >= 1 && ifmr->ifm_ulist) {
+					ifmr->ifm_count = 1;
+					error = copyout(&ifmr->ifm_current,
+						ifmr->ifm_ulist, 
+						sizeof(int));
+				}
+			}
+		} else
+			error = EINVAL;
+		break;
+
+	case SIOCSIFMEDIA:
+		error = EINVAL;
 		break;
 
 	case SIOCSIFMTU:

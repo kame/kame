@@ -30,8 +30,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)radix.c	8.4 (Berkeley) 11/2/94
- * $FreeBSD: src/sys/net/radix.c,v 1.26 2002/11/09 12:55:06 alfred Exp $
+ *	@(#)radix.c	8.5 (Berkeley) 5/19/95
+ * $FreeBSD: src/sys/net/radix.c,v 1.31 2003/02/08 01:44:09 hsu Exp $
  */
 
 /*
@@ -40,9 +40,10 @@
 #ifndef _RADIX_H_
 #include <sys/param.h>
 #ifdef	_KERNEL
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
-#define	M_DONTWAIT M_NOWAIT
 #include <sys/domain.h>
 #else
 #include <stdlib.h>
@@ -85,7 +86,7 @@ static int	rn_lexobetter(void *m_arg, void *n_arg);
 static struct radix_mask *
 		rn_new_radix_mask(struct radix_node *tt,
 		    struct radix_mask *next);
-static int	rn_satsifies_leaf(char *trial, struct radix_node *leaf,
+static int	rn_satisfies_leaf(char *trial, struct radix_node *leaf,
 		    int skip);
 
 /*
@@ -207,7 +208,7 @@ rn_lookup(v_arg, m_arg, head)
 }
 
 static int
-rn_satsifies_leaf(trial, leaf, skip)
+rn_satisfies_leaf(trial, leaf, skip)
 	char *trial;
 	register struct radix_node *leaf;
 	int skip;
@@ -298,7 +299,7 @@ on1:
 		if (t->rn_flags & RNF_NORMAL) {
 			if (rn_bit <= t->rn_bit)
 				return t;
-		} else if (rn_satsifies_leaf(v, t, matched_off))
+		} else if (rn_satisfies_leaf(v, t, matched_off))
 				return t;
 	t = saved_t;
 	/* start searching up the tree */
@@ -321,7 +322,7 @@ on1:
 				x = rn_search_m(v, t, m->rm_mask);
 				while (x && x->rn_mask != m->rm_mask)
 					x = x->rn_dupedkey;
-				if (x && rn_satsifies_leaf(v, x, off))
+				if (x && rn_satisfies_leaf(v, x, off))
 					return x;
 			}
 			m = m->rm_mklist;
@@ -611,6 +612,9 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 		 * in a masklist -- most specific to least specific.
 		 * This may require the unfortunate nuisance of relocating
 		 * the head of the list.
+		 *
+		 * We also reverse, or doubly link the list through the
+		 * parent pointer.
 		 */
 		if (tt == saved_tt) {
 			struct	radix_node *xx = x;
@@ -796,8 +800,8 @@ on1:
 	dupedkey = saved_tt->rn_dupedkey;
 	if (dupedkey) {
 		/*
-		 * at this point, tt is the deletion target and saved_tt
-		 * is the head of the dupekey chain
+		 * Here, tt is the deletion target and
+		 * saved_tt is the head of the dupekey chain.
 		 */
 		if (tt == saved_tt) {
 			/* remove from head of chain */
@@ -1048,6 +1052,9 @@ rn_inithead(head, off)
 	if (rnh == 0)
 		return (0);
 	Bzero(rnh, sizeof (*rnh));
+#ifdef _KERNEL
+	RADIX_NODE_HEAD_LOCK_INIT(rnh);
+#endif
 	*head = rnh;
 	t = rn_newpair(rn_zeros, off, rnh->rnh_nodes);
 	ttt = rnh->rnh_nodes + 2;

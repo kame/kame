@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.73 2002/10/20 22:52:06 phk Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.78 2003/03/21 15:43:06 mdodd Exp $
  */
 
 #include "opt_ipsec.h"
@@ -84,7 +84,11 @@ SYSCTL_STRUCT(_net_inet_icmp, ICMPCTL_STATS, stats, CTLFLAG_RW,
 
 static int	icmpmaskrepl = 0;
 SYSCTL_INT(_net_inet_icmp, ICMPCTL_MASKREPL, maskrepl, CTLFLAG_RW,
-	&icmpmaskrepl, 0, "");
+	&icmpmaskrepl, 0, "Reply to ICMP Address Mask Request packets.");
+
+static u_int	icmpmaskfake = 0;
+SYSCTL_UINT(_net_inet_icmp, OID_AUTO, maskfake, CTLFLAG_RW,
+	&icmpmaskfake, 0, "Fake reply to ICMP Address Mask Request packets.");
 
 static int	drop_redirect = 0;
 SYSCTL_INT(_net_inet_icmp, OID_AUTO, drop_redirect, CTLFLAG_RW, 
@@ -497,7 +501,10 @@ icmp_input(m, off)
 		if (ia->ia_ifp == 0)
 			break;
 		icp->icmp_type = ICMP_MASKREPLY;
-		icp->icmp_mask = ia->ia_sockmask.sin_addr.s_addr;
+		if (icmpmaskfake == 0)
+			icp->icmp_mask = ia->ia_sockmask.sin_addr.s_addr;
+		else
+			icp->icmp_mask = icmpmaskfake;
 		if (ip->ip_src.s_addr == 0) {
 			if (ia->ia_ifp->if_flags & IFF_BROADCAST)
 			    ip->ip_src = satosin(&ia->ia_broadaddr)->sin_addr;
@@ -835,49 +842,37 @@ ip_next_mtu(mtu, dir)
 int
 badport_bandlim(int which)
 {
-	static int lticks[BANDLIM_MAX + 1];
-	static int lpackets[BANDLIM_MAX + 1];
-	int dticks;
-	const char *bandlimittype[] = {
-		"Limiting icmp unreach response",
-		"Limiting icmp ping response",
-		"Limiting icmp tstamp response",
-		"Limiting closed port RST response",
-		"Limiting open port RST response"
-		};
+#define	N(a)	(sizeof (a) / sizeof (a[0]))
+	static struct rate {
+		const char	*type;
+		struct timeval	lasttime;
+		int		curpps;;
+	} rates[BANDLIM_MAX+1] = {
+		{ "icmp unreach response" },
+		{ "icmp ping response" },
+		{ "icmp tstamp response" },
+		{ "closed port RST response" },
+		{ "open port RST response" }
+	};
 
 	/*
-	 * Return ok status if feature disabled or argument out of
-	 * ranage.
+	 * Return ok status if feature disabled or argument out of range.
 	 */
+	if (icmplim > 0 && (u_int) which < N(rates)) {
+		struct rate *r = &rates[which];
+		int opps = r->curpps;
 
-	if (icmplim <= 0 || which > BANDLIM_MAX || which < 0)
-		return(0);
-	dticks = ticks - lticks[which];
-
-	/*
-	 * reset stats when cumulative dt exceeds one second.
-	 */
-
-	if ((unsigned int)dticks > hz) {
-		if (lpackets[which] > icmplim && icmplim_output) {
-			printf("%s from %d to %d packets per second\n",
-				bandlimittype[which],
-				lpackets[which],
-				icmplim
-			);
-		}
-		lticks[which] = ticks;
-		lpackets[which] = 0;
+		if (!ppsratecheck(&r->lasttime, &r->curpps, icmplim))
+			return -1;	/* discard packet */
+		/*
+		 * If we've dropped below the threshold after having
+		 * rate-limited traffic print the message.  This preserves
+		 * the previous behaviour at the expense of added complexity.
+		 */
+		if (icmplim_output && opps > icmplim)
+			printf("Limiting %s from %d to %d packets/sec\n",
+				r->type, opps, icmplim);
 	}
-
-	/*
-	 * bump packet count
-	 */
-
-	if (++lpackets[which] > icmplim) {
-		return(-1);
-	}
-	return(0);
+	return 0;			/* okay to send packet */
+#undef N
 }
-

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_proto.c	8.2 (Berkeley) 2/9/95
- * $FreeBSD: src/sys/netinet/in_proto.c,v 1.62 2002/11/08 23:37:50 sam Exp $
+ * $FreeBSD: src/sys/netinet/in_proto.c,v 1.64 2003/03/05 19:24:23 peter Exp $
  */
 
 #include "opt_ipdivert.h"
@@ -44,6 +44,7 @@
 #endif
 #include "opt_sctp.h"
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
 #include <sys/domain.h>
@@ -89,11 +90,6 @@
 
 #ifdef IPXIP
 #include <netipx/ipx_ip.h>
-#endif
-
-#ifdef NSIP
-#include <netns/ns.h>
-#include <netns/ns_if.h>
 #endif
 
 #ifdef SCTP
@@ -262,14 +258,6 @@ struct protosw inetsw[] = {
 #ifdef IPXIP
 { SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   ipxip_input,	0,		ipxip_ctlinput,	0,
-  0,
-  0,		0,		0,		0,
-  &rip_usrreqs
-},
-#endif
-#ifdef NSIP
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  idpip_input,	0,		nsip_ctlinput,	0,
   0,
   0,		0,		0,		0,
   &rip_usrreqs

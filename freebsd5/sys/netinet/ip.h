@@ -31,11 +31,13 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip.h	8.2 (Berkeley) 6/1/94
- * $FreeBSD: src/sys/netinet/ip.h,v 1.20 2002/10/20 22:52:06 phk Exp $
+ * $FreeBSD: src/sys/netinet/ip.h,v 1.24 2003/04/02 20:14:43 mdodd Exp $
  */
 
 #ifndef _NETINET_IP_H_
 #define _NETINET_IP_H_
+
+#include <sys/cdefs.h>
 
 /*
  * Definitions for internet protocol version 4.
@@ -67,7 +69,7 @@ struct ip {
 	u_char	ip_p;			/* protocol */
 	u_short	ip_sum;			/* checksum */
 	struct	in_addr ip_src,ip_dst;	/* source and dest address */
-} __attribute__((__packed__));
+} __packed;
 
 #ifdef CTASSERT
 CTASSERT(sizeof (struct ip) == 20);

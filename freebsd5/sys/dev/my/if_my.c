@@ -25,10 +25,12 @@
  *
  * Written by: yen_cw@myson.com.tw  available at: http://www.myson.com.tw/
  *
- * $FreeBSD: src/sys/dev/my/if_my.c,v 1.12 2002/11/14 23:54:53 sam Exp $
- *
  * Myson fast ethernet PCI NIC driver
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/my/if_my.c,v 1.16 2003/04/15 06:37:25 mdodd Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -169,7 +171,9 @@ static driver_t my_driver = {
 
 static devclass_t my_devclass;
 
-DRIVER_MODULE(if_my, pci, my_driver, my_devclass, 0, 0);
+DRIVER_MODULE(my, pci, my_driver, my_devclass, 0, 0);
+MODULE_DEPEND(my, pci, 1, 1, 1);
+MODULE_DEPEND(my, ether, 1, 1, 1);
 
 static long
 my_send_cmd_to_phy(struct my_softc * sc, int opcode, int regad)

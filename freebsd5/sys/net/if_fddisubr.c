@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	from: if_ethersubr.c,v 1.5 1994/12/13 22:31:45 wollman Exp
- * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.72 2002/11/15 00:00:15 sam Exp $
+ * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.85 2003/03/16 00:17:44 mdodd Exp $
  */
 
 #include "opt_atalk.h"
@@ -53,9 +53,10 @@
 #include <sys/sockio.h>
 
 #include <net/if.h>
-#include <net/if_llc.h>
 #include <net/if_dl.h>
+#include <net/if_llc.h>
 #include <net/if_types.h>
+
 #include <net/netisr.h>
 #include <net/route.h>
 #include <net/bpf.h>
@@ -73,11 +74,6 @@
 #ifdef IPX
 #include <netipx/ipx.h> 
 #include <netipx/ipx_if.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
 #endif
 
 #ifdef DECNET
@@ -102,9 +98,8 @@ static int fddi_output(struct ifnet *, struct mbuf *, struct sockaddr *,
 		       struct rtentry *); 
 static void fddi_input(struct ifnet *ifp, struct mbuf *m);
 
-
 #define	IFP2AC(IFP)	((struct arpcom *)IFP)
-#define	senderr(e)	{ error = (e); goto bad; }
+#define	senderr(e)	do { error = (e); goto bad; } while (0)
 
 /*
  * FDDI output routine.
@@ -134,6 +129,8 @@ fddi_output(ifp, m, dst, rt0)
 		senderr(error);
 #endif
 
+	if (ifp->if_flags & IFF_MONITOR)
+		senderr(ENETDOWN);
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
 	getmicrotime(&ifp->if_lastchange);
@@ -167,7 +164,6 @@ fddi_output(ifp, m, dst, rt0)
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
 	switch (dst->sa_family) {
-
 #ifdef INET
 	case AF_INET: {
 		if (!arpresolve(ifp, rt, m, dst, edst, rt0))
@@ -175,7 +171,7 @@ fddi_output(ifp, m, dst, rt0)
 		type = htons(ETHERTYPE_IP);
 		break;
 	}
-#endif
+#endif /* INET */
 #ifdef INET6
 	case AF_INET6:
 		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)edst)) {
@@ -184,14 +180,14 @@ fddi_output(ifp, m, dst, rt0)
 		}
 		type = htons(ETHERTYPE_IPV6);
 		break;
-#endif
+#endif /* INET6 */
 #ifdef IPX
 	case AF_IPX:
 		type = htons(ETHERTYPE_IPX);
  		bcopy((caddr_t)&(((struct sockaddr_ipx *)dst)->sipx_addr.x_host),
 		    (caddr_t)edst, FDDI_ADDR_LEN);
 		break;
-#endif
+#endif /* IPX */
 #ifdef NETATALK
 	case AF_APPLETALK: {
 	    struct at_ifaddr *aa;
@@ -226,13 +222,6 @@ fddi_output(ifp, m, dst, rt0)
 	    break;
 	}
 #endif /* NETATALK */
-#ifdef NS
-	case AF_NS:
-		type = htons(ETHERTYPE_NS);
- 		bcopy((caddr_t)&(((struct sockaddr_ns *)dst)->sns_addr.x_host),
-		    (caddr_t)edst, FDDI_ADDR_LEN);
-		break;
-#endif
 
 	case pseudo_AF_HDRCMPLT:
 	{
@@ -304,9 +293,10 @@ fddi_output(ifp, m, dst, rt0)
 		l = mtod(m, struct llc *);
 		l->llc_control = LLC_UI;
 		l->llc_dsap = l->llc_ssap = LLC_SNAP_LSAP;
-		l->llc_snap.org_code[0] = l->llc_snap.org_code[1] = l->llc_snap.org_code[2] = 0;
-		bcopy((caddr_t)&type, (caddr_t)&l->llc_snap.ether_type,
-			sizeof(u_int16_t));
+		l->llc_snap.org_code[0] =
+			l->llc_snap.org_code[1] =
+			l->llc_snap.org_code[2] = 0;
+		l->llc_snap.ether_type = htons(type);
 	}
 
 	/*
@@ -336,15 +326,15 @@ fddi_output(ifp, m, dst, rt0)
 	 * reasons and compatibility with the original behavior.
 	 */
 	if ((ifp->if_flags & IFF_SIMPLEX) && (loop_copy != -1)) {
-		if ((m->m_flags & M_BCAST) || loop_copy) {
-			struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
-
-			(void) if_simloop(ifp,
-				n, dst->sa_family, FDDI_HDR_LEN);
-	     	} else if (bcmp(fh->fddi_dhost,
-		    fh->fddi_shost, FDDI_ADDR_LEN) == 0) {
-			(void) if_simloop(ifp,
-				m, dst->sa_family, FDDI_HDR_LEN);
+		if ((m->m_flags & M_BCAST) || (loop_copy > 0)) {
+			struct mbuf *n;
+			n = m_copy(m, 0, (int)M_COPYALL);
+			(void) if_simloop(ifp, n, dst->sa_family,
+					  FDDI_HDR_LEN);
+	     	} else if (bcmp(fh->fddi_dhost, fh->fddi_shost,
+				FDDI_ADDR_LEN) == 0) {
+			(void) if_simloop(ifp, m, dst->sa_family,
+					  FDDI_HDR_LEN);
 			return (0);	/* XXX */
 		}
 	}
@@ -360,26 +350,41 @@ bad:
 }
 
 /*
- * Process a received FDDI packet;
- * the packet is in the mbuf chain m without
- * the fddi header, which is provided separately.
+ * Process a received FDDI packet.
  */
 static void
 fddi_input(ifp, m)
 	struct ifnet *ifp;
 	struct mbuf *m;
 {
-	struct ifqueue *inq;
+	int isr;
 	struct llc *l;
 	struct fddi_header *fh;
 
-	fh = mtod(m, struct fddi_header *);
-
 	/*
-	 * Update interface statistics.
+	 * Do consistency checks to verify assumptions
+	 * made by code past this point.
 	 */
-	ifp->if_ibytes += m->m_pkthdr.len;
-	getmicrotime(&ifp->if_lastchange);
+	if ((m->m_flags & M_PKTHDR) == 0) {
+		if_printf(ifp, "discard frame w/o packet header\n");
+		ifp->if_ierrors++;
+		m_freem(m);
+		return;
+	}
+	if (m->m_pkthdr.rcvif == NULL) {
+		if_printf(ifp, "discard frame w/o interface pointer\n");
+		ifp->if_ierrors++;
+		m_freem(m);
+		return;
+        }
+
+	m = m_pullup(m, FDDI_HDR_LEN);
+	if (m == NULL) {
+		ifp->if_ierrors++;
+		goto dropanyway;
+	}
+	fh = mtod(m, struct fddi_header *);
+	m->m_pkthdr.header = (void *)fh;
 
 	/*
 	 * Discard packet if interface is not up.
@@ -387,9 +392,28 @@ fddi_input(ifp, m)
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		goto dropanyway;
 
+	/*
+	 * Give bpf a chance at the packet.
+	 */
+	BPF_MTAP(ifp, m);
+
+	/*
+	 * Interface marked for monitoring; discard packet.
+	 */
+	if (ifp->if_flags & IFF_MONITOR) {
+		m_freem(m);
+		return;
+	}
+
 #ifdef MAC
 	mac_create_mbuf_from_ifnet(ifp, m);
 #endif
+
+	/*
+	 * Update interface statistics.
+	 */
+	ifp->if_ibytes += m->m_pkthdr.len;
+	getmicrotime(&ifp->if_lastchange);
 
 	/*
 	 * Discard non local unicast packets when interface
@@ -423,9 +447,9 @@ fddi_input(ifp, m)
 #endif
 
 	/* Strip off FDDI header. */
-	m_adj(m, sizeof(struct fddi_header));
+	m_adj(m, FDDI_HDR_LEN);
 
-	m = m_pullup(m, sizeof(struct llc));
+	m = m_pullup(m, LLC_SNAPFRAMELEN);
 	if (m == 0) {
 		ifp->if_ierrors++;
 		goto dropanyway;
@@ -436,26 +460,26 @@ fddi_input(ifp, m)
 	case LLC_SNAP_LSAP:
 	{
 		u_int16_t type;
-		if (l->llc_control != LLC_UI || l->llc_ssap != LLC_SNAP_LSAP) {
+		if ((l->llc_control != LLC_UI) ||
+		    (l->llc_ssap != LLC_SNAP_LSAP)) {
 			ifp->if_noproto++;
 			goto dropanyway;
 		}
 #ifdef NETATALK
 		if (Bcmp(&(l->llc_snap.org_code)[0], at_org_code,
-			 sizeof(at_org_code)) == 0 &&
-		 	ntohs(l->llc_snap.ether_type) == ETHERTYPE_AT) {
-		    inq = &atintrq2;
-		    m_adj(m, LLC_SNAPFRAMELEN);
-		    schednetisr(NETISR_ATALK);
-		    break;
+		    sizeof(at_org_code)) == 0 &&
+		    ntohs(l->llc_snap.ether_type) == ETHERTYPE_AT) {
+			isr = NETISR_ATALK2;
+			m_adj(m, LLC_SNAPFRAMELEN);
+			break;
 		}
 
 		if (Bcmp(&(l->llc_snap.org_code)[0], aarp_org_code,
-			 sizeof(aarp_org_code)) == 0 &&
-			ntohs(l->llc_snap.ether_type) == ETHERTYPE_AARP) {
-		    m_adj(m, LLC_SNAPFRAMELEN);
-		    aarpinput(IFP2AC(ifp), m); /* XXX */
-		    return;
+		    sizeof(aarp_org_code)) == 0 &&
+		    ntohs(l->llc_snap.ether_type) == ETHERTYPE_AARP) {
+			m_adj(m, LLC_SNAPFRAMELEN);
+			isr = NETISR_AARP;
+			break;
 		}
 #endif /* NETATALK */
 		if (l->llc_snap.org_code[0] != 0 ||
@@ -473,50 +497,37 @@ fddi_input(ifp, m)
 		case ETHERTYPE_IP:
 			if (ipflow_fastforward(m))
 				return;
-			schednetisr(NETISR_IP);
-			inq = &ipintrq;
+			isr = NETISR_IP;
 			break;
 
 		case ETHERTYPE_ARP:
 			if (ifp->if_flags & IFF_NOARP)
 				goto dropanyway;
-			schednetisr(NETISR_ARP);
-			inq = &arpintrq;
+			isr = NETISR_ARP;
 			break;
 #endif
 #ifdef INET6
 		case ETHERTYPE_IPV6:
-			schednetisr(NETISR_IPV6);
-			inq = &ip6intrq;
+			isr = NETISR_IPV6;
 			break;
 #endif
 #ifdef IPX      
 		case ETHERTYPE_IPX: 
-			schednetisr(NETISR_IPX);
-			inq = &ipxintrq;
+			isr = NETISR_IPX;
 			break;  
 #endif   
-#ifdef NS
-		case ETHERTYPE_NS:
-			schednetisr(NETISR_NS);
-			inq = &nsintrq;
-			break;
-#endif
 #ifdef DECNET
 		case ETHERTYPE_DECNET:
-			schednetisr(NETISR_DECNET);
-			inq = &decnetintrq;
+			isr = NETISR_DECNET;
 			break;
 #endif
 #ifdef NETATALK 
 		case ETHERTYPE_AT:
-	                schednetisr(NETISR_ATALK);
-			inq = &atintrq1;
+	                isr = NETISR_ATALK1;
 			break;
 	        case ETHERTYPE_AARP:
-			/* probably this should be done with a NETISR as well */
-			aarpinput(IFP2AC(ifp), m); /* XXX */
-			return;
+			isr = NETISR_AARP;
+			break;
 #endif /* NETATALK */
 		default:
 			/* printf("fddi_input: unknown protocol 0x%x\n", type); */
@@ -531,8 +542,7 @@ fddi_input(ifp, m)
 		ifp->if_noproto++;
 		goto dropanyway;
 	}
-
-	(void) IF_HANDOFF(inq, m, NULL);
+	netisr_dispatch(isr, m);
 	return;
 
 dropanyway:
@@ -570,8 +580,7 @@ fddi_ifattach(ifp, bpf)
 #endif
 	ifa = ifaddr_byindex(ifp->if_index);
 	if (ifa == NULL) {
-		printf("%s(): no lladdr for %s%d!\n", __FUNCTION__,
-		       ifp->if_name, ifp->if_unit);
+		if_printf(ifp, "%s() no lladdr!\n", __func__);
 		return;
 	}
 

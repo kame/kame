@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.131 2002/11/20 19:07:27 luigi Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.147 2003/05/05 09:15:50 obrien Exp $
  */
 
 #include "opt_atalk.h"
@@ -83,14 +83,6 @@ int (*ef_outputp)(struct ifnet *ifp, struct mbuf **mp,
 		struct sockaddr *dst, short *tp, int *hlen);
 #endif
 
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-ushort ns_nettype;
-int ether_outputdebug = 0;
-int ether_inputdebug = 0;
-#endif
-
 #ifdef NETATALK
 #include <netatalk/at.h>
 #include <netatalk/at_var.h>
@@ -119,9 +111,12 @@ bdg_forward_t *bdg_forward_ptr;
 bdgtakeifaces_t *bdgtakeifaces_ptr;
 struct bdg_softc *ifp2sc;
 
+static u_char etherbroadcastaddr[ETHER_ADDR_LEN] =
+			{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
 static	int ether_resolvemulti(struct ifnet *, struct sockaddr **,
 		struct sockaddr *);
-u_char	etherbroadcastaddr[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
 #define senderr(e) do { error = (e); goto bad;} while (0)
 #define IFP2AC(IFP) ((struct arpcom *)IFP)
 
@@ -139,7 +134,7 @@ static int ether_ipfw;
  */
 int
 ether_output(ifp, m, dst, rt0)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	struct mbuf *m;
 	struct sockaddr *dst;
 	struct rtentry *rt0;
@@ -147,8 +142,8 @@ ether_output(ifp, m, dst, rt0)
 	short type;
 	int error = 0, hdrcmplt = 0;
  	u_char esrc[6], edst[6];
-	register struct rtentry *rt;
-	register struct ether_header *eh;
+	struct rtentry *rt;
+	struct ether_header *eh;
 	int loop_copy = 0;
 	int hlen;	/* link layer header lenght */
 	struct arpcom *ac = IFP2AC(ifp);
@@ -163,31 +158,11 @@ ether_output(ifp, m, dst, rt0)
 		senderr(ENETDOWN);
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	rt = rt0;
-	if (rt) {
-		if ((rt->rt_flags & RTF_UP) == 0) {
-			rt0 = rt = rtalloc1(dst, 1, 0UL);
-			if (rt0)
-				rt->rt_refcnt--;
-			else
-				senderr(EHOSTUNREACH);
-		}
-		if (rt->rt_flags & RTF_GATEWAY) {
-			if (rt->rt_gwroute == 0)
-				goto lookup;
-			if (((rt = rt->rt_gwroute)->rt_flags & RTF_UP) == 0) {
-				rtfree(rt); rt = rt0;
-			lookup: rt->rt_gwroute = rtalloc1(rt->rt_gateway, 1,
-							  0UL);
-				if ((rt = rt->rt_gwroute) == 0)
-					senderr(EHOSTUNREACH);
-			}
-		}
-		if (rt->rt_flags & RTF_REJECT)
-			if (rt->rt_rmx.rmx_expire == 0 ||
-			    time_second < rt->rt_rmx.rmx_expire)
-				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
-	}
+
+	error = rt_check(&rt, &rt0, dst);
+	if (error)
+		goto bad;
+
 	hlen = ETHER_HDR_LEN;
 	switch (dst->sa_family) {
 #ifdef INET
@@ -236,59 +211,20 @@ ether_output(ifp, m, dst, rt0)
 	    if ( aa->aa_flags & AFA_PHASE2 ) {
 		struct llc llc;
 
-		M_PREPEND(m, sizeof(struct llc), M_TRYWAIT);
+		M_PREPEND(m, LLC_SNAPFRAMELEN, M_TRYWAIT);
 		llc.llc_dsap = llc.llc_ssap = LLC_SNAP_LSAP;
 		llc.llc_control = LLC_UI;
 		bcopy(at_org_code, llc.llc_snap_org_code, sizeof(at_org_code));
 		llc.llc_snap_ether_type = htons( ETHERTYPE_AT );
-		bcopy(&llc, mtod(m, caddr_t), sizeof(struct llc));
+		bcopy(&llc, mtod(m, caddr_t), LLC_SNAPFRAMELEN);
 		type = htons(m->m_pkthdr.len);
-		hlen = sizeof(struct llc) + ETHER_HDR_LEN;
+		hlen = LLC_SNAPFRAMELEN + ETHER_HDR_LEN;
 	    } else {
 		type = htons(ETHERTYPE_AT);
 	    }
 	    break;
 	  }
 #endif /* NETATALK */
-#ifdef NS
-	case AF_NS:
-		switch(ns_nettype){
-		default:
-		case 0x8137: /* Novell Ethernet_II Ethernet TYPE II */
-			type = 0x8137;
-			break;
-		case 0x0: /* Novell 802.3 */
-			type = htons( m->m_pkthdr.len);
-			break;
-		case 0xe0e0: /* Novell 802.2 and Token-Ring */
-			M_PREPEND(m, 3, M_TRYWAIT);
-			type = htons( m->m_pkthdr.len);
-			cp = mtod(m, u_char *);
-			*cp++ = 0xE0;
-			*cp++ = 0xE0;
-			*cp++ = 0x03;
-			break;
-		}
- 		bcopy((caddr_t)&(((struct sockaddr_ns *)dst)->sns_addr.x_host),
-		    (caddr_t)edst, sizeof (edst));
-		/*
-		 * XXX if ns_thishost is the same as the node's ethernet
-		 * address then just the default code will catch this anyhow.
-		 * So I'm not sure if this next clause should be here at all?
-		 * [JRE]
-		 */
-		if (!bcmp((caddr_t)edst, (caddr_t)&ns_thishost, sizeof(edst))){
-			m->m_pkthdr.rcvif = ifp;
-			inq = &nsintrq;
-			if (IF_HANDOFF(inq, m, NULL))
-				schednetisr(NETISR_NS);
-			return (error);
-		}
-		if (!bcmp((caddr_t)edst, (caddr_t)&ns_broadhost, sizeof(edst))){
-			m->m_flags |= M_BCAST;
-		}
-		break;
-#endif /* NS */
 
 	case pseudo_AF_HDRCMPLT:
 		hdrcmplt = 1;
@@ -312,7 +248,7 @@ ether_output(ifp, m, dst, rt0)
 	 * Add local net header.  If no space in first mbuf,
 	 * allocate another.
 	 */
-	M_PREPEND(m, sizeof (struct ether_header), M_DONTWAIT);
+	M_PREPEND(m, ETHER_HDR_LEN, M_DONTWAIT);
 	if (m == 0)
 		senderr(ENOBUFS);
 	eh = mtod(m, struct ether_header *);
@@ -342,16 +278,19 @@ ether_output(ifp, m, dst, rt0)
 			csum_flags |= (CSUM_IP_CHECKED|CSUM_IP_VALID);
 		if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA)
 			csum_flags |= (CSUM_DATA_VALID|CSUM_PSEUDO_HDR);
+
 		if ((m->m_flags & M_BCAST) || (loop_copy > 0)) {
-			struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
+			struct mbuf *n;
 
-			n->m_pkthdr.csum_flags |= csum_flags;
-			if (csum_flags & CSUM_DATA_VALID)
-				n->m_pkthdr.csum_data = 0xffff;
-
-			(void) if_simloop(ifp, n, dst->sa_family, hlen);
-		} else if (bcmp(eh->ether_dhost,
-		    eh->ether_shost, ETHER_ADDR_LEN) == 0) {
+			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
+				n->m_pkthdr.csum_flags |= csum_flags;
+				if (csum_flags & CSUM_DATA_VALID)
+					n->m_pkthdr.csum_data = 0xffff;
+				(void)if_simloop(ifp, n, dst->sa_family, hlen);
+			} else
+				ifp->if_iqdrops++;
+		} else if (bcmp(eh->ether_dhost, eh->ether_shost,
+				ETHER_ADDR_LEN) == 0) {
 			m->m_pkthdr.csum_flags |= csum_flags;
 			if (csum_flags & CSUM_DATA_VALID)
 				m->m_pkthdr.csum_data = 0xffff;
@@ -478,7 +417,7 @@ ether_ipfw_chk(struct mbuf **m0, struct ifnet *dst,
 		 * Restore Ethernet header, as needed, in case the
 		 * mbuf chain was replaced by ipfw.
 		 */
-		M_PREPEND(m, ETHER_HDR_LEN, M_NOWAIT);
+		M_PREPEND(m, ETHER_HDR_LEN, M_DONTWAIT);
 		if (m == NULL) {
 			*m0 = m;
 			return 0;
@@ -543,7 +482,7 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 		m_freem(m);
 		return;
 	}
-	if (m->m_len < sizeof (struct ether_header)) {
+	if (m->m_len < ETHER_HDR_LEN) {
 		/* XXX maybe should pullup? */
 		if_printf(ifp, "discard frame w/o leading ethernet "
 				"header (len %u pkt len %u)\n",
@@ -655,7 +594,6 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 			 * packet for us to free; sigh.
 			 */
 			if (bif != BDG_BCAST && bif != BDG_MCAST) {
-printf("ether_input: drop bdg packet, bif %p\n", bif);/*XXX*/
 				m_freem(m);
 				return;
 			}
@@ -675,10 +613,10 @@ void
 ether_demux(struct ifnet *ifp, struct mbuf *m)
 {
 	struct ether_header *eh;
-	struct ifqueue *inq;
+	int isr;
 	u_short ether_type;
 #if defined(NETATALK)
-	register struct llc *l;
+	struct llc *l;
 #endif
 	struct ip_fw *rule = NULL;
 
@@ -800,7 +738,7 @@ post_stats:
 	}
 
 	/* Strip off Ethernet header. */
-	m_adj(m, sizeof (struct ether_header));
+	m_adj(m, ETHER_HDR_LEN);
 
 	/* If the CRC is still on the packet, trim it off. */
 	if (m->m_flags & M_HASFCS) {
@@ -813,8 +751,7 @@ post_stats:
 	case ETHERTYPE_IP:
 		if (ipflow_fastforward(m))
 			return;
-		schednetisr(NETISR_IP);
-		inq = &ipintrq;
+		isr = NETISR_IP;
 		break;
 
 	case ETHERTYPE_ARP:
@@ -823,103 +760,62 @@ post_stats:
 			m_freem(m);
 			return;
 		}
-		schednetisr(NETISR_ARP);
-		inq = &arpintrq;
+		isr = NETISR_ARP;
 		break;
 #endif
 #ifdef IPX
 	case ETHERTYPE_IPX:
 		if (ef_inputp && ef_inputp(ifp, eh, m) == 0)
 			return;
-		schednetisr(NETISR_IPX);
-		inq = &ipxintrq;
+		isr = NETISR_IPX;
 		break;
 #endif
 #ifdef INET6
 	case ETHERTYPE_IPV6:
-		schednetisr(NETISR_IPV6);
-		inq = &ip6intrq;
+		isr = NETISR_IPV6;
 		break;
 #endif
-#ifdef NS
-	case 0x8137: /* Novell Ethernet_II Ethernet TYPE II */
-		schednetisr(NETISR_NS);
-		inq = &nsintrq;
-		break;
-
-#endif /* NS */
 #ifdef NETATALK
-        case ETHERTYPE_AT:
-                schednetisr(NETISR_ATALK);
-                inq = &atintrq1;
-                break;
-        case ETHERTYPE_AARP:
-		/* probably this should be done with a NETISR as well */
-                aarpinput(IFP2AC(ifp), m); /* XXX */
-                return;
+	case ETHERTYPE_AT:
+		isr = NETISR_ATALK1;
+		break;
+	case ETHERTYPE_AARP:
+		isr = NETISR_AARP;
+		break;
 #endif /* NETATALK */
 	default:
 #ifdef IPX
 		if (ef_inputp && ef_inputp(ifp, eh, m) == 0)
 			return;
 #endif /* IPX */
-#ifdef NS
-		checksum = mtod(m, ushort *);
-		/* Novell 802.3 */
-		if ((ether_type <= ETHERMTU) &&
-			((*checksum == 0xffff) || (*checksum == 0xE0E0))){
-			if(*checksum == 0xE0E0) {
-				m->m_pkthdr.len -= 3;
-				m->m_len -= 3;
-				m->m_data += 3;
-			}
-				schednetisr(NETISR_NS);
-				inq = &nsintrq;
-				break;
-		}
-#endif /* NS */
 #if defined(NETATALK)
 		if (ether_type > ETHERMTU)
 			goto discard;
 		l = mtod(m, struct llc *);
-		switch (l->llc_dsap) {
-		case LLC_SNAP_LSAP:
-		    switch (l->llc_control) {
-		    case LLC_UI:
-			if (l->llc_ssap != LLC_SNAP_LSAP)
-			    goto discard;
-	
+		if (l->llc_dsap == LLC_SNAP_LSAP &&
+		    l->llc_ssap == LLC_SNAP_LSAP &&
+		    l->llc_control == LLC_UI) {
 			if (Bcmp(&(l->llc_snap_org_code)[0], at_org_code,
-				   sizeof(at_org_code)) == 0 &&
-			     ntohs(l->llc_snap_ether_type) == ETHERTYPE_AT) {
-			    inq = &atintrq2;
-			    m_adj( m, sizeof( struct llc ));
-			    schednetisr(NETISR_ATALK);
-			    break;
+			    sizeof(at_org_code)) == 0 &&
+			    ntohs(l->llc_snap_ether_type) == ETHERTYPE_AT) {
+			    	m_adj(m, LLC_SNAPFRAMELEN);
+				isr = NETISR_ATALK2;
+			    	break;
 			}
-
 			if (Bcmp(&(l->llc_snap_org_code)[0], aarp_org_code,
-				   sizeof(aarp_org_code)) == 0 &&
-			     ntohs(l->llc_snap_ether_type) == ETHERTYPE_AARP) {
-			    m_adj( m, sizeof( struct llc ));
-			    aarpinput(IFP2AC(ifp), m); /* XXX */
-			    return;
+			    sizeof(aarp_org_code)) == 0 &&
+			    ntohs(l->llc_snap_ether_type) == ETHERTYPE_AARP) {
+				m_adj(m, LLC_SNAPFRAMELEN);
+				isr = NETISR_AARP;
+				break;
 			}
-		
-		    default:
-			goto discard;
-		    }
-		    break;
-		default:
-			goto discard;
 		}
-#else /* NETATALK */
-		goto discard;
 #endif /* NETATALK */
+		goto discard;
 	}
-
-	(void) IF_HANDOFF(inq, m, NULL);
+	netisr_dispatch(isr, m);
 	return;
+
 discard:
 	/*
 	 * Packet is to be discarded.  If netgraph is present,
@@ -931,7 +827,7 @@ discard:
 		 * Put back the ethernet header so netgraph has a
 		 * consistent view of inbound packets.
 		 */
-		M_PREPEND(m, sizeof (struct ether_header), M_NOWAIT);
+		M_PREPEND(m, ETHER_HDR_LEN, M_DONTWAIT);
 		(*ng_ether_input_orphan_p)(ifp, m);
 		return;
 	}
@@ -960,8 +856,8 @@ ether_sprintf(const u_char *ap)
 void
 ether_ifattach(struct ifnet *ifp, const u_int8_t *llc)
 {
-	register struct ifaddr *ifa;
-	register struct sockaddr_dl *sdl;
+	struct ifaddr *ifa;
+	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_ETHER;
 	ifp->if_addrlen = ETHER_ADDR_LEN;
@@ -988,7 +884,7 @@ ether_ifattach(struct ifnet *ifp, const u_int8_t *llc)
 	if (llc != IFP2AC(ifp)->ac_enaddr)
 		bcopy(llc, IFP2AC(ifp)->ac_enaddr, ifp->if_addrlen);
 
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	bpfattach(ifp, DLT_EN10MB, ETHER_HDR_LEN);
 	if (ng_ether_attach_p != NULL)
 		(*ng_ether_attach_p)(ifp);
 	if (BDG_LOADED)
@@ -1041,7 +937,7 @@ ether_ioctl(ifp, command, data)
 		 */
 		case AF_IPX:
 			{
-			register struct ipx_addr *ina = &(IA_SIPX(ifa)->sipx_addr);
+			struct ipx_addr *ina = &(IA_SIPX(ifa)->sipx_addr);
 			struct arpcom *ac = IFP2AC(ifp);
 
 			if (ipx_nullhost(*ina))
@@ -1060,31 +956,6 @@ ether_ioctl(ifp, command, data)
 			ifp->if_init(ifp->if_softc);
 			break;
 			}
-#endif
-#ifdef NS
-		/*
-		 * XXX - This code is probably wrong
-		 */
-		case AF_NS:
-		{
-			register struct ns_addr *ina = &(IA_SNS(ifa)->sns_addr);
-			struct arpcom *ac = IFP2AC(ifp);
-
-			if (ns_nullhost(*ina))
-				ina->x_host =
-				    *(union ns_host *) (ac->ac_enaddr);
-			else {
-				bcopy((caddr_t) ina->x_host.c_host,
-				      (caddr_t) ac->ac_enaddr,
-				      sizeof(ac->ac_enaddr));
-			}
-
-			/*
-			 * Set new address
-			 */
-			ifp->if_init(ifp->if_softc);
-			break;
-		}
 #endif
 		default:
 			ifp->if_init(ifp->if_softc);
@@ -1273,3 +1144,12 @@ bad:
 	pktattr->pattr_af = AF_UNSPEC;
 }
 #endif /* ALTQ */
+
+static moduledata_t ether_mod = {
+        "ether",
+        NULL,
+        0
+};
+                
+DECLARE_MODULE(ether, ether_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+MODULE_VERSION(ether, 1);

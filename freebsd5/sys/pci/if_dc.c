@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_dc.c,v 1.85 2002/11/27 07:04:10 imp Exp $
  */
 
 /*
@@ -48,6 +46,7 @@
  * Xircom X3201 (www.xircom.com)
  * Abocom FE2500
  * Conexant LANfinity (www.conexant.com)
+ * 3Com OfficeConnect 10/100B 3CSOHO100B (www.3com.com)
  *
  * Datasheets for the 21143 are available at developer.intel.com.
  * Datasheets for the clone parts can be found at their respective sites.
@@ -88,6 +87,9 @@
  * the cards I've seen use an MII transceiver, probably because the
  * AX88140A doesn't support internal NWAY.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_dc.c,v 1.108 2003/05/15 16:53:29 mbr Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -130,15 +132,12 @@
 
 #include <pci/if_dcreg.h>
 
+MODULE_DEPEND(dc, pci, 1, 1, 1);
+MODULE_DEPEND(dc, ether, 1, 1, 1);
 MODULE_DEPEND(dc, miibus, 1, 1, 1);
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_dc.c,v 1.85 2002/11/27 07:04:10 imp Exp $";
-#endif
 
 /*
  * Various supported device vendors/types and their names.
@@ -146,6 +145,8 @@ static const char rcsid[] =
 static struct dc_type dc_devs[] = {
 	{ DC_VENDORID_DEC, DC_DEVICEID_21143,
 		"Intel 21143 10/100BaseTX" },
+	{ DC_VENDORID_DAVICOM, DC_DEVICEID_DM9009,
+		"Davicom DM9009 10/100BaseTX" },
 	{ DC_VENDORID_DAVICOM, DC_DEVICEID_DM9100,
 		"Davicom DM9100 10/100BaseTX" },
 	{ DC_VENDORID_DAVICOM, DC_DEVICEID_DM9102,
@@ -192,6 +193,12 @@ static struct dc_type dc_devs[] = {
 		"Abocom FE2500 10/100BaseTX" },
 	{ DC_VENDORID_CONEXANT, DC_DEVICEID_RS7112,
 		"Conexant LANfinity MiniPCI 10/100BaseTX" },
+	{ DC_VENDORID_HAWKING, DC_DEVICEID_HAWKING_PN672TX,
+		"Hawking CB102 CardBus 10/100" },
+	{ DC_VENDORID_PLANEX, DC_DEVICEID_FNW3602T,
+		"PlaneX FNW-3602-T CardBus 10/100" },
+	{ DC_VENDORID_3COM, DC_DEVICEID_3CSOHOB,
+		"3Com OfficeConnect 10/100B" },
 	{ 0, 0, NULL }
 };
 
@@ -307,8 +314,8 @@ SYSCTL_INT(_hw, OID_AUTO, dc_quick, CTLFLAG_RW,
 	&dc_quick,0,"do not mdevget in dc driver");
 #endif
 
-DRIVER_MODULE(if_dc, cardbus, dc_driver, dc_devclass, 0, 0);
-DRIVER_MODULE(if_dc, pci, dc_driver, dc_devclass, 0, 0);
+DRIVER_MODULE(dc, cardbus, dc_driver, dc_devclass, 0, 0);
+DRIVER_MODULE(dc, pci, dc_driver, dc_devclass, 0, 0);
 DRIVER_MODULE(miibus, dc, miibus_driver, miibus_devclass, 0, 0);
 
 #define DC_SETBIT(sc, reg, x)				\
@@ -1172,7 +1179,7 @@ dc_setfilt_21143(sc)
 	}
 
 	if (ifp->if_flags & IFF_BROADCAST) {
-		h = dc_crc_le(sc, (caddr_t)&etherbroadcastaddr);
+		h = dc_crc_le(sc, (caddr_t)ifp->if_broadcastaddr);
 		sp[h >> 4] |= 1 << (h & 0xF);
 	}
 
@@ -1238,7 +1245,10 @@ dc_setfilt_admtek(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = dc_crc_be(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		if (DC_IS_CENTAUR(sc))
+			h = dc_crc_le(sc, LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		else
+			h = dc_crc_be(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -1368,7 +1378,7 @@ dc_setfilt_xircom(sc)
 	}
 
 	if (ifp->if_flags & IFF_BROADCAST) {
-		h = dc_crc_le(sc, (caddr_t)&etherbroadcastaddr);
+		h = dc_crc_le(sc, (caddr_t)ifp->if_broadcastaddr);
 		sp[h >> 4] |= 1 << (h & 0xF);
 	}
 
@@ -1552,9 +1562,6 @@ dc_setcfg(sc, media)
 			DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_PORTSEL);
 		}
 	}
-
-	if (DC_IS_ADMTEK(sc))
-		DC_SETBIT(sc, DC_AL_CR, DC_AL_CR_ATUR);
 
 	if ((media & IFM_GMASK) == IFM_FDX) {
 		DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_FULLDUPLEX);
@@ -1857,10 +1864,30 @@ dc_parse_21143_srom(sc)
 	struct dc_eblock_hdr	*hdr;
 	int			i, loff;
 	char			*ptr;
+	int			have_mii;
 
+	have_mii = 0;
 	loff = sc->dc_srom[27];
 	lhdr = (struct dc_leaf_hdr *)&(sc->dc_srom[loff]);
 
+	ptr = (char *)lhdr;
+	ptr += sizeof(struct dc_leaf_hdr) - 1;
+	/*
+	 * Look if we got a MII media block.
+	 */
+	for (i = 0; i < lhdr->dc_mcnt; i++) {
+		hdr = (struct dc_eblock_hdr *)ptr;
+		if (hdr->dc_type == DC_EBLOCK_MII)
+		    have_mii++;
+
+		ptr += (hdr->dc_len & 0x7F);
+		ptr++;
+	}
+
+	/*
+	 * Do the same thing again. Only use SIA and SYM media
+	 * blocks if no MII media block is available.
+	 */
 	ptr = (char *)lhdr;
 	ptr += sizeof(struct dc_leaf_hdr) - 1;
 	for (i = 0; i < lhdr->dc_mcnt; i++) {
@@ -1870,10 +1897,14 @@ dc_parse_21143_srom(sc)
 			dc_decode_leaf_mii(sc, (struct dc_eblock_mii *)hdr);
 			break;
 		case DC_EBLOCK_SIA:
-			dc_decode_leaf_sia(sc, (struct dc_eblock_sia *)hdr);
+			if (! have_mii)
+				dc_decode_leaf_sia(sc,
+				    (struct dc_eblock_sia *)hdr);
 			break;
 		case DC_EBLOCK_SYM:
-			dc_decode_leaf_sym(sc, (struct dc_eblock_sym *)hdr);
+			if (! have_mii)
+				dc_decode_leaf_sym(sc,
+				    (struct dc_eblock_sym *)hdr);
 			break;
 		default:
 			/* Don't care. Yet. */
@@ -1905,7 +1936,6 @@ dc_attach(dev)
 
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
-	bzero(sc, sizeof(struct dc_softc));
 
 	mtx_init(&sc->dc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
@@ -1919,23 +1949,6 @@ dc_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef DC_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("dc%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;
-		goto fail_nolock;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("dc%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;
-		goto fail_nolock;
-	}
-#endif
 
 	rid = DC_RID;
 	sc->dc_res = bus_alloc_resource(dev, DC_RES, &rid,
@@ -1944,7 +1957,7 @@ dc_attach(dev)
 	if (sc->dc_res == NULL) {
 		printf("dc%d: couldn't map ports/memory\n", unit);
 		error = ENXIO;
-		goto fail_nolock;
+		goto fail;
 	}
 
 	sc->dc_btag = rman_get_bustag(sc->dc_res);
@@ -1957,26 +1970,18 @@ dc_attach(dev)
 
 	if (sc->dc_irq == NULL) {
 		printf("dc%d: couldn't map interrupt\n", unit);
-		bus_release_resource(dev, DC_RES, DC_RID, sc->dc_res);
 		error = ENXIO;
-		goto fail_nolock;
+		goto fail;
 	}
-
-	error = bus_setup_intr(dev, sc->dc_irq, INTR_TYPE_NET | 
-	    (IS_MPSAFE ? INTR_MPSAFE : 0),
-	    dc_intr, sc, &sc->dc_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->dc_irq);
-		bus_release_resource(dev, DC_RES, DC_RID, sc->dc_res);
-		printf("dc%d: couldn't set up irq\n", unit);
-		goto fail_nolock;
-	}
-	DC_LOCK(sc);
 
 	/* Need this info to decide on a chip type. */
 	sc->dc_info = dc_devtype(dev);
 	revision = pci_read_config(dev, DC_PCI_CFRV, 4) & 0x000000FF;
+
+	/* Get the eeprom width, but PNIC and XIRCOM have diff eeprom */
+	if (sc->dc_info->dc_did != DC_DEVICEID_82C168 &&
+	   sc->dc_info->dc_did != DC_DEVICEID_X3201)
+		dc_eeprom_width(sc);
 
 	switch(sc->dc_info->dc_did) {
 	case DC_DEVICEID_21143:
@@ -1984,9 +1989,9 @@ dc_attach(dev)
 		sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
 		sc->dc_flags |= DC_REDUCED_MII_POLL;
 		/* Save EEPROM contents so we can parse them later. */
-		dc_eeprom_width(sc);
 		dc_read_srom(sc, sc->dc_romwidth);
 		break;
+	case DC_DEVICEID_DM9009:
 	case DC_DEVICEID_DM9100:
 	case DC_DEVICEID_DM9102:
 		sc->dc_type = DC_TYPE_DM9102;
@@ -2004,17 +2009,18 @@ dc_attach(dev)
 		sc->dc_flags |= DC_TX_USE_TX_INTR;
 		sc->dc_flags |= DC_TX_ADMTEK_WAR;
 		sc->dc_pmode = DC_PMODE_MII;
-		dc_eeprom_width(sc);
 		dc_read_srom(sc, sc->dc_romwidth);
 		break;
 	case DC_DEVICEID_AN985:
 	case DC_DEVICEID_FE2500:
 	case DC_DEVICEID_EN2242:
+	case DC_DEVICEID_HAWKING_PN672TX:
+	case DC_DEVICEID_3CSOHOB:
 		sc->dc_type = DC_TYPE_AN985;
+		sc->dc_flags |= DC_64BIT_HASH;
 		sc->dc_flags |= DC_TX_USE_TX_INTR;
 		sc->dc_flags |= DC_TX_ADMTEK_WAR;
 		sc->dc_pmode = DC_PMODE_MII;
-		dc_eeprom_width(sc);
 		dc_read_srom(sc, sc->dc_romwidth);
 		break;
 	case DC_DEVICEID_98713:
@@ -2085,7 +2091,6 @@ dc_attach(dev)
 		sc->dc_flags |= DC_TX_INTR_ALWAYS;
 		sc->dc_flags |= DC_REDUCED_MII_POLL;
 		sc->dc_pmode = DC_PMODE_MII;
-		dc_eeprom_width(sc);
 		dc_read_srom(sc, sc->dc_romwidth);
 		break;
 	default:
@@ -2162,6 +2167,7 @@ dc_attach(dev)
 		mac = pci_get_ether(dev);
 		if (!mac) {
 			device_printf(dev, "No station address in CIS!\n");
+			error = ENXIO;
 			goto fail;
 		}
 		bcopy(mac, eaddr, ETHER_ADDR_LEN);
@@ -2184,9 +2190,6 @@ dc_attach(dev)
 
 	if (sc->dc_ldata == NULL) {
 		printf("dc%d: no memory for list buffers!\n", unit);
-		bus_teardown_intr(dev, sc->dc_irq, sc->dc_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->dc_irq);
-		bus_release_resource(dev, DC_RES, DC_RID, sc->dc_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -2246,10 +2249,6 @@ dc_attach(dev)
 
 	if (error) {
 		printf("dc%d: MII without any PHY!\n", sc->dc_unit);
-		bus_teardown_intr(dev, sc->dc_irq, sc->dc_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->dc_irq);
-		bus_release_resource(dev, DC_RES, DC_RID, sc->dc_res);
-		error = ENXIO;
 		goto fail;
 	}
 
@@ -2266,10 +2265,12 @@ dc_attach(dev)
 		DELAY(10);
 	}
 
-	/*
-	 * Call MI attach routine.
-	 */
-	ether_ifattach(ifp, eaddr);
+	if (DC_IS_ADMTEK(sc)) {
+		/*
+		 * Set automatic TX underrun recovery for the ADMtek chips
+		 */
+		DC_SETBIT(sc, DC_AL_CR, DC_AL_CR_ATUR);
+	}
 
 	/*
 	 * Tell the upper layer(s) we support long frames.
@@ -2305,16 +2306,35 @@ dc_attach(dev)
 	}
 #endif
 
-	DC_UNLOCK(sc);
-	return(0);
+	/*
+	 * Call MI attach routine.
+	 */
+	ether_ifattach(ifp, eaddr);
+
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->dc_irq, INTR_TYPE_NET | 
+	    (IS_MPSAFE ? INTR_MPSAFE : 0),
+	    dc_intr, sc, &sc->dc_intrhand);
+
+	if (error) {
+		printf("dc%d: couldn't set up irq\n", unit);
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
-	DC_UNLOCK(sc);
-fail_nolock:
-	mtx_destroy(&sc->dc_mtx);
-	return(error);
+	if (error)
+		dc_detach(dev);
+	return (error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 dc_detach(dev)
 	device_t		dev;
@@ -2324,24 +2344,30 @@ dc_detach(dev)
 	struct dc_mediainfo	*m;
 
 	sc = device_get_softc(dev);
-
+	KASSERT(mtx_initialized(&sc->dc_mtx), ("dc mutex not initialized"));
 	DC_LOCK(sc);
 
 	ifp = &sc->arpcom.ac_if;
 
-	dc_stop(sc);
-	ether_ifdetach(ifp);
-
+	/* These should only be active if attach succeeded */
+	if (device_is_attached(dev)) {
+		dc_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->dc_miibus)
+		device_delete_child(dev, sc->dc_miibus);
 	bus_generic_detach(dev);
-	device_delete_child(dev, sc->dc_miibus);
 
-	bus_teardown_intr(dev, sc->dc_irq, sc->dc_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->dc_irq);
-	bus_release_resource(dev, DC_RES, DC_RID, sc->dc_res);
+	if (sc->dc_intrhand)
+		bus_teardown_intr(dev, sc->dc_irq, sc->dc_intrhand);
+	if (sc->dc_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->dc_irq);
+	if (sc->dc_res)
+		bus_release_resource(dev, DC_RES, DC_RID, sc->dc_res);
 
-	contigfree(sc->dc_ldata, sizeof(struct dc_list_data), M_DEVBUF);
-	if (sc->dc_pnic_rx_buf != NULL)
-		free(sc->dc_pnic_rx_buf, M_DEVBUF);
+	if (sc->dc_ldata)
+		contigfree(sc->dc_ldata, sizeof(struct dc_list_data), M_DEVBUF);
+	free(sc->dc_pnic_rx_buf, M_DEVBUF);
 
 	while(sc->dc_mi != NULL) {
 		m = sc->dc_mi->dc_next;
@@ -2861,10 +2887,11 @@ dc_tick(xsc)
 		} else {
 			r = CSR_READ_4(sc, DC_ISR);
 			if ((r & DC_ISR_RX_STATE) == DC_RXSTATE_WAIT &&
-			    sc->dc_cdata.dc_tx_cnt == 0)
+			    sc->dc_cdata.dc_tx_cnt == 0) {
 				mii_tick(mii);
 				if (!(mii->mii_media_status & IFM_ACTIVE))
 					sc->dc_link = 0;
+			}
 		}
 	} else
 		mii_tick(mii);
@@ -3123,8 +3150,32 @@ dc_encap(sc, m_head, txidx)
 {
 	struct dc_desc		*f = NULL;
 	struct mbuf		*m;
-	int			frag, cur, cnt = 0;
+	int			frag, cur, cnt = 0, chainlen = 0;
 
+	/*
+	 * If there's no way we can send any packets, return now.
+	 */
+	if (DC_TX_LIST_CNT - sc->dc_cdata.dc_tx_cnt < 6)
+		return (ENOBUFS);
+
+	/*
+	 * Count the number of frags in this chain to see if
+	 * we need to m_defrag.  Since the descriptor list is shared
+	 * by all packets, we'll m_defrag long chains so that they
+	 * do not use up the entire list, even if they would fit.
+	 */
+
+	for (m = m_head; m != NULL; m = m->m_next)
+		chainlen++;
+
+	if ((chainlen > DC_TX_LIST_CNT / 4) ||
+	    ((DC_TX_LIST_CNT - (chainlen + sc->dc_cdata.dc_tx_cnt)) < 6)) {
+		m = m_defrag(m_head, M_DONTWAIT);
+		if (m == NULL)
+			return (ENOBUFS);
+		m_head = m;
+	}
+	
 	/*
 	 * Start packing the mbufs in this chain into
 	 * the fragment pointers. Stop when we run out
@@ -3211,7 +3262,6 @@ dc_coal(sc, m_head)
 
 	return(0);
 }
-
 /*
  * Main transmit routine. To avoid having to do mbuf copies, we put pointers
  * to the mbuf data regions directly in the transmit lists. We also save a
@@ -3224,7 +3274,7 @@ dc_start(ifp)
 	struct ifnet		*ifp;
 {
 	struct dc_softc		*sc;
-	struct mbuf		*m_head = NULL;
+	struct mbuf		*m_head = NULL, *m;
 	int			idx, coalesced;
 
 	sc = ifp->if_softc;
@@ -3265,6 +3315,8 @@ dc_start(ifp)
 				m_freem(m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
+			} else {
+				m_head = m;
 			}
 			coalesced = 1;
 		} else

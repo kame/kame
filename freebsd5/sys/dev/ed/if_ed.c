@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed.c,v 1.212 2002/11/14 23:54:50 sam Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed.c,v 1.217 2003/04/05 18:12:36 cognet Exp $
  */
 
 /*
@@ -568,8 +568,8 @@ ed_probe_WD80x3_generic(dev, flags, intr_vals)
 
 	for (i = 0; i < memsize; ++i) {
 		if (sc->mem_start[i]) {
-			device_printf(dev, "failed to clear shared memory at %lx - check configuration\n",
-				      kvtop(sc->mem_start + i));
+			device_printf(dev, "failed to clear shared memory at %jx - check configuration\n",
+				      (uintmax_t)kvtop(sc->mem_start + i));
 
 			/*
 			 * Disable 16 bit access to shared memory
@@ -903,8 +903,8 @@ ed_probe_3Com(dev, port_rid, flags)
 
 	for (i = 0; i < memsize; ++i)
 		if (sc->mem_start[i]) {
-			device_printf(dev, "failed to clear shared memory at %lx - check configuration\n",
-				      kvtop(sc->mem_start + i));
+			device_printf(dev, "failed to clear shared memory at %jx - check configuration\n",
+				      (uintmax_t)kvtop(sc->mem_start + i));
 			return (ENXIO);
 		}
 	return (0);
@@ -936,7 +936,7 @@ ed_probe_Novell_generic(dev, flags)
 	/*
 	 * I don't know if this is necessary; probably cruft leftover from
 	 * Clarkson packet driver code. Doesn't do a thing on the boards I've
-	 * tested. -DG [note that a outb(0x84, 0) seems to work here, and is
+	 * tested. -DG [note that an outb(0x84, 0) seems to work here, and is
 	 * non-invasive...but some boards don't seem to reset and I don't have
 	 * complete documentation on what the 'right' thing to do is...so we
 	 * do the invasive thing for now. Yuck.]

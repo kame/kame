@@ -17,7 +17,7 @@
  *
  * From: Version 2.4, Thu Apr 30 17:17:21 MSD 1997
  *
- * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.97 2002/10/16 10:45:53 phk Exp $
+ * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.102 2003/03/05 19:24:22 peter Exp $
  */
 
 #include <sys/param.h>
@@ -87,11 +87,6 @@
 #ifdef IPX
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
 #endif
 
 #include <net/if_sppp.h>
@@ -514,7 +509,7 @@ void
 sppp_input(struct ifnet *ifp, struct mbuf *m)
 {
 	struct ppp_header *h;
-	struct ifqueue *inq = 0;
+	int isr = -1;
 	struct sppp *sp = (struct sppp *)ifp;
 	u_char *iphdr;
 	int hlen, vjlen, do_account = 0;
@@ -591,8 +586,7 @@ sppp_input(struct ifnet *ifp, struct mbuf *m)
 			return;
 		case PPP_IP:
 			if (sp->state[IDX_IPCP] == STATE_OPENED) {
-				schednetisr (NETISR_IP);
-				inq = &ipintrq;
+				isr = NETISR_IP;
 			}
 			do_account++;
 			break;
@@ -622,9 +616,7 @@ sppp_input(struct ifnet *ifp, struct mbuf *m)
 				if (m == NULL)
 					goto drop2;
 				bcopy(iphdr, mtod(m, u_char *), hlen);
-
-				schednetisr (NETISR_IP);
-				inq = &ipintrq;
+				isr = NETISR_IP;
 			}
 			do_account++;
 			break;
@@ -641,8 +633,7 @@ sppp_input(struct ifnet *ifp, struct mbuf *m)
 						    SPP_ARGS(ifp));
 					goto drop;
 				}
-				schednetisr (NETISR_IP);
-				inq = &ipintrq;
+				isr = NETISR_IP;
 			}
 			do_account++;
 			break;
@@ -655,30 +646,16 @@ sppp_input(struct ifnet *ifp, struct mbuf *m)
 			return;
 
 		case PPP_IPV6:
-			if (sp->state[IDX_IPV6CP] == STATE_OPENED) {
-				schednetisr (NETISR_IPV6);
-				inq = &ip6intrq;
-			}
+			if (sp->state[IDX_IPV6CP] == STATE_OPENED)
+				isr = NETISR_IPV6;
 			do_account++;
 			break;
 #endif
 #ifdef IPX
 		case PPP_IPX:
 			/* IPX IPXCP not implemented yet */
-			if (sp->pp_phase == PHASE_NETWORK) {
-				schednetisr (NETISR_IPX);
-				inq = &ipxintrq;
-			}
-			do_account++;
-			break;
-#endif
-#ifdef NS
-		case PPP_XNS:
-			/* XNS IDPCP not implemented yet */
-			if (sp->pp_phase == PHASE_NETWORK) {
-				schednetisr (NETISR_NS);
-				inq = &nsintrq;
-			}
+			if (sp->pp_phase == PHASE_NETWORK)
+				isr = NETISR_IPX;
 			do_account++;
 			break;
 #endif
@@ -706,29 +683,19 @@ sppp_input(struct ifnet *ifp, struct mbuf *m)
 			return;
 #ifdef INET
 		case ETHERTYPE_IP:
-			schednetisr (NETISR_IP);
-			inq = &ipintrq;
+			isr = NETISR_IP;
 			do_account++;
 			break;
 #endif
 #ifdef INET6
 		case ETHERTYPE_IPV6:
-			schednetisr (NETISR_IPV6);
-			inq = &ip6intrq;
+			isr = NETISR_IPV6;
 			do_account++;
 			break;
 #endif
 #ifdef IPX
 		case ETHERTYPE_IPX:
-			schednetisr (NETISR_IPX);
-			inq = &ipxintrq;
-			do_account++;
-			break;
-#endif
-#ifdef NS
-		case ETHERTYPE_NS:
-			schednetisr (NETISR_NS);
-			inq = &nsintrq;
+			isr = NETISR_IPX;
 			do_account++;
 			break;
 #endif
@@ -745,11 +712,11 @@ sppp_input(struct ifnet *ifp, struct mbuf *m)
 		goto drop;
 	}
 
-	if (! (ifp->if_flags & IFF_UP) || ! inq)
+	if (! (ifp->if_flags & IFF_UP) || isr == -1)
 		goto drop;
 
 	/* Check queue. */
-	if (! IF_HANDOFF(inq, m, NULL)) {
+	if (! netisr_queue(isr, m)) {
 		if (debug)
 			log(LOG_DEBUG, SPP_FMT "protocol queue overflow\n",
 				SPP_ARGS(ifp));
@@ -962,12 +929,6 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 		}
 		break;
 #endif
-#ifdef NS
-	case AF_NS:     /* Xerox NS Protocol */
-		h->protocol = htons (sp->pp_mode == IFF_CISCO ?
-			ETHERTYPE_NS : PPP_XNS);
-		break;
-#endif
 #ifdef IPX
 	case AF_IPX:     /* Novell IPX Protocol */
 		h->protocol = htons (sp->pp_mode == IFF_CISCO ?
@@ -994,8 +955,10 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 		IFQ_HANDOFF(ifp, m, NULL, error);
 	if (error != 0) {
 		++ifp->if_oerrors;
-		return (rv? rv: error);
+		splx (s);
+		return (rv? rv: ENOBUFS);
 	}
+	splx (s);
 	/*
 	 * Unlike in sppp_input(), we can always bump the timestamp
 	 * here since sppp_output() is only called on behalf of

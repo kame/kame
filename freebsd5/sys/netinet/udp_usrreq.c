@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
- * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.130 2002/11/20 19:00:54 luigi Exp $
+ * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.133 2003/02/19 05:47:34 imp Exp $
  */
 
 /*
@@ -400,10 +400,14 @@ udp_input(m, off)
 			 * Receive multicast data which fits MSF condition.
 			 */
 			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
-				continue;
+				goto docontinue;
 			
+#if 1
+			imo = inp->inp_moptions;
+#else
 			if ((imo = inp->inp_moptions) == NULL)
-				continue;
+				goto docontinue;
+#endif
 			bzero(&src, sizeof(src));
 			src.sin_family = AF_INET;
 			src.sin_len = sizeof(src);
@@ -411,7 +415,7 @@ udp_input(m, off)
 			for (i = 0; i < imo->imo_num_memberships; i++) {
 				if (imo->imo_membership[i]->inm_addr.s_addr
 				    != ip->ip_dst.s_addr)
-					continue;
+					goto docontinue;
 				
 				/* receive data from any source */
 				if (imo->imo_msf[i]->msf_grpjoin != 0) {
@@ -474,7 +478,7 @@ udp_input(m, off)
 				goto next_inp;
 			}
 			if (i == imo->imo_num_memberships)
-				continue;
+				goto docontinue;
 #undef PASS_TO_PCB
 #else
 			if (last != NULL) {
@@ -502,7 +506,8 @@ udp_input(m, off)
 				break;
 
 #ifdef IGMPV3
-		next_inp:;
+		next_inp:
+			INP_UNLOCK(inp);
 #endif
 		}
 
@@ -712,7 +717,7 @@ udp_ctlinput(cmd, sa, vip)
                     ip->ip_src, uh->uh_sport, 0, NULL);
 		if (inp != NULL) {
 			INP_LOCK(inp);
-			if(inp->inp_socket != NULL) {
+			if (inp->inp_socket != NULL) {
 				(*notify)(inp, inetctlerrmap[cmd]);
 			}
 			INP_UNLOCK(inp);
@@ -749,8 +754,10 @@ udp_pcblist(SYSCTL_HANDLER_ARGS)
 	 * OK, now we're committed to doing something.
 	 */
 	s = splnet();
+	INP_INFO_RLOCK(&udbinfo);
 	gencnt = udbinfo.ipi_gencnt;
 	n = udbinfo.ipi_count;
+	INP_INFO_RUNLOCK(&udbinfo);
 	splx(s);
 
 	sysctl_wire_old_buffer(req, 2 * (sizeof xig)
@@ -785,7 +792,6 @@ udp_pcblist(SYSCTL_HANDLER_ARGS)
 	error = 0;
 	for (i = 0; i < n; i++) {
 		inp = inp_list[i];
-		INP_LOCK(inp);
 		if (inp->inp_gencnt <= gencnt) {
 			struct xinpcb xi;
 			xi.xi_len = sizeof xi;
@@ -793,9 +799,9 @@ udp_pcblist(SYSCTL_HANDLER_ARGS)
 			bcopy(inp, &xi.xi_inp, sizeof *inp);
 			if (inp->inp_socket)
 				sotoxsocket(inp->inp_socket, &xi.xi_socket);
+			xi.xi_inp.inp_gencnt = inp->inp_gencnt;
 			error = SYSCTL_OUT(req, &xi, sizeof xi);
 		}
-		INP_UNLOCK(inp);
 	}
 	if (!error) {
 		/*

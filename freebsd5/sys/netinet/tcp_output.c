@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.73 2002/10/16 19:16:33 dillon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.78 2003/02/19 22:18:05 jlemon Exp $
  */
 
 #include "opt_inet6.h"
@@ -144,7 +144,6 @@ tcp_output(struct tcpcb *tp)
 	int maxburst = TCP_MAXBURST;
 #endif
 	struct rmxp_tao *taop;
-	struct rmxp_tao tao_noncached;
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
 	int isipv6;
@@ -175,16 +174,19 @@ tcp_output(struct tcpcb *tp)
 		 * Set the slow-start flight size depending on whether
 		 * this is a local network or not.
 		 */      
-		int ss = ss_fltsz;
+		if (
 #ifdef INET6
-		if (isipv6) {
-			if (in6_localaddr(&tp->t_inpcb->in6p_fsa))
-				ss = ss_fltsz_local;
-		} else
-#endif /* INET6 */
-		if (in_localaddr(tp->t_inpcb->inp_faddr))
-			ss = ss_fltsz_local;
-		tp->snd_cwnd = tp->t_maxseg * ss;
+		    (isipv6 && in6_localaddr(&tp->t_inpcb->in6p_fsa)) ||
+		    (!isipv6 &&
+#endif
+		     in_localaddr(tp->t_inpcb->inp_faddr)
+#ifdef INET6
+		     )
+#endif
+		    )
+			tp->snd_cwnd = tp->t_maxseg * ss_fltsz_local;
+		else     
+			tp->snd_cwnd = tp->t_maxseg * ss_fltsz;
 	}
 	tp->t_flags &= ~TF_LASTIDLE;
 	if (idle) {
@@ -256,10 +258,7 @@ again:
 	 */
 	len = (long)ulmin(so->so_snd.sb_cc, win) - off;
 
-	if ((taop = tcp_gettaocache(&tp->t_inpcb->inp_inc)) == NULL) {
-		taop = &tao_noncached;
-		bzero(taop, sizeof(*taop));
-	}
+	taop = tcp_gettaocache(&tp->t_inpcb->inp_inc);
 
 	/*
 	 * Lop off SYN bit if it has already been sent.  However, if this
@@ -270,7 +269,7 @@ again:
 		flags &= ~TH_SYN;
 		off--, len++;
 		if (len > 0 && tp->t_state == TCPS_SYN_SENT &&
-		    taop->tao_ccsent == 0)
+		    (taop == NULL || taop->tao_ccsent == 0))
 			return 0;
 	}
 
@@ -364,8 +363,9 @@ again:
 	 * next expected input).  If the difference is at least two
 	 * max size segments, or at least 50% of the maximum possible
 	 * window, then want to send a window update to peer.
+	 * Skip this if the connection is in T/TCP half-open state.
 	 */
-	if (win > 0) {
+	if (win > 0 && !(tp->t_flags & TF_NEEDSYN)) {
 		/*
 		 * "adv" is the amount we can increase the window,
 		 * taking into account that we are limited by
@@ -701,15 +701,14 @@ send:
 	if (isipv6) {
 		ip6 = mtod(m, struct ip6_hdr *);
 		th = (struct tcphdr *)(ip6 + 1);
-		tcp_fillheaders(tp, ip6, th);
+		tcpip_fillheaders(tp->t_inpcb, ip6, th);
 	} else
 #endif /* INET6 */
       {
 	ip = mtod(m, struct ip *);
 	ipov = (struct ipovly *)ip;
 	th = (struct tcphdr *)(ip + 1);
-	/* this picks up the pseudo header (w/o the length) */
-	tcp_fillheaders(tp, ip, th);
+	tcpip_fillheaders(tp->t_inpcb, ip, th);
       }
 
 	/*
@@ -832,9 +831,8 @@ send:
       {
 	m->m_pkthdr.csum_flags = CSUM_TCP;
 	m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
-	if (len + optlen)
-		th->th_sum = in_addword(th->th_sum, 
-		    htons((u_short)(optlen + len)));
+	th->th_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
+	    htons(sizeof(struct tcphdr) + IPPROTO_TCP + len + optlen));
 
 	/* IP version must be set here for ipv4/ipv6 checking later */
 	KASSERT(ip->ip_v == IPVERSION,
@@ -986,7 +984,6 @@ send:
  					    tp->t_inpcb->in6p_route.ro_rt ?
  					    tp->t_inpcb->in6p_route.ro_rt->rt_ifp
  					    : NULL);
- 	else
 #endif /* INET6 */
 	ip->ip_ttl = tp->t_inpcb->inp_ip_ttl;	/* XXX */
 	ip->ip_tos = tp->t_inpcb->inp_ip_tos;	/* XXX */
@@ -1062,8 +1059,8 @@ out:
 	if (win > 0 && SEQ_GT(tp->rcv_nxt+win, tp->rcv_adv))
 		tp->rcv_adv = tp->rcv_nxt + win;
 	tp->last_ack_sent = tp->rcv_nxt;
-	tp->t_flags &= ~TF_ACKNOW;
-	if (tcp_delack_enabled)
+	tp->t_flags &= ~(TF_ACKNOW | TF_DELACK);
+	if (callout_active(tp->tt_delack))
 		callout_stop(tp->tt_delack);
 #if 0
 	/*
