@@ -287,7 +287,8 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		if (hp) {
 			if (flags & NI_NOFQDN) {
 				p = strchr(hp->h_name, '.');
-				if (p) *p = '\0';
+				if (p)
+					*p = '\0';
 			}
 			if (strlen(hp->h_name) > hostlen) {
 #ifdef USE_GETIPNODEBY
