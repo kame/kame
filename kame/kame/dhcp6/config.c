@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.10 2002/05/08 17:43:58 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.11 2002/05/09 13:30:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -49,8 +49,10 @@ extern int errno;
 
 struct dhcp6_if *dhcp6_if;
 
+struct prefix_ifconf *prefix_ifconflist;
+
 static struct dhcp6_ifconf *dhcp6_ifconflist;
-static struct prefix_ifconf *prefix_ifconflist0, *prefix_ifconflist;
+static struct prefix_ifconf *prefix_ifconflist0;
 static struct host_conf *host_conflist0, *host_conflist;
 
 enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
@@ -204,8 +206,13 @@ configure_prefix_interface(iflist)
 		}
 
 		pif->ifid_len = IFID_LEN_DEFAULT;
-		if (get_default_ifid(pif))
+		pif->sla_len = SLA_LEN_DEFAULT;
+		if (get_default_ifid(pif)) {
+			dprintf(LOG_NOTICE,
+				"failed to get default IF ID for %s",
+				pif->ifname);
 			goto bad;
+		}
 
 		for (cfl = ifp->params; cfl; cfl = cfl->next) {
 			switch(cfl->type) {
@@ -359,8 +366,10 @@ get_default_ifid(pif)
 		return -1;
 	}
 
-	if (getifaddrs(&ifap) < 0)
+	if (getifaddrs(&ifap) < 0) {
+		dprintf(LOG_ERR, "getifaddrs failed: %s", strerror(errno));
 		return -1;
+	}
 	
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		char *cp;
@@ -390,6 +399,14 @@ get_default_ifid(pif)
 		pif->ifid[13] = cp[3];
 		pif->ifid[14] = cp[4];
 		pif->ifid[15] = cp[5];
+
+		break;
+	}
+
+	if (ifa == NULL) {
+		dprintf(LOG_INFO, "cannot find interface information for %s",
+			pif->ifname);
+		goto fail;
 	}
 
 	freeifaddrs(ifap);
