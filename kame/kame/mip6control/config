@@ -18,9 +18,9 @@ transport_spi_mn_to_ha=2000
 transport_spi_ha_to_mn=2001
 transport_protocol=esp
 transport_esp_algorithm=blowfish-cbc
-transport_esp_secret="THIS_IS_ESP_SECRET!!"
+transport_esp_secret='"THIS_IS_ESP_SECRET!!"'
 transport_auth_algorithm=hmac-sha1
-transport_auth_secret="THIS_IS_AH_SECRET!!!"
+transport_auth_secret='"THIS_IS_AH_SECRET!!!"'
 
 #
 # parameters for the IPsec tunnel mode to protect RR signals.
@@ -31,5 +31,6 @@ tunnel_uid_mn_to_ha=2002
 tunnel_uid_ha_to_mn=2003
 tunnel_esp_algorithm=blowfish-cbc
 tunnel_esp_secret="THIS_IS_ESP_SECRET!!"
+tunnel_esp_secret=0x0001020304050607080900010203040506070809
 tunnel_auth_algorithm=hmac-sha1
-tunnel_auth_secret="THIS_IS_AH_SECRET!!!"
+tunnel_auth_secret=0x0908070605040302010009080706050403020100

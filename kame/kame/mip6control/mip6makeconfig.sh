@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: mip6makeconfig.sh,v 1.4 2003/09/30 12:37:16 keiichi Exp $
+# $Id: mip6makeconfig.sh,v 1.5 2003/09/30 12:48:00 keiichi Exp $
 
 cat=/bin/cat
 basename=/usr/bin/basename
@@ -51,11 +51,7 @@ if [ "X${transport_protocol}" = 'Xah' ]; then
 	transport_esp_secret=''
 else
 	transport_esparg='-E'
-	transport_esp_secret=\"${transport_esp_secret}\"
 fi
-transport_auth_secret=\"${transport_auth_secret}\"
-tunnel_auth_secret=\"${tunnel_auth_secret}\"
-tunnel_esp_secret=\"${tunnel_esp_secret}\"
 
 #
 # write security association configuration files
