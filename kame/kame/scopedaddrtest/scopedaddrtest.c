@@ -43,9 +43,9 @@
 #include <err.h>
 
 void
-rtest(name, nflag, scopeid)
+rtest(name, nflag, Nflag, scopeid)
 	char *name;
-	int nflag, scopeid;
+	int nflag, Nflag, scopeid;
 {
 	static char buf[MAXHOSTNAMELEN];
 	int flag = NI_WITHSCOPEID;
@@ -61,10 +61,16 @@ rtest(name, nflag, scopeid)
 	if (nflag)
 		flag |= NI_NUMERICHOST;
 
+#ifdef NI_NUMERICSCOPE
+	if (Nflag) {
+		flag |= NI_NUMERICSCOPE;
+	}
+#endif
+
 	getnameinfo((struct sockaddr *)&sa6, sa6.sin6_len, buf, sizeof(buf),
 		    NULL, 0, flag);
 
-	printf("getnameinfo returned %s\n", buf);
+	printf("getnameinfo returned %s\n", buf, flag);
 	exit(0);
 }
 
@@ -75,13 +81,16 @@ main(argc, argv)
 {
 	char *name, inet6addr[INET6_ADDRSTRLEN];
 	struct addrinfo hints, *res;
-	int ret_ga, nflag = 0, ch, scopeid = 0, rflag = 0;
+	int ret_ga, nflag = 0, Nflag = 0, ch, scopeid = 0, rflag = 0;
 	struct sockaddr_in6 *sa6;
 
-	while ((ch = getopt(argc, argv, "nrs:")) != -1) {
+	while ((ch = getopt(argc, argv, "Nnrs:")) != -1) {
 		char *ep;
 
 		switch(ch) {
+		case 'N':
+			Nflag++;
+			break;
 		case 'n':
 			nflag++;
 			break;
@@ -108,7 +117,7 @@ main(argc, argv)
 	name = argv[0];
 
 	if (rflag)
-		rtest(name, nflag, scopeid);
+		rtest(name, nflag, Nflag, scopeid);
 
 	memset(&hints, 0, sizeof(hints));
 	if (nflag)

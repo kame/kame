@@ -38,7 +38,7 @@ LDFLAGS=-L/usr/local/v6/lib
 
 all: $(TARGET)
 
-scopedaddrtest: 
+scopedaddrtest: scopedaddrtest.c
 	$(CC) $(CFLAGS) -o $@  scopedaddrtest.c $(LDFLAGS) $(LIBS)
 
 clean:
