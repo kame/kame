@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.323 2002/10/16 15:00:12 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.324 2002/10/22 06:26:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2704,6 +2704,10 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	     */
 	    if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
 		if (numsrc != 0) {
+#ifdef MLDV2_DEBUG
+		    printf("in6_modmulti: source filter not supported for %s\n",
+			   ip6_sprintf(&in6m->in6m_sa.sin6_addr));
+#endif
 		    splx(s);
 		    *error = EINVAL;
 		    return NULL; /* source filter is not supported for
@@ -3006,12 +3010,18 @@ in6_addmulti(maddr6, ifp, errorp)
 			return NULL;
 		}
 		if (newhead != NULL) {
+#ifdef MLDV2_DEBUG
+			printf("in6_addmultisrc: non-NULL newhead\n");
+#endif
 			/*
 			 * Merge new source list to current pending report's 
 			 * source list.
 			 */
 			if ((*errorp = in6_merge_msf_state
 					(in6m, newhead, newmode, newnumsrc)) > 0) {
+#ifdef MLDV2_DEBUG
+				printf("in6_addmultisrc: in6_merge_msf_state failed\n");
+#endif
 				/* 
 				 * State-Change Report will not be sent. Just 
 				 * return immediately. 
@@ -3024,6 +3034,9 @@ in6_addmulti(maddr6, ifp, errorp)
 				return in6m;
 			}
 		} else {
+#ifdef MLDV2_DEBUG
+			printf("in6_addmultisrc: NULL newhead\n");
+#endif
 			/* Only newhead was merged in a former function. */
 			in6m->in6m_source->i6ms_mode = newmode;
 			in6m->in6m_source->i6ms_cur->numsrc = newnumsrc;
@@ -3044,10 +3057,21 @@ in6_addmulti(maddr6, ifp, errorp)
 					else
 						type = CHANGE_TO_EXCLUDE_MODE;
 				}
+#ifdef MLDV2_DEBUG
+				printf("in6_addmultisrc: send current status\n");
+#endif
 				mld_send_state_change_report
 					(&m, &buflen, in6m, type, timer_init);
 			}
+#ifdef MLDV2_DEBUG
+			 else {
+				printf("in6_addmultisrc: do nothing since there's no change (mode=%d->%d, numsrc=%d->%d)\n", curmode, newmode, curnumsrc, newnumsrc);
+			}
+#endif
 		} else {
+#ifdef MLDV2_DEBUG
+			printf("in6_addmultisrc: clear MLDv2 stat since I'm MLDv1\n");
+#endif
 			/*
 			 * If MSF's pending records exist, they must be deleted.
 			 * Otherwise, ALW or BLK record will be blocked or pending
@@ -3127,13 +3151,17 @@ in6_addmulti(maddr6, ifp, errorp)
 	if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
 		if (curmode != newmode) {
 			if (newmode == MCAST_INCLUDE)
-				type = CHANGE_TO_INCLUDE_MODE; /* never happen? */
+				/* never happen? */
+				type = CHANGE_TO_INCLUDE_MODE;
 			else 
 				type = CHANGE_TO_EXCLUDE_MODE;
 		}
 		mld_send_state_change_report
-				(&m, &buflen, in6m, type, timer_init);
+			(&m, &buflen, in6m, type, timer_init);
 	} else {
+#ifdef MLDV2_DEBUG
+		printf("in6_addmultisrc: clear MLDv2 stat since I'm MLDv1\n");
+#endif
 		/*
 		 * If MSF's pending records exist, they must be deleted.
 		 */
@@ -3364,6 +3392,10 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	     */
 	    if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
 		if (numsrc != 0) {
+#ifdef MLDV2_DEBUG
+		    printf("in6_modmulti: source filter not supported for %s\n",
+			   ip6_sprintf(&in6m->in6m_sa.sin6_addr));
+#endif
 		    splx(s);
 		    *error = EINVAL;
 		    return NULL; /* source filter is not supported for
@@ -3622,9 +3654,8 @@ in6_leavegroup(imm)
 
 	if (imm->i6mm_maddr) {
 #ifdef MLDV2
-		error = in6_getmopt_source_list(imm->i6mm_msf, &numsrc,
-						(struct sockaddr_in6 **)&del_ss,
-						&mode);
+		struct sock_msf *msf = imm->i6mm_msf;
+		error = in6_getmopt_source_list(msf, &numsrc, &del_ss, &mode);
 		if (error != 0) {
 			/* XXX strange... panic? */
 			if (del_ss != NULL)
@@ -3635,9 +3666,8 @@ in6_leavegroup(imm)
 			     mode, final);
 		if (del_ss != NULL)
 			FREE(del_ss, M_IPMOPTS);
-		in6_freemopt_source_list(imm->i6mm_msf, imm->i6mm_msf->msf_head,
-					 imm->i6mm_msf->msf_blkhead);
-		IMO_MSF_FREE(imm->i6mm_msf);
+		in6_freemopt_source_list(msf, msf->msf_head, msf->msf_blkhead);
+		IMO_MSF_FREE(msf);
 #else
 		in6_delmulti(imm->i6mm_maddr);
 #endif
