@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.27 2002/02/19 03:40:39 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.28 2002/03/01 09:37:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -192,12 +192,13 @@ struct mip6_config {
 	u_int32_t mcfg_hrbc_lifetime_limit;
 	u_int32_t mcfg_bu_maxlifetime;
 	u_int32_t mcfg_hrbu_maxlifetime;
+	u_int8_t mcfg_bu_use_single;
 };
-#define MIP6_CONFIG_TYPE_MN 1
-#define MIP6_CONFIG_TYPE_HA 2
+#define MIP6_CONFIG_TYPE_MOBILENODE 1
+#define MIP6_CONFIG_TYPE_HOMEAGENT 2
 
-#define MIP6_IS_MN (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_MN)
-#define MIP6_IS_HA (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_HA)
+#define MIP6_IS_MN (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_MOBILENODE)
+#define MIP6_IS_HA (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_HOMEAGENT)
 
 /* packet options used by the mip6 packet output processing routine. */
 struct mip6_pktopts {
@@ -280,7 +281,7 @@ int mip6_process_destopt		__P((struct mbuf *,
 u_int8_t *mip6_destopt_find_subopt	__P((u_int8_t *,
 					     u_int8_t, u_int8_t));
 void mip6_create_addr			__P((struct sockaddr_in6 *,
-					     struct sockaddr_in6 *,
+					     const struct sockaddr_in6 *,
 					     struct nd_prefix *));
 struct mip6_bc *mip6_bc_list_find_withcoa
 					__P((struct mip6_bc_list *,
@@ -397,6 +398,7 @@ int mip6_bu_list_insert			__P((struct mip6_bu_list *,
 int mip6_bu_list_remove_all		__P((struct mip6_bu_list *));
 struct mip6_bu *mip6_bu_list_find_withpaddr
 					__P((struct mip6_bu_list *,
+					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *));
 struct mip6_bu *mip6_bu_list_find_home_registration
 					__P((struct mip6_bu_list *,

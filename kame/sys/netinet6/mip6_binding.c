@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.92 2002/02/28 10:31:36 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.93 2002/03/01 09:37:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -176,7 +176,12 @@ void mip6_bu_print __P((struct mip6_bu *));
 #endif /* MIP6_DEBUG */
 
 static const struct sockaddr_in6 sin6_any = {
-	sizeof(struct sockaddr_in6), AF_INET6, 0, 0, {{{0, 0, 0, 0}}}, 0
+	sizeof(struct sockaddr_in6),	/* sin6_len */
+	AF_INET6,			/* sin6_family */
+	0,				/* sin6_port */
+	0,				/* sin6_flowinfo */
+	{{{0, 0, 0, 0}}},		/* sin6_addr */
+	0				/* sin6_scope_id */
 };
 
 /*
@@ -191,21 +196,29 @@ mip6_bu_init()
 }
 
 /*
- * Find the BU entry specified with the destination (peer) address
- * from specified hif_softc entry.
- *
- * Returns: BU entry or NULL (if not found)
+ * find the binding update entry specified by the destination (peer)
+ * address and optionally the home address of the mobile node.  if the
+ * home address is not specified, the first binding update entry found
+ * that matches the specified destination address will be returned.
  */
 struct mip6_bu *
-mip6_bu_list_find_withpaddr(bu_list, paddr)
+mip6_bu_list_find_withpaddr(bu_list, paddr, haddr)
 	struct mip6_bu_list *bu_list;
 	struct sockaddr_in6 *paddr;
+	struct sockaddr_in6 *haddr;
 {
 	struct mip6_bu *mbu;
 
+	/* sanity check. */
+	if (paddr == NULL)
+		return (NULL);
+
 	for (mbu = LIST_FIRST(bu_list); mbu;
 	     mbu = LIST_NEXT(mbu, mbu_entry)) {
-		if (SA6_ARE_ADDR_EQUAL(&mbu->mbu_paddr, paddr))
+		if (SA6_ARE_ADDR_EQUAL(&mbu->mbu_paddr, paddr)
+		    && ((haddr != NULL)
+			? SA6_ARE_ADDR_EQUAL(&mbu->mbu_haddr, haddr)
+			: 1))
 			break;
 	}
 	return (mbu);
@@ -287,6 +300,176 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	return (mbu);
 }
 
+#if 1
+int
+mip6_home_registration(sc)
+	struct hif_softc *sc;
+{
+	struct hif_subnet *hs;
+	struct mip6_subnet *ms;
+	struct mip6_subnet_prefix *mspfx;
+	struct mip6_prefix *mpfx;
+	struct mip6_bu *mbu;
+
+	if (TAILQ_FIRST(&sc->hif_hs_list_home) == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: no home subnet\n",
+			 __FILE__, __LINE__));
+		return (EINVAL);
+	}
+	for (hs = TAILQ_FIRST(&sc->hif_hs_list_home);
+	     hs;
+	     hs = TAILQ_NEXT(hs, hs_entry)) {
+		if ((ms = hs->hs_ms) == NULL) {
+			/* must not happen. */
+			return (EINVAL);
+		}
+		for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
+		     mspfx;
+		     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
+			if ((mpfx = mspfx->mspfx_mpfx) == NULL) {
+				/* must not happen. */
+				return (EINVAL);
+			}
+			for (mbu = LIST_FIRST(&sc->hif_bu_list);
+			     mbu;
+			     mbu = LIST_NEXT(mbu, mbu_entry)) {
+				if ((mbu->mbu_flags & IP6_BUF_HOME) == 0)
+					continue;
+				if (SA6_ARE_ADDR_EQUAL(&mbu->mbu_haddr,
+						       &mpfx->mpfx_haddr))
+					break;
+			}
+			if (mbu == NULL) {
+				/* not exist */
+				const struct sockaddr_in6 *haaddr;
+				struct mip6_subnet_ha *msha;
+				struct mip6_ha *mha;
+
+				if (sc->hif_location == HIF_LOCATION_HOME) {
+					/*
+					 * we are home and we have no
+					 * binding update entry for
+					 * home registration.  this
+					 * will happen when either of
+					 * the following two cases
+					 * happens.
+					 *
+					 * 1. enabling MN function at
+					 * home subnet.
+					 *
+					 * 2. returning home with
+					 * expired home registration.
+					 *
+					 * in either case, we should
+					 * do nothing.
+					 */
+					continue;
+				}
+
+				/*
+				 * no home registration found.  create
+				 * a new binding update entry.
+				 */
+
+				/* pick the preferable HA from the list. */
+				msha = mip6_subnet_ha_list_find_preferable(
+					&ms->ms_msha_list);
+				if (msha == NULL) {
+					/*
+					 * if no HA is found, try to
+					 * find a HA using Dynamic
+					 * Home Agent Discovery.
+					 */
+					mip6log((LOG_INFO,
+						 "%s:%d: "
+						 "no home agent.  start ha discovery.\n",
+						 __FILE__, __LINE__));
+					mip6_icmp6_ha_discov_req_output(sc);
+					haaddr = &sin6_any;
+				} else {
+					if ((mha = msha->msha_mha) == NULL) {
+						/* must not happen. */
+						return (EINVAL);
+					}
+					haaddr = &mha->mha_gaddr;
+				}
+
+				mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
+						     IP6_BUF_ACK|IP6_BUF_HOME|IP6_BUF_DAD|IP6_BUF_SINGLE,
+						     sc);
+				if (mbu == NULL)
+					return (ENOMEM);
+				/*
+				 * for the first registration to the
+				 * home agent, the ack timeout value
+				 * should be (retrans * dadtransmits)
+				 * * 1.5.
+				 */
+				/*
+				 * XXX: TODO: KAME has different dad
+				 * retrans values for each interfaces.
+				 * which retrans value should be
+				 * selected ?
+				 */
+
+				mip6_bu_list_insert(&sc->hif_bu_list, mbu);
+			} else {
+				/* exist */
+				int32_t coa_lifetime, prefix_lifetime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+				long time_second = time.tv_sec;
+#endif
+
+				/* 
+				 * a binding update entry exists.
+				 * update information.
+				 */
+
+				/* update coa. */
+				if (sc->hif_location == HIF_LOCATION_HOME) {
+					/* un-registration. */
+					mbu->mbu_coa = mbu->mbu_haddr;
+					mbu->mbu_reg_state
+					    = MIP6_BU_REG_STATE_DEREGWAITACK;
+				} else {
+					/* registration. */
+					mbu->mbu_coa = hif_coa;
+					mbu->mbu_reg_state
+						= MIP6_BU_REG_STATE_REGWAITACK;
+				}
+
+				/* update lifetime. */
+				coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa.sin6_addr);
+				prefix_lifetime = mip6_subnet_prefix_list_get_minimum_lifetime(&ms->ms_mspfx_list);
+				if (coa_lifetime < prefix_lifetime) {
+					mbu->mbu_lifetime = coa_lifetime;
+				} else {
+					mbu->mbu_lifetime = prefix_lifetime;
+				}
+				mbu->mbu_expire
+					= time_second + mbu->mbu_lifetime;
+				/* sanity check for overflow */
+				if (mbu->mbu_expire < time_second)
+					mbu->mbu_expire = 0x7fffffff;
+				mbu->mbu_refresh = mbu->mbu_lifetime;
+				mbu->mbu_refexpire
+					= time_second + mbu->mbu_refresh;
+				/* sanity check for overflow */
+				if (mbu->mbu_refexpire < time_second)
+					mbu->mbu_refexpire = 0x7fffffff;
+				mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
+				mbu->mbu_ackexpire
+					= time_second + mbu->mbu_acktimeout;
+				/* mbu->mbu_flags |= IP6_BUF_DAD ;*/
+			}
+			mbu->mbu_state |= (MIP6_BU_STATE_WAITACK|MIP6_BU_STATE_WAITSENT);
+		}
+	}
+
+	return (0);
+}
+#else
 int
 mip6_home_registration(sc)
 	struct hif_softc *sc;
@@ -305,11 +488,12 @@ mip6_home_registration(sc)
 		return (EINVAL);
 	}
 	if ((ms = hs->hs_ms) == NULL) {
-		/* must not happen */
+		/* must not happen. */
 		return (EINVAL);
 	}
 
-	/* check each BU entry that has a BUF_HOME flag on. */
+	/* check each binding update entry that has a BUF_HOME flag
+	 * on. */
 	for (mbu = LIST_FIRST(&sc->hif_bu_list);
 	     mbu;
 	     mbu = LIST_NEXT(mbu, mbu_entry)) {
@@ -317,16 +501,20 @@ mip6_home_registration(sc)
 			continue;
 
 		/*
-		 * check if this BU entry is home registration to the
-		 * HA or home registration to the AR of a foreign
-		 * network.  if paddr of the BU is one of the HAs of
-		 * our home link, this BU is home registration to the
-		 * HA.
+		 * check if this binding update entry is for a home
+		 * registration to the home agent or home registration
+		 * to the AR of a foreign network.  if paddr of the
+		 * binding update is one of the home agents of our
+		 * home link, this binding update is a home
+		 * registration to the home agent.
 		 */
 		msha = mip6_subnet_ha_list_find_withhaaddr(&ms->ms_msha_list,
 							   &mbu->mbu_paddr);
 		if (msha) {
-			/* this BU is a home registration to our HA */
+			/*
+			 * this binding update is a home registration
+			 * to our home agent.
+			 */
 			break;
 		}
 			
@@ -336,6 +524,7 @@ mip6_home_registration(sc)
 		struct mip6_ha *mha;
 		struct mip6_subnet_prefix *mspfx;
 		struct mip6_prefix *mpfx;
+		u_int8_t bu_flags = 0;
 
 		if (sc->hif_location == HIF_LOCATION_HOME) {
 			/*
@@ -398,9 +587,10 @@ mip6_home_registration(sc)
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&mpfx->mpfx_haddr.sin6_addr)));
 
-		mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
-				     IP6_BUF_ACK|IP6_BUF_HOME|IP6_BUF_DAD,
-				     sc);
+		bu_flags = IP6_BUF_ACK|IP6_BUF_HOME|IP6_BUF_DAD;
+		if (mip6_config.mcfg_bu_use_single != 0)
+			bu_flags |= IP6_BUF_SINGLE;
+		mbu = mip6_bu_create(haaddr, mpfx, &hif_coa, bu_flags, sc);
 		if (mbu == NULL)
 			return (ENOMEM);
 		/*
@@ -465,6 +655,7 @@ mip6_home_registration(sc)
 
 	return (0);
 }
+#endif
 
 static int
 mip6_bu_list_notify_binding_change(sc)
@@ -1727,7 +1918,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			if (pr->ndpr_ifp != hifp)
 				continue;
 
-			mip6_create_addr(&haddr, haddr0, pr);
+			mip6_create_addr(&haddr,
+					 (const struct sockaddr_in6 *)haddr0,
+					 pr);
 
 			if (IN6_IS_ADDR_LINKLOCAL(&haddr.sin6_addr))
 				lladdr = haddr.sin6_addr;
@@ -2457,7 +2650,7 @@ mip6_validate_ba(m, opt)
 		/* silently ignore. */
 		return (1);
 	}
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, sin6src);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, sin6src, sin6dst);
 	if (mbu == NULL) {
 		mip6log((LOG_NOTICE,
 			 "%s:%d: no matching binding update entry found.\n",
@@ -2621,7 +2814,7 @@ mip6_process_ba(m, opt)
 	ba_opt = (struct ip6_opt_binding_ack *)opt;
 	sc = hif_list_find_withhaddr(sin6dst);
 
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, sin6src);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, sin6src, sin6dst);
 	if (mbu == NULL) {
 		mip6log((LOG_NOTICE,
 			 "%s:%d: no matching BU entry found from host %s.\n",
@@ -2833,7 +3026,7 @@ mip6_bu_authdata_verify(src, dst, coa, bu_opt, authdata)
 	int error = 0;
 	struct sockaddr_in6 src_sa, dst_sa;
 
-	bcopy((caddr_t)&authdata->spi, &authdata_spi, sizeof(authdata_spi));
+	bcopy((caddr_t)&authdata->spi[0], &authdata_spi, sizeof(authdata_spi));
 
 	/* XXX: this function should take full sockaddrs */
 	bzero(&src_sa, sizeof(src_sa));
@@ -2896,7 +3089,7 @@ mip6_ba_authdata_verify(src, dst, ba_opt, authdata)
 	int error = 0;
 	struct sockaddr_in6 src_sa, dst_sa;
 
-	bcopy((caddr_t)&authdata->spi, &authdata_spi, sizeof(authdata_spi));
+	bcopy((caddr_t)&authdata->spi[0], &authdata_spi, sizeof(authdata_spi));
 
 	/* XXX: this function should take full sockaddrs */
 	bzero(&src_sa, sizeof(src_sa));
@@ -2982,7 +3175,7 @@ mip6_authdata_create(sav)
 	/* fill the authentication data sub-option. */
 	authdata->type = MIP6SUBOPT_AUTHDATA;
 	authdata->len = authdata_size - 2;
-	bcopy((caddr_t)&sav->spi, (caddr_t)&authdata->spi, sizeof(u_int32_t));
+	bcopy((caddr_t)&sav->spi, (caddr_t)&authdata->spi[0], sizeof(u_int32_t));
 
 	/* checksum calculation will be done after. */
 
@@ -3193,7 +3386,7 @@ mip6_process_br(m, opt)
 		return (0);
 	}
 
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, sin6src);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, sin6src, sin6dst);
 	if (mbu == NULL) {
 		/* XXX there is no BU for this peer.  create? */
 		return (0);
@@ -3894,7 +4087,8 @@ mip6_route_optimize(m)
 	 * peer sending this un-optimized packet.
 	 */
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-					  sin6src);
+					  sin6src,
+					  sin6dst);
 	if (mbu == NULL) {
 		/*
 		 * if no binding update entry is found, this is a

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.108 2002/02/25 07:49:17 suz Exp $	*/
+/*	$KAME: in6_src.c,v 1.109 2002/03/01 09:37:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -288,7 +288,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	     sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		mbu_dst = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-						      dstsock);
+						      dstsock, NULL);
 		if ((mbu_dst != NULL) &&
 		    ((mbu_dst->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0))
 			coafallback = 1;

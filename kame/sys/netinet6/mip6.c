@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.117 2002/02/19 03:40:39 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.118 2002/03/01 09:37:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -93,9 +93,9 @@
 #ifndef MIP6_CONFIG_DEBUG
 #ifdef MIP6_DEBUG
 #define MIP6_CONFIG_DEBUG 1
-#else
+#else /* MIP6_DEBUG */
 #define MIP6_CONFIG_DEBUG 0
-#endif
+#endif /* MIP6_DEBUG */
 #endif /* !MIP6_CONFIG_DEBUG */
 #ifndef MIP6_CONFIG_USE_IPSEC
 #ifdef MIP6_DRAFT13
@@ -119,6 +119,11 @@
 #ifndef MIP6_CONFIG_HRBU_MAXLIFETIME
 #define MIP6_CONFIG_HRBU_MAXLIFETIME 0
 #endif /* !MIP6_CONFIG_HRBU_MAXLIFETIME */
+#if 1 /* #ifndef MIP6_CONFIG_BU_USE_SINGLE */
+#define MIP6_CONFIG_BU_USE_SINGLE 1
+#else
+#define MIP6_CONFIG_BU_USE_SINGLE 0
+#endif /* !MIP6_CONFIG_BU_USE_SINGLE */
 
 extern struct mip6_subnet_list mip6_subnet_list;
 extern struct mip6_prefix_list mip6_prefix_list;
@@ -152,6 +157,7 @@ static int mip6_rthdr_create_withdst __P((struct ip6_rthdr **,
 					  struct sockaddr_in6 *,
 					  struct ip6_pktopts *));
 static int mip6_haddr_destopt_create __P((struct ip6_dest **,
+					  struct sockaddr_in6 *,
 					  struct sockaddr_in6 *,
 					  struct hif_softc *));
 static int mip6_bu_destopt_create __P((struct ip6_dest **,
@@ -195,6 +201,7 @@ mip6_init()
 	mip6_config.mcfg_hrbc_lifetime_limit = MIP6_CONFIG_HRBC_LIFETIME_LIMIT;
 	mip6_config.mcfg_bu_maxlifetime = MIP6_CONFIG_BU_MAXLIFETIME;
 	mip6_config.mcfg_hrbu_maxlifetime = MIP6_CONFIG_HRBU_MAXLIFETIME;
+	mip6_config.mcfg_bu_use_single = MIP6_CONFIG_BU_USE_SINGLE;
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
         callout_init(&mip6_pfx_ch);
@@ -558,6 +565,7 @@ mip6_process_pfxlist_status_change(hif_coa)
 {
 	struct nd_prefix *pr;
 	struct hif_softc *sc;
+	struct hif_subnet *hs;
 	int error = 0;
 
 	for (sc = TAILQ_FIRST(&hif_softc_list);
@@ -565,6 +573,38 @@ mip6_process_pfxlist_status_change(hif_coa)
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		sc->hif_location = HIF_LOCATION_UNKNOWN;
 
+#if 1
+		for (hs = TAILQ_FIRST(&sc->hif_hs_list_home);
+		     hs;
+		     hs = TAILQ_NEXT(hs, hs_entry)) {
+			struct mip6_subnet *ms;
+			struct mip6_subnet_prefix *mspfx;
+
+			if ((ms = hs->hs_ms) == NULL) {
+				/* must not happen. */
+				return (EINVAL);
+			}
+			for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
+			     mspfx;
+			     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
+				struct mip6_prefix *mpfx;
+
+				if ((mpfx = mspfx->mspfx_mpfx) == NULL) {
+					/* must not happen. */
+					return (EINVAL);
+				}
+				if (in6_are_prefix_equal(
+					    &hif_coa->sin6_addr,
+					    &mpfx->mpfx_prefix.sin6_addr,
+					    mpfx->mpfx_prefixlen)) {
+					sc->hif_location = HIF_LOCATION_HOME;
+					goto i_know_where_i_am;
+				}
+			}
+		}
+		sc->hif_location = HIF_LOCATION_FOREIGN;
+	i_know_where_i_am:
+#else
 		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 			if (!in6_are_prefix_equal(&hif_coa->sin6_addr,
 						  &pr->ndpr_prefix.sin6_addr,
@@ -582,6 +622,7 @@ mip6_process_pfxlist_status_change(hif_coa)
 				    pr->ndpr_plen))
 				sc->hif_location = HIF_LOCATION_FOREIGN;
 		}
+#endif
 		mip6log((LOG_INFO,
 			 "location = %d\n", sc->hif_location));
 
@@ -1227,7 +1268,7 @@ mip6_ioctl(cmd, data)
 			mip6log((LOG_INFO,
 				 "%s:%d: MN function enabled\n",
 				 __FILE__, __LINE__));
-			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_MN;
+			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_MOBILENODE;
 			break;
 
 		case SIOCSMIP6CFG_DISABLEMN:
@@ -1263,7 +1304,7 @@ mip6_ioctl(cmd, data)
 			mip6log((LOG_INFO,
 				 "%s:%d: HA function enabled\n",
 				 __FILE__, __LINE__));
-			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_HA;
+			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_HOMEAGENT;
 			break;
 
 		case SIOCSMIP6CFG_ENABLEIPSEC:
@@ -1583,7 +1624,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 	}
 
 	/* create haddr destopt. */
-	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr, dst, sc);
+	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr,
+					  src, dst, sc);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: homeaddress insertion failed.\n",
@@ -1715,7 +1757,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		return (0);
 
 	/* find existing binding update entry for this destination. */
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst, src);
 	hrmbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
 	if ((mbu == NULL) && (hrmbu != NULL) &&
 	    (hrmbu->mbu_reg_state == MIP6_BU_REG_STATE_REG)) {
@@ -1998,8 +2040,9 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 }
 
 static int
-mip6_haddr_destopt_create(pktopt_haddr, dst, sc)
+mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	struct ip6_dest **pktopt_haddr;
+	struct sockaddr_in6 *src;
 	struct sockaddr_in6 *dst;
 	struct hif_softc *sc;
 {
@@ -2017,7 +2060,7 @@ mip6_haddr_destopt_create(pktopt_haddr, dst, sc)
 	haddr_opt.ip6oh_type = IP6OPT_HOME_ADDRESS;
 	haddr_opt.ip6oh_len = IP6OPT_HALEN;
 
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst, src);
 #ifdef MIP6_ALLOW_COA_FALLBACK
 	if (mbu && ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0)) {
 		return (0);
@@ -2185,6 +2228,9 @@ mip6_ba_destopt_create(pktopt_badest2, src, dst,
 	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		error = ENOMEM;
+		mip6log((LOG_ERR,
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
 		goto freesp;
 	}
 	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
@@ -3008,7 +3054,7 @@ mip6_coa_get_lifetime(coa)
 void
 mip6_create_addr(addr, ifid, ndpr)
 	struct sockaddr_in6 *addr;
-	struct sockaddr_in6 *ifid;
+	const struct sockaddr_in6 *ifid;
 	struct nd_prefix *ndpr;
 {
 	int i, bytelen, bitlen;

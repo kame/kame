@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.95 2002/02/19 03:40:39 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.96 2002/03/01 09:37:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,9 +473,9 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 		for (sc = TAILQ_FIRST(&hif_softc_list);
 		     sc;
 		     sc = TAILQ_NEXT(sc, hif_entry)) {
-			/* XXX: the function should take sockaddr_in6 */
 			mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-							  taddr6);
+							  taddr6,
+							  NULL);
 			if (mbu == NULL)
 				continue;
 			if ((mbu->mbu_flags & IP6_BUF_HOME) == 0)

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.37 2002/02/22 02:40:14 k-sugyou Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.38 2002/03/01 09:37:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -99,7 +99,7 @@ extern struct mip6_subnet_list mip6_subnet_list;
 
 u_int16_t mip6_hadiscovid = 0;
 
-static struct sockaddr_in6 haanyaddr_ifid64 = {
+static const struct sockaddr_in6 haanyaddr_ifid64 = {
 	sizeof(struct sockaddr_in6),	/* sin6_len */
 	AF_INET6,			/* sin6_family */
 	0,				/* sin6_port */
@@ -108,7 +108,7 @@ static struct sockaddr_in6 haanyaddr_ifid64 = {
 	    0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}},
 	0				/* sin6_scope_id */
 };
-static struct sockaddr_in6 haanyaddr_ifidnn = {
+static const struct sockaddr_in6 haanyaddr_ifidnn = {
 	sizeof(struct sockaddr_in6),	/* sin6_len */
 	AF_INET6,			/* sin6_family */
 	0,				/* sin6_port */
@@ -244,7 +244,8 @@ mip6_icmp6_input(m, off, icmp6len)
 			     sc;
 			     sc = TAILQ_NEXT(sc, hif_entry)) {
 				mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-								  &paddr);
+								  &paddr,
+								  &laddr);
 				if (mbu) {
 					mip6log((LOG_INFO,
 						 "%s:%d: a node (%s) doesn't support a binding update destopt.\n",
@@ -276,7 +277,8 @@ mip6_icmp6_input(m, off, icmp6len)
 			     sc;
 			     sc = TAILQ_NEXT(sc, hif_entry)) {
 				mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-								  &paddr);
+								  &paddr,
+								  &laddr);
 				if (mbu) {
 					mbu->mbu_state
 						|= MIP6_BU_STATE_BUNOTSUPP;
