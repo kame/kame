@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2611 2004/05/26 03:01:47 itojun Exp $
+$KAME: CHANGELOG,v 1.2612 2004/05/27 09:08:18 itojun Exp $
 
 <200405>
-Wed May 26 11:58:56 JST 2004 itojun@iijlab.net
+Thu May 27 17:55:28 JST 2004  itojun@iijlab.net
+	* openbsd: switch to 3.5.  there are a lot more work to do (ALTQ, PF,
+	  CARP, PFSYNC)
+
+Wed May 26 11:58:56 JST 2004  itojun@iijlab.net
 	* sys/netkey/keysock.c: support tons of pfkey messages generated
 	  at once.  used only for DUMP and SPDDUMP only.
 	
