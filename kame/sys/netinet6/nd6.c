@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.110 2001/02/06 09:14:38 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.111 2001/02/08 02:47:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -466,6 +466,7 @@ nd6_timer(ignored_arg)
 	struct ifnet *ifp;
 	struct in6_ifaddr *ia6, *nia6;
 	struct in6_addrlifetime *lt6;
+	int freed = 0;
 	
 #ifdef __NetBSD__
 	s = splsoftnet();
@@ -490,6 +491,7 @@ nd6_timer(ignored_arg)
 	timeout(nd6_timer, (caddr_t)0, nd6_prune * hz);
 #endif
 
+  nbrloop:
 	ln = llinfo_nd6.ln_next;
 	/* XXX BSD/OS separates this code -- itojun */
 	while (ln && ln != &llinfo_nd6) {
@@ -498,6 +500,8 @@ nd6_timer(ignored_arg)
 		struct llinfo_nd6 *next = ln->ln_next;
 		/* XXX: used for the DELAY case only: */
 		struct nd_ifinfo *ndi = NULL;
+
+		freed = 0;
 
 		if ((rt = ln->ln_rt) == NULL) {
 			ln = next;
@@ -550,6 +554,7 @@ nd6_timer(ignored_arg)
 					ln->ln_hold = NULL;
 				}
 				nd6_free(rt);
+				freed = 1;
 			}
 			break;
 		case ND6_LLINFO_REACHABLE:
@@ -561,8 +566,10 @@ nd6_timer(ignored_arg)
 
 		case ND6_LLINFO_STALE:
 			/* Garbage Collection(RFC 2461 5.3) */
-			if (ln->ln_expire)
+			if (ln->ln_expire) {
 				nd6_free(rt);
+				freed = 1;
+			}
 			break;
 
 		case ND6_LLINFO_DELAY:
@@ -589,10 +596,32 @@ nd6_timer(ignored_arg)
 					       &dst->sin6_addr, ln, 0);
 			} else {
 				nd6_free(rt);
+				freed = 1;
 			}
 			break;
 		}
 		ln = next;
+
+		if (freed && next != &llinfo_nd6) {
+			struct llinfo_nd6 *lnn;
+			int found = 0;
+
+			for (lnn = llinfo_nd6.ln_next; lnn != &llinfo_nd6;
+			     lnn = lnn->ln_next) {
+				if (lnn == next) {
+					found = 1;
+					break;
+				}
+			}
+
+			if (found == 0) {
+				nd6log((LOG_DEBUG,
+					"nd6_timer: inconsistency in the "
+					"neighbor cache list (%p not found)\n",
+					next));
+				goto nbrloop; /* restart */
+			}
+		}
 	}
 	
 	/* expire default router list */
