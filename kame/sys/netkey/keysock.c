@@ -332,8 +332,11 @@ key_sendup0(rp, m, promisc, canwait)
 		if (canwait &&
 		    sbspace(&rp->rcb_socket->so_rcv) < m->m_pkthdr.len) {
 			error = EAGAIN;
-			continue;
+			kp->kp_queue = m;
+			break;
 		}
+
+		m->m_nextpkt = NULL;
 
 		if (!sbappendaddr(&rp->rcb_socket->so_rcv,
 		    (struct sockaddr *)&key_src, m, NULL)) {
