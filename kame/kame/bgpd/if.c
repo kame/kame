@@ -35,6 +35,9 @@
 #include "aspath.h"
 #include "bgp_var.h"
 #include "in6.h"
+#ifdef HAVE_GETIFADDRS
+#include <ifaddrs.h>
+#endif 
 
 static void get_ifinfo __P((struct ifinfo *));
 
@@ -44,6 +47,101 @@ static void get_ifinfo __P((struct ifinfo *));
  */
 void
 ifconfig()
+#ifdef HAVE_GETIFADDRS
+{
+  extern struct ifinfo *ifentry;
+  struct ifaddrs *ifap, *ifa;
+  struct sockaddr_in6 *sin6;
+  struct ifinfo    *ife;
+  int s;
+
+  if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+    fatal("<ifconfig>: socket");
+
+  if (getifaddrs(&ifap))
+    fatal("<ifconfig>: getifaddrs");
+
+  for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr->sa_family == AF_INET6) {
+
+      sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+
+      if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+	if ((ife = find_if_by_name(ifa->ifa_name)) == NULL) { /* ifreq */
+	  /* new interface */
+	  MALLOC(ife,          struct ifinfo);
+	  MALLOC(ife->ifi_ifn, struct if_nameindex);
+
+	  ife->ifi_ifn->if_index = if_nametoindex(ifa->ifa_name);
+	  ife->ifi_ifn->if_name  = (char *)malloc(strlen(ifa->ifa_name) +1);
+	  strcpy(ife->ifi_ifn->if_name, ifa->ifa_name);
+
+	  get_ifinfo(ife);
+
+	  if (ifentry != NULL) {    /* (global) */
+	    insque(ife, ifentry);
+	  } else {
+	    ife->ifi_next = ife; 
+	    ife->ifi_prev = ife;
+	    ifentry       = ife;
+	  }
+	} else {
+	  if (!IN6_IS_ADDR_UNSPECIFIED(&ife->ifi_laddr))
+	    fatalx("<ifconfig>: link-local address cannot be doubly defined");
+	}
+	memcpy(&ife->ifi_laddr, &sin6->sin6_addr, sizeof(struct in6_addr));
+#ifdef ADVANCEDAPI
+	CLEAR_IN6_LINKLOCAL_IFINDEX(&ife->ifi_laddr);/* Toshiba's IPv6 macro */
+#endif
+      }
+
+      if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) &&
+	  !IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr) && /* should keep this? */
+	  IN6_IS_ADDR_ROUTABLE(&sin6->sin6_addr)) {
+	if ((ife = find_if_by_name(ifa->ifa_name)) == NULL) { /* ifreq */
+	  /* new interface */
+	  MALLOC(ife,          struct ifinfo);
+	  MALLOC(ife->ifi_ifn, struct if_nameindex);
+
+	  ife->ifi_ifn->if_index = if_nametoindex(ifa->ifa_name);
+	  ife->ifi_ifn->if_name  = (char *)malloc(strlen(ifa->ifa_name) +1);
+
+	  strcpy(ife->ifi_ifn->if_name, ifa->ifa_name);
+
+	  get_ifinfo(ife);
+
+	  if (ifentry != NULL) {    /* (global) */
+	    insque(ife, ifentry);
+	  } else {
+	    ife->ifi_next = ife; 
+	    ife->ifi_prev = ife;
+	    ifentry       = ife;
+	  }
+	  memcpy(&ife->ifi_gaddr, &sin6->sin6_addr, sizeof(struct in6_addr));
+	} else { /* ifentry found  */
+	  struct in6_ifreq ifr;
+
+	  strcpy(ifr.ifr_name, ife->ifi_ifn->if_name);
+	  ifr.ifr_addr = *sin6;
+	  if (ioctl(s, SIOCGIFAFLAG_IN6, (caddr_t)&ifr) != 0) {
+	    fatal("<ifconfig>: SIOCGIFAFLAG_IN6");
+	  } else {
+	    if (
+		!(ifr.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST) &&  /* new one */
+		IN6_IS_ADDR_UNSPECIFIED(&ife->ifi_gaddr)) {    /* already */
+	      memcpy(&ife->ifi_gaddr, &sin6->sin6_addr,
+		     sizeof(struct in6_addr));
+	    }
+	  }
+	}
+      } /* not routable, but INET6 */
+    }
+  }
+
+  close(s);
+  free(ifa);
+}
+#else  /* !HAVE_GETIFADDRS */
 {
   int                 s;
   int                 i;
@@ -55,7 +153,6 @@ ifconfig()
   struct sockaddr_in6 *sin;
 
   extern struct ifinfo *ifentry;
-
 
   if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
     fatal("<ifconfig>: socket");
@@ -151,6 +248,7 @@ ifconfig()
   }
   close(s);
 }
+#endif /* HAVE_GETIFADDRS */
 
 /*
  * Get interface flags.
