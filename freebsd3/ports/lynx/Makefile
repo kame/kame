@@ -2,37 +2,38 @@
 # Date created:         15 Dec 1994
 # Whom:                 ache
 #
-# $FreeBSD: ports/www/lynx/Makefile,v 1.88 1999/08/31 06:51:50 mharo Exp $
+# $FreeBSD: ports/www/lynx-current/Makefile,v 1.118 2000/06/29 13:12:38 ache Exp $
 #
 
-PORTNAME=	lynx2.8.2
-PORTVERSION=	rel.1
-CATEGORIES=	www
+PORTNAME=	lynx
+PORTVERSION=    2.8.4d7
+CATEGORIES=	www ipv6
 MASTER_SITES=   http://lynx.isc.org/current/
-
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	lynx-282-v6-20000201.diff.gz
-PATCH_DIST_STRIP=	-p1
+DISTNAME=       ${PORTNAME}2.8.4dev.7
 
 MAINTAINER=	k-sugyou@kame.net
 
-BROKEN=		"security issues"
+LIB_DEPENDS=    intl.1:${PORTSDIR}/devel/gettext
 
+WRKSRC=         ${WRKDIR}/${PORTNAME}2-8-4
 USE_BZIP2=      YES
-WRKSRC=         ${WRKDIR}/lynx2-8-2
+NO_LATEST_LINK=	YES
 GNU_CONFIGURE=  YES
 CONFIGURE_ARGS= --with-screen=ncurses --with-zlib --libdir="${L_LIB}" \
-		--enable-nsl-fork --enable-persistent-cookies
-MAKE_FLAGS=     helpdir=${L_HELP} -f
+		--enable-nsl-fork --enable-persistent-cookies \
+		--enable-nls --enable-ipv6
+CONFIGURE_ENV=  CC="${CC} -I${LOCALBASE}/include" LDFLAGS=-L${LOCALBASE}/lib
+MAKE_FLAGS=     helpdir=${L_HELP} docdir=${L_DOC} -f
 MAKEFILE=       makefile
-INSTALL_TARGET= install install-help
+INSTALL_TARGET= install-full
 MAN1=		lynx.1
 
 L_LIB=          ${PREFIX}/etc
+L_DOC=          ${PREFIX}/share/doc/lynx
 L_HELP=         ${PREFIX}/share/lynx_help
 
 post-install:
+	${CHOWN} -R ${SHAREOWN}:${SHAREGRP} ${L_DOC}
 	${CHOWN} -R ${SHAREOWN}:${SHAREGRP} ${L_HELP}
 	${CHOWN} ${SHAREOWN}:${SHAREGRP} ${L_LIB}/lynx.cfg
 
