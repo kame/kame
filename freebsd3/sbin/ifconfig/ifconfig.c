@@ -934,6 +934,19 @@ in_status(s, info)
 
 #ifdef INET6
 void
+in6_fillscopeid(sin6)
+	struct sockaddr_in6 *sin6;
+{
+#if defined(__KAME__) && defined(KAME_SCOPEID)
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+		sin6->sin6_scope_id =
+			ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
+		sin6->sin6_addr.s6_addr[2] = sin6->sin6_addr.s6_addr[3] = 0;
+	}
+#endif
+}
+
+void
 in6_status(s, info)
 	int s __unused;
 	struct rt_addrinfo * info;
@@ -944,6 +957,13 @@ in6_status(s, info)
 	u_int32_t flags6;
 	struct in6_addrlifetime lifetime;
 	time_t t = time(NULL);
+	char hbuf[NI_MAXHOST];
+	u_int32_t scopeid;
+#ifdef NI_WITHSCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif
 
 	memset(&null_sin, 0, sizeof(null_sin));
 
@@ -970,9 +990,12 @@ in6_status(s, info)
 	lifetime = ifr6.ifr_ifru.ifru_lifetime;
 	close(s6);
 
-	printf("\tinet6 %s ", inet_ntop(AF_INET6, &sin->sin6_addr,
-				ntop_buf, sizeof(ntop_buf)));
-
+	in6_fillscopeid(sin);
+	scopeid = sin->sin6_scope_id;
+	if (getnameinfo((struct sockaddr *)sin, sin->sin6_len,
+			hbuf, sizeof(hbuf), NULL, 0, niflag))
+		strncpy(hbuf, "", sizeof(hbuf));	/* some message? */
+	printf("\tinet6 %s", hbuf);
 
 	if (flags & IFF_POINTOPOINT) {
 		/* note RTAX_BRD overlap with IFF_BROADCAST */
@@ -982,43 +1005,50 @@ in6_status(s, info)
 		 * address.
 		 */
 		if (sin && sin->sin6_family == AF_INET6) {
-			printf("--> %s ", inet_ntop(AF_INET6, &sin->sin6_addr,
-						ntop_buf, sizeof(ntop_buf)));
+			in6_fillscopeid(sin);
+			if (getnameinfo((struct sockaddr *)sin, sin->sin6_len,
+					hbuf, sizeof(hbuf), NULL, 0, niflag)) {
+				/* some message? */
+				strncpy(hbuf, "", sizeof(hbuf));
+			}
+			printf(" --> %s", hbuf);
 		}
 	}
 
 	sin = (struct sockaddr_in6 *)info->rti_info[RTAX_NETMASK];
 	if (!sin)
 		sin = &null_sin;
-	printf("prefixlen %d ", prefix(&sin->sin6_addr,
+	printf(" prefixlen %d", prefix(&sin->sin6_addr,
 		sizeof(struct in6_addr)));
 
 	if (flags6 & IN6_IFF_ANYCAST)
-		printf("anycast ");
+		printf(" anycast");
 	if (flags6 & IN6_IFF_TENTATIVE)
-		printf("tentative ");
+		printf(" tentative");
 	if (flags6 & IN6_IFF_DUPLICATED)
-		printf("duplicated ");
+		printf(" duplicated");
 	if (flags6 & IN6_IFF_DETACHED)
-		printf("detached ");
+		printf(" detached");
 	if (flags6 & IN6_IFF_DEPRECATED)
-		printf("deprecated ");
+		printf(" deprecated");
 
+	if (scopeid)
+		printf(" scopeid 0x%x", scopeid);
 
 	if (ip6lifetime && (lifetime.ia6t_preferred || lifetime.ia6t_expire)) {
-		printf("pltime ");
+		printf(" pltime");
 		if (lifetime.ia6t_preferred) {
-			printf("%s ", lifetime.ia6t_preferred < t
+			printf(" %s", lifetime.ia6t_preferred < t
 				? "0" : sec2str(lifetime.ia6t_preferred - t));
 		} else
-			printf("infty ");
+			printf(" infty");
 
-		printf("vltime ");
+		printf(" vltime");
 		if (lifetime.ia6t_expire) {
-			printf("%s ", lifetime.ia6t_expire < t
+			printf(" %s", lifetime.ia6t_expire < t
 				? "0" : sec2str(lifetime.ia6t_expire - t));
 		} else
-			printf("infty ");
+			printf(" infty");
 	}
 
 	putchar('\n');
