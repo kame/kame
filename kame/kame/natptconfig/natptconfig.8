@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.14 2002/01/25 08:39:55 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.15 2002/02/04 07:47:38 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -42,9 +42,11 @@
 .\"
 .Sh SYNOPSIS
 .Nm
+.Op Fl q
 .Op Fl d Ar debuglevel
 .Fl f Ar configfile
 .Nm
+.Op Fl q
 .Op Fl d Ar debuglevel
 subcommand
 .Op Ar args ...
@@ -57,6 +59,8 @@ kernel.
 .Nm
 takes the following command line options.
 .Bl -tag witdh Ds
+.It Fl q
+Suppress error message sent to stderr.
 .It Fl d Ar debuglevel
 Set debug level to
 .Ar debuglevel .
