@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.47 2002/05/31 10:10:03 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.48 2002/05/31 10:13:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,7 +113,7 @@ main(argc, argv)
 	int s, maxfd, ch, once = 0;
 	struct timeval *timeout;
 	char *argv0, *opts;
-	struct fd_set fdset;
+	fd_set fdset;
 	int rtsock;
 
 	/*
@@ -272,7 +272,7 @@ main(argc, argv)
 	FD_SET(s, &fdset);
 	FD_SET(rtsock, &fdset);
 	while (1) {		/* main loop */
-		struct fd_set select_fd = fdset;
+		fd_set select_fd = fdset;
 		int e;
 
 		if (do_dump) {	/* SIGUSR1 */
