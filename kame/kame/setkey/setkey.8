@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: setkey.8,v 1.22 2000/03/12 23:50:52 itojun Exp $
+.\"     $Id: setkey.8,v 1.23 2000/03/13 05:33:53 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt SETKEY 8
@@ -525,7 +525,7 @@ lzs		rfc2395
 .Sh EXAMPLES
 .Bd -literal -offset
 add	3ffe:501:4819::1 3ffe:501:481d::1 esp 123457
-		-E des-cbc "ESP SA!!"
+		-E des-cbc "ESP SA!!" ;
 
 add	3ffe:501:4819::1 3ffe:501:481d::1 ah 123456
 		-A hmac-sha1 "AH SA configuration!" ;
