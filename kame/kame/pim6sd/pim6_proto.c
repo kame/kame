@@ -3781,7 +3781,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 			& grp_mask_ptr->group_mask.s6_addr[i];
 	    }
 
-	    if (inet6_lessthan(&prefix_h2, &prefix_h))
+	    if (inet6_greaterthan(&prefix_h2, &prefix_h))
 		continue;
 	    else
 		break;

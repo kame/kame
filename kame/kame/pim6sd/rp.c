@@ -358,7 +358,7 @@ add_grp_mask(used_grp_mask_list, group_addr, group_mask, hash_mask)
 	prefix_h.sin6_addr.s6_addr[i] =
 		group_addr->sin6_addr.s6_addr[i] & group_mask.s6_addr[i];
 
-    /* The ordering is: smaller first */
+    /* The ordering is: bigger first */
     for (grp_mask = *used_grp_mask_list; grp_mask != (grp_mask_t *) NULL;
 	 grp_mask_prev = grp_mask, grp_mask = grp_mask->next)
     {
@@ -366,7 +366,7 @@ add_grp_mask(used_grp_mask_list, group_addr, group_mask, hash_mask)
 	    prefix_h2.sin6_addr.s6_addr[i] =
 		    (grp_mask->group_addr.sin6_addr.s6_addr[i] &
 		     grp_mask->group_mask.s6_addr[i]);
-	if (inet6_lessthan(&prefix_h2, &prefix_h) )
+	if (inet6_greaterthan(&prefix_h2, &prefix_h) )
 	    continue;
 	if (inet6_equal(&prefix_h2, &prefix_h))
 	    return (grp_mask);
@@ -722,7 +722,7 @@ delete_grp_mask(used_cand_rp_list, used_grp_mask_list, group_addr, group_mask)
 	    prefix_h2.sin6_addr.s6_addr[i] = 
 		grp_mask_ptr->group_addr.sin6_addr.s6_addr[i]&grp_mask_ptr->group_mask.s6_addr[i];
 
-	if (inet6_lessthan(&prefix_h2, &prefix_h))
+	if (inet6_greaterthan(&prefix_h2, &prefix_h))
 	    continue;
 	if (IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_addr.sin6_addr,
 			       &group_addr->sin6_addr) &&
@@ -1036,10 +1036,8 @@ rp_grp_match(group)
 		 grp_mask_ptr->group_mask.s6_addr[i]);
 
 	/* Search the grp_mask (group_prefix) list */
-	if ((inet6_greaterthan(&prefix_h, &prefix_h2)))
+	if (!inet6_equal(&prefix_h, &prefix_h2))
 	    continue;
-	if ((inet6_lessthan(&prefix_h, &prefix_h2)))
-	    break;
 
 	for (grp_rp_entry_ptr = grp_mask_ptr->grp_rp_next;
 	     grp_rp_entry_ptr != (rp_grp_entry_t *) NULL;
