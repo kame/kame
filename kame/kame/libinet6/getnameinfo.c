@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.53 2001/04/30 17:16:10 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.54 2001/07/23 05:57:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -360,8 +360,8 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 #endif
 
 	/* if_indextoname() does not take buffer size.  not a good api... */
-	if ((IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6)) &&
-	    bufsiz >= IF_NAMESIZE) {
+	if ((IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6) ||
+	     IN6_IS_ADDR_MC_INTFACELOCAL(a6)) && bufsiz >= IF_NAMESIZE) {
 		char *p = if_indextoname(ifindex, buf);
 		if (p) {
 			return(strlen(p));
