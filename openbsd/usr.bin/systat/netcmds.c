@@ -307,6 +307,8 @@ selecthost(sa, onoff)
 			p->onoff = onoff;
 			return (0);
 		}
+	if (sa->sa_len > sizeof(struct sockaddr_storage))
+		return (-1);	/*XXX*/
 	if (nhosts == 0)
 		hosts = (struct hitem *)malloc(sizeof (*p));
 	else
