@@ -32,5 +32,6 @@ $TEST 127.0.0.1 ''
 $TEST localhost ''
 $TEST '' ''
 
+# the following items are local to KAME.
 $TEST fe80::1@lo0 http
 $TEST fe80::1@$IF http
