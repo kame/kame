@@ -74,31 +74,14 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/mbuf.h>
-#include <sys/protosw.h>
 
-#include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_icmp.h>
 
-#ifdef INET6
-#include <netinet/ip6.h>
-#endif
-
-#include <netinet/icmp_var.h>
-#include <netinet/igmp_var.h>
-#include <netinet/ip_var.h>
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/keysock.h>
 #endif
 
-#include <arpa/inet.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
