@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1186 2000/08/11 13:32:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.1187 2000/08/11 14:41:49 jinmei Exp $
 
 <200007>
+2000-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd3/ports/bind9/: upgraded to 9.0.0rc2.
+
 2000-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/include/.prepare: was added to ignore ifaddrs.h
 	conflict between the FreeBSD's original version and the KAME's
