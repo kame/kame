@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2100 2002/03/15 09:29:48 itojun Exp $
+$KAME: CHANGELOG,v 1.2101 2002/03/15 10:47:25 itojun Exp $
 
 <200203>
+Fri Mar 15 19:45:40 JST 2002  itojun@iijlab.net
+	* sys/netinet6/frag6.c: implement real lock around IPv6 reassembly code.
+	  (netbsd/openbsd only)
+
 Fri Mar 15 18:28:20 JST 2002  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp_subr.c: have tcp6_drain().
 
