@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.11 2000/02/19 13:54:04 itojun Exp $
+ * $Id: mip6.c,v 1.12 2000/02/20 08:28:38 itojun Exp $
  *
  */
 
@@ -1604,8 +1604,8 @@ mip6_add_ifaddr(struct in6_addr *addr,
 		} else
 			ifp->if_addrlist = &ia->ia_ifa;
 #else
-		TAILQ_INSERT_TAIL(&ifp->if_addrhead, &ia->ia_ifa,
-				  ifa_link);
+		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
+				  ifa_list);
 #endif
 		ia->ia_ifa.ifa_refcnt++;
 	}
