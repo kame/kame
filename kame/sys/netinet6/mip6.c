@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.52 2001/09/17 12:42:39 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.53 2001/09/20 06:21:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -705,7 +705,7 @@ mip6_select_coa(preferedifp)
 	mip6log((LOG_INFO,
 		 "%s: prefered ifp is %s(%p)\n",
 		 __FUNCTION__,
-		 preferedifp->if_name, preferedifp));
+		 if_name(preferedifp), preferedifp));
 	
 	hcoa = hif_coa_list_find_withifp(&hif_coa_list, preferedifp);
 	if (hcoa == NULL) {
@@ -721,7 +721,7 @@ mip6_select_coa(preferedifp)
 	}
 	mip6log((LOG_INFO,
 		 "%s: hifcoa = %p, hifcoa->ifp = %s(%p)\n",
-		 __FUNCTION__, hcoa, hcoa->hcoa_ifp->if_name, hcoa->hcoa_ifp));
+		 __FUNCTION__, hcoa, if_name(hcoa->hcoa_ifp), hcoa->hcoa_ifp));
 
 	/*
 	 * XXX TODO
