@@ -91,6 +91,7 @@ extern int innetgr __P(( const char *, const char *, const char *, const char * 
 #define max(a, b)	((a > b) ? a : b)
 
 int __ivaliduser_af __P((FILE *, const void *, const char *, const char *, int, int));
+int __ivaliduser_sa __P((FILE *, const struct sockaddr *, const char *, const char *));
 #if 0
 static int __icheckhost __P((const void *, const char *, int, int));
 #endif
@@ -722,10 +723,8 @@ __ivaliduser_sa(hostf, raddr, luser, ruser)
 	int ch;
 	char buf[MAXHOSTNAMELEN + 128];		/* host + login */
 	char hname[MAXHOSTNAMELEN];
-	struct hostent *hp;
 	/* Presumed guilty until proven innocent. */
 	int userok = 0, hostok = 0;
-	int h_error;
 #ifdef YP
 	char *ypdomain;
 
@@ -900,14 +899,9 @@ __icheckhost_sa(raddr, lhost)
 	const struct sockaddr *raddr;
         const char *lhost;
 {
-	char **pp;
 	int match;
 	struct addrinfo hints, *res0, *res;
 	int error;
-	struct sockaddr_in *sa4, *sb4;
-#ifdef INET6
-	struct sockaddr_in6 *sa6, *sb6;
-#endif
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
 
 	if (getnameinfo(raddr, raddr->sa_len, h1, sizeof(h1), NULL, 0,
