@@ -1,4 +1,4 @@
-$Id: TODO,v 1.5 2000/01/14 19:49:21 sakane Exp $
+$Id: TODO,v 1.6 2000/01/14 20:10:57 itojun Exp $
 
 Sorry that `racoon' is not stable yet.  But she can exchange the key
 in limited environment.  Try to run with racoon.conf in the case
@@ -12,12 +12,16 @@ o UserFQDN/FQDN type of ID payload on phase 1 for pre-shared key.
 o acceptable IP address check.
 o acceptable SAs check.
 o system logging facility.
-o SA bundle.
+o SA bundle. (caveat: initiator side cannot propose multiple transform of
+  same proto_id, in single proposal)
+o IPcomp SA negotiation
 
 TODO list
 
 UGENT
 o The documents for users convenience.
+o split log file based on client.  printf-like config directive, i.e.
+  "logfile racoon.%s.log", should be useful here.
 
 MUST
 o authentication methods besides pre-shared-key. e.g. RSA, PGP.
@@ -26,7 +30,24 @@ o To consider the use with certificate infrastructure.  PXIX ???
 o Support scoped (link-local and site-local) IPv6 addresses.
   It needs pfkey modification for scope IDs, and advanced API (RFC2292)
   related mods in racoon itself.
-o kmstat is to be useful.
+o kmstat should be improved.
+o aggressive mode DH group checks/handling on responder side.
+o proposal parser needs to be improved.  this should be like:
+  A. chained list of transform, only for single proto_id
+     (this is same as set of transforms in single proposal payload)
+  B. proposal.  this will point to multiple (A) items (order is important here
+     so pointer to (A) must be ordered array, or chained list). 
+     this covers multiple proposal on a packet if proposal # is the same.
+  C. finally, (B) needs to be connected as chained list.
+
+	---> B[.......] ---> B[...] ---> B[...] ---> B[...]
+	       v v v v
+	       A A A A <-- must preserve order here
+	       t t t t
+	       t t     <--- transforms
+	       t
+  incoming packets needs to be parsed to construct the same structure
+  (we use separate structures, "ipsecsa" and "prop_pair" for those).
 
 SHOULD
 o To be supported bytes lifetimes for ISAKMP-SA.
@@ -152,3 +173,9 @@ o configuration should be made easier.
 		}
 	}
   may be too complex, use pre-processor like cpp?
+
+o responder policy and initiator policy should be separated.
+o for lifetime and key length, something like this should be useful.
+  - propose N
+  - accept between X and Y
+o wildcard "accept any proposal" policy should be allowed.
