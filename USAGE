@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/06 16:30:35 $
+		     $Date: 1999/10/07 00:53:08 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -147,6 +147,12 @@ If you want to add a default route manually, do as follows:
 
 "default" means ::/0.  In other cases, if "prefixlen" is omitted, 64
 is assumed for "prefixlen" to get along with the aggregatable address.
+
+Note that, in IPv6, link-local address should be used as gateway
+("fe80:2::200:a2ff:fe0e:7543" in the above).  If you use global addresses,
+icmp6 redirect may not work properly.  For ease of configuration we recommend
+you to avoid static routes and run a routing daemon (route6d for example)
+instead.
 
 <<<ping6>>>
 
