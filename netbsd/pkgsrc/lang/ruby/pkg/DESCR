@@ -1,9 +1,13 @@
+From the distribution README:
+
+* What's Ruby
+
 Ruby is the interpreted scripting language for quick and
 easy object-oriented programming.  It has many features to
 process text files and to do system management tasks (as in
-perl).  It is simple, straight-forward, and extensible.
+Perl).  It is simple, straight-forward, and extensible.
 
-Features of ruby is shown below.
+* Features of Ruby
 
   + Simple Syntax
   + *Normal* Object-Oriented features(ex. class, method calls)
@@ -14,5 +18,3 @@ Features of ruby is shown below.
   + Garbage Collection
   + Dynamic Loading of Object files(on some architecture)
   + Highly Portable(works on many UNIX machines)
-
-The ruby home page is at http://www.netlab.co.jp/ruby/.
