@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.13 2000/03/12 02:03:00 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.14 2000/03/12 10:23:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -153,6 +153,7 @@ static int stf_encapcheck __P((const struct mbuf *, int, int, void *));
 static struct in6_ifaddr *stf_getsrcifa6 __P((struct ifnet *));
 static int stf_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
+static int stf_checkinner __P((struct in6_addr *in6));
 static void stf_rtrequest __P((int, struct rtentry *, struct sockaddr *));
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 static int stf_ioctl __P((struct ifnet *, int, caddr_t));
@@ -405,6 +406,48 @@ stf_output(ifp, m, dst, rt)
 #endif
 }
 
+static int
+stf_checkinner(in6)
+	struct in6_addr *in6;
+{
+	struct in_addr *in;
+	struct in_ifaddr *ia4;
+
+	/* for now, we only check 6to4 addresses */
+	if (!IN6_IS_ADDR_6TO4(in6))
+		return 0;
+
+	in = GET_V4(in6);
+
+	/*
+	 * reject packets with the following address:
+	 * 6to4(multicast) 6to4(0.0.0.0) 6to4(255.255.255.255)
+	 */
+	if (IN_MULTICAST(in->s_addr) || in->s_addr == INADDR_ANY ||
+	    in->s_addr == INADDR_BROADCAST) {
+		return -1;
+	}
+
+	/*
+	 * reject packets with 6to4(broadcast)
+	 */
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+	for (ia4 = in_ifaddr.tqh_first;
+	     ia4;
+	     ia4 = ia4->ia_list.tqe_next)
+#else
+	for (ia4 = in_ifaddr; ia4 != NULL; ia4 = ia4->ia_next)
+#endif
+	{
+		if ((ia4->ia_ifa.ifa_ifp->if_flags & IFF_BROADCAST) == 0)
+			continue;
+		if (in->s_addr == ia4->ia_broadaddr.sin_addr.s_addr)
+			return -1;
+	}
+
+	return 0;
+}
+
 void
 #if __STDC__
 in_stf_input(struct mbuf *m, ...)
@@ -460,29 +503,14 @@ in_stf_input(m, va_alist)
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst)) {
-		/*
-		 * reject packets with the following inner destinations:
-		 * 6to4(multicast) 6to4(0.0.0.0) 6to4(255.255.255.255)
-		 */
-		if (IN_MULTICAST(GET_V4(&ip6->ip6_dst)->s_addr) ||
-		    GET_V4(&ip6->ip6_dst)->s_addr == INADDR_ANY ||
-		    GET_V4(&ip6->ip6_dst)->s_addr == INADDR_BROADCAST) {
-			m_freem(m);
-			return;
-		}
-	}
-	if (IN6_IS_ADDR_6TO4(&ip6->ip6_src)) {
-		/*
-		 * reject packets with the following inner source:
-		 * 6to4(multicast) 6to4(0.0.0.0) 6to4(255.255.255.255)
-		 */
-		if (IN_MULTICAST(GET_V4(&ip6->ip6_src)->s_addr) ||
-		    GET_V4(&ip6->ip6_src)->s_addr == INADDR_ANY ||
-		    GET_V4(&ip6->ip6_src)->s_addr == INADDR_BROADCAST) {
-			m_freem(m);
-			return;
-		}
+	/*
+	 * perform sanity check against inner src/dst.
+	 * XXX use routing table to detect address spoofs?
+	 */
+	if (stf_checkinner(&ip6->ip6_dst) < 0 ||
+	    stf_checkinner(&ip6->ip6_src) < 0) {
+		m_freem(m);
+		return;
 	}
 
 	itos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
