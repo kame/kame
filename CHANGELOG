@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1344 2000/10/19 01:42:45 itojun Exp $
+$KAME: CHANGELOG,v 1.1345 2000/10/19 02:28:20 jinmei Exp $
 
 <200010>
+2000-10-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c (add_m6fc): made sure to reset
+	the outgoing interfaces list in all cases where a multicast
+	routing cache is created or updated.
+	In response to a report from Hoerdt Mickael
+	<hoerdt@clarinet.u-strasbg.fr>
+
 Thu Oct 19 10:37:05 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: (netbsd only for now) try to prevent
 	  DoS attack using path MTU messages.  validate ICMPv6 too big messages
@@ -3078,7 +3085,7 @@ Wed Mar 22 15:52:48 JST 2000  itojun@iijlab.net
 	Without this, bsdi4/openbsd would panic when an application using
 	IPv6 multicasting is terminated.
 	This fix would solve KAME PR sys/224.
-	
+
 Tue Mar 21 21:56:04 JST 2000  itojun@iijlab.net
 	* freebsd[23]/sys/kern/uipc_socket.c: correct freebsd bug in sanity
 	  check for socket timeout value.  netbsd uipc_socket.c 1.18 -> 1.19.
