@@ -93,7 +93,9 @@ __RCSID("$NetBSD: ifconfig.c,v 1.50.2.2 1999/06/18 17:42:19 perry Exp $");
 #include <net/if_media.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#ifdef INET6
 #include <netinet6/nd6.h>
+#endif
 #include <arpa/inet.h>
 
 #include <netatalk/at.h>
