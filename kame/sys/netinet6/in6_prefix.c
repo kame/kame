@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.43 2001/01/30 14:06:20 jinmei Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.44 2001/02/08 10:57:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,6 +99,8 @@ struct rr_prhead rr_prefix;
 
 #ifdef __NetBSD__
 struct callout in6_rr_timer_ch;
+#elif defined(__OpenBSD__)
+struct timeout in6_rr_timer_ch;
 #endif
 
 #include <net/net_osdep.h>
@@ -1358,6 +1360,9 @@ in6_rr_timer(void *ignored_arg)
 #ifdef __NetBSD__
 	callout_reset(&in6_rr_timer_ch, ip6_rr_prune * hz,
 	    in6_rr_timer, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&in6_rr_timer_ch, in6_rr_timer, NULL);
+	timeout_add(&in6_rr_timer_ch, ip6_rr_prune * hz);
 #else
 	timeout(in6_rr_timer, (caddr_t)0, ip6_rr_prune * hz);
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.36 2000/12/22 09:41:00 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.37 2001/02/08 10:57:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -62,6 +62,8 @@
 #include <sys/systm.h>
 #ifdef __NetBSD__
 #include <sys/callout.h>
+#elif defined(__OpenBSD__)
+#include <sys/timeout.h>
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/malloc.h>
@@ -253,6 +255,8 @@ static int del_m6fc __P((struct mf6cctl *));
 
 #ifdef __NetBSD__
 static struct callout expire_upcalls_ch = CALLOUT_INITIALIZER;
+#elif defined(__OpenBSD__)
+static struct timeout expire_upcalls_ch;
 #endif
 
 /*
@@ -522,6 +526,9 @@ ip6_mrouter_init(so, m, cmd)
 #ifdef __NetBSD__
 	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
 	    expire_upcalls, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&expire_upcalls_ch, expire_upcalls, NULL);
+	timeout_add(&expire_upcalls_ch, EXPIRE_TIMEOUT);
 #else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	expire_upcalls_ch =
@@ -595,6 +602,8 @@ ip6_mrouter_done()
 
 #ifdef __NetBSD__
 	callout_stop(&expire_upcalls_ch);
+#elif defined(__OpenBSD__)
+	timeout_del(&expire_upcalls_ch);
 #else
 	untimeout(expire_upcalls, (caddr_t)NULL
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -1415,6 +1424,9 @@ expire_upcalls(unused)
 #ifdef __NetBSD__
 	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
 	    expire_upcalls, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&expire_upcalls_ch, expire_upcalls, NULL);
+	timeout_add(&expire_upcalls_ch, EXPIRE_TIMEOUT);
 #else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	expire_upcalls_ch =

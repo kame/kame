@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.102 2001/02/07 11:01:29 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.103 2001/02/08 10:56:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,7 +75,9 @@ size_t icmp6_ifstatmax = 0;
 unsigned long in6_maxmtu = 0;
 
 #ifdef __NetBSD__
-struct callout in6_tmpaddrtimer_ch;
+struct callout in6_tmpaddrtimer_ch = CALLOUT_INITIALIZER;
+#elif defined(__OpenBSD__)
+struct timeout in6_tmpaddrtimer_ch;
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1266,6 +1268,11 @@ in6_tmpaddrtimer(ignored_arg)
 		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
 		       ip6_temp_regen_advance) * hz,
 		      in6_tmpaddrtimer, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&in6_tmpaddrtimer_ch, in6_tmpaddrtimer, NULL);
+	timeout_add(&in6_tmpaddrtimer_ch, 
+	    (ip6_temp_preferred_lifetime - ip6_desync_factor -
+	    ip6_temp_regen_advance) * hz);
 #else
 	timeout(in6_tmpaddrtimer, (caddr_t)0,
 		(ip6_temp_preferred_lifetime - ip6_desync_factor -

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.113 2001/02/08 10:32:03 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.114 2001/02/08 10:57:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -49,6 +49,8 @@
 #include <sys/systm.h>
 #ifdef __NetBSD__
 #include <sys/callout.h>
+#elif defined(__OpenBSD__)
+#include <sys/timeout.h>
 #endif
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -154,9 +156,13 @@ void (*mip6_expired_defrouter_hook)(struct nd_defrouter *dr) = 0;
 #endif
 
 #ifdef __NetBSD__
-struct callout nd6_slowtimo_ch;
-struct callout nd6_timer_ch;
+struct callout nd6_slowtimo_ch = CALLOUT_INITIALIZER;
+struct callout nd6_timer_ch = CALLOUT_INITIALIZER;
 extern struct callout in6_tmpaddrtimer_ch;
+#elif defined(__OpenBSD__)
+struct timeout nd6_slowtimo_ch;
+struct timeout nd6_timer_ch;
+extern struct timeout in6_tmpaddrtimer_ch;
 #endif
 
 void
@@ -184,6 +190,9 @@ nd6_init()
 #ifdef __NetBSD__
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&nd6_slowtimo_ch, nd6_slowtimo, NULL);
+	timeout_add(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz);
 #else
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
 #endif
@@ -477,6 +486,9 @@ nd6_timer(ignored_arg)
 #ifdef __NetBSD__
 		callout_reset(&nd6_timer_ch, nd6_prune * hz / MIP6_EAGER_FREQ,
 		    nd6_timer, NULL);
+#elif defined(__OpenBSD__)
+		timeout_set(&nd6_timer_ch, nd6_timer, NULL);
+		timeout_add(&nd6_timer_ch, nd6_prune * hz / MIP6_EAGER_FREQ);
 #else
 		timeout(nd6_timer, (caddr_t)0, 
 			nd6_prune * hz / MIP6_EAGER_FREQ);
@@ -486,6 +498,9 @@ nd6_timer(ignored_arg)
 #ifdef __NetBSD__
 	callout_reset(&nd6_timer_ch, nd6_prune * hz,
 		      nd6_timer, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&nd6_timer_ch, nd6_timer, NULL);
+	timeout_add(&nd6_timer_ch, nd6_prune * hz);
 #else
 	timeout(nd6_timer, (caddr_t)0, nd6_prune * hz);
 #endif
@@ -1980,6 +1995,9 @@ nd6_slowtimo(ignored_arg)
 #ifdef __NetBSD__
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&nd6_slowtimo_ch, nd6_slowtimo, NULL);
+	timeout_add(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz);
 #else
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
 #endif
