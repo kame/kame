@@ -1,4 +1,4 @@
-/*	$KAME: altq_var.h,v 1.7 2000/12/14 08:12:46 thorpej Exp $	*/
+/*	$KAME: altq_var.h,v 1.8 2001/02/09 09:44:41 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -186,6 +186,18 @@ typedef u_long ioctlcmd_t;
 #ifndef CALLOUT_INITIALIZER
 #define	CALLOUT_INITIALIZER	{ { { NULL } }, 0, NULL, NULL, 0 }
 #endif
+#elif defined(__OpenBSD__)
+#include <sys/timeout.h>
+/* callout structure as a wrapper of struct timeout */
+struct callout {
+	struct timeout	c_to;
+};
+#define	CALLOUT_INIT(c)		do { bzero((c), sizeof(*(c))); } while (0)
+#define	CALLOUT_RESET(c,t,f,a)	do { if (!timeout_initialized(&(c)->c_to))  \
+					 timeout_set(&(c)->c_to, (f), (a)); \
+				     timeout_add(&(c)->c_to, (t)); } while (0)
+#define	CALLOUT_STOP(c)		timeout_del(&(c)->c_to)
+#define	CALLOUT_INITIALIZER	{ { { NULL }, NULL, NULL, 0, 0 } }
 #else
 /* use old-style timeout/untimeout */
 /* dummy callout structure */
