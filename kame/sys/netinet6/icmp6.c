@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.129 2000/08/02 18:55:51 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.130 2000/08/03 14:22:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1375,17 +1375,17 @@ ni6_input(m, off)
 	/* qtype dependent procedure */
 	switch (qtype) {
 	case NI_QTYPE_NOOP:
-		nni6->ni_code = ICMP6_NI_SUCESS;
+		nni6->ni_code = ICMP6_NI_SUCCESS;
 		nni6->ni_flags = 0;
 		break;
 	case NI_QTYPE_SUPTYPES:
-		nni6->ni_code = ICMP6_NI_SUCESS;
+		nni6->ni_code = ICMP6_NI_SUCCESS;
 		nni6->ni_flags = htons(0x0000);	/* raw bitmap */
 		/* supports NOOP, SUPTYPES, FQDN, and NODEADDR */
 		*(u_int32_t *)(nni6 + 1) = htonl(0x000f);
 		break;
 	case NI_QTYPE_FQDN:
-		nni6->ni_code = ICMP6_NI_SUCESS;
+		nni6->ni_code = ICMP6_NI_SUCCESS;
 		fqdn = (struct ni_reply_fqdn *)(mtod(n, caddr_t) +
 						sizeof(struct ip6_hdr) +
 						sizeof(struct icmp6_nodeinfo));
@@ -1406,7 +1406,7 @@ ni6_input(m, off)
 	{
 		int lenlim, copied;
 
-		nni6->ni_code = ICMP6_NI_SUCESS;
+		nni6->ni_code = ICMP6_NI_SUCCESS;
 		if (n->m_flags & M_EXT)
 			lenlim = MCLBYTES - sizeof(struct ip6_hdr) -
 				sizeof(struct icmp6_nodeinfo);
