@@ -371,9 +371,11 @@ in_control(so, cmd, data, ifp, p)
 		/* FALLTHROUGH */
 	case SIOCSIFADDR:
 	case SIOCSIFDSTADDR:
+#if 0
 		if (ifra->ifra_addr.sin_family != AF_INET)
 			return (EAFNOSUPPORT);
 		/* FALLTHROUGH */
+#endif
 	case SIOCSIFNETMASK:
 		if (ifp == 0)
 			panic("in_control");
