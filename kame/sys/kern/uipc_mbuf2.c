@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.27 2001/02/14 12:26:39 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.28 2001/02/14 13:41:20 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -87,8 +87,8 @@
 	 ((m)->m_ext.ext_free || mclrefcnt[mtocl((m)->m_ext.ext_buf)] > 1))
 #endif
 
-#if !(defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
-static struct mbuf *m_dup __P((struct mbuf *, int, int, int));
+#ifndef __NetBSD__
+static struct mbuf *m_dup1 __P((struct mbuf *, int, int, int));
 #endif
 
 /*
@@ -233,7 +233,11 @@ m_pulldown(m, off, len, offp)
 	 * chop the current mbuf into two pieces, set off to 0.
 	 */
 	if (len <= n->m_len - off) {
+#ifdef __NetBSD__
 		o = m_dup(n, off, n->m_len - off, M_DONTWAIT);
+#else
+		o = m_dup1(n, off, n->m_len - off, M_DONTWAIT);
+#endif
 		if (o == NULL) {
 			m_freem(m);
 			return NULL;	/* ENOBUFS */
@@ -335,9 +339,9 @@ ok:
 	return n;
 }
 
-#if !(defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
+#ifndef __NetBSD__
 static struct mbuf *
-m_dup(m, off, len, wait)
+m_dup1(m, off, len, wait)
 	struct mbuf *m;
 	int off;
 	int len;
