@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.h,v 1.6 2001/07/11 09:35:39 suz Exp $	*/
+/*	$KAME: mld6_proto.h,v 1.7 2001/09/18 04:28:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -66,7 +66,7 @@ typedef struct
 #define MLD6_DEFAULT_ROBUSTNESS_VARIABLE        2
 #define MLD6_DEFAULT_QUERY_INTERVAL 125 /* in seconds */
 #define MLD6_DEFAULT_QUERY_RESPONSE_INTERVAL 10000 /* in milliseconds */
-#define MLD6_DEFAULT_LAST_LISTENER_QUERY_INTERVAL 10000 /* in milliseconds */
+#define MLD6_DEFAULT_LAST_LISTENER_QUERY_INTERVAL 1000 /* in milliseconds */
 
 #define MLD6_ROBUSTNESS_VARIABLE	v->uv_mld_robustness
 #define MLD6_QUERY_INTERVAL		v->uv_mld_query_interval
