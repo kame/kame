@@ -47,7 +47,6 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	"IPSEC_IPV6FWD"         #IP security tunnel for IPv6
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
-options 	MAPPED_ADDR_ENABLED	#enable IPv4, on IPv6 socket
 
 # special kernel for TAHI test team - not for general users
 ###options		TAHI
