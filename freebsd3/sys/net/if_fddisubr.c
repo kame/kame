@@ -219,8 +219,7 @@ fddi_output(ifp, m0, dst, rt0)
 			return (0);	/* if not yet resolved */
 #else
 		if (!nd6_storelladdr(&ac->ac_if, rt, m, dst, (u_char *)edst)) {
-			/* this must be impossible, so we bark */
-			printf("nd6_storelladdr failed\n");
+			/* something bad happened */
 			return(0);
 		}
 #endif /* OLDIP6OUTPUT */
