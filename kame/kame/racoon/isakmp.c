@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.130 2001/03/05 12:19:48 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.131 2001/03/15 09:39:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1172,6 +1172,7 @@ isakmp_open()
 {
 	const int yes = 1;
 	int ifnum;
+	int pktinfo;
 	struct myaddrs *p;
 
 	ifnum = 0;
@@ -1222,19 +1223,19 @@ isakmp_open()
 		case AF_INET6:
 #ifdef ADVAPI
 #ifdef IPV6_RECVPKTINFO
-			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-					(void *)&yes, sizeof(yes)) < 0)
+			pktinfo = IPV6_RECVPKTINFO;
 #else  /* old adv. API */
-			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_PKTINFO,
-					(void *)&yes, sizeof(yes)) < 0)
+			pktinfo = IPV6_PKTINFO;
 #endif /* IPV6_RECVPKTINFO */
 #else
-			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_RECVDSTADDR,
-					(void *)&yes, sizeof(yes)) < 0)
+			pktinfo = IPV6_RECVDSTADDR;
 #endif
+			if (setsockopt(p->sock, IPPROTO_IPV6, pktinfo,
+					(void *)&yes, sizeof(yes)) < 0)
 			{
 				plog(LLV_ERROR, LOCATION, NULL,
-					"setsockopt (%s)\n", strerror(errno));
+					"setsockopt(%d): %s\n",
+					pktinfo, strerror(errno));
 				goto err_and_next;
 			}
 			break;
