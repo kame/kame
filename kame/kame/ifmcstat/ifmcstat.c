@@ -308,30 +308,27 @@ if6_addrlist(ifap)
 		in6_multilist(mc);
 #endif
 #ifdef N_IN6_MK
-    {
-	LIST_HEAD(in6_mktype, multi6_kludge) in6_mk;
-	struct multi6_kludge *mkp, mk;
-	char *nam;
+	if (nl[N_IN6_MK].n_value != 0) {
+		LIST_HEAD(in6_mktype, multi6_kludge) in6_mk;
+		struct multi6_kludge *mkp, mk;
+		char *nam;
 
-	if (nl[N_IN6_MK].n_value == 0) {
-		printf("symbol %s not found\n", nl[N_IN6_MK].n_name);
-		exit(1);
-	}
-	KREAD(nl[N_IN6_MK].n_value, &in6_mk, struct in6_mktype);
-	KREAD(ifap0, &ifa, struct ifaddr);
+		KREAD(nl[N_IN6_MK].n_value, &in6_mk, struct in6_mktype);
+		KREAD(ifap0, &ifa, struct ifaddr);
 
-	nam = strdup(ifname(ifa.ifa_ifp));
+		nam = strdup(ifname(ifa.ifa_ifp));
 
-	for (mkp = in6_mk.lh_first; mkp; mkp = mk.mk_entry.le_next) {
-		KREAD(mkp, &mk, struct multi6_kludge);
-		if (strcmp(nam, ifname(mk.mk_ifp)) == 0 && mk.mk_head.lh_first) {
-			printf("\t(on kludge entry for %s)\n", nam);
-			in6_multilist(mk.mk_head.lh_first);
+		for (mkp = in6_mk.lh_first; mkp; mkp = mk.mk_entry.le_next) {
+			KREAD(mkp, &mk, struct multi6_kludge);
+			if (strcmp(nam, ifname(mk.mk_ifp)) == 0 &&
+			    mk.mk_head.lh_first) {
+				printf("\t(on kludge entry for %s)\n", nam);
+				in6_multilist(mk.mk_head.lh_first);
+			}
 		}
-	}
 
-	free(nam);
-    }
+		free(nam);
+	}
 #endif
 }
 
