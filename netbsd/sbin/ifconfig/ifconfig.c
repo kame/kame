@@ -996,16 +996,14 @@ settunnel(src, dst)
 		sin6 = &in6_addreq.ifra_addr;
 		if (sin6->sin6_scope_id && 
 		    (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
-		     IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr) ||
-		     IN6_IS_ADDR_MC_INTFACELOCAL(&sin6->sin6_addr))) {
+		     IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr))) {
 			*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
 			    htons(sin6->sin6_scope_id);
 		}
 		sin6 = &in6_addreq.ifra_dstaddr;
 		if (sin6->sin6_scope_id && 
 		    (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
-		     IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr) ||
-		     IN6_IS_ADDR_MC_INTFACELOCAL(&sin6->sin6_addr))) {
+		     IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr))) {
 			*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
 			    htons(sin6->sin6_scope_id);
 		}

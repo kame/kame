@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.17 2001/08/01 00:57:13 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.18 2001/08/01 09:53:50 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -854,12 +854,7 @@ in6_getaddr(s, which)
 	/* embed scopeid */
 	if (sin->sin6_scope_id && 
 	    (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr) ||
-	     IN6_IS_ADDR_MC_LINKLOCAL(&sin->sin6_addr)
-#if 0
-	     ||
-	     IN6_IS_ADDR_MC_INTFACELOCAL(&sin->sin6_addr)
-#endif
-	     )) {
+	     IN6_IS_ADDR_MC_LINKLOCAL(&sin->sin6_addr))) {
 		*(u_int16_t *)&sin->sin6_addr.s6_addr[2] =
 		    htons(sin->sin6_scope_id);
 	}
