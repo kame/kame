@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.413 2004/01/20 00:07:56 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.414 2004/01/20 00:14:43 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4048,6 +4048,7 @@ ip6_setmoptions(optname, im6op, m)
 			if (init) {
 				IMO_MSF_FREE(msf);
 				LIST_REMOVE(imm, i6mm_chain);
+				FREE(imm, M_IPMADDR);
 			} else {
 				in6_undomopt_source_addr(msf, optname);
 			}
@@ -4283,7 +4284,7 @@ ip6_setmoptions(optname, im6op, m)
 		 */
 		if (final) {
 			LIST_REMOVE(imm, i6mm_chain);
-			free(imm, M_IPMADDR);
+			FREE(imm, M_IPMADDR);
 		}
 		break;
 #endif /* MLDV2 */
