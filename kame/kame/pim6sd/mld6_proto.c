@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.13 2000/12/04 06:45:30 itojun Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.14 2001/04/17 17:34:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -260,8 +260,7 @@ accept_listener_query(src, dst, group, tmo)
 	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 	for (g = v->uv_groups; g != NULL; g = g->al_next)
 	{
-	    if (inet6_equal(&group_sa, &g->al_addr)
-		&& g->al_query == 0)
+	    if (inet6_equal(&group_sa, &g->al_addr) && g->al_query == 0)
 	    {
 		/* setup a timeout to remove the group membership */
 		if (g->al_timerid)
