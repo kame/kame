@@ -281,7 +281,7 @@ void
 if_detach(ifp)
 	struct ifnet *ifp;
 {
-	struct ifaddr *ifa;
+	struct ifaddr *ifa, *next;
 	struct radix_node_head	*rnh;
 	int s;
 	int i;
@@ -307,8 +307,11 @@ if_detach(ifp)
 	while (if_index > 0 && ifnet_addrs[if_index - 1] == 0)
 		if_index--;
 
-	for (ifa = TAILQ_FIRST(&ifp->if_addrhead); ifa;
-	     ifa = TAILQ_FIRST(&ifp->if_addrhead)) {
+	for (ifa = TAILQ_FIRST(&ifp->if_addrhead); ifa; ifa = next) {
+		next = TAILQ_NEXT(ifa, ifa_link);
+
+		if (ifa->ifa_addr->sa_family == AF_LINK)
+			continue;
 #ifdef INET
 		/* XXX: Ugly!! ad hoc just for INET */
 		if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
