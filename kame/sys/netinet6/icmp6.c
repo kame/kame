@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.266 2001/11/30 06:52:59 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.267 2001/11/30 09:02:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2491,7 +2491,8 @@ icmp6_reflect(m, off)
 	 * Note that only echo and node information replies are affected,
 	 * since the length of ICMP6 errors is limited to the minimum MTU.
 	 */
-	ip6_output(m, NULL, NULL, IPV6_MINMTU, NULL, &outif);
+	if (ip6_output(m, NULL, NULL, IPV6_MINMTU, NULL, &outif) != 0 && outif)
+		icmp6_ifstat_inc(outif, ifs6_out_error);
 
 	if (outif)
 		icmp6_ifoutstat_inc(outif, type, code);
@@ -3046,7 +3047,8 @@ noredhdropt:;
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
 #endif /* IPSEC */
-	ip6_output(m, NULL, NULL, 0, NULL, NULL);
+	if (ip6_output(m, NULL, NULL, 0, NULL, NULL) != 0)
+		icmp6_ifstat_inc(ifp, ifs6_out_error);
 
 	icmp6_ifstat_inc(ifp, ifs6_out_msg);
 	icmp6_ifstat_inc(ifp, ifs6_out_redirect);
