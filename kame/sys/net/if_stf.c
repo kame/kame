@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.101 2003/01/10 08:27:14 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.102 2003/01/10 09:32:53 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1351,7 +1351,7 @@ stf_ioctl(ifp, cmd, data)
 			TAILQ_REMOVE(&isatap_rtrlist, rtr, isr_entry);
 			free(rtr, M_IFADDR);
 			splx(s);
-			break;
+			return error;
 		}
 		error = EADDRNOTAVAIL;
 		break;
