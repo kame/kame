@@ -272,7 +272,7 @@ udp_input(m, off, proto)
 
 #ifdef IPSEC
 				/* check AH/ESP integrity. */
-				if (last != NULL && ipsec4_in_reject(m, last)) {
+				if (ipsec4_in_reject(m, last)) {
 					ipsecstat.in_polvio++;
 					/* do not inject data to pcb */
 				} else

@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.38 2000/02/22 14:04:37 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.39 2000/02/23 08:54:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -306,7 +306,7 @@ udp6_input(mp, offp, proto)
 				/*
 				 * Check AH/ESP integrity.
 				 */
-				if (last != NULL && ipsec6_in_reject(m, last)) {
+				if (ipsec6_in_reject(m, last)) {
 					ipsec6stat.in_polvio++;
 					/* do not inject data into pcb */
 				} else
