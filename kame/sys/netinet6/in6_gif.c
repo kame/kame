@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.75 2001/10/19 09:47:47 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.76 2001/10/23 12:25:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -350,6 +350,8 @@ in6_gif_output(ifp, family, m)
 
 		/* if it constitutes infinite encapsulation, punt. */
 		if (sc->gif_ro6.ro_rt->rt_ifp == ifp) {
+			RTFREE(sc->gif_ro6.ro_rt);
+			sc->gif_ro6.ro_rt = NULL;
 			m_freem(m);
 			return ENETUNREACH;	/* XXX */
 		}
