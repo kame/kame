@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.68 2002/06/15 02:50:49 itojun Exp $	*/
+/*	$KAME: config.c,v 1.69 2002/06/29 06:16:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -321,7 +321,6 @@ getconfig(intface)
 
 			pfx->origin = PREFIX_FROM_CONFIG;
 
-
 			makeentry(entbuf, sizeof(entbuf), i, "addr", added);
 			addr = (char *)agetstr(entbuf, &bp);
 			if (addr == NULL) {
@@ -412,6 +411,20 @@ getconfig(intface)
 				gettimeofday(&now, 0);
 				pfx->pltimeexpire =
 					now.tv_sec + pfx->preflifetime;
+			}
+		}
+		for (i = pfxs; i < 20; i++) {
+			char entbuf[256];
+			int added = (pfxs > 1) ? 1 : 0;
+
+			/* XXX hardcoded "20" */
+			makeentry(entbuf, sizeof(entbuf), i, "addr", added);
+			addr = (char *)agetstr(entbuf, &bp);
+			if (addr != NULL) {
+				syslog(LOG_ERR,
+				       "<%s> \"%s\" out of range - change "
+				       "\"addrs\"", __func__, entbuf);
+				exit(1);
 			}
 		}
 	}
