@@ -170,3 +170,8 @@ struct rt_entry *rte_remove   __P((struct rt_entry *, struct rt_entry *));
  */
 int bgp_input_filter __P((struct rpcb *, struct rt_entry *));
 int bgp_output_filter __P((struct rpcb *, struct rt_entry *));
+
+/*
+ * statistics
+ */
+void bgp_update_stat __P((struct rpcb *, int));

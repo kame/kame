@@ -46,6 +46,8 @@ extern task *taskhead;
 
 char *dumpfile;
 
+static time_t tloc_now;
+
 static char *aspath2str(struct aspath *);
 static char *cll2str(struct clstrlist *);
 
@@ -66,6 +68,37 @@ struct bgproute_list {
 #define bgp_route_next(l) ((l)->next)
 #define bgp_route_prev(l) ((l)->prev)
 #define bgp_route_insert(new,post) insque((new), (post)->prev)
+
+static char *
+sec2str(total)
+	time_t total;
+{
+	static char result[256];
+	int days, hours, mins, secs;
+	int first = 1;
+	char *p = result;
+
+	days = total / 3600 / 24;
+	hours = (total / 3600) % 24;
+	mins = (total / 60) % 60;
+	secs = total % 60;
+
+	if (days) {
+		first = 0;
+		p += sprintf(p, "%dd", days);
+	}
+	if (!first || hours) {
+		first = 0;
+		p += sprintf(p, "%dh", hours);
+	}
+	if (!first || mins) {
+		first = 0;
+		p += sprintf(p, "%dm", mins);
+	}
+	sprintf(p, "%ds", secs);
+
+	return(result);
+}
 
 static void
 dump_if_rtable(FILE *fp, struct rt_entry *base)
@@ -423,6 +456,7 @@ print_rip_dump(FILE *fp)
 {
 	struct ripif *ripif = ripifs;
 	task *t = taskhead;
+	extern time_t last_rip_dump;
 
 	fprintf(fp, "\n=== RIPng generic information ===\n");
 	while (t) {
@@ -435,6 +469,8 @@ print_rip_dump(FILE *fp)
 		if ((t = t->tsk_next) == taskhead)
 			break;
 	}
+	fprintf(fp, "  Last dump: %s", ctime(&last_rip_dump));
+	fprintf(fp, "    (%s before\n)", sec2str(tloc_now - last_rip_dump));
 
 	fprintf(fp, "\n=== RIPng per interface information ===\n");
 	while(ripif) {
@@ -683,6 +719,7 @@ print_bgp_routes(fp)
 	free_bgp_route_list(brl);
 }
 
+
 static void
 show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 {
@@ -742,11 +779,9 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 			(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec/60),
 			(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec%60));
 	fputc('\n', fp);
-	fprintf(fp, "%sStatistics:\n", indent);
-	fprintf(fp, "%s Connection retries: %d\n",
-		indent, bnp->rp_stat.rps_connretry);
+
 	/*
-	 * Dump filter information if
+	 * Dump filter information and statistics if
 	 * - there is an actively opened peer (it must be, though), and
 	 *   + bnp is active, or
 	 *   + it is an actively opend peer and there is no other active peer.
@@ -755,6 +790,52 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 	    (bnp->rp_state != BGPSTATE_IDLE ||
 	     ((bnp->rp_mode & BGPO_PASSIVE) == 0 &&
 	      find_active_peer(bnp) == NULL))) {
+		fprintf(fp, "%sStatistics:\n", indent);
+		fprintf(fp, "%s Connection retries: %qu\n",
+			indent, abnp->rp_stat.rps_connretry);
+		fprintf(fp, "%s Peering establishments: %qu\n",
+			indent, abnp->rp_stat.established);
+		fprintf(fp, "%s OPENs: in/out: %qu/%qu\n",
+			indent, abnp->rp_stat.openrcvd,
+			abnp->rp_stat.opensent);
+		fprintf(fp, "%s UPDATEs: in/out: %qu/%qu\n",
+			indent, abnp->rp_stat.updatercvd,
+			abnp->rp_stat.updatesent);
+		fprintf(fp, "%s NOTIFYs: in/out: %qu/%qu\n",
+			indent, abnp->rp_stat.notifyrcvd,
+			abnp->rp_stat.notifysent);
+		fprintf(fp, "%s KEEPALIVEs: in/out: %qu/%qu\n",
+			indent, abnp->rp_stat.keepalivercvd,
+			abnp->rp_stat.keepalivesent);
+		fprintf(fp, "%s WITHDRAWs: in/out: %qu/%qu\n",
+			indent, abnp->rp_stat.withdrawrcvd,
+			abnp->rp_stat.withdrawsent);
+		if (abnp->rp_stat.last_established) {
+			/* ctime appends \n */
+			fprintf(fp, "%s Last esbalished: %s", indent,
+				ctime(&abnp->rp_stat.last_established));
+			if (bnp->rp_state == BGPSTATE_ESTABLISHED)
+				fprintf(fp,
+					"%s   has been established for %s\n",
+					indent,
+					sec2str(tloc_now -
+						abnp->rp_stat.last_established));
+			fprintf(fp, "%s Max esbalished period: %s\n", indent,
+				sec2str(abnp->rp_stat.max_establihed_period));
+			fprintf(fp, "%s Min esbalished period: %s\n", indent,
+				sec2str(abnp->rp_stat.min_establihed_period));
+		}
+		if (abnp->rp_stat.last_closed) {
+			/* ctime appends \n */
+			fprintf(fp, "%s Last closed: %s", indent,
+				ctime(&abnp->rp_stat.last_established));
+			if (bnp->rp_state != BGPSTATE_ESTABLISHED)
+				fprintf(fp,
+					"%s   hasn't been established for %s\n",
+					indent,
+					sec2str(tloc_now -
+						abnp->rp_stat.last_closed));
+		}
 		fprintf(fp, "%sFilters:\n", indent);
 		dump_filterinfo(fp, indent, &abnp->rp_filterset);
 	}
@@ -837,7 +918,6 @@ print_bgp_dump(FILE *fp)
 void
 bgpd_dump_file()
 {
-	time_t tloc;
 	FILE *fp;
 
 	if ((fp = fopen(dumpfile, "w")) == NULL) {
@@ -846,8 +926,8 @@ bgpd_dump_file()
 		return;
 	}
 
-	(void)time(&tloc);
-	fprintf(fp, "\n************ bgpd dump on %s", ctime(&tloc));
+	(void)time(&tloc_now);
+	fprintf(fp, "\n************ bgpd dump on %s", ctime(&tloc_now));
 	print_if_dump(fp);
 	print_rip_dump(fp);
 	print_bgp_dump(fp);

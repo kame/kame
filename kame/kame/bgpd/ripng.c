@@ -317,9 +317,11 @@ rip_query_dump()
       spktinfo.ipi6_addr    = ripif->rip_ife->ifi_laddr;  /* copy */
       spktinfo.ipi6_ifindex = ripif->rip_ife->ifi_ifn->if_index;
 
-      rip_sendmsg(&ripsin,      /* ff02::9.RIPNG_PORT  */
-		  &spktinfo,    /* source address, I/F */
-		  sizeof(struct riphdr) + sizeof(struct ripinfo6));
+      if (rip_sendmsg(&ripsin,      /* ff02::9.RIPNG_PORT  */
+		      &spktinfo,    /* source address, I/F */
+		      sizeof(struct riphdr) + sizeof(struct ripinfo6)))
+	ripif->rip_reqsentfail++;
+      ripif->rip_requestsent++;
     }
     if ((ripif = ripif->rip_next) == ripifs)
       break;
@@ -471,6 +473,7 @@ rip_input()
   switch (rp->riph_cmd) {         /* received cmd */
 
   case RIPNGCMD_REQUEST:
+    ripif->rip_requestrcvd++;
 #ifdef DEBUG_RIP
     syslog(LOG_DEBUG, "RIPng RECV cmd=%s, length=%d, nn=%d",
 	   rip_msgstr[rp->riph_cmd], len, nn);
@@ -513,9 +516,11 @@ rip_input()
 	       &ripbuf[sizeof(struct riphdr) + done*sizeof(struct ripinfo6)],
 	       mm * sizeof(struct ripinfo6));
 
-	rip_sendmsg(&fsock,     /* sender's addr.port  */
-		    &spktinfo,  /* source address, I/F */
-		    sizeof(struct riphdr) + mm * sizeof(struct ripinfo6));
+	if (rip_sendmsg(&fsock,     /* sender's addr.port  */
+			&spktinfo,  /* source address, I/F */
+			sizeof(struct riphdr) + mm * sizeof(struct ripinfo6)))
+	  ripif->rip_respfail++;
+	ripif->rip_responsesent++;
 	done += mm;
 	if (done == nn) break;
       }
@@ -524,6 +529,7 @@ rip_input()
 
   case RIPNGCMD_RESPONSE:
 
+    ripif->rip_responsercvd++;
     if (ntohs(fsock.sin6_port) != RIPNG_PORT) {
 #ifdef DEBUG_RIP
       syslog(LOG_DEBUG,
@@ -1289,7 +1295,7 @@ rip_process_response(ripif, nn)
  *  rip_sendmsg()
  *     Actually sendmsg.
  */
-void
+int
 rip_sendmsg(sin, pktinfo, len)
      struct sockaddr_in6 *sin;      /* dst addr.port           */
      struct in6_pktinfo  *pktinfo;  /* src addr, outgoing I/F  */
@@ -1367,7 +1373,7 @@ rip_sendmsg(sin, pktinfo, len)
 	   "<rip_sendmsg>: sendmsg on %s (src=%s): %s",
 	   if_indextoname(pktinfo->ipi6_ifindex, ifname),
 	   ip6str(&pktinfo->ipi6_addr, 0), strerror(errno));
-    return;
+    return(-1);
   }
 
 #ifdef DEBUG_RIP
@@ -1383,6 +1389,7 @@ rip_sendmsg(sin, pktinfo, len)
 	 if_indextoname(pktinfo->ipi6_ifindex, ifname));
 #endif
 
+  return(0);
   /* End of rip_sendmsg */
 }
 
@@ -1765,9 +1772,12 @@ rip_dump() {
 		 &ripbuf[sizeof(struct riphdr) + done*sizeof(struct ripinfo6)],
 		 mm * sizeof(struct ripinfo6));
 
-	  rip_sendmsg(&ripsin,      /* ff02::9.RIPNG_PORT  */
-		      &spktinfo,    /* source address, I/F */
-		      sizeof(struct riphdr) + mm * sizeof(struct ripinfo6));
+	  if (rip_sendmsg(&ripsin,      /* ff02::9.RIPNG_PORT  */
+			  &spktinfo,    /* source address, I/F */
+			  sizeof(struct riphdr) +
+			  mm * sizeof(struct ripinfo6)))
+	    ripif->rip_respfail++;
+	  ripif->rip_responsesent++;
 
 	  done += mm;
 	  if (done == nn) break;

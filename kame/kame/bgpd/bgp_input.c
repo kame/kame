@@ -160,6 +160,7 @@ bgp_read_data(bnp)
 				    2, (byte *)&bh->bh_length);
 			 return;
 		 }
+		 bgp_update_stat(bnp, BGPS_OPENRCVD);
 		 bgp_process_open(bnp);
 		 break;
 
@@ -174,10 +175,12 @@ bgp_read_data(bnp)
 				    2, (byte *)&bh->bh_length);
 			 return;
 		 }
+		 bgp_update_stat(bnp, BGPS_UPDATERCVD);
 		 bgp_process_update(bnp);
 		 break;
 
 	 case BGP_NOTIFY:
+		 bgp_update_stat(bnp, BGPS_NOTIFYRCVD);
 		 bgp_process_notification(bnp);
 		 break;
 
@@ -192,6 +195,7 @@ bgp_read_data(bnp)
 				    2, (byte *)&bh->bh_length);
 			 return;
 		 }
+		 bgp_update_stat(bnp, BGPS_UPDATERCVD);
 		 bgp_process_keepalive(bnp);
 		 break;
 

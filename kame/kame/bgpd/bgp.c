@@ -94,7 +94,13 @@ bgp_connect_start(struct rpcb *bnp)
 #ifdef DEBUG
   tsk->tsk_timefull.tv_sec  = BGPCONN_SHORT;
 #else
+  /*
+   * The suggested value for the ConnectRetry timer is 120 seconds.
+   * RFC 1771 Section 6.4
+   */
   tsk->tsk_timefull.tv_sec  = bnp->rp_stat.rps_connretry * BGPCONN_SHORT;
+  if (tsk->tsk_timefull.tv_sec > 120)
+    tsk->tsk_timefull.tv_sec = 120;
 #endif
   tsk->tsk_timefull.tv_usec = 0;
   bnp->rp_connect_timer     = tsk;
@@ -1451,7 +1457,12 @@ bgp_process_update(struct rpcb *bnp)
       while (i < k + atrlen) {             /* Malform is detected ASAP */
 	struct rt_entry *rte;
 	int              poctets;   /* (minimum len in octet bound) */
+	int first = 1;		/* XXX: just for statistics */
 
+	if (first) {
+	  bgp_update_stat(bnp, BGPS_WITHDRAWRCVD);
+	  first = 0;
+	}
 	MALLOC(rte, struct rt_entry);
 
 	/* Length in bits (1 octet) */
@@ -2113,6 +2124,7 @@ bgp_process_keepalive (struct rpcb *bnp) {
 		   sizeof(bgpsbsize)) < 0) {
 	    fatal("bgp_process_keepalive>: setsockopt");
     }
+    bgp_update_stat(bnp, BGPS_ESTABLISHED);
     bgp_dump(bnp);
     if (bnp && bnp->rp_hold_timer)
       task_timer_update(bnp->rp_hold_timer);
@@ -2280,6 +2292,8 @@ bgp_flush(struct rpcb *bnp)
 {
   extern task   *taskhead;
   extern fd_set  fdmask;
+
+  bgp_update_stat(bnp, BGPS_CLOSED);/* this must be done before state change */
 
   bnp->rp_state = BGPSTATE_IDLE;       /* (1998/7/15) */
 #ifdef DEBUG_BGPSTATE

@@ -31,3 +31,6 @@
 /* Define byte if ISODE has not already */
 typedef u_char byte;
 #endif  /* _PSAP_ */
+
+extern void insque __P((void *, void *)); /* XXX */
+extern void remque __P((void *)); /* XXX */

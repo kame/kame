@@ -35,7 +35,7 @@ void          rip_dump             __P(());
 void          rip_life_expired     __P(());
 void          rip_garbage_expired  __P(());
 
-void          rip_sendmsg          __P((struct sockaddr_in6 *,
+int           rip_sendmsg          __P((struct sockaddr_in6 *,
 					struct in6_pktinfo *,
 					int));
 void          rip_query_dump       __P(());

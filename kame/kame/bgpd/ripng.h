@@ -58,20 +58,14 @@ struct ripif {
 #define rip_filtered_outdef rip_filterset.filtered_outdef
 #define rip_input_restrected rip_filterset.input_restrected
 #define rip_output_restrected rip_filterset.output_restrected
-#if 0
-  struct filtinfo   *rip_filterin;  /* incoming filter list */
-  struct filtinfo   *rip_filterout; /* outgoing filter list */
-  struct filtinfo   *rip_restrictin; /* incoming restriction list */
-  struct filtinfo   *rip_restrictout; /* outgoing restriction list */
 
-  u_int32_t	rip_filtered_indef; /* # of filtered incoming defaults */
-  u_int32_t	rip_filtered_outdef; /* # of filtered outgoing defaults */
-
-  /* # of filtered incoming routes by restriction: */
-  u_int32_t	rip_input_restrected;
-  /* # of filtered outgoing routes by restriction: */
-  u_int32_t	rip_output_restrected;
-#endif
+  /* statistics */
+  u_quad_t rip_requestsent;	/* number of RIP request packets sent */
+  u_quad_t rip_reqsentfail;	/* number of failues of sending request */
+  u_quad_t rip_requestrcvd;	/* number of RIP request packets received */
+  u_quad_t rip_responsesent;	/* number of RIP reponse packets sent */
+  u_quad_t rip_respfail;	/* number of failues of sending response */
+  u_quad_t rip_responsercvd;	/* number of RIP reponse packets received */
 };
 
 #define RIPNG_VERSION            1

@@ -1275,7 +1275,7 @@ bgp_input_filter(bnp, rte)
 
 	/* Check filters. Site-locals are always filtered. */
 	if (input_filter_check(&abnp->rp_filterset, 0,
-				&rte->rt_ripinfo.rip6_dest)) {
+				&rte->rt_ripinfo)) {
 		syslog(LOG_DEBUG,
 		       "<%s>: input route %s/%d to %s was filtered",
 		       __FUNCTION__, &rte->rt_ripinfo.rip6_dest,
@@ -1302,7 +1302,7 @@ bgp_output_filter(bnp, rte)
 
 	/* Check filters. Site-locals are always filtered. */
 	if (output_filter_check(&abnp->rp_filterset, 0,
-				&rte->rt_ripinfo.rip6_dest)) {
+				&rte->rt_ripinfo)) {
 		syslog(LOG_DEBUG,
 		       "<%s>: output route %s/%d to %s was filtered",
 		       __FUNCTION__, &rte->rt_ripinfo.rip6_dest,
@@ -1373,4 +1373,68 @@ bgp_sockinit()
     }
 
     FD_SET(bgpsock, &fdmask);           /* (global) */
+}
+
+void
+bgp_update_stat(bnp, type)
+     struct rpcb *bnp;
+     int type;
+{
+	struct rpcb *abnp = find_aopen_peer(bnp);
+	time_t tloc, period;
+
+	if (abnp == NULL)
+		return;
+
+	switch(type) {
+	case BGPS_ESTABLISHED:
+		abnp->rp_stat.established++;
+		(void)time(&tloc);
+		abnp->rp_stat.last_established = tloc;
+		break;
+	case BGPS_OPENSENT:
+		abnp->rp_stat.opensent++;
+		break;
+	case BGPS_OPENRCVD:
+		abnp->rp_stat.openrcvd++;
+		break;
+	case BGPS_UPDATESENT:
+		abnp->rp_stat.updatesent++;
+		break;
+	case BGPS_UPDATERCVD:
+		abnp->rp_stat.updatercvd++;
+		break;
+	case BGPS_NOTIFYSENT:
+		abnp->rp_stat.notifysent++;
+		break;
+	case BGPS_NOTIFYRCVD:
+		abnp->rp_stat.notifyrcvd++;
+		break;
+	case BGPS_KEEPALIVESENT:
+		abnp->rp_stat.keepalivesent++;
+		break;
+	case BGPS_KEEPALIVERCVD:
+		abnp->rp_stat.keepalivercvd++;
+		break;
+	case BGPS_WITHDRAWSENT:
+		abnp->rp_stat.withdrawsent++;
+		break;
+	case BGPS_WITHDRAWRCVD:
+		abnp->rp_stat.withdrawrcvd++;
+		break;
+	case BGPS_CLOSED:
+		(void)time(&tloc);
+		abnp->rp_stat.last_closed = tloc;
+		if (bnp->rp_state != BGPSTATE_ESTABLISHED)
+			break;
+		period = tloc - abnp->rp_stat.last_established;
+		if (period > abnp->rp_stat.max_establihed_period) {
+			/* this covers the first time */
+			abnp->rp_stat.max_establihed_period = period;
+		}
+		if (abnp->rp_stat.min_establihed_period == 0 ||
+		    period < abnp->rp_stat.min_establihed_period)
+			abnp->rp_stat.min_establihed_period = period;
+		break;
+	}
 }

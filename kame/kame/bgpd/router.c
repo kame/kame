@@ -213,9 +213,12 @@ propagate(rte)
 		 &ripbuf[sizeof(struct riphdr) + done*sizeof(struct ripinfo6)],
 		 mm * sizeof(struct ripinfo6));
 
-	  rip_sendmsg(&ripsin,
-		      &spktinfo,
-		      sizeof(struct riphdr) + mm * sizeof(struct ripinfo6));
+	  if (rip_sendmsg(&ripsin,
+			  &spktinfo,
+			  sizeof(struct riphdr) +
+			  mm * sizeof(struct ripinfo6)))
+	    ripif->rip_respfail++;
+	  ripif->rip_responsesent++;
 
 	  done += mm;
 	  if (done == nn) break;
@@ -298,9 +301,12 @@ redistribute(rte)
 		 &ripbuf[sizeof(struct riphdr) + done*sizeof(struct ripinfo6)],
 		 mm * sizeof(struct ripinfo6));
 
-	  rip_sendmsg(&ripsin,
-		      &spktinfo,
-		      sizeof(struct riphdr) + mm * sizeof(struct ripinfo6));
+	  if (rip_sendmsg(&ripsin,
+			  &spktinfo,
+			  sizeof(struct riphdr) +
+			  mm * sizeof(struct ripinfo6)))
+	    ripif->rip_respfail++;
+	  ripif->rip_responsesent++;
 
 	  done += mm;
 	  if (done == nn) break;

@@ -108,4 +108,5 @@ int              aggr_advable   __P((struct rt_entry *, struct rtproto *));
 int		 find_filter  __P((struct filtinfo *, struct filtinfo *));
 struct filtinfo *filter_check __P((struct filtinfo *, struct in6_addr *, int));
 struct filtinfo *restrict_check __P((struct filtinfo *, struct in6_addr *, int));
+int input_filter_check __P((struct filterset *, int, struct ripinfo6 *));
 int output_filter_check __P((struct filterset *, int, struct ripinfo6 *));

@@ -58,6 +58,8 @@ byte             bgpyes, ripyes, ospfyes;
 
 unsigned long debug;
 
+time_t last_rip_dump;
+
 #define  PIDFILENAME  "/var/run/bgpd.pid"
 #define CONFFILENAME  "/usr/local/v6/etc/bgpd.conf"
 
@@ -450,6 +452,7 @@ alarm_handler()
     break;
 
   case RIP_DUMP_TIMER:
+    (void)time(&last_rip_dump);
     rip_dump();
     break;
   case RIP_LIFE_TIMER:

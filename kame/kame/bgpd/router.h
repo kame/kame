@@ -28,8 +28,36 @@
  */
 
 struct rpstat {
-  int rps_connretry;
+  u_quad_t rps_connretry;	/* number of retries of connection setup */
+  u_quad_t established;		/* total number of established connections */
+  u_quad_t opensent;		/* number of OPEN msgs sent */
+  u_quad_t openrcvd;		/* number of OPEN msgs received */
+  u_quad_t updatesent;		/* number of UPDATE msgs sent */
+  u_quad_t updatercvd;		/* number of UPDATE msgs received */
+  u_quad_t notifysent;		/* number of NOTIFY msgs sent */
+  u_quad_t notifyrcvd;		/* number of NOTIFY msgs received */
+  u_quad_t keepalivesent;	/* number of KEEPALIVE msgs sent */
+  u_quad_t keepalivercvd;	/* number of KEEPALIVE msgs received */
+  u_quad_t withdrawsent;	/* number of withdraws sent */
+  u_quad_t withdrawrcvd;	/* number of withdraws received */
+  time_t last_established;	/* stamp of the last establish time */
+  time_t last_closed;		/* stamp of the last closed time */
+  time_t max_establihed_period;	/* the longest period of peering */
+  time_t min_establihed_period;	/* the shortest period of peering */
 };
+
+#define BGPS_ESTABLISHED 1
+#define BGPS_OPENSENT 2
+#define BGPS_OPENRCVD 3
+#define BGPS_UPDATESENT 4
+#define BGPS_UPDATERCVD 5
+#define BGPS_NOTIFYSENT 6
+#define BGPS_NOTIFYRCVD 7
+#define BGPS_KEEPALIVESENT 8
+#define BGPS_KEEPALIVERCVD 9
+#define BGPS_WITHDRAWSENT 10
+#define BGPS_WITHDRAWRCVD 11
+#define BGPS_CLOSED 12
 
 /* XXX: we have to define this structure here since rpcb use it */
 struct filterset {

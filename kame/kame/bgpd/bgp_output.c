@@ -131,6 +131,7 @@ bgp_send_open(struct rpcb *bnp)
     return NULL;
   }
 
+  bgp_update_stat(bnp, BGPS_OPENSENT);
   BGP_LOG_SEND(BGP_OPEN, i);
 
 
@@ -256,6 +257,7 @@ bgp_send_notification(bnp, errcode, subcode, len, data)
     break;
   }
 
+  bgp_update_stat(bnp, BGPS_NOTIFYSENT);
   BGP_LOG_SEND(BGP_NOTIFY, i);
 
   bnp->rp_state = BGPSTATE_IDLE;
@@ -315,6 +317,7 @@ bgp_send_keepalive(struct rpcb *bnp)
     return NULL;
   }
 
+  bgp_update_stat(bnp, BGPS_KEEPALIVESENT);
   BGP_LOG_SEND(BGP_KEEPALIVE, BGP_HEADER_LEN);
 
 
@@ -942,6 +945,7 @@ bgp_send_update(bnp, rte, headrte)
     return NULL;
   }
 
+  bgp_update_stat(bnp, BGPS_UPDATESENT);
   BGP_LOG_SEND(BGP_UPDATE, i);
 
 
@@ -1124,6 +1128,7 @@ bgp_send_withdrawn(bnp, rte, headrte)
     return NULL;
   }
 
+  bgp_update_stat(bnp, BGPS_WITHDRAWSENT);
   BGP_LOG_SEND(BGP_UPDATE, i);
 
   return rt;   /* the last RTE. */
