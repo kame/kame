@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1776 2001/07/17 08:12:32 jinmei Exp $
+$KAME: CHANGELOG,v 1.1777 2001/07/18 08:39:59 jinmei Exp $
 
 <200107>
+2001-07-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_createmkludge): was newly added
+	to allocate space for the kludge at interface initialization time.
+	Formerly, we dynamically allocated the space in in6_savemkludge()
+	with malloc(M_WAITOK).  However, it was wrong since the function
+	could be called under an interrupt context (software timer on
+	address lifetime expiration).
+	Although this function is a global one, it is expected to be
+	called only from in6_ifattach().
+
 Tue Jul 17 10:58:21 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4/sys/kern/kern_exec.c: applied the patch of 'FreeBSD
 	  Security Advisory FreeBSD-SA-01:42.signal'
