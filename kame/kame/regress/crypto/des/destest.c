@@ -1,4 +1,4 @@
-/*	$KAME: destest.c,v 1.1 2000/11/01 09:36:30 itojun Exp $	*/
+/*	$KAME: destest.c,v 1.2 2000/11/05 03:15:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -237,7 +237,7 @@ main(argc, argv)
 	printf("Doing DES ecb\n");
 	for (i = 0; i < NUM_TESTS - 1; i++) {
 		des_set_key(&key_data[i], ks);
-		memcpy(in, plain_data[i],8);
+		memcpy(in, plain_data[i], 8);
 		memset(out, 0, 8);
 		memset(outin, 0, 8);
 		des_ecb_encrypt(&in, &out, ks, DES_ENCRYPT);
