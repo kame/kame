@@ -46,6 +46,7 @@
 FILE *outfp;
 int recvsock;
 int vflag = 0;
+int af = AF_INET;
 
 void recvloop __P((void));
 int get_socket __P((struct addrinfo *, char *, struct addrinfo **));
@@ -59,17 +60,19 @@ main(argc, argv)
 	char *ifname, *servname, *address;
 	struct addrinfo hints;
 	struct addrinfo *ai, *ai_valid;
-	extern int optind;
-#if 0
-	extern char *optarg;
-#endif
 	int c;
 	int error;
 
-	while ((c = getopt(argc, argv, "v")) != -1) {
+	while ((c = getopt(argc, argv, "v46")) != -1) {
 		switch (c) {
 		case 'v':
 			vflag++;
+			break;
+		case '4':
+			af = AF_INET;
+			break;
+		case '6':
+			af = AF_INET6;
 			break;
 		default:
 			usage();
@@ -95,8 +98,9 @@ main(argc, argv)
 		errx(1, "invalid interface %s", ifname);
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = 0;
+	hints.ai_family = af;
 	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE;
 	if ((error = getaddrinfo(address, servname, &hints, &ai)) != 0)
 		errx(1, "getaddrinfo: %s\n", gai_strerror(error));
 
@@ -142,6 +146,7 @@ get_socket(ai0, ifname, valid)
 	struct addrinfo *ai;
 	char *emsg = NULL;
 	char hbuf[1024];
+	int ifindex = if_nametoindex(ifname);
 
 	for (ai = ai0; ai; ai = ai->ai_next) {
 		if (getnameinfo(ai->ai_addr, ai->ai_addrlen, hbuf, sizeof(hbuf),
@@ -175,7 +180,6 @@ get_socket(ai0, ifname, valid)
 		/* join multicast group */
 
 		switch (ai->ai_family) {
-#ifdef INET6
 		case AF_INET6:
 		    {
 			struct ipv6_mreq mreq6;
@@ -202,24 +206,26 @@ get_socket(ai0, ifname, valid)
 			}
 			break;
 		    }
-#endif
-#ifdef notyet
 		case AF_INET:
 		    {
+			struct in_addr a;
 			struct ip_mreq mreq4;
-			memcpy(&mreq4.imr_multiaddr,
-				&((struct sockaddr_in *)ai->ai_addr)->sin_addr,
-				sizeof(mreq4.imr_multiaddr));
-			if (ioctl(so, mreq4.imr_interface, ifname) < 0) {
-				emsg = "ioctl";
+
+			a.s_addr = htonl(ifindex);
+			if (setsockopt(so, IPPROTO_IP, IP_MULTICAST_IF,
+			    &a, sizeof(a)) < 0) {
+				emsg = "setsockopt(IP_MULTICAST_IF)";
 				if (vflag)
 					warn("%s", emsg);
 				close(so);
 				so = -1;
 				continue;
 			}
+			mreq4.imr_multiaddr =
+			    ((struct sockaddr_in *)ai->ai_addr)->sin_addr;
+			mreq4.imr_interface = a;
 			if (setsockopt(so, IPPROTO_IP, IP_ADD_MEMBERSHIP,
-					&mreq4, sizeof(mreq4))) {
+			    &mreq4, sizeof(mreq4))) {
 				emsg = "setsockopt(IP_ADD_MEMBERSHIP)";
 				if (vflag)
 					warn("%s", emsg);
@@ -229,7 +235,6 @@ get_socket(ai0, ifname, valid)
 			}
 			break;
 		    }
-#endif
 		default:
 			errno = 0;
 			emsg = "unsupported address family";
@@ -261,7 +266,7 @@ void
 usage(void)
 {
 	fprintf(stderr,
-		"usage: mcastread [-v] interface multicastaddr port [file]\n");
+		"usage: mcastread [-v46] interface multicastaddr port [file]\n");
 	exit(1);
 	/*NOTREACHED*/
 }
