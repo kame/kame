@@ -228,6 +228,10 @@ ip_init()
 	const u_int16_t defbaddynamicports_tcp[] = DEFBADDYNAMICPORTS_TCP;
 	const u_int16_t defbaddynamicports_udp[] = DEFBADDYNAMICPORTS_UDP;
 
+#ifdef RADIX_ART
+	rt_tables[AF_INET]->rnh_addrsize = sizeof(struct in_addr);
+#endif
+
 	pr = pffindproto(PF_INET, IPPROTO_RAW, SOCK_RAW);
 	if (pr == 0)
 		panic("ip_init");

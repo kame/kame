@@ -293,6 +293,10 @@ ip_init()
 	struct protosw *pr;
 	int i;
 
+#ifdef RADIX_ART
+	rt_tables[AF_INET]->rnh_addrsize = sizeof(struct in_addr);
+#endif
+
 	pool_init(&ipqent_pool, sizeof(struct ipqent), 0, 0, 0, "ipqepl",
 	    0, NULL, NULL, M_IPQ);
 

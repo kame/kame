@@ -85,6 +85,9 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 
 #include <net/if.h>
 #include <net/radix.h>
+#ifdef RADIX_ART
+#include <net/radix_art.h>
+#endif
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -303,7 +306,12 @@ struct protosw in_stf_protosw =
 struct domain inetdomain =
     { AF_INET, "internet", 0, 0, 0, 
       inetsw, &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
-      rn_inithead, 32, sizeof(struct sockaddr_in) };
+#ifdef RADIX_ART
+      rn_art_inithead,
+#else
+      rn_inithead,
+#endif
+      32, sizeof(struct sockaddr_in) };
 
 #ifdef notyet /* XXXX */
 #include "hy.h"

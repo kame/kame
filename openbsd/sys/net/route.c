@@ -137,6 +137,10 @@ void
 route_init()
 {
 	rn_init();	/* initialize all zeroes, all ones, mask table */
+#ifdef RADIX_ART
+	/* must be called after rn_init() */
+	rn_art_init();	/* initialize all zeroes, all ones, mask table */
+#endif
 	rtable_init((void **)rt_tables);
 }
 
