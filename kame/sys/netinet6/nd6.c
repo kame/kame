@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.208 2001/10/19 05:58:56 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.209 2001/10/19 06:18:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1576,6 +1576,10 @@ nd6_ioctl(cmd, data, ifp)
 	case SIOCGPRLST_IN6:
 		/*
 		 * obsolete API, use sysctl under net.inet6.icmp6
+		 *
+		 * XXX the structure in6_prlist was changed in backward-
+		 * incompatible manner.  luckily, SIOCGPRLST_IN6 is obsolete
+		 * and we don't need to merge it.
 		 */
 		/*
 		 * XXX meaning of fields, especialy "raflags", is very
