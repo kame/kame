@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.314 2003/04/28 06:38:03 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.315 2003/05/14 14:43:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1652,7 +1652,7 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 
 		microtime(&tv);
 		*mp = sbcreatecontrol((caddr_t) &tv, sizeof(tv),
-				      SCM_TIMESTAMP, SOL_SOCKET);
+		    SCM_TIMESTAMP, SOL_SOCKET);
 		if (*mp) {
 			/* always set regradless of the previous value */
 			ctl->timestamp = *mp;
@@ -1672,9 +1672,8 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 					: 0;
 
 		*mp = sbcreatecontrol((caddr_t) &pi6,
-				      sizeof(struct in6_pktinfo),
-				      IS2292(IPV6_2292PKTINFO, IPV6_PKTINFO),
-				      IPPROTO_IPV6);
+		    sizeof(struct in6_pktinfo),
+		    IS2292(IPV6_2292PKTINFO, IPV6_PKTINFO), IPPROTO_IPV6);
 		if (*mp) {
 			ctl->pktinfo = *mp;
 			mp = &(*mp)->m_next;
@@ -1685,8 +1684,7 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 		int hlim = ip6->ip6_hlim & 0xff;
 
 		*mp = sbcreatecontrol((caddr_t) &hlim, sizeof(int),
-				      IS2292(IPV6_2292HOPLIMIT, IPV6_HOPLIMIT),
-				      IPPROTO_IPV6);
+		    IS2292(IPV6_2292HOPLIMIT, IPV6_HOPLIMIT), IPPROTO_IPV6);
 		if (*mp) {
 			ctl->hlim = *mp;
 			mp = &(*mp)->m_next;
@@ -1701,8 +1699,8 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 		flowinfo >>= 20;
 
 		v = flowinfo & 0xff;
-		*mp = sbcreatecontrol((caddr_t) &v, sizeof(v),
-				      IPV6_TCLASS, IPPROTO_IPV6);
+		*mp = sbcreatecontrol((caddr_t) &v, sizeof(v), IPV6_TCLASS,
+		    IPPROTO_IPV6);
 		if (*mp) {
 			ctl->hlim = *mp;
 			mp = &(*mp)->m_next;
@@ -1759,9 +1757,8 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 			 * 2292bis.
 			 */
 			*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
-					      IS2292(IPV6_2292HOPOPTS,
-						     IPV6_HOPOPTS),
-					      IPPROTO_IPV6);
+			    IS2292(IPV6_2292HOPOPTS, IPV6_HOPOPTS),
+			    IPPROTO_IPV6);
 			if (*mp) {
 				ctl->hbh = *mp;
 				mp = &(*mp)->m_next;
@@ -1846,9 +1843,8 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 					break;
 
 				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
-						      IS2292(IPV6_2292DSTOPTS,
-							     IPV6_DSTOPTS),
-						      IPPROTO_IPV6);
+				    IS2292(IPV6_2292DSTOPTS, IPV6_DSTOPTS),
+				    IPPROTO_IPV6);
 				if (ctl->dest == NULL)
 					ctl->dest = *mp;
 				if (*mp)
@@ -1861,9 +1857,8 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 					break;
 
 				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
-						      IS2292(IPV6_2292RTHDR,
-							     IPV6_RTHDR),
-						      IPPROTO_IPV6);
+				    IS2292(IPV6_2292RTHDR, IPV6_RTHDR),
+				    IPPROTO_IPV6);
 				if (ctl->rthdr == NULL)
 					ctl->rthdr = *mp;
 				if (*mp)
@@ -1949,7 +1944,7 @@ ip6_notify_pmtu(in6p, dst, mtu)
 #endif
 
 	if ((m_mtu = sbcreatecontrol((caddr_t)&mtuctl, sizeof(mtuctl),
-				     IPV6_PATHMTU, IPPROTO_IPV6)) == NULL)
+	    IPV6_PATHMTU, IPPROTO_IPV6)) == NULL)
 		return;
 
 	if (sbappendaddr(&so->so_rcv, (struct sockaddr *)dst, NULL, m_mtu)
