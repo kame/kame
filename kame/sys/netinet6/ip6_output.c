@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.250 2001/12/21 04:30:24 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.251 2001/12/21 04:34:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2777,6 +2777,8 @@ do { \
 #ifdef HAVE_NRL_INPCB
 #define in6p inp
 #define in6p_outputopts inp_outputopts6
+#define in6p_route inp_route6
+#define in6p_faddr inp_faddr6
 #endif
 				case IPV6_TCLASS:
 				case IPV6_DONTFRAG:
