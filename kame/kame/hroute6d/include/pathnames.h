@@ -1,5 +1,5 @@
 /* 
- * $Id: pathnames.h,v 1.1 1999/08/08 23:29:41 itojun Exp $
+ * $Id: pathnames.h,v 1.2 1999/12/16 05:35:06 jinmei Exp $
  */
 
 /*
@@ -36,7 +36,7 @@
 #define ADM_RIP6_ADM	"/var/run/hroute6d.adm"
 #define ADM_RIP6_UDS	"/var/run/hroute6d.uds"
 
-#define RT6_TRACEFILE	"/var/tmp/hroute6d.trace"
+#define RT6_TRACEFILE	"/var/run/hroute6d.trace"
 #define RT6_CONFIGFILE	"/usr/local/v6/etc/hroute6d.conf"
 #define RT6_PID		"/var/run/hroute6d.pid"
 #define RT6_PATH	"/usr/local/v6/sbin/hroute6d"
