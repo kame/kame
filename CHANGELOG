@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1359 2000/11/01 14:59:39 itojun Exp $
+$KAME: CHANGELOG,v 1.1360 2000/11/02 14:18:02 itojun Exp $
 
 <200011>
+Thu Nov  2 23:17:07 JST 2000  itojun@iijlab.net
+	* sys/netinet6/esp_core.c: fix [13]DES on big endian machines.
+	  report from shigeru@iij.ad.jp.
+
 Wed Nov  1 23:58:34 JST 2000  itojun@iijlab.net
 	* sys/crypto/twofish: fix runtime error check logic.  it has been
 	  broken for some time.
