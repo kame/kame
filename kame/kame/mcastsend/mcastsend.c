@@ -254,7 +254,7 @@ parse(ac, av)
 
 	pname = *av;
 
-	while ((c = getopt(ac, av, "hdl:i:s:")) != EOF) {
+	while ((c = getopt(ac, av, "hdl:i:s:")) != -1) {
 		switch (c) {
 		case 'l':
 			hlim = atoi(optarg);

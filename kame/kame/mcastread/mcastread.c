@@ -66,7 +66,7 @@ main(argc, argv)
 	int c;
 	int error;
 
-	while ((c = getopt(argc, argv, "v")) != EOF) {
+	while ((c = getopt(argc, argv, "v")) != -1) {
 		switch (c) {
 		case 'v':
 			vflag++;

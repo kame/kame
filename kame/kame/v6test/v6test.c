@@ -67,7 +67,7 @@ main(argc, argv)
 	int fd = -1;
 	int linkhdr;
 	
-	while ((ch = getopt(argc, argv, "d:f:i:ns:")) != EOF)
+	while ((ch = getopt(argc, argv, "d:f:i:ns:")) != -1)
 		switch(ch) {
 		case 's':
 			if (inet_pton(AF_INET6, optarg, &ip6src) != 1) {

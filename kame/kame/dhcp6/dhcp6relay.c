@@ -111,7 +111,7 @@ main(argc, argv)
 	else
 		progname++;
 
-	while((ch = getopt(argc, argv, "dDfH:")) != EOF) {
+	while((ch = getopt(argc, argv, "dDfH:")) != -1) {
 		switch(ch) {
 		case 'd':
 			debug = 1;

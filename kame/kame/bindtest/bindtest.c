@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.25 2001/05/08 03:38:23 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.26 2001/05/08 04:36:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -123,7 +123,7 @@ main(argc, argv)
 	extern char *optarg;
 	struct testitem *testi, *testj;
 
-	while ((ch = getopt(argc, argv, "126APp:st")) != EOF) {
+	while ((ch = getopt(argc, argv, "126APp:st")) != -1) {
 		switch (ch) {
 		case '1':
 			connect1st = 1;

@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.122 2001/02/07 03:13:58 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.123 2001/05/08 04:36:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -325,7 +325,7 @@ main(argc, argv)
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
 	while ((ch = getopt(argc, argv,
-	    "a:b:c:dfHh:I:i:l:mnNp:qRS:s:tvwW" ADDOPTS)) != EOF) {
+	    "a:b:c:dfHh:I:i:l:mnNp:qRS:s:tvwW" ADDOPTS)) != -1) {
 #undef ADDOPTS
 		switch (ch) {
 		case 'a':

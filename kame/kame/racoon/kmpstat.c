@@ -1,4 +1,4 @@
-/*	$KAME: kmpstat.c,v 1.25 2001/04/03 15:51:55 thorpej Exp $	*/
+/*	$KAME: kmpstat.c,v 1.26 2001/05/08 04:36:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -188,7 +188,7 @@ main(ac, av)
 
 	pname = *av;
 
-	while ((c = getopt(ac, av, "p:ld")) != EOF) {
+	while ((c = getopt(ac, av, "p:ld")) != -1) {
 		switch(c) {
 		case 'p':
 			port = atoi(optarg);

@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.13 2001/02/09 08:31:24 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.14 2001/05/08 04:36:26 itojun Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -88,7 +88,7 @@ main(argc, argv)
 	int socktype = SOCK_DGRAM;
 	int proto = IPPROTO_UDP;
 
-	while ((ch = getopt(argc, argv, "d:D:h:l:M:mp:s:")) != EOF)
+	while ((ch = getopt(argc, argv, "d:D:h:l:M:mp:s:")) != -1)
 		switch(ch) {
 		case 'D':
 			dsthdr1len = atoi(optarg);

@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.34 2001/05/02 07:19:55 sakane Exp $	*/
+/*	$KAME: main.c,v 1.35 2001/05/08 04:36:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -272,7 +272,7 @@ parse(ac, av)
 #ifdef INET6
 			"46"
 #endif
-			)) != EOF) {
+			)) != -1) {
 		switch (c) {
 		case 'd':
 			loglevel++;

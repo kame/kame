@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.17 2000/12/20 01:14:50 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.18 2001/05/08 04:36:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -118,7 +118,7 @@ main(ac, av)
 
 	thiszone = gmt2local(0);
 
-	while ((c = getopt(ac, av, "acdf:hlvxDFP")) != EOF) {
+	while ((c = getopt(ac, av, "acdf:hlvxDFP")) != -1) {
 		switch (c) {
 		case 'c':
 			f_mode = MODE_SCRIPT;

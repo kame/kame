@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.6 2001/05/05 11:50:06 fujisawa Exp $
+ *	$Id: main.c,v 1.7 2001/05/08 04:36:32 itojun Exp $
  */
 
 #include <stdio.h>
@@ -137,7 +137,7 @@ parseArgument(int argc, char *argv[])
     extern	 char	*optarg;
     extern	 int	 optind;
 
-    while ((ch = getopt(argc, argv, "d:f:n:")) != EOF)
+    while ((ch = getopt(argc, argv, "d:f:n:")) != -1)
     {
 	switch (ch)
 	{

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.9 2000/12/04 06:29:37 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.10 2001/05/08 04:36:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -79,7 +79,7 @@ main(int argc, char *argv[])
 	int ch;
 
 	type = MLD6_LISTENER_QUERY;
-	while ((ch = getopt(argc, argv, "d")) != EOF) {
+	while ((ch = getopt(argc, argv, "d")) != -1) {
 		switch (ch) {
 		case 'd':
 			type = MLD6_LISTENER_DONE;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pvctxctl.c,v 1.1 2000/01/19 12:47:09 kjc Exp $
+ * $Id: pvctxctl.c,v 1.2 2001/05/08 04:36:36 itojun Exp $
  */
 
 #include <stdio.h>
@@ -78,7 +78,7 @@ main(int argc, char **argv)
 		str2vc(argv[2], &vpi, &vci);
     
 	optind = 3;
-	while ((ch = getopt(argc, argv, "p:b:j:snv")) != EOF) {
+	while ((ch = getopt(argc, argv, "p:b:j:snv")) != -1) {
 		switch (ch) {
 		case 'p':
 			pcr = strtol(optarg, NULL, 0);

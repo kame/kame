@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.36 2001/05/02 12:09:07 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.37 2001/05/08 04:36:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -97,7 +97,7 @@ main(argc, argv)
 	struct sockdb *sd;
 	int nsock;
 
-	while ((ch = getopt(argc, argv, "46Dfh:i:lmp:P:")) != EOF) {
+	while ((ch = getopt(argc, argv, "46Dfh:i:lmp:P:")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;

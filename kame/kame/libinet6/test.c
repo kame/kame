@@ -85,7 +85,7 @@ main(argc, argv)
 	memset(&ai, 0, sizeof(ai));
 	ai.ai_family = PF_UNSPEC;
 	ai.ai_flags |= AI_CANONNAME;
-	while ((c = getopt(argc, argv, "Df:p:PRs:Sv46")) != EOF) {
+	while ((c = getopt(argc, argv, "Df:p:PRs:Sv46")) != -1) {
 		switch (c) {
 		case 'D':
 			ai.ai_socktype = SOCK_DGRAM;

@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.64 2001/03/29 05:34:29 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.65 2001/05/08 04:36:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -183,7 +183,7 @@ main(argc, argv)
 
 	pid = getpid();
 	thiszone = gmt2local(0);
-	while ((ch = getopt(argc, argv, "acndfIilprstA:HPR")) != EOF)
+	while ((ch = getopt(argc, argv, "acndfIilprstA:HPR")) != -1)
 		switch ((char)ch) {
 		case 'a':
 			aflag = 1;

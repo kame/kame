@@ -1,4 +1,4 @@
-/*	$KAME: cksum6.c,v 1.3 2000/11/24 11:36:15 itojun Exp $	*/
+/*	$KAME: cksum6.c,v 1.4 2001/05/08 04:36:27 itojun Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -60,7 +60,7 @@ main(argc, argv)
 	unsigned char buf[BUFSIZ], *p, *np;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "ad")) != EOF) {
+	while ((ch = getopt(argc, argv, "ad")) != -1) {
 		switch (ch) {
 		case 'a':
 			all++;

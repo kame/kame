@@ -1,4 +1,4 @@
-/*	$KAME: accept.c,v 1.14 2001/02/09 08:31:24 jinmei Exp $ */
+/*	$KAME: accept.c,v 1.15 2001/05/08 04:36:25 itojun Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -66,7 +66,7 @@ main(argc, argv)
 	char recvbuf[1024];	/* xxx hardcoding */
 	struct addrinfo hints, *res;
 
-	while ((ch = getopt(argc, argv, "adDhilp:ru")) != EOF)
+	while ((ch = getopt(argc, argv, "adDhilp:ru")) != -1)
 		switch(ch) {
 		case 'a':
 			aflag++;

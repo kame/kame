@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.10 2001/03/12 04:54:13 itojun Exp $	*/
+/*	$KAME: rip6query.c,v 1.11 2001/05/08 04:36:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,7 +84,7 @@ main(argc, argv)
 	char pbuf[10];
 	struct addrinfo hints, *res;
 
-	while ((c = getopt(argc, argv, "I:")) != EOF) {
+	while ((c = getopt(argc, argv, "I:")) != -1) {
 		switch (c) {
 		case 'I':
 			ifidx = if_nametoindex(optarg);

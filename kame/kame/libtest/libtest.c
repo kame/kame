@@ -1,4 +1,4 @@
-/*	$KAME: libtest.c,v 1.9 2000/11/23 22:58:55 itojun Exp $	*/
+/*	$KAME: libtest.c,v 1.10 2001/05/08 04:36:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -60,7 +60,7 @@ main(argc, argv)
 	extern int optind;
 	int failure = 0;
 
-	while ((ch = getopt(argc, argv, "")) != EOF) {
+	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
 		default:
 			usage();

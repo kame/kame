@@ -98,7 +98,7 @@ main(argc, argv)
   FD_ZERO(&fdmask);  
 
   /* get options */
-  while ((ch = getopt(argc, argv, "Cc:f")) != EOF){
+  while ((ch = getopt(argc, argv, "Cc:f")) != -1){
     switch (ch){
     case 'C':
       confcheck++;

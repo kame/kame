@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.41 2001/01/12 20:04:26 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.42 2001/05/08 04:36:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -418,7 +418,7 @@ main(argc, argv)
 
 	seq = 0;
 	
-	while ((ch = getopt(argc, argv, "df:g:lm:np:q:rs:w:v")) != EOF)
+	while ((ch = getopt(argc, argv, "df:g:lm:np:q:rs:w:v")) != -1)
 		switch(ch) {
 		case 'd':
 			options |= SO_DEBUG;

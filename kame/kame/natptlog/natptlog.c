@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.12 2000/10/17 06:15:04 fujisawa Exp $
+ *	$Id: natptlog.c,v 1.13 2001/05/08 04:36:33 itojun Exp $
  */
 
 #include <stdio.h>
@@ -182,7 +182,7 @@ parseArgument(int argc, char *argv[])
     extern	char	*optarg;
     extern	int	 optind;
 
-    while ((ch = getopt(argc, argv, "bd:")) != EOF)
+    while ((ch = getopt(argc, argv, "bd:")) != -1)
     {
 	switch (ch)
 	{

@@ -152,7 +152,7 @@ main(argc, argv)
 	pname = argv[0];
 	gethostname(myhostname, sizeof(myhostname));
 
-	while ((c = getopt(argc, argv, "dDi:l:P:")) != EOF) {
+	while ((c = getopt(argc, argv, "dDi:l:P:")) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;

@@ -126,7 +126,7 @@ main(argc, argv)
 
 	TAILQ_INIT(&dnslist);
 	srandom(time(NULL) & getpid());
-	while ((ch = getopt(argc, argv, "dDfn:N:")) != EOF) {
+	while ((ch = getopt(argc, argv, "dDfn:N:")) != -1) {
 		switch (ch) {
 		case 'd':
 			debug = 1;

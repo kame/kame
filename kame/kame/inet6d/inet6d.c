@@ -285,7 +285,7 @@ main(argc, argv, envp)
 
 	openlog("inetd", LOG_PID | LOG_NOWAIT, LOG_DAEMON);
 
-	while ((ch = getopt(argc, argv, "dR:")) != EOF)
+	while ((ch = getopt(argc, argv, "dR:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug = 1;

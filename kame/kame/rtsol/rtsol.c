@@ -89,7 +89,7 @@ main(argc, argv)
 
 	srandom((unsigned)time(NULL));
 	
-	while ((opt = getopt(argc, argv, "nv")) != EOF) {
+	while ((opt = getopt(argc, argv, "nv")) != -1) {
 		switch (opt) {
 		case 'n':
 			trick = 0;

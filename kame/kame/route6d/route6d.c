@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.63 2001/04/17 07:58:32 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.64 2001/05/08 04:36:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.63 2001/04/17 07:58:32 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.64 2001/05/08 04:36:37 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -293,7 +293,7 @@ main(argc, argv)
 		progname = *argv;
 
 	pid = getpid();
-	while ((ch = getopt(argc, argv, "A:N:O:R:T:L:t:adDhlnqsS")) != EOF) {
+	while ((ch = getopt(argc, argv, "A:N:O:R:T:L:t:adDhlnqsS")) != -1) {
 		switch (ch) {
 		case 'A':
 		case 'N':

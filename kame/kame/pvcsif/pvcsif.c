@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pvcsif.c,v 1.1 2000/01/19 12:47:08 kjc Exp $
+ * $Id: pvcsif.c,v 1.2 2001/05/08 04:36:35 itojun Exp $
  */
 
 #include <stdio.h>
@@ -69,7 +69,7 @@ main(int argc, char **argv)
 	strncpy(ifr.ifr_name, argv[1], IFNAMSIZ-1);
 
 	optind = 2;
-	while ((ch = getopt(argc, argv, "s")) != EOF) {
+	while ((ch = getopt(argc, argv, "s")) != -1) {
 		switch (ch) {
 		case 's':
 			shell_mode = 1;
