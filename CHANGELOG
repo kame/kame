@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1207 2000/08/16 06:43:37 itojun Exp $
+$KAME: CHANGELOG,v 1.1208 2000/08/17 01:09:37 itojun Exp $
 
 <200008>
+Thu Aug 17 10:19:13 JST 2000  itojun@iijlab.net
+	* openbsd: change kernel headers to use "NEW_STRUCT_ROUTE" definition.
+	  kernel can panic if you don't define it in kernel configuration file.
+
 Wed Aug 16 15:41:28 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/wget: upgrade to latest IPv6 patch.
 	  IPv6 FTP is now available.
