@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.637 2000/02/29 16:33:29 itojun Exp $
+$Id: CHANGELOG,v 1.638 2000/02/29 16:46:47 itojun Exp $
 
 <200003>
 Wed Mar  1 01:30:43 JST 2000  itojun@iijlab.net
@@ -8,7 +8,8 @@ Wed Mar  1 01:30:43 JST 2000  itojun@iijlab.net
 	  inbound udp4 checksum.
 	* bsdi4/sys/netinet/udp_usrreq.c: always use in4_cksum() for inbound
 	  udp4 checksum.  fix ipsec checks on multicast.  add jumbogram
-	  consideration a bit.
+	  consideration a bit.  undo temporary pcbconnect correctly on
+	  udp6 scope check failure.
 
 <200002>
 Tue Feb 29 13:30:10 JST 2000  itojun@iijlab.net
