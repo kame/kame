@@ -725,7 +725,10 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 			if (verbose)
 				fprintf(ttyout, "Requesting %s\n", url);
 			fprintf(fin, "GET %s HTTP/1.1\r\n", path);
-			fprintf(fin, "Host: %s:%s\r\n", host, port);
+			if (strchr(host, ':'))
+				fprintf(fin, "Host: [%s]:%s\r\n", host, port);
+			else
+				fprintf(fin, "Host: %s:%s\r\n", host, port);
 			fprintf(fin, "Accept: */*\r\n");
 			if (uname(&unam) != -1) {
 				fprintf(fin, "User-Agent: %s-%s/ftp\r\n",
