@@ -36,6 +36,7 @@
 #include <netkey/key_debug.h>
 
 #include <netinet/in.h>
+#include <netinet6/ipsec.h>
 #ifdef INET6
 #include <netinet6/in6.h>
 #endif
@@ -63,9 +64,10 @@
 #define GETAF(p) \
 	(((struct sockaddr *)(p))->sa_family)
 
-static char *_str_addr(u_int family, caddr_t addr, u_int pref, u_int port);
-static char *_str_time(time_t t);
-static void _str_lifetime_byte(struct sadb_lifetime *x, char *str);
+static char *_str_ipaddr __P((u_int family, caddr_t addr));
+static char *_str_prefport __P((u_int family, u_int pref, u_int port));
+static char *_str_time __P((time_t t));
+static void _str_lifetime_byte __P((struct sadb_lifetime *x, char *str));
 
 /*
  * Must to be re-written about following strings.
@@ -83,6 +85,12 @@ static char *_str_satype[] = {
 	"ipcomp",
 };
 
+static char *_str_mode[] = {
+	"any",
+	"transport",
+	"tunnel",
+};
+
 static char *_str_upper[] = {
 	"any",	"icmp",	"",	"",	"",
 	"",	"tcp",	"",	"",	"",
@@ -91,13 +99,6 @@ static char *_str_upper[] = {
 	"",	"",	"",	"",	"",
 	"",	"",	"",	"",	"",
 };
-
-#if 0
-static char *_str_base[] = {
-	"new",
-	"old",
-};
-#endif
 
 static char *_str_state[] = {
 	"larval",
@@ -135,13 +136,14 @@ static char *_str_alg_comp[] = {
 static char *_str_dir[] = {
 	"outbound",
 	"inbound",
-	"bi-direction",
 };
 
 /*
  * dump SADB_MSG formated.  For debugging, you should use kdebug_sadb().
  */
-void pfkey_sadump(struct sadb_msg *m)
+void
+pfkey_sadump(m)
+	struct sadb_msg *m;
 {
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	struct sadb_sa *m_sa;
@@ -152,7 +154,11 @@ void pfkey_sadump(struct sadb_msg *m)
 	struct sadb_sens *m_sens;
 
 	/* check pfkey message. */
-	if (pfkey_check(m, mhp)) {
+	if (pfkey_align(m, mhp)) {
+		printf("%s\n", ipsec_strerror());
+		return;
+	}
+	if (pfkey_check(mhp)) {
 		printf("%s\n", ipsec_strerror());
 		return;
 	}
@@ -176,10 +182,7 @@ void pfkey_sadump(struct sadb_msg *m)
 		return;
 	}
 	printf("%s ",
-		_str_addr(GETAF((caddr_t)m_saddr + sizeof(*m_saddr)),
-		     _INADDRBYSA((caddr_t)m_saddr + sizeof(*m_saddr)),
-		     m_saddr->sadb_address_prefixlen,
-		     _INPORTBYSA((caddr_t)m_saddr + sizeof(*m_saddr))));
+		_str_ipaddr(GETAF(m_saddr + 1), _INADDRBYSA(m_saddr + 1)));
 
 	/* destination address */
 	if (m_daddr == NULL) {
@@ -187,36 +190,19 @@ void pfkey_sadump(struct sadb_msg *m)
 		return;
 	}
 	printf("%s ",
-		_str_addr(GETAF((caddr_t)m_daddr + sizeof(*m_daddr)),
-		     _INADDRBYSA((caddr_t)m_daddr + sizeof(*m_daddr)),
-		     m_daddr->sadb_address_prefixlen,
-		     _INPORTBYSA((caddr_t)m_daddr + sizeof(*m_daddr))));
-
-	/* upper layer protocol */
-	if (m_saddr->sadb_address_proto != m_saddr->sadb_address_proto) {
-		printf("upper layer protocol mismatched.\n");
-		return;
-	}
-	GETMSGSTR(_str_upper, m_saddr->sadb_address_proto);
-
-	/* proxy address */
-	if (m_paddr != NULL) {
-		int prefix = _INALENBYAF(GETAF((caddr_t)m_paddr + sizeof(*m_paddr))) << 3;
-		printf("%s",
-			_str_addr(GETAF((caddr_t)m_paddr + sizeof(*m_paddr)),
-			     _INADDRBYSA((caddr_t)m_paddr + sizeof(*m_paddr)),
-		             prefix,
-			     0));
-	}
-	printf("\n");
+		_str_ipaddr(GETAF(m_daddr + 1), _INADDRBYSA(m_daddr + 1)));
 
 	/* SA type */
 	if (m_sa == NULL) {
 		printf("no SA extension.\n");
 		return;
 	}
-	printf("\t");
+	printf("\n\t");
+
 	GETMSGSTR(_str_satype, m->sadb_msg_satype);
+
+	printf("mode=");
+	GETMSGSTR(_str_mode, m->sadb_msg_mode);
 
 	printf("spi=%u(0x%08x) replay=%u flags=0x%08x\n",
 		(u_int32_t)ntohl(m_sa->sadb_sa_spi),
@@ -297,24 +283,26 @@ void pfkey_sadump(struct sadb_msg *m)
 			0 : m_lfts->sadb_lifetime_allocations));
 	}
 
-    {	/* XXX TEST */
-	char *x = (char *)&m->sadb_msg_reserved;
-	printf("\tdir=");
-	GETMSGSTR(_str_dir, (int)x[0]);
-	printf("refcnt=%d\n", (int)x[1]);
-    }
+	/* XXX DEBUG */
+	printf("\trefcnt=%d\n", m->sadb_msg_reserved);
 
 	return;
 }
 
-void pfkey_spdump(struct sadb_msg *m)
+void
+pfkey_spdump(m)
+	struct sadb_msg *m;
 {
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	struct sadb_address *m_saddr, *m_daddr;
 	struct sadb_x_policy *m_xpl;
 
 	/* check pfkey message. */
-	if (pfkey_check(m, mhp)) {
+	if (pfkey_align(m, mhp)) {
+		printf("%s\n", ipsec_strerror());
+		return;
+	}
+	if (pfkey_check(mhp)) {
 		printf("%s\n", ipsec_strerror());
 		return;
 	}
@@ -328,25 +316,32 @@ void pfkey_spdump(struct sadb_msg *m)
 		printf("no ADDRESS_SRC extension.\n");
 		return;
 	}
-	printf("%s ",
-		_str_addr(GETAF((caddr_t)m_saddr + sizeof(*m_saddr)),
-		      _INADDRBYSA((caddr_t)m_saddr + sizeof(*m_saddr)),
-		      m_saddr->sadb_address_prefixlen,
-		      _INPORTBYSA((caddr_t)m_saddr + sizeof(*m_saddr))));
+	printf("%s%s ",
+		_str_ipaddr(GETAF(m_saddr + 1), _INADDRBYSA(m_saddr + 1)),
+		_str_prefport(GETAF(m_saddr + 1),
+		     m_saddr->sadb_address_prefixlen,
+		     _INPORTBYSA(m_saddr + 1)));
 
 	/* destination address */
 	if (m_daddr == NULL) {
 		printf("no ADDRESS_DST extension.\n");
 		return;
 	}
-	printf("%s ",
-		_str_addr(GETAF((caddr_t)m_daddr + sizeof(*m_daddr)),
-		      _INADDRBYSA((caddr_t)m_daddr + sizeof(*m_daddr)),
-		      m_daddr->sadb_address_prefixlen,
-		      _INPORTBYSA((caddr_t)m_daddr + sizeof(*m_daddr))));
+	printf("%s%s ",
+		_str_ipaddr(GETAF(m_daddr + 1), _INADDRBYSA(m_daddr + 1)),
+		_str_prefport(GETAF(m_daddr + 1),
+		     m_daddr->sadb_address_prefixlen,
+		     _INPORTBYSA(m_daddr + 1)));
 
 	/* upper layer protocol */
-	GETMSGSTR(_str_upper, m_saddr->sadb_address_proto);
+	if (m_saddr->sadb_address_proto != m_saddr->sadb_address_proto) {
+		printf("upper layer protocol mismatched.\n");
+		return;
+	}
+	if (m_saddr->sadb_address_proto == IPSEC_ULPROTO_ANY)
+		printf("any");
+	else
+		GETMSGSTR(_str_upper, m_saddr->sadb_address_proto);
 
 	/* policy */
     {
@@ -367,37 +362,65 @@ void pfkey_spdump(struct sadb_msg *m)
 		(u_long)m->sadb_msg_seq,
 		(u_long)m->sadb_msg_pid);
 
-    {	/* TEST */
-	char *x = (char *)&m->sadb_msg_reserved;
-	printf("\tdir=");
-	GETMSGSTR(_str_dir, (int)x[0]);
-	printf("refcnt=%d\n", (int)x[1]);
-    }
+	/* XXX TEST */
+	printf("\trefcnt=%d\n", m->sadb_msg_reserved);
 
 	return;
 }
 
 /*
- * set "ip address/prefix[port number]" to buffer.
+ * set "ipaddress" to buffer.
  */
-static char *_str_addr(u_int family, caddr_t addr, u_int pref, u_int port)
+static char *
+_str_ipaddr(family, addr)
+	u_int family;
+	caddr_t addr;
 {
 	static char buf[128];
-	char pbuf[128];
+	char addrbuf[128];
 
 	if (addr == NULL)
 		return "";
 
-	inet_ntop(family, addr, pbuf, sizeof(pbuf));
+	inet_ntop(family, addr, addrbuf, sizeof(addrbuf));
 
-	snprintf(buf, sizeof(buf), "%s/%u[%u]", pbuf, pref, ntohs(port));
+	snprintf(buf, sizeof(buf), "%s", addrbuf);
+
+	return buf;
+}
+
+/*
+ * set "/prefix[port number]" to buffer.
+ */
+static char *
+_str_prefport(family, pref, port)
+	u_int family, pref, port;
+{
+	static char buf[128];
+	char prefbuf[10];
+	char portbuf[10];
+
+	if (pref == (_INALENBYAF(family) << 3))
+		prefbuf[0] = '\0';
+	else
+		snprintf(prefbuf, sizeof(prefbuf), "/%u", pref);
+
+	if (port == IPSEC_PORT_ANY)
+		snprintf(portbuf, sizeof(portbuf), "[%s]", "any");
+	else
+		snprintf(portbuf, sizeof(portbuf), "[%u]", ntohs(port));
+
+	snprintf(buf, sizeof(buf), "%s%s", prefbuf, portbuf);
+
 	return buf;
 }
 
 /*
  * set "Mon Day Time Year" to buffer
  */
-static char *_str_time(time_t t)
+static char *
+_str_time(t)
+	time_t t;
 {
 	static char buf[128];
 
@@ -415,7 +438,10 @@ static char *_str_time(time_t t)
 	return(buf);
 }
 
-static void _str_lifetime_byte(struct sadb_lifetime *x, char *str)
+static void
+_str_lifetime_byte(x, str)
+	struct sadb_lifetime *x;
+	char *str;
 {
 	double y;
 	char *unit;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: setkey.c,v 1.1 1999/08/08 23:31:51 itojun Exp $ */
+/* KAME $Id: setkey.c,v 1.2 1999/09/01 05:34:07 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -60,14 +60,18 @@ const char *numstr __P((int));
 void shortdump_hdr __P((void));
 void shortdump __P((struct sadb_msg *));
 
+#define MODE_SCRIPT	1
+#define MODE_CMDDUMP	2
+#define MODE_CMDFLUSH	3
+
+int so;
+
 int f_forever = 0;
 int f_all = 0;
 int f_debug = 0;
 int f_verbose = 0;
-int f_command = 0;
-int f_script = 0;
+int f_mode = 0;
 int f_cmddump = 0;
-int f_cmdflush = 0;
 int f_policy = 0;
 int f_promisc = 0;
 int f_hexdump = 0;
@@ -88,6 +92,7 @@ Usage()
 	printf("\t%s [-Padlv] -D\n", pname);
 	printf("\t%s [-Pdv] -F\n", pname);
 	printf("\t%s [-h] -x\n", pname);
+	pfkey_close(so);
 	exit(0);
 }
 
@@ -105,22 +110,25 @@ main(ac, av)
 
 	while ((c = getopt(ac, av, "acdf:hlvxDFP")) != EOF) {
 		switch (c) {
-		case 'a':
-			f_all = 1;
-			break;
 		case 'c':
-			f_script = 1;
+			f_mode = MODE_SCRIPT;
 			fp = stdin;
 			break;
-		case 'd':
-			f_debug = 1;
-			break;
 		case 'f':
-			f_script = 1;
+			f_mode = MODE_SCRIPT;
 			if ((fp = fopen(optarg, "r")) == NULL) {
 				perror("fopen");
 				exit(-1);
 			}
+			break;
+		case 'D':
+			f_mode = MODE_CMDDUMP;
+			break;
+		case 'F':
+			f_mode = MODE_CMDFLUSH;
+			break;
+		case 'a':
+			f_all = 1;
 			break;
 		case 'l':
 			f_forever = 1;
@@ -128,21 +136,18 @@ main(ac, av)
 		case 'h':
 			f_hexdump = 1;
 			break;
-		case 'v':
-			f_verbose = 1;
-			break;
 		case 'x':
 			f_promisc = 1;
 			promisc();
 			/*NOTREACHED*/
-		case 'D':
-			f_cmddump = 1;
-			break;
-		case 'F':
-			f_cmdflush = 1;
-			break;
 		case 'P':
 			f_policy = 1;
+			break;
+		case 'd':
+			f_debug = 1;
+			break;
+		case 'v':
+			f_verbose = 1;
 			break;
 		default:
 			Usage();
@@ -150,22 +155,23 @@ main(ac, av)
 		}
 	}
 
-	if (get_supported() < 0) {
-		printf("%s\n", ipsec_strerror());
-		exit(-1);
-	}
-
-	if (f_cmdflush)
-		sendkeyshort(f_policy ? SADB_X_SPDFLUSH: SADB_FLUSH);
-	else
-	if (f_cmddump)
+	switch (f_mode) {
+	case MODE_CMDDUMP:
 		sendkeyshort(f_policy ? SADB_X_SPDDUMP: SADB_DUMP);
-	else
-	if (f_script)
+		break;
+	case MODE_CMDFLUSH:
+		sendkeyshort(f_policy ? SADB_X_SPDFLUSH: SADB_FLUSH);
+		pfkey_close(so);
+		break;
+	case MODE_SCRIPT:
+		if (get_supported() < 0) {
+			printf("%s\n", ipsec_strerror());
+			exit(-1);
+		}
 		parse(&fp);
-	else {
+		break;
+	default:
 		Usage();
-		/*NOTREACHED*/
 	}
 
 	exit(0);
@@ -176,14 +182,12 @@ get_supported()
 {
 	int so;
 
-#if 0
+	if ((so = pfkey_open()) < 0)
+		return -1;
+
 	/* debug mode ? */
 	if (f_debug)
 		return 0;
-#endif
-
-	if ((so = pfkey_open()) < 0)
-		return -1;
 
 	if (pfkey_send_register(so, PF_UNSPEC) < 0)
 		return -1;
@@ -191,14 +195,12 @@ get_supported()
 	if (pfkey_recv_register(so) < 0)
 		return -1;
 
-	pfkey_close(so);
-
 	return 0;
 }
 
 void
 sendkeyshort(type)
-	u_int type;
+        u_int type;
 {
 	struct sadb_msg *m_msg = (struct sadb_msg *)m_buf;
 
@@ -295,14 +297,14 @@ promisc()
 int
 sendkeymsg()
 {
+	int so;
+
 	u_char rbuf[1024 * 32];	/* XXX: Enough ? Should I do MSG_PEEK ? */
-	int so, len;
+	int len;
 	struct sadb_msg *msg;
 
-	if ((so = pfkey_open()) < 0) {
-		printf("%s\n", ipsec_strerror());
-		return 0;
-	}
+	if ((so = pfkey_open()) < 0)
+		return -1;
 
     {
 	struct timeval tv;
@@ -364,7 +366,7 @@ postproc(msg, len)
 		char inf[80];
 		char *errmsg = NULL;
 
-		if (f_script)
+		if (f_mode == MODE_SCRIPT)
 			snprintf(inf, sizeof(inf), "The result of line %d: ", lineno);
 		else
 			inf[0] = '\0';
@@ -402,7 +404,8 @@ postproc(msg, len)
 		if (!f_all) {
 			caddr_t mhp[SADB_EXT_MAX + 1];
 			struct sadb_sa *sa;
-			pfkey_check(msg, mhp);
+			pfkey_align(msg, mhp);
+			pfkey_check(mhp);
 			if ((sa = (struct sadb_sa *)mhp[SADB_EXT_SA]) != NULL) {
 				if (sa->sadb_sa_state == SADB_SASTATE_DEAD)
 					break;
@@ -486,7 +489,8 @@ shortdump(msg)
 	u_int t;
 	time_t cur = time(0);
 
-	pfkey_check(msg, mhp);
+	pfkey_align(msg, mhp);
+	pfkey_check(mhp);
 
 	printf("%02lu%02lu", (u_long)(cur % 3600) / 60, (u_long)(cur % 60));
 

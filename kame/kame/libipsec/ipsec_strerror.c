@@ -44,7 +44,9 @@ static char *ipsec_errlist[] = {
 "Invalid sadb message",				/*EIPSEC_INVAL_SADBMSG*/
 "Invalid version",				/*EIPSEC_INVAL_VERSION*/
 "Invalid security policy",			/*EIPSEC_INVAL_POLICY*/
+"Invalid address specification",		/*EIPSEC_INVAL_ADDRESS*/
 "Invalid ipsec protocol",			/*EIPSEC_INVAL_PROTO*/
+"Invalid ipsec mode",				/*EIPSEC_INVAL_MODE*/
 "Invalid ipsec level",				/*EIPSEC_INVAL_LEVEL*/
 "Invalid SA type",				/*EIPSEC_INVAL_SATYPE*/
 "Invalid message type",				/*EIPSEC_INVAL_MSGTYPE*/
@@ -53,6 +55,7 @@ static char *ipsec_errlist[] = {
 "Invalid key length",				/*EIPSEC_INVAL_KEYLEN*/
 "Invalid address family",			/*EIPSEC_INVAL_FAMILY*/
 "Invalid prefix length",			/*EIPSEC_INVAL_PREFIXLEN*/
+"Invalid direciton",				/*EIPSEC_INVAL_DIR*/
 "SPI range violation",				/*EIPSEC_INVAL_SPI*/
 "No protocol specified",			/*EIPSEC_NO_PROTO*/
 "No algorithm specified",			/*EIPSEC_NO_ALGS*/

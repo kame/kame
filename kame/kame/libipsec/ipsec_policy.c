@@ -27,19 +27,25 @@
  * SUCH DAMAGE.
  */
 
-static char *rcsid = "@(#) ipsec_policy.c $Revision: 1.1 $";
+#ifndef lint
+static char *rcsid = "@(#) ipsec_policy.c $Revision: 1.2 $";
+#endif
 
 /*
- * The following requests are accepted:
- *	protocol		parsed as protocol/default/
- *	protocol/level/proxy
- *	protocol/		parsed as protocol/default/
- *	protocol/level		parsed as protocol/level/
- *	protocol/level/		parsed as protocol/level/
- *	protocol/proxy		parsed as protocol/default/proxy
- *	protocol//proxy		parsed as protocol/default/proxy
- *	protocol//		parsed as protocol/default/
- * You can concatenate these requests with either ' ' or '\n'.
+ * IN/OUT bound policy configuration take place such below:
+ *	in <policy>
+ *	out <policy>
+ *
+ * <policy> is one of following:
+ *	"discard", "none", "ipsec <requests>", "entrust", "bypass",
+ *
+ * The following requests are accepted as <requests>:
+ *
+ *	protocol/mode/src-dst/level
+ *	protocol/mode/src-dst		parsed as protocol/mode/src-dst/default
+ *	protocol/mode/src-dst/		parsed as protocol/mode/src-dst/default
+ *
+ * You can concatenate these requests with either ' '(single space) or '\n'.
  */
 
 #include <sys/types.h>
@@ -67,18 +73,25 @@ static char *rcsid = "@(#) ipsec_policy.c $Revision: 1.1 $";
 
 /* order must be the same */
 static char *tokens[] = {
+	"in", "out",
 	"discard", "none", "ipsec", "entrust", "bypass",
-	"esp", "ah", "ipcomp", "default", "use", "require", "/", NULL
+	"esp", "ah", "ipcomp", "default", "use", "require",
+	"transport", "tunnel", "/", NULL
 };
 enum token {
-	t_invalid = -1, t_discard, t_none, t_ipsec, t_entrust, t_bypass,
-	t_esp, t_ah, t_ipcomp, t_default, t_use, t_require, t_slash, t_omit,
+	t_invalid = -1,
+	t_in, t_out,
+	t_discard, t_none, t_ipsec, t_entrust, t_bypass,
+	t_esp, t_ah, t_ipcomp, t_default, t_use, t_require,
+	t_transport, t_tunnel, t_slash,
 };
 static int values[] = {
+	IPSEC_DIR_INBOUND, IPSEC_DIR_OUTBOUND,
 	IPSEC_POLICY_DISCARD, IPSEC_POLICY_NONE, IPSEC_POLICY_IPSEC,
 	IPSEC_POLICY_ENTRUST, IPSEC_POLICY_BYPASS,
 	IPPROTO_ESP, IPPROTO_AH, IPPROTO_IPCOMP,
-	IPSEC_LEVEL_DEFAULT, IPSEC_LEVEL_USE, IPSEC_LEVEL_REQUIRE, 0, 0,
+	IPSEC_LEVEL_DEFAULT, IPSEC_LEVEL_USE, IPSEC_LEVEL_REQUIRE,
+	IPSEC_MODE_TRANSPORT, IPSEC_MODE_TUNNEL, 0
 };
 struct pbuf {
 	char *buf;
@@ -86,22 +99,29 @@ struct pbuf {
 	int off;	/* current offset */
 };
 
-/* XXX duplicated def */
-static char *ipsp_strs[] = {
+static char *ipsp_dir_strs[] = {
+	"any", "inbound", "outbound",
+};
+
+static char *ipsp_policy_strs[] = {
 	"discard", "none", "ipsec", "entrust", "bypass",
 };
 
-static enum token gettoken(char *p);
-static char *skiptoken(char *p, enum token t);
-static char *skipspaces(char *p);
-static char *parse_request(struct pbuf *pbuf, char *p);
-static char *parse_policy(struct pbuf *pbuf, char *p);
-static char *get_sockaddr(char *host, struct sockaddr *addr);
-static int parse_setreq(struct pbuf *pbuf, int proto, int level,
-	struct sockaddr *proxy);
-static int parse_main(struct pbuf *pbuf, char *policy);
+static enum token gettoken __P((char *p));
+static char *skiptoken __P((char *p, enum token t));
+static char *skipspaces __P((char *p));
+static char *parse_request __P((struct pbuf *pbuf, char *p));
+static char *parse_addresses __P((struct sockaddr *src, struct sockaddr *dst,
+	char *p));
+static char *parse_policy __P((struct pbuf *pbuf, char *p));
+static char *get_sockaddr __P((char *host, struct sockaddr *addr));
+static int parse_setreq __P((struct pbuf *pbuf, int proto, int mode, int level,
+	struct sockaddr *src, struct sockaddr *dst));
+static int parse_main __P((struct pbuf *pbuf, char *policy));
 
-static enum token gettoken(char *p)
+static enum token
+gettoken(p)
+	char *p;
 {
 	int i;
 	int l;
@@ -123,7 +143,10 @@ static enum token gettoken(char *p)
 	return t_invalid;
 }
 
-static char *skiptoken(char *p, enum token t)
+static char *
+skiptoken(p, t)
+	char *p;
+	enum token t;
 {
 	assert(p);
 	assert(tokens[t] != NULL);
@@ -133,7 +156,9 @@ static char *skiptoken(char *p, enum token t)
 	return p + strlen(tokens[t]);
 }
 
-static char *skipspaces(char *p)
+static char *
+skipspaces(p)
+	char *p;
 {
 	assert(p);
 	while (p && isspace(*p))
@@ -141,13 +166,15 @@ static char *skipspaces(char *p)
 	return p;
 }
 
-static char *parse_request(struct pbuf *pbuf, char *p)
+static char *
+parse_request(pbuf, p)
+	struct pbuf *pbuf;
+	char *p;
 {
 	enum token t;
 	int i;
-	enum token ts[3];	/* set of tokens */
-	struct sockaddr_storage proxy;
-	int isproxy;
+	enum token ts[7];	/* set of tokens */
+	struct sockaddr_storage src, dst;
 
 	assert(p);
 	assert(pbuf);
@@ -161,6 +188,8 @@ static char *parse_request(struct pbuf *pbuf, char *p)
 	 */
 	for (i = 0; i < sizeof(ts)/sizeof(ts[0]); i++)
 		ts[i] = t_invalid;
+	memset(&src, 0, sizeof(src));
+	memset(&dst, 0, sizeof(dst));
 	i = 0;
 	while (i < sizeof(ts)/sizeof(ts[0])) {
 		/* get a token */
@@ -168,58 +197,71 @@ static char *parse_request(struct pbuf *pbuf, char *p)
 		t = gettoken(p);
 		switch (t) {
 		case t_invalid:
-			/*
-			 * this may be a proxy.
-			 * this shouldn't be a termination.
-			 */
-			if (*p != '\0')
+			if (i == 4) {
+				/* this may be peer's addresses. */
+				p = parse_addresses((struct sockaddr *)&src,
+				                    (struct sockaddr *)&dst, p);
+				if (p == NULL) {
+					/* parse_address sets ipsec_errorcode.*/
+					return NULL;
+				}
+			} else if (*p == '\0') {
+				/* this may be omited level specifier. */
 				goto breakbreak;
-			goto parseerror;
+			} else {
+				goto parseerror;
+			}
+
+			i++;
+			break;
 		case t_esp:
 		case t_ah:
 		case t_ipcomp:
+		case t_transport:
+		case t_tunnel:
 		case t_default:
 		case t_use:
 		case t_require:
+			/* even is always either protocol, mode or level. */
+			if (i & 1)
+				goto parseerror;
 			/*
-			 * protocol or level - just keep it into ts[],
+			 * protocol, mode or level - just keep it into ts[],
 			 * we'll care about protocol/level ordering afterwards
 			 */
 			ts[i++] = t;
 			p = skiptoken(p, t);
-			break;
-		case t_slash:
-			/*
-			 * the user did not specify the token - don't advance
-			 * the pointer.
-			 */
-			ts[i++] = t_omit;
 			break;
 		default:
 			/* bzz, you are wrong */
 			goto parseerror;
 		}
 
-		/* get a slash */
+		/* skip space */
 		p = skipspaces(p);
 		t = gettoken(p);
 		switch (t) {
 		case t_invalid:
-			/* this may be a termination. */
 			if (*p == '\0')
-				goto breakbreak;
-			goto parseerror;
+				break;
+			else
+				goto parseerror;
+			break;
 		case t_esp:
 		case t_ah:
 		case t_ipcomp:
-			/* protocol - we've hit the next request */
+			/* we may reach at next request. */
 			goto breakbreak;
 		case t_slash:
+			/* odds is always 'slash'. */
+			if (!(i & 1))
+				goto parseerror;
+			i++;
 			p = skiptoken(p, t);
 			break;
 		default:
 			/* bzz, you are wrong */
-			return NULL;
+			goto parseerror;
 		}
 	}
 
@@ -228,22 +270,27 @@ breakbreak:
 	/* alright, we've got the tokens. */
 	switch (i) {
 	case 0:
-		ipsec_errcode = EIPSEC_NO_PROTO;
-		return NULL;	/* no token?  naa, go away */
 	case 1:
 	case 2:
+	case 3:
+	case 4:
+		ipsec_errcode = EIPSEC_NO_PROTO;
+		return NULL;	/* less token?  naa, go away */
+	case 5:
+	case 6:
+	case 7:
 		if (!(ts[0] == t_esp || ts[0] == t_ah || ts[0] == t_ipcomp)) {
 			ipsec_errcode = EIPSEC_INVAL_PROTO;
 			return NULL;
 		}
-		if (i == 1) {
-			i++;
-			ts[1] = t_default;
+		if (!(ts[2] == t_transport || ts[2] == t_tunnel)) {
+			ipsec_errcode = EIPSEC_INVAL_MODE;
+			return NULL;
 		}
-		if (ts[1] == t_omit)
-			ts[1] = t_default;
-		if (!(ts[1] == t_default || ts[1] == t_use
-		 || ts[1] == t_require)) {
+		if (i != 7)
+			ts[6] = t_default;
+		if (!(ts[6] == t_default || ts[6] == t_use
+		 || ts[6] == t_require)) {
 			ipsec_errcode = EIPSEC_INVAL_LEVEL;
 			return NULL;
 		}
@@ -253,23 +300,8 @@ breakbreak:
 		return NULL;
 	}
 
-	/* here, we should be having 2 tokens */
-	assert(i == 2);
-
-	/* we may have a proxy here */
-	isproxy = 0;
-	if (*p != '\0' && gettoken(p) == t_invalid) {
-		p = get_sockaddr(p, (struct sockaddr *)&proxy);
-		if (p == NULL) {
-			/* get_sockaddr updates ipsec_errcode */
-			return NULL;
-		}
-		isproxy++;
-		p = skipspaces(p);
-	}
-
-	if (parse_setreq(pbuf, values[ts[0]], values[ts[1]],
-			isproxy ? (struct sockaddr *)&proxy : NULL) < 0) {
+	if (parse_setreq(pbuf, values[ts[0]], values[ts[2]], values[ts[6]],
+			(struct sockaddr *)&src, (struct sockaddr *)&dst) < 0) {
 		/* parse_setreq updates ipsec_errcode */
 		return NULL;
 	}
@@ -299,9 +331,45 @@ parseerror:
 	return NULL;
 }
 
-static char *parse_policy(struct pbuf *pbuf, char *p)
+static char *
+parse_addresses(src, dst, p)
+	struct sockaddr *src, *dst;
+	char *p;
 {
-	enum token t;
+	char *p2;
+
+	if ((p2 = strchr(p, '-')) == NULL) {
+		ipsec_errcode = EIPSEC_INVAL_ADDRESS;
+		return NULL;
+	}
+	*p2 = '\0';
+	
+	p = get_sockaddr(p, src);
+	if (p == NULL) {
+		/* get_sockaddr updates ipsec_errcode */
+		return NULL;
+	}
+	*p2 = '-';
+	if (p != p2) {
+		ipsec_errcode = EIPSEC_INVAL_ADDRESS;
+		return NULL;
+	}
+
+	p = get_sockaddr(p2 + 1, dst);
+	if (p == NULL) {
+		/* get_sockaddr updates ipsec_errcode */
+		return NULL;
+	}
+
+	return p;
+}
+
+static char *
+parse_policy(pbuf, p)
+	struct pbuf *pbuf;
+	char *p;
+{
+	enum token t, dir;
 	int len;
 	struct sadb_x_policy *policy;
 
@@ -309,7 +377,21 @@ static char *parse_policy(struct pbuf *pbuf, char *p)
 	assert(pbuf);
 	ipsec_errcode = EIPSEC_NO_ERROR;
 
-	/* get the token */
+	/* get direction */
+	p = skipspaces(p);
+	dir = gettoken(p);
+	switch (dir) {
+	case t_in:
+	case t_out:
+		p = skiptoken(p, dir);
+		break;
+	default:
+		/* bzz, you're wrong */
+		ipsec_errcode = EIPSEC_INVAL_POLICY;
+		return NULL;
+	}
+
+	/* get policy type */
 	p = skipspaces(p);
 	t = gettoken(p);
 	switch (t) {
@@ -342,6 +424,7 @@ static char *parse_policy(struct pbuf *pbuf, char *p)
 			/* update later */
 		policy->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
 		policy->sadb_x_policy_type = values[t];
+		policy->sadb_x_policy_dir = values[dir];
 	}
 	pbuf->off += len;
 
@@ -362,7 +445,10 @@ static char *parse_policy(struct pbuf *pbuf, char *p)
 	return p;
 }
 
-static char *get_sockaddr(char *host, struct sockaddr *addr)
+static char *
+get_sockaddr(host, addr)
+	char *host;
+	struct sockaddr *addr;
 {
 	struct sockaddr *saddr = NULL;
 	struct addrinfo hints, *res;
@@ -416,18 +502,23 @@ static char *get_sockaddr(char *host, struct sockaddr *addr)
 	return p;
 }
 
-static int parse_setreq(struct pbuf *pbuf, int proto, int level,
-	struct sockaddr *proxy)
+static int
+parse_setreq(pbuf, proto, mode, level, src, dst)
+	struct pbuf *pbuf;
+	int proto, mode, level;
+	struct sockaddr *src, *dst;
 {
 	struct sadb_x_ipsecrequest *req;
 	int start;
 	int len;
 
 	assert(pbuf);
+	assert(src && dst);
 
+	ipsec_errcode = EIPSEC_NO_ERROR;
 	start = pbuf->off;
 
-	len = PFKEY_ALIGN8(sizeof(*req));
+	len = PFKEY_ALIGN8(sizeof(*req) + src->sa_len + dst->sa_len);
 	req = NULL;
 	if (pbuf->buf) {
 		if (pbuf->off + len > pbuf->buflen) {
@@ -436,37 +527,24 @@ static int parse_setreq(struct pbuf *pbuf, int proto, int level,
 			return -1;
 		}
 		req = (struct sadb_x_ipsecrequest *)&pbuf->buf[pbuf->off];
-		memset(req, 0, sizeof(*req));
-		req->sadb_x_ipsecrequest_len = len;	/* updated later */
+		memset(req, 0, len);
+		req->sadb_x_ipsecrequest_len = len;
 		req->sadb_x_ipsecrequest_proto = proto;
-		req->sadb_x_ipsecrequest_mode =
-			(proxy == NULL ? IPSEC_MODE_TRANSPORT
-				       : IPSEC_MODE_TUNNEL);
+		req->sadb_x_ipsecrequest_mode = mode;
 		req->sadb_x_ipsecrequest_level = level;
 
+		memcpy(req + 1, src, src->sa_len);
+		memcpy((caddr_t)(req + 1) + src->sa_len, dst, dst->sa_len);
 	}
 	pbuf->off += len;
-
-	if (proxy) {
-		len = PFKEY_ALIGN8(proxy->sa_len);
-		if (pbuf->buf) {
-			if (pbuf->off + len > pbuf->buflen) {
-				/* buffer overflow */
-				ipsec_errcode = EIPSEC_NO_BUFS;
-				return -1;
-			}
-			memset(&pbuf->buf[pbuf->off], 0, len);
-			memcpy(&pbuf->buf[pbuf->off], proxy, proxy->sa_len);
-		}
-		if (req)
-			req->sadb_x_ipsecrequest_len += len;
-		pbuf->off += len;
-	}
 
 	return 0;
 }
 
-static int parse_main(struct pbuf *pbuf, char *policy)
+static int
+parse_main(pbuf, policy)
+	struct pbuf *pbuf;
+	char *policy;
 {
 	char *p;
 
@@ -493,7 +571,9 @@ static int parse_main(struct pbuf *pbuf, char *policy)
 }
 
 /* %%% */
-int ipsec_get_policylen(char *policy)
+int
+ipsec_get_policylen(policy)
+	char *policy;
 {
 	struct pbuf pbuf;
 
@@ -505,7 +585,11 @@ int ipsec_get_policylen(char *policy)
 	return pbuf.off;
 }
 
-int ipsec_set_policy(char *buf, int len, char *policy)
+int
+ipsec_set_policy(buf, len, policy)
+	char *buf;
+	int len;
+	char *policy;
 {
 	struct pbuf pbuf;
 
@@ -524,7 +608,10 @@ int ipsec_set_policy(char *buf, int len, char *policy)
  * Must call free() later.
  * When delimiter == NULL, alternatively ' '(space) is applied.
  */
-char *ipsec_dump_policy(char *policy, char *delimiter)
+char *
+ipsec_dump_policy(policy, delimiter)
+	char *policy;
+	char *delimiter;
 {
 	struct sadb_x_policy *xpl = (struct sadb_x_policy *)policy;
 	struct sadb_x_ipsecrequest *xisr;
@@ -543,6 +630,16 @@ char *ipsec_dump_policy(char *policy, char *delimiter)
 	if (delimiter == NULL)
 		delimiter = " ";
 
+	switch (xpl->sadb_x_policy_dir) {
+	case IPSEC_DIR_ANY:
+	case IPSEC_DIR_INBOUND:
+	case IPSEC_DIR_OUTBOUND:
+		break;
+	default:
+		ipsec_errcode = EIPSEC_INVAL_DIR;
+		return NULL;
+	}
+
 	switch (xpl->sadb_x_policy_type) {
 	case IPSEC_POLICY_DISCARD:
 	case IPSEC_POLICY_NONE:
@@ -555,13 +652,18 @@ char *ipsec_dump_policy(char *policy, char *delimiter)
 		return NULL;
 	}
 
-	buflen = strlen(ipsp_strs[xpl->sadb_x_policy_type]) + 1;
+	buflen = strlen(ipsp_dir_strs[xpl->sadb_x_policy_dir])
+		+ 1	/* space */
+		+ strlen(ipsp_policy_strs[xpl->sadb_x_policy_type])
+		+ 1;	/* NUL */
 
 	if ((buf = malloc(buflen)) == NULL) {
 		ipsec_errcode = EIPSEC_NO_BUFS;
 		return NULL;
 	}
-	strcpy(buf, ipsp_strs[xpl->sadb_x_policy_type]);
+	strcpy(buf, ipsp_dir_strs[xpl->sadb_x_policy_dir]);
+	strcat(buf, " ");
+	strcat(buf, ipsp_policy_strs[xpl->sadb_x_policy_type]);
 
 	if (xpl->sadb_x_policy_type != IPSEC_POLICY_IPSEC) {
 		ipsec_errcode = EIPSEC_NO_ERROR;
@@ -617,6 +719,47 @@ char *ipsec_dump_policy(char *policy, char *delimiter)
 			return NULL;
 		}
 
+		switch (xisr->sadb_x_ipsecrequest_mode) {
+		case IPSEC_MODE_ANY:
+			strcat(buf, "/any");
+			break;
+		case IPSEC_MODE_TRANSPORT:
+			strcat(buf, "/transport");
+			break;
+		case IPSEC_MODE_TUNNEL:
+			strcat(buf, "/tunnel");
+			break;
+		default:
+			ipsec_errcode = EIPSEC_INVAL_MODE;
+			free(buf);
+			return NULL;
+		}
+
+	    {
+		char tmp[100]; /* XXX */
+		struct sockaddr *saddr = (struct sockaddr *)(xisr + 1);
+#if 1
+		inet_ntop(saddr->sa_family, _INADDRBYSA(saddr),
+			tmp, sizeof(tmp));
+#else
+		getnameinfo(saddr, saddr->sa_len, tmp, sizeof(tmp),
+			NULL, 0, NI_NUMERICHOST);
+#endif
+		strcat(buf, "/");
+		strcat(buf, tmp);
+		strcat(buf, "-");
+
+		saddr = (struct sockaddr *)((caddr_t)saddr + saddr->sa_len);
+#if 1
+		inet_ntop(saddr->sa_family, _INADDRBYSA(saddr),
+			tmp, sizeof(tmp));
+#else
+		getnameinfo(saddr, saddr->sa_len, tmp, sizeof(tmp),
+			NULL, 0, NI_NUMERICHOST);
+#endif
+		strcat(buf, tmp);
+	    }
+		
 		switch (xisr->sadb_x_ipsecrequest_level) {
 		case IPSEC_LEVEL_DEFAULT:
 			strcat(buf, "/default");
@@ -633,21 +776,6 @@ char *ipsec_dump_policy(char *policy, char *delimiter)
 			return NULL;
 		}
 
-		if (xisr->sadb_x_ipsecrequest_mode ==IPSEC_MODE_TUNNEL) {
-			char tmp[100]; /* XXX */
-			struct sockaddr *saddr =
-				(struct sockaddr *)((caddr_t)xisr + sizeof(*xisr));
-#if 1
-			inet_ntop(saddr->sa_family, _INADDRBYSA(saddr),
-				tmp, sizeof(tmp));
-#else
-			getnameinfo(saddr, saddr->sa_len, tmp, sizeof(tmp),
-				NULL, 0, NI_NUMERICHOST);
-#endif
-			strcat(buf, "/");
-			strcat(buf, tmp);
-		}
-		
 		xtlen -= xisr->sadb_x_ipsecrequest_len;
 		xisr = (struct sadb_x_ipsecrequest *)((caddr_t)xisr
 				+ xisr->sadb_x_ipsecrequest_len);
