@@ -404,7 +404,7 @@ ip6_stats(off, name)
 	p(ip6s_mext2m, "\t\t%qu two or more ext mbuf%s\n");
 	p(ip6s_exthdrtoolong, "\t%qu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%qu tunneling packet%s that can't find gif\n");
-	p(ip6s_toomanyhdr, "\t%qu packet%s discarded due to too may headers\n");
+	p(ip6s_toomanyhdr, "\t%qu packet%s discarded due to too many headers\n");
 
 	/* for debugging source address selection */
 #define PRINT_SCOPESTAT(s,i) do {\
