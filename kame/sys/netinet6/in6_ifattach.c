@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.90 2001/02/02 06:46:33 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.91 2001/02/02 14:15:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -926,8 +926,14 @@ in6_ifattach(ifp, altifp)
 		 * Adjust the flags so that in6_if_up will perform DAD.
 		 * I believe we should basically do DAD on non-loopback
 		 * interfaces. (20010122 jinmei@kame.net)
+		 * XXX: our DAD routine requires the interface up and running.
+		 * However, some of interfaces can be up before the RUNNING
+		 * status.  We skip DAD in such a case as a work around.
+		 * (But, is it really correct?)
 		 */
-		if ((ifp->if_flags & IFF_LOOPBACK) == 0) {
+		if ((ifp->if_flags & IFF_LOOPBACK) == 0 &&
+		    (ifp->if_flags & (IFF_UP|IFF_RUNNING)) ==
+		    (IFF_UP|IFF_RUNNING)) {
 			ia->ia6_flags &= ~IN6_IFF_NODAD;
 			ia->ia6_flags |= IN6_IFF_TENTATIVE;
 		}
