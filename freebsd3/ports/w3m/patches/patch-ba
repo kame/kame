@@ -1,11 +1,11 @@
---- config.h~	Tue Jan 11 03:49:52 2000
-+++ config.h	Tue Jan 11 03:50:56 2000
-@@ -55,7 +55,7 @@
+--- config.h.orig	Thu May 18 15:49:01 2000
++++ config.h	Thu May 18 16:04:28 2000
+@@ -69,7 +69,7 @@
  HELP_DIR_JA = %%PREFIX%%/share/doc/ja/w3m
- HELP_FILE = w3mhelp_en.html
+ LIB_DIR = %%PREFIX%%/libexec/w3m
  SYS_LIBRARIES = -lncurses
 -LOCAL_LIBRARIES = 
 +LOCAL_LIBRARIES = -L/usr/local/v6/lib -linet6
- #CC = gcc
- #MYCFLAGS = -g -I./gc
  KEYBIND_SRC = keybind.c
+ KEYBIND_OBJ = keybind.o
+ EXT=

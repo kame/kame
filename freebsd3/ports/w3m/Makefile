@@ -1,5 +1,4 @@
 # New ports collection makefile for:   w3m
-# Version required:		991028-2
 # Date Created:			7 Oct 1999
 # Whom:				MANTANI Nobutaka <nobutaka@nobutaka.com>
 #
@@ -8,9 +7,9 @@
 
 DISTNAME=	w3m-${W3M_DIST_VER}
 PKGNAME?=	w3m-${W3M_VER}
-W3M_DIST_VER=	991203
+W3M_DIST_VER=	0.1.9
 W3M_VER=	${W3M_DIST_VER}
-CATEGORIES?=	www
+CATEGORIES?=	www #ipv6
 MASTER_SITES=	ftp://ei5nazha.yz.yamagata-u.ac.jp/w3m/ \
 		ftp://ftp.firedrake.org/w3m/ \
 		http://www.instinct.org/~pgl/w3m/ \
@@ -18,48 +17,48 @@ MASTER_SITES=	ftp://ei5nazha.yz.yamagata-u.ac.jp/w3m/ \
 
 MAINTAINER=	nobutaka@nobutaka.com
 
-RESTRICTED=     "Contains cryptography"
-
 BUILD_DEPENDS=	${LOCALBASE}/lib/libgc.a:${PORTSDIR}/devel/boehm-gc
 
 WRKSRC=		${WRKDIR}/w3m
 MAN1=		w3m.1
 MANLANG=	""
+CFLAGS=		-pipe
 
 TARGET=		${WRKSRC}/config.h
-DOCS=		FAQ.html MANUAL.html MANUAL_lynx.html README \
+DOCS=		FAQ.html HISTORY MANUAL.html README \
 		README.dict README.func STORY.html keymap.default \
 		keymap.lynx menu.default menu.submenu
 SED_CMD=	-e "s,%%PREFIX%%,${PREFIX},g" \
 		-e "s,%%LOCALBASE%%,${LOCALBASE},g"
 
-#.if defined(USE_INET6)
+.include <bsd.port.pre.mk>
+
+#.if ${OSVERSION} >= 400014
 SED_CMD+=	-e "s,undef INET6,define INET6,g"
 #.endif
 
 .if defined(JAPANESE)
-SED_CMD+=	-e "s,undef JAPANESE,define JAPANESE,g" \
-		-e "s,w3mhelp_en.html,w3mhelp_ja.html,g"
+SED_CMD+=	-e "s,undef JAPANESE,define JAPANESE,g"
 MANLANG+=	ja
-DOCS_JP=	${DOCS} HISTORY HISTORY.kokb README.keymap README.kokb \
+DOCS_JP=	${DOCS} HISTORY.kokb README.keymap README.kokb \
 		README.menu
 .endif
 
-.if defined(USE_SSL)
-LIB_DEPENDS+=	crypto.1:${PORTSDIR}/security/openssl \
-		ssl.1:${PORTSDIR}/security/openssl
+.if defined(USE_OPENSSL)
+SSL_CFLAGS=	-I${OPENSSLINC}/openssl -I${OPENSSLINC}
+SSL_LIBS=	-L${OPENSSLLIB} -lssl -lcrypto
 
-SSL_CFLAGS=	-I${LOCALBASE}/include/openssl
-SSL_LIBS=	-lssl -lcrypto
-.if defined(USA_RESIDENT) && ${USA_RESIDENT} == YES
+SED_CMD+=	-e "s,undef USE_SSL,define USE_SSL,g" \
+		-e "s,undef USE_SSL_VERIFY, define USE_SSL_VERIFY,g"
+
+.if defined(OPENSSL_RSAREF)
 EXTRA_SSL_LIBS=	-lRSAglue -lrsaref
 .endif
-
-SED_CMD+=	-e "s,undef USE_SSL,define USE_SSL,g"
+MAKE_FLAGS+=	DEFS="${SSL_CFLAGS} -I${LOCALBASE}/include" \
+		LIBS="${SSL_LIBS} ${EXTRA_SSL_LIBS} -L${LOCALBASE}/lib"
+.else
+MAKE_FLAGS+=	DEFS="-I${LOCALBASE}/include" LIBS="-L${LOCALBASE}/lib"
 .endif
-
-MAKE_FLAGS+=	DEFS="-I${LOCALBASE}/include ${SSL_CFLAGS}" \
-		LIBS="-L${LOCALBASE}/lib ${SSL_LIBS} ${EXTRA_SSL_LIBS}"
 
 post-configure:
 	@${CP} ${TARGET} ${TARGET}.in
@@ -69,19 +68,19 @@ post-install:
 .if !defined(NOPORTDOCS)
 .if defined(JAPANESE)
 	@${MKDIR} ${PREFIX}/share/doc/ja/w3m
-	@(cd ${WRKSRC}/doc-jp; \
+	@cd ${WRKSRC}/doc-jp; \
 	for i in ${DOCS_JP} ; do \
 		${INSTALL_DATA} $$i ${PREFIX}/share/doc/ja/w3m/ ; \
-	done)
+	done
 .endif
-	@(cd ${WRKSRC}/doc; \
+	@cd ${WRKSRC}/doc; \
 	for i in ${DOCS} ; do \
 		${INSTALL_DATA} $$i ${PREFIX}/share/doc/w3m/ ; \
-	done)
+	done
 .endif
 	@${INSTALL_MAN} ${WRKSRC}/doc/w3m.1 ${PREFIX}/man/man1
 .if defined(JAPANESE)
 	@${INSTALL_MAN} ${WRKSRC}/doc-jp/w3m.1 ${PREFIX}/man/ja/man1
 .endif
 
-.include <bsd.port.mk>
+.include <bsd.port.post.mk>
