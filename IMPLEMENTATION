@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.254 2001/07/29 10:40:20 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.255 2001/07/30 07:05:23 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1979,10 +1979,11 @@ draft-touch-ipsec-vpn (transportmode + Pseudo-interface) approach
 	PRO: run routing daemons across IPsec tunnels
 	PRO: source address selection can be done normally, by looking at
 		IPsec tunnel pseudo devices
-	CON: possibility of infinite loops and kernel stack overflows
+	CON: on outbound, possibility of infinite loops if routing setup
+		is wrong
 	CON: due to differences in encap/decap logic from RFC2401, it may not
-		interoperate with very pick RFC2401 implementations
-		(those who checks TOS bits, for example)
+		interoperate with very picky RFC2401 implementations
+		(those who check TOS bits, for example)
 	CON: cannot negotiate IKE with other IPsec tunnel-mode devices
 		(the other end has to implement 
 	???: IPv6 scope zone is likely to be different from the real ethernet
@@ -1990,14 +1991,28 @@ draft-touch-ipsec-vpn (transportmode + Pseudo-interface) approach
 Heterogeneous approach
 	PRO: IKE can operate normally
 	PRO: run routing daemons across IPsec tunnels
+	XXXX routing exchanges do not work right now
 	PRO: no infinite possibility of infinite loops on outbound
 		(for inbound it is easier to avoid it)
+	PRO: easy to control source address selection on originating cases
+		(need an explicit ifconfig on sec* interface, though)
 	CON: IPv6 scope zone is handled in a very strange way.  Packets can go
 		out of scope zone A and comes back from B.
 
+The recommendation is different depending on the situation you have:
+- use draft-touch-ipsec-vpn if you have the control over the other end.
+  this one is the best in terms of simplicity.
+- if the other end is normal IPsec device with RFC2401 implementation,
+  you need to use either RFC2401 or heterogeneous, otherwise you won't be
+  able to run IKE.
+- use heterogeneous approach if you do not use IPv6 scoped addresses.
+- use RFC2401 approach if you just want to forward packets back and forth
+  and there's no plan to use IPsec gateway itself as an originating device.
+
 4.8.1 RFC2401 IPsec tunnel mode approach
 
-If you configure your kernel without "pseudo-device sec"
+This case applies only if you configure your kernel without "pseudo-device sec".
+
 To configure your device as RFC2401 IPsec tunnel mode endpoint, you will
 use "tunnel" keyword in setkey(8) "spdadd" directives.  Let us assume the
 following topology (A and B could be a network, like prefix/length):
@@ -2055,23 +2070,31 @@ We can also exchange routing information over the tunnel (gif0), as the tunnel
 is represented as a pseudo interface (dynamic routes points to the
 pseudo interface).
 
-There is a big drawback, however; with this, you can use IKE if and only if
+There is a big drawbacks, however; with this, you can use IKE if and only if
 the other end is using draft-touch-ipsec-vpn approach too.  Since racoon(8)
 grabs phase 2 IKE proposals from the kernel SPD database, you will be
 negotiating IPsec transport-mode SAs with the other end, not tunnel-mode SAs.
+Also, since the encapsulation mechanism is different from RFC2401, you may not
+be able to interoperate with a picky RFC2401 implementations - if the other
+end checks certain outer IP header fields (like TOS), you will not be able to
+interoperate.
 
 4.8.3 Heterogeneous approach
 
+This case applies only if you configure your kernel with "pseudo-device sec".
+
 With this approach, the kernel will generate pseudo device like "sec0",
 just for inbound processing, for every tunnel-mode IPsec policies you specify.
+With the following policy, you will get "sec0" interface, with C and D
+specified as the tunnel endpoints, automatically.
 
 	# setkey -c <<EOF
 	spdadd A B any -P out ipsec esp/tunnel/C-D/use;
 	spdadd A B any -P in ipsec esp/tunnel/D-C/use;
 	^D
 
-Additionally, if you would like to control the source address selection, you
-can have addresses on to the tunnel:
+Additionally, if you would like to control the source address selection for
+originating case, you can have addresses on to the tunnel:
 
 	# ifconfig sec0 A B
 
@@ -2081,6 +2104,7 @@ Outgoing traffic is captured by filters like RFC2401-like devices, and
 there's no fear of kernel stack overflow.  Incoming traffic will be
 decapsulated by "sec0" tunnel pseudo devices, so it is possible to have
 routing entries against them (routing daemons should work fine).
+XXXX routing exchanges do not work right now
 
 One big drawback is that we will have a very strange behavior in terms of
 IPv6 scope address architecture - if we throw packet to the other end
