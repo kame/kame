@@ -1,3 +1,5 @@
+/*	$KAME$	*/
+  
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10 2000/01/16 18:00:06 shin Exp $
  */
 
 /*
@@ -440,8 +441,6 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	if (inp->in6p_route.ro_rt)
 		ifp = inp->in6p_route.ro_rt->rt_ifp;
 
-	inp->in6p_ip6_hlim = (u_int8_t)in6_selecthlim(inp, ifp);
-
 	return(0);
 }
 
@@ -499,6 +498,7 @@ in6_pcbconnect(inp, nam, p)
 	return (0);
 }
 
+#if 0
 /*
  * Return an IPv6 address, which is the most appropriate for given
  * destination and user specified options.
@@ -699,6 +699,7 @@ in6_selecthlim(in6p, ifp)
 	else
 		return(ip6_defhlim);
 }
+#endif
 
 void
 in6_pcbdisconnect(inp)
@@ -719,28 +720,20 @@ in6_pcbdetach(inp)
 	struct inpcbinfo *ipi = inp->inp_pcbinfo;
 
 #ifdef IPSEC
-	if (sotoinpcb(so) != 0)
-		key_freeso(so);
-	ipsec6_delete_pcbpolicy(inp);
+	if (inp->in6p_sp != NULL)
+		ipsec6_delete_pcbpolicy(inp);
 #endif /* IPSEC */
 	inp->inp_gencnt = ++ipi->ipi_gencnt;
 	in_pcbremlists(inp);
 	sotoinpcb(so) = 0;
 	sofree(so);
-	if (inp->in6p_options)
-		m_freem(inp->in6p_options);
-	if (inp->in6p_outputopts) {
-		if (inp->in6p_outputopts->ip6po_rthdr &&
-		    inp->in6p_outputopts->ip6po_route.ro_rt)
-			RTFREE(inp->in6p_outputopts->ip6po_route.ro_rt);
-		if (inp->in6p_outputopts->ip6po_m)
-			(void)m_free(inp->in6p_outputopts->ip6po_m);
-		free(inp->in6p_outputopts, M_IP6OPT);
-	}
+
+	if (inp->in6p_inputopts) /* Free all received options. */
+ 		m_freem(inp->in6p_inputopts->head); /* this is safe */
+ 	ip6_freepcbopts(inp->in6p_outputopts);
+ 	ip6_freemoptions(inp->in6p_moptions);
 	if (inp->in6p_route.ro_rt)
 		rtfree(inp->in6p_route.ro_rt);
-	ip6_freemoptions(inp->in6p_moptions);
-
 	/* Check and free IPv4 related resources in case of mapped addr */
 	if (inp->inp_options)
 		(void)m_free(inp->inp_options);
@@ -892,10 +885,13 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 	int cmd;
 	void (*notify) __P((struct inpcb *, int));
 {
-	struct inpcb *inp, *oinp;
+	struct inpcb *inp, *ninp;
 	struct in6_addr faddr6;
 	u_short	fport = fport_arg, lport = lport_arg;
 	int errno, s;
+	void (*notify2) __P((struct inpcb *, int));
+
+	notify2 = NULL;
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return;
@@ -905,8 +901,9 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 
 	/*
 	 * Redirects go to all references to the destination,
-	 * and use in_rtchange to invalidate the route cache.
-	 * Dead host indications: notify all references to the destination.
+	 * and use in6_rtchange to invalidate the route cache.
+	 * Dead host indications: also use in6_rtchange to invalidate
+	 * the cache, and deliver the error to all the sockets.
 	 * Otherwise, if we have knowledge of the local port and address,
 	 * deliver only to that socket.
 	 */
@@ -914,29 +911,52 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		fport = 0;
 		lport = 0;
 		bzero((caddr_t)laddr6, sizeof(*laddr6));
-		if (cmd != PRC_HOSTDEAD)
-			notify = in6_rtchange;
+
+ 		/*
+ 		 * Keep the old notify function to store a soft error
+ 		 * in each PCB.
+ 		 */
+		if (cmd == PRC_HOSTDEAD && notify != in6_rtchange)
+ 			notify2 = notify;
+
+ 		notify = in6_rtchange;
 	}
 	errno = inet6ctlerrmap[cmd];
 	s = splnet();
-	for (inp = LIST_FIRST(head); inp != NULL;) {
-		if ((inp->inp_vflag & INP_IPV6) == 0) {
-			inp = LIST_NEXT(inp, inp_list);
+ 	for (inp = LIST_FIRST(head); inp != NULL; inp = ninp) {
+ 		ninp = LIST_NEXT(inp, inp_list);
+
+ 		if ((inp->inp_vflag & INP_IPV6) == NULL)
 			continue;
-		}
+
+ 		if (notify == in6_rtchange) {
+ 			/*
+ 			 * Since a non-connected PCB might have a cached route,
+ 			 * we always call in6_rtchange without matching
+ 			 * the PCB to the src/dst pair.
+ 			 *
+ 			 * XXX: we assume in6_rtchange does not free the PCB.
+ 			 */
+ 			if (IN6_ARE_ADDR_EQUAL(&inp->in6p_route.ro_dst.sin6_addr,
+ 					       &faddr6))
+ 				in6_rtchange(inp, errno);
+
+ 			if (notify2 == NULL)
+ 				continue;
+
+ 			notify = notify2;
+  		}
+
 		if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &faddr6) ||
 		   inp->inp_socket == 0 ||
 		   (lport && inp->inp_lport != lport) ||
 		   (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
 		    !IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, laddr6)) ||
-		   (fport && inp->inp_fport != fport)) {
-			inp = LIST_NEXT(inp, inp_list);
+		    (fport && inp->inp_fport != fport))
 			continue;
-		}
-		oinp = inp;
-		inp = LIST_NEXT(inp, inp_list);
+
 		if (notify)
-			(*notify)(oinp, errno);
+ 			(*notify)(inp, errno);
 	}
 	splx(s);
 }
