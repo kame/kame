@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.98 2001/01/31 05:32:56 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.99 2001/01/31 09:09:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2317,8 +2317,8 @@ sadbsecas2str(src, dst, proto, spi, mode)
 	if (spi) {
 		p += i;
 		blen -= i;
-		snprintf(p, blen, "spi=%u(0x%x)", (u_int32_t)ntohl(spi),
-		    (u_int32_t)ntohl(spi));
+		snprintf(p, blen, "spi=%lu(0x%lx)", (unsigned long)ntohl(spi),
+		    (unsigned long)ntohl(spi));
 	}
 
 	return buf;

@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.24 2000/12/15 13:43:57 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.25 2001/01/31 09:09:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -797,12 +797,12 @@ printsaproto(pri, pr)
 		return;
 
 	plog(pri, LOCATION, NULL,
-		" (proto_id=%s spisize=%d spi=%08x spi_p=%08x "
+		" (proto_id=%s spisize=%d spi=%08lx spi_p=%08lx "
 		"encmode=%s reqid=%d:%d)\n",
 		s_ipsecdoi_proto(pr->proto_id),
 		pr->spisize,
-		(u_int32_t)ntohl(pr->spi),
-		(u_int32_t)ntohl(pr->spi_p),
+		(unsigned long)ntohl(pr->spi),
+		(unsigned long)ntohl(pr->spi_p),
 		s_ipsecdoi_attr_v(IPSECDOI_ATTR_ENC_MODE, pr->encmode),
 		pr->reqid_in, pr->reqid_out);
 
