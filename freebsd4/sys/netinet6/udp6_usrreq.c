@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.36 2001/08/16 08:52:43 keiichi Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.37 2001/08/16 09:58:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -735,9 +735,9 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		if (hasv4addr) {
 			struct pr_usrreqs *pru;
 
-			if (inp->inp_flags & IN6P_IPV6_V6ONLY) {
+			if ((inp->inp_flags & IN6P_IPV6_V6ONLY)) {
 				/* 
-				 * since a user of this socket set an
+				 * since a user of this socket set the
 				 * IPV6_V6ONLY flag, we discard this
 				 * datagram destined to a v4 addr.
 				 */
