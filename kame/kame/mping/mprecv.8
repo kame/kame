@@ -1,4 +1,4 @@
-.\"	$KAME: mprecv.8,v 1.3 2000/11/10 12:12:11 itojun Exp $
+.\"	$KAME: mprecv.8,v 1.4 2000/12/05 08:51:35 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -37,16 +37,31 @@
 .\"
 .Sh SYNOPSIS
 .Nm mprecv
-.Op Fl d
+.Op Fl dv
+.Bk -words
 .Op Fl p Ar port
-.Op Fl v
+.Ek
+.Bk -words
 .Op Fl D Ar dumpfile
+.Ek
+.Bk -words
 .Op Fl H Ar history
+.Ek
+.Bk -words
+.Op Fl i Ar interface
+.Ek
+.Bk -words
 .Op Fl L Ar logfile
+.Ek
+.Bk -words
+.Op Fl m Ar mcastaddr
+.Ek
+.Bk -words
 .Op Fl T Ar loginterval
+.Ek
+.Bk -words
 .Op Fl X Ar expire
-.Fl i Ar interface
-.Fl m Ar mcastaddr
+.Ek
 .\"
 .Sh DESCRIPTION
 The
@@ -79,11 +94,28 @@ is used.
 .It Fl H Ar history
 Specify the number of "packet lost" history kept for each logging
 interval.
+.It Fl i Ar interface
+Specify the name of
+.Ar interface
+for listening to multicast stream.
+If unicast address is specified with
+.Fl m ,
+or
+.Fl m
+is omitted, the option has no effect.
 .It Fl L Ar logfile
 Specify the name of logfile.
 By default
 .Pa /var/log/mprecv.log
 is used.
+.It Fl m Ar mcastaddr
+Specify multicast adddress to listen to.
+If
+.Fl m
+is not specified,
+.Nm
+will listen to wildcard IPv6 address
+.Pq Li :: .
 .It Fl T Ar loginterval
 Specify the interval of status dump to
 .Ar logfile

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: mprecv.c,v 1.2 1999/12/07 14:03:57 itojun Exp $	*/
+/*	$Id: mprecv.c,v 1.3 2000/12/05 08:51:35 itojun Exp $	*/
 
 #include "mping.h"
 
@@ -485,5 +485,7 @@ clear_interval(sig)
 void
 usage()
 {
-	fprintf(stderr, "Usage: %s [-d][-p port][-v][-D dumpfile][-L logfile][-T loginterval]-i interface -m mcastaddr\n", argv0);
+	fprintf(stderr,
+"Usage: %s [-dv] [-p port] [-D dumpfile] [-H history] [-i interface] \n"
+"        [-L logfile] [-m mcastaddr] [-T loginterval] [-X expire]\n", argv0);
 }
