@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.24 2002/04/26 06:30:48 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.25 2002/05/15 13:49:32 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -219,6 +219,24 @@ writeXlateHeader(int type)
 		printf("\n");
 	}
 
+}
+
+
+void
+showTTLs()
+{
+	const char *fn = __FUNCTION__;
+
+	int	icmp, tcp, udp;
+
+	if (getValue(NATPTCTL_MAXTTYICMP, (caddr_t)&icmp) <= 0)
+		err(1, "%s(): failure on read", fn);
+	if (getValue(NATPTCTL_MAXTTYTCP, (caddr_t)&tcp) <= 0)
+		err(1, "%s(): failure on read", fn);
+	if (getValue(NATPTCTL_MAXTTYUDP, (caddr_t)&udp) <= 0)
+		err(1, "%s(): failure on read", fn);
+
+	printf("maxTTLs: icmp=%d, tcp=%d, udp=%d\n", icmp, tcp, udp);
 }
 
 
