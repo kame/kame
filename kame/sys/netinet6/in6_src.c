@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.81 2001/10/01 11:10:37 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.82 2001/10/01 12:46:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -446,6 +446,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			dst_policy = lookup_addrsel_policy(dstsock);
 		if (dst_policy->label != ADDR_LABEL_NOTAPP) {
 			new_policy = lookup_addrsel_policy(&ia->ia_addr);
+			if (best_policy == NULL)
+				best_policy = lookup_addrsel_policy(&ia_best->ia_addr);
 			if (dst_policy->label == best_policy->label &&
 			    dst_policy->label != new_policy->label)
 				NEXT(6);
