@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: pim6sd.conf.5,v 1.7 1999/12/03 07:31:45 jinmei Exp $
+.\"	$Id: pim6sd.conf.5,v 1.8 2000/04/28 13:43:09 jinmei Exp $
 .\"
 .Dd Oct 6, 1999
 .Dt PIM6SD.CONF 5
@@ -255,6 +255,7 @@ specifies a group prefix that the RP will handle.
 .Op Ar interface
 .Op Ic time Ar time
 .Op Ic priority Ar priority
+.Op Ic masklen Ar masklen
 .Ic ;
 .Xc
 Specifies to act as a candidate bootstrap router(BSR).
@@ -276,6 +277,11 @@ Another optional parameter
 .Ic priority
 specifies the priority of the RP.
 The default value is 0, which means the lowest priority.
+Hash mask length can also be specified by the
+.Ic masklen
+parametr. Its value,
+.Ar masklen ,
+must be no less than 0 and no greater than 128.
 .\"
 .It Xo
 .Ic switch_register_threshold Ic rate Ar rate Ic interval Ar interval;
