@@ -33,10 +33,10 @@
  * - Return values.  There are nonstandard return values defined and used
  *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
- * - IPv4 shortened form.  RFC2553 is silent about it.  XNET 5.2 says to
- *   use inet_aton() to convert IPv4 numeric to binary (alows shortened form
- *   as a result).
- *   current code - disallow shortened form (due to use of inet_pton).
+ * - IPv4 classful (shortened) form.  RFC2553 is silent about it.  XNET 5.2
+ *   says to use inet_aton() to convert IPv4 numeric to binary (alows
+ *   classful form as a result).
+ *   current code - allow classful form for IPv4 (due to use of inet_aton).
  * - freeaddrinfo(NULL).  RFC2553 is silent about it.  XNET 5.2 says it is
  *   invalid.
  *   current code - SEGV on freeaddrinfo(NULL)
@@ -748,15 +748,33 @@ explore_numeric(pai, hostname, servname, res)
 	afd = find_afd(pai->ai_family);
 	flags = pai->ai_flags;
 
-	if (inet_pton(afd->a_af, hostname, pton) == 1) {
-		if (pai->ai_family == afd->a_af ||
-		    pai->ai_family == PF_UNSPEC /*?*/) {
-			GET_AI(cur->ai_next, afd, pton);
-			GET_PORT(cur->ai_next, servname);
-			while (cur && cur->ai_next)
-				cur = cur->ai_next;
-		} else 
-			ERR(EAI_FAMILY);	/*xxx*/
+	switch (afd->a_af) {
+#if 1 /*X/Open spec*/
+	case AF_INET:
+		if (inet_aton(hostname, (struct in_addr *)pton) == 1) {
+			if (pai->ai_family == afd->a_af ||
+			    pai->ai_family == PF_UNSPEC /*?*/) {
+				GET_AI(cur->ai_next, afd, pton);
+				GET_PORT(cur->ai_next, servname);
+				while (cur && cur->ai_next)
+					cur = cur->ai_next;
+			} else 
+				ERR(EAI_FAMILY);	/*xxx*/
+		}
+		break;
+#endif
+	default:
+		if (inet_pton(afd->a_af, hostname, pton) == 1) {
+			if (pai->ai_family == afd->a_af ||
+			    pai->ai_family == PF_UNSPEC /*?*/) {
+				GET_AI(cur->ai_next, afd, pton);
+				GET_PORT(cur->ai_next, servname);
+				while (cur && cur->ai_next)
+					cur = cur->ai_next;
+			} else 
+				ERR(EAI_FAMILY);	/*xxx*/
+		}
+		break;
 	}
 
 	*res = sentinel.ai_next;
