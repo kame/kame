@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.16 2000/05/31 12:16:11 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.17 2000/05/31 12:41:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -193,18 +193,26 @@ main(argc, argv)
 				err(1, "join");
 				/*NOTREACHED*/
 			}
+			if (setif(sock[i], sockaf[i], intface) < 0) {
+				errx(1, "setif");
+				/*NOTREACHED*/
+			}
 			break;
-#if 0
 		case AF_INET:
 			ready4++;
-			break;
+#if 0
+			if (join(sock[0], sockaf[i], MDNS_GROUP4) < 0) {
+				err(1, "join");
+				/*NOTREACHED*/
+			}
+			if (setif(sock[i], sockaf[i], intface) < 0) {
+				errx(1, "setif");
+				/*NOTREACHED*/
+			}
 #endif
+			break;
 		}
 
-		if (setif(sock[i], sockaf[i], intface) < 0) {
-			errx(1, "setif");
-			/*NOTREACHED*/
-		}
 	}
 
 	if (ready4)
@@ -351,6 +359,7 @@ join0(s, ai)
 	int s;
 	const struct addrinfo *ai;
 {
+	struct ip_mreq mreq4;
 	struct ipv6_mreq mreq6;
 
 	switch (ai->ai_family) {
@@ -370,7 +379,15 @@ join0(s, ai)
 		}
 		break;
 	case AF_INET:
-		/* XXX do something */
+		memset(&mreq4, 0, sizeof(mreq4));
+		mreq4.imr_multiaddr =
+		    ((struct sockaddr_in *)ai->ai_addr)->sin_addr;
+#if 0
+		if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq4,
+		    sizeof(mreq4)) != 0) {
+			return -1;
+		}
+#endif
 		break;
 	default:
 		errno = EAFNOSUPPORT;
