@@ -1,0 +1,5 @@
+sbin/leafnode
+sbin/fetchnews
+sbin/texpire
+sbin/checkgroups
+sbin/leaftool
