@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.8 2002/01/20 15:23:45 suz Exp $
+ * $KAME: mld6v2.c,v 1.9 2002/03/29 13:34:50 jinmei Exp $
  */
 
 /*
@@ -105,7 +105,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 		unsigned int delay, int datalen, int alert, int sflag,
 		int qrv, int qqic)
 {
-    static struct sockaddr_in6 dst_sa = { sizeof(dst_sa), AF_INET6 };
+    struct sockaddr_in6 dst_sa;
     struct mldv2_hdr *mhp = (struct mldv2_hdr *) mld6_send_buf;
     int             ctllen, hbhlen = 0;
     int             nbsrc = 0;
@@ -115,6 +115,10 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
     register int    vifi;
     struct uvif    *v;
     struct listaddr *g = NULL;
+
+    memset(&dst_sa, 0, sizeof(dst_sa));
+    dst_sa.sin6_family = AF_INET6;
+    dst_sa.sin6_len = sizeof(dst_sa);
 
     if ((vifi = local_address(src)) == NO_VIF) {
         IF_DEBUG(DEBUG_MLD)

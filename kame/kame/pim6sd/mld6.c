@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.39 2002/01/20 10:25:20 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.40 2002/03/29 13:34:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -442,9 +442,13 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
     struct sockaddr_in6 *src, *dst;
     struct in6_addr *group;
 {
-    static struct sockaddr_in6 dst_sa = {sizeof(dst_sa), AF_INET6};
+    struct sockaddr_in6 dst_sa;
     struct mld_hdr *mhp = (struct mld_hdr *)mld6_send_buf;
     int ctllen, hbhlen = 0;
+
+    memset(&dst_sa, 0, sizeof(dst_sa));
+    dst_sa.sin6_family = AF_INET6;
+    dst_sa.sin6_len = sizeof(dst_sa);
 
     switch(type) {
     case MLD_MTRACE:
