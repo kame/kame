@@ -1,4 +1,4 @@
-/*	$KAME: prefix.c,v 1.5 2000/11/19 11:45:38 itojun Exp $	*/
+/*	$KAME: prefix.c,v 1.6 2000/11/24 04:46:28 sakane Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -68,7 +68,7 @@ prefix_set(s, prefix, slash)
 {
 	char *p, *q, *r;
 	struct addrinfo hints, *res = NULL;
-	int max;
+	int max = 0;
 	char *a;
 
 	p = strdup(s);
