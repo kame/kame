@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_init.c	8.1 (Berkeley) 6/7/93";
-static char rcsid[] = "$Id: res_init.c,v 1.8 2000/06/18 20:48:14 itojun Exp $";
+static char rcsid[] = "$Id: res_init.c,v 1.9 2000/06/18 20:49:19 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -214,6 +214,7 @@ res_init()
 #endif
 	_res.nsaddr.sin_family = AF_INET;
 	_res.nsaddr.sin_port = htons(NAMESERVER_PORT);
+	_res.nsaddr.sin_len = sizeof(struct sockaddr_in);
 #ifdef INET6
 	if (sizeof(_res_ext.nsaddr) >= _res.nsaddr.sin_len)
 		memcpy(&_res_ext.nsaddr, &_res.nsaddr, _res.nsaddr.sin_len);
