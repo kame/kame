@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1389 2000/11/15 04:41:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.1390 2000/11/15 04:43:48 jinmei Exp $
 
 <200011>
 2000-11-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -10,7 +10,7 @@ $KAME: CHANGELOG,v 1.1389 2000/11/15 04:41:59 jinmei Exp $
 	* bsdi4/sys/netinet6/in6_pcb.c (in6_pcbnotify):
 	IPV6_RECVPATHMTU socket option support.
 	Note that the current implementation is not fully conformant to
-	the latest rfc2292bis spec. The implementation use a special
+	the latest rfc2292bis spec. The implementation uses a special
 	control structure to pass both the MTU value and the destination
 	to the application, while the spec says the corresponding
 	ancillary data just contains the MTU value.
