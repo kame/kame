@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.12 2001/02/05 06:42:06 jinmei Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.13 2001/03/03 12:15:59 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,9 +337,10 @@ natpt_uattach(struct socket *so, int proto, struct proc *p)
 	privileged = (so->so_state & SS_PRIV);
 #endif
 
-	return(EPERM);
-
-	return (natpt_attach(so, proto));
+	if (privileged)
+		return (natpt_attach(so, proto));
+	else
+		return(EPERM);
 }
 
 
