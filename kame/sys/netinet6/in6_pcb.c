@@ -1,4 +1,4 @@
-/*	$KAME$	*/
+/*	$KAME: in6_pcb.c,v 1.34 2000/02/22 14:04:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -254,7 +254,8 @@ in6_pcbbind(in6p, nam)
 		if (lport) {
 			/* GROSS */
 			if (ntohs(lport) < IPV6PORT_RESERVED &&
-			   (error = suser(p->p_ucred, &p->p_acflag)))
+			    (p == 0 ||
+			     (error = suser(p->p_ucred, &p->p_acflag))))
 				return(EACCES);
 
 			if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
