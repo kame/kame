@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.351 1999/12/19 15:15:34 itojun Exp $
+$Id: CHANGELOG,v 1.352 1999/12/20 08:03:47 itojun Exp $
 
 <199912>
+Mon Dec 20 17:05:42 JST 1999  sumikawa@kame.net
+	* freebsd3/ports/{xtris,netris}, netbsd/pkgsrc/games/{xtris,netris}:
+	  tetris over IPv6 network.
+	  From: Hideaki YOSHIFUJI <yoshfuji@ecei.tohoku.ac.jp>
+
 Mon Dec 20 00:16:49 JST 1999  itojun@iijlab.net
 	* kame/faithd/faithd.c: handle connetion to IPv4 mapped address
 	  correctly.  the bug can allow DoS attack.
