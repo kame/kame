@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.19 2000/02/16 03:45:34 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.20 2000/03/01 08:01:45 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -1358,8 +1358,15 @@ ident_ir3sendmx(iph1)
 #endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
-		tlen += sizeof(*gen) + iph1->hash->l;
-		break;
+		plog(logp, LOCATION, NULL,
+			"not supported authentication type %d\n",
+			iph1->approval->authmethod);
+		goto end;
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid authentication type %d\n",
+			iph1->approval->authmethod);
+		goto end;
 	}
 
 #ifdef HAVE_PRINT_ISAKMP_C
