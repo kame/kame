@@ -139,8 +139,9 @@ cksum6(int linkhdrlen)
 	ipovly[38] = 0;
 	ipovly[39] = nxt;
 
-	*cksum = 0;
-	*cksum = in_cksum((u_short *)(packet + off), (u_short *)ipovly, len);
+	if (*cksum == 0)
+		*cksum = in_cksum((u_short *)(packet + off),
+				  (u_short *)ipovly, len);
 	return;
 }
 
