@@ -11,10 +11,6 @@ options 	NEW_STRUCT_ROUTE
 #options 	IPV6FIREWALL_VERBOSE
 #options 	IPV6FIREWALL_DEFAULT_TO_ACCEPT
 
-# Network Address Translation - Protocol Translation (NAT-PT)
-# not tested
-#options 	NATPT
-
 # a pseudo device needed for ALTQ
 pseudo-device	altq			# altq pseudo-device
 
