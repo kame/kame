@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.20 2001/11/16 07:51:12 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.21 2001/11/16 09:48:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -119,22 +119,26 @@ mip6_icmp6_input(m, off, icmp6len)
 	struct mip6_bu *mbu;
 	struct mip6_bc *mbc;
 	struct in6_addr *laddr, *paddr;
+	int error = 0;
 
+	/* header pullup/down is already done in icmp6_input(). */
 	ip6 = mtod(m, struct ip6_hdr *);
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
 
 	switch (icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
 		/*
-		 * the contacting MN might move to somewhere.  in
-		 * current code, we remove a related BC entry
-		 * immediately.  should we be more patient ?
+		 * the contacting mobile node might move to somewhere.
+		 * in current code, we remove the corresponding
+		 * binding cache entry immediately.  should we be more
+		 * patient?
 		 */
 		mip6_icmp6_find_addr((caddr_t)icmp6, icmp6len, &laddr, &paddr);
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, paddr);
 		if (mbc) {
 			mip6log((LOG_INFO,
-				 "%s:%d: a MN (%s) moved.\n",
+				 "%s:%d: "
+				 "a mobile node (%s) moved.\n",
 				 __FILE__, __LINE__,
 				 ip6_sprintf(paddr)));
 			mip6_bc_list_remove(&mip6_bc_list, mbc);
@@ -144,16 +148,24 @@ mip6_icmp6_input(m, off, icmp6len)
 	case ICMP6_HADISCOV_REQUEST:
 		if (!MIP6_IS_HA)
 			break;
-		if (mip6_icmp6_ha_discov_req_input(m, off, icmp6len)) {
-			m_freem(m);
+		error = mip6_icmp6_ha_discov_req_input(m, off, icmp6len);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: failed to process a DHAAD request.\n",
+				 __FILE__, __LINE__));
+			return (error);
 		}
 		break;
 
 	case ICMP6_HADISCOV_REPLY:
 		if (!MIP6_IS_MN)
 			break;
-		if (mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)) {
-			m_freem(m);
+		error = mip6_icmp6_ha_discov_rep_input(m, off, icmp6len);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: failed to process a DHAAD reply.\n",
+				 __FILE__, __LINE__));
+			return (error);
 		}
 		break;
 
@@ -169,21 +181,30 @@ mip6_icmp6_input(m, off, icmp6len)
 			break;
 
 		pptr = ntohl(icmp6->icmp6_pptr);
-		if ((sizeof(struct icmp6_hdr) + pptr + 1) > icmp6len) {
-			/* we can't get packet detail, ignore this... */
+		if ((sizeof(*icmp6) + pptr + 1) > icmp6len) {
+			/*
+			 * we can't get the detail of the packet,
+			 * ignore this...
+			 */
 			break;
 		}
-		
-		origip6 = (caddr_t)icmp6 + sizeof(struct icmp6_hdr);
+
+		/*
+		 * XXX: TODO
+		 *
+		 * should we mcopydata??
+		 */
+		origip6 = (caddr_t)(icmp6 + 1);
 		switch (*(u_int8_t *)(origip6 + pptr)) {
 		case IP6OPT_BINDING_UPDATE:
 			mip6_icmp6_find_addr((caddr_t)icmp6, icmp6len,
 					     &laddr, &paddr);
 			/*
-			 * a node that doesn't support MIP6 returns
-			 * an icmp paramprob on recieving BU.
-			 * we shold avoid further sending of BU to that node.
-			 * (draft-13 10.14)
+			 * a node that doesn't support MIP6 returns an
+			 * icmp paramprob when it receives a binding
+			 * update destination option.  we shold avoid
+			 * further sending of a binding update
+			 * destination option to that node.
 			 */
 			for (sc = TAILQ_FIRST(&hif_softc_list);
 			     sc;
@@ -199,9 +220,11 @@ mip6_icmp6_input(m, off, icmp6len)
 				}
 			}
 			break;
+
 		case IP6OPT_HOME_ADDRESS:
 			/*
-			 * all IPv6 node must support a home address option.
+			 * all IPv6 node must support a home address
+			 * destination option.
 			 */
 			mip6_icmp6_find_addr((caddr_t)icmp6, icmp6len,
 					     &laddr, &paddr);
@@ -210,6 +233,10 @@ mip6_icmp6_input(m, off, icmp6len)
 				 __FILE__, __LINE__,
 				 ip6_sprintf(paddr)));
 #ifdef MIP6_ALLOW_COA_FALLBACK
+			/*
+			 * as i said above, all IPv6 node must support
+			 * a home address destination option, but ...
+			 */
 			for (sc = TAILQ_FIRST(&hif_softc_list);
 			     sc;
 			     sc = TAILQ_NEXT(sc, hif_entry)) {
@@ -220,7 +247,7 @@ mip6_icmp6_input(m, off, icmp6len)
 					mbu->mbu_coafallback = 1;
 				}
 			}
-#endif
+#endif /* MIP6_ALLOW_COA_FALLBACK */
 			break;
 		}
 		break;
@@ -252,11 +279,13 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	
 	/*
 	 * check if this icmp is generated on the way to sending from
-	 * ha to mn by encapsulating.  if so, relay this icmp to the
-	 * sender of an original packet.
+	 * a home agent to a mobile node by encapsulating the original
+	 * packet.  if so, relay this icmp to the sender of the
+	 * original packet.
 	 *
-	 * the icmp packet against the tunneled packet looks like as
-	 * follows.
+	 * the icmp packet against the encapsulated packet looks like
+	 * as follows.
+	 *
 	 *   ip(src=??,dst=ha)
 	 *     |icmp|ip(src=ha,dst=mnhoa)|ip(src=cn,dst=mnhoa)|payload
 	 */
@@ -271,28 +300,33 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		return (0);
 	} 
 	if (plen < (sizeof(*icmp6) + sizeof(otip6) + sizeof(oip6))) {
-		/* this is not an icmp against the tunneled packet. */
+		/*
+		 * this is not an icmp against the encapsulated packet.
+		 * it apparently too small.
+		 */
 		return (0);
 	}
-	/* original tunneled ip6 hdr is not guaranteed to be continuous. */
+	/* the ip6_hdr for encapsulating may not be contiguous. */
 	m_copydata(m, off + sizeof(*icmp6), sizeof(otip6), (caddr_t)&otip6);
 
 	/*
-	 * XXX
-	 * must check extension headers...
+	 * XXX: TODO
+	 *
+	 * encapsulating ip packet may have some extension headers.
+	 * we should check them and calculate the offset.
 	 */
 	if (otip6.ip6_nxt != IPPROTO_IPV6) {
-		/* this packet is not tunneled. */
+		/* this packet is not encapsulated. */
 		/* XXX we must chase extension haeders... */
 		return (0);
 	}
 
-	/* length check is already done.  we can copy immediately. */
+	/* length check has been already done.  we can copy immediately. */
 	m_copydata(m, off + sizeof(*icmp6) + sizeof(otip6),
 		   sizeof(oip6), (caddr_t)&oip6);
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &oip6.ip6_dst);
 	if (mbc == NULL) {
-		/* we are not a homeagent of this mn?? */
+		/* we are not a home agent of this mobile node ?? */
 		return (0);
 	}
 
@@ -301,7 +335,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		mip6log((LOG_ERR,
 			 "%s:%d: mbuf allocation failed.\n",
 			 __FILE__, __LINE__));
-		/* continue, anyway */
+		/* continue, anyway. */
 		return (0);
 	}
 	m_adj(n, off + sizeof(*icmp6) + sizeof(otip6));
@@ -311,21 +345,21 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		mip6log((LOG_ERR,
 			 "%s:%d: mbuf prepend for ip6/icmp6 failed.\n",
 			 __FILE__, __LINE__));
-		/* continue */
+		/* continue. */
 		return (0);
 	}
-	/* fill the ip6 hdr */
+	/* fill the ip6_hdr. */
 	nip6 = mtod(n, struct ip6_hdr *);
 	nip6->ip6_flow = 0;
 	nip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	nip6->ip6_vfc |= IPV6_VERSION;
 	nip6->ip6_plen = htons(n->m_pkthdr.len - sizeof(struct ip6_hdr));
 	nip6->ip6_nxt = IPPROTO_ICMPV6;
-	nip6->ip6_hlim = IPV6_DEFHLIM;
+	nip6->ip6_hlim = ip6_defhlim;
 	nip6->ip6_src = ip6->ip6_dst;
 	nip6->ip6_dst = oip6.ip6_src;
 
-	/* fill the icmp6 hdr */
+	/* fill the icmp6_hdr. */
 	nicmp6 = (struct icmp6_hdr *)(nip6 + 1);
 	nicmp6->icmp6_type = icmp6->icmp6_type;
 	nicmp6->icmp6_code = icmp6->icmp6_code;
@@ -333,7 +367,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 
 	/* XXX modify icmp data in some case.  (ex. TOOBIG) */
 
-	/* calculate checksum */
+	/* calculate the checksum. */
 	nicmp6->icmp6_cksum = 0;
 	nicmp6->icmp6_cksum = in6_cksum(n, IPPROTO_ICMPV6, 
 					sizeof(*nip6), ntohs(nip6->ip6_plen));
@@ -346,7 +380,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 			 "%s:%d: send failed. (errno = %d)\n",
 			 __FILE__, __LINE__, error));
 		m_freem(n);
-		/* continue processing 'm' (the original icmp) */
+		/* continue processing 'm' (the original icmp). */
 		return (0);
 	}
 
@@ -628,7 +662,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
-	hdrep = (struct ha_discov_rep *)(ip6 + 1);
+	hdrep = (struct ha_discov_rep *)((caddr_t)ip6 + off);
 #else
 	IP6_EXTHDR_GET(hdrep, struct ha_discov_rep *, m, off, icmp6len);
 	if (hdrep == NULL) {

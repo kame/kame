@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.34 2001/11/15 10:56:32 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.35 2001/11/16 09:48:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -792,7 +792,7 @@ mip6_validate_bu(m, opt)
 		for (optlen = 0;
 		     suboptlen > 0;
 		     suboptlen -= optlen, opt += optlen) {
-			if (*opt != IP6SUBOPT_PAD1 &&
+			if (*opt != MIP6SUBOPT_PAD1 &&
 			    (suboptlen < 2 || *(opt + 1) + 2 > suboptlen)) {
 				mip6log((LOG_ERR,
 					 "%s:%d: "
@@ -801,15 +801,15 @@ mip6_validate_bu(m, opt)
 				return (-1);
 			}
 			switch (*opt) {
-			case IP6SUBOPT_PAD1:
+			case MIP6SUBOPT_PAD1:
 				optlen = 1;
 				break;
-			case IP6SUBOPT_ALTCOA:
+			case MIP6SUBOPT_ALTCOA:
 				/* XXX */
 				optlen = *(opt + 1) + 2;
 				break;
 #ifndef MIP6_DRAFT13
-			case IP6SUBOPT_AUTHDATA:
+			case MIP6SUBOPT_AUTHDATA:
 				authdata = (struct mip6_subopt_authdata *)opt;
 				optlen = *(opt + 1) + 2;
 				break;
@@ -911,7 +911,7 @@ mip6_process_bu(m, opt)
 	altcoa_subopt = (struct mip6_subopt_altcoa *)
 		mip6_destopt_find_subopt(subopthead,
 					 suboptlen,
-					 IP6SUBOPT_ALTCOA);
+					 MIP6SUBOPT_ALTCOA);
 	if (altcoa_subopt == NULL) {
 		pcoa = &ip6a->ip6a_careof;
 	} else {
@@ -1672,20 +1672,39 @@ void
 mip6_bu_print(mbu)
 	struct mip6_bu *mbu;
 {
-	printf("paddr      %s\n", ip6_sprintf(&mbu->mbu_paddr));
-	printf("haddr      %s\n", ip6_sprintf(&mbu->mbu_haddr));
-	printf("coa        %s\n", ip6_sprintf(&mbu->mbu_coa));
-	printf("lifetime   %lu\n", (u_long)mbu->mbu_lifetime);
-	printf("remain     %lld\n", (long long)mbu->mbu_remain);
-	printf("refresh    %lu\n", (u_long)mbu->mbu_refresh);
-	printf("refremain  %lld\n", (long long)mbu->mbu_refremain);
-	printf("acktimeout %lu\n", (u_long)mbu->mbu_acktimeout);
-	printf("ackremain  %lld\n", (long long)mbu->mbu_ackremain);
-	printf("seqno      %u\n", mbu->mbu_seqno);
-	printf("flags      0x%x\n", mbu->mbu_flags);
-	printf("state      0x%x\n", mbu->mbu_state);
-	printf("hif        0x%p\n", mbu->mbu_hif);
-	printf("dontsend   %u\n", mbu->mbu_dontsend);
+	mip6log((LOG_INFO,
+		 "paddr      %s\n"
+		 "haddr      %s\n"
+		 "coa        %s\n"
+		 "lifetime   %lu\n"
+		 "remain     %lld\n"
+		 "refresh    %lu\n"
+		 "refremain  %lld\n"
+		 "acktimeout %lu\n"
+		 "ackremain  %lld\n"
+		 "seqno      %u\n"
+		 "flags      0x%x\n"
+		 "state      0x%x\n"
+		 "hif        0x%p\n"
+		 "dontsend   %u\n"
+		 "coafb      %u\n"
+		 "reg_state  %u\n",
+		 ip6_sprintf(&mbu->mbu_paddr),
+		 ip6_sprintf(&mbu->mbu_haddr),
+		 ip6_sprintf(&mbu->mbu_coa),
+		 (u_long)mbu->mbu_lifetime,
+		 (long long)mbu->mbu_remain,
+		 (u_long)mbu->mbu_refresh,
+		 (long long)mbu->mbu_refremain,
+		 (u_long)mbu->mbu_acktimeout,
+		 (long long)mbu->mbu_ackremain,
+		 mbu->mbu_seqno,
+		 mbu->mbu_flags,
+		 mbu->mbu_state,
+		 mbu->mbu_hif,
+		 mbu->mbu_dontsend,
+		 mbu->mbu_coafallback,
+		 mbu->mbu_reg_state));
 
 }
 #endif /* MIP6_DEBUG */
@@ -1969,7 +1988,7 @@ mip6_verify_authdata(m, bu_opt, authdata)
 }
 
 struct mip6_subopt_authdata *
-mip6_calc_authdata(src, dst, coa, bu_opt)
+mip6_authdata_create(src, dst, coa, bu_opt)
 	struct in6_addr *src;
 	struct in6_addr *dst;
 	struct in6_addr *coa;
@@ -1995,7 +2014,7 @@ mip6_calc_authdata(src, dst, coa, bu_opt)
 	bzero((caddr_t)authdata, size);
 	/* XXX: TODO */
 	/* calc authdata */
-	authdata->type = IP6SUBOPT_AUTHDATA;
+	authdata->type = MIP6SUBOPT_AUTHDATA;
 	authdata->len = size - 2;
 
 	return (authdata);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.26 2001/10/17 08:24:24 keiichi Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.27 2001/11/16 09:48:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -122,13 +122,17 @@ void
 mip6_ha_print(mha)
 	struct mip6_ha *mha;
 {
-	if (mip6_config.mcfg_debug) {
-		printf("lladdr   %s\n", ip6_sprintf(&mha->mha_lladdr));
-		printf("gaddr    %s\n", ip6_sprintf(&mha->mha_gaddr));
-		printf("pref     %u\n", mha->mha_pref);
-		printf("lifetime %u\n", mha->mha_lifetime);
-		printf("remain   %ld\n", (long)mha->mha_remain);
-	}
+	mip6log((LOG_INFO,
+		 "lladdr   %s\n"
+		 "gaddr    %s\n"
+		 "pref     %u\n"
+		 "lifetime %u\n"
+		 "remain   %ld\n",
+		 ip6_sprintf(&mha->mha_lladdr),
+		 ip6_sprintf(&mha->mha_gaddr),
+		 mha->mha_pref,
+		 mha->mha_lifetime,
+		 (long)mha->mha_remain));
 }
 
 int

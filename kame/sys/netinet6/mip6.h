@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.28 2001/11/15 10:09:44 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.29 2001/11/16 09:48:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -58,15 +58,15 @@ struct mip6_req {
 #define MIP6_DHAAD_INITIAL_TIMEOUT 2
 #define MIP6_DHAAD_RETRIES         3
 
-#define IP6SUBOPT_PAD1     0x00
-#define IP6SUBOPT_PADN     0x01
-#define IP6SUBOPT_UNIQID   0x02
+#define MIP6SUBOPT_PAD1     0x00
+#define MIP6SUBOPT_PADN     0x01
+#define MIP6SUBOPT_UNIQID   0x02
 #ifdef MIP6_DRAFT13
-#define IP6SUBOPT_ALTCOA   0x04
+#define MIP6SUBOPT_ALTCOA   0x04
 #else
-#define IP6SUBOPT_ALTCOA   0x03
-#define IP6SUBOPT_AUTHDATA 0x04
-#endif
+#define MIP6SUBOPT_ALTCOA   0x03
+#define MIP6SUBOPT_AUTHDATA 0x04
+#endif /* MIP6_DRAFT13 */
 
 /* Unique Identifier sub-option format. */
 struct mip6_subopt_uniqid {
@@ -289,7 +289,7 @@ struct mip6_bc *mip6_bc_list_find_withpcoa
 					__P((struct mip6_bc_list *,
 					     struct in6_addr *));
 
-struct mip6_subopt_authdata *mip6_calc_authdata
+struct mip6_subopt_authdata *mip6_authdata_create
 					__P((struct in6_addr *,
 					     struct in6_addr *,
 					     struct in6_addr *,

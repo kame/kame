@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.75 2001/11/15 10:09:44 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.76 2001/11/16 09:48:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1601,14 +1601,17 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mip6_find_offset(&optbuf);
 	}
 
-	/* add BU option (and other user specified optiosn if any) */
+	/*
+	 * add a binding update destination option (and other user
+	 * specified optiosns if any)
+	 */
 	bu_opt_pos = (struct ip6_opt_binding_update *)
 		mip6_add_opt2dh((u_int8_t *)&bu_opt, &optbuf);
 #ifndef MIP6_DRAFT13
-	authdata = mip6_calc_authdata(src, dst, &mbu->mbu_coa, bu_opt_pos);
+	authdata = mip6_authdata_create(src, dst, &mbu->mbu_coa, bu_opt_pos);
 	if (authdata == NULL) {
 		mip6log((LOG_ERR,
-			 "%s:%d: failed to calc authdata\n",
+			 "%s:%d: failed to create authdata sub-option.\n",
 			 __FILE__, __LINE__));
 		return (EINVAL);
 	}
@@ -2075,10 +2078,10 @@ mip6_add_subopt2dh(subopt, dh)
 	}
 
 	/* Add sub-option to Destination option */
-	padn = IP6SUBOPT_PADN;
+	padn = MIP6SUBOPT_PADN;
 	type = *subopt;
 	switch (type) {
-		case IP6SUBOPT_AUTHDATA:
+		case MIP6SUBOPT_AUTHDATA:
 			/*
 			 * Authentication Data alignment requirement
 			 * (8n + 6)
