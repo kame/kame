@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto.c,v 1.3 1999/08/16 16:27:24 itojun Exp $ */
+/* YIPS $Id: crypto.c,v 1.4 1999/08/16 16:35:02 itojun Exp $ */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -65,7 +65,7 @@ eay_des_encrypt(data, key, iv)
 	vchar_t *res;
 	des_key_schedule ks;
 
-	if (des_key_sched((C_Block *)key->v, ks) != 0)
+	if (des_key_sched((des_cblock *)key->v, ks) != 0)
 		return NULL;
 
 	/* allocate buffer for result */
@@ -73,8 +73,8 @@ eay_des_encrypt(data, key, iv)
 		return NULL;
 
 	/* decryption data */
-	des_cbc_encrypt((C_Block *)data->v, (C_Block *)res->v, data->l,
-	                ks, (C_Block *)iv, DES_ENCRYPT);
+	des_cbc_encrypt((void *)data->v, (void *)res->v, data->l,
+	                ks, (des_cblock *)iv, DES_ENCRYPT);
 
 	return res;
 }
@@ -87,7 +87,7 @@ eay_des_decrypt(data, key, iv)
 	vchar_t *res;
 	des_key_schedule ks;
 
-	if (des_key_sched((C_Block *)key->v, ks) != 0)
+	if (des_key_sched((des_cblock *)key->v, ks) != 0)
 		return NULL;
 
 	/* allocate buffer for result */
@@ -95,8 +95,8 @@ eay_des_decrypt(data, key, iv)
 		return NULL;
 
 	/* decryption data */
-	des_cbc_encrypt((C_Block *)data->v, (C_Block *)res->v, data->l,
-	                ks, (C_Block *)iv, DES_DECRYPT);
+	des_cbc_encrypt((void *)data->v, (void *)res->v, data->l,
+	                ks, (des_cblock *)iv, DES_DECRYPT);
 
 	return res;
 }
@@ -105,7 +105,7 @@ int
 eay_des_weakkey(key)
 	vchar_t *key;
 {
-	return des_is_weak_key((C_Block *)key->v);
+	return des_is_weak_key((des_cblock *)key->v);
 }
 
 #ifdef HAVE_IDEA_H
@@ -286,11 +286,11 @@ eay_3des_encrypt(data, key, iv)
 	if (key->l < 24)
 		return NULL;
 
-	if (des_key_sched((C_Block *)key->v, ks1) != 0)
+	if (des_key_sched((des_cblock *)key->v, ks1) != 0)
 		return NULL;
-	if (des_key_sched((C_Block *)(key->v + 8), ks2) != 0)
+	if (des_key_sched((des_cblock *)(key->v + 8), ks2) != 0)
 		return NULL;
-	if (des_key_sched((C_Block *)(key->v + 16), ks3) != 0)
+	if (des_key_sched((des_cblock *)(key->v + 16), ks3) != 0)
 		return NULL;
 
 	/* allocate buffer for result */
@@ -298,8 +298,8 @@ eay_3des_encrypt(data, key, iv)
 		return NULL;
 
 	/* decryption data */
-	des_ede3_cbc_encrypt((C_Block *)data->v, (C_Block *)res->v, data->l,
-	                ks1, ks2, ks3, (C_Block *)iv, DES_ENCRYPT);
+	des_ede3_cbc_encrypt((void *)data->v, (void *)res->v, data->l,
+	                ks1, ks2, ks3, (des_cblock *)iv, DES_ENCRYPT);
 
 	return res;
 }
@@ -315,11 +315,11 @@ eay_3des_decrypt(data, key, iv)
 	if (key->l < 24)
 		return NULL;
 
-	if (des_key_sched((C_Block *)key->v, ks1) != 0)
+	if (des_key_sched((des_cblock *)key->v, ks1) != 0)
 		return NULL;
-	if (des_key_sched((C_Block *)(key->v + 8), ks2) != 0)
+	if (des_key_sched((des_cblock *)(key->v + 8), ks2) != 0)
 		return NULL;
-	if (des_key_sched((C_Block *)(key->v + 16), ks3) != 0)
+	if (des_key_sched((des_cblock *)(key->v + 16), ks3) != 0)
 		return NULL;
 
 	/* allocate buffer for result */
@@ -327,8 +327,8 @@ eay_3des_decrypt(data, key, iv)
 		return NULL;
 
 	/* decryption data */
-	des_ede3_cbc_encrypt((C_Block *)data->v, (C_Block *)res->v, data->l,
-	                ks1, ks2, ks3, (C_Block *)iv, DES_DECRYPT);
+	des_ede3_cbc_encrypt((void *)data->v, (void *)res->v, data->l,
+	                ks1, ks2, ks3, (des_cblock *)iv, DES_DECRYPT);
 
 	return res;
 }
@@ -340,9 +340,9 @@ eay_3des_weakkey(key)
 	if (key->l < 24)
 		return NULL;
 
-	return (des_is_weak_key((C_Block *)key->v)
-		|| des_is_weak_key((C_Block *)(key->v + 8))
-		|| des_is_weak_key((C_Block *)(key->v + 16)));
+	return (des_is_weak_key((des_cblock *)key->v)
+		|| des_is_weak_key((des_cblock *)(key->v + 8))
+		|| des_is_weak_key((des_cblock *)(key->v + 16)));
 }
 
 /*
