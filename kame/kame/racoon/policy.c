@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.4 2000/01/11 00:15:27 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.5 2000/01/11 00:18:14 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -169,10 +169,10 @@ cmpspidx_wild(a, b)
 	mask_sockaddr((struct sockaddr *)&sa2, (struct sockaddr *)&b->src,
 		a->prefs);
 	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "a masked with %d: %s\n",
-			a->prefs, saddr2str((struct sockaddr *)&sa1));
-		plog(logp, LOCATION, NULL, "b masked with %d: %s\n",
-			a->prefs, saddr2str((struct sockaddr *)&sa2)););
+		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
+			a, a->prefs, saddr2str((struct sockaddr *)&sa1));
+		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
+			b, a->prefs, saddr2str((struct sockaddr *)&sa2)););
 	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
 		return 1;
 
@@ -185,10 +185,10 @@ cmpspidx_wild(a, b)
 	mask_sockaddr((struct sockaddr *)&sa2, (struct sockaddr *)&b->dst,
 		a->prefd);
 	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "a masked with %d: %s\n",
-			a->prefd, saddr2str((struct sockaddr *)&sa1));
-		plog(logp, LOCATION, NULL, "b masked with %d: %s\n",
-			a->prefd, saddr2str((struct sockaddr *)&sa2)););
+		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
+			a, a->prefd, saddr2str((struct sockaddr *)&sa1));
+		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
+			b, a->prefd, saddr2str((struct sockaddr *)&sa2)););
 	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
 		return 1;
 
