@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.98 2003/01/09 11:16:38 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.99 2003/01/09 11:54:39 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -581,7 +581,7 @@ stf_output(ifp, m, dst, rt)
 		}
 	} else if (STF_IS_ISATAP(sc)) {
 		if (IN6_IS_ADDR_ISATAP(&ip6->ip6_dst) &&
-		    isatap_match_prefix(sc->sc_if, &ip6->ip6_dst)) {
+		    isatap_match_prefix(&sc->sc_if, &ip6->ip6_dst)) {
 			ptr = GET_V4(sc, &ip6->ip6_dst);
 		}
 		if (IN6_IS_ADDR_ISATAP(&dst6->sin6_addr)) {
@@ -620,7 +620,7 @@ stf_output(ifp, m, dst, rt)
 	bzero(&xfs, sizeof(xfs));
 	tdb.tdb_src.sin.sin_family = AF_INET;
 	tdb.tdb_src.sin.sin_len = sizeof(struct sockaddr_in);
-	bcopy(GET_V4(&((struct sockaddr_in6 *)&ia6->ia_addr)->sin6_addr),
+	bcopy(GET_V4(sc, &((struct sockaddr_in6 *)&ia6->ia_addr)->sin6_addr),
 	    &tdb.tdb_src.sin.sin_addr, sizeof(tdb.tdb_src.sin.sin_addr));
 	tdb.tdb_dst.sin.sin_family = AF_INET;
 	tdb.tdb_dst.sin.sin_len = sizeof(struct sockaddr_in);
