@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.57 2000/12/01 16:09:51 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.58 2001/01/17 11:26:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,10 +155,12 @@ nd6_rs_input(m, off, icmp6len)
 
 	/* Sanity checks */
 	if (ip6->ip6_hlim != 255) {
+#ifdef ND6_DEBUG
 		log(LOG_ERR,
 		    "nd6_rs_input: invalid hlim (%d) from %s to %s on %s\n",
 		    ip6->ip6_hlim, ip6_sprintf(&ip6->ip6_src),
 		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp));
+#endif
 		goto freeit;
 	}
 
@@ -235,10 +237,12 @@ nd6_ra_input(m, off, icmp6len)
 		goto freeit;
 
 	if (ip6->ip6_hlim != 255) {
+#ifdef ND6_DEBUG
 		log(LOG_ERR,
 		    "nd6_ra_input: invalid hlim (%d) from %s to %s on %s\n",
 		    ip6->ip6_hlim, ip6_sprintf(&ip6->ip6_src),
 		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp));
+#endif
 		goto freeit;
 	}
 
