@@ -190,7 +190,6 @@ struct igmpstat {
 
 #ifdef _KERNEL
 extern	struct igmpstat igmpstat;
-extern	struct router_info *rti_head;
 
 #ifdef IGMPV3_DEBUG
 #define igmplog(x)	do { if (1) log x; } while (/*CONSTCOND*/ 0)

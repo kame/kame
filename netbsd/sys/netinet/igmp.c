@@ -104,7 +104,7 @@ __KERNEL_RCSID(0, "$NetBSD: igmp.c,v 1.36 2003/08/22 21:53:02 itojun Exp $");
 struct pool igmp_rti_pool;
 struct igmpstat igmpstat;
 int igmp_timers_are_running;
-struct router_info *rti_head;
+static LIST_HEAD(, router_info) rti_head = LIST_HEAD_INITIALIZER(rti_head);
 
 int interface_timers_are_running;
 int state_change_timers_are_running;
@@ -208,8 +208,6 @@ igmp_init()
 	interface_timers_are_running = 0; /* used only by IGMPv3 */
 	state_change_timers_are_running = 0; /* used only by IGMPv3 */
 
-	rti_head = 0;
-
 	/*
 	 * Prepare Router Alert option to use in outgoing packets.
 	 */
@@ -265,7 +263,7 @@ rti_fill(inm)
 		}
 	}
 
-	if ((rti = rti_init(ifp)) == NULL)
+	if ((rti = rti_init(inm->inm_ifp)) == NULL)
 		return -1;
 	inm->inm_rti = rti;
 	return (IGMP_v2_HOST_MEMBERSHIP_REPORT);
@@ -292,10 +290,10 @@ static void
 rti_delete(ifp)
 	struct ifnet *ifp;
 {
-	struct router_info *rti, *next;
+	struct router_info *rti, *nxt;
 
-	for (rti = LIST_HEAD(&rti_head, rti_link); rti; rti = next) {
-		next = LIST_NEAD(rti, rti_link);
+	for (rti = LIST_HEAD(&rti_head, rti_link); rti; rti = nxt) {
+		nxt = LIST_NEXT(rti, rti_link);
 		if (rti->rti_ifp == ifp) {
 			LIST_REMOVE(rti, rti_link);
 			pool_put(&igmp_rti_pool, rti);

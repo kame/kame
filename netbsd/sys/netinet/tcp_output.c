@@ -173,6 +173,7 @@ __KERNEL_RCSID(0, "$NetBSD: tcp_output.c,v 1.108.2.1 2004/05/11 13:00:20 tron Ex
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
+#endif
 
 #ifdef FAST_IPSEC
 #include <netipsec/ipsec.h>

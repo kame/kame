@@ -268,12 +268,12 @@ struct router_info {
 struct in_multi {
 	LIST_ENTRY(in_multi) inm_list;	/* list of multicast addresses */
 	struct	router_info *inm_rti;	/* router version info */
-	struct	ifnet *inm_ifp;		/* back pointer to ifnet */
 	struct	in_addr inm_addr;	/* IP multicast address */
+	struct	ifnet *inm_ifp;		/* back pointer to ifnet */
+	struct	in_ifaddr *inm_ia;	/* back pointer to in_ifaddr */
 	u_int	inm_refcount;		/* no. membership claims by sockets */
 	u_int	inm_timer;		/* IGMP membership report timer */
 	u_int	inm_state;		/* state of membership */
-	struct	router_info *inm_rti;	/* router version info */
 	struct	in_multi_source *inm_source; /* filtered source list */
 };
 
