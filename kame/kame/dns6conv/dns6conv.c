@@ -1,4 +1,4 @@
-/*	$KAME: dns6conv.c,v 1.2 2001/01/13 06:33:32 itojun Exp $ */
+/*	$KAME: dns6conv.c,v 1.3 2001/01/13 06:34:10 itojun Exp $ */
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -78,7 +78,6 @@ main(argc, argv)
 		case 'f':
 			fmtstr = optarg;
 			break;
-		case '?':
 		default:
 			usage();
 			/* NOTREACHED */
