@@ -586,7 +586,7 @@ struct in6_pktinfo {
 __BEGIN_DECLS
 int	   bindresvport __P((int, struct sockaddr_in *));
 struct sockaddr;
-int	   bindresvport_sa __P((int, struct sockaddr *, int));
+int	   bindresvport_sa __P((int, struct sockaddr *));
 __END_DECLS
 
 #else
