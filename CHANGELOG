@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1963 2001/11/04 14:04:08 jinmei Exp $
+$KAME: CHANGELOG,v 1.1964 2001/11/06 07:51:06 itojun Exp $
 
 <200111>
+Tue Nov  6 16:47:45 JST 2001  itojun@iijlab.net
+	* kame/sys/netinet6/udp6_usrreq.c, netbsd/sys/netinet/udp_usrreq.c:
+	  remove in6_mcmatch().  now sockets after bind(2) won't grab packets
+	  to joined multicast groups (behavior now looks like 4.4BSD IPv4 code).
+
 2001-11-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (defrouter_select): do not override
 	a working router unless the new one is really better.  "better"
