@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.27 2000/03/25 07:23:43 sumikawa Exp $	*/
+/*	$KAME: in6_gif.c,v 1.28 2000/03/30 01:39:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -440,12 +440,10 @@ in6_gif_ioctl(ifp, cmd, data)
 		sc->gif_oflags = ifp->if_flags;
 
 		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
-		bzero((caddr_t)sa, size);
 		bcopy((caddr_t)src, (caddr_t)sa, size);
 		sc->gif_psrc = sa;
 		
 		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
-		bzero((caddr_t)sa, size);
 		bcopy((caddr_t)dst, (caddr_t)sa, size);
 		sc->gif_pdst = sa;
 		
