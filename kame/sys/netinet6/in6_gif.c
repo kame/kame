@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.58 2001/07/25 00:55:49 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.59 2001/07/25 02:38:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -525,8 +525,10 @@ int
 in6_gif_detach(sc)
 	struct gif_softc *sc;
 {
+	int error;
 
-	encap_detach(sc->encap_cookie6);
-	sc->encap_cookie6 = NULL;
-	return 0;
+	error = encap_detach(sc->encap_cookie6);
+	if (error == 0)
+		sc->encap_cookie6 = NULL;
+	return error;
 }
