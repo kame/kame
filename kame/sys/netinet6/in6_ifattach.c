@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.127 2001/07/24 09:48:36 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.128 2001/07/24 09:51:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -696,7 +696,7 @@ in6_ifattach_loopback(ifp)
 	ifra.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
 	ifra.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
 
-	/* we don't need to perfrom DAD on loopback interfaces. */
+	/* we don't need to perform DAD on loopback interfaces. */
 	ifra.ifra_flags |= IN6_IFF_NODAD;
 
 	/* skip registration to the prefix list. XXX should be temporary. */
