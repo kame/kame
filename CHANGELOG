@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1765 2001/07/11 09:16:27 suz Exp $
+$KAME: CHANGELOG,v 1.1766 2001/07/11 09:30:40 suz Exp $
 
 <200107>
 Wed Jul 11 17:55:33 JST 2001	suz@sdl.hitachi.co.jp
@@ -11,6 +11,8 @@ Wed Jul 11 17:55:33 JST 2001	suz@sdl.hitachi.co.jp
 		+ uses SPT for multicast address in SSM range
 		  (inet6.[ch], mrt.c, pim6*.[ch], route.c)
 
+	* kame/sys/netinet/icmp6.h: added ICMPv6 code for MLDv2 Report
+	  temporarily.
 	* kame/kame/pim6sd/BUGS.V6
 	- write down ToDos suggested in the above patch.
 

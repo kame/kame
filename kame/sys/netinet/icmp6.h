@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.56 2001/07/03 15:34:39 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.57 2001/07/11 09:30:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,8 +131,10 @@ struct icmp6_hdr {
 #define ICMP6_HADISCOV_REPLY		203	/* XXX To be defined */
 #define ICMP6_MOBILEPREFIX_SOLICIT	204	/* XXX To be defined */
 #define ICMP6_MOBILEPREFIX_ADVERT	205	/* XXX To be defined */
-  
-#define ICMP6_MAXTYPE			205
+
+#define MLD6V2_LISTENER_REPORT		206	/* MLDv2 report. to be assigned */
+ 
+#define ICMP6_MAXTYPE			206
 
 #define ICMP6_DST_UNREACH_NOROUTE	0	/* no route to destination */
 #define ICMP6_DST_UNREACH_ADMIN	 	1	/* administratively prohibited */

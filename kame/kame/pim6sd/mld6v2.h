@@ -88,15 +88,6 @@ struct mld6v2_report
 
 #define MLD6_MAXSOURCES(len)  (((len)-28)>>2)
 
-#define MLD6V2_LISTENER_REPORT 143
-
-#if 0
-/*
- * IMPORTANT 
- */
-#define ICMP6_MAXTYPE 143
-#endif
-
 /*************** MYDEV ***********************/
 
 #define SFLAGYES		0x08
