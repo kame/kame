@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.198 2001/07/18 09:12:38 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.199 2001/07/21 04:13:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1211,32 +1211,29 @@ in6_update_ifa(ifp, ifra, ia)
 		 * XXX: since "node-local" is obsoleted by interface-local,
 		 *      we have to join the group on every interface with
 		 *      some interface-boundary restriction.
+		 *
+		 * we need ff01::/32 only for loopback interface.
 		 */
-#if 0
-		if ((ifp->if_flags & IFF_LOOPBACK) != 0)
-#endif
-		{
-			mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
-			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
-			if (!in6m) {
-				rtrequest(RTM_ADD,
-					  (struct sockaddr *)&mltaddr,
-					  (struct sockaddr *)&ia->ia_addr,
-					  (struct sockaddr *)&mltmask,
-					  RTF_UP,
-					  (struct rtentry **)0);
-			}
-			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
-			if (imm) {
-				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
-				    i6mm_chain);
-			} else {
-				log(LOG_WARNING, "in6_update_ifa: "
-				    "addmulti failed for %s on %s "
-				    "(errno=%d)\n",
-				    ip6_sprintf(&mltaddr.sin6_addr), 
-				    if_name(ifp), error);
-			}
+		mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
+		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+		if (!in6m && (ifp->if_flags & IFF_LOOPBACK) != 0) {
+			rtrequest(RTM_ADD,
+				  (struct sockaddr *)&mltaddr,
+				  (struct sockaddr *)&ia->ia_addr,
+				  (struct sockaddr *)&mltmask,
+				  RTF_UP,
+				  (struct rtentry **)0);
+		}
+		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+		if (imm) {
+			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
+			    i6mm_chain);
+		} else {
+			log(LOG_WARNING, "in6_update_ifa: "
+			    "addmulti failed for %s on %s "
+			    "(errno=%d)\n",
+			    ip6_sprintf(&mltaddr.sin6_addr), 
+			    if_name(ifp), error);
 		}
 	}
 
