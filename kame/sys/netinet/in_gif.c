@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.90 2003/02/07 10:17:08 suz Exp $	*/
+/*	$KAME: in_gif.c,v 1.91 2003/04/09 09:28:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -375,7 +375,7 @@ in_gif_output(ifp, family, m)
 	}
 
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
 			 , NULL
 #endif
 			 );

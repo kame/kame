@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.67 2003/02/07 10:17:10 suz Exp $	*/
+/*	$KAME: udp6_output.c,v 1.68 2003/04/09 09:28:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -454,7 +454,7 @@ udp6_output(in6p, m, addr6, control)
 		}
 		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
 				   flags, in6p->in6p_moptions, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 				   ,NULL
 #endif
 				   );

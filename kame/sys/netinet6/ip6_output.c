@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.363 2003/04/02 10:18:32 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.364 2003/04/09 09:28:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,7 +249,7 @@ extern struct ifnet loif[NLOOP];
  * which is rt_rmx.rmx_mtu.
  */
 int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 ip6_output(m0, opt, ro, flags, im6o, ifpp, inp)
 #else
 ip6_output(m0, opt, ro, flags, im6o, ifpp)
@@ -264,7 +264,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	int flags;
 	struct ip6_moptions *im6o;
 	struct ifnet **ifpp;		/* XXX: just for statistics */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 	struct inpcb *inp;
 #endif
 {

@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.104 2003/02/08 19:21:49 kjc Exp $	*/
+/*	$KAME: in6_gif.c,v 1.105 2003/04/09 09:28:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -369,13 +369,13 @@ in6_gif_output(ifp, family, m)
 	 * path MTU discovery for encapsulated packets.
 	 */
 	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			   );
 #else
 	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.78 2003/03/19 09:03:10 ono Exp $	*/
+/*	$KAME: mld6.c,v 1.79 2003/04/09 09:28:19 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1069,7 +1069,7 @@ mld6_sendpkt(in6m, type, dst)
 	}
 
 	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 		   ,NULL
 #endif
 		   );

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.108 2003/02/07 10:17:09 suz Exp $	*/
+/*	$KAME: ip6_var.h,v 1.109 2003/04/09 09:28:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -420,7 +420,7 @@ void	ip6_forward __P((struct mbuf *, int));
 
 void	ip6_mloopback __P((struct ifnet *, struct mbuf *, struct sockaddr_in6 *));
 #if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__OpenBSD__)  || defined(__FreeBSD__)
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route *,
 			int,
@@ -433,7 +433,7 @@ int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct ip6_moptions *, struct ifnet **));
 #endif
 #else
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route_in6 *,
 			int,

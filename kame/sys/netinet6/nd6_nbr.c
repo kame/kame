@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.120 2003/02/07 10:17:10 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.121 2003/04/09 09:28:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -655,7 +655,7 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 	(void)ipsec_setsocket(m, NULL);
 #endif
 	ip6_output(m, NULL, &ro, dad ? IPV6_UNSPECSRC : 0, &im6o, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 		   ,NULL
 #endif
 		  );
@@ -1168,7 +1168,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	(void)ipsec_setsocket(m, NULL);
 #endif
 	ip6_output(m, NULL, &ro, 0, &im6o, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 		   ,NULL
 #endif
 		  );

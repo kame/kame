@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.310 2003/04/08 08:15:14 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.311 2003/04/09 09:28:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -496,6 +496,8 @@ ip6_input(m)
 		if (n != NULL) {
 #ifdef __OpenBSD__
 			M_DUP_PKTHDR(n, m);
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
+			m_dup_pkthdr(n, m, M_DONTWAIT);
 #else
 			M_COPY_PKTHDR(n, m);
 #endif

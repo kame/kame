@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.344 2003/04/08 06:56:26 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.345 2003/04/09 09:28:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -766,7 +766,7 @@ icmp6_input(mp, offp, proto)
 				m = NULL;
 				goto deliverecho;
 			}
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
+#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version < 500000)
 			M_MOVE_PKTHDR(n, n0);
 #else
 			M_COPY_PKTHDR(n, n0);
@@ -960,6 +960,8 @@ icmp6_input(mp, offp, proto)
 			noff = sizeof(struct ip6_hdr);
 #ifdef __OpenBSD__
 			M_DUP_PKTHDR(n, m); /* just for rcvif */
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
+			m_dup_pkthdr(n, m, M_DONTWAIT);
 #else
 			M_COPY_PKTHDR(n, m); /* just for rcvif */
 #endif
@@ -1752,6 +1754,8 @@ ni6_input(m, off)
 	}
 #ifdef __OpenBSD__
 	M_DUP_PKTHDR(n, m); /* just for rcvif */
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
+	m_dup_pkthdr(n, m, M_DONTWAIT);
 #else
 	M_COPY_PKTHDR(n, m); /* just for rcvif */
 #endif
@@ -2389,6 +2393,8 @@ icmp6_rip6_input(mp, off, src, dst)
 #ifdef __OpenBSD__
 					/* shouldn't this be M_DUP_PKTHDR? */
 					M_MOVE_PKTHDR(n, m);
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
+					m_dup_pkthdr(n, m, M_DONTWAIT);
 #else
 					M_COPY_PKTHDR(n, m);
 #endif
@@ -2433,6 +2439,8 @@ icmp6_rip6_input(mp, off, src, dst)
 #ifdef __OpenBSD__
 				/* shouldn't this be M_DUP_PKTHDR? */
 				M_MOVE_PKTHDR(n, m);
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
+				m_dup_pkthdr(n, m, M_DONTWAIT);
 #else
 				M_COPY_PKTHDR(n, m);
 #endif
@@ -2656,7 +2664,7 @@ icmp6_reflect(m, off)
 	 * since the length of ICMP6 errors is limited to the minimum MTU.
 	 */
 	if (ip6_output(m, NULL, NULL, IPV6_MINMTU, NULL, &outif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 		       , NULL
 #endif
 		       ) != 0 && outif)
@@ -3224,7 +3232,7 @@ noredhdropt:
 	(void)ipsec_setsocket(m, NULL);
 #endif /* IPSEC */
 	if (ip6_output(m, NULL, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 		       , NULL
 #endif
 		       ) != 0)

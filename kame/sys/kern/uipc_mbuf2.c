@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.42 2003/02/06 16:08:30 suz Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.43 2003/04/09 09:28:15 suz Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -371,7 +371,7 @@ m_dup1(m, off, len, wait)
 		return NULL;
 
 	if (copyhdr) {
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__FreeBSD__) && __FreeBSD_version >= 400000 && __FreeBSD_version < 500000
 		M_MOVE_PKTHDR(n, m);
 #else
 		M_COPY_PKTHDR(n, m);
