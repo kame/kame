@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.350 2004/04/09 05:37:46 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.351 2004/04/09 05:40:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1271,7 +1271,7 @@ nd6_free(rt, gc)
 /*
  * Upper-layer reachability hint for Neighbor Unreachability Detection.
  *
- * XXX cost-effective metods?
+ * XXX cost-effective methods?
  */
 void
 nd6_nud_hint(rt, dst6, force)
