@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbuf.c,v 1.12 2002/02/23 01:12:54 art Exp $	*/
+/*	$OpenBSD: mbuf.c,v 1.16 2002/06/30 20:27:16 angelos Exp $	*/
 /*	$NetBSD: mbuf.c,v 1.9 1996/05/07 02:55:03 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)mbuf.c	8.1 (Berkeley) 6/6/93";
 #else
-static char *rcsid = "$OpenBSD: mbuf.c,v 1.12 2002/02/23 01:12:54 art Exp $";
+static char *rcsid = "$OpenBSD: mbuf.c,v 1.16 2002/06/30 20:27:16 angelos Exp $";
 #endif
 #endif /* not lint */
 
@@ -47,9 +47,13 @@ static char *rcsid = "$OpenBSD: mbuf.c,v 1.12 2002/02/23 01:12:54 art Exp $";
 #include <sys/socket.h>
 #include <sys/mbuf.h>
 #include <sys/pool.h>
+#include <sys/sysctl.h>
+#include <sys/errno.h>
 
+#include <kvm.h>
 #include <limits.h>
 #include <stdio.h>
+#include <string.h>
 #include "netstat.h"
 
 #define	YES	1
@@ -58,6 +62,7 @@ typedef int bool;
 struct	mbstat mbstat;
 struct pool mbpool, mclpool;
 
+extern kvm_t *kvmd;
 
 static struct mbtypes {
 	int	mt_type;
@@ -85,8 +90,10 @@ mbpr(mbaddr, mbpooladdr, mclpooladdr)
 	u_long mbpooladdr, mclpooladdr;
 {
 	int totmem, totused, totmbufs, totpct;
-	int i;
+	int i, mib[4], npools, flag = 0;
+	struct pool pool;
 	struct mbtypes *mp;
+	size_t size;
 	int page_size = getpagesize();
 
 	if (nmbtypes != 256) {
@@ -95,18 +102,82 @@ mbpr(mbaddr, mbpooladdr, mclpooladdr)
 		    __progname);
 		return;
 	}
-	if (mbaddr == 0) {
-		fprintf(stderr, "%s: mbstat: symbol not in namelist\n",
-		    __progname);
-		return;
-	}
-	if (kread(mbaddr, (char *)&mbstat, sizeof (mbstat)))
-		return;
-	if (kread(mbpooladdr, (char *)&mbpool, sizeof (mbpool)))
-		return;
 
-	if (kread(mclpooladdr, (char *)&mclpool, sizeof (mclpool)))
-		return;
+	if (kvmd == NULL) {
+		if (mbaddr == 0) {
+			fprintf(stderr, "%s: mbstat: symbol not in namelist\n",
+			    __progname);
+			return;
+		}
+
+		if (kread(mbaddr, (char *)&mbstat, sizeof (mbstat)))
+			return;
+		if (kread(mbpooladdr, (char *)&mbpool, sizeof (mbpool)))
+			return;
+
+		if (kread(mclpooladdr, (char *)&mclpool, sizeof (mclpool)))
+			return;
+	} else {
+		mib[0] = CTL_KERN;
+		mib[1] = KERN_MBSTAT;
+		size = sizeof(mbstat);
+
+		if (sysctl(mib, 2, &mbstat, &size, NULL, 0) < 0) {
+			printf("Can't retrieve mbuf statistics from the kernel: %s\n",
+			    strerror(errno));
+			return;
+		}
+
+		mib[0] = CTL_KERN;
+		mib[1] = KERN_POOL;
+		mib[2] = KERN_POOL_NPOOLS;
+		size = sizeof(npools);
+
+		if (sysctl(mib, 3, &npools, &size, NULL, 0) < 0) {
+			printf("Can't figure out number of pools in kernel: %s\n",
+			    strerror(errno));
+			return;
+		}
+
+		for (i = 1; npools; i++) {
+			char name[32];
+
+			mib[0] = CTL_KERN;
+			mib[1] = KERN_POOL;
+			mib[2] = KERN_POOL_POOL;
+			mib[3] = i;
+			size = sizeof(struct pool);
+			if (sysctl(mib, 4, &pool, &size, NULL, 0) < 0) {
+				if (errno == ENOENT)
+					continue;
+				printf("error getting pool: %s\n",
+				    strerror(errno));
+				return;
+			}
+			npools--;
+			mib[2] = KERN_POOL_NAME;
+			size = sizeof(name);
+			if (sysctl(mib, 4, &name, &size, NULL, 0) < 0) {
+				printf("error getting pool name: %s\n",
+				    strerror(errno));
+				return;
+			}
+
+			if (!strncmp(name, "mbpl", strlen("mbpl"))) {
+				bcopy(&pool, &mbpool, sizeof(struct pool));
+				flag++;
+			} else {
+				if (!strncmp(name, "mclpl", strlen("mclpl"))) {
+					bcopy(&pool, &mclpool,
+					    sizeof(struct pool));
+					flag++;
+				}
+			}
+
+			if (flag == 2)
+				break;
+		}
+	}
 
 	totmbufs = 0;
 	for (mp = mbtypes; mp->mt_name; mp++)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.29 2002/02/16 21:27:50 millert Exp $	*/
+/*	$OpenBSD: if.c,v 1.32 2002/06/19 23:40:20 itojun Exp $	*/
 /*	$NetBSD: if.c,v 1.16.4.2 1996/06/07 21:46:46 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)if.c	8.2 (Berkeley) 2/21/94";
 #else
-static char *rcsid = "$OpenBSD: if.c,v 1.29 2002/02/16 21:27:50 millert Exp $";
+static char *rcsid = "$OpenBSD: if.c,v 1.32 2002/06/19 23:40:20 itojun Exp $";
 #endif
 #endif /* not lint */
 
@@ -194,9 +194,9 @@ intpr(interval, ifnetaddr)
 				 * keeps nets unshifted.
 				 */
 				in = inet_makeaddr(ifaddr.in.ia_subnet,
-					INADDR_ANY);
+				    INADDR_ANY);
 				cp = netname(in.s_addr,
-			    	    ifaddr.in.ia_subnetmask);
+				    ifaddr.in.ia_subnetmask);
 #else
 				cp = netname(ifaddr.in.ia_subnet,
 				    ifaddr.in.ia_subnetmask);
@@ -233,17 +233,14 @@ intpr(interval, ifnetaddr)
 #ifdef KAME_SCOPEID
 				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 					sin6->sin6_scope_id =
-						ntohs(*(u_int16_t *)
-						  &sin6->sin6_addr.s6_addr[2]);
-					/* too little width */
-					if (!vflag)
-						sin6->sin6_scope_id = 0;
+					    ntohs(*(u_int16_t *)
+					      &sin6->sin6_addr.s6_addr[2]);
 					sin6->sin6_addr.s6_addr[2] = 0;
 					sin6->sin6_addr.s6_addr[3] = 0;
 				}
 #endif
 				cp = netname6(&ifaddr.in6.ia_addr,
-					&ifaddr.in6.ia_prefixmask.sin6_addr);
+				    &ifaddr.in6.ia_prefixmask.sin6_addr);
 				if (vflag)
 					n = strlen(cp) < 11 ? 11 : strlen(cp);
 				else
@@ -258,20 +255,32 @@ intpr(interval, ifnetaddr)
 				if (aflag) {
 					u_long multiaddr;
 					struct in6_multi inm;
-					char hbuf[INET6_ADDRSTRLEN];
+					struct sockaddr_in6 m6;
 
 					multiaddr = (u_long)ifaddr.in6.ia6_multiaddrs.lh_first;
 					while (multiaddr != 0) {
 						kread(multiaddr, (char *)&inm,
 						    sizeof inm);
-						inet_ntop(AF_INET6, &inm.in6m_sa.sin6_addr,
-							hbuf, sizeof(hbuf));
+						memset(&m6, 0, sizeof(m6));
+						m6.sin6_len = sizeof(struct sockaddr_in6);
+						m6.sin6_family = AF_INET6;
+						m6.sin6_addr = inm.in6m_sa.sin6_addr;
+#ifdef KAME_SCOPEID
+						if (IN6_IS_ADDR_MC_LINKLOCAL(&m6.sin6_addr)) {
+							m6.sin6_scope_id =
+							    ntohs(*(u_int16_t *)
+							      &m6.sin6_addr.s6_addr[2]);
+							m6.sin6_addr.s6_addr[2] = 0;
+							m6.sin6_addr.s6_addr[3] = 0;
+						}
+#endif
+						cp = routename6(&m6);
 						if (vflag)
-							n = strlen(hbuf) < 17 ? 17 : strlen(hbuf);
+							n = strlen(cp) < 17 ? 17 : strlen(cp);
 						else
 							n = 17;
 						printf("\n%25s %-*.*s ", "",
-						    n, n, hbuf);
+						    n, n, cp);
 						multiaddr = (u_long)inm.in6m_entry.le_next;
 					}
 				}

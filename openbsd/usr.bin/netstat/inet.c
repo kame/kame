@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet.c,v 1.58 2002/02/19 21:11:23 miod Exp $	*/
+/*	$OpenBSD: inet.c,v 1.62 2002/06/09 04:07:10 jsyn Exp $	*/
 /*	$NetBSD: inet.c,v 1.14 1995/10/03 21:42:37 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-static char *rcsid = "$OpenBSD: inet.c,v 1.58 2002/02/19 21:11:23 miod Exp $";
+static char *rcsid = "$OpenBSD: inet.c,v 1.62 2002/06/09 04:07:10 jsyn Exp $";
 #endif
 #endif /* not lint */
 
@@ -203,8 +203,8 @@ protopr0(off, name, af)
 		}
 #ifdef INET6
 		if (inpcb.inp_flags & INP_IPV6) {
-			strcpy(namebuf, name0);
-			strcat(namebuf, "6");
+			strlcpy(namebuf, name0, sizeof namebuf);
+			strlcat(namebuf, "6", sizeof namebuf);
 			name = namebuf;
 		} else
 			name = name0;
@@ -251,24 +251,24 @@ tcp_stats(off, name)
 	kread(off, (char *)&tcpstat, sizeof (tcpstat));
 
 #define	p(f, m) if (tcpstat.f || sflag <= 1) \
-    printf(m, tcpstat.f, plural(tcpstat.f))
+	printf(m, tcpstat.f, plural(tcpstat.f))
 #define	p1(f, m) if (tcpstat.f || sflag <= 1) \
-    printf(m, tcpstat.f)
+	printf(m, tcpstat.f)
 #define	p2(f1, f2, m) if (tcpstat.f1 || tcpstat.f2 || sflag <= 1) \
-    printf(m, tcpstat.f1, plural(tcpstat.f1), tcpstat.f2, plural(tcpstat.f2))
+	printf(m, tcpstat.f1, plural(tcpstat.f1), tcpstat.f2, plural(tcpstat.f2))
 #define	p2a(f1, f2, m) if (tcpstat.f1 || tcpstat.f2 || sflag <= 1) \
-    printf(m, tcpstat.f1, plural(tcpstat.f1), tcpstat.f2)
+	printf(m, tcpstat.f1, plural(tcpstat.f1), tcpstat.f2)
 #define	p3(f, m) if (tcpstat.f || sflag <= 1) \
-    printf(m, tcpstat.f, plurales(tcpstat.f))
+	printf(m, tcpstat.f, plurales(tcpstat.f))
 
 	p(tcps_sndtotal, "\t%u packet%s sent\n");
 	p2(tcps_sndpack,tcps_sndbyte,
-		"\t\t%u data packet%s (%qd byte%s)\n");
+	    "\t\t%u data packet%s (%qd byte%s)\n");
 	p2(tcps_sndrexmitpack, tcps_sndrexmitbyte,
-		"\t\t%u data packet%s (%qd byte%s) retransmitted\n");
+	    "\t\t%u data packet%s (%qd byte%s) retransmitted\n");
 	p(tcps_sndrexmitfast, "\t\t%qd fast retransmitted packet%s\n");
 	p2a(tcps_sndacks, tcps_delack,
-		"\t\t%u ack-only packet%s (%u delayed)\n");
+	    "\t\t%u ack-only packet%s (%u delayed)\n");
 	p(tcps_sndurg, "\t\t%u URG only packet%s\n");
 	p(tcps_sndprobe, "\t\t%u window probe packet%s\n");
 	p(tcps_sndwinup, "\t\t%u window update packet%s\n");
@@ -279,16 +279,16 @@ tcp_stats(off, name)
 	p(tcps_rcvdupack, "\t\t%u duplicate ack%s\n");
 	p(tcps_rcvacktoomuch, "\t\t%u ack%s for unsent data\n");
 	p2(tcps_rcvpack, tcps_rcvbyte,
-		"\t\t%u packet%s (%qu byte%s) received in-sequence\n");
+	    "\t\t%u packet%s (%qu byte%s) received in-sequence\n");
 	p2(tcps_rcvduppack, tcps_rcvdupbyte,
-		"\t\t%u completely duplicate packet%s (%qd byte%s)\n");
+	    "\t\t%u completely duplicate packet%s (%qd byte%s)\n");
 	p(tcps_pawsdrop, "\t\t%u old duplicate packet%s\n");
 	p2(tcps_rcvpartduppack, tcps_rcvpartdupbyte,
-		"\t\t%u packet%s with some dup. data (%qd byte%s duped)\n");
+	    "\t\t%u packet%s with some duplicate data (%qd byte%s duplicated)\n");
 	p2(tcps_rcvoopack, tcps_rcvoobyte,
-		"\t\t%u out-of-order packet%s (%qd byte%s)\n");
+	    "\t\t%u out-of-order packet%s (%qd byte%s)\n");
 	p2(tcps_rcvpackafterwin, tcps_rcvbyteafterwin,
-		"\t\t%u packet%s (%qd byte%s) of data after window\n");
+	    "\t\t%u packet%s (%qd byte%s) of data after window\n");
 	p(tcps_rcvwinprobe, "\t\t%u window probe%s\n");
 	p(tcps_rcvwinupd, "\t\t%u window update packet%s\n");
 	p(tcps_rcvafterclose, "\t\t%u packet%s received after close\n");
@@ -301,10 +301,10 @@ tcp_stats(off, name)
 	p(tcps_accepts, "\t%u connection accept%s\n");
 	p(tcps_connects, "\t%u connection%s established (including accepts)\n");
 	p2(tcps_closed, tcps_drops,
-		"\t%u connection%s closed (including %u drop%s)\n");
+	    "\t%u connection%s closed (including %u drop%s)\n");
 	p(tcps_conndrops, "\t%u embryonic connection%s dropped\n");
 	p2(tcps_rttupdated, tcps_segstimed,
-		"\t%u segment%s updated rtt (of %u attempt%s)\n");
+	    "\t%u segment%s updated rtt (of %u attempt%s)\n");
 	p(tcps_rexmttimeo, "\t%u retransmit timeout%s\n");
 	p(tcps_timeoutdrop, "\t\t%u connection%s dropped by rexmit timeout\n");
 	p(tcps_persisttimeo, "\t%u persist timeout%s\n");
@@ -323,9 +323,9 @@ tcp_stats(off, name)
 	p(tcps_ecn_sndect, "\t\t%u ECT packet%s sent\n");
 	p(tcps_ecn_sndece, "\t\t%u ECE packet%s sent\n");
 	p(tcps_ecn_sndcwr, "\t\t%u CWR packet%s sent\n");
-	p1(tcps_cwr_frecovery, "\t\t\tfastrecovery: %u\n");
-	p1(tcps_cwr_timeout, "\t\t\ttimeout: %u\n");
-	p1(tcps_cwr_ecn, "\t\t\tecn: %u\n");
+	p1(tcps_cwr_frecovery, "\t\t\tcwr by fastrecovery: %u\n");
+	p1(tcps_cwr_timeout, "\t\t\tcwr by timeout: %u\n");
+	p1(tcps_cwr_ecn, "\t\t\tcwr by ecn: %u\n");
 
 #undef p
 #undef p1
@@ -350,9 +350,10 @@ udp_stats(off, name)
 	kread(off, (char *)&udpstat, sizeof (udpstat));
 	printf("%s:\n", name);
 #define	p(f, m) if (udpstat.f || sflag <= 1) \
-    printf(m, udpstat.f, plural(udpstat.f))
+	printf(m, udpstat.f, plural(udpstat.f))
 #define	p1(f, m) if (udpstat.f || sflag <= 1) \
-    printf(m, udpstat.f)
+	printf(m, udpstat.f)
+
 	p(udps_ipackets, "\t%lu datagram%s received\n");
 	p1(udps_hdrops, "\t%lu with incomplete header\n");
 	p1(udps_badlen, "\t%lu with bad data length field\n");
@@ -364,13 +365,10 @@ udp_stats(off, name)
 	p(udps_noportbcast, "\t%lu broadcast/multicast datagram%s dropped due to no socket\n");
 	p1(udps_nosec, "\t%lu dropped due to missing IPsec protection\n");
 	p1(udps_fullsock, "\t%lu dropped due to full socket buffers\n");
-	delivered = udpstat.udps_ipackets -
-		    udpstat.udps_hdrops -
-		    udpstat.udps_badlen -
-		    udpstat.udps_badsum -
-		    udpstat.udps_noport -
-		    udpstat.udps_noportbcast -
-		    udpstat.udps_fullsock;
+	delivered = udpstat.udps_ipackets - udpstat.udps_hdrops -
+	    udpstat.udps_badlen - udpstat.udps_badsum -
+	    udpstat.udps_noport - udpstat.udps_noportbcast -
+	    udpstat.udps_fullsock;
 	if (delivered || sflag <= 1)
 		printf("\t%lu delivered\n", delivered);
 	p(udps_opackets, "\t%lu datagram%s output\n");
@@ -395,9 +393,9 @@ ip_stats(off, name)
 	printf("%s:\n", name);
 
 #define	p(f, m) if (ipstat.f || sflag <= 1) \
-    printf(m, ipstat.f, plural(ipstat.f))
+	printf(m, ipstat.f, plural(ipstat.f))
 #define	p1(f, m) if (ipstat.f || sflag <= 1) \
-    printf(m, ipstat.f)
+	printf(m, ipstat.f)
 
 	p(ips_total, "\t%lu total packet%s received\n");
 	p(ips_badsum, "\t%lu bad header checksum%s\n");
@@ -408,7 +406,7 @@ ip_stats(off, name)
 	p1(ips_badoptions, "\t%lu with bad options\n");
 	p1(ips_badvers, "\t%lu with incorrect version number\n");
 	p(ips_fragments, "\t%lu fragment%s received\n");
-	p(ips_fragdropped, "\t%lu fragment%s dropped (dup or out of space)\n");
+	p(ips_fragdropped, "\t%lu fragment%s dropped (duplicates or out of space)\n");
 	p(ips_badfrags, "\t%lu malformed fragment%s dropped\n");
 	p(ips_fragtimeout, "\t%lu fragment%s dropped after timeout\n");
 	p(ips_reassembled, "\t%lu packet%s reassembled ok\n");
@@ -473,11 +471,11 @@ icmp_stats(off, name)
 	printf("%s:\n", name);
 
 #define	p(f, m) if (icmpstat.f || sflag <= 1) \
-    printf(m, icmpstat.f, plural(icmpstat.f))
+	printf(m, icmpstat.f, plural(icmpstat.f))
 
 	p(icps_error, "\t%lu call%s to icmp_error\n");
 	p(icps_oldicmp,
-	    "\t%lu error%s not generated 'cuz old message was icmp\n");
+	    "\t%lu error%s not generated because old message was icmp\n");
 	for (first = 1, i = 0; i < ICMP_MAXTYPE + 1; i++)
 		if (icmpstat.icps_outhist[i] != 0) {
 			if (first) {
@@ -485,7 +483,7 @@ icmp_stats(off, name)
 				first = 0;
 			}
 			printf("\t\t%s: %lu\n", icmpnames[i],
-				icmpstat.icps_outhist[i]);
+			    icmpstat.icps_outhist[i]);
 		}
 	p(icps_badcode, "\t%lu message%s with bad code fields\n");
 	p(icps_tooshort, "\t%lu message%s < minimum length\n");
@@ -498,7 +496,7 @@ icmp_stats(off, name)
 				first = 0;
 			}
 			printf("\t\t%s: %lu\n", icmpnames[i],
-				icmpstat.icps_inhist[i]);
+			    icmpstat.icps_inhist[i]);
 		}
 	p(icps_reflect, "\t%lu message response%s generated\n");
 #undef p
@@ -520,9 +518,10 @@ igmp_stats(off, name)
 	printf("%s:\n", name);
 
 #define	p(f, m) if (igmpstat.f || sflag <= 1) \
-    printf(m, igmpstat.f, plural(igmpstat.f))
+	printf(m, igmpstat.f, plural(igmpstat.f))
 #define	py(f, m) if (igmpstat.f || sflag <= 1) \
-    printf(m, igmpstat.f, igmpstat.f != 1 ? "ies" : "y")
+	printf(m, igmpstat.f, igmpstat.f != 1 ? "ies" : "y")
+
 	p(igps_rcv_total, "\t%lu message%s received\n");
 	p(igps_rcv_tooshort, "\t%lu message%s received with too few bytes\n");
 	p(igps_rcv_toolong, "\t%lu message%s received over MTU size\n");
@@ -666,9 +665,9 @@ inetname(inp)
 		first = 0;
 		if (gethostname(domain, sizeof(domain)) == 0 &&
 		    (cp = strchr(domain, '.')))
-			(void) strcpy(domain, cp + 1);
+			(void) strlcpy(domain, cp + 1, sizeof domain);
 		else
-			domain[0] = 0;
+			domain[0] = '\0';
 	}
 	cp = 0;
 	if (!nflag && inp->s_addr != INADDR_ANY) {
@@ -720,9 +719,9 @@ ah_stats(off, name)
 	printf("%s:\n", name);
 
 #define p(f, m) if (ahstat.f || sflag <= 1) \
-    printf(m, ahstat.f, plural(ahstat.f))
+	printf(m, ahstat.f, plural(ahstat.f))
 #define p1(f, m) if (ahstat.f || sflag <= 1) \
-    printf(m, ahstat.f)
+	printf(m, ahstat.f)
 
 	p1(ahs_input, "\t%u input AH packets\n");
 	p1(ahs_output, "\t%u output AH packets\n");
@@ -737,7 +736,7 @@ ah_stats(off, name)
 	p(ahs_wrap, "\t%u packet%s where counter wrapping was detected\n");
 	p(ahs_replay, "\t%u possibly replayed packet%s received\n");
 	p(ahs_badauthl, "\t%u packet%s with bad authenticator length received\n");
-	p(ahs_invalid, "\t%u packet%s attempted to use an invalid tdb\n");
+	p(ahs_invalid, "\t%u packet%s attempted to use an invalid TDB\n");
 	p(ahs_toobig, "\t%u packet%s got larger than max IP packet size\n");
 	p(ahs_crypto, "\t%u packet%s that failed crypto processing\n");
 	p(ahs_ibytes, "\t%qu input byte%s\n");
@@ -763,7 +762,7 @@ etherip_stats(off, name)
 	printf("%s:\n", name);
 
 #define p(f, m) if (etheripstat.f || sflag <= 1) \
-    printf(m, etheripstat.f, plural(etheripstat.f))
+	printf(m, etheripstat.f, plural(etheripstat.f))
 
 
 	p(etherip_hdrops, "\t%u packet%s shorter than header shows\n");
@@ -794,7 +793,7 @@ esp_stats(off, name)
 	printf("%s:\n", name);
 
 #define p(f, m) if (espstat.f || sflag <= 1) \
-    printf(m, espstat.f, plural(espstat.f))
+	printf(m, espstat.f, plural(espstat.f))
 
 	p(esps_input, "\t%u input ESP packet%s\n");
 	p(esps_output, "\t%u output ESP packet%s\n");
@@ -810,7 +809,7 @@ esp_stats(off, name)
 	p(esps_wrap, "\t%u packet%s where counter wrapping was detected\n");
 	p(esps_replay, "\t%u possibly replayed packet%s received\n");
 	p(esps_badilen, "\t%u packet%s with bad payload size or padding received\n");
-	p(esps_invalid, "\t%u packet%s attempted to use an invalid tdb\n");
+	p(esps_invalid, "\t%u packet%s attempted to use an invalid TDB\n");
 	p(esps_toobig, "\t%u packet%s got larger than max IP packet size\n");
 	p(esps_crypto, "\t%u packet%s that failed crypto processing\n");
 	p(esps_ibytes, "\t%qu input byte%s\n");
@@ -835,7 +834,7 @@ ipip_stats(off, name)
 	printf("%s:\n", name);
 
 #define p(f, m) if (ipipstat.f || sflag <= 1) \
-    printf(m, ipipstat.f, plural(ipipstat.f))
+	printf(m, ipipstat.f, plural(ipipstat.f))
 
 	p(ipips_ipackets, "\t%u total input packet%s\n");
 	p(ipips_opackets, "\t%u total output packet%s\n");
@@ -866,7 +865,7 @@ ipcomp_stats(off, name)
 	printf("%s:\n", name);
 
 #define p(f, m) if (ipcompstat.f || sflag <= 1) \
-    printf(m, ipcompstat.f, plural(ipcompstat.f))
+	printf(m, ipcompstat.f, plural(ipcompstat.f))
 
 	p(ipcomps_input, "\t%u input IPCOMP packet%s\n");
 	p(ipcomps_output, "\t%u output IPCOMP packet%s\n");
@@ -878,7 +877,7 @@ ipcomp_stats(off, name)
 	p(ipcomps_noxform, "\t%u packet%s for which no XFORM was set in TDB received\n");
 	p(ipcomps_qfull, "\t%u packet%s were dropped due to full output queue\n");
 	p(ipcomps_wrap, "\t%u packet%s where counter wrapping was detected\n");
-	p(ipcomps_invalid, "\t%u packet%s attempted to use an invalid tdb\n");
+	p(ipcomps_invalid, "\t%u packet%s attempted to use an invalid TDB\n");
 	p(ipcomps_toobig, "\t%u packet%s got larger than max IP packet size\n");
 	p(ipcomps_crypto, "\t%u packet%s that failed (de)compression processing\n");
 	p(ipcomps_ibytes, "\t%qu input byte%s\n");
