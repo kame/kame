@@ -1,4 +1,4 @@
-/*	$KAME: plog.h,v 1.5 2000/12/15 13:43:56 sakane Exp $	*/
+/*	$KAME: plog.h,v 1.6 2000/12/15 15:42:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,8 +40,8 @@
 
 /*
  * INFO: begin negotiation, SA establishment/deletion/expiration.
- * NOTIFY: not error but notifiable.
- * WARNING:
+ * NOTIFY: just notifiable.
+ * WARNING: not error strictly.
  * ERROR: system call error. also invalid parameter/format.
  * DEBUG1: debugging informatioin.
  * DEBUG2: too more verbose. e.g. parsing config.
