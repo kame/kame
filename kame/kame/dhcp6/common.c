@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.100 2004/05/13 13:48:07 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.101 2004/05/13 13:52:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1378,7 +1378,7 @@ copyin_option(type, p, ep, list)
 				dprintf(LOG_INFO, FNAME,
 				    "%s is an invalid position for %s",
 				    dhcp6optstr(type), dhcp6optstr(opt));
-				goto nextoption; /* or discard the message? */
+				goto fail;
 			}
 			/* check option length */
 			if (optlen + sizeof(opth) < sizeof(opt_iapd_prefix))
