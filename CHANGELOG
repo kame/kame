@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1437 2000/12/12 17:07:57 thorpej Exp $
+$KAME: CHANGELOG,v 1.1438 2000/12/13 08:16:06 itojun Exp $
 
 <200012>
+Wed Dec 13 17:05:36 JST 2000  itojun@iijlab.net
+	* netbsd/sbin/racoon: update racoon reachover makefile.  compiles in
+	  GSSAPI support if MKKERBEROS is set.
+
 Tue Dec 12 08:56:39 PST 2000  thorpej@zembu.com
 	* racoon/Makefile.in
 	* racoon/algorithm.c
