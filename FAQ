@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.41 2001/07/25 23:52:57 itojun Exp $
+$KAME: FAQ,v 1.42 2001/07/26 00:00:16 itojun Exp $
 
 
 GENERAL
@@ -102,8 +102,8 @@ Q: Which operating systems/vendor routers use KAME stack?
 
 INSTALLATION
 ============
-Q: I heard that the *BSDs have integrated KAME code already.  Do I still need to
-install KAME patches?
+Q: I heard that the *BSDs have integrated KAME code already.
+Do I still need to install KAME patches?
 	Depends on your goal.  Roughly speaking,
 	- If you want IPv6 for normal day-to-day use, you will be happy with
 	  *BSD integrated code (no need for KAME patches).
@@ -117,7 +117,7 @@ Q: I replaced the kernel and rebooted, and lost IPv4 connectivity.  Why?
 	There are several possibilities, but it is almost always
 	due to kernel configuration differences.  If you have
 	been using a specific kernel configuration for your IPv4
-	kernel, and you have installed a GENERIC.v6 kernel, you lost
+	kernel, and you have installed a GENERIC.v6 kernel, you lose
 	your special configurations.
 
 	One good way to deal with this problem is to, (1) copy
@@ -132,12 +132,22 @@ Q: Is anything special required for network interface card drivers?
 	(IPv6 code), in the following form:
 
 	(1) single internal mbuf
-	(2) single external mbuf
-	(3) multiple external mbufs
+	(2) single external (cluster) mbuf
+	(3) multiple external (cluster) mbufs
 
 	Some of traditional drivers will pass the packet to upper layers in
 	two linked internal mbufs.  In this case, the driver must be modified.
 	You can check this situation by using netstat -sn.
+
+	If you see the following line ("two or more mbufs") for your ethernet
+	card in netstat output (ip6 section), your driver needs to be modified.
+
+		Mbuf statistics:
+			58 one mbufs
+			two or more mbuf:
+				foo0 = 2	<--- foo0 needs modification
+			6486 one ext mbufs
+			0 two or more ext mbufs
 
 	The modification is very simple.  You should check the use of MINCLSIZE
 	in the driver, change that to MHLEN.  In this way you can avoid two
@@ -199,6 +209,10 @@ Q: Does KAME support site-local addresses?
 	Site-local addressing (the spec itself, not KAME) has a
 	bunch of issues/twists to be solved, such as site-border management
 	and name servers.  We are trying very hard to solve them.
+
+	On many of KAME-ready BSD systems, reject routes are installed in
+	/etc/rc for fec0::/10 as a precaution.  If you plan to use site-local
+	addresses, you first need to remove the route.
 
 Q: How can I implement address-family independent applications?
 Q: How can I modify my application to support IPv6 as well as IPv4?
