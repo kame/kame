@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2055 2002/01/21 05:50:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.2056 2002/01/21 07:41:20 jinmei Exp $
 
 <200201>
+2002-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/wru: allowed the user to omit the hostname, in which
+	case the command used ff02::1 disambiguating the link zone using
+	the default interface.
+
 2002-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/route6.c (ip6_rthdr0): made the source routing
 	code more scope-aware:
