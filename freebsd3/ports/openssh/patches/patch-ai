@@ -1,21 +1,26 @@
-diff -ru /home/green/ssh/includes.h ./includes.h
---- /home/green/ssh/includes.h	Wed Nov  3 03:36:00 1999
-+++ ./includes.h	Mon Nov  8 00:06:40 1999
-@@ -24,7 +24,6 @@
- #include <sys/select.h>
- #include <sys/param.h>
- #include <sys/ioctl.h>
--#include <sys/endian.h>
- #include <sys/stat.h>
- #include <sys/wait.h>
- #include <sys/time.h>
-@@ -38,7 +37,8 @@
- #include <arpa/inet.h>
- #include <netdb.h>
+--- /usr/ports/distfiles/OpenSSH-1.2/src/usr.bin/ssh/ssh-agent/Makefile	Wed Oct 27 12:54:49 1999
++++ ./ssh-agent/Makefile	Tue Nov 23 19:27:38 1999
+@@ -2,20 +2,13 @@
  
--#include <netgroup.h>
-+#include <machine/endian.h>
-+
- #include <stdio.h>
- #include <ctype.h>
- #include <errno.h>
+ PROG=	ssh-agent
+ BINOWN=	root
+-
+-.if (${MACHINE_ARCH} == "alpha" || ${MACHINE_ARCH} == "powerpc" || \
+-	${MACHINE_ARCH} == "hppa")
+-BINMODE=0000
+-.else
+-BINMODE?=555
+-.endif
+-
+-BINDIR=	/usr/bin
++BINMODE=555
++BINDIR=	/bin
+ MAN=	ssh-agent.1
+ 
+ SRCS=	ssh-agent.c log-client.c
+ 
+ .include <bsd.prog.mk>
+ 
+-LDADD+=	-lcrypto -lutil -lz
++LDADD+=	${CRYPTOLIBS} -lutil -lz
+ DPADD+=	${LIBCRYPTO} ${LIBDES} ${LIBUTIL} ${LIBZ}

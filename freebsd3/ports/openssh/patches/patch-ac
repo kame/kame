@@ -1,14 +1,24 @@
-diff -ru /home/green/ssh/auth-rsa.c ./auth-rsa.c
---- /home/green/ssh/auth-rsa.c	Wed Nov  3 03:36:00 1999
-+++ ./auth-rsa.c	Mon Nov  8 00:06:40 1999
-@@ -25,8 +25,8 @@
- #include "mpaux.h"
- #include "uidswap.h"
+--- /usr/ports/distfiles/OpenSSH-1.2/src/usr.bin/ssh/includes.h	Tue Nov  2 16:21:02 1999
++++ ./includes.h	Tue Nov 23 19:20:38 1999
+@@ -24,12 +24,12 @@
+ #include <sys/select.h>
+ #include <sys/param.h>
+ #include <sys/ioctl.h>
+-#include <sys/endian.h>
+ #include <sys/stat.h>
+ #include <sys/wait.h>
+ #include <sys/time.h>
+ #include <sys/un.h>
+ #include <sys/resource.h>
++#include <machine/endian.h>
  
--#include <ssl/rsa.h>
--#include <ssl/md5.h>
-+#include <openssl/rsa.h>
-+#include <openssl/md5.h>
+ #include <netinet/in.h>
+ #include <netinet/in_systm.h>
+@@ -38,7 +38,6 @@
+ #include <arpa/inet.h>
+ #include <netdb.h>
  
- /* Flags that may be set in authorized_keys options. */
- extern int no_port_forwarding_flag;
+-#include <netgroup.h>
+ #include <stdio.h>
+ #include <ctype.h>
+ #include <errno.h>

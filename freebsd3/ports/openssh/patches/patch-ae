@@ -1,12 +1,14 @@
-diff -ru /home/green/ssh/authfile.c ./authfile.c
---- /home/green/ssh/authfile.c	Tue Oct 12 03:47:00 1999
-+++ ./authfile.c	Mon Nov  8 00:06:40 1999
-@@ -17,7 +17,7 @@
+--- /usr/ports/distfiles/OpenSSH-1.2/src/usr.bin/ssh/login.c	Tue Nov 23 18:55:14 1999
++++ ./login.c	Tue Nov 23 19:35:08 1999
+@@ -20,7 +20,11 @@
  #include "includes.h"
- RCSID("$Id: authfile.c,v 1.7 1999/10/11 20:00:35 markus Exp $");
+ RCSID("$Id: login.c,v 1.8 1999/11/23 22:25:54 markus Exp $");
  
--#include <ssl/bn.h>
-+#include <openssl/bn.h>
- #include "xmalloc.h"
- #include "buffer.h"
- #include "bufaux.h"
++#ifdef __FreeBSD__
++#include <libutil.h>
++#else
+ #include <util.h>
++#endif /* __FreeBSD__ */
+ #include <utmp.h>
+ #include "ssh.h"
+ 

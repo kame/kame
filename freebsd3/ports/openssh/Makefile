@@ -1,34 +1,34 @@
 # New ports collection makefile for:	OpenSSH
-# Version required:	19991107
-# Date created:		Tue Nov 16 19:45:46 JST 1999
-# Whom:			sumikawa
+# Version required:	1.2
+# Date created:		7 October 1999
+# Whom:			green
 #
-# $FreeBSD: ports/security/openssh/Makefile,v 1.12 1999/11/17 20:12:17 green Exp $
-# $Id: Makefile,v 1.4 1999/12/27 12:37:11 sumikawa Exp $
+# $FreeBSD: ports/security/openssh/Makefile,v 1.31 1999/12/23 06:37:20 green Exp $
+# $Id: Makefile,v 1.5 2000/01/07 04:48:20 sumikawa Exp $
 #
 
 DISTNAME=	src/usr.bin/ssh
-PKGNAME=	OpenSSH-1.2
+PKGNAME=	OpenSSH-1.2.1
 CATEGORIES=	security net
-MASTER_SITES=	anoncvs@anoncvs1.ca.openbsd.org:/cvs \
-		:pserver:anoncvs@anoncvs1.usa.openbsd.org:/cvs
-
-PATCH_SITES=	http://www.rcac.tdi.co.jp/fujiwara/
-PATCHFILES=	openssh.v6.patch-0.01
-PATCH_DIST_STRIP=	-p1
+# ${MASTER_SITES} is only for if CVS won't work, period.
+MASTER_SITES=	ftp://internat.FreeBSD.org/pub/Crypto/OpenSSH/
 
 MAINTAINER=	sumikawa@kame.net
 
-LIB_DEPENDS=	crypto.1:${PORTSDIR}/security/openssl
+RESTRICTED=	"One file calls external cryptographic routines."
 
-RESTRICTED=	"Links with cryptographic code."
+LIB_DEPENDS=	crypto.1:${PORTSDIR}/security/openssl
 
 .include <bsd.port.pre.mk>
 CAT?=		/bin/cat
 DISTFILES!=	${CAT} ${FILESDIR}/distfiles
 
 CVS_CMD?=	cvs -z3
-CVS_DATE=	Mon Nov 15 01:30:17 EST 1999
+CVS_DATE=	Fri Jan  7 01:25:49 JST 2000
+SED?=		/usr/bin/sed
+CVS_DATE_!=	${ECHO} -n "${CVS_DATE}" | ${SED} 's/[ \t:]/_/g'
+CVS_SITES=	anoncvs@anoncvs1.ca.openbsd.org:/cvs \
+		:pserver:anoncvs@anoncvs1.usa.openbsd.org:/cvs
 CRYPTOLIBS=	-L${PREFIX}/lib -lcrypto
 .if defined(USA_RESIDENT) && ${USA_RESIDENT} == YES
 CRYPTOLIBS+=	-lRSAglue -lrsaref
@@ -44,6 +44,12 @@ MAKE_ENV+=	AFS=yes
 .if defined(KERBEROS) && ${KERBEROS} == YES
 MAKE_ENV+=	KERBEROS=yes
 .endif
+.if exists(/usr/include/security/pam_modules.h)
+PAM?=		yes
+.else
+PAM=		no
+.endif
+MAKE_ENV+=	PAM=${PAM}
 .if defined(SKEY) && ${SKEY} == YES
 MAKE_ENV+=	SKEY=yes
 .endif
@@ -53,84 +59,98 @@ WRKSRC=		${WRKDIR}/ssh
 do-fetch:
 	@if [ ! -e ${STAMPFILE} ] || \
 	    [ "X${CVS_DATE}" != "X$$(${CAT} ${STAMPFILE})" ]; then \
+		if [ -e ${DISTDIR}/${PKGNAME}.${CVS_DATE_}.tar.gz ]; then \
+			cd ${DISTDIR}; \
+			${TAR} xfz ${PKGNAME}.${CVS_DATE_}.tar.gz \
+			    ${DISTFILES}; \
+			${ECHO} -n "${CVS_DATE}" > ${STAMPFILE}; \
+			exit; \
+		fi; \
 		unset CVS_RSH CVS_SERVER || ${TRUE}; \
 		if [ -n "${PORTS_CVS_RSH}" ]; then \
 			export CVS_RSH="${PORTS_CVS_RSH}"; \
 		fi; \
 		${MKDIR} ${DISTDIR}/${PKGNAME} && \
-		cd ${DISTDIR}/${PKGNAME} || exit; \
-		for CVS_SITE in ${MASTER_SITES}; do \
-			${ECHO_MSG} ">> Attempting to CVS checkout from\
-			$${CVS_SITE}."; \
-			${CVS_CMD} -d $${CVS_SITE} co -D "${CVS_DATE}" \
-				${DISTNAME} && { ${ECHO} -n ${CVS_DATE} > \
-				${STAMPFILE} && exit; }; \
+		cd ${DISTDIR}/${PKGNAME}; \
+		for CVS_SITE in ${CVS_SITES}; do \
+			${ECHO_MSG} ">> Attempting to CVS checkout from $${CVS_SITE}."; \
+			if ${CVS_CMD} -d $${CVS_SITE} co -D "${CVS_DATE}" \
+			    ${DISTNAME}; then \
+				${ECHO} -n ${CVS_DATE} > ${STAMPFILE}; \
+				exit; \
+			fi \
 		done; \
-		${ECHO_MSG} ">> Couldn't CVS checkout ${PKGNAME}.  Please try\
-			to retrieve"; \
-		${ECHO_MSG} ">> this port manually into ${_DISTDIR} and try\
-			again."; \
+		${ECHO_MSG} ">> Couldn't CVS checkout ${PKGNAME}.  Please try to retrieve"; \
+		${ECHO_MSG} ">> a snapshot with \"make fetchsrctarball\" and try again."; \
 		exit 1; \
 	fi
-	@(cd ${_DISTDIR}; \
-	 for file in ${PATCHFILES}; do \
-		if [ ! -f $$file -a ! -f `${BASENAME} $$file` ]; then \
-			if [ -h $$file -o -h `${BASENAME} $$file` ]; then \
-				${ECHO_MSG} ">> ${_DISTDIR}/$$file is a broken symlink."; \
-				${ECHO_MSG} ">> Perhaps a filesystem (most likely a CD) isn't mounted?"; \
-				${ECHO_MSG} ">> Please correct this problem and try again."; \
-				exit 1; \
-			fi ; \
-			${ECHO_MSG} ">> $$file doesn't seem to exist on this system."; \
-			for site in ${PATCH_SITES}; do \
-			    ${ECHO_MSG} ">> Attempting to fetch from $${site}."; \
-				DIR=${DIST_SUBDIR}; \
-				CKSIZE=`${GREP} "^SIZE ($${DIR:+$$DIR/}$$file)" ${MD5_FILE} | ${AWK} '{print $$4}'`; \
-				case $${file} in \
-				*/*)	${MKDIR} $${file%/*}; \
-						args="-o $${file} $${site}$${file}";; \
-				*)		args=$${site}$${file};; \
-				esac; \
-				if ${SETENV} ${FETCH_ENV} ${FETCH_CMD} ${FETCH_BEFORE_ARGS} $${args} ${FETCH_AFTER_ARGS}; then \
-					continue 2; \
-				fi \
-			done; \
-			${ECHO_MSG} ">> Couldn't fetch it - please try to retrieve this";\
-			${ECHO_MSG} ">> port manually into ${_DISTDIR} and try again."; \
-			exit 1; \
-	    fi \
-	 done)
+
+makesrctarball: fetch
+	@cd ${DISTDIR}; \
+	${ECHO_MSG} ">> Creating source tarball in ${DISTDIR}"; \
+	${ECHO_MSG} ">> \"${PKGNAME}.${CVS_DATE_}.tar.gz\"."; \
+	${TAR} cfz ${PKGNAME}.${CVS_DATE_}.tar.gz ${PKGNAME}
+
+fetchsrctarball:
+	@cd ${DISTDIR}; \
+	file=${PKGNAME}.${CVS_DATE_}.tar.gz; \
+	if [ -e $$file ]; then \
+		exit; \
+	fi; \
+	${ECHO_MSG} ">> $$file doesn't seem to exist on this system."; \
+	for site in ${MASTER_SITES}; do \
+		${ECHO_MSG} ">> Attempting to fetch from $${site}."; \
+		if ${SETENV} ${FETCH_ENV} ${FETCH_CMD} ${FETCH_BEFORE_ARGS} \
+		    $${site}$${file}; then \
+			exit; \
+		fi; \
+	done; \
+	${ECHO_MSG} ">> Couldn't fetch $$file."; \
+	${ECHO_MSG} ">> Please try to retrieve this file manually into"; \
+	${ECHO_MSG" ">> ${_DISTDIR} and try again."; \
+	exit 1
 
 do-extract:
 	@${MKDIR} ${WRKDIR}
 	@${CP} -r ${DISTDIR}/${PKGNAME}/${DISTNAME} ${WRKDIR}
-	@${CP} ${FILESDIR}/strlcpy.c ${WRKSRC}/lib/
+	@${CP} ${FILESDIR}/strlcat.c ${FILESDIR}/strlcpy.c ${WRKSRC}/lib/
+	@${MKDIR} ${WRKSRC}/pam_ssh
+	@${CP} ${FILESDIR}/pam_ssh_Makefile ${WRKSRC}/pam_ssh/Makefile
+	@${CP} ${FILESDIR}/pam_ssh.c ${WRKSRC}/pam_ssh/
 
 post-patch:
-	@${PERL} -pi.orig -e 's:(_PATH_STDPATH):$$1 "${PREFIX}/bin":g' \
-		${WRKSRC}/sshd.c
-	@${PERL} -pi.orig -e 's:__PREFIX__:${PREFIX}:g' ${WRKSRC}/ssh.h
-	@${PERL} -pi.orig -e 's:__PREFIX__:${PREFIX}:g' ${WRKSRC}/sshd_config
-	@${PERL} -pi.openssl -e \
-		's:^(\s*#\s*include\s+<)ssl(/\w+\.h>\s*)$$:$$1openssl$$2:g' \
-		${WRKSRC}/*.[ch]
+	@${PERL} -pi -e 's:__PREFIX__:${PREFIX}:g' ${WRKSRC}/ssh.h \
+		${WRKSRC}/sshd_config ${WRKSRC}/pam_ssh/pam_ssh.c
+	@${PERL} -pi -e \
+	    's:^(\s*#\s*include\s+<)ssl(/\w+\.h>\s*)$$:$$1openssl$$2:g' \
+	    ${WRKSRC}/*.[ch]
 
-pre-install:
-	@if [ ! -f ${PREFIX}/etc/sshd_config ]; then \
-		cd ${WRKSRC} && ${MAKE} DESTDIR=${PREFIX} distribution; \
-	else \
-		${ECHO} ">> ${PREFIX}/etc/sshd_config exists, not being replaced!"; \
-		${ECHO} ">> If this is left over from another version of SSH, you will"; \
-		${ECHO} ">> need to update it to work with OpenSSH."; \
-	fi
+.if ${PAM} == yes
+PLIST=		${WRKDIR}/PLIST
+
+do-configure:
+	@${CP} ${PKGDIR}/PLIST ${PLIST}
+	@${ECHO} "@cwd /usr" >> ${PLIST}
+	@${ECHO} "lib/pam_ssh.so" >> ${PLIST}
+.endif
 
 post-install:
-	@if [ ! -f ${PREFIX}/etc/rc.d/sshd.sh ]; then \
-		${ECHO} ">> Installing ${PREFIX}/etc/rc.d/sshd.sh startup file."; \
-		${ECHO} "#!/bin/sh" > ${PREFIX}/etc/rc.d/sshd.sh; \
-		${ECHO} "[ -x ${PREFIX}/sbin/sshd ] && ${PREFIX}/sbin/sshd &&" \
-			"${ECHO} -n ' sshd'" >> ${PREFIX}/etc/rc.d/sshd.sh; \
-		${CHMOD} 755 ${PREFIX}/etc/rc.d/sshd.sh; \
-	fi
+.if !exists(${PREFIX}/etc/ssh_host_key)
+	@${ECHO_MSG} ">> Generating a secret host key."
+	${PREFIX}/bin/ssh-keygen -N "" -f ${PREFIX}/etc/ssh_host_key
+.endif
+.if !exists(${PREFIX}/etc/rc.d/sshd.sh)
+	@${ECHO} "#!/bin/sh" > ${PREFIX}/etc/rc.d/sshd.sh
+	@${ECHO} "[ -x ${PREFIX}/sbin/sshd ] && ${PREFIX}/sbin/sshd && echo -n ' sshd'" >> ${PREFIX}/etc/rc.d/sshd.sh
+	@${CHMOD} 0555 ${PREFIX}/etc/rc.d/sshd.sh
+.endif
+.if !exists(${PREFIX}/etc/ssh_config) && !exists(${PREFIX}/etc/sshd_config)
+	@cd ${WRKSRC}; \
+	${MAKE} DESTDIR=${PREFIX} distribution
+.else
+	@${ECHO_MSG} ">> ${PREFIX}/etc/ssh{,d}_config exists, not being replaced!"
+	@${ECHO_MSG} ">> If this is left over from another version of SSH, you will"
+	@${ECHO_MSG} ">> need to update it to work with OpenSSH."
+.endif
 
 .include <bsd.port.mk>

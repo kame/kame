@@ -1,12 +1,20 @@
-diff -ru /home/green/ssh/authfd.c ./authfd.c
---- /home/green/ssh/authfd.c	Fri Oct 15 03:34:00 1999
-+++ ./authfd.c	Mon Nov  8 00:06:40 1999
-@@ -24,7 +24,7 @@
- #include "xmalloc.h"
- #include "getput.h"
+--- lib/Makefile.orig	Tue Dec  7 22:50:49 1999
++++ lib/Makefile	Tue Dec  7 22:53:22 1999
+@@ -4,7 +4,8 @@
+ SRCS=   authfd.c authfile.c bufaux.c buffer.c canohost.c channels.c \
+ 	cipher.c compat.c compress.c crc32.c deattack.c fingerprint.c \
+ 	hostfile.c log.c match.c mpaux.c nchan.c packet.c readpass.c \
+-	rsa.c tildexpand.c ttymodes.c uidswap.c xmalloc.c atomicio.c
++	rsa.c tildexpand.c ttymodes.c uidswap.c xmalloc.c atomicio.c \
++	strlcat.c strlcpy.c
  
--#include <ssl/rsa.h>
-+#include <openssl/rsa.h>
+ NOPROFILE= yes
+ NOPIC=	yes
+@@ -13,6 +14,7 @@
+ 	@echo -n
  
- /* Returns the number of the authentication fd, or -1 if there is none. */
+ .include <bsd.own.mk>
++.include "../Makefile.inc"
  
+ .if (${KERBEROS} == "yes")
+ CFLAGS+= -DKRB4 -I/usr/include/kerberosIV

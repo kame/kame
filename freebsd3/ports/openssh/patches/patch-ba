@@ -1,11 +1,10 @@
---- sshd_config.orig	Mon Nov  8 01:57:32 1999
-+++ sshd_config	Mon Nov  8 01:57:51 1999
-@@ -2,7 +2,7 @@
+--- includes.h.orig	Fri Jan  7 01:32:21 2000
++++ includes.h	Fri Jan  7 01:33:08 2000
+@@ -65,4 +65,7 @@
+  */
+ #define USE_PIPES 1
  
- Port 22
- ListenAddress 0.0.0.0
--HostKey /etc/ssh_host_key
-+HostKey __PREFIX__/etc/ssh_host_key
- ServerKeyBits 768
- LoginGraceTime 600
- KeyRegenerationInterval 3600
++typedef unsigned int    socklen_t;
++#define ss_family __ss_family
++
+ #endif				/* INCLUDES_H */

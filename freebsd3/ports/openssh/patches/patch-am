@@ -1,12 +1,28 @@
-diff -ru /home/green/ssh/packet.h ./packet.h
---- /home/green/ssh/packet.h	Tue Sep 28 03:45:00 1999
-+++ ./packet.h	Mon Nov  8 00:06:40 1999
-@@ -18,7 +18,7 @@
- #ifndef PACKET_H
- #define PACKET_H
+--- /usr/ports/distfiles/OpenSSH-1.2/src/usr.bin/ssh/sshd/Makefile	Mon Oct 25 16:27:27 1999
++++ ./sshd/Makefile	Tue Nov 23 19:29:25 1999
+@@ -3,13 +3,14 @@
+ PROG=	sshd
+ BINOWN=	root
+ BINMODE=555
+-BINDIR=	/usr/sbin
+-MAN=	sshd.8
++BINDIR=	/sbin
++MAN8=	sshd.8
  
--#include <ssl/bn.h>
-+#include <openssl/bn.h>
+ SRCS=	sshd.c auth-rhosts.c auth-passwd.c auth-rsa.c auth-rh-rsa.c \
+ 	pty.c log-server.c login.c servconf.c serverloop.c
  
- /* Sets the socket used for communication.  Disables encryption until
-    packet_set_encryption_key is called.  It is permissible that fd_in
+ .include <bsd.own.mk> # for KERBEROS and AFS
++.include "../Makefile.inc"
+ 
+ .if (${KERBEROS} == "yes")
+ CFLAGS+= -DKRB4 -I/usr/include/kerberosIV
+@@ -29,7 +30,7 @@
+ 
+ .include <bsd.prog.mk>
+ 
+-LDADD+=	-lcrypto -lutil -lz
++LDADD+=	${CRYPTOLIBS} -lcrypt -lutil -lz
+ DPADD+=	${LIBCRYPTO} ${LIBUTIL} ${LIBZ}
+ 
+ .if (${TCP_WRAPPERS} == "yes")

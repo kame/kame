@@ -1,19 +1,15 @@
-diff -ru /home/green/ssh/ssh-add/Makefile ./ssh-add/Makefile
---- /home/green/ssh/ssh-add/Makefile	Thu Oct 28 03:32:00 1999
-+++ ./ssh-add/Makefile	Mon Nov  8 00:13:30 1999
-@@ -10,12 +10,12 @@
- BINMODE?=555
- .endif
- 
--BINDIR=	/usr/bin
--MAN=	ssh-add.1
-+BINDIR=	/bin
-+MAN1=	ssh-add.1
- 
- SRCS=	ssh-add.c log-client.c
- 
- .include <bsd.prog.mk>
- 
--LDADD+=	-lcrypto -lutil -lz
-+LDADD+=	-lutil -lz ${CRYPTOLIBS}
- DPADD+= ${LIBCRYPTO} ${LIBDES} ${LIBUTIL} ${LIBZ}
+--- servconf.h.orig	Sun Dec  5 01:48:12 1999
++++ servconf.h	Sun Dec  5 02:25:49 1999
+@@ -83,6 +83,12 @@
+ 	char   *allow_groups[MAX_ALLOW_GROUPS];
+ 	unsigned int num_deny_groups;
+ 	char   *deny_groups[MAX_DENY_GROUPS];
++	unsigned int connections_per_period;	/*
++						 * If not 0, number of sshd
++						 * connections accepted per
++						 * connections_period.
++						 */
++	unsigned int connections_period;
+ }       ServerOptions;
+ /*
+  * Initializes the server options to special values that indicate that they

@@ -1,14 +1,27 @@
-diff -ru /home/green/ssh/cipher.h ./cipher.h
---- /home/green/ssh/cipher.h	Sun Oct  3 03:39:00 1999
-+++ ./cipher.h	Mon Nov  8 00:06:40 1999
-@@ -16,8 +16,8 @@
- #ifndef CIPHER_H
- #define CIPHER_H
+--- /usr/ports/distfiles/OpenSSH-1.2/src/usr.bin/ssh/ssh-add/Makefile	Wed Oct 27 12:54:48 1999
++++ ./ssh-add/Makefile	Tue Nov 23 19:26:48 1999
+@@ -2,20 +2,13 @@
  
--#include <des.h>
--#include <ssl/blowfish.h>
-+#include <openssl/blowfish.h>
-+#include <openssl/des.h>
+ PROG=	ssh-add
+ BINOWN=	root
+-
+-.if (${MACHINE_ARCH} == "alpha" || ${MACHINE_ARCH} == "powerpc" || \
+-	${MACHINE_ARCH} == "hppa")
+-BINMODE=0000
+-.else
+-BINMODE?=555
+-.endif
+-
+-BINDIR=	/usr/bin
+-MAN=	ssh-add.1
++BINMODE=555
++BINDIR=	/bin
++MAN1=	ssh-add.1
  
- /* Cipher types.  New types can be added, but old types should not be removed
-    for compatibility.  The maximum allowed value is 31. */
+ SRCS=	ssh-add.c log-client.c
+ 
+ .include <bsd.prog.mk>
+ 
+-LDADD+=	-lcrypto -lutil -lz
++LDADD+=	${CRYPTOLIBS} -lutil -lz
+ DPADD+= ${LIBCRYPTO} ${LIBDES} ${LIBUTIL} ${LIBZ}
