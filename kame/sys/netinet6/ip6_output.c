@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.240 2001/11/26 08:42:43 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.241 2001/11/26 08:56:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1352,29 +1352,22 @@ skip_ipsec2:;
 #endif
 	    )
 	{
-#if defined(__NetBSD__) && defined(IFA_STATS)
 		struct in6_ifaddr *ia6;
 		ip6 = mtod(m, struct ip6_hdr *);
 		ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
 		if (ia6) {
+ 			/* Record statistics for this interface address. */
+#if defined(__NetBSD__) && defined(IFA_STATS)
 			ia6->ia_ifa.ifa_data.ifad_outbytes +=
 				m->m_pkthdr.len;
-		}
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
- 		/* Record statistics for this interface address. */
- 		if (ia && !(flags & IPV6_FORWARDING)) {
- 			ia->ia_ifa.if_opackets++;
- 			ia->ia_ifa.if_obytes += m->m_pkthdr.len;
- 		}
+ 			ia6->ia_ifa.if_opackets++;
+ 			ia6->ia_ifa.if_obytes += m->m_pkthdr.len;
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802
-		struct in6_ifaddr *ia6;
-		ip6 = mtod(m, struct ip6_hdr *);
-		ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
-		if (ia6) {
  			ia6->ia_ifa.ifa_opackets++;
  			ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
-		}
 #endif
+ 		}
 #if defined(IPSEC) && !defined(__OpenBSD__)
 		/* clean ipsec history once it goes out of the node */
 		ipsec_delaux(m);
@@ -1516,29 +1509,25 @@ sendorfree:
 		m0 = m->m_nextpkt;
 		m->m_nextpkt = 0;
 		if (error == 0) {
-#if defined(__NetBSD__) && defined(IFA_STATS)
 			struct in6_ifaddr *ia6;
 			ip6 = mtod(m, struct ip6_hdr *);
 			ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
 			if (ia6) {
+				/*
+				 * Record statistics for this interface
+				 * address.
+				 */
+#if defined(__NetBSD__) && defined(IFA_STATS)
 				ia6->ia_ifa.ifa_data.ifad_outbytes +=
 					m->m_pkthdr.len;
-			}
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
- 			/* Record statistics for this interface address. */
- 			if (ia) {
- 				ia->ia_ifa.if_opackets++;
- 				ia->ia_ifa.if_obytes += m->m_pkthdr.len;
- 			}
+ 				ia6->ia_ifa.if_opackets++;
+ 				ia6->ia_ifa.if_obytes += m->m_pkthdr.len;
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802
-			struct in6_ifaddr *ia6;
-			ip6 = mtod(m, struct ip6_hdr *);
-			ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
-			if (ia6) {
  				ia6->ia_ifa.ifa_opackets++;
  				ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
-			}
 #endif
+			}
 #if defined(IPSEC) && !defined(__OpenBSD__)
 			/* clean ipsec history once it goes out of the node */
 			ipsec_delaux(m);
