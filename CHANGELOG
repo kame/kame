@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2197 2002/07/04 02:02:03 itojun Exp $
+$KAME: CHANGELOG,v 1.2198 2002/07/08 09:44:30 sakane Exp $
 
 <200207>
+Mon Jul  8 18:40:07 JST 2002 sakane@kame.net
+	* sys/netkey/key_debug.c:
+	debugging with "setkey -x" probably becomes easier.
+	this patch is from <archie@packetdesign.com>.
+
+Mon Jul  8 18:33:54 JST 2002 sakane@kame.net
+	* sys/netkey/key.c:
+	the order of searching SA table for packets is fixed.
+	the kernel might select dying SAs when the kernel needed newest SA.
+
 Thu Jul  4 11:00:56 JST 2002  itojun@iijlab.net
 	* sys/netinet/sctp*: new sctp patch from randall.  uses RADIX_MPATH
 	  codepath for freebsd4.
