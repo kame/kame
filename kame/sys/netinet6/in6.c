@@ -577,6 +577,13 @@ in6_control(so, cmd, data, ifp)
 	switch (cmd) {
 
 	case SIOCDIFADDR_IN6:
+		/*
+		 * for IPv4, we look for existing in6_ifaddr here to allow
+		 * "ifconfig if0 delete" to remove first IPv4 address on the
+		 * interface.  For IPv6, as the spec allow multiple interface
+		 * address from the day one, we consider "remove the first one"
+		 * semantics to be not preferrable.
+		 */
 		if (ia == 0)
 			return(EADDRNOTAVAIL);
 		/* FALLTHROUGH */
