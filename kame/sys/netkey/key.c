@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.316 2003/09/22 04:50:53 itojun Exp $	*/
+/*	$KAME: key.c,v 1.317 2003/10/13 08:54:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2658,8 +2658,10 @@ key_setspddump(errorp)
 			}
 			if (!m)
 				m = n;
-			else
+			else {
+				m->m_pkthdr.len += n->m_pkthdr.len;
 				m_cat(m, n);
+			}
 		}
 	}
 
