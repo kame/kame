@@ -1,4 +1,4 @@
-.\"	$NetBSD: ifconfig.8,v 1.32.4.10 2001/05/01 11:07:30 he Exp $
+.\"	$NetBSD: ifconfig.8,v 1.54 2001/11/16 10:25:45 wiz Exp $
 .\"
 .\" Copyright (c) 1983, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -33,9 +33,9 @@
 .\"
 .\"     @(#)ifconfig.8	8.4 (Berkeley) 6/1/94
 .\"
-.Dd April 16, 1997
+.Dd April 27, 2001
 .Dt IFCONFIG 8
-.Os BSD 4.2
+.Os
 .Sh NAME
 .Nm ifconfig
 .Nd configure network interface parameters
@@ -106,7 +106,7 @@ and each of the six bytes of the host number,
 through
 .Ar f ,
 are specified in hexadecimal.
-The host number may be omitted on 10Mb/s Ethernet interfaces,
+The host number may be omitted on Ethernet interfaces,
 which use the hardware physical address,
 and on interfaces other than the first.
 For the
@@ -153,7 +153,7 @@ between network level addresses and link level addresses (default).
 This is currently implemented for mapping between
 .Tn DARPA
 Internet
-addresses and 10Mb/s Ethernet addresses.
+addresses and Ethernet addresses.
 .It Fl arp
 Disable the use of the Address Resolution Protocol.
 .It Cm anycast
@@ -327,9 +327,30 @@ are used.
 For IEEE 802.11 wireless network, the length of each key is restricted to
 40 bits, i.e. 5-character string or 10 hexadecimal digits,
 while the WaveLAN/IEEE Gold cards accept the 104 bits (13 characters) key.
+.It Cm nwkey Cm persist
+(IEEE 802.11 devices only)
+Enable WEP encryption for IEEE 802.11-based wireless network interfaces
+with the persistent key written in the network card.
+.It Cm nwkey Cm persist: Ns Ar key
+(IEEE 802.11 devices only)
+Write the
+.Ar key
+to the persistent memory of the network card, and
+enable WEP encryption for IEEE 802.11-based wireless network interfaces
+with the
+.Ar key .
 .It Fl nwkey
 (IEEE 802.11 devices only)
 Disable WEP encryption for IEEE 802.11-based wireless network interfaces.
+.It Cm powersave
+(IEEE 802.11 devices only)
+Enable 802.11 power saving mode.
+.It Fl powersave
+(IEEE 802.11 devices only)
+Disable 802.11 power saving mode.
+.It Cm powersavesleep Ar duration
+(IEEE 802.11 devices only)
+Set the receiver sleep duration in milliseconds for 802.11 power saving mode.
 .It Cm tunnel Ar src_addr Ar dest_addr
 (IP tunnel devices only)
 Configure the physical source and destination address for IP tunnel
@@ -355,10 +376,16 @@ To configure infinite lifetime,
 should be set to
 .Dq Li infty .
 .It Cm prefixlen Ar n
-(inet6 only)
+(inet and inet6 only)
 Effect is similar to
 .Cm netmask .
 but you can specify by prefix length by digits.
+.It Cm deprecated
+(inet6 only)
+Set the IPv6 deprecated address bit.
+.It Fl deprecated
+(inet6 only)
+Clear the IPv6 deprecated address bit.
 .It Cm tentative
 (inet6 only)
 Set the IPv6 tentative address bit.
@@ -399,12 +426,12 @@ If the interface is a
 .Xr vlan 4
 pseudo-interface, associate the physical interface
 .Ar iface
-with it.  Packets transmitted through the 
+with it.  Packets transmitted through the
 .Xr vlan 4
 interface will be diverted to the specified physical interface
 .Ar iface
 with 802.1Q VLAN encapsulation.  Packets with 802.1Q encapsulation received
-by the physical interface with the correct VLAN tag will be diverted to the 
+by the physical interface with the correct VLAN tag will be diverted to the
 associated
 .Xr vlan 4
 pseudo-interface.  The VLAN interface is assigned a copy of the physical
@@ -428,6 +455,48 @@ To configure infinite lifetime,
 .Ar n
 should be set to
 .Dq Li infty .
+.It Cm ip4csum
+Enable hardware-assisted IPv4 header checksums on interfaces that
+support it.
+.It Cm -ip4csum
+Disable hardware-assisted IPv4 header checksums on interfaces that
+support it.
+.It Cm tcp4csum
+Enable hardware-assisted TCP/IPv4 checksums on interfaces that
+support it.
+.It Cm -tcp4csum
+Disable hardware-assisted TCP/IPv4 checksums on interfaces that
+support it.
+.It Cm udp4csum
+Enable hardware-assisted UDP/IPv4 checksums on interfaces that
+support it.
+.It Cm -udp4csum
+Disable hardware-assisted UDP/IPv4 checksums on interfaces that
+support it.
+.It Cm tcp6csum
+Enable hardware-assisted TCP/IPv6 checksums on interfaces that
+support it.
+.It Cm -tcp6csum
+Disable hardware-assisted TCP/IPv6 checksums on interfaces that
+support it.
+.It Cm udp6csum
+Enable hardware-assisted UDP/IPv6 checksums on interfaces that
+support it.
+.It Cm -udp6csum
+Disable hardware-assisted UDP/IPv6 checksums on interfaces that
+support it.
+.It Cm tcp4csum-rx
+Enable hardware-assisted TCP/IPv4 checksums on interfaces that
+support it only for the in-bound direction.
+.It Cm -tcp4csum-rx
+Disable hardware-assisted TCP/IPv4 checksums on interfaces that
+support it only for the in-bound direction.
+.It Cm udp4csum-rx
+Enable hardware-assisted UDP/IPv4 checksums on interfaces that
+support it only for the in-bound direction.
+.It Cm -udp4csum-rx
+Disable hardware-assisted UDP/IPv4 checksums on interfaces that
+support it only for the in-bound direction.
 .El
 .Pp
 .Nm
@@ -445,7 +514,7 @@ flag is passed before an interface name,
 will attempt to query the interface for its media status.  If the
 interface supports reporting media status, and it reports that it does
 not appear to be connected to a network,
-.Nm 
+.Nm
 will exit with status of 1 (false); otherwise, it will exit with a
 zero (true) exit status.  Not all interface drivers support media
 status reporting.

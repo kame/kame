@@ -10,6 +10,7 @@ struct keytab keywords[] = {
 	{"atalk", K_ATALK},
 	{"blackhole", K_BLACKHOLE},
 	{"change", K_CHANGE},
+	{"cloned", K_CLONED},
 	{"cloning", K_CLONING},
 	{"delete", K_DELETE},
 	{"dst", K_DST},
