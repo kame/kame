@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.60 2001/08/13 17:48:42 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.61 2001/08/13 20:34:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1009,6 +1009,15 @@ eay_des_weakkey(key)
 	return des_is_weak_key((void *)key->v);
 }
 
+int
+eay_des_keylen(len)
+	int len;
+{
+	if (len != 0 && len != 8)
+		return -1;
+	return 8;
+}
+
 #ifdef HAVE_OPENSSL_IDEA_H
 /*
  * IDEA-CBC
@@ -1062,6 +1071,15 @@ eay_idea_weakkey(key)
 {
 	return 0;	/* XXX */
 }
+
+int
+eay_idea_keylen(len)
+	int len;
+{
+	if (len != 0 && len != 16)
+		return -1;
+	return 16;
+}
 #endif
 
 /*
@@ -1114,6 +1132,17 @@ eay_bf_weakkey(key)
 	vchar_t *key;
 {
 	return 0;	/* XXX to be done. refer to RFC 2451 */
+}
+
+int
+eay_bf_keylen(len)
+	int len;
+{
+	if (len == 0)
+		return 56;
+	if (len < 40 || len > 448)
+		return -1;
+	return len + 7 / 8;
 }
 
 #ifdef HAVE_OPENSSL_RC5_H
@@ -1170,6 +1199,17 @@ eay_rc5_weakkey(key)
 {
 	return 0;	/* No known weak keys when used with 16 rounds. */
 
+}
+
+int
+eay_rc5_keylen(len)
+	int len;
+{
+	if (len == 0)
+		return 16;
+	if (len < 40 || len > 2040)
+		return -1;
+	return len + 7 / 8;
 }
 #endif
 
@@ -1246,6 +1286,15 @@ eay_3des_weakkey(key)
 		|| des_is_weak_key((void *)(key->v + 16)));
 }
 
+int
+eay_3des_keylen(len)
+	int len;
+{
+	if (len != 0 && len != 24)
+		return -1;
+	return 24;
+}
+
 /*
  * CAST-CBC
  */
@@ -1296,6 +1345,17 @@ eay_cast_weakkey(key)
 	vchar_t *key;
 {
 	return 0;	/* No known weak keys. */
+}
+
+int
+eay_cast_keylen(len)
+	int len;
+{
+	if (len == 0)
+		return 16;
+	if (len < 40 || len > 128)
+		return -1;
+	return len + 7 / 8;
 }
 
 /*
@@ -1360,6 +1420,15 @@ eay_aes_weakkey(key)
 	vchar_t *key;
 {
 	return 0;
+}
+
+int
+eay_aes_keylen(len)
+	int len;
+{
+	if (len != 128 && len != 192 && len != 256)
+		return -1;
+	return len;
 }
 
 /*
@@ -1729,6 +1798,12 @@ eay_sha2_512_one(data)
 	return(res);
 }
 
+int
+eay_sha2_512_hashlen()
+{
+	return SHA512_DIGEST_LENGTH;
+}
+
 /*
  * SHA2-384 functions
  */
@@ -1779,6 +1854,12 @@ eay_sha2_384_one(data)
 	res = eay_sha2_384_final(ctx);
 
 	return(res);
+}
+
+int
+eay_sha2_384_hashlen()
+{
+	return SHA384_DIGEST_LENGTH;
 }
 
 /*
@@ -1833,6 +1914,12 @@ eay_sha2_256_one(data)
 	return(res);
 }
 
+int
+eay_sha2_256_hashlen()
+{
+	return SHA256_DIGEST_LENGTH;
+}
+
 /*
  * SHA functions
  */
@@ -1885,6 +1972,12 @@ eay_sha1_one(data)
 	return(res);
 }
 
+int
+eay_sha1_hashlen()
+{
+	return SHA_DIGEST_LENGTH;
+}
+
 /*
  * MD5 functions
  */
@@ -1935,6 +2028,12 @@ eay_md5_one(data)
 	res = eay_md5_final(ctx);
 
 	return(res);
+}
+
+int
+eay_md5_hashlen()
+{
+	return MD5_DIGEST_LENGTH;
 }
 
 /*

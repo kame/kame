@@ -1,4 +1,4 @@
-/*	$KAME: oakley.h,v 1.21 2001/08/13 19:45:17 sakane Exp $	*/
+/*	$KAME: oakley.h,v 1.22 2001/08/13 20:34:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -254,6 +254,7 @@ struct hash_algorithm {
 	caddr_t (*init) __P((void));
 	void (*update) __P((caddr_t, vchar_t *));
 	vchar_t *(*final) __P((caddr_t));
+	int (*hashlen) __P((void));
 	vchar_t *(*one) __P((vchar_t *));
 };
 
@@ -262,6 +263,7 @@ struct cipher_algorithm {
 	vchar_t *(*encrypt) __P((vchar_t *, vchar_t *, caddr_t));
 	vchar_t *(*decrypt) __P((vchar_t *, vchar_t *, caddr_t));
 	int (*weakkey) __P((vchar_t *));
+	int (*keylen) __P((int));
 };
 
 struct dhgroup {

@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.92 2001/08/13 19:46:55 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.93 2001/08/13 20:34:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,19 +99,26 @@ static vchar_t oakley_prime1536;
 
 static struct hash_algorithm hashdef[] = {
 { "NULL",	NULL,			NULL,
-		NULL,			NULL, },
+		NULL,			NULL,
+		NULL, },
 { "md5",	eay_md5_init,		eay_md5_update,
-		eay_md5_final,		eay_md5_one, },
+		eay_md5_final,		eay_md5_hashlen,
+		eay_md5_one, },
 { "sha1",	eay_sha1_init,		eay_sha1_update,
-		eay_sha1_final,		eay_sha1_one, },
+		eay_sha1_final,		eay_sha1_hashlen,
+		eay_sha1_one, },
 { "*dummy*",	NULL,			NULL,
-		NULL,			NULL, },
+		NULL,			NULL,
+		NULL, },
 { "sha2_256",	eay_sha2_256_init,	eay_sha2_256_update,
-		eay_sha2_256_final,	eay_sha2_256_one, },
+		eay_sha2_256_final,	eay_sha2_256_hashlen,
+		eay_sha1_one, },
 { "sha2_384",	eay_sha2_384_init,	eay_sha2_384_update,
-		eay_sha2_384_final,	eay_sha2_384_one, },
+		eay_sha2_384_final,	eay_sha2_384_hashlen,
+		eay_sha1_one, },
 { "sha2_512",	eay_sha2_512_init,	eay_sha2_512_update,
-		eay_sha2_512_final,	eay_sha2_512_one, },
+		eay_sha2_512_final,	eay_sha2_512_hashlen,
+		eay_sha1_one, },
 };
 
 static struct hmac_algorithm hmacdef[] = {
@@ -132,22 +139,32 @@ static struct hmac_algorithm hmacdef[] = {
 };
 
 static struct cipher_algorithm encdef[] = {
-{ "NULL",	NULL,			NULL,			NULL, },
-{ "des",	eay_des_encrypt,	eay_des_decrypt,	eay_des_weakkey, },
+{ "NULL",	NULL,			NULL,
+		NULL,			NULL, },
+{ "des",	eay_des_encrypt,	eay_des_decrypt,
+		eay_des_weakkey,	eay_des_keylen, },
 #ifdef HAVE_OPENSSL_IDEA_H
-{ "idea",	eay_idea_encrypt,	eay_idea_decrypt,	eay_idea_weakkey, },
+{ "idea",	eay_idea_encrypt,	eay_idea_decrypt,
+		eay_idea_weakkey,	eay_idea_keylen, },
 #else
-{ "*dummy*",	NULL,			NULL,			NULL, },
+{ "*dummy*",	NULL,			NULL,
+		NULL,			NULL, },
 #endif
-{ "blowfish",	eay_bf_encrypt,		eay_bf_decrypt,		eay_bf_weakkey, },
+{ "blowfish",	eay_bf_encrypt,		eay_bf_decrypt,
+		eay_bf_weakkey,		eay_bf_keylen, },
 #ifdef HAVE_OPENSSL_RC5_H
-{ "rc5",	eay_rc5_encrypt,	eay_rc5_decrypt,	eay_rc5_weakkey, },
+{ "rc5",	eay_rc5_encrypt,	eay_rc5_decrypt,
+		eay_rc5_weakkey,	eay_rc5_keylen, },
 #else
-{ "*dummy*",	NULL,			NULL,			NULL, },
+{ "*dummy*",	NULL,			NULL,
+		NULL,			NULL, },
 #endif
-{ "3des",	eay_3des_encrypt,	eay_3des_decrypt,	eay_3des_weakkey, },
-{ "cast",	eay_cast_decrypt,	eay_cast_decrypt,	eay_cast_weakkey, },
-{ "aes",	eay_aes_decrypt,	eay_aes_decrypt,	eay_aes_weakkey, },
+{ "3des",	eay_3des_encrypt,	eay_3des_decrypt,
+		eay_3des_weakkey,	eay_3des_keylen, },
+{ "cast",	eay_cast_decrypt,	eay_cast_decrypt,
+		eay_cast_weakkey,	eay_cast_keylen, },
+{ "aes",	eay_aes_decrypt,	eay_aes_decrypt,
+		eay_aes_weakkey,	eay_aes_keylen, },
 };
 
 static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));
@@ -311,6 +328,10 @@ oakley_setdhgroup(group, dhgrp)
 	case OAKLEY_ATTR_GRP_DESC_MODP768:
 	case OAKLEY_ATTR_GRP_DESC_MODP1024:
 	case OAKLEY_ATTR_GRP_DESC_MODP1536:
+	case OAKLEY_ATTR_GRP_DESC_MODP2048:
+	case OAKLEY_ATTR_GRP_DESC_MODP3072:
+	case OAKLEY_ATTR_GRP_DESC_MODP4096:
+	case OAKLEY_ATTR_GRP_DESC_MODP8192:
 		if (group > ARRAYLEN(dhgroup)
 		 || dhgroup[group].type == 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
@@ -2275,56 +2296,36 @@ oakley_compute_enckey(iph1)
 	int error = -1;
 
 	/* RFC2409 p39 */
-	switch (iph1->approval->enctype) {
-	case OAKLEY_ATTR_ENC_ALG_DES:
-		keylen = 8;
-		break;
-	case OAKLEY_ATTR_ENC_ALG_IDEA:
-		keylen = 16;
-		break;
-	case OAKLEY_ATTR_ENC_ALG_BLOWFISH:	/* can negotiate keylen */
-		keylen = iph1->approval->encklen
-			? (iph1->approval->encklen + 7) / 8 : 56;
-		break;
-	case OAKLEY_ATTR_ENC_ALG_RC5:		/* can negotiate encklen */
-	case OAKLEY_ATTR_ENC_ALG_CAST:		/* can negotiate encklen */
-		keylen = iph1->approval->encklen
-			? (iph1->approval->encklen + 7) / 8 : 16;
-		break;
-	case OAKLEY_ATTR_ENC_ALG_3DES:
-		keylen = 24;
-		break;
-	default:
+	if (iph1->approval->enctype > ARRAYLEN(encdef))
+		goto end;
+	if (encdef[iph1->approval->enctype].weakkey == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"encryption algoritym %d isn't supported.\n",
 			iph1->approval->enctype);
 		goto end;
 	}
-
-	switch (iph1->approval->dh_group) {
-	default:
-		switch (iph1->approval->hashtype) {
-		case OAKLEY_ATTR_HASH_ALG_MD5:
-			prflen = 16;
-			break;
-		case OAKLEY_ATTR_HASH_ALG_SHA:
-			prflen = 20;
-			break;
-		default:
-			plog(LLV_ERROR, LOCATION, NULL,
-				"hash type %d isn't supported.\n",
-				iph1->approval->hashtype);
-			return 0;
-			break;
-		}
+	keylen = (encdef[iph1->approval->enctype].keylen)
+			(iph1->approval->encklen);
+	if (keylen == -1) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"weakkey was generated.\n");
+		goto end;
 	}
-
 	iph1->key = vmalloc(keylen);
 	if (iph1->key == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get key buffer\n");
 		goto end;
 	}
+
+	/* set prf length */
+	if (iph1->approval->hashtype > ARRAYLEN(hashdef)) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"hash type %d isn't supported.\n",
+			iph1->approval->hashtype);
+		goto end;
+	}
+	prflen = (hashdef[iph1->approval->hashtype].hashlen)();
 
 	/* see isakmp-oakley-08 5.3. */
 	if (iph1->key->l <= iph1->skeyid_e->l) {
