@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.169 2004/04/13 12:40:50 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.170 2004/04/14 04:42:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -407,14 +407,14 @@ str2number(p)
 	const char *p;
 {
 	char *ep;
-	int v;
+	unsigned long v;
 
 	if (*p == '\0')
 		return -1;
 	ep = NULL;
 	errno = 0;
-	v = (int)strtoul(p, &ep, 10);
-	if (errno == 0 && ep && *ep == '\0')
+	v = strtoul(p, &ep, 10);
+	if (errno == 0 && ep && *ep == '\0' && v <= UINT_MAX)
 		return v;
 	else
 		return -1;
