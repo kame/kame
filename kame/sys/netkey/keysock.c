@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.8 2000/01/16 18:30:58 itojun Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.9 2000/01/17 09:24:40 itojun Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -87,26 +87,6 @@ struct sockproto key_proto = { PF_KEY, PF_KEY_V2 };
 
 static int key_sendup0 __P((struct rawcb *, struct mbuf *, int));
 
-#if 1
-#define KMALLOC(p, t, n) \
-	((p) = (t) malloc((unsigned long)(n), M_SECA, M_NOWAIT))
-#define KFREE(p) \
-	free((caddr_t)(p), M_SECA);
-#else
-#define KMALLOC(p, t, n) \
-	do {								\
-		((p) = (t)malloc((unsigned long)(n), M_SECA, M_NOWAIT));\
-		printf("%s %d: %p <- KMALLOC(%s, %d)\n",		\
-			__FILE__, __LINE__, (p), #t, n);		\
-	} while (0)
-
-#define KFREE(p) \
-	do {								\
-		printf("%s %d: %p -> KFREE()\n", __FILE__, __LINE__, (p));\
-		free((caddr_t)(p), M_SECA);				\
-	} while (0)
-#endif
-
 struct pfkeystat pfkeystat;
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -139,7 +119,7 @@ key_usrreq(so, req, m, nam, control, p)
 	s = splnet();
 #endif
 	if (req == PRU_ATTACH) {
-		MALLOC(kp, struct keycb *, sizeof(*kp), M_PCB, M_WAITOK);
+		kp = (struct keycb *)malloc(sizeof(*kp), M_PCB, M_WAITOK);
 		so->so_pcb = (caddr_t)kp;
 		if (so->so_pcb)
 			bzero(so->so_pcb, sizeof(*kp));
@@ -295,8 +275,8 @@ key_output(m, va_alist)
 	 * allocate memory for sadb_msg, and copy to sadb_msg from mbuf
 	 * XXX: To be processed directly without a copy.
 	 */
-	KMALLOC(msg, struct sadb_msg *, len);
-	if (msg == 0) {
+	msg = (struct sadb_msg *)malloc(len, M_SECA, M_NOWAIT);
+	if (msg == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_output: No more memory.\n");
 #endif
@@ -324,7 +304,7 @@ key_output(m, va_alist)
 	/* send up message to the socket */
 	error = key_sendup(so, msg, len, target);
 	splx(s);
-	KFREE(msg);
+	free(msg, M_SECA);
 end:
 	m_freem(m);
 	return (error);
@@ -599,7 +579,7 @@ key_attach(struct socket *so, int proto, struct proc *p)
 
 	if (sotorawcb(so) != 0)
 		return EISCONN;	/* XXX panic? */
-	MALLOC(kp, struct keycb *, sizeof *kp, M_PCB, M_WAITOK); /* XXX */
+	kp = (struct keycb *)malloc(sizeof *kp, M_PCB, M_WAITOK); /* XXX */
 	if (kp == 0)
 		return ENOBUFS;
 	bzero(kp, sizeof *kp);
