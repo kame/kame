@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.3 2002/05/01 10:31:51 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.4 2002/05/01 10:38:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -239,6 +239,9 @@ cleanup_declaration(decl)
 		cleanup_dhcpoption(decl->decl_val);
 		break;
 	case DECL_INFO_ONLY:	/* no value */
+		break;
+	case DECL_ALLOW:
+		cleanup_dhcpoption(decl->decl_val);
 		break;
 	default:
 		yyerror("cleanup_declaration: unexpected declaration");

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.63 2002/05/01 10:30:35 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.64 2002/05/01 10:38:58 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -567,6 +567,7 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
 			memcpy(p, &d->addr, sizeof(struct in6_addr));
 			p += sizeof(struct in6_addr);
 		}
+		roptinfo.dns.list = dnsbuf;
 	}
 
 	/* set options in the reply message */
@@ -580,6 +581,7 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
 	}
 	len += optlen;
 
+	dst = *sa6_any_downstream;
 	dst.sin6_addr = ((struct sockaddr_in6 *)from)->sin6_addr;
 	dst.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
 
