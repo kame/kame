@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: libtest.c,v 1.3 1999/10/26 11:31:09 itojun Exp $
+ * $Id: libtest.c,v 1.4 1999/11/03 19:50:27 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -48,6 +48,7 @@
 int main __P((int, char **));
 static void usage __P((void));
 static int test_pton __P((void));
+static int test_getnameinfo __P((void));
 
 int
 main(argc, argv)
@@ -75,6 +76,8 @@ main(argc, argv)
 	}
 
 	failure += test_pton();
+	failure += test_getnameinfo();
+
 	printf("%d failure%s\n", failure, failure > 1 ? "s" : "");
 	exit(failure);
 }
@@ -107,5 +110,118 @@ test_pton()
 		return 1;
 	} else
 		return 0;
+#undef FUNCNAME
+}
+
+static int
+test_getnameinfo()
+{
+#define FUNCNAME	"test_getnameinfo"
+	struct sockaddr_storage ss;
+	struct sockaddr *sa;
+	struct sockaddr_in *sin;
+	char hbuf[NI_MAXHOST], pbuf[NI_MAXSERV];
+	int i, j, k;
+	int fail;
+	int ntest;
+
+	fail = 0;
+	ntest = 0;
+
+	sa = (struct sockaddr *)&ss;
+	sin = (struct sockaddr_in *)&ss;
+	memset(sin, 0, sizeof(*sin));
+	sin->sin_len = sizeof(struct sockaddr_in);
+	sin->sin_family = AF_INET;
+	sin->sin_addr.s_addr = ntohl(0x7f000001);
+	sin->sin_port = ntohs(9876);
+
+	/*
+	 * host/serv with NULL, or hostlen/servlen with 0, should not
+	 * raise any error.
+	 */
+	for (i = 0; i < 3 * 3; i++) {
+		char *h, *p;
+		int hl, pl;
+
+		switch (i % 3) {
+		case 0:	h = hbuf; hl = 0; break;
+		case 1:	h = NULL; hl = sizeof(hbuf); break;
+		case 2:	h = NULL; hl = 0; break;
+		}
+		switch ((i / 3) % 3) {
+		case 0:	p = pbuf; pl = 0; break;
+		case 1:	p = NULL; pl = sizeof(pbuf); break;
+		case 2:	p = NULL; pl = 0; break;
+		}
+		ntest++;
+		if (getnameinfo(sa, sa->sa_len, h, hl, p, pl,
+				NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
+			printf("%s: test %d failed\n", FUNCNAME, ntest);
+			fail++;
+		}
+
+	}
+
+	/* test for RFC2553/X-open getnameinfo spec */
+	ntest++;
+	j = k = 0;
+	for (i = 1; i < strlen("127.0.0.1"); i++) {
+		memset(hbuf, 0, sizeof(hbuf));
+		if (getnameinfo(sa, sa->sa_len, hbuf, i, NULL, 0,
+				NI_NUMERICHOST) != 0) {
+			/*
+			 * RFC2553 behavior - should raise error if the
+			 * room is not enough
+			 */
+			j++;
+		} else {
+			if (strncmp("127.0.0.1", hbuf, strlen(hbuf)) == 0) {
+				/*
+				 * X/open behavior - caller must supply
+				 * enough buffer
+				 */
+				k++;
+			} else {
+				printf("%s: test %d failed with len=%d\n",
+					FUNCNAME, ntest, i);
+				fail++;
+			}
+		}
+	}
+
+	for (i = 1; i < strlen("9876"); i++) {
+		memset(hbuf, 0, sizeof(hbuf));
+		if (getnameinfo(sa, sa->sa_len, hbuf, i, NULL, 0,
+				NI_NUMERICHOST) != 0) {
+			/*
+			 * RFC2553 behavior - should raise error if the
+			 * room is not enough
+			 */
+			j++;
+		} else {
+			if (strncmp("9876", hbuf, strlen(hbuf)) == 0) {
+				/*
+				 * X/open behavior - caller must supply
+				 * enough buffer
+				 */
+				k++;
+			} else {
+				printf("%s: test %d failed with len=%d\n",
+					FUNCNAME, ntest, i);
+				fail++;
+			}
+		}
+	}
+	if (k == 0)
+		printf("%s: RFC2553 behavior on short buffer\n", FUNCNAME);
+	else if (j == 0)
+		printf("%s: X/open behavior on short buffer\n", FUNCNAME);
+	else {
+		printf("%s: test %d failed - random behavior\n", FUNCNAME,
+			ntest);
+	}
+
+	return fail ? 1 : 0;
 #undef FUNCNAME
 }
