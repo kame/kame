@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.49 2000/08/21 05:59:19 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.50 2000/08/29 02:32:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1067,27 +1067,26 @@ prelist_update(new, dr, m)
 			    storedlifetime < new->ndpr_vltime) {
 				lt6->ia6t_vltime = new->ndpr_vltime;
 				update++;
-			} else if (auth &&
-				   storedlifetime <= TWOHOUR
+			} else if (storedlifetime <= TWOHOUR
 #if 0
 				   /* this condition is redundant */
 				   && new->ndpr_vltime <= storedlifetime
 #endif
 				) {
-				lt6->ia6t_vltime = new->ndpr_vltime;
-				update++;
+				if (auth) {
+					lt6->ia6t_vltime = new->ndpr_vltime;
+					update++;
+				}
 			} else {
 				/*
 				 * new->ndpr_vltime <= TWOHOUR &&
-				 * new->ndpr_vltime <= storedlifetime &&
-				 * not authenticated
+				 * TWOHOUR < storedlifetime
 				 */
 				lt6->ia6t_vltime = TWOHOUR;
 				update++;
 			}
 
 			/* 2 hour rule is not imposed for pref lifetime */
-			new->ndpr_apltime = new->ndpr_pltime;
 			lt6->ia6t_pltime = new->ndpr_pltime;
 #else	/* update from Jim Bound, (ipng 6712) */
 			/*
