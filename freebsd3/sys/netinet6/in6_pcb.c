@@ -489,11 +489,14 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		}
 		if (ro->ro_rt == (struct rtentry *)0 ||
 		    ro->ro_rt->rt_ifp == (struct ifnet *)0) {
+			struct sockaddr_in6 *dst6;
+
 			/* No route yet, so try to acquire one */
 			bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));
-			ro->ro_dst.sin6_family = AF_INET6;
-			ro->ro_dst.sin6_len = sizeof(struct sockaddr_in6);
-			ro->ro_dst.sin6_addr = *dst;
+			dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
+			dst6->sin6_family = AF_INET6;
+			dst6->sin6_len = sizeof(struct sockaddr_in6);
+			dst6->sin6_addr = *dst;
 			if (IN6_IS_ADDR_MULTICAST(dst)) {
 #ifdef __FreeBSD__
 				ro->ro_rt = rtalloc1(&((struct route *)ro)
@@ -788,6 +791,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 			continue;
 
 		if (do_rtchange) {
+			struct sockaddr_in6 *dst6;
+
 			/*
 			 * Since a non-connected PCB might have a cached route,
 			 * we always call in6_rtchange without matching
@@ -795,8 +800,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 			 *
 			 * XXX: we assume in6_rtchange does not free the PCB.
 			 */
-			if (IN6_ARE_ADDR_EQUAL(&inp->in6p_route.ro_dst.sin6_addr,
-					       &faddr6))
+			dst6 = (struct sockaddr_in6 *)&inp->in6p_route.ro_dst;
+			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, &faddr6))
 				in6_rtchange(inp, errno);
 
 			if (notify == in6_rtchange)
