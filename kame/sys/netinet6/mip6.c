@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.91 2001/12/17 08:36:26 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.92 2001/12/17 10:09:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1588,27 +1588,29 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
 	optbuf.off = 2;
 
-	if (opts && opts->ip6po_dest2) {
-		int dstoptlen;
-		if (*pktopt_mip6dest2 == NULL) {
+	if (*pktopt_mip6dest2 == NULL) {
+		if ((opts != NULL) && (opts->ip6po_dest2 != NULL)) {
+			int dstoptlen;
 			/*
-			 * destination option 2 already exists and
-			 * have not merged yet.  merge them.
+			 * destination option 2 is specified and have
+			 * not been merged yet.  merge them.
 			 */
 			dstoptlen = (opts->ip6po_dest2->ip6d_len + 1) << 3;
 			bcopy((caddr_t)opts->ip6po_dest2, (caddr_t)optbuf.buf,
 			      dstoptlen);
-		} else {
-			/*
-			 * destination option 2 already exists and
-			 * have merged before.  copy them.
-			 */
-			dstoptlen =
-				((*pktopt_mip6dest2)->ip6d_len + 1) << 3;
-			bcopy((void *)(*pktopt_mip6dest2),
-			      (void *)optbuf.buf,
-			      dstoptlen);
+			optbuf.off = dstoptlen;
+			mip6_find_offset(&optbuf);
 		}
+	} else {
+		int dstoptlen;
+		/*
+		 * mip6dest2 is already set.  we must merge the
+		 * existing destopts and the options we are going to
+		 * add in the following code.
+		 */
+		dstoptlen = ((*pktopt_mip6dest2)->ip6d_len + 1) << 3;
+		bcopy((caddr_t)(*pktopt_mip6dest2), (caddr_t)optbuf.buf,
+		      dstoptlen);
 		optbuf.off = dstoptlen;
 		mip6_find_offset(&optbuf);
 	}
@@ -1634,6 +1636,8 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	
 	mip6_align_destopt(&optbuf);
 
+	if (*pktopt_mip6dest2 != NULL)
+		free(*pktopt_mip6dest2, M_IP6OPT);
 	*pktopt_mip6dest2 = (struct ip6_dest *)optbuf.buf;
 
 	/* hoping that the binding update will be sent with no accident. */
@@ -1723,27 +1727,29 @@ mip6_babr_destopt_create(pktopt_mip6dest2, dst, opts)
 	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
 	optbuf.off = 0;
 
-	if (opts && opts->ip6po_dest2) {
-		int dstoptlen;
-		if (*pktopt_mip6dest2 == NULL) {
+	if (*pktopt_mip6dest2 == NULL) {
+		if ((opts != NULL) && (opts->ip6po_dest2 != NULL)) {
+			int dstoptlen;
 			/*
-			 * destination option 2 already exists and
-			 * have not merged yet.  merge them.
+			 * destination option 2 is specified and have
+			 * not been merged yet.  merge them.
 			 */
 			dstoptlen = (opts->ip6po_dest2->ip6d_len + 1) << 3;
 			bcopy((caddr_t)opts->ip6po_dest2, (caddr_t)optbuf.buf,
 			      dstoptlen);
-		} else {
-			/*
-			 * destination option 2 already exists and
-			 * have merged before.  copy them.
-			 */
-			dstoptlen =
-				((*pktopt_mip6dest2)->ip6d_len + 1) << 3;
-			bcopy((void *)(*pktopt_mip6dest2),
-			      (void *)optbuf.buf,
-			      dstoptlen);
+			optbuf.off = dstoptlen;
+			mip6_find_offset(&optbuf);
 		}
+	} else {
+		int dstoptlen;
+		/*
+		 * mip6dest2 is already set.  we must merge the
+		 * existing destopts and the options we are going to
+		 * add in the following code.
+		 */
+		dstoptlen = ((*pktopt_mip6dest2)->ip6d_len + 1) << 3;
+		bcopy((caddr_t)(*pktopt_mip6dest2), (caddr_t)optbuf.buf,
+		      dstoptlen);
 		optbuf.off = dstoptlen;
 		mip6_find_offset(&optbuf);
 	}
@@ -1771,6 +1777,9 @@ mip6_babr_destopt_create(pktopt_mip6dest2, dst, opts)
 	}
 	
 	mip6_align_destopt(&optbuf);
+
+	if (*pktopt_mip6dest2 != NULL)
+		free(*pktopt_mip6dest2, M_IP6OPT);
 	*pktopt_mip6dest2 = (struct ip6_dest *)optbuf.buf;
 
 	return (error);
