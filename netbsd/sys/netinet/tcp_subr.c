@@ -626,7 +626,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		} else
 			ip6->ip6_hlim = ip6_defhlim;
 		ip6->ip6_flow &= ~IPV6_FLOWINFO_MASK;
-		if (tp && tp->t_in6pcb->in6p_flags & IN6P_AUTOFLOWLABEL) {
+		if (tp && (tp->t_in6pcb->in6p_flags & IN6P_AUTOFLOWLABEL)) {
 			ip6->ip6_flow |= 
 				(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 		}
