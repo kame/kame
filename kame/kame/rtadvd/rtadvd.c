@@ -69,7 +69,9 @@ struct iovec sndiov[2];
 struct sockaddr_in6 from;
 struct sockaddr_in6 sin6_allnodes = {sizeof(sin6_allnodes), AF_INET6};
 int sock, rtsock;
+#ifdef MIP6
 int mobileip6 = 0;
+#endif
 int accept_rr = 0;
 int dflag = 0, sflag = 0;
 
@@ -144,7 +146,13 @@ main(argc, argv)
 	openlog(*argv, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
 	/* get command line options and arguments */
-	while ((ch = getopt(argc, argv, "c:dDfmRs")) != -1) {
+#ifdef MIP6
+#define OPTIONS "c:dDfmRs"
+#else
+#define OPTIONS "c:dDfRs"
+#endif
+	while ((ch = getopt(argc, argv, OPTIONS)) != -1) {
+#undef OPTIONS
 		switch(ch) {
 		 case 'c':
 			 conffile = optarg;
@@ -158,9 +166,11 @@ main(argc, argv)
 		 case 'f':
 			 fflag = 1;
 			 break;
+#ifdef MIP6
 		 case 'm':
 			 mobileip6 = 1;
 			 break;
+#endif
 		 case 'R':
 			 accept_rr = 1;
 			 break;
@@ -173,7 +183,11 @@ main(argc, argv)
 	argv += optind;
 	if (argc == 0) {
 		fprintf(stderr,
+#ifdef MIP6
 			"usage: rtadvd [-dDfmRs] [-c conffile] "
+#else
+			"usage: rtadvd [-dDfRs] [-c conffile] "
+#endif
 			"interfaces...\n");
 		exit(1);
 	}

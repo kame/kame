@@ -44,7 +44,9 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
+#ifdef MIP6
 #include <netinet6/mip6.h>
+#endif
 
 #include <arpa/inet.h>
 
@@ -161,8 +163,10 @@ getconfig(intface)
 	MAYHAVE(val, "raflags", 0);
 	tmp->managedflg= val & ND_RA_FLAG_MANAGED;
 	tmp->otherflg = val & ND_RA_FLAG_OTHER;
+#ifdef MIP6
 	if (mobileip6)
 		tmp->haflg = val & ND_RA_FLAG_HA;
+#endif
 
 	MAYHAVE(val, "rltime", tmp->maxinterval * 3);
 	if (val && (val < tmp->maxinterval || val > MAXROUTERLIFETIME)) {
@@ -192,8 +196,12 @@ getconfig(intface)
 	}
 	tmp->retranstimer = (u_int32_t)val;
 
-	/* MIPv6 */
-	if (!mobileip6) {
+#ifdef MIP6
+	if (!mobileip6)
+#else
+	if (1)
+#endif
+	{
 		if (agetstr("hapref", &bp) || agetstr("hatime", &bp)) {
 			syslog(LOG_ERR,
 			       "<%s> mobile-ip6 configuration without "
@@ -201,7 +209,9 @@ getconfig(intface)
 			       __FUNCTION__);
 			exit(1);
 		}
-	} else {
+	}
+#ifdef MIP6
+	else {
 		tmp->hapref = 0;
 		if ((val = agetnum("hapref")) >= 0)
 			tmp->hapref = (int16_t)val;
@@ -217,6 +227,7 @@ getconfig(intface)
 			}
 		}
 	}
+#endif
 
 	/* prefix information */
 	if ((pfxs = agetnum("addrs")) < 0) {
@@ -258,18 +269,24 @@ getconfig(intface)
 			pfx->prefixlen = (int)val;
 
 			makeentry(entbuf, i, "pinfoflags", added);
-			if (mobileip6) {
+#ifdef MIP6
+			if (mobileip6)
+			{
 				MAYHAVE(val, entbuf,
 				    (ND_OPT_PI_FLAG_ONLINK|ND_OPT_PI_FLAG_AUTO|
 					 ND_OPT_PI_FLAG_RTADDR));
-			} else {
+			} else
+#endif
+			{
 				MAYHAVE(val, entbuf,
 				    (ND_OPT_PI_FLAG_ONLINK|ND_OPT_PI_FLAG_AUTO));
 			}
 			pfx->onlinkflg = val & ND_OPT_PI_FLAG_ONLINK;
 			pfx->autoconfflg = val & ND_OPT_PI_FLAG_AUTO;
+#ifdef MIP6
 			if (mobileip6)
 				pfx->routeraddr = val & ND_OPT_PI_FLAG_RTADDR;
+#endif
 
 			makeentry(entbuf, i, "vltime", added);
 			MAYHAVE(val, entbuf, DEF_ADVVALIDLIFETIME);
@@ -611,10 +628,12 @@ make_packet(struct rainfo *rainfo)
 		packlen += sizeof(struct nd_opt_prefix_info) * rainfo->pfxs;
 	if (rainfo->linkmtu)
 		packlen += sizeof(struct nd_opt_mtu);
+#ifdef MIP6
 	if (mobileip6 && rainfo->maxinterval)
 		packlen += sizeof(struct nd_opt_advint);
 	if (mobileip6 && rainfo->hatime)
 		packlen += sizeof(struct nd_opt_hai);
+#endif
 
 	/* allocate memory for the packet */
 	if ((buf = malloc(packlen)) == NULL) {
@@ -640,8 +659,10 @@ make_packet(struct rainfo *rainfo)
 		rainfo->managedflg ? ND_RA_FLAG_MANAGED : 0;
 	ra->nd_ra_flags_reserved |=
 		rainfo->otherflg ? ND_RA_FLAG_OTHER : 0;
+#ifdef MIP6
 	ra->nd_ra_flags_reserved |=
 		rainfo->haflg ? ND_RA_FLAG_HA : 0;
+#endif
 	ra->nd_ra_router_lifetime = htons(rainfo->lifetime);
 	ra->nd_ra_reachable = htonl(rainfo->reachabletime);
 	ra->nd_ra_retransmit = htonl(rainfo->retranstimer);
@@ -661,6 +682,7 @@ make_packet(struct rainfo *rainfo)
 		buf += sizeof(struct nd_opt_mtu);
 	}
 
+#ifdef MIP6
 	if (mobileip6 && rainfo->maxinterval) {
 		ndopt_advint = (struct nd_opt_advint *)buf;
 		ndopt_advint->nd_opt_int_type = ND_OPT_ADV_INTERVAL;
@@ -670,7 +692,9 @@ make_packet(struct rainfo *rainfo)
 							  1000);
 		buf += sizeof(struct nd_opt_advint);
 	}
+#endif
 	
+#ifdef MIP6
 	if (rainfo->hatime) {
 		ndopt_hai = (struct nd_opt_hai *)buf;
 		ndopt_hai->nd_opt_hai_type = ND_OPT_HA_INFORMATION;
@@ -680,6 +704,7 @@ make_packet(struct rainfo *rainfo)
 		ndopt_hai->nd_opt_hai_lifetime = ntohs(rainfo->hatime);
 		buf += sizeof(struct nd_opt_hai);
 	}
+#endif
 	
 	for (pfx = rainfo->prefix.next;
 	     pfx != &rainfo->prefix; pfx = pfx->next) {
@@ -694,9 +719,11 @@ make_packet(struct rainfo *rainfo)
 		if (pfx->autoconfflg)
 			ndopt_pi->nd_opt_pi_flags_reserved |=
 				ND_OPT_PI_FLAG_AUTO;
+#ifdef MIP6
 		if (pfx->routeraddr)
 			ndopt_pi->nd_opt_pi_flags_reserved |=
 				ND_OPT_PI_FLAG_RTADDR;
+#endif
 		ndopt_pi->nd_opt_pi_valid_time = ntohl(pfx->validlifetime);
 		ndopt_pi->nd_opt_pi_preferred_time =
 			ntohl(pfx->preflifetime);
