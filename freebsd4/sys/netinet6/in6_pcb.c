@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.23 2000/11/29 16:43:04 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.24 2000/11/30 15:22:09 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -792,7 +792,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg,notify)
 	if (PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) {
 		fport = 0;
 		lport = 0;
-		bzero((caddr_t)laddr6, sizeof(*laddr6));
+		bzero((caddr_t)&laddr6, sizeof(laddr6));
 
 		if (cmd != PRC_HOSTDEAD)
 			notify = in6_rtchange;
