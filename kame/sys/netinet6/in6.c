@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.138 2001/01/22 12:05:18 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.139 2001/01/22 12:30:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -156,7 +156,7 @@ static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
 static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
 	struct ifnet *));
 #endif
-static int in6_ifaddroute __P((struct ifnet *, struct in6_ifaddr *)); 
+static int in6_ifaddroute __P((struct ifnet *, struct in6_ifaddr *, int));
 static void in6_unlink_ifa __P((struct in6_ifaddr *, struct ifnet *));
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -384,7 +384,7 @@ in6_mask2len(mask, lim0)
 	u_char *lim = lim0, *p;
 
 	if (lim0 == NULL ||
-	    lim0 - mask > sizeof(*mask)) /* ignore the scope_id part */
+	    lim0 - (u_char *)mask > sizeof(*mask)) /* ignore the scope_id part */
 		lim = (u_char *)mask + sizeof(*mask);
 	for (p = (u_char *)mask; p < lim; x++, p++) {
 		if (*p != 0xff)
@@ -1607,7 +1607,7 @@ in6_ifscrub(ifp, ia, delloop)
 		ia6_plen = in6_mask2len(&ia6->ia_prefixmask.sin6_addr, NULL);
 		if (in6_are_prefix_equal(&ia->ia_addr.sin6_addr,
 					 &ia6->ia_addr.sin6_addr, plen)) {
-			if ((e = in6_ifaddroute(ifp, ia6)) != 0) {
+			if ((e = in6_ifaddroute(ifp, ia6, plen)) != 0) {
 				log(LOG_NOTICE,
 				    "in6_ifscrub: failed to restore an interface"
 				    " route for %s/%d on %s, errno = %d\n",
@@ -1688,7 +1688,8 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 	 * We therefore return the error immediately on failure.
 	 */
 	if (newprefix) {
-		if ((error = in6_ifaddroute(ifp, ia)) != 0)
+		int flags = RTF_UP;
+		if ((error = in6_ifaddroute(ifp, ia, plen)) != 0)
 			return(error);
 	}
 
@@ -1705,21 +1706,15 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 }
 
 static int
-in6_ifaddroute(ifp, ia)
+in6_ifaddroute(ifp, ia, plen)
 	struct ifnet *ifp;
 	struct in6_ifaddr *ia;
+	int plen;
 {
 	int flags = RTF_UP, error;
 
-	if (ifp->if_flags & IFF_LOOPBACK) {
-		ia->ia_ifa.ifa_dstaddr = ia->ia_ifa.ifa_addr;
+	if (plen == 128)
 		flags |= RTF_HOST;
-	} else if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
-		if (ia->ia_dstaddr.sin6_family == AF_INET6) {
-			/* note that prefixlen must be 128 in this case. */
-			flags |= RTF_HOST;
-		}
-	}
 
 	if ((error = rtinit(&(ia->ia_ifa), (int)RTM_ADD, flags)) == 0)
 		ia->ia_flags |= IFA_ROUTE;
