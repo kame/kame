@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.36 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.37 2000/06/12 05:35:59 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1118,7 +1118,7 @@ oakley_validate_auth(iph1)
 				"few isakmp message received.\n");
 			return -1;
 		}
-		if (iph1->cert_p == NULL && iph1->pl_cr != NULL) {
+		if (iph1->cert_p == NULL && iph1->rmconf->peerscertfile == NULL) {
 			plog(logp, LOCATION, NULL,
 				"no CERT payload found even though CR sent.\n");
 			return -1;
@@ -1411,6 +1411,65 @@ oakley_savecert(iph1, gen)
 			"Invalid CERT type %d\n", type);
 		return -1;
 	}
+
+	return 0;
+}
+
+/*
+ * get my CR.
+ * NOTE: No Certificate Authority field is included to CR payload at the
+ * moment. Becuase any certificate authority are accepted without any check.
+ * The section 3.10 in RFC2408 says that this field SHOULD not be included,
+ * if there is no specific certificate authority requested.
+ */
+vchar_t *
+oakley_getcr(iph1)
+	struct ph1handle *iph1;
+{
+	vchar_t *buf;
+
+	buf = vmalloc(1);
+	if (buf == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get cr buffer\n");
+		return NULL;
+	}
+	buf->v[0] = iph1->rmconf->certtype;
+
+	YIPSDEBUG(DEBUG_CERT,
+		plog(logp, LOCATION, NULL, "create my CR: %s\n",
+			s_isakmp_certtype(iph1->rmconf->certtype));
+		if (buf->l > 1) {
+			PVDUMP(buf);
+		});
+
+	return buf;
+}
+
+/*
+ * check peer's CR.
+ */
+int
+oakley_checkcr(iph1)
+	struct ph1handle *iph1;
+{
+	if (iph1->cr_p == NULL)
+		return 0;
+
+	YIPSDEBUG(DEBUG_NOTIFY,
+		plog(logp, LOCATION, iph1->remote,
+		"peer transmitted CR: %s\n",
+		s_isakmp_certtype(iph1->cr_p->v[0])));
+
+	if (iph1->cr_p->v[0] != iph1->rmconf->certtype) {
+		YIPSDEBUG(DEBUG_NOTIFY,
+			plog(logp, LOCATION, iph1->remote,
+			"such a cert type isn't supported: %d\n",
+			(char)iph1->cr_p->v[0]));
+		return -1;
+	}
+
+	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cr_p));
 
 	return 0;
 }

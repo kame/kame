@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.31 2000/06/08 08:35:24 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.32 2000/06/12 05:35:59 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -88,6 +88,8 @@ agg_i1send(iph1, msg)
 	struct isakmp_gen *gen;
 	caddr_t p;
 	int tlen;
+	int need_cr = 0;
+	vchar_t *cr = NULL;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -129,12 +131,25 @@ agg_i1send(iph1, msg)
 	if (iph1->nonce == NULL)
 		goto end;
 
+	/* create CR if need */
+	if (iph1->rmconf->peerscertfile == NULL) {
+		need_cr = 1;
+		cr = oakley_getcr(iph1);
+		if (cr == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get cr buffer.\n");
+			goto end;
+		}
+	}
+
 	/* create buffer to send isakmp payload */
 	tlen = sizeof(struct isakmp)
 		+ sizeof(*gen) + iph1->sa->l
 		+ sizeof(*gen) + iph1->dhpub->l
 		+ sizeof(*gen) + iph1->nonce->l
 		+ sizeof(*gen) + iph1->id->l;
+	if (need_cr)
+		tlen += sizeof(*gen) + cr->l;
 
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) {
@@ -158,7 +173,12 @@ agg_i1send(iph1, msg)
 	p = set_isakmp_payload(p, iph1->nonce, ISAKMP_NPTYPE_ID);
 
 	/* create isakmp ID payload */
-	p = set_isakmp_payload(p, iph1->id, ISAKMP_NPTYPE_NONE);
+	p = set_isakmp_payload(p, iph1->id,
+		need_cr ? ISAKMP_NPTYPE_CR : ISAKMP_NPTYPE_NONE);
+
+	/* create isakmp CR payload */
+	if (need_cr)
+		p = set_isakmp_payload(p, cr, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
@@ -177,6 +197,9 @@ agg_i1send(iph1, msg)
 	error = 0;
 
 end:
+	if (cr)
+		vfree(cr);
+
 	return error;
 }
 
@@ -252,10 +275,8 @@ agg_i2recv(iph1, msg)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_CR:
-			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Certificate Request.\n"));
+			if (isakmp_p2ph(&iph1->cr_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_CERT:
 			if (oakley_savecert(iph1, pa->ptr) < 0)
@@ -335,6 +356,11 @@ agg_i2recv(iph1, msg)
 	}
     }
 
+	if (oakley_checkcr(iph1) < 0) {
+		/* Ignore this error in order to be interoperability. */
+		;
+	}
+
 	/* change status of isakmp status entry */
 	iph1->status = PHASE1ST_MSG2RECEIVED;
 
@@ -352,6 +378,7 @@ end:
 		VPTRINIT(iph1->cert_p);
 		VPTRINIT(iph1->crl_p);
 		VPTRINIT(iph1->sig_p);
+		VPTRINIT(iph1->cr_p);
 	}
 
 	return error;
@@ -554,10 +581,8 @@ agg_r1recv(iph1, msg)
 			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_CR:
-			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Certificate Request.\n"));
+			if (isakmp_p2ph(&iph1->cr_p, pa->ptr) < 0)
+				goto end;
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
@@ -580,6 +605,11 @@ agg_r1recv(iph1, msg)
 		goto end;
 	}
 
+	if (oakley_checkcr(iph1) < 0) {
+		/* Ignore this error in order to be interoperability. */
+		;
+	}
+
 	iph1->status = PHASE1ST_MSG1RECEIVED;
 
 	error = 0;
@@ -592,6 +622,7 @@ end:
 		VPTRINIT(iph1->dhpub_p);
 		VPTRINIT(iph1->nonce_p);
 		VPTRINIT(iph1->id_p);
+		VPTRINIT(iph1->cr_p);
 	}
 
 	return error;
@@ -612,6 +643,8 @@ agg_r1send(iph1, msg)
 	struct isakmp_gen *gen;
 	char *p;
 	int tlen;
+	int need_cr = 0;
+	vchar_t *cr = NULL;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -661,6 +694,17 @@ agg_r1send(iph1, msg)
 	if (iph1->hash == NULL)
 		goto end;
 
+	/* create CR if need */
+	if (iph1->rmconf->peerscertfile == NULL) {
+		need_cr = 1;
+		cr = oakley_getcr(iph1);
+		if (cr == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get cr buffer.\n");
+			goto end;
+		}
+	}
+
 	tlen = sizeof(struct isakmp);
 
 	switch (iph1->approval->authmethod) {
@@ -673,6 +717,8 @@ agg_r1send(iph1, msg)
 			+ sizeof(*gen) + iph1->hash->l;
 		if (lcconf->vendorid)
 			tlen += sizeof(*gen) + lcconf->vendorid->l;
+		if (need_cr)
+			tlen += sizeof(*gen) + cr->l;
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) { 
@@ -701,11 +747,18 @@ agg_r1send(iph1, msg)
 		/* create isakmp HASH payload */
 		p = set_isakmp_payload(p, iph1->hash,
 			lcconf->vendorid ? ISAKMP_NPTYPE_VID
-					 : ISAKMP_NPTYPE_NONE);
+					 : (need_cr ? ISAKMP_NPTYPE_CR
+						    : ISAKMP_NPTYPE_NONE));
 
 		/* append vendor id, if needed */
 		if (lcconf->vendorid)
-			p = set_isakmp_payload(p, lcconf->vendorid, ISAKMP_NPTYPE_NONE);
+			p = set_isakmp_payload(p, lcconf->vendorid,
+				need_cr ? ISAKMP_NPTYPE_CR
+					: ISAKMP_NPTYPE_NONE);
+
+		/* create isakmp CR payload if needed */
+		if (need_cr)
+			p = set_isakmp_payload(p, cr, ISAKMP_NPTYPE_NONE);
 		break;
 #ifdef HAVE_SIGNING_C
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
@@ -727,6 +780,8 @@ agg_r1send(iph1, msg)
 			tlen += sizeof(*gen) + iph1->cert->l;
 		if (lcconf->vendorid)
 			tlen += sizeof(*gen) + lcconf->vendorid->l;
+		if (need_cr)
+			tlen += sizeof(*gen) + cr->l;
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) { 
@@ -760,11 +815,18 @@ agg_r1send(iph1, msg)
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig,
 			lcconf->vendorid ? ISAKMP_NPTYPE_VID
-					 : ISAKMP_NPTYPE_NONE);
+					 : (need_cr ? ISAKMP_NPTYPE_CR
+						    : ISAKMP_NPTYPE_NONE));
 
 		/* append vendor id, if needed */
 		if (lcconf->vendorid)
-			p = set_isakmp_payload(p, lcconf->vendorid, ISAKMP_NPTYPE_NONE);
+			p = set_isakmp_payload(p, lcconf->vendorid,
+				need_cr ? ISAKMP_NPTYPE_CR
+					: ISAKMP_NPTYPE_NONE);
+
+		/* create isakmp CR payload if needed */
+		if (need_cr)
+			p = set_isakmp_payload(p, cr, ISAKMP_NPTYPE_NONE);
 		break;
 #endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
@@ -791,6 +853,9 @@ agg_r1send(iph1, msg)
 	error = 0;
 
 end:
+	if (cr)
+		vfree(cr);
+
 	return error;
 }
 

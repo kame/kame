@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.31 2000/06/08 08:35:25 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.32 2000/06/12 05:35:59 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -354,10 +354,8 @@ ident_i3recv(iph1, msg)
 			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_CR:
-			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Certificate Request.\n"));
+			if (isakmp_p2ph(&iph1->cr_p, pa->ptr) < 0)
+				goto end;
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
@@ -376,6 +374,11 @@ ident_i3recv(iph1, msg)
 		goto end;
 	}
 
+	if (oakley_checkcr(iph1) < 0) {
+		/* Ignore this error in order to be interoperability. */
+		;
+	}
+
 	iph1->status = PHASE1ST_MSG3RECEIVED;
 
 	error = 0;
@@ -387,6 +390,7 @@ end:
 		VPTRINIT(iph1->dhpub_p);
 		VPTRINIT(iph1->nonce_p);
 		VPTRINIT(iph1->id_p);
+		VPTRINIT(iph1->cr_p);
 	}
 
 	return error;
@@ -848,9 +852,9 @@ ident_r2recv(iph1, msg)
 			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_CR:
-			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
 			plog(logp, LOCATION, iph1->remote,
-				"certificate request received.\n");
+				"NOTICE: CR received, ignore it."
+				"It should be in other exchange.\n");
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
@@ -1013,10 +1017,8 @@ ident_r3recv(iph1, msg0)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_CR:
-			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Certificate Request.\n"));
+			if (isakmp_p2ph(&iph1->cr_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_CERT:
 			if (oakley_savecert(iph1, pa->ptr) < 0)
@@ -1095,6 +1097,11 @@ ident_r3recv(iph1, msg0)
 	}
     }
 
+	if (oakley_checkcr(iph1) < 0) {
+		/* Ignore this error in order to be interoperability. */
+		;
+	}
+
 	/*
 	 * XXX: Should we do compare two addresses, ph1handle's and ID
 	 * payload's.
@@ -1119,6 +1126,7 @@ end:
 		VPTRINIT(iph1->cert_p);
 		VPTRINIT(iph1->crl_p);
 		VPTRINIT(iph1->sig_p);
+		VPTRINIT(iph1->cr_p);
 	}
 
 	return error;
@@ -1193,10 +1201,18 @@ end:
 }
 
 /*
- * create KE, NONCE payload with isakmp header.
  * This is used in main mode for:
- *	initiator's 3rd exchange
- *	responders 2nd exchnage
+ * initiator's 3rd exchange send to responder
+ * 	psk: HDR, KE, Ni
+ * 	sig: HDR, KE, Ni
+ * 	rsa: HDR, KE, [ HASH(1), ] <IDi1_b>PubKey_r, <Ni_b>PubKey_r
+ * 	rev: HDR, [ HASH(1), ] <Ni_b>Pubkey_r, <KE_b>Ke_i,
+ * 	          <IDi1_b>Ke_i, [<<Cert-I_b>Ke_i]
+ * responders 2nd exchnage send to initiator
+ * 	psk: HDR, KE, Nr
+ * 	sig: HDR, KE, Nr [, CR ]
+ * 	rsa: HDR, KE, <IDr1_b>PubKey_i, <Nr_b>PubKey_i
+ * 	rev: HDR, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDr1_b>Ke_r,
  */
 static vchar_t *
 ident_ir2sendmx(iph1)
@@ -1206,7 +1222,21 @@ ident_ir2sendmx(iph1)
 	struct isakmp_gen *gen;
 	char *p;
 	int tlen;
+	int need_cr = 0;
+	vchar_t *cr = NULL;
 	int error = -1;
+
+	/* create CR if need */
+	if (iph1->side == INITIATOR
+	 && iph1->rmconf->peerscertfile == NULL) {
+		need_cr = 1;
+		cr = oakley_getcr(iph1);
+		if (cr == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get cr buffer.\n");
+			goto end;
+		}
+	}
 
 	/* create buffer */
 	tlen = sizeof(struct isakmp)
@@ -1214,6 +1244,8 @@ ident_ir2sendmx(iph1)
 	     + sizeof(*gen) + iph1->nonce->l;
 	if (lcconf->vendorid)
 		tlen += sizeof(*gen) + lcconf->vendorid->l;
+	if (need_cr)
+		tlen += sizeof(*gen) + cr->l;
 
 	buf = vmalloc(tlen);
 	if (buf == NULL) {
@@ -1232,11 +1264,19 @@ ident_ir2sendmx(iph1)
 
 	/* create isakmp NONCE payload */
 	p = set_isakmp_payload(p, iph1->nonce,
-		lcconf->vendorid ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+			lcconf->vendorid ? ISAKMP_NPTYPE_VID
+					 : (need_cr ? ISAKMP_NPTYPE_CR
+						    : ISAKMP_NPTYPE_NONE));
 
 	/* append vendor id, if needed */
 	if (lcconf->vendorid)
-		p = set_isakmp_payload(p, lcconf->vendorid, ISAKMP_NPTYPE_NONE);
+		p = set_isakmp_payload(p, lcconf->vendorid,
+				need_cr ? ISAKMP_NPTYPE_CR
+					: ISAKMP_NPTYPE_NONE);
+
+	/* create isakmp CR payload if needed */
+	if (need_cr)
+		p = set_isakmp_payload(p, cr, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(buf, iph1->local, iph1->remote, 0);
@@ -1259,14 +1299,12 @@ end:
 
 /*
  * This is used in main mode for:
- * initiator's 4th exchange
- * send to responder
+ * initiator's 4th exchange send to responder
  * 	psk: HDR*, IDi1, HASH_I
  * 	sig: HDR*, IDi1, [ CR, ] [ CERT, ] SIG_I
  * 	rsa: HDR*, HASH_I
  * 	rev: HDR*, HASH_I
- * responders 3rd exchnage
- * send to initiator
+ * responders 3rd exchnage send to initiator
  * 	psk: HDR*, IDr1, HASH_R
  * 	sig: HDR*, IDr1, [ CERT, ] SIG_R
  * 	rsa: HDR*, HASH_R
@@ -1280,6 +1318,8 @@ ident_ir3sendmx(iph1)
 	char *p;
 	int tlen;
 	struct isakmp_gen *gen;
+	int need_cr = 0;
+	vchar_t *cr = NULL;
 	int error = -1;
 
 	tlen = sizeof(struct isakmp);
@@ -1310,18 +1350,30 @@ ident_ir3sendmx(iph1)
 #ifdef HAVE_SIGNING_C
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
-		/* XXX if there is CR or not ? */
-
 		if (oakley_getmycert(iph1) < 0)
 			goto end;
 
 		if (oakley_getsign(iph1) < 0)
 			goto end;
 
+		/* create CR if need */
+		if (iph1->side == INITIATOR
+		 && iph1->rmconf->peerscertfile == NULL) {
+			need_cr = 1;
+			cr = oakley_getcr(iph1);
+			if (cr == NULL) {
+				plog(logp, LOCATION, NULL,
+					"failed to get cr buffer.\n");
+				goto end;
+			}
+		}
+
 		tlen += sizeof(*gen) + iph1->id->l
 			+ sizeof(*gen) + iph1->sig->l;
 		if (iph1->cert != NULL)
 			tlen += sizeof(*gen) + iph1->cert->l;
+		if (need_cr)
+			tlen += sizeof(*gen) + cr->l;
 
 		buf = vmalloc(tlen);
 		if (buf == NULL) {
@@ -1344,7 +1396,12 @@ ident_ir3sendmx(iph1)
 		if (iph1->cert != NULL)
 			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
-		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
+		p = set_isakmp_payload(p, iph1->sig,
+			need_cr ? ISAKMP_NPTYPE_CR : ISAKMP_NPTYPE_NONE);
+
+		/* create isakmp CR payload */
+		if (need_cr)
+			p = set_isakmp_payload(p, cr, ISAKMP_NPTYPE_NONE);
 		break;
 #endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
@@ -1384,6 +1441,8 @@ ident_ir3sendmx(iph1)
 	error = 0;
 
 end:
+	if (cr)
+		vfree(cr);
 	if (error && buf != NULL) {
 		vfree(buf);
 		buf = NULL;

@@ -26,13 +26,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.h,v 1.4 2000/06/08 06:43:53 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.h,v 1.5 2000/06/12 05:36:00 sakane Exp $ */
 
 extern char *s_ipsecdoi_proto __P((int));
 extern char *s_ipsecdoi_trns __P((int, int));
 extern char *s_oakley_attr __P((int));
 extern char *s_oakley_attr_v __P((int, int));
 extern char *s_oakley_attr_method __P((int));
+extern char *s_isakmp_certtype __P((int));
 extern char *s_ipsec_level __P((int));
 extern char *s_ipsecdoi_attr __P((int));
 extern char *s_ipsecdoi_encmode __P((int));

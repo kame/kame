@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.8 2000/05/31 15:13:17 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.9 2000/06/12 05:36:00 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -238,6 +238,29 @@ s_oakley_attr_method(type)
 {
 	if (ARRAYLEN(name_attr_isakmp_method) > type)
 		return name_attr_isakmp_method[type];
+	return NULL;
+}
+
+static char *name_isakmp_certtype[] = {
+	"NONE",
+	"PKCS #7 wrapped X.509 certificate",
+	"PGP Certificate",
+	"DNS Signed Key",
+	"X.509 Certificate - Signature",
+	"X.509 Certificate - Key Exchange",
+	"Kerberos Tokens",
+	"Certificate Revocation List (CRL)",
+	"Authority Revocation List (ARL)",
+	"SPKI Certificate",
+	"X.509 Certificate - Attribute",
+};
+
+char *
+s_isakmp_certtype(type)
+	int type;
+{
+	if (ARRAYLEN(name_isakmp_certtype) > type)
+		return name_isakmp_certtype[type];
 	return NULL;
 }
 
