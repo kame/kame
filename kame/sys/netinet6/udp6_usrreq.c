@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.45 2000/04/17 14:48:42 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.46 2000/04/17 16:16:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -645,8 +645,7 @@ udp6_output(in6p, m, addr6, control)
 		fport = sin6->sin6_port; /* allow 0 port */
 		/*
 		 * If the scope of the destination is link-local,
-		 * embed the interface
-		 * index in the address.
+		 * embed the interface index in the address.
 		 *
 		 * XXX advanced-api value overrides sin6_scope_id
 		 */
@@ -665,8 +664,7 @@ udp6_output(in6p, m, addr6, control)
 			    pi->ipi6_ifindex) {
 				faddr->s6_addr16[1] = htons(pi->ipi6_ifindex);
 				oifp = ifindex2ifnet[pi->ipi6_ifindex];
-			}
-			else if (IN6_IS_ADDR_MULTICAST(faddr) &&
+			} else if (IN6_IS_ADDR_MULTICAST(faddr) &&
 				 (mopt = in6p->in6p_moptions) &&
 				 mopt->im6o_multicast_ifp) {
 				oifp = mopt->im6o_multicast_ifp;
