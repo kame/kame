@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.255 2004/07/05 07:46:03 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.256 2004/07/05 07:55:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1409,10 +1409,13 @@ prelist_update(new, dr, m, mcast)
 	}
 
 	/*
-	 * 5.5.3 (d). If the prefix advertised does not match the prefix of an
-	 * address already in the list, and the Valid Lifetime is not 0,
-	 * form an address.  Note that even a manually configured address
-	 * should reject autoconfiguration of a new address.
+	 * 5.5.3 (d).  If the prefix advertised is not equal to the prefix of
+	 * an address configured by stateless autoconfiguration already in the
+	 * list of addresses associated with the interface, and the Valid
+	 * Lifetime is not 0, form an address.
+	 * Note: we apply a clarification in rfc2462bis-02 here.  We only
+	 * consider autoconfigured addresses while RFC2462 simply said
+	 * "address".
 	 */
 #ifdef __FreeBSD__
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
@@ -1430,6 +1433,9 @@ prelist_update(new, dr, m, mcast)
 			continue;
 
 		ifa6 = (struct in6_ifaddr *)ifa;
+
+		if ((ifa6->ia6_flags & IN6_IFF_AUTOCONF) != 0)
+			continue;
 
 		/*
 		 * Spec is not clear here, but I believe we should concentrate
