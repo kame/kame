@@ -252,7 +252,7 @@ struct mbuf {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_pktdat; \
 		(m)->m_flags = M_PKTHDR; \
-		bzero(&(m)->m_pkthdr, sizeof((m)->m_pkthdr)); \
+		memset(&(m)->m_pkthdr, 0, sizeof((m)->m_pkthdr)); \
 	} else \
 		(m) = m_retryhdr((how), (type)); \
 } while (0)
