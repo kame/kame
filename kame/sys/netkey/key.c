@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.70 2000/03/09 13:15:02 sakane Exp $	*/
+/*	$KAME: key.c,v 1.71 2000/03/15 09:49:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.70 2000/03/09 13:15:02 sakane Exp $ */
+/* KAME $Id: key.c,v 1.71 2000/03/15 09:49:39 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -3834,6 +3834,25 @@ key_timehandler(void)
 	}
     }
 #endif
+
+	/* SP ACQ tree */
+    {
+	struct secspacq *acq, *nextacq;
+
+	for (acq = LIST_FIRST(&acqsptree);
+	     acq != NULL;
+	     acq = nextacq) {
+
+		nextacq = LIST_NEXT(acq, chain);
+
+		acq->tick++;
+
+		if (key_blockacq_lifetime < acq->tick && __LIST_CHAINED(acq)) {
+			LIST_REMOVE(acq, chain);
+			KFREE(acq);
+		}
+	}
+    }
 
 	/* initialize random seed */
 	if (key_tick_init_random++ > key_int_random) {
