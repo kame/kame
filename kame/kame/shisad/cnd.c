@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.2 2005/01/26 07:41:59 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.3 2005/02/03 13:22:08 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -215,8 +215,7 @@ mipsock_input(miphdr)
 	switch (miphdr->miph_type) {
 	case MIPM_NODETYPE_INFO:
 		nodeinfo = (struct mipm_nodetype_info *)miphdr;
-		if (nodeinfo->mipmni_nodetype == MIP6_NODETYPE_HOME_AGENT)
-			homeagent_mode = nodeinfo->mipmni_enable;
+		homeagent_mode = nodeinfo->mipmni_enable & MIP6_NODETYPE_HOME_AGENT;
 	case MIPM_BE_HINT:
 		mipsock_behint_input(miphdr);
 		break;

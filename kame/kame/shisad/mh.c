@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.13 2005/01/31 11:35:51 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.14 2005/02/03 13:22:08 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -712,7 +712,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		 */
 		if (!homeagent_mode && (flags & IP6_MH_BU_HOME)) {
 			if (mip6_bc_lookup(hoa, dst, bid))
-				statuscode= IP6_MH_BAS_REG_NOT_ALLOWED;
+				statuscode = IP6_MH_BAS_REG_NOT_ALLOWED;
 			else
 				statuscode = IP6_MH_BAS_HA_NOT_SUPPORTED;
 			goto sendba;
@@ -771,7 +771,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	}
 
 #ifdef MIP_CN
-	/* 
+	/*
 	 * Home Registration flag check. 
 	 * Note L and K flags are ignored on cnd if this node acts as HA.
 	 */
