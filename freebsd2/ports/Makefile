@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.1 1999/08/09 01:36:49 itojun Exp $
+# $Id: Makefile,v 1.2 1999/09/30 23:59:11 itojun Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -50,6 +50,7 @@ SUBDIR+=	v6tun
 SUBDIR+=	vat6
 SUBDIR+=	vic6
 SUBDIR+=	vnc
+SUBDIR+=	w3m
 SUBDIR+=	wbd
 SUBDIR+=	wget
 SUBDIR+=	wu-ftpd
