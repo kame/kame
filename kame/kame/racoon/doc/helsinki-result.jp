@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.17 2001/08/15 08:32:20 itojun Exp $
+$KAME: helsinki-result.jp,v 1.18 2001/08/15 08:33:13 sakane Exp $
 
 
 generic
@@ -11,7 +11,7 @@ generic
 	tunnel modeのproposal比較。see F-Secure
 
 	phase 1でのAES/SHA2 support要。
-	AES/MD5のIVの計算方法。MD5は12bytes。AES16bytes必要。
+	AES/MD5のIVの計算方法。
 
 	IPsecでのSHA2 support確認(添付するbit数)。
 
