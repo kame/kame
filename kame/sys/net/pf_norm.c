@@ -1132,6 +1132,7 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 	return (PF_DROP);
 }
 
+#ifdef INET6
 int
 pf_normalize_ip6(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 {
@@ -1296,6 +1297,7 @@ pf_normalize_ip6(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 		PFLOG_PACKET(ifp, h, m, AF_INET6, dir, *reason, r, NULL, NULL);
 	return (PF_DROP);
 }
+#endif
 
 int
 pf_normalize_tcp(int dir, struct ifnet *ifp, struct mbuf *m, int ipoff,
