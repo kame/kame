@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.53 2002/02/03 09:00:44 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.54 2002/02/08 09:56:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2186,7 +2186,7 @@ tcp6_peer_mss(t6p, offer)
 		mss = ifp->if_mtu;
 #endif
 		mss -= sizeof(struct ip6tcp);
-		if (tcp6_pmtu == 0 && !in6_localaddr(&in6p->in6p_faddr))
+		if (tcp6_pmtu == 0 && !in6_localaddr(&in6p->in6p_fsa))
 			mss = min(mss, tcp6_mssdflt);
 	}
 	/*
@@ -2278,7 +2278,7 @@ tcp6_send_mss(t6p)
 
 	mss -= sizeof(struct ip6tcp);
 
-	if (tcp6_43maxseg && !in6_localaddr(&in6p->in6p_faddr))
+	if (tcp6_43maxseg && !in6_localaddr(&in6p->in6p_fsa))
 		mss = min(mss, tcp6_mssdflt);
 
 	/*
@@ -2518,7 +2518,7 @@ syn_cache_get6(so, m, off, len, src, dst)
 	if ((th->th_ack != sc->sc_iss + 1) ||
 	    SEQ_LEQ(th->th_seq, sc->sc_irs) ||
 	    SEQ_GT(th->th_seq, sc->sc_irs + 1 + win)) {
-		(void) syn_cache_respond6(sc, m, ip6, th, win, 0);
+		(void) syn_cache_respond6(sc, m, ip6, th, win, 0, dst);
 		return ((struct socket *)(-1));
 	}
 
@@ -2709,7 +2709,7 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 	if ((sc = syn_cache_lookup6(th, &sc_prev, &scp, src, dst)) != NULL) {
 		tcp6stat.tcp6s_sc_dupesyn++;
 		if (syn_cache_respond6(sc, m, ip6, th, win,
-				       tb.ts_recent) == 0) {
+				       tb.ts_recent, dst) == 0) {
 			tcp6stat.tcp6s_sndacks++;
 			tcp6stat.tcp6s_sndtotal++;
 		}
@@ -2743,7 +2743,8 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 		sc->sc_requested_s_scale = 15;
 		sc->sc_request_r_scale = 15;
 	}
-	if (syn_cache_respond6(sc, m, ip6, th, win, tb.ts_recent) == 0) {
+	if (syn_cache_respond6(sc, m, ip6, th, win, tb.ts_recent, dst)
+	    == 0) {
 		syn_cache_insert6(sc, &sc_prev, &scp);
 		tcp6stat.tcp6s_sndacks++;
 		tcp6stat.tcp6s_sndtotal++;
@@ -2755,20 +2756,21 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 }
 
 int
-syn_cache_respond6(sc, m, ip6, th, win, ts)
+syn_cache_respond6(sc, m, ip6, th, win, ts, dst)
 	struct syn_cache6 *sc;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
 	struct tcp6hdr *th;
 	long win;
 	u_long ts;
+	struct sockaddr_in6 *dst;
 {
 	u_char *optp;
 	int optlen;
 	u_short mss;
 
 	mss = in6_maxmtu - sizeof(struct ip6_hdr) - sizeof(struct tcp6hdr);
-	if (tcp6_43maxseg && !in6_localaddr(&ip6->ip6_dst))
+	if (tcp6_43maxseg && !in6_localaddr(dst))
 		mss = min(mss, tcp6_mssdflt);
 
 	/*

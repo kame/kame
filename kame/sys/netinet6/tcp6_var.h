@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_var.h,v 1.10 2002/02/03 09:00:45 jinmei Exp $	*/
+/*	$KAME: tcp6_var.h,v 1.11 2002/02/08 09:56:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -462,7 +462,7 @@ void	 syn_cache_reset6 __P((struct tcp6hdr *, struct sockaddr_in6 *,
 			       struct sockaddr_in6 *));
 int	 syn_cache_respond6 __P((struct syn_cache6 *, struct mbuf *,
 				 struct ip6_hdr *, struct tcp6hdr *,
-				 long, u_long));
+				 long, u_long, struct sockaddr_in6 *));
 void	 syn_cache_timer6 __P((int));
 
 #endif

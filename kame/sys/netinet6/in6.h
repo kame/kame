@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.118 2002/02/08 09:55:04 sakane Exp $	*/
+/*	$KAME: in6.h,v 1.119 2002/02/08 09:56:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -855,7 +855,7 @@ struct ip6_mtuinfo {
 struct cmsghdr;
 
 int	in6_cksum __P((struct mbuf *, u_int8_t, u_int32_t, u_int32_t));
-int	in6_localaddr __P((struct in6_addr *));
+int	in6_localaddr __P((struct sockaddr_in6 *));
 int	in6_addrscope __P((struct in6_addr *));
 struct	in6_ifaddr *in6_ifawithifp __P((struct ifnet *, struct in6_addr *));
 extern void in6_if_up __P((struct ifnet *));
