@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.374 2004/07/05 03:10:13 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.375 2004/07/07 08:43:05 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -139,6 +139,10 @@
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
 #endif
+#endif
+
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
 #endif
 
 #include <netinet/ip6.h>
