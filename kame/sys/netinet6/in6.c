@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.345 2003/08/09 17:06:40 suz Exp $	*/
+/*	$KAME: in6.c,v 1.346 2003/08/12 12:16:39 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -323,6 +323,30 @@ static void
 in6_ifaddloop(struct ifaddr *ifa)
 {
 	struct rtentry *rt;
+
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+	rt = rtalloc1(ifa->ifa_addr, 0
+#ifdef __FreeBSD__
+		      , 0
+#endif /* __FreeBSD__ */
+		);
+	/*
+	 * XXX delete a loopback rtentry for my own address before
+	 * adding a new loopback entry.  there is a case that the same
+	 * addresses are configured simultaneously on different
+	 * interfaces when a mobile node returns home.  in that case,
+	 * we must discard the old one (that is for the HoA assigned
+	 * to hif interface) before adding a new one so that the new
+	 * rtentry for CoA (this is eventually HoA) is installed
+	 * correctly.
+	 */
+	if (rt
+	    && ((rt->rt_flags & RTF_HOST) != 0)
+	    && ((rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0)) {
+		rt->rt_refcnt--;
+		in6_ifloop_request(RTM_DELETE, ifa);
+	}
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	/* If there is no loopback entry, allocate one. */
 	rt = rtalloc1(ifa->ifa_addr, 0
