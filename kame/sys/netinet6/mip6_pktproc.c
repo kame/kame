@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.83 2002/11/22 06:18:36 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.84 2002/11/27 12:00:59 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -444,7 +444,8 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		for (mbu = LIST_FIRST(&sc->hif_bu_list);
 		     mbu;
 		     mbu = LIST_NEXT(mbu, mbu_entry)) {
-			if (SA6_ARE_ADDR_EQUAL(dst_sa, &mbu->mbu_coa))
+			if (SA6_ARE_ADDR_EQUAL(dst_sa, &mbu->mbu_coa) &&
+			    SA6_ARE_ADDR_EQUAL(src_sa, &mbu->mbu_paddr))
 				break;
 		}
 	}
@@ -715,9 +716,10 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 				goto send_ba;
 			}
 			/*
-			 * ignore 'S' bit (issue #66)
-			 * XXX 'L'?
+			 * ignore 'S'&'L' bit (issue #66)
 			 */
+			bi.mbc_flags |= ~(IP6MU_SINGLE|IP6MU_LINK);
+			bi.mbc_flags |= (mbc->mbc_flags && (IP6MU_SINGLE|IP6MU_LINK));
 			if (mip6_process_hurbu(&bi)) {
 				mip6log((LOG_ERR,
 					 "%s:%d: home unregistration failed\n",
@@ -1561,19 +1563,6 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 			    lifetime > mip6_config.mcfg_hrbu_maxlifetime)
 				lifetime = mip6_config.mcfg_hrbu_maxlifetime;
 		}
-#ifdef MIP6_SYNC_SA_LIFETIME
-		/* XXX k-sugyou */
-		if (sav != NULL) {
-			u_int32_t sa_lifetime = 0;
-			if (sav->lft_h != NULL &&
-			    sav->lft_h->sadb_lifetime_addtime != 0) {
-				sa_lifetime = sav->lft_h->sadb_lifetime_addtime
-					      - (time_second - sav->created);
-			}
-			if (sa_lifetime > 0 && lifetime > sa_lifetime)
-				lifetime = sa_lifetime;
-		}
-#endif /* MIP6_SYNC_SA_LIFETIME */
 		mbu->mbu_lifetime = lifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
