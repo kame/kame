@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.10 2000/05/24 05:18:34 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.11 2000/05/24 09:39:18 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -115,19 +115,12 @@ initlcconf()
 	lcconf->wait_ph2complete = LC_DEFAULT_WAIT_PH2COMPLETE;
 	lcconf->strict_address = FALSE;
 
-	/* set vendor id */
-    {
-	/*
-	 * XXX move this section to vendorid.c. and calculate HASH same time.
-	 */
-	char *vid = VENDORID;
-	lcconf->vendorid = vmalloc(strlen(vid));
+	/* set hashed vendor id */
+	lcconf->vendorid = set_vendorid();
 	if (lcconf->vendorid == NULL) {
 		fprintf(stderr, "failed to set vendorid.\n");
 		exit(1);
 	}
-	memcpy(lcconf->vendorid->v, vid, strlen(vid));
-    }
 }
 
 /*

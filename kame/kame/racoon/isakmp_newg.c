@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_newg.c,v 1.3 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_newg.c,v 1.4 2000/05/24 09:39:17 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -55,6 +55,7 @@
 #include "pfkey.h"
 #include "admin.h"
 #include "str2val.h"
+#include "vendorid.h"
 
 /*
  * New group mode as responder
@@ -119,7 +120,7 @@ isakmp_newgroup_r(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
 			isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE, NULL);

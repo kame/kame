@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.17 2000/05/23 16:25:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.18 2000/05/24 09:39:17 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -67,6 +67,7 @@
 #include "pfkey.h"
 #include "isakmp_base.h"
 #include "isakmp_inf.h"
+#include "vendorid.h"
 
 static vchar_t *base_ir2sendmx __P((struct ph1handle *));
 
@@ -230,7 +231,7 @@ base_i2recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
@@ -386,7 +387,7 @@ base_i3recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
@@ -527,7 +528,7 @@ base_r1recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
@@ -710,7 +711,7 @@ base_r2recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */

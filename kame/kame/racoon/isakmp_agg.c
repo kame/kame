@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.24 2000/05/23 16:25:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.25 2000/05/24 09:39:17 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -67,6 +67,7 @@
 #include "pfkey.h"
 #include "isakmp_ident.h"
 #include "isakmp_inf.h"
+#include "vendorid.h"
 
 /*
  * begin Aggressive Mode as initiator.
@@ -267,7 +268,7 @@ agg_i2recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_N:
 			YIPSDEBUG(DEBUG_NOTIFY,
@@ -541,7 +542,7 @@ agg_r1recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_CR:
 			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
@@ -843,7 +844,7 @@ agg_r2recv(iph1, msg0)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_CERT:
 			if (oakley_savecert(iph1, pa->ptr) < 0)

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.60 2000/05/23 16:25:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.61 2000/05/24 09:39:17 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1685,42 +1685,6 @@ isakmp_p2ph(buf, gen)
 	memcpy((*buf)->v, gen + 1, (*buf)->l);
 
 	return 0;
-}
-
-void
-isakmp_check_vendorid(gen, from)
-	struct isakmp_gen *gen;		/* points to Vendor ID payload */
-	struct sockaddr *from;
-{
-	vchar_t *vidhash;
-	vchar_t *vid = lcconf->vendorid;
-
-	if (!gen)
-		return;
-	if (vid == NULL) {
-		plog(logp, LOCATION, from,
-			"ignoring Vendor ID as I don't have one.\n");
-		return;
-	}
-
-	/* XXX should this be configurable? */
-	vidhash = eay_md5_one(vid);
-	if (!vidhash) {
-		plog(logp, LOCATION, from,
-			"failed to hash my Vendor ID.\n");
-		return;
-	}
-	if (vidhash->l == ntohs(gen->len) - sizeof(*gen)
-	 && memcmp(vidhash->v, gen + 1, vidhash->l) == 0) {
-		plog(logp, LOCATION, from,
-			"Vendor ID matched <%s>.\n",
-			vid->v);
-	} else
-		plog(logp, LOCATION, from,
-			"Vendor ID mismatch.\n");
-	vfree(vidhash);
-
-	return;
 }
 
 u_int32_t

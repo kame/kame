@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.19 2000/04/24 07:37:42 sakane Exp $
+# YIPS $Id: Makefile.in,v 1.20 2000/05/24 09:39:17 sakane Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -24,7 +24,7 @@ PROG=	racoon kmpstat eaytest
 OBJS=	main.o session.o isakmp.o handler.o \
 	isakmp_ident.o isakmp_agg.o isakmp_base.o \
 	isakmp_quick.o isakmp_inf.o isakmp_newg.o \
-	pfkey.o admin.o ipsec_doi.o oakley.o grabmyaddr.o \
+	pfkey.o admin.o ipsec_doi.o oakley.o grabmyaddr.o vendorid.o \
 	policy.o localconf.o remoteconf.o crypto_openssl.o algorithm.o \
 	proposal.o sainfo.o cfparse.o cftoken.o strnames.o \
 	vmbuf.o plog.o logger.o schedule.o str2val.o misc.o sockmisc.o \

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.25 2000/05/23 16:25:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.26 2000/05/24 09:39:17 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -67,6 +67,7 @@
 #include "pfkey.h"
 #include "isakmp_ident.h"
 #include "isakmp_inf.h"
+#include "vendorid.h"
 
 static vchar_t *ident_ir2sendmx __P((struct ph1handle *));
 static vchar_t *ident_ir3sendmx __P((struct ph1handle *));
@@ -210,7 +211,7 @@ ident_i2recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
@@ -347,7 +348,7 @@ ident_i3recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_CR:
 			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
@@ -522,7 +523,7 @@ ident_i4recv(iph1, msg0)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_N:
 			YIPSDEBUG(DEBUG_NOTIFY,
@@ -675,7 +676,7 @@ ident_r1recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
 			/*
@@ -833,7 +834,7 @@ ident_r2recv(iph1, msg)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_CR:
 			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
@@ -1011,7 +1012,7 @@ ident_r3recv(iph1, msg0)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n"));
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			(void)check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_N:
 			YIPSDEBUG(DEBUG_NOTIFY,
