@@ -1,4 +1,4 @@
-# YIPS @(#)$Id: policy.conf.in,v 1.1 2000/01/09 01:31:38 itojun Exp $
+# YIPS @(#)$Id: policy.conf.in,v 1.2 2000/01/10 19:05:51 itojun Exp $
 
 # IPsec SA configuration
 
@@ -6,7 +6,7 @@
 #	"policy" local remote protocol direciton "ipsec" { ... } ;
 #	"policy" local remote protocol direction "discard" ;
 #
-#		direction := "in", "out", "in=out"
+#		direction := "in", "out", "inout"
 #		protocol := "any", "tcp", "udp"
 #		action := "discard", "ipsec"
 #	
@@ -21,7 +21,7 @@
 #       172.168.1.1      172.168.2.2
 # setting on gateway A:
 
-policy 10.1.1.0/24 10.2.2.0/24 any in=out ipsec
+policy 10.1.1.0/24 10.2.2.0/24 any inout ipsec
 {
 	# "pfs_group" specifys to require PFS, and defines a DH group number.
 	# It is followed by either "modp768", "modp1024" or "modp1536".

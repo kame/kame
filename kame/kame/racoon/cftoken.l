@@ -186,7 +186,7 @@ octetstring	{octet}({dot}{octet})+
 <S_PLCY>{bcl}any{ecl}	{ YYD; return(PORTANY); }
 <S_PLCY>in		{ YYD; yylval.num = IPSEC_DIR_INBOUND; return(DIRTYPE); }
 <S_PLCY>out		{ YYD; yylval.num = IPSEC_DIR_OUTBOUND; return(DIRTYPE); }
-<S_PLCY>in=out		{ YYD; /* XXX */ yylval.num = IPSEC_DIR_ANY; return(DIRTYPE); }
+<S_PLCY>inout		{ YYD; /* XXX */ yylval.num = IPSEC_DIR_ANY; return(DIRTYPE); }
 <S_PLCY>discard		{ YYD; yylval.num = IPSEC_POLICY_DISCARD; return(ACTION); }
 <S_PLCY>none		{ YYD; yylval.num = IPSEC_POLICY_NONE; return(ACTION); }
 <S_PLCY>ipsec		{ YYD; yylval.num = IPSEC_POLICY_IPSEC; return(ACTION); }
