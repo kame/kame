@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.74 2000/11/30 16:00:05 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.75 2000/11/30 16:32:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -548,7 +548,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	void (*notify) __P((struct in6pcb *, int));
 {
 	struct in6pcb *in6p, *nin6p;
-	struct in6_addr faddr6, laddr6;
+	struct sockaddr_in6 sa6_src, *sa6_dst;
 	u_int16_t fport = fport_arg, lport = lport_arg;
 	int errno;
 	int nmatch = 0;
@@ -556,11 +556,16 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return 0;
-	faddr6 = ((struct sockaddr_in6 *)dst)->sin6_addr;
-	laddr6 = ((struct sockaddr_in6 *)src)->sin6_addr;
-	flowinfo = ((struct sockaddr_in6 *)src)->sin6_flowinfo;
-	if (IN6_IS_ADDR_UNSPECIFIED(&faddr6))
-		return 0;
+
+	sa6_dst = (struct sockaddr_in6 *)dst;
+	if (IN6_IS_ADDR_UNSPECIFIED(&sa6_dst->sin6_addr))
+		return;
+
+	/*
+	 * note that src can be NULL when we get notify by local fragmentation.
+	 */
+	sa6_src = (src == NULL) ? sa6_any : *(struct sockaddr_in6 *)src;
+	flowinfo = sa6_src.sin6_flowinfo;
 
 	/*
 	 * Redirects go to all references to the destination,
@@ -573,7 +578,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	if (PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) {
 		fport = 0;
 		lport = 0;
-		bzero((caddr_t)&laddr6, sizeof(laddr6));
+		bzero((caddr_t)&sa6_src.sin6_addr, sizeof(sa6_src.sin6_addr));
 
 		if (cmd != PRC_HOSTDEAD)
 			notify = in6_rtchange;
@@ -590,13 +595,12 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 * disconnected sockets if the corresponding application
 		 * wanted. This is because some UDP applications keep sending
 		 * sockets disconnected.
-		 * XXX: not sure if PRC_MSGSIZE can be given by other reasons
-		 *      than ICMP6 too big messages.
 		 * XXX: should we avoid to notify the value to TCP sockets?
 		 */
 		if (cmd == PRC_MSGSIZE && (in6p->in6p_flags & IN6P_MTU) != 0 &&
 		    (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) ||
-		     IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &faddr6))) {
+		     IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
+					&sa6_dst->sin6_addr))) {
 			ip6_notify_pmtu(in6p, (struct sockaddr_in6 *)dst,
 					(u_int32_t *)cmdarg);
 		}
@@ -605,20 +609,22 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 * Detect if we should notify the error. If no source and
 		 * destination ports are specifed, but non-zero flowinfo and
 		 * local address match, notify the error. This is the case
-		 * when the error is delivered with an encrypted error buffer
+		 * when the error is delivered with an encrypted buffer
 		 * by ESP. Otherwise, just compare addresses and ports
 		 * as usual.
 		 */
 		if (lport == 0 && fport == 0 && flowinfo &&
 		    in6p->in6p_socket != NULL &&
 		    flowinfo == (in6p->in6p_flowinfo & IPV6_FLOWLABEL_MASK) &&
-		    IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &laddr6))
+		    IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &sa6_src.sin6_addr))
 			goto do_notify;
-		else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &faddr6) ||
+		else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
+					     &sa6_dst->sin6_addr) ||
 		    in6p->in6p_socket == 0 ||
 		    (lport && in6p->in6p_lport != lport) ||
-		    (!IN6_IS_ADDR_UNSPECIFIED(&laddr6) &&
-		     !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &laddr6)) ||
+		    (!IN6_IS_ADDR_UNSPECIFIED(&sa6_src.sin6_addr) &&
+		     !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
+					 &sa6_src.sin6_addr)) ||
 		    (fport && in6p->in6p_fport != fport))
 			continue;
 
