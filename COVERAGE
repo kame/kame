@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.31 2000/04/26 09:24:31 itojun Exp $
+$Id: COVERAGE,v 1.32 2000/04/26 16:22:36 itojun Exp $
 
 
 x: supported/integrated
@@ -75,6 +75,9 @@ CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	notyet	notyet	ALIGN
 
 getaddrinfo obeys configured resolv order
 		(+)	x	x	-	notyet	notyet	-
+
+getnameinfo uses addr%numeric for scopeid > maxifindex
+		x	x	x	-	notyet	notyet	-
 
 ALTQ		(+)	-	-	-	notyet	notyet	-
 
