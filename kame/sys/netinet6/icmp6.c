@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.396 2005/01/17 09:53:52 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.397 2005/01/20 08:47:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -447,7 +447,13 @@ icmp6_error(m, type, code, param)
 			goto freeit;
 		}
 		m_copydata(m, off, sizeof(icp), (caddr_t)&icp);
-		if (icp.icmp6_type < ICMP6_ECHO_REQUEST ||
+		if (in6_cksum(m, IPPROTO_IPV6, off, m->m_pkthdr.len - off)) {
+			/*
+			 * original packet is broken
+			 */
+			icmp6stat.icp6s_canterror++;
+			goto freeit;
+		} else if (icp.icmp6_type < ICMP6_ECHO_REQUEST ||
 		    icp.icmp6_type == ND_REDIRECT) {
 			/*
 			 * ICMPv6 error
