@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.97 2002/03/13 17:03:52 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.98 2002/03/14 06:47:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1004,7 +1004,11 @@ mip6_bdt_create(sc, paddr)
 	gate.sin6_scope_id = 0;
 	mask.sin6_scope_id = 0;
 #endif /* !SCOPEDROUTING */
-	error = rtrequest(RTM_ADD, &dst, &gate, &mask, RTF_UP|RTF_HOST,
+	error = rtrequest(RTM_ADD,
+			  (struct sockaddr *)&dst,
+			  (struct sockaddr *)&gate,
+			  (struct sockaddr *)&mask,
+			  RTF_UP|RTF_HOST,
 			  &retrt);
 	if (error == 0) {
 		retrt->rt_refcnt--;
@@ -1018,7 +1022,7 @@ mip6_bdt_delete(paddr)
 	struct sockaddr_in6 *paddr;
 {
 	struct rtentry *rt;
-	struct sockaddr_in6 dst, gate, mask;
+	struct sockaddr_in6 dst;
 	int error = 0;
 
 	dst = *paddr;
@@ -1026,7 +1030,9 @@ mip6_bdt_delete(paddr)
 	dst.sin6_scope_id = 0;
 #endif /* !SCOPEDROUTING */
 	rt = rtalloc1((struct sockaddr *)&dst, 0, 0UL);
-	if (rt) {
+	if (rt
+	    && ((rt->rt_flags & RTF_HOST) != 0)
+	    && (SA6_ARE_ADDR_EQUAL(&dst, (struct sockaddr_in6 *)rt_key(rt)))) {
 		error = rtrequest(RTM_DELETE, rt_key(rt),
 				  (struct sockaddr *)0,
 				  rt_mask(rt), 0, (struct rtentry **)0);
