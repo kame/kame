@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.89 2000/07/15 09:02:42 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.90 2000/07/15 22:18:41 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -744,25 +744,31 @@ cmp_aproppair(a, b)
 		}
 		if (!r) {
 			/* no suitable transform found */
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-				"ERROR: no suitable transform found.\n"));
+			plog(logp, LOCATION, NULL,
+				"ERROR: no suitable transform found.\n");
 			return -1;
 		}
 
 		/* compare prop */
-		if (p->prop->p_no != r->prop->p_no
-		 || p->prop->proto_id != r->prop->proto_id
-		 || p->prop->spi_size != r->prop->spi_size) {
-			YIPSDEBUG(DEBUG_SA,
+		if (p->prop->p_no != r->prop->p_no) {
+			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, NULL,
-				"ERROR: no suitable proposal found.\n"));
+				"NOTICE: proposal #%d mismatched, "
+				"expected #%d.\n",
+				r->prop->p_no, p->prop->p_no));
+			/*FALLTHROUGH*/
+		}
+
+		if (p->prop->proto_id != r->prop->proto_id
+		 || p->prop->spi_size != r->prop->spi_size) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: no suitable proposal found.\n");
 			return -1;
 		}
 
 		/* check #of transforms */
 		if (p->prop->num_t != 1) {
-			YIPSDEBUG(DEBUG_SA,
+			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, NULL,
 				"NOTICE: #of transform is %d, "
 				"but expected 1.\n", p->prop->num_t));
@@ -771,16 +777,15 @@ cmp_aproppair(a, b)
 
 		if (p->trns->t_id != r->trns->t_id
 		 || p->trns->reserved != r->trns->reserved) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-				"ERROR: no suitable transform found.\n"));
+			plog(logp, LOCATION, NULL,
+				"ERROR: no suitable transform found.\n");
 			return -1;
 		}
 
 		/* compare attribute */
 		len = ntohs(r->trns->h.len) - sizeof(*p->trns);
 		if (memcmp(p->trns + 1, r->trns + 1, len) != 0) {
-			YIPSDEBUG(DEBUG_SA,
+			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, NULL,
 				"WARNING: attribute is modified.\n"));
 			/*FALLTHROUGH*/
@@ -788,9 +793,8 @@ cmp_aproppair(a, b)
 	}
 	if ((p && !q) || (!p && q)) {
 		/* # of protocols mismatched */
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-			"ERROR: #of protocols mismatched.\n"));
+		plog(logp, LOCATION, NULL,
+			"ERROR: #of protocols mismatched.\n");
 		return -1;
 	}
 
