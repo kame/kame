@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/07 14:52:55 $
+			$Date: 2000/01/07 17:40:42 $
 
 1. IPv6
 
@@ -99,8 +99,8 @@ draft-ietf-ipngwg-scopedaddr-format-00.txt:
 	An Extension of Format for IPv6 Scoped Addresses
 draft-ietf-ipngwg-rfc2292bis-01.txt:
 	A revised version of the advanced API
-      Some of the draft have not been implemented. See TODO.2292bis
-      form more detais.
+    * Some of the draft have not been implemented. See TODO.2292bis
+      form more details.
 
 1.2 Neighbor Discovery
 
