@@ -21,7 +21,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.8 2000/01/30 17:16:20 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.9 2000/02/28 03:37:47 jinmei Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -1131,7 +1131,7 @@ struct block *
 gen_proto_abbrev(proto)
 	int proto;
 {
-	struct block *b0, *b1;
+	struct block *b0 = NULL, *b1;
 
 	switch (proto) {
 
