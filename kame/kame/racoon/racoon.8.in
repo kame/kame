@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: racoon.8.in,v 1.5 2000/05/31 14:56:45 itojun Exp $
+.\"     $Id: racoon.8.in,v 1.6 2000/05/31 17:00:08 itojun Exp $
 .\"
 .Dd July 7, 1998
 .Dt RACOON 8
@@ -36,7 +36,7 @@
 .Nd IKE (ISAKMP/Oakley) key management daemon
 .\" 
 .Sh SYNOPSIS
-.Nm ""
+.Nm racoon
 .Bk -words
 .Op Fl 46hv
 .Ek
