@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.104 2002/05/28 10:24:24 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.105 2002/06/07 07:39:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -147,7 +147,7 @@ nd6_ns_input(m, off, icmp6len)
 	ip6 = mtod(m, struct ip6_hdr *); /* adjust pointer for safety */
 	bzero(&taddr6, sizeof(taddr6));
 	taddr6.sin6_family = AF_INET6;
-	taddr6.sin6_len = sizeof(struct sockaddr_in6); 
+	taddr6.sin6_len = sizeof(struct sockaddr_in6);
 	taddr6.sin6_addr = nd_ns->nd_ns_target;
 	if (in6_addr2zoneid(ifp, &taddr6.sin6_addr, &taddr6.sin6_scope_id))
 		goto bad;	/* XXX: impossible */
@@ -941,7 +941,7 @@ nd6_na_input(m, off, icmp6len)
 			 * Lock to protect the default router list.
 			 * XXX: this might be unnecessary, since this function
 			 * is only called under the network software interrupt
-			 * context.  However, we keep it just for safety.  
+			 * context.  However, we keep it just for safety.
 			 */
 #ifdef __NetBSD__
 			s = splsoftnet();
