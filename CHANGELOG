@@ -1,7 +1,12 @@
-$Id: CHANGELOG,v 1.469 2000/01/20 09:42:13 itojun Exp $
+$Id: CHANGELOG,v 1.470 2000/01/21 04:00:44 itojun Exp $
 
 
 <200001>
+Fri Jan 21 12:59:51 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/totd, openbsd/ports/net/totd,
+	  freebsd[23]/ports/totd: upgrade to 1.1p2.
+	  From: Feico Dillema
+
 Thu Jan 20 18:41:40 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/lang/python, freebsd2/ports/python:
 	  upgrade to latest IPv6 patch.
