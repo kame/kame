@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.42 2001/10/05 02:47:07 sakane Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.43 2001/10/05 02:52:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -237,7 +237,7 @@ base_i2recv(iph1, msg)
 		goto end;
 	}
 
-	/* veryfy identifier */
+	/* verify identifier */
 	error = ipsecdoi_checkid1(iph1);
 	if (error != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
