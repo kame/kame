@@ -1,6 +1,8 @@
+.\"	$KAME: gif.4,v 1.6 2000/04/14 09:09:50 itojun Exp $
+.\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
-.\" 
+.\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
 .\" are met:
@@ -12,7 +14,7 @@
 .\" 3. Neither the name of the project nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
-.\" 
+.\"
 .\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
 .\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 .\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -24,8 +26,6 @@
 .\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
-.\"
-.\"     $Id: gif.4,v 1.5 2000/04/14 09:04:54 itojun Exp $
 .\"
 .Dd April 10, 1999
 .Dt GIF 4
@@ -48,7 +48,7 @@ is mainly based on RFC1933 IPv6-over-IPv4 configured tunnel.
 .Pp
 To use
 .Nm gif ,
-administrator needs to configure protocol and addresses used for the outer 
+administrator needs to configure protocol and addresses used for the outer
 header.
 This can be done by using
 .Xr gifconfig 8 ,
@@ -201,7 +201,7 @@ This should be used in mutual agreement with the peer.
 .Nm
 interface will capture packets toward IPv4-in-IPv4 tunnel,
 which has been used by
-.Xr vif 4 
+.Xr vif 4
 multicast tunnel device
 .Pq used in MBone community .
 For compatibility, IPv4-in-IPv4 traffic will be matched to
