@@ -883,7 +883,7 @@ vxget(sc, totlen)
             }
             len = MLEN;
         }
-        if (totlen >= MINCLSIZE) {
+        if (totlen >= MHLEN) {
 	    MCLGET(m, M_DONTWAIT);
 	    if (m->m_flags & M_EXT)
 		len = MCLBYTES;
