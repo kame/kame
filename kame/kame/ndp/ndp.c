@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.110 2004/06/14 05:35:14 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.111 2004/08/11 10:29:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -982,6 +982,9 @@ ifinfo(ifname, argc, argv)
 				newflags |= (f);\
 		}\
 	} while (0)
+#ifdef ND6_IFF_IFDISABLED
+		SETFLAG("disabled", ND6_IFF_IFDISABLED);
+#endif
 		SETFLAG("nud", ND6_IFF_PERFORMNUD);
 #ifdef ND6_IFF_ACCEPT_RTADV
 		SETFLAG("accept_rtadv", ND6_IFF_ACCEPT_RTADV);
@@ -1039,6 +1042,10 @@ ifinfo(ifname, argc, argv)
 	if (ND.flags) {
 		printf("\nFlags: ");
 		if ((ND.flags & ND6_IFF_PERFORMNUD))
+#ifdef ND6_IFF_IFDISABLED
+		if ((ND.flags & ND6_IFF_IFDISABLED))
+			printf("disabled ");
+#endif
 			printf("nud ");
 #ifdef ND6_IFF_ACCEPT_RTADV
 		if ((ND.flags & ND6_IFF_ACCEPT_RTADV))
