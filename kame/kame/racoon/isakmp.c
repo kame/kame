@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.68 2000/06/14 16:03:10 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.69 2000/06/14 17:49:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -123,6 +123,7 @@ static int (*ph2exchange[][2][PHASE2ST_MAX])
 
 static u_char r_ck0[] = { 0,0,0,0,0,0,0,0 }; /* used to verify the r_ck. */
  
+static int ph1_main __P((struct ph1handle *, vchar_t *));
 static int isakmp_ph1begin_r __P((vchar_t *, struct sockaddr *, u_int8_t));
 static int isakmp_ph2begin_r __P((struct ph1handle *, vchar_t *));
 static int etypesw __P((int));
@@ -368,67 +369,14 @@ isakmp_main(msg, remote, local)
 			}
 		}
 
-		/* acceptable check */
-		if (iph1->etype != isakmp->etype) {
-			plog(logp, LOCATION, remote,
-				"exchange type changed. db=%s packet=%s\n",
-				s_isakmp_etype(iph1->etype),
-				s_isakmp_etype(isakmp->etype));
-		}
-
-		/* receive */
-		if (ph1exchange[etypesw(iph1->etype)]
-		               [iph1->side]
-		               [iph1->status] == NULL) {
+		/* call main process of phase 1 */
+		if (ph1_main(iph1, msg) < 0) {
+			plog(logp, LOCATION, iph1->remote,
+				"ERROR: delete phase1 handler due to error.\n");
 			remph1(iph1);
 			delph1(iph1);
 			return -1;
 		}
-		if ((ph1exchange[etypesw(iph1->etype)]
-		                [iph1->side]
-		                [iph1->status])(iph1, msg) < 0) {
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, remote,
-					"failed to pre-process packet.\n"));
-			remph1(iph1);
-			delph1(iph1);
-			return -1;
-		}
-
-		/* free resend buffer */
-		if (iph1->sendbuf == NULL) {
-			plog(logp, LOCATION, NULL,
-				"no buffer found as sendbuf\n"); 
-			remph1(iph1);
-			delph1(iph1);
-			return -1;
-		}
-		vfree(iph1->sendbuf);
-		iph1->sendbuf = NULL;
-
-		/* turn off schedule */
-		if (iph1->scr == NULL) {
-			plog(logp, LOCATION, NULL,
-				"nothing scheduled.\n"); 
-			remph1(iph1);
-			delph1(iph1);
-			return -1;
-		}
-		SCHED_KILL(iph1->scr);
-
-		/* send */
-		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-		if ((ph1exchange[etypesw(iph1->etype)]
-		                [iph1->side]
-		                [iph1->status])(iph1, msg) < 0) {
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, remote,
-					"failed to process packet.\n"));
-			remph1(iph1);
-			delph1(iph1);
-			return -1;
-		}
-
 		break;
 
 	case ISAKMP_ETYPE_AUTH:
@@ -591,6 +539,71 @@ isakmp_main(msg, remote, local)
 			plog(logp, LOCATION, remote,
 				"Invalid exchange type %d.\n",
 				isakmp->etype));
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ * main function of phase 1.
+ */
+static int
+ph1_main(iph1, msg)
+	struct ph1handle *iph1;
+	vchar_t *msg;
+{
+	struct isakmp *isakmp = (struct isakmp *)msg->v;
+
+	/* acceptable check */
+	if (iph1->etype != isakmp->etype) {
+		plog(logp, LOCATION, iph1->remote,
+			"ERROR: exchange type changed. db=%s packet=%s\n",
+			s_isakmp_etype(iph1->etype),
+			s_isakmp_etype(isakmp->etype));
+		return -1;
+	}
+
+	/* receive */
+	if (ph1exchange[etypesw(iph1->etype)]
+		       [iph1->side]
+		       [iph1->status] == NULL) {
+		plog(logp, LOCATION, iph1->remote,
+			"ERROR: why isn't the function defined.\n");
+		return -1;
+	}
+	if ((ph1exchange[etypesw(iph1->etype)]
+			[iph1->side]
+			[iph1->status])(iph1, msg) < 0) {
+		plog(logp, LOCATION, iph1->remote,
+			"ERROR: failed to pre-process packet.\n");
+		return -1;
+	}
+
+	/* free resend buffer */
+	if (iph1->sendbuf == NULL) {
+		plog(logp, LOCATION, NULL,
+			"ERROR: no buffer found as sendbuf\n"); 
+		return -1;
+	}
+	vfree(iph1->sendbuf);
+	iph1->sendbuf = NULL;
+
+	/* turn off schedule */
+	if (iph1->scr == NULL) {
+		plog(logp, LOCATION, NULL,
+			"ERROR: nothing scheduled.\n"); 
+		return -1;
+	}
+	SCHED_KILL(iph1->scr);
+
+	/* send */
+	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+	if ((ph1exchange[etypesw(iph1->etype)]
+			[iph1->side]
+			[iph1->status])(iph1, msg) < 0) {
+		plog(logp, LOCATION, iph1->remote,
+			"ERROR: failed to process packet.\n");
 		return -1;
 	}
 
