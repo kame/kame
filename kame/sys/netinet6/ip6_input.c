@@ -1390,6 +1390,9 @@ dump_inputopts(str, p)
 	char *str;
 	struct ip6_recvpktopts *p;
 {
+#if 1
+	return;
+#else
 #define PRINT1(p, name) \
 do { \
 	if (p->name) { \
@@ -1408,6 +1411,7 @@ do { \
 	PRINT1(p, rthdr);
 	printf("\n");
 #undef PRINT1
+#endif
 }
 
 void
