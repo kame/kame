@@ -252,7 +252,7 @@ main(argc, argv)
 #ifndef __NetBSD__
 	extern int errno;
 #endif
-#ifdef __FreeBSD__ && __FreeBSD__ < 3
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
 	extern int optind;
 	extern char *optarg;
 #endif
