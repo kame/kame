@@ -119,7 +119,7 @@ struct inpcb {
 	struct	  mbuf *inp_options;	/* IPv4 options */
 #ifndef INET6
 	void *inp_inputopts6;	/* XXX bad fix. */
-#endif
+#else
 	struct ip6_recvpktopts inp_inputopts6;/* IPv6 opts for incoming pkts */
 #endif 
 	struct ip6_pktopts *inp_outputopts6; /* IP6 opts for outgoing pkts */
