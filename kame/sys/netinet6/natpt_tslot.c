@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.17 2001/05/05 11:19:04 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.18 2001/05/28 16:12:08 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -94,7 +94,6 @@ static struct pAddr	*fillupOutgoing4local	__P((struct _cSlot *, struct _cv *, st
 static struct pAddr	*fillupOutgoing4Remote	__P((struct _cSlot *, struct _cv *, struct pAddr *));
 static struct pAddr	*fillupOutgoingV6local	__P((struct _cSlot *, struct _cv *, struct pAddr *));
 static struct pAddr	*fillupOutgoingV6Remote	__P((struct _cSlot *, struct _cv *, struct pAddr *));
-static struct pAddr	*remapRemote4Port	__P((struct _cSlot *, struct _cv *, struct pAddr *));
 
 #ifdef NATPT_FRAGMENT
 struct _fragment	*internFragmented	__P((struct _cv *, int));
@@ -483,6 +482,55 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 
     ats->ip_payload = cv6->ip_payload;
     ats->session = sess;
+    ats->csl = acs;
+    registTSlotEntry(ats);						/* XXX	*/
+
+    hv6 = _hash_pat6(local);
+    hv4 = _hash_pat4(remote);
+
+    s = splnet();
+    LST_hookup_list(&_insideHash [hv6], ats);
+    LST_hookup_list(&_outsideHash[hv4], ats);
+    splx(s);
+
+    return (ats);
+}
+
+
+struct _tSlot *
+openIncomingV4Conn(int proto, struct pAddr *local, struct pAddr *remote)
+{
+    const char *fn = __FUNCTION__;
+
+    int			 s, hv4, hv6;
+    struct _tSlot	*ats;
+    struct _tcpstate	*ts;
+
+    MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_NATPT, M_NOWAIT);
+    if (ats == NULL)
+    {
+	printf("%s(): ENOBUFS for struct _tSlot\n", fn);
+	return (NULL);
+    }
+						/* Should we think about UDP?	*/
+    MALLOC(ts, struct _tcpstate *, sizeof(struct _tcpstate), M_NATPT, M_NOWAIT);
+    if (ts == NULL)
+    {
+	printf("%s(): ENOBUFS for struct _tcpstate\n", fn);
+	FREE(ats, M_NATPT);
+	return (NULL);
+    }
+
+    bzero(ats, sizeof(struct _tSlot));
+    ats->ip_payload = proto;
+    ats->session = NATPT_INBOUND;
+    ats->local = *local;
+    ats->remote = *remote;
+
+    bzero(ts, sizeof(struct _tcpstate));
+    ts->_state = TCPS_CLOSED;
+    ats->suit.tcp = ts;
+
     registTSlotEntry(ats);						/* XXX	*/
 
     hv6 = _hash_pat6(local);
@@ -647,7 +695,7 @@ fillupOutgoingV6Remote(struct _cSlot *acs, struct _cv *cv6, struct pAddr *remote
 }
 
 
-static struct pAddr *
+struct pAddr *
 remapRemote4Port(struct _cSlot *acs, struct _cv *cv4, struct pAddr *remote)
 {
     int			firsttime = 0;

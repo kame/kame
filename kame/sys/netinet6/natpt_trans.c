@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.28 2001/05/23 12:21:47 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.29 2001/05/28 16:12:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,8 +88,10 @@
 #define	FTP_CONTROL			21
 
 #if BYTE_ORDER == BIG_ENDIAN
+#define	FTP6_EPRT			0x45505254
 #define	FTP6_EPSV			0x45505356
 #else
+#define	FTP6_EPRT			0x54525045
 #define	FTP6_EPSV			0x56535045
 #endif
 
@@ -137,11 +139,13 @@ void		 tr_icmp6EchoReply		__P((struct _cv *, struct _cv *));
 void		 translatingPYLD4To6		__P((struct _cv *, struct pAddr *));
 int		 translatingFTP4ReplyTo6	__P((struct _cv *, struct pAddr *));
 
-void		 translatingPYLD6To4		__P((struct _cv *, struct pAddr *));
-int		 translatingFTP6CommandTo4	__P((struct _cv *, struct pAddr *));
+void		 translatingPYLD6To4		__P((struct _cv *, struct _cv *));
+int		 translatingFTP6CommandTo4	__P((struct _cv *, struct _cv *));
 
 struct ftpparam *parseFTPdialogue		__P((caddr_t, caddr_t, struct ftpparam *));
+struct sockaddr	*parseEPRT			__P((caddr_t, caddr_t, struct sockaddr_in6 *));
 struct sockaddr	*parse227			__P((caddr_t, caddr_t, struct sockaddr_in *));
+int		 natpt_pton6			__P((caddr_t, caddr_t, struct in6_addr *));
 int		 rewriteMbuf			__P((struct mbuf *, char *, int , char *,int));
 void		 incrementSeq			__P((struct tcphdr *, int));
 void		 decrementAck			__P((struct tcphdr *, int));
@@ -1427,7 +1431,7 @@ translatingTCPv6To4(struct _cv *cv6, struct pAddr *pad)
     cv4.ip_p = cv4.ip_payload = IPPROTO_TCP;
 
     updateTcpStatus(&cv4);
-    translatingPYLD6To4(&cv4, pad);
+    translatingPYLD6To4(cv6, &cv4);
     cksumOrg = ntohs(cv6->_payload._tcp6->th_sum);
     adjustUpperLayerChecksum(IPPROTO_IPV6, IPPROTO_TCP, cv6, &cv4);
 
@@ -1440,7 +1444,7 @@ translatingTCPv6To4(struct _cv *cv6, struct pAddr *pad)
 
 
 void
-translatingPYLD6To4(struct _cv *cv4, struct pAddr *pad)
+translatingPYLD6To4(struct _cv *cv6, struct _cv *cv4)
 {
     int			 delta = 0;
     struct tcphdr	*th4 = cv4->_payload._tcp4;
@@ -1449,7 +1453,7 @@ translatingPYLD6To4(struct _cv *cv4, struct pAddr *pad)
     if (cv4->ats && (cv4->ats->session == NATPT_OUTBOUND)
 	&& (htons(cv4->_payload._tcp4->th_dport) == FTP_CONTROL))
     {
-	if ((delta = translatingFTP6CommandTo4(cv4, pad)) != 0)
+	if ((delta = translatingFTP6CommandTo4(cv6, cv4)) != 0)
 	{
 	    struct mbuf		*mbf = cv4->m;
 	    struct ip		*ip4 = cv4->_ip._ip4;
@@ -1486,7 +1490,7 @@ translatingPYLD6To4(struct _cv *cv4, struct pAddr *pad)
 
 
 int
-translatingFTP6CommandTo4(struct _cv *cv4, struct pAddr *pad)
+translatingFTP6CommandTo4(struct _cv *cv6, struct _cv *cv4)
 {
     int			 delta = 0;
     char		*tstr;
@@ -1495,6 +1499,8 @@ translatingFTP6CommandTo4(struct _cv *cv4, struct pAddr *pad)
     struct tcphdr	*th4 = cv4->_payload._tcp4;
     struct _tcpstate	*ts;
     struct ftpparam	 ftp6;
+    struct sockaddr_in6	 sin6;
+    char		 wow[128];
 
     kb = (caddr_t)th4 + (th4->th_off << 2);
     kk = (caddr_t)ip4 + ip4->ip_len;
@@ -1505,6 +1511,40 @@ translatingFTP6CommandTo4(struct _cv *cv4, struct pAddr *pad)
     ts = cv4->ats->suit.tcp;
     switch(ftp6.cmd)
     {
+      case FTP6_EPRT:
+	{
+	    char		*h, *p;
+	    struct _tSlot	*ats;
+	    struct pAddr	 local, remote;
+
+	    ts->ftpstate = FTP6_EPRT;
+	    if (parseEPRT(ftp6.arg, kk, &sin6) == NULL)
+		return (0);
+
+	    ats = cv4->ats;
+	    local = ats->local;
+	    local._sport = htons(FTP_DATA);
+	    local._dport = sin6.sin6_port;
+	    remote = ats->remote;
+	    remote._sport = 0;	/* this port should be remapped	*/
+	    remote._dport = htons(FTP_DATA);
+
+	    if (remapRemote4Port(ats->csl, NULL, &remote) == NULL)
+		return (0);
+	    
+	    if (openIncomingV4Conn(IPPROTO_TCP, &local, &remote) == NULL)
+		return (0);
+
+	    h = (char *)&remote.addr[0];
+	    p = (char *)&remote.port[0];
+	    snprintf(wow, sizeof(wow), "PORT %u,%u,%u,%u,%u,%u\r\n",
+		     h[0], h[1], h[2], h[3],
+		     p[0], p[1]);
+
+	    delta = rewriteMbuf(cv4->m, kb, (kk-kb), wow, strlen(wow));
+	}
+	break;
+
       case FTP6_EPSV:
 	ts->ftpstate = FTP6_EPSV;
 	tstr = "PASV\r\n";
@@ -1666,6 +1706,45 @@ parseFTPdialogue(caddr_t kb, caddr_t kk, struct ftpparam *ftp6)
 
 
 struct sockaddr *
+parseEPRT(caddr_t kb, caddr_t kk, struct sockaddr_in6 *sin6)
+{
+    int		port;
+    caddr_t	km;
+
+    bzero(sin6, sizeof(struct sockaddr_in6));
+
+    if (*kb++ != '|')			return (NULL);
+    switch (*kb++)
+    {
+      case '1':	sin6->sin6_family = AF_INET;	break;
+      case '2': sin6->sin6_family = AF_INET6;	break;
+      default:
+	return (NULL);
+    }
+    if (*kb++ != '|')			return (NULL);
+
+    km = kb;
+    while ((kb < kk) && (isxdigit(*kb) || (*kb == ':')))
+	kb++;
+    if (*kb != '|')			return (NULL);
+    if (natpt_pton6(km, kb++, &sin6->sin6_addr) == 0)
+	return (NULL);
+
+    port = 0;
+    while ((kb < kk) && (isdigit(*kb)))
+    {
+	port = port * 10 + *kb - '0';
+	kb++;
+    }
+    if (*kb != '|')			return (NULL);
+    
+    sin6->sin6_port = htons(port);
+    sin6->sin6_len = sizeof(struct sockaddr_in6);
+    return ((struct sockaddr *)sin6);
+}
+
+
+struct sockaddr *
 parse227(caddr_t kb, caddr_t kk, struct sockaddr_in *sin)
 {
     int				 bite;
@@ -1705,6 +1784,89 @@ parse227(caddr_t kb, caddr_t kk, struct sockaddr_in *sin)
     sin->sin_addr = inaddr;
 
     return ((struct sockaddr *)sin);
+}
+
+
+int
+natpt_pton6(caddr_t kb, caddr_t kk, struct in6_addr *addr6)
+{
+    int			ch, col, cols;
+    u_int		v, val;
+    u_char	       *d;
+    struct in6_addr	bow;
+
+    if ((*kb == ':') && (*(kb+1) != ':'))
+	return (0);
+
+    d = (u_char *)&bow;
+    bzero(&bow, sizeof(bow));
+
+    col = cols = val = 0;
+    while (kb < kk)
+    {
+	v = 'z';
+	ch = *kb++;
+	if (isdigit(ch))
+	    v = ch - '0';
+	else if (('A' <= ch) && (ch <= 'F'))
+	    v = ch - 55;
+	else if (('a' <= ch) && (ch <= 'f'))
+	    v = ch - 87;
+	else
+	    ;
+
+	if (v != 'z')
+	{
+	    val = (val << 4) | v;
+	    if (val > 0xffff)
+		return (0);
+	    col = 0;
+	    continue;
+	}
+	else if	(ch == ':')
+	{
+	    if (col == 0)
+	    {
+		*d++ = (u_char)((val >> 8) & 0xff);
+		*d++ = (u_char)( val & 0xff);
+		val = 0;
+		col++;
+		continue;
+	    }
+	    else if (col == 1)
+	    {
+		/* count number of colon, and advance the address
+		 * which begin to write.
+		 */
+		int	ncol;
+		caddr_t	p;
+
+		if (cols > 0)
+		    return (0);	/* we've already seen "::".	*/
+
+		for (p = kb, ncol = 0; p < kk; p++)
+		    if (*p == ':')
+			ncol++;
+
+		d = (u_char *)&bow + (7-ncol)*2;
+		col++;
+		cols++;
+		continue;
+	    }
+	    else
+		return (0);	/* COLON continued more than 3.	*/
+	}
+	else
+	    return (0);	/* illegal character	*/
+    }
+
+    if (val > 0)
+    {
+	*d++ = (u_char)((val >> 8) & 0xff);
+	*d++ = (u_char)( val & 0xff);
+    }
+    *addr6 = bow;
+    return (1);
 }
 
 

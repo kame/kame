@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.15 2001/05/23 12:21:47 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.16 2001/05/28 16:12:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -317,6 +317,11 @@ struct	_tSlot					/* sizeof(): 104[byte]	*/
     int			lcount;
     u_long		inbound;
     u_long		outbound;
+
+    /* This pointer is used in order to open connection from FTP
+     * server when FTP non passive mode.
+     */
+    struct _cSlot      *csl;
 
     union
     {
