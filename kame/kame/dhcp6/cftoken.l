@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.22 2003/07/31 23:20:25 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.23 2003/08/01 00:27:44 jinmei Exp $	*/
 
 %{
 /*
@@ -48,7 +48,11 @@
 #include "dhcp6.h"
 #include "config.h"
 #include "common.h"
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 106000000	/* XXX */
+#include "cfparse.h"
+#else
 #include "y.tab.h"
+#endif
 
 #define YY_NO_UNPUT 1
 
