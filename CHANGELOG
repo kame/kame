@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2001 2001/12/11 11:38:08 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2002 2001/12/11 21:55:55 jinmei Exp $
 
 <200112>
+2001-12-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c: implemented more rules for
+	destination addr ordering; matching label, higher precedence, and
+	longest matching.  Due to differences on sysctl, the first two
+	rules are not available for FreeBSD at this moment.
+
 2001-12-11 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{defs,dispatch,trans,tslot,var}.[ch]:
 	- Support fragmented IPv4 packet translation.  
