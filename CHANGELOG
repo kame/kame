@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1089 2000/07/04 04:11:23 jinmei Exp $
+$Id: CHANGELOG,v 1.1090 2000/07/04 04:27:42 sakane Exp $
 
 <200006>
+Tue Jul  4 13:26:56 JST 2000 sakane@ydc.co.jp
+	* kame/sys/key.c:
+	A patch from <Francis.Dupont@enst-bretagne.fr> applied.
+	- fixed a interval to call key_timehandler.
+	- fixed a typo.
+	- added a value to be returned when some error happen.
+
 2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_control): added several
 	improvements for sharing a single prefix with multiple addresses:
