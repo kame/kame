@@ -1,9 +1,9 @@
-/*	$KAME: md5.c,v 1.3 2000/02/22 14:01:17 itojun Exp $	*/
+/*	$KAME: md5.c,v 1.4 2000/03/27 04:36:22 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -193,7 +193,7 @@ void md5_pad(ctxt)
 #if BYTE_ORDER == LITTLE_ENDIAN
 	bcopy(&ctxt->md5_n8[0], &ctxt->md5_buf[56], 8);
 #endif
-#if BYTE_ORDER == BIG_ENDIAN 
+#if BYTE_ORDER == BIG_ENDIAN
 	ctxt->md5_buf[56] = ctxt->md5_n8[7];
 	ctxt->md5_buf[57] = ctxt->md5_n8[6];
 	ctxt->md5_buf[58] = ctxt->md5_n8[5];
@@ -215,7 +215,7 @@ void md5_result(digest, ctxt)
 #if BYTE_ORDER == LITTLE_ENDIAN
 	bcopy(&ctxt->md5_st8[0], digest, 16);
 #endif
-#if BYTE_ORDER == BIG_ENDIAN 
+#if BYTE_ORDER == BIG_ENDIAN
 	digest[ 0] = ctxt->md5_st8[ 3]; digest[ 1] = ctxt->md5_st8[ 2];
 	digest[ 2] = ctxt->md5_st8[ 1]; digest[ 3] = ctxt->md5_st8[ 0];
 	digest[ 4] = ctxt->md5_st8[ 7]; digest[ 5] = ctxt->md5_st8[ 6];
@@ -245,7 +245,7 @@ static void md5_calc(b64, ctxt)
 #if BYTE_ORDER == BIG_ENDIAN
 	/* 4 byte words */
 	/* what a brute force but fast! */
-	u_int8_t *y = (u_int8_t *)X; 
+	u_int8_t *y = (u_int8_t *)X;
 	y[ 0] = b64[ 3]; y[ 1] = b64[ 2]; y[ 2] = b64[ 1]; y[ 3] = b64[ 0];
 	y[ 4] = b64[ 7]; y[ 5] = b64[ 6]; y[ 6] = b64[ 5]; y[ 7] = b64[ 4];
 	y[ 8] = b64[11]; y[ 9] = b64[10]; y[10] = b64[ 9]; y[11] = b64[ 8];

@@ -1,9 +1,9 @@
-/*	$KAME: des_3cbc.c,v 1.2 2000/02/22 14:01:23 itojun Exp $	*/
+/*	$KAME: des_3cbc.c,v 1.3 2000/03/27 04:36:32 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -30,7 +30,7 @@
  */
 /*
  * based on sys/crypto/des/des_cbc.c, rewrote by Tomomi Suzuki
- */ 
+ */
 #include <crypto/des/des_locl.h>
 
 
@@ -109,7 +109,7 @@ void des_3cbc_process(m0, skip, length, schedule, ivec, mode)
 
 	/*
 	 * encrypt/decrypt packet
-	 */ 
+	 */
 	while (length > 0) {
 		if (!m)
 			panic("des_3cbc_process: mbuf chain?\n");
