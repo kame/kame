@@ -1,4 +1,4 @@
-/*	$KAME: rijndaeltest.c,v 1.2 2000/11/01 14:36:11 itojun Exp $	*/
+/*	$KAME: rijndaeltest.c,v 1.3 2000/11/01 14:37:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -154,13 +154,13 @@ next1:;
 
 	test = "encrypt test";
 	for (i = 0; evector[i].key; i++) {
-		hex2key(input, dvector[i].pt);
+		hex2key(input, evector[i].pt);
 		memset(output, 0, sizeof(output));
-		hex2key(answer, dvector[i].ct);
+		hex2key(answer, evector[i].ct);
 
 		/* LINTED const cast */
 		if (rijndael_makeKey(&k, DIR_ENCRYPT,
-		    strlen(dvector[i].key) * 4, (char *)dvector[i].key) < 0) {
+		    strlen(evector[i].key) * 4, (char *)evector[i].key) < 0) {
 			printf("makeKey failed for %s %d\n", test, i);
 			error++;
 			continue;
