@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.96 2001/06/22 14:25:35 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.97 2001/06/28 06:10:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -714,6 +714,8 @@ SYSCTL_INT(_net_inet6_ip6, IPV6CTL_SENDREDIRECTS,
 	redirect, CTLFLAG_RW,		&ip6_sendredirects,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_DEFHLIM,
 	hlim, CTLFLAG_RW,		&ip6_defhlim,	0, "");
+SYSCTL_STRUCT(_net_inet6_ip6, IPV6CTL_STATS, stats, CTLFLAG_RD,
+	&ip6stat, ip6stat, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAXFRAGPACKETS,
 	maxfragpackets, CTLFLAG_RW,	&ip6_maxfragpackets,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_ACCEPT_RTADV,
