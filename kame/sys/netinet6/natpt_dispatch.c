@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.49 2002/04/15 06:35:30 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.50 2002/04/25 07:29:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -343,7 +343,8 @@ natpt_config6(struct mbuf *m, struct pcv *cv6)
 		}
 	}
 
-	return (IPPROTO_IP);
+	cv6->ip_p = cv6->ip.ip6->ip6_nxt;
+	return (cv6->ip_p);
 }
 
 

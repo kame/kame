@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.103 2002/04/22 07:49:58 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.104 2002/04/25 07:29:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -244,6 +244,7 @@ natpt_translateIPv6To4(struct pcv *cv6, struct pAddr *pad)
 {
 	const char	*fn = __FUNCTION__;
 
+	struct pcv	cv4;
 	struct timeval	atv;
 	struct mbuf	*m4 = NULL;
 
@@ -264,6 +265,12 @@ natpt_translateIPv6To4(struct pcv *cv6, struct pAddr *pad)
 
 	case IPPROTO_UDP:
 		m4 = natpt_translateUDPv6To4(cv6, pad);
+		break;
+
+	default:
+		bzero(&cv4, sizeof(struct pcv));
+		if ((m4 = natpt_translateTCPUDPv6To4(cv6, pad, &cv4)) == NULL)
+			return (NULL);
 		break;
 	}
 
@@ -640,7 +647,7 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 		ulc.ulc_tu.th.th_sport = cv6->pyld.tcp6->th_sport;
 		ulc.ulc_tu.th.th_dport = cv6->pyld.tcp6->th_dport;
 		aux.cksum6 = ntohs(cv6->pyld.tcp6->th_sum);
-	} else {
+	} else if (cv6->ip_p == IPPROTO_UDP) {
 		ulc.ulc_tu.uh.uh_sport = cv6->pyld.udp->uh_sport;
 		ulc.ulc_tu.uh.uh_dport = cv6->pyld.udp->uh_dport;
 		aux.cksum6 = ntohs(cv6->pyld.udp->uh_sum);
@@ -677,9 +684,12 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 	ip6 = mtod(cv6->m, struct ip6_hdr *);
 	natpt_composeIPv4Hdr(cv6, pad, ip4);
 
-	th = (struct tcphdr *)(ip4 + 1);
-	th->th_sport = pad->port[1];
-	th->th_dport = pad->port[0];
+	if ((cv6->ip_p == IPPROTO_TCP)
+	    || (cv6->ip_p == IPPROTO_UDP)) {
+	    th = (struct tcphdr *)(ip4 + 1);
+	    th->th_sport = pad->port[1];
+	    th->th_dport = pad->port[0];
+	}
 
 	return (m4);
 }
