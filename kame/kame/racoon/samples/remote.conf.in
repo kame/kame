@@ -1,4 +1,4 @@
-# $KAME: remote.conf.in,v 1.6 2000/03/26 10:52:59 itojun Exp $
+# $KAME: remote.conf.in,v 1.7 2000/03/29 23:50:28 sakane Exp $
 
 # IKE SA configuration
 
@@ -16,7 +16,6 @@ remote 172.168.2.2 [7000]
 	# specify the identifier type
 	# "address", "fqdn", "user_fqdn", "keyid"
 	identifier user_fqdn;
-	certificate_type pgp;
 
 	# specify the bytes length of nonce.
 	nonce_size 16;
@@ -28,11 +27,6 @@ remote 172.168.2.2 [7000]
 	lifetime time 10 min;	# sec,min,hour
 	lifetime byte 5 MB;	# B,KB,GB
 
-	proposal {
-		encryption_algorithm 3des;
-		hash_algorithm md5;
-		authentication_method rsasig ;
-	}
 	proposal {
 		encryption_algorithm 3des;
 		hash_algorithm md5;
@@ -72,15 +66,6 @@ remote 172.168.0.1
 		encryption_algorithm 3des;
 		hash_algorithm md5;
 		authentication_method rsasig ;
-	}
-	proposal {
-		encryption_algorithm 3des;
-		hash_algorithm md5;
-		authentication_method pre_shared_key ;
-
-		# they can be defined individually.
-		lifetime time 5 min;
-		lifetime byte 2 MB;
 	}
 }
 
@@ -170,7 +155,6 @@ remote 172.16.1.133
 	# specify the identifier type
 	# "address", "fqdn", "user_fqdn", "keyid"
 	identifier user_fqdn;
-	certificate_type pkcs7;
 
 	# specify the bytes length of nonce.
 	nonce_size 16;
@@ -197,10 +181,5 @@ remote 172.16.1.133
 		# they can be defined individually.
 		lifetime time 5 min;
 		lifetime byte 2 MB;
-	}
-	proposal {
-		encryption_algorithm des;
-		hash_algorithm md5;
-		authentication_method rsasig ;
 	}
 }
