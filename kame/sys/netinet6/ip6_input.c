@@ -141,11 +141,12 @@
 
 extern struct domain inet6domain;
 extern struct ip6protosw inet6sw[];
-#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
+#ifdef __bsdi__
+#if _BSDI_VERSION < 199802
 extern struct ifnet loif;
-#endif
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+#else
 extern struct ifnet *loifp;
+#endif
 #endif
 
 u_char ip6_protox[IPPROTO_MAX];
@@ -153,7 +154,7 @@ static int ip6qmaxlen = IFQ_MAXLEN;
 struct in6_ifaddr *in6_ifaddr;
 struct ifqueue ip6intrq;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
 int ip6_forward_srcrt;			/* XXX */
@@ -222,11 +223,11 @@ static void
 ip6_init2(dummy)
 	void *dummy;
 {
-#if !(defined(__bsdi__) || defined(__OpenBSD__))
+#ifndef __bsdi__
 	int i;
 #endif
 	int ret;
-#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
+#if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
 
@@ -237,7 +238,7 @@ ip6_init2(dummy)
 	 * to route local address of p2p link to loopback,
 	 * assign loopback address first. 
 	 */
-#if defined(__bsdi__) || defined(__OpenBSD__)
+#ifdef __bsdi__
 	in6_ifattach(loifp, IN6_IFT_LOOP, NULL, 0);
 #else
 	for (i = 0; i < NLOOP; i++)
@@ -290,7 +291,7 @@ ip6_input(m)
 	u_int32_t rtalert = ~0;
 	int nxt, ours = 0;
 	struct ifnet *deliverifp = NULL;
-#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
+#if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
 
@@ -316,7 +317,7 @@ ip6_input(m)
 	} else {
 		if (m->m_next) {
 			if (m->m_flags & M_LOOP) {
-#if defined(__bsdi__) || defined(__OpenBSD__)
+#ifdef __bsdi__
 				ip6stat.ip6s_m2m[loifp->if_index]++;	/*XXX*/
 #else
 				ip6stat.ip6s_m2m[loif[0].if_index]++;	/*XXX*/
@@ -484,11 +485,10 @@ ip6_input(m)
 		ip6_forward_rt.ro_dst.sin6_family = AF_INET6;
 		ip6_forward_rt.ro_dst.sin6_addr = ip6->ip6_dst;
 
-#if defined(__bsdi__) || defined(__NetBSD__)
-		rtalloc((struct route *)&ip6_forward_rt);
-#endif
 #ifdef __FreeBSD__
 		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
+#else
+		rtalloc((struct route *)&ip6_forward_rt);
 #endif
 	}
 
@@ -546,7 +546,7 @@ ip6_input(m)
 	}
 #endif
 
-#ifdef __OpenBSD__
+#if 0
     {
 	/*
 	 * Last resort: check in6_ifaddr for incoming interface.
@@ -569,6 +569,7 @@ ip6_input(m)
 	}
     }
 #endif
+
 	/*
 	 * Now there is no reason to process the packet if it's not our own
 	 * and we're not a router.

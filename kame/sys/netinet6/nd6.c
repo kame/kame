@@ -82,7 +82,7 @@
 #ifndef __bsdi__
 #include "loop.h"
 #endif
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
 
@@ -1039,8 +1039,7 @@ nd6_rtrequest(req, rt, sa)
 				extern struct ifnet loif;
 				rt->rt_ifp = &loif;	/*XXX*/
 #endif
-#endif /*__bsdi__*/
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#else /* non-bsdi */
 				rt->rt_ifp = &loif[0];	/*XXX*/
 #endif
 				/*
@@ -1146,10 +1145,9 @@ nd6_p2p_rtrequest(req, rt, sa)
 				extern struct ifnet loif;
 				rt->rt_ifp = &loif;	/*XXX*/
 #endif
-#endif /*__bsdi__*/
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#else
 				rt->rt_ifp = &loif[0];	/*XXX*/
-#endif
+#endif /*__bsdi__*/
 			}
 		}
 		break;

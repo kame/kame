@@ -153,18 +153,18 @@ static int ip6_insertfraghdr __P((struct mbuf *, struct mbuf *, int,
 				  struct ip6_frag **));
 static int ip6_insert_jumboopt __P((struct ip6_exthdrs *, u_int32_t));
 static int ip6_splithdr __P((struct mbuf *, struct ip6_exthdrs *));
-#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
+#ifdef __bsdi__
+#if _BSDI_VERSION < 199802
 extern struct ifnet loif;
-struct ifnet *loifp = &loif;
-#endif
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+#else
 extern struct ifnet *loifp;
 #endif
-
-#ifdef __NetBSD__
-extern struct ifnet **ifindex2ifnet;
+#endif
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
+
+extern struct ifnet **ifindex2ifnet;
 
 /*
  * IP6 output. The packet in mbuf chain m contains a skeletal IP6
@@ -207,6 +207,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	m->m_pkthdr.rcvif = NULL;
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* IPSEC */
+#if defined(__bsdi__) && _BSDI_VERSION < 199802
+	struct ifnet *loifp = &loif;
+#endif
 
 #define MAKE_EXTHDR(hp,mp)						\
     {									\
@@ -658,7 +661,7 @@ skip_ipsec2:;
 				goto bad;
 			}
 			else {
-#if defined(__bsdi__) || defined(__OpenBSD__)
+#if defined(__bsdi__)
 				ifp = loifp;
 #else
 				ifp = &loif[0];
@@ -1939,6 +1942,9 @@ ip6_setmoptions(optname, im6op, m)
 #else
 	struct proc *p = curproc;	/* XXX */
 #endif
+#if defined(__bsdi__) && _BSDI_VERSION < 199802
+	struct ifnet *loifp = &loif;
+#endif
 
 	if (im6o == NULL) {
 		/*
@@ -2059,7 +2065,7 @@ ip6_setmoptions(optname, im6op, m)
 			 *   XXX: is it a good approach?
 			 */
 			if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr)) {
-#if defined(__bsdi__) || defined(__OpenBSD__)
+#if defined(__bsdi__)
 				ifp = loifp;
 #else
 				ifp = &loif[0];

@@ -553,7 +553,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 		ib->ia_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
 		ib->ia_dstaddr.sin6_family = AF_INET6;
 		ib->ia_dstaddr.sin6_addr = in6addr_loopback;
-#endif /* __bsdi__ */
+#endif
 
 		ib->ia_ifa.ifa_metric = ifp->if_metric;
 
