@@ -1,4 +1,4 @@
-/*	$KAME: defs.h,v 1.4 2000/12/04 06:45:29 itojun Exp $	*/
+/*	$KAME: defs.h,v 1.5 2001/08/09 10:10:06 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -70,9 +70,9 @@ int register_input_handler __P((int fd,ihfunc_t func));
 #define ALL_MCAST_GROUPS_LENGTH 8 
 
 
-typedef u_int		u_int32;
-typedef u_short		u_int16;
-typedef u_char		u_int8;
+typedef u_int32_t	u_int32;
+typedef u_int16_t	u_int16;
+typedef u_int8_t	u_int8;
 
 
 extern char configfilename[];
