@@ -6,10 +6,10 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright  
+ * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.6.2.3 2002/08/21 05:34:07 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.6.2.11 2003/01/27 13:45:20 maxim Exp $
  */
 
 #define        DEB(x)
@@ -106,7 +106,6 @@ static struct ip_fw *layer3_chain;
 MALLOC_DEFINE(M_IPFW, "IpFw/IpAcct", "IpFw/IpAcct chain's");
 
 static int fw_debug = 1;
-int fw_one_pass = 1;
 static int autoinc_step = 100; /* bounded to 1..1000 in add_rule() */
 
 #ifdef SYSCTL_NODE
@@ -115,14 +114,14 @@ SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, enable, CTLFLAG_RW,
     &fw_enable, 0, "Enable ipfw");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, autoinc_step, CTLFLAG_RW,
     &autoinc_step, 0, "Rule number autincrement step");
-SYSCTL_INT(_net_inet_ip_fw, OID_AUTO,one_pass,CTLFLAG_RW, 
-    &fw_one_pass, 0, 
+SYSCTL_INT(_net_inet_ip_fw, OID_AUTO,one_pass,CTLFLAG_RW,
+    &fw_one_pass, 0,
     "Only do a single pass through ipfw when using dummynet(4)");
-SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, debug, CTLFLAG_RW, 
+SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, debug, CTLFLAG_RW,
     &fw_debug, 0, "Enable printing of debug ip_fw statements");
-SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose, CTLFLAG_RW, 
+SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose, CTLFLAG_RW,
     &fw_verbose, 0, "Log matches to ipfw rules");
-SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose_limit, CTLFLAG_RW, 
+SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose_limit, CTLFLAG_RW,
     &verbose_limit, 0, "Set upper limit of matches of ipfw rules logged");
 
 /*
@@ -182,7 +181,7 @@ static u_int32_t dyn_short_lifetime = 5;
  * dyn_rst_lifetime and dyn_fin_lifetime should be strictly lower
  * than dyn_keepalive_period.
  */
- 
+
 static u_int32_t dyn_keepalive_interval = 20;
 static u_int32_t dyn_keepalive_period = 5;
 static u_int32_t dyn_keepalive = 1;	/* do send keepalives */
@@ -489,10 +488,10 @@ ipfw_log(struct ip_fw *f, u_int hlen, struct ether_header *eh,
 				inet_ntoa(sa->sa.sin_addr));
 			if (sa->sa.sin_port)
 				snprintf(SNPARGS(action2, len), ":%d",
-					ntohs(sa->sa.sin_port));
+				    sa->sa.sin_port);
 			}
 			break;
-		default:	
+		default:
 			action = "UNKNOWN";
 			break;
 		}
@@ -847,7 +846,7 @@ realloc_dynamic_table(void)
 		free(ipfw_dyn_v, M_IPFW);
 	for (;;) {
 		ipfw_dyn_v = malloc(curr_dyn_buckets * sizeof(ipfw_dyn_rule *),
-		       M_IPFW, M_DONTWAIT | M_ZERO);
+		       M_IPFW, M_NOWAIT | M_ZERO);
 		if (ipfw_dyn_v != NULL || curr_dyn_buckets <= 2)
 			break;
 		curr_dyn_buckets /= 2;
@@ -878,7 +877,7 @@ add_dyn_rule(struct ipfw_flow_id *id, u_int8_t dyn_type, struct ip_fw *rule)
 	}
 	i = hash_packet(id);
 
-	r = malloc(sizeof *r, M_IPFW, M_DONTWAIT | M_ZERO);
+	r = malloc(sizeof *r, M_IPFW, M_NOWAIT | M_ZERO);
 	if (r == NULL) {
 		printf ("sorry cannot allocate state\n");
 		return NULL;
@@ -1022,7 +1021,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 			if (parent->count >= cmd->conn_limit) {
 				if (fw_verbose && last_log != time_second) {
 					last_log = time_second;
-					printf(
+					log(LOG_SECURITY | LOG_DEBUG,
 					    "drop session, too many entries\n");
 				}
 				return 1;
@@ -1054,7 +1053,7 @@ send_pkt(struct ipfw_flow_id *id, u_int32_t seq, u_int32_t ack, int flags)
 	struct route sro;	/* fake route */
 
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
-	if (m == 0)  
+	if (m == 0)
 		return;
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
 	m->m_pkthdr.len = m->m_len = sizeof(struct ip) + sizeof(struct tcphdr);
@@ -1120,7 +1119,7 @@ send_pkt(struct ipfw_flow_id *id, u_int32_t seq, u_int32_t ack, int flags)
 	bzero (&sro, sizeof (sro));
 	ip_rtaddr(ip->ip_dst, &sro);
 	m->m_flags |= M_SKIP_FIREWALL;
-	ip_output(m, NULL, &sro, 0, NULL);
+	ip_output(m, NULL, &sro, 0, NULL, NULL);
 	if (sro.ro_rt)
 		RTFREE(sro.ro_rt);
 }
@@ -1132,9 +1131,15 @@ static void
 send_reject(struct ip_fw_args *args, int code, int offset, int ip_len)
 {
 
-	if (code != ICMP_REJECT_RST) /* Send an ICMP unreach */
+	if (code != ICMP_REJECT_RST) { /* Send an ICMP unreach */
+		/* We need the IP header in host order for icmp_error(). */
+		if (args->eh != NULL) {
+			struct ip *ip = mtod(args->m, struct ip *);
+			ip->ip_len = ntohs(ip->ip_len);
+			ip->ip_off = ntohs(ip->ip_off);
+		}
 		icmp_error(args->m, ICMP_UNREACH, code, 0L, 0);
-	else if (offset == 0 && args->f_id.proto == IPPROTO_TCP) {
+	} else if (offset == 0 && args->f_id.proto == IPPROTO_TCP) {
 		struct tcphdr *const tcp =
 		    L3HDR(struct tcphdr, mtod(args->m, struct ip *));
 		if ( (tcp->th_flags & TH_RST) == 0)
@@ -1160,7 +1165,7 @@ send_reject(struct ip_fw_args *args, int code, int offset, int ip_len)
  * This never returns NULL -- in case we do not have an exact match,
  * the next rule is returned. When the ruleset is changed,
  * pointers are flushed so we are always correct.
- */ 
+ */
 
 static struct ip_fw *
 lookup_next_rule(struct ip_fw *me)
@@ -1170,6 +1175,8 @@ lookup_next_rule(struct ip_fw *me)
 
 	/* look for action, in case it is a skipto */
 	cmd = ACTION_PTR(me);
+	if (cmd->opcode == O_LOG)
+		cmd += F_LEN(cmd);
 	if ( cmd->opcode == O_SKIPTO )
 		for (rule = me->next; rule ; rule = rule->next)
 			if (rule->rulenum >= cmd->arg1)
@@ -1216,7 +1223,7 @@ lookup_next_rule(struct ip_fw *me)
  *		  16 bits as a dummynet pipe number instead of diverting
  */
 
-static int 
+static int
 ipfw_chk(struct ip_fw_args *args)
 {
 	/*
@@ -1581,7 +1588,7 @@ check_body:
 				    ((ipfw_insn_ip *)cmd)->addr.s_addr ==
 				    src_ip.s_addr);
 				break;
-		
+
 			case O_IP_SRC_MASK:
 				match = (hlen > 0 &&
 				    ((ipfw_insn_ip *)cmd)->addr.s_addr ==
@@ -1597,15 +1604,15 @@ check_body:
 					match = (tif != NULL);
 				}
 				break;
-		
+
 			case O_IP_DST_SET:
 			case O_IP_SRC_SET:
 				if (hlen > 0) {
 					u_int32_t *d = (u_int32_t *)(cmd+1);
 					u_int32_t addr =
 					    cmd->opcode == O_IP_DST_SET ?
-						args->f_id.src_ip :
-						args->f_id.dst_ip;
+						args->f_id.dst_ip :
+						args->f_id.src_ip;
 
 					    if (addr < d[0])
 						    break;
@@ -1637,7 +1644,7 @@ check_body:
 					match = (tif != NULL);
 				}
 				break;
-		
+
 			case O_IP_SRCPORT:
 			case O_IP_DSTPORT:
 				/*
@@ -1838,7 +1845,7 @@ check_body:
 				args->rule = f; /* report matching rule */
 				retval = cmd->arg1 | IP_FW_PORT_DYNT_FLAG;
 				goto done;
-			
+
 			case O_DIVERT:
 			case O_TEE:
 				if (args->eh) /* not on layer 2 */
@@ -1909,7 +1916,7 @@ check_body:
 		}	/* end of inner for, scan opcodes */
 
 next_rule:;		/* try next rule		*/
-	    
+
 	}		/* end of outer for, scan rules */
 	printf("+++ ipfw: ouch!, skip past end of rules, denying packet\n");
 	return(IP_FW_PORT_DENY_FLAG);
@@ -1953,10 +1960,9 @@ flush_pipe_ptrs(struct dn_flow_set *match)
 
 	for (rule = layer3_chain; rule; rule = rule->next) {
 		ipfw_insn_pipe *cmd = (ipfw_insn_pipe *)ACTION_PTR(rule);
-                
+
 		if (cmd->o.opcode != O_PIPE && cmd->o.opcode != O_QUEUE)
 			continue;
-  
 		if (match == NULL || cmd->pipe_ptr == match)
 			cmd->pipe_ptr = NULL;
 	}
@@ -1977,7 +1983,7 @@ add_rule(struct ip_fw **head, struct ip_fw *input_rule)
 	if (*head == NULL && input_rule->rulenum != IPFW_DEFAULT_RULE)
 		return (EINVAL);
 
-	rule = malloc(l, M_IPFW, M_DONTWAIT | M_ZERO);
+	rule = malloc(l, M_IPFW, M_NOWAIT | M_ZERO);
 	if (rule == NULL)
 		return (ENOSPC);
 
@@ -2096,7 +2102,7 @@ free_chain(struct ip_fw **chain, int kill_default)
  *
  * The argument is an u_int32_t. The low 16 bit are the rule or set number,
  * the next 8 bits are the new set, the top 8 bits are the command:
- * 
+ *
  *	0	delete rules with given number
  *	1	delete rules with given set number
  *	2	move rules with given number to new set
@@ -2126,7 +2132,7 @@ del_entry(struct ip_fw **chain, u_int32_t arg)
 		if (rulenum > 30)
 			return EINVAL;
 	}
-	
+
 	switch (cmd) {
 	case 0:	/* delete rules with given number */
 		/*
@@ -2335,7 +2341,7 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 		case O_LOG:
 			if (cmdlen != F_INSN_SIZE(ipfw_insn_log))
 				goto bad_size;
-			
+
 			((ipfw_insn_log *)cmd)->log_left =
 			    ((ipfw_insn_log *)cmd)->max_log;
 
@@ -2544,7 +2550,7 @@ ipfw_ctl(struct sockopt *sopt)
 		 * On the other hand, the risk is that we end up with
 		 * a very inconsistent ruleset, so better keep the lock
 		 * around the whole cycle.
-		 * 
+		 *
 		 * XXX this code can be improved by resetting the head of
 		 * the list to point to the default rule, and then freeing
 		 * the old list without the need for a lock.
@@ -2722,7 +2728,7 @@ ipfw_modevent(module_t mod, int type, void *unused)
 {
 	int s;
 	int err = 0;
-	
+
 	switch (type) {
 	case MOD_LOAD:
 		s = splimp();

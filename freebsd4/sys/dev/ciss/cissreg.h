@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ciss/cissreg.h,v 1.1.2.1 2001/12/12 06:38:16 ps Exp $
+ *	$FreeBSD: src/sys/dev/ciss/cissreg.h,v 1.1.2.2 2003/02/06 21:42:59 ps Exp $
  */
 
 /*
@@ -167,6 +167,21 @@ struct ciss_lun_report
     u_int32_t	list_size;		/* big-endian */
     u_int32_t	:32;
     union ciss_device_address lun[0];
+} __attribute__ ((packed));
+
+#define	CISS_VPD_LOGICAL_DRIVE_GEOMETRY		0xc1
+struct ciss_ldrive_geometry
+{
+    u_int8_t	periph_qualifier:3;
+    u_int8_t	periph_devtype:5;
+    u_int8_t	page_code;
+    u_int8_t	res1;
+    u_int8_t	page_length;
+    u_int16_t	cylinders;		/* big-endian */
+    u_int8_t	heads;
+    u_int8_t	sectors;
+    u_int8_t	fault_tolerance;
+    u_int8_t	res2[3];
 } __attribute__ ((packed));
 
 struct ciss_report_cdb 

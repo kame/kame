@@ -1,5 +1,5 @@
 /*	$NetBSD: smc90cx6.c,v 1.38 2001/07/07 15:57:53 thorpej Exp $ */
-/*	$FreeBSD: src/sys/dev/cm/smc90cx6.c,v 1.1.2.1 2002/02/13 22:33:41 fjoe Exp $ */
+/*	$FreeBSD: src/sys/dev/cm/smc90cx6.c,v 1.1.2.3 2003/02/05 18:42:14 fjoe Exp $ */
 
 /*-
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
@@ -44,7 +44,7 @@
 
 /* #define CMSOFTCOPY */
 #define CMRETRANSMIT /**/
-#undef CM_DEBUG
+/* #define CM_DEBUG */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,13 +68,6 @@
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/if_arc.h>
-#include <net/bpf.h>
-
-#if 0
-#if NBPFILTER > 0
-#include <net/bpfdesc.h>
-#endif
-#endif
 
 #include <dev/cm/smc90cx6reg.h>
 #include <dev/cm/smc90cx6var.h>
@@ -346,7 +339,7 @@ cm_attach(sc, unit)
 #endif
 	}
 
-	printf("%s%d: link addr 0x%02x(%d)\n",
+	printf("%s%d: link addr 0x%02x (%d)\n",
 	       ifp->if_name, ifp->if_unit, linkaddress, linkaddress);
 	return 0;
 }
@@ -513,16 +506,6 @@ cm_start(ifp)
 	if (m == 0)
 		return;
 
-	/*
-	 * If bpf is listening on this interface, let it
-	 * see the packet before we commit it to the wire
-	 *
-	 * (can't give the copy in A2060 card RAM to bpf, because
-	 * that RAM is just accessed as on every other byte)
-	 */
-	if (ifp->if_bpf)
-		bpf_mtap(ifp, m);
-
 #ifdef CM_DEBUG
 	if (m->m_len < ARC_HDRLEN)
 		m = m_pullup(m, ARC_HDRLEN);/* gcc does structure padding */
@@ -533,7 +516,7 @@ cm_start(ifp)
 	if (m->m_len < 2)
 		m = m_pullup(m, 2);
 #endif
-	cm_ram_ptr = buffer*512;
+	cm_ram_ptr = buffer * 512;
 
 	if (m == 0)
 		return;
@@ -668,7 +651,7 @@ cm_srint(vsc)
 	 * (2*sizeof(ulong) - CM_HDRNEWLEN)), packet type dependent.
 	 */
 
-	cm_ram_ptr = buffer*512;
+	cm_ram_ptr = buffer * 512;
 	offset = GETMEM(cm_ram_ptr + 2);
 	if (offset)
 		len = 256 - offset;
@@ -846,7 +829,7 @@ cmintr(arg)
 		return;
 	do {
 
-#if defined(CM_DEBUG) && (CM_DEBUG>1)
+#if defined(CM_DEBUG) && (CM_DEBUG > 1)
 		printf("%s%d: intr: status 0x%02x, intmask 0x%02x\n",
 		    ifp->if_name, ifp->if_unit, isr, sc->sc_intmask);
 #endif
@@ -907,7 +890,7 @@ cmintr(arg)
 
 			buffer = sc->sc_rx_act;
 			/* look if buffer is marked invalid: */
-			if (GETMEM(buffer*512) == 0) {
+			if (GETMEM(buffer * 512) == 0) {
 				/*
 				 * invalid marked buffer (or illegally
 				 * configured sender)
@@ -962,7 +945,7 @@ cmintr(arg)
 		isr = GETREG(CMSTAT);
 		maskedisr = isr & sc->sc_intmask;
 	} while (maskedisr);
-#if defined(CM_DEBUG) && (CM_DEBUG>1)
+#if defined(CM_DEBUG) && (CM_DEBUG > 1)
 	printf("%s%d: intr (exit): status 0x%02x, intmask 0x%02x\n",
 	    ifp->if_name, ifp->if_unit, isr, sc->sc_intmask);
 #endif
@@ -1012,6 +995,7 @@ cm_ioctl(ifp, command, data)
 
 	switch (command) {
 	case SIOCSIFADDR:
+	case SIOCGIFADDR:
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 	case SIOCSIFMTU:

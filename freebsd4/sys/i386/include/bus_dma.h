@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/i386/include/bus_dma.h,v 1.15.2.1 2002/03/03 05:42:50 nyan Exp $ */
+/* $FreeBSD: src/sys/i386/include/bus_dma.h,v 1.15.2.2 2002/11/21 23:36:01 sam Exp $ */
 
 #ifndef _I386_BUS_DMA_H_
 #define _I386_BUS_DMA_H_
@@ -201,6 +201,29 @@ typedef void bus_dmamap_callback_t(void *, bus_dma_segment_t *, int, int);
 int bus_dmamap_load(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 		    bus_size_t buflen, bus_dmamap_callback_t *callback,
 		    void *callback_arg, int flags);
+
+/*
+ * Like bus_dmamap_callback but includes map size in bytes.  This is
+ * defined as a separate interface to maintain compatiiblity for users
+ * of bus_dmamap_callback_t--at some point these interfaces should be merged.
+ */
+typedef void bus_dmamap_callback2_t(void *, bus_dma_segment_t *, int, bus_size_t, int);
+/*
+ * Like bus_dmamap_load but for mbufs.  Note the use of the
+ * bus_dmamap_callback2_t interface.
+ */
+int bus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map,
+			 struct mbuf *mbuf,
+			 bus_dmamap_callback2_t *callback, void *callback_arg,
+			 int flags);
+/*
+ * Like bus_dmamap_load but for uios.  Note the use of the
+ * bus_dmamap_callback2_t interface.
+ */
+int bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map,
+			struct uio *ui,
+			bus_dmamap_callback2_t *callback, void *callback_arg,
+			int flags);
 
 /*
  * Perform a syncronization operation on the given map.

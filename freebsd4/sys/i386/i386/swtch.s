@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.89.2.8 2002/07/16 17:58:21 dillon Exp $
+ * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.89.2.10 2003/01/23 03:36:24 ps Exp $
  */
 
 #include "npx.h"
@@ -46,8 +46,8 @@
 
 #ifdef SMP
 #include <machine/pmap.h>
-#include <machine/apic.h>
 #include <machine/smptests.h>		/** GRAB_LOPRIO */
+#include <machine/apic.h>
 #include <machine/lock.h>
 #endif /* SMP */
 
@@ -184,7 +184,9 @@ idle_loop:
 	 * in order to be able to take IPI's while blocked.
 	 */
 3:
+#ifdef GRAB_LOPRIO
 	movl	$LOPRIO_LEVEL, lapic_tpr	/* arbitrate for INTs */
+#endif
 	sti
 	call	_get_mplock
 	cli

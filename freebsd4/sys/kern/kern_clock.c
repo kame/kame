@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.9 2002/09/17 22:39:57 sam Exp $
+ * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.10 2002/10/17 13:19:40 maxim Exp $
  */
 
 #include "opt_ntp.h"
@@ -549,6 +549,11 @@ microtime(struct timeval *tv)
 	tv->tv_usec += ((u_int64_t)tco_delta(tc) * tc->tc_scale_micro) >> 32;
 	tv->tv_usec += boottime.tv_usec;
 	tv->tv_sec += boottime.tv_sec;
+	while (tv->tv_usec < 0) {
+		tv->tv_usec += 1000000;
+		if (tv->tv_sec > 0)
+			tv->tv_sec--;
+	}
 	while (tv->tv_usec >= 1000000) {
 		tv->tv_usec -= 1000000;
 		tv->tv_sec++;
@@ -571,6 +576,11 @@ nanotime(struct timespec *ts)
 	delta += ((u_int64_t)count * tc->tc_scale_nano_i);
 	delta += boottime.tv_usec * 1000;
 	ts->tv_sec += boottime.tv_sec;
+	while (delta < 0) {
+		delta += 1000000000;
+		if (ts->tv_sec > 0)
+			ts->tv_sec--;
+	}
 	while (delta >= 1000000000) {
 		delta -= 1000000000;
 		ts->tv_sec++;
@@ -615,6 +625,11 @@ microuptime(struct timeval *tv)
 	tv->tv_sec = tc->tc_offset_sec;
 	tv->tv_usec = tc->tc_offset_micro;
 	tv->tv_usec += ((u_int64_t)tco_delta(tc) * tc->tc_scale_micro) >> 32;
+	while (tv->tv_usec < 0) {
+		tv->tv_usec += 1000000;
+		if (tv->tv_sec > 0)
+			tv->tv_sec--;
+	}
 	while (tv->tv_usec >= 1000000) {
 		tv->tv_usec -= 1000000;
 		tv->tv_sec++;
@@ -635,6 +650,11 @@ nanouptime(struct timespec *ts)
 	delta += ((u_int64_t)count * tc->tc_scale_nano_f);
 	delta >>= 32;
 	delta += ((u_int64_t)count * tc->tc_scale_nano_i);
+	while (delta < 0) {
+		delta += 1000000000;
+		if (ts->tv_sec > 0)
+			ts->tv_sec--;
+	}
 	while (delta >= 1000000000) {
 		delta -= 1000000000;
 		ts->tv_sec++;

@@ -28,7 +28,7 @@
  * its contributors.
  */
 
-/* $FreeBSD: src/sys/dev/usb/urio.c,v 1.11.2.2 2002/08/12 14:19:49 joe Exp $ */
+/* $FreeBSD: src/sys/dev/usb/urio.c,v 1.11.2.4 2002/11/06 14:41:01 joe Exp $ */
 
 /*
  * 2000/3/24  added NetBSD/OpenBSD support (from Alex Nemirovsky)
@@ -104,11 +104,11 @@ SYSCTL_INT(_hw_usb_urio, OID_AUTO, debug, CTLFLAG_RW,
 #define RIO_NODIR  2
 
 #if defined(__NetBSD__)
-int urioopen(dev_t, int, int, struct proc *);
-int urioclose(dev_t, int, int, struct proc *p);
+int urioopen(dev_t, int, int, usb_proc_ptr);
+int urioclose(dev_t, int, int, usb_proc_ptr);
 int urioread(dev_t, struct uio *uio, int);
 int uriowrite(dev_t, struct uio *uio, int);
-int urioioctl(dev_t, u_long, caddr_t, int, struct proc *);
+int urioioctl(dev_t, u_long, caddr_t, int, usb_proc_ptr);
 
 cdev_decl(urio);
 #define RIO_UE_GET_DIR(p) ((UE_GET_DIR(p) == UE_DIR_IN) ? RIO_IN :\
@@ -296,11 +296,7 @@ USB_ATTACH(urio)
 
 
 int
-urioopen(dev, flag, mode, p)
-	dev_t dev;
-	int flag;
-	int mode;
-	struct proc *p;
+urioopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 {
 #if (USBDI >= 1)
 	struct urio_softc * sc;
@@ -340,11 +336,7 @@ urioopen(dev, flag, mode, p)
 }
 
 int
-urioclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag;
-	int mode;
-	struct proc *p;
+urioclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
 {
 #if (USBDI >= 1)
 	struct urio_softc * sc;
@@ -367,10 +359,7 @@ urioclose(dev, flag, mode, p)
 }
 
 int
-urioread(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+urioread(dev_t dev, struct uio *uio, int flag)
 {
 #if (USBDI >= 1)
 	struct urio_softc * sc;
@@ -444,10 +433,7 @@ urioread(dev, uio, flag)
 }
 
 int
-uriowrite(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+uriowrite(dev_t dev, struct uio *uio, int flag)
 {
 #if (USBDI >= 1)
 	struct urio_softc * sc;
@@ -514,12 +500,7 @@ uriowrite(dev, uio, flag)
 
 
 int
-urioioctl(dev, cmd, addr, flag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t addr; 
-	int flag;
-	struct proc *p;
+urioioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 {
 #if (USBDI >= 1)
 	struct urio_softc * sc;
@@ -620,9 +601,7 @@ ret:
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 int
-urio_activate(self, act)
-	device_ptr_t self;
-	enum devact act;
+urio_activate(device_ptr_t self, enum devact act)
 {
 	struct urio_softc *sc = (struct urio_softc *)self;
 

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/pthread_np.h,v 1.7.2.1 2001/11/01 06:09:23 imp Exp $
+ * $FreeBSD: src/include/pthread_np.h,v 1.7.2.4 2003/01/10 15:41:17 fjoe Exp $
  */
 #ifndef _PTHREAD_NP_H_
 #define _PTHREAD_NP_H_
@@ -44,13 +44,17 @@ typedef void	(*pthread_switch_routine_t) __P((pthread_t, pthread_t));
  */
 __BEGIN_DECLS
 int pthread_attr_setcreatesuspend_np __P((pthread_attr_t *));
+int pthread_attr_get_np __P((pthread_t, pthread_attr_t *));
+int pthread_main_np __P((void));
 int pthread_multi_np __P((void));
-int pthread_resume_np __P((pthread_t));
-int pthread_single_np __P((void));
-int pthread_suspend_np __P((pthread_t));
 int pthread_mutexattr_getkind_np __P((pthread_mutexattr_t));
 int pthread_mutexattr_setkind_np __P((pthread_mutexattr_t *, int));
+void pthread_resume_all_np __P((void));
+int pthread_resume_np __P((pthread_t));
 void pthread_set_name_np __P((pthread_t, const char *));
+int pthread_single_np __P((void));
+void pthread_suspend_all_np __P((void));
+int pthread_suspend_np __P((pthread_t));
 int pthread_switch_add_np __P((pthread_switch_routine_t));
 int pthread_switch_delete_np __P((pthread_switch_routine_t));
 __END_DECLS

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.16 2002/07/07 10:08:20 nyan Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.17 2003/03/14 21:22:35 jhb Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -32,6 +32,7 @@ DEBUG_SVR4		opt_svr4.h
 
 # i386 SMP options
 APIC_IO			opt_global.h
+HTT
 
 # Change KVM size.  Changes things all over the kernel.
 KVA_PAGES		opt_global.h

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.4.2.17 2002/08/16 04:45:39 iwasaki Exp $
+ * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.4.2.21 2003/02/12 22:19:34 mbr Exp $
  */
 
 /*
@@ -504,6 +504,7 @@ struct dc_mii_frame {
  * ADMtek specific registers and constants for the AL981 and AN985.
  * The AN985 doesn't use the magic PHY registers.
  */
+#define DC_AL_CR		0x88	/* command register */
 #define DC_AL_PAR0		0xA4	/* station address */
 #define DC_AL_PAR1		0xA8	/* station address */
 #define DC_AL_MAR0		0xAC	/* multicast hash filter */
@@ -516,6 +517,7 @@ struct dc_mii_frame {
 #define DC_AL_LPAR		0xC8	/* bnilt in PHY link part. ability */
 #define DC_AL_ANER		0xCC	/* built in PHY autoneg expansion */
 
+#define DC_AL_CR_ATUR		0x00000001 /* automatic TX underrun recovery */
 #define DC_ADMTEK_PHYADDR	0x1
 #define DC_AL_EE_NODEADDR	4
 /* End of ADMtek specific registers */
@@ -686,13 +688,14 @@ struct dc_softc {
 	u_int8_t		dc_pmode;
 	u_int8_t		dc_link;
 	u_int8_t		dc_cachesize;
+	int			dc_romwidth;
 	int			dc_pnic_rx_bug_save;
 	unsigned char		*dc_pnic_rx_buf;
 	int			dc_if_flags;
 	int			dc_if_media;
 	u_int32_t		dc_flags;
 	u_int32_t		dc_txthresh;
-	u_int8_t		dc_srom[1024];
+	u_int8_t		*dc_srom;
 	struct dc_mediainfo	*dc_mi;
 	struct dc_list_data	*dc_ldata;
 	struct dc_chain_data	dc_cdata;
@@ -814,6 +817,7 @@ struct dc_softc {
 /*
  * Davicom device IDs.
  */
+#define DC_DEVICEID_DM9009	0x9009
 #define DC_DEVICEID_DM9100	0x9100
 #define DC_DEVICEID_DM9102	0x9102
 
@@ -1022,7 +1026,7 @@ struct dc_info_leaf {
 #define DC_CTYPE_MII_100FX		0x0010
 #define DC_CTYPE_MII_100FX_FDX		0x0211
 #define DC_CTYPE_DYN_PUP_AUTOSENSE	0x0800
-#define DC_CTYPE_PUP_AUTOSENSe		0x8800
+#define DC_CTYPE_PUP_AUTOSENSE		0x8800
 #define DC_CTYPE_NOMEDIA		0xFFFF
 
 #define DC_EBLOCK_SIA			0x0002

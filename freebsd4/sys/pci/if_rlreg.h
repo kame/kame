@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.14.2.4 2002/04/21 15:39:57 luigi Exp $
+ * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.14.2.5 2003/03/02 20:58:54 dan Exp $
  */
 
 /*
@@ -456,6 +456,16 @@ struct rl_softc {
  * D-Link DFE-530TX+ device ID
  */
 #define DLINK_DEVICEID_530TXPLUS		0x1300
+
+/*
+ * Peppercon vendor ID.
+ */
+#define PEPPERCON_VENDORID			0x1743
+
+/*
+ * Peppercon AG ROL/F device ID.
+ */
+#define PEPPERCON_DEVICEID_ROLF			0x8139
 
 /*
  * PCI low memory base and low I/O base register, and

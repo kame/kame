@@ -59,7 +59,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_glue.c,v 1.94.2.3 2002/03/06 00:08:33 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_glue.c,v 1.94.2.4 2003/01/13 22:51:17 dillon Exp $
  */
 
 #include "opt_vm.h"
@@ -270,6 +270,18 @@ vm_fork(p1, p2, flags)
 	 * and make the child ready to run.
 	 */
 	cpu_fork(p1, p2, flags);
+}
+
+/*
+ * Called after process has been wait(2)'ed apon and is being reaped.
+ * The idea is to reclaim resources that we could not reclaim while  
+ * the process was still executing.
+ */
+void
+vm_waitproc(struct proc *p)
+{
+	cpu_wait(p);
+	vmspace_exitfree(p);	/* and clean-out the vmspace */
 }
 
 /*

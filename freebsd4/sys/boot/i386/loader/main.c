@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/loader/main.c,v 1.17.2.6 2001/12/21 22:20:37 jhb Exp $
+ * $FreeBSD: src/sys/boot/i386/loader/main.c,v 1.17.2.7 2002/10/10 15:53:27 iwasaki Exp $
  */
 
 /*
@@ -133,6 +133,11 @@ main(void)
     printf("\n");
     printf("%s, Revision %s\n", bootprog_name, bootprog_rev);
     printf("(%s, %s)\n", bootprog_maker, bootprog_date);
+
+    if (initial_bootinfo != NULL) {
+	initial_bootinfo->bi_basemem = bios_basemem / 1024;
+	initial_bootinfo->bi_extmem = bios_extmem / 1024;
+    }
 
     extract_currdev();				/* set $currdev and $loaddev */
     setenv("LINES", "24", 1);			/* optional */

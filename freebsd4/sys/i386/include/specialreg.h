@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)specialreg.h	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/include/specialreg.h,v 1.19.2.2 2002/06/29 17:22:35 mp Exp $
+ * $FreeBSD: src/sys/i386/include/specialreg.h,v 1.19.2.3 2003/01/22 17:24:28 jhb Exp $
  */
 
 #ifndef _MACHINE_SPECIALREG_H_
@@ -106,10 +106,18 @@
 #define	CPUID_XMM	0x02000000
 #define	CPUID_SSE2	0x04000000
 #define	CPUID_SS	0x08000000
-#define	CPUID_HHT	0x10000000
+#define	CPUID_HTT	0x10000000
 #define	CPUID_TM	0x20000000
 #define	CPUID_B30	0x40000000
 #define	CPUID_PBE	0x80000000
+
+/*
+ * CPUID instruction 1 ebx info
+ */
+#define	CPUID_BRAND_INDEX	0x000000ff
+#define	CPUID_CLFUSH_SIZE	0x0000ff00
+#define	CPUID_HTT_CORES		0x00ff0000
+#define	CPUID_LOCAL_APIC_ID	0xff000000
 
 /*
  * Model-specific registers for the i386 family

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ns_if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netns/ns_if.h,v 1.12 1999/12/29 04:46:19 peter Exp $
+ * $FreeBSD: src/sys/netns/ns_if.h,v 1.12.2.1 2002/12/01 14:03:09 sobomax Exp $
  */
 
 #ifndef _NETNS_NS_IF_H_
@@ -80,10 +80,10 @@ struct nsip_req {
 #endif
 
 #ifdef	_KERNEL
-struct	ns_ifaddr *ns_ifaddr;
-struct	ns_ifaddr *ns_iaonnetof();
-void	nsintr __P((void));
-struct	ifqueue	nsintrq;	/* XNS input packet queue */
+extern struct ns_ifaddr	*ns_ifaddr;
+struct ns_ifaddr	*ns_iaonnetof(void);
+void			nsintr(void);
+extern struct ifqueue	nsintrq;	/* XNS input packet queue */
 #endif
 
 #endif

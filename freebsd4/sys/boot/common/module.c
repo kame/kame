@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/module.c,v 1.13.2.3 2001/06/12 15:35:14 jesper Exp $
+ * $FreeBSD: src/sys/boot/common/module.c,v 1.13.2.4 2002/12/19 12:41:10 thomas Exp $
  */
 
 /*
@@ -369,7 +369,9 @@ file_load_dependancies(struct loaded_module *base_file)
 	if (mod_findmodule(NULL, dmodname) == NULL) {
 	    printf("loading required module '%s'\n", dmodname);
 	    error = mod_load(dmodname, 0, NULL);
-	    if (error && error != EEXIST)
+	    if (error == EEXIST)
+		error = 0;
+	    if (error != 0)
 		break;
 	}
 	md = metadata_next(md, MODINFOMD_DEPLIST);

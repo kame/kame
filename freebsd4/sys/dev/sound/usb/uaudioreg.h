@@ -1,5 +1,5 @@
 /*	$NetBSD: uaudioreg.h,v 1.7 2000/12/28 00:29:58 augustss Exp $	*/
-/* $FreeBSD: src/sys/dev/sound/usb/uaudioreg.h,v 1.1.2.1 2002/08/24 08:03:07 nsayer Exp $ */
+/* $FreeBSD: src/sys/dev/sound/usb/uaudioreg.h,v 1.1.2.2 2002/11/06 21:40:31 joe Exp $ */
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -54,10 +54,6 @@
 #define UDESCSUB_AC_FEATURE	6
 #define UDESCSUB_AC_PROCESSING	7
 #define UDESCSUB_AC_EXTENSION	8
-
-#if defined(__FreeBSD__) && (__FreeBSD_version <= 500014)
-#define UPACKED __attribute__ ((packed))
-#endif
 
 /* The first fields are identical to usb_endpoint_descriptor_t */
 typedef struct {

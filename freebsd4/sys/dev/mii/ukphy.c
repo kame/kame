@@ -73,7 +73,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <sys/module.h>
@@ -91,7 +90,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/ukphy.c,v 1.2.2.1 2000/12/12 19:29:15 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/mii/ukphy.c,v 1.2.2.2 2002/11/08 21:53:49 semenu Exp $";
 #endif
 
 static int ukphy_probe		__P((device_t));

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.7.2.3 2002/08/18 21:44:19 silby Exp $
+ * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.7.2.5 2003/02/06 04:46:20 silby Exp $
  */
 
 /*
@@ -80,6 +80,10 @@
 #define VR_MPA_CNT		0x7C
 #define VR_CRC_CNT		0x7E
 #define VR_STICKHW		0x83
+
+/* Misc Registers */
+#define VR_MISC_CR1		0x81
+#define VR_MISCCR1_FORSRST	0x40
 
 /*
  * RX config bits.
@@ -459,10 +463,14 @@ struct vr_softc {
 	struct vr_type		*vr_info;	/* Rhine adapter info */
 	u_int8_t		vr_unit;	/* interface number */
 	u_int8_t		vr_type;
+	u_int8_t		vr_revid;	/* Rhine chip revision */
+	u_int8_t		vr_flags;	/* See VR_F_* below */
 	struct vr_list_data	*vr_ldata;
 	struct vr_chain_data	vr_cdata;
 	struct callout_handle	vr_stat_ch;
 };
+
+#define VR_F_RESTART		0x01		/* Restart unit on next tick */
 
 /*
  * register space access macros
@@ -497,6 +505,8 @@ struct vr_softc {
 #define	VIA_DEVICEID_RHINE		0x3043
 #define VIA_DEVICEID_RHINE_II		0x6100
 #define VIA_DEVICEID_RHINE_II_2		0x3065
+#define VIA_DEVICEID_RHINE_III		0x3106
+#define VIA_DEVICEID_RHINE_III_M	0x3053
 
 /*
  * Delta Electronics device ID.
@@ -518,6 +528,20 @@ struct vr_softc {
  */
 #define ADDTRON_DEVICEID_RHINE_II	0x1320
 
+/*
+ * VIA Rhine revision IDs
+ */
+
+#define REV_ID_VT3043_E			0x04
+#define REV_ID_VT3071_A			0x20
+#define REV_ID_VT3071_B			0x21
+#define REV_ID_VT3065_A			0x40
+#define REV_ID_VT3065_B			0x41
+#define REV_ID_VT3065_C			0x42
+#define REV_ID_VT6102_APOLLO		0x74
+#define REV_ID_VT3106			0x80
+#define REV_ID_VT3106_J			0x80    /* 0x80-0x8F */
+#define REV_ID_VT3106_S			0x90    /* 0x90-0xA0 */
 
 /*
  * PCI low memory base and low I/O base register, and
@@ -528,6 +552,7 @@ struct vr_softc {
 #define VR_PCI_DEVICE_ID	0x02
 #define VR_PCI_COMMAND		0x04
 #define VR_PCI_STATUS		0x06
+#define VR_PCI_REVID		0x08
 #define VR_PCI_CLASSCODE	0x09
 #define VR_PCI_LATENCY_TIMER	0x0D
 #define VR_PCI_HEADER_TYPE	0x0E
@@ -540,6 +565,9 @@ struct vr_softc {
 #define VR_PCI_MINLAT		0x0F
 #define VR_PCI_RESETOPT		0x48
 #define VR_PCI_EEPROM_DATA	0x4C
+#define VR_PCI_MODE		0x50
+
+#define VR_MODE3_MIION		0x04
 
 /* power management registers */
 #define VR_PCI_CAPID		0xDC /* 8 bits */

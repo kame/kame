@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/usb_ethersubr.h,v 1.4 2000/01/14 01:36:16 wpaul Exp $
+ * $FreeBSD: src/sys/dev/usb/usb_ethersubr.h,v 1.4.2.1 2002/11/06 14:23:20 joe Exp $
  */
 
 #ifndef _USB_ETHERSUBR_H_
@@ -41,11 +41,11 @@
 
 struct usb_qdat {
 	struct ifnet		*ifp;
-	void (*if_rxstart)	__P((struct ifnet *));
+	void (*if_rxstart)	(struct ifnet *);
 };
 
-void usb_register_netisr	__P((void));
-void usb_ether_input		__P((struct mbuf *));
-void usb_tx_done		__P((struct mbuf *));
+void usb_register_netisr	(void);
+void usb_ether_input		(struct mbuf *);
+void usb_tx_done		(struct mbuf *);
 
 #endif

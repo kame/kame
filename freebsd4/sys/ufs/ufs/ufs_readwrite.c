@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.11 (Berkeley) 5/8/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.11 2002/06/22 18:08:04 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.13 2002/10/18 23:20:07 dillon Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -464,9 +464,17 @@ WRITE(ap)
 
 	resid = uio->uio_resid;
 	osize = ip->i_size;
-	flags = 0;
+
+	/*
+	 * NOTE! These B_ flags are actually balloc-only flags, not buffer
+	 * flags.  They are similar to the BA_ flags in -current.
+	 */
+	if (seqcount > B_SEQMAX)
+		flags = B_SEQMAX << B_SEQSHIFT;
+	else
+		flags = seqcount << B_SEQSHIFT;
 	if ((ioflag & IO_SYNC) && !DOINGASYNC(vp))
-		flags = B_SYNC;
+		flags |= B_SYNC;
 
 	if (object && (object->flags & OBJ_OPT)) {
 		vm_freeze_copyopts(object,

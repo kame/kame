@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.48.2.18 2002/09/16 19:38:37 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.48.2.20 2002/11/25 05:30:31 njl Exp $
  */
 
 #include "opt_ata.h"
@@ -1002,11 +1002,24 @@ acdioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 	break;
 
     case CDRIOCREADSPEED:
-	error = acd_set_speed(cdp, 177 * (*(int *)addr), -1);
+	{
+	    int speed = *(int *)addr;
+
+	    /* Preserve old behavior: units in multiples of CDROM speed */
+	    if (speed < 177)
+		speed *= 177;
+	    error = acd_set_speed(cdp, speed, CDR_MAX_SPEED);
+	}
 	break;
 
     case CDRIOCWRITESPEED:
-	error = acd_set_speed(cdp, -1, 177 * (*(int *)addr));
+    	{
+	    int speed = *(int *)addr;
+
+	    if (speed < 177)
+		speed *= 177;
+	    error = acd_set_speed(cdp, CDR_MAX_SPEED, speed);
+	}
 	break;
 
     case CDRIOCGETBLOCKSIZE:

@@ -28,7 +28,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder.c,v 1.8.2.8 2002/04/22 15:49:36 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder.c,v 1.8.2.9 2003/02/08 01:43:07 orion Exp $");
 
 MALLOC_DEFINE(M_FEEDER, "feeder", "pcm feeder");
 
@@ -387,6 +387,10 @@ feed_root(struct pcm_feeder *feeder, struct pcm_channel *ch, u_int8_t *buffer, u
 
 	l = min(count, sndbuf_getready(src));
 	sndbuf_dispose(src, buffer, l);
+
+	/* When recording only return as much data as available */
+	if (ch->direction == PCMDIR_REC)
+		return l;
 
 /*
 	if (l < count)

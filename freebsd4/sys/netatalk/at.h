@@ -19,6 +19,8 @@
  *	Ann Arbor, Michigan
  *	+1-313-763-0525
  *	netatalk@itd.umich.edu
+ *
+ * $FreeBSD: src/sys/netatalk/at.h,v 1.5.6.1 2002/12/01 14:03:09 sobomax Exp $
  */
 
 #ifndef __AT_HEADER__
@@ -28,14 +30,6 @@
  */
 #define ATPROTO_DDP	0
 #define ATPROTO_AARP	254
-
-/*
- * Ethernet types, for DIX.
- * These should really be in some global header file, but we can't
- * count on them being there, and it's annoying to patch system files.
- */
-#define ETHERTYPE_AT	0x809B		/* AppleTalk protocol */
-#define ETHERTYPE_AARP	0x80F3		/* AppleTalk ARP */
 
 #define DDP_MAXSZ	587
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac.c,v 1.9.2.10 2002/05/05 00:18:03 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac.c,v 1.9.2.12.2.1 2003/03/28 20:03:29 scottl Exp $
  */
 
 /*
@@ -55,7 +55,6 @@
 #include <sys/conf.h>
 #include <sys/devicestat.h>
 #include <sys/disk.h>
-#include <sys/file.h>
 #include <sys/signalvar.h>
 #include <sys/time.h>
 #include <sys/eventhandler.h>
@@ -258,7 +257,8 @@ aac_attach(struct aac_softc *sc)
 		return(error);
 
 	/*
-	 * Allocate command structures.
+	 * Allocate command structures.  This must be done before aac_init()
+	 * in order to work around a 2120/2200 bug.
 	 */
 	if ((error = aac_alloc_commands(sc)) != 0)
 		return(error);
@@ -623,45 +623,43 @@ aac_intr(void *arg)
 {
 	struct aac_softc *sc;
 	u_int16_t reason;
+	u_int32_t *resp_queue;
 
 	debug_called(2);
 
 	sc = (struct aac_softc *)arg;
 
-	reason = AAC_GET_ISTATUS(sc);
+	/*
+	 * Optimize the common case of adapter response interrupts.
+	 * We must read from the card prior to processing the responses
+	 * to ensure the clear is flushed prior to accessing the queues.
+	 * Reading the queues from local memory might save us a PCI read.
+	 */
+	resp_queue = sc->aac_queues->qt_qindex[AAC_HOST_NORM_RESP_QUEUE];
+	if (resp_queue[AAC_PRODUCER_INDEX] != resp_queue[AAC_CONSUMER_INDEX])
+		reason = AAC_DB_RESPONSE_READY;
+	else 
+		reason = AAC_GET_ISTATUS(sc);
+	AAC_CLEAR_ISTATUS(sc, reason);
+	(void)AAC_GET_ISTATUS(sc);
+
+	/* It's not ok to return here because of races with the previous step */
+	if (reason & AAC_DB_RESPONSE_READY)
+		aac_host_response(sc);
 
 	/* controller wants to talk to the log */
-	if (reason & AAC_DB_PRINTF) {
-		AAC_CLEAR_ISTATUS(sc, AAC_DB_PRINTF);
+	if (reason & AAC_DB_PRINTF)
 		aac_print_printf(sc);
-	}
 
 	/* controller has a message for us? */
 	if (reason & AAC_DB_COMMAND_READY) {
-		AAC_CLEAR_ISTATUS(sc, AAC_DB_COMMAND_READY);
 		/* XXX What happens if the thread is already awake? */
 		if (sc->aifflags & AAC_AIFFLAGS_RUNNING) {
 			sc->aifflags |= AAC_AIFFLAGS_PENDING;
 			wakeup(sc->aifthread);
 		}
 	}
-	
-	/* controller has a response for us? */
-	if (reason & AAC_DB_RESPONSE_READY) {
-		AAC_CLEAR_ISTATUS(sc, AAC_DB_RESPONSE_READY);
-		aac_host_response(sc);
-	}
-
-	/*
-	 * spurious interrupts that we don't use - reset the mask and clear the
-	 * interrupts
-	 */
-	if (reason & (AAC_DB_COMMAND_NOT_FULL | AAC_DB_RESPONSE_NOT_FULL)) {
-		AAC_UNMASK_INTERRUPTS(sc);
-		AAC_CLEAR_ISTATUS(sc, AAC_DB_COMMAND_NOT_FULL |
-				  AAC_DB_RESPONSE_NOT_FULL);
-	}
-};
+}
 
 /*
  * Command Processing
@@ -728,7 +726,6 @@ aac_start(struct aac_command *cm)
 	/* save a pointer to the command for speedy reverse-lookup */
 	cm->cm_fib->Header.SenderData = (u_int32_t)cm;	/* XXX 64-bit physical
 							 * address issue */
-
 	/* put the FIB on the outbound queue */
 	error = aac_enqueue_fib(sc, cm->cm_queue, cm);
 	return(error);
@@ -927,11 +924,14 @@ aac_bio_command(struct aac_softc *sc, struct aac_command **cmp)
 	/* build the FIB */
 	fib = cm->cm_fib;
 	fib->Header.XferState =  
-	AAC_FIBSTATE_HOSTOWNED   | 
-	AAC_FIBSTATE_INITIALISED | 
-	AAC_FIBSTATE_FROMHOST	 |
-	AAC_FIBSTATE_REXPECTED   |
-	AAC_FIBSTATE_NORM;
+		AAC_FIBSTATE_HOSTOWNED   | 
+		AAC_FIBSTATE_INITIALISED | 
+		AAC_FIBSTATE_EMPTY	 | 
+		AAC_FIBSTATE_FROMHOST	 |
+		AAC_FIBSTATE_REXPECTED   |
+		AAC_FIBSTATE_NORM	 |
+		AAC_FIBSTATE_ASYNC	 |
+		AAC_FIBSTATE_FAST_RESPONSE;
 	fib->Header.Command = ContainerCommand;
 	fib->Header.Size = sizeof(struct aac_fib_header);
 
@@ -1176,7 +1176,8 @@ aac_release_command(struct aac_command *cm)
 	 * initialised here for debugging purposes only.
 	 */
 	cm->cm_fib->Header.SenderFibAddress = (u_int32_t)cm->cm_fib;
-	cm->cm_fib->Header.ReceiverFibAddress = cm->cm_fibphys;
+	cm->cm_fib->Header.ReceiverFibAddress = (u_int32_t)cm->cm_fibphys;
+	cm->cm_fib->Header.SenderData = 0;
 
 	aac_enqueue_free(cm);
 }
@@ -1212,11 +1213,24 @@ aac_alloc_commands(struct aac_softc *sc)
 			 BUS_DMA_NOWAIT, &sc->aac_fibmap)) {
 		return(ENOMEM);
 	}
+
+	/*
+	 * Work around a bug in the 2120 and 2200 that cannot DMA commands
+	 * below address 8192 in physical memory.
+	 * XXX If the padding is not needed, can it be put to use instead
+	 * of ignored?
+	 */
 	bus_dmamap_load(sc->aac_fib_dmat, sc->aac_fibmap, sc->aac_fibs, 
-			AAC_FIB_COUNT * sizeof(struct aac_fib),
+			8192 + AAC_FIB_COUNT * sizeof(struct aac_fib),
 			aac_map_command_helper, sc, 0);
 
+	if (sc->aac_fibphys < 8192) {
+		sc->aac_fibs += (8192 / sizeof(struct aac_fib));
+		sc->aac_fibphys += 8192;
+	}
+
 	/* initialise constant fields in the command structure */
+	bzero(sc->aac_fibs, AAC_FIB_COUNT * sizeof(struct aac_fib));
 	for (i = 0; i < AAC_FIB_COUNT; i++) {
 		cm = &sc->aac_command[i];
 		cm->cm_sc = sc;
@@ -1300,12 +1314,12 @@ aac_map_command(struct aac_command *cm)
 				cm->cm_data, cm->cm_datalen,
 				aac_map_command_sg, cm, 0);
 
-	if (cm->cm_flags & AAC_CMD_DATAIN)
-		bus_dmamap_sync(sc->aac_buffer_dmat, cm->cm_datamap,
-				BUS_DMASYNC_PREREAD);
-	if (cm->cm_flags & AAC_CMD_DATAOUT)
-		bus_dmamap_sync(sc->aac_buffer_dmat, cm->cm_datamap,
-				BUS_DMASYNC_PREWRITE);
+		if (cm->cm_flags & AAC_CMD_DATAIN)
+			bus_dmamap_sync(sc->aac_buffer_dmat, cm->cm_datamap,
+					BUS_DMASYNC_PREREAD);
+		if (cm->cm_flags & AAC_CMD_DATAOUT)
+			bus_dmamap_sync(sc->aac_buffer_dmat, cm->cm_datamap,
+					BUS_DMASYNC_PREWRITE);
 	}
 	cm->cm_flags |= AAC_CMD_MAPPED;
 }
@@ -1456,6 +1470,7 @@ aac_init(struct aac_softc *sc)
 	 */
 	ip = &sc->aac_common->ac_init;
 	ip->InitStructRevision = AAC_INIT_STRUCT_REVISION;
+	ip->MiniPortRevision = AAC_INIT_STRUCT_MINIPORT_REVISION;
 
 	ip->AdapterFibsPhysicalAddress = sc->aac_common_busaddr +
 					 offsetof(struct aac_common, ac_fibs);
@@ -1467,7 +1482,8 @@ aac_init(struct aac_softc *sc)
 				  offsetof(struct aac_common, ac_printf);
 	ip->PrintfBufferSize = AAC_PRINTF_BUFSIZE;
 
-	ip->HostPhysMemPages = 0;		/* not used? */
+	/* The adapter assumes that pages are 4K in size */
+	ip->HostPhysMemPages = ctob(physmem) / AAC_PAGE_SIZE;
 	ip->HostElapsedSeconds = time_second;	/* reset later if invalid */
 
 	/*
@@ -1798,6 +1814,15 @@ aac_dequeue_fib(struct aac_softc *sc, int queue, u_int32_t *fib_size,
 	*fib_addr = (struct aac_fib *)(sc->aac_qentries[queue] +
 				       ci)->aq_fib_addr;
 
+	/*
+	 * Is this a fast response? If it is, update the fib fields in
+	 * local memory so the whole fib doesn't have to be DMA'd back up.
+	 */
+	if (*(uintptr_t *)fib_addr & 0x01) {
+		*(uintptr_t *)fib_addr &= ~0x01;
+		(*fib_addr)->Header.XferState |= AAC_FIBSTATE_DONEADAP;
+		*((u_int32_t*)((*fib_addr)->data)) = AAC_ERROR_NORMAL;
+	}
 	/* update consumer index */
 	sc->aac_queues->qt_qindex[queue][AAC_CONSUMER_INDEX] = ci + 1;
 
@@ -2584,53 +2609,6 @@ aac_handle_aif(struct aac_softc *sc, struct aac_fib *fib)
 
 	return;
 }
-
-/*
- * Linux Management Interface
- * This is soon to be removed!
- */
-
-#ifdef AAC_COMPAT_LINUX
-
-#include <sys/proc.h>
-#include <machine/../linux/linux.h>
-#include <machine/../linux/linux_proto.h>
-#include <compat/linux/linux_ioctl.h>
-
-/* There are multiple ioctl number ranges that need to be handled */
-#define AAC_LINUX_IOCTL_MIN  0x0000
-#define AAC_LINUX_IOCTL_MAX  0x21ff
-
-static linux_ioctl_function_t aac_linux_ioctl;
-static struct linux_ioctl_handler aac_handler = {aac_linux_ioctl,
-						 AAC_LINUX_IOCTL_MIN,
-						 AAC_LINUX_IOCTL_MAX};
-
-SYSINIT  (aac_register,   SI_SUB_KLD, SI_ORDER_MIDDLE,
-	  linux_ioctl_register_handler, &aac_handler);
-SYSUNINIT(aac_unregister, SI_SUB_KLD, SI_ORDER_MIDDLE,
-	  linux_ioctl_unregister_handler, &aac_handler);
-
-MODULE_DEPEND(aac, linux, 1, 1, 1);
-
-static int
-aac_linux_ioctl(struct proc *p, struct linux_ioctl_args *args)
-{
-	struct file *fp;
-	u_long cmd;
-
-	debug_called(2);
-
-	fp = p->p_fd->fd_ofiles[args->fd];
-	cmd = args->cmd;
-
-	/*
-	 * Pass the ioctl off to our standard handler.
-	 */
-	return(fo_ioctl(fp, cmd, (caddr_t)args->arg, p));
-}
-
-#endif
 
 /*
  * Return the Revision of the driver to userspace and check to see if the

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_bus.c,v 1.54.2.8 2001/01/18 00:19:50 n_hibma Exp $
+ * $FreeBSD: src/sys/kern/subr_bus.c,v 1.54.2.9 2002/10/10 15:13:32 jhb Exp $
  */
 
 #include "opt_bus.h"
@@ -1848,6 +1848,34 @@ resource_list_release(struct resource_list *rl,
 
     rle->res = NULL;
     return 0;
+}
+
+int
+resource_list_print_type(struct resource_list *rl, const char *name, int type,
+    const char *format)
+{
+	struct resource_list_entry *rle;
+	int printed, retval;
+
+	printed = 0;
+	retval = 0;
+	/* Yes, this is kinda cheating */
+	SLIST_FOREACH(rle, rl, link) {
+		if (rle->type == type) {
+			if (printed == 0)
+				retval += printf(" %s ", name);
+			else
+				retval += printf(",");
+			printed++;
+			retval += printf(format, rle->start);
+			if (rle->count > 1) {
+				retval += printf("-");
+				retval += printf(format, rle->start +
+						 rle->count - 1);
+			}
+		}
+	}
+	return (retval);
 }
 
 /*

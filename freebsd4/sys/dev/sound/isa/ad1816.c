@@ -31,7 +31,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.7.2.8 2002/07/07 11:49:03 robert Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.7.2.9 2002/12/24 21:17:41 semenu Exp $");
 
 struct ad1816_info;
 
@@ -102,9 +102,9 @@ static void
 port_wr(struct resource *port, int off, u_int8_t data)
 {
 	if (port)
-		return bus_space_write_1(rman_get_bustag(port),
-					 rman_get_bushandle(port),
-					 off, data);
+		bus_space_write_1(rman_get_bustag(port),
+				  rman_get_bushandle(port),
+				  off, data);
 }
 
 static int
@@ -116,7 +116,7 @@ io_rd(struct ad1816_info *ad1816, int reg)
 static void
 io_wr(struct ad1816_info *ad1816, int reg, u_int8_t data)
 {
-	return port_wr(ad1816->io_base, reg, data);
+	port_wr(ad1816->io_base, reg, data);
 }
 
 static void

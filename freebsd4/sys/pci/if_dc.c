@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.35 2002/08/16 04:45:38 iwasaki Exp $
+ * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.41 2003/03/05 18:42:33 njl Exp $
  */
 
 /*
@@ -134,7 +134,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.35 2002/08/16 04:45:38 iwasaki Exp $";
+  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.41 2003/03/05 18:42:33 njl Exp $";
 #endif
 
 /*
@@ -143,6 +143,8 @@ static const char rcsid[] =
 static struct dc_type dc_devs[] = {
 	{ DC_VENDORID_DEC, DC_DEVICEID_21143,
 		"Intel 21143 10/100BaseTX" },
+	{ DC_VENDORID_DAVICOM, DC_DEVICEID_DM9009,
+		"Davicom DM9009 10/100BaseTX" },
 	{ DC_VENDORID_DAVICOM, DC_DEVICEID_DM9100,
 		"Davicom DM9100 10/100BaseTX" },
 	{ DC_VENDORID_DAVICOM, DC_DEVICEID_DM9102,
@@ -221,6 +223,7 @@ static void dc_eeprom_putbyte	__P((struct dc_softc *, int));
 static void dc_eeprom_getword	__P((struct dc_softc *, int, u_int16_t *));
 static void dc_eeprom_getword_pnic
 				__P((struct dc_softc *, int, u_int16_t *));
+static void dc_eeprom_width	__P((struct dc_softc *));
 static void dc_read_eeprom	__P((struct dc_softc *, caddr_t, int,
 							int, int));
 
@@ -248,6 +251,7 @@ static void dc_reset		__P((struct dc_softc *));
 static int dc_list_rx_init	__P((struct dc_softc *));
 static int dc_list_tx_init	__P((struct dc_softc *));
 
+static void dc_read_srom	__P((struct dc_softc *, int));
 static void dc_parse_21143_srom	__P((struct dc_softc *));
 static void dc_decode_leaf_sia	__P((struct dc_softc *,
 				    struct dc_eblock_sia *));
@@ -322,6 +326,70 @@ static void dc_delay(sc)
 		CSR_READ_4(sc, DC_BUSCTL);
 }
 
+static void dc_eeprom_width(sc)
+	struct dc_softc		*sc;
+{
+	int i;
+
+	/* Force EEPROM to idle state. */
+	dc_eeprom_idle(sc);
+
+	/* Enter EEPROM access mode. */
+	CSR_WRITE_4(sc, DC_SIO, DC_SIO_EESEL);
+	dc_delay(sc);
+	DC_SETBIT(sc, DC_SIO, DC_SIO_ROMCTL_READ);
+	dc_delay(sc);
+	DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+	dc_delay(sc);
+	DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CS);
+	dc_delay(sc);
+
+	for (i = 3; i--;) {
+		if (6 & (1 << i))
+			DC_SETBIT(sc, DC_SIO, DC_SIO_EE_DATAIN);
+		else
+			DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_DATAIN);
+		dc_delay(sc);
+		DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+		DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+	}
+
+	for (i = 1; i <= 12; i++) {
+		DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+		if (!(CSR_READ_4(sc, DC_SIO) & DC_SIO_EE_DATAOUT)) {
+			DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+			dc_delay(sc);
+			break;
+		}
+		DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+	}
+
+	/* Turn off EEPROM access mode. */
+	dc_eeprom_idle(sc);
+
+	if (i < 4 || i > 12)
+		sc->dc_romwidth = 6;
+	else
+		sc->dc_romwidth = i;
+
+	/* Enter EEPROM access mode. */
+	CSR_WRITE_4(sc, DC_SIO, DC_SIO_EESEL);
+	dc_delay(sc);
+	DC_SETBIT(sc, DC_SIO, DC_SIO_ROMCTL_READ);
+	dc_delay(sc);
+	DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+	dc_delay(sc);
+	DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CS);
+	dc_delay(sc);
+
+	/* Turn off EEPROM access mode. */
+	dc_eeprom_idle(sc);
+}
+
 static void dc_eeprom_idle(sc)
 	struct dc_softc		*sc;
 {
@@ -361,21 +429,24 @@ static void dc_eeprom_putbyte(sc, addr)
 {
 	register int		d, i;
 
-	/*
-	 * The AN985 has a 93C66 EEPROM on it instead of
-	 * a 93C46. It uses a different bit sequence for
-	 * specifying the "read" opcode.
-	 */
-	if (DC_IS_CENTAUR(sc) || DC_IS_CONEXANT(sc))
-		d = addr | (DC_EECMD_READ << 2);
-	else
-		d = addr | DC_EECMD_READ;
+	d = DC_EECMD_READ >> 6;
+	for (i = 3; i--; ) {
+		if (d & (1 << i))
+			DC_SETBIT(sc, DC_SIO, DC_SIO_EE_DATAIN);
+		else
+			DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_DATAIN);
+		dc_delay(sc);
+		DC_SETBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+		DC_CLRBIT(sc, DC_SIO, DC_SIO_EE_CLK);
+		dc_delay(sc);
+	}
 
 	/*
 	 * Feed in each bit and strobe the clock.
 	 */
-	for (i = 0x400; i; i >>= 1) {
-		if (d & i) {
+	for (i = sc->dc_romwidth; i--;) {
+		if (addr & (1 << i)) {
 			SIO_SET(DC_SIO_EE_DATAIN);
 		} else {
 			SIO_CLR(DC_SIO_EE_DATAIN);
@@ -1628,6 +1699,17 @@ static void dc_decode_leaf_mii(sc, l)
 	return;
 }
 
+static void dc_read_srom(sc, bits)
+	struct dc_softc		*sc;
+	int			bits;
+{
+	int size;
+
+	size = 2 << bits;
+	sc->dc_srom = malloc(size, M_DEVBUF, M_NOWAIT);
+	dc_read_eeprom(sc, (caddr_t)sc->dc_srom, 0, (size / 2), 0);
+}
+
 static void dc_parse_21143_srom(sc)
 	struct dc_softc		*sc;
 {
@@ -1751,14 +1833,19 @@ static int dc_attach(dev)
 	sc->dc_info = dc_devtype(dev);
 	revision = pci_read_config(dev, DC_PCI_CFRV, 4) & 0x000000FF;
 
+	/* Get the eeprom width, but PNIC has diff eeprom */
+	if (sc->dc_info->dc_did != DC_DEVICEID_82C168)
+		dc_eeprom_width(sc);
+
 	switch(sc->dc_info->dc_did) {
 	case DC_DEVICEID_21143:
 		sc->dc_type = DC_TYPE_21143;
 		sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
 		sc->dc_flags |= DC_REDUCED_MII_POLL;
 		/* Save EEPROM contents so we can parse them later. */
-		dc_read_eeprom(sc, (caddr_t)&sc->dc_srom, 0, 512, 0);
+		dc_read_srom(sc, sc->dc_romwidth);
 		break;
+	case DC_DEVICEID_DM9009:
 	case DC_DEVICEID_DM9100:
 	case DC_DEVICEID_DM9102:
 		sc->dc_type = DC_TYPE_DM9102;
@@ -1776,6 +1863,7 @@ static int dc_attach(dev)
 		sc->dc_flags |= DC_TX_USE_TX_INTR;
 		sc->dc_flags |= DC_TX_ADMTEK_WAR;
 		sc->dc_pmode = DC_PMODE_MII;
+		dc_read_srom(sc, sc->dc_romwidth);
 		break;
 	case DC_DEVICEID_AN985:
 	case DC_DEVICEID_EN2242:
@@ -1783,6 +1871,7 @@ static int dc_attach(dev)
 		sc->dc_flags |= DC_TX_USE_TX_INTR;
 		sc->dc_flags |= DC_TX_ADMTEK_WAR;
 		sc->dc_pmode = DC_PMODE_MII;
+		dc_read_srom(sc, sc->dc_romwidth);
 		break;
 	case DC_DEVICEID_98713:
 	case DC_DEVICEID_98713_CP:
@@ -1841,7 +1930,7 @@ static int dc_attach(dev)
 		sc->dc_flags |= DC_TX_INTR_ALWAYS;
 		sc->dc_flags |= DC_REDUCED_MII_POLL;
 		sc->dc_pmode = DC_PMODE_MII;
-		dc_read_eeprom(sc, (caddr_t)&sc->dc_srom, 0, 256, 0);
+		dc_read_srom(sc, sc->dc_romwidth);
 		break;
 	default:
 		printf("dc%d: unknown device: %x\n", sc->dc_unit,
@@ -1905,6 +1994,8 @@ static int dc_attach(dev)
 		break;
 	case DC_TYPE_AL981:
 	case DC_TYPE_AN985:
+		bcopy(&sc->dc_srom[DC_AL_EE_NODEADDR], (caddr_t)&eaddr,
+		    ETHER_ADDR_LEN);
 		dc_read_eeprom(sc, (caddr_t)&eaddr, DC_AL_EE_NODEADDR, 3, 0);
 		break;
 	case DC_TYPE_CONEXANT:
@@ -1928,6 +2019,8 @@ static int dc_attach(dev)
 
 	if (sc->dc_ldata == NULL) {
 		printf("dc%d: no memory for list buffers!\n", unit);
+		if (sc->dc_pnic_rx_buf != NULL)
+			free(sc->dc_pnic_rx_buf, M_DEVBUF);
 		bus_teardown_intr(dev, sc->dc_irq, sc->dc_intrhand);
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->dc_irq);
 		bus_release_resource(dev, DC_RES, DC_RID, sc->dc_res);
@@ -1988,6 +2081,10 @@ static int dc_attach(dev)
 
 	if (error) {
 		printf("dc%d: MII without any PHY!\n", sc->dc_unit);
+		contigfree(sc->dc_ldata, sizeof(struct dc_list_data),
+		    M_DEVBUF);
+		if (sc->dc_pnic_rx_buf != NULL)
+			free(sc->dc_pnic_rx_buf, M_DEVBUF);
 		bus_teardown_intr(dev, sc->dc_irq, sc->dc_intrhand);
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->dc_irq);
 		bus_release_resource(dev, DC_RES, DC_RID, sc->dc_res);
@@ -2000,6 +2097,13 @@ static int dc_attach(dev)
 	 */
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	callout_handle_init(&sc->dc_stat_ch);
+
+	if (DC_IS_ADMTEK(sc)) {
+		/*
+		 * Set automatic TX underrun recovery for the ADMtek chips
+		 */
+		DC_SETBIT(sc, DC_AL_CR, DC_AL_CR_ATUR);
+	}
 
 	/*
 	 * Tell the upper layer(s) we support long frames.
@@ -2071,6 +2175,7 @@ static int dc_detach(dev)
 		free(sc->dc_mi, M_DEVBUF);
 		sc->dc_mi = m;
 	}
+	free(sc->dc_srom, M_DEVBUF);
 
 	splx(s);
 
@@ -2458,13 +2563,13 @@ static void dc_rxeof(sc)
  * the list buffers.
  */
 
-static void dc_txeof(sc)
+static void
+dc_txeof(sc)
 	struct dc_softc		*sc;
 {
 	struct dc_desc		*cur_tx = NULL;
 	struct ifnet		*ifp;
 	int			idx;
-	u_int32_t		errmask;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -2484,7 +2589,6 @@ static void dc_txeof(sc)
 
 		if (!(cur_tx->dc_ctl & DC_TXCTL_LASTFRAG) ||
 		    cur_tx->dc_ctl & DC_TXCTL_SETUP) {
-			sc->dc_cdata.dc_tx_cnt--;
 			if (cur_tx->dc_ctl & DC_TXCTL_SETUP) {
 				/*
 				 * Yes, the PNIC is so brain damaged
@@ -2501,21 +2605,29 @@ static void dc_txeof(sc)
 				}
 				sc->dc_cdata.dc_tx_chain[idx] = NULL;
 			}
+			sc->dc_cdata.dc_tx_cnt--;
 			DC_INC(idx, DC_TX_LIST_CNT);
 			continue;
 		}
 
-		if (sc->dc_pmode == DC_PMODE_MII) {
-			errmask = DC_TXSTAT_ERRSUM|
-			    DC_TXSTAT_NOCARRIER|DC_TXSTAT_CARRLOST;
+		if (DC_IS_CONEXANT(sc)) {
 			/*
-			 * The Conexant chip always reports carrier lost
-			 * in full duplex modes.
+			 * For some reason Conexant chips like
+			 * setting the CARRLOST flag even when
+			 * the carrier is there. In CURRENT we
+			 * have the same problem for Xircom
+			 * cards !
 			 */
-			if (DC_IS_CONEXANT(sc) && (sc->dc_if_media & IFM_FDX)) {
-				errmask &= ~DC_TXSTAT_CARRLOST;
-			}
-			if ((txstat & 0xFFFF) & ~errmask)
+			if (/*sc->dc_type == DC_TYPE_21143 &&*/
+			    sc->dc_pmode == DC_PMODE_MII &&
+			    ((txstat & 0xFFFF) & ~(DC_TXSTAT_ERRSUM|
+			    DC_TXSTAT_NOCARRIER)))
+				txstat &= ~DC_TXSTAT_ERRSUM;
+		} else {
+			if (/*sc->dc_type == DC_TYPE_21143 &&*/
+			    sc->dc_pmode == DC_PMODE_MII &&
+			    ((txstat & 0xFFFF) & ~(DC_TXSTAT_ERRSUM|
+			    DC_TXSTAT_NOCARRIER|DC_TXSTAT_CARRLOST)))
 				txstat &= ~DC_TXSTAT_ERRSUM;
 		}
 
@@ -2543,11 +2655,13 @@ static void dc_txeof(sc)
 		DC_INC(idx, DC_TX_LIST_CNT);
 	}
 
-        if (idx != sc->dc_cdata.dc_tx_cons) {    
+	if (idx != sc->dc_cdata.dc_tx_cons) {
+	    	/* some buffers have been freed */
 		sc->dc_cdata.dc_tx_cons = idx;
-                ifp->if_flags &= ~IFF_OACTIVE;
-        }
-        ifp->if_timer = (sc->dc_cdata.dc_tx_cnt == 0) ? 0 : 5;
+		ifp->if_flags &= ~IFF_OACTIVE;
+	}
+	ifp->if_timer = (sc->dc_cdata.dc_tx_cnt == 0) ? 0 : 5;
+
 	return;
 }
 
@@ -3242,15 +3356,12 @@ static int dc_ioctl(ifp, command, data)
 		break;
 	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
-			if (ifp->if_flags & IFF_RUNNING &&
-			    ifp->if_flags & IFF_PROMISC &&
-			    !(sc->dc_if_flags & IFF_PROMISC)) {
-				dc_setfilt(sc);
-			} else if (ifp->if_flags & IFF_RUNNING &&
-			    !(ifp->if_flags & IFF_PROMISC) &&
-			    sc->dc_if_flags & IFF_PROMISC) {
-				dc_setfilt(sc);
-			} else if (!(ifp->if_flags & IFF_RUNNING)) {
+			int need_setfilt = (ifp->if_flags ^ sc->dc_if_flags) &
+				(IFF_PROMISC | IFF_ALLMULTI);
+			if (ifp->if_flags & IFF_RUNNING) {
+				if (need_setfilt)
+					dc_setfilt(sc);
+			} else {
 				sc->dc_txthresh = 0;
 				dc_init(sc);
 			}

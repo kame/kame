@@ -22,13 +22,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mpapic.c,v 1.37.2.5 2001/02/13 22:32:44 tegge Exp $
+ * $FreeBSD: src/sys/i386/i386/mpapic.c,v 1.37.2.7 2003/01/25 02:31:47 peter Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 
-#include <machine/smptests.h>	/** TEST_TEST1 */
+#include <machine/smptests.h>	/** TEST_TEST1, GRAB_LOPRIO */
 #include <machine/smp.h>
 #include <machine/mpapic.h>
 #include <machine/segments.h>
@@ -68,14 +68,16 @@ apic_initialize(void)
 	temp = lapic.lvt_lint1;
 	temp &= ~(APIC_LVT_M | APIC_LVT_TM | APIC_LVT_IIPP | APIC_LVT_DM);
 	temp |= 0x00010400;		/* masked, edge trigger, active hi */
-
 	lapic.lvt_lint1 = temp;
 
 	/* set the Task Priority Register as needed */
 	temp = lapic.tpr;
 	temp &= ~APIC_TPR_PRIO;		/* clear priority field */
-	temp |= LOPRIO_LEVEL;		/* allow INT arbitration */
-
+#ifdef GRAB_LOPRIO
+	/* Leave the BSP at TPR 0 during boot to make sure it gets interrupts */
+	if (cpuid != 0)
+		temp |= LOPRIO_LEVEL;	/* allow INT arbitration */
+#endif
 	lapic.tpr = temp;
 
 	/* enable the local APIC */

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/svr4/svr4_misc.c,v 1.13.2.5 2002/09/02 21:22:54 dillon Exp $
+ * $FreeBSD: src/sys/svr4/svr4_misc.c,v 1.13.2.7 2003/01/14 21:33:58 dillon Exp $
  */
 
 /*
@@ -81,6 +81,10 @@
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_map.h>
+
+#if defined(__FreeBSD__)
+#include <vm/vm_extern.h>
+#endif
 
 #if defined(NetBSD)
 # if defined(UVM)
@@ -1281,7 +1285,8 @@ loop:
 			 * to free anything that cpu_exit couldn't
 			 * release while still running in process context.
 			 */
-			cpu_wait(q);
+			vm_waitproc(q);
+			/* XXX what about process 'q' itself?  zfree? */
 #if defined(__NetBSD__)
 			pool_put(&proc_pool, q);
 #endif

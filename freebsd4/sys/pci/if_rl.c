@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.13 2002/07/08 21:59:40 luigi Exp $
+ * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.16 2003/03/05 18:42:33 njl Exp $
  */
 
 /*
@@ -132,7 +132,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.13 2002/07/08 21:59:40 luigi Exp $";
+  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.16 2003/03/05 18:42:33 njl Exp $";
 #endif
 
 /*
@@ -153,6 +153,8 @@ static struct rl_type rl_devs[] = {
 		"D-Link DFE-530TX+ 10/100BaseTX" },
 	{ NORTEL_VENDORID, ACCTON_DEVICEID_5030,
 		"Nortel Networks 10/100BaseTX" },
+	{ PEPPERCON_VENDORID, PEPPERCON_DEVICEID_ROLF,
+		"Peppercon AG ROL/F" },
 	{ 0, 0, NULL }
 };
 
@@ -448,9 +450,9 @@ static int rl_mii_readreg(sc, frame)
 	/* Check for ack */
 	MII_CLR(RL_MII_CLK);
 	DELAY(1);
+	ack = CSR_READ_2(sc, RL_MII) & RL_MII_DATAIN;
 	MII_SET(RL_MII_CLK);
 	DELAY(1);
-	ack = CSR_READ_2(sc, RL_MII) & RL_MII_DATAIN;
 
 	/*
 	 * Now try reading data bits. If the ack failed, we still
@@ -950,6 +952,8 @@ static int rl_attach(dev)
 	if (mii_phy_probe(dev, &sc->rl_miibus,
 	    rl_ifmedia_upd, rl_ifmedia_sts)) {
 		printf("rl%d: MII without any phy!\n", sc->rl_unit);
+		contigfree(sc->rl_cdata.rl_rx_buf, RL_RXBUFLEN + 1518,
+		    M_DEVBUF);
 		bus_teardown_intr(dev, sc->rl_irq, sc->rl_intrhand);
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
 		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
@@ -1004,7 +1008,7 @@ static int rl_detach(dev)
 	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
 	bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 
-	contigfree(sc->rl_cdata.rl_rx_buf, RL_RXBUFLEN + 32, M_DEVBUF);
+	contigfree(sc->rl_cdata.rl_rx_buf, RL_RXBUFLEN + 1518, M_DEVBUF);
 
 	splx(s);
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.16 2002/08/24 18:40:26 dillon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.20 2003/01/29 22:45:36 hsu Exp $
  */
 
 #include "opt_inet6.h"
@@ -75,6 +75,11 @@
 #include <netinet6/ipsec.h>
 #endif /*IPSEC*/
 
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#define	IPSEC
+#endif /*FAST_IPSEC*/
+
 #include <machine/in_cksum.h>
 
 #ifdef notyet
@@ -96,6 +101,7 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, local_slowstart_flightsize, CTLFLAG_RW,
 int     tcp_do_newreno = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, newreno, CTLFLAG_RW, &tcp_do_newreno,
         0, "Enable NewReno Algorithms");
+
 /*
  * Tcp output routine: figure out what should be sent and send it.
  */
@@ -120,7 +126,6 @@ tcp_output(tp)
 	int maxburst = TCP_MAXBURST;
 #endif
 	struct rmxp_tao *taop;
-	struct rmxp_tao tao_noncached;
 #ifdef INET6
 	int isipv6;
 #endif
@@ -215,12 +220,21 @@ again:
 		}
 	}
 
+	/*
+	 * If snd_nxt == snd_max and we have transmitted a FIN, the 
+	 * offset will be > 0 even if so_snd.sb_cc is 0, resulting in
+	 * a negative length.  This can also occur when tcp opens up
+	 * its congestion window while receiving additional duplicate
+	 * acks after fast-retransmit because TCP will reset snd_nxt
+	 * to snd_max after the fast-retransmit.
+	 *
+	 * In the normal retransmit-FIN-only case, however, snd_nxt will
+	 * be set to snd_una, the offset will be 0, and the length may
+	 * wind up 0.
+	 */
 	len = (long)ulmin(so->so_snd.sb_cc, win) - off;
 
-	if ((taop = tcp_gettaocache(&tp->t_inpcb->inp_inc)) == NULL) {
-		taop = &tao_noncached;
-		bzero(taop, sizeof(*taop));
-	}
+	taop = tcp_gettaocache(&tp->t_inpcb->inp_inc);
 
 	/*
 	 * Lop off SYN bit if it has already been sent.  However, if this
@@ -231,7 +245,7 @@ again:
 		flags &= ~TH_SYN;
 		off--, len++;
 		if (len > 0 && tp->t_state == TCPS_SYN_SENT &&
-		    taop->tao_ccsent == 0)
+		    (taop == NULL || taop->tao_ccsent == 0))
 			return 0;
 	}
 
@@ -252,7 +266,7 @@ again:
 		/*
 		 * If FIN has been sent but not acked,
 		 * but we haven't been called to retransmit,
-		 * len will be -1.  Otherwise, window shrank
+		 * len will be < 0.  Otherwise, window shrank
 		 * after we sent into it.  If window shrank to 0,
 		 * cancel pending retransmit, pull snd_nxt back
 		 * to (closed) window, and set the persist timer
@@ -268,6 +282,12 @@ again:
 				tcp_setpersist(tp);
 		}
 	}
+
+	/*
+	 * len will be >= 0 after this point.  Truncate to the maximum
+	 * segment length and ensure that FIN is removed if the length
+	 * no longer contains the last data byte.
+	 */
 	if (len > tp->t_maxseg) {
 		len = tp->t_maxseg;
 		sendalot = 1;
@@ -336,7 +356,8 @@ again:
 	}
 
 	/*
-	 * Send if we owe peer an ACK.
+	 * Send if we owe the peer an ACK, RST, SYN, or urgent data.  ACKNOW
+	 * is also a catch-all for the retransmit timer timeout case.
 	 */
 	if (tp->t_flags & TF_ACKNOW)
 		goto send;
@@ -347,8 +368,7 @@ again:
 		goto send;
 	/*
 	 * If our state indicates that FIN should be sent
-	 * and we have not yet done so, or we're retransmitting the FIN,
-	 * then we need to send.
+	 * and we have not yet done so, then we need to send.
 	 */
 	if (flags & TH_FIN &&
 	    ((tp->t_flags & TF_SENTFIN) == 0 || tp->snd_nxt == tp->snd_una))
@@ -795,7 +815,7 @@ send:
 
 		/*
 		 * Set retransmit timer if not currently set,
-		 * and not doing an ack or a keep-alive probe.
+		 * and not doing a pure ack or a keep-alive probe.
 		 * Initial value for retransmit timer is smoothed
 		 * round-trip time + 2 * round-trip time variance.
 		 * Initialize shift counter which is used for backoff
@@ -810,9 +830,21 @@ send:
 			callout_reset(tp->tt_rexmt, tp->t_rxtcur,
 				      tcp_timer_rexmt, tp);
 		}
-	} else
-		if (SEQ_GT(tp->snd_nxt + len, tp->snd_max))
-			tp->snd_max = tp->snd_nxt + len;
+	} else {
+		/*
+		 * Persist case, update snd_max but since we are in
+		 * persist mode (no window) we do not update snd_nxt.
+		 */
+		int xlen = len;
+		if (flags & TH_SYN)
+			++xlen;
+		if (flags & TH_FIN) {
+			++xlen;
+			tp->t_flags |= TF_SENTFIN;
+		}
+		if (SEQ_GT(tp->snd_nxt + xlen, tp->snd_max))
+			tp->snd_max = tp->snd_nxt + xlen;
+	}
 
 #ifdef TCPDEBUG
 	/*
@@ -846,17 +878,11 @@ send:
 					       : NULL);
 
 		/* TODO: IPv6 IP6TOS_ECT bit on */
-#ifdef IPSEC
-		if (ipsec_setsocket(m, so) != 0) {
-			m_freem(m);
-			error = ENOBUFS;
-			goto out;
-		}
-#endif /*IPSEC*/
 		error = ip6_output(m,
 			    tp->t_inpcb->in6p_outputopts,
 			    &tp->t_inpcb->in6p_route,
-			    (so->so_options & SO_DONTROUTE), NULL, NULL);
+			    (so->so_options & SO_DONTROUTE), NULL, NULL,
+			    tp->t_inpcb);
 	} else
 #endif /* INET6 */
     {
@@ -885,11 +911,8 @@ send:
 	    && !(rt->rt_rmx.rmx_locks & RTV_MTU)) {
 		ip->ip_off |= IP_DF;
 	}
-#ifdef IPSEC
- 	ipsec_setsocket(m, so);
-#endif /*IPSEC*/
 	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
-	    (so->so_options & SO_DONTROUTE), 0);
+	    (so->so_options & SO_DONTROUTE), 0, tp->t_inpcb);
     }
 	if (error) {
 

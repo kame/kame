@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.c	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in.c,v 1.44.2.12 2002/05/01 08:30:36 brian Exp $
+ * $FreeBSD: src/sys/netinet/in.c,v 1.44.2.14 2002/11/08 00:45:50 suz Exp $
  */
 
 #include "opt_bootp.h"
@@ -88,13 +88,11 @@ in_localaddr(in)
 	register struct in_ifaddr *ia;
 
 	if (subnetsarelocal) {
-		for (ia = in_ifaddrhead.tqh_first; ia; 
-		     ia = ia->ia_link.tqe_next)
+		TAILQ_FOREACH(ia, &in_ifaddrhead, ia_link)
 			if ((i & ia->ia_netmask) == ia->ia_net)
 				return (1);
 	} else {
-		for (ia = in_ifaddrhead.tqh_first; ia;
-		     ia = ia->ia_link.tqe_next)
+		TAILQ_FOREACH(ia, &in_ifaddrhead, ia_link)
 			if ((i & ia->ia_subnetmask) == ia->ia_subnet)
 				return (1);
 	}
@@ -248,7 +246,7 @@ in_control(so, cmd, data, ifp, p)
 		if (ifp == 0)
 			return (EADDRNOTAVAIL);
 		if (ifra->ifra_addr.sin_family == AF_INET) {
-			for (oia = ia; ia; ia = ia->ia_link.tqe_next) {
+			for (oia = ia; ia; ia = TAILQ_NEXT(ia, ia_link)) {
 				if (ia->ia_ifp == ifp  &&
 				    ia->ia_addr.sin_addr.s_addr ==
 				    ifra->ifra_addr.sin_addr.s_addr)
@@ -670,7 +668,12 @@ in_ifinit(ifp, ia, sin, scrub)
 	int s = splimp(), flags = RTF_UP, error = 0;
 
 	oldaddr = ia->ia_addr;
+	if (oldaddr.sin_family == AF_INET)
+		LIST_REMOVE(ia, ia_hash);
 	ia->ia_addr = *sin;
+	if (ia->ia_addr.sin_family == AF_INET)
+		LIST_INSERT_HEAD(INADDR_HASH(ia->ia_addr.sin_addr.s_addr),
+		    ia, ia_hash);
 	/*
 	 * Give the interface a chance to initialize
 	 * if this is its first address,
@@ -679,14 +682,13 @@ in_ifinit(ifp, ia, sin, scrub)
 	if (ifp->if_ioctl &&
 	    (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (caddr_t)ia))) {
 		splx(s);
+		/* LIST_REMOVE(ia, ia_hash) is done in in_control */
 		ia->ia_addr = oldaddr;
+		if (ia->ia_addr.sin_family == AF_INET)
+			LIST_INSERT_HEAD(INADDR_HASH(ia->ia_addr.sin_addr.s_addr),
+			    ia, ia_hash);
 		return (error);
 	}
-	if (oldaddr.sin_family == AF_INET)
-		LIST_REMOVE(ia, ia_hash);
-	if (ia->ia_addr.sin_family == AF_INET)
-		LIST_INSERT_HEAD(INADDR_HASH(ia->ia_addr.sin_addr.s_addr),
-		    ia, ia_hash);
 	splx(s);
 	if (scrub) {
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&oldaddr;
@@ -785,8 +787,7 @@ in_broadcast(in, ifp)
 	 * with a broadcast address.
 	 */
 #define ia ((struct in_ifaddr *)ifa)
-	for (ifa = ifp->if_addrhead.tqh_first; ifa; 
-	     ifa = ifa->ifa_link.tqe_next)
+	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
 		if (ifa->ifa_addr->sa_family == AF_INET &&
 		    (in.s_addr == ia->ia_broadaddr.sin_addr.s_addr ||
 		     in.s_addr == ia->ia_netbroadcast.s_addr ||

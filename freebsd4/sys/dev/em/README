@@ -1,8 +1,8 @@
-$FreeBSD: src/sys/dev/em/README,v 1.1.2.3 2002/08/25 01:54:53 pdeuskar Exp $
+$FreeBSD: src/sys/dev/em/README,v 1.1.2.5 2003/01/03 18:18:55 pdeuskar Exp $
 FreeBSD* Driver for the Intel(R) PRO/1000 Family of Adapters
 ============================================================
 
-July 2, 2002
+November 12, 2002
 
 
 Contents
@@ -21,10 +21,10 @@ Contents
 In This Release
 ===============
 
-This file describes the FreeBSD* driver, version 1.3.x, for the Intel(R)
+This file describes the FreeBSD* driver, version 1.4.x, for the Intel(R)
 PRO/1000 Family of Adapters. This driver has been developed for use with 
-FreeBSD, version 4.6. As a new feature for this release, the driver is now 
-compiled by default into the FreeBSD 4.6 kernel.
+FreeBSD, version 4.7. As a new feature for this release, the driver is now 
+compiled by default into the FreeBSD 4.7 kernel.
 
 The driver supports Transmit/Receive Checksum Offload and Jumbo Frames on 
 all but the 82542-based adapters. For specific adapters, refer to the 

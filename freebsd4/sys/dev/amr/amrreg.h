@@ -24,7 +24,35 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/dev/amr/amrreg.h,v 1.1.2.2 2000/12/22 22:24:32 msmith Exp $
+ * Copyright (c) 2002 Eric Moore
+ * Copyright (c) 2002 LSI Logic Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The party using or redistributing the source code and binary forms
+ *    agrees to the disclaimer below and the terms and conditions set forth
+ *    herein.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *      $FreeBSD: src/sys/dev/amr/amrreg.h,v 1.1.2.4 2002/11/11 13:19:10 emoore Exp $
  */
 
 /********************************************************************************
@@ -42,7 +70,12 @@
  * cleanly fit more than 16 entries in without a page boundary.  But is this a concern,
  * since we allocate the s/g maps contiguously anyway?
  */
-#define AMR_NSEG		16
+/*
+ * emoore - Oct 21, 2002
+ * firmware doesn't have sglist boundary restrictions.
+ * The sgelem can be set to 26
+ */
+#define AMR_NSEG		26
 
 #define AMR_MAXCMD		255		/* ident = 0 not allowed */
 #define AMR_LIMITCMD		120		/* maximum count of outstanding commands */
@@ -54,6 +87,7 @@
 #define AMR_MAX_SCSI_CMDS	(15 * AMR_MAX_CHANNELS)	/* one for every target? */
 
 #define AMR_MAX_CDB_LEN		0x0a
+#define AMR_MAX_EXTCDB_LEN	0x10
 #define AMR_MAX_REQ_SENSE_LEN	0x20
 
 #define AMR_BLKSIZE		512		/* constant for all controllers */
@@ -89,6 +123,7 @@
 #define AMR_CONFIG_ENQ3_SOLICITED_NOTIFY	0x01
 #define AMR_CONFIG_ENQ3_SOLICITED_FULL		0x02
 #define AMR_CONFIG_ENQ3_UNSOLICITED		0x03
+#define AMR_CMD_EXTPASS		0xe3
 
 /*
  * Command results
@@ -168,7 +203,7 @@ struct amr_adapter_info
     u_int8_t	aa_inserteddrive;
     u_int8_t	aa_batterystatus;
     u_int8_t   	res1;
-} __attribute__ ((packed));
+} __packed;
 
 /*
  * Logical Drive info structure
@@ -180,7 +215,7 @@ struct amr_logdrive_info
     u_int32_t	al_size[AMR_8LD_MAXDRIVES];
     u_int8_t	al_properties[AMR_8LD_MAXDRIVES];
     u_int8_t	al_state[AMR_8LD_MAXDRIVES];
-} __attribute__ ((packed));
+} __packed;
 
 /*
  * Physical Drive info structure
@@ -189,7 +224,7 @@ struct amr_physdrive_info
 {
     u_int8_t	ap_state[AMR_8LD_MAXPHYSDRIVES];	/* low nibble current state, high nibble previous state */
     u_int8_t	ap_predictivefailure;
-} __attribute__ ((packed));
+} __packed;
 
 /*
  * Enquiry response structure for AMR_CMD_ENQUIRY, AMR_CMD_EXT_ENQUIRY and
@@ -216,7 +251,7 @@ struct amr_enquiry
 #define AMR_SIG_T7	0xfff80007
 #define AMR_SIG_490	0xfff70008
     u_int8_t			res2[844];			/*			X */
-} __attribute__ ((packed));
+} __packed;
 
 
 /********************************************************************************
@@ -254,7 +289,7 @@ struct amr_prodinfo
     u_int16_t	ap_subsystem;		/* subsystem identifier */
     u_int16_t	ap_subvendor;		/* subsystem vendor ID */
     u_int8_t	ap_numnotifyctr;	/* number of notify counters */
-} __attribute__((packed));
+} __packed;
 
 /*
  * Notify structure
@@ -319,7 +354,7 @@ struct amr_notify
     u_int8_t	an_fcloopstate0;
     u_int8_t	an_fcloopstate1;
     u_int8_t	res4;
-} __attribute__((packed));
+} __packed;
 
 /*
  * Enquiry3 structure
@@ -346,7 +381,7 @@ struct amr_enquiry3
     u_int8_t	ae_targxfer[80];			/* physical drive transfer rates */
 
     u_int8_t	res1[263];		/* pad to 1024 bytes */
-} __attribute__ ((packed));
+} __packed;
 
 
 /********************************************************************************
@@ -374,13 +409,13 @@ struct amr_mailbox
     u_int8_t	mb_poll;
     u_int8_t	mb_ack;
     u_int8_t	res2[16];
-} __attribute__ ((packed));
+} __packed;
 
 struct amr_mailbox64
 {
     u_int32_t		mb64_segment;	/* for 64-bit controllers */
     struct amr_mailbox	mb;
-} __attribute__ ((packed));
+} __packed;
 
 struct amr_mailbox_ioctl
 {
@@ -399,13 +434,13 @@ struct amr_mailbox_ioctl
     u_int8_t	mb_poll;
     u_int8_t	mb_ack;
     u_int8_t	res4[16];
-} __attribute__ ((packed));
+} __packed;
 
 struct amr_sgentry
 {
     u_int32_t	sg_addr;
     u_int32_t	sg_count;
-} __attribute__ ((packed));
+} __packed;
 
 struct amr_passthrough
 {
@@ -426,7 +461,32 @@ struct amr_passthrough
     u_int8_t	ap_scsi_status;
     u_int32_t	ap_data_transfer_address;
     u_int32_t	ap_data_transfer_length;
-} __attribute__ ((packed));
+} __packed;
+
+struct amr_ext_passthrough
+{
+    u_int8_t	ap_timeout:3;
+    u_int8_t	ap_ars:1;
+    u_int8_t	ap_rsvd1:1;
+    u_int8_t	ap_cd_rom:1;
+    u_int8_t	ap_rsvd2:1;
+    u_int8_t	ap_islogical:1;
+    u_int8_t	ap_logical_drive_no;
+    u_int8_t	ap_channel;
+    u_int8_t	ap_scsi_id;
+    u_int8_t	ap_queue_tag;
+    u_int8_t	ap_queue_action;
+    u_int8_t	ap_cdb_length;
+    u_int8_t	ap_rsvd3;
+    u_int8_t	ap_cdb[AMR_MAX_EXTCDB_LEN];
+    u_int8_t	ap_no_sg_elements;
+    u_int8_t	ap_scsi_status;
+    u_int8_t	ap_request_sense_length;
+    u_int8_t	ap_request_sense_area[AMR_MAX_REQ_SENSE_LEN];
+    u_int8_t	ap_rsvd4;
+    u_int32_t	ap_data_transfer_address;
+    u_int32_t	ap_data_transfer_length;
+} __packed;
 
 #ifdef _KERNEL
 /********************************************************************************
@@ -542,4 +602,4 @@ struct amr_passthrough
 #define AMR_SGET_INITTARG(sc)	bus_space_read_1 (sc->amr_btag, sc->amr_bhandle, AMR_SMBOX_ENABLE + 3)
 #endif
 
-#endif _KERNEL
+#endif /* _KERNEL */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)file.h	8.3 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/file.h,v 1.22.2.6 2001/06/03 05:00:10 dillon Exp $
+ * $FreeBSD: src/sys/sys/file.h,v 1.22.2.7 2002/11/21 23:39:24 sam Exp $
  */
 
 #ifndef _SYS_FILE_H_
@@ -62,6 +62,7 @@ struct file {
 #define	DTYPE_PIPE	3	/* pipe */
 #define	DTYPE_FIFO	4	/* fifo (named pipe) */
 #define	DTYPE_KQUEUE	5	/* event queue */
+#define DTYPE_CRYPTO	6	/* crypto */
 	short	f_type;		/* descriptor type */
 	u_int	f_flag;		/* see fcntl.h */
 	struct	ucred *f_cred;	/* credentials associated with descriptor */

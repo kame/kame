@@ -2,7 +2,7 @@
  * Inline routines shareable across OS platforms.
  *
  * Copyright (c) 1994-2001 Justin T. Gibbs.
- * Copyright (c) 2000-2002 Adaptec Inc.
+ * Copyright (c) 2000-2003 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_inline.h#36 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_inline.h#44 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_inline.h,v 1.3.2.2 2002/09/27 16:29:35 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_inline.h,v 1.3.2.4 2003/03/07 23:20:36 gibbs Exp $
  */
 
 #ifndef _AIC79XX_INLINE_H_
@@ -109,7 +109,7 @@ ahd_set_modes(struct ahd_softc *ahd, ahd_mode src, ahd_mode dst)
 	 || ahd->dst_mode == AHD_MODE_UNKNOWN)
 		panic("Setting mode prior to saving it.\n");
 	if ((ahd_debug & AHD_SHOW_MODEPTR) != 0)
-		printf("Setting mode 0x%x\n",
+		printf("%s: Setting mode 0x%x\n", ahd_name(ahd),
 		       ahd_build_mode_state(ahd, src, dst));
 #endif
 	ahd_outb(ahd, MODE_PTR, ahd_build_mode_state(ahd, src, dst));
@@ -217,8 +217,11 @@ ahd_unpause(struct ahd_softc *ahd)
 	 * prior to the first change of the mode.
 	 */
 	if (ahd->saved_src_mode != AHD_MODE_UNKNOWN
-	 && ahd->saved_dst_mode != AHD_MODE_UNKNOWN)
+	 && ahd->saved_dst_mode != AHD_MODE_UNKNOWN) {
+		if ((ahd->flags & AHD_UPDATE_PEND_CMDS) != 0)
+			ahd_reset_cmds_pending(ahd);
 		ahd_set_modes(ahd, ahd->saved_src_mode, ahd->saved_dst_mode);
+	}
 
 	if ((ahd_inb(ahd, INTSTAT) & ~(SWTMINT | CMDCMPLT)) == 0)
 		ahd_outb(ahd, HCNTRL, ahd->unpause);
@@ -265,10 +268,10 @@ static __inline void
 ahd_setup_scb_common(struct ahd_softc *ahd, struct scb *scb)
 {
 	/* XXX Handle target mode SCBs. */
+	scb->crc_retry_count = 0;
 	if ((scb->flags & SCB_PACKETIZED) != 0) {
 		/* XXX what about ACA??  It is type 4, but TAG_TYPE == 0x3. */
 		scb->hscb->task_attribute= scb->hscb->control & SCB_TAG_TYPE;
-		scb->hscb->task_management = 0;
 		/*
 		 * For Rev A short lun workaround.
 		 */
@@ -675,7 +678,8 @@ ahd_inb_scbram(struct ahd_softc *ahd, u_int offset)
 	 * Razor #528
 	 */
 	value = ahd_inb(ahd, offset);
-	ahd_inb(ahd, MODE_PTR);
+	if ((ahd->flags & AHD_PCIX_SCBRAM_RD_BUG) != 0)
+		ahd_inb(ahd, MODE_PTR);
 	return (value);
 }
 
@@ -766,7 +770,7 @@ ahd_queue_scb(struct ahd_softc *ahd, struct scb *scb)
 	ahd_setup_scb_common(ahd, scb);
 
 	/*
-	 * Make sure our data is consistant from the
+	 * Make sure our data is consistent from the
 	 * perspective of the adapter.
 	 */
 	ahd_sync_scb(ahd, scb, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
@@ -898,8 +902,22 @@ ahd_intr(struct ahd_softc *ahd)
 		 * and after the sequencer has added new entries
 		 * and asserted the interrupt again.
 		 */
-		ahd_flush_device_writes(ahd);
+		if ((ahd->bugs & AHD_INTCOLLISION_BUG) != 0) {
+			if (ahd_is_paused(ahd)) {
+				/*
+				 * Potentially lost SEQINT.
+				 * If SEQINTCODE is non-zero,
+				 * simulate the SEQINT.
+				 */
+				if (ahd_inb(ahd, SEQINTCODE) != NO_SEQINT)
+					intstat |= SEQINT;
+			}
+		} else {
+			ahd_flush_device_writes(ahd);
+		}
 		ahd_run_qoutfifo(ahd);
+		ahd->cmdcmplt_counts[ahd->cmdcmplt_bucket]++;
+		ahd->cmdcmplt_total++;
 #ifdef AHD_TARGET_MODE
 		if ((ahd->flags & AHD_TARGETROLE) != 0)
 			ahd_run_tqinfifo(ahd, /*paused*/FALSE);

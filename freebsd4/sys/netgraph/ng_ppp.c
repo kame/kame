@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ppp.c,v 1.15.2.9 2002/07/02 23:44:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ppp.c,v 1.15.2.10 2003/03/10 17:55:48 archie Exp $
  * $Whistle: ng_ppp.c,v 1.24 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -1370,6 +1370,7 @@ ng_ppp_frag_checkstale(node_p node)
 	struct mbuf *m;
 	meta_p meta;
 	int i, seq;
+	int endseq;
 
 	now.tv_sec = 0;			/* uninitialized state */
 	while (1) {
@@ -1419,11 +1420,12 @@ ng_ppp_frag_checkstale(node_p node)
 		}
 
 		/* Extract completed packet */
+		endseq = end->seq;
 		ng_ppp_get_packet(node, &m, &meta);
 
 		/* Bump MSEQ if necessary */
-		if (MP_RECV_SEQ_DIFF(priv, priv->mseq, end->seq) < 0) {
-			priv->mseq = end->seq;
+		if (MP_RECV_SEQ_DIFF(priv, priv->mseq, endseq) < 0) {
+			priv->mseq = endseq;
 			for (i = 0; i < priv->numActiveLinks; i++) {
 				struct ng_ppp_link *const alink =
 				    &priv->links[priv->activeLinks[i]];

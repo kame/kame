@@ -24,7 +24,35 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.2.2.2 2000/10/28 10:16:59 msmith Exp $
+ * Copyright (c) 2002 Eric Moore
+ * Copyright (c) 2002 LSI Logic Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The party using or redistributing the source code and binary forms
+ *    agrees to the disclaimer below and the terms and conditions set forth
+ *    herein.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.2.2.5 2002/12/20 15:12:04 emoore Exp $
  */
 
 #if __FreeBSD_version >= 500005
@@ -32,13 +60,13 @@
 #endif
 
 #ifdef AMR_DEBUG
-# define debug(level, fmt, args...)	do {if (level <= AMR_DEBUG) printf("%s: " fmt "\n", __FUNCTION__ , ##args);} while(0)
-# define debug_called(level)		do {if (level <= AMR_DEBUG) printf("%s: called\n", __FUNCTION__);} while(0)
+# define debug(level, fmt, args...)	do {if (level <= AMR_DEBUG) printf("%s: " fmt "\n", __func__ , ##args);} while(0)
+# define debug_called(level)		do {if (level <= AMR_DEBUG) printf("%s: called\n", __func__);} while(0)
 #else
 # define debug(level, fmt, args...)
 # define debug_called(level)
 #endif
-#define xdebug(fmt, args...)	printf("%s: " fmt "\n", __FUNCTION__ , ##args)
+#define xdebug(fmt, args...)	printf("%s: " fmt "\n", __func__ , ##args)
 
 /*
  * Per-logical-drive datastructure
@@ -103,6 +131,7 @@ struct amr_command
     u_int32_t			ac_ccb_dataphys;
 
     void			(* ac_complete)(struct amr_command *ac);
+    void			*ac_private;
 };
 
 struct amr_command_cluster
@@ -181,6 +210,8 @@ struct amr_softc
 #define AMR_IS_40LD(sc)		((sc)->amr_type & AMR_TYPE_40LD)
     int				(* amr_submit_command)(struct amr_softc *sc);
     int				(* amr_get_work)(struct amr_softc *sc, struct amr_mailbox *mbsave);
+    int				(*amr_poll_command)(struct amr_command *ac);
+    int 			support_ext_cdb;	/* greater than 10 byte cdb support */
 
     /* misc glue */
     struct intr_config_hook	amr_ich;		/* wait-for-interrupts probe hook */
@@ -198,8 +229,6 @@ extern void		amr_free(struct amr_softc *sc);
 extern int		amr_flush(struct amr_softc *sc);
 extern int		amr_done(struct amr_softc *sc);
 extern void		amr_startio(struct amr_softc *sc);
-
-extern devclass_t	amr_devclass;
 
 /*
  * Command buffer allocation.
@@ -225,7 +254,6 @@ struct amrd_softc
     struct amr_logdrive	*amrd_drive;
     struct disk		amrd_disk;
     struct devstat	amrd_stats;
-    struct disklabel	amrd_label;
     int			amrd_unit;
     int			amrd_flags;
 #define AMRD_OPEN	(1<<0)		/* drive is open (can't detach) */

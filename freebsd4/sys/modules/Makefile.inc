@@ -1,2 +1,6 @@
-# $FreeBSD: src/sys/modules/Makefile.inc,v 1.2.2.1 2002/07/17 14:10:26 ru Exp $
+# $FreeBSD: src/sys/modules/Makefile.inc,v 1.2.2.2 2002/12/01 09:01:07 nyan Exp $
+
+.if ${MACHINE} == "pc98"
+CFLAGS+= -DPC98
+.endif
 

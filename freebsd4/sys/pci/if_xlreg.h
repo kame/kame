@@ -29,13 +29,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_xlreg.h,v 1.25.2.2 2001/05/31 22:09:53 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_xlreg.h,v 1.25.2.7 2003/01/25 23:00:10 silby Exp $
  */
 
 #define XL_EE_READ	0x0080	/* read, 5 bit address */
 #define XL_EE_WRITE	0x0040	/* write, 5 bit address */
 #define XL_EE_ERASE	0x00c0	/* erase, 5 bit address */
 #define XL_EE_EWEN	0x0030	/* erase, no data needed */
+#define XL_EE_8BIT_READ	0x0200	/* read, 8 bit address */
 #define XL_EE_BUSY	0x8000
 
 #define XL_EE_EADDR0	0x00	/* station address, first word */
@@ -247,6 +248,9 @@
 #define XL_RESETOPT_TESTPDTPDR	0x0800
 #define XL_RESETOPT_TEST100TX	0x1000
 #define XL_RESETOPT_TEST100RX	0x2000
+
+#define XL_RESETOPT_INVERT_LED	0x0010
+#define XL_RESETOPT_INVERT_MII	0x4000
 
 /*
  * Window 3 (fifo management)
@@ -554,6 +558,11 @@ struct xl_mii_frame {
 #define XL_FLAG_EEPROM_OFFSET_30	0x0004
 #define XL_FLAG_WEIRDRESET		0x0008
 #define XL_FLAG_8BITROM			0x0010
+#define XL_FLAG_INVERT_LED_PWR		0x0020
+#define XL_FLAG_INVERT_MII_PWR		0x0040
+#define XL_FLAG_NO_XCVR_PWR		0x0080
+
+#define XL_NO_XCVR_PWR_MAGICBITS	0x0900
 
 struct xl_softc {
 	struct arpcom		arpcom;		/* interface info */
@@ -648,12 +657,20 @@ struct xl_stats {
 #define TC_DEVICEID_CYCLONE_10_100_COMBO	0x9058
 #define TC_DEVICEID_CYCLONE_10_100FX		0x905A
 #define TC_DEVICEID_TORNADO_10_100BT		0x9200
+#define TC_DEVICEID_TORNADO_10_100BT_920B	0x9201
 #define TC_DEVICEID_HURRICANE_10_100BT_SERV	0x9800
 #define TC_DEVICEID_TORNADO_10_100BT_SERV	0x9805
 #define TC_DEVICEID_HURRICANE_SOHO100TX		0x7646
 #define TC_DEVICEID_TORNADO_HOMECONNECT		0x4500
+#define TC_DEVICEID_HURRICANE_555		0x5055
 #define TC_DEVICEID_HURRICANE_556		0x6055
 #define TC_DEVICEID_HURRICANE_556B		0x6056
+#define TC_DEVICEID_HURRICANE_575A		0x5057
+#define TC_DEVICEID_HURRICANE_575B		0x5157
+#define TC_DEVICEID_HURRICANE_575C		0x5257
+#define TC_DEVICEID_HURRICANE_656		0x6560
+#define TC_DEVICEID_HURRICANE_656B		0x6562
+#define TC_DEVICEID_TORNADO_656C		0x6564
 
 /*
  * PCI low memory base and low I/O base register, and

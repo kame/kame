@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan.c,v 1.15.2.12 2002/04/04 05:51:55 luigi Exp $
+ * $FreeBSD: src/sys/net/if_vlan.c,v 1.15.2.13 2003/02/14 22:25:58 fenner Exp $
  */
 
 /*
@@ -637,6 +637,29 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			bcopy(((struct arpcom *)ifp->if_softc)->ac_enaddr,
 			      (caddr_t) sa->sa_data, ETHER_ADDR_LEN);
 		}
+		break;
+
+	case SIOCGIFMEDIA:
+		if (ifv->ifv_p != NULL) {
+			error = (ifv->ifv_p->if_ioctl)(ifv->ifv_p, SIOCGIFMEDIA, data);
+			/* Limit the result to the parent's current config. */
+			if (error == 0) {
+				struct ifmediareq *ifmr;
+
+				ifmr = (struct ifmediareq *) data;
+				if (ifmr->ifm_count >= 1 && ifmr->ifm_ulist) {
+					ifmr->ifm_count = 1;
+					error = copyout(&ifmr->ifm_current,
+						ifmr->ifm_ulist, 
+						sizeof(int));
+				}
+			}
+		} else
+			error = EINVAL;
+		break;
+
+	case SIOCSIFMEDIA:
+		error = EINVAL;
 		break;
 
 	case SIOCSIFMTU:

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.6 2001/12/20 10:30:16 ru Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.7 2003/01/23 21:06:44 sam Exp $
  */
 
 /*
@@ -154,17 +154,15 @@ looutput(ifp, m, dst, rt)
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
 		if (!n)
 			goto contiguousfail;
+		M_MOVE_PKTHDR(n, m);
 		MCLGET(n, M_DONTWAIT);
 		if (! (n->m_flags & M_EXT)) {
 			m_freem(n);
 			goto contiguousfail;
 		}
 
-		m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
-		n->m_pkthdr = m->m_pkthdr;
-		n->m_len = m->m_pkthdr.len;
-		n->m_pkthdr.aux = m->m_pkthdr.aux;
-		m->m_pkthdr.aux = (struct mbuf *)NULL;
+		m_copydata(m, 0, n->m_pkthdr.len, mtod(n, caddr_t));
+		n->m_len = n->m_pkthdr.len;
 		m_freem(m);
 		m = n;
 	}

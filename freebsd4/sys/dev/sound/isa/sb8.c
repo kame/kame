@@ -36,7 +36,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.62.2.4 2002/04/22 15:49:31 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.62.2.5 2002/12/24 21:17:42 semenu Exp $");
 
 #define SB_DEFAULT_BUFSZ	4096
 
@@ -127,7 +127,7 @@ port_rd(struct resource *port, int off)
 static void
 port_wr(struct resource *port, int off, u_int8_t data)
 {
-	return bus_space_write_1(rman_get_bustag(port), rman_get_bushandle(port), off, data);
+	bus_space_write_1(rman_get_bustag(port), rman_get_bushandle(port), off, data);
 }
 
 static int

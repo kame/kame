@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ciss/cissvar.h,v 1.3.2.1 2001/12/12 06:38:16 ps Exp $
+ *	$FreeBSD: src/sys/dev/ciss/cissvar.h,v 1.3.2.2 2003/02/06 21:42:59 ps Exp $
  */
 
 /*
@@ -158,6 +158,7 @@ struct ciss_ldrive
 
     struct ciss_bmic_id_ldrive	*cl_ldrive;
     struct ciss_bmic_id_lstatus	*cl_lstatus;
+    struct ciss_ldrive_geometry	cl_geometry;
 
     char			cl_name[16];		/* device name */
 };

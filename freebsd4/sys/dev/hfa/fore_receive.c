@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.5.2.1 2001/07/20 20:43:17 pirzyk Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.5.2.2 2003/01/23 21:06:43 sam Exp $
  *
  */
 
@@ -38,7 +38,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.5.2.1 2001/07/20 20:43:17 pirzyk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.5.2.2 2003/01/23 21:06:43 sam Exp $");
 #endif
 
 
@@ -421,7 +421,7 @@ retry:
 		 */
 		mhead->m_pkthdr.rcvif = NULL;
 		mhead->m_pkthdr.csum_flags = 0;
-		mhead->m_pkthdr.aux   = NULL; 
+		SLIST_INIT(&mhead->m_pkthdr.tags);
 		KB_PLENSET(mhead, pdulen);
 		fup->fu_pif.pif_ipdus++;
 		fup->fu_pif.pif_ibytes += pdulen;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/ipl_funcs.c,v 1.15.2.4 2001/07/26 18:53:01 peter Exp $
+ * $FreeBSD: src/sys/alpha/alpha/ipl_funcs.c,v 1.15.2.5 2002/12/30 18:43:06 sam Exp $
  */
 
 #include <sys/param.h>
@@ -160,6 +160,7 @@ GENSET(setsoftcambio,	&ipending,	1 << SWI_CAMBIO)
 GENSET(setsoftvm,	&ipending,	1 << SWI_VM)
 GENSET(setsofttq,	&ipending,	1 << SWI_TQ)
 GENSET(setsoftclock,	&ipending,	1 << SWI_CLOCK)
+GENSET(setsoftcrypto,	&ipending,	1 << SWI_CRYPTO)
 
 GENSET(schedsofttty,	&idelayed,	1 << SWI_TTY)
 GENSET(schedsoftnet,	&idelayed,	1 << SWI_NET)

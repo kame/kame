@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.7 2002/08/09 14:49:22 ru Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.12 2003/02/27 04:50:02 silby Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
@@ -63,6 +63,7 @@ struct ipq {
 	u_short	ipq_id;			/* sequence id for reassembly */
 	struct mbuf *ipq_frags;		/* to ip headers of fragments */
 	struct	in_addr ipq_src,ipq_dst;
+	u_char	ipq_nfrags;		/* # frags in this packet */
 #ifdef IPDIVERT
 	u_int32_t ipq_div_info;		/* ipfw divert port & flags */
 	u_int16_t ipq_div_cookie;	/* ipfw divert cookie */
@@ -163,7 +164,8 @@ void	 ip_init(void);
 extern int	 (*ip_mforward)(struct ip *, struct ifnet *, struct mbuf *,
 			  struct ip_moptions *);
 int	 ip_output(struct mbuf *,
-	    struct mbuf *, struct route *, int, struct ip_moptions *);
+	    struct mbuf *, struct route *, int, struct ip_moptions *,
+	    struct inpcb *);
 struct in_ifaddr *
 	 ip_rtaddr(struct in_addr, struct route *);
 void	 ip_savecontrol(struct inpcb *, struct mbuf **, struct ip *,
@@ -181,13 +183,13 @@ void	rip_ctlinput(int, struct sockaddr *, void *);
 void	rip_init(void);
 void	rip_input(struct mbuf *, int, int);
 int	rip_output(struct mbuf *, struct socket *, u_long);
-void	ipip_input(struct mbuf *, int, int);
+extern void	(*ipip_input)(struct mbuf *, int, int);
 void	rsvp_input(struct mbuf *, int, int);
 int	ip_rsvp_init(struct socket *);
 int	ip_rsvp_done(void);
-int	ip_rsvp_vif_init(struct socket *, struct sockopt *);
-int	ip_rsvp_vif_done(struct socket *, struct sockopt *);
-void	ip_rsvp_force_done(struct socket *);
+extern int	(*ip_rsvp_vif)(struct socket *, struct sockopt *);
+extern void	(*ip_rsvp_force_done)(struct socket *);
+extern void	(*rsvp_input_p)(struct mbuf *m, int off, int proto);
 
 #ifdef IPDIVERT
 void	div_init(void);

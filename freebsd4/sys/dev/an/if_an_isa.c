@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.4 2001/09/26 01:02:01 brooks Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.5 2003/02/01 03:25:12 ambrisko Exp $
  */
 
 /*
@@ -49,7 +49,6 @@
 #include <sys/systm.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
-#include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
 
@@ -74,7 +73,7 @@
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.4 2001/09/26 01:02:01 brooks Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.5 2003/02/01 03:25:12 ambrisko Exp $";
 #endif
 
 static struct isa_pnp_id an_ids[] = {

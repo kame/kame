@@ -33,7 +33,7 @@
  * 
  *	@(#)ipx_ip.c
  *
- * $FreeBSD: src/sys/netipx/ipx_ip.c,v 1.24.2.1 2001/02/22 09:44:18 bp Exp $
+ * $FreeBSD: src/sys/netipx/ipx_ip.c,v 1.24.2.2 2003/01/23 21:06:48 sam Exp $
  */
 
 /*
@@ -295,7 +295,7 @@ ipxipoutput(ifp, m, dst, rt)
 	/*
 	 * Output final datagram.
 	 */
-	error =  (ip_output(m, (struct mbuf *)NULL, ro, SO_BROADCAST, NULL));
+	error =  (ip_output(m, (struct mbuf *)NULL, ro, SO_BROADCAST, NULL, NULL));
 	if (error) {
 		ifn->ifen_ifnet.if_oerrors++;
 		ifn->ifen_ifnet.if_ierrors = error;

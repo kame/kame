@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_node.h,v 1.1.2.1 2001/05/22 08:32:26 bp Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_node.h,v 1.1.2.2 2003/01/17 08:20:26 tjr Exp $
  */
 #ifndef _FS_SMBFS_NODE_H_
 #define _FS_SMBFS_NODE_H_
@@ -48,7 +48,7 @@ struct smbfs_fctx;
 struct smbnode {
 	struct lock		n_lock;		/* smbnode lock. (mbf) */
 	int			n_flag;
-	struct smbnode *	n_parent;
+	struct vnode *		n_parent;
 	struct vnode *		n_vnode;
 	struct smbmount *	n_mount;
 	time_t			n_attrage;	/* attributes cache time */

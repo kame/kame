@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.31 2002/08/01 17:26:24 blackend Exp $
+# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.35 2003/02/10 13:11:51 nyan Exp $
 
 machine		pc98
 cpu		I386_CPU
@@ -45,7 +45,7 @@ options 	CD9660_ROOT		#CD-ROM usable as root, CD9660 required
 options 	PROCFS			#Process filesystem
 options 	COMPAT_43		#Compatible with BSD 4.3 [KEEP THIS!]
 options 	SCSI_DELAY=15000	#Delay (in ms) before probing SCSI
-options 	EPSON_BOUNCEDMA		#use bounce buufer for 15-16M
+options 	EPSON_BOUNCEDMA		#use bounce buffer for 15-16M
 #options 	EPSON_MEMWIN		#EPSON memory window support
 options 	UCONSOLE		#Allow users to grab the console
 #options 	LINE30
@@ -57,7 +57,7 @@ options 	SYSVMSG			#SYSV-style message queues
 options 	SYSVSEM			#SYSV-style semaphores
 options 	P1003_1B		#Posix P1003_1B real-time extensions
 options 	_KPOSIX_PRIORITY_SCHEDULING
-options		ICMP_BANDLIM		#Rate limit bad replies
+options 	ICMP_BANDLIM		#Rate limit bad replies
 
 # To make an SMP kernel, the next two are needed
 #options 	SMP			# Symmetric MultiProcessor Kernel
@@ -76,9 +76,9 @@ device		fd3	at fdc0 drive 3
 # IDE controller and disks
 device		wdc0	at isa? port IO_WD1 irq 9
 device		wd0	at wdc0 drive 0
-#device		wd1	at wdc0 drive 1
-#device		wd2	at wdc0 drive 2
-#device		wd3	at wdc0 drive 3
+device		wd1	at wdc0 drive 2
+device		wd2	at wdc0 drive 1
+device		wd3	at wdc0 drive 3
 
 # ATAPI devices on wdc
 device		wcd		#IDE CD-ROM
@@ -92,7 +92,7 @@ device		amd		# AMD 53C974 (Tekram DC-390(T))
 device		isp		# Qlogic family
 device		ncr		# NCR/Symbios Logic
 device		sym		# NCR/Symbios Logic (newer chipsets)
-options		SYM_SETUP_LP_PROBE_MAP=0x40
+options 	SYM_SETUP_LP_PROBE_MAP=0x40
 				# Allow ncr to attach legacy NCR devices when 
 				# both sym and ncr are configured
 
@@ -103,7 +103,7 @@ device	aic0	at isa? port 0x1840 irq 5 flags 0x10000
 # WD33C93 SCSI card (55/92 like board)
 #
 
-options	BS_TARG_SAFEMODE
+options 	BS_TARG_SAFEMODE
 
 # PC-9801-92
 device bs0 at isa? port IO_SCSI irq 5 drq 3 flags 0
@@ -157,6 +157,8 @@ device		npx0	at nexus? port IO_NPX irq 8
 # Power management support (see LINT for more options)
 #device		apm0	at nexus? disable flags 0x20 # Advanced Power Management
 #device		pmc0	at isa? port 0x8f0
+#device		canbus
+#device		canbepm
 
 # PCCARD (PCMCIA) support
 device		card

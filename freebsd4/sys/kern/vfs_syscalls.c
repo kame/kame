@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.16 2002/04/26 00:46:04 iedowse Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.17 2003/01/02 17:26:18 bde Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -2698,14 +2698,10 @@ rename(p, uap)
 	if (fvp == tdvp)
 		error = EINVAL;
 	/*
-	 * If source is the same as the destination (that is the
-	 * same inode number with the same name in the same directory),
-	 * then there is nothing to do.
+	 * If the source is the same as the destination (that is, if they
+	 * are links to the same vnode), then there is nothing to do.
 	 */
-	if (fvp == tvp && fromnd.ni_dvp == tdvp &&
-	    fromnd.ni_cnd.cn_namelen == tond.ni_cnd.cn_namelen &&
-	    !bcmp(fromnd.ni_cnd.cn_nameptr, tond.ni_cnd.cn_nameptr,
-	      fromnd.ni_cnd.cn_namelen))
+	if (fvp == tvp)
 		error = -1;
 out:
 	if (!error) {

@@ -1,6 +1,6 @@
 /**************************************************************************
 
-Copyright (c) 2001-2002, Intel Corporation
+Copyright (c) 2001-2003, Intel Corporation
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em.h,v 1.1.2.9 2002/09/26 16:34:41 pdeuskar Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em.h,v 1.1.2.11 2003/01/03 18:18:56 pdeuskar Exp $*/
 
 #ifndef _EM_H_DEFINED_
 #define _EM_H_DEFINED_
@@ -76,21 +76,154 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <dev/em/if_em_hw.h>
 
 /* Tunables */
-#define MAX_TXD                         256
-#define MAX_RXD                         256
-#define TX_CLEANUP_THRESHOLD            MAX_TXD / 8
-#define TIDV                            128     
-#define RIDV                            28      
-#define DO_AUTO_NEG                     1       
-#define WAIT_FOR_AUTO_NEG_DEFAULT       1       
+
+/*
+ * FlowControl
+ * Valid Range: 0-3 (0=none, 1=Rx only, 2=Tx only, 3=Rx&Tx)
+ * Default: Read flow control settings from the EEPROM
+ *   This parameter controls the automatic generation(Tx) and response(Rx) to
+ *   Ethernet PAUSE frames.
+ */
+
+
+/*
+ * TxDescriptors
+ * Valid Range: 80-256 for 82542 and 82543-based adapters
+ *            80-4096 for 82540, 82544, 82545, and 82546-based adapters
+ * Default Value: 256
+ *   This value is the number of transmit descriptors allocated by the driver.
+ *   Increasing this value allows the driver to queue more transmits. Each
+ *   descriptor is 16 bytes.
+ */
+#define EM_MAX_TXD                      256
+
+/*
+ * RxDescriptors
+ * Valid Range: 80-256 for 82542 and 82543-based adapters
+ *            80-4096 for 82540, 82544, 82545, and 82546-based adapters
+ * Default Value: 256
+ *   This value is the number of receive descriptors allocated by the driver.
+ *   Increasing this value allows the driver to buffer more incoming packets.
+ *   Each descriptor is 16 bytes.  A receive buffer is also allocated for each
+ *   descriptor. The maximum MTU size is 16110.
+ *
+ */
+#define EM_MAX_RXD                      256
+
+/*
+ * TxIntDelay
+ * Valid Range: 0-65535 (0=off)
+ * Default Value: 64
+ *   This value delays the generation of transmit interrupts in units of
+ *   1.024 microseconds. Transmit interrupt reduction can improve CPU
+ *   efficiency if properly tuned for specific network traffic. If the
+ *   system is reporting dropped transmits, this value may be set too high
+ *   causing the driver to run out of available transmit descriptors.
+ */
+#define EM_TIDV                         64
+
+/*
+ * TxAbsIntDelay (82540, 82545, and 82546-based adapters only)
+ * Valid Range: 0-65535 (0=off)
+ * Default Value: 64
+ *   This value, in units of 1.024 microseconds, limits the delay in which a
+ *   transmit interrupt is generated. Useful only if TxIntDelay is non-zero,
+ *   this value ensures that an interrupt is generated after the initial
+ *   packet is sent on the wire within the set amount of time.  Proper tuning,
+ *   along with TxIntDelay, may improve traffic throughput in specific
+ *   network conditions.
+ */
+#define EM_TADV                         64
+
+/*
+ * RxIntDelay
+ * Valid Range: 0-65535 (0=off)
+ * Default Value: 0
+ *   This value delays the generation of receive interrupts in units of 1.024
+ *   microseconds.  Receive interrupt reduction can improve CPU efficiency if
+ *   properly tuned for specific network traffic. Increasing this value adds
+ *   extra latency to frame reception and can end up decreasing the throughput
+ *   of TCP traffic. If the system is reporting dropped receives, this value
+ *   may be set too high, causing the driver to run out of available receive
+ *   descriptors.
+ *
+ *   CAUTION: When setting RxIntDelay to a value other than 0, adapters
+ *            may hang (stop transmitting) under certain network conditions.
+ *            If this occurs a WATCHDOG message is logged in the system event log.
+ *            In addition, the controller is automatically reset, restoring the
+ *            network connection. To eliminate the potential for the hang
+ *            ensure that RxIntDelay is set to 0.
+ */
+#define EM_RDTR                         0
+
+/*
+ * RxAbsIntDelay (82540, 82545, and 82546-based adapters only)
+ * Valid Range: 0-65535 (0=off)
+ * Default Value: 64
+ *   This value, in units of 1.024 microseconds, limits the delay in which a
+ *   receive interrupt is generated. Useful only if RxIntDelay is non-zero,
+ *   this value ensures that an interrupt is generated after the initial
+ *   packet is received within the set amount of time.  Proper tuning,
+ *   along with RxIntDelay, may improve traffic throughput in specific network
+ *   conditions.
+ */
+#define EM_RADV                         64
+
+
+/*
+ * This parameter controls the maximum no of times the driver will loop
+ * in the isr.
+ *           Minimum Value = 1
+ */
+#define EM_MAX_INTR                     3
+
+
+/*
+ * This parameter determines when the hardware will report that it is
+ * done with the packet.
+ *           0 - "Done" is reported when the packet has been sent on the wire
+ *           1 - "Done" is reported when the packet has been DMA'ed and is on chip.
+ *           2 -  Determine the best method.
+ */
+#define EM_REPORT_TX_EARLY              2
+
+/*
+ * Inform the stack about transmit checksum offload capabilities.
+ */
+#define EM_CHECKSUM_FEATURES            (CSUM_TCP | CSUM_UDP)
+
+/*
+ * This parameter controls the duration of transmit watchdog timer.
+ */
+#define EM_TX_TIMEOUT                   5    /* set to 5 seconds */
+
+/*
+ * This parameter controls when the driver calls the routine to reclaim
+ * transmit descriptors.
+ */
+#define EM_TX_CLEANUP_THRESHOLD         EM_MAX_TXD / 8
+
+/*
+ * This parameter controls whether or not autonegotation is enabled.
+ *              0 - Disable autonegotiation
+ *              1 - Enable  autonegotiation
+ */
+#define DO_AUTO_NEG                     1
+
+/*
+ * This parameter control whether or not the driver will wait for
+ * autonegotiation to complete.
+ *              1 - Wait for autonegotiation to complete
+ *              0 - Don't wait for autonegotiation to complete
+ */
+#define WAIT_FOR_AUTO_NEG_DEFAULT       1
+
+
+/* Tunables -- End */
+
 #define AUTONEG_ADV_DEFAULT             (ADVERTISE_10_HALF | ADVERTISE_10_FULL | \
                                          ADVERTISE_100_HALF | ADVERTISE_100_FULL | \
                                          ADVERTISE_1000_FULL)
-#define EM_REPORT_TX_EARLY              2
-#define EM_CHECKSUM_FEATURES            (CSUM_TCP | CSUM_UDP)
-#define EM_MAX_INTR                     3
-#define EM_TX_TIMEOUT                   5    /* set to 5 seconds */
-
 
 #define EM_VENDOR_ID                    0x8086
 #define EM_MMBA                         0x0010 /* Mem base address */
@@ -101,7 +234,11 @@ POSSIBILITY OF SUCH DAMAGE.
 #define IOCTL_CMD_TYPE                  u_long
 #define MAX_NUM_MULTICAST_ADDRESSES     128
 #define PCI_ANY_ID                      (~0U)
+
+#ifndef ETHER_ALIGN
 #define ETHER_ALIGN                     2
+#endif
+
 #define QTAG_TYPE                       0x8100
 
 /* Defines for printing debug information */
@@ -138,8 +275,7 @@ POSSIBILITY OF SUCH DAMAGE.
  * should load.
  *
  * ******************************************************************************/
-typedef struct _em_vendor_info_t
-{
+typedef struct _em_vendor_info_t {
 	unsigned int vendor_id;
 	unsigned int device_id;
 	unsigned int subvendor_id;
@@ -148,22 +284,10 @@ typedef struct _em_vendor_info_t
 } em_vendor_info_t;
 
 
-struct em_tx_buffer {
-	STAILQ_ENTRY(em_tx_buffer) em_tx_entry;
+struct em_buffer {
 	struct mbuf    *m_head;
-	u_int32_t       num_tx_desc_used;
 };
 
-
-/* ******************************************************************************
- * This structure stores information about the 2k aligned receive buffer
- * into which the E1000 DMA's frames. 
- * ******************************************************************************/
-struct em_rx_buffer {
-	STAILQ_ENTRY(em_rx_buffer) em_rx_entry;
-	struct mbuf    *m_head;
-	u_int64_t      buffer_addr;
-};
 
 typedef enum _XSUM_CONTEXT_T {
 	OFFLOAD_NONE,
@@ -196,32 +320,43 @@ struct adapter {
 	u_int16_t       link_speed;
 	u_int16_t       link_duplex;
 	u_int32_t       tx_int_delay;
+	u_int32_t       tx_abs_int_delay;
 	u_int32_t       rx_int_delay;
+	u_int32_t       rx_abs_int_delay;
 
 	XSUM_CONTEXT_T  active_checksum_context;
 
-	/* Transmit definitions */
-	struct em_tx_desc *first_tx_desc;
-	struct em_tx_desc *last_tx_desc;
-	struct em_tx_desc *next_avail_tx_desc;
-	struct em_tx_desc *oldest_used_tx_desc;
-	struct em_tx_desc *tx_desc_base;
-	volatile u_int16_t num_tx_desc_avail;
-	u_int16_t       num_tx_desc;
-	u_int32_t       txd_cmd;
-	struct em_tx_buffer   *tx_buffer_area;
-	STAILQ_HEAD(__em_tx_buffer_free, em_tx_buffer)  free_tx_buffer_list;
-	STAILQ_HEAD(__em_tx_buffer_used, em_tx_buffer)  used_tx_buffer_list;
+	/*
+         * Transmit definitions
+         *
+         * We have an array of num_tx_desc descriptors (handled
+         * by the controller) paired with an array of tx_buffers
+         * (at tx_buffer_area).
+         * The index of the next available descriptor is next_avail_tx_desc.
+         * The number of remaining tx_desc is num_tx_desc_avail.
+         */
+        struct em_tx_desc *tx_desc_base;
+        u_int32_t          next_avail_tx_desc;
+	u_int32_t          oldest_used_tx_desc;
+        volatile u_int16_t num_tx_desc_avail;
+        u_int16_t          num_tx_desc;
+        u_int32_t          txd_cmd;
+        struct em_buffer   *tx_buffer_area;
 
-	/* Receive definitions */
-	struct em_rx_desc *first_rx_desc;
-	struct em_rx_desc *last_rx_desc;
-	struct em_rx_desc *next_rx_desc_to_check;
-	struct em_rx_desc *rx_desc_base;
-	u_int16_t       num_rx_desc;
-	u_int32_t       rx_buffer_len;
-	struct em_rx_buffer   *rx_buffer_area;
-	STAILQ_HEAD(__em_rx_buffer, em_rx_buffer)  rx_buffer_list;
+	/* 
+	 * Receive definitions
+         *
+         * we have an array of num_rx_desc rx_desc (handled by the
+         * controller), and paired with an array of rx_buffers
+         * (at rx_buffer_area).
+         * The next pair to check on receive is at offset next_rx_desc_to_check
+         */
+        struct em_rx_desc *rx_desc_base;
+        u_int32_t          next_rx_desc_to_check;
+        u_int16_t          num_rx_desc;
+        u_int32_t          rx_buffer_len;
+        struct em_buffer   *rx_buffer_area;
+
 
 	/* Jumbo frame */
 	struct mbuf     *fmp;
@@ -232,10 +367,8 @@ struct adapter {
 	unsigned long   dropped_pkts;
 	unsigned long   mbuf_alloc_failed;
 	unsigned long   mbuf_cluster_failed;
-	unsigned long   xmit_pullup;
-	unsigned long   no_tx_desc_avail;
-	unsigned long   no_tx_buffer_avail1;
-	unsigned long   no_tx_buffer_avail2;
+	unsigned long   no_tx_desc_avail1;
+	unsigned long   no_tx_desc_avail2;
 #ifdef DBG_STATS
 	unsigned long   no_pkts_avail;
 	unsigned long   clean_tx_interrupts;

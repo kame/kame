@@ -43,7 +43,7 @@
  *	       arrays that span controllers (Wow!).
  */
 
-#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.28.2.2 2001/03/05 13:08:56 obrien Exp $"
+#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.28.2.3 2003/01/31 02:47:10 grog Exp $"
 
 #define _DPT_C_
 
@@ -1562,7 +1562,7 @@ dpt_intr(void *arg)
 
 		/* Ignore status packets with EOC not set */
 		if (dpt->sp->EOC == 0) {
-			printf("dpt%d ERROR: Request %d recieved with "
+			printf("dpt%d ERROR: Request %d received with "
 			       "clear EOC.\n     Marking as LOST.\n",
 			       dpt->unit, dccb->transaction_id);
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/buf.h,v 1.88.2.7 2001/12/25 01:44:44 dillon Exp $
+ * $FreeBSD: src/sys/sys/buf.h,v 1.88.2.10 2003/01/25 19:02:23 dillon Exp $
  */
 
 #ifndef _SYS_BUF_H_
@@ -455,9 +455,17 @@ bufq_first(struct buf_queue_head *head)
 	(bp)->b_resid = 0;						\
 }
 
-/* Flags to low-level allocation routines. */
-#define B_CLRBUF	0x01	/* Request allocated buffer be cleared. */
-#define B_SYNC		0x02	/* Do all allocations synchronously. */
+/*
+ * Flags to low-level bitmap allocation routines (balloc).
+ *
+ * Note: sequential_heuristic() in kern/vfs_vnops.c limits the count
+ * to 127.
+ */
+#define B_SEQMASK	0x7F000000	/* Sequential heuristic mask. */
+#define B_SEQSHIFT	24		/* Sequential heuristic shift. */
+#define B_SEQMAX	0x7F
+#define B_CLRBUF	0x01		/* Cleared invalid areas of buffer. */
+#define B_SYNC		0x02		/* Do all allocations synchronously. */
 
 #ifdef _KERNEL
 extern int	nbuf;			/* The number of buffer headers */
@@ -515,7 +523,7 @@ void	vfs_bio_clrbuf __P((struct buf *));
 void	vfs_busy_pages __P((struct buf *, int clear_modify));
 void	vfs_unbusy_pages __P((struct buf *));
 void	vwakeup __P((struct buf *));
-void	vmapbuf __P((struct buf *));
+int	vmapbuf __P((struct buf *));
 void	vunmapbuf __P((struct buf *));
 void	relpbuf __P((struct buf *, int *));
 void	brelvp __P((struct buf *));

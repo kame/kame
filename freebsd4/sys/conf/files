@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/files,v 1.340.2.115 2002/09/01 02:21:04 mjacob Exp $
+# $FreeBSD: src/sys/conf/files,v 1.340.2.131.2.1 2003/03/28 20:05:11 scottl Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -84,7 +84,6 @@ cam/scsi/scsi_low_pisa.c	optional ncv
 cam/scsi/scsi_low_pisa.c	optional nsp
 cam/scsi/scsi_low_pisa.c	optional stg
 cam/scsi/scsi_pass.c	optional pass
-cam/scsi/scsi_passthru_target.c	optional passthru_target
 cam/scsi/scsi_ses.c	optional ses
 cam/scsi/scsi_target.c	optional targ
 cam/scsi/scsi_targ_bh.c	optional targbh
@@ -127,6 +126,7 @@ dev/aac/aac.c		optional aac
 #dev/aac/aac_debug.c	optional aac
 dev/aac/aac_disk.c	optional aac
 dev/aac/aac_pci.c	optional aac pci
+dev/aac/aac_linux.c	optional aac compat_linux
 dev/aac/aac_cam.c	optional aacp aac
 dev/advansys/adv_eisa.c	optional adv eisa
 dev/advansys/adv_pci.c	optional adv pci
@@ -154,10 +154,12 @@ dev/ata/ata-raid.c	optional atadisk
 dev/ata/atapi-all.c	optional atapicd
 dev/ata/atapi-all.c	optional atapifd
 dev/ata/atapi-all.c	optional atapist
+dev/ata/atapi-all.c	optional atapicam
 dev/ata/atapi-cd.c	optional atapicd
 dev/ata/atapi-fd.c	optional atapifd
 dev/ata/atapi-tape.c	optional atapist
-#dev/amr/amr_cam.c	optional amr
+dev/ata/atapi-cam.c	optional atapicam
+dev/amr/amr_cam.c	optional amr
 dev/amr/amr_disk.c	optional amr
 dev/amr/amr_pci.c	optional amr
 dev/amr/amr.c		optional amr
@@ -207,6 +209,14 @@ dev/ex/if_ex_isa.c	optional ex isa
 dev/ex/if_ex_pccard.c	optional ex card
 dev/fe/if_fe.c		optional fe
 dev/fe/if_fe_pccard.c	optional fe card
+dev/firewire/firewire.c	optional firewire
+dev/firewire/fwcrom.c	optional firewire
+dev/firewire/fwdev.c	optional firewire
+dev/firewire/fwmem.c	optional firewire
+dev/firewire/fwohci.c	optional firewire
+dev/firewire/fwohci_pci.c	optional firewire pci
+dev/firewire/if_fwe.c	optional fwe
+dev/firewire/sbp.c	optional sbp
 dev/fxp/if_fxp.c	optional fxp
 dev/gx/if_gx.c		optional gx
 dev/hea/eni.c		optional hea
@@ -469,8 +479,10 @@ dev/iicbus/iiconf.c	optional iicbus
 dev/iicbus/iicbus.c	optional iicbus
 dev/iicbus/if_ic.c	optional ic
 dev/iicbus/iic.c	optional iic
+dev/trm/trm.c		optional trm
 dev/twe/twe.c			optional twe
 dev/twe/twe_freebsd.c		optional twe
+dev/tx/if_tx.c			optional tx
 dev/txp/if_txp.c		optional txp
 dev/vinum/vinum.c		optional vinum
 dev/vinum/vinumconfig.c		optional vinum
@@ -676,8 +688,6 @@ miscfs/deadfs/dead_vnops.c	standard
 miscfs/fdesc/fdesc_vfsops.c	optional fdesc
 miscfs/fdesc/fdesc_vnops.c	optional fdesc
 miscfs/fifofs/fifo_vnops.c	standard
-miscfs/kernfs/kernfs_vfsops.c	optional kernfs
-miscfs/kernfs/kernfs_vnops.c	optional kernfs
 miscfs/nullfs/null_subr.c	optional nullfs
 miscfs/nullfs/null_vfsops.c	optional nullfs
 miscfs/nullfs/null_vnops.c	optional nullfs
@@ -729,6 +739,7 @@ net/if_iso88025subr.c	optional token
 net/if_faith.c		optional faith
 net/if_fddisubr.c	optional fddi
 net/if_gif.c		optional gif
+net/if_gre.c		optional gre
 net/if_loop.c		optional loop
 net/if_media.c		standard
 net/if_mib.c		standard
@@ -885,6 +896,7 @@ netinet/in_gif.c	optional gif inet
 netinet/igmp.c		optional inet
 netinet/in.c		optional inet
 #netinet/in_hostcache.c	optional inet
+netinet/ip_gre.c	optional gre inet
 netinet/ip_id.c		optional inet
 netinet/in_pcb.c	optional inet
 netinet/in_proto.c	optional inet
@@ -900,7 +912,7 @@ netinet/ip_fw.c		optional ipfirewall
 netinet/ip_fw2.c	optional ipfw2
 netinet/ip_icmp.c	optional inet
 netinet/ip_input.c	optional inet
-netinet/ip_mroute.c	optional inet
+netinet/ip_mroute.c	optional mrouting
 netinet/ip_output.c	optional inet
 netinet/raw_ip.c	optional inet
 netinet/tcp_debug.c	optional tcpdebug
@@ -948,6 +960,17 @@ netinet6/route6.c	optional inet6
 netinet6/scope6.c	optional inet6
 netinet6/udp6_output.c	optional inet6
 netinet6/udp6_usrreq.c	optional inet6
+netipsec/ipsec.c	optional fast_ipsec
+netipsec/ipsec_input.c	optional fast_ipsec
+netipsec/ipsec_mbuf.c	optional fast_ipsec
+netipsec/ipsec_output.c	optional fast_ipsec
+netipsec/key.c		optional fast_ipsec
+netipsec/key_debug.c	optional fast_ipsec
+netipsec/keysock.c	optional fast_ipsec
+netipsec/xform_ah.c	optional fast_ipsec
+netipsec/xform_esp.c	optional fast_ipsec
+netipsec/xform_ipcomp.c	optional fast_ipsec
+netipsec/xform_ipip.c	optional fast_ipsec
 netipx/ipx.c		optional ipx
 netipx/ipx_cksum.c	optional ipx
 netipx/ipx_input.c	optional ipx
@@ -1056,7 +1079,6 @@ pci/if_sk.c		optional sk
 pci/if_ste.c		optional ste
 pci/if_ti.c		optional ti
 pci/if_tl.c		optional tl
-pci/if_tx.c		optional tx
 pci/if_vr.c		optional vr
 pci/if_wb.c		optional wb
 pci/if_wx.c		optional wx
@@ -1170,6 +1192,8 @@ dev/usb/usb_subr.c	optional usb
 dev/usb/usb_quirks.c	optional usb
 dev/usb/hid.c		optional usb
 dev/usb/ufm.c		optional ufm
+dev/usb/ubsa.c		optional ubsa ucom
+dev/usb/uftdi.c		optional uftdi ucom
 dev/usb/ugen.c		optional ugen
 dev/usb/uhid.c		optional uhid
 dev/usb/ums.c		optional ums
@@ -1299,6 +1323,7 @@ mixer_if.h		optional pcm					\
 
 #
 dev/sound/pcm/ac97.c	optional pcm
+dev/sound/pcm/ac97_patch.c	optional pcm
 dev/sound/pcm/buffer.c	optional pcm
 dev/sound/pcm/channel.c	optional pcm
 dev/sound/pcm/dsp.c	optional pcm
@@ -1354,3 +1379,31 @@ libkern/strtol.c	standard
 libkern/strtoq.c	standard
 libkern/strtoul.c	standard
 libkern/strtouq.c	standard
+crypto/blowfish/bf_skey.c	optional crypto
+crypto/blowfish/bf_skey.c       optional crypto
+crypto/cast128/cast128.c	optional crypto
+crypto/des/des_ecb.c	optional crypto
+crypto/des/des_ecb.c            optional crypto
+crypto/des/des_setkey.c	optional crypto
+crypto/des/des_setkey.c         optional crypto
+crypto/rijndael/rijndael-alg-fst.c	optional crypto
+crypto/rijndael/rijndael-api-fst.c	optional crypto
+crypto/sha1.c		optional crypto
+crypto/sha1.c                   optional crypto
+crypto/sha2/sha2.c	optional ipsec
+crypto/sha2/sha2.c              optional crypto
+net/zlib.c		optional crypto
+opencrypto/cast.c               optional crypto
+opencrypto/criov.c              optional crypto
+opencrypto/crmbuf.c             optional crypto
+opencrypto/crypto.c             optional crypto
+opencrypto/cryptodev.c          optional cryptodev
+opencrypto/cryptosoft.c         optional crypto
+opencrypto/deflate.c            optional crypto
+opencrypto/rijndael.c           optional crypto
+opencrypto/rmd160.c             optional crypto
+opencrypto/skipjack.c           optional crypto
+opencrypto/xform.c              optional crypto
+dev/ubsec/ubsec.c		optional ubsec
+dev/hifn/hifn7751.c		optional hifn 
+

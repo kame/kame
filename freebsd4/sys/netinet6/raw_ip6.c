@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.7.2.5 2001/12/15 01:06:28 brooks Exp $
+ * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.7.2.7 2003/01/24 05:11:35 sam Exp $
  */
 
 /*
@@ -101,6 +101,11 @@
 #include <netinet6/ipsec.h>
 #include <netinet6/ipsec6.h>
 #endif /*IPSEC*/
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/ipsec6.h>
+#endif /* FAST_IPSEC */
 
 #include <machine/stdarg.h>
 
@@ -178,6 +183,15 @@ rip6_input(mp, offp, proto)
 				/* do not inject data into pcb */
 			} else
 #endif /*IPSEC*/
+#ifdef FAST_IPSEC
+			/*
+			 * Check AH/ESP integrity.
+			 */
+			if (n && ipsec6_in_reject(n, last)) {
+				m_freem(n);
+				/* do not inject data into pcb */
+			} else
+#endif /*FAST_IPSEC*/
 			if (n) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS ||
 				    last->in6p_socket->so_options & SO_TIMESTAMP)
@@ -209,6 +223,16 @@ rip6_input(mp, offp, proto)
 		/* do not inject data into pcb */
 	} else
 #endif /*IPSEC*/
+#ifdef FAST_IPSEC
+	/*
+	 * Check AH/ESP integrity.
+	 */
+	if (last && ipsec6_in_reject(m, last)) {
+		m_freem(m);
+		ip6stat.ip6s_delivered--;
+		/* do not inject data into pcb */
+	} else
+#endif /*FAST_IPSEC*/
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS ||
 		    last->in6p_socket->so_options & SO_TIMESTAMP)
@@ -442,15 +466,8 @@ rip6_output(m, va_alist)
 		*p = in6_cksum(m, ip6->ip6_nxt, sizeof(*ip6), plen);
 	}
 
-#ifdef IPSEC
-	if (ipsec_setsocket(m, so) != 0) {
-		error = ENOBUFS;
-		goto bad;
-	}
-#endif /*IPSEC*/
-
 	error = ip6_output(m, optp, &in6p->in6p_route, 0,
-			   in6p->in6p_moptions, &oifp);
+			   in6p->in6p_moptions, &oifp, in6p);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		if (oifp)
 			icmp6_ifoutstat_inc(oifp, type, code);

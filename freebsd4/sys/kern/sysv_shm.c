@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45.2.5 2001/11/03 01:41:08 ps Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45.2.6 2002/10/22 20:45:03 fjoe Exp $ */
 /*	$NetBSD: sysv_shm.c,v 1.23 1994/07/04 23:25:12 glass Exp $	*/
 
 /*
@@ -127,6 +127,12 @@ struct	shminfo shminfo = {
 };
 
 static int shm_use_phys;
+
+TUNABLE_INT("kern.ipc.shmmin", &shminfo.shmmin);
+TUNABLE_INT("kern.ipc.shmmni", &shminfo.shmmni);
+TUNABLE_INT("kern.ipc.shmseg", &shminfo.shmseg);
+TUNABLE_INT("kern.ipc.shmmaxpgs", &shminfo.shmall);
+TUNABLE_INT("kern.ipc.shm_use_phys", &shm_use_phys);
 
 SYSCTL_DECL(_kern_ipc);
 SYSCTL_INT(_kern_ipc, OID_AUTO, shmmax, CTLFLAG_RW, &shminfo.shmmax, 0, "");
@@ -684,6 +690,7 @@ shminit(dummy)
 {
 	int i;
 
+	shminfo.shmmax = shminfo.shmall * PAGE_SIZE;
 	shmalloced = shminfo.shmmni;
 	shmsegs = malloc(shmalloced * sizeof(shmsegs[0]), M_SHM, M_WAITOK);
 	if (shmsegs == NULL)

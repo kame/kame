@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/kern_physio.c,v 1.46.2.1 2000/10/03 22:07:24 alc Exp $
+ * $FreeBSD: src/sys/kern/kern_physio.c,v 1.46.2.2 2003/01/25 19:04:40 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -105,7 +105,10 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 					error = EFAULT;
 					goto doerror;
 				}
-				vmapbuf(bp);
+				if (vmapbuf(bp) < 0) {
+					error = EFAULT;
+					goto doerror;
+				}
 			}
 
 			BUF_STRATEGY(bp, 0);

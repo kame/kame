@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/brgphy.c,v 1.1.2.4 2002/04/04 06:12:48 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/brgphy.c,v 1.1.2.6 2002/12/11 21:26:56 ps Exp $
  */
 
 /*
@@ -40,7 +40,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 
@@ -59,7 +58,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.1.2.4 2002/04/04 06:12:48 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.1.2.6 2002/12/11 21:26:56 ps Exp $";
 #endif
 
 static int brgphy_probe		__P((device_t));
@@ -119,6 +118,12 @@ static int brgphy_probe(dev)
 	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxBROADCOM &&
 	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxBROADCOM_BCM5701) {
 		device_set_desc(dev, MII_STR_xxBROADCOM_BCM5701);
+		return(0);
+	}
+
+	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxBROADCOM &&
+	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxBROADCOM_BCM5703) {
+		device_set_desc(dev, MII_STR_xxBROADCOM_BCM5703);
 		return(0);
 	}
 

@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, [92/04/03  16:51:14  rvb]
- * $FreeBSD: src/sys/boot/pc98/boot2/boot.c,v 1.6.2.2 2000/07/07 00:11:23 obrien Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/boot.c,v 1.6.2.3 2003/01/13 08:52:53 nyan Exp $
  */
 
 
@@ -119,11 +119,16 @@ boot(int drive)
 	dosdev = drive;
 #ifdef PC98
 	maj = (drive&0x70) >> 3;		/* a good first bet */
-	if (maj == 4) {		/* sd */
+	if (maj == 4) {	/* da */
 		disk_equips = *(unsigned char *)V(0xA1482);
 		unit = 0;
 		for (i=0; i<(drive&0x0f); i++) {
-			unit += (disk_equips >> i) & 1;
+			int media = ((unsigned *)V(0xA1460))[i] & 0x1F;
+
+			if ((disk_equips >> i) & 1)	/* HD */
+				unit++;
+			else if (media == 7)		/* MO */
+				unit++;
 		}
 	} else {
 		unit = drive & 0x0f;

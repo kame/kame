@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/mii/e1000phy.c,v 1.1.2.1 2001/04/21 16:13:09 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/mii/e1000phy.c,v 1.1.2.2 2002/11/08 21:53:49 semenu Exp $ */
 /*
  * Principal Author: Parag Patel
  * Copyright (c) 2001
@@ -37,7 +37,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 

@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:35:49  rpd
- * $FreeBSD: src/sys/boot/pc98/boot2/disk.c,v 1.4 1999/12/08 09:32:42 phk Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/disk.c,v 1.4.2.1 2003/01/13 08:52:53 nyan Exp $
  */
 
 /*
@@ -127,17 +127,6 @@ devopen(void)
 		if (dl->d_magic != DISKMAGIC) {
 			printf("bad disklabel\n");
 			return 1;
-		}
-		if( (maj == 4) || (maj == 0) || (maj == 1))
-		{
-			if (dl->d_type == DTYPE_SCSI)
-			{
-				maj = 4; /* use scsi as boot dev */
-			}
-			else
-			{
-				maj = 0; /* must be ESDI/IDE */
-			}
 		}
 		/* This little trick is for OnTrack DiskManager disks */
 		boff = dl->d_partitions[part].p_offset -

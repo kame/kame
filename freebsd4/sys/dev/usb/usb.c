@@ -1,5 +1,5 @@
 /*	$NetBSD: usb.c,v 1.33 1999/11/22 21:57:09 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb.c,v 1.26.2.6 2002/08/12 14:19:49 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb.c,v 1.26.2.9 2002/11/13 15:15:22 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -135,7 +135,7 @@ d_open_t  usbopen;
 d_close_t usbclose;
 d_read_t usbread;
 d_ioctl_t usbioctl;
-int usbpoll(dev_t, int, struct proc *);
+int usbpoll(dev_t, int, usb_proc_ptr);
 
 struct cdevsw usb_cdevsw = {
 	/* open */      usbopen,
@@ -275,8 +275,7 @@ USB_ATTACH(usb)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 void
-usb_create_event_thread(arg)
-	void *arg;
+usb_create_event_thread(void *arg)
 {
 	struct usb_softc *sc = arg;
 
@@ -289,8 +288,7 @@ usb_create_event_thread(arg)
 }
 
 void
-usb_event_thread(arg)
-	void *arg;
+usb_event_thread(void *arg)
 {
 	struct usb_softc *sc = arg;
 
@@ -319,9 +317,7 @@ usb_event_thread(arg)
 }
 
 int
-usbctlprint(aux, pnp)
-	void *aux;
-	const char *pnp;
+usbctlprint(void *aux, const char *pnp)
 {
 	/* only "usb"es can attach to host controllers */
 	if (pnp)
@@ -332,10 +328,7 @@ usbctlprint(aux, pnp)
 #endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 
 int
-usbopen(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+usbopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 {
 	int unit = USBUNIT(dev);
 	struct usb_softc *sc;
@@ -357,10 +350,7 @@ usbopen(dev, flag, mode, p)
 }
 
 int
-usbread(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+usbread(dev_t dev, struct uio *uio, int flag)
 {
 	struct usb_event ue;
 	int unit = USBUNIT(dev);
@@ -394,10 +384,7 @@ usbread(dev, uio, flag)
 }
 
 int
-usbclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+usbclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
 {
 	int unit = USBUNIT(dev);
 
@@ -410,12 +397,7 @@ usbclose(dev, flag, mode, p)
 }
 
 int
-usbioctl(devt, cmd, data, flag, p)
-	dev_t devt;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+usbioctl(dev_t devt, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 {
 	struct usb_softc *sc;
 	int unit = USBUNIT(devt);
@@ -538,10 +520,7 @@ usbioctl(devt, cmd, data, flag, p)
 }
 
 int
-usbpoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
+usbpoll(dev_t dev, int events, usb_proc_ptr p)
 {
 	int revents, mask, s;
 	int unit = USBUNIT(dev);
@@ -586,8 +565,7 @@ usbpoll(dev, events, p)
 
 /* Explore device tree from the root. */
 usbd_status
-usb_discover(sc)
-	struct usb_softc *sc;
+usb_discover(struct usb_softc *sc)
 {
 #if defined(__FreeBSD__)
 	/* The splxxx parts should be deleted when kthreads is available */
@@ -620,8 +598,7 @@ usb_discover(sc)
 }
 
 void
-usb_needs_explore(bus)
-	usbd_bus_handle bus;
+usb_needs_explore(usbd_bus_handle bus)
 {
 	bus->needs_explore = 1;
 #if defined(__FreeBSD__)
@@ -633,8 +610,7 @@ usb_needs_explore(bus)
 
 /* Called at splusb() */
 int
-usb_get_next_event(ue)
-	struct usb_event *ue;
+usb_get_next_event(struct usb_event *ue)
 {
 	struct usb_event_q *ueq;
 
@@ -649,9 +625,7 @@ usb_get_next_event(ue)
 }
 
 void
-usbd_add_event(type, dev)
-	int type;
-	usbd_device_handle dev;
+usbd_add_event(int type, usbd_device_handle dev)
 {
 	struct usb_event_q *ueq;
 	struct usb_event ue;
@@ -672,8 +646,8 @@ usbd_add_event(type, dev)
 		return;
 	}
 	ueq->ue.ue_type = type;
-	ueq->ue.ue_cookie = dev->cookie;
-	usbd_fill_deviceinfo(dev, &ueq->ue.ue_device);
+	ueq->ue.u.ue_driver.ue_cookie = dev->cookie;
+	usbd_fill_deviceinfo(dev, &ueq->ue.u.ue_device);
 	microtime(&thetime);
 	TIMEVAL_TO_TIMESPEC(&thetime, &ueq->ue.ue_time);
 	SIMPLEQ_INSERT_TAIL(&usb_events, ueq, next);
@@ -686,9 +660,7 @@ usbd_add_event(type, dev)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 int
-usb_activate(self, act)
-	device_ptr_t self;
-	enum devact act;
+usb_activate(device_ptr_t self, devact act)
 {
 	struct usb_softc *sc = (struct usb_softc *)self;
 	usbd_device_handle dev = sc->sc_port.device;
@@ -711,9 +683,7 @@ usb_activate(self, act)
 }
 
 int
-usb_detach(self, flags)
-	device_ptr_t self;
-	int flags;
+usb_detach(device_ptr_t self, int flags)
 {
 	struct usb_softc *sc = (struct usb_softc *)self;
 

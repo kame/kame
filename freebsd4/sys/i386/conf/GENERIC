@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.246.2.48 2002/08/31 20:28:26 obrien Exp $
+# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.246.2.51.2.2 2003/03/25 23:35:15 jhb Exp $
 
 machine		i386
 cpu		I386_CPU
@@ -53,16 +53,19 @@ options 	SYSVMSG			#SYSV-style message queues
 options 	SYSVSEM			#SYSV-style semaphores
 options 	P1003_1B		#Posix P1003_1B real-time extensions
 options 	_KPOSIX_PRIORITY_SCHEDULING
-options		ICMP_BANDLIM		#Rate limit bad replies
+options 	ICMP_BANDLIM		#Rate limit bad replies
 options 	KBD_INSTALL_CDEV	# install a CDEV entry in /dev
-options		AHC_REG_PRETTY_PRINT	# Print register bitfields in debug
+options 	AHC_REG_PRETTY_PRINT	# Print register bitfields in debug
 					# output.  Adds ~128k to driver.
-options		AHD_REG_PRETTY_PRINT	# Print register bitfields in debug 
+options 	AHD_REG_PRETTY_PRINT	# Print register bitfields in debug 
 					# output.  Adds ~215k to driver.
 
 # To make an SMP kernel, the next two are needed
 #options 	SMP			# Symmetric MultiProcessor Kernel
 #options 	APIC_IO			# Symmetric (APIC) I/O
+
+# To support HyperThreading, HTT is needed in addition to SMP and APIC_IO
+#options 	HTT			# HyperThreading Technology
 
 device		isa
 device		eisa
@@ -96,7 +99,7 @@ device		isp		# Qlogic family
 device		mpt		# LSI-Logic MPT/Fusion
 device		ncr		# NCR/Symbios Logic
 device		sym		# NCR/Symbios Logic (newer chipsets)
-options		SYM_SETUP_LP_PROBE_MAP=0x40
+options 	SYM_SETUP_LP_PROBE_MAP=0x40
 				# Allow ncr to attach legacy NCR devices when 
 				# both sym and ncr are configured
 
@@ -126,7 +129,7 @@ device		ciss		# Compaq SmartRAID 5* series
 
 # RAID controllers
 device		aac		# Adaptec FSA RAID, Dell PERC2/PERC3
-device		aacp		# SCSI passthrough for aac (requires CAM)
+#device		aacp		# SCSI passthrough for aac (requires CAM)
 device		ida		# Compaq Smart RAID
 device		amr		# AMI MegaRAID
 device		mlx		# Mylex DAC960 family
@@ -151,6 +154,8 @@ device		sc0	at isa? flags 0x100
 #options 	FAT_CURSOR		# start with block cursor
 # If you have a ThinkPAD, uncomment this along with the rest of the PCVT lines
 #options 	PCVT_SCANSET=2		# IBM keyboards are non-std
+
+device		agp		# support several AGP chipsets
 
 # Floating point support - do not disable.
 device		npx0	at nexus? port IO_NPX irq 13
@@ -203,10 +208,10 @@ device		bge		# Broadcom BCM570x (``Tigon III'')
 
 # ISA Ethernet NICs.
 # 'device ed' requires 'device miibus'
-device		ed0	at isa? port 0x280 irq 10 iomem 0xd8000
+device		ed0	at isa? disable port 0x280 irq 10 iomem 0xd8000
 device		ex
 device		ep
-device		fe0	at isa? port 0x300
+device		fe0	at isa? disable port 0x300
 # Xircom Ethernet
 device		xe
 # PRISM I IEEE 802.11b wireless NIC.
@@ -222,11 +227,11 @@ device		wi
 # those parameters here.
 device		an
 # The probe order of these is presently determined by i386/isa/isa_compat.c.
-device		ie0	at isa? port 0x300 irq 10 iomem 0xd0000
-#device		le0	at isa? port 0x300 irq 5 iomem 0xd0000
-device		lnc0	at isa? port 0x280 irq 10 drq 0
-device		cs0	at isa? port 0x300
-device		sn0	at isa? port 0x300 irq 10
+device		ie0	at isa? disable port 0x300 irq 10 iomem 0xd0000
+#device		le0	at isa? disable port 0x300 irq 5 iomem 0xd0000
+device		lnc0	at isa? disable port 0x280 irq 10 drq 0
+device		cs0	at isa? disable port 0x300
+device		sn0	at isa? disable port 0x300 irq 10
 
 # Pseudo devices - the number indicates how many units to allocate.
 pseudo-device	loop		# Network loopback

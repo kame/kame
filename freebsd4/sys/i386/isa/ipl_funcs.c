@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/ipl_funcs.c,v 1.32.2.4 2001/07/26 18:53:02 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/ipl_funcs.c,v 1.32.2.5 2002/12/17 18:04:02 sam Exp $
  */
 
 #include <sys/param.h>
@@ -56,6 +56,7 @@ DO_SETBITS(setsoftnet,   &ipending, SWI_NET_PENDING)
 DO_SETBITS(setsofttty,   &ipending, SWI_TTY_PENDING)
 DO_SETBITS(setsoftvm,	 &ipending, SWI_VM_PENDING)
 DO_SETBITS(setsofttq,	 &ipending, SWI_TQ_PENDING)
+DO_SETBITS(setsoftcrypto,&ipending, SWI_CRYPTO_PENDING)
 
 DO_SETBITS(schedsoftcamnet, &idelayed, SWI_CAMNET_PENDING)
 DO_SETBITS(schedsoftcambio, &idelayed, SWI_CAMBIO_PENDING)
@@ -272,3 +273,4 @@ GENSPL(splsofttq,	|=,	SWI_TQ_MASK,				17)
 GENSPL(splstatclock,	|=,	stat_imask,				13)
 GENSPL(spltty,		|=,	tty_imask,				14)
 GENSPL(splvm,		|=,	net_imask | bio_imask | cam_imask,	15)
+GENSPL(splcrypto,	|=,	net_imask | SWI_NET_MASK | SWI_CRYPTO_MASK,16)

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_meter.c	8.4 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/vm/vm_meter.c,v 1.34.2.6 2001/11/14 17:22:53 iedowse Exp $
+ * $FreeBSD: src/sys/vm/vm_meter.c,v 1.34.2.7 2002/10/10 19:28:22 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -71,6 +71,10 @@ SYSCTL_UINT(_vm, VM_V_PAGEOUT_FREE_MIN, v_pageout_free_min,
 	CTLFLAG_RW, &cnt.v_pageout_free_min, 0, "");
 SYSCTL_UINT(_vm, OID_AUTO, v_free_severe,
 	CTLFLAG_RW, &cnt.v_free_severe, 0, "");
+SYSCTL_UINT(_vm, OID_AUTO, v_intrans_coll,
+	CTLFLAG_RW, &cnt.v_intrans_coll, 0, "");
+SYSCTL_UINT(_vm, OID_AUTO, v_intrans_wait,
+	CTLFLAG_RW, &cnt.v_intrans_wait, 0, "");
 
 SYSCTL_STRUCT(_vm, VM_LOADAVG, loadavg, CTLFLAG_RD, 
     &averunnable, loadavg, "Machine loadaverage history");

@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: aic7770.c,v 1.1.1.5 2002/10/24 05:34:26 suz Exp $
+ * $Id: aic7770.c,v 1.1.1.6 2003/04/09 04:14:26 suz Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7770.c,v 1.1.2.7 2002/10/01 16:41:29 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7770.c,v 1.1.2.8 2003/01/20 23:59:19 gibbs Exp $
  */
 
 #ifdef __linux__
@@ -56,6 +56,8 @@
 #define ID_AHA_274x	0x04907771
 #define ID_AHA_284xB	0x04907756 /* BIOS enabled */
 #define ID_AHA_284x	0x04907757 /* BIOS disabled*/
+#define	ID_OLV_274x	0x04907782 /* Olivetti OEM */
+#define	ID_OLV_274xD	0x04907783 /* Olivetti OEM (Differential) */
 
 static int aha2840_load_seeprom(struct ahc_softc *ahc);
 static ahc_device_setup_t ahc_aic7770_VL_setup;
@@ -76,6 +78,18 @@ struct aic7770_identity aic7770_ident_table [] =
 		0xFFFFFFFE,
 		"Adaptec 284X SCSI adapter",
 		ahc_aic7770_VL_setup
+	},
+	{
+		ID_OLV_274x,
+		0xFFFFFFFF,
+		"Adaptec (Olivetti OEM) 274X SCSI adapter",
+		ahc_aic7770_EISA_setup
+	},
+	{
+		ID_OLV_274xD,
+		0xFFFFFFFF,
+		"Adaptec (Olivetti OEM) 274X Differential SCSI adapter",
+		ahc_aic7770_EISA_setup
 	},
 	/* Generic chip probes for devices we don't know 'exactly' */
 	{

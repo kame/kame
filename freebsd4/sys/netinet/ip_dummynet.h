@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.10.2.6 2002/08/16 10:53:44 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.10.2.8 2002/12/23 10:10:42 maxim Exp $
  */
 
 #ifndef _IP_DUMMYNET_H
@@ -75,6 +75,12 @@ typedef u_int64_t dn_key ;      /* sorting key */
  * a structure. It is used by the heap management routines.
  */
 #define OFFSET_OF(type, field) ((int)&( ((type *)0)->field) )
+
+/*
+ * The maximum hash table size for queues.  This value must be a power
+ * of 2.
+ */
+#define DN_MAX_HASH_SIZE 65536
 
 /*
  * A heap entry is made of a key and a pointer to the actual
@@ -304,7 +310,7 @@ struct dn_flow_set {
 /*
  * Pipe descriptor. Contains global parameters, delay-line queue,
  * and the flow_set used for fixed-rate queues.
- * 
+ *
  * For WF2Q+ support it also has 3 heaps holding dn_flow_queue:
  *   not_eligible_heap, for queues whose start time is higher
  *	than the virtual time. Sorted by start time.
@@ -313,7 +319,7 @@ struct dn_flow_set {
  *   idle_heap, all flows that are idle and can be removed. We
  *	do that on each tick so we do not slow down too much
  *	operations during forwarding.
- * 
+ *
  */
 struct dn_pipe {		/* a pipe */
     struct dn_pipe *next ;
@@ -339,7 +345,7 @@ struct dn_pipe {		/* a pipe */
      * When the tx clock come from an interface (if_name[0] != '\0'), its name
      * is stored below, whereas the ifp is filled when the rule is configured.
      */
-    char if_name[16];
+    char if_name[IFNAMSIZ];
     struct ifnet *ifp ;
     int ready ; /* set if ifp != NULL and we got a signal from it */
 

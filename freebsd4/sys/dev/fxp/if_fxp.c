@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.110.2.25 2002/09/24 23:45:16 ps Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.110.2.28 2003/01/28 11:17:33 sanpei Exp $
  */
 
 /*
@@ -165,6 +165,7 @@ static struct fxp_ident fxp_ident_table[] = {
     { 0x103C,		"Intel Pro/100 Ethernet" },
     { 0x103D,		"Intel Pro/100 Ethernet" },
     { 0x103E,		"Intel Pro/100 Ethernet" },
+    { 0x1059,		"Intel Pro/100 M Mobile Connection" },
     { 0,		NULL },
 };
 
@@ -1239,6 +1240,13 @@ fxp_intr_body(struct fxp_softc *sc, u_int8_t statack, int count)
 
 	if (rnr)
 		fxp_rnr++;
+#ifdef DEVICE_POLLING
+	/* Pick up a deferred RNR condition if `count' ran out last time. */
+	if (sc->flags & FXP_FLAG_DEFERRED_RNR) {
+		sc->flags &= ~FXP_FLAG_DEFERRED_RNR;
+		rnr = 1;
+	}
+#endif
 
 	/*
 	 * Free any finished transmit mbuf chains.
@@ -1281,38 +1289,40 @@ fxp_intr_body(struct fxp_softc *sc, u_int8_t statack, int count)
 	/*
 	 * Just return if nothing happened on the receive side.
 	 */
-	if ( (statack & (FXP_SCB_STATACK_FR | FXP_SCB_STATACK_RNR)) == 0)
+	if (!rnr && (statack & FXP_SCB_STATACK_FR) == 0)
 		return;
 
 	/*
 	 * Process receiver interrupts. If a no-resource (RNR)
 	 * condition exists, get whatever packets we can and
 	 * re-start the receiver.
+	 *
 	 * When using polling, we do not process the list to completion,
 	 * so when we get an RNR interrupt we must defer the restart
 	 * until we hit the last buffer with the C bit set.
 	 * If we run out of cycles and rfa_headm has the C bit set,
-	 * record the pending RNR in an unused status bit, so that the
-	 * info will be used in the subsequent polling cycle.
+	 * record the pending RNR in the FXP_FLAG_DEFERRED_RNR flag so
+	 * that the info will be used in the subsequent polling cycle.
 	 */
-
-#define	FXP_RFA_RNRMARK		0x4000	/* used to mark a pending RNR intr */
-
 	for (;;) {
 		m = sc->rfa_headm;
 		rfa = (struct fxp_rfa *)(m->m_ext.ext_buf +
 		    RFA_ALIGNMENT_FUDGE);
 
 #ifdef DEVICE_POLLING /* loop at most count times if count >=0 */
-		if (count >= 0 && count-- == 0)
+		if (count >= 0 && count-- == 0) {
+			if (rnr) {
+				/* Defer RNR processing until the next time. */
+				sc->flags |= FXP_FLAG_DEFERRED_RNR;
+				rnr = 0;
+			}
 			break;
+		}
 #endif /* DEVICE_POLLING */
 
 		if ( (rfa->rfa_status & FXP_RFA_STATUS_C) == 0)
 			break;
 
-		if (rfa->rfa_status & FXP_RFA_RNRMARK)
-			rnr = 1;
 		/*
 		 * Remove first packet from the chain.
 		 */
@@ -1346,15 +1356,11 @@ fxp_intr_body(struct fxp_softc *sc, u_int8_t statack, int count)
 		}
 	}
 	if (rnr) {
-		if (rfa->rfa_status & FXP_RFA_STATUS_C)
-			rfa->rfa_status |= FXP_RFA_RNRMARK;
-		else {
-			fxp_scb_wait(sc);
-			CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL,
-			    vtophys(sc->rfa_headm->m_ext.ext_buf) +
-				RFA_ALIGNMENT_FUDGE);
-			fxp_scb_cmd(sc, FXP_SCB_COMMAND_RU_START);
-		}
+		fxp_scb_wait(sc);
+		CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL,
+		    vtophys(sc->rfa_headm->m_ext.ext_buf) +
+		    RFA_ALIGNMENT_FUDGE);
+		fxp_scb_cmd(sc, FXP_SCB_COMMAND_RU_START);
 	}
 }
 

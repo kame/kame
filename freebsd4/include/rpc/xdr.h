@@ -28,7 +28,7 @@
  *
  *	from: @(#)xdr.h 1.19 87/04/22 SMI
  *	from: @(#)xdr.h	2.2 88/07/29 4.0 RPCSRC
- * $FreeBSD: src/include/rpc/xdr.h,v 1.14 1999/12/29 05:00:44 peter Exp $
+ * $FreeBSD: src/include/rpc/xdr.h,v 1.14.2.1 2003/03/20 12:59:55 jedgar Exp $
  */
 
 /*
@@ -118,7 +118,7 @@ typedef struct __rpc_xdr {
 	caddr_t 	x_public;	/* users' data */
 	caddr_t		x_private;	/* pointer to private data */
 	caddr_t 	x_base;		/* private used for position info */
-	int		x_handy;	/* extra private word */
+	u_int		x_handy;	/* extra private word */
 } XDR;
 
 /*

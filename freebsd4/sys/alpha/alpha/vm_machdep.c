@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.28.2.5 2002/02/10 19:22:48 gallatin Exp $
+ * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.28.2.7 2003/01/25 19:02:22 dillon Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -256,9 +256,6 @@ cpu_wait(p)
 {
 	/* drop per-process resources */
 	pmap_dispose_proc(p);
-
-	/* and clean-out the vmspace */
-	vmspace_free(p->p_vmspace);
 }
 
 /*
@@ -292,69 +289,6 @@ setredzone(pte, vaddr)
    and take the dump while still in mapped mode */
 }
 #endif
-
-/*
- * Map an IO request into kernel virtual address space.
- *
- * All requests are (re)mapped into kernel VA space.
- * Notice that we use b_bufsize for the size of the buffer
- * to be mapped.  b_bcount might be modified by the driver.
- */
-void
-vmapbuf(bp)
-	register struct buf *bp;
-{
-	register caddr_t addr, v, kva;
-	vm_offset_t pa;
-
-	if ((bp->b_flags & B_PHYS) == 0)
-		panic("vmapbuf");
-
-	for (v = bp->b_saveaddr, addr = (caddr_t)trunc_page(bp->b_data);
-	    addr < bp->b_data + bp->b_bufsize;
-	    addr += PAGE_SIZE, v += PAGE_SIZE) {
-		/*
-		 * Do the vm_fault if needed; do the copy-on-write thing
-		 * when reading stuff off device into memory.
-		 */
-		vm_fault_quick((addr >= bp->b_data) ? addr : bp->b_data,
-			(bp->b_flags&B_READ)?(VM_PROT_READ|VM_PROT_WRITE):VM_PROT_READ);
-		pa = trunc_page(pmap_kextract((vm_offset_t) addr));
-		if (pa == 0)
-			panic("vmapbuf: page not present");
-		vm_page_hold(PHYS_TO_VM_PAGE(pa));
-		pmap_kenter((vm_offset_t) v, pa);
-	}
-
-	kva = bp->b_saveaddr;
-	bp->b_saveaddr = bp->b_data;
-	bp->b_data = kva + (((vm_offset_t) bp->b_data) & PAGE_MASK);
-}
-
-/*
- * Free the io map PTEs associated with this IO operation.
- * We also invalidate the TLB entries and restore the original b_addr.
- */
-void
-vunmapbuf(bp)
-	register struct buf *bp;
-{
-	register caddr_t addr;
-	vm_offset_t pa;
-
-	if ((bp->b_flags & B_PHYS) == 0)
-		panic("vunmapbuf");
-
-	for (addr = (caddr_t)trunc_page(bp->b_data);
-	    addr < bp->b_data + bp->b_bufsize;
-	    addr += PAGE_SIZE) {
-		pa = trunc_page(pmap_kextract((vm_offset_t) addr));
-		pmap_kremove((vm_offset_t) addr);
-		vm_page_unhold(PHYS_TO_VM_PAGE(pa));
-	}
-
-	bp->b_data = bp->b_saveaddr;
-}
 
 /*
  * Force reset the processor by invalidating the entire address space!

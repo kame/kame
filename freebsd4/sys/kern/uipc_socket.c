@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket.c	8.3 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.21 2002/05/01 03:27:35 silby Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.22 2002/12/15 09:24:23 maxim Exp $
  */
 
 #include "opt_inet.h"
@@ -1231,6 +1231,8 @@ sosetopt(so, sopt)
 				error = EDOM;
 				goto bad;
 			}
+			if (val == 0 && tv.tv_usec != 0)
+				val = 1;
 
 			switch (sopt->sopt_name) {
 			case SO_SNDTIMEO:

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_bio.c	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfs/nfs_bio.c,v 1.83.2.3 2002/07/19 17:12:37 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_bio.c,v 1.83.2.4 2002/12/29 18:19:53 dillon Exp $
  */
 
 
@@ -364,7 +364,7 @@ nfs_bioread(vp, uio, ioflag, cred)
 	    (uio->uio_offset + uio->uio_resid) > nmp->nm_maxfilesize)
 		return (EFBIG);
 	biosize = vp->v_mount->mnt_stat.f_iosize;
-	seqcount = (int)((off_t)(ioflag >> 16) * biosize / BKVASIZE);
+	seqcount = (int)((off_t)(ioflag >> IO_SEQSHIFT) * biosize / BKVASIZE);
 	/*
 	 * For nfs, cache consistency can only be maintained approximately.
 	 * Although RFC1094 does not specify the criteria, the following is

@@ -28,7 +28,7 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/isa/sb.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.19.2.11 2002/04/22 15:49:31 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.19.2.12 2002/12/24 21:17:42 semenu Exp $");
 
 #define IO_MAX	3
 #define IRQ_MAX	1
@@ -146,9 +146,9 @@ sb_rd(struct resource *io, int reg)
 static void
 sb_wr(struct resource *io, int reg, u_int8_t val)
 {
-	return bus_space_write_1(rman_get_bustag(io),
-				 rman_get_bushandle(io),
-				 reg, val);
+	bus_space_write_1(rman_get_bustag(io),
+			  rman_get_bushandle(io),
+			  reg, val);
 }
 
 static int

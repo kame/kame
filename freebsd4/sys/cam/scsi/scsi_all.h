@@ -14,7 +14,7 @@
  *
  * Ported to run under 386BSD by Julian Elischer (julian@tfs.com) Sept 1992
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.h,v 1.14.2.3 2000/08/14 05:42:33 kbyanc Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_all.h,v 1.14.2.4 2002/10/11 20:38:28 ken Exp $
  */
 
 /*
@@ -401,8 +401,8 @@ struct scsi_rw_12
 #define	SRW12_DPO	0x10
 	u_int8_t byte2;
 	u_int8_t addr[4];
-	u_int8_t reserved;
 	u_int8_t length[4];
+	u_int8_t reserved;
 	u_int8_t control;
 };
 

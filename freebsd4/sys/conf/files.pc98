@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.40 2002/10/05 18:31:47 scottl Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.44 2003/02/10 13:11:50 nyan Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -64,8 +64,8 @@ msysosak.o			optional	fla			\
 #
 contrib/dev/oltr/if_oltr.c	optional	oltr
 trlld.o				optional	oltr			\
-	dependency	"$S/contrib/dev/oltr/i386${FMT}.trlld.o.uu"	\
-	compile-with	"uudecode < $S/contrib/dev/oltr/i386${FMT}.trlld.o.uu"	\
+	dependency	"$S/contrib/dev/oltr/i386-elf.trlld.o.uu"	\
+	compile-with	"uudecode < $S/contrib/dev/oltr/i386-elf.trlld.o.uu"	\
 	no-implicit-rule
 contrib/dev/oltr/trlldbm.c	optional	oltr
 contrib/dev/oltr/trlldhm.c	optional	oltr
@@ -78,6 +78,13 @@ crypto/des/arch/i386/des_enc.S		optional	ipsec ipsec_esp
 crypto/des/des_ecb.c			optional	netsmbcrypto
 crypto/des/arch/i386/des_enc.S		optional	netsmbcrypto
 crypto/des/des_setkey.c			optional	netsmbcrypto
+bf_enc.o			optional	crypto		\
+	dependency	"$S/crypto/blowfish/arch/i386/bf_enc.S $S/crypto/blowfish/arch/i386/bf_enc_586.S $S/crypto/blowfish/arch/i386/bf_enc_686.S"		\
+	compile-with	"${CC} -c -I$S/crypto/blowfish/arch/i386 ${ASM_CFLAGS} ${WERROR} ${.IMPSRC}"	\
+	no-implicit-rule
+crypto/des/arch/i386/des_enc.S		optional	crypto
+crypto/des/des_ecb.c			optional	crypto
+crypto/des/des_setkey.c			optional	crypto
 #dev/advansys/adv_isa.c		optional	adv isa
 dev/aic/aic_cbus.c		optional	aic isa
 dev/ar/if_ar_isa.c		optional	ar isa
@@ -221,6 +228,22 @@ i386/isa/bs/bshw.c		optional	bs
 i386/isa/bs/bsif.c		optional	bs
 i386/isa/asc.c			optional	asc
 pc98/pc98/atapi.c		optional	wdc
+pc98/pc98/canbepm.c		optional	canbepm
+pc98/pc98/canbus.c		optional        canbus
+canbus_if.o			optional	canbus			\
+	dependency	"canbus_if.c canbus_if.h"			\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+canbus_if.c			optional	canbus			\
+	dependency	"$S/kern/makeops.pl $S/pc98/pc98/canbus_if.m"	\
+	compile-with	"perl5 $S/kern/makeops.pl -c $S/pc98/pc98/canbus_if.m" \
+	no-obj no-implicit-rule before-depend local			\
+	clean		"canbus_if.c"
+canbus_if.h			optional	canbus			\
+	dependency	"$S/kern/makeops.pl $S/pc98/pc98/canbus_if.m"	\
+	compile-with	"perl5 $S/kern/makeops.pl -h $S/pc98/pc98/canbus_if.m" \
+	no-obj no-implicit-rule before-depend				\
+	clean		"canbus_if.h"
 pc98/pc98/clock.c		standard
 i386/isa/cronyx.c		optional	cx
 i386/isa/ctx.c			optional	ctx
@@ -361,6 +384,7 @@ i386/linux/linux_dummy.c	optional	compat_linux
 i386/linux/linux_locore.s	optional	compat_linux		   \
 	dependency 	"linux_assym.h"
 i386/linux/linux_machdep.c	optional	compat_linux
+i386/linux/linux_ptrace.c	optional	compat_linux
 i386/linux/linux_sysent.c	optional	compat_linux
 i386/linux/linux_sysvec.c	optional	compat_linux
 svr4/imgact_svr4.c		optional	compat_svr4

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_synch.c	8.9 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/kern/kern_synch.c,v 1.87.2.5 2002/06/28 00:21:44 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_synch.c,v 1.87.2.6 2002/10/13 07:29:53 kbyanc Exp $
  */
 
 #include "opt_ktrace.h"
@@ -953,7 +953,8 @@ loadav(void *arg)
 	struct proc *p;
 
 	avg = &averunnable;
-	for (nrun = 0, p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	nrun = 0;
+	LIST_FOREACH(p, &allproc, p_list) {
 		switch (p->p_stat) {
 		case SRUN:
 		case SIDL:

@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.15 2002/09/25 15:23:03 jdp Exp $
+ * $FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.20 2003/02/06 21:36:40 ps Exp $
  */
 
 /*
@@ -120,7 +120,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.15 2002/09/25 15:23:03 jdp Exp $";
+  "$FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.20 2003/02/06 21:36:40 ps Exp $";
 #endif
 
 /*
@@ -129,6 +129,7 @@ static const char rcsid[] =
  * ID burned into it, though it will always be overriden by the vendor
  * ID in the EEPROM. Just to be safe, we cover all possibilities.
  */
+#define BGE_DEVDESC_MAX		64	/* Maximum device description length */
 
 static struct bge_type bge_devs[] = {
 	{ ALT_VENDORID,	ALT_DEVICEID_BCM5700,
@@ -139,6 +140,10 @@ static struct bge_type bge_devs[] = {
 		"Broadcom BCM5700 Gigabit Ethernet" },
 	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5701,
 		"Broadcom BCM5701 Gigabit Ethernet" },
+	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5702X,
+		"Broadcom BCM5702X Gigabit Ethernet" },
+	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5703X,
+		"Broadcom BCM5703X Gigabit Ethernet" },
 	{ SK_VENDORID, SK_DEVICEID_ALTIMA,
 		"SysKonnect Gigabit Ethernet" },
 	{ ALTIMA_VENDORID, ALTIMA_DEVICE_AC1000,
@@ -482,8 +487,12 @@ bge_miibus_readreg(dev, phy, reg)
 	sc = device_get_softc(dev);
 	ifp = &sc->arpcom.ac_if;
 
-	if (sc->bge_asicrev == BGE_ASICREV_BCM5701_B5 && phy != 1)
-		return(0);
+	if (phy != 1)
+		switch(sc->bge_asicrev) {
+		case BGE_ASICREV_BCM5701_B5:
+		case BGE_ASICREV_BCM5703_A2:
+			return(0);
+		}
 
 	CSR_WRITE_4(sc, BGE_MI_COMM, BGE_MICMD_READ|BGE_MICOMM_BUSY|
 	    BGE_MIPHY(phy)|BGE_MIREG(reg));
@@ -905,7 +914,6 @@ bge_init_rx_ring_jumbo(sc)
 {
 	int i;
 	struct bge_rcb *rcb;
-	struct bge_rcb_opaque *rcbo;
 
 	for (i = 0; i < BGE_JUMBO_RX_RING_CNT; i++) {
 		if (bge_newbuf_jumbo(sc, i, NULL) == ENOBUFS)
@@ -915,9 +923,8 @@ bge_init_rx_ring_jumbo(sc)
 	sc->bge_jumbo = i - 1;
 
 	rcb = &sc->bge_rdata->bge_info.bge_jumbo_rx_rcb;
-	rcbo = (struct bge_rcb_opaque *)rcb;
-	rcb->bge_flags = 0;
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_MAXLEN_FLAGS, rcbo->bge_reg2);
+	rcb->bge_maxlen_flags = BGE_RCB_MAXLEN_FLAGS(0, 0);
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_MAXLEN_FLAGS, rcb->bge_maxlen_flags);
 
 	CSR_WRITE_4(sc, BGE_MBX_RX_JUMBO_PROD_LO, sc->bge_jumbo);
 
@@ -1038,7 +1045,6 @@ static int
 bge_chipinit(sc)
 	struct bge_softc *sc;
 {
-	u_int32_t		cachesize;
 	int			i;
 
 	/* Set endianness before we access any non-PCI registers. */
@@ -1096,53 +1102,11 @@ bge_chipinit(sc)
 	    BGE_MODECTL_NO_RX_CRC|BGE_MODECTL_TX_NO_PHDR_CSUM|
 	    BGE_MODECTL_RX_NO_PHDR_CSUM);
 
-	/* Get cache line size. */
-	cachesize = pci_read_config(sc->bge_dev, BGE_PCI_CACHESZ, 1);
-
 	/*
-	 * Avoid violating PCI spec on certain chip revs.
+	 * Disable memory write invalidate.  Apparently it is not supported
+	 * properly by these devices.
 	 */
-	if (pci_read_config(sc->bge_dev, BGE_PCI_CMD, 4) & PCIM_CMD_MWIEN) {
-		switch(cachesize) {
-		case 1:
-			PCI_SETBIT(sc->bge_dev, BGE_PCI_DMA_RW_CTL,
-			    BGE_PCI_WRITE_BNDRY_16BYTES, 4);
-			break;
-		case 2:
-			PCI_SETBIT(sc->bge_dev, BGE_PCI_DMA_RW_CTL,
-			    BGE_PCI_WRITE_BNDRY_32BYTES, 4);
-			break;
-		case 4:
-			PCI_SETBIT(sc->bge_dev, BGE_PCI_DMA_RW_CTL,
-			    BGE_PCI_WRITE_BNDRY_64BYTES, 4);
-			break;
-		case 8:
-			PCI_SETBIT(sc->bge_dev, BGE_PCI_DMA_RW_CTL,
-			    BGE_PCI_WRITE_BNDRY_128BYTES, 4);
-			break;
-		case 16:
-			PCI_SETBIT(sc->bge_dev, BGE_PCI_DMA_RW_CTL,
-			    BGE_PCI_WRITE_BNDRY_256BYTES, 4);
-			break;
-		case 32:
-			PCI_SETBIT(sc->bge_dev, BGE_PCI_DMA_RW_CTL,
-			    BGE_PCI_WRITE_BNDRY_512BYTES, 4);
-			break;
-		case 64:
-			PCI_SETBIT(sc->bge_dev, BGE_PCI_DMA_RW_CTL,
-			    BGE_PCI_WRITE_BNDRY_1024BYTES, 4);
-			break;
-		default:
-		/* Disable PCI memory write and invalidate. */
-			if (bootverbose)
-				printf("bge%d: cache line size %d not "
-				    "supported; disabling PCI MWI\n",
-				    sc->bge_unit, cachesize);
-			PCI_CLRBIT(sc->bge_dev, BGE_PCI_CMD,
-			    PCIM_CMD_MWIEN, 4);
-			break;
-		}
-	}
+	PCI_CLRBIT(sc->bge_dev, BGE_PCI_CMD, PCIM_CMD_MWIEN, 4);
 
 #ifdef __brokenalpha__
 	/*
@@ -1151,7 +1115,8 @@ bge_chipinit(sc)
 	 * restriction on some ALPHA platforms with early revision 
 	 * 21174 PCI chipsets, such as the AlphaPC 164lx 
 	 */
-	PCI_SETBIT(sc, BGE_PCI_DMA_RW_CTL, BGE_PCI_READ_BNDRY_1024, 4);
+	PCI_SETBIT(sc->bge_dev, BGE_PCI_DMA_RW_CTL,
+	    BGE_PCI_READ_BNDRY_1024BYTES, 4);
 #endif
 
 	/* Set the timer prescaler (always 66Mhz) */
@@ -1165,7 +1130,7 @@ bge_blockinit(sc)
 	struct bge_softc *sc;
 {
 	struct bge_rcb *rcb;
-	struct bge_rcb_opaque *rcbo;
+	volatile struct bge_rcb *vrcb;
 	int i;
 
 	/*
@@ -1236,17 +1201,15 @@ bge_blockinit(sc)
 	rcb = &sc->bge_rdata->bge_info.bge_std_rx_rcb;
 	BGE_HOSTADDR(rcb->bge_hostaddr) =
 	    vtophys(&sc->bge_rdata->bge_rx_std_ring);
-	rcb->bge_max_len = BGE_MAX_FRAMELEN;
+	rcb->bge_maxlen_flags = BGE_RCB_MAXLEN_FLAGS(BGE_MAX_FRAMELEN, 0);
 	if (sc->bge_extram)
 		rcb->bge_nicaddr = BGE_EXT_STD_RX_RINGS;
 	else
 		rcb->bge_nicaddr = BGE_STD_RX_RINGS;
-	rcb->bge_flags = 0;
-	rcbo = (struct bge_rcb_opaque *)rcb;
-	CSR_WRITE_4(sc, BGE_RX_STD_RCB_HADDR_HI, rcbo->bge_reg0);
-	CSR_WRITE_4(sc, BGE_RX_STD_RCB_HADDR_LO, rcbo->bge_reg1);
-	CSR_WRITE_4(sc, BGE_RX_STD_RCB_MAXLEN_FLAGS, rcbo->bge_reg2);
-	CSR_WRITE_4(sc, BGE_RX_STD_RCB_NICADDR, rcbo->bge_reg3);
+	CSR_WRITE_4(sc, BGE_RX_STD_RCB_HADDR_HI, rcb->bge_hostaddr.bge_addr_hi);
+	CSR_WRITE_4(sc, BGE_RX_STD_RCB_HADDR_LO, rcb->bge_hostaddr.bge_addr_lo);
+	CSR_WRITE_4(sc, BGE_RX_STD_RCB_MAXLEN_FLAGS, rcb->bge_maxlen_flags);
+	CSR_WRITE_4(sc, BGE_RX_STD_RCB_NICADDR, rcb->bge_nicaddr);
 
 	/*
 	 * Initialize the jumbo RX ring control block
@@ -1258,24 +1221,24 @@ bge_blockinit(sc)
 	rcb = &sc->bge_rdata->bge_info.bge_jumbo_rx_rcb;
 	BGE_HOSTADDR(rcb->bge_hostaddr) =
 	    vtophys(&sc->bge_rdata->bge_rx_jumbo_ring);
-	rcb->bge_max_len = BGE_MAX_FRAMELEN;
+	rcb->bge_maxlen_flags =
+	    BGE_RCB_MAXLEN_FLAGS(BGE_MAX_FRAMELEN, BGE_RCB_FLAG_RING_DISABLED);
 	if (sc->bge_extram)
 		rcb->bge_nicaddr = BGE_EXT_JUMBO_RX_RINGS;
 	else
 		rcb->bge_nicaddr = BGE_JUMBO_RX_RINGS;
-	rcb->bge_flags = BGE_RCB_FLAG_RING_DISABLED;
-
-	rcbo = (struct bge_rcb_opaque *)rcb;
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_HADDR_HI, rcbo->bge_reg0);
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_HADDR_LO, rcbo->bge_reg1);
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_MAXLEN_FLAGS, rcbo->bge_reg2);
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_NICADDR, rcbo->bge_reg3);
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_HADDR_HI,
+	    rcb->bge_hostaddr.bge_addr_hi);
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_HADDR_LO,
+	    rcb->bge_hostaddr.bge_addr_lo);
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_MAXLEN_FLAGS, rcb->bge_maxlen_flags);
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_NICADDR, rcb->bge_nicaddr);
 
 	/* Set up dummy disabled mini ring RCB */
 	rcb = &sc->bge_rdata->bge_info.bge_mini_rx_rcb;
-	rcb->bge_flags = BGE_RCB_FLAG_RING_DISABLED;
-	rcbo = (struct bge_rcb_opaque *)rcb;
-	CSR_WRITE_4(sc, BGE_RX_MINI_RCB_MAXLEN_FLAGS, rcbo->bge_reg2);
+	rcb->bge_maxlen_flags =
+	    BGE_RCB_MAXLEN_FLAGS(0, BGE_RCB_FLAG_RING_DISABLED);
+	CSR_WRITE_4(sc, BGE_RX_MINI_RCB_MAXLEN_FLAGS, rcb->bge_maxlen_flags);
 
 	/*
 	 * Set the BD ring replentish thresholds. The recommended
@@ -1290,37 +1253,37 @@ bge_blockinit(sc)
 	 * bit in the flags field of all the TX send ring control blocks.
 	 * These are located in NIC memory.
 	 */
-	rcb = (struct bge_rcb *)(sc->bge_vhandle + BGE_MEMWIN_START +
+	vrcb = (volatile struct bge_rcb *)(sc->bge_vhandle + BGE_MEMWIN_START +
 	    BGE_SEND_RING_RCB);
 	for (i = 0; i < BGE_TX_RINGS_EXTSSRAM_MAX; i++) {
-		rcb->bge_flags = BGE_RCB_FLAG_RING_DISABLED;
-		rcb->bge_max_len = 0;
-		rcb->bge_nicaddr = 0;
-		rcb++;
+		vrcb->bge_maxlen_flags =
+		    BGE_RCB_MAXLEN_FLAGS(0, BGE_RCB_FLAG_RING_DISABLED);
+		vrcb->bge_nicaddr = 0;
+		vrcb++;
 	}
 
 	/* Configure TX RCB 0 (we use only the first ring) */
-	rcb = (struct bge_rcb *)(sc->bge_vhandle + BGE_MEMWIN_START +
+	vrcb = (volatile struct bge_rcb *)(sc->bge_vhandle + BGE_MEMWIN_START +
 	    BGE_SEND_RING_RCB);
-	rcb->bge_hostaddr.bge_addr_hi = 0;
-	BGE_HOSTADDR(rcb->bge_hostaddr) =
+	vrcb->bge_hostaddr.bge_addr_hi = 0;
+	BGE_HOSTADDR(vrcb->bge_hostaddr) =
 	    vtophys(&sc->bge_rdata->bge_tx_ring);
-	rcb->bge_nicaddr = BGE_NIC_TXRING_ADDR(0, BGE_TX_RING_CNT);
-	rcb->bge_max_len = BGE_TX_RING_CNT;
-	rcb->bge_flags = 0;
+	vrcb->bge_nicaddr = BGE_NIC_TXRING_ADDR(0, BGE_TX_RING_CNT);
+	vrcb->bge_maxlen_flags = BGE_RCB_MAXLEN_FLAGS(BGE_TX_RING_CNT, 0);
 
 	/* Disable all unused RX return rings */
-	rcb = (struct bge_rcb *)(sc->bge_vhandle + BGE_MEMWIN_START +
+	vrcb = (volatile struct bge_rcb *)(sc->bge_vhandle + BGE_MEMWIN_START +
 	    BGE_RX_RETURN_RING_RCB);
 	for (i = 0; i < BGE_RX_RINGS_MAX; i++) {
-		rcb->bge_hostaddr.bge_addr_hi = 0;
-		rcb->bge_hostaddr.bge_addr_lo = 0;
-		rcb->bge_flags = BGE_RCB_FLAG_RING_DISABLED;
-		rcb->bge_max_len = BGE_RETURN_RING_CNT;
-		rcb->bge_nicaddr = 0;
+		vrcb->bge_hostaddr.bge_addr_hi = 0;
+		vrcb->bge_hostaddr.bge_addr_lo = 0;
+		vrcb->bge_maxlen_flags =
+		    BGE_RCB_MAXLEN_FLAGS(BGE_RETURN_RING_CNT,
+		    BGE_RCB_FLAG_RING_DISABLED);
+		vrcb->bge_nicaddr = 0;
 		CSR_WRITE_4(sc, BGE_MBX_RX_CONS0_LO +
 		    (i * (sizeof(u_int64_t))), 0);
-		rcb++;
+		vrcb++;
 	}
 
 	/* Initialize RX ring indexes */
@@ -1334,14 +1297,13 @@ bge_blockinit(sc)
 	 * The return rings live entirely within the host, so the
 	 * nicaddr field in the RCB isn't used.
 	 */
-	rcb = (struct bge_rcb *)(sc->bge_vhandle + BGE_MEMWIN_START +
+	vrcb = (volatile struct bge_rcb *)(sc->bge_vhandle + BGE_MEMWIN_START +
 	    BGE_RX_RETURN_RING_RCB);
-	rcb->bge_hostaddr.bge_addr_hi = 0;
-	BGE_HOSTADDR(rcb->bge_hostaddr) =
+	vrcb->bge_hostaddr.bge_addr_hi = 0;
+	BGE_HOSTADDR(vrcb->bge_hostaddr) =
 	    vtophys(&sc->bge_rdata->bge_rx_return_ring);
-	rcb->bge_nicaddr = 0x00000000;
-	rcb->bge_max_len = BGE_RETURN_RING_CNT;
-	rcb->bge_flags = 0;
+	vrcb->bge_nicaddr = 0x00000000;
+	vrcb->bge_maxlen_flags = BGE_RCB_MAXLEN_FLAGS(BGE_RETURN_RING_CNT, 0);
 
 	/* Set random backoff seed for TX */
 	CSR_WRITE_4(sc, BGE_TX_RANDOM_BACKOFF,
@@ -1521,6 +1483,7 @@ bge_probe(dev)
 {
 	struct bge_type *t;
 	struct bge_softc *sc;
+	char *descbuf;
 
 	t = bge_devs;
 
@@ -1536,7 +1499,14 @@ bge_probe(dev)
 			bge_vpd_read(sc);
 			device_set_desc(dev, sc->bge_vpd_prodname);
 #endif
-			device_set_desc(dev, t->bge_name);
+			descbuf = malloc(BGE_DEVDESC_MAX, M_TEMP, M_NOWAIT);
+			if (descbuf == NULL)
+				return(ENOMEM);
+			snprintf(descbuf, BGE_DEVDESC_MAX,
+			    "%s, ASIC rev. %#04x", t->bge_name,
+			    pci_read_config(dev, BGE_PCI_MISC_CTL, 4) >> 16);
+			device_set_desc_copy(dev, descbuf);
+			free(descbuf, M_TEMP);
 			return(0);
 		}
 		t++;
@@ -1554,6 +1524,7 @@ bge_attach(dev)
 	struct ifnet *ifp;
 	struct bge_softc *sc;
 	u_int32_t hwcfg = 0;
+	u_int32_t mac_addr = 0;
 	int unit, error = 0, rid;
 
 	s = splimp();
@@ -1643,7 +1614,16 @@ bge_attach(dev)
 	/*
 	 * Get station address from the EEPROM.
 	 */
-	if (bge_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
+	mac_addr = bge_readmem_ind(sc, 0x0c14);
+	if ((mac_addr >> 16) == 0x484b) {
+		sc->arpcom.ac_enaddr[0] = (u_char)(mac_addr >> 8);
+		sc->arpcom.ac_enaddr[1] = (u_char)mac_addr;
+		mac_addr = bge_readmem_ind(sc, 0x0c18);
+		sc->arpcom.ac_enaddr[2] = (u_char)(mac_addr >> 24);
+		sc->arpcom.ac_enaddr[3] = (u_char)(mac_addr >> 16);
+		sc->arpcom.ac_enaddr[4] = (u_char)(mac_addr >> 8);
+		sc->arpcom.ac_enaddr[5] = (u_char)mac_addr;
+	} else if (bge_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
 	    BGE_EE_MAC_OFFSET + 2, ETHER_ADDR_LEN)) {
 		printf("bge%d: failed to read station address\n", unit);
 		bge_release_resources(sc);
@@ -1715,14 +1695,22 @@ bge_attach(dev)
 
 	/*
 	 * Figure out what sort of media we have by checking the
-	 * hardware config word in the EEPROM. Note: on some BCM5700
-	 * cards, this value appears to be unset. If that's the
-	 * case, we have to rely on identifying the NIC by its PCI
-	 * subsystem ID, as we do below for the SysKonnect SK-9D41.
+	 * hardware config word in the first 32k of NIC internal memory,
+	 * or fall back to examining the EEPROM if necessary.
+	 * Note: on some BCM5700 cards, this value appears to be unset.
+	 * If that's the case, we have to rely on identifying the NIC
+	 * by its PCI subsystem ID, as we do below for the SysKonnect
+	 * SK-9D41.
 	 */
-	bge_read_eeprom(sc, (caddr_t)&hwcfg,
-		    BGE_EE_HWCFG_OFFSET, sizeof(hwcfg));
-	if ((ntohl(hwcfg) & BGE_HWCFG_MEDIA) == BGE_MEDIA_FIBER)
+	if (bge_readmem_ind(sc, BGE_SOFTWARE_GENCOMM_SIG) == BGE_MAGIC_NUMBER)
+		hwcfg = bge_readmem_ind(sc, BGE_SOFTWARE_GENCOMM_NICCFG);
+	else {
+		bge_read_eeprom(sc, (caddr_t)&hwcfg,
+				BGE_EE_HWCFG_OFFSET, sizeof(hwcfg));
+		hwcfg = ntohl(hwcfg);
+	}
+
+	if ((hwcfg & BGE_HWCFG_MEDIA) == BGE_MEDIA_FIBER)
 		sc->bge_tbi = 1;
 
 	/* The SysKonnect SK-9D41 is a 1000baseSX card. */

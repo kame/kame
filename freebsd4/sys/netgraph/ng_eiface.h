@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  * 	$Id: ng_eiface.h,v 1.4 2000/03/06 09:46:14 vitaly Exp $
- * $FreeBSD: src/sys/netgraph/ng_eiface.h,v 1.2.2.2 2002/07/02 23:44:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_eiface.h,v 1.2.2.4 2002/12/12 23:36:39 julian Exp $
  */
 
 #ifndef _NETGRAPH_EIFACE_H_
@@ -38,7 +38,7 @@
 #define NGM_EIFACE_COOKIE		948105892
 
 /* Interface base name */
-#define NG_EIFACE_EIFACE_NAME		"nge"
+#define NG_EIFACE_EIFACE_NAME		"ngeth"
 #define NG_EIFACE_EIFACE_NAME_MAX		15
 
 /* My hook names */
@@ -79,21 +79,5 @@ struct ng_eiface_par {
     { "oct5",		&ng_parse_int8_type	},		\
     { NULL }							\
 }
-static const struct ng_parse_type ng_eiface_par_type = {
-	&ng_parse_struct_type,
-	&ng_eiface_par_fields
-};
-
-static const struct ng_cmdlist ng_eiface_cmdlist[] = {
-	{
-	  NGM_EIFACE_COOKIE,
-	  NGM_EIFACE_SET,
-	  "set",
-	  &ng_eiface_par_type,
-	  NULL
-	},
-	{ 0 }
-};
-
 
 #endif /* _NETGRAPH_EIFACE_H_ */

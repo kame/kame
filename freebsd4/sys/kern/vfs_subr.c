@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.27 2002/02/16 16:05:27 iedowse Exp $
+ * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.29 2002/10/13 16:19:12 iedowse Exp $
  */
 
 /*
@@ -1256,7 +1256,7 @@ pbrelvp(bp)
 	KASSERT(bp->b_vp != NULL, ("pbrelvp: NULL"));
 
 	/* XXX REMOVE ME */
-	if (bp->b_vnbufs.tqe_next != NULL) {
+	if (TAILQ_NEXT(bp, b_vnbufs) != NULL) {
 		panic(
 		    "relpbuf(): b_vp was probably reassignbuf()d %p %x", 
 		    bp,

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34.2.11 2002/08/07 16:32:00 ru Exp $
+# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34.2.12 2003/01/02 20:41:34 kan Exp $
 
 MAINTAINER=	marcel@FreeBSD.org
 
@@ -13,7 +13,7 @@ OBJS=	linux_locore.o
 MAN=	linux.8
 
 .if ${MACHINE_ARCH} == "i386"
-SRCS+=	linux_uid16.c imgact_linux.c
+SRCS+=	linux_ptrace.c linux_uid16.c imgact_linux.c opt_cpu.h
 .endif
 
 CLEANFILES=	linux_assym.h linux_genassym.o

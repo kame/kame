@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.6 2002/07/29 18:56:37 ume Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.7 2003/01/24 05:11:34 sam Exp $
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -40,10 +40,10 @@
 #include <sys/queue.h>
 
 #include <net/route.h>
-#include <netinet6/ipsec.h> /* for IPSEC */
 
 #define	in6pcb		inpcb	/* for KAME src sync over BSD*'s */
 #define	in6p_sp		inp_sp	/* for KAME src sync over BSD*'s */
+struct inpcbpolicy;
 
 /*
  * Common structure pcb for internet protocol implementation.

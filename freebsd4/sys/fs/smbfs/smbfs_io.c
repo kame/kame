@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_io.c,v 1.3.2.2 2002/04/30 08:33:11 bp Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_io.c,v 1.3.2.3 2003/01/17 08:20:26 tjr Exp $
  *
  */
 #include <sys/param.h>
@@ -102,7 +102,7 @@ smbfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred)
 		bzero((caddr_t)&de, DE_SIZE);
 		de.d_reclen = DE_SIZE;
 		de.d_fileno = (offset == 0) ? np->n_ino :
-		    (np->n_parent ? np->n_parent->n_ino : 2);
+		    (np->n_parent ? VTOSMB(np->n_parent)->n_ino : 2);
 		if (de.d_fileno == 0)
 			de.d_fileno = 0x7ffffffd + offset;
 		de.d_namlen = offset + 1;

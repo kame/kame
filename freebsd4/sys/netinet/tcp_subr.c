@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73.2.28 2002/08/24 18:40:26 dillon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73.2.31 2003/01/24 05:11:34 sam Exp $
  */
 
 #include "opt_compat.h"
@@ -96,6 +96,14 @@
 #include <netinet6/ipsec6.h>
 #endif
 #endif /*IPSEC*/
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#ifdef INET6
+#include <netipsec/ipsec6.h>
+#endif
+#define	IPSEC
+#endif /*FAST_IPSEC*/
 
 #include <machine/in_cksum.h>
 #include <sys/md5.h>
@@ -164,6 +172,10 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, inflight_min, CTLFLAG_RW,
 static int     tcp_inflight_max = TCP_MAXWIN << TCP_MAX_WINSHIFT;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, inflight_max, CTLFLAG_RW,
     &tcp_inflight_max, 0, "Upper-bound for TCP inflight window");
+
+static int     tcp_inflight_stab = 20;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, inflight_stab, CTLFLAG_RW,
+    &tcp_inflight_stab, 0, "Slop in maximal packets / 10 (20 = 2 packets)");
 
 static void	tcp_cleartaocache __P((void));
 static void	tcp_notify __P((struct inpcb *, int));
@@ -494,15 +506,10 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	if (tp == NULL || (tp->t_inpcb->inp_socket->so_options & SO_DEBUG))
 		tcp_trace(TA_OUTPUT, 0, tp, mtod(m, void *), th, 0);
 #endif
-#ifdef IPSEC
-	if (ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL) != 0) {
-		m_freem(m);
-		return;
-	}
-#endif
 #ifdef INET6
 	if (isipv6) {
-		(void)ip6_output(m, NULL, ro6, ipflags, NULL, NULL);
+		(void)ip6_output(m, NULL, ro6, ipflags, NULL, NULL,
+			tp ? tp->t_inpcb : NULL);
 		if (ro6 == &sro6 && ro6->ro_rt) {
 			RTFREE(ro6->ro_rt);
 			ro6->ro_rt = NULL;
@@ -510,7 +517,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	} else
 #endif /* INET6 */
       {
-	(void) ip_output(m, NULL, ro, ipflags, NULL);
+	(void) ip_output(m, NULL, ro, ipflags, NULL, tp ? tp->t_inpcb : NULL);
 	if (ro == &sro && ro->ro_rt) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = NULL;
@@ -1583,9 +1590,15 @@ tcp_xmit_bandwidth_limit(struct tcpcb *tp, tcp_seq ack_seq)
 	 *	(3) Theoretically should stabilize in the face of multiple
 	 *	    connections implementing the same algorithm (this may need
 	 *	    a little work).
+	 *
+	 *	(4) Stability value (defaults to 20 = 2 maximal packets) can 
+	 *	    be adjusted with a sysctl but typically only needs to be on
+	 *	    very slow connections.  A value no smaller then 5 should
+	 *	    be used, but only reduce this default if you have no other
+	 *	    choice.
 	 */
 #define USERTT	((tp->t_srtt + tp->t_rttbest) / 2)
-	bwnd = (int64_t)bw * USERTT / (hz << TCP_RTT_SHIFT) + 2 * tp->t_maxseg;
+	bwnd = (int64_t)bw * USERTT / (hz << TCP_RTT_SHIFT) + tcp_inflight_stab * (int)tp->t_maxseg / 10;
 #undef USERTT
 
 	if (tcp_inflight_debug > 0) {

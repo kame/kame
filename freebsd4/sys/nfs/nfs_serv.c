@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_serv.c  8.8 (Berkeley) 7/31/95
- * $FreeBSD: src/sys/nfs/nfs_serv.c,v 1.93.2.5 2002/04/28 11:29:12 iedowse Exp $
+ * $FreeBSD: src/sys/nfs/nfs_serv.c,v 1.93.2.6 2002/12/29 18:19:53 dillon Exp $
  */
 
 /*
@@ -893,8 +893,8 @@ nfsrv_read(nfsd, slp, procp, mrq)
 		 */
 
 		if ((off == 0 && nh->nh_seqcount > 0) || off == nh->nh_nextr) {
-			if (++nh->nh_seqcount > 127)
-				nh->nh_seqcount = 127;
+			if (++nh->nh_seqcount > IO_SEQMAX)
+				nh->nh_seqcount = IO_SEQMAX;
 		} else if (nh->nh_seqcount > 1) {
 			nh->nh_seqcount = 1;
 		} else {
@@ -903,7 +903,7 @@ nfsrv_read(nfsd, slp, procp, mrq)
 		nh->nh_use += NHUSE_INC;
 		if (nh->nh_use > NHUSE_MAX)
 			nh->nh_use = NHUSE_MAX;
-		ioflag |= nh->nh_seqcount << 16;
+		ioflag |= nh->nh_seqcount << IO_SEQSHIFT;
         }
 
 	nfsm_reply(NFSX_POSTOPORFATTR(v3) + 3 * NFSX_UNSIGNED+nfsm_rndup(cnt));

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.16 2002/08/24 18:40:26 dillon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.17 2002/10/11 11:46:44 ume Exp $
  */
 
 #include "opt_ipsec.h"
@@ -360,8 +360,10 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (IN6_IS_ADDR_V4MAPPED(&sin6p->sin6_addr)) {
 		struct sockaddr_in sin;
 
-		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) != 0)
-			return(EINVAL);
+		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) != 0) {
+			error = EINVAL;
+			goto out;
+		}
 
 		in6_sin6_2_sin(&sin, sin6p);
 		inp->inp_vflag |= INP_IPV4;

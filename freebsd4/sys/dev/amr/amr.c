@@ -24,7 +24,35 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/amr/amr.c,v 1.7.2.9 2002/04/26 11:25:49 hm Exp $
+ * Copyright (c) 2002 Eric Moore
+ * Copyright (c) 2002 LSI Logic Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The party using or redistributing the source code and binary forms
+ *    agrees to the disclaimer below and the terms and conditions set forth
+ *    herein.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	$FreeBSD: src/sys/dev/amr/amr.c,v 1.7.2.13 2003/01/15 13:41:18 emoore Exp $
  */
 
 /*
@@ -78,7 +106,6 @@ static struct cdevsw amr_cdevsw = {
 		/* dump */	nodump,
 		/* psize */ 	nopsize,
 		/* flags */	0,
-		/* bmaj */	254	/* XXX magic no-bdev */
 };
 
 /*
@@ -93,6 +120,7 @@ static int	amr_query_controller(struct amr_softc *sc);
 static void	*amr_enquiry(struct amr_softc *sc, size_t bufsize, 
 			     u_int8_t cmd, u_int8_t cmdsub, u_int8_t cmdqual);
 static void	amr_completeio(struct amr_command *ac);
+static int	amr_support_ext_cdb(struct amr_softc *sc);
 
 /*
  * Command buffer allocation.
@@ -105,7 +133,6 @@ static void	amr_freecmd_cluster(struct amr_command_cluster *acc);
  */
 static int	amr_bio_command(struct amr_softc *sc, struct amr_command **acp);
 static int	amr_wait_command(struct amr_command *ac);
-static int	amr_poll_command(struct amr_command *ac);
 static int	amr_getslot(struct amr_command *ac);
 static void	amr_mapcmd(struct amr_command *ac);
 static void	amr_unmapcmd(struct amr_command *ac);
@@ -122,9 +149,11 @@ static void	amr_periodic(void *data);
  */
 static int	amr_quartz_submit_command(struct amr_softc *sc);
 static int	amr_quartz_get_work(struct amr_softc *sc, struct amr_mailbox *mbsave);
+static int	amr_quartz_poll_command(struct amr_command *ac);
 
 static int	amr_std_submit_command(struct amr_softc *sc);
 static int	amr_std_get_work(struct amr_softc *sc, struct amr_mailbox *mbsave);
+static int	amr_std_poll_command(struct amr_command *ac);
 static void	amr_std_attach_mailbox(struct amr_softc *sc);
 
 #ifdef AMR_BOARD_INIT
@@ -137,7 +166,9 @@ static int	amr_std_init(struct amr_softc *sc);
  */
 static void	amr_describe_controller(struct amr_softc *sc);
 #ifdef AMR_DEBUG
+#if 0
 static void	amr_printcommand(struct amr_command *ac);
+#endif
 #endif
 
 /********************************************************************************
@@ -185,9 +216,11 @@ amr_attach(struct amr_softc *sc)
     if (AMR_IS_QUARTZ(sc)) {
 	sc->amr_submit_command = amr_quartz_submit_command;
 	sc->amr_get_work       = amr_quartz_get_work;
+	sc->amr_poll_command   = amr_quartz_poll_command;
     } else {
 	sc->amr_submit_command = amr_std_submit_command;
 	sc->amr_get_work       = amr_std_get_work;
+	sc->amr_poll_command   = amr_std_poll_command;
 	amr_std_attach_mailbox(sc);;
     }
 
@@ -204,14 +237,12 @@ amr_attach(struct amr_softc *sc)
 
     debug(2, "controller query complete");
 
-#ifdef AMR_SCSI_PASSTHROUGH
     /*
      * Attach our 'real' SCSI channels to CAM.
      */
     if (amr_cam_attach(sc))
 	return(ENXIO);
     debug(2, "CAM attach done");
-#endif
 
     /*
      * Create the control device.
@@ -308,10 +339,8 @@ amr_free(struct amr_softc *sc)
 {
     struct amr_command_cluster	*acc;
 
-#ifdef AMR_SCSI_PASSTHROUGH
     /* detach from CAM */
     amr_cam_detach(sc);
-#endif
 
     /* cancel status timeout */
     untimeout(amr_periodic, sc, sc->amr_timeout);
@@ -321,6 +350,10 @@ amr_free(struct amr_softc *sc)
 	TAILQ_REMOVE(&sc->amr_cmd_clusters, acc, acc_link);
 	amr_freecmd_cluster(acc);
     }
+
+    /* destroy control device */
+    if( sc->amr_dev_t != (dev_t)NULL)
+	    destroy_dev(sc->amr_dev_t);
 }
 
 /*******************************************************************************
@@ -340,11 +373,11 @@ amr_submit_bio(struct amr_softc *sc, struct bio *bio)
 /********************************************************************************
  * Accept an open operation on the control device.
  */
-int
-amr_open(dev_t dev, int flags, int fmt, struct proc *p)
+static int
+amr_open(dev_t dev, int flags, int fmt, d_thread_t *td)
 {
     int			unit = minor(dev);
-    struct amr_softc	*sc = devclass_get_softc(amr_devclass, unit);
+    struct amr_softc	*sc = devclass_get_softc(devclass_find("amr"), unit);
 
     debug_called(1);
 
@@ -355,11 +388,11 @@ amr_open(dev_t dev, int flags, int fmt, struct proc *p)
 /********************************************************************************
  * Accept the last close on the control device.
  */
-int
-amr_close(dev_t dev, int flags, int fmt, struct proc *p)
+static int
+amr_close(dev_t dev, int flags, int fmt, d_thread_t *td)
 {
     int			unit = minor(dev);
-    struct amr_softc	*sc = devclass_get_softc(amr_devclass, unit);
+    struct amr_softc	*sc = devclass_get_softc(devclass_find("amr"), unit);
 
     debug_called(1);
 
@@ -370,8 +403,8 @@ amr_close(dev_t dev, int flags, int fmt, struct proc *p)
 /********************************************************************************
  * Handle controller-specific control operations.
  */
-int
-amr_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
+static int
+amr_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, d_thread_t *td)
 {
     struct amr_softc		*sc = (struct amr_softc *)dev->si_drv1;
     int				*arg = (int *)addr;
@@ -415,11 +448,10 @@ amr_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
 
 	/* handle SCSI passthrough command */
 	if (au->au_cmd[0] == AMR_CMD_PASS) {
-	    if ((ap = malloc(sizeof(*ap), M_DEVBUF, M_WAITOK)) == NULL) {
+	    if ((ap = malloc(sizeof(*ap), M_DEVBUF, M_WAITOK | M_ZERO)) == NULL) {
 		error = ENOMEM;
 		break;
 	    }
-	    bzero(ap, sizeof(*ap));
 
 	    /* copy cdb */
 	    ap->ap_cdb_length = au->au_cmd[2];
@@ -433,6 +465,7 @@ amr_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
 	    ap->ap_channel		= au->au_cmd[ap->ap_cdb_length + 5];
 	    ap->ap_scsi_id 		= au->au_cmd[ap->ap_cdb_length + 6];
 	    ap->ap_request_sense_length	= 14;
+	    ap->ap_data_transfer_length = au->au_length;
 	    /* XXX what about the request-sense area? does the caller want it? */
 
 	    /* build command */
@@ -477,10 +510,10 @@ amr_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
 	    error = copyout(dp, au->au_buffer, au->au_length);
 	debug(2, "copyout %ld bytes from %p -> %p", au->au_length, dp, au->au_buffer);
 	if (dp != NULL)
-	    debug(2, "%16D", dp, " ");
+	    debug(2, "%16d", (int)dp);
 	au->au_status = ac->ac_status;
 	break;
-	
+
     default:
 	debug(1, "unknown ioctl 0x%lx", cmd);
 	error = ENOIOCTL;
@@ -544,6 +577,15 @@ amr_query_controller(struct amr_softc *sc)
      */
     if (sc->amr_maxio == 0)
 	sc->amr_maxio = 2;
+
+    /*
+     * Greater than 10 byte cdb support
+     */
+    sc->support_ext_cdb = amr_support_ext_cdb(sc);
+
+    if(sc->support_ext_cdb) {
+	debug(2,"supports extended CDBs.");
+    }
 
     /* 
      * Try to issue an ENQUIRY3 command 
@@ -655,7 +697,7 @@ amr_enquiry(struct amr_softc *sc, size_t bufsize, u_int8_t cmd, u_int8_t cmdsub,
     mbox[3] = cmdqual;
 
     /* can't assume that interrupts are going to work here, so play it safe */
-    if (amr_poll_command(ac))
+    if (sc->amr_poll_command(ac))
 	goto out;
     error = ac->ac_status;
     
@@ -689,11 +731,49 @@ amr_flush(struct amr_softc *sc)
     ac->ac_mailbox.mb_command = AMR_CMD_FLUSH;
 
     /* we have to poll, as the system may be going down or otherwise damaged */
-    if (amr_poll_command(ac))
+    if (sc->amr_poll_command(ac))
 	goto out;
     error = ac->ac_status;
     
  out:
+    if (ac != NULL)
+	amr_releasecmd(ac);
+    return(error);
+}
+
+/********************************************************************************
+ * Detect extented cdb >> greater than 10 byte cdb support
+ * returns '1' means this support exist
+ * returns '0' means this support doesn't exist
+ */
+static int
+amr_support_ext_cdb(struct amr_softc *sc)
+{
+    struct amr_command	*ac;
+    u_int8_t		*mbox;
+    int			error;
+
+    /* get ourselves a command buffer */
+    error = 0;
+    if ((ac = amr_alloccmd(sc)) == NULL)
+	goto out;
+    /* set command flags */
+    ac->ac_flags |= AMR_CMD_PRIORITY | AMR_CMD_DATAOUT;
+
+    /* build the command proper */
+    mbox = (u_int8_t *)&ac->ac_mailbox;		/* XXX want a real structure for this? */
+    mbox[0] = 0xA4;
+    mbox[2] = 0x16;
+
+
+    /* we have to poll, as the system may be going down or otherwise damaged */
+    if (sc->amr_poll_command(ac))
+	goto out;
+    if( ac->ac_status == AMR_STATUS_SUCCESS ) {
+	    error = 1;
+    }
+
+out:
     if (ac != NULL)
 	amr_releasecmd(ac);
     return(error);
@@ -721,12 +801,10 @@ amr_startio(struct amr_softc *sc)
 	if (ac == NULL)
 	    (void)amr_bio_command(sc, &ac);
 
-#ifdef AMR_SCSI_PASSTHROUGH
 	/* if that failed, build a command from a ccb */
 	if (ac == NULL)
 	    (void)amr_cam_command(sc, &ac);
-#endif
-	
+
 	/* if we don't have anything to do, give up */
 	if (ac == NULL)
 	    break;
@@ -815,8 +893,9 @@ amr_bio_command(struct amr_softc *sc, struct amr_command **acp)
     /* we fill in the s/g related data when the command is mapped */
 
     if ((bio->bio_pblkno + blkcount) > sc->amr_drive[driveno].al_size)
-	device_printf(sc->amr_dev, "I/O beyond end of unit (%u,%d > %u)\n", 
-		      bio->bio_pblkno, blkcount, sc->amr_drive[driveno].al_size);
+	device_printf(sc->amr_dev, "I/O beyond end of unit (%lld,%d > %lu)\n", 
+		      (long long)bio->bio_pblkno, blkcount,
+		      (u_long)sc->amr_drive[driveno].al_size);
 
 out:
     if (error != 0) {
@@ -858,7 +937,7 @@ amr_wait_command(struct amr_command *ac)
  * Returns nonzero on error.  Can be safely called with interrupts enabled.
  */
 static int
-amr_poll_command(struct amr_command *ac)
+amr_std_poll_command(struct amr_command *ac)
 {
     struct amr_softc	*sc = ac->ac_sc;
     int			error, count;
@@ -885,6 +964,72 @@ amr_poll_command(struct amr_command *ac)
 	error = EIO;
 	device_printf(sc->amr_dev, "polled command timeout\n");
     }
+    return(error);
+}
+
+/********************************************************************************
+ * Take a command, submit it to the controller and busy-wait for it to return.
+ * Returns nonzero on error.  Can be safely called with interrupts enabled.
+ */
+static int
+amr_quartz_poll_command(struct amr_command *ac)
+{
+    struct amr_softc	*sc = ac->ac_sc;
+    int			s;
+    int			error,count;
+
+    debug_called(2);
+
+    /* now we have a slot, we can map the command (unmapped in amr_complete) */
+    amr_mapcmd(ac);
+
+    s = splbio();
+
+    count=0;
+    while (sc->amr_busyslots){
+	tsleep(sc, PRIBIO | PCATCH, "amrpoll", hz);
+	if(count++>10) {
+	    break;
+	}
+    }
+
+    if(sc->amr_busyslots) {
+	device_printf(sc->amr_dev, "adapter is busy\n");
+	splx(s);
+	amr_unmapcmd(ac);
+    	ac->ac_status=0;
+	return(1);
+    }
+
+    bcopy(&ac->ac_mailbox, (void *)(uintptr_t)(volatile void *)sc->amr_mailbox, AMR_MBOX_CMDSIZE);
+
+    /* clear the poll/ack fields in the mailbox */
+    sc->amr_mailbox->mb_ident = 0xFE;
+    sc->amr_mailbox->mb_nstatus = 0xFF;
+    sc->amr_mailbox->mb_status = 0xFF;
+    sc->amr_mailbox->mb_poll = 0;
+    sc->amr_mailbox->mb_ack = 0;
+    sc->amr_mailbox->mb_busy = 1;
+
+    AMR_QPUT_IDB(sc, sc->amr_mailboxphys | AMR_QIDB_SUBMIT);
+
+    while(sc->amr_mailbox->mb_nstatus == 0xFF);
+    while(sc->amr_mailbox->mb_status == 0xFF);
+    ac->ac_status=sc->amr_mailbox->mb_status;
+    error = (ac->ac_status !=AMR_STATUS_SUCCESS) ? 1:0;
+    while(sc->amr_mailbox->mb_poll != 0x77);
+    sc->amr_mailbox->mb_poll = 0;
+    sc->amr_mailbox->mb_ack = 0x77;
+
+    /* acknowledge that we have the commands */
+    AMR_QPUT_IDB(sc, sc->amr_mailboxphys | AMR_QIDB_ACK);
+    while(AMR_QGET_IDB(sc) & AMR_QIDB_ACK);
+
+    splx(s);
+
+    /* unmap the command's data buffer */
+    amr_unmapcmd(ac);
+
     return(error);
 }
 
@@ -961,8 +1106,10 @@ amr_setup_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int error)
     /* decide whether we need to populate the s/g table */
     if (nsegments < 2) {
 	*sgc = 0;
+	ac->ac_mailbox.mb_nsgelem = 0;
 	ac->ac_mailbox.mb_physaddr = ac->ac_dataphys;
     } else {
+        ac->ac_mailbox.mb_nsgelem = nsegments;
 	*sgc = nsegments;
 	ac->ac_mailbox.mb_physaddr = sc->amr_sgbusaddr + (ac->ac_slot * AMR_NSEG * sizeof(struct amr_sgentry));
 	for (i = 0; i < nsegments; i++, sg++) {
@@ -975,30 +1122,51 @@ amr_setup_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int error)
 static void
 amr_setup_ccbmap(void *arg, bus_dma_segment_t *segs, int nsegments, int error)
 {
-    struct amr_command		*ac = (struct amr_command *)arg;
-    struct amr_softc		*sc = ac->ac_sc;
-    struct amr_sgentry		*sg;
-    struct amr_passthrough	*ap = (struct amr_passthrough *)ac->ac_data;
-    int				i;
+    struct amr_command          *ac = (struct amr_command *)arg;
+    struct amr_softc            *sc = ac->ac_sc;
+    struct amr_sgentry          *sg;
+    struct amr_passthrough      *ap = (struct amr_passthrough *)ac->ac_data;
+    struct amr_ext_passthrough	*aep = (struct amr_ext_passthrough *)ac->ac_data;
+    int                         i;
 
     /* get base address of s/g table */
     sg = sc->amr_sgtable + (ac->ac_slot * AMR_NSEG);
 
-    /* save s/g table information in passthrough */
-    ap->ap_no_sg_elements = nsegments;
-    ap->ap_data_transfer_address = sc->amr_sgbusaddr + (ac->ac_slot * AMR_NSEG * sizeof(struct amr_sgentry));
-
-    /* save pointer to passthrough in command   XXX is this already done above? */
-    ac->ac_mailbox.mb_physaddr = ac->ac_dataphys;
-
-    debug(3, "slot %d  %d segments at 0x%x, passthrough at 0x%x", ac->ac_slot,
-	   ap->ap_no_sg_elements, ap->ap_data_transfer_address, ac->ac_dataphys);
-    
-    /* populate s/g table (overwrites previous call which mapped the passthrough) */
-    for (i = 0; i < nsegments; i++, sg++) {
-	sg->sg_addr = segs[i].ds_addr;
-	sg->sg_count = segs[i].ds_len;
-	debug(3, " %d: 0x%x/%d", i, sg->sg_addr, sg->sg_count);
+    /* decide whether we need to populate the s/g table */
+    if( ac->ac_mailbox.mb_command == AMR_CMD_EXTPASS ) {
+	if (nsegments < 2) {
+	    aep->ap_no_sg_elements = 0;
+	    aep->ap_data_transfer_address =  segs[0].ds_addr;
+	} else {
+	    /* save s/g table information in passthrough */
+	    aep->ap_no_sg_elements = nsegments;
+	    aep->ap_data_transfer_address = sc->amr_sgbusaddr + (ac->ac_slot * AMR_NSEG * sizeof(struct amr_sgentry));
+	    /* populate s/g table (overwrites previous call which mapped the passthrough) */
+	    for (i = 0; i < nsegments; i++, sg++) {
+		sg->sg_addr = segs[i].ds_addr;
+		sg->sg_count = segs[i].ds_len;
+		debug(3, " %d: 0x%x/%d", i, sg->sg_addr, sg->sg_count);
+	    }
+	}
+	debug(3, "slot %d  %d segments at 0x%x, passthrough at 0x%x", ac->ac_slot,
+	    aep->ap_no_sg_elements, aep->ap_data_transfer_address, ac->ac_dataphys);
+    } else {
+	if (nsegments < 2) {
+	    ap->ap_no_sg_elements = 0;
+	    ap->ap_data_transfer_address =  segs[0].ds_addr;
+	} else {
+	    /* save s/g table information in passthrough */
+	    ap->ap_no_sg_elements = nsegments;
+	    ap->ap_data_transfer_address = sc->amr_sgbusaddr + (ac->ac_slot * AMR_NSEG * sizeof(struct amr_sgentry));
+	    /* populate s/g table (overwrites previous call which mapped the passthrough) */
+	    for (i = 0; i < nsegments; i++, sg++) {
+		sg->sg_addr = segs[i].ds_addr;
+		sg->sg_count = segs[i].ds_len;
+		debug(3, " %d: 0x%x/%d", i, sg->sg_addr, sg->sg_count);
+	    }
+	}
+	debug(3, "slot %d  %d segments at 0x%x, passthrough at 0x%x", ac->ac_slot,
+	    ap->ap_no_sg_elements, ap->ap_data_transfer_address, ac->ac_dataphys);
     }
 }
 
@@ -1014,7 +1182,7 @@ amr_mapcmd(struct amr_command *ac)
 
 	if (ac->ac_data != NULL) {
 	    /* map the data buffers into bus space and build the s/g list */
-	    bus_dmamap_load(sc->amr_buffer_dmat, ac->ac_dmamap, ac->ac_data, ac->ac_length, 
+	    bus_dmamap_load(sc->amr_buffer_dmat, ac->ac_dmamap, ac->ac_data, ac->ac_length,
 			    amr_setup_dmamap, ac, 0);
 	    if (ac->ac_flags & AMR_CMD_DATAIN)
 		bus_dmamap_sync(sc->amr_buffer_dmat, ac->ac_dmamap, BUS_DMASYNC_PREREAD);
@@ -1023,7 +1191,7 @@ amr_mapcmd(struct amr_command *ac)
 	}
 
 	if (ac->ac_ccb_data != NULL) {
-	    bus_dmamap_load(sc->amr_buffer_dmat, ac->ac_ccb_dmamap, ac->ac_ccb_data, ac->ac_ccb_length, 
+	    bus_dmamap_load(sc->amr_buffer_dmat, ac->ac_ccb_dmamap, ac->ac_ccb_data, ac->ac_ccb_length,
 			    amr_setup_ccbmap, ac, 0);
 	    if (ac->ac_flags & AMR_CMD_CCB_DATAIN)
 		bus_dmamap_sync(sc->amr_buffer_dmat, ac->ac_ccb_dmamap, BUS_DMASYNC_PREREAD);
@@ -1072,7 +1240,7 @@ amr_start(struct amr_command *ac)
 {
     struct amr_softc	*sc = ac->ac_sc;
     int			done, s, i;
-    
+
     debug_called(3);
 
     /* mark command as busy so that polling consumer can tell */
@@ -1244,6 +1412,10 @@ amr_complete(void *context, int pending)
 	} else if (ac->ac_flags & AMR_CMD_SLEEP) {
 	    wakeup(ac);
 	}
+
+	if(!sc->amr_busyslots) {
+	    wakeup(sc);
+	}
     }
 }
 
@@ -1301,7 +1473,7 @@ amr_releasecmd(struct amr_command *ac)
 /********************************************************************************
  * Allocate a new command cluster and initialise it.
  */
-void
+static void
 amr_alloccmd_cluster(struct amr_softc *sc)
 {
     struct amr_command_cluster	*acc;
@@ -1327,7 +1499,7 @@ amr_alloccmd_cluster(struct amr_softc *sc)
 /********************************************************************************
  * Free a command cluster
  */
-void
+static void
 amr_freecmd_cluster(struct amr_command_cluster *acc)
 {
     struct amr_softc	*sc = acc->acc_command[0].ac_sc;
@@ -1542,7 +1714,7 @@ amr_describe_controller(struct amr_softc *sc)
      * Try to get 40LD product info, which tells us what the card is labelled as.
      */
     if ((ap = amr_enquiry(sc, 2048, AMR_CMD_CONFIG, AMR_CONFIG_PRODUCT_INFO, 0)) != NULL) {
-	device_printf(sc->amr_dev, "<%.80s> Firmware %.16s, BIOS %.16s, %dMB RAM\n",
+	device_printf(sc->amr_dev, "<LSILogic %.80s> Firmware %.16s, BIOS %.16s, %dMB RAM\n",
 		      ap->ap_product, ap->ap_firmware, ap->ap_bios,
 		      ap->ap_memsize);
 
@@ -1595,7 +1767,7 @@ amr_describe_controller(struct amr_softc *sc)
 	/* this looks like we have an HP NetRaid version of the MegaRaid */
 
     	if(ae->ae_signature == AMR_SIG_438) {
-    		/* the AMI 438 is an NetRaid 3si in HP-land */
+    		/* the AMI 438 is a NetRaid 3si in HP-land */
     		prod = "HP NetRaid 3si";
     	}
     	
@@ -1619,6 +1791,7 @@ amr_describe_controller(struct amr_softc *sc)
 /********************************************************************************
  * Print the command (ac) in human-readable format
  */
+#if 0
 static void
 amr_printcommand(struct amr_command *ac)
 {
@@ -1640,4 +1813,5 @@ amr_printcommand(struct amr_command *ac)
     for (i = 0; i < ac->ac_mailbox.mb_nsgelem; i++, sg++)
 	device_printf(sc->amr_dev, "  %x/%d\n", sg->sg_addr, sg->sg_count);
 }
+#endif
 #endif

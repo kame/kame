@@ -11,15 +11,16 @@
  * 2. Absolutely no warranty of function or purpose is made by the author
  *	John S. Dyson.
  *
- * $FreeBSD: src/sys/vm/vm_zone.h,v 1.13.2.1 2001/03/04 09:04:39 assar Exp $
+ * $FreeBSD: src/sys/vm/vm_zone.h,v 1.13.2.2 2002/10/10 19:50:16 dillon Exp $
  */
 
 #ifndef _SYS_ZONE_H
 
 #define _SYS_ZONE_H
 
-#define ZONE_INTERRUPT 1 /* Use this if you need to allocate at int time */
-#define ZONE_BOOT 16	 /* This is an internal flag used by zbootinit */
+#define ZONE_INTERRUPT 0x0001	/* If you need to allocate at int time */
+#define ZONE_PANICFAIL 0x0002	/* panic if the zalloc fails */
+#define ZONE_BOOT      0x0010	/* Internal flag used by zbootinit */
 
 #include	<machine/lock.h>
 

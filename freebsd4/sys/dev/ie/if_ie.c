@@ -47,7 +47,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ie/if_ie.c,v 1.72.2.2 2000/07/17 21:24:27 archie Exp $
+ * $FreeBSD: src/sys/dev/ie/if_ie.c,v 1.72.2.2.12.2 2003/03/27 21:02:31 mdodd Exp $
  */
 
 /*
@@ -825,6 +825,7 @@ ieattach(struct isa_device *dvp)
 	ifp->if_type = IFT_ETHER;
 	ifp->if_addrlen = 6;
 	ifp->if_hdrlen = 14;
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
 	if (ie->hard_type == IE_EE16)
 		EVENTHANDLER_REGISTER(shutdown_post_sync, ee16_shutdown,

@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.1.2.2 2002/05/06 09:36:19 phk Exp $
+ * $FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.1.2.3 2002/11/08 21:53:49 semenu Exp $
  */
 
 /*
@@ -50,7 +50,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 
@@ -69,7 +68,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.1.2.2 2002/05/06 09:36:19 phk Exp $";
+  "$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.1.2.3 2002/11/08 21:53:49 semenu Exp $";
 #endif
 
 static int nsgphy_probe		__P((device_t));

@@ -4,7 +4,7 @@
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  *
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_lookup.c,v 1.21.2.2 2001/03/05 13:08:59 obrien Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_lookup.c,v 1.21.2.3 2002/11/17 02:02:42 bde Exp $
  */
 /*
  * Copyright (c) 1989, 1993
@@ -467,7 +467,6 @@ searchloop:
 				 */
 				dp->i_ino = ep->inode;
 				dp->i_reclen = ep->rec_len;
-				brelse(bp);
 				goto found;
 			}
 		}
@@ -562,6 +561,7 @@ found:
 		dp->i_size = entryoffsetinblock+EXT2_DIR_REC_LEN(ep->name_len);
 		dp->i_flag |= IN_CHANGE | IN_UPDATE;
 	}
+	brelse(bp);
 
 	/*
 	 * Found component in pathname.

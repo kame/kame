@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-raid.c,v 1.3.2.18 2002/10/02 14:13:38 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-raid.c,v 1.3.2.19 2003/01/30 07:19:59 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -225,6 +225,8 @@ ar_attach_raid(struct ar_softc *rdp, int update)
 	    else
 		printf(" %d FREE  ", disk);
 	    ad_print(AD_SOFTC(rdp->disks[disk]));
+	    printf("         ");
+	    ata_enclosure_print(AD_SOFTC(rdp->disks[disk])->device);
 	}
 	else if (rdp->disks[disk].flags & AR_DF_ASSIGNED)
 	    printf(" %d DOWN\n", disk);
@@ -393,7 +395,7 @@ ata_raid_delete(int array)
     for (disk = 0; disk < rdp->total_disks; disk++) {
 	if ((rdp->disks[disk].flags&AR_DF_PRESENT) && rdp->disks[disk].device) {
 	    AD_SOFTC(rdp->disks[disk])->flags &= ~AD_F_RAID_SUBDISK;
-	    ata_drawerleds(rdp->disks[disk].device, ATA_LED_GREEN);
+	    ata_enclosure_leds(rdp->disks[disk].device, ATA_LED_GREEN);
 	    rdp->disks[disk].flags = 0;
 	}
     }
@@ -772,9 +774,9 @@ ar_config_changed(struct ar_softc *rdp, int writeback)
 	}
 	if ((rdp->disks[disk].flags&AR_DF_PRESENT) && rdp->disks[disk].device) {
 	    if (rdp->disks[disk].flags & AR_DF_ONLINE)
-		ata_drawerleds(rdp->disks[disk].device, ATA_LED_GREEN);
+		ata_enclosure_leds(rdp->disks[disk].device, ATA_LED_GREEN);
 	    else
-		ata_drawerleds(rdp->disks[disk].device, ATA_LED_RED);
+		ata_enclosure_leds(rdp->disks[disk].device, ATA_LED_RED);
 	}
     }
     if (writeback) {
@@ -807,7 +809,7 @@ ar_rebuild(struct ar_softc *rdp)
 #endif
 		continue;
 	    }
-	    ata_drawerleds(rdp->disks[disk].device, ATA_LED_ORANGE);
+	    ata_enclosure_leds(rdp->disks[disk].device, ATA_LED_ORANGE);
 	    count++;
 	}
     }

@@ -36,7 +36,7 @@
  *
  *	$Id: i4b_isppp.c,v 1.44 2000/08/31 07:07:26 hm Exp $
  *
- * $FreeBSD: src/sys/i4b/driver/i4b_isppp.c,v 1.7.2.2 2002/04/24 18:45:24 joerg Exp $
+ * $FreeBSD: src/sys/i4b/driver/i4b_isppp.c,v 1.7.2.3 2003/02/06 14:50:53 gj Exp $
  *
  *	last edit-date: [Thu Aug 31 09:02:27 2000]
  *
@@ -598,7 +598,7 @@ i4bisppp_disconnect(int unit, void *cdp)
 		UNTIMEOUT(i4bisppp_timeout, (void *)sp, sc->sc_ch);
 #endif
 		sc->sc_cdp = (call_desc_t *)0;	
-		/* do thhis here because pp_down calls i4bisppp_tlf */
+		/* do this here because pp_down calls i4bisppp_tlf */
 		sc->sc_state = ST_IDLE;
 		sp->pp_down(sp);	/* tell PPP we have hung up */
 	}
@@ -614,6 +614,7 @@ static void
 i4bisppp_dialresponse(int unit, int status, cause_t cause)
 {
 	struct i4bisppp_softc *sc = &i4bisppp_softc[unit];
+	struct sppp *sp = &sc->sc_if_un.scu_sp;
 
 	NDBGL4(L4_ISPDBG, "isp%d: status=%d, cause=%d", unit, status, cause);
 
@@ -628,6 +629,18 @@ i4bisppp_dialresponse(int unit, int status, cause_t cause)
 			while((m = sppp_dequeue(&sc->sc_if)) != NULL)
 				m_freem(m);
 		}
+
+		sc->sc_cdp = (call_desc_t *)0;
+		/* do this here because pp_down calls i4bisppp_tlf */
+		sc->sc_state = ST_IDLE;
+                /*
+                 * Ahh, sppp doesn't like to get a down event when
+                 * dialing fails. So first tell it that we are up
+                 * (doesn't hurt us since sc_state != ST_CONNECTED)
+                 * and then go down.
+                 */
+		sp->pp_up(sp);
+		sp->pp_down(sp);
 	}
 }
 	

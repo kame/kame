@@ -1,6 +1,6 @@
 /**************************************************************************
 
-Copyright (c) 2001-2002, Intel Corporation
+Copyright (c) 2001-2003, Intel Corporation
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em_osdep.h,v 1.1.2.7 2002/09/26 16:34:41 pdeuskar Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em_osdep.h,v 1.1.2.9 2003/01/03 18:18:56 pdeuskar Exp $*/
 
 #ifndef _FREEBSD_OS_H_
 #define _FREEBSD_OS_H_
@@ -88,6 +88,8 @@ struct em_osdep
 	bus_space_handle_t mem_bus_space_handle;
 	struct device     *dev;
 };
+
+#define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS)
 
 #define E1000_READ_REG(a, reg) (\
  ((a)->mac_type >= em_82543) ? \

@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic_isa.c,v 1.13.2.7 2001/11/12 05:29:22 imp Exp $
+ * $FreeBSD: src/sys/pccard/pcic_isa.c,v 1.13.2.8 2003/02/26 18:42:00 imp Exp $
  */
 
 #include <sys/param.h>
@@ -143,7 +143,7 @@ pcic_isa_probe(device_t dev)
 	 * offset we set after we assume it's broken.
 	 *
 	 * Note: because of this, we may incorrectly detect a single
-	 * slot vlsi chip as a i82365sl step D.  I cannot find a
+	 * slot vlsi chip as an i82365sl step D.  I cannot find a
 	 * datasheet for the affected chip, so that's the best we can
 	 * do for now.
 	 */
@@ -224,7 +224,7 @@ pcic_isa_probe(device_t dev)
 		/*
 		 *	Intel i82365sl-DF step or maybe a vlsi 82c146
 		 * we detected the vlsi case earlier, so if the controller
-		 * isn't set, we know it is a i82365sl step D.
+		 * isn't set, we know it is an i82365sl step D.
 		 */
 		case PCIC_INTEL2:
 			if (sp->controller == -1)

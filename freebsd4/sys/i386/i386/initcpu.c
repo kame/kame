@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.19.2.6 2002/04/28 23:01:34 dwmalone Exp $
+ * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.19.2.8 2003/01/22 20:14:52 jhb Exp $
  */
 
 #include "opt_cpu.h"
@@ -63,12 +63,10 @@ static void	init_6x86MX(void);
 static void	init_ppro(void);
 static void	init_mendocino(void);
 #endif
-void	enable_sse(void);
 
-int	hw_instruction_sse = 0;
+static int	hw_instruction_sse;
 SYSCTL_INT(_hw, OID_AUTO, instruction_sse, CTLFLAG_RD,
-	   &hw_instruction_sse, 0,
-	   "SIMD/MMX2 instructions available in CPU");
+    &hw_instruction_sse, 0, "SIMD/MMX2 instructions available in CPU");
 
 #ifdef CPU_ENABLE_SSE
 u_int	cpu_fxsr;		/* SSE enabled */
@@ -597,13 +595,13 @@ initializecpu(void)
 
 #if defined(PC98) && !defined(CPU_UPGRADE_HW_CACHE)
 	/*
-	 * OS should flush L1 cahce by itself because no PC-98 supports
+	 * OS should flush L1 cache by itself because no PC-98 supports
 	 * non-Intel CPUs.  Use wbinvd instruction before DMA transfer
 	 * when need_pre_dma_flush = 1, use invd instruction after DMA
 	 * transfer when need_post_dma_flush = 1.  If your CPU upgrade
-	 * product support hardware cache control, you can add
-	 * UPGRADE_CPU_HW_CACHE option in your kernel configuration file.
-	 * This option elminate unneeded cache flush instruction.
+	 * product supports hardware cache control, you can add the
+	 * CPU_UPGRADE_HW_CACHE option in your kernel configuration file.
+	 * This option eliminates unneeded cache flush instruction(s).
 	 */
 	if (strcmp(cpu_vendor, "CyrixInstead") == 0) {
 		switch (cpu) {
@@ -639,7 +637,7 @@ initializecpu(void)
 		need_pre_dma_flush = 1;
 #endif
 	}
-#endif /* PC98 && !UPGRADE_CPU_HW_CACHE */
+#endif /* PC98 && !CPU_UPGRADE_HW_CACHE */
 }
 
 #if defined(I586_CPU) && defined(CPU_WT_ALLOC)

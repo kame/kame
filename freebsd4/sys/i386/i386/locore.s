@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)locore.s	7.3 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132.2.8 2001/09/20 09:29:23 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132.2.10 2003/02/03 20:54:49 jhb Exp $
  *
  *		originally from: locore.s, by William F. Jolitz
  *
@@ -102,12 +102,13 @@ HIDENAME(tmpstk):
 	.globl	_boothowto,_bootdev
 
 	.globl	_cpu,_cpu_vendor,_cpu_id,_bootinfo
-	.globl	_cpu_high, _cpu_feature
+	.globl	_cpu_high, _cpu_feature, _cpu_procinfo
 
 _cpu:		.long	0			/* are we 386, 386sx, or 486 */
 _cpu_id:	.long	0			/* stepping ID */
 _cpu_high:	.long	0			/* highest arg to CPUID */
 _cpu_feature:	.long	0			/* features */
+_cpu_procinfo:	.long	0			/* brand index / HTT info */
 _cpu_vendor:	.space	20			/* CPU origin code */
 _bootinfo:	.space	BOOTINFO_SIZE		/* bootinfo that we can handle */
 
@@ -669,7 +670,7 @@ trycyrix:
 
 trycpuid:	/* Use the `cpuid' instruction. */
 	xorl	%eax,%eax
-	.byte	0x0f,0xa2			# cpuid 0
+	cpuid					# cpuid 0
 	movl	%eax,R(_cpu_high)		# highest capability
 	movl	%ebx,R(_cpu_vendor)		# store vendor string
 	movl	%edx,R(_cpu_vendor+4)
@@ -677,8 +678,9 @@ trycpuid:	/* Use the `cpuid' instruction. */
 	movb	$0,R(_cpu_vendor+12)
 
 	movl	$1,%eax
-	.byte	0x0f,0xa2			# cpuid 1
+	cpuid					# cpuid 1
 	movl	%eax,R(_cpu_id)			# store cpu_id
+	movl	%ebx,R(_cpu_procinfo)		# store cpu_procinfo
 	movl	%edx,R(_cpu_feature)		# store cpu_feature
 	rorl	$8,%eax				# extract family type
 	andl	$15,%eax

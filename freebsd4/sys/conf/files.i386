@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.35 2002/10/05 18:31:47 scottl Exp $
+# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.38 2003/01/02 20:41:33 kan Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -67,8 +67,8 @@ msysosak.o			optional	fla			\
 #
 contrib/dev/oltr/if_oltr.c	optional	oltr
 trlld.o				optional	oltr			\
-	dependency	"$S/contrib/dev/oltr/i386${FMT}.trlld.o.uu"	\
-	compile-with	"uudecode < $S/contrib/dev/oltr/i386${FMT}.trlld.o.uu"	\
+	dependency	"$S/contrib/dev/oltr/i386-elf.trlld.o.uu"	\
+	compile-with	"uudecode < $S/contrib/dev/oltr/i386-elf.trlld.o.uu"	\
 	no-implicit-rule
 contrib/dev/oltr/trlldbm.c	optional	oltr
 contrib/dev/oltr/trlldhm.c	optional	oltr
@@ -81,6 +81,13 @@ crypto/des/arch/i386/des_enc.S		optional	ipsec ipsec_esp
 crypto/des/des_ecb.c			optional	netsmbcrypto
 crypto/des/arch/i386/des_enc.S		optional	netsmbcrypto
 crypto/des/des_setkey.c			optional	netsmbcrypto
+bf_enc.o			optional	crypto		\
+	dependency	"$S/crypto/blowfish/arch/i386/bf_enc.S $S/crypto/blowfish/arch/i386/bf_enc_586.S $S/crypto/blowfish/arch/i386/bf_enc_686.S"		\
+	compile-with	"${CC} -c -I$S/crypto/blowfish/arch/i386 ${ASM_CFLAGS} ${WERROR} ${.IMPSRC}"	\
+	no-implicit-rule
+crypto/des/arch/i386/des_enc.S		optional	crypto
+crypto/des/des_ecb.c			optional	crypto
+crypto/des/des_setkey.c			optional	crypto
 dev/advansys/adv_isa.c		optional	adv isa
 dev/aic/aic_isa.c		optional	aic isa
 dev/ar/if_ar_isa.c		optional	ar isa
@@ -356,6 +363,7 @@ i386/linux/linux_dummy.c	optional	compat_linux
 i386/linux/linux_locore.s	optional	compat_linux		   \
 	dependency 	"linux_assym.h"
 i386/linux/linux_machdep.c	optional	compat_linux
+i386/linux/linux_ptrace.c	optional	compat_linux
 i386/linux/linux_sysent.c	optional	compat_linux
 i386/linux/linux_sysvec.c	optional	compat_linux
 svr4/imgact_svr4.c		optional	compat_svr4

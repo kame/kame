@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.26.2.16 2002/07/29 04:20:16 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.26.2.17 2002/10/11 17:35:11 mjacob Exp $ */
 /*
  * Qlogic ISP SCSI Host Adapter FreeBSD Wrapper Definitions
  * Copyright (c) 1997, 1998, 1999, 2000, 2001, 2002 by Matthew Jacob
@@ -31,7 +31,6 @@
 #define	ISP_PLATFORM_VERSION_MINOR	16
 
 #include <sys/param.h>
-#include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/queue.h>
@@ -57,6 +56,12 @@
 
 #include "opt_ddb.h"
 #include "opt_isp.h"
+
+/*
+ * Not quite yet
+ */
+/* #define	ISP_DAC_SUPPORTED	1 */
+
 /*
  * Efficiency- get rid of SBus code && tests unless we need them.
  */
@@ -166,7 +171,6 @@ struct isposinfo {
 #define	MEMZERO			bzero
 #define	MEMCPY(dst, src, amt)	bcopy((src), (dst), (amt))
 #define	SNPRINTF		snprintf
-#define	STRNCAT			strncat
 #define	USEC_DELAY		DELAY
 #define	USEC_SLEEP(isp, x)		\
 	if (isp->isp_osinfo.intsok)	\

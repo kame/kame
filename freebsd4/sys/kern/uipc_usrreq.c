@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)uipc_usrreq.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_usrreq.c,v 1.54.2.7 2002/03/09 05:22:23 dd Exp $
+ * $FreeBSD: src/sys/kern/uipc_usrreq.c,v 1.54.2.10 2003/03/04 17:28:09 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -212,6 +212,14 @@ uipc_peeraddr(struct socket *so, struct sockaddr **nam)
 	if (unp->unp_conn && unp->unp_conn->unp_addr)
 		*nam = dup_sockaddr((struct sockaddr *)unp->unp_conn->unp_addr,
 				    1);
+	else {
+		/*
+		 * XXX: It seems that this test always fails even when
+		 * connection is established.  So, this else clause is
+		 * added as workaround to return PF_LOCAL sockaddr.
+		 */
+		*nam = dup_sockaddr((struct sockaddr *)&sun_noname, 1);
+	}
 	return 0;
 }
 
@@ -395,8 +403,8 @@ uipc_sense(struct socket *so, struct stat *sb)
 		sb->st_blksize += so2->so_rcv.sb_cc;
 	}
 	sb->st_dev = NOUDEV;
-	if (unp->unp_ino == 0)
-		unp->unp_ino = unp_ino++;
+	if (unp->unp_ino == 0)		/* make up a non-zero inode number */
+		unp->unp_ino = (++unp_ino == 0) ? ++unp_ino : unp_ino;
 	sb->st_ino = unp->unp_ino;
 	return (0);
 }
@@ -1048,6 +1056,8 @@ unp_internalize(control, p)
 		if ((unsigned)fd >= fdescp->fd_nfiles ||
 		    fdescp->fd_ofiles[fd] == NULL)
 			return (EBADF);
+		if (fdescp->fd_ofiles[fd]->f_type == DTYPE_KQUEUE)
+			return (EOPNOTSUPP);
 	}
 	/*
 	 * Now replace the integer FDs with pointers to

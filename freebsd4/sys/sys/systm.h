@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.17 2002/07/31 17:30:48 imp Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.18 2002/12/17 18:04:02 sam Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -226,6 +226,7 @@ void		setsoftast __P((void));
 void		setsoftcambio __P((void));
 void		setsoftcamnet __P((void));
 void		setsoftclock __P((void));
+void		setsoftcrypto __P((void));
 void		setsoftnet __P((void));
 void		setsofttty __P((void));
 void		setsoftvm __P((void));
@@ -241,6 +242,7 @@ void		spl0 __P((void));
 intrmask_t	splbio __P((void));
 intrmask_t	splcam __P((void));
 intrmask_t	splclock __P((void));
+intrmask_t	splcrypto __P((void));
 intrmask_t	splhigh __P((void));
 intrmask_t	splimp __P((void));
 intrmask_t	splnet __P((void));
@@ -266,6 +268,7 @@ void		splz __P((void));
 void	splbioassert __P((const char *msg));
 void	splcamassert __P((const char *msg));
 void	splclockassert __P((const char *msg));
+void	splcryptoassert __P((const char *msg));
 void	splhighassert __P((const char *msg));
 void	splimpassert __P((const char *msg));
 void	splnetassert __P((const char *msg));

@@ -36,7 +36,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb16.c,v 1.64.2.6 2002/08/19 15:28:19 sobomax Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb16.c,v 1.64.2.7 2002/12/24 21:17:42 semenu Exp $");
 
 #define SB16_BUFFSIZE	4096
 #define PLAIN_SB16(x) ((((x)->bd_flags) & (BD_F_SB16|BD_F_SB16X)) == BD_F_SB16)
@@ -136,7 +136,7 @@ port_rd(struct resource *port, int off)
 static void
 port_wr(struct resource *port, int off, u_int8_t data)
 {
-	return bus_space_write_1(rman_get_bustag(port), rman_get_bushandle(port), off, data);
+	bus_space_write_1(rman_get_bustag(port), rman_get_bushandle(port), off, data);
 }
 
 static int

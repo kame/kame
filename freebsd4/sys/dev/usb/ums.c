@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/usb/ums.c,v 1.36.2.4 2002/08/12 14:19:48 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ums.c,v 1.36.2.6 2002/11/06 20:23:50 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -175,7 +175,7 @@ USB_MATCH(ums)
 	if (!uaa->iface)
 		return (UMATCH_NONE);
 	id = usbd_get_interface_descriptor(uaa->iface);
-	if (!id || id->bInterfaceClass != UCLASS_HID)
+	if (!id || id->bInterfaceClass != UICLASS_HID)
 		return (UMATCH_NONE);
 
 	err = usbd_alloc_report_desc(uaa->iface, &desc, &size, M_TEMP);
@@ -587,7 +587,7 @@ ums_disable(priv)
 }
 
 Static int
-ums_open(dev_t dev, int flag, int fmt, struct proc *p)
+ums_open(dev_t dev, int flag, int fmt, usb_proc_ptr p)
 {
 	struct ums_softc *sc;
 
@@ -597,7 +597,7 @@ ums_open(dev_t dev, int flag, int fmt, struct proc *p)
 }
 
 Static int
-ums_close(dev_t dev, int flag, int fmt, struct proc *p)
+ums_close(dev_t dev, int flag, int fmt, usb_proc_ptr p)
 {
 	struct ums_softc *sc;
 
@@ -683,7 +683,7 @@ ums_read(dev_t dev, struct uio *uio, int flag)
 }
 
 Static int
-ums_poll(dev_t dev, int events, struct proc *p)
+ums_poll(dev_t dev, int events, usb_proc_ptr p)
 {
 	struct ums_softc *sc;
 	int revents = 0;
@@ -709,7 +709,7 @@ ums_poll(dev_t dev, int events, struct proc *p)
 }
 	
 int
-ums_ioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
+ums_ioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 {
 	struct ums_softc *sc;
 	int error = 0;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.19 2002/06/18 00:15:31 kbyanc Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.22 2002/12/12 23:19:02 orion Exp $
  */
 
 /*
@@ -94,15 +94,16 @@ SYSCTL_INT(_net_link_ether_inet, OID_AUTO, host_down_time, CTLFLAG_RW,
 struct llinfo_arp {
 	LIST_ENTRY(llinfo_arp) la_le;
 	struct	rtentry *la_rt;
-	struct	mbuf *la_hold;		/* last packet until resolved/timeout */
-	long	la_asked;		/* last time we QUERIED for this addr */
+	struct	mbuf *la_hold;	/* last packet until resolved/timeout */
+	u_short	la_preempt;	/* #times we QUERIED before entry expiration */
+	u_short	la_asked;	/* #times we QUERIED following expiration */
 #define la_timer la_rt->rt_rmx.rmx_expire /* deletion time in seconds */
 };
 
 static	LIST_HEAD(, llinfo_arp) llinfo_arp;
 
 struct	ifqueue arpintrq = {0, 0, 0, 50};
-static int	arp_inuse, arp_allocated;
+static int	arp_inuse, arp_allocated, arpinit_done;
 
 static int	arp_maxtries = 5;
 static int	useloopback = 1; /* use loopback interface for local traffic */
@@ -142,13 +143,13 @@ arptimer(ignored_arg)
 	void *ignored_arg;
 {
 	int s = splnet();
-	register struct llinfo_arp *la = llinfo_arp.lh_first;
+	register struct llinfo_arp *la = LIST_FIRST(&llinfo_arp);
 	struct llinfo_arp *ola;
 
 	timeout(arptimer, (caddr_t)0, arpt_prune * hz);
 	while ((ola = la) != 0) {
 		register struct rtentry *rt = la->la_rt;
-		la = la->la_le.le_next;
+		la = LIST_NEXT(la, la_le);
 		if (rt->rt_expire && rt->rt_expire <= time_second)
 			arptfree(ola); /* timer has expired, clear */
 	}
@@ -167,13 +168,10 @@ arp_rtrequest(req, rt, info)
 	register struct sockaddr *gate = rt->rt_gateway;
 	register struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
-	static int arpinit_done;
 
 	if (!arpinit_done) {
 		arpinit_done = 1;
-		LIST_INIT(&llinfo_arp);
 		timeout(arptimer, (caddr_t)0, hz);
-		register_netisr(NETISR_ARP, arpintr);
 	}
 	if (rt->rt_flags & RTF_GATEWAY)
 		return;
@@ -438,13 +436,13 @@ arpresolve(ifp, rt, m, dst, desten, rt0)
 		 * arpt_down interval.
 		 */
 		if ((rt->rt_expire != 0) &&
-		    (time_second + (arp_maxtries - la->la_asked) * arpt_down >
-		     rt->rt_expire)) {
+		    (time_second + (arp_maxtries - la->la_preempt) * arpt_down
+		     > rt->rt_expire)) {
 			arprequest(ifp,
 				   &SIN(rt->rt_ifa->ifa_addr)->sin_addr,
 				   &SIN(dst)->sin_addr,
 				   IF_LLADDR(ifp));
-			la->la_asked++;
+			la->la_preempt++;
 		} 
 
 		bcopy(LLADDR(sdl), desten, sdl->sdl_alen);
@@ -472,15 +470,15 @@ arpresolve(ifp, rt, m, dst, desten, rt0)
 		rt->rt_flags &= ~RTF_REJECT;
 		if (la->la_asked == 0 || rt->rt_expire != time_second) {
 			rt->rt_expire = time_second;
-			if (la->la_asked++ < arp_maxtries)
-			    arprequest(ifp,
-			        &SIN(rt->rt_ifa->ifa_addr)->sin_addr,
-				&SIN(dst)->sin_addr,
-				IF_LLADDR(ifp));
-			else {
+			if (la->la_asked++ < arp_maxtries) {
+				arprequest(ifp,
+					   &SIN(rt->rt_ifa->ifa_addr)->sin_addr,
+					   &SIN(dst)->sin_addr,
+					   IF_LLADDR(ifp));
+			} else {
 				rt->rt_flags |= RTF_REJECT;
 				rt->rt_expire += arpt_down;
-				la->la_asked = 0;
+				la->la_preempt = la->la_asked = 0;
 			}
 
 		}
@@ -734,7 +732,7 @@ match:
 		if (rt->rt_expire)
 			rt->rt_expire = time_second + arpt_keep;
 		rt->rt_flags &= ~RTF_REJECT;
-		la->la_asked = 0;
+		la->la_preempt = la->la_asked = 0;
 		if (la->la_hold) {
 			(*ifp->if_output)(ifp, la->la_hold,
 				rt_key(rt), rt);
@@ -858,7 +856,7 @@ arptfree(la)
 	if (rt->rt_refcnt > 0 && (sdl = SDL(rt->rt_gateway)) &&
 	    sdl->sdl_family == AF_LINK) {
 		sdl->sdl_alen = 0;
-		la->la_asked = 0;
+		la->la_preempt = la->la_asked = 0;
 		rt->rt_flags &= ~RTF_REJECT;
 		return;
 	}
@@ -912,3 +910,12 @@ arp_ifinit(ifp, ifa)
 	ifa->ifa_rtrequest = arp_rtrequest;
 	ifa->ifa_flags |= RTF_CLONING;
 }
+
+static void
+arp_init(void)
+{
+	LIST_INIT(&llinfo_arp);
+	register_netisr(NETISR_ARP, arpintr);
+}
+
+SYSINIT(arp, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY, arp_init, 0);

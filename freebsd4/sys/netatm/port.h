@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/port.h,v 1.2.2.1 2002/02/13 00:43:11 dillon Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/port.h,v 1.2.2.2 2003/01/23 21:06:44 sam Exp $
  *
  */
 
@@ -264,8 +264,7 @@ typedef struct mbuf	KBuffer;
 }
 #define	KB_LINKHEAD(new, head) {			\
 	if ((head) && KB_ISPKT(new) && KB_ISPKT(head)) {\
-		M_COPY_PKTHDR((new), (head));		\
-		(head)->m_flags &= ~M_PKTHDR;		\
+		M_MOVE_PKTHDR((new), (head));		\
 	}						\
 	(new)->m_next = (head);				\
 }

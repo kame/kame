@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14.2.8 2002/08/30 17:21:41 gibbs Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14.2.9 2002/10/21 05:38:11 simokawa Exp $
  */
 
 #include <sys/param.h>
@@ -670,6 +670,10 @@ scsi_op_desc(u_int16_t opcode, struct scsi_inquiry_data *inq_data)
 		num_ops[0] = sizeof(scsi_op_codes)/sizeof(scsi_op_codes[0]);
 		num_tables = 1;
 	}
+
+	/* RBC is 'Simplified' Direct Access Device */
+	if (pd_type == T_RBC)
+		pd_type = T_DIRECT;
 
 	opmask = 1 << pd_type;
 

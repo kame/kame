@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/md_var.h,v 1.35.2.3 2002/09/17 22:39:54 sam Exp $
+ * $FreeBSD: src/sys/i386/include/md_var.h,v 1.35.2.4 2003/01/22 20:14:53 jhb Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -44,10 +44,12 @@ extern	int	(*copyin_vector) __P((const void *udaddr, void *kaddr,
 				      size_t len));
 extern	int	(*copyout_vector) __P((const void *kaddr, void *udaddr,
 				       size_t len));
+extern	u_int	cpu_exthigh;
 extern	u_int	cpu_feature;
+extern	u_int	cpu_fxsr;
 extern	u_int	cpu_high;
 extern	u_int	cpu_id;
-extern	u_int	cpu_fxsr;
+extern	u_int	cpu_procinfo;
 extern	char	cpu_vendor[];
 extern	u_int	cyrix_did;
 extern	char	kstack[];
@@ -81,6 +83,7 @@ void	doreti_popl_es __P((void)) __asm(__STRING(doreti_popl_es));
 void	doreti_popl_es_fault __P((void)) __asm(__STRING(doreti_popl_es_fault));
 void	doreti_popl_fs __P((void)) __asm(__STRING(doreti_popl_fs));
 void	doreti_popl_fs_fault __P((void)) __asm(__STRING(doreti_popl_fs_fault));
+void	enable_sse __P((void));
 int	fill_fpregs __P((struct proc *, struct fpreg *));
 int	fill_regs __P((struct proc *p, struct reg *regs));
 int	fill_dbregs __P((struct proc *p, struct dbreg *dbregs));

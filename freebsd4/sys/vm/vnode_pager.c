@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vnode_pager.c	7.5 (Berkeley) 4/20/91
- * $FreeBSD: src/sys/vm/vnode_pager.c,v 1.116.2.6 2001/12/20 19:56:30 dillon Exp $
+ * $FreeBSD: src/sys/vm/vnode_pager.c,v 1.116.2.7 2002/12/31 09:34:51 dillon Exp $
  */
 
 /*
@@ -1010,11 +1010,17 @@ vnode_pager_generic_putpages(vp, m, bytecount, flags, rtvals)
 	/*
 	 * pageouts are already clustered, use IO_ASYNC to force a bawrite()
 	 * rather then a bdwrite() to prevent paging I/O from saturating
-	 * the buffer cache.
+	 * the buffer cache.  Dummy-up the sequential heuristic to cause
+	 * large ranges to cluster.  If neither IO_SYNC or IO_ASYNC is set,
+	 * the system decides how to cluster.
 	 */
 	ioflags = IO_VMIO;
-	ioflags |= (flags & (VM_PAGER_PUT_SYNC | VM_PAGER_PUT_INVAL)) ? IO_SYNC: IO_ASYNC;
+	if (flags & (VM_PAGER_PUT_SYNC | VM_PAGER_PUT_INVAL))
+		ioflags |= IO_SYNC;
+	else if ((flags & VM_PAGER_CLUSTER_OK) == 0)
+		ioflags |= IO_ASYNC;
 	ioflags |= (flags & VM_PAGER_PUT_INVAL) ? IO_INVAL: 0;
+	ioflags |= IO_SEQMAX << IO_SEQSHIFT;
 
 	aiov.iov_base = (caddr_t) 0;
 	aiov.iov_len = maxsize;

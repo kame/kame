@@ -1,5 +1,5 @@
 #	From: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD: src/sys/conf/kmod.mk,v 1.82.2.13 2002/08/07 16:31:53 ru Exp $
+# $FreeBSD: src/sys/conf/kmod.mk,v 1.82.2.15 2003/02/10 13:11:50 nyan Exp $
 #
 # The include file <bsd.kmod.mk> handles installing Kernel Loadable Device
 # drivers (KLD's).
@@ -220,8 +220,8 @@ MFILES?= kern/bus_if.m kern/device_if.m dev/iicbus/iicbb_if.m \
     dev/ppbus/ppbus_if.m dev/smbus/smbus_if.m dev/usb/usb_if.m \
     dev/sound/pcm/ac97_if.m dev/sound/pcm/channel_if.m \
     dev/sound/pcm/feeder_if.m dev/sound/pcm/mixer_if.m \
-    libkern/iconv_converter_if.m \
-    pci/agp_if.m
+    libkern/iconv_converter_if.m pci/agp_if.m opencrypto/crypto_if.m \
+    pc98/pc98/canbus_if.m
 
 .for _srcsrc in ${MFILES}
 .for _ext in c h

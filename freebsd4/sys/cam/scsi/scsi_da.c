@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.26 2002/08/24 19:03:58 njl Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.33 2003/03/14 02:13:13 njl Exp $
  */
 
 #ifdef _KERNEL
@@ -255,14 +255,14 @@ static struct da_quirk_entry da_quirk_table[] =
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "Sony DSC", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
 	},
-    {
+	{
 		/*
 		 * Maxtor 3000LE USB Drive
 		 */
 		{T_DIRECT, SIP_MEDIA_FIXED, "MAXTOR*", "K040H2*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE
 	},
-    {
+	{
 		/*
 		 * LaCie USB drive, among others
 		 */
@@ -277,7 +277,8 @@ static struct da_quirk_entry da_quirk_table[] =
 		/*
 		 * Microtech USB CameraMate
 		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "eUSB    Compact*", "Compact Flash*", "*"},
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "eUSB    Compact*",
+		 "Compact Flash*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
 	},
 	{
@@ -289,7 +290,7 @@ static struct da_quirk_entry da_quirk_table[] =
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "SMSC*", "USB FDC*","*"},
 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
 	},
-        {
+	{
 		/*
 		 * Olympus digital cameras (C-3040ZOOM, C-2040ZOOM, C-1)
 		 */
@@ -310,7 +311,7 @@ static struct da_quirk_entry da_quirk_table[] =
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "OLYMPUS", "E-*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
 	},
-        {
+	{
 		/*
 		 * KingByte Pen Drives
 		 */
@@ -321,7 +322,8 @@ static struct da_quirk_entry da_quirk_table[] =
 		/*
 		 * FujiFilm Camera
 		 */
- 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "FUJIFILMUSB-DRIVEUNIT", "USB-DRIVEUNIT", "*"},
+ 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "FUJIFILMUSB-DRIVEUNIT",
+		 "USB-DRIVEUNIT", "*"},
  		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
  	},
 	{
@@ -362,7 +364,7 @@ static struct da_quirk_entry da_quirk_table[] =
 	{
 		/*
 		 * DIVA USB Mp3 Player.
-		 * Doesn't work correctly with 6 byte reads/writes.
+		 * PR: kern/33638
 		 */
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "DIVA USB", "Media Reader","*"},
 		/*quirks*/ DA_Q_NO_6_BYTE
@@ -372,6 +374,71 @@ static struct da_quirk_entry da_quirk_table[] =
 		 * Daisy Technology PhotoClip USB Camera
 		 */
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Digital", "World   DMC","*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * Apacer HandyDrive
+		 * PR: kern/43627
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Apacer", "HandyDrive", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * Daisy Technology PhotoClip on Zoran chip
+		 * PR: kern/43580
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "ZORAN", "COACH", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * HP 315 Digital Camera
+		 * PR: kern/41010
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "HP", "USB CAMERA", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * Fujitsu-Siemens Memorybird pen drive
+		 * PR: kern/34712
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Fujitsu", "Memorybird", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * Sony USB Key-Storage
+		 * PR: kern/46386
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "Storage Media", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * Lexar Media Jumpdrive
+		 * PR: kern/47006
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "LEXAR", "DIGITAL FILM", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * Pentax USB Optio 230 camera
+		 * PR: kern/46369
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE,
+		 "PENTAX", "DIGITAL_CAMERA", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * SanDisk ImageMate II compact flash
+		 * PR: kern/47877
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "SanDisk", "ImageMate*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE
 	}
 };
@@ -594,6 +661,8 @@ daopen(dev_t dev, int flags, int fmt, struct proc *p)
 		if ((softc->flags & DA_FLAG_PACK_REMOVABLE) != 0) {
 			daprevent(periph, PR_ALLOW);
 		}
+		softc->flags &= ~DA_FLAG_OPEN;
+		cam_periph_release(periph);
 	}
 	cam_periph_unlock(periph);
 	return (error);

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/usb/ukbd.c,v 1.24.2.5 2002/08/12 14:19:48 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ukbd.c,v 1.24.2.6 2002/11/06 20:23:50 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -1344,8 +1344,8 @@ probe_keyboard(struct usb_attach_arg *uaa, int flags)
 	/* Check that this is a keyboard that speaks the boot protocol. */
 	id = usbd_get_interface_descriptor(uaa->iface);
 	if (id
-	    && id->bInterfaceClass == UCLASS_HID
-	    && id->bInterfaceSubClass == USUBCLASS_BOOT
+	    && id->bInterfaceClass == UICLASS_HID
+	    && id->bInterfaceSubClass == UISUBCLASS_BOOT
 	    && id->bInterfaceProtocol == UPROTO_BOOT_KEYBOARD)
 		return 0;	/* found it */
 

@@ -32,7 +32,7 @@
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.3.2.11 2002/08/22 16:38:21 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.3.2.12 2003/01/20 03:59:42 orion Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -625,6 +625,10 @@ ich_pci_probe(device_t dev)
 
 	case 0x01b110de:
 		device_set_desc(dev, "Nvidia nForce AC97 controller");
+		return 0;
+
+	case 0x006a10de:
+		device_set_desc(dev, "Nvidia nForce2 AC97 controller");
 		return 0;
 
 	default:

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.3.2.15 2002/05/13 16:28:14 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.3.2.17 2003/01/23 18:38:22 scottl Exp $
  */
 
 /*
@@ -115,12 +115,12 @@ struct aac_ident
 	"Dell PERC 3/Di"},
 	{0x1011, 0x0046, 0x9005, 0x0364, AAC_HWIF_STRONGARM, AAC_QUIRK_NOCAM,
 	"Adaptec AAC-364"},
-	{0x1011, 0x0046, 0x9005, 0x0365, AAC_HWIF_STRONGARM, 0,
+	{0x1011, 0x0046, 0x9005, 0x0365, AAC_HWIF_STRONGARM, AAC_QUIRK_NOCAM,
 	"Adaptec SCSI RAID 5400S"},
 	{0x1011, 0x0046, 0x9005, 0x1364, AAC_HWIF_STRONGARM, AAC_QUIRK_NOCAM |
 	AAC_QUIRK_PERC2QC, "Dell PERC 2/QC"},
-	{0x1011, 0x0046, 0x103c, 0x10c2, AAC_HWIF_STRONGARM, 
-	AAC_QUIRK_CAM_NORESET, "HP NetRaid-4M"},
+	{0x1011, 0x0046, 0x103c, 0x10c2, AAC_HWIF_STRONGARM, AAC_QUIRK_NOCAM,
+	"HP NetRaid-4M"},
 	{0x9005, 0x0285, 0x9005, 0x0285, AAC_HWIF_I960RX, 0,
 	 "Adaptec SCSI RAID 2200S"},
 	{0x9005, 0x0285, 0x1028, 0x0287, AAC_HWIF_I960RX, 0,
@@ -275,7 +275,7 @@ aac_pci_attach(device_t dev)
 			   BUS_SPACE_MAXADDR,		/* lowaddr */
 			   BUS_SPACE_MAXADDR, 		/* highaddr */
 			   NULL, NULL, 			/* filter, filterarg */
-			   AAC_FIB_COUNT *
+			   8192 + AAC_FIB_COUNT *	/* XXX dma hack */
 			   sizeof(struct aac_fib), 1,	/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			   0,				/* flags */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 1997 Justin T. Gibbs.
- * Copyright (c) 1997, 1998, 1999, 2000 Kenneth D. Merry.
+ * Copyright (c) 1997, 1998, 1999, 2000, 2001 Kenneth D. Merry.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_cd.c,v 1.31.2.9 2001/10/06 23:38:01 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_cd.c,v 1.31.2.13 2002/11/25 05:30:31 njl Exp $
  */
 /*
  * Portions of this driver taken from the original FreeBSD cd driver.
@@ -56,6 +56,7 @@
 #include <sys/disk.h>
 #include <sys/malloc.h>
 #include <sys/cdio.h>
+#include <sys/cdrio.h>
 #include <sys/dvdio.h>
 #include <sys/devicestat.h>
 #include <sys/sysctl.h>
@@ -232,6 +233,8 @@ static	int		cdplaytracks(struct cam_periph *periph,
 static	int		cdpause(struct cam_periph *periph, u_int32_t go);
 static	int		cdstopunit(struct cam_periph *periph, u_int32_t eject);
 static	int		cdstartunit(struct cam_periph *periph);
+static	int		cdsetspeed(struct cam_periph *periph,
+				   u_int32_t rdspeed, u_int32_t wrspeed);
 static	int		cdreportkey(struct cam_periph *periph,
 				    struct dvd_authinfo *authinfo);
 static	int		cdsendkey(struct cam_periph *periph,
@@ -2443,6 +2446,12 @@ cdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 		/* return (cd_reset(periph)); */
 		error = ENOTTY;
 		break;
+	case CDRIOCREADSPEED:
+		error = cdsetspeed(periph, *(u_int32_t *)addr, CDR_MAX_SPEED);
+		break;
+	case CDRIOCWRITESPEED:
+		error = cdsetspeed(periph, CDR_MAX_SPEED, *(u_int32_t *)addr);
+		break;
 	case DVDIOCSENDKEY:
 	case DVDIOCREPORTKEY: {
 		struct dvd_authinfo *authinfo;
@@ -3092,6 +3101,50 @@ cdstopunit(struct cam_periph *periph, u_int32_t eject)
 }
 
 static int
+cdsetspeed(struct cam_periph *periph, u_int32_t rdspeed, u_int32_t wrspeed)
+{
+	struct scsi_set_speed *scsi_cmd;
+	struct ccb_scsiio *csio;
+	union ccb *ccb;
+	int error;
+
+	error = 0;
+	ccb = cdgetccb(periph, /* priority */ 1);
+	csio = &ccb->csio;
+
+	/* Preserve old behavior: units in multiples of CDROM speed */
+	if (rdspeed < 177)
+		rdspeed *= 177;
+	if (wrspeed < 177)
+		wrspeed *= 177;
+
+	cam_fill_csio(csio,
+		      /* retries */ 1,
+		      /* cbfcnp */ cddone,
+		      /* flags */ CAM_DIR_NONE,
+		      /* tag_action */ MSG_SIMPLE_Q_TAG,
+		      /* data_ptr */ NULL,
+		      /* dxfer_len */ 0,
+		      /* sense_len */ SSD_FULL_SIZE,
+		      sizeof(struct scsi_set_speed),
+ 		      /* timeout */ 50000);
+
+	scsi_cmd = (struct scsi_set_speed *)&csio->cdb_io.cdb_bytes;
+	bzero(scsi_cmd, sizeof(*scsi_cmd));
+
+	scsi_cmd->opcode = SET_CD_SPEED;
+	scsi_ulto2b(rdspeed, scsi_cmd->readspeed);
+	scsi_ulto2b(wrspeed, scsi_cmd->writespeed);
+
+	error = cdrunccb(ccb, cderror, /*cam_flags*/0,
+			 /*sense_flags*/SF_RETRY_UA | SF_RETRY_SELTO);
+
+	xpt_release_ccb(ccb);
+
+	return(error);
+}
+
+static int
 cdreportkey(struct cam_periph *periph, struct dvd_authinfo *authinfo)
 {
 	union ccb *ccb;
@@ -3230,6 +3283,8 @@ cdreportkey(struct cam_periph *periph, struct dvd_authinfo *authinfo)
 			(rpc_data->byte4 & RKD_RPC_VENDOR_RESET_MASK) >>
 			RKD_RPC_VENDOR_RESET_SHIFT;
 		authinfo->user_rsts = rpc_data->byte4 & RKD_RPC_USER_RESET_MASK;
+		authinfo->region = rpc_data->region_mask;
+		authinfo->rpc_scheme = rpc_data->rpc_scheme1;
 		break;
 	}
 	case DVD_INVALIDATE_AGID:
@@ -3309,9 +3364,6 @@ cdsendkey(struct cam_periph *periph, struct dvd_authinfo *authinfo)
 		scsi_ulto2b(length - sizeof(rpc_data->data_len),
 			    rpc_data->data_len);
 
-		/*
-		 * XXX KDM is this the right field from authinfo to use?
-		 */
 		rpc_data->region_code = authinfo->region;
 		break;
 	}

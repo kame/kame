@@ -28,9 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/ahd_pci.c#6 $
+ * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/ahd_pci.c#12 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/ahd_pci.c,v 1.2.2.2 2002/09/27 16:29:35 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/ahd_pci.c,v 1.2.2.4 2003/01/20 23:59:19 gibbs Exp $
  */
 
 #include <dev/aic7xxx/aic79xx_osm.h>
@@ -119,7 +119,8 @@ ahd_pci_attach(device_t dev)
 				   : BUS_SPACE_MAXADDR_32BIT,
 				   /*highaddr*/BUS_SPACE_MAXADDR,
 				   /*filter*/NULL, /*filterarg*/NULL,
-				   /*maxsize*/MAXBSIZE, /*nsegments*/AHD_NSEG,
+				   /*maxsize*/BUS_SPACE_MAXSIZE_32BIT,
+				   /*nsegments*/AHD_NSEG,
 				   /*maxsegsz*/AHD_MAXTRANSFER_SIZE,
 				   /*flags*/BUS_DMA_ALLOCNOW,
 				   &ahd->parent_dmat);
@@ -150,13 +151,26 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 	int	regs_type;
 	int	regs_id;
 	int	regs_id2;
+	int	allow_memio;
 
 	command = ahd_pci_read_config(ahd->dev_softc, PCIR_COMMAND, /*bytes*/1);
 	regs = NULL;
 	regs2 = NULL;
 	regs_type = 0;
 	regs_id = 0;
-	if ((command & PCIM_CMD_MEMEN) != 0) {
+
+	/* Retrieve the per-device 'allow_memio' hint */
+	if (resource_int_value(device_get_name(ahd->dev_softc),
+			       device_get_unit(ahd->dev_softc),
+			       "allow_memio", &allow_memio) != 0) {
+		if (bootverbose)
+			device_printf(ahd->dev_softc,
+				      "Defaulting to MEMIO on\n");
+	}
+
+	if ((command & PCIM_CMD_MEMEN) != 0
+	 && (ahd->bugs & AHD_PCIX_MMAPIO_BUG) == 0
+	 && allow_memio != 0) {
 
 		regs_type = SYS_RES_MEMORY;
 		regs_id = AHD_PCI_MEMADDR;
@@ -176,7 +190,8 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 			 * Do a quick test to see if memory mapped
 			 * I/O is functioning correctly.
 			 */
-			if (error != 0 || ahd_inb(ahd, HCNTRL) == 0xFF) {
+			if (error != 0
+			 || ahd_pci_test_register_access(ahd) != 0) {
 				device_printf(ahd->dev_softc,
 				       "PCI Device %d:%d:%d failed memory "
 				       "mapped test.  Using PIO.\n",

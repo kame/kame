@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ste.c,v 1.14.2.8 2002/09/18 21:38:28 ambrisko Exp $
+ * $FreeBSD: src/sys/pci/if_ste.c,v 1.14.2.9 2003/02/05 22:03:57 mbr Exp $
  */
 
 #include <sys/param.h>
@@ -74,7 +74,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ste.c,v 1.14.2.8 2002/09/18 21:38:28 ambrisko Exp $";
+  "$FreeBSD: src/sys/pci/if_ste.c,v 1.14.2.9 2003/02/05 22:03:57 mbr Exp $";
 #endif
 
 /*
@@ -281,9 +281,9 @@ static int ste_mii_readreg(sc, frame)
 	/* Check for ack */
 	MII_CLR(STE_PHYCTL_MCLK);
 	DELAY(1);
+	ack = CSR_READ_2(sc, STE_PHYCTL) & STE_PHYCTL_MDATA;
 	MII_SET(STE_PHYCTL_MCLK);
 	DELAY(1);
-	ack = CSR_READ_2(sc, STE_PHYCTL) & STE_PHYCTL_MDATA;
 
 	/*
 	 * Now try reading data bits. If the ack failed, we still

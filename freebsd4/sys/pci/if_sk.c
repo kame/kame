@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.8 2001/12/16 15:46:07 luigi Exp $
+ * $FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.9 2003/03/05 18:42:34 njl Exp $
  */
 
 /*
@@ -112,7 +112,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.8 2001/12/16 15:46:07 luigi Exp $";
+  "$FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.9 2003/03/05 18:42:34 njl Exp $";
 #endif
 
 static struct sk_type sk_devs[] = {
@@ -1212,6 +1212,8 @@ static int sk_attach_xmac(dev)
 	if (mii_phy_probe(dev, &sc_if->sk_miibus,
 	    sk_ifmedia_upd, sk_ifmedia_sts)) {
 		printf("skc%d: no PHY found!\n", sc_if->sk_unit);
+		contigfree(sc_if->sk_cdata.sk_jumbo_buf, SK_JMEM,
+		    M_DEVBUF);
 		contigfree(sc_if->sk_rdata,
 		    sizeof(struct sk_ring_data), M_DEVBUF);
 		return(ENXIO);

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.5 2001/09/26 01:02:01 brooks Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.6 2003/02/01 03:25:12 ambrisko Exp $
  */
 
 /*
@@ -66,7 +66,7 @@
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.5 2001/09/26 01:02:01 brooks Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.6 2003/02/01 03:25:12 ambrisko Exp $";
 #endif
 
 #include <dev/an/if_aironet_ieee.h>
@@ -160,4 +160,3 @@ an_pccard_attach(device_t dev)
 	error = an_attach(sc, device_get_unit(dev), flags);
 	return (error);
 }
-

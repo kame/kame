@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/tcp_syncache.c,v 1.5.2.8 2002/08/18 22:04:47 silby Exp $
+ * $FreeBSD: src/sys/netinet/tcp_syncache.c,v 1.5.2.14 2003/02/24 04:02:27 silby Exp $
  */
 
 #include "opt_inet6.h"
@@ -81,6 +81,15 @@
 #endif
 #include <netkey/key.h>
 #endif /*IPSEC*/
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#ifdef INET6
+#include <netipsec/ipsec6.h>
+#endif
+#include <netipsec/key.h>
+#define	IPSEC
+#endif /*FAST_IPSEC*/
 
 #include <machine/in_cksum.h>
 #include <vm/vm_zone.h>
@@ -236,7 +245,7 @@ syncache_init(void)
 	/* Allocate the hash table. */
 	MALLOC(tcp_syncache.hashbase, struct syncache_head *,
 	    tcp_syncache.hashsize * sizeof(struct syncache_head),
-	    M_SYNCACHE, M_WAITOK | M_ZERO);
+	    M_SYNCACHE, M_WAITOK);
 
 	/* Initialize the hash buckets. */
 	for (i = 0; i < tcp_syncache.hashsize; i++) {
@@ -912,6 +921,8 @@ syncache_add(inc, to, th, sop, m)
 		sc->sc_route.ro_rt = NULL;
 	}
 	sc->sc_irs = th->th_seq;
+	sc->sc_flags = 0;
+	sc->sc_peer_mss = to->to_flags & TOF_MSS ? to->to_mss : 0;
 	if (tcp_syncookies)
 		sc->sc_iss = syncookie_generate(sc);
 	else
@@ -923,8 +934,6 @@ syncache_add(inc, to, th, sop, m)
 	win = imin(win, TCP_MAXWIN);
 	sc->sc_wnd = win;
 
-	sc->sc_flags = 0;
-	sc->sc_peer_mss = to->to_flags & TOF_MSS ? to->to_mss : 0;
 	if (tcp_do_rfc1323) {
 		/*
 		 * A timestamp received in a SYN makes
@@ -1088,14 +1097,6 @@ syncache_respond(sc, m)
 	m->m_pkthdr.len = tlen;
 	m->m_pkthdr.rcvif = NULL;
 
-#ifdef IPSEC
-	/* use IPsec policy on listening socket to send SYN,ACK */
-	if (ipsec_setsocket(m, sc->sc_tp->t_inpcb->inp_socket) != 0) {
-		m_freem(m);
-		return (ENOBUFS);
-	}
-#endif
-
 #ifdef INET6
 	if (sc->sc_inc.inc_isipv6) {
 		ip6 = mtod(m, struct ip6_hdr *);
@@ -1197,7 +1198,8 @@ no_options:
 		th->th_sum = in6_cksum(m, IPPROTO_TCP, hlen, tlen - hlen);
 		ip6->ip6_hlim = in6_selecthlim(NULL,
 		    ro6->ro_rt ? ro6->ro_rt->rt_ifp : NULL);
-		error = ip6_output(m, NULL, ro6, 0, NULL, NULL);
+		error = ip6_output(m, NULL, ro6, 0, NULL, NULL,
+				sc->sc_tp->t_inpcb);
 	} else
 #endif
 	{
@@ -1205,7 +1207,8 @@ no_options:
 		    htons(tlen - hlen + IPPROTO_TCP));
 		m->m_pkthdr.csum_flags = CSUM_TCP;
 		m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
-		error = ip_output(m, sc->sc_ipopts, &sc->sc_route, 0, NULL);
+		error = ip_output(m, sc->sc_ipopts, &sc->sc_route, 0, NULL,
+				sc->sc_tp->t_inpcb);
 	}
 	return (error);
 }
@@ -1215,29 +1218,27 @@ no_options:
  *
  *	|. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .|
  *	| peer iss                                                      |
- *	| MD5(laddr,faddr,lport,fport,secret)             |. . . . . . .|
+ *	| MD5(laddr,faddr,secret,lport,fport)             |. . . . . . .|
  *	|                     0                       |(A)|             |
  * (A): peer mss index
  */
 
 /*
  * The values below are chosen to minimize the size of the tcp_secret
- * table, as well as providing roughly a 4 second lifetime for the cookie.
+ * table, as well as providing roughly a 16 second lifetime for the cookie.
  */
 
-#define SYNCOOKIE_HASHSHIFT	2	/* log2(# of 32bit words from hash) */
-#define SYNCOOKIE_WNDBITS	7	/* exposed bits for window indexing */
-#define SYNCOOKIE_TIMESHIFT	5	/* scale ticks to window time units */
+#define SYNCOOKIE_WNDBITS	5	/* exposed bits for window indexing */
+#define SYNCOOKIE_TIMESHIFT	1	/* scale ticks to window time units */
 
-#define SYNCOOKIE_HASHMASK	((1 << SYNCOOKIE_HASHSHIFT) - 1)
 #define SYNCOOKIE_WNDMASK	((1 << SYNCOOKIE_WNDBITS) - 1)
-#define SYNCOOKIE_NSECRETS	(1 << (SYNCOOKIE_WNDBITS - SYNCOOKIE_HASHSHIFT))
+#define SYNCOOKIE_NSECRETS	(1 << SYNCOOKIE_WNDBITS)
 #define SYNCOOKIE_TIMEOUT \
     (hz * (1 << SYNCOOKIE_WNDBITS) / (1 << SYNCOOKIE_TIMESHIFT))
 #define SYNCOOKIE_DATAMASK 	((3 << SYNCOOKIE_WNDBITS) | SYNCOOKIE_WNDMASK)
 
 static struct {
-	u_int32_t	ts_secbits;
+	u_int32_t	ts_secbits[4];
 	u_int		ts_expire;
 } tcp_secret[SYNCOOKIE_NSECRETS];
 
@@ -1246,6 +1247,16 @@ static int tcp_msstab[] = { 0, 536, 1460, 8960 };
 static MD5_CTX syn_ctx;
 
 #define MD5Add(v)	MD5Update(&syn_ctx, (u_char *)&v, sizeof(v))
+
+struct md5_add {
+	u_int32_t laddr, faddr;
+	u_int32_t secbits[4];
+	u_int16_t lport, fport;
+};
+
+#ifdef CTASSERT
+CTASSERT(sizeof(struct md5_add) == 28);
+#endif
 
 /*
  * Consider the problem of a recreated (and retransmitted) cookie.  If the
@@ -1262,35 +1273,42 @@ syncookie_generate(struct syncache *sc)
 {
 	u_int32_t md5_buffer[4];
 	u_int32_t data;
-	int wnd, idx;
+	int idx, i;
+	struct md5_add add;
 
-	wnd = ((ticks << SYNCOOKIE_TIMESHIFT) / hz) & SYNCOOKIE_WNDMASK;
-	idx = wnd >> SYNCOOKIE_HASHSHIFT;
+	idx = ((ticks << SYNCOOKIE_TIMESHIFT) / hz) & SYNCOOKIE_WNDMASK;
 	if (tcp_secret[idx].ts_expire < ticks) {
-		tcp_secret[idx].ts_secbits = arc4random();
+		for (i = 0; i < 4; i++)
+			tcp_secret[idx].ts_secbits[i] = arc4random();
 		tcp_secret[idx].ts_expire = ticks + SYNCOOKIE_TIMEOUT;
 	}
 	for (data = sizeof(tcp_msstab) / sizeof(int) - 1; data > 0; data--)
 		if (tcp_msstab[data] <= sc->sc_peer_mss)
 			break;
-	data = (data << SYNCOOKIE_WNDBITS) | wnd;
+	data = (data << SYNCOOKIE_WNDBITS) | idx;
 	data ^= sc->sc_irs;				/* peer's iss */
 	MD5Init(&syn_ctx);
 #ifdef INET6
 	if (sc->sc_inc.inc_isipv6) {
 		MD5Add(sc->sc_inc.inc6_laddr);
 		MD5Add(sc->sc_inc.inc6_faddr);
+		add.laddr = 0;
+		add.faddr = 0;
 	} else
 #endif
 	{
-		MD5Add(sc->sc_inc.inc_laddr);
-		MD5Add(sc->sc_inc.inc_faddr);
+		add.laddr = sc->sc_inc.inc_laddr.s_addr;
+		add.faddr = sc->sc_inc.inc_faddr.s_addr;
 	}
-	MD5Add(sc->sc_inc.inc_lport);
-	MD5Add(sc->sc_inc.inc_fport);
-	MD5Add(tcp_secret[idx].ts_secbits);
+	add.lport = sc->sc_inc.inc_lport;
+	add.fport = sc->sc_inc.inc_fport;
+	add.secbits[0] = tcp_secret[idx].ts_secbits[0];
+	add.secbits[1] = tcp_secret[idx].ts_secbits[1];
+	add.secbits[2] = tcp_secret[idx].ts_secbits[2];
+	add.secbits[3] = tcp_secret[idx].ts_secbits[3];
+	MD5Add(add);
 	MD5Final((u_char *)&md5_buffer, &syn_ctx);
-	data ^= (md5_buffer[wnd & SYNCOOKIE_HASHMASK] & ~SYNCOOKIE_WNDMASK);
+	data ^= (md5_buffer[0] & ~SYNCOOKIE_WNDMASK);
 	return (data);
 }
 
@@ -1304,10 +1322,10 @@ syncookie_lookup(inc, th, so)
 	struct syncache *sc;
 	u_int32_t data;
 	int wnd, idx;
+	struct md5_add add;
 
 	data = (th->th_ack - 1) ^ (th->th_seq - 1);	/* remove ISS */
-	wnd = data & SYNCOOKIE_WNDMASK;
-	idx = wnd >> SYNCOOKIE_HASHSHIFT;
+	idx = data & SYNCOOKIE_WNDMASK;
 	if (tcp_secret[idx].ts_expire < ticks ||
 	    sototcpcb(so)->ts_recent + SYNCOOKIE_TIMEOUT < ticks)
 		return (NULL);
@@ -1316,17 +1334,23 @@ syncookie_lookup(inc, th, so)
 	if (inc->inc_isipv6) {
 		MD5Add(inc->inc6_laddr);
 		MD5Add(inc->inc6_faddr);
+		add.laddr = 0;
+		add.faddr = 0;
 	} else
 #endif
 	{
-		MD5Add(inc->inc_laddr);
-		MD5Add(inc->inc_faddr);
+		add.laddr = inc->inc_laddr.s_addr;
+		add.faddr = inc->inc_faddr.s_addr;
 	}
-	MD5Add(inc->inc_lport);
-	MD5Add(inc->inc_fport);
-	MD5Add(tcp_secret[idx].ts_secbits);
+	add.lport = inc->inc_lport;
+	add.fport = inc->inc_fport;
+	add.secbits[0] = tcp_secret[idx].ts_secbits[0];
+	add.secbits[1] = tcp_secret[idx].ts_secbits[1];
+	add.secbits[2] = tcp_secret[idx].ts_secbits[2];
+	add.secbits[3] = tcp_secret[idx].ts_secbits[3];
+	MD5Add(add);
 	MD5Final((u_char *)&md5_buffer, &syn_ctx);
-	data ^= md5_buffer[wnd & SYNCOOKIE_HASHMASK];
+	data ^= md5_buffer[0];
 	if ((data & ~SYNCOOKIE_DATAMASK) != 0)
 		return (NULL);
 	data = data >> SYNCOOKIE_WNDBITS;

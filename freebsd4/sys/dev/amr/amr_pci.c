@@ -24,7 +24,35 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1.2.5 2002/08/30 18:28:54 gibbs Exp $
+ * Copyright (c) 2002 Eric Moore
+ * Copyright (c) 2002 LSI Logic Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The party using or redistributing the source code and binary forms
+ *    agrees to the disclaimer below and the terms and conditions set forth
+ *    herein.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1.2.9 2002/12/20 15:12:04 emoore Exp $
  */
 
 #include <sys/param.h>
@@ -83,10 +111,10 @@ static driver_t amr_pci_driver = {
 	sizeof(struct amr_softc)
 };
 
-devclass_t	amr_devclass;
+static devclass_t	amr_devclass;
 DRIVER_MODULE(amr, pci, amr_pci_driver, amr_devclass, 0, 0);
 
-static struct 
+static struct
 {
     int		vendor;
     int		device;
@@ -97,11 +125,13 @@ static struct
     {0x101e, 0x9060, 0},
     {0x8086, 0x1960, PROBE_SIGNATURE},/* generic i960RD, check for signature */
     {0x101e, 0x1960, 0},
-    {0x1000, 0x1960, 0}, 
+    {0x1000, 0x1960, PROBE_SIGNATURE},
     {0x1000, 0x0407, 0},
+    {0x1028, 0x000e, PROBE_SIGNATURE}, /* perc4/di i960 */
+    {0x1028, 0x000f, 0}, /* perc4/di Verde*/
     {0, 0, 0}
 };
-    
+
 static int
 amr_pci_probe(device_t dev)
 {
@@ -119,7 +149,7 @@ amr_pci_probe(device_t dev)
 		if ((sig != AMR_SIGNATURE_1) && (sig != AMR_SIGNATURE_2))
 		    continue;
 	    }
-	    device_set_desc(dev, "AMI MegaRAID");
+	    device_set_desc(dev, "LSILogic MegaRAID");
 	    return(-10);	/* allow room to be overridden */
 	}
     }
@@ -149,7 +179,8 @@ amr_pci_attach(device_t dev)
      * Determine board type.
      */
     command = pci_read_config(dev, PCIR_COMMAND, 1);
-    if (pci_get_device(dev) == 0x1960) {
+    if ((pci_get_device(dev) == 0x1960) || (pci_get_device(dev) == 0x0407) ||
+	(pci_get_device(dev) == 0x000e) || (pci_get_device(dev) == 0x000f)) {
 	/*
 	 * Make sure we are going to be able to talk to this board.
 	 */
@@ -198,7 +229,7 @@ amr_pci_attach(device_t dev)
         device_printf(sc->amr_dev, "can't allocate interrupt\n");
 	goto out;
     }
-    if (bus_setup_intr(sc->amr_dev, sc->amr_irq, INTR_TYPE_BIO, amr_pci_intr, sc, &sc->amr_intr)) {
+    if (bus_setup_intr(sc->amr_dev, sc->amr_irq, INTR_TYPE_BIO | INTR_ENTROPY, amr_pci_intr, sc, &sc->amr_intr)) {
         device_printf(sc->amr_dev, "can't set up interrupt\n");
 	goto out;
     }
@@ -305,6 +336,7 @@ static int
 amr_pci_shutdown(device_t dev)
 {
     struct amr_softc	*sc = device_get_softc(dev);
+    int			i,error,s;
 
     debug_called(1);
 
@@ -316,9 +348,23 @@ amr_pci_shutdown(device_t dev)
     device_printf(sc->amr_dev, "flushing cache...");
     printf("%s\n", amr_flush(sc) ? "failed" : "done");
 
+    s = splbio();
+    error = 0;
+
+    /* delete all our child devices */
+    for(i = 0 ; i < AMR_MAXLD; i++) {
+	if( sc->amr_drive[i].al_disk != 0) {
+	    if((error = device_delete_child(sc->amr_dev,sc->amr_drive[i].al_disk)) != 0)
+		goto shutdown_out;
+	    sc->amr_drive[i].al_disk = 0;
+	}
+    }
+
     /* XXX disable interrupts? */
-    
-    return(0);
+
+shutdown_out:
+    splx(s);
+    return(error);
 }
 
 /********************************************************************************
@@ -401,10 +447,10 @@ amr_pci_free(struct amr_softc *sc)
     /* free and destroy DMA memory and tag for mailbox */
     if (sc->amr_mailbox) {
 	p = (u_int8_t *)(uintptr_t)(volatile void *)sc->amr_mailbox;
-	bus_dmamem_free(sc->amr_sg_dmat, p - 16, sc->amr_sg_dmamap);
+	bus_dmamem_free(sc->amr_mailbox_dmat, p - 16, sc->amr_mailbox_dmamap);
     }
-    if (sc->amr_sg_dmat)
-	bus_dma_tag_destroy(sc->amr_sg_dmat);
+    if (sc->amr_mailbox_dmat)
+	bus_dma_tag_destroy(sc->amr_mailbox_dmat);
 
     /* disconnect the interrupt handler */
     if (sc->amr_intr)

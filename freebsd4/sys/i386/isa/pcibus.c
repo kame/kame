@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57.2.8 2002/09/17 22:39:55 sam Exp $
+ * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57.2.11 2002/11/13 21:40:40 peter Exp $
  *
  */
 
@@ -209,6 +209,19 @@ nexus_pcib_is_host_bridge(pcicfgregs *cfg,
 
 	case 0x00091166:
 		s = "ServerWorks NB6635 3.0LE host to PCI bridge";
+		*busnum = pci_cfgread(cfg, 0x44, 1);
+		break;
+
+	case 0x00101166:
+		s = "ServerWorks CIOB30 host to PCI bridge";
+		*busnum = pci_cfgread(cfg, 0x44, 1);
+		break;
+
+		/* XXX unknown chipset, but working */
+	case 0x00171166:
+		/* FALLTHROUGH */
+	case 0x01011166:
+		s = "ServerWorks host to PCI bridge(unknown chipset)";
 		*busnum = pci_cfgread(cfg, 0x44, 1);
 		break;
 

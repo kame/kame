@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.1.2.5 2002/07/27 17:00:41 jdp Exp $
+ * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.1.2.9 2003/02/06 21:36:40 ps Exp $
  */
 
 /*
@@ -72,6 +72,8 @@
 #define BGE_STATUS_BLOCK		0x00000B00
 #define BGE_STATUS_BLOCK_END		0x00000B4F
 #define BGE_SOFTWARE_GENCOMM		0x00000B50
+#define BGE_SOFTWARE_GENCOMM_SIG	0x00000B54
+#define BGE_SOFTWARE_GENCOMM_NICCFG	0x00000B58
 #define BGE_SOFTWARE_GENCOMM_END	0x00000FFF
 #define BGE_UNMAPPED			0x00001000
 #define BGE_UNMAPPED_END		0x00001FFF
@@ -221,6 +223,9 @@
 #define BGE_ASICREV_BCM5701_B0		0x01000000
 #define BGE_ASICREV_BCM5701_B2		0x01020000
 #define BGE_ASICREV_BCM5701_B5		0x01050000
+#define BGE_ASICREV_BCM5703_A0		0x10000000
+#define BGE_ASICREV_BCM5703_A1		0x10010000
+#define BGE_ASICREV_BCM5703_A2		0x10020000
 
 /* shorthand one */
 #define BGE_ASICREV_BCM5700		0x71000000
@@ -1673,22 +1678,15 @@ typedef struct {
 	u_int32_t		bge_addr_hi;
 	u_int32_t		bge_addr_lo;
 } bge_hostaddr;
-#define BGE_HOSTADDR(x)	x.bge_addr_lo
+#define BGE_HOSTADDR(x)	((x).bge_addr_lo)
 
 /* Ring control block structure */
 struct bge_rcb {
 	bge_hostaddr		bge_hostaddr;
-	u_int16_t		bge_flags;
-	u_int16_t		bge_max_len;
+	u_int32_t		bge_maxlen_flags;
 	u_int32_t		bge_nicaddr;
 };
-
-struct bge_rcb_opaque {
-	u_int32_t		bge_reg0;
-	u_int32_t		bge_reg1;
-	u_int32_t		bge_reg2;
-	u_int32_t		bge_reg3;
-};
+#define BGE_RCB_MAXLEN_FLAGS(maxlen, flags)	((maxlen) << 16 | (flags))
 
 #define BGE_RCB_FLAG_USE_EXT_RX_BD	0x0001
 #define BGE_RCB_FLAG_RING_DISABLED	0x0002
@@ -1781,6 +1779,8 @@ struct bge_status_block {
 #define BCOM_VENDORID			0x14E4
 #define BCOM_DEVICEID_BCM5700		0x1644
 #define BCOM_DEVICEID_BCM5701		0x1645
+#define BCOM_DEVICEID_BCM5702X		0x16A6
+#define BCOM_DEVICEID_BCM5703X		0x16A7
 
 /*
  * Alteon AceNIC PCI vendor/device ID.

@@ -29,7 +29,7 @@
 
 #include <dev/sound/pcm/sound.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.48.2.10 2002/04/22 15:49:30 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.48.2.11 2002/12/24 21:17:41 semenu Exp $");
 
 /* board-specific include files */
 #include <dev/sound/isa/mss.h>
@@ -198,9 +198,9 @@ static void
 port_wr(struct resource *port, int off, u_int8_t data)
 {
 	if (port)
-		return bus_space_write_1(rman_get_bustag(port),
-					 rman_get_bushandle(port),
-					 off, data);
+		bus_space_write_1(rman_get_bustag(port),
+				  rman_get_bushandle(port),
+				  off, data);
 }
 
 static int
@@ -214,7 +214,7 @@ static void
 io_wr(struct mss_info *mss, int reg, u_int8_t data)
 {
 	if (mss->bd_flags & BD_F_MSS_OFFSET) reg -= 4;
-	return port_wr(mss->io_base, reg, data);
+	port_wr(mss->io_base, reg, data);
 }
 
 static void

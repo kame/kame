@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_balloc.c	8.8 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_balloc.c,v 1.26 2000/02/24 20:43:20 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_balloc.c,v 1.26.2.1 2002/10/10 19:48:20 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -323,8 +323,22 @@ ffs_balloc(ap)
 		return (0);
 	}
 	brelse(bp);
+	/*
+	 * If requested clear invalid portions of the buffer.  If we 
+	 * have to do a read-before-write (typical if B_CLRBUF is set),
+	 * try to do some read-ahead in the sequential case to reduce
+	 * the number of I/O transactions.
+	 */
 	if (flags & B_CLRBUF) {
-		error = bread(vp, lbn, (int)fs->fs_bsize, NOCRED, &nbp);
+		int seqcount = (flags & B_SEQMASK) >> B_SEQSHIFT;
+		if (seqcount &&
+		    (vp->v_mount->mnt_flag & MNT_NOCLUSTERR) == 0) {
+			error = cluster_read(vp, ip->i_size, lbn,
+				    (int)fs->fs_bsize, NOCRED,
+				    MAXBSIZE, seqcount, &nbp);
+		} else {
+			error = bread(vp, lbn, (int)fs->fs_bsize, NOCRED, &nbp);
+		}
 		if (error) {
 			brelse(nbp);
 			goto fail;

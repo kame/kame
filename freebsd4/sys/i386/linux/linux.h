@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux.h,v 1.41.2.3 2001/11/05 19:08:23 marcel Exp $
+ * $FreeBSD: src/sys/i386/linux/linux.h,v 1.41.2.4 2003/01/06 09:19:43 fjoe Exp $
  */
 
 #ifndef _I386_LINUX_LINUX_H_
@@ -494,6 +494,10 @@ int	linux_ioctl_unregister_handlers(struct linker_set *s);
 #define	LINUX_F_SETLKW		7
 #define	LINUX_F_SETOWN		8
 #define	LINUX_F_GETOWN		9
+
+#define	LINUX_F_GETLK64		12
+#define	LINUX_F_SETLK64		13
+#define	LINUX_F_SETLKW64	14
 
 #define	LINUX_F_RDLCK		0
 #define	LINUX_F_WRLCK		1

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mii/inphy.c,v 1.4.2.1 2001/05/13 00:16:08 jlemon Exp $
+ *	$FreeBSD: src/sys/dev/mii/inphy.c,v 1.4.2.2 2002/11/08 21:53:49 semenu Exp $
  */
 
 /*
@@ -36,7 +36,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 

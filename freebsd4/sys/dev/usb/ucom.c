@@ -1,5 +1,5 @@
 /*	$NetBSD: ucom.c,v 1.39 2001/08/16 22:31:24 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ucom.c,v 1.24.2.1 2002/08/08 18:45:04 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ucom.c,v 1.24.2.2 2003/01/17 17:32:10 joe Exp $	*/
 
 /*-
  * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
@@ -217,7 +217,7 @@ ucom_detach(struct ucom_softc *sc)
 	if (tp != NULL) {
 		if (tp->t_state & TS_ISOPEN) {
 			device_printf(sc->sc_dev,
-				      "still open, focing close\n");
+				      "still open, forcing close\n");
 			(*linesw[tp->t_line].l_close)(tp, 0);
 			tp->t_gen++;
 			ttyclose(tp);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.38 2002/08/09 14:49:22 ru Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.52 2003/03/07 07:01:28 silby Exp $
  */
 
 #define	_IP_VHL
@@ -86,6 +86,11 @@
 #include <netkey/key.h>
 #endif
 
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/key.h>
+#endif
+
 int rsvp_on = 0;
 static int ip_rsvp_on;
 struct socket *ip_rsvpd;
@@ -116,11 +121,21 @@ SYSCTL_INT(_net_inet_ip, IPCTL_KEEPFAITH, keepfaith, CTLFLAG_RW,
 	&ip_keepfaith,	0,
 	"Enable packet capture for FAITH IPv4->IPv6 translater daemon");
 
-static int	ip_nfragpackets = 0;
-static int	ip_maxfragpackets;	/* initialized in ip_init() */
+static int	nipq = 0;	/* total # of reass queues */
+static int	maxnipq;
 SYSCTL_INT(_net_inet_ip, OID_AUTO, maxfragpackets, CTLFLAG_RW,
-	&ip_maxfragpackets, 0,
+	&maxnipq, 0,
 	"Maximum number of IPv4 fragment reassembly queue entries");
+
+static int    maxfragsperpacket;
+SYSCTL_INT(_net_inet_ip, OID_AUTO, maxfragsperpacket, CTLFLAG_RW,
+	&maxfragsperpacket, 0,
+	"Maximum number of IPv4 fragments allowed per packet");
+
+static int	ip_sendsourcequench = 0;
+SYSCTL_INT(_net_inet_ip, OID_AUTO, sendsourcequench, CTLFLAG_RW,
+	&ip_sendsourcequench, 0,
+	"Enable the transmission of source quench packets");
 
 /*
  * XXX - Setting ip_checkinterface mostly implements the receive side of
@@ -168,8 +183,6 @@ SYSCTL_STRUCT(_net_inet_ip, IPCTL_STATS, stats, CTLFLAG_RW,
 	(((((x) & 0xF) | ((((x) >> 8) & 0xF) << 4)) ^ (y)) & IPREASS_HMASK)
 
 static struct ipq ipq[IPREASS_NHASH];
-static int    nipq = 0;         /* total # of reass queues */
-static int    maxnipq;
 const  int    ipintrq_present = 1;
 
 #ifdef IPCTL_DEFMTU
@@ -187,6 +200,7 @@ SYSCTL_INT(_net_inet_ip, OID_AUTO, stealth, CTLFLAG_RW,
 /* Firewall hooks */
 ip_fw_chk_t *ip_fw_chk_ptr;
 int fw_enable = 1 ;
+int fw_one_pass = 1;
 
 /* Dummynet hooks */
 ip_dn_io_t *ip_dn_io_ptr;
@@ -250,8 +264,8 @@ ip_init()
 	for (i = 0; i < IPREASS_NHASH; i++)
 	    ipq[i].next = ipq[i].prev = &ipq[i];
 
-	maxnipq = nmbclusters / 4;
-	ip_maxfragpackets = nmbclusters / 4;
+	maxnipq = nmbclusters / 32;
+	maxfragsperpacket = 16;
 
 #ifndef RANDOM_IP_ID
 	ip_id = time_second & 0xffff;
@@ -285,6 +299,12 @@ ip_input(struct mbuf *m)
 	struct in_addr pkt_dst;
 	u_int32_t divert_info = 0;		/* packet divert/tee info */
 	struct ip_fw_args args;
+#ifdef FAST_IPSEC
+	struct m_tag *mtag;
+	struct tdb_ident *tdbi;
+	struct secpolicy *sp;
+	int s, error;
+#endif /* FAST_IPSEC */
 
 	args.eh = NULL;
 	args.oif = NULL;
@@ -294,10 +314,10 @@ ip_input(struct mbuf *m)
 
 	/* Grab info from MT_TAG mbufs prepended to the chain.	*/
 	for (; m && m->m_type == MT_TAG; m = m->m_next) {
-		switch(m->m_tag_id) {
+		switch(m->_m_tag_id) {
 		default:
 			printf("ip_input: unrecognised MT_TAG tag %d\n",
-			    m->m_tag_id);
+			    m->_m_tag_id);
 			break;
 
 		case PACKET_TAG_DUMMYNET:
@@ -404,8 +424,10 @@ tooshort:
 		} else
 			m_adj(m, ip->ip_len - m->m_pkthdr.len);
 	}
-
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(IPSEC_FILTERGIF)
+	/*
+	 * Bypass packet filtering for packets from a tunnel (gif).
+	 */
 	if (ipsec_gethist(m, NULL))
 		goto pass;
 #endif
@@ -578,7 +600,8 @@ pass:
 			 * ip_mforward() returns a non-zero value, the packet
 			 * must be discarded, else it may be accepted below.
 			 */
-			if (ip_mforward(ip, m->m_pkthdr.rcvif, m, 0) != 0) {
+			if (ip_mforward &&
+			    ip_mforward(ip, m->m_pkthdr.rcvif, m, 0) != 0) {
 				ipstat.ips_cantforward++;
 				m_freem(m);
 				return;
@@ -638,6 +661,34 @@ pass:
 			goto bad;
 		}
 #endif /* IPSEC */
+#ifdef FAST_IPSEC
+		mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
+		s = splnet();
+		if (mtag != NULL) {
+			tdbi = (struct tdb_ident *)(mtag + 1);
+			sp = ipsec_getpolicy(tdbi, IPSEC_DIR_INBOUND);
+		} else {
+			sp = ipsec_getpolicybyaddr(m, IPSEC_DIR_INBOUND,
+						   IP_FORWARDING, &error);   
+		}
+		if (sp == NULL) {	/* NB: can happen if error */
+			splx(s);
+			/*XXX error stat???*/
+			DPRINTF(("ip_input: no SP for forwarding\n"));	/*XXX*/
+			goto bad;
+		}
+
+		/*
+		 * Check security policy against packet attributes.
+		 */
+		error = ipsec_in_reject(sp, m);
+		KEY_FREESP(&sp);
+		splx(s);
+		if (error) {
+			ipstat.ips_cantforward++;
+			goto bad;
+		}
+#endif /* FAST_IPSEC */
 		ip_forward(m, 0, args.next_hop);
 	}
 	return;
@@ -668,6 +719,13 @@ ours:
 	 */
 	if (ip->ip_off & (IP_MF | IP_OFFMASK)) {
 
+		/* If maxnipq is 0, never accept fragments. */
+		if (maxnipq == 0) {
+                	ipstat.ips_fragments++;
+			ipstat.ips_fragdropped++;
+			goto bad;
+		}
+
 		sum = IPREASS_HASH(ip->ip_src.s_addr, ip->ip_id);
 		/*
 		 * Look for queue of fragments
@@ -682,8 +740,12 @@ ours:
 
 		fp = 0;
 
-		/* check if there's a place for the new queue */
-		if (nipq > maxnipq) {
+		/*
+		 * Enforce upper bound on number of fragmented packets
+		 * for which we attempt reassembly;
+		 * If maxnipq is -1, accept all fragments without limitation.
+		 */
+		if ((nipq > maxnipq) && (maxnipq > 0)) {
 		    /*
 		     * drop something from the tail of the current queue
 		     * before proceeding further
@@ -691,12 +753,16 @@ ours:
 		    if (ipq[sum].prev == &ipq[sum]) {   /* gak */
 			for (i = 0; i < IPREASS_NHASH; i++) {
 			    if (ipq[i].prev != &ipq[i]) {
+				ipstat.ips_fragtimeout +=
+				    ipq[i].prev->ipq_nfrags;
 				ip_freef(ipq[i].prev);
 				break;
 			    }
 			}
-		    } else
+		    } else {
+			ipstat.ips_fragtimeout += ipq[sum].prev->ipq_nfrags;
 			ip_freef(ipq[sum].prev);
+		    }
 		}
 found:
 		/*
@@ -714,7 +780,8 @@ found:
 				goto bad;
 			}
 			m->m_flags |= M_FRAG;
-		}
+		} else
+			m->m_flags &= ~M_FRAG;
 		ip->ip_off <<= 3;
 
 		/*
@@ -801,6 +868,45 @@ found:
 		goto bad;
 	}
 #endif
+#if FAST_IPSEC
+	/*
+	 * enforce IPsec policy checking if we are seeing last header.
+	 * note that we do not visit this with protocols with pcb layer
+	 * code - like udp/tcp/raw ip.
+	 */
+	if ((inetsw[ip_protox[ip->ip_p]].pr_flags & PR_LASTHDR) != 0) {
+		/*
+		 * Check if the packet has already had IPsec processing
+		 * done.  If so, then just pass it along.  This tag gets
+		 * set during AH, ESP, etc. input handling, before the
+		 * packet is returned to the ip input queue for delivery.
+		 */ 
+		mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
+		s = splnet();
+		if (mtag != NULL) {
+			tdbi = (struct tdb_ident *)(mtag + 1);
+			sp = ipsec_getpolicy(tdbi, IPSEC_DIR_INBOUND);
+		} else {
+			sp = ipsec_getpolicybyaddr(m, IPSEC_DIR_INBOUND,
+						   IP_FORWARDING, &error);   
+		}
+		if (sp != NULL) {
+			/*
+			 * Check security policy against packet attributes.
+			 */
+			error = ipsec_in_reject(sp, m);
+			KEY_FREESP(&sp);
+		} else {
+			/* XXX error stat??? */
+			error = EINVAL;
+DPRINTF(("ip_input: no SP, packet discarded\n"));/*XXX*/
+			goto bad;
+		}
+		splx(s);
+		if (error)
+			goto bad;
+	}
+#endif /* FAST_IPSEC */
 
 	/*
 	 * Switch out to protocol's input routine.
@@ -875,20 +981,12 @@ ip_reass(struct mbuf *m, struct ipq *fp, struct ipq *where,
 	 * If first fragment to arrive, create a reassembly queue.
 	 */
 	if (fp == 0) {
-		/*
-		 * Enforce upper bound on number of fragmented packets
-		 * for which we attempt reassembly;
-		 * If maxfrag is 0, never accept fragments.
-		 * If maxfrag is -1, accept all fragments without limitation.
-		 */
-		if ((ip_maxfragpackets >= 0) && (ip_nfragpackets >= ip_maxfragpackets))
-			goto dropfrag;
-		ip_nfragpackets++;
 		if ((t = m_get(M_DONTWAIT, MT_FTABLE)) == NULL)
 			goto dropfrag;
 		fp = mtod(t, struct ipq *);
 		insque(fp, where);
 		nipq++;
+		fp->ipq_nfrags = 1;
 		fp->ipq_ttl = IPFRAGTTL;
 		fp->ipq_p = ip->ip_p;
 		fp->ipq_id = ip->ip_id;
@@ -901,6 +999,8 @@ ip_reass(struct mbuf *m, struct ipq *fp, struct ipq *where,
 		fp->ipq_div_cookie = 0;
 #endif
 		goto inserted;
+	} else {
+		fp->ipq_nfrags++;
 	}
 
 #define GETIP(m)	((struct ip*)((m)->m_pkthdr.header))
@@ -955,6 +1055,8 @@ ip_reass(struct mbuf *m, struct ipq *fp, struct ipq *where,
 		}
 		nq = q->m_nextpkt;
 		m->m_nextpkt = nq;
+		ipstat.ips_fragdropped++;
+		fp->ipq_nfrags--;
 		m_freem(q);
 	}
 
@@ -974,17 +1076,34 @@ inserted:
 #endif
 
 	/*
-	 * Check for complete reassembly.
+	 * Check for complete reassembly and perform frag per packet
+	 * limiting.
+	 *
+	 * Frag limiting is performed here so that the nth frag has
+	 * a chance to complete the packet before we drop the packet.
+	 * As a result, n+1 frags are actually allowed per packet, but
+	 * only n will ever be stored. (n = maxfragsperpacket.)
+	 *
 	 */
 	next = 0;
 	for (p = NULL, q = fp->ipq_frags; q; p = q, q = q->m_nextpkt) {
-		if (GETIP(q)->ip_off != next)
+		if (GETIP(q)->ip_off != next) {
+			if (fp->ipq_nfrags > maxfragsperpacket) {
+				ipstat.ips_fragdropped += fp->ipq_nfrags;
+				ip_freef(fp);
+			}
 			return (0);
+		}
 		next += GETIP(q)->ip_len;
 	}
 	/* Make sure the last packet didn't have the IP_MF flag */
-	if (p->m_flags & M_FRAG)
+	if (p->m_flags & M_FRAG) {
+		if (fp->ipq_nfrags > maxfragsperpacket) {
+			ipstat.ips_fragdropped += fp->ipq_nfrags;
+			ip_freef(fp);
+		}
 		return (0);
+	}
 
 	/*
 	 * Reassembly is complete.  Make sure the packet is a sane size.
@@ -993,6 +1112,7 @@ inserted:
 	ip = GETIP(q);
 	if (next + (IP_VHL_HL(ip->ip_vhl) << 2) > IP_MAXPACKET) {
 		ipstat.ips_toolong++;
+		ipstat.ips_fragdropped += fp->ipq_nfrags;
 		ip_freef(fp);
 		return (0);
 	}
@@ -1034,7 +1154,6 @@ inserted:
 	remque(fp);
 	nipq--;
 	(void) m_free(dtom(fp));
-	ip_nfragpackets--;
 	m->m_len += (IP_VHL_HL(ip->ip_vhl) << 2);
 	m->m_data -= (IP_VHL_HL(ip->ip_vhl) << 2);
 	/* some debugging cruft by sklower, below, will go away soon */
@@ -1052,6 +1171,8 @@ dropfrag:
 	*divert_rule = 0;
 #endif
 	ipstat.ips_fragdropped++;
+	if (fp != 0)
+		fp->ipq_nfrags--;
 	m_freem(m);
 	return (0);
 
@@ -1075,7 +1196,6 @@ ip_freef(fp)
 	}
 	remque(fp);
 	(void) m_free(dtom(fp));
-	ip_nfragpackets--;
 	nipq--;
 }
 
@@ -1099,7 +1219,7 @@ ip_slowtimo()
 			--fp->ipq_ttl;
 			fp = fp->next;
 			if (fp->prev->ipq_ttl == 0) {
-				ipstat.ips_fragtimeout++;
+				ipstat.ips_fragtimeout += fp->prev->ipq_nfrags;
 				ip_freef(fp->prev);
 			}
 		}
@@ -1109,11 +1229,12 @@ ip_slowtimo()
 	 * (due to the limit being lowered), drain off
 	 * enough to get down to the new limit.
 	 */
-	for (i = 0; i < IPREASS_NHASH; i++) {
-		if (ip_maxfragpackets >= 0) {
-			while ((ip_nfragpackets > ip_maxfragpackets) &&
+	if (maxnipq >= 0 && nipq > maxnipq) {
+		for (i = 0; i < IPREASS_NHASH; i++) {
+			while (nipq > maxnipq &&
 				(ipq[i].next != &ipq[i])) {
-				ipstat.ips_fragdropped++;
+				ipstat.ips_fragdropped +=
+				    ipq[i].next->ipq_nfrags;
 				ip_freef(ipq[i].next);
 			}
 		}
@@ -1132,7 +1253,7 @@ ip_drain()
 
 	for (i = 0; i < IPREASS_NHASH; i++) {
 		while (ipq[i].next != &ipq[i]) {
-			ipstat.ips_fragdropped++;
+			ipstat.ips_fragdropped += ipq[i].next->ipq_nfrags;
 			ip_freef(ipq[i].next);
 		}
 	}
@@ -1375,6 +1496,7 @@ dropit:
 				(void)memcpy(sin, &IA_SIN(ia)->sin_addr,
 				    sizeof(struct in_addr));
 				cp[IPOPT_OFFSET] += sizeof(struct in_addr);
+				off += sizeof(struct in_addr);
 				break;
 
 			case IPOPT_TS_PRESPEC:
@@ -1388,6 +1510,7 @@ dropit:
 				if (ifa_ifwithaddr((SA)&ipaddr) == 0)
 					continue;
 				cp[IPOPT_OFFSET] += sizeof(struct in_addr);
+				off += sizeof(struct in_addr);
 				break;
 
 			default:
@@ -1593,7 +1716,7 @@ ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 	n_long dest;
 	struct in_addr pkt_dst;
 	struct ifnet *destifp;
-#ifdef IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 	struct ifnet dummyifp;
 #endif
 
@@ -1665,8 +1788,17 @@ ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 	 * data in a cluster may change before we reach icmp_error().
 	 */
 	MGET(mcopy, M_DONTWAIT, m->m_type);
+	if (mcopy != NULL && !m_dup_pkthdr(mcopy, m, M_DONTWAIT)) {
+		/*
+		 * It's probably ok if the pkthdr dup fails (because
+		 * the deep copy of the tag chain failed), but for now
+		 * be conservative and just discard the copy since
+		 * code below may some day want the tags.
+		 */
+		m_free(mcopy);
+		mcopy = NULL;
+	}
 	if (mcopy != NULL) {
-		M_COPY_PKTHDR(mcopy, m);
 		mcopy->m_len = imin((IP_VHL_HL(ip->ip_vhl) << 2) + 8,
 		    (int)ip->ip_len);
 		m_copydata(m, 0, mcopy->m_len, mtod(mcopy, caddr_t));
@@ -1724,7 +1856,7 @@ ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 		m = (struct mbuf *)&tag;
 	}
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt, 
-			  IP_FORWARDING, 0);
+			  IP_FORWARDING, 0, NULL);
     }
 	if (error)
 		ipstat.ips_cantforward++;
@@ -1762,10 +1894,7 @@ ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 	case EMSGSIZE:
 		type = ICMP_UNREACH;
 		code = ICMP_UNREACH_NEEDFRAG;
-#ifndef IPSEC
-		if (ipforward_rt.ro_rt)
-			destifp = ipforward_rt.ro_rt->rt_ifp;
-#else
+#ifdef IPSEC
 		/*
 		 * If the packet is routed over IPsec tunnel, tell the
 		 * originator the tunnel MTU.
@@ -1816,13 +1945,80 @@ ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 				key_freesp(sp);
 			}
 		}
+#elif FAST_IPSEC
+		/*
+		 * If the packet is routed over IPsec tunnel, tell the
+		 * originator the tunnel MTU.
+		 *	tunnel MTU = if MTU - sizeof(IP) - ESP/AH hdrsiz
+		 * XXX quickhack!!!
+		 */
+		if (ipforward_rt.ro_rt) {
+			struct secpolicy *sp = NULL;
+			int ipsecerror;
+			int ipsechdr;
+			struct route *ro;
+
+			sp = ipsec_getpolicybyaddr(mcopy,
+						   IPSEC_DIR_OUTBOUND,
+			                           IP_FORWARDING,
+			                           &ipsecerror);
+
+			if (sp == NULL)
+				destifp = ipforward_rt.ro_rt->rt_ifp;
+			else {
+				/* count IPsec header size */
+				ipsechdr = ipsec4_hdrsiz(mcopy,
+							 IPSEC_DIR_OUTBOUND,
+							 NULL);
+
+				/*
+				 * find the correct route for outer IPv4
+				 * header, compute tunnel MTU.
+				 *
+				 * XXX BUG ALERT
+				 * The "dummyifp" code relies upon the fact
+				 * that icmp_error() touches only ifp->if_mtu.
+				 */
+				/*XXX*/
+				destifp = NULL;
+				if (sp->req != NULL
+				 && sp->req->sav != NULL
+				 && sp->req->sav->sah != NULL) {
+					ro = &sp->req->sav->sah->sa_route;
+					if (ro->ro_rt && ro->ro_rt->rt_ifp) {
+						dummyifp.if_mtu =
+						    ro->ro_rt->rt_ifp->if_mtu;
+						dummyifp.if_mtu -= ipsechdr;
+						destifp = &dummyifp;
+					}
+				}
+
+				KEY_FREESP(&sp);
+			}
+		}
+#else /* !IPSEC && !FAST_IPSEC */
+		if (ipforward_rt.ro_rt)
+			destifp = ipforward_rt.ro_rt->rt_ifp;
 #endif /*IPSEC*/
 		ipstat.ips_cantfrag++;
 		break;
 
 	case ENOBUFS:
-		type = ICMP_SOURCEQUENCH;
-		code = 0;
+		/*
+		 * A router should not generate ICMP_SOURCEQUENCH as
+		 * required in RFC1812 Requirements for IP Version 4 Routers.
+		 * Source quench could be a big problem under DoS attacks,
+		 * or if the underlying interface is rate-limited.
+		 * Those who need source quench packets may re-enable them
+		 * via the net.inet.ip.sendsourcequench sysctl.
+		 */
+		if (ip_sendsourcequench == 0) {
+			m_freem(mcopy);
+			return;
+		} else {
+			type = ICMP_SOURCEQUENCH;
+			code = 0;
+		}
 		break;
 
 	case EACCES:			/* ipfw denied packet */
@@ -1921,10 +2117,10 @@ ip_rsvp_init(struct socket *so)
 {
 	if (so->so_type != SOCK_RAW ||
 	    so->so_proto->pr_protocol != IPPROTO_RSVP)
-	  return EOPNOTSUPP;
+		return EOPNOTSUPP;
 
 	if (ip_rsvpd != NULL)
-	  return EADDRINUSE;
+		return EADDRINUSE;
 
 	ip_rsvpd = so;
 	/*
@@ -1953,3 +2149,30 @@ ip_rsvp_done(void)
 	}
 	return 0;
 }
+
+void
+rsvp_input(struct mbuf *m, int off, int proto)	/* XXX must fixup manually */
+{
+	if (rsvp_input_p) { /* call the real one if loaded */
+		rsvp_input_p(m, off, proto);
+		return;
+	}
+
+	/* Can still get packets with rsvp_on = 0 if there is a local member
+	 * of the group to which the RSVP packet is addressed.  But in this
+	 * case we want to throw the packet away.
+	 */
+
+	if (!rsvp_on) {
+		m_freem(m);
+		return;
+	}
+
+	if (ip_rsvpd != NULL) { 
+		rip_input(m, off, proto);
+		return;
+	}
+	/* Drop the packet */
+	m_freem(m);
+}
+

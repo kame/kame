@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  * 	$Id: ng_eiface.c,v 1.14 2000/03/15 12:28:44 vitaly Exp $
- * $FreeBSD: src/sys/netgraph/ng_eiface.c,v 1.4.2.2 2002/07/02 23:44:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_eiface.c,v 1.4.2.5 2002/12/17 21:47:48 julian Exp $
  */
 
 #include <sys/param.h>
@@ -58,10 +58,26 @@
 static const struct ng_parse_struct_field ng_eiface_par_fields[]
 	= NG_EIFACE_PAR_FIELDS;
 
+static const struct ng_parse_type ng_eiface_par_type = {
+	&ng_parse_struct_type,
+	&ng_eiface_par_fields
+};
+
+static const struct ng_cmdlist ng_eiface_cmdlist[] = {
+	{
+	  NGM_EIFACE_COOKIE,
+	  NGM_EIFACE_SET,
+	  "set",
+	  &ng_eiface_par_type,
+	  NULL
+	},
+	{ 0 }
+};
+
 /* Node private data */
 struct ng_eiface_private {
-	struct	ifnet *ifp;		/* This interface */
 	struct arpcom	arpcom;		/* per-interface network data */
+	struct	ifnet *ifp;		/* This interface */
 	node_p	node;			/* Our netgraph node */
 	hook_p	ether;			/* Hook for ethernet stream */
 	struct	private *next;		/* When hung on the free list */
@@ -344,9 +360,7 @@ ng_eiface_constructor(node_p *nodep)
 	*/
 
 	/* Attach the interface */
-	if_attach(ifp);
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 
 	/* Done */
 	return (0);

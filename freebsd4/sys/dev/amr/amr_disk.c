@@ -25,7 +25,35 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.5.2.2 2000/10/28 10:16:59 msmith Exp $
+ * Copyright (c) 2002 Eric Moore
+ * Copyright (c) 2002 LSI Logic Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The party using or redistributing the source code and binary forms
+ *    agrees to the disclaimer below and the terms and conditions set forth
+ *    herein.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.5.2.5 2002/12/20 15:12:04 emoore Exp $
  */
 
 /*
@@ -76,7 +104,9 @@ static struct cdevsw amrd_cdevsw = {
 		/* dump */	nodump,
 		/* psize */ 	nopsize,
 		/* flags */	D_DISK,
-		/* bmaj */	254
+#if __FreeBSD_version < 500000
+		/* bmaj */	-1
+#endif
 };
 
 static devclass_t	amrd_devclass;
@@ -101,13 +131,15 @@ static driver_t amrd_driver = {
 DRIVER_MODULE(amrd, amr, amrd_driver, amrd_devclass, 0, 0);
 
 static int
-amrd_open(dev_t dev, int flags, int fmt, struct proc *p)
+amrd_open(dev_t dev, int flags, int fmt, d_thread_t *td)
 {
     struct amrd_softc	*sc = (struct amrd_softc *)dev->si_drv1;
-    struct disklabel	*label;
+#if __FreeBSD_version < 500000		/* old buf style */
+    struct disklabel    *label;
+#endif
 
     debug_called(1);
-	
+
     if (sc == NULL)
 	return (ENXIO);
 
@@ -115,27 +147,34 @@ amrd_open(dev_t dev, int flags, int fmt, struct proc *p)
     if (sc->amrd_controller->amr_state & AMR_STATE_SHUTDOWN)
 	return(ENXIO);
 
+#if __FreeBSD_version < 500000		/* old buf style */
     label = &sc->amrd_disk.d_label;
     bzero(label, sizeof(*label));
-    label->d_type 	= DTYPE_SCSI;
+    label->d_type       = DTYPE_SCSI;
     label->d_secsize    = AMR_BLKSIZE;
     label->d_nsectors   = sc->amrd_drive->al_sectors;
     label->d_ntracks    = sc->amrd_drive->al_heads;
     label->d_ncylinders = sc->amrd_drive->al_cylinders;
     label->d_secpercyl  = sc->amrd_drive->al_sectors * sc->amrd_drive->al_heads;
     label->d_secperunit = sc->amrd_drive->al_size;
+#else
+    sc->amrd_disk.d_sectorsize = AMR_BLKSIZE;
+    sc->amrd_disk.d_mediasize = (off_t)sc->amrd_drive->al_size * AMR_BLKSIZE;
+    sc->amrd_disk.d_fwsectors = sc->amrd_drive->al_sectors;
+    sc->amrd_disk.d_fwheads = sc->amrd_drive->al_heads;
+#endif
 
     sc->amrd_flags |= AMRD_OPEN;
     return (0);
 }
 
 static int
-amrd_close(dev_t dev, int flags, int fmt, struct proc *p)
+amrd_close(dev_t dev, int flags, int fmt, d_thread_t *td)
 {
     struct amrd_softc	*sc = (struct amrd_softc *)dev->si_drv1;
 
     debug_called(1);
-	
+
     if (sc == NULL)
 	return (ENXIO);
     sc->amrd_flags &= ~AMRD_OPEN;
@@ -143,7 +182,7 @@ amrd_close(dev_t dev, int flags, int fmt, struct proc *p)
 }
 
 static int
-amrd_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
+amrd_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, d_thread_t *td)
 {
 
     return (ENOTTY);
@@ -166,10 +205,6 @@ amrd_strategy(struct bio *bio)
 	goto bad;
     }
 
-    /* do-nothing operation */
-    if (bio->bio_bcount == 0)
-	goto done;
-
     devstat_start_transaction(&sc->amrd_stats);
     amr_submit_bio(sc->amrd_controller, bio);
     return;
@@ -177,7 +212,6 @@ amrd_strategy(struct bio *bio)
  bad:
     bio->bio_flags |= BIO_ERROR;
 
- done:
     /*
      * Correctly set the buf to indicate a completed transfer
      */
@@ -201,8 +235,7 @@ amrd_intr(void *data)
 	bio->bio_resid = 0;
     }
 
-    devstat_end_transaction_bio(&sc->amrd_stats, bio);
-    biodone(bio);
+    AMR_BIO_FINISH(bio);
 }
 
 static int
@@ -210,8 +243,8 @@ amrd_probe(device_t dev)
 {
 
     debug_called(1);
-	
-    device_set_desc(dev, "MegaRAID logical drive");
+
+    device_set_desc(dev, "LSILogic MegaRAID logical drive");
     return (0);
 }
 

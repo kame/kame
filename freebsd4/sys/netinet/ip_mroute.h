@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_mroute.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/ip_mroute.h,v 1.17 1999/12/29 04:41:01 peter Exp $
+ * $FreeBSD: src/sys/netinet/ip_mroute.h,v 1.17.2.2 2002/11/20 23:20:55 luigi Exp $
  */
 
 #ifndef _NETINET_IP_MROUTE_H_
@@ -215,9 +215,6 @@ struct rtdetq {
     struct mbuf 	*m;		/* A copy of the packet		    */
     struct ifnet	*ifp;		/* Interface pkt came in on	    */
     vifi_t		xmt_vif;	/* Saved copy of imo_multicast_vif  */
-#ifdef UPCALL_TIMING
-    struct timeval	t;		/* Timestamp */
-#endif /* UPCALL_TIMING */
     struct rtdetq	*next;		/* Next in list of packets          */
 };
 
@@ -253,14 +250,10 @@ struct tbf
 
 struct sockopt;
 
-extern int	(*ip_mrouter_set) __P((struct socket *, struct sockopt *));
-extern int	(*ip_mrouter_get) __P((struct socket *, struct sockopt *));
-extern int	(*ip_mrouter_done) __P((void));
-#ifdef MROUTING
-extern int	(*mrt_ioctl) __P((int, caddr_t));
-#else
-extern int	(*mrt_ioctl) __P((int, caddr_t, struct proc *));
-#endif
+extern int	(*ip_mrouter_set)(struct socket *, struct sockopt *);
+extern int	(*ip_mrouter_get)(struct socket *, struct sockopt *);
+extern int	(*ip_mrouter_done)(void);
+extern int	(*mrt_ioctl)(int, caddr_t);
 
 #endif /* _KERNEL */
 

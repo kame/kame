@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_pager.h	8.4 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_pager.h,v 1.24.2.1 2000/03/27 21:34:45 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_pager.h,v 1.24.2.2 2002/12/31 09:34:51 dillon Exp $
  */
 
 /*
@@ -79,8 +79,10 @@ struct pagerops {
 #define	VM_PAGER_ERROR	4
 #define VM_PAGER_AGAIN	5
 
-#define	VM_PAGER_PUT_SYNC	0x1
-#define	VM_PAGER_PUT_INVAL	0x2
+#define	VM_PAGER_PUT_SYNC		0x0001
+#define	VM_PAGER_PUT_INVAL		0x0002
+#define	VM_PAGER_IGNORE_CLEANCHK	0x0004
+#define	VM_PAGER_CLUSTER_OK		0x0008
 
 #ifdef _KERNEL
 

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.2.2.12 2002/07/02 23:44:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.2.2.13 2002/10/10 18:27:54 archie Exp $
  * $Whistle: ng_pptpgre.c,v 1.7 1999/12/08 00:10:06 archie Exp $
  */
 
@@ -619,7 +619,7 @@ bad:
 
 	/* Sanity check packet length and GRE header bits */
 	extralen = m->m_pkthdr.len
-	    - (iphlen + grelen + (u_int16_t)ntohs(gre->length));
+	    - (iphlen + grelen + gre->hasSeq * (u_int16_t)ntohs(gre->length));
 	if (extralen < 0) {
 		priv->stats.recvBadGRE++;
 		goto bad;

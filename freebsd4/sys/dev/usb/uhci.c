@@ -1,5 +1,5 @@
 /*	$NetBSD: uhci.c,v 1.80 2000/01/19 01:16:38 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhci.c,v 1.40.2.8 2002/08/12 14:19:48 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhci.c,v 1.40.2.10 2003/01/12 02:13:58 iedowse Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -600,6 +600,7 @@ uhci_power(int why, void *v)
 		UHCICMD(sc, cmd & ~UHCI_CMD_EGSM); /* back to normal */
 		UWRITE2(sc, UHCI_INTR, UHCI_INTR_TOCRCIE | UHCI_INTR_RIE | 
 			UHCI_INTR_IOCE | UHCI_INTR_SPIE); /* re-enable intrs */
+		UHCICMD(sc, UHCI_CMD_MAXP);
 		uhci_run(sc, 1); /* and start traffic again */
 		usb_delay_ms(&sc->sc_bus, USB_RESUME_RECOVERY);
 		sc->sc_bus.use_polling--;
@@ -2535,9 +2536,9 @@ usb_device_descriptor_t uhci_devd = {
 	USB_DEVICE_DESCRIPTOR_SIZE,
 	UDESC_DEVICE,		/* type */
 	{0x00, 0x01},		/* USB version */
-	UCLASS_HUB,		/* class */
-	USUBCLASS_HUB,		/* subclass */
-	0,			/* protocol */
+	UDCLASS_HUB,		/* class */
+	UDSUBCLASS_HUB,		/* subclass */
+	UDPROTO_FSHUB,		/* protocol */
 	64,			/* max packet */
 	{0},{0},{0x00,0x01},	/* device id */
 	1,2,0,			/* string indicies */
@@ -2563,9 +2564,9 @@ usb_interface_descriptor_t uhci_ifcd = {
 	0,
 	0,
 	1,
-	UCLASS_HUB,
-	USUBCLASS_HUB,
-	0,
+	UICLASS_HUB,
+	UISUBCLASS_HUB,
+	UIPROTO_FSHUB,
 	0
 };
 

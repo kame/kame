@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ns.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netns/ns.h,v 1.13 1999/12/29 04:46:19 peter Exp $
+ * $FreeBSD: src/sys/netns/ns.h,v 1.13.2.1 2002/12/01 14:03:09 sobomax Exp $
  */
 
 #ifndef _NETNS_NS_H_
@@ -137,12 +137,12 @@ struct sockaddr_ns {
 
 #ifdef _KERNEL
 extern struct domain nsdomain;
-union ns_host ns_thishost;
-union ns_host ns_zerohost;
-union ns_host ns_broadhost;
-union ns_net ns_zeronet;
-union ns_net ns_broadnet;
-u_short ns_cksum();
+extern union ns_host ns_thishost;
+extern union ns_host ns_zerohost;
+extern union ns_host ns_broadhost;
+extern union ns_net ns_zeronet;
+extern union ns_net ns_broadnet;
+u_short ns_cksum(void);
 #else
 
 #include <sys/cdefs.h>

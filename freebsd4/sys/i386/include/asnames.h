@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44.2.7 2002/07/16 17:58:22 dillon Exp $
+ * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44.2.8 2003/01/22 20:14:53 jhb Exp $
  */
 
 #ifndef _MACHINE_ASNAMES_H_
@@ -194,6 +194,7 @@
 #define _cpu_feature			cpu_feature
 #define _cpu_fxsr			cpu_fxsr
 #define _cpu_high			cpu_high
+#define _cpu_procinfo			cpu_procinfo
 #define _cpu_id				cpu_id
 #define _cpu_idle			cpu_idle
 #define _cpu_num_to_apic_id		cpu_num_to_apic_id

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdio.h	8.5 (Berkeley) 4/29/95
- * $FreeBSD: src/include/stdio.h,v 1.24.2.3 2002/08/22 22:08:38 archie Exp $
+ * $FreeBSD: src/include/stdio.h,v 1.24.2.5 2002/11/09 08:07:20 imp Exp $
  */
 
 #ifndef	_STDIO_H_
@@ -128,7 +128,7 @@ typedef	struct __sFILE {
 } FILE;
 
 __BEGIN_DECLS
-extern FILE __sF[];
+extern FILE *__stdinp, *__stdoutp, *__stderrp;
 __END_DECLS
 
 #define	__SLBF	0x0001		/* line buffered */
@@ -190,9 +190,9 @@ __END_DECLS
 #define	SEEK_END	2	/* set file offset to EOF plus offset */
 #endif
 
-#define	stdin	(&__sF[0])
-#define	stdout	(&__sF[1])
-#define	stderr	(&__sF[2])
+#define	stdin	(__stdinp)
+#define	stdout	(__stdoutp)
+#define	stderr	(__stderrp)
 
 /*
  * Functions defined in ANSI C standard.

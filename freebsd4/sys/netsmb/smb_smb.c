@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_smb.c,v 1.1.2.2 2002/04/13 12:50:32 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb_smb.c,v 1.1.2.3 2002/12/14 14:44:19 fjoe Exp $
  */
 /*
  * various SMB requests. Most of the routines merely packs data into mbufs.
@@ -282,7 +282,7 @@ smb_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred)
 		 pp = "";
 		 plen = 1;
 		 unipp = &smb_unieol;
-		 uniplen = sizeof(smb_unieol);
+		 uniplen = 0 /* sizeof(smb_unieol) */;
 	}
 	smb_rq_wstart(rqp);
 	mbp = &rqp->sr_rq;

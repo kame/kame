@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.191.2.44 2002/09/01 07:18:21 scottl Exp $
+# $FreeBSD: src/sys/conf/options,v 1.191.2.47.2.2 2003/03/28 21:26:40 scottl Exp $
 #
 #        On the handling of kernel options
 #
@@ -32,7 +32,7 @@
 
 # Adaptec Array Controller driver options
 AAC_COMPAT_LINUX	opt_aac.h	# Enable the linux ioctl interface
- 
+
 AAC_DEBUG		opt_aac.h	# Debugging levels:
 					# 0 - quiet, only emit warnings
 					# 1 - noisy, emit major function
@@ -262,6 +262,8 @@ INET6			opt_inet6.h
 IPSEC			opt_ipsec.h
 IPSEC_ESP		opt_ipsec.h
 IPSEC_DEBUG		opt_ipsec.h
+IPSEC_FILTERGIF		opt_ipsec.h
+FAST_IPSEC		opt_ipsec.h
 IPDIVERT
 DUMMYNET		opt_ipdn.h
 IPFILTER		opt_ipfilter.h
@@ -284,6 +286,7 @@ IPTUNNEL		opt_ipx.h
 LIBMCHAIN
 NCP			opt_ncp.h
 NETATALK		opt_atalk.h
+NS			opt_ns.h
 PPP_BSDCOMP		opt_ppp.h
 PPP_DEFLATE		opt_ppp.h
 PPP_FILTER		opt_ppp.h

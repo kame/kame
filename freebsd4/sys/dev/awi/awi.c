@@ -1,5 +1,5 @@
 /*	$NetBSD: awi.c,v 1.26 2000/07/21 04:48:55 onoe Exp $	*/
-/* $FreeBSD: src/sys/dev/awi/awi.c,v 1.10.2.1 2000/12/07 04:09:39 imp Exp $ */
+/* $FreeBSD: src/sys/dev/awi/awi.c,v 1.10.2.2 2003/01/23 21:06:42 sam Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -1160,7 +1160,7 @@ awi_fix_rxhdr(sc, m0)
 					m_freem(m0);
 					return NULL;
 				}
-				M_COPY_PKTHDR(n, m0);
+				M_MOVE_PKTHDR(n, m0);
 				n->m_len = MHLEN;
 			} else {
 				MGET(n, M_DONTWAIT, MT_DATA);

@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: aicasm_insformat.h,v 1.1.1.4 2002/10/24 05:34:29 suz Exp $
+ * $Id: aicasm_insformat.h,v 1.1.1.5 2003/04/09 04:14:32 suz Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_insformat.h,v 1.3.2.5 2002/09/27 15:46:28 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_insformat.h,v 1.3.2.6 2003/01/20 23:59:21 gibbs Exp $
  */
 
 struct ins_format1 {

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_descrip.c	8.6 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.81.2.14 2002/04/29 15:14:12 asmodai Exp $
+ * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.81.2.15 2002/11/11 01:43:31 iedowse Exp $
  */
 
 #include "opt_compat.h"
@@ -711,10 +711,12 @@ fpathconf(p, uap)
 	switch (fp->f_type) {
 	case DTYPE_PIPE:
 	case DTYPE_SOCKET:
-		if (uap->name != _PC_PIPE_BUF)
-			return (EINVAL);
-		p->p_retval[0] = PIPE_BUF;
-		error = 0;
+		if (uap->name != _PC_PIPE_BUF) {
+			error = EINVAL;
+		} else {
+			p->p_retval[0] = PIPE_BUF;
+			error = 0;
+		}
 		break;
 	case DTYPE_FIFO:
 	case DTYPE_VNODE:

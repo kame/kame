@@ -29,9 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic79xx_osm.c#22 $
+ * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic79xx_osm.c#26 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.c,v 1.3.2.1 2002/08/31 07:25:51 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.c,v 1.3.2.3 2003/03/07 23:20:36 gibbs Exp $
  */
 
 #include <dev/aic7xxx/aic79xx_osm.h>
@@ -465,6 +465,7 @@ ahd_action(struct cam_sim *sim, union ccb *ccb)
 			hscb->cdb_len = 0;
 			scb->flags |= SCB_DEVICE_RESET;
 			hscb->control |= MK_MESSAGE;
+			hscb->task_management = SIU_TASKMGMT_LUN_RESET;
 			ahd_execute_scb(scb, NULL, 0, 0);
 		} else {
 #ifdef AHD_TARGET_MODE
@@ -488,6 +489,7 @@ ahd_action(struct cam_sim *sim, union ccb *ccb)
 				    ahd_htole16(ccb->csio.tag_id);
 			}
 #endif
+			hscb->task_management = 0;
 			if (ccb->ccb_h.flags & CAM_TAG_ACTION_VALID)
 				hscb->control |= ccb->csio.tag_action;
 			
@@ -1112,8 +1114,11 @@ ahd_execute_scb(void *arg, bus_dma_segment_t *dm_segs, int nsegments,
 	 && (ccb->ccb_h.flags & CAM_DIS_DISCONNECT) == 0)
 		scb->hscb->control |= DISCENB;
 
-	if ((tinfo->curr.ppr_options & MSG_EXT_PPR_IU_REQ) != 0)
+	if ((tinfo->curr.ppr_options & MSG_EXT_PPR_IU_REQ) != 0) {
 		scb->flags |= SCB_PACKETIZED;
+		if (scb->hscb->task_management != 0)
+			scb->hscb->control &= ~MK_MESSAGE;
+	}
 
 	if ((ccb->ccb_h.flags & CAM_NEGOTIATE) != 0
 	 && (tinfo->goal.width != 0
@@ -1183,6 +1188,11 @@ ahd_setup_data(struct ahd_softc *ahd, struct cam_sim *sim,
 			 && (ccb_h->flags & CAM_CDB_PHYS) == 0) {
 				u_long s;
 
+				/*
+				 * Should CAM start to support CDB sizes
+				 * greater than 16 bytes, we could use
+				 * the sense buffer to store the CDB.
+				 */
 				ahd_set_transaction_status(scb,
 							   CAM_REQ_INVALID);
 				ahd_lock(ahd, &s);
@@ -1192,8 +1202,11 @@ ahd_setup_data(struct ahd_softc *ahd, struct cam_sim *sim,
 				return;
 			}
 			if ((ccb_h->flags & CAM_CDB_PHYS) != 0) {
-				hscb->shared_data.idata.cdbptr =
+				hscb->shared_data.idata.cdb_from_host.cdbptr =
 				   ahd_htole64((uintptr_t)csio->cdb_io.cdb_ptr);
+				hscb->shared_data.idata.cdb_from_host.cdblen =
+				   csio->cdb_len;
+				hscb->cdb_len |= SCB_CDB_LEN_PTR;
 			} else {
 				memcpy(hscb->shared_data.idata.cdb, 
 				       csio->cdb_io.cdb_ptr,
@@ -1927,7 +1940,7 @@ DB_COMMAND(ahd_in, ahd_ddb_in)
 	if (count <= 0)
 		count = 1;
 	while (--count >= 0) {
-		db_printf("%04x (M)%x: \t", addr,
+		db_printf("%04lx (M)%x: \t", (u_long)addr,
 			  ahd_inb(ahd_ddb_softc, MODE_PTR));
 		switch (size) {
 		case 1:
@@ -1986,9 +1999,9 @@ DB_SET(ahd_out, ahd_ddb_out, db_cmd_set, CS_MORE, NULL)
 			ahd_outl(ahd_ddb_softc, addr, new_value);
 			break;
 		}
-		db_printf("%04x (M)%x: \t0x%x\t=\t0x%x",
-			  addr, ahd_inb(ahd_ddb_softc, MODE_PTR),
-			  old_value, new_value);
+		db_printf("%04lx (M)%x: \t0x%lx\t=\t0x%lx",
+			  (u_long)addr, ahd_inb(ahd_ddb_softc, MODE_PTR),
+			  (u_long)old_value, (u_long)new_value);
 		addr += size;
 	}
 	db_skip_to_eol();

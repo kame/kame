@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/ispmbox.h,v 1.20.2.12 2002/07/29 04:25:02 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/ispmbox.h,v 1.20.2.13 2002/10/11 18:51:13 mjacob Exp $ */
 /*
  * Mailbox and Queue Entry Definitions for for Qlogic ISP SCSI adapters.
  *
@@ -108,6 +108,9 @@
 #define		FW_FEATURE_LVD_NOTIFY	0x2
 #define		FW_FEATURE_RIO_32BIT	0x4
 #define		FW_FEATURE_RIO_16BIT	0x8
+
+#define	MBOX_INIT_REQ_QUEUE_A64		0x0052
+#define	MBOX_INIT_RES_QUEUE_A64		0x0053
 
 #define	MBOX_ENABLE_TARGET_MODE		0x0055
 #define		ENABLE_TARGET_FLAG	0x8000
@@ -337,6 +340,9 @@ typedef struct {
 	u_int8_t	req_cdb[12];
 	ispds_t		req_dataseg[ISP_RQDSEG];
 } ispreq_t;
+
+#define	ispreq64_t	ispreqt3_t	/* same as.... */
+#define	ISP_RQDSEG_A64	2
 
 /*
  * A request packet can also be a marker packet.
@@ -648,6 +654,7 @@ typedef struct isp_icb {
 #define	ICBXOPT_RIO_32BIT	2
 #define	ICBXOPT_RIO_16BIT_IOCB	3
 #define	ICBXOPT_RIO_32BIT_IOCB	4
+#define	ICBXOPT_ZIO		5
 
 #define	ICBZOPT_ENA_RDXFR_RDY	0x01
 #define	ICBZOPT_ENA_OOF		(1 << 6) /* out of order frame handling */

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)reg.h	5.5 (Berkeley) 1/18/91
- * $FreeBSD: src/sys/i386/include/reg.h,v 1.22.2.1 2000/10/21 01:42:52 bsd Exp $
+ * $FreeBSD: src/sys/i386/include/reg.h,v 1.22.2.2 2002/11/07 22:47:55 alfred Exp $
  */
 
 #ifndef _MACHINE_REG_H_
@@ -135,7 +135,7 @@ struct dbreg {
 #define DBREG_DR7_EXEC      0x00      /* break on execute       */
 #define DBREG_DR7_WRONLY    0x01      /* break on write         */
 #define DBREG_DR7_RDWR      0x03      /* break on read or write */
-#define DBREG_DRX(d,x) ((&d->dr0)[x]) /* reference dr0 - dr7 by
+#define DBREG_DRX(d,x) ((&(d)->dr0)[x]) /* reference dr0 - dr7 by
                                          register number */
 
 

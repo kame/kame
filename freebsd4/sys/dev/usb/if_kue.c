@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_kue.c,v 1.17.2.6 2000/07/17 21:24:28 archie Exp $
+ * $FreeBSD: src/sys/dev/usb/if_kue.c,v 1.17.2.8 2002/11/06 14:23:20 joe Exp $
  */
 
 /*
@@ -95,7 +95,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.17.2.6 2000/07/17 21:24:28 archie Exp $";
+  "$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.17.2.8 2002/11/06 14:23:20 joe Exp $";
 #endif
 
 /*
@@ -122,36 +122,32 @@ Static struct kue_type kue_devs[] = {
 
 Static struct usb_qdat kue_qdat;
 
-Static int kue_match		__P((device_t));
-Static int kue_attach		__P((device_t));
-Static int kue_detach		__P((device_t));
-Static void kue_shutdown		__P((device_t));
-Static int kue_tx_list_init	__P((struct kue_softc *));
-Static int kue_rx_list_init	__P((struct kue_softc *));
-Static int kue_newbuf		__P((struct kue_softc *, struct kue_chain *,
-				    struct mbuf *));
-Static int kue_encap		__P((struct kue_softc *, struct mbuf *, int));
-Static void kue_rxeof		__P((usbd_xfer_handle,
-				    usbd_private_handle, usbd_status));
-Static void kue_txeof		__P((usbd_xfer_handle,
-				    usbd_private_handle, usbd_status));
-Static void kue_start		__P((struct ifnet *));
-Static void kue_rxstart		__P((struct ifnet *));
-Static int kue_ioctl		__P((struct ifnet *, u_long, caddr_t));
-Static void kue_init		__P((void *));
-Static void kue_stop		__P((struct kue_softc *));
-Static void kue_watchdog		__P((struct ifnet *));
+Static int kue_match(device_t);
+Static int kue_attach(device_t);
+Static int kue_detach(device_t);
+Static void kue_shutdown(device_t);
+Static int kue_tx_list_init(struct kue_softc *);
+Static int kue_rx_list_init(struct kue_softc *);
+Static int kue_newbuf(struct kue_softc *, struct kue_chain *, struct mbuf *);
+Static int kue_encap(struct kue_softc *, struct mbuf *, int);
+Static void kue_rxeof(usbd_xfer_handle, usbd_private_handle, usbd_status);
+Static void kue_txeof(usbd_xfer_handle, usbd_private_handle, usbd_status);
+Static void kue_start(struct ifnet *);
+Static void kue_rxstart(struct ifnet *);
+Static int kue_ioctl(struct ifnet *, u_long, caddr_t);
+Static void kue_init(void *);
+Static void kue_stop(struct kue_softc *);
+Static void kue_watchdog(struct ifnet *);
 
-Static void kue_setmulti	__P((struct kue_softc *));
-Static void kue_reset		__P((struct kue_softc *));
+Static void kue_setmulti(struct kue_softc *);
+Static void kue_reset(struct kue_softc *);
 
-Static usbd_status kue_do_request
-				__P((usbd_device_handle,
-				    usb_device_request_t *, void *));
-Static usbd_status kue_ctl	__P((struct kue_softc *, int, u_int8_t,
-				    u_int16_t, char *, int));
-Static usbd_status kue_setword	__P((struct kue_softc *, u_int8_t, u_int16_t));
-Static int kue_load_fw		__P((struct kue_softc *));
+Static usbd_status kue_do_request(usbd_device_handle,
+				  usb_device_request_t *, void *);
+Static usbd_status kue_ctl(struct kue_softc *, int, u_int8_t,
+			   u_int16_t, char *, int);
+Static usbd_status kue_setword(struct kue_softc *, u_int8_t, u_int16_t);
+Static int kue_load_fw(struct kue_softc *);
 
 Static device_method_t kue_methods[] = {
 	/* Device interface */
@@ -180,10 +176,8 @@ DRIVER_MODULE(if_kue, uhub, kue_driver, kue_devclass, usbd_driver_load, 0);
  * to download the firmware to the device, which can take longer
  * than the default timeout.
  */
-Static usbd_status kue_do_request(dev, req, data)
-	usbd_device_handle	dev;
-	usb_device_request_t	*req;
-	void			*data;
+Static usbd_status
+kue_do_request(usbd_device_handle dev, usb_device_request_t *req, void *data)
 {
 	usbd_xfer_handle	xfer;
 	usbd_status		err;
@@ -196,10 +190,8 @@ Static usbd_status kue_do_request(dev, req, data)
 	return(err);
 }
 
-Static usbd_status kue_setword(sc, breq, word)
-	struct kue_softc	*sc;
-	u_int8_t		breq;
-	u_int16_t		word;
+Static usbd_status
+kue_setword(struct kue_softc *sc, u_int8_t breq, u_int16_t word)
 {
 	usbd_device_handle	dev;
 	usb_device_request_t	req;
@@ -227,13 +219,9 @@ Static usbd_status kue_setword(sc, breq, word)
 	return(err);
 }
 
-Static usbd_status kue_ctl(sc, rw, breq, val, data, len)
-	struct kue_softc	*sc;
-	int			rw;
-	u_int8_t		breq;
-	u_int16_t		val;
-	char			*data;
-	int			len;
+Static usbd_status
+kue_ctl(struct kue_softc *sc, int rw, u_int8_t breq, u_int16_t val,
+	char *data, int len)
 {
 	usbd_device_handle	dev;
 	usb_device_request_t	req;
@@ -264,8 +252,8 @@ Static usbd_status kue_ctl(sc, rw, breq, val, data, len)
 	return(err);
 }
 
-Static int kue_load_fw(sc)
-	struct kue_softc	*sc;
+Static int
+kue_load_fw(struct kue_softc *sc)
 {
 	usbd_status		err;
 	usb_device_descriptor_t	*dd;
@@ -321,8 +309,8 @@ Static int kue_load_fw(sc)
 	return(0);
 }
 
-Static void kue_setmulti(sc)
-	struct kue_softc	*sc;
+Static void
+kue_setmulti(struct kue_softc *sc)
 {
 	struct ifnet		*ifp;
 	struct ifmultiaddr	*ifma;
@@ -372,8 +360,8 @@ Static void kue_setmulti(sc)
  * done after the firmware is loaded into the adapter in order to
  * bring it into proper operation.
  */
-Static void kue_reset(sc)
-	struct kue_softc	*sc;
+Static void
+kue_reset(struct kue_softc *sc)
 {
 	if (usbd_set_config_no(sc->kue_udev, KUE_CONFIG_NO, 0)) {
 		printf("kue%d: getting interface handle failed\n",
@@ -510,8 +498,8 @@ USB_ATTACH(kue)
 	USB_ATTACH_SUCCESS_RETURN;
 }
 
-Static int kue_detach(dev)
-	device_t		dev;
+Static int
+kue_detach(device_ptr_t dev)
 {
 	struct kue_softc	*sc;
 	struct ifnet		*ifp;
@@ -545,10 +533,8 @@ Static int kue_detach(dev)
 /*
  * Initialize an RX descriptor and attach an MBUF cluster.
  */
-Static int kue_newbuf(sc, c, m)
-	struct kue_softc	*sc;
-	struct kue_chain	*c;
-	struct mbuf		*m;
+Static int
+kue_newbuf(struct kue_softc *sc, struct kue_chain *c, struct mbuf *m)
 {
 	struct mbuf		*m_new = NULL;
 
@@ -579,8 +565,8 @@ Static int kue_newbuf(sc, c, m)
 	return(0);
 }
 
-Static int kue_rx_list_init(sc)
-	struct kue_softc	*sc;
+Static int
+kue_rx_list_init(struct kue_softc *sc)
 {
 	struct kue_cdata	*cd;
 	struct kue_chain	*c;
@@ -603,8 +589,8 @@ Static int kue_rx_list_init(sc)
 	return(0);
 }
 
-Static int kue_tx_list_init(sc)
-	struct kue_softc	*sc;
+Static int
+kue_tx_list_init(struct kue_softc *sc)
 {
 	struct kue_cdata	*cd;
 	struct kue_chain	*c;
@@ -629,8 +615,8 @@ Static int kue_tx_list_init(sc)
 	return(0);
 }
 
-Static void kue_rxstart(ifp)
-	struct ifnet		*ifp;
+Static void
+kue_rxstart(struct ifnet *ifp)
 {
 	struct kue_softc	*sc;
 	struct kue_chain	*c;
@@ -656,10 +642,8 @@ Static void kue_rxstart(ifp)
  * A frame has been uploaded: pass the resulting mbuf chain up to
  * the higher level protocols.
  */
-Static void kue_rxeof(xfer, priv, status)
-	usbd_xfer_handle	xfer;
-	usbd_private_handle	priv;
-	usbd_status		status;
+Static void kue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv,
+		      usbd_status status)
 {
 	struct kue_softc	*sc;
 	struct kue_chain	*c;
@@ -725,10 +709,8 @@ done:
  * the list buffers.
  */
 
-Static void kue_txeof(xfer, priv, status)
-	usbd_xfer_handle	xfer;
-	usbd_private_handle	priv;
-	usbd_status		status;
+Static void
+kue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 {
 	struct kue_softc	*sc;
 	struct kue_chain	*c;
@@ -775,10 +757,8 @@ Static void kue_txeof(xfer, priv, status)
 	return;
 }
 
-Static int kue_encap(sc, m, idx)
-	struct kue_softc	*sc;
-	struct mbuf		*m;
-	int			idx;
+Static int
+kue_encap(struct kue_softc *sc, struct mbuf *m, int idx)
 {
 	int			total_len;
 	struct kue_chain	*c;
@@ -815,8 +795,8 @@ Static int kue_encap(sc, m, idx)
 	return(0);
 }
 
-Static void kue_start(ifp)
-	struct ifnet		*ifp;
+Static void
+kue_start(struct ifnet *ifp)
 {
 	struct kue_softc	*sc;
 	struct mbuf		*m_head = NULL;
@@ -853,8 +833,8 @@ Static void kue_start(ifp)
 	return;
 }
 
-Static void kue_init(xsc)
-	void			*xsc;
+Static void
+kue_init(void *xsc)
 {
 	struct kue_softc	*sc = xsc;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
@@ -942,10 +922,8 @@ Static void kue_init(xsc)
 	return;
 }
 
-Static int kue_ioctl(ifp, command, data)
-	struct ifnet		*ifp;
-	u_long			command;
-	caddr_t			data;
+Static int
+kue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	struct kue_softc	*sc = ifp->if_softc;
 	int			s, error = 0;
@@ -996,8 +974,8 @@ Static int kue_ioctl(ifp, command, data)
 	return(error);
 }
 
-Static void kue_watchdog(ifp)
-	struct ifnet		*ifp;
+Static void
+kue_watchdog(struct ifnet *ifp)
 {
 	struct kue_softc	*sc;
 	struct kue_chain	*c;
@@ -1022,8 +1000,8 @@ Static void kue_watchdog(ifp)
  * Stop the adapter and free any mbufs allocated to the
  * RX and TX lists.
  */
-Static void kue_stop(sc)
-	struct kue_softc	*sc;
+Static void
+kue_stop(struct kue_softc *sc)
 {
 	usbd_status		err;
 	struct ifnet		*ifp;
@@ -1116,8 +1094,8 @@ Static void kue_stop(sc)
  * Stop all chip I/O so that the kernel's probe routines don't
  * get confused by errant DMAs when rebooting.
  */
-Static void kue_shutdown(dev)
-	device_t		dev;
+Static void
+kue_shutdown(device_ptr_t dev)
 {
 	struct kue_softc	*sc;
 

@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.1.2.2 2000/12/12 19:29:15 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.1.2.3 2002/11/08 21:53:49 semenu Exp $
  */
 
 /*
@@ -45,7 +45,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <sys/module.h>
@@ -64,7 +63,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.1.2.2 2000/12/12 19:29:15 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.1.2.3 2002/11/08 21:53:49 semenu Exp $";
 #endif
 
 static int pnaphy_probe		__P((device_t));

@@ -1,5 +1,5 @@
 /*	$NetBSD: usb_quirks.c,v 1.26 2000/04/27 15:26:50 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.21.2.6 2002/08/24 08:00:32 nsayer Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.21.2.8 2003/02/12 14:05:57 sanpei Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -83,6 +83,15 @@ Static struct usbd_quirk_entry {
  { USB_VENDOR_HP, USB_PRODUCT_HP_815C,		    ANY,   { UQ_BROKEN_BIDIR }},
  { USB_VENDOR_HP, USB_PRODUCT_HP_810C,		    ANY,   { UQ_BROKEN_BIDIR }},
  { USB_VENDOR_HP, USB_PRODUCT_HP_830C,		    ANY,   { UQ_BROKEN_BIDIR }},
+ /* YAMAHA router's ucdDevice is the version of farmware and often changes. */
+ { USB_VENDOR_YAMAHA, USB_PRODUCT_YAMAHA_RTA54I,
+	ANY, { UQ_ASSUME_CM_OVER_DATA }},
+ { USB_VENDOR_YAMAHA, USB_PRODUCT_YAMAHA_RTA55I,
+	ANY, { UQ_ASSUME_CM_OVER_DATA }},
+ { USB_VENDOR_YAMAHA, USB_PRODUCT_YAMAHA_RTW65B,
+	ANY, { UQ_ASSUME_CM_OVER_DATA }},
+ { USB_VENDOR_YAMAHA, USB_PRODUCT_YAMAHA_RTW65I,
+	ANY, { UQ_ASSUME_CM_OVER_DATA }},
 
  { 0, 0, 0, { 0 } }
 };
@@ -97,7 +106,7 @@ usbd_find_quirk(usb_device_descriptor_t *d)
 	for (t = usb_quirks; t->idVendor != 0; t++) {
 		if (t->idVendor  == UGETW(d->idVendor) &&
 		    t->idProduct == UGETW(d->idProduct) &&
-		    t->bcdDevice == UGETW(d->bcdDevice))
+		    (t->bcdDevice == ANY || t->bcdDevice == UGETW(d->bcdDevice)))
 			break;
 	}
 #ifdef USB_DEBUG

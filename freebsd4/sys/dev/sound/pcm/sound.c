@@ -31,7 +31,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/sound.c,v 1.17.2.13 2002/05/07 16:54:19 greid Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/sound.c,v 1.17.2.14 2002/11/07 23:17:18 cognet Exp $");
 
 struct snddev_channel {
 	SLIST_ENTRY(snddev_channel) link;
@@ -523,12 +523,18 @@ pcm_killchan(device_t dev)
 {
     	struct snddev_info *d = device_get_softc(dev);
     	struct snddev_channel *sce;
+	struct pcm_channel *ch;
+	int error;
 
 	snd_mtxlock(d->lock);
 	sce = SLIST_FIRST(&d->channels);
 	snd_mtxunlock(d->lock);
+	ch = sce->channel;
 
-	return pcm_chn_remove(d, sce->channel, 1);
+	error = pcm_chn_remove(d, sce->channel, 1);
+	if (error)
+		return (error);
+	return (pcm_chn_destroy(ch));
 }
 
 int

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.17.2.5 2002/02/09 23:02:39 luigi Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.17.2.6 2002/11/13 20:58:31 iedowse Exp $
  */
 
 /*
@@ -157,6 +157,7 @@ struct fxp_softc {
 #define FXP_FLAG_ALL_MCAST	0x0040	/* accept all multicast frames */
 #define FXP_FLAG_CU_RESUME_BUG	0x0080	/* requires workaround for CU_RESUME */
 #define FXP_FLAG_UCODE		0x0100	/* ucode is loaded */
+#define FXP_FLAG_DEFERRED_RNR	0x0200	/* DEVICE_POLLING deferred RNR */
 
 /* Macros to ease CSR access. */
 #define	CSR_READ_1(sc, reg)						\

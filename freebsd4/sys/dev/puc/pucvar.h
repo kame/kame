@@ -1,5 +1,5 @@
 /*	$NetBSD: pucvar.h,v 1.2 1999/02/06 06:29:54 cgd Exp $	*/
-/*	$FreeBSD: src/sys/dev/puc/pucvar.h,v 1.1.2.2 2002/06/18 02:50:05 obrien Exp $ */
+/*	$FreeBSD: src/sys/dev/puc/pucvar.h,v 1.1.2.3 2003/02/06 13:17:11 sobomax Exp $ */
 
 /*-
  * Copyright (c) 2002 JF Hay.  All rights reserved.
@@ -64,7 +64,7 @@
  * Author: Christopher G. Demetriou, May 14, 1998.
  */
 
-#define	PUC_MAX_PORTS		12
+#define	PUC_MAX_PORTS		16
 
 struct puc_device_description {
 	const char	*name;

@@ -44,7 +44,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/module.h>
 #include <sys/bus.h>
@@ -59,7 +58,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/ukphy_subr.c,v 1.2 1999/08/28 00:42:16 peter Exp $";
+  "$FreeBSD: src/sys/dev/mii/ukphy_subr.c,v 1.2.2.1 2002/11/08 21:53:49 semenu Exp $";
 #endif
 
 /*

@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 3/21/94
-# $FreeBSD: src/sys/kern/Makefile,v 1.6 1999/11/14 13:54:42 marcel Exp $
+# $FreeBSD: src/sys/kern/Makefile,v 1.6.2.1 2003/02/10 12:21:08 des Exp $
 
 # Makefile for kernel tags files, init_sysent, etc.
 
@@ -35,7 +35,7 @@ DGEN=	conf \
 	dev dev/scsi \
 	hp hp/dev hp/hpux \
 	kern libkern \
-	miscfs miscfs/deadfs miscfs/fdesc miscfs/fifofs miscfs/kernfs \
+	miscfs miscfs/deadfs miscfs/fdesc miscfs/fifofs \
 	miscfs/lofs miscfs/nullfs miscfs/portal miscfs/procfs \
 	miscfs/specfs miscfs/umapfs miscfs/union \
 	net netccitt netinet netiso netns nfs scripts sys \

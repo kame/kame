@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.2.2.2 2002/05/05 00:18:04 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.2.2.3 2003/02/21 20:27:55 scottl Exp $
  */
 
 /*
@@ -220,7 +220,7 @@ aac_cam_action(struct cam_sim *sim, union ccb *ccb)
 		cpi->version_num = 1;
 		cpi->hba_inquiry = PI_WIDE_16;
 		cpi->target_sprt = 0;
-		cpi->hba_misc = 0;
+		cpi->hba_misc = PIM_NOBUSRESET;
 		cpi->hba_eng_cnt = 0;
 		cpi->max_target = camsc->inf->TargetsPerBus;
 		cpi->max_lun = 8;	/* Per the controller spec */

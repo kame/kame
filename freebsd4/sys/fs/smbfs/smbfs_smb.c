@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_smb.c,v 1.1.2.1 2001/05/22 08:32:26 bp Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_smb.c,v 1.1.2.2 2003/01/17 08:20:26 tjr Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1253,7 +1253,8 @@ smbfs_smb_lookup(struct smbnode *dnp, const char *name, int nmlen,
 		error = smbfs_smb_lookup(dnp, NULL, 0, fap, scred);
 		return error;
 	} else if (nmlen == 2 && name[0] == '.' && name[1] == '.') {
-		error = smbfs_smb_lookup(dnp->n_parent, NULL, 0, fap, scred);
+		error = smbfs_smb_lookup(VTOSMB(dnp->n_parent), NULL, 0, fap,
+		    scred);
 		printf("%s: knows NOTHING about '..'\n", __FUNCTION__);
 		return error;
 	}

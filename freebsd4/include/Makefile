@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD: src/include/Makefile,v 1.109.2.24 2002/07/22 23:04:29 ru Exp $
+# $FreeBSD: src/include/Makefile,v 1.109.2.27 2003/01/24 05:12:29 sam Exp $
 #
 # Doing a make install builds /usr/include
 #
@@ -32,11 +32,11 @@ SHDRS=	soundcard.h joystick.h
 LHDRS=	aio.h errno.h fcntl.h inttypes.h linker_set.h poll.h syslog.h \
 	termios.h ucontext.h
 
-LDIRS=	cam msdosfs net netatalk netatm netgraph netinet netinet6 \
+LDIRS=	cam msdosfs net netatalk netatm netgraph netinet netinet6 netipsec \
 	netipx netkey netnatm netncp netns netsmb nfs ntfs nwfs pccard posix4 \
 	sys vm
 
-LSUBDIRS=	cam/scsi dev/an dev/ppbus dev/usb dev/wi \
+LSUBDIRS=	cam/scsi dev/an dev/firewire dev/ppbus dev/usb dev/wi \
 	fs/smbfs isofs/cd9660 \
 	netatm/ipatm netatm/sigpvc netatm/spans netatm/uni \
 	ufs/ffs ufs/mfs ufs/ufs
@@ -78,7 +78,7 @@ INCSLINKS+=	posix4/$i ${INCLUDEDIR}/$i
 .endfor
 
 copies:
-.for i in ${LDIRS} ${LSYMSUBDIRS} machine
+.for i in ${LDIRS} ${LSYMSUBDIRS} machine crypto
 	if [ -h ${DESTDIR}/usr/include/$i ]; then \
 		rm -f ${DESTDIR}/usr/include/$i; \
 	fi
@@ -90,6 +90,9 @@ copies:
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 $i/*.h \
 		${DESTDIR}/usr/include/$i
 .endfor
+	cd ${.CURDIR}/../sys; \
+		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 opencrypto/*.h \
+		${DESTDIR}/usr/include/crypto
 .if exists(${.CURDIR}/../sys/${MACHINE_ARCH}/include)
 	cd ${.CURDIR}/../sys/${MACHINE_ARCH}/include; \
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
@@ -110,6 +113,8 @@ symlinks:
 	rm -rf ${DESTDIR}/usr/include/$i
 	ln -s ../../sys/$i ${DESTDIR}/usr/include/$i
 .endfor
+	rm -rf ${DESTDIR}/usr/include/crypto
+	ln -s ../../sys/opencrypto ${DESTDIR}/usr/include/crypto
 .for i in ${LSYMSUBDIRS}
 	rm -rf ${DESTDIR}/usr/include/$i
 	ln -s ../../../sys/$i ${DESTDIR}/usr/include/$i

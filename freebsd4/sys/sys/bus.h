@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/bus.h,v 1.30.2.3 2001/06/16 23:05:02 peter Exp $
+ * $FreeBSD: src/sys/sys/bus.h,v 1.30.2.4 2002/10/10 15:13:33 jhb Exp $
  */
 
 #ifndef _SYS_BUS_H_
@@ -154,6 +154,15 @@ struct resource *
 int	resource_list_release(struct resource_list *rl,
 			      device_t bus, device_t child,
 			      int type, int rid, struct resource *res);
+
+/*
+ * Print all resources of a specified type, for use in bus_print_child.
+ * The name is printed if at least one resource of the given type is available.
+ * The format ist used to print resource start and end.
+ */
+int	resource_list_print_type(struct resource_list *rl,
+				 const char *name, int type,
+				 const char *format);
 
 /*
  * The root bus, to which all top-level busses are attached.

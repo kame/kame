@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-disk.c,v 1.60.2.23 2002/05/30 11:42:13 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-disk.c,v 1.60.2.24 2003/01/30 07:19:59 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -217,8 +217,12 @@ ad_attach(struct ata_device *atadev)
     /* if this disk belongs to an ATA RAID dont print the probe */
     if (ata_raiddisk_attach(adp))
 	adp->flags |= AD_F_RAID_SUBDISK;
-    else
-	ad_print(adp);
+    else {
+	if (atadev->driver) {
+	    ad_print(adp);
+	    ata_enclosure_print(atadev);
+	}
+    }
 }
 
 void

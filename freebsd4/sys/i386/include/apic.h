@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/apic.h,v 1.14 1999/11/19 16:49:28 dillon Exp $
+ * $FreeBSD: src/sys/i386/include/apic.h,v 1.14.2.2 2003/03/21 21:46:15 jhb Exp $
  */
 
 #ifndef _MACHINE_APIC_H_
@@ -214,10 +214,8 @@ typedef struct IOAPIC ioapic_t;
  * various code 'logical' values
  */
 
-/* default level for TPR */
-#define LOPRIO_LEVEL		0x00000010	/* TPR of CPU accepting INTs */
-
 #ifdef GRAB_LOPRIO
+#define LOPRIO_LEVEL		0x00000010	/* TPR of CPU accepting INTs */
 #define ALLHWI_LEVEL		0x00000000	/* TPR of CPU grabbing INTs */
 #endif /** GRAB_LOPRIO */
 
@@ -312,7 +310,7 @@ typedef struct IOAPIC ioapic_t;
 
 
 /* fields in ICR_HIGH */
-#define APIC_ID_MASK		0x0f000000
+#define APIC_ID_MASK		0xff000000
 
 
 /* fields in LVT1/2 */

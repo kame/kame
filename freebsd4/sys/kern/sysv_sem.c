@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.24.2.7 2002/03/13 12:54:02 maxim Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.24.2.8 2002/10/22 20:45:03 fjoe Exp $ */
 
 /*
  * Implementation of SVID semaphores
@@ -132,6 +132,17 @@ struct seminfo seminfo = {
                 SEMVMX,         /* semaphore maximum value */
                 SEMAEM          /* adjust on exit max value */
 };
+
+TUNABLE_INT("kern.ipc.semmap", &seminfo.semmap);
+TUNABLE_INT("kern.ipc.semmni", &seminfo.semmni);
+TUNABLE_INT("kern.ipc.semmns", &seminfo.semmns);
+TUNABLE_INT("kern.ipc.semmnu", &seminfo.semmnu);
+TUNABLE_INT("kern.ipc.semmsl", &seminfo.semmsl);
+TUNABLE_INT("kern.ipc.semopm", &seminfo.semopm);
+TUNABLE_INT("kern.ipc.semume", &seminfo.semume);
+TUNABLE_INT("kern.ipc.semusz", &seminfo.semusz);
+TUNABLE_INT("kern.ipc.semvmx", &seminfo.semvmx);
+TUNABLE_INT("kern.ipc.semaem", &seminfo.semaem);
 
 SYSCTL_DECL(_kern_ipc);
 SYSCTL_INT(_kern_ipc, OID_AUTO, semmap, CTLFLAG_RW, &seminfo.semmap, 0, "");

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_vnops.c,v 1.95.2.2 2002/04/21 07:19:46 bde Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_vnops.c,v 1.95.2.3 2002/12/29 18:19:53 dillon Exp $ */
 /*	$NetBSD: msdosfs_vnops.c,v 1.68 1998/02/10 14:10:04 mrg Exp $	*/
 
 /*-
@@ -582,7 +582,7 @@ msdosfs_read(ap)
 	if (orig_resid <= 0)
 		return (0);
 
-	seqcount = ap->a_ioflag >> 16;
+	seqcount = ap->a_ioflag >> IO_SEQSHIFT;
 
 	isadir = dep->de_Attributes & ATTR_DIRECTORY;
 	do {

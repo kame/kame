@@ -29,7 +29,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/channel.c,v 1.19.2.18 2002/04/22 15:49:35 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/channel.c,v 1.19.2.19 2003/03/11 15:15:41 orion Exp $");
 
 #define MIN_CHUNK_SIZE 		256	/* for uiomove etc. */
 #define	DMA_ALIGN_THRESHOLD	4
@@ -860,7 +860,7 @@ chn_setspeed(struct pcm_channel *c, int speed)
 	r = chn_tryspeed(c, speed);
 	if (r) {
 		DEB(printf("Failed to set speed %d falling back to %d\n", speed, oldspeed));
-		chn_tryspeed(c, oldspeed);
+		r = chn_tryspeed(c, oldspeed);
 	}
 	return r;
 }

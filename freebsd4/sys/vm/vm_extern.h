@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_extern.h	8.2 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_extern.h,v 1.46.2.2 2001/11/14 17:22:53 iedowse Exp $
+ * $FreeBSD: src/sys/vm/vm_extern.h,v 1.46.2.3 2003/01/13 22:51:17 dillon Exp $
  */
 
 #ifndef _VM_EXTERN_H_
@@ -81,6 +81,7 @@ void vm_fault_unwire __P((vm_map_t, vm_offset_t, vm_offset_t));
 int vm_fault_wire __P((vm_map_t, vm_offset_t, vm_offset_t));
 int vm_fault_user_wire __P((vm_map_t, vm_offset_t, vm_offset_t));
 void vm_fork __P((struct proc *, struct proc *, int));
+void vm_waitproc __P((struct proc *));
 int vm_mmap __P((vm_map_t, vm_offset_t *, vm_size_t, vm_prot_t, vm_prot_t, int, void *, vm_ooffset_t));
 vm_offset_t vm_page_alloc_contig __P((vm_offset_t, vm_offset_t, vm_offset_t, vm_offset_t));
 void vm_set_page_size __P((void));
@@ -89,6 +90,7 @@ struct vmspace *vmspace_fork __P((struct vmspace *));
 void vmspace_exec __P((struct proc *));
 void vmspace_unshare __P((struct proc *));
 void vmspace_free __P((struct vmspace *));
+void vmspace_exitfree __P((struct proc *));
 void vnode_pager_setsize __P((struct vnode *, vm_ooffset_t));
 void vslock __P((caddr_t, u_int));
 void vsunlock __P((caddr_t, u_int));

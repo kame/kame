@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-all.h,v 1.22.2.9 2002/03/18 08:37:34 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-all.h,v 1.22.2.10 2002/10/31 23:10:33 thomas Exp $
  */
 
 /* ATAPI misc defines */
@@ -172,7 +172,10 @@ struct atapi_request {
 };
 
 void atapi_attach(struct ata_device *);
+void atapi_cam_attach_bus(struct ata_channel *);
 void atapi_detach(struct ata_device *);
+void atapi_cam_detach_bus(struct ata_channel *);
+void atapi_cam_reinit_bus(struct ata_channel *);
 void atapi_reinit(struct ata_device *);
 void atapi_start(struct ata_device *);
 int atapi_transfer(struct atapi_request *);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $FreeBSD: src/sys/sys/vnode.h,v 1.111.2.18 2001/12/25 01:44:44 dillon Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.111.2.19 2002/12/29 18:19:53 dillon Exp $
  */
 
 #ifndef _SYS_VNODE_H_
@@ -216,6 +216,9 @@ struct vattr {
 #define IO_ASYNC	0x80		/* bawrite rather then bdwrite */
 #define IO_DIRECT	0x100		/* attempt to bypass buffer cache */
 #define IO_NOWDRAIN	0x200		/* do not block on wdrain */
+
+#define IO_SEQMAX	0x7F		/* seq heuristic max value */
+#define IO_SEQSHIFT	16		/* seq heuristic in upper 16 bits */
 
 /*
  *  Modes.  Some values same as Ixxx entries from inode.h for now.

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.21.2.6 2001/11/05 19:08:23 marcel Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.21.2.7 2003/01/02 20:41:33 kan Exp $
  */
 
 #include <sys/param.h>
@@ -39,7 +39,6 @@
 DUMMY(stat);
 DUMMY(mount);
 DUMMY(stime);
-DUMMY(ptrace);
 DUMMY(fstat);
 DUMMY(olduname);
 DUMMY(syslog);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/sys/event.h,v 1.5.2.5 2001/12/14 19:21:22 jlemon Exp $
+ *	$FreeBSD: src/sys/sys/event.h,v 1.5.2.6 2003/02/09 15:28:13 nectar Exp $
  */
 
 #ifndef _SYS_EVENT_H_
@@ -39,7 +39,8 @@
 
 #define EVFILT_SYSCOUNT		7
 
-#define EV_SET(kevp, a, b, c, d, e, f) do {	\
+#define EV_SET(kevp_, a, b, c, d, e, f) do {	\
+	struct kevent *kevp = (kevp_);		\
 	(kevp)->ident = (a);			\
 	(kevp)->filter = (b);			\
 	(kevp)->flags = (c);			\

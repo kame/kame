@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.2.2.8 2002/08/22 10:50:58 jhay Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.2.2.9 2003/02/06 13:17:11 sobomax Exp $");
 
 /*
  * PCI "universal" communications card driver configuration data (used to
@@ -916,6 +916,29 @@ const struct puc_device_description puc_devices[] = {
 	    {
 		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x1c, 0x08, COM_FREQ },
+	    },
+	},
+
+	{   "IC Book Labs Dreadnought x16 Lite",
+	    {	0xb00c, 0x091c, 0,	0	},
+	    {   0xffff, 0xffff, 0,      0       },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x20, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x28, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x30, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x38, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x40, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x48, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x50, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x58, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x60, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x68, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x70, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x78, COM_FREQ },
 	    },
 	},
 
