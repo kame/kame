@@ -59,9 +59,13 @@ if [ X"$defaultiface" = X"" ]; then
 	break
     done
 fi
-# disallow unicast packets without outgoing scope identifiers.
-# if you instead want to route such packets to a "default" interface,
+# Disallow unicast packets without outgoing scope identifiers.
+# If you instead want to route such packets to a "default" interface,
 # comment out the 1st two lines, and enable the lines after them.
+#
+# If you configure site-locals without scope id (it is permissible config for
+# routers that are not on scope boundary), you may want to comment the latter
+# one out.
 $route add -inet6 fe80:: -prefixlen 10 ::1 -reject
 $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
 #if [ X"$defaultiface" = X"" ]; then
@@ -75,11 +79,26 @@ $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
 #    $route add -inet6 fec0:: ::1 -prefixlen 10 -interface -ifp $defaultiface -cloning
 #fi
 
-# disallow "internal" addresses to appear on the wire
+# disallow "internal" addresses to appear on the wire.
 $route add -inet6 ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject
+
+# Don't originate packets to IPv4 compatible destination.
+#
+# This conflicts with RFC1933 rule, in the following case:
+# - the KAME box behaves as a router (for IPv4 native packets), and 
+#   originating node emits native IPv6 packet with IPv4 compatible destination,
+#   hoping that the packet would reach some router with auto tunnel
+#   capability
+# - the KAME box behaves as a host, and tries to transmit packets to IPv4
+#   compatible destination.  KAME box is not capable of doing auto tunnels,
+#   and from RFC1933 it transmits native IPv6 packet with IPv4 compatible
+#   destination.
+# This situation is rather rare, and it is less secure to allow native
+# transmission of packets toward IPv4 compatible address.  We forbit it by
+# default.
 $route add -inet6 ::0.0.0.0 -prefixlen 96 ::1 -reject
 
-# disallow packets to malicious 6to4 prefix
+# disallow packets to malicious 6to4 prefix.
 $route add -inet6 2002:e000:: -prefixlen 20 ::1 -reject
 $route add -inet6 2002:7f00:0000:: -prefixlen 24 ::1 -reject
 $route add -inet6 2002:0000:0000:: -prefixlen 48 ::1 -reject
