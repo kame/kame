@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.70 2001/02/15 01:13:53 itojun Exp $
+	$KAME: RELNOTES,v 1.71 2001/03/14 05:05:33 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -117,5 +117,16 @@ Many of old ones have been solved.
 - libinet6 resolver code does not support NIS lookup.
 
 - bsdi4: may see panics on multicast socket close.
+
+- In many cases, you cannot use *BSD userland programs with KAME-patched
+  kernel, or vice versa.  Be sure to use userland programs supplied with KAME
+  (in /usr/local/v6) when you use KAME-patched kernel.  If you mix them up,
+  you may experience strange behaviors.  For example, it causes serious trouble
+  if you use FreeBSD 4.2-RELEASE /sbin/ifconfig against KAME-patched kernel.
+
+- The KAME build tree is designed to avoid overwrites of userland programs.
+  It is intentional that we install KAME userland binaries into /usr/local/v6,
+  not into /usr/{bin,sbin}, it is to allow you to go back to unpatched
+  BSD kernel easily.
 
 							<end of RELNOTES>
