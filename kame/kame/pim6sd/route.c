@@ -219,9 +219,9 @@ set_incoming(srcentry_ptr, srctype)
 
     /* WARNING WARNING WARNING WARNING */
     /*
-     * If the router is directly connected to the RP and the RP is the BSR,
-     * the next hop is the globally reachable address of the RP:
-     * NOT link-local neighbor but an IPv6 global neighbor... 
+     * If the router is directly connected to the RP, the next hop is the
+     * globally reachable address of the RP: NOT link-local neighbor but an
+     * IPv6 global neighbor... 
      * the upstream router is the globally reachable router...
      */
     /* WARNING WARNING WARNING WARNING */
