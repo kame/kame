@@ -1,6 +1,6 @@
 .include <bsd.own.mk>			# for EXPORTABLE_SYSTEM definition
 
-SUBDIR+=inetd sysctl
+SUBDIR+=sysctl
 
 SUBDIR+=rtsold ifmcstat ndp mping
 SUBDIR+=traceroute6 rtadvd mld6query rrenumd prefix icmp6dump gifconfig

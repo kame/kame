@@ -1,6 +1,6 @@
 .include <bsd.own.mk>			# for EXPORTABLE_SYSTEM definition
 
-SUBDIR+=ifconfig ping route
+SUBDIR+=route
 
 SUBDIR+=ping6 rtsol
 
