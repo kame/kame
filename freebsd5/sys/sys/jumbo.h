@@ -29,7 +29,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
  *
- * $FreeBSD: src/sys/sys/jumbo.h,v 1.3 2002/07/06 02:44:15 gallatin Exp $
+ * $FreeBSD: src/sys/sys/jumbo.h,v 1.5 2003/03/25 01:47:29 jake Exp $
  */
 
 #ifndef _SYS_JUMBO_H_
@@ -38,15 +38,15 @@
 #ifdef _KERNEL
 extern vm_offset_t jumbo_basekva;
 
-static __inline caddr_t	jumbo_phys_to_kva(vm_offset_t pa);
+static __inline caddr_t	jumbo_phys_to_kva(vm_paddr_t pa);
 static __inline caddr_t
-jumbo_phys_to_kva(vm_offset_t pa)
+jumbo_phys_to_kva(vm_paddr_t pa)
 {
 	vm_page_t pg;
 
 	pg = PHYS_TO_VM_PAGE(pa);
 	pg->flags &= ~PG_BUSY;
-	return (caddr_t)(ptoa(pg->pindex) + jumbo_basekva);
+	return (caddr_t)(ptoa((vm_offset_t)pg->pindex) + jumbo_basekva);
 }
 
 int		jumbo_vm_init(void);

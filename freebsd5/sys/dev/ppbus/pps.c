@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/dev/ppbus/pps.c,v 1.35.2.1 2003/01/10 05:18:08 rwatson Exp $
+ * $FreeBSD: src/sys/dev/ppbus/pps.c,v 1.37 2003/03/03 12:15:44 phk Exp $
  *
  * This driver implements a draft-mogul-pps-api-02.txt PPS source.
  *
@@ -62,19 +62,11 @@ static	d_ioctl_t	ppsioctl;
 
 #define CDEV_MAJOR 89
 static struct cdevsw pps_cdevsw = {
-	/* open */	ppsopen,
-	/* close */	ppsclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	ppsioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	PPS_NAME,
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	ppsopen,
+	.d_close =	ppsclose,
+	.d_ioctl =	ppsioctl,
+	.d_name =	PPS_NAME,
+	.d_maj =	CDEV_MAJOR,
 };
 
 static void

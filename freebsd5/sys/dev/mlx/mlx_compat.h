@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mlx/mlx_compat.h,v 1.1 2001/06/25 04:32:31 msmith Exp $
+ * $FreeBSD: src/sys/dev/mlx/mlx_compat.h,v 1.3 2003/03/08 08:01:29 phk Exp $
  */
 /*
  * Portability and compatibility interfaces.
@@ -65,13 +65,13 @@ typedef struct bio_queue_head		mlx_bioq;
 # define MLX_BIO_DATA(bp)		(bp)->bio_data
 # define MLX_BIO_LENGTH(bp)		(bp)->bio_bcount
 # define MLX_BIO_LBA(bp)		(bp)->bio_pblkno
-# define MLX_BIO_SOFTC(bp)		(bp)->bio_dev->si_drv1
-# define MLX_BIO_UNIT(bp)		*(int *)((bp)->bio_dev->si_drv2)
+# define MLX_BIO_SOFTC(bp)		(bp)->bio_disk->d_drv1
+# define MLX_BIO_UNIT(bp)		(bp)->bio_disk->d_unit
 # define MLX_BIO_SET_ERROR(bp, err)	do { (bp)->bio_error = err; (bp)->bio_flags |= BIO_ERROR;} while(0)
 # define MLX_BIO_HAS_ERROR(bp)		((bp)->bio_flags & BIO_ERROR)
 # define MLX_BIO_RESID(bp)		(bp)->bio_resid
 # define MLX_BIO_DONE(bp)		biodone(bp)	/* XXX nice to integrate bio_finish here */
-# define MLX_BIO_STATS_START(bp)	devstat_start_transaction(&((struct mlxd_softc *)MLX_BIO_SOFTC(bp))->mlxd_stats)
-# define MLX_BIO_STATS_END(bp)		devstat_end_transaction_bio(&((struct mlxd_softc *)MLX_BIO_SOFTC(bp))->mlxd_stats, bp)
+# define MLX_BIO_STATS_START(bp)
+# define MLX_BIO_STATS_END(bp)
 #endif
 

@@ -1,6 +1,6 @@
 .file "__umoddi3.s"
 
-// $FreeBSD: src/sys/libkern/ia64/__umoddi3.S,v 1.1 2000/10/04 17:53:03 dfr Exp $
+// $FreeBSD: src/sys/libkern/ia64/__umoddi3.S,v 1.3 2003/02/11 20:15:11 schweikh Exp $
 //  
 // Copyright (c) 2000, Intel Corporation
 // All rights reserved.
@@ -48,8 +48,8 @@ __umoddi3:
   // 64-BIT UNSIGNED INTEGER REMAINDER BEGINS HERE
 
   // general register used:
-  //    r32 - 64-bit unsigned integer dividend
-  //    r33 - 64-bit unsigned integer divisor
+  //    r32 - 64-bit unsigned integer dividend, called a below
+  //    r33 - 64-bit unsigned integer divisor, called b below
   //    r8 - 64-bit unsigned integer result
   // floating-point registers used: f6, f7, f8, f9, f10, f11, f12
   // predicate registers used: p6

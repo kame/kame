@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_event.c,v 1.15 2002/11/04 09:31:02 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_event.c,v 1.39 2003/05/02 05:26:19 phk Exp $
  */
 
 /*
@@ -41,50 +41,59 @@
  */
 
 #include <sys/param.h>
-#ifndef _KERNEL
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <err.h>
-#else
 #include <sys/malloc.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#include <sys/eventhandler.h>
-#endif
+#include <machine/stdarg.h>
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <geom/geom.h>
 #include <geom/geom_int.h>
 
+TAILQ_HEAD(event_tailq_head, g_event);
+
 static struct event_tailq_head g_events = TAILQ_HEAD_INITIALIZER(g_events);
-static u_int g_pending_events, g_silence_events;
-static void g_do_event(struct g_event *ep);
+static u_int g_pending_events;
 static TAILQ_HEAD(,g_provider) g_doorstep = TAILQ_HEAD_INITIALIZER(g_doorstep);
 static struct mtx g_eventlock;
-static int g_shutdown;
+static struct sx g_eventstall;
 
-void
-g_silence(void)
-{
+#define G_N_EVENTREFS		20
 
-	g_silence_events = 1;
-}
+struct g_event {
+	TAILQ_ENTRY(g_event)	events;
+	g_event_t		*func;
+	void			*arg;
+	int			flag;
+	void			*ref[G_N_EVENTREFS];
+};
+
+#define EV_DONE		0x80000
+#define EV_WAKEUP	0x40000
+#define EV_CANCELED	0x20000
 
 void
 g_waitidle(void)
 {
 
-	g_silence_events = 0;
-	mtx_lock(&Giant);
-	wakeup(&g_silence_events);
 	while (g_pending_events)
 		tsleep(&g_pending_events, PPAUSE, "g_waitidle", hz/5);
-	mtx_unlock(&Giant);
+}
+
+void
+g_stall_events(void)
+{
+
+	sx_xlock(&g_eventstall);
+}
+
+void
+g_release_events(void)
+{
+
+	sx_xunlock(&g_eventstall);
 }
 
 void
@@ -118,7 +127,7 @@ g_orphan_register(struct g_provider *pp)
 
 	/*
 	 * Tell all consumers the bad news.
-	 * Don't get surprised if they self-destruct.
+	 * Don't be surprised if they self-destruct.
 	 */
 	cp = LIST_FIRST(&pp->consumers);
 	while (cp != NULL) {
@@ -129,93 +138,13 @@ g_orphan_register(struct g_provider *pp)
 		cp->geom->orphan(cp);
 		cp = cp2;
 	}
-}
-
-static void
-g_destroy_event(struct g_event *ep)
-{
-
-	g_free(ep);
-}
-
-static void
-g_do_event(struct g_event *ep)
-{
-	struct g_class *mp, *mp2;
-	struct g_geom *gp;
-	struct g_consumer *cp, *cp2;
-	struct g_provider *pp;
-	int i;
-
-	g_trace(G_T_TOPOLOGY, "g_do_event(%p) %d m:%p g:%p p:%p c:%p - ",
-	    ep, ep->event, ep->class, ep->geom, ep->provider, ep->consumer);
-	g_topology_assert();
-	switch (ep->event) {
-	case EV_CALL_ME:
-		ep->func(ep->arg);
-		g_topology_assert();
-		break;	
-	case EV_NEW_CLASS:
-		mp2 = ep->class;
-		if (g_shutdown)
-			break;
-		if (mp2->taste == NULL)
-			break;
-		if (g_shutdown)
-			break;
-		LIST_FOREACH(mp, &g_classes, class) {
-			if (mp2 == mp)
-				continue;
-			LIST_FOREACH(gp, &mp->geom, geom) {
-				LIST_FOREACH(pp, &gp->provider, provider) {
-					mp2->taste(ep->class, pp, 0);
-					g_topology_assert();
-				}
-			}
-		}
-		break;
-	case EV_NEW_PROVIDER:
-		if (g_shutdown)
-			break;
-		g_trace(G_T_TOPOLOGY, "EV_NEW_PROVIDER(%s)",
-		    ep->provider->name);
-		LIST_FOREACH(mp, &g_classes, class) {
-			if (mp->taste == NULL)
-				continue;
-			if (!strcmp(ep->provider->name, "geom.ctl") &&
-			    strcmp(mp->name, "DEV"))
-				continue;
-			i = 1;
-			LIST_FOREACH(cp, &ep->provider->consumers, consumers)
-				if(cp->geom->class == mp)
-					i = 0;
-			if (i) {
-				mp->taste(mp, ep->provider, 0);
-				g_topology_assert();
-			}
-		}
-		break;
-	case EV_SPOILED:
-		g_trace(G_T_TOPOLOGY, "EV_SPOILED(%p(%s),%p)",
-		    ep->provider, ep->provider->name, ep->consumer);
-		cp = LIST_FIRST(&ep->provider->consumers);
-		while (cp != NULL) {
-			cp2 = LIST_NEXT(cp, consumers);
-			if (cp->spoiled) {
-				g_trace(G_T_TOPOLOGY, "spoiling %p (%s) (%p)",
-				    cp, cp->geom->name, cp->geom->spoiled);
-				if (cp->geom->spoiled != NULL)
-					cp->geom->spoiled(cp);
-				else
-					cp->spoiled = 0;
-			}
-			cp = cp2;
-		}
-		break;
-	case EV_LAST:
-	default:
-		KASSERT(1 == 0, ("Unknown event %d", ep->event));
-	}
+#ifdef notyet
+	cp = LIST_FIRST(&pp->consumers);
+	if (cp != NULL)
+		return;
+	if (pp->geom->flags & G_GEOM_WITHER)
+		g_destroy_provider(pp);
+#endif
 }
 
 static int
@@ -224,6 +153,7 @@ one_event(void)
 	struct g_event *ep;
 	struct g_provider *pp;
 
+	sx_xlock(&g_eventstall);
 	g_topology_lock();
 	for (;;) {
 		mtx_lock(&g_eventlock);
@@ -240,24 +170,25 @@ one_event(void)
 	if (ep == NULL) {
 		mtx_unlock(&g_eventlock);
 		g_topology_unlock();
+		sx_xunlock(&g_eventstall);
 		return (0);
 	}
 	TAILQ_REMOVE(&g_events, ep, events);
 	mtx_unlock(&g_eventlock);
-	if (ep->class != NULL)
-		ep->class->event = NULL;
-	if (ep->geom != NULL)
-		ep->geom->event = NULL;
-	if (ep->provider != NULL)
-		ep->provider->event = NULL;
-	if (ep->consumer != NULL)
-		ep->consumer->event = NULL;
-	g_do_event(ep);
-	g_destroy_event(ep);
+	g_topology_assert();
+	ep->func(ep->arg, 0);
+	g_topology_assert();
+	if (ep->flag & EV_WAKEUP) {
+		ep->flag |= EV_DONE;
+		wakeup(ep);
+	} else {
+		g_free(ep);
+	}
 	g_pending_events--;
 	if (g_pending_events == 0)
 		wakeup(&g_pending_events);
 	g_topology_unlock();
+	sx_xunlock(&g_eventstall);
 	return (1);
 }
 
@@ -270,56 +201,62 @@ g_run_events()
 }
 
 void
-g_post_event(enum g_events ev, struct g_class *mp, struct g_geom *gp, struct g_provider *pp, struct g_consumer *cp)
+g_cancel_event(void *ref)
 {
-	struct g_event *ep;
+	struct g_event *ep, *epn;
+	struct g_provider *pp;
+	u_int n;
 
-	g_trace(G_T_TOPOLOGY, "g_post_event(%d, %p, %p, %p, %p)",
-	    ev, mp, gp, pp, cp);
-	g_topology_assert();
-	ep = g_malloc(sizeof *ep, M_WAITOK | M_ZERO);
-	ep->event = ev;
-	if (mp != NULL) {
-		ep->class = mp;
-		KASSERT(mp->event == NULL, ("Double event on class %d %d",
-		    ep->event, mp->event->event));
-		mp->event = ep;
-	}
-	if (gp != NULL) {
-		ep->geom = gp;
-		KASSERT(gp->event == NULL, ("Double event on geom %d %d",
-		    ep->event, gp->event->event));
-		gp->event = ep;
-	}
-	if (pp != NULL) {
-		ep->provider = pp;
-		KASSERT(pp->event == NULL, ("Double event on provider %s %d %d",
-		    pp->name, ep->event, pp->event->event));
-		pp->event = ep;
-	}
-	if (cp != NULL) {
-		ep->consumer = cp;
-		KASSERT(cp->event == NULL, ("Double event on consumer %d %d",
-		    ep->event, cp->event->event));
-		cp->event = ep;
-	}
 	mtx_lock(&g_eventlock);
-	g_pending_events++;
-	TAILQ_INSERT_TAIL(&g_events, ep, events);
+	TAILQ_FOREACH(pp, &g_doorstep, orphan) {
+		if (pp != ref)
+			continue;
+		TAILQ_REMOVE(&g_doorstep, pp, orphan);
+		break;
+	}
+	for (ep = TAILQ_FIRST(&g_events); ep != NULL; ep = epn) {
+		epn = TAILQ_NEXT(ep, events);
+		for (n = 0; n < G_N_EVENTREFS; n++) {
+			if (ep->ref[n] == NULL)
+				break;
+			if (ep->ref[n] == ref) {
+				TAILQ_REMOVE(&g_events, ep, events);
+				ep->func(ep->arg, EV_CANCEL);
+				if (ep->flag & EV_WAKEUP) {
+					ep->flag |= EV_DONE;
+					ep->flag |= EV_CANCELED;
+					wakeup(ep);
+				} else {
+					g_free(ep);
+				}
+				break;
+			}
+		}
+	}
 	mtx_unlock(&g_eventlock);
-	wakeup(&g_wait_event);
 }
 
-int
-g_call_me(g_call_me_t *func, void *arg)
+static int
+g_post_event_x(g_event_t *func, void *arg, int flag, struct g_event **epp, va_list ap)
 {
 	struct g_event *ep;
+	void *p;
+	u_int n;
 
-	g_trace(G_T_TOPOLOGY, "g_call_me(%p, %p", func, arg);
-	ep = g_malloc(sizeof *ep, M_NOWAIT | M_ZERO);
+	g_trace(G_T_TOPOLOGY, "g_post_event_x(%p, %p, %d", func, arg, flag);
+	ep = g_malloc(sizeof *ep, flag | M_ZERO);
 	if (ep == NULL)
 		return (ENOMEM);
-	ep->event = EV_CALL_ME;
+	ep->flag = flag;
+	for (n = 0; n < G_N_EVENTREFS; n++) {
+		p = va_arg(ap, void *);
+		if (p == NULL)
+			break;
+		g_trace(G_T_TOPOLOGY, "  ref %p", p);
+		ep->ref[n++] = p;
+	}
+	va_end(ap);
+	KASSERT(p == NULL, ("Too many references to event"));
 	ep->func = func;
 	ep->arg = arg;
 	mtx_lock(&g_eventlock);
@@ -327,26 +264,57 @@ g_call_me(g_call_me_t *func, void *arg)
 	TAILQ_INSERT_TAIL(&g_events, ep, events);
 	mtx_unlock(&g_eventlock);
 	wakeup(&g_wait_event);
+	if (epp != NULL)
+		*epp = ep;
 	return (0);
 }
 
-#ifdef _KERNEL
-static void
-geom_shutdown(void *foo __unused)
+int
+g_post_event(g_event_t *func, void *arg, int flag, ...)
 {
+	va_list ap;
 
-	g_shutdown = 1;
+	va_start(ap, flag);
+	KASSERT(flag == M_WAITOK || flag == M_NOWAIT,
+	    ("Wrong flag to g_post_event"));
+	return (g_post_event_x(func, arg, flag, NULL, ap));
 }
-#endif
+
+
+/*
+ * XXX: It might actually be useful to call this function with topology held.
+ * XXX: This would ensure that the event gets created before anything else
+ * XXX: changes.  At present all users have a handle on things in some other
+ * XXX: way, so this remains an XXX for now.
+ */
+
+int
+g_waitfor_event(g_event_t *func, void *arg, int flag, ...)
+{
+	va_list ap;
+	struct g_event *ep;
+	int error;
+
+	/* g_topology_assert_not(); */
+	va_start(ap, flag);
+	KASSERT(flag == M_WAITOK || flag == M_NOWAIT,
+	    ("Wrong flag to g_post_event"));
+	error = g_post_event_x(func, arg, flag | EV_WAKEUP, &ep, ap);
+	if (error)
+		return (error);
+	do 
+		tsleep(ep, PRIBIO, "g_waitfor_event", hz);
+	while (!(ep->flag & EV_DONE));
+	if (ep->flag & EV_CANCELED)
+		error = EAGAIN;
+	g_free(ep);
+	return (error);
+}
 
 void
 g_event_init()
 {
 
-#ifdef _KERNEL
-	
-	EVENTHANDLER_REGISTER(shutdown_pre_sync, geom_shutdown, NULL,
-		SHUTDOWN_PRI_FIRST);
-#endif
 	mtx_init(&g_eventlock, "GEOM orphanage", NULL, MTX_DEF);
+	sx_init(&g_eventstall, "GEOM event stalling");
 }

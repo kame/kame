@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/autoconf.c,v 1.14 2002/04/06 21:09:08 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/autoconf.c,v 1.17 2003/03/08 08:01:30 phk Exp $
  */
 
 #include "opt_bootp.h"
@@ -34,14 +34,11 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
-#include <sys/disklabel.h>
-#include <sys/diskslice.h> /* for BASE_SLICE, MAX_SLICES */
 #include <sys/reboot.h>
 #include <sys/kernel.h>
 #include <sys/mount.h>
 #include <sys/sysctl.h>
 #include <sys/bus.h>
-#include <sys/devicestat.h>
 #include <sys/cons.h>
 
 #include <machine/md_var.h>
@@ -107,8 +104,7 @@ cpu_rootconf()
 #endif
 
 #ifdef BOOTP
-	if (!ia64_running_in_simulator())
-		bootpc_init();
+	bootpc_init();
 #endif
 #if defined(NFSCLIENT) && defined(NFS_ROOT)
 #if !defined(BOOTP_NFSROOT)

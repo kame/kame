@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sn/if_sn_isa.c,v 1.9 2000/12/13 01:47:19 imp Exp $
+ * $FreeBSD: src/sys/dev/sn/if_sn_isa.c,v 1.10 2003/04/15 06:37:26 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -87,4 +87,6 @@ static driver_t sn_isa_driver = {
 
 extern devclass_t sn_devclass;
 
-DRIVER_MODULE(if_sn, isa, sn_isa_driver, sn_devclass, 0, 0);
+DRIVER_MODULE(sn, isa, sn_isa_driver, sn_devclass, 0, 0);
+MODULE_DEPEND(sn, isa, 1, 1, 1);
+MODULE_DEPEND(sn, ether, 1, 1, 1);

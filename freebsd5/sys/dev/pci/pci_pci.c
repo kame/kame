@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/pci/pci_pci.c,v 1.22 2002/12/03 08:34:20 imp Exp $
+ *	$FreeBSD: src/sys/dev/pci/pci_pci.c,v 1.24 2003/05/22 17:45:26 ticso Exp $
  */
 
 /*
@@ -51,7 +51,6 @@
 #include "pcib_if.h"
 
 static int		pcib_probe(device_t dev);
-static int		pcib_route_interrupt(device_t pcib, device_t dev, int pin);
 
 static device_method_t pcib_methods[] = {
     /* Device interface */
@@ -478,7 +477,7 @@ pcib_write_config(device_t dev, int b, int s, int f, int reg, u_int32_t val, int
 /*
  * Route an interrupt across a PCI bridge.
  */
-static int
+int
 pcib_route_interrupt(device_t pcib, device_t dev, int pin)
 {
     device_t	bus;
@@ -496,7 +495,7 @@ pcib_route_interrupt(device_t pcib, device_t dev, int pin)
      *
      * parent_intpin = (device + child_intpin) % 4
      */
-    parent_intpin = (pci_get_slot(pcib) + (pin - 1)) % 4;
+    parent_intpin = (pci_get_slot(dev) + (pin - 1)) % 4;
 
     /*
      * Our parent is a PCI bus.  Its parent must export the pcib interface

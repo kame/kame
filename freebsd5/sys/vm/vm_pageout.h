@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_pageout.h,v 1.30 2002/03/19 22:17:45 alfred Exp $
+ * $FreeBSD: src/sys/vm/vm_pageout.h,v 1.36 2003/05/03 04:21:16 alc Exp $
  */
 
 #ifndef _VM_VM_PAGEOUT_H_
@@ -79,10 +79,7 @@ extern int vm_page_max_wired;
 extern int vm_pages_needed;	/* should be some "event" structure */
 extern int vm_pageout_pages_needed;
 extern int vm_pageout_deficit;
-
-#define VM_PAGEOUT_ASYNC 0
-#define VM_PAGEOUT_SYNC 1
-#define VM_PAGEOUT_FORCE 2
+extern int vm_pageout_page_count;
 
 /*
  * Swap out requests
@@ -104,10 +101,12 @@ extern void pagedaemon_wakeup(void);
 extern void vm_wait(void);
 extern void vm_waitpfault(void);
 
+/* XXX This is probably misplaced. */
+#ifndef NO_SWAPPING
+void vm_proc_swapin_all(int);
+#endif	/* !NO_SWAPPING */
+
 #ifdef _KERNEL
-void vm_pageout_page(vm_page_t, vm_object_t);
-void vm_pageout_cluster(vm_page_t, vm_object_t);
-int vm_pageout_flush(vm_page_t *, int, int);
-void vm_pageout_page_free(vm_page_t);
+int vm_pageout_flush(vm_page_t *, int, int, int is_object_locked);
 #endif
 #endif	/* _VM_VM_PAGEOUT_H_ */

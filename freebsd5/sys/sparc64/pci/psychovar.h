@@ -27,7 +27,7 @@
  *
  *	from: NetBSD: psychovar.h,v 1.6 2001/07/20 00:07:13 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/pci/psychovar.h,v 1.5 2002/10/16 17:03:36 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/pci/psychovar.h,v 1.8 2003/05/30 20:48:05 tmm Exp $
  */
 
 #ifndef _SPARC64_PCI_PSYCHOVAR_H_
@@ -43,7 +43,7 @@ struct psycho_softc {
 	 * PSYCHO register.  we record the base physical address of these
 	 * also as it is the base of the entire PSYCHO
 	 */
-	vm_offset_t			sc_basepaddr;
+	vm_paddr_t			sc_basepaddr;
 
 	/* Interrupt Group Number for this device */
 	int				sc_ign;
@@ -61,7 +61,11 @@ struct psycho_softc {
 #define	PSYCHO_MODE_SABRE	1
 #define	PSYCHO_MODE_PSYCHO	2
 
+	/* Bus A or B of a psycho pair? */
+	int				sc_half;
+
 	struct iommu_state		*sc_is;
+	u_int32_t			sc_dvmabase;
 
 	struct resource			*sc_mem_res;
 	struct resource			*sc_irq_res[6];

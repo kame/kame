@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/i386/isa/loran.c,v 1.35 2002/10/16 10:16:17 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/loran.c,v 1.42 2003/03/09 11:03:45 phk Exp $
  *
  * This device-driver helps the userland controlprogram for a LORAN-C
  * receiver avoid monopolizing the CPU.
@@ -242,10 +242,7 @@ extern	struct timecounter loran_timecounter;
 static int
 loranprobe(struct isa_device *dvp)
 {
-	static int once;
 
-	if (!once++)
-		cdevsw_add(&loran_cdevsw);
 	dvp->id_iobase = PORT;
 	return (8);
 }
@@ -298,7 +295,7 @@ loranattach(struct isa_device *isdp)
 	TAILQ_INIT(&working);
 	for (i = 0; i < NLORAN + 1; i++) {
 		TAILQ_INIT(&minors[i]);
-		
+		make_dev(&loran_cdevsw, i, UID_ROOT, GID_WHEEL, 0600, "loran%d", i);
 	}
 
 	for (i = 0; i < NDUMMY; i++) {
@@ -361,7 +358,7 @@ loranread(dev_t dev, struct uio * uio, int ioflag)
 		return(EIO);
 	}
 	if (TAILQ_EMPTY(&minors[idx])) 
-		tsleep ((caddr_t)&minors[idx], (PZERO + 8) |PCATCH, "loranrd", hz*2);
+		tsleep (&minors[idx], (PZERO + 8) |PCATCH, "loranrd", hz*2);
 	if (TAILQ_EMPTY(&minors[idx])) 
 		return(0);
 	this = TAILQ_FIRST(&minors[idx]);
@@ -566,7 +563,7 @@ loranintr(int unit)
 		done->vco = vco_is;
 		done->when = there;
 		TAILQ_INSERT_TAIL(done->home, done, list);
-		wakeup((caddr_t)done->home);
+		wakeup(done->home);
 	}
 
 	ticker = first->scheduled;
@@ -624,21 +621,12 @@ struct	isa_driver lorandriver = {
 };
 COMPAT_ISA_DRIVER(loran, lorandriver);
 
-#define CDEV_MAJOR 94
 static struct cdevsw loran_cdevsw = {
-	/* open */	loranopen,
-	/* close */	loranclose,
-	/* read */	loranread,
-	/* write */	loranwrite,
-	/* ioctl */	noioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"loran",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	loranopen,
+	.d_close =	loranclose,
+	.d_read =	loranread,
+	.d_write =	loranwrite,
+	.d_name =	"loran",
 };
 
 #endif /* _KERNEL */

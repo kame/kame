@@ -26,7 +26,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_ktr.c,v 1.33 2002/09/26 07:38:56 jeff Exp $
+ * $FreeBSD: src/sys/kern/kern_ktr.c,v 1.36 2003/05/02 00:33:11 julian Exp $
  */
 
 /*
@@ -195,7 +195,7 @@ ktr_tracepoint(u_int mask, const char *file, int line, const char *format,
 #ifdef KTR_ALQ
 	if (ktr_alq_enabled &&
 	    td->td_critnest == 0 &&
-	    (td->td_kse->ke_flags & KEF_IDLEKSE) == 0 &&
+	    (td->td_flags & TDF_IDLETD) == 0 &&
 	    td != ald_thread) {
 		if (ktr_alq_max && ktr_alq_cnt > ktr_alq_max)
 			goto done;
@@ -216,6 +216,9 @@ ktr_tracepoint(u_int mask, const char *file, int line, const char *format,
 #endif
 	entry->ktr_timestamp = KTR_TIME;
 	entry->ktr_cpu = cpu;
+	if (file != NULL)
+		while (strncmp(file, "../", 3) == 0)
+			file += 3;
 	entry->ktr_file = file;
 	entry->ktr_line = line;
 #ifdef KTR_VERBOSE
@@ -263,6 +266,7 @@ static	int db_mach_vtrace(void);
 DB_SHOW_COMMAND(ktr, db_ktr_all)
 {
 	int	c, lines;
+	int	all = 0;
 
 	lines = NUM_LINES_PER_PAGE;
 	tstate.cur = (ktr_idx - 1) & (KTR_ENTRIES - 1);
@@ -271,8 +275,13 @@ DB_SHOW_COMMAND(ktr, db_ktr_all)
 		db_ktr_verbose = 1;
 	else
 		db_ktr_verbose = 0;
+	if (strcmp(modif, "a") == 0)
+		all = 1;
 	while (db_mach_vtrace())
-		if (--lines == 0) {
+		if (all) {
+			if (cncheckc() != -1)
+				return;
+		} else if (--lines == 0) {
 			db_printf("--More--");
 			c = cngetc();
 			db_printf("\r");

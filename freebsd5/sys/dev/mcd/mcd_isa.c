@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/dev/mcd/mcd_isa.c,v 1.5 2002/10/16 08:48:37 phk Exp $
+ * $FreeBSD: src/sys/dev/mcd/mcd_isa.c,v 1.6 2003/04/16 20:48:29 phk Exp $
  */
 
 #include <sys/param.h>
@@ -10,7 +10,6 @@
 #include <sys/fcntl.h>
 #include <sys/bio.h>
 #include <sys/cdio.h>
-#include <sys/disklabel.h>
 #include <sys/bus.h>
 
 #include <sys/lock.h>

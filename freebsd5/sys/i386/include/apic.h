@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/apic.h,v 1.18 2001/12/20 23:48:30 jhb Exp $
+ * $FreeBSD: src/sys/i386/include/apic.h,v 1.20 2003/03/17 19:14:13 jhb Exp $
  */
 
 #ifndef _MACHINE_APIC_H_
@@ -214,23 +214,6 @@ typedef struct IOAPIC ioapic_t;
  * various code 'logical' values
  */
 
-/* default level for TPR */
-#define LOPRIO_LEVEL		0x00000010	/* TPR of CPU accepting INTs */
-
-#ifdef GRAB_LOPRIO
-#define ALLHWI_LEVEL		0x00000000	/* TPR of CPU grabbing INTs */
-#endif /** GRAB_LOPRIO */
-
-/*
- * XXX This code assummes that the reserved field of the
- *      local APIC TPR can be written with all 0s.
- *     This saves quite a few memory accesses.
- *     If the silicon ever changes then things will break!
- *     It affects mplock.s, swtch.s, and possibly other files.
- */
-#define CHEAP_TPR
-
-
 /******************************************************************************
  * LOCAL APIC defines
  */
@@ -307,7 +290,7 @@ typedef struct IOAPIC ioapic_t;
 
 
 /* fields in ICR_HIGH */
-#define APIC_ID_MASK		0x0f000000
+#define APIC_ID_MASK		0xff000000
 
 
 /* fields in LVT1/2 */

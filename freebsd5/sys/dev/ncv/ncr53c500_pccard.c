@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.14 2002/11/28 01:13:58 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.16 2003/04/10 04:36:01 imp Exp $	*/
 /*	$NecBSD: ncr53c500_pisa.c,v 1.28 1998/11/26 01:59:11 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -88,7 +88,7 @@ static const struct ncv_product {
 	{ PCMCIA_CARD(QLOGIC, PC05, 0), 0x84d00000 }, 
 #define FLAGS_REX5572 0x84d00000
 	{ PCMCIA_CARD(RATOC, REX5572, 0), FLAGS_REX5572 }, 
-	{ PCMCIA_CARD(RATOC, REX_R280, 0), 0x84d00000 }, 
+	{ PCMCIA_CARD(RATOC, REX9530, 0), 0x84d00000 }, 
 	{ { NULL }, 0 }
 };
 
@@ -210,7 +210,8 @@ static int ncv_pccard_match(device_t dev)
 	if ((pp = (const struct ncv_product *) pccard_product_lookup(dev, 
 	    (const struct pccard_product *) ncv_products,
 	    sizeof(ncv_products[0]), NULL)) != NULL) {
-		device_set_desc(dev, pp->prod.pp_name);
+		if (pp->prod.pp_name != NULL)
+			device_set_desc(dev, pp->prod.pp_name);
 		device_set_flags(dev, pp->flags);
 		return(0);
 	}

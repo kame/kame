@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/i386/include/bus_dma.h,v 1.16 2002/10/04 20:40:37 sam Exp $ */
+/* $FreeBSD: src/sys/i386/include/bus_dma.h,v 1.21 2003/05/30 20:40:33 hmp Exp $ */
 
 #ifndef _I386_BUS_DMA_H_
 #define _I386_BUS_DMA_H_
@@ -78,7 +78,7 @@
 #define	BUS_DMA_WAITOK		0x00	/* safe to sleep (pseudo-flag) */
 #define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
 #define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
-#define	BUS_DMAMEM_NOSYNC	0x04	/* map memory to not require sync */
+#define	BUS_DMA_COHERENT	0x04	/* hint: map memory in a coherent way */
 #define	BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
 #define	BUS_DMA_BUS2		0x20
 #define	BUS_DMA_BUS3		0x40
@@ -89,16 +89,13 @@ struct mbuf;
 struct uio;
 
 /*
- *	bus_dmasync_op_t
- *
- *	Operations performed by bus_dmamap_sync().
+ * Operations performed by bus_dmamap_sync().
  */
-typedef enum {
-	BUS_DMASYNC_PREREAD,
-	BUS_DMASYNC_POSTREAD,
-	BUS_DMASYNC_PREWRITE,
-	BUS_DMASYNC_POSTWRITE
-} bus_dmasync_op_t;
+typedef int bus_dmasync_op_t;
+#define	BUS_DMASYNC_PREREAD	1
+#define	BUS_DMASYNC_POSTREAD	2
+#define	BUS_DMASYNC_PREWRITE	4
+#define	BUS_DMASYNC_POSTWRITE	8
 
 /*
  *	bus_dma_tag_t

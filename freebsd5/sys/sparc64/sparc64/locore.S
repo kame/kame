@@ -22,11 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/sparc64/sparc64/locore.S,v 1.18 2002/08/29 01:59:54 jake Exp $
  */
 
-#include <sys/syscall.h>
+#include <machine/asm.h>
+__FBSDID("$FreeBSD: src/sys/sparc64/sparc64/locore.S,v 1.21 2003/04/29 00:37:41 jake Exp $");
 
 #include <machine/asi.h>
 #include <machine/asmacros.h>
@@ -56,6 +55,7 @@ ENTRY(_start)
 	wrpr	%g0, 0, %cleanwin
 	wrpr	%g0, 0, %pil
 	wr	%g0, 0, %fprs
+	wrpr	%g0, 0, %tick
 
 	/*
 	 * Get onto our per-cpu panic stack, which precedes the struct pcpu in

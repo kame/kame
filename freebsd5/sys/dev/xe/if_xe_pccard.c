@@ -25,7 +25,7 @@
  *
  *
  * xe pccard interface driver
- * $FreeBSD: src/sys/dev/xe/if_xe_pccard.c,v 1.5 2002/11/14 23:54:55 sam Exp $
+ * $FreeBSD: src/sys/dev/xe/if_xe_pccard.c,v 1.8 2003/04/10 04:36:02 imp Exp $
  */
 
 #include <sys/param.h>
@@ -307,7 +307,9 @@ xe_pccard_detach(device_t dev)
 }
 
 static const struct pccard_product xe_pccard_products[] = {
+	PCMCIA_CARD(ACCTON, EN2226, 0),
 	PCMCIA_CARD(COMPAQ2, CPQ_10_100, 0),
+	PCMCIA_CARD(INTEL, EEPRO100, 0),
 	PCMCIA_CARD(XIRCOM, CE, 0),
 	PCMCIA_CARD(XIRCOM, CE2, 0),
 	PCMCIA_CARD(XIRCOM, CE3, 0),
@@ -326,7 +328,8 @@ xe_pccard_match(device_t dev)
 
 	if ((pp = pccard_product_lookup(dev, xe_pccard_products,
 	     sizeof(xe_pccard_products[0]), NULL)) != NULL) {
-		device_set_desc(dev, pp->pp_name);
+		if (pp->pp_name != NULL)
+			device_set_desc(dev, pp->pp_name);
 		return (0);
 	}
 	return (EIO);

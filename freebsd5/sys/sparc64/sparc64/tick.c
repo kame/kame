@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/tick.c,v 1.8 2002/10/25 17:42:14 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/tick.c,v 1.13 2003/05/29 17:49:21 tmm Exp $
  */
 
 #include <sys/param.h>
@@ -46,17 +46,19 @@
 #include <machine/frame.h>
 #include <machine/intr_machdep.h>
 #include <machine/tick.h>
+#include <machine/ver.h>
 #ifdef SMP
 #include <machine/cpu.h>
 #endif
 
 int tick_missed;	/* statistics */
 
-#define	TICK_GRACE	1000
+#define	TICK_GRACE	10000
 
 void
 cpu_initclocks(void)
 {
+	stathz = hz;
 	tick_start(tick_hardclock);
 }
 
@@ -64,20 +66,13 @@ static __inline void
 tick_process(struct clockframe *cf)
 {
 
-#ifdef SMP
 	if (PCPU_GET(cpuid) == 0)
 		hardclock(cf);
-	else {
-		CTR1(KTR_CLK, "tick_process: AP, cpuid=%d", PCPU_GET(cpuid));
-		mtx_lock_spin_flags(&sched_lock, MTX_QUIET);
-		hardclock_process(curthread, CLKF_USERMODE(cf));
-		statclock_process(curthread->td_kse, CLKF_PC(cf),
-		    CLKF_USERMODE(cf));
-		mtx_unlock_spin_flags(&sched_lock, MTX_QUIET);
-	}
-#else
-	hardclock(cf);
-#endif
+	else
+		hardclock_process(cf);
+	if (profprocs != 0)
+		profclock(cf);
+	statclock(cf);
 }
 
 void
@@ -85,6 +80,7 @@ tick_hardclock(struct clockframe *cf)
 {
 	int missed;
 	u_long next;
+	register_t i;
 
 	tick_process(cf);
 	/*
@@ -96,14 +92,14 @@ tick_hardclock(struct clockframe *cf)
 	 */
 	missed = 0;
 	next = rd(asr23) + tick_increment;
-	critical_enter();
+	i = intr_disable();
 	while (next < rd(tick) + TICK_GRACE) {
 		next += tick_increment;
 		missed++;
 	}
-	atomic_add_int(&tick_missed, missed);
 	wr(asr23, next, 0);
-	critical_exit();
+	intr_restore(i);
+	atomic_add_int(&tick_missed, missed);
 	for (; missed > 0; missed--)
 		tick_process(cf);
 }
@@ -143,6 +139,8 @@ tick_start_ap(void)
 void
 tick_stop(void)
 {
-	wrpr(tick, 0, 0);
+
+	if (cpu_impl >= CPU_IMPL_ULTRASPARCIII)
+		wr(asr24, 1L << 63, 0);
 	wr(asr23, 1L << 63, 0);
 }

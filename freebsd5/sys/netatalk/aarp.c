@@ -2,7 +2,7 @@
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
  * All Rights Reserved.
  *
- * $FreeBSD: src/sys/netatalk/aarp.c,v 1.17 2002/08/15 18:58:44 rwatson Exp $
+ * $FreeBSD: src/sys/netatalk/aarp.c,v 1.21 2003/03/21 17:53:16 mdodd Exp $
  */
 
 #include "opt_atalk.h"
@@ -180,7 +180,7 @@ aarpwhohas( struct arpcom *ac, struct sockaddr_at *sat )
 	ea->aarp_spnode = AA_SAT( aa )->sat_addr.s_node;
 	ea->aarp_tpnode = sat->sat_addr.s_node;
     } else {
-	bcopy((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,
+	bcopy((caddr_t)ac->ac_if.if_broadcastaddr, (caddr_t)eh->ether_dhost,
 		sizeof( eh->ether_dhost ));
 	eh->ether_type = htons( ETHERTYPE_AARP );
 
@@ -221,8 +221,8 @@ aarpresolve( ac, m, destsat, desten )
 	    bcopy( (caddr_t)atmulticastaddr, (caddr_t)desten,
 		    sizeof( atmulticastaddr ));
 	} else {
-	    bcopy( (caddr_t)etherbroadcastaddr, (caddr_t)desten,
-		    sizeof( etherbroadcastaddr ));
+	    bcopy( (caddr_t)ac->ac_if.if_broadcastaddr, (caddr_t)desten,
+		    sizeof( ac->ac_if.if_addrlen ));
 	}
 	return( 1 );
     }
@@ -258,12 +258,13 @@ aarpresolve( ac, m, destsat, desten )
 }
 
 void
-aarpinput( ac, m )
-    struct arpcom	*ac;
+aarpintr( m )
     struct mbuf		*m;
 {
     struct arphdr	*ar;
+    struct arpcom	*ac;
 
+    ac = (struct arpcom *)m->m_pkthdr.rcvif;
     if ( ac->ac_if.if_flags & IFF_NOARP )
 	goto out;
 
@@ -592,7 +593,7 @@ aarpprobe( void *arg )
 		sizeof( ea->aarp_tpnet ));
 	ea->aarp_spnode = ea->aarp_tpnode = AA_SAT( aa )->sat_addr.s_node;
     } else {
-	bcopy((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,
+	bcopy((caddr_t)ac->ac_if.if_broadcastaddr, (caddr_t)eh->ether_dhost,
 		sizeof( eh->ether_dhost ));
 	eh->ether_type = htons( ETHERTYPE_AARP );
 	ea->aarp_spa = ea->aarp_tpa = AA_SAT( aa )->sat_addr.s_node;

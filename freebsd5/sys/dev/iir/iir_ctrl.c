@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/iir/iir_ctrl.c,v 1.3.2.1 2003/01/10 05:18:08 rwatson Exp $ */
+/* $FreeBSD: src/sys/dev/iir/iir_ctrl.c,v 1.9 2003/04/25 05:37:04 scottl Exp $ */
 /*
  *       Copyright (c) 2000-01 Intel Corporation
  *       All Rights Reserved
@@ -46,8 +46,9 @@
 #include <sys/kernel.h>
 #include <sys/uio.h>
 #include <sys/conf.h>
+#include <sys/disk.h>
 #include <sys/stat.h>
-#include <sys/ioccom.h>
+#include <sys/disklabel.h>
 #include <machine/bus.h>
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -69,23 +70,18 @@ static d_ioctl_t	iir_ioctl;
 
 /* Normally, this is a static structure.  But we need it in pci/iir_pci.c */
 static struct cdevsw iir_cdevsw = {
-        /* open */      iir_open,
-        /* close */     iir_close,
-        /* read */      iir_read,
-        /* write */     iir_write,
-        /* ioctl */     iir_ioctl,
-        /* poll */      nopoll,
-        /* mmap */      nommap,
-        /* strategy */  nostrategy,
-        /* name */      "iir",
-        /* maj */       CDEV_MAJOR,
-        /* dump */      nodump,
-        /* psize */     nopsize,
-        /* flags */     0,
-        /* kq */        nokqfilter
+	.d_open =	iir_open,
+	.d_close =	iir_close,
+	.d_read =	iir_read,
+	.d_write =	iir_write,
+	.d_ioctl =	iir_ioctl,
+	.d_name =	"iir",
+	.d_maj =	CDEV_MAJOR,
 };
 
+/*
 static int iir_devsw_installed = 0;
+*/
 #ifndef SDEV_PER_HBA
 static int sdev_made = 0;
 #endif
@@ -105,12 +101,12 @@ gdt_make_dev(int unit)
 
 #ifdef SDEV_PER_HBA
     dev = make_dev(&iir_cdevsw, hba2minor(unit), UID_ROOT, GID_OPERATOR,
-                   S_IRUSR | S_IWUSR | S_IRGRP, "iir%d", unit);
+                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, "iir%d", unit);
 #else
     if (sdev_made)
         return (0);
     dev = make_dev(&iir_cdevsw, 0, UID_ROOT, GID_OPERATOR,
-                   S_IRUSR | S_IWUSR | S_IRGRP, "iir");
+                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, "iir");
     sdev_made = 1;
 #endif
     return (dev);
@@ -357,16 +353,17 @@ iir_ioctl(dev_t dev, u_long cmd, caddr_t cmdarg, int flags, d_thread_t * p)
     return (0);
 }
 
+/*
 static void
 iir_drvinit(void *unused)
 {
     GDT_DPRINTF(GDT_D_DEBUG, ("iir_drvinit()\n"));
                 
     if (!iir_devsw_installed) {
-        /* Add the I/O (data) channel */
         cdevsw_add(&iir_cdevsw);
         iir_devsw_installed = 1;
     }
 }
 
 SYSINIT(iir_dev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE + CDEV_MAJOR, iir_drvinit, NULL)
+*/

@@ -1,4 +1,3 @@
-
 /*
  * ng_iface.c
  *
@@ -36,7 +35,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.22 2002/11/14 23:44:37 sam Exp $
+ * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.26 2003/04/08 14:25:45 des Exp $
  * $Whistle: ng_iface.c,v 1.33 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -51,6 +50,11 @@
  * This node also includes Berkeley packet filter support.
  */
 
+#include "opt_atalk.h"
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#include "opt_ipx.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -58,6 +62,7 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/errno.h>
+#include <sys/random.h>
 #include <sys/sockio.h>
 #include <sys/socket.h>
 #include <sys/syslog.h>
@@ -65,8 +70,8 @@
 
 #include <net/if.h>
 #include <net/if_types.h>
-#include <net/intrq.h>
 #include <net/bpf.h>
+#include <net/netisr.h>
 
 #include <netinet/in.h>
 
@@ -97,7 +102,6 @@ const static struct iffam gFamilies[] = {
 	{ AF_IPX,	NG_IFACE_HOOK_IPX	},
 	{ AF_ATM,	NG_IFACE_HOOK_ATM	},
 	{ AF_NATM,	NG_IFACE_HOOK_NATM	},
-	{ AF_NS,	NG_IFACE_HOOK_NS	},
 };
 #define NUM_FAMILIES		(sizeof(gFamilies) / sizeof(*gFamilies))
 
@@ -729,12 +733,13 @@ ng_iface_rcvdata(hook_p hook, item_p item)
 	const iffam_p iffam = get_iffam_from_hook(priv, hook);
 	struct ifnet *const ifp = priv->ifp;
 	struct mbuf *m;
+	int isr;
 
 	NGI_GET_M(item, m);
 	NG_FREE_ITEM(item);
 	/* Sanity checks */
 	KASSERT(iffam != NULL, ("%s: iffam", __func__));
-	KASSERT(m->m_flags & M_PKTHDR, ("%s: not pkthdr", __func__));
+	M_ASSERTPKTHDR(m);
 	if (m == NULL)
 		return (EINVAL);
 	if ((ifp->if_flags & IFF_UP) == 0) {
@@ -753,7 +758,36 @@ ng_iface_rcvdata(hook_p hook, item_p item)
 	ng_iface_bpftap(ifp, m, iffam->family);
 
 	/* Send packet */
-	return family_enqueue(iffam->family, m);
+	switch (iffam->family) {
+#ifdef INET
+	case AF_INET:
+		isr = NETISR_IP;
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		isr = NETISR_IPV6;
+		break;
+#endif
+#ifdef IPX
+	case AF_IPX:
+		isr = NETISR_IPX;
+		break;
+#endif
+#ifdef NETATALK
+	case AF_APPLETALK:
+		isr = NETISR_ATALK2;
+		break;
+#endif
+	default:
+		m_freem(m);
+		return (EAFNOSUPPORT);
+	}
+	/* First chunk of an mbuf contains good junk */
+	if (harvest.point_to_point)
+		random_harvest(m, 16, 3, 0, RANDOM_NET);
+	netisr_dispatch(isr, m);
+	return (0);
 }
 
 /*

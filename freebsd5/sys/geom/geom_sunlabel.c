@@ -32,18 +32,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_sunlabel.c,v 1.18.2.1 2002/12/20 21:52:02 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_sunlabel.c,v 1.36 2003/05/02 12:57:40 phk Exp $
  */
 
 
 #include <sys/param.h>
-#ifndef _KERNEL
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <err.h>
-#else
+#include <sys/endian.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/conf.h>
@@ -51,7 +45,7 @@
 #include <sys/malloc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#endif
+#include <sys/sun_disklabel.h>
 #include <geom/geom.h>
 #include <geom/geom_slice.h>
 #include <machine/endian.h>
@@ -59,22 +53,83 @@
 #define SUNLABEL_CLASS_NAME "SUN"
 
 struct g_sunlabel_softc {
+	int sectorsize;
 	int nheads;
 	int nsects;
 	int nalt;
 };
 
 static int
-g_sunlabel_start(struct bio *bp)
+g_sunlabel_modify(struct g_geom *gp, struct g_sunlabel_softc *ms, u_char *sec0)
 {
-	struct g_geom *gp;
-	struct g_sunlabel_softc *ms;
-	struct g_slicer *gsp;
+	int i, error;
+	u_int u, v, csize;
+	struct sun_disklabel sl;
 
+	error = sunlabel_dec(sec0, &sl);
+	if (error)
+		return (error);
+
+	csize = sl.sl_ntracks * sl.sl_nsectors;
+
+	for (i = 0; i < SUN_NPART; i++) {
+		v = sl.sl_part[i].sdkp_cyloffset;
+		u = sl.sl_part[i].sdkp_nsectors;
+		error = g_slice_config(gp, i, G_SLICE_CONFIG_CHECK,
+		    ((off_t)v * csize) << 9ULL,
+		    ((off_t)u) << 9ULL,
+		    ms->sectorsize,
+		    "%s%c", gp->name, 'a' + i);
+		if (error)
+			return (error);
+	}
+	for (i = 0; i < SUN_NPART; i++) {
+		v = sl.sl_part[i].sdkp_cyloffset;
+		u = sl.sl_part[i].sdkp_nsectors;
+		g_slice_config(gp, i, G_SLICE_CONFIG_SET,
+		    ((off_t)v * csize) << 9ULL,
+		    ((off_t)u) << 9ULL,
+		    ms->sectorsize,
+		    "%s%c", gp->name, 'a' + i);
+	}
+	ms->nalt = sl.sl_acylinders;
+	ms->nheads = sl.sl_ntracks;
+	ms->nsects = sl.sl_nsectors;
+
+	return (0);
+}
+
+static void
+g_sunlabel_hotwrite(void *arg, int flag)
+{
+	struct bio *bp;
+	struct g_geom *gp;
+	struct g_slicer *gsp;
+	struct g_slice *gsl;
+	struct g_sunlabel_softc *ms;
+	u_char *p;
+	int error;
+
+	KASSERT(flag != EV_CANCEL, ("g_sunlabel_hotwrite cancelled"));
+	bp = arg;
 	gp = bp->bio_to->geom;
 	gsp = gp->softc;
 	ms = gsp->softc;
-	return (0);
+	gsl = &gsp->slices[bp->bio_to->index];
+	/*
+	 * XXX: For all practical purposes, this whould be equvivalent to
+	 * XXX: "p = (u_char *)bp->bio_data;" because the label is always
+	 * XXX: in the first sector and we refuse sectors smaller than the
+	 * XXX: label.
+	 */
+	p = (u_char *)bp->bio_data - (bp->bio_offset + gsl->offset);
+
+	error = g_sunlabel_modify(gp, ms, p);
+	if (error) {
+		g_io_deliver(bp, EPERM);
+		return;
+	}
+	g_slice_finish_hot(bp);
 }
 
 static void
@@ -92,15 +147,94 @@ g_sunlabel_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp, stru
 	}
 }
 
+struct h0h0 {
+	struct g_geom *gp;
+	struct g_sunlabel_softc *ms;
+	u_char *label;
+	int error;
+};
+
+static void
+g_sunlabel_callconfig(void *arg, int flag)
+{
+	struct h0h0 *hp;
+
+	hp = arg;
+	hp->error = g_sunlabel_modify(hp->gp, hp->ms, hp->label);
+	if (!hp->error)
+		hp->error = g_write_data(LIST_FIRST(&hp->gp->consumer),
+		    0, hp->label, SUN_SIZE);
+}
+
+/*
+ * NB! curthread is user process which GCTL'ed.
+ */
+static int
+g_sunlabel_config(struct gctl_req *req, struct g_geom *gp, const char *verb)
+{
+	u_char *label;
+	int error, i;
+	struct h0h0 h0h0;
+	struct g_slicer *gsp;
+	struct g_consumer *cp;
+
+	g_topology_assert();
+	cp = LIST_FIRST(&gp->consumer);
+	gsp = gp->softc;
+	if (!strcmp(verb, "write label")) {
+		label = gctl_get_paraml(req, "label", SUN_SIZE);
+		if (label == NULL)
+			return (EINVAL);
+		h0h0.gp = gp;
+		h0h0.ms = gsp->softc;
+		h0h0.label = label;
+		h0h0.error = -1;
+		/* XXX: Does this reference register with our selfdestruct code ? */
+		error = g_access_rel(cp, 1, 1, 1);
+		if (error) {
+			g_free(label);
+			return (error);
+		}
+		g_topology_unlock();
+		g_waitfor_event(g_sunlabel_callconfig, &h0h0, M_WAITOK, gp, NULL);
+		g_topology_lock();
+		error = h0h0.error;
+		g_access_rel(cp, -1, -1, -1);
+		g_free(label);
+	} else if (!strcmp(verb, "write bootcode")) {
+		label = gctl_get_paraml(req, "bootcode", SUN_BOOTSIZE);
+		if (label == NULL)
+			return (EINVAL);
+		/* XXX: Does this reference register with our selfdestruct code ? */
+		error = g_access_rel(cp, 1, 1, 1);
+		if (error) {
+			g_free(label);
+			return (error);
+		}
+		for (i = 0; i < SUN_NPART; i++) {
+			if (gsp->slices[i].length <= SUN_BOOTSIZE)
+				continue;
+			g_write_data(cp,
+			    gsp->slices[i].offset + SUN_SIZE, label + SUN_SIZE,
+			    SUN_BOOTSIZE - SUN_SIZE);
+		}
+		g_access_rel(cp, -1, -1, -1);
+		g_free(label);
+	} else {
+		return (gctl_error(req, "Unknown verb parameter"));
+	}
+
+	return (error);
+}
+
 static struct g_geom *
 g_sunlabel_taste(struct g_class *mp, struct g_provider *pp, int flags)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
-	int error, i, npart;
+	int error, npart;
 	u_char *buf;
 	struct g_sunlabel_softc *ms;
-	u_int sectorsize, u, v, csize;
 	off_t mediasize;
 	struct g_slicer *gsp;
 
@@ -109,92 +243,45 @@ g_sunlabel_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	if (flags == G_TF_NORMAL &&
 	    !strcmp(pp->geom->class->name, SUNLABEL_CLASS_NAME))
 		return (NULL);
-	gp = g_slice_new(mp, 8, pp, &cp, &ms, sizeof *ms, g_sunlabel_start);
+	gp = g_slice_new(mp, 8, pp, &cp, &ms, sizeof *ms, NULL);
 	if (gp == NULL)
 		return (NULL);
 	gsp = gp->softc;
-	g_topology_unlock();
 	gp->dumpconf = g_sunlabel_dumpconf;
 	npart = 0;
-	while (1) {	/* a trick to allow us to use break */
+	do {
 		if (gp->rank != 2 && flags == G_TF_NORMAL)
 			break;
-		sectorsize = cp->provider->sectorsize;
-		if (sectorsize < 512)
+		ms->sectorsize = cp->provider->sectorsize;
+		if (ms->sectorsize < 512)
 			break;
-		gsp->frontstuff = 16 * sectorsize;
 		mediasize = cp->provider->mediasize;
-		buf = g_read_data(cp, 0, sectorsize, &error);
+		g_topology_unlock();
+		buf = g_read_data(cp, 0, ms->sectorsize, &error);
+		g_topology_lock();
 		if (buf == NULL || error != 0)
 			break;
+		
+		g_sunlabel_modify(gp, ms, buf);
+		g_free(buf);
 
-		/* The second last short is a magic number */
-		if (g_dec_be2(buf + 508) != 0xdabe)
-			break;
-		/* The shortword parity of the entire thing must be even */
-		u = 0;
-		for (i = 0; i < 512; i += 2)
-			u ^= g_dec_be2(buf + i);
-		if (u != 0)
-			break;
-		if (bootverbose) {
-			g_hexdump(buf, 128);
-			for (i = 0; i < 8; i++) {
-				printf("part %d %u %u\n", i,
-				    g_dec_be4(buf + 444 + i * 8),
-				    g_dec_be4(buf + 448 + i * 8));
-			}
-			printf("v_version = %d\n", g_dec_be4(buf + 128));
-			printf("v_nparts = %d\n", g_dec_be2(buf + 140));
-			for (i = 0; i < 8; i++) {
-				printf("v_part[%d] = %d %d\n",
-				    i, g_dec_be2(buf + 142 + i * 4),
-				    g_dec_be2(buf + 144 + i * 4));
-			}
-			printf("v_sanity %x\n", g_dec_be4(buf + 186));
-			printf("v_version = %d\n", g_dec_be4(buf + 128));
-			printf("v_rpm %d\n", g_dec_be2(buf + 420));
-			printf("v_totalcyl %d\n", g_dec_be2(buf + 422));
-			printf("v_cyl %d\n", g_dec_be2(buf + 432));
-			printf("v_alt %d\n", g_dec_be2(buf + 434));
-			printf("v_head %d\n", g_dec_be2(buf + 436));
-			printf("v_sec %d\n", g_dec_be2(buf + 438));
-		}
-		ms->nalt = g_dec_be2(buf + 434);
-		ms->nheads = g_dec_be2(buf + 436);
-		ms->nsects = g_dec_be2(buf + 438);
-
-		csize = ms->nheads * ms->nsects;
-
-		for (i = 0; i < 8; i++) {
-			v = g_dec_be4(buf + 444 + i * 8);
-			u = g_dec_be4(buf + 448 + i * 8);
-			if (u == 0)
-				continue;
-			npart++;
-			g_topology_lock();
-			g_slice_config(gp, i, G_SLICE_CONFIG_SET,
-			    ((off_t)v * csize) << 9ULL,
-			    ((off_t)u) << 9ULL,
-			    sectorsize,
-			    "%s%c", pp->name, 'a' + i);
-			g_topology_unlock();
-		}
 		break;
-	}
-	g_topology_lock();
+	} while (0);
 	g_access_rel(cp, -1, 0, 0);
 	if (LIST_EMPTY(&gp->provider)) {
-		g_std_spoiled(cp);
+		g_slice_spoiled(cp);
 		return (NULL);
 	}
+	g_slice_conf_hot(gp, 0, 0, SUN_SIZE,
+	    G_SLICE_HOT_ALLOW, G_SLICE_HOT_DENY, G_SLICE_HOT_CALL);
+	gsp->hot = g_sunlabel_hotwrite;
 	return (gp);
 }
 
 static struct g_class g_sunlabel_class = {
-	SUNLABEL_CLASS_NAME,
-	g_sunlabel_taste,
-	NULL,
+	.name = SUNLABEL_CLASS_NAME,
+	.taste = g_sunlabel_taste,
+	.config_geom = g_sunlabel_config,
 	G_CLASS_INITIALIZER
 };
 

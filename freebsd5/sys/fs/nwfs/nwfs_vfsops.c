@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/nwfs/nwfs_vfsops.c,v 1.25 2002/09/25 02:32:39 jeff Exp $
+ * $FreeBSD: src/sys/fs/nwfs/nwfs_vfsops.c,v 1.29 2003/04/01 02:47:09 tjr Exp $
  */
 #include "opt_ncp.h"
 #ifndef NCP
@@ -76,7 +76,6 @@ static int nwfs_quotactl(struct mount *, int, uid_t, caddr_t, struct thread *);
 static int nwfs_root(struct mount *, struct vnode **);
 static int nwfs_start(struct mount *, int, struct thread *);
 static int nwfs_statfs(struct mount *, struct statfs *, struct thread *);
-static int nwfs_sync(struct mount *, int, struct ucred *, struct thread *);
 static int nwfs_unmount(struct mount *, int, struct thread *);
 static int nwfs_init(struct vfsconf *vfsp);
 static int nwfs_uninit(struct vfsconf *vfsp);
@@ -88,7 +87,7 @@ static struct vfsops nwfs_vfsops = {
 	nwfs_root,
 	nwfs_quotactl,
 	nwfs_statfs,
-	nwfs_sync,
+	vfs_stdsync,
 	vfs_stdvget,
 	vfs_stdfhtovp,		/* shouldn't happen */
 	vfs_stdcheckexp,
@@ -182,7 +181,8 @@ static int nwfs_mount(struct mount *mp, char *path, caddr_t data,
 	ncp_conn_unlock(conn, td);	/* we keep the ref */
 	mp->mnt_stat.f_iosize = conn->buffer_size;
         /* We must malloc our own mount info */
-        MALLOC(nmp,struct nwmount *,sizeof(struct nwmount),M_NWFSDATA,M_USE_RESERVE | M_ZERO);
+        MALLOC(nmp,struct nwmount *,sizeof(struct nwmount),M_NWFSDATA,
+	    M_WAITOK | M_USE_RESERVE | M_ZERO);
         if (nmp == NULL) {
                 nwfs_printf("could not alloc nwmount\n");
                 error = ENOMEM;
@@ -459,54 +459,4 @@ nwfs_statfs(mp, sbp, td)
 	}
 	strncpy(sbp->f_fstypename, mp->mnt_vfc->vfc_name, MFSNAMELEN);
 	return 0;
-}
-
-/*
- * Flush out the buffer cache
- */
-/* ARGSUSED */
-static int
-nwfs_sync(mp, waitfor, cred, td)
-	struct mount *mp;
-	int waitfor;
-	struct ucred *cred;
-	struct thread *td;
-{
-	struct vnode *vp, *nvp;
-	int error, allerror = 0;
-	/*
-	 * Force stale buffer cache information to be flushed.
-	 */
-	mtx_lock(&mntvnode_mtx);
-loop:
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist);
-	     vp != NULL;
-	     vp = nvp) {
-		/*
-		 * If the vnode that we are about to sync is no longer
-		 * associated with this mount point, start over.
-		 */
-		if (vp->v_mount != mp)
-			goto loop;
-		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
-		mtx_unlock(&mntvnode_mtx);
-		VI_LOCK(vp);
-		if (VOP_ISLOCKED(vp, NULL) || TAILQ_EMPTY(&vp->v_dirtyblkhd) ||
-		    waitfor == MNT_LAZY) {
-			VI_UNLOCK(vp);
-			mtx_lock(&mntvnode_mtx);
-			continue;
-		}
-		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
-			mtx_lock(&mntvnode_mtx);
-			goto loop;
-		}
-		error = VOP_FSYNC(vp, cred, waitfor, td);
-		if (error)
-			allerror = error;
-		vput(vp);
-		mtx_lock(&mntvnode_mtx);
-	}
-	mtx_unlock(&mntvnode_mtx);
-	return (allerror);
 }

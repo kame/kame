@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/iicbus/if_ic.c,v 1.14 2002/11/14 23:54:52 sam Exp $
+ * $FreeBSD: src/sys/dev/iicbus/if_ic.c,v 1.17 2003/03/04 23:19:54 jlemon Exp $
  */
 
 /*
@@ -314,10 +314,8 @@ icintr (device_t dev, int event, char *ptr)
 
 	  top = m_devget(sc->ic_ifbuf + ICHDRLEN, len, 0, &sc->ic_if, 0);
 
-	  if (top) {
-	    if (IF_HANDOFF(&ipintrq, top, NULL))
-	      schednetisr(NETISR_IP);
-	  }
+	  if (top)
+	    netisr_dispatch(NETISR_IP, top);
 	  break;
 
 	err:

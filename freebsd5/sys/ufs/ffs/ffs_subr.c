@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_subr.c	8.5 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_subr.c,v 1.34.2.1 2002/12/29 14:54:19 phk Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_subr.c,v 1.36 2003/03/18 08:45:24 phk Exp $
  */
 
 #include <sys/param.h>
@@ -44,7 +44,6 @@
 #include "opt_ddb.h"
 
 #include <sys/systm.h>
-#include <sys/stdint.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_arp.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_arp.h,v 1.16 2001/10/14 20:17:52 fjoe Exp $
+ * $FreeBSD: src/sys/net/if_arp.h,v 1.17 2003/03/21 17:53:15 mdodd Exp $
  */
 
 #ifndef _NET_IF_ARP_H_
@@ -114,8 +114,6 @@ struct	arpcom {
 	int	ac_multicnt;		/* length of ac_multiaddrs list */
 	void	*ac_netgraph;		/* ng_ether(4) netgraph node info */
 };
-
-extern u_char	etherbroadcastaddr[6];
 #endif
 
 #endif /* !_NET_IF_ARP_H_ */

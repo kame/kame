@@ -59,13 +59,14 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_glue.c,v 1.159 2002/10/22 14:31:32 jhb Exp $
+ * $FreeBSD: src/sys/vm/vm_glue.c,v 1.172 2003/05/13 20:36:02 jhb Exp $
  */
 
 #include "opt_vm.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
@@ -79,8 +80,6 @@
 #include <sys/ktr.h>
 #include <sys/unistd.h>
 
-#include <machine/limits.h>
-
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
@@ -91,6 +90,7 @@
 #include <vm/vm_kern.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_pager.h>
+#include <vm/swap_pager.h>
 
 #include <sys/user.h>
 
@@ -120,10 +120,16 @@ static void vm_proc_swapout(struct proc *p);
 
 /*
  * MPSAFE
+ *
+ * WARNING!  This code calls vm_map_check_protection() which only checks
+ * the associated vm_map_entry range.  It does not determine whether the
+ * contents of the memory is actually readable or writable.  In most cases
+ * just checking the vm_map_entry is sufficient within the kernel's address
+ * space.
  */
 int
 kernacc(addr, len, rw)
-	caddr_t addr;
+	void *addr;
 	int len, rw;
 {
 	boolean_t rv;
@@ -141,10 +147,16 @@ kernacc(addr, len, rw)
 
 /*
  * MPSAFE
+ *
+ * WARNING!  This code calls vm_map_check_protection() which only checks
+ * the associated vm_map_entry range.  It does not determine whether the
+ * contents of the memory is actually readable or writable.  vmapbuf(),
+ * vm_fault_quick(), or copyin()/copout()/su*()/fu*() functions should be
+ * used in conjuction with this call.
  */
 int
 useracc(addr, len, rw)
-	caddr_t addr;
+	void *addr;
 	int len, rw;
 {
 	boolean_t rv;
@@ -169,7 +181,7 @@ useracc(addr, len, rw)
  */
 void
 vslock(addr, len)
-	caddr_t addr;
+	void *addr;
 	u_int len;
 {
 
@@ -182,7 +194,7 @@ vslock(addr, len)
  */
 void
 vsunlock(addr, len)
-	caddr_t addr;
+	void *addr;
 	u_int len;
 {
 
@@ -226,9 +238,11 @@ vm_proc_new(struct proc *p)
 		    VM_ALLOC_NORMAL | VM_ALLOC_RETRY | VM_ALLOC_WIRED);
 		ma[i] = m;
 
+		vm_page_lock_queues();
 		vm_page_wakeup(m);
 		vm_page_flag_clear(m, PG_ZERO);
 		m->valid = VM_PAGE_BITS_ALL;
+		vm_page_unlock_queues();
 	}
 
 	/*
@@ -250,6 +264,7 @@ vm_proc_dispose(struct proc *p)
 	vm_page_t m;
 
 	upobj = p->p_upages_obj;
+	VM_OBJECT_LOCK(upobj);
 	if (upobj->resident_page_count != UAREA_PAGES)
 		panic("vm_proc_dispose: incorrect number of pages in upobj");
 	vm_page_lock_queues();
@@ -259,6 +274,7 @@ vm_proc_dispose(struct proc *p)
 		vm_page_free(m);
 	}
 	vm_page_unlock_queues();
+	VM_OBJECT_UNLOCK(upobj);
 	up = (vm_offset_t)p->p_uarea;
 	pmap_qremove(up, UAREA_PAGES);
 	kmem_free(kernel_map, up, UAREA_PAGES * PAGE_SIZE);
@@ -277,6 +293,7 @@ vm_proc_swapout(struct proc *p)
 	vm_page_t m;
 
 	upobj = p->p_upages_obj;
+	VM_OBJECT_LOCK(upobj);
 	if (upobj->resident_page_count != UAREA_PAGES)
 		panic("vm_proc_dispose: incorrect number of pages in upobj");
 	vm_page_lock_queues();
@@ -285,6 +302,7 @@ vm_proc_swapout(struct proc *p)
 		vm_page_unwire(m, 0);
 	}
 	vm_page_unlock_queues();
+	VM_OBJECT_UNLOCK(upobj);
 	up = (vm_offset_t)p->p_uarea;
 	pmap_qremove(up, UAREA_PAGES);
 }
@@ -312,6 +330,7 @@ vm_proc_swapin(struct proc *p)
 		}
 		ma[i] = m;
 	}
+	VM_OBJECT_LOCK(upobj);
 	if (upobj->resident_page_count != UAREA_PAGES)
 		panic("vm_proc_swapin: lost pages from upobj");
 	vm_page_lock_queues();
@@ -321,8 +340,49 @@ vm_proc_swapin(struct proc *p)
 		vm_page_wakeup(m);
 	}
 	vm_page_unlock_queues();
+	VM_OBJECT_UNLOCK(upobj);
 	up = (vm_offset_t)p->p_uarea;
 	pmap_qenter(up, ma, UAREA_PAGES);
+}
+
+/*
+ * Swap in the UAREAs of all processes swapped out to the given device.
+ * The pages in the UAREA are marked dirty and their swap metadata is freed.
+ */
+void
+vm_proc_swapin_all(int devidx)
+{
+	struct proc *p;
+	vm_object_t object;
+	vm_page_t m;
+
+retry:
+	sx_slock(&allproc_lock);
+	FOREACH_PROC_IN_SYSTEM(p) {
+		PROC_LOCK(p);
+		object = p->p_upages_obj;
+		if (object != NULL) {
+			VM_OBJECT_LOCK(object);
+			if (swap_pager_isswapped(object, devidx)) {
+				VM_OBJECT_UNLOCK(object);
+				sx_sunlock(&allproc_lock);
+				faultin(p);
+				PROC_UNLOCK(p);
+				VM_OBJECT_LOCK(object);
+				vm_page_lock_queues();
+				TAILQ_FOREACH(m, &object->memq, listq)
+					vm_page_dirty(m);
+				vm_page_unlock_queues();
+				swap_pager_freespace(object, 0,
+				    object->un_pager.swp.swp_bcount);
+				VM_OBJECT_UNLOCK(object);
+				goto retry;
+			}
+			VM_OBJECT_UNLOCK(object);
+		}
+		PROC_UNLOCK(p);
+	}
+	sx_sunlock(&allproc_lock);
 }
 #endif
 
@@ -381,30 +441,20 @@ vm_forkproc(td, p2, td2, flags)
 
 	/* XXXKSE this is unsatisfactory but should be adequate */
 	up = p2->p_uarea;
+	MPASS(p2->p_sigacts != NULL);
 
 	/*
 	 * p_stats currently points at fields in the user struct
 	 * but not at &u, instead at p_addr. Copy parts of
 	 * p_stats; zero the rest of p_stats (statistics).
-	 *
-	 * If procsig->ps_refcnt is 1 and p2->p_sigacts is NULL we dont' need
-	 * to share sigacts, so we use the up->u_sigacts.
 	 */
 	p2->p_stats = &up->u_stats;
-	if (p2->p_sigacts == NULL) {
-		if (p2->p_procsig->ps_refcnt != 1)
-			printf ("PID:%d NULL sigacts with refcnt not 1!\n",p2->p_pid);
-		p2->p_sigacts = &up->u_sigacts;
-		up->u_sigacts = *p1->p_sigacts;
-	}
-
 	bzero(&up->u_stats.pstat_startzero,
 	    (unsigned) ((caddr_t) &up->u_stats.pstat_endzero -
 		(caddr_t) &up->u_stats.pstat_startzero));
 	bcopy(&p1->p_stats->pstat_startcopy, &up->u_stats.pstat_startcopy,
 	    ((caddr_t) &up->u_stats.pstat_endcopy -
 		(caddr_t) &up->u_stats.pstat_startcopy));
-
 
 	/*
 	 * cpu_fork will copy and update the pcb, set up the kernel stack,
@@ -462,54 +512,54 @@ void
 faultin(p)
 	struct proc *p;
 {
+#ifdef NO_SWAPPING
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	if ((p->p_sflag & PS_INMEM) == 0)
+		panic("faultin: proc swapped out with NO_SWAPPING!");
+#else /* !NO_SWAPPING */
+	struct thread *td;
 
 	GIANT_REQUIRED;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
-	mtx_assert(&sched_lock, MA_OWNED);
-#ifdef NO_SWAPPING
-	if ((p->p_sflag & PS_INMEM) == 0)
-		panic("faultin: proc swapped out with NO_SWAPPING!");
-#else
-	if ((p->p_sflag & PS_INMEM) == 0) {
-		struct thread *td;
-
-		++p->p_lock;
+	/*
+	 * If another process is swapping in this process,
+	 * just wait until it finishes.
+	 */
+	if (p->p_sflag & PS_SWAPPINGIN)
+		msleep(&p->p_sflag, &p->p_mtx, PVM, "faultin", 0);
+	else if ((p->p_sflag & PS_INMEM) == 0) {
 		/*
-		 * If another process is swapping in this process,
-		 * just wait until it finishes.
+		 * Don't let another thread swap process p out while we are
+		 * busy swapping it in.
 		 */
-		if (p->p_sflag & PS_SWAPPINGIN) {
-			mtx_unlock_spin(&sched_lock);
-			msleep(&p->p_sflag, &p->p_mtx, PVM, "faultin", 0);
-			mtx_lock_spin(&sched_lock);
-			--p->p_lock;
-			return;
-		}
-
+		++p->p_lock;
+		mtx_lock_spin(&sched_lock);
 		p->p_sflag |= PS_SWAPPINGIN;
 		mtx_unlock_spin(&sched_lock);
 		PROC_UNLOCK(p);
 
 		vm_proc_swapin(p);
-		FOREACH_THREAD_IN_PROC (p, td) {
+		FOREACH_THREAD_IN_PROC(p, td)
 			pmap_swapin_thread(td);
-			TD_CLR_SWAPPED(td);
-		}
 
 		PROC_LOCK(p);
 		mtx_lock_spin(&sched_lock);
 		p->p_sflag &= ~PS_SWAPPINGIN;
 		p->p_sflag |= PS_INMEM;
-		FOREACH_THREAD_IN_PROC (p, td)
+		FOREACH_THREAD_IN_PROC(p, td) {
+			TD_CLR_SWAPPED(td);
 			if (TD_CAN_RUN(td))
 				setrunnable(td);
+		}
+		mtx_unlock_spin(&sched_lock);
 
 		wakeup(&p->p_sflag);
 
-		/* undo the effect of setting SLOCK above */
+		/* Allow other threads to swap p out now. */
 		--p->p_lock;
 	}
-#endif
+#endif /* NO_SWAPPING */
 }
 
 /*
@@ -546,7 +596,7 @@ loop:
 	sx_slock(&allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		struct ksegrp *kg;
-		if (p->p_sflag & (PS_INMEM | PS_SWAPPING | PS_SWAPPINGIN)) {
+		if (p->p_sflag & (PS_INMEM | PS_SWAPPINGOUT | PS_SWAPPINGIN)) {
 			continue;
 		}
 		mtx_lock_spin(&sched_lock);
@@ -587,20 +637,20 @@ loop:
 		goto loop;
 	}
 	PROC_LOCK(p);
-	mtx_lock_spin(&sched_lock);
 
 	/*
 	 * Another process may be bringing or may have already
 	 * brought this process in while we traverse all threads.
 	 * Or, this process may even be being swapped out again.
 	 */
-	if (p->p_sflag & (PS_INMEM|PS_SWAPPING|PS_SWAPPINGIN)) {
-		mtx_unlock_spin(&sched_lock);
+	if (p->p_sflag & (PS_INMEM | PS_SWAPPINGOUT | PS_SWAPPINGIN)) {
 		PROC_UNLOCK(p);
 		goto loop;
 	}
 
+	mtx_lock_spin(&sched_lock);
 	p->p_sflag &= ~PS_SWAPINREQ;
+	mtx_unlock_spin(&sched_lock);
 
 	/*
 	 * We would like to bring someone in. (only if there is space).
@@ -608,6 +658,7 @@ loop:
 	 */
 	faultin(p);
 	PROC_UNLOCK(p);
+	mtx_lock_spin(&sched_lock);
 	p->p_swtime = 0;
 	mtx_unlock_spin(&sched_lock);
 	goto loop;
@@ -619,16 +670,16 @@ loop:
  * Swap_idle_threshold1 is the guaranteed swapped in time for a process
  */
 static int swap_idle_threshold1 = 2;
-SYSCTL_INT(_vm, OID_AUTO, swap_idle_threshold1,
-	CTLFLAG_RW, &swap_idle_threshold1, 0, "");
+SYSCTL_INT(_vm, OID_AUTO, swap_idle_threshold1, CTLFLAG_RW,
+    &swap_idle_threshold1, 0, "Guaranteed swapped in time for a process");
 
 /*
  * Swap_idle_threshold2 is the time that a process can be idle before
  * it will be swapped out, if idle swapping is enabled.
  */
 static int swap_idle_threshold2 = 10;
-SYSCTL_INT(_vm, OID_AUTO, swap_idle_threshold2,
-	CTLFLAG_RW, &swap_idle_threshold2, 0, "");
+SYSCTL_INT(_vm, OID_AUTO, swap_idle_threshold2, CTLFLAG_RW,
+    &swap_idle_threshold2, 0, "Time before a process will be swapped out");
 
 /*
  * Swapout is driven by the pageout daemon.  Very simple, we find eligible
@@ -677,11 +728,8 @@ retry:
 		 * Perform a quick check whether
 		 * a process has P_SYSTEM.
 		 */
-		PROC_LOCK(p);
-		if ((p->p_flag & P_SYSTEM) != 0) {
-			PROC_UNLOCK(p);
+		if ((p->p_flag & P_SYSTEM) != 0)
 			continue;
-		}
 
 		/*
 		 * Do not swapout a process that
@@ -695,6 +743,7 @@ retry:
 		 * process may attempt to alter
 		 * the map.
 		 */
+		PROC_LOCK(p);
 		vm = p->p_vmspace;
 		KASSERT(vm != NULL,
 			("swapout_procs: a process has no address space"));
@@ -714,17 +763,17 @@ retry:
 		 * skipped because of the if statement above checking 
 		 * for P_SYSTEM
 		 */
-		mtx_lock_spin(&sched_lock);
-		if ((p->p_sflag & (PS_INMEM|PS_SWAPPING|PS_SWAPPINGIN)) != PS_INMEM)
-			goto nextproc;
+		if ((p->p_sflag & (PS_INMEM|PS_SWAPPINGOUT|PS_SWAPPINGIN)) != PS_INMEM)
+			goto nextproc2;
 
 		switch (p->p_state) {
 		default:
 			/* Don't swap out processes in any sort
 			 * of 'special' state. */
-			goto nextproc;
+			break;
 
 		case PRS_NORMAL:
+			mtx_lock_spin(&sched_lock);
 			/*
 			 * do not swapout a realtime process
 			 * Check all the thread groups..
@@ -778,20 +827,16 @@ retry:
 				 (minslptime > swap_idle_threshold2))) {
 				swapout(p);
 				didswap++;
-
-				/*
-				 * swapout() unlocks a proc lock. This is
-				 * ugly, but avoids superfluous lock.
-				 */
 				mtx_unlock_spin(&sched_lock);
+				PROC_UNLOCK(p);
 				vm_map_unlock(&vm->vm_map);
 				vmspace_free(vm);
 				sx_sunlock(&allproc_lock);
 				goto retry;
 			}
+nextproc:			
+			mtx_unlock_spin(&sched_lock);
 		}
-nextproc:
-		mtx_unlock_spin(&sched_lock);
 nextproc2:
 		PROC_UNLOCK(p);
 		vm_map_unlock(&vm->vm_map);
@@ -825,7 +870,7 @@ swapout(p)
 	 * by now.  Assuming that there is only one pageout daemon thread,
 	 * this process should still be in memory.
 	 */
-	KASSERT((p->p_sflag & (PS_INMEM|PS_SWAPPING|PS_SWAPPINGIN)) == PS_INMEM,
+	KASSERT((p->p_sflag & (PS_INMEM|PS_SWAPPINGOUT|PS_SWAPPINGIN)) == PS_INMEM,
 		("swapout: lost a swapout race?"));
 
 #if defined(INVARIANTS)
@@ -846,18 +891,20 @@ swapout(p)
 	 */
 	p->p_vmspace->vm_swrss = vmspace_resident_count(p->p_vmspace);
 
-	PROC_UNLOCK(p);
 	p->p_sflag &= ~PS_INMEM;
-	p->p_sflag |= PS_SWAPPING;
+	p->p_sflag |= PS_SWAPPINGOUT;
+	PROC_UNLOCK(p);
+	FOREACH_THREAD_IN_PROC(p, td)
+		TD_SET_SWAPPED(td);
 	mtx_unlock_spin(&sched_lock);
 
 	vm_proc_swapout(p);
-	FOREACH_THREAD_IN_PROC(p, td) {
+	FOREACH_THREAD_IN_PROC(p, td)
 		pmap_swapout_thread(td);
-		TD_SET_SWAPPED(td);
-	}
+
+	PROC_LOCK(p);
 	mtx_lock_spin(&sched_lock);
-	p->p_sflag &= ~PS_SWAPPING;
+	p->p_sflag &= ~PS_SWAPPINGOUT;
 	p->p_swtime = 0;
 }
 #endif /* !NO_SWAPPING */

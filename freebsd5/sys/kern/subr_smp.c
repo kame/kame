@@ -26,7 +26,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_smp.c,v 1.170 2002/09/11 08:13:54 julian Exp $
+ * $FreeBSD: src/sys/kern/subr_smp.c,v 1.174 2003/04/10 17:35:44 julian Exp $
  */
 
 /*
@@ -61,6 +61,10 @@ SYSCTL_NODE(_kern, OID_AUTO, smp, CTLFLAG_RD, NULL, "Kernel SMP");
 
 int smp_active = 0;	/* are the APs allowed to run? */
 SYSCTL_INT(_kern_smp, OID_AUTO, active, CTLFLAG_RW, &smp_active, 0, "");
+
+int smp_disabled = 0;	/* has smp been disabled? */
+SYSCTL_INT(_kern_smp, OID_AUTO, disabled, CTLFLAG_RD, &smp_disabled, 0, "");
+TUNABLE_INT("kern.smp.disabled", &smp_disabled);
 
 int smp_cpus = 1;	/* how many cpu's running */
 SYSCTL_INT(_kern_smp, OID_AUTO, cpus, CTLFLAG_RD, &smp_cpus, 0, "");
@@ -102,7 +106,7 @@ mp_start(void *dummy)
 {
 
 	/* Probe for MP hardware. */
-	if (mp_probe_status == 0)
+	if (mp_probe_status == 0 || smp_disabled != 0)
 		return;
 
 	mtx_init(&smp_rv_mtx, "smp rendezvous", NULL, MTX_SPIN);
@@ -119,8 +123,8 @@ forward_signal(struct thread *td)
 	int id;
 
 	/*
-	 * signotify() has already set KEF_ASTPENDING and PS_NEEDSIGCHECK on
-	 * this process, so all we need to do is poke it if it is currently
+	 * signotify() has already set TDF_ASTPENDING and TDF_NEEDSIGCHECK on
+	 * this thread, so all we need to do is poke it if it is currently
 	 * executing so that it executes ast().
 	 */
 	mtx_assert(&sched_lock, MA_OWNED);
@@ -138,7 +142,7 @@ forward_signal(struct thread *td)
 	if (td == curthread)
 		return;
 
-	id = td->td_kse->ke_oncpu;
+	id = td->td_oncpu;
 	if (id == NOCPU)
 		return;
 	ipi_selected(1 << id, IPI_AST);
@@ -165,7 +169,7 @@ forward_roundrobin(void)
 		id = pc->pc_cpumask;
 		if (id != PCPU_GET(cpumask) && (id & stopped_cpus) == 0 &&
 		    td != pc->pc_idlethread) {
-			td->td_kse->ke_flags |= KEF_NEEDRESCHED;
+			td->td_flags |= TDF_NEEDRESCHED;
 			map |= id;
 		}
 	}

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/include/metadata.h,v 1.1 2002/07/10 12:14:23 benno Exp $
+ * $FreeBSD: src/sys/powerpc/include/metadata.h,v 1.2 2003/05/01 03:31:17 peter Exp $
  */
 
 #ifndef _MACHINE_METADATA_H_
@@ -32,11 +32,5 @@
 #define	MODINFOMD_ENVP		0x1001
 #define	MODINFOMD_HOWTO		0x1002
 #define	MODINFOMD_KERNEND	0x1003
-
-#define	MD_FETCH(mdp, info, type) ({ \
-	type *__p; \
-	__p = (type *)preload_search_info((mdp), MODINFO_METADATA | (info)); \
-	__p ? *__p : 0; \
-})
 
 #endif /* !_MACHINE_METADATA_H_ */

@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/kern_physio.c,v 1.53 2002/10/11 14:58:29 mike Exp $
+ * $FreeBSD: src/sys/kern/kern_physio.c,v 1.58 2003/04/05 23:02:58 alc Exp $
  */
 
 #include <sys/param.h>
@@ -29,12 +29,6 @@
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
-
-static void
-physwakeup(struct buf *bp)
-{
-	wakeup(bp);
-}
 
 int
 physio(dev_t dev, struct uio *uio, int ioflag)
@@ -51,7 +45,7 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 
 	bp = getpbuf(NULL);
 	sa = bp->b_data;
-	error = bp->b_error = 0;
+	error = 0;
 
 	/* XXX: sanity check */
 	if(dev->si_iosize_max < PAGE_SIZE) {
@@ -68,7 +62,7 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 			else 
 				bp->b_iocmd = BIO_WRITE;
 			bp->b_dev = dev;
-			bp->b_iodone = physwakeup;
+			bp->b_iodone = bdone;
 			bp->b_data = uio->uio_iov[i].iov_base;
 			bp->b_bcount = uio->uio_iov[i].iov_len;
 			bp->b_offset = uio->uio_offset;
@@ -94,20 +88,18 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 
 			bp->b_blkno = btodb(bp->b_offset);
 
-			if (uio->uio_segflg == UIO_USERSPACE) {
-				if (!useracc(bp->b_data, bp->b_bufsize,
-				    bp->b_iocmd == BIO_READ ?
-				    VM_PROT_WRITE : VM_PROT_READ)) {
+			if (uio->uio_segflg == UIO_USERSPACE)
+				if (vmapbuf(bp) < 0) {
 					error = EFAULT;
 					goto doerror;
 				}
-				vmapbuf(bp);
-			}
 
-			DEV_STRATEGY(bp, 0);
+			DEV_STRATEGY(bp);
 			spl = splbio();
-			while ((bp->b_flags & B_DONE) == 0)
-				tsleep(bp, PRIBIO, "physstr", 0);
+			if (uio->uio_rw == UIO_READ)
+				bwait(bp, PRIBIO, "physrd");
+			else
+				bwait(bp, PRIBIO, "physwr");
 			splx(spl);
 
 			if (uio->uio_segflg == UIO_USERSPACE)

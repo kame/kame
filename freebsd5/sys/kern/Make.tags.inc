@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/kern/Make.tags.inc,v 1.14 2002/02/27 10:07:15 alfred Exp $
+# $FreeBSD: src/sys/kern/Make.tags.inc,v 1.15 2003/03/05 19:24:21 peter Exp $
 #	@(#)Make.tags.inc	8.1 (Berkeley) 6/11/93
 
 SYS?=	${.CURDIR}/..
@@ -45,7 +45,6 @@ COMM=	${SYS}/dev/advansys/*.[ch] \
 	${SYS}/netipx/*.[ch] \
 	${SYS}/netkey/*.[ch] \
 	${SYS}/netnatm/*.[ch] \
-	${SYS}/netns/*.[ch] \
 	${SYS}/nfs/*.[ch] \
 	${SYS}/pci/*.[ch] \
 	${SYS}/posix4/*.[ch] \
@@ -63,7 +62,6 @@ COMMDIR1= ${SYS}/conf \
 	${SYS}/netipx \
 	${SYS}/netkey \
 	${SYS}/netnatm \
-	${SYS}/netns \
 	${SYS}/nfs \
 	${SYS}/pci \
 	${SYS}/posix4 \

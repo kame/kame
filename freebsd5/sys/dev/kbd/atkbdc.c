@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbdc.c,v 1.12 2002/08/19 23:58:37 peter Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbdc.c,v 1.14 2003/05/12 02:44:37 peter Exp $
  * from kbdio.c,v 1.13 1998/09/25 11:55:46 yokota Exp
  */
 
@@ -156,6 +156,8 @@ atkbdc_configure(void)
 	/* XXX: tag should be passed from the caller */
 #if defined(__i386__)
 	tag = I386_BUS_SPACE_IO;
+#elif defined(__amd64__)
+	tag = AMD64_BUS_SPACE_IO;
 #elif defined(__alpha__)
 	tag = busspace_isa_io;
 #elif defined(__ia64__)

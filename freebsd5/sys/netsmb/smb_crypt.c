@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_crypt.c,v 1.3 2001/08/21 08:07:18 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb_crypt.c,v 1.5 2003/02/19 05:47:38 imp Exp $
  */
 #include <sys/param.h>
 #include <sys/malloc.h>

@@ -5,7 +5,7 @@
  * modified for FreeBSD by Andrew A. Chernov <ache@astral.msk.su>
  * modified for PC98 by Kakefuda
  *
- * $FreeBSD: src/sys/i386/isa/spkr.c,v 1.56 2002/11/02 04:18:10 mdodd Exp $
+ * $FreeBSD: src/sys/i386/isa/spkr.c,v 1.62 2003/03/24 21:01:54 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -34,19 +34,12 @@ static	d_ioctl_t	spkrioctl;
 
 #define CDEV_MAJOR 26
 static struct cdevsw spkr_cdevsw = {
-	/* open */	spkropen,
-	/* close */	spkrclose,
-	/* read */	noread,
-	/* write */	spkrwrite,
-	/* ioctl */	spkrioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"spkr",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	spkropen,
+	.d_close =	spkrclose,
+	.d_write =	spkrwrite,
+	.d_ioctl =	spkrioctl,
+	.d_name =	"spkr",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static MALLOC_DEFINE(M_SPKR, "spkr", "Speaker buffer");
@@ -68,6 +61,7 @@ static MALLOC_DEFINE(M_SPKR, "spkr", "Speaker buffer");
  * XXX PPI control values should be in a header and used in clock.c.
  */
 #ifdef PC98
+#define	SPKR_DESC	"PC98 speaker"
 #define	PPI_SPKR	0x08	/* turn these PPI bits on to pass sound */
 #define	PIT_COUNT	0x3fdb	/* PIT count address */
 
@@ -80,6 +74,7 @@ static MALLOC_DEFINE(M_SPKR, "spkr", "Speaker buffer");
 					outb(PIT_COUNT, (val >> 8)); \
 				}
 #else
+#define	SPKR_DESC	"PC speaker"
 #define PPI_SPKR	0x03	/* turn these PPI bits on to pass sound */
 
 #define	SPEAKER_ON	outb(IO_PPI, inb(IO_PPI) | PPI_SPKR)
@@ -99,7 +94,6 @@ static void tone(unsigned int thz, unsigned int ticks);
 static void rest(int ticks);
 static void playinit(void);
 static void playtone(int pitch, int value, int sustain);
-static int abs(int n);
 static void playstring(char *cp, size_t slen);
 
 /* emit tone of frequency thz for given number of ticks */
@@ -141,7 +135,7 @@ tone(thz, ticks)
      * emitted.
      */
     if (ticks > 0)
-	tsleep((caddr_t)&endtone, SPKRPRI | PCATCH, "spkrtn", ticks);
+	tsleep(&endtone, SPKRPRI | PCATCH, "spkrtn", ticks);
     SPEAKER_OFF;
     sps = splclock();
     TIMER_RELEASE;
@@ -162,7 +156,7 @@ rest(ticks)
     (void) printf("rest: %d\n", ticks);
 #endif /* DEBUG */
     if (ticks > 0)
-	tsleep((caddr_t)&endrest, SPKRPRI | PCATCH, "spkrrs", ticks);
+	tsleep(&endrest, SPKRPRI | PCATCH, "spkrrs", ticks);
 }
 
 /**************** PLAY STRING INTERPRETER BEGINS HERE **********************
@@ -272,16 +266,6 @@ playtone(pitch, value, sustain)
 	if (fill != LEGATO)
 	    rest(silence);
     }
-}
-
-static int
-abs(n)
-	int n;
-{
-    if (n < 0)
-	return(-n);
-    else
-	return(n);
 }
 
 /* interpret and play an item from a notation string */
@@ -559,8 +543,8 @@ spkrclose(dev, flags, fmt, td)
 	return(ENXIO);
     else
     {
-	wakeup((caddr_t)&endtone);
-	wakeup((caddr_t)&endrest);
+	wakeup(&endtone);
+	wakeup(&endrest);
 	free(spkr_inbuf, M_SPKR);
 	spkr_active = FALSE;
 	return(0);
@@ -620,7 +604,7 @@ spkrioctl(dev, cmd, cmdarg, flags, td)
  */
 static struct isa_pnp_id speaker_ids[] = {
 #ifndef PC98
-	{ 0x0008d041 /* PNP0800 */, "PC speaker" },
+	{ 0x0008d041 /* PNP0800 */, SPKR_DESC },
 #endif
 	{ 0 }
 };
@@ -646,7 +630,7 @@ speaker_probe(device_t dev)
 	if (strncmp(device_get_name(dev), "speaker", 9))
 		return (ENXIO);
 
-	device_set_desc(dev, "PC speaker");
+	device_set_desc(dev, SPKR_DESC);
 
 	return (0);
 }

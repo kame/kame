@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netncp/ncp_sock.h,v 1.4 2001/03/10 05:24:45 bp Exp $
+ * $FreeBSD: src/sys/netncp/ncp_sock.h,v 1.5 2003/02/26 21:25:55 fjoe Exp $
  */
 #ifndef _NETNCP_NCP_SOCK_H_
 #define _NETNCP_NCP_SOCK_H_
@@ -46,7 +46,8 @@ int  ncp_sock_recv(struct socket *so, struct mbuf **mp, int *rlen);
 int  ncp_sock_send(struct socket *so, struct mbuf *data, struct ncp_rq *rqp);
 int  ncp_sock_disconnect(struct ncp_conn *conn);
 int  ncp_poll(struct socket *so, int events);
-int  ncp_sock_rselect(struct socket *so,struct proc *p, struct timeval *tv,int events);
+int  ncp_sock_rselect(struct socket *so, struct thread *td, struct timeval *tv,
+		      int events);
 int  ncp_sock_checksum(struct ncp_conn *conn, int enable);
 
 void ncp_check_rq(struct ncp_conn *conn);

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/apm/apm_saver.c,v 1.6 2002/03/20 06:48:11 alfred Exp $
+ * $FreeBSD: src/sys/dev/syscons/apm/apm_saver.c,v 1.9 2003/03/27 07:37:02 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -44,10 +44,8 @@
 #include <machine/pc/bios.h>
 #ifdef PC98
 #include <machine/bus.h>
-#include <pc98/apm/apm.h>
-#else
-#include <i386/apm/apm.h>
 #endif
+#include <i386/bios/apm.h>
 
 extern int apm_display(int newstate);
 
@@ -90,3 +88,4 @@ static scrn_saver_t apm_module = {
 };
 
 SAVER_MODULE(apm_saver, apm_module);
+MODULE_DEPEND(apm_saver, apm, 1, 1, 1);

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_usrreq.c,v 1.16 2002/04/21 01:41:04 arr Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_usrreq.c,v 1.17 2002/12/22 05:35:02 hsu Exp $
  *
  */
 
@@ -55,7 +55,7 @@
 #include <netatm/atm_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_usrreq.c,v 1.16 2002/04/21 01:41:04 arr Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_usrreq.c,v 1.17 2002/12/22 05:35:02 hsu Exp $");
 #endif
 
 
@@ -394,6 +394,7 @@ atm_dgram_control(so, cmd, data, ifp, td)
 			/*
 			 * Make sure prefix name is unique
 			 */
+			IFNET_RLOCK();
 			TAILQ_FOREACH(ifp2, &ifnet, if_link) {
 				if (!strcmp(ifp2->if_name, asp->asr_nif_pref)) {
 					/*
@@ -407,9 +408,11 @@ atm_dgram_control(so, cmd, data, ifp, td)
 					}
 					if (nip)
 						continue;
+					IFNET_RUNLOCK();
 					ATM_RETERR(EEXIST);
 				}
 			}
+			IFNET_RUNLOCK();
 
 			/*
 			 * Let interface handle it from here

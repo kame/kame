@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_sf.c,v 1.47 2002/11/14 23:49:09 sam Exp $
  */
 
 /*
@@ -79,6 +77,9 @@
  * registers inside the 256-byte I/O window.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_sf.c,v 1.56 2003/04/21 18:34:04 imp Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -117,12 +118,9 @@
 
 #include <pci/if_sfreg.h>
 
+MODULE_DEPEND(sf, pci, 1, 1, 1);
+MODULE_DEPEND(sf, ether, 1, 1, 1);
 MODULE_DEPEND(sf, miibus, 1, 1, 1);
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sf.c,v 1.47 2002/11/14 23:49:09 sam Exp $";
-#endif
 
 static struct sf_type sf_devs[] = {
 	{ AD_VENDORID, AD_DEVICEID_STARFIRE,
@@ -207,7 +205,7 @@ static driver_t sf_driver = {
 
 static devclass_t sf_devclass;
 
-DRIVER_MODULE(if_sf, pci, sf_driver, sf_devclass, 0, 0);
+DRIVER_MODULE(sf, pci, sf_driver, sf_devclass, 0, 0);
 DRIVER_MODULE(miibus, sf, miibus_driver, miibus_devclass, 0, 0);
 
 #define SF_SETBIT(sc, reg, x)	\
@@ -674,18 +672,16 @@ sf_attach(dev)
 	device_t		dev;
 {
 	int			i;
-	u_int32_t		command;
 	struct sf_softc		*sc;
 	struct ifnet		*ifp;
 	int			unit, rid, error = 0;
 
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
-	bzero(sc, sizeof(struct sf_softc));
 
 	mtx_init(&sc->sf_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-	SF_LOCK(sc);
+
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -713,23 +709,6 @@ sf_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef SF_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("sf%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("sf%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#endif
 
 	rid = SF_RID;
 	sc->sf_res = bus_alloc_resource(dev, SF_RES, &rid,
@@ -751,18 +730,7 @@ sf_attach(dev)
 
 	if (sc->sf_irq == NULL) {
 		printf("sf%d: couldn't map interrupt\n", unit);
-		bus_release_resource(dev, SF_RES, SF_RID, sc->sf_res);
 		error = ENXIO;
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->sf_irq, INTR_TYPE_NET,
-	    sf_intr, sc, &sc->sf_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sf_res);
-		bus_release_resource(dev, SF_RES, SF_RID, sc->sf_res);
-		printf("sf%d: couldn't set up irq\n", unit);
 		goto fail;
 	}
 
@@ -791,9 +759,6 @@ sf_attach(dev)
 
 	if (sc->sf_ldata == NULL) {
 		printf("sf%d: no memory for list buffers!\n", unit);
-		bus_teardown_intr(dev, sc->sf_irq, sc->sf_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sf_irq);
-		bus_release_resource(dev, SF_RES, SF_RID, sc->sf_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -804,10 +769,6 @@ sf_attach(dev)
 	if (mii_phy_probe(dev, &sc->sf_miibus,
 	    sf_ifmedia_upd, sf_ifmedia_sts)) {
 		printf("sf%d: MII without any phy!\n", sc->sf_unit);
-		contigfree(sc->sf_ldata,sizeof(struct sf_list_data),M_DEVBUF);
-		bus_teardown_intr(dev, sc->sf_irq, sc->sf_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sf_irq);
-		bus_release_resource(dev, SF_RES, SF_RID, sc->sf_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -830,15 +791,31 @@ sf_attach(dev)
 	 * Call MI attach routine.
 	 */
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
-	SF_UNLOCK(sc);
-	return(0);
+
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->sf_irq, INTR_TYPE_NET,
+	    sf_intr, sc, &sc->sf_intrhand);
+
+	if (error) {
+		printf("sf%d: couldn't set up irq\n", unit);
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
-	SF_UNLOCK(sc);
-	mtx_destroy(&sc->sf_mtx);
+	if (error)
+		sf_detach(dev);
+
 	return(error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 sf_detach(dev)
 	device_t		dev;
@@ -847,20 +824,28 @@ sf_detach(dev)
 	struct ifnet		*ifp;
 
 	sc = device_get_softc(dev);
+	KASSERT(mtx_initialized(&sc->sf_mtx), ("sf mutex not initialized"));
 	SF_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	ether_ifdetach(ifp);
-	sf_stop(sc);
-
+	/* These should only be active if attach succeeded */
+	if (device_is_attached(dev)) {
+		sf_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->sf_miibus)
+		device_delete_child(dev, sc->sf_miibus);
 	bus_generic_detach(dev);
-	device_delete_child(dev, sc->sf_miibus);
 
-	bus_teardown_intr(dev, sc->sf_irq, sc->sf_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sf_irq);
-	bus_release_resource(dev, SF_RES, SF_RID, sc->sf_res);
+	if (sc->sf_intrhand)
+		bus_teardown_intr(dev, sc->sf_irq, sc->sf_intrhand);
+	if (sc->sf_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sf_irq);
+	if (sc->sf_res)
+		bus_release_resource(dev, SF_RES, SF_RID, sc->sf_res);
 
-	contigfree(sc->sf_ldata, sizeof(struct sf_list_data), M_DEVBUF);
+	if (sc->sf_ldata)
+		contigfree(sc->sf_ldata, sizeof(struct sf_list_data), M_DEVBUF);
 
 	SF_UNLOCK(sc);
 	mtx_destroy(&sc->sf_mtx);

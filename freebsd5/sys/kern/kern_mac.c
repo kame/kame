@@ -1,7 +1,7 @@
 /*-
  * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
  * Copyright (c) 2001 Ilmar S. Habibulin
- * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson and Ilmar Habibulin for the
@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_mac.c,v 1.71.2.1 2002/12/19 09:40:10 alfred Exp $
+ * $FreeBSD: src/sys/kern/kern_mac.c,v 1.90 2003/05/08 19:49:42 rwatson Exp $
  */
 /*
  * Developed by the TrustedBSD Project.
@@ -98,14 +98,14 @@ SYSCTL_DECL(_security);
 SYSCTL_NODE(_security, OID_AUTO, mac, CTLFLAG_RW, 0,
     "TrustedBSD MAC policy controls");
 
-#if MAC_MAX_POLICIES > 32
-#error "MAC_MAX_POLICIES too large"
+#if MAC_MAX_SLOTS > 32
+#error "MAC_MAX_SLOTS too large"
 #endif
 
-static unsigned int mac_max_policies = MAC_MAX_POLICIES;
-static unsigned int mac_policy_offsets_free = (1 << MAC_MAX_POLICIES) - 1;
-SYSCTL_UINT(_security_mac, OID_AUTO, max_policies, CTLFLAG_RD,
-    &mac_max_policies, 0, "");
+static unsigned int mac_max_slots = MAC_MAX_SLOTS;
+static unsigned int mac_slot_offsets_free = (1 << MAC_MAX_SLOTS) - 1;
+SYSCTL_UINT(_security_mac, OID_AUTO, max_slots, CTLFLAG_RD,
+    &mac_max_slots, 0, "");
 
 /*
  * Has the kernel started generating labeled objects yet?  All read/write
@@ -119,6 +119,21 @@ static int	mac_late = 0;
  * Weak coherency, no locking.
  */
 static int	ea_warn_once = 0;
+
+#ifndef MAC_ALWAYS_LABEL_MBUF
+/*
+ * Flag to indicate whether or not we should allocate label storage for
+ * new mbufs.  Since most dynamic policies we currently work with don't
+ * rely on mbuf labeling, try to avoid paying the cost of mtag allocation
+ * unless specifically notified of interest.  One result of this is
+ * that if a dynamically loaded policy requests mbuf labels, it must
+ * be able to deal with a NULL label being returned on any mbufs that
+ * were already in flight when the policy was loaded.  Since the policy
+ * already has to deal with uninitialized labels, this probably won't
+ * be a problem.  Note: currently no locking.  Will this be a problem?
+ */
+static int	mac_labelmbufs = 0;
+#endif
 
 static int	mac_enforce_fs = 1;
 SYSCTL_INT(_security_mac, OID_AUTO, enforce_fs, CTLFLAG_RW,
@@ -231,40 +246,31 @@ MALLOC_DEFINE(M_MACPIPELABEL, "macpipelabel", "MAC labels for pipes");
 MALLOC_DEFINE(M_MACTEMP, "mactemp", "MAC temporary label storage");
 
 /*
- * mac_policy_list stores the list of active policies.  A busy count is
+ * mac_static_policy_list holds a list of policy modules that are not
+ * loaded while the system is "live", and cannot be unloaded.  These
+ * policies can be invoked without holding the busy count.
+ *
+ * mac_policy_list stores the list of dynamic policies.  A busy count is
  * maintained for the list, stored in mac_policy_busy.  The busy count
- * is protected by mac_policy_list_lock; the list may be modified only
+ * is protected by mac_policy_mtx; the list may be modified only
  * while the busy count is 0, requiring that the lock be held to
  * prevent new references to the list from being acquired.  For almost
  * all operations, incrementing the busy count is sufficient to
  * guarantee consistency, as the list cannot be modified while the
  * busy count is elevated.  For a few special operations involving a
- * change to the list of active policies, the lock itself must be held.
- * A condition variable, mac_policy_list_not_busy, is used to signal
- * potential exclusive consumers that they should try to acquire the
- * lock if a first attempt at exclusive access fails.
+ * change to the list of active policies, the mtx itself must be held.
+ * A condition variable, mac_policy_cv, is used to signal potential
+ * exclusive consumers that they should try to acquire the lock if a
+ * first attempt at exclusive access fails.
  */
-static struct mtx mac_policy_list_lock;
-static struct cv mac_policy_list_not_busy;
+static struct mtx mac_policy_mtx;
+static struct cv mac_policy_cv;
+static int mac_policy_count;
 static LIST_HEAD(, mac_policy_conf) mac_policy_list;
-static int mac_policy_list_busy;
-
-#define	MAC_POLICY_LIST_LOCKINIT() do {					\
-	mtx_init(&mac_policy_list_lock, "mac_policy_list_lock", NULL,	\
-	    MTX_DEF);							\
-	cv_init(&mac_policy_list_not_busy, "mac_policy_list_not_busy");	\
-} while (0)
-
-#define	MAC_POLICY_LIST_LOCK() do {					\
-	mtx_lock(&mac_policy_list_lock);				\
-} while (0)
-
-#define	MAC_POLICY_LIST_UNLOCK() do {					\
-	mtx_unlock(&mac_policy_list_lock);				\
-} while (0)
+static LIST_HEAD(, mac_policy_conf) mac_static_policy_list;
 
 /*
- * We manually invoke WITNESS_SLEEP() to allow Witness to generate
+ * We manually invoke WITNESS_WARN() to allow Witness to generate
  * warnings even if we don't end up ever triggering the wait at
  * run-time.  The consumer of the exclusive interface must not hold
  * any locks (other than potentially Giant) since we may sleep for
@@ -272,28 +278,67 @@ static int mac_policy_list_busy;
  * framework to become quiescent so that a policy list change may
  * be made.
  */
-#define	MAC_POLICY_LIST_EXCLUSIVE() do {				\
-	WITNESS_SLEEP(1, NULL);						\
-	mtx_lock(&mac_policy_list_lock);				\
-	while (mac_policy_list_busy != 0)				\
-		cv_wait(&mac_policy_list_not_busy,			\
-		    &mac_policy_list_lock);				\
-} while (0)
+static __inline void
+mac_policy_grab_exclusive(void)
+{
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
+ 	    "mac_policy_grab_exclusive() at %s:%d", __FILE__, __LINE__);
+	mtx_lock(&mac_policy_mtx);
+	while (mac_policy_count != 0)
+		cv_wait(&mac_policy_cv, &mac_policy_mtx);
+}
 
-#define	MAC_POLICY_LIST_BUSY() do {					\
-	MAC_POLICY_LIST_LOCK();						\
-	mac_policy_list_busy++;						\
-	MAC_POLICY_LIST_UNLOCK();					\
-} while (0)
+static __inline void
+mac_policy_assert_exclusive(void)
+{
+	mtx_assert(&mac_policy_mtx, MA_OWNED);
+	KASSERT(mac_policy_count == 0,
+	    ("mac_policy_assert_exclusive(): not exclusive"));
+}
 
-#define	MAC_POLICY_LIST_UNBUSY() do {					\
-	MAC_POLICY_LIST_LOCK();						\
-	mac_policy_list_busy--;						\
-	KASSERT(mac_policy_list_busy >= 0, ("MAC_POLICY_LIST_LOCK"));	\
-	if (mac_policy_list_busy == 0)					\
-		cv_signal(&mac_policy_list_not_busy);			\
-	MAC_POLICY_LIST_UNLOCK();					\
-} while (0)
+static __inline void
+mac_policy_release_exclusive(void)
+{
+
+	KASSERT(mac_policy_count == 0,
+	    ("mac_policy_release_exclusive(): not exclusive"));
+	mtx_unlock(&mac_policy_mtx);
+	cv_signal(&mac_policy_cv);
+}
+
+static __inline void
+mac_policy_list_busy(void)
+{
+	mtx_lock(&mac_policy_mtx);
+	mac_policy_count++;
+	mtx_unlock(&mac_policy_mtx);
+}
+
+static __inline int
+mac_policy_list_conditional_busy(void)
+{
+	int ret;
+
+	mtx_lock(&mac_policy_mtx);
+	if (!LIST_EMPTY(&mac_policy_list)) {
+		mac_policy_count++;
+		ret = 1;
+	} else
+		ret = 0;
+	mtx_unlock(&mac_policy_mtx);
+	return (ret);
+}
+
+static __inline void
+mac_policy_list_unbusy(void)
+{
+	mtx_lock(&mac_policy_mtx);
+	mac_policy_count--;
+	KASSERT(mac_policy_count >= 0, ("MAC_POLICY_LIST_LOCK"));
+	if (mac_policy_count == 0)
+		cv_signal(&mac_policy_cv);
+	mtx_unlock(&mac_policy_mtx);
+}
 
 /*
  * MAC_CHECK performs the designated check by walking the policy
@@ -303,16 +348,24 @@ static int mac_policy_list_busy;
  */
 #define	MAC_CHECK(check, args...) do {					\
 	struct mac_policy_conf *mpc;					\
+	int entrycount;							\
 									\
 	error = 0;							\
-	MAC_POLICY_LIST_BUSY();						\
-	LIST_FOREACH(mpc, &mac_policy_list, mpc_list) {			\
+	LIST_FOREACH(mpc, &mac_static_policy_list, mpc_list) {		\
 		if (mpc->mpc_ops->mpo_ ## check != NULL)		\
 			error = error_select(				\
 			    mpc->mpc_ops->mpo_ ## check (args),		\
 			    error);					\
 	}								\
-	MAC_POLICY_LIST_UNBUSY();					\
+	if ((entrycount = mac_policy_list_conditional_busy()) != 0) {	\
+		LIST_FOREACH(mpc, &mac_policy_list, mpc_list) {		\
+			if (mpc->mpc_ops->mpo_ ## check != NULL)	\
+				error = error_select(			\
+				    mpc->mpc_ops->mpo_ ## check (args),	\
+				    error);				\
+		}							\
+		mac_policy_list_unbusy();				\
+	}								\
 } while (0)
 
 /*
@@ -325,14 +378,22 @@ static int mac_policy_list_busy;
  */
 #define	MAC_BOOLEAN(operation, composition, args...) do {		\
 	struct mac_policy_conf *mpc;					\
+	int entrycount;							\
 									\
-	MAC_POLICY_LIST_BUSY();						\
-	LIST_FOREACH(mpc, &mac_policy_list, mpc_list) {			\
+	LIST_FOREACH(mpc, &mac_static_policy_list, mpc_list) {		\
 		if (mpc->mpc_ops->mpo_ ## operation != NULL)		\
 			result = result composition			\
 			    mpc->mpc_ops->mpo_ ## operation (args);	\
 	}								\
-	MAC_POLICY_LIST_UNBUSY();					\
+	if ((entrycount = mac_policy_list_conditional_busy()) != 0) {	\
+		LIST_FOREACH(mpc, &mac_policy_list, mpc_list) {		\
+			if (mpc->mpc_ops->mpo_ ## operation != NULL)	\
+				result = result composition		\
+				    mpc->mpc_ops->mpo_ ## operation	\
+				    (args);				\
+		}							\
+		mac_policy_list_unbusy();				\
+	}								\
 } while (0)
 
 #define	MAC_EXTERNALIZE(type, label, elementlist, outbuf, 		\
@@ -430,13 +491,19 @@ static int mac_policy_list_busy;
  */
 #define	MAC_PERFORM(operation, args...) do {				\
 	struct mac_policy_conf *mpc;					\
+	int entrycount;							\
 									\
-	MAC_POLICY_LIST_BUSY();						\
-	LIST_FOREACH(mpc, &mac_policy_list, mpc_list) {			\
+	LIST_FOREACH(mpc, &mac_static_policy_list, mpc_list) {		\
 		if (mpc->mpc_ops->mpo_ ## operation != NULL)		\
 			mpc->mpc_ops->mpo_ ## operation (args);		\
 	}								\
-	MAC_POLICY_LIST_UNBUSY();					\
+	if ((entrycount = mac_policy_list_conditional_busy()) != 0) {	\
+		LIST_FOREACH(mpc, &mac_policy_list, mpc_list) {		\
+			if (mpc->mpc_ops->mpo_ ## operation != NULL)	\
+				mpc->mpc_ops->mpo_ ## operation (args);	\
+		}							\
+		mac_policy_list_unbusy();				\
+	}								\
 } while (0)
 
 /*
@@ -446,8 +513,11 @@ static void
 mac_init(void)
 {
 
+	LIST_INIT(&mac_static_policy_list);
 	LIST_INIT(&mac_policy_list);
-	MAC_POLICY_LIST_LOCKINIT();
+
+	mtx_init(&mac_policy_mtx, "mac_policy_mtx", NULL, MTX_DEF);
+	cv_init(&mac_policy_cv, "mac_policy_cv");
 }
 
 /*
@@ -460,6 +530,42 @@ mac_late_init(void)
 {
 
 	mac_late = 1;
+}
+
+/*
+ * After the policy list has changed, walk the list to update any global
+ * flags.
+ */
+static void
+mac_policy_updateflags(void)
+{
+	struct mac_policy_conf *tmpc;
+#ifndef MAC_ALWAYS_LABEL_MBUF
+	int labelmbufs;
+#endif
+
+	mac_policy_assert_exclusive();
+
+#ifndef MAC_ALWAYS_LABEL_MBUF
+	labelmbufs = 0;
+#endif
+
+	LIST_FOREACH(tmpc, &mac_static_policy_list, mpc_list) {
+#ifndef MAC_ALWAYS_LABEL_MBUF
+		if (tmpc->mpc_loadtime_flags & MPC_LOADTIME_FLAG_LABELMBUFS)
+			labelmbufs++;
+#endif
+	}
+	LIST_FOREACH(tmpc, &mac_policy_list, mpc_list) {
+#ifndef MAC_ALWAYS_LABEL_MBUF
+		if (tmpc->mpc_loadtime_flags & MPC_LOADTIME_FLAG_LABELMBUFS)
+			labelmbufs++;
+#endif
+	}
+
+#ifndef MAC_ALWAYS_LABEL_MBUF
+	mac_labelmbufs = (labelmbufs != 0);
+#endif
 }
 
 /*
@@ -504,37 +610,75 @@ static int
 mac_policy_register(struct mac_policy_conf *mpc)
 {
 	struct mac_policy_conf *tmpc;
-	int slot;
+	int error, slot, static_entry;
 
-	MAC_POLICY_LIST_EXCLUSIVE();
-	LIST_FOREACH(tmpc, &mac_policy_list, mpc_list) {
-		if (strcmp(tmpc->mpc_name, mpc->mpc_name) == 0) {
-			MAC_POLICY_LIST_UNLOCK();
-			return (EEXIST);
+	error = 0;
+
+	/*
+	 * We don't technically need exclusive access while !mac_late,
+	 * but hold it for assertion consistency.
+	 */
+	mac_policy_grab_exclusive();
+
+	/*
+	 * If the module can potentially be unloaded, or we're loading
+	 * late, we have to stick it in the non-static list and pay
+	 * an extra performance overhead.  Otherwise, we can pay a
+	 * light locking cost and stick it in the static list.
+	 */
+	static_entry = (!mac_late &&
+	    !(mpc->mpc_loadtime_flags & MPC_LOADTIME_FLAG_UNLOADOK));
+
+	if (static_entry) {
+		LIST_FOREACH(tmpc, &mac_static_policy_list, mpc_list) {
+			if (strcmp(tmpc->mpc_name, mpc->mpc_name) == 0) {
+				error = EEXIST;
+				goto out;
+			}
+		}
+	} else {
+		LIST_FOREACH(tmpc, &mac_policy_list, mpc_list) {
+			if (strcmp(tmpc->mpc_name, mpc->mpc_name) == 0) {
+				error = EEXIST;
+				goto out;
+			}
 		}
 	}
 	if (mpc->mpc_field_off != NULL) {
-		slot = ffs(mac_policy_offsets_free);
+		slot = ffs(mac_slot_offsets_free);
 		if (slot == 0) {
-			MAC_POLICY_LIST_UNLOCK();
-			return (ENOMEM);
+			error = ENOMEM;
+			goto out;
 		}
 		slot--;
-		mac_policy_offsets_free &= ~(1 << slot);
+		mac_slot_offsets_free &= ~(1 << slot);
 		*mpc->mpc_field_off = slot;
 	}
 	mpc->mpc_runtime_flags |= MPC_RUNTIME_FLAG_REGISTERED;
-	LIST_INSERT_HEAD(&mac_policy_list, mpc, mpc_list);
+
+	/*
+	 * If we're loading a MAC module after the framework has
+	 * initialized, it has to go into the dynamic list.  If
+	 * we're loading it before we've finished initializing,
+	 * it can go into the static list with weaker locker
+	 * requirements.
+	 */
+	if (static_entry)
+		LIST_INSERT_HEAD(&mac_static_policy_list, mpc, mpc_list);
+	else
+		LIST_INSERT_HEAD(&mac_policy_list, mpc, mpc_list);
 
 	/* Per-policy initialization. */
 	if (mpc->mpc_ops->mpo_init != NULL)
 		(*(mpc->mpc_ops->mpo_init))(mpc);
-	MAC_POLICY_LIST_UNLOCK();
+	mac_policy_updateflags();
 
 	printf("Security policy loaded: %s (%s)\n", mpc->mpc_fullname,
 	    mpc->mpc_name);
 
-	return (0);
+out:
+	mac_policy_release_exclusive();
+	return (error);
 }
 
 static int
@@ -546,9 +690,9 @@ mac_policy_unregister(struct mac_policy_conf *mpc)
 	 * to see if we did the run-time registration, and if not,
 	 * silently succeed.
 	 */
-	MAC_POLICY_LIST_EXCLUSIVE();
+	mac_policy_grab_exclusive();
 	if ((mpc->mpc_runtime_flags & MPC_RUNTIME_FLAG_REGISTERED) == 0) {
-		MAC_POLICY_LIST_UNLOCK();
+		mac_policy_release_exclusive();
 		return (0);
 	}
 #if 0
@@ -565,7 +709,7 @@ mac_policy_unregister(struct mac_policy_conf *mpc)
 	 * by its own definition.
 	 */
 	if ((mpc->mpc_loadtime_flags & MPC_LOADTIME_FLAG_UNLOADOK) == 0) {
-		MAC_POLICY_LIST_UNLOCK();
+		mac_policy_release_exclusive();
 		return (EBUSY);
 	}
 	if (mpc->mpc_ops->mpo_destroy != NULL)
@@ -573,8 +717,9 @@ mac_policy_unregister(struct mac_policy_conf *mpc)
 
 	LIST_REMOVE(mpc, mpc_list);
 	mpc->mpc_runtime_flags &= ~MPC_RUNTIME_FLAG_REGISTERED;
+	mac_policy_updateflags();
 
-	MAC_POLICY_LIST_UNLOCK();
+	mac_policy_release_exclusive();
 
 	printf("Security policy unload: %s (%s)\n", mpc->mpc_fullname,
 	    mpc->mpc_name);
@@ -617,6 +762,18 @@ error_select(int error1, int error2)
 	if (error1 != 0)
 		return (error1);
 	return (error2);
+}
+
+static struct label *
+mbuf_to_label(struct mbuf *mbuf)
+{
+	struct m_tag *tag;
+	struct label *label;
+
+	tag = m_tag_find(mbuf, PACKET_TAG_MACLABEL, NULL);
+	label = (struct label *)(tag+1);
+
+	return (label);
 }
 
 static void
@@ -696,37 +853,75 @@ mac_init_ifnet(struct ifnet *ifp)
 	mac_init_ifnet_label(&ifp->if_label);
 }
 
-void
-mac_init_ipq(struct ipq *ipq)
-{
-
-	mac_init_label(&ipq->ipq_label);
-	MAC_PERFORM(init_ipq_label, &ipq->ipq_label);
-#ifdef MAC_DEBUG
-	atomic_add_int(&nmacipqs, 1);
-#endif
-}
-
 int
-mac_init_mbuf(struct mbuf *m, int flag)
+mac_init_ipq(struct ipq *ipq, int flag)
 {
 	int error;
 
-	KASSERT(m->m_flags & M_PKTHDR, ("mac_init_mbuf on non-header mbuf"));
+	mac_init_label(&ipq->ipq_label);
 
-	mac_init_label(&m->m_pkthdr.label);
-
-	MAC_CHECK(init_mbuf_label, &m->m_pkthdr.label, flag);
+	MAC_CHECK(init_ipq_label, &ipq->ipq_label, flag);
 	if (error) {
-		MAC_PERFORM(destroy_mbuf_label, &m->m_pkthdr.label);
-		mac_destroy_label(&m->m_pkthdr.label);
+		MAC_PERFORM(destroy_ipq_label, &ipq->ipq_label);
+		mac_destroy_label(&ipq->ipq_label);
 	}
+#ifdef MAC_DEBUG
+	if (error == 0)
+		atomic_add_int(&nmacipqs, 1);
+#endif
+	return (error);
+}
 
+int
+mac_init_mbuf_tag(struct m_tag *tag, int flag)
+{
+	struct label *label;
+	int error;
+
+	label = (struct label *) (tag + 1);
+	mac_init_label(label);
+
+	MAC_CHECK(init_mbuf_label, label, flag);
+	if (error) {
+		MAC_PERFORM(destroy_mbuf_label, label);
+		mac_destroy_label(label);
+	}
 #ifdef MAC_DEBUG
 	if (error == 0)
 		atomic_add_int(&nmacmbufs, 1);
 #endif
 	return (error);
+}
+
+int
+mac_init_mbuf(struct mbuf *m, int flag)
+{
+	struct m_tag *tag;
+	int error;
+
+	M_ASSERTPKTHDR(m);
+
+#ifndef MAC_ALWAYS_LABEL_MBUF
+	/*
+	 * Don't reserve space for labels on mbufs unless we have a policy
+	 * that uses the labels.
+	 */
+	if (mac_labelmbufs) {
+#endif
+		tag = m_tag_get(PACKET_TAG_MACLABEL, sizeof(struct label),
+		    flag);
+		if (tag == NULL)
+			return (ENOMEM);
+		error = mac_init_mbuf_tag(tag, flag);
+		if (error) {
+			m_tag_free(tag);
+			return (error);
+		}
+		m_tag_prepend(m, tag);
+#ifndef MAC_ALWAYS_LABEL_MBUF
+	}
+#endif
+	return (0);
 }
 
 void
@@ -916,11 +1111,14 @@ mac_destroy_ipq(struct ipq *ipq)
 }
 
 void
-mac_destroy_mbuf(struct mbuf *m)
+mac_destroy_mbuf_tag(struct m_tag *tag)
 {
+	struct label *label;
 
-	MAC_PERFORM(destroy_mbuf_label, &m->m_pkthdr.label);
-	mac_destroy_label(&m->m_pkthdr.label);
+	label = (struct label *)(tag+1);
+
+	MAC_PERFORM(destroy_mbuf_label, label);
+	mac_destroy_label(label);
 #ifdef MAC_DEBUG
 	atomic_subtract_int(&nmacmbufs, 1);
 #endif
@@ -1012,6 +1210,21 @@ mac_destroy_vnode(struct vnode *vp)
 {
 
 	mac_destroy_vnode_label(&vp->v_label);
+}
+
+void
+mac_copy_mbuf_tag(struct m_tag *src, struct m_tag *dest)
+{
+	struct label *src_label, *dest_label;
+
+	src_label = (struct label *)(src+1);
+	dest_label = (struct label *)(dest+1);
+
+	/*
+	 * mac_init_mbuf_tag() is called on the target tag in
+	 * m_tag_copy(), so we don't need to call it here.
+	 */
+	MAC_PERFORM(copy_mbuf_label, src_label, dest_label);
 }
 
 static void
@@ -1973,11 +2186,13 @@ mac_cred_mmapped_drop_perms_recurse(struct thread *td, struct ucred *cred,
 				 */
 				vm_object_reference(object);
 				vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
+				VM_OBJECT_LOCK(object);
 				vm_object_page_clean(object,
 				    OFF_TO_IDX(offset),
 				    OFF_TO_IDX(offset + vme->end - vme->start +
 					PAGE_MASK),
 				    OBJPC_SYNC);
+				VM_OBJECT_UNLOCK(object);
 				VOP_UNLOCK(vp, 0, td);
 				vm_object_deallocate(object);
 				/*
@@ -2084,9 +2299,12 @@ mac_relabel_pipe(struct ucred *cred, struct pipe *pipe, struct label *newlabel)
 void
 mac_set_socket_peer_from_mbuf(struct mbuf *mbuf, struct socket *socket)
 {
+	struct label *label;
 
-	MAC_PERFORM(set_socket_peer_from_mbuf, mbuf, &mbuf->m_pkthdr.label,
-	    socket, &socket->so_peerlabel);
+	label = mbuf_to_label(mbuf);
+
+	MAC_PERFORM(set_socket_peer_from_mbuf, mbuf, label, socket,
+	    &socket->so_peerlabel);
 }
 
 void
@@ -2101,85 +2319,117 @@ mac_set_socket_peer_from_socket(struct socket *oldsocket,
 void
 mac_create_datagram_from_ipq(struct ipq *ipq, struct mbuf *datagram)
 {
+	struct label *label;
+
+	label = mbuf_to_label(datagram);
 
 	MAC_PERFORM(create_datagram_from_ipq, ipq, &ipq->ipq_label,
-	    datagram, &datagram->m_pkthdr.label);
+	    datagram, label);
 }
 
 void
 mac_create_fragment(struct mbuf *datagram, struct mbuf *fragment)
 {
+	struct label *datagramlabel, *fragmentlabel;
 
-	MAC_PERFORM(create_fragment, datagram, &datagram->m_pkthdr.label,
-	    fragment, &fragment->m_pkthdr.label);
+	datagramlabel = mbuf_to_label(datagram);
+	fragmentlabel = mbuf_to_label(fragment);
+
+	MAC_PERFORM(create_fragment, datagram, datagramlabel, fragment,
+	    fragmentlabel);
 }
 
 void
 mac_create_ipq(struct mbuf *fragment, struct ipq *ipq)
 {
+	struct label *label;
 
-	MAC_PERFORM(create_ipq, fragment, &fragment->m_pkthdr.label, ipq,
-	    &ipq->ipq_label);
+	label = mbuf_to_label(fragment);
+
+	MAC_PERFORM(create_ipq, fragment, label, ipq, &ipq->ipq_label);
 }
 
 void
 mac_create_mbuf_from_mbuf(struct mbuf *oldmbuf, struct mbuf *newmbuf)
 {
+	struct label *oldmbuflabel, *newmbuflabel;
 
-	MAC_PERFORM(create_mbuf_from_mbuf, oldmbuf, &oldmbuf->m_pkthdr.label,
-	    newmbuf, &newmbuf->m_pkthdr.label);
+	oldmbuflabel = mbuf_to_label(oldmbuf);
+	newmbuflabel = mbuf_to_label(newmbuf);
+
+	MAC_PERFORM(create_mbuf_from_mbuf, oldmbuf, oldmbuflabel, newmbuf,
+	    newmbuflabel);
 }
 
 void
 mac_create_mbuf_from_bpfdesc(struct bpf_d *bpf_d, struct mbuf *mbuf)
 {
+	struct label *label;
+
+	label = mbuf_to_label(mbuf);
 
 	MAC_PERFORM(create_mbuf_from_bpfdesc, bpf_d, &bpf_d->bd_label, mbuf,
-	    &mbuf->m_pkthdr.label);
+	    label);
 }
 
 void
 mac_create_mbuf_linklayer(struct ifnet *ifnet, struct mbuf *mbuf)
 {
+	struct label *label;
+
+	label = mbuf_to_label(mbuf);
 
 	MAC_PERFORM(create_mbuf_linklayer, ifnet, &ifnet->if_label, mbuf,
-	    &mbuf->m_pkthdr.label);
+	    label);
 }
 
 void
 mac_create_mbuf_from_ifnet(struct ifnet *ifnet, struct mbuf *mbuf)
 {
+	struct label *label;
+
+	label = mbuf_to_label(mbuf);
 
 	MAC_PERFORM(create_mbuf_from_ifnet, ifnet, &ifnet->if_label, mbuf,
-	    &mbuf->m_pkthdr.label);
+	    label);
 }
 
 void
 mac_create_mbuf_multicast_encap(struct mbuf *oldmbuf, struct ifnet *ifnet,
     struct mbuf *newmbuf)
 {
+	struct label *oldmbuflabel, *newmbuflabel;
 
-	MAC_PERFORM(create_mbuf_multicast_encap, oldmbuf,
-	    &oldmbuf->m_pkthdr.label, ifnet, &ifnet->if_label, newmbuf,
-	    &newmbuf->m_pkthdr.label);
+	oldmbuflabel = mbuf_to_label(oldmbuf);
+	newmbuflabel = mbuf_to_label(newmbuf);
+
+	MAC_PERFORM(create_mbuf_multicast_encap, oldmbuf, oldmbuflabel,
+	    ifnet, &ifnet->if_label, newmbuf, newmbuflabel);
 }
 
 void
 mac_create_mbuf_netlayer(struct mbuf *oldmbuf, struct mbuf *newmbuf)
 {
+	struct label *oldmbuflabel, *newmbuflabel;
 
-	MAC_PERFORM(create_mbuf_netlayer, oldmbuf, &oldmbuf->m_pkthdr.label,
-	    newmbuf, &newmbuf->m_pkthdr.label);
+	oldmbuflabel = mbuf_to_label(oldmbuf);
+	newmbuflabel = mbuf_to_label(newmbuf);
+
+	MAC_PERFORM(create_mbuf_netlayer, oldmbuf, oldmbuflabel, newmbuf,
+	    newmbuflabel);
 }
 
 int
 mac_fragment_match(struct mbuf *fragment, struct ipq *ipq)
 {
+	struct label *label;
 	int result;
 
+	label = mbuf_to_label(fragment);
+
 	result = 1;
-	MAC_BOOLEAN(fragment_match, &&, fragment, &fragment->m_pkthdr.label,
-	    ipq, &ipq->ipq_label);
+	MAC_BOOLEAN(fragment_match, &&, fragment, label, ipq,
+	    &ipq->ipq_label);
 
 	return (result);
 }
@@ -2187,17 +2437,22 @@ mac_fragment_match(struct mbuf *fragment, struct ipq *ipq)
 void
 mac_update_ipq(struct mbuf *fragment, struct ipq *ipq)
 {
+	struct label *label;
 
-	MAC_PERFORM(update_ipq, fragment, &fragment->m_pkthdr.label, ipq,
-	    &ipq->ipq_label);
+	label = mbuf_to_label(fragment);
+
+	MAC_PERFORM(update_ipq, fragment, label, ipq, &ipq->ipq_label);
 }
 
 void
 mac_create_mbuf_from_socket(struct socket *socket, struct mbuf *mbuf)
 {
+	struct label *label;
+
+	label = mbuf_to_label(mbuf);
 
 	MAC_PERFORM(create_mbuf_from_socket, socket, &socket->so_label, mbuf,
-	    &mbuf->m_pkthdr.label);
+	    label);
 }
 
 void
@@ -2256,17 +2511,18 @@ mac_check_cred_visible(struct ucred *u1, struct ucred *u2)
 int
 mac_check_ifnet_transmit(struct ifnet *ifnet, struct mbuf *mbuf)
 {
+	struct label *label;
 	int error;
+
+	M_ASSERTPKTHDR(mbuf);
 
 	if (!mac_enforce_network)
 		return (0);
 
-	KASSERT(mbuf->m_flags & M_PKTHDR, ("packet has no pkthdr"));
-	if (!(mbuf->m_pkthdr.label.l_flags & MAC_FLAG_INITIALIZED))
-		if_printf(ifnet, "not initialized\n");
+	label = mbuf_to_label(mbuf);
 
 	MAC_CHECK(check_ifnet_transmit, ifnet, &ifnet->if_label, mbuf,
-	    &mbuf->m_pkthdr.label);
+	    label);
 
 	return (error);
 }
@@ -2547,13 +2803,16 @@ mac_check_socket_connect(struct ucred *cred, struct socket *socket,
 int
 mac_check_socket_deliver(struct socket *socket, struct mbuf *mbuf)
 {
+	struct label *label;
 	int error;
 
 	if (!mac_enforce_socket)
 		return (0);
 
+	label = mbuf_to_label(mbuf);
+
 	MAC_CHECK(check_socket_deliver, socket, &socket->so_label, mbuf,
-	    &mbuf->m_pkthdr.label);
+	    label);
 
 	return (error);
 }
@@ -2618,6 +2877,18 @@ mac_check_socket_visible(struct ucred *cred, struct socket *socket)
 
 	MAC_CHECK(check_socket_visible, cred, socket, &socket->so_label);
 
+	return (error);
+}
+
+int
+mac_check_sysarch_ioperm(struct ucred *cred)
+{
+	int error;
+
+	if (!mac_enforce_system)
+		return (0);
+
+	MAC_CHECK(check_sysarch_ioperm, cred);
 	return (error);
 }
 
@@ -2689,6 +2960,20 @@ mac_check_system_swapon(struct ucred *cred, struct vnode *vp)
 		return (0);
 
 	MAC_CHECK(check_system_swapon, cred, vp, &vp->v_label);
+	return (error);
+}
+
+int
+mac_check_system_swapoff(struct ucred *cred, struct vnode *vp)
+{
+	int error;
+
+	ASSERT_VOP_LOCKED(vp, "mac_check_system_swapoff");
+
+	if (!mac_enforce_system)
+		return (0);
+
+	MAC_CHECK(check_system_swapoff, cred, vp, &vp->v_label);
 	return (error);
 }
 
@@ -3211,7 +3496,7 @@ __mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 	switch (fp->f_type) {
 	case DTYPE_FIFO:
 	case DTYPE_VNODE:
-		vp = (struct vnode *)fp->f_data;
+		vp = fp->f_data;
 
 		mac_init_vnode_label(&intlabel);
 
@@ -3221,7 +3506,7 @@ __mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 
 		break;
 	case DTYPE_PIPE:
-		pipe = (struct pipe *)fp->f_data;
+		pipe = fp->f_data;
 
 		mac_init_pipe_label(&intlabel);
 
@@ -3419,7 +3704,7 @@ __mac_set_fd(struct thread *td, struct __mac_set_fd_args *uap)
 			break;
 		}
 
-		vp = (struct vnode *)fp->f_data;
+		vp = fp->f_data;
 		error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
 		if (error != 0) {
 			mac_destroy_vnode_label(&intlabel);
@@ -3438,7 +3723,7 @@ __mac_set_fd(struct thread *td, struct __mac_set_fd_args *uap)
 		mac_init_pipe_label(&intlabel);
 		error = mac_internalize_pipe_label(&intlabel, buffer);
 		if (error == 0) {
-			pipe = (struct pipe *)fp->f_data;
+			pipe = fp->f_data;
 			PIPE_LOCK(pipe);
 			error = mac_pipe_label_set(td->td_ucred, pipe,
 			    &intlabel);
@@ -3581,14 +3866,13 @@ mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 {
 	struct mac_policy_conf *mpc;
 	char target[MAC_MAX_POLICY_NAME];
-	int error;
+	int entrycount, error;
 
 	error = copyinstr(uap->policy, target, sizeof(target), NULL);
 	if (error)
 		return (error);
 
 	error = ENOSYS;
-	MAC_POLICY_LIST_BUSY();
 	LIST_FOREACH(mpc, &mac_policy_list, mpc_list) {
 		if (strcmp(mpc->mpc_name, target) == 0 &&
 		    mpc->mpc_ops->mpo_syscall != NULL) {
@@ -3598,8 +3882,18 @@ mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 		}
 	}
 
+	if ((entrycount = mac_policy_list_conditional_busy()) != 0) {
+		LIST_FOREACH(mpc, &mac_policy_list, mpc_list) {
+			if (strcmp(mpc->mpc_name, target) == 0 &&
+			    mpc->mpc_ops->mpo_syscall != NULL) {
+				error = mpc->mpc_ops->mpo_syscall(td,
+				    uap->call, uap->arg);
+				break;
+			}
+		}
+		mac_policy_list_unbusy();
+	}
 out:
-	MAC_POLICY_LIST_UNBUSY();
 	return (error);
 }
 

@@ -31,19 +31,18 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.108 2002/10/20 16:55:52 phk Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.122 2003/05/09 02:15:52 silby Exp $
  */
 
 #ifndef _SYS_MBUF_H_
 #define	_SYS_MBUF_H_
 
-#include <sys/_label.h>
 #include <sys/queue.h>
 
 /*
- * Mbufs are of a single size, MSIZE (machine/param.h), which
+ * Mbufs are of a single size, MSIZE (sys/param.h), which
  * includes overhead.  An mbuf may add a single "mbuf cluster" of size
- * MCLBYTES (also in machine/param.h), which has no additional overhead
+ * MCLBYTES (also in sys/param.h), which has no additional overhead
  * and is used instead of the internal data area; this is done when
  * at least MINCLSIZE of data must be stored.  Additionally, it is possible
  * to allocate a separate buffer externally and attach it to the mbuf in
@@ -98,7 +97,6 @@ struct pkthdr {
 	int	csum_flags;		/* flags regarding checksum */
 	int	csum_data;		/* data field used by csum routines */
 	SLIST_HEAD(packet_tags, m_tag) tags; /* list of packet tags */
-	struct	label label;		/* MAC label of data in packet */
 };
 
 /*
@@ -155,6 +153,7 @@ struct mbuf {
 #define	M_PROTO3	0x0040	/* protocol-specific */
 #define	M_PROTO4	0x0080	/* protocol-specific */
 #define	M_PROTO5	0x0100	/* protocol-specific */
+#define	M_FREELIST	0x8000	/* mbuf is on the free list */
 
 /*
  * mbuf pkthdr flags (also stored in m_flags).
@@ -173,12 +172,14 @@ struct mbuf {
 #define	EXT_NET_DRV	100	/* custom ext_buf provided by net driver(s) */
 #define	EXT_MOD_TYPE	200	/* custom module's ext_buf type */
 #define	EXT_DISPOSABLE	300	/* can throw this buffer away w/page flipping */
+#define	EXT_EXTREF	400	/* has externally maintained ref_cnt ptr*/
 
 /*
  * Flags copied when copying m_pkthdr.
  */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3 | \
-			    M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|M_FRAG|M_RDONLY)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_RDONLY|M_PROTO1|M_PROTO1|M_PROTO2|\
+			    M_PROTO3|M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|\
+			    M_FRAG|M_FIRSTFRAG|M_LASTFRAG)
 
 /*
  * Flags indicating hw checksum support and sw checksum requirements.
@@ -229,9 +230,9 @@ struct mbuf {
  */
 struct mbpstat {
 	u_long	mb_mbfree;
-	u_long	mb_mbpgs;
+	u_long	mb_mbbucks;
 	u_long	mb_clfree;
-	u_long	mb_clpgs;
+	u_long	mb_clbucks;
 	long	mb_mbtypes[MT_NTYPES];
 	short	mb_active;
 };
@@ -255,6 +256,8 @@ struct mbstat {
 	u_long	m_minclsize;	/* min length of data to allocate a cluster */
 	u_long	m_mlen;		/* length of data in an mbuf */
 	u_long	m_mhlen;	/* length of data in a header mbuf */
+	u_int	m_mbperbuck;	/* number of mbufs per "bucket" */
+	u_int	m_clperbuck;	/* number of clusters per "bucket" */
 	/* Number of mbtypes (gives # elems in mbpstat's mb_mbtypes[] array: */
 	short	m_numtypes;
 };
@@ -265,9 +268,10 @@ struct mbstat {
  * M_TRYWAIT means "block for mbuf_wait ticks at most if nothing is
  * available."
  */
-#define	M_DONTWAIT	1
-#define	M_TRYWAIT	0
+#define	M_DONTWAIT	0x4		/* don't conflict with M_NOWAIT */
+#define	M_TRYWAIT	0x8		/* or M_WAITOK */
 #define	M_WAIT		M_TRYWAIT	/* XXX: Deprecated. */
+#define	MBTOM(how)	((how) & M_TRYWAIT ? M_WAITOK : M_NOWAIT)
 
 #ifdef _KERNEL
 /*-
@@ -294,7 +298,8 @@ struct mbstat {
  * mbuf, cluster, and external object allocation macros
  * (for compatibility purposes).
  */
-#define	M_COPY_PKTHDR(to, from)	m_copy_pkthdr((to), (from))
+/* NB: M_COPY_PKTHDR is deprecated, use M_MOVE_PKTHDR or m_dup_pktdr */
+#define	M_MOVE_PKTHDR(to, from)	m_move_pkthdr((to), (from))
 #define	m_getclr(how, type)	m_get_clrd((how), (type))
 #define	MGET(m, how, type)	((m) = m_get((how), (type)))
 #define	MGETHDR(m, how, type)	((m) = m_gethdr((how), (type)))
@@ -326,6 +331,13 @@ struct mbstat {
  */
 #define	M_WRITABLE(m)	(!((m)->m_flags & M_RDONLY) && (!((m)->m_flags  \
 			    & M_EXT) || !MEXT_IS_REF(m)))
+
+/*
+ * Check if the supplied mbuf has a packet header, or else panic.
+ */
+#define M_ASSERTPKTHDR(m)				\
+	KASSERT(m != NULL && m->m_flags & M_PKTHDR,	\
+		("%s: no mbuf packet header!", __func__))
 
 /*
  * Set the m_data pointer of a newly-allocated mbuf (m_get/MGET) to place
@@ -425,9 +437,11 @@ void		 m_copydata(const struct mbuf *, int, int, caddr_t);
 struct	mbuf	*m_copym(struct mbuf *, int, int, int);
 struct	mbuf	*m_copypacket(struct mbuf *, int);
 void		 m_copy_pkthdr(struct mbuf *, struct mbuf *);
+struct	mbuf	*m_defrag(struct mbuf *, int);
 struct	mbuf	*m_devget(char *, int, int, struct ifnet *,
 		    void (*)(char *, caddr_t, u_int));
 struct	mbuf	*m_dup(struct mbuf *, int);
+int		 m_dup_pkthdr(struct mbuf *, struct mbuf *, int);
 u_int		 m_fixhdr(struct mbuf *);
 struct	mbuf	*m_free(struct mbuf *);
 void		 m_freem(struct mbuf *);
@@ -438,6 +452,7 @@ struct	mbuf	*m_gethdr(int, short);
 struct	mbuf	*m_gethdr_clrd(int, short);
 struct	mbuf	*m_getm(struct mbuf *, int, int, short);
 u_int		 m_length(struct mbuf *, struct mbuf **);
+void		 m_move_pkthdr(struct mbuf *, struct mbuf *);
 struct	mbuf	*m_prepend(struct mbuf *, int, int);
 void		 m_print(const struct mbuf *);
 struct	mbuf	*m_pulldown(struct mbuf *, int, int, int *);
@@ -519,6 +534,7 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
 #define	PACKET_TAG_IPFW				16 /* ipfw classification */
 #define	PACKET_TAG_DIVERT			17 /* divert info */
 #define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
+#define	PACKET_TAG_MACLABEL			19 /* MAC label */
 
 /* Packet tag routines */
 struct	m_tag 	*m_tag_alloc(u_int32_t, int, int, int);
@@ -528,8 +544,8 @@ void		 m_tag_unlink(struct mbuf *, struct m_tag *);
 void		 m_tag_delete(struct mbuf *, struct m_tag *);
 void		 m_tag_delete_chain(struct mbuf *, struct m_tag *);
 struct	m_tag	*m_tag_locate(struct mbuf *, u_int32_t, int, struct m_tag *);
-struct	m_tag	*m_tag_copy(struct m_tag *);
-int		 m_tag_copy_chain(struct mbuf *, struct mbuf *);
+struct	m_tag	*m_tag_copy(struct m_tag *, int);
+int		 m_tag_copy_chain(struct mbuf *, struct mbuf *, int);
 void		 m_tag_init(struct mbuf *);
 struct	m_tag	*m_tag_first(struct mbuf *);
 struct	m_tag	*m_tag_next(struct mbuf *, struct m_tag *);

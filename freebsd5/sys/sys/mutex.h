@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from BSDI $Id: mutex.h,v 2.7.2.35 2000/04/27 03:10:26 cp Exp $
- * $FreeBSD: src/sys/sys/mutex.h,v 1.57 2002/07/27 16:54:23 jhb Exp $
+ * $FreeBSD: src/sys/sys/mutex.h,v 1.61 2003/05/18 03:46:30 scottl Exp $
  */
 
 #ifndef _SYS_MUTEX_H_
@@ -56,7 +56,6 @@
 #define MTX_SPIN	0x00000001	/* Spin lock (disables interrupts) */
 #define MTX_RECURSE	0x00000004	/* Option: lock allowed to recurse */
 #define	MTX_NOWITNESS	0x00000008	/* Don't do any witness checking. */
-#define	MTX_SLEEPABLE	0x00000010	/* We can sleep with this lock. */
 #define	MTX_DUPOK	0x00000020	/* Don't log a duplicate acquire */
 
 /*
@@ -115,8 +114,6 @@ void	_mtx_unlock_spin_flags(struct mtx *m, int opts, const char *file,
 #ifdef INVARIANT_SUPPORT
 void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
 #endif
-int	mtx_lock_giant(int sysctlvar);
-void	mtx_unlock_giant(int s);
 
 /*
  * We define our machine-independent (unoptimized) mutex micro-operations
@@ -249,7 +246,7 @@ extern int mtx_pool_valid;
 #ifndef LOCK_DEBUG
 #error LOCK_DEBUG not defined, include <sys/lock.h> before <sys/mutex.h>
 #endif
-#if LOCK_DEBUG > 0
+#if LOCK_DEBUG > 0 || defined(MUTEX_NOINLINE)
 #define	mtx_lock_flags(m, opts)						\
 	_mtx_lock_flags((m), (opts), LOCK_FILE, LOCK_LINE)
 #define	mtx_unlock_flags(m, opts)					\
@@ -258,7 +255,7 @@ extern int mtx_pool_valid;
 	_mtx_lock_spin_flags((m), (opts), LOCK_FILE, LOCK_LINE)
 #define	mtx_unlock_spin_flags(m, opts)					\
 	_mtx_unlock_spin_flags((m), (opts), LOCK_FILE, LOCK_LINE)
-#else	/* LOCK_DEBUG == 0 */
+#else	/* LOCK_DEBUG == 0 && !MUTEX_NOINLINE */
 #define	mtx_lock_flags(m, opts)						\
 	_get_sleep_lock((m), curthread, (opts), LOCK_FILE, LOCK_LINE)
 #define	mtx_unlock_flags(m, opts)					\
@@ -272,7 +269,7 @@ extern int mtx_pool_valid;
 #define	mtx_lock_spin_flags(m, opts)	critical_enter()
 #define	mtx_unlock_spin_flags(m, opts)	critical_exit()
 #endif	/* SMP */
-#endif	/* LOCK_DEBUG */
+#endif	/* LOCK_DEBUG > 0 || MUTEX_NOINLINE */
 
 #define mtx_trylock_flags(m, opts)					\
 	_mtx_trylock((m), (opts), LOCK_FILE, LOCK_LINE)
@@ -292,18 +289,13 @@ extern struct mtx sched_lock;
 extern struct mtx Giant;
 
 /*
- * Giant lock sysctl variables used by other modules
- */
-extern int kern_giant_proc;
-extern int kern_giant_file;
-extern int kern_giant_ucred;
-
-/*
  * Giant lock manipulation and clean exit macros.
  * Used to replace return with an exit Giant and return.
  *
  * Note that DROP_GIANT*() needs to be paired with PICKUP_GIANT() 
+ * The #ifndef is to allow lint-like tools to redefine DROP_GIANT.
  */
+#ifndef DROP_GIANT
 #define DROP_GIANT()							\
 do {									\
 	int _giantcnt;							\
@@ -328,6 +320,7 @@ do {									\
 		mtx_lock(&Giant);					\
 	if (mtx_owned(&Giant))						\
 		WITNESS_RESTORE(&Giant.mtx_object, Giant)
+#endif
 
 #define	UGAR(rval) do {							\
 	int _val = (rval);						\
@@ -343,9 +336,9 @@ struct mtx_args {
 
 #define	MTX_SYSINIT(name, mtx, desc, opts)				\
 	static struct mtx_args name##_args = {				\
-		mtx,							\
-		desc,							\
-		opts							\
+		(mtx),							\
+		(desc),							\
+		(opts)							\
 	};								\
 	SYSINIT(name##_mtx_sysinit, SI_SUB_LOCK, SI_ORDER_MIDDLE,	\
 	    mtx_sysinit, &name##_args)

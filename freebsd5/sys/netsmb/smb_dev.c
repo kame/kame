@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_dev.c,v 1.6 2002/02/27 18:32:18 jhb Exp $
+ * $FreeBSD: src/sys/netsmb/smb_dev.c,v 1.16 2003/03/06 10:38:18 tjr Exp $
  */
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -40,6 +40,7 @@
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/file.h>		/* Must come after sys/malloc.h */
+#include <sys/filedesc.h>
 #include <sys/mbuf.h>
 #include <sys/poll.h>
 #include <sys/proc.h>
@@ -65,10 +66,7 @@
 
 static d_open_t	 nsmb_dev_open;
 static d_close_t nsmb_dev_close;
-static d_read_t	 nsmb_dev_read;
-static d_write_t nsmb_dev_write;
 static d_ioctl_t nsmb_dev_ioctl;
-static d_poll_t	 nsmb_dev_poll;
 
 MODULE_DEPEND(netsmb, libiconv, 1, 1, 1);
 MODULE_VERSION(netsmb, NSMB_VERSION);
@@ -87,22 +85,11 @@ int smb_dev_queue(struct smb_dev *ndp, struct smb_rq *rqp, int prio);
 */
 
 static struct cdevsw nsmb_cdevsw = {
-	/* open */	nsmb_dev_open,
-	/* close */	nsmb_dev_close,
-	/* read */	nsmb_dev_read,
-	/* write */	nsmb_dev_write,
-	/* ioctl */ 	nsmb_dev_ioctl,
-	/* poll */	nsmb_dev_poll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	NSMB_NAME,
-	/* maj */	NSMB_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
-#ifndef FB_CURRENT
-	/* bmaj */	-1
-#endif
+	.d_open =	nsmb_dev_open,
+	.d_close =	nsmb_dev_close,
+	.d_ioctl =	nsmb_dev_ioctl,
+	.d_name =	NSMB_NAME,
+	.d_maj =	NSMB_MAJOR,
 };
 
 static eventhandler_tag nsmb_dev_tag;
@@ -110,13 +97,14 @@ static eventhandler_tag nsmb_dev_tag;
 static void
 nsmb_dev_clone(void *arg, char *name, int namelen, dev_t *dev)
 {
-	int min;
+	int u;
 
 	if (*dev != NODEV)
 		return;
-	if (dev_stdclone(name, NULL, NSMB_NAME, &min) != 1)
+	if (dev_stdclone(name, NULL, NSMB_NAME, &u) != 1)
 		return;
-	*dev = make_dev(&nsmb_cdevsw, min, 0, 0, 0600, NSMB_NAME"%d", min);
+	*dev = make_dev(&nsmb_cdevsw, unit2minor(u), 0, 0, 0600,
+	    NSMB_NAME"%d", u);
 }
 
 static int
@@ -332,24 +320,6 @@ nsmb_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 }
 
 static int
-nsmb_dev_read(dev_t dev, struct uio *uio, int flag)
-{
-	return EACCES;
-}
-
-static int
-nsmb_dev_write(dev_t dev, struct uio *uio, int flag)
-{
-	return EACCES;
-}
-
-static int
-nsmb_dev_poll(dev_t dev, int events, struct thread *td)
-{
-	return ENODEV;
-}
-
-static int
 nsmb_dev_load(module_t mod, int cmd, void *arg)
 {
 	int error = 0;
@@ -364,7 +334,6 @@ nsmb_dev_load(module_t mod, int cmd, void *arg)
 			smb_sm_done();
 			break;
 		}
-		cdevsw_add(&nsmb_cdevsw);
 		nsmb_dev_tag = EVENTHANDLER_REGISTER(dev_clone, nsmb_dev_clone, 0, 1000);
 		printf("netsmb_dev: loaded\n");
 		break;
@@ -373,7 +342,6 @@ nsmb_dev_load(module_t mod, int cmd, void *arg)
 		error = smb_sm_done();
 		error = 0;
 		EVENTHANDLER_DEREGISTER(dev_clone, nsmb_dev_tag);
-		cdevsw_remove(&nsmb_cdevsw);
 		printf("netsmb_dev: unloaded\n");
 		break;
 	    default:
@@ -419,7 +387,7 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 	fp = nsmb_getfp(scred->scr_td->td_proc->p_fd, fd, FREAD | FWRITE);
 	if (fp == NULL)
 		return EBADF;
-	vp = (struct vnode*)fp->f_data;
+	vp = fp->f_data;
 	if (vp == NULL) {
 		fdrop(fp, curthread);
 		return EBADF;

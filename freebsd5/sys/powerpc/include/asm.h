@@ -29,11 +29,13 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	$NetBSD: asm.h,v 1.6.18.1 2000/07/25 08:37:14 kleink Exp $
- * $FreeBSD: src/sys/powerpc/include/asm.h,v 1.6 2002/09/23 07:27:45 peter Exp $
+ * $FreeBSD: src/sys/powerpc/include/asm.h,v 1.9 2003/01/28 10:54:31 benno Exp $
  */
 
 #ifndef _MACHINE_ASM_H_
 #define	_MACHINE_ASM_H_
+
+#include <sys/cdefs.h>
 
 #ifdef PIC
 #define	PIC_PROLOGUE	XXX
@@ -75,6 +77,7 @@
 
 #define	RCSID(x)	.text; .asciz x
 
+#undef __FBSDID
 #if !defined(lint) && !defined(STRIP_FBSDID)
 #define __FBSDID(s)	.ident s
 #else

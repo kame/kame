@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_bio.c,v 1.114 2002/09/25 02:38:43 jeff Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_bio.c,v 1.118 2003/05/15 21:12:08 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -376,7 +376,7 @@ nfs_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 	    (uio->uio_offset + uio->uio_resid) > nmp->nm_maxfilesize)
 		return (EFBIG);
 	biosize = vp->v_mount->mnt_stat.f_iosize;
-	seqcount = (int)((off_t)(ioflag >> 16) * biosize / BKVASIZE);
+	seqcount = (int)((off_t)(ioflag >> IO_SEQSHIFT) * biosize / BKVASIZE);
 	/*
 	 * For nfs, cache consistency can only be maintained approximately.
 	 * Although RFC1094 does not specify the criteria, the following is
@@ -1032,14 +1032,14 @@ nfs_getcacheblk(struct vnode *vp, daddr_t bn, int size, struct thread *td)
 	nmp = VFSTONFS(mp);
 
 	if (nmp->nm_flag & NFSMNT_INT) {
-		bp = getblk(vp, bn, size, PCATCH, 0);
+		bp = getblk(vp, bn, size, PCATCH, 0, 0);
 		while (bp == NULL) {
 			if (nfs_sigintr(nmp, NULL, td))
 				return (NULL);
-			bp = getblk(vp, bn, size, 0, 2 * hz);
+			bp = getblk(vp, bn, size, 0, 2 * hz, 0);
 		}
 	} else {
-		bp = getblk(vp, bn, size, 0, 0);
+		bp = getblk(vp, bn, size, 0, 0, 0);
 	}
 
 	if (vp->v_type == VREG) {
@@ -1063,6 +1063,8 @@ nfs_vinvalbuf(struct vnode *vp, int flags, struct ucred *cred,
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
 	int error = 0, slpflag, slptimeo;
 
+	ASSERT_VOP_LOCKED(vp, "nfs_vinvalbuf");
+
 	VI_LOCK(vp);
 	if (vp->v_iflag & VI_XLOCK) {
 		/* XXX Should we wait here? */
@@ -1085,7 +1087,7 @@ nfs_vinvalbuf(struct vnode *vp, int flags, struct ucred *cred,
 	 */
 	while (np->n_flag & NFLUSHINPROG) {
 		np->n_flag |= NFLUSHWANT;
-		error = tsleep((caddr_t)&np->n_flag, PRIBIO + 2, "nfsvinval",
+		error = tsleep(&np->n_flag, PRIBIO + 2, "nfsvinval",
 			slptimeo);
 		if (error && intrflg &&
 		    nfs_sigintr(nmp, NULL, td))
@@ -1103,7 +1105,7 @@ nfs_vinvalbuf(struct vnode *vp, int flags, struct ucred *cred,
 			np->n_flag &= ~NFLUSHINPROG;
 			if (np->n_flag & NFLUSHWANT) {
 				np->n_flag &= ~NFLUSHWANT;
-				wakeup((caddr_t)&np->n_flag);
+				wakeup(&np->n_flag);
 			}
 			return (EINTR);
 		}
@@ -1112,7 +1114,7 @@ nfs_vinvalbuf(struct vnode *vp, int flags, struct ucred *cred,
 	np->n_flag &= ~(NMODIFIED | NFLUSHINPROG);
 	if (np->n_flag & NFLUSHWANT) {
 		np->n_flag &= ~NFLUSHWANT;
-		wakeup((caddr_t)&np->n_flag);
+		wakeup(&np->n_flag);
 	}
 	return (0);
 }
@@ -1180,7 +1182,7 @@ again:
 		nfs_iodwant[iod] = NULL;
 		nfs_iodmount[iod] = nmp;
 		nmp->nm_bufqiods++;
-		wakeup((caddr_t)&nfs_iodwant[iod]);
+		wakeup(&nfs_iodwant[iod]);
 	}
 
 	/*
@@ -1344,7 +1346,7 @@ nfs_doio(struct buf *bp, struct ucred *cr, struct thread *td)
 			uiop->uio_resid = 0;
 		    }
 		}
-		ASSERT_VOP_LOCKED(vp, "nfs_doio");
+		/* ASSERT_VOP_LOCKED(vp, "nfs_doio"); */
 		if (p && (vp->v_vflag & VV_TEXT) &&
 			(np->n_mtime != np->n_vattr.va_mtime.tv_sec)) {
 			uprintf("Process killed due to text file modification\n");

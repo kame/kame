@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/sys/agpio.h,v 1.2 2001/11/21 08:40:23 ru Exp $
+ *	$FreeBSD: src/sys/sys/agpio.h,v 1.3 2003/02/08 20:42:26 mdodd Exp $
  */
 
 #ifndef _SYS_AGPIO_H_
@@ -37,6 +37,9 @@
 
 /*
  * Macros to manipulate AGP mode words.
+ *
+ * SBA = Sideband Address Port
+ * FW  = Fast Writes
  */
 #define AGP_MODE_GET_RQ(x)		(((x) & 0xff000000U) >> 24)
 #define AGP_MODE_GET_SBA(x)		(((x) & 0x00000200U) >> 9)

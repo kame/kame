@@ -34,9 +34,11 @@
 #include  <dev/sound/isa/sb.h>
 #include  <dev/sound/chip.h>
 
+#include <isa/isavar.h>
+
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ess.c,v 1.23 2002/01/25 04:14:05 scottl Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ess.c,v 1.25 2003/02/07 14:05:33 nyan Exp $");
 
 #define ESS_BUFFSIZE (4096)
 #define ABS(x) (((x) < 0)? -(x) : (x))
@@ -155,9 +157,9 @@ port_rd(struct resource *port, int off)
 static void
 port_wr(struct resource *port, int off, u_int8_t data)
 {
-	return bus_space_write_1(rman_get_bustag(port),
-				 rman_get_bushandle(port),
-				 off, data);
+	bus_space_write_1(rman_get_bustag(port),
+			  rman_get_bushandle(port),
+			  off, data);
 }
 
 static int
@@ -367,7 +369,7 @@ ess_intr(void *arg)
 			chn_intr(sc->pch.channel);
 		if (sc->pch.stopping) {
 			sc->pch.run = 0;
-			sndbuf_isadma(sc->pch.buffer, PCMTRIG_STOP);
+			sndbuf_dma(sc->pch.buffer, PCMTRIG_STOP);
 			sc->pch.stopping = 0;
 			if (sc->pch.hwch == 1)
 				ess_write(sc, 0xb8, ess_read(sc, 0xb8) & ~0x01);
@@ -381,7 +383,7 @@ ess_intr(void *arg)
 			chn_intr(sc->rch.channel);
 		if (sc->rch.stopping) {
 			sc->rch.run = 0;
-			sndbuf_isadma(sc->rch.buffer, PCMTRIG_STOP);
+			sndbuf_dma(sc->rch.buffer, PCMTRIG_STOP);
 			sc->rch.stopping = 0;
 			/* XXX: will this stop audio2? */
 			ess_write(sc, 0xb8, ess_read(sc, 0xb8) & ~0x01);
@@ -565,7 +567,7 @@ esschan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 	ch->hwch = 1;
 	if ((dir == PCMDIR_PLAY) && (sc->duplex))
 		ch->hwch = 2;
-	sndbuf_isadmasetup(ch->buffer, (ch->hwch == 1)? sc->drq1 : sc->drq2);
+	sndbuf_dmasetup(ch->buffer, (ch->hwch == 1)? sc->drq1 : sc->drq2);
 	return ch;
 }
 
@@ -612,7 +614,7 @@ esschan_trigger(kobj_t obj, void *data, int go)
 	switch (go) {
 	case PCMTRIG_START:
 		ch->run = 1;
-		sndbuf_isadma(ch->buffer, go);
+		sndbuf_dma(ch->buffer, go);
 		ess_start(ch);
 		break;
 
@@ -630,7 +632,7 @@ esschan_getptr(kobj_t obj, void *data)
 {
 	struct ess_chinfo *ch = data;
 
-	return sndbuf_isadmaptr(ch->buffer);
+	return sndbuf_dmaptr(ch->buffer);
 }
 
 static struct pcmchan_caps *

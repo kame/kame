@@ -31,7 +31,7 @@
  *	from: @(#)auth.h 1.17 88/02/08 SMI
  *	from: @(#)auth.h	2.3 88/08/07 4.0 RPCSRC
  *	from: @(#)auth.h	1.43 	98/02/02 SMI
- * $FreeBSD: src/include/rpc/auth.h,v 1.19 2002/03/23 17:24:55 imp Exp $
+ * $FreeBSD: src/include/rpc/auth.h,v 1.20 2003/01/01 18:48:42 schweikh Exp $
  */
 
 /*
@@ -40,7 +40,7 @@
  * Copyright (C) 1984, Sun Microsystems, Inc.
  *
  * The data structures are completely opaque to the client.  The client
- * is required to pass a AUTH * to routines that create rpc
+ * is required to pass an AUTH * to routines that create rpc
  * "sessions".
  */
 

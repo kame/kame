@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.15 2002/11/08 21:13:18 jhb Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.19 2003/05/15 18:51:28 julian Exp $
  */
 
 /*
@@ -713,7 +713,7 @@ ng_bridge_rcvdata(hook_p hook, item_p item)
 			 * It's usable link but not the reserved (first) one.
 			 * Copy mbuf and meta info for sending.
 			 */
-			m2 = m_dup(m, M_NOWAIT);	/* XXX m_copypacket() */
+			m2 = m_dup(m, M_DONTWAIT);	/* XXX m_copypacket() */
 			if (m2 == NULL) {
 				link->stats.memoryFailures++;
 				NG_FREE_ITEM(item);
@@ -987,7 +987,7 @@ ng_bridge_timeout(void *arg)
 	/* If node was shut down, this is the final lingering timeout */
 	s = splnet();
 	if (NG_NODE_NOT_VALID(node)) {
-		FREE(priv, M_NETGRAPH);
+		FREE(priv, M_NETGRAPH_BRIDGE);
 		NG_NODE_SET_PRIVATE(node, NULL);
 		NG_NODE_UNREF(node);
 		splx(s);

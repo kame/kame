@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/_label.h,v 1.3 2002/11/04 02:35:46 rwatson Exp $
+ * $FreeBSD: src/sys/sys/_label.h,v 1.4 2003/05/08 19:49:42 rwatson Exp $
  */
 #ifndef _SYS__LABEL_H
 #define	_SYS__LABEL_H
@@ -41,7 +41,7 @@
  * and various other messes.
  */
 
-#define	MAC_MAX_POLICIES	4
+#define	MAC_MAX_SLOTS	4
 
 #define	MAC_FLAG_INITIALIZED	0x0000001	/* Is initialized for use. */
 
@@ -50,7 +50,7 @@ struct label {
 	union {
 		void	*l_ptr;
 		long	 l_long;
-	}	l_perpolicy[MAC_MAX_POLICIES];
+	}	l_perpolicy[MAC_MAX_SLOTS];
 };
 
 #endif /* !_SYS__LABEL_H */

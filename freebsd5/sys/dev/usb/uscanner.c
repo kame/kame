@@ -1,5 +1,5 @@
 /*	$NetBSD: uscanner.c,v 1.30 2002/07/11 21:14:36 augustss Exp$	*/
-/*	$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.32 2002/08/08 12:05:51 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.37 2003/03/03 12:15:48 phk Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -181,6 +181,8 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1640 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_640U }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1650 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1660 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1260 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_GT9700F }, USC_KEEP_OPEN },
 
   /* UMAX */
@@ -247,19 +249,13 @@ d_poll_t  uscannerpoll;
 #define USCANNER_CDEV_MAJOR	156
 
 Static struct cdevsw uscanner_cdevsw = {
-	/* open */	uscanneropen,
-	/* close */	uscannerclose,
-	/* read */	uscannerread,
-	/* write */	uscannerwrite,
-	/* ioctl */	noioctl,
-	/* poll */	uscannerpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"uscanner",
-	/* maj */	USCANNER_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	uscanneropen,
+	.d_close =	uscannerclose,
+	.d_read =	uscannerread,
+	.d_write =	uscannerwrite,
+	.d_poll =	uscannerpoll,
+	.d_name =	"uscanner",
+	.d_maj =	USCANNER_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
 	/* bmaj */	-1
 #endif

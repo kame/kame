@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/db_trace.c,v 1.14 2002/09/19 19:51:56 jhb Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/db_trace.c,v 1.16 2003/04/01 03:05:46 jake Exp $
  */
 
 #include <sys/param.h>
@@ -142,7 +142,7 @@ db_stack_trace_cmd(db_expr_t addr, boolean_t have_addr, db_expr_t count,
 				return;
 			}
 			td = FIRST_THREAD_IN_PROC(p);	/* XXXKSE */
-			addr = td->td_pcb->pcb_fp;
+			addr = td->td_pcb->pcb_sp;
 		}
 	}
 	fp = (struct frame *)(addr + SPOFF);
@@ -309,4 +309,8 @@ db_utrace(struct thread *td, struct trapframe *tf)
 void
 db_print_backtrace(void)
 {
+	u_long *sp;
+
+	sp = __builtin_frame_address(1);
+	db_stack_trace_cmd((db_expr_t)sp, TRUE, -1, "a");
 }

@@ -29,7 +29,7 @@
 
 #include <dev/sound/pcm/sound.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/dsp.c,v 1.57 2002/08/28 15:19:30 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/dsp.c,v 1.63 2003/05/01 16:31:21 orion Exp $");
 
 #define OLDPCM_IOCTL
 
@@ -42,19 +42,15 @@ static d_poll_t dsp_poll;
 static d_mmap_t dsp_mmap;
 
 static struct cdevsw dsp_cdevsw = {
-	/* open */	dsp_open,
-	/* close */	dsp_close,
-	/* read */	dsp_read,
-	/* write */	dsp_write,
-	/* ioctl */	dsp_ioctl,
-	/* poll */	dsp_poll,
-	/* mmap */	dsp_mmap,
-	/* strategy */	nostrategy,
-	/* name */	"dsp",
-	/* maj */	SND_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	dsp_open,
+	.d_close =	dsp_close,
+	.d_read =	dsp_read,
+	.d_write =	dsp_write,
+	.d_ioctl =	dsp_ioctl,
+	.d_poll =	dsp_poll,
+	.d_mmap =	dsp_mmap,
+	.d_name =	"dsp",
+	.d_maj =	SND_CDEV_MAJOR,
 };
 
 #ifdef USING_DEVFS
@@ -266,16 +262,18 @@ dsp_open(dev_t i_dev, int flags, int mode, struct thread *td)
 
 	i_dev->si_drv1 = rdch;
 	i_dev->si_drv2 = wrch;
-	pcm_unlock(d);
-	/* finished with snddev, new channels still locked */
 
-	/* bump refcounts, reset and unlock any channels that we just opened */
+	/* Bump refcounts, reset and unlock any channels that we just opened,
+	 * and then release device lock.
+	 */
 	if (flags & FREAD) {
 		if (chn_reset(rdch, fmt)) {
-			pcm_lock(d);
 			pcm_chnrelease(rdch);
-			if (wrch && (flags & FWRITE))
+			i_dev->si_drv1 = NULL;
+			if (wrch && (flags & FWRITE)) {
 				pcm_chnrelease(wrch);
+				i_dev->si_drv2 = NULL;
+			}
 			pcm_unlock(d);
 			splx(s);
 			return ENODEV;
@@ -287,13 +285,13 @@ dsp_open(dev_t i_dev, int flags, int mode, struct thread *td)
 	}
 	if (flags & FWRITE) {
 		if (chn_reset(wrch, fmt)) {
-			pcm_lock(d);
 			pcm_chnrelease(wrch);
+			i_dev->si_drv2 = NULL;
 			if (flags & FREAD) {
 				CHN_LOCK(rdch);
 				pcm_chnref(rdch, -1);
 				pcm_chnrelease(rdch);
-				CHN_UNLOCK(rdch);
+				i_dev->si_drv1 = NULL;
 			}
 			pcm_unlock(d);
 			splx(s);
@@ -304,6 +302,7 @@ dsp_open(dev_t i_dev, int flags, int mode, struct thread *td)
 		pcm_chnref(wrch, 1);
 	 	CHN_UNLOCK(wrch);
 	}
+	pcm_unlock(d);
 	splx(s);
 	return 0;
 }
@@ -986,11 +985,10 @@ dsp_poll(dev_t i_dev, int events, struct thread *td)
 }
 
 static int
-dsp_mmap(dev_t i_dev, vm_offset_t offset, int nprot)
+dsp_mmap(dev_t i_dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	struct pcm_channel *wrch = NULL, *rdch = NULL, *c;
 	intrmask_t s;
-	int ret;
 
 	if (nprot & PROT_EXEC)
 		return -1;
@@ -1030,11 +1028,11 @@ dsp_mmap(dev_t i_dev, vm_offset_t offset, int nprot)
 	if (!(c->flags & CHN_F_MAPPED))
 		c->flags |= CHN_F_MAPPED;
 
-	ret = atop(vtophys(sndbuf_getbufofs(c->bufsoft, offset)));
+	*paddr = vtophys(sndbuf_getbufofs(c->bufsoft, offset));
 	relchns(i_dev, rdch, wrch, SD_F_PRIO_RD | SD_F_PRIO_WR);
 
 	splx(s);
-	return ret;
+	return 0;
 }
 
 int

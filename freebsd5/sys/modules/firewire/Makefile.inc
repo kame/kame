@@ -1,3 +1,4 @@
-# $FreeBSD: src/sys/modules/firewire/Makefile.inc,v 1.1 2002/11/06 13:41:39 nyan Exp $
+# $FreeBSD: src/sys/modules/firewire/Makefile.inc,v 1.2 2003/04/17 03:38:02 simokawa Exp $
 
+#CFLAGS+=-g
 .include "../Makefile.inc"

@@ -34,10 +34,8 @@
  */
 
 #ifndef RPC_HDR
-%#ifndef lint
-%static const char rcsid[] =
-%  "$FreeBSD: src/include/rpcsvc/yp.x,v 1.12 1999/08/27 23:45:12 peter Exp $";
-%#endif /* not lint */
+%#include <sys/cdefs.h>
+%__FBSDID("$FreeBSD: src/include/rpcsvc/yp.x,v 1.13 2003/05/04 02:51:42 obrien Exp $");
 #endif
 
 const YPMAXRECORD = 1024;

@@ -28,7 +28,7 @@
  *
  *	from: NetBSD: psychoreg.h,v 1.8 2001/09/10 16:17:06 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/pci/ofw_pci.h,v 1.4 2002/11/07 16:07:46 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/pci/ofw_pci.h,v 1.5 2003/05/30 20:48:05 tmm Exp $
  */
 
 #ifndef _SPARC64_PCI_OFW_PCI_H_
@@ -71,7 +71,6 @@ struct ofw_pci_bdesc {
 	struct ofw_pci_bdesc	*obd_super;
 };
 
-u_int32_t ofw_pci_route_intr(phandle_t, u_int32_t);
 obr_callback_t ofw_pci_orb_callback;
 u_int8_t ofw_pci_alloc_busno(phandle_t);
 ofw_pci_binit_t ofw_pci_binit;

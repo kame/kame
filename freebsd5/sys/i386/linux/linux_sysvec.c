@@ -6,7 +6,7 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer 
+ *    notice, this list of conditions and the following disclaimer
  *    in this position and unchanged.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.110 2002/11/02 07:41:04 marcel Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.123 2003/05/13 20:35:58 jhb Exp $
  */
 
 /* XXX we use functions that might not exist. */
@@ -70,6 +70,7 @@
 
 #include <i386/linux/linux.h>
 #include <i386/linux/linux_proto.h>
+#include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_signal.h>
 #include <compat/linux/linux_util.h>
 
@@ -110,26 +111,28 @@ static void	linux_prepsyscall(struct trapframe *tf, int *args, u_int *code,
 		    caddr_t *params);
 static void     linux_sendsig(sig_t catcher, int sig, sigset_t *mask,
 		    u_long code);
+static void	exec_linux_setregs(struct thread *td, u_long entry,
+				   u_long stack, u_long ps_strings);
 
 /*
  * Linux syscalls return negative errno's, we do positive and map them
  */
 static int bsd_to_linux_errno[ELAST + 1] = {
-  	-0,  -1,  -2,  -3,  -4,  -5,  -6,  -7,  -8,  -9,
- 	-10, -35, -12, -13, -14, -15, -16, -17, -18, -19,
- 	-20, -21, -22, -23, -24, -25, -26, -27, -28, -29,
- 	-30, -31, -32, -33, -34, -11,-115,-114, -88, -89,
- 	-90, -91, -92, -93, -94, -95, -96, -97, -98, -99,
+	-0,  -1,  -2,  -3,  -4,  -5,  -6,  -7,  -8,  -9,
+	-10, -35, -12, -13, -14, -15, -16, -17, -18, -19,
+	-20, -21, -22, -23, -24, -25, -26, -27, -28, -29,
+	-30, -31, -32, -33, -34, -11,-115,-114, -88, -89,
+	-90, -91, -92, -93, -94, -95, -96, -97, -98, -99,
 	-100,-101,-102,-103,-104,-105,-106,-107,-108,-109,
 	-110,-111, -40, -36,-112,-113, -39, -11, -87,-122,
 	-116, -66,  -6,  -6,  -6,  -6,  -6, -37, -38,  -9,
-  	-6, -6, -43, -42, -75, -6, -84
+	-6, -6, -43, -42, -75, -6, -84
 };
 
 int bsd_to_linux_signal[LINUX_SIGTBLSZ] = {
 	LINUX_SIGHUP, LINUX_SIGINT, LINUX_SIGQUIT, LINUX_SIGILL,
 	LINUX_SIGTRAP, LINUX_SIGABRT, 0, LINUX_SIGFPE,
-	LINUX_SIGKILL, LINUX_SIGBUS, LINUX_SIGSEGV, 0,
+	LINUX_SIGKILL, LINUX_SIGBUS, LINUX_SIGSEGV, LINUX_SIGSYS,
 	LINUX_SIGPIPE, LINUX_SIGALRM, LINUX_SIGTERM, LINUX_SIGURG,
 	LINUX_SIGSTOP, LINUX_SIGTSTP, LINUX_SIGCONT, LINUX_SIGCHLD,
 	LINUX_SIGTTIN, LINUX_SIGTTOU, LINUX_SIGIO, LINUX_SIGXCPU,
@@ -145,7 +148,7 @@ int linux_to_bsd_signal[LINUX_SIGTBLSZ] = {
 	SIGCHLD, SIGCONT, SIGSTOP, SIGTSTP,
 	SIGTTIN, SIGTTOU, SIGURG, SIGXCPU,
 	SIGXFSZ, SIGVTALRM, SIGPROF, SIGWINCH,
-	SIGIO, SIGURG, 0
+	SIGIO, SIGURG, SIGSYS
 };
 
 #define LINUX_T_UNKNOWN  255
@@ -228,11 +231,15 @@ linux_fixup(register_t **stack_base, struct image_params *imgp)
 static int
 elf_linux_fixup(register_t **stack_base, struct image_params *imgp)
 {
-	Elf32_Auxargs *args = (Elf32_Auxargs *)imgp->auxargs;
+	Elf32_Auxargs *args;
 	register_t *pos;
-             
-	pos = *stack_base + (imgp->argc + imgp->envc + 2);  
-    
+
+	KASSERT(curthread->td_proc == imgp->proc &&
+	    (curthread->td_proc->p_flag & P_THREADED) == 0,
+	    ("unsafe elf_linux_fixup(), should be curproc"));
+	args = (Elf32_Auxargs *)imgp->auxargs;
+	pos = *stack_base + (imgp->argc + imgp->envc + 2);
+
 	if (args->trace)
 		AUXARGS_ENTRY(pos, AT_DEBUG, 1);
 	if (args->execfd != -1)
@@ -244,19 +251,17 @@ elf_linux_fixup(register_t **stack_base, struct image_params *imgp)
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
 	AUXARGS_ENTRY(pos, AT_BASE, args->base);
-	PROC_LOCK(imgp->proc);
 	AUXARGS_ENTRY(pos, AT_UID, imgp->proc->p_ucred->cr_ruid);
 	AUXARGS_ENTRY(pos, AT_EUID, imgp->proc->p_ucred->cr_svuid);
 	AUXARGS_ENTRY(pos, AT_GID, imgp->proc->p_ucred->cr_rgid);
 	AUXARGS_ENTRY(pos, AT_EGID, imgp->proc->p_ucred->cr_svgid);
-	PROC_UNLOCK(imgp->proc);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
-	
-	free(imgp->auxargs, M_TEMP);      
+
+	free(imgp->auxargs, M_TEMP);
 	imgp->auxargs = NULL;
 
 	(*stack_base)--;
-	**stack_base = (long)imgp->argc;
+	**stack_base = (register_t)imgp->argc;
 	return 0;
 }
 
@@ -266,13 +271,16 @@ extern unsigned long linux_sznonrtsigcode;
 static void
 linux_rt_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 {
-	register struct thread *td = curthread;
-	register struct proc *p = td->td_proc;
-	register struct trapframe *regs;
+	struct thread *td = curthread;
+	struct proc *p = td->td_proc;
+	struct sigacts *psp;
+	struct trapframe *regs;
 	struct l_rt_sigframe *fp, frame;
 	int oonstack;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
+	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 	regs = td->td_frame;
 	oonstack = sigonstack(regs->tf_esp);
 
@@ -285,12 +293,12 @@ linux_rt_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	 * Allocate space for the signal handler context.
 	 */
 	if ((p->p_flag & P_ALTSTACK) && !oonstack &&
-	    SIGISMEMBER(p->p_sigacts->ps_sigonstack, sig)) {
+	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
 		fp = (struct l_rt_sigframe *)(p->p_sigstk.ss_sp +
 		    p->p_sigstk.ss_size - sizeof(struct l_rt_sigframe));
 	} else
 		fp = (struct l_rt_sigframe *)regs->tf_esp - 1;
-	PROC_UNLOCK(p);
+	mtx_unlock(&psp->ps_mtx);
 
 	/*
 	 * Build the argument list for the signal handler.
@@ -317,7 +325,6 @@ linux_rt_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	frame.sf_sc.uc_flags = 0;		/* XXX ??? */
 	frame.sf_sc.uc_link = NULL;		/* XXX ??? */
 
-	PROC_LOCK(p);
 	frame.sf_sc.uc_stack.ss_sp = p->p_sigstk.ss_sp;
 	frame.sf_sc.uc_stack.ss_size = p->p_sigstk.ss_size;
 	frame.sf_sc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
@@ -371,7 +378,7 @@ linux_rt_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	 * Build context to run handler in.
 	 */
 	regs->tf_esp = (int)fp;
-	regs->tf_eip = PS_STRINGS - *(p->p_sysent->sv_szsigcode) + 
+	regs->tf_eip = PS_STRINGS - *(p->p_sysent->sv_szsigcode) +
 	    linux_sznonrtsigcode;
 	regs->tf_eflags &= ~(PSL_T | PSL_VM);
 	regs->tf_cs = _ucodesel;
@@ -380,6 +387,7 @@ linux_rt_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	regs->tf_fs = _udatasel;
 	regs->tf_ss = _udatasel;
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 
 
@@ -396,15 +404,18 @@ linux_rt_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 static void
 linux_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 {
-	register struct thread *td = curthread;
-	register struct proc *p = td->td_proc;
-	register struct trapframe *regs;
+	struct thread *td = curthread;
+	struct proc *p = td->td_proc;
+	struct sigacts *psp;
+	struct trapframe *regs;
 	struct l_sigframe *fp, frame;
 	l_sigset_t lmask;
 	int oonstack, i;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig)) {
+	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
 		linux_rt_sendsig(catcher, sig, mask, code);
 		return;
@@ -423,11 +434,12 @@ linux_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	 * Allocate space for the signal handler context.
 	 */
 	if ((p->p_flag & P_ALTSTACK) && !oonstack &&
-	    SIGISMEMBER(p->p_sigacts->ps_sigonstack, sig)) {
+	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
 		fp = (struct l_sigframe *)(p->p_sigstk.ss_sp +
 		    p->p_sigstk.ss_size - sizeof(struct l_sigframe));
 	} else
 		fp = (struct l_sigframe *)regs->tf_esp - 1;
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/*
@@ -491,6 +503,7 @@ linux_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	regs->tf_fs = _udatasel;
 	regs->tf_ss = _udatasel;
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 
 /*
@@ -508,7 +521,7 @@ linux_sigreturn(struct thread *td, struct linux_sigreturn_args *args)
 {
 	struct proc *p = td->td_proc;
 	struct l_sigframe frame;
-	register struct trapframe *regs;
+	struct trapframe *regs;
 	l_sigset_t lmask;
 	int eflags, i;
 
@@ -523,7 +536,7 @@ linux_sigreturn(struct thread *td, struct linux_sigreturn_args *args)
 	 * It is unsafe to keep track of it ourselves, in the event that a
 	 * program jumps out of a signal handler.
 	 */
-	if (copyin((caddr_t)args->sfp, &frame, sizeof(frame)) != 0)
+	if (copyin(args->sfp, &frame, sizeof(frame)) != 0)
 		return (EFAULT);
 
 	/*
@@ -542,7 +555,7 @@ linux_sigreturn(struct thread *td, struct linux_sigreturn_args *args)
 	 * allowing it is fairly harmless.
 	 */
 	if (!EFLAGS_SECURE(eflags & ~PSL_RF, regs->tf_eflags & ~PSL_RF))
-    		return(EINVAL);
+		return(EINVAL);
 
 	/*
 	 * Don't allow users to load a valid privileged %cs.  Let the
@@ -551,7 +564,7 @@ linux_sigreturn(struct thread *td, struct linux_sigreturn_args *args)
 	 */
 #define	CS_SECURE(cs)	(ISPL(cs) == SEL_UPL)
 	if (!CS_SECURE(frame.sf_sc.sc_cs)) {
-		trapsignal(p, SIGBUS, T_PROTFLT);
+		trapsignal(td, SIGBUS, T_PROTFLT);
 		return(EINVAL);
 	}
 
@@ -559,9 +572,9 @@ linux_sigreturn(struct thread *td, struct linux_sigreturn_args *args)
 	for (i = 0; i < (LINUX_NSIG_WORDS-1); i++)
 		lmask.__bits[i+1] = frame.sf_extramask[i];
 	PROC_LOCK(p);
-	linux_to_bsd_sigset(&lmask, &p->p_sigmask);
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	linux_to_bsd_sigset(&lmask, &td->td_sigmask);
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 
 	/*
@@ -605,7 +618,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	struct l_sigcontext *context;
 	l_stack_t *lss;
 	stack_t ss;
-	register struct trapframe *regs;
+	struct trapframe *regs;
 	int eflags;
 
 	regs = td->td_frame;
@@ -619,7 +632,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	 * It is unsafe to keep track of it ourselves, in the event that a
 	 * program jumps out of a signal handler.
 	 */
-	if (copyin((caddr_t)args->ucp, &uc, sizeof(uc)) != 0)
+	if (copyin(args->ucp, &uc, sizeof(uc)) != 0)
 		return (EFAULT);
 
 	context = &uc.uc_mcontext;
@@ -640,7 +653,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	 * allowing it is fairly harmless.
 	 */
 	if (!EFLAGS_SECURE(eflags & ~PSL_RF, regs->tf_eflags & ~PSL_RF))
-    		return(EINVAL);
+		return(EINVAL);
 
 	/*
 	 * Don't allow users to load a valid privileged %cs.  Let the
@@ -649,14 +662,14 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	 */
 #define	CS_SECURE(cs)	(ISPL(cs) == SEL_UPL)
 	if (!CS_SECURE(context->sc_cs)) {
-		trapsignal(p, SIGBUS, T_PROTFLT);
+		trapsignal(td, SIGBUS, T_PROTFLT);
 		return(EINVAL);
 	}
 
 	PROC_LOCK(p);
-	linux_to_bsd_sigset(&uc.uc_sigmask, &p->p_sigmask);
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	linux_to_bsd_sigset(&uc.uc_sigmask, &td->td_sigmask);
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 
 	/*
@@ -757,12 +770,12 @@ linux_aout_coredump(struct thread *td, struct vnode *vp, off_t limit)
 		    (caddr_t)trunc_page(USRSTACK - ctob(vm->vm_ssize)),
 		    round_page(ctob(vm->vm_ssize)),
 		    (off_t)ctob(uarea_pages + kstack_pages) +
-		        ctob(vm->vm_dsize), UIO_USERSPACE,
+			ctob(vm->vm_dsize), UIO_USERSPACE,
 		    IO_UNIT | IO_DIRECT, cred, NOCRED, (int *) NULL, td);
 	return (error);
 }
 /*
- * If a linux binary is exec'ing something, try this image activator 
+ * If a linux binary is exec'ing something, try this image activator
  * first.  We override standard shell script execution in order to
  * be able to modify the interpreter path.  We only do this if a linux
  * binary is doing the exec, so we do not create an EXEC module for it.
@@ -804,18 +817,35 @@ exec_linux_imgact_try(struct image_params *imgp)
     return(error);
 }
 
+/*
+ * exec_setregs may initialize some registers differently than Linux
+ * does, thus potentially confusing Linux binaries. If necessary, we
+ * override the exec_setregs default(s) here.
+ */
+static void
+exec_linux_setregs(struct thread *td, u_long entry,
+		   u_long stack, u_long ps_strings)
+{
+	struct pcb *pcb = td->td_pcb;
+
+	exec_setregs(td, entry, stack, ps_strings);
+
+	/* Linux sets %gs to 0, we default to _udatasel */
+	pcb->pcb_gs = 0; load_gs(0);
+}
+
 struct sysentvec linux_sysvec = {
 	LINUX_SYS_MAXSYSCALL,
 	linux_sysent,
 	0xff,
 	LINUX_SIGTBLSZ,
 	bsd_to_linux_signal,
-	ELAST + 1, 
+	ELAST + 1,
 	bsd_to_linux_errno,
 	translate_traps,
 	linux_fixup,
 	linux_sendsig,
-	linux_sigcode,	
+	linux_sigcode,
 	&linux_szsigcode,
 	linux_prepsyscall,
 	"Linux a.out",
@@ -829,7 +859,7 @@ struct sysentvec linux_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	exec_copyout_strings,
-	exec_setregs
+	exec_linux_setregs
 };
 
 struct sysentvec elf_linux_sysvec = {
@@ -857,7 +887,7 @@ struct sysentvec elf_linux_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	exec_copyout_strings,
-	exec_setregs
+	exec_linux_setregs
 };
 
 static Elf32_Brandinfo linux_brand = {
@@ -923,6 +953,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 				linux_ioctl_unregister_handler(*lihp);
 			if (bootverbose)
 				printf("Linux ELF exec handler removed\n");
+			linux_mib_destroy();
 		} else
 			printf("Could not deinstall ELF interpreter entry\n");
 		break;

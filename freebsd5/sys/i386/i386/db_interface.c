@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/i386/i386/db_interface.c,v 1.69 2002/09/21 18:53:58 markm Exp $
+ * $FreeBSD: src/sys/i386/i386/db_interface.c,v 1.72 2003/03/30 01:16:18 jake Exp $
  */
 
 /*
@@ -77,6 +77,7 @@ rss(void)
 int
 kdb_trap(int type, int code, struct i386_saved_state *regs)
 {
+	u_int ef;
 	volatile int ddb_mode = !(boothowto & RB_GDB);
 
 	/*
@@ -95,6 +96,9 @@ kdb_trap(int type, int code, struct i386_saved_state *regs)
 	    }
 	    return (0);
 	}
+
+	ef = read_eflags();
+	disable_intr();
 
 	switch (type) {
 	    case T_BPTFLT:	/* breakpoint */
@@ -216,6 +220,9 @@ kdb_trap(int type, int code, struct i386_saved_state *regs)
 	regs->tf_fs     = ddb_regs.tf_fs & 0xffff;
 	regs->tf_cs     = ddb_regs.tf_cs & 0xffff;
 	regs->tf_ds     = ddb_regs.tf_ds & 0xffff;
+
+	write_eflags(ef);
+
 	return (1);
 }
 
@@ -244,18 +251,18 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 {
 	char	*dst;
 
-	unsigned	*ptep0 = NULL;
-	unsigned	oldmap0 = 0;
+	pt_entry_t	*ptep0 = NULL;
+	pt_entry_t	oldmap0 = 0;
 	vm_offset_t	addr1;
-	unsigned	*ptep1 = NULL;
-	unsigned	oldmap1 = 0;
+	pt_entry_t	*ptep1 = NULL;
+	pt_entry_t	oldmap1 = 0;
 
 	db_nofault = &db_jmpbuf;
 
 	if (addr > trunc_page((vm_offset_t)btext) - size &&
 	    addr < round_page((vm_offset_t)etext)) {
 
-	    ptep0 = pmap_pte(kernel_pmap, addr);
+	    ptep0 = pmap_pte_quick(kernel_pmap, addr);
 	    oldmap0 = *ptep0;
 	    *ptep0 |= PG_RW;
 
@@ -263,14 +270,14 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 	    if ((*ptep0 & PG_PS) == 0) {
 	    	addr1 = trunc_page(addr + size - 1);
 	    	if (trunc_page(addr) != addr1) {
-		    ptep1 = pmap_pte(kernel_pmap, addr1);
+		    ptep1 = pmap_pte_quick(kernel_pmap, addr1);
 		    oldmap1 = *ptep1;
 		    *ptep1 |= PG_RW;
 	    	}
 	    } else {
 		addr1 = trunc_4mpage(addr + size - 1);
 		if (trunc_4mpage(addr) != addr1) {
-		    ptep1 = pmap_pte(kernel_pmap, addr1);
+		    ptep1 = pmap_pte_quick(kernel_pmap, addr1);
 		    oldmap1 = *ptep1;
 		    *ptep1 |= PG_RW;
 		}

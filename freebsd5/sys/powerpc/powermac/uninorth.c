@@ -22,7 +22,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/powermac/uninorth.c,v 1.4 2002/09/19 04:49:58 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/powermac/uninorth.c,v 1.5 2003/04/18 02:42:27 grehan Exp $
  */
 
 #include <sys/param.h>
@@ -358,8 +358,6 @@ uninorth_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	case SYS_RES_MEMORY:
 		rm = &sc->sc_mem_rman;
 		bt = PPC_BUS_SPACE_MEM;
-                if (flags & PPC_BUS_SPARSE4)
-			bt |= 4;		
 		break;
 	case SYS_RES_IRQ:
 		return (bus_alloc_resource(bus, type, rid, start, end, count,

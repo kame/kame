@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/ubsec/ubsecvar.h,v 1.2.4.1 2003/01/07 21:46:54 sam Exp $ */
+/* $FreeBSD: src/sys/dev/ubsec/ubsecvar.h,v 1.6 2003/03/11 22:47:06 sam Exp $ */
 /*	$OpenBSD: ubsecvar.h,v 1.35 2002/09/24 18:33:26 jason Exp $	*/
 
 /*
@@ -52,6 +52,8 @@
 #define UBS_DEF_RTY		0xff	/* PCI Retry Timeout */
 #define UBS_DEF_TOUT		0xff	/* PCI TRDY Timeout */
 #define UBS_DEF_CACHELINE	0x01	/* Cache Line setting */
+
+#ifdef _KERNEL
 
 struct ubsec_dma_alloc {
 	u_int32_t		dma_paddr;
@@ -172,6 +174,8 @@ struct ubsec_q {
 #define	q_dst_segs	q_dst.segs
 #define	q_dst_mapsize	q_dst.mapsize
 
+struct rndstate_test;
+
 struct ubsec_softc {
 	device_t		sc_dev;		/* device backpointer */
 	struct mtx		sc_mtx;		/* per-driver lock */
@@ -199,6 +203,9 @@ struct ubsec_softc {
 	struct callout		sc_rngto;	/* rng timeout */
 	int			sc_rnghz;	/* rng poll time */
 	struct ubsec_q2_rng	sc_rng;
+	struct rndtest_state	*sc_rndtest;	/* RNG test state */
+	void			(*sc_harvest)(struct rndtest_state *,
+					void *, u_int);
 	struct ubsec_dma	sc_dmaa[UBS_MAX_NQUEUE];
 	struct ubsec_q		*sc_queuea[UBS_MAX_NQUEUE];
 	SIMPLEQ_HEAD(,ubsec_q2)	sc_q2free;	/* free list */
@@ -216,6 +223,7 @@ struct ubsec_session {
 	u_int32_t	ses_hmouter[5];		/* hmac outer state */
 	u_int32_t	ses_iv[2];		/* [3]DES iv */
 };
+#endif /* _KERNEL */
 
 struct ubsec_stats {
 	u_int64_t hst_ibytes;

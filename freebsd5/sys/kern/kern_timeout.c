@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_timeout.c,v 1.74 2002/09/05 11:42:03 phk Exp $
+ * $FreeBSD: src/sys/kern/kern_timeout.c,v 1.75 2003/02/01 10:06:40 phk Exp $
  */
 
 #include <sys/param.h>
@@ -197,9 +197,10 @@ softclock(void *dummy)
 				binuptime(&bt2);
 				bintime_sub(&bt2, &bt1);
 				if (bt2.frac > maxdt) {
+					maxdt = bt2.frac;
 					bintime2timespec(&bt2, &ts2);
 					printf(
-			"Expensive timeout(9) function: %p(%p) %d.%09ld\n",
+			"Expensive timeout(9) function: %p(%p) %d.%09ld s\n",
 					c_func, c_arg,
 					ts2.tv_sec, ts2.tv_nsec);
 				}

@@ -6,7 +6,7 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer 
+ *    notice, this list of conditions and the following disclaimer
  *    in this position and unchanged.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_machdep.c,v 1.33 2002/10/19 11:57:38 markm Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_machdep.c,v 1.39 2003/04/18 20:54:41 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -36,7 +36,6 @@
 #include <sys/proc.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
-#include <sys/stdint.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/unistd.h>
@@ -153,7 +152,7 @@ linux_ipc(struct thread *td, struct linux_ipc_args *args)
 		a.semid = args->arg1;
 		a.semnum = args->arg2;
 		a.cmd = args->arg3;
-		error = copyin((caddr_t)args->ptr, &a.arg, sizeof(a.arg));
+		error = copyin(args->ptr, &a.arg, sizeof(a.arg));
 		if (error)
 			return (error);
 		return (linux_semctl(td, &a));
@@ -179,7 +178,7 @@ linux_ipc(struct thread *td, struct linux_ipc_args *args)
 
 			if (args->ptr == NULL)
 				return (EINVAL);
-			error = copyin((caddr_t)args->ptr, &tmp, sizeof(tmp));
+			error = copyin(args->ptr, &tmp, sizeof(tmp));
 			if (error)
 				return (error);
 			a.msgp = tmp.msgp;
@@ -255,7 +254,7 @@ linux_old_select(struct thread *td, struct linux_old_select_args *args)
 		printf(ARGS(old_select, "%p"), args->ptr);
 #endif
 
-	error = copyin((caddr_t)args->ptr, &linux_args, sizeof(linux_args));
+	error = copyin(args->ptr, &linux_args, sizeof(linux_args));
 	if (error)
 		return (error);
 
@@ -314,11 +313,12 @@ linux_clone(struct thread *td, struct linux_clone_args *args)
 {
 	int error, ff = RFPROC | RFSTOPPED;
 	struct proc *p2;
+	struct thread *td2;
 	int exit_signal;
 
 #ifdef DEBUG
 	if (ldebug(clone)) {
-		printf(ARGS(clone, "flags %x, stack %x"), 
+		printf(ARGS(clone, "flags %x, stack %x"),
 		    (unsigned int)args->flags, (unsigned int)args->stack);
 		if (args->flags & CLONE_PID)
 			printf(LMSG("CLONE_PID not yet supported"));
@@ -342,35 +342,34 @@ linux_clone(struct thread *td, struct linux_clone_args *args)
 	if (!(args->flags & CLONE_FILES))
 		ff |= RFFDG;
 
-	mtx_lock(&Giant);
 	error = fork1(td, ff, 0, &p2);
-	if (error == 0) {
-		td->td_retval[0] = p2->p_pid;
-		td->td_retval[1] = 0;
+	if (error)
+		return (error);
+	
 
-		PROC_LOCK(p2);
-		p2->p_sigparent = exit_signal;
-		FIRST_THREAD_IN_PROC(p2)->td_frame->tf_esp =
-					(unsigned int)args->stack;
+	PROC_LOCK(p2);
+	p2->p_sigparent = exit_signal;
+	PROC_UNLOCK(p2);
+	td2 = FIRST_THREAD_IN_PROC(p2);
+	td2->td_frame->tf_esp = (unsigned int)args->stack;
 
 #ifdef DEBUG
-		if (ldebug(clone))
-			printf(LMSG("clone: successful rfork to %ld"),
-			    (long)p2->p_pid);
+	if (ldebug(clone))
+		printf(LMSG("clone: successful rfork to %ld, stack %p sig = %d"),
+		    (long)p2->p_pid, args->stack, exit_signal);
 #endif
 
-		/*
-		 * Make this runnable after we are finished with it.
-		 */
-		mtx_lock_spin(&sched_lock);
-		TD_SET_CAN_RUN(FIRST_THREAD_IN_PROC(p2));
-		setrunqueue(FIRST_THREAD_IN_PROC(p2));
-		mtx_unlock_spin(&sched_lock);
-		PROC_UNLOCK(p2);
-	}
-	mtx_unlock(&Giant);
+	/*
+	 * Make this runnable after we are finished with it.
+	 */
+	mtx_lock_spin(&sched_lock);
+	TD_SET_CAN_RUN(td2);
+	setrunqueue(td2);
+	mtx_unlock_spin(&sched_lock);
 
-	return (error);
+	td->td_retval[0] = p2->p_pid;
+	td->td_retval[1] = 0;
+	return (0);
 }
 
 /* XXX move */
@@ -395,9 +394,9 @@ linux_mmap2(struct thread *td, struct linux_mmap2_args *args)
 
 #ifdef DEBUG
 	if (ldebug(mmap2))
-		printf(ARGS(mmap2, "%p, %d, %d, 0x%08x, %d, %d"),       
-		    (void *)args->addr, args->len, args->prot,       
-		    args->flags, args->fd, args->pgoff);       
+		printf(ARGS(mmap2, "%p, %d, %d, 0x%08x, %d, %d"),
+		    (void *)args->addr, args->len, args->prot,
+		    args->flags, args->fd, args->pgoff);
 #endif
 
 	linux_args.addr = (l_caddr_t)args->addr;
@@ -416,7 +415,7 @@ linux_mmap(struct thread *td, struct linux_mmap_args *args)
 	int error;
 	struct l_mmap_argv linux_args;
 
-	error = copyin((caddr_t)args->ptr, &linux_args, sizeof(linux_args));
+	error = copyin(args->ptr, &linux_args, sizeof(linux_args));
 	if (error)
 		return (error);
 
@@ -443,7 +442,9 @@ linux_mmap_common(struct thread *td, struct l_mmap_argv *linux_args)
 		long pad;
 		off_t pos;
 	} */ bsd_args;
+	int error;
 
+	error = 0;
 	bsd_args.flags = 0;
 	if (linux_args->flags & LINUX_MAP_SHARED)
 		bsd_args.flags |= MAP_SHARED;
@@ -531,12 +532,18 @@ linux_mmap_common(struct thread *td, struct l_mmap_argv *linux_args)
 
 #ifdef DEBUG
 	if (ldebug(mmap))
-		printf("-> (%p, %d, %d, 0x%08x, %d, %d)\n",
+		printf("-> %s(%p, %d, %d, 0x%08x, %d, 0x%x)\n",
+		    __func__,
 		    (void *)bsd_args.addr, bsd_args.len, bsd_args.prot,
 		    bsd_args.flags, bsd_args.fd, (int)bsd_args.pos);
 #endif
-
-	return (mmap(td, &bsd_args));
+	error = mmap(td, &bsd_args);
+#ifdef DEBUG
+	if (ldebug(mmap))
+		printf("-> %s() return: 0x%x (0x%08x)\n",
+			__func__, error, (u_int)td->td_retval[0]);
+#endif
+	return (error);
 }
 
 int
@@ -683,8 +690,7 @@ linux_sigaction(struct thread *td, struct linux_sigaction_args *args)
 #endif
 
 	if (args->nsa != NULL) {
-		error = copyin((caddr_t)args->nsa, &osa,
-		    sizeof(l_osigaction_t));
+		error = copyin(args->nsa, &osa, sizeof(l_osigaction_t));
 		if (error)
 			return (error);
 		act.lsa_handler = osa.lsa_handler;
@@ -702,8 +708,7 @@ linux_sigaction(struct thread *td, struct linux_sigaction_args *args)
 		osa.lsa_flags = oact.lsa_flags;
 		osa.lsa_restorer = oact.lsa_restorer;
 		osa.lsa_mask = oact.lsa_mask.__bits[0];
-		error = copyout(&osa, (caddr_t)args->osa,
-		    sizeof(l_osigaction_t));
+		error = copyout(&osa, args->osa, sizeof(l_osigaction_t));
 	}
 
 	return (error);
@@ -767,7 +772,7 @@ linux_pause(struct thread *td, struct linux_pause_args *args)
 #endif
 
 	PROC_LOCK(p);
-	sigmask = p->p_sigmask;
+	sigmask = td->td_sigmask;
 	PROC_UNLOCK(p);
 	return (kern_sigsuspend(td, sigmask));
 }

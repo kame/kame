@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/powerpc/powerpc/mp_machdep.c,v 1.9 2001/07/26 18:47:37 bmilekic Exp $
+ *	$FreeBSD: src/sys/powerpc/powerpc/mp_machdep.c,v 1.10 2003/02/16 14:11:53 phk Exp $
  */
 
 #include <sys/param.h>
@@ -40,7 +40,6 @@
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #include <sys/user.h>
-#include <sys/dkstat.h>
 
 #include <machine/atomic.h>
 #include <machine/pmap.h>

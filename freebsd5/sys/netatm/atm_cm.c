@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.22 2002/11/08 18:27:29 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.25 2003/02/19 05:47:30 imp Exp $
  *
  */
 
@@ -57,7 +57,7 @@
 #include <netatm/atm_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.22 2002/11/08 18:27:29 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.25 2003/02/19 05:47:30 imp Exp $");
 #endif
 
 
@@ -2118,7 +2118,7 @@ atm_cm_match(ap, pcop)
 /*
  * Find Shareable LLC VCC
  * 
- * Given a endpoint-supplied connection attribute using LLC multiplexing,
+ * Given an endpoint-supplied connection attribute using LLC multiplexing,
  * this function will attempt to locate an existing connection which meets
  * the requirements of the supplied attributes.
  *

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/sio.c,v 1.181 2002/10/14 10:10:09 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/sio.c,v 1.190 2003/04/29 13:36:05 kan Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.234
  */
@@ -116,10 +116,10 @@
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/dkstat.h>
 #include <sys/fcntl.h>
 #include <sys/interrupt.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
@@ -136,7 +136,6 @@
 
 #include <isa/isavar.h>
 
-#include <machine/limits.h>
 #include <machine/resource.h>
 
 #include <dev/sio/sioreg.h>
@@ -185,6 +184,7 @@
 #define	COM_DEBUGGER(flags)	((flags) & 0x80)
 #define	COM_LOSESOUTINTS(flags)	((flags) & 0x08)
 #define	COM_NOFIFO(flags)		((flags) & 0x02)
+#define	COM_PPSCTS(flags)	((flags) & 0x10000)
 #define COM_ST16650A(flags)	((flags) & 0x20000)
 #define COM_C_NOPROBE		(0x40000)
 #define COM_NOPROBE(flags)	((flags) & COM_C_NOPROBE)
@@ -304,7 +304,7 @@ struct com_s {
 	Port_t	sts_port;
 	Port_t	in_modem_port;
 	Port_t	intr_ctrl_port;
-	Port_t	rsabase;	/* iobase address of a I/O-DATA RSA board */
+	Port_t	rsabase;	/* Iobase address of an I/O-DATA RSA board. */
 	int	intr_enable;
 	int	pc98_prev_modem_status;
 	int	pc98_modem_delta;
@@ -342,6 +342,7 @@ struct com_s {
 	struct timeval	timestamp;
 	struct timeval	dcd_timestamp;
 	struct	pps_state pps;
+	int	pps_bit;
 
 	u_long	bytes_in;	/* statistics */
 	u_long	bytes_out;
@@ -408,20 +409,16 @@ static	d_ioctl_t	sioioctl;
 
 #define	CDEV_MAJOR	28
 static struct cdevsw sio_cdevsw = {
-	/* open */	sioopen,
-	/* close */	sioclose,
-	/* read */	sioread,
-	/* write */	siowrite,
-	/* ioctl */	sioioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	sio_driver_name,
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	sioopen,
+	.d_close =	sioclose,
+	.d_read =	sioread,
+	.d_write =	siowrite,
+	.d_ioctl =	sioioctl,
+	.d_poll =	ttypoll,
+	.d_name =	sio_driver_name,
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 int	comconsole = -1;
@@ -1801,8 +1798,15 @@ determined_type: ;
 	com->devs[5] = make_dev(&sio_cdevsw,
 	    minorbase | CALLOUT_MASK | CONTROL_LOCK_STATE,
 	    UID_UUCP, GID_DIALER, 0660, "cuala%r", unit);
+	for (rid = 0; rid < 6; rid++)
+		com->devs[rid]->si_drv1 = com;
 	com->flags = flags;
 	com->pps.ppscap = PPS_CAPTUREASSERT | PPS_CAPTURECLEAR;
+
+	if (COM_PPSCTS(flags))
+		com->pps_bit = MSR_CTS;
+	else
+		com->pps_bit = MSR_DCD;
 	pps_init(&com->pps);
 
 	rid = 0;
@@ -2604,9 +2608,11 @@ more_intr:
 #endif /* PC98 */
 		if (com->pps.ppsparam.mode & PPS_CAPTUREBOTH) {
 			modem_status = inb(com->modem_status_port);
-		        if ((modem_status ^ com->last_modem_status) & MSR_DCD) {
+		        if ((modem_status ^ com->last_modem_status) &
+			    com->pps_bit) {
 				pps_capture(&com->pps);
-				pps_event(&com->pps, (modem_status & MSR_DCD) ? 
+				pps_event(&com->pps,
+				    (modem_status & com->pps_bit) ? 
 				    PPS_CAPTUREASSERT : PPS_CAPTURECLEAR);
 			}
 		}
@@ -4002,6 +4008,7 @@ CONS_DRIVER(sio, siocnprobe, siocninit, siocnterm, siocngetc, siocncheckc,
 /* To get the GDB related variables */
 #if DDB > 0
 #include <ddb/ddb.h>
+struct consdev gdbconsdev;
 #endif
 
 static void
@@ -4211,7 +4218,8 @@ siocnprobe(cp)
 				siogdbiobase = iobase;
 				siogdbunit = unit;
 #if DDB > 0
-				gdbdev = makedev(CDEV_MAJOR, unit);
+				gdbconsdev.cn_dev = makedev(CDEV_MAJOR, unit);
+				gdb_arg = &gdbconsdev;
 				gdb_getc = siocngetc;
 				gdb_putc = siocnputc;
 #endif
@@ -4225,14 +4233,15 @@ siocnprobe(cp)
 	 * If no gdb port has been specified, set it to be the console
 	 * as some configuration files don't specify the gdb port.
 	 */
-	if (gdbdev == NODEV && (boothowto & RB_GDB)) {
+	if (gdb_arg == NULL && (boothowto & RB_GDB)) {
 		printf("Warning: no GDB port specified. Defaulting to sio%d.\n",
 			siocnunit);
 		printf("Set flag 0x80 on desired GDB port in your\n");
 		printf("configuration file (currently sio only).\n");
 		siogdbiobase = siocniobase;
 		siogdbunit = siocnunit;
-		gdbdev = makedev(CDEV_MAJOR, siocnunit);
+		gdbconsdev.cn_dev = makedev(CDEV_MAJOR, siocnunit);
+		gdb_arg = &gdbconsdev;
 		gdb_getc = siocngetc;
 		gdb_putc = siocnputc;
 	}
@@ -4319,7 +4328,8 @@ siogdbattach(port, speed)
 	printf("sio%d: gdb debugging port\n", unit);
 	siogdbunit = unit;
 #if DDB > 0
-	gdbdev = makedev(CDEV_MAJOR, unit);
+	gdbconsdev.cn_dev = makedev(CDEV_MAJOR, unit);
+	gdb_arg = &gdbconsdev;
 	gdb_getc = siocngetc;
 	gdb_putc = siocnputc;
 #endif
@@ -4351,15 +4361,16 @@ siogdbattach(port, speed)
 #endif
 
 static int
-siocncheckc(dev)
-	dev_t	dev;
+siocncheckc(struct consdev *cd)
 {
 	int	c;
+	dev_t	dev;
 	Port_t	iobase;
 	int	s;
 	struct siocnstate	sp;
 	speed_t	speed;
 
+	dev = cd->cn_dev;
 	if (minor(dev) == siocnunit) {
 		iobase = siocniobase;
 		speed = comdefaultrate;
@@ -4380,15 +4391,16 @@ siocncheckc(dev)
 
 
 static int
-siocngetc(dev)
-	dev_t	dev;
+siocngetc(struct consdev *cd)
 {
 	int	c;
+	dev_t	dev;
 	Port_t	iobase;
 	int	s;
 	struct siocnstate	sp;
 	speed_t	speed;
 
+	dev = cd->cn_dev;
 	if (minor(dev) == siocnunit) {
 		iobase = siocniobase;
 		speed = comdefaultrate;
@@ -4407,16 +4419,16 @@ siocngetc(dev)
 }
 
 static void
-siocnputc(dev, c)
-	dev_t	dev;
-	int	c;
+siocnputc(struct consdev *cd, int c)
 {
 	int	need_unlock;
 	int	s;
+	dev_t 	dev;
 	struct siocnstate	sp;
 	Port_t	iobase;
 	speed_t	speed;
 
+	dev = cd->cn_dev;
 	if (minor(dev) == siocnunit) {
 		iobase = siocniobase;
 		speed = comdefaultrate;

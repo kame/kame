@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1999-2001 Robert N. M. Watson
+ * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_acl.c,v 1.32.2.1 2002/12/19 09:40:10 alfred Exp $
+ * $FreeBSD: src/sys/kern/kern_acl.c,v 1.40 2003/01/13 00:28:54 dillon Exp $
  */
 /*
  * Developed by the TrustedBSD Project.
@@ -45,6 +45,7 @@
 #include <sys/mutex.h>
 #include <sys/namei.h>
 #include <sys/file.h>
+#include <sys/filedesc.h>
 #include <sys/proc.h>
 #include <sys/sysent.h>
 #include <sys/errno.h>
@@ -692,8 +693,29 @@ __acl_get_file(struct thread *td, struct __acl_get_file_args *uap)
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, uap->path, td);
 	error = namei(&nd);
 	if (error == 0) {
-		error = vacl_get_acl(td, nd.ni_vp, uap->type, 
-			    uap->aclp);
+		error = vacl_get_acl(td, nd.ni_vp, uap->type, uap->aclp);
+		NDFREE(&nd, 0);
+	}
+	mtx_unlock(&Giant);
+	return (error);
+}
+
+/*
+ * Given a file path, get an ACL for it; don't follow links.
+ *
+ * MPSAFE
+ */
+int
+__acl_get_link(struct thread *td, struct __acl_get_link_args *uap)
+{
+	struct nameidata nd;
+	int error;
+
+	mtx_lock(&Giant);
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->path, td);
+	error = namei(&nd);
+	if (error == 0) {
+		error = vacl_get_acl(td, nd.ni_vp, uap->type, uap->aclp);
 		NDFREE(&nd, 0);
 	}
 	mtx_unlock(&Giant);
@@ -715,8 +737,29 @@ __acl_set_file(struct thread *td, struct __acl_set_file_args *uap)
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, uap->path, td);
 	error = namei(&nd);
 	if (error == 0) {
-		error = vacl_set_acl(td, nd.ni_vp, uap->type,
-			    uap->aclp);
+		error = vacl_set_acl(td, nd.ni_vp, uap->type, uap->aclp);
+		NDFREE(&nd, 0);
+	}
+	mtx_unlock(&Giant);
+	return (error);
+}
+
+/*
+ * Given a file path, set an ACL for it; don't follow links.
+ *
+ * MPSAFE
+ */
+int
+__acl_set_link(struct thread *td, struct __acl_set_link_args *uap)
+{
+	struct nameidata nd;
+	int error;
+
+	mtx_lock(&Giant);
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->path, td);
+	error = namei(&nd);
+	if (error == 0) {
+		error = vacl_set_acl(td, nd.ni_vp, uap->type, uap->aclp);
 		NDFREE(&nd, 0);
 	}
 	mtx_unlock(&Giant);
@@ -737,8 +780,7 @@ __acl_get_fd(struct thread *td, struct __acl_get_fd_args *uap)
 	mtx_lock(&Giant);
 	error = getvnode(td->td_proc->p_fd, uap->filedes, &fp);
 	if (error == 0) {
-		error = vacl_get_acl(td, (struct vnode *)fp->f_data,
-			    uap->type, uap->aclp);
+		error = vacl_get_acl(td, fp->f_data, uap->type, uap->aclp);
 		fdrop(fp, td);
 	}
 	mtx_unlock(&Giant);
@@ -759,8 +801,7 @@ __acl_set_fd(struct thread *td, struct __acl_set_fd_args *uap)
 	mtx_lock(&Giant);
 	error = getvnode(td->td_proc->p_fd, uap->filedes, &fp);
 	if (error == 0) {
-		error = vacl_set_acl(td, (struct vnode *)fp->f_data,
-			    uap->type, uap->aclp);
+		error = vacl_set_acl(td, fp->f_data, uap->type, uap->aclp);
 		fdrop(fp, td);
 	}
 	mtx_unlock(&Giant);
@@ -790,6 +831,28 @@ __acl_delete_file(struct thread *td, struct __acl_delete_file_args *uap)
 }
 
 /*
+ * Given a file path, delete an ACL from it; don't follow links.
+ *
+ * MPSAFE
+ */
+int
+__acl_delete_link(struct thread *td, struct __acl_delete_link_args *uap)
+{
+	struct nameidata nd;
+	int error;
+
+	mtx_lock(&Giant);
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->path, td);
+	error = namei(&nd);
+	if (error == 0) {
+		error = vacl_delete(td, nd.ni_vp, uap->type);
+		NDFREE(&nd, 0);
+	}
+	mtx_unlock(&Giant);
+	return (error);
+}
+
+/*
  * Given a file path, delete an ACL from it.
  *
  * MPSAFE
@@ -803,8 +866,7 @@ __acl_delete_fd(struct thread *td, struct __acl_delete_fd_args *uap)
 	mtx_lock(&Giant);
 	error = getvnode(td->td_proc->p_fd, uap->filedes, &fp);
 	if (error == 0) {
-		error = vacl_delete(td, (struct vnode *)fp->f_data, 
-			    uap->type);
+		error = vacl_delete(td, fp->f_data, uap->type);
 		fdrop(fp, td);
 	}
 	mtx_unlock(&Giant);
@@ -826,8 +888,29 @@ __acl_aclcheck_file(struct thread *td, struct __acl_aclcheck_file_args *uap)
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, uap->path, td);
 	error = namei(&nd);
 	if (error == 0) {
-		error = vacl_aclcheck(td, nd.ni_vp, uap->type,
-			    uap->aclp);
+		error = vacl_aclcheck(td, nd.ni_vp, uap->type, uap->aclp);
+		NDFREE(&nd, 0);
+	}
+	mtx_unlock(&Giant);
+	return (error);
+}
+
+/*
+ * Given a file path, check an ACL for it; don't follow links.
+ *
+ * MPSAFE
+ */
+int
+__acl_aclcheck_link(struct thread *td, struct __acl_aclcheck_link_args *uap)
+{
+	struct nameidata	nd;
+	int	error;
+
+	mtx_lock(&Giant);
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->path, td);
+	error = namei(&nd);
+	if (error == 0) {
+		error = vacl_aclcheck(td, nd.ni_vp, uap->type, uap->aclp);
 		NDFREE(&nd, 0);
 	}
 	mtx_unlock(&Giant);
@@ -848,8 +931,7 @@ __acl_aclcheck_fd(struct thread *td, struct __acl_aclcheck_fd_args *uap)
 	mtx_lock(&Giant);
 	error = getvnode(td->td_proc->p_fd, uap->filedes, &fp);
 	if (error == 0) {
-		error = vacl_aclcheck(td, (struct vnode *)fp->f_data,
-			    uap->type, uap->aclp);
+		error = vacl_aclcheck(td, fp->f_data, uap->type, uap->aclp);
 		fdrop(fp, td);
 	}
 	mtx_unlock(&Giant);

@@ -1,5 +1,5 @@
-# $FreeBSD: src/sys/modules/drm/Makefile,v 1.1 2002/04/27 20:54:49 anholt Exp $
+# $FreeBSD: src/sys/modules/drm/Makefile,v 1.2 2003/03/09 02:08:29 anholt Exp $
 
-SUBDIR = gamma mga r128 radeon tdfx
+SUBDIR = mga r128 radeon tdfx
 
 .include <bsd.subdir.mk>

@@ -22,7 +22,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/include/intr_machdep.h,v 1.1 2002/07/09 11:12:16 benno Exp $
+ * $FreeBSD: src/sys/powerpc/include/intr_machdep.h,v 1.2 2003/02/01 07:20:36 benno Exp $
  */
 
 #ifndef	_MACHINE_INTR_MACHDEP_H_
@@ -37,10 +37,11 @@ struct intr_handler {
 	void		*ih_arg;
 	struct		ithd *ih_ithd;
 	u_int		ih_irq;
+	u_int		ih_flags;
 };
 
 void	intr_init(void (*)(void), int, void (*)(int), void (*)(int));
-void	intr_setup(u_int, ih_func_t *, void *);
+void	intr_setup(u_int, ih_func_t *, void *, u_int);
 int	inthand_add(const char *, u_int, void (*)(void *), void *, int,
 	    void **);
 int	inthand_remove(u_int, void *);

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/pci_cfgreg.h,v 1.8 2002/09/06 22:15:44 jhb Exp $
+ * $FreeBSD: src/sys/i386/include/pci_cfgreg.h,v 1.9 2003/02/18 03:36:48 peter Exp $
  *
  */
 
@@ -51,6 +51,4 @@ int		pci_cfgregopen(void);
 u_int32_t	pci_cfgregread(int bus, int slot, int func, int reg, int bytes);
 void		pci_cfgregwrite(int bus, int slot, int func, int reg, u_int32_t data, int bytes);
 int		pci_cfgintr(int bus, int device, int pin, int oldirq);
-int		pci_kill_pcibios(void);
-int		pci_pcibios_active(void);
 int		pci_probe_route_table(int bus);

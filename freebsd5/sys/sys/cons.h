@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.h	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/sys/cons.h,v 1.28 2002/03/19 20:18:36 alfred Exp $
+ * $FreeBSD: src/sys/sys/cons.h,v 1.29 2003/02/20 20:54:45 phk Exp $
  */
 
 #ifndef _MACHINE_CONS_H_
@@ -46,10 +46,10 @@ struct consdev;
 typedef	void	cn_probe_t(struct consdev *);
 typedef	void	cn_init_t(struct consdev *);
 typedef	void	cn_term_t(struct consdev *);
-typedef	int	cn_getc_t(dev_t);
-typedef	int	cn_checkc_t(dev_t);
-typedef	void	cn_putc_t(dev_t, int);
-typedef	void	cn_dbctl_t(dev_t, int);
+typedef	int	cn_getc_t(struct consdev *);
+typedef	int	cn_checkc_t(struct consdev *);
+typedef	void	cn_putc_t(struct consdev *, int);
+typedef	void	cn_dbctl_t(struct consdev *, int);
 
 struct consdev {
 	cn_probe_t	*cn_probe;
@@ -69,6 +69,7 @@ struct consdev {
 	struct	tty *cn_tp;	/* tty structure for console device */
 	dev_t	cn_dev;		/* major/minor of device */
 	short	cn_pri;		/* pecking order; the higher the better */
+	void	*cn_arg;	/* drivers method argument */
 };
 
 /* values for cn_pri - reflect our policy for console selection */

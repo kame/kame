@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/bootp_subr.c,v 1.42 2002/08/18 07:04:59 sobomax Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/bootp_subr.c,v 1.47 2003/02/19 05:47:38 imp Exp $");
 
 #include "opt_bootp.h"
 
@@ -375,7 +375,9 @@ bootpboot_p_rtlist(void)
 {
 
 	printf("Routing table:\n");
+	RADIX_NODE_LOCK(rt_tables[AF_INET]);	/* could sleep XXX */
 	bootpboot_p_tree(rt_tables[AF_INET]->rnh_treetop);
+	RADIX_NODE_UNLOCK(rt_tables[AF_INET]);
 }
 
 void
@@ -401,6 +403,7 @@ bootpboot_p_iflist(void)
 	struct ifaddr *ifa;
 
 	printf("Interface list:\n");
+	IFNET_RLOCK(); /* could sleep, but okay for debugging XXX */
 	for (ifp = TAILQ_FIRST(&ifnet);
 	     ifp != NULL;
 	     ifp = TAILQ_NEXT(ifp, if_link)) {
@@ -410,6 +413,7 @@ bootpboot_p_iflist(void)
 			if (ifa->ifa_addr->sa_family == AF_INET)
 				bootpboot_p_if(ifp, ifa);
 	}
+	IFNET_RUNLOCK();
 }
 #endif /* defined(BOOTP_DEBUG) */
 
@@ -1382,7 +1386,7 @@ bootpc_compose_query(struct bootpc_ifcontext *ifctx,
 	*vendp = TAG_END;
 
 	ifctx->call.secs = 0;
-	ifctx->call.flags = htons(0x8000); /* We need an broadcast answer */
+	ifctx->call.flags = htons(0x8000); /* We need a broadcast answer */
 }
 
 static int
@@ -1689,6 +1693,7 @@ bootpc_init(void)
 	       __XSTRING(BOOTP_WIRED_TO));
 #endif
 	bzero(&ifctx->ireq, sizeof(ifctx->ireq));
+	IFNET_RLOCK();
 	for (ifp = TAILQ_FIRST(&ifnet);
 	     ifp != NULL;
 	     ifp = TAILQ_NEXT(ifp, if_link)) {
@@ -1712,6 +1717,7 @@ bootpc_init(void)
 		gctx->lastinterface = ifctx;
 		ifctx = allocifctx(gctx);
 	}
+	IFNET_RUNLOCK();
 	free(ifctx, M_TEMP);
 
 	if (gctx->interfaces == NULL) {

@@ -23,18 +23,19 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pccbb/pccbbdevid.h,v 1.9 2002/08/10 06:35:03 imp Exp $
+ * $FreeBSD: src/sys/dev/pccbb/pccbbdevid.h,v 1.12 2003/05/04 12:49:37 imp Exp $
  */
 
 /* Vendor/Device IDs */
-#define PCIC_ID_INTEL_82092AA	0x12218086ul	/* 16bit I/O */
 #define	PCIC_ID_CLPD6729	0x11001013ul	/* 16bit I/O */
 #define	PCIC_ID_CLPD6832	0x11101013ul
 #define	PCIC_ID_CLPD6833	0x11131013ul
 #define	PCIC_ID_CLPD6834	0x11121013ul
-#define PCIC_ID_OMEGA_82C094	0x1221119bul	/* 16bit I/O */
-#define	PCIC_ID_OZ6729		0x67291217ul
-#define	PCIC_ID_OZ6730		0x673A1217ul
+#define	PCIC_ID_INTEL_82092AA_0	0x12218086ul	/* 16bit I/O */
+#define	PCIC_ID_INTEL_82092AA_1	0x12228086ul	/* 16bit I/O */
+#define	PCIC_ID_OMEGA_82C094	0x1221119bul	/* 16bit I/O */
+#define	PCIC_ID_OZ6729		0x67291217ul	/* 16bit I/O */
+#define	PCIC_ID_OZ6730		0x673A1217ul	/* 16bit I/O */
 #define	PCIC_ID_OZ6832		0x68321217ul	/* Also 6833 */
 #define	PCIC_ID_OZ6860		0x68361217ul	/* Also 6836 */
 #define	PCIC_ID_OZ6872		0x68721217ul	/* Also 6812 */
@@ -47,6 +48,7 @@
 #define	PCIC_ID_RICOH_RL5C476	0x04761180ul
 #define	PCIC_ID_RICOH_RL5C477	0x04771180ul
 #define	PCIC_ID_RICOH_RL5C478	0x04781180ul
+#define	PCIC_ID_SMC_34C90	0xb10610b3ul	/* XXX */
 #define	PCIC_ID_TI1031		0xac13104cul
 #define	PCIC_ID_TI1130		0xac12104cul
 #define	PCIC_ID_TI1131		0xac15104cul
@@ -66,11 +68,21 @@
 #define	PCIC_ID_TI1450		0xac1b104cul
 #define	PCIC_ID_TI1451		0xac52104cul
 #define PCIC_ID_TI1510		0xac56104cul
+#define PCIC_ID_TI1515		0xac58104cul
 #define PCIC_ID_TI1520		0xac55104cul
+#define PCIC_ID_TI1530		0xac57104cul
+#define PCIC_ID_TI1620		0xac54104cul
 #define	PCIC_ID_TI4410		0xac41104cul
 #define	PCIC_ID_TI4450		0xac40104cul
 #define	PCIC_ID_TI4451		0xac42104cul
 #define PCIC_ID_TI4510		0xac44104cul
+#define PCIC_ID_TI4520		0xac46104cul
+#define PCIC_ID_TI7410		0xac49104cul
+#define PCIC_ID_TI7510		0xac47104cul
+#define PCIC_ID_TI7610		0xac48104cul
+#define PCIC_ID_TI7610M		0xac4a104cul
+#define PCIC_ID_TI7610SD	0xac4b104cul
+#define PCIC_ID_TI7610MS	0xac4c104cul
 #define	PCIC_ID_TOPIC95		0x06031179ul
 #define	PCIC_ID_TOPIC95B	0x060a1179ul
 #define	PCIC_ID_TOPIC97		0x060f1179ul
@@ -80,7 +92,6 @@
  * Other ID, from sources too vague to be reliable
  *	Mfg		  model		PCI ID
  *   smc/Databook	DB87144		0x310610b3
- *   SMC/databook	smc34c90	0xb10610b3
  *   Omega/Trident	82c194		0x01941023
  *   Omega/Trident	82c722		0x07221023?
  *   Opti		82c814		0xc8141045

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.35 2002/08/25 13:16:54 charnier Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.38 2003/04/30 12:57:38 markm Exp $
  */
 
 #include "opt_kbd.h"
@@ -34,6 +34,7 @@
 #include <sys/kernel.h>
 #include <sys/bus.h>
 #include <sys/proc.h>
+#include <sys/limits.h>
 #include <sys/malloc.h>
 
 #include <machine/bus.h>
@@ -167,8 +168,6 @@ atkbd_timeout(void *arg)
 
 /* LOW-LEVEL */
 
-#include <machine/limits.h>
-
 #define ATKBD_DEFAULT	0
 
 typedef struct atkbd_state {
@@ -206,7 +205,7 @@ static kbd_get_state_t	atkbd_get_state;
 static kbd_set_state_t	atkbd_set_state;
 static kbd_poll_mode_t	atkbd_poll;
 
-keyboard_switch_t atkbdsw = {
+static keyboard_switch_t atkbdsw = {
 	atkbd_probe,
 	atkbd_init,
 	atkbd_term,
@@ -1225,7 +1224,7 @@ init_keyboard(KBDC kbdc, int *type, int flags)
 		 * the self-test, or the keyboard controller on the
 		 * motherboard and the keyboard somehow fail to shake hands.
 		 * It is just possible, particularly in the last case,
-		 * that the keyoard controller may be left in a hung state.
+		 * that the keyboard controller may be left in a hung state.
 		 * test_controller() and test_kbd_port() appear to bring
 		 * the keyboard controller back (I don't know why and how,
 		 * though.)

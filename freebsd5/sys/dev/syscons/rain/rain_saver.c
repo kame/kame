@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/rain/rain_saver.c,v 1.11 2002/03/25 02:55:34 brooks Exp $
+ * $FreeBSD: src/sys/dev/syscons/rain/rain_saver.c,v 1.12 2003/02/02 13:52:25 alfred Exp $
  */
 
 #include <sys/param.h>
@@ -41,6 +41,9 @@
 #include <dev/syscons/syscons.h>
 
 #define SAVER_NAME	 "rain_saver"
+#ifdef MAX
+#undef MAX
+#endif
 #define MAX		 63	/* number of colors (in addition to black) */
 #define INCREMENT	 4	/* increment between colors */
 

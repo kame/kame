@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/mac_policy.h,v 1.34 2002/12/09 03:44:28 rwatson Exp $
+ * $FreeBSD: src/sys/sys/mac_policy.h,v 1.39 2003/04/18 19:57:37 rwatson Exp $
  */
 /*
  * Kernel interface for MAC policy modules.
@@ -73,7 +73,7 @@ struct mac_policy_ops {
 	void	(*mpo_init_cred_label)(struct label *label);
 	void	(*mpo_init_devfsdirent_label)(struct label *label);
 	void	(*mpo_init_ifnet_label)(struct label *label);
-	void	(*mpo_init_ipq_label)(struct label *label);
+	int	(*mpo_init_ipq_label)(struct label *label, int flag);
 	int	(*mpo_init_mbuf_label)(struct label *label, int flag);
 	void	(*mpo_init_mount_label)(struct label *label);
 	void	(*mpo_init_mount_fs_label)(struct label *label);
@@ -95,6 +95,8 @@ struct mac_policy_ops {
 	void	(*mpo_destroy_pipe_label)(struct label *label);
 	void	(*mpo_destroy_proc_label)(struct label *label);
 	void	(*mpo_destroy_vnode_label)(struct label *label);
+	void	(*mpo_copy_mbuf_label)(struct label *src,
+		    struct label *dest);
 	void	(*mpo_copy_pipe_label)(struct label *src,
 		    struct label *dest);
 	void	(*mpo_copy_vnode_label)(struct label *src,
@@ -322,12 +324,15 @@ struct mac_policy_ops {
 		    struct socket *so, struct label *socketlabel);
 	int	(*mpo_check_socket_visible)(struct ucred *cred,
 		    struct socket *so, struct label *socketlabel);
+	int	(*mpo_check_sysarch_ioperm)(struct ucred *cred);
 	int	(*mpo_check_system_acct)(struct ucred *cred,
 		    struct vnode *vp, struct label *vlabel);
 	int	(*mpo_check_system_nfsd)(struct ucred *cred);
 	int	(*mpo_check_system_reboot)(struct ucred *cred, int howto);
 	int	(*mpo_check_system_settime)(struct ucred *cred);
 	int	(*mpo_check_system_swapon)(struct ucred *cred,
+		    struct vnode *vp, struct label *label);
+	int	(*mpo_check_system_swapoff)(struct ucred *cred,
 		    struct vnode *vp, struct label *label);
 	int	(*mpo_check_system_sysctl)(struct ucred *cred, int *name,
 		    u_int namelen, void *old, size_t *oldlenp, int inkernel,
@@ -428,6 +433,7 @@ struct mac_policy_conf {
 /* Flags for the mpc_loadtime_flags field. */
 #define	MPC_LOADTIME_FLAG_NOTLATE	0x00000001
 #define	MPC_LOADTIME_FLAG_UNLOADOK	0x00000002
+#define	MPC_LOADTIME_FLAG_LABELMBUFS	0x00000004
 
 /* Flags for the mpc_runtime_flags field. */
 #define	MPC_RUNTIME_FLAG_REGISTERED	0x00000001

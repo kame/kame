@@ -30,7 +30,7 @@
 #include "opt_fb.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.2.2.1 2003/01/10 05:18:09 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.4 2003/03/03 12:15:47 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -97,20 +97,14 @@ static struct gfb_type tga_devs[] = {
 #ifdef FB_INSTALL_CDEV
 
 static struct cdevsw tga_cdevsw = {
-	/* open */	pcigfb_open,
-	/* close */	pcigfb_close,
-	/* read */	pcigfb_read,
-	/* write */	pcigfb_write,
-	/* ioctl */	pcigfb_ioctl,
-	/* poll */	nopoll,
-	/* mmap */	pcigfb_mmap,
-	/* strategy */	nostrategy,
-	/* name */	"tga",
-	/* maj */	-1,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
-	/* kqfilter */	nokqfilter
+	.d_open =	pcigfb_open,
+	.d_close =	pcigfb_close,
+	.d_read =	pcigfb_read,
+	.d_write =	pcigfb_write,
+	.d_ioctl =	pcigfb_ioctl,
+	.d_mmap =	pcigfb_mmap,
+	.d_name =	"tga",
+	.d_maj =	-1,
 };
 
 #endif /* FB_INSTALL_CDEV */

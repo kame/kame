@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/exception.s,v 1.99 2002/11/07 01:34:23 davidxu Exp $
+ * $FreeBSD: src/sys/i386/i386/exception.s,v 1.103 2003/02/17 09:55:08 julian Exp $
  */
 
 #include "opt_npx.h"
@@ -81,34 +81,16 @@
 			.type __CONCAT(X,name),@function; __CONCAT(X,name):
 #define	TRAP(a)		pushl $(a) ; jmp alltraps
 
-#ifdef BDE_DEBUGGER
-#define	BDBTRAP(name) \
-	ss ; \
-	cmpb	$0,_bdb_exists ; \
-	je	1f ; \
-	testb	$SEL_RPL_MASK,4(%esp) ; \
-	jne	1f ; \
-	ss ; \
-	.globl	__CONCAT(__CONCAT(bdb_,name),_ljmp); \
-__CONCAT(__CONCAT(bdb_,name),_ljmp): \
-	ljmp	$0,$0 ; \
-1:
-#else
-#define BDBTRAP(name)
-#endif
-
 MCOUNT_LABEL(user)
 MCOUNT_LABEL(btrap)
 
 IDTVEC(div)
 	pushl $0; TRAP(T_DIVIDE)
 IDTVEC(dbg)
-	BDBTRAP(dbg)
 	pushl $0; TRAP(T_TRCTRAP)
 IDTVEC(nmi)
 	pushl $0; TRAP(T_NMI)
 IDTVEC(bpt)
-	BDBTRAP(bpt)
 	pushl $0; TRAP(T_BPTFLT)
 IDTVEC(ofl)
 	pushl $0; TRAP(T_OFLOW)
@@ -298,8 +280,7 @@ doreti_ast:
 	 */
 	cli
 	movl	PCPU(CURTHREAD),%eax
-	movl	TD_KSE(%eax), %eax
-	testl	$KEF_ASTPENDING | KEF_NEEDRESCHED,KE_FLAGS(%eax)
+	testl	$TDF_ASTPENDING | TDF_NEEDRESCHED,TD_FLAGS(%eax)
 	je	doreti_exit
 	sti
 	pushl	%esp			/* pass a pointer to the trapframe */

@@ -27,7 +27,7 @@
 /*
  * als4000.c - driver for the Avance Logic ALS 4000 chipset.
  *
- * The ALS4000 is a effectively an SB16 with a PCI interface.
+ * The ALS4000 is effectively an SB16 with a PCI interface.
  *
  * This driver derives from ALS4000a.PDF, Bart Hartgers alsa driver, and
  * SB16 register descriptions.
@@ -42,7 +42,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/als4000.c,v 1.8 2001/10/24 21:42:06 jhb Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/als4000.c,v 1.10 2003/02/20 17:31:11 cognet Exp $");
 
 /* Debugging macro's */
 #undef DEB
@@ -334,7 +334,7 @@ als_playback_start(struct sc_chinfo *ch)
 	struct	sc_info *sc = ch->parent;
 	u_int32_t	buf, bufsz, count, dma_prog;
 
-	buf = vtophys(sndbuf_getbuf(ch->buffer));
+	buf = sndbuf_getbufaddr(ch->buffer);
 	bufsz = sndbuf_getsize(ch->buffer);
 	count = bufsz / 2;
 	if (ch->format & AFMT_16BIT)
@@ -428,7 +428,7 @@ als_capture_start(struct sc_chinfo *ch)
 	struct	sc_info *sc = ch->parent;
 	u_int32_t	buf, bufsz, count, dma_prog;
 
-	buf = vtophys(sndbuf_getbuf(ch->buffer));
+	buf = sndbuf_getbufaddr(ch->buffer);
 	bufsz = sndbuf_getsize(ch->buffer);
 	count = bufsz / 2;
 	if (ch->format & AFMT_16BIT)

@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/mii/xmphy.c,v 1.10 2002/10/29 00:20:47 semenu Exp $
  */
 
 /*
@@ -38,28 +36,25 @@
  * here is full/half duplex. Speed is always 1000mbps.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.12 2003/04/03 21:36:30 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 
-
 #include <net/if.h>
 #include <net/if_media.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-#include <dev/mii/miidevs.h>
+#include "miidevs.h"
 
 #include <dev/mii/xmphyreg.h>
 
 #include "miibus_if.h"
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.10 2002/10/29 00:20:47 semenu Exp $";
-#endif
 
 static int xmphy_probe(device_t);
 static int xmphy_attach(device_t);

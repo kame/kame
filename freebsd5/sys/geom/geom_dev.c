@@ -32,11 +32,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_dev.c,v 1.32.2.3 2003/01/13 21:04:15 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_dev.c,v 1.58 2003/05/09 21:25:28 phk Exp $
  */
 
 #include <sys/param.h>
-#include <sys/stdint.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
@@ -48,42 +47,33 @@
 #include <sys/time.h>
 #include <sys/disk.h>
 #include <sys/fcntl.h>
+#include <sys/limits.h>
 #include <geom/geom.h>
 #include <geom/geom_int.h>
-#include <machine/limits.h>
-
-#define CDEV_MAJOR	4
 
 static d_open_t		g_dev_open;
 static d_close_t	g_dev_close;
 static d_strategy_t	g_dev_strategy;
 static d_ioctl_t	g_dev_ioctl;
-static d_psize_t	g_dev_psize;
 
 static struct cdevsw g_dev_cdevsw = {
-	/* open */      g_dev_open,
-	/* close */     g_dev_close,
-	/* read */      physread,
-	/* write */     physwrite,
-	/* ioctl */     g_dev_ioctl,
-	/* poll */      nopoll,
-	/* mmap */      nommap,
-	/* strategy */  g_dev_strategy,
-	/* name */      "g_dev",
-	/* maj */       CDEV_MAJOR,
-	/* dump */      nodump,
-	/* psize */     g_dev_psize,
-	/* flags */     D_DISK | D_CANFREE | D_TRACKCLOSE,
-	/* kqfilter */	nokqfilter
+	.d_open =	g_dev_open,
+	.d_close =	g_dev_close,
+	.d_read =	physread,
+	.d_write =	physwrite,
+	.d_ioctl =	g_dev_ioctl,
+	.d_strategy =	g_dev_strategy,
+	.d_name =	"g_dev",
+	.d_maj =	GEOM_MAJOR,
+	.d_flags =	D_DISK | D_TRACKCLOSE,
 };
 
 static g_taste_t g_dev_taste;
 static g_orphan_t g_dev_orphan;
 
 static struct g_class g_dev_class	= {
-	"DEV",
-	g_dev_taste,
-	NULL,
+	.name = "DEV",
+	.taste = g_dev_taste,
 	G_CLASS_INITIALIZER
 };
 
@@ -101,6 +91,13 @@ g_dev_print(void)
 	return (1);
 }
 
+/*
+ * XXX: This is disgusting and wrong in every way imaginable:  The only reason
+ * XXX: we have a clone function is because of the root-mount hack we currently
+ * XXX: employ.  An improvment would be to unregister this cloner once we know
+ * XXX: we no longer need it.  Ideally, root-fs would be mounted through DEVFS
+ * XXX: eliminating the need for this hack.
+ */
 static void
 g_dev_clone(void *arg __unused, char *name, int namelen __unused, dev_t *dev)
 {
@@ -111,7 +108,6 @@ g_dev_clone(void *arg __unused, char *name, int namelen __unused, dev_t *dev)
 
 	g_waitidle();
 
-	/* XXX: can I drop Giant here ??? */
 	/* g_topology_lock(); */
 	LIST_FOREACH(gp, &g_dev_class.geom, geom) {
 		if (strcmp(gp->name, name))
@@ -143,7 +139,7 @@ g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
-	static int unit;
+	static int unit = GEOM_MINOR_PROVIDERS;
 	int error;
 	dev_t dev;
 
@@ -166,9 +162,13 @@ g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	mtx_lock(&Giant);
 	dev = make_dev(&g_dev_cdevsw, unit2minor(unit++),
 	    UID_ROOT, GID_OPERATOR, 0640, gp->name);
+	if (pp->flags & G_PF_CANDELETE)
+		dev->si_flags |= SI_CANDELETE;
 	mtx_unlock(&Giant);
 	g_topology_lock();
-
+	dev->si_iosize_max = MAXPHYS;
+	dev->si_stripesize = pp->stripesize;
+	dev->si_stripeoffset = pp->stripeoffset;
 	gp->softc = dev;
 	dev->si_drv1 = gp;
 	dev->si_drv2 = cp;
@@ -184,13 +184,11 @@ g_dev_open(dev_t dev, int flags, int fmt, struct thread *td)
 
 	gp = dev->si_drv1;
 	cp = dev->si_drv2;
-	if (gp == NULL || cp == NULL)
-		return(ENXIO);
+	if (gp == NULL || cp == NULL || gp->softc != dev)
+		return(ENXIO);		/* g_dev_taste() not done yet */
+
 	g_trace(G_T_ACCESS, "g_dev_open(%s, %d, %d, %p)",
 	    gp->name, flags, fmt, td);
-	DROP_GIANT();
-	g_topology_lock();
-	g_silence();
 	r = flags & FREAD ? 1 : 0;
 	w = flags & FWRITE ? 1 : 0;
 #ifdef notyet
@@ -198,11 +196,17 @@ g_dev_open(dev_t dev, int flags, int fmt, struct thread *td)
 #else
 	e = 0;
 #endif
-	error = g_access_rel(cp, r, w, e);
+	DROP_GIANT();
+	g_topology_lock();
+	if (dev->si_devsw == NULL)
+		error = ENXIO;		/* We were orphaned */
+	else
+		error = g_access_rel(cp, r, w, e);
 	g_topology_unlock();
 	PICKUP_GIANT();
 	g_waitidle();
-	dev->si_bsize_phys = cp->provider->sectorsize;
+	if (!error)
+		dev->si_bsize_phys = cp->provider->sectorsize;
 	return(error);
 }
 
@@ -211,7 +215,7 @@ g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
-	int error, r, w, e;
+	int error, r, w, e, i;
 
 	gp = dev->si_drv1;
 	cp = dev->si_drv2;
@@ -219,9 +223,6 @@ g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
 		return(ENXIO);
 	g_trace(G_T_ACCESS, "g_dev_close(%s, %d, %d, %p)",
 	    gp->name, flags, fmt, td);
-	DROP_GIANT();
-	g_topology_lock();
-	g_silence();
 	r = flags & FREAD ? -1 : 0;
 	w = flags & FWRITE ? -1 : 0;
 #ifdef notyet
@@ -229,13 +230,38 @@ g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
 #else
 	e = 0;
 #endif
-	error = g_access_rel(cp, r, w, e);
+	DROP_GIANT();
+	g_topology_lock();
+	if (dev->si_devsw == NULL)
+		error = ENXIO;		/* We were orphaned */
+	else
+		error = g_access_rel(cp, r, w, e);
+	for (i = 0; i < 10 * hz;) {
+		if (cp->acr != 0 || cp->acw != 0)
+			break;
+ 		if (cp->nstart == cp->nend)
+			break;
+		tsleep(&i, PRIBIO, "gdevwclose", hz / 10);
+		i += hz / 10;
+	}
+	if (cp->acr == 0 && cp->acw == 0 && cp->nstart != cp->nend) {
+		printf("WARNING: Final close of geom_dev(%s) %s %s",
+		    gp->name,
+		    "still has outstanding I/O after 10 seconds.",
+		    "Completing close anyway, panic may happen later.");
+	}
 	g_topology_unlock();
 	PICKUP_GIANT();
 	g_waitidle();
 	return (error);
 }
 
+/*
+ * XXX: Until we have unmessed the ioctl situation, there is a race against
+ * XXX: a concurrent orphanization.  We cannot close it by holding topology
+ * XXX: since that would prevent us from doing our job, and stalling events
+ * XXX: will break (actually: stall) the BSD disklabel hacks.
+ */
 static int
 g_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 {
@@ -254,8 +280,11 @@ g_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 	gio = NULL;
 
 	error = 0;
+	KASSERT(cp->acr || cp->acw,
+	    ("Consumer with zero access count in g_dev_ioctl"));
 	DROP_GIANT();
 
+	gio = NULL;
 	i = IOCPARM_LEN(cmd);
 	switch (cmd) {
 	case DIOCGSECTORSIZE:
@@ -318,10 +347,8 @@ g_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 		KASSERT(gio->func != NULL, ("NULL function but EDIRIOCTL"));
 		error = (gio->func)(gio->dev, cmd, data, fflag, td);
 	}
-	if (gio != NULL)
-		g_free(gio);
 	g_waitidle();
-	if (error == ENOIOCTL) {
+	if (gio != NULL && (error == EOPNOTSUPP || error == ENOIOCTL)) {
 		if (g_debugflags & G_T_TOPOLOGY) {
 			i = IOCGROUP(cmd);
 			printf("IOCTL(0x%lx) \"%s\"", cmd, gp->name);
@@ -338,19 +365,9 @@ g_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 		}
 		error = ENOTTY;
 	}
+	if (gio != NULL)
+		g_free(gio);
 	return (error);
-}
-
-static int
-g_dev_psize(dev_t dev)
-{
-	struct g_consumer *cp;
-	off_t mediasize;
-
-	cp = dev->si_drv2;
-
-	mediasize = cp->provider->mediasize;
-	return (mediasize >> DEV_BSHIFT);
 }
 
 static void
@@ -358,7 +375,7 @@ g_dev_done(struct bio *bp2)
 {
 	struct bio *bp;
 
-	bp = bp2->bio_linkage;
+	bp = bp2->bio_parent;
 	bp->bio_error = bp2->bio_error;
 	if (bp->bio_error != 0) {
 		g_trace(G_T_BIO, "g_dev_done(%p) had error %d",
@@ -390,6 +407,9 @@ g_dev_strategy(struct bio *bp)
 	dev = bp->bio_dev;
 	gp = dev->si_drv1;
 	cp = dev->si_drv2;
+	KASSERT(cp->acr || cp->acw,
+	    ("Consumer with zero access count in g_dev_strategy"));
+
 	bp2 = g_clone_bio(bp);
 	KASSERT(bp2 != NULL, ("XXX: ENOMEM in a bad place"));
 	bp2->bio_offset = (off_t)bp->bio_blkno << DEV_BSHIFT;
@@ -403,17 +423,22 @@ g_dev_strategy(struct bio *bp)
 	    bp, bp2, (intmax_t)bp->bio_offset, (intmax_t)bp2->bio_length,
 	    bp2->bio_data, bp2->bio_cmd);
 	g_io_request(bp2, cp);
+	KASSERT(cp->acr || cp->acw,
+	    ("g_dev_strategy raced with g_dev_close and lost"));
+
 }
 
 /*
  * g_dev_orphan()
  *
- * Called from below when the provider orphaned us.  It is our responsibility
- * to get the access counts back to zero, until we do so the stack below will
- * not unravel.  We must clear the kernel-dump settings, if this is the
- * current dumpdev.  We call destroy_dev(9) to send our dev_t the way of
- * punched cards and if we have non-zero access counts, we call down with
- * them negated before we detattch and selfdestruct.
+ * Called from below when the provider orphaned us.
+ * - Clear any dump settings.
+ * - Destroy the dev_t to prevent any more request from coming in.  The
+ *   provider is already marked with an error, so anything which comes in
+ *   in the interrim will be returned immediately.
+ * - Wait for any outstanding I/O to finish.
+ * - Set our access counts to zero, whatever they were.
+ * - Detach and self-destruct.
  */
 
 static void
@@ -422,18 +447,25 @@ g_dev_orphan(struct g_consumer *cp)
 	struct g_geom *gp;
 	dev_t dev;
 
-	gp = cp->geom;
-	g_trace(G_T_TOPOLOGY, "g_dev_orphan(%p(%s))", cp, gp->name);
 	g_topology_assert();
-	if (cp->biocount > 0)
-		return;
+	gp = cp->geom;
 	dev = gp->softc;
+	g_trace(G_T_TOPOLOGY, "g_dev_orphan(%p(%s))", cp, gp->name);
+
+	/* Reset any dump-area set on this device */
 	if (dev->si_flags & SI_DUMPDEV)
 		set_dumper(NULL);
-	/* XXX: we may need Giant for now */
+
+	/* Destroy the dev_t so we get no more requests */
 	destroy_dev(dev);
+
+	/* Wait for the cows to come home */
+	while (cp->nstart != cp->nend)
+		msleep(&dev, NULL, PRIBIO, "gdevorphan", hz / 10);
+
 	if (cp->acr > 0 || cp->acw > 0 || cp->ace > 0)
 		g_access_rel(cp, -cp->acr, -cp->acw, -cp->ace);
+
 	g_detach(cp);
 	g_destroy_consumer(cp);
 	g_destroy_geom(gp);

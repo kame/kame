@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_bsdextended/mac_bsdextended.c,v 1.9.2.1 2002/12/31 05:21:33 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_bsdextended/mac_bsdextended.c,v 1.14 2003/03/27 19:26:38 rwatson Exp $
  */
 /*
  * Developed by the TrustedBSD Project.
@@ -295,6 +295,22 @@ mac_bsdextended_check(struct ucred *cred, uid_t object_uid, gid_t object_gid,
 	}
 
 	return (0);
+}
+
+static int
+mac_bsdextended_check_system_swapon(struct ucred *cred, struct vnode *vp,
+    struct label *label)
+{
+	struct vattr vap;
+	int error;
+
+	if (!mac_bsdextended_enabled)
+		return (0);
+
+	error = VOP_GETATTR(vp, &vap, cred, curthread);
+	if (error)
+		return (error);
+	return (mac_bsdextended_check(cred, vap.va_uid, vap.va_gid, VWRITE));
 }
 
 static int
@@ -729,6 +745,7 @@ static struct mac_policy_ops mac_bsdextended_ops =
 {
 	.mpo_destroy = mac_bsdextended_destroy,
 	.mpo_init = mac_bsdextended_init,
+	.mpo_check_system_swapon = mac_bsdextended_check_system_swapon,
 	.mpo_check_vnode_access = mac_bsdextended_check_vnode_access,
 	.mpo_check_vnode_chdir = mac_bsdextended_check_vnode_chdir,
 	.mpo_check_vnode_chroot = mac_bsdextended_check_vnode_chroot,
@@ -755,5 +772,5 @@ static struct mac_policy_ops mac_bsdextended_ops =
 	.mpo_check_vnode_stat = mac_bsdextended_check_vnode_stat,
 };
 
-MAC_POLICY_SET(&mac_bsdextended_ops, trustedbsd_mac_bsdextended,
+MAC_POLICY_SET(&mac_bsdextended_ops, mac_bsdextended,
     "TrustedBSD MAC/BSD Extended", MPC_LOADTIME_FLAG_UNLOADOK, NULL);

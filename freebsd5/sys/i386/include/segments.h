@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)segments.h	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/include/segments.h,v 1.32 2002/09/26 05:07:41 peter Exp $
+ * $FreeBSD: src/sys/i386/include/segments.h,v 1.33 2003/01/28 19:05:44 jake Exp $
  */
 
 #ifndef _MACHINE_SEGMENTS_H_
@@ -199,11 +199,7 @@ struct region_descriptor {
 #define GBIOSUTIL_SEL	13	/* BIOS interface (Utility) */
 #define GBIOSARGS_SEL	14	/* BIOS interface (Arguments) */
 
-#ifdef BDE_DEBUGGER
-#define	NGDT		18	/* some of 11-17 are reserved for debugger */
-#else
 #define NGDT 		15
-#endif
 
 /*
  * Entries in the Local Descriptor Table (LDT)

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/pmap.h,v 1.52 2002/11/13 05:39:58 alc Exp $
+ * $FreeBSD: src/sys/vm/pmap.h,v 1.57 2003/04/10 18:42:06 jhb Exp $
  */
 
 /*
@@ -89,11 +89,13 @@ typedef struct pmap_statistics *pmap_statistics_t;
 struct proc;
 struct thread;
 
+/*
+ * Updates to kernel_vm_end are synchronized by the kernel_map's system mutex.
+ */
+extern vm_offset_t kernel_vm_end;
+
 extern	int	 pmap_pagedaemon_waken;
 
-#ifdef __alpha__
-void		 pmap_page_is_free(vm_page_t m);
-#endif
 void		 pmap_change_wiring(pmap_t, vm_offset_t, boolean_t);
 void		 pmap_clear_modify(vm_page_t m);
 void		 pmap_clear_reference(vm_page_t m);
@@ -101,20 +103,17 @@ void		 pmap_copy(pmap_t, pmap_t, vm_offset_t, vm_size_t, vm_offset_t);
 void		 pmap_copy_page(vm_page_t, vm_page_t);
 void		 pmap_enter(pmap_t, vm_offset_t, vm_page_t, vm_prot_t,
 		    boolean_t);
-vm_offset_t	 pmap_extract(pmap_t pmap, vm_offset_t va);
+vm_paddr_t	 pmap_extract(pmap_t pmap, vm_offset_t va);
 void		 pmap_growkernel(vm_offset_t);
-void		 pmap_init(vm_offset_t, vm_offset_t);
+void		 pmap_init(vm_paddr_t, vm_paddr_t);
 boolean_t	 pmap_is_modified(vm_page_t m);
 boolean_t	 pmap_ts_referenced(vm_page_t m);
-void		 pmap_kenter(vm_offset_t va, vm_offset_t pa);
-void		 pmap_kremove(vm_offset_t);
-vm_offset_t	 pmap_map(vm_offset_t *, vm_offset_t, vm_offset_t, int);
+vm_offset_t	 pmap_map(vm_offset_t *, vm_paddr_t, vm_paddr_t, int);
 void		 pmap_object_init_pt(pmap_t pmap, vm_offset_t addr,
 		    vm_object_t object, vm_pindex_t pindex, vm_offset_t size,
 		    int pagelimit);
 boolean_t	 pmap_page_exists_quick(pmap_t pmap, vm_page_t m);
 void		 pmap_page_protect(vm_page_t m, vm_prot_t prot);
-vm_offset_t	 pmap_phys_address(int);
 void		 pmap_pinit(pmap_t);
 void		 pmap_pinit0(pmap_t);
 void		 pmap_pinit2(pmap_t);

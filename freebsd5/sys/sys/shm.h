@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/sys/shm.h,v 1.17 2002/03/19 20:18:41 alfred Exp $ */
+/* $FreeBSD: src/sys/sys/shm.h,v 1.19 2003/01/25 21:33:05 alfred Exp $ */
 /*	$NetBSD: shm.h,v 1.15 1994/06/29 06:45:17 cgd Exp $	*/
 
 /*
@@ -97,19 +97,25 @@ struct shm_info {
 
 struct thread;
 struct proc;
+struct vmspace;
 
-void	shmexit(struct proc *);
+void	shmexit(struct vmspace *);
 void	shmfork(struct proc *, struct proc *);
 #else /* !_KERNEL */
 
 #include <sys/cdefs.h>
 
+#ifndef _SIZE_T_DECLARED
+typedef __size_t        size_t;
+#define _SIZE_T_DECLARED
+#endif
+
 __BEGIN_DECLS
 int shmsys(int, ...);
-void *shmat(int, void *, int);
-int shmget(key_t, int, int);
+void *shmat(int, const void *, int);
+int shmget(key_t, size_t, int);
 int shmctl(int, int, struct shmid_ds *);
-int shmdt(void *);
+int shmdt(const void *);
 __END_DECLS
 
 #endif /* !_KERNEL */

@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/elf_machdep.c,v 1.9 2002/10/19 19:30:38 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/elf_machdep.c,v 1.11 2003/05/16 21:26:40 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -59,8 +59,8 @@ struct sysentvec elf64_freebsd_sysvec = {
 	NULL,
 	__elfN(freebsd_fixup),
 	sendsig,
-	sigcode,
-	&szsigcode,
+	NULL,		/* sigcode */
+	NULL,		/* &szsigcode */
 	NULL,
 	"FreeBSD ELF64",
 	__elfN(coredump),
@@ -141,8 +141,8 @@ lookup_fdesc(linker_file_t lf, Elf_Word symidx)
 }
 
 /* Process one elf relocation with addend. */
-int
-elf_reloc(linker_file_t lf, const void *data, int type)
+static int
+elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
 {
 	Elf_Addr relocbase = (Elf_Addr)lf->address;
 	Elf_Addr *where;
@@ -179,6 +179,12 @@ elf_reloc(linker_file_t lf, const void *data, int type)
 		panic("%s: invalid ELF relocation (0x%x)\n", __func__, type);
 	}
 
+	if (local) {
+		if (rtype == R_IA64_REL64LSB)
+			*where = relocbase + addend;
+		return (0);
+	}
+
 	switch (rtype) {
 	case R_IA64_NONE:
 		break;
@@ -199,7 +205,6 @@ elf_reloc(linker_file_t lf, const void *data, int type)
 		*where = addr;
 		break;
 	case R_IA64_REL64LSB:	/* word64 LSB	BD + A */
-		*where = relocbase + addend;
 		break;
 	case R_IA64_IPLTLSB:
 		addr = lookup_fdesc(lf, symidx);
@@ -215,6 +220,20 @@ elf_reloc(linker_file_t lf, const void *data, int type)
 	}
 
 	return (0);
+}
+
+int
+elf_reloc(linker_file_t lf, const void *data, int type)
+{
+
+	return (elf_reloc_internal(lf, data, type, 0));
+}
+
+int
+elf_reloc_local(linker_file_t lf, const void *data, int type)
+{
+
+	return (elf_reloc_internal(lf, data, type, 1));
 }
 
 int
@@ -243,7 +262,7 @@ elf_cpu_load_file(linker_file_t lf)
 
 		if (ph->p_type == PT_IA_64_UNWIND) {
 			vaddr = ph->p_vaddr + reloc;
-			ia64_add_unwind_table((vm_offset_t)lf->address, vaddr,
+			unw_table_add((vm_offset_t)lf->address, vaddr,
 			    vaddr + ph->p_memsz);
 		}
 		++ph;
@@ -256,6 +275,6 @@ int
 elf_cpu_unload_file(linker_file_t lf)
 {
 
-	ia64_delete_unwind_table((vm_offset_t)lf->address);
+	unw_table_remove((vm_offset_t)lf->address);
 	return (0);
 }

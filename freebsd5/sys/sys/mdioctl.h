@@ -41,7 +41,7 @@
  *
  * From: src/sys/sys/vnioctl.h,v 1.4
  *
- * $FreeBSD: src/sys/sys/mdioctl.h,v 1.10 2001/12/20 06:38:21 dd Exp $
+ * $FreeBSD: src/sys/sys/mdioctl.h,v 1.13 2003/04/09 11:59:28 phk Exp $
  */
 
 #ifndef _SYS_MDIOCTL_H_
@@ -53,6 +53,7 @@ enum md_types {MD_MALLOC, MD_PRELOAD, MD_VNODE, MD_SWAP};
  * Ioctl definitions for memory disk pseudo-device.
  */
 
+#define MDNPAD		97
 struct md_ioctl {
 	unsigned	md_version;	/* Structure layout version */
 	unsigned	md_unit;	/* unit number */
@@ -61,7 +62,10 @@ struct md_ioctl {
 	unsigned	md_size;	/* size of disk in DEV_BSIZE units */
 	unsigned	md_options;	/* options */
 	u_int64_t	md_base;	/* base address */
-	int		pad[100];	/* padding for future ideas */
+	int		md_secsize;	/* sectorsize */
+	int		md_fwheads;	/* firmware heads */
+	int		md_fwsectors;	/* firmware sectors */
+	int		md_pad[MDNPAD];	/* padding for future ideas */
 };
 
 #define MD_NAME		"md"
@@ -78,6 +82,7 @@ struct md_ioctl {
 #define MDIOCATTACH	_IOWR('m', 0, struct md_ioctl)	/* attach disk */
 #define MDIOCDETACH	_IOWR('m', 1, struct md_ioctl)	/* detach disk */
 #define MDIOCQUERY	_IOWR('m', 2, struct md_ioctl)	/* query status */
+#define MDIOCLIST	_IOWR('m', 3, struct md_ioctl)	/* query status */
 
 #define MD_CLUSTER	0x01	/* Don't cluster */
 #define MD_RESERVE	0x02	/* Pre-reserve swap */

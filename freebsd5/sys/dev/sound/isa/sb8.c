@@ -34,9 +34,11 @@
 #include  <dev/sound/isa/sb.h>
 #include  <dev/sound/chip.h>
 
+#include <isa/isavar.h>
+
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.69 2002/01/25 04:14:05 scottl Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.71 2003/02/07 14:05:33 nyan Exp $");
 
 #define SB_DEFAULT_BUFSZ	4096
 
@@ -127,7 +129,7 @@ port_rd(struct resource *port, int off)
 static void
 port_wr(struct resource *port, int off, u_int8_t data)
 {
-	return bus_space_write_1(rman_get_bustag(port), rman_get_bushandle(port), off, data);
+	bus_space_write_1(rman_get_bustag(port), rman_get_bushandle(port), off, data);
 }
 
 static int
@@ -582,7 +584,7 @@ sbchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *c
 	ch->buffer = b;
 	if (sndbuf_alloc(ch->buffer, sb->parent_dmat, sb->bufsize) == -1)
 		return NULL;
-	sndbuf_isadmasetup(ch->buffer, sb->drq);
+	sndbuf_dmasetup(ch->buffer, sb->drq);
 	return ch;
 }
 
@@ -621,7 +623,7 @@ sbchan_trigger(kobj_t obj, void *data, int go)
 	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
 		return 0;
 
-	sndbuf_isadma(ch->buffer, go);
+	sndbuf_dma(ch->buffer, go);
 	if (go == PCMTRIG_START)
 		sb_start(ch);
 	else
@@ -634,7 +636,7 @@ sbchan_getptr(kobj_t obj, void *data)
 {
 	struct sb_chinfo *ch = data;
 
-	return sndbuf_isadmaptr(ch->buffer);
+	return sndbuf_dmaptr(ch->buffer);
 }
 
 static struct pcmchan_caps *

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from BSDI $Id: ktr.h,v 1.10.2.7 2000/03/16 21:44:42 cp Exp $
- * $FreeBSD: src/sys/sys/ktr.h,v 1.20 2002/09/22 07:13:45 jeff Exp $
+ * $FreeBSD: src/sys/sys/ktr.h,v 1.21 2003/03/11 20:07:22 jhb Exp $
  */
 
 /*
@@ -65,7 +65,7 @@
 #define	KTR_INIT	0x00004000		/* System initialization */
 #define KTR_KGDB	0x00008000		/* Trace kgdb internals */
 #define	KTR_IO		0x00010000		/* Upper I/O  */
-#define KTR_LOCKMGR	0x00020000
+#define	KTR_EVH		0x00020000		/* Eventhandler */
 #define KTR_NFS		0x00040000		/* The obvious */
 #define KTR_VOP		0x00080000		/* The obvious */
 #define KTR_VM		0x00100000		/* The virtual memory system */

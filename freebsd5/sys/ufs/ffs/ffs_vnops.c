@@ -40,7 +40,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vnops.c	8.15 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vnops.c,v 1.100 2002/10/18 22:52:40 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_vnops.c,v 1.109.2.1 2003/06/01 03:21:13 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -50,6 +50,7 @@
 #include <sys/conf.h>
 #include <sys/extattr.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
@@ -58,8 +59,6 @@
 #include <sys/stat.h>
 #include <sys/vmmeter.h>
 #include <sys/vnode.h>
-
-#include <machine/limits.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -76,7 +75,11 @@
 
 #include <ufs/ffs/fs.h>
 #include <ufs/ffs/ffs_extern.h>
+#include "opt_directio.h"
 
+#ifdef DIRECTIO
+extern int	ffs_rawread(struct vnode *vp, struct uio *uio, int *workdone);
+#endif
 static int	ffs_fsync(struct vop_fsync_args *);
 static int	ffs_getpages(struct vop_getpages_args *);
 static int	ffs_read(struct vop_read_args *);
@@ -184,7 +187,7 @@ ffs_fsync(ap)
 	VI_LOCK(vp);
 loop:
 	TAILQ_FOREACH(bp, &vp->v_dirtyblkhd, b_vnbufs)
-		bp->b_flags &= ~B_SCANNED;
+		bp->b_vflags &= ~BV_SCANNED;
 	for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
 		nbp = TAILQ_NEXT(bp, b_vnbufs);
 		/* 
@@ -195,22 +198,21 @@ loop:
 		 * it to be redirtied and it has not already been deferred,
 		 * or it is already being written.
 		 */
-		if ((bp->b_flags & B_SCANNED) != 0)
+		if ((bp->b_vflags & BV_SCANNED) != 0)
 			continue;
-		bp->b_flags |= B_SCANNED;
+		bp->b_vflags |= BV_SCANNED;
 		if ((skipmeta == 1 && bp->b_lblkno < 0))
+			continue;
+		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT, NULL))
 			continue;
 		if (!wait && LIST_FIRST(&bp->b_dep) != NULL &&
 		    (bp->b_flags & B_DEFERRED) == 0 &&
 		    buf_countdeps(bp, 0)) {
 			bp->b_flags |= B_DEFERRED;
+			BUF_UNLOCK(bp);
 			continue;
 		}
 		VI_UNLOCK(vp);
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT)) {
-			VI_LOCK(vp);
-			continue;
-		}
 		if ((bp->b_flags & B_DELWRI) == 0)
 			panic("ffs_fsync: not dirty");
 		if (vp != bp->b_vp)
@@ -228,7 +230,6 @@ loop:
 			 */
 			if (passes > 0 || !wait) {
 				if ((bp->b_flags & B_CLUSTEROK) && !wait) {
-					BUF_UNLOCK(bp);
 					(void) vfs_bio_awrite(bp);
 				} else {
 					bremfree(bp);
@@ -253,10 +254,9 @@ loop:
 			splx(s);
 			brelse(bp);
 			s = splbio();
-		} else {
-			BUF_UNLOCK(bp);
+		} else
 			vfs_bio_awrite(bp);
-		}
+
 		/*
 		 * Since we may have slept during the I/O, we need 
 		 * to start from a known point.
@@ -352,6 +352,15 @@ ffs_read(ap)
 #else
 		panic("ffs_read+IO_EXT");
 #endif
+#ifdef DIRECTIO
+	if ((ioflag & IO_DIRECT) != 0) {
+		int workdone;
+
+		error = ffs_rawread(vp, uio, &workdone);
+		if (error != 0 || workdone != 0)
+			return error;
+	}
+#endif
 
 	GIANT_REQUIRED;
 
@@ -390,45 +399,6 @@ ffs_read(ap)
 		vm_object_reference(object);
 	}
 
-#ifdef ENABLE_VFS_IOOPT
-	/*
-	 * If IO optimisation is turned on,
-	 * and we are NOT a VM based IO request, 
-	 * (i.e. not headed for the buffer cache)
-	 * but there IS a vm object associated with it.
-	 */
-	if ((ioflag & IO_VMIO) == 0 && (vfs_ioopt > 1) && object) {
-		int nread, toread;
-
-		toread = uio->uio_resid;
-		if (toread > bytesinfile)
-			toread = bytesinfile;
-		if (toread >= PAGE_SIZE) {
-			/*
-			 * Then if it's at least a page in size, try 
-			 * get the data from the object using vm tricks
-			 */
-			error = uioread(toread, uio, object, &nread);
-			if ((uio->uio_resid == 0) || (error != 0)) {
-				/*
-				 * If we finished or there was an error
-				 * then finish up (the reference previously
-				 * obtained on object must be released).
-				 */
-				if ((error == 0 ||
-				    uio->uio_resid != orig_resid) &&
-				    (vp->v_mount->mnt_flag & MNT_NOATIME) == 0)
-					ip->i_flag |= IN_ACCESS;
-
-				if (object) {
-					vm_object_vndeallocate(object);
-				}
-				return error;
-			}
-		}
-	}
-#endif
-
 	/*
 	 * Ok so we couldn't do it all in one vm trick...
 	 * so cycle around trying smaller bites..
@@ -436,52 +406,6 @@ ffs_read(ap)
 	for (error = 0, bp = NULL; uio->uio_resid > 0; bp = NULL) {
 		if ((bytesinfile = ip->i_size - uio->uio_offset) <= 0)
 			break;
-#ifdef ENABLE_VFS_IOOPT
-		if ((ioflag & IO_VMIO) == 0 && (vfs_ioopt > 1) && object) {
-			/*
-			 * Obviously we didn't finish above, but we
-			 * didn't get an error either. Try the same trick again.
-			 * but this time we are looping.
-			 */
-			int nread, toread;
-			toread = uio->uio_resid;
-			if (toread > bytesinfile)
-				toread = bytesinfile;
-
-			/*
-			 * Once again, if there isn't enough for a
-			 * whole page, don't try optimising.
-			 */
-			if (toread >= PAGE_SIZE) {
-				error = uioread(toread, uio, object, &nread);
-				if ((uio->uio_resid == 0) || (error != 0)) {
-					/*
-					 * If we finished or there was an 
-					 * error then finish up (the reference
-					 * previously obtained on object must 
-					 * be released).
-					 */
-					if ((error == 0 ||
-					    uio->uio_resid != orig_resid) &&
-					    (vp->v_mount->mnt_flag &
-					    MNT_NOATIME) == 0)
-						ip->i_flag |= IN_ACCESS;
-					if (object) {
-						vm_object_vndeallocate(object);
-					}
-					return error;
-				}
-				/*
-				 * To get here we didnt't finish or err.
-				 * If we did get some data,
-				 * loop to try another bite.
-				 */
-				if (nread > 0) {
-					continue;
-				}
-			}
-		}
-#endif
 
 		lbn = lblkno(fs, uio->uio_offset);
 		nextlbn = lbn + 1;
@@ -576,22 +500,6 @@ ffs_read(ap)
 			xfersize = size;
 		}
 
-#ifdef ENABLE_VFS_IOOPT
-		if (vfs_ioopt && object &&
-		    (bp->b_flags & B_VMIO) &&
-		    ((blkoffset & PAGE_MASK) == 0) &&
-		    ((xfersize & PAGE_MASK) == 0)) {
-			/*
-			 * If VFS IO  optimisation is turned on,
-			 * and it's an exact page multiple
-			 * And a normal VM based op,
-			 * then use uiomiveco()
-			 */
-			error =
-				uiomoveco((char *)bp->b_data + blkoffset,
-					(int)xfersize, uio, object, 0);
-		} else 
-#endif
 		{
 			/*
 			 * otherwise use the general form
@@ -641,6 +549,7 @@ ffs_read(ap)
 	}
 
 	if (object) {
+		VM_OBJECT_LOCK(object);
 		vm_object_vndeallocate(object);
 	}
 	if ((error == 0 || uio->uio_resid != orig_resid) &&
@@ -705,6 +614,7 @@ ffs_write(ap)
 			uio->uio_offset = ip->i_size;
 		if ((ip->i_flags & APPEND) && uio->uio_offset != ip->i_size) {
 			if (object) {
+				VM_OBJECT_LOCK(object);
 				vm_object_vndeallocate(object);
 			}
 			return (EPERM);
@@ -726,6 +636,7 @@ ffs_write(ap)
 	if (uio->uio_offset < 0 ||
 	    (u_int64_t)uio->uio_offset + uio->uio_resid > fs->fs_maxfilesize) {
 		if (object) {
+			VM_OBJECT_LOCK(object);
 			vm_object_vndeallocate(object);
 		}
 		return (EFBIG);
@@ -742,6 +653,7 @@ ffs_write(ap)
 		psignal(td->td_proc, SIGXFSZ);
 		PROC_UNLOCK(td->td_proc);
 		if (object) {
+			VM_OBJECT_LOCK(object);
 			vm_object_vndeallocate(object);
 		}
 		return (EFBIG);
@@ -756,13 +668,6 @@ ffs_write(ap)
 	if ((ioflag & IO_SYNC) && !DOINGASYNC(vp))
 		flags |= IO_SYNC;
 
-#ifdef ENABLE_VFS_IOOPT
-	if (object && (object->flags & OBJ_OPT)) {
-		vm_freeze_copyopts(object,
-			OFF_TO_IDX(uio->uio_offset),
-			OFF_TO_IDX(uio->uio_offset + uio->uio_resid + PAGE_MASK));
-	}
-#endif
 	for (error = 0; uio->uio_resid > 0;) {
 		lbn = lblkno(fs, uio->uio_offset);
 		blkoffset = blkoff(fs, uio->uio_offset);
@@ -873,6 +778,7 @@ ffs_write(ap)
 		error = UFS_UPDATE(vp, 1);
 
 	if (object) {
+		VM_OBJECT_LOCK(object);
 		vm_object_vndeallocate(object);
 	}
 
@@ -1518,6 +1424,10 @@ struct vop_openextattr_args {
 	fs = ip->i_fs;
 	if (fs->fs_magic == FS_UFS1_MAGIC)
 		return (ufs_vnoperate((struct vop_generic_args *)ap));
+
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
+
 	return (ffs_open_ea(ap->a_vp, ap->a_cred, ap->a_td));
 }
 
@@ -1544,6 +1454,10 @@ struct vop_closeextattr_args {
 	fs = ip->i_fs;
 	if (fs->fs_magic == FS_UFS1_MAGIC)
 		return (ufs_vnoperate((struct vop_generic_args *)ap));
+
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
+
 	return (ffs_close_ea(ap->a_vp, ap->a_commit, ap->a_cred, ap->a_td));
 }
 
@@ -1579,6 +1493,9 @@ vop_getextattr {
 
 	if (fs->fs_magic == FS_UFS1_MAGIC)
 		return (ufs_vnoperate((struct vop_generic_args *)ap));
+
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
 
 	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
 	    ap->a_cred, ap->a_td, IREAD);
@@ -1665,6 +1582,9 @@ vop_setextattr {
 
 	if (fs->fs_magic == FS_UFS1_MAGIC)
 		return (ufs_vnoperate((struct vop_generic_args *)ap));
+
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
 
 	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
 	    ap->a_cred, ap->a_td, IWRITE);

@@ -28,7 +28,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder.c,v 1.24 2002/11/25 17:17:42 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder.c,v 1.29 2003/03/05 14:48:28 orion Exp $");
 
 MALLOC_DEFINE(M_FEEDER, "feeder", "pcm feeder");
 
@@ -59,7 +59,7 @@ feeder_register(void *p)
 		KASSERT(fc->desc == NULL, ("first feeder not root: %s", fc->name));
 
 		SLIST_INIT(&feedertab);
-		fte = malloc(sizeof(*fte), M_FEEDER, M_WAITOK | M_ZERO);
+		fte = malloc(sizeof(*fte), M_FEEDER, M_NOWAIT | M_ZERO);
 		if (fte == NULL) {
 			printf("can't allocate memory for root feeder: %s\n",
 			    fc->name);
@@ -84,7 +84,7 @@ feeder_register(void *p)
 	i = 0;
 	while ((feedercnt < MAXFEEDERS) && (fc->desc[i].type > 0)) {
 		/* printf("adding feeder %s, %x -> %x\n", fc->name, fc->desc[i].in, fc->desc[i].out); */
-		fte = malloc(sizeof(*fte), M_FEEDER, M_WAITOK | M_ZERO);
+		fte = malloc(sizeof(*fte), M_FEEDER, M_NOWAIT | M_ZERO);
 		if (fte == NULL) {
 			printf("can't allocate memory for feeder '%s', %x -> %x\n", fc->name, fc->desc[i].in, fc->desc[i].out);
 
@@ -387,6 +387,10 @@ feed_root(struct pcm_feeder *feeder, struct pcm_channel *ch, u_int8_t *buffer, u
 
 	l = min(count, sndbuf_getready(src));
 	sndbuf_dispose(src, buffer, l);
+
+	/* When recording only return as much data as available */
+	if (ch->direction == PCMDIR_REC)
+		return l;
 
 /*
 	if (l < count)

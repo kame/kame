@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.34 2002/09/14 08:56:10 benno Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.36 2003/04/28 22:07:40 archie Exp $
  * $Whistle: ng_ksocket.c,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -749,12 +749,13 @@ ng_ksocket_rcvmsg(node_p node, item_p item, hook_p lasthook)
 				so->so_state &= ~SS_ISCONNECTING;
 				ERROUT(error);
 			}
-			if ((so->so_state & SS_ISCONNECTING) != 0)
+			if ((so->so_state & SS_ISCONNECTING) != 0) {
 				/* We will notify the sender when we connect */
 				priv->response_token = msg->header.token;
 				raddr = priv->response_addr = NGI_RETADDR(item);
 				priv->flags |= KSF_CONNECTING;
 				ERROUT(EINPROGRESS);
+			}
 			break;
 		    }
 

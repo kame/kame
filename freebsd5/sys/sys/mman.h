@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mman.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/mman.h,v 1.34 2002/09/13 18:29:15 mike Exp $
+ * $FreeBSD: src/sys/sys/mman.h,v 1.35 2003/03/31 21:09:56 wes Exp $
  */
 
 #ifndef _SYS_MMAN_H_
@@ -124,6 +124,7 @@
 #define	MADV_AUTOSYNC	7	/* revert to default flushing strategy */
 #define	MADV_NOCORE	8	/* do not include these pages in a core file */
 #define	MADV_CORE	9	/* revert to including pages in a core file */
+#define	MADV_PROTECT	10	/* protect process from pageout kill */
 
 /*
  * Return bits from mincore

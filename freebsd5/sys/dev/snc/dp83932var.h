@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/snc/dp83932var.h,v 1.2 2002/03/20 02:07:42 alfred Exp $	*/
+/*	$FreeBSD: src/sys/dev/snc/dp83932var.h,v 1.3 2003/02/10 13:31:49 nyan Exp $	*/
 /*	$NecBSD: dp83932var.h,v 1.3 1999/01/24 01:39:51 kmatsuda Exp $	*/
 /*	$NetBSD: if_snvar.h,v 1.12 1998/05/01 03:42:47 scottr Exp $	*/
 
@@ -34,7 +34,11 @@
 #endif
 
 /* NetBSD Emulation */
+#ifdef __NetBSD__
+#define	splhardnet	splnet
+#endif
 #ifdef __FreeBSD__
+#define	splhardnet	splimp
 #ifndef NBPG
 #define NBPG PAGE_SIZE
 #endif

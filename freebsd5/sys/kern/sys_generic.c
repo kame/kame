@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_generic.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/sys_generic.c,v 1.115.2.1 2002/12/19 09:40:11 alfred Exp $
+ * $FreeBSD: src/sys/kern/sys_generic.c,v 1.121 2003/04/29 13:36:03 kan Exp $
  */
 
 #include "opt_ktrace.h"
@@ -53,6 +53,7 @@
 #include <sys/socketvar.h>
 #include <sys/uio.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/poll.h>
 #include <sys/resourcevar.h>
@@ -68,8 +69,6 @@
 #endif
 #include <vm/vm.h>
 #include <vm/vm_page.h>
-
-#include <machine/limits.h>
 
 static MALLOC_DEFINE(M_IOCTLOPS, "ioctlops", "ioctl data buffer");
 static MALLOC_DEFINE(M_SELECT, "select", "select() buffer");

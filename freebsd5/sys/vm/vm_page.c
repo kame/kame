@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vm_page.c	7.4 (Berkeley) 5/7/91
- * $FreeBSD: src/sys/vm/vm_page.c,v 1.226 2002/11/23 19:10:31 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_page.c,v 1.248 2003/04/25 06:35:05 alc Exp $
  */
 
 /*
@@ -163,18 +163,20 @@ vm_offset_t
 vm_page_startup(vm_offset_t starta, vm_offset_t enda, vm_offset_t vaddr)
 {
 	vm_offset_t mapped;
-	vm_size_t npages, page_range;
-	vm_offset_t new_end;
+	vm_size_t npages;
+	vm_paddr_t page_range;
+	vm_paddr_t new_end;
 	int i;
-	vm_offset_t pa;
+	vm_paddr_t pa;
 	int nblocks;
-	vm_offset_t last_pa;
+	vm_paddr_t last_pa;
 
 	/* the biggest memory array is the second group of pages */
-	vm_offset_t end;
-	vm_offset_t biggestone, biggestsize;
+	vm_paddr_t end;
+	vm_paddr_t biggestsize;
+	int biggestone;
 
-	vm_offset_t total;
+	vm_paddr_t total;
 	vm_size_t bootpages;
 
 	total = 0;
@@ -189,7 +191,7 @@ vm_page_startup(vm_offset_t starta, vm_offset_t enda, vm_offset_t vaddr)
 	}
 
 	for (i = 0; phys_avail[i + 1]; i += 2) {
-		vm_size_t size = phys_avail[i + 1] - phys_avail[i];
+		vm_paddr_t size = phys_avail[i + 1] - phys_avail[i];
 
 		if (size > biggestsize) {
 			biggestone = i;
@@ -245,6 +247,7 @@ vm_page_startup(vm_offset_t starta, vm_offset_t enda, vm_offset_t vaddr)
 	mapped = pmap_map(&vaddr, new_end, end,
 	    VM_PROT_READ | VM_PROT_WRITE);
 	vm_page_array = (vm_page_t) mapped;
+	phys_avail[biggestone + 1] = new_end;
 
 	/*
 	 * Clear all of the page structures
@@ -262,10 +265,7 @@ vm_page_startup(vm_offset_t starta, vm_offset_t enda, vm_offset_t vaddr)
 	cnt.v_free_count = 0;
 	for (i = 0; phys_avail[i + 1] && npages > 0; i += 2) {
 		pa = phys_avail[i];
-		if (i == biggestone)
-			last_pa = new_end;
-		else
-			last_pa = phys_avail[i + 1];
+		last_pa = phys_avail[i + 1];
 		while (pa < last_pa && npages-- > 0) {
 			vm_pageq_add_new_page(pa);
 			pa += PAGE_SIZE;
@@ -277,14 +277,16 @@ vm_page_startup(vm_offset_t starta, vm_offset_t enda, vm_offset_t vaddr)
 void
 vm_page_flag_set(vm_page_t m, unsigned short bits)
 {
-	GIANT_REQUIRED;
+
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	m->flags |= bits;
 } 
 
 void
 vm_page_flag_clear(vm_page_t m, unsigned short bits)
 {
-	GIANT_REQUIRED;
+
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	m->flags &= ~bits;
 }
 
@@ -325,10 +327,6 @@ vm_page_wakeup(vm_page_t m)
 	vm_page_flash(m);
 }
 
-/*
- *
- *
- */
 void
 vm_page_io_start(vm_page_t m)
 {
@@ -356,14 +354,16 @@ vm_page_io_finish(vm_page_t m)
 void
 vm_page_hold(vm_page_t mem)
 {
-        GIANT_REQUIRED;
+
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
         mem->hold_count++;
 }
 
 void
 vm_page_unhold(vm_page_t mem)
 {
-	GIANT_REQUIRED;
+
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	--mem->hold_count;
 	KASSERT(mem->hold_count >= 0, ("vm_page_unhold: hold count < 0!!!"));
 	if (mem->hold_count == 0 && mem->queue == PQ_HOLD)
@@ -413,39 +413,6 @@ vm_page_free_zero(vm_page_t m)
 }
 
 /*
- *	vm_page_sleep_busy:
- *
- *	Wait until page is no longer PG_BUSY or (if also_m_busy is TRUE)
- *	m->busy is zero.  Returns TRUE if it had to sleep ( including if
- *	it almost had to sleep and made temporary spl*() mods), FALSE
- *	otherwise.
- *
- *	This routine assumes that interrupts can only remove the busy
- *	status from a page, not set the busy status or change it from
- *	PG_BUSY to m->busy or vise versa (which would create a timing
- *	window).
- */
-int
-vm_page_sleep_busy(vm_page_t m, int also_m_busy, const char *msg)
-{
-	GIANT_REQUIRED;
-	if ((m->flags & PG_BUSY) || (also_m_busy && m->busy))  {
-		int s = splvm();
-		if ((m->flags & PG_BUSY) || (also_m_busy && m->busy)) {
-			/*
-			 * Page is busy. Wait and retry.
-			 */
-			vm_page_flag_set(m, PG_WANTED | PG_REFERENCED);
-			tsleep(m, PVM, msg, 0);
-		}
-		splx(s);
-		return (TRUE);
-		/* not reached */
-	}
-	return (FALSE);
-}
-
-/*
  *	vm_page_sleep_if_busy:
  *
  *	Sleep and release the page queues lock if PG_BUSY is set or,
@@ -456,11 +423,20 @@ vm_page_sleep_busy(vm_page_t m, int also_m_busy, const char *msg)
 int
 vm_page_sleep_if_busy(vm_page_t m, int also_m_busy, const char *msg)
 {
+	int is_object_locked;
 
 	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	if ((m->flags & PG_BUSY) || (also_m_busy && m->busy)) {
 		vm_page_flag_set(m, PG_WANTED | PG_REFERENCED);
+		/*
+		 * Remove mtx_owned() after vm_object locking is finished.
+		 */
+		if ((is_object_locked = m->object != NULL &&
+		     mtx_owned(&m->object->mtx)))
+			mtx_unlock(&m->object->mtx);
 		msleep(m, &vm_page_queue_mtx, PDROP | PVM, msg, 0);
+		if (is_object_locked)
+			mtx_lock(&m->object->mtx);
 		return (TRUE);
 	}
 	return (FALSE);
@@ -476,6 +452,8 @@ vm_page_dirty(vm_page_t m)
 {
 	KASSERT(m->queue - m->pc != PQ_CACHE,
 	    ("vm_page_dirty: page in cache!"));
+	KASSERT(m->queue - m->pc != PQ_FREE,
+	    ("vm_page_dirty: page is free!"));
 	m->dirty = VM_PAGE_BITS_ALL;
 }
 
@@ -554,8 +532,8 @@ vm_page_insert(vm_page_t m, vm_object_t object, vm_pindex_t pindex)
 {
 	vm_page_t root;
 
-	GIANT_REQUIRED;
-
+	if (!VM_OBJECT_LOCKED(object))
+		GIANT_REQUIRED;
 	if (m->object != NULL)
 		panic("vm_page_insert: already inserted");
 
@@ -621,11 +599,11 @@ vm_page_remove(vm_page_t m)
 	vm_object_t object;
 	vm_page_t root;
 
-	GIANT_REQUIRED;
-
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	if (m->object == NULL)
 		return;
-
+	if (!VM_OBJECT_LOCKED(m->object))
+		GIANT_REQUIRED;
 	if ((m->flags & PG_BUSY) == 0) {
 		panic("vm_page_remove: page not busy");
 	}
@@ -675,8 +653,8 @@ vm_page_lookup(vm_object_t object, vm_pindex_t pindex)
 {
 	vm_page_t m;
 
-	GIANT_REQUIRED;
-
+	if (!VM_OBJECT_LOCKED(object))
+		GIANT_REQUIRED;
 	m = vm_page_splay(pindex, object->root);
 	if ((object->root = m) != NULL && m->pindex != pindex)
 		m = NULL;
@@ -712,13 +690,11 @@ vm_page_rename(vm_page_t m, vm_object_t new_object, vm_pindex_t new_pindex)
 	int s;
 
 	s = splvm();
-	vm_page_lock_queues();
 	vm_page_remove(m);
 	vm_page_insert(m, new_object, new_pindex);
 	if (m->queue - m->pc == PQ_CACHE)
 		vm_page_deactivate(m);
 	vm_page_dirty(m);
-	vm_page_unlock_queues();
 	splx(s);
 }
 
@@ -789,24 +765,17 @@ vm_page_alloc(vm_object_t object, vm_pindex_t pindex, int req)
 {
 	vm_page_t m = NULL;
 	vm_pindex_t color;
-	int page_req, s;
+	int flags, page_req, s;
 
-	GIANT_REQUIRED;
+	page_req = req & VM_ALLOC_CLASS_MASK;
 
-#ifdef INVARIANTS
 	if ((req & VM_ALLOC_NOOBJ) == 0) {
 		KASSERT(object != NULL,
 		    ("vm_page_alloc: NULL object."));
 		KASSERT(!vm_page_lookup(object, pindex),
 		    ("vm_page_alloc: page already allocated"));
-	}
-#endif
-
-	page_req = req & VM_ALLOC_CLASS_MASK;
-
-	if ((req & VM_ALLOC_NOOBJ) == 0)
 		color = pindex + object->pg_color;
-	else
+	} else
 		color = pindex;
 
 	/*
@@ -819,23 +788,16 @@ vm_page_alloc(vm_object_t object, vm_pindex_t pindex, int req)
 	s = splvm();
 loop:
 	mtx_lock_spin(&vm_page_queue_free_mtx);
-	if (cnt.v_free_count > cnt.v_free_reserved) {
-		/*
-		 * Allocate from the free queue if there are plenty of pages
-		 * in it.
-		 */
-		m = vm_page_select_free(color, (req & VM_ALLOC_ZERO) != 0);
-					
-	} else if (
+	if (cnt.v_free_count > cnt.v_free_reserved ||
 	    (page_req == VM_ALLOC_SYSTEM && 
 	     cnt.v_cache_count == 0 && 
 	     cnt.v_free_count > cnt.v_interrupt_free_min) ||
-	    (page_req == VM_ALLOC_INTERRUPT && cnt.v_free_count > 0)
-	) {
+	    (page_req == VM_ALLOC_INTERRUPT && cnt.v_free_count > 0)) {
 		/*
-		 * Interrupt or system, dig deeper into the free list.
+		 * Allocate from the free queue if the number of free pages
+		 * exceeds the minimum for the request class.
 		 */
-		m = vm_page_select_free(color, FALSE);
+		m = vm_page_select_free(color, (req & VM_ALLOC_ZERO) != 0);
 	} else if (page_req != VM_ALLOC_INTERRUPT) {
 		mtx_unlock_spin(&vm_page_queue_free_mtx);
 		/*
@@ -851,7 +813,7 @@ loop:
 			if (cnt.v_cache_count > 0)
 				printf("vm_page_alloc(NORMAL): missing pages on cache queue: %d\n", cnt.v_cache_count);
 #endif
-			vm_pageout_deficit++;
+			atomic_add_int(&vm_pageout_deficit, 1);
 			pagedaemon_wakeup();
 			return (NULL);
 		}
@@ -867,7 +829,7 @@ loop:
 		 */
 		mtx_unlock_spin(&vm_page_queue_free_mtx);
 		splx(s);
-		vm_pageout_deficit++;
+		atomic_add_int(&vm_pageout_deficit, 1);
 		pagedaemon_wakeup();
 		return (NULL);
 	}
@@ -890,14 +852,15 @@ loop:
 	/*
 	 * Initialize structure.  Only the PG_ZERO flag is inherited.
 	 */
+	flags = PG_BUSY;
 	if (m->flags & PG_ZERO) {
 		vm_page_zero_count--;
-		m->flags = PG_ZERO | PG_BUSY;
-	} else {
-		m->flags = PG_BUSY;
+		if (req & VM_ALLOC_ZERO)
+			flags = PG_ZERO | PG_BUSY;
 	}
+	m->flags = flags;
 	if (req & VM_ALLOC_WIRED) {
-		cnt.v_wire_count++;
+		atomic_add_int(&cnt.v_wire_count, 1);
 		m->wire_count = 1;
 	} else
 		m->wire_count = 0;
@@ -940,15 +903,18 @@ vm_wait(void)
 	int s;
 
 	s = splvm();
+	vm_page_lock_queues();
 	if (curproc == pageproc) {
 		vm_pageout_pages_needed = 1;
-		tsleep(&vm_pageout_pages_needed, PSWP, "VMWait", 0);
+		msleep(&vm_pageout_pages_needed, &vm_page_queue_mtx,
+		    PDROP | PSWP, "VMWait", 0);
 	} else {
 		if (!vm_pages_needed) {
 			vm_pages_needed = 1;
 			wakeup(&vm_pages_needed);
 		}
-		tsleep(&cnt.v_free_count, PVM, "vmwait", 0);
+		msleep(&cnt.v_free_count, &vm_page_queue_mtx, PDROP | PVM,
+		    "vmwait", 0);
 	}
 	splx(s);
 }
@@ -969,11 +935,13 @@ vm_waitpfault(void)
 	int s;
 
 	s = splvm();
+	vm_page_lock_queues();
 	if (!vm_pages_needed) {
 		vm_pages_needed = 1;
 		wakeup(&vm_pages_needed);
 	}
-	tsleep(&cnt.v_free_count, PUSER, "pfault", 0);
+	msleep(&cnt.v_free_count, &vm_page_queue_mtx, PDROP | PUSER,
+	    "pfault", 0);
 	splx(s);
 }
 
@@ -1023,6 +991,8 @@ vm_page_activate(vm_page_t m)
 static __inline void
 vm_page_free_wakeup(void)
 {
+
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	/*
 	 * if pageout daemon needs pages, then tell it that there are
 	 * some free.
@@ -1060,7 +1030,7 @@ vm_page_free_toq(vm_page_t m)
 	struct vpgqueues *pq;
 	vm_object_t object = m->object;
 
-	GIANT_REQUIRED;
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	s = splvm();
 	cnt.v_tfree++;
 
@@ -1127,10 +1097,6 @@ vm_page_free_toq(vm_page_t m)
 	 */
 	if (m->flags & PG_UNMANAGED) {
 		m->flags &= ~PG_UNMANAGED;
-	} else {
-#ifdef __alpha__
-		pmap_page_is_free(m);
-#endif
 	}
 
 	if (m->hold_count != 0) {
@@ -1216,7 +1182,7 @@ vm_page_wire(vm_page_t m)
 	if (m->wire_count == 0) {
 		if ((m->flags & PG_UNMANAGED) == 0)
 			vm_pageq_remove(m);
-		cnt.v_wire_count++;
+		atomic_add_int(&cnt.v_wire_count, 1);
 	}
 	m->wire_count++;
 	KASSERT(m->wire_count != 0, ("vm_page_wire: wire_count overflow m=%p", m));
@@ -1261,7 +1227,7 @@ vm_page_unwire(vm_page_t m, int activate)
 	if (m->wire_count > 0) {
 		m->wire_count--;
 		if (m->wire_count == 0) {
-			cnt.v_wire_count--;
+			atomic_subtract_int(&cnt.v_wire_count, 1);
 			if (m->flags & PG_UNMANAGED) {
 				;
 			} else if (activate)

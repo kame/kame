@@ -9,6 +9,7 @@
  *		(void)  blist_destroy(blist)
  *		blkno = blist_alloc(blist, count)
  *		(void)  blist_free(blist, blkno, count)
+ *		nblks = blist_fill(blist, blkno, count)
  *		(void)  blist_resize(&blist, count, freeextra)
  *		
  *
@@ -24,27 +25,13 @@
  *		that.  Managing something like 512MB worth of 4K blocks 
  *		eats around 32 KBytes of memory. 
  *
- * $FreeBSD: src/sys/sys/blist.h,v 1.4 2002/05/18 09:38:20 phk Exp $
+ * $FreeBSD: src/sys/sys/blist.h,v 1.6 2003/01/11 01:09:51 dillon Exp $
  */
 
 #ifndef _SYS_BLIST_H_
 #define _SYS_BLIST_H_
 
 typedef	u_int32_t	u_daddr_t;	/* unsigned disk address */
-
-static __inline int
-LOG2(u_daddr_t v)
-{
-        int i = -1;
-
-        if (!v)
-                return(0);
-        while (v) {
-                i++;
-                v >>= 1;
-        }
-        return (i);
-}
 
 /*
  * blmeta and bl_bitmap_t MUST be a power of 2 in size.
@@ -68,9 +55,7 @@ typedef struct blist {
 } *blist_t;
 
 #define BLIST_META_RADIX	16
-#define BLIST_META_RADIX_SHIFT	LOG2(BLIST_META_RADIX)
 #define BLIST_BMAP_RADIX	(sizeof(u_daddr_t)*8)
-#define BLIST_BMAP_RADIX_SHIFT	LOG2(BLIST_BMAP_RADIX)
 
 #define BLIST_MAX_ALLOC		BLIST_BMAP_RADIX
 
@@ -78,6 +63,7 @@ extern blist_t blist_create(daddr_t blocks);
 extern void blist_destroy(blist_t blist);
 extern daddr_t blist_alloc(blist_t blist, daddr_t count);
 extern void blist_free(blist_t blist, daddr_t blkno, daddr_t count);
+extern int blist_fill(blist_t bl, daddr_t blkno, daddr_t count);
 extern void blist_print(blist_t blist);
 extern void blist_resize(blist_t *pblist, daddr_t count, int freenew);
 

@@ -37,7 +37,7 @@
  *
  *      from: @(#)trap.c        7.4 (Berkeley) 5/13/91
  * 	from: FreeBSD: src/sys/i386/i386/trap.c,v 1.197 2001/07/19
- * $FreeBSD: src/sys/sparc64/sparc64/trap.c,v 1.51 2002/10/26 17:38:20 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/trap.c,v 1.62 2003/05/04 07:21:04 jake Exp $
  */
 
 #include "opt_ddb.h"
@@ -49,7 +49,6 @@
 #include <sys/bus.h>
 #include <sys/interrupt.h>
 #include <sys/ktr.h>
-#include <sys/kse.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
@@ -139,12 +138,12 @@ const char *trap_msg[] = {
 	"trap instruction 29",
 	"trap instruction 30",
 	"trap instruction 31",
+	"fast instruction access mmu miss",
+	"fast data access mmu miss",
 	"interrupt",
 	"physical address watchpoint",
 	"virtual address watchpoint",
 	"corrected ecc error",
-	"fast instruction access mmu miss",
-	"fast data access mmu miss",
 	"spill",
 	"fill",
 	"fill",
@@ -194,12 +193,12 @@ const int trap_sig[] = {
 	SIGILL,			/* trap instruction 29 */
 	SIGILL,			/* trap instruction 30 */
 	SIGILL,			/* trap instruction 31 */
+	SIGSEGV,		/* fast instruction access mmu miss */
+	SIGSEGV,		/* fast data access mmu miss */
 	-1,			/* interrupt */
 	-1,			/* physical address watchpoint */
 	-1,			/* virtual address watchpoint */
 	-1,			/* corrected ecc error */
-	SIGSEGV,		/* fast instruction access mmu miss */
-	SIGSEGV,		/* fast data access mmu miss */
 	SIGILL,			/* spill */
 	SIGILL,			/* fill */
 	SIGILL,			/* fill */
@@ -239,20 +238,13 @@ trap(struct trapframe *tf)
 
 	if ((tf->tf_tstate & TSTATE_PRIV) == 0) {
 		KASSERT(td != NULL, ("trap: curthread NULL"));
-		KASSERT(td->td_kse != NULL, ("trap: curkse NULL"));
 		KASSERT(td->td_proc != NULL, ("trap: curproc NULL"));
 
 		p = td->td_proc;
-		sticks = td->td_kse->ke_sticks;
+		sticks = td->td_sticks;
 		td->td_frame = tf;
 		if (td->td_ucred != p->p_ucred)
 			cred_update_thread(td);
-		if ((p->p_flag & P_WEXIT) && (p->p_singlethread != td)) {
-			PROC_LOCK(p);
-			mtx_lock_spin(&sched_lock);
-			thread_exit();
-			/* NOTREACHED */
-		}
 
 		switch (tf->tf_type) {
 		case T_DATA_MISS:
@@ -286,7 +278,7 @@ trap(struct trapframe *tf)
 			if (debugger_on_signal &&
 			    (sig == 4 || sig == 10 || sig == 11))
 				Debugger("trapsig");
-			trapsignal(p, sig, tf->tf_type);
+			trapsignal(td, sig, tf->tf_type);
 		}
 
 		userret(td, tf, sticks);
@@ -483,7 +475,6 @@ syscall(struct trapframe *tf)
 
 	td = PCPU_GET(curthread);
 	KASSERT(td != NULL, ("trap: curthread NULL"));
-	KASSERT(td->td_kse != NULL, ("trap: curkse NULL"));
 	KASSERT(td->td_proc != NULL, ("trap: curproc NULL"));
 
 	p = td->td_proc;
@@ -495,11 +486,11 @@ syscall(struct trapframe *tf)
 	reg = 0;
 	regcnt = REG_MAXARGS;
 
-	sticks = td->td_kse->ke_sticks;
+	sticks = td->td_sticks;
 	td->td_frame = tf;
 	if (td->td_ucred != p->p_ucred)
 		cred_update_thread(td);
-	if (p->p_flag & P_KSES)
+	if (p->p_flag & P_THREADED)
 		thread_user_enter(p, td);
 	code = tf->tf_global[1];
 
@@ -632,12 +623,8 @@ syscall(struct trapframe *tf)
 #ifdef DIAGNOSTIC
 	cred_free_thread(td);
 #endif
-#ifdef WITNESS
-	if (witness_list(td)) {
-		panic("system call %s returning with mutex(s) held\n",
-		    syscallnames[code]);
-	}
-#endif
+	WITNESS_WARN(WARN_PANIC, NULL, "System call %s returning",
+	    (code >= 0 && code < SYS_MAXSYSCALL) ? syscallnames[code] : "???");
 	mtx_assert(&sched_lock, MA_NOTOWNED);
 	mtx_assert(&Giant, MA_NOTOWNED);
 }

@@ -27,7 +27,7 @@
  *	i4b_ctl.c - i4b system control port driver
  *	------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/driver/i4b_ctl.c,v 1.19 2002/09/02 00:52:06 brooks Exp $
+ * $FreeBSD: src/sys/i4b/driver/i4b_ctl.c,v 1.21 2003/03/03 12:15:50 phk Exp $
  *
  *	last edit-date: [Sun Mar 17 09:49:24 2002]
  *
@@ -40,10 +40,6 @@
 #include <sys/conf.h>
 #include <sys/socket.h>
 #include <net/if.h>
-
-#ifdef DEVFS
-#include <sys/devfsext.h>
-#endif
 
 #include <machine/i4b_debug.h>
 #include <machine/i4b_ioctl.h>
@@ -63,34 +59,16 @@ static	d_poll_t	i4bctlpoll;
 #define CDEV_MAJOR 55
 
 static struct cdevsw i4bctl_cdevsw = {
-	/* open */      i4bctlopen,
-	/* close */     i4bctlclose,
-	/* read */      noread,
-	/* write */     nowrite,
-	/* ioctl */     i4bctlioctl,
-	/* poll */      i4bctlpoll,
-	/* mmap */      nommap,
-	/* strategy */  nostrategy,
-	/* name */      "i4bctl",
-	/* maj */       CDEV_MAJOR,
-	/* dump */      nodump,
-	/* psize */     nopsize,
-	/* flags */     0,
+	.d_open =	i4bctlopen,
+	.d_close =	i4bctlclose,
+	.d_ioctl =	i4bctlioctl,
+	.d_poll =	i4bctlpoll,
+	.d_name =	"i4bctl",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static void i4bctlattach(void *);
 PSEUDO_SET(i4bctlattach, i4b_i4bctldrv);
-
-/*---------------------------------------------------------------------------*
- *	initialization at kernel load time
- *---------------------------------------------------------------------------*/
-static void
-i4bctlinit(void *unused)
-{
-	cdevsw_add(&i4bctl_cdevsw);
-}
-
-SYSINIT(i4bctldev, SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR, &i4bctlinit, NULL);
 
 /*---------------------------------------------------------------------------*
  *	interface attach routine

@@ -33,7 +33,7 @@
  *
  *	From: @(#)ansi.h	8.2 (Berkeley) 1/4/94
  *	From: @(#)types.h	8.3 (Berkeley) 1/5/94
- * $FreeBSD: src/sys/i386/include/_types.h,v 1.4 2002/10/01 14:07:18 phk Exp $
+ * $FreeBSD: src/sys/i386/include/_types.h,v 1.7 2003/03/30 05:24:52 jake Exp $
  */
 
 #ifndef _MACHINE__TYPES_H_
@@ -69,6 +69,8 @@ typedef	unsigned long long	__uint64_t;
  */
 typedef	unsigned long	__clock_t;		/* clock()... */
 typedef	__int32_t	__critical_t;
+typedef	double		__double_t;
+typedef	double		__float_t;
 typedef	__int32_t	__intfptr_t;
 typedef	__int64_t	__intmax_t;
 typedef	__int32_t	__intptr_t;
@@ -100,6 +102,11 @@ typedef	__uint64_t	__uint_least64_t;
 typedef	__uint32_t	__u_register_t;
 typedef	__uint32_t	__vm_offset_t;
 typedef	__int64_t	__vm_ooffset_t;
+#ifdef PAE
+typedef	__uint64_t	__vm_paddr_t;
+#else
+typedef	__uint32_t	__vm_paddr_t;
+#endif
 typedef	__uint64_t	__vm_pindex_t;
 typedef	__uint32_t	__vm_size_t;
 

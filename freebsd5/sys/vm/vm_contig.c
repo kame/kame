@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vm_page.c	7.4 (Berkeley) 5/7/91
- * $FreeBSD: src/sys/vm/vm_contig.c,v 1.13 2002/08/04 07:07:34 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_contig.c,v 1.17 2003/04/24 04:31:25 alc Exp $
  */
 
 /*
@@ -105,14 +105,16 @@ vm_contig_launder(int queue)
 				vm_page_unlock_queues();
 				vn_lock(object->handle,
 				    LK_EXCLUSIVE | LK_RETRY, curthread);
+				VM_OBJECT_LOCK(object);
 				vm_object_page_clean(object, 0, 0, OBJPC_SYNC);
+				VM_OBJECT_UNLOCK(object);
 				VOP_UNLOCK(object->handle, 0, curthread);
 				vm_page_lock_queues();
 				return (TRUE);
 			} else if (object->type == OBJT_SWAP ||
 				   object->type == OBJT_DEFAULT) {
 				m_tmp = m;
-				vm_pageout_flush(&m_tmp, 1, 0);
+				vm_pageout_flush(&m_tmp, 1, 0, FALSE);
 				return (TRUE);
 			}
 		} else if (m->busy == 0 && m->hold_count == 0)
@@ -132,14 +134,15 @@ contigmalloc1(
 	unsigned long size,	/* should be size_t here and for malloc() */
 	struct malloc_type *type,
 	int flags,
-	unsigned long low,
-	unsigned long high,
+	vm_paddr_t low,
+	vm_paddr_t high,
 	unsigned long alignment,
 	unsigned long boundary,
 	vm_map_t map)
 {
 	int i, s, start;
-	vm_offset_t addr, phys, tmp_addr;
+	vm_paddr_t phys;
+	vm_offset_t addr, tmp_addr;
 	int pass;
 	vm_page_t pga = vm_page_array;
 
@@ -243,12 +246,14 @@ again1:
 		vm_map_unlock(map);
 
 		tmp_addr = addr;
+		VM_OBJECT_LOCK(kernel_object);
 		for (i = start; i < (start + size / PAGE_SIZE); i++) {
 			vm_page_t m = &pga[i];
 			vm_page_insert(m, kernel_object,
 				OFF_TO_IDX(tmp_addr - VM_MIN_KERNEL_ADDRESS));
 			tmp_addr += PAGE_SIZE;
 		}
+		VM_OBJECT_UNLOCK(kernel_object);
 		vm_map_wire(map, addr, addr + size, FALSE);
 
 		splx(s);
@@ -262,8 +267,8 @@ contigmalloc(
 	unsigned long size,	/* should be size_t here and for malloc() */
 	struct malloc_type *type,
 	int flags,
-	unsigned long low,
-	unsigned long high,
+	vm_paddr_t low,
+	vm_paddr_t high,
 	unsigned long alignment,
 	unsigned long boundary)
 {
@@ -286,8 +291,8 @@ contigfree(void *addr, unsigned long size, struct malloc_type *type)
 vm_offset_t
 vm_page_alloc_contig(
 	vm_offset_t size,
-	vm_offset_t low,
-	vm_offset_t high,
+	vm_paddr_t low,
+	vm_paddr_t high,
 	vm_offset_t alignment)
 {
 	vm_offset_t ret;

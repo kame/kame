@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)proc.h	8.15 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/proc.h,v 1.284 2002/12/10 02:33:45 julian Exp $
+ * $FreeBSD: src/sys/sys/proc.h,v 1.329.2.1 2003/06/03 20:43:18 jeff Exp $
  */
 
 #ifndef _SYS_PROC_H_
@@ -44,11 +44,16 @@
 
 #include <sys/callout.h>		/* For struct callout. */
 #include <sys/event.h>			/* For struct klist. */
+#ifndef _KERNEL
 #include <sys/filedesc.h>
+#endif
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
 #include <sys/queue.h>
 #include <sys/priority.h>
 #include <sys/rtprio.h>			/* XXX */
 #include <sys/runq.h>
+#include <sys/sigio.h>
 #include <sys/signal.h>
 #include <sys/_label.h>
 #ifndef _KERNEL
@@ -70,13 +75,13 @@
  */
 struct session {
 	int		s_count;	/* (m) Ref cnt; pgrps in session. */
-	struct	proc	*s_leader;	/* (m + e) Session leader. */
-	struct	vnode	*s_ttyvp;	/* (m) Vnode of controlling tty. */
-	struct	tty	*s_ttyp;	/* (m) Controlling tty. */
+	struct proc	*s_leader;	/* (m + e) Session leader. */
+	struct vnode	*s_ttyvp;	/* (m) Vnode of controlling tty. */
+	struct tty	*s_ttyp;	/* (m) Controlling tty. */
 	pid_t		s_sid;		/* (c) Session ID. */
 					/* (m) Setlogin() name: */
 	char		s_login[roundup(MAXLOGNAME, sizeof(long))];
-	struct	mtx	s_mtx;		/* Mutex to protect members */
+	struct mtx	s_mtx;		/* Mutex to protect members */
 };
 
 /*
@@ -94,20 +99,8 @@ struct pgrp {
 	struct sigiolst	pg_sigiolst;	/* (m) List of sigio sources. */
 	pid_t		pg_id;		/* (c) Pgrp id. */
 	int		pg_jobc;	/* (m) job cntl proc count */
-	struct	mtx	pg_mtx;		/*  Mutex to protect members */
+	struct mtx	pg_mtx;		/*  Mutex to protect members */
 };
-
-struct procsig {
-	sigset_t ps_sigignore;		/* Signals being ignored. */
-	sigset_t ps_sigcatch;		/* Signals being caught by user. */
-	int	 ps_flag;
-	struct	 sigacts *ps_sigacts;	/* Signal actions, state. */
-	int	 ps_refcnt;
-};
-
-#define	PS_NOCLDWAIT	0x0001	/* No zombies if child dies */
-#define	PS_NOCLDSTOP	0x0002	/* No SIGCHLD when children stop. */
-#define	PS_CLDSIGIGN	0x0004	/* The SIGCHLD handler is SIG_IGN. */
 
 /*
  * pargs, used to hold a copy of the command line, if it had a sane length.
@@ -135,8 +128,8 @@ struct pargs {
  *      * - not yet protected
  *      a - only touched by curproc or parent during fork/wait
  *      b - created at fork, never changes
- *      	(exception aiods switch vmspaces, but they are also
- *      	marked 'P_SYSTEM' so hopefully it will be left alone)
+ *		(exception aiods switch vmspaces, but they are also
+ *		marked 'P_SYSTEM' so hopefully it will be left alone)
  *      c - locked by proc mtx
  *      d - locked by allproc_lock lock
  *      e - locked by proctree_lock lock
@@ -152,6 +145,8 @@ struct pargs {
  *      o - ktrace lock
  *      p - select lock (sellock)
  *      r - p_peers lock
+ *      x - created at fork, only changes during single threading in exec
+ *      z - zombie threads/kse/ksegroup lock
  *
  * If the locking key specifies two identifiers (for example, p_pptr) then
  * either lock is sufficient for read access, but both locks must be held
@@ -170,17 +165,17 @@ struct trapframe;
  *
  * The first is the thread. It might be though of as a "Kernel
  * Schedulable Entity Context".
- * This structure contains all the information as to where a thread of 
+ * This structure contains all the information as to where a thread of
  * execution is now, or was when it was suspended, why it was suspended,
  * and anything else that will be needed to restart it when it is
  * rescheduled. Always associated with a KSE when running, but can be
- * reassigned to an equivalent KSE  when being restarted for
+ * reassigned to an equivalent KSE when being restarted for
  * load balancing. Each of these is associated with a kernel stack
  * and a pcb.
- * 
+ *
  * It is important to remember that a particular thread structure only
  * exists as long as the system call or kernel entrance (e.g. by pagefault)
- * which it is currently executing. It should threfore NEVER be referenced
+ * which it is currently executing. It should therefore NEVER be referenced
  * by pointers in long lived structures that live longer than a single
  * request. If several threads complete their work at the same time,
  * they will all rewind their stacks to the user boundary, report their
@@ -190,11 +185,11 @@ struct trapframe;
  * keeps a cached thread available to allow it to quickly
  * get one when it needs a new one. There is also a system
  * cache of free threads. Threads have priority and partake in priority
- * inherritance schemes.
+ * inheritance schemes.
  */
 struct thread;
 
-/* 
+/*
  * The second structure is the Kernel Schedulable Entity. (KSE)
  * It represents the ability to take a slot in the scheduler queue.
  * As long as this is scheduled, it could continue to run any threads that
@@ -211,7 +206,7 @@ struct kse;
 /*
  * The KSEGRP is allocated resources across a number of CPUs.
  * (Including a number of CPUxQUANTA. It parcels these QUANTA up among
- * Its KSEs, each of which should be running in a different CPU.
+ * its KSEs, each of which should be running in a different CPU.
  * BASE priority and total available quanta are properties of a KSEGRP.
  * Multiple KSEGRPs in a single process compete against each other
  * for total quanta in the same way that a forked child competes against
@@ -225,7 +220,7 @@ struct ksegrp;
  * All KSEGs under one process see, and have the same access to, these
  * resources (e.g. files, memory, sockets, permissions kqueues).
  * A process may compete for CPU cycles on the same basis as a
- * forked process cluster by spawning several KSEGRPs. 
+ * forked process cluster by spawning several KSEGRPs.
  */
 struct proc;
 
@@ -236,10 +231,10 @@ struct proc;
  RUNQ: --->KSE---KSE--...               SLEEPQ:[]---THREAD---THREAD---THREAD
 	   |   /                               []---THREAD
 	   KSEG---THREAD--THREAD--THREAD       []
-	                                       []---THREAD---THREAD
+					       []---THREAD---THREAD
 
   (processors run THREADs from the KSEG until they are exhausted or
-  the KSEG exhausts its quantum) 
+  the KSEG exhausts its quantum)
 
 With PER-CPU run queues:
 KSEs on the separate run queues directly
@@ -253,20 +248,20 @@ They would be given priorities calculated from the KSEG.
  * This is what is put to sleep and reactivated.
  * The first KSE available in the correct group will run this thread.
  * If several are available, use the one on the same CPU as last time.
- * When waing to be run, threads are hung off the KSEGRP in priority order.
+ * When waiting to be run, threads are hung off the KSEGRP in priority order.
  * with N runnable and queued KSEs in the KSEGRP, the first N threads
  * are linked to them. Other threads are not yet assigned.
  */
 struct thread {
-	struct proc	*td_proc;	/* Associated process. */
-	struct ksegrp	*td_ksegrp;	/* Associated KSEG. */
-	TAILQ_ENTRY(thread) td_plist;	/* All threads in this proc */
-	TAILQ_ENTRY(thread) td_kglist;	/* All threads in this ksegrp */
+	struct proc	*td_proc;	/* (*) Associated process. */
+	struct ksegrp	*td_ksegrp;	/* (*) Associated KSEG. */
+	TAILQ_ENTRY(thread) td_plist;	/* (*) All threads in this proc */
+	TAILQ_ENTRY(thread) td_kglist;	/* (*) All threads in this ksegrp */
 
 	/* The two queues below should someday be merged */
-	TAILQ_ENTRY(thread) td_slpq; 	/* (j) Sleep queue. XXXKSE */ 
-	TAILQ_ENTRY(thread) td_lockq; 	/* (j) Lock queue. XXXKSE */ 
-	TAILQ_ENTRY(thread) td_runq; 	/* (j) Run queue(s). XXXKSE */ 
+	TAILQ_ENTRY(thread) td_slpq;	/* (j) Sleep queue. XXXKSE */
+	TAILQ_ENTRY(thread) td_lockq;	/* (j) Lock queue. XXXKSE */
+	TAILQ_ENTRY(thread) td_runq;	/* (j/z) Run queue(s). XXXKSE */
 
 	TAILQ_HEAD(, selinfo) td_selq;	/* (p) List of selinfos. */
 
@@ -282,6 +277,7 @@ struct thread {
 	u_char		td_lastcpu;	/* (j) Last cpu we were on. */
 	u_char		td_inktr;	/* (k) Currently handling a KTR. */
 	u_char		td_inktrace;	/* (k) Currently handling a KTRACE. */
+	u_char		td_oncpu;	/* (j) Which cpu we are on. */
 	short		td_locks;	/* (k) DEBUG: lockmgr count of locks */
 	struct mtx	*td_blocked;	/* (j) Mutex process is blocked on. */
 	struct ithd	*td_ithd;	/* (b) For interrupt threads only. */
@@ -289,12 +285,21 @@ struct thread {
 	LIST_HEAD(, mtx) td_contested;	/* (j) Contested locks. */
 	struct lock_list_entry *td_sleeplocks; /* (k) Held sleep locks. */
 	int		td_intr_nesting_level; /* (k) Interrupt recursion. */
-	struct kse_thr_mailbox *td_mailbox; /* the userland mailbox address */
+	struct kse_thr_mailbox *td_mailbox; /* (*) Userland mailbox address */
 	struct ucred	*td_ucred;	/* (k) Reference to credentials. */
 	void		(*td_switchin)(void); /* (k) Switchin special func. */
-	struct thread	*td_standin;	/* (?) use this for an upcall */
-	u_int		td_usticks;	/* Statclock hits in kernel, for UTS */
+	struct thread	*td_standin;	/* (*) Use this for an upcall */
+	u_int		td_prticks;	/* (*) Profclock hits in sys for user */
+	struct kse_upcall *td_upcall;	/* (*) Upcall structure. */
+	u_int64_t	td_sticks;	/* (j) Statclock hits in system mode. */
+	u_int		td_uuticks;	/* (*) Statclock hits in user, for UTS */
+	u_int		td_usticks;	/* (*) Statclock hits in kernel, for UTS */
 	u_int		td_critnest;	/* (k) Critical section nest level. */
+	sigset_t	td_oldsigmask;	/* (k) Saved mask from pre sigpause. */
+	sigset_t	td_sigmask;	/* (c) Current signal mask. */
+	sigset_t	td_siglist;	/* (c) Sigs arrived, not delivered. */
+	TAILQ_ENTRY(thread) td_umtx;	/* (c?) Link for when we're blocked. */
+
 #define	td_endzero td_base_pri
 
 /* Copied during fork1() or thread_sched_upcall() */
@@ -309,51 +314,59 @@ struct thread {
  */
 	struct pcb	*td_pcb;	/* (k) Kernel VA of pcb and kstack. */
 	enum {
-		TDS_INACTIVE = 0x20,
+		TDS_INACTIVE = 0x0,
 		TDS_INHIBITED,
 		TDS_CAN_RUN,
 		TDS_RUNQ,
 		TDS_RUNNING
 	} td_state;
-	register_t 	td_retval[2];	/* (k) Syscall aux returns. */
+	register_t	td_retval[2];	/* (k) Syscall aux returns. */
 	struct callout	td_slpcallout;	/* (h) Callout for sleep. */
 	struct trapframe *td_frame;	/* (k) */
 	struct vm_object *td_kstack_obj;/* (a) Kstack object. */
-	vm_offset_t	td_kstack;	/* Kernel VA of kstack. */
-	int		td_kstack_pages; /* Size of the kstack */
+	vm_offset_t	td_kstack;	/* (a) Kernel VA of kstack. */
+	int		td_kstack_pages; /* (a) Size of the kstack */
 	struct vm_object *td_altkstack_obj;/* (a) Alternate kstack object. */
-	vm_offset_t	td_altkstack;	/* Kernel VA of alternate kstack. */
-	int		td_altkstack_pages; /* Size of the alternate kstack */
+	vm_offset_t	td_altkstack;	/* (a) Kernel VA of alternate kstack. */
+	int		td_altkstack_pages; /* (a) Size of the alternate kstack */
 	struct mdthread td_md;		/* (k) Any machine-dependent fields. */
-	struct td_sched	*td_sched;	/* Scheduler specific data */
+	struct td_sched	*td_sched;	/* (*) Scheduler specific data */
 };
 /* flags kept in td_flags */ 
-#define	TDF_UNBOUND	0x000001 /* May give away the kse, uses the kg runq. */
+#define	TDF_OLDMASK	0x000001 /* Need to restore mask after suspend. */
 #define	TDF_INPANIC	0x000002 /* Caused a panic, let it drive crashdump. */
+#define	TDF_CAN_UNBIND	0x000004 /* Only temporarily bound. */
 #define	TDF_SINTR	0x000008 /* Sleep is interruptible. */
 #define	TDF_TIMEOUT	0x000010 /* Timing out during sleep. */
+#define	TDF_IDLETD	0x000020 /* This is one of the per-CPU idle threads */
 #define	TDF_SELECT	0x000040 /* Selecting; wakeup/waiting danger. */
 #define	TDF_CVWAITQ	0x000080 /* Thread is on a cv_waitq (not slpq). */
 #define	TDF_UPCALLING	0x000100 /* This thread is doing an upcall. */
 #define	TDF_ONSLEEPQ	0x000200 /* On the sleep queue. */
-#define	TDF_INMSLEEP	0x000400 /* Don't recurse in msleep(). */
+#define	TDF_ASTPENDING	0x000800 /* Thread has some asynchronous events. */
 #define	TDF_TIMOFAIL	0x001000 /* Timeout from sleep after we were awake. */
 #define	TDF_INTERRUPT	0x002000 /* Thread is marked as interrupted. */
+#define	TDF_USTATCLOCK	0x004000 /* Stat clock hits in userland. */
+#define	TDF_OWEUPC	0x008000 /* Owe thread an addupc() call at next AST. */
+#define	TDF_NEEDRESCHED	0x010000 /* Thread needs to yield. */
+#define	TDF_NEEDSIGCHK	0x020000 /* Thread may need signal delivery. */
 #define	TDF_DEADLKTREAT	0x800000 /* Lock aquisition - deadlock treatment. */
 
-#define	TDI_SUSPENDED	0x01	/* On suspension queue. */
-#define	TDI_SLEEPING	0x02	/* Actually asleep! (tricky). */
-#define	TDI_SWAPPED	0x04	/* Stack not in mem.. bad juju if run. */
-#define	TDI_LOCK	0x08	/* Stopped on a lock. */
-#define	TDI_IWAIT	0x10	/* Awaiting interrupt. */
-#define	TDI_LOAN	0x20	/* bound thread's KSE is lent */
+#define	TDI_SUSPENDED	0x0001	/* On suspension queue. */
+#define	TDI_SLEEPING	0x0002	/* Actually asleep! (tricky). */
+#define	TDI_SWAPPED	0x0004	/* Stack not in mem.. bad juju if run. */
+#define	TDI_LOCK	0x0008	/* Stopped on a lock. */
+#define	TDI_IWAIT	0x0010	/* Awaiting interrupt. */
+
+#define	TD_CAN_UNBIND(td)					\
+    (((td)->td_flags & TDF_CAN_UNBIND) == TDF_CAN_UNBIND &&	\
+     ((td)->td_upcall != NULL))
 
 #define	TD_IS_SLEEPING(td)	((td)->td_inhibitors & TDI_SLEEPING)
 #define	TD_ON_SLEEPQ(td)	((td)->td_wchan != NULL)
 #define	TD_IS_SUSPENDED(td)	((td)->td_inhibitors & TDI_SUSPENDED)
 #define	TD_IS_SWAPPED(td)	((td)->td_inhibitors & TDI_SWAPPED)
 #define	TD_ON_LOCK(td)		((td)->td_inhibitors & TDI_LOCK)
-#define	TD_LENT(td)		((td)->td_inhibitors & TDI_LOAN)
 #define	TD_AWAITING_INTR(td)	((td)->td_inhibitors & TDI_IWAIT)
 #define	TD_IS_RUNNING(td)	((td)->td_state == TDS_RUNNING)
 #define	TD_ON_RUNQ(td)		((td)->td_state == TDS_RUNQ)
@@ -362,12 +375,12 @@ struct thread {
 
 #define	TD_SET_INHIB(td, inhib) do {			\
 	(td)->td_state = TDS_INHIBITED;			\
-	(td)->td_inhibitors |= inhib;			\
+	(td)->td_inhibitors |= (inhib);			\
 } while (0)
 
 #define	TD_CLR_INHIB(td, inhib) do {			\
-	if (((td)->td_inhibitors & inhib) &&		\
-	    (((td)->td_inhibitors &= ~inhib) == 0))	\
+	if (((td)->td_inhibitors & (inhib)) &&		\
+	    (((td)->td_inhibitors &= ~(inhib)) == 0))	\
 		(td)->td_state = TDS_CAN_RUN;		\
 } while (0)
 
@@ -376,14 +389,13 @@ struct thread {
 #define	TD_SET_LOCK(td)		TD_SET_INHIB((td), TDI_LOCK)
 #define	TD_SET_SUSPENDED(td)	TD_SET_INHIB((td), TDI_SUSPENDED)
 #define	TD_SET_IWAIT(td)	TD_SET_INHIB((td), TDI_IWAIT)
-#define	TD_SET_LOAN(td)		TD_SET_INHIB((td), TDI_LOAN)
+#define	TD_SET_EXITING(td)	TD_SET_INHIB((td), TDI_EXITING)
 
 #define	TD_CLR_SLEEPING(td)	TD_CLR_INHIB((td), TDI_SLEEPING)
 #define	TD_CLR_SWAPPED(td)	TD_CLR_INHIB((td), TDI_SWAPPED)
 #define	TD_CLR_LOCK(td)		TD_CLR_INHIB((td), TDI_LOCK)
 #define	TD_CLR_SUSPENDED(td)	TD_CLR_INHIB((td), TDI_SUSPENDED)
 #define	TD_CLR_IWAIT(td)	TD_CLR_INHIB((td), TDI_IWAIT)
-#define	TD_CLR_LOAN(td)		TD_CLR_INHIB((td), TDI_LOAN)
 
 #define	TD_SET_RUNNING(td)	do {(td)->td_state = TDS_RUNNING; } while (0)
 #define	TD_SET_RUNQ(td)		do {(td)->td_state = TDS_RUNQ; } while (0)
@@ -394,17 +406,6 @@ struct thread {
 		(td)->td_wchan = NULL;			\
 } while (0)
 
-
-/*
- * Traps for young players:
- * The main thread variable that controls whether a thread acts as a threaded
- * or unthreaded thread is the td_bound counter (0 == unbound).
- * UPCALLS run with the UNBOUND flags clear, after they are first scheduled.
- * i.e. they bind themselves to whatever thread thay are first scheduled with.
- * You may see BOUND threads in KSE processes but you should never see
- * UNBOUND threads in non KSE processes.
- */
-
 /*
  * The schedulable entity that can be given a context to run.
  * A process may have several of these. Probably one per processor
@@ -413,63 +414,51 @@ struct thread {
  * for the group.
  */
 struct kse {
-	struct proc	*ke_proc;	/* Associated process. */
-	struct ksegrp	*ke_ksegrp;	/* Associated KSEG. */
-	TAILQ_ENTRY(kse) ke_kglist;	/* Queue of all KSEs in ke_ksegrp. */
-	TAILQ_ENTRY(kse) ke_kgrlist;	/* Queue of all KSEs in this state. */
-	TAILQ_ENTRY(kse) ke_procq;	/* (j) Run queue. */
+	struct proc	*ke_proc;	/* (*) Associated process. */
+	struct ksegrp	*ke_ksegrp;	/* (*) Associated KSEG. */
+	TAILQ_ENTRY(kse) ke_kglist;	/* (*) Queue of KSEs in ke_ksegrp. */
+	TAILQ_ENTRY(kse) ke_kgrlist;	/* (*) Queue of KSEs in this state. */
+	TAILQ_ENTRY(kse) ke_procq;	/* (j/z) Run queue. */
 
 #define	ke_startzero ke_flags
 	int		ke_flags;	/* (j) KEF_* flags. */
-	struct thread	*ke_thread;	/* Active associated thread. */
-	struct thread	*ke_bound;	/* Thread bound to this KSE (*) */
-	int		ke_cpticks;	/* (j) Ticks of cpu time. */
+	struct thread	*ke_thread;	/* (*) Active associated thread. */
 	fixpt_t		ke_pctcpu;	/* (j) %cpu during p_swtime. */
-	u_int64_t	ke_uu;		/* (j) Previous user time in usec. */
-	u_int64_t	ke_su;		/* (j) Previous system time in usec. */
-	u_int64_t	ke_iu;		/* (j) Previous intr time in usec. */
-	u_int64_t	ke_uticks;	/* (j) Statclock hits in user mode. */
-	u_int64_t	ke_sticks;	/* (j) Statclock hits in system mode. */
-	u_int64_t	ke_iticks;	/* (j) Statclock hits in intr. */
-	u_int		ke_uuticks;	/* Statclock hits in user, for UTS */
-	u_int		ke_usticks;	/* Statclock hits in kernel, for UTS */
 	u_char		ke_oncpu;	/* (j) Which cpu we are on. */
 	char		ke_rqindex;	/* (j) Run queue index. */
 	enum {
-		KES_IDLE = 0x10,
+		KES_UNUSED = 0x0,
+		KES_IDLE,
 		KES_ONRUNQ,
 		KES_UNQUEUED,		/* in transit */
 		KES_THREAD		/* slaved to thread state */
-	} ke_state;			/* (j) S* process status. */
-	struct kse_mailbox *ke_mailbox;	/* the userland mailbox address */
-	stack_t		ke_stack;
-	void		*ke_upcall;
-	struct thread	*ke_tdspare;	/* spare thread for upcalls */
+	} ke_state;			/* (j) KSE status. */
 #define	ke_endzero ke_dummy
 	u_char		ke_dummy;
-	struct ke_sched	*ke_sched;	/* Scheduler specific data */
+	struct ke_sched	*ke_sched;	/* (*) Scheduler specific data */
 };
 
 /* flags kept in ke_flags */
-#define	KEF_OWEUPC	0x00002	/* Owe process an addupc() call at next ast. */
-#define	KEF_IDLEKSE	0x00004	/* A 'Per CPU idle process'.. has one thread */
-#define	KEF_LOANED	0x00008	/* On loan from the bound thread to another */
-#define	KEF_USER	0x00200	/* Process is not officially in the kernel */
-#define	KEF_ASTPENDING	0x00400	/* KSE has a pending ast. */
-#define	KEF_NEEDRESCHED	0x00800	/* Process needs to yield. */
-#define	KEF_ONLOANQ	0x01000 /* KSE is on loan queue. */
 #define	KEF_DIDRUN	0x02000	/* KSE actually ran. */
 #define	KEF_EXIT	0x04000	/* KSE is being killed. */
 
 /*
- * (*) A bound KSE with a bound thread in a KSE process may be lent to
- * Other threads, as long as those threads do not leave the kernel. 
- * The other threads must be either exiting, or be unbound with a valid
- * mailbox so that they can save their state there rather than going
- * to user space. While this happens the real bound thread is still linked
- * to the kse via the ke_bound field, and the KSE has its "KEF_LOANED
- * flag set.
+ * The upcall management structure.
+ * The upcall is used when returning to userland.  If a thread does not have
+ * an upcall on return to userland the thread exports its context and exits.
  */
+struct kse_upcall {
+	TAILQ_ENTRY(kse_upcall) ku_link;	/* List of upcalls in KSEG. */
+	struct ksegrp		*ku_ksegrp;	/* Associated KSEG. */
+	struct thread		*ku_owner;	/* owning thread */
+	int			ku_flags;	/* KUF_* flags. */
+	struct kse_mailbox	*ku_mailbox;	/* userland mailbox address. */
+	stack_t			ku_stack;	/* userland upcall stack. */
+	void			*ku_func;	/* userland upcall function. */
+	unsigned int		ku_mflags;	/* cached upcall mailbox flags */
+};
+
+#define	KUF_DOUPCALL	0x00001		/* Do upcall now, don't wait */
 
 /*
  * Kernel-scheduled entity group (KSEG).  The scheduler considers each KSEG to
@@ -477,34 +466,36 @@ struct kse {
  * contain multiple KSEs.
  */
 struct ksegrp {
-	struct proc	*kg_proc;	/* Process that contains this KSEG. */
-	TAILQ_ENTRY(ksegrp) kg_ksegrp;	/* Queue of KSEGs in kg_proc. */
+	struct proc	*kg_proc;	/* (*) Process that contains this KSEG. */
+	TAILQ_ENTRY(ksegrp) kg_ksegrp;	/* (*) Queue of KSEGs in kg_proc. */
 	TAILQ_HEAD(, kse) kg_kseq;	/* (ke_kglist) All KSEs. */
-	TAILQ_HEAD(, kse) kg_iq;	/* (ke_kgrlist) Idle KSEs. */
-	TAILQ_HEAD(, kse) kg_lq;	/* (ke_kgrlist) Loan KSEs. */
+	TAILQ_HEAD(, kse) kg_iq;	/* (ke_kgrlist) All idle KSEs. */
 	TAILQ_HEAD(, thread) kg_threads;/* (td_kglist) All threads. */
 	TAILQ_HEAD(, thread) kg_runq;	/* (td_runq) waiting RUNNABLE threads */
 	TAILQ_HEAD(, thread) kg_slpq;	/* (td_runq) NONRUNNABLE threads. */
-
+	TAILQ_HEAD(, kse_upcall) kg_upcalls;	/* All upcalls in the group */
 #define	kg_startzero kg_estcpu
-	u_int		kg_estcpu;	/* Sum of the same field in KSEs. */
- 	u_int		kg_slptime;	/* (j) How long completely blocked. */
-	struct thread 	*kg_last_assigned; /* Last thread assigned to a KSE */
-	int		kg_runnable;	/* Num runnable threads on queue. */
-	int		kg_runq_kses;	/* Num KSEs on runq. */
-	int		kg_loan_kses;	/* Num KSEs on loan queue. */
-	struct kse_thr_mailbox *kg_completed; /* (c) completed thread mboxes */
+	u_int		kg_estcpu;	/* (j) Sum of the same field in KSEs. */
+	u_int		kg_slptime;	/* (j) How long completely blocked. */
+	struct thread	*kg_last_assigned; /* (j) Last thread assigned to a KSE. */
+	int		kg_runnable;	/* (j) Num runnable threads on queue. */
+	int		kg_runq_kses;	/* (j) Num KSEs on runq. */
+	int		kg_idle_kses;	/* (j) Num KSEs on iq */
+	int		kg_numupcalls;	/* (j) Num upcalls */
+	int		kg_upsleeps;	/* (c) Num threads in kse_release() */
+	struct kse_thr_mailbox *kg_completed; /* (c) Completed thread mboxes. */
+	int		kg_nextupcall;	/* (*) Next upcall time */
+	int		kg_upquantum;	/* (*) Quantum to schedule an upcall */
 #define	kg_endzero kg_pri_class
 
-#define	kg_startcopy 	kg_endzero
+#define	kg_startcopy	kg_endzero
 	u_char		kg_pri_class;	/* (j) Scheduling class. */
 	u_char		kg_user_pri;	/* (j) User pri from estcpu and nice. */
-	char		kg_nice;	/* (j?/k?) Process "nice" value. */
+	char		kg_nice;	/* (c + j) Process "nice" value. */
 #define	kg_endcopy kg_numthreads
-	int		kg_numthreads;	/* Num threads in total */
-	int		kg_idle_kses;	/* num KSEs idle */
-	int		kg_kses;	/* Num KSEs in group. */
-	struct kg_sched	*kg_sched;	/* Scheduler specific data */
+	int		kg_numthreads;	/* (j) Num threads in total */
+	int		kg_kses;	/* (j) Num KSEs in group. */
+	struct kg_sched	*kg_sched;	/* (*) Scheduler specific data */
 };
 
 /*
@@ -515,14 +506,14 @@ struct proc {
 	LIST_ENTRY(proc) p_list;	/* (d) List of all processes. */
 	TAILQ_HEAD(, ksegrp) p_ksegrps;	/* (kg_ksegrp) All KSEGs. */
 	TAILQ_HEAD(, thread) p_threads;	/* (td_plist) Threads. (shortcut) */
-	TAILQ_HEAD(, thread) p_suspended; /* (td_runq) suspended threads */
+	TAILQ_HEAD(, thread) p_suspended; /* (td_runq) Suspended threads. */
 	struct ucred	*p_ucred;	/* (c) Process owner's identity. */
 	struct filedesc	*p_fd;		/* (b) Ptr to open files structure. */
 					/* Accumulated stats for all KSEs? */
 	struct pstats	*p_stats;	/* (b) Accounting/statistics (CPU). */
-	struct plimit	*p_limit;	/* (m) Process limits. */
+	struct plimit	*p_limit;	/* (c*) Process limits. */
 	struct vm_object *p_upages_obj; /* (a) Upages object. */
-	struct procsig	*p_procsig;	/* (c) Signal actions, state (CPU). */
+	struct sigacts	*p_sigacts;	/* (x) Signal actions, state (CPU). */
 
 	/*struct ksegrp	p_ksegrp;
 	struct kse	p_kse; */
@@ -537,31 +528,39 @@ struct proc {
 		PRS_NEW = 0,		/* In creation */
 		PRS_NORMAL,		/* KSEs can be run */
 		PRS_ZOMBIE
-	} p_state;			/* (j) S* process status. */
+	} p_state;			/* (j/c) S* process status. */
 	pid_t		p_pid;		/* (b) Process identifier. */
 	LIST_ENTRY(proc) p_hash;	/* (d) Hash chain. */
 	LIST_ENTRY(proc) p_pglist;	/* (g + e) List of processes in pgrp. */
 	struct proc	*p_pptr;	/* (c + e) Pointer to parent process. */
 	LIST_ENTRY(proc) p_sibling;	/* (e) List of sibling processes. */
 	LIST_HEAD(, proc) p_children;	/* (e) Pointer to list of children. */
-	struct mtx	p_mtx;		/* (k) Lock for this struct. */
+	struct mtx	p_mtx;		/* (n) Lock for this struct. */
 
 /* The following fields are all zeroed upon creation in fork. */
 #define	p_startzero	p_oppid
-	pid_t		p_oppid; 	/* (c + e) Save ppid in ptrace. XXX */
+	pid_t		p_oppid;	/* (c + e) Save ppid in ptrace. XXX */
 	struct vmspace	*p_vmspace;	/* (b) Address space. */
 	u_int		p_swtime;	/* (j) Time swapped in or out. */
-	struct itimerval p_realtimer;	/* (h?/k?) Alarm timer. */
+	struct itimerval p_realtimer;	/* (c) Alarm timer. */
 	struct bintime	p_runtime;	/* (j) Real time. */
+	u_int64_t	p_uu;		/* (j) Previous user time in usec. */
+	u_int64_t	p_su;		/* (j) Previous system time in usec. */
+	u_int64_t	p_iu;		/* (j) Previous intr time in usec. */
+	u_int64_t	p_uticks;	/* (j) Statclock hits in user mode. */
+	u_int64_t	p_sticks;	/* (j) Statclock hits in system mode. */
+	u_int64_t	p_iticks;	/* (j) Statclock hits in intr. */
+	int		p_profthreads;	/* (c) Num threads in addupc_task */
+	int		p_maxthrwaits;	/* (c) Max threads num waiters */
 	int		p_traceflag;	/* (o) Kernel trace points. */
-	struct vnode	*p_tracep;	/* (c + o) Trace to vnode. */
-	sigset_t	p_siglist;	/* (c) Sigs arrived, not delivered. */
+	struct vnode	*p_tracevp;	/* (c + o) Trace to vnode. */
+	struct ucred	*p_tracecred;	/* (o) Credentials to trace with. */
 	struct vnode	*p_textvp;	/* (b) Vnode of executable. */
+	sigset_t	p_siglist;	/* (c) Sigs not delivered to a td. */
 	char		p_lock;		/* (c) Proclock (prevent swap) count. */
-	struct klist p_klist;		/* (c) Knotes attached to this proc. */
+	struct klist	p_klist;	/* (c) Knotes attached to this proc. */
 	struct sigiolst	p_sigiolst;	/* (c) List of sigio sources. */
 	int		p_sigparent;	/* (c) Signal to parent on exit. */
-	sigset_t	p_oldsigmask;	/* (c) Saved mask from pre sigpause. */
 	int		p_sig;		/* (n) For core dump/debugger XXX. */
 	u_long		p_code;		/* (n) For core dump/debugger XXX. */
 	u_int		p_stops;	/* (c) Stop event bitmask. */
@@ -569,16 +568,14 @@ struct proc {
 	char		p_step;		/* (c) Process is stopped. */
 	u_char		p_pfsflags;	/* (c) Procfs flags. */
 	struct nlminfo	*p_nlminfo;	/* (?) Only used by/for lockd. */
-	void		*p_aioinfo;	/* (c) ASYNC I/O info. */
-	struct thread	*p_singlethread;/* (j) If single threading this is it */
-	int		p_suspcount;	/* (j) # threads in suspended mode */
-	int		p_userthreads;	/* (j) # threads in userland */
+	void		*p_aioinfo;	/* (?) ASYNC I/O info. */
+	struct thread	*p_singlethread;/* (c + j) If single threading this is it */
+	int		p_suspcount;	/* (c) # threads in suspended mode */
 /* End area that is zeroed on creation. */
-#define	p_endzero	p_sigmask
+#define	p_endzero	p_sigstk
 
 /* The following fields are all copied upon creation in fork. */
 #define	p_startcopy	p_endzero
-	sigset_t	p_sigmask;	/* (c) Current signal mask. */
 	stack_t		p_sigstk;	/* (c) Stack ptr and on-stack flag. */
 	u_int		p_magic;	/* (b) Magic number. */
 	char		p_comm[MAXCOMLEN + 1];	/* (b) Process name. */
@@ -590,24 +587,21 @@ struct proc {
 #define	p_endcopy	p_xstat
 
 	u_short		p_xstat;	/* (c) Exit status; also stop sig. */
-	int		p_numthreads;	/* (?) number of threads */
+	int		p_numthreads;	/* (j) Number of threads. */
 	int		p_numksegrps;	/* (?) number of ksegrps */
-	struct mdproc	p_md;		/* (c) Any machine-dependent fields. */
-	struct callout	p_itcallout;	/* (h) Interval timer callout. */
+	struct mdproc	p_md;		/* Any machine-dependent fields. */
+	struct callout	p_itcallout;	/* (h + c) Interval timer callout. */
 	struct user	*p_uarea;	/* (k) Kernel VA of u-area (CPU) */
 	u_short		p_acflag;	/* (c) Accounting flags. */
 	struct rusage	*p_ru;		/* (a) Exit information. XXX */
 	struct proc	*p_peers;	/* (r) */
 	struct proc	*p_leader;	/* (b) */
 	void		*p_emuldata;	/* (c) Emulator state data. */
-	struct label	p_label;	/* process (not subject) MAC label */
-	struct p_sched	*p_sched;	/* Scheduler specific data */
+	struct label	p_label;	/* (*) Process (not subject) MAC label */
+	struct p_sched	*p_sched;	/* (*) Scheduler specific data */
 };
 
 #define	p_rlimit	p_limit->pl_rlimit
-#define	p_sigacts	p_procsig->ps_sigacts
-#define	p_sigignore	p_procsig->ps_sigignore
-#define	p_sigcatch	p_procsig->ps_sigcatch
 #define	p_session	p_pgrp->pg_session
 #define	p_pgid		p_pgrp->pg_id
 
@@ -621,13 +615,16 @@ struct proc {
 #define	P_KTHREAD	0x00004	/* Kernel thread. (*)*/
 #define	P_NOLOAD	0x00008	/* Ignore during load avg calculations. */
 #define	P_PPWAIT	0x00010	/* Parent is waiting for child to exec/exit. */
+#define	P_PROFIL	0x00020	/* Has started profiling. */
+#define	P_STOPPROF	0x00040	/* Has thread in requesting to stop prof */
 #define	P_SUGID		0x00100	/* Had set id privileges since last exec. */
 #define	P_SYSTEM	0x00200	/* System proc: no sigs, stats or swapping. */
 #define	P_WAITED	0x01000	/* Someone is waiting for us */
 #define	P_WEXIT		0x02000	/* Working on exiting. */
 #define	P_EXEC		0x04000	/* Process called exec. */
-#define	P_KSES		0x08000	/* Process is using KSEs. */
+#define	P_THREADED	0x08000	/* Process is using threads. */
 #define	P_CONTINUED	0x10000	/* Proc has continued from a stopped state. */
+#define	P_PROTECTED	0x100000 /* Do not kill on memory overcommit. */
 
 /* flags that control how threads may be suspended for some reason */
 #define	P_STOPPED_SIG		0x20000	/* Stopped due to SIGSTOP/SIGTSTP */
@@ -641,24 +638,20 @@ struct proc {
 #define	P_SHOULDSTOP(p)		((p)->p_flag & P_STOPPED)
 
 /* Should be moved to machine-dependent areas. */
-#define	P_UNUSED100000	0x100000
 #define	P_COWINPROGRESS	0x400000 /* Snapshot copy-on-write in progress. */
 
 #define	P_JAILED	0x1000000 /* Process is in jail. */
-#define	P_OLDMASK	0x2000000 /* Need to restore mask after suspend. */
-#define	P_ALTSTACK	0x4000000 /* Have alternate signal stack. */
-#define	P_INEXEC	0x8000000 /* Process is in execve(). */
+#define	P_ALTSTACK	0x2000000 /* Have alternate signal stack. */
+#define	P_INEXEC	0x4000000 /* Process is in execve(). */
 
 /* These flags are kept in p_sflag and are protected with sched_lock. */
 #define	PS_INMEM	0x00001	/* Loaded into memory. */
 #define	PS_XCPU		0x00002 /* Exceeded CPU limit. */
-#define	PS_PROFIL	0x00004	/* Has started profiling. */
 #define	PS_ALRMPEND	0x00020	/* Pending SIGVTALRM needs to be posted. */
 #define	PS_PROFPEND	0x00040	/* Pending SIGPROF needs to be posted. */
 #define	PS_SWAPINREQ	0x00100	/* Swapin request due to wakeup. */
-#define	PS_SWAPPING	0x00200	/* Process is being swapped. */
-#define	PS_NEEDSIGCHK	0x02000	/* Process may need signal delivery. */
-#define	PS_SWAPPINGIN	0x04000	/* Swapin in progress. */
+#define	PS_SWAPPINGOUT	0x00200	/* Process is being swapped out. */
+#define	PS_SWAPPINGIN	0x04000	/* Process is being swapped in. */
 #define	PS_MACPEND	0x08000	/* Ast()-based MAC event pending. */
 
 /* used only in legacy conversion code */
@@ -690,6 +683,8 @@ MALLOC_DECLARE(M_ZOMBIE);
 	TAILQ_FOREACH((td), &(kg)->kg_threads, td_kglist)
 #define	FOREACH_KSE_IN_GROUP(kg, ke)					\
 	TAILQ_FOREACH((ke), &(kg)->kg_kseq, ke_kglist)
+#define	FOREACH_UPCALL_IN_GROUP(kg, ku)					\
+	TAILQ_FOREACH((ku), &(kg)->kg_upcalls, ku_link)
 #define	FOREACH_THREAD_IN_PROC(p, td)					\
 	TAILQ_FOREACH((td), &(p)->p_threads, td_plist)
 
@@ -698,26 +693,6 @@ MALLOC_DECLARE(M_ZOMBIE);
 #define	FIRST_KSEGRP_IN_PROC(p) TAILQ_FIRST(&p->p_ksegrps)
 #define	FIRST_KSE_IN_KSEGRP(kg) TAILQ_FIRST(&kg->kg_kseq)
 #define	FIRST_KSE_IN_PROC(p) FIRST_KSE_IN_KSEGRP(FIRST_KSEGRP_IN_PROC(p))
-
-static __inline int
-sigonstack(size_t sp)
-{
-	register struct thread *td = curthread;
-	struct proc *p = td->td_proc;
-
-	return ((p->p_flag & P_ALTSTACK) ?
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
-	    ((p->p_sigstk.ss_size == 0) ? (p->p_sigstk.ss_flags & SS_ONSTACK) :
-		((sp - (size_t)p->p_sigstk.ss_sp) < p->p_sigstk.ss_size))
-#else
-	    ((sp - (size_t)p->p_sigstk.ss_sp) < p->p_sigstk.ss_size)
-#endif
-	    : 0);
-}
-
-/* Handy macro to determine if p1 can mangle p2. */
-#define	PRISON_CHECK(p1, p2) \
-	((p1)->p_prison == NULL || (p1)->p_prison == (p2)->p_prison)
 
 /*
  * We use process IDs <= PID_MAX; PID_MAX + 1 must also fit in a pid_t,
@@ -784,11 +759,9 @@ sigonstack(size_t sp)
 } while (0)
 #define	_PHOLD(p) do {							\
 	PROC_LOCK_ASSERT((p), MA_OWNED);				\
-	if ((p)->p_lock++ == 0) {					\
-		mtx_lock_spin(&sched_lock);				\
+	(p)->p_lock++;							\
+	if (((p)->p_sflag & PS_INMEM) == 0)				\
 		faultin((p));						\
-		mtx_unlock_spin(&sched_lock);				\
-	}								\
 } while (0)
 
 #define	PRELE(p) do {							\
@@ -824,6 +797,7 @@ extern struct proc proc0;		/* Process slot for swapper. */
 extern struct thread thread0;		/* Primary thread in proc0 */
 extern struct ksegrp ksegrp0;		/* Primary ksegrp in proc0 */
 extern struct kse kse0;			/* Primary kse in proc0 */
+extern struct vmspace vmspace0;		/* VM space for proc0. */
 extern int hogticks;			/* Limit on kernel cpu hogs. */
 extern int nprocs, maxproc;		/* Current and max number of procs. */
 extern int maxprocperuid;		/* Max procs per uid. */
@@ -881,11 +855,17 @@ int	securelevel_gt(struct ucred *cr, int level);
 void	setrunnable(struct thread *);
 void	setrunqueue(struct thread *);
 void	setsugid(struct proc *p);
+int	sigonstack(size_t sp);
 void	sleepinit(void);
 void	stopevent(struct proc *, u_int, u_int);
 void	cpu_idle(void);
+#if !defined(__alpha__) && !defined(__powerpc__) 
+void	cpu_switch(struct thread *old, struct thread *new);
+void	cpu_throw(struct thread *old, struct thread *new) __dead2;
+#else
 void	cpu_switch(void);
 void	cpu_throw(void) __dead2;
+#endif
 void	unsleep(struct thread *);
 void	userret(struct thread *, struct trapframe *, u_int);
 
@@ -904,7 +884,7 @@ struct	kse *kse_alloc(void);
 void	kse_free(struct kse *ke);
 void	kse_stash(struct kse *ke);
 void	cpu_set_upcall(struct thread *td, void *pcb);
-void	cpu_set_upcall_kse(struct thread *td, struct kse *ke);
+void	cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku);
 void	cpu_thread_clean(struct thread *);
 void	cpu_thread_exit(struct thread *);
 void	cpu_thread_setup(struct thread *td);
@@ -913,8 +893,8 @@ void	kse_link(struct kse *ke, struct ksegrp *kg);
 void	kse_unlink(struct kse *ke);
 void	ksegrp_link(struct ksegrp *kg, struct proc *p);
 void	ksegrp_unlink(struct ksegrp *kg);
-void	make_kse_runnable(struct kse *ke);
-struct thread *signal_upcall(struct proc *p, int sig);
+void	thread_signal_add(struct thread *td, int sig);
+void	thread_signal_upcall(struct thread *td);
 struct	thread *thread_alloc(void);
 void	thread_exit(void) __dead2;
 int	thread_export_context(struct thread *td);
@@ -922,7 +902,7 @@ void	thread_free(struct thread *td);
 void	thread_getcontext(struct thread *td, ucontext_t *uc);
 void	thread_link(struct thread *td, struct ksegrp *kg);
 void	thread_reap(void);
-struct thread *thread_schedule_upcall(struct thread *td, struct kse *ke);
+struct thread *thread_schedule_upcall(struct thread *td, struct kse_upcall *ku);
 int	thread_setcontext(struct thread *td, ucontext_t *uc);
 int	thread_single(int how);
 #define	SINGLE_NO_EXIT 0			/* values for 'how' */
@@ -931,14 +911,23 @@ void	thread_single_end(void);
 void	thread_stash(struct thread *td);
 int	thread_suspend_check(int how);
 void	thread_suspend_one(struct thread *td);
+void	thread_unlink(struct thread *td);
 void	thread_unsuspend(struct proc *p);
 void	thread_unsuspend_one(struct thread *td);
 int	thread_userret(struct thread *td, struct trapframe *frame);
 void	thread_user_enter(struct proc *p, struct thread *td);
 void	thread_wait(struct proc *p);
-int	thread_add_ticks_intr(int user, uint ticks);
-
+int	thread_statclock(int user);
+struct kse_upcall *upcall_alloc(void);
+void	upcall_free(struct kse_upcall *ku);
+void	upcall_link(struct kse_upcall *ku, struct ksegrp *kg);
+void	upcall_unlink(struct kse_upcall *ku);
+void	upcall_remove(struct thread *td);
+void	upcall_stash(struct kse_upcall *ke);
 void	thread_sanity_check(struct thread *td, char *);
+void	thread_stopped(struct proc *p);
+void	thread_switchout(struct thread *td);
+void	thr_exit1(void);
 #endif	/* _KERNEL */
 
 #endif	/* !_SYS_PROC_H_ */

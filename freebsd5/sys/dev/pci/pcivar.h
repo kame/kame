@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pcivar.h,v 1.60 2002/11/27 06:41:28 imp Exp $
+ * $FreeBSD: src/sys/dev/pci/pcivar.h,v 1.61 2003/04/16 03:15:08 mdodd Exp $
  *
  */
 
@@ -249,28 +249,28 @@ PCIB_ACCESSOR(bus,		BUS,		u_int32_t)
  * These should be used in preference to manually manipulating
  * configuration space.
  */
-static __inline void
+static __inline int
 pci_enable_busmaster(device_t dev)
 {
-    PCI_ENABLE_BUSMASTER(device_get_parent(dev), dev);
+    return(PCI_ENABLE_BUSMASTER(device_get_parent(dev), dev));
 }
 
-static __inline void
+static __inline int
 pci_disable_busmaster(device_t dev)
 {
-    PCI_DISABLE_BUSMASTER(device_get_parent(dev), dev);
+    return(PCI_DISABLE_BUSMASTER(device_get_parent(dev), dev));
 }
 
-static __inline void
+static __inline int
 pci_enable_io(device_t dev, int space)
 {
-    PCI_ENABLE_IO(device_get_parent(dev), dev, space);
+    return(PCI_ENABLE_IO(device_get_parent(dev), dev, space));
 }
 
-static __inline void
+static __inline int
 pci_disable_io(device_t dev, int space)
 {
-    PCI_DISABLE_IO(device_get_parent(dev), dev, space);
+    return(PCI_DISABLE_IO(device_get_parent(dev), dev, space));
 }
 
 /*

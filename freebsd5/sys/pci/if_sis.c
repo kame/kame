@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sis.c,v 1.58 2002/11/14 23:49:09 sam Exp $
+ * $FreeBSD: src/sys/pci/if_sis.c,v 1.75 2003/05/06 02:00:01 cognet Exp $
  */
 
 /*
@@ -56,6 +56,9 @@
  * The only downside to this chipset is that RX descriptors must be
  * longword aligned.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_sis.c,v 1.75 2003/05/06 02:00:01 cognet Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -93,15 +96,12 @@
 
 #include <pci/if_sisreg.h>
 
+MODULE_DEPEND(sis, pci, 1, 1, 1);
+MODULE_DEPEND(sis, ether, 1, 1, 1);
 MODULE_DEPEND(sis, miibus, 1, 1, 1);
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sis.c,v 1.58 2002/11/14 23:49:09 sam Exp $";
-#endif
 
 /*
  * Various supported device vendors/types and their names.
@@ -148,6 +148,10 @@ static void sis_read_mac	(struct sis_softc *, device_t, caddr_t);
 static device_t sis_find_bridge	(device_t);
 #endif
 
+static void sis_mii_sync	(struct sis_softc *);
+static void sis_mii_send	(struct sis_softc *, u_int32_t, int);
+static int sis_mii_readreg	(struct sis_softc *, struct sis_mii_frame *);
+static int sis_mii_writereg	(struct sis_softc *, struct sis_mii_frame *);
 static int sis_miibus_readreg	(device_t, int, int);
 static int sis_miibus_writereg	(device_t, int, int, int);
 static void sis_miibus_statchg	(device_t);
@@ -197,7 +201,7 @@ static driver_t sis_driver = {
 
 static devclass_t sis_devclass;
 
-DRIVER_MODULE(if_sis, pci, sis_driver, sis_devclass, 0, 0);
+DRIVER_MODULE(sis, pci, sis_driver, sis_devclass, 0, 0);
 DRIVER_MODULE(miibus, sis, miibus_driver, miibus_devclass, 0, 0);
 
 #define SIS_SETBIT(sc, reg, x)				\
@@ -514,13 +518,198 @@ sis_read_mac(sc, dev, dest)
 }
 #endif
 
+/*
+ * Sync the PHYs by setting data bit and strobing the clock 32 times.
+ */
+static void sis_mii_sync(sc)
+	struct sis_softc	*sc;
+{
+	register int		i;
+ 
+ 	SIO_SET(SIS_MII_DIR|SIS_MII_DATA);
+ 
+ 	for (i = 0; i < 32; i++) {
+ 		SIO_SET(SIS_MII_CLK);
+ 		DELAY(1);
+ 		SIO_CLR(SIS_MII_CLK);
+ 		DELAY(1);
+ 	}
+ 
+ 	return;
+}
+ 
+/*
+ * Clock a series of bits through the MII.
+ */
+static void sis_mii_send(sc, bits, cnt)
+	struct sis_softc	*sc;
+	u_int32_t		bits;
+	int			cnt;
+{
+	int			i;
+ 
+	SIO_CLR(SIS_MII_CLK);
+ 
+	for (i = (0x1 << (cnt - 1)); i; i >>= 1) {
+		if (bits & i) {
+			SIO_SET(SIS_MII_DATA);
+		} else {
+			SIO_CLR(SIS_MII_DATA);
+		}
+		DELAY(1);
+		SIO_CLR(SIS_MII_CLK);
+		DELAY(1);
+		SIO_SET(SIS_MII_CLK);
+	}
+}
+ 
+/*
+ * Read an PHY register through the MII.
+ */
+static int sis_mii_readreg(sc, frame)
+	struct sis_softc	*sc;
+	struct sis_mii_frame	*frame;
+ 	
+{
+	int			i, ack, s;
+ 
+	s = splimp();
+ 
+	/*
+	 * Set up frame for RX.
+	 */
+	frame->mii_stdelim = SIS_MII_STARTDELIM;
+	frame->mii_opcode = SIS_MII_READOP;
+	frame->mii_turnaround = 0;
+	frame->mii_data = 0;
+ 	
+	/*
+ 	 * Turn on data xmit.
+	 */
+	SIO_SET(SIS_MII_DIR);
+
+	sis_mii_sync(sc);
+ 
+	/*
+	 * Send command/address info.
+	 */
+	sis_mii_send(sc, frame->mii_stdelim, 2);
+	sis_mii_send(sc, frame->mii_opcode, 2);
+	sis_mii_send(sc, frame->mii_phyaddr, 5);
+	sis_mii_send(sc, frame->mii_regaddr, 5);
+ 
+	/* Idle bit */
+	SIO_CLR((SIS_MII_CLK|SIS_MII_DATA));
+	DELAY(1);
+	SIO_SET(SIS_MII_CLK);
+	DELAY(1);
+ 
+	/* Turn off xmit. */
+	SIO_CLR(SIS_MII_DIR);
+ 
+	/* Check for ack */
+	SIO_CLR(SIS_MII_CLK);
+	DELAY(1);
+	ack = CSR_READ_4(sc, SIS_EECTL) & SIS_MII_DATA;
+	SIO_SET(SIS_MII_CLK);
+	DELAY(1);
+ 
+	/*
+	 * Now try reading data bits. If the ack failed, we still
+	 * need to clock through 16 cycles to keep the PHY(s) in sync.
+	 */
+	if (ack) {
+		for(i = 0; i < 16; i++) {
+			SIO_CLR(SIS_MII_CLK);
+			DELAY(1);
+			SIO_SET(SIS_MII_CLK);
+			DELAY(1);
+		}
+		goto fail;
+	}
+ 
+	for (i = 0x8000; i; i >>= 1) {
+		SIO_CLR(SIS_MII_CLK);
+		DELAY(1);
+		if (!ack) {
+			if (CSR_READ_4(sc, SIS_EECTL) & SIS_MII_DATA)
+				frame->mii_data |= i;
+			DELAY(1);
+		}
+		SIO_SET(SIS_MII_CLK);
+		DELAY(1);
+	}
+
+fail:
+
+	SIO_CLR(SIS_MII_CLK);
+	DELAY(1);
+	SIO_SET(SIS_MII_CLK);
+	DELAY(1);
+
+	splx(s);
+
+	if (ack)
+		return(1);
+	return(0);
+}
+ 
+/*
+ * Write to a PHY register through the MII.
+ */
+static int sis_mii_writereg(sc, frame)
+	struct sis_softc	*sc;
+	struct sis_mii_frame	*frame;
+	
+{
+	int			s;
+ 
+	 s = splimp();
+ 	/*
+ 	 * Set up frame for TX.
+ 	 */
+ 
+ 	frame->mii_stdelim = SIS_MII_STARTDELIM;
+ 	frame->mii_opcode = SIS_MII_WRITEOP;
+ 	frame->mii_turnaround = SIS_MII_TURNAROUND;
+ 	
+ 	/*
+  	 * Turn on data output.
+ 	 */
+ 	SIO_SET(SIS_MII_DIR);
+ 
+ 	sis_mii_sync(sc);
+ 
+ 	sis_mii_send(sc, frame->mii_stdelim, 2);
+ 	sis_mii_send(sc, frame->mii_opcode, 2);
+ 	sis_mii_send(sc, frame->mii_phyaddr, 5);
+ 	sis_mii_send(sc, frame->mii_regaddr, 5);
+ 	sis_mii_send(sc, frame->mii_turnaround, 2);
+ 	sis_mii_send(sc, frame->mii_data, 16);
+ 
+ 	/* Idle bit. */
+ 	SIO_SET(SIS_MII_CLK);
+ 	DELAY(1);
+ 	SIO_CLR(SIS_MII_CLK);
+ 	DELAY(1);
+ 
+ 	/*
+ 	 * Turn off xmit.
+ 	 */
+ 	SIO_CLR(SIS_MII_DIR);
+ 
+ 	splx(s);
+ 
+ 	return(0);
+}
+
 static int
 sis_miibus_readreg(dev, phy, reg)
 	device_t		dev;
 	int			phy, reg;
 {
 	struct sis_softc	*sc;
-	int			i, val = 0;
+	struct sis_mii_frame    frame;
 
 	sc = device_get_softc(dev);
 
@@ -539,33 +728,51 @@ sis_miibus_readreg(dev, phy, reg)
 		 */
 		if (!CSR_READ_4(sc, NS_BMSR))
 			DELAY(1000);
-		val = CSR_READ_4(sc, NS_BMCR + (reg * 4));
-		return(val);
+		return CSR_READ_4(sc, NS_BMCR + (reg * 4));
 	}
 
+	/*
+	 * Chipsets < SIS_635 seem not to be able to read/write
+	 * through mdio. Use the enhanced PHY access register
+	 * again for them.
+	 */
 	if (sc->sis_type == SIS_TYPE_900 &&
-	    sc->sis_rev < SIS_REV_635 && phy != 0)
-		return(0);
+	    sc->sis_rev < SIS_REV_635) {
+		int i, val = 0;
 
-	CSR_WRITE_4(sc, SIS_PHYCTL, (phy << 11) | (reg << 6) | SIS_PHYOP_READ);
-	SIS_SETBIT(sc, SIS_PHYCTL, SIS_PHYCTL_ACCESS);
+		if (phy != 0)
+			return(0);
 
-	for (i = 0; i < SIS_TIMEOUT; i++) {
-		if (!(CSR_READ_4(sc, SIS_PHYCTL) & SIS_PHYCTL_ACCESS))
-			break;
+		CSR_WRITE_4(sc, SIS_PHYCTL,
+		    (phy << 11) | (reg << 6) | SIS_PHYOP_READ);
+		SIS_SETBIT(sc, SIS_PHYCTL, SIS_PHYCTL_ACCESS);
+
+		for (i = 0; i < SIS_TIMEOUT; i++) {
+			if (!(CSR_READ_4(sc, SIS_PHYCTL) & SIS_PHYCTL_ACCESS))
+				break;
+		}
+
+		if (i == SIS_TIMEOUT) {
+			printf("sis%d: PHY failed to come ready\n",
+			    sc->sis_unit);
+			return(0);
+		}
+
+		val = (CSR_READ_4(sc, SIS_PHYCTL) >> 16) & 0xFFFF;
+
+		if (val == 0xFFFF)
+			return(0);
+
+		return(val);
+	} else {
+		bzero((char *)&frame, sizeof(frame));
+
+		frame.mii_phyaddr = phy;
+		frame.mii_regaddr = reg;
+		sis_mii_readreg(sc, &frame);
+
+		return(frame.mii_data);
 	}
-
-	if (i == SIS_TIMEOUT) {
-		printf("sis%d: PHY failed to come ready\n", sc->sis_unit);
-		return(0);
-	}
-
-	val = (CSR_READ_4(sc, SIS_PHYCTL) >> 16) & 0xFFFF;
-
-	if (val == 0xFFFF)
-		return(0);
-
-	return(val);
 }
 
 static int
@@ -574,7 +781,7 @@ sis_miibus_writereg(dev, phy, reg, data)
 	int			phy, reg, data;
 {
 	struct sis_softc	*sc;
-	int			i;
+	struct sis_mii_frame	frame;
 
 	sc = device_get_softc(dev);
 
@@ -585,21 +792,38 @@ sis_miibus_writereg(dev, phy, reg, data)
 		return(0);
 	}
 
-	if (sc->sis_type == SIS_TYPE_900 && phy != 0)
-		return(0);
+	/*
+	 * Chipsets < SIS_635 seem not to be able to read/write
+	 * through mdio. Use the enhanced PHY access register
+	 * again for them.
+	 */
+	if (sc->sis_type == SIS_TYPE_900 &&
+	    sc->sis_rev < SIS_REV_635) {
+		int i;
 
-	CSR_WRITE_4(sc, SIS_PHYCTL, (data << 16) | (phy << 11) |
-	    (reg << 6) | SIS_PHYOP_WRITE);
-	SIS_SETBIT(sc, SIS_PHYCTL, SIS_PHYCTL_ACCESS);
+		if (phy != 0)
+			return(0);
 
-	for (i = 0; i < SIS_TIMEOUT; i++) {
-		if (!(CSR_READ_4(sc, SIS_PHYCTL) & SIS_PHYCTL_ACCESS))
-			break;
+		CSR_WRITE_4(sc, SIS_PHYCTL, (data << 16) | (phy << 11) |
+		    (reg << 6) | SIS_PHYOP_WRITE);
+		SIS_SETBIT(sc, SIS_PHYCTL, SIS_PHYCTL_ACCESS);
+
+		for (i = 0; i < SIS_TIMEOUT; i++) {
+			if (!(CSR_READ_4(sc, SIS_PHYCTL) & SIS_PHYCTL_ACCESS))
+				break;
+		}
+
+		if (i == SIS_TIMEOUT)
+			printf("sis%d: PHY failed to come ready\n",
+			    sc->sis_unit);
+	} else {
+		bzero((char *)&frame, sizeof(frame));
+
+		frame.mii_phyaddr = phy;
+		frame.mii_regaddr = reg;
+		frame.mii_data = data;
+		sis_mii_writereg(sc, &frame);
 	}
-
-	if (i == SIS_TIMEOUT)
-		printf("sis%d: PHY failed to come ready\n", sc->sis_unit);
-
 	return(0);
 }
 
@@ -645,9 +869,12 @@ sis_crc(sc, addr)
 	 * different than the SiS, so we special-case it.
 	 */
 	if (sc->sis_type == SIS_TYPE_83815)
-		return((crc >> 23) & 0x1FF);
-
-	return((crc >> 25) & 0x0000007F);
+		return (crc >> 23);
+	else if (sc->sis_rev >= SIS_REV_635 ||
+	    sc->sis_rev == SIS_REV_900B)
+		return (crc >> 24);
+	else
+		return (crc >> 25);
 }
 
 static void
@@ -705,37 +932,54 @@ sis_setmulti_sis(sc)
 {
 	struct ifnet		*ifp;
 	struct ifmultiaddr	*ifma;
-	u_int32_t		h = 0, i, filtsave;
+	u_int32_t		h, i, n, ctl;
+	u_int16_t		hashes[16];
 
 	ifp = &sc->arpcom.ac_if;
 
+	/* hash table size */
+	if (sc->sis_rev >= SIS_REV_635 ||
+	    sc->sis_rev == SIS_REV_900B)
+		n = 16;
+	else
+		n = 8;
+
+	ctl = CSR_READ_4(sc, SIS_RXFILT_CTL) & SIS_RXFILTCTL_ENABLE;
+
+	if (ifp->if_flags & IFF_BROADCAST)
+		ctl |= SIS_RXFILTCTL_BROAD;
+
 	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
-		SIS_SETBIT(sc, SIS_RXFILT_CTL, SIS_RXFILTCTL_ALLMULTI);
-		return;
-	}
-
-	SIS_CLRBIT(sc, SIS_RXFILT_CTL, SIS_RXFILTCTL_ALLMULTI);
-
-	filtsave = CSR_READ_4(sc, SIS_RXFILT_CTL);
-
-	/* first, zot all the existing hash bits */
-	for (i = 0; i < 8; i++) {
-		CSR_WRITE_4(sc, SIS_RXFILT_CTL, (4 + ((i * 16) >> 4)) << 16);
-		CSR_WRITE_4(sc, SIS_RXFILT_DATA, 0);
-	}
-
-	/* now program new ones */
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-		if (ifma->ifma_addr->sa_family != AF_LINK)
+		ctl |= SIS_RXFILTCTL_ALLMULTI;
+		if (ifp->if_flags & IFF_PROMISC)
+			ctl |= SIS_RXFILTCTL_BROAD|SIS_RXFILTCTL_ALLPHYS;
+		for (i = 0; i < n; i++)
+			hashes[i] = ~0;
+	} else {
+		for (i = 0; i < n; i++)
+			hashes[i] = 0;
+		i = 0;
+		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+			if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = sis_crc(sc, LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
-		CSR_WRITE_4(sc, SIS_RXFILT_CTL, (4 + (h >> 4)) << 16);
-		SIS_SETBIT(sc, SIS_RXFILT_DATA, (1 << (h & 0xF)));
+			h = sis_crc(sc,
+			    LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+			hashes[h >> 4] |= 1 << (h & 0xf);
+			i++;
+		}
+		if (i > n) {
+			ctl |= SIS_RXFILTCTL_ALLMULTI;
+			for (i = 0; i < n; i++)
+				hashes[i] = ~0;
+		}
 	}
 
-	CSR_WRITE_4(sc, SIS_RXFILT_CTL, filtsave);
+	for (i = 0; i < n; i++) {
+		CSR_WRITE_4(sc, SIS_RXFILT_CTL, (4 + i) << 16);
+		CSR_WRITE_4(sc, SIS_RXFILT_DATA, hashes[i]);
+	}
 
-	return;
+	CSR_WRITE_4(sc, SIS_RXFILT_CTL, ctl);
 }
 
 static void
@@ -802,14 +1046,13 @@ sis_attach(dev)
 	device_t		dev;
 {
 	u_char			eaddr[ETHER_ADDR_LEN];
-	u_int32_t		command;
 	struct sis_softc	*sc;
 	struct ifnet		*ifp;
-	int			unit, error = 0, rid;
+	int			unit, error = 0, rid, waittime = 0;
 
+	waittime = 0;
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
-	bzero(sc, sizeof(struct sis_softc));
 
 	mtx_init(&sc->sis_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
@@ -850,23 +1093,6 @@ sis_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef SIS_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("sis%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("sis%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;;
-		goto fail;
-	}
-#endif
 
 	rid = SIS_RID;
 	sc->sis_res = bus_alloc_resource(dev, SIS_RES, &rid,
@@ -888,23 +1114,19 @@ sis_attach(dev)
 
 	if (sc->sis_irq == NULL) {
 		printf("sis%d: couldn't map interrupt\n", unit);
-		bus_release_resource(dev, SIS_RES, SIS_RID, sc->sis_res);
 		error = ENXIO;
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->sis_irq, INTR_TYPE_NET,
-	    sis_intr, sc, &sc->sis_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sis_irq);
-		bus_release_resource(dev, SIS_RES, SIS_RID, sc->sis_res);
-		printf("sis%d: couldn't set up irq\n", unit);
 		goto fail;
 	}
 
 	/* Reset the adapter. */
 	sis_reset(sc);
+
+	if (sc->sis_type == SIS_TYPE_900 &&
+            (sc->sis_rev == SIS_REV_635 ||
+            sc->sis_rev == SIS_REV_900B)) {
+		SIO_SET(SIS_CFG_RND_CNT);
+		SIO_SET(SIS_CFG_PERR_DETECT);
+	}
 
 	/*
 	 * Get station address from the EEPROM.
@@ -971,7 +1193,31 @@ sis_attach(dev)
 		else if (sc->sis_rev == SIS_REV_635 ||
 			 sc->sis_rev == SIS_REV_630ET)
 			sis_read_mac(sc, dev, (caddr_t)&eaddr);
-		else
+		else if (sc->sis_rev == SIS_REV_96x) {
+			/* Allow to read EEPROM from LAN. It is shared
+			 * between a 1394 controller and the NIC and each
+			 * time we access it, we need to set SIS_EECMD_REQ.
+			 */
+			SIO_SET(SIS_EECMD_REQ);
+			for (waittime = 0; waittime < SIS_TIMEOUT;
+			    waittime++) {
+				/* Force EEPROM to idle state. */
+				sis_eeprom_idle(sc);
+				if (CSR_READ_4(sc, SIS_EECTL) & SIS_EECMD_GNT) {
+					sis_read_eeprom(sc, (caddr_t)&eaddr,
+					    SIS_EE_NODEADDR, 3, 0);
+					break;
+				}
+				DELAY(1);
+			}
+			/*
+			 * Set SIS_EECTL_CLK to high, so a other master
+			 * can operate on the i2c bus.
+			 */
+			SIO_SET(SIS_EECTL_CLK);
+			/* Refuse EEPROM access by LAN */
+			SIO_SET(SIS_EECMD_DONE);
+		} else
 #endif
 			sis_read_eeprom(sc, (caddr_t)&eaddr,
 			    SIS_EE_NODEADDR, 3, 0);
@@ -1000,9 +1246,13 @@ sis_attach(dev)
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */ 
 			BUS_DMA_ALLOCNOW,	/* flags */
 			&sc->sis_parent_tag);
+	if (error)
+		goto fail;
 
 	/*
-	 * Now allocate a tag for the DMA descriptor lists.
+	 * Now allocate a tag for the DMA descriptor lists and a chunk
+	 * of DMA-able memory based on the tag.  Also obtain the physical
+	 * addresses of the RX and TX ring, which we'll need later.
 	 * All of our lists are allocated as a contiguous block
 	 * of memory.
 	 */
@@ -1015,6 +1265,33 @@ sis_attach(dev)
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
 			0,			/* flags */
 			&sc->sis_ldata.sis_rx_tag);
+	if (error)
+		goto fail;
+
+	error = bus_dmamem_alloc(sc->sis_ldata.sis_rx_tag,
+	    (void **)&sc->sis_ldata.sis_rx_list, BUS_DMA_NOWAIT,
+	    &sc->sis_ldata.sis_rx_dmamap);
+
+	if (error) {
+		printf("sis%d: no memory for rx list buffers!\n", unit);
+		bus_dma_tag_destroy(sc->sis_ldata.sis_rx_tag);
+		sc->sis_ldata.sis_rx_tag = NULL;
+		goto fail;
+	}
+
+	error = bus_dmamap_load(sc->sis_ldata.sis_rx_tag,
+	    sc->sis_ldata.sis_rx_dmamap, &(sc->sis_ldata.sis_rx_list[0]),
+	    sizeof(struct sis_desc), sis_dma_map_ring,
+	    &sc->sis_cdata.sis_rx_paddr, 0);
+
+	if (error) {
+		printf("sis%d: cannot get address of the rx ring!\n", unit);
+		bus_dmamem_free(sc->sis_ldata.sis_rx_tag,
+		    sc->sis_ldata.sis_rx_list, sc->sis_ldata.sis_rx_dmamap);
+		bus_dma_tag_destroy(sc->sis_ldata.sis_rx_tag);
+		sc->sis_ldata.sis_rx_tag = NULL;
+		goto fail;
+	}
 
 	error = bus_dma_tag_create(sc->sis_parent_tag,	/* parent */
 			1, 0,			/* alignment, boundary */
@@ -1025,53 +1302,45 @@ sis_attach(dev)
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
 			0,			/* flags */
 			&sc->sis_ldata.sis_tx_tag);
+	if (error)
+		goto fail;
+
+	error = bus_dmamem_alloc(sc->sis_ldata.sis_tx_tag,
+	    (void **)&sc->sis_ldata.sis_tx_list, BUS_DMA_NOWAIT,
+	    &sc->sis_ldata.sis_tx_dmamap);
+
+	if (error) {
+		printf("sis%d: no memory for tx list buffers!\n", unit);
+		bus_dma_tag_destroy(sc->sis_ldata.sis_tx_tag);
+		sc->sis_ldata.sis_tx_tag = NULL;
+		goto fail;
+	}
+
+	error = bus_dmamap_load(sc->sis_ldata.sis_tx_tag,
+	    sc->sis_ldata.sis_tx_dmamap, &(sc->sis_ldata.sis_tx_list[0]),
+	    sizeof(struct sis_desc), sis_dma_map_ring,
+	    &sc->sis_cdata.sis_tx_paddr, 0);
+
+	if (error) {
+		printf("sis%d: cannot get address of the tx ring!\n", unit);
+		bus_dmamem_free(sc->sis_ldata.sis_tx_tag,
+		    sc->sis_ldata.sis_tx_list, sc->sis_ldata.sis_tx_dmamap);
+		bus_dma_tag_destroy(sc->sis_ldata.sis_tx_tag);
+		sc->sis_ldata.sis_tx_tag = NULL;
+		goto fail;
+	}
 
 	error = bus_dma_tag_create(sc->sis_parent_tag,	/* parent */
 			1, 0,			/* alignment, boundary */
 			BUS_SPACE_MAXADDR,	/* lowaddr */
 			BUS_SPACE_MAXADDR,	/* highaddr */
 			NULL, NULL,		/* filter, filterarg */
-			SIS_TX_LIST_SZ, 1,	/* maxsize,nsegments */
+			MCLBYTES, 1,		/* maxsize,nsegments */
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
 			0,			/* flags */
 			&sc->sis_tag);
-
-	/*
-	 * Now allocate a chunk of DMA-able memory based on the
-	 * tag we just created.
-	 */
-	error = bus_dmamem_alloc(sc->sis_ldata.sis_tx_tag,
-	    (void **)&sc->sis_ldata.sis_tx_list, BUS_DMA_NOWAIT,
-	    &sc->sis_ldata.sis_tx_dmamap);
-
-	if (error) {
-		printf("sis%d: no memory for list buffers!\n", unit);
-		bus_teardown_intr(dev, sc->sis_irq, sc->sis_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sis_irq);
-		bus_release_resource(dev, SIS_RES, SIS_RID, sc->sis_res);
-		bus_dma_tag_destroy(sc->sis_ldata.sis_rx_tag);
-		bus_dma_tag_destroy(sc->sis_ldata.sis_tx_tag);
-		error = ENXIO;
+	if (error)
 		goto fail;
-	}
-
-	error = bus_dmamem_alloc(sc->sis_ldata.sis_rx_tag,
-	    (void **)&sc->sis_ldata.sis_rx_list, BUS_DMA_NOWAIT,
-	    &sc->sis_ldata.sis_rx_dmamap);
-
-	if (error) {
-		printf("sis%d: no memory for list buffers!\n", unit);
-		bus_teardown_intr(dev, sc->sis_irq, sc->sis_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sis_irq);
-		bus_release_resource(dev, SIS_RES, SIS_RID, sc->sis_res);
-		bus_dmamem_free(sc->sis_ldata.sis_rx_tag,
-		    sc->sis_ldata.sis_tx_list, sc->sis_ldata.sis_tx_dmamap);
-		bus_dma_tag_destroy(sc->sis_ldata.sis_rx_tag);
-		bus_dma_tag_destroy(sc->sis_ldata.sis_tx_tag);
-		error = ENXIO;
-		goto fail;
-	}
-
 
 	bzero(sc->sis_ldata.sis_tx_list, SIS_TX_LIST_SZ);
 	bzero(sc->sis_ldata.sis_rx_list, SIS_RX_LIST_SZ);
@@ -1080,14 +1349,6 @@ sis_attach(dev)
 	 * Obtain the physical addresses of the RX and TX
 	 * rings which we'll need later in the init routine.
 	 */
-	bus_dmamap_load(sc->sis_ldata.sis_tx_tag,
-	    sc->sis_ldata.sis_tx_dmamap, &(sc->sis_ldata.sis_tx_list[0]),
-	    sizeof(struct sis_desc), sis_dma_map_ring,
-	    &sc->sis_cdata.sis_tx_paddr, 0);
-	bus_dmamap_load(sc->sis_ldata.sis_rx_tag,
-	    sc->sis_ldata.sis_rx_dmamap, &(sc->sis_ldata.sis_rx_list[0]),
-	    sizeof(struct sis_desc), sis_dma_map_ring,
-	    &sc->sis_cdata.sis_rx_paddr, 0);
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
@@ -1109,15 +1370,6 @@ sis_attach(dev)
 	if (mii_phy_probe(dev, &sc->sis_miibus,
 	    sis_ifmedia_upd, sis_ifmedia_sts)) {
 		printf("sis%d: MII without any PHY!\n", sc->sis_unit);
-		bus_teardown_intr(dev, sc->sis_irq, sc->sis_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sis_irq);
-		bus_release_resource(dev, SIS_RES, SIS_RID, sc->sis_res);
-		bus_dmamem_free(sc->sis_ldata.sis_rx_tag,
-		    sc->sis_ldata.sis_rx_list, sc->sis_ldata.sis_rx_dmamap);
-		bus_dmamem_free(sc->sis_ldata.sis_rx_tag,
-		    sc->sis_ldata.sis_tx_list, sc->sis_ldata.sis_tx_dmamap);
-		bus_dma_tag_destroy(sc->sis_ldata.sis_rx_tag);
-		bus_dma_tag_destroy(sc->sis_ldata.sis_tx_tag);
 		error = ENXIO;
 		goto fail;
 	}
@@ -1133,14 +1385,30 @@ sis_attach(dev)
 	ifp->if_data.ifi_hdrlen = sizeof(struct ether_vlan_header);
 	ifp->if_capabilities |= IFCAP_VLAN_MTU;
 
-	callout_handle_init(&sc->sis_stat_ch);
-	return(0);
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->sis_irq, INTR_TYPE_NET,
+	    sis_intr, sc, &sc->sis_intrhand);
+
+	if (error) {
+		printf("sis%d: couldn't set up irq\n", unit);
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
-	mtx_destroy(&sc->sis_mtx);
+	if (error)
+		sis_detach(dev);
+
 	return(error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 sis_detach(dev)
 	device_t		dev;
@@ -1148,33 +1416,46 @@ sis_detach(dev)
 	struct sis_softc	*sc;
 	struct ifnet		*ifp;
 
-
 	sc = device_get_softc(dev);
+	KASSERT(mtx_initialized(&sc->sis_mtx), ("sis mutex not initialized"));
 	SIS_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	sis_reset(sc);
-	sis_stop(sc);
-	ether_ifdetach(ifp);
-
+	/* These should only be active if attach succeeded */
+	if (device_is_attached(dev)) {
+		sis_reset(sc);
+		sis_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->sis_miibus)
+		device_delete_child(dev, sc->sis_miibus);
 	bus_generic_detach(dev);
-	device_delete_child(dev, sc->sis_miibus);
 
-	bus_teardown_intr(dev, sc->sis_irq, sc->sis_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sis_irq);
-	bus_release_resource(dev, SIS_RES, SIS_RID, sc->sis_res);
+	if (sc->sis_intrhand)
+		bus_teardown_intr(dev, sc->sis_irq, sc->sis_intrhand);
+	if (sc->sis_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sis_irq);
+	if (sc->sis_res)
+		bus_release_resource(dev, SIS_RES, SIS_RID, sc->sis_res);
 
-	bus_dmamap_unload(sc->sis_ldata.sis_rx_tag,
-	    sc->sis_ldata.sis_rx_dmamap);
-	bus_dmamap_unload(sc->sis_ldata.sis_tx_tag,
-	    sc->sis_ldata.sis_tx_dmamap);
-	bus_dmamem_free(sc->sis_ldata.sis_rx_tag,
-	    sc->sis_ldata.sis_rx_list, sc->sis_ldata.sis_rx_dmamap);
-	bus_dmamem_free(sc->sis_ldata.sis_rx_tag,
-	    sc->sis_ldata.sis_tx_list, sc->sis_ldata.sis_tx_dmamap);
-	bus_dma_tag_destroy(sc->sis_ldata.sis_rx_tag);
-	bus_dma_tag_destroy(sc->sis_ldata.sis_tx_tag);
-	bus_dma_tag_destroy(sc->sis_parent_tag);
+	if (sc->sis_ldata.sis_rx_tag) {
+		bus_dmamap_unload(sc->sis_ldata.sis_rx_tag,
+		    sc->sis_ldata.sis_rx_dmamap);
+		bus_dmamem_free(sc->sis_ldata.sis_rx_tag,
+		    sc->sis_ldata.sis_rx_list, sc->sis_ldata.sis_rx_dmamap);
+		bus_dma_tag_destroy(sc->sis_ldata.sis_rx_tag);
+	}
+	if (sc->sis_ldata.sis_tx_tag) {
+		bus_dmamap_unload(sc->sis_ldata.sis_tx_tag,
+		    sc->sis_ldata.sis_tx_dmamap);
+		bus_dmamem_free(sc->sis_ldata.sis_tx_tag,
+		    sc->sis_ldata.sis_tx_list, sc->sis_ldata.sis_tx_dmamap);
+		bus_dma_tag_destroy(sc->sis_ldata.sis_tx_tag);
+	}
+	if (sc->sis_parent_tag)
+		bus_dma_tag_destroy(sc->sis_parent_tag);
+	if (sc->sis_tag)
+		bus_dma_tag_destroy(sc->sis_tag);
 
 	SIS_UNLOCK(sc);
 	mtx_destroy(&sc->sis_mtx);
@@ -1465,8 +1746,6 @@ sis_tick(xsc)
 			sis_start(ifp);
 	}
 
-	sc->sis_stat_ch = timeout(sis_tick, sc, hz);
-
 	SIS_UNLOCK(sc);
 
 	return;
@@ -1602,8 +1881,32 @@ sis_encap(sc, m_head, txidx)
 {
 	struct sis_desc		*f = NULL;
 	struct mbuf		*m;
-	int			frag, cur, cnt = 0;
+	int			frag, cur, cnt = 0, chainlen = 0;
 
+	/*
+	 * If there's no way we can send any packets, return now.
+	 */
+	if (SIS_TX_LIST_CNT - sc->sis_cdata.sis_tx_cnt < 2)
+		return (ENOBUFS);
+
+	/*
+	 * Count the number of frags in this chain to see if
+	 * we need to m_defrag.  Since the descriptor list is shared
+	 * by all packets, we'll m_defrag long chains so that they
+	 * do not use up the entire list, even if they would fit.
+	 */
+
+	for (m = m_head; m != NULL; m = m->m_next)
+		chainlen++;
+
+	if ((chainlen > SIS_TX_LIST_CNT / 4) ||
+	    ((SIS_TX_LIST_CNT - (chainlen + sc->sis_cdata.sis_tx_cnt)) < 2)) {
+		m = m_defrag(m_head, M_DONTWAIT);
+		if (m == NULL)
+			return (ENOBUFS);
+		m_head = m;
+	}
+	
 	/*
  	 * Start packing the mbufs in this chain into
 	 * the fragment pointers. Stop when we run out
@@ -1806,8 +2109,16 @@ sis_init(xsc)
 	CSR_WRITE_4(sc, SIS_RX_LISTPTR, sc->sis_cdata.sis_rx_paddr);
 	CSR_WRITE_4(sc, SIS_TX_LISTPTR, sc->sis_cdata.sis_tx_paddr);
 
-	/* Set RX configuration */
-	CSR_WRITE_4(sc, SIS_RX_CFG, SIS_RXCFG);
+	/* SIS_CFG_EDB_MASTER_EN indicates the EDB bus is used instead of
+	 * the PCI bus. When this bit is set, the Max DMA Burst Size
+	 * for TX/RX DMA should be no larger than 16 double words.
+	 */
+	if (CSR_READ_4(sc, SIS_CFG) & SIS_CFG_EDB_MASTER_EN) {
+		CSR_WRITE_4(sc, SIS_RX_CFG, SIS_RXCFG64);
+	} else {
+		CSR_WRITE_4(sc, SIS_RX_CFG, SIS_RXCFG256);
+	}
+
 
 	/* Accept Long Packets for VLAN support */
 	SIS_SETBIT(sc, SIS_RX_CFG, SIS_RXCFG_RX_JABBER);

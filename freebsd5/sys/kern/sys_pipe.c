@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.124 2002/10/14 21:15:04 alfred Exp $
+ * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.134 2003/04/02 15:24:50 hsu Exp $
  */
 
 /*
@@ -94,22 +94,17 @@
 /*
  * interfaces to the outside world
  */
-static int pipe_read(struct file *fp, struct uio *uio, 
-		struct ucred *active_cred, int flags, struct thread *td);
-static int pipe_write(struct file *fp, struct uio *uio, 
-		struct ucred *active_cred, int flags, struct thread *td);
-static int pipe_close(struct file *fp, struct thread *td);
-static int pipe_poll(struct file *fp, int events, struct ucred *active_cred,
-		struct thread *td);
-static int pipe_kqfilter(struct file *fp, struct knote *kn);
-static int pipe_stat(struct file *fp, struct stat *sb,
-		struct ucred *active_cred, struct thread *td);
-static int pipe_ioctl(struct file *fp, u_long cmd, void *data,
-		struct ucred *active_cred, struct thread *td);
+static fo_rdwr_t	pipe_read;
+static fo_rdwr_t	pipe_write;
+static fo_ioctl_t	pipe_ioctl;
+static fo_poll_t	pipe_poll;
+static fo_kqfilter_t	pipe_kqfilter;
+static fo_stat_t	pipe_stat;
+static fo_close_t	pipe_close;
 
 static struct fileops pipeops = {
 	pipe_read, pipe_write, pipe_ioctl, pipe_poll, pipe_kqfilter,
-	pipe_stat, pipe_close
+	pipe_stat, pipe_close, DFLAG_PASSABLE
 };
 
 static void	filt_pipedetach(struct knote *kn);
@@ -337,7 +332,7 @@ pipespace(cpipe, size)
 	cpipe->pipe_buffer.in = 0;
 	cpipe->pipe_buffer.out = 0;
 	cpipe->pipe_buffer.cnt = 0;
-	amountpipekva += cpipe->pipe_buffer.size;
+	atomic_add_int(&amountpipekva, cpipe->pipe_buffer.size);
 	return (0);
 }
 
@@ -457,7 +452,7 @@ pipe_read(fp, uio, active_cred, flags, td)
 	struct thread *td;
 	int flags;
 {
-	struct pipe *rpipe = (struct pipe *) fp->f_data;
+	struct pipe *rpipe = fp->f_data;
 	int error;
 	int nread = 0;
 	u_int size;
@@ -625,7 +620,8 @@ pipe_build_write_buffer(wpipe, uio)
 {
 	u_int size;
 	int i;
-	vm_offset_t addr, endaddr, paddr;
+	vm_offset_t addr, endaddr;
+	vm_paddr_t paddr;
 
 	GIANT_REQUIRED;
 	PIPE_LOCK_ASSERT(wpipe, MA_NOTOWNED);
@@ -681,7 +677,8 @@ pipe_build_write_buffer(wpipe, uio)
 		 */
 		wpipe->pipe_map.kva = kmem_alloc_pageable(kernel_map,
 			wpipe->pipe_buffer.size + PAGE_SIZE);
-		amountpipekva += wpipe->pipe_buffer.size + PAGE_SIZE;
+		atomic_add_int(&amountpipekva,
+		    wpipe->pipe_buffer.size + PAGE_SIZE);
 	}
 	pmap_qenter(wpipe->pipe_map.kva, wpipe->pipe_map.ms,
 		wpipe->pipe_map.npages);
@@ -719,7 +716,8 @@ pipe_destroy_write_buffer(wpipe)
 			wpipe->pipe_map.kva = 0;
 			kmem_free(kernel_map, kva,
 				wpipe->pipe_buffer.size + PAGE_SIZE);
-			amountpipekva -= wpipe->pipe_buffer.size + PAGE_SIZE;
+			atomic_subtract_int(&amountpipekva,
+			    wpipe->pipe_buffer.size + PAGE_SIZE);
 		}
 	}
 	vm_page_lock_queues();
@@ -826,8 +824,8 @@ retry:
 			PIPE_GET_GIANT(wpipe);
 			pipe_destroy_write_buffer(wpipe);
 			PIPE_DROP_GIANT(wpipe);
-			pipeunlock(wpipe);
 			pipeselwakeup(wpipe);
+			pipeunlock(wpipe);
 			error = EPIPE;
 			goto error1;
 		}
@@ -873,7 +871,7 @@ pipe_write(fp, uio, active_cred, flags, td)
 	int orig_resid;
 	struct pipe *wpipe, *rpipe;
 
-	rpipe = (struct pipe *) fp->f_data;
+	rpipe = fp->f_data;
 	wpipe = rpipe->pipe_peer;
 
 	PIPE_LOCK(rpipe);
@@ -1160,7 +1158,7 @@ pipe_ioctl(fp, cmd, data, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	struct pipe *mpipe = (struct pipe *)fp->f_data;
+	struct pipe *mpipe = fp->f_data;
 #ifdef MAC
 	int error;
 #endif
@@ -1228,7 +1226,7 @@ pipe_poll(fp, events, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	struct pipe *rpipe = (struct pipe *)fp->f_data;
+	struct pipe *rpipe = fp->f_data;
 	struct pipe *wpipe;
 	int revents = 0;
 #ifdef MAC
@@ -1289,7 +1287,7 @@ pipe_stat(fp, ub, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	struct pipe *pipe = (struct pipe *)fp->f_data;
+	struct pipe *pipe = fp->f_data;
 #ifdef MAC
 	int error;
 
@@ -1322,7 +1320,7 @@ pipe_close(fp, td)
 	struct file *fp;
 	struct thread *td;
 {
-	struct pipe *cpipe = (struct pipe *)fp->f_data;
+	struct pipe *cpipe = fp->f_data;
 
 	fp->f_ops = &badfileops;
 	fp->f_data = NULL;
@@ -1343,7 +1341,7 @@ pipe_free_kmem(cpipe)
 	if (cpipe->pipe_buffer.buffer != NULL) {
 		if (cpipe->pipe_buffer.size > PIPE_SIZE)
 			--nbigpipe;
-		amountpipekva -= cpipe->pipe_buffer.size;
+		atomic_subtract_int(&amountpipekva, cpipe->pipe_buffer.size);
 		kmem_free(kernel_map,
 			(vm_offset_t)cpipe->pipe_buffer.buffer,
 			cpipe->pipe_buffer.size);
@@ -1351,7 +1349,8 @@ pipe_free_kmem(cpipe)
 	}
 #ifndef PIPE_NODIRECT
 	if (cpipe->pipe_map.kva != 0) {
-		amountpipekva -= cpipe->pipe_buffer.size + PAGE_SIZE;
+		atomic_subtract_int(&amountpipekva,
+		    cpipe->pipe_buffer.size + PAGE_SIZE);
 		kmem_free(kernel_map,
 			cpipe->pipe_map.kva,
 			cpipe->pipe_buffer.size + PAGE_SIZE);
@@ -1433,7 +1432,7 @@ pipe_kqfilter(struct file *fp, struct knote *kn)
 {
 	struct pipe *cpipe;
 
-	cpipe = (struct pipe *)kn->kn_fp->f_data;
+	cpipe = kn->kn_fp->f_data;
 	switch (kn->kn_filter) {
 	case EVFILT_READ:
 		kn->kn_fop = &pipe_rfiltops;
@@ -1470,7 +1469,7 @@ filt_pipedetach(struct knote *kn)
 static int
 filt_piperead(struct knote *kn, long hint)
 {
-	struct pipe *rpipe = (struct pipe *)kn->kn_fp->f_data;
+	struct pipe *rpipe = kn->kn_fp->f_data;
 	struct pipe *wpipe = rpipe->pipe_peer;
 
 	PIPE_LOCK(rpipe);
@@ -1492,7 +1491,7 @@ filt_piperead(struct knote *kn, long hint)
 static int
 filt_pipewrite(struct knote *kn, long hint)
 {
-	struct pipe *rpipe = (struct pipe *)kn->kn_fp->f_data;
+	struct pipe *rpipe = kn->kn_fp->f_data;
 	struct pipe *wpipe = rpipe->pipe_peer;
 
 	PIPE_LOCK(rpipe);

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/kern/kern_tc.c,v 1.141.2.1 2003/01/06 22:47:16 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_tc.c,v 1.148 2003/03/18 08:45:23 phk Exp $
  */
 
 #include "opt_ntp.h"
@@ -96,6 +96,7 @@ TC_STATS(nbinuptime);    TC_STATS(nnanouptime);    TC_STATS(nmicrouptime);
 TC_STATS(nbintime);      TC_STATS(nnanotime);      TC_STATS(nmicrotime);
 TC_STATS(ngetbinuptime); TC_STATS(ngetnanouptime); TC_STATS(ngetmicrouptime);
 TC_STATS(ngetbintime);   TC_STATS(ngetnanotime);   TC_STATS(ngetmicrotime);
+TC_STATS(nsetclock);
 
 #undef TC_STATS
 
@@ -281,8 +282,8 @@ tc_init(struct timecounter *tc)
 {
 	unsigned u;
 
-	printf("Timecounter \"%s\"  frequency %lu Hz",
-	    tc->tc_name, (u_long)tc->tc_frequency);
+	printf("Timecounter \"%s\"  frequency %ju Hz",
+	    tc->tc_name, (intmax_t)tc->tc_frequency);
 
 	u = tc->tc_frequency / tc->tc_counter_mask;
 	if (u > hz) {
@@ -298,7 +299,7 @@ tc_init(struct timecounter *tc)
 }
 
 /* Report the frequency of the current timecounter. */
-u_int32_t
+u_int64_t
 tc_getfrequency(void)
 {
 
@@ -314,6 +315,7 @@ tc_setclock(struct timespec *ts)
 {
 	struct timespec ts2;
 
+	nsetclock++;
 	nanouptime(&ts2);
 	boottime.tv_sec = ts->tv_sec - ts2.tv_sec;
 	/* XXX boottime should probably be a timespec. */
@@ -626,21 +628,22 @@ pps_event(struct pps_state *pps, int event)
 	}
 #ifdef PPS_SYNC
 	if (fhard) {
+		u_int64_t scale;
+
 		/*
 		 * Feed the NTP PLL/FLL.
-		 * The FLL wants to know how many nanoseconds elapsed since
-		 * the previous event.
-		 * I have never been able to convince myself that this code
-		 * is actually correct:  Using th_scale is bound to contain
-		 * a phase correction component from userland, when running
-		 * as FLL, so the number hardpps() gets is not meaningful IMO.
+		 * The FLL wants to know how many (hardware) nanoseconds
+		 * elapsed since the previous event.
 		 */
 		tcount = pps->capcount - pps->ppscount[2];
 		pps->ppscount[2] = pps->capcount;
 		tcount &= pps->capth->th_counter->tc_counter_mask;
+		scale = (u_int64_t)1 << 63;
+		scale /= pps->capth->th_counter->tc_frequency;
+		scale *= 2;
 		bt.sec = 0;
 		bt.frac = 0;
-		bintime_addx(&bt, pps->capth->th_scale * tcount);
+		bintime_addx(&bt, scale * tcount);
 		bintime2timespec(&bt, &ts);
 		hardpps(tsp, ts.tv_nsec + 1000000000 * ts.tv_sec);
 	}
@@ -655,7 +658,7 @@ pps_event(struct pps_state *pps, int event)
  */
 
 static int tc_tick;
-SYSCTL_INT(_kern_timecounter, OID_AUTO, tick, CTLFLAG_RD, &tick, 0, "");
+SYSCTL_INT(_kern_timecounter, OID_AUTO, tick, CTLFLAG_RD, &tc_tick, 0, "");
 
 void
 tc_ticktock(void)

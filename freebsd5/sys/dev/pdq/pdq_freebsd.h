@@ -24,7 +24,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Id: pdqvar.h,v 1.21 1997/03/21 21:16:04 thomas Exp
- * $FreeBSD: src/sys/dev/pdq/pdq_freebsd.h,v 1.2 2002/06/02 20:05:46 schweikh Exp $
+ * $FreeBSD: src/sys/dev/pdq/pdq_freebsd.h,v 1.6 2003/04/01 16:31:12 gallatin Exp $
  *
  */
 
@@ -152,7 +152,7 @@ typedef struct _pdq_os_ctx_t {
 #define	PDQ_OS_TX_TIMEOUT		5	/* seconds */
 
 #define	PDQ_OS_IFP_TO_SOFTC(ifp)	((pdq_softc_t *) (ifp)->if_softc)
-#define	PDQ_BPF_MTAP(sc, m)		bpf_mtap(&(sc)->arpcom.ac_if, m)
+#define	PDQ_BPF_MTAP(sc, m)		BPF_MTAP(&(sc)->arpcom.ac_if, m)
 
 #endif	/* PDQ_OSSUPPORT */
 
@@ -165,7 +165,11 @@ typedef struct _pdq_os_ctx_t {
 #define	PDQ_OS_CSR_FMT	"0x%x"
 
 #define	PDQ_OS_USEC_DELAY(n)		DELAY(n)
+#ifdef __alpha__
+#define	PDQ_OS_VA_TO_BUSPA(pdq, p)      alpha_XXX_dmamap((vm_offset_t)p)
+#else
 #define	PDQ_OS_VA_TO_BUSPA(pdq, p)	vtophys(p)
+#endif
 
 #define	PDQ_OS_MEMALLOC(n)		malloc(n, M_DEVBUF, M_NOWAIT)
 #define	PDQ_OS_MEMFREE(p, n)		free((void *) p, M_DEVBUF)

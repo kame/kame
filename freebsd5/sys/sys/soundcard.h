@@ -27,7 +27,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/soundcard.h,v 1.38 2002/03/19 20:18:41 alfred Exp $
+ * $FreeBSD: src/sys/sys/soundcard.h,v 1.41 2003/05/04 05:57:50 mbr Exp $
  */
 
 #ifndef _SYS_SOUNDCARD_H_
@@ -95,6 +95,7 @@
 #define SNDCARD_OPL            28
 
 #include <sys/types.h>
+#include <machine/endian.h>
 #ifndef _IOWR
 #include <sys/ioccom.h>
 #endif  /* !_IOWR */
@@ -161,6 +162,13 @@ struct snd_size {
 #define AFMT_U16_BE	0x00000100	/* Big endian unsigned 16-bit */
 #define AFMT_MPEG	0x00000200	/* MPEG MP2/MP3 audio */
 #define AFMT_AC3	0x00000400	/* Dolby Digital AC3 */
+
+#if _BYTE_ORDER == _LITTLE_ENDIAN
+#define AFMT_S16_NE	AFMT_S16_LE	/* native endian signed 16 */
+#else
+#define AFMT_S16_NE	AFMT_S16_BE
+#endif
+
 /*
  * 32-bit formats below used for 24-bit audio data where the data is stored
  * in the 24 most significant bits and the least significant bits are not used
@@ -364,7 +372,7 @@ struct patch_info {
  *
  * The low_note and high_note fields define the minimum and maximum note
  * frequencies for which this sample is valid. It is possible to define
- * more than one samples for a instrument number at the same time. The
+ * more than one samples for an instrument number at the same time. The
  * low_note and high_note fields are used to select the most suitable one.
  *
  * The fields base_note, high_note and low_note should contain
@@ -446,7 +454,7 @@ struct patmgr_info {	/* Note! size must be < 4k since kmalloc() is used */
 	  u_long key;	/* Don't worry. Reserved for communication
 	  			   between the patch manager and the driver. */
 #define PM_K_EVENT		1 /* Event from the /dev/sequencer driver */
-#define PM_K_COMMAND		2 /* Request from a application */
+#define PM_K_COMMAND		2 /* Request from an application */
 #define PM_K_RESPONSE		3 /* From patmgr to application */
 #define PM_ERROR		4 /* Error returned by the patmgr */
 	  int device;

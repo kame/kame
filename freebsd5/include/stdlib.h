@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdlib.h	8.5 (Berkeley) 5/19/95
- * $FreeBSD: src/include/stdlib.h,v 1.45.2.1 2003/01/08 10:12:13 obrien Exp $
+ * $FreeBSD: src/include/stdlib.h,v 1.48 2003/03/12 20:29:58 das Exp $
  */
 
 #ifndef _STDLIB_H_
@@ -107,10 +107,10 @@ int	 rand(void);
 void	*realloc(void *, size_t);
 void	 srand(unsigned);
 double	 strtod(const char * __restrict, char ** __restrict);
-/* float strtof(const char * __restrict, char ** __restrict); */
+float	 strtof(const char * __restrict, char ** __restrict);
 long	 strtol(const char * __restrict, char ** __restrict, int);
-/* long double
-	 strtold(const char * __restrict, char ** __restrict); */
+long double
+	 strtold(const char * __restrict, char ** __restrict);
 unsigned long
 	 strtoul(const char * __restrict, char ** __restrict, int);
 int	 system(const char *);
@@ -184,7 +184,7 @@ double	 erand48(unsigned short[3]);
 int	 getsubopt(char **, char *const *, char **);
 #define	_GETSUBOPT_DECLARED
 #endif
-/* int	 grantpt(int); */
+int	 grantpt(int);
 char	*initstate(unsigned long /* XSI requires u_int */, char *, long);
 long	 jrand48(unsigned short[3]);
 /* char	*l64a(long); */
@@ -200,8 +200,8 @@ char	*mktemp(char *);
 #endif
 long	 mrand48(void);
 long	 nrand48(unsigned short[3]);
-/* int	 posix_openpt(int); */
-/* char	*ptsname(int); */
+int	 posix_openpt(int);
+char	*ptsname(int);
 int	 putenv(const char *);
 long	 random(void);
 char	*realpath(const char *, char resolved_path[]);
@@ -214,7 +214,7 @@ int	 setkey(const char *);
 char	*setstate(/* const */ char *);
 void	 srand48(long);
 void	 srandom(unsigned long);
-/* int	 unlockpt(int); */
+int	 unlockpt(int);
 #endif /* __XSI_VISIBLE */
 
 #if __BSD_VISIBLE

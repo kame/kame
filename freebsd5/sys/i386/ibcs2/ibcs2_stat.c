@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_stat.c,v 1.16.2.1 2002/12/19 09:40:08 alfred Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_stat.c,v 1.21 2003/01/13 00:28:58 dillon Exp $
  */
 
 #include <sys/param.h>

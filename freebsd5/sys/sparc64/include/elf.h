@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/elf.h,v 1.9 2002/05/30 08:32:18 dfr Exp $
+ * $FreeBSD: src/sys/sparc64/include/elf.h,v 1.10 2003/01/05 03:48:55 jake Exp $
  */
 
 #ifndef	_MACHINE_ELF_H_
@@ -33,9 +33,12 @@
  * ELF definitions for the sparc64 architecture.
  */
 
+#include <sys/elf32.h>	/* Definitions common to all 32 bit architectures. */
 #include <sys/elf64.h>	/* Definitions common to all 64 bit architectures. */
 
+#ifndef __ELF_WORD_SIZE
 #define __ELF_WORD_SIZE	64	/* Used by <sys/elf_generic.h> */
+#endif
 #include <sys/elf_generic.h>
 
 #define	ELF_ARCH	EM_SPARCV9
@@ -45,6 +48,13 @@
 /*
  * Auxiliary vector entries for passing information to the interpreter.
  */
+
+typedef struct {	/* Auxiliary vector entry on initial stack */
+	int	a_type;			/* Entry type. */
+	union {
+		int	a_val;		/* Integer value. */
+	} a_un;
+} Elf32_Auxinfo;
 
 typedef struct {	/* Auxiliary vector entry on initial stack */
 	long	a_type;			/* Entry type. */

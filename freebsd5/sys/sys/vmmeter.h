@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vmmeter.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/vmmeter.h,v 1.23 2002/06/01 03:55:16 bsd Exp $
+ * $FreeBSD: src/sys/sys/vmmeter.h,v 1.24 2003/02/02 07:16:39 alc Exp $
  */
 
 #ifndef _SYS_VMMETER_H_
@@ -178,7 +178,7 @@ vm_paging_target(void)
 }
 
 /*
- * Return a positive number if the pagedaemon needs to be woken up.
+ * Returns TRUE if the pagedaemon needs to be woken up.
  */
 
 static __inline 

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.27 2002/10/07 05:26:35 imp Exp $
+ * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.32 2003/05/12 19:50:20 mbr Exp $
  */
 
 /*
@@ -845,6 +845,7 @@ struct dc_softc {
 /*
  * Davicom device IDs.
  */
+#define DC_DEVICEID_DM9009	0x9009
 #define DC_DEVICEID_DM9100	0x9100
 #define DC_DEVICEID_DM9102	0x9102
 
@@ -865,6 +866,16 @@ struct dc_softc {
  */
 #define DC_DEVICEID_AL981	0x0981
 #define DC_DEVICEID_AN985	0x0985
+
+/*
+ * 3COM PCI vendor ID
+ */
+#define DC_VENDORID_3COM	0x10b7
+
+/*
+ * 3COM OfficeConnect 10/100B (3CSOHO100B-TX)
+ */
+#define DC_DEVICEID_3CSOHOB	0x9300
 
 /*
  * ASIX vendor ID.
@@ -923,6 +934,28 @@ struct dc_softc {
  * Conexant device IDs.
  */
 #define DC_DEVICEID_RS7112	0x1803
+
+/*
+ * Planex vendor ID
+ */
+#define DC_VENDORID_PLANEX     0x14ea
+
+/*
+ * Planex device IDs.
+ */
+#define DC_DEVICEID_FNW3602T   0xab08
+
+/*
+ * Not sure who this vendor should be, so we'll go with HAWKING until
+ * I can locate the right one.
+ */
+#define DC_VENDORID_HAWKING	0x17b3
+
+/*
+ * Sure looks like an abocom device ID, but it found on my hawking PN672TX
+ * card.  Use that for now, and upgrade later.
+ */
+#define DC_DEVICEID_HAWKING_PN672TX 0xab08
 
 /*
  * PCI low memory base and low I/O base register, and
@@ -1073,7 +1106,7 @@ struct dc_info_leaf {
 #define DC_CTYPE_MII_100FX		0x0010
 #define DC_CTYPE_MII_100FX_FDX		0x0211
 #define DC_CTYPE_DYN_PUP_AUTOSENSE	0x0800
-#define DC_CTYPE_PUP_AUTOSENSe		0x8800
+#define DC_CTYPE_PUP_AUTOSENSE		0x8800
 #define DC_CTYPE_NOMEDIA		0xFFFF
 
 #define DC_EBLOCK_SIA			0x0002

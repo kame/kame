@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_subr.h,v 1.7 2002/08/27 12:22:06 bde Exp $
+ * $FreeBSD: src/sys/netsmb/smb_subr.h,v 1.9 2003/03/31 22:49:17 jeff Exp $
  */
 #ifndef _NETSMB_SMB_SUBR_H_
 #define _NETSMB_SMB_SUBR_H_
@@ -41,8 +41,6 @@
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_SMBTEMP);
 #endif
-
-#define	FB_CURRENT
 
 #define SMBERROR(format, args...) printf("%s: "format, __func__ ,## args)
 #define SMBPANIC(format, args...) printf("%s: "format, __func__ ,## args)
@@ -142,7 +140,7 @@ struct smb_vc;
 struct smb_rq;
 
 void smb_makescred(struct smb_cred *scred, struct thread *td, struct ucred *cred);
-int  smb_proc_intr(struct proc *);
+int  smb_td_intr(struct thread *);
 char *smb_strdup(const char *s);
 void *smb_memdup(const void *umem, int len);
 char *smb_strdupin(char *s, int maxlen);

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.16 2002/10/16 08:48:38 phk Exp $
+ * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.26 2003/04/01 15:06:25 phk Exp $
  */
 
 /*
@@ -39,12 +39,11 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <dev/twe/twe_compat.h>
+#include <geom/geom_disk.h>
 #include <dev/twe/twereg.h>
 #include <dev/twe/tweio.h>
 #include <dev/twe/twevar.h>
 #include <dev/twe/twe_tables.h>
-
-#include <sys/devicestat.h>
 
 static devclass_t	twe_devclass;
 
@@ -71,19 +70,11 @@ static	d_ioctl_t		twe_ioctl_wrapper;
 #define TWE_CDEV_MAJOR  146
 
 static struct cdevsw twe_cdevsw = {
-    twe_open,
-    twe_close,
-    noread,
-    nowrite,
-    twe_ioctl_wrapper,
-    nopoll,
-    nommap,
-    nostrategy,
-    "twe",
-    TWE_CDEV_MAJOR,
-    nodump,
-    nopsize,
-    0
+	.d_open =	twe_open,
+	.d_close =	twe_close,
+	.d_ioctl =	twe_ioctl_wrapper,
+	.d_name =	"twe",
+	.d_maj =	TWE_CDEV_MAJOR,
 };
 
 /********************************************************************************
@@ -544,13 +535,9 @@ twe_clear_pci_abort(struct twe_softc *sc)
 struct twed_softc 
 {
     device_t		twed_dev;
-    dev_t		twed_dev_t;
     struct twe_softc	*twed_controller;	/* parent device softc */
     struct twe_drive	*twed_drive;		/* drive data in parent softc */
     struct disk		twed_disk;		/* generic disk handle */
-    struct devstat	twed_stats;		/* accounting */
-    int			twed_flags;
-#define TWED_OPEN	(1<<0)			/* drive is open (can't shut down) */
 };
 
 /*
@@ -583,30 +570,7 @@ DRIVER_MODULE(twed, twe, twed_driver, twed_devclass, 0, 0);
 /*
  * Disk device control interface.
  */
-static	d_open_t	twed_open;
-static	d_close_t	twed_close;
-static	d_strategy_t	twed_strategy;
-static	d_dump_t	twed_dump;
 
-#define TWED_CDEV_MAJOR	147
-
-static struct cdevsw twed_cdevsw = {
-    twed_open,
-    twed_close,
-    physread,
-    physwrite,
-    noioctl,
-    nopoll,
-    nommap,
-    twed_strategy,
-    "twed",
-    TWED_CDEV_MAJOR,
-    twed_dump,
-    nopsize,
-    D_DISK
-};
-
-static struct cdevsw	tweddisk_cdevsw;
 #ifdef FREEBSD_4
 static int		disks_registered = 0;
 #endif
@@ -618,9 +582,9 @@ static int		disks_registered = 0;
  * for opens on subdevices (eg. slices, partitions).
  */
 static int
-twed_open(dev_t dev, int flags, int fmt, d_thread_t *td)
+twed_open(struct disk *dp)
 {
-    struct twed_softc	*sc = (struct twed_softc *)dev->si_drv1;
+    struct twed_softc	*sc = (struct twed_softc *)dp->d_drv1;
 
     debug_called(4);
 	
@@ -631,29 +595,6 @@ twed_open(dev_t dev, int flags, int fmt, d_thread_t *td)
     if (sc->twed_controller->twe_state & TWE_STATE_SHUTDOWN)
 	return(ENXIO);
 
-    sc->twed_disk.d_sectorsize = TWE_BLOCK_SIZE;
-    sc->twed_disk.d_mediasize = TWE_BLOCK_SIZE * (off_t)sc->twed_drive->td_size;
-    sc->twed_disk.d_fwsectors = sc->twed_drive->td_sectors;
-    sc->twed_disk.d_fwheads = sc->twed_drive->td_heads;
-
-    sc->twed_flags |= TWED_OPEN;
-    return (0);
-}
-
-/********************************************************************************
- * Handle last close of the disk device.
- */
-static int
-twed_close(dev_t dev, int flags, int fmt, d_thread_t *td)
-{
-    struct twed_softc	*sc = (struct twed_softc *)dev->si_drv1;
-
-    debug_called(4);
-	
-    if (sc == NULL)
-	return (ENXIO);
-
-    sc->twed_flags &= ~TWED_OPEN;
     return (0);
 }
 
@@ -667,6 +608,7 @@ twed_strategy(twe_bio *bp)
 
     debug_called(4);
 
+    bp->bio_driver1 = &sc->twed_drive->td_unit;
     TWED_BIO_IN;
 
     /* bogus disk? */
@@ -693,57 +635,24 @@ twed_strategy(twe_bio *bp)
  * System crashdump support
  */
 static int
-twed_dump(dev_t dev, void *virtual, vm_offset_t physical, off_t offset, size_t length)
+twed_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t length)
 {
-
-    /* XXX: this needs modified to the new dump API */
-    return (ENXIO);
-#if 0
-    struct twed_softc	*twed_sc = (struct twed_softc *)dev->si_drv1;
-    struct twe_softc	*twe_sc  = (struct twe_softc *)twed_sc->twed_controller;
-    u_int		count, blkno, secsize;
-    vm_offset_t		addr = 0;
-    long		blkcnt;
-    int			dumppages = MAXDUMPPGS;
+    struct twed_softc	*twed_sc;
+    struct twe_softc	*twe_sc;
     int			error;
-    int			i;
+    struct disk		*dp;
 
-    if ((error = disk_dumpcheck(dev, &count, &blkno, &secsize)))
-        return(error);
-
+    dp = arg;
+    twed_sc = (struct twed_softc *)dp->d_drv1;
+    twe_sc  = (struct twe_softc *)twed_sc->twed_controller;
     if (!twed_sc || !twe_sc)
 	return(ENXIO);
 
-    blkcnt = howmany(PAGE_SIZE, secsize);
-
-    while (count > 0) {
-	caddr_t va = NULL;
-
-	if ((count / blkcnt) < dumppages)
-	    dumppages = count / blkcnt;
-
-	for (i = 0; i < dumppages; ++i) {
-	    vm_offset_t a = addr + (i * PAGE_SIZE);
-	    if (is_physical_memory(a))
-		va = pmap_kenter_temporary(trunc_page(a), i);
-	    else
-		va = pmap_kenter_temporary(trunc_page(0), i);
-	}
-
-	if ((error = twe_dump_blocks(twe_sc, twed_sc->twed_drive->td_unit, blkno, va, 
-				     (PAGE_SIZE * dumppages) / TWE_BLOCK_SIZE)) != 0)
+    if (length > 0) {
+	if ((error = twe_dump_blocks(twe_sc, twed_sc->twed_drive->td_unit, offset / TWE_BLOCK_SIZE, virtual, length / TWE_BLOCK_SIZE)) != 0)
 	    return(error);
-
-
-	if (dumpstatus(addr, (off_t)count * DEV_BSIZE) < 0)
-	    return(EINTR);
-
-	blkno += blkcnt * dumppages;
-	count -= blkcnt * dumppages;
-	addr += PAGE_SIZE * dumppages;
     }
     return(0);
-#endif
 }
 
 /********************************************************************************
@@ -780,7 +689,6 @@ twed_attach(device_t dev)
 {
     struct twed_softc	*sc;
     device_t		parent;
-    dev_t		dsk;
     
     debug_called(4);
 
@@ -796,22 +704,25 @@ twed_attach(device_t dev)
 		sc->twed_drive->td_size / ((1024 * 1024) / TWE_BLOCK_SIZE),
 		sc->twed_drive->td_size);
     
-    devstat_add_entry(&sc->twed_stats, "twed", device_get_unit(dev), TWE_BLOCK_SIZE,
-		      DEVSTAT_NO_ORDERED_TAGS,
-		      DEVSTAT_TYPE_STORARRAY | DEVSTAT_TYPE_IF_OTHER, 
-		      DEVSTAT_PRIORITY_ARRAY);
-
     /* attach a generic disk device to ourselves */
-    dsk = disk_create(device_get_unit(dev), &sc->twed_disk, 0, &twed_cdevsw, &tweddisk_cdevsw);
-    dsk->si_drv1 = sc;
-    dsk->si_drv2 = &sc->twed_drive->td_unit;
-    sc->twed_dev_t = dsk;
+
+    sc->twed_disk.d_open = twed_open;
+    sc->twed_disk.d_strategy = twed_strategy;
+    sc->twed_disk.d_dump = (dumper_t *)twed_dump;
+    sc->twed_disk.d_name = "twed";
+    sc->twed_disk.d_drv1 = sc;
+    sc->twed_disk.d_maxsize = (TWE_MAX_SGL_LENGTH - 1) * PAGE_SIZE;
+    sc->twed_disk.d_sectorsize = TWE_BLOCK_SIZE;
+    sc->twed_disk.d_mediasize = TWE_BLOCK_SIZE * (off_t)sc->twed_drive->td_size;
+    sc->twed_disk.d_fwsectors = sc->twed_drive->td_sectors;
+    sc->twed_disk.d_fwheads = sc->twed_drive->td_heads;
+
+    disk_create(device_get_unit(dev), &sc->twed_disk, 0, NULL, NULL);
 #ifdef FREEBSD_4
     disks_registered++;
 #endif
 
     /* set the maximum I/O size to the theoretical maximum allowed by the S/G list size */
-    dsk->si_iosize_max = (TWE_MAX_SGL_LENGTH - 1) * PAGE_SIZE;
 
     return (0);
 }
@@ -826,15 +737,14 @@ twed_detach(device_t dev)
 
     debug_called(4);
 
-    if (sc->twed_flags & TWED_OPEN)
+    if (sc->twed_disk.d_flags & DISKFLAG_OPEN)
 	return(EBUSY);
 
-    devstat_remove_entry(&sc->twed_stats);
 #ifdef FREEBSD_4
     if (--disks_registered == 0)
 	cdevsw_remove(&tweddisk_cdevsw);
 #else
-    disk_destroy(sc->twed_dev_t);
+    disk_destroy(&sc->twed_disk);
 #endif
 
     return(0);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)msgbuf.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/msgbuf.h,v 1.19 2002/11/14 16:11:12 tmm Exp $
+ * $FreeBSD: src/sys/sys/msgbuf.h,v 1.20 2003/03/28 02:50:10 iedowse Exp $
  */
 
 #ifndef _SYS_MSGBUF_H_
@@ -44,6 +44,7 @@ struct msgbuf {
 	int	msg_bufx;		/* write pointer */
 	int	msg_bufr;		/* read pointer */
 	char	*msg_ptr;		/* pointer to buffer */
+	u_int	msg_cksum;		/* checksum of contents */
 };
 
 #ifdef _KERNEL

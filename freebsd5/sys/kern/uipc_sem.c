@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/kern/uipc_sem.c,v 1.3.2.1 2003/01/11 02:11:35 alfred Exp $
+ *	$FreeBSD: src/sys/kern/uipc_sem.c,v 1.8 2003/03/24 21:15:34 jhb Exp $
  */
 
 #include "opt_posix.h"
@@ -31,6 +31,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/lock.h>
@@ -54,11 +55,11 @@ static struct ksem *sem_lookup_byname(const char *name);
 static int sem_create(struct thread *td, const char *name,
     struct ksem **ksret, mode_t mode, unsigned int value);
 static void sem_free(struct ksem *ksnew);
-static int sem_perm(struct proc *p, struct ksem *ks);
+static int sem_perm(struct thread *td, struct ksem *ks);
 static void sem_enter(struct proc *p, struct ksem *ks);
 static int sem_leave(struct proc *p, struct ksem *ks);
-static void sem_exithook(struct proc *p);
-static int sem_hasopen(struct proc *p, struct ksem *ks);
+static void sem_exithook(void *arg, struct proc *p);
+static int sem_hasopen(struct thread *td, struct ksem *ks);
 
 static int kern_sem_close(struct thread *td, semid_t id);
 static int kern_sem_post(struct thread *td, semid_t id);
@@ -113,6 +114,8 @@ static MALLOC_DEFINE(M_SEM, "sems", "semaphore data");
 static int nsems = 0;
 SYSCTL_DECL(_p1003_1b);
 SYSCTL_INT(_p1003_1b, OID_AUTO, nsems, CTLFLAG_RD, &nsems, 0, "");
+
+static eventhandler_tag sem_exit_tag, sem_exec_tag;
 
 #ifdef SEM_DEBUG
 #define DP(x)	printf x
@@ -185,7 +188,7 @@ sem_create(td, name, ksret, mode, value)
 
 	DP(("sem_create\n"));
 	p = td->td_proc;
-	uc = p->p_ucred;
+	uc = td->td_ucred;
 	if (value > SEM_VALUE_MAX)
 		return (EINVAL);
 	ret = malloc(sizeof(*ret), M_SEM, M_WAITOK | M_ZERO);
@@ -394,7 +397,7 @@ kern_sem_open(td, dir, name, oflag, mode, value, idp)
 		/*
 		 * if we aren't the creator, then enforce permissions.
 		 */
-		error = sem_perm(td->td_proc, ks);
+		error = sem_perm(td, ks);
 		if (!error)
 			sem_ref(ks);
 		mtx_unlock(&sem_lock);
@@ -421,19 +424,19 @@ kern_sem_open(td, dir, name, oflag, mode, value, idp)
 }
 
 static int
-sem_perm(p, ks)
-	struct proc *p;
+sem_perm(td, ks)
+	struct thread *td;
 	struct ksem *ks;
 {
 	struct ucred *uc;
 
-	uc = p->p_ucred;
+	uc = td->td_ucred;
 	DP(("sem_perm: uc(%d,%d) ks(%d,%d,%o)\n",
 	    uc->cr_uid, uc->cr_gid,
 	     ks->ks_uid, ks->ks_gid, ks->ks_mode));
 	if ((uc->cr_uid == ks->ks_uid && (ks->ks_mode & S_IWUSR) != 0) ||
 	    (uc->cr_gid == ks->ks_gid && (ks->ks_mode & S_IWGRP) != 0) ||
-	    (ks->ks_mode & S_IWOTH) != 0 || suser_cred(uc, 0) == 0)
+	    (ks->ks_mode & S_IWOTH) != 0 || suser(td) == 0)
 		return (0);
 	return (EPERM);
 }
@@ -467,13 +470,13 @@ sem_getuser(p, ks)
 }
 
 static int
-sem_hasopen(p, ks)
-	struct proc *p;
+sem_hasopen(td, ks)
+	struct thread *td;
 	struct ksem *ks;
 {
 	
-	return ((ks->ks_name == NULL && sem_perm(p, ks))
-	    || sem_getuser(p, ks) != NULL);
+	return ((ks->ks_name == NULL && sem_perm(td, ks))
+	    || sem_getuser(td->td_proc, ks) != NULL);
 }
 
 static int
@@ -552,7 +555,7 @@ kern_sem_unlink(td, name)
 	if (ks == NULL)
 		error = ENOENT;
 	else
-		error = sem_perm(td->td_proc, ks);
+		error = sem_perm(td, ks);
 	DP(("sem_unlink: '%s' ks = %p, error = %d\n", name, ks, error));
 	if (error == 0) {
 		LIST_REMOVE(ks, ks_entry);
@@ -620,7 +623,7 @@ kern_sem_post(td, id)
 
 	mtx_lock(&sem_lock);
 	ks = ID_TO_SEM(id);
-	if (ks == NULL || !sem_hasopen(td->td_proc, ks)) {
+	if (ks == NULL || !sem_hasopen(td, ks)) {
 		error = EINVAL;
 		goto err;
 	}
@@ -686,7 +689,7 @@ kern_sem_wait(td, id, tryflag)
 		goto err;
 	}
 	sem_ref(ks);
-	if (!sem_hasopen(td->td_proc, ks)) {
+	if (!sem_hasopen(td, ks)) {
 		DP(("kern_sem_wait hasopen failed\n"));
 		error = EINVAL;
 		goto err;
@@ -726,7 +729,7 @@ ksem_getvalue(td, uap)
 
 	mtx_lock(&sem_lock);
 	ks = ID_TO_SEM(uap->id);
-	if (ks == NULL || !sem_hasopen(td->td_proc, ks)) {
+	if (ks == NULL || !sem_hasopen(td, ks)) {
 		mtx_unlock(&sem_lock);
 		return (EINVAL);
 	}
@@ -752,7 +755,7 @@ ksem_destroy(td, uap)
 
 	mtx_lock(&sem_lock);
 	ks = ID_TO_SEM(uap->id);
-	if (ks == NULL || !sem_hasopen(td->td_proc, ks) ||
+	if (ks == NULL || !sem_hasopen(td, ks) ||
 	    ks->ks_name != NULL) {
 		error = EINVAL;
 		goto err;
@@ -769,7 +772,8 @@ err:
 }
 
 static void
-sem_exithook(p)
+sem_exithook(arg, p)
+	void *arg;
 	struct proc *p;
 {
 	struct ksem *ks, *ksnext;
@@ -800,16 +804,18 @@ sem_modload(struct module *module, int cmd, void *arg)
 		mtx_init(&sem_lock, "sem", "semaphore", MTX_DEF);
 		p31b_setcfg(CTL_P1003_1B_SEM_NSEMS_MAX, SEM_MAX);
 		p31b_setcfg(CTL_P1003_1B_SEM_VALUE_MAX, SEM_VALUE_MAX);
-		at_exec(&sem_exithook);
-		at_exit(&sem_exithook);
+		sem_exit_tag = EVENTHANDLER_REGISTER(process_exit, sem_exithook,
+		    NULL, EVENTHANDLER_PRI_ANY);
+		sem_exec_tag = EVENTHANDLER_REGISTER(process_exec, sem_exithook,
+		    NULL, EVENTHANDLER_PRI_ANY);
                 break;
         case MOD_UNLOAD:
 		if (nsems != 0) {
 			error = EOPNOTSUPP;
 			break;
 		}
-		rm_at_exit(&sem_exithook);
-		rm_at_exec(&sem_exithook);
+		EVENTHANDLER_DEREGISTER(process_exit, sem_exit_tag);
+		EVENTHANDLER_DEREGISTER(process_exec, sem_exec_tag);
 		mtx_destroy(&sem_lock);
                 break;
         case MOD_SHUTDOWN:

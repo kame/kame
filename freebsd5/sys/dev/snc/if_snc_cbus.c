@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/snc/if_snc_cbus.c,v 1.3 2002/03/20 02:07:42 alfred Exp $
+ * $FreeBSD: src/sys/dev/snc/if_snc_cbus.c,v 1.4 2003/04/15 06:37:26 mdodd Exp $
  */
 
 /*
@@ -216,4 +216,6 @@ static driver_t snc_isa_driver = {
 	sizeof(struct snc_softc)
 };
 
-DRIVER_MODULE(if_snc, isa, snc_isa_driver, snc_devclass, 0, 0);
+DRIVER_MODULE(snc, isa, snc_isa_driver, snc_devclass, 0, 0);
+MODULE_DEPEND(snc, isa, 1, 1, 1);
+MODULE_DEPEND(snc, ether, 1, 1, 1);

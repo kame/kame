@@ -1,8 +1,9 @@
 /*
  *	from: vector.s, 386BSD 0.1 unknown origin
- * $FreeBSD: src/sys/i386/isa/apic_vector.s,v 1.85 2002/08/23 21:45:59 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/apic_vector.s,v 1.87 2003/04/02 23:53:29 peter Exp $
  */
 
+#include "opt_swtch.h"
 
 #include <machine/apic.h>
 #include <machine/smp.h>
@@ -365,7 +366,7 @@ Xinvlrng:
 	iret
 
 /*
- * Forward hardclock to another CPU.  Pushes a trapframe and calls
+ * Forward hardclock to another CPU.  Pushes a clockframe and calls
  * forwarded_hardclock().
  */
 	.text
@@ -389,14 +390,16 @@ Xhardclock:
 	jmp	10f
 1:
 	incl	TD_INTR_NESTING_LEVEL(%ebx)
+	pushl	$0		/* XXX convert trapframe to clockframe */
 	call	forwarded_hardclock
+	addl	$4, %esp	/* XXX convert clockframe to trapframe */
 	decl	TD_INTR_NESTING_LEVEL(%ebx)
 10:
 	MEXITCOUNT
 	jmp	doreti
 
 /*
- * Forward statclock to another CPU.  Pushes a trapframe and calls
+ * Forward statclock to another CPU.  Pushes a clockframe and calls
  * forwarded_statclock().
  */
 	.text
@@ -422,7 +425,9 @@ Xstatclock:
 	jmp	10f
 1:
 	incl	TD_INTR_NESTING_LEVEL(%ebx)
+	pushl	$0		/* XXX convert trapframe to clockframe */
 	call	forwarded_statclock
+	addl	$4, %esp	/* XXX convert clockframe to trapframe */
 	decl	TD_INTR_NESTING_LEVEL(%ebx)
 10:
 	MEXITCOUNT
@@ -644,7 +649,28 @@ Xrendezvous:
 	POP_FRAME
 	iret
 	
+#ifdef LAZY_SWITCH
+/*
+ * Clean up when we lose out on the lazy context switch optimization.
+ * ie: when we are about to release a PTD but a cpu is still borrowing it.
+ */
+	SUPERALIGN_TEXT
+	.globl	Xlazypmap
+Xlazypmap:
+	PUSH_FRAME
+	movl	$KDSEL, %eax
+	mov	%ax, %ds		/* use KERNEL data segment */
+	mov	%ax, %es
+	movl	$KPSEL, %eax
+	mov	%ax, %fs
+
+	call	pmap_lazyfix_action
 	
+	movl	$0, lapic+LA_EOI	/* End Of Interrupt to APIC */
+	POP_FRAME
+	iret
+#endif
+
 	.data
 
 	.globl	apic_pin_trigger

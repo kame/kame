@@ -29,19 +29,12 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/lge/if_lge.c,v 1.15 2002/11/14 23:54:52 sam Exp $
  */
 
 /*
  * Level 1 LXT1001 gigabit ethernet driver for FreeBSD. Public
  * documentation not available, but ask me nicely.
  *
- * Written by Bill Paul <william.paul@windriver.com>
- * Wind River Systems
- */
-
-/*
  * The Level 1 chip is used on some D-Link, SMC and Addtron NICs.
  * It's a 64-bit PCI part that supports TCP/IP checksum offload,
  * VLAN tagging/insertion, GMII and TBI (1000baseX) ports. There
@@ -72,6 +65,9 @@
  * - Paul Saab at Y!, for not killing me (though it remains to be seen
  *   if in fact he did me much of a favor)
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.20 2003/04/16 03:16:55 mdodd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -111,11 +107,6 @@
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.15 2002/11/14 23:54:52 sam Exp $";
-#endif
 
 /*
  * Various supported device vendors/types and their names.
@@ -198,8 +189,11 @@ static driver_t lge_driver = {
 
 static devclass_t lge_devclass;
 
-DRIVER_MODULE(if_lge, pci, lge_driver, lge_devclass, 0, 0);
+DRIVER_MODULE(lge, pci, lge_driver, lge_devclass, 0, 0);
 DRIVER_MODULE(miibus, lge, miibus_driver, miibus_devclass, 0, 0);
+MODULE_DEPEND(lge, pci, 1, 1, 1);
+MODULE_DEPEND(lge, ether, 1, 1, 1);
+MODULE_DEPEND(lge, miibus, 1, 1, 1);
 
 #define LGE_SETBIT(sc, reg, x)				\
 	CSR_WRITE_4(sc, reg,				\
@@ -498,7 +492,6 @@ lge_attach(dev)
 {
 	int			s;
 	u_char			eaddr[ETHER_ADDR_LEN];
-	u_int32_t		command;
 	struct lge_softc	*sc;
 	struct ifnet		*ifp;
 	int			unit, error = 0, rid;
@@ -536,23 +529,6 @@ lge_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef LGE_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("lge%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("lge%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;;
-		goto fail;
-	}
-#endif
 
 	rid = LGE_RID;
 	sc->lge_res = bus_alloc_resource(dev, LGE_RES, &rid,

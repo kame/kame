@@ -1,5 +1,5 @@
 /*	$NetBSD: ugen.c,v 1.57 2002/02/11 15:11:49 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ugen.c,v 1.65 2002/11/07 21:34:21 jhb Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ugen.c,v 1.71 2003/05/29 23:47:12 ticso Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -138,19 +138,14 @@ d_poll_t  ugenpoll;
 #define UGEN_CDEV_MAJOR	114
 
 Static struct cdevsw ugen_cdevsw = {
-	/* open */	ugenopen,
-	/* close */	ugenclose,
-	/* read */	ugenread,
-	/* write */	ugenwrite,
-	/* ioctl */	ugenioctl,
-	/* poll */	ugenpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"ugen",
-	/* maj */	UGEN_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	ugenopen,
+	.d_close =	ugenclose,
+	.d_read =	ugenread,
+	.d_write =	ugenwrite,
+	.d_ioctl =	ugenioctl,
+	.d_poll =	ugenpoll,
+	.d_name =	"ugen",
+	.d_maj =	UGEN_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
 	/* bmaj */	-1
 #endif
@@ -419,6 +414,13 @@ ugenopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 		edesc = sce->edesc;
 		switch (edesc->bmAttributes & UE_XFERTYPE) {
 		case UE_INTERRUPT:
+			if (dir == OUT) {
+				err = usbd_open_pipe(sce->iface, 
+				    edesc->bEndpointAddress, 0, &sce->pipeh);
+				if (err)
+					return (EIO);
+				break;
+			}
 			isize = UGETW(edesc->wMaxPacketSize);
 			if (isize == 0)	/* shouldn't happen */
 				return (EINVAL);
@@ -776,6 +778,30 @@ ugen_do_write(struct ugen_softc *sc, int endpt, struct uio *uio, int flag)
 		}
 		usbd_free_xfer(xfer);
 		break;
+	case UE_INTERRUPT:
+		xfer = usbd_alloc_xfer(sc->sc_udev);
+		if (xfer == 0)
+			return (EIO);
+		while ((n = min(UGETW(sce->edesc->wMaxPacketSize),
+		    uio->uio_resid)) != 0) {
+			error = uiomove(buf, n, uio);
+			if (error)
+				break;
+			DPRINTFN(1, ("ugenwrite: transfer %d bytes\n", n));
+			err = usbd_intr_transfer(xfer, sce->pipeh, 0, 
+				  sce->timeout, buf, &n,"ugenwi");
+			if (err) {
+				if (err == USBD_INTERRUPTED)
+					error = EINTR;
+				else if (err == USBD_TIMEOUT)
+					error = ETIMEDOUT;
+				else
+					error = EIO;
+				break;
+			}
+		}
+		usbd_free_xfer(xfer);
+		break;
 	default:
 		return (ENXIO);
 	}
@@ -998,6 +1024,12 @@ ugen_set_interface(struct ugen_softc *sc, int ifaceidx, int altno)
 	err = usbd_endpoint_count(iface, &nendpt);
 	if (err)
 		return (err);
+
+#if defined(__FreeBSD__)
+	/* destroy the existing devices, we remake the new ones in a moment */
+	ugen_destroy_devnodes(sc);
+#endif
+
 	/* XXX should only do this after setting new altno has succeeded */
 	for (endptno = 0; endptno < nendpt; endptno++) {
 		ed = usbd_interface2endpoint_descriptor(iface,endptno);
@@ -1026,6 +1058,12 @@ ugen_set_interface(struct ugen_softc *sc, int ifaceidx, int altno)
 		sce->edesc = ed;
 		sce->iface = iface;
 	}
+
+#if defined(__FreeBSD__)
+	/* make the new devices */
+	ugen_make_devnodes(sc);
+#endif
+
 	return (0);
 }
 

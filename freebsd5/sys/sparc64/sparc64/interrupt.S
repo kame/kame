@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/sparc64/sparc64/interrupt.S,v 1.2 2002/09/28 03:06:35 jake Exp $
  */
+
+#include <machine/asm.h>
+__FBSDID("$FreeBSD: src/sys/sparc64/sparc64/interrupt.S,v 1.6 2003/04/29 00:37:41 jake Exp $");
 
 #include <machine/asi.h>
 #include <machine/asmacros.h>
@@ -110,7 +111,7 @@ ENTRY(intr_vector)
 	lduw	[%g2 + IV_PRI], %g6
 
 	/*
-	 * Get a intr_request from the free list.  There should always be one
+	 * Get an intr_request from the free list.  There should always be one
 	 * unless we are getting an interrupt storm from stray interrupts, in
 	 * which case the we will deference a NULL pointer and panic.
 	 */
@@ -140,7 +141,7 @@ ENTRY(intr_vector)
 	 */
 	mov	1, %g1
 	sllx	%g1, %g6, %g1
-	wr	%g1, 0, %asr20
+	wr	%g1, 0, %set_softint
 
 	/*
 	 * Done, retry the instruction.

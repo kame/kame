@@ -38,7 +38,7 @@
  *      @(#)bpf.h	8.1 (Berkeley) 6/10/93
  *	@(#)bpf.h	1.34 (LBL)     6/16/96
  *
- * $FreeBSD: src/sys/net/bpf.h,v 1.27 2002/11/14 23:24:13 sam Exp $
+ * $FreeBSD: src/sys/net/bpf.h,v 1.28 2003/01/20 19:08:46 sam Exp $
  */
 
 #ifndef _NET_BPF_H_
@@ -115,6 +115,8 @@ struct bpf_version {
 #define BIOCSHDRCMPLT	_IOW('B',117, u_int)
 #define BIOCGSEESENT	_IOR('B',118, u_int)
 #define BIOCSSEESENT	_IOW('B',119, u_int)
+#define	BIOCSDLT	_IOW('B',120, u_int)
+#define	BIOCGDLTLIST	_IOWR('B',121, struct bpf_dltlist)
 
 /*
  * Structure prepended to each packet.
@@ -338,6 +340,14 @@ struct bpf_insn {
  */
 #define BPF_STMT(code, k) { (u_short)(code), 0, 0, k }
 #define BPF_JUMP(code, k, jt, jf) { (u_short)(code), jt, jf, k }
+
+/*
+ * Structure to retrieve available DLTs for the interface.
+ */
+struct bpf_dltlist {
+	u_int	bfl_len;	/* number of bfd_list array */
+	u_int	*bfl_list;	/* array of DLTs */
+};
 
 #ifdef _KERNEL
 struct bpf_if;

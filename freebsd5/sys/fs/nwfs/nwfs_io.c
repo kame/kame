@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/nwfs/nwfs_io.c,v 1.22 2002/08/04 10:29:29 jeff Exp $
+ * $FreeBSD: src/sys/fs/nwfs/nwfs_io.c,v 1.27 2003/03/02 16:54:36 des Exp $
  *
  */
 #include <sys/param.h>
@@ -124,7 +124,7 @@ nwfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred) {
 #if 0
 			if (error && eofflag) {
 			/*	*eofflag = 1;*/
-			        break;
+				break;
 			}
 #endif
 			break;
@@ -137,7 +137,7 @@ nwfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred) {
 				VTONW(newvp)->n_ctime = VTONW(newvp)->n_vattr.va_ctime.tv_sec;
 				cn.cn_nameptr = dp.d_name;
 				cn.cn_namelen = dp.d_namlen;
-			        cache_enter(vp, newvp, &cn);
+				cache_enter(vp, newvp, &cn);
 				vput(newvp);
 			} else
 				error = 0;
@@ -146,7 +146,7 @@ nwfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred) {
 		    error = 0;
 		    break;
 		}
-		if ((error = uiomove((caddr_t)&dp, DE_SIZE, uio)))
+		if ((error = uiomove(&dp, DE_SIZE, uio)))
 			break;
 	}
 
@@ -343,7 +343,7 @@ nwfs_doio(bp, cr, td)
 		 * the block is reused. This is indicated by setting
 		 * the B_DELWRI and B_NEEDCOMMIT flags.
 		 */
-    		if (error == EINTR
+		if (error == EINTR
 		    || (!error && (bp->b_flags & B_NEEDCOMMIT))) {
 			int s;
 
@@ -358,7 +358,7 @@ nwfs_doio(bp, cr, td)
 			if ((bp->b_flags & B_ASYNC) == 0)
 			    bp->b_flags |= B_EINTR;
 			splx(s);
-	    	} else {
+		} else {
 			if (error) {
 				bp->b_ioflags |= BIO_ERROR;
 				bp->b_error /*= np->n_error */= error;
@@ -467,7 +467,7 @@ nwfs_getpages(ap)
 			int nvalid = ((size + DEV_BSIZE - 1) - toff) & ~(DEV_BSIZE - 1);
 			vm_page_set_validclean(m, 0, nvalid);
 		}
-		
+
 		if (i != ap->a_reqpage) {
 			/*
 			 * Whether or not to leave the page activated is up in
@@ -575,10 +575,12 @@ nwfs_putpages(ap)
 
 	if (!error) {
 		int nwritten = round_page(count - uio.uio_resid) / PAGE_SIZE;
+		vm_page_lock_queues();
 		for (i = 0; i < nwritten; i++) {
 			rtvals[i] = VM_PAGER_OK;
-			pages[i]->dirty = 0;
+			vm_page_undirty(pages[i]);
 		}
+		vm_page_unlock_queues();
 	}
 	return rtvals[0];
 #endif /* NWFS_RWCACHE */
@@ -615,8 +617,8 @@ nwfs_vinvalbuf(vp, flags, cred, td, intrflg)
 	}
 	while (np->n_flag & NFLUSHINPROG) {
 		np->n_flag |= NFLUSHWANT;
-		error = tsleep((caddr_t)&np->n_flag, PRIBIO + 2, "nwfsvinv", slptimeo);
-		error = ncp_chkintr(NWFSTOCONN(VTONWFS(vp)), td->td_proc);
+		error = tsleep(&np->n_flag, PRIBIO + 2, "nwfsvinv", slptimeo);
+		error = ncp_chkintr(NWFSTOCONN(VTONWFS(vp)), td);
 		if (error == EINTR && intrflg)
 			return EINTR;
 	}
@@ -627,7 +629,7 @@ nwfs_vinvalbuf(vp, flags, cred, td, intrflg)
 			np->n_flag &= ~NFLUSHINPROG;
 			if (np->n_flag & NFLUSHWANT) {
 				np->n_flag &= ~NFLUSHWANT;
-				wakeup((caddr_t)&np->n_flag);
+				wakeup(&np->n_flag);
 			}
 			return EINTR;
 		}
@@ -636,7 +638,7 @@ nwfs_vinvalbuf(vp, flags, cred, td, intrflg)
 	np->n_flag &= ~(NMODIFIED | NFLUSHINPROG);
 	if (np->n_flag & NFLUSHWANT) {
 		np->n_flag &= ~NFLUSHWANT;
-		wakeup((caddr_t)&np->n_flag);
+		wakeup(&np->n_flag);
 	}
 	return (error);
 }

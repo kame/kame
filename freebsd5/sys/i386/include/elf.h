@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/elf.h,v 1.13 2002/05/30 08:32:18 dfr Exp $
+ * $FreeBSD: src/sys/i386/include/elf.h,v 1.14 2003/05/01 03:46:12 peter Exp $
  */
 
 #ifndef _MACHINE_ELF_H_
@@ -34,8 +34,14 @@
  */
 
 #include <sys/elf32.h>	/* Definitions common to all 32 bit architectures. */
+#if defined(__ELF_WORD_SIZE) && __ELF_WORD_SIZE == 64
+#include <sys/elf64.h>	/* Definitions common to all 64 bit architectures. */
+#endif
 
+#ifndef __ELF_WORD_SIZE
 #define	__ELF_WORD_SIZE	32	/* Used by <sys/elf_generic.h> */
+#endif
+
 #include <sys/elf_generic.h>
 
 #define	ELF_ARCH	EM_386
@@ -57,6 +63,13 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 		void	(*a_fcn)(void);	/* Function pointer (not used). */
 	} a_un;
 } Elf32_Auxinfo;
+
+#if __ELF_WORD_SIZE == 64
+/* Fake for amd64 loader support */
+typedef struct {
+	int fake;
+} Elf64_Auxinfo;
+#endif
 
 __ElfType(Auxinfo);
 

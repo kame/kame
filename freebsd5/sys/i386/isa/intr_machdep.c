@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.73 2002/10/20 18:02:46 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.75 2003/05/07 17:21:38 jhb Exp $
  */
 
 #include "opt_auto_eoi.h"
@@ -83,7 +83,7 @@
 #endif
 
 #ifdef DEV_MCA
-#include <i386/isa/mca_machdep.h>
+#include <i386/bios/mca_machdep.h>
 #endif
 
 /*
@@ -309,7 +309,8 @@ isa_nmi(cd)
 /*
  *  ICU reinitialize when ICU configuration has lost.
  */
-void icu_reinit()
+void
+icu_reinit()
 {
 	int i;
 	register_t crit;
@@ -349,7 +350,8 @@ isa_defaultirq()
 /* 
  *initialize 8259's
  */
-static void init_i8259()
+static void
+init_i8259()
 {
 
 #ifdef DEV_MCA

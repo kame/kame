@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.106 2002/11/02 20:16:55 peter Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.109 2003/03/11 22:15:09 kan Exp $
  */
 
 #include <sys/param.h>
@@ -79,7 +79,7 @@ static struct vfsops cd9660_vfsops = {
 	cd9660_root,
 	vfs_stdquotactl,
 	cd9660_statfs,
-	vfs_stdsync,
+	vfs_stdnosync,
 	cd9660_vget,
 	cd9660_fhtovp,
 	vfs_stdcheckexp,

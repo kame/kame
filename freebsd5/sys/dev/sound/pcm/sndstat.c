@@ -27,7 +27,7 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/vchan.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/sndstat.c,v 1.10 2002/11/25 17:17:42 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/sndstat.c,v 1.13 2003/03/03 12:15:46 phk Exp $");
 
 #define	SS_TYPE_MODULE		0
 #define	SS_TYPE_FIRST		1
@@ -41,19 +41,11 @@ static d_close_t sndstat_close;
 static d_read_t sndstat_read;
 
 static struct cdevsw sndstat_cdevsw = {
-	/* open */	sndstat_open,
-	/* close */	sndstat_close,
-	/* read */	sndstat_read,
-	/* write */	nowrite,
-	/* ioctl */	noioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"sndstat",
-	/* maj */	SND_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	sndstat_open,
+	.d_close =	sndstat_close,
+	.d_read =	sndstat_read,
+	.d_name =	"sndstat",
+	.d_maj =	SND_CDEV_MAJOR,
 };
 
 struct sndstat_entry {

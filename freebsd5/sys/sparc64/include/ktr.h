@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from BSDI $Id: ktr.h,v 1.10.2.7 2000/03/16 21:44:42 cp Exp $
- * $FreeBSD: src/sys/sparc64/include/ktr.h,v 1.4 2002/04/06 08:40:59 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/ktr.h,v 1.5 2003/04/26 17:00:10 obrien Exp $
  */
 
 #ifndef _MACHINE_KTR_H_
@@ -55,11 +55,11 @@
  */
 #define	ATR(desc, r1, r2, r3, l1, l2) \
 	.sect	.rodata ; \
-l1 ## :	.asciz	desc ; \
+l1:	.asciz	desc ; \
 	.previous ; \
 	SET(ktr_idx, r2, r1) ; \
 	lduw	[r1], r2 ; \
-l2 ## :	add	r2, 1, r3 ; \
+l2:	add	r2, 1, r3 ; \
 	set	KTR_ENTRIES - 1, r1 ; \
 	and	r3, r1, r3 ; \
 	set	ktr_idx, r1 ; \

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)swap_pager.h	7.1 (Berkeley) 12/5/90
- * $FreeBSD: src/sys/vm/swap_pager.h,v 1.34 2002/09/05 14:04:34 bde Exp $
+ * $FreeBSD: src/sys/vm/swap_pager.h,v 1.40 2003/04/24 05:29:27 alc Exp $
  */
 
 /*
@@ -44,8 +44,26 @@
  * 18 Dec 93.
  */
 
-#ifndef	_SWAP_PAGER_
-#define	_SWAP_PAGER_	1
+#ifndef	_VM_SWAP_PAGER_H_
+#define	_VM_SWAP_PAGER_H_ 1
+
+/*
+ * Swap device table
+ */
+struct swdevt {
+	udev_t	sw_dev;			/* For quasibogus swapdev reporting */
+	int	sw_flags;
+	int	sw_nblks;
+	int     sw_used;
+	struct	vnode *sw_vp;
+	dev_t	sw_device;
+};
+#define	SW_FREED	0x01
+#define	SW_SEQUENTIAL	0x02
+#define	SW_CLOSING	0x04
+#define	sw_freed	sw_flags	/* XXX compat */
+
+#ifdef _KERNEL
 
 /*
  * SWB_NPAGES must be a power of 2.  It may be set to 1, 2, 4, 8, or 16
@@ -78,20 +96,31 @@ struct swblock {
 	daddr_t		swb_pages[SWAP_META_PAGES];
 };
 
-#ifdef _KERNEL
 extern struct pagerlst swap_pager_un_object_list;
 extern int swap_pager_full;
 extern struct blist *swapblist;
 extern struct uma_zone *swap_zone;
+extern int nswap_lowat, nswap_hiwat;
+extern int dmmax, dmmax_mask;
+extern struct vnode *swapdev_vp;
+extern struct swdevt *swdevt;
+extern int nswdev;
+/*
+ * vm_swap_size is in page-sized chunks now.  It was DEV_BSIZE'd chunks
+ * in the old system.
+ */
+extern int vm_swap_size;	/* number of free swap blocks, in pages */
 
 void swap_pager_putpages(vm_object_t, vm_page_t *, int, boolean_t, int *);
 boolean_t swap_pager_haspage(vm_object_t object, vm_pindex_t pindex, int *before, int *after);
+void swap_pager_swapoff(int devidx, int *sw_used);
 
 int swap_pager_swp_alloc(vm_object_t, int);
 void swap_pager_copy(vm_object_t, vm_object_t, vm_pindex_t, int);
 void swap_pager_freespace(vm_object_t, vm_pindex_t, vm_size_t);
 void swap_pager_dmzspace(vm_object_t, vm_pindex_t, vm_size_t);
 void swap_pager_swap_init(void);
+int swap_pager_isswapped(vm_object_t, int);
 int swap_pager_reserve(vm_object_t, vm_pindex_t, vm_size_t);
 
 /*
@@ -100,9 +129,5 @@ int swap_pager_reserve(vm_object_t, vm_pindex_t, vm_size_t);
 
 void swap_pager_page_removed(vm_page_t, vm_object_t);
 
-/* choose underlying swap device and queue up I/O */
-struct buf;
-void swstrategy(struct buf *bp);	/* probably needs to move elsewhere */
-
 #endif				/* _KERNEL */
-#endif				/* _SWAP_PAGER_ */
+#endif				/* _VM_SWAP_PAGER_H_ */

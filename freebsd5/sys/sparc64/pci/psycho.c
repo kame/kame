@@ -28,7 +28,7 @@
  *
  *	from: NetBSD: psycho.c,v 1.39 2001/10/07 20:30:41 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/pci/psycho.c,v 1.21 2002/12/06 13:16:52 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/pci/psycho.c,v 1.35 2003/05/30 20:48:05 tmm Exp $
  */
 
 /*
@@ -106,6 +106,10 @@ static int psycho_dmamap_create(bus_dma_tag_t, bus_dma_tag_t, int,
 static int psycho_dmamap_destroy(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t);
 static int psycho_dmamap_load(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
     void *, bus_size_t, bus_dmamap_callback_t *, void *, int);
+static int psycho_dmamap_load_mbuf(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
+    struct mbuf *, bus_dmamap_callback2_t *, void *, int);
+static int psycho_dmamap_load_uio(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
+    struct uio *, bus_dmamap_callback2_t *, void *, int);
 static void psycho_dmamap_unload(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t);
 static void psycho_dmamap_sync(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
     bus_dmasync_op_t);
@@ -137,6 +141,7 @@ static void psycho_write_config(device_t, u_int, u_int, u_int, u_int, u_int32_t,
     int);
 static int psycho_route_interrupt(device_t, device_t, int);
 static int psycho_intr_pending(device_t, int);
+static u_int32_t psycho_guess_ino(device_t, phandle_t, u_int, u_int);
 static bus_space_handle_t psycho_get_bus_handle(device_t dev, enum sbbt_id id,
     bus_space_handle_t childhdl, bus_space_tag_t *tag);
 
@@ -163,6 +168,7 @@ static device_method_t psycho_methods[] = {
 
 	/* sparcbus interface */
 	DEVMETHOD(sparcbus_intr_pending,	psycho_intr_pending),
+	DEVMETHOD(sparcbus_guess_ino,	psycho_guess_ino),
 	DEVMETHOD(sparcbus_get_bus_handle,	psycho_get_bus_handle),
 
 	{ 0, 0 }
@@ -334,7 +340,7 @@ psycho_attach(device_t dev)
 	struct psycho_desc *desc;
 	phandle_t node;
 	u_int64_t csr;
-	u_long pcictl_offs, mlen;
+	u_long mlen;
 	int psycho_br[2];
 	int n, i, nreg, rid;
 #if defined(PSYCHO_DEBUG) || defined(PSYCHO_STRAY)
@@ -360,8 +366,6 @@ psycho_attach(device_t dev)
 	 * (1) per-PBM PCI configuration space, containing only the
 	 *     PBM 256-byte PCI header
 	 * (2) the shared psycho configuration registers (struct psychoreg)
-	 *
-	 * XXX use the prom address for the psycho registers?  we do so far.
 	 */
 	reg = nexus_get_reg(dev);
 	nreg = nexus_get_nreg(dev);
@@ -369,15 +373,27 @@ psycho_attach(device_t dev)
 	if (sc->sc_mode == PSYCHO_MODE_PSYCHO) {
 		if (nreg <= 2)
 			panic("psycho_attach: %d not enough registers", nreg);
-		sc->sc_basepaddr = (vm_offset_t)UPA_REG_PHYS(&reg[2]);
+		sc->sc_basepaddr = (vm_paddr_t)UPA_REG_PHYS(&reg[2]);
 		mlen = UPA_REG_SIZE(&reg[2]);
-		pcictl_offs = UPA_REG_PHYS(&reg[0]);
+		sc->sc_pcictl = UPA_REG_PHYS(&reg[0]) - sc->sc_basepaddr;
+		switch (sc->sc_pcictl) {
+		case PSR_PCICTL0:
+			sc->sc_half = 0;
+			break;
+		case PSR_PCICTL1:
+			sc->sc_half = 1;
+			break;
+		default:
+			panic("psycho_attach: bogus pci control register "
+			    "location");
+		}
 	} else {
 		if (nreg <= 0)
 			panic("psycho_attach: %d not enough registers", nreg);
-		sc->sc_basepaddr = (vm_offset_t)UPA_REG_PHYS(&reg[0]);
+		sc->sc_basepaddr = (vm_paddr_t)UPA_REG_PHYS(&reg[0]);
 		mlen = UPA_REG_SIZE(reg);
-		pcictl_offs = sc->sc_basepaddr + PSR_PCICTL0;
+		sc->sc_pcictl = PSR_PCICTL0;
+		sc->sc_half = 0;
 	}
 
 	/*
@@ -412,17 +428,14 @@ psycho_attach(device_t dev)
 		sc->sc_bustag = osc->sc_bustag;
 		sc->sc_bushandle = osc->sc_bushandle;
 	}
-	if (pcictl_offs < sc->sc_basepaddr)
-		panic("psycho_attach: bogus pci control register location");
-	sc->sc_pcictl = pcictl_offs - sc->sc_basepaddr;
 	csr = PSYCHO_READ8(sc, PSR_CS);
 	sc->sc_ign = 0x7c0; /* APB IGN is always 0x7c */
 	if (sc->sc_mode == PSYCHO_MODE_PSYCHO)
 		sc->sc_ign = PSYCHO_GCSR_IGN(csr) << 6;
 
-	device_printf(dev, "%s, impl %d, version %d, ign %x ",
+	device_printf(dev, "%s, impl %d, version %d, ign %#x, bus %c\n",
 	    desc->pd_name, (int)PSYCHO_GCSR_IMPL(csr),
-	    (int)PSYCHO_GCSR_VERS(csr), sc->sc_ign);
+	    (int)PSYCHO_GCSR_VERS(csr), sc->sc_ign, 'A' + sc->sc_half);
 
 	/*
 	 * Setup the PCI control register
@@ -432,6 +445,17 @@ psycho_attach(device_t dev)
 	csr &= ~(PCICTL_SERR | PCICTL_CPU_PRIO | PCICTL_ARB_PRIO |
 	    PCICTL_RTRYWAIT);
 	PCICTL_WRITE8(sc, PCR_CS, csr);
+
+	if (sc->sc_mode == PSYCHO_MODE_SABRE) {
+		/*
+		 * Use the PROM preset for now.
+		 */
+		csr = PCICTL_READ8(sc, PCR_TAS);
+		if (csr == 0)
+			panic("psycho_attach: sabre TAS not initialized.");
+		sc->sc_dvmabase = (ffs(csr) - 1) << PCITAS_ADDR_SHIFT;
+	} else
+		sc->sc_dvmabase = -1;
 
 	/* Grab the psycho ranges */
 	psycho_get_ranges(sc->sc_node, &sc->sc_range, &sc->sc_nrange);
@@ -476,14 +500,16 @@ psycho_attach(device_t dev)
 	    0x3ffffffff, 0xff, 0xffffffff, 0, &sc->sc_dmat) != 0)
 		panic("psycho_attach: bus_dma_tag_create failed");
 	/* Customize the tag */
-	sc->sc_dmat->cookie = sc;
-	sc->sc_dmat->dmamap_create = psycho_dmamap_create;
-	sc->sc_dmat->dmamap_destroy = psycho_dmamap_destroy;
-	sc->sc_dmat->dmamap_load = psycho_dmamap_load;
-	sc->sc_dmat->dmamap_unload = psycho_dmamap_unload;
-	sc->sc_dmat->dmamap_sync = psycho_dmamap_sync;
-	sc->sc_dmat->dmamem_alloc = psycho_dmamem_alloc;
-	sc->sc_dmat->dmamem_free = psycho_dmamem_free;
+	sc->sc_dmat->dt_cookie = sc;
+	sc->sc_dmat->dt_dmamap_create = psycho_dmamap_create;
+	sc->sc_dmat->dt_dmamap_destroy = psycho_dmamap_destroy;
+	sc->sc_dmat->dt_dmamap_load = psycho_dmamap_load;
+	sc->sc_dmat->dt_dmamap_load_mbuf = psycho_dmamap_load_mbuf;
+	sc->sc_dmat->dt_dmamap_load_uio = psycho_dmamap_load_uio;
+	sc->sc_dmat->dt_dmamap_unload = psycho_dmamap_unload;
+	sc->sc_dmat->dt_dmamap_sync = psycho_dmamap_sync;
+	sc->sc_dmat->dt_dmamem_alloc = psycho_dmamem_alloc;
+	sc->sc_dmat->dt_dmamem_free = psycho_dmamem_free;
 	/* XXX: register as root dma tag (kluge). */
 	sparc64_root_dma_tag = sc->sc_dmat;
 
@@ -537,7 +563,7 @@ psycho_attach(device_t dev)
 		 * of a pair of psycho's to arrive here.
 		 *
 		 * We should calculate a TSB size based on amount of RAM
-		 * and number of bus controllers and number an type of
+		 * and number of bus controllers and number and type of
 		 * child devices.
 		 *
 		 * For the moment, 32KB should be more than enough.
@@ -550,7 +576,7 @@ psycho_attach(device_t dev)
 		sc->sc_is->is_sb[1] = 0;
 		if (OF_getproplen(sc->sc_node, "no-streaming-cache") < 0)
 			sc->sc_is->is_sb[0] = sc->sc_pcictl + PCR_STRBUF;
-		psycho_iommu_init(sc, 2);
+		psycho_iommu_init(sc, 3);
 	} else {
 		/* Just copy IOMMU state, config tag and address */
 		sc->sc_is = osc->sc_is;
@@ -742,7 +768,7 @@ psycho_ue(void *arg)
 	if ((afsr & UEAFSR_P_DTE) != 0)
 		iommu_decode_fault(sc->sc_is, afar);
 	/* It's uncorrectable.  Dump the regs and panic. */
-	panic("%s: uncorrectable DMA error AFAR %#lx AFSR %#lx\n",
+	panic("%s: uncorrectable DMA error AFAR %#lx AFSR %#lx",
 	    device_get_name(sc->sc_dev), (u_long)afar, (u_long)afsr);
 }
 
@@ -769,7 +795,7 @@ psycho_bus_a(void *arg)
 	afar = PSYCHO_READ8(sc, PSR_PCICTL0 + PCR_AFA);
 	afsr = PSYCHO_READ8(sc, PSR_PCICTL0 + PCR_AFS);
 	/* It's uncorrectable.  Dump the regs and panic. */
-	panic("%s: PCI bus A error AFAR %#lx AFSR %#lx\n",
+	panic("%s: PCI bus A error AFAR %#lx AFSR %#lx",
 	    device_get_name(sc->sc_dev), (u_long)afar, (u_long)afsr);
 }
 
@@ -782,7 +808,7 @@ psycho_bus_b(void *arg)
 	afar = PSYCHO_READ8(sc, PSR_PCICTL1 + PCR_AFA);
 	afsr = PSYCHO_READ8(sc, PSR_PCICTL1 + PCR_AFS);
 	/* It's uncorrectable.  Dump the regs and panic. */
-	panic("%s: PCI bus B error AFAR %#lx AFSR %#lx\n",
+	panic("%s: PCI bus B error AFAR %#lx AFSR %#lx",
 	    device_get_name(sc->sc_dev), (u_long)afar, (u_long)afsr);
 }
 
@@ -820,9 +846,6 @@ psycho_iommu_init(struct psycho_softc *sc, int tsbsize)
 {
 	char *name;
 	struct iommu_state *is = sc->sc_is;
-	u_int32_t iobase = -1;
-	int *vdma = NULL;
-	int nitem;
 
 	/* punch in our copies */
 	is->is_bustag = sc->sc_bustag;
@@ -834,35 +857,13 @@ psycho_iommu_init(struct psycho_softc *sc, int tsbsize)
 	is->is_dva = PSR_IOMMU_SVADIAG;
 	is->is_dtcmp = PSR_IOMMU_TLB_CMP_DIAG;
 
-	/*
-	 * Separate the men from the boys.  Get the `virtual-dma'
-	 * property for sabre and use that to make sure the damn
-	 * iommu works.
-	 *
-	 * We could query the `#virtual-dma-size-cells' and
-	 * `#virtual-dma-addr-cells' and DTRT, but I'm lazy.
-	 */
-	nitem = OF_getprop_alloc(sc->sc_node, "virtual-dma", sizeof(vdma),
-	    (void **)&vdma);
-	if (nitem > 0) {
-		iobase = vdma[0];
-		tsbsize = ffs(vdma[1]);
-		if (tsbsize < 25 || tsbsize > 31 ||
-		    (vdma[1] & ~(1 << (tsbsize - 1))) != 0) {
-			printf("bogus tsb size %x, using 7\n", vdma[1]);
-			tsbsize = 31;
-		}
-		tsbsize -= 24;
-		free(vdma, M_OFWPROP);
-	}
-
 	/* give us a nice name.. */
 	name = (char *)malloc(32, M_DEVBUF, M_NOWAIT);
 	if (name == 0)
 		panic("couldn't malloc iommu name");
 	snprintf(name, 32, "%s dvma", device_get_name(sc->sc_dev));
 
-	iommu_init(name, is, tsbsize, iobase, 0);
+	iommu_init(name, is, tsbsize, sc->sc_dvmabase, 0);
 }
 
 static void
@@ -1190,7 +1191,6 @@ psycho_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	case SYS_RES_IOPORT:
 		rm = &sc->sc_io_rman;
 		bt = sc->sc_iot;
-		/* XXX: probably should use ranges property here. */
 		bh = sc->sc_bh[PCI_CS_IO];
 		break;
 	default:
@@ -1282,6 +1282,31 @@ psycho_intr_pending(device_t dev, int intr)
 	return (diag != 0);
 }
 
+static u_int32_t
+psycho_guess_ino(device_t dev, phandle_t node, u_int slot, u_int pin)
+{
+	struct psycho_softc *sc = (struct psycho_softc *)device_get_softc(dev);
+	bus_addr_t intrmap;
+
+	/*
+	 * If this is not for one of our direct children (i.e. we are mapping
+	 * at our node), tell the interrupt mapper to go on - we need the
+	 * slot number of the device or it's topmost parent bridge to guess
+	 * the INO.
+	 */
+	if (node != sc->sc_node)
+		return (255);
+	/*
+	 * Actually guess the INO. We always assume that this is a non-OBIO
+	 * device, and use from the slot number to determine it.
+	 * We only need to do this on e450s, it seems; here, the slot numbers
+	 * for bus A are one-based, while those for bus B seemingly have an
+	 * offset of 2 (hence the factor of 3 below).
+	 */
+	intrmap = PSR_PCIA0_INT_MAP + 8 * (slot - 1 + 3 * sc->sc_half);
+	return (INTINO(PSYCHO_READ8(sc, intrmap)) + pin - 1);
+}
+
 static bus_space_handle_t
 psycho_get_bus_handle(device_t dev, enum sbbt_id id,
     bus_space_handle_t childhdl, bus_space_tag_t *tag)
@@ -1315,9 +1340,9 @@ psycho_alloc_bus_tag(struct psycho_softc *sc, int type)
 		panic("psycho_alloc_bus_tag: out of memory");
 
 	bzero(bt, sizeof *bt);
-	bt->cookie = sc;
-	bt->parent = sc->sc_bustag;
-	bt->type = type;
+	bt->bst_cookie = sc;
+	bt->bst_parent = sc->sc_bustag;
+	bt->bst_type = type;
 	return (bt);
 }
 
@@ -1330,7 +1355,7 @@ psycho_dmamem_alloc(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, void **vaddr,
 {
 	struct psycho_softc *sc;
 
-	sc = (struct psycho_softc *)pdmat->cookie;
+	sc = (struct psycho_softc *)pdmat->dt_cookie;
 	return (iommu_dvmamem_alloc(pdmat, ddmat, sc->sc_is, vaddr, flags,
 	    mapp));
 }
@@ -1341,7 +1366,7 @@ psycho_dmamem_free(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, void *vaddr,
 {
 	struct psycho_softc *sc;
 
-	sc = (struct psycho_softc *)pdmat->cookie;
+	sc = (struct psycho_softc *)pdmat->dt_cookie;
 	iommu_dvmamem_free(pdmat, ddmat, sc->sc_is, vaddr, map);
 }
 
@@ -1351,7 +1376,7 @@ psycho_dmamap_create(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, int flags,
 {
 	struct psycho_softc *sc;
 
-	sc = (struct psycho_softc *)pdmat->cookie;
+	sc = (struct psycho_softc *)pdmat->dt_cookie;
 	return (iommu_dvmamap_create(pdmat, ddmat, sc->sc_is, flags, mapp));
 
 }
@@ -1362,7 +1387,7 @@ psycho_dmamap_destroy(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
 {
 	struct psycho_softc *sc;
 
-	sc = (struct psycho_softc *)pdmat->cookie;
+	sc = (struct psycho_softc *)pdmat->dt_cookie;
 	return (iommu_dvmamap_destroy(pdmat, ddmat, sc->sc_is, map));
 }
 
@@ -1373,8 +1398,32 @@ psycho_dmamap_load(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map,
 {
 	struct psycho_softc *sc;
 
-	sc = (struct psycho_softc *)pdmat->cookie;
+	sc = (struct psycho_softc *)pdmat->dt_cookie;
 	return (iommu_dvmamap_load(pdmat, ddmat, sc->sc_is, map, buf, buflen,
+	    callback, callback_arg, flags));
+}
+
+static int
+psycho_dmamap_load_mbuf(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
+    bus_dmamap_t map, struct mbuf *m, bus_dmamap_callback2_t *callback,
+    void *callback_arg, int flags)
+{
+	struct psycho_softc *sc;
+
+	sc = (struct psycho_softc *)pdmat->dt_cookie;
+	return (iommu_dvmamap_load_mbuf(pdmat, ddmat, sc->sc_is, map, m,
+	    callback, callback_arg, flags));
+}
+
+static int
+psycho_dmamap_load_uio(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
+    bus_dmamap_t map, struct uio *uio, bus_dmamap_callback2_t *callback,
+    void *callback_arg, int flags)
+{
+	struct psycho_softc *sc;
+
+	sc = (struct psycho_softc *)pdmat->dt_cookie;
+	return (iommu_dvmamap_load_uio(pdmat, ddmat, sc->sc_is, map, uio,
 	    callback, callback_arg, flags));
 }
 
@@ -1383,7 +1432,7 @@ psycho_dmamap_unload(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map)
 {
 	struct psycho_softc *sc;
 
-	sc = (struct psycho_softc *)pdmat->cookie;
+	sc = (struct psycho_softc *)pdmat->dt_cookie;
 	iommu_dvmamap_unload(pdmat, ddmat, sc->sc_is, map);
 }
 
@@ -1393,6 +1442,6 @@ psycho_dmamap_sync(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map,
 {
 	struct psycho_softc *sc;
 
-	sc = (struct psycho_softc *)pdmat->cookie;
+	sc = (struct psycho_softc *)pdmat->dt_cookie;
 	iommu_dvmamap_sync(pdmat, ddmat, sc->sc_is, map, op);
 }

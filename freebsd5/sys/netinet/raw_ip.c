@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.107 2002/11/20 19:00:54 luigi Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.111 2003/02/19 05:47:34 imp Exp $
  */
 
 #include "opt_inet6.h"
@@ -174,7 +174,7 @@ rip_input(m, off)
 			int policyfail = 0;
 
 			if (n != NULL) {
-#ifdef IPSSEC
+#ifdef IPSEC
 				/* check AH/ESP integrity. */
 				if (ipsec4_in_reject_so(n, last->inp_socket)) {
 					policyfail = 1;
@@ -581,7 +581,9 @@ static int
 rip_abort(struct socket *so)
 {
 	soisdisconnected(so);
-	return rip_detach(so);
+	if (so->so_state & SS_NOFDREF)
+		return rip_detach(so);
+	return 0;
 }
 
 static int

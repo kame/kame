@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sio/sio_pccard.c,v 1.6 2002/03/20 02:07:41 alfred Exp $
+ * $FreeBSD: src/sys/dev/sio/sio_pccard.c,v 1.8 2003/02/16 18:03:15 imp Exp $
  */
 
 #include <sys/param.h>
@@ -46,7 +46,6 @@
 #include <dev/sio/siovar.h>
 
 static	int	sio_pccard_attach(device_t dev);
-static	int	sio_pccard_detach(device_t dev);
 static	int	sio_pccard_match(device_t self);
 static	int	sio_pccard_probe(device_t dev);
 
@@ -54,7 +53,7 @@ static device_method_t sio_pccard_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		pccard_compat_probe),
 	DEVMETHOD(device_attach,	pccard_compat_attach),
-	DEVMETHOD(device_detach,	sio_pccard_detach),
+	DEVMETHOD(device_detach,	siodetach),
 
 	/* Card interface */
 	DEVMETHOD(card_compat_match,	sio_pccard_match),
@@ -80,10 +79,12 @@ sio_pccard_match(device_t dev)
 	if (error != 0)
 		return (error);
 	/*
-	 * If a serial card, we are likely the right driver.
+	 * If a serial card, we are likely the right driver.  However,
+	 * some serial cards are better servered by other drivers, so
+	 * allow other drivers to claim it, if they want.
 	 */
 	if (fcn == PCCARD_FUNCTION_SERIAL)
-		return (0);
+		return (-100);
 
 	return(ENXIO);
 }
@@ -106,13 +107,6 @@ sio_pccard_attach(dev)
 	device_t	dev;
 {
 	return (sioattach(dev, 0, 0UL));
-}
-
-static int
-sio_pccard_detach(dev)
-	device_t	dev;
-{
-	return (siodetach(dev));
 }
 
 DRIVER_MODULE(sio, pccard, sio_pccard_driver, sio_devclass, 0, 0);

@@ -11,7 +11,7 @@
  * this software for any purpose.  It is provided "as is"
  * without express or implied warranty.
  *
- * $FreeBSD: src/sys/pc98/pc98/mse.c,v 1.37 2002/03/25 12:44:03 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/mse.c,v 1.40 2003/03/03 12:15:53 phk Exp $
  */
 /*
  * Driver for the Logitech and ATI Inport Bus mice for use with 386bsd and
@@ -138,19 +138,13 @@ static	d_poll_t	msepoll;
 
 #define CDEV_MAJOR 27
 static struct cdevsw mse_cdevsw = {
-	/* open */	mseopen,
-	/* close */	mseclose,
-	/* read */	mseread,
-	/* write */	nowrite,
-	/* ioctl */	mseioctl,
-	/* poll */	msepoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"mse",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	mseopen,
+	.d_close =	mseclose,
+	.d_read =	mseread,
+	.d_ioctl =	mseioctl,
+	.d_poll =	msepoll,
+	.d_name =	"mse",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static	void		mseintr(void *);
@@ -535,7 +529,7 @@ mseread(dev, uio, ioflag)
 				return (0);
 			}
 			sc->sc_flags |= MSESC_WANT;
-			error = tsleep((caddr_t)sc, MSEPRI | PCATCH,
+			error = tsleep(sc, MSEPRI | PCATCH,
 				"mseread", 0);
 			if (error) {
 				splx(s);
@@ -814,7 +808,7 @@ mseintr(arg)
 	    (sc->sc_obuttons ^ sc->sc_buttons) != 0) {
 		if (sc->sc_flags & MSESC_WANT) {
 			sc->sc_flags &= ~MSESC_WANT;
-			wakeup((caddr_t)sc);
+			wakeup(sc);
 		}
 		selwakeup(&sc->sc_selp);
 	}
@@ -912,7 +906,7 @@ mse_getlogi(tag, handle, dx, dy, but)
  * Routines for the ATI Inport bus mouse.
  */
 /*
- * Test for a ATI Inport bus mouse and return 1 if it is.
+ * Test for an ATI Inport bus mouse and return 1 if it is.
  * (do not enable interrupts)
  */
 static int

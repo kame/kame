@@ -31,7 +31,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/gsc.c,v 1.41 2001/11/04 08:52:11 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/gsc.c,v 1.43 2003/03/03 12:15:49 phk Exp $
  *
  */
 
@@ -79,8 +79,6 @@
 #else
 #define lprintf(args)
 #endif
-
-#define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 
 #define TIMEOUT (hz*15)  /* timeout while reading a buffer - default value */
 #define LONG    (hz/60)  /* timesteps while reading a buffer */
@@ -195,19 +193,12 @@ static	d_ioctl_t	gscioctl;
 
 #define CDEV_MAJOR 47
 static struct cdevsw gsc_cdevsw = {
-	/* open */	gscopen,
-	/* close */	gscclose,
-	/* read */	gscread,
-	/* write */	nowrite,
-	/* ioctl */	gscioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"gsc",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	gscopen,
+	.d_close =	gscclose,
+	.d_read =	gscread,
+	.d_ioctl =	gscioctl,
+	.d_name =	"gsc",
+	.d_maj =	CDEV_MAJOR,
 };
 
 

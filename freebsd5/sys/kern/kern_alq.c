@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_alq.c,v 1.3 2002/09/26 07:38:56 jeff Exp $
+ * $FreeBSD: src/sys/kern/kern_alq.c,v 1.6 2003/05/25 08:48:42 jeff Exp $
  *
  */
 
@@ -428,6 +428,8 @@ alq_get(struct alq *alq, int waitok)
 		aln = ale->ae_next;
 		if ((aln->ae_flags & AE_VALID) == 0)
 			alq->aq_entfree = aln;
+		else
+			alq->aq_entfree = NULL;
 	} else
 		ALQ_UNLOCK(alq);
 

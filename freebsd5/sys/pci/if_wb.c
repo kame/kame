@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_wb.c,v 1.50 2002/11/14 23:49:09 sam Exp $
  */
 
 /*
@@ -83,6 +81,9 @@
  * three of my test boards seems fine.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_wb.c,v 1.60 2003/04/21 18:34:04 imp Exp $");
+
 #include "opt_bdg.h"
 
 #include <sys/param.h>
@@ -124,12 +125,9 @@
 
 #include <pci/if_wbreg.h>
 
+MODULE_DEPEND(wb, pci, 1, 1, 1);
+MODULE_DEPEND(wb, ether, 1, 1, 1);
 MODULE_DEPEND(wb, miibus, 1, 1, 1);
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_wb.c,v 1.50 2002/11/14 23:49:09 sam Exp $";
-#endif
 
 /*
  * Various supported device vendors/types and their names.
@@ -222,7 +220,7 @@ static driver_t wb_driver = {
 
 static devclass_t wb_devclass;
 
-DRIVER_MODULE(if_wb, pci, wb_driver, wb_devclass, 0, 0);
+DRIVER_MODULE(wb, pci, wb_driver, wb_devclass, 0, 0);
 DRIVER_MODULE(miibus, wb, miibus_driver, miibus_devclass, 0, 0);
 
 #define WB_SETBIT(sc, reg, x)				\
@@ -436,9 +434,9 @@ wb_mii_readreg(sc, frame)
 	/* Check for ack */
 	SIO_CLR(WB_SIO_MII_CLK);
 	DELAY(1);
+	ack = CSR_READ_4(sc, WB_SIO) & WB_SIO_MII_DATAOUT;
 	SIO_SET(WB_SIO_MII_CLK);
 	DELAY(1);
-	ack = CSR_READ_4(sc, WB_SIO) & WB_SIO_MII_DATAOUT;
 	SIO_CLR(WB_SIO_MII_CLK);
 	DELAY(1);
 	SIO_SET(WB_SIO_MII_CLK);
@@ -822,7 +820,6 @@ wb_attach(dev)
 	device_t		dev;
 {
 	u_char			eaddr[ETHER_ADDR_LEN];
-	u_int32_t		command;
 	struct wb_softc		*sc;
 	struct ifnet		*ifp;
 	int			unit, error = 0, rid;
@@ -832,7 +829,6 @@ wb_attach(dev)
 
 	mtx_init(&sc->wb_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-	WB_LOCK(sc);
 
 	/*
 	 * Handle power management nonsense.
@@ -862,23 +858,6 @@ wb_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef WB_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("wb%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("wb%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#endif
 
 	rid = WB_RID;
 	sc->wb_res = bus_alloc_resource(dev, WB_RES, &rid,
@@ -900,18 +879,7 @@ wb_attach(dev)
 
 	if (sc->wb_irq == NULL) {
 		printf("wb%d: couldn't map interrupt\n", unit);
-		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
 		error = ENXIO;
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->wb_irq, INTR_TYPE_NET,
-	    wb_intr, sc, &sc->wb_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
-		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
-		printf("wb%d: couldn't set up irq\n", unit);
 		goto fail;
 	}
 
@@ -939,9 +907,6 @@ wb_attach(dev)
 
 	if (sc->wb_ldata == NULL) {
 		printf("wb%d: no memory for list buffers!\n", unit);
-		bus_teardown_intr(dev, sc->wb_irq, sc->wb_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
-		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -967,10 +932,6 @@ wb_attach(dev)
 	 */
 	if (mii_phy_probe(dev, &sc->wb_miibus,
 	    wb_ifmedia_upd, wb_ifmedia_sts)) {
-		bus_teardown_intr(dev, sc->wb_irq, sc->wb_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
-		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
-		free(sc->wb_ldata_ptr, M_DEVBUF);
 		error = ENXIO;
 		goto fail;
 	}
@@ -979,18 +940,31 @@ wb_attach(dev)
 	 * Call MI attach routine.
 	 */
 	ether_ifattach(ifp, eaddr);
-	WB_UNLOCK(sc);
-	return(0);
+
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->wb_irq, INTR_TYPE_NET,
+	    wb_intr, sc, &sc->wb_intrhand);
+
+	if (error) {
+		printf("wb%d: couldn't set up irq\n", unit);
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
 	if (error)
-		device_delete_child(dev, sc->wb_miibus);
-	WB_UNLOCK(sc);
-	mtx_destroy(&sc->wb_mtx);
+		wb_detach(dev);
 
 	return(error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 wb_detach(dev)
 	device_t		dev;
@@ -999,21 +973,33 @@ wb_detach(dev)
 	struct ifnet		*ifp;
 
 	sc = device_get_softc(dev);
+	KASSERT(mtx_initialized(&sc->wb_mtx), ("wb mutex not initialized"));
 	WB_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	wb_stop(sc);
-	ether_ifdetach(ifp);
-
-	/* Delete any miibus and phy devices attached to this interface */
+	/* 
+	 * Delete any miibus and phy devices attached to this interface.
+	 * This should only be done if attach succeeded.
+	 */
+	if (device_is_attached(dev)) {
+		wb_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->wb_miibus)
+		device_delete_child(dev, sc->wb_miibus);
 	bus_generic_detach(dev);
-	device_delete_child(dev, sc->wb_miibus);
 
-	bus_teardown_intr(dev, sc->wb_irq, sc->wb_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
-	bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
+	if (sc->wb_intrhand)
+		bus_teardown_intr(dev, sc->wb_irq, sc->wb_intrhand);
+	if (sc->wb_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
+	if (sc->wb_res)
+		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
 
-	free(sc->wb_ldata_ptr, M_DEVBUF);
+	if (sc->wb_ldata) {
+		contigfree(sc->wb_ldata, sizeof(struct wb_list_data) + 8,
+		    M_DEVBUF);
+	}
 
 	WB_UNLOCK(sc);
 	mtx_destroy(&sc->wb_mtx);

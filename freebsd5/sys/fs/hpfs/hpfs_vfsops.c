@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/hpfs/hpfs_vfsops.c,v 1.30 2002/11/07 22:33:28 jhb Exp $
+ * $FreeBSD: src/sys/fs/hpfs/hpfs_vfsops.c,v 1.33 2003/03/11 22:15:08 kan Exp $
  */
 
 
@@ -577,7 +577,7 @@ static struct vfsops hpfs_vfsops = {
 	hpfs_root,
 	vfs_stdquotactl,
 	hpfs_statfs,
-	vfs_stdsync,
+	vfs_stdnosync,
 	hpfs_vget,
 	hpfs_fhtovp,
 	vfs_stdcheckexp,

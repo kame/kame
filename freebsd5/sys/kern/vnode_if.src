@@ -31,7 +31,7 @@
 # SUCH DAMAGE.
 #
 #	@(#)vnode_if.src	8.12 (Berkeley) 5/14/95
-# $FreeBSD: src/sys/kern/vnode_if.src,v 1.58 2002/09/26 00:31:16 jeff Exp $
+# $FreeBSD: src/sys/kern/vnode_if.src,v 1.60 2003/01/04 22:10:36 phk Exp $
 #
 
 #
@@ -400,6 +400,15 @@ vop_strategy {
 };
 
 #
+# specstrategy	vp	L L L
+#! specstrategy	pre	vop_strategy_pre
+#
+vop_specstrategy {
+	IN struct vnode *vp;
+	IN struct buf *bp;
+};
+
+#
 #% getwritemount vp	= = =
 #
 vop_getwritemount {
@@ -578,15 +587,6 @@ vop_destroyvobject {
 vop_getvobject {
 	IN struct vnode *vp;
 	OUT struct vm_object **objpp;
-};
-
-#
-#% refreshlabel	vp	L L L
-#
-vop_refreshlabel {
-	IN struct vnode *vp;
-	IN struct ucred *cred;
-	IN struct thread *td;
 };
 
 #

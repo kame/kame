@@ -26,7 +26,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/usb/udbp.c,v 1.18 2002/08/08 12:05:50 joe Exp $
+ *	$FreeBSD: src/sys/dev/usb/udbp.c,v 1.21 2003/03/15 13:03:30 takawata Exp $
  */
 
 /* Driver for arbitrary double bulk pipe devices.
@@ -606,6 +606,7 @@ udbp_out_transfer_cb(usbd_xfer_handle xfer, usbd_private_handle priv,
 }
 
 DRIVER_MODULE(udbp, uhub, udbp_driver, udbp_devclass, usbd_driver_load, 0);
+MODULE_DEPEND(udbp, netgraph, NG_ABI_VERSION, NG_ABI_VERSION, NG_ABI_VERSION);
 
 
 /***********************************************************************

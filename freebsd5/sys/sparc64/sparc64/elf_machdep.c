@@ -36,7 +36,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *	from: NetBSD: mdreloc.c,v 1.5 2001/04/25 12:24:51 kleink Exp
- * $FreeBSD: src/sys/sparc64/sparc64/elf_machdep.c,v 1.12 2002/12/02 18:56:30 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/elf_machdep.c,v 1.13 2003/01/21 02:42:43 jake Exp $
  */
 
 #include <sys/param.h>
@@ -235,6 +235,28 @@ static long reloc_target_bitmask[] = {
 };
 #define RELOC_VALUE_BITMASK(t)	(reloc_target_bitmask[t])
 
+int
+elf_reloc_local(linker_file_t lf, const void *data, int type)
+{
+	const Elf_Rela *rela;
+	Elf_Addr value;
+	Elf_Addr *where;
+
+	if (type != ELF_RELOC_RELA)
+		return (-1);
+
+	rela = (const Elf_Rela *)data;
+	if (ELF_R_TYPE(rela->r_info) != R_SPARC_RELATIVE)
+		return (-1);
+
+	value = rela->r_addend + (Elf_Addr)lf->address;
+	where = (Elf_Addr *)((Elf_Addr)lf->address + rela->r_offset);
+
+	*where = value;
+
+	return (0);
+}
+
 /* Process one elf relocation with addend. */
 int
 elf_reloc(linker_file_t lf, const void *data, int type)
@@ -258,7 +280,7 @@ elf_reloc(linker_file_t lf, const void *data, int type)
 	rtype = ELF_R_TYPE(rela->r_info);
 	symidx = ELF_R_SYM(rela->r_info);
 
-	if (rtype == R_SPARC_NONE)
+	if (rtype == R_SPARC_NONE || rtype == R_SPARC_RELATIVE)
 		return (0);
 
 	if (rtype == R_SPARC_JMP_SLOT || rtype == R_SPARC_COPY ||

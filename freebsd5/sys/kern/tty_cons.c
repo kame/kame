@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/kern/tty_cons.c,v 1.102 2002/10/17 20:03:38 robert Exp $
+ * $FreeBSD: src/sys/kern/tty_cons.c,v 1.110 2003/03/09 20:42:49 phk Exp $
  */
 
 #include "opt_ddb.h"
@@ -69,22 +69,22 @@ static	d_ioctl_t	cnioctl;
 static	d_poll_t	cnpoll;
 static	d_kqfilter_t	cnkqfilter;
 
-#define	CDEV_MAJOR	0
 static struct cdevsw cn_cdevsw = {
-	/* open */	cnopen,
-	/* close */	cnclose,
-	/* read */	cnread,
-	/* write */	cnwrite,
-	/* ioctl */	cnioctl,
-	/* poll */	cnpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"console",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	cnkqfilter,
+	.d_open =	cnopen,
+	.d_close =	cnclose,
+	.d_read =	cnread,
+	.d_write =	cnwrite,
+	.d_ioctl =	cnioctl,
+	.d_poll =	cnpoll,
+	.d_name =	"console",
+	.d_maj =	256,
+			/*
+			 * XXX: We really want major #0, but zero here means
+			 * XXX: allocate a major number automatically.
+			 * XXX: kern_conf.c knows what to do when it sees 256.
+			 */
+	.d_flags =	D_TTY,
+	.d_kqfilter =	cnkqfilter,
 };
 
 struct cn_device {
@@ -115,7 +115,6 @@ int	cons_unavail = 0;	/* XXX:
 static int cn_mute;
 static int openflag;			/* how /dev/console was opened */
 static int cn_is_open;
-static dev_t cn_devfsdev;		/* represents the device private info */
 static u_char console_pausing;		/* pause after each line during probe */
 static char *console_pausestr=
 "<pause; press any key to proceed to next line or '.' to end pause mode>";
@@ -530,7 +529,7 @@ cncheckc(void)
 		return (-1);
 	STAILQ_FOREACH(cnd, &cn_devlist, cnd_next) {
 		cn = cnd->cnd_cn;
-		c = cn->cn_checkc(cn->cn_dev);
+		c = cn->cn_checkc(cn);
 		if (c != -1) {
 			return (c);
 		}
@@ -550,8 +549,8 @@ cnputc(int c)
 	STAILQ_FOREACH(cnd, &cn_devlist, cnd_next) {
 		cn = cnd->cnd_cn;
 		if (c == '\n')
-			cn->cn_putc(cn->cn_dev, '\r');
-		cn->cn_putc(cn->cn_dev, c);
+			cn->cn_putc(cn, '\r');
+		cn->cn_putc(cn, c);
 	}
 #ifdef DDB
 	if (console_pausing && !db_active && (c == '\n')) {
@@ -582,7 +581,7 @@ cndbctl(int on)
 		STAILQ_FOREACH(cnd, &cn_devlist, cnd_next) {
 			cn = cnd->cnd_cn;
 			if (cn->cn_dbctl != NULL)
-				cn->cn_dbctl(cn->cn_dev, on);
+				cn->cn_dbctl(cn, on);
 		}
 	if (on)
 		refcount++;
@@ -592,8 +591,7 @@ static void
 cn_drvinit(void *unused)
 {
 
-	cn_devfsdev = make_dev(&cn_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600,
-	    "console");
+	make_dev(&cn_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "console");
 }
 
-SYSINIT(cndev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,cn_drvinit,NULL)
+SYSINIT(cndev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, cn_drvinit, NULL)

@@ -37,7 +37,7 @@
  *	isic - I4B Siemens ISDN Chipset Driver for Teles S0/8 and clones
  *	================================================================
  *
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_tel_s08.c,v 1.6 2002/09/02 00:52:08 brooks Exp $
+ * $FreeBSD: src/sys/i4b/layer1/isic/i4b_tel_s08.c,v 1.7 2003/03/25 00:07:03 jake Exp $
  *
  *      last edit-date: [Wed Jan 24 09:27:58 2001]
  *
@@ -181,7 +181,7 @@ isic_probe_s08(device_t dev)
 	if((kvtop(sc->sc_vmem_addr) < 0xa0000) ||
 	   (kvtop(sc->sc_vmem_addr) > 0xdf000))
 	{
-		printf("isic%d: Error, mem addr 0x%lx outside 0xA0000-0xDF000 for Teles S0/8!\n",
+		printf("isic%d: Error, mem addr 0x%x outside 0xA0000-0xDF000 for Teles S0/8!\n",
 				unit, kvtop(sc->sc_vmem_addr));
 		bus_release_resource(dev,SYS_RES_MEMORY,
 				     sc->sc_resources.mem_rid,

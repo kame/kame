@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs_subr.c,v 1.26 2002/10/14 03:20:33 mckusick Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_subr.c,v 1.29 2003/03/04 00:04:42 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -1453,7 +1453,7 @@ ntfs_writentvattr_plain(
 			if ((off == 0) && (tocopy == ntfs_cntob(cl)))
 			{
 				bp = getblk(ntmp->ntm_devvp, ntfs_cntobn(cn),
-					    ntfs_cntob(cl), 0, 0);
+					    ntfs_cntob(cl), 0, 0, 0);
 				clrbuf(bp);
 			} else {
 				error = bread(ntmp->ntm_devvp, ntfs_cntobn(cn),

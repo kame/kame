@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp_via.c,v 1.6 2002/11/13 17:40:15 mux Exp $
+ *	$FreeBSD: src/sys/pci/agp_via.c,v 1.7 2003/04/15 06:37:29 mdodd Exp $
  */
 
 #include "opt_bus.h"
@@ -255,3 +255,5 @@ static driver_t agp_via_driver = {
 static devclass_t agp_devclass;
 
 DRIVER_MODULE(agp_via, pci, agp_via_driver, agp_devclass, 0, 0);
+MODULE_DEPEND(agp_via, agp, 1, 1, 1);
+MODULE_DEPEND(agp_via, pci, 1, 1, 1);

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/pthread.h,v 1.25 2002/03/23 17:24:53 imp Exp $
+ * $FreeBSD: src/include/pthread.h,v 1.28 2003/04/20 01:53:12 jdp Exp $
  */
 #ifndef _PTHREAD_H_
 #define _PTHREAD_H_
@@ -190,6 +190,9 @@ enum pthread_mutextype {
  */
 __BEGIN_DECLS
 int		pthread_attr_destroy(pthread_attr_t *);
+int		pthread_attr_getstack(const pthread_attr_t * __restrict, 
+			void ** __restrict stackaddr, 
+			size_t * __restrict stacksize);
 int		pthread_attr_getstacksize(const pthread_attr_t *, size_t *);
 int		pthread_attr_getguardsize(const pthread_attr_t *, size_t *);
 int		pthread_attr_getstackaddr(const pthread_attr_t *, void **);
@@ -197,17 +200,13 @@ int		pthread_attr_getdetachstate(const pthread_attr_t *, int *);
 int		pthread_attr_init(pthread_attr_t *);
 int		pthread_attr_setstacksize(pthread_attr_t *, size_t);
 int		pthread_attr_setguardsize(pthread_attr_t *, size_t);
+int		pthread_attr_setstack(pthread_attr_t *, void *, size_t);
 int		pthread_attr_setstackaddr(pthread_attr_t *, void *);
 int		pthread_attr_setdetachstate(pthread_attr_t *, int);
 void		pthread_cleanup_pop(int);
 void		pthread_cleanup_push(void (*) (void *), void *routine_arg);
 int		pthread_condattr_destroy(pthread_condattr_t *);
 int		pthread_condattr_init(pthread_condattr_t *);
-
-#if defined(_POSIX_THREAD_PROCESS_SHARED)
-int		pthread_condattr_getpshared(pthread_condattr_t *, int *);
-int		pthread_condattr_setpshared(pthread_condattr_t *, int);
-#endif
 
 int		pthread_cond_broadcast(pthread_cond_t *);
 int		pthread_cond_destroy(pthread_cond_t *);
@@ -265,13 +264,6 @@ int		pthread_getprio(pthread_t);
 int		pthread_setprio(pthread_t, int);
 void		pthread_yield(void);
 
-#if defined(_POSIX_THREAD_PROCESS_SHARED)
-int		pthread_mutexattr_getpshared(pthread_mutexattr_t *,
-			int *pshared);
-int		pthread_mutexattr_setpshared(pthread_mutexattr_t *,
-			int pshared);
-#endif
-
 int		pthread_mutexattr_getprioceiling(pthread_mutexattr_t *,
 			int *);
 int		pthread_mutexattr_setprioceiling(pthread_mutexattr_t *,
@@ -296,6 +288,8 @@ int		pthread_getschedparam(pthread_t pthread, int *,
 			struct sched_param *);
 int		pthread_setschedparam(pthread_t, int,
 			const struct sched_param *);
+int		pthread_getconcurrency(void);
+int		pthread_setconcurrency(int);
 __END_DECLS
 
 #endif

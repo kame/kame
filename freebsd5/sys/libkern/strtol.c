@@ -35,13 +35,13 @@
  *
  * From: static char sccsid[] = "@(#)strtol.c	8.1 (Berkeley) 6/4/93";
  *
- * $FreeBSD: src/sys/libkern/strtol.c,v 1.5 1999/12/01 22:56:50 archie Exp $
+ * $FreeBSD: src/sys/libkern/strtol.c,v 1.6 2003/04/29 13:36:04 kan Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ctype.h>
-#include <machine/limits.h>
+#include <sys/limits.h>
 
 /*
  * Convert a string to a long integer.

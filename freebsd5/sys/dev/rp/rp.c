@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/rp/rp.c,v 1.47 2002/10/20 18:43:11 tegge Exp $
+ * $FreeBSD: src/sys/dev/rp/rp.c,v 1.49 2003/03/03 12:15:45 phk Exp $
  */
 
 /* 
@@ -43,7 +43,6 @@
 #include <sys/fcntl.h>
 #include <sys/malloc.h>
 #include <sys/tty.h>
-#include <sys/dkstat.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
 #include <machine/resource.h>
@@ -572,19 +571,15 @@ static	d_ioctl_t	rpioctl;
 
 #define	CDEV_MAJOR	81
 struct cdevsw rp_cdevsw = {
-	/* open */	rpopen,
-	/* close */	rpclose,
-	/* read */	ttyread,
-	/* write */	rpwrite,
-	/* ioctl */	rpioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"rp",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY,
+	.d_open =	rpopen,
+	.d_close =	rpclose,
+	.d_read =	ttyread,
+	.d_write =	rpwrite,
+	.d_ioctl =	rpioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"rp",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
 };
 
 static int	rp_num_ports_open = 0;

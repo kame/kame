@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/perfmon.c,v 1.30 2002/03/21 06:19:07 imp Exp $
+ * $FreeBSD: src/sys/i386/i386/perfmon.c,v 1.31 2003/03/03 12:15:49 phk Exp $
  */
 
 #include <sys/param.h>
@@ -71,19 +71,11 @@ SYSINIT(cpu, SI_SUB_DRIVERS, SI_ORDER_ANY, perfmon_init_dev, NULL);
 
 #define CDEV_MAJOR 2	/* We're really a minor of mem.c */
 static struct cdevsw perfmon_cdevsw = {
-	/* open */      perfmon_open,
-	/* close */     perfmon_close,
-	/* read */      noread,
-	/* write */     nowrite,
-	/* ioctl */     perfmon_ioctl,
-	/* poll */      nopoll,
-	/* mmap */      nommap,
-	/* strategy */  nostrategy,
-	/* name */      "perfmon",
-	/* maj */       CDEV_MAJOR,
-	/* dump */      nodump,
-	/* psize */     nopsize,
-	/* flags */     0,
+	.d_open =	perfmon_open,
+	.d_close =	perfmon_close,
+	.d_ioctl =	perfmon_ioctl,
+	.d_name =	"perfmon",
+	.d_maj =	CDEV_MAJOR,
 };
 
 /*

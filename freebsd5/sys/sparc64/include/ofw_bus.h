@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/ofw_bus.h,v 1.3 2002/11/07 16:07:46 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/ofw_bus.h,v 1.4 2003/05/30 20:48:04 tmm Exp $
  */
 
 #ifndef	_MACHINE_OFW_BUS_H_
@@ -32,8 +32,8 @@
 #define	ORIR_NOTFOUND	0xffffffff
 
 typedef int obr_callback_t(phandle_t, u_int8_t *, int, u_int8_t *, int,
-    u_int8_t **, int *);
+    u_int8_t **, int *, void *);
 
-u_int32_t ofw_bus_route_intr(phandle_t, int, obr_callback_t *);
+u_int32_t ofw_bus_route_intr(phandle_t, int, obr_callback_t *, void *);
 
 #endif /* !_MACHINE_OFW_BUS_H_ */

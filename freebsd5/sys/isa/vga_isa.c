@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/vga_isa.c,v 1.20 2001/09/12 08:37:42 julian Exp $
+ * $FreeBSD: src/sys/isa/vga_isa.c,v 1.24 2003/05/01 04:23:15 peter Exp $
  */
 
 #include "opt_vga.h"
@@ -46,7 +46,9 @@
 #include <vm/pmap.h>
 
 #include <machine/md_var.h>
+#ifdef __i386__
 #include <machine/pc/bios.h>
+#endif
 
 #include <dev/fb/fbreg.h>
 #include <dev/fb/vgareg.h>
@@ -69,19 +71,14 @@ static d_ioctl_t	isavga_ioctl;
 static d_mmap_t		isavga_mmap;
 
 static struct cdevsw isavga_cdevsw = {
-	/* open */	isavga_open,
-	/* close */	isavga_close,
-	/* read */	isavga_read,
-	/* write */	isavga_write,
-	/* ioctl */	isavga_ioctl,
-	/* poll */	nopoll,
-	/* mmap */	isavga_mmap,
-	/* strategy */	nostrategy,
-	/* name */	VGA_DRIVER_NAME,
-	/* maj */	-1,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	isavga_open,
+	.d_close =	isavga_close,
+	.d_read =	isavga_read,
+	.d_write =	isavga_write,
+	.d_ioctl =	isavga_ioctl,
+	.d_mmap =	isavga_mmap,
+	.d_name =	VGA_DRIVER_NAME,
+	.d_maj =	-1,
 };
 
 #endif /* FB_INSTALL_CDEV */
@@ -196,9 +193,9 @@ isavga_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 }
 
 static int
-isavga_mmap(dev_t dev, vm_offset_t offset, int prot)
+isavga_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
-	return vga_mmap(dev, VGA_SOFTC(VGA_UNIT(dev)), offset, prot);
+	return vga_mmap(dev, VGA_SOFTC(VGA_UNIT(dev)), offset, paddr, prot);
 }
 
 #endif /* FB_INSTALL_CDEV */

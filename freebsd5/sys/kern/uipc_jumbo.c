@@ -29,7 +29,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
  *
- * $FreeBSD: src/sys/kern/uipc_jumbo.c,v 1.4 2002/07/21 19:06:46 alc Exp $
+ * $FreeBSD: src/sys/kern/uipc_jumbo.c,v 1.7 2003/04/19 19:13:25 alc Exp $
  */
 /*
  * This is a set of routines for allocating large-sized mbuf payload
@@ -49,8 +49,6 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
-#include <vm/pmap.h>
-#include <vm/vm_map.h>
 #include <vm/vm_map.h>
 #include <vm/vm_param.h>
 #include <vm/vm_pageout.h>
@@ -199,7 +197,9 @@ jumbo_pg_alloc(void)
 	entry = SLIST_FIRST(&jumbo_kmap_free);
 	if (entry != NULL){
 		pindex = atop(entry->kva - jumbo_basekva);
+		VM_OBJECT_LOCK(jumbo_vm_object);
 		pg = vm_page_alloc(jumbo_vm_object, pindex, VM_ALLOC_INTERRUPT);
+		VM_OBJECT_UNLOCK(jumbo_vm_object);
 		if (pg != NULL) {
 			SLIST_REMOVE_HEAD(&jumbo_kmap_free, entries);
 			SLIST_INSERT_HEAD(&jumbo_kmap_inuse, entry, entries);
@@ -214,7 +214,7 @@ void
 jumbo_pg_free(vm_offset_t addr)
 {
 	struct jumbo_kmap *entry;
-	vm_offset_t paddr;
+	vm_paddr_t paddr;
 	vm_page_t pg;
 
 	paddr = pmap_kextract((vm_offset_t)addr);

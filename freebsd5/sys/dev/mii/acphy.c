@@ -68,6 +68,9 @@
  * Driver for Altima AC101 10/100 PHY
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/acphy.c,v 1.13 2003/04/03 21:36:30 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -81,16 +84,11 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-#include <dev/mii/miidevs.h>
+#include "miidevs.h"
 
 #include <dev/mii/acphyreg.h>
 
 #include "miibus_if.h"
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/acphy.c,v 1.10 2002/10/14 22:31:52 alfred Exp $";
-#endif
 
 static int acphy_probe(device_t);
 static int acphy_attach(device_t);
@@ -129,6 +127,9 @@ acphy_probe(dev)
 	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxALTIMA &&
 	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxALTIMA_AC101) {
 		device_set_desc(dev, MII_STR_xxALTIMA_AC101);
+	} else if(MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxALTIMA &&
+	          MII_MODEL(ma->mii_id2) == MII_MODEL_xxALTIMA_AC101L) {
+		device_set_desc(dev, MII_STR_xxALTIMA_AC101L);
 	} else 
 		return (ENXIO);
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)device_pager.c	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/vm/device_pager.c,v 1.59 2002/07/12 02:55:55 alc Exp $
+ * $FreeBSD: src/sys/vm/device_pager.c,v 1.63 2003/03/25 00:07:05 jake Exp $
  */
 
 #include <sys/param.h>
@@ -74,7 +74,7 @@ static struct mtx dev_pager_mtx;
 
 static uma_zone_t fakepg_zone;
 
-static vm_page_t dev_pager_getfake(vm_offset_t);
+static vm_page_t dev_pager_getfake(vm_paddr_t);
 static void dev_pager_putfake(vm_page_t);
 
 struct pagerops devicepagerops = {
@@ -107,6 +107,7 @@ dev_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot, vm_ooffset_t fo
 	d_mmap_t *mapfunc;
 	vm_object_t object;
 	unsigned int npages;
+	vm_paddr_t paddr;
 	vm_offset_t off;
 
 	/*
@@ -137,7 +138,7 @@ dev_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot, vm_ooffset_t fo
 	 */
 	npages = OFF_TO_IDX(size);
 	for (off = foff; npages--; off += PAGE_SIZE)
-		if ((*mapfunc)(dev, off, (int) prot) == -1) {
+		if ((*mapfunc)(dev, off, &paddr, (int)prot) != 0) {
 			mtx_unlock(&Giant);
 			return (NULL);
 		}
@@ -202,10 +203,10 @@ dev_pager_getpages(object, m, count, reqpage)
 	int reqpage;
 {
 	vm_pindex_t offset;
-	vm_offset_t paddr;
+	vm_paddr_t paddr;
 	vm_page_t page;
 	dev_t dev;
-	int i;
+	int i, ret;
 	d_mmap_t *mapfunc;
 	int prot;
 
@@ -218,11 +219,11 @@ dev_pager_getpages(object, m, count, reqpage)
 	if (mapfunc == NULL || mapfunc == (d_mmap_t *)nullop)
 		panic("dev_pager_getpage: no map function");
 
-	paddr = pmap_phys_address((*mapfunc) (dev, (vm_offset_t) offset << PAGE_SHIFT, prot));
-	KASSERT(paddr != -1,("dev_pager_getpage: map function returns error"));
+	ret = (*mapfunc)(dev, (vm_offset_t)offset << PAGE_SHIFT, &paddr, prot);
+	KASSERT(ret == 0, ("dev_pager_getpage: map function returns error"));
 	/*
-	 * Replace the passed in reqpage page with our own fake page and free up the
-	 * all of the original pages.
+	 * Replace the passed in reqpage page with our own fake page and
+	 * free up the all of the original pages.
 	 */
 	page = dev_pager_getfake(paddr);
 	TAILQ_INSERT_TAIL(&object->un_pager.devp.devp_pglist, page, pageq);
@@ -262,7 +263,7 @@ dev_pager_haspage(object, pindex, before, after)
 
 static vm_page_t
 dev_pager_getfake(paddr)
-	vm_offset_t paddr;
+	vm_paddr_t paddr;
 {
 	vm_page_t m;
 

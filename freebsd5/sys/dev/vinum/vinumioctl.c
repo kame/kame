@@ -41,8 +41,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumioctl.c,v 1.14 2000/10/27 03:07:53 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.38.2.1 2003/01/07 22:59:50 grog Exp $
+ * $Id: vinumioctl.c,v 1.23 2003/05/23 01:02:22 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.47 2003/05/23 01:14:13 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -57,6 +57,7 @@ void detachobject(struct vinum_ioctl_msg *);
 void renameobject(struct vinum_rename_msg *);
 void replaceobject(struct vinum_ioctl_msg *);
 void moveobject(struct vinum_ioctl_msg *);
+void setreadpol(struct vinum_ioctl_msg *);
 
 jmp_buf command_fail;					    /* return on a failed command */
 
@@ -69,354 +70,374 @@ vinumioctl(dev_t dev,
     struct thread *td)
 {
     unsigned int objno;
-    int error = 0;
     struct sd *sd;
     struct plex *plex;
     struct volume *vol;
+
+    /* First, decide what we're looking at */
+    if ((minor(dev) == VINUM_SUPERDEV_MINOR)
+	|| (minor(dev) == VINUM_DAEMON_MINOR))
+	return vinum_super_ioctl(dev, cmd, data);
+    else						    /* real device */
+	switch (DEVTYPE(dev)) {
+	case VINUM_SD_TYPE:
+	case VINUM_SD2_TYPE:				    /* second half of sd namespace */
+	    objno = Sdno(dev);
+
+	    sd = &SD[objno];
+
+	    switch (cmd) {
+	    case DIOCGSECTORSIZE:
+		*(u_int *) data = sd->sectorsize;
+		return 0;
+
+	    case DIOCGMEDIASIZE:
+		*(u_int64_t *) data = sd->sectors * sd->sectorsize;
+		return 0;
+
+		/*
+		 * We don't have this stuff on hardware,
+		 * so just pretend to do it so that
+		 * utilities don't get upset.
+		 */
+	    case DIOCWDINFO:				    /* write partition info */
+	    case DIOCSDINFO:				    /* set partition info */
+		return 0;				    /* not a titty */
+
+	    default:
+		return ENOTTY;				    /* not my kind of ioctl */
+	    }
+
+	    return 0;					    /* pretend we did it */
+
+	case VINUM_PLEX_TYPE:
+	    objno = Plexno(dev);
+
+	    plex = &PLEX[objno];
+
+	    switch (cmd) {
+	    case DIOCGSECTORSIZE:
+		*(u_int64_t *) data = plex->sectorsize;
+		return 0;
+
+	    case DIOCGMEDIASIZE:
+		*(u_int64_t *) data = plex->length * plex->sectorsize;
+		return 0;
+
+		/*
+		 * We don't have this stuff on hardware,
+		 * so just pretend to do it so that
+		 * utilities don't get upset.
+		 */
+	    case DIOCWDINFO:				    /* write partition info */
+	    case DIOCSDINFO:				    /* set partition info */
+		return 0;				    /* not a titty */
+
+	    default:
+		return ENOTTY;				    /* not my kind of ioctl */
+	    }
+
+	    return 0;					    /* pretend we did it */
+
+	case VINUM_VOLUME_TYPE:
+	    objno = Volno(dev);
+
+	    if ((unsigned) objno >= (unsigned) vinum_conf.volumes_allocated) /* not a valid volume */
+		return ENXIO;
+	    vol = &VOL[objno];
+	    if (vol->state != volume_up)		    /* not up, */
+		return EIO;				    /* I/O error */
+
+	    switch (cmd) {
+	    case DIOCGSECTORSIZE:
+		*(u_int *) data = vol->sectorsize;
+		return 0;
+
+	    case DIOCGMEDIASIZE:
+		*(u_int64_t *) data = vol->size * vol->sectorsize;
+		return 0;
+
+		/*
+		 * We don't have this stuff on hardware,
+		 * so just pretend to do it so that
+		 * utilities don't get upset.
+		 */
+	    case DIOCWDINFO:				    /* write partition info */
+	    case DIOCSDINFO:				    /* set partition info */
+		return 0;				    /* not a titty */
+
+	    default:
+		return ENOTTY;				    /* not my kind of ioctl */
+	    }
+	    break;
+	}
+    return 0;						    /* XXX */
+}
+
+/* Handle ioctls for the super device */
+int
+vinum_super_ioctl(dev_t dev,
+    u_long cmd,
+    caddr_t data)
+{
+    int error = 0;
     unsigned int index;					    /* for transferring config info */
     unsigned int sdno;					    /* for transferring config info */
     int fe;						    /* free list element number */
     struct _ioctl_reply *ioctl_reply = (struct _ioctl_reply *) data; /* struct to return */
 
-    /* First, decide what we're looking at */
-    switch (DEVTYPE(dev)) {
-    case VINUM_SUPERDEV_TYPE:				    /* ordinary super device */
-	ioctl_reply = (struct _ioctl_reply *) data;	    /* save the address to reply to */
-	switch (cmd) {
+    ioctl_reply = (struct _ioctl_reply *) data;		    /* save the address to reply to */
+    if (error)						    /* bombed out */
+	return 0;					    /* the reply will contain meaningful info */
+    switch (cmd) {
 #ifdef VINUMDEBUG
-	case VINUM_DEBUG:
-	    if (((struct debuginfo *) data)->changeit)	    /* change debug settings */
-		debug = (((struct debuginfo *) data)->param);
-	    else {
-		if (debug & DEBUG_REMOTEGDB)
-		    boothowto |= RB_GDB;		    /* serial debug line */
-		else
-		    boothowto &= ~RB_GDB;		    /* local ddb */
-		Debugger("vinum debug");
-	    }
-	    ioctl_reply = (struct _ioctl_reply *) data;	    /* reinstate the address to reply to */
-	    ioctl_reply->error = 0;
-	    return 0;
-#endif
-
-	case VINUM_CREATE:				    /* create a vinum object */
-	    error = lock_config();			    /* get the config for us alone */
-	    if (error)					    /* can't do it, */
-		return error;				    /* give up */
-	    error = setjmp(command_fail);		    /* come back here on error */
-	    if (error == 0)				    /* first time, */
-		ioctl_reply->error = parse_user_config((char *) data, /* update the config */
-		    &keyword_set);
-	    else if (ioctl_reply->error == 0) {		    /* longjmp, but no error status */
-		ioctl_reply->error = EINVAL;		    /* note that something's up */
-		ioctl_reply->msg[0] = '\0';		    /* no message? */
-	    }
-	    unlock_config();
-	    return 0;					    /* must be 0 to return the real error info */
-
-	case VINUM_GETCONFIG:				    /* get the configuration information */
-	    bcopy(&vinum_conf, data, sizeof(vinum_conf));
-	    return 0;
-
-	    /* start configuring the subsystem */
-	case VINUM_STARTCONFIG:
-	    return start_config(*(int *) data);		    /* just lock it.  Parameter is 'force' */
-
-	    /*
-	     * Move the individual parts of the config to user space.
-	     *
-	     * Specify the index of the object in the first word of data,
-	     * and return the object there
-	     */
-	case VINUM_DRIVECONFIG:
-	    index = *(int *) data;			    /* get the index */
-	    if (index >= (unsigned) vinum_conf.drives_allocated) /* can't do it */
-		return ENXIO;				    /* bang */
-	    bcopy(&DRIVE[index], data, sizeof(struct _drive)); /* copy the config item out */
-	    return 0;
-
-	case VINUM_SDCONFIG:
-	    index = *(int *) data;			    /* get the index */
-	    if (index >= (unsigned) vinum_conf.subdisks_allocated) /* can't do it */
-		return ENXIO;				    /* bang */
-	    bcopy(&SD[index], data, sizeof(struct _sd));    /* copy the config item out */
-	    return 0;
-
-	case VINUM_PLEXCONFIG:
-	    index = *(int *) data;			    /* get the index */
-	    if (index >= (unsigned) vinum_conf.plexes_allocated) /* can't do it */
-		return ENXIO;				    /* bang */
-	    bcopy(&PLEX[index], data, sizeof(struct _plex)); /* copy the config item out */
-	    return 0;
-
-	case VINUM_VOLCONFIG:
-	    index = *(int *) data;			    /* get the index */
-	    if (index >= (unsigned) vinum_conf.volumes_allocated) /* can't do it */
-		return ENXIO;				    /* bang */
-	    bcopy(&VOL[index], data, sizeof(struct _volume)); /* copy the config item out */
-	    return 0;
-
-	case VINUM_PLEXSDCONFIG:
-	    index = *(int *) data;			    /* get the plex index */
-	    sdno = ((int *) data)[1];			    /* and the sd index */
-	    if ((index >= (unsigned) vinum_conf.plexes_allocated) /* plex doesn't exist */
-	    ||(sdno >= PLEX[index].subdisks))		    /* or it doesn't have this many subdisks */
-		return ENXIO;				    /* bang */
-	    bcopy(&SD[PLEX[index].sdnos[sdno]],		    /* copy the config item out */
-		data,
-		sizeof(struct _sd));
-	    return 0;
-
-	    /*
-	     * We get called in two places: one from the
-	     * userland config routines, which call us
-	     * to complete the config and save it.  This
-	     * call supplies the value 0 as a parameter.
-	     *
-	     * The other place is from the user "saveconfig"
-	     * routine, which can only work if we're *not*
-	     * configuring.  In this case, supply parameter 1.
-	     */
-	case VINUM_SAVECONFIG:
-	    if (VFLAGS & VF_CONFIGURING) {		    /* must be us, the others are asleep */
-		if (*(int *) data == 0)			    /* finish config */
-		    finish_config(1);			    /* finish the configuration and update it */
-		else
-		    return EBUSY;			    /* can't do it now */
-	    }
-	    save_config();				    /* save configuration to disk */
-	    return 0;
-
-	case VINUM_RELEASECONFIG:			    /* release the config */
-	    if (VFLAGS & VF_CONFIGURING) {		    /* must be us, the others are asleep */
-		finish_config(0);			    /* finish the configuration, don't change it */
-		save_config();				    /* save configuration to disk */
-	    } else
-		error = EINVAL;				    /* release what config? */
-	    return error;
-
-	case VINUM_INIT:
-	    ioctl_reply = (struct _ioctl_reply *) data;	    /* reinstate the address to reply to */
-	    ioctl_reply->error = 0;
-	    return 0;
-
-	case VINUM_RESETCONFIG:
-	    if (vinum_inactive(0)) {			    /* if the volumes are not active */
-		/*
-		 * Note the open count.  We may be called from v, so we'll be open.
-		 * Keep the count so we don't underflow
-		 */
-		free_vinum(1);				    /* clean up everything */
-		log(LOG_NOTICE, "vinum: CONFIGURATION OBLITERATED\n");
-		ioctl_reply = (struct _ioctl_reply *) data; /* reinstate the address to reply to */
-		ioctl_reply->error = 0;
-		return 0;
-	    }
-	    return EBUSY;
-
-	case VINUM_SETSTATE:
-	    setstate((struct vinum_ioctl_msg *) data);	    /* set an object state */
-	    return 0;
-
-	    /*
-	     * Set state by force, without changing
-	     * anything else.
-	     */
-	case VINUM_SETSTATE_FORCE:
-	    setstate_by_force((struct vinum_ioctl_msg *) data);	/* set an object state */
-	    return 0;
-
-#ifdef VINUMDEBUG
-	case VINUM_MEMINFO:
-	    vinum_meminfo(data);
-	    return 0;
-
-	case VINUM_MALLOCINFO:
-	    return vinum_mallocinfo(data);
-
-	case VINUM_RQINFO:
-	    return vinum_rqinfo(data);
-#endif
-
-	case VINUM_LABEL:				    /* label a volume */
-	    ioctl_reply->error = write_volume_label(*(int *) data); /* index of the volume to label */
-	    ioctl_reply->msg[0] = '\0';			    /* no message */
-	    return 0;
-
-	case VINUM_REMOVE:
-	    remove((struct vinum_ioctl_msg *) data);	    /* remove an object */
-	    return 0;
-
-	case VINUM_GETFREELIST:				    /* get a drive free list element */
-	    index = *(int *) data;			    /* get the drive index */
-	    fe = ((int *) data)[1];			    /* and the free list element */
-	    if ((index >= (unsigned) vinum_conf.drives_allocated) /* plex doesn't exist */
-	    ||(DRIVE[index].state == drive_unallocated))
-		return ENODEV;
-	    if (fe >= DRIVE[index].freelist_entries)	    /* no such entry */
-		return ENOENT;
-	    bcopy(&DRIVE[index].freelist[fe],
-		data,
-		sizeof(struct drive_freelist));
-	    return 0;
-
-	case VINUM_RESETSTATS:
-	    resetstats((struct vinum_ioctl_msg *) data);    /* reset object stats */
-	    return 0;
-
-	    /* attach an object to a superordinate object */
-	case VINUM_ATTACH:
-	    attachobject((struct vinum_ioctl_msg *) data);
-	    return 0;
-
-	    /* detach an object from a superordinate object */
-	case VINUM_DETACH:
-	    detachobject((struct vinum_ioctl_msg *) data);
-	    return 0;
-
-	    /* rename an object */
-	case VINUM_RENAME:
-	    renameobject((struct vinum_rename_msg *) data);
-	    return 0;
-
-	    /* replace an object */
-	case VINUM_REPLACE:
-	    replaceobject((struct vinum_ioctl_msg *) data);
-	    return 0;
-
-	case VINUM_DAEMON:
-	    vinum_daemon();				    /* perform the daemon */
-	    return 0;
-
-	case VINUM_FINDDAEMON:				    /* check for presence of daemon */
-	    return vinum_finddaemon();
-	    return 0;
-
-	case VINUM_SETDAEMON:				    /* set daemon flags */
-	    return vinum_setdaemonopts(*(int *) data);
-
-	case VINUM_GETDAEMON:				    /* get daemon flags */
-	    *(int *) data = daemon_options;
-	    return 0;
-
-	case VINUM_PARITYOP:				    /* check/rebuild RAID-4/5 parity */
-	    parityops((struct vinum_ioctl_msg *) data);
-	    return 0;
-
-	    /* move an object */
-	case VINUM_MOVE:
-	    moveobject((struct vinum_ioctl_msg *) data);
-	    return 0;
-
-	default:
-	    /* FALLTHROUGH */
-	    break;
-	}
-
-    case VINUM_DRIVE_TYPE:
-    default:
-	log(LOG_WARNING,
-	    "vinumioctl: invalid ioctl from process %d (%s): %lx\n",
-	    curthread->td_proc->p_pid,
-	    curthread->td_proc->p_comm,
-	    cmd);
-	return EINVAL;
-
-    case VINUM_SD_TYPE:
-    case VINUM_RAWSD_TYPE:
-	objno = Sdno(dev);
-
-	sd = &SD[objno];
-
-	switch (cmd) {
-      case DIOCGDINFO:				    /* get disk label */
-	    get_volume_label(sd->name, 1, sd->sectors, (struct disklabel *) data);
-	    break;
-
-	    /*
-	     * We don't have this stuff on hardware,
-	     * so just pretend to do it so that
-	     * utilities don't get upset.
-	     */
-	case DIOCWDINFO:				    /* write partition info */
-	case DIOCSDINFO:				    /* set partition info */
-	    return 0;					    /* not a titty */
-
-	default:
-	    return ENOTTY;				    /* not my kind of ioctl */
-	}
-
-	return 0;					    /* pretend we did it */
-
-    case VINUM_RAWPLEX_TYPE:
-    case VINUM_PLEX_TYPE:
-	objno = Plexno(dev);
-
-	plex = &PLEX[objno];
-
-	switch (cmd) {
-	case DIOCGDINFO:				    /* get disk label */
-	    get_volume_label(plex->name, 1, plex->length, (struct disklabel *) data);
-	    break;
-
-	    /*
-	     * We don't have this stuff on hardware,
-	     * so just pretend to do it so that
-	     * utilities don't get upset.
-	     */
-	case DIOCWDINFO:				    /* write partition info */
-	case DIOCSDINFO:				    /* set partition info */
-	    return 0;					    /* not a titty */
-
-	default:
-	    return ENOTTY;				    /* not my kind of ioctl */
-	}
-
-	return 0;					    /* pretend we did it */
-
-    case VINUM_VOLUME_TYPE:
-	objno = Volno(dev);
-
-	if ((unsigned) objno >= (unsigned) vinum_conf.volumes_allocated) /* not a valid volume */
-	    return ENXIO;
-	vol = &VOL[objno];
-	if (vol->state != volume_up)			    /* not up, */
-	    return EIO;					    /* I/O error */
-
-	switch (cmd) {
-
-	case DIOCGMEDIASIZE:
-	    *(off_t *)data = vol->size << DEV_BSHIFT;
-	    break;
-
-	case DIOCGSECTORSIZE:
-	    *(u_int *)data = DEV_BSIZE;
-	    break;
-
-	    /*
-	     * We don't have this stuff on hardware,
-	     * so just pretend to do it so that
-	     * utilities don't get upset.
-	     */
-	case DIOCWDINFO:				    /* write partition info */
-	case DIOCSDINFO:				    /* set partition info */
-	    return 0;					    /* not a titty */
-
-	case DIOCWLABEL:				    /* set or reset label writeable */
-	    if ((flag & FWRITE) == 0)			    /* not writeable? */
-		return EACCES;				    /* no, die */
-	    if (*(int *) data != 0)			    /* set it? */
-		vol->flags |= VF_WLABEL;		    /* yes */
+    case VINUM_DEBUG:
+	if (((struct debuginfo *) data)->changeit)	    /* change debug settings */
+	    debug = (((struct debuginfo *) data)->param);
+	else {
+	    if (debug & DEBUG_REMOTEGDB)
+		boothowto |= RB_GDB;			    /* serial debug line */
 	    else
-		vol->flags &= ~VF_WLABEL;		    /* no, reset */
-	    break;
-
-	default:
-	    return ENOTTY;				    /* not my kind of ioctl */
+		boothowto &= ~RB_GDB;			    /* local ddb */
+	    Debugger("vinum debug");
 	}
+	ioctl_reply = (struct _ioctl_reply *) data;	    /* reinstate the address to reply to */
+	ioctl_reply->error = 0;
+	return 0;
+#endif
+
+    case VINUM_CREATE:					    /* create a vinum object */
+	error = lock_config();				    /* get the config for us alone */
+	if (error)					    /* can't do it, */
+	    return error;				    /* give up */
+	error = setjmp(command_fail);			    /* come back here on error */
+	if (error == 0)					    /* first time, */
+	    ioctl_reply->error = parse_user_config((char *) data, /* update the config */
+		&keyword_set);
+	else if (ioctl_reply->error == 0) {		    /* longjmp, but no error status */
+	    ioctl_reply->error = EINVAL;		    /* note that something's up */
+	    ioctl_reply->msg[0] = '\0';			    /* no message? */
+	}
+	unlock_config();
+	return 0;					    /* must be 0 to return the real error info */
+
+    case VINUM_GETCONFIG:				    /* get the configuration information */
+	bcopy(&vinum_conf, data, sizeof(vinum_conf));
+	return 0;
+
+	/* start configuring the subsystem */
+    case VINUM_STARTCONFIG:
+	return start_config(*(int *) data);		    /* just lock it.  Parameter is 'force' */
+
+	/*
+	 * Move the individual parts of the config to user space.
+	 *
+	 * Specify the index of the object in the first word of data,
+	 * and return the object there
+	 */
+    case VINUM_DRIVECONFIG:
+	index = *(int *) data;				    /* get the index */
+	if (index >= (unsigned) vinum_conf.drives_allocated) /* can't do it */
+	    return ENXIO;				    /* bang */
+	bcopy(&DRIVE[index], data, sizeof(struct _drive));  /* copy the config item out */
+	return 0;
+
+    case VINUM_SDCONFIG:
+	index = *(int *) data;				    /* get the index */
+	if (index >= (unsigned) vinum_conf.subdisks_allocated) /* can't do it */
+	    return ENXIO;				    /* bang */
+	bcopy(&SD[index], data, sizeof(struct _sd));	    /* copy the config item out */
+	return 0;
+
+    case VINUM_PLEXCONFIG:
+	index = *(int *) data;				    /* get the index */
+	if (index >= (unsigned) vinum_conf.plexes_allocated) /* can't do it */
+	    return ENXIO;				    /* bang */
+	bcopy(&PLEX[index], data, sizeof(struct _plex));    /* copy the config item out */
+	return 0;
+
+    case VINUM_VOLCONFIG:
+	index = *(int *) data;				    /* get the index */
+	if (index >= (unsigned) vinum_conf.volumes_allocated) /* can't do it */
+	    return ENXIO;				    /* bang */
+	bcopy(&VOL[index], data, sizeof(struct _volume));   /* copy the config item out */
+	return 0;
+
+    case VINUM_PLEXSDCONFIG:
+	index = *(int *) data;				    /* get the plex index */
+	sdno = ((int *) data)[1];			    /* and the sd index */
+	if ((index >= (unsigned) vinum_conf.plexes_allocated) /* plex doesn't exist */
+	||(sdno >= PLEX[index].subdisks))		    /* or it doesn't have this many subdisks */
+	    return ENXIO;				    /* bang */
+	bcopy(&SD[PLEX[index].sdnos[sdno]],		    /* copy the config item out */
+	    data,
+	    sizeof(struct _sd));
+	return 0;
+
+	/*
+	 * We get called in two places: one from the
+	 * userland config routines, which call us
+	 * to complete the config and save it.  This
+	 * call supplies the value 0 as a parameter.
+	 *
+	 * The other place is from the user "saveconfig"
+	 * routine, which can only work if we're *not*
+	 * configuring.  In this case, supply parameter 1.
+	 */
+    case VINUM_SAVECONFIG:
+	if (VFLAGS & VF_CONFIGURING) {			    /* must be us, the others are asleep */
+	    if (*(int *) data == 0)			    /* finish config */
+		finish_config(1);			    /* finish the configuration and update it */
+	    else
+		return EBUSY;				    /* can't do it now */
+	}
+	save_config();					    /* save configuration to disk */
+	return 0;
+
+    case VINUM_RELEASECONFIG:				    /* release the config */
+	if (VFLAGS & VF_CONFIGURING) {			    /* must be us, the others are asleep */
+	    finish_config(0);				    /* finish the configuration, don't change it */
+	    save_config();				    /* save configuration to disk */
+	} else
+	    error = EINVAL;				    /* release what config? */
+	return error;
+
+    case VINUM_READCONFIG:
+	if (((char *) data)[0] == '\0')
+	    ioctl_reply->error = vinum_scandisk(NULL);	    /* built your own list */
+	else
+	    ioctl_reply->error = vinum_scandisk((char *) data);
+	if (ioctl_reply->error == ENOENT) {
+	    if (vinum_conf.drives_used > 0)
+		strcpy(ioctl_reply->msg, "no additional drives found");
+	    else
+		strcpy(ioctl_reply->msg, "no drives found");
+	} else if (ioctl_reply->error)
+	    strcpy(ioctl_reply->msg, "can't read configuration information, see log file");
+	return 0;					    /* must be 0 to return the real error info */
+
+    case VINUM_INIT:
+	ioctl_reply = (struct _ioctl_reply *) data;	    /* reinstate the address to reply to */
+	ioctl_reply->error = 0;
+	return 0;
+
+    case VINUM_RESETCONFIG:
+	if (vinum_inactive(0)) {			    /* if the volumes are not active */
+	    /*
+	     * Note the open count.  We may be called from v, so we'll be open.
+	     * Keep the count so we don't underflow
+	     */
+	    free_vinum(1);				    /* clean up everything */
+	    log(LOG_NOTICE, "vinum: CONFIGURATION OBLITERATED\n");
+	    ioctl_reply = (struct _ioctl_reply *) data;	    /* reinstate the address to reply to */
+	    ioctl_reply->error = 0;
+	    return 0;
+	}
+	return EBUSY;
+
+    case VINUM_SETSTATE:
+	setstate((struct vinum_ioctl_msg *) data);	    /* set an object state */
+	return 0;
+
+	/*
+	 * Set state by force, without changing
+	 * anything else.
+	 */
+    case VINUM_SETSTATE_FORCE:
+	setstate_by_force((struct vinum_ioctl_msg *) data); /* set an object state */
+	return 0;
+
+#ifdef VINUMDEBUG
+    case VINUM_MEMINFO:
+	vinum_meminfo(data);
+	return 0;
+
+    case VINUM_MALLOCINFO:
+	return vinum_mallocinfo(data);
+
+    case VINUM_RQINFO:
+	return vinum_rqinfo(data);
+#endif
+
+    case VINUM_LABEL:					    /* label a volume */
+	ioctl_reply->error = write_volume_label(*(int *) data);	/* index of the volume to label */
+	ioctl_reply->msg[0] = '\0';			    /* no message */
+	return 0;
+
+    case VINUM_REMOVE:
+	remove((struct vinum_ioctl_msg *) data);	    /* remove an object */
+	return 0;
+
+    case VINUM_GETFREELIST:				    /* get a drive free list element */
+	index = *(int *) data;				    /* get the drive index */
+	fe = ((int *) data)[1];				    /* and the free list element */
+	if ((index >= (unsigned) vinum_conf.drives_allocated) /* plex doesn't exist */
+	||(DRIVE[index].state == drive_unallocated))
+	    return ENODEV;
+	if (fe >= DRIVE[index].freelist_entries)	    /* no such entry */
+	    return ENOENT;
+	bcopy(&DRIVE[index].freelist[fe],
+	    data,
+	    sizeof(struct drive_freelist));
+	return 0;
+
+    case VINUM_RESETSTATS:
+	resetstats((struct vinum_ioctl_msg *) data);	    /* reset object stats */
+	return 0;
+
+	/* attach an object to a superordinate object */
+    case VINUM_ATTACH:
+	attachobject((struct vinum_ioctl_msg *) data);
+	return 0;
+
+	/* detach an object from a superordinate object */
+    case VINUM_DETACH:
+	detachobject((struct vinum_ioctl_msg *) data);
+	return 0;
+
+	/* rename an object */
+    case VINUM_RENAME:
+	renameobject((struct vinum_rename_msg *) data);
+	return 0;
+
+	/* replace an object */
+    case VINUM_REPLACE:
+	replaceobject((struct vinum_ioctl_msg *) data);
+	return 0;
+
+    case VINUM_DAEMON:
+	vinum_daemon();					    /* perform the daemon */
+	return 0;
+
+    case VINUM_FINDDAEMON:				    /* check for presence of daemon */
+	return vinum_finddaemon();
+	return 0;
+
+    case VINUM_SETDAEMON:				    /* set daemon flags */
+	return vinum_setdaemonopts(*(int *) data);
+
+    case VINUM_GETDAEMON:				    /* get daemon flags */
+	*(int *) data = daemon_options;
+	return 0;
+
+    case VINUM_PARITYOP:				    /* check/rebuild RAID-4/5 parity */
+	parityops((struct vinum_ioctl_msg *) data);
+	return 0;
+
+	/* move an object */
+    case VINUM_MOVE:
+	moveobject((struct vinum_ioctl_msg *) data);
+	return 0;
+
+    case VINUM_READPOL:
+	setreadpol((struct vinum_ioctl_msg *) data);
+	return 0;
+
+    default:
+	/* FALLTHROUGH */
 	break;
     }
-    return 0;						    /* XXX */
+    return 0;						    /* to keep the compiler happy */
 }
 
 /*
@@ -583,23 +604,24 @@ attachobject(struct vinum_ioctl_msg *msg)
 	    &&(!msg->force)) {				    /* without using force */
 		reply->error = EINVAL;			    /* no message, the user should check */
 		strcpy(reply->msg, "Can't attach to this plex organization");
-		return;
-	    }
-	    if (sd->plexno >= 0) {			    /* already belong to a plex */
+	    } else if (sd->plexno >= 0) {		    /* already belong to a plex */
 		reply->error = EBUSY;			    /* no message, the user should check */
+		sprintf(reply->msg, "%s is already attached to %s",
+		    sd->name,
+		    sd[sd->plexno].name);
 		reply->msg[0] = '\0';
-		return;
+	    } else {
+		sd->plexoffset = msg->offset;		    /* this is where we want it */
+		set_sd_state(sd->sdno, sd_stale, setstate_force); /* make sure it's stale */
+		give_sd_to_plex(plex->plexno, sd->sdno);    /* and give it to the plex */
+		update_sd_config(sd->sdno, 0);
+		save_config();
+		if (sd->state == sd_reviving)
+		    reply->error = EAGAIN;		    /* need to revive it */
+		else
+		    reply->error = 0;
 	    }
-	    sd->plexoffset = msg->offset;		    /* this is where we want it */
-	    set_sd_state(sd->sdno, sd_stale, setstate_force); /* make sure it's stale */
-	    give_sd_to_plex(plex->plexno, sd->sdno);	    /* and give it to the plex */
-	    update_sd_config(sd->sdno, 0);
-	    save_config();
 	}
-	if (sd->state == sd_reviving)
-	    reply->error = EAGAIN;			    /* need to revive it */
-	else
-	    reply->error = 0;
 	break;
 
     case plex_object:
@@ -608,23 +630,27 @@ attachobject(struct vinum_ioctl_msg *msg)
 	    return;
 	vol = validvol(msg->otherobject, reply);	    /* and volume information */
 	if (vol) {
-	    if ((vol->plexes == MAXPLEX)		    /* we have too many already */
-	    ||(plex->volno >= 0)) {			    /* or the plex has an owner */
-		reply->error = EINVAL;			    /* no message, the user should check */
-		reply->msg[0] = '\0';
-		return;
-	    }
-	    for (sdno = 0; sdno < plex->subdisks; sdno++) {
-		sd = &SD[plex->sdnos[sdno]];
+	    if (vol->plexes == MAXPLEX) {		    /* we have too many already */
+		reply->error = ENOSPC;			    /* nowhere to put it */
+		strcpy(reply->msg, "Too many plexes");
+	    } else if (plex->volno >= 0) {		    /* the plex has an owner */
+		reply->error = EBUSY;			    /* no message, the user should check */
+		sprintf(reply->msg, "%s is already attached to %s",
+		    plex->name,
+		    VOL[plex->volno].name);
+	    } else {
+		for (sdno = 0; sdno < plex->subdisks; sdno++) {
+		    sd = &SD[plex->sdnos[sdno]];
 
-		if (sd->state > sd_down)		    /* real subdisk, vaguely accessible */
-		    set_sd_state(plex->sdnos[sdno], sd_stale, setstate_force); /* make it stale */
+		    if (sd->state > sd_down)		    /* real subdisk, vaguely accessible */
+			set_sd_state(plex->sdnos[sdno], sd_stale, setstate_force); /* make it stale */
+		}
+		set_plex_state(plex->plexno, plex_up, setstate_none); /* update plex state */
+		give_plex_to_volume(msg->otherobject, msg->index, 0); /* and give it to the volume */
+		update_plex_config(plex->plexno, 0);
+		save_config();
+		reply->error = 0;			    /* all went well */
 	    }
-	    set_plex_state(plex->plexno, plex_up, setstate_none); /* update plex state */
-	    give_plex_to_volume(msg->otherobject, msg->index); /* and give it to the volume */
-	    update_plex_config(plex->plexno, 0);
-	    save_config();
-	    reply->error = 0;				    /* all went well */
 	}
     }
 }
@@ -695,6 +721,8 @@ detachobject(struct vinum_ioctl_msg *msg)
 		set_plex_state(plex->plexno,
 		    plex_down,
 		    setstate_force | setstate_configuring);
+	    if (plex->volno >= 0)			    /* plex attached to volume, */
+		update_volume_config(plex->volno);
 	    save_config();
 	    reply->error = 0;
 	}
@@ -757,7 +785,7 @@ detachobject(struct vinum_ioctl_msg *msg)
 		bcopy("ex-", plex->name, 3);
 		plex->name[MAXPLEXNAME - 1] = '\0';
 	    }
-	    update_volume_config(volno, 0);
+	    update_volume_config(volno);
 	    save_config();
 	    reply->error = 0;
 	} else {
@@ -830,7 +858,7 @@ renameobject(struct vinum_rename_msg *msg)
 	vol = validvol(msg->index, reply);
 	if (vol) {
 	    bcopy(msg->newname, vol->name, MAXVOLNAME);
-	    update_volume_config(msg->index, 0);
+	    update_volume_config(msg->index);
 	    save_config();
 	    reply->error = 0;
 	}
@@ -893,6 +921,40 @@ moveobject(struct vinum_ioctl_msg *msg)
     sd->driveno = msg->index;
     sd->driveoffset = -1;				    /* let the drive decide where to put us */
     give_sd_to_drive(sd->sdno);
+    reply->error = 0;
+}
+
+void
+setreadpol(struct vinum_ioctl_msg *msg)
+{
+    struct _ioctl_reply *reply = (struct _ioctl_reply *) msg;
+    struct volume *vol;
+    struct plex *plex;
+    int myplexno = -1;
+
+    /* Check that our objects are valid (i.e. they exist) */
+    vol = validvol(msg->index, reply);
+    if (vol == NULL)
+	return;
+
+    /* If a plex was specified, check that is is valid */
+    if (msg->otherobject >= 0) {
+	plex = validplex(msg->otherobject, reply);
+	if (vol == NULL)
+	    return;
+
+	/* Is it attached to this volume? */
+	myplexno = my_plex(msg->index, msg->otherobject);
+	if (myplexno < 0) {
+	    strcpy(reply->msg, "Plex is not attached to volume");
+	    reply->error = ENOENT;
+	    return;
+	}
+    }
+    lock_config();
+    vol->preferred_plex = myplexno;
+    save_config();
+    unlock_config();
     reply->error = 0;
 }
 

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.70 2002/10/29 16:46:13 fenner Exp $
+ * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.74 2003/04/08 14:25:45 des Exp $
  */
 
 #include "opt_inet.h"
@@ -180,7 +180,7 @@ divert_packet(struct mbuf *m, int incoming, int port, int rule)
 		struct ifaddr *ifa;
 
 		/* Sanity check */
-		KASSERT((m->m_flags & M_PKTHDR), ("%s: !PKTHDR", __func__));
+		M_ASSERTPKTHDR(m);
 
 		/* Find IP address for receive interface */
 		TAILQ_FOREACH(ifa, &m->m_pkthdr.rcvif->if_addrhead, ifa_link) {
@@ -284,7 +284,7 @@ div_output(struct socket *so, struct mbuf *m,
 		 * The name is user supplied data so don't trust its size
 		 * or that it is zero terminated.
 		 */
-		for (i = 0; sin->sin_zero[i] && i < sizeof(sin->sin_zero); i++)
+		for (i = 0; i < sizeof(sin->sin_zero) && sin->sin_zero[i]; i++)
 			;
 		if ( i > 0 && i < sizeof(sin->sin_zero))
 			m->m_pkthdr.rcvif = ifunit(sin->sin_zero);

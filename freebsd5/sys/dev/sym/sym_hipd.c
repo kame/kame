@@ -55,7 +55,7 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/sym/sym_hipd.c,v 1.36 2002/10/16 08:48:38 phk Exp $ */
+/* $FreeBSD: src/sys/dev/sym/sym_hipd.c,v 1.40 2003/04/10 23:50:06 mux Exp $ */
 
 #define SYM_DRIVER_NAME	"sym-1.6.5-20000902"
 
@@ -396,13 +396,6 @@ static __inline struct sym_quehead *sym_remque_tail(struct sym_quehead *head)
  *  For this one, we want a short name :-)
  */
 #define MAX_QUEUE	SYM_CONF_MAX_QUEUE
-
-/*
- *  These ones should have been already defined.
- */
-#ifndef MIN
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#endif
 
 /*
  *  Active debugging tags and verbosity.
@@ -4028,7 +4021,7 @@ static void sym_log_hard_error(hcb_p np, u_short sist, u_char dstat)
  *  the following situations:
  *
  *  - SCSI parity error + Phase mismatch  (PAR|MA)
- *    When an parity error is detected in input phase 
+ *    When a parity error is detected in input phase 
  *    and the device switches to msg-in phase inside a 
  *    block MOV.
  *  - SCSI parity error + Unexpected disconnect (PAR|UDC)
@@ -5387,9 +5380,9 @@ static void sym_sir_task_recovery(hcb_p np, int num)
 
 		/*
 		 *  If we want to abort an untagged command, we 
-		 *  will send a IDENTIFY + M_ABORT.
+		 *  will send an IDENTIFY + M_ABORT.
 		 *  Otherwise (tagged command), we will send 
-		 *  a IDENTITFY + task attributes + ABORT TAG.
+		 *  an IDENTIFY + task attributes + ABORT TAG.
 		 */
 		if (cp->tag == NO_TAG) {
 			np->abrt_msg[1] = M_ABORT;
@@ -6118,7 +6111,7 @@ static void sym_wide_nego(hcb_p np, tcb_p tp, ccb_p cp)
 	};
 
 	/*
-	 * Is it an request from the device?
+	 * Is it a request from the device?
 	 */
 	if (INB (HS_PRT) == HS_NEGOTIATE) {
 		OUTB (HS_PRT, HS_BUSY);
@@ -7503,7 +7496,7 @@ static void sym_complete_error (hcb_p np, ccb_p cp)
 	 */
 	if (cp->dmamapped) {
 		bus_dmamap_sync(np->data_dmat, cp->dmamap,
-			(bus_dmasync_op_t)(cp->dmamapped == SYM_DMA_READ ? 
+			(cp->dmamapped == SYM_DMA_READ ? 
 				BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE));
 	}
 #endif
@@ -7575,7 +7568,7 @@ static void sym_complete_ok (hcb_p np, ccb_p cp)
 	 */
 	if (cp->dmamapped) {
 		bus_dmamap_sync(np->data_dmat, cp->dmamap,
-			(bus_dmasync_op_t)(cp->dmamapped == SYM_DMA_READ ? 
+			(cp->dmamapped == SYM_DMA_READ ? 
 				BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE));
 	}
 #endif
@@ -8052,7 +8045,7 @@ sym_execute_ccb(void *arg, bus_dma_segment_t *psegs, int nsegs, int error)
 	 */
 	if (cp->dmamapped) {
 		bus_dmamap_sync(np->data_dmat, cp->dmamap,
-			(bus_dmasync_op_t)(cp->dmamapped == SYM_DMA_READ ? 
+			(cp->dmamapped == SYM_DMA_READ ? 
 				BUS_DMASYNC_PREREAD : BUS_DMASYNC_PREWRITE));
 	}
 

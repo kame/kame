@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp.c,v 1.100 2002/10/11 17:28:00 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp.c,v 1.103 2003/02/16 01:32:52 mjacob Exp $ */
 /*
  * Machine and OS Independent (well, as best as possible)
  * code for the Qlogic ISP SCSI adapters.
@@ -790,14 +790,10 @@ again:
 	 * It turns out that even for QLogic 2100s with ROM 1.10 and above
 	 * we do get a firmware attributes word returned in mailbox register 6.
 	 *
-	 * Because the lun is in a a different position in the Request Queue
+	 * Because the lun is in a different position in the Request Queue
 	 * Entry structure for Fibre Channel with expanded lun firmware, we
 	 * can only support one lun (lun zero) when we don't know what kind
 	 * of firmware we're running.
-	 *
-	 * Note that we only do this once (the first time thru isp_reset)
-	 * because we may be called again after firmware has been loaded once
-	 * and released.
 	 */
 	if (IS_SCSI(isp)) {
 		if (dodnld) {
@@ -1628,7 +1624,7 @@ isp_fclink_test(struct ispsoftc *isp, int usdelay)
 	 * Check to see if we're on a fabric by trying to see if we
 	 * can talk to the fabric name server. This can be a bit
 	 * tricky because if we're a 2100, we should check always
-	 * (in case we're connected to an server doing aliasing).
+	 * (in case we're connected to a server doing aliasing).
 	 */
 	fcp->isp_onfabric = 0;
 
@@ -3153,7 +3149,7 @@ isp_start(XS_T *xs)
 		isp_update(isp);
 	}
 
-	if (isp_getrqentry(isp, &nxti, &optr, (void **)&qep)) {
+	if (isp_getrqentry(isp, &nxti, &optr, (void *)&qep)) {
 		isp_prt(isp, ISP_LOGDEBUG0, "Request Queue Overflow");
 		XS_SETERR(xs, HBA_BOTCH);
 		return (CMD_EAGAIN);
@@ -3182,7 +3178,7 @@ isp_start(XS_T *xs)
 			isp_put_request(isp, reqp, qep);
 			ISP_ADD_REQUEST(isp, nxti);
 			isp->isp_sendmarker &= ~(1 << i);
-			if (isp_getrqentry(isp, &nxti, &optr, (void **) &qep)) {
+			if (isp_getrqentry(isp, &nxti, &optr, (void *) &qep)) {
 				isp_prt(isp, ISP_LOGDEBUG0,
 				    "Request Queue Overflow+");
 				XS_SETERR(xs, HBA_BOTCH);
@@ -4212,9 +4208,13 @@ isp_parse_async(struct ispsoftc *isp, u_int16_t mbox)
 			break;
 		case ISP_CONN_FATAL:
 			isp_prt(isp, ISP_LOGERR, "FATAL CONNECTION ERROR");
+#ifdef	ISP_FW_CRASH_DUMP
+			isp_async(isp, ISPASYNC_FW_CRASH, NULL);
+#else
 			isp_async(isp, ISPASYNC_FW_CRASH, NULL);
 			isp_reinit(isp);
 			isp_async(isp, ISPASYNC_FW_RESTARTED, NULL);
+#endif
 			return (-1);
 		case ISP_CONN_LOOPBACK:
 			isp_prt(isp, ISP_LOGWARN,
@@ -5197,7 +5197,7 @@ static char *fc_mbcmd_names[] = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
+	"DRIVER HEARTBEAT",
 	NULL,
 	"GET/SET DATA RATE",
 	NULL,

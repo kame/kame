@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbni/if_sbni_isa.c,v 1.8 2002/09/28 20:59:59 phk Exp $
+ * $FreeBSD: src/sys/dev/sbni/if_sbni_isa.c,v 1.9 2003/04/15 06:37:26 mdodd Exp $
  */
 
 
@@ -69,8 +69,8 @@ static struct isa_pnp_id  sbni_ids[] = {
 	{ 0, NULL }	/* we have no pnp sbni cards atm.  */
 };
 
-DRIVER_MODULE(if_sbni, isa, sbni_isa_driver, sbni_isa_devclass, 0, 0);
-
+DRIVER_MODULE(sbni, isa, sbni_isa_driver, sbni_isa_devclass, 0, 0);
+MODULE_DEPEND(sbni, isa, 1, 1, 1);
 
 static int
 sbni_probe_isa(device_t dev)

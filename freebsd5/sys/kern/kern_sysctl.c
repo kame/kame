@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.135 2002/10/27 07:12:34 rwatson Exp $
+ * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.143 2003/05/29 21:19:18 mux Exp $
  */
 
 #include "opt_compat.h"
@@ -68,7 +68,7 @@ static struct sx sysctllock;
 
 #define	SYSCTL_LOCK()		sx_xlock(&sysctllock)
 #define	SYSCTL_UNLOCK()		sx_xunlock(&sysctllock)
-#define	SYSCTL_INIT()		sx_init(&sysctllock, "sysctl sysctllock")
+#define	SYSCTL_INIT()		sx_init(&sysctllock, "sysctl lock")
 
 static int sysctl_root(SYSCTL_HANDLER_ARGS);
 
@@ -153,7 +153,30 @@ sysctl_register_oid(struct sysctl_oid *oidp)
 void
 sysctl_unregister_oid(struct sysctl_oid *oidp)
 {
-	SLIST_REMOVE(oidp->oid_parent, oidp, sysctl_oid, oid_link);
+	struct sysctl_oid *p;
+	int error;
+
+	error = ENOENT;
+	if (oidp->oid_number == OID_AUTO) {
+		error = EINVAL;
+	} else {
+		SLIST_FOREACH(p, oidp->oid_parent, oid_link) {
+			if (p == oidp) {
+				SLIST_REMOVE(oidp->oid_parent, oidp,
+				    sysctl_oid, oid_link);
+				error = 0;
+				break;
+			}
+		}
+	}
+
+	/* 
+	 * This can happen when a module fails to register and is
+	 * being unloaded afterwards.  It should not be a panic()
+	 * for normal use.
+	 */
+	if (error)
+		printf("%s: failed to unregister sysctl\n", __func__);
 }
 
 /* Initialize a new context to keep track of dynamically added sysctls. */
@@ -557,7 +580,7 @@ sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen,
 			if (!sysctl_sysctl_next_ls(lsp, 0, 0, next+1, 
 				len, level+1, oidpp))
 				return 0;
-			goto next;
+			goto emptynode;
 		}
 
 		if (oidp->oid_number < *name)
@@ -586,6 +609,7 @@ sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen,
 			return (0);
 	next:
 		namelen = 1;
+	emptynode:
 		*len = level;
 	}
 	return 1;
@@ -999,7 +1023,8 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 	size_t i = 0;
 
 	if (req->lock == 1 && req->oldptr)
-		WITNESS_SLEEP(1, NULL);
+		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
+		    "sysctl_old_user()");
 	if (req->oldptr) {
 		i = l;
 		if (req->oldlen <= req->oldidx)
@@ -1098,7 +1123,7 @@ static int
 sysctl_root(SYSCTL_HANDLER_ARGS)
 {
 	struct sysctl_oid *oid;
-	int error, indx;
+	int error, indx, lvl;
 
 	error = sysctl_find_oid(arg1, arg2, &oid, &indx, req);
 	if (error)
@@ -1122,7 +1147,8 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 
 	/* Is this sysctl sensitive to securelevels? */
 	if (req->newptr && (oid->oid_kind & CTLFLAG_SECURE)) {
-		error = securelevel_gt(req->td->td_ucred, 0);
+		lvl = (oid->oid_kind & CTLMASK_SECURE) >> CTLSHIFT_SECURE;
+		error = securelevel_gt(req->td->td_ucred, lvl);
 		if (error)
 			return (error);
 	}
@@ -1390,7 +1416,7 @@ ogetkerninfo(struct thread *td, struct getkerninfo_args *uap)
 
 	case KINFO_METER:
 		name[0] = CTL_VM;
-		name[1] = VM_METER;
+		name[1] = VM_TOTAL;
 		error = userland_sysctl(td, name, 2, uap->where, uap->size,
 			0, 0, 0, &size);
 		break;

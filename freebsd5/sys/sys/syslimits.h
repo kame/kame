@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)syslimits.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/syslimits.h,v 1.14 2002/11/29 23:49:27 mike Exp $
+ * $FreeBSD: src/sys/sys/syslimits.h,v 1.15 2003/01/06 04:33:47 obrien Exp $
  */
 
 #ifndef _SYS_SYSLIMITS_H_
@@ -52,6 +52,7 @@
 #define	CHILD_MAX		   40	/* max simultaneous processes */
 #endif
 #define	LINK_MAX		32767	/* max file link count */
+#define	LOGIN_NAME_MAX	   17   /* max login name length (incl. NUL) */
 #define	MAX_CANON		  255	/* max bytes in term canon input line */
 #define	MAX_INPUT		  255	/* max bytes in terminal input */
 #define	NAME_MAX		  255	/* max bytes in a file name */
@@ -68,7 +69,6 @@
  * assume conservative values or call sysconf() to get the current value.
  *
  * HOST_NAME_MAX
- * LOGIN_NAME_MAX
  *
  * (We should do this for most of the values currently defined here,
  * but many programs are not prepared to deal with this yet.)

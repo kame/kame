@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	From Id: lpt.c,v 1.55.2.1 1996/11/12 09:08:38 phk Exp
- * $FreeBSD: src/sys/dev/ppbus/if_plip.c,v 1.24 2002/11/14 23:54:53 sam Exp $
+ * $FreeBSD: src/sys/dev/ppbus/if_plip.c,v 1.28 2003/03/04 23:19:54 jlemon Exp $
  */
 
 /*
@@ -35,7 +35,7 @@
  * This driver sends two bytes (0x08, 0x00) in front of each packet,
  * to allow us to distinguish another format later.
  *
- * Now added an Linux/Crynwr compatibility mode which is enabled using
+ * Now added a Linux/Crynwr compatibility mode which is enabled using
  * IF_LINK0 - Tim Wilkinson.
  *
  * TODO:
@@ -520,11 +520,7 @@ lp_intr (void *arg)
 	    if (top) {
 		if (sc->sc_if.if_bpf)
 		    lptap(&sc->sc_if, top);
-                if (! IF_HANDOFF(&ipintrq, top, NULL)) {
-	            lprintf("DROP");
-                } else {
-	            schednetisr(NETISR_IP);
-	        }
+		netisr_queue(NETISR_IP, top);
 	    }
 	    goto done;
 	}
@@ -569,11 +565,7 @@ lp_intr (void *arg)
 	    if (top) {
 		if (sc->sc_if.if_bpf)
 		    lptap(&sc->sc_if, top);
-                if (! IF_HANDOFF(&ipintrq, top, NULL))  {
-		    lprintf("DROP");
-                } else {
-		    schednetisr(NETISR_IP);
-	        }
+		netisr_queue(NETISR_IP, top);
 	    }
 	}
 	goto done;

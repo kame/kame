@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_if.c,v 1.16 2002/11/08 18:27:29 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_if.c,v 1.21 2003/02/19 05:47:30 imp Exp $
  *
  */
 
@@ -37,6 +37,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/malloc.h>
 #include <sys/sockio.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -61,7 +62,7 @@
 #include <netatm/atm_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_if.c,v 1.16 2002/11/08 18:27:29 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_if.c,v 1.21 2003/02/19 05:47:30 imp Exp $");
 #endif
 
 
@@ -869,13 +870,17 @@ atm_nif_detach(nip)
 	for (i = 1; i <= AF_MAX; i++) {
 		if ((rnh = rt_tables[i]) == NULL)
 			continue;
+		RADIX_NODE_HEAD_LOCK(rnh);
 		(void) rnh->rnh_walktree(rnh, atm_netif_rtdel, ifp);
+		RADIX_NODE_HEAD_UNLOCK(rnh);
 	}
 
 	/*
 	 * Remove from system interface list (ie. if_detach())
 	 */
+	IFNET_WLOCK();
 	TAILQ_REMOVE(&ifnet, ifp, if_link);
+	IFNET_WUNLOCK();
 
 	/*
 	 * Remove from physical interface list

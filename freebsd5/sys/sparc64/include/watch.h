@@ -21,15 +21,15 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/watch.h,v 1.1 2001/08/20 23:50:08 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/watch.h,v 1.2 2003/04/08 06:35:08 jake Exp $
  */
 
 #ifndef	_MACHINE_WATCH_H_
 #define	_MACHINE_WATCH_H_
 
-int	watch_phys_set_mask(vm_offset_t pa, u_long mask);
-int	watch_phys_set(vm_offset_t pa, int sz);
-vm_offset_t	watch_phys_get(int *bm);
+int	watch_phys_set_mask(vm_paddr_t pa, u_long mask);
+int	watch_phys_set(vm_paddr_t pa, int sz);
+vm_paddr_t	watch_phys_get(int *bm);
 void	watch_phys_clear(void);
 int	watch_phys_active(void);
 int	watch_virt_set_mask(vm_offset_t va, u_long mask);

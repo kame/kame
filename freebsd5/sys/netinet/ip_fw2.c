@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.19.2.1 2002/12/15 13:57:43 maxim Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.28.2.1 2003/06/04 02:19:36 ticso Exp $
  */
 
 #define        DEB(x)
@@ -112,18 +112,18 @@ static int autoinc_step = 100; /* bounded to 1..1000 in add_rule() */
 #ifdef SYSCTL_NODE
 SYSCTL_NODE(_net_inet_ip, OID_AUTO, fw, CTLFLAG_RW, 0, "Firewall");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, enable,
-    CTLFLAG_RW | CTLFLAG_SECURE,
+    CTLFLAG_RW | CTLFLAG_SECURE3,
     &fw_enable, 0, "Enable ipfw");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, autoinc_step, CTLFLAG_RW,
     &autoinc_step, 0, "Rule number autincrement step");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, one_pass,
-    CTLFLAG_RW | CTLFLAG_SECURE,
+    CTLFLAG_RW | CTLFLAG_SECURE3,
     &fw_one_pass, 0,
     "Only do a single pass through ipfw when using dummynet(4)");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, debug, CTLFLAG_RW,
     &fw_debug, 0, "Enable printing of debug ip_fw statements");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose,
-    CTLFLAG_RW | CTLFLAG_SECURE,
+    CTLFLAG_RW | CTLFLAG_SECURE3,
     &fw_verbose, 0, "Log matches to ipfw rules");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose_limit, CTLFLAG_RW,
     &verbose_limit, 0, "Set upper limit of matches of ipfw rules logged");
@@ -402,6 +402,48 @@ iface_match(struct ifnet *ifp, ipfw_insn_if *cmd)
 	return(0);	/* no match, fail ... */
 }
 
+/*
+ * The 'verrevpath' option checks that the interface that an IP packet
+ * arrives on is the same interface that traffic destined for the 
+ * packet's source address would be routed out of. This is a measure
+ * to block forged packets. This is also commonly known as "anti-spoofing"
+ * or Unicast Reverse Path Forwarding (Unicast RFP) in Cisco-ese. The
+ * name of the knob is purposely reminisent of the Cisco IOS command,
+ *
+ *   ip verify unicast reverse-path
+ *
+ * which implements the same functionality. But note that syntax is
+ * misleading. The check may be performed on all IP packets whether unicast,
+ * multicast, or broadcast.
+ */
+static int
+verify_rev_path(struct in_addr src, struct ifnet *ifp)
+{
+	static struct route ro;
+	struct sockaddr_in *dst;
+
+	dst = (struct sockaddr_in *)&(ro.ro_dst);
+
+	/* Check if we've cached the route from the previous call. */
+	if (src.s_addr != dst->sin_addr.s_addr) {
+		ro.ro_rt = NULL;
+
+		bzero(dst, sizeof(*dst));
+		dst->sin_family = AF_INET;
+		dst->sin_len = sizeof(*dst);
+		dst->sin_addr = src;
+
+		rtalloc_ign(&ro, RTF_CLONING|RTF_PRCLONING);
+	}
+
+	if ((ro.ro_rt == NULL) || (ifp == NULL) ||
+	    (ro.ro_rt->rt_ifp->if_index != ifp->if_index))
+		return 0;
+	
+    	return 1;
+}
+
+
 static u_int64_t norule_counter;	/* counter for ipfw_log(NULL...) */
 
 #define SNPARGS(buf, len) buf + len, sizeof(buf) > len ? sizeof(buf) - len : 0
@@ -622,7 +664,7 @@ hash_packet(struct ipfw_flow_id *id)
 	/* remove a refcount to the parent */				\
 	if (q->dyn_type == O_LIMIT)					\
 		q->parent->count--;					\
-	DEB(printf("-- unlink entry 0x%08x %d -> 0x%08x %d, %d left\n",	\
+	DEB(printf("ipfw: unlink entry 0x%08x %d -> 0x%08x %d, %d left\n",\
 		(q->id.src_ip), (q->id.src_port),			\
 		(q->id.dst_ip), (q->id.dst_port), dyn_count-1 ); )	\
 	if (prev != NULL)						\
@@ -688,7 +730,7 @@ next_pass:
 					goto next;
 				if (FORCE && q->count != 0 ) {
 					/* XXX should not happen! */
-					printf( "OUCH! cannot remove rule,"
+					printf("ipfw: OUCH! cannot remove rule,"
 					     " count %d\n", q->count);
 				}
 			} else {
@@ -883,7 +925,7 @@ add_dyn_rule(struct ipfw_flow_id *id, u_int8_t dyn_type, struct ip_fw *rule)
 
 	r = malloc(sizeof *r, M_IPFW, M_NOWAIT | M_ZERO);
 	if (r == NULL) {
-		printf ("sorry cannot allocate state\n");
+		printf ("ipfw: sorry cannot allocate state\n");
 		return NULL;
 	}
 
@@ -908,7 +950,7 @@ add_dyn_rule(struct ipfw_flow_id *id, u_int8_t dyn_type, struct ip_fw *rule)
 	r->next = ipfw_dyn_v[i];
 	ipfw_dyn_v[i] = r;
 	dyn_count++;
-	DEB(printf("-- add dyn entry ty %d 0x%08x %d -> 0x%08x %d, total %d\n",
+	DEB(printf("ipfw: add dyn entry ty %d 0x%08x %d -> 0x%08x %d, total %d\n",
 	   dyn_type,
 	   (r->id.src_ip), (r->id.src_port),
 	   (r->id.dst_ip), (r->id.dst_port),
@@ -937,7 +979,7 @@ lookup_dyn_parent(struct ipfw_flow_id *pkt, struct ip_fw *rule)
 			    pkt->src_port == q->id.src_port &&
 			    pkt->dst_port == q->id.dst_port) {
 				q->expire = time_second + dyn_short_lifetime;
-				DEB(printf("lookup_dyn_parent found 0x%p\n",q);)
+				DEB(printf("ipfw: lookup_dyn_parent found 0x%p\n",q);)
 				return q;
 			}
 	}
@@ -958,7 +1000,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 
 	ipfw_dyn_rule *q;
 
-	DEB(printf("-- install state type %d 0x%08x %u -> 0x%08x %u\n",
+	DEB(printf("ipfw: install state type %d 0x%08x %u -> 0x%08x %u\n",
 	    cmd->o.opcode,
 	    (args->f_id.src_ip), (args->f_id.src_port),
 	    (args->f_id.dst_ip), (args->f_id.dst_port) );)
@@ -968,7 +1010,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 	if (q != NULL) { /* should never occur */
 		if (last_log != time_second) {
 			last_log = time_second;
-			printf(" install_state: entry already present, done\n");
+			printf("ipfw: install_state: entry already present, done\n");
 		}
 		return 0;
 	}
@@ -982,7 +1024,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 	if (dyn_count >= dyn_max) {
 		if (last_log != time_second) {
 			last_log = time_second;
-			printf("install_state: Too many dynamic rules\n");
+			printf("ipfw: install_state: Too many dynamic rules\n");
 		}
 		return 1; /* cannot install, notify caller */
 	}
@@ -998,7 +1040,8 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 		struct ipfw_flow_id id;
 		ipfw_dyn_rule *parent;
 
-		DEB(printf("installing dyn-limit rule %d\n", cmd->conn_limit);)
+		DEB(printf("ipfw: installing dyn-limit rule %d\n",
+		    cmd->conn_limit);)
 
 		id.dst_ip = id.src_ip = 0;
 		id.dst_port = id.src_port = 0;
@@ -1014,7 +1057,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 			id.dst_port = args->f_id.dst_port;
 		parent = lookup_dyn_parent(&id, rule);
 		if (parent == NULL) {
-			printf("add parent failed\n");
+			printf("ipfw: add parent failed\n");
 			return 1;
 		}
 		if (parent->count >= cmd->conn_limit) {
@@ -1035,7 +1078,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 	    }
 		break;
 	default:
-		printf("unknown dynamic rule type %u\n", cmd->o.opcode);
+		printf("ipfw: unknown dynamic rule type %u\n", cmd->o.opcode);
 		return 1;
 	}
 	lookup_dyn_rule(&args->f_id, NULL, NULL); /* XXX just set lifetime */
@@ -1135,9 +1178,15 @@ static void
 send_reject(struct ip_fw_args *args, int code, int offset, int ip_len)
 {
 
-	if (code != ICMP_REJECT_RST) /* Send an ICMP unreach */
+	if (code != ICMP_REJECT_RST) { /* Send an ICMP unreach */
+		/* We need the IP header in host order for icmp_error(). */
+		if (args->eh != NULL) {
+			struct ip *ip = mtod(args->m, struct ip *);
+			ip->ip_len = ntohs(ip->ip_len);
+			ip->ip_off = ntohs(ip->ip_off);
+		}
 		icmp_error(args->m, ICMP_UNREACH, code, 0L, 0);
-	else if (offset == 0 && args->f_id.proto == IPPROTO_TCP) {
+	} else if (offset == 0 && args->f_id.proto == IPPROTO_TCP) {
 		struct tcphdr *const tcp =
 		    L3HDR(struct tcphdr, mtod(args->m, struct ip *));
 		if ( (tcp->th_flags & TH_RST) == 0)
@@ -1173,6 +1222,8 @@ lookup_next_rule(struct ip_fw *me)
 
 	/* look for action, in case it is a skipto */
 	cmd = ACTION_PTR(me);
+	if (cmd->opcode == O_LOG)
+		cmd += F_LEN(cmd);
 	if ( cmd->opcode == O_SKIPTO )
 		for (rule = me->next; rule ; rule = rule->next)
 			if (rule->rulenum >= cmd->arg1)
@@ -1502,11 +1553,11 @@ check_body:
 				if (pcb == NULL || pcb->inp_socket == NULL)
 					break;
 #if __FreeBSD_version < 500034
-#define socheckuid(a,b)	((a)->so_cred->cr_uid == (b))
+#define socheckuid(a,b)	((a)->so_cred->cr_uid != (b))
 #endif
 				if (cmd->opcode == O_UID) {
 					match =
-					  socheckuid(pcb->inp_socket,
+					  !socheckuid(pcb->inp_socket,
 					   (uid_t)((ipfw_insn_u32 *)cmd)->d[0]);
 				} else  {
 					match = groupmember(
@@ -1746,6 +1797,13 @@ check_body:
 				match = (random()<((ipfw_insn_u32 *)cmd)->d[0]);
 				break;
 
+			case O_VERREVPATH:
+				/* Outgoing packets automatically pass/match */
+				match = ((oif != NULL) ||
+				    (m->m_pkthdr.rcvif == NULL) ||	 
+				    verify_rev_path(src_ip, m->m_pkthdr.rcvif));
+				break;
+
 			/*
 			 * The second set of opcodes represents 'actions',
 			 * i.e. the terminal part of a rule once the packet
@@ -1914,7 +1972,7 @@ check_body:
 next_rule:;		/* try next rule		*/
 
 	}		/* end of outer for, scan rules */
-	printf("+++ ipfw: ouch!, skip past end of rules, denying packet\n");
+	printf("ipfw: ouch!, skip past end of rules, denying packet\n");
 	return(IP_FW_PORT_DENY_FLAG);
 
 done:
@@ -1926,7 +1984,7 @@ done:
 
 pullup_failed:
 	if (fw_verbose)
-		printf("pullup failed\n");
+		printf("ipfw: pullup failed\n");
 	return(IP_FW_PORT_DENY_FLAG);
 }
 
@@ -1959,8 +2017,15 @@ flush_pipe_ptrs(struct dn_flow_set *match)
 
 		if (cmd->o.opcode != O_PIPE && cmd->o.opcode != O_QUEUE)
 			continue;
-		if (match == NULL || cmd->pipe_ptr == match)
-			cmd->pipe_ptr = NULL;
+		/*
+		 * XXX Use bcmp/bzero to handle pipe_ptr to overcome
+		 * possible alignment problems on 64-bit architectures.
+		 * This code is seldom used so we do not worry too
+		 * much about efficiency.
+		 */
+		if (match == NULL ||
+		    !bcmp(&cmd->pipe_ptr, &match, sizeof(match)) )
+			bzero(&cmd->pipe_ptr, sizeof(cmd->pipe_ptr));
 	}
 }
 
@@ -2041,7 +2106,7 @@ done:
 	static_count++;
 	static_len += l;
 	splx(s);
-	DEB(printf("++ installed rule %d, static count now %d\n",
+	DEB(printf("ipfw: installed rule %d, static count now %d\n",
 		rule->rulenum, static_count);)
 	return (0);
 }
@@ -2313,6 +2378,7 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 		case O_TCPFLAGS:
 		case O_TCPOPTS:
 		case O_ESTAB:
+		case O_VERREVPATH:
 			if (cmdlen != F_INSN_SIZE(ipfw_insn))
 				goto bad_size;
 			break;
@@ -2500,7 +2566,8 @@ ipfw_ctl(struct sockopt *sopt)
 		for (rule = layer3_chain; rule ; rule = rule->next) {
 			int i = RULESIZE(rule);
 			bcopy(rule, bp, i);
-			((struct ip_fw *)bp)->set_disable = set_disable;
+			bcopy(&set_disable, &(bp->next_rule),
+			    sizeof(set_disable));
 			bp = (struct ip_fw *)((char *)bp + i);
 		}
 		if (ipfw_dyn_v) {
@@ -2512,21 +2579,22 @@ ipfw_ctl(struct sockopt *sopt)
 				for ( p = ipfw_dyn_v[i] ; p != NULL ;
 				    p = p->next, dst++ ) {
 					bcopy(p, dst, sizeof *p);
-					dst->rulenum = p->rule->rulenum;
+					bcopy(&(p->rule->rulenum), &(dst->rule),
+					    sizeof(p->rule->rulenum));
 					/*
 					 * store a non-null value in "next".
 					 * The userland code will interpret a
 					 * NULL here as a marker
 					 * for the last dynamic rule.
 					 */
-					dst->next = dst ;
+					bcopy(&dst, &dst->next, sizeof(dst));
 					last = dst ;
 					dst->expire =
 					    TIME_LEQ(dst->expire, time_second) ?
 						0 : dst->expire - time_second ;
 				}
 			if (last != NULL) /* mark last dynamic rule */
-				last->next = NULL;
+				bzero(&last->next, sizeof(last));
 		}
 		splx(s);
 
@@ -2609,7 +2677,7 @@ ipfw_ctl(struct sockopt *sopt)
 		break;
 
 	default:
-		printf("ipfw_ctl invalid option %d\n", sopt->sopt_name);
+		printf("ipfw: ipfw_ctl invalid option %d\n", sopt->sopt_name);
 		error = EINVAL;
 	}
 

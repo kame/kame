@@ -27,7 +27,9 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/isa/sb.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.9 2001/08/23 11:30:50 cg Exp $");
+#include <isa/isavar.h>
+
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.10 2003/02/08 07:05:07 nyan Exp $");
 
 #ifdef __alpha__
 static int

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp_sis.c,v 1.5 2002/11/13 17:40:15 mux Exp $
+ *	$FreeBSD: src/sys/pci/agp_sis.c,v 1.7 2003/04/15 06:37:29 mdodd Exp $
  */
 
 #include "opt_bus.h"
@@ -66,6 +66,8 @@ agp_sis_match(device_t dev)
 	switch (pci_get_devid(dev)) {
 	case 0x00011039:
 		return ("SiS 5591 host to AGP bridge");
+	case 0x06481039:
+		return ("SiS 648 host to AGP bridge");
 	};
 
 	if (pci_get_vendor(dev) == 0x1039)
@@ -256,3 +258,5 @@ static driver_t agp_sis_driver = {
 static devclass_t agp_devclass;
 
 DRIVER_MODULE(agp_sis, pci, agp_sis_driver, agp_devclass, 0, 0);
+MODULE_DEPEND(agp_sis, agp, 1, 1, 1);
+MODULE_DEPEND(agp_sis, pci, 1, 1, 1);

@@ -40,8 +40,10 @@
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
  * 	from: FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.167 2001/07/12
- * $FreeBSD: src/sys/sparc64/sparc64/vm_machdep.c,v 1.30 2002/12/10 02:33:45 julian Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/vm_machdep.c,v 1.44 2003/04/08 06:35:09 jake Exp $
  */
+
+#include "opt_pmap.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,6 +51,8 @@
 #include <sys/proc.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
+#include <sys/linker_set.h>
+#include <sys/sysctl.h>
 #include <sys/unistd.h>
 #include <sys/user.h>
 #include <sys/vmmeter.h>
@@ -60,15 +64,28 @@
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
+#include <vm/vm_pageout.h>
 #include <vm/vm_param.h>
+#include <vm/uma.h>
+#include <vm/uma_int.h>
 
 #include <machine/cache.h>
 #include <machine/cpu.h>
+#include <machine/fp.h>
 #include <machine/fsr.h>
 #include <machine/frame.h>
 #include <machine/md_var.h>
 #include <machine/ofw_machdep.h>
+#include <machine/ofw_mem.h>
+#include <machine/tlb.h>
 #include <machine/tstate.h>
+
+extern struct ofw_mem_region sparc64_memreg[];
+extern int sparc64_nmemreg;
+
+PMAP_STATS_VAR(uma_nsmall_alloc);
+PMAP_STATS_VAR(uma_nsmall_alloc_oc);
+PMAP_STATS_VAR(uma_nsmall_free);
 
 void
 cpu_exit(struct thread *td)
@@ -121,15 +138,33 @@ cpu_thread_clean(struct thread *td)
 void
 cpu_thread_setup(struct thread *td)
 {
+	struct pcb *pcb;
+
+	pcb = (struct pcb *)((td->td_kstack + KSTACK_PAGES * PAGE_SIZE -
+	    sizeof(struct pcb)) & ~0x3fUL);
+	td->td_frame = (struct trapframe *)pcb - 1;
+	td->td_pcb = pcb;
 }
 
 void
-cpu_set_upcall(struct thread *td, void *pcb)
+cpu_set_upcall(struct thread *td, void *v)
 {
+	struct trapframe *tf;
+	struct frame *fr;
+	struct pcb *pcb;
+
+	pcb = td->td_pcb;
+	tf = td->td_frame;
+	fr = (struct frame *)tf - 1;
+	fr->fr_local[0] = (u_long)fork_return;
+	fr->fr_local[1] = (u_long)td;
+	fr->fr_local[2] = (u_long)tf;
+	pcb->pcb_pc = (u_long)fork_trampoline - 8;
+	pcb->pcb_sp = (u_long)fr - SPOFF;
 }
 
 void
-cpu_set_upcall_kse(struct thread *td, struct kse *ke)
+cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 {
 }
 
@@ -170,11 +205,10 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	/*
 	 * Ensure that p1's pcb is up to date.
 	 */
-	if ((td1->td_frame->tf_fprs & FPRS_FEF) != 0) {
-		mtx_lock_spin(&sched_lock);
-		savefpctx(&pcb1->pcb_fpstate);
-		mtx_unlock_spin(&sched_lock);
-	}
+	critical_enter();
+	if ((td1->td_frame->tf_fprs & FPRS_FEF) != 0)
+		savefpctx(pcb1->pcb_ufp);
+	critical_exit();
 	/* Make sure the copied windows are spilled. */
 	flushw();
 	/* Copy the pcb (this will copy the windows saved in the pcb, too). */
@@ -224,7 +258,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	fp->fr_local[0] = (u_long)fork_return;
 	fp->fr_local[1] = (u_long)td2;
 	fp->fr_local[2] = (u_long)tf;
-	pcb2->pcb_fp = (u_long)fp - SPOFF;
+	pcb2->pcb_sp = (u_long)fp - SPOFF;
 	pcb2->pcb_pc = (u_long)fork_trampoline - 8;
 
 	/*
@@ -270,7 +304,7 @@ cpu_set_fork_handler(struct thread *td, void (*func)(void *), void *arg)
 	struct pcb *pcb;
 
 	pcb = td->td_pcb;
-	fp = (struct frame *)(pcb->pcb_fp + SPOFF);
+	fp = (struct frame *)(pcb->pcb_sp + SPOFF);
 	fp->fr_local[0] = (u_long)func;
 	fp->fr_local[1] = (u_long)arg;
 }
@@ -281,11 +315,14 @@ cpu_wait(struct proc *p)
 }
 
 int
-is_physical_memory(vm_offset_t addr)
+is_physical_memory(vm_paddr_t addr)
 {
+	struct ofw_mem_region *mr;
 
-	/* There is no device memory in the midst of the normal RAM. */
-	return (1);
+	for (mr = sparc64_memreg; mr < sparc64_memreg + sparc64_nmemreg; mr++)
+		if (addr >= mr->mr_start && addr < mr->mr_start + mr->mr_size)
+			return (1);
+	return (0);
 }
 
 void
@@ -298,91 +335,60 @@ swi_vm(void *v)
 	 */
 }
 
-/*
- * quick version of vm_fault
- */
-int
-vm_fault_quick(caddr_t v, int prot)
+void *
+uma_small_alloc(uma_zone_t zone, int bytes, u_int8_t *flags, int wait)
 {
-	int r;
+	static vm_pindex_t color;
+	vm_paddr_t pa;
+	vm_page_t m;
+	int pflags;
+	void *va;
 
-	if (prot & VM_PROT_WRITE)
-		r = subyte(v, fubyte(v));
+	PMAP_STATS_INC(uma_nsmall_alloc);
+
+	*flags = UMA_SLAB_PRIV;
+
+	if ((wait & (M_NOWAIT|M_USE_RESERVE)) == M_NOWAIT)
+		pflags = VM_ALLOC_INTERRUPT;
 	else
-		r = fubyte(v);
-	return(r);
-}
+		pflags = VM_ALLOC_SYSTEM;
 
-/*
- * Map an IO request into kernel virtual address space.
- *
- * All requests are (re)mapped into kernel VA space.
- * Notice that we use b_bufsize for the size of the buffer
- * to be mapped.  b_bcount might be modified by the driver.
- */
-void
-vmapbuf(struct buf *bp)
-{
-	caddr_t addr, kva;
-	vm_offset_t pa;
-	int pidx;
-	struct vm_page *m;
-	pmap_t pmap;
+	if (wait & M_ZERO)
+		pflags |= VM_ALLOC_ZERO;
 
-	GIANT_REQUIRED;
-
-	if ((bp->b_flags & B_PHYS) == 0)
-		panic("vmapbuf");
-
-	pmap = &curproc->p_vmspace->vm_pmap;
-	for (addr = (caddr_t)trunc_page((vm_offset_t)bp->b_data), pidx = 0;
-	     addr < bp->b_data + bp->b_bufsize; addr += PAGE_SIZE,  pidx++) {
-		/*
-		 * Do the vm_fault if needed; do the copy-on-write thing
-		 * when reading stuff off device into memory.
-		 */
-		vm_fault_quick((addr >= bp->b_data) ? addr : bp->b_data,
-		    (bp->b_iocmd == BIO_READ) ? (VM_PROT_READ | VM_PROT_WRITE) :
-		    VM_PROT_READ);
-		pa = trunc_page(pmap_extract(pmap, (vm_offset_t)addr));
-		if (pa == 0)
-			panic("vmapbuf: page not present");
-		m = PHYS_TO_VM_PAGE(pa);
-		vm_page_hold(m);
-		bp->b_pages[pidx] = m;
+	for (;;) {
+		m = vm_page_alloc(NULL, color++, pflags | VM_ALLOC_NOOBJ);
+		if (m == NULL) {
+			if (wait & M_NOWAIT)
+				return (NULL);
+			else
+				VM_WAIT;
+		} else
+			break;
 	}
-	if (pidx > btoc(MAXPHYS))
-		panic("vmapbuf: mapped more than MAXPHYS");
-	pmap_qenter((vm_offset_t)bp->b_saveaddr, bp->b_pages, pidx);
 
-	kva = bp->b_saveaddr;
-	bp->b_npages = pidx;
-	bp->b_saveaddr = bp->b_data;
-	bp->b_data = kva + (((vm_offset_t)bp->b_data) & PAGE_MASK);
+	pa = VM_PAGE_TO_PHYS(m);
+	if (m->md.color != DCACHE_COLOR(pa)) {
+		KASSERT(m->md.colors[0] == 0 && m->md.colors[1] == 0,
+		    ("uma_small_alloc: free page still has mappings!"));
+		PMAP_STATS_INC(uma_nsmall_alloc_oc);
+		m->md.color = DCACHE_COLOR(pa);
+		dcache_page_inval(pa);
+	}
+	va = (void *)TLB_PHYS_TO_DIRECT(pa);
+	if ((m->flags & PG_ZERO) == 0)
+		bzero(va, PAGE_SIZE);
+	return (va);
 }
 
-/*
- * Free the io map PTEs associated with this IO operation.
- * We also invalidate the TLB entries and restore the original b_addr.
- */
 void
-vunmapbuf(struct buf *bp)
+uma_small_free(void *mem, int size, u_int8_t flags)
 {
-	int pidx;
-	int npages;
+	vm_page_t m;
 
-	GIANT_REQUIRED;
-
-	if ((bp->b_flags & B_PHYS) == 0)
-		panic("vunmapbuf");
-
-	npages = bp->b_npages;
-	pmap_qremove(trunc_page((vm_offset_t)bp->b_data),
-	    npages);
+	PMAP_STATS_INC(uma_nsmall_free);
+	m = PHYS_TO_VM_PAGE(TLB_DIRECT_TO_PHYS((vm_offset_t)mem));
 	vm_page_lock_queues();
-	for (pidx = 0; pidx < npages; pidx++)
-		vm_page_unhold(bp->b_pages[pidx]);
+	vm_page_free(m);
 	vm_page_unlock_queues();
-
-	bp->b_data = bp->b_saveaddr;
 }

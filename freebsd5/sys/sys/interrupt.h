@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/interrupt.h,v 1.22 2002/03/19 20:18:36 alfred Exp $
+ * $FreeBSD: src/sys/sys/interrupt.h,v 1.23 2003/02/26 03:15:42 scottl Exp $
  */
 
 #ifndef _SYS_INTERRUPT_H_
@@ -94,8 +94,9 @@ struct ithd {
 #define	SWI_CAMNET	2
 #define	SWI_CAMBIO	3
 #define	SWI_VM		4
-#define	SWI_TQ		5
-#define	SWI_CLOCK	6
+#define	SWI_TQ_GIANT	5
+#define	SWI_TQ		6
+#define	SWI_CLOCK	7
 
 extern struct	ithd *tty_ithd;
 extern struct	ithd *clk_ithd;

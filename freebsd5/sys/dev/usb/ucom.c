@@ -1,5 +1,5 @@
 /*	$NetBSD: ucom.c,v 1.39 2001/08/16 22:31:24 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ucom.c,v 1.25 2002/11/17 13:33:55 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ucom.c,v 1.29 2003/03/09 11:33:26 akiyama Exp $	*/
 
 /*-
  * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
@@ -128,23 +128,19 @@ Static d_ioctl_t ucomioctl;
 #define UCOM_CDEV_MAJOR  138
 
 static struct cdevsw ucom_cdevsw = {
-	/* open */      ucomopen,
-	/* close */     ucomclose,
-	/* read */      ucomread,
-	/* write */     ucomwrite,
-	/* ioctl */     ucomioctl,
-	/* poll */      ttypoll,
-	/* mmap */      nommap,
-	/* strategy */  nostrategy,
-	/* name */      "ucom",
-	/* maj */       UCOM_CDEV_MAJOR,
-	/* dump */      nodump,
-	/* psize */     nopsize,
-	/* flags */     D_TTY | D_KQFILTER,
+	.d_open =	ucomopen,
+	.d_close =	ucomclose,
+	.d_read =	ucomread,
+	.d_write =	ucomwrite,
+	.d_ioctl =	ucomioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"ucom",
+	.d_maj =	UCOM_CDEV_MAJOR,
+	.d_flags =	D_TTY,
 #if __FreeBSD_version < 500014
 	/* bmaj */	-1,
 #endif
-	/* kqfilter */	ttykqfilter,
+	.d_kqfilter =	ttykqfilter,
 };
 
 Static void ucom_cleanup(struct ucom_softc *);
@@ -343,7 +339,7 @@ ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 		err = usbd_open_pipe(sc->sc_iface, sc->sc_bulkin_no, 0,
 				     &sc->sc_bulkin_pipe);
 		if (err) {
-			printf("%s: open bulk out error (addr %d): %s\n",
+			printf("%s: open bulk in error (addr %d): %s\n",
 			       USBDEVNAME(sc->sc_dev), sc->sc_bulkin_no, 
 			       usbd_errstr(err));
 			error = EIO;
@@ -353,7 +349,7 @@ ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 		err = usbd_open_pipe(sc->sc_iface, sc->sc_bulkout_no,
 				     USBD_EXCLUSIVE_USE, &sc->sc_bulkout_pipe);
 		if (err) {
-			printf("%s: open bulk in error (addr %d): %s\n",
+			printf("%s: open bulk out error (addr %d): %s\n",
 			       USBDEVNAME(sc->sc_dev), sc->sc_bulkout_no,
 			       usbd_errstr(err));
 			error = EIO;
@@ -978,6 +974,11 @@ ucomwritecb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 
 	usbd_get_xfer_status(xfer, NULL, NULL, &cc, NULL);
 	DPRINTF(("ucomwritecb: cc = %d\n", cc));
+	if (cc <= sc->sc_opkthdrlen) {
+		printf("%s: sent size too small, cc = %d\n",
+		       USBDEVNAME(sc->sc_dev), cc);
+		goto error;
+	}
 
 	/* convert from USB bytes to tty bytes */
 	cc -= sc->sc_opkthdrlen;
@@ -1053,9 +1054,20 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 
 	usbd_get_xfer_status(xfer, NULL, (void **)&cp, &cc, NULL);
 	DPRINTF(("ucomreadcb: got %d chars, tp = %p\n", cc, tp));
+	if (cc == 0)
+		goto resubmit;
+
 	if (sc->sc_callback->ucom_read != NULL)
 		sc->sc_callback->ucom_read(sc->sc_parent, sc->sc_portno,
 					   &cp, &cc);
+
+	if (cc > sc->sc_ibufsize) {
+		printf("%s: invalid receive data size, %d chars\n",
+		       USBDEVNAME(sc->sc_dev), cc);
+		goto resubmit;
+	}
+	if (cc < 1)
+		goto resubmit;
 
 	s = spltty();
 	if (tp->t_state & TS_CAN_BYPASS_L_RINT) {
@@ -1079,18 +1091,21 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 			       lostcc);
 	} else {
 		/* Give characters to tty layer. */
-		while (cc-- > 0) {
-			DPRINTFN(7,("ucomreadcb: char = 0x%02x\n", *cp));
-			if ((*rint)(*cp++, tp) == -1) {
+		while (cc > 0) {
+			DPRINTFN(7, ("ucomreadcb: char = 0x%02x\n", *cp));
+			if ((*rint)(*cp, tp) == -1) {
 				/* XXX what should we do? */
 				printf("%s: lost %d chars\n",
 				       USBDEVNAME(sc->sc_dev), cc);
 				break;
 			}
+			cc--;
+			cp++;
 		}
 	}
 	splx(s);
 
+    resubmit:
 	err = ucomstartread(sc);
 	if (err) {
 		printf("%s: read start failed\n", USBDEVNAME(sc->sc_dev));
@@ -1136,11 +1151,11 @@ ucomstopread(struct ucom_softc *sc)
 	DPRINTF(("ucomstopread: enter\n"));
 
 	if (!(sc->sc_state & UCS_RXSTOP)) {
+		sc->sc_state |= UCS_RXSTOP;
 		if (sc->sc_bulkin_pipe == NULL) {
 			DPRINTF(("ucomstopread: bulkin pipe NULL\n"));
 			return;
 		}
-		sc->sc_state |= UCS_RXSTOP;
 		err = usbd_abort_pipe(sc->sc_bulkin_pipe);
 		if (err) {
 			DPRINTF(("ucomstopread: err = %s\n",

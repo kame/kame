@@ -28,16 +28,23 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ie/if_iee16.h,v 1.2 2000/05/01 19:54:25 peter Exp $
+ * $FreeBSD: src/sys/dev/ie/if_iee16.h,v 1.3 2003/03/28 06:27:08 mdodd Exp $
  */
 
 /*
  * Definitions for EtherExpress 16
  */
 
+#define	IEE16_DATAPORT		0x00	/* shared memory data port */
+#define	IEE16_WRITEPTR		0x02	/* shared memory write pointer */
+#define	IEE16_READPTR		0x04	/* shared memory read pointer */
+
 #define	IEE16_ATTN		0x06	/* channel attention control */
 #define	IEE16_IRQ		0x07	/* IRQ configuration */
+#define	 IEE16_IRQ_DISABLE	0x00	/* disable board interrupts */
 #define	 IEE16_IRQ_ENABLE	0x08	/* enable board interrupts */
+
+#define	IEE16_SHADOWPTR		0x08	/* shadow memory pointer */
 
 #define	IEE16_MEMDEC		0x0a	/* memory decode */
 #define	IEE16_MCTRL		0x0b	/* memory control */
@@ -71,6 +78,8 @@
 
 /* Locations in the EEPROM */
 #define IEE16_EEPROM_CONFIG1	0x00	/* Configuration register 1 */
+#define	IEE16_EEPROM_MEDIA_EXT	0x1000	/* Using external transceiver 0 = AUI */
+
 #define  IEE16_EEPROM_IRQ	0xE000	/* Encoded IRQ */
 #define  IEE16_EEPROM_IRQ_SHIFT	13	/* To shift IRQ to lower bits */
 #define IEE16_EEPROM_LOCK_ADDR	0x01	/* contains the lock bit */
@@ -79,3 +88,6 @@
 #define IEE16_EEPROM_ENET_LOW	0x02	/* Ethernet address, low word */
 #define IEE16_EEPROM_ENET_MID	0x03	/* Ethernet address, middle word */
 #define IEE16_EEPROM_ENET_HIGH	0x04	/* Ethernet address, high word */
+
+#define	IEE16_EEPROM_MEDIA	0x05	/* Selects between TP/BNC */
+#define	 IEE16_EEPROM_MEDIA_TP	0x01	/* if ON, using TP, else BNC */

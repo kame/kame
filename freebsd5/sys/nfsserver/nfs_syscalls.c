@@ -34,11 +34,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_syscalls.c	8.5 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfsserver/nfs_syscalls.c,v 1.82 2002/11/04 15:13:35 rwatson Exp $
+ * $FreeBSD: src/sys/nfsserver/nfs_syscalls.c,v 1.87 2003/03/02 16:54:39 des Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_syscalls.c,v 1.82 2002/11/04 15:13:35 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_syscalls.c,v 1.87 2003/03/02 16:54:39 des Exp $");
 
 #include "opt_inet6.h"
 #include "opt_mac.h"
@@ -150,7 +150,7 @@ nfssvc(struct thread *td, struct nfssvc_args *uap)
 	mtx_lock(&Giant);
 	while (nfssvc_sockhead_flag & SLP_INIT) {
 		 nfssvc_sockhead_flag |= SLP_WANTINIT;
-		(void) tsleep((caddr_t)&nfssvc_sockhead, PSOCK, "nfsd init", 0);
+		(void) tsleep(&nfssvc_sockhead, PSOCK, "nfsd init", 0);
 	}
 	if (uap->flag & NFSSVC_ADDSOCK) {
 		error = copyin(uap->argp, (caddr_t)&nfsdarg, sizeof(nfsdarg));
@@ -200,7 +200,7 @@ nfssvc_addsock(struct file *fp, struct sockaddr *mynam, struct thread *td)
 	struct socket *so;
 	int error, s;
 
-	so = (struct socket *)fp->f_data;
+	so = fp->f_data;
 #if 0
 	tslp = NULL;
 	/*
@@ -316,7 +316,7 @@ nfssvc_nfsd(struct thread *td)
 			    (nfsd_head_flag & NFSD_CHECKSLP) == 0) {
 				nfsd->nfsd_flag |= NFSD_WAITING;
 				nfsd_waiting++;
-				error = tsleep((caddr_t)nfsd, PSOCK | PCATCH,
+				error = tsleep(nfsd, PSOCK | PCATCH,
 				    "nfsd", 0);
 				nfsd_waiting--;
 				if (error)
@@ -611,7 +611,7 @@ nfs_slplock(struct nfssvc_sock *slp, int wait)
 		return(0);	/* already locked, fail */
 	while (*statep & NFSRV_SNDLOCK) {
 		*statep |= NFSRV_WANTSND;
-		(void) tsleep((caddr_t)statep, PZERO - 1, "nfsslplck", 0);
+		(void) tsleep(statep, PZERO - 1, "nfsslplck", 0);
 	}
 	*statep |= NFSRV_SNDLOCK;
 	return (1);
@@ -630,7 +630,7 @@ nfs_slpunlock(struct nfssvc_sock *slp)
 	*statep &= ~NFSRV_SNDLOCK;
 	if (*statep & NFSRV_WANTSND) {
 		*statep &= ~NFSRV_WANTSND;
-		wakeup((caddr_t)statep);
+		wakeup(statep);
 	}
 }
 
@@ -663,7 +663,7 @@ nfsrv_init(int terminating)
 	nfssvc_sockhead_flag &= ~SLP_INIT;
 	if (nfssvc_sockhead_flag & SLP_WANTINIT) {
 		nfssvc_sockhead_flag &= ~SLP_WANTINIT;
-		wakeup((caddr_t)&nfssvc_sockhead);
+		wakeup(&nfssvc_sockhead);
 	}
 
 	TAILQ_INIT(&nfsd_head);

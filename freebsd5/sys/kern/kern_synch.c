@@ -36,11 +36,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_synch.c	8.9 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/kern/kern_synch.c,v 1.208 2002/12/10 02:33:44 julian Exp $
+ * $FreeBSD: src/sys/kern/kern_synch.c,v 1.223 2003/05/16 21:26:42 marcel Exp $
  */
 
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
+#ifdef __i386__
+#include "opt_swtch.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,6 +70,9 @@
 #endif
 
 #include <machine/cpu.h>
+#ifdef SWTCH_OPTIM_STATS
+#include <machine/md_var.h>
+#endif
 
 static void sched_setup(void *dummy);
 SYSINIT(sched_setup, SI_SUB_KICK_SCHEDULER, SI_ORDER_FIRST, sched_setup, NULL)
@@ -149,7 +155,8 @@ msleep(ident, mtx, priority, wmesg, timo)
 	if (KTRPOINT(td, KTR_CSW))
 		ktrcsw(1, 0);
 #endif
-	WITNESS_SLEEP(0, &mtx->mtx_object);
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, &mtx->mtx_object,
+	    "Sleeping on \"%s\"", wmesg);
 	KASSERT(timo != 0 || mtx_owned(&Giant) || mtx != NULL,
 	    ("sleeping without a mutex"));
 	/*
@@ -158,9 +165,9 @@ msleep(ident, mtx, priority, wmesg, timo)
 	 * and queue it as ready to run. Note that there is danger here
 	 * because we need to make sure that we don't sleep allocating
 	 * the thread (recursion here might be bad).
-	 * Hence the TDF_INMSLEEP flag.
 	 */
-	if (p->p_flag & P_KSES) {
+	mtx_lock_spin(&sched_lock);
+	if (p->p_flag & P_THREADED || p->p_numthreads > 1) {
 		/*
 		 * Just don't bother if we are exiting
 		 * and not the exiting thread or thread was marked as
@@ -170,24 +177,9 @@ msleep(ident, mtx, priority, wmesg, timo)
 		    (((p->p_flag & P_WEXIT) && (p->p_singlethread != td)) ||
 		     (td->td_flags & TDF_INTERRUPT))) {
 			td->td_flags &= ~TDF_INTERRUPT;
+			mtx_unlock_spin(&sched_lock);
 			return (EINTR);
 		}
-		mtx_lock_spin(&sched_lock);
-		if ((td->td_flags & (TDF_UNBOUND|TDF_INMSLEEP)) ==
-		    TDF_UNBOUND) {
-			/*
-			 * Arrange for an upcall to be readied.
-			 * it will not actually happen until all
-			 * pending in-kernel work for this KSEGRP
-			 * has been done.
-			 */
-			/* Don't recurse here! */
-			td->td_flags |= TDF_INMSLEEP;
-			thread_schedule_upcall(td, td->td_kse);
-			td->td_flags &= ~TDF_INMSLEEP;
-		}
-	} else {
-		mtx_lock_spin(&sched_lock);
 	}
 	if (cold ) {
 		/*
@@ -238,7 +230,9 @@ msleep(ident, mtx, priority, wmesg, timo)
 		td->td_flags |= TDF_SINTR;
 		mtx_unlock_spin(&sched_lock);
 		PROC_LOCK(p);
+		mtx_lock(&p->p_sigacts->ps_mtx);
 		sig = cursig(td);
+		mtx_unlock(&p->p_sigacts->ps_mtx);
 		if (sig == 0 && thread_suspend_check(1))
 			sig = SIGSTOP;
 		mtx_lock_spin(&sched_lock);
@@ -299,12 +293,14 @@ msleep(ident, mtx, priority, wmesg, timo)
 	if (rval == 0 && catch) {
 		PROC_LOCK(p);
 		/* XXX: shouldn't we always be calling cursig() */
+		mtx_lock(&p->p_sigacts->ps_mtx);
 		if (sig != 0 || (sig = cursig(td))) {
 			if (SIGISMEMBER(p->p_sigacts->ps_sigintr, sig))
 				rval = EINTR;
 			else
 				rval = ERESTART;
 		}
+		mtx_unlock(&p->p_sigacts->ps_mtx);
 		PROC_UNLOCK(p);
 	}
 #ifdef KTRACE
@@ -345,6 +341,7 @@ endtsleep(arg)
 		TAILQ_REMOVE(&slpque[LOOKUP(td->td_wchan)], td, td_slpq);
 		TD_CLR_ON_SLEEPQ(td);
 		td->td_flags |= TDF_TIMEOUT;
+		td->td_wmesg = NULL;
 	} else {
 		td->td_flags |= TDF_TIMOFAIL;
 	}
@@ -389,6 +386,7 @@ unsleep(struct thread *td)
 	if (TD_ON_SLEEPQ(td)) {
 		TAILQ_REMOVE(&slpque[LOOKUP(td->td_wchan)], td, td_slpq);
 		TD_CLR_ON_SLEEPQ(td);
+		td->td_wmesg = NULL;
 	}
 	mtx_unlock_spin(&sched_lock);
 }
@@ -461,18 +459,19 @@ void
 mi_switch(void)
 {
 	struct bintime new_switchtime;
-	struct thread *td = curthread;	/* XXX */
-	struct proc *p = td->td_proc;	/* XXX */
-	struct kse *ke = td->td_kse;
+	struct thread *td;
+#if !defined(__alpha__) && !defined(__powerpc__)
+	struct thread *newtd;
+#endif
+	struct proc *p;
 	u_int sched_nest;
 
 	mtx_assert(&sched_lock, MA_OWNED | MA_NOTRECURSED);
-
+	td = curthread;			/* XXX */
+	p = td->td_proc;		/* XXX */
 	KASSERT(!TD_ON_RUNQ(td), ("mi_switch: called by old code"));
 #ifdef INVARIANTS
-	if (!TD_ON_LOCK(td) &&
-	    !TD_ON_RUNQ(td) &&
-	    !TD_IS_RUNNING(td))
+	if (!TD_ON_LOCK(td) && !TD_IS_RUNNING(td))
 		mtx_assert(&Giant, MA_NOTOWNED);
 #endif
 	KASSERT(td->td_critnest == 1,
@@ -492,6 +491,7 @@ mi_switch(void)
 	 */
 	if (db_active) {
 		mtx_unlock_spin(&sched_lock);
+		db_print_backtrace();
 		db_error("Context switches not allowed in the debugger.");
 	}
 #endif
@@ -503,7 +503,7 @@ mi_switch(void)
 	if (p->p_cpulimit != RLIM_INFINITY &&
 	    p->p_runtime.sec > p->p_cpulimit) {
 		p->p_sflag |= PS_XCPU;
-		ke->ke_flags |= KEF_ASTPENDING;
+		td->td_flags |= TDF_ASTPENDING;
 	}
 
 	/*
@@ -513,11 +513,22 @@ mi_switch(void)
 	PCPU_SET(switchtime, new_switchtime);
 	CTR3(KTR_PROC, "mi_switch: old thread %p (pid %d, %s)", td, p->p_pid,
 	    p->p_comm);
-
 	sched_nest = sched_lock.mtx_recurse;
+	if (td->td_proc->p_flag & P_THREADED)
+		thread_switchout(td);
 	sched_switchout(td);
 
+#if !defined(__alpha__) && !defined(__powerpc__) 
+	newtd = choosethread();
+	if (td != newtd)
+		cpu_switch(td, newtd);	/* SHAZAM!! */
+#ifdef SWTCH_OPTIM_STATS
+	else
+		stupid_switch++;
+#endif
+#else
 	cpu_switch();		/* SHAZAM!!*/
+#endif
 
 	sched_lock.mtx_recurse = sched_nest;
 	sched_lock.mtx_lock = (uintptr_t)td;

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdio.h	8.5 (Berkeley) 4/29/95
- * $FreeBSD: src/include/stdio.h,v 1.50 2002/10/14 11:18:21 tjr Exp $
+ * $FreeBSD: src/include/stdio.h,v 1.51 2003/01/13 08:41:47 tjr Exp $
  */
 
 #ifndef	_STDIO_H_
@@ -301,6 +301,12 @@ int	 getc_unlocked(FILE *);
 int	 getchar_unlocked(void);
 int	 putc_unlocked(int, FILE *);
 int	 putchar_unlocked(int);
+#endif
+#if __BSD_VISIBLE
+void	clearerr_unlocked(FILE *);
+int	feof_unlocked(FILE *);
+int	ferror_unlocked(FILE *);
+int	fileno_unlocked(FILE *);
 #endif
 
 #if __POSIX_VISIBLE >= 200112

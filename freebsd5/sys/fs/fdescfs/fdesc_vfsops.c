@@ -35,7 +35,7 @@
  *
  *	@(#)fdesc_vfsops.c	8.4 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/fs/fdescfs/fdesc_vfsops.c,v 1.36 2002/08/04 10:29:25 jeff Exp $
+ * $FreeBSD: src/sys/fs/fdescfs/fdesc_vfsops.c,v 1.39 2003/03/11 22:15:08 kan Exp $
  */
 
 /*
@@ -213,7 +213,7 @@ static struct vfsops fdesc_vfsops = {
 	fdesc_root,
 	vfs_stdquotactl,
 	fdesc_statfs,
-	vfs_stdsync,
+	vfs_stdnosync,
 	vfs_stdvget,
 	vfs_stdfhtovp,
 	vfs_stdcheckexp,

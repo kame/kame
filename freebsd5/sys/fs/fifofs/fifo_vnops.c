@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fifo_vnops.c	8.10 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/fs/fifofs/fifo_vnops.c,v 1.78.2.1 2003/01/02 19:51:07 phk Exp $
+ * $FreeBSD: src/sys/fs/fifofs/fifo_vnops.c,v 1.85 2003/03/24 11:03:42 bde Exp $
  */
 
 #include <sys/param.h>
@@ -210,7 +210,7 @@ fifo_open(ap)
 		if (fip->fi_readers == 1) {
 			fip->fi_writesock->so_state &= ~SS_CANTSENDMORE;
 			if (fip->fi_writers > 0) {
-				wakeup((caddr_t)&fip->fi_writers);
+				wakeup(&fip->fi_writers);
 				sowwakeup(fip->fi_writesock);
 			}
 		}
@@ -220,19 +220,24 @@ fifo_open(ap)
 		if (fip->fi_writers == 1) {
 			fip->fi_readsock->so_state &= ~SS_CANTRCVMORE;
 			if (fip->fi_readers > 0) {
-				wakeup((caddr_t)&fip->fi_readers);
+				wakeup(&fip->fi_readers);
 				sorwakeup(fip->fi_writesock);
 			}
 		}
 	}
 	if ((ap->a_mode & FREAD) && (ap->a_mode & O_NONBLOCK) == 0) {
-		while (fip->fi_writers == 0) {
+		if (fip->fi_writers == 0) {
 			VOP_UNLOCK(vp, 0, td);
-			error = tsleep((caddr_t)&fip->fi_readers,
+			error = tsleep(&fip->fi_readers,
 			    PCATCH | PSOCK, "fifoor", 0);
 			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 			if (error)
 				goto bad;
+			/*
+			 * We must have got woken up because we had a writer.
+			 * That (and not still having one) is the condition
+			 * that we must wait for.
+			 */
 		}
 	}
 	if (ap->a_mode & FWRITE) {
@@ -242,18 +247,18 @@ fifo_open(ap)
 				goto bad;
 			}
 		} else {
-			while (fip->fi_readers == 0) {
+			if (fip->fi_readers == 0) {
 				VOP_UNLOCK(vp, 0, td);
-				/*
-				 * XXX: Some race I havn't located is solved
-				 * by timing out after a sec.  Race seen when
-				 * sendmail hangs here during boot /phk
-				 */
-				error = tsleep((caddr_t)&fip->fi_writers,
-				    PCATCH | PSOCK, "fifoow", hz);
+				error = tsleep(&fip->fi_writers,
+				    PCATCH | PSOCK, "fifoow", 0);
 				vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 				if (error)
 					goto bad;
+				/*
+				 * We must have got woken up because we had
+				 * a reader.  That (and not still having one)
+				 * is the condition that we must wait for.
+				 */
 			}
 		}
 	}
@@ -352,7 +357,7 @@ fifo_ioctl(ap)
 	if (ap->a_command == FIONBIO)
 		return (0);
 	if (ap->a_fflag & FREAD) {
-		filetmp.f_data = (caddr_t)ap->a_vp->v_fifoinfo->fi_readsock;
+		filetmp.f_data = ap->a_vp->v_fifoinfo->fi_readsock;
 		filetmp.f_cred = ap->a_cred;
 		error = soo_ioctl(&filetmp, ap->a_command, ap->a_data,
 		    ap->a_td->td_ucred, ap->a_td);
@@ -360,7 +365,7 @@ fifo_ioctl(ap)
 			return (error);
 	}
 	if (ap->a_fflag & FWRITE) {
-		filetmp.f_data = (caddr_t)ap->a_vp->v_fifoinfo->fi_writesock;
+		filetmp.f_data = ap->a_vp->v_fifoinfo->fi_writesock;
 		filetmp.f_cred = ap->a_cred;
 		error = soo_ioctl(&filetmp, ap->a_command, ap->a_data,
 		    ap->a_td->td_ucred, ap->a_td);
@@ -482,7 +487,7 @@ fifo_poll(ap)
 			events |= POLLINIGNEOF;
 		}
 
-		filetmp.f_data = (caddr_t)ap->a_vp->v_fifoinfo->fi_readsock;
+		filetmp.f_data = ap->a_vp->v_fifoinfo->fi_readsock;
 		filetmp.f_cred = ap->a_cred;
 		if (filetmp.f_data)
 			revents |= soo_poll(&filetmp, events,
@@ -497,11 +502,12 @@ fifo_poll(ap)
 	}
 	events = ap->a_events & (POLLOUT | POLLWRNORM | POLLWRBAND);
 	if (events) {
-		filetmp.f_data = (caddr_t)ap->a_vp->v_fifoinfo->fi_writesock;
+		filetmp.f_data = ap->a_vp->v_fifoinfo->fi_writesock;
 		filetmp.f_cred = ap->a_cred;
-		if (filetmp.f_data)
+		if (filetmp.f_data) {
 			revents |= soo_poll(&filetmp, events,
 			    ap->a_td->td_ucred, ap->a_td);
+		}
 	}
 	return (revents);
 }

@@ -60,7 +60,7 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_gif_demux.c,v 1.4 2001/12/10 08:09:47 obrien Exp $
+ * $FreeBSD: src/sys/netgraph/ng_gif_demux.c,v 1.7 2003/03/05 19:24:22 peter Exp $
  */
 
 /*
@@ -108,7 +108,6 @@ const static struct iffam gFamilies[] = {
 	{ AF_IPX,	NG_GIF_DEMUX_HOOK_IPX	},
 	{ AF_ATM,	NG_GIF_DEMUX_HOOK_ATM	},
 	{ AF_NATM,	NG_GIF_DEMUX_HOOK_NATM	},
-	{ AF_NS,	NG_GIF_DEMUX_HOOK_NS	},
 };
 #define NUM_FAMILIES		(sizeof(gFamilies) / sizeof(*gFamilies))
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_lookup.c	8.15 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.66 2002/10/01 15:48:31 phk Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.67 2003/04/30 12:57:40 markm Exp $
  */
 
 #include "opt_ffs_broken_fixme.h"
@@ -68,9 +68,9 @@
 #include <ufs/ufs/ufs_extern.h>
 
 #ifdef DIAGNOSTIC
-int	dirchk = 1;
+static int	dirchk = 1;
 #else
-int	dirchk = 0;
+static int	dirchk = 0;
 #endif
 
 SYSCTL_INT(_debug, OID_AUTO, dircheck, CTLFLAG_RW, &dirchk, 0, "");

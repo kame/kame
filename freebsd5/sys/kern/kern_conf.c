@@ -23,12 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_conf.c,v 1.112 2002/10/05 17:10:28 green Exp $
+ * $FreeBSD: src/sys/kern/kern_conf.c,v 1.132 2003/04/13 15:27:49 phk Exp $
  */
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
+#include <sys/bio.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/sysctl.h>
@@ -40,11 +41,10 @@
 #include <sys/ctype.h>
 #include <machine/stdarg.h>
 
-#define cdevsw_ALLOCSTART	(NUMCDEVSW/2)
-
-static struct cdevsw 	*cdevsw[NUMCDEVSW];
-
 static MALLOC_DEFINE(M_DEVT, "dev_t", "dev_t storage");
+
+/* Built at compile time from sys/conf/majors */
+extern unsigned char reserved_majors[256];
 
 /*
  * This is the number of hash-buckets.  Experiements with 'real-life'
@@ -62,72 +62,60 @@ static LIST_HEAD(, cdev) dev_hash[DEVT_HASH];
 
 static LIST_HEAD(, cdev) dev_free;
 
-devfs_create_t *devfs_create_hook;
-devfs_destroy_t *devfs_destroy_hook;
-int devfs_present;
-
 static int ready_for_devs;
 
 static int free_devt;
 SYSCTL_INT(_debug, OID_AUTO, free_devt, CTLFLAG_RW, &free_devt, 0, "");
 
-/* XXX: This is a hack */
-void disk_dev_synth(dev_t dev);
+/* Define a dead_cdevsw for use when devices leave unexpectedly. */
+
+static int
+enxio(void)
+{
+	return (ENXIO);
+}
+
+#define dead_open	(d_open_t *)enxio
+#define dead_close	(d_close_t *)enxio
+#define dead_read	(d_read_t *)enxio
+#define dead_write	(d_write_t *)enxio
+#define dead_ioctl	(d_ioctl_t *)enxio
+#define dead_poll	nopoll
+#define dead_mmap	nommap
+
+static void
+dead_strategy(struct bio *bp)
+{
+
+	biofinish(bp, NULL, ENXIO);
+}
+
+#define dead_dump	(dumper_t *)enxio
+
+#define dead_kqfilter	(d_kqfilter_t *)enxio
+
+static struct cdevsw dead_cdevsw = {
+	.d_open =	dead_open,
+	.d_close =	dead_close,
+	.d_read =	dead_read,
+	.d_write =	dead_write,
+	.d_ioctl =	dead_ioctl,
+	.d_poll =	dead_poll,
+	.d_mmap =	dead_mmap,
+	.d_strategy =	dead_strategy,
+	.d_name =	"dead",
+	.d_maj =	255,
+	.d_dump =	dead_dump,
+	.d_kqfilter =	dead_kqfilter
+};
+
 
 struct cdevsw *
 devsw(dev_t dev)
 {
 	if (dev->si_devsw)
 		return (dev->si_devsw);
-	/* XXX: Hack around our backwards disk code */
-	disk_dev_synth(dev);
-	if (dev->si_devsw)
-		return (dev->si_devsw);
-	if (devfs_present)
-		return (NULL);
-        return(cdevsw[major(dev)]);
-}
-
-/*
- *  Add a cdevsw entry
- */
-
-int
-cdevsw_add(struct cdevsw *newentry)
-{
-
-	if (newentry->d_maj < 0 || newentry->d_maj >= NUMCDEVSW) {
-		printf("%s: ERROR: driver has bogus cdevsw->d_maj = %d\n",
-		    newentry->d_name, newentry->d_maj);
-		return (EINVAL);
-	}
-
-	if (cdevsw[newentry->d_maj]) {
-		printf("WARNING: \"%s\" is usurping \"%s\"'s cdevsw[]\n",
-		    newentry->d_name, cdevsw[newentry->d_maj]->d_name);
-	}
-
-	cdevsw[newentry->d_maj] = newentry;
-
-	return (0);
-}
-
-/*
- *  Remove a cdevsw entry
- */
-
-int
-cdevsw_remove(struct cdevsw *oldentry)
-{
-	if (oldentry->d_maj < 0 || oldentry->d_maj >= NUMCDEVSW) {
-		printf("%s: ERROR: driver has bogus cdevsw->d_maj = %d\n",
-		    oldentry->d_name, oldentry->d_maj);
-		return EINVAL;
-	}
-
-	cdevsw[oldentry->d_maj] = NULL;
-
-	return 0;
+	return (&dead_cdevsw);
 }
 
 /*
@@ -180,12 +168,14 @@ allocdev(void)
 		LIST_REMOVE(si, si_hash);
 	} else if (stashed >= DEVT_STASH) {
 		MALLOC(si, struct cdev *, sizeof(*si), M_DEVT,
-		    M_USE_RESERVE | M_ZERO);
+		    M_USE_RESERVE | M_ZERO | M_WAITOK);
 	} else {
 		si = devt_stash + stashed++;
 		bzero(si, sizeof *si);
 		si->si_flags |= SI_STASHED;
 	}
+	si->__si_namebuf[0] = '\0';
+	si->si_name = si->__si_namebuf;
 	LIST_INIT(&si->si_children);
 	TAILQ_INIT(&si->si_snapshots);
 	return (si);
@@ -282,8 +272,39 @@ make_dev(struct cdevsw *devsw, int minor, uid_t uid, gid_t gid, int perms, const
 	va_list ap;
 	int i;
 
-	KASSERT(umajor(makeudev(devsw->d_maj, minor)) == devsw->d_maj,
-	    ("Invalid minor (%d) in make_dev", minor));
+	KASSERT((minor & ~0xffff00ff) == 0,
+	    ("Invalid minor (0x%x) in make_dev", minor));
+
+	if (devsw->d_open == NULL)	devsw->d_open = noopen;
+	if (devsw->d_close == NULL)	devsw->d_close = noclose;
+	if (devsw->d_read == NULL)	devsw->d_read = noread;
+	if (devsw->d_write == NULL)	devsw->d_write = nowrite;
+	if (devsw->d_ioctl == NULL)	devsw->d_ioctl = noioctl;
+	if (devsw->d_poll == NULL)	devsw->d_poll = nopoll;
+	if (devsw->d_mmap == NULL)	devsw->d_mmap = nommap;
+	if (devsw->d_strategy == NULL)	devsw->d_strategy = nostrategy;
+	if (devsw->d_dump == NULL)	devsw->d_dump = nodump;
+	if (devsw->d_kqfilter == NULL)	devsw->d_kqfilter = nokqfilter;
+
+	if (devsw->d_maj == MAJOR_AUTO) {
+		for (i = NUMCDEVSW - 1; i > 0; i--)
+			if (reserved_majors[i] != i)
+				break;
+		KASSERT(i > 0, ("Out of major numbers (%s)", devsw->d_name));
+		devsw->d_maj = i;
+		reserved_majors[i] = i;
+	} else {
+		if (devsw->d_maj == 256)	/* XXX: tty_cons.c is magic */
+			devsw->d_maj = 0;	
+		KASSERT(devsw->d_maj >= 0 && devsw->d_maj < 256,
+		    ("Invalid major (%d) in make_dev", devsw->d_maj));
+		if (reserved_majors[devsw->d_maj] != devsw->d_maj) {
+			printf("WARNING: driver \"%s\" used %s %d\n",
+			    devsw->d_name, "unreserved major device number",
+			    devsw->d_maj);
+			reserved_majors[devsw->d_maj] = devsw->d_maj;
+		}
+	}
 
 	if (!ready_for_devs) {
 		printf("WARNING: Driver mistake: make_dev(%s) called before SI_SUB_DRIVERS\n",
@@ -299,8 +320,11 @@ make_dev(struct cdevsw *devsw, int minor, uid_t uid, gid_t gid, int perms, const
 		return (dev);
 	}
 	va_start(ap, fmt);
-	i = kvprintf(fmt, NULL, dev->si_name, 32, ap);
-	dev->si_name[i] = '\0';
+	i = vsnrprintf(dev->__si_namebuf, sizeof dev->__si_namebuf, 32, fmt, ap);
+	if (i > (sizeof dev->__si_namebuf - 1)) {
+		printf("WARNING: Device name truncated! (%s)", 
+		    dev->__si_namebuf);
+	}
 	va_end(ap);
 	dev->si_devsw = devsw;
 	dev->si_uid = uid;
@@ -308,8 +332,7 @@ make_dev(struct cdevsw *devsw, int minor, uid_t uid, gid_t gid, int perms, const
 	dev->si_mode = perms;
 	dev->si_flags |= SI_NAMED;
 
-	if (devfs_create_hook)
-		devfs_create_hook(dev);
+	devfs_create(dev);
 	return (dev);
 }
 
@@ -347,12 +370,14 @@ make_dev_alias(dev_t pdev, const char *fmt, ...)
 	dev->si_flags |= SI_NAMED;
 	dev_depends(pdev, dev);
 	va_start(ap, fmt);
-	i = kvprintf(fmt, NULL, dev->si_name, 32, ap);
-	dev->si_name[i] = '\0';
+	i = vsnrprintf(dev->__si_namebuf, sizeof dev->__si_namebuf, 32, fmt, ap);
+	if (i > (sizeof dev->__si_namebuf - 1)) {
+		printf("WARNING: Device name truncated! (%s)", 
+		    dev->__si_namebuf);
+	}
 	va_end(ap);
 
-	if (devfs_create_hook)
-		devfs_create_hook(dev);
+	devfs_create(dev);
 	return (dev);
 }
 
@@ -380,8 +405,7 @@ destroy_dev(dev_t dev)
 		return;
 	}
 		
-	if (devfs_destroy_hook)
-		devfs_destroy_hook(dev);
+	devfs_destroy(dev);
 	if (dev->si_flags & SI_CHILD) {
 		LIST_REMOVE(dev, si_siblings);
 		dev->si_flags &= ~SI_CHILD;

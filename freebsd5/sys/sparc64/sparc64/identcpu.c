@@ -6,7 +6,7 @@
  * As long as the above copyright statement and this notice remain
  * unchanged, you can do what ever you want with this file.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/identcpu.c,v 1.9 2002/11/06 23:31:01 mux Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/identcpu.c,v 1.10 2003/03/19 05:51:21 jake Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -47,8 +47,7 @@ cpu_identify(u_long vers, u_int freq, u_int id)
 		manus = NULL;
 		break;
 	}
-	cpu_impl = VER_IMPL(vers);
-	switch (cpu_impl) {
+	switch (VER_IMPL(vers)) {
 	case CPU_IMPL_SPARC64:
 		impls = "SPARC64";
 		break;

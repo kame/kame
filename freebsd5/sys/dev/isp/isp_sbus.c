@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_sbus.c,v 1.5 2002/09/23 05:03:34 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_sbus.c,v 1.7 2003/02/19 05:47:06 imp Exp $ */
 /*
  * PCI specific probe and attach routines for Qlogic ISP SCSI adapters.
  * FreeBSD Version.

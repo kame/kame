@@ -36,7 +36,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/ia64/include/setjmp.h,v 1.8 2002/11/11 08:11:44 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/setjmp.h,v 1.10 2003/03/05 04:39:23 marcel Exp $
  */
 
 #ifndef _MACHINE_SETJMP_H_
@@ -86,13 +86,13 @@
 #define	J_B3		0x1c0
 #define	J_B4		0x1c8
 #define	J_B5		0x1d0
-#define	J_SIG0		0x1d8
-#define	J_SIG1		0x1e0
-#define	J_SIGMASK	0x1e8
+#define	J_SIGMASK	0x1d8
+#define	J_SIGSET	0x1e0
+#define	J_GP		0x1f0
 #endif /* __BSD_VISIBLE */
 
 /*
- * We have 16 bytes left for future use, but it's a nice round,
+ * We have 8 bytes left for future use, but it's a nice round,
  * but above all large number. Size is in bytes.
  */
 #define	_JMPBUFSZ	0x200

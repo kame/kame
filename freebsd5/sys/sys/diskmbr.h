@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)disklabel.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/diskmbr.h,v 1.92.2.1 2003/01/02 20:16:17 phk Exp $
+ * $FreeBSD: src/sys/sys/diskmbr.h,v 1.98 2003/04/13 21:52:22 phk Exp $
  */
 
 #ifndef _SYS_DISKMBR_H_
@@ -41,10 +41,16 @@
 
 #define	DOSBBSECTOR	0	/* DOS boot block relative sector number */
 #define	DOSPARTOFF	446
+#define	DOSPARTSIZE	16
 #define	NDOSPART	4
+#define	NEXTDOSPART	32
+#define	DOSMAGICOFFSET	510
+#define	DOSMAGIC	0xAA55
+
 #define	DOSPTYP_386BSD	0xa5	/* 386BSD partition type */
 #define	DOSPTYP_LINSWP	0x82	/* Linux swap partition */
 #define	DOSPTYP_LINUX	0x83	/* Linux partition */
+#define	DOSPTYP_PMBR	0xee	/* GPT Protective MBR */
 #define	DOSPTYP_EXT	5	/* DOS extended partition */
 #define	DOSPTYP_EXTLBA	15	/* DOS extended partition */
 
@@ -61,14 +67,15 @@ struct dos_partition {
 	u_int32_t	dp_size;	/* partition size in sectors */
 };
 #ifdef CTASSERT
-CTASSERT(sizeof (struct dos_partition) == 16);
+CTASSERT(sizeof (struct dos_partition) == DOSPARTSIZE);
 #endif
+
+void dos_partition_dec(void const *pp, struct dos_partition *d);
+void dos_partition_enc(void *pp, struct dos_partition *d);
 
 #define	DPSECT(s) ((s) & 0x3f)		/* isolate relevant bits of sector */
 #define	DPCYL(c, s) ((c) + (((s) & 0xc0)<<2)) /* and those that are cylinder */
 
-#define DIOCGMBR 	_IOR('M', 128, u_char[512])
 #define DIOCSMBR 	_IOW('M', 129, u_char[512])
-
 
 #endif /* !_SYS_DISKMBR_H_ */

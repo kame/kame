@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/snc/dp83932subr.c,v 1.4 2002/03/20 02:07:42 alfred Exp $	*/
+/*	$FreeBSD: src/sys/dev/snc/dp83932subr.c,v 1.5 2003/05/03 01:47:38 nyan Exp $	*/
 /*	$NecBSD: dp83932subr.c,v 1.5.6.2 1999/10/09 05:47:23 kmatsuda Exp $	*/
 /*	$NetBSD$	*/
   
@@ -629,7 +629,7 @@ snc_nec16_copyfrombuf(sc, dst, offset, size)
 
 	if (size > 3)  {
 		if (noffset & 3)  {
-			size_t asize = (~noffset & 3);
+			size_t asize = 4 - (noffset & 3);
 
 			bus_space_read_region_1(memt, memh, noffset,
 			    bptr, asize);
@@ -670,7 +670,7 @@ snc_nec16_copytobuf(sc, src, offset, size)
 
 	if (size > 3)  {
 		if (noffset & 3)  {
-			size_t asize = (~noffset & 3);
+			size_t asize = 4 - (noffset & 3);
 
 			bus_space_write_region_1(memt, memh, noffset,
 			    bptr, asize);
@@ -712,7 +712,7 @@ snc_nec16_zerobuf(sc, offset, size)
 
 	if (size > 3)  {
 		if (noffset & 3)  {
-			size_t asize = (~noffset & 3);
+			size_t asize = 4 - (noffset & 3);
 
 			bus_space_set_region_1(memt, memh, noffset, 0, asize);
 			noffset += asize;

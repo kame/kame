@@ -26,12 +26,11 @@
  *
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vfsops.c 1.36
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_devs.c,v 1.23 2002/12/09 03:44:27 rwatson Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_devs.c,v 1.28 2003/03/02 13:35:30 phk Exp $
  */
 
 #include "opt_devfs.h"
 #include "opt_mac.h"
-#ifndef NODEVFS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -378,7 +377,7 @@ devfs_populate(struct devfs_mount *dm)
 	return (0);
 }
 
-static void
+void
 devfs_create(dev_t dev)
 {
 	int ino, i, *ip;
@@ -427,7 +426,7 @@ devfs_create(dev_t dev)
 		devfs_attemptoverflow(0);
 }
 
-static void
+void
 devfs_destroy(dev_t dev)
 {
 	int ino, i;
@@ -448,12 +447,9 @@ devfs_destroy(dev_t dev)
 static void
 devfs_init(void *junk)
 {
-	devfs_create_hook = devfs_create;
-	devfs_destroy_hook = devfs_destroy;
-	devfs_present = 1;
+
 	devfs_rules_init();
 }
 
 SYSINIT(devfs, SI_SUB_DEVFS, SI_ORDER_FIRST, devfs_init, NULL);
 
-#endif

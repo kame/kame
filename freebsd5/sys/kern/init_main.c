@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)init_main.c	8.9 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/init_main.c,v 1.216 2002/11/30 22:15:30 keramida Exp $
+ * $FreeBSD: src/sys/kern/init_main.c,v 1.231 2003/05/13 20:35:59 jhb Exp $
  */
 
 #include "opt_init_path.h"
@@ -90,14 +90,12 @@ struct	proc proc0;
 struct	thread thread0;
 struct	kse kse0;
 struct	ksegrp ksegrp0;
-static struct procsig procsig0;
 static struct filedesc0 filedesc0;
 static struct plimit limit0;
-static struct vmspace vmspace0;
+struct	vmspace vmspace0;
 struct	proc *initproc;
 
 int cmask = CMASK;
-extern int fallback_elf_brand;
 
 struct	vnode *rootvp;
 int	boothowto = 0;		/* initialized so that it can be patched */
@@ -377,7 +375,7 @@ proc0_init(void *dummy __unused)
 	td->td_priority = PVM;
 	td->td_base_pri = PUSER;
 	td->td_kse = ke; /* XXXKSE */
-	ke->ke_oncpu = 0;
+	td->td_oncpu = 0;
 	ke->ke_state = KES_THREAD;
 	ke->ke_thread = td;
 	p->p_peers = 0;
@@ -386,7 +384,7 @@ proc0_init(void *dummy __unused)
 
 	bcopy("swapper", p->p_comm, sizeof ("swapper"));
 
-	callout_init(&p->p_itcallout, 0);
+	callout_init(&p->p_itcallout, 1);
 	callout_init(&td->td_slpcallout, 1);
 
 	/* Create credentials. */
@@ -400,9 +398,8 @@ proc0_init(void *dummy __unused)
 #endif
 	td->td_ucred = crhold(p->p_ucred);
 
-	/* Create procsig. */
-	p->p_procsig = &procsig0;
-	p->p_procsig->ps_refcnt = 1;
+	/* Create sigacts. */
+	p->p_sigacts = sigacts_alloc();
 
 	/* Initialize signal state for process 0. */
 	siginit(&proc0);
@@ -442,11 +439,10 @@ proc0_init(void *dummy __unused)
 	vmspace0.vm_map.pmap = vmspace_pmap(&vmspace0);
 
 	/*
-	 * We continue to place resource usage info and signal
-	 * actions in the user struct so they're pageable.
+	 * We continue to place resource usage info
+	 * in the user struct so that it's pageable.
 	 */
 	p->p_stats = &p->p_uarea->u_stats;
-	p->p_sigacts = &p->p_uarea->u_sigacts;
 
 	/*
 	 * Charge root for one process.
@@ -468,7 +464,7 @@ proc0_post(void *dummy __unused)
 	 */
 	sx_slock(&allproc_lock);
 	LIST_FOREACH(p, &allproc, p_list) {
-		microtime(&p->p_stats->p_start);
+		microuptime(&p->p_stats->p_start);
 		p->p_runtime.sec = 0;
 		p->p_runtime.frac = 0;
 	}
@@ -554,21 +550,19 @@ start_init(void *dummy)
 	mac_create_root_mount(td->td_ucred, TAILQ_FIRST(&mountlist));
 #endif
 
-	if (devfs_present) {
-		/*
-		 * For disk based systems, we probably cannot do this yet
-		 * since the fs will be read-only.  But a NFS root
-		 * might be ok.  It is worth a shot.
-		 */
-		error = kern_mkdir(td, "/dev", UIO_SYSSPACE, 0700);
-		if (error == EEXIST)
-			error = 0;
-		if (error == 0)
-			error = kernel_vmount(0, "fstype", "devfs",
-			    "fspath", "/dev", NULL);
-		if (error != 0)
-			init_does_devfs = 1;
-	}
+	/*
+	 * For disk based systems, we probably cannot do this yet
+	 * since the fs will be read-only.  But a NFS root
+	 * might be ok.  It is worth a shot.
+	 */
+	error = kern_mkdir(td, "/dev", UIO_SYSSPACE, 0700);
+	if (error == EEXIST)
+		error = 0;
+	if (error == 0)
+		error = kernel_vmount(0, "fstype", "devfs",
+		    "fspath", "/dev", NULL);
+	if (error != 0)
+		init_does_devfs = 1;
 
 	/*
 	 * Need just enough stack to hold the faked-up "execve()" arguments.
@@ -582,10 +576,6 @@ start_init(void *dummy)
 
 	if ((var = getenv("init_path")) != NULL) {
 		strlcpy(init_path, var, sizeof(init_path));
-		freeenv(var);
-	}
-	if ((var = getenv("kern.fallback_elf_brand")) != NULL) {
-		fallback_elf_brand = strtol(var, NULL, 0);
 		freeenv(var);
 	}
 	

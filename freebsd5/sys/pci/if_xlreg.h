@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_xlreg.h,v 1.38 2002/10/22 02:33:50 silby Exp $
+ * $FreeBSD: src/sys/pci/if_xlreg.h,v 1.45 2003/03/18 06:29:51 silby Exp $
  */
 
 #define XL_EE_READ	0x0080	/* read, 5 bit address */
@@ -420,6 +420,15 @@
 
 #define XL_LAST_FRAG		0x80000000
 
+#define XL_MAXFRAGS		63
+#define XL_RX_LIST_CNT		128
+#define XL_TX_LIST_CNT		256
+#define XL_RX_LIST_SZ		XL_RX_LIST_CNT * sizeof(struct xl_list_onefrag)
+#define XL_TX_LIST_SZ		XL_TX_LIST_CNT * sizeof(struct xl_list)
+#define XL_MIN_FRAMELEN		60
+#define ETHER_ALIGN		2
+#define XL_INC(x, y)		(x) = (x + 1) % y
+
 /*
  * Boomerang/Cyclone TX/RX list structure.
  * For the TX lists, bits 0 to 12 of the status word indicate
@@ -434,7 +443,7 @@ struct xl_frag {
 struct xl_list {
 	u_int32_t		xl_next;	/* final entry has 0 nextptr */
 	u_int32_t		xl_status;
-	struct xl_frag		xl_frag[63];
+	struct xl_frag		xl_frag[XL_MAXFRAGS];
 };
 
 struct xl_list_onefrag {
@@ -443,17 +452,15 @@ struct xl_list_onefrag {
 	struct xl_frag		xl_frag;
 };
 
-#define XL_MAXFRAGS		63
-#define XL_RX_LIST_CNT		128
-#define XL_TX_LIST_CNT		256
-#define XL_MIN_FRAMELEN		60
-#define ETHER_ALIGN		2
-#define XL_INC(x, y)		(x) = (x + 1) % y
-
 struct xl_list_data {
-	struct xl_list_onefrag	xl_rx_list[XL_RX_LIST_CNT];
-	struct xl_list		xl_tx_list[XL_TX_LIST_CNT];
-	unsigned char		xl_pad[XL_MIN_FRAMELEN];
+	struct xl_list_onefrag	*xl_rx_list;
+	struct xl_list		*xl_tx_list;
+	u_int32_t		xl_rx_dmaaddr;
+	bus_dma_tag_t		xl_rx_tag;
+	bus_dmamap_t		xl_rx_dmamap;
+	u_int32_t		xl_tx_dmaaddr;
+	bus_dma_tag_t		xl_tx_tag;
+	bus_dmamap_t		xl_tx_dmamap;
 };
 
 struct xl_chain {
@@ -462,12 +469,14 @@ struct xl_chain {
 	struct xl_chain		*xl_next;
 	struct xl_chain		*xl_prev;
 	u_int32_t		xl_phys;
+	bus_dmamap_t		xl_map;
 };
 
 struct xl_chain_onefrag {
 	struct xl_list_onefrag	*xl_ptr;
 	struct mbuf		*xl_mbuf;
 	struct xl_chain_onefrag	*xl_next;
+	bus_dmamap_t		xl_map;
 };
 
 struct xl_chain_data {
@@ -561,6 +570,7 @@ struct xl_mii_frame {
 #define XL_FLAG_INVERT_LED_PWR		0x0020
 #define XL_FLAG_INVERT_MII_PWR		0x0040
 #define XL_FLAG_NO_XCVR_PWR		0x0080
+#define XL_FLAG_USE_MMIO		0x0100
 
 #define XL_NO_XCVR_PWR_MAGICBITS	0x0900
 
@@ -574,6 +584,8 @@ struct xl_softc {
 	struct resource		*xl_res;
 	device_t		xl_miibus;
 	struct xl_type		*xl_info;	/* 3Com adapter info */
+	bus_dma_tag_t		xl_mtag;
+	bus_dmamap_t		xl_tmpmap;	/* spare DMA map */
 	u_int8_t		xl_unit;	/* interface number */
 	u_int8_t		xl_type;
 	u_int32_t		xl_xcvr;
@@ -582,7 +594,7 @@ struct xl_softc {
 	u_int8_t		xl_stats_no_timeout;
 	u_int16_t		xl_tx_thresh;
 	int			xl_if_flags;
-	struct xl_list_data	*xl_ldata;
+	struct xl_list_data	xl_ldata;
 	struct xl_chain_data	xl_cdata;
 	struct callout_handle	xl_stat_ch;
 	int			xl_flags;
@@ -667,10 +679,12 @@ struct xl_stats {
 #define TC_DEVICEID_CYCLONE_10_100_COMBO	0x9058
 #define TC_DEVICEID_CYCLONE_10_100FX		0x905A
 #define TC_DEVICEID_TORNADO_10_100BT		0x9200
+#define TC_DEVICEID_TORNADO_10_100BT_920B	0x9201
 #define TC_DEVICEID_HURRICANE_10_100BT_SERV	0x9800
 #define TC_DEVICEID_TORNADO_10_100BT_SERV	0x9805
 #define TC_DEVICEID_HURRICANE_SOHO100TX		0x7646
 #define TC_DEVICEID_TORNADO_HOMECONNECT		0x4500
+#define TC_DEVICEID_HURRICANE_555		0x5055
 #define TC_DEVICEID_HURRICANE_556		0x6055
 #define TC_DEVICEID_HURRICANE_556B		0x6056
 #define TC_DEVICEID_HURRICANE_575A		0x5057
@@ -717,12 +731,6 @@ struct xl_stats {
 #define XL_PSTATE_D3		0x0003
 #define XL_PME_EN		0x0010
 #define XL_PME_STATUS		0x8000
-
-#ifdef __alpha__
-#undef vtophys
-#define vtophys(va)		alpha_XXX_dmamap((vm_offset_t)va)
-				
-#endif
 
 #ifndef IFM_10_FL
 #define IFM_10_FL	13		/* 10baseFL - Fiber */

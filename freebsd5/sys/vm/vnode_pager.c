@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vnode_pager.c	7.5 (Berkeley) 4/20/91
- * $FreeBSD: src/sys/vm/vnode_pager.c,v 1.163 2002/11/27 19:51:48 alc Exp $
+ * $FreeBSD: src/sys/vm/vnode_pager.c,v 1.173 2003/05/06 02:45:28 alc Exp $
  */
 
 /*
@@ -60,7 +60,6 @@
 #include <sys/buf.h>
 #include <sys/vmmeter.h>
 #include <sys/conf.h>
-#include <sys/stdint.h>
 
 #include <vm/vm.h>
 #include <vm/vm_object.h>
@@ -140,9 +139,11 @@ vnode_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 	 * If the object is being terminated, wait for it to
 	 * go away.
 	 */
-	while (((object = vp->v_object) != NULL) &&
-		(object->flags & OBJ_DEAD)) {
-		tsleep(object, PVM, "vadead", 0);
+	while ((object = vp->v_object) != NULL) {
+		VM_OBJECT_LOCK(object);
+		if ((object->flags & OBJ_DEAD) == 0)
+			break;
+		msleep(object, VM_OBJECT_MTX(object), PDROP | PVM, "vadead", 0);
 	}
 
 	if (vp->v_usecount == 0)
@@ -160,6 +161,7 @@ vnode_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 		vp->v_object = object;
 	} else {
 		object->ref_count++;
+		VM_OBJECT_UNLOCK(object);
 	}
 	VI_LOCK(vp);
 	vp->v_usecount++;
@@ -173,16 +175,19 @@ vnode_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 	return (object);
 }
 
+/*
+ *	The object must be locked.
+ */
 static void
 vnode_pager_dealloc(object)
 	vm_object_t object;
 {
 	struct vnode *vp = object->handle;
 
-	GIANT_REQUIRED;
 	if (vp == NULL)
 		panic("vnode_pager_dealloc: pager already dealloced");
 
+	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 	vm_object_pip_wait(object, "vnpdea");
 
 	object->handle = NULL;
@@ -307,12 +312,11 @@ vnode_pager_setsize(vp, nsize)
 	 * File has shrunk. Toss any cached pages beyond the new EOF.
 	 */
 	if (nsize < object->un_pager.vnp.vnp_size) {
-#ifdef ENABLE_VFS_IOOPT
-		vm_freeze_copyopts(object, OFF_TO_IDX(nsize), object->size);
-#endif
 		if (nobjsize < object->size) {
+			VM_OBJECT_LOCK(object);
 			vm_object_page_remove(object, nobjsize, object->size,
 				FALSE);
+			VM_OBJECT_UNLOCK(object);
 		}
 		/*
 		 * this gets rid of garbage at the end of a page that is now
@@ -491,7 +495,7 @@ vnode_pager_input_smlfs(object, m)
 			runningbufspace += bp->b_runningbufspace;
 
 			/* do the input */
-			BUF_STRATEGY(bp);
+			VOP_SPECSTRATEGY(bp->b_vp, bp);
 
 			/* we definitely need to be at splvm here */
 
@@ -821,7 +825,10 @@ vnode_pager_generic_getpages(vp, m, bytecount, reqpage)
 	cnt.v_vnodepgsin += count;
 
 	/* do the input */
-	BUF_STRATEGY(bp);
+	if (dp->v_type == VCHR)
+		VOP_SPECSTRATEGY(bp->b_vp, bp);
+	else
+		VOP_STRATEGY(bp->b_vp, bp);
 
 	s = splvm();
 	/* we definitely need to be at splvm here */
@@ -1042,11 +1049,17 @@ vnode_pager_generic_putpages(vp, m, bytecount, flags, rtvals)
 	/*
 	 * pageouts are already clustered, use IO_ASYNC t o force a bawrite()
 	 * rather then a bdwrite() to prevent paging I/O from saturating 
-	 * the buffer cache.
+	 * the buffer cache.  Dummy-up the sequential heuristic to cause
+	 * large ranges to cluster.  If neither IO_SYNC or IO_ASYNC is set,
+	 * the system decides how to cluster.
 	 */
 	ioflags = IO_VMIO;
-	ioflags |= (flags & (VM_PAGER_PUT_SYNC | VM_PAGER_PUT_INVAL)) ? IO_SYNC: IO_ASYNC;
+	if (flags & (VM_PAGER_PUT_SYNC | VM_PAGER_PUT_INVAL))
+		ioflags |= IO_SYNC;
+	else if ((flags & VM_PAGER_CLUSTER_OK) == 0)
+		ioflags |= IO_ASYNC;
 	ioflags |= (flags & VM_PAGER_PUT_INVAL) ? IO_INVAL: 0;
+	ioflags |= IO_SEQMAX << IO_SEQSHIFT;
 
 	aiov.iov_base = (caddr_t) 0;
 	aiov.iov_len = maxsize;

@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kernel.h	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/kernel.h,v 1.107 2002/10/20 08:17:39 scottl Exp $
+ * $FreeBSD: src/sys/sys/kernel.h,v 1.109 2003/02/03 19:49:35 phk Exp $
  */
 
 #ifndef _SYS_KERNEL_H_
@@ -68,15 +68,17 @@ extern char kernelname[MAXPATHLEN];
 /* 1.2 */
 extern struct timeval boottime;
 
-extern struct timezone tz;			/* XXX */
-
 extern int tick;			/* usec per tick (1000000 / hz) */
 extern int hz;				/* system clock's frequency */
 extern int psratio;			/* ratio: prof / stat */
 extern int stathz;			/* statistics clock's frequency */
 extern int profhz;			/* profiling clock's frequency */
+extern int profprocs;			/* number of process's profiling */
 extern int ticks;
 extern int lbolt;			/* once a second sleep address */
+
+extern int tz_minuteswest;
+extern int tz_dsttime;
 
 #endif /* _KERNEL */
 

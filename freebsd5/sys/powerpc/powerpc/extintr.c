@@ -39,10 +39,8 @@
  *	@(#)isa.c	7.2 (Berkeley) 5/12/91
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/powerpc/powerpc/extintr.c,v 1.6 2002/03/20 23:17:50 alfred Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/extintr.c,v 1.9 2003/04/03 21:36:33 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

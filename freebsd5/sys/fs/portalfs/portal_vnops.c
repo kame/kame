@@ -35,7 +35,7 @@
  *
  *	@(#)portal_vnops.c	8.14 (Berkeley) 5/21/95
  *
- * $FreeBSD: src/sys/fs/portalfs/portal_vnops.c,v 1.53.2.1 2003/01/08 00:37:26 tjr Exp $
+ * $FreeBSD: src/sys/fs/portalfs/portal_vnops.c,v 1.59 2003/03/03 19:15:38 njl Exp $
  */
 
 /*
@@ -269,7 +269,7 @@ portal_open(ap)
 	/*
 	 * Kick off connection
 	 */
-	error = portal_connect(so, (struct socket *)fmp->pm_server->f_data);
+	error = portal_connect(so, fmp->pm_server->f_data);
 	if (error)
 		goto bad;
 
@@ -561,7 +561,6 @@ static struct vnodeopv_entry_desc portal_vnodeop_entries[] = {
 	{ &vop_lookup_desc,		(vop_t *) portal_lookup },
 	{ &vop_open_desc,		(vop_t *) portal_open },
 	{ &vop_pathconf_desc,		(vop_t *) vop_stdpathconf },
-	{ &vop_print_desc,		(vop_t *) vop_null },
 	{ &vop_readdir_desc,		(vop_t *) portal_readdir },
 	{ &vop_reclaim_desc,		(vop_t *) portal_reclaim },
 	{ &vop_setattr_desc,		(vop_t *) portal_setattr },

@@ -1,5 +1,5 @@
 /*	$NetBSD: i82365.c,v 1.25 1999/10/15 06:07:27 haya Exp $	*/
-/* $FreeBSD: src/sys/dev/pcic/i82365.c,v 1.37 2002/11/17 04:52:37 imp Exp $ */
+/* $FreeBSD: src/sys/dev/pcic/i82365.c,v 1.38 2003/03/02 16:54:34 des Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -511,7 +511,7 @@ pcic_event_thread(void *arg)
 		} else {
 			splx(s);
 			/* sleep .25s to be enqueued chatterling interrupts */
-			(void) tsleep((caddr_t)pcic_event_thread, PWAIT, "pcicss", hz/4);
+			(void) tsleep(pcic_event_thread, PWAIT, "pcicss", hz/4);
 		}
 		s = splhigh();
 		STAILQ_REMOVE_HEAD_UNTIL(&h->events, pe, pe_q);

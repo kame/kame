@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vnops.c,v 1.189 2002/10/11 14:58:32 mike Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vnops.c,v 1.205 2003/05/15 21:12:08 rwatson Exp $");
 
 /*
  * vnode op calls for Sun NFS version 2 and 3
@@ -147,7 +147,6 @@ static struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
 	{ &vop_getpages_desc,		(vop_t *) nfs_getpages },
 	{ &vop_putpages_desc,		(vop_t *) nfs_putpages },
 	{ &vop_inactive_desc,		(vop_t *) nfs_inactive },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_lease_desc,		(vop_t *) vop_null },
 	{ &vop_link_desc,		(vop_t *) nfs_link },
 	{ &vop_lock_desc,		(vop_t *) vop_sharedlock },
@@ -166,7 +165,6 @@ static struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
 	{ &vop_setattr_desc,		(vop_t *) nfs_setattr },
 	{ &vop_strategy_desc,		(vop_t *) nfs_strategy },
 	{ &vop_symlink_desc,		(vop_t *) nfs_symlink },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) nfs_write },
 	{ NULL, NULL }
 };
@@ -184,14 +182,12 @@ static struct vnodeopv_entry_desc nfsv2_specop_entries[] = {
 	{ &vop_close_desc,		(vop_t *) nfsspec_close },
 	{ &vop_fsync_desc,		(vop_t *) nfs_fsync },
 	{ &vop_getattr_desc,		(vop_t *) nfs_getattr },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_inactive_desc,		(vop_t *) nfs_inactive },
 	{ &vop_lock_desc,		(vop_t *) vop_sharedlock },
 	{ &vop_print_desc,		(vop_t *) nfs_print },
 	{ &vop_read_desc,		(vop_t *) nfsspec_read },
 	{ &vop_reclaim_desc,		(vop_t *) nfs_reclaim },
 	{ &vop_setattr_desc,		(vop_t *) nfs_setattr },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) nfsspec_write },
 	{ NULL, NULL }
 };
@@ -207,13 +203,11 @@ static struct vnodeopv_entry_desc nfsv2_fifoop_entries[] = {
 	{ &vop_fsync_desc,		(vop_t *) nfs_fsync },
 	{ &vop_getattr_desc,		(vop_t *) nfs_getattr },
 	{ &vop_inactive_desc,		(vop_t *) nfs_inactive },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_lock_desc,		(vop_t *) vop_sharedlock },
 	{ &vop_print_desc,		(vop_t *) nfs_print },
 	{ &vop_read_desc,		(vop_t *) nfsfifo_read },
 	{ &vop_reclaim_desc,		(vop_t *) nfs_reclaim },
 	{ &vop_setattr_desc,		(vop_t *) nfs_setattr },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) nfsfifo_write },
 	{ NULL, NULL }
 };
@@ -532,7 +526,9 @@ nfs_close(struct vop_close_args *ap)
 		    error = nfs_flush(vp, ap->a_cred, MNT_WAIT, ap->a_td, cm);
 		    /* np->n_flag &= ~NMODIFIED; */
 		} else {
+		    vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, ap->a_td);
 		    error = nfs_vinvalbuf(vp, V_SAVE, ap->a_cred, ap->a_td, 1);
+		    VOP_UNLOCK(vp, 0, ap->a_td);
 		}
 		np->n_attrstamp = 0;
 	    }
@@ -1527,6 +1523,14 @@ nfs_rename(struct vop_rename_args *ap)
 		goto out;
 	}
 
+	if (fvp == tvp) {
+		printf("nfs_rename: fvp == tvp (can't happen)\n");
+		error = 0;
+		goto out;
+	}
+	if ((error = vn_lock(fvp, LK_EXCLUSIVE, fcnp->cn_thread)) != 0)
+		goto out;
+
 	/*
 	 * We have to flush B_DELWRI data prior to renaming
 	 * the file.  If we don't, the delayed-write buffers
@@ -1535,8 +1539,8 @@ nfs_rename(struct vop_rename_args *ap)
 	 * ( as far as I can tell ) it flushes dirty buffers more
 	 * often.
 	 */
-
 	VOP_FSYNC(fvp, fcnp->cn_cred, MNT_WAIT, fcnp->cn_thread);
+	VOP_UNLOCK(fvp, 0, fcnp->cn_thread);
 	if (tvp)
 	    VOP_FSYNC(tvp, tcnp->cn_cred, MNT_WAIT, tcnp->cn_thread);
 
@@ -2622,6 +2626,8 @@ again:
 	bvecpos = 0;
 	if (NFS_ISV3(vp) && commit) {
 		s = splbio();
+		if (bvec != NULL && bvec != bvec_on_stack)
+			free(bvec, M_TEMP);
 		/*
 		 * Count up how many buffers waiting for a commit.
 		 */
@@ -2640,12 +2646,16 @@ again:
 		 * If we can't get memory (for whatever reason), we will end up
 		 * committing the buffers one-by-one in the loop below.
 		 */
-		if (bvec != NULL && bvec != bvec_on_stack)
-			free(bvec, M_TEMP);
 		if (bveccount > NFS_COMMITBVECSIZ) {
+			/*
+			 * Release the vnode interlock to avoid a lock
+			 * order reversal.
+			 */
+			VI_UNLOCK(vp);
 			bvec = (struct buf **)
 				malloc(bveccount * sizeof(struct buf *),
 				       M_TEMP, M_NOWAIT);
+			VI_LOCK(vp);
 			if (bvec == NULL) {
 				bvec = bvec_on_stack;
 				bvecsize = NFS_COMMITBVECSIZ;
@@ -2658,14 +2668,17 @@ again:
 		for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
 			if (bvecpos >= bvecsize)
 				break;
-			VI_UNLOCK(vp);
-			if ((bp->b_flags & (B_DELWRI | B_NEEDCOMMIT)) !=
-			    (B_DELWRI | B_NEEDCOMMIT) ||
-			    BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT)) {
-				VI_LOCK(vp);
+			if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT, NULL)) {
 				nbp = TAILQ_NEXT(bp, b_vnbufs);
 				continue;
 			}
+			if ((bp->b_flags & (B_DELWRI | B_NEEDCOMMIT)) !=
+			    (B_DELWRI | B_NEEDCOMMIT)) {
+				BUF_UNLOCK(bp);
+				nbp = TAILQ_NEXT(bp, b_vnbufs);
+				continue;
+			}
+			VI_UNLOCK(vp);
 			bremfree(bp);
 			/*
 			 * Work out if all buffers are using the same cred
@@ -2785,14 +2798,13 @@ loop:
 	VI_LOCK(vp);
 	for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
 		nbp = TAILQ_NEXT(bp, b_vnbufs);
-		VI_UNLOCK(vp);
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT)) {
-			if (waitfor != MNT_WAIT || passone) {
-				VI_LOCK(vp);
+		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT, NULL)) {
+			if (waitfor != MNT_WAIT || passone)
 				continue;
-			}
-			error = BUF_TIMELOCK(bp, LK_EXCLUSIVE | LK_SLEEPFAIL,
-			    "nfsfsync", slpflag, slptimeo);
+
+			error = BUF_TIMELOCK(bp,
+			    LK_EXCLUSIVE | LK_SLEEPFAIL | LK_INTERLOCK,
+			    VI_MTX(vp), "nfsfsync", slpflag, slptimeo);
 			splx(s);
 			if (error == 0)
 				panic("nfs_fsync: inconsistent lock");
@@ -2812,9 +2824,9 @@ loop:
 			panic("nfs_fsync: not dirty");
 		if ((passone || !commit) && (bp->b_flags & B_NEEDCOMMIT)) {
 			BUF_UNLOCK(bp);
-			VI_LOCK(vp);
 			continue;
 		}
+		VI_UNLOCK(vp);
 		bremfree(bp);
 		if (passone || !commit)
 		    bp->b_flags |= B_ASYNC;
@@ -2836,8 +2848,8 @@ loop:
 			error = msleep((caddr_t)&vp->v_numoutput, VI_MTX(vp),
 				slpflag | (PRIBIO + 1), "nfsfsync", slptimeo);
 			if (error) {
+			    VI_UNLOCK(vp);
 			    if (nfs_sigintr(nmp, NULL, td)) {
-				VI_UNLOCK(vp);
 				error = EINTR;
 				goto done;
 			    }
@@ -2845,6 +2857,7 @@ loop:
 				slpflag = 0;
 				slptimeo = 2 * hz;
 			    }
+			    VI_LOCK(vp);
 			}
 		}
 		if (!TAILQ_EMPTY(&vp->v_dirtyblkhd) && commit) {
@@ -2887,8 +2900,8 @@ nfs_print(struct vop_print_args *ap)
 	struct vnode *vp = ap->a_vp;
 	struct nfsnode *np = VTONFS(vp);
 
-	printf("tag %s fileid %ld fsid 0x%x",
-	       vp->v_tag, np->n_vattr.va_fileid, np->n_vattr.va_fsid);
+	printf("\tfileid %ld fsid 0x%x",
+	   np->n_vattr.va_fileid, np->n_vattr.va_fsid);
 	if (vp->v_type == VFIFO)
 		fifo_printinfo(vp);
 	printf("\n");
@@ -2946,7 +2959,7 @@ nfs_writebp(struct buf *bp, int force, struct thread *td)
 	if (force)
 		bp->b_flags |= B_WRITEINPROG;
 	BUF_KERNPROC(bp);
-	BUF_STRATEGY(bp);
+	VOP_STRATEGY(bp->b_vp, bp);
 
 	if( (oldflags & B_ASYNC) == 0) {
 		int rtval = bufwait(bp);
@@ -2973,12 +2986,10 @@ static int
 nfsspec_access(struct vop_access_args *ap)
 {
 	struct vattr *vap;
-	gid_t *gp;
 	struct ucred *cred = ap->a_cred;
 	struct vnode *vp = ap->a_vp;
 	mode_t mode = ap->a_mode;
 	struct vattr vattr;
-	int i;
 	int error;
 
 	/*
@@ -2996,33 +3007,12 @@ nfsspec_access(struct vop_access_args *ap)
 			break;
 		}
 	}
-	/*
-	 * If you're the super-user,
-	 * you always get access.
-	 */
-	if (cred->cr_uid == 0)
-		return (0);
 	vap = &vattr;
 	error = VOP_GETATTR(vp, vap, cred, ap->a_td);
 	if (error)
 		return (error);
-	/*
-	 * Access check is based on only one of owner, group, public.
-	 * If not owner, then check group. If not a member of the
-	 * group, then check public access.
-	 */
-	if (cred->cr_uid != vap->va_uid) {
-		mode >>= 3;
-		gp = cred->cr_groups;
-		for (i = 0; i < cred->cr_ngroups; i++, gp++)
-			if (vap->va_gid == *gp)
-				goto found;
-		mode >>= 3;
-found:
-		;
-	}
-	error = (vap->va_mode & mode) == mode ? 0 : EACCES;
-	return (error);
+	return (vaccess(vp->v_type, vap->va_mode, vap->va_uid, vap->va_gid,
+	    mode, cred, NULL));
 }
 
 /*
@@ -3143,7 +3133,9 @@ nfsfifo_close(struct vop_close_args *ap)
 				vattr.va_atime = np->n_atim;
 			if (np->n_flag & NUPD)
 				vattr.va_mtime = np->n_mtim;
+			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, ap->a_td);
 			(void)VOP_SETATTR(vp, &vattr, ap->a_cred, ap->a_td);
+			VOP_UNLOCK(vp, 0, ap->a_td);
 		}
 	}
 	return (VOCALL(fifo_vnodeop_p, VOFFSET(vop_close), ap));

@@ -40,7 +40,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinuminterrupt.c,v 1.14 2001/05/23 23:03:37 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinuminterrupt.c,v 1.39 2002/11/07 21:52:50 jhb Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinuminterrupt.c,v 1.40 2003/01/03 05:57:34 phk Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -420,7 +420,7 @@ complete_raid5_write(struct rqelement *rqe)
 		    if (debug & DEBUG_LASTREQS)
 			logrq(loginfo_raid5_data, (union rqinfou) rqe, ubp);
 #endif
-		    DEV_STRATEGY(&rqe->b, 0);
+		    DEV_STRATEGY(&rqe->b);
 		}
 	    }
 	}
@@ -459,7 +459,7 @@ complete_raid5_write(struct rqelement *rqe)
     if (debug & DEBUG_LASTREQS)
 	logrq(loginfo_raid5_parity, (union rqinfou) rqe, ubp);
 #endif
-    DEV_STRATEGY(&rqe->b, 0);
+    DEV_STRATEGY(&rqe->b);
 }
 
 /* Local Variables: */

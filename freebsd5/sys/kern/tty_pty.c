@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty_pty.c	8.4 (Berkeley) 2/20/95
- * $FreeBSD: src/sys/kern/tty_pty.c,v 1.98 2002/04/16 17:09:22 jhb Exp $
+ * $FreeBSD: src/sys/kern/tty_pty.c,v 1.108 2003/05/13 20:35:59 jhb Exp $
  */
 
 /*
@@ -39,6 +39,7 @@
  * (Actually two drivers, requiring two entries in 'cdevsw')
  */
 #include "opt_compat.h"
+#include "opt_tty.h"
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
@@ -77,38 +78,30 @@ static	d_poll_t	ptcpoll;
 
 #define	CDEV_MAJOR_S	5
 static struct cdevsw pts_cdevsw = {
-	/* open */	ptsopen,
-	/* close */	ptsclose,
-	/* read */	ptsread,
-	/* write */	ptswrite,
-	/* ioctl */	ptyioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"pts",
-	/* maj */	CDEV_MAJOR_S,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	ptsopen,
+	.d_close =	ptsclose,
+	.d_read =	ptsread,
+	.d_write =	ptswrite,
+	.d_ioctl =	ptyioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"pts",
+	.d_maj =	CDEV_MAJOR_S,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 #define	CDEV_MAJOR_C	6
 static struct cdevsw ptc_cdevsw = {
-	/* open */	ptcopen,
-	/* close */	ptcclose,
-	/* read */	ptcread,
-	/* write */	ptcwrite,
-	/* ioctl */	ptyioctl,
-	/* poll */	ptcpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"ptc",
-	/* maj */	CDEV_MAJOR_C,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	ptcopen,
+	.d_close =	ptcclose,
+	.d_read =	ptcread,
+	.d_write =	ptcwrite,
+	.d_ioctl =	ptyioctl,
+	.d_poll =	ptcpoll,
+	.d_name =	"ptc",
+	.d_maj =	CDEV_MAJOR_C,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 #define BUFSIZ 100		/* Chunk size iomoved to/from user */
@@ -136,7 +129,7 @@ static char *names = "pqrsPQRS";
  * pts == /dev/tty[pqrsPQRS][0123456789abcdefghijklmnopqrstuv]
  * ptc == /dev/pty[pqrsPQRS][0123456789abcdefghijklmnopqrstuv]
  *
- * XXX: define and add mapping of upper minor bits to allow more 
+ * XXX: define and add mapping of upper minor bits to allow more
  *      than 256 ptys.
  */
 static dev_t
@@ -172,12 +165,12 @@ ptsopen(dev, flag, devtype, td)
 	int flag, devtype;
 	struct thread *td;
 {
-	register struct tty *tp;
+	struct tty *tp;
 	int error;
 	struct pt_ioctl *pti;
 
 	if (!dev->si_drv1)
-		return(ENXIO);	
+		return(ENXIO);
 	pti = dev->si_drv1;
 	tp = dev->si_tty;
 	if ((tp->t_state & TS_ISOPEN) == 0) {
@@ -214,7 +207,7 @@ ptsclose(dev, flag, mode, td)
 	int flag, mode;
 	struct thread *td;
 {
-	register struct tty *tp;
+	struct tty *tp;
 	int err;
 
 	tp = dev->si_tty;
@@ -232,8 +225,8 @@ ptsread(dev, uio, flag)
 {
 	struct thread *td = curthread;
 	struct proc *p = td->td_proc;
-	register struct tty *tp = dev->si_tty;
-	register struct pt_ioctl *pti = dev->si_drv1;
+	struct tty *tp = dev->si_tty;
+	struct pt_ioctl *pti = dev->si_drv1;
 	struct pgrp *pg;
 	int error = 0;
 
@@ -242,8 +235,8 @@ again:
 		while (isbackground(p, tp)) {
 			sx_slock(&proctree_lock);
 			PROC_LOCK(p);
-			if (SIGISMEMBER(p->p_sigignore, SIGTTIN) ||
-			    SIGISMEMBER(p->p_sigmask, SIGTTIN) ||
+			if (SIGISMEMBER(p->p_sigacts->ps_sigignore, SIGTTIN) ||
+			    SIGISMEMBER(td->td_sigmask, SIGTTIN) ||
 			    p->p_pgrp->pg_jobc == 0 || p->p_flag & P_PPWAIT) {
 				PROC_UNLOCK(p);
 				sx_sunlock(&proctree_lock);
@@ -296,7 +289,7 @@ ptswrite(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	register struct tty *tp;
+	struct tty *tp;
 
 	tp = dev->si_tty;
 	if (tp->t_oproc == 0)
@@ -312,7 +305,7 @@ static void
 ptsstart(tp)
 	struct tty *tp;
 {
-	register struct pt_ioctl *pti = tp->t_dev->si_drv1;
+	struct pt_ioctl *pti = tp->t_dev->si_drv1;
 
 	if (tp->t_state & TS_TTSTOP)
 		return;
@@ -346,13 +339,13 @@ ptcopen(dev, flag, devtype, td)
 	int flag, devtype;
 	struct thread *td;
 {
-	register struct tty *tp;
+	struct tty *tp;
 	struct pt_ioctl *pti;
 
 	if (!dev->si_drv1)
 		ptyinit(dev);
 	if (!dev->si_drv1)
-		return(ENXIO);	
+		return(ENXIO);
 	tp = dev->si_tty;
 	if (tp->t_oproc)
 		return (EIO);
@@ -376,7 +369,7 @@ ptcclose(dev, flags, fmt, td)
 	int fmt;
 	struct thread *td;
 {
-	register struct tty *tp;
+	struct tty *tp;
 
 	tp = dev->si_tty;
 	(void)(*linesw[tp->t_line].l_modem)(tp, 0);
@@ -405,7 +398,7 @@ ptcread(dev, uio, flag)
 	struct uio *uio;
 	int flag;
 {
-	register struct tty *tp = dev->si_tty;
+	struct tty *tp = dev->si_tty;
 	struct pt_ioctl *pti = dev->si_drv1;
 	char buf[BUFSIZ];
 	int error = 0, cc;
@@ -425,8 +418,7 @@ ptcread(dev, uio, flag)
 				if (pti->pt_send & TIOCPKT_IOCTL) {
 					cc = min(uio->uio_resid,
 						sizeof(tp->t_termios));
-					uiomove((caddr_t)&tp->t_termios, cc,
-						uio);
+					uiomove(&tp->t_termios, cc, uio);
 				}
 				pti->pt_send = 0;
 				return (0);
@@ -463,7 +455,7 @@ ptcread(dev, uio, flag)
 
 static	void
 ptsstop(tp, flush)
-	register struct tty *tp;
+	struct tty *tp;
 	int flush;
 {
 	struct pt_ioctl *pti = tp->t_dev->si_drv1;
@@ -491,7 +483,7 @@ ptcpoll(dev, events, td)
 	int events;
 	struct thread *td;
 {
-	register struct tty *tp = dev->si_tty;
+	struct tty *tp = dev->si_tty;
 	struct pt_ioctl *pti = dev->si_drv1;
 	int revents = 0;
 	int s;
@@ -514,7 +506,7 @@ ptcpoll(dev, events, td)
 	if (events & (POLLOUT | POLLWRNORM))
 		if (tp->t_state & TS_ISOPEN &&
 		    ((pti->pt_flags & PF_REMOTE) ?
-		     (tp->t_canq.c_cc == 0) : 
+		     (tp->t_canq.c_cc == 0) :
 		     ((tp->t_rawq.c_cc + tp->t_canq.c_cc < TTYHOG - 2) ||
 		      (tp->t_canq.c_cc == 0 && (tp->t_lflag & ICANON)))))
 			revents |= events & (POLLOUT | POLLWRNORM);
@@ -527,7 +519,7 @@ ptcpoll(dev, events, td)
 		if (events & (POLLIN | POLLRDNORM))
 			selrecord(td, &pti->pt_selr);
 
-		if (events & (POLLOUT | POLLWRNORM)) 
+		if (events & (POLLOUT | POLLWRNORM))
 			selrecord(td, &pti->pt_selw);
 	}
 	splx(s);
@@ -538,12 +530,12 @@ ptcpoll(dev, events, td)
 static	int
 ptcwrite(dev, uio, flag)
 	dev_t dev;
-	register struct uio *uio;
+	struct uio *uio;
 	int flag;
 {
-	register struct tty *tp = dev->si_tty;
-	register u_char *cp = 0;
-	register int cc = 0;
+	struct tty *tp = dev->si_tty;
+	u_char *cp = 0;
+	int cc = 0;
 	u_char locbuf[BUFSIZ];
 	int cnt = 0;
 	struct pt_ioctl *pti = dev->si_drv1;
@@ -561,7 +553,7 @@ again:
 				cc = min(uio->uio_resid, BUFSIZ);
 				cc = min(cc, TTYHOG - 1 - tp->t_canq.c_cc);
 				cp = locbuf;
-				error = uiomove((caddr_t)cp, cc, uio);
+				error = uiomove(cp, cc, uio);
 				if (error)
 					return (error);
 				/* check again for safety */
@@ -596,7 +588,7 @@ again:
 		if (cc == 0) {
 			cc = min(uio->uio_resid, BUFSIZ);
 			cp = locbuf;
-			error = uiomove((caddr_t)cp, cc, uio);
+			error = uiomove(cp, cc, uio);
 			if (error)
 				return (error);
 			/* check again for safety */
@@ -654,9 +646,9 @@ ptyioctl(dev, cmd, data, flag, td)
 	int flag;
 	struct thread *td;
 {
-	register struct tty *tp = dev->si_tty;
-	register struct pt_ioctl *pti = dev->si_drv1;
-	register u_char *cc = tp->t_cc;
+	struct tty *tp = dev->si_tty;
+	struct pt_ioctl *pti = dev->si_drv1;
+	u_char *cc = tp->t_cc;
 	int stop, error;
 
 	if (devsw(dev)->d_open == ptcopen) {
@@ -698,7 +690,7 @@ ptyioctl(dev, cmd, data, flag, td)
 		}
 
 		/*
-		 * The rest of the ioctls shouldn't be called until 
+		 * The rest of the ioctls shouldn't be called until
 		 * the slave is open.
 		 */
 		if ((tp->t_state & TS_ISOPEN) == 0)
@@ -866,9 +858,8 @@ static void
 ptc_drvinit(unused)
 	void *unused;
 {
+
 	EVENTHANDLER_REGISTER(dev_clone, pty_clone, 0, 1000);
-	cdevsw_add(&pts_cdevsw);
-	cdevsw_add(&ptc_cdevsw);
 }
 
 SYSINIT(ptcdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR_C,ptc_drvinit,NULL)

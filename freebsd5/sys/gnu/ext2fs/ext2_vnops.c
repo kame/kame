@@ -43,7 +43,7 @@
  *
  *	@(#)ufs_vnops.c	8.7 (Berkeley) 2/3/94
  *	@(#)ufs_vnops.c 8.27 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.74 2002/10/16 10:14:34 phk Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.78 2003/03/03 19:15:39 njl Exp $
  */
 
 #include "opt_suiddir.h"
@@ -136,9 +136,7 @@ static struct vnodeopv_entry_desc ext2_vnodeop_entries[] = {
 	{ &vop_getattr_desc,		(vop_t *) ext2_getattr },
 	{ &vop_getwritemount_desc,	(vop_t *) vop_stdgetwritemount },
 	{ &vop_inactive_desc,		(vop_t *) ext2_inactive },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_link_desc,		(vop_t *) ext2_link },
-	{ &vop_lock_desc,		(vop_t *) vop_stdlock },
 	{ &vop_lookup_desc,		(vop_t *) vfs_cache_lookup },
 	{ &vop_mkdir_desc,		(vop_t *) ext2_mkdir },
 	{ &vop_mknod_desc,		(vop_t *) ext2_mknod },
@@ -158,7 +156,6 @@ static struct vnodeopv_entry_desc ext2_vnodeop_entries[] = {
 	{ &vop_setattr_desc,		(vop_t *) ext2_setattr },
 	{ &vop_strategy_desc,		(vop_t *) ext2_strategy },
 	{ &vop_symlink_desc,		(vop_t *) ext2_symlink },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) ext2_write },
 	{ NULL, NULL }
 };
@@ -173,13 +170,10 @@ static struct vnodeopv_entry_desc ext2_specop_entries[] = {
 	{ &vop_fsync_desc,		(vop_t *) ext2_fsync },
 	{ &vop_getattr_desc,		(vop_t *) ext2_getattr },
 	{ &vop_inactive_desc,		(vop_t *) ext2_inactive },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
-	{ &vop_lock_desc,		(vop_t *) vop_stdlock },
 	{ &vop_print_desc,		(vop_t *) ext2_print },
 	{ &vop_read_desc,		(vop_t *) ext2spec_read },
 	{ &vop_reclaim_desc,		(vop_t *) ext2_reclaim },
 	{ &vop_setattr_desc,		(vop_t *) ext2_setattr },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) ext2spec_write },
 	{ NULL, NULL }
 };
@@ -194,14 +188,11 @@ static struct vnodeopv_entry_desc ext2_fifoop_entries[] = {
 	{ &vop_fsync_desc,		(vop_t *) ext2_fsync },
 	{ &vop_getattr_desc,		(vop_t *) ext2_getattr },
 	{ &vop_inactive_desc,		(vop_t *) ext2_inactive },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_kqfilter_desc,		(vop_t *) ext2fifo_kqfilter },
-	{ &vop_lock_desc,		(vop_t *) vop_stdlock },
 	{ &vop_print_desc,		(vop_t *) ext2_print },
 	{ &vop_read_desc,		(vop_t *) ext2fifo_read },
 	{ &vop_reclaim_desc,		(vop_t *) ext2_reclaim },
 	{ &vop_setattr_desc,		(vop_t *) ext2_setattr },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) ext2fifo_write },
 	{ NULL, NULL }
 };
@@ -683,59 +674,13 @@ ext2_fsync(ap)
 		struct thread *a_td;
 	} */ *ap;
 {
-	struct vnode *vp = ap->a_vp;
-	struct buf *bp;
-	struct buf *nbp;
-	int s;
-
-	/* 
-	 * XXX why is all this fs specific?
-	 */
-
 	/*
 	 * Flush all dirty buffers associated with a vnode.
 	 */
-	ext2_discard_prealloc(VTOI(vp));
+	ext2_discard_prealloc(VTOI(ap->a_vp));
 
-loop:
-	VI_LOCK(vp);
-	s = splbio();
-	for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
-		nbp = TAILQ_NEXT(bp, b_vnbufs);
-		VI_UNLOCK(vp);
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT)) {
-			VI_LOCK(vp);
-			continue;
-		}
-		if ((bp->b_flags & B_DELWRI) == 0)
-			panic("ext2_fsync: not dirty");
-		bremfree(bp);
-		splx(s);
-		/*
-		 * Wait for I/O associated with indirect blocks to complete,
-		 * since there is no way to quickly wait for them below.
-		 */
-		if (bp->b_vp == vp || ap->a_waitfor == MNT_NOWAIT)
-			(void) bawrite(bp);
-		else
-			(void) bwrite(bp);
-		goto loop;
-	}
-	if (ap->a_waitfor == MNT_WAIT) {
-		while (vp->v_numoutput) {
-			vp->v_iflag |= VI_BWAIT;
-			msleep(&vp->v_numoutput, VI_MTX(vp), 
-			    PRIBIO + 1, "e2fsyn", 0);
-		}
-#if DIAGNOSTIC
-		if (!TAILQ_EMPTY(&vp->v_dirtyblkhd)) {
-			vprint("ext2_fsync: dirty", vp);
-			goto loop;
-		}
-#endif
-	}
-	VI_UNLOCK(vp);
-	splx(s);
+	vop_stdfsync(ap);
+
 	return (ext2_update(ap->a_vp, ap->a_waitfor == MNT_WAIT));
 }
 
@@ -1537,7 +1482,7 @@ ext2_strategy(ap)
 	}
 	vp = ip->i_devvp;
 	bp->b_dev = vp->v_rdev;
-	VOP_STRATEGY(vp, bp);
+	VOP_SPECSTRATEGY(vp, bp);
 	return (0);
 }
 
@@ -1553,7 +1498,7 @@ ext2_print(ap)
 	struct vnode *vp = ap->a_vp;
 	struct inode *ip = VTOI(vp);
 
-	printf("ino %lu, on dev %s (%d, %d)", (u_long)ip->i_number,
+	printf("\tino %lu, on dev %s (%d, %d)", (u_long)ip->i_number,
 	    devtoname(ip->i_dev), major(ip->i_dev), minor(ip->i_dev));
 	if (vp->v_type == VFIFO)
 		fifo_printinfo(vp);

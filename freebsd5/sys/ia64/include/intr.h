@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/intr.h,v 1.2 2001/10/05 10:30:08 dfr Exp $
+ * $FreeBSD: src/sys/ia64/include/intr.h,v 1.3 2003/01/05 22:14:30 marcel Exp $
  */
 
 #ifndef _MACHINE_INTR_H_
@@ -43,8 +43,10 @@ struct ia64_interrupt_block
 	u_int8_t	ib_reserved4[0x1fff0];
 };
 
+extern u_int64_t ia64_lapic_address;
+
 #define IA64_INTERRUPT_BLOCK	\
-	(struct ia64_interrupt_block *)IA64_PHYS_TO_RR6(0xfee00000)
+	(struct ia64_interrupt_block *)IA64_PHYS_TO_RR6(ia64_lapic_address)
 
 struct sapic;
 

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_pager.c,v 1.83 2002/07/01 02:38:05 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_pager.c,v 1.86 2003/05/06 02:45:28 alc Exp $
  */
 
 /*
@@ -256,10 +256,15 @@ vm_pager_allocate(objtype_t type, void *handle, vm_ooffset_t size,
 	return (ret);
 }
 
+/*
+ *	The object must be locked.
+ */
 void
 vm_pager_deallocate(object)
 	vm_object_t object;
 {
+
+	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 	(*pagertab[object->type]->pgo_dealloc) (object);
 }
 
@@ -345,7 +350,7 @@ initpbuf(struct buf *bp)
 	bp->b_error = 0;
 	bp->b_magic = B_MAGIC_BIO;
 	bp->b_op = &buf_ops_bio;
-	BUF_LOCK(bp, LK_EXCLUSIVE);
+	BUF_LOCK(bp, LK_EXCLUSIVE, NULL);
 }
 
 /*
@@ -371,7 +376,6 @@ getpbuf(pfreecnt)
 	struct buf *bp;
 
 	s = splvm();
-	GIANT_REQUIRED;
 	mtx_lock(&pbuf_mtx);
 
 	for (;;) {
@@ -445,7 +449,6 @@ relpbuf(bp, pfreecnt)
 	int s;
 
 	s = splvm();
-	mtx_lock(&pbuf_mtx);
 
 	if (bp->b_rcred != NOCRED) {
 		crfree(bp->b_rcred);
@@ -461,6 +464,7 @@ relpbuf(bp, pfreecnt)
 
 	BUF_UNLOCK(bp);
 
+	mtx_lock(&pbuf_mtx);
 	TAILQ_INSERT_HEAD(&bswlist, bp, b_freelist);
 
 	if (bswneeded) {

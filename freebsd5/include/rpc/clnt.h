@@ -47,7 +47,7 @@
  *
  *	from: @(#)clnt.h 1.31 94/04/29 SMI
  *	from: @(#)clnt.h	2.1 88/07/29 4.0 RPCSRC
- * $FreeBSD: src/include/rpc/clnt.h,v 1.20 2002/07/21 20:37:58 robert Exp $
+ * $FreeBSD: src/include/rpc/clnt.h,v 1.21 2003/01/24 01:47:55 fjoe Exp $
  */
 
 /*
@@ -468,14 +468,10 @@ struct rpc_createerr {
 	struct rpc_err cf_error; /* useful when cf_stat == RPC_PMAPFAILURE */
 };
 
-#ifdef _THREAD_SAFE
 __BEGIN_DECLS
 extern struct rpc_createerr	*__rpc_createerr(void);
 __END_DECLS
 #define rpc_createerr		(*(__rpc_createerr()))
-#else
-extern struct rpc_createerr rpc_createerr;
-#endif /* _THREAD_SAFE */
 
 /*
  * The simplified interface:

@@ -22,14 +22,14 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/kerneldump.h,v 1.1 2002/10/20 17:03:15 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/kerneldump.h,v 1.2 2003/04/08 06:35:08 jake Exp $
  */
 
 #ifndef _MACHINE_KERNELDUMP_H_
 #define	_MACHINE_KERNELDUMP_H_
 
 struct sparc64_dump_reg {
-	vm_offset_t	dr_pa;
+	vm_paddr_t	dr_pa;
 	vm_offset_t	dr_size;
 	vm_offset_t	dr_offs;
 };
@@ -41,7 +41,7 @@ struct sparc64_dump_reg {
  */
 struct sparc64_dump_hdr {
 	vm_offset_t	dh_hdr_size;
-	vm_offset_t	dh_tsb_pa;
+	vm_paddr_t	dh_tsb_pa;
 	vm_size_t	dh_tsb_size;
 	vm_size_t	dh_tsb_mask;
 	int		dh_nregions;

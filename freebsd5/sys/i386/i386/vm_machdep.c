@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.196 2002/12/10 02:33:43 julian Exp $
+ * $FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.207.2.1 2003/06/02 21:37:07 tegge Exp $
  */
 
 #include "opt_npx.h"
@@ -94,23 +94,6 @@ static u_int	cpu_reset_proxyid;
 static volatile u_int	cpu_reset_proxy_active;
 #endif
 extern int	_ucodesel, _udatasel;
-
-/*
- * quick version of vm_fault
- */
-int
-vm_fault_quick(v, prot)
-	caddr_t v;
-	int prot;
-{
-	int r;
-
-	if (prot & VM_PROT_WRITE)
-		r = subyte(v, fubyte(v));
-	else
-		r = fubyte(v);
-	return(r);
-}
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -187,14 +170,19 @@ cpu_fork(td1, p2, td2, flags)
 	 * Set registers for trampoline to user mode.  Leave space for the
 	 * return address on stack.  These are the kernel mode register values.
 	 */
+#ifdef PAE
+	pcb2->pcb_cr3 = vtophys(vmspace_pmap(p2->p_vmspace)->pm_pdpt);
+#else
 	pcb2->pcb_cr3 = vtophys(vmspace_pmap(p2->p_vmspace)->pm_pdir);
+#endif
 	pcb2->pcb_edi = 0;
 	pcb2->pcb_esi = (int)fork_return;	/* fork_trampoline argument */
 	pcb2->pcb_ebp = 0;
 	pcb2->pcb_esp = (int)td2->td_frame - sizeof(void *);
 	pcb2->pcb_ebx = (int)td2;		/* fork_trampoline argument */
 	pcb2->pcb_eip = (int)fork_trampoline;
-	pcb2->pcb_psl = td2->td_frame->tf_eflags & ~PSL_I; /* ints disabled */
+	pcb2->pcb_psl = PSL_KERNEL;		/* ints disabled */
+	pcb2->pcb_gs = rgs();
 	/*-
 	 * pcb2->pcb_dr*:	cloned above.
 	 * pcb2->pcb_savefpu:	cloned above.
@@ -259,9 +247,13 @@ cpu_exit(struct thread *td)
 {
 	struct mdproc *mdp;
 
+	/* Reset pc->pcb_gs and %gs before possibly invalidating it. */
 	mdp = &td->td_proc->p_md;
-	if (mdp->md_ldt)
+	if (mdp->md_ldt) {
+		td->td_pcb->pcb_gs = _udatasel;
+		load_gs(_udatasel);
 		user_ldt_free(td);
+	}
 	reset_dbregs();
 }
 
@@ -315,6 +307,7 @@ cpu_thread_setup(struct thread *td)
 	td->td_pcb =
 	     (struct pcb *)(td->td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
 	td->td_frame = (struct trapframe *)((caddr_t)td->td_pcb - 16) - 1;
+	td->td_pcb->pcb_ext = NULL; 
 }
 
 /*
@@ -328,8 +321,6 @@ void
 cpu_set_upcall(struct thread *td, void *pcb)
 {
 	struct pcb *pcb2;
-
-	td->td_flags |= TDF_UPCALLING;
 
 	/* Point the pcb to the top of the stack. */
 	pcb2 = td->td_pcb;
@@ -361,7 +352,11 @@ cpu_set_upcall(struct thread *td, void *pcb)
 	 * Set registers for trampoline to user mode.  Leave space for the
 	 * return address on stack.  These are the kernel mode register values.
 	 */
+#ifdef PAE
+	pcb2->pcb_cr3 = vtophys(vmspace_pmap(td->td_proc->p_vmspace)->pm_pdpt);
+#else
 	pcb2->pcb_cr3 = vtophys(vmspace_pmap(td->td_proc->p_vmspace)->pm_pdir);
+#endif
 	pcb2->pcb_edi = 0;
 	pcb2->pcb_esi = (int)fork_return;		    /* trampoline arg */
 	pcb2->pcb_ebp = 0;
@@ -369,6 +364,7 @@ cpu_set_upcall(struct thread *td, void *pcb)
 	pcb2->pcb_ebx = (int)td;			    /* trampoline arg */
 	pcb2->pcb_eip = (int)fork_trampoline;
 	pcb2->pcb_psl &= ~(PSL_I);	/* interrupts must be disabled */
+	pcb2->pcb_gs = rgs();
 	/*
 	 * If we didn't copy the pcb, we'd need to do the following registers:
 	 * pcb2->pcb_dr*:	cloned above.
@@ -387,7 +383,7 @@ cpu_set_upcall(struct thread *td, void *pcb)
  * in thread_userret() itself can be done as well.
  */
 void
-cpu_set_upcall_kse(struct thread *td, struct kse *ke)
+cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 {
 
 	/* 
@@ -404,15 +400,15 @@ cpu_set_upcall_kse(struct thread *td, struct kse *ke)
 	 * function.
 	 */
 	td->td_frame->tf_esp =
-	    (int)ke->ke_stack.ss_sp + ke->ke_stack.ss_size - 16;
-	td->td_frame->tf_eip = (int)ke->ke_upcall;
+	    (int)ku->ku_stack.ss_sp + ku->ku_stack.ss_size - 16;
+	td->td_frame->tf_eip = (int)ku->ku_func;
 
 	/*
 	 * Pass the address of the mailbox for this kse to the uts
 	 * function as a parameter on the stack.
 	 */
 	suword((void *)(td->td_frame->tf_esp + sizeof(void *)),
-	    (int)ke->ke_mailbox);
+	    (int)ku->ku_mailbox);
 }
 
 void
@@ -424,89 +420,15 @@ cpu_wait(p)
 /*
  * Convert kernel VA to physical address
  */
-u_long
+vm_paddr_t
 kvtop(void *addr)
 {
-	vm_offset_t va;
+	vm_paddr_t pa;
 
-	va = pmap_kextract((vm_offset_t)addr);
-	if (va == 0)
+	pa = pmap_kextract((vm_offset_t)addr);
+	if (pa == 0)
 		panic("kvtop: zero page frame");
-	return((int)va);
-}
-
-/*
- * Map an IO request into kernel virtual address space.
- *
- * All requests are (re)mapped into kernel VA space.
- * Notice that we use b_bufsize for the size of the buffer
- * to be mapped.  b_bcount might be modified by the driver.
- */
-void
-vmapbuf(bp)
-	register struct buf *bp;
-{
-	register caddr_t addr, kva;
-	vm_offset_t pa;
-	int pidx;
-	struct vm_page *m;
-
-	GIANT_REQUIRED;
-
-	if ((bp->b_flags & B_PHYS) == 0)
-		panic("vmapbuf");
-
-	for (addr = (caddr_t)trunc_page((vm_offset_t)bp->b_data), pidx = 0;
-	     addr < bp->b_data + bp->b_bufsize;
-	     addr += PAGE_SIZE, pidx++) {
-		/*
-		 * Do the vm_fault if needed; do the copy-on-write thing
-		 * when reading stuff off device into memory.
-		 */
-		vm_fault_quick((addr >= bp->b_data) ? addr : bp->b_data,
-			(bp->b_iocmd == BIO_READ)?(VM_PROT_READ|VM_PROT_WRITE):VM_PROT_READ);
-		pa = trunc_page(pmap_kextract((vm_offset_t) addr));
-		if (pa == 0)
-			panic("vmapbuf: page not present");
-		m = PHYS_TO_VM_PAGE(pa);
-		vm_page_hold(m);
-		bp->b_pages[pidx] = m;
-	}
-	if (pidx > btoc(MAXPHYS))
-		panic("vmapbuf: mapped more than MAXPHYS");
-	pmap_qenter((vm_offset_t)bp->b_saveaddr, bp->b_pages, pidx);
-	
-	kva = bp->b_saveaddr;
-	bp->b_npages = pidx;
-	bp->b_saveaddr = bp->b_data;
-	bp->b_data = kva + (((vm_offset_t) bp->b_data) & PAGE_MASK);
-}
-
-/*
- * Free the io map PTEs associated with this IO operation.
- * We also invalidate the TLB entries and restore the original b_addr.
- */
-void
-vunmapbuf(bp)
-	register struct buf *bp;
-{
-	int pidx;
-	int npages;
-
-	GIANT_REQUIRED;
-
-	if ((bp->b_flags & B_PHYS) == 0)
-		panic("vunmapbuf");
-
-	npages = bp->b_npages;
-	pmap_qremove(trunc_page((vm_offset_t)bp->b_data),
-		     npages);
-	vm_page_lock_queues();
-	for (pidx = 0; pidx < npages; pidx++)
-		vm_page_unhold(bp->b_pages[pidx]);
-	vm_page_unlock_queues();
-
-	bp->b_data = bp->b_saveaddr;
+	return (pa);
 }
 
 /*
@@ -607,7 +529,7 @@ cpu_reset_real()
 #endif
 #endif /* PC98 */
 	/* force a shutdown by unmapping entire address space ! */
-	bzero((caddr_t) PTD, PAGE_SIZE);
+	bzero((caddr_t)PTD, NBPTD);
 
 	/* "good night, sweet prince .... <THUNK!>" */
 	invltlb();

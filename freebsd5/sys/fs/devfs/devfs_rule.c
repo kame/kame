@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_rule.c,v 1.4 2002/10/16 08:04:11 phk Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_rule.c,v 1.8 2003/02/19 05:47:17 imp Exp $
  */
 
 /*
@@ -63,7 +63,6 @@
  */
 
 #include "opt_devfs.h"
-#ifndef NODEVFS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -634,7 +633,8 @@ devfs_rule_matchpath(struct devfs_krule *dk, struct devfs_dirent *de)
 	dev = devfs_rule_getdev(de);
 	if (dev != NULL)
 		pname = dev->si_name;
-	/* XXX: Support symlinks (check d_type == DT_LNK here). */
+	else if (de->de_dirent->d_type == DT_LNK)
+		pname = de->de_dirent->d_name;
 	else
 		return (0);
 	KASSERT(pname != NULL, ("devfs_rule_matchpath: NULL pname"));
@@ -828,4 +828,3 @@ devfs_ruleset_use(devfs_rsnum rsnum, struct devfs_mount *dm)
 	return (0);
 }
 
-#endif /* !NODEVFS */

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_condvar.c,v 1.34 2002/10/25 07:11:12 julian Exp $
+ * $FreeBSD: src/sys/kern/kern_condvar.c,v 1.41 2003/05/13 20:35:59 jhb Exp $
  */
 
 #include "opt_ktrace.h"
@@ -36,6 +36,7 @@
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/condvar.h>
+#include <sys/sched.h>
 #include <sys/signalvar.h>
 #include <sys/resourcevar.h>
 #ifdef KTRACE
@@ -116,26 +117,6 @@ cv_destroy(struct cv *cvp)
 static __inline void
 cv_switch(struct thread *td)
 {
-
-	/*
-	 * If we are capable of async syscalls and there isn't already
-	 * another one ready to return, start a new thread
-	 * and queue it as ready to run. Note that there is danger here
-	 * because we need to make sure that we don't sleep allocating
-	 * the thread (recursion here might be bad).
-	 * Hence the TDF_INMSLEEP flag.
-	 */
-	if ((td->td_flags & (TDF_UNBOUND|TDF_INMSLEEP)) == TDF_UNBOUND) {
-		/*
-		 * We don't need to upcall now, just queue it.
-		 * The upcall will happen when other n-kernel work
-		 * in this SKEGRP has completed.
-		 * Don't recurse here!
-		 */
-		td->td_flags |= TDF_INMSLEEP;
-		thread_schedule_upcall(td, td->td_kse);
-		td->td_flags &= ~TDF_INMSLEEP;
-	}
 	TD_SET_SLEEPING(td);
 	td->td_proc->p_stats->p_ru.ru_nvcsw++;
 	mi_switch();
@@ -165,7 +146,9 @@ cv_switch_catch(struct thread *td)
 	mtx_unlock_spin(&sched_lock);
 	p = td->td_proc;
 	PROC_LOCK(p);
+	mtx_lock(&p->p_sigacts->ps_mtx);
 	sig = cursig(td);
+	mtx_unlock(&p->p_sigacts->ps_mtx);
 	if (thread_suspend_check(1))
 		sig = SIGSTOP;
 	mtx_lock_spin(&sched_lock);
@@ -193,11 +176,10 @@ cv_waitq_add(struct cv *cvp, struct thread *td)
 	TD_SET_ON_SLEEPQ(td);
 	td->td_wchan = cvp;
 	td->td_wmesg = cvp->cv_description;
-	td->td_ksegrp->kg_slptime = 0; /* XXXKSE */
-	td->td_base_pri = td->td_priority;
 	CTR3(KTR_PROC, "cv_waitq_add: thread %p (pid %d, %s)", td,
 	    td->td_proc->p_pid, td->td_proc->p_comm);
 	TAILQ_INSERT_TAIL(&cvp->cv_waitq, td, td_slpq);
+	sched_sleep(td, td->td_priority);
 }
 
 /*
@@ -219,7 +201,8 @@ cv_wait(struct cv *cvp, struct mtx *mp)
 		ktrcsw(1, 0);
 #endif
 	CV_ASSERT(cvp, mp, td);
-	WITNESS_SLEEP(0, &mp->mtx_object);
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, &mp->mtx_object,
+	    "Waiting on \"%s\"", cvp->cv_description);
 	WITNESS_SAVE(&mp->mtx_object, mp);
 
 	if (cold ) {
@@ -275,7 +258,8 @@ cv_wait_sig(struct cv *cvp, struct mtx *mp)
 		ktrcsw(1, 0);
 #endif
 	CV_ASSERT(cvp, mp, td);
-	WITNESS_SLEEP(0, &mp->mtx_object);
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, &mp->mtx_object,
+	    "Waiting on \"%s\"", cvp->cv_description);
 	WITNESS_SAVE(&mp->mtx_object, mp);
 
 	if (cold || panicstr) {
@@ -301,6 +285,7 @@ cv_wait_sig(struct cv *cvp, struct mtx *mp)
 	mtx_unlock_spin(&sched_lock);
 
 	PROC_LOCK(p);
+	mtx_lock(&p->p_sigacts->ps_mtx);
 	if (sig == 0)
 		sig = cursig(td);	/* XXXKSE */
 	if (sig != 0) {
@@ -309,9 +294,10 @@ cv_wait_sig(struct cv *cvp, struct mtx *mp)
 		else
 			rval = ERESTART;
 	}
-	PROC_UNLOCK(p);
+	mtx_unlock(&p->p_sigacts->ps_mtx);
 	if (p->p_flag & P_WEXIT)
 		rval = EINTR;
+	PROC_UNLOCK(p);
 
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_CSW))
@@ -343,7 +329,8 @@ cv_timedwait(struct cv *cvp, struct mtx *mp, int timo)
 		ktrcsw(1, 0);
 #endif
 	CV_ASSERT(cvp, mp, td);
-	WITNESS_SLEEP(0, &mp->mtx_object);
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, &mp->mtx_object,
+	    "Waiting on \"%s\"", cvp->cv_description);
 	WITNESS_SAVE(&mp->mtx_object, mp);
 
 	if (cold || panicstr) {
@@ -384,8 +371,6 @@ cv_timedwait(struct cv *cvp, struct mtx *mp, int timo)
 		td->td_flags &= ~TDF_TIMOFAIL;
 	}
 
-	if (td->td_proc->p_flag & P_WEXIT)
-		rval = EWOULDBLOCK;
 	mtx_unlock_spin(&sched_lock);
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_CSW))
@@ -421,7 +406,8 @@ cv_timedwait_sig(struct cv *cvp, struct mtx *mp, int timo)
 		ktrcsw(1, 0);
 #endif
 	CV_ASSERT(cvp, mp, td);
-	WITNESS_SLEEP(0, &mp->mtx_object);
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, &mp->mtx_object,
+	    "Waiting on \"%s\"", cvp->cv_description);
 	WITNESS_SAVE(&mp->mtx_object, mp);
 
 	if (cold || panicstr) {
@@ -464,6 +450,7 @@ cv_timedwait_sig(struct cv *cvp, struct mtx *mp, int timo)
 	mtx_unlock_spin(&sched_lock);
 
 	PROC_LOCK(p);
+	mtx_lock(&p->p_sigacts->ps_mtx);
 	if (sig == 0)
 		sig = cursig(td);
 	if (sig != 0) {
@@ -472,10 +459,10 @@ cv_timedwait_sig(struct cv *cvp, struct mtx *mp, int timo)
 		else
 			rval = ERESTART;
 	}
-	PROC_UNLOCK(p);
-
+	mtx_unlock(&p->p_sigacts->ps_mtx);
 	if (p->p_flag & P_WEXIT)
 		rval = EINTR;
+	PROC_UNLOCK(p);
 
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_CSW))
@@ -555,6 +542,7 @@ cv_waitq_remove(struct thread *td)
 	if ((cvp = td->td_wchan) != NULL && td->td_flags & TDF_CVWAITQ) {
 		TAILQ_REMOVE(&cvp->cv_waitq, td, td_slpq);
 		td->td_flags &= ~TDF_CVWAITQ;
+		td->td_wmesg = NULL;
 		TD_CLR_ON_SLEEPQ(td);
 	}
 }

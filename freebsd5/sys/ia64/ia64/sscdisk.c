@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/ia64/ia64/sscdisk.c,v 1.18 2002/10/12 23:00:40 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/sscdisk.c,v 1.28 2003/04/05 21:14:05 marcel Exp $
  *
  */
 
@@ -17,8 +17,6 @@
 #include <sys/systm.h>
 #include <sys/bio.h>
 #include <sys/conf.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
 #include <sys/kernel.h>
 #include <sys/linker.h>
 #include <sys/lock.h>
@@ -35,6 +33,7 @@
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
 #include <machine/md_var.h>
+#include <geom/geom_disk.h>
 
 #ifndef SKI_ROOT_FILESYSTEM
 #define SKI_ROOT_FILESYSTEM	"ia64-root.fs"
@@ -73,104 +72,40 @@ ssc(u_int64_t in0, u_int64_t in1, u_int64_t in2, u_int64_t in3, int which)
 #define SSC_NSECT 409600
 #endif
 
-MALLOC_DEFINE(M_SSC, "SSC disk", "Memory Disk");
-MALLOC_DEFINE(M_SSCSECT, "SSC sectors", "Memory Disk Sectors");
-
-static int ssc_debug;
-SYSCTL_INT(_debug, OID_AUTO, sscdebug, CTLFLAG_RW, &ssc_debug, 0, "");
+MALLOC_DEFINE(M_SSC, "SSC disk", "Simulator Disk");
 
 static int sscrootready;
 
-#define CDEV_MAJOR	157
-
 static d_strategy_t sscstrategy;
-static d_open_t sscopen;
-static d_ioctl_t sscioctl;
-
-static struct cdevsw ssc_cdevsw = {
-        /* open */      sscopen,
-        /* close */     nullclose,
-        /* read */      physread,
-        /* write */     physwrite,
-        /* ioctl */     sscioctl,
-        /* poll */      nopoll,
-        /* mmap */      nommap,
-        /* strategy */  sscstrategy,
-        /* name */      "sscdisk",
-        /* maj */       CDEV_MAJOR,
-        /* dump */      nodump,
-        /* psize */     nopsize,
-        /* flags */     D_DISK | D_CANFREE,
-};
-
-static struct cdevsw sscdisk_cdevsw;
 
 static LIST_HEAD(, ssc_s) ssc_softc_list = LIST_HEAD_INITIALIZER(&ssc_softc_list);
 
 struct ssc_s {
 	int unit;
 	LIST_ENTRY(ssc_s) list;
-	struct devstat stats;
 	struct bio_queue_head bio_queue;
 	struct disk disk;
 	dev_t dev;
 	int busy;
-	unsigned nsect;
 	int fd;
 };
 
 static int sscunits;
-
-static int
-sscopen(dev_t dev, int flag, int fmt, struct thread *td)
-{
-	struct ssc_s *sc;
-
-	if (ssc_debug)
-		printf("sscopen(%s %x %x %p)\n",
-			devtoname(dev), flag, fmt, td);
-
-	sc = dev->si_drv1;
-
-	sc->disk.d_sectorsize = DEV_BSIZE;
-	sc->disk.d_mediasize = (off_t)sc->nsect * DEV_BSIZE;
-	sc->disk.d_fwsectors = 0;
-	sc->disk.d_fwheads = 0;
-	return (0);
-}
-
-static int
-sscioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
-{
-
-	if (ssc_debug)
-		printf("sscioctl(%s %lx %p %x %p)\n",
-			devtoname(dev), cmd, addr, flags, td);
-
-	return (ENOIOCTL);
-}
 
 static void
 sscstrategy(struct bio *bp)
 {
 	struct ssc_s *sc;
 	int s;
-	devstat_trans_flags dop;
-	unsigned sscop = 0;
 	struct disk_req req;
 	struct disk_stat stat;
 	u_long len, va, off;
 
-	if (ssc_debug > 1)
-		printf("sscstrategy(%p) %s %x, %ld, %ld, %p)\n",
-		    bp, devtoname(bp->bio_dev), bp->bio_flags, bp->bio_blkno, 
-		    bp->bio_bcount / DEV_BSIZE, bp->bio_data);
-
-	sc = bp->bio_dev->si_drv1;
+	sc = bp->bio_disk->d_drv1;
 
 	s = splbio();
 
-	bioqdisksort(&sc->bio_queue, bp);
+	bioq_disksort(&sc->bio_queue, bp);
 
 	if (sc->busy) {
 		splx(s);
@@ -187,17 +122,6 @@ sscstrategy(struct bio *bp)
 		if (!bp)
 			break;
 
-		devstat_start_transaction(&sc->stats);
-
-		if (bp->bio_cmd == BIO_DELETE) {
-			dop = DEVSTAT_NO_DATA;
-		} else if (bp->bio_cmd == BIO_READ) {
-			dop = DEVSTAT_READ;
-			sscop = SSC_READ;
-		} else {
-			dop = DEVSTAT_WRITE;
-			sscop = SSC_WRITE;
-		}
 		va = (u_long) bp->bio_data;
 		len = bp->bio_bcount;
 		off = bp->bio_pblkno << DEV_BSHIFT;
@@ -209,10 +133,8 @@ sscstrategy(struct bio *bp)
 				t = len;
 			req.len = t;
 			req.addr = ia64_tpa(va);
-			if (ssc_debug > 1)
-				printf("sscstrategy: reading %d bytes from 0x%ld into 0x%lx\n",
-				       req.len, off, req.addr);
-			ssc(sc->fd, 1, ia64_tpa((long) &req), off, sscop);
+			ssc(sc->fd, 1, ia64_tpa((long) &req), off,
+			    (bp->bio_cmd == BIO_READ) ? SSC_READ : SSC_WRITE);
 			stat.fd = sc->fd;
 			ssc(ia64_tpa((long)&stat), 0, 0, 0,
 			    SSC_WAIT_COMPLETION);
@@ -221,7 +143,7 @@ sscstrategy(struct bio *bp)
 			off += t;
 		}
 		bp->bio_resid = 0;
-		biofinish(bp, &sc->stats, 0);
+		biodone(bp);
 		s = splbio();
 	}
 
@@ -251,59 +173,35 @@ ssccreate(int unit)
 	LIST_INSERT_HEAD(&ssc_softc_list, sc, list);
 	sc->unit = unit;
 	bioq_init(&sc->bio_queue);
-	devstat_add_entry(&sc->stats, "sscdisk", sc->unit, DEV_BSIZE,
-		DEVSTAT_NO_ORDERED_TAGS, 
-		DEVSTAT_TYPE_DIRECT | DEVSTAT_TYPE_IF_OTHER,
-		DEVSTAT_PRIORITY_OTHER);
-	sc->dev = disk_create(sc->unit, &sc->disk, 0,
-			      &ssc_cdevsw, &sscdisk_cdevsw);
-	sc->dev->si_drv1 = sc;
-	sc->nsect = SSC_NSECT;
+
+	sc->disk.d_drv1 = sc;
+	sc->disk.d_fwheads = 0;
+	sc->disk.d_fwsectors = 0;
+	sc->disk.d_maxsize = DFLTPHYS;
+	sc->disk.d_mediasize = (off_t)SSC_NSECT * DEV_BSIZE;
+	sc->disk.d_name = "sscdisk";
+	sc->disk.d_sectorsize = DEV_BSIZE;
+	sc->disk.d_strategy = sscstrategy;
+	disk_create(sc->unit, &sc->disk, 0, NULL, NULL);
 	sc->fd = fd;
 	if (sc->unit == 0) 
 		sscrootready = 1;
 	return (sc);
 }
 
-#if 0
-static void
-ssc_clone (void *arg, char *name, int namelen, dev_t *dev)
-{
-	int i, u;
-
-	if (*dev != NODEV)
-		return;
-	i = dev_stdclone(name, NULL, "ssc", &u);
-	if (i == 0)
-		return;
-	/* XXX: should check that next char is [\0sa-h] */
-	/*
-	 * Now we cheat: We just create the disk, but don't match.
-	 * Since we run before it, subr_disk.c::disk_clone() will
-	 * find our disk and match the sought for device.
-	 */
-	ssccreate(u);
-	return;
-}
-#endif
-
 static void
 ssc_drvinit(void *unused)
 {
-	if (!ia64_running_in_simulator())
-		return;
-
 	ssccreate(-1);
 }
 
-SYSINIT(sscdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR, ssc_drvinit,NULL)
+SYSINIT(sscdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE, ssc_drvinit,NULL)
 
 static void
 ssc_takeroot(void *junk)
 {
 	if (sscrootready)
-		rootdevnames[0] = "ufs:/dev/sscdisk0c";
+		rootdevnames[0] = "ufs:/dev/sscdisk0";
 }
 
 SYSINIT(ssc_root, SI_SUB_MOUNT_ROOT, SI_ORDER_FIRST, ssc_takeroot, NULL);
-

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_vfsops.c,v 1.12 2002/09/25 02:32:41 jeff Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_vfsops.c,v 1.18 2003/04/01 02:42:02 tjr Exp $
  */
 #include "opt_netsmb.h"
 #ifndef NETSMB
@@ -83,7 +83,6 @@ static int smbfs_quotactl(struct mount *, int, uid_t, caddr_t, struct thread *);
 static int smbfs_root(struct mount *, struct vnode **);
 static int smbfs_start(struct mount *, int, struct thread *);
 static int smbfs_statfs(struct mount *, struct statfs *, struct thread *);
-static int smbfs_sync(struct mount *, int, struct ucred *, struct thread *);
 static int smbfs_unmount(struct mount *, int, struct thread *);
 static int smbfs_init(struct vfsconf *vfsp);
 static int smbfs_uninit(struct vfsconf *vfsp);
@@ -95,7 +94,7 @@ static struct vfsops smbfs_vfsops = {
 	smbfs_root,
 	smbfs_quotactl,
 	smbfs_statfs,
-	smbfs_sync,
+	vfs_stdsync,
 	vfs_stdvget,
 	vfs_stdfhtovp,		/* shouldn't happen */
 	vfs_stdcheckexp,
@@ -124,9 +123,6 @@ smbfs_mount(struct mount *mp, char *path, caddr_t data,
 	struct smb_share *ssp = NULL;
 	struct vnode *vp;
 	struct smb_cred scred;
-#ifndef	FB_CURRENT
-	size_t size;
-#endif
 	int error;
 	char *pc, *pe;
 
@@ -159,7 +155,8 @@ smbfs_mount(struct mount *mp, char *path, caddr_t data,
 #ifdef SMBFS_USEZONE
 	smp = zalloc(smbfsmount_zone);
 #else
-        MALLOC(smp, struct smbmount*, sizeof(*smp), M_SMBFSDATA, M_USE_RESERVE);
+	MALLOC(smp, struct smbmount*, sizeof(*smp), M_SMBFSDATA,
+	    M_WAITOK|M_USE_RESERVE);
 #endif
         if (smp == NULL) {
                 printf("could not alloc smbmount\n");
@@ -182,12 +179,6 @@ smbfs_mount(struct mount *mp, char *path, caddr_t data,
 			    (S_IRWXU|S_IRWXG|S_IRWXO)) | S_IFDIR;
 
 /*	simple_lock_init(&smp->sm_npslock);*/
-#ifndef	FB_CURRENT
-	error = copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
-	if (error)
-		goto bad;
-	bzero(mp->mnt_stat.f_mntonname + size, MNAMELEN - size);
-#endif
 	pc = mp->mnt_stat.f_mntfromname;
 	pe = pc + sizeof(mp->mnt_stat.f_mntfromname);
 	bzero(pc, MNAMELEN);
@@ -243,8 +234,19 @@ smbfs_unmount(struct mount *mp, int mntflags, struct thread *td)
 	flags = 0;
 	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
-	/* There is 1 extra root vnode reference from smbfs_mount(). */
-	error = vflush(mp, 1, flags);
+	/*
+	 * Keep trying to flush the vnode list for the mount while 
+	 * some are still busy and we are making progress towards
+	 * making them not busy. This is needed because smbfs vnodes
+	 * reference their parent directory but may appear after their
+	 * parent in the list; one pass over the vnode list is not
+	 * sufficient in this case.
+	 */
+	do {
+		smp->sm_didrele = 0;
+		/* There is 1 extra root vnode reference from smbfs_mount(). */
+		error = vflush(mp, 1, flags);
+	} while (error == EBUSY && smp->sm_didrele != 0);
 	if (error)
 		return error;
 	smb_makescred(&scred, td, td->td_ucred);
@@ -399,50 +401,3 @@ smbfs_statfs(struct mount *mp, struct statfs *sbp, struct thread *td)
 	strncpy(sbp->f_fstypename, mp->mnt_vfc->vfc_name, MFSNAMELEN);
 	return 0;
 }
-
-/*
- * Flush out the buffer cache
- */
-/* ARGSUSED */
-static int
-smbfs_sync(mp, waitfor, cred, td)
-	struct mount *mp;
-	int waitfor;
-	struct ucred *cred;
-	struct thread *td;
-{
-	struct vnode *vp;
-	int error, allerror = 0;
-	/*
-	 * Force stale buffer cache information to be flushed.
-	 */
-loop:
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist);
-	     vp != NULL;
-	     vp = TAILQ_NEXT(vp, v_nmntvnodes)) {
-		/*
-		 * If the vnode that we are about to sync is no longer
-		 * associated with this mount point, start over.
-		 */
-		if (vp->v_mount != mp)
-			goto loop;
-		VI_LOCK(vp);
-#ifndef FB_RELENG3
-		if (VOP_ISLOCKED(vp, NULL) || TAILQ_EMPTY(&vp->v_dirtyblkhd) ||
-#else
-		if (VOP_ISLOCKED(vp) || TAILQ_EMPTY(&vp->v_dirtyblkhd) ||
-#endif
-		    waitfor == MNT_LAZY) {
-			VI_UNLOCK(vp);
-			continue;
-		}
-		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td))
-			goto loop;
-		error = VOP_FSYNC(vp, cred, waitfor, td);
-		if (error)
-			allerror = error;
-		vput(vp);
-	}
-	return (allerror);
-}
-

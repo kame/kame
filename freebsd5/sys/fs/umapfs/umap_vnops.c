@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)umap_vnops.c	8.6 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/fs/umapfs/umap_vnops.c,v 1.37 2002/10/16 08:00:32 phk Exp $
+ * $FreeBSD: src/sys/fs/umapfs/umap_vnops.c,v 1.38 2003/03/03 19:15:39 njl Exp $
  */
 
 /*
@@ -436,8 +436,7 @@ umap_print(ap)
 	} */ *ap;
 {
 	struct vnode *vp = ap->a_vp;
-	printf("\ttag %s, vp=%p, lowervp=%p\n", vp->v_tag, vp,
-	       UMAPVPTOLOWERVP(vp));
+	printf("\tvp=%p, lowervp=%p\n", vp, UMAPVPTOLOWERVP(vp));
 	return (0);
 }
 

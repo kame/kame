@@ -55,7 +55,7 @@
  *
  * W. Metzenthen   June 1994.
  *
- * $FreeBSD: src/sys/gnu/i386/fpemul/fpu_entry.c,v 1.27 2001/11/12 21:58:23 keramida Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/fpu_entry.c,v 1.28 2003/04/17 22:02:47 jhb Exp $
  *
  */
 
@@ -198,7 +198,7 @@ char    emulating = 0;
 static int
 math_emulate(struct trapframe * tframe)
 {
-
+	struct proc *p;
 	unsigned char FPU_modrm;
 	unsigned short code;
 #ifdef LOOKAHEAD_LIMIT
@@ -232,10 +232,11 @@ math_emulate(struct trapframe * tframe)
 #endif
 
 	FPU_lookahead = FPU_LOOKAHEAD;
-	PROC_LOCK(curthread->td_proc);
-	if (curproc->p_flag & P_TRACED)
+	p = curthread->td_proc;
+	PROC_LOCK(p);
+	if (p->p_flag & P_TRACED)
 		FPU_lookahead = 0;
-	PROC_UNLOCK(curthread->td_proc);
+	PROC_UNLOCK(p);
 
 do_another_FPU_instruction:
 

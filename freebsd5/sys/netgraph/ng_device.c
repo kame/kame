@@ -28,7 +28,7 @@
  * This node presents a /dev/ngd%d device that interfaces to an other 
  * netgraph node.
  *
- * $FreeBSD: src/sys/netgraph/ng_device.c,v 1.1 2002/06/18 21:32:33 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_device.c,v 1.3 2003/03/03 12:15:52 phk Exp $
  *
  */
 
@@ -99,9 +99,6 @@ struct ngd_softc {
 	char nodename[NG_NODELEN + 1];
 } ngd_softc;
 
-/* helper definition */
-#define		MIN(a, b)	((a) < (b) ? (a) : (b))
-
 /* the per connection receiving queue maximum */
 #define NGD_QUEUE_SIZE (1024*10)
 
@@ -117,19 +114,14 @@ static d_poll_t ngdpoll;
 
 #define NGD_CDEV_MAJOR 20
 static struct cdevsw ngd_cdevsw = {
-        /* open */      ngdopen,
-        /* close */     ngdclose,
-        /* read */      ngdread,
-        /* write */     ngdwrite,
-        /* ioctl */     ngdioctl,
-        /* poll */      ngdpoll,
-        /* mmap */      nommap,
-        /* strategy */  nostrategy,
-        /* name */      "ngd",
-        /* maj */       NGD_CDEV_MAJOR,
-        /* dump */      nodump,
-        /* psize */     nopsize,
-        /* flags */     0,
+	.d_open =	ngdopen,
+	.d_close =	ngdclose,
+	.d_read =	ngdread,
+	.d_write =	ngdwrite,
+	.d_ioctl =	ngdioctl,
+	.d_poll =	ngdpoll,
+	.d_name =	"ngd",
+	.d_maj =	NGD_CDEV_MAJOR,
 };
 
 /* 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_bus.c,v 1.117.2.1 2003/01/07 05:24:03 imp Exp $
+ * $FreeBSD: src/sys/kern/subr_bus.c,v 1.128 2003/04/30 12:57:39 markm Exp $
  */
 
 #include "opt_bus.h"
@@ -217,19 +217,13 @@ static d_poll_t		devpoll;
 
 #define CDEV_MAJOR 173
 static struct cdevsw dev_cdevsw = {
-	/* open */	devopen,
-	/* close */	devclose,
-	/* read */	devread,
-	/* write */	nowrite,
-	/* ioctl */	devioctl,
-	/* poll */	devpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"devctl",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	devopen,
+	.d_close =	devclose,
+	.d_read =	devread,
+	.d_ioctl =	devioctl,
+	.d_poll =	devpoll,
+	.d_name =	"devctl",
+	.d_maj =	CDEV_MAJOR,
 };
 
 struct dev_event_info
@@ -240,7 +234,7 @@ struct dev_event_info
 
 TAILQ_HEAD(devq, dev_event_info);
 
-struct dev_softc 
+static struct dev_softc
 {
 	int	inuse;
 	int 	nonblock;
@@ -248,10 +242,10 @@ struct dev_softc
 	struct cv cv;
 	struct selinfo sel;
 	struct devq devq;
-	d_thread_t *async_td;
+	struct proc *async_proc;
 } devsoftc;
 
-dev_t		devctl_dev;
+static dev_t		devctl_dev;
 
 static void
 devinit(void)
@@ -271,7 +265,7 @@ devopen(dev_t dev, int oflags, int devtype, d_thread_t *td)
 	/* move to init */
 	devsoftc.inuse = 1;
 	devsoftc.nonblock = 0;
-	devsoftc.async_td = NULL;
+	devsoftc.async_proc = NULL;
 	return (0);
 }
 
@@ -337,9 +331,9 @@ devioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, d_thread_t *td)
 		return (0);
 	case FIOASYNC:
 		if (*(int*)data)
-			devsoftc.async_td = td;
+			devsoftc.async_proc = td->td_proc;
 		else
-			devsoftc.async_td = NULL;
+			devsoftc.async_proc = NULL;
 		return (0);
 
 		/* (un)Support for other fcntl() calls. */
@@ -359,20 +353,14 @@ devpoll(dev_t dev, int events, d_thread_t *td)
 {
 	int	revents = 0;
 
-	if (events & (POLLIN | POLLRDNORM))
-		revents |= events & (POLLIN | POLLRDNORM);
-
-	if (events & (POLLOUT | POLLWRNORM))
-		revents |= events & (POLLOUT | POLLWRNORM);
-
 	mtx_lock(&devsoftc.mtx);
-	if (events & POLLRDBAND)
+	if (events & (POLLIN | POLLRDNORM)) {
 		if (!TAILQ_EMPTY(&devsoftc.devq))
-			revents |= POLLRDBAND;
+			revents = events & (POLLIN | POLLRDNORM);
+		else
+			selrecord(td, &devsoftc.sel);
+	}
 	mtx_unlock(&devsoftc.mtx);
-
-	if (revents == 0)
-		selrecord(td, &devsoftc.sel);
 
 	return (revents);
 }
@@ -381,24 +369,15 @@ devpoll(dev_t dev, int events, d_thread_t *td)
  * Common routine that tries to make sending messages as easy as possible.
  * We allocate memory for the data, copy strings into that, but do not
  * free it unless there's an error.  The dequeue part of the driver should
- * free the data.  We do not send any data if there is no listeners on the
- * /dev/devctl device.  We assume that on startup, any program that wishes
- * to do things based on devices that have attached before it starts will
- * query the tree to find out its current state.  This decision may
- * be revisited if there are difficulties determining if one should do an
- * action or not (eg, are all actions that the listening program idempotent
- * or not).  This may also open up races as well (say if the listener
- * dies just before a device goes away, and is run again just after, no
- * detach action would happen).  The flip side would be that we'd need to
- * limit the size of the queue because otherwise if no listener is running
- * then we'd have unbounded growth.  Most systems have less than 100 (maybe
- * even less than 50) devices, so maybe a limit of 200 or 300 wouldn't be
- * too horrible. XXX
+ * free the data.  We don't send data when the device is disabled.  We do
+ * send data, even when we have no listeners, because we wish to avoid
+ * races relating to startup and restart of listening applications.
  */
 static void
 devaddq(const char *type, const char *what, device_t dev)
 {
 	struct dev_event_info *n1 = NULL;
+	struct proc *p;
 	char *data = NULL;
 	char *loc;
 	const char *parstr;
@@ -428,8 +407,12 @@ devaddq(const char *type, const char *what, device_t dev)
 	cv_broadcast(&devsoftc.cv);
 	mtx_unlock(&devsoftc.mtx);
 	selwakeup(&devsoftc.sel);
-	if (devsoftc.async_td)
-		psignal(devsoftc.async_td->td_proc, SIGIO);
+	p = devsoftc.async_proc;
+	if (p != NULL) {
+		PROC_LOCK(p);
+		psignal(p, SIGIO);
+		PROC_UNLOCK(p);
+	}
 	return;
 bad:;
 	free(data, M_BUS);
@@ -996,7 +979,7 @@ device_delete_child(device_t dev, device_t child)
 	TAILQ_REMOVE(&dev->children, child, link);
 	TAILQ_REMOVE(&bus_data_devices, child, devlink);
 	device_set_desc(child, NULL);
-	free(child, M_BUS);
+	kobj_delete((kobj_t) child, M_BUS);
 
 	bus_data_generation_update();
 	return (0);
@@ -1170,7 +1153,7 @@ device_get_devclass(device_t dev)
 const char *
 device_get_name(device_t dev)
 {
-	if (dev->devclass)
+	if (dev != NULL && dev->devclass)
 		return (devclass_get_name(dev->devclass));
 	return (NULL);
 }
@@ -1370,6 +1353,12 @@ device_is_alive(device_t dev)
 }
 
 int
+device_is_attached(device_t dev)
+{
+	return (dev->state >= DS_ATTACHED);
+}
+
+int
 device_set_devclass(device_t dev, const char *classname)
 {
 	devclass_t dc;
@@ -1417,6 +1406,7 @@ device_set_driver(device_t dev, driver_t *driver)
 			dev->softc = malloc(driver->size, M_BUS,
 			    M_NOWAIT | M_ZERO);
 			if (!dev->softc) {
+				kobj_delete((kobj_t) dev, 0);
 				kobj_init((kobj_t) dev, &null_class);
 				dev->driver = NULL;
 				return (ENOMEM);

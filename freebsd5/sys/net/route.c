@@ -30,8 +30,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)route.c	8.3 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/route.c,v 1.71 2002/11/15 22:53:53 luigi Exp $
+ *	@(#)route.c	8.3.1.1 (Berkeley) 2/23/95
+ * $FreeBSD: src/sys/net/route.c,v 1.81 2003/04/13 06:21:02 hsu Exp $
  */
 
 #include "opt_inet.h"
@@ -132,7 +132,12 @@ rtalloc1(dst, report, ignflags)
 	/*
 	 * Look up the address in the table for that Address Family
 	 */
-	if (rnh && (rn = rnh->rnh_matchaddr((caddr_t)dst, rnh)) &&
+	if (rnh == NULL) {
+		rtstat.rts_unreach++;
+		goto miss2;
+	}
+	RADIX_NODE_HEAD_LOCK(rnh);
+	if ((rn = rnh->rnh_matchaddr((caddr_t)dst, rnh)) &&
 	    ((rn->rn_flags & RNF_ROOT) == 0)) {
 		/*
 		 * If we find it and it's not the root node, then
@@ -178,6 +183,7 @@ rtalloc1(dst, report, ignflags)
 			rt_missmsg(RTM_ADD, &info, rt->rt_flags, 0);
 		} else
 			rt->rt_refcnt++;
+		RADIX_NODE_HEAD_UNLOCK(rnh);
 	} else {
 		/*
 		 * Either we hit the root or couldn't find any match,
@@ -185,7 +191,9 @@ rtalloc1(dst, report, ignflags)
 		 * "caint get there frm here"
 		 */
 		rtstat.rts_unreach++;
-	miss:	if (report) {
+	miss:
+		RADIX_NODE_HEAD_UNLOCK(rnh);
+	miss2:	if (report) {
 			/*
 			 * If required, report the failure to the supervising
 			 * Authorities.
@@ -211,9 +219,7 @@ rtfree(rt)
 	/*
 	 * find the tree for that address family
 	 */
-	register struct radix_node_head *rnh =
-		rt_tables[rt_key(rt)->sa_family];
-	register struct ifaddr *ifa;
+	struct radix_node_head *rnh = rt_tables[rt_key(rt)->sa_family];
 
 	if (rt == 0 || rnh == 0)
 		panic("rtfree");
@@ -223,7 +229,7 @@ rtfree(rt)
 	 * and there is a close function defined, call the close function
 	 */
 	rt->rt_refcnt--;
-	if(rnh->rnh_close && rt->rt_refcnt == 0) {
+	if (rnh->rnh_close && rt->rt_refcnt == 0) {
 		rnh->rnh_close((struct radix_node *)rt, rnh);
 	}
 
@@ -252,11 +258,10 @@ rtfree(rt)
 		 * release references on items we hold them on..
 		 * e.g other routes and ifaddrs.
 		 */
-		if((ifa = rt->rt_ifa))
-			IFAFREE(ifa);
-		if (rt->rt_parent) {
+		if (rt->rt_ifa)
+			IFAFREE(rt->rt_ifa);
+		if (rt->rt_parent)
 			RTFREE(rt->rt_parent);
-		}
 
 		/*
 		 * The key is separatly alloc'd so free it (see rt_setgate()).
@@ -272,17 +277,8 @@ rtfree(rt)
 	}
 }
 
-void
-ifafree(ifa)
-	register struct ifaddr *ifa;
-{
-	if (ifa == NULL)
-		panic("ifafree");
-	if (ifa->ifa_refcnt == 0)
-		free(ifa, M_IFADDR);
-	else
-		ifa->ifa_refcnt--;
-}
+/* compare two sockaddr structures */
+#define	sa_equal(a1, a2) (bcmp((a1), (a2), (a1)->sa_len) == 0)
 
 /*
  * Force a routing table entry to the specified
@@ -317,9 +313,8 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 	 * we have a routing loop, perhaps as a result of an interface
 	 * going down recently.
 	 */
-#define	equal(a1, a2) (bcmp((caddr_t)(a1), (caddr_t)(a2), (a1)->sa_len) == 0)
 	if (!(flags & RTF_DONE) && rt &&
-	     (!equal(src, rt->rt_gateway) || rt->rt_ifa != ifa))
+	     (!sa_equal(src, rt->rt_gateway) || rt->rt_ifa != ifa))
 		error = EINVAL;
 	else if (ifa_ifwithaddr(gateway))
 		error = EHOSTUNREACH;
@@ -394,8 +389,8 @@ out:
 }
 
 /*
-* Routing table ioctl interface.
-*/
+ * Routing table ioctl interface.
+ */
 int
 rtioctl(req, data)
 	u_long req;
@@ -443,7 +438,7 @@ ifa_ifwithroute(flags, dst, gateway)
 		struct rtentry *rt = rtalloc1(gateway, 0, 0UL);
 		if (rt == 0)
 			return (0);
-		rt->rt_refcnt--;
+		--rt->rt_refcnt;
 		if ((ifa = rt->rt_ifa) == 0)
 			return (0);
 	}
@@ -549,8 +544,11 @@ rtrequest1(req, info, ret_nrt)
 	/*
 	 * Find the correct routing tree to use for this Address Family
 	 */
-	if ((rnh = rt_tables[dst->sa_family]) == 0)
-		senderr(EAFNOSUPPORT);
+	if ((rnh = rt_tables[dst->sa_family]) == 0) {
+		splx(s);
+		return (EAFNOSUPPORT);
+	}
+	RADIX_NODE_HEAD_LOCK(rnh);
 	/*
 	 * If we are adding a host route then we don't want to put
 	 * a netmask in the tree, nor do we want to clone it.
@@ -570,6 +568,8 @@ rtrequest1(req, info, ret_nrt)
 		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
 			panic ("rtrequest delete");
 		rt = (struct rtentry *)rn;
+		rt->rt_refcnt++;
+		rt->rt_flags &= ~RTF_UP;
 
 		/*
 		 * Now search what's left of the subtree for any cloned
@@ -593,15 +593,6 @@ rtrequest1(req, info, ret_nrt)
 		}
 
 		/*
-		 * NB: RTF_UP must be set during the search above,
-		 * because we might delete the last ref, causing
-		 * rt to get freed prematurely.
-		 *  eh? then why not just add a reference?
-		 * I'm not sure how RTF_UP helps matters. (JRE)
-		 */
-		rt->rt_flags &= ~RTF_UP;
-
-		/*
 		 * give the protocol a chance to keep things in sync.
 		 */
 		if ((ifa = rt->rt_ifa) && ifa->ifa_rtrequest)
@@ -620,10 +611,8 @@ rtrequest1(req, info, ret_nrt)
 		 */
 		if (ret_nrt)
 			*ret_nrt = rt;
-		else if (rt->rt_refcnt <= 0) {
-			rt->rt_refcnt++; /* make a 1->0 transition */
-			rtfree(rt);
-		}
+		else
+			RTFREE(rt);
 		break;
 
 	case RTM_RESOLVE:
@@ -679,7 +668,7 @@ rtrequest1(req, info, ret_nrt)
 		 * This moved from below so that rnh->rnh_addaddr() can
 		 * examine the ifa and  ifa->ifa_ifp if it so desires.
 		 */
-		ifa->ifa_refcnt++;
+		IFAREF(ifa);
 		rt->rt_ifa = ifa;
 		rt->rt_ifp = ifa->ifa_ifp;
 		/* XXX mtu manipulation will be done in rnh_addaddr -- itojun */
@@ -754,7 +743,8 @@ rtrequest1(req, info, ret_nrt)
 		 * it doesn't fire when we call it there because the node
 		 * hasn't been added to the tree yet.
 		 */
-		if (!(rt->rt_flags & RTF_HOST) && rt_mask(rt) != 0) {
+		if (req == RTM_ADD &&
+		    !(rt->rt_flags & RTF_HOST) && rt_mask(rt) != 0) {
 			struct rtfc_arg arg;
 			arg.rnh = rnh;
 			arg.rt0 = rt;
@@ -775,6 +765,7 @@ rtrequest1(req, info, ret_nrt)
 		error = EOPNOTSUPP;
 	}
 bad:
+	RADIX_NODE_HEAD_UNLOCK(rnh);
 	splx(s);
 	return (error);
 #undef dst
@@ -800,7 +791,8 @@ rt_fixdelete(rn, vp)
 	struct rtentry *rt = (struct rtentry *)rn;
 	struct rtentry *rt0 = vp;
 
-	if (rt->rt_parent == rt0 && !(rt->rt_flags & RTF_PINNED)) {
+	if (rt->rt_parent == rt0 &&
+	    !(rt->rt_flags & (RTF_PINNED | RTF_CLONING | RTF_PRCLONING))) {
 		return rtrequest(RTM_DELETE, rt_key(rt),
 				 (struct sockaddr *)0, rt_mask(rt),
 				 rt->rt_flags, (struct rtentry **)0);
@@ -842,9 +834,10 @@ rt_fixchange(rn, vp)
 		printf("rt_fixchange: rt %p, rt0 %p\n", rt, rt0);
 #endif
 
-	if (!rt->rt_parent || (rt->rt_flags & RTF_PINNED)) {
+	if (!rt->rt_parent ||
+	    (rt->rt_flags & (RTF_PINNED | RTF_CLONING | RTF_PRCLONING))) {
 #ifdef DEBUG
-		if(rtfcdebug) printf("no parent or pinned\n");
+		if(rtfcdebug) printf("no parent, pinned or cloning\n");
 #endif
 		return 0;
 	}
@@ -1012,8 +1005,10 @@ rt_setgate(rt0, dst, gate)
 		struct rtfc_arg arg;
 		arg.rnh = rnh;
 		arg.rt0 = rt;
+		RADIX_NODE_HEAD_LOCK(rnh);
 		rnh->rnh_walktree_from(rnh, rt_key(rt), rt_mask(rt),
 				       rt_fixchange, &arg);
+		RADIX_NODE_HEAD_UNLOCK(rnh);
 	}
 
 	return 0;
@@ -1089,26 +1084,20 @@ rtinit(ifa, cmd, flags)
 		 * Look up an rtentry that is in the routing tree and
 		 * contains the correct info.
 		 */
-		if ((rnh = rt_tables[dst->sa_family]) == NULL ||
-		    (rn = rnh->rnh_lookup(dst, netmask, rnh)) == NULL ||
+		if ((rnh = rt_tables[dst->sa_family]) == NULL)
+			goto bad;
+		RADIX_NODE_HEAD_LOCK(rnh);
+		error = ((rn = rnh->rnh_lookup(dst, netmask, rnh)) == NULL ||
 		    (rn->rn_flags & RNF_ROOT) ||
 		    ((struct rtentry *)rn)->rt_ifa != ifa ||
-		    !equal(SA(rn->rn_key), dst)) {
+		    !sa_equal(SA(rn->rn_key), dst));
+		RADIX_NODE_HEAD_UNLOCK(rnh);
+		if (error) {
+bad:
 			if (m)
 				(void) m_free(m);
 			return (flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
 		}
-		/* XXX */
-#if 0
-		else {
-			/*
-			 * One would think that as we are deleting, and we know
-			 * it doesn't exist, we could just return at this point
-			 * with an "ELSE" clause, but apparently not..
-			 */
-			return (flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
-		}
-#endif
 	}
 	/*
 	 * Do the actual request
@@ -1130,10 +1119,7 @@ rtinit(ifa, cmd, flags)
 			 * If we are deleting, and we found an entry, then
 			 * it's been removed from the tree.. now throw it away.
 			 */
-			if (rt->rt_refcnt <= 0) {
-				rt->rt_refcnt++; /* make a 1->0 transition */
-				rtfree(rt);
-			}
+			RTFREE(rt);
 		} else if (cmd == RTM_ADD) {
 			/*
 			 * We just wanted to add it.. we don't actually
@@ -1144,6 +1130,57 @@ rtinit(ifa, cmd, flags)
 	}
 	if (m)
 		(void) m_free(m);
+	return (error);
+}
+
+int
+rt_check(lrt, lrt0, dst)
+	struct rtentry **lrt;
+	struct rtentry **lrt0;
+	struct sockaddr *dst;
+{
+	struct rtentry *rt;
+	struct rtentry *rt0;
+	int error;
+
+	rt = *lrt;
+	rt0 = *lrt0;
+	error = 0;
+
+	rt = rt0;
+
+	if (rt != NULL) {
+		if ((rt->rt_flags & RTF_UP) == 0) {
+			rt0 = rt = rtalloc1(dst, 1, 0UL);
+			if (rt0 != NULL)
+				rt->rt_refcnt--;
+			else
+				senderr(EHOSTUNREACH);
+		}
+		if (rt->rt_flags & RTF_GATEWAY) {
+			if (rt->rt_gwroute == NULL)
+				goto lookup;
+
+			rt = rt->rt_gwroute;
+			if ((rt->rt_flags & RTF_UP) == 0) {
+				rtfree(rt);
+				rt = rt0;
+			lookup:
+				rt->rt_gwroute = rtalloc1(rt->rt_gateway, 1, 0UL);
+				rt = rt->rt_gwroute;
+				if (rt == NULL)
+					senderr(EHOSTUNREACH);
+			}
+		}
+		if (rt->rt_flags & RTF_REJECT)
+			if (rt->rt_rmx.rmx_expire == 0 ||
+				time_second < rt->rt_rmx.rmx_expire)
+				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
+	}
+
+bad:
+	*lrt = rt;
+	*lrt0 = rt0;
 	return (error);
 }
 

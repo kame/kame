@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_disc.c,v 1.32 2002/11/15 00:00:14 sam Exp $
+ * $FreeBSD: src/sys/net/if_disc.c,v 1.35 2003/04/08 14:25:45 des Exp $
  */
 
 /*
@@ -155,8 +155,7 @@ static int
 discoutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
     struct rtentry *rt)
 {
-	if ((m->m_flags & M_PKTHDR) == 0)
-		panic("discoutput no HDR");
+	M_ASSERTPKTHDR(m);
 	/* BPF write needs to be handled specially */
 	if (dst->sa_family == AF_UNSPEC) {
 		dst->sa_family = *(mtod(m, int *));

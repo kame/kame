@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/hpfs/hpfs_subr.c,v 1.3 2002/03/17 01:25:40 mckusick Exp $
+ * $FreeBSD: src/sys/fs/hpfs/hpfs_subr.c,v 1.6 2003/03/04 00:04:42 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -75,7 +75,7 @@ hpfs_bmdeinit(
 			dprintf(("[%d: 0x%x] ", i, hpmp->hpm_bmind[i]));
 
 			bp = getblk(hpmp->hpm_devvp, hpmp->hpm_bmind[i],
-				    BMSIZE, 0, 0);
+				    BMSIZE, 0, 0, 0);
 			clrbuf(bp);
 
 			bcopy(hpmp->hpm_bitmap + BMSIZE * i, bp->b_data,
@@ -732,7 +732,7 @@ hpfs_update (
 	if (!(hp->h_flag & H_CHANGE))
 		return (0);
 
-	bp = getblk(hp->h_devvp, hp->h_no, FNODESIZE, 0, 0);
+	bp = getblk(hp->h_devvp, hp->h_no, FNODESIZE, 0, 0, 0);
 	clrbuf(bp);
 
 	bcopy (&hp->h_fn, bp->b_data, sizeof(struct fnode));

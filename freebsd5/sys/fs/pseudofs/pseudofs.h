@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/fs/pseudofs/pseudofs.h,v 1.22 2002/10/26 14:38:20 rwatson Exp $
+ *      $FreeBSD: src/sys/fs/pseudofs/pseudofs.h,v 1.24 2003/03/11 22:15:09 kan Exp $
  */
 
 #ifndef _PSEUDOFS_H_INCLUDED
@@ -127,7 +127,7 @@ typedef int (*pfs_vis_t)(PFS_VIS_ARGS);
  */
 #define PFS_IOCTL_ARGS \
 	struct thread *td, struct proc *p, struct pfs_node *pn, \
-	unsigned long cmd, caddr_t data
+	unsigned long cmd, void *data
 #define PFS_IOCTL_PROTO(name) \
 	int name(PFS_IOCTL_ARGS);
 typedef int (*pfs_ioctl_t)(PFS_IOCTL_ARGS);
@@ -256,7 +256,7 @@ static struct vfsops name##_vfsops = {					\
 	pfs_root,							\
 	vfs_stdquotactl,						\
 	pfs_statfs,							\
-	vfs_stdsync,							\
+	vfs_stdnosync,							\
 	vfs_stdvget,							\
 	vfs_stdfhtovp,							\
 	vfs_stdcheckexp,						\

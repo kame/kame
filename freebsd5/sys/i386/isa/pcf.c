@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pcf.c,v 1.18 2002/03/25 21:22:35 nsouch Exp $
+ * $FreeBSD: src/sys/i386/isa/pcf.c,v 1.19 2003/01/01 18:48:53 schweikh Exp $
  *
  */
 #include <sys/param.h>
@@ -285,7 +285,7 @@ static int pcf_stop(device_t pcfdev)
 
 	/*
 	 * Send STOP condition iff the START condition was previously sent.
-	 * STOP is sent only once even if a iicbus_stop() is called after
+	 * STOP is sent only once even if an iicbus_stop() is called after
 	 * an iicbus_read()... see pcf_read(): the pcf needs to send the stop
 	 * before the last char is read.
 	 */

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vmparam.h	5.9 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/include/vmparam.h,v 1.33 2000/03/30 07:17:01 peter Exp $
+ * $FreeBSD: src/sys/i386/include/vmparam.h,v 1.36 2003/05/01 00:10:38 peter Exp $
  */
 
 
@@ -90,18 +90,15 @@
  * messy at times, but hey, we'll do anything to save a page :-)
  */
 
-#define VM_MAX_KERNEL_ADDRESS	VADDR(KPTDI+NKPDE, 0)
+#define VM_MAX_KERNEL_ADDRESS	VADDR(KPTDI+NKPDE-1, NPTEPG-1)
 #define VM_MIN_KERNEL_ADDRESS	VADDR(PTDPTDI, PTDPTDI)
 
 #define	KERNBASE		VADDR(KPTDI, 0)
 
-#define KPT_MAX_ADDRESS		VADDR(PTDPTDI, KPTDI+NKPT)
-#define KPT_MIN_ADDRESS		VADDR(PTDPTDI, KPTDI)
-
 #define UPT_MAX_ADDRESS		VADDR(PTDPTDI, PTDPTDI)
 #define UPT_MIN_ADDRESS		VADDR(PTDPTDI, 0)
 
-#define VM_MAXUSER_ADDRESS	VADDR(UMAXPTDI, UMAXPTEOFF)
+#define VM_MAXUSER_ADDRESS	VADDR(PTDPTDI, 0)
 
 #define USRSTACK		VM_MAXUSER_ADDRESS
 

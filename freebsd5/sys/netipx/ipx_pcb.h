@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_pcb.h
  *
- * $FreeBSD: src/sys/netipx/ipx_pcb.h,v 1.17 2002/03/20 02:39:13 alfred Exp $
+ * $FreeBSD: src/sys/netipx/ipx_pcb.h,v 1.18 2003/01/01 18:48:56 schweikh Exp $
  */
 
 #ifndef _NETIPX_IPX_PCB_H_
@@ -74,7 +74,7 @@ struct ipxpcb {
 #define	sotoipxpcb(so)		((struct ipxpcb *)((so)->so_pcb))
 
 /*
- * Nominal space allocated to a IPX socket.
+ * Nominal space allocated to an IPX socket.
  */
 #define	IPXSNDQ		16384
 #define	IPXRCVQ		40960

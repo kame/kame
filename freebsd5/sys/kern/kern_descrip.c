@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_descrip.c	8.6 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.169.2.3 2003/01/10 05:18:09 rwatson Exp $
+ * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.196 2003/05/15 21:13:08 rwatson Exp $
  */
 
 #include "opt_compat.h"
@@ -49,6 +49,7 @@
 #include <sys/filedesc.h>
 #include <sys/lock.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/sysctl.h>
@@ -67,8 +68,6 @@
 #include <sys/socketvar.h>
 #include <sys/signalvar.h>
 
-#include <machine/limits.h>
-
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
@@ -76,26 +75,16 @@
 static MALLOC_DEFINE(M_FILEDESC, "file desc", "Open file descriptor table");
 static MALLOC_DEFINE(M_SIGIO, "sigio", "sigio structures");
 
-uma_zone_t file_zone;
+static uma_zone_t file_zone;
 
 static	 d_open_t  fdopen;
 #define	NUMFDESC 64
 
 #define	CDEV_MAJOR 22
 static struct cdevsw fildesc_cdevsw = {
-	/* open */	fdopen,
-	/* close */	noclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	noioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"FD",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	fdopen,
+	.d_name =	"FD",
+	.d_maj =	CDEV_MAJOR,
 };
 
 /* How to treat 'new' parameter when allocating a fd for do_dup(). */
@@ -103,16 +92,6 @@ enum dup_type { DUP_VARIABLE, DUP_FIXED };
 
 static int do_dup(struct thread *td, enum dup_type type, int old, int new,
     register_t *retval);
-static int badfo_readwrite(struct file *fp, struct uio *uio,
-    struct ucred *active_cred, int flags, struct thread *td);
-static int badfo_ioctl(struct file *fp, u_long com, void *data,
-    struct ucred *active_cred, struct thread *td);
-static int badfo_poll(struct file *fp, int events,
-    struct ucred *active_cred, struct thread *td);
-static int badfo_kqfilter(struct file *fp, struct knote *kn);
-static int badfo_stat(struct file *fp, struct stat *sb,
-    struct ucred *active_cred, struct thread *td);
-static int badfo_close(struct file *fp, struct thread *td);
 
 /*
  * Descriptor management.
@@ -213,7 +192,7 @@ struct fcntl_args {
 int
 fcntl(td, uap)
 	struct thread *td;
-	register struct fcntl_args *uap;
+	struct fcntl_args *uap;
 {
 	struct flock fl;
 	intptr_t arg;
@@ -244,11 +223,11 @@ fcntl(td, uap)
 int
 kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 {
-	register struct filedesc *fdp;
+	struct filedesc *fdp;
 	struct flock *flp;
-	register struct file *fp;
+	struct file *fp;
 	struct proc *p;
-	register char *pop;
+	char *pop;
 	struct vnode *vp;
 	u_int newmin;
 	int error, flg, tmp;
@@ -298,10 +277,12 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		break;
 
 	case F_SETFL:
-		fhold(fp);
+		FILE_LOCK(fp);
 		FILEDESC_UNLOCK(fdp);
+		fhold_locked(fp);
 		fp->f_flag &= ~FCNTLFLAGS;
 		fp->f_flag |= FFLAGS(arg & ~O_ACCMODE) & FCNTLFLAGS;
+		FILE_UNLOCK(fp);
 		tmp = fp->f_flag & FNONBLOCK;
 		error = fo_ioctl(fp, FIONBIO, &tmp, td->td_ucred, td);
 		if (error) {
@@ -314,7 +295,9 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 			fdrop(fp, td);
 			break;
 		}
+		FILE_LOCK(fp);
 		fp->f_flag &= ~FNONBLOCK;
+		FILE_UNLOCK(fp);
 		tmp = 0;
 		(void)fo_ioctl(fp, FIONBIO, &tmp, td->td_ucred, td);
 		fdrop(fp, td);
@@ -365,7 +348,7 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		 */
 		fhold(fp);
 		FILEDESC_UNLOCK(fdp);
-		vp = (struct vnode *)fp->f_data;
+		vp = fp->f_data;
 
 		switch (flp->l_type) {
 		case F_RDLCK:
@@ -373,9 +356,9 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 				error = EBADF;
 				break;
 			}
-			PROC_LOCK(p);
-			p->p_flag |= P_ADVLOCK;
-			PROC_UNLOCK(p);
+			PROC_LOCK(p->p_leader);
+			p->p_leader->p_flag |= P_ADVLOCK;
+			PROC_UNLOCK(p->p_leader);
 			error = VOP_ADVLOCK(vp, (caddr_t)p->p_leader, F_SETLK,
 			    flp, flg);
 			break;
@@ -384,9 +367,9 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 				error = EBADF;
 				break;
 			}
-			PROC_LOCK(p);
-			p->p_flag |= P_ADVLOCK;
-			PROC_UNLOCK(p);
+			PROC_LOCK(p->p_leader);
+			p->p_leader->p_flag |= P_ADVLOCK;
+			PROC_UNLOCK(p->p_leader);
 			error = VOP_ADVLOCK(vp, (caddr_t)p->p_leader, F_SETLK,
 			    flp, flg);
 			break;
@@ -398,6 +381,19 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 			error = EINVAL;
 			break;
 		}
+		/* Check for race with close */
+		FILEDESC_LOCK(fdp);
+		if ((unsigned) fd >= fdp->fd_nfiles ||
+		    fp != fdp->fd_ofiles[fd]) {
+			FILEDESC_UNLOCK(fdp);
+			flp->l_whence = SEEK_SET;
+			flp->l_start = 0;
+			flp->l_len = 0;
+			flp->l_type = F_UNLCK;
+			(void) VOP_ADVLOCK(vp, (caddr_t)p->p_leader,
+					   F_UNLCK, flp, F_POSIX);
+		} else
+			FILEDESC_UNLOCK(fdp);
 		fdrop(fp, td);
 		break;
 
@@ -430,7 +426,7 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		 */
 		fhold(fp);
 		FILEDESC_UNLOCK(fdp);
-		vp = (struct vnode *)fp->f_data;
+		vp = fp->f_data;
 		error = VOP_ADVLOCK(vp, (caddr_t)p->p_leader, F_GETLK, flp,
 		    F_POSIX);
 		fdrop(fp, td);
@@ -447,7 +443,6 @@ done2:
 
 /*
  * Common code for dup, dup2, and fcntl(F_DUPFD).
- * filedesc must be locked, but will be unlocked as a side effect.
  */
 static int
 do_dup(td, type, old, new, retval)
@@ -456,7 +451,7 @@ do_dup(td, type, old, new, retval)
 	register_t *retval;
 	struct thread *td;
 {
-	register struct filedesc *fdp;
+	struct filedesc *fdp;
 	struct proc *p;
 	struct file *fp;
 	struct file *delfp;
@@ -795,8 +790,8 @@ close(td, uap)
 	struct thread *td;
 	struct close_args *uap;
 {
-	register struct filedesc *fdp;
-	register struct file *fp;
+	struct filedesc *fdp;
+	struct file *fp;
 	int fd, error;
 
 	fd = uap->fd;
@@ -854,7 +849,7 @@ struct ofstat_args {
 int
 ofstat(td, uap)
 	struct thread *td;
-	register struct ofstat_args *uap;
+	struct ofstat_args *uap;
 {
 	struct file *fp;
 	struct stat ub;
@@ -926,7 +921,7 @@ struct nfstat_args {
 int
 nfstat(td, uap)
 	struct thread *td;
-	register struct nfstat_args *uap;
+	struct nfstat_args *uap;
 {
 	struct file *fp;
 	struct stat ub;
@@ -963,7 +958,7 @@ struct fpathconf_args {
 int
 fpathconf(td, uap)
 	struct thread *td;
-	register struct fpathconf_args *uap;
+	struct fpathconf_args *uap;
 {
 	struct file *fp;
 	struct vnode *vp;
@@ -989,9 +984,11 @@ fpathconf(td, uap)
 		break;
 	case DTYPE_FIFO:
 	case DTYPE_VNODE:
-		vp = (struct vnode *)fp->f_data;
+		vp = fp->f_data;
 		mtx_lock(&Giant);
+		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 		error = VOP_PATHCONF(vp, uap->name, td->td_retval);
+		VOP_UNLOCK(vp, 0, td);
 		mtx_unlock(&Giant);
 		break;
 	default:
@@ -1016,8 +1013,8 @@ fdalloc(td, want, result)
 	int *result;
 {
 	struct proc *p = td->td_proc;
-	register struct filedesc *fdp = td->td_proc->p_fd;
-	register int i;
+	struct filedesc *fdp = td->td_proc->p_fd;
+	int i;
 	int lim, last, nfiles;
 	struct file **newofile, **oldofile;
 	char *newofileflags;
@@ -1118,12 +1115,12 @@ fdalloc(td, want, result)
 int
 fdavail(td, n)
 	struct thread *td;
-	register int n;
+	int n;
 {
 	struct proc *p = td->td_proc;
-	register struct filedesc *fdp = td->td_proc->p_fd;
-	register struct file **fpp;
-	register int i, lim, last;
+	struct filedesc *fdp = td->td_proc->p_fd;
+	struct file **fpp;
+	int i, lim, last;
 
 	FILEDESC_LOCK_ASSERT(fdp, MA_OWNED);
 
@@ -1145,12 +1142,12 @@ fdavail(td, n)
  */
 int
 falloc(td, resultfp, resultfd)
-	register struct thread *td;
+	struct thread *td;
 	struct file **resultfp;
 	int *resultfd;
 {
 	struct proc *p = td->td_proc;
-	register struct file *fp, *fq;
+	struct file *fp, *fq;
 	int error, i;
 
 	fp = uma_zalloc(file_zone, M_WAITOK | M_ZERO);
@@ -1200,7 +1197,7 @@ falloc(td, resultfp, resultfd)
  */
 void
 ffree(fp)
-	register struct file *fp;
+	struct file *fp;
 {
 
 	KASSERT(fp->f_count == 0, ("ffree: fp_fcount not 0!"));
@@ -1213,19 +1210,18 @@ ffree(fp)
 }
 
 /*
- * Build a new filedesc structure.
+ * Build a new filedesc structure from another.
+ * Copy the current, root, and jail root vnode references.
  */
 struct filedesc *
-fdinit(td)
-	struct thread *td;
+fdinit(fdp)
+	struct filedesc *fdp;
 {
-	register struct filedesc0 *newfdp;
-	register struct filedesc *fdp = td->td_proc->p_fd;
+	struct filedesc0 *newfdp;
 
 	MALLOC(newfdp, struct filedesc0 *, sizeof(struct filedesc0),
 	    M_FILEDESC, M_WAITOK | M_ZERO);
 	mtx_init(&newfdp->fd_fd.fd_mtx, FILEDESC_LOCK_DESC, NULL, MTX_DEF);
-	FILEDESC_LOCK(&newfdp->fd_fd);
 	newfdp->fd_fd.fd_cdir = fdp->fd_cdir;
 	if (newfdp->fd_fd.fd_cdir)
 		VREF(newfdp->fd_fd.fd_cdir);
@@ -1243,8 +1239,6 @@ fdinit(td)
 	newfdp->fd_fd.fd_ofileflags = newfdp->fd_dfileflags;
 	newfdp->fd_fd.fd_nfiles = NDFILE;
 	newfdp->fd_fd.fd_knlistsize = -1;
-	FILEDESC_UNLOCK(&newfdp->fd_fd);
-
 	return (&newfdp->fd_fd);
 }
 
@@ -1252,28 +1246,29 @@ fdinit(td)
  * Share a filedesc structure.
  */
 struct filedesc *
-fdshare(p)
-	struct proc *p;
+fdshare(fdp)
+	struct filedesc *fdp;
 {
-	FILEDESC_LOCK(p->p_fd);
-	p->p_fd->fd_refcnt++;
-	FILEDESC_UNLOCK(p->p_fd);
-	return (p->p_fd);
+	FILEDESC_LOCK(fdp);
+	fdp->fd_refcnt++;
+	FILEDESC_UNLOCK(fdp);
+	return (fdp);
 }
 
 /*
  * Copy a filedesc structure.
+ * A NULL pointer in returns a NULL reference, this is to ease callers,
+ * not catch errors.
  */
 struct filedesc *
-fdcopy(td)
-	struct thread *td;
+fdcopy(fdp)
+	struct filedesc *fdp;
 {
-	register struct filedesc *newfdp, *fdp;
-	register struct file **fpp;
-	register int i, j;
+	struct filedesc *newfdp;
+	struct file **fpp;
+	int i, j;
 
 	/* Certain daemons might not have file descriptors. */
-	fdp = td->td_proc->p_fd;
 	if (fdp == NULL)
 		return (NULL);
 
@@ -1374,6 +1369,10 @@ retry:
 	return (newfdp);
 }
 
+/* A mutex to protect the association between a proc and filedesc. */
+struct mtx	fdesc_mtx;
+MTX_SYSINIT(fdesc, &fdesc_mtx, "fdesc", MTX_DEF);
+
 /*
  * Release a filedesc structure.
  */
@@ -1381,9 +1380,9 @@ void
 fdfree(td)
 	struct thread *td;
 {
-	register struct filedesc *fdp;
+	struct filedesc *fdp;
 	struct file **fpp;
-	register int i;
+	int i;
 
 	/* Certain daemons might not have file descriptors. */
 	fdp = td->td_proc->p_fd;
@@ -1406,7 +1405,12 @@ fdfree(td)
 		if (*fpp)
 			(void) closef(*fpp, td);
 	}
+
+	/* XXX This should happen earlier. */
+	mtx_lock(&fdesc_mtx);
 	td->td_proc->p_fd = NULL;
+	mtx_unlock(&fdesc_mtx);
+
 	if (fdp->fd_nfiles > NDFILE)
 		FREE(fdp->fd_ofiles, M_FILEDESC);
 	if (fdp->fd_cdir)
@@ -1436,7 +1440,7 @@ static int
 is_unsafe(struct file *fp)
 {
 	if (fp->f_type == DTYPE_VNODE) {
-		struct vnode *vp = (struct vnode *)fp->f_data;
+		struct vnode *vp = fp->f_data;
 
 		if ((vp->v_vflag & VV_PROCDEP) != 0)
 			return (1);
@@ -1452,7 +1456,7 @@ setugidsafety(td)
 	struct thread *td;
 {
 	struct filedesc *fdp;
-	register int i;
+	int i;
 
 	/* Certain daemons might not have file descriptors. */
 	fdp = td->td_proc->p_fd;
@@ -1506,7 +1510,7 @@ fdcloseexec(td)
 	struct thread *td;
 {
 	struct filedesc *fdp;
-	register int i;
+	int i;
 
 	/* Certain daemons might not have file descriptors. */
 	fdp = td->td_proc->p_fd;
@@ -1617,8 +1621,8 @@ fdcheckstd(td)
  */
 int
 closef(fp, td)
-	register struct file *fp;
-	register struct thread *td;
+	struct file *fp;
+	struct thread *td;
 {
 	struct vnode *vp;
 	struct flock lf;
@@ -1633,15 +1637,15 @@ closef(fp, td)
 	 * If the descriptor was in a message, POSIX-style locks
 	 * aren't passed with the descriptor.
 	 */
-	if (td && (td->td_proc->p_flag & P_ADVLOCK) &&
+	if (td != NULL && (td->td_proc->p_leader->p_flag & P_ADVLOCK) != 0 &&
 	    fp->f_type == DTYPE_VNODE) {
 		lf.l_whence = SEEK_SET;
 		lf.l_start = 0;
 		lf.l_len = 0;
 		lf.l_type = F_UNLCK;
-		vp = (struct vnode *)fp->f_data;
+		vp = fp->f_data;
 		(void) VOP_ADVLOCK(vp, (caddr_t)td->td_proc->p_leader,
-		    F_UNLCK, &lf, F_POSIX);
+				   F_UNLCK, &lf, F_POSIX);
 	}
 	return (fdrop(fp, td));
 }
@@ -1753,7 +1757,7 @@ _fgetvp(struct thread *td, int fd, struct vnode **vpp, int flags)
 	if (fp->f_type != DTYPE_VNODE && fp->f_type != DTYPE_FIFO) {
 		error = EINVAL;
 	} else {
-		*vpp = (struct vnode *)fp->f_data;
+		*vpp = fp->f_data;
 		vref(*vpp);
 	}
 	FILEDESC_UNLOCK(td->td_proc->p_fd);
@@ -1802,7 +1806,7 @@ fgetsock(struct thread *td, int fd, struct socket **spp, u_int *fflagp)
 	if (fp->f_type != DTYPE_SOCKET) {
 		error = ENOTSOCK;
 	} else {
-		*spp = (struct socket *)fp->f_data;
+		*spp = fp->f_data;
 		if (fflagp)
 			*fflagp = fp->f_flag;
 		soref(*spp);
@@ -1850,7 +1854,7 @@ fdrop_locked(fp, td)
 		lf.l_start = 0;
 		lf.l_len = 0;
 		lf.l_type = F_UNLCK;
-		vp = (struct vnode *)fp->f_data;
+		vp = fp->f_data;
 		FILE_UNLOCK(fp);
 		(void) VOP_ADVLOCK(vp, (caddr_t)fp, F_UNLCK, &lf, F_FLOCK);
 	} else
@@ -1883,7 +1887,7 @@ struct flock_args {
 int
 flock(td, uap)
 	struct thread *td;
-	register struct flock_args *uap;
+	struct flock_args *uap;
 {
 	struct file *fp;
 	struct vnode *vp;
@@ -1898,7 +1902,7 @@ flock(td, uap)
 	}
 
 	mtx_lock(&Giant);
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	lf.l_whence = SEEK_SET;
 	lf.l_start = 0;
 	lf.l_len = 0;
@@ -1968,7 +1972,7 @@ dupfdopen(td, fdp, indx, dfd, mode, error)
 	int mode;
 	int error;
 {
-	register struct file *wfp;
+	struct file *wfp;
 	struct file *fp;
 
 	/*
@@ -2112,8 +2116,10 @@ sysctl_kern_file(SYSCTL_HANDLER_ARGS)
 		PROC_LOCK(p);
 		xf.xf_pid = p->p_pid;
 		xf.xf_uid = p->p_ucred->cr_uid;
+		PROC_UNLOCK(p);
+		mtx_lock(&fdesc_mtx);
 		if ((fdp = p->p_fd) == NULL) {
-			PROC_UNLOCK(p);
+			mtx_unlock(&fdesc_mtx);
 			continue;
 		}
 		FILEDESC_LOCK(fdp);
@@ -2122,20 +2128,18 @@ sysctl_kern_file(SYSCTL_HANDLER_ARGS)
 				continue;
 			xf.xf_fd = n;
 			xf.xf_file = fp;
-#define	XF_COPY(field) xf.xf_##field = fp->f_##field
-			XF_COPY(type);
-			XF_COPY(count);
-			XF_COPY(msgcount);
-			XF_COPY(offset);
-			XF_COPY(data);
-			XF_COPY(flag);
-#undef XF_COPY
+			xf.xf_data = fp->f_data;
+			xf.xf_type = fp->f_type;
+			xf.xf_count = fp->f_count;
+			xf.xf_msgcount = fp->f_msgcount;
+			xf.xf_offset = fp->f_offset;
+			xf.xf_flag = fp->f_flag;
 			error = SYSCTL_OUT(req, &xf, sizeof(xf));
 			if (error)
 				break;
 		}
 		FILEDESC_UNLOCK(fdp);
-		PROC_UNLOCK(p);
+		mtx_unlock(&fdesc_mtx);
 		if (error)
 			break;
 	}
@@ -2166,14 +2170,14 @@ fildesc_drvinit(void *unused)
 	make_dev_alias(dev, "stdout");
 	dev = make_dev(&fildesc_cdevsw, 2, UID_ROOT, GID_WHEEL, 0666, "fd/2");
 	make_dev_alias(dev, "stderr");
-	if (!devfs_present) {
-		int fd;
-
-		for (fd = 3; fd < NUMFDESC; fd++)
-			make_dev(&fildesc_cdevsw, fd, UID_ROOT, GID_WHEEL,
-			    0666, "fd/%d", fd);
-	}
 }
+
+static fo_rdwr_t	badfo_readwrite;
+static fo_ioctl_t	badfo_ioctl;
+static fo_poll_t	badfo_poll;
+static fo_kqfilter_t	badfo_kqfilter;
+static fo_stat_t	badfo_stat;
+static fo_close_t	badfo_close;
 
 struct fileops badfileops = {
 	badfo_readwrite,
@@ -2182,7 +2186,8 @@ struct fileops badfileops = {
 	badfo_poll,
 	badfo_kqfilter,
 	badfo_stat,
-	badfo_close
+	badfo_close,
+	0
 };
 
 static int

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/bde/g_bde_work.c,v 1.3.2.2 2003/01/07 18:21:39 phk Exp $
+ * $FreeBSD: src/sys/geom/bde/g_bde_work.c,v 1.21 2003/05/05 08:37:07 phk Exp $
  *
  * This source file contains the state-engine which makes things happen in the
  * right order.
@@ -58,7 +58,6 @@
  */
 
 #include <sys/param.h>
-#include <sys/stdint.h>
 #include <sys/bio.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -67,7 +66,6 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
-#include <sys/time.h>
 #include <sys/proc.h>
 #include <sys/kthread.h>
 
@@ -78,8 +76,8 @@
 
 static void g_bde_delete_sector(struct g_bde_softc *wp, struct g_bde_sector *sp);
 static struct g_bde_sector * g_bde_new_sector(struct g_bde_work *wp, u_int len);
-static void g_bde_release_sector(struct g_bde_work *wp, struct g_bde_sector *sp);
-static struct g_bde_sector *g_bde_get_sector(struct g_bde_work *wp, off_t offset);
+static void g_bde_release_keysector(struct g_bde_work *wp);
+static struct g_bde_sector *g_bde_get_keysector(struct g_bde_work *wp);
 static int g_bde_start_read(struct g_bde_sector *sp);
 static void g_bde_purge_sector(struct g_bde_softc *sc, int fraction);
 
@@ -91,12 +89,14 @@ static void g_bde_purge_sector(struct g_bde_softc *sc, int fraction);
 static u_int g_bde_nwork;
 SYSCTL_UINT(_debug, OID_AUTO, gbde_nwork, CTLFLAG_RD, &g_bde_nwork, 0, "");
 
+static MALLOC_DEFINE(M_GBDE, "GBDE", "GBDE data structures");
+
 static struct g_bde_work *
 g_bde_new_work(struct g_bde_softc *sc)
 {
 	struct g_bde_work *wp;
 
-	wp = g_malloc(sizeof *wp, M_NOWAIT | M_ZERO);
+	wp = malloc(sizeof *wp, M_GBDE, M_NOWAIT | M_ZERO);
 	if (wp == NULL)
 		return (wp);
 	wp->state = SETUP;
@@ -116,7 +116,7 @@ g_bde_delete_work(struct g_bde_work *wp)
 	g_bde_nwork--;
 	sc->nwork--;
 	TAILQ_REMOVE(&sc->worklist, wp, list);
-	g_free(wp);
+	free(wp, M_GBDE);
 }
 
 /*
@@ -135,8 +135,8 @@ g_bde_delete_sector(struct g_bde_softc *sc, struct g_bde_sector *sp)
 	g_bde_nsect--;
 	sc->nsect--;
 	if (sp->malloc)
-		g_free(sp->data);
-	g_free(sp);
+		free(sp->data, M_GBDE);
+	free(sp, M_GBDE);
 }
 
 static struct g_bde_sector *
@@ -144,13 +144,13 @@ g_bde_new_sector(struct g_bde_work *wp, u_int len)
 {
 	struct g_bde_sector *sp;
 
-	sp = g_malloc(sizeof *sp, M_NOWAIT | M_ZERO);
+	sp = malloc(sizeof *sp, M_GBDE, M_NOWAIT | M_ZERO);
 	if (sp == NULL)
 		return (sp);
 	if (len > 0) {
-		sp->data = g_malloc(len, M_NOWAIT | M_ZERO);
+		sp->data = malloc(len, M_GBDE, M_NOWAIT | M_ZERO);
 		if (sp->data == NULL) {
-			g_free(sp);
+			free(sp, M_GBDE);
 			return (NULL);
 		}
 		sp->malloc = 1;
@@ -197,12 +197,14 @@ g_bde_purge_one_sector(struct g_bde_softc *sc, struct g_bde_sector *sp)
 }
 
 static struct g_bde_sector *
-g_bde_get_sector(struct g_bde_work *wp, off_t offset)
+g_bde_get_keysector(struct g_bde_work *wp)
 {
 	struct g_bde_sector *sp;
 	struct g_bde_softc *sc;
+	off_t offset;
 
-	g_trace(G_T_TOPOLOGY, "g_bde_get_sector(%p, %jd)", wp, (intmax_t)offset);
+	offset = wp->kso;
+	g_trace(G_T_TOPOLOGY, "g_bde_get_keysector(%p, %jd)", wp, (intmax_t)offset);
 	sc = wp->softc;
 
 	if (malloc_last_fail() < g_bde_ncache)
@@ -233,10 +235,10 @@ g_bde_get_sector(struct g_bde_work *wp, off_t offset)
 		if (sp != NULL && sp->ref > 0)
 			sp = NULL;
 		if (sp == NULL) {
-			g_bde_ncache++;
-			sc->ncache++;
 			sp = g_bde_new_sector(wp, sc->sectorsize);
 			if (sp != NULL) {
+				g_bde_ncache++;
+				sc->ncache++;
 				TAILQ_INSERT_TAIL(&sc->freelist, sp, list);
 				sp->malloc = 2;
 			}
@@ -253,25 +255,21 @@ g_bde_get_sector(struct g_bde_work *wp, off_t offset)
 	if (sp != NULL) {
 		TAILQ_REMOVE(&sc->freelist, sp, list);
 		TAILQ_INSERT_TAIL(&sc->freelist, sp, list);
+		sp->used = time_uptime;
 	}
 	wp->ksp = sp;
-	if (sp == NULL) {
-		g_bde_purge_sector(sc, -1);
-		sp = g_bde_get_sector(wp, offset);
-	}
-	if (sp != NULL)
-		sp->used = time_uptime;
-	KASSERT(sp != NULL, ("get_sector failed"));
 	return(sp);
 }
 
 static void
-g_bde_release_sector(struct g_bde_work *wp, struct g_bde_sector *sp)
+g_bde_release_keysector(struct g_bde_work *wp)
 {
 	struct g_bde_softc *sc;
 	struct g_bde_work *wp2;
+	struct g_bde_sector *sp;
 
-	g_trace(G_T_TOPOLOGY, "g_bde_release_sector(%p)", sp);
+	sp = wp->ksp;
+	g_trace(G_T_TOPOLOGY, "g_bde_release_keysector(%p)", sp);
 	KASSERT(sp->malloc == 2, ("Wrong sector released"));
 	sc = sp->softc;
 	KASSERT(sc != NULL, ("NULL sp->softc"));
@@ -330,12 +328,16 @@ g_bde_purge_sector(struct g_bde_softc *sc, int fraction)
 }
 
 static struct g_bde_sector *
-g_bde_read_sector(struct g_bde_softc *sc, struct g_bde_work *wp, off_t offset)
+g_bde_read_keysector(struct g_bde_softc *sc, struct g_bde_work *wp)
 {
 	struct g_bde_sector *sp;
 
-	g_trace(G_T_TOPOLOGY, "g_bde_read_sector(%p)", wp);
-	sp = g_bde_get_sector(wp, offset);
+	g_trace(G_T_TOPOLOGY, "g_bde_read_keysector(%p)", wp);
+	sp = g_bde_get_keysector(wp);
+	if (sp == NULL) {
+		g_bde_purge_sector(sc, -1);
+		sp = g_bde_get_keysector(wp);
+	}
 	if (sp == NULL)
 		return (sp);
 	if (sp->owner != wp)
@@ -344,7 +346,7 @@ g_bde_read_sector(struct g_bde_softc *sc, struct g_bde_work *wp, off_t offset)
 		return (sp);
 	if (g_bde_start_read(sp) == 0)
 		return (sp);
-	g_bde_release_sector(wp, sp);
+	g_bde_release_keysector(wp);
 	return (NULL);
 }
 
@@ -403,6 +405,8 @@ g_bde_write_done(struct bio *bp)
 	KASSERT(sc != NULL, ("NULL sc"));
 	KASSERT(sp->owner != NULL, ("NULL sp->owner"));
 	g_trace(G_T_TOPOLOGY, "g_bde_write_done(%p)", sp);
+	if (bp->bio_error == 0 && bp->bio_completed != sp->size)
+		bp->bio_error = EIO;
 	sp->error = bp->bio_error;
 	g_destroy_bio(bp);
 	wp = sp->owner;
@@ -428,7 +432,7 @@ g_bde_write_done(struct bio *bp)
 	}
 	if (wp->sp == NULL && wp->ksp != NULL && wp->ksp->state == VALID) {
 		g_bde_contribute(wp->bp, wp->length, wp->error);
-		g_bde_release_sector(wp, wp->ksp);
+		g_bde_release_keysector(wp);
 		g_bde_delete_work(wp);
 	}
 	mtx_unlock(&sc->worklist_mutex);
@@ -479,8 +483,13 @@ g_bde_read_done(struct bio *bp)
 	g_trace(G_T_TOPOLOGY, "g_bde_read_done(%p)", sp);
 	sc = bp->bio_caller2;
 	mtx_lock(&sc->worklist_mutex);
+	if (bp->bio_error == 0 && bp->bio_completed != sp->size)
+		bp->bio_error = EIO;
 	sp->error = bp->bio_error;
-	sp->state = VALID;
+	if (sp->error == 0)
+		sp->state = VALID;
+	else
+		sp->state = JUNK;
 	wakeup(sc);
 	g_destroy_bio(bp);
 	mtx_unlock(&sc->worklist_mutex);
@@ -558,30 +567,38 @@ g_bde_worker(void *arg)
 				    ("Illegal sector state (JUNK ?)"));
 			}
 
-			if (wp->bp->bio_cmd == BIO_READ && wp->sp->state != VALID)
+			if (wp->bp->bio_cmd == BIO_READ &&
+			     wp->sp->state == IO)
 				continue;
 
 			if (wp->ksp != NULL && wp->ksp->error != 0) {
 				g_bde_contribute(wp->bp, wp->length,
 				    wp->ksp->error);
 				g_bde_delete_sector(sc, wp->sp);
-				g_bde_release_sector(wp, wp->ksp);
+				g_bde_release_keysector(wp);
 				g_bde_delete_work(wp);
 				busy++;
 				break;
 			} 
 			switch(wp->bp->bio_cmd) {
 			case BIO_READ:
-				if (wp->ksp != NULL && wp->sp->error == 0) {
-					mtx_unlock(&sc->worklist_mutex);
-					g_bde_crypt_read(wp);
-					mtx_lock(&sc->worklist_mutex);
+				if (wp->ksp == NULL) {
+					KASSERT(wp->error != 0,
+					    ("BIO_READ, no ksp and no error"));
+					g_bde_contribute(wp->bp, wp->length,
+						    wp->error);
+				} else {
+					if (wp->sp->error == 0) {
+						mtx_unlock(&sc->worklist_mutex);
+						g_bde_crypt_read(wp);
+						mtx_lock(&sc->worklist_mutex);
+					}
+					g_bde_contribute(wp->bp, wp->length,
+						    wp->sp->error);
 				}
-				g_bde_contribute(wp->bp, wp->length,
-					    wp->sp->error);
 				g_bde_delete_sector(sc, wp->sp);
 				if (wp->ksp != NULL)
-					g_bde_release_sector(wp, wp->ksp);
+					g_bde_release_keysector(wp);
 				g_bde_delete_work(wp);
 				break;
 			case BIO_WRITE:
@@ -591,8 +608,17 @@ g_bde_worker(void *arg)
 				mtx_unlock(&sc->worklist_mutex);
 				g_bde_crypt_write(wp);
 				mtx_lock(&sc->worklist_mutex);
-				g_bde_start_write(wp->sp);
-				g_bde_start_write(wp->ksp);
+				error = g_bde_start_write(wp->sp);
+				if (error) {
+					g_bde_contribute(wp->bp, wp->length, error);
+					g_bde_release_keysector(wp);
+					g_bde_delete_sector(sc, wp->sp);
+					g_bde_delete_work(wp);
+					break;
+				}
+				error = g_bde_start_write(wp->ksp);
+				if (wp->error == 0)
+					wp->error = error;
 				break;
 			case BIO_DELETE:
 				wp->state = FINISH;
@@ -669,7 +695,7 @@ g_bde_start2(struct g_bde_work *wp)
 			g_bde_delete_work(wp);
 			return;
 		}
-		g_bde_read_sector(sc, wp, wp->kso);
+		g_bde_read_keysector(sc, wp);
 		if (wp->ksp == NULL)
 			wp->error = ENOMEM;
 	} else if (wp->bp->bio_cmd == BIO_DELETE) {
@@ -686,7 +712,7 @@ g_bde_start2(struct g_bde_work *wp)
 			g_bde_delete_work(wp);
 			return;
 		}
-		g_bde_read_sector(sc, wp, wp->kso);
+		g_bde_read_keysector(sc, wp);
 		if (wp->ksp == NULL) {
 			g_bde_contribute(wp->bp, wp->length, ENOMEM);
 			g_bde_delete_sector(sc, wp->sp);
@@ -720,18 +746,19 @@ g_bde_start1(struct bio *bp)
 	mtx_lock(&sc->worklist_mutex);
 	for(done = 0; done < bp->bio_length; ) {
 		wp = g_bde_new_work(sc);
-		if (wp == NULL) {
-			g_io_deliver(bp, ENOMEM);
-			mtx_unlock(&sc->worklist_mutex);
-			return;
+		if (wp != NULL) {
+			wp->bp = bp;
+			wp->offset = bp->bio_offset + done;
+			wp->data = bp->bio_data + done;
+			wp->length = bp->bio_length - done;
+			g_bde_map_sector(wp);
+			done += wp->length;
+			g_bde_start2(wp);
 		}
-		wp->bp = bp;
-		wp->offset = bp->bio_offset + done;
-		wp->data = bp->bio_data + done;
-		wp->length = bp->bio_length - done;
-		g_bde_map_sector(wp);
-		done += wp->length;
-		g_bde_start2(wp);
+		if (wp == NULL || bp->bio_error != 0) {
+			g_bde_contribute(bp, bp->bio_length - done, ENOMEM);
+			break;
+		}
 	}
 	mtx_unlock(&sc->worklist_mutex);
 	return;

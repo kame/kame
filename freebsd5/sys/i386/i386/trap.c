@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/trap.c,v 1.237 2002/11/07 01:34:23 davidxu Exp $
+ * $FreeBSD: src/sys/i386/i386/trap.c,v 1.252 2003/05/20 20:50:33 jhb Exp $
  */
 
 /*
@@ -54,7 +54,6 @@
 #include <sys/bus.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
-#include <sys/kse.h>
 #include <sys/pioctl.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
@@ -213,7 +212,8 @@ trap(frame)
 			printf(
 			    "pid %ld (%s): trap %d with interrupts disabled\n",
 			    (long)curproc->p_pid, curproc->p_comm, type);
-		else if (type != T_BPTFLT && type != T_TRCTRAP) {
+		else if (type != T_BPTFLT && type != T_TRCTRAP &&
+			 frame.tf_eip != (int)cpu_switch_load_gs) {
 			/*
 			 * XXX not quite right, since this may be for a
 			 * multiple fault in user mode.
@@ -222,10 +222,10 @@ trap(frame)
 			    type);
 			/*
 			 * Page faults need interrupts diasabled until later,
-			 * and we shouldn't enable interrupts while holding a
-			 * spin lock.
+			 * and we shouldn't enable interrupts while in a
+			 * critical section.
 			 */
-			if (type != T_PAGEFLT && PCPU_GET(spinlocks) == NULL)
+			if (type != T_PAGEFLT && td->td_critnest == 0)
 				enable_intr();
 		}
 	}
@@ -240,7 +240,7 @@ trap(frame)
 		 * are finally ready to read %cr2 and then must
 		 * reenable interrupts.
 		 *
-		 * If we get a page fault while holding a spin lock, then
+		 * If we get a page fault while in a critical section, then
 		 * it is most likely a fatal kernel page fault.  The kernel
 		 * is already going to panic trying to get a sleep lock to
 		 * do the VM lookup, so just consider it a fatal trap so the
@@ -248,7 +248,7 @@ trap(frame)
 		 * to the debugger.
 		 */
 		eva = rcr2();
-		if (PCPU_GET(spinlocks) == NULL)
+		if (td->td_critnest == 0)
 			enable_intr();
 		else
 			trap_fatal(&frame, eva);
@@ -264,22 +264,10 @@ trap(frame)
 		!(PCPU_GET(curpcb)->pcb_flags & PCB_VM86CALL))) {
 		/* user trap */
 
-		sticks = td->td_kse->ke_sticks;
+		sticks = td->td_sticks;
 		td->td_frame = &frame;
 		if (td->td_ucred != p->p_ucred) 
 			cred_update_thread(td);
-
-		/*
-		 * First check that we shouldn't just abort.
-		 * But check if we are the single thread first!
-		 * XXX p_singlethread not locked, but should be safe.
-		 */
-		if ((p->p_flag & P_WEXIT) && (p->p_singlethread != td)) {
-			PROC_LOCK(p);
-			mtx_lock_spin(&sched_lock);
-			thread_exit();
-			/* NOTREACHED */
-		}
 
 		switch (type) {
 		case T_PRIVINFLT:	/* privileged instruction fault */
@@ -482,9 +470,6 @@ trap(frame)
 			if (PCPU_GET(curpcb)->pcb_flags & PCB_VM86CALL)
 				break;
 
-			if (td->td_intr_nesting_level != 0)
-				break;
-
 			/*
 			 * Invalid %fs's and %gs's can be created using
 			 * procfs or PT_SETREGS or by invalidating the
@@ -496,11 +481,16 @@ trap(frame)
 			 */
 			if (frame.tf_eip == (int)cpu_switch_load_gs) {
 				PCPU_GET(curpcb)->pcb_gs = 0;
+#if 0				
 				PROC_LOCK(p);
 				psignal(p, SIGBUS);
 				PROC_UNLOCK(p);
+#endif				
 				goto out;
 			}
+
+			if (td->td_intr_nesting_level != 0)
+				break;
 
 			/*
 			 * Invalid segment selectors and out of bounds
@@ -646,7 +636,7 @@ trap(frame)
 	if (*p->p_sysent->sv_transtrap)
 		i = (*p->p_sysent->sv_transtrap)(i, type);
 
-	trapsignal(p, i, ucode);
+	trapsignal(td, i, ucode);
 
 #ifdef DEBUG
 	if (type <= MAX_TRAP_MSG) {
@@ -954,14 +944,12 @@ syscall(frame)
 		mtx_unlock(&Giant);
 	}
 #endif
-	KASSERT((td->td_kse != NULL), ("syscall: kse/thread UNLINKED"));
-	KASSERT((td->td_kse->ke_thread == td), ("syscall:kse/thread mismatch"));
 
-	sticks = td->td_kse->ke_sticks;
+	sticks = td->td_sticks;
 	td->td_frame = &frame;
 	if (td->td_ucred != p->p_ucred) 
 		cred_update_thread(td);
-	if (p->p_flag & P_KSES)
+	if (p->p_flag & P_THREADED)
 		thread_user_enter(p, td);
 	params = (caddr_t)frame.tf_esp + sizeof(int);
 	code = frame.tf_eax;
@@ -1074,7 +1062,7 @@ syscall(frame)
 	 */
 	if ((orig_tf_eflags & PSL_T) && !(orig_tf_eflags & PSL_VM)) {
 		frame.tf_eflags &= ~PSL_T;
-		trapsignal(p, SIGTRAP, 0);
+		trapsignal(td, SIGTRAP, 0);
 	}
 
 	/*
@@ -1097,13 +1085,8 @@ syscall(frame)
 #ifdef DIAGNOSTIC
 	cred_free_thread(td);
 #endif
-
-#ifdef WITNESS
-	if (witness_list(td)) {
-		panic("system call %s returning with mutex(s) held\n",
-		    syscallnames[code]);
-	}
-#endif
+	WITNESS_WARN(WARN_PANIC, NULL, "System call %s returning",
+	    (code >= 0 && code < SYS_MAXSYSCALL) ? syscallnames[code] : "???");
 	mtx_assert(&sched_lock, MA_NOTOWNED);
 	mtx_assert(&Giant, MA_NOTOWNED);
 }

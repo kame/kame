@@ -33,20 +33,20 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinummemory.c,v 1.28 2001/05/23 23:04:06 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinummemory.c,v 1.29 2001/09/12 08:37:16 julian Exp $
+ * $Id: vinummemory.c,v 1.31 2003/05/23 01:08:36 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinummemory.c,v 1.33 2003/05/23 01:15:01 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
 
 #ifdef VINUMDEBUG
-#undef longjmp						    /* this was defined as LongJmp */
-
 #include <dev/vinum/request.h>
 extern struct rqinfo rqinfo[];
 extern struct rqinfo *rqip;
 int rqinfo_size = RQINFO_SIZE;				    /* for debugger */
 
+#undef longjmp						    /* this was defined as LongJmp */
+#define strrchr	rindex
 #ifdef __i386__						    /* check for validity */
 void
 LongJmp(jmp_buf buf, int retval)
@@ -87,16 +87,16 @@ LongJmp(jmp_buf buf, int retval)
     longjmp(buf, retval);
 }
 
-#else
+#else /* not i386 */
 #define LongJmp longjmp					    /* just use the kernel function */
-#endif
-#endif
+#endif /* i386 */
+#endif /* VINUMDEBUG */
 
 /* find the base name of a path name */
 char *
 basename(char *file)
 {
-    char *f = rindex(file, '/');			    /* chop off dirname if present */
+    char *f = strrchr(file, '/');			    /* chop off dirname if present */
 
     if (f == NULL)
 	return file;
@@ -104,27 +104,40 @@ basename(char *file)
 	return ++f;					    /* skip the / */
 }
 
+#ifdef VINUMDEBUG
+void
+expand_table(void **table, int oldsize, int newsize, char *file, int line)
+#else
 void
 expand_table(void **table, int oldsize, int newsize)
+#endif
 {
     if (newsize > oldsize) {
 	int *temp;
 	int s;
 
 	s = splhigh();
+#ifdef VINUMDEBUG
+	temp = (int *) MMalloc(newsize, file, line);	    /* allocate a new table */
+#else
 	temp = (int *) Malloc(newsize);			    /* allocate a new table */
+#endif
 	CHECKALLOC(temp, "vinum: Can't expand table\n");
 	bzero((char *) temp, newsize);			    /* clean it all out */
 	if (*table != NULL) {				    /* already something there, */
 	    bcopy((char *) *table, (char *) temp, oldsize); /* copy it to the old table */
+#ifdef VINUMDEBUG
+	    FFree(*table, file, line);
+#else
 	    Free(*table);
+#endif
 	}
 	*table = temp;
 	splx(s);
     }
 }
 
-#ifdef VINUMDEBUG					    /* XXX debug */
+#ifdef VINUMDEBUG
 #define MALLOCENTRIES 16384
 int malloccount = 0;
 int highwater = 0;					    /* highest index ever allocated */
@@ -172,8 +185,7 @@ MMalloc(int size, char *file, int line)
 	    malloced[i].size = size;
 	    malloced[i].line = line;
 	    malloced[i].address = result;
-	    bcopy(f, malloced[i].file, min(strlen(f), MCFILENAMELEN - 1));
-	    malloced[i].file[MCFILENAMELEN - 1] = '\0';
+	    strlcpy(malloced[i].file, f, MCFILENAMELEN);
 	}
 	if (malloccount > highwater)
 	    highwater = malloccount;
@@ -196,7 +208,7 @@ FFree(void *mem, char *file, int line)
 	    malloccount--;
 	    total_malloced -= malloced[i].size;
 	    if (debug & DEBUG_MEMFREE) {		    /* keep track of recent frees */
-		char *f = rindex(file, '/');		    /* chop off dirname if present */
+		char *f = strrchr(file, '/');		    /* chop off dirname if present */
 
 		if (f == NULL)
 		    f = file;
@@ -208,8 +220,7 @@ FFree(void *mem, char *file, int line)
 		freeinfo[lastfree].size = malloced[i].size;
 		freeinfo[lastfree].line = line;
 		freeinfo[lastfree].address = mem;
-		bcopy(f, freeinfo[lastfree].file, min(strlen(f), MCFILENAMELEN - 1));
-		freeinfo[lastfree].file[MCFILENAMELEN - 1] = '\0';
+		bcopy(f, freeinfo[lastfree].file, MCFILENAMELEN);
 		if (++lastfree == FREECOUNT)
 		    lastfree = 0;
 	    }
@@ -251,7 +262,7 @@ vinum_mallocinfo(caddr_t data)
     m->size = malloced[ent].size;
     m->line = malloced[ent].line;
     m->seq = malloced[ent].seq;
-    bcopy(malloced[ent].file, m->file, MCFILENAMELEN);
+    strlcpy(m->file, malloced[ent].file, MCFILENAMELEN);
     return 0;
 }
 

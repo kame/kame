@@ -1,12 +1,11 @@
-# $FreeBSD: src/sys/modules/libmchain/Makefile,v 1.2 2002/01/11 01:15:59 msmith Exp $
+# $FreeBSD: src/sys/modules/libmchain/Makefile,v 1.3 2002/12/14 00:01:51 tjr Exp $
 
 .PATH: ${.CURDIR}/../../kern
 
 KMOD=	libmchain
 SRCS=	subr_mchain.c
 
-EXPORT_SYMS=	m_fixhdr	\
-		mb_init		\
+EXPORT_SYMS=	mb_init		\
 		mb_initm	\
 		mb_done		\
 		mb_detach	\

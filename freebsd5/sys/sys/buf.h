@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/buf.h,v 1.138 2002/08/30 04:04:37 peter Exp $
+ * $FreeBSD: src/sys/sys/buf.h,v 1.149 2003/03/13 07:31:45 jeff Exp $
  */
 
 #ifndef _SYS_BUF_H_
@@ -95,6 +95,11 @@ typedef unsigned char b_xflags_t;
  *
  *	b_resid.  Number of bytes remaining in I/O.  After an I/O operation
  *	completes, b_resid is usually 0 indicating 100% success.
+ *
+ *	All fields are protected by the buffer lock except those marked:
+ *		V - Protected by owning vnode lock
+ *		Q - Protected by the buf queue lock
+ *		D - Protected by an dependency implementation specific lock
  */
 struct buf {
 	/* XXX: b_io must be the first element of struct buf for now /phk */
@@ -119,15 +124,13 @@ struct buf {
 #define B_MAGIC_NFS	0x67238234
 	void	(*b_iodone)(struct buf *);
 	off_t	b_offset;		/* Offset into file. */
-#ifdef USE_BUFHASH
-	LIST_ENTRY(buf) b_hash;		/* Hash chain. */
-#endif
-	TAILQ_ENTRY(buf) b_vnbufs;	/* Buffer's associated vnode. */
-	struct buf	*b_left;	/* splay tree link (V) */
-	struct buf	*b_right;	/* splay tree link (V) */
-	TAILQ_ENTRY(buf) b_freelist;	/* Free list position if not active. */
-	long	b_flags;		/* B_* flags. */
-	unsigned short b_qindex;	/* buffer queue index */
+	TAILQ_ENTRY(buf) b_vnbufs;	/* (V) Buffer's associated vnode. */
+	struct buf	*b_left;	/* (V) splay tree link */
+	struct buf	*b_right;	/* (V) splay tree link */
+	uint32_t	b_vflags;	/* (V) BV_* flags */
+	TAILQ_ENTRY(buf) b_freelist;	/* (Q) Free list position inactive. */
+	unsigned short b_qindex;	/* (Q) buffer queue index */
+	uint32_t	b_flags;	/* B_* flags. */
 	b_xflags_t b_xflags;		/* extra flags */
 	struct lock b_lock;		/* Buffer lock */
 	long	b_bufsize;		/* Allocated buffer size. */
@@ -152,7 +155,7 @@ struct buf {
 	} b_cluster;
 	struct	vm_page *b_pages[btoc(MAXPHYS)];
 	int		b_npages;
-	struct	workhead b_dep;		/* List of filesystem dependencies. */
+	struct	workhead b_dep;		/* (D) List of filesystem dependencies. */
 };
 
 #define b_spc	b_pager.pg_spc
@@ -221,7 +224,7 @@ struct buf {
 #define	B_DONE		0x00000200	/* I/O completed. */
 #define	B_EINTR		0x00000400	/* I/O was interrupted */
 #define	B_NOWDRAIN	0x00000800	/* Avoid wdrain deadlock */
-#define	B_SCANNED	0x00001000	/* VOP_FSYNC funcs mark written bufs */
+#define	B_00001000	0x00001000	/* Available flag. */
 #define	B_INVAL		0x00002000	/* Does not contain valid info. */
 #define	B_LOCKED	0x00004000	/* Locked in core (not reusable). */
 #define	B_NOCACHE	0x00008000	/* Do not cache block after use. */
@@ -261,11 +264,12 @@ struct buf {
 
 #define	NOOFFSET	(-1LL)		/* No buffer offset calculated yet */
 
+#define	BV_SCANNED	0x00001000	/* VOP_FSYNC funcs mark written bufs */
+
 #ifdef _KERNEL
 /*
  * Buffer locking
  */
-extern struct mtx buftimelock;		/* Interlock on setting prio and timo */
 extern const char *buf_wmesg;		/* Default buffer lock message */
 #define BUF_WMESG "bufwait"
 #include <sys/proc.h>			/* XXX for curthread */
@@ -280,37 +284,39 @@ extern const char *buf_wmesg;		/* Default buffer lock message */
  *
  * Get a lock sleeping non-interruptably until it becomes available.
  */
-static __inline int BUF_LOCK(struct buf *, int);
+static __inline int BUF_LOCK(struct buf *, int, struct mtx *);
 static __inline int
-BUF_LOCK(struct buf *bp, int locktype)
+BUF_LOCK(struct buf *bp, int locktype, struct mtx *interlock)
 {
 	int s, ret;
 
 	s = splbio();
-	mtx_lock(&buftimelock);
-	locktype |= LK_INTERLOCK;
+	mtx_lock(bp->b_lock.lk_interlock);
+	locktype |= LK_INTERNAL;
 	bp->b_lock.lk_wmesg = buf_wmesg;
 	bp->b_lock.lk_prio = PRIBIO + 4;
-	ret = lockmgr(&(bp)->b_lock, locktype, &buftimelock, curthread);
+	ret = lockmgr(&(bp)->b_lock, locktype, interlock, curthread);
 	splx(s);
 	return ret;
 }
 /*
  * Get a lock sleeping with specified interruptably and timeout.
  */
-static __inline int BUF_TIMELOCK(struct buf *, int, char *, int, int);
+static __inline int BUF_TIMELOCK(struct buf *, int, struct mtx *,
+    char *, int, int);
 static __inline int
-BUF_TIMELOCK(struct buf *bp, int locktype, char *wmesg, int catch, int timo)
+BUF_TIMELOCK(struct buf *bp, int locktype, struct mtx *interlock,
+    char *wmesg, int catch, int timo)
 {
 	int s, ret;
 
 	s = splbio();
-	mtx_lock(&buftimelock);
-	locktype |= LK_INTERLOCK | LK_TIMELOCK;
+	mtx_lock(bp->b_lock.lk_interlock);
+	locktype |= LK_INTERNAL | LK_TIMELOCK;
 	bp->b_lock.lk_wmesg = wmesg;
 	bp->b_lock.lk_prio = (PRIBIO + 4) | catch;
 	bp->b_lock.lk_timo = timo;
-	ret = lockmgr(&(bp)->b_lock, (locktype), &buftimelock, curthread);
+	ret = lockmgr(&(bp)->b_lock, (locktype), interlock, curthread);
 	splx(s);
 	return ret;
 }
@@ -353,7 +359,7 @@ BUF_KERNPROC(struct buf *bp)
 	struct thread *td = curthread;
 
 	if ((td != PCPU_GET(idlethread))
-	&& bp->b_lock.lk_lockholder == td->td_proc->p_pid)
+	&& bp->b_lock.lk_lockholder == td)
 		td->td_locks--;
 	bp->b_lock.lk_lockholder = LK_KERNPROC;
 }
@@ -367,6 +373,14 @@ BUF_REFCNT(struct buf *bp)
 {
 	int s, ret;
 
+	/*
+	 * When the system is panicing, the lock manager grants all lock
+	 * requests whether or not the lock is available. To avoid "unlocked
+	 * buffer" panics after a crash, we just claim that all buffers
+	 * are locked when cleaning up after a system panic.
+	 */
+	if (panicstr != NULL)
+		return (1);
 	s = splbio();
 	ret = lockcount(&(bp)->b_lock);
 	splx(s);
@@ -400,8 +414,6 @@ struct cluster_save {
 
 #define BUF_WRITE(bp)					\
 	(bp)->b_op->bop_write(bp)
-
-#define BUF_STRATEGY(bp)	VOP_STRATEGY((bp)->b_vp, (bp))
 
 static __inline void
 buf_start(struct buf *bp)
@@ -451,6 +463,11 @@ buf_countdeps(struct buf *bp, int i)
 	(bp)->b_resid = 0;						\
 }
 
+/*
+ * Flags for getblk's last parameter.
+ */
+#define	GB_LOCK_NOWAIT	0x0001		/* Fail if we block on a buf lock. */
+
 #ifdef _KERNEL
 extern int	nbuf;			/* The number of buffer headers */
 extern int	maxswzone;		/* Max KVA for swap structures */
@@ -485,7 +502,7 @@ struct buf *     getpbuf(int *);
 struct buf *incore(struct vnode *, daddr_t);
 struct buf *gbincore(struct vnode *, daddr_t);
 int	inmem(struct vnode *, daddr_t);
-struct buf *getblk(struct vnode *, daddr_t, int, int, int);
+struct buf *getblk(struct vnode *, daddr_t, int, int, int, int);
 struct buf *geteblk(int);
 int	bufwait(struct buf *);
 void	bufdone(struct buf *);
@@ -501,7 +518,7 @@ void	vfs_bio_clrbuf(struct buf *);
 void	vfs_busy_pages(struct buf *, int clear_modify);
 void	vfs_unbusy_pages(struct buf *);
 void	vwakeup(struct buf *);
-void	vmapbuf(struct buf *);
+int	vmapbuf(struct buf *);
 void	vunmapbuf(struct buf *);
 void	relpbuf(struct buf *, int *);
 void	brelvp(struct buf *);
@@ -511,6 +528,8 @@ void	pbrelvp(struct buf *);
 int	allocbuf(struct buf *bp, int size);
 void	reassignbuf(struct buf *, struct vnode *);
 struct	buf *trypbuf(int *);
+void	bwait(struct buf *, u_char, const char *);
+void	bdone(struct buf *);
 
 #endif /* _KERNEL */
 

@@ -27,7 +27,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/cy.c,v 1.128 2002/04/01 21:30:42 jhb Exp $
+ * $FreeBSD: src/sys/i386/isa/cy.c,v 1.131 2003/03/03 16:24:45 phk Exp $
  */
 
 #include "opt_compat.h"
@@ -71,7 +71,6 @@
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/dkstat.h>
 #include <sys/fcntl.h>
 #include <sys/interrupt.h>
 #include <sys/kernel.h>
@@ -398,20 +397,16 @@ static	d_ioctl_t	sioioctl;
 
 #define	CDEV_MAJOR	48
 static struct cdevsw sio_cdevsw = {
-	/* open */	sioopen,
-	/* close */	sioclose,
-	/* read */	ttyread,
-	/* write */	siowrite,
-	/* ioctl */	sioioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	driver_name,
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	sioopen,
+	.d_close =	sioclose,
+	.d_read =	ttyread,
+	.d_write =	siowrite,
+	.d_ioctl =	sioioctl,
+	.d_poll =	ttypoll,
+	.d_name =	driver_name,
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 static	int	comconsole = -1;

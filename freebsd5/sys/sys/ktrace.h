@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ktrace.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/ktrace.h,v 1.25 2002/06/07 05:32:59 jhb Exp $
+ * $FreeBSD: src/sys/sys/ktrace.h,v 1.26 2003/03/13 18:31:15 jhb Exp $
  */
 
 #ifndef _SYS_KTRACE_H_
@@ -145,6 +145,12 @@ struct ktr_csw {
 #define KTR_USER	7
 
 /*
+ * KTR_DROP - If this bit is set in ktr_type, then at least one event
+ * between the previous record and this record was dropped.
+ */
+#define	KTR_DROP	0x8000
+
+/*
  * kernel trace points (in p_traceflag)
  */
 #define KTRFAC_MASK	0x00ffffff
@@ -160,6 +166,7 @@ struct ktr_csw {
  */
 #define KTRFAC_ROOT	0x80000000	/* root set this trace */
 #define KTRFAC_INHERIT	0x40000000	/* pass trace flags to children */
+#define	KTRFAC_DROP	0x20000000	/* last event was dropped */
 
 #ifdef	_KERNEL
 extern struct mtx ktrace_mtx;

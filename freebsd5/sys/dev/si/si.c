@@ -30,7 +30,7 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
  * NO EVENT SHALL THE AUTHORS BE LIABLE.
  *
- * $FreeBSD: src/sys/dev/si/si.c,v 1.112 2002/10/16 08:48:38 phk Exp $
+ * $FreeBSD: src/sys/dev/si/si.c,v 1.117 2003/03/05 08:16:29 das Exp $
  */
 
 #ifndef lint
@@ -41,6 +41,7 @@ static const char si_copyright1[] =  "@(#) Copyright (C) Specialix International
 
 #include "opt_compat.h"
 #include "opt_debug_si.h"
+#include "opt_tty.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,7 +51,6 @@ static const char si_copyright1[] =  "@(#) Copyright (C) Specialix International
 #include <sys/tty.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
-#include <sys/dkstat.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/sysctl.h>
@@ -117,20 +117,16 @@ static	d_ioctl_t	siioctl;
 
 #define	CDEV_MAJOR	68
 static struct cdevsw si_cdevsw = {
-	/* open */	siopen,
-	/* close */	siclose,
-	/* read */	ttyread,
-	/* write */	siwrite,
-	/* ioctl */	siioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"si",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	siopen,
+	.d_close =	siclose,
+	.d_read =	ttyread,
+	.d_write =	siwrite,
+	.d_ioctl =	siioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"si",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 static int si_Nports;
@@ -851,7 +847,7 @@ sihardclose(struct si_port *pp)
 
 	}
 	pp->sp_active_out = FALSE;
-	wakeup((caddr_t)&pp->sp_active_out);
+	wakeup(&pp->sp_active_out);
 	wakeup(TSA_CARR_ON(tp));
 
 	splx(oldspl);
@@ -1417,7 +1413,7 @@ si_write_enable(struct si_port *pp, int state)
 		if (pp->sp_state & SS_WAITWRITE) {
 			pp->sp_state &= ~SS_WAITWRITE;
 			/* thunder away! */
-			wakeup((caddr_t)pp);
+			wakeup(pp);
 		}
 	} else {
 		pp->sp_state |= SS_BLOCKWRITE;

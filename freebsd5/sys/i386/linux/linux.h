@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux.h,v 1.60 2002/07/09 15:57:12 robert Exp $
+ * $FreeBSD: src/sys/i386/linux/linux.h,v 1.62 2003/02/24 16:16:45 kan Exp $
  */
 
 #ifndef _I386_LINUX_LINUX_H_
@@ -230,7 +230,7 @@ struct l_new_utsname {
 #define	LINUX_SIGIO		29
 #define	LINUX_SIGPOLL		LINUX_SIGIO
 #define	LINUX_SIGPWR		30
-#define	LINUX_SIGUNUSED		31
+#define	LINUX_SIGSYS		31
 
 #define	LINUX_SIGTBLSZ		31
 #define	LINUX_NSIG_WORDS	2
@@ -584,6 +584,7 @@ union l_semun {
 #define	LINUX_AF_AX25		3
 #define	LINUX_AF_IPX		4
 #define	LINUX_AF_APPLETALK	5
+#define	LINUX_AF_INET6		10
 
 #define	LINUX_SOL_SOCKET	1
 #define	LINUX_SOL_IP		0

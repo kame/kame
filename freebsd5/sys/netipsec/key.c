@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/key.c,v 1.1 2002/10/16 02:10:07 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/key.c,v 1.5 2003/02/19 05:47:36 imp Exp $	*/
 /*	$KAME: key.c,v 1.191 2001/06/27 10:46:49 sakane Exp $	*/
 
 /*
@@ -137,7 +137,7 @@ static LIST_HEAD(_spacqtree, secspacq) spacqtree;	/* SP acquiring list */
 static u_int saorder_state_valid[] = {
 	SADB_SASTATE_DYING, SADB_SASTATE_MATURE,
 	/*
-	 * This order is important because we must select a oldest SA
+	 * This order is important because we must select the oldest SA
 	 * for outbound processing.  For inbound, This is not important.
 	 */
 };
@@ -1673,7 +1673,7 @@ fail:
 
 /*
  * SADB_X_SPDADD, SADB_X_SPDSETIDX or SADB_X_SPDUPDATE processing
- * add a entry to SP database, when received
+ * add an entry to SP database, when received
  *   <base, address(SD), (lifetime(H),) policy>
  * from the user(?).
  * Adding to SP database,
@@ -2201,7 +2201,7 @@ key_spdacquire(sp)
 	if (sp->policy != IPSEC_POLICY_IPSEC)
 		panic("key_spdacquire: policy mismathed. IPsec is expected.\n");
 
-	/* get a entry to check whether sent message or not. */
+	/* Get an entry to check whether sent message or not. */
 	if ((newspacq = key_getspacq(&sp->spidx)) != NULL) {
 		if (key_blockacq_count < newspacq->count) {
 			/* reset counter and do send message. */
@@ -4267,7 +4267,9 @@ key_timehandler(void)
 static void
 key_srandom()
 {
+#if 0   /* Already called in kern/init_main.c:proc0_post() */
 	srandom(time_second);
+#endif
 }
 
 u_long
@@ -4822,7 +4824,7 @@ key_getsavbyseq(sah, seq)
 
 /*
  * SADB_ADD processing
- * add a entry to SA database, when received
+ * add an entry to SA database, when received
  *   <base, SA, (SA2), (lifetime(HSC),) address(SD), (address(P),)
  *       key(AE), (identity(SD),) (sensitivity)>
  * from the ikmpd,
@@ -5647,7 +5649,7 @@ key_acquire(const struct secasindex *saidx, struct secpolicy *sp)
 	 * getting something message from IKEd.  In later case, to be
 	 * managed with ACQUIRING list.
 	 */
-	/* get a entry to check whether sending message or not. */
+	/* Get an entry to check whether sending message or not. */
 	if ((newacq = key_getacq(saidx)) != NULL) {
 		if (key_blockacq_count < newacq->count) {
 			/* reset counter and do send message. */

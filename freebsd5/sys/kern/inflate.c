@@ -7,7 +7,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/kern/inflate.c,v 1.16 2002/03/25 13:52:45 phk Exp $
+ * $FreeBSD: src/sys/kern/inflate.c,v 1.18 2003/02/19 05:47:25 imp Exp $
  *
  *
  */

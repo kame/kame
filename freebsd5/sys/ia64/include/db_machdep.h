@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/include/db_machdep.h,v 1.8 2002/05/19 04:42:19 marcel Exp $ */
+/* $FreeBSD: src/sys/ia64/include/db_machdep.h,v 1.9 2003/05/16 21:26:41 marcel Exp $ */
 /* $NetBSD: db_machdep.h,v 1.6 1997/09/06 02:02:25 thorpej Exp $ */
 
 /*
@@ -50,8 +50,8 @@ typedef struct trapframe db_regs_t;
 extern db_regs_t	ddb_regs;	/* register state */
 #define	DDB_REGS	(&ddb_regs)
 
-#define	PC_REGS(regs)	((db_addr_t)(regs)->tf_cr_iip \
-			 + (((regs)->tf_cr_ipsr >> 41) & 3))
+#define	PC_REGS(regs)	((db_addr_t)(regs)->tf_special.iip + \
+	(((regs)->tf_special.psr >> 41) & 3))
 
 #define BKPT_WRITE(addr, storage)	db_write_breakpoint(addr, storage)
 #define BKPT_CLEAR(addr, storage)	db_clear_breakpoint(addr, storage)
@@ -59,8 +59,8 @@ extern db_regs_t	ddb_regs;	/* register state */
 
 #define BKPT_SKIP			db_skip_breakpoint()
 
-#define db_clear_single_step(regs)	ddb_regs.tf_cr_ipsr &= ~IA64_PSR_SS
-#define db_set_single_step(regs)	ddb_regs.tf_cr_ipsr |= IA64_PSR_SS
+#define db_clear_single_step(regs)	ddb_regs.tf_special.psr &= ~IA64_PSR_SS
+#define db_set_single_step(regs)	ddb_regs.tf_special.psr |= IA64_PSR_SS
 
 #define	IS_BREAKPOINT_TRAP(type, code)	(type == IA64_VEC_BREAK)
 #define	IS_WATCHPOINT_TRAP(type, code)	0

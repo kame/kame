@@ -44,7 +44,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty.c	8.8 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/tty.c,v 1.190 2002/10/03 02:12:58 truckman Exp $
+ * $FreeBSD: src/sys/kern/tty.c,v 1.201 2003/05/14 00:03:55 ps Exp $
  */
 
 /*-
@@ -76,6 +76,7 @@
  */
 
 #include "opt_compat.h"
+#include "opt_tty.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -93,7 +94,6 @@
 #undef	TTYDEFCHARS
 #include <sys/fcntl.h>
 #include <sys/conf.h>
-#include <sys/dkstat.h>
 #include <sys/poll.h>
 #include <sys/kernel.h>
 #include <sys/vnode.h>
@@ -108,6 +108,11 @@
 #include <vm/vm_map.h>
 
 MALLOC_DEFINE(M_TTYS, "ttys", "tty data structures");
+
+long tk_cancc;
+long tk_nin;
+long tk_nout;
+long tk_rawcc;
 
 static int	proc_compare(struct proc *p1, struct proc *p2);
 static int	ttnread(struct tty *tp);
@@ -771,8 +776,8 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 		sx_slock(&proctree_lock);
 		PROC_LOCK(p);
 		while (isbackground(p, tp) && !(p->p_flag & P_PPWAIT) &&
-		    !SIGISMEMBER(p->p_sigignore, SIGTTOU) &&
-		    !SIGISMEMBER(p->p_sigmask, SIGTTOU)) {
+		    !SIGISMEMBER(p->p_sigacts->ps_sigignore, SIGTTOU) &&
+		    !SIGISMEMBER(td->td_sigmask, SIGTTOU)) {
 			pgrp = p->p_pgrp;
 			PROC_UNLOCK(p);
 			if (pgrp->pg_jobc == 0) {
@@ -1566,13 +1571,16 @@ ttread(struct tty *tp, struct uio *uio, int flag)
 	int c;
 	tcflag_t lflag;
 	cc_t *cc = tp->t_cc;
-	struct proc *p = curproc;
+	struct thread *td;
+	struct proc *p;
 	int s, first, error = 0;
 	int has_stime = 0, last_cc = 0;
 	long slp = 0;		/* XXX this should be renamed `timo'. */
 	struct timeval stime;
 	struct pgrp *pg;
 
+	td = curthread;
+	p = td->td_proc;
 loop:
 	s = spltty();
 	lflag = tp->t_lflag;
@@ -1593,8 +1601,8 @@ loop:
 		splx(s);
 		sx_slock(&proctree_lock);
 		PROC_LOCK(p);
-		if (SIGISMEMBER(p->p_sigignore, SIGTTIN) ||
-		    SIGISMEMBER(p->p_sigmask, SIGTTIN) ||
+		if (SIGISMEMBER(p->p_sigacts->ps_sigignore, SIGTTIN) ||
+		    SIGISMEMBER(td->td_sigmask, SIGTTIN) ||
 		    (p->p_flag & P_PPWAIT) || p->p_pgrp->pg_jobc == 0) {
 			PROC_UNLOCK(p);
 			sx_sunlock(&proctree_lock);
@@ -1842,21 +1850,35 @@ ttycheckoutq(struct tty *tp, int wait)
 {
 	int hiwat, s;
 	sigset_t oldmask;
+	struct thread *td;
+	struct proc *p;
 
+	td = curthread;
+	p = td->td_proc;
 	hiwat = tp->t_ohiwat;
 	SIGEMPTYSET(oldmask);
 	s = spltty();
-	if (wait)
-		oldmask = curproc->p_siglist;
+	if (wait) {
+		PROC_LOCK(p);
+		oldmask = td->td_siglist;
+		PROC_UNLOCK(p);
+	}
 	if (tp->t_outq.c_cc > hiwat + OBUFSIZ + 100)
 		while (tp->t_outq.c_cc > hiwat) {
 			ttstart(tp);
 			if (tp->t_outq.c_cc <= hiwat)
 				break;
-			if (!(wait && SIGSETEQ(curproc->p_siglist, oldmask))) {
+			if (!wait) {
 				splx(s);
 				return (0);
 			}
+			PROC_LOCK(p);
+			if (!SIGSETEQ(td->td_siglist, oldmask)) {
+				PROC_UNLOCK(p);
+				splx(s);
+				return (0);
+			}
+			PROC_UNLOCK(p);
 			SET(tp->t_state, TS_SO_OLOWAT);
 			tsleep(TSA_OLOWAT(tp), PZERO - 1, "ttoutq", hz);
 		}
@@ -1872,6 +1894,7 @@ ttwrite(struct tty *tp, struct uio *uio, int flag)
 {
 	char *cp = NULL;
 	int cc, ce;
+	struct thread *td;
 	struct proc *p;
 	int i, hiwat, cnt, error, s;
 	char obuf[OBUFSIZ];
@@ -1880,6 +1903,8 @@ ttwrite(struct tty *tp, struct uio *uio, int flag)
 	cnt = uio->uio_resid;
 	error = 0;
 	cc = 0;
+	td = curthread;
+	p = td->td_proc;
 loop:
 	s = spltty();
 	if (ISSET(tp->t_state, TS_ZOMBIE)) {
@@ -1905,13 +1930,12 @@ loop:
 	/*
 	 * Hang the process if it's in the background.
 	 */
-	p = curproc;
 	sx_slock(&proctree_lock);
 	PROC_LOCK(p);
 	if (isbackground(p, tp) &&
 	    ISSET(tp->t_lflag, TOSTOP) && !(p->p_flag & P_PPWAIT) &&
-	    !SIGISMEMBER(p->p_sigignore, SIGTTOU) &&
-	    !SIGISMEMBER(p->p_sigmask, SIGTTOU)) {
+	    !SIGISMEMBER(p->p_sigacts->ps_sigignore, SIGTTOU) &&
+	    !SIGISMEMBER(td->td_sigmask, SIGTTOU)) {
 		if (p->p_pgrp->pg_jobc == 0) {
 			PROC_UNLOCK(p);
 			sx_sunlock(&proctree_lock);
@@ -2361,7 +2385,7 @@ ttyinfo(struct tty *tp)
 {
 	struct proc *p, *pick;
 	struct timeval utime, stime;
-	const char *stmp;
+	const char *stmp, *sprefix;
 	long ltmp;
 	int tmp;
 	struct thread *td;
@@ -2392,7 +2416,8 @@ ttyinfo(struct tty *tp)
 			PGRP_UNLOCK(tp->t_pgrp);
 
 			td = FIRST_THREAD_IN_PROC(pick);
-			if (pick->p_flag & P_KSES) {
+			sprefix = "";
+			if (pick->p_flag & P_THREADED) {
 				stmp = "KSE" ;  /* XXXKSE */
 			} else {
 				if (td) {
@@ -2401,6 +2426,7 @@ ttyinfo(struct tty *tp)
 						stmp = "running";
 					} else if (TD_ON_LOCK(td)) {
 						stmp = td->td_lockname;
+						sprefix = "*";
 					} else if (td->td_wmesg) {
 						stmp = td->td_wmesg;
 					} else {
@@ -2412,9 +2438,7 @@ ttyinfo(struct tty *tp)
 				}
 			}
 			calcru(pick, &utime, &stime, NULL);
-			/* XXXKSE The TDS_IWAIT  line is Dubious */
 			if (pick->p_state == PRS_NEW ||
-			    (td && (TD_AWAITING_INTR(td))) ||
 			    pick->p_state == PRS_ZOMBIE) {
 				ltmp = 0;
 			} else {
@@ -2424,9 +2448,7 @@ ttyinfo(struct tty *tp)
 			mtx_unlock_spin(&sched_lock);
 
 			ttyprintf(tp, " cmd: %s %d [%s%s] ", pick->p_comm,
-			    pick->p_pid,
-			    TD_ON_LOCK(td) ? "*" : "",
-			    stmp);
+			    pick->p_pid, sprefix, stmp);
 
 			/* Print user time. */
 			ttyprintf(tp, "%ld.%02ldu ",

@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_ifoff/mac_ifoff.c,v 1.4 2002/11/04 01:53:11 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_ifoff/mac_ifoff.c,v 1.6 2003/04/18 20:22:23 rwatson Exp $
  */
 
 /*
@@ -147,10 +147,9 @@ mac_ifoff_check_socket_deliver(struct socket *so, struct label *socketlabel,
     struct mbuf *m, struct label *mbuflabel)
 {
 
-	if (m->m_flags & M_PKTHDR) {
-		if (m->m_pkthdr.rcvif != NULL)
-			return (check_ifnet_incoming(m->m_pkthdr.rcvif, 0));
-	}
+	M_ASSERTPKTHDR(m);
+	if (m->m_pkthdr.rcvif != NULL)
+		return (check_ifnet_incoming(m->m_pkthdr.rcvif, 0));
 
 	return (0);
 }
@@ -162,5 +161,5 @@ static struct mac_policy_ops mac_ifoff_ops =
 	.mpo_check_socket_deliver = mac_ifoff_check_socket_deliver,
 };
 
-MAC_POLICY_SET(&mac_ifoff_ops, trustedbsd_mac_ifoff, "TrustedBSD MAC/ifoff",
+MAC_POLICY_SET(&mac_ifoff_ops, mac_ifoff, "TrustedBSD MAC/ifoff",
     MPC_LOADTIME_FLAG_UNLOADOK, NULL);

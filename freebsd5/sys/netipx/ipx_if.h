@@ -33,7 +33,7 @@
  * 
  *	@(#)ipx_if.h
  *
- * $FreeBSD: src/sys/netipx/ipx_if.h,v 1.12 2002/03/20 02:39:13 alfred Exp $
+ * $FreeBSD: src/sys/netipx/ipx_if.h,v 1.13 2003/03/04 23:19:53 jlemon Exp $
  */
 
 #ifndef _NETIPX_IPX_IF_H_
@@ -88,7 +88,6 @@ struct ipxip_req {
 #endif
 
 #ifdef	_KERNEL
-extern struct	ifqueue	ipxintrq;	/* IPX input packet queue */
 extern struct	ipx_ifaddr *ipx_ifaddr;
 
 struct ipx_ifaddr *ipx_iaonnetof(struct ipx_addr *dst);

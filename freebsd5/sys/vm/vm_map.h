@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.h,v 1.92.2.1 2002/12/22 03:30:33 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_map.h,v 1.97 2003/03/12 23:13:16 das Exp $
  */
 
 /*
@@ -72,6 +72,7 @@
 
 #include <sys/lock.h>
 #include <sys/lockmgr.h>
+#include <sys/_mutex.h>
 
 /*
  *	Types defined:
@@ -164,6 +165,7 @@ vm_map_entry_behavior(vm_map_entry_t entry)
 struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
 	struct lock lock;		/* Lock for map data */
+	struct mtx system_mtx;
 	int nentries;			/* Number of entries */
 	vm_size_t size;			/* virtual size */
 	u_char needs_wakeup;
@@ -219,7 +221,7 @@ struct vmspace {
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
 	caddr_t vm_maxsaddr;	/* user VA at max stack growth */
 #define	vm_endcopy vm_exitingcnt
-	int	vm_exitingcnt;	/* several processes zombied in exit1 */
+	int	vm_exitingcnt;	/* several processes zombied in exit1  */
 };
 
 #ifdef	_KERNEL
@@ -246,6 +248,7 @@ void _vm_map_unlock(vm_map_t map, const char *file, int line);
 void _vm_map_lock_read(vm_map_t map, const char *file, int line);
 void _vm_map_unlock_read(vm_map_t map, const char *file, int line);
 int _vm_map_trylock(vm_map_t map, const char *file, int line);
+int _vm_map_trylock_read(vm_map_t map, const char *file, int line);
 int _vm_map_lock_upgrade(vm_map_t map, const char *file, int line);
 void _vm_map_lock_downgrade(vm_map_t map, const char *file, int line);
 int vm_map_unlock_and_wait(vm_map_t map, boolean_t user_wait);
@@ -256,6 +259,8 @@ void vm_map_wakeup(vm_map_t map);
 #define	vm_map_lock_read(map)	_vm_map_lock_read(map, LOCK_FILE, LOCK_LINE)
 #define	vm_map_unlock_read(map)	_vm_map_unlock_read(map, LOCK_FILE, LOCK_LINE)
 #define	vm_map_trylock(map)	_vm_map_trylock(map, LOCK_FILE, LOCK_LINE)
+#define	vm_map_trylock_read(map)	\
+			_vm_map_trylock_read(map, LOCK_FILE, LOCK_LINE)
 #define	vm_map_lock_upgrade(map)	\
 			_vm_map_lock_upgrade(map, LOCK_FILE, LOCK_LINE)
 #define	vm_map_lock_downgrade(map)	\
@@ -320,6 +325,5 @@ int vm_map_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
 int vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end,
     boolean_t user_wire);
 int vmspace_swap_count (struct vmspace *vmspace);
-int vm_uiomove(vm_map_t, vm_object_t, off_t, int, vm_offset_t, int *);
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */

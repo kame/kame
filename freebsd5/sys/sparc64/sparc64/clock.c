@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/clock.c,v 1.9 2002/10/22 07:10:15 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/clock.c,v 1.10 2003/02/03 17:53:15 jake Exp $
  */
 
 #include <sys/param.h>
@@ -48,9 +48,13 @@ DELAY(int n)
 }
 
 void
-setstatclockrate(int newhz)
+cpu_startprofclock(void)
 {
-	/* TODO; */
+}
+
+void
+cpu_stopprofclock(void)
+{
 }
 
 int

@@ -31,12 +31,11 @@
  *	@(#)kernfs_vfsops.c	8.10 (Berkeley) 5/14/95
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vfsops.c 1.36
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_vfsops.c,v 1.26 2002/12/09 03:44:27 rwatson Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_vfsops.c,v 1.30 2003/03/11 22:15:08 kan Exp $
  */
 
 #include "opt_devfs.h"
 #include "opt_mac.h"
-#ifndef NODEVFS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -195,7 +194,7 @@ static struct vfsops devfs_vfsops = {
 	devfs_root,
 	vfs_stdquotactl,
 	devfs_statfs,
-	vfs_stdsync,
+	vfs_stdnosync,
 	vfs_stdvget,
 	vfs_stdfhtovp,
 	vfs_stdcheckexp,
@@ -207,4 +206,3 @@ static struct vfsops devfs_vfsops = {
 };
 
 VFS_SET(devfs_vfsops, devfs, VFCF_SYNTHETIC);
-#endif

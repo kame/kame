@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/null/null.c,v 1.12 2002/09/21 17:28:17 markm Exp $
+ * $FreeBSD: src/sys/dev/null/null.c,v 1.17 2003/03/03 12:15:44 phk Exp $
  */
 
 #include <sys/param.h>
@@ -36,8 +36,6 @@
 #include <sys/disk.h>
 #include <sys/bus.h>
 #include <machine/bus.h>
-#include <machine/resource.h>
-#include <sys/rman.h>
 
 /* For use with destroy_dev(9). */
 static dev_t null_dev;
@@ -46,49 +44,44 @@ static dev_t zero_dev;
 static d_write_t null_write;
 static d_ioctl_t null_ioctl;
 static d_read_t zero_read;
+static d_read_t null_read;
 
 #define CDEV_MAJOR	2
 #define NULL_MINOR	2
 #define ZERO_MINOR	12
 
 static struct cdevsw null_cdevsw = {
-	/* open */	(d_open_t *)nullop,
-	/* close */	(d_close_t *)nullop,
-	/* read */	(d_read_t *)nullop,
-	/* write */	null_write,
-	/* ioctl */	null_ioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"null",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
-	/* kqfilter */	NULL
+	.d_open =	nullopen,
+	.d_close =	nullclose,
+	.d_read =	null_read,
+	.d_write =	null_write,
+	.d_ioctl =	null_ioctl,
+	.d_name =	"null",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static struct cdevsw zero_cdevsw = {
-	/* open */	(d_open_t *)nullop,
-	/* close */	(d_close_t *)nullop,
-	/* read */	zero_read,
-	/* write */	null_write,
-	/* ioctl */	noioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"zero",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_MMAP_ANON,
-	/* kqfilter */	NULL
+	.d_open =	nullopen,
+	.d_close =	nullclose,
+	.d_read =	zero_read,
+	.d_write =	null_write,
+	.d_name =	"zero",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_MMAP_ANON,
 };
 
 static void *zbuf;
 
 static int
-null_write(dev_t dev, struct uio *uio, int flags)
+null_read(dev_t dev __unused, struct uio *uio, int flags __unused)
+{
+
+	return 0;
+}
+
+/* ARGSUSED */
+static int
+null_write(dev_t dev __unused, struct uio *uio, int flags __unused)
 {
 	uio->uio_resid = 0;
 	return 0;
@@ -107,21 +100,23 @@ null_ioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
 	return (set_dumper(NULL));
 }
 
+/* ARGSUSED */
 static int
-zero_read(dev_t dev, struct uio *uio, int flags)
+zero_read(dev_t dev __unused, struct uio *uio, int flags __unused)
 {
-	u_int c;
+	int c;
 	int error = 0;
 
 	while (uio->uio_resid > 0 && error == 0) {
-		c = min(uio->uio_resid, PAGE_SIZE);
+		c = uio->uio_resid < PAGE_SIZE ? uio->uio_resid : PAGE_SIZE;
 		error = uiomove(zbuf, c, uio);
 	}
 	return error;
 }
 
+/* ARGSUSED */
 static int
-null_modevent(module_t mod, int type, void *data)
+null_modevent(module_t mod __unused, int type, void *data __unused)
 {
 	switch(type) {
 	case MOD_LOAD:

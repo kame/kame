@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/q2110_sigcpcs.c,v 1.9 2002/11/08 18:27:30 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/q2110_sigcpcs.c,v 1.10 2003/02/23 22:26:39 obrien Exp $
  *
  */
 
@@ -58,7 +58,7 @@
 #include <netatm/uni/sscop_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/q2110_sigcpcs.c,v 1.9 2002/11/08 18:27:30 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/q2110_sigcpcs.c,v 1.10 2003/02/23 22:26:39 obrien Exp $");
 #endif
 
 
@@ -1729,7 +1729,7 @@ sscop_poll_ready(sop, m, trlr)
 	struct poll_pdu	*pp = (struct poll_pdu *)trlr;
 	sscop_seq	nps;
 
-	NTOHL(pp->poll_ns);
+	pp->poll_ns = ntohl(pp->poll_ns);
 
 	/*
 	 * If the poll sequence number is less than highest number

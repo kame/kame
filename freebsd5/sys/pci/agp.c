@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp.c,v 1.22 2002/11/13 17:40:15 mux Exp $
+ *	$FreeBSD: src/sys/pci/agp.c,v 1.29 2003/03/25 00:07:05 jake Exp $
  */
 
 #include "opt_bus.h"
@@ -70,19 +70,13 @@ static d_ioctl_t agp_ioctl;
 static d_mmap_t agp_mmap;
 
 static struct cdevsw agp_cdevsw = {
-	/* open */	agp_open,
-	/* close */	agp_close,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	agp_ioctl,
-	/* poll */	nopoll,
-	/* mmap */	agp_mmap,
-	/* strategy */	nostrategy,
-	/* name */	"agp",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY,
+	.d_open =	agp_open,
+	.d_close =	agp_close,
+	.d_ioctl =	agp_ioctl,
+	.d_mmap =	agp_mmap,
+	.d_name =	"agp",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
 };
 
 static devclass_t agp_devclass;
@@ -95,6 +89,12 @@ agp_flush_cache()
 {
 #ifdef __i386__
 	wbinvd();
+#endif
+#ifdef __alpha__
+	/* FIXME: This is most likely not correct as it doesn't flush CPU 
+	 * write caches, but we don't have a facility to do that and 
+	 * this is all linux does, too */
+	alpha_mb();
 #endif
 }
 
@@ -443,7 +443,9 @@ agp_generic_bind_memory(device_t dev, struct agp_memory *mem,
 				 * Bail out. Reverse all the mappings
 				 * and unwire the pages.
 				 */
+				vm_page_lock_queues();
 				vm_page_wakeup(m);
+				vm_page_unlock_queues();
 				for (k = 0; k < i + j; k += AGP_PAGE_SIZE)
 					AGP_UNBIND_PAGE(dev, offset + k);
 				for (k = 0; k <= i; k += PAGE_SIZE) {
@@ -457,7 +459,9 @@ agp_generic_bind_memory(device_t dev, struct agp_memory *mem,
 				return error;
 			}
 		}
+		vm_page_lock_queues();
 		vm_page_wakeup(m);
+		vm_page_unlock_queues();
 	}
 
 	/*
@@ -712,14 +716,15 @@ agp_ioctl(dev_t kdev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 }
 
 static int
-agp_mmap(dev_t kdev, vm_offset_t offset, int prot)
+agp_mmap(dev_t kdev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
 	device_t dev = KDEV2DEV(kdev);
 	struct agp_softc *sc = device_get_softc(dev);
 
 	if (offset > AGP_GET_APERTURE(dev))
 		return -1;
-	return atop(rman_get_start(sc->as_aperture) + offset);
+	*paddr = rman_get_start(sc->as_aperture) + offset;
+	return 0;
 }
 
 /* Implementation of the kernel api */

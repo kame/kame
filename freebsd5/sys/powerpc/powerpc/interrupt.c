@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/powerpc/interrupt.c,v 1.2 2002/09/19 04:29:59 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/powerpc/interrupt.c,v 1.3 2003/01/08 12:20:46 grehan Exp $
  */
 
 /*
@@ -109,9 +109,9 @@ powerpc_interrupt(struct trapframe *framep)
 		 */
 #if 0
 		printf("powerpc_interrupt: got trap\n");
-#endif
 		mtmsr(mfmsr() | PSL_EE);
 		isync();
+#endif
 		trap(framep);
 	}	        
 }

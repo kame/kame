@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/i386/include/param.h,v 1.65 2002/09/17 01:48:57 peter Exp $
+ * $FreeBSD: src/sys/i386/include/param.h,v 1.68 2003/03/30 05:24:52 jake Exp $
  */
 
 /*
@@ -87,8 +87,17 @@
 #define PAGE_MASK	(PAGE_SIZE-1)
 #define NPTEPG		(PAGE_SIZE/(sizeof (pt_entry_t)))
 
-#define NPDEPG		(PAGE_SIZE/(sizeof (pd_entry_t)))
+#ifdef PAE
+#define NPGPTD		4
+#define PDRSHIFT	21		/* LOG2(NBPDR) */
+#else
+#define NPGPTD		1
 #define PDRSHIFT	22		/* LOG2(NBPDR) */
+#endif
+
+#define NBPTD		(NPGPTD<<PAGE_SHIFT)
+#define NPDEPTD		(NBPTD/(sizeof (pd_entry_t)))
+#define NPDEPG		(PAGE_SIZE/(sizeof (pd_entry_t)))
 #define NBPDR		(1<<PDRSHIFT)	/* bytes/page dir */
 #define PDRMASK		(NBPDR-1)
 
@@ -123,14 +132,14 @@
  */
 #define trunc_page(x)		((x) & ~PAGE_MASK)
 #define round_page(x)		(((x) + PAGE_MASK) & ~PAGE_MASK)
-#define trunc_4mpage(x)		((unsigned)(x) & ~PDRMASK)
-#define round_4mpage(x)		((((unsigned)(x)) + PDRMASK) & ~PDRMASK)
+#define trunc_4mpage(x)		((x) & ~PDRMASK)
+#define round_4mpage(x)		((((x)) + PDRMASK) & ~PDRMASK)
 
-#define atop(x)			((unsigned)(x) >> PAGE_SHIFT)
-#define ptoa(x)			((unsigned)(x) << PAGE_SHIFT)
+#define atop(x)			((x) >> PAGE_SHIFT)
+#define ptoa(x)			((x) << PAGE_SHIFT)
 
-#define i386_btop(x)		((unsigned)(x) >> PAGE_SHIFT)
-#define i386_ptob(x)		((unsigned)(x) << PAGE_SHIFT)
+#define i386_btop(x)		((x) >> PAGE_SHIFT)
+#define i386_ptob(x)		((x) << PAGE_SHIFT)
 
 #define	pgtok(x)		((x) * (PAGE_SIZE / 1024))
 

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/bios.c,v 1.56 2002/09/23 18:54:31 alfred Exp $
+ * $FreeBSD: src/sys/i386/i386/bios.c,v 1.59 2003/03/30 05:24:52 jake Exp $
  */
 
 /*
@@ -384,12 +384,16 @@ bios16(struct bios_args *args, char *fmt, ...)
     args->seg.code32.limit = 0xffff;	
 
     ptd = (pd_entry_t *)rcr3();
-    if (ptd == (u_int *)IdlePTD) {
+#ifdef PAE
+    if (ptd == IdlePDPT) {
+#else
+    if (ptd == IdlePTD) {
+#endif
 	/*
 	 * no page table, so create one and install it.
 	 */
 	pte = (pt_entry_t *)malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
-	ptd = (pd_entry_t *)((u_int)ptd + KERNBASE);
+	ptd = (pd_entry_t *)((u_int)IdlePTD + KERNBASE);
 	*ptd = vtophys(pte) | PG_RW | PG_V;
     } else {
 	/*

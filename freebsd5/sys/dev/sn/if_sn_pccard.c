@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.15 2002/08/08 15:52:55 imp Exp $
+ * $FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.17 2003/04/15 06:37:26 mdodd Exp $
  */
 
 /*
@@ -69,7 +69,8 @@ sn_pccard_match(device_t dev)
 
 	if ((pp = pccard_product_lookup(dev, sn_pccard_products,
 	    sizeof(sn_pccard_products[0]), NULL)) != NULL) {
-		device_set_desc(dev, pp->pp_name);
+		if (pp->pp_name != NULL)
+			device_set_desc(dev, pp->pp_name);
 		return 0;
 	}
 	return EIO;
@@ -125,5 +126,6 @@ static driver_t sn_pccard_driver = {
 
 extern devclass_t sn_devclass;
 
-DRIVER_MODULE(if_sn, pccard, sn_pccard_driver, sn_devclass, 0, 0);
-MODULE_DEPEND(if_sn, pccard, 1, 1, 1);
+DRIVER_MODULE(sn, pccard, sn_pccard_driver, sn_devclass, 0, 0);
+MODULE_DEPEND(sn, pccard, 1, 1, 1);
+MODULE_DEPEND(sn, ether, 1, 1, 1);

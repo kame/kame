@@ -36,9 +36,9 @@
 %#ifndef lint
 %/*static char sccsid[] = "from: @(#)yppasswd.x 1.1 87/04/13 Copyr 1987 Sun Micro";*/
 %/*static char sccsid[] = "from: @(#)yppasswd.x	2.1 88/08/01 4.0 RPCSRC";*/
-%static const char rcsid[] =
-%  "$FreeBSD: src/include/rpcsvc/yppasswd.x,v 1.7 2002/03/24 01:11:49 imp Exp $";
 %#endif /* not lint */
+%#include <sys/cdefs.h>
+%__FBSDID("$FreeBSD: src/include/rpcsvc/yppasswd.x,v 1.8 2003/05/04 02:51:42 obrien Exp $");
 #endif
 
 program YPPASSWDPROG {

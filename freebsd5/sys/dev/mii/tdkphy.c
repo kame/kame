@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.11 2002/10/29 00:20:47 semenu Exp $
  */
 
 /*
@@ -42,6 +40,9 @@
  * way.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.13 2003/04/03 21:36:30 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -57,15 +58,17 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-#include <dev/mii/miidevs.h>
+#include "miidevs.h"
 
 #include <dev/mii/tdkphyreg.h>
 
 #include "miibus_if.h"
 
+#if 0
 #if !defined(lint)
 static const char rcsid[] =
   "$Id: tdkphy.c,v 1.3 2000/10/14 06:20:56 jon Exp $";
+#endif
 #endif
 
 static int tdkphy_probe(device_t);

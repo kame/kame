@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/ia64/interrupt.c,v 1.28 2002/10/28 00:50:39 marcel Exp $ */
+/* $FreeBSD: src/sys/ia64/ia64/interrupt.c,v 1.37 2003/05/16 21:26:40 marcel Exp $ */
 /* $NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $ */
 
 /*
@@ -113,7 +113,7 @@ interrupt(u_int64_t vector, struct trapframe *framep)
 		printf("ExtINT interrupt: vector=%ld\n", vector);
 	}
 
-	if (vector == 255) {/* clock interrupt */
+	if (vector == CLOCK_VECTOR) {/* clock interrupt */
 		/* CTR0(KTR_INTR, "clock interrupt"); */
 			
 		cnt.v_intr++;
@@ -123,24 +123,28 @@ interrupt(u_int64_t vector, struct trapframe *framep)
 		intrcnt[INTRCNT_CLOCK]++;
 #endif
 		critical_enter();
+		/* Rearm so we get the next clock interrupt */
+		ia64_set_itm(ia64_get_itc() + itm_reload);
 #ifdef SMP
 		clks[PCPU_GET(cpuid)]++;
 		/* Only the BSP runs the real clock */
 		if (PCPU_GET(cpuid) == 0) {
 #endif
-			handleclock(framep);
+			hardclock((struct clockframe *)framep);
 			/* divide hz (1024) by 8 to get stathz (128) */
-			if ((++schedclk2 & 0x7) == 0)
+			if ((++schedclk2 & 0x7) == 0) {
+				if (profprocs != 0)
+					profclock((struct clockframe *)framep);
 				statclock((struct clockframe *)framep);
+			}
 #ifdef SMP
 		} else {
-			ia64_set_itm(ia64_get_itc() + itm_reload);
-			mtx_lock_spin(&sched_lock);
-			hardclock_process(curthread, TRAPF_USERMODE(framep));
-			if ((schedclk2 & 0x7) == 0)
-				statclock_process(curkse, TRAPF_PC(framep),
-				    TRAPF_USERMODE(framep));
-			mtx_unlock_spin(&sched_lock);
+			hardclock_process((struct clockframe *)framep);
+			if ((schedclk2 & 0x7) == 0) {
+				if (profprocs != 0)
+					profclock((struct clockframe *)framep);
+				statclock((struct clockframe *)framep);
+			}
 		}
 #endif
 		critical_exit();
@@ -148,6 +152,9 @@ interrupt(u_int64_t vector, struct trapframe *framep)
 	} else if (vector == ipi_vector[IPI_AST]) {
 		asts[PCPU_GET(cpuid)]++;
 		CTR1(KTR_SMP, "IPI_AST, cpuid=%d", PCPU_GET(cpuid));
+	} else if (vector == ipi_vector[IPI_HIGH_FP]) {
+		if (PCPU_GET(fpcurthread) != NULL)
+			ia64_highfp_save(PCPU_GET(fpcurthread));
 	} else if (vector == ipi_vector[IPI_RENDEZVOUS]) {
 		rdvs[PCPU_GET(cpuid)]++;
 		CTR1(KTR_SMP, "IPI_RENDEZVOUS, cpuid=%d", PCPU_GET(cpuid));
@@ -206,10 +213,11 @@ struct ia64_intr {
     volatile long	*cntp;  /* interrupt counter */
 };
 
-static struct sapic *ia64_sapics[16]; /* XXX make this resizable */
-static int ia64_sapic_count;
 static struct mtx ia64_intrs_lock;
 static struct ia64_intr *ia64_intrs[256];
+
+extern struct sapic *ia64_sapics[];
+extern int ia64_sapic_count;
 
 static void
 ithds_init(void *dummy)
@@ -219,13 +227,6 @@ ithds_init(void *dummy)
 }
 SYSINIT(ithds_init, SI_SUB_INTR, SI_ORDER_SECOND, ithds_init, NULL);
 
-void
-ia64_add_sapic(struct sapic *sa)
-{
-
-	ia64_sapics[ia64_sapic_count++] = sa;
-}
-
 static void
 ia64_enable(int vector)
 {
@@ -234,14 +235,11 @@ ia64_enable(int vector)
 	irq = vector - IA64_HARDWARE_IRQ_BASE;
 	for (i = 0; i < ia64_sapic_count; i++) {
 		struct sapic *sa = ia64_sapics[i];
-		if (irq >= sa->sa_base && irq <= sa->sa_limit)
-			sapic_enable(sa, irq - sa->sa_base, vector,
-				     (irq < 16
-				      ? SAPIC_TRIGGER_EDGE
-				      : SAPIC_TRIGGER_LEVEL),
-				     (irq < 16
-				      ? SAPIC_POLARITY_HIGH
-				      : SAPIC_POLARITY_LOW));
+		if (irq < sa->sa_base || irq > sa->sa_limit)
+			continue;
+		sapic_enable(sa, irq - sa->sa_base, vector,
+		    (irq < 16) ? SAPIC_TRIGGER_EDGE : SAPIC_TRIGGER_LEVEL,
+		    (irq < 16) ? SAPIC_POLARITY_HIGH : SAPIC_POLARITY_LOW);
 	}
 }
 
@@ -338,6 +336,9 @@ ia64_dispatch_intr(void *frame, unsigned long vector)
 	if (i == NULL)
 		return;			/* no ithread for this vector */
 
+	if (i->cntp)
+		atomic_add_long(i->cntp, 1);
+
 	ithd = i->ithd;
 	KASSERT(ithd != NULL, ("interrupt vector without a thread"));
 
@@ -347,9 +348,6 @@ ia64_dispatch_intr(void *frame, unsigned long vector)
 	 */
 	if (TAILQ_EMPTY(&ithd->it_handlers))
 		return;
-
-	if (i->cntp)
-		atomic_add_long(i->cntp, 1);
 
 	/*
 	 * Handle a fast interrupt if there is no actual thread for this

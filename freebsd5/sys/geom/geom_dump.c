@@ -32,23 +32,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_dump.c,v 1.19.2.1 2002/12/20 21:52:02 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_dump.c,v 1.26 2003/04/23 21:28:26 phk Exp $
  */
 
 
 #include <sys/param.h>
-#include <sys/stdint.h>
 #include <sys/sbuf.h>
-#ifndef _KERNEL
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <err.h>
-#else
 #include <sys/systm.h>
 #include <sys/malloc.h>
-#endif
 #include <machine/stdarg.h>
 
 #include <geom/geom.h>
@@ -59,8 +50,8 @@ static void
 g_confdot_consumer(struct sbuf *sb, struct g_consumer *cp)
 {
 
-	sbuf_printf(sb, "z%p [label=\"r%dw%de%d\\nbio #%d\"];\n",
-	    cp, cp->acr, cp->acw, cp->ace, cp->biocount);
+	sbuf_printf(sb, "z%p [label=\"r%dw%de%d\"];\n",
+	    cp, cp->acr, cp->acw, cp->ace);
 	if (cp->provider)
 		sbuf_printf(sb, "z%p -> z%p;\n", cp, cp->provider);
 }
@@ -102,11 +93,12 @@ g_confdot_class(struct sbuf *sb, struct g_class *mp)
 }
 
 void
-g_confdot(void *p)
+g_confdot(void *p, int flag )
 {
 	struct g_class *mp;
 	struct sbuf *sb;
 
+	KASSERT(flag != EV_CANCEL, ("g_confdot was cancelled"));
 	sb = p;
 	g_topology_assert();
 	sbuf_printf(sb, "digraph geom {\n");
@@ -114,7 +106,6 @@ g_confdot(void *p)
 		g_confdot_class(sb, mp);
 	sbuf_printf(sb, "};\n");
 	sbuf_finish(sb);
-	wakeup(p);
 }
 
 static void
@@ -144,11 +135,12 @@ g_conftxt_class(struct sbuf *sb, struct g_class *mp)
 }
 
 void
-g_conftxt(void *p)
+g_conftxt(void *p, int flag)
 {
 	struct g_class *mp;
 	struct sbuf *sb;
 
+	KASSERT(flag != EV_CANCEL, ("g_conftxt was cancelled"));
 	sb = p;
 	g_topology_assert();
 	LIST_FOREACH(mp, &g_classes, class)
@@ -157,7 +149,6 @@ g_conftxt(void *p)
 	if (mp != NULL)
 		g_conftxt_class(sb, mp);
 	sbuf_finish(sb);
-	wakeup(p);
 }
 
 
@@ -251,9 +242,6 @@ g_conf_specific(struct sbuf *sb, struct g_class *mp, struct g_geom *gp, struct g
 
 	g_topology_assert();
 	sbuf_printf(sb, "<mesh>\n");
-#ifndef _KERNEL
-	sbuf_printf(sb, "  <FreeBSD>%cFreeBSD%c</FreeBSD>\n", '$', '$');
-#endif
 	LIST_FOREACH(mp2, &g_classes, class) {
 		if (mp != NULL && mp != mp2)
 			continue;
@@ -264,12 +252,12 @@ g_conf_specific(struct sbuf *sb, struct g_class *mp, struct g_geom *gp, struct g
 }
 
 void
-g_confxml(void *p)
+g_confxml(void *p, int flag)
 {
 
+	KASSERT(flag != EV_CANCEL, ("g_confxml was cancelled"));
 	g_topology_assert();
 	g_conf_specific(p, NULL, NULL, NULL, NULL);
-	wakeup(p);
 }
 
 void

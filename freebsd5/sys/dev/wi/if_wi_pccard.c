@@ -38,6 +38,9 @@
  * Columbia University, New York City
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.25 2003/04/27 03:34:05 imp Exp $");
+
 #include "opt_wi.h"
 
 #include <sys/param.h>
@@ -65,7 +68,6 @@
 #endif
 
 #include <dev/wi/if_wavelan_ieee.h>
-#include <dev/wi/wi_hostap.h>
 #include <dev/wi/if_wivar.h>
 #include <dev/wi/if_wireg.h>
 #ifdef WI_SYMBOL_FIRMWARE
@@ -73,11 +75,6 @@
 #endif
 
 #include "card_if.h"
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.14 2002/10/14 01:59:57 imp Exp $";
-#endif
 
 static int wi_pccard_probe(device_t);
 static int wi_pccard_attach(device_t);
@@ -87,7 +84,7 @@ static device_method_t wi_pccard_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		wi_pccard_probe),
 	DEVMETHOD(device_attach,	wi_pccard_attach),
-	DEVMETHOD(device_detach,	wi_generic_detach),
+	DEVMETHOD(device_detach,	wi_detach),
 	DEVMETHOD(device_shutdown,	wi_shutdown),
 
 	{ 0, 0 }
@@ -100,7 +97,7 @@ static device_method_t wi_pccard_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		pccard_compat_probe),
 	DEVMETHOD(device_attach,	pccard_compat_attach),
-	DEVMETHOD(device_detach,	wi_generic_detach),
+	DEVMETHOD(device_detach,	wi_detach),
 	DEVMETHOD(device_shutdown,	wi_shutdown),
 
 	/* Card interface */
@@ -119,7 +116,9 @@ static driver_t wi_pccard_driver = {
 	sizeof(struct wi_softc)
 };
 
-DRIVER_MODULE(if_wi, pccard, wi_pccard_driver, wi_devclass, 0, 0);
+DRIVER_MODULE(wi, pccard, wi_pccard_driver, wi_devclass, 0, 0);
+MODULE_DEPEND(wi, wlan, 1, 1, 1);
+MODULE_DEPEND(wi, pccard, 1, 1, 1);
 
 #if __FreeBSD_version >= 500000
 static const struct pccard_product wi_pccard_products[] = {
@@ -127,6 +126,7 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(3COM, 3CRWE777A, 0),
 	PCMCIA_CARD(ACTIONTEC, PRISM, 0),
 	PCMCIA_CARD(ADDTRON, AWP100, 0),
+	PCMCIA_CARD(ALLIEDTELESIS, WR211PCM, 0),
 	PCMCIA_CARD(BAY, EMOBILITY_11B, 0),
 	PCMCIA_CARD(BUFFALO, WLI_PCM_S11, 0),
 	PCMCIA_CARD(BUFFALO, WLI_CF_S11G, 0),
@@ -135,6 +135,7 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCC_11, 0),
 	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCCA_11, 0),
 	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCCB_11, 0),
+	PCMCIA_CARD(DLINK, DWL650H, 0),
 	PCMCIA_CARD(ELSA, XI300_IEEE, 0),
 	PCMCIA_CARD(ELSA, XI325_IEEE, 0),
 	PCMCIA_CARD(ELSA, XI800_IEEE, 0),
@@ -148,15 +149,10 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(LINKSYS2, IWN, 0),
 	PCMCIA_CARD(LINKSYS2, IWN3, 0),
 	PCMCIA_CARD(LINKSYS2, WCF11, 0),
-	/* Now that we do PRISM detection, I don't think we need these - imp */
-	PCMCIA_CARD2(LUCENT, WAVELAN_IEEE, NANOSPEED_PRISM2, 0),
-	PCMCIA_CARD2(LUCENT, WAVELAN_IEEE, NEC_CMZ_RT_WP, 0),
-	PCMCIA_CARD2(LUCENT, WAVELAN_IEEE, NTT_ME_WLAN, 0),
-	PCMCIA_CARD2(LUCENT, WAVELAN_IEEE, SMC_2632W, 0),
-	/* Must be after other LUCENT ones because it is less specific */
 	PCMCIA_CARD(LUCENT, WAVELAN_IEEE, 0),
 	PCMCIA_CARD(NETGEAR_2, MA401RA, 0),
 	PCMCIA_CARD(NOKIA, C110_WLAN, 0),
+	PCMCIA_CARD(OEM1, PRISM3, 0),
 	PCMCIA_CARD(PLANEX_2, GWNS11H, 0),
 	PCMCIA_CARD(PROXIM, RANGELANDS_8430, 0),
 	PCMCIA_CARD(SAMSUNG, SWL_2000N, 0),
@@ -175,10 +171,11 @@ wi_pccard_match(dev)
 
 	if ((pp = pccard_product_lookup(dev, wi_pccard_products,
 	    sizeof(wi_pccard_products[0]), NULL)) != NULL) {
-		device_set_desc(dev, pp->pp_name);
-		return 0;
+		if (pp->pp_name != NULL)
+			device_set_desc(dev, pp->pp_name);
+		return (0);
 	}
-	return ENXIO;
+	return (ENXIO);
 }
 #endif
 
@@ -245,5 +242,5 @@ wi_pccard_attach(device_t dev)
 	}
 #endif
 
-	return (wi_generic_attach(dev));
+	return (wi_attach(dev));
 }

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *
- * $FreeBSD: src/sys/kern/vfs_default.c,v 1.68 2002/10/24 17:55:49 phk Exp $
+ * $FreeBSD: src/sys/kern/vfs_default.c,v 1.84 2003/05/06 02:45:28 alc Exp $
  */
 
 #include <sys/param.h>
@@ -45,6 +45,7 @@
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
@@ -52,8 +53,6 @@
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 #include <sys/poll.h>
-
-#include <machine/limits.h>
 
 #include <vm/vm.h>
 #include <vm/vm_object.h>
@@ -66,6 +65,7 @@
 
 static int	vop_nolookup(struct vop_lookup_args *);
 static int	vop_nostrategy(struct vop_strategy_args *);
+static int	vop_nospecstrategy(struct vop_specstrategy_args *);
 
 /*
  * This vnode table stores what we want to do if the filesystem doesn't
@@ -94,10 +94,11 @@ static struct vnodeopv_entry_desc default_vnodeop_entries[] = {
 	{ &vop_lookup_desc,		(vop_t *) vop_nolookup },
 	{ &vop_open_desc,		(vop_t *) vop_null },
 	{ &vop_pathconf_desc,		(vop_t *) vop_einval },
-	{ &vop_putpages_desc,		(vop_t *) vop_stdputpages },
 	{ &vop_poll_desc,		(vop_t *) vop_nopoll },
+	{ &vop_putpages_desc,		(vop_t *) vop_stdputpages },
 	{ &vop_readlink_desc,		(vop_t *) vop_einval },
 	{ &vop_revoke_desc,		(vop_t *) vop_revoke },
+	{ &vop_specstrategy_desc,	(vop_t *) vop_nospecstrategy },
 	{ &vop_strategy_desc,		(vop_t *) vop_nostrategy },
 	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ NULL, NULL }
@@ -203,7 +204,7 @@ vop_nolookup(ap)
  *
  *	BIO_ERROR and B_INVAL must be cleared prior to calling any strategy
  *	routine.  Typically this is done for a BIO_READ strategy call.
- *	Typically B_INVAL is assumed to already be clear prior to a write 
+ *	Typically B_INVAL is assumed to already be clear prior to a write
  *	and should not be cleared manually unless you just made the buffer
  *	invalid.  BIO_ERROR should be cleared either way.
  */
@@ -212,8 +213,8 @@ static int
 vop_nostrategy (struct vop_strategy_args *ap)
 {
 	printf("No strategy for buffer at %p\n", ap->a_bp);
-	vprint("", ap->a_vp);
-	vprint("", ap->a_bp->b_vp);
+	vprint("vnode", ap->a_vp);
+	vprint("device vnode", ap->a_bp->b_vp);
 	ap->a_bp->b_ioflags |= BIO_ERROR;
 	ap->a_bp->b_error = EOPNOTSUPP;
 	bufdone(ap->a_bp);
@@ -221,8 +222,31 @@ vop_nostrategy (struct vop_strategy_args *ap)
 }
 
 /*
+ *	vop_nospecstrategy:
+ *
+ *	This shouldn't happen.  VOP_SPECSTRATEGY should always have a VCHR
+ *	argument vnode, and thos have a method for specstrategy over in
+ *	specfs, so we only ever get here if somebody botched it.
+ *	Pass the call to VOP_STRATEGY() and get on with life.
+ *	The first time we print some info useful for debugging.
+ */
+
+static int
+vop_nospecstrategy (struct vop_specstrategy_args *ap)
+{
+	static int once;
+
+	if (!once) {
+		vprint("VOP_SPECSTRATEGY on non-VCHR", ap->a_vp);
+		backtrace();
+		once++;
+	}
+	return VOP_STRATEGY(ap->a_vp, ap->a_bp);
+}
+
+/*
  * vop_stdpathconf:
- * 
+ *
  * Standard implementation of POSIX pathconf, to get information about limits
  * for a filesystem.
  * Override per filesystem for the case where the filesystem has smaller
@@ -272,7 +296,7 @@ vop_stdlock(ap)
 		int a_flags;
 		struct thread *a_td;
 	} */ *ap;
-{               
+{
 	struct vnode *vp = ap->a_vp;
 
 #ifndef	DEBUG_LOCKS
@@ -389,7 +413,7 @@ vop_sharedlock(ap)
 	 * function unlock them. Otherwise all intermediate vnode layers
 	 * (such as union, umapfs, etc) must catch these functions to do
 	 * the necessary locking at their layer. Note that the inactive
-	 * and lookup operations also change their lock state, but this 
+	 * and lookup operations also change their lock state, but this
 	 * cannot be avoided, so these two operations will always need
 	 * to be handled in intermediate layers.
 	 */
@@ -420,8 +444,7 @@ vop_sharedlock(ap)
 	default:
 		panic("vop_sharedlock: bad operation %d", flags & LK_TYPE_MASK);
 	}
-	if (flags & LK_INTERLOCK)
-		vnflags |= LK_INTERLOCK;
+	vnflags |= flags & (LK_INTERLOCK | LK_EXTFLG_MASK);
 #ifndef	DEBUG_LOCKS
 	return (lockmgr(vp->v_vnlock, vnflags, VI_MTX(vp), ap->a_td));
 #else
@@ -455,7 +478,7 @@ vop_nolock(ap)
 	 * function unlock them. Otherwise all intermediate vnode layers
 	 * (such as union, umapfs, etc) must catch these functions to do
 	 * the necessary locking at their layer. Note that the inactive
-	 * and lookup operations also change their lock state, but this 
+	 * and lookup operations also change their lock state, but this
 	 * cannot be avoided, so these two operations will always need
 	 * to be handled in intermediate layers.
 	 */
@@ -478,8 +501,7 @@ vop_nolock(ap)
 	default:
 		panic("vop_nolock: bad operation %d", flags & LK_TYPE_MASK);
 	}
-	if (flags & LK_INTERLOCK)
-		vnflags |= LK_INTERLOCK;
+	vnflags |= flags & (LK_INTERLOCK | LK_EXTFLG_MASK);
 	return(lockmgr(vp->v_vnlock, vnflags, VI_MTX(vp), ap->a_td));
 #else /* for now */
 	/*
@@ -583,15 +605,20 @@ retry:
 		 * Dereference the reference we just created.  This assumes
 		 * that the object is associated with the vp.
 		 */
+		VM_OBJECT_LOCK(object);
 		object->ref_count--;
+		VM_OBJECT_UNLOCK(object);
 		vrele(vp);
 	} else {
+		VM_OBJECT_LOCK(object);
 		if (object->flags & OBJ_DEAD) {
 			VOP_UNLOCK(vp, 0, td);
-			tsleep(object, PVM, "vodead", 0);
+			msleep(object, VM_OBJECT_MTX(object), PDROP | PVM,
+			    "vodead", 0);
 			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 			goto retry;
 		}
+		VM_OBJECT_UNLOCK(object);
 	}
 
 	KASSERT(vp->v_object != NULL, ("vfs_object_create: NULL object"));
@@ -613,9 +640,9 @@ vop_stddestroyvobject(ap)
 
 	GIANT_REQUIRED;
 
-	if (vp->v_object == NULL)
+	if (obj == NULL)
 		return (0);
-
+	VM_OBJECT_LOCK(obj);
 	if (obj->ref_count == 0) {
 		/*
 		 * vclean() may be called twice. The first time
@@ -627,11 +654,14 @@ vop_stddestroyvobject(ap)
 		 */
 		if ((obj->flags & OBJ_DEAD) == 0)
 			vm_object_terminate(obj);
+		else
+			VM_OBJECT_UNLOCK(obj);
 	} else {
 		/*
 		 * Woe to the process that tries to page now :-).
 		 */
 		vm_pager_deallocate(obj);
+		VM_OBJECT_UNLOCK(obj);
 	}
 	return (0);
 }
@@ -662,7 +692,7 @@ vop_stdgetvobject(ap)
 /* XXX Needs good comment and VOP_BMAP(9) manpage */
 int
 vop_stdbmap(ap)
-	struct vop_bmap_args /* {  
+	struct vop_bmap_args /* {
 		struct vnode *a_vp;
 		daddr_t  a_bn;
 		struct vnode **a_vpp;
@@ -681,6 +711,95 @@ vop_stdbmap(ap)
 	if (ap->a_runb != NULL)
 		*ap->a_runb = 0;
 	return (0);
+}
+
+int
+vop_stdfsync(ap)
+	struct vop_fsync_args /* {
+		struct vnode *a_vp;
+		struct ucred *a_cred;
+		int a_waitfor;
+		struct thread *a_td;
+	} */ *ap;
+{
+	struct vnode *vp = ap->a_vp;
+	struct buf *bp;
+	struct buf *nbp;
+	int s, error = 0;
+	int maxretry = 100;     /* large, arbitrarily chosen */
+
+	VI_LOCK(vp);
+loop1:
+	/*
+	 * MARK/SCAN initialization to avoid infinite loops.
+	 */
+	s = splbio();
+        TAILQ_FOREACH(bp, &vp->v_dirtyblkhd, b_vnbufs) {
+                bp->b_vflags &= ~BV_SCANNED;
+		bp->b_error = 0;
+	}
+	splx(s);
+
+	/*
+	 * Flush all dirty buffers associated with a block device.
+	 */
+loop2:
+	s = splbio();
+	for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp != NULL; bp = nbp) {
+		nbp = TAILQ_NEXT(bp, b_vnbufs);
+		if ((bp->b_vflags & BV_SCANNED) != 0)
+			continue;
+		bp->b_vflags |= BV_SCANNED;
+		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT, NULL))
+			continue;
+		VI_UNLOCK(vp);
+		if ((bp->b_flags & B_DELWRI) == 0)
+			panic("fsync: not dirty");
+		if ((vp->v_vflag & VV_OBJBUF) && (bp->b_flags & B_CLUSTEROK)) {
+			vfs_bio_awrite(bp);
+			splx(s);
+		} else {
+			bremfree(bp);
+			splx(s);
+			bawrite(bp);
+		}
+		VI_LOCK(vp);
+		goto loop2;
+	}
+
+	/*
+	 * If synchronous the caller expects us to completely resolve all
+	 * dirty buffers in the system.  Wait for in-progress I/O to
+	 * complete (which could include background bitmap writes), then
+	 * retry if dirty blocks still exist.
+	 */
+	if (ap->a_waitfor == MNT_WAIT) {
+		while (vp->v_numoutput) {
+			vp->v_iflag |= VI_BWAIT;
+			msleep((caddr_t)&vp->v_numoutput, VI_MTX(vp),
+			    PRIBIO + 1, "fsync", 0);
+		}
+		if (!TAILQ_EMPTY(&vp->v_dirtyblkhd)) {
+			/*
+			 * If we are unable to write any of these buffers
+			 * then we fail now rather than trying endlessly
+			 * to write them out.
+			 */
+			TAILQ_FOREACH(bp, &vp->v_dirtyblkhd, b_vnbufs)
+				if ((error = bp->b_error) == 0)
+					continue;
+			if (error == 0 && --maxretry >= 0) {
+				splx(s);
+				goto loop1;
+			}
+			vprint("fsync: giving up on dirty", vp);
+			error = EAGAIN;
+		}
+	}
+	VI_UNLOCK(vp);
+	splx(s);
+
+	return (error);
 }
 
 /* XXX Needs good comment and more info in the manpage (VOP_GETPAGES(9)). */
@@ -716,9 +835,7 @@ vop_stdputpages(ap)
 	     ap->a_sync, ap->a_rtvals);
 }
 
-
-
-/* 
+/*
  * vfs default ops
  * used to fill the vfs function table to get reasonable default return values.
  */
@@ -756,7 +873,7 @@ vfs_stdstart (mp, flags, td)
 	return (0);
 }
 
-int	
+int
 vfs_stdquotactl (mp, cmds, uid, arg, td)
 	struct mount *mp;
 	int cmds;
@@ -767,17 +884,72 @@ vfs_stdquotactl (mp, cmds, uid, arg, td)
 	return (EOPNOTSUPP);
 }
 
-int	
-vfs_stdsync (mp, waitfor, cred, td)
+int
+vfs_stdsync(mp, waitfor, cred, td)
 	struct mount *mp;
 	int waitfor;
-	struct ucred *cred; 
+	struct ucred *cred;
+	struct thread *td;
+{
+	struct vnode *vp, *nvp;
+	int error, lockreq, allerror = 0;
+
+	lockreq = LK_EXCLUSIVE | LK_INTERLOCK;
+	if (waitfor != MNT_WAIT)
+		lockreq |= LK_NOWAIT;
+	/*
+	 * Force stale buffer cache information to be flushed.
+	 */
+	mtx_lock(&mntvnode_mtx);
+loop:
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
+		/*
+		 * If the vnode that we are about to sync is no longer
+		 * associated with this mount point, start over.
+		 */
+		if (vp->v_mount != mp)
+			goto loop;
+
+		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
+
+		VI_LOCK(vp);
+		if (TAILQ_EMPTY(&vp->v_dirtyblkhd)) {
+			VI_UNLOCK(vp);
+			continue;
+		}
+		mtx_unlock(&mntvnode_mtx);
+
+		if ((error = vget(vp, lockreq, td)) != 0) {
+			if (error == ENOENT)
+				goto loop;
+			continue;
+		}
+		error = VOP_FSYNC(vp, cred, waitfor, td);
+		if (error)
+			allerror = error;
+
+		mtx_lock(&mntvnode_mtx);
+		if (nvp != TAILQ_NEXT(vp, v_nmntvnodes)) {
+			vput(vp);
+			goto loop;
+		}
+		vput(vp);
+	}
+	mtx_unlock(&mntvnode_mtx);
+	return (allerror);
+}
+
+int
+vfs_stdnosync (mp, waitfor, cred, td)
+	struct mount *mp;
+	int waitfor;
+	struct ucred *cred;
 	struct thread *td;
 {
 	return (0);
 }
 
-int	
+int
 vfs_stdvget (mp, ino, flags, vpp)
 	struct mount *mp;
 	ino_t ino;
@@ -787,7 +959,7 @@ vfs_stdvget (mp, ino, flags, vpp)
 	return (EOPNOTSUPP);
 }
 
-int	
+int
 vfs_stdfhtovp (mp, fhp, vpp)
 	struct mount *mp;
 	struct fid *fhp;
@@ -797,7 +969,7 @@ vfs_stdfhtovp (mp, fhp, vpp)
 }
 
 int
-vfs_stdinit (vfsp) 
+vfs_stdinit (vfsp)
 	struct vfsconf *vfsp;
 {
 	return (0);

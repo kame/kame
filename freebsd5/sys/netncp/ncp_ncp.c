@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netncp/ncp_ncp.c,v 1.12 2002/10/11 14:58:30 mike Exp $
+ * $FreeBSD: src/sys/netncp/ncp_ncp.c,v 1.16 2003/05/13 20:36:00 jhb Exp $
  *
  * Core of NCP protocol
  */
@@ -41,6 +41,8 @@
 #include <sys/signalvar.h>
 #include <sys/sysctl.h>
 #include <sys/mbuf.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/uio.h>
 
 #include <netipx/ipx.h>
@@ -74,17 +76,26 @@ void m_dumpm(struct mbuf *m) {
 #endif /* NCP_DATA_DEBUG */
 
 int
-ncp_chkintr(struct ncp_conn *conn, struct proc *p)
+ncp_chkintr(struct ncp_conn *conn, struct thread *td)
 {
+	struct proc *p;
 	sigset_t tmpset;
 
-	if (p == NULL)
+	if (td == NULL)
 		return 0;
+	p = td->td_proc;
+	PROC_LOCK(p);
 	tmpset = p->p_siglist;
-	SIGSETNAND(tmpset, p->p_sigmask);
-	SIGSETNAND(tmpset, p->p_sigignore);
-	if (SIGNOTEMPTY(p->p_siglist) && NCP_SIGMASK(tmpset))
+	SIGSETOR(tmpset, td->td_siglist);
+	SIGSETNAND(tmpset, td->td_sigmask);
+	mtx_lock(&p->p_sigacts->ps_mtx);
+	SIGSETNAND(tmpset, p->p_sigacts->ps_sigignore);
+	mtx_unlock(&p->p_sigacts->ps_mtx);
+	if (SIGNOTEMPTY(td->td_siglist) && NCP_SIGMASK(tmpset)) {
+		PROC_UNLOCK(p);
                 return EINTR;
+	}
+	PROC_UNLOCK(p);
 	return 0;
 }
 
@@ -99,8 +110,8 @@ ncp_ncp_connect(struct ncp_conn *conn)
 	struct ncp_rq *rqp;
 	struct ncp_rphdr *rp;
 	int error;
-	
-	error = ncp_rq_alloc_any(NCP_ALLOC_SLOT, 0, conn, conn->procp, conn->ucred, &rqp);
+
+	error = ncp_rq_alloc_any(NCP_ALLOC_SLOT, 0, conn, conn->td, conn->ucred, &rqp);
 	if (error)
 		return error;
 
@@ -130,7 +141,7 @@ ncp_ncp_disconnect(struct ncp_conn *conn)
 	ncp_burst_disconnect(conn);
 #endif
 	if (conn->flags & NCPFL_ATTACHED) {
-		error = ncp_rq_alloc_any(NCP_FREE_SLOT, 0, conn, conn->procp, conn->ucred, &rqp);
+		error = ncp_rq_alloc_any(NCP_FREE_SLOT, 0, conn, conn->td, conn->ucred, &rqp);
 		if (!error) {
 			ncp_request_int(rqp);
 			ncp_rq_done(rqp);
@@ -152,7 +163,7 @@ ncp_negotiate_buffersize(struct ncp_conn *conn, int size, int *target)
 	u_int16_t bsize;
 	int error;
 
-	error = ncp_rq_alloc(0x21, conn, conn->procp, conn->ucred, &rqp);
+	error = ncp_rq_alloc(0x21, conn, conn->td, conn->ucred, &rqp);
 	if (error)
 		return error;
 	mb_put_uint16be(&rqp->rq, size);
@@ -166,14 +177,14 @@ ncp_negotiate_buffersize(struct ncp_conn *conn, int size, int *target)
 }
 
 static int
-ncp_negotiate_size_and_options(struct ncp_conn *conn, int size, int options, 
+ncp_negotiate_size_and_options(struct ncp_conn *conn, int size, int options,
 	    int *ret_size, u_int8_t *ret_options)
 {
 	struct ncp_rq *rqp;
 	u_int16_t rs;
 	int error;
 
-	error = ncp_rq_alloc(0x61, conn, conn->procp, conn->ucred, &rqp);
+	error = ncp_rq_alloc(0x61, conn, conn->td, conn->ucred, &rqp);
 	if (error)
 		return error;
 	mb_put_uint16be(&rqp->rq, size);
@@ -201,14 +212,14 @@ ncp_renegotiate_connparam(struct ncp_conn *conn, int buffsize, u_int8_t in_optio
 		in_options |= NCP_SECURITY_LEVEL_SIGN_HEADERS;
 	if (conn->li.saddr.sa_family == AF_IPX) {
 		ilen = sizeof(ckslevel);
-		error = kernel_sysctlbyname(curproc, "net.ipx.ipx.checksum",
+		error = kernel_sysctlbyname(curthread, "net.ipx.ipx.checksum",
 		    &ckslevel, &ilen, NULL, 0, NULL);
 		if (error)
 			return error;
 		if (ckslevel == 2)
 			in_options |= NCP_IPX_CHECKSUM;
 	}
-	error = ncp_negotiate_size_and_options(conn, buffsize, in_options, 
+	error = ncp_negotiate_size_and_options(conn, buffsize, in_options,
 	    &neg_buffsize, &options);
 	if (!error) {
 		if (conn->li.saddr.sa_family == AF_IPX &&
@@ -252,26 +263,27 @@ ncp_renegotiate_connparam(struct ncp_conn *conn, int buffsize, u_int8_t in_optio
 }
 
 void
-ncp_check_rq(struct ncp_conn *conn){
+ncp_check_rq(struct ncp_conn *conn)
+{
 	return;
-	if (conn->flags & NCPFL_INTR) return;
+	if (conn->flags & NCPFL_INTR)
+		return;
 	/* first, check for signals */
-	if (ncp_chkintr(conn,conn->procp)) {
+	if (ncp_chkintr(conn, conn->td))
 		conn->flags |= NCPFL_INTR;
-	}
 	return;
 }
 
 int
-ncp_get_bindery_object_id(struct ncp_conn *conn, 
-		u_int16_t object_type, char *object_name, 
+ncp_get_bindery_object_id(struct ncp_conn *conn,
+		u_int16_t object_type, char *object_name,
 		struct ncp_bindery_object *target,
-		struct proc *p,struct ucred *cred)
+		struct thread *td, struct ucred *cred)
 {
 	struct ncp_rq *rqp;
 	int error;
 
-	error = ncp_rq_alloc_subfn(23, 53, conn, conn->procp, conn->ucred, &rqp);
+	error = ncp_rq_alloc_subfn(23, 53, conn, conn->td, conn->ucred, &rqp);
 	mb_put_uint16be(&rqp->rq, object_type);
 	ncp_rq_pstring(rqp, object_name);
 	rqp->nr_minrplen = 54;
@@ -294,7 +306,7 @@ ncp_get_encryption_key(struct ncp_conn *conn, char *target)
 	struct ncp_rq *rqp;
 	int error;
 
-	error = ncp_rq_alloc_subfn(23, 23, conn, conn->procp, conn->ucred, &rqp);
+	error = ncp_rq_alloc_subfn(23, 23, conn, conn->td, conn->ucred, &rqp);
 	if (error)
 		return error;
 	rqp->nr_minrplen = 8;
@@ -336,7 +348,7 @@ ncp_sign_start(struct ncp_conn *conn, char *logindata)
 int
 ncp_login_encrypted(struct ncp_conn *conn, struct ncp_bindery_object *object,
 	const u_char *key, const u_char *passwd,
-	struct proc *p, struct ucred *cred)
+	struct thread *td, struct ucred *cred)
 {
 	struct ncp_rq *rqp;
 	struct mbchain *mbp;
@@ -348,7 +360,7 @@ ncp_login_encrypted(struct ncp_conn *conn, struct ncp_bindery_object *object,
 	nw_keyhash((u_char*)&tmpID, passwd, strlen(passwd), buf);
 	nw_encrypt(key, buf, encrypted);
 
-	error = ncp_rq_alloc_subfn(23, 24, conn, p, cred, &rqp);
+	error = ncp_rq_alloc_subfn(23, 24, conn, td, cred, &rqp);
 	if (error)
 		return error;
 	mbp = &rqp->rq;
@@ -367,14 +379,14 @@ ncp_login_encrypted(struct ncp_conn *conn, struct ncp_bindery_object *object,
 }
 
 int
-ncp_login_unencrypted(struct ncp_conn *conn, u_int16_t object_type, 
+ncp_login_unencrypted(struct ncp_conn *conn, u_int16_t object_type,
 	const char *object_name, const u_char *passwd,
-	struct proc *p, struct ucred *cred)
+	struct thread *td, struct ucred *cred)
 {
 	struct ncp_rq *rqp;
 	int error;
 
-	error = ncp_rq_alloc_subfn(23, 20, conn, p, cred, &rqp);
+	error = ncp_rq_alloc_subfn(23, 20, conn, td, cred, &rqp);
 	if (error)
 		return error;
 	mb_put_uint16be(&rqp->rq, object_type);
@@ -405,7 +417,7 @@ ncp_read(struct ncp_conn *conn, ncp_fh *file, struct uio *uiop, struct ucred *cr
 		if (!burstio) {
 			len = min(4096 - (uiop->uio_offset % 4096), tsiz);
 			len = min(len, conn->buffer_size);
-			error = ncp_rq_alloc(72, conn, uiop->uio_procp, cred, &rqp);
+			error = ncp_rq_alloc(72, conn, uiop->uio_td, cred, &rqp);
 			if (error)
 				break;
 			mbp = &rqp->rq;
@@ -455,7 +467,7 @@ ncp_write(struct ncp_conn *conn, ncp_fh *file, struct uio *uiop, struct ucred *c
 			printf("gotcha!\n");
 		}
 		/* rq head */
-		error = ncp_rq_alloc(73, conn, uiop->uio_procp, cred, &rqp);
+		error = ncp_rq_alloc(73, conn, uiop->uio_td, cred, &rqp);
 		if (error)
 			break;
 		mbp = &rqp->rq;

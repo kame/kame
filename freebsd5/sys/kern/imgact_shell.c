@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_shell.c,v 1.24 2002/11/05 01:59:55 rwatson Exp $
+ * $FreeBSD: src/sys/kern/imgact_shell.c,v 1.25 2003/01/01 18:48:54 schweikh Exp $
  */
 
 #include <sys/param.h>
@@ -40,7 +40,7 @@
 #endif
 
 /*
- * Shell interpreter image activator. A interpreter name beginning
+ * Shell interpreter image activator. An interpreter name beginning
  *	at imgp->stringbase is the minimal successful exit requirement.
  */
 int

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.23 2002/10/12 07:45:23 seanc Exp $
+ * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.26 2003/03/27 14:56:36 maxim Exp $
  */
 
 #ifndef _IP_DUMMYNET_H
@@ -218,7 +218,7 @@ struct dn_flow_queue {
     struct dn_pkt *head, *tail ;	/* queue of packets */
     u_int len ;
     u_int len_bytes ;
-    long numbytes ;		/* credit for transmission (dynamic queues) */
+    u_long numbytes ;		/* credit for transmission (dynamic queues) */
 
     u_int64_t tot_pkts ;	/* statistics counters	*/
     u_int64_t tot_bytes ;
@@ -310,7 +310,7 @@ struct dn_flow_set {
 /*
  * Pipe descriptor. Contains global parameters, delay-line queue,
  * and the flow_set used for fixed-rate queues.
- * 
+ *
  * For WF2Q+ support it also has 3 heaps holding dn_flow_queue:
  *   not_eligible_heap, for queues whose start time is higher
  *	than the virtual time. Sorted by start time.
@@ -319,7 +319,7 @@ struct dn_flow_set {
  *   idle_heap, all flows that are idle and can be removed. We
  *	do that on each tick so we do not slow down too much
  *	operations during forwarding.
- * 
+ *
  */
 struct dn_pipe {		/* a pipe */
     struct dn_pipe *next ;
@@ -345,7 +345,7 @@ struct dn_pipe {		/* a pipe */
      * When the tx clock come from an interface (if_name[0] != '\0'), its name
      * is stored below, whereas the ifp is filled when the rule is configured.
      */
-    char if_name[16];
+    char if_name[IFNAMSIZ];
     struct ifnet *ifp ;
     int ready ; /* set if ifp != NULL and we got a signal from it */
 

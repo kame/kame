@@ -48,7 +48,7 @@
  *	from: unknown origin, 386BSD 0.1
  *	From Id: lpt.c,v 1.55.2.1 1996/11/12 09:08:38 phk Exp
  *	From Id: nlpt.c,v 1.14 1999/02/08 13:55:43 des Exp
- * $FreeBSD: src/sys/dev/ppbus/lpt.c,v 1.24 2002/11/07 17:20:58 jhb Exp $
+ * $FreeBSD: src/sys/dev/ppbus/lpt.c,v 1.28 2003/03/03 12:15:44 phk Exp $
  */
 
 /*
@@ -189,19 +189,13 @@ static	d_ioctl_t	lptioctl;
 
 #define CDEV_MAJOR 16
 static struct cdevsw lpt_cdevsw = {
-	/* open */	lptopen,
-	/* close */	lptclose,
-	/* read */	lptread,
-	/* write */	lptwrite,
-	/* ioctl */	lptioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	LPT_NAME,
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	lptopen,
+	.d_close =	lptclose,
+	.d_read =	lptread,
+	.d_write =	lptwrite,
+	.d_ioctl =	lptioctl,
+	.d_name =	LPT_NAME,
+	.d_maj =	CDEV_MAJOR,
 };
 
 static int
@@ -444,7 +438,7 @@ lptout(void *arg)
 		lptintr(dev);
 	} else {
 		sc->sc_state &= ~OBUSY;
-		wakeup((caddr_t)dev);
+		wakeup(dev);
 	}
 }
 
@@ -523,7 +517,7 @@ lptopen(dev_t dev, int flags, int fmt, struct thread *td)
 		}
 
 		/* wait 1/4 second, give up if we get a signal */
-		if (tsleep((caddr_t)lptdev, LPPRI|PCATCH, "lptinit", hz/4) !=
+		if (tsleep(lptdev, LPPRI|PCATCH, "lptinit", hz/4) !=
 		    EWOULDBLOCK) {
 			sc->sc_state = 0;
 			splx(s);
@@ -597,7 +591,7 @@ lptclose(dev_t dev, int flags, int fmt, struct thread *td)
 			(LPS_SEL|LPS_OUT|LPS_NBSY|LPS_NERR)) !=
 			(LPS_SEL|LPS_NBSY|LPS_NERR) || sc->sc_xfercnt)
 			/* wait 1/4 second, give up if we get a signal */
-			if (tsleep((caddr_t)lptdev, LPPRI|PCATCH,
+			if (tsleep(lptdev, LPPRI|PCATCH,
 				"lpclose", hz) != EWOULDBLOCK)
 				break;
 
@@ -661,7 +655,7 @@ lpt_pushbytes(device_t dev)
 				 */
 				if (tic > MAX_SLEEP)
 					tic = MAX_SLEEP;
-				err = tsleep((caddr_t)dev, LPPRI,
+				err = tsleep(dev, LPPRI,
 					LPT_NAME "poll", tic);
 				if (err != EWOULDBLOCK) {
 					return (err);
@@ -796,7 +790,7 @@ lptwrite(dev_t dev, struct uio *uio, int ioflag)
 			}
 			lprintf(("W "));
 			if (sc->sc_state & OBUSY)
-				if ((err = tsleep((caddr_t)lptdev,
+				if ((err = tsleep(lptdev,
 					 LPPRI|PCATCH, LPT_NAME "write", 0))) {
 					sc->sc_state |= INTERRUPTED;
 					return(err);
@@ -872,7 +866,7 @@ lpt_intr(void *arg)
 		sc->sc_state &= ~OBUSY;
 
 		if(!(sc->sc_state & INTERRUPTED))
-			wakeup((caddr_t)lptdev);
+			wakeup(lptdev);
 		lprintf(("w "));
 		return;
 	} else	{	/* check for error */

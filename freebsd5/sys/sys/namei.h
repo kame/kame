@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)namei.h	8.5 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/namei.h,v 1.37 2002/10/19 21:25:51 rwatson Exp $
+ * $FreeBSD: src/sys/sys/namei.h,v 1.39 2003/01/13 08:49:36 phk Exp $
  */
 
 #ifndef _SYS_NAMEI_H_
@@ -66,13 +66,9 @@ struct nameidata {
 	 */
 	const	char *ni_dirp;		/* pathname pointer */
 	enum	uio_seg ni_segflg;	/* location of pathname */
-     /* u_long	ni_nameiop;		   namei operation */
-     /* u_long	ni_flags;		   flags to namei */
-     /* struct	proc *ni_proc;		   process requesting lookup */
 	/*
 	 * Arguments to lookup.
 	 */
-     /* struct	ucred *ni_cred;		   credentials */
 	struct	vnode *ni_startdir;	/* starting directory */
 	struct	vnode *ni_rootdir;	/* logical root directory */
 	struct	vnode *ni_topdir;	/* logical top directory */
@@ -148,25 +144,16 @@ struct nameidata {
 #define	PARAMASK	0xfffe00 /* mask of parameter descriptors */
 
 /*
- * Initialization of an nameidata structure.
+ * Initialization of a nameidata structure.
  */
 static void NDINIT(struct nameidata *, u_long, u_long, enum uio_seg,
 	    const char *, struct thread *);
 static __inline void
-#if defined(__STDC__) || defined(__cplusplus)
 NDINIT(struct nameidata *ndp,
 	u_long op, u_long flags,
 	enum uio_seg segflg,
 	const char *namep,
 	struct thread *td)
-#else
-NDINIT(ndp, op, flags, segflg, namep, td)
-	struct nameidata *ndp;
-	u_long op, flags;
-	enum uio_seg segflg;
-	const char *namep;
-	struct thread *td;
-#endif
 {
 	ndp->ni_cnd.cn_nameiop = op;
 	ndp->ni_cnd.cn_flags = flags;

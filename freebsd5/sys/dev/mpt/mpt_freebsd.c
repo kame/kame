@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/mpt/mpt_freebsd.c,v 1.8 2002/10/16 08:48:37 phk Exp $ */
+/* $FreeBSD: src/sys/dev/mpt/mpt_freebsd.c,v 1.11 2003/05/27 18:32:24 jhb Exp $ */
 /*
  * FreeBSD/CAM specific routines for LSI '909 FC  adapters.
  * FreeBSD Version.

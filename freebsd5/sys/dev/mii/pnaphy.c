@@ -29,8 +29,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.10 2002/10/29 00:20:47 semenu Exp $
  */
 
 /*
@@ -41,6 +39,9 @@
  * really clever, we could tweak some of the vendor-specific registers
  * to optimize the link.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.12 2003/04/03 21:36:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,14 +57,9 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-#include <dev/mii/miidevs.h>
+#include "miidevs.h"
 
 #include "miibus_if.h"
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.10 2002/10/29 00:20:47 semenu Exp $";
-#endif
 
 static int pnaphy_probe(device_t);
 static int pnaphy_attach(device_t);

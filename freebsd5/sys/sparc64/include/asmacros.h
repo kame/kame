@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/asmacros.h,v 1.13 2002/08/18 02:09:26 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/asmacros.h,v 1.16 2003/04/26 20:54:44 obrien Exp $
  */
 
 #ifndef	_MACHINE_ASMACROS_H_
@@ -112,43 +112,16 @@
 	call	printf ; \
 	 nop
 
-/*
- * If the kernel can be located above 4G, setx needs to be used to load
- * symbol values, otherwise set is sufficient.
- */
-#ifdef HIGH_KERNEL
-#define	SET(sym, tmp, dst) \
-	setx	sym, tmp, dst
-#else
-#define	SET(sym, tmp, dst) \
-	set	sym, dst
-#endif
-
 #define	_ALIGN_DATA	.align 8
-#ifdef GPROF
-#define	_ALIGN_TEXT	.align 32
-#else
-#define	_ALIGN_TEXT	.align 16
-#endif
 
 #define	DATA(name) \
 	.data ; \
 	_ALIGN_DATA ; \
 	.globl	name ; \
 	.type	name, @object ; \
-name ## :
+name:
 
 #define	EMPTY
-
-#define	ENTRY(name) \
-	.text ; \
-	_ALIGN_TEXT ; \
-	.globl	name ; \
-	.type	name, @function ; \
-name ## :
-
-#define	END(name) \
-	.size	name, . - name
 
 #endif /* LOCORE */
 

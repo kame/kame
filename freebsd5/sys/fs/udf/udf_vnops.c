@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/udf/udf_vnops.c,v 1.17 2002/10/14 03:20:34 mckusick Exp $
+ * $FreeBSD: src/sys/fs/udf/udf_vnops.c,v 1.27 2003/05/04 07:39:11 scottl Exp $
  */
 
 /* udf_vnops.c */
@@ -57,7 +57,6 @@ static int udf_read(struct vop_read_args *);
 static int udf_readdir(struct vop_readdir_args *);
 static int udf_readlink(struct vop_readlink_args *ap);
 static int udf_strategy(struct vop_strategy_args *);
-static int udf_print(struct vop_print_args *);
 static int udf_bmap(struct vop_bmap_args *);
 static int udf_lookup(struct vop_cachedlookup_args *);
 static int udf_reclaim(struct vop_reclaim_args *);
@@ -73,17 +72,13 @@ static struct vnodeopv_entry_desc udf_vnodeop_entries[] = {
 	{ &vop_cachedlookup_desc,	(vop_t *) udf_lookup },
 	{ &vop_getattr_desc,		(vop_t *) udf_getattr },
 	{ &vop_ioctl_desc,		(vop_t *) udf_ioctl },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
-	{ &vop_lock_desc,		(vop_t *) vop_stdlock },
 	{ &vop_lookup_desc,		(vop_t *) vfs_cache_lookup },
 	{ &vop_pathconf_desc,		(vop_t *) udf_pathconf },
-	{ &vop_print_desc,		(vop_t *) udf_print },
 	{ &vop_read_desc,		(vop_t *) udf_read },
 	{ &vop_readdir_desc,		(vop_t *) udf_readdir },
 	{ &vop_readlink_desc,		(vop_t *) udf_readlink },
 	{ &vop_reclaim_desc,		(vop_t *) udf_reclaim },
 	{ &vop_strategy_desc,		(vop_t *) udf_strategy },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ NULL, NULL }
 };
 static struct vnodeopv_desc udf_vnodeop_opv_desc =
@@ -100,13 +95,17 @@ int
 udf_hashlookup(struct udf_mnt *udfmp, ino_t id, int flags, struct vnode **vpp)
 {
 	struct udf_node *node;
+	struct udf_hash_lh *lh;
 	int error;
 
 	*vpp = NULL;
 
 loop:
 	mtx_lock(&udfmp->hash_mtx);
-	TAILQ_FOREACH(node, &udfmp->udf_tqh, tq) {
+	lh = &udfmp->hashtbl[id % udfmp->hashsz];
+	if (lh == NULL)
+		return (ENOENT);
+	LIST_FOREACH(node, lh, le) {
 		if (node->hash_id == id) {
 			VI_LOCK(node->i_vnode);
 			mtx_unlock(&udfmp->hash_mtx);
@@ -129,13 +128,17 @@ int
 udf_hashins(struct udf_node *node)
 {
 	struct udf_mnt *udfmp;
+	struct udf_hash_lh *lh;
 
 	udfmp = node->udfmp;
 
-	mtx_lock(&udfmp->hash_mtx);
-	TAILQ_INSERT_TAIL(&udfmp->udf_tqh, node, tq);
-	mtx_unlock(&udfmp->hash_mtx);
 	vn_lock(node->i_vnode, LK_EXCLUSIVE | LK_RETRY, curthread);
+	mtx_lock(&udfmp->hash_mtx);
+	lh = &udfmp->hashtbl[node->hash_id % udfmp->hashsz];
+	if (lh == NULL)
+		LIST_INIT(lh);
+	LIST_INSERT_HEAD(lh, node, le);
+	mtx_unlock(&udfmp->hash_mtx);
 
 	return (0);
 }
@@ -144,11 +147,15 @@ int
 udf_hashrem(struct udf_node *node)
 {
 	struct udf_mnt *udfmp;
+	struct udf_hash_lh *lh;
 
 	udfmp = node->udfmp;
 
 	mtx_lock(&udfmp->hash_mtx);
-	TAILQ_REMOVE(&udfmp->udf_tqh, node, tq);
+	lh = &udfmp->hashtbl[node->hash_id % udfmp->hashsz];
+	if (lh == NULL)
+		panic("hash entry is NULL, node->hash_id= %d\n", node->hash_id);
+	LIST_REMOVE(node, le);
 	mtx_unlock(&udfmp->hash_mtx);
 
 	return (0);
@@ -166,7 +173,6 @@ udf_allocv(struct mount *mp, struct vnode **vpp, struct thread *td)
 		return (error);
 	}
 
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	*vpp = vp;
 	return (0);
 }
@@ -191,7 +197,7 @@ udf_permtomode(struct udf_node *node)
 
 	return (mode);
 }
- 
+
 static int
 udf_access(struct vop_access_args *a)
 {
@@ -269,7 +275,7 @@ udf_timetotimespec(struct timestamp *time, struct timespec *t)
 	/* Calclulate the month */
 	lpyear = udf_isaleapyear(time->year);
 	for (i = 1; i < time->month; i++)
-		t->tv_sec += mon_lens[lpyear][i] * 3600 * 24; 
+		t->tv_sec += mon_lens[lpyear][i] * 3600 * 24;
 
 	/* Speed up the calculation */
 	if (time->year > 1979)
@@ -409,7 +415,7 @@ udf_read(struct vop_read_args *a)
 		error = udf_readatoffset(node, &size, offset, &bp, &data);
 		if (error)
 			return (error);
-		error = uiomove((caddr_t)data, size, uio);
+		error = uiomove(data, size, uio);
 		if (bp != NULL)
 			brelse(bp);
 		if (error)
@@ -461,7 +467,7 @@ udf_transname(char *cs0string, char *destname, int len)
 	}
 
 	/* At this point, the name is in 16-bit Unicode.  Compact it down
- 	 * to 8-bit
+	 * to 8-bit
 	 */
 	for (i = 0; i < unilen ; i++) {
 		if (transname[i] & 0xff00) {
@@ -527,7 +533,7 @@ udf_uiodir(struct udf_uiodir *uiodir, int de_size, struct uio *uio, long cookie)
 		return (-1);
 	}
 
-	return (uiomove((caddr_t)uiodir->dirent, de_size, uio));
+	return (uiomove(uiodir->dirent, de_size, uio));
 }
 
 static struct udf_dirstream *
@@ -742,7 +748,7 @@ udf_readdir(struct vop_readdir_args *a)
 			dir.d_namlen = 1;
 			dir.d_reclen = GENERIC_DIRSIZ(&dir);
 			uiodir.dirent = &dir;
-			error = udf_uiodir(&uiodir, dir.d_reclen, uio, 1); 
+			error = udf_uiodir(&uiodir, dir.d_reclen, uio, 1);
 			if (error)
 				break;
 
@@ -831,15 +837,8 @@ udf_strategy(struct vop_strategy_args *a)
 	}
 	vp = node->i_devvp;
 	bp->b_dev = vp->v_rdev;
-	VOP_STRATEGY(vp, bp);
+	VOP_SPECSTRATEGY(vp, bp);
 	return (0);
-}
-
-static int
-udf_print(struct vop_print_args *a)
-{
-	printf("%s called\n", __FUNCTION__);
-	return (EOPNOTSUPP);
 }
 
 static int
@@ -1035,7 +1034,7 @@ udf_reclaim(struct vop_reclaim_args *a)
 }
 
 /*
- * Read the block and then set the data pointer to correspond with the 
+ * Read the block and then set the data pointer to correspond with the
  * offset passed in.  Only read in at most 'size' bytes, and then set 'size'
  * to the number of bytes pointed to.  If 'size' is zero, try to read in a
  * whole extent.
@@ -1075,7 +1074,7 @@ udf_readatoffset(struct udf_node *node, int *size, int offset, struct buf **bp, 
 	*size = min(*size, MAXBSIZE);
 
 	if ((error = udf_readlblks(udfmp, sector, *size, bp))) {
-		printf("udf_readlblks returned %d\n", error);
+		printf("warning: udf_readlblks returned error %d\n", error);
 		return (error);
 	}
 
@@ -1139,7 +1138,7 @@ udf_bmap_internal(struct udf_node *node, uint32_t offset, daddr_t *sector, uint3
 		lsector = (offset  >> udfmp->bshift) +
 		    ((struct short_ad *)(icb))->pos;
 
-		*max_size = GETICBLEN(short_ad, icb) - offset;
+		*max_size = GETICBLEN(short_ad, icb);
 
 		break;
 	case 1:
@@ -1160,10 +1159,10 @@ udf_bmap_internal(struct udf_node *node, uint32_t offset, daddr_t *sector, uint3
 			ad_num++;
 		} while(offset >= icblen);
 
-		lsector = (offset >> udfmp->bshift) + 
+		lsector = (offset >> udfmp->bshift) +
 		    ((struct long_ad *)(icb))->loc.lb_num;
 
-		*max_size = GETICBLEN(long_ad, icb) - offset;
+		*max_size = GETICBLEN(long_ad, icb);
 
 		break;
 	case 3:

@@ -1,4 +1,4 @@
- $FreeBSD: src/sys/ia64/ia32/syscalls.master,v 1.13 2002/11/16 15:15:17 deischen Exp $
+ $FreeBSD: src/sys/ia64/ia32/syscalls.master,v 1.21 2003/04/25 15:59:18 jhb Exp $
 ;	from: @(#)syscalls.master	8.2 (Berkeley) 1/13/94
 ;	from: src/sys/kern/syscalls.master 1.107
 ;
@@ -594,3 +594,18 @@
 421	UNIMPL	BSD	getcontext
 422	UNIMPL	BSD	setcontext
 423	UNIMPL	BSD	swapcontext
+424	UNIMPL	BSD	swapoff
+425	UNIMPL	BSD	__acl_get_link
+426	UNIMPL	BSD	__acl_set_link
+427	UNIMPL	BSD	__acl_delete_link
+428	UNIMPL	BSD	__acl_aclcheck_link
+429	UNIMPL	NOHIDE	sigwait
+430	MNOPROTO BSD	{ int thr_create(ucontext_t *ctx, thr_id_t *id, \
+			    int flag s); }
+431	MNOPROTO BSD	{ void thr_exit(void); }
+432	MNOPROTO BSD	{ int thr_self(thr_id_t *id); }
+433	MNOPROTO BSD	{ int thr_kill(thr_id_t id, int sig); }
+434	MNOPROTO BSD	{ int _umtx_lock(struct umtx *umtx); }
+435	MNOPROTO BSD	{ int _umtx_unlock(struct umtx *umtx); }
+436	MNOPROTO BSD	{ int jail_attach(int jid); }
+

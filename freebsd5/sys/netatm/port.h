@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/port.h,v 1.11 2002/11/08 18:27:29 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/port.h,v 1.15 2003/02/23 22:26:39 obrien Exp $
  *
  */
 
@@ -178,8 +178,7 @@ typedef struct mbuf	KBuffer;
 }
 #define	KB_LINKHEAD(new, head) {			\
 	if ((head) && KB_ISPKT(new) && KB_ISPKT(head)) {\
-		M_COPY_PKTHDR((new), (head));		\
-		(head)->m_flags &= ~M_PKTHDR;		\
+		M_MOVE_PKTHDR((new), (head));		\
 	}						\
 	(new)->m_next = (head);				\
 }
@@ -282,20 +281,6 @@ typedef void	KTimeout_ret;
 #define	KT_TIME(t)	microtime(&t)
 
 #endif	/* _KERNEL */
-
-#ifndef NTOHL
-#if BYTE_ORDER == BIG_ENDIAN
-#define	NTOHL(x)	(x)
-#define	NTOHS(x)	(x)
-#define	HTONL(x)	(x)
-#define	HTONS(x)	(x)
-#else
-#define	NTOHL(x)	(x) = ntohl((u_long)(x))
-#define	NTOHS(x)	(x) = ntohs((u_short)(x))
-#define	HTONL(x)	(x) = htonl((u_long)(x))
-#define	HTONS(x)	(x) = htons((u_short)(x))
-#endif
-#endif	/* NTOHL */
 
 #ifndef MAX
 #define	MAX(a,b)	max((a),(b))

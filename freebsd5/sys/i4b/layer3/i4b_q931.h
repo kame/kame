@@ -27,7 +27,7 @@
  *	i4b_q931.h - Q931 handling header file
  *	--------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer3/i4b_q931.h,v 1.9 2002/03/26 15:13:54 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer3/i4b_q931.h,v 1.10 2003/01/01 18:48:53 schweikh Exp $
  *
  *      last edit-date: [Tue Mar 26 15:04:33 2002]
  *
@@ -117,7 +117,7 @@
 
 /* ALERT */
 
-#define MSG_ALERT_LEN		4	/* length of a alert message */
+#define MSG_ALERT_LEN		4	/* length of an alert message */
 
 #endif /* _I4B_Q931_H_ */
 

@@ -29,11 +29,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netncp/ncp_subr.c,v 1.7 2001/05/19 05:48:07 jlemon Exp $
+ * $FreeBSD: src/sys/netncp/ncp_subr.c,v 1.11 2003/03/24 21:15:35 jhb Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -52,8 +53,9 @@
 int ncp_debuglevel = 0;
 
 struct callout_handle ncp_timer_handle;
+static eventhandler_tag ncp_exit_tag;
 
-static void ncp_at_exit(struct proc *p);
+static void ncp_at_exit(void *arg, struct proc *p);
 static void ncp_timer(void *arg);
 
 /*
@@ -76,33 +78,35 @@ ncp_str_dup(char *s) {
 
 
 void
-ncp_at_exit(struct proc *p)
+ncp_at_exit(void *arg, struct proc *p)
 {
 	struct ncp_conn *ncp, *nncp;
+	struct thread *td;
 
-	if (ncp_conn_putprochandles(p) == 0) return;
-
-	ncp_conn_locklist(LK_EXCLUSIVE, p);
-	for (ncp = SLIST_FIRST(&conn_list); ncp; ncp = nncp) {
-		nncp = SLIST_NEXT(ncp, nc_next);
-		if (ncp_conn_lock(ncp, p, p->p_ucred,NCPM_READ|NCPM_EXECUTE|NCPM_WRITE))
+	FOREACH_THREAD_IN_PROC(p, td) {
+		if (ncp_conn_putprochandles(td) == 0)
 			continue;
-		if (ncp_conn_free(ncp) != 0)
-			ncp_conn_unlock(ncp,p);
+
+		ncp_conn_locklist(LK_EXCLUSIVE, td);
+		for (ncp = SLIST_FIRST(&conn_list); ncp; ncp = nncp) {
+			nncp = SLIST_NEXT(ncp, nc_next);
+			if (ncp_conn_lock(ncp, td, td->td_ucred,
+					  NCPM_READ | NCPM_EXECUTE | NCPM_WRITE))
+				continue;
+			if (ncp_conn_free(ncp) != 0)
+				ncp_conn_unlock(ncp, td);
+		}
+		ncp_conn_unlocklist(td);
 	}
-	ncp_conn_unlocklist(p);
-	return;
 }
 
 int
 ncp_init(void)
 {
 	ncp_conn_init();
-	if (at_exit(ncp_at_exit)) {
-		NCPFATAL("can't register at_exit handler\n");
-		return ENOMEM;
-	}
-	ncp_timer_handle = timeout(ncp_timer,NULL,NCP_TIMER_TICK);
+	ncp_exit_tag = EVENTHANDLER_REGISTER(process_exit, ncp_at_exit, NULL,
+	    EVENTHANDLER_PRI_ANY);
+	ncp_timer_handle = timeout(ncp_timer, NULL, NCP_TIMER_TICK);
 	return 0;
 }
 
@@ -114,8 +118,8 @@ ncp_done(void)
 	error = ncp_conn_destroy();
 	if (error)
 		return error;
-	untimeout(ncp_timer,NULL,ncp_timer_handle);
-	rm_at_exit(ncp_at_exit);
+	untimeout(ncp_timer, NULL, ncp_timer_handle);
+	EVENTHANDLER_DEREGISTER(process_exit, ncp_exit_tag);
 	return 0;
 }
 
@@ -131,5 +135,5 @@ ncp_timer(void *arg)
 			ncp_check_conn(conn);
 		ncp_conn_unlocklist(NULL);
 	}
-	ncp_timer_handle = timeout(ncp_timer,NULL,NCP_TIMER_TICK);
+	ncp_timer_handle = timeout(ncp_timer, NULL, NCP_TIMER_TICK);
 }

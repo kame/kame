@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_smb.c,v 1.6 2002/11/07 22:35:45 jhb Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_smb.c,v 1.10 2003/02/19 05:47:19 imp Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -364,7 +364,7 @@ smb_smb_flush(struct smbnode *np, struct smb_cred *scred)
 	int error;
 
 	if (np->n_opencount <= 0 || !SMBTOV(np) || SMBTOV(np)->v_type != VREG)
-		return 0; /* not an regular open file */
+		return 0; /* not a regular open file */
 	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_FLUSH, scred);
 	if (error)
 		return (error);
@@ -1485,7 +1485,8 @@ smbfs_smb_lookup(struct smbnode *dnp, const char *name, int nmlen,
 		error = smbfs_smb_lookup(dnp, NULL, 0, fap, scred);
 		return error;
 	} else if (nmlen == 2 && name[0] == '.' && name[1] == '.') {
-		error = smbfs_smb_lookup(dnp->n_parent, NULL, 0, fap, scred);
+		error = smbfs_smb_lookup(VTOSMB(dnp->n_parent), NULL, 0, fap,
+		    scred);
 		printf("%s: knows NOTHING about '..'\n", __func__);
 		return error;
 	}

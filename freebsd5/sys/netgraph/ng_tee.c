@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.20 2002/05/31 23:48:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.23 2003/02/19 05:47:32 imp Exp $
  * $Whistle: ng_tee.c,v 1.18 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -334,7 +334,7 @@ ngt_rcvdata(hook_p hook, item_p item)
 		meta_p meta2;
 
 		/* Copy packet (failure will not stop the original)*/
-		m2 = m_dup(m, M_NOWAIT);
+		m2 = m_dup(m, M_DONTWAIT);
 		if (m2) {
 
 			/* Copy meta info */

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/kern/subr_sbuf.c,v 1.21 2002/10/04 09:58:16 phk Exp $
+ *      $FreeBSD: src/sys/kern/subr_sbuf.c,v 1.24 2003/05/25 19:03:08 peter Exp $
  */
 
 #include <sys/param.h>
@@ -399,6 +399,7 @@ sbuf_cpy(struct sbuf *s, const char *str)
 int
 sbuf_vprintf(struct sbuf *s, const char *fmt, va_list ap)
 {
+	va_list ap_copy;
 	int len;
 
 	assert_sbuf_integrity(s);
@@ -411,8 +412,10 @@ sbuf_vprintf(struct sbuf *s, const char *fmt, va_list ap)
 		return (-1);
 
 	do {
+		va_copy(ap_copy, ap);
 		len = vsnprintf(&s->s_buf[s->s_len], SBUF_FREESPACE(s) + 1,
-		    fmt, ap);
+		    fmt, ap_copy);
+		va_end(ap_copy);
 	} while (len > SBUF_FREESPACE(s) &&
 	    sbuf_extend(s, len - SBUF_FREESPACE(s)) == 0);
 

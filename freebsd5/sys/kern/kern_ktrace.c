@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_ktrace.c	8.2 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/kern/kern_ktrace.c,v 1.79 2002/10/02 07:44:23 scottl Exp $
+ * $FreeBSD: src/sys/kern/kern_ktrace.c,v 1.84 2003/04/25 19:59:35 jhb Exp $
  */
 
 #include "opt_ktrace.h"
@@ -226,17 +226,23 @@ ktr_getrequest(int type)
 	if (req != NULL) {
 		STAILQ_REMOVE_HEAD(&ktr_free, ktr_list);
 		req->ktr_header.ktr_type = type;
-		KASSERT(p->p_tracep != NULL, ("ktrace: no trace vnode"));
-		req->ktr_vp = p->p_tracep;
-		VREF(p->p_tracep);
+		if (p->p_traceflag & KTRFAC_DROP) {
+			req->ktr_header.ktr_type |= KTR_DROP;
+			p->p_traceflag &= ~KTRFAC_DROP;
+		}
+		KASSERT(p->p_tracevp != NULL, ("ktrace: no trace vnode"));
+		KASSERT(p->p_tracecred != NULL, ("ktrace: no trace cred"));
+		req->ktr_vp = p->p_tracevp;
+		VREF(p->p_tracevp);
+		req->ktr_cred = crhold(p->p_tracecred);
 		mtx_unlock(&ktrace_mtx);
 		microtime(&req->ktr_header.ktr_time);
 		req->ktr_header.ktr_pid = p->p_pid;
 		bcopy(p->p_comm, req->ktr_header.ktr_comm, MAXCOMLEN + 1);
-		req->ktr_cred = crhold(td->td_ucred);
 		req->ktr_header.ktr_buffer = NULL;
 		req->ktr_header.ktr_len = 0;
 	} else {
+		p->p_traceflag |= KTRFAC_DROP;
 		pm = print_message;
 		print_message = 0;
 		mtx_unlock(&ktrace_mtx);
@@ -467,12 +473,14 @@ ktrcsw(out, user)
 	kc->user = user;
 	ktr_submitrequest(req);
 }
-#endif
+#endif /* KTRACE */
 
 /* Interface and common routines */
 
 /*
  * ktrace system call
+ *
+ * MPSAFE
  */
 #ifndef _SYS_SYSPROTO_H_
 struct ktrace_args {
@@ -498,6 +506,13 @@ ktrace(td, uap)
 	int ret = 0;
 	int flags, error = 0;
 	struct nameidata nd;
+	struct ucred *cred;
+
+	/*
+	 * Need something to (un)trace.
+	 */
+	if (ops != KTROP_CLEARFILE && facs == 0)
+		return (EINVAL);
 
 	td->td_inktrace = 1;
 	if (ops != KTROP_CLEAR) {
@@ -506,8 +521,10 @@ ktrace(td, uap)
 		 */
 		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->fname, td);
 		flags = FREAD | FWRITE | O_NOFOLLOW;
+		mtx_lock(&Giant);
 		error = vn_open(&nd, &flags, 0);
 		if (error) {
+			mtx_unlock(&Giant);
 			td->td_inktrace = 0;
 			return (error);
 		}
@@ -516,9 +533,11 @@ ktrace(td, uap)
 		VOP_UNLOCK(vp, 0, td);
 		if (vp->v_type != VREG) {
 			(void) vn_close(vp, FREAD|FWRITE, td->td_ucred, td);
+			mtx_unlock(&Giant);
 			td->td_inktrace = 0;
 			return (EACCES);
 		}
+		mtx_unlock(&Giant);
 	}
 	/*
 	 * Clear all uses of the tracefile.
@@ -527,15 +546,20 @@ ktrace(td, uap)
 		sx_slock(&allproc_lock);
 		LIST_FOREACH(p, &allproc, p_list) {
 			PROC_LOCK(p);
-			if (p->p_tracep == vp) {
+			if (p->p_tracevp == vp) {
 				if (ktrcanset(td, p)) {
 					mtx_lock(&ktrace_mtx);
-					p->p_tracep = NULL;
+					cred = p->p_tracecred;
+					p->p_tracecred = NULL;
+					p->p_tracevp = NULL;
 					p->p_traceflag = 0;
 					mtx_unlock(&ktrace_mtx);
 					PROC_UNLOCK(p);
+					mtx_lock(&Giant);
 					(void) vn_close(vp, FREAD|FWRITE,
-						td->td_ucred, td);
+						cred, td);
+					mtx_unlock(&Giant);
+					crfree(cred);
 				} else {
 					PROC_UNLOCK(p);
 					error = EPERM;
@@ -547,20 +571,13 @@ ktrace(td, uap)
 		goto done;
 	}
 	/*
-	 * need something to (un)trace (XXX - why is this here?)
-	 */
-	if (!facs) {
-		error = EINVAL;
-		goto done;
-	}
-	/*
 	 * do it
 	 */
+	sx_slock(&proctree_lock);
 	if (uap->pid < 0) {
 		/*
 		 * by process group
 		 */
-		sx_slock(&proctree_lock);
 		pg = pgfind(-uap->pid);
 		if (pg == NULL) {
 			sx_sunlock(&proctree_lock);
@@ -577,37 +594,46 @@ ktrace(td, uap)
 				ret |= ktrsetchildren(td, p, ops, facs, vp);
 			else
 				ret |= ktrops(td, p, ops, facs, vp);
-		sx_sunlock(&proctree_lock);
 	} else {
 		/*
 		 * by pid
 		 */
 		p = pfind(uap->pid);
 		if (p == NULL) {
+			sx_sunlock(&proctree_lock);
 			error = ESRCH;
 			goto done;
 		}
+		/*
+		 * The slock of the proctree lock will keep this process
+		 * from going away, so unlocking the proc here is ok.
+		 */
 		PROC_UNLOCK(p);
-		/* XXX: UNLOCK above has a race */
 		if (descend)
 			ret |= ktrsetchildren(td, p, ops, facs, vp);
 		else
 			ret |= ktrops(td, p, ops, facs, vp);
 	}
+	sx_sunlock(&proctree_lock);
 	if (!ret)
 		error = EPERM;
 done:
-	if (vp != NULL)
+	if (vp != NULL) {
+		mtx_lock(&Giant);
 		(void) vn_close(vp, FWRITE, td->td_ucred, td);
+		mtx_unlock(&Giant);
+	}
 	td->td_inktrace = 0;
 	return (error);
-#else
-	return ENOSYS;
-#endif
+#else /* !KTRACE */
+	return (ENOSYS);
+#endif /* KTRACE */
 }
 
 /*
  * utrace system call
+ *
+ * MPSAFE
  */
 /* ARGSUSED */
 int
@@ -640,9 +666,9 @@ utrace(td, uap)
 	req->ktr_header.ktr_len = uap->len;
 	ktr_submitrequest(req);
 	return (0);
-#else
+#else /* !KTRACE */
 	return (ENOSYS);
-#endif
+#endif /* KTRACE */
 }
 
 #ifdef KTRACE
@@ -654,6 +680,7 @@ ktrops(td, p, ops, facs, vp)
 	struct vnode *vp;
 {
 	struct vnode *tracevp = NULL;
+	struct ucred *tracecred = NULL;
 
 	PROC_LOCK(p);
 	if (!ktrcanset(td, p)) {
@@ -662,13 +689,17 @@ ktrops(td, p, ops, facs, vp)
 	}
 	mtx_lock(&ktrace_mtx);
 	if (ops == KTROP_SET) {
-		if (p->p_tracep != vp) {
+		if (p->p_tracevp != vp) {
 			/*
 			 * if trace file already in use, relinquish below
 			 */
-			tracevp = p->p_tracep;
+			tracevp = p->p_tracevp;
 			VREF(vp);
-			p->p_tracep = vp;
+			p->p_tracevp = vp;
+		}
+		if (p->p_tracecred != td->td_ucred) {
+			tracecred = p->p_tracecred;
+			p->p_tracecred = crhold(td->td_ucred);
 		}
 		p->p_traceflag |= facs;
 		if (td->td_ucred->cr_uid == 0)
@@ -678,14 +709,21 @@ ktrops(td, p, ops, facs, vp)
 		if (((p->p_traceflag &= ~facs) & KTRFAC_MASK) == 0) {
 			/* no more tracing */
 			p->p_traceflag = 0;
-			tracevp = p->p_tracep;
-			p->p_tracep = NULL;
+			tracevp = p->p_tracevp;
+			p->p_tracevp = NULL;
+			tracecred = p->p_tracecred;
+			p->p_tracecred = NULL;
 		}
 	}
 	mtx_unlock(&ktrace_mtx);
 	PROC_UNLOCK(p);
-	if (tracevp != NULL)
+	if (tracevp != NULL) {
+		mtx_lock(&Giant);
 		vrele(tracevp);
+		mtx_unlock(&Giant);
+	}
+	if (tracecred != NULL)
+		crfree(tracecred);
 
 	return (1);
 }
@@ -701,7 +739,7 @@ ktrsetchildren(td, top, ops, facs, vp)
 	register int ret = 0;
 
 	p = top;
-	sx_slock(&proctree_lock);
+	sx_assert(&proctree_lock, SX_LOCKED);
 	for (;;) {
 		ret |= ktrops(td, p, ops, facs, vp);
 		/*
@@ -712,10 +750,8 @@ ktrsetchildren(td, top, ops, facs, vp)
 		if (!LIST_EMPTY(&p->p_children))
 			p = LIST_FIRST(&p->p_children);
 		else for (;;) {
-			if (p == top) {
-				sx_sunlock(&proctree_lock);
+			if (p == top)
 				return (ret);
-			}
 			if (LIST_NEXT(p, p_sibling)) {
 				p = LIST_NEXT(p, p_sibling);
 				break;
@@ -748,7 +784,7 @@ ktr_writerequest(struct ktr_request *req)
 	if (vp == NULL)
 		return;
 	kth = &req->ktr_header;
-	datalen = data_lengths[kth->ktr_type];
+	datalen = data_lengths[(ushort)kth->ktr_type & ~KTR_DROP];
 	buflen = kth->ktr_len;
 	cred = req->ktr_cred;
 	td = curthread;
@@ -804,17 +840,24 @@ ktr_writerequest(struct ktr_request *req)
 	 * we really do this?  Other processes might have suitable
 	 * credentials for the operation.
 	 */
+	cred = NULL;
 	sx_slock(&allproc_lock);
 	LIST_FOREACH(p, &allproc, p_list) {
 		PROC_LOCK(p);
-		if (p->p_tracep == vp) {
+		if (p->p_tracevp == vp) {
 			mtx_lock(&ktrace_mtx);
-			p->p_tracep = NULL;
+			p->p_tracevp = NULL;
 			p->p_traceflag = 0;
+			cred = p->p_tracecred;
+			p->p_tracecred = NULL;
 			mtx_unlock(&ktrace_mtx);
 			vrele_count++;
 		}
 		PROC_UNLOCK(p);
+		if (cred != NULL) {
+			crfree(cred);
+			cred = NULL;
+		}
 	}
 	sx_sunlock(&allproc_lock);
 	/*

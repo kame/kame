@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)disklabel.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/disklabel.h,v 1.95 2002/10/20 08:17:39 scottl Exp $
+ * $FreeBSD: src/sys/sys/disklabel.h,v 1.102 2003/05/02 22:46:13 phk Exp $
  */
 
 #ifndef _SYS_DISKLABEL_H_
@@ -298,60 +298,16 @@ static const char *fstypenames[] = {
 #define DIOCGDINFO	_IOR('d', 101, struct disklabel)/* get */
 #define DIOCSDINFO	_IOW('d', 102, struct disklabel)/* set */
 #define DIOCWDINFO	_IOW('d', 103, struct disklabel)/* set, update disk */
-
-#define DIOCWLABEL	_IOW('d', 109, int)	/* write en/disable label */
-
-#ifdef _KERNEL
+#define DIOCBSDBB	_IOW('d', 110, void *)	/* write bootblocks */
 
 /*
- * XXX encoding of disk minor numbers, should be elsewhere.
- *
- * See <sys/reboot.h> for a possibly better encoding.
- *
- * "cpio -H newc" can be used to back up device files with large minor
- * numbers (but not ones >= 2^31).  Old cpio formats and all tar formats
- * don't have enough bits, and cpio and tar don't notice the lossage.
- * There are also some sign extension bugs.
+ * Functions for proper encoding/decoding of struct disklabel into/from
+ * bytestring.
  */
-
-/*
-       3                   2                   1                   0
-     1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
-    _________________________________________________________________
-    | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |
-    -----------------------------------------------------------------
-    |    SPARE    |UNIT_2 | SLICE   |  MAJOR?       |  UNIT   |PART |
-    -----------------------------------------------------------------
-*/
-
-#define	DKMAXUNIT	0x1ff
-
-#define	dkmakeminor(unit, slice, part) \
-				(((slice) << 16) | (((unit) & 0x1e0) << 16) | \
-				(((unit) & 0x1f) << 3) | (part))
-#define	dkpart(dev)		(minor(dev) & 7)
-#define	dkslice(dev)		((minor(dev) >> 16) & 0x1f)
-#define	dksparebits(dev)       	((minor(dev) >> 25) & 0x7f)
-
-struct	bio;
-struct	bio_queue_head;
-
-int	bounds_check_with_label(struct bio *bp, struct disklabel *lp,
-	    int wlabel);
-dev_t	dkmodpart(dev_t dev, int part);
-dev_t	dkmodslice(dev_t dev, int slice);
-u_int	dkunit(dev_t dev);
-char	*readdisklabel(dev_t dev, struct disklabel *lp);
-int	setdisklabel(struct disklabel *olp, struct disklabel *nlp,
-	    u_long openmask);
-int	writedisklabel(dev_t dev, struct disklabel *lp);
-#ifdef __alpha__
-struct	buf;			
-void	alpha_fix_srm_checksum(struct buf *bp);
-#endif
-
-#endif /* _KERNEL */
-
+void bsd_partition_le_dec(u_char *ptr, struct partition *d);
+int bsd_disklabel_le_dec(u_char *ptr, struct disklabel *d, int maxpart);
+void bsd_partition_le_enc(u_char *ptr, struct partition *d);
+void bsd_disklabel_le_enc(u_char *ptr, struct disklabel *d);
 
 #ifndef _KERNEL
 __BEGIN_DECLS

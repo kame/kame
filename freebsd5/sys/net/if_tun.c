@@ -13,10 +13,13 @@
  * UCL. This driver is based much more on read/write/poll mode of
  * operation though.
  *
- * $FreeBSD: src/sys/net/if_tun.c,v 1.112 2002/11/15 00:00:15 sam Exp $
+ * $FreeBSD: src/sys/net/if_tun.c,v 1.125 2003/03/08 17:32:21 jlemon Exp $
  */
 
+#include "opt_atalk.h"
 #include "opt_inet.h"
+#include "opt_inet6.h"
+#include "opt_ipx.h"
 #include "opt_mac.h"
 
 #include <sys/param.h>
@@ -39,12 +42,13 @@
 #include <sys/vnode.h>
 #include <sys/malloc.h>
 #include <machine/bus.h>	/* XXX Shouldn't really be required ! */
+#include <sys/random.h>
 #include <sys/rman.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
+#include <net/netisr.h>
 #include <net/route.h>
-#include <net/intrq.h>
 #ifdef INET
 #include <netinet/in.h>
 #endif
@@ -81,19 +85,14 @@ static d_poll_t		tunpoll;
 
 #define CDEV_MAJOR 52
 static struct cdevsw tun_cdevsw = {
-	/* open */	tunopen,
-	/* close */	tunclose,
-	/* read */	tunread,
-	/* write */	tunwrite,
-	/* ioctl */	tunioctl,
-	/* poll */	tunpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	TUNNAME,
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	tunopen,
+	.d_close =	tunclose,
+	.d_read =	tunread,
+	.d_write =	tunwrite,
+	.d_ioctl =	tunioctl,
+	.d_poll =	tunpoll,
+	.d_name =	TUNNAME,
+	.d_maj =	CDEV_MAJOR,
 };
 
 static void
@@ -135,30 +134,22 @@ tunclone(void *arg, char *name, int namelen, dev_t *dev)
 }
 
 static int
-tunmodevent(module_t mod, int type, void *data) 
+tunmodevent(module_t mod, int type, void *data)
 {
 	static eventhandler_tag tag;
 	struct tun_softc *tp;
 	dev_t dev;
 	int err;
 
-	switch (type) { 
-	case MOD_LOAD: 
+	switch (type) {
+	case MOD_LOAD:
 		tag = EVENTHANDLER_REGISTER(dev_clone, tunclone, 0, 1000);
 		if (tag == NULL)
 			return (ENOMEM);
-		if (!devfs_present) {
-			err = cdevsw_add(&tun_cdevsw);
-			if (err != 0) {
-				EVENTHANDLER_DEREGISTER(dev_clone, tag);
-				return (err);
-			}
-		}
 		tununits.rm_type = RMAN_ARRAY;
 		tununits.rm_descr = "open if_tun units";
 		err = rman_init(&tununits);
 		if (err != 0) {
-			cdevsw_remove(&tun_cdevsw);
 			EVENTHANDLER_DEREGISTER(dev_clone, tag);
 			return (err);
 		}
@@ -167,12 +158,11 @@ tunmodevent(module_t mod, int type, void *data)
 			printf("%s: tununits: rman_manage_region: Failed %d\n",
 			    TUNNAME, err);
 			rman_fini(&tununits);
-			cdevsw_remove(&tun_cdevsw);
 			EVENTHANDLER_DEREGISTER(dev_clone, tag);
 			return (err);
 		}
-		break; 
-	case MOD_UNLOAD: 
+		break;
+	case MOD_UNLOAD:
 		err = rman_fini(&tununits);
 		if (err != 0)
 			return (err);
@@ -200,18 +190,16 @@ tunmodevent(module_t mod, int type, void *data)
 		if (tunbasedev != NOUDEV)
 			destroy_dev(udev2dev(tunbasedev, 0));
 
-		if (!devfs_present)
-			cdevsw_remove(&tun_cdevsw);
 		break;
-	} 
-	return 0; 
-} 
+	}
+	return 0;
+}
 
-static moduledata_t tun_mod = { 
-	"if_tun", 
-	tunmodevent, 
+static moduledata_t tun_mod = {
+	"if_tun",
+	tunmodevent,
 	0
-}; 
+};
 
 DECLARE_MODULE(if_tun, tun_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 
@@ -222,7 +210,7 @@ tunstart(struct ifnet *ifp)
 
 	if (tp->tun_flags & TUN_RWAIT) {
 		tp->tun_flags &= ~TUN_RWAIT;
-		wakeup((caddr_t)tp);
+		wakeup(tp);
 	}
 	if (tp->tun_flags & TUN_ASYNC && tp->tun_sigio)
 		pgsigio(&tp->tun_sigio, SIGIO, 0);
@@ -325,7 +313,7 @@ tunclose(dev_t dev, int foo, int bar, struct thread *td)
 	}
 
 	if (ifp->if_flags & IFF_RUNNING) {
-		register struct ifaddr *ifa;
+		struct ifaddr *ifa;
 
 		s = splimp();
 		/* find internet addresses and delete routes */
@@ -351,7 +339,7 @@ static int
 tuninit(struct ifnet *ifp)
 {
 	struct tun_softc *tp = ifp->if_softc;
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 	int error = 0;
 
 	TUNDEBUG("%s%d: tuninit\n", ifp->if_name, ifp->if_unit);
@@ -359,7 +347,7 @@ tuninit(struct ifnet *ifp)
 	ifp->if_flags |= IFF_UP | IFF_RUNNING;
 	getmicrotime(&ifp->if_lastchange);
 
-	for (ifa = TAILQ_FIRST(&ifp->if_addrhead); ifa; 
+	for (ifa = TAILQ_FIRST(&ifp->if_addrhead); ifa;
 	     ifa = TAILQ_NEXT(ifa, ifa_link)) {
 		if (ifa->ifa_addr == NULL)
 			error = EFAULT;
@@ -543,26 +531,26 @@ tunioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	int		s;
 	int		error;
 	struct tun_softc *tp = dev->si_drv1;
- 	struct tuninfo *tunp;
+	struct tuninfo *tunp;
 
 	switch (cmd) {
- 	case TUNSIFINFO:
- 		tunp = (struct tuninfo *)data;
+	case TUNSIFINFO:
+		tunp = (struct tuninfo *)data;
 		if (tunp->mtu < IF_MINMTU)
 			return (EINVAL);
- 		if (tp->tun_if.if_mtu != tunp->mtu
+		if (tp->tun_if.if_mtu != tunp->mtu
 		&& (error = suser(td)) != 0)
 			return (error);
- 		tp->tun_if.if_mtu = tunp->mtu;
- 		tp->tun_if.if_type = tunp->type;
- 		tp->tun_if.if_baudrate = tunp->baudrate;
- 		break;
- 	case TUNGIFINFO:
- 		tunp = (struct tuninfo *)data;
- 		tunp->mtu = tp->tun_if.if_mtu;
- 		tunp->type = tp->tun_if.if_type;
- 		tunp->baudrate = tp->tun_if.if_baudrate;
- 		break;
+		tp->tun_if.if_mtu = tunp->mtu;
+		tp->tun_if.if_type = tunp->type;
+		tp->tun_if.if_baudrate = tunp->baudrate;
+		break;
+	case TUNGIFINFO:
+		tunp = (struct tuninfo *)data;
+		tunp->mtu = tp->tun_if.if_mtu;
+		tunp->type = tp->tun_if.if_type;
+		tunp->baudrate = tp->tun_if.if_baudrate;
+		break;
 	case TUNSDEBUG:
 		tundebug = *(int *)data;
 		break;
@@ -580,7 +568,7 @@ tunioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 		if (*(int *)data) {
 			tp->tun_flags |= TUN_IFHEAD;
 			tp->tun_flags &= ~TUN_LMODE;
-		} else 
+		} else
 			tp->tun_flags &= ~TUN_IFHEAD;
 		break;
 	case TUNGIFHEAD:
@@ -617,7 +605,7 @@ tunioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 		s = splimp();
 		if (tp->tun_if.if_snd.ifq_head) {
 			struct mbuf *mb = tp->tun_if.if_snd.ifq_head;
-			for( *(int *)data = 0; mb != 0; mb = mb->m_next) 
+			for( *(int *)data = 0; mb != 0; mb = mb->m_next)
 				*(int *)data += mb->m_len;
 		} else
 			*(int *)data = 0;
@@ -675,7 +663,7 @@ tunread(dev_t dev, struct uio *uio, int flag)
 				return (EWOULDBLOCK);
 			}
 			tp->tun_flags |= TUN_RWAIT;
-			if((error = tsleep((caddr_t)tp, PCATCH | (PZERO + 1),
+			if((error = tsleep(tp, PCATCH | (PZERO + 1),
 					"tunread", 0)) != 0) {
 				splx(s);
 				return (error);
@@ -687,7 +675,7 @@ tunread(dev_t dev, struct uio *uio, int flag)
 	while (m && uio->uio_resid > 0 && error == 0) {
 		len = min(uio->uio_resid, m->m_len);
 		if (len != 0)
-			error = uiomove(mtod(m, caddr_t), len, uio);
+			error = uiomove(mtod(m, void *), len, uio);
 		m = m_free(m);
 	}
 
@@ -709,6 +697,7 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 	struct mbuf	*top, **mp, *m;
 	int		error=0, tlen, mlen;
 	uint32_t	family;
+	int 		isr;
 
 	TUNDEBUG("%s%d: tunwrite\n", ifp->if_name, ifp->if_unit);
 
@@ -736,7 +725,7 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 	mp = &top;
 	while (error == 0 && uio->uio_resid > 0) {
 		m->m_len = min(mlen, uio->uio_resid);
-		error = uiomove(mtod (m, caddr_t), m->m_len, uio);
+		error = uiomove(mtod(m, void *), m->m_len, uio);
 		*mp = m;
 		mp = &m->m_next;
 		if (uio->uio_resid > 0) {
@@ -803,10 +792,38 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 	} else
 		family = AF_INET;
 
+	switch (family) {
+#ifdef INET
+	case AF_INET:
+		isr = NETISR_IP;
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		isr = NETISR_IPV6;
+		break;
+#endif
+#ifdef IPX
+	case AF_IPX:
+		isr = NETISR_IPX;
+		break;
+#endif
+#ifdef NETATALK
+	case AF_APPLETALK:
+		isr = NETISR_ATALK2;
+		break;
+#endif
+	default:
+		m_freem(m);
+		return (EAFNOSUPPORT);
+	}
+	/* First chunk of an mbuf contains good junk */
+	if (harvest.point_to_point)
+		random_harvest(m, 16, 3, 0, RANDOM_NET);
 	ifp->if_ibytes += top->m_pkthdr.len;
 	ifp->if_ipackets++;
-
-	return (family_enqueue(family, top));
+	netisr_dispatch(isr, top);
+	return (0);
 }
 
 /*

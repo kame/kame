@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_cb.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/raw_cb.c,v 1.22 2002/11/20 19:00:53 luigi Exp $
+ * $FreeBSD: src/sys/net/raw_cb.c,v 1.25 2003/02/19 05:47:29 imp Exp $
  */
 
 #include <sys/param.h>
@@ -139,7 +139,7 @@ raw_bind(so, nam)
 	if (ifnet == 0)
 		return (EADDRNOTAVAIL);
 	rp = sotorawcb(so);
-	nam = m_copym(nam, 0, M_COPYALL, M_WAITOK);
+	nam = m_copym(nam, 0, M_COPYALL, M_TRYWAIT);
 	rp->rcb_laddr = mtod(nam, struct sockaddr *);
 	return (0);
 }

@@ -33,12 +33,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/istallion.c,v 1.46 2002/04/01 21:30:42 jhb Exp $
+ * $FreeBSD: src/sys/i386/isa/istallion.c,v 1.51 2003/03/05 08:16:29 das Exp $
  */
 
 /*****************************************************************************/
 
 #include "opt_compat.h"
+#include "opt_tty.h"
 
 #define	TTYDEFCHARS	1
 
@@ -642,20 +643,16 @@ COMPAT_ISA_DRIVER(stli, stlidriver);
 
 #define	CDEV_MAJOR	75
 static struct cdevsw stli_cdevsw = {
-	/* open */	stliopen,
-	/* close */	stliclose,
-	/* read */	stliread,
-	/* write */	stliwrite,
-	/* ioctl */	stliioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	stli_drvname,
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	stliopen,
+	.d_close =	stliclose,
+	.d_read =	stliread,
+	.d_write =	stliwrite,
+	.d_ioctl =	stliioctl,
+	.d_poll =	ttypoll,
+	.d_name =	stli_drvname,
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 #endif
@@ -815,10 +812,6 @@ static int stliprobe(struct isa_device *idp)
 {
 	stlibrd_t	*brdp;
 	int		btype, bclass;
-	static int once;
-
-	if (!once++)
-		cdevsw_add(&stli_cdevsw);
 
 #if DEBUG
 	printf("stliprobe(idp=%x): unit=%d iobase=%x flags=%x\n", (int) idp,
@@ -919,6 +912,9 @@ static int stliattach(struct isa_device *idp)
 		return(0);
 	if (brdp->state & BST_FOUND)
 		stli_brdattach(brdp);
+	if (0) {
+		make_dev(&stli_cdevsw, 0, 0, 0, 0, "istallion_is_broken");
+	}
 	return(1);
 }
 
@@ -3745,7 +3741,7 @@ static int stli_clrportstats(stliport_t *portp, caddr_t data)
 /*****************************************************************************/
 
 /*
- *	Code to handle an "staliomem" read and write operations. This device
+ *	Code to handle a "staliomem" read and write operations. This device
  *	is the contents of the board shared memory. It is used for down
  *	loading the slave image (and debugging :-)
  */

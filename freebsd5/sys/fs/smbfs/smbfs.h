@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs.h,v 1.5 2002/09/18 09:27:04 bp Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs.h,v 1.8 2003/02/08 05:48:04 tjr Exp $
  */
 #ifndef _SMBFS_SMBFS_H_
 #define _SMBFS_SMBFS_H_
@@ -89,6 +89,7 @@ struct smbmount {
 	struct lock		sm_hashlock;
 	LIST_HEAD(smbnode_hashhead, smbnode) *sm_hash;
 	u_long			sm_hashlen;
+	int			sm_didrele;
 };
 
 #define VFSTOSMBFS(mp)		((struct smbmount *)((mp)->mnt_data))

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/sysmouse.c,v 1.13 2002/04/01 21:30:35 jhb Exp $
+ * $FreeBSD: src/sys/dev/syscons/sysmouse.c,v 1.14 2003/03/03 12:15:47 phk Exp $
  */
 
 #include "opt_syscons.h"
@@ -48,19 +48,14 @@ static d_close_t	smclose;
 static d_ioctl_t	smioctl;
 
 static struct cdevsw sm_cdevsw = {
-	/* open */	smopen,
-	/* close */	smclose,
-	/* read */	ttyread,
-	/* write */	nowrite,
-	/* ioctl */	smioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"sysmouse",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY,
+	.d_open =	smopen,
+	.d_close =	smclose,
+	.d_read =	ttyread,
+	.d_ioctl =	smioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"sysmouse",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
 };
 
 /* local variables */

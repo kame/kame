@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_xenix.c,v 1.28.2.1 2002/12/19 09:40:08 alfred Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_xenix.c,v 1.32 2003/02/03 19:49:34 phk Exp $
  */
 
 #include <sys/param.h>
@@ -120,8 +120,8 @@ xenix_ftime(td, uap)
 	microtime(&tv);
 	itb.time = tv.tv_sec;
 	itb.millitm = (tv.tv_usec / 1000);
-	itb.timezone = tz.tz_minuteswest;
-	itb.dstflag = tz.tz_dsttime != DST_NONE;
+	itb.timezone = tz_minuteswest;
+	itb.dstflag = tz_dsttime != DST_NONE;
 
 	return copyout((caddr_t)&itb, (caddr_t)uap->tp,
 		       sizeof(struct ibcs2_timeb));

@@ -42,39 +42,32 @@
  *	@(#)sun_disklabel.h	8.1 (Berkeley) 6/11/93
  *	$NetBSD: disklabel.h,v 1.2 1998/08/22 14:55:28 mrg Exp $
  *
- * $FreeBSD: src/sys/sys/sun_disklabel.h,v 1.3 2002/10/29 06:43:57 phk Exp $ 
+ * $FreeBSD: src/sys/sys/sun_disklabel.h,v 1.7 2003/04/23 08:04:30 phk Exp $ 
  */
 
+#ifndef _SYS_SUN_DISKLABEL_H_
+#define	_SYS_SUN_DISKLABEL_H_
+
 /*
- * SunOS disk label layout (only relevant portions discovered here).
+ * SunOS/Solaris disk label layout (partial).
+ * 
+ * Suns disk label format contains a lot of historical baggage which we 
+ * ignore entirely.  The structure below contains the relevant bits and the
+ * _enc/_dec functions encode/decode only these fields.
  */
 
 #define	SUN_DKMAGIC	55998
-
-/* geometry info */
-struct sun_dkgeom {
-	u_short	sdkc_ncylinders;	/* data cylinders */
-	u_short	sdkc_acylinders;	/* alternate cylinders */
-	u_short	sdkc_xxx1;
-	u_short	sdkc_ntracks;		/* tracks per cylinder */
-	u_short	sdkc_xxx2;
-	u_short	sdkc_nsectors;		/* sectors per track */
-	u_short	sdkc_interleave;	/* interleave factor */
-	u_short	sdkc_xxx3;
-	u_short	sdkc_xxx4;
-	u_short	sdkc_sparespercyl;	/* spare sectors per cylinder */
-	u_short	sdkc_rpm;		/* rotational speed */
-	u_short	sdkc_pcylinders;	/* physical cylinders */
-	u_short	sdkc_xxx5[7];
-};
-
-/* controller info */
-struct sun_dkctlr {
-	int	sdkc_addr;		/* controller address */
-	short	sdkc_unit;		/* unit (slave) address */
-	short	sdkc_type;		/* controller type */
-	short	sdkc_flags;		/* flags */
-};
+#define	SUN_NPART	8
+#define	SUN_RAWPART	2
+#define	SUN_SIZE	512
+/*
+ * XXX: I am actually not sure if this should be "16 sectors" or "8192 bytes".
+ * XXX: Considering that Sun went to the effort of getting 512 byte compatible
+ * XXX: CDROM drives produced my guess is that Sun computers stand little or
+ * XXX: even no chance of running, much less booting on !=512 byte media.
+ * XXX: Define this is in terms of bytes since that is easier for us.
+ */
+#define	SUN_BOOTSIZE	8192
 
 /* partition info */
 struct sun_dkpart {
@@ -82,24 +75,21 @@ struct sun_dkpart {
 	u_int32_t	sdkp_nsectors;		/* number of sectors */
 };
 
-struct sun_disklabel {			/* total size = 512 bytes */
+struct sun_disklabel {
 	char		sl_text[128];
-	char		sl_xxx1[292];
-	u_int16_t	sl_rpm;		/* rotational speed */
+	u_int16_t	sl_rpm;			/* rotational speed */
 	u_int16_t	sl_pcylinders;		/* number of physical cyls */
 	u_int16_t	sl_sparespercyl;	/* spare sectors per cylinder */
-	char		sl_xxx3[4];
 	u_int16_t	sl_interleave;		/* interleave factor */
 	u_int16_t	sl_ncylinders;		/* data cylinders */
 	u_int16_t	sl_acylinders;		/* alternate cylinders */
 	u_int16_t	sl_ntracks;		/* tracks per cylinder */
 	u_int16_t	sl_nsectors;		/* sectors per track */
-	char		sl_xxx4[4];
-	struct sun_dkpart sl_part[8];	/* partition layout */
+	struct sun_dkpart sl_part[SUN_NPART];	/* partition layout */
 	u_int16_t	sl_magic;		/* == SUN_DKMAGIC */
-	u_int16_t	sl_cksum;		/* xor checksum of all shorts */
 };
 
-#ifdef CTASSERT
-CTASSERT(sizeof (struct sun_disklabel) == 512);
-#endif
+int sunlabel_dec(void const *pp, struct sun_disklabel *sl);
+void sunlabel_enc(void *pp, struct sun_disklabel *sl);
+
+#endif /* _SYS_SUN_DISKLABEL_H_ */

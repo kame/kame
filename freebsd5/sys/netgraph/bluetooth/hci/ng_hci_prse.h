@@ -25,8 +25,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ng_hci_prse.h,v 1.9 2002/11/12 22:35:40 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_prse.h,v 1.1 2002/11/20 23:01:56 julian Exp $
+ * $Id: ng_hci_prse.h,v 1.2 2003/03/18 00:09:36 max Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_prse.h,v 1.2 2003/05/10 21:44:40 julian Exp $
  */
 
 /***************************************************************************
@@ -193,6 +193,20 @@ static const struct ng_cmdlist	ng_hci_cmdlist[] = {
 		NGM_HCI_COOKIE,
 		NGM_HCI_NODE_SET_PACKET_MASK,
 		"set_pkt_mask",
+		&ng_parse_uint16_type,
+		NULL
+	},
+	{
+		NGM_HCI_COOKIE,
+		NGM_HCI_NODE_GET_ROLE_SWITCH,
+		"get_role_sw",
+		NULL,
+		&ng_parse_uint16_type
+	},
+	{
+		NGM_HCI_COOKIE,
+		NGM_HCI_NODE_SET_ROLE_SWITCH,
+		"set_role_sw",
 		&ng_parse_uint16_type,
 		NULL
 	},

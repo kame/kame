@@ -1,5 +1,5 @@
 /*	$NetBSD: pcmcia.c,v 1.23 2000/07/28 19:17:02 drochner Exp $	*/
-/* $FreeBSD: src/sys/dev/pccard/pccard.c,v 1.70 2002/11/14 14:02:32 mux Exp $ */
+/* $FreeBSD: src/sys/dev/pccard/pccard.c,v 1.79 2003/04/10 04:11:15 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -148,6 +148,23 @@ pccard_ccr_write(struct pccard_function *pf, int ccr, int val)
 }
 
 static int
+pccard_set_default_descr(device_t dev)
+{
+	char *vendorstr, *prodstr, *str;
+
+	if (pccard_get_vendor_str(dev, &vendorstr))
+		return (0);
+	if (pccard_get_product_str(dev, &prodstr))
+		return (0);
+	str = malloc(strlen(vendorstr) + strlen(prodstr) + 2, M_DEVBUF,
+	    M_WAITOK);
+	sprintf(str, "%s %s", vendorstr, prodstr);
+	device_set_desc_copy(dev, str);
+	free(str, M_DEVBUF);
+	return (0);
+}
+
+static int
 pccard_attach_card(device_t dev)
 {
 	struct pccard_softc *sc = PCCARD_SOFTC(dev);
@@ -241,6 +258,7 @@ pccard_attach_card(device_t dev)
 		if (sc->sc_enabled_count == 0)
 			POWER_ENABLE_SOCKET(device_get_parent(dev), dev);
 		if (pccard_function_enable(pf) == 0 &&
+		    pccard_set_default_descr(child) == 0 &&
 		    device_probe_and_attach(child) == 0) {
 			DEVPRINTF((sc->dev, "function %d CCR at %d "
 			    "offset %x: %x %x %x %x, %x %x %x %x, %x\n",
@@ -295,8 +313,8 @@ pccard_detach_card(device_t dev)
 
 static const struct pccard_product *
 pccard_do_product_lookup(device_t bus, device_t dev,
-			 const struct pccard_product *tab, size_t ent_size,
-			 pccard_product_match_fn matchfn)
+    const struct pccard_product *tab, size_t ent_size,
+    pccard_product_match_fn matchfn)
 {
 	const struct pccard_product *ent;
 	int matches;
@@ -308,8 +326,8 @@ pccard_do_product_lookup(device_t bus, device_t dev,
 
 #ifdef DIAGNOSTIC
 	if (sizeof *ent > ent_size)
-		panic("pccard_product_lookup: bogus ent_size %ld",
-		    (long) ent_size);
+		panic("pccard_product_lookup: bogus ent_size %jd",
+		    (intmax_t) ent_size);
 #endif
 	if (pccard_get_vendor(dev, &vendor))
 		return (NULL);
@@ -321,16 +339,17 @@ pccard_do_product_lookup(device_t bus, device_t dev,
 		return (NULL);
 	if (pccard_get_product_str(dev, &prodstr))
 		return (NULL);
-	for (ent = tab; ent->pp_name != NULL; ent =
+	for (ent = tab; ent->pp_vendor != 0; ent =
 	    (const struct pccard_product *) ((const char *) ent + ent_size)) {
 		matches = 1;
 		if (ent->pp_vendor == PCCARD_VENDOR_ANY &&
-		    ent->pp_product == PCCARD_VENDOR_ANY &&
+		    ent->pp_product == PCCARD_PRODUCT_ANY &&
 		    ent->pp_cis[0] == NULL &&
 		    ent->pp_cis[1] == NULL) {
-			device_printf(dev,
-			    "Total wildcard entry ignored for %s\n",
-			    ent->pp_name);
+			if (ent->pp_name)
+				device_printf(dev,
+				    "Total wildcard entry ignored for %s\n",
+				    ent->pp_name);
 			continue;
 		}
 		if (matches && ent->pp_vendor != PCCARD_VENDOR_ANY &&
@@ -511,7 +530,7 @@ pccard_function_free(struct pccard_function *pf)
 
 	SLIST_FOREACH(rle, &devi->resources, link) {
 		if (rle->res) {
-			if (rle->res->r_dev != pf->sc->dev)
+			if (rman_get_device(rle->res) != pf->sc->dev)
 				device_printf(pf->sc->dev,
 				    "function_free: Resource still owned by "
 				    "child, oops. "
@@ -519,7 +538,7 @@ pccard_function_free(struct pccard_function *pf)
 				    rle->type, rle->rid,
 				    rman_get_start(rle->res));
 			BUS_RELEASE_RESOURCE(device_get_parent(pf->sc->dev),
-			    rle->res->r_dev, rle->type, rle->rid, rle->res);
+			    pf->sc->dev, rle->type, rle->rid, rle->res);
 			rle->res = NULL;
 		}
 	}
@@ -1084,7 +1103,7 @@ pccard_alloc_resource(device_t dev, device_t child, int type, int *rid,
 		}
 		return (rle->res);
 	}
-	if (rle->res->r_dev != dev)
+	if (rman_get_device(rle->res) != dev)
 		return (NULL);
 	bus_release_resource(dev, type, *rid, rle->res);
 	rle->res = NULL;

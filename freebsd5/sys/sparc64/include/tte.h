@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from: BSDI: pmap.v9.h,v 1.10.2.6 1999/08/23 22:18:44 cp Exp
- * $FreeBSD: src/sys/sparc64/include/tte.h,v 1.13 2002/08/18 02:09:26 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/tte.h,v 1.16 2003/03/27 02:16:31 jake Exp $
  */
 
 #ifndef	_MACHINE_TTE_H_
@@ -68,6 +68,8 @@
 #define	TD_NFO		(1UL << 60)
 #define	TD_IE		(1UL << 59)
 #define	TD_PA(pa)	((pa) & (TD_PA_MASK << TD_PA_SHIFT))
+/* NOTE: bit 6 of TD_SOFT will be sign-extended if used as an immediate. */
+#define	TD_FAKE		((1UL << 5) << TD_SOFT_SHIFT)
 #define	TD_EXEC		((1UL << 4) << TD_SOFT_SHIFT)
 #define	TD_REF		((1UL << 3) << TD_SOFT_SHIFT)
 #define	TD_PV		((1UL << 2) << TD_SOFT_SHIFT)
@@ -104,17 +106,18 @@
 #define	TTE_GET_VA(tp) \
 	(TTE_GET_VPN(tp) << TTE_GET_PAGE_SHIFT(tp))
 #define	TTE_GET_PMAP(tp) \
-	((tp)->tte_pmap)
+	(((tp)->tte_data & TD_P) != 0 ? \
+	 (kernel_pmap) : \
+	 (PHYS_TO_VM_PAGE(pmap_kextract((vm_offset_t)(tp)))->md.pmap))
 #define	TTE_ZERO(tp) \
-	bzero(tp, sizeof(*tp))
+	memset(tp, 0, sizeof(*tp))
 
 struct pmap;
 
 struct tte {
 	u_long	tte_vpn;
 	u_long	tte_data;
-	STAILQ_ENTRY(tte) tte_link;
-	struct	pmap *tte_pmap;
+	TAILQ_ENTRY(tte) tte_link;
 };
 
 static __inline int

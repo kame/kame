@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: Id: machdep.c,v 1.193 1996/06/18 01:22:04 bde Exp
- * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.108 2002/09/04 19:43:21 phk Exp $
+ * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.122 2003/04/30 12:23:58 markm Exp $
  */
 
 #include "opt_cpu.h"
@@ -77,15 +77,16 @@ void panicifcpuunsupported(void);
 
 static void identifycyrix(void);
 #if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
-static void print_AMD_features(u_int *regs);
+static void print_AMD_features(void);
 #endif
-static void print_AMD_info(u_int amd_maxregs);
+static void print_AMD_info(void);
 static void print_AMD_assoc(int i);
 static void print_transmeta_info(void);
 static void setup_tmx86_longrun(void);
 
+int	cpu_class;
+u_int	cpu_exthigh;		/* Highest arg to extended CPUID */
 u_int	cyrix_did;		/* Device ID of Cyrix CPU */
-int cpu_class = CPUCLASS_386;	/* least common denominator */
 char machine[] = "i386";
 SYSCTL_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD, 
     machine, 0, "Machine class");
@@ -93,6 +94,28 @@ SYSCTL_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD,
 static char cpu_model[128];
 SYSCTL_STRING(_hw, HW_MODEL, model, CTLFLAG_RD, 
     cpu_model, 0, "Machine model");
+
+static int hw_clockrate;
+SYSCTL_INT(_hw, OID_AUTO, clockrate, CTLFLAG_RD, 
+    &hw_clockrate, 0, "CPU instruction clock rate");
+
+#if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
+static char cpu_brand[48];
+
+#define	MAX_BRAND_INDEX	8
+
+static const char *cpu_brandtable[MAX_BRAND_INDEX + 1] = {
+	NULL,			/* No brand */
+	"Intel Celeron",
+	"Intel Pentium III",
+	"Intel Pentium III Xeon",
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	"Intel Pentium 4"
+};
+#endif
 
 static struct cpu_nameclass i386_cpus[] = {
 	{ "Intel 80286",	CPUCLASS_286 },		/* CPU_286   */
@@ -122,16 +145,39 @@ void
 printcpuinfo(void)
 {
 #if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
-	u_int regs[4];
+	u_int regs[4], i;
+	char *brand;
 #endif
-	u_int nreg = 0;
+
 	cpu_class = i386_cpus[cpu].cpu_class;
 	printf("CPU: ");
-	strncpy(cpu_model, i386_cpus[cpu].cpu_name, sizeof cpu_model);
+	strncpy(cpu_model, i386_cpus[cpu].cpu_name, sizeof (cpu_model));
 
 #if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
-	if (strcmp(cpu_vendor,"GenuineIntel") == 0) {
+	/* Check for extended CPUID information and a processor name. */
+	if (cpu_high > 0 &&
+	    (strcmp(cpu_vendor, "GenuineIntel") == 0 ||
+	    strcmp(cpu_vendor, "AuthenticAMD") == 0 ||
+	    strcmp(cpu_vendor, "GenuineTMx86") == 0 ||
+	    strcmp(cpu_vendor, "TransmetaCPU") == 0)) {
+		do_cpuid(0x80000000, regs);
+		if (regs[0] >= 0x80000000) {
+			cpu_exthigh = regs[0];
+			if (cpu_exthigh >= 0x80000004) {
+				brand = cpu_brand;
+				for (i = 0x80000002; i < 0x80000005; i++) {
+					do_cpuid(i, regs);
+					memcpy(brand, regs, sizeof(regs));
+					brand += sizeof(regs);
+				}
+			}
+		}
+	}
+
+	if (strcmp(cpu_vendor, "GenuineIntel") == 0) {
 		if ((cpu_id & 0xf00) > 0x300) {
+			u_int brand_index;
+
 			cpu_model[0] = '\0';
 
 			switch (cpu_id & 0x3000) {
@@ -249,8 +295,19 @@ printcpuinfo(void)
 				break;
 			}
 
+			/*
+			 * If we didn't get a brand name from the extended
+			 * CPUID, try to look it up in the brand table.
+			 */
+			if (cpu_high > 0 && *cpu_brand == '\0') {
+				brand_index = cpu_procinfo & CPUID_BRAND_INDEX;
+				if (brand_index <= MAX_BRAND_INDEX &&
+				    cpu_brandtable[brand_index] != NULL)
+					strcpy(cpu_brand,
+					    cpu_brandtable[brand_index]);
+			}
 		}
-	} else if (strcmp(cpu_vendor,"AuthenticAMD") == 0) {
+	} else if (strcmp(cpu_vendor, "AuthenticAMD") == 0) {
 		/*
 		 * Values taken from AMD Processor Recognition
 		 * http://www.amd.com/K6/k6docs/pdf/20734g.pdf
@@ -322,17 +379,7 @@ printcpuinfo(void)
 				enable_K6_wt_alloc();
 		}
 #endif
-		do_cpuid(0x80000000, regs);
-		nreg = regs[0];
-		if (nreg >= 0x80000004) {
-			do_cpuid(0x80000002, regs);
-			memcpy(cpu_model, regs, sizeof regs);
-			do_cpuid(0x80000003, regs);
-			memcpy(cpu_model+16, regs, sizeof regs);
-			do_cpuid(0x80000004, regs);
-			memcpy(cpu_model+32, regs, sizeof regs);
-		}
-	} else if (strcmp(cpu_vendor,"CyrixInstead") == 0) {
+	} else if (strcmp(cpu_vendor, "CyrixInstead") == 0) {
 		strcpy(cpu_model, "Cyrix ");
 		switch (cpu_id & 0xff0) {
 		case 0x440:
@@ -493,20 +540,18 @@ printcpuinfo(void)
 		}
 	} else if (strcmp(cpu_vendor, "IBM") == 0) {
 		strcpy(cpu_model, "Blue Lightning CPU");
-	} else if (strcmp(cpu_vendor, "GenuineTMx86") == 0 ||
-		   strcmp(cpu_vendor, "TransmetaCPU") == 0) {
-		do_cpuid(0x80000000, regs);
-		nreg = regs[0];
-		if (nreg >= 0x80000004) {
-			do_cpuid(0x80000002, regs);
-			memcpy(cpu_model, regs, sizeof regs);
-			do_cpuid(0x80000003, regs);
-			memcpy(cpu_model+16, regs, sizeof regs);
-			do_cpuid(0x80000004, regs);
-			memcpy(cpu_model+32, regs, sizeof regs);
-		}
-		cpu_model[64] = '\0';
 	}
+
+	/*
+	 * Replace cpu_model with cpu_brand minus leading spaces if
+	 * we have one.
+	 */
+	brand = cpu_brand;
+	while (*brand == ' ')
+		++brand;
+	if (*brand != '\0')
+		strcpy(cpu_model, brand);
+
 #endif
 
 	printf("%s (", cpu_model);
@@ -522,22 +567,24 @@ printcpuinfo(void)
 #if defined(I486_CPU)
 	case CPUCLASS_486:
 		printf("486");
-		bzero = i486_bzero;
+		bzero_vector = i486_bzero;
 		break;
 #endif
 #if defined(I586_CPU)
 	case CPUCLASS_586:
-		printf("%d.%02d-MHz ",
-		       (tsc_freq + 4999) / 1000000,
-		       ((tsc_freq + 4999) / 10000) % 100);
+		hw_clockrate = (tsc_freq + 5000) / 1000000;
+		printf("%jd.%02d-MHz ",
+		       (intmax_t)(tsc_freq + 4999) / 1000000,
+		       (u_int)((tsc_freq + 4999) / 10000) % 100);
 		printf("586");
 		break;
 #endif
 #if defined(I686_CPU)
 	case CPUCLASS_686:
-		printf("%d.%02d-MHz ",
-		       (tsc_freq + 4999) / 1000000,
-		       ((tsc_freq + 4999) / 10000) % 100);
+		hw_clockrate = (tsc_freq + 5000) / 1000000;
+		printf("%jd.%02d-MHz ",
+		       (intmax_t)(tsc_freq + 4999) / 1000000,
+		       (u_int)((tsc_freq + 4999) / 10000) % 100);
 		printf("686");
 		break;
 #endif
@@ -602,12 +649,21 @@ printcpuinfo(void)
 			"\035HTT"	/* Hyperthreading (see EBX bit 16-23) */
 			"\036TM"	/* Thermal Monitor clock slowdown */
 			"\037IA64"	/* CPU can execute IA64 instructions */
-			"\040<b31>"
+			"\040PBE"	/* Pending Break Enable */
 			);
+
+			/*
+			 * If this CPU supports hyperthreading then mention
+			 * the number of logical CPU's it contains.
+			 */
+			if (cpu_feature & CPUID_HTT &&
+			    (cpu_procinfo & CPUID_HTT_CORES) >> 16 > 1)
+				printf("\n  Hyperthreading: %d logical CPUs",
+				    (cpu_procinfo & CPUID_HTT_CORES) >> 16);
 		}
 		if (strcmp(cpu_vendor, "AuthenticAMD") == 0 &&
-		    nreg >= 0x80000001)
-			print_AMD_features(regs);
+		    cpu_exthigh >= 0x80000001)
+			print_AMD_features();
 	} else if (strcmp(cpu_vendor, "CyrixInstead") == 0) {
 		printf("  DIR=0x%04x", cyrix_did);
 		printf("  Stepping=%u", (cyrix_did & 0xf000) >> 12);
@@ -631,7 +687,7 @@ printcpuinfo(void)
 		return;
 
 	if (strcmp(cpu_vendor, "AuthenticAMD") == 0)
-		print_AMD_info(nreg);
+		print_AMD_info();
 	else if (strcmp(cpu_vendor, "GenuineTMx86") == 0 ||
 		 strcmp(cpu_vendor, "TransmetaCPU") == 0)
 		print_transmeta_info();
@@ -649,9 +705,12 @@ void
 panicifcpuunsupported(void)
 {
 
+#if !defined(lint)
 #if !defined(I386_CPU) && !defined(I486_CPU) && !defined(I586_CPU) && !defined(I686_CPU)
 #error This kernel is not configured for one of the supported CPUs
 #endif
+#else /* lint */
+#endif /* lint */
 #if defined(I386_CPU) && (defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU))
 #error I386_CPU is mutually exclusive with the other cpu types.
 #endif
@@ -690,6 +749,7 @@ static	volatile u_int trap_by_rdmsr;
  * be advanced.
  */
 inthand_t	bluetrap6;
+#ifdef __GNUC__
 __asm
 ("									\
 	.text;								\
@@ -701,12 +761,14 @@ __asm
 	addl	$2, (%esp);	/* rdmsr is a 2-byte instruction */	\
 	iret								\
 ");
+#endif
 
 /*
  * Special exception 13 handler.
  * Accessing non-existent MSR generates general protection fault.
  */
 inthand_t	bluetrap13;
+#ifdef __GNUC__
 __asm
 ("									\
 	.text;								\
@@ -719,6 +781,7 @@ __asm
 	addl	$2, (%esp);	/* rdmsr is a 2-bytes instruction. */	\
 	iret;								\
 ");
+#endif
 
 /*
  * Distinguish IBM Blue Lightning CPU from Cyrix CPUs that does not
@@ -903,21 +966,6 @@ finishidentcpu(void)
 	}
 }
 
-/*
- * This routine is called specifically to set up cpu_class before
- * startrtclock() uses it.  Probably this should be rearranged so that
- * startrtclock() doesn't need to run until after identifycpu() has been
- * called.  Another alternative formulation would be for this routine
- * to do all the identification work, and make identifycpu() into a
- * printing-only routine.
- */
-void
-earlysetcpuclass(void)
-{
-
-	cpu_class = i386_cpus[cpu].cpu_class;
-}
-
 static void
 print_AMD_assoc(int i)
 {
@@ -928,11 +976,11 @@ print_AMD_assoc(int i)
 }
 
 static void
-print_AMD_info(u_int amd_maxregs)
+print_AMD_info(void)
 {
 	quad_t amd_whcr;
 
-	if (amd_maxregs >= 0x80000005) {
+	if (cpu_exthigh >= 0x80000005) {
 		u_int regs[4];
 
 		do_cpuid(0x80000005, regs);
@@ -948,7 +996,7 @@ print_AMD_info(u_int amd_maxregs)
 		printf(", %d bytes/line", regs[3] & 0xff);
 		printf(", %d lines/tag", (regs[3] >> 8) & 0xff);
 		print_AMD_assoc((regs[3] >> 16) & 0xff);
-		if (amd_maxregs >= 0x80000006) {	/* K6-III only */
+		if (cpu_exthigh >= 0x80000006) {	/* K6-III only */
 			do_cpuid(0x80000006, regs);
 			printf("L2 internal cache: %d kbytes", regs[2] >> 16);
 			printf(", %d bytes/line", regs[2] & 0xff);
@@ -989,8 +1037,10 @@ print_AMD_info(u_int amd_maxregs)
 
 #if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
 static void
-print_AMD_features(u_int *regs)
+print_AMD_features(void)
 {
+	u_int regs[4];
+
 	/*
 	 * Values taken from AMD Processor Recognition
 	 * http://www.amd.com/products/cpg/athlon/techdocs/pdf/20734.pdf
@@ -1057,7 +1107,7 @@ union msrinfo {
 	u_int32_t	regs[2];
 };
 
-u_int32_t longrun_modes[LONGRUN_MODE_MAX][3] = {
+static u_int32_t longrun_modes[LONGRUN_MODE_MAX][3] = {
 	/*  MSR low, MSR high, flags bit0 */
 	{	  0,	  0,		0},	/* LONGRUN_MODE_MINFREQUENCY */
 	{	  0,	100,		0},	/* LONGRUN_MODE_ECONOMY */

@@ -1,5 +1,5 @@
 /*	$NetBSD: usbdi_util.h,v 1.23 2001/10/26 17:58:22 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi_util.h,v 1.14 2002/04/07 17:13:00 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi_util.h,v 1.15 2003/02/28 19:28:29 jhay Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -77,6 +77,10 @@ usbd_status usbd_set_config_no(usbd_device_handle dev, int no, int msg);
 usbd_status usbd_set_config_index(usbd_device_handle dev, int index, int msg);
 
 usbd_status usbd_bulk_transfer(usbd_xfer_handle xfer, usbd_pipe_handle pipe,
+			       u_int16_t flags, u_int32_t timeout, void *buf,
+			       u_int32_t *size, char *lbl);
+
+usbd_status usbd_intr_transfer(usbd_xfer_handle xfer, usbd_pipe_handle pipe,
 			       u_int16_t flags, u_int32_t timeout, void *buf,
 			       u_int32_t *size, char *lbl);
 

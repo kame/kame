@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.183 2002/09/07 22:11:45 peter Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.193 2003/04/04 17:29:55 des Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -46,6 +46,7 @@
 #include <machine/cpufunc.h>
 #include <sys/callout.h>
 #include <sys/queue.h>
+#include <sys/stdint.h>		/* for people using printf mainly */
 
 extern int securelevel;		/* system security level (see init(8)) */
 extern int suser_enabled;	/* suser() is permitted to return 0 */
@@ -81,9 +82,11 @@ extern int maxusers;		/* system tune hint */
 #define	KASSERT(exp,msg)
 #endif
 
+#ifndef CTASSERT		/* Allow lint to override */
 #define	CTASSERT(x)		_CTASSERT(x, __LINE__)
 #define	_CTASSERT(x, y)		__CTASSERT(x, y)
 #define	__CTASSERT(x, y)	typedef char __assert ## y[(x) ? 1 : -1]
+#endif
 
 /*
  * XXX the hints declarations are even more misplaced than most declarations
@@ -135,6 +138,7 @@ void	panic(const char *, ...) __printflike(1, 2);
 void	panic(const char *, ...) __dead2 __printflike(1, 2);
 #endif
 
+void	backtrace(void);
 void	cpu_boot(int);
 void	cpu_rootconf(void);
 extern uint32_t crc32_tab[];
@@ -154,6 +158,7 @@ int	sprintf(char *buf, const char *, ...) __printflike(2, 3);
 int	uprintf(const char *, ...) __printflike(1, 2);
 int	vprintf(const char *, __va_list) __printflike(1, 0);
 int	vsnprintf(char *, size_t, const char *, __va_list) __printflike(3, 0);
+int	vsnrprintf(char *, size_t, int, const char *, __va_list) __printflike(4, 0); 
 int	vsprintf(char *buf, const char *, __va_list) __printflike(2, 0);
 int	ttyprintf(struct tty *, const char *, ...) __printflike(2, 3);
 int	sscanf(const char *, char const *, ...);
@@ -164,14 +169,9 @@ quad_t	strtoq(const char *, char **, int);
 u_quad_t strtouq(const char *, char **, int);
 void	tprintf(struct proc *p, int pri, const char *, ...) __printflike(3, 4);
 
+#define ovbcopy(f, t, l) bcopy((f), (t), (l))
 void	bcopy(const void *from, void *to, size_t len);
-void	ovbcopy(const void *from, void *to, size_t len);
-
-#ifdef __i386__
-extern void	(*bzero)(void *buf, size_t len);
-#else
 void	bzero(void *buf, size_t len);
-#endif
 
 void	*memcpy(void *to, const void *from, size_t len);
 
@@ -192,18 +192,20 @@ int	suword(void *base, long word);
 int	suword16(void *base, int word);
 int	suword32(void *base, int32_t word);
 int	suword64(void *base, int64_t word);
+intptr_t casuptr(intptr_t *p, intptr_t old, intptr_t new);
 
 void	realitexpire(void *);
 
 void	hardclock(struct clockframe *frame);
-void	hardclock_process(struct thread *td, int user);
+void	hardclock_process(struct clockframe *frame);
 void	softclock(void *);
 void	statclock(struct clockframe *frame);
-void	statclock_process(struct kse *ke, register_t pc, int user);
+void	profclock(struct clockframe *frame);
 
 void	startprofclock(struct proc *);
 void	stopprofclock(struct proc *);
-void	setstatclockrate(int hzrate);
+void	cpu_startprofclock(void);
+void	cpu_stopprofclock(void);
 
 /* flags for suser() and suser_cred() */
 #define PRISON_ROOT	1
@@ -276,24 +278,6 @@ static __inline void		splx(intrmask_t ipl __unused)	{ return; }
 /*
  * Various callout lists.
  */
-
-/* Exit callout list declarations. */
-typedef void (*exitlist_fn)(struct proc *procp);
-
-int	at_exit(exitlist_fn function);
-int	rm_at_exit(exitlist_fn function);
-
-/* Fork callout list declarations. */
-typedef void (*forklist_fn)(struct proc *parent, struct proc *child, int flags);
-
-int	at_fork(forklist_fn function);
-int	rm_at_fork(forklist_fn function);
-
-/* Exec callout list declarations. */
-typedef void (*execlist_fn)(struct proc *procp);
-
-int	at_exec(execlist_fn function);
-int	rm_at_exec(execlist_fn function);
 
 /*
  * Not exactly a callout LIST, but a callout entry.

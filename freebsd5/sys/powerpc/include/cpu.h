@@ -29,7 +29,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	$NetBSD: cpu.h,v 1.11 2000/05/26 21:19:53 thorpej Exp $
- * $FreeBSD: src/sys/powerpc/include/cpu.h,v 1.12 2002/09/19 04:44:35 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/include/cpu.h,v 1.13 2003/01/18 11:20:06 grehan Exp $
  */
 
 #ifndef _MACHINE_CPU_H_
@@ -79,17 +79,17 @@ extern void __syncicache(void *, int);
 static __inline u_int64_t
 get_cyclecount(void)
 {
-	u_int32_t upper, lower;
-	u_int64_t time;
+	u_int32_t _upper, _lower;
+	u_int64_t _time;
 
 	__asm __volatile(
 		"mftb %0\n"
 		"mftbu %1"
-		: "=r" (lower), "=r" (upper));
+		: "=r" (_lower), "=r" (_upper));
 
-	time = (u_int64_t)upper;
-	time = (time << 32) + lower;
-	return (time);
+	_time = (u_int64_t)_upper;
+	_time = (_time << 32) + _lower;
+	return (_time);
 }
 
 #define	cpu_getstack(td)	((td)->td_frame->fixreg[1])

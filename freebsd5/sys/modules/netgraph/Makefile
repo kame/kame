@@ -1,5 +1,5 @@
 # $Whistle: Makefile,v 1.5 1999/01/24 06:48:37 archie Exp $
-# $FreeBSD: src/sys/modules/netgraph/Makefile,v 1.27 2002/11/21 00:40:11 julian Exp $
+# $FreeBSD: src/sys/modules/netgraph/Makefile,v 1.28 2003/04/20 19:05:32 wpaul Exp $
 
 SUBDIR=	UI \
 	async \
@@ -10,6 +10,7 @@ SUBDIR=	UI \
 	eiface \
 	etf \
 	ether \
+	fec \
 	frame_relay \
 	gif \
 	gif_demux \

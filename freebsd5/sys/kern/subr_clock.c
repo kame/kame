@@ -41,7 +41,7 @@
  *	and
  *	from: src/sys/i386/isa/clock.c,v 1.176 2001/09/04
  *
- * $FreeBSD: src/sys/kern/subr_clock.c,v 1.2 2002/08/07 19:43:54 tmm Exp $
+ * $FreeBSD: src/sys/kern/subr_clock.c,v 1.3 2003/02/03 19:49:34 phk Exp $
  */
 
 /*
@@ -281,7 +281,7 @@ inittodr(time_t base)
 		printf("Check and reset the date immediately!\n");
 	}
 
-	ts.tv_sec += tz.tz_minuteswest * 60 +
+	ts.tv_sec += tz_minuteswest * 60 +
 	    (wall_cmos_clock ? adjkerntz : 0);
 
 	if (timespeccmp(&ref, &ts, >)) {
@@ -310,7 +310,7 @@ resettodr()
 		return;
 
 	getnanotime(&ts);
-	ts.tv_sec -= tz.tz_minuteswest * 60 + (wall_cmos_clock ? adjkerntz : 0);
+	ts.tv_sec -= tz_minuteswest * 60 + (wall_cmos_clock ? adjkerntz : 0);
 	if ((error = CLOCK_SETTIME(clock_dev, &ts)) != 0) {
 		printf("warning: clock_settime failed (%d), time-of-day clock "
 		    "not adjusted to system time\n", error);

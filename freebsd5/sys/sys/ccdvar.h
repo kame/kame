@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/sys/ccdvar.h,v 1.13 2001/09/10 11:28:07 kris Exp $ */
+/* $FreeBSD: src/sys/sys/ccdvar.h,v 1.18 2003/03/08 08:01:31 phk Exp $ */
 
 /*	$NetBSD: ccdvar.h,v 1.7.2.1 1995/10/12 21:30:18 thorpej Exp $	*/
 
@@ -97,9 +97,6 @@ struct ccd_ioctl {
 	size_t	ccio_size;		/* (returned) size of ccd */
 };
 
-/* Mask of user-settable ccd flags. */
-#define CCDF_USERMASK	(CCDF_SWAP|CCDF_UNIFORM|CCDF_MIRROR|CCDF_PARITY)
-
 /*
  * Component info table.
  * Describes a single component of a concatenated disk.
@@ -171,24 +168,24 @@ struct ccd_s {
 #define	CCD_MAXNDISKS	 65536
 	struct ccdcinfo	 *sc_cinfo;		/* component info */
 	struct ccdiinfo	 *sc_itable;		/* interleave table */
-	struct devstat	 device_stats;		/* device statistics */
 	struct ccdgeom   sc_geom;		/* pseudo geometry info */
-	struct disklabel sc_label;		/* generic disk device info */
-	int		 sc_openmask;
 	int		 sc_pick;		/* side of mirror picked */
 	daddr_t		 sc_blk[2];		/* mirror localization */
+	struct disk	 *sc_disk;
+	struct cdev	 *__remove00;		/* XXX: remove when convenient */
 };
 
 /* sc_flags */
-#define CCDF_SWAP	0x01	/* interleave should be dmmax */
 #define CCDF_UNIFORM	0x02	/* use LCCD of sizes for uniform interleave */
 #define CCDF_MIRROR	0x04	/* use mirroring */
-#define CCDF_PARITY	0x08	/* use parity (RAID level 5) */
 #define CCDF_INITED	0x10	/* unit has been initialized */
 #define CCDF_WLABEL	0x20	/* label area is writable */
 #define CCDF_LABELLING	0x40	/* unit is currently being labelled */
 #define CCDF_WANTED	0x60	/* someone is waiting to obtain a lock */
 #define CCDF_LOCKED	0x80	/* unit is locked */
+
+/* Mask of user-settable ccd flags. */
+#define CCDF_USERMASK	(CCDF_UNIFORM|CCDF_MIRROR)
 
 /*
  * Before you can use a unit, it must be configured with CCDIOCSET.

@@ -36,26 +36,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)dkstat.h	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/dkstat.h,v 1.13 2000/09/07 16:38:04 des Exp $
+ * $FreeBSD: src/sys/sys/dkstat.h,v 1.17 2003/05/07 15:26:43 phk Exp $
  */
 
 #ifndef _SYS_DKSTAT_H_
 #define _SYS_DKSTAT_H_ 1
 
-#define	CP_USER		0
-#define	CP_NICE		1
-#define	CP_SYS		2
-#define	CP_INTR		3
-#define	CP_IDLE		4
-#define	CPUSTATES	5
-
-#ifdef _KERNEL
-
-extern long cp_time[CPUSTATES];
-extern long tk_cancc;
-extern long tk_nin;
-extern long tk_nout;
-extern long tk_rawcc;
-#endif
+#include <sys/resource.h>
 
 #endif /* _SYS_DKSTAT_H_ */

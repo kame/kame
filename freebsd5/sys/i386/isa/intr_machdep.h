@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/intr_machdep.h,v 1.42 2002/07/12 07:56:10 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.h,v 1.43 2003/04/02 23:53:29 peter Exp $
  */
 
 #ifndef _I386_ISA_INTR_MACHDEP_H_
@@ -115,6 +115,9 @@
 
 /* inter-CPU rendezvous */
 #define XRENDEZVOUS_OFFSET	(ICU_OFFSET + 122)	/* 0x9A */
+
+/* lazy pmap release */
+#define XLAZYPMAP_OFFSET	(ICU_OFFSET + 123)	/* 0x9B */
 
 /* IPI to generate an additional software trap at the target CPU */
 /* XXX in the middle of the interrupt range, overlapping IRQ48 */
@@ -206,7 +209,8 @@ inthand_t
 	Xcpuast,	/* Additional software trap on other cpu */ 
 	Xcpustop,	/* CPU stops & waits for another CPU to restart it */
 	Xspuriousint,	/* handle APIC "spurious INTs" */
-	Xrendezvous;	/* handle CPU rendezvous */
+	Xrendezvous,	/* handle CPU rendezvous */
+	Xlazypmap;	/* handle lazy pmap release */
 
 #ifdef TEST_TEST1
 inthand_t

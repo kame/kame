@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp_ali.c,v 1.5 2002/11/13 17:40:15 mux Exp $
+ *	$FreeBSD: src/sys/pci/agp_ali.c,v 1.6 2003/04/15 06:37:28 mdodd Exp $
  */
 
 #include "opt_bus.h"
@@ -264,3 +264,5 @@ static driver_t agp_ali_driver = {
 static devclass_t agp_devclass;
 
 DRIVER_MODULE(agp_ali, pci, agp_ali_driver, agp_devclass, 0, 0);
+MODULE_DEPEND(agp_ali, agp, 1, 1, 1);
+MODULE_DEPEND(agp_ali, pci, 1, 1, 1);

@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/stallion.c,v 1.51 2002/08/25 13:17:11 charnier Exp $
+ * $FreeBSD: src/sys/i386/isa/stallion.c,v 1.55 2003/03/05 08:16:29 das Exp $
  */
 
 /*****************************************************************************/
@@ -41,6 +41,7 @@
 #define	TTYDEFCHARS	1
 
 #include "opt_compat.h"
+#include "opt_tty.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -536,29 +537,17 @@ COMPAT_PCI_DRIVER (stlpci, stlpcidriver);
 
 #define	CDEV_MAJOR	72
 static struct cdevsw stl_cdevsw = {
-	/* open */	stlopen,
-	/* close */	stlclose,
-	/* read */	ttyread,
-	/* write */	ttywrite,
-	/* ioctl */	stlioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"stl",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	stlopen,
+	.d_close =	stlclose,
+	.d_read =	ttyread,
+	.d_write =	ttywrite,
+	.d_ioctl =	stlioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"stl",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
-
-static void stl_drvinit(void *unused)
-{
-
-	cdevsw_add(&stl_cdevsw);
-}
-
-SYSINIT(sidev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,stl_drvinit,NULL)
 
 #endif
 
@@ -662,6 +651,9 @@ static int stlattach(struct isa_device *idp)
 	brdp->irqtype = stl_irqshared;
 	stl_brdinit(brdp);
 
+	if (0) {
+		make_dev(&stl_cdevsw, 0, 0, 0, 0, "stallion_is_broken");
+	}
 	return(1);
 }
 

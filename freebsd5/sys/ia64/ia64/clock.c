@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/ia64/clock.c,v 1.17 2002/11/15 22:36:57 peter Exp $ */
+/* $FreeBSD: src/sys/ia64/ia64/clock.c,v 1.21 2003/05/20 06:51:20 marcel Exp $ */
 /* $NetBSD: clock.c,v 1.20 1998/01/31 10:32:47 ross Exp $ */
 
 /*
@@ -89,7 +89,7 @@ static struct timecounter ia64_timecounter = {
 	0,			/* no poll_pps */
  	~0u,			/* counter_mask */
 	0,			/* frequency */
-	"IA64 ITC"		/* name */
+	"ITC"			/* name */
 };
 
 #endif
@@ -193,7 +193,7 @@ cpu_initclocks()
 
 	itm_reload = (itc_frequency + hz/2) / hz;
 	ia64_set_itm(ia64_get_itc() + itm_reload);
-	ia64_set_itv(255);	/* highest priority class */
+	ia64_set_itv(CLOCK_VECTOR);	/* highest priority class */
 
 	stathz = 128;
 }
@@ -254,24 +254,24 @@ fail:
 }
 #endif
 
-void
-handleclock(void* arg)
-{
-	ia64_set_itm(ia64_get_itc() + (itc_frequency + hz/2) / hz);
-	hardclock(arg);
-}
-
 /*
  * We assume newhz is either stathz or profhz, and that neither will
  * change after being set up above.  Could recalculate intervals here
  * but that would be a drag.
  */
+
 void
-setstatclockrate(newhz)
-	int newhz;
+cpu_startprofclock(void)
 {
 
-	/* nothing we can do */
+	/* nothing to do */
+}
+
+void
+cpu_stopprofclock(void)
+{
+
+	/* nothing to do */
 }
 
 /*

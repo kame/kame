@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)autoconf.c	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/nfsclient/nfs_diskless.c,v 1.1 2002/09/22 00:59:01 jake Exp $
+ * $FreeBSD: src/sys/nfsclient/nfs_diskless.c,v 1.2 2002/12/22 05:35:03 hsu Exp $
  */
 
 #include <sys/param.h>
@@ -102,6 +102,7 @@ nfs_setup_diskless(void)
 		return;
 	}
 	ifa = NULL;
+	IFNET_RLOCK();
 	TAILQ_FOREACH(ifp, &ifnet, if_link) {
 		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 			if ((ifa->ifa_addr->sa_family == AF_LINK) &&
@@ -110,11 +111,14 @@ nfs_setup_diskless(void)
 				    (sdl->sdl_alen == ourdl.sdl_alen) &&
 				    !bcmp(sdl->sdl_data + sdl->sdl_nlen,
 					  ourdl.sdl_data + ourdl.sdl_nlen, 
-					  sdl->sdl_alen))
+					  sdl->sdl_alen)) {
+				    IFNET_RUNLOCK();
 				    goto match_done;
+				}
 			}
 		}
 	}
+	IFNET_RUNLOCK();
 	printf("nfs_diskless: no interface\n");
 	return;	/* no matching interface */
 match_done:

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs_vfsops.c,v 1.50 2002/10/14 03:20:33 mckusick Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_vfsops.c,v 1.53 2003/03/11 22:15:08 kan Exp $
  */
 
 
@@ -781,7 +781,7 @@ static struct vfsops ntfs_vfsops = {
 	ntfs_root,
 	vfs_stdquotactl,
 	ntfs_statfs,
-	vfs_stdsync,
+	vfs_stdnosync,
 	ntfs_vget,
 	ntfs_fhtovp,
 	vfs_stdcheckexp,

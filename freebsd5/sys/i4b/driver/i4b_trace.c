@@ -29,7 +29,7 @@
  *
  *	last edit-date: [Sun Mar 17 09:52:51 2002]
  *
- * $FreeBSD: src/sys/i4b/driver/i4b_trace.c,v 1.20 2002/09/02 00:52:06 brooks Exp $
+ * $FreeBSD: src/sys/i4b/driver/i4b_trace.c,v 1.23 2003/03/03 12:15:50 phk Exp $
  *
  *	NOTE: the code assumes that SPLI4B >= splimp !
  *
@@ -47,10 +47,6 @@
 #include <sys/socket.h>
 #include <net/if.h>
 #include <sys/tty.h>
-
-#ifdef DEVFS
-#include <sys/devfsext.h>
-#endif
 
 #include <machine/i4b_trace.h>
 #include <machine/i4b_ioctl.h>
@@ -80,32 +76,14 @@ static d_poll_t i4btrcpoll;
 #define CDEV_MAJOR 59
 
 static struct cdevsw i4btrc_cdevsw = {
-	/* open */      i4btrcopen,
-        /* close */     i4btrcclose,
-        /* read */      i4btrcread,
-        /* write */     nowrite,
-        /* ioctl */     i4btrcioctl,
-        /* poll */      i4btrcpoll,
-        /* mmap */      nommap,
-        /* strategy */  nostrategy,
-        /* name */      "i4btrc",
-        /* maj */       CDEV_MAJOR,
-        /* dump */      nodump,
-        /* psize */     nopsize,
-        /* flags */     0,
+	.d_open =	i4btrcopen,
+	.d_close =	i4btrcclose,
+	.d_read =	i4btrcread,
+	.d_ioctl =	i4btrcioctl,
+	.d_poll =	i4btrcpoll,
+	.d_name =	"i4btrc",
+	.d_maj =	CDEV_MAJOR,
 };
-
-/*---------------------------------------------------------------------------*
- *	interface init routine
- *---------------------------------------------------------------------------*/
-static
-void i4btrcinit(void *unused)
-{
-	cdevsw_add(&i4btrc_cdevsw);
-}
-
-SYSINIT(i4btrcdev, SI_SUB_DRIVERS,
-	SI_ORDER_MIDDLE+CDEV_MAJOR, &i4btrcinit, NULL);
 
 static void i4btrcattach(void *);
 PSEUDO_SET(i4btrcattach, i4b_trace);
@@ -233,7 +211,7 @@ get_trace_data_from_l1(i4b_trace_hdr_t *hdr, int len, char *buf)
 	if(device_state[unit] & ST_WAITDATA)
 	{
 		device_state[unit] &= ~ST_WAITDATA;
-		wakeup((caddr_t) &trace_queue[unit]);
+		wakeup( &trace_queue[unit]);
 	}
 
 	splx(x);
@@ -336,7 +314,7 @@ i4btrcread(dev_t dev, struct uio * uio, int ioflag)
 	{
 		device_state[unit] |= ST_WAITDATA;
 		
-		if((error = msleep((caddr_t) &trace_queue[unit],
+		if((error = msleep( &trace_queue[unit],
 					&trace_queue[unit].ifq_mtx,
 					TTIPRI | PCATCH,
 					"bitrc", 0 )) != 0)

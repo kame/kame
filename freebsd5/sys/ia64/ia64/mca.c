@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/mca.c,v 1.5 2002/11/24 20:07:23 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/mca.c,v 1.8 2003/02/19 05:47:24 imp Exp $
  */
 
 #include <sys/param.h>
@@ -198,14 +198,15 @@ ia64_mca_init(void)
 	}
 	max_size = round_page(max_size);
 
-	p = contigmalloc(max_size, M_TEMP, M_WAITOK, 0ul, 256*1024*1024 - 1,
-	    PAGE_SIZE, 256*1024*1024);
+	if (max_size) {
+		p = contigmalloc(max_size, M_TEMP, M_WAITOK, 0ul,
+		    256*1024*1024 - 1, PAGE_SIZE, 256*1024*1024);
+		mca_info_block = IA64_PHYS_TO_RR7(ia64_tpa((u_int64_t)p));
 
-	mca_info_block = IA64_PHYS_TO_RR7(ia64_tpa((u_int64_t)p));
-
-	if (bootverbose)
-		printf("MCA: allocated %ld bytes for state information\n",
-		    max_size);
+		if (bootverbose)
+			printf("MCA: allocated %ld bytes for state info.\n",
+			    max_size);
+	}
 
 	/*
 	 * Initialize the spin lock used to protect the info block. When APs

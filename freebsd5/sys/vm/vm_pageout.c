@@ -65,7 +65,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_pageout.c,v 1.217 2002/12/01 05:40:18 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_pageout.c,v 1.235 2003/05/19 00:51:07 das Exp $
  */
 
 /*
@@ -110,6 +110,7 @@
 /* the kernel process "vm_pageout"*/
 static void vm_pageout(void);
 static int vm_pageout_clean(vm_page_t);
+static void vm_pageout_page_free(vm_page_t);
 static void vm_pageout_pmap_collect(void);
 static void vm_pageout_scan(int pass);
 static int vm_pageout_free_page_calc(vm_size_t count);
@@ -136,15 +137,14 @@ SYSINIT(vmdaemon, SI_SUB_KTHREAD_VM, SI_ORDER_FIRST, kproc_start, &vm_kp)
 #endif
 
 
-int vm_pages_needed=0;		/* Event on which pageout daemon sleeps */
-int vm_pageout_deficit=0;	/* Estimated number of pages deficit */
-int vm_pageout_pages_needed=0;	/* flag saying that the pageout daemon needs pages */
+int vm_pages_needed;		/* Event on which pageout daemon sleeps */
+int vm_pageout_deficit;		/* Estimated number of pages deficit */
+int vm_pageout_pages_needed;	/* flag saying that the pageout daemon needs pages */
 
 #if !defined(NO_SWAPPING)
 static int vm_pageout_req_swapout;	/* XXX */
 static int vm_daemon_needed;
 #endif
-extern int vm_swap_size;
 static int vm_max_launder = 32;
 static int vm_pageout_stats_max=0, vm_pageout_stats_interval = 0;
 static int vm_pageout_full_stats_interval = 0;
@@ -206,7 +206,7 @@ int vm_pageout_page_count = VM_PAGEOUT_PAGE_COUNT;
 int vm_page_max_wired;		/* XXX max # of wired pages system-wide */
 
 #if !defined(NO_SWAPPING)
-typedef void freeer_fcn_t(vm_map_t, vm_object_t, vm_pindex_t, int);
+typedef void freeer_fcn_t(vm_map_t, vm_object_t, vm_pindex_t);
 static void vm_pageout_map_deactivate_pages(vm_map_t, vm_pindex_t);
 static freeer_fcn_t vm_pageout_object_deactivate_pages;
 static void vm_req_vmdaemon(void);
@@ -348,7 +348,7 @@ more:
 	/*
 	 * we allow reads during pageouts...
 	 */
-	return vm_pageout_flush(&mc[page_base], pageout_count, 0);
+	return vm_pageout_flush(&mc[page_base], pageout_count, 0, FALSE);
 }
 
 /*
@@ -361,10 +361,11 @@ more:
  *	the ordering.
  */
 int
-vm_pageout_flush(mc, count, flags)
+vm_pageout_flush(mc, count, flags, is_object_locked)
 	vm_page_t *mc;
 	int count;
 	int flags;
+	int is_object_locked;
 {
 	vm_object_t object;
 	int pageout_status[count];
@@ -389,20 +390,22 @@ vm_pageout_flush(mc, count, flags)
 	}
 	object = mc[0]->object;
 	vm_page_unlock_queues();
+	if (!is_object_locked)
+		VM_OBJECT_LOCK(object);
 	vm_object_pip_add(object, count);
+	VM_OBJECT_UNLOCK(object);
 
 	vm_pager_put_pages(object, mc, count,
-	    (flags | ((object == kernel_object) ? OBJPC_SYNC : 0)),
+	    (flags | ((object == kernel_object) ? VM_PAGER_PUT_SYNC : 0)),
 	    pageout_status);
 
+	VM_OBJECT_LOCK(object);
 	vm_page_lock_queues();
 	for (i = 0; i < count; i++) {
 		vm_page_t mt = mc[i];
 
 		switch (pageout_status[i]) {
 		case VM_PAGER_OK:
-			numpagedout++;
-			break;
 		case VM_PAGER_PEND:
 			numpagedout++;
 			break;
@@ -441,6 +444,8 @@ vm_pageout_flush(mc, count, flags)
 				pmap_page_protect(mt, VM_PROT_READ);
 		}
 	}
+	if (!is_object_locked)
+		VM_OBJECT_UNLOCK(object);
 	return numpagedout;
 }
 
@@ -456,11 +461,10 @@ vm_pageout_flush(mc, count, flags)
  *	The object and map must be locked.
  */
 static void
-vm_pageout_object_deactivate_pages(map, object, desired, map_remove_only)
+vm_pageout_object_deactivate_pages(map, object, desired)
 	vm_map_t map;
 	vm_object_t object;
 	vm_pindex_t desired;
-	int map_remove_only;
 {
 	vm_page_t p, next;
 	int actcount, rcount, remove_mode;
@@ -475,7 +479,7 @@ vm_pageout_object_deactivate_pages(map, object, desired, map_remove_only)
 		if (object->paging_in_progress)
 			return;
 
-		remove_mode = map_remove_only;
+		remove_mode = 0;
 		if (object->shadow_count > 1)
 			remove_mode = 1;
 		/*
@@ -576,7 +580,7 @@ vm_pageout_map_deactivate_pages(map, desired)
 	}
 
 	if (bigobj)
-		vm_pageout_object_deactivate_pages(map, bigobj, desired, 0);
+		vm_pageout_object_deactivate_pages(map, bigobj, desired);
 
 	/*
 	 * Next, hunt around for other pages to deactivate.  We actually
@@ -589,7 +593,7 @@ vm_pageout_map_deactivate_pages(map, desired)
 		if ((tmpe->eflags & MAP_ENTRY_IS_SUB_MAP) == 0) {
 			obj = tmpe->object.vm_object;
 			if (obj)
-				vm_pageout_object_deactivate_pages(map, obj, desired, 0);
+				vm_pageout_object_deactivate_pages(map, obj, desired);
 		}
 		tmpe = tmpe->next;
 	}
@@ -609,25 +613,25 @@ vm_pageout_map_deactivate_pages(map, desired)
 #endif		/* !defined(NO_SWAPPING) */
 
 /*
- * Don't try to be fancy - being fancy can lead to VOP_LOCK's and therefore
- * to vnode deadlocks.  We only do it for OBJT_DEFAULT and OBJT_SWAP objects
- * which we know can be trivially freed.
+ * Warning! The page queue lock is released and reacquired.
  */
-void
+static void
 vm_pageout_page_free(vm_page_t m)
 {
 	vm_object_t object = m->object;
-	int type = object->type;
 
 	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
-	if (type == OBJT_SWAP || type == OBJT_DEFAULT)
-		vm_object_reference(object);
 	vm_page_busy(m);
+	vm_page_unlock_queues();
+	/*
+	 * Avoid a lock order reversal.  The page must be busy.
+	 */
+	VM_OBJECT_LOCK(object);
+	vm_page_lock_queues();
 	pmap_remove_all(m);
 	vm_page_free(m);
+	VM_OBJECT_UNLOCK(object);
 	cnt.v_dfree++;
-	if (type == OBJT_SWAP || type == OBJT_DEFAULT)
-		vm_object_deallocate(object);
 }
 
 /*
@@ -694,8 +698,7 @@ vm_pageout_scan(int pass)
 	 */
 	vm_pageout_pmap_collect();
 
-	addl_page_shortage_init = vm_pageout_deficit;
-	vm_pageout_deficit = 0;
+	addl_page_shortage_init = atomic_readandclear_int(&vm_pageout_deficit);
 
 	/*
 	 * Calculate the number of pages we want to either free or move
@@ -857,8 +860,10 @@ rescan0:
 			 * before being freed.  This significantly extends
 			 * the thrash point for a heavily loaded machine.
 			 */
+			vm_page_lock_queues();
 			vm_page_flag_set(m, PG_WINATCFLS);
 			vm_pageq_requeue(m);
+			vm_page_unlock_queues();
 		} else if (maxlaunder > 0) {
 			/*
 			 * We always want to try to flush some dirty pages if
@@ -1157,8 +1162,11 @@ rescan0:
 	}
 
 	/*
-	 * If we are out of swap and were not able to reach our paging
-	 * target, kill the largest process.
+	 * If we are critically low on one of RAM or swap and low on
+	 * the other, kill the largest process.  However, we avoid
+	 * doing this on the first pass in order to give ourselves a
+	 * chance to flush out dirty vnode-backed pages and to allow
+	 * active pages to be moved to the inactive queue and reclaimed.
 	 *
 	 * We keep the process bigproc locked once we find it to keep anyone
 	 * from messing with it; however, there is a possibility of
@@ -1167,11 +1175,9 @@ rescan0:
 	 * lock while walking this list.  To avoid this, we don't block on
 	 * the process lock but just skip a process if it is already locked.
 	 */
-	if ((vm_swap_size < 64 && vm_page_count_min()) ||
-	    (swap_pager_full && vm_paging_target() > 0)) {
-#if 0
-	if ((vm_swap_size < 64 || swap_pager_full) && vm_page_count_min()) {
-#endif
+	if (pass != 0 &&
+	    ((vm_swap_size < 64 && vm_page_count_min()) ||
+	     (swap_pager_full && vm_paging_target() > 0))) {
 		bigproc = NULL;
 		bigsize = 0;
 		sx_slock(&allproc_lock);
@@ -1183,9 +1189,10 @@ rescan0:
 			if (PROC_TRYLOCK(p) == 0)
 				continue;
 			/*
-			 * if this is a system process, skip it
+			 * If this is a system or protected process, skip it.
 			 */
 			if ((p->p_flag & P_SYSTEM) || (p->p_pid == 1) ||
+			    (p->p_flag & P_PROTECTED) ||
 			    ((p->p_pid < 48) && (vm_swap_size != 0))) {
 				PROC_UNLOCK(p);
 				continue;
@@ -1213,8 +1220,13 @@ rescan0:
 			/*
 			 * get the process size
 			 */
-			size = vmspace_resident_count(p->p_vmspace) +
-				vmspace_swap_count(p->p_vmspace);
+			if (!vm_map_trylock_read(&p->p_vmspace->vm_map)) {
+				PROC_UNLOCK(p);
+				continue;
+			}
+			size = vmspace_swap_count(p->p_vmspace);
+			vm_map_unlock_read(&p->p_vmspace->vm_map);
+			size += vmspace_resident_count(p->p_vmspace);
 			/*
 			 * if the this process is bigger than the biggest one
 			 * remember it.
@@ -1363,7 +1375,7 @@ vm_size_t count;
 static void
 vm_pageout()
 {
-	int pass;
+	int error, pass, s;
 
 	mtx_lock(&Giant);
 
@@ -1430,9 +1442,8 @@ vm_pageout()
 	 * The pageout daemon is never done, so loop forever.
 	 */
 	while (TRUE) {
-		int error;
-		int s = splvm();
-
+		s = splvm();
+		vm_page_lock_queues();
 		/*
 		 * If we have enough free memory, wakeup waiters.  Do
 		 * not clear vm_pages_needed until we reach our target,
@@ -1440,7 +1451,7 @@ vm_pageout()
 		 * waste a lot of cpu.
 		 */
 		if (vm_pages_needed && !vm_page_count_min()) {
-			if (vm_paging_needed() <= 0)
+			if (!vm_paging_needed())
 				vm_pages_needed = 0;
 			wakeup(&cnt.v_free_count);
 		}
@@ -1452,7 +1463,7 @@ vm_pageout()
 			 */
 			++pass;
 			if (pass > 1)
-				tsleep(&vm_pages_needed, PVM,
+				msleep(&vm_pages_needed, &vm_page_queue_mtx, PVM,
 				       "psleep", hz/2);
 		} else {
 			/*
@@ -1463,29 +1474,36 @@ vm_pageout()
 				pass = 1;
 			else
 				pass = 0;
-			error = tsleep(&vm_pages_needed, PVM,
+			error = msleep(&vm_pages_needed, &vm_page_queue_mtx, PVM,
 				    "psleep", vm_pageout_stats_interval * hz);
 			if (error && !vm_pages_needed) {
+				vm_page_unlock_queues();
 				splx(s);
 				pass = 0;
 				vm_pageout_page_stats();
 				continue;
 			}
 		}
-
 		if (vm_pages_needed)
 			cnt.v_pdwakeups++;
+		vm_page_unlock_queues();
 		splx(s);
 		vm_pageout_scan(pass);
-		vm_pageout_deficit = 0;
 	}
 }
 
+/*
+ * Unless the page queue lock is held by the caller, this function
+ * should be regarded as advisory.  Specifically, the caller should
+ * not msleep() on &cnt.v_free_count following this function unless
+ * the page queue lock is held until the msleep() is performed.
+ */
 void
 pagedaemon_wakeup()
 {
+
 	if (!vm_pages_needed && curthread->td_proc != pageproc) {
-		vm_pages_needed++;
+		vm_pages_needed = 1;
 		wakeup(&vm_pages_needed);
 	}
 }
@@ -1528,7 +1546,9 @@ vm_daemon()
 			 * if this is a system process or if we have already
 			 * looked at this process, skip it.
 			 */
+			PROC_LOCK(p);
 			if (p->p_flag & (P_SYSTEM | P_WEXIT)) {
+				PROC_UNLOCK(p);
 				continue;
 			}
 			/*
@@ -1545,8 +1565,9 @@ vm_daemon()
 					break;
 				}
 			}
+			mtx_unlock_spin(&sched_lock);
 			if (breakout) {
-				mtx_unlock_spin(&sched_lock);
+				PROC_UNLOCK(p);
 				continue;
 			}
 			/*
@@ -1563,7 +1584,7 @@ vm_daemon()
 			 */
 			if ((p->p_sflag & PS_INMEM) == 0)
 				limit = 0;	/* XXX */
-			mtx_unlock_spin(&sched_lock);
+			PROC_UNLOCK(p);
 
 			size = vmspace_resident_count(p->p_vmspace);
 			if (limit >= 0 && size >= limit) {

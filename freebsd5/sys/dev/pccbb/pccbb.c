@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pccbb/pccbb.c,v 1.64 2002/11/23 23:09:45 imp Exp $
+ * $FreeBSD: src/sys/dev/pccbb/pccbb.c,v 1.71 2003/05/04 23:58:37 imp Exp $
  */
 
 /*
@@ -176,8 +176,8 @@ struct yenta_chipinfo {
 	{PCIC_ID_OZ6860, "O2Micro OZ6836/6860 PCI-CardBus Bridge", CB_CIRRUS},
 	{PCIC_ID_OZ6872, "O2Micro OZ6812/6872 PCI-CardBus Bridge", CB_CIRRUS},
 	{PCIC_ID_OZ6912, "O2Micro OZ6912/6972 PCI-CardBus Bridge", CB_CIRRUS},
-	{PCIC_ID_OZ6922, "O2Micro OZ6822 PCI-CardBus Bridge", CB_CIRRUS},
-	{PCIC_ID_OZ6933, "O2Micro OZ6833 PCI-CardBus Bridge", CB_CIRRUS},
+	{PCIC_ID_OZ6922, "O2Micro OZ6922 PCI-CardBus Bridge", CB_CIRRUS},
+	{PCIC_ID_OZ6933, "O2Micro OZ6933 PCI-CardBus Bridge", CB_CIRRUS},
 
 	/* sentinel */
 	{0 /* null id */, "unknown", CB_UNKNOWN},
@@ -541,8 +541,8 @@ cbb_chipinit(struct cbb_softc *sc)
 	 * other is to set CSC to 0.  Since both methods are mutually
 	 * compatible, we do both.
 	 */
-	exca_write(&sc->exca, EXCA_INTR, EXCA_INTR_ENABLE);
-	exca_write(&sc->exca, EXCA_CSC_INTR, 0);
+	exca_putb(&sc->exca, EXCA_INTR, EXCA_INTR_ENABLE);
+	exca_putb(&sc->exca, EXCA_CSC_INTR, 0);
 
 	/* close all memory and io windows */
 	pci_write_config(sc->dev, CBBR_MEMBASE0, 0xffffffff, 4);
@@ -600,32 +600,26 @@ cbb_attach(device_t brdev)
 		 * does this, we allow CardBus bridges to work on more
 		 * machines.
 		 */
+		pci_write_config(brdev, rid, 0xfffffffful, 4);
 		sockbase = pci_read_config(brdev, rid, 4);
-		if (sockbase < 0x100000 || sockbase >= 0xfffffff0) {
-			pci_write_config(brdev, rid, 0xffffffff, 4);
-			sockbase = pci_read_config(brdev, rid, 4);
-			sockbase = (sockbase & 0xfffffff0) &
-			    -(sockbase & 0xfffffff0);
-			sc->base_res = bus_generic_alloc_resource(
-			    device_get_parent(brdev), brdev, SYS_RES_MEMORY,
-			    &rid, cbb_start_mem, ~0, sockbase,
-			    RF_ACTIVE|rman_make_alignment_flags(sockbase));
-			if (!sc->base_res) {
-				device_printf(brdev,
-				    "Could not grab register memory\n");
-				mtx_destroy(&sc->mtx);
-				cv_destroy(&sc->cv);
-				return (ENOMEM);
-			}
-			sc->flags |= CBB_KLUDGE_ALLOC;
-			pci_write_config(brdev, CBBR_SOCKBASE,
-			    rman_get_start(sc->base_res), 4);
-			DEVPRINTF((brdev, "PCI Memory allocated: %08lx\n",
-			    rman_get_start(sc->base_res)));
-		} else {
-			device_printf(brdev, "Could not map register memory\n");
-			goto err;
+		sockbase = (sockbase & 0xfffffff0ul) &
+		    -(sockbase & 0xfffffff0ul);
+		sc->base_res = bus_generic_alloc_resource(
+		    device_get_parent(brdev), brdev, SYS_RES_MEMORY,
+		    &rid, cbb_start_mem, ~0, sockbase,
+		    RF_ACTIVE | rman_make_alignment_flags(sockbase));
+		if (!sc->base_res) {
+			device_printf(brdev,
+			    "Could not grab register memory\n");
+			mtx_destroy(&sc->mtx);
+			cv_destroy(&sc->cv);
+			return (ENOMEM);
 		}
+		sc->flags |= CBB_KLUDGE_ALLOC;
+		pci_write_config(brdev, CBBR_SOCKBASE,
+		    rman_get_start(sc->base_res), 4);
+		DEVPRINTF((brdev, "PCI Memory allocated: %08lx\n",
+		    rman_get_start(sc->base_res)));
 #endif
 	}
 
@@ -633,6 +627,7 @@ cbb_attach(device_t brdev)
 	sc->bsh = rman_get_bushandle(sc->base_res);
 	exca_init(&sc->exca, brdev, sc->bst, sc->bsh, CBB_EXCA_OFFSET);
 	sc->exca.flags |= EXCA_HAS_MEMREG_WIN;
+	sc->exca.chipset = EXCA_CARDBUS;
 	cbb_chipinit(sc);
 
 	/* attach children */
@@ -739,8 +734,7 @@ cbb_detach(device_t brdev)
 	bus_release_resource(brdev, SYS_RES_IRQ, 0, sc->irq_res);
 	if (sc->flags & CBB_KLUDGE_ALLOC)
 		bus_generic_release_resource(device_get_parent(brdev),
-		    brdev, SYS_RES_MEMORY, CBBR_SOCKBASE,
-		    sc->base_res);
+		    brdev, SYS_RES_MEMORY, CBBR_SOCKBASE, sc->base_res);
 	else
 		bus_release_resource(brdev, SYS_RES_MEMORY,
 		    CBBR_SOCKBASE, sc->base_res);
@@ -762,7 +756,7 @@ cbb_shutdown(device_t brdev)
 
 	cbb_power(brdev, CARD_VCC_0V | CARD_VPP_0V);
 
-	exca_write(&sc->exca, EXCA_ADDRWIN_ENABLE, 0);
+	exca_putb(&sc->exca, EXCA_ADDRWIN_ENABLE, 0);
 	pci_write_config(brdev, CBBR_MEMBASE0, 0, 4);
 	pci_write_config(brdev, CBBR_MEMLIMIT0, 0, 4);
 	pci_write_config(brdev, CBBR_MEMBASE1, 0, 4);
@@ -798,10 +792,6 @@ cbb_setup_intr(device_t dev, device_t child, struct resource *irq,
 	ih->arg = arg;
 	STAILQ_INSERT_TAIL(&sc->intr_handlers, ih, entries);
 	/*
-	 * XXX we should do what old card does to ensure that we don't
-	 * XXX call the function's interrupt routine(s).
-	 */
-	/*
 	 * XXX need to turn on ISA interrupts, if we ever support them, but
 	 * XXX for now that's all we need to do.
 	 */
@@ -828,45 +818,25 @@ cbb_driver_added(device_t brdev, driver_t *driver)
 {
 	struct cbb_softc *sc = device_get_softc(brdev);
 	device_t *devlist;
+	device_t dev;
 	int tmp;
 	int numdevs;
-	int wake;
-	uint32_t sockstate;
+	int wake = 0;
 
 	DEVICE_IDENTIFY(driver, brdev);
 	device_get_children(brdev, &devlist, &numdevs);
-	wake = 0;
-	sockstate = cbb_get(sc, CBB_SOCKET_STATE);
 	for (tmp = 0; tmp < numdevs; tmp++) {
-		if (device_get_state(devlist[tmp]) == DS_NOTPRESENT &&
-		    device_probe_and_attach(devlist[tmp]) == 0) {
-			if (devlist[tmp] == NULL)
-				/* NOTHING */;
-			else if (strcmp(driver->name, "cardbus") == 0) {
-				sc->cbdev = devlist[tmp];
-				if (((sockstate & CBB_SOCKET_STAT_CD) == 0) &&
-				    (sockstate & CBB_SOCKET_STAT_CB))
-					wake++;
-			} else if (strcmp(driver->name, "pccard") == 0) {
-				sc->pccarddev = devlist[tmp];
-				if (((sockstate & CBB_SOCKET_STAT_CD) == 0) &&
-				    (sockstate & CBB_SOCKET_STAT_16BIT))
-					wake++;
-			} else
-				device_printf(brdev,
-				    "Unsupported child bus: %s\n",
-				    driver->name);
-		}
+		dev = devlist[tmp];
+		if (device_get_state(dev) == DS_NOTPRESENT &&
+		    device_probe_and_attach(dev) == 0)
+			wake++;
 	}
 	free(devlist, M_TEMP);
 
 	if (wake > 0) {
-		if ((cbb_get(sc, CBB_SOCKET_STATE) & CBB_SOCKET_STAT_CD)
-		    == 0) {
-			mtx_lock(&sc->mtx);
-			wakeup(sc);
-			mtx_unlock(&sc->mtx);
-		}
+		mtx_lock(&sc->mtx);
+		cv_signal(&sc->cv);
+		mtx_unlock(&sc->mtx);
 	}
 }
 
@@ -875,13 +845,9 @@ cbb_child_detached(device_t brdev, device_t child)
 {
 	struct cbb_softc *sc = device_get_softc(brdev);
 
-	if (child == sc->cbdev)
-		sc->cbdev = NULL;
-	else if (child == sc->pccarddev)
-		sc->pccarddev = NULL;
-	else
-		device_printf(brdev, "Unknown child detached: %s %p/%p\n",
-		    device_get_nameunit(child), sc->cbdev, sc->pccarddev);
+	if (child != sc->cbdev && child != sc->pccarddev)
+		device_printf(brdev, "Unknown child detached: %s\n",
+		    device_get_nameunit(child));
 }
 
 /************************************************************************/
@@ -956,11 +922,9 @@ cbb_insert(struct cbb_softc *sc)
 		if (sc->pccarddev != NULL) {
 			sc->flags |= CBB_16BIT_CARD;
 			sc->flags |= CBB_CARD_OK;
-			if (CARD_ATTACH_CARD(sc->pccarddev) != 0) {
+			if (CARD_ATTACH_CARD(sc->pccarddev) != 0)
 				device_printf(sc->dev,
 				    "PC Card card activation failed\n");
-				sc->flags &= ~CBB_CARD_OK;
-			}
 		} else {
 			device_printf(sc->dev,
 			    "PC Card inserted, but no pccard bus.\n");
@@ -969,11 +933,9 @@ cbb_insert(struct cbb_softc *sc)
 		if (sc->cbdev != NULL) {
 			sc->flags &= ~CBB_16BIT_CARD;
 			sc->flags |= CBB_CARD_OK;
-			if (CARD_ATTACH_CARD(sc->cbdev) != 0) {
+			if (CARD_ATTACH_CARD(sc->cbdev) != 0)
 				device_printf(sc->dev,
 				    "CardBus card activation failed\n");
-				sc->flags &= ~CBB_CARD_OK;
-			}
 		} else {
 			device_printf(sc->dev,
 			    "CardBus card inserted, but no cardbus bus.\n");
@@ -983,7 +945,7 @@ cbb_insert(struct cbb_softc *sc)
 		 * We should power the card down, and try again a couple of
 		 * times if this happens. XXX
 		 */
-		device_printf (sc->dev, "Unsupported card type detected\n");
+		device_printf(sc->dev, "Unsupported card type detected\n");
 	}
 }
 
@@ -1052,7 +1014,6 @@ cbb_intr(void *arg)
 		STAILQ_FOREACH(ih, &sc->intr_handlers, entries) {
 			(*ih->intr)(ih->arg);
 		}
-		
 	}
 }
 
@@ -1485,6 +1446,7 @@ cbb_cardbus_alloc_resource(device_t brdev, device_t child, int type,
 			return (NULL);
 		}
 		start = end = tmp;
+		flags |= RF_SHAREABLE;
 		break;
 	case SYS_RES_IOPORT:
 		if (start <= cbb_start_32_io)

@@ -1,5 +1,5 @@
 /*	$NetBSD: usb_subr.c,v 1.98 2002/02/20 20:30:13 christos Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_subr.c,v 1.52 2002/06/17 20:52:26 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_subr.c,v 1.54 2003/01/14 23:07:43 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -153,15 +153,21 @@ usbd_get_string_desc(usbd_device_handle dev, int sindex, int langid,
 {
 	usb_device_request_t req;
 	usbd_status err;
+	int actlen;
 
 	req.bmRequestType = UT_READ_DEVICE;
 	req.bRequest = UR_GET_DESCRIPTOR;
 	USETW2(req.wValue, UDESC_STRING, sindex);
 	USETW(req.wIndex, langid);
-	USETW(req.wLength, 1);	/* only size byte first */
-	err = usbd_do_request(dev, &req, sdesc);
+	USETW(req.wLength, 2);	/* only size byte first */
+	err = usbd_do_request_flags(dev, &req, sdesc, USBD_SHORT_XFER_OK,
+		&actlen, USBD_DEFAULT_TIMEOUT);
 	if (err)
 		return (err);
+
+	if (actlen < 1)
+		return (USBD_SHORT_XFER);
+
 	USETW(req.wLength, sdesc->bLength);	/* the whole string */
 	return (usbd_do_request(dev, &req, sdesc));
 }
@@ -1106,9 +1112,15 @@ usbd_status
 usbd_reload_device_desc(usbd_device_handle dev)
 {
 	usbd_status err;
+	int i;
 
 	/* Get the full device descriptor. */
-	err = usbd_get_device_desc(dev, &dev->ddesc);
+	for (i = 0; i < 3; ++i) {
+		err = usbd_get_device_desc(dev, &dev->ddesc);
+		if (!err)
+			break;
+ 		usbd_delay_ms(dev, 200);
+	}
 	if (err)
 		return (err);
 

@@ -34,11 +34,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_socket.c	8.5 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.79 2002/07/24 14:24:16 rwatson Exp $
+ * $FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.83 2003/03/02 16:54:39 des Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.79 2002/07/24 14:24:16 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.83 2003/03/02 16:54:39 des Exp $");
 
 /*
  * Socket operations for use by nfs
@@ -483,7 +483,8 @@ nfsrv_rcv(struct socket *so, void *arg, int waitflag)
 			if (mp) {
 				struct nfsrv_rec *rec;
 				rec = malloc(sizeof(struct nfsrv_rec),
-					     M_NFSRVDESC, waitflag);
+			            M_NFSRVDESC, 
+				    waitflag == M_DONTWAIT ? M_NOWAIT : M_WAITOK);
 				if (!rec) {
 					if (nam)
 						FREE(nam, M_SONAME);
@@ -631,7 +632,8 @@ nfsrv_getstream(struct nfssvc_sock *slp, int waitflag)
 	    *mpp = recm;
 	    if (slp->ns_flag & SLP_LASTFRAG) {
 		struct nfsrv_rec *rec;
-		rec = malloc(sizeof(struct nfsrv_rec), M_NFSRVDESC, waitflag);
+		rec = malloc(sizeof(struct nfsrv_rec), M_NFSRVDESC,
+	            waitflag == M_DONTWAIT ? M_NOWAIT : M_WAITOK);
 		if (!rec) {
 		    m_freem(slp->ns_frag);
 		} else {
@@ -703,7 +705,7 @@ nfsrv_wakenfsd(struct nfssvc_sock *slp)
 				panic("nfsd wakeup");
 			slp->ns_sref++;
 			nd->nfsd_slp = slp;
-			wakeup((caddr_t)nd);
+			wakeup(nd);
 			return;
 		}
 	}

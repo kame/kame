@@ -1,6 +1,6 @@
 /*	$NetBSD: if_de.c,v 1.86 1999/06/01 19:17:59 thorpej Exp $	*/
 
-/* $FreeBSD: src/sys/pci/if_de.c,v 1.140 2002/11/14 23:49:08 sam Exp $ */
+/* $FreeBSD: src/sys/pci/if_de.c,v 1.145 2003/04/15 06:37:29 mdodd Exp $ */
 
 /*-
  * Copyright (c) 1994-1997 Matt Thomas (matt@3am-software.com)
@@ -3058,7 +3058,7 @@ tulip_addr_filter(
 	 * receiving every multicast.
 	 */
 	if ((sc->tulip_flags & TULIP_ALLMULTI) == 0) {
-	    hash = tulip_mchash(etherbroadcastaddr);
+	    hash = tulip_mchash(sc->tulip_if.if_broadcastaddr);
 #if BYTE_ORDER == BIG_ENDIAN
 	    sp[hash >> 4] |= bswap32(1 << (hash & 0xF));
 #else
@@ -3417,7 +3417,7 @@ tulip_rx_intr(
 	     * those buffers and chain to the starting mbuf.  All buffers but
 	     * the last buffer have the same length so we can set that now.
 	     * (we add to last_offset instead of multiplying since we normally
-	     * won't go into the loop and thereby saving a ourselves from
+	     * won't go into the loop and thereby saving ourselves from
 	     * doing a multiplication by 0 in the normal case).
 	     */
 	    _IF_DEQUEUE(&sc->tulip_rxq, ms);
@@ -3918,7 +3918,7 @@ tulip_intr_handler(
 
 #if defined(TULIP_USE_SOFTINTR)
 /*
- * This is a experimental idea to alleviate problems due to interrupt
+ * This is an experimental idea to alleviate problems due to interrupt
  * livelock.  What is interrupt livelock?  It's when you spend all your
  * time servicing device interrupts and never drop below device ipl
  * to do "useful" work.
@@ -5259,4 +5259,4 @@ static driver_t tulip_pci_driver = {
     sizeof(tulip_softc_t),
 };
 static devclass_t tulip_devclass;
-DRIVER_MODULE(if_de, pci, tulip_pci_driver, tulip_devclass, 0, 0);
+DRIVER_MODULE(de, pci, tulip_pci_driver, tulip_devclass, 0, 0);

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/pci/xrpu.c,v 1.25 2002/04/26 21:22:02 phk Exp $
+ * $FreeBSD: src/sys/pci/xrpu.c,v 1.31 2003/04/15 06:37:30 mdodd Exp $
  *
  * A very simple device driver for PCI cards based on Xilinx 6200 series
  * FPGA/RPU devices.  Current Functionality is to allow you to open and
@@ -44,19 +44,12 @@ static d_mmap_t xrpu_mmap;
 
 #define CDEV_MAJOR 100
 static struct cdevsw xrpu_cdevsw = {
-	/* open */	xrpu_open,
-	/* close */	xrpu_close,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	xrpu_ioctl,
-	/* poll */	nopoll,
-	/* mmap */	xrpu_mmap,
-	/* strategy */	nostrategy,
-	/* name */	"xrpu",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	xrpu_open,
+	.d_close =	xrpu_close,
+	.d_ioctl =	xrpu_ioctl,
+	.d_mmap =	xrpu_mmap,
+	.d_name =	"xrpu",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static MALLOC_DEFINE(M_XRPU, "xrpu", "XRPU related");
@@ -136,12 +129,13 @@ xrpu_close(dev_t dev, int flag, int mode, struct  thread *td)
 }
 
 static int
-xrpu_mmap(dev_t dev, vm_offset_t offset, int nprot)
+xrpu_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	struct softc *sc = dev->si_drv1;
 	if (offset >= 0x1000000) 
 		return (-1);
-	return (i386_btop(sc->physbase + offset));
+	*paddr = sc->physbase + offset;
+	return (0);
 }
 
 static int
@@ -269,3 +263,4 @@ static driver_t xrpu_driver = {
  
  
 DRIVER_MODULE(xrpu, pci, xrpu_driver, xrpu_devclass, 0, 0);
+MODULE_DEPEND(xrpu, pci, 1, 1, 1);

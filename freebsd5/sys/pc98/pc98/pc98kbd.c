@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.24 2002/08/25 13:17:38 charnier Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.25 2003/04/29 13:36:05 kan Exp $
  */
 
 #include "opt_kbd.h"
@@ -263,7 +263,7 @@ pckbd_timeout(void *arg)
 
 /* LOW-LEVEL */
 
-#include <machine/limits.h>
+#include <sys/limits.h>
 
 #define PC98KBD_DEFAULT	0
 

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)quad.h	8.1 (Berkeley) 6/4/93
- * $FreeBSD: src/sys/libkern/quad.h,v 1.13 2002/10/08 07:24:19 phk Exp $
+ * $FreeBSD: src/sys/libkern/quad.h,v 1.14 2003/04/29 13:36:03 kan Exp $
  */
 
 #ifndef _LIBKERN_QUAD_H
@@ -59,8 +59,8 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <sys/limits.h>
 #include <sys/syslimits.h>
-#include <machine/limits.h>
 
 /*
  * Depending on the desired operation, we view a `long long' (aka quad_t) in

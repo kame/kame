@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.137 2002/11/18 02:41:03 alfred Exp $
+ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.143 2003/04/17 22:29:23 jhb Exp $
  */
 
 #include "opt_ddb.h"
@@ -53,7 +53,6 @@
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
-#include <sys/disklabel.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
@@ -139,13 +138,18 @@ static void shutdown_panic(void *junk, int howto);
 static void shutdown_reset(void *junk, int howto);
 
 /* register various local shutdown events */
-static void 
+static void
 shutdown_conf(void *unused)
 {
-	EVENTHANDLER_REGISTER(shutdown_final, poweroff_wait, NULL, SHUTDOWN_PRI_FIRST);
-	EVENTHANDLER_REGISTER(shutdown_final, shutdown_halt, NULL, SHUTDOWN_PRI_LAST + 100);
-	EVENTHANDLER_REGISTER(shutdown_final, shutdown_panic, NULL, SHUTDOWN_PRI_LAST + 100);
-	EVENTHANDLER_REGISTER(shutdown_final, shutdown_reset, NULL, SHUTDOWN_PRI_LAST + 200);
+
+	EVENTHANDLER_REGISTER(shutdown_final, poweroff_wait, NULL,
+	    SHUTDOWN_PRI_FIRST);
+	EVENTHANDLER_REGISTER(shutdown_final, shutdown_halt, NULL,
+	    SHUTDOWN_PRI_LAST + 100);
+	EVENTHANDLER_REGISTER(shutdown_final, shutdown_panic, NULL,
+	    SHUTDOWN_PRI_LAST + 100);
+	EVENTHANDLER_REGISTER(shutdown_final, shutdown_reset, NULL,
+	    SHUTDOWN_PRI_LAST + 200);
 }
 
 SYSINIT(shutdown_conf, SI_SUB_INTRINSIC, SI_ORDER_ANY, shutdown_conf, NULL)
@@ -183,8 +187,9 @@ static int shutdown_howto = 0;
 void
 shutdown_nice(int howto)
 {
+
 	shutdown_howto = howto;
-	
+
 	/* Send a signal to init(8) and have it shutdown the world */
 	if (initproc != NULL) {
 		PROC_LOCK(initproc);
@@ -228,6 +233,7 @@ print_uptime(void)
 static void
 doadump(void)
 {
+
 	savectx(&dumppcb);
 	dumping++;
 	dumpsys(&dumper);
@@ -326,7 +332,7 @@ boot(int howto)
 				nbusy++;
 #if defined(SHOW_BUSYBUFS) || defined(DIAGNOSTIC)
 				printf(
-			    "%d: dev:%s, flags:%08lx, blkno:%ld, lblkno:%ld\n",
+			    "%d: dev:%s, flags:%0x, blkno:%ld, lblkno:%ld\n",
 				    nbusy, devtoname(bp->b_dev),
 				    bp->b_flags, (long)bp->b_blkno,
 				    (long)bp->b_lblkno);
@@ -376,6 +382,7 @@ boot(int howto)
 static void
 shutdown_halt(void *junk, int howto)
 {
+
 	if (howto & RB_HALT) {
 		printf("\n");
 		printf("The operating system has halted.\n");
@@ -431,11 +438,28 @@ shutdown_panic(void *junk, int howto)
 static void
 shutdown_reset(void *junk, int howto)
 {
+
 	printf("Rebooting...\n");
 	DELAY(1000000);	/* wait 1 sec for printf's to complete and be read */
 	/* cpu_boot(howto); */ /* doesn't do anything at the moment */
 	cpu_reset();
 	/* NOTREACHED */ /* assuming reset worked */
+}
+
+/*
+ * Print a backtrace if we can.
+ */
+
+void
+backtrace(void)
+{
+
+#ifdef DDB
+	printf("Stack backtrace:\n");
+	db_print_backtrace();
+#else
+	printf("Sorry, need DDB option to print backtrace");
+#endif
 }
 
 #ifdef SMP
@@ -498,7 +522,7 @@ panic(const char *fmt, ...)
 
 #if defined(DDB)
 	if (newpanic && trace_on_panic)
-		db_print_backtrace();
+		backtrace();
 	if (debugger_on_panic)
 		Debugger ("panic");
 #ifdef RESTARTABLE_PANICS
@@ -511,7 +535,9 @@ panic(const char *fmt, ...)
 	}
 #endif
 #endif
+	mtx_lock_spin(&sched_lock);
 	td->td_flags |= TDF_INPANIC;
+	mtx_unlock_spin(&sched_lock);
 	if (!sync_on_panic)
 		bootopt |= RB_NOSYNC;
 	boot(bootopt);
@@ -528,10 +554,11 @@ static int poweroff_delay = POWEROFF_DELAY;
 SYSCTL_INT(_kern_shutdown, OID_AUTO, poweroff_delay, CTLFLAG_RW,
 	&poweroff_delay, 0, "");
 
-static void 
+static void
 poweroff_wait(void *junk, int howto)
 {
-	if(!(howto & RB_POWEROFF) || poweroff_delay <= 0)
+
+	if (!(howto & RB_POWEROFF) || poweroff_delay <= 0)
 		return;
 	DELAY(poweroff_delay * 1000);
 }
@@ -571,6 +598,7 @@ kproc_shutdown(void *arg, int howto)
 int
 set_dumper(struct dumperinfo *di)
 {
+
 	if (di == NULL) {
 		bzero(&dumper, sizeof dumper);
 		return (0);

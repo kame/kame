@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_exec.c,v 1.202.2.1 2002/12/19 09:40:10 alfred Exp $
+ * $FreeBSD: src/sys/kern/kern_exec.c,v 1.219 2003/05/13 20:35:59 jhb Exp $
  */
 
 #include "opt_ktrace.h"
@@ -31,6 +31,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/eventhandler.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/sysproto.h>
@@ -72,23 +73,11 @@
 
 MALLOC_DEFINE(M_PARGS, "proc-args", "Process arguments");
 
-static MALLOC_DEFINE(M_ATEXEC, "atexec", "atexec callback");
-
 static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
+static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int kern_execve(struct thread *td, char *fname, char **argv,
 	char **envv, struct mac *mac_p);
-
-/*
- * callout list for things to do at exec time
- */
-struct execlist {
-	execlist_fn function;
-	TAILQ_ENTRY(execlist) next;
-};
-
-TAILQ_HEAD(exec_list_head, execlist);
-static struct exec_list_head exec_list = TAILQ_HEAD_INITIALIZER(exec_list);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD,
@@ -97,6 +86,9 @@ SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD,
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_USRSTACK, usrstack, CTLTYPE_ULONG|CTLFLAG_RD,
     NULL, 0, sysctl_kern_usrstack, "LU", "");
+
+SYSCTL_PROC(_kern, OID_AUTO, stackprot, CTLTYPE_INT|CTLFLAG_RD,
+    NULL, 0, sysctl_kern_stackprot, "I", "");
 
 u_long ps_arg_cache_limit = PAGE_SIZE / 16;
 SYSCTL_ULONG(_kern, OID_AUTO, ps_arg_cache_limit, CTLFLAG_RW, 
@@ -131,6 +123,16 @@ sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS)
 	    sizeof(p->p_sysent->sv_usrstack)));
 }
 
+static int
+sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS)
+{
+	struct proc *p;
+
+	p = curproc;
+	return (SYSCTL_OUT(req, &p->p_sysent->sv_stackprot,
+	    sizeof(p->p_sysent->sv_stackprot)));
+}
+
 /*
  * Each of the items is a pointer to a `const struct execsw', hence the
  * double pointer here.
@@ -161,9 +163,10 @@ kern_execve(td, fname, argv, envv, mac_p)
 	struct vattr attr;
 	int (*img_first)(struct image_params *);
 	struct pargs *oldargs = NULL, *newargs = NULL;
-	struct procsig *oldprocsig, *newprocsig;
+	struct sigacts *oldsigacts, *newsigacts;
 #ifdef KTRACE
 	struct vnode *tracevp = NULL;
+	struct ucred *tracecred = NULL;
 #endif
 	struct vnode *textvp = NULL;
 	int credential_changing;
@@ -186,7 +189,7 @@ kern_execve(td, fname, argv, envv, mac_p)
 	PROC_LOCK(p);
 	KASSERT((p->p_flag & P_INEXEC) == 0,
 	    ("%s(): process already has P_INEXEC flag", __func__));
-	if (p->p_flag & P_KSES) {
+	if (p->p_flag & P_THREADED || p->p_numthreads > 1) {
 		if (thread_single(SINGLE_EXIT)) {
 			PROC_UNLOCK(p);
 			return (ERESTART);	/* Try again later. */
@@ -195,8 +198,8 @@ kern_execve(td, fname, argv, envv, mac_p)
 		 * If we get here all other threads are dead,
 		 * so unset the associated flags and lose KSE mode.
 		 */
-		p->p_flag &= ~P_KSES;
-		td->td_flags &= ~TDF_UNBOUND;
+		p->p_flag &= ~P_THREADED;
+		td->td_mailbox = NULL;
 		thread_single_end();
 	}
 	p->p_flag |= P_INEXEC;
@@ -377,7 +380,7 @@ interpret:
 	if (p->p_fd->fd_refcnt > 1) {
 		struct filedesc *tmp;
 
-		tmp = fdcopy(td);
+		tmp = fdcopy(td->td_proc->p_fd);
 		FILEDESC_UNLOCK(p->p_fd);
 		fdfree(td);
 		p->p_fd = tmp;
@@ -406,23 +409,16 @@ interpret:
 	 * reset.
 	 */
 	PROC_LOCK(p);
-	mp_fixme("procsig needs a lock");
-	if (p->p_procsig->ps_refcnt > 1) {
-		oldprocsig = p->p_procsig;
+	if (sigacts_shared(p->p_sigacts)) {
+		oldsigacts = p->p_sigacts;
 		PROC_UNLOCK(p);
-		MALLOC(newprocsig, struct procsig *, sizeof(struct procsig),
-		    M_SUBPROC, M_WAITOK);
-		bcopy(oldprocsig, newprocsig, sizeof(*newprocsig));
-		newprocsig->ps_refcnt = 1;
-		oldprocsig->ps_refcnt--;
+		newsigacts = sigacts_alloc();
+		sigacts_copy(newsigacts, oldsigacts);
 		PROC_LOCK(p);
-		p->p_procsig = newprocsig;
-		if (p->p_sigacts == &p->p_uarea->u_sigacts)
-			panic("shared procsig but private sigacts?");
+		p->p_sigacts = newsigacts;
+	} else
+		oldsigacts = NULL;
 
-		p->p_uarea->u_sigacts = *p->p_sigacts;
-		p->p_sigacts = &p->p_uarea->u_sigacts;
-	}
 	/* Stop profiling */
 	stopprofclock(p);
 
@@ -475,11 +471,13 @@ interpret:
 		 */
 		setsugid(p);
 #ifdef KTRACE
-		if (p->p_tracep && suser_cred(oldcred, PRISON_ROOT)) {
+		if (p->p_tracevp != NULL && suser_cred(oldcred, PRISON_ROOT)) {
 			mtx_lock(&ktrace_mtx);
 			p->p_traceflag = 0;
-			tracevp = p->p_tracep;
-			p->p_tracep = NULL;
+			tracevp = p->p_tracevp;
+			p->p_tracevp = NULL;
+			tracecred = p->p_tracecred;
+			p->p_tracecred = NULL;
 			mtx_unlock(&ktrace_mtx);
 		}
 #endif
@@ -612,11 +610,15 @@ done1:
 #ifdef KTRACE
 	if (tracevp != NULL)
 		vrele(tracevp);
+	if (tracecred != NULL)
+		crfree(tracecred);
 #endif
 	if (oldargs != NULL)
 		pargs_drop(oldargs);
 	if (newargs != NULL)
 		pargs_drop(newargs);
+	if (oldsigacts != NULL)
+		sigacts_free(oldsigacts);
 
 exec_fail_dealloc:
 
@@ -758,7 +760,9 @@ exec_map_first_page(imgp)
 					break;
 				if (ma[i]->valid)
 					break;
+				vm_page_lock_queues();
 				vm_page_busy(ma[i]);
+				vm_page_unlock_queues();
 			} else {
 				ma[i] = vm_page_alloc(object, i,
 				    VM_ALLOC_NORMAL);
@@ -819,7 +823,6 @@ exec_new_vmspace(imgp, sv)
 	struct sysentvec *sv;
 {
 	int error;
-	struct execlist *ep;
 	struct proc *p = imgp->proc;
 	struct vmspace *vmspace = p->p_vmspace;
 	vm_offset_t stack_addr;
@@ -831,11 +834,7 @@ exec_new_vmspace(imgp, sv)
 
 	imgp->vmspace_destroyed = 1;
 
-	/*
-	 * Perform functions registered with at_exec().
-	 */
-	TAILQ_FOREACH(ep, &exec_list, next)
-		(*ep->function)(p);
+	EVENTHANDLER_INVOKE(process_exec, p);
 
 	/*
 	 * Blow away entire process VM, if address space not shared,
@@ -845,8 +844,7 @@ exec_new_vmspace(imgp, sv)
 	map = &vmspace->vm_map;
 	if (vmspace->vm_refcnt == 1 && vm_map_min(map) == sv->sv_minuser &&
 	    vm_map_max(map) == sv->sv_maxuser) {
-		if (vmspace->vm_shm)
-			shmexit(p);
+		shmexit(vmspace);
 		vm_page_lock_queues();
 		pmap_remove_pages(vmspace_pmap(vmspace), vm_map_min(map),
 		    vm_map_max(map));
@@ -1091,17 +1089,17 @@ exec_check_permissions(imgp)
 
 	td = curthread;			/* XXXKSE */
 
+	/* Get file attributes */
+	error = VOP_GETATTR(vp, attr, td->td_ucred, td);
+	if (error)
+		return (error);
+
 #ifdef MAC
 	error = mac_check_vnode_exec(td->td_ucred, imgp->vp, imgp);
 	if (error)
 		return (error);
 #endif
 	
-	/* Get file attributes */
-	error = VOP_GETATTR(vp, attr, td->td_ucred, td);
-	if (error)
-		return (error);
-
 	/*
 	 * 1) Check if file execution is disabled for the filesystem that this
 	 *	file resides on.
@@ -1201,45 +1199,5 @@ exec_unregister(execsw_arg)
 	if (execsw)
 		free(execsw, M_TEMP);
 	execsw = newexecsw;
-	return (0);
-}
-
-int
-at_exec(function)
-	execlist_fn function;
-{
-	struct execlist *ep;
-
-#ifdef INVARIANTS
-	/* Be noisy if the programmer has lost track of things */
-	if (rm_at_exec(function)) 
-		printf("WARNING: exec callout entry (%p) already present\n",
-		    function);
-#endif
-	ep = malloc(sizeof(*ep), M_ATEXEC, M_NOWAIT);
-	if (ep == NULL)
-		return (ENOMEM);
-	ep->function = function;
-	TAILQ_INSERT_TAIL(&exec_list, ep, next);
-	return (0);
-}
-
-/*
- * Scan the exec callout list for the given item and remove it.
- * Returns the number of items removed (0 or 1)
- */
-int
-rm_at_exec(function)
-	execlist_fn function;
-{
-	struct execlist *ep;
-
-	TAILQ_FOREACH(ep, &exec_list, next) {
-		if (ep->function == function) {
-			TAILQ_REMOVE(&exec_list, ep, next);
-			free(ep, M_ATEXEC);
-			return (1);
-		}
-	}	
 	return (0);
 }

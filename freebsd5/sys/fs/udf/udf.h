@@ -23,11 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/udf/udf.h,v 1.3 2002/08/15 00:43:43 scottl Exp $
+ * $FreeBSD: src/sys/fs/udf/udf.h,v 1.5 2003/05/04 07:40:29 scottl Exp $
  */
 
+#define UDF_HASHTBLSIZE 100
+
 struct udf_node {
-	TAILQ_ENTRY(udf_node)	tq;
+	LIST_ENTRY(udf_node)	le;
 	struct vnode	*i_vnode;
 	struct vnode	*i_devvp;
 	struct udf_mnt	*udfmp;
@@ -50,7 +52,8 @@ struct udf_mnt {
 	uint64_t		root_id;
 	struct vnode		*root_vp;
 	struct long_ad		root_icb;
-	TAILQ_HEAD(, udf_node)	udf_tqh;
+	LIST_HEAD(udf_hash_lh, udf_node)	*hashtbl;
+	u_long			hashsz;
 	struct mtx		hash_mtx;
 	int			p_sectors;
 	int			s_table_entries;
@@ -88,8 +91,8 @@ MALLOC_DECLARE(M_UDFFENTRY);
 static __inline int
 udf_readlblks(struct udf_mnt *udfmp, int sector, int size, struct buf **bp)
 {
-	return (bread(udfmp->im_devvp, sector << (udfmp->bshift - DEV_BSHIFT),
-		      (size + udfmp->bmask) & ~udfmp->bmask, NOCRED, bp));
+	return (RDSECTOR(udfmp->im_devvp, sector,
+			 (size + udfmp->bmask) & ~udfmp->bmask, bp));
 }
 
 static __inline int
@@ -113,7 +116,7 @@ udf_readalblks(struct udf_mnt *udfmp, int lsector, int size, struct buf **bp)
  * XXX Assumes the ICB is a long_ad.  This struct is compatible with short_ad,
  *     but not ext_ad.
  */
-static ino_t
+static __inline ino_t
 udf_getid(struct long_ad *icb)
 {
 	return (icb->loc.lb_num);

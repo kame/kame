@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
- * $FreeBSD: src/sys/ia64/ia64/sys_machdep.c,v 1.2.2.1 2002/12/19 09:40:09 alfred Exp $
+ * $FreeBSD: src/sys/ia64/ia64/sys_machdep.c,v 1.6 2003/04/25 20:04:02 jhb Exp $
  *
  */
 
@@ -68,7 +68,7 @@ sysarch(td, uap)
 	struct thread *td;
 	register struct sysarch_args *uap;
 {
-	int error = 0;
+	int error;
 
 	switch(uap->op) {
 	default:

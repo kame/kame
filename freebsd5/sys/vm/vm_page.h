@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_page.h,v 1.116 2002/11/18 04:05:22 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_page.h,v 1.118 2003/03/25 00:07:06 jake Exp $
  */
 
 /*
@@ -116,7 +116,7 @@ struct vm_page {
 
 	vm_object_t object;		/* which object am I in (O,P)*/
 	vm_pindex_t pindex;		/* offset into object (O,P) */
-	vm_offset_t phys_addr;		/* physical address of page */
+	vm_paddr_t phys_addr;	/* physical address of page */
 	struct md_page md;		/* machine dependant stuff */
 	u_short	queue;			/* page queue index */
 	u_short	flags,			/* see below */
@@ -330,13 +330,12 @@ void vm_page_unhold(vm_page_t mem);
 void vm_page_copy(vm_page_t src_m, vm_page_t dest_m);
 void vm_page_free(vm_page_t m);
 void vm_page_free_zero(vm_page_t m);
-int vm_page_sleep_busy(vm_page_t m, int also_m_busy, const char *msg);
 int vm_page_sleep_if_busy(vm_page_t m, int also_m_busy, const char *msg);
 void vm_page_dirty(vm_page_t m);
 void vm_page_wakeup(vm_page_t m);
 
 void vm_pageq_init(void);
-vm_page_t vm_pageq_add_new_page(vm_offset_t pa);
+vm_page_t vm_pageq_add_new_page(vm_paddr_t pa);
 void vm_pageq_enqueue(int queue, vm_page_t m);
 void vm_pageq_remove_nowakeup(vm_page_t m);
 void vm_pageq_remove(vm_page_t m);

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pci_user.c,v 1.5 2002/02/27 18:31:47 jhb Exp $
+ * $FreeBSD: src/sys/dev/pci/pci_user.c,v 1.9 2003/03/03 12:15:44 phk Exp $
  *
  */
 
@@ -67,22 +67,18 @@ static int	pci_conf_match(struct pci_match_conf *matches, int num_matches,
 			       struct pci_conf *match_buf);
 static d_ioctl_t	pci_ioctl;
 
+#if __FreeBSD_version < 500000
 #define	PCI_CDEV	78
+#else
+#define	PCI_CDEV	MAJOR_AUTO
+#endif
 
 struct cdevsw pcicdev = {
-	/* open */	pci_open,
-	/* close */	pci_close,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	pci_ioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"pci",
-	/* maj */	PCI_CDEV,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	pci_open,
+	.d_close =	pci_close,
+	.d_ioctl =	pci_ioctl,
+	.d_name =	"pci",
+	.d_maj =	PCI_CDEV,
 };
   
 static int

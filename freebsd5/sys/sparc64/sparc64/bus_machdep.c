@@ -106,13 +106,15 @@
  *	and
  * 	from: FreeBSD: src/sys/i386/i386/busdma_machdep.c,v 1.24 2001/08/15
  *
- * $FreeBSD: src/sys/sparc64/sparc64/bus_machdep.c,v 1.11 2002/10/04 20:40:35 sam Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/bus_machdep.c,v 1.30 2003/05/27 04:59:59 scottl Exp $
  */
 
 #include <sys/param.h>
 #include <sys/bus.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/smp.h>
 #include <sys/systm.h>
@@ -126,10 +128,10 @@
 #include <vm/vm_map.h>
 
 #include <machine/asi.h>
+#include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/bus_private.h>
 #include <machine/cache.h>
-#include <machine/pmap.h>
 #include <machine/smp.h>
 #include <machine/tlb.h>
 
@@ -201,41 +203,45 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 	if (newtag == NULL)
 		return (ENOMEM);
 
-	newtag->parent = parent != NULL ? parent : sparc64_root_dma_tag;
-	newtag->alignment = alignment;
-	newtag->boundary = boundary;
-	newtag->lowaddr = trunc_page((vm_offset_t)lowaddr) + (PAGE_SIZE - 1);
-	newtag->highaddr = trunc_page((vm_offset_t)highaddr) + (PAGE_SIZE - 1);
-	newtag->filter = filter;
-	newtag->filterarg = filterarg;
-	newtag->maxsize = maxsize;
-	newtag->nsegments = nsegments;
-	newtag->maxsegsz = maxsegsz;
-	newtag->flags = flags;
-	newtag->ref_count = 1; /* Count ourselves */
-	newtag->map_count = 0;
+	newtag->dt_parent = parent != NULL ? parent : sparc64_root_dma_tag;
+	newtag->dt_alignment = alignment;
+	newtag->dt_boundary = boundary;
+	newtag->dt_lowaddr = trunc_page((vm_offset_t)lowaddr) + (PAGE_SIZE - 1);
+	newtag->dt_highaddr = trunc_page((vm_offset_t)highaddr) +
+	    (PAGE_SIZE - 1);
+	newtag->dt_filter = filter;
+	newtag->dt_filterarg = filterarg;
+	newtag->dt_maxsize = maxsize;
+	newtag->dt_nsegments = nsegments;
+	newtag->dt_maxsegsz = maxsegsz;
+	newtag->dt_flags = flags;
+	newtag->dt_ref_count = 1; /* Count ourselves */
+	newtag->dt_map_count = 0;
 
-	newtag->dmamap_create = NULL;
-	newtag->dmamap_destroy = NULL;
-	newtag->dmamap_load = NULL;
-	newtag->dmamap_load_mbuf = NULL;
-	newtag->dmamap_load_uio = NULL;
-	newtag->dmamap_unload = NULL;
-	newtag->dmamap_sync = NULL;
-	newtag->dmamem_alloc = NULL;
-	newtag->dmamem_free = NULL;
+	newtag->dt_dmamap_create = NULL;
+	newtag->dt_dmamap_destroy = NULL;
+	newtag->dt_dmamap_load = NULL;
+	newtag->dt_dmamap_load_mbuf = NULL;
+	newtag->dt_dmamap_load_uio = NULL;
+	newtag->dt_dmamap_unload = NULL;
+	newtag->dt_dmamap_sync = NULL;
+	newtag->dt_dmamem_alloc = NULL;
+	newtag->dt_dmamem_free = NULL;
 
 	/* Take into account any restrictions imposed by our parent tag */
 	if (parent != NULL) {
-		newtag->lowaddr = ulmin(parent->lowaddr, newtag->lowaddr);
-		newtag->highaddr = ulmax(parent->highaddr, newtag->highaddr);
+		newtag->dt_lowaddr = ulmin(parent->dt_lowaddr,
+		    newtag->dt_lowaddr);
+		newtag->dt_highaddr = ulmax(parent->dt_highaddr,
+		    newtag->dt_highaddr);
 		/*
 		 * XXX Not really correct??? Probably need to honor boundary
 		 *     all the way up the inheritence chain.
 		 */
-		newtag->boundary = ulmax(parent->boundary, newtag->boundary);
+		newtag->dt_boundary = ulmin(parent->dt_boundary,
+		    newtag->dt_boundary);
 	}
-	newtag->parent->ref_count++;
+	atomic_add_int(&newtag->dt_parent->dt_ref_count, 1);
 
 	*dmat = newtag;
 	return (0);
@@ -247,12 +253,12 @@ bus_dma_tag_destroy(bus_dma_tag_t dmat)
 	bus_dma_tag_t parent;
 
 	if (dmat != NULL) {
-		if (dmat->map_count != 0)
+		if (dmat->dt_map_count != 0)
 			return (EBUSY);
 		while (dmat != NULL) {
-			parent = dmat->parent;
-			dmat->ref_count--;
-			if (dmat->ref_count == 0) {
+			parent = dmat->dt_parent;
+			atomic_subtract_int(&dmat->dt_ref_count, 1);
+			if (dmat->dt_ref_count == 0) {
 				free(dmat, M_DEVBUF);
 				/*
 				 * Last reference count, so
@@ -276,10 +282,10 @@ nexus_dmamap_create(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, int flags,
     bus_dmamap_t *mapp)
 {
 
-	/* Not much to do...? */
 	*mapp = malloc(sizeof(**mapp), M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (*mapp != NULL) {
-		ddmat->map_count++;
+		ddmat->dt_map_count++;
+		sparc64_dmamap_init(*mapp);
 		return (0);
 	} else
 		return (ENOMEM);
@@ -294,85 +300,7 @@ nexus_dmamap_destroy(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map)
 {
 
 	free(map, M_DEVBUF);
-	ddmat->map_count--;
-	return (0);
-}
-
-#define BUS_DMAMAP_NSEGS ((BUS_SPACE_MAXSIZE / PAGE_SIZE) + 1)
-
-/*
- * Common function for loading a DMA map with a linear buffer.  May
- * be called by bus-specific DMA map load functions.
- *
- * Most SPARCs have IOMMUs in the bus controllers.  In those cases
- * they only need one segment and will use virtual addresses for DVMA.
- * Those bus controllers should intercept these vectors and should
- * *NEVER* call nexus_dmamap_load() which is used only by devices that
- * bypass DVMA.
- */
-static int
-nexus_dmamap_load(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map,
-    void *buf, bus_size_t buflen, bus_dmamap_callback_t *callback,
-    void *callback_arg, int flags)
-{
-	vm_offset_t vaddr;
-	vm_offset_t paddr;
-#ifdef __GNUC__
-	bus_dma_segment_t dm_segments[ddmat->nsegments];
-#else
-	bus_dma_segment_t dm_segments[BUS_DMAMAP_NSEGS];
-#endif
-	bus_dma_segment_t *sg;
-	int seg;
-	int error;
-	vm_offset_t nextpaddr;
-	bus_size_t size;
-
-	error = 0;
-
-	vaddr = (vm_offset_t)buf;
-	sg = &dm_segments[0];
-	seg = 1;
-	sg->ds_len = 0;
-
-	map->buf = buf;
-	map->buflen = buflen;
-	map->start = (bus_addr_t)buf;
-
-	nextpaddr = 0;
-	do {
-		paddr = pmap_kextract(vaddr);
-		size = PAGE_SIZE - (paddr & PAGE_MASK);
-		if (size > buflen)
-			size = buflen;
-
-		if (sg->ds_len == 0) {
-			sg->ds_addr = paddr;
-			sg->ds_len = size;
-		} else if (paddr == nextpaddr) {
-			sg->ds_len += size;
-		} else {
-			/* Go to the next segment */
-			sg++;
-			seg++;
-			if (seg > ddmat->nsegments)
-				break;
-			sg->ds_addr = paddr;
-			sg->ds_len = size;
-		}
-		vaddr += size;
-		nextpaddr = paddr + size;
-		buflen -= size;
-	} while (buflen > 0);
-
-	if (buflen != 0) {
-		printf("bus_dmamap_load: Too many segs! buf_len = 0x%lx\n",
-		       (u_long)buflen);
-		error = EFBIG;
-	}
-
-	(*callback)(callback_arg, dm_segments, seg, error);
-
+	ddmat->dt_map_count--;
 	return (0);
 }
 
@@ -383,14 +311,9 @@ nexus_dmamap_load(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map,
  * first indicates if this is the first invocation of this function.
  */
 static int
-_nexus_dmamap_load_buffer(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
-			bus_dma_segment_t segs[],
-			void *buf, bus_size_t buflen,
-			struct thread *td,
-			int flags,
-			vm_offset_t *lastaddrp,
-			int *segp,
-			int first)
+_nexus_dmamap_load_buffer(bus_dma_tag_t ddmat, bus_dma_segment_t segs[],
+    void *buf, bus_size_t buflen, struct thread *td, int flags,
+    bus_addr_t *lastaddrp, int *segp, int first)
 {
 	bus_size_t sgsize;
 	bus_addr_t curaddr, lastaddr, baddr, bmask;
@@ -404,7 +327,7 @@ _nexus_dmamap_load_buffer(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
 		pmap = NULL;
 
 	lastaddr = *lastaddrp;
-	bmask  = ~(ddmat->boundary - 1);
+	bmask  = ~(ddmat->dt_boundary - 1);
 
 	for (seg = *segp; buflen > 0 ; ) {
 		/*
@@ -425,8 +348,8 @@ _nexus_dmamap_load_buffer(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
 		/*
 		 * Make sure we don't cross any boundaries.
 		 */
-		if (ddmat->boundary > 0) {
-			baddr = (curaddr + ddmat->boundary) & bmask;
+		if (ddmat->dt_boundary > 0) {
+			baddr = (curaddr + ddmat->dt_boundary) & bmask;
 			if (sgsize > (baddr - curaddr))
 				sgsize = (baddr - curaddr);
 		}
@@ -441,12 +364,12 @@ _nexus_dmamap_load_buffer(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
 			first = 0;
 		} else {
 			if (curaddr == lastaddr &&
-			    (segs[seg].ds_len + sgsize) <= ddmat->maxsegsz &&
-			    (ddmat->boundary == 0 ||
+			    (segs[seg].ds_len + sgsize) <= ddmat->dt_maxsegsz &&
+			    (ddmat->dt_boundary == 0 ||
 			     (segs[seg].ds_addr & bmask) == (curaddr & bmask)))
 				segs[seg].ds_len += sgsize;
 			else {
-				if (++seg >= ddmat->nsegments)
+				if (++seg >= ddmat->dt_nsegments)
 					break;
 				segs[seg].ds_addr = curaddr;
 				segs[seg].ds_len = sgsize;
@@ -468,38 +391,71 @@ _nexus_dmamap_load_buffer(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
 }
 
 /*
- * Like _bus_dmamap_load(), but for mbufs.
+ * Common function for loading a DMA map with a linear buffer.  May
+ * be called by bus-specific DMA map load functions.
+ *
+ * Most SPARCs have IOMMUs in the bus controllers.  In those cases
+ * they only need one segment and will use virtual addresses for DVMA.
+ * Those bus controllers should intercept these vectors and should
+ * *NEVER* call nexus_dmamap_load() which is used only by devices that
+ * bypass DVMA.
+ */
+static int
+nexus_dmamap_load(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map,
+    void *buf, bus_size_t buflen, bus_dmamap_callback_t *callback,
+    void *callback_arg, int flags)
+{
+#ifdef __GNUC__
+	bus_dma_segment_t dm_segments[ddmat->dt_nsegments];
+#else
+	bus_dma_segment_t dm_segments[BUS_DMAMAP_NSEGS];
+#endif
+	bus_addr_t lastaddr;
+	int error, nsegs;
+
+	error = _nexus_dmamap_load_buffer(ddmat, dm_segments, buf, buflen,
+	    NULL, flags, &lastaddr, &nsegs, 1);
+
+	if (error == 0) {
+		(*callback)(callback_arg, dm_segments, nsegs + 1, 0);
+		map->dm_loaded = 1;
+	} else
+		(*callback)(callback_arg, NULL, 0, error);
+
+	return (0);
+}
+
+/*
+ * Like nexus_dmamap_load(), but for mbufs.
  */
 static int
 nexus_dmamap_load_mbuf(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
-		     bus_dmamap_t map,
-		     struct mbuf *m0,
-		     bus_dmamap_callback2_t *callback, void *callback_arg,
-		     int flags)
+    bus_dmamap_t map, struct mbuf *m0, bus_dmamap_callback2_t *callback,
+    void *callback_arg, int flags)
 {
 #ifdef __GNUC__
-	bus_dma_segment_t dm_segments[ddmat->nsegments];
+	bus_dma_segment_t dm_segments[ddmat->dt_nsegments];
 #else
 	bus_dma_segment_t dm_segments[BUS_DMAMAP_NSEGS];
 #endif
 	int nsegs, error;
 
-	KASSERT(m0->m_flags & M_PKTHDR,
-		("nexus_dmamap_load_mbuf: no packet header"));
+	M_ASSERTPKTHDR(m0);
 
 	nsegs = 0;
 	error = 0;
-	if (m0->m_pkthdr.len <= ddmat->maxsize) {
+	if (m0->m_pkthdr.len <= ddmat->dt_maxsize) {
 		int first = 1;
-		vm_offset_t lastaddr = 0;
+		bus_addr_t lastaddr = 0;
 		struct mbuf *m;
 
 		for (m = m0; m != NULL && error == 0; m = m->m_next) {
-			error = _nexus_dmamap_load_buffer(pdmat, ddmat,
-					dm_segments,
-					m->m_data, m->m_len,
-					NULL, flags, &lastaddr, &nsegs, first);
-			first = 0;
+			if (m->m_len > 0) {
+				error = _nexus_dmamap_load_buffer(ddmat,
+				    dm_segments, m->m_data, m->m_len, NULL,
+				    flags, &lastaddr, &nsegs, first);
+				first = 0;
+			}
 		}
 	} else {
 		error = EINVAL;
@@ -509,25 +465,24 @@ nexus_dmamap_load_mbuf(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
 		/* force "no valid mappings" in callback */
 		(*callback)(callback_arg, dm_segments, 0, 0, error);
 	} else {
-		(*callback)(callback_arg, dm_segments,
-			    nsegs+1, m0->m_pkthdr.len, error);
+		map->dm_loaded = 1;
+		(*callback)(callback_arg, dm_segments, nsegs + 1,
+		    m0->m_pkthdr.len, error);
 	}
 	return (error);
 }
 
 /*
- * Like _bus_dmamap_load(), but for uios.
+ * Like nexus_dmamap_load(), but for uios.
  */
 static int
 nexus_dmamap_load_uio(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
-		    bus_dmamap_t map,
-		    struct uio *uio,
-		    bus_dmamap_callback2_t *callback, void *callback_arg,
-		    int flags)
+    bus_dmamap_t map, struct uio *uio, bus_dmamap_callback2_t *callback,
+    void *callback_arg, int flags)
 {
-	vm_offset_t lastaddr;
+	bus_addr_t lastaddr;
 #ifdef __GNUC__
-	bus_dma_segment_t dm_segments[ddmat->nsegments];
+	bus_dma_segment_t dm_segments[ddmat->dt_nsegments];
 #else
 	bus_dma_segment_t dm_segments[BUS_DMAMAP_NSEGS];
 #endif
@@ -557,21 +512,22 @@ nexus_dmamap_load_uio(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
 			resid < iov[i].iov_len ? resid : iov[i].iov_len;
 		caddr_t addr = (caddr_t) iov[i].iov_base;
 
-		error = _nexus_dmamap_load_buffer(pdmat, ddmat,
-				dm_segments,
-				addr, minlen,
-				td, flags, &lastaddr, &nsegs, first);
-		first = 0;
+		if (minlen > 0) {
+			error = _nexus_dmamap_load_buffer(ddmat, dm_segments,
+			    addr, minlen, td, flags, &lastaddr, &nsegs, first);
+			first = 0;
 
-		resid -= minlen;
+			resid -= minlen;
+		}
 	}
 
 	if (error) {
 		/* force "no valid mappings" in callback */
 		(*callback)(callback_arg, dm_segments, 0, 0, error);
 	} else {
-		(*callback)(callback_arg, dm_segments,
-			    nsegs+1, uio->uio_resid, error);
+		map->dm_loaded = 1;
+		(*callback)(callback_arg, dm_segments, nsegs + 1,
+		    uio->uio_resid, error);
 	}
 	return (error);
 }
@@ -584,7 +540,7 @@ static void
 nexus_dmamap_unload(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map)
 {
 
-	/* Nothing to do...? */
+	map->dm_loaded = 0;
 }
 
 /*
@@ -601,23 +557,21 @@ nexus_dmamap_sync(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map,
 	 *
 	 * Actually a #Sync is expensive.  We should optimize.
 	 */
-	if ((op == BUS_DMASYNC_PREREAD) || (op == BUS_DMASYNC_PREWRITE)) {
+	if ((op & BUS_DMASYNC_PREREAD) || (op & BUS_DMASYNC_PREWRITE)) {
 		/* 
 		 * Don't really need to do anything, but flush any pending
 		 * writes anyway. 
 		 */
 		membar(Sync);
 	}
-	if (op == BUS_DMASYNC_POSTREAD) {
-		/*
-		 * Invalidate the caches (it is unclear whether that is really
-		 * needed. The manual only mentions that PCI transactions are
-		 * cache coherent).
-		 */
+#if 0
+	/* Should not be needed. */
+	if (op & BUS_DMASYNC_POSTREAD) {
 		ecache_flush((vm_offset_t)map->buf,
 		    (vm_offset_t)map->buf + map->buflen - 1);
 	}
-	if (op == BUS_DMASYNC_POSTWRITE) {
+#endif
+	if (op & BUS_DMASYNC_POSTWRITE) {
 		/* Nothing to do.  Handled by the bus controller. */
 	}
 }
@@ -638,7 +592,8 @@ sparc64_dmamem_alloc_map(bus_dma_tag_t dmat, bus_dmamap_t *mapp)
 	if (*mapp == NULL)
 		return (ENOMEM);
 
-	dmat->map_count++;
+	dmat->dt_map_count++;
+	sparc64_dmamap_init(*mapp);
 	return (0);
 }
 
@@ -647,7 +602,7 @@ sparc64_dmamem_free_map(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
 
 	free(map, M_DEVBUF);
-	dmat->map_count--;
+	dmat->dt_map_count--;
 }
 
 /*
@@ -659,8 +614,8 @@ nexus_dmamem_alloc(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, void **vaddr,
     int flags, bus_dmamap_t *mapp)
 {
 
-	if ((ddmat->maxsize <= PAGE_SIZE)) {
-		*vaddr = malloc(ddmat->maxsize, M_DEVBUF,
+	if ((ddmat->dt_maxsize <= PAGE_SIZE)) {
+		*vaddr = malloc(ddmat->dt_maxsize, M_DEVBUF,
 		    (flags & BUS_DMA_NOWAIT) ? M_NOWAIT : M_WAITOK);
 	} else {
 		/*
@@ -668,11 +623,13 @@ nexus_dmamem_alloc(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, void **vaddr,
 		 * and handles multi-seg allocations.  Nobody is doing multi-seg
 		 * allocations yet though.
 		 */
-		*vaddr = contigmalloc(ddmat->maxsize, M_DEVBUF,
+		mtx_lock(&Giant);
+		*vaddr = contigmalloc(ddmat->dt_maxsize, M_DEVBUF,
 		    (flags & BUS_DMA_NOWAIT) ? M_NOWAIT : M_WAITOK,
-		    0ul, ddmat->lowaddr,
-		    ddmat->alignment ? ddmat->alignment : 1UL,
-		    ddmat->boundary);
+		    0ul, ddmat->dt_lowaddr,
+		    ddmat->dt_alignment ? ddmat->dt_alignment : 1UL,
+		    ddmat->dt_boundary);
+		mtx_unlock(&Giant);
 	}
 	if (*vaddr == NULL) {
 		free(*mapp, M_DEVBUF);
@@ -691,10 +648,13 @@ nexus_dmamem_free(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, void *vaddr,
 {
 
 	sparc64_dmamem_free_map(ddmat, map);
-	if ((ddmat->maxsize <= PAGE_SIZE))
+	if ((ddmat->dt_maxsize <= PAGE_SIZE))
 		free(vaddr, M_DEVBUF);
-	else
-		contigfree(vaddr, ddmat->maxsize, M_DEVBUF);
+	else {
+		mtx_lock(&Giant);
+		contigfree(vaddr, ddmat->dt_maxsize, M_DEVBUF);
+		mtx_unlock(&Giant);
+	}
 }
 
 struct bus_dma_tag nexus_dmatag = {
@@ -734,7 +694,7 @@ sparc64_bus_mem_map(bus_space_tag_t tag, bus_space_handle_t handle,
 	vm_offset_t addr;
 	vm_offset_t sva;
 	vm_offset_t va;
-	vm_offset_t pa;
+	vm_paddr_t pa;
 	vm_size_t vsz;
 	u_long pm_flags;
 
@@ -744,7 +704,7 @@ sparc64_bus_mem_map(bus_space_tag_t tag, bus_space_handle_t handle,
 		printf("sparc64_bus_map: zero size\n");
 		return (EINVAL);
 	}
-	switch (tag->type) {
+	switch (tag->bst_type) {
 	case PCI_CONFIG_BUS_SPACE:
 	case PCI_IO_BUS_SPACE:
 	case PCI_MEMORY_BUS_SPACE:
@@ -766,7 +726,7 @@ sparc64_bus_mem_map(bus_space_tag_t tag, bus_space_handle_t handle,
 			    "memory");
 	}
 
-	/* note: preserve page offset */
+	/* Preserve page offset. */
 	*hp = (void *)(sva | ((u_long)addr & PAGE_MASK));
 
 	pa = trunc_page(addr);
@@ -810,10 +770,10 @@ bus_space_handle_t
 sparc64_fake_bustag(int space, bus_addr_t addr, struct bus_space_tag *ptag)
 {
 
-	ptag->cookie = NULL;
-	ptag->parent = NULL;
-	ptag->type = space;
-	ptag->bus_barrier = NULL;
+	ptag->bst_cookie = NULL;
+	ptag->bst_parent = NULL;
+	ptag->bst_type = space;
+	ptag->bst_bus_barrier = NULL;
 	return (addr);
 }
 

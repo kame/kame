@@ -28,25 +28,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_gpt.c,v 1.11.2.1 2002/12/20 21:52:02 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_gpt.c,v 1.22 2003/05/02 08:33:26 phk Exp $
  */
 
 #include <sys/param.h>
-#ifndef _KERNEL
-#include <stdio.h>
-#include <string.h>
-#include <signal.h>
-#include <sys/param.h>
-#include <stdlib.h>
-#include <err.h>
-#else
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/bio.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#endif
 
 #include <sys/endian.h>
 #include <sys/sbuf.h>
@@ -88,28 +79,8 @@ is_gpt_hdr(struct gpt_hdr *hdr)
 static int
 g_gpt_start(struct bio *bp)
 {
-	struct uuid freebsd = GPT_ENT_TYPE_FREEBSD;
-	struct g_provider *pp = bp->bio_to;
-	struct g_geom *gp = pp->geom;
-	struct g_slicer *gsp = gp->softc;
-	struct g_gpt_softc *gs = gsp->softc;
-	u_int type;
 
-	if (bp->bio_cmd != BIO_GETATTR)
-		return (0);
-
-	/*
-	 * XXX: this is bogus. The BSD class has a strong dependency on
-	 * the MBR/MBREXT class, because it asks for an attribute that's
-	 * specific to the MBR/MBREXT class and the value of the attribute
-	 * is just as specific to the MBR class. In an extensible scheme
-	 * a geom would ask another geom if it could possible accomodate a
-	 * class and the answer should be yes or no. Now we're forced to
-	 * emulate a MBR class :-/
-	 */
-	type = (memcmp(&gs->part[pp->index]->ent_type, &freebsd,
-	    sizeof(freebsd))) ? 0 : 165;
-	return ((g_handleattr_int(bp, "MBR::type", type)) ? 1 : 0);
+	return (0);
 }
 
 static void
@@ -209,9 +180,6 @@ g_gpt_taste(struct g_class *mp, struct g_provider *pp, int insist)
 		tblsz = (hdr->hdr_entries * hdr->hdr_entsz + secsz - 1) &
 		    ~(secsz - 1);
 		buf = g_read_data(cp, hdr->hdr_lba_table * secsz, tblsz, &error);
-
-		gsp->frontstuff = hdr->hdr_lba_start * secsz;
-
 		for (i = 0; i < hdr->hdr_entries; i++) {
 			struct uuid unused = GPT_ENT_TYPE_UNUSED;
 			struct uuid freebsd = GPT_ENT_TYPE_FREEBSD;
@@ -220,6 +188,7 @@ g_gpt_taste(struct g_class *mp, struct g_provider *pp, int insist)
 			ent = (void*)(buf + i * hdr->hdr_entsz);
 			if (!memcmp(&ent->ent_type, &unused, sizeof(unused)))
 				continue;
+			/* XXX: This memory leaks */
 			gs->part[i] = g_malloc(hdr->hdr_entsz, M_WAITOK);
 			if (gs->part[i] == NULL)
 				break;
@@ -246,16 +215,15 @@ g_gpt_taste(struct g_class *mp, struct g_provider *pp, int insist)
 	g_topology_lock();
 	g_access_rel(cp, -1, 0, 0);
 	if (LIST_EMPTY(&gp->provider)) {
-		g_std_spoiled(cp);
+		g_slice_spoiled(cp);
 		return (NULL);
 	}
 	return (gp);
 }
 
 static struct g_class g_gpt_class = {
-	"GPT",
-	g_gpt_taste,
-	NULL,
+	.name = "GPT",
+	.taste = g_gpt_taste,
 	G_CLASS_INITIALIZER
 };
 

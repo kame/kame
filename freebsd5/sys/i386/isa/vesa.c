@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/vesa.c,v 1.37 2002/08/09 05:50:31 rwatson Exp $
+ * $FreeBSD: src/sys/i386/isa/vesa.c,v 1.42 2003/04/05 18:08:22 cognet Exp $
  */
 
 #include "opt_vga.h"
@@ -439,7 +439,7 @@ vesa_bios_save_restore(int code, void *p, size_t size)
 	vmf.vmf_ecx = STATE_MOST;
 	vmf.vmf_edx = code;	/* STATE_SAVE/STATE_LOAD */
 	buf = (u_char *)vm86_getpage(&vesa_vmcontext, 1);
-	vm86_getptr(&vesa_vmcontext, (vm_offset_t)buf, &vmf.vmf_es, &vmf.vmf_di);
+	vm86_getptr(&vesa_vmcontext, (vm_offset_t)buf, &vmf.vmf_es, &vmf.vmf_bx);
 	bcopy(p, buf, size);
 
 	err = vm86_datacall(0x10, &vmf, &vesa_vmcontext);
@@ -1278,7 +1278,8 @@ vesa_blank_display(video_adapter_t *adp, int mode)
 }
 
 static int
-vesa_mmap(video_adapter_t *adp, vm_offset_t offset, int prot)
+vesa_mmap(video_adapter_t *adp, vm_offset_t offset, vm_paddr_t *paddr,
+	  int prot)
 {
 #if VESA_DEBUG > 0
 	printf("vesa_mmap(): window:0x%x, buffer:0x%x, offset:0x%x\n", 
@@ -1290,14 +1291,10 @@ vesa_mmap(video_adapter_t *adp, vm_offset_t offset, int prot)
 		/* XXX: is this correct? */
 		if (offset > adp->va_window_size - PAGE_SIZE)
 			return -1;
-#ifdef __i386__
-		return i386_btop(adp->va_info.vi_buffer + offset);
-#endif
-#ifdef __alpha__ /* XXX */
-		return alpha_btop(adp->va_info.vi_buffer + offset);
-#endif
+		*paddr = adp->va_info.vi_buffer + offset;
+		return 0;
 	} else {
-		return (*prevvidsw->mmap)(adp, offset, prot);
+		return (*prevvidsw->mmap)(adp, offset, paddr, prot);
 	}
 }
 

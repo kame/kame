@@ -20,7 +20,7 @@
  * the original CMU copyright notice.
  *
  * Version 1.3, Thu Nov 11 12:09:13 MSK 1993
- * $FreeBSD: src/sys/i386/isa/wt.c,v 1.68 2002/05/14 06:57:02 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/wt.c,v 1.72 2003/03/03 12:15:49 phk Exp $
  *
  */
 
@@ -186,19 +186,14 @@ static	d_strategy_t	wtstrategy;
 #define CDEV_MAJOR 10
 
 static struct cdevsw wt_cdevsw = {
-	/* open */	wtopen,
-	/* close */	wtclose,
-	/* read */	physread,
-	/* write */	physwrite,
-	/* ioctl */	wtioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	wtstrategy,
-	/* name */	"wt",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	wtopen,
+	.d_close =	wtclose,
+	.d_read =	physread,
+	.d_write =	physwrite,
+	.d_ioctl =	wtioctl,
+	.d_strategy =	wtstrategy,
+	.d_name =	"wt",
+	.d_maj =	CDEV_MAJOR,
 };
 
 
@@ -614,7 +609,7 @@ wtintr (int u)
 			"rewind busy?\n" : "rewind finished\n"));
 		t->flags &= ~TPREW;             /* Rewind finished. */
 		wtsense (t, 1, TP_WRP);
-		wakeup ((caddr_t)t);
+		wakeup (t);
 		return;
 	}
 
@@ -627,7 +622,7 @@ wtintr (int u)
 		if (! (s & t->NOEXCEP))         /* operation failed */
 			wtsense (t, 1, (t->flags & TPRMARK) ? TP_WRP : 0);
 		t->flags &= ~(TPRMARK | TPWMARK); /* operation finished */
-		wakeup ((caddr_t)t);
+		wakeup (t);
 		return;
 	}
 
@@ -664,7 +659,7 @@ wtintr (int u)
 			t->flags |= TPVOL;      /* end of file */
 		else
 			t->flags |= TPEXCEP;    /* i/o error */
-		wakeup ((caddr_t)t);
+		wakeup (t);
 		return;
 	}
 
@@ -675,7 +670,7 @@ wtintr (int u)
 	}
 	if (t->dmacount > t->dmatotal)          /* short last block */
 		t->dmacount = t->dmatotal;
-	wakeup ((caddr_t)t);	/* wake up user level */
+	wakeup (t);	/* wake up user level */
 	TRACE (("i/o finished, %d\n", t->dmacount));
 }
 
@@ -719,7 +714,7 @@ wtreadfm (wtinfo_t *t)
 static int
 wtwritefm (wtinfo_t *t)
 {
-	tsleep ((caddr_t)wtwritefm, WTPRI, "wtwfm", hz); /* timeout: 1 second */
+	tsleep (wtwritefm, WTPRI, "wtwfm", hz); /* timeout: 1 second */
 	t->flags &= ~(TPRO | TPWO);
 	if (! wtcmd (t, QIC_WRITEFM)) {
 		wtsense (t, 1, 0);
@@ -753,7 +748,7 @@ wtpoll (wtinfo_t *t, int mask, int bits)
 		s = inb (t->STATPORT);
 		if ((s & mask) != bits)
 			return (s);
-		tsleep ((caddr_t)wtpoll, WTPRI, "wtpoll", 1); /* timeout: 1 tick */
+		tsleep (wtpoll, WTPRI, "wtpoll", 1); /* timeout: 1 tick */
 	}
 }
 
@@ -789,7 +784,7 @@ wtwait (wtinfo_t *t, int catch, char *msg)
 
 	TRACE (("wtwait() `%s'\n", msg));
 	while (t->flags & (TPACTIVE | TPREW | TPRMARK | TPWMARK)) {
-		error = tsleep ((caddr_t)t, WTPRI | catch, msg, 0);
+		error = tsleep (t, WTPRI | catch, msg, 0);
 		if (error)
 			return (error);
 	}

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_kthread.c,v 1.28 2002/10/02 07:44:22 scottl Exp $
+ * $FreeBSD: src/sys/kern/kern_kthread.c,v 1.31 2003/05/13 20:35:59 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -79,7 +79,7 @@ kthread_create(void (*func)(void *), void *arg,
 	struct thread *td;
 	struct proc *p2;
 
-	if (!proc0.p_stats /* || proc0.p_stats->p_start.tv_sec == 0 */)
+	if (!proc0.p_stats)
 		panic("kthread_create called too soon");
 
 	error = fork1(&thread0, RFMEM | RFFDG | RFPROC | RFSTOPPED | flags,
@@ -94,7 +94,9 @@ kthread_create(void (*func)(void *), void *arg,
 	/* this is a non-swapped system process */
 	PROC_LOCK(p2);
 	p2->p_flag |= P_SYSTEM | P_KTHREAD;
-	p2->p_procsig->ps_flag |= PS_NOCLDWAIT;
+	mtx_lock(&p2->p_sigacts->ps_mtx);
+	p2->p_sigacts->ps_flag |= PS_NOCLDWAIT;
+	mtx_unlock(&p2->p_sigacts->ps_mtx);
 	_PHOLD(p2);
 	PROC_UNLOCK(p2);
 
@@ -109,12 +111,11 @@ kthread_create(void (*func)(void *), void *arg,
 	TD_SET_CAN_RUN(td);
 
 	/* Delay putting it on the run queue until now. */
-	mtx_lock_spin(&sched_lock);
-	p2->p_sflag |= PS_INMEM;
 	if (!(flags & RFSTOPPED)) {
+		mtx_lock_spin(&sched_lock);
 		setrunqueue(td); 
+		mtx_unlock_spin(&sched_lock);
 	}
-	mtx_unlock_spin(&sched_lock);
 
 	return 0;
 }

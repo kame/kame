@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/metadata.h,v 1.3 2002/05/29 05:49:59 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/metadata.h,v 1.4 2003/05/01 03:31:18 peter Exp $
  */
 
 #ifndef _MACHINE_METADATA_H_
@@ -41,11 +41,5 @@ struct tlb_entry {
 	vm_offset_t te_pa;
 	vm_offset_t te_va;
 };
-
-#define	MD_FETCH(mdp, info, type) ({ \
-	type *__p; \
-	__p = (type *)preload_search_info((mdp), MODINFO_METADATA | (info)); \
-	__p ? *__p : 0; \
-})
 
 #endif /* !_MACHINE_METADATA_H_ */

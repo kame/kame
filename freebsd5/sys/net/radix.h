@@ -31,11 +31,16 @@
  * SUCH DAMAGE.
  *
  *	@(#)radix.h	8.2 (Berkeley) 10/31/94
- * $FreeBSD: src/sys/net/radix.h,v 1.18 2002/03/19 21:54:18 alfred Exp $
+ * $FreeBSD: src/sys/net/radix.h,v 1.22 2003/02/08 01:44:09 hsu Exp $
  */
 
 #ifndef _RADIX_H_
 #define	_RADIX_H_
+
+#ifdef _KERNEL
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
+#endif
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_RTABLE);
@@ -138,6 +143,9 @@ struct radix_node_head {
 	void	(*rnh_close)	/* do something when the last ref drops */
 		(struct radix_node *rn, struct radix_node_head *head);
 	struct	radix_node rnh_nodes[3];	/* empty tree for common case */
+#ifdef _KERNEL
+	struct	mtx rnh_mtx;			/* locks entire radix tree */
+#endif
 };
 
 #ifndef _KERNEL
@@ -150,8 +158,15 @@ struct radix_node_head {
 #define Bcmp(a, b, n) bcmp(((caddr_t)(a)), ((caddr_t)(b)), (unsigned)(n))
 #define Bcopy(a, b, n) bcopy(((caddr_t)(a)), ((caddr_t)(b)), (unsigned)(n))
 #define Bzero(p, n) bzero((caddr_t)(p), (unsigned)(n));
-#define R_Malloc(p, t, n) (p = (t) malloc((unsigned long)(n), M_RTABLE, M_DONTWAIT))
+#define R_Malloc(p, t, n) (p = (t) malloc((unsigned long)(n), M_RTABLE, M_NOWAIT))
 #define Free(p) free((caddr_t)p, M_RTABLE);
+
+#define	RADIX_NODE_HEAD_LOCK_INIT(rnh)	\
+    mtx_init(&(rnh)->rnh_mtx, "radix node head", NULL, MTX_DEF | MTX_RECURSE)
+#define	RADIX_NODE_HEAD_LOCK(rnh)	mtx_lock(&(rnh)->rnh_mtx)
+#define	RADIX_NODE_HEAD_UNLOCK(rnh)	mtx_unlock(&(rnh)->rnh_mtx)
+#define	RADIX_NODE_HEAD_DESTROY(rnh)	mtx_destroy(&(rnh)->rnh_mtx)
+#define	RADIX_NODE_HEAD_LOCK_ASSERT(rnh) mtx_assert(&(rnh)->rnh_mtx, MA_OWNED)
 #endif /* _KERNEL */
 
 void	 rn_init(void);
@@ -165,6 +180,5 @@ struct radix_node
 	 *rn_lookup (void *v_arg, void *m_arg,
 		        struct radix_node_head *head),
 	 *rn_match(void *, struct radix_node_head *);
-
 
 #endif /* _RADIX_H_ */

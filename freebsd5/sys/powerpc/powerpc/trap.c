@@ -31,10 +31,8 @@
  * $NetBSD: trap.c,v 1.58 2002/03/04 04:07:35 dbj Exp $
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/powerpc/powerpc/trap.c,v 1.34 2002/10/04 01:19:18 grehan Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/trap.c,v 1.42 2003/04/30 17:59:27 jhb Exp $");
 
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
@@ -150,7 +148,7 @@ trapname(u_int vector)
 void
 trap(struct trapframe *frame)
 {
-	struct thread	*td, *fputhread;
+	struct thread	*td;
 	struct proc	*p;
 	int		sig, type, user;
 	u_int		sticks, ucode;
@@ -169,7 +167,7 @@ trap(struct trapframe *frame)
 	    trapname(type), user ? "user" : "kernel");
 
 	if (user) {
-		sticks = td->td_kse->ke_sticks;
+		sticks = td->td_sticks;
 		td->td_frame = frame;
 		if (td->td_ucred != p->p_ucred)
 			cred_update_thread(td);
@@ -192,13 +190,9 @@ trap(struct trapframe *frame)
 			break;
 
 		case EXC_FPU:
-			if ((fputhread = PCPU_GET(fputhread)) != NULL) {
-				save_fpu(fputhread);
-			}
-			PCPU_SET(fputhread, td);
-			td->td_pcb->pcb_fpcpu = PCPU_GET(cpuid);
+			KASSERT((td->td_pcb->pcb_flags & PCB_FPU) != PCB_FPU,
+			    ("FPU already enabled for thread"));
 			enable_fpu(td);
-			frame->srr1 |= PSL_FP;
 			break;
 
 #ifdef	ALTIVEC
@@ -253,10 +247,6 @@ trap(struct trapframe *frame)
 		}
 	}
 
-	if (td != PCPU_GET(fputhread) ||
-	    td->td_pcb->pcb_fpcpu != PCPU_GET(cpuid))
-		frame->srr1 &= ~PSL_FP;
-
 #ifdef	ALTIVEC
 	if (td != PCPU_GET(vecthread) ||
 	    td->td_pcb->pcb_veccpu != PCPU_GET(cpuid))
@@ -266,7 +256,7 @@ trap(struct trapframe *frame)
 	if (sig != 0) {
 		if (p->p_sysent->sv_transtrap != NULL)
 			sig = (p->p_sysent->sv_transtrap)(sig, type);
-		trapsignal(p, sig, ucode);
+		trapsignal(td, sig, ucode);
 	}
 
 	userret(td, frame, sticks);
@@ -473,12 +463,8 @@ syscall(struct trapframe *frame)
 	 */
 	STOPEVENT(p, S_SCX, code);
 
-#ifdef WITNESS
-	if (witness_list(td)) {
-		panic("system call %s returning with mutex(s) held\n",
-		    syscallnames[code]);
-	}
-#endif
+	WITNESS_WARN(WARN_PANIC, NULL, "System call %s returning",
+	    (code >= 0 && code < SYS_MAXSYSCALL) ? syscallnames[code] : "???");
 	mtx_assert(&sched_lock, MA_NOTOWNED);
 	mtx_assert(&Giant, MA_NOTOWNED);	
 }

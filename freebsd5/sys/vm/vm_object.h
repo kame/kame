@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_object.h,v 1.85 2002/11/13 19:50:06 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_object.h,v 1.96 2003/05/18 04:10:16 alc Exp $
  */
 
 /*
@@ -72,6 +72,8 @@
 #define	_VM_OBJECT_
 
 #include <sys/queue.h>
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
 
 enum obj_type { OBJT_DEFAULT, OBJT_SWAP, OBJT_VNODE, OBJT_DEVICE, OBJT_PHYS,
 		OBJT_DEAD };
@@ -88,16 +90,16 @@ typedef u_char objtype_t;
  */
 
 struct vm_object {
+	struct mtx mtx;
 	TAILQ_ENTRY(vm_object) object_list; /* list of all objects */
-	TAILQ_HEAD(, vm_object) shadow_head; /* objects that this is a shadow for */
-	TAILQ_ENTRY(vm_object) shadow_list; /* chain of shadow objects */
+	LIST_HEAD(, vm_object) shadow_head; /* objects that this is a shadow for */
+	LIST_ENTRY(vm_object) shadow_list; /* chain of shadow objects */
 	TAILQ_HEAD(, vm_page) memq;	/* list of resident pages */
 	vm_page_t root;			/* root of the resident page splay tree */
 	int generation;			/* generation ID */
 	vm_pindex_t size;		/* Object size */
 	int ref_count;			/* How many refs?? */
 	int shadow_count;		/* how many objects that this is a shadow for */
-	int hash_rand;			/* (c) hash table randomizer */
 	objtype_t type;			/* type of pager */
 	u_short flags;			/* see below */
 	u_short pg_color;		/* (c) color of first page in obj */
@@ -149,7 +151,6 @@ struct vm_object {
 #define	OBJ_WRITEABLE	0x0080		/* object has been made writable */
 #define OBJ_MIGHTBEDIRTY 0x0100		/* object might be dirty */
 #define OBJ_CLEANING	0x0200
-#define OBJ_OPT		0x1000		/* I/O optimization */
 #define	OBJ_ONEMAPPING	0x2000		/* One USE (a single, non-forked) mapping flag */
 
 #define IDX_TO_OFF(idx) (((vm_ooffset_t)(idx)) << PAGE_SHIFT)
@@ -169,13 +170,19 @@ extern struct mtx vm_object_list_mtx;	/* lock for object list and count */
 extern vm_object_t kernel_object;	/* the single kernel object */
 extern vm_object_t kmem_object;
 
-#endif				/* _KERNEL */
+#define	VM_OBJECT_LOCK(object)		mtx_lock(&(object)->mtx)
+#define	VM_OBJECT_LOCK_ASSERT(object, type) \
+					mtx_assert(&(object)->mtx, (type))
+#define	VM_OBJECT_LOCK_INIT(object)	mtx_init(&(object)->mtx, "vm object", \
+					    NULL, MTX_DEF | MTX_DUPOK)
+#define	VM_OBJECT_LOCKED(object)	mtx_owned(&(object)->mtx)
+#define	VM_OBJECT_MTX(object)		(&(object)->mtx)
+#define	VM_OBJECT_UNLOCK(object)	mtx_unlock(&(object)->mtx)
 
-#ifdef _KERNEL
-#define	vm_object_lock(object)		mtx_lock(&Giant)
-#define	vm_object_unlock(object)	mtx_unlock(&Giant)
-
-void vm_freeze_copyopts(vm_object_t, vm_pindex_t, vm_pindex_t);
+#define	vm_object_lock(object) \
+	mtx_lock((object) == kmem_object ? &kmem_object->mtx : &Giant)
+#define	vm_object_unlock(object) \
+	mtx_unlock((object) == kmem_object ? &kmem_object->mtx : &Giant)
 
 void vm_object_set_flag(vm_object_t object, u_short bits);
 void vm_object_clear_flag(vm_object_t object, u_short bits);
@@ -183,7 +190,6 @@ void vm_object_pip_add(vm_object_t object, short i);
 void vm_object_pip_subtract(vm_object_t object, short i);
 void vm_object_pip_wakeup(vm_object_t object);
 void vm_object_pip_wakeupn(vm_object_t object, short i);
-void vm_object_pip_sleep(vm_object_t object, char *waitid);
 void vm_object_pip_wait(vm_object_t object, char *waitid);
 
 vm_object_t vm_object_allocate (objtype_t, vm_pindex_t);
@@ -198,12 +204,10 @@ void vm_object_set_writeable_dirty (vm_object_t);
 void vm_object_init (void);
 void vm_object_page_clean (vm_object_t, vm_pindex_t, vm_pindex_t, boolean_t);
 void vm_object_page_remove (vm_object_t, vm_pindex_t, vm_pindex_t, boolean_t);
-void vm_object_pmap_copy_1 (vm_object_t, vm_pindex_t, vm_pindex_t);
 void vm_object_reference (vm_object_t);
 void vm_object_shadow (vm_object_t *, vm_ooffset_t *, vm_size_t);
 void vm_object_split(vm_map_entry_t);
 void vm_object_madvise (vm_object_t, vm_pindex_t, int, int);
-void vm_object_init2 (void);
 #endif				/* _KERNEL */
 
 #endif				/* _VM_OBJECT_ */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_meter.c	8.4 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/vm/vm_meter.c,v 1.66 2002/10/02 20:31:47 jhb Exp $
+ * $FreeBSD: src/sys/vm/vm_meter.c,v 1.72 2003/04/13 19:36:18 alc Exp $
  */
 
 #include <sys/param.h>
@@ -97,8 +97,11 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 	 */
 	GIANT_REQUIRED;
 	mtx_lock(&vm_object_list_mtx);
-	TAILQ_FOREACH(object, &vm_object_list, object_list)
+	TAILQ_FOREACH(object, &vm_object_list, object_list) {
+		VM_OBJECT_LOCK(object);
 		vm_object_clear_flag(object, OBJ_ACTIVE);
+		VM_OBJECT_UNLOCK(object);
+	}
 	mtx_unlock(&vm_object_list_mtx);
 	/*
 	 * Calculate process statistics.
@@ -149,14 +152,19 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 		 * Note active objects.
 		 */
 		paging = 0;
-		for (map = &p->p_vmspace->vm_map, entry = map->header.next;
+		map = &p->p_vmspace->vm_map;
+		vm_map_lock_read(map);
+		for (entry = map->header.next;
 		    entry != &map->header; entry = entry->next) {
 			if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) ||
-			    entry->object.vm_object == NULL)
+			    (object = entry->object.vm_object) == NULL)
 				continue;
-			vm_object_set_flag(entry->object.vm_object, OBJ_ACTIVE);
-			paging |= entry->object.vm_object->paging_in_progress;
+			VM_OBJECT_LOCK(object);
+			vm_object_set_flag(object, OBJ_ACTIVE);
+			paging |= object->paging_in_progress;
+			VM_OBJECT_UNLOCK(object);
 		}
+		vm_map_unlock_read(map);
 		if (paging)
 			totalp->t_pw++;
 	}
@@ -166,11 +174,14 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 	 */
 	mtx_lock(&vm_object_list_mtx);
 	TAILQ_FOREACH(object, &vm_object_list, object_list) {
+		VM_OBJECT_LOCK(object);
 		/*
 		 * devices, like /dev/mem, will badly skew our totals
 		 */
-		if (object->type == OBJT_DEVICE)
+		if (object->type == OBJT_DEVICE) {
+			VM_OBJECT_UNLOCK(object);
 			continue;
+		}
 		totalp->t_vm += object->size;
 		totalp->t_rm += object->resident_page_count;
 		if (object->flags & OBJ_ACTIVE) {
@@ -186,6 +197,7 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 				totalp->t_armshr += object->resident_page_count;
 			}
 		}
+		VM_OBJECT_UNLOCK(object);
 	}
 	mtx_unlock(&vm_object_list_mtx);
 	totalp->t_free = cnt.v_free_count + cnt.v_cache_count;
@@ -217,12 +229,15 @@ vcnt(SYSCTL_HANDLER_ARGS)
 		struct pcpu *pcpu = pcpu_find(i);
 		count += *(int *)((char *)&pcpu->pc_cnt + offset);
 	}
+#else
+	int offset = (char *)arg1 - (char *)&cnt;
+	count += *(int *)((char *)PCPU_PTR(cnt) + offset);
 #endif
 	error = SYSCTL_OUT(req, &count, sizeof(int));
 	return(error);
 }
 
-SYSCTL_PROC(_vm, VM_METER, vmmeter, CTLTYPE_OPAQUE|CTLFLAG_RD,
+SYSCTL_PROC(_vm, VM_TOTAL, vmtotal, CTLTYPE_OPAQUE|CTLFLAG_RD,
     0, sizeof(struct vmtotal), vmtotal, "S,vmtotal", 
     "System virtual memory statistics");
 SYSCTL_NODE(_vm, OID_AUTO, stats, CTLFLAG_RW, 0, "VM meter stats");
@@ -338,8 +353,4 @@ SYSCTL_INT(_vm_stats_misc, OID_AUTO,
 	first_page, CTLFLAG_RD, &first_page, 0, "");
 SYSCTL_INT(_vm_stats_misc, OID_AUTO,
 	last_page, CTLFLAG_RD, &last_page, 0, "");
-SYSCTL_INT(_vm_stats_misc, OID_AUTO,
-	vm_page_bucket_count, CTLFLAG_RD, &vm_page_bucket_count, 0, "");
-SYSCTL_INT(_vm_stats_misc, OID_AUTO,
-	vm_page_hash_mask, CTLFLAG_RD, &vm_page_hash_mask, 0, "");
 #endif

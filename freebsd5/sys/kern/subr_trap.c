@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/kern/subr_trap.c,v 1.238 2002/11/08 19:00:17 rwatson Exp $
+ * $FreeBSD: src/sys/kern/subr_trap.c,v 1.254 2003/05/13 20:35:59 jhb Exp $
  */
 
 #include "opt_mac.h"
@@ -73,21 +73,18 @@ userret(td, frame, oticks)
 	u_int oticks;
 {
 	struct proc *p = td->td_proc;
-	struct kse *ke = td->td_kse; 
 
 	CTR3(KTR_SYSC, "userret: thread %p (pid %d, %s)", td, p->p_pid,
             p->p_comm);
 #ifdef INVARIANTS
 	/* Check that we called signotify() enough. */
-	mtx_lock(&Giant);
 	PROC_LOCK(p);
 	mtx_lock_spin(&sched_lock);
-	if (SIGPENDING(p) && ((p->p_sflag & PS_NEEDSIGCHK) == 0 ||
-	    (td->td_kse->ke_flags & KEF_ASTPENDING) == 0))
+	if (SIGPENDING(td) && ((td->td_flags & TDF_NEEDSIGCHK) == 0 ||
+	    (td->td_flags & TDF_ASTPENDING) == 0))
 		printf("failed to set signal flags properly for ast()\n");
 	mtx_unlock_spin(&sched_lock);
 	PROC_UNLOCK(p);
-	mtx_unlock(&Giant);
 #endif
 
 	/*
@@ -110,24 +107,20 @@ userret(td, frame, oticks)
 	/*
 	 * Do special thread processing, e.g. upcall tweaking and such.
 	 */
-	if (p->p_flag & P_KSES) {
+	if (p->p_flag & P_THREADED) {
 		thread_userret(td, frame);
-		/* printf("KSE thread returned"); */
 	}
 
 	/*
 	 * Charge system time if profiling.
-	 *
-	 * XXX should move PS_PROFIL to a place that can obviously be
-	 * accessed safely without sched_lock.
 	 */
-	if (p->p_sflag & PS_PROFIL) {
+	if (p->p_flag & P_PROFIL) {
 		quad_t ticks;
 
 		mtx_lock_spin(&sched_lock);
-		ticks = ke->ke_sticks - oticks;
+		ticks = td->td_sticks - oticks;
 		mtx_unlock_spin(&sched_lock);
-		addupc_task(ke, TRAPF_PC(frame), (u_int)ticks * psratio);
+		addupc_task(td, TRAPF_PC(frame), (u_int)ticks * psratio);
 	}
 }
 
@@ -159,10 +152,7 @@ ast(struct trapframe *framep)
 	CTR3(KTR_SYSC, "ast: thread %p (pid %d, %s)", td, p->p_pid,
             p->p_comm);
 	KASSERT(TRAPF_USERMODE(framep), ("ast in kernel mode"));
-#ifdef WITNESS
-	if (witness_list(td))
-		panic("Returning to user mode with mutex(s) held");
-#endif
+	WITNESS_WARN(WARN_PANIC, NULL, "Returning to user mode");
 	mtx_assert(&Giant, MA_NOTOWNED);
 	mtx_assert(&sched_lock, MA_NOTOWNED);
 	td->td_frame = framep;
@@ -176,17 +166,18 @@ ast(struct trapframe *framep)
 	 */
 	mtx_lock_spin(&sched_lock);
 	ke = td->td_kse;
-	sticks = ke->ke_sticks;
-	flags = ke->ke_flags;
+	sticks = td->td_sticks;
+	flags = td->td_flags;
 	sflag = p->p_sflag;
-	p->p_sflag &= ~(PS_ALRMPEND | PS_NEEDSIGCHK | PS_PROFPEND | PS_XCPU);
+	p->p_sflag &= ~(PS_ALRMPEND | PS_PROFPEND | PS_XCPU);
 #ifdef MAC
 	p->p_sflag &= ~PS_MACPEND;
 #endif
-	ke->ke_flags &= ~(KEF_ASTPENDING | KEF_NEEDRESCHED | KEF_OWEUPC);
+	td->td_flags &= ~(TDF_ASTPENDING | TDF_NEEDSIGCHK |
+	    TDF_NEEDRESCHED | TDF_OWEUPC);
 	cnt.v_soft++;
 	prticks = 0;
-	if (flags & KEF_OWEUPC && sflag & PS_PROFIL) {
+	if (flags & TDF_OWEUPC && p->p_flag & P_PROFIL) {
 		prticks = p->p_stats->p_prof.pr_ticks;
 		p->p_stats->p_prof.pr_ticks = 0;
 	}
@@ -201,8 +192,8 @@ ast(struct trapframe *framep)
 
 	if (td->td_ucred != p->p_ucred) 
 		cred_update_thread(td);
-	if (flags & KEF_OWEUPC && sflag & PS_PROFIL)
-		addupc_task(ke, p->p_stats->p_prof.pr_addr, prticks);
+	if (flags & TDF_OWEUPC && p->p_flag & P_PROFIL)
+		addupc_task(td, p->p_stats->p_prof.pr_addr, prticks);
 	if (sflag & PS_ALRMPEND) {
 		PROC_LOCK(p);
 		psignal(p, SIGVTALRM);
@@ -214,7 +205,7 @@ ast(struct trapframe *framep)
 		    PCB_NPXTRAP);
 		ucode = npxtrap();
 		if (ucode != -1) {
-			trapsignal(p, SIGFPE, ucode);
+			trapsignal(td, SIGFPE, ucode);
 		}
 	}
 #endif
@@ -226,14 +217,15 @@ ast(struct trapframe *framep)
 	if (sflag & PS_XCPU) {
 		PROC_LOCK(p);
 		rlim = &p->p_rlimit[RLIMIT_CPU];
-		if (p->p_runtime.sec >= rlim->rlim_max)
+		mtx_lock_spin(&sched_lock);
+		if (p->p_runtime.sec >= rlim->rlim_max) {
+			mtx_unlock_spin(&sched_lock);
 			killproc(p, "exceeded maximum CPU limit");
-		else {
-			psignal(p, SIGXCPU);
-			mtx_lock_spin(&sched_lock);
+		} else {
 			if (p->p_cpulimit < rlim->rlim_max)
 				p->p_cpulimit += 5;
 			mtx_unlock_spin(&sched_lock);
+			psignal(p, SIGXCPU);
 		}
 		PROC_UNLOCK(p);
 	}
@@ -241,18 +233,33 @@ ast(struct trapframe *framep)
 	if (sflag & PS_MACPEND)
 		mac_thread_userret(td);
 #endif
-	if (flags & KEF_NEEDRESCHED) {
+	if (flags & TDF_NEEDRESCHED) {
 		mtx_lock_spin(&sched_lock);
 		sched_prio(td, kg->kg_user_pri);
 		p->p_stats->p_ru.ru_nivcsw++;
 		mi_switch();
 		mtx_unlock_spin(&sched_lock);
 	}
-	if (sflag & PS_NEEDSIGCHK) {
+	if (flags & TDF_NEEDSIGCHK) {
+		int sigs;
+
+		sigs = 0;
 		PROC_LOCK(p);
-		while ((sig = cursig(td)) != 0)
+		mtx_lock(&p->p_sigacts->ps_mtx);
+		while ((sig = cursig(td)) != 0) {
 			postsig(sig);
+			sigs++;
+		}
+		mtx_unlock(&p->p_sigacts->ps_mtx);
 		PROC_UNLOCK(p);
+		if (p->p_flag & P_THREADED && sigs) {
+			struct kse_upcall *ku = td->td_upcall;
+			if ((void *)TRAPF_PC(framep) != ku->ku_func) {
+				mtx_lock_spin(&sched_lock);
+				ku->ku_flags |= KUF_DOUPCALL;
+				mtx_unlock_spin(&sched_lock);
+			}
+		}
 	}
 
 	userret(td, framep, sticks);

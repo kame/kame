@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_log.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/subr_log.c,v 1.52 2002/11/14 16:11:11 tmm Exp $
+ * $FreeBSD: src/sys/kern/subr_log.c,v 1.55 2003/03/03 12:15:51 phk Exp $
  */
 
 /*
@@ -67,19 +67,13 @@ static	void logtimeout(void *arg);
 
 #define CDEV_MAJOR 7
 static struct cdevsw log_cdevsw = {
-	/* open */	logopen,
-	/* close */	logclose,
-	/* read */	logread,
-	/* write */	nowrite,
-	/* ioctl */	logioctl,
-	/* poll */	logpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"log",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	logopen,
+	.d_close =	logclose,
+	.d_read =	logread,
+	.d_ioctl =	logioctl,
+	.d_poll =	logpoll,
+	.d_name =	"log",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static struct logsoftc {
@@ -151,7 +145,7 @@ logread(dev_t dev, struct uio *uio, int flag)
 		l = imin(l, uio->uio_resid);
 		if (l == 0)
 			break;
-		error = uiomove((caddr_t)msgbufp->msg_ptr + mbp->msg_bufr,
+		error = uiomove((char *)msgbufp->msg_ptr + mbp->msg_bufr,
 		    l, uio);
 		if (error)
 			break;
@@ -197,7 +191,7 @@ logtimeout(void *arg)
 	if ((logsoftc.sc_state & LOG_ASYNC) && logsoftc.sc_sigio != NULL)
 		pgsigio(&logsoftc.sc_sigio, SIGIO, 0);
 	if (logsoftc.sc_state & LOG_RDWAIT) {
-		wakeup((caddr_t)msgbufp);
+		wakeup(msgbufp);
 		logsoftc.sc_state &= ~LOG_RDWAIT;
 	}
 	callout_reset(&logsoftc.sc_callout, hz / log_wakeups_per_second,

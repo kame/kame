@@ -31,12 +31,15 @@
  * SUCH DAMAGE.
  *
  *	@(#)signalvar.h	8.6 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/signalvar.h,v 1.55 2002/10/25 19:10:58 peter Exp $
+ * $FreeBSD: src/sys/sys/signalvar.h,v 1.62 2003/05/14 15:00:24 jhb Exp $
  */
 
 #ifndef _SYS_SIGNALVAR_H_
 #define	_SYS_SIGNALVAR_H_
 
+#include <sys/queue.h>
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
 #include <sys/signal.h>
 
 /*
@@ -45,21 +48,33 @@
  */
 
 /*
- * Process signal actions and state, needed only within the process
- * (not necessarily resident).
+ * Logical process signal actions and state, needed only within the process
+ * The mapping between sigacts and proc structures is 1:1 except for rfork()
+ * processes masquerading as threads which use one structure for the whole
+ * group.  All members are locked by the included mutex.  The reference count
+ * and mutex must be last for the bcopy in sigacts_copy() to work.
  */
 struct sigacts {
-	sig_t	ps_sigact[_SIG_MAXSIG];	/* disposition of signals */
-	sigset_t ps_catchmask[_SIG_MAXSIG];	/* signals to be blocked */
-	sigset_t ps_sigonstack;		/* signals to take on sigstack */
-	sigset_t ps_sigintr;		/* signals that interrupt syscalls */
-	sigset_t ps_sigreset;		/* signals that reset when caught */
-	sigset_t ps_signodefer;		/* signals not masked while handled */
-	sigset_t ps_siginfo;		/* signals that want SA_SIGINFO args */
-	sigset_t ps_freebsd4;		/* signals that use freebsd4 ucontext */
-	sigset_t ps_osigset;		/* signals that use <= 3.x osigset_t */
-	sigset_t ps_usertramp;		/* SunOS compat; libc sigtramp XXX */
+	sig_t	ps_sigact[_SIG_MAXSIG];	/* Disposition of signals. */
+	sigset_t ps_catchmask[_SIG_MAXSIG];	/* Signals to be blocked. */
+	sigset_t ps_sigonstack;		/* Signals to take on sigstack. */
+	sigset_t ps_sigintr;		/* Signals that interrupt syscalls. */
+	sigset_t ps_sigreset;		/* Signals that reset when caught. */
+	sigset_t ps_signodefer;		/* Signals not masked while handled. */
+	sigset_t ps_siginfo;		/* Signals that want SA_SIGINFO args. */
+	sigset_t ps_sigignore;		/* Signals being ignored. */
+	sigset_t ps_sigcatch;		/* Signals being caught by user. */
+	sigset_t ps_freebsd4;		/* signals using freebsd4 ucontext. */
+	sigset_t ps_osigset;		/* Signals using <= 3.x osigset_t. */
+	sigset_t ps_usertramp;		/* SunOS compat; libc sigtramp. XXX */
+	int	ps_flag;
+	int	ps_refcnt;
+	struct mtx ps_mtx;
 };
+
+#define	PS_NOCLDWAIT	0x0001	/* No zombies if child dies */
+#define	PS_NOCLDSTOP	0x0002	/* No SIGCHLD when children stop. */
+#define	PS_CLDSIGIGN	0x0004	/* The SIGCHLD handler is SIG_IGN. */
 
 #if defined(_KERNEL) && defined(COMPAT_43)
 /*
@@ -191,10 +206,10 @@ __sigseteq(sigset_t *set1, sigset_t *set2)
 #ifdef _KERNEL
 
 /* Return nonzero if process p has an unmasked pending signal. */
-#define	SIGPENDING(p)							\
-	(!SIGISEMPTY((p)->p_siglist) &&					\
-	    (!sigsetmasked(&(p)->p_siglist, &(p)->p_sigmask) ||		\
-	    (p)->p_flag & P_TRACED))
+#define	SIGPENDING(td)							\
+	(!SIGISEMPTY((td)->td_siglist) &&				\
+	    (!sigsetmasked(&(td)->td_siglist, &(td)->td_sigmask) ||	\
+	    (td)->td_proc->p_flag & P_TRACED))
 
 /*
  * Return the value of the pseudo-expression ((*set & ~*mask) != 0).  This
@@ -238,16 +253,22 @@ extern struct mtx	sigio_lock;
 int	cursig(struct thread *td);
 void	execsigs(struct proc *p);
 void	gsignal(int pgid, int sig);
-int	issignal(struct thread *p);
 void	killproc(struct proc *p, char *why);
 void	pgsigio(struct sigio **, int signum, int checkctty);
 void	pgsignal(struct pgrp *pgrp, int sig, int checkctty);
 void	postsig(int sig);
 void	psignal(struct proc *p, int sig);
+struct sigacts *sigacts_alloc(void);
+void	sigacts_copy(struct sigacts *dest, struct sigacts *src);
+void	sigacts_free(struct sigacts *ps);
+struct sigacts *sigacts_hold(struct sigacts *ps);
+int	sigacts_shared(struct sigacts *ps);
 void	sigexit(struct thread *td, int signum) __dead2;
+int	sig_ffs(sigset_t *set);
 void	siginit(struct proc *p);
-void	signotify(struct proc *p);
-void	trapsignal(struct proc *p, int sig, u_long code);
+void	signotify(struct thread *td);
+void	tdsignal(struct thread *td, int sig);
+void	trapsignal(struct thread *td, int sig, u_long code);
 
 /*
  * Machine-dependent functions:

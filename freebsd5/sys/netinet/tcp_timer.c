@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.54.2.1 2003/01/03 20:35:59 hsu Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.59 2003/03/08 22:06:20 jlemon Exp $
  */
 
 #include "opt_inet6.h"
@@ -136,10 +136,11 @@ tcp_slowtimo()
 	int s;
 
 	s = splnet();
-
 	tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
-
 	splx(s);
+	INP_INFO_WLOCK(&tcbinfo);
+	(void) tcp_timer_2msl_tw(0);
+	INP_INFO_WUNLOCK(&tcbinfo);
 }
 
 /*
@@ -251,6 +252,71 @@ tcp_timer_2msl(xtp)
 	splx(s);
 }
 
+struct twlist {
+	LIST_HEAD(, tcptw)	tw_list;
+	struct tcptw	tw_tail;
+};
+#define TWLIST_NLISTS	2
+static struct twlist twl_2msl[TWLIST_NLISTS];
+static struct twlist *tw_2msl_list[] = { &twl_2msl[0], &twl_2msl[1], NULL };
+
+void
+tcp_timer_init(void)
+{
+	int i;
+	struct twlist *twl;
+
+	for (i = 0; i < TWLIST_NLISTS; i++) {
+		twl = &twl_2msl[i];
+		LIST_INIT(&twl->tw_list);
+		LIST_INSERT_HEAD(&twl->tw_list, &twl->tw_tail, tw_2msl);
+	}
+}
+
+void
+tcp_timer_2msl_reset(struct tcptw *tw, int timeo)
+{
+	int i;
+	struct tcptw *tw_tail;
+
+	if (tw->tw_time != 0)
+		LIST_REMOVE(tw, tw_2msl);
+	tw->tw_time = timeo + ticks;
+	i = timeo > tcp_msl ? 1 : 0;
+	tw_tail = &twl_2msl[i].tw_tail;
+	LIST_INSERT_BEFORE(tw_tail, tw, tw_2msl);
+}
+
+void
+tcp_timer_2msl_stop(struct tcptw *tw)
+{
+
+	if (tw->tw_time != 0)
+		LIST_REMOVE(tw, tw_2msl);
+}
+
+struct tcptw *
+tcp_timer_2msl_tw(int reuse)
+{
+	struct tcptw *tw, *tw_tail;
+	struct twlist *twl;
+	int i;
+	
+	for (i = 0; i < 2; i++) {
+		twl = tw_2msl_list[i];
+		tw_tail = &twl->tw_tail;
+		for (;;) {
+			tw = LIST_FIRST(&twl->tw_list);
+			if (tw == tw_tail || (!reuse && tw->tw_time > ticks))
+				break;
+			INP_LOCK(tw->tw_inpcb);
+			if (tcp_twclose(tw, reuse) != NULL)
+				return (tw);
+		}
+	}
+	return (NULL);
+}
+
 void
 tcp_timer_keep(xtp)
 	void *xtp;
@@ -305,7 +371,7 @@ tcp_timer_keep(xtp)
 		 * correspondent TCP to respond.
 		 */
 		tcpstat.tcps_keepprobe++;
-		t_template = tcp_maketemplate(tp);
+		t_template = tcpip_maketemplate(inp);
 		if (t_template) {
 			tcp_respond(tp, t_template->tt_ipgen,
 				    &t_template->tt_t, (struct mbuf *)NULL,
@@ -462,6 +528,7 @@ tcp_timer_rexmt(xtp)
 		 */
 		tp->snd_cwnd_prev = tp->snd_cwnd;
 		tp->snd_ssthresh_prev = tp->snd_ssthresh;
+		tp->snd_high_prev = tp->snd_high;
 		tp->t_badrxtwin = ticks + (tp->t_srtt >> (TCP_RTT_SHIFT + 1));
 	}
 	tcpstat.tcps_rexmttimeo++;
@@ -499,11 +566,7 @@ tcp_timer_rexmt(xtp)
 		tp->t_srtt = 0;
 	}
 	tp->snd_nxt = tp->snd_una;
-	/*
-	 * Note:  We overload snd_recover to function also as the
-	 * snd_last variable described in RFC 2582
-	 */
-	tp->snd_recover = tp->snd_max;
+	tp->snd_high = tp->snd_max;
 	/*
 	 * Force a segment to be sent.
 	 */

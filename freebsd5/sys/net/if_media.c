@@ -1,5 +1,5 @@
 /*	$NetBSD: if_media.c,v 1.1 1997/03/17 02:55:15 thorpej Exp $	*/
-/* $FreeBSD: src/sys/net/if_media.c,v 1.17 2002/06/26 03:34:50 ken Exp $ */
+/* $FreeBSD: src/sys/net/if_media.c,v 1.19 2003/04/29 17:23:23 harti Exp $ */
 
 /*
  * Copyright (c) 1997
@@ -409,6 +409,15 @@ struct ifmedia_description ifm_subtype_ieee80211_descriptions[] =
 struct ifmedia_description ifm_subtype_ieee80211_option_descriptions[] =
     IFM_SUBTYPE_IEEE80211_OPTION_DESCRIPTIONS;
 
+struct ifmedia_description ifm_subtype_ieee80211_mode_descriptions[] =
+    IFM_SUBTYPE_IEEE80211_MODE_DESCRIPTIONS;
+
+struct ifmedia_description ifm_subtype_atm_descriptions[] =
+    IFM_SUBTYPE_ATM_DESCRIPTIONS;
+
+struct ifmedia_description ifm_subtype_atm_option_descriptions[] =
+    IFM_SUBTYPE_ATM_OPTION_DESCRIPTIONS;
+
 struct ifmedia_description ifm_subtype_shared_descriptions[] =
     IFM_SUBTYPE_SHARED_DESCRIPTIONS;
 
@@ -418,25 +427,35 @@ struct ifmedia_description ifm_shared_option_descriptions[] =
 struct ifmedia_type_to_subtype {
 	struct ifmedia_description *subtypes;
 	struct ifmedia_description *options;
+	struct ifmedia_description *modes;
 };
 
 /* must be in the same order as IFM_TYPE_DESCRIPTIONS */
 struct ifmedia_type_to_subtype ifmedia_types_to_subtypes[] = {
 	{
 	  &ifm_subtype_ethernet_descriptions[0],
-	  &ifm_subtype_ethernet_option_descriptions[0]
+	  &ifm_subtype_ethernet_option_descriptions[0],
+	  NULL,
 	},
 	{
 	  &ifm_subtype_tokenring_descriptions[0],
-	  &ifm_subtype_tokenring_option_descriptions[0]
+	  &ifm_subtype_tokenring_option_descriptions[0],
+	  NULL,
 	},
 	{
 	  &ifm_subtype_fddi_descriptions[0],
-	  &ifm_subtype_fddi_option_descriptions[0]
+	  &ifm_subtype_fddi_option_descriptions[0],
+	  NULL,
 	},
 	{
 	  &ifm_subtype_ieee80211_descriptions[0],
-	  &ifm_subtype_ieee80211_option_descriptions[0]
+	  &ifm_subtype_ieee80211_option_descriptions[0],
+	  &ifm_subtype_ieee80211_mode_descriptions[0]
+	},
+	{
+	  &ifm_subtype_atm_descriptions[0],
+	  &ifm_subtype_atm_option_descriptions[0],
+	  NULL,
 	},
 };
 
@@ -461,6 +480,14 @@ ifmedia_printword(ifmw)
 		return;
 	}
 	printf(desc->ifmt_string);
+
+	/* Any mode. */
+	for (desc = ttos->modes; desc && desc->ifmt_string != NULL; desc++)
+		if (IFM_MODE(ifmw) == desc->ifmt_word) {
+			if (desc->ifmt_string != NULL)
+				printf(" mode %s", desc->ifmt_string);
+			break;
+		}
 
 	/*
 	 * Check for the shared subtype descriptions first, then the

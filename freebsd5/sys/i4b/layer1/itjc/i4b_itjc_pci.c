@@ -33,7 +33,7 @@
  *	i4b_itjc_pci.c: NetJet-S hardware driver
  *	----------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/itjc/i4b_itjc_pci.c,v 1.6 2002/10/15 20:32:45 phk Exp $
+ * $FreeBSD: src/sys/i4b/layer1/itjc/i4b_itjc_pci.c,v 1.7 2003/05/30 20:40:33 hmp Exp $
  *
  *      last edit-date: [Thu Jan 11 11:29:38 2001]
  *
@@ -1607,7 +1607,7 @@ itjc_attach(device_t dev)
 		ITJC_DMA_POOL_BYTES,			/* maxsize*/
 		1,					/* nsegments*/
 		ITJC_DMA_POOL_BYTES,			/* maxsegsz*/
-		BUS_DMA_ALLOCNOW | BUS_DMAMEM_NOSYNC,	/* flags*/
+		BUS_DMA_ALLOCNOW | BUS_DMA_COHERENT,	/* flags*/
 		&ctx->tag);
 
 	if (error)
@@ -1621,7 +1621,7 @@ itjc_attach(device_t dev)
         error = bus_dmamem_alloc(
 		ctx->tag, 				/* DMA tag */
 		(void **)&ctx->pool,	/* KV addr of the allocated memory */
-		BUS_DMA_NOWAIT | BUS_DMAMEM_NOSYNC,	/* flags */
+		BUS_DMA_NOWAIT | BUS_DMA_COHERENT,	/* flags */
 		&ctx->map);				/* KV <-> PCI map */
 
 	if (error)

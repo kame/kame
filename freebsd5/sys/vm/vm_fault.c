@@ -66,7 +66,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_fault.c,v 1.156 2002/11/16 07:44:25 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_fault.c,v 1.167 2003/04/22 20:01:56 jhb Exp $
  */
 
 /*
@@ -137,12 +137,16 @@ static void
 _unlock_things(struct faultstate *fs, int dealloc)
 {
 	GIANT_REQUIRED;
+	VM_OBJECT_LOCK(fs->object);
 	vm_object_pip_wakeup(fs->object);
+	VM_OBJECT_UNLOCK(fs->object);
 	if (fs->object != fs->first_object) {
+		VM_OBJECT_LOCK(fs->first_object);
 		vm_page_lock_queues();
 		vm_page_free(fs->first_m);
 		vm_page_unlock_queues();
 		vm_object_pip_wakeup(fs->first_object);
+		VM_OBJECT_UNLOCK(fs->first_object);
 		fs->first_m = NULL;
 	}
 	if (dealloc) {
@@ -278,15 +282,10 @@ RetryFault:;
 	 */
 	vm_object_reference(fs.first_object);
 	fs.vp = vnode_pager_lock(fs.first_object);
+	VM_OBJECT_LOCK(fs.first_object);
 	vm_object_pip_add(fs.first_object, 1);
+	VM_OBJECT_UNLOCK(fs.first_object);
 
-#ifdef ENABLE_VFS_IOOPT
-	if ((fault_type & VM_PROT_WRITE) &&
-		(fs.first_object->type == OBJT_VNODE)) {
-		vm_freeze_copyopts(fs.first_object,
-			fs.first_pindex, fs.first_pindex + 1);
-	}
-#endif
 	fs.lookup_still_valid = TRUE;
 
 	if (wired)
@@ -317,11 +316,18 @@ RetryFault:;
 			int queue, s;
 
 			/* 
-			 * check for page-based copy on write
+			 * check for page-based copy on write.
+			 * We check fs.object == fs.first_object so
+			 * as to ensure the legacy COW mechanism is
+			 * used when the page in question is part of
+			 * a shadow object.  Otherwise, vm_page_cowfault()
+			 * removes the page from the backing object, 
+			 * which is not what we want.
 			 */
 			vm_page_lock_queues();
 			if ((fs.m->cow) && 
-			    (fault_type & VM_PROT_WRITE)) {
+			    (fault_type & VM_PROT_WRITE) &&
+			    (fs.object == fs.first_object)) {
 				s = splvm();
 				vm_page_cowfault(fs.m);
 				splx(s);
@@ -349,7 +355,9 @@ RetryFault:;
 			if ((fs.m->flags & PG_BUSY) || fs.m->busy) {
 				vm_page_unlock_queues();
 				unlock_things(&fs);
-				(void)vm_page_sleep_busy(fs.m, TRUE, "vmpfw");
+				vm_page_lock_queues();
+				if (!vm_page_sleep_if_busy(fs.m, TRUE, "vmpfw"))
+					vm_page_unlock_queues();
 				cnt.v_intrans++;
 				vm_object_deallocate(fs.first_object);
 				goto RetryFault;
@@ -610,7 +618,9 @@ readrest:
 			 * object with zeros.
 			 */
 			if (fs.object != fs.first_object) {
+				VM_OBJECT_LOCK(fs.object);
 				vm_object_pip_wakeup(fs.object);
+				VM_OBJECT_UNLOCK(fs.object);
 
 				fs.object = fs.first_object;
 				fs.pindex = fs.first_pindex;
@@ -631,11 +641,15 @@ readrest:
 			break;	/* break to PAGE HAS BEEN FOUND */
 		} else {
 			if (fs.object != fs.first_object) {
+				VM_OBJECT_LOCK(fs.object);
 				vm_object_pip_wakeup(fs.object);
+				VM_OBJECT_UNLOCK(fs.object);
 			}
 			KASSERT(fs.object != next_object, ("object loop %p", next_object));
 			fs.object = next_object;
+			VM_OBJECT_LOCK(fs.object);
 			vm_object_pip_add(fs.object, 1);
+			VM_OBJECT_UNLOCK(fs.object);
 		}
 	}
 
@@ -702,7 +716,6 @@ readrest:
 				vm_page_lock_queues();
 				pmap_remove_all(fs.first_m);
 				vm_page_free(fs.first_m);
-				vm_page_unlock_queues();
 				fs.first_m = NULL;
 
 				/*
@@ -713,6 +726,7 @@ readrest:
 				vm_page_rename(fs.m, fs.first_object, fs.first_pindex);
 				fs.first_m = fs.m;
 				vm_page_busy(fs.first_m);
+				vm_page_unlock_queues();
 				fs.m = NULL;
 				cnt.v_cow_optim++;
 			} else {
@@ -733,7 +747,9 @@ readrest:
 			 * fs.object != fs.first_object due to above 
 			 * conditional
 			 */
+			VM_OBJECT_LOCK(fs.object);
 			vm_object_pip_wakeup(fs.object);
+			VM_OBJECT_UNLOCK(fs.object);
 
 			/*
 			 * Only use the new page below...
@@ -829,6 +845,7 @@ readrest:
 	 */
 
 	if (prot & VM_PROT_WRITE) {
+		vm_page_lock_queues();
 		vm_page_flag_set(fs.m, PG_WRITEABLE);
 		vm_object_set_writeable_dirty(fs.m->object);
 
@@ -853,6 +870,7 @@ readrest:
 		} else {
 			vm_page_flag_clear(fs.m, PG_NOSYNC);
 		}
+		vm_page_unlock_queues();
 		if (fault_flags & VM_FAULT_DIRTY) {
 			int s;
 			vm_page_dirty(fs.m);
@@ -899,15 +917,16 @@ readrest:
 	}
 	vm_page_wakeup(fs.m);
 	vm_page_unlock_queues();
-	mtx_lock_spin(&sched_lock);
-	if (curproc && (curproc->p_sflag & PS_INMEM) && curproc->p_stats) {
+
+	PROC_LOCK(curproc);
+	if ((curproc->p_sflag & PS_INMEM) && curproc->p_stats) {
 		if (hardfault) {
 			curproc->p_stats->p_ru.ru_majflt++;
 		} else {
 			curproc->p_stats->p_ru.ru_minflt++;
 		}
 	}
-	mtx_unlock_spin(&sched_lock);
+	PROC_UNLOCK(curproc);
 
 	/*
 	 * Unlock everything, and return
@@ -915,6 +934,24 @@ readrest:
 	vm_object_deallocate(fs.first_object);
 	mtx_unlock(&Giant);
 	return (KERN_SUCCESS);
+}
+
+/*
+ *	vm_fault_quick:
+ *
+ *	Ensure that the requested virtual address, which may be in userland,
+ *	is valid.  Fault-in the page if necessary.  Return -1 on failure.
+ */
+int
+vm_fault_quick(caddr_t v, int prot)
+{
+	int r;
+
+	if (prot & VM_PROT_WRITE)
+		r = subyte(v, fubyte(v));
+	else
+		r = fubyte(v);
+	return(r);
 }
 
 /*
@@ -959,7 +996,8 @@ vm_fault_unwire(map, start, end)
 	vm_map_t map;
 	vm_offset_t start, end;
 {
-	vm_offset_t va, pa;
+	vm_paddr_t pa;
+	vm_offset_t va;
 	pmap_t pmap;
 
 	pmap = vm_map_pmap(map);
@@ -971,7 +1009,7 @@ vm_fault_unwire(map, start, end)
 	 */
 	for (va = start; va < end; va += PAGE_SIZE) {
 		pa = pmap_extract(pmap, va);
-		if (pa != (vm_offset_t) 0) {
+		if (pa != 0) {
 			pmap_change_wiring(pmap, va, FALSE);
 			vm_page_lock_queues();
 			vm_page_unwire(PHYS_TO_VM_PAGE(pa), 1);
@@ -1062,7 +1100,6 @@ vm_fault_copy_entry(dst_map, src_map, dst_entry, src_entry)
 		/*
 		 * Enter it in the pmap...
 		 */
-		vm_page_flag_clear(dst_m, PG_ZERO);
 		pmap_enter(dst_map->pmap, vaddr, dst_m, prot, FALSE);
 		vm_page_lock_queues();
 		vm_page_flag_set(dst_m, PG_WRITEABLE);

@@ -38,7 +38,7 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/i386/mem.c,v 1.99.2.1 2003/01/04 22:55:30 njl Exp $
+ * $FreeBSD: src/sys/i386/i386/mem.c,v 1.106 2003/04/03 23:44:35 jake Exp $
  */
 
 /*
@@ -78,19 +78,15 @@ static	d_mmap_t	memmmap;
 
 #define CDEV_MAJOR 2
 static struct cdevsw mem_cdevsw = {
-	/* open */	mmopen,
-	/* close */	mmclose,
-	/* read */	mmrw,
-	/* write */	mmrw,
-	/* ioctl */	mmioctl,
-	/* poll */	(d_poll_t *)seltrue,
-	/* mmap */	memmmap,
-	/* strategy */	nostrategy,
-	/* name */	"mem",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_MEM,
+	.d_open =	mmopen,
+	.d_close =	mmclose,
+	.d_read =	mmrw,
+	.d_write =	mmrw,
+	.d_ioctl =	mmioctl,
+	.d_mmap =	memmmap,
+	.d_name =	"mem",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_MEM,
 };
 
 MALLOC_DEFINE(M_MEMDESC, "memdesc", "memory range descriptors");
@@ -183,8 +179,6 @@ mmrw(dev_t dev, struct uio *uio, int flags)
 
 			if (addr < (vm_offset_t)VADDR(PTDPTDI, 0))
 				return (EFAULT);
-			if (eaddr >= (vm_offset_t)VADDR(APTDPTDI, 0))
-				return (EFAULT);
 			for (; addr < eaddr; addr += PAGE_SIZE) 
 				if (pmap_extract(kernel_pmap, addr) == 0)
 					return (EFAULT);
@@ -215,22 +209,25 @@ mmrw(dev_t dev, struct uio *uio, int flags)
 * instead of going through read/write			*
 \*******************************************************/
 static int
-memmmap(dev_t dev, vm_offset_t offset, int prot)
+memmmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
 	switch (minor(dev))
 	{
 
 	/* minor device 0 is physical memory */
 	case 0:
-        	return (i386_btop(offset));
+		*paddr = offset;
+		break;
 
 	/* minor device 1 is kernel memory */
 	case 1:
-        	return (i386_btop(vtophys(offset)));
+        	*paddr = vtophys(offset);
+		break;
 
 	default:
 		return (-1);
 	}
+	return (0);
 }
 
 /*

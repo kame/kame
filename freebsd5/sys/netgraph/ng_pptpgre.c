@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.26 2002/09/14 00:00:49 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.30 2003/04/04 12:12:34 des Exp $
  * $Whistle: ng_pptpgre.c,v 1.7 1999/12/08 00:10:06 archie Exp $
  */
 
@@ -532,7 +532,7 @@ ng_pptpgre_xmit(node_p node, item_p item)
 		m->m_len = m->m_pkthdr.len = grelen;
 		m->m_pkthdr.rcvif = NULL;
 	} else {
-		M_PREPEND(m, grelen, M_NOWAIT);
+		M_PREPEND(m, grelen, M_DONTWAIT);
 		if (m == NULL || (m->m_len < grelen
 		    && (m = m_pullup(m, grelen)) == NULL)) {
 			priv->stats.memoryFailures++;
@@ -669,7 +669,7 @@ bad:
 			a->ato = PPTP_MIN_TIMEOUT;
 
 		/* Shift packet transmit times in our transmit window */
-		ovbcopy(a->timeSent + index + 1, a->timeSent,
+		bcopy(a->timeSent + index + 1, a->timeSent,
 		    sizeof(*a->timeSent) * (PPTP_XMIT_WIN - (index + 1)));
 
 		/* If we sent an entire window, increase window size by one */

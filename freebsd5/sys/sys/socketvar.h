@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/socketvar.h,v 1.96 2002/11/02 05:14:31 alc Exp $
+ * $FreeBSD: src/sys/sys/socketvar.h,v 1.103 2003/03/29 06:14:14 alc Exp $
  */
 
 #ifndef _SYS_SOCKETVAR_H_
@@ -228,7 +228,8 @@ struct xsocket {
 /* adjust counters in sb reflecting allocation of m */
 #define	sballoc(sb, m) { \
 	(sb)->sb_cc += (m)->m_len; \
-	if ((m)->m_type != MT_DATA) \
+	if ((m)->m_type != MT_DATA && (m)->m_type != MT_HEADER && \
+	    (m)->m_type != MT_OOBDATA) \
 		(sb)->sb_ctl += (m)->m_len; \
 	(sb)->sb_mbcnt += MSIZE; \
 	if ((m)->m_flags & M_EXT) \
@@ -238,7 +239,8 @@ struct xsocket {
 /* adjust counters in sb reflecting freeing of m */
 #define	sbfree(sb, m) { \
 	(sb)->sb_cc -= (m)->m_len; \
-	if ((m)->m_type != MT_DATA) \
+	if ((m)->m_type != MT_DATA && (m)->m_type != MT_HEADER && \
+	    (m)->m_type != MT_OOBDATA) \
 		(sb)->sb_ctl -= (m)->m_len; \
 	(sb)->sb_mbcnt -= MSIZE; \
 	if ((m)->m_flags & M_EXT) \
@@ -259,7 +261,7 @@ struct xsocket {
 	(sb)->sb_flags &= ~SB_LOCK; \
 	if ((sb)->sb_flags & SB_WANT) { \
 		(sb)->sb_flags &= ~SB_WANT; \
-		wakeup((caddr_t)&(sb)->sb_flags); \
+		wakeup(&(sb)->sb_flags); \
 	} \
 }
 
@@ -338,30 +340,10 @@ extern u_long	sb_max;
 extern struct uma_zone *socket_zone;
 extern so_gen_t so_gencnt;
 
-struct file;
-struct filedesc;
-struct knote;
 struct mbuf;
 struct sockaddr;
-struct stat;
 struct ucred;
 struct uio;
-
-/*
- * File operations on sockets.
- */
-int	soo_read(struct file *fp, struct uio *uio, struct ucred *active_cred,
-	    int flags, struct thread *td);
-int	soo_write(struct file *fp, struct uio *uio,
-	    struct ucred *active_cred, int flags, struct thread *td);
-int	soo_close(struct file *fp, struct thread *td);
-int	soo_ioctl(struct file *fp, u_long cmd, void *data,
-	    struct ucred *active_cred, struct thread *td);
-int	soo_poll(struct file *fp, int events, struct ucred *active_cred,
-	    struct thread *td);
-int	soo_stat(struct file *fp, struct stat *ub, struct ucred *active_cred,
-	    struct thread *td);
-int	sokqfilter(struct file *fp, struct knote *kn);
 
 /*
  * From uipc_socket and friends
@@ -389,7 +371,7 @@ int	sbreserve(struct sockbuf *sb, u_long cc, struct socket *so,
 void	sbtoxsockbuf(struct sockbuf *sb, struct xsockbuf *xsb);
 int	sbwait(struct sockbuf *sb);
 struct sf_buf *
-	sf_buf_alloc(void);
+	sf_buf_alloc(struct vm_page *m);
 void	sf_buf_free(void *addr, void *args);
 int	sb_lock(struct sockbuf *sb);
 int	soabort(struct socket *so);

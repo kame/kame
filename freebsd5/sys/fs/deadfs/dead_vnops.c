@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)dead_vnops.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/fs/deadfs/dead_vnops.c,v 1.38 2002/10/16 08:04:11 phk Exp $
+ * $FreeBSD: src/sys/fs/deadfs/dead_vnops.c,v 1.39 2003/03/03 19:15:37 njl Exp $
  */
 
 #include <sys/param.h>
@@ -73,7 +73,6 @@ static struct vnodeopv_entry_desc dead_vnodeop_entries[] = {
 	{ &vop_open_desc,		(vop_t *) dead_open },
 	{ &vop_pathconf_desc,		(vop_t *) vop_ebadf },	/* per pathconf(2) */
 	{ &vop_poll_desc,		(vop_t *) dead_poll },
-	{ &vop_print_desc,		(vop_t *) vop_null },
 	{ &vop_read_desc,		(vop_t *) dead_read },
 	{ &vop_readdir_desc,		(vop_t *) vop_ebadf },
 	{ &vop_readlink_desc,		(vop_t *) vop_ebadf },

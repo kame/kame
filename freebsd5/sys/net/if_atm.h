@@ -1,5 +1,5 @@
 /*      $NetBSD: if_atm.h,v 1.7 1996/11/09 23:02:27 chuck Exp $       */
-/* $FreeBSD: src/sys/net/if_atm.h,v 1.5 2002/03/19 21:54:16 alfred Exp $ */
+/* $FreeBSD: src/sys/net/if_atm.h,v 1.8 2003/05/05 16:35:52 harti Exp $ */
 
 /*
  *
@@ -36,6 +36,66 @@
 /*
  * net/if_atm.h
  */
+
+/*
+ * Classification of ATM cards.
+ */
+#define ATM_DEVICE_UNKNOWN	0
+#define ATM_DEVICE_PCA200E	1	/* Fore/Marconi PCA200-E */
+#define ATM_DEVICE_HE155	2	/* Fore/Marconi HE155 */
+#define ATM_DEVICE_HE622	3	/* Fore/Marconi HE622 */
+#define ATM_DEVICE_ENI155P	4	/* Efficient networks 155p */
+#define ATM_DEVICE_ADP155P	5	/* Adaptec 155p */
+
+/* map to strings and vendors */
+#define ATM_DEVICE_NAMES					\
+	{ "Unknown",	"Unknown" },				\
+	{ "PCA200-E",	"Fore/Marconi" },			\
+	{ "HE155",	"Fore/Marconi" },			\
+	{ "HE622",	"Fore/Marconi" },			\
+	{ "ENI155p",	"Efficient Networks" },			\
+	{ "ADP155p",	"Adaptec" },
+
+/*
+ * This is the common link layer MIB for all ATM interfaces. Much of the
+ * information here is needed for ILMI. This will be augmented by statistics
+ * at some point.
+ */
+struct ifatm_mib {
+	/* configuration data */
+	uint8_t		device;		/* type of card */
+	u_char		esi[6];		/* end system identifier (MAC) */
+	uint32_t	serial;		/* card serial number */
+	uint32_t	hw_version;	/* card version */
+	uint32_t	sw_version;	/* firmware version (if any) */
+	uint32_t	pcr;		/* supported peak cell rate */
+	uint32_t	media;		/* physical media */
+	uint8_t		vpi_bits;	/* number of used bits in VPI field */
+	uint8_t		vci_bits;	/* number of used bits in VCI field */
+	uint16_t	max_vpcs;	/* maximum number of VPCs */
+	uint32_t	max_vccs;	/* maximum number of VCCs */
+};
+
+#ifdef _KERNEL
+/*
+ * Common fields for all ATM interfaces. Each driver's softc must start with
+ * this structure.
+ */
+struct ifatm {
+	struct ifnet	ifnet;		/* required by if_var.h */
+	struct ifatm_mib mib;		/* exported data */
+	void		*phy;		/* usually SUNI */
+	void		*ngpriv;	/* netgraph link */
+};
+#endif
+
+/*
+ * Peak cell rates for various physical media. Note, that there are
+ * different opinions on what the correct values are.
+ */
+#define ATM_RATE_155M		353208
+#define ATM_RATE_622M		1412830
+#define ATM_RATE_24G		5651320
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
 #define RTALLOC1(A,B)		rtalloc1((A),(B))
@@ -93,12 +153,13 @@ struct atmllc {
 /* ATM_LLC macros: note type code in host byte order */
 #define ATM_LLC_TYPE(X) (((X)->type[0] << 8) | ((X)->type[1]))
 #define ATM_LLC_SETTYPE(X,V) { \
-	(X)->type[1] = ((V) >> 8) & 0xff; \
-	(X)->type[0] = ((V) & 0xff); \
+	(X)->type[0] = ((V) >> 8) & 0xff; \
+	(X)->type[1] = ((V) & 0xff); \
 }
 
 #ifdef _KERNEL
 void	atm_ifattach(struct ifnet *);
+void	atm_ifdetach(struct ifnet *);
 void	atm_input(struct ifnet *, struct atm_pseudohdr *,
 		struct mbuf *, void *);
 int	atm_output(struct ifnet *, struct mbuf *, struct sockaddr *, 

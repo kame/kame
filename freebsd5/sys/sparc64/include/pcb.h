@@ -23,25 +23,29 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/pcb.h,v 1.12 2002/10/19 15:54:34 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/pcb.h,v 1.16 2003/04/03 18:28:03 jake Exp $
  */
 
 #ifndef	_MACHINE_PCB_H_
 #define	_MACHINE_PCB_H_
 
-#include <machine/fp.h>
 #include <machine/frame.h>
 
 #define	MAXWIN	8
 
-/* NOTE: pcb_fpstate must be aligned on a 64 byte boundary. */
+#define	PCB_FEF	(1 << 0)
+
+/* NOTE: pcb_ufp must be aligned on a 64 byte boundary. */
 struct pcb {
-	struct	fpstate	pcb_fpstate;
-	u_long	pcb_fp;
-	u_long	pcb_pc;
-	u_long	pcb_nsaved;
-	u_long	pcb_rwsp[MAXWIN];
 	struct	rwindow pcb_rw[MAXWIN];
+	uint32_t pcb_kfp[64];
+	uint32_t pcb_ufp[64];
+	uint64_t pcb_rwsp[MAXWIN];
+	uint64_t pcb_flags;
+	uint64_t pcb_nsaved;
+	uint64_t pcb_pc;
+	uint64_t pcb_sp;
+	uint64_t pcb_pad[4];
 } __aligned(64);
 
 #ifdef _KERNEL

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/usb/ums.c,v 1.56 2002/08/08 12:05:51 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ums.c,v 1.57 2003/03/03 12:15:47 phk Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -149,19 +149,13 @@ Static d_poll_t  ums_poll;
 #define UMS_CDEV_MAJOR	111
 
 Static struct cdevsw ums_cdevsw = {
-	/* open */	ums_open,
-	/* close */	ums_close,
-	/* read */	ums_read,
-	/* write */	nowrite,
-	/* ioctl */	ums_ioctl,
-	/* poll */	ums_poll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"ums",
-	/* maj */	UMS_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	ums_open,
+	.d_close =	ums_close,
+	.d_read =	ums_read,
+	.d_ioctl =	ums_ioctl,
+	.d_poll =	ums_poll,
+	.d_name =	"ums",
+	.d_maj =	UMS_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
 	/* bmaj */	-1
 #endif

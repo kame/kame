@@ -28,7 +28,7 @@
  *
  *	from: NetBSD: psychoreg.h,v 1.8 2001/09/10 16:17:06 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/pci/psychoreg.h,v 1.5 2002/12/01 23:00:41 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/pci/psychoreg.h,v 1.6 2003/01/06 16:51:06 tmm Exp $
  */
 
 #ifndef _SPARC64_PCI_PSYCHOREG_H_
@@ -239,6 +239,9 @@
 #define	UEAFSR_S_DRD	(1UL << 59)	/* sec. error during read */
 #define	UEAFSR_P_DWR	(1UL << 61)	/* pri. error during write */
 #define	UEAFSR_P_DRD	(1UL << 62)	/* pri. error during read */
+
+/* Definitions for the target address space register. */
+#define	PCITAS_ADDR_SHIFT	29
 
 /* Definitions for the psycho configuration space */
 #define	PCS_DEVICE	0		/* Device number of psycho CS entry */

@@ -33,8 +33,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumparser.c,v 1.21 2000/12/20 03:44:13 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumparser.c,v 1.28 2002/09/20 17:14:48 phk Exp $
+ * $Id: vinumparser.c,v 1.24 2003/04/28 02:54:43 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumparser.c,v 1.30 2003/05/05 05:35:01 grog Exp $
  */
 
 /*
@@ -114,12 +114,11 @@ struct _keywords keywords[] =
     keypair(state),
     keypair(round),
     keypair(prefer),
+    keypair(preferred),
     keypair(rename),
     keypair(detached),
 #ifndef _KERNEL						    /* for vinum(8) only */
-#ifdef VINUMDEBUG
     keypair(debug),
-#endif
     keypair(stripe),
     keypair(mirror),
 #endif

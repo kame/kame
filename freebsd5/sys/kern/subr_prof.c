@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_prof.c	8.3 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/kern/subr_prof.c,v 1.55 2002/10/01 13:15:11 phk Exp $
+ * $FreeBSD: src/sys/kern/subr_prof.c,v 1.65 2003/05/02 01:02:20 julian Exp $
  */
 
 #include <sys/param.h>
@@ -358,18 +358,24 @@ sysctl_kern_prof(SYSCTL_HANDLER_ARGS)
 			return (0);
 		if (state == GMON_PROF_OFF) {
 			gp->state = state;
+			PROC_LOCK(&proc0);
 			stopprofclock(&proc0);
+			PROC_UNLOCK(&proc0);
 			stopguprof(gp);
 		} else if (state == GMON_PROF_ON) {
 			gp->state = GMON_PROF_OFF;
 			stopguprof(gp);
 			gp->profrate = profhz;
+			PROC_LOCK(&proc0);
 			startprofclock(&proc0);
+			PROC_UNLOCK(&proc0);
 			gp->state = state;
 #ifdef GUPROF
 		} else if (state == GMON_PROF_HIRES) {
 			gp->state = GMON_PROF_OFF;
+			PROC_LOCK(&proc0);
 			stopprofclock(&proc0);
+			PROC_UNLOCK(&proc0);
 			startguprof(gp);
 			gp->state = state;
 #endif
@@ -419,34 +425,29 @@ profil(td, uap)
 	struct thread *td;
 	register struct profil_args *uap;
 {
-	register struct uprof *upp;
-	int s;
-	int error = 0;
+	struct uprof *upp;
+	struct proc *p;
 
-	mtx_lock(&Giant);
+	if (uap->scale > (1 << 16))
+		return (EINVAL);
 
-	if (uap->scale > (1 << 16)) {
-		error = EINVAL;
-		goto done2;
-	}
+	p = td->td_proc;
 	if (uap->scale == 0) {
+		PROC_LOCK(td->td_proc);
 		stopprofclock(td->td_proc);
-		goto done2;
+		PROC_UNLOCK(td->td_proc);
+		return (0);
 	}
 	upp = &td->td_proc->p_stats->p_prof;
-
-	/* Block profile interrupts while changing state. */
-	s = splstatclock();
 	upp->pr_off = uap->offset;
 	upp->pr_scale = uap->scale;
 	upp->pr_base = uap->samples;
 	upp->pr_size = uap->size;
-	startprofclock(td->td_proc);
-	splx(s);
+	PROC_LOCK(p);
+	startprofclock(p);
+	PROC_UNLOCK(p);
 
-done2:
-	mtx_unlock(&Giant);
-	return (error);
+	return (0);
 }
 
 /*
@@ -472,19 +473,16 @@ done2:
  * inaccurate.
  */
 void
-addupc_intr(ke, pc, ticks)
-	register struct kse *ke;
-	register uintptr_t pc;
-	u_int ticks;
+addupc_intr(struct thread *td, uintptr_t pc, u_int ticks)
 {
-	register struct uprof *prof;
-	register caddr_t addr;
-	register u_int i;
-	register int v;
+	struct uprof *prof;
+	caddr_t addr;
+	u_int i;
+	int v;
 
 	if (ticks == 0)
 		return;
-	prof = &ke->ke_proc->p_stats->p_prof;
+	prof = &td->td_proc->p_stats->p_prof;
 	if (pc < prof->pr_off ||
 	    (i = PC_TO_INDEX(pc, prof)) >= prof->pr_size)
 		return;			/* out of range; ignore */
@@ -494,7 +492,7 @@ addupc_intr(ke, pc, ticks)
 		mtx_lock_spin(&sched_lock);
 		prof->pr_addr = pc;
 		prof->pr_ticks = ticks;
-		ke->ke_flags |= KEF_OWEUPC | KEF_ASTPENDING ;
+		td->td_flags |= TDF_OWEUPC | TDF_ASTPENDING ;
 		mtx_unlock_spin(&sched_lock);
 	}
 }
@@ -504,30 +502,94 @@ addupc_intr(ke, pc, ticks)
  * update fails, we simply turn off profiling.
  */
 void
-addupc_task(ke, pc, ticks)
-	register struct kse *ke;
-	register uintptr_t pc;
-	u_int ticks;
+addupc_task(struct thread *td, uintptr_t pc, u_int ticks)
 {
-	struct proc *p = ke->ke_proc;
-	register struct uprof *prof;
-	register caddr_t addr;
-	register u_int i;
+	struct proc *p = td->td_proc; 
+	struct uprof *prof;
+	caddr_t addr;
+	u_int i;
 	u_short v;
+	int stop = 0;
 
 	if (ticks == 0)
 		return;
 
+	PROC_LOCK(p);
+	if (!(p->p_flag & P_PROFIL)) {
+		PROC_UNLOCK(p);
+		return;
+	}
+	p->p_profthreads++;
+	PROC_UNLOCK(p);
 	prof = &p->p_stats->p_prof;
 	if (pc < prof->pr_off ||
-	    (i = PC_TO_INDEX(pc, prof)) >= prof->pr_size)
-		return;
+	    (i = PC_TO_INDEX(pc, prof)) >= prof->pr_size) {
+		goto out;
+	}
 
 	addr = prof->pr_base + i;
 	if (copyin(addr, &v, sizeof(v)) == 0) {
 		v += ticks;
 		if (copyout(&v, addr, sizeof(v)) == 0)
-			return;
+			goto out;
 	}
-	stopprofclock(p);
+	stop = 1;
+
+out:
+	PROC_LOCK(p);
+	if (--p->p_profthreads == 0) {
+		if (p->p_flag & P_STOPPROF) {
+			wakeup(&p->p_profthreads);
+			stop = 0;
+		}
+	}
+	if (stop)
+		stopprofclock(p);
+	PROC_UNLOCK(p);
 }
+
+#if defined(__i386__) && __GNUC__ >= 2
+/*
+ * Support for "--test-coverage --profile-arcs" in GCC.
+ *
+ * We need to call all the functions in the .ctor section, in order
+ * to get all the counter-arrays strung into a list.
+ *
+ * XXX: the .ctors call __bb_init_func which is located in over in 
+ * XXX: i386/i386/support.s for historical reasons.  There is probably
+ * XXX: no reason for that to be assembler anymore, but doing it right
+ * XXX: in MI C code requires one to reverse-engineer the type-selection
+ * XXX: inside GCC.  Have fun.
+ *
+ * XXX: Worrisome perspective: Calling the .ctors may make C++ in the
+ * XXX: kernel feasible.  Don't.
+ */
+typedef void (*ctor_t)(void);
+extern ctor_t _start_ctors, _stop_ctors;
+
+static void
+tcov_init(void *foo __unused)
+{
+	ctor_t *p, q;
+
+	for (p = &_start_ctors; p < &_stop_ctors; p++) {
+		q = *p;
+		q();
+	}
+}
+
+SYSINIT(tcov_init, SI_SUB_KPROF, SI_ORDER_SECOND, tcov_init, NULL)
+
+/*
+ * GCC contains magic to recognize calls to for instance execve() and
+ * puts in calls to this function to preserve the profile counters.
+ * XXX: Put zinging punchline here.
+ */
+void __bb_fork_func(void);
+void
+__bb_fork_func(void)
+{
+}
+
+#endif
+

@@ -37,10 +37,8 @@
  */
 
 #ifndef RPC_HDR
-%#ifndef lint
-%static const char rcsid[] =
-%  "$FreeBSD: src/include/rpcsvc/sm_inter.x,v 1.10 2002/03/22 19:43:20 alfred Exp $";
-%#endif /* not lint */
+%#include <sys/cdefs.h>
+%__FBSDID("$FreeBSD: src/include/rpcsvc/sm_inter.x,v 1.11 2003/05/04 02:51:42 obrien Exp $");
 #endif
 
 program SM_PROG { 

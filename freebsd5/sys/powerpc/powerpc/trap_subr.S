@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/powerpc/powerpc/trap_subr.S,v 1.6 2002/09/19 04:39:04 grehan Exp $ */
+/* $FreeBSD: src/sys/powerpc/powerpc/trap_subr.S,v 1.8 2003/02/26 14:41:39 grehan Exp $ */
 /* $NetBSD: trap_subr.S,v 1.20 2002/04/22 23:20:08 kleink Exp $	*/
 
 /*
@@ -690,9 +690,10 @@ CNAME(trapexit):
 
 	mfsprg	3, 0			/* get per-CPU pointer */
 	lwz	4, PC_CURTHREAD(3)	/* deref to get curthread */
-	lwz	3, TD_KSE(4)		/* deref to get current KSE */
-	lwz	4, KE_FLAGS(3)		/* get KSE flags value */
-	andi.	4,4,KEF_ASTPENDING|KEF_NEEDRESCHED
+	lwz	4, TD_FLAGS(4)		/* get thread flags value */
+	lis	5, (TDF_ASTPENDING|TDF_NEEDRESCHED)@h
+	ori	5,5, (TDF_ASTPENDING|TDF_NEEDRESCHED)@l	
+	and.	4,4,5
 	beq	1f
 	mfmsr	3			/* re-enable interrupts */
 	ori	3,3,PSL_EE@l

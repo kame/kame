@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)signal.h	8.4 (Berkeley) 5/4/95
- * $FreeBSD: src/sys/sys/signal.h,v 1.38.2.1 2002/12/31 19:35:41 mike Exp $
+ * $FreeBSD: src/sys/sys/signal.h,v 1.42 2003/03/31 23:31:50 jeff Exp $
  */
 
 #ifndef _SYS_SIGNAL_H_
@@ -110,6 +110,9 @@
 #if __POSIX_VISIBLE || __XSI_VISIBLE
 #define	SIGUSR1		30	/* user defined signal 1 */
 #define	SIGUSR2		31	/* user defined signal 2 */
+#endif
+#if __BSD_VISIBLE
+#define	SIGTHR		32	/* Thread interrupt. */
 #endif
 /*
  * XXX missing SIGRTMIN, SIGRTMAX.

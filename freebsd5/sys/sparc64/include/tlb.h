@@ -23,17 +23,24 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/tlb.h,v 1.24 2002/08/16 00:57:36 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/tlb.h,v 1.26 2003/04/13 21:54:58 jake Exp $
  */
 
 #ifndef	_MACHINE_TLB_H_
 #define	_MACHINE_TLB_H_
 
-#define	TLB_DIRECT_MASK			(((1UL << (64 - 38)) - 1) << 38)
-#define	TLB_DIRECT_SHIFT		(3)
-#define	TLB_DIRECT_UNCACHEABLE_SHIFT	(11)
-#define	TLB_DIRECT_COLOR_SHIFT		(10)
-#define	TLB_DIRECT_UNCACHEABLE		(1 << TLB_DIRECT_UNCACHEABLE_SHIFT)
+#define	TLB_DIRECT_ADDRESS_BITS		(43)
+#define	TLB_DIRECT_PAGE_BITS		(PAGE_SHIFT_4M)
+
+#define	TLB_DIRECT_ADDRESS_MASK		((1UL << TLB_DIRECT_ADDRESS_BITS) - 1)
+#define	TLB_DIRECT_PAGE_MASK		((1UL << TLB_DIRECT_PAGE_BITS) - 1)
+
+#define	TLB_PHYS_TO_DIRECT(pa) \
+	((pa) | VM_MIN_DIRECT_ADDRESS)
+#define	TLB_DIRECT_TO_PHYS(va) \
+	((va) & TLB_DIRECT_ADDRESS_MASK)
+#define	TLB_DIRECT_TO_TTE_MASK \
+	(TD_V | TD_4M | (TLB_DIRECT_ADDRESS_MASK - TLB_DIRECT_PAGE_MASK))
 
 #define	TLB_DAR_SLOT_SHIFT		(3)
 #define	TLB_DAR_SLOT(slot)		((slot) << TLB_DAR_SLOT_SHIFT)
@@ -86,17 +93,21 @@
 #define	MMU_SFSR_W			(1UL << MMU_SFSR_W_SHIFT)
 #define	MMU_SFSR_FV			(1UL << MMU_SFSR_FV_SHIFT)
 
+typedef void tlb_flush_user_t(void);
+
+struct pmap;
 struct tlb_entry;
 
 extern int kernel_tlb_slots;
 extern struct tlb_entry *kernel_tlbs;
 
-extern int tlb_dtlb_entries;
-extern int tlb_itlb_entries;
-
 void	tlb_context_demap(struct pmap *pm);
 void	tlb_page_demap(struct pmap *pm, vm_offset_t va);
 void	tlb_range_demap(struct pmap *pm, vm_offset_t start, vm_offset_t end);
-void	tlb_dump(void);
+
+tlb_flush_user_t cheetah_tlb_flush_user;
+tlb_flush_user_t spitfire_tlb_flush_user;
+
+extern tlb_flush_user_t *tlb_flush_user;
 
 #endif /* !_MACHINE_TLB_H_ */

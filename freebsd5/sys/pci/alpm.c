@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/alpm.c,v 1.17 2002/03/23 15:49:15 nsouch Exp $
+ * $FreeBSD: src/sys/pci/alpm.c,v 1.18 2003/04/15 06:37:29 mdodd Exp $
  *
  */
 
@@ -637,5 +637,6 @@ static driver_t alpm_driver = {
 };
 
 DRIVER_MODULE(alpm, pci, alpm_driver, alpm_devclass, 0, 0);
+MODULE_DEPEND(alpm, pci, 1, 1, 1);
 MODULE_DEPEND(alpm, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);
 MODULE_VERSION(alpm, 1);

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sysctl.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/sysctl.h,v 1.110 2002/10/20 22:48:08 phk Exp $
+ * $FreeBSD: src/sys/sys/sysctl.h,v 1.113 2003/03/28 14:17:17 robert Exp $
  */
 
 #ifndef _SYS_SYSCTL_H_
@@ -86,6 +86,17 @@ struct ctlname {
 #define CTLFLAG_PRISON	0x04000000	/* Prisoned roots can fiddle */
 #define CTLFLAG_DYN	0x02000000	/* Dynamic oid - can be freed */
 #define CTLFLAG_SKIP	0x01000000	/* Skip this sysctl when listing */
+#define CTLMASK_SECURE	0x00F00000	/* Secure level */
+
+/*
+ * Secure level.   Note that CTLFLAG_SECURE == CTLFLAG_SECURE1.  
+ *
+ * Secure when the securelevel is raised to at least N.
+ */
+#define CTLSHIFT_SECURE	20
+#define CTLFLAG_SECURE1	(CTLFLAG_SECURE | (0 << CTLSHIFT_SECURE))
+#define CTLFLAG_SECURE2	(CTLFLAG_SECURE | (1 << CTLSHIFT_SECURE))
+#define CTLFLAG_SECURE3	(CTLFLAG_SECURE | (2 << CTLSHIFT_SECURE))
 
 /*
  * USE THIS instead of a hardwired number from the categories below
@@ -178,6 +189,9 @@ struct sysctl_ctx_entry {
 
 TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 
+#define SYSCTL_NODE_CHILDREN(parent, name) \
+	sysctl_##parent##_##name##_children
+
 /* This constructs a "raw" MIB oid. */
 #define SYSCTL_OID(parent, nbr, name, kind, a1, a2, handler, fmt, descr) \
 	static struct sysctl_oid sysctl__##parent##_##name = {		 \
@@ -190,9 +204,9 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 
 /* This constructs a node from which other oids can hang. */
 #define SYSCTL_NODE(parent, nbr, name, access, handler, descr)		    \
-	struct sysctl_oid_list sysctl_##parent##_##name##_children;	    \
+	struct sysctl_oid_list SYSCTL_NODE_CHILDREN(parent, name);	    \
 	SYSCTL_OID(parent, nbr, name, CTLTYPE_NODE|(access),		    \
-		   (void*)&sysctl_##parent##_##name##_children, 0, handler, \
+		   (void*)&SYSCTL_NODE_CHILDREN(parent, name), 0, handler, \
 		   "N", descr)
 
 #define SYSCTL_ADD_NODE(ctx, parent, nbr, name, access, handler, descr)	    \
@@ -235,7 +249,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	sysctl_add_oid(ctx, parent, nbr, name, CTLTYPE_LONG|(access),	    \
 	ptr, 0, sysctl_handle_long, "L", descr)
 
-/* Oid for a long.  The pointer must be non NULL. */
+/* Oid for an unsigned long.  The pointer must be non NULL. */
 #define SYSCTL_ULONG(parent, nbr, name, access, ptr, val, descr) \
 	SYSCTL_OID(parent, nbr, name, CTLTYPE_ULONG|(access), \
 		ptr, val, sysctl_handle_long, "LU", descr)

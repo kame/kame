@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/bus.h,v 1.51 2002/10/07 07:08:00 imp Exp $
+ * $FreeBSD: src/sys/sys/bus.h,v 1.53 2003/04/21 18:19:08 imp Exp $
  */
 
 #ifndef _SYS_BUS_H_
@@ -58,8 +58,8 @@ struct u_device {
 	char		dv_name[32];		/* Name of device in tree. */
 	char		dv_desc[32];		/* Driver description */
 	char		dv_drivername[32];	/* Driver name */
-	char		dv_pnpinfo[64];		/* Plug and play info */
-	char		dv_location[64];	/* Where is the device? */
+	char		dv_pnpinfo[128];	/* Plug and play info */
+	char		dv_location[128];	/* Where is the device? */
 	uint32_t	dv_devflags;		/* API Flags for device */
 	uint16_t	dv_flags;		/* flags for dev date */
 	device_state_t	dv_state;		/* State of attachment */
@@ -310,6 +310,7 @@ void	*device_get_softc(device_t dev);
 device_state_t	device_get_state(device_t dev);
 int	device_get_unit(device_t dev);
 int	device_is_alive(device_t dev);	/* did probe succeed? */
+int	device_is_attached(device_t dev);	/* did attach succeed? */
 int	device_is_enabled(device_t dev);
 int	device_is_quiet(device_t dev);
 int	device_print_prettyname(device_t dev);

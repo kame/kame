@@ -1,5 +1,5 @@
 /* $NetBSD: pcmcia_cis.c,v 1.17 2000/02/10 09:01:52 chopps Exp $ */
-/* $FreeBSD: src/sys/dev/pccard/pccard_cis.c,v 1.23 2002/11/14 14:02:32 mux Exp $ */
+/* $FreeBSD: src/sys/dev/pccard/pccard_cis.c,v 1.24 2003/03/18 02:38:33 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -109,7 +109,7 @@ pccard_scan_cis(device_t dev, int (*fct)(struct pccard_tuple *, void *),
 	struct pccard_tuple tuple;
 	int longlink_present;
 	int longlink_common;
-	u_long longlink_addr;
+	u_long longlink_addr;		/* Type suspect */
 	int mfc_count;
 	int mfc_index;
 	struct {

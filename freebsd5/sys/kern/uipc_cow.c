@@ -29,7 +29,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
  *
- * $FreeBSD: src/sys/kern/uipc_cow.c,v 1.7 2002/10/11 14:58:30 mike Exp $
+ * $FreeBSD: src/sys/kern/uipc_cow.c,v 1.14 2003/04/11 07:02:36 alc Exp $
  */
 /*
  * This is a set of routines for enabling and disabling copy on write
@@ -52,13 +52,6 @@
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
 #include <vm/vm_object.h>
-#if 0
-#include <vm/vm_pager.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_zone.h>
-#include <vm/swap_pager.h>
-#endif
 
 
 struct netsend_cow_stats {
@@ -77,9 +70,6 @@ struct netsend_cow_stats {
 
 static struct netsend_cow_stats socow_stats = {0,0,0,0,0,0,0,0,0,0,0};
 
-extern struct sf_buf *sf_bufs;
-extern vm_offset_t sf_base;
-#define dtosf(x) (&sf_bufs[((uintptr_t)(x) - (uintptr_t)sf_base) >> PAGE_SHIFT])
 static void socow_iodone(void *addr, void *args);
 
 static void
@@ -87,22 +77,18 @@ socow_iodone(void *addr, void *args)
 {	
 	int s;
 	struct sf_buf *sf;
-
-	vm_offset_t paddr; 
 	vm_page_t pp;
 
-	sf = dtosf(addr);
-	paddr = vtophys((vm_offset_t)addr);
-	pp = PHYS_TO_VM_PAGE(paddr);
+	sf = args;
+	pp = sf->m;
 	s = splvm();
 	/* remove COW mapping  */
 	vm_page_lock_queues();
 	vm_page_cowclear(pp);
 	vm_page_unlock_queues();
-	vm_object_deallocate(pp->object);
 	splx(s);
 	/* note that sf_buf_free() unwires the page for us*/
-	sf_buf_free(addr, NULL);
+	sf_buf_free(addr, args);
 	socow_stats.iodone++;
 }
 
@@ -111,14 +97,14 @@ socow_setup(struct mbuf *m0, struct uio *uio)
 {
 	struct sf_buf *sf;
 	vm_page_t pp;
-	vm_offset_t pa;
+	vm_paddr_t pa;
 	struct iovec *iov;
 	struct vmspace *vmspace;
 	struct vm_map *map;
 	vm_offset_t uva;
 	int s;
 
-	vmspace = curproc->p_vmspace;;
+	vmspace = curproc->p_vmspace;
 	map = &vmspace->vm_map;
 	uva = (vm_offset_t) uio->uio_iov->iov_base;
 
@@ -136,10 +122,6 @@ socow_setup(struct mbuf *m0, struct uio *uio)
 	}
 	pp = PHYS_TO_VM_PAGE(pa);
 
-	sf = sf_buf_alloc();
-	sf->m = pp;
-	pmap_qenter(sf->kva, &pp, 1);
-
 	/* 
 	 * set up COW
 	 */
@@ -153,16 +135,16 @@ socow_setup(struct mbuf *m0, struct uio *uio)
 	vm_page_unlock_queues();
 
 	/*
-	 * prevent the process from exiting on us.
+	 * Allocate an sf buf
 	 */
-	vm_object_reference(pp->object);
+	sf = sf_buf_alloc(pp);
 
 	/* 
 	 * attach to mbuf
 	 */
 	m0->m_data = (caddr_t)sf->kva;
 	m0->m_len = PAGE_SIZE;
-	MEXTADD(m0, sf->kva, PAGE_SIZE, socow_iodone, NULL, 0, EXT_SFBUF);
+	MEXTADD(m0, sf->kva, PAGE_SIZE, socow_iodone, sf, M_RDONLY, EXT_SFBUF);
 	socow_stats.success++;
 
 	iov = uio->uio_iov;

@@ -29,26 +29,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_mbr.c,v 1.25.2.2 2003/01/02 20:16:17 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_mbr.c,v 1.50 2003/05/02 08:13:03 phk Exp $
  */
 
 #include <sys/param.h>
 #include <sys/errno.h>
-#ifndef _KERNEL
-#include <stdio.h>
-#include <string.h>
-#include <signal.h>
-#include <sys/param.h>
-#include <stdlib.h>
-#include <err.h>
-#else
+#include <sys/endian.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/bio.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#endif
 
 #include <sys/diskmbr.h>
 #include <sys/sbuf.h>
@@ -64,48 +56,29 @@ static struct dos_partition historical_bogus_partition_table[NDOSPART] = {
         { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },
         { 0x80, 0, 1, 0, DOSPTYP_386BSD, 255, 255, 255, 0, 50000, },
 };
+
 static struct dos_partition historical_bogus_partition_table_fixed[NDOSPART] = {
         { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },
         { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },
         { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },
         { 0x80, 0, 1, 0, DOSPTYP_386BSD, 254, 255, 255, 0, 50000, },
 };
+
 static void
-g_dec_dos_partition(u_char *ptr, struct dos_partition *d)
+g_mbr_print(int i, struct dos_partition *dp)
 {
 
-	d->dp_flag = ptr[0];
-	d->dp_shd = ptr[1];
-	d->dp_ssect = ptr[2];
-	d->dp_scyl = ptr[3];
-	d->dp_typ = ptr[4];
-	d->dp_ehd = ptr[5];
-	d->dp_esect = ptr[6];
-	d->dp_ecyl = ptr[7];
-	d->dp_start = g_dec_le4(ptr + 8);
-	d->dp_size = g_dec_le4(ptr + 12);
+	printf("[%d] f:%02x typ:%d", i, dp->dp_flag, dp->dp_typ);
+	printf(" s(CHS):%d/%d/%d", DPCYL(dp->dp_scyl, dp->dp_ssect),
+	    dp->dp_shd, DPSECT(dp->dp_ssect));
+	printf(" e(CHS):%d/%d/%d", DPCYL(dp->dp_ecyl, dp->dp_esect),
+	    dp->dp_ehd, DPSECT(dp->dp_esect));
+	printf(" s:%d l:%d\n", dp->dp_start, dp->dp_size);
 }
-
-#if 0
-static void
-g_enc_dos_partition(u_char *ptr, struct dos_partition *d)
-{
-
-	ptr[0] = d->dp_flag;
-	ptr[1] = d->dp_shd;
-	ptr[2] = d->dp_ssect;
-	ptr[3] = d->dp_scyl;
-	ptr[4] = d->dp_typ;
-	ptr[5] = d->dp_ehd;
-	ptr[6] = d->dp_esect;
-	ptr[7] = d->dp_ecyl;
-	g_enc_le4(ptr + 8, d->dp_start);
-	g_enc_le4(ptr + 12, d->dp_size);
-}
-#endif
 
 struct g_mbr_softc {
 	int		type [NDOSPART];
+	u_int		sectorsize;
 	u_char		sec0[512];
 };
 
@@ -122,10 +95,13 @@ g_mbr_modify(struct g_geom *gp, struct g_mbr_softc *ms, u_char *sec0)
 		return (EBUSY);
 
 	dp = ndp;
-	for (i = 0; i < NDOSPART; i++) 
-		g_dec_dos_partition(
+	for (i = 0; i < NDOSPART; i++) {
+		dos_partition_dec(
 		    sec0 + DOSPARTOFF + i * sizeof(struct dos_partition),
 		    dp + i);
+		if (bootverbose)
+			g_mbr_print(i, dp + i);
+	}
 	if ((!bcmp(dp, historical_bogus_partition_table,
 	    sizeof historical_bogus_partition_table)) ||
 	    (!bcmp(dp, historical_bogus_partition_table_fixed,
@@ -151,32 +127,32 @@ g_mbr_modify(struct g_geom *gp, struct g_mbr_softc *ms, u_char *sec0)
 		 * partitions to be present in the MBR. A PMBR will
 		 * be handled correctly anyway.
 		 */
-		if (dp[i].dp_typ == 0xee)
+		if (dp[i].dp_typ == DOSPTYP_PMBR)
 			l[i] = 0;
 		else if (dp[i].dp_flag != 0 && dp[i].dp_flag != 0x80)
 			l[i] = 0;
 		else if (dp[i].dp_typ == 0)
 			l[i] = 0;
 		else
-			l[i] = (off_t)dp[i].dp_size << 9ULL;
+			l[i] = (off_t)dp[i].dp_size * ms->sectorsize;
 		error = g_slice_config(gp, i, G_SLICE_CONFIG_CHECK,
-		    (off_t)dp[i].dp_start << 9ULL, l[i], 512,
-		    "%ss%d", gp->name, 1 + i);
+		    (off_t)dp[i].dp_start * ms->sectorsize, l[i],
+		    ms->sectorsize, "%ss%d", gp->name, 1 + i);
 		if (error)
 			return (error);
 	}
 	for (i = 0; i < NDOSPART; i++) {
 		ms->type[i] = dp[i].dp_typ;
 		g_slice_config(gp, i, G_SLICE_CONFIG_SET,
-		    (off_t)dp[i].dp_start << 9ULL, l[i], 512,
-		    "%ss%d", gp->name, 1 + i);
+		    (off_t)dp[i].dp_start * ms->sectorsize, l[i],
+		    ms->sectorsize, "%ss%d", gp->name, 1 + i);
 	}
 	bcopy(sec0, ms->sec0, 512);
 	return (0);
 }
 
 static void
-g_mbr_ioctl(void *arg)
+g_mbr_ioctl(void *arg, int flag)
 {
 	struct bio *bp;
 	struct g_geom *gp;
@@ -187,8 +163,11 @@ g_mbr_ioctl(void *arg)
 	u_char *sec0;
 	int error;
 
-	/* Get hold of the interesting bits from the bio. */
 	bp = arg;
+	if (flag == EV_CANCEL) {
+		g_io_deliver(bp, ENXIO);
+		return;
+	}
 	gp = bp->bio_to->geom;
 	gsp = gp->softc;
 	ms = gsp->softc;
@@ -241,18 +220,13 @@ g_mbr_start(struct bio *bp)
 	gio = (struct g_ioctl *)bp->bio_data;
 
 	switch (gio->cmd) {
-	case DIOCGMBR:
-		/* Return a copy of the disklabel to userland. */
-		bcopy(mp->sec0, gio->data, 512);
-		g_io_deliver(bp, 0);
-		return (1);
 	case DIOCSMBR:
 		/*
 		 * These we cannot do without the topology lock and some
 		 * some I/O requests.  Ask the event-handler to schedule
 		 * us in a less restricted environment.
 		 */
-		error = g_call_me(g_mbr_ioctl, bp);
+		error = g_post_event(g_mbr_ioctl, bp, M_NOWAIT, gp, NULL);
 		if (error)
 			g_io_deliver(bp, error);
 		/*
@@ -285,19 +259,6 @@ g_mbr_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp, struct g_
 	}
 }
 
-
-
-static void
-g_mbr_print(int i, struct dos_partition *dp)
-{
-
-	g_hexdump(dp, sizeof(dp[0]));
-	printf("[%d] f:%02x typ:%d", i, dp->dp_flag, dp->dp_typ);
-	printf(" s(CHS):%d/%d/%d", dp->dp_scyl, dp->dp_shd, dp->dp_ssect);
-	printf(" e(CHS):%d/%d/%d", dp->dp_ecyl, dp->dp_ehd, dp->dp_esect);
-	printf(" s:%d l:%d\n", dp->dp_start, dp->dp_size);
-}
-
 static struct g_geom *
 g_mbr_taste(struct g_class *mp, struct g_provider *pp, int insist)
 {
@@ -317,16 +278,16 @@ g_mbr_taste(struct g_class *mp, struct g_provider *pp, int insist)
 	gsp = gp->softc;
 	g_topology_unlock();
 	gp->dumpconf = g_mbr_dumpconf;
-	while (1) {	/* a trick to allow us to use break */
+	do {
 		if (gp->rank != 2 && insist == 0)
 			break;
 		error = g_getattr("GEOM::fwsectors", cp, &fwsectors);
 		if (error)
 			fwsectors = 17;
 		sectorsize = cp->provider->sectorsize;
-		if (sectorsize != 512)
+		if (sectorsize < 512)
 			break;
-		gsp->frontstuff = sectorsize * fwsectors;
+		ms->sectorsize = sectorsize;
 		buf = g_read_data(cp, 0, sectorsize, &error);
 		if (buf == NULL || error != 0)
 			break;
@@ -335,20 +296,19 @@ g_mbr_taste(struct g_class *mp, struct g_provider *pp, int insist)
 		g_topology_unlock();
 		g_free(buf);
 		break;
-	}
+	} while (0);
 	g_topology_lock();
 	g_access_rel(cp, -1, 0, 0);
 	if (LIST_EMPTY(&gp->provider)) {
-		g_std_spoiled(cp);
+		g_slice_spoiled(cp);
 		return (NULL);
 	}
 	return (gp);
 }
 
 static struct g_class g_mbr_class	= {
-	MBR_CLASS_NAME,
-	g_mbr_taste,
-	NULL,
+	.name = MBR_CLASS_NAME,
+	.taste = g_mbr_taste,
 	G_CLASS_INITIALIZER
 };
 
@@ -415,7 +375,8 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	g_topology_assert();
 	if (strcmp(pp->geom->class->name, MBR_CLASS_NAME))
 		return (NULL);
-	gp = g_slice_new(mp, NDOSEXTPART, pp, &cp, &ms, sizeof *ms, g_mbrext_start);
+	gp = g_slice_new(mp, NDOSEXTPART, pp, &cp, &ms, sizeof *ms,
+	    g_mbrext_start);
 	if (gp == NULL)
 		return (NULL);
 	gsp = gp->softc;
@@ -423,7 +384,7 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	gp->dumpconf = g_mbrext_dumpconf;
 	off = 0;
 	slice = 0;
-	while (1) {	/* a trick to allow us to use break */
+	do {
 		error = g_getattr("MBR::type", cp, &i);
 		if (error || (i != DOSPTYP_EXT && i != DOSPTYP_EXTLBA))
 			break;
@@ -433,21 +394,25 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 		sectorsize = cp->provider->sectorsize;
 		if (sectorsize != 512)
 			break;
-		gsp->frontstuff = sectorsize * fwsectors;
 		for (;;) {
 			buf = g_read_data(cp, off, sectorsize, &error);
 			if (buf == NULL || error != 0)
 				break;
-			if (buf[0x1fe] != 0x55 && buf[0x1ff] != 0xaa)
+			if (buf[0x1fe] != 0x55 && buf[0x1ff] != 0xaa) {
+				g_free(buf);
 				break;
+			}
 			for (i = 0; i < NDOSPART; i++) 
-				g_dec_dos_partition(
+				dos_partition_dec(
 				    buf + DOSPARTOFF + 
 				    i * sizeof(struct dos_partition), dp + i);
 			g_free(buf);
-			printf("MBREXT Slice %d on %s:\n", slice + 5, gp->name);
-			g_mbr_print(0, dp);
-			g_mbr_print(1, dp + 1);
+			if (bootverbose) {
+				printf("MBREXT Slice %d on %s:\n",
+				    slice + 5, gp->name);
+				g_mbr_print(0, dp);
+				g_mbr_print(1, dp + 1);
+			}
 			if ((dp[0].dp_flag & 0x7f) == 0 &&
 			     dp[0].dp_size != 0 && dp[0].dp_typ != 0) {
 				g_topology_lock();
@@ -473,11 +438,11 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 			off = ((off_t)dp[1].dp_start) << 9ULL;
 		}
 		break;
-	}
+	} while (0);
 	g_topology_lock();
 	g_access_rel(cp, -1, 0, 0);
 	if (LIST_EMPTY(&gp->provider)) {
-		g_std_spoiled(cp);
+		g_slice_spoiled(cp);
 		return (NULL);
 	}
 	return (gp);
@@ -485,9 +450,8 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 
 
 static struct g_class g_mbrext_class	= {
-	MBREXT_CLASS_NAME,
-	g_mbrext_taste,
-	NULL,
+	.name = MBREXT_CLASS_NAME,
+	.taste = g_mbrext_taste,
 	G_CLASS_INITIALIZER
 };
 

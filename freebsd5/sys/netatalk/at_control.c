@@ -2,7 +2,7 @@
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
  * All Rights Reserved.
  *
- * $FreeBSD: src/sys/netatalk/at_control.c,v 1.31 2002/04/01 21:31:05 jhb Exp $
+ * $FreeBSD: src/sys/netatalk/at_control.c,v 1.34 2003/02/19 05:47:30 imp Exp $
  */
 
 #include <sys/param.h>
@@ -159,12 +159,6 @@ at_control(struct socket *so, u_long cmd, caddr_t data,
 	    } else {
 		at_ifaddr = aa0;
 	    }
-	    /* 
-	     * Don't Add a reference for the aa itself!
-	     * I fell into this trap. IFAFREE tests for <=0
-	     * not <= 1 like RTFREE
-	     */
-	    /* aa->aa_ifa.ifa_refcnt++; DON'T DO THIS!! */
 	    aa = aa0;
 
 	    /*
@@ -172,12 +166,9 @@ at_control(struct socket *so, u_long cmd, caddr_t data,
 	     * and link our new one on the end 
 	     */
 	    ifa = (struct ifaddr *)aa;
+	    IFA_LOCK_INIT(ifa);
+	    ifa->ifa_refcnt = 1;
 	    TAILQ_INSERT_TAIL(&ifp->if_addrhead, ifa, ifa_link);
-
-	    /*
-	     * Add a reference for the linking into the ifp_if_addrlist.
-	     */
-	    ifa->ifa_refcnt++;
 
 	    /*
 	     * As the at_ifaddr contains the actual sockaddrs,

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/sparc64/sparc64/support.S,v 1.19 2002/08/16 00:57:37 jake Exp $
  */
+
+#include <machine/asm.h>
+__FBSDID("$FreeBSD: src/sys/sparc64/sparc64/support.S,v 1.25 2003/04/29 00:53:13 jake Exp $");
 
 #include <machine/asi.h>
 #include <machine/asmacros.h>
@@ -109,7 +110,7 @@
 	or	pat, %g1, pat ; \
 	sllx	pat, 32, %g1 ; \
 	or	pat, %g1, pat ; \
-	_ALIGN_TEXT ; \
+	.align 16 ; \
 1:	deccc	1, len ; \
 	bl,pn	%xcc, 5f ; \
 	 btst	7, dst ; \
@@ -118,7 +119,7 @@
 	ST(b, da) pat, [dst] dasi ; \
 	b	%xcc, 1b ; \
 	 inc	dst ; \
-	_ALIGN_TEXT ; \
+	.align 16 ; \
 2:	deccc	32, len ; \
 	bl,a,pn	%xcc, 3f ; \
 	 inc	32, len ; \
@@ -128,14 +129,14 @@
 	ST(x, da) pat, [dst + 24] dasi ; \
 	b	%xcc, 2b ; \
 	 inc	32, dst ; \
-	_ALIGN_TEXT ; \
+	.align 16 ; \
 3:	deccc	8, len ; \
 	bl,a,pn	%xcc, 4f ; \
 	 inc	8, len ; \
 	ST(x, da) pat, [dst] dasi ; \
 	b	%xcc, 3b ; \
 	 inc	8, dst ; \
-	_ALIGN_TEXT ; \
+	.align 16 ; \
 4:	deccc	1, len ; \
 	bl,a,pn	%xcc, 5f ; \
 	 nop ; \
@@ -171,12 +172,12 @@
 	inc	1, src ; \
 	b	%xcc, 1b ; \
 	 inc	1, dst ; \
-	_ALIGN_TEXT ; \
+	.align 16 ; \
 2:	btst	7, src ; \
 	bz,a,pt	%xcc, 3f ; \
 	 nop ; \
 	b,a	%xcc, 5f ; \
-	_ALIGN_TEXT ; \
+	.align 16 ; \
 3:	deccc	32, len ; \
 	bl,a,pn	%xcc, 4f ; \
 	 inc	32, len ; \
@@ -191,7 +192,7 @@
 	inc	32, src ; \
 	b	%xcc, 3b ; \
 	 inc	32, dst ; \
-	_ALIGN_TEXT ; \
+	.align 16 ; \
 4:	deccc	8, len ; \
 	bl,a,pn	%xcc, 5f ; \
 	 inc	8, len ; \
@@ -200,7 +201,7 @@
 	inc	8, src ; \
 	b	%xcc, 4b ; \
 	 inc	8, dst ; \
-	_ALIGN_TEXT ; \
+	.align 16 ; \
 5:	deccc	1, len ; \
 	bl,a,pn	%xcc, 6f ; \
 	 nop ; \
@@ -273,7 +274,6 @@ END(bcmp)
  * void bcopy(const void *src, void *dst, size_t len)
  */
 ENTRY(bcopy)
-ENTRY(ovbcopy)
 	/*
 	 * Check for overlap, and copy backwards if so.
 	 */
@@ -402,6 +402,29 @@ fs_nofault_begin:
 	.set	susword, suword16
 	.set	suword, suword64
 
+	.globl	casuptr, fuptr, suptr
+	.set	casuptr, casuword64
+	.set	fuptr, fuword64
+	.set	suptr, suword64
+
+/*
+ * int32_t casuword32(volatile int32_t *p, int32_t e, int32_t s)
+ */
+ENTRY(casuword32)
+	casa	[%o0] ASI_AIUP, %o1, %o2
+	retl
+	 mov	%o2, %o0
+END(casuword32)
+
+/*
+ * int64_t casuword64(volatile int64_t *p, int64_t e, int64_t s)
+ */
+ENTRY(casuword64)
+	casxa	[%o0] ASI_AIUP, %o1, %o2
+	retl
+	 mov	%o2, %o0
+END(casuword64)
+
 /*
  * int fuword8(const void *base)
  */
@@ -503,6 +526,143 @@ ENTRY(fs_fault)
 	retl
 	 mov	-1, %o0
 END(fsfault)
+
+	.globl	fpu_fault_begin
+fpu_fault_begin:
+	nop
+
+/*
+ * void spitfire_block_copy(void *src, void *dst, size_t len)
+ */
+ENTRY(spitfire_block_copy)
+	rdpr	%pil, %o3
+	wrpr	%g0, PIL_TICK, %pil
+
+	wr	%g0, ASI_BLK_S, %asi
+	wr	%g0, FPRS_FEF, %fprs
+
+	sub	PCB_REG, TF_SIZEOF, %o4
+	ldx	[%o4 + TF_FPRS], %o5
+	andcc	%o5, FPRS_FEF, %g0
+	bz,a,pt	%xcc, 1f
+	 nop
+	stda	%f0, [PCB_REG + PCB_UFP + (0 * 64)] %asi
+	stda	%f16, [PCB_REG + PCB_UFP + (1 * 64)] %asi
+	stda	%f32, [PCB_REG + PCB_UFP + (2 * 64)] %asi
+	stda	%f48, [PCB_REG + PCB_UFP + (3 * 64)] %asi
+	membar	#Sync
+
+	andn	%o5, FPRS_FEF, %o5
+	stx	%o5, [%o4 + TF_FPRS]
+	ldx	[PCB_REG + PCB_FLAGS], %o4
+	or	%o4, PCB_FEF, %o4
+	stx	%o4, [PCB_REG + PCB_FLAGS]
+
+1:	wrpr	%o3, 0, %pil
+
+	ldda	[%o0] %asi, %f0
+	add	%o0, 64, %o0
+	sub	%o2, 64, %o2
+
+2:	ldda	[%o0] %asi, %f16
+	fsrc1	%f0, %f32
+	fsrc1	%f2, %f34
+	fsrc1	%f4, %f36
+	fsrc1	%f6, %f38
+	fsrc1	%f8, %f40
+	fsrc1	%f10, %f42
+	fsrc1	%f12, %f44
+	fsrc1	%f14, %f46
+	stda	%f32, [%o1] %asi
+	add	%o0, 64, %o0
+	subcc	%o2, 64, %o2
+	bz,pn	%xcc, 3f
+	 add	%o1, 64, %o1
+	ldda	[%o0] %asi, %f0
+	fsrc1	%f16, %f32
+	fsrc1	%f18, %f34
+	fsrc1	%f20, %f36
+	fsrc1	%f22, %f38
+	fsrc1	%f24, %f40
+	fsrc1	%f26, %f42
+	fsrc1	%f28, %f44
+	fsrc1	%f30, %f46
+	stda	%f32, [%o1] %asi
+	add	%o0, 64, %o0
+	sub	%o2, 64, %o2
+	ba	%xcc, 2b
+	 add	%o1, 64, %o1
+
+3:	membar	#Sync
+
+	stda	%f16, [%o1] %asi
+	membar	#Sync
+
+	wr	%g0, 0, %fprs
+
+	retl
+	 nop
+END(spitfire_block_copy)
+
+/*
+ * void spitfire_block_zero(void *dst, size_t len)
+ */
+ENTRY(spitfire_block_zero)
+	rdpr	%pil, %o3
+	wrpr	%g0, PIL_TICK, %pil
+
+	wr	%g0, ASI_BLK_S, %asi
+	wr	%g0, FPRS_FEF, %fprs
+
+	sub	PCB_REG, TF_SIZEOF, %o4
+	ldx	[%o4 + TF_FPRS], %o5
+	andcc	%o5, FPRS_FEF, %g0
+	bz,a,pt	%xcc, 1f
+	 nop
+	stda	%f0, [PCB_REG + PCB_UFP + (0 * 64)] %asi
+	stda	%f16, [PCB_REG + PCB_UFP + (1 * 64)] %asi
+	stda	%f32, [PCB_REG + PCB_UFP + (2 * 64)] %asi
+	stda	%f48, [PCB_REG + PCB_UFP + (3 * 64)] %asi
+	membar	#Sync
+
+	andn	%o5, FPRS_FEF, %o5
+	stx	%o5, [%o4 + TF_FPRS]
+	ldx	[PCB_REG + PCB_FLAGS], %o4
+	or	%o4, PCB_FEF, %o4
+	stx	%o4, [PCB_REG + PCB_FLAGS]
+
+1:	wrpr	%o3, 0, %pil
+
+	fzero	%f0
+	fzero	%f2
+	fzero	%f4
+	fzero	%f6
+	fzero	%f8
+	fzero	%f10
+	fzero	%f12
+	fzero	%f14
+
+1:	stda	%f0, [%o0] %asi
+	stda	%f0, [%o0 + 64] %asi
+	stda	%f0, [%o0 + 128] %asi
+	stda	%f0, [%o0 + 192] %asi
+	sub	%o1, 256, %o1
+	brnz	%o1, 1b
+	 add	%o0, 256, %o0
+	membar	#Sync
+
+	wr	%g0, 0, %fprs
+
+	retl
+	 nop
+END(spitfire_block_zero)
+
+	.globl	fpu_fault_end
+fpu_fault_end:
+	nop
+
+	.globl	fpu_fault_size
+	.set	fpu_fault_size, fpu_fault_end - fpu_fault_begin
 
 ENTRY(longjmp)
 	set	1, %g3

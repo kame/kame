@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)libkern.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/sys/libkern.h,v 1.34 2002/10/11 13:13:06 phk Exp $
+ * $FreeBSD: src/sys/sys/libkern.h,v 1.39 2003/02/25 22:11:39 rwatson Exp $
  */
 
 #ifndef _SYS_LIBKERN_H_
@@ -63,7 +63,12 @@ static __inline quad_t qmin(quad_t a, quad_t b) { return (a < b ? a : b); }
 static __inline u_long ulmax(u_long a, u_long b) { return (a > b ? a : b); }
 static __inline u_long ulmin(u_long a, u_long b) { return (a < b ? a : b); }
 
+static __inline int abs(int a) { return (a < 0 ? -a : a); }
+static __inline long labs(long a) { return (a < 0 ? -a : a); }
+static __inline quad_t qabs(quad_t a) { return (a < 0 ? -a : a); }
+
 /* Prototypes for non-quad routines. */
+struct malloc_type;
 uint32_t arc4random(void);
 void	 arc4rand(void *ptr, u_int len, int reseed);
 int	 bcmp(const void *, const void *, size_t);
@@ -85,14 +90,15 @@ char	*rindex(const char *, int);
 int	 scanc(u_int, const u_char *, const u_char *, int);
 int	 skpc(int, int, char *);
 void	 srandom(u_long);
-char	*strcat(char *, const char *);
+char	*strcat(char * __restrict, const char * __restrict);
 int	 strcmp(const char *, const char *);
-char	*strcpy(char *, const char *);
+char	*strcpy(char * __restrict, const char * __restrict);
+char	*strdup(const char *__restrict, struct malloc_type *);
 size_t	 strlcat(char *, const char *, size_t);
 size_t	 strlcpy(char *, const char *, size_t);
 size_t	 strlen(const char *);
 int	 strncmp(const char *, const char *, size_t);
-char	*strncpy(char *, const char *, size_t);
+char	*strncpy(char * __restrict, const char * __restrict, size_t);
 char	*strsep(char **, const char *delim);
 int	 strvalid(const char *, size_t);
 

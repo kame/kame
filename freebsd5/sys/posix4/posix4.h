@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/posix4/posix4.h,v 1.11 2002/11/17 04:15:34 alfred Exp $
+ * $FreeBSD: src/sys/posix4/posix4.h,v 1.13 2003/02/19 05:47:42 imp Exp $
  */
 
 #include <sys/param.h>

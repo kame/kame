@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/sal.h,v 1.4 2002/04/22 06:35:40 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/sal.h,v 1.5 2003/02/01 22:50:09 marcel Exp $
  */
 
 #ifndef _MACHINE_SAL_H_
@@ -31,6 +31,7 @@
 
 struct sal_system_table {
 	char		sal_signature[4];
+#define	SAL_SIGNATURE	"SST_"
 	u_int32_t	sal_length;
 	u_int8_t	sal_rev[2];
 	u_int16_t	sal_entry_count;

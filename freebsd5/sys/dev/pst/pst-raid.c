@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 2001,2002,2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pst/pst-raid.c,v 1.4 2002/09/27 21:56:35 sos Exp $
+ * $FreeBSD: src/sys/dev/pst/pst-raid.c,v 1.9 2003/04/28 08:10:27 sos Exp $
  */
 
 #include <sys/param.h>
@@ -35,8 +35,6 @@
 #include <sys/bus.h>
 #include <sys/bio.h>
 #include <sys/conf.h>
-#include <sys/disk.h>
-#include <sys/devicestat.h>
 #include <sys/eventhandler.h>
 #include <sys/malloc.h>
 #include <sys/lock.h>
@@ -49,38 +47,16 @@
 #include <sys/rman.h>
 #include <pci/pcivar.h>
 #include <pci/pcireg.h>
+#include <geom/geom_disk.h>
 
 #include "dev/pst/pst-iop.h"
-
-/* device structures */ 
-static d_strategy_t pststrategy;
-static struct cdevsw pst_cdevsw = {
-    /* open */	nullopen,
-    /* close */ nullclose,
-    /* read */	physread,
-    /* write */ physwrite,
-    /* ioctl */ noioctl,
-    /* poll */	nopoll,
-    /* mmap */	nommap,
-    /* strat */ pststrategy,
-    /* name */	"pst",
-    /* maj */	200,
-    /* dump */	nodump,
-    /* psize */ nopsize,
-    /* flags */ D_DISK,
-};
-static struct cdevsw pstdisk_cdevsw;
 
 struct pst_softc {
     struct iop_softc		*iop;
     struct i2o_lct_entry	*lct;
     struct i2o_bsa_device	*info;
-    dev_t			device;
-    struct devstat		stats;
     struct disk			disk;
     struct bio_queue_head	queue;
-    struct mtx			mtx;
-    int				outstanding;
 };
 
 struct pst_request {
@@ -91,6 +67,7 @@ struct pst_request {
 };
 
 /* prototypes */
+static disk_strategy_t pststrategy;
 static int pst_probe(device_t);
 static int pst_attach(device_t);
 static int pst_shutdown(device_t);
@@ -111,7 +88,11 @@ pst_add_raid(struct iop_softc *sc, struct i2o_lct_entry *lct)
 
     if (!child)
 	return ENOMEM;
-    psc = malloc(sizeof(struct pst_softc), M_PSTRAID, M_NOWAIT | M_ZERO); 
+    if (!(psc = malloc(sizeof(struct pst_softc), 
+		       M_PSTRAID, M_NOWAIT | M_ZERO))) {
+	device_delete_child(sc->dev, child);
+	return ENOMEM;
+    }
     psc->iop = sc;
     psc->lct = lct;
     device_set_softc(child, psc);
@@ -166,21 +147,17 @@ pst_attach(device_t dev)
     contigfree(reply, PAGE_SIZE, M_PSTRAID);
 
     bioq_init(&psc->queue);
-    mtx_init(&psc->mtx, "pst lock", MTX_DEF, 0);
 
-    psc->device = disk_create(lun, &psc->disk, 0, &pst_cdevsw, &pstdisk_cdevsw);
-    psc->device->si_drv1 = psc;
-    psc->device->si_iosize_max = 64 * 1024; /*I2O_SGL_MAX_SEGS * PAGE_SIZE;*/
+    psc->disk.d_name = "pst";
+    psc->disk.d_strategy = pststrategy;
+    psc->disk.d_maxsize = 64 * 1024; /*I2O_SGL_MAX_SEGS * PAGE_SIZE;*/
+    psc->disk.d_drv1 = psc;
+    disk_create(lun, &psc->disk, DISKFLAG_NOGIANT, NULL, NULL);
 
     psc->disk.d_sectorsize = psc->info->block_size;
     psc->disk.d_mediasize = psc->info->capacity;
     psc->disk.d_fwsectors = 63;
     psc->disk.d_fwheads = 255;
-
-    devstat_add_entry(&psc->stats, "pst", lun, psc->info->block_size,
-		      DEVSTAT_NO_ORDERED_TAGS,
-		      DEVSTAT_TYPE_DIRECT | DEVSTAT_TYPE_IF_IDE,
-		      DEVSTAT_PRIORITY_DISK);
 
     printf("pst%d: %lluMB <%.40s> [%lld/%d/%d] on %.16s\n", lun,
 	   (unsigned long long)psc->info->capacity / (1024 * 1024),
@@ -217,12 +194,12 @@ pst_shutdown(device_t dev)
 static void
 pststrategy(struct bio *bp)
 {
-    struct pst_softc *psc = bp->bio_dev->si_drv1;
+    struct pst_softc *psc = bp->bio_disk->d_drv1;
     
-    mtx_lock(&psc->mtx);
-    bioqdisksort(&psc->queue, bp);
+    mtx_lock(&psc->iop->mtx);
+    bioq_disksort(&psc->queue, bp);
     pst_start(psc);
-    mtx_unlock(&psc->mtx);
+    mtx_unlock(&psc->iop->mtx);
 }
 
 static void
@@ -232,30 +209,25 @@ pst_start(struct pst_softc *psc)
     struct bio *bp;
     u_int32_t mfa;
 
-    if (psc->outstanding < (I2O_IOP_OUTBOUND_FRAME_COUNT - 1) &&
+    if (psc->iop->outstanding < (I2O_IOP_OUTBOUND_FRAME_COUNT - 1) &&
 	(bp = bioq_first(&psc->queue))) {
 	if ((mfa = iop_get_mfa(psc->iop)) != 0xffffffff) {
+	    bioq_remove(&psc->queue, bp);
 	    if (!(request = malloc(sizeof(struct pst_request),
 				   M_PSTRAID, M_NOWAIT | M_ZERO))) {
 		printf("pst: out of memory in start\n");
+		biofinish(request->bp, NULL, ENOMEM);
 		iop_free_mfa(psc->iop, mfa);
 		return;
 	    }
-	    psc->outstanding++;
+	    psc->iop->outstanding++;
 	    request->psc = psc;
 	    request->mfa = mfa;
 	    request->bp = bp;
-	    if (dumping)
-		request->timeout_handle.callout = NULL;
-	    else
-		request->timeout_handle =
-		    timeout((timeout_t*)pst_timeout, request, 10 * hz);
-	    bioq_remove(&psc->queue, bp);
-	    devstat_start_transaction(&psc->stats);
 	    if (pst_rw(request)) {
-		biofinish(request->bp, &psc->stats, EIO);
+		biofinish(request->bp, NULL, EIO);
 		iop_free_mfa(request->psc->iop, request->mfa);
-		psc->outstanding--;
+		psc->iop->outstanding--;
 		free(request, M_PSTRAID);
 	    }
 	}
@@ -271,40 +243,11 @@ pst_done(struct iop_softc *sc, u_int32_t mfa, struct i2o_single_reply *reply)
 
     untimeout((timeout_t *)pst_timeout, request, request->timeout_handle);
     request->bp->bio_resid = request->bp->bio_bcount - reply->donecount;
-    biofinish(request->bp, &psc->stats, reply->status ? EIO : 0);
+    biofinish(request->bp, NULL, reply->status ? EIO : 0);
     free(request, M_PSTRAID);
-    mtx_lock(&psc->mtx);
     psc->iop->reg->oqueue = mfa;
-    psc->outstanding--;
+    psc->iop->outstanding--;
     pst_start(psc);
-    mtx_unlock(&psc->mtx);
-}
-
-static void
-pst_timeout(struct pst_request *request)
-{
-    printf("pst: timeout mfa=0x%08x cmd=0x%02x\n",
-	   request->mfa, request->bp->bio_cmd);
-    mtx_lock(&request->psc->mtx);
-    iop_free_mfa(request->psc->iop, request->mfa);
-    if ((request->mfa = iop_get_mfa(request->psc->iop)) == 0xffffffff) {
-	printf("pst: timeout no mfa possible\n");
-	biofinish(request->bp, &request->psc->stats, EIO);
-	request->psc->outstanding--;
-	mtx_unlock(&request->psc->mtx);
-	return;
-    }
-    if (dumping)
-	request->timeout_handle.callout = NULL;
-    else
-	request->timeout_handle =
-	    timeout((timeout_t*)pst_timeout, request, 10 * hz);
-    if (pst_rw(request)) {
-	iop_free_mfa(request->psc->iop, request->mfa);
-	biofinish(request->bp, &request->psc->stats, EIO);
-	request->psc->outstanding--;
-    }
-    mtx_unlock(&request->psc->mtx);
 }
 
 int
@@ -335,7 +278,7 @@ pst_rw(struct pst_request *request)
 	sgl_flag = I2O_SGL_DIR;
 	break;
     default:
-	printf("pst: unknown command type\n");
+	printf("pst: unknown command type 0x%02x\n", request->bp->bio_cmd);
 	return -1;
     }
     msg->initiator_context = (u_int32_t)pst_done;
@@ -343,11 +286,46 @@ pst_rw(struct pst_request *request)
     msg->time_multiplier = 1;
     msg->bytecount = request->bp->bio_bcount;
     msg->lba = ((u_int64_t)request->bp->bio_pblkno) * (DEV_BSIZE * 1LL);
+
     if (!iop_create_sgl((struct i2o_basic_message *)msg, request->bp->bio_data,
 			request->bp->bio_bcount, sgl_flag))
 	return -1;
+
     request->psc->iop->reg->iqueue = request->mfa;
+
+    if (dumping)
+	request->timeout_handle.callout = NULL;
+    else
+	request->timeout_handle = 
+	    timeout((timeout_t*)pst_timeout, request, 10 * hz);
     return 0;
+}
+
+static void
+pst_timeout(struct pst_request *request)
+{
+    printf("pst: timeout mfa=0x%08x cmd=0x%02x\n",
+	   request->mfa, request->bp->bio_cmd);
+    mtx_lock(&request->psc->iop->mtx);
+    iop_free_mfa(request->psc->iop, request->mfa);
+    if ((request->mfa = iop_get_mfa(request->psc->iop)) == 0xffffffff) {
+	printf("pst: timeout no mfa possible\n");
+	biofinish(request->bp, NULL, EIO);
+	request->psc->iop->outstanding--;
+	mtx_unlock(&request->psc->iop->mtx);
+	return;
+    }
+    if (dumping)
+	request->timeout_handle.callout = NULL;
+    else
+	request->timeout_handle =
+	    timeout((timeout_t*)pst_timeout, request, 10 * hz);
+    if (pst_rw(request)) {
+	iop_free_mfa(request->psc->iop, request->mfa);
+	biofinish(request->bp, NULL, EIO);
+	request->psc->iop->outstanding--;
+    }
+    mtx_unlock(&request->psc->iop->mtx);
 }
 
 static void
@@ -357,7 +335,8 @@ bpack(int8_t *src, int8_t *dst, int len)
     int8_t *ptr, *buf = dst;
 
     for (i = j = blank = 0 ; i < len; i++) {
-	if (blank && src[i] == ' ') continue;
+	if (blank && src[i] == ' ')
+	    continue;
 	if (blank && src[i] != ' ') {
 	    dst[j++] = src[i];
 	    blank = 0;

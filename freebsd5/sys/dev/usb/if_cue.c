@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/usb/if_cue.c,v 1.29 2002/11/14 23:54:54 sam Exp $
  */
 
 /*
@@ -49,6 +47,9 @@
  * mode where multiple packets can be transfered using a single bulk
  * transaction, which helps performance a great deal.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.34 2003/04/15 06:37:27 mdodd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -75,11 +76,6 @@
 #include <dev/usb/usb_ethersubr.h>
 
 #include <dev/usb/if_cuereg.h>
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.29 2002/11/14 23:54:54 sam Exp $";
-#endif
 
 /*
  * Various supported device vendors/products.
@@ -143,8 +139,9 @@ Static driver_t cue_driver = {
 
 Static devclass_t cue_devclass;
 
-DRIVER_MODULE(if_cue, uhub, cue_driver, cue_devclass, usbd_driver_load, 0);
-MODULE_DEPEND(if_cue, usb, 1, 1, 1);
+DRIVER_MODULE(cue, uhub, cue_driver, cue_devclass, usbd_driver_load, 0);
+MODULE_DEPEND(cue, usb, 1, 1, 1);
+MODULE_DEPEND(cue, ether, 1, 1, 1);
 
 #define CUE_SETBIT(sc, reg, x)				\
 	cue_csr_write_1(sc, reg, cue_csr_read_1(sc, reg) | (x))
@@ -376,7 +373,7 @@ cue_setmulti(struct cue_softc *sc)
 	 * so we can receive broadcast frames.
  	 */
 	if (ifp->if_flags & IFF_BROADCAST) {
-		h = cue_crc(etherbroadcastaddr);
+		h = cue_crc(ifp->if_broadcastaddr);
 		sc->cue_mctab[h >> 3] |= 1 << (h & 0x7);		
 	}
 

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/stringlist.h,v 1.2 2002/03/23 17:24:53 imp Exp $
+ * $FreeBSD: src/include/stringlist.h,v 1.3 2003/01/19 01:16:00 obrien Exp $
  */
 
 #ifndef _STRINGLIST_H
@@ -49,7 +49,7 @@ typedef struct _stringlist {
 
 __BEGIN_DECLS
 StringList *sl_init(void);
-void	 sl_add(StringList *, char *);
+int	 sl_add(StringList *, char *);
 void	 sl_free(StringList *, int);
 char	*sl_find(StringList *, char *);
 __END_DECLS

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_exit.c	8.7 (Berkeley) 2/12/94
- * $FreeBSD: src/sys/kern/kern_exit.c,v 1.187.2.1 2002/12/22 03:30:34 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_exit.c,v 1.214 2003/05/13 20:35:59 jhb Exp $
  */
 
 #include "opt_compat.h"
@@ -46,6 +46,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/lock.h>
@@ -83,20 +84,7 @@
 /* Required to be non-static for SysVR4 emulator */
 MALLOC_DEFINE(M_ZOMBIE, "zombie", "zombie proc status");
 
-static MALLOC_DEFINE(M_ATEXIT, "atexit", "atexit callback");
-
 static int wait1(struct thread *, struct wait_args *, int);
-
-/*
- * callout list for things to do at exit time
- */
-struct exitlist {
-	exitlist_fn function;
-	TAILQ_ENTRY(exitlist) next;
-};
-
-TAILQ_HEAD(exit_list_head, exitlist);
-static struct exit_list_head exit_list = TAILQ_HEAD_INITIALIZER(exit_list);
 
 /*
  * exit --
@@ -105,11 +93,7 @@ static struct exit_list_head exit_list = TAILQ_HEAD_INITIALIZER(exit_list);
  * MPSAFE
  */
 void
-sys_exit(td, uap)
-	struct thread *td;
-	struct sys_exit_args /* {
-		int	rval;
-	} */ *uap;
+sys_exit(struct thread *td, struct sys_exit_args *uap)
 {
 
 	mtx_lock(&Giant);
@@ -123,18 +107,16 @@ sys_exit(td, uap)
  * status and rusage for wait().  Check for child processes and orphan them.
  */
 void
-exit1(td, rv)
-	register struct thread *td;
-	int rv;
+exit1(struct thread *td, int rv)
 {
-	struct exitlist *ep;
 	struct proc *p, *nq, *q;
 	struct tty *tp;
 	struct vnode *ttyvp;
-	register struct vmspace *vm;
+	struct vmspace *vm;
 	struct vnode *vtmp;
 #ifdef KTRACE
 	struct vnode *tracevp;
+	struct ucred *tracecred;
 #endif
 
 	GIANT_REQUIRED;
@@ -147,26 +129,15 @@ exit1(td, rv)
 	}
 
 	/*
-	 * XXXXKSE: MUST abort all other threads before proceeding past here.
+	 * MUST abort all other threads before proceeding past here.
 	 */
 	PROC_LOCK(p);
-	if (p->p_flag & P_KSES) {
+	if (p->p_flag & P_THREADED || p->p_numthreads > 1) {
 		/*
 		 * First check if some other thread got here before us..
 		 * if so, act apropriatly, (exit or suspend);
 		 */
 		thread_suspend_check(0);
-		/*
-		 * Here is a trick..
-		 * We need to free up our KSE to process other threads
-		 * so that we can safely set the UNBOUND flag
-		 * (whether or not we have a mailbox) as we are NEVER
-		 * going to return to the user.
-		 * The flag will not be set yet if we are exiting
-		 * because of a signal, pagefault, or similar
-		 * (or even an exit(2) from the UTS).
-		 */
-		td->td_flags |= TDF_UNBOUND;
 
 		/*
 		 * Kill off the other threads. This requires
@@ -188,12 +159,11 @@ exit1(td, rv)
 		/*
 		 * All other activity in this process is now stopped.
 		 * Remove excess KSEs and KSEGRPS. XXXKSE (when we have them)
-		 * ... 
+		 * ...
 		 * Turn off threading support.
 		 */
-		p->p_flag &= ~P_KSES;
-		td->td_flags &= ~TDF_UNBOUND;
-		thread_single_end(); 	/* Don't need this any more. */
+		p->p_flag &= ~P_THREADED;
+		thread_single_end();	/* Don't need this any more. */
 	}
 	/*
 	 * With this state set:
@@ -219,7 +189,7 @@ exit1(td, rv)
 			PROC_UNLOCK(q);
 			q = q->p_peers;
 		}
-		while (p->p_peers != NULL) 
+		while (p->p_peers != NULL)
 			msleep(p, &ppeers_lock, PWAIT, "exit1", 0);
 		mtx_unlock(&ppeers_lock);
 	}
@@ -230,15 +200,12 @@ exit1(td, rv)
 	STOPEVENT(p, S_EXIT, rv);
 	wakeup(&p->p_stype);	/* Wakeup anyone in procfs' PIOCWAIT */
 
-	/* 
+	/*
 	 * Check if any loadable modules need anything done at process exit.
 	 * e.g. SYSV IPC stuff
 	 * XXX what if one of these generates an error?
 	 */
-	TAILQ_FOREACH(ep, &exit_list, next) 
-		(*ep->function)(p);
-
-	stopprofclock(p);
+	EVENTHANDLER_INVOKE(process_exit, p);
 
 	MALLOC(p->p_ru, struct rusage *, sizeof(struct rusage),
 		M_ZOMBIE, M_WAITOK);
@@ -247,11 +214,13 @@ exit1(td, rv)
 	 * P_PPWAIT is set; we will wakeup the parent below.
 	 */
 	PROC_LOCK(p);
+	stopprofclock(p);
 	p->p_flag &= ~(P_TRACED | P_PPWAIT);
 	SIGEMPTYSET(p->p_siglist);
-	PROC_UNLOCK(p);
+	SIGEMPTYSET(td->td_siglist);
 	if (timevalisset(&p->p_realtimer.it_value))
 		callout_stop(&p->p_itcallout);
+	PROC_UNLOCK(p);
 
 	/*
 	 * Reset any sigio structures pointing to us as a result of
@@ -263,7 +232,7 @@ exit1(td, rv)
 	 * Close open files and release open-file table.
 	 * This may block!
 	 */
-	fdfree(td); /* XXXKSE *//* may not be the one in proc */
+	fdfree(td);
 
 	/*
 	 * Remove ourself from our leader's peer list and wake our leader.
@@ -297,8 +266,7 @@ exit1(td, rv)
 	 */
 	++vm->vm_exitingcnt;
 	if (--vm->vm_refcnt == 0) {
-		if (vm->vm_shm)
-			shmexit(p);
+		shmexit(vm);
 		vm_page_lock_queues();
 		pmap_remove_pages(vmspace_pmap(vm), vm_map_min(&vm->vm_map),
 		    vm_map_max(&vm->vm_map));
@@ -309,7 +277,7 @@ exit1(td, rv)
 
 	sx_xlock(&proctree_lock);
 	if (SESS_LEADER(p)) {
-		register struct session *sp;
+		struct session *sp;
 
 		sp = p->p_session;
 		if (sp->s_ttyvp) {
@@ -372,12 +340,16 @@ exit1(td, rv)
 	PROC_LOCK(p);
 	mtx_lock(&ktrace_mtx);
 	p->p_traceflag = 0;	/* don't trace the vrele() */
-	tracevp = p->p_tracep;
-	p->p_tracep = NULL;
+	tracevp = p->p_tracevp;
+	p->p_tracevp = NULL;
+	tracecred = p->p_tracecred;
+	p->p_tracecred = NULL;
 	mtx_unlock(&ktrace_mtx);
 	PROC_UNLOCK(p);
 	if (tracevp != NULL)
 		vrele(tracevp);
+	if (tracecred != NULL)
+		crfree(tracecred);
 #endif
 	/*
 	 * Release reference to text vnode
@@ -459,9 +431,11 @@ exit1(td, rv)
 	 * 1 instead (and hope it will handle this situation).
 	 */
 	PROC_LOCK(p->p_pptr);
-	if (p->p_pptr->p_procsig->ps_flag & (PS_NOCLDWAIT | PS_CLDSIGIGN)) {
+	mtx_lock(&p->p_pptr->p_sigacts->ps_mtx);
+	if (p->p_pptr->p_sigacts->ps_flag & (PS_NOCLDWAIT | PS_CLDSIGIGN)) {
 		struct proc *pp;
 
+		mtx_unlock(&p->p_pptr->p_sigacts->ps_mtx);
 		pp = p->p_pptr;
 		PROC_UNLOCK(pp);
 		proc_reparent(p, initproc);
@@ -473,7 +447,8 @@ exit1(td, rv)
 		 */
 		if (LIST_EMPTY(&pp->p_children))
 			wakeup(pp);
-	}
+	} else
+		mtx_unlock(&p->p_pptr->p_sigacts->ps_mtx);
 
 	if (p->p_sigparent && p->p_pptr != initproc)
 		psignal(p->p_pptr, p->p_sigparent);
@@ -487,7 +462,7 @@ exit1(td, rv)
 	if (p->p_flag & P_KTHREAD)
 		wakeup(p);
 	PROC_UNLOCK(p);
-	
+
 	/*
 	 * Finally, call machine-dependent code to release the remaining
 	 * resources including address space.
@@ -505,7 +480,7 @@ exit1(td, rv)
 		mtx_unlock(&Giant);
 
 	/*
-	 * We have to wait until after releasing all locks before
+	 * We have to wait until after acquiring all locks before
 	 * changing p_state.  If we block on a mutex then we will be
 	 * back at SRUN when we resume and our parent will never
 	 * harvest us.
@@ -520,9 +495,16 @@ exit1(td, rv)
 
 	cpu_sched_exit(td); /* XXXKSE check if this should be in thread_exit */
 	/*
+	 * Allow the scheduler to adjust the priority of the
+	 * parent when a kseg is exiting.
+	 */
+	if (p->p_pid != 1) 
+		sched_exit(p->p_pptr, p);
+
+	/*
 	 * Make sure the scheduler takes this thread out of its tables etc.
 	 * This will also release this thread's reference to the ucred.
- 	 * Other thread parts to release include pcb bits and such.
+	 * Other thread parts to release include pcb bits and such.
 	 */
 	thread_exit();
 }
@@ -532,11 +514,7 @@ exit1(td, rv)
  * MPSAFE.  The dirty work is handled by wait1().
  */
 int
-owait(td, uap)
-	struct thread *td;
-	register struct owait_args /* {
-		int     dummy;
-	} */ *uap;
+owait(struct thread *td, struct owait_args *uap __unused)
 {
 	struct wait_args w;
 
@@ -552,9 +530,7 @@ owait(td, uap)
  * MPSAFE.  The dirty work is handled by wait1().
  */
 int
-wait4(td, uap)
-	struct thread *td;
-	struct wait_args *uap;
+wait4(struct thread *td, struct wait_args *uap)
 {
 
 	return (wait1(td, uap, 0));
@@ -564,15 +540,7 @@ wait4(td, uap)
  * MPSAFE
  */
 static int
-wait1(td, uap, compat)
-	register struct thread *td;
-	register struct wait_args /* {
-		int pid;
-		int *status;
-		int options;
-		struct rusage *rusage;
-	} */ *uap;
-	int compat;
+wait1(struct thread *td, struct wait_args *uap, int compat)
 {
 	struct rusage ru;
 	int nfound;
@@ -600,7 +568,7 @@ loop:
 		}
 
 		/*
-		 * This special case handles a kthread spawned by linux_clone 
+		 * This special case handles a kthread spawned by linux_clone
 		 * (see linux_misc.c).  The linux_wait4 and linux_waitpid
 		 * functions need to be able to distinguish between waiting
 		 * on a process and waiting on a thread.  It is a thread if
@@ -615,17 +583,6 @@ loop:
 
 		nfound++;
 		if (p->p_state == PRS_ZOMBIE) {
-			/*
-			 * Allow the scheduler to adjust the priority of the
-			 * parent when a kseg is exiting.
-			 */
-			if (curthread->td_proc->p_pid != 1) {
-				mtx_lock_spin(&sched_lock);
-				sched_exit(curthread->td_ksegrp,
-				    FIRST_KSEGRP_IN_PROC(p));
-				mtx_unlock_spin(&sched_lock);
-			}
-
 			td->td_retval[0] = p->p_pid;
 #ifdef COMPAT_43
 			if (compat)
@@ -670,17 +627,16 @@ loop:
 				mtx_unlock(&Giant);
 				return (0);
 			}
+
 			/*
 			 * Remove other references to this process to ensure
 			 * we have an exclusive reference.
 			 */
-			leavepgrp(p);
-
 			sx_xlock(&allproc_lock);
 			LIST_REMOVE(p, p_list);	/* off zombproc */
 			sx_xunlock(&allproc_lock);
-
 			LIST_REMOVE(p, p_sibling);
+			leavepgrp(p);
 			sx_xunlock(&proctree_lock);
 
 			/*
@@ -703,23 +659,14 @@ loop:
 			(void)chgproccnt(p->p_ucred->cr_ruidinfo, -1, 0);
 
 			/*
-			 * Free up credentials.
+			 * Free credentials, arguments, and sigacts
 			 */
 			crfree(p->p_ucred);
-			p->p_ucred = NULL;	/* XXX: why? */
-
-			/*
-			 * Remove unused arguments
-			 */
+			p->p_ucred = NULL;
 			pargs_drop(p->p_args);
 			p->p_args = NULL;
-
-			if (--p->p_procsig->ps_refcnt == 0) {
-				if (p->p_sigacts != &p->p_uarea->u_sigacts)
-					FREE(p->p_sigacts, M_SUBPROC);
-				FREE(p->p_procsig, M_SUBPROC);
-				p->p_procsig = NULL;
-			}
+			sigacts_free(p->p_sigacts);
+			p->p_sigacts = NULL;
 
 			/*
 			 * do any thread-system specific cleanups
@@ -732,7 +679,6 @@ loop:
 			 * release while still running in process context.
 			 */
 			vm_waitproc(p);
-			mtx_destroy(&p->p_mtx);
 #ifdef MAC
 			mac_destroy_proc(p);
 #endif
@@ -745,8 +691,11 @@ loop:
 			mtx_unlock(&Giant);
 			return (0);
 		}
-		if (P_SHOULDSTOP(p) && ((p->p_flag & P_WAITED) == 0) &&
+		mtx_lock_spin(&sched_lock);
+		if (P_SHOULDSTOP(p) && (p->p_suspcount == p->p_numthreads) &&
+		    ((p->p_flag & P_WAITED) == 0) &&
 		    (p->p_flag & P_TRACED || uap->options & WUNTRACED)) {
+			mtx_unlock_spin(&sched_lock);
 			p->p_flag |= P_WAITED;
 			sx_xunlock(&proctree_lock);
 			td->td_retval[0] = p->p_pid;
@@ -769,6 +718,7 @@ loop:
 			mtx_unlock(&Giant);
 			return (error);
 		}
+		mtx_unlock_spin(&sched_lock);
 		if (uap->options & WCONTINUED && (p->p_flag & P_CONTINUED)) {
 			sx_xunlock(&proctree_lock);
 			td->td_retval[0] = p->p_pid;
@@ -814,9 +764,7 @@ loop:
  * Must be called with an exclusive hold of proctree lock.
  */
 void
-proc_reparent(child, parent)
-	register struct proc *child;
-	register struct proc *parent;
+proc_reparent(struct proc *child, struct proc *parent)
 {
 
 	sx_assert(&proctree_lock, SX_XLOCKED);
@@ -827,54 +775,4 @@ proc_reparent(child, parent)
 	LIST_REMOVE(child, p_sibling);
 	LIST_INSERT_HEAD(&parent->p_children, child, p_sibling);
 	child->p_pptr = parent;
-}
-
-/*
- * The next two functions are to handle adding/deleting items on the
- * exit callout list
- * 
- * at_exit():
- * Take the arguments given and put them onto the exit callout list,
- * However first make sure that it's not already there.
- * returns 0 on success.
- */
-
-int
-at_exit(function)
-	exitlist_fn function;
-{
-	struct exitlist *ep;
-
-#ifdef INVARIANTS
-	/* Be noisy if the programmer has lost track of things */
-	if (rm_at_exit(function)) 
-		printf("WARNING: exit callout entry (%p) already present\n",
-		    function);
-#endif
-	ep = malloc(sizeof(*ep), M_ATEXIT, M_NOWAIT);
-	if (ep == NULL)
-		return (ENOMEM);
-	ep->function = function;
-	TAILQ_INSERT_TAIL(&exit_list, ep, next);
-	return (0);
-}
-
-/*
- * Scan the exit callout list for the given item and remove it.
- * Returns the number of items removed (0 or 1)
- */
-int
-rm_at_exit(function)
-	exitlist_fn function;
-{
-	struct exitlist *ep;
-
-	TAILQ_FOREACH(ep, &exit_list, next) {
-		if (ep->function == function) {
-			TAILQ_REMOVE(&exit_list, ep, next);
-			free(ep, M_ATEXIT);
-			return (1);
-		}
-	}
-	return (0);
 }

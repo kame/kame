@@ -25,18 +25,17 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/fs/pseudofs/pseudofs_fileno.c,v 1.7 2002/06/06 16:59:24 des Exp $
+ *      $FreeBSD: src/sys/fs/pseudofs/pseudofs_fileno.c,v 1.10 2003/04/29 13:36:01 kan Exp $
  */
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/sysctl.h>
-
-#include <machine/limits.h>
 
 #include <fs/pseudofs/pseudofs.h>
 #include <fs/pseudofs/pseudofs_internal.h>

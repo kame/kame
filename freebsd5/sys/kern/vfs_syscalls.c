@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.297.2.2 2003/01/06 21:20:54 nectar Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.314 2003/04/29 13:36:03 kan Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -58,6 +58,7 @@
 #include <sys/kernel.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
+#include <sys/limits.h>
 #include <sys/linker.h>
 #include <sys/stat.h>
 #include <sys/sx.h>
@@ -70,7 +71,6 @@
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 
-#include <machine/limits.h>
 #include <machine/stdarg.h>
 
 #include <vm/vm.h>
@@ -78,7 +78,6 @@
 #include <vm/vm_page.h>
 #include <vm/uma.h>
 
-static int change_dir(struct nameidata *ndp, struct thread *td);
 static int chroot_refuse_vdir_fds(struct filedesc *fdp);
 static int getutimes(const struct timeval *, enum uio_seg, struct timespec *);
 static int setfown(struct thread *td, struct vnode *, uid_t, gid_t);
@@ -199,8 +198,7 @@ quotactl(td, uap)
 	vrele(nd.ni_vp);
 	if (error)
 		return (error);
-	error = VFS_QUOTACTL(mp, uap->cmd, uap->uid,
-	    uap->arg, td);
+	error = VFS_QUOTACTL(mp, uap->cmd, uap->uid, uap->arg, td);
 	vn_finished_write(mp);
 	return (error);
 }
@@ -400,7 +398,7 @@ fchdir(td, uap)
 
 	if ((error = getvnode(fdp, uap->fd, &fp)) != 0)
 		return (error);
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	VREF(vp);
 	fdrop(fp, td);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
@@ -464,8 +462,14 @@ kern_chdir(struct thread *td, char *path, enum uio_seg pathseg)
 	struct vnode *vp;
 
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, pathseg, path, td);
-	if ((error = change_dir(&nd, td)) != 0)
+	if ((error = namei(&nd)) != 0)
 		return (error);
+	if ((error = change_dir(nd.ni_vp, td)) != 0) {
+		vput(nd.ni_vp);
+		NDFREE(&nd, NDF_ONLY_PNBUF);
+		return (error);
+	}
+	VOP_UNLOCK(nd.ni_vp, 0, td);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	FILEDESC_LOCK(fdp);
 	vp = fdp->fd_cdir;
@@ -493,7 +497,7 @@ chroot_refuse_vdir_fds(fdp)
 		if (fp == NULL)
 			continue;
 		if (fp->f_type == DTYPE_VNODE) {
-			vp = (struct vnode *)fp->f_data;
+			vp = fp->f_data;
 			if (vp->v_type == VDIR)
 				return (EPERM);
 		}
@@ -530,77 +534,95 @@ chroot(td, uap)
 		char *path;
 	} */ *uap;
 {
-	register struct filedesc *fdp = td->td_proc->p_fd;
 	int error;
 	struct nameidata nd;
-	struct vnode *vp;
 
 	error = suser_cred(td->td_ucred, PRISON_ROOT);
 	if (error)
 		return (error);
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE,
-	    uap->path, td);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, uap->path, td);
 	mtx_lock(&Giant);
-	if ((error = change_dir(&nd, td)) != 0)
+	error = namei(&nd);
+	if (error)
 		goto error;
+	if ((error = change_dir(nd.ni_vp, td)) != 0)
+		goto e_vunlock;
 #ifdef MAC
 	if ((error = mac_check_vnode_chroot(td->td_ucred, nd.ni_vp)))
-		goto error;
+		goto e_vunlock;
 #endif
-	FILEDESC_LOCK(fdp);
-	if (chroot_allow_open_directories == 0 ||
-	    (chroot_allow_open_directories == 1 && fdp->fd_rdir != rootvnode)) {
-		error = chroot_refuse_vdir_fds(fdp);
-		if (error)
-			goto error_unlock;
-	}
-	vp = fdp->fd_rdir;
-	fdp->fd_rdir = nd.ni_vp;
-	if (!fdp->fd_jdir) {
-		fdp->fd_jdir = nd.ni_vp;
-                VREF(fdp->fd_jdir);
-	}
-	FILEDESC_UNLOCK(fdp);
+	VOP_UNLOCK(nd.ni_vp, 0, td);
+	error = change_root(nd.ni_vp, td);
+	vrele(nd.ni_vp);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
-	vrele(vp);
 	mtx_unlock(&Giant);
-	return (0);
-error_unlock:
-	FILEDESC_UNLOCK(fdp);
+	return (error);
+e_vunlock:
+	vput(nd.ni_vp);
 error:
 	mtx_unlock(&Giant);
-	NDFREE(&nd, 0);
+	NDFREE(&nd, NDF_ONLY_PNBUF);
 	return (error);
 }
 
 /*
- * Common routine for chroot and chdir.
+ * Common routine for chroot and chdir.  Callers must provide a locked vnode
+ * instance.
  */
-static int
-change_dir(ndp, td)
-	register struct nameidata *ndp;
+int
+change_dir(vp, td)
+	struct vnode *vp;
 	struct thread *td;
 {
-	struct vnode *vp;
 	int error;
 
-	error = namei(ndp);
+	ASSERT_VOP_LOCKED(vp, "change_dir(): vp not locked");
+	if (vp->v_type != VDIR)
+		return (ENOTDIR);
+#ifdef MAC
+	error = mac_check_vnode_chdir(td->td_ucred, vp);
 	if (error)
 		return (error);
-	vp = ndp->ni_vp;
-	if (vp->v_type != VDIR)
-		error = ENOTDIR;
-#ifdef MAC
-	else if ((error = mac_check_vnode_chdir(td->td_ucred, vp)) != 0) {
-	}
 #endif
-	else
-		error = VOP_ACCESS(vp, VEXEC, td->td_ucred, td);
-	if (error)
-		vput(vp);
-	else
-		VOP_UNLOCK(vp, 0, td);
+	error = VOP_ACCESS(vp, VEXEC, td->td_ucred, td);
 	return (error);
+}
+
+/*
+ * Common routine for kern_chroot() and jail_attach().  The caller is
+ * responsible for invoking suser() and mac_check_chroot() to authorize this
+ * operation.
+ */
+int
+change_root(vp, td)
+	struct vnode *vp;
+	struct thread *td;
+{
+	struct filedesc *fdp;
+	struct vnode *oldvp;
+	int error;
+
+	mtx_assert(&Giant, MA_OWNED);
+	fdp = td->td_proc->p_fd;
+	FILEDESC_LOCK(fdp);
+	if (chroot_allow_open_directories == 0 ||
+	    (chroot_allow_open_directories == 1 && fdp->fd_rdir != rootvnode)) {
+		error = chroot_refuse_vdir_fds(fdp);
+		if (error) {
+			FILEDESC_UNLOCK(fdp);
+			return (error);
+		}
+	}
+	oldvp = fdp->fd_rdir;
+	fdp->fd_rdir = vp;
+	VREF(fdp->fd_rdir);
+	if (!fdp->fd_jdir) {
+		fdp->fd_jdir = vp;
+		VREF(fdp->fd_jdir);
+	}
+	FILEDESC_UNLOCK(fdp);
+	vrele(oldvp);
+	return (0);
 }
 
 /*
@@ -651,9 +673,7 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 	if (error)
 		return (error);
 	fp = nfp;
-	FILEDESC_LOCK(fdp);
 	cmode = ((mode &~ fdp->fd_cmask) & ALLPERMS) &~ S_ISTXT;
-	FILEDESC_UNLOCK(fdp);
 	NDINIT(&nd, LOOKUP, FOLLOW, pathseg, path, td);
 	td->td_dupfd = -indx - 1;		/* XXX check for fdopen */
 	/*
@@ -1321,7 +1341,7 @@ lseek(td, uap)
 		fdrop(fp, td);
 		return (ESPIPE);
 	}
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	noneg = (vp->v_type != VCHR);
 	offset = uap->offset;
 	switch (uap->whence) {
@@ -1943,16 +1963,13 @@ setfflags(td, vp, flags)
 		return (error);
 	VOP_LEASE(vp, td, td->td_ucred, LEASE_WRITE);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
+	VATTR_NULL(&vattr);
+	vattr.va_flags = flags;
 #ifdef MAC
 	error = mac_check_vnode_setflags(td->td_ucred, vp, vattr.va_flags);
-	if (error == 0) {
+	if (error == 0)
 #endif
-		VATTR_NULL(&vattr);
-		vattr.va_flags = flags;
 		error = VOP_SETATTR(vp, &vattr, td->td_ucred, td);
-#ifdef MAC
-	}
-#endif
 	VOP_UNLOCK(vp, 0, td);
 	vn_finished_write(mp);
 	return (error);
@@ -2034,7 +2051,7 @@ fchflags(td, uap)
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	error = setfflags(td, (struct vnode *) fp->f_data, uap->flags);
+	error = setfflags(td, fp->f_data, uap->flags);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2159,8 +2176,8 @@ fchmod(td, uap)
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	vp = (struct vnode *)fp->f_data;
-	error = setfmode(td, (struct vnode *)fp->f_data, uap->mode);
+	vp = fp->f_data;
+	error = setfmode(td, fp->f_data, uap->mode);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2303,9 +2320,8 @@ fchown(td, uap)
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	vp = (struct vnode *)fp->f_data;
-	error = setfown(td, (struct vnode *)fp->f_data,
-		uap->uid, uap->gid);
+	vp = fp->f_data;
+	error = setfown(td, fp->f_data, uap->uid, uap->gid);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2503,7 +2519,7 @@ kern_futimes(struct thread *td, int fd, struct timeval *tptr,
 		return (error);
 	if ((error = getvnode(td->td_proc->p_fd, fd, &fp)) != 0)
 		return (error);
-	error = setutimes(td, (struct vnode *)fp->f_data, ts, 2, tptr == NULL);
+	error = setutimes(td, fp->f_data, ts, 2, tptr == NULL);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2605,7 +2621,7 @@ ftruncate(td, uap)
 		fdrop(fp, td);
 		return (EINVAL);
 	}
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0) {
 		fdrop(fp, td);
 		return (error);
@@ -2716,14 +2732,16 @@ fsync(td, uap)
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0) {
 		fdrop(fp, td);
 		return (error);
 	}
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	if (VOP_GETVOBJECT(vp, &obj) == 0) {
+		VM_OBJECT_LOCK(obj);
 		vm_object_page_clean(obj, 0, 0, 0);
+		VM_OBJECT_UNLOCK(obj);
 	}
 	error = VOP_FSYNC(vp, fp->f_cred, MNT_WAIT, td);
 	if (error == 0 && vp->v_mount && (vp->v_mount->mnt_flag & MNT_SOFTDEP)
@@ -3077,7 +3095,7 @@ ogetdirentries(td, uap)
 		fdrop(fp, td);
 		return (EBADF);
 	}
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 unionread:
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
@@ -3225,7 +3243,7 @@ getdirentries(td, uap)
 		fdrop(fp, td);
 		return (EBADF);
 	}
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 unionread:
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
@@ -3362,8 +3380,7 @@ revoke(td, uap)
 	int error;
 	struct nameidata nd;
 
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, uap->path,
-	    td);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, uap->path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	vp = nd.ni_vp;
@@ -3949,7 +3966,7 @@ extattr_set_fd(td, uap)
 	if (error)
 		return (error);
 
-	error = extattr_set_vp((struct vnode *)fp->f_data, uap->attrnamespace,
+	error = extattr_set_vp(fp->f_data, uap->attrnamespace,
 	    attrname, uap->data, uap->nbytes, td);
 	fdrop(fp, td);
 
@@ -4113,7 +4130,7 @@ extattr_get_fd(td, uap)
 	if (error)
 		return (error);
 
-	error = extattr_get_vp((struct vnode *)fp->f_data, uap->attrnamespace,
+	error = extattr_get_vp(fp->f_data, uap->attrnamespace,
 	    attrname, uap->data, uap->nbytes, td);
 
 	fdrop(fp, td);
@@ -4245,7 +4262,7 @@ extattr_delete_fd(td, uap)
 	error = getvnode(td->td_proc->p_fd, uap->fd, &fp);
 	if (error)
 		return (error);
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 
 	error = extattr_delete_vp(vp, uap->attrnamespace, attrname, td);
 	fdrop(fp, td);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.114 2002/11/08 23:50:32 sam Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.121 2003/04/29 13:36:04 kan Exp $
  */
 
 #include "opt_ipsec.h"
@@ -39,6 +39,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/domain.h>
@@ -50,8 +51,6 @@
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 
-#include <machine/limits.h>
-
 #include <vm/uma.h>
 
 #include <net/if.h>
@@ -62,6 +61,7 @@
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
+#include <netinet/tcp_var.h>
 #ifdef INET6
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -75,9 +75,6 @@
 #ifdef FAST_IPSEC
 #if defined(IPSEC) || defined(IPSEC_ESP)
 #error "Bad idea: don't compile with both IPSEC and FAST_IPSEC!"
-#endif
-#if defined(INET6)
-#error "Bad idea: don't use IPv6 with FAST_IPSEC (for the moment)!"
 #endif
 
 #include <netipsec/ipsec.h>
@@ -97,6 +94,14 @@ int	ipport_firstauto = IPPORT_HIFIRSTAUTO;		/* 49152 */
 int	ipport_lastauto  = IPPORT_HILASTAUTO;		/* 65535 */
 int	ipport_hifirstauto = IPPORT_HIFIRSTAUTO;	/* 49152 */
 int	ipport_hilastauto  = IPPORT_HILASTAUTO;		/* 65535 */
+
+/*
+ * Reserved ports accessible only to root. There are significant
+ * security considerations that must be accounted for when changing these,
+ * but the security benefits can be great. Please be careful.
+ */
+int	ipport_reservedhigh = IPPORT_RESERVED - 1;	/* 1023 */
+int	ipport_reservedlow = 0;
 
 #define RANGECHK(var, min, max) \
 	if ((var) < (min)) { (var) = (min); } \
@@ -134,6 +139,10 @@ SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, hifirst, CTLTYPE_INT|CTLFLAG_RW,
 	   &ipport_hifirstauto, 0, &sysctl_net_ipport_check, "I", "");
 SYSCTL_PROC(_net_inet_ip_portrange, OID_AUTO, hilast, CTLTYPE_INT|CTLFLAG_RW,
 	   &ipport_hilastauto, 0, &sysctl_net_ipport_check, "I", "");
+SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, reservedhigh,
+	   CTLFLAG_RW|CTLFLAG_SECURE, &ipport_reservedhigh, 0, "");
+SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, reservedlow,
+	   CTLFLAG_RW|CTLFLAG_SECURE, &ipport_reservedlow, 0, "");
 
 /*
  * in_pcb.c: manage the Protocol Control Blocks.
@@ -172,8 +181,11 @@ in_pcballoc(so, pcbinfo, td)
 	}
 #endif /*IPSEC*/
 #if defined(INET6)
-	if (INP_SOCKAF(so) == AF_INET6 && ip6_v6only)
-		inp->inp_flags |= IN6P_IPV6_V6ONLY;
+	if (INP_SOCKAF(so) == AF_INET6) {
+		inp->inp_vflag |= INP_IPV6PROTO;
+		if (ip6_v6only)
+			inp->inp_flags |= IN6P_IPV6_V6ONLY;
+	}
 #endif
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);
 	pcbinfo->ipi_count++;
@@ -287,8 +299,9 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 		if (lport) {
 			struct inpcb *t;
 			/* GROSS */
-			if (ntohs(lport) < IPPORT_RESERVED && td &&
-			    suser_cred(td->td_ucred, PRISON_ROOT))
+			if (ntohs(lport) <= ipport_reservedhigh &&
+			    ntohs(lport) >= ipport_reservedlow &&
+			    td && suser_cred(td->td_ucred, PRISON_ROOT))
 				return (EACCES);
 			if (td && jailed(td->td_ucred))
 				prison = 1;
@@ -297,6 +310,17 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 				t = in_pcblookup_local(inp->inp_pcbinfo,
 				    sin->sin_addr, lport,
 				    prison ? 0 :  INPLOOKUP_WILDCARD);
+	/*
+	 * XXX
+	 * This entire block sorely needs a rewrite.
+	 */
+				if (t && (t->inp_vflag & INP_TIMEWAIT)) {
+					if ((ntohl(sin->sin_addr.s_addr) != INADDR_ANY ||
+					    ntohl(t->inp_laddr.s_addr) != INADDR_ANY ||
+					    (intotw(t)->tw_so_options & SO_REUSEPORT) == 0) &&
+					    (so->so_cred->cr_uid != intotw(t)->tw_cred->cr_uid))
+						return (EADDRINUSE);
+				} else
 				if (t &&
 				    (ntohl(sin->sin_addr.s_addr) != INADDR_ANY ||
 				     ntohl(t->inp_laddr.s_addr) != INADDR_ANY ||
@@ -320,6 +344,10 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 				return (EADDRNOTAVAIL);
 			t = in_pcblookup_local(pcbinfo, sin->sin_addr,
 			    lport, prison ? 0 : wild);
+			if (t && (t->inp_vflag & INP_TIMEWAIT)) {
+				if ((reuseport & intotw(t)->tw_so_options) == 0)
+					return (EADDRINUSE);
+			} else
 			if (t &&
 			    (reuseport & t->inp_socket->so_options) == 0) {
 #if defined(INET6)
@@ -643,8 +671,10 @@ in_pcbdetach(inp)
 #endif /*IPSEC*/
 	inp->inp_gencnt = ++ipi->ipi_gencnt;
 	in_pcbremlists(inp);
-	so->so_pcb = 0;
-	sotryfree(so);
+	if (so) {
+		so->so_pcb = 0;
+		sotryfree(so);
+	}
 	if (inp->inp_options)
 		(void)m_free(inp->inp_options);
 	if (inp->inp_route.ro_rt)
@@ -755,26 +785,26 @@ in_pcbnotifyall(pcbinfo, faddr, errno, notify)
 	int s;
 
 	s = splnet();
-	INP_INFO_RLOCK(pcbinfo);
+	INP_INFO_WLOCK(pcbinfo);
 	head = pcbinfo->listhead;
 	for (inp = LIST_FIRST(head); inp != NULL; inp = ninp) {
 		INP_LOCK(inp);
 		ninp = LIST_NEXT(inp, inp_list);
 #ifdef INET6
 		if ((inp->inp_vflag & INP_IPV4) == 0) {
-			INP_UNLOCK(inp);		
+			INP_UNLOCK(inp);
 			continue;
 		}
 #endif
 		if (inp->inp_faddr.s_addr != faddr.s_addr ||
 		    inp->inp_socket == NULL) {
-				INP_UNLOCK(inp);		
-				continue;
+			INP_UNLOCK(inp);
+			continue;
 		}
-		(*notify)(inp, errno);
-		INP_UNLOCK(inp);		
+		if ((*notify)(inp, errno))
+			INP_UNLOCK(inp);
 	}
-	INP_INFO_RUNLOCK(pcbinfo);
+	INP_INFO_WUNLOCK(pcbinfo);
 	splx(s);
 }
 

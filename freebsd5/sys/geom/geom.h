@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom.h,v 1.37.2.1 2002/12/20 21:52:02 phk Exp $
+ * $FreeBSD: src/sys/geom/geom.h,v 1.64 2003/05/04 19:24:34 phk Exp $
  */
 
 #ifndef _GEOM_GEOM_H_
@@ -45,25 +45,21 @@
 #include <sys/ioccom.h>
 #include <sys/sbuf.h>
 
-#ifdef KERNELSIM
-/*
- * The GEOM subsystem makes a few concessions in order to be able to run as a
- * user-land simulation as well as a kernel component.
- */
-#include <geom_sim.h>
-#endif
-
 struct g_class;
 struct g_geom;
 struct g_consumer;
 struct g_provider;
-struct g_event;
+struct g_stat;
 struct thread;
 struct bio;
 struct sbuf;
+struct gctl_req;
 struct g_configargs;
 
 typedef int g_config_t (struct g_configargs *ca);
+typedef int g_ctl_create_geom_t (struct gctl_req *, struct g_class *cp, struct g_provider *pp);
+typedef int g_ctl_destroy_geom_t (struct gctl_req *, struct g_class *cp, struct g_geom *gp);
+typedef int g_ctl_config_geom_t (struct gctl_req *, struct g_geom *gp, const char *verb);
 typedef struct g_geom * g_taste_t (struct g_class *, struct g_provider *,
     int flags);
 #define G_TF_NORMAL		0
@@ -89,17 +85,22 @@ struct g_class {
 	const char		*name;
 	g_taste_t		*taste;
 	g_config_t		*config;
+	g_ctl_create_geom_t	*create_geom;
+	g_ctl_destroy_geom_t	*destroy_geom;
+	g_ctl_config_geom_t	*config_geom;
 	/*
 	 * The remaning elements are private and classes should use
 	 * the G_CLASS_INITIALIZER macro to initialize them.
          */
 	LIST_ENTRY(g_class)	class;
 	LIST_HEAD(,g_geom)	geom;
-	struct g_event		*event;
 	u_int			protect;
 };
 
-#define G_CLASS_INITIALIZER { 0, 0 }, { 0 }, 0, 0
+#define G_CLASS_INITIALIZER 	\
+	.class = { 0, 0 },	\
+	.geom = { 0 },		\
+	.protect = 0	
 
 /*
  * The g_geom is an instance of a g_class.
@@ -119,7 +120,6 @@ struct g_geom {
 	g_access_t		*access;
 	g_orphan_t		*orphan;
 	void			*softc;
-	struct g_event		*event;
 	unsigned		flags;
 #define	G_GEOM_WITHER		1
 };
@@ -148,10 +148,9 @@ struct g_consumer {
 	struct g_provider	*provider;
 	LIST_ENTRY(g_consumer)	consumers;	/* XXX: better name */
 	int			acr, acw, ace;
-	struct g_event		*event;
-
-	int			biocount;
 	int			spoiled;
+	struct devstat		*stat;
+	u_int			nstart, nend;
 };
 
 /*
@@ -165,31 +164,16 @@ struct g_provider {
 	LIST_HEAD(,g_consumer)	consumers;
 	int			acr, acw, ace;
 	int			error;
-	struct g_event		*event;
 	TAILQ_ENTRY(g_provider)	orphan;
 	u_int			index;
 	off_t			mediasize;
 	u_int			sectorsize;
-};
-
-/*
- * This gadget is used by userland to pinpoint a particular instance of
- * something in the kernel.  The name is unreadable on purpose, people
- * should not encounter it directly but use library functions to deal
- * with it.
- * If len is zero, "id" contains a cast of the kernel pointer where the
- * entity is located, (likely derived from the "id=" attribute in the
- * XML config) and the g_id*() functions will validate this before allowing
- * it to be used.
- * If len is non-zero, it is the strlen() of the name which is pointed to
- * by "name".
- */
-struct geomidorname {
-	u_int len;
-	union {
-		const char	*name;
-		uintptr_t	id;
-	} u;
+	u_int			stripesize;
+	u_int			stripeoffset;
+	struct devstat		*stat;
+	u_int			nstart, nend;
+	u_int			flags;
+#define G_PF_CANDELETE		0x1
 };
 
 /* geom_dev.c */
@@ -204,10 +188,12 @@ void g_trace(int level, const char *, ...);
 
 
 /* geom_event.c */
-typedef void g_call_me_t(void *);
-int g_call_me(g_call_me_t *func, void *arg);
+typedef void g_event_t(void *, int flag);
+#define EV_CANCEL	1
+int g_post_event(g_event_t *func, void *arg, int flag, ...);
+int g_waitfor_event(g_event_t *func, void *arg, int flag, ...);
+void g_cancel_event(void *ref);
 void g_orphan_provider(struct g_provider *pp, int error);
-void g_silence(void);
 void g_waitidle(void);
 
 /* geom_subr.c */
@@ -225,7 +211,6 @@ int g_getattr__(const char *attr, struct g_consumer *cp, void *var, int len);
 int g_handleattr(struct bio *bp, const char *attribute, void *val, int len);
 int g_handleattr_int(struct bio *bp, const char *attribute, int val);
 int g_handleattr_off_t(struct bio *bp, const char *attribute, off_t val);
-struct g_geom * g_insert_geom(const char *class, struct g_consumer *cp);
 struct g_consumer * g_new_consumer(struct g_geom *gp);
 struct g_geom * g_new_geomf(struct g_class *mp, const char *fmt, ...);
 struct g_provider * g_new_providerf(struct g_geom *gp, const char *fmt, ...);
@@ -234,10 +219,7 @@ void g_spoil(struct g_provider *pp, struct g_consumer *cp);
 int g_std_access(struct g_provider *pp, int dr, int dw, int de);
 void g_std_done(struct bio *bp);
 void g_std_spoiled(struct g_consumer *cp);
-struct g_class *g_idclass(struct geomidorname *);
-struct g_geom *g_idgeom(struct geomidorname *);
-struct g_provider *g_idprovider(struct geomidorname *);
-
+void g_wither_geom(struct g_geom *gp, int error);
 
 /* geom_io.c */
 struct bio * g_clone_bio(struct bio *);
@@ -245,7 +227,6 @@ void g_destroy_bio(struct bio *);
 void g_io_deliver(struct bio *bp, int error);
 int g_io_getattr(const char *attr, struct g_consumer *cp, int *len, void *ptr);
 void g_io_request(struct bio *bp, struct g_consumer *cp);
-int g_io_setattr(const char *attr, struct g_consumer *cp, int len, void *ptr);
 struct bio *g_new_bio(void);
 void * g_read_data(struct g_consumer *cp, off_t offset, off_t length, int *error);
 int g_write_data(struct g_consumer *cp, off_t offset, void *ptr, off_t length);
@@ -263,7 +244,7 @@ struct g_ioctl {
 	int		fflag;
 	struct thread	*td;
 	d_ioctl_t	*func;
-	dev_t		dev;
+	void		*dev;
 };
 
 #ifdef _KERNEL
@@ -329,102 +310,10 @@ extern struct sx topology_lock;
 
 #endif /* _KERNEL */
 
-/*
- * IOCTLS for talking to the geom.ctl device.
- */
-
-/*
- * This is the structure used internally in the kernel, it is created and
- * populated by geom_ctl.c.
- */
-struct g_configargs {
-	/* Valid on call */
-	struct g_class		*class;
-	struct g_geom		*geom;
-	struct g_provider	*provider;
-	u_int			flag;
-	u_int			len;
-	void			*ptr;
-};
-
-/*
- * This is the structure used to communicate with userland.
- */
-struct geomconfiggeom {
-	/* Valid on call */
-	struct geomidorname	class;
-	struct geomidorname	geom;
-	struct geomidorname	provider;
-	u_int			flag;
-	u_int			len;
-	void			*ptr;
-};
-
-#define GEOMCONFIGGEOM _IOW('G',  0, struct geomconfiggeom)
-
-#define GCFG_GENERIC0		0x00000000
-	/*
-	 * Generic requests suitable for all classes.
-	 */
-#define GCFG_CLASS0		0x10000000
-	/*
-	 * Class specific verbs.  Allocations in this part of the numberspace
-	 * can only be done after review and approval of phk@FreeBSD.org.
-	 * All allocations in this space will be listed in this file.
-	 */
-#define GCFG_PRIVATE0		0x20000000
-	/*
-	 * Lowest allocation for private flag definitions.
-	 * If you define you own private "verbs", please express them in
-	 * your code as (GCFG_PRIVATE0 + somenumber), where somenumber is
-	 * a magic number in the range [0x0 ... 0xfffffff] chosen the way
-	 * magic numbers are chosen.  Such allocation SHALL NOT be listed
-	 * here but SHOULD be listed in some suitable .h file.
-	 */
-#define GCFG_RESERVED0		0x30000000
-#define GCFG_RESERVEDN		0xffffffff
-	/*
-	 * This area is reserved for the future.
-	 */
-
-#define GCFG_CREATE		(GCFG_GENERIC0 + 0x0)
-	/*
-	 * Request geom construction.
-	 * ptr/len is class-specific.
-	 */
-#define GCFG_DISMANTLE		(GCFG_GENERIC0 + 0x1)
-	/*
-	 * Request orderly geom dismantling.
-	 * ptr/len is class-specific.
-	 */
-
-
-struct gcfg_magicrw {
-	off_t	offset;
-	u_int	len;
-};
-
-#define GCFG_MAGICREAD		(GCFG_GENERIC0 + 0x100)
-	/*
-	 * Read of magic spaces.
-	 * ptr/len is gcfgmagicrw structure followed by bufferspace
-	 * for data to be read.
-	 */
-#define GCFG_MAGICWRITE		(GCFG_GENERIC0 + 0x101)
-	/*
-	 * Write of magic spaces.
-	 * as above, only the other way.
-	 */
-
-
-/* geom_enc.c */
-uint16_t g_dec_be2(const u_char *p);
-uint32_t g_dec_be4(const u_char *p);
-uint16_t g_dec_le2(const u_char *p);
-uint32_t g_dec_le4(const u_char *p);
-uint64_t g_dec_le8(const u_char *p);
-void g_enc_le2(u_char *p, uint16_t u);
-void g_enc_le4(u_char *p, uint32_t u);
-void g_enc_le8(u_char *p, uint64_t u);
+/* geom_ctl.c */
+int gctl_set_param(struct gctl_req *req, const char *param, void *ptr, int len);
+void *gctl_get_param(struct gctl_req *req, const char *param, int *len);
+void *gctl_get_paraml(struct gctl_req *req, const char *param, int len);
+int gctl_error(struct gctl_req *req, const char *fmt, ...);
 
 #endif /* _GEOM_GEOM_H_ */

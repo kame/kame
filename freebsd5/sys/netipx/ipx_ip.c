@@ -33,7 +33,7 @@
  * 
  *	@(#)ipx_ip.c
  *
- * $FreeBSD: src/sys/netipx/ipx_ip.c,v 1.31 2002/11/08 21:16:27 jhb Exp $
+ * $FreeBSD: src/sys/netipx/ipx_ip.c,v 1.34 2003/03/04 23:19:53 jlemon Exp $
  */
 
 /*
@@ -168,7 +168,6 @@ ipxip_input(m, hlen)
 {
 	register struct ip *ip;
 	register struct ipx *ipx;
-	register struct ifqueue *ifq = &ipxintrq;
 	int len, s;
 
 	if (ipxip_hold_input) {
@@ -224,9 +223,7 @@ ipxip_input(m, hlen)
 	/*
 	 * Deliver to IPX
 	 */
-	if (IF_HANDOFF(ifq, m, NULL))
-		schednetisr(NETISR_IPX);
-	return;
+	netisr_dispatch(NETISR_IPX, m);
 }
 
 static int

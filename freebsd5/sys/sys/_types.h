@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/_types.h,v 1.11 2002/10/22 13:26:35 mike Exp $
+ * $FreeBSD: src/sys/sys/_types.h,v 1.14 2003/03/28 15:27:30 mike Exp $
  */
 
 #ifndef _SYS__TYPES_H_
@@ -41,16 +41,21 @@ typedef	__uint64_t	__fsblkcnt_t;
 typedef	__uint64_t	__fsfilcnt_t;
 typedef	__uint32_t	__gid_t;
 typedef	__int64_t	__id_t;		/* can hold a gid_t, pid_t, or uid_t */
+typedef	__uint32_t	__ino_t;	/* inode number */
 typedef	long		__key_t;	/* IPC key (for Sys V IPC) */
 typedef	__uint16_t	__mode_t;	/* permissions */
 typedef	int		__nl_item;
+typedef	__uint16_t	__nlink_t;	/* link count */
 typedef	__int64_t	__off_t;	/* file offset */
 typedef	__int32_t	__pid_t;	/* process [group] */
 typedef	__int64_t	__rlim_t;	/* resource limit (XXX not unsigned) */
 typedef	__uint8_t	__sa_family_t;
 typedef	__uint32_t	__socklen_t;
+typedef	long		__suseconds_t;	/* microseconds (signed) */
 typedef	__int32_t	__timer_t;	/* timer_gettime()... */
+typedef	__uint32_t	__udev_t;	/* device number */
 typedef	__uint32_t	__uid_t;
+typedef	unsigned int	__useconds_t;	/* microseconds (unsigned) */
 
 /*
  * Unusual type definitions.
@@ -74,6 +79,16 @@ typedef	int		__ct_rune_t;
 typedef	__ct_rune_t	__rune_t;
 typedef	__ct_rune_t	__wchar_t;
 typedef	__ct_rune_t	__wint_t;
+
+/*
+ * dev_t has differing meanings in userland and the kernel.
+ */
+#ifdef _KERNEL
+struct cdev;
+typedef	struct cdev	*__dev_t;
+#else
+typedef	__udev_t	__dev_t;		/* device number */
+#endif
 
 /*
  * mbstate_t is an opaque object to keep conversion state during multibyte

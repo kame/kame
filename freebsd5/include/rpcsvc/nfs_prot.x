@@ -31,9 +31,9 @@
 %#ifndef lint
 %/*static char sccsid[] = "from: @(#)nfs_prot.x 1.2 87/10/12 Copyr 1987 Sun Micro";*/
 %/*static char sccsid[] = "from: @(#)nfs_prot.x	2.1 88/08/01 4.0 RPCSRC";*/
-%static const char rcsid[] =
-%  "$FreeBSD: src/include/rpcsvc/nfs_prot.x,v 1.7 1999/08/27 23:45:08 peter Exp $";
 %#endif /* not lint */
+%#include <sys/cdefs.h>
+%__FBSDID("$FreeBSD: src/include/rpcsvc/nfs_prot.x,v 1.8 2003/05/04 02:51:42 obrien Exp $");
 #endif
 
 const NFS_PORT          = 2049;

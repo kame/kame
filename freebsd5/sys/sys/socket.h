@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socket.h	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/sys/socket.h,v 1.68 2002/11/13 11:49:24 mike Exp $
+ * $FreeBSD: src/sys/sys/socket.h,v 1.72 2003/03/05 19:24:24 peter Exp $
  */
 
 #ifndef _SYS_SOCKET_H_
@@ -39,6 +39,7 @@
 
 #include <sys/cdefs.h>
 #include <sys/_types.h>
+#include <sys/_iovec.h>
 #define _NO_NAMESPACE_POLLUTION
 #include <machine/param.h>
 #undef _NO_NAMESPACE_POLLUTION
@@ -72,11 +73,6 @@ typedef	__sa_family_t	sa_family_t;
 #define	_SA_FAMILY_T_DECLARED
 #endif
 
-#ifndef _SIZE_T_DECLARED
-typedef	__size_t	size_t;
-#define	_SIZE_T_DECLARED
-#endif
- 
 #ifndef _SOCKLEN_T_DECLARED
 typedef	__socklen_t	socklen_t;
 #define	_SOCKLEN_T_DECLARED
@@ -175,7 +171,7 @@ struct accept_filter_arg {
 #define	AF_IMPLINK	3		/* arpanet imp addresses */
 #define	AF_PUP		4		/* pup protocols: e.g. BSP */
 #define	AF_CHAOS	5		/* mit CHAOS protocols */
-#define	AF_NS		6		/* XEROX NS protocols */
+#define	AF_NETBIOS	6		/* SMB protocols */
 #define	AF_ISO		7		/* ISO protocols */
 #define	AF_OSI		AF_ISO
 #define	AF_ECMA		8		/* European computer manufacturers */
@@ -264,7 +260,7 @@ struct sockaddr_storage {
 #define	PF_IMPLINK	AF_IMPLINK
 #define	PF_PUP		AF_PUP
 #define	PF_CHAOS	AF_CHAOS
-#define	PF_NS		AF_NS
+#define	PF_NETBIOS	AF_NETBIOS
 #define	PF_ISO		AF_ISO
 #define	PF_OSI		AF_ISO
 #define	PF_ECMA		AF_ECMA
@@ -282,7 +278,7 @@ struct sockaddr_storage {
 #define	PF_COIP		AF_COIP
 #define	PF_CNT		AF_CNT
 #define	PF_SIP		AF_SIP
-#define	PF_IPX		AF_IPX		/* same format as AF_NS */
+#define	PF_IPX		AF_IPX
 #define PF_RTIP		pseudo_AF_RTIP	/* same format as AF_INET */
 #define PF_PIP		pseudo_AF_PIP
 #define	PF_ISDN		AF_ISDN
@@ -369,14 +365,6 @@ struct sockaddr_storage {
  * Maximum queue length specifiable by listen.
  */
 #define	SOMAXCONN	128
-
-#ifndef _STRUCT_IOVEC_DECLARED
-#define	_STRUCT_IOVEC_DECLARED
-struct iovec {
-	void	*iov_base;	/* Base address. */
-	size_t	iov_len;	/* Length. */
-};
-#endif
 
 /*
  * Message header for recvmsg and sendmsg calls.
@@ -542,11 +530,9 @@ int	sendfile(int, int, off_t, size_t, struct sf_hdtr *, off_t *, int);
 #endif
 int	setsockopt(int, int, int, const void *, socklen_t);
 int	shutdown(int, int);
+int	sockatmark(int);
 int	socket(int, int, int);
 int	socketpair(int, int, int, int *);
-/*
- * XXX missing sockatmark().
- */
 __END_DECLS
 
 #endif /* !_KERNEL */

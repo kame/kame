@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/bde/g_bde_crypt.c,v 1.5.2.2 2003/01/07 18:21:39 phk Exp $
+ * $FreeBSD: src/sys/geom/bde/g_bde_crypt.c,v 1.15 2003/05/02 19:08:57 phk Exp $
  *
  * This source file contains the functions responsible for the crypto, keying
  * and mapping operations on the I/O requests.
@@ -37,13 +37,13 @@
  */
 
 #include <sys/param.h>
-#include <sys/stdint.h>
 #include <sys/bio.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/queue.h>
 #include <sys/malloc.h>
 #include <sys/libkern.h>
+#include <sys/endian.h>
 #include <sys/md5.h>
 
 #include <crypto/rijndael/rijndael.h>
@@ -52,6 +52,10 @@
 #include <geom/geom.h>
 #include <geom/bde/g_bde.h>
 
+/*
+ * XXX: Debugging DO NOT ENABLE
+ */
+#undef MD5_KEY
 
 /*
  * Derive kkey from mkey + sector offset.
@@ -81,7 +85,7 @@ g_bde_kkey(struct g_bde_softc *sc, keyInstance *ki, int dir, off_t sector)
 	u_char buf2[8];
 
 	/* We have to be architecture neutral */
-	g_enc_le8(buf2, sector);
+	le64enc(buf2, sector);
 
 	MD5Init(&ct);
 	MD5Update(&ct, sc->key.salt, 8);
@@ -128,8 +132,30 @@ g_bde_crypt_read(struct g_bde_work *wp)
 		g_bde_kkey(sc, &ki, DIR_DECRYPT, wp->offset + o);
 		AES_decrypt(&ci, &ki, d, skey, sizeof skey);
 		d = (u_char *)wp->data + o;
+#ifdef MD5_KEY
+		{
+		MD5_CTX ct;
+		u_char rkey[16];
+		int i;
+
+		MD5Init(&ct);
+		MD5Update(&ct, d, sc->sectorsize);
+		MD5Final(rkey, &ct);
+		if (bcmp(rkey, skey, 16) != 0) {
+#if 0
+			printf("MD5_KEY failed at %jd (t=%d)\n",
+			    (intmax_t)(wp->offset + o), time_second);
+#endif
+			for (i = 0; i < sc->sectorsize; i++)
+				d[i] = 'A' + i % 26;
+			sprintf(d, "MD5_KEY failed at %jd (t=%d)", 
+			    (intmax_t)(wp->offset + o), time_second);
+		}
+		}
+#else
 		AES_makekey(&ki, DIR_DECRYPT, G_BDE_SKEYBITS, skey);
 		AES_decrypt(&ci, &ki, d, d, sc->sectorsize);
+#endif
 	}
 	bzero(skey, sizeof skey);
 	bzero(&ci, sizeof ci);
@@ -161,9 +187,20 @@ g_bde_crypt_write(struct g_bde_work *wp)
 
 		s = (u_char *)wp->data + o;
 		d = (u_char *)wp->sp->data + o;
+#ifdef MD5_KEY
+		{
+		MD5_CTX ct;
+
+		MD5Init(&ct);
+		MD5Update(&ct, s, sc->sectorsize);
+		MD5Final(skey, &ct);
+		bcopy(s, d, sc->sectorsize);
+		}
+#else
 		arc4rand(&skey, sizeof skey, 0);
 		AES_makekey(&ki, DIR_ENCRYPT, G_BDE_SKEYBITS, skey);
 		AES_encrypt(&ci, &ki, s, d, sc->sectorsize);
+#endif
 
 		d = (u_char *)wp->ksp->data + wp->ko + n * G_BDE_SKEYLEN;
 		g_bde_kkey(sc, &ki, DIR_ENCRYPT, wp->offset + o);
@@ -282,6 +319,11 @@ g_bde_map_sector(struct g_bde_work *wp)
 
 	/* restrict length to that zone */
 	len = kp->zone_cont - zoff;
+
+	/* ... and in general */
+	if (len > DFLTPHYS)
+		len = DFLTPHYS;
+
 	if (len < wp->length)
 		wp->length = len;
 
@@ -289,6 +331,8 @@ g_bde_map_sector(struct g_bde_work *wp)
 	wp->so = zone * kp->zone_width + zoff;
 	wp->so += kp->keyoffset;
 	wp->so %= kp->media_width;
+	if (wp->so + wp->length > kp->media_width)
+		wp->length = kp->media_width - wp->so;
 	wp->so += kp->sector0;
 
 	/* The key sector is the last in this zone. */
@@ -322,4 +366,28 @@ g_bde_map_sector(struct g_bde_work *wp)
 	    (intmax_t)wp->kso,
 	    wp->ko);
 #endif
+	KASSERT(wp->so + wp->length <= kp->sectorN,
+	    ("wp->so (%jd) + wp->length (%jd) > EOM (%jd), offset = %jd",
+	    (intmax_t)wp->so,
+	    (intmax_t)wp->length,
+	    (intmax_t)kp->sectorN,
+	    (intmax_t)wp->offset));
+
+	KASSERT(wp->kso + kp->sectorsize <= kp->sectorN,
+	    ("wp->kso (%jd) + kp->sectorsize > EOM (%jd), offset = %jd",
+	    (intmax_t)wp->kso,
+	    (intmax_t)kp->sectorN,
+	    (intmax_t)wp->offset));
+
+	KASSERT(wp->so >= kp->sector0,
+	    ("wp->so (%jd) < BOM (%jd), offset = %jd",
+	    (intmax_t)wp->so,
+	    (intmax_t)kp->sector0,
+	    (intmax_t)wp->offset));
+
+	KASSERT(wp->kso >= kp->sector0,
+	    ("wp->kso (%jd) <BOM (%jd), offset = %jd",
+	    (intmax_t)wp->kso,
+	    (intmax_t)kp->sector0,
+	    (intmax_t)wp->offset));
 }

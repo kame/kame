@@ -18,18 +18,18 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/ia64/conf/GENERIC,v 1.45.2.2 2003/01/05 03:39:34 marcel Exp $
+# $FreeBSD: src/sys/ia64/conf/GENERIC,v 1.53 2003/04/21 16:44:05 simokawa Exp $
 
 machine		ia64
 cpu		ITANIUM
 ident		GENERIC
-maxusers	0
 
 #To statically compile in device wiring instead of /boot/device.hints
 #hints		"GENERIC.hints"
 
 makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
 
+options 	SCHED_4BSD		#4BSD scheduler
 options 	INET			#InterNETworking
 options 	INET6			#IPv6 communications protocols
 options 	FFS			#Berkeley Fast Filesystem
@@ -45,7 +45,6 @@ options 	CD9660			#ISO 9660 Filesystem
 options 	PROCFS			#Process filesystem (requires PSEUDOFS)
 options 	PSEUDOFS		#Pseudo-filesystem framework
 options 	COMPAT_43		#Compatible with BSD 4.3 [KEEP THIS!]
-options 	COMPAT_FREEBSD4		#Keep this for a while
 options 	SCSI_DELAY=5000		#Delay (in ms) before probing SCSI 
 options 	KTRACE			#ktrace(1) syscall trace support
 options 	SYSVSHM			#SYSV-style shared memory
@@ -160,6 +159,7 @@ device		bpf		#Berkeley packet filter
 
 # USB support
 #device		uhci		# UHCI PCI->USB interface (breaks BigSur!)
+device		ehci		# EHCI host controller
 device		ohci		# OHCI PCI->USB interface
 device		usb		# USB Bus (required)
 device		ugen		# Generic
@@ -172,3 +172,8 @@ device		ums		# Mouse
 device		aue		# ADMtek USB ethernet
 device		cue		# CATC USB ethernet
 device		kue		# Kawasaki LSI USB ethernet
+
+# FireWire support
+device		firewire	# FireWire bus code
+device		sbp		# SCSI over FireWire (Requires scbus and da)
+device		fwe		# Ethernet over FireWire (non-standard!)

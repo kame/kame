@@ -1,7 +1,7 @@
 /*
  * 16 Feb 93	Julian Elischer	(julian@dialix.oz.au)
  *
- * $FreeBSD: src/sys/sys/cdio.h,v 1.23 2002/04/05 13:10:26 sos Exp $
+ * $FreeBSD: src/sys/sys/cdio.h,v 1.24 2003/04/30 12:07:32 markm Exp $
  */
 
 /*
@@ -44,13 +44,13 @@ union msf_lba {
 
 struct cd_toc_entry {
 #if BYTE_ORDER == LITTLE_ENDIAN
-	u_int16_t	:8;
-	u_int16_t	control:4;
-	u_int16_t	addr_type:4;
+	u_int	:8;
+	u_int	control:4;
+	u_int	addr_type:4;
 #else
-	u_int16_t	:8;
-	u_int16_t	addr_type:4;
-	u_int16_t	control:4;
+	u_int	:8;
+	u_int	addr_type:4;
+	u_int	control:4;
 #endif
 	u_char  track;
 	u_int	:8;

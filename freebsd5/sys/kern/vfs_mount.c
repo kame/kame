@@ -61,7 +61,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/vfs_mount.c,v 1.90.2.1 2002/12/19 09:40:11 alfred Exp $
+ * $FreeBSD: src/sys/kern/vfs_mount.c,v 1.106 2003/04/24 08:16:06 tjr Exp $
  */
 
 #include <sys/param.h>
@@ -75,6 +75,7 @@
 #include <sys/mutex.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
+#include <sys/filedesc.h>
 #include <sys/reboot.h>
 #include <sys/sysproto.h>
 #include <sys/sx.h>
@@ -148,6 +149,30 @@ static char *cdrom_rootdevnames[] = {
 char		*rootdevnames[2] = {NULL, NULL};
 static int	setrootbyname(char *name);
 dev_t		rootdev = NODEV;
+
+/*
+ * Has to be dynamic as the value of rootdev can change; however, it can't
+ * change after the root is mounted, so a user process can't access this
+ * sysctl until after the value is unchangeable.
+ */
+static int
+sysctl_rootdev(SYSCTL_HANDLER_ARGS)
+{
+	int error;
+
+	/* _RD prevents this from happening. */
+	KASSERT(req->newptr == NULL, ("Attempt to change root device name"));
+
+	if (rootdev != NODEV)
+		error = sysctl_handle_string(oidp, rootdev->si_name, 0, req);
+	else
+		error = sysctl_handle_string(oidp, "", 0, req);
+
+	return (error);
+}
+
+SYSCTL_PROC(_kern, OID_AUTO, rootdev, CTLTYPE_STRING | CTLFLAG_RD,
+    0, 0, sysctl_rootdev, "A", "Root file system device");
 
 /* Remove one mount option. */
 static void
@@ -636,6 +661,7 @@ vfs_nmount(td, fsflags, fsoptions)
 	mp = malloc(sizeof(struct mount), M_MOUNT, M_WAITOK | M_ZERO);
 	TAILQ_INIT(&mp->mnt_nvnodelist);
 	TAILQ_INIT(&mp->mnt_reservedvnlist);
+	mp->mnt_nvnodelistsize = 0;
 	lockinit(&mp->mnt_lock, PVFS, "vfslock", 0, LK_NOPAUSE);
 	(void)vfs_busy(mp, LK_NOWAIT, 0, td);
 	mp->mnt_op = vfsp->vfc_vfsops;
@@ -675,6 +701,7 @@ update:
 #ifdef MAC
 			mac_destroy_mount(mp);
 #endif
+			crfree(mp->mnt_cred);
 			free(mp, M_MOUNT);
 		}
 		vrele(vp);
@@ -768,6 +795,7 @@ update:
 #ifdef MAC
 		mac_destroy_mount(mp);
 #endif
+		crfree(mp->mnt_cred);
 		free(mp, M_MOUNT);
 		vput(vp);
 		goto bad;
@@ -815,8 +843,7 @@ mount(td, uap)
 	if (error == 0)
 		error = copyinstr(uap->path, fspath, MNAMELEN, NULL);
 	if (error == 0)
-		error = vfs_mount(td, fstype, fspath, uap->flags,
-		    uap->data);
+		error = vfs_mount(td, fstype, fspath, uap->flags, uap->data);
 	free(fstype, M_TEMP);
 	free(fspath, M_TEMP);
 	return (error);
@@ -1001,6 +1028,7 @@ vfs_mount(td, fstype, fspath, fsflags, fsdata)
 	mp = malloc(sizeof(struct mount), M_MOUNT, M_WAITOK | M_ZERO);
 	TAILQ_INIT(&mp->mnt_nvnodelist);
 	TAILQ_INIT(&mp->mnt_reservedvnlist);
+	mp->mnt_nvnodelistsize = 0;
 	lockinit(&mp->mnt_lock, PVFS, "vfslock", 0, LK_NOPAUSE);
 	(void)vfs_busy(mp, LK_NOWAIT, 0, td);
 	mp->mnt_op = vfsp->vfc_vfsops;
@@ -1038,6 +1066,7 @@ update:
 #ifdef MAC
 			mac_destroy_mount(mp);
 #endif
+			crfree(mp->mnt_cred);
 			free(mp, M_MOUNT);
 		}
 		vrele(vp);
@@ -1118,6 +1147,7 @@ update:
 #ifdef MAC
 		mac_destroy_mount(mp);
 #endif
+		crfree(mp->mnt_cred);
 		free(mp, M_MOUNT);
 		vput(vp);
 	}
@@ -1141,10 +1171,10 @@ checkdirs(olddp, newdp)
 		return;
 	sx_slock(&allproc_lock);
 	LIST_FOREACH(p, &allproc, p_list) {
-		PROC_LOCK(p);
+		mtx_lock(&fdesc_mtx);
 		fdp = p->p_fd;
 		if (fdp == NULL) {
-			PROC_UNLOCK(p);
+			mtx_unlock(&fdesc_mtx);
 			continue;
 		}
 		nrele = 0;
@@ -1160,7 +1190,7 @@ checkdirs(olddp, newdp)
 			nrele++;
 		}
 		FILEDESC_UNLOCK(fdp);
-		PROC_UNLOCK(p);
+		mtx_unlock(&fdesc_mtx);
 		while (nrele--)
 			vrele(olddp);
 	}
@@ -1198,8 +1228,7 @@ unmount(td, uap)
 	int error;
 	struct nameidata nd;
 
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE,
-	    uap->path, td);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, uap->path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	vp = nd.ni_vp;
@@ -1367,6 +1396,7 @@ vfs_rootmountalloc(fstypename, devname, mpp)
 	(void)vfs_busy(mp, LK_NOWAIT, 0, td);
 	TAILQ_INIT(&mp->mnt_nvnodelist);
 	TAILQ_INIT(&mp->mnt_reservedvnlist);
+	mp->mnt_nvnodelistsize = 0;
 	mp->mnt_vfc = vfsp;
 	mp->mnt_op = vfsp->vfc_vfsops;
 	mp->mnt_flag = MNT_RDONLY;
@@ -1544,6 +1574,7 @@ done:
 #ifdef MAC
 			mac_destroy_mount(mp);
 #endif
+			crfree(mp->mnt_cred);
 			free(mp, M_MOUNT);
 		}
 		printf("Root mount failed: %d\n", error);
@@ -1578,7 +1609,7 @@ vfs_mountroot_ask(void)
 #if defined(__i386__) || defined(__ia64__)
 		printf("                       eg. ufs:da0s1a\n");
 #else
-		printf("                       eg. ufs:da0a\n");
+		printf("                       eg. ufs:/dev/da0a\n");
 #endif
 		printf("  ?                  List valid disk boot devices\n");
 		printf("  <empty line>       Abort manual input\n");
@@ -1715,6 +1746,8 @@ vfs_getopt(opts, name, buf, len)
 {
 	struct vfsopt *opt;
 
+	KASSERT(opts != NULL, ("vfs_getopt: caller passed 'opts' as NULL"));
+
 	TAILQ_FOREACH(opt, opts, link) {
 		if (strcmp(name, opt->name) == 0) {
 			if (len != NULL)
@@ -1743,6 +1776,8 @@ vfs_copyopt(opts, name, dest, len)
 	int len;
 {
 	struct vfsopt *opt;
+
+	KASSERT(opts != NULL, ("vfs_copyopt: caller passed 'opts' as NULL"));
 
 	TAILQ_FOREACH(opt, opts, link) {
 		if (strcmp(name, opt->name) == 0) {

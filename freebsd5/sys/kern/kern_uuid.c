@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_uuid.c,v 1.3 2002/08/22 12:47:22 bde Exp $
+ * $FreeBSD: src/sys/kern/kern_uuid.c,v 1.4 2002/12/22 05:35:01 hsu Exp $
  */
 
 #include <sys/param.h>
@@ -91,7 +91,7 @@ uuid_node(uint16_t *node)
 	struct sockaddr_dl *sdl;
 	int i;
 
-	/* XXX: lock ifnet. */
+	IFNET_RLOCK();
 	TAILQ_FOREACH(ifp, &ifnet, if_link) {
 		/* Walk the address list */
 		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
@@ -100,12 +100,12 @@ uuid_node(uint16_t *node)
 			    sdl->sdl_type == IFT_ETHER) {
 				/* Got a MAC address. */
 				bcopy(LLADDR(sdl), node, UUID_NODE_LEN);
-				/* XXX: unlock ifnet. */
+				IFNET_RUNLOCK();
 				return;
 			}
 		}
 	}
-	/* XXX: unlock ifnet. */
+	IFNET_RUNLOCK();
 
 	for (i = 0; i < (UUID_NODE_LEN>>1); i++)
 		node[i] = (uint16_t)arc4random();

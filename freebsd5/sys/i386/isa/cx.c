@@ -15,7 +15,7 @@
  *
  * Version 1.9, Wed Oct  4 18:58:15 MSK 1995
  *
- * $FreeBSD: src/sys/i386/isa/cx.c,v 1.52 2002/10/16 10:16:17 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/cx.c,v 1.56 2003/03/03 16:24:45 phk Exp $
  *
  */
 #undef DEBUG
@@ -73,20 +73,16 @@ static	d_ioctl_t	cxioctl;
 #define	CDEV_MAJOR	42
 /* Don't make this static, since if_cx.c uses it. */
 struct cdevsw cx_cdevsw = {
-	/* open */	cxopen,
-	/* close */	cxclose,
-	/* read */	ttyread,
-	/* write */	ttywrite,
-	/* ioctl */	cxioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"cx",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	cxopen,
+	.d_close =	cxclose,
+	.d_read =	ttyread,
+	.d_write =	ttywrite,
+	.d_ioctl =	cxioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"cx",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 static void cxoproc (struct tty *tp);
@@ -885,12 +881,3 @@ void cxtimeout (void *a)
 		}
 	timeout (cxtimeout, 0, hz*5);
 }
-
-
-static void 	cx_drvinit(void *unused)
-{
-
-	cdevsw_add(&cx_cdevsw);
-}
-
-SYSINIT(cxdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,cx_drvinit,NULL)

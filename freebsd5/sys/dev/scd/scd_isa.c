@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/dev/scd/scd_isa.c,v 1.1 2002/11/05 09:37:31 mdodd Exp $
+ * $FreeBSD: src/sys/dev/scd/scd_isa.c,v 1.2 2003/04/16 20:51:48 phk Exp $
  */
 
 #include <sys/param.h>
@@ -10,7 +10,6 @@
 #include <sys/fcntl.h>
 #include <sys/bio.h>
 #include <sys/cdio.h>
-#include <sys/disklabel.h>
 #include <sys/bus.h>
 
 #include <sys/mutex.h>

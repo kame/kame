@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/i386/include/smp.h,v 1.73 2002/10/17 18:17:28 pirzyk Exp $
+ * $FreeBSD: src/sys/i386/include/smp.h,v 1.76 2003/04/02 23:53:29 peter Exp $
  *
  */
 
@@ -56,6 +56,7 @@ extern int current_postcode;  /** XXX currently in mp_machdep.c */
 #define	IPI_INVLTLB		XINVLTLB_OFFSET
 #define	IPI_INVLPG		XINVLPG_OFFSET
 #define	IPI_INVLRNG		XINVLRNG_OFFSET
+#define	IPI_LAZYPMAP		XLAZYPMAP_OFFSET
 #define	IPI_RENDEZVOUS		XRENDEZVOUS_OFFSET
 #define	IPI_AST			XCPUAST_OFFSET
 #define	IPI_STOP		XCPUSTOP_OFFSET
@@ -108,14 +109,15 @@ int	apic_src_bus_irq(int, int);
 int	apic_int_type(int, int);
 int	apic_trigger(int, int);
 int	apic_polarity(int, int);
+int	mp_grab_cpu_hlt(void);
 void	assign_apic_irq(int apic, int intpin, int irq);
 void	revoke_apic_irq(int irq);
 void	bsp_apic_configure(void);
 void	init_secondary(void);
 void	forward_statclock(void);
-void	forwarded_statclock(struct trapframe frame);
+void	forwarded_statclock(struct clockframe frame);
 void	forward_hardclock(void);
-void	forwarded_hardclock(struct trapframe frame);
+void	forwarded_hardclock(struct clockframe frame);
 void	ipi_selected(u_int cpus, u_int ipi);
 void	ipi_all(u_int ipi);
 void	ipi_all_but_self(u_int ipi);

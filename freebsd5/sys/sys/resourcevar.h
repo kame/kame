@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)resourcevar.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/resourcevar.h,v 1.30 2002/10/09 17:17:24 jhb Exp $
+ * $FreeBSD: src/sys/sys/resourcevar.h,v 1.35 2003/04/20 13:54:04 rwatson Exp $
  */
 
 #ifndef	_SYS_RESOURCEVAR_H_
@@ -72,15 +72,10 @@ struct pstats {
 /*
  * Kernel shareable process resource limits.  Because this structure
  * is moderately large but changes infrequently, it is normally
- * shared copy-on-write after forks.  If a group of processes
- * ("threads") share modifications, the PL_SHAREMOD flag is set,
- * and a copy must be made for the child of a new fork that isn't
- * sharing modifications to the limits.
+ * shared copy-on-write after forks.
  */
 struct plimit {
 	struct	rlimit pl_rlimit[RLIM_NLIMITS];
-#define	PL_SHAREMOD	0x01		/* modifications are shared */
-	int	p_lflags;
 	int	p_refcnt;		/* number of references */
 };
 
@@ -94,7 +89,7 @@ struct uidinfo {
 	rlim_t	ui_sbsize;		/* socket buffer space consumed */
 	long	ui_proccnt;		/* number of processes */
 	uid_t	ui_uid;			/* uid */
-	u_short	ui_ref;			/* reference count */
+	u_int	ui_ref;			/* reference count */
 	struct mtx	*ui_mtxp;	/* protect all counts/limits */
 };
 
@@ -105,8 +100,8 @@ struct thread;
 struct kse;
 struct proc;
 
-void	 addupc_intr(struct kse *ke, uintptr_t pc, u_int ticks);
-void	 addupc_task(struct kse *ke, uintptr_t pc, u_int ticks);
+void	 addupc_intr(struct thread *td, uintptr_t pc, u_int ticks);
+void	 addupc_task(struct thread *td, uintptr_t pc, u_int ticks);
 void	 calcru(struct proc *p, struct timeval *up, struct timeval *sp,
 	    struct timeval *ip);
 int	 chgproccnt(struct uidinfo *uip, int diff, int max);

@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/pci/pci_if.m,v 1.4 2001/02/27 23:13:20 peter Exp $
+# $FreeBSD: src/sys/dev/pci/pci_if.m,v 1.5 2003/04/16 03:15:08 mdodd Exp $
 #
 
 #include <sys/bus.h>
@@ -56,23 +56,23 @@ METHOD int set_powerstate {
 	int		state;
 };
 
-METHOD void enable_busmaster {
+METHOD int enable_busmaster {
 	device_t	dev;
 	device_t	child;
 };
 
-METHOD void disable_busmaster {
+METHOD int disable_busmaster {
 	device_t	dev;
 	device_t	child;
 };
 
-METHOD void enable_io {
+METHOD int enable_io {
 	device_t	dev;
 	device_t	child;
 	int		space;
 };
 
-METHOD void disable_io {
+METHOD int disable_io {
 	device_t	dev;
 	device_t	child;
 	int		space;

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  *
- * $FreeBSD: src/sys/sys/kse.h,v 1.9 2002/11/18 01:59:31 davidxu Exp $
+ * $FreeBSD: src/sys/sys/kse.h,v 1.13 2003/04/21 07:27:59 davidxu Exp $
  */
 
 #ifndef _SYS_KSE_H_
@@ -78,15 +78,21 @@ struct kse_mailbox {
 	stack_t			km_stack;	/* UTS context */
 	void			*km_udata;	/* For use by the UTS */
 	struct timespec		km_timeofday;	/* Time of day */
+	int			km_quantum;	/* Upcall quantum in msecs */
 	int			km_spare[8];
 };
 
 #define	KSE_VER_0	0
+#define	KSE_VERSION	KSE_VER_0
+
+/* These flags are kept in km_flags */
+#define	KMF_NOUPCALL		0x01
+#define	KMF_NOCOMPLETED		0x02
 
 #ifndef _KERNEL
 int	kse_create(struct kse_mailbox *, int);
 int	kse_exit(void);
-int	kse_release(void);
+int	kse_release(struct timespec *);
 int	kse_thr_interrupt(struct kse_thr_mailbox *);
 int	kse_wakeup(struct kse_mailbox *);
 #endif	/* !_KERNEL */

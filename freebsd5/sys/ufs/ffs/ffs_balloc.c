@@ -8,9 +8,6 @@
  * contract N66001-01-C-8035 ("CBOSS"), as part of the DARPA CHATS
  * research program
  *
- * Copyright (c) 1982, 1989, 1993
- *	The Regents of the University of California.  All rights reserved.
- * (c) UNIX System Laboratories, Inc.
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -43,7 +40,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_balloc.c	8.8 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_balloc.c,v 1.39 2002/10/22 01:14:25 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_balloc.c,v 1.41 2003/03/04 00:04:43 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -179,7 +176,7 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 			    nsize, cred, &newb);
 			if (error)
 				return (error);
-			bp = getblk(vp, lbn, nsize, 0, 0);
+			bp = getblk(vp, lbn, nsize, 0, 0, 0);
 			bp->b_blkno = fsbtodb(fs, newb);
 			if (flags & BA_CLRBUF)
 				vfs_bio_clrbuf(bp);
@@ -216,7 +213,7 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 			return (error);
 		nb = newb;
 		*allocblk++ = nb;
-		bp = getblk(vp, indirs[1].in_lbn, fs->fs_bsize, 0, 0);
+		bp = getblk(vp, indirs[1].in_lbn, fs->fs_bsize, 0, 0, 0);
 		bp->b_blkno = fsbtodb(fs, nb);
 		vfs_bio_clrbuf(bp);
 		if (DOINGSOFTDEP(vp)) {
@@ -265,7 +262,7 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 		}
 		nb = newb;
 		*allocblk++ = nb;
-		nbp = getblk(vp, indirs[i].in_lbn, fs->fs_bsize, 0, 0);
+		nbp = getblk(vp, indirs[i].in_lbn, fs->fs_bsize, 0, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 		vfs_bio_clrbuf(nbp);
 		if (DOINGSOFTDEP(vp)) {
@@ -317,7 +314,7 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 		}
 		nb = newb;
 		*allocblk++ = nb;
-		nbp = getblk(vp, lbn, fs->fs_bsize, 0, 0);
+		nbp = getblk(vp, lbn, fs->fs_bsize, 0, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 		if (flags & BA_CLRBUF)
 			vfs_bio_clrbuf(nbp);
@@ -354,7 +351,7 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 			goto fail;
 		}
 	} else {
-		nbp = getblk(vp, lbn, fs->fs_bsize, 0, 0);
+		nbp = getblk(vp, lbn, fs->fs_bsize, 0, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 	}
 	*bpp = nbp;
@@ -544,7 +541,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 			   nsize, cred, &newb);
 			if (error)
 				return (error);
-			bp = getblk(vp, -1 - lbn, nsize, 0, 0);
+			bp = getblk(vp, -1 - lbn, nsize, 0, 0, 0);
 			bp->b_blkno = fsbtodb(fs, newb);
 			bp->b_xflags |= BX_ALTDATA;
 			if (flags & BA_CLRBUF)
@@ -640,7 +637,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 				&dp->di_db[0]), nsize, cred, &newb);
 			if (error)
 				return (error);
-			bp = getblk(vp, lbn, nsize, 0, 0);
+			bp = getblk(vp, lbn, nsize, 0, 0, 0);
 			bp->b_blkno = fsbtodb(fs, newb);
 			if (flags & BA_CLRBUF)
 				vfs_bio_clrbuf(bp);
@@ -677,7 +674,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 			return (error);
 		nb = newb;
 		*allocblk++ = nb;
-		bp = getblk(vp, indirs[1].in_lbn, fs->fs_bsize, 0, 0);
+		bp = getblk(vp, indirs[1].in_lbn, fs->fs_bsize, 0, 0, 0);
 		bp->b_blkno = fsbtodb(fs, nb);
 		vfs_bio_clrbuf(bp);
 		if (DOINGSOFTDEP(vp)) {
@@ -726,7 +723,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 		}
 		nb = newb;
 		*allocblk++ = nb;
-		nbp = getblk(vp, indirs[i].in_lbn, fs->fs_bsize, 0, 0);
+		nbp = getblk(vp, indirs[i].in_lbn, fs->fs_bsize, 0, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 		vfs_bio_clrbuf(nbp);
 		if (DOINGSOFTDEP(vp)) {
@@ -778,7 +775,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 		}
 		nb = newb;
 		*allocblk++ = nb;
-		nbp = getblk(vp, lbn, fs->fs_bsize, 0, 0);
+		nbp = getblk(vp, lbn, fs->fs_bsize, 0, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 		if (flags & BA_CLRBUF)
 			vfs_bio_clrbuf(nbp);
@@ -821,7 +818,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 			goto fail;
 		}
 	} else {
-		nbp = getblk(vp, lbn, fs->fs_bsize, 0, 0);
+		nbp = getblk(vp, lbn, fs->fs_bsize, 0, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 	}
 	*bpp = nbp;

@@ -46,7 +46,7 @@
  * SUCH DAMAGE.
  *
  *	from: unknown origin, 386BSD 0.1
- * $FreeBSD: src/sys/pc98/pc98/olpt.c,v 1.17 2001/09/14 04:50:27 imp Exp $
+ * $FreeBSD: src/sys/pc98/pc98/olpt.c,v 1.20 2003/03/03 12:15:53 phk Exp $
  */
 
 /*
@@ -62,7 +62,7 @@
  * This driver sends two bytes (0x08, 0x00) in front of each packet,
  * to allow us to distinguish another format later.
  *
- * Now added an Linux/Crynwr compatibility mode which is enabled using
+ * Now added a Linux/Crynwr compatibility mode which is enabled using
  * IF_LINK0 - Tim Wilkinson.
  *
  * TODO:
@@ -232,19 +232,12 @@ static	d_ioctl_t	lptioctl;
 
 #define CDEV_MAJOR 16
 static struct cdevsw lpt_cdevsw = {
-	/* open */	lptopen,
-	/* close */	lptclose,
-	/* read */	noread,
-	/* write */	lptwrite,
-	/* ioctl */	lptioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"lpt",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	lptopen,
+	.d_close =	lptclose,
+	.d_write =	lptwrite,
+	.d_ioctl =	lptioctl,
+	.d_name =	"lpt",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static bus_addr_t lpt_iat[] = {0, 2, 4, 6};
@@ -535,7 +528,7 @@ lptopen (dev_t dev, int flags, int fmt, struct thread *td)
 		}
 
 		/* wait 1/4 second, give up if we get a signal */
-		if (tsleep ((caddr_t)sc, LPPRI|PCATCH, "lptinit", hz/4) !=
+		if (tsleep (sc, LPPRI|PCATCH, "lptinit", hz/4) !=
 		    EWOULDBLOCK) {
 			sc->sc_state = 0;
 			splx(s);
@@ -601,7 +594,7 @@ lptout (void *arg)
 		splx(pl);
 	} else {
 		sc->sc_state &= ~OBUSY;
-		wakeup((caddr_t)sc);
+		wakeup(sc);
 	}
 }
 
@@ -634,7 +627,7 @@ lptclose(dev_t dev, int flags, int fmt, struct thread *td)
 		while ((inb(port+lpt_status) & (LPS_SEL|LPS_OUT|LPS_NBSY|LPS_NERR)) !=
 			(LPS_SEL|LPS_NBSY|LPS_NERR) || sc->sc_xfercnt)
 			/* wait 1/4 second, give up if we get a signal */
-			if (tsleep ((caddr_t)sc, LPPRI|PCATCH,
+			if (tsleep (sc, LPPRI|PCATCH,
 				"lpclose", hz) != EWOULDBLOCK)
 				break;
 
@@ -692,7 +685,7 @@ pushbytes(struct lpt_softc * sc)
 				 */
 				if (tic > MAX_SLEEP)
 					tic = MAX_SLEEP;
-				err = tsleep((caddr_t)sc, LPPRI,
+				err = tsleep(sc, LPPRI,
 					"lptpoll", tic);
 				if (err != EWOULDBLOCK) {
 					return (err);
@@ -754,7 +747,7 @@ lptwrite(dev_t dev, struct uio * uio, int ioflag)
 			}
 			lprintf(("W "));
 			if (sc->sc_state & OBUSY)
-				if ((err = tsleep ((caddr_t)sc,
+				if ((err = tsleep (sc,
 					 LPPRI|PCATCH, "lpwrite", 0))) {
 					sc->sc_state |= INTERRUPTED;
 					return(err);

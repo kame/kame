@@ -30,7 +30,7 @@
  *	from: @(#)types.h	2.3 88/08/15 4.0 RPCSRC
  *	from: @(#)xdr.h 1.19 87/04/22 SMI
  *	from: @(#)xdr.h	2.2 88/07/29 4.0 RPCSRC
- * $FreeBSD: src/sys/netatm/spans/spans_kxdr.h,v 1.1 2002/09/17 08:57:52 peter Exp $
+ * $FreeBSD: src/sys/netatm/spans/spans_kxdr.h,v 1.2 2003/01/01 18:48:55 schweikh Exp $
  */
 
 #ifndef _SPANS_KXDR_H
@@ -252,7 +252,7 @@ xdr_putint32(XDR *xdrs, int32_t *ip)
 /*
  * Support struct for discriminated unions.
  * You create an array of xdrdiscrim structures, terminated with
- * a entry with a null procedure pointer.  The xdr_union routine gets
+ * an entry with a null procedure pointer.  The xdr_union routine gets
  * the discriminant value and then searches the array of structures
  * for a matching value.  If a match is found the associated xdr routine
  * is called to handle that part of the union.  If there is

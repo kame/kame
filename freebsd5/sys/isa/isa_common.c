@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/isa_common.c,v 1.32 2002/10/15 00:02:51 jhb Exp $
+ * $FreeBSD: src/sys/isa/isa_common.c,v 1.34 2003/04/30 21:41:41 peter Exp $
  */
 /*
  * Modifications for Intel architecture by Garrett A. Wollman.
@@ -1112,6 +1112,7 @@ static driver_t isa_driver = {
  */
 DRIVER_MODULE(isa, isab, isa_driver, isa_devclass, 0, 0);
 DRIVER_MODULE(isa, eisab, isa_driver, isa_devclass, 0, 0);
-#ifdef __i386__
+#if defined(__i386__) || defined(__amd64__)
 DRIVER_MODULE(isa, legacy, isa_driver, isa_devclass, 0, 0);
 #endif
+MODULE_VERSION(isa, 1);

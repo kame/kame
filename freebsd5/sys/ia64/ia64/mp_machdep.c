@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/ia64/mp_machdep.c,v 1.41 2002/10/27 23:00:46 marcel Exp $
+ *	$FreeBSD: src/sys/ia64/ia64/mp_machdep.c,v 1.47 2003/05/16 21:26:40 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -56,9 +56,12 @@
 #include <machine/fpu.h>
 #include <i386/include/specialreg.h>
 
+MALLOC_DECLARE(M_PMAP);
+
 void ia64_ap_startup(void);
 
 extern vm_offset_t vhpt_base, vhpt_size;
+extern u_int64_t ia64_lapic_address;
 
 #define	LID_SAPIC_ID(x)		((int)((x) >> 24) & 0xff)
 #define	LID_SAPIC_EID(x)	((int)((x) >> 16) & 0xff)
@@ -68,36 +71,37 @@ extern vm_offset_t vhpt_base, vhpt_size;
 int	mp_ipi_test = 0;
 
 /* Variables used by os_boot_rendez */
-volatile vm_offset_t ap_stack;
-volatile struct pcpu *ap_pcpu;
+void *ap_stack;
+struct pcpu *ap_pcpu;
 volatile int ap_delay;
 volatile int ap_awake;
 volatile int ap_spin;
 
-static void ipi_send(u_int64_t, int);
 static void cpu_mp_unleash(void *);
 
 void
 ia64_ap_startup(void)
 {
+	ap_awake = 1;
+	ap_delay = 0;
+
 	__asm __volatile("mov cr.pta=%0;; srlz.i;;" ::
 	    "r" (vhpt_base + (1<<8) + (vhpt_size<<2) + 1));
 
+	pcpup = ap_pcpu;
+	ia64_set_k4((intptr_t)pcpup);
+
+	map_pal_code();
+	map_port_space();
+	map_gateway_page();
+
 	ia64_set_fpsr(IA64_FPSR_DEFAULT);
-
-	/*
-	 * Set ia32 control registers.
-	 */
-	ia64_set_cflg(CR0_PE | CR0_PG | ((long)(CR4_XMM|CR4_FXSR) << 32));
-
-	ap_awake = 1;
-	ap_delay = 0;
 
 	/* Wait until it's time for us to be unleashed */
 	while (ap_spin)
 		/* spin */;
 
-	__asm __volatile("ssm psr.ic|psr.i;; srlz.i;;");
+	__asm __volatile("ssm psr.i;; srlz.d;;");
 
 	/*
 	 * Get and save the CPU specific MCA records. Should we get the
@@ -119,10 +123,10 @@ ia64_ap_startup(void)
 
 	/* kick off the clock on this AP */
 	ia64_set_itm(ia64_get_itc() + itm_reload);
-	ia64_set_itv(255);
+	ia64_set_itv(CLOCK_VECTOR);
 	ia64_set_tpr(0);
-	cpu_throw();
-	panic("ia64_ap_startup: cpu_throw() returned");
+	cpu_throw(NULL, choosethread());
+	/* NOTREACHED */
 }
 
 int
@@ -212,22 +216,8 @@ cpu_mp_start()
 		pc->pc_current_pmap = kernel_pmap;
 		pc->pc_other_cpus = all_cpus & ~pc->pc_cpumask;
 		if (pc->pc_cpuid > 0) {
-			void *ks;
-
-			/*
-			 * Use contigmalloc for stack so that we can
-			 * use a region 7 address for it which makes
-			 * it impossible to accidentally lose when
-			 * recording a trapframe.
-			 */
-			ks = contigmalloc(KSTACK_PAGES * PAGE_SIZE, M_TEMP,
-					  M_WAITOK,
-					  0ul,
-					  256*1024*1024 - 1,
-					  PAGE_SIZE,
-					  256*1024*1024);
-
-			ap_stack = IA64_PHYS_TO_RR7(ia64_tpa((u_int64_t)ks));
+			ap_stack = malloc(KSTACK_PAGES * PAGE_SIZE, M_PMAP,
+			    M_WAITOK);
 			ap_pcpu = pc;
 			ap_delay = 2000;
 			ap_awake = 0;
@@ -343,18 +333,17 @@ ipi_self(int ipi)
  * cr.lid (CR64) contents of the target processor. Only the id and eid
  * fields are used here.
  */
-static void
+void
 ipi_send(u_int64_t lid, int ipi)
 {
 	volatile u_int64_t *pipi;
 	u_int64_t vector;
 
-	pipi = ia64_memory_address(PAL_PIB_DEFAULT_ADDR |
+	pipi = __MEMIO_ADDR(ia64_lapic_address |
 	    ((lid & LID_SAPIC_MASK) >> 12));
 	vector = (u_int64_t)(ipi_vector[ipi] & 0xff);
 	CTR3(KTR_SMP, "ipi_send(%p, %ld), cpuid=%d", pipi, vector,
 	    PCPU_GET(cpuid));
-	ia64_mf();
 	*pipi = vector;
 }
 

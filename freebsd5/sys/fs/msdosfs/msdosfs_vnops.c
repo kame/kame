@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_vnops.c,v 1.126 2002/09/25 02:32:38 jeff Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_vnops.c,v 1.136 2003/03/04 00:04:42 jeff Exp $ */
 /*	$NetBSD: msdosfs_vnops.c,v 1.68 1998/02/10 14:10:04 mrg Exp $	*/
 
 /*-
@@ -406,7 +406,7 @@ msdosfs_setattr(ap)
 	if (vap->va_uid != (uid_t)VNOVAL || vap->va_gid != (gid_t)VNOVAL) {
 		uid_t uid;
 		gid_t gid;
-		
+
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
 			return (EROFS);
 		uid = vap->va_uid;
@@ -523,7 +523,7 @@ msdosfs_read(ap)
 		return (EINVAL);
 
 	if ((uoff_t)uio->uio_offset > DOS_FILESIZE_MAX)
-                return (0);
+		return (0);
 	/*
 	 * If they didn't ask for any data, then we are done.
 	 */
@@ -531,7 +531,7 @@ msdosfs_read(ap)
 	if (orig_resid <= 0)
 		return (0);
 
-	seqcount = ap->a_ioflag >> 16;
+	seqcount = ap->a_ioflag >> IO_SEQSHIFT;
 
 	isadir = dep->de_Attributes & ATTR_DIRECTORY;
 	do {
@@ -559,7 +559,7 @@ msdosfs_read(ap)
 			    de_cn2off(pmp, rablock) < dep->de_FileSize) {
 				rasize = pmp->pm_bpcluster;
 				error = breadn(vp, lbn, blsize,
-				    &rablock, &rasize, 1, NOCRED, &bp); 
+				    &rablock, &rasize, 1, NOCRED, &bp);
 			} else {
 				error = bread(vp, lbn, blsize, NOCRED, &bp);
 			}
@@ -653,7 +653,7 @@ msdosfs_write(ap)
 	}
 
 	if ((uoff_t)uio->uio_offset + uio->uio_resid > DOS_FILESIZE_MAX)
-                return (EFBIG);
+		return (EFBIG);
 
 	/*
 	 * If the offset we are starting the write at is beyond the end of
@@ -703,15 +703,15 @@ msdosfs_write(ap)
 
 		bn = de_cluster(pmp, uio->uio_offset);
 		if ((uio->uio_offset & pmp->pm_crbomask) == 0
-		    && (de_cluster(pmp, uio->uio_offset + uio->uio_resid) 
-		        > de_cluster(pmp, uio->uio_offset)
+		    && (de_cluster(pmp, uio->uio_offset + uio->uio_resid)
+			> de_cluster(pmp, uio->uio_offset)
 			|| uio->uio_offset + uio->uio_resid >= dep->de_FileSize)) {
 			/*
 			 * If either the whole cluster gets written,
 			 * or we write the cluster from its start beyond EOF,
 			 * then no need to read data from disk.
 			 */
-			bp = getblk(thisvp, bn, pmp->pm_bpcluster, 0, 0);
+			bp = getblk(thisvp, bn, pmp->pm_bpcluster, 0, 0, 0);
 			clrbuf(bp);
 			/*
 			 * Do the bmap now, since pcbmap needs buffers
@@ -806,45 +806,12 @@ msdosfs_fsync(ap)
 		struct thread *a_td;
 	} */ *ap;
 {
-	struct vnode *vp = ap->a_vp;
-	int s;
-	struct buf *bp, *nbp;
-
 	/*
-	 * Flush all dirty buffers associated with a vnode.
+	 * Flush our dirty buffers.
 	 */
-loop:
-	s = splbio();
-	VI_LOCK(vp);
-	for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
-		nbp = TAILQ_NEXT(bp, b_vnbufs);
-		VI_UNLOCK(vp);
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT)) {
-			VI_LOCK(vp);
-			continue;
-		}
-		if ((bp->b_flags & B_DELWRI) == 0)
-			panic("msdosfs_fsync: not dirty");
-		bremfree(bp);
-		splx(s);
-		/* XXX Could do bawrite */
-		(void) bwrite(bp);
-		goto loop;
-	}
-	while (vp->v_numoutput) {
-		vp->v_iflag |= VI_BWAIT;
-		(void) msleep((caddr_t)&vp->v_numoutput, VI_MTX(vp),
-		    PRIBIO + 1, "msdosfsn", 0);
-	}
-#ifdef DIAGNOSTIC
-	if (!TAILQ_EMPTY(&vp->v_dirtyblkhd)) {
-		vprint("msdosfs_fsync: dirty", vp);
-		goto loop;
-	}
-#endif
-	VI_UNLOCK(vp);
-	splx(s);
-	return (deupdat(VTODE(vp), ap->a_waitfor == MNT_WAIT));
+	vop_stdfsync(ap);
+
+	return (deupdat(VTODE(ap->a_vp), ap->a_waitfor == MNT_WAIT));
 }
 
 static int
@@ -1262,17 +1229,17 @@ static struct {
 } dosdirtemplate = {
 	{	".       ", "   ",			/* the . entry */
 		ATTR_DIRECTORY,				/* file attribute */
-		0,	 				/* reserved */
+		0,					/* reserved */
 		0, { 0, 0 }, { 0, 0 },			/* create time & date */
 		{ 0, 0 },				/* access date */
 		{ 0, 0 },				/* high bits of start cluster */
 		{ 210, 4 }, { 210, 4 },			/* modify time & date */
 		{ 0, 0 },				/* startcluster */
-		{ 0, 0, 0, 0 } 				/* filesize */
+		{ 0, 0, 0, 0 }				/* filesize */
 	},
 	{	"..      ", "   ",			/* the .. entry */
 		ATTR_DIRECTORY,				/* file attribute */
-		0,	 				/* reserved */
+		0,					/* reserved */
 		0, { 0, 0 }, { 0, 0 },			/* create time & date */
 		{ 0, 0 },				/* access date */
 		{ 0, 0 },				/* high bits of start cluster */
@@ -1334,7 +1301,7 @@ msdosfs_mkdir(ap)
 	 */
 	bn = cntobn(pmp, newcluster);
 	/* always succeeds */
-	bp = getblk(pmp->pm_devvp, bn, pmp->pm_bpcluster, 0, 0);
+	bp = getblk(pmp->pm_devvp, bn, pmp->pm_bpcluster, 0, 0, 0);
 	bzero(bp->b_data, pmp->pm_bpcluster);
 	bcopy(&dosdirtemplate, bp->b_data, sizeof dosdirtemplate);
 	denp = (struct direntry *)bp->b_data;
@@ -1403,13 +1370,13 @@ msdosfs_rmdir(ap)
 		struct componentname *a_cnp;
 	} */ *ap;
 {
-	register struct vnode *vp = ap->a_vp;
-	register struct vnode *dvp = ap->a_dvp;
-	register struct componentname *cnp = ap->a_cnp;
-	register struct denode *ip, *dp;
+	struct vnode *vp = ap->a_vp;
+	struct vnode *dvp = ap->a_dvp;
+	struct componentname *cnp = ap->a_cnp;
+	struct denode *ip, *dp;
 	struct thread *td = cnp->cn_thread;
 	int error;
-	
+
 	ip = VTODE(vp);
 	dp = VTODE(dvp);
 
@@ -1578,8 +1545,7 @@ msdosfs_readdir(ap)
 				dirbuf.d_reclen = GENERIC_DIRSIZ(&dirbuf);
 				if (uio->uio_resid < dirbuf.d_reclen)
 					goto out;
-				error = uiomove((caddr_t) &dirbuf,
-						dirbuf.d_reclen, uio);
+				error = uiomove(&dirbuf, dirbuf.d_reclen, uio);
 				if (error)
 					goto out;
 				offset += sizeof(struct direntry);
@@ -1701,8 +1667,7 @@ msdosfs_readdir(ap)
 				brelse(bp);
 				goto out;
 			}
-			error = uiomove((caddr_t) &dirbuf,
-					dirbuf.d_reclen, uio);
+			error = uiomove(&dirbuf, dirbuf.d_reclen, uio);
 			if (error) {
 				brelse(bp);
 				goto out;
@@ -1820,7 +1785,7 @@ msdosfs_strategy(ap)
 	 */
 	vp = dep->de_devvp;
 	bp->b_dev = vp->v_rdev;
-	VOP_STRATEGY(vp, bp);
+	VOP_SPECSTRATEGY(vp, bp);
 	return (0);
 }
 
@@ -1832,7 +1797,7 @@ msdosfs_print(ap)
 {
 	struct denode *dep = VTODE(ap->a_vp);
 
-	printf("startcluster %lu, dircluster %lu, diroffset %lu, ",
+	printf("\tstartcluster %lu, dircluster %lu, diroffset %lu, ",
 	       dep->de_StartCluster, dep->de_dirclust, dep->de_diroffset);
 	printf("on dev (%d, %d)\n", major(dep->de_dev), minor(dep->de_dev));
 	return (0);
@@ -1883,9 +1848,7 @@ static struct vnodeopv_entry_desc msdosfs_vnodeop_entries[] = {
 	{ &vop_fsync_desc,		(vop_t *) msdosfs_fsync },
 	{ &vop_getattr_desc,		(vop_t *) msdosfs_getattr },
 	{ &vop_inactive_desc,		(vop_t *) msdosfs_inactive },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_link_desc,		(vop_t *) msdosfs_link },
-	{ &vop_lock_desc,		(vop_t *) vop_stdlock },
 	{ &vop_lookup_desc,		(vop_t *) vfs_cache_lookup },
 	{ &vop_mkdir_desc,		(vop_t *) msdosfs_mkdir },
 	{ &vop_mknod_desc,		(vop_t *) msdosfs_mknod },
@@ -1900,7 +1863,6 @@ static struct vnodeopv_entry_desc msdosfs_vnodeop_entries[] = {
 	{ &vop_setattr_desc,		(vop_t *) msdosfs_setattr },
 	{ &vop_strategy_desc,		(vop_t *) msdosfs_strategy },
 	{ &vop_symlink_desc,		(vop_t *) msdosfs_symlink },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) msdosfs_write },
 	{ NULL, NULL }
 };

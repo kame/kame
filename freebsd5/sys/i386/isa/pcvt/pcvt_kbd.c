@@ -47,7 +47,7 @@
  *
  *	Last Edit-Date: [Wed Apr  5 18:16:52 2000]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_kbd.c,v 1.38 2000/09/10 14:31:40 markm Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_kbd.c,v 1.41 2003/03/02 16:54:37 des Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -1066,7 +1066,7 @@ scroll_reset:
 				if(!(vsp->scroll_lock))
 				{
 					/* someone may be sleeping */
-					wakeup((caddr_t)&(vsp->scroll_lock));
+					wakeup(&(vsp->scroll_lock));
 				}
 			}
 			break;

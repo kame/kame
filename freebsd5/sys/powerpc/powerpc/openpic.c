@@ -22,7 +22,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/powerpc/openpic.c,v 1.3 2002/09/19 04:32:25 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/powerpc/openpic.c,v 1.8 2003/02/20 01:59:42 grehan Exp $
  */
 
 #include <sys/param.h>
@@ -183,9 +183,15 @@ openpic_probe(device_t dev)
 	}
 
 	sc->sc_ncpu = ((val & OPENPIC_FEATURE_LAST_CPU_MASK) >>
-	    OPENPIC_FEATURE_LAST_CPU_SHIFT);
+	    OPENPIC_FEATURE_LAST_CPU_SHIFT) + 1;
 	sc->sc_nirq = ((val & OPENPIC_FEATURE_LAST_IRQ_MASK) >>
-	    OPENPIC_FEATURE_LAST_IRQ_SHIFT);
+	    OPENPIC_FEATURE_LAST_IRQ_SHIFT) + 1;
+
+	/*
+	 * PSIM seems to report 1 too many IRQs
+	 */
+	if (sc->sc_psim)
+		sc->sc_nirq--;
 
 	device_set_desc(dev, "OpenPIC interrupt controller");
 	return (0);
@@ -201,8 +207,8 @@ openpic_attach(device_t dev)
 	softc = sc;
 
 	device_printf(dev,
-	    "Version %s, supports up to %d CPUs and up to %d irqs\n",
-	    sc->sc_version, sc->sc_ncpu+1, sc->sc_nirq+1);
+	    "Version %s, supports %d CPUs and %d irqs\n",
+	    sc->sc_version, sc->sc_ncpu, sc->sc_nirq);
 
 	sc->sc_rman.rm_type = RMAN_ARRAY;
 	sc->sc_rman.rm_descr = device_get_nameunit(dev);

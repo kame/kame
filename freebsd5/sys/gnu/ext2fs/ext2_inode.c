@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_inode.c	8.5 (Berkeley) 12/30/93
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode.c,v 1.37 2002/10/14 03:20:34 mckusick Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode.c,v 1.40 2003/03/04 00:04:42 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -396,7 +396,7 @@ ext2_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 	 * explicitly instead of letting bread do everything for us.
 	 */
 	vp = ITOV(ip);
-	bp = getblk(vp, lbn, (int)fs->s_blocksize, 0, 0);
+	bp = getblk(vp, lbn, (int)fs->s_blocksize, 0, 0, 0);
 	if (bp->b_flags & (B_DONE | B_DELWRI)) {
 	} else {
 		bp->b_iocmd = BIO_READ;

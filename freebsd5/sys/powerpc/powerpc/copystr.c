@@ -31,10 +31,8 @@
  *	$NetBSD: copystr.c,v 1.3 2000/06/08 06:47:17 kleink Exp $
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/powerpc/powerpc/copystr.c,v 1.1 2001/06/10 02:39:37 benno Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/copystr.c,v 1.2 2003/04/03 21:36:33 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>

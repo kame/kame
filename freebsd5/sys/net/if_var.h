@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.52 2002/11/14 23:36:28 sam Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.58 2003/01/01 18:48:54 schweikh Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -52,12 +52,12 @@
  * and then transmits it on its medium.
  *
  * On input, each interface unwraps the data received by it, and either
- * places it on the input queue of a internetwork datagram routine
+ * places it on the input queue of an internetwork datagram routine
  * and posts the associated software interrupt, or passes the datagram to a raw
  * packet input routine.
  *
  * Routines exist for locating interfaces by their addresses
- * or for locating a interface on a certain network, as well as more general
+ * or for locating an interface on a certain network, as well as more general
  * routing and gateway routines maintaining information used to locate
  * interfaces.  These routines live in the files if.c and route.c
  */
@@ -348,17 +348,23 @@ struct ifaddr {
 #endif
 	int (*ifa_claim_addr)		/* check if an addr goes to this if */
 		(struct ifaddr *, struct sockaddr *);
-
+	struct mtx ifa_mtx;
 };
 #define	IFA_ROUTE	RTF_UP		/* route installed */
 
 /* for compatibility with other BSDs */
 #define	ifa_list	ifa_link
 
+#define	IFA_LOCK_INIT(ifa)	\
+    mtx_init(&(ifa)->ifa_mtx, "ifaddr", NULL, MTX_DEF)
+#define	IFA_LOCK(ifa)		mtx_lock(&(ifa)->ifa_mtx)
+#define	IFA_UNLOCK(ifa)		mtx_unlock(&(ifa)->ifa_mtx)
+#define	IFA_DESTROY(ifa)	mtx_destroy(&(ifa)->ifa_mtx)
+
 /*
  * The prefix structure contains information about one prefix
  * of an interface.  They are maintained by the different address families,
- * are allocated and attached when an prefix or an address is set,
+ * are allocated and attached when a prefix or an address is set,
  * and are linked together so all prefixes for an interface can be located.
  */
 struct ifprefix {
@@ -385,13 +391,32 @@ struct ifmultiaddr {
 };
 
 #ifdef _KERNEL
-#define	IFAFREE(ifa) \
-	do { \
-		if ((ifa)->ifa_refcnt <= 0) \
-			ifafree(ifa); \
-		else \
-			(ifa)->ifa_refcnt--; \
+#define	IFAFREE(ifa)					\
+	do {						\
+		IFA_LOCK(ifa);				\
+		KASSERT((ifa)->ifa_refcnt > 0,		\
+		    ("ifa %p !(ifa_refcnt > 0)", ifa));	\
+		if (--(ifa)->ifa_refcnt == 0) {		\
+			IFA_DESTROY(ifa);		\
+			free(ifa, M_IFADDR);		\
+		} else 					\
+			IFA_UNLOCK(ifa);		\
 	} while (0)
+
+#define IFAREF(ifa)					\
+	do {						\
+		IFA_LOCK(ifa);				\
+		++(ifa)->ifa_refcnt;			\
+		IFA_UNLOCK(ifa);			\
+	} while (0)
+
+extern	struct mtx ifnet_lock;
+#define	IFNET_LOCK_INIT() \
+    mtx_init(&ifnet_lock, "ifnet", NULL, MTX_DEF | MTX_RECURSE)
+#define	IFNET_WLOCK()		mtx_lock(&ifnet_lock)
+#define	IFNET_WUNLOCK()		mtx_unlock(&ifnet_lock)
+#define	IFNET_RLOCK()		IFNET_WLOCK()
+#define	IFNET_RUNLOCK()		IFNET_WUNLOCK()
 
 struct ifindex_entry {
 	struct	ifnet *ife_ifnet;
@@ -438,7 +463,6 @@ struct	ifaddr *ifa_ifwithdstaddr(struct sockaddr *);
 struct	ifaddr *ifa_ifwithnet(struct sockaddr *);
 struct	ifaddr *ifa_ifwithroute(int, struct sockaddr *, struct sockaddr *);
 struct	ifaddr *ifaof_ifpforaddr(struct sockaddr *, struct ifnet *);
-void	ifafree(struct ifaddr *);
 
 struct	ifmultiaddr *ifmaof_ifpforaddr(struct sockaddr *, struct ifnet *);
 int	if_simloop(struct ifnet *ifp, struct mbuf *m, int af, int hlen);

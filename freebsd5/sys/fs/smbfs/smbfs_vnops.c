@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.24 2002/09/26 14:07:43 phk Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.36 2003/04/29 13:36:01 kan Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -42,9 +42,8 @@
 #include <sys/mount.h>
 #include <sys/unistd.h>
 #include <sys/vnode.h>
+#include <sys/limits.h>
 #include <sys/lockf.h>
-
-#include <machine/limits.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -83,9 +82,7 @@ static int smbfs_strategy(struct vop_strategy_args *);
 static int smbfs_print(struct vop_print_args *);
 static int smbfs_pathconf(struct vop_pathconf_args *ap);
 static int smbfs_advlock(struct vop_advlock_args *);
-#ifndef FB_RELENG3
 static int smbfs_getextattr(struct vop_getextattr_args *ap);
-#endif
 
 vop_t **smbfs_vnodeop_p;
 static struct vnodeopv_entry_desc smbfs_vnodeop_entries[] = {
@@ -99,9 +96,7 @@ static struct vnodeopv_entry_desc smbfs_vnodeop_entries[] = {
 	{ &vop_getpages_desc,		(vop_t *) smbfs_getpages },
 	{ &vop_inactive_desc,		(vop_t *) smbfs_inactive },
 	{ &vop_ioctl_desc,		(vop_t *) smbfs_ioctl },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_link_desc,		(vop_t *) smbfs_link },
-	{ &vop_lock_desc,		(vop_t *) vop_stdlock },
 	{ &vop_lookup_desc,		(vop_t *) smbfs_lookup },
 	{ &vop_mkdir_desc,		(vop_t *) smbfs_mkdir },
 	{ &vop_mknod_desc,		(vop_t *) smbfs_mknod },
@@ -118,12 +113,9 @@ static struct vnodeopv_entry_desc smbfs_vnodeop_entries[] = {
 	{ &vop_setattr_desc,		(vop_t *) smbfs_setattr },
 	{ &vop_strategy_desc,		(vop_t *) smbfs_strategy },
 	{ &vop_symlink_desc,		(vop_t *) smbfs_symlink },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) smbfs_write },
-#ifndef FB_RELENG3
 	{ &vop_getextattr_desc, 	(vop_t *) smbfs_getextattr },
 /*	{ &vop_setextattr_desc,		(vop_t *) smbfs_setextattr },*/
-#endif
 	{ NULL, NULL }
 };
 
@@ -142,10 +134,9 @@ smbfs_access(ap)
 	} */ *ap;
 {
 	struct vnode *vp = ap->a_vp;
-	struct ucred *cred = ap->a_cred;
-	u_int mode = ap->a_mode;
+	mode_t mode = ap->a_mode;
+	mode_t mpmode;
 	struct smbmount *smp = VTOSMBFS(vp);
-	int error = 0;
 
 	SMBVDEBUG("\n");
 	if ((mode & VWRITE) && (vp->v_mount->mnt_flag & MNT_RDONLY)) {
@@ -156,15 +147,10 @@ smbfs_access(ap)
 			break;
 		}
 	}
-	if (cred->cr_uid == 0)
-		return 0;
-	if (cred->cr_uid != smp->sm_args.uid) {
-		mode >>= 3;
-		if (!groupmember(smp->sm_args.gid, cred))
-			mode >>= 3;
-	}
-	error = (((vp->v_type == VREG) ? smp->sm_args.file_mode : smp->sm_args.dir_mode) & mode) == mode ? 0 : EACCES;
-	return error;
+	mpmode = vp->v_type == VREG ? smp->sm_args.file_mode :
+	    smp->sm_args.dir_mode;
+	return (vaccess(vp->v_type, mpmode, smp->sm_args.uid,
+	    smp->sm_args.gid, ap->a_mode, ap->a_cred, NULL));
 }
 
 /* ARGSUSED */
@@ -252,7 +238,8 @@ smbfs_closel(struct vop_close_args *ap)
 	struct vattr vattr;
 	int error;
 
-	SMBVDEBUG("name=%s, pid=%d, c=%d\n",np->n_name, td->td_pid, np->n_opencount);
+	SMBVDEBUG("name=%s, pid=%d, c=%d\n", np->n_name, td->td_proc->p_pid,
+	    np->n_opencount);
 
 	smb_makescred(&scred, td, ap->a_cred);
 
@@ -420,6 +407,11 @@ smbfs_setattr(ap)
 	if (vap->va_atime.tv_sec != VNOVAL)
 		atime = &vap->va_atime;
 	if (mtime != atime) {
+		if (ap->a_cred->cr_uid != VTOSMBFS(vp)->sm_args.uid &&
+		    (error = suser_cred(ap->a_cred, PRISON_ROOT)) &&
+		    ((vap->va_vaflags & VA_UTIMES_NULL) == 0 ||
+		    (error = VOP_ACCESS(vp, VWRITE, ap->a_cred, ap->a_td))))
+			return (error);
 #if 0
 		if (mtime == NULL)
 			mtime = &np->n_mtime;
@@ -627,8 +619,10 @@ smbfs_rename(ap)
 		flags |= 2;
 	} else if (fvp->v_type == VREG) {
 		flags |= 1;
-	} else
-		return EINVAL;
+	} else {
+		error = EINVAL;
+		goto out;
+	}
 	smb_makescred(&scred, tcnp->cn_thread, tcnp->cn_cred);
 	/*
 	 * It seems that Samba doesn't implement SMB_COM_MOVE call...
@@ -646,7 +640,7 @@ smbfs_rename(ap)
 		if (tvp && tvp != fvp) {
 			error = smbfs_smb_delete(VTOSMB(tvp), &scred);
 			if (error)
-				goto out;
+				goto out_cacherem;
 		}
 		error = smbfs_smb_rename(VTOSMB(fvp), VTOSMB(tdvp),
 		    tcnp->cn_nameptr, tcnp->cn_namelen, &scred);
@@ -657,6 +651,10 @@ smbfs_rename(ap)
 			cache_purge(tdvp);
 		cache_purge(fdvp);
 	}
+
+out_cacherem:
+	smbfs_attr_cacheremove(fdvp);
+	smbfs_attr_cacheremove(tdvp);
 out:
 	if (tdvp == tvp)
 		vrele(tdvp);
@@ -666,8 +664,6 @@ out:
 		vput(tvp);
 	vrele(fdvp);
 	vrele(fvp);
-	smbfs_attr_cacheremove(fdvp);
-	smbfs_attr_cacheremove(tdvp);
 #ifdef possible_mistake
 	vgone(fvp);
 	if (tvp)
@@ -845,8 +841,8 @@ int smbfs_print (ap)
 		printf("no smbnode data\n");
 		return (0);
 	}
-	printf("name = %s, parent = %p, opencount = %d\n", np->n_name,
-	    np->n_parent ? SMBTOV(np->n_parent) : NULL, np->n_opencount);
+	printf("\tname = %s, parent = %p, opencount = %d\n", np->n_name,
+	    np->n_parent ? np->n_parent : NULL, np->n_opencount);
 	return (0);
 }
 
@@ -1074,7 +1070,7 @@ smbfs_advlock(ap)
 static int
 smbfs_pathcheck(struct smbmount *smp, const char *name, int nmlen, int nameiop)
 {
-	static const char *badchars = "*/\[]:<>=;?";
+	static const char *badchars = "*/\\[]:<>=;?";
 	static const char *badchars83 = " +|,";
 	const char *cp;
 	int i, error;
@@ -1236,7 +1232,8 @@ smbfs_lookup(ap)
 	smb_makescred(&scred, td, cnp->cn_cred);
 	fap = &fattr;
 	if (flags & ISDOTDOT) {
-		error = smbfs_smb_lookup(dnp->n_parent, NULL, 0, fap, &scred);
+		error = smbfs_smb_lookup(VTOSMB(dnp->n_parent), NULL, 0, fap,
+		    &scred);
 		SMBVDEBUG("result of dotdot lookup: %d\n", error);
 	} else {
 		fap = &fattr;

@@ -44,7 +44,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty.h	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/tty.h,v 1.69 2002/05/28 15:24:13 bde Exp $
+ * $FreeBSD: src/sys/sys/tty.h,v 1.71 2003/03/05 08:17:10 das Exp $
  */
 
 #ifndef _SYS_TTY_H_
@@ -168,7 +168,7 @@ struct xtty {
 #define	OBUFSIZ	100
 
 #ifndef TTYHOG
-#define	TTYHOG	1024
+#define	TTYHOG	8192
 #endif
 
 #ifdef _KERNEL
@@ -266,6 +266,10 @@ struct speedtab {
 MALLOC_DECLARE(M_TTYS);
 #endif
 extern	struct tty *constty;	/* Temporary virtual console. */
+extern long tk_cancc;
+extern long tk_nin;
+extern long tk_nout;
+extern long tk_rawcc;
 
 int	 b_to_q(char *cp, int cc, struct clist *q);
 void	 catq(struct clist *from, struct clist *to);

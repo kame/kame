@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/snc/if_snc_pccard.c,v 1.2 2000/10/31 08:22:26 phk Exp $
+ * $FreeBSD: src/sys/dev/snc/if_snc_pccard.c,v 1.3 2003/04/15 06:37:26 mdodd Exp $
  */
 
 /*
@@ -76,7 +76,9 @@ static driver_t snc_pccard_driver = {
 	sizeof(struct snc_softc)
 };
 
-DRIVER_MODULE(if_snc, pccard, snc_pccard_driver, snc_devclass, 0, 0);
+DRIVER_MODULE(snc, pccard, snc_pccard_driver, snc_devclass, 0, 0);
+MODULE_DEPEND(snc, ether, 1, 1, 1);
+MODULE_DEPEND(snc, pccard, 1, 1, 1);
 
 /*
  *      snc_pccard_detach - unload the driver and clear the table.

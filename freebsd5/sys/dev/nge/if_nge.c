@@ -29,8 +29,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.38 2002/11/14 23:54:53 sam Exp $
  */
 
 /*
@@ -87,6 +85,9 @@
  * if the user selects an MTU larger than 8152 (8170 - 18).
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.45 2003/04/16 03:16:55 mdodd Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -125,15 +126,12 @@
 
 #include <dev/nge/if_ngereg.h>
 
+MODULE_DEPEND(nge, pci, 1, 1, 1);
+MODULE_DEPEND(nge, ether, 1, 1, 1);
 MODULE_DEPEND(nge, miibus, 1, 1, 1);
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.38 2002/11/14 23:54:53 sam Exp $";
-#endif
 
 #define NGE_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP)
 
@@ -226,7 +224,7 @@ static driver_t nge_driver = {
 
 static devclass_t nge_devclass;
 
-DRIVER_MODULE(if_nge, pci, nge_driver, nge_devclass, 0, 0);
+DRIVER_MODULE(nge, pci, nge_driver, nge_devclass, 0, 0);
 DRIVER_MODULE(miibus, nge, miibus_driver, miibus_devclass, 0, 0);
 
 #define NGE_SETBIT(sc, reg, x)				\
@@ -483,9 +481,9 @@ nge_mii_readreg(sc, frame)
 	/* Check for ack */
 	SIO_CLR(NGE_MEAR_MII_CLK);
 	DELAY(1);
+	ack = CSR_READ_4(sc, NGE_MEAR) & NGE_MEAR_MII_DATA;
 	SIO_SET(NGE_MEAR_MII_CLK);
 	DELAY(1);
-	ack = CSR_READ_4(sc, NGE_MEAR) & NGE_MEAR_MII_DATA;
 
 	/*
 	 * Now try reading data bits. If the ack failed, we still
@@ -791,7 +789,7 @@ nge_reset(sc)
 }
 
 /*
- * Probe for an NatSemi chip. Check the PCI vendor and device
+ * Probe for a NatSemi chip. Check the PCI vendor and device
  * IDs against our list and return a device name if we find a match.
  */
 static int
@@ -824,7 +822,6 @@ nge_attach(dev)
 {
 	int			s;
 	u_char			eaddr[ETHER_ADDR_LEN];
-	u_int32_t		command;
 	struct nge_softc	*sc;
 	struct ifnet		*ifp;
 	int			unit, error = 0, rid;
@@ -866,23 +863,6 @@ nge_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef NGE_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("nge%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("nge%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;;
-		goto fail;
-	}
-#endif
 
 	rid = NGE_RID;
 	sc->nge_res = bus_alloc_resource(dev, NGE_RES, &rid,

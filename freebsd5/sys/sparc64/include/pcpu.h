@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	from: FreeBSD: src/sys/i386/include/globaldata.h,v 1.27 2001/04/27
- * $FreeBSD: src/sys/sparc64/include/pcpu.h,v 1.17 2002/08/15 05:24:55 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/pcpu.h,v 1.18 2003/03/18 08:15:24 jake Exp $
  */
 
 #ifndef	_MACHINE_PCPU_H_
@@ -55,11 +55,7 @@ struct vmspace;
 	u_int	pc_node;						\
 	u_int	pc_tlb_ctx;						\
 	u_int	pc_tlb_ctx_max;						\
-	u_int	pc_tlb_ctx_min;						\
-	u_int	pc_wp_insn;			/* watch point support */ \
-	u_long	pc_wp_pstate;						\
-	u_long	pc_wp_va;						\
-	int	pc_wp_mask
+	u_int	pc_tlb_ctx_min
 
 struct pcb;
 struct pcpu;

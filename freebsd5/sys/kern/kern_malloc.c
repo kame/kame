@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_malloc.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/kern_malloc.c,v 1.113 2002/11/01 18:58:12 phk Exp $
+ * $FreeBSD: src/sys/kern/kern_malloc.c,v 1.124 2003/05/12 05:09:56 phk Exp $
  */
 
 #include "opt_vm.h"
@@ -138,6 +138,24 @@ static int sysctl_kern_malloc(SYSCTL_HANDLER_ARGS);
 /* time_uptime of last malloc(9) failure */
 static time_t t_malloc_fail;
 
+#ifdef MALLOC_MAKE_FAILURES
+/*
+ * Causes malloc failures every (n) mallocs with M_NOWAIT.  If set to 0,
+ * doesn't cause failures.
+ */
+SYSCTL_NODE(_debug, OID_AUTO, malloc, CTLFLAG_RD, 0,
+    "Kernel malloc debugging options");
+
+static int malloc_failure_rate;
+static int malloc_nowait_count;
+static int malloc_failure_count;
+SYSCTL_INT(_debug_malloc, OID_AUTO, failure_rate, CTLFLAG_RW,
+    &malloc_failure_rate, 0, "Every (n) mallocs with M_NOWAIT will fail");
+TUNABLE_INT("debug.malloc.failure_rate", &malloc_failure_rate);
+SYSCTL_INT(_debug_malloc, OID_AUTO, failure_count, CTLFLAG_RD,
+    &malloc_failure_count, 0, "Number of imposed M_NOWAIT malloc failures");
+#endif
+
 int
 malloc_last_fail(void)
 {
@@ -162,13 +180,43 @@ malloc(size, type, flags)
 	int indx;
 	caddr_t va;
 	uma_zone_t zone;
+#ifdef DIAGNOSTIC
+	unsigned long osize = size;
+#endif
 	register struct malloc_type *ksp = type;
 
+#ifdef INVARIANTS
+	/*
+	 * To make sure that WAITOK or NOWAIT is set, but not more than
+	 * one, and check against the API botches that are common.
+	 */
+	indx = flags & (M_WAITOK | M_NOWAIT | M_DONTWAIT | M_TRYWAIT);
+	if (indx != M_NOWAIT && indx != M_WAITOK) {
+		static	struct timeval lasterr;
+		static	int curerr, once;
+		if (once == 0 && ppsratecheck(&lasterr, &curerr, 1)) {
+			printf("Bad malloc flags: %x\n", indx);
+			backtrace();
+			flags |= M_WAITOK;
+			once++;
+		}
+	}
+#endif
 #if 0
 	if (size == 0)
 		Debugger("zero size malloc");
 #endif
-	if (!(flags & M_NOWAIT))
+#ifdef MALLOC_MAKE_FAILURES
+	if ((flags & M_NOWAIT) && (malloc_failure_rate != 0)) {
+		atomic_add_int(&malloc_nowait_count, 1);
+		if ((malloc_nowait_count % malloc_failure_rate) == 0) {
+			atomic_add_int(&malloc_failure_count, 1);
+			t_malloc_fail = time_uptime;
+			return (NULL);
+		}
+	}
+#endif
+	if (flags & M_WAITOK)
 		KASSERT(curthread->td_intr_nesting_level == 0,
 		   ("malloc(M_WAITOK) in interrupt context"));
 	if (size <= KMEM_ZMAX) {
@@ -202,11 +250,15 @@ out:
 		ksp->ks_maxused = ksp->ks_memuse;
 
 	mtx_unlock(&ksp->ks_mtx);
-	if (!(flags & M_NOWAIT))
+	if (flags & M_WAITOK)
 		KASSERT(va != NULL, ("malloc(M_WAITOK) returned NULL"));
-	if (va == NULL) {
+	else if (va == NULL)
 		t_malloc_fail = time_uptime;
+#ifdef DIAGNOSTIC
+	if (va != NULL && !(flags & M_ZERO)) {
+		memset(va, 0x70, osize);
 	}
+#endif
 	return ((void *) va);
 }
 
@@ -230,6 +282,9 @@ free(addr, type)
 	if (addr == NULL)
 		return;
 
+	KASSERT(ksp->ks_memuse > 0,
+		("malloc(9)/free(9) confusion.\n%s",
+		 "Probably freeing with wrong type, but maybe not here."));
 	size = 0;
 
 	slab = vtoslab((vm_offset_t)addr & (~UMA_SLAB_MASK));
@@ -265,6 +320,9 @@ free(addr, type)
 		uma_large_free(slab);
 	}
 	mtx_lock(&ksp->ks_mtx);
+	KASSERT(size <= ksp->ks_memuse,
+		("malloc(9)/free(9) confusion.\n%s",
+		 "Probably freeing with wrong type, but maybe not here."));
 	ksp->ks_memuse -= size;
 	ksp->ks_inuse--;
 	mtx_unlock(&ksp->ks_mtx);
@@ -391,8 +449,7 @@ kmeminit(dummy)
 	 * amount to slightly more address space than we need for the submaps,
 	 * but it never hurts to have an extra page in kmem_map.
 	 */
-	npg = (nmbufs * MSIZE + nmbclusters * MCLBYTES + nmbcnt *
-	    sizeof(u_int) + vm_kmem_size) / PAGE_SIZE;
+	npg = (nmbufs*MSIZE + nmbclusters*MCLBYTES + vm_kmem_size) / PAGE_SIZE; 
 
 	kmem_map = kmem_suballoc(kernel_map, (vm_offset_t *)&kmembase,
 		(vm_offset_t *)&kmemlimit, (vm_size_t)(npg * PAGE_SIZE));

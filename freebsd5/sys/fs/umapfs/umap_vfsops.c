@@ -35,7 +35,7 @@
  *
  *	@(#)umap_vfsops.c	8.8 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/fs/umapfs/umap_vfsops.c,v 1.50 2002/10/19 22:22:42 kan Exp $
+ * $FreeBSD: src/sys/fs/umapfs/umap_vfsops.c,v 1.53 2003/03/11 22:15:09 kan Exp $
  */
 
 /*
@@ -443,7 +443,7 @@ static struct vfsops umap_vfsops = {
 	umapfs_root,
 	umapfs_quotactl,
 	umapfs_statfs,
-	vfs_stdsync,
+	vfs_stdnosync,
 	umapfs_vget,
 	umapfs_fhtovp,
 	umapfs_checkexp,

@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/i386/include/bus_at386.h,v 1.19 2002/07/15 13:25:15 markm Exp $ */
+/* $FreeBSD: src/sys/i386/include/bus_at386.h,v 1.22 2003/03/30 05:24:52 jake Exp $ */
 
 #ifndef _I386_BUS_AT386_H_
 #define _I386_BUS_AT386_H_
@@ -92,15 +92,23 @@
 /*
  * Bus address and size types
  */
-typedef u_int bus_addr_t;
-typedef u_int bus_size_t;
+#ifdef PAE
+typedef uint64_t bus_addr_t;
+#else
+typedef uint32_t bus_addr_t;
+#endif
+typedef uint32_t bus_size_t;
 
 #define BUS_SPACE_MAXSIZE_24BIT	0xFFFFFF
 #define BUS_SPACE_MAXSIZE_32BIT 0xFFFFFFFF
-#define BUS_SPACE_MAXSIZE	(64 * 1024) /* Maximum supported size */
+#define BUS_SPACE_MAXSIZE	0xFFFFFFFF
 #define BUS_SPACE_MAXADDR_24BIT	0xFFFFFF
 #define BUS_SPACE_MAXADDR_32BIT 0xFFFFFFFF
+#ifdef PAE
+#define BUS_SPACE_MAXADDR	0xFFFFFFFFFFFFFFFFULL
+#else
 #define BUS_SPACE_MAXADDR	0xFFFFFFFF
+#endif
 
 #define BUS_SPACE_UNRESTRICTED	(~0)
 
@@ -866,7 +874,7 @@ static __inline void
 bus_space_set_multi_1(bus_space_tag_t tag, bus_space_handle_t bsh,
 		      bus_size_t offset, u_int8_t value, size_t count)
 {
-	bus_addr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 #if defined(_I386_BUS_PIO_H_)
 #if defined(_I386_BUS_MEMIO_H_)
@@ -888,7 +896,7 @@ static __inline void
 bus_space_set_multi_2(bus_space_tag_t tag, bus_space_handle_t bsh,
 		     bus_size_t offset, u_int16_t value, size_t count)
 {
-	bus_addr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 #if defined(_I386_BUS_PIO_H_)
 #if defined(_I386_BUS_MEMIO_H_)
@@ -910,7 +918,7 @@ static __inline void
 bus_space_set_multi_4(bus_space_tag_t tag, bus_space_handle_t bsh,
 		      bus_size_t offset, u_int32_t value, size_t count)
 {
-	bus_addr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 #if defined(_I386_BUS_PIO_H_)
 #if defined(_I386_BUS_MEMIO_H_)
@@ -954,7 +962,7 @@ static __inline void
 bus_space_set_region_1(bus_space_tag_t tag, bus_space_handle_t bsh,
 		       bus_size_t offset, u_int8_t value, size_t count)
 {
-	bus_addr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 #if defined(_I386_BUS_PIO_H_)
 #if defined(_I386_BUS_MEMIO_H_)
@@ -976,7 +984,7 @@ static __inline void
 bus_space_set_region_2(bus_space_tag_t tag, bus_space_handle_t bsh,
 		       bus_size_t offset, u_int16_t value, size_t count)
 {
-	bus_addr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 #if defined(_I386_BUS_PIO_H_)
 #if defined(_I386_BUS_MEMIO_H_)
@@ -998,7 +1006,7 @@ static __inline void
 bus_space_set_region_4(bus_space_tag_t tag, bus_space_handle_t bsh,
 		       bus_size_t offset, u_int32_t value, size_t count)
 {
-	bus_addr_t addr = bsh + offset;
+	bus_space_handle_t addr = bsh + offset;
 
 #if defined(_I386_BUS_PIO_H_)
 #if defined(_I386_BUS_MEMIO_H_)
@@ -1048,8 +1056,8 @@ bus_space_copy_region_1(bus_space_tag_t tag, bus_space_handle_t bsh1,
 			bus_size_t off1, bus_space_handle_t bsh2,
 			bus_size_t off2, size_t count)
 {
-	bus_addr_t addr1 = bsh1 + off1;
-	bus_addr_t addr2 = bsh2 + off2;
+	bus_space_handle_t addr1 = bsh1 + off1;
+	bus_space_handle_t addr2 = bsh2 + off2;
 
 #if defined(_I386_BUS_PIO_H_)
 #if defined(_I386_BUS_MEMIO_H_)
@@ -1094,8 +1102,8 @@ bus_space_copy_region_2(bus_space_tag_t tag, bus_space_handle_t bsh1,
 			bus_size_t off1, bus_space_handle_t bsh2,
 			bus_size_t off2, size_t count)
 {
-	bus_addr_t addr1 = bsh1 + off1;
-	bus_addr_t addr2 = bsh2 + off2;
+	bus_space_handle_t addr1 = bsh1 + off1;
+	bus_space_handle_t addr2 = bsh2 + off2;
 
 #if defined(_I386_BUS_PIO_H_)
 #if defined(_I386_BUS_MEMIO_H_)
@@ -1140,8 +1148,8 @@ bus_space_copy_region_4(bus_space_tag_t tag, bus_space_handle_t bsh1,
 			bus_size_t off1, bus_space_handle_t bsh2,
 			bus_size_t off2, size_t count)
 {
-	bus_addr_t addr1 = bsh1 + off1;
-	bus_addr_t addr2 = bsh2 + off2;
+	bus_space_handle_t addr1 = bsh1 + off1;
+	bus_space_handle_t addr2 = bsh2 + off2;
 
 #if defined(_I386_BUS_PIO_H_)
 #if defined(_I386_BUS_MEMIO_H_)

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pci_private.h,v 1.4 2002/09/04 03:13:16 jhb Exp $
+ * $FreeBSD: src/sys/dev/pci/pci_private.h,v 1.8 2003/04/16 03:15:08 mdodd Exp $
  *
  */
 
@@ -54,10 +54,10 @@ u_int32_t	pci_read_config_method(device_t dev, device_t child,
 		    int reg, int width);
 void		pci_write_config_method(device_t dev, device_t child, 
 		    int reg, u_int32_t val, int width);
-void		pci_enable_busmaster_method(device_t dev, device_t child);
-void		pci_disable_busmaster_method(device_t dev, device_t child);
-void		pci_enable_io_method(device_t dev, device_t child, int space);
-void		pci_disable_io_method(device_t dev, device_t child, int space);
+int		pci_enable_busmaster_method(device_t dev, device_t child);
+int		pci_disable_busmaster_method(device_t dev, device_t child);
+int		pci_enable_io_method(device_t dev, device_t child, int space);
+int		pci_disable_io_method(device_t dev, device_t child, int space);
 struct resource	*pci_alloc_resource(device_t dev, device_t child, 
 		    int type, int *rid, u_long start, u_long end, u_long count,
 		    u_int flags);
@@ -68,5 +68,8 @@ struct pci_devinfo *pci_read_device(device_t pcib, int b, int s, int f,
 		    size_t size);
 void		pci_print_verbose(struct pci_devinfo *dinfo);
 int		pci_freecfg(struct pci_devinfo *dinfo);
-
+int		pci_child_location_str_method(device_t cbdev, device_t child,
+		    char *buf, size_t buflen);
+int		pci_child_pnpinfo_str_method(device_t cbdev, device_t child,
+		    char *buf, size_t buflen);
 #endif /* _PCI_PRIVATE_H_ */

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/raidframe/rf_threadstuff.h,v 1.1 2002/10/20 08:17:37 scottl Exp $ */
+/*	$FreeBSD: src/sys/dev/raidframe/rf_threadstuff.h,v 1.2 2003/03/20 21:17:39 jhb Exp $ */
 /*	$NetBSD: rf_threadstuff.h,v 1.10 2001/01/27 20:42:21 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
@@ -78,7 +78,7 @@ typedef void *RF_ThreadArg_t;
 static __inline struct ucred *
 rf_getucred(RF_Thread_t td)
 {
-	return (((struct thread *)td)->td_proc->p_ucred);
+	return (((struct thread *)td)->td_ucred);
 }
 #endif
 

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from: BSDI: pmap.v9.h,v 1.10.2.6 1999/08/23 22:18:44 cp Exp
- * $FreeBSD: src/sys/sparc64/include/tsb.h,v 1.17 2002/08/18 02:09:26 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/tsb.h,v 1.18 2003/04/08 06:35:08 jake Exp $
  */
 
 #ifndef	_MACHINE_TSB_H_
@@ -46,7 +46,7 @@
 extern struct tte *tsb_kernel;
 extern vm_size_t tsb_kernel_mask;
 extern vm_size_t tsb_kernel_size;
-extern vm_offset_t tsb_kernel_phys;
+extern vm_paddr_t tsb_kernel_phys;
 
 static __inline struct tte *
 tsb_vpntobucket(pmap_t pm, vm_offset_t vpn)

@@ -32,7 +32,7 @@
  *
  *	from: @(#)float.h	7.1 (Berkeley) 5/8/90
  *	from: FreeBSD: src/sys/i386/include/float.h,v 1.8 1999/08/28 00:44:11
- * $FreeBSD: src/sys/powerpc/include/float.h,v 1.1 2002/05/15 20:54:35 obrien Exp $
+ * $FreeBSD: src/sys/powerpc/include/float.h,v 1.2 2003/02/08 20:37:55 mike Exp $
  */
 
 #ifndef _MACHINE_FLOAT_H_
@@ -40,6 +40,8 @@
 
 #define FLT_RADIX	2		/* b */
 #define FLT_ROUNDS	1		/* FP addition rounds to nearest */
+#define	FLT_EVAL_METHOD	1		/* operands promoted to double */
+#define	DECIMAL_DIG	35		/* max precision in decimal digits */
 
 #define FLT_MANT_DIG	24		/* p */
 #define FLT_EPSILON	1.19209290E-07F	/* b**(1-p) */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.199.2.1 2002/12/29 14:54:19 phk Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.211 2003/05/01 06:41:59 tjr Exp $
  */
 
 #include "opt_mac.h"
@@ -40,7 +40,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/stdint.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>
@@ -200,7 +199,7 @@ ffs_mount(mp, path, data, ndp, td)
 			 * Flush any dirty data.
 			 */
 			if ((error = VFS_SYNC(mp, MNT_WAIT,
-			    td->td_proc->p_ucred, td)) != 0) {
+			    td->td_ucred, td)) != 0) {
 				vn_finished_write(mp);
 				return (error);
 			}
@@ -872,7 +871,7 @@ ffs_oldfscompat_read(fs, ump, sblockloc)
 	/*
 	 * If not yet done, update UFS1 superblock with new wider fields.
 	 */
-	if (fs->fs_magic == FS_UFS1_MAGIC && fs->fs_size != fs->fs_old_size) {
+	if (fs->fs_magic == FS_UFS1_MAGIC && fs->fs_maxbsize != fs->fs_bsize) {
 		fs->fs_maxbsize = fs->fs_bsize;
 		fs->fs_time = fs->fs_old_time;
 		fs->fs_size = fs->fs_old_size;
@@ -1345,7 +1344,7 @@ ffs_vget(mp, ino, flags, vpp)
 	 * already have one. This should only happen on old filesystems.
 	 */
 	if (ip->i_gen == 0) {
-		ip->i_gen = random() / 2 + 1;
+		ip->i_gen = arc4random() / 2 + 1;
 		if ((vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
 			ip->i_flag |= IN_MODIFIED;
 			DIP(ip, i_gen) = ip->i_gen;
@@ -1469,6 +1468,10 @@ ffs_sbupdate(mp, waitfor)
 	void *space;
 	int i, size, error, allerror = 0;
 
+	if (fs->fs_ronly == 1 &&
+	    (mp->um_mountp->mnt_flag & (MNT_RDONLY | MNT_UPDATE)) != 
+	    (MNT_RDONLY | MNT_UPDATE))
+		panic("ffs_sbupdate: write read-only filesystem");
 	/*
 	 * First write back the summary information.
 	 */
@@ -1479,7 +1482,7 @@ ffs_sbupdate(mp, waitfor)
 		if (i + fs->fs_frag > blks)
 			size = (blks - i) * fs->fs_fsize;
 		bp = getblk(mp->um_devvp, fsbtodb(fs, fs->fs_csaddr + i),
-		    size, 0, 0);
+		    size, 0, 0, 0);
 		bcopy(space, bp->b_data, (u_int)size);
 		space = (char *)space + size;
 		if (waitfor != MNT_WAIT)
@@ -1507,7 +1510,7 @@ ffs_sbupdate(mp, waitfor)
 		fs->fs_sblockloc = SBLOCK_UFS2;
 	}
 	bp = getblk(mp->um_devvp, btodb(fs->fs_sblockloc), (int)fs->fs_sbsize,
-	    0, 0);
+	    0, 0, 0);
 	fs->fs_fmod = 0;
 	fs->fs_time = time_second;
 	bcopy((caddr_t)fs, bp->b_data, (u_int)fs->fs_sbsize);
@@ -1537,9 +1540,9 @@ static void
 ffs_ifree(struct ufsmount *ump, struct inode *ip)
 {
 
-	if (ump->um_fstype == UFS1)
+	if (ump->um_fstype == UFS1 && ip->i_din1 != NULL)
 		uma_zfree(uma_ufs1, ip->i_din1);
-	else
-		uma_zfree(uma_ufs2, ip->i_din1);
+	else if (ip->i_din2 != NULL)
+		uma_zfree(uma_ufs2, ip->i_din2);
 	uma_zfree(uma_inode, ip);
 }

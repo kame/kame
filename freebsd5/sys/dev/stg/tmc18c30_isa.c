@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/stg/tmc18c30_isa.c,v 1.8 2002/09/20 16:53:19 phk Exp $	*/
+/*	$FreeBSD: src/sys/dev/stg/tmc18c30_isa.c,v 1.9 2003/04/07 10:13:25 mdodd Exp $	*/
 /*	$NecBSD: tmc18c30_pisa.c,v 1.22 1998/11/26 01:59:21 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -52,103 +52,12 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <isa/isavar.h>
-
-#include <machine/dvcfg.h>
-
-#include <sys/device_port.h>
-
 #include <cam/scsi/scsi_low.h>
-#include <isa/isa_common.h>
 #include <cam/scsi/scsi_low_pisa.h>
 
 #include <dev/stg/tmc18c30reg.h>
 #include <dev/stg/tmc18c30var.h>
-
-#define	STG_HOSTID	7
-
-#include	<sys/kernel.h>
-#include	<sys/module.h>
-
-static	int	stgprobe(device_t devi);
-static	int	stgattach(device_t devi);
-
-static	void	stg_isa_unload	(device_t);
-
-static void
-stg_isa_intr(void * arg)
-{
-	stgintr(arg);
-}
-
-static void
-stg_release_resource(device_t dev)
-{
-	struct stg_softc	*sc = device_get_softc(dev);
-
-	if (sc->stg_intrhand) {
-		bus_teardown_intr(dev, sc->irq_res, sc->stg_intrhand);
-	}
-
-	if (sc->port_res) {
-		bus_release_resource(dev, SYS_RES_IOPORT,
-				     sc->port_rid, sc->port_res);
-	}
-
-	if (sc->irq_res) {
-		bus_release_resource(dev, SYS_RES_IRQ,
-				     sc->irq_rid, sc->irq_res);
-	}
-
-	if (sc->mem_res) {
-		bus_release_resource(dev, SYS_RES_MEMORY,
-				     sc->mem_rid, sc->mem_res);
-	}
-}
-
-static int
-stg_alloc_resource(device_t dev)
-{
-	struct stg_softc	*sc = device_get_softc(dev);
-	u_long			maddr, msize;
-	int			error;
-
-	sc->port_rid = 0;
-	sc->port_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->port_rid,
-					  0, ~0, STGIOSZ, RF_ACTIVE);
-	if (sc->port_res == NULL) {
-		stg_release_resource(dev);
-		return(ENOMEM);
-	}
-
-	sc->irq_rid = 0;
-	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-					 0, ~0, 1, RF_ACTIVE);
-	if (sc->irq_res == NULL) {
-		stg_release_resource(dev);
-		return(ENOMEM);
-	}
-
-	error = bus_get_resource(dev, SYS_RES_MEMORY, 0, &maddr, &msize);
-	if (error) {
-		return(0);      /* XXX */
-	}
-
-	/* no need to allocate memory if not configured */
-	if (maddr == 0 || msize == 0) {
-		return(0);
-	}
-
-	sc->mem_rid = 0;
-	sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->mem_rid,
-					 0, ~0, 1, RF_ACTIVE);
-	if (sc->mem_res == NULL) {
-		stg_release_resource(dev);
-		return(ENOMEM);
-	}
-
-	return(0);
-}
+#include <dev/stg/tmc18c30.h>
 
 static int
 stg_isa_probe(device_t dev)
@@ -156,14 +65,14 @@ stg_isa_probe(device_t dev)
 	struct stg_softc	*sc = device_get_softc(dev);
 	int			error;
 
-	bzero(sc, sizeof(struct stg_softc));
-
+	sc->port_rid = 0;
+	sc->irq_rid = 0;
 	error = stg_alloc_resource(dev);
 	if (error) {
 		return(error);
 	}
 
-	if (stgprobe(dev) == 0) {
+	if (stg_probe(dev) == 0) {
 		stg_release_resource(dev);
 		return(ENXIO);
 	}
@@ -179,19 +88,21 @@ stg_isa_attach(device_t dev)
 	struct stg_softc	*sc = device_get_softc(dev);
 	int			error;
 
+	sc->port_rid = 0;
+	sc->irq_rid = 0;
 	error = stg_alloc_resource(dev);
 	if (error) {
 		return(error);
 	}
 
 	error = bus_setup_intr(dev, sc->irq_res, INTR_TYPE_CAM | INTR_ENTROPY,
-			       stg_isa_intr, (void *)sc, &sc->stg_intrhand);
+			       stg_intr, (void *)sc, &sc->stg_intrhand);
 	if (error) {
 		stg_release_resource(dev);
 		return(error);
 	}
 
-	if (stgattach(dev) == 0) {
+	if (stg_attach(dev) == 0) {
 		stg_release_resource(dev);
 		return(ENXIO);
 	}
@@ -199,18 +110,11 @@ stg_isa_attach(device_t dev)
 	return(0);
 }
 
-static	void
-stg_isa_detach(device_t dev)
-{
-	stg_isa_unload(dev);
-	stg_release_resource(dev);
-}
-
 static device_method_t stg_isa_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		stg_isa_probe),
 	DEVMETHOD(device_attach,	stg_isa_attach),
-	DEVMETHOD(device_detach,	stg_isa_detach),
+	DEVMETHOD(device_detach,	stg_detach),
 
 	{ 0, 0 }
 };
@@ -221,71 +125,5 @@ static driver_t stg_isa_driver = {
 	sizeof(struct stg_softc),
 };
 
-static devclass_t stg_devclass;
-
 DRIVER_MODULE(stg, isa, stg_isa_driver, stg_devclass, 0, 0);
-
-static	void
-stg_isa_unload(device_t devi)
-{
-	struct stg_softc *sc = device_get_softc(devi);
-	intrmask_t s;
-
-	printf("%s: unload\n",sc->sc_sclow.sl_xname);
-	s = splcam();
-	scsi_low_deactivate((struct scsi_low_softc *)sc);
-	scsi_low_dettach(&sc->sc_sclow);
-	splx(s);
-}
-
-static	int
-stgprobe(device_t devi)
-{
-	int rv;
-	struct stg_softc *sc = device_get_softc(devi);
-
-	rv = stgprobesubr(rman_get_bustag(sc->port_res),
-			  rman_get_bushandle(sc->port_res),
-			  device_get_flags(devi));
-
-	return rv;
-}
-
-static	int
-stgattach(device_t devi)
-{
-	struct stg_softc *sc;
-	struct scsi_low_softc *slp;
-	u_int32_t flags = device_get_flags(devi);
-	u_int iobase = bus_get_resource_start(devi, SYS_RES_IOPORT, 0);
-	intrmask_t s;
-	char	dvname[16];
-
-	strcpy(dvname,"stg");
-
-
-	if (iobase == 0)
-	{
-		printf("%s: no ioaddr is given\n", dvname);
-		return (0);
-	}
-
-	sc = device_get_softc(devi);
-	if (sc == NULL) {
-		return(0);
-	}
-
-	slp = &sc->sc_sclow;
-	slp->sl_dev = devi;
-	sc->sc_iot = rman_get_bustag(sc->port_res);
-	sc->sc_ioh = rman_get_bushandle(sc->port_res);
-
-	slp->sl_hostid = STG_HOSTID;
-	slp->sl_cfgflags = flags;
-
-	s = splcam();
-	stgattachsubr(sc);
-	splx(s);
-
-	return(STGIOSZ);
-}
+MODULE_DEPEND(stg, scsi_low, 1, 1, 1);

@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_slice.h,v 1.9.2.1 2002/12/20 21:52:02 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_slice.h,v 1.16 2003/05/02 06:29:33 phk Exp $
  */
 
 #ifndef _GEOM_GEOM_SLICE_H_
@@ -45,28 +45,43 @@ struct g_slice {
 	struct	g_provider *provider;
 };
 
+struct g_slice_hot {
+	off_t	offset;
+	off_t	length;
+	int	ract;
+	int	dact;
+	int	wact;
+};
+
 typedef int g_slice_start_t (struct bio *bp);
 
 struct g_slicer {
-	u_int		nslice;
-	u_int		nprovider;
-	u_int		nhot;
-	off_t		cfrontstuff;
-	off_t		frontstuff;
-	struct g_slice	*slices;
-	struct g_slice	*hot;
-	void		*softc;
-	g_slice_start_t	*start;
+	u_int			nslice;
+	u_int			nprovider;
+	struct g_slice		*slices;
+
+	u_int			nhotspot;
+	struct g_slice_hot	*hotspot;
+
+	void			*softc;
+	g_slice_start_t		*start;
+	g_event_t		*hot;
 };
 
 g_dumpconf_t g_slice_dumpconf;
 int g_slice_config(struct g_geom *gp, u_int idx, int how, off_t offset, off_t length, u_int sectorsize, const char *fmt, ...);
+void g_slice_spoiled(struct g_consumer *cp);
 #define G_SLICE_CONFIG_CHECK	0
 #define G_SLICE_CONFIG_SET	1
 #define G_SLICE_CONFIG_FORCE	2
 struct g_geom * g_slice_new(struct g_class *mp, u_int slices, struct g_provider *pp, struct g_consumer **cpp, void *extrap, int extra, g_slice_start_t *start);
 
-int g_slice_conf_hot(struct g_geom *gp, u_int idx, off_t offset, off_t length);
+int g_slice_conf_hot(struct g_geom *gp, u_int idx, off_t offset, off_t length, int ract, int dact, int wact);
+#define G_SLICE_HOT_ALLOW	1
+#define G_SLICE_HOT_DENY	2
+#define G_SLICE_HOT_START	4
+#define G_SLICE_HOT_CALL	8
+
 void g_slice_finish_hot(struct bio *bp);
 
 #endif /* _GEOM_GEOM_SLICE_H_ */

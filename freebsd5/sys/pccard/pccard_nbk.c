@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard_nbk.c,v 1.42 2002/07/31 20:01:11 imp Exp $
+ * $FreeBSD: src/sys/pccard/pccard_nbk.c,v 1.43 2003/04/23 23:39:21 imp Exp $
  */
 
 /*
@@ -322,6 +322,18 @@ pccard_read_ivar(device_t bus, device_t child, int which, uintptr_t *result)
 	case PCCARD_IVAR_PRODEXT:
 		*(u_int16_t *) result = devi->prodext;
 		return (0);
+	case PCCARD_IVAR_VENDOR_STR:
+		*(char **) result = devi->manufstr;
+		break;
+	case PCCARD_IVAR_PRODUCT_STR:
+		*(char **) result = devi->versstr;
+		break;
+	case PCCARD_IVAR_CIS3_STR:
+		*(char **) result = devi->cis3str;
+		break;
+	case PCCARD_IVAR_CIS4_STR:
+		*(char **) result = devi->cis4str;
+		break;
 	}
 	return (ENOENT);
 }

@@ -28,7 +28,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder_fmt.c,v 1.8 2002/11/25 17:17:42 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder_fmt.c,v 1.11 2003/04/20 17:08:56 orion Exp $");
 
 MALLOC_DEFINE(M_FMTFEEDER, "fmtfeed", "pcm format feeder");
 
@@ -210,7 +210,9 @@ static int
 feed_16to8_init(struct pcm_feeder *f)
 {
 	f->data = malloc(FEEDBUFSZ, M_FMTFEEDER, M_NOWAIT | M_ZERO);
-	return (f->data)? 0 : ENOMEM;
+	if (f->data == NULL)
+		return ENOMEM;
+	return 0;
 }
 
 static int
@@ -319,7 +321,9 @@ static int
 feed_stereotomono8_init(struct pcm_feeder *f)
 {
 	f->data = malloc(FEEDBUFSZ, M_FMTFEEDER, M_NOWAIT | M_ZERO);
-	return (f->data)? 0 : ENOMEM;
+	if (f->data == NULL)
+		return ENOMEM;
+	return 0;
 }
 
 static int
@@ -364,7 +368,9 @@ static int
 feed_stereotomono16_init(struct pcm_feeder *f)
 {
 	f->data = malloc(FEEDBUFSZ, M_FMTFEEDER, M_NOWAIT | M_ZERO);
-	return (f->data)? 0 : ENOMEM;
+	if (f->data == NULL)
+		return ENOMEM;
+	return 0;
 }
 
 static int

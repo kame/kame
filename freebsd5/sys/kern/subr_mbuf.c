@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2001, 2002
+ * Copyright (c) 2001, 2002, 2003
  * 	Bosko Milekic <bmilekic@FreeBSD.org>.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_mbuf.c,v 1.34 2002/11/27 04:26:00 tjr Exp $
+ * $FreeBSD: src/sys/kern/subr_mbuf.c,v 1.50.2.1 2003/06/03 23:27:05 bmilekic Exp $
  */
 
 #include "opt_mac.h"
@@ -51,9 +51,14 @@
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 
-/******************************************************************************
- * mb_alloc mbuf and cluster allocator.
+/*
+ * mb_alloc: network buffer allocator
  *
+ * XXX: currently, the "low watermark" sysctl is marked read-only as its
+ * effects are not completely implemented.  To be fixed soon.
+ */
+
+/*
  * Maximum number of PCPU containers. If you know what you're doing you could
  * explicitly define MBALLOC_NCPU to be exactly the number of CPUs on your
  * system during compilation, and thus prevent kernel structure bloat.
@@ -70,34 +75,50 @@
 #endif
 
 /*-
- * The mbuf allocator is heavily based on Alfred Perlstein's
- * (alfred@FreeBSD.org) "memcache" allocator which is itself based
- * on concepts from several per-CPU memory allocators. The difference
- * between this allocator and memcache is that, among other things:
+ * The mbuf allocator is based on Alfred Perlstein's <alfred@FreeBSD.org>
+ * "memcache" proof-of-concept allocator which was itself based on
+ * several well-known SMP-friendly allocators.
  *
- * (i) We don't free back to the map from the free() routine - we leave the
- *     option of implementing lazy freeing (from a kproc) in the future. 
+ * The mb_alloc mbuf allocator is a special when compared to other
+ * general-purpose allocators.  Some things to take note of:
  *
- * (ii) We allocate from separate sub-maps of kmem_map, thus limiting the
- *	maximum number of allocatable objects of a given type. Further,
- *	we handle blocking on a cv in the case that the map is starved and
- *	we have to rely solely on cached (circulating) objects.
+ *   Mbufs and mbuf clusters are two different objects.  Sometimes we
+ *   will allocate a single mbuf, other times a single cluster,
+ *   other times both.  Further, we may sometimes wish to allocate a
+ *   whole chain of mbufs with clusters.  This allocator will perform
+ *   the common case of each scenario in one function call (this
+ *   includes constructing or destructing the object) while only
+ *   locking/unlocking the cache once, if it can get away with it.
+ *   The caches consist of pure mbufs and pure clusters; that is
+ *   there are no 'zones' containing mbufs with already pre-hooked
+ *   clusters.  Since we can allocate both objects atomically anyway,
+ *   we don't bother fragmenting our caches for any particular 'scenarios.'
+ *
+ *   We allocate from seperate sub-maps of kmem_map, thus imposing
+ *   an ultimate upper-limit on the number of allocatable clusters
+ *   and mbufs and also, since the clusters all come from a
+ *   virtually contiguous region, we can keep reference counters
+ *   for them and "allocate" them purely by indexing into a
+ *   dense refcount vector.
+ *
+ *   We call out to protocol drain routines (which can be hooked
+ *   into us) when we're low on space.
  *
  * The mbuf allocator keeps all objects that it allocates in mb_buckets.
- * The buckets keep a page worth of objects (an object can be an mbuf or an
+ * The buckets keep a number of objects (an object can be an mbuf or an
  * mbuf cluster) and facilitate moving larger sets of contiguous objects
- * from the per-CPU lists to the main list for the given object. The buckets
- * also have an added advantage in that after several moves from a per-CPU
- * list to the main list and back to the per-CPU list, contiguous objects
- * are kept together, thus trying to put the TLB cache to good use.
+ * from the per-CPU caches to the global cache. The buckets also have
+ * the added advantage that objects, when migrated from cache to cache,
+ * are migrated in chunks that keep contiguous objects together,
+ * minimizing TLB pollution.
  *
  * The buckets are kept on singly-linked lists called "containers." A container
- * is protected by a mutex lock in order to ensure consistency.  The mutex lock
+ * is protected by a mutex in order to ensure consistency.  The mutex
  * itself is allocated separately and attached to the container at boot time,
- * thus allowing for certain containers to share the same mutex lock.  Per-CPU
- * containers for mbufs and mbuf clusters all share the same per-CPU
- * lock whereas the "general system" containers (i.e., the "main lists") for
- * these objects share one global lock.
+ * thus allowing for certain containers to share the same lock.  Per-CPU
+ * containers for mbufs and mbuf clusters all share the same per-CPU 
+ * lock whereas the global cache containers for these objects share one
+ * global lock.
  */
 struct mb_bucket {
 	SLIST_ENTRY(mb_bucket) mb_blist;
@@ -113,7 +134,7 @@ struct mb_container {
 	u_int	mc_starved;
 	long	*mc_types;
 	u_long	*mc_objcount;
-	u_long	*mc_numpgs;
+	u_long	*mc_numbucks;
 };
 
 struct mb_gen_list {
@@ -151,6 +172,13 @@ int	nmbufs;
 int	nmbclusters;
 int	nmbcnt;
 int	nsfbufs;
+
+/*
+ * Sizes of objects per bucket.  There are this size's worth of mbufs
+ * or clusters in each bucket.  Please keep these a power-of-2.
+ */
+#define	MBUF_BUCK_SZ	(PAGE_SIZE * 2)
+#define	CLUST_BUCK_SZ	(PAGE_SIZE * 4)
 
 /*
  * Perform sanity checks of tunables declared above.
@@ -197,11 +225,13 @@ struct mb_lstmngr {
 	vm_offset_t	ml_maptop;
 	int		ml_mapfull;
 	u_int		ml_objsize;
+	u_int		ml_objbucks;
 	u_int		*ml_wmhigh;
+	u_int		*ml_wmlow;
 };
 static struct mb_lstmngr mb_list_mbuf, mb_list_clust;
 static struct mtx mbuf_gen, mbuf_pcpu[NCPU];
-u_int *cl_refcntmap;
+static u_int *cl_refcntmap;
 
 /*
  * Local macros for internal allocator structure manipulations.
@@ -222,7 +252,8 @@ u_int *cl_refcntmap;
     (mb_lst)->ml_cntlst[(num)]
 
 #define	MB_BUCKET_INDX(mb_obj, mb_lst)					\
-    (int)(((caddr_t)(mb_obj) - (caddr_t)(mb_lst)->ml_mapbase) / PAGE_SIZE)
+    (int)(((caddr_t)(mb_obj) - (caddr_t)(mb_lst)->ml_mapbase) /		\
+    ((mb_lst)->ml_objbucks * (mb_lst)->ml_objsize))
 
 #define	MB_GET_OBJECT(mb_objp, mb_bckt, mb_lst)				\
 {									\
@@ -269,8 +300,10 @@ struct mbstat mbstat;
 /* Sleep time for wait code (in ticks). */
 static int mbuf_wait = 64;
 
-static u_int mbuf_limit = 512;	/* Upper limit on # of mbufs per CPU. */
-static u_int clust_limit = 128;	/* Upper limit on # of clusters per CPU. */
+static u_int mbuf_hiwm = 512;	/* High wm on  # of mbufs per cache */
+static u_int mbuf_lowm = 128;	/* Low wm on # of mbufs per cache */
+static u_int clust_hiwm = 128;	/* High wm on # of clusters per cache */
+static u_int clust_lowm = 16;	/* Low wm on # of clusters per cache */
 
 /*
  * Objects exported by sysctl(8).
@@ -286,10 +319,14 @@ SYSCTL_INT(_kern_ipc, OID_AUTO, nsfbufs, CTLFLAG_RD, &nsfbufs, 0,
     "Maximum number of sendfile(2) sf_bufs available");
 SYSCTL_INT(_kern_ipc, OID_AUTO, mbuf_wait, CTLFLAG_RW, &mbuf_wait, 0,
     "Sleep time of mbuf subsystem wait allocations during exhaustion");
-SYSCTL_UINT(_kern_ipc, OID_AUTO, mbuf_limit, CTLFLAG_RW, &mbuf_limit, 0,
-    "Upper limit of number of mbufs allowed on each PCPU list");
-SYSCTL_UINT(_kern_ipc, OID_AUTO, clust_limit, CTLFLAG_RW, &clust_limit, 0,
-    "Upper limit of number of mbuf clusters allowed on each PCPU list");
+SYSCTL_UINT(_kern_ipc, OID_AUTO, mbuf_hiwm, CTLFLAG_RW, &mbuf_hiwm, 0,
+    "Upper limit of number of mbufs allowed in each cache");
+SYSCTL_UINT(_kern_ipc, OID_AUTO, mbuf_lowm, CTLFLAG_RD, &mbuf_lowm, 0,
+    "Lower limit of number of mbufs allowed in each cache");
+SYSCTL_UINT(_kern_ipc, OID_AUTO, clust_hiwm, CTLFLAG_RW, &clust_hiwm, 0,
+    "Upper limit of number of mbuf clusters allowed in each cache");
+SYSCTL_UINT(_kern_ipc, OID_AUTO, clust_lowm, CTLFLAG_RD, &clust_lowm, 0,
+    "Lower limit of number of mbuf clusters allowed in each cache");
 SYSCTL_STRUCT(_kern_ipc, OID_AUTO, mbstat, CTLFLAG_RD, &mbstat, mbstat,
     "Mbuf general information and statistics");
 SYSCTL_OPAQUE(_kern_ipc, OID_AUTO, mb_statpcpu, CTLFLAG_RD, mb_statpcpu,
@@ -309,8 +346,8 @@ static void		 mbuf_init(void *);
  * of each object that will be placed initially in each PCPU container for
  * said object.
  */
-#define	NMB_MBUF_INIT	4
-#define	NMB_CLUST_INIT	16
+#define	NMB_MBUF_INIT	2
+#define	NMB_CLUST_INIT	8
 
 /*
  * Internal flags that allow for cache locks to remain "persistent" across
@@ -341,14 +378,12 @@ mbuf_init(void *dummy)
 
 	/*
 	 * Set up all the submaps, for each type of object that we deal
-	 * with in this allocator.  We also allocate space for the cluster
-	 * ref. counts in the mbuf map (and not the cluster map) in order to
-	 * give clusters a nice contiguous address space without any holes.
+	 * with in this allocator.
 	 */
-	mb_map_size = (vm_size_t)(nmbufs * MSIZE + nmbclusters * sizeof(u_int));
-	mb_map_size = rounddown(mb_map_size, PAGE_SIZE);
-	mb_list_mbuf.ml_btable = malloc((unsigned long)mb_map_size / PAGE_SIZE *
-	    sizeof(struct mb_bucket *), M_MBUF, M_NOWAIT);
+	mb_map_size = (vm_size_t)(nmbufs * MSIZE);
+	mb_map_size = rounddown(mb_map_size, MBUF_BUCK_SZ);
+	mb_list_mbuf.ml_btable = malloc((unsigned long)mb_map_size /
+	    MBUF_BUCK_SZ * sizeof(struct mb_bucket *), M_MBUF, M_NOWAIT);
 	if (mb_list_mbuf.ml_btable == NULL)
 		goto bad;
 	mb_list_mbuf.ml_map = kmem_suballoc(kmem_map,&(mb_list_mbuf.ml_mapbase),
@@ -356,12 +391,14 @@ mbuf_init(void *dummy)
 	mb_list_mbuf.ml_map->system_map = 1;
 	mb_list_mbuf.ml_mapfull = 0;
 	mb_list_mbuf.ml_objsize = MSIZE;
-	mb_list_mbuf.ml_wmhigh = &mbuf_limit;
+	mb_list_mbuf.ml_objbucks = MBUF_BUCK_SZ / MSIZE;
+	mb_list_mbuf.ml_wmhigh = &mbuf_hiwm;
+	mb_list_mbuf.ml_wmlow = &mbuf_lowm;
 
 	mb_map_size = (vm_size_t)(nmbclusters * MCLBYTES);
-	mb_map_size = rounddown(mb_map_size, PAGE_SIZE);
-	mb_list_clust.ml_btable = malloc((unsigned long)mb_map_size / PAGE_SIZE
-	    * sizeof(struct mb_bucket *), M_MBUF, M_NOWAIT);
+	mb_map_size = rounddown(mb_map_size, CLUST_BUCK_SZ);
+	mb_list_clust.ml_btable = malloc((unsigned long)mb_map_size /
+	    CLUST_BUCK_SZ * sizeof(struct mb_bucket *), M_MBUF, M_NOWAIT);
 	if (mb_list_clust.ml_btable == NULL)
 		goto bad;
 	mb_list_clust.ml_map = kmem_suballoc(kmem_map,
@@ -370,7 +407,9 @@ mbuf_init(void *dummy)
 	mb_list_clust.ml_map->system_map = 1;
 	mb_list_clust.ml_mapfull = 0;
 	mb_list_clust.ml_objsize = MCLBYTES;
-	mb_list_clust.ml_wmhigh = &clust_limit;
+	mb_list_clust.ml_objbucks = CLUST_BUCK_SZ / MCLBYTES;
+	mb_list_clust.ml_wmhigh = &clust_hiwm;
+	mb_list_clust.ml_wmlow = &clust_lowm;
 
 	/*
 	 * Allocate required general (global) containers for each object type.
@@ -404,10 +443,10 @@ mbuf_init(void *dummy)
 	    &(mb_statpcpu[MB_GENLIST_OWNER].mb_mbfree);
 	mb_list_clust.ml_genlist->mb_cont.mc_objcount =
 	    &(mb_statpcpu[MB_GENLIST_OWNER].mb_clfree);
-	mb_list_mbuf.ml_genlist->mb_cont.mc_numpgs =
-	    &(mb_statpcpu[MB_GENLIST_OWNER].mb_mbpgs);
-	mb_list_clust.ml_genlist->mb_cont.mc_numpgs =
-	    &(mb_statpcpu[MB_GENLIST_OWNER].mb_clpgs);
+	mb_list_mbuf.ml_genlist->mb_cont.mc_numbucks =
+	    &(mb_statpcpu[MB_GENLIST_OWNER].mb_mbbucks);
+	mb_list_clust.ml_genlist->mb_cont.mc_numbucks =
+	    &(mb_statpcpu[MB_GENLIST_OWNER].mb_clbucks);
 	mb_list_mbuf.ml_genlist->mb_cont.mc_types =
 	    &(mb_statpcpu[MB_GENLIST_OWNER].mb_mbtypes[0]);
 	mb_list_clust.ml_genlist->mb_cont.mc_types = NULL;
@@ -418,8 +457,7 @@ mbuf_init(void *dummy)
 	 * Allocate all the required counters for clusters.  This makes
 	 * cluster allocations/deallocations much faster.
 	 */
-	cl_refcntmap = (u_int *)kmem_malloc(mb_list_mbuf.ml_map,
-	    roundup(nmbclusters * sizeof(u_int), MSIZE), M_NOWAIT);
+	cl_refcntmap = malloc(nmbclusters * sizeof(u_int), M_MBUF, M_NOWAIT);
 	if (cl_refcntmap == NULL)
 		goto bad;
 
@@ -432,13 +470,17 @@ mbuf_init(void *dummy)
 	mbstat.m_mlen = MLEN;
 	mbstat.m_mhlen = MHLEN;
 	mbstat.m_numtypes = MT_NTYPES;
+	mbstat.m_mbperbuck = MBUF_BUCK_SZ / MSIZE;
+	mbstat.m_clperbuck = CLUST_BUCK_SZ / MCLBYTES;
 
 	/*
 	 * Allocate and initialize PCPU containers.
 	 */
 	for (i = 0; i < NCPU; i++) {
-		if (CPU_ABSENT(i))
+		if (CPU_ABSENT(i)) {
+			mb_statpcpu[i].mb_active = 0;
 			continue;
+		}
 
 		mb_list_mbuf.ml_cntlst[i] = malloc(sizeof(struct mb_pcpu_list),
 		    M_MBUF, M_NOWAIT);
@@ -461,10 +503,10 @@ mbuf_init(void *dummy)
 		    &(mb_statpcpu[i].mb_mbfree);
 		mb_list_clust.ml_cntlst[i]->mb_cont.mc_objcount =
 		    &(mb_statpcpu[i].mb_clfree);
-		mb_list_mbuf.ml_cntlst[i]->mb_cont.mc_numpgs =
-		    &(mb_statpcpu[i].mb_mbpgs);
-		mb_list_clust.ml_cntlst[i]->mb_cont.mc_numpgs =
-		    &(mb_statpcpu[i].mb_clpgs);
+		mb_list_mbuf.ml_cntlst[i]->mb_cont.mc_numbucks =
+		    &(mb_statpcpu[i].mb_mbbucks);
+		mb_list_clust.ml_cntlst[i]->mb_cont.mc_numbucks =
+		    &(mb_statpcpu[i].mb_clbucks);
 		mb_list_mbuf.ml_cntlst[i]->mb_cont.mc_types =
 		    &(mb_statpcpu[i].mb_mbtypes[0]);
 		mb_list_clust.ml_cntlst[i]->mb_cont.mc_types = NULL;
@@ -527,13 +569,12 @@ mb_pop_cont(struct mb_lstmngr *mb_list, int how, struct mb_pcpu_list *cnt_lst)
 		return (NULL);
 
 	bucket = malloc(sizeof(struct mb_bucket) +
-	    PAGE_SIZE / mb_list->ml_objsize * sizeof(void *), M_MBUF,
-	    how == M_TRYWAIT ? M_WAITOK : M_NOWAIT);
+	    mb_list->ml_objbucks * sizeof(void *), M_MBUF, MBTOM(how));
 	if (bucket == NULL)
 		return (NULL);
 
-	p = (caddr_t)kmem_malloc(mb_list->ml_map, PAGE_SIZE,
-	    how == M_TRYWAIT ? M_WAITOK : M_NOWAIT);
+	p = (caddr_t)kmem_malloc(mb_list->ml_map, mb_list->ml_objsize * 
+	    mb_list->ml_objbucks, MBTOM(how));
 	if (p == NULL) {
 		free(bucket, M_MBUF);
 		if (how == M_TRYWAIT)
@@ -543,7 +584,7 @@ mb_pop_cont(struct mb_lstmngr *mb_list, int how, struct mb_pcpu_list *cnt_lst)
 
 	bucket->mb_numfree = 0;
 	mb_list->ml_btable[MB_BUCKET_INDX(p, mb_list)] = bucket;
-	for (i = 0; i < (PAGE_SIZE / mb_list->ml_objsize); i++) {
+	for (i = 0; i < mb_list->ml_objbucks; i++) {
 		bucket->mb_free[i] = p;
 		bucket->mb_numfree++;
 		p += mb_list->ml_objsize;
@@ -552,14 +593,14 @@ mb_pop_cont(struct mb_lstmngr *mb_list, int how, struct mb_pcpu_list *cnt_lst)
 	MB_LOCK_CONT(cnt_lst);
 	bucket->mb_owner = cnt_lst->mb_cont.mc_numowner;
 	SLIST_INSERT_HEAD(&(cnt_lst->mb_cont.mc_bhead), bucket, mb_blist);
-	(*(cnt_lst->mb_cont.mc_numpgs))++;
+	(*(cnt_lst->mb_cont.mc_numbucks))++;
 	*(cnt_lst->mb_cont.mc_objcount) += bucket->mb_numfree;
 
 	return (bucket);
 }
 
 /*
- * Allocate an mbuf-subsystem type object.
+ * Allocate a network buffer.
  * The general case is very easy.  Complications only arise if our PCPU
  * container is empty.  Things get worse if the PCPU container is empty,
  * the general container is empty, and we've run out of address space
@@ -574,6 +615,23 @@ mb_alloc(struct mb_lstmngr *mb_list, int how, short type, short persist,
 	struct mb_pcpu_list *cnt_lst;
 	struct mb_bucket *bucket;
 	void *m;
+
+#ifdef INVARIANTS
+	int flags;
+	
+	flags = how & (M_WAITOK | M_NOWAIT | M_DONTWAIT | M_TRYWAIT);
+	if (flags != M_DONTWAIT && flags != M_TRYWAIT) {
+		static	struct timeval lasterr;
+		static	int curerr;
+		if (ppsratecheck(&lasterr, &curerr, 1)) {
+			printf("Bad mbuf alloc flags: %x\n", flags);
+			backtrace();
+			how = M_TRYWAIT;
+		}
+	}
+	if ((flags & M_DONTWAIT) == 0)
+		GIANT_REQUIRED;
+#endif
 
 	m = NULL;
 	if ((persist & MBP_PERSISTENT) != 0) {
@@ -629,8 +687,8 @@ mb_alloc(struct mb_lstmngr *mb_list, int how, short type, short persist,
 			SLIST_REMOVE_HEAD(&(gen_list->mb_cont.mc_bhead),
 			    mb_blist);
 			bucket->mb_owner = cnt_lst->mb_cont.mc_numowner;
-			(*(gen_list->mb_cont.mc_numpgs))--;
-			(*(cnt_lst->mb_cont.mc_numpgs))++;
+			(*(gen_list->mb_cont.mc_numbucks))--;
+			(*(cnt_lst->mb_cont.mc_numbucks))++;
 			*(gen_list->mb_cont.mc_objcount) -= bucket->mb_numfree;
 			bucket->mb_numfree--;
 			m = bucket->mb_free[(bucket->mb_numfree)];
@@ -840,6 +898,11 @@ retry_lock:
 		 */
 		MB_PUT_OBJECT(m, bucket, gen_list);
 		MB_MBTYPES_DEC(gen_list, type, 1);
+		if (bucket->mb_owner & MB_BUCKET_FREE) {
+			SLIST_INSERT_HEAD(&(gen_list->mb_cont.mc_bhead),
+			    bucket, mb_blist);
+			bucket->mb_owner = MB_GENLIST_OWNER;
+		}
 		if (gen_list->mb_cont.mc_starved > 0)
 			cv_signal(&(gen_list->mgl_mstarved));
 		if ((persist & MBP_PERSIST) == 0)
@@ -871,64 +934,14 @@ retry_lock:
 
 		MB_PUT_OBJECT(m, bucket, cnt_lst);
 		MB_MBTYPES_DEC(cnt_lst, type, 1);
-
-		if (cnt_lst->mb_cont.mc_starved > 0) {
-			/*
-			 * This is a tough case. It means that we've
-			 * been flagged at least once to indicate that
-			 * we're empty, and that the system is in a critical
-			 * situation, so we ought to migrate at least one
-			 * bucket over to the general container.
-			 * There may or may not be a thread blocking on
-			 * the starved condition variable, but chances
-			 * are that one will eventually come up soon so
-			 * it's better to migrate now than never.
-			 */
-			gen_list = MB_GET_GEN_LIST(mb_list);
-			MB_LOCK_CONT(gen_list);
-			KASSERT((bucket->mb_owner & MB_BUCKET_FREE) != 0,
-			    ("mb_free: corrupt bucket %p\n", bucket));
-			SLIST_INSERT_HEAD(&(gen_list->mb_cont.mc_bhead),
-			    bucket, mb_blist);
-			bucket->mb_owner = MB_GENLIST_OWNER;
-			(*(cnt_lst->mb_cont.mc_objcount))--;
-			(*(gen_list->mb_cont.mc_objcount))++;
-			(*(cnt_lst->mb_cont.mc_numpgs))--;
-			(*(gen_list->mb_cont.mc_numpgs))++;
-
-			/*
-			 * Determine whether or not to keep transferring
-			 * buckets to the general list or whether we've
-			 * transferred enough already.
-			 * We realize that although we may flag another
-			 * bucket to be migrated to the general container
-			 * that in the meantime, the thread that was
-			 * blocked on the cv is already woken up and
-			 * long gone. But in that case, the worst
-			 * consequence is that we will end up migrating
-			 * one bucket too many, which is really not a big
-			 * deal, especially if we're close to a critical
-			 * situation.
-			 */
-			if (gen_list->mb_cont.mc_starved > 0) {
-				cnt_lst->mb_cont.mc_starved--;
-				cv_signal(&(gen_list->mgl_mstarved));
-			} else
-				cnt_lst->mb_cont.mc_starved = 0;
-
-			MB_UNLOCK_CONT(gen_list);
-			if ((persist & MBP_PERSIST) == 0)
-				MB_UNLOCK_CONT(cnt_lst);
-			else
-				*pers_list = owner;
-			break;
-		}
-
-		if (*(cnt_lst->mb_cont.mc_objcount) > *(mb_list->ml_wmhigh)) {
+		if ((*(cnt_lst->mb_cont.mc_objcount) > *(mb_list->ml_wmhigh)) ||
+		    (cnt_lst->mb_cont.mc_starved > 0)) {
 			/*
 			 * We've hit the high limit of allowed numbers of mbufs
-			 * on this PCPU list. We must now migrate a bucket
-			 * over to the general container.
+			 * on this PCPU list or we've been flagged that we need
+			 * to transfer a bucket over to the general cache.
+			 * We must now migrate a bucket over to the general
+			 * container.
 			 */
 			gen_list = MB_GET_GEN_LIST(mb_list);
 			MB_LOCK_CONT(gen_list);
@@ -943,8 +956,8 @@ retry_lock:
 			bucket->mb_owner = MB_GENLIST_OWNER;
 			*(cnt_lst->mb_cont.mc_objcount) -= bucket->mb_numfree;
 			*(gen_list->mb_cont.mc_objcount) += bucket->mb_numfree;
-			(*(cnt_lst->mb_cont.mc_numpgs))--;
-			(*(gen_list->mb_cont.mc_numpgs))++;
+			(*(cnt_lst->mb_cont.mc_numbucks))--;
+			(*(gen_list->mb_cont.mc_numbucks))++;
 
 			/*
 			 * While we're at it, transfer some of the mbtypes
@@ -957,11 +970,28 @@ retry_lock:
 			 * being freed in an effort to keep the mbtypes
 			 * counters approximately balanced across all lists.
 			 */ 
-			MB_MBTYPES_DEC(cnt_lst, type, (PAGE_SIZE /
-			    mb_list->ml_objsize) - bucket->mb_numfree);
-			MB_MBTYPES_INC(gen_list, type, (PAGE_SIZE /
-			    mb_list->ml_objsize) - bucket->mb_numfree);
- 
+			MB_MBTYPES_DEC(cnt_lst, type,
+			    mb_list->ml_objbucks - bucket->mb_numfree);
+			MB_MBTYPES_INC(gen_list, type,
+			    mb_list->ml_objbucks - bucket->mb_numfree);
+
+			if (cnt_lst->mb_cont.mc_starved > 0) {
+				/*
+				 * Determine whether or not to keep
+				 * transferring buckets to the general list
+				 * or whether we've transferred enough already.
+				 * The thread that is blocked may end up waking
+				 * up in the meantime, but transferring an
+				 * extra bucket in a constrained situation
+				 * is not so bad, as we're likely to need
+				 * it soon anyway.
+				 */
+				if (gen_list->mb_cont.mc_starved > 0) {
+					cnt_lst->mb_cont.mc_starved--;
+					cv_signal(&(gen_list->mgl_mstarved));
+				} else
+					cnt_lst->mb_cont.mc_starved = 0;
+			}
 			MB_UNLOCK_CONT(gen_list);
 			if ((persist & MBP_PERSIST) == 0)
 				MB_UNLOCK_CONT(cnt_lst);
@@ -999,15 +1029,8 @@ mb_reclaim(void)
 	struct domain *dp;
 	struct protosw *pr;
 
-/*
- * XXX: Argh, we almost always trip here with witness turned on now-a-days
- * XXX: because we often come in with Giant held. For now, there's no way
- * XXX: to avoid this.
- */
-#ifdef WITNESS
-	KASSERT(witness_list(curthread) == 0,
-	    ("mb_reclaim() called with locks held"));
-#endif
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK | WARN_PANIC, NULL,
+	    "mb_reclaim()");
 
 	mbstat.m_drain++;	/* XXX: No consistency. */
 
@@ -1059,10 +1082,11 @@ mb_reclaim(void)
 } while (0)
 
 #define	cl2ref(cl)							\
-    (((uintptr_t)(cl) - (uintptr_t)cl_refcntmap) >> MCLSHIFT)
+    (((uintptr_t)(cl) - (uintptr_t)mb_list_clust.ml_mapbase) >> MCLSHIFT)
 
 #define	_mext_dealloc_ref(m)						\
-	free((m)->m_ext.ref_cnt, M_MBUF)
+	if ((m)->m_ext.ext_type != EXT_EXTREF)				\
+		free((m)->m_ext.ref_cnt, M_MBUF)
 
 /******************************************************************************
  * Internal routines.
@@ -1146,7 +1170,7 @@ m_get(int how, short type)
  * Allocate a given length worth of mbufs and/or clusters (whatever fits
  * best) and return a pointer to the top of the allocated chain.  If an
  * existing mbuf chain is provided, then we will append the new chain
- * to the existing one and return the top of the provided (existing)
+ * to the existing one but still return the top of the newly allocated
  * chain.  NULL is returned on failure, in which case the [optional]
  * provided chain is left untouched, and any memory already allocated
  * is freed.
@@ -1234,9 +1258,7 @@ m_getm(struct mbuf *m, int len, int how, short type)
 
 	if (mtail != NULL)
 		mtail->m_next = top;
-	else
-		mtail = top;
-	return mtail;
+	return top;
 failed:
 	if (top != NULL)
 		m_freem(top);
@@ -1260,9 +1282,9 @@ m_gethdr(int how, short type)
 	if (mb != NULL) {
 		_mbhdr_setup(mb, type);
 #ifdef MAC
-		if (mac_init_mbuf(mb, how) != 0) {
+		if (mac_init_mbuf(mb, MBTOM(how)) != 0) {
 			m_free(mb);
-			return NULL;
+			return (NULL);
 		}
 #endif
 	}
@@ -1309,9 +1331,9 @@ m_gethdr_clrd(int how, short type)
 	if (mb != NULL) {
 		_mbhdr_setup(mb, type);
 #ifdef MAC
-		if (mac_init_mbuf(mb, how) != 0) {
+		if (mac_init_mbuf(mb, MBTOM(how)) != 0) {
 			m_free(mb);
-			return NULL;
+			return (NULL);
 		}
 #endif
 		bzero(mtod(mb, caddr_t), MHLEN);
@@ -1335,13 +1357,13 @@ m_free(struct mbuf *mb)
 	int cchnum;
 	short persist = 0;
 
+#ifdef INVARIANTS
+	if (mb->m_flags & M_FREELIST)
+		panic("m_free detected a mbuf double-free");
+	mb->m_flags |= M_FREELIST;
+#endif
 	if ((mb->m_flags & M_PKTHDR) != 0)
 		m_tag_delete_chain(mb, NULL);
-#ifdef MAC
-	if ((mb->m_flags & M_PKTHDR) &&
-	    (mb->m_pkthdr.label.l_flags & MAC_FLAG_INITIALIZED))
-		mac_destroy_mbuf(mb);
-#endif
 	nb = mb->m_next;
 	if ((mb->m_flags & M_EXT) != 0) {
 		MEXT_REM_REF(mb);
@@ -1377,39 +1399,9 @@ m_free(struct mbuf *mb)
 void
 m_freem(struct mbuf *mb)
 {
-	struct mbuf *m;
-	int cchnum;
-	short persist;
 
-	while (mb != NULL) {
-		if ((mb->m_flags & M_PKTHDR) != 0)
-			m_tag_delete_chain(mb, NULL);
-#ifdef MAC
-		if ((mb->m_flags & M_PKTHDR) &&
-		    (mb->m_pkthdr.label.l_flags & MAC_FLAG_INITIALIZED))
-			mac_destroy_mbuf(mb);
-#endif
-		persist = 0;
-		m = mb;
-		mb = mb->m_next;
-		if ((m->m_flags & M_EXT) != 0) {
-			MEXT_REM_REF(m);
-			if (atomic_cmpset_int(m->m_ext.ref_cnt, 0, 1)) {
-				if (m->m_ext.ext_type == EXT_CLUSTER) {
-					mb_free(&mb_list_clust,
-					    (caddr_t)m->m_ext.ext_buf,
-					    MT_NOTMBUF, MBP_PERSIST, &cchnum);
-					persist = MBP_PERSISTENT;
-				} else {
-					(*(m->m_ext.ext_free))(m->m_ext.ext_buf,
-					    m->m_ext.ext_args);
-					_mext_dealloc_ref(m);
-					persist = 0;
-				}
-			}
-		}
-		mb_free(&mb_list_mbuf, m, m->m_type, persist, &cchnum);
-	}
+	while (mb != NULL)
+		mb = m_free(mb);
 }
 
 /*
@@ -1456,9 +1448,11 @@ m_getcl(int how, short type, int flags)
 		_mext_init_ref(mb, &cl_refcntmap[cl2ref(mb->m_ext.ext_buf)]);
 	}
 #ifdef MAC
-	if ((flags & M_PKTHDR) && (mac_init_mbuf(mb, how) != 0)) {
-		m_free(mb);
-		return NULL;
+	if (flags & M_PKTHDR) {
+		if (mac_init_mbuf(mb, MBTOM(how)) != 0) {
+			m_free(mb);
+			return (NULL);
+		}
 	}
 #endif
 	return (mb);
@@ -1508,9 +1502,13 @@ void
 m_extadd(struct mbuf *mb, caddr_t buf, u_int size,
     void (*freef)(void *, void *), void *args, int flags, int type)
 {
+	u_int *ref_cnt = NULL;
 
-	_mext_init_ref(mb, ((type != EXT_CLUSTER) ?
-	    NULL : &cl_refcntmap[cl2ref(mb->m_ext.ext_buf)]));
+	if (type == EXT_CLUSTER)
+		ref_cnt = &cl_refcntmap[cl2ref(mb->m_ext.ext_buf)];
+	else if (type == EXT_EXTREF)
+		ref_cnt = mb->m_ext.ref_cnt;
+	_mext_init_ref(mb, ref_cnt);
 	if (mb->m_ext.ref_cnt != NULL) {
 		mb->m_flags |= (M_EXT | flags);
 		mb->m_ext.ext_buf = buf;

@@ -29,10 +29,8 @@
 % */
 
 #ifndef RPC_HDR
-%#ifndef lint
-%static const char rcsid[] =
-%  "$FreeBSD: src/include/rpcsvc/nis.x,v 1.4 2001/02/06 10:39:18 asmodai Exp $";
-%#endif /* not lint */
+%#include <sys/cdefs.h>
+%__FBSDID("$FreeBSD: src/include/rpcsvc/nis.x,v 1.6 2003/05/04 02:51:42 obrien Exp $");
 #endif
 
 /* 
@@ -192,7 +190,7 @@ struct ping_args {
 /* 
  * These are the type of entries that are stored in the transaction log, 
  * note that modifications will appear as two entries, for names, they have
- * a "OLD" entry followed by a "NEW" entry. For entries in tables, there
+ * an "OLD" entry followed by a "NEW" entry. For entries in tables, there
  * is a remove followed by an add. It is done this way so that we can read
  * the log backwards to back out transactions and forwards to propogate
  * updated.

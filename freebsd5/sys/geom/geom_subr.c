@@ -32,21 +32,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_subr.c,v 1.23.2.2 2003/01/02 20:00:59 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_subr.c,v 1.52 2003/05/02 06:42:59 phk Exp $
  */
 
 
 #include <sys/param.h>
-#include <sys/stdint.h>
-#ifndef _KERNEL
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <string.h>
-#include <err.h>
-#else
 #include <sys/systm.h>
+#include <sys/devicestat.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/bio.h>
@@ -55,7 +47,6 @@
 #include <sys/kthread.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#endif
 #include <sys/errno.h>
 #include <sys/sbuf.h>
 #include <geom/geom.h>
@@ -68,6 +59,37 @@ static int g_nproviders;
 char *g_wait_event, *g_wait_up, *g_wait_down, *g_wait_sim;
 
 static int g_ignition;
+
+
+/*
+ * This event offers a new class a chance to taste all preexisting providers.
+ */
+static void
+g_new_class_event(void *arg, int flag)
+{
+	struct g_class *mp2, *mp;
+	struct g_geom *gp;
+	struct g_provider *pp;
+
+	g_topology_assert();
+	if (flag == EV_CANCEL)
+		return;
+	if (g_shutdown)
+		return;
+	mp2 = arg;
+	if (mp2->taste == NULL)
+		return;
+	LIST_FOREACH(mp, &g_classes, class) {
+		if (mp2 == mp)
+			continue;
+		LIST_FOREACH(gp, &mp->geom, geom) {
+			LIST_FOREACH(pp, &gp->provider, provider) {
+				mp2->taste(mp2, pp, 0);
+				g_topology_assert();
+			}
+		}
+	}
+}
 
 void
 g_add_class(struct g_class *mp)
@@ -82,8 +104,8 @@ g_add_class(struct g_class *mp)
 	g_trace(G_T_TOPOLOGY, "g_add_class(%s)", mp->name);
 	LIST_INIT(&mp->geom);
 	LIST_INSERT_HEAD(&g_classes, mp, class);
-	if (g_nproviders > 0)
-		g_post_event(EV_NEW_CLASS, mp, NULL, NULL, NULL);
+	if (g_nproviders > 0 && mp->taste != NULL)
+		g_post_event(g_new_class_event, mp, M_WAITOK, mp, NULL);
 	g_topology_unlock();
 }
 
@@ -119,17 +141,55 @@ g_destroy_geom(struct g_geom *gp)
 
 	g_trace(G_T_TOPOLOGY, "g_destroy_geom(%p(%s))", gp, gp->name);
 	g_topology_assert();
-	KASSERT(gp->event == NULL, ("g_destroy_geom() with event"));
 	KASSERT(LIST_EMPTY(&gp->consumer),
 	    ("g_destroy_geom(%s) with consumer(s) [%p]",
 	    gp->name, LIST_FIRST(&gp->consumer)));
 	KASSERT(LIST_EMPTY(&gp->provider),
 	    ("g_destroy_geom(%s) with provider(s) [%p]",
 	    gp->name, LIST_FIRST(&gp->consumer)));
+	g_cancel_event(gp);
 	LIST_REMOVE(gp, geom);
 	TAILQ_REMOVE(&geoms, gp, geoms);
 	g_free(gp->name);
 	g_free(gp);
+}
+
+/*
+ * This function is called (repeatedly) until has withered away.
+ */
+void
+g_wither_geom(struct g_geom *gp, int error)
+{
+	struct g_provider *pp, *pp2;
+	struct g_consumer *cp, *cp2;
+	static int once_is_enough;
+
+	if (once_is_enough)
+		return;
+	once_is_enough = 1;
+	g_trace(G_T_TOPOLOGY, "g_wither_geom(%p(%s))", gp, gp->name);
+	g_topology_assert();
+	if (!(gp->flags & G_GEOM_WITHER)) {
+		gp->flags |= G_GEOM_WITHER;
+		LIST_FOREACH(pp, &gp->provider, provider)
+			g_orphan_provider(pp, error);
+	}
+	for (pp = LIST_FIRST(&gp->provider); pp != NULL; pp = pp2) {
+		pp2 = LIST_NEXT(pp, provider);
+		if (!LIST_EMPTY(&pp->consumers))
+			continue;
+		g_destroy_provider(pp);
+	}
+	for (cp = LIST_FIRST(&gp->consumer); cp != NULL; cp = cp2) {
+		cp2 = LIST_NEXT(cp, consumer);
+		if (cp->acr || cp->acw || cp->ace)
+			continue;
+		g_detach(cp);
+		g_destroy_consumer(cp);
+	}
+	if (LIST_EMPTY(&gp->provider) && LIST_EMPTY(&gp->consumer))
+		g_destroy_geom(gp);
+	once_is_enough = 0;
 }
 
 struct g_consumer *
@@ -145,6 +205,8 @@ g_new_consumer(struct g_geom *gp)
 	cp = g_malloc(sizeof *cp, M_WAITOK | M_ZERO);
 	cp->protect = 0x020016602;
 	cp->geom = gp;
+	cp->stat = devstat_new_entry(cp, -1, 0, DEVSTAT_ALL_SUPPORTED,
+	    DEVSTAT_TYPE_DIRECT, DEVSTAT_PRIORITY_MAX);
 	LIST_INSERT_HEAD(&gp->consumer, cp, consumer);
 	return(cp);
 }
@@ -152,17 +214,51 @@ g_new_consumer(struct g_geom *gp)
 void
 g_destroy_consumer(struct g_consumer *cp)
 {
+	struct g_geom *gp;
 
 	g_trace(G_T_TOPOLOGY, "g_destroy_consumer(%p)", cp);
 	g_topology_assert();
-	KASSERT(cp->event == NULL, ("g_destroy_consumer() with event"));
 	KASSERT (cp->provider == NULL, ("g_destroy_consumer but attached"));
 	KASSERT (cp->acr == 0, ("g_destroy_consumer with acr"));
 	KASSERT (cp->acw == 0, ("g_destroy_consumer with acw"));
 	KASSERT (cp->ace == 0, ("g_destroy_consumer with ace"));
+	g_cancel_event(cp);
+	gp = cp->geom;
 	LIST_REMOVE(cp, consumer);
+	devstat_remove_entry(cp->stat);
 	g_free(cp);
+	if (gp->flags & G_GEOM_WITHER)
+		g_wither_geom(gp, 0);
 }
+
+static void
+g_new_provider_event(void *arg, int flag)
+{
+	struct g_class *mp;
+	struct g_provider *pp;
+	struct g_consumer *cp;
+	int i;
+
+	g_topology_assert();
+	if (flag == EV_CANCEL)
+		return;
+	if (g_shutdown)
+		return;
+	pp = arg;
+	LIST_FOREACH(mp, &g_classes, class) {
+		if (mp->taste == NULL)
+			continue;
+		i = 1;
+		LIST_FOREACH(cp, &pp->consumers, consumers)
+			if (cp->geom->class == mp)
+				i = 0;
+		if (!i)
+			continue;
+		mp->taste(mp, pp, 0);
+		g_topology_assert();
+	}
+}
+
 
 struct g_provider *
 g_new_providerf(struct g_geom *gp, const char *fmt, ...)
@@ -184,9 +280,11 @@ g_new_providerf(struct g_geom *gp, const char *fmt, ...)
 	LIST_INIT(&pp->consumers);
 	pp->error = ENXIO;
 	pp->geom = gp;
+	pp->stat = devstat_new_entry(pp, -1, 0, DEVSTAT_ALL_SUPPORTED,
+	    DEVSTAT_TYPE_DIRECT, DEVSTAT_PRIORITY_MAX);
 	LIST_INSERT_HEAD(&gp->provider, pp, provider);
 	g_nproviders++;
-	g_post_event(EV_NEW_PROVIDER, NULL, NULL, pp, NULL);
+	g_post_event(g_new_provider_event, pp, M_WAITOK, pp, NULL);
 	return (pp);
 }
 
@@ -202,31 +300,21 @@ void
 g_destroy_provider(struct g_provider *pp)
 {
 	struct g_geom *gp;
-	struct g_consumer *cp;
 
 	g_topology_assert();
-	KASSERT(pp->event == NULL, ("g_destroy_provider() with event"));
 	KASSERT(LIST_EMPTY(&pp->consumers),
 	    ("g_destroy_provider but attached"));
 	KASSERT (pp->acr == 0, ("g_destroy_provider with acr"));
 	KASSERT (pp->acw == 0, ("g_destroy_provider with acw"));
 	KASSERT (pp->acw == 0, ("g_destroy_provider with ace"));
+	g_cancel_event(pp);
 	g_nproviders--;
 	LIST_REMOVE(pp, provider);
 	gp = pp->geom;
+	devstat_remove_entry(pp->stat);
 	g_free(pp);
-	if (!(gp->flags & G_GEOM_WITHER))
-		return;
-	if (!LIST_EMPTY(&gp->provider))
-		return;
-	for (;;) {
-		cp = LIST_FIRST(&gp->consumer);
-		if (cp == NULL)
-			break;
-		g_detach(cp);
-		g_destroy_consumer(cp);
-	}
-	g_destroy_geom(gp);
+	if ((gp->flags & G_GEOM_WITHER))
+		g_wither_geom(gp, 0);
 }
 
 /*
@@ -327,14 +415,13 @@ g_detach(struct g_consumer *cp)
 	KASSERT(cp->acr == 0, ("detach but nonzero acr"));
 	KASSERT(cp->acw == 0, ("detach but nonzero acw"));
 	KASSERT(cp->ace == 0, ("detach but nonzero ace"));
-	KASSERT(cp->biocount == 0, ("detach but nonzero biocount"));
+	KASSERT(cp->nstart == cp->nend,
+	    ("detach with active requests"));
 	pp = cp->provider;
 	LIST_REMOVE(cp, consumers);
 	cp->provider = NULL;
-	if (LIST_EMPTY(&pp->consumers)) {
-		if (pp->geom->flags & G_GEOM_WITHER)
-			g_destroy_provider(pp);
-	}
+	if (pp->geom->flags & G_GEOM_WITHER)
+		g_wither_geom(pp->geom, 0);
 	redo_rank(cp->geom);
 }
 
@@ -388,13 +475,9 @@ g_access_rel(struct g_consumer *cp, int dcr, int dcw, int dce)
 	 * now rather than having to unravel this later.
 	 */
 	if (cp->geom->spoiled != NULL && cp->spoiled) {
-		KASSERT(dcr >= 0, ("spoiled but dcr = %d", dcr));
-		KASSERT(dcw >= 0, ("spoiled but dce = %d", dcw));
-		KASSERT(dce >= 0, ("spoiled but dcw = %d", dce));
-		KASSERT(cp->acr == 0, ("spoiled but cp->acr = %d", cp->acr));
-		KASSERT(cp->acw == 0, ("spoiled but cp->acw = %d", cp->acw));
-		KASSERT(cp->ace == 0, ("spoiled but cp->ace = %d", cp->ace));
-		return(ENXIO);
+		KASSERT(dcr <= 0, ("spoiled but dcr = %d", dcr));
+		KASSERT(dcw <= 0, ("spoiled but dce = %d", dcw));
+		KASSERT(dce <= 0, ("spoiled but dcw = %d", dce));
 	}
 
 	/*
@@ -412,30 +495,34 @@ g_access_rel(struct g_consumer *cp, int dcr, int dcw, int dce)
 	    pp->acr, pp->acw, pp->ace,
 	    pp, pp->name);
 
+	/* If foot-shooting is enabled, any open on rank#1 is OK */
+	if ((g_debugflags & 16) && pp->geom->rank == 1)
+		;
 	/* If we try exclusive but already write: fail */
-	if (dce > 0 && pw > 0)
+	else if (dce > 0 && pw > 0)
 		return (EPERM);
 	/* If we try write but already exclusive: fail */
-	if (dcw > 0 && pe > 0)
+	else if (dcw > 0 && pe > 0)
 		return (EPERM);
 	/* If we try to open more but provider is error'ed: fail */
-	if ((dcr > 0 || dcw > 0 || dce > 0) && pp->error != 0)
+	else if ((dcr > 0 || dcw > 0 || dce > 0) && pp->error != 0)
 		return (pp->error);
 
 	/* Ok then... */
 
-	/*
-	 * If we open first write, spoil any partner consumers.
-	 * If we close last write, trigger re-taste.
-	 */
-	if (pp->acw == 0 && dcw != 0)
-		g_spoil(pp, cp);
-	else if (pp->acw != 0 && pp->acw == -dcw && 
-	    !(pp->geom->flags & G_GEOM_WITHER))
-		g_post_event(EV_NEW_PROVIDER, NULL, NULL, pp, NULL);
-
 	error = pp->geom->access(pp, dcr, dcw, dce);
 	if (!error) {
+		/*
+		 * If we open first write, spoil any partner consumers.
+		 * If we close last write, trigger re-taste.
+		 */
+		if (pp->acw == 0 && dcw != 0)
+			g_spoil(pp, cp);
+		else if (pp->acw != 0 && pp->acw == -dcw && 
+		    !(pp->geom->flags & G_GEOM_WITHER))
+			g_post_event(g_new_provider_event, pp, M_WAITOK, 
+			    pp, NULL);
+
 		pp->acr += dcr;
 		pp->acw += dcw;
 		pp->ace += dce;
@@ -459,7 +546,6 @@ g_handleattr_off_t(struct bio *bp, const char *attribute, off_t val)
 
 	return (g_handleattr(bp, attribute, &val, sizeof val));
 }
-
 
 int
 g_handleattr(struct bio *bp, const char *attribute, void *val, int len)
@@ -494,13 +580,13 @@ g_std_done(struct bio *bp)
 {
 	struct bio *bp2;
 
-	bp2 = bp->bio_linkage;
+	bp2 = bp->bio_parent;
 	if (bp2->bio_error == 0)
 		bp2->bio_error = bp->bio_error;
 	bp2->bio_completed += bp->bio_completed;
 	g_destroy_bio(bp);
-	bp2->bio_children--;	/* XXX: atomic ? */
-	if (bp2->bio_children == 0)
+	bp2->bio_inbed++;
+	if (bp2->bio_children == bp2->bio_inbed)
 		g_io_deliver(bp2, bp2->bio_error);
 }
 
@@ -536,6 +622,28 @@ g_std_spoiled(struct g_consumer *cp)
  * are open, regardless of mode, this ends up DTRT.
  */
 
+static void
+g_spoil_event(void *arg, int flag)
+{
+	struct g_provider *pp;
+	struct g_consumer *cp, *cp2;
+
+	g_topology_assert();
+	if (flag == EV_CANCEL)
+		return;
+	pp = arg;
+	for (cp = LIST_FIRST(&pp->consumers); cp != NULL; cp = cp2) {
+		cp2 = LIST_NEXT(cp, consumers);
+		if (!cp->spoiled)
+			continue;
+		cp->spoiled = 0;
+		if (cp->geom->spoiled == NULL)
+			continue;
+		cp->geom->spoiled(cp);
+		g_topology_assert();
+	}
+}
+
 void
 g_spoil(struct g_provider *pp, struct g_consumer *cp)
 {
@@ -543,8 +651,6 @@ g_spoil(struct g_provider *pp, struct g_consumer *cp)
 
 	g_topology_assert();
 
-	if (!strcmp(pp->name, "geom.ctl"))
-		return;
 	LIST_FOREACH(cp2, &pp->consumers, consumers) {
 		if (cp2 == cp)
 			continue;
@@ -555,58 +661,7 @@ g_spoil(struct g_provider *pp, struct g_consumer *cp)
 		KASSERT(cp2->ace == 0, ("spoiling cp->ace = %d", cp2->ace));
 		cp2->spoiled++;
 	}
-	g_post_event(EV_SPOILED, NULL, NULL, pp, cp);
-}
-
-static struct g_class *
-g_class_by_name(const char *name)
-{
-	struct g_class *mp;
-
-	g_trace(G_T_TOPOLOGY, "g_class_by_name(%s)", name);
-	g_topology_assert();
-	LIST_FOREACH(mp, &g_classes, class)
-		if (!strcmp(mp->name, name))
-			return (mp);
-	return (NULL);
-}
-
-struct g_geom *
-g_insert_geom(const char *class, struct g_consumer *cp)
-{
-	struct g_class *mp;
-	struct g_geom *gp;
-	struct g_provider *pp, *pp2;
-	struct g_consumer *cp2;
-	int error;
-
-	g_trace(G_T_TOPOLOGY, "g_insert_geomf(%s, %p)", class, cp);
-	g_topology_assert();
-	KASSERT(cp->provider != NULL, ("g_insert_geomf but not attached"));
-	/* XXX: check for events ?? */
-	mp = g_class_by_name(class);
-	if (mp == NULL)
-		return (NULL);
-	if (mp->config == NULL)
-		return (NULL);
-	pp = cp->provider;
-	gp = mp->taste(mp, pp, G_TF_TRANSPARENT);
-	if (gp == NULL)
-		return (NULL);
-	pp2 = LIST_FIRST(&gp->provider);
-	cp2 = LIST_FIRST(&gp->consumer);
-	cp2->acr += pp->acr;
-	cp2->acw += pp->acw;
-	cp2->ace += pp->ace;
-	pp2->acr += pp->acr;
-	pp2->acw += pp->acw;
-	pp2->ace += pp->ace;
-	LIST_REMOVE(cp, consumers);
-	LIST_INSERT_HEAD(&pp2->consumers, cp, consumers);
-	cp->provider = pp2;
-	error = redo_rank(gp);
-	KASSERT(error == 0, ("redo_rank failed in g_insert_geom"));
-	return (gp);
+	g_post_event(g_spoil_event, pp, M_WAITOK, pp, NULL);
 }
 
 int
@@ -662,88 +717,3 @@ g_sanity(void *ptr)
 	}
 }
 
-#ifdef _KERNEL
-struct g_class *
-g_idclass(struct geomidorname *p)
-{
-	struct g_class *mp;
-	char *n;
-
-	if (p->len == 0) {
-		LIST_FOREACH(mp, &g_classes, class)
-			if ((uintptr_t)mp == p->u.id)
-				return (mp);
-		return (NULL);
-	}
-	n = g_malloc(p->len + 1, M_WAITOK);
-	if (copyin(p->u.name, n, p->len) == 0) {
-		n[p->len] = '\0';
-		LIST_FOREACH(mp, &g_classes, class)
-			if (!bcmp(n, mp->name, p->len + 1)) {
-				g_free(n);
-				return (mp);
-			}
-	}
-	g_free(n);
-	return (NULL);
-}
-
-struct g_geom *
-g_idgeom(struct geomidorname *p)
-{
-	struct g_class *mp;
-	struct g_geom *gp;
-	char *n;
-
-	if (p->len == 0) {
-		LIST_FOREACH(mp, &g_classes, class)
-			LIST_FOREACH(gp, &mp->geom, geom)
-				if ((uintptr_t)gp == p->u.id)
-					return (gp);
-		return (NULL);
-	}
-	n = g_malloc(p->len + 1, M_WAITOK);
-	if (copyin(p->u.name, n, p->len) == 0) {
-		n[p->len] = '\0';
-		LIST_FOREACH(mp, &g_classes, class)
-			LIST_FOREACH(gp, &mp->geom, geom)
-				if (!bcmp(n, gp->name, p->len + 1)) {
-					g_free(n);
-					return (gp);
-				}
-	}
-	g_free(n);
-	return (NULL);
-}
-
-struct g_provider *
-g_idprovider(struct geomidorname *p)
-{
-	struct g_class *mp;
-	struct g_geom *gp;
-	struct g_provider *pp;
-	char *n;
-
-	if (p->len == 0) {
-		LIST_FOREACH(mp, &g_classes, class)
-			LIST_FOREACH(gp, &mp->geom, geom)
-				LIST_FOREACH(pp, &gp->provider, provider)
-					if ((uintptr_t)pp == p->u.id)
-						return (pp);
-		return (NULL);
-	}
-	n = g_malloc(p->len + 1, M_WAITOK);
-	if (copyin(p->u.name, n, p->len) == 0) {
-		n[p->len] = '\0';
-		LIST_FOREACH(mp, &g_classes, class)
-			LIST_FOREACH(gp, &mp->geom, geom)
-				LIST_FOREACH(pp, &gp->provider, provider)
-					if (!bcmp(n, pp->name, p->len + 1)) {
-						g_free(n);
-						return (pp);
-					}
-	}
-	g_free(n);
-	return (NULL);
-}
-#endif /* _KERNEL */

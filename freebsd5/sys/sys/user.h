@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)user.h	8.2 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/sys/user.h,v 1.51 2002/10/15 00:02:50 peter Exp $
+ * $FreeBSD: src/sys/sys/user.h,v 1.53 2003/05/13 20:36:02 jhb Exp $
  */
 
 #ifndef _SYS_USER_H_
@@ -74,7 +74,8 @@
  * to initialize it in two places: kern/kern_proc.c in the function
  * fill_kinfo_proc and in lib/libkvm/kvm_proc.c in the function kvm_proclist.
  */
-#if defined(__alpha__) || defined(__ia64__) || defined(__sparc64__)
+#if defined(__alpha__) || defined(__ia64__) || defined(__sparc64__) || \
+    defined(__amd64__)
 #define	KINFO_PROC_SIZE	912		/* the correct size for kinfo_proc */
 #endif
 #ifdef	__i386__
@@ -173,7 +174,6 @@ void fill_kinfo_proc(struct proc *, struct kinfo_proc *);
  * when the process isn't running (esp. when swapped out).
  */
 struct user {
-	struct	sigacts u_sigacts;	/* *p_sigacts */
 	struct	pstats u_stats;		/* *p_stats */
 	/*
 	 * Remaining field for a.out core dumps - not valid at other times!

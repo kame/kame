@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/syscons_pc98.c,v 1.17 2002/10/22 15:22:49 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/syscons_pc98.c,v 1.18 2003/01/15 13:12:12 nyan Exp $
  */
 
 #include "opt_syscons.h"
@@ -35,6 +35,7 @@
 #include <sys/bus.h>
 #include <sys/cons.h>
 #include <sys/consio.h>
+#include <sys/sysctl.h>
 
 #include <machine/clock.h>
 
@@ -50,6 +51,17 @@
 static devclass_t	sc_devclass;
 
 static sc_softc_t main_softc;
+#ifdef SC_NO_SUSPEND_VTYSWITCH
+static int sc_no_suspend_vtswitch = 1;
+#else
+static int sc_no_suspend_vtswitch = 0;
+#endif
+static int sc_cur_scr;
+
+TUNABLE_INT("hw.syscons.sc_no_suspend_vtswitch", (int *)&sc_no_suspend_vtswitch);
+SYSCTL_DECL(_hw_syscons);
+SYSCTL_INT(_hw_syscons, OID_AUTO, sc_no_suspend_vtswitch, CTLFLAG_RW,
+	&sc_no_suspend_vtswitch, 0, "Disable VT switch before suspend.");
 
 static void
 scidentify (driver_t *driver, device_t parent)
@@ -74,20 +86,19 @@ scattach(device_t dev)
 	return sc_attach_unit(device_get_unit(dev), device_get_flags(dev));
 }
 
-#ifndef SC_NO_SUSPEND_VTYSWITCH
-static int	sc_cur_scr;
-#endif
-
 static int
 scsuspend(device_t dev)
 {
-#ifndef SC_NO_SUSPEND_VTYSWITCH
 	int		retry = 10;
 	static int	dummy;
 	sc_softc_t	*sc;
 
 	sc = &main_softc;
 	sc_cur_scr = sc->cur_scp->index;
+
+	if (sc_no_suspend_vtswitch)
+		return (0);
+
 	do {
 		sc_switch_scr(sc, 0);
 		if (!sc->switch_in_progress) {
@@ -96,20 +107,20 @@ scsuspend(device_t dev)
 		tsleep(&dummy, 0, "scsuspend", 100);
 	} while (retry--);
 
-#endif
 	return (0);
 }
 
 static int
 scresume(device_t dev)
 {
-#ifndef SC_NO_SUSPEND_VTYSWITCH
 	sc_softc_t	*sc;
+
+	if (sc_no_suspend_vtswitch)
+		return (0);
 
 	sc = &main_softc;
 	sc_switch_scr(sc, sc_cur_scr);
 
-#endif
 	return (0);
 }
 

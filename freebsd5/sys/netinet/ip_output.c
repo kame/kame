@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.172 2002/11/20 18:56:25 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.188 2003/04/29 21:36:18 mdodd Exp $
  */
 
 #include "opt_ipfw.h"
@@ -42,6 +42,7 @@
 #include "opt_mac.h"
 #include "opt_pfil_hooks.h"
 #include "opt_random_ip_id.h"
+#include "opt_mbuf_stress_test.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,6 +53,7 @@
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -93,6 +95,12 @@ static MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 				  (ntohl(a.s_addr))&0xFF, y);
 
 u_short ip_id;
+
+#ifdef MBUF_STRESS_TEST
+int mbuf_frag_size = 0;
+SYSCTL_INT(_net_inet_ip, OID_AUTO, mbuf_frag_size, CTLFLAG_RW,
+	&mbuf_frag_size, 0, "Fragment outgoing mbufs to this size");
+#endif
 
 static struct mbuf *ip_insertoptions(struct mbuf *, struct mbuf *, int *);
 static struct ifnet *ip_multicast_if(struct in_addr *, int *);
@@ -136,7 +144,6 @@ ip_output(m0, opt, ro, flags, imo, inp)
 #ifdef IPSEC
 	struct route iproute;
 	struct secpolicy *sp = NULL;
-	struct socket *so = inp ? inp->inp_socket : NULL;
 #endif
 #ifdef FAST_IPSEC
 	struct route iproute;
@@ -192,7 +199,7 @@ ip_output(m0, opt, ro, flags, imo, inp)
 	}
 	m = m0;
 
-	KASSERT(!m || (m->m_flags & M_PKTHDR) != 0, ("ip_output: no HDR"));
+	M_ASSERTPKTHDR(m);
 #ifndef FAST_IPSEC
 	KASSERT(ro != NULL, ("ip_output: no route, proto %d",
 	    mtod(m, struct ip *)->ip_p));
@@ -470,10 +477,10 @@ ip_output(m0, opt, ro, flags, imo, inp)
 sendit:
 #ifdef IPSEC
 	/* get SP for this packet */
-	if (so == NULL)
+	if (inp == NULL)
 		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, flags, &error);
 	else
-		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
+		sp = ipsec4_getpolicybypcb(m, IPSEC_DIR_OUTBOUND, inp, &error);
 
 	if (sp == NULL) {
 		ipsecstat.out_inval++;
@@ -669,6 +676,15 @@ skip_ipsec:
 
 		/* NB: callee frees mbuf */
 		error = ipsec4_process_packet(m, sp->req, flags, 0);
+		/*
+		 * Preserve KAME behaviour: ENOENT can be returned
+		 * when an SA acquire is in progress.  Don't propagate
+		 * this to user-level; it confuses applications.
+		 *
+		 * XXX this will go away when the SADB is redone.
+		 */
+		if (error == ENOENT)
+			error = 0;
 		splx(s);
 		goto done;
 	} else {
@@ -874,7 +890,7 @@ spd_done:
 			 * initiated packets) If we used the loopback inteface,
 			 * we would not be able to control what happens 
 			 * as the packet runs through ip_input() as
-			 * it is done through a ISR.
+			 * it is done through an ISR.
 			 */
 			LIST_FOREACH(ia,
 			    INADDR_HASH(dst->sin_addr.s_addr), ia_hash) {
@@ -1004,6 +1020,26 @@ pass:
 		ipsec_delaux(m);
 #endif
 
+#ifdef MBUF_STRESS_TEST
+		if (mbuf_frag_size && m->m_pkthdr.len > mbuf_frag_size) {
+			struct mbuf *m1, *m2;
+			int length, tmp;
+
+			tmp = length = m->m_pkthdr.len;
+
+			while ((length -= mbuf_frag_size) >= 1) {
+				m1 = m_split(m, length, M_DONTWAIT);
+				if (m1 == NULL)
+					break;
+				m1->m_flags &= ~M_PKTHDR;
+				m2 = m;
+				while (m2->m_next != NULL)
+					m2 = m2->m_next;
+				m2->m_next = m1;
+			}
+			m->m_pkthdr.len = tmp;
+		}
+#endif
 		error = (*ifp->if_output)(ifp, m,
 				(struct sockaddr *)dst, ro->ro_rt);
 		goto done;
@@ -1281,12 +1317,12 @@ ip_insertoptions(m, opt, phlen)
 		m = n;
 		m->m_len = optlen + sizeof(struct ip);
 		m->m_data += max_linkhdr;
-		(void)memcpy(mtod(m, void *), ip, sizeof(struct ip));
+		bcopy(ip, mtod(m, void *), sizeof(struct ip));
 	} else {
 		m->m_data -= optlen;
 		m->m_len += optlen;
 		m->m_pkthdr.len += optlen;
-		ovbcopy((caddr_t)ip, mtod(m, caddr_t), sizeof(struct ip));
+		bcopy(ip, mtod(m, void *), sizeof(struct ip));
 	}
 	ip = mtod(m, struct ip *);
 	bcopy(p->ipopt_list, ip + 1, optlen);
@@ -1388,6 +1424,7 @@ ip_ctloutput(so, sopt)
 		case IP_RECVOPTS:
 		case IP_RECVRETOPTS:
 		case IP_RECVDSTADDR:
+		case IP_RECVTTL:
 		case IP_RECVIF:
 		case IP_FAITH:
 			error = sooptcopyin(sopt, &optval, sizeof optval,
@@ -1419,6 +1456,10 @@ ip_ctloutput(so, sopt)
 
 			case IP_RECVDSTADDR:
 				OPTSET(INP_RECVDSTADDR);
+				break;
+
+			case IP_RECVTTL:
+				OPTSET(INP_RECVTTL);
 				break;
 
 			case IP_RECVIF:
@@ -1517,6 +1558,7 @@ ip_ctloutput(so, sopt)
 		case IP_RECVOPTS:
 		case IP_RECVRETOPTS:
 		case IP_RECVDSTADDR:
+		case IP_RECVTTL:
 		case IP_RECVIF:
 		case IP_PORTRANGE:
 		case IP_FAITH:
@@ -1542,6 +1584,10 @@ ip_ctloutput(so, sopt)
 
 			case IP_RECVDSTADDR:
 				optval = OPTBIT(INP_RECVDSTADDR);
+				break;
+
+			case IP_RECVTTL:
+				optval = OPTBIT(INP_RECVTTL);
 				break;
 
 			case IP_RECVIF:
@@ -1642,8 +1688,8 @@ ip_pcbopts(optname, pcbopt, m)
 	cnt = m->m_len;
 	m->m_len += sizeof(struct in_addr);
 	cp = mtod(m, u_char *) + sizeof(struct in_addr);
-	ovbcopy(mtod(m, caddr_t), (caddr_t)cp, (unsigned)cnt);
-	bzero(mtod(m, caddr_t), sizeof(struct in_addr));
+	bcopy(mtod(m, void *), cp, (unsigned)cnt);
+	bzero(mtod(m, void *), sizeof(struct in_addr));
 
 	for (; cnt > 0; cnt -= optlen, cp += optlen) {
 		opt = cp[IPOPT_OPTVAL];
@@ -1688,9 +1734,8 @@ ip_pcbopts(optname, pcbopt, m)
 			 * Then copy rest of options back
 			 * to close up the deleted entry.
 			 */
-			ovbcopy((caddr_t)(&cp[IPOPT_OFFSET+1] +
-			    sizeof(struct in_addr)),
-			    (caddr_t)&cp[IPOPT_OFFSET+1],
+			bcopy((&cp[IPOPT_OFFSET+1] + sizeof(struct in_addr)),
+			    &cp[IPOPT_OFFSET+1],
 			    (unsigned)cnt + sizeof(struct in_addr));
 			break;
 		}

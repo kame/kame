@@ -27,7 +27,7 @@
  *	i4b_ipr.c - isdn4bsd IP over raw HDLC ISDN network driver
  *	---------------------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/driver/i4b_ipr.c,v 1.20 2002/11/15 00:00:14 sam Exp $
+ * $FreeBSD: src/sys/i4b/driver/i4b_ipr.c,v 1.23 2003/03/04 23:19:54 jlemon Exp $
  *
  *	last edit-date: [Sun Mar 17 09:32:58 2002]
  *
@@ -879,7 +879,7 @@ error:
 		BPF_MTAP(&sc->sc_if, &mm);
 	}
 
-	if(! IF_HANDOFF(&ipintrq, m, NULL))
+	if(! netisr_queue(NETISR_IP, m))
 	{
 		NDBGL4(L4_IPRDBG, "ipr%d: ipintrq full!", unit);
 		sc->sc_if.if_ierrors++;

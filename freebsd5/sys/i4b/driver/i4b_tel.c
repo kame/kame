@@ -27,7 +27,7 @@
  *	i4b_tel.c - device driver for ISDN telephony
  *	--------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/driver/i4b_tel.c,v 1.24 2002/09/02 00:52:06 brooks Exp $
+ * $FreeBSD: src/sys/i4b/driver/i4b_tel.c,v 1.27 2003/03/03 12:15:50 phk Exp $
  *
  *	last edit-date: [Tue Aug 27 13:54:08 2002]
  *
@@ -48,10 +48,6 @@
 #include <sys/socket.h>
 #include <net/if.h>
 #include <sys/tty.h>
-
-#ifdef DEVFS
-#include <sys/devfsext.h>
-#endif
 
 #include <machine/i4b_ioctl.h>
 #include <machine/i4b_tel_ioctl.h>
@@ -140,22 +136,16 @@ static d_poll_t i4btelpoll;
 #define CDEV_MAJOR 56
 
 static struct cdevsw i4btel_cdevsw = {
-	/* open */      i4btelopen,
-	/* close */     i4btelclose,
-	/* read */      i4btelread,
-	/* write */     i4btelwrite,
-	/* ioctl */     i4btelioctl,
-	/* poll */      i4btelpoll,
-	/* mmap */      nommap,
-	/* strategy */  nostrategy,
-	/* name */      "i4btel",
-	/* maj */       CDEV_MAJOR,
-	/* dump */      nodump,
-	/* psize */     nopsize,
-	/* flags */     0,
+	.d_open =	i4btelopen,
+	.d_close =	i4btelclose,
+	.d_read =	i4btelread,
+	.d_write =	i4btelwrite,
+	.d_ioctl =	i4btelioctl,
+	.d_poll =	i4btelpoll,
+	.d_name =	"i4btel",
+	.d_maj =	CDEV_MAJOR,
 };
 
-static void i4btelinit(void *unused);
 static void i4btelattach(void *);
 
 PSEUDO_SET(i4btelattach, i4b_tel);
@@ -163,18 +153,6 @@ PSEUDO_SET(i4btelattach, i4b_tel);
 /*===========================================================================*
  *			DEVICE DRIVER ROUTINES
  *===========================================================================*/
-
-/*---------------------------------------------------------------------------*
- *	initialization at kernel load time
- *---------------------------------------------------------------------------*/
-static void
-i4btelinit(void *unused)
-{
-	cdevsw_add(&i4btel_cdevsw);
-}
-
-SYSINIT(i4bteldev, SI_SUB_DRIVERS,
-	SI_ORDER_MIDDLE+CDEV_MAJOR, &i4btelinit, NULL);
 
 /*---------------------------------------------------------------------------*
  *	interface attach routine
@@ -271,7 +249,7 @@ i4btelclose(dev_t dev, int flag, int fmt, struct thread *td)
 		{
 			sc->devstate |= ST_WRWAITEMPTY;
 	
-			if((error = tsleep((caddr_t) &sc->isdn_linktab->tx_queue,
+			if((error = tsleep( &sc->isdn_linktab->tx_queue,
 					TTIPRI | PCATCH, "wtcl", 0)) != 0)
 			{
 				break;
@@ -282,7 +260,7 @@ i4btelclose(dev_t dev, int flag, int fmt, struct thread *td)
 
 	sc->devstate &= ~ST_ISOPEN;		
 	splx(x);
-	wakeup((caddr_t) &sc->tones);
+	wakeup( &sc->tones);
 
 	return(error);
 }
@@ -368,7 +346,7 @@ i4btelioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 				s = splimp();
 				while ((sc->devstate & ST_TONE) && 
 				    sc->tones.duration[sc->toneidx] != 0) {
-					if((error = tsleep((caddr_t) &sc->tones,
+					if((error = tsleep( &sc->tones,
 					    TTIPRI | PCATCH, "rtone", 0 )) != 0) {
 					    	splx(s);
 						return(error);
@@ -440,7 +418,7 @@ i4btelread(dev_t dev, struct uio *uio, int ioflag)
 
 			NDBGL4(L4_TELDBG, "i4btel%d, queue empty!", unit);
 
-			if((error = msleep((caddr_t) &sc->isdn_linktab->rx_queue,
+			if((error = msleep( &sc->isdn_linktab->rx_queue,
 					&sc->isdn_linktab->rx_queue->ifq_mtx,
 					TTIPRI | PCATCH,
 					"rtel", 0 )) != 0)
@@ -507,7 +485,7 @@ i4btelread(dev_t dev, struct uio *uio, int ioflag)
 	
 			NDBGL4(L4_TELDBG, "i4btel%d, wait for result!", unit);
 			
-			if((error = tsleep((caddr_t) &sc->result,
+			if((error = tsleep( &sc->result,
 						TTIPRI | PCATCH,
 						"rtel1", 0 )) != 0)
 			{
@@ -576,7 +554,7 @@ i4btelwrite(dev_t dev, struct uio * uio, int ioflag)
 		{
 			sc->devstate |= ST_WRWAITEMPTY;
 
-			if((error = msleep((caddr_t) &sc->isdn_linktab->tx_queue,
+			if((error = msleep( &sc->isdn_linktab->tx_queue,
 					&sc->isdn_linktab->tx_queue->ifq_mtx,
 					TTIPRI | PCATCH, "wtel", 0)) != 0)
 			{
@@ -687,7 +665,7 @@ tel_tone(tel_sc_t *sc)
 					sc->tonefreq = sc->tones.frequency[sc->toneidx];
 				}
 				if (sc->tones.duration[sc->toneidx] == 0) {
-					wakeup((caddr_t) &sc->tones);
+					wakeup( &sc->tones);
 				}
 			}
 		}
@@ -812,7 +790,7 @@ tel_connect(int unit, void *cdp)
 		if(sc->devstate & ST_RDWAITDATA)
 		{
 			sc->devstate &= ~ST_RDWAITDATA;
-			wakeup((caddr_t) &sc->result);
+			wakeup( &sc->result);
 		}
 		selwakeup(&sc->selp);
 	}
@@ -835,13 +813,13 @@ tel_disconnect(int unit, void *cdp)
 	if(sc->devstate & ST_RDWAITDATA)
 	{
 		sc->devstate &= ~ST_RDWAITDATA;
-		wakeup((caddr_t) &sc->isdn_linktab->rx_queue);
+		wakeup( &sc->isdn_linktab->rx_queue);
 	}
 
 	if(sc->devstate & ST_WRWAITEMPTY)
 	{
 		sc->devstate &= ~ST_WRWAITEMPTY;
-		wakeup((caddr_t) &sc->isdn_linktab->tx_queue);
+		wakeup( &sc->isdn_linktab->tx_queue);
 	}
 
 	/* dialer device */
@@ -856,13 +834,13 @@ tel_disconnect(int unit, void *cdp)
 		if(sc->devstate & ST_RDWAITDATA)
 		{
 			sc->devstate &= ~ST_RDWAITDATA;
-			wakeup((caddr_t) &sc->result);
+			wakeup( &sc->result);
 		}
 		selwakeup(&sc->selp);
 
 		if (sc->devstate & ST_TONE) {
 			sc->devstate &= ~ST_TONE;
-			wakeup((caddr_t) &sc->tones);
+			wakeup( &sc->tones);
 		}
 	}
 }
@@ -885,7 +863,7 @@ tel_dialresponse(int unit, int status, cause_t cause)
 		if(sc->devstate & ST_RDWAITDATA)
 		{
 			sc->devstate &= ~ST_RDWAITDATA;
-			wakeup((caddr_t) &sc->result);
+			wakeup( &sc->result);
 		}
 		selwakeup(&sc->selp);
 	}
@@ -912,7 +890,7 @@ tel_rx_data_rdy(int unit)
 	if(sc->devstate & ST_RDWAITDATA)
 	{
 		sc->devstate &= ~ST_RDWAITDATA;
-		wakeup((caddr_t) &sc->isdn_linktab->rx_queue);
+		wakeup( &sc->isdn_linktab->rx_queue);
 	}
 	selwakeup(&sc->selp);
 }
@@ -930,7 +908,7 @@ tel_tx_queue_empty(int unit)
 	if(sc->devstate & ST_WRWAITEMPTY)
 	{
 		sc->devstate &= ~ST_WRWAITEMPTY;
-		wakeup((caddr_t) &sc->isdn_linktab->tx_queue);
+		wakeup( &sc->isdn_linktab->tx_queue);
 	}
 	if(sc->devstate & ST_TONE) {
 		tel_tone(sc);

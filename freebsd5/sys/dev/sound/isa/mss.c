@@ -29,17 +29,18 @@
 
 #include <dev/sound/pcm/sound.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.79 2002/11/26 18:16:25 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.84 2003/02/07 14:05:33 nyan Exp $");
 
 /* board-specific include files */
 #include <dev/sound/isa/mss.h>
 #include <dev/sound/isa/sb.h>
 #include <dev/sound/chip.h>
 
+#include <isa/isavar.h>
+
 #include "mixer_if.h"
 
 #define MSS_DEFAULT_BUFSZ (4096)
-#define	abs(x)	(((x) < 0) ? -(x) : (x))
 #define MSS_INDEXED_REGS 0x20
 #define OPL_INDEXED_REGS 0x19
 
@@ -158,6 +159,7 @@ static struct pcmchan_caps opti931_caps = {4000, 48000, opti931_fmt, 0};
 #define MD_AD1848	0x91
 #define MD_AD1845	0x92
 #define MD_CS42XX	0xA1
+#define MD_CS423X	0xA2
 #define MD_OPTI930	0xB0
 #define	MD_OPTI931	0xB1
 #define MD_OPTI925	0xB2
@@ -198,9 +200,9 @@ static void
 port_wr(struct resource *port, int off, u_int8_t data)
 {
 	if (port)
-		return bus_space_write_1(rman_get_bustag(port),
-					 rman_get_bushandle(port),
-					 off, data);
+		bus_space_write_1(rman_get_bustag(port),
+				  rman_get_bushandle(port),
+				  off, data);
 }
 
 static int
@@ -214,7 +216,7 @@ static void
 io_wr(struct mss_info *mss, int reg, u_int8_t data)
 {
 	if (mss->bd_flags & BD_F_MSS_OFFSET) reg -= 4;
-	return port_wr(mss->io_base, reg, data);
+	port_wr(mss->io_base, reg, data);
 }
 
 static void
@@ -1127,7 +1129,7 @@ msschan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 	ch->buffer = b;
 	ch->dir = dir;
 	if (sndbuf_alloc(ch->buffer, mss->parent_dmat, mss->bufsize) == -1) return NULL;
-	sndbuf_isadmasetup(ch->buffer, (dir == PCMDIR_PLAY)? mss->drq1 : mss->drq2);
+	sndbuf_dmasetup(ch->buffer, (dir == PCMDIR_PLAY)? mss->drq1 : mss->drq2);
 	return ch;
 }
 
@@ -1177,7 +1179,7 @@ msschan_trigger(kobj_t obj, void *data, int go)
 	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
 		return 0;
 
-	sndbuf_isadma(ch->buffer, go);
+	sndbuf_dma(ch->buffer, go);
 	mss_lock(mss);
 	mss_trigger(ch, go);
 	mss_unlock(mss);
@@ -1188,7 +1190,7 @@ static int
 msschan_getptr(kobj_t obj, void *data)
 {
 	struct mss_chinfo *ch = data;
-	return sndbuf_isadmaptr(ch->buffer);
+	return sndbuf_dmaptr(ch->buffer);
 }
 
 static struct pcmchan_caps *
@@ -1376,7 +1378,7 @@ mss_detect(device_t dev, struct mss_info *mss)
 		if ((tmp = io_rd(mss, MSS_INDEX)) & MSS_IDXBUSY) DELAY(10000);
 		else break;
 
-    	if (i >= 10) {	/* Not a AD1848 */
+    	if (i >= 10) {	/* Not an AD1848 */
 		BVDDB(printf("mss_detect, busy still set (0x%02x)\n", tmp));
 		goto no;
     	}
@@ -1807,8 +1809,7 @@ mss_resume(device_t dev)
 
     	mss = pcm_getdevinfo(dev);
 
-    	if (mss->bd_id == MD_YM0020)
-    	{
+    	if(mss->bd_id == MD_YM0020 || mss->bd_id == MD_CS423X) {
 		/* This works on a Toshiba Libretto 100CT. */
 		for (i = 0; i < MSS_INDEXED_REGS; i++)
     			ad_write(mss, i, mss->mss_indexed_regs[i]);
@@ -1816,6 +1817,13 @@ mss_resume(device_t dev)
     			conf_wr(mss, i, mss->opl_indexed_regs[i]);
 		mss_intr(mss);
     	}
+
+	if (mss->bd_id == MD_CS423X) {
+		/* Needed on IBM Thinkpad 600E */
+		chn_setformat(mss->pch.channel, mss->pch.channel->format);
+		chn_setspeed(mss->pch.channel, mss->pch.channel->speed);
+	}
+
     	return 0;
 
 }
@@ -1837,7 +1845,7 @@ mss_suspend(device_t dev)
 
     	mss = pcm_getdevinfo(dev);
 
-    	if(mss->bd_id == MD_YM0020)
+    	if(mss->bd_id == MD_YM0020 || mss->bd_id == MD_CS423X)
     	{
 		/* this stops playback. */
 		conf_wr(mss, 0x12, 0x0c);
@@ -1868,6 +1876,7 @@ static driver_t mss_driver = {
 };
 
 DRIVER_MODULE(snd_mss, isa, mss_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_mss, acpi, mss_driver, pcm_devclass, 0, 0);
 MODULE_DEPEND(snd_mss, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
 MODULE_VERSION(snd_mss, 1);
 
@@ -1954,6 +1963,7 @@ pnpmss_attach(device_t dev)
 	case 0x0000630e:			/* CSC0000 */
 	case 0x0001630e:			/* CSC0100 */
 	    mss->bd_flags |= BD_F_MSS_OFFSET;
+	    mss->bd_id = MD_CS423X;
 	    break;
 
 	case 0x2100a865:			/* YHM0021 */

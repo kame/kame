@@ -35,7 +35,7 @@
  *
  *	@(#)portal_vfsops.c	8.11 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/fs/portalfs/portal_vfsops.c,v 1.41 2002/10/06 11:45:22 mux Exp $
+ * $FreeBSD: src/sys/fs/portalfs/portal_vfsops.c,v 1.46 2003/03/11 22:15:09 kan Exp $
  */
 
 /*
@@ -106,7 +106,7 @@ portal_mount(mp, path, data, ndp, td)
 		fdrop(fp, td);
                 return(ENOTSOCK);
 	}
-	so = (struct socket *) fp->f_data;	/* XXX race against userland */
+	so = fp->f_data;	/* XXX race against userland */
 	if (so->so_proto->pr_domain->dom_family != AF_UNIX) {
 		fdrop(fp, td);
 		return (ESOCKTNOSUPPORT);
@@ -186,7 +186,7 @@ portal_unmount(mp, mntflags, td)
 	 * daemon to wake up, and then the accept will get ECONNABORTED
 	 * which it interprets as a request to go and bury itself.
 	 */
-	soshutdown((struct socket *) VFSTOPORTAL(mp)->pm_server->f_data, 2);
+	soshutdown(VFSTOPORTAL(mp)->pm_server->f_data, 2);
 	/*
 	 * Discard reference to underlying file.  Must call closef because
 	 * this may be the last reference.
@@ -249,7 +249,7 @@ static struct vfsops portal_vfsops = {
 	portal_root,
 	vfs_stdquotactl,
 	portal_statfs,
-	vfs_stdsync,
+	vfs_stdnosync,
 	vfs_stdvget,
 	vfs_stdfhtovp,
 	vfs_stdcheckexp,

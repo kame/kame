@@ -32,20 +32,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_slice.c,v 1.28.2.2 2002/12/22 18:00:18 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_slice.c,v 1.47 2003/05/02 06:29:33 phk Exp $
  */
 
 
 #include <sys/param.h>
-#include <sys/stdint.h>
-#ifndef _KERNEL
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <string.h>
-#include <err.h>
-#else
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
@@ -55,7 +46,6 @@
 #include <sys/kthread.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#endif
 #include <sys/errno.h>
 #include <sys/sbuf.h>
 #include <geom/geom.h>
@@ -67,7 +57,7 @@ static g_access_t g_slice_access;
 static g_start_t g_slice_start;
 
 static struct g_slicer *
-g_slice_init(unsigned nslice, unsigned scsize)
+g_slice_alloc(unsigned nslice, unsigned scsize)
 {
 	struct g_slicer *gsp;
 
@@ -77,6 +67,17 @@ g_slice_init(unsigned nslice, unsigned scsize)
 	    M_WAITOK | M_ZERO);
 	gsp->nslice = nslice;
 	return (gsp);
+}
+
+static void
+g_slice_free(struct g_slicer *gsp)
+{
+
+	g_free(gsp->slices);
+	if (gsp->hotspot != NULL)
+		g_free(gsp->hotspot);
+	g_free(gsp->softc);
+	g_free(gsp);
 }
 
 static int
@@ -122,6 +123,13 @@ g_slice_access(struct g_provider *pp, int dr, int dw, int de)
 	return (error);
 }
 
+/*
+ * XXX: It should be possible to specify here if we should finish all of the
+ * XXX: bio, or only the non-hot bits.  This would get messy if there were
+ * XXX: two hot spots in the same bio, so for now we simply finish off the
+ * XXX: entire bio.  Modifying hot data on the way to disk is frowned on
+ * XXX: so making that considerably harder is not a bad idea anyway.
+ */
 void
 g_slice_finish_hot(struct bio *bp)
 {
@@ -132,8 +140,10 @@ g_slice_finish_hot(struct bio *bp)
 	struct g_slice *gsl;
 	int idx;
 
-	KASSERT(bp->bio_to != NULL, ("NULL bio_to in g_slice_finish_hot(%p)", bp));
-	KASSERT(bp->bio_from != NULL, ("NULL bio_from in g_slice_finish_hot(%p)", bp));
+	KASSERT(bp->bio_to != NULL,
+	    ("NULL bio_to in g_slice_finish_hot(%p)", bp));
+	KASSERT(bp->bio_from != NULL,
+	    ("NULL bio_from in g_slice_finish_hot(%p)", bp));
 	gp = bp->bio_to->geom;
 	gsp = gp->softc;
 	cp = LIST_FIRST(&gp->consumer);
@@ -162,7 +172,8 @@ g_slice_start(struct bio *bp)
 	struct g_geom *gp;
 	struct g_consumer *cp;
 	struct g_slicer *gsp;
-	struct g_slice *gsl, *gmp;
+	struct g_slice *gsl;
+	struct g_slice_hot *ghp;
 	int idx, error;
 	u_int m_index;
 	off_t t;
@@ -186,22 +197,34 @@ g_slice_start(struct bio *bp)
 		 * method once if so.
 		 */
 		t = bp->bio_offset + gsl->offset;
-		/* .ctl devices may take us negative */
-		if (t < 0 || (t + bp->bio_length) < 0) {
-			g_io_deliver(bp, EINVAL);
-			return;
-		}
-		for (m_index = 0; m_index < gsp->nhot; m_index++) {
-			gmp = &gsp->hot[m_index];
-			if (t >= gmp->offset + gmp->length)
+		for (m_index = 0; m_index < gsp->nhotspot; m_index++) {
+			ghp = &gsp->hotspot[m_index];
+			if (t >= ghp->offset + ghp->length)
 				continue;
-			if (t + bp->bio_length <= gmp->offset)
+			if (t + bp->bio_length <= ghp->offset)
 				continue;
-			error = gsp->start(bp);
-			if (error == EJUSTRETURN)
+			switch(bp->bio_cmd) {
+			case BIO_READ:		idx = ghp->ract; break;
+			case BIO_WRITE:		idx = ghp->wact; break;
+			case BIO_DELETE:	idx = ghp->dact; break;
+			}
+			switch(idx) {
+			case G_SLICE_HOT_ALLOW:
+				/* Fall out and continue normal processing */
+				continue;
+			case G_SLICE_HOT_DENY:
+				g_io_deliver(bp, EROFS);
 				return;
-			else if (error) {
-				g_io_deliver(bp, error);
+			case G_SLICE_HOT_START:
+				error = gsp->start(bp);
+				if (error && error != EJUSTRETURN)
+					g_io_deliver(bp, error);
+				return;
+			case G_SLICE_HOT_CALL:
+				error = g_post_event(gsp->hot, bp, M_NOWAIT,
+				    gp, NULL);
+				if (error)
+					g_io_deliver(bp, error);
 				return;
 			}
 			break;
@@ -218,23 +241,9 @@ g_slice_start(struct bio *bp)
 		g_io_request(bp2, cp);
 		return;
 	case BIO_GETATTR:
-	case BIO_SETATTR:
 		/* Give the real method a chance to override */
-		if (gsp->start(bp))
+		if (gsp->start != NULL && gsp->start(bp))
 			return;
-		if (!strcmp("GEOM::frontstuff", bp->bio_attribute)) {
-			t = gsp->cfrontstuff;
-			if (gsp->frontstuff > t)
-				t = gsp->frontstuff;
-			t -= gsl->offset;
-			if (t < 0)
-				t = 0;
-			if (t > gsl->length)
-				t = gsl->length;
-			g_handleattr_off_t(bp, "GEOM::frontstuff", t);
-			return;
-		}
-#ifdef _KERNEL
 		if (!strcmp("GEOM::kerneldump", bp->bio_attribute)) {
 			struct g_kerneldump *gkd;
 
@@ -244,7 +253,6 @@ g_slice_start(struct bio *bp)
 				gkd->length = gsp->slices[idx].length;
 			/* now, pass it on downwards... */
 		}
-#endif
 		bp2 = g_clone_bio(bp);
 		if (bp2 == NULL) {
 			g_io_deliver(bp, ENOMEM);
@@ -271,10 +279,6 @@ g_slice_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp, struct 
 		    (uintmax_t)gsp->slices[pp->index].offset);
 		return;
 	}
-	if (gp != NULL && (pp == NULL && cp == NULL)) {
-		sbuf_printf(sb, "%s<frontstuff>%ju</frontstuff>\n",
-		    indent, (intmax_t)gsp->frontstuff);
-	}
 	if (pp != NULL) {
 		sbuf_printf(sb, "%s<index>%u</index>\n", indent, pp->index);
 		sbuf_printf(sb, "%s<length>%ju</length>\n",
@@ -291,7 +295,7 @@ g_slice_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp, struct 
 int
 g_slice_config(struct g_geom *gp, u_int idx, int how, off_t offset, off_t length, u_int sectorsize, const char *fmt, ...)
 {
-	struct g_provider *pp;
+	struct g_provider *pp, *pp2;
 	struct g_slicer *gsp;
 	struct g_slice *gsl;
 	va_list ap;
@@ -346,6 +350,12 @@ g_slice_config(struct g_geom *gp, u_int idx, int how, off_t offset, off_t length
 	sbuf_vprintf(sb, fmt, ap);
 	sbuf_finish(sb);
 	pp = g_new_providerf(gp, sbuf_data(sb));
+	pp2 = LIST_FIRST(&gp->consumer)->provider;
+	pp->flags = pp2->flags & G_PF_CANDELETE;
+	if (pp2->stripesize > 0) {
+		pp->stripesize = pp2->stripesize;
+		pp->stripeoffset = (pp2->stripeoffset + offset) % pp->stripesize;
+	}
 	if (bootverbose)
 		printf("GEOM: Configure %s, start %jd length %jd end %jd\n",
 		    pp->name, (intmax_t)offset, (intmax_t)length,
@@ -360,33 +370,64 @@ g_slice_config(struct g_geom *gp, u_int idx, int how, off_t offset, off_t length
 	return(0);
 }
 
+/*
+ * Configure "hotspots".  A hotspot is a piece of the parent device which
+ * this particular slicer cares about for some reason.  Typically because
+ * it contains meta-data used to configure the slicer.
+ * A hotspot is identified by its index number. The offset and length are
+ * relative to the parent device, and the three "?act" fields specify
+ * what action to take on BIO_READ, BIO_DELETE and BIO_WRITE.
+ *
+ * XXX: There may be a race relative to g_slice_start() here, if an existing
+ * XXX: hotspot is changed wile I/O is happening.  Should this become a problem
+ * XXX: we can protect the hotspot stuff with a mutex.
+ */
+
 int
-g_slice_conf_hot(struct g_geom *gp, u_int idx, off_t offset, off_t length)
+g_slice_conf_hot(struct g_geom *gp, u_int idx, off_t offset, off_t length, int ract, int dact, int wact)
 {
 	struct g_slicer *gsp;
-	struct g_slice *gsl, *gsl2;
+	struct g_slice_hot *gsl, *gsl2;
 
-	g_trace(G_T_TOPOLOGY, "g_slice_conf_hot()");
+	g_trace(G_T_TOPOLOGY, "g_slice_conf_hot(%s, idx: %d, off: %jd, len: %jd)",
+	    gp->name, idx, (intmax_t)offset, (intmax_t)length);
 	g_topology_assert();
 	gsp = gp->softc;
-	gsl = gsp->hot;
-	if(idx >= gsp->nhot) {
+	gsl = gsp->hotspot;
+	if(idx >= gsp->nhotspot) {
 		gsl2 = g_malloc((idx + 1) * sizeof *gsl2, M_WAITOK | M_ZERO);
-		if (gsp->hot != NULL)
-			bcopy(gsp->hot, gsl2, gsp->nhot * sizeof *gsl2);
-		gsp->hot = gsl2;
-		if (gsp->hot != NULL)
+		if (gsp->hotspot != NULL)
+			bcopy(gsp->hotspot, gsl2, gsp->nhotspot * sizeof *gsl2);
+		gsp->hotspot = gsl2;
+		if (gsp->hotspot != NULL)
 			g_free(gsl);
 		gsl = gsl2;
-		gsp->nhot = idx + 1;
+		gsp->nhotspot = idx + 1;
 	}
-	if (bootverbose)
-		printf("GEOM: Add %s hot[%d] start %jd length %jd end %jd\n",
-		    gp->name, idx, (intmax_t)offset, (intmax_t)length,
-		    (intmax_t)(offset + length - 1));
 	gsl[idx].offset = offset;
 	gsl[idx].length = length;
+	KASSERT(!((ract | dact | wact) & G_SLICE_HOT_START)
+	    || gsp->start != NULL, ("G_SLICE_HOT_START but no slice->start"));
+	/* XXX: check that we _have_ a start function if HOT_START specified */
+	gsl[idx].ract = ract;
+	gsl[idx].dact = dact;
+	gsl[idx].wact = wact;
 	return (0);
+}
+
+void
+g_slice_spoiled(struct g_consumer *cp)
+{
+	struct g_geom *gp;
+	struct g_slicer *gsp;
+
+	g_topology_assert();
+	gp = cp->geom;
+	g_trace(G_T_TOPOLOGY, "g_slice_spoiled(%p/%s)", cp, gp->name);
+	gsp = gp->softc;
+	gp->softc = NULL;
+	g_slice_free(gsp);
+	g_wither_geom(gp, ENXIO);
 }
 
 struct g_geom *
@@ -396,37 +437,27 @@ g_slice_new(struct g_class *mp, u_int slices, struct g_provider *pp, struct g_co
 	struct g_slicer *gsp;
 	struct g_consumer *cp;
 	void **vp;
-	int error, i;
+	int error;
 
 	g_topology_assert();
 	vp = (void **)extrap;
 	gp = g_new_geomf(mp, "%s", pp->name);
-	gsp = g_slice_init(slices, extra);
+	gsp = g_slice_alloc(slices, extra);
 	gsp->start = start;
 	gp->access = g_slice_access;
 	gp->orphan = g_slice_orphan;
 	gp->softc = gsp;
 	gp->start = g_slice_start;
-	gp->spoiled = g_std_spoiled;
+	gp->spoiled = g_slice_spoiled;
 	gp->dumpconf = g_slice_dumpconf;
 	cp = g_new_consumer(gp);
 	error = g_attach(cp, pp);
 	if (error == 0)
 		error = g_access_rel(cp, 1, 0, 0);
 	if (error) {
-		if (cp->provider != NULL)
-			g_detach(cp);
-		g_destroy_consumer(cp);
-		g_free(gsp->slices);
-		g_free(gp->softc);
-		g_destroy_geom(gp);
+		g_wither_geom(gp, ENXIO);
 		return (NULL);
 	}
-	/* Find out if there are any magic bytes on the consumer */
-	i = sizeof gsp->cfrontstuff;
-	error = g_io_getattr("GEOM::frontstuff", cp, &i, &gsp->cfrontstuff);
-	if (error)
-		gsp->cfrontstuff = 0;
 	*vp = gsp->softc;
 	*cpp = cp;
 	return (gp);
@@ -435,20 +466,13 @@ g_slice_new(struct g_class *mp, u_int slices, struct g_provider *pp, struct g_co
 static void
 g_slice_orphan(struct g_consumer *cp)
 {
-	struct g_geom *gp;
-	struct g_provider *pp;
-	int error;
 
 	g_trace(G_T_TOPOLOGY, "g_slice_orphan(%p/%s)", cp, cp->provider->name);
 	g_topology_assert();
 	KASSERT(cp->provider->error != 0,
 	    ("g_slice_orphan with error == 0"));
 
-	gp = cp->geom;
 	/* XXX: Not good enough we leak the softc and its suballocations */
-	gp->flags |= G_GEOM_WITHER;
-	error = cp->provider->error;
-	LIST_FOREACH(pp, &gp->provider, provider)
-		g_orphan_provider(pp, error);
-	return;
+	g_slice_free(cp->geom->softc);
+	g_wither_geom(cp->geom, cp->provider->error);
 }

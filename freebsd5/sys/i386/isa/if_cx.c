@@ -16,7 +16,7 @@
  *
  * Version 1.9, Wed Oct  4 18:58:15 MSK 1995
  *
- * $FreeBSD: src/sys/i386/isa/if_cx.c,v 1.36 2002/11/15 00:00:14 sam Exp $
+ * $FreeBSD: src/sys/i386/isa/if_cx.c,v 1.38 2003/02/19 05:47:22 imp Exp $
  *
  */
 #undef DEBUG

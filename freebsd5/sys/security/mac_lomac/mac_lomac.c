@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_lomac/mac_lomac.c,v 1.6 2002/12/10 16:20:33 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_lomac/mac_lomac.c,v 1.12.2.1 2003/06/02 18:59:29 rwatson Exp $
  */
 
 /*
@@ -530,7 +530,7 @@ maybe_demote(struct mac_lomac *subjlabel, struct mac_lomac *objlabel,
 	subj->mac_lomac.ml_rangehigh = objlabel->ml_single;
 	subj->mac_lomac.ml_flags |= MAC_LOMAC_FLAG_UPDATE;
 	mtx_lock_spin(&sched_lock);
-	curthread->td_kse->ke_flags |= KEF_ASTPENDING;
+	curthread->td_flags |= TDF_ASTPENDING;
 	curthread->td_proc->p_sflag |= PS_MACPEND;
 	mtx_unlock_spin(&sched_lock);
 	subjtext = subjlabeltext = objlabeltext = xxx;
@@ -1057,8 +1057,7 @@ mac_lomac_associate_vnode_extattr(struct mount *mp, struct label *fslabel,
     struct vnode *vp, struct label *vlabel)
 {
 	struct mac_lomac temp, *source, *dest;
-	size_t buflen;
-	int error;
+	int buflen, error;
 
 	source = SLOT(fslabel);
 	dest = SLOT(vlabel);
@@ -2613,7 +2612,7 @@ static struct mac_policy_ops mac_lomac_ops =
 	.mpo_init_cred_label = mac_lomac_init_label,
 	.mpo_init_devfsdirent_label = mac_lomac_init_label,
 	.mpo_init_ifnet_label = mac_lomac_init_label,
-	.mpo_init_ipq_label = mac_lomac_init_label,
+	.mpo_init_ipq_label = mac_lomac_init_label_waitcheck,
 	.mpo_init_mbuf_label = mac_lomac_init_label_waitcheck,
 	.mpo_init_mount_label = mac_lomac_init_label,
 	.mpo_init_mount_fs_label = mac_lomac_init_label,
@@ -2635,6 +2634,7 @@ static struct mac_policy_ops mac_lomac_ops =
 	.mpo_destroy_socket_label = mac_lomac_destroy_label,
 	.mpo_destroy_socket_peer_label = mac_lomac_destroy_label,
 	.mpo_destroy_vnode_label = mac_lomac_destroy_label,
+	.mpo_copy_mbuf_label = mac_lomac_copy_label,
 	.mpo_copy_pipe_label = mac_lomac_copy_label,
 	.mpo_copy_vnode_label = mac_lomac_copy_label,
 	.mpo_externalize_cred_label = mac_lomac_externalize_label,
@@ -2735,4 +2735,4 @@ static struct mac_policy_ops mac_lomac_ops =
 };
 
 MAC_POLICY_SET(&mac_lomac_ops, mac_lomac, "TrustedBSD MAC/LOMAC",
-    MPC_LOADTIME_FLAG_NOTLATE, &mac_lomac_slot);
+    MPC_LOADTIME_FLAG_NOTLATE | MPC_LOADTIME_FLAG_LABELMBUFS, &mac_lomac_slot);

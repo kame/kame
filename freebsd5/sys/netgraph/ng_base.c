@@ -36,7 +36,7 @@
  * Authors: Julian Elischer <julian@freebsd.org>
  *          Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.64 2002/08/22 00:30:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.69 2003/04/29 13:36:04 kan Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -48,6 +48,7 @@
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
@@ -56,7 +57,6 @@
 #include <sys/mbuf.h>
 #include <sys/ctype.h>
 #include <sys/sysctl.h>
-#include <machine/limits.h>
 
 #include <net/netisr.h>
 
@@ -335,8 +335,7 @@ static	ng_ID_t nextID = 1;
 		struct mbuf *n;						\
 		int total;						\
 									\
-		if (((m)->m_flags & M_PKTHDR) == 0)			\
-			panic("%s: !PKTHDR", __func__);		\
+		M_ASSERTPKTHDR(m);					\
 		for (total = 0, n = (m); n != NULL; n = n->m_next)	\
 			total += n->m_len;				\
 		if ((m)->m_pkthdr.len != total) {			\
@@ -885,7 +884,7 @@ ng_name2noderef(node_p here, const char *name)
 }
 
 /*
- * Decode a ID name, eg. "[f03034de]". Returns 0 if the
+ * Decode an ID name, eg. "[f03034de]". Returns 0 if the
  * string is not valid, otherwise returns the value.
  */
 static ng_ID_t
@@ -2987,7 +2986,7 @@ ngb_mod_event(module_t mod, int event, void *data)
 		mtx_init(&ng_idhash_mtx, "netgraph idhash mutex", NULL, 0);
 		mtx_init(&ngq_mtx, "netgraph netisr mutex", NULL, 0);
 		s = splimp();
-		error = register_netisr(NETISR_NETGRAPH, ngintr);
+		netisr_register(NETISR_NETGRAPH, (netisr_t *)ngintr, NULL);
 		splx(s);
 		break;
 	case MOD_UNLOAD:
@@ -3017,8 +3016,18 @@ SYSCTL_INT(_net_graph, OID_AUTO, msg_version, CTLFLAG_RD, 0, NG_VERSION, "");
 
 
 static int			allocated;	/* number of items malloc'd */
+
 static int			maxalloc = 128;	/* limit the damage of a leak */
-static const int		ngqfreemax = 64;/* cache at most this many */
+static int			ngqfreemax = 64;/* cache at most this many */
+
+TUNABLE_INT("net.graph.maxalloc", &maxalloc);
+SYSCTL_INT(_net_graph, OID_AUTO, maxalloc, CTLFLAG_RD, &maxalloc,
+    0, "Maximum number of queue items to allocate");
+
+TUNABLE_INT("net.graph.ngqfreemax", &ngqfreemax);
+SYSCTL_INT(_net_graph, OID_AUTO, ngqfreemax, CTLFLAG_RD, &ngqfreemax,
+    0, "Maximum number of free queue items to cache");
+
 static const int		ngqfreelow = 4; /* try malloc if free < this */
 static volatile int		ngqfreesize;	/* number of cached entries */
 #ifdef	NETGRAPH_DEBUG

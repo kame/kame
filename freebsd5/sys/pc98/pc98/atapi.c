@@ -13,7 +13,7 @@
  *
  * Version 1.9, Mon Oct  9 22:34:47 MSK 1995
  *
- * $FreeBSD: src/sys/pc98/pc98/atapi.c,v 1.8 2002/02/11 05:46:25 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/atapi.c,v 1.10 2003/03/02 16:54:39 des Exp $
  */
 
 /*
@@ -104,9 +104,6 @@
 #include "wdc.h"
 
 #include "wcd.h"
-#include "wfd.h"
-#include "wst.h"
-/* #include "wmd.h" -- add your driver here */
 
 #if NWDC > 0
 
@@ -251,14 +248,6 @@ int atapi_attach (int ctlr, int unit, int port)
 		break;
 
 	case AT_TYPE_DIRECT:            /* direct-access */
-#if NWFD > 0
-		/* ATAPI Floppy(LS-120) */
-		if (wfdattach (ata, unit, ap, ata->debug) >= 0) {
-			/* Device attached successfully. */
-			ata->attached[unit] = 1;
-			return (1);
-		}
-#endif
 #if NWCD > 0
 		/* FALLTHROUGH */
 #else
@@ -278,16 +267,7 @@ int atapi_attach (int ctlr, int unit, int port)
 #endif
 
 	case AT_TYPE_TAPE:              /* streaming tape */
-#if NWST > 0
-		/* ATAPI Streaming Tape */
-		if (wstattach (ata, unit, ap, ata->debug) < 0)
-			break;
-		/* Device attached successfully. */
-		ata->attached[unit] = 1;
-		return (1);
-#else
 		printf ("wdc%d: ATAPI streaming tapes not configured\n", ctlr);
-#endif
 		break;
 
 	case AT_TYPE_OPTICAL:           /* optical disk */
@@ -529,7 +509,7 @@ static struct atapicmd *atapi_alloc (struct atapi *ata)
 	struct atapicmd *ac;
 
 	while (! ata->free)
-		tsleep ((caddr_t)ata, PRIBIO, "atacmd", 100);
+		tsleep (ata, PRIBIO, "atacmd", 100);
 	ac = ata->free;
 	ata->free = ac->next;
 	ac->busy = 1;
@@ -539,7 +519,7 @@ static struct atapicmd *atapi_alloc (struct atapi *ata)
 static void atapi_free (struct atapi *ata, struct atapicmd *ac)
 {
 	if (! ata->free)
-		wakeup ((caddr_t)ata);
+		wakeup (ata);
 	ac->busy = 0;
 	ac->next = ata->free;
 	ata->free = ac;
@@ -573,7 +553,7 @@ static void atapi_done (struct atapi *ata)
 		(*ac->callback) (ac->cbarg1, ac->cbarg2, ac->count, ac->result);
 		atapi_free (ata, ac);
 	} else
-		wakeup ((caddr_t)ac);
+		wakeup (ac);
 }
 
 /*
@@ -919,7 +899,7 @@ struct atapires atapi_request_wait (struct atapi *ata, int unit,
 	atapi_enqueue (ata, ac);
 	wdstart (ata->ctrlr);
 	if (ata->tail == ac)
-		tsleep ((caddr_t)ac, PRIBIO, "atareq", 0);
+		tsleep (ac, PRIBIO, "atareq", 0);
 
 	result = ac->result;
 	atapi_free (ata, ac);

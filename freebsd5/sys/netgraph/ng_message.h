@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_message.h,v 1.16 2002/05/31 23:48:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_message.h,v 1.17 2003/04/18 12:37:33 phk Exp $
  * $Whistle: ng_message.h,v 1.12 1999/01/25 01:17:44 archie Exp $
  */
 
@@ -361,6 +361,10 @@ struct flow_manager {
  */
 #define NG_MKMESSAGE(msg, cookie, cmdid, len, how)			\
 	do {								\
+	  KASSERT(!(how & M_DONTWAIT),					\
+	      ("NG_MKMESSAGE() with how=M_DONTWAIT (%d)\n", how));	\
+	  KASSERT(!(how & M_TRYWAIT),					\
+	      ("NG_MKMESSAGE() with how=M_TRYWAIT (%d)\n", how));	\
 	  MALLOC((msg), struct ng_mesg *, sizeof(struct ng_mesg)	\
 	    + (len), M_NETGRAPH_MSG, (how) | M_ZERO);			\
 	  if ((msg) == NULL)						\

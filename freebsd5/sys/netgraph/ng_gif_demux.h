@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_gif_demux.h,v 1.3 2001/09/27 03:14:17 brooks Exp $
+ * $FreeBSD: src/sys/netgraph/ng_gif_demux.h,v 1.4 2003/03/05 19:24:22 peter Exp $
  */
 
 #ifndef _NETGRAPH_NG_GIF_DEMUX_H_
@@ -45,6 +45,5 @@
 #define NG_GIF_DEMUX_HOOK_IPX		"ipx"
 #define NG_GIF_DEMUX_HOOK_ATM		"atm"
 #define NG_GIF_DEMUX_HOOK_NATM		"natm"
-#define NG_GIF_DEMUX_HOOK_NS		"ns"
 
 #endif /* _NETGRAPH_NG_GIF_DEMUX_H_ */

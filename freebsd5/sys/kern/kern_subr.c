@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_subr.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_subr.c,v 1.63 2002/11/28 08:44:26 alc Exp $
+ * $FreeBSD: src/sys/kern/kern_subr.c,v 1.74 2003/05/05 21:27:29 jhb Exp $
  */
 
 #include "opt_zero.h"
@@ -59,31 +59,19 @@
 #include <vm/vm_map.h>
 #ifdef ZERO_COPY_SOCKETS
 #include <vm/vm_param.h>
-#endif
-#if defined(ZERO_COPY_SOCKETS) || defined(ENABLE_VFS_IOOPT)
 #include <vm/vm_object.h>
 #endif
 
-SYSCTL_INT(_kern, KERN_IOV_MAX, iov_max, CTLFLAG_RD, NULL, UIO_MAXIOV, 
+SYSCTL_INT(_kern, KERN_IOV_MAX, iov_max, CTLFLAG_RD, NULL, UIO_MAXIOV,
 	"Maximum number of elements in an I/O vector; sysconf(_SC_IOV_MAX)");
-
-#if defined(ZERO_COPY_SOCKETS) || defined(ENABLE_VFS_IOOPT)
-static int userspaceco(caddr_t cp, u_int cnt, struct uio *uio,
-		       struct vm_object *obj, int disposable);
-#endif
 
 #ifdef ZERO_COPY_SOCKETS
 /* Declared in uipc_socket.c */
 extern int so_zero_copy_receive;
 
-static int vm_pgmoveco(vm_map_t mapa, vm_object_t srcobj, vm_offset_t kaddr,
-		       vm_offset_t uaddr);
-
 static int
-vm_pgmoveco(mapa, srcobj,  kaddr, uaddr)
-        vm_map_t mapa;
-	vm_object_t srcobj;
-	vm_offset_t kaddr, uaddr;
+vm_pgmoveco(vm_map_t mapa, vm_object_t srcobj, vm_offset_t kaddr,
+    vm_offset_t uaddr)
 {
 	vm_map_t map = mapa;
 	vm_page_t kern_pg, user_pg;
@@ -99,7 +87,7 @@ vm_pgmoveco(mapa, srcobj,  kaddr, uaddr)
 	kern_pg = PHYS_TO_VM_PAGE(vtophys(kaddr));
 
 	if ((vm_map_lookup(&map, uaddr,
-			   VM_PROT_READ, &entry, &uobject,
+			   VM_PROT_WRITE, &entry, &uobject,
 			   &upindex, &prot, &wired)) != KERN_SUCCESS) {
 		return(EFAULT);
 	}
@@ -110,9 +98,8 @@ vm_pgmoveco(mapa, srcobj,  kaddr, uaddr)
 		vm_page_busy(user_pg);
 		pmap_remove_all(user_pg);
 		vm_page_free(user_pg);
-		vm_page_unlock_queues();
-	}
-
+	} else
+		vm_page_lock_queues();
 	if (kern_pg->busy || ((kern_pg->queue - kern_pg->pc) == PQ_FREE) ||
 	    (kern_pg->hold_count != 0)|| (kern_pg->flags & PG_BUSY)) {
 		printf("vm_pgmoveco: pindex(%lu), busy(%d), PG_BUSY(%d), "
@@ -129,20 +116,18 @@ vm_pgmoveco(mapa, srcobj,  kaddr, uaddr)
 	vm_page_rename(kern_pg, uobject, upindex);
 	vm_page_flag_clear(kern_pg, PG_BUSY);
 	kern_pg->valid = VM_PAGE_BITS_ALL;
-	
+	vm_page_unlock_queues();
+
 	vm_map_lookup_done(map, entry);
 	return(KERN_SUCCESS);
 }
 #endif /* ZERO_COPY_SOCKETS */
 
 int
-uiomove(cp, n, uio)
-	register caddr_t cp;
-	register int n;
-	register struct uio *uio;
+uiomove(void *cp, int n, struct uio *uio)
 {
 	struct thread *td = curthread;
-	register struct iovec *iov;
+	struct iovec *iov;
 	u_int cnt;
 	int error = 0;
 	int save = 0;
@@ -196,39 +181,30 @@ uiomove(cp, n, uio)
 		iov->iov_len -= cnt;
 		uio->uio_resid -= cnt;
 		uio->uio_offset += cnt;
-		cp += cnt;
+		cp = (char *)cp + cnt;
 		n -= cnt;
 	}
 out:
-	if (td != curthread) printf("uiomove: IT CHANGED!");
-	td = curthread;	/* Might things have changed in copyin/copyout? */
-	if (td) {
+	if (td && save == 0) {
 		mtx_lock_spin(&sched_lock);
-		td->td_flags = (td->td_flags & ~TDF_DEADLKTREAT) | save;
+		td->td_flags &= ~TDF_DEADLKTREAT;
 		mtx_unlock_spin(&sched_lock);
 	}
 	return (error);
 }
 
-#if defined(ENABLE_VFS_IOOPT) || defined(ZERO_COPY_SOCKETS)
+#ifdef ZERO_COPY_SOCKETS
 /*
  * Experimental support for zero-copy I/O
  */
 static int
-userspaceco(cp, cnt, uio, obj, disposable)
-	caddr_t cp;
-	u_int cnt;
-	struct uio *uio;
-	struct vm_object *obj;
-	int disposable;
+userspaceco(void *cp, u_int cnt, struct uio *uio, struct vm_object *obj,
+    int disposable)
 {
 	struct iovec *iov;
 	int error;
 
 	iov = uio->uio_iov;
-
-#ifdef ZERO_COPY_SOCKETS
-
 	if (uio->uio_rw == UIO_READ) {
 		if ((so_zero_copy_receive != 0)
 		 && (obj != NULL)
@@ -245,7 +221,7 @@ userspaceco(cp, cnt, uio, obj, disposable)
 			 * kernel page to the userland process.
 			 */
 			error =	vm_pgmoveco(&curproc->p_vmspace->vm_map,
-					    obj, (vm_offset_t)cp, 
+					    obj, (vm_offset_t)cp,
 					    (vm_offset_t)iov->iov_base);
 
 			/*
@@ -257,53 +233,18 @@ userspaceco(cp, cnt, uio, obj, disposable)
 			 */
 			if (error != 0)
 				error = copyout(cp, iov->iov_base, cnt);
-#ifdef ENABLE_VFS_IOOPT
-		} else if ((vfs_ioopt != 0)
-		 && ((cnt & PAGE_MASK) == 0)
-		 && ((((intptr_t) iov->iov_base) & PAGE_MASK) == 0)
-		 && ((uio->uio_offset & PAGE_MASK) == 0)
-		 && ((((intptr_t) cp) & PAGE_MASK) == 0)) {
-			error = vm_uiomove(&curproc->p_vmspace->vm_map, obj,
-					   uio->uio_offset, cnt,
-					   (vm_offset_t) iov->iov_base, NULL);
-#endif /* ENABLE_VFS_IOOPT */
 		} else {
 			error = copyout(cp, iov->iov_base, cnt);
 		}
 	} else {
 		error = copyin(iov->iov_base, cp, cnt);
 	}
-#else /* ZERO_COPY_SOCKETS */
-	if (uio->uio_rw == UIO_READ) {
-#ifdef ENABLE_VFS_IOOPT
-		if ((vfs_ioopt != 0)
-		 && ((cnt & PAGE_MASK) == 0)
-		 && ((((intptr_t) iov->iov_base) & PAGE_MASK) == 0)
-		 && ((uio->uio_offset & PAGE_MASK) == 0)
-		 && ((((intptr_t) cp) & PAGE_MASK) == 0)) {
-			error = vm_uiomove(&curproc->p_vmspace->vm_map, obj,
-					   uio->uio_offset, cnt,
-					   (vm_offset_t) iov->iov_base, NULL);
-		} else
-#endif /* ENABLE_VFS_IOOPT */
-		{
-			error = copyout(cp, iov->iov_base, cnt);
-		}
-	} else {
-		error = copyin(iov->iov_base, cp, cnt);
-	}
-#endif /* ZERO_COPY_SOCKETS */
-
 	return (error);
 }
 
 int
-uiomoveco(cp, n, uio, obj, disposable)
-	caddr_t cp;
-	int n;
-	struct uio *uio;
-	struct vm_object *obj;
-	int disposable;
+uiomoveco(void *cp, int n, struct uio *uio, struct vm_object *obj,
+    int disposable)
 {
 	struct iovec *iov;
 	u_int cnt;
@@ -350,95 +291,21 @@ uiomoveco(cp, n, uio, obj, disposable)
 		iov->iov_len -= cnt;
 		uio->uio_resid -= cnt;
 		uio->uio_offset += cnt;
-		cp += cnt;
+		cp = (char *)cp + cnt;
 		n -= cnt;
 	}
 	return (0);
 }
-#endif /* ENABLE_VFS_IOOPT || ZERO_COPY_SOCKETS */
-
-#ifdef ENABLE_VFS_IOOPT
-
-/*
- * Experimental support for zero-copy I/O
- */
-int
-uioread(n, uio, obj, nread)
-	int n;
-	struct uio *uio;
-	struct vm_object *obj;
-	int *nread;
-{
-	int npagesmoved;
-	struct iovec *iov;
-	u_int cnt, tcnt;
-	int error;
-
-	*nread = 0;
-	if (vfs_ioopt < 2)
-		return 0;
-
-	error = 0;
-
-	while (n > 0 && uio->uio_resid) {
-		iov = uio->uio_iov;
-		cnt = iov->iov_len;
-		if (cnt == 0) {
-			uio->uio_iov++;
-			uio->uio_iovcnt--;
-			continue;
-		}
-		if (cnt > n)
-			cnt = n;
-
-		if ((uio->uio_segflg == UIO_USERSPACE) &&
-			((((intptr_t) iov->iov_base) & PAGE_MASK) == 0) &&
-				 ((uio->uio_offset & PAGE_MASK) == 0) ) {
-
-			if (cnt < PAGE_SIZE)
-				break;
-
-			cnt &= ~PAGE_MASK;
-
-			if (ticks - PCPU_GET(switchticks) >= hogticks)
-				uio_yield();
-			error = vm_uiomove(&curproc->p_vmspace->vm_map, obj,
-						uio->uio_offset, cnt,
-						(vm_offset_t) iov->iov_base, &npagesmoved);
-
-			if (npagesmoved == 0)
-				break;
-
-			tcnt = npagesmoved * PAGE_SIZE;
-			cnt = tcnt;
-
-			if (error)
-				break;
-
-			iov->iov_base = (char *)iov->iov_base + cnt;
-			iov->iov_len -= cnt;
-			uio->uio_resid -= cnt;
-			uio->uio_offset += cnt;
-			*nread += cnt;
-			n -= cnt;
-		} else {
-			break;
-		}
-	}
-	return error;
-}
-#endif /* ENABLE_VFS_IOOPT */
+#endif /* ZERO_COPY_SOCKETS */
 
 /*
  * Give next character to user as result of read.
  */
 int
-ureadc(c, uio)
-	register int c;
-	register struct uio *uio;
+ureadc(int c, struct uio *uio)
 {
-	register struct iovec *iov;
-	register char *iov_base;
+	struct iovec *iov;
+	char *iov_base;
 
 again:
 	if (uio->uio_iovcnt == 0 || uio->uio_resid == 0)
@@ -476,10 +343,7 @@ again:
  * General routine to allocate a hash table.
  */
 void *
-hashinit(elements, type, hashmask)
-	int elements;
-	struct malloc_type *type;
-	u_long *hashmask;
+hashinit(int elements, struct malloc_type *type, u_long *hashmask)
 {
 	long hashsize;
 	LIST_HEAD(generic, generic) *hashtbl;
@@ -498,10 +362,7 @@ hashinit(elements, type, hashmask)
 }
 
 void
-hashdestroy(vhashtbl, type, hashmask)
-	void *vhashtbl;
-	struct malloc_type *type;
-	u_long hashmask;
+hashdestroy(void *vhashtbl, struct malloc_type *type, u_long hashmask)
 {
 	LIST_HEAD(generic, generic) *hashtbl, *hp;
 
@@ -521,10 +382,7 @@ static int primes[] = { 1, 13, 31, 61, 127, 251, 509, 761, 1021, 1531, 2039,
  * General routine to allocate a prime number sized hash table.
  */
 void *
-phashinit(elements, type, nentries)
-	int elements;
-	struct malloc_type *type;
-	u_long *nentries;
+phashinit(int elements, struct malloc_type *type, u_long *nentries)
 {
 	long hashsize;
 	LIST_HEAD(generic, generic) *hashtbl;
@@ -547,7 +405,7 @@ phashinit(elements, type, nentries)
 }
 
 void
-uio_yield()
+uio_yield(void)
 {
 	struct thread *td;
 

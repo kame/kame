@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/ncr.c,v 1.167 2002/10/16 09:04:52 phk Exp $
+** $FreeBSD: src/sys/pci/ncr.c,v 1.171 2003/04/15 06:37:30 mdodd Exp $
 **
 **  Device driver for the   NCR 53C8XX   PCI-SCSI-Controller Family.
 **
@@ -1306,7 +1306,7 @@ static	int	ncr_attach	(device_t dev);
 
 #if !defined(lint)
 static const char ident[] =
-	"\n$FreeBSD: src/sys/pci/ncr.c,v 1.167 2002/10/16 09:04:52 phk Exp $\n";
+	"\n$FreeBSD: src/sys/pci/ncr.c,v 1.171 2003/04/15 06:37:30 mdodd Exp $\n";
 #endif
 
 static const u_long	ncr_version = NCR_VERSION	* 11
@@ -2056,7 +2056,7 @@ static	struct script script0 = {
 }/*-------------------------< DISCONNECT >---------------*/,{
 	/*
 	**	If QUIRK_AUTOSAVE is set,
-	**	do an "save pointer" operation.
+	**	do a "save pointer" operation.
 	*/
 	SCR_FROM_REG (QU_REG),
 		0,
@@ -7157,7 +7157,8 @@ static driver_t ncr_driver = {
 
 static devclass_t ncr_devclass;
 
-DRIVER_MODULE(if_ncr, pci, ncr_driver, ncr_devclass, 0, 0);
+DRIVER_MODULE(ncr, pci, ncr_driver, ncr_devclass, 0, 0);
+MODULE_DEPEND(ncr, pci, 1, 1, 1);
 
 /*=========================================================================*/
 #endif /* _KERNEL */

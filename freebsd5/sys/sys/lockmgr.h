@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)lock.h	8.12 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/lockmgr.h,v 1.35 2002/11/30 19:00:51 mckusick Exp $
+ * $FreeBSD: src/sys/sys/lockmgr.h,v 1.39 2003/02/25 03:37:48 jeff Exp $
  */
 
 #ifndef	_SYS_LOCKMGR_H_
@@ -57,14 +57,14 @@ struct lock {
 	short	lk_prio;		/* priority at which to sleep */
 	const char *lk_wmesg;		/* resource sleeping (for tsleep) */
 	int	lk_timo;		/* maximum sleep time (for tsleep) */
-	pid_t	lk_lockholder;		/* pid of exclusive lock holder */
+	struct thread *lk_lockholder;	/* thread of exclusive lock holder */
 	struct	lock *lk_newlock;	/* lock taking over this lock */
 #ifdef	DEBUG_LOCKS
 	const char *lk_filename;
 	const char *lk_lockername;
 	int     lk_lineno;
 
-	pid_t	lk_slockholder;
+	struct thread *lk_slockholder;
 	const char *lk_sfilename;
 	const char *lk_slockername;
 	int     lk_slineno;
@@ -149,6 +149,7 @@ struct lock {
 				    */
 #define LK_RETRY	0x00020000 /* vn_lock: retry until locked */
 #define	LK_THISLAYER	0x00040000 /* vn_lock: lock/unlock only current layer */
+#define	LK_INTERNAL	0x00080000/* The internal lock is already held */
 
 /*
  * Internal state flags corresponding to lk_sharecount, and lk_waitcount
@@ -176,8 +177,8 @@ struct lock {
 /*
  * Indicator that no process holds exclusive lock
  */
-#define LK_KERNPROC ((pid_t) -2)
-#define LK_NOPROC ((pid_t) -1)
+#define LK_KERNPROC ((struct thread *)-2)
+#define LK_NOPROC ((struct thread *) -1)
 
 #ifdef INVARIANTS
 #define	LOCKMGR_ASSERT(lkp, what, p) do {				\

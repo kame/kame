@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pci.c,v 1.206 2002/11/27 06:41:28 imp Exp $
+ * $FreeBSD: src/sys/dev/pci/pci.c,v 1.214 2003/04/16 03:15:08 mdodd Exp $
  *
  */
 
@@ -65,9 +65,6 @@ static int		pci_maptype(unsigned mapreg);
 static int		pci_mapsize(unsigned testval);
 static int		pci_maprange(unsigned mapreg);
 static void		pci_fixancient(pcicfgregs *cfg);
-static void		pci_hdrtypedata(device_t pcib, int b, int s, int f, 
-					pcicfgregs *cfg);
-static void		pci_read_extcap(device_t pcib, pcicfgregs *cfg);
 
 static int		pci_porten(device_t pcib, int b, int s, int f);
 static int		pci_memen(device_t pcib, int b, int s, int f);
@@ -81,6 +78,9 @@ static int		pci_describe_parse_line(char **ptr, int *vendor,
 						int *device, char **desc);
 static char		*pci_describe_device(device_t dev);
 static int		pci_modevent(module_t mod, int what, void *arg);
+static void		pci_hdrtypedata(device_t pcib, int b, int s, int f, 
+					pcicfgregs *cfg);
+static void		pci_read_extcap(device_t pcib, pcicfgregs *cfg);
 
 static device_method_t pci_methods[] = {
 	/* Device interface */
@@ -107,6 +107,8 @@ static device_method_t pci_methods[] = {
 	DEVMETHOD(bus_release_resource,	bus_generic_rl_release_resource),
 	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
 	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
+	DEVMETHOD(bus_child_pnpinfo_str, pci_child_pnpinfo_str_method),
+	DEVMETHOD(bus_child_location_str, pci_child_location_str_method),
 
 	/* PCI interface */
 	DEVMETHOD(pci_read_config,	pci_read_config_method),
@@ -451,7 +453,6 @@ pci_freecfg(struct pci_devinfo *dinfo)
 
 	devlist_head = &pci_devq;
 
-	/* XXX this hasn't been tested */
 	STAILQ_REMOVE(devlist_head, dinfo, pci_devinfo, pci_links);
 	free(dinfo, M_DEVBUF);
 
@@ -567,42 +568,81 @@ pci_clear_command_bit(device_t dev, device_t child, u_int16_t bit)
 	PCI_WRITE_CONFIG(dev, child, PCIR_COMMAND, command, 2);
 }
 
-void
+int
 pci_enable_busmaster_method(device_t dev, device_t child)
 {
 	pci_set_command_bit(dev, child, PCIM_CMD_BUSMASTEREN);
+	return (0);
 }
 
-void
+int
 pci_disable_busmaster_method(device_t dev, device_t child)
 {
 	pci_clear_command_bit(dev, child, PCIM_CMD_BUSMASTEREN);
+	return (0);
 }
 
-void
+int
 pci_enable_io_method(device_t dev, device_t child, int space)
 {
+	u_int16_t command;
+	u_int16_t bit;
+	char *error;
+
+	bit = 0;
+	error = NULL;
+
 	switch(space) {
 	case SYS_RES_IOPORT:
-		pci_set_command_bit(dev, child, PCIM_CMD_PORTEN);
+		bit = PCIM_CMD_PORTEN;
+		error = "port";
 		break;
 	case SYS_RES_MEMORY:
-		pci_set_command_bit(dev, child, PCIM_CMD_MEMEN);
+		bit = PCIM_CMD_MEMEN;
+		error = "memory";
+		break;
+	default:
+		return (EINVAL);
 		break;
 	}
+	pci_set_command_bit(dev, child, bit);
+	command = PCI_READ_CONFIG(dev, child, PCIR_COMMAND, 2);
+	if (command & bit)
+		return (0);
+	device_printf(child, "failed to enable %s mapping!\n", error);
+	return (ENXIO);
 }
 
-void
+int
 pci_disable_io_method(device_t dev, device_t child, int space)
 {
+	u_int16_t command;
+	u_int16_t bit;
+	char *error;
+
+	bit = 0;
+	error = NULL;
+
 	switch(space) {
 	case SYS_RES_IOPORT:
-		pci_clear_command_bit(dev, child, PCIM_CMD_PORTEN);
+		bit = PCIM_CMD_PORTEN;
+		error = "port";
 		break;
 	case SYS_RES_MEMORY:
-		pci_clear_command_bit(dev, child, PCIM_CMD_MEMEN);
+		bit = PCIM_CMD_MEMEN;
+		error = "memory";
+		break;
+	default:
+		return (EINVAL);
 		break;
 	}
+	pci_clear_command_bit(dev, child, bit);
+	command = PCI_READ_CONFIG(dev, child, PCIR_COMMAND, 2);
+	if (command & bit) {
+		device_printf(child, "failed to disable %s mapping!\n", error);
+		return (ENXIO);
+	}
+	return (0);
 }
 
 /*
@@ -1300,21 +1340,34 @@ pci_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	 * XXX add support here for SYS_RES_IOPORT and SYS_RES_MEMORY
 	 */
 	if (device_get_parent(child) == dev) {
-		/*
-		 * If the child device doesn't have an interrupt routed
-		 * and is deserving of an interrupt, try to assign it one.
-		 */
-		if ((type == SYS_RES_IRQ) &&
-		    !PCI_INTERRUPT_VALID(cfg->intline) &&
-		    (cfg->intpin != 0)) {
-			cfg->intline = PCIB_ROUTE_INTERRUPT(
-				device_get_parent(dev), child, cfg->intpin);
-			if (PCI_INTERRUPT_VALID(cfg->intline)) {
-				pci_write_config(child, PCIR_INTLINE,
-				    cfg->intline, 1);
-				resource_list_add(rl, SYS_RES_IRQ, 0,
-				    cfg->intline, cfg->intline, 1);
+		switch (type) {
+		case SYS_RES_IRQ:
+			/*
+			 * If the child device doesn't have an
+			 * interrupt routed and is deserving of an
+			 * interrupt, try to assign it one.
+			 */
+			if (!PCI_INTERRUPT_VALID(cfg->intline) &&
+			    (cfg->intpin != 0)) {
+				cfg->intline = PCIB_ROUTE_INTERRUPT(
+				    device_get_parent(dev), child, cfg->intpin);
+				if (PCI_INTERRUPT_VALID(cfg->intline)) {
+					pci_write_config(child, PCIR_INTLINE,
+					    cfg->intline, 1);
+					resource_list_add(rl, SYS_RES_IRQ, 0,
+					    cfg->intline, cfg->intline, 1);
+				}
 			}
+			break;
+		case SYS_RES_IOPORT:
+		case SYS_RES_MEMORY:
+			/*
+			 * Enable the I/O mode.  We should also be allocating
+			 * resources too. XXX
+			 */
+			if (PCI_ENABLE_IO(dev, child, type))
+				return (NULL);
+			break;
 		}
 	}
 
@@ -1337,7 +1390,7 @@ pci_delete_resource(device_t dev, device_t child, int type, int rid)
 	rle = resource_list_find(rl, type, rid);
 	if (rle) {
 		if (rle->res) {
-			if (rle->res->r_dev != dev ||
+			if (rman_get_device(rle->res) != dev ||
 			    rman_get_flags(rle->res) & RF_ACTIVE) {
 				device_printf(dev, "delete_resource: "
 				    "Resource still owned by child, oops. "
@@ -1389,6 +1442,36 @@ pci_write_config_method(device_t dev, device_t child, int reg,
 
 	PCIB_WRITE_CONFIG(device_get_parent(dev),
 	    cfg->bus, cfg->slot, cfg->func, reg, val, width);
+}
+
+int
+pci_child_location_str_method(device_t cbdev, device_t child, char *buf,
+    size_t buflen)
+{
+	struct pci_devinfo *dinfo;
+	pcicfgregs *cfg;
+
+	dinfo = device_get_ivars(child);
+	cfg = &dinfo->cfg;
+	snprintf(buf, buflen, "slot=%d function=%d", pci_get_slot(child),
+	    pci_get_function(child));
+	return (0);
+}
+
+int
+pci_child_pnpinfo_str_method(device_t cbdev, device_t child, char *buf,
+    size_t buflen)
+{
+	struct pci_devinfo *dinfo;
+	pcicfgregs *cfg;
+
+	dinfo = device_get_ivars(child);
+	cfg = &dinfo->cfg;
+	snprintf(buf, buflen, "vendor=0x%04x device=0x%04x subvendor=0x%04x "
+	    "subdevice=0x%04x class=0x%02x%02x%02x", cfg->vendor, cfg->device,
+	    cfg->subvendor, cfg->subdevice, cfg->baseclass, cfg->subclass,
+	    cfg->progif);
+	return (0);
 }
 
 static int

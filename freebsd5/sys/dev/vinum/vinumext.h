@@ -33,8 +33,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumext.h,v 1.27 2001/05/22 04:07:22 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumext.h,v 1.33 2002/09/20 17:14:48 phk Exp $
+ * $Id: vinumext.h,v 1.33 2003/05/23 00:57:48 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumext.h,v 1.40 2003/05/23 01:13:43 grog Exp $
  */
 
 /* vinumext.h: external definitions */
@@ -42,6 +42,7 @@
 /* *sigh* We still need this at the moment. */
 #ifdef _KERNEL
 extern struct _vinum_conf vinum_conf;			    /* configuration information */
+extern struct mtx plexmutex[];				    /* mutexes for plexes to use */
 #else
 extern struct __vinum_conf vinum_conf;			    /* configuration information */
 #endif
@@ -70,7 +71,7 @@ int vinum_inactive(int);
 void free_vinum(int);
 int give_sd_to_plex(int plexno, int sdno);
 void give_sd_to_drive(int sdno);
-int give_plex_to_volume(int volno, int plexno);
+int give_plex_to_volume(int, int, int);
 struct drive *check_drive(char *);
 enum drive_label_info read_drive_label(struct drive *, int);
 int parse_config(char *, struct keywordset *, int);
@@ -84,7 +85,7 @@ int my_plex(int volno, int plexno);
 int my_sd(int plexno, int sdno);
 int get_empty_drive(void);
 int find_drive(const char *name, int create);
-int find_drive_by_dev(const char *devname, int create);
+int find_drive_by_name(const char *devname, int create);
 int get_empty_sd(void);
 int find_subdisk(const char *name, int create);
 void return_drive_space(int driveno, int64_t offset, int length);
@@ -102,7 +103,7 @@ void config_drive(int);
 void updateconfig(int);
 void update_sd_config(int sdno, int kernelstate);
 void update_plex_config(int plexno, int kernelstate);
-void update_volume_config(int volno, int kernelstate);
+void update_volume_config(int volno);
 void update_config(void);
 void drive_io_done(struct buf *);
 void save_config(void);
@@ -126,22 +127,21 @@ int init_drive(struct drive *, int);
 /* void throw_rude_remark (int, struct _ioctl_reply *, char *, ...); XXX */
 void throw_rude_remark(int, char *,...);
 
-/* XXX die die */
 void format_config(char *config, int len);
 void checkkernel(char *op);
 void free_drive(struct drive *drive);
 void down_drive(struct drive *drive);
 void remove_drive(int driveno);
 
-int vinum_scandisk(char *drivename[], int drives);
+int vinum_scandisk(char *drivename);
 
 /* I/O */
 d_open_t vinumopen;
 d_close_t vinumclose;
 d_strategy_t vinumstrategy;
 d_ioctl_t vinumioctl;
-d_psize_t vinumsize;
 
+int vinum_super_ioctl(dev_t, u_long, caddr_t);
 int vinumstart(struct buf *bp, int reviveok);
 int launch_requests(struct request *rq, int reviveok);
 void sdio(struct buf *bp);
@@ -160,7 +160,11 @@ void LongJmp(jmp_buf, int);
 char *basename(char *);
 #endif
 
+#ifdef VINUMDEBUG
+void expand_table(void **, int, int, char *, int);
+#else
 void expand_table(void **, int, int);
+#endif
 
 struct disklabel;
 struct request;

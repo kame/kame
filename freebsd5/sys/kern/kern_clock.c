@@ -36,20 +36,20 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_clock.c,v 1.143 2002/11/18 01:59:30 davidxu Exp $
+ * $FreeBSD: src/sys/kern/kern_clock.c,v 1.158 2003/04/29 13:36:02 kan Exp $
  */
 
 #include "opt_ntp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/dkstat.h>
 #include <sys/callout.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/ktr.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
 #include <sys/signalvar.h>
@@ -60,17 +60,16 @@
 #include <sys/sysctl.h>
 #include <sys/bus.h>
 #include <sys/interrupt.h>
+#include <sys/limits.h>
 #include <sys/timetc.h>
 
 #include <machine/cpu.h>
-#include <machine/limits.h>
 
 #ifdef GPROF
 #include <sys/gmon.h>
 #endif
 
 #ifdef DEVICE_POLLING
-extern void init_device_poll(void);
 extern void hardclock_device_poll(void);
 #endif /* DEVICE_POLLING */
 
@@ -82,11 +81,6 @@ long cp_time[CPUSTATES];
 
 SYSCTL_OPAQUE(_kern, OID_AUTO, cp_time, CTLFLAG_RD, &cp_time, sizeof(cp_time),
     "LU", "CPU time statistics");
-
-long tk_cancc;
-long tk_nin;
-long tk_nout;
-long tk_rawcc;
 
 /*
  * Clock handling routines.
@@ -122,10 +116,9 @@ long tk_rawcc;
 
 int	stathz;
 int	profhz;
-static int profprocs;
+int	profprocs;
 int	ticks;
-static int psdiv, pscnt;		/* prof => stat divider */
-int	psratio;			/* ratio: prof / stat */
+int	psratio;
 
 /*
  * Initialize clock frequencies and start both clocks running.
@@ -141,12 +134,8 @@ initclocks(dummy)
 	 * Set divisors to 1 (normal case) and let the machine-specific
 	 * code do its bit.
 	 */
-	psdiv = pscnt = 1;
 	cpu_initclocks();
 
-#ifdef DEVICE_POLLING
-	init_device_poll();
-#endif
 	/*
 	 * Compute profhz/stathz, and fix profhz if needed.
 	 */
@@ -157,43 +146,39 @@ initclocks(dummy)
 }
 
 /*
- * Each time the real-time timer fires, this function is called on all CPUs
- * with each CPU passing in its curthread as the first argument.  If possible
- * a nice optimization in the future would be to allow the CPU receiving the
- * actual real-time timer interrupt to call this function on behalf of the
- * other CPUs rather than sending an IPI to all other CPUs so that they
- * can call this function.  Note that hardclock() calls hardclock_process()
- * for the CPU receiving the timer interrupt, so only the other CPUs in the
- * system need to call this function (or have it called on their behalf.
+ * Each time the real-time timer fires, this function is called on all CPUs.
+ * Note that hardclock() calls hardclock_process() for the boot CPU, so only
+ * the other CPUs in the system need to call this function.
  */
 void
-hardclock_process(td, user)
-	struct thread *td;
-	int user;
+hardclock_process(frame)
+	register struct clockframe *frame;
 {
 	struct pstats *pstats;
+	struct thread *td = curthread;
 	struct proc *p = td->td_proc;
 
 	/*
 	 * Run current process's virtual and profile time, as needed.
 	 */
-	mtx_assert(&sched_lock, MA_OWNED);
-	if (p->p_flag & P_KSES) {
+	mtx_lock_spin_flags(&sched_lock, MTX_QUIET);
+	if (p->p_flag & P_THREADED) {
 		/* XXXKSE What to do? */
 	} else {
 		pstats = p->p_stats;
-		if (user &&
+		if (CLKF_USERMODE(frame) &&
 		    timevalisset(&pstats->p_timer[ITIMER_VIRTUAL].it_value) &&
 		    itimerdecr(&pstats->p_timer[ITIMER_VIRTUAL], tick) == 0) {
 			p->p_sflag |= PS_ALRMPEND;
-			td->td_kse->ke_flags |= KEF_ASTPENDING;
+			td->td_flags |= TDF_ASTPENDING;
 		}
 		if (timevalisset(&pstats->p_timer[ITIMER_PROF].it_value) &&
 		    itimerdecr(&pstats->p_timer[ITIMER_PROF], tick) == 0) {
 			p->p_sflag |= PS_PROFPEND;
-			td->td_kse->ke_flags |= KEF_ASTPENDING;
+			td->td_flags |= TDF_ASTPENDING;
 		}
 	}
+	mtx_unlock_spin_flags(&sched_lock, MTX_QUIET);
 }
 
 /*
@@ -206,9 +191,7 @@ hardclock(frame)
 	int need_softclock = 0;
 
 	CTR0(KTR_CLK, "hardclock fired");
-	mtx_lock_spin_flags(&sched_lock, MTX_QUIET);
-	hardclock_process(curthread, CLKF_USERMODE(frame));
-	mtx_unlock_spin_flags(&sched_lock, MTX_QUIET);
+	hardclock_process(frame);
 
 	tc_ticktock();
 	/*
@@ -216,8 +199,10 @@ hardclock(frame)
 	 *
 	 * XXX: this only works for UP
 	 */
-	if (stathz == 0)
+	if (stathz == 0) {
+		profclock(frame);
 		statclock(frame);
+	}
 
 #ifdef DEVICE_POLLING
 	hardclock_device_poll();	/* this is very short and quick */
@@ -312,24 +297,22 @@ void
 startprofclock(p)
 	register struct proc *p;
 {
-	int s;
 
 	/*
 	 * XXX; Right now sched_lock protects statclock(), but perhaps
 	 * it should be protected later on by a time_lock, which would
 	 * cover psdiv, etc. as well.
 	 */
-	mtx_lock_spin(&sched_lock);
-	if ((p->p_sflag & PS_PROFIL) == 0) {
-		p->p_sflag |= PS_PROFIL;
-		if (++profprocs == 1 && stathz != 0) {
-			s = splstatclock();
-			psdiv = pscnt = psratio;
-			setstatclockrate(profhz);
-			splx(s);
-		}
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	if (p->p_flag & P_STOPPROF)
+		return;
+	if ((p->p_flag & P_PROFIL) == 0) {
+		mtx_lock_spin(&sched_lock);
+		p->p_flag |= P_PROFIL;
+		if (++profprocs == 1)
+			cpu_startprofclock();
+		mtx_unlock_spin(&sched_lock);
 	}
-	mtx_unlock_spin(&sched_lock);
 }
 
 /*
@@ -339,83 +322,60 @@ void
 stopprofclock(p)
 	register struct proc *p;
 {
-	int s;
 
-	mtx_lock_spin(&sched_lock);
-	if (p->p_sflag & PS_PROFIL) {
-		p->p_sflag &= ~PS_PROFIL;
-		if (--profprocs == 0 && stathz != 0) {
-			s = splstatclock();
-			psdiv = pscnt = 1;
-			setstatclockrate(stathz);
-			splx(s);
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	if (p->p_flag & P_PROFIL) {
+		if (p->p_profthreads != 0) {
+			p->p_flag |= P_STOPPROF;
+			while (p->p_profthreads != 0)
+				msleep(&p->p_profthreads, &p->p_mtx, PPAUSE,
+				    "stopprof", NULL);
+			p->p_flag &= ~P_STOPPROF;
 		}
+		mtx_lock_spin(&sched_lock);
+		p->p_flag &= ~P_PROFIL;
+		if (--profprocs == 0)
+			cpu_stopprofclock();
+		mtx_unlock_spin(&sched_lock);
 	}
-	mtx_unlock_spin(&sched_lock);
 }
 
 /*
- * Do process and kernel statistics.  Most of the statistics are only
+ * Statistics clock.  Grab profile sample, and if divider reaches 0,
+ * do process and kernel statistics.  Most of the statistics are only
  * used by user-level statistics programs.  The main exceptions are
- * ke->ke_uticks, p->p_sticks, p->p_iticks, and p->p_estcpu.  This function
- * should be called by all CPUs in the system for each statistics clock
- * interrupt.  See the description of hardclock_process for more detail on
- * this function's relationship to statclock.
+ * ke->ke_uticks, p->p_sticks, p->p_iticks, and p->p_estcpu.
+ * This should be called by all active processors.
  */
 void
-statclock_process(ke, pc, user)
-	struct kse *ke;
-	register_t pc;
-	int user;
+statclock(frame)
+	register struct clockframe *frame;
 {
-#ifdef GPROF
-	struct gmonparam *g;
-	int i;
-#endif
 	struct pstats *pstats;
-	long rss;
 	struct rusage *ru;
 	struct vmspace *vm;
-	struct proc *p = ke->ke_proc;
-	struct thread *td = ke->ke_thread; /* current thread */
+	struct thread *td;
+	struct kse *ke;
+	struct proc *p;
+	long rss;
 
-	KASSERT(ke == curthread->td_kse, ("statclock_process: td != curthread"));
-	mtx_assert(&sched_lock, MA_OWNED);
-	if (user) {
-		/*
-		 * Came from user mode; CPU was in user state.
-		 * If this process is being profiled, record the tick.
-		 */
-		if (p->p_sflag & PS_PROFIL)
-			addupc_intr(ke, pc, 1);
-		if (pscnt < psdiv)
-			return;
+	td = curthread;
+	p = td->td_proc;
+
+	mtx_lock_spin_flags(&sched_lock, MTX_QUIET);
+	ke = td->td_kse;
+	if (CLKF_USERMODE(frame)) {
 		/*
 		 * Charge the time as appropriate.
 		 */
-		if (p->p_flag & P_KSES)
-			thread_add_ticks_intr(1, 1);
-		ke->ke_uticks++;
+		if (p->p_flag & P_THREADED)
+			thread_statclock(1);
+		p->p_uticks++;
 		if (ke->ke_ksegrp->kg_nice > NZERO)
 			cp_time[CP_NICE]++;
 		else
 			cp_time[CP_USER]++;
 	} else {
-#ifdef GPROF
-		/*
-		 * Kernel statistics are just like addupc_intr, only easier.
-		 */
-		g = &_gmonparam;
-		if (g->state == GMON_PROF_ON) {
-			i = pc - g->lowpc;
-			if (i < g->textsize) {
-				i /= HISTFRACTION * sizeof(*g->kcount);
-				g->kcount[i]++;
-			}
-		}
-#endif
-		if (pscnt < psdiv)
-			return;
 		/*
 		 * Came from kernel mode, so we were:
 		 * - handling an interrupt,
@@ -429,12 +389,13 @@ statclock_process(ke, pc, user)
 		 * in ``non-process'' (i.e., interrupt) work.
 		 */
 		if ((td->td_ithd != NULL) || td->td_intr_nesting_level >= 2) {
-			ke->ke_iticks++;
+			p->p_iticks++;
 			cp_time[CP_INTR]++;
 		} else {
-			if (p->p_flag & P_KSES)
-				thread_add_ticks_intr(0, 1);
-			ke->ke_sticks++;
+			if (p->p_flag & P_THREADED)
+				thread_statclock(0);
+			td->td_sticks++;
+			p->p_sticks++;
 			if (p != PCPU_GET(idlethread)->td_proc)
 				cp_time[CP_SYS]++;
 			else
@@ -442,7 +403,7 @@ statclock_process(ke, pc, user)
 		}
 	}
 
-	sched_clock(ke->ke_thread);
+	sched_clock(ke);
 
 	/* Update resource usage integrals and maximums. */
 	if ((pstats = p->p_stats) != NULL &&
@@ -455,25 +416,46 @@ statclock_process(ke, pc, user)
 		if (ru->ru_maxrss < rss)
 			ru->ru_maxrss = rss;
 	}
+	mtx_unlock_spin_flags(&sched_lock, MTX_QUIET);
 }
 
-/*
- * Statistics clock.  Grab profile sample, and if divider reaches 0,
- * do process and kernel statistics.  Most of the statistics are only
- * used by user-level statistics programs.  The main exceptions are
- * ke->ke_uticks, p->p_sticks, p->p_iticks, and p->p_estcpu.
- */
 void
-statclock(frame)
+profclock(frame)
 	register struct clockframe *frame;
 {
+	struct thread *td;
+#ifdef GPROF
+	struct gmonparam *g;
+	int i;
+#endif
 
-	CTR0(KTR_CLK, "statclock fired");
-	mtx_lock_spin_flags(&sched_lock, MTX_QUIET);
-	if (--pscnt == 0)
-		pscnt = psdiv;
-	statclock_process(curthread->td_kse, CLKF_PC(frame), CLKF_USERMODE(frame));
-	mtx_unlock_spin_flags(&sched_lock, MTX_QUIET);
+	td = curthread;
+	if (CLKF_USERMODE(frame)) {
+		/*
+		 * Came from user mode; CPU was in user state.
+		 * If this process is being profiled, record the tick.
+		 * if there is no related user location yet, don't
+		 * bother trying to count it.
+		 */
+		td = curthread;
+		if (td->td_proc->p_flag & P_PROFIL)
+			addupc_intr(td, CLKF_PC(frame), 1);
+	}
+#ifdef GPROF
+	else {
+		/*
+		 * Kernel statistics are just like addupc_intr, only easier.
+		 */
+		g = &_gmonparam;
+		if (g->state == GMON_PROF_ON) {
+			i = CLKF_PC(frame) - g->lowpc;
+			if (i < g->textsize) {
+				i /= HISTFRACTION * sizeof(*g->kcount);
+				g->kcount[i]++;
+			}
+		}
+	}
+#endif
 }
 
 /*

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.305 2002/12/04 15:04:18 nyan Exp $
+ * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.318 2003/05/14 20:21:42 jhb Exp $
  */
 
 #include "opt_atalk.h"
@@ -49,6 +49,7 @@
 #include "opt_msgbuf.h"
 #include "opt_npx.h"
 #include "opt_perfmon.h"
+#include "opt_swtch.h"
 #include "opt_kstack_pages.h"
 
 #include <sys/param.h>
@@ -128,7 +129,6 @@ extern void init386(int first);
 extern void dblfault_handler(void);
 
 extern void printcpuinfo(void);	/* XXX header file */
-extern void earlysetcpuclass(void);	/* same header file */
 extern void finishidentcpu(void);
 extern void panicifcpuunsupported(void);
 extern void initializecpu(void);
@@ -162,11 +162,40 @@ int	_udatasel, _ucodesel;
 u_int	atdevbase;
 
 #if defined(SWTCH_OPTIM_STATS)
-extern int swtch_optim_stats;
+int stupid_switch;
+SYSCTL_INT(_debug, OID_AUTO, stupid_switch,
+	CTLFLAG_RW, &stupid_switch, 0, "");
+int swtch_optim_stats;
 SYSCTL_INT(_debug, OID_AUTO, swtch_optim_stats,
-	CTLFLAG_RD, &swtch_optim_stats, 0, "");
+	CTLFLAG_RW, &swtch_optim_stats, 0, "");
+int tlb_flush_count;
 SYSCTL_INT(_debug, OID_AUTO, tlb_flush_count,
-	CTLFLAG_RD, &tlb_flush_count, 0, "");
+	CTLFLAG_RW, &tlb_flush_count, 0, "");
+int lazy_flush_count;
+SYSCTL_INT(_debug, OID_AUTO, lazy_flush_count,
+	CTLFLAG_RW, &lazy_flush_count, 0, "");
+int lazy_flush_fixup;
+SYSCTL_INT(_debug, OID_AUTO, lazy_flush_fixup,
+	CTLFLAG_RW, &lazy_flush_fixup, 0, "");
+#ifdef SMP
+int lazy_flush_smpfixup;
+SYSCTL_INT(_debug, OID_AUTO, lazy_flush_smpfixup,
+	CTLFLAG_RW, &lazy_flush_smpfixup, 0, "");
+int lazy_flush_smpipi;
+SYSCTL_INT(_debug, OID_AUTO, lazy_flush_smpipi,
+	CTLFLAG_RW, &lazy_flush_smpipi, 0, "");
+int lazy_flush_smpbadcr3;
+SYSCTL_INT(_debug, OID_AUTO, lazy_flush_smpbadcr3,
+	CTLFLAG_RW, &lazy_flush_smpbadcr3, 0, "");
+int lazy_flush_smpmiss;
+SYSCTL_INT(_debug, OID_AUTO, lazy_flush_smpmiss,
+	CTLFLAG_RW, &lazy_flush_smpmiss, 0, "");
+#endif
+#endif
+#ifdef LAZY_SWITCH
+int lazy_flush_enable = 1;
+SYSCTL_INT(_debug, OID_AUTO, lazy_flush_enable,
+	CTLFLAG_RW, &lazy_flush_enable, 0, "");
 #endif
 
 #ifdef PC98
@@ -191,7 +220,7 @@ long Maxmem = 0;
 int Maxmem_under16M = 0;
 #endif
 
-vm_offset_t phys_avail[10];
+vm_paddr_t phys_avail[10];
 
 /* must be 2 less so 0 0 can signal end of chunks */
 #define PHYS_AVAIL_ARRAY_END ((sizeof(phys_avail) / sizeof(vm_offset_t)) - 2)
@@ -212,15 +241,14 @@ cpu_startup(dummy)
 	/*
 	 * Good {morning,afternoon,evening,night}.
 	 */
-	earlysetcpuclass();
 	startrtclock();
 	printcpuinfo();
 	panicifcpuunsupported();
 #ifdef PERFMON
 	perfmon_init();
 #endif
-	printf("real memory  = %u (%u MB)\n", ptoa(Maxmem),
-	    ptoa(Maxmem) / 1048576);
+	printf("real memory  = %ju (%ju MB)\n", ptoa((uintmax_t)Maxmem),
+	    ptoa((uintmax_t)Maxmem) / 1048576);
 	/*
 	 * Display any holes after the first chunk of extended memory.
 	 */
@@ -229,19 +257,22 @@ cpu_startup(dummy)
 
 		printf("Physical memory chunk(s):\n");
 		for (indx = 0; phys_avail[indx + 1] != 0; indx += 2) {
-			unsigned int size1;
+			vm_paddr_t size;
 
-			size1 = phys_avail[indx + 1] - phys_avail[indx];
-			printf("0x%08x - 0x%08x, %u bytes (%u pages)\n",
-			    phys_avail[indx], phys_avail[indx + 1] - 1, size1,
-			    size1 / PAGE_SIZE);
+			size = phys_avail[indx + 1] - phys_avail[indx];
+			printf(
+			    "0x%016jx - 0x%016jx, %ju bytes (%ju pages)\n",
+			    (uintmax_t)phys_avail[indx],
+			    (uintmax_t)phys_avail[indx + 1] - 1,
+			    (uintmax_t)size, (uintmax_t)size / PAGE_SIZE);
 		}
 	}
 
 	vm_ksubmap_init(&kmi);
 
-	printf("avail memory = %u (%u MB)\n", ptoa(cnt.v_free_count),
-	    ptoa(cnt.v_free_count) / 1048576);
+	printf("avail memory = %ju (%ju MB)\n",
+	    ptoa((uintmax_t)cnt.v_free_count),
+	    ptoa((uintmax_t)cnt.v_free_count) / 1048576);
 
 	/*
 	 * Set up buffers, so they can be used to read disk labels.
@@ -284,6 +315,7 @@ osendsig(catcher, sig, mask, code)
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 	regs = td->td_frame;
 	oonstack = sigonstack(regs->tf_esp);
 
@@ -297,7 +329,6 @@ osendsig(catcher, sig, mask, code)
 #endif
 	} else
 		fp = (struct osigframe *)regs->tf_esp - 1;
-	PROC_UNLOCK(p);
 
 	/* Translate the signal if appropriate. */
 	if (p->p_sysent->sv_sigtbl && sig <= p->p_sysent->sv_sigsize)
@@ -306,8 +337,7 @@ osendsig(catcher, sig, mask, code)
 	/* Build the argument list for the signal handler. */
 	sf.sf_signum = sig;
 	sf.sf_scp = (register_t)&fp->sf_siginfo.si_sc;
-	PROC_LOCK(p);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig)) {
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
 		sf.sf_arg2 = (register_t)&fp->sf_siginfo;
 		sf.sf_siginfo.si_signo = sig;
@@ -319,6 +349,7 @@ osendsig(catcher, sig, mask, code)
 		sf.sf_addr = regs->tf_err;
 		sf.sf_ahu.sf_handler = catcher;
 	}
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/* Save most if not all of trap frame. */
@@ -391,6 +422,7 @@ osendsig(catcher, sig, mask, code)
 	load_gs(_udatasel);
 	regs->tf_ss = _udatasel;
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 #endif /* COMPAT_43 */
 
@@ -413,6 +445,7 @@ freebsd4_sendsig(catcher, sig, mask, code)
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 	regs = td->td_frame;
 	oonstack = sigonstack(regs->tf_esp);
 
@@ -436,7 +469,6 @@ freebsd4_sendsig(catcher, sig, mask, code)
 #endif
 	} else
 		sfp = (struct sigframe4 *)regs->tf_esp - 1;
-	PROC_UNLOCK(p);
 
 	/* Translate the signal if appropriate. */
 	if (p->p_sysent->sv_sigtbl && sig <= p->p_sysent->sv_sigsize)
@@ -445,8 +477,7 @@ freebsd4_sendsig(catcher, sig, mask, code)
 	/* Build the argument list for the signal handler. */
 	sf.sf_signum = sig;
 	sf.sf_ucontext = (register_t)&sfp->sf_uc;
-	PROC_LOCK(p);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig)) {
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
 		sf.sf_siginfo = (register_t)&sfp->sf_si;
 		sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher;
@@ -461,6 +492,7 @@ freebsd4_sendsig(catcher, sig, mask, code)
 		sf.sf_addr = regs->tf_err;
 		sf.sf_ahu.sf_handler = catcher;
 	}
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/*
@@ -512,6 +544,7 @@ freebsd4_sendsig(catcher, sig, mask, code)
 	regs->tf_fs = _udatasel;
 	regs->tf_ss = _udatasel;
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 #endif	/* COMPAT_FREEBSD4 */
 
@@ -534,6 +567,7 @@ sendsig(catcher, sig, mask, code)
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 #ifdef COMPAT_FREEBSD4
 	if (SIGISMEMBER(psp->ps_freebsd4, sig)) {
 		freebsd4_sendsig(catcher, sig, mask, code);
@@ -574,7 +608,6 @@ sendsig(catcher, sig, mask, code)
 		sp = (char *)regs->tf_esp - sizeof(struct sigframe);
 	/* Align to 16 bytes. */
 	sfp = (struct sigframe *)((unsigned int)sp & ~0xF);
-	PROC_UNLOCK(p);
 
 	/* Translate the signal if appropriate. */
 	if (p->p_sysent->sv_sigtbl && sig <= p->p_sysent->sv_sigsize)
@@ -583,8 +616,7 @@ sendsig(catcher, sig, mask, code)
 	/* Build the argument list for the signal handler. */
 	sf.sf_signum = sig;
 	sf.sf_ucontext = (register_t)&sfp->sf_uc;
-	PROC_LOCK(p);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig)) {
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
 		sf.sf_siginfo = (register_t)&sfp->sf_si;
 		sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher;
@@ -599,6 +631,7 @@ sendsig(catcher, sig, mask, code)
 		sf.sf_addr = regs->tf_err;
 		sf.sf_ahu.sf_handler = catcher;
 	}
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/*
@@ -650,6 +683,7 @@ sendsig(catcher, sig, mask, code)
 	regs->tf_fs = _udatasel;
 	regs->tf_ss = _udatasel;
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 
 /*
@@ -699,7 +733,7 @@ osigreturn(td, uap)
 
 		/* Go back to user mode if both flags are set. */
 		if ((eflags & PSL_VIP) && (eflags & PSL_VIF))
-			trapsignal(p, SIGBUS, 0);
+			trapsignal(td, SIGBUS, 0);
 
 		if (vm86->vm86_has_vme) {
 			eflags = (tf->tf_eflags & ~VME_USERCHANGE) |
@@ -740,7 +774,7 @@ osigreturn(td, uap)
 		 * other selectors, invalid %eip's and invalid %esp's.
 		 */
 		if (!CS_SECURE(scp->sc_cs)) {
-			trapsignal(p, SIGBUS, T_PROTFLT);
+			trapsignal(td, SIGBUS, T_PROTFLT);
 			return (EINVAL);
 		}
 		regs->tf_ds = scp->sc_ds;
@@ -770,9 +804,9 @@ osigreturn(td, uap)
 	else
 		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
-	SIGSETOLD(p->p_sigmask, scp->sc_mask);
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	SIGSETOLD(td->td_sigmask, scp->sc_mask);
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 	return (EJUSTRETURN);
 }
@@ -817,7 +851,7 @@ freebsd4_sigreturn(td, uap)
 
 		/* Go back to user mode if both flags are set. */
 		if ((eflags & PSL_VIP) && (eflags & PSL_VIF))
-			trapsignal(p, SIGBUS, 0);
+			trapsignal(td, SIGBUS, 0);
 
 		if (vm86->vm86_has_vme) {
 			eflags = (tf->tf_eflags & ~VME_USERCHANGE) |
@@ -863,7 +897,7 @@ freebsd4_sigreturn(td, uap)
 		cs = ucp->uc_mcontext.mc_cs;
 		if (!CS_SECURE(cs)) {
 			printf("freebsd4_sigreturn: cs = 0x%x\n", cs);
-			trapsignal(p, SIGBUS, T_PROTFLT);
+			trapsignal(td, SIGBUS, T_PROTFLT);
 			return (EINVAL);
 		}
 
@@ -878,9 +912,9 @@ freebsd4_sigreturn(td, uap)
 		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
-	p->p_sigmask = ucp->uc_sigmask;
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	td->td_sigmask = ucp->uc_sigmask;
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 	return (EJUSTRETURN);
 }
@@ -924,7 +958,7 @@ sigreturn(td, uap)
 
 		/* Go back to user mode if both flags are set. */
 		if ((eflags & PSL_VIP) && (eflags & PSL_VIF))
-			trapsignal(p, SIGBUS, 0);
+			trapsignal(td, SIGBUS, 0);
 
 		if (vm86->vm86_has_vme) {
 			eflags = (tf->tf_eflags & ~VME_USERCHANGE) |
@@ -970,7 +1004,7 @@ sigreturn(td, uap)
 		cs = ucp->uc_mcontext.mc_cs;
 		if (!CS_SECURE(cs)) {
 			printf("sigreturn: cs = 0x%x\n", cs);
-			trapsignal(p, SIGBUS, T_PROTFLT);
+			trapsignal(td, SIGBUS, T_PROTFLT);
 			return (EINVAL);
 		}
 
@@ -988,9 +1022,9 @@ sigreturn(td, uap)
 		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
-	p->p_sigmask = ucp->uc_sigmask;
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	td->td_sigmask = ucp->uc_sigmask;
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 	return (EJUSTRETURN);
 }
@@ -1027,12 +1061,11 @@ cpu_halt(void)
  * XXX we need to have a cpu mask of idle cpus and generate an IPI or
  * otherwise generate some sort of interrupt to wake up cpus sitting in HLT.
  * Then we can have our cake and eat it too.
+ *
+ * XXX I'm turning it on for SMP as well by default for now.  It seems to
+ * help lock contention somewhat, and this is critical for HTT. -Peter
  */
-#ifdef SMP
-static int	cpu_idle_hlt = 0;
-#else
 static int	cpu_idle_hlt = 1;
-#endif
 SYSCTL_INT(_machdep, OID_AUTO, cpu_idle_hlt, CTLFLAG_RW,
     &cpu_idle_hlt, 0, "Idle loop HLT enable");
 
@@ -1045,6 +1078,12 @@ SYSCTL_INT(_machdep, OID_AUTO, cpu_idle_hlt, CTLFLAG_RW,
 void
 cpu_idle(void)
 {
+
+#ifdef SMP
+	if (mp_grab_cpu_hlt())
+		return;
+#endif
+
 	if (cpu_idle_hlt) {
 		disable_intr();
   		if (sched_runnable()) {
@@ -1485,6 +1524,8 @@ sdtossd(sd, ssd)
  *
  * Total memory size may be set by the kernel environment variable
  * hw.physmem or the compile-time define MAXMEM.
+ *
+ * XXX first should be vm_paddr_t.
  */
 static void
 getmemsize(int first)
@@ -1500,7 +1541,7 @@ getmemsize(int first)
 	u_int basemem, extmem;
 	struct vm86frame vmf;
 	struct vm86context vmc;
-	vm_offset_t pa, physmap[PHYSMAP_SIZE];
+	vm_paddr_t pa, physmap[PHYSMAP_SIZE];
 	pt_entry_t *pte;
 	char *cp;
 	struct bios_smap *smap;
@@ -1575,7 +1616,7 @@ getmemsize(int first)
 	 * map page 1 R/W into the kernel page table so we can use it
 	 * as a buffer.  The kernel will unmap this page later.
 	 */
-	pmap_kenter(KERNBASE + (1 << PAGE_SHIFT), 1);
+	pmap_kenter(KERNBASE + (1 << PAGE_SHIFT), 1 << PAGE_SHIFT);
 
 	/*
 	 * get memory map with INT 15:E820
@@ -1594,12 +1635,8 @@ getmemsize(int first)
 		if (i || vmf.vmf_eax != SMAP_SIG)
 			break;
 		if (boothowto & RB_VERBOSE)
-			printf("SMAP type=%02x base=%08x %08x len=%08x %08x\n",
-				smap->type,
-				*(u_int32_t *)((char *)&smap->base + 4),
-				(u_int32_t)smap->base,
-				*(u_int32_t *)((char *)&smap->length + 4),
-				(u_int32_t)smap->length);
+			printf("SMAP type=%02x base=%016llx len=%016llx\n",
+			    smap->type, smap->base, smap->length);
 
 		if (smap->type != 0x01)
 			goto next_run;
@@ -1812,7 +1849,7 @@ physmap_done:
 	 * extend the last memory segment to the new limit.
 	 */ 
 	if (atop(physmap[physmap_idx + 1]) < Maxmem)
-		physmap[physmap_idx + 1] = ptoa(Maxmem);
+		physmap[physmap_idx + 1] = ptoa((vm_paddr_t)Maxmem);
 
 	/* call pmap initialization to make new kernel address space */
 	pmap_bootstrap(first, 0);
@@ -1831,9 +1868,9 @@ physmap_done:
 	 * round up the start address and round down the end address.
 	 */
 	for (i = 0; i <= physmap_idx; i += 2) {
-		vm_offset_t end;
+		vm_paddr_t end;
 
-		end = ptoa(Maxmem);
+		end = ptoa((vm_paddr_t)Maxmem);
 		if (physmap[i + 1] < end)
 			end = trunc_page(physmap[i + 1]);
 		for (pa = round_page(physmap[i]); pa < end; pa += PAGE_SIZE) {
@@ -2018,14 +2055,8 @@ init386(first)
 	gdt_segs[GPRIV_SEL].ssd_base = (int) pc;
 	gdt_segs[GPROC0_SEL].ssd_base = (int) &pc->pc_common_tss;
 
-	for (x = 0; x < NGDT; x++) {
-#ifdef BDE_DEBUGGER
-		/* avoid overwriting db entries with APM ones */
-		if (x >= GAPMCODE32_SEL && x <= GAPMDATA_SEL)
-			continue;
-#endif
+	for (x = 0; x < NGDT; x++)
 		ssdtosd(&gdt_segs[x], &gdt[x].sd);
-	}
 
 	r_gdt.rd_limit = NGDT * sizeof(gdt[0]) - 1;
 	r_gdt.rd_base =  (int) gdt;
@@ -2400,13 +2431,15 @@ set_fpregs(struct thread *td, struct fpreg *fpregs)
  * Get machine context.
  */
 int
-get_mcontext(struct thread *td, mcontext_t *mcp)
+get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 {
 	struct trapframe *tp;
 
 	tp = td->td_frame;
 
+	PROC_LOCK(curthread->td_proc);
 	mcp->mc_onstack = sigonstack(tp->tf_esp);
+	PROC_UNLOCK(curthread->td_proc);
 	mcp->mc_gs = td->td_pcb->pcb_gs;
 	mcp->mc_fs = tp->tf_fs;
 	mcp->mc_es = tp->tf_es;
@@ -2416,9 +2449,14 @@ get_mcontext(struct thread *td, mcontext_t *mcp)
 	mcp->mc_ebp = tp->tf_ebp;
 	mcp->mc_isp = tp->tf_isp;
 	mcp->mc_ebx = tp->tf_ebx;
-	mcp->mc_edx = tp->tf_edx;
+	if (clear_ret != 0) {
+		mcp->mc_eax = 0;
+		mcp->mc_edx = 0;
+	} else {
+		mcp->mc_eax = tp->tf_eax;
+		mcp->mc_edx = tp->tf_edx;
+	}
 	mcp->mc_ecx = tp->tf_ecx;
-	mcp->mc_eax = tp->tf_eax;
 	mcp->mc_eip = tp->tf_eip;
 	mcp->mc_cs = tp->tf_cs;
 	mcp->mc_eflags = tp->tf_eflags;

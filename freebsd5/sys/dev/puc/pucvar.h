@@ -1,5 +1,5 @@
 /*	$NetBSD: pucvar.h,v 1.2 1999/02/06 06:29:54 cgd Exp $	*/
-/*	$FreeBSD: src/sys/dev/puc/pucvar.h,v 1.6 2002/09/27 22:01:32 phk Exp $ */
+/*	$FreeBSD: src/sys/dev/puc/pucvar.h,v 1.10 2003/03/15 16:25:40 sobomax Exp $ */
 
 /*-
  * Copyright (c) 2002 JF Hay.  All rights reserved.
@@ -64,7 +64,7 @@
  * Author: Christopher G. Demetriou, May 14, 1998.
  */
 
-#define	PUC_MAX_PORTS		12
+#define	PUC_MAX_PORTS		16
 
 struct puc_softc;
 typedef int puc_init_t(struct puc_softc *sc);
@@ -80,6 +80,8 @@ struct puc_device_description {
 		u_int	serialfreq;
 		u_int	flags;
 	} ports[PUC_MAX_PORTS];
+	uint32_t	ilr_type;
+	uint32_t	ilr_offset[2];
 };
 
 #define	PUC_REG_VEND		0
@@ -90,6 +92,12 @@ struct puc_device_description {
 #define	PUC_PORT_TYPE_NONE	0
 #define	PUC_PORT_TYPE_COM	1
 #define	PUC_PORT_TYPE_LPT	2
+
+/* Interrupt Latch Register (ILR) types */
+#define	PUC_ILR_TYPE_NONE	0
+#define	PUC_ILR_TYPE_DIGI	1
+
+#define	PUC_FLAGS_MEMORY	0x0001		/* Use memory mapped I/O. */
 
 #define	PUC_PORT_VALID(desc, port) \
   ((port) < PUC_MAX_PORTS && (desc)->ports[(port)].type != PUC_PORT_TYPE_NONE)
@@ -124,10 +132,14 @@ struct puc_softc {
 	int			irqrid;
 	struct resource		*irqres;
 	void			*intr_cookie;
+	int			ilr_enabled;
+	bus_space_tag_t		ilr_st;
+	bus_space_handle_t	ilr_sh;
 
 	struct {
 		int		used;
 		int 		bar;
+		int		type;	/* SYS_RES_IOPORT or SYS_RES_MEMORY. */
 		struct resource	*res;
 	} sc_bar_mappings[PUC_MAX_BAR];
 

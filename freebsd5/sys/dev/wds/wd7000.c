@@ -34,7 +34,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wds/wd7000.c,v 1.5 2002/11/07 22:25:13 jhb Exp $
+ * $FreeBSD: src/sys/dev/wds/wd7000.c,v 1.6 2003/04/16 20:49:11 phk Exp $
  */
 
 /* All bugs are subject to removal without further notice */
@@ -133,7 +133,6 @@
 
 #include <sys/bio.h>
 #include <sys/buf.h>
-#include <sys/disklabel.h>
 
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>

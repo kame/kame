@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_prf.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/subr_prf.c,v 1.92 2002/11/14 16:11:11 tmm Exp $
+ * $FreeBSD: src/sys/kern/subr_prf.c,v 1.100 2003/04/17 22:30:43 jhb Exp $
  */
+
+#include "opt_ddb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,12 +51,15 @@
 #include <sys/malloc.h>
 #include <sys/proc.h>
 #include <sys/stddef.h>
-#include <sys/stdint.h>
 #include <sys/sysctl.h>
 #include <sys/tty.h>
 #include <sys/syslog.h>
 #include <sys/cons.h>
 #include <sys/uio.h>
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
 
 /*
  * Note that stdarg.h and the ANSI style va_start macro is used for both
@@ -87,6 +92,7 @@ struct	tty *constty;			/* pointer to console "window" tty */
 static void (*v_putc)(int) = cnputc;	/* routine to putc on virtual console */
 static void  msglogchar(int c, int pri);
 static void  msgaddchar(int c, void *dummy);
+static u_int msgbufcksum(char *cp, size_t size, u_int cksum);
 static void  putchar(int ch, void *arg);
 static char *ksprintn(char *nbuf, uintmax_t num, int base, int *len);
 static void  snprintf_func(int ch, void *arg);
@@ -155,22 +161,23 @@ void
 tprintf(struct proc *p, int pri, const char *fmt, ...)
 {
 	struct tty *tp = NULL;
-	int flags = 0, shld = 0;
+	int flags = 0;
 	va_list ap;
 	struct putchar_arg pca;
 	int retval;
+	struct session *sess = NULL;
 
 	if (pri != -1)
 		flags |= TOLOG;
 	if (p != NULL) {
 		PROC_LOCK(p);
 		if (p->p_flag & P_CONTROLT && p->p_session->s_ttyvp) {
-			SESS_LOCK(p->p_session);
-			SESSHOLD(p->p_session);
-			tp = p->p_session->s_ttyp;
-			SESS_UNLOCK(p->p_session);
+			sess = p->p_session;
+			SESS_LOCK(sess);
 			PROC_UNLOCK(p);
-			shld++;
+			SESSHOLD(sess);
+			tp = sess->s_ttyp;
+			SESS_UNLOCK(sess);
 			if (ttycheckoutq(tp, 0))
 				flags |= TOTTY;
 			else
@@ -184,12 +191,10 @@ tprintf(struct proc *p, int pri, const char *fmt, ...)
 	va_start(ap, fmt);
 	retval = kvprintf(fmt, putchar, &pca, 10, ap);
 	va_end(ap);
-	if (shld) {
-		PROC_LOCK(p);
-		SESS_LOCK(p->p_session);
-		SESSRELE(p->p_session);
-		SESS_UNLOCK(p->p_session);
-		PROC_UNLOCK(p);
+	if (sess != NULL) {
+		SESS_LOCK(sess);
+		SESSRELE(sess);
+		SESS_UNLOCK(sess);
 	}
 	msgbuftrigger = 1;
 }
@@ -410,6 +415,23 @@ vsnprintf(char *str, size_t size, const char *format, va_list ap)
 	return (retval);
 }
 
+/*
+ * Kernel version which takes radix argument vsnprintf(3).
+ */
+int
+vsnrprintf(char *str, size_t size, int radix, const char *format, va_list ap)
+{
+	struct snprintf_arg info;
+	int retval;
+
+	info.str = str;
+	info.remain = size;
+	retval = kvprintf(format, snprintf_func, &info, radix, ap);
+	if (info.remain >= 1)
+		*info.str++ = '\0';
+	return (retval);
+}
+
 static void
 snprintf_func(int ch, void *arg)
 {
@@ -554,7 +576,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				width = n;
 			goto reswitch;
 		case 'b':
-			num = va_arg(ap, int);
+			num = (u_int)va_arg(ap, int);
 			p = va_arg(ap, char *);
 			for (q = ksprintn(nbuf, num, *p++, NULL); *q;)
 				PCHAR(*q--);
@@ -796,6 +818,7 @@ msgaddchar(int c, void *dummy)
 	if (!msgbufmapped)
 		return;
 	mbp = msgbufp;
+	mbp->msg_cksum += (u_char)c - (u_char)mbp->msg_ptr[mbp->msg_bufx];
 	mbp->msg_ptr[mbp->msg_bufx++] = c;
 	if (mbp->msg_bufx >= mbp->msg_size)
 		mbp->msg_bufx = 0;
@@ -830,17 +853,34 @@ msgbufinit(void *ptr, int size)
 	msgbufp = (struct msgbuf *) (cp + size);
 	if (msgbufp->msg_magic != MSG_MAGIC || msgbufp->msg_size != size ||
 	    msgbufp->msg_bufx >= size || msgbufp->msg_bufx < 0 ||
-	    msgbufp->msg_bufr >= size || msgbufp->msg_bufr < 0) {
+	    msgbufp->msg_bufr >= size || msgbufp->msg_bufr < 0 ||
+	    msgbufcksum(cp, size, msgbufp->msg_cksum) != msgbufp->msg_cksum) {
 		bzero(cp, size);
 		bzero(msgbufp, sizeof(*msgbufp));
 		msgbufp->msg_magic = MSG_MAGIC;
-		msgbufp->msg_size = (char *)msgbufp - cp;
+		msgbufp->msg_size = size;
 	}
 	msgbufp->msg_ptr = cp;
 	if (msgbufmapped && oldp != msgbufp)
 		msgbufcopy(oldp);
 	msgbufmapped = 1;
 	oldp = msgbufp;
+}
+
+static u_int
+msgbufcksum(char *cp, size_t size, u_int cksum)
+{
+	u_int sum;
+	int i;
+
+	sum = 0;
+	for (i = 0; i < size; i++)
+		sum += (u_char)cp[i];
+	if (sum != cksum)
+		printf("msgbuf cksum mismatch (read %x, calc %x)\n", cksum,
+		    sum);
+
+	return (sum);
 }
 
 SYSCTL_DECL(_security_bsd);
@@ -891,6 +931,7 @@ sysctl_kern_msgbuf_clear(SYSCTL_HANDLER_ARGS)
 		/* Clear the buffer and reset write pointer */
 		bzero(msgbufp->msg_ptr, msgbufp->msg_size);
 		msgbufp->msg_bufr = msgbufp->msg_bufx = 0;
+		msgbufp->msg_cksum = 0;
 		msgbuf_clear = 0;
 	}
 	return (error);
@@ -900,9 +941,7 @@ SYSCTL_PROC(_kern, OID_AUTO, msgbuf_clear,
     CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE, &msgbuf_clear, 0,
     sysctl_kern_msgbuf_clear, "I", "Clear kernel message buffer");
 
-#include "opt_ddb.h"
 #ifdef DDB
-#include <ddb/ddb.h>
 
 DB_SHOW_COMMAND(msgbuf, db_show_msgbuf)
 {
@@ -913,9 +952,9 @@ DB_SHOW_COMMAND(msgbuf, db_show_msgbuf)
 		return;
 	}
 	db_printf("msgbufp = %p\n", msgbufp);
-	db_printf("magic = %x, size = %d, r= %d, w = %d, ptr = %p\n",
+	db_printf("magic = %x, size = %d, r= %d, w = %d, ptr = %p, cksum= %d\n",
 	    msgbufp->msg_magic, msgbufp->msg_size, msgbufp->msg_bufr,
-	    msgbufp->msg_bufx, msgbufp->msg_ptr);
+	    msgbufp->msg_bufx, msgbufp->msg_ptr, msgbufp->msg_cksum);
 	for (i = 0; i < msgbufp->msg_size; i++) {
 		j = (i + msgbufp->msg_bufr) % msgbufp->msg_size;
 		db_printf("%c", msgbufp->msg_ptr[j]);

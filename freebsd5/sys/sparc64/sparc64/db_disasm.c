@@ -28,10 +28,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *	from: NetBSD: db_disasm.c,v 1.9 2000/08/16 11:29:42 pk Exp
- * $FreeBSD: src/sys/sparc64/sparc64/db_disasm.c,v 1.5 2002/03/23 20:22:19 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/db_disasm.c,v 1.7 2003/01/16 08:53:03 mdodd Exp $
  */
 
 #include <sys/param.h>
+#include <sys/systm.h>
 
 #include <ddb/ddb.h>
 #include <ddb/db_access.h>
@@ -39,8 +40,6 @@
 
 #include <machine/db_machdep.h>
 #include <machine/instr.h>
-
-#define	abs(v)	((v) > 0 ? (v) : -(v))
 
 #define SIGN(v)			(((v)<0)?"-":"")
 

@@ -29,7 +29,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	$NetBSD: pmap.h,v 1.17 2000/03/30 16:18:24 jdolecek Exp $
- * $FreeBSD: src/sys/powerpc/include/pmap.h,v 1.9 2002/08/07 19:37:22 alc Exp $
+ * $FreeBSD: src/sys/powerpc/include/pmap.h,v 1.10 2003/03/16 04:16:03 jake Exp $
  */
 
 #ifndef	_MACHINE_PMAP_H_
@@ -69,6 +69,8 @@ extern	struct pmap kernel_pmap_store;
 #ifdef _KERNEL
 
 void		pmap_bootstrap(vm_offset_t, vm_offset_t);
+void		pmap_kenter(vm_offset_t va, vm_offset_t pa);
+void		pmap_kremove(vm_offset_t);
 void		*pmap_mapdev(vm_offset_t, vm_size_t);
 void		pmap_unmapdev(vm_offset_t, vm_size_t);
 void		pmap_deactivate(struct thread *);

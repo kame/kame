@@ -1,5 +1,5 @@
 /*	$NetBSD: pcmciavar.h,v 1.12 2000/02/08 12:51:31 enami Exp $	*/
-/* $FreeBSD: src/sys/dev/pccard/pccardvar.h,v 1.34 2002/11/14 05:15:50 imp Exp $ */
+/* $FreeBSD: src/sys/dev/pccard/pccardvar.h,v 1.41 2003/04/23 23:32:53 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -82,7 +82,7 @@ struct pccard_mem_handle {
 
 struct pccard_config_entry {
 	int		number;
-	u_int32_t	flags;
+	uint32_t	flags;
 	int		iftype;
 	int		num_iospace;
 
@@ -96,7 +96,7 @@ struct pccard_config_entry {
 		u_long	length;
 		u_long	start;
 	} iospace[4];		/* XXX this could be as high as 16 */
-	u_int16_t	irqmask;
+	uint16_t	irqmask;
 	int		num_memspace;
 	struct {
 		u_long	length;
@@ -119,7 +119,7 @@ struct pccard_funce_disk {
 
 struct pccard_funce_lan {
 	int pfl_nidlen;
-	u_int8_t pfl_nid[8];
+	uint8_t pfl_nid[8];
 };
 
 union pccard_funce {
@@ -180,7 +180,7 @@ struct pccard_card {
 	int32_t		product;
 #define	PCMCIA_PRODUCT_INVALID		-1
 	int16_t		prodext;
-	u_int16_t	error;
+	uint16_t	error;
 #define	PCMCIA_CIS_INVALID		{ NULL, NULL, NULL, NULL }
 	STAILQ_HEAD(, pccard_function) pf_head;
 };
@@ -229,10 +229,10 @@ struct pccard_tuple {
 
 struct pccard_product {
 	const char	*pp_name;		/* NULL if end of table */
-#define PCCARD_VENDOR_ANY ((u_int32_t) -1)
-	u_int32_t	pp_vendor;
-#define PCCARD_PRODUCT_ANY ((u_int32_t) -1)
-	u_int32_t	pp_product;
+#define PCCARD_VENDOR_ANY (0xffffffff)
+	uint32_t	pp_vendor;
+#define PCCARD_PRODUCT_ANY (0xffffffff)
+	uint32_t	pp_product;
 	int		pp_expfunc;
 	const char	*pp_cis[4];
 };
@@ -349,15 +349,16 @@ pccard_get_ ## A(device_t dev, T *t)					\
 	    PCCARD_IVAR_ ## B, (uintptr_t *) t);			\
 }
 
-PCCARD_ACCESSOR(ether,		ETHADDR,		u_int8_t)
-PCCARD_ACCESSOR(vendor,		VENDOR,			u_int32_t)
-PCCARD_ACCESSOR(product,	PRODUCT,		u_int32_t)
-PCCARD_ACCESSOR(prodext,	PRODEXT,		u_int16_t)
-PCCARD_ACCESSOR(function_number,FUNCTION_NUMBER,	u_int32_t)
-PCCARD_ACCESSOR(function,	FUNCTION,		u_int32_t)
+PCCARD_ACCESSOR(ether,		ETHADDR,		uint8_t)
+PCCARD_ACCESSOR(vendor,		VENDOR,			uint32_t)
+PCCARD_ACCESSOR(product,	PRODUCT,		uint32_t)
+PCCARD_ACCESSOR(prodext,	PRODEXT,		uint16_t)
+PCCARD_ACCESSOR(function_number,FUNCTION_NUMBER,	uint32_t)
+PCCARD_ACCESSOR(function,	FUNCTION,		uint32_t)
 PCCARD_ACCESSOR(vendor_str,	VENDOR_STR,		char *)
 PCCARD_ACCESSOR(product_str,	PRODUCT_STR,		char *)
 PCCARD_ACCESSOR(cis3_str,	CIS3_STR,		char *)
+PCCARD_ACCESSOR(cis4_str,	CIS4_STR,		char *)
 
 /* shared memory flags */
 enum {
@@ -373,9 +374,15 @@ enum {
 #define PCCARD_S(a, b) PCMCIA_STR_ ## a ## _ ## b
 #define PCCARD_P(a, b) PCMCIA_PRODUCT_ ## a ## _ ## b
 #define PCCARD_C(a, b) PCMCIA_CIS_ ## a ## _ ## b
-#define PCMCIA_CARD(v, p, f) { PCCARD_S(v, p), PCMCIA_VENDOR_ ## v, \
+#define PCMCIA_CARD_D(v, p, f) { PCCARD_S(v, p), PCMCIA_VENDOR_ ## v, \
 		PCCARD_P(v, p), f, PCCARD_C(v, p) }
-#define PCMCIA_CARD2(v1, p1, p2, f) \
+#define PCMCIA_CARD2_D(v1, p1, p2, f) \
 		{ PCMCIA_STR_ ## p2, PCMCIA_VENDOR_ ## v1, PCCARD_P(v1, p1), \
 		  f, PCMCIA_CIS_ ## p2}
-
+#if 1
+#define PCMCIA_CARD(v, p, f) { NULL, PCMCIA_VENDOR_ ## v, \
+		PCCARD_P(v, p), f, PCCARD_C(v, p) }
+#define PCMCIA_CARD2(v1, p1, p2, f) \
+		{ NULL, PCMCIA_VENDOR_ ## v1, PCCARD_P(v1, p1), \
+		  f, PCMCIA_CIS_ ## p2}
+#endif

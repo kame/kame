@@ -37,8 +37,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumrevive.c,v 1.15 2001/05/23 23:04:48 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumrevive.c,v 1.40 2002/12/12 01:03:45 grog Exp $
+ * $Id: vinumrevive.c,v 1.18 2003/04/28 02:54:43 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumrevive.c,v 1.42 2003/05/05 16:56:44 obrien Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -131,7 +131,7 @@ revive_block(int sdno)
 	break;
 
     case plex_disorg:					    /* to keep the compiler happy */
-	break;
+	break;						    /* to keep the pedants happy */
     }
 
     if (paritysd) {					    /* we're reviving a parity block, */
@@ -159,7 +159,7 @@ revive_block(int sdno)
 	       * First, read the data from the volume.  We
 	       * don't care which plex, that's bre's job.
 	     */
-	    bp->b_dev = VINUMDEV(plex->volno, 0, 0, VINUM_VOLUME_TYPE);	/* create the device number */
+	    bp->b_dev = VINUM_VOL(plex->volno);		    /* create the device number */
 	else						    /* it's an unattached plex */
 	    bp->b_dev = VINUM_PLEX(sd->plexno);		    /* create the device number */
 
@@ -204,13 +204,13 @@ revive_block(int sdno)
 
 	    if (debug & DEBUG_REVIVECONFLICT)
 		log(LOG_DEBUG,
-		    "Relaunch revive conflict sd %d: %p\n%s dev %d.%d, offset 0x%llx, length %ld\n",
+		    "Relaunch revive conflict sd %d: %p\n%s dev %d.%d, offset 0x%jx, length %ld\n",
 		    rq->sdno,
 		    rq,
 		    rq->bp->b_iocmd == BIO_READ ? "Read" : "Write",
 		    major(rq->bp->b_dev),
 		    minor(rq->bp->b_dev),
-		    (long long)rq->bp->b_blkno,
+		    (intmax_t)rq->bp->b_blkno,
 		    rq->bp->b_bcount);
 #endif
 	    launch_requests(sd->waitlist, 1);		    /* do them now */
@@ -306,8 +306,8 @@ parityops(struct vinum_ioctl_msg *data)
 	    if (op == checkparity)
 		reply->error = EIO;
 	    sprintf(reply->msg,
-		"Parity incorrect at offset 0x%llx\n",
-		(long long)errorloc);
+		"Parity incorrect at offset 0x%jx\n",
+		(intmax_t)errorloc);
 	}
 	if (reply->error == EAGAIN) {			    /* still OK, */
 	    plex->checkblock = pstripe + (pbp->b_bcount >> DEV_BSHIFT);	/* moved this much further down */

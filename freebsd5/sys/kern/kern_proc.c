@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_proc.c	8.7 (Berkeley) 2/14/95
- * $FreeBSD: src/sys/kern/kern_proc.c,v 1.168 2002/11/21 09:30:55 jeff Exp $
+ * $FreeBSD: src/sys/kern/kern_proc.c,v 1.186 2003/05/13 20:35:59 jhb Exp $
  */
 
 #include "opt_ktrace.h"
@@ -71,14 +71,10 @@ MALLOC_DEFINE(M_SESSION, "session", "session header");
 static MALLOC_DEFINE(M_PROC, "proc", "Proc structures");
 MALLOC_DEFINE(M_SUBPROC, "subproc", "Proc sub-structures");
 
-static struct proc *dopfind(register pid_t);
-
 static void doenterpgrp(struct proc *, struct pgrp *);
-
-static void pgdelete(struct pgrp *);
-
 static void orphanpg(struct pgrp *pg);
-
+static void pgadjustjobc(struct pgrp *pgrp, int entering);
+static void pgdelete(struct pgrp *);
 static void proc_ctor(void *mem, int size, void *arg);
 static void proc_dtor(void *mem, int size, void *arg);
 static void proc_init(void *mem, int size);
@@ -198,6 +194,8 @@ proc_init(void *mem, int size)
 	ke = kse_alloc();
 	kg = ksegrp_alloc();
 	proc_linkup(p, kg, ke, td);
+	bzero(&p->p_mtx, sizeof(struct mtx));
+	mtx_init(&p->p_mtx, "process lock", NULL, MTX_DEF | MTX_DUPOK);
 }
 
 /*
@@ -224,6 +222,7 @@ proc_fini(void *mem, int size)
 	thread_free(td);
 	ksegrp_free(kg);
 	kse_free(ke);
+	mtx_destroy(&p->p_mtx);
 }
 
 /*
@@ -251,24 +250,12 @@ pfind(pid)
 	register struct proc *p;
 
 	sx_slock(&allproc_lock);
-	p = dopfind(pid);
-	sx_sunlock(&allproc_lock);
-	return (p);
-}
-
-static struct proc *
-dopfind(pid)
-	register pid_t pid;
-{
-	register struct proc *p;
-
-	sx_assert(&allproc_lock, SX_LOCKED);
-
 	LIST_FOREACH(p, PIDHASH(pid), p_hash)
 		if (p->p_pid == pid) {
 			PROC_LOCK(p);
 			break;
 		}
+	sx_sunlock(&allproc_lock);
 	return (p);
 }
 
@@ -490,6 +477,23 @@ pgdelete(pgrp)
 	FREE(pgrp, M_PGRP);
 }
 
+static void
+pgadjustjobc(pgrp, entering)
+	struct pgrp *pgrp;
+	int entering;
+{
+
+	PGRP_LOCK(pgrp);
+	if (entering)
+		pgrp->pg_jobc++;
+	else {
+		--pgrp->pg_jobc;
+		if (pgrp->pg_jobc == 0)
+			orphanpg(pgrp);
+	}
+	PGRP_UNLOCK(pgrp);
+}
+
 /*
  * Adjust pgrp jobc counters when specified process changes process group.
  * We count the number of processes in each process group that "qualify"
@@ -520,17 +524,8 @@ fixjobc(p, pgrp, entering)
 	 */
 	mysession = pgrp->pg_session;
 	if ((hispgrp = p->p_pptr->p_pgrp) != pgrp &&
-	    hispgrp->pg_session == mysession) {
-		PGRP_LOCK(pgrp);
-		if (entering)
-			pgrp->pg_jobc++;
-		else {
-			--pgrp->pg_jobc;
-			if (pgrp->pg_jobc == 0)
-				orphanpg(pgrp);
-		}
-		PGRP_UNLOCK(pgrp);
-	}
+	    hispgrp->pg_session == mysession)
+		pgadjustjobc(pgrp, entering);
 
 	/*
 	 * Check this process' children to see whether they qualify
@@ -538,19 +533,17 @@ fixjobc(p, pgrp, entering)
 	 * process groups.
 	 */
 	LIST_FOREACH(p, &p->p_children, p_sibling) {
-		if ((hispgrp = p->p_pgrp) != pgrp &&
-		    hispgrp->pg_session == mysession &&
-		    p->p_state != PRS_ZOMBIE) {
-			PGRP_LOCK(hispgrp);
-			if (entering)
-				hispgrp->pg_jobc++;
-			else {
-				--hispgrp->pg_jobc;
-				if (hispgrp->pg_jobc == 0)
-					orphanpg(hispgrp);
-			}
-			PGRP_UNLOCK(hispgrp);
+		hispgrp = p->p_pgrp;
+		if (hispgrp == pgrp ||
+		    hispgrp->pg_session != mysession)
+			continue;
+		PROC_LOCK(p);
+		if (p->p_state == PRS_ZOMBIE) {
+			PROC_UNLOCK(p);
+			continue;
 		}
+		PROC_UNLOCK(p);
+		pgadjustjobc(hispgrp, entering);
 	}
 }
 
@@ -567,10 +560,10 @@ orphanpg(pg)
 
 	PGRP_LOCK_ASSERT(pg, MA_OWNED);
 
-	mtx_lock_spin(&sched_lock);
 	LIST_FOREACH(p, &pg->pg_members, p_pglist) {
+		PROC_LOCK(p);
 		if (P_SHOULDSTOP(p)) {
-			mtx_unlock_spin(&sched_lock);
+			PROC_UNLOCK(p);
 			LIST_FOREACH(p, &pg->pg_members, p_pglist) {
 				PROC_LOCK(p);
 				psignal(p, SIGHUP);
@@ -579,8 +572,8 @@ orphanpg(pg)
 			}
 			return;
 		}
+		PROC_UNLOCK(p);
 	}
-	mtx_unlock_spin(&sched_lock);
 }
 
 #include "opt_ddb.h"
@@ -615,7 +608,7 @@ DB_SHOW_COMMAND(pgrpdump, pgrpdump)
 #endif /* DDB */
 
 /*
- * Fill in an kinfo_proc structure for the specified process.
+ * Fill in a kinfo_proc structure for the specified process.
  * Must be called with the target process locked.
  */
 void
@@ -624,11 +617,15 @@ fill_kinfo_proc(p, kp)
 	struct kinfo_proc *kp;
 {
 	struct thread *td;
+	struct thread *td0;
 	struct kse *ke;
 	struct ksegrp *kg;
 	struct tty *tp;
 	struct session *sp;
 	struct timeval tv;
+	struct sigacts *ps;
+
+	td = FIRST_THREAD_IN_PROC(p);
 
 	bzero(kp, sizeof(*kp));
 
@@ -639,7 +636,7 @@ fill_kinfo_proc(p, kp)
 	kp->ki_args = p->p_args;
 	kp->ki_textvp = p->p_textvp;
 #ifdef KTRACE
-	kp->ki_tracep = p->p_tracep;
+	kp->ki_tracep = p->p_tracevp;
 	mtx_lock(&ktrace_mtx);
 	kp->ki_traceflag = p->p_traceflag;
 	mtx_unlock(&ktrace_mtx);
@@ -657,9 +654,12 @@ fill_kinfo_proc(p, kp)
 		kp->ki_rgid = p->p_ucred->cr_rgid;
 		kp->ki_svgid = p->p_ucred->cr_svgid;
 	}
-	if (p->p_procsig) {
-		kp->ki_sigignore = p->p_procsig->ps_sigignore;
-		kp->ki_sigcatch = p->p_procsig->ps_sigcatch;
+	if (p->p_sigacts) {
+		ps = p->p_sigacts;
+		mtx_lock(&ps->ps_mtx);
+		kp->ki_sigignore = ps->ps_sigignore;
+		kp->ki_sigcatch = ps->ps_sigcatch;
+		mtx_unlock(&ps->ps_mtx);
 	}
 	mtx_lock_spin(&sched_lock);
 	if (p->p_state != PRS_NEW &&
@@ -671,8 +671,12 @@ fill_kinfo_proc(p, kp)
 		kp->ki_rssize = vmspace_resident_count(vm); /*XXX*/
 		if (p->p_sflag & PS_INMEM)
 			kp->ki_rssize += UAREA_PAGES;
-		FOREACH_THREAD_IN_PROC(p, td) /* XXXKSE: thread swapout check */
-			kp->ki_rssize += KSTACK_PAGES;
+		FOREACH_THREAD_IN_PROC(p, td0) {
+			if (!TD_IS_SWAPPED(td0))
+				kp->ki_rssize += td0->td_kstack_pages;
+			if (td0->td_altkstack_obj != NULL)
+				kp->ki_rssize += td0->td_altkstack_pages;
+		}
 		kp->ki_swrss = vm->vm_swrss;
 		kp->ki_tsize = vm->vm_tsize;
 		kp->ki_dsize = vm->vm_dsize;
@@ -680,6 +684,7 @@ fill_kinfo_proc(p, kp)
 	}
 	if ((p->p_sflag & PS_INMEM) && p->p_stats) {
 		kp->ki_start = p->p_stats->p_start;
+		timevaladd(&kp->ki_start, &boottime);
 		kp->ki_rusage = p->p_stats->p_ru;
 		kp->ki_childtime.tv_sec = p->p_stats->p_cru.ru_utime.tv_sec +
 		    p->p_stats->p_cru.ru_stime.tv_sec;
@@ -687,7 +692,6 @@ fill_kinfo_proc(p, kp)
 		    p->p_stats->p_cru.ru_stime.tv_usec;
 	}
 	if (p->p_state != PRS_ZOMBIE) {
-		td = FIRST_THREAD_IN_PROC(p);
 		if (td == NULL) {
 			/* XXXKSE: This should never happen. */
 			printf("fill_kinfo_proc(): pid %d has no threads!\n",
@@ -695,7 +699,7 @@ fill_kinfo_proc(p, kp)
 			mtx_unlock_spin(&sched_lock);
 			return;
 		}
-		if (!(p->p_flag & P_KSES)) {
+		if (!(p->p_flag & P_THREADED)) {
 			if (td->td_wmesg != NULL) {
 				strlcpy(kp->ki_wmesg, td->td_wmesg,
 				    sizeof(kp->ki_wmesg));
@@ -729,7 +733,7 @@ fill_kinfo_proc(p, kp)
 		kp->ki_swtime = p->p_swtime;
 		kp->ki_pid = p->p_pid;
 		/* vvv XXXKSE */
-		if (!(p->p_flag & P_KSES)) {
+		if (!(p->p_flag & P_THREADED)) {
 			kg = td->td_ksegrp;
 			ke = td->td_kse;
 			KASSERT((ke != NULL), ("fill_kinfo_proc: Null KSE"));
@@ -749,13 +753,13 @@ fill_kinfo_proc(p, kp)
 			kp->ki_pri.pri_level = td->td_priority;
 			kp->ki_pri.pri_native = td->td_base_pri;
 			kp->ki_lastcpu = td->td_lastcpu;
+			kp->ki_oncpu = td->td_oncpu;
 			kp->ki_tdflags = td->td_flags;
 			kp->ki_pcb = td->td_pcb;
 			kp->ki_kstack = (void *)td->td_kstack;
 
 			/* Things in the kse */
 			kp->ki_rqindex = ke->ke_rqindex;
-			kp->ki_oncpu = ke->ke_oncpu;
 			kp->ki_pctcpu = sched_pctcpu(ke);
 		} else {
 			kp->ki_oncpu = -1;
@@ -800,7 +804,8 @@ fill_kinfo_proc(p, kp)
 		strlcpy(kp->ki_ocomm, p->p_comm, sizeof(kp->ki_ocomm));
 	}
 	kp->ki_siglist = p->p_siglist;
-	kp->ki_sigmask = p->p_sigmask;
+        SIGSETOR(kp->ki_siglist, td->td_siglist);
+	kp->ki_sigmask = td->td_sigmask;
 	kp->ki_xstat = p->p_xstat;
 	kp->ki_acflag = p->p_acflag;
 	kp->ki_flag = p->p_flag;
@@ -908,18 +913,20 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 		else
 			p = LIST_FIRST(&zombproc);
 		for (; p != 0; p = LIST_NEXT(p, p_list)) {
+			/*
+			 * Skip embryonic processes.
+			 */
+			mtx_lock_spin(&sched_lock);
+			if (p->p_state == PRS_NEW) {
+				mtx_unlock_spin(&sched_lock);
+				continue;
+			}
+			mtx_unlock_spin(&sched_lock);
 			PROC_LOCK(p);
 			/*
 			 * Show a user only appropriate processes.
 			 */
 			if (p_cansee(curthread, p)) {
-				PROC_UNLOCK(p);
-				continue;
-			}
-			/*
-			 * Skip embryonic processes.
-			 */
-			if (p->p_state == PRS_NEW) {
 				PROC_UNLOCK(p);
 				continue;
 			}
@@ -1038,8 +1045,8 @@ sysctl_kern_proc_args(SYSCTL_HANDLER_ARGS)
 {
 	int *name = (int*) arg1;
 	u_int namelen = arg2;
+	struct pargs *newpa, *pa;
 	struct proc *p;
-	struct pargs *pa;
 	int error = 0;
 
 	if (namelen != 1) 
@@ -1053,40 +1060,35 @@ sysctl_kern_proc_args(SYSCTL_HANDLER_ARGS)
 		PROC_UNLOCK(p);
 		return (0);
 	}
-	PROC_UNLOCK(p);
 
-	if (req->newptr && curproc != p)
+	if (req->newptr && curproc != p) {
+		PROC_UNLOCK(p);
 		return (EPERM);
+	}
 
-	PROC_LOCK(p);
 	pa = p->p_args;
 	pargs_hold(pa);
 	PROC_UNLOCK(p);
-	if (req->oldptr && pa != NULL) {
+	if (req->oldptr != NULL && pa != NULL)
 		error = SYSCTL_OUT(req, pa->ar_args, pa->ar_length);
-	}
 	pargs_drop(pa);
-	if (req->newptr == NULL)
+	if (error != 0 || req->newptr == NULL)
 		return (error);
-
-	PROC_LOCK(p);
-	pa = p->p_args;
-	p->p_args = NULL;
-	PROC_UNLOCK(p);
-	pargs_drop(pa);
 
 	if (req->newlen + sizeof(struct pargs) > ps_arg_cache_limit)
+		return (ENOMEM);
+	newpa = pargs_alloc(req->newlen);
+	error = SYSCTL_IN(req, newpa->ar_args, req->newlen);
+	if (error != 0) {
+		pargs_free(newpa);
 		return (error);
-
-	pa = pargs_alloc(req->newlen);
-	error = SYSCTL_IN(req, pa->ar_args, req->newlen);
-	if (!error) {
-		PROC_LOCK(p);
-		p->p_args = pa;
-		PROC_UNLOCK(p);
-	} else
-		pargs_free(pa);
-	return (error);
+	}
+	PROC_LOCK(p);
+	pa = p->p_args;
+	p->p_args = newpa;
+	PROC_UNLOCK(p);
+	pargs_drop(pa);
+	return (0);
 }
 
 SYSCTL_NODE(_kern, KERN_PROC, proc, CTLFLAG_RD,  0, "Process table");

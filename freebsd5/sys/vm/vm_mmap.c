@@ -38,7 +38,7 @@
  * from: Utah $Hdr: vm_mmap.c 1.6 91/10/21$
  *
  *	@(#)vm_mmap.c	8.4 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_mmap.c,v 1.153 2002/11/28 08:01:39 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_mmap.c,v 1.158 2003/04/17 22:38:27 jhb Exp $
  */
 
 /*
@@ -309,7 +309,7 @@ mmap(td, uap)
 		 */
 		if (fp->f_flag & FPOSIXSHM)
 			flags |= MAP_NOSYNC;
-		vp = (struct vnode *) fp->f_data;
+		vp = fp->f_data;
 		error = vget(vp, LK_EXCLUSIVE, td);
 		if (error)
 			goto done;
@@ -752,7 +752,23 @@ madvise(td, uap)
 {
 	vm_offset_t start, end;
 	vm_map_t map;
+	struct proc *p;
+	int error;
 
+	/*
+	 * Check for our special case, advising the swap pager we are
+	 * "immortal."
+	 */
+	if (uap->behav == MADV_PROTECT) {
+		error = suser(td);
+		if (error == 0) {
+			p = td->td_proc;
+			PROC_LOCK(p);
+			p->p_flag |= P_PROTECTED;
+			PROC_UNLOCK(p);
+		}
+		return (error);
+	}
 	/*
 	 * Check for illegal behavior
 	 */
@@ -1215,7 +1231,7 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 	/*
 	 * Force device mappings to be shared.
 	 */
-	if (type == OBJT_DEVICE || type == OBJT_PHYS) {
+	if (type == OBJT_DEVICE) {
 		flags &= ~(MAP_PRIVATE|MAP_COPY);
 		flags |= MAP_SHARED;
 	}

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_target.c,v 1.22 2002/10/14 22:13:51 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_target.c,v 1.25 2003/02/16 14:26:23 mjacob Exp $ */
 /*
  * Machine and OS Independent Target Mode Code for the Qlogic SCSI/FC adapters.
  *
@@ -386,6 +386,8 @@ isp_target_put_atio(struct ispsoftc *isp, void *arg)
 		} else {
 			atun._atio2.at_lun = (u_int8_t) aep->at_lun;
 		}
+		atun._atio2.at_iid = aep->at_iid;
+		atun._atio2.at_rxid = aep->at_rxid;
 		atun._atio2.at_status = CT_OK;
 	} else {
 		at_entry_t *aep = arg;
@@ -763,7 +765,7 @@ isp_handle_atio(struct ispsoftc *isp, at_entry_t *aep)
 
 	case AT_RESET:
 		/*
-		 * A bus reset came along an blew away this command. Why
+		 * A bus reset came along and blew away this command. Why
 		 * they do this in addition the async event code stuff,
 		 * I dunno.
 		 *

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/cy_pci.c,v 1.27 2002/03/20 02:07:59 alfred Exp $
+ * $FreeBSD: src/sys/pci/cy_pci.c,v 1.28 2003/04/15 06:37:29 mdodd Exp $
  */
 
 /*
@@ -88,6 +88,7 @@ static driver_t cy_pci_driver = {
 static devclass_t	cy_devclass;
 
 DRIVER_MODULE(cy, pci, cy_pci_driver, cy_devclass, 0, 0);
+MODULE_DEPEND(cy, pci, 1, 1, 1);
 
 static int
 cy_pci_probe(dev)

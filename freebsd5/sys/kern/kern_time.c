@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_time.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/kern_time.c,v 1.86.2.1 2002/12/19 09:40:10 alfred Exp $
+ * $FreeBSD: src/sys/kern/kern_time.c,v 1.102 2003/05/13 19:21:46 jhb Exp $
  */
 
 #include "opt_mac.h"
@@ -45,7 +45,6 @@
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
 #include <sys/mac.h>
-#include <sys/systm.h>
 #include <sys/sysent.h>
 #include <sys/proc.h>
 #include <sys/time.h>
@@ -55,7 +54,8 @@
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 
-struct timezone tz;
+int tz_minuteswest;
+int tz_dsttime;
 
 /*
  * Time of day and interval timer support.
@@ -159,11 +159,12 @@ clock_gettime(struct thread *td, struct clock_gettime_args *uap)
 {
 	struct timespec ats;
 
-	if (uap->clock_id != CLOCK_REALTIME)
+	if (uap->clock_id == CLOCK_REALTIME)
+		nanotime(&ats);
+	else if (uap->clock_id == CLOCK_MONOTONIC)
+		nanouptime(&ats);
+	else
 		return (EINVAL);
-	mtx_lock(&Giant);
-	nanotime(&ats);
-	mtx_unlock(&Giant);
 	return (copyout(&ats, uap->tp, sizeof(ats)));
 }
 
@@ -293,24 +294,17 @@ nanosleep(struct thread *td, struct nanosleep_args *uap)
 	if (error)
 		return (error);
 
-	mtx_lock(&Giant);
-	if (uap->rmtp) {
-		if (!useracc((caddr_t)uap->rmtp, sizeof(rmt), 
-		    VM_PROT_WRITE)) {
-			error = EFAULT;
-			goto done2;
-		}
-	}
+	if (uap->rmtp &&
+	    !useracc((caddr_t)uap->rmtp, sizeof(rmt), VM_PROT_WRITE))
+			return (EFAULT);
 	error = nanosleep1(td, &rqt, &rmt);
 	if (error && uap->rmtp) {
 		int error2;
 
 		error2 = copyout(&rmt, uap->rmtp, sizeof(rmt));
-		if (error2)	/* XXX shouldn't happen, did useracc() above */
+		if (error2)
 			error = error2;
 	}
-done2:
-	mtx_unlock(&Giant);
 	return (error);
 }
 
@@ -328,6 +322,7 @@ int
 gettimeofday(struct thread *td, struct gettimeofday_args *uap)
 {
 	struct timeval atv;
+	struct timezone rtz;
 	int error = 0;
 
 	if (uap->tp) {
@@ -335,9 +330,9 @@ gettimeofday(struct thread *td, struct gettimeofday_args *uap)
 		error = copyout(&atv, uap->tp, sizeof (atv));
 	}
 	if (error == 0 && uap->tzp != NULL) {
-		mtx_lock(&Giant);
-		error = copyout(&tz, uap->tzp, sizeof (tz));
-		mtx_unlock(&Giant);
+		rtz.tz_minuteswest = tz_minuteswest;
+		rtz.tz_dsttime = tz_dsttime;
+		error = copyout(&rtz, uap->tzp, sizeof (rtz));
 	}
 	return (error);
 }
@@ -380,9 +375,8 @@ settimeofday(struct thread *td, struct settimeofday_args *uap)
 	if (uap->tv && (error = settime(td, &atv)))
 		return (error);
 	if (uap->tzp) {
-		mtx_lock(&Giant);
-		tz = atz;
-		mtx_unlock(&Giant);
+		tz_minuteswest = atz.tz_minuteswest;
+		tz_dsttime = atz.tz_dsttime;
 	}
 	return (error);
 }
@@ -416,22 +410,16 @@ struct getitimer_args {
 /*
  * MPSAFE
  */
-/* ARGSUSED */
 int
 getitimer(struct thread *td, struct getitimer_args *uap)
 {
 	struct proc *p = td->td_proc;
 	struct timeval ctv;
 	struct itimerval aitv;
-	int s;
-	int error;
 
 	if (uap->which > ITIMER_PROF)
 		return (EINVAL);
 
-	mtx_lock(&Giant);
-
-	s = splclock(); /* XXX still needed ? */
 	if (uap->which == ITIMER_REAL) {
 		/*
 		 * Convert from absolute to relative time in .it_value
@@ -439,7 +427,9 @@ getitimer(struct thread *td, struct getitimer_args *uap)
 		 * has passed return 0, else return difference between
 		 * current time and time for the timer to go off.
 		 */
+		PROC_LOCK(p);
 		aitv = p->p_realtimer;
+		PROC_UNLOCK(p);
 		if (timevalisset(&aitv.it_value)) {
 			getmicrouptime(&ctv);
 			if (timevalcmp(&aitv.it_value, &ctv, <))
@@ -448,12 +438,11 @@ getitimer(struct thread *td, struct getitimer_args *uap)
 				timevalsub(&aitv.it_value, &ctv);
 		}
 	} else {
+		mtx_lock_spin(&sched_lock);
 		aitv = p->p_stats->p_timer[uap->which];
+		mtx_unlock_spin(&sched_lock);
 	}
-	splx(s);
-	error = copyout(&aitv, uap->itv, sizeof (struct itimerval));
-	mtx_unlock(&Giant);
-	return(error);
+	return (copyout(&aitv, uap->itv, sizeof (struct itimerval)));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -465,59 +454,58 @@ struct setitimer_args {
 /*
  * MPSAFE
  */
-/* ARGSUSED */
 int
 setitimer(struct thread *td, struct setitimer_args *uap)
 {
 	struct proc *p = td->td_proc;
-	struct itimerval aitv;
+	struct itimerval aitv, oitv;
 	struct timeval ctv;
-	struct itimerval *itvp;
-	int s, error = 0;
+	int error;
+
+	if (uap->itv == NULL) {
+		uap->itv = uap->oitv;
+		return (getitimer(td, (struct getitimer_args *)uap));
+	}
 
 	if (uap->which > ITIMER_PROF)
 		return (EINVAL);
-	itvp = uap->itv;
-	if (itvp && (error = copyin(itvp, &aitv, sizeof(struct itimerval))))
+	if ((error = copyin(uap->itv, &aitv, sizeof(struct itimerval))))
 		return (error);
-
-	mtx_lock(&Giant);
-
-	if ((uap->itv = uap->oitv) &&
-	    (error = getitimer(td, (struct getitimer_args *)uap))) {
-		goto done2;
-	}
-	if (itvp == 0) {
-		error = 0;
-		goto done2;
-	}
-	if (itimerfix(&aitv.it_value)) {
-		error = EINVAL;
-		goto done2;
-	}
-	if (!timevalisset(&aitv.it_value)) {
+	if (itimerfix(&aitv.it_value))
+		return (EINVAL);
+	if (!timevalisset(&aitv.it_value))
 		timevalclear(&aitv.it_interval);
-	} else if (itimerfix(&aitv.it_interval)) {
-		error = EINVAL;
-		goto done2;
-	}
-	s = splclock(); /* XXX: still needed ? */
+	else if (itimerfix(&aitv.it_interval))
+		return (EINVAL);
+
 	if (uap->which == ITIMER_REAL) {
+		PROC_LOCK(p);
 		if (timevalisset(&p->p_realtimer.it_value))
 			callout_stop(&p->p_itcallout);
-		if (timevalisset(&aitv.it_value)) 
+		getmicrouptime(&ctv);
+		if (timevalisset(&aitv.it_value)) {
 			callout_reset(&p->p_itcallout, tvtohz(&aitv.it_value),
 			    realitexpire, p);
-		getmicrouptime(&ctv);
-		timevaladd(&aitv.it_value, &ctv);
+			timevaladd(&aitv.it_value, &ctv);
+		}
+		oitv = p->p_realtimer;
 		p->p_realtimer = aitv;
+		PROC_UNLOCK(p);
+		if (timevalisset(&oitv.it_value)) {
+			if (timevalcmp(&oitv.it_value, &ctv, <))
+				timevalclear(&oitv.it_value);
+			else
+				timevalsub(&oitv.it_value, &ctv);
+		}
 	} else {
+		mtx_lock_spin(&sched_lock);
+		oitv = p->p_stats->p_timer[uap->which];
 		p->p_stats->p_timer[uap->which] = aitv;
+		mtx_unlock_spin(&sched_lock);
 	}
-	splx(s);
-done2:
-	mtx_unlock(&Giant);
-	return (error);
+	if (uap->oitv == NULL)
+		return (0);
+	return (copyout(&oitv, uap->oitv, sizeof(struct itimerval)));
 }
 
 /*
@@ -537,7 +525,6 @@ realitexpire(void *arg)
 {
 	struct proc *p;
 	struct timeval ctv, ntv;
-	int s;
 
 	p = (struct proc *)arg;
 	PROC_LOCK(p);
@@ -548,7 +535,6 @@ realitexpire(void *arg)
 		return;
 	}
 	for (;;) {
-		s = splclock(); /* XXX: still neeeded ? */
 		timevaladd(&p->p_realtimer.it_value,
 		    &p->p_realtimer.it_interval);
 		getmicrouptime(&ctv);
@@ -557,11 +543,9 @@ realitexpire(void *arg)
 			timevalsub(&ntv, &ctv);
 			callout_reset(&p->p_itcallout, tvtohz(&ntv) - 1,
 			    realitexpire, p);
-			splx(s);
 			PROC_UNLOCK(p);
 			return;
 		}
-		splx(s);
 	}
 	/*NOTREACHED*/
 }
@@ -661,5 +645,66 @@ timevalfix(struct timeval *t1)
 	if (t1->tv_usec >= 1000000) {
 		t1->tv_sec++;
 		t1->tv_usec -= 1000000;
+	}
+}
+
+/*
+ * ratecheck(): simple time-based rate-limit checking.
+ */
+int
+ratecheck(struct timeval *lasttime, const struct timeval *mininterval)
+{
+	struct timeval tv, delta;
+	int rv = 0;
+
+	getmicrouptime(&tv);		/* NB: 10ms precision */
+	delta = tv;
+	timevalsub(&delta, lasttime);
+
+	/*
+	 * check for 0,0 is so that the message will be seen at least once,
+	 * even if interval is huge.
+	 */
+	if (timevalcmp(&delta, mininterval, >=) ||
+	    (lasttime->tv_sec == 0 && lasttime->tv_usec == 0)) {
+		*lasttime = tv;
+		rv = 1;
+	}
+
+	return (rv);
+}
+
+/*
+ * ppsratecheck(): packets (or events) per second limitation.
+ *
+ * Return 0 if the limit is to be enforced (e.g. the caller
+ * should drop a packet because of the rate limitation).
+ *
+ * maxpps of 0 always causes zero to be returned.  maxpps of -1
+ * always causes 1 to be returned; this effectively defeats rate
+ * limiting.
+ *
+ * Note that we maintain the struct timeval for compatibility
+ * with other bsd systems.  We reuse the storage and just monitor
+ * clock ticks for minimal overhead.  
+ */
+int
+ppsratecheck(struct timeval *lasttime, int *curpps, int maxpps)
+{
+	int now;
+
+	/*
+	 * Reset the last time and counter if this is the first call
+	 * or more than a second has passed since the last update of
+	 * lasttime.
+	 */
+	now = ticks;
+	if (lasttime->tv_sec == 0 || (u_int)(now - lasttime->tv_sec) >= hz) {
+		lasttime->tv_sec = now;
+		*curpps = 1;
+		return (maxpps != 0);
+	} else {
+		(*curpps)++;		/* NB: ignore potential overflow */
+		return (maxpps < 0 || *curpps < maxpps);
 	}
 }

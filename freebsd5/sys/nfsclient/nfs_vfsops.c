@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vfsops.c,v 1.128.2.1 2002/12/24 02:21:39 dillon Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vfsops.c,v 1.135 2003/05/19 22:35:00 peter Exp $");
 
 #include "opt_bootp.h"
 #include "opt_nfsroot.h"
@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vfsops.c,v 1.128.2.1 2002/12/24 02:21:
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -85,6 +86,9 @@ struct nfsstats	nfsstats;
 SYSCTL_NODE(_vfs, OID_AUTO, nfs, CTLFLAG_RW, 0, "NFS filesystem");
 SYSCTL_STRUCT(_vfs_nfs, NFS_NFSSTATS, nfsstats, CTLFLAG_RD,
 	&nfsstats, nfsstats, "S,nfsstats");
+static int nfs_ip_paranoia = 1;
+SYSCTL_INT(_vfs_nfs, OID_AUTO, nfs_ip_paranoia, CTLFLAG_RW,
+    &nfs_ip_paranoia, 0, "");
 #ifdef NFS_DEBUG
 int nfs_debug;
 SYSCTL_INT(_vfs_nfs, OID_AUTO, debug, CTLFLAG_RW, &nfs_debug, 0, "");
@@ -242,6 +246,7 @@ nfs_statfs(struct mount *mp, struct statfs *sbp, struct thread *td)
 	struct mbuf *mreq, *mrep, *md, *mb;
 	struct nfsnode *np;
 	u_quad_t tquad;
+	int bsize;
 
 #ifndef nolint
 	sfp = NULL;
@@ -269,17 +274,29 @@ nfs_statfs(struct mount *mp, struct statfs *sbp, struct thread *td)
 	sbp->f_flags = nmp->nm_flag;
 	sbp->f_iosize = nfs_iosize(nmp);
 	if (v3) {
-		sbp->f_bsize = NFS_FABLKSIZE;
-		tquad = fxdr_hyper(&sfp->sf_tbytes);
-		sbp->f_blocks = (long)(tquad / ((u_quad_t)NFS_FABLKSIZE));
-		tquad = fxdr_hyper(&sfp->sf_fbytes);
-		sbp->f_bfree = (long)(tquad / ((u_quad_t)NFS_FABLKSIZE));
-		tquad = fxdr_hyper(&sfp->sf_abytes);
-		sbp->f_bavail = (long)(tquad / ((u_quad_t)NFS_FABLKSIZE));
-		sbp->f_files = (fxdr_unsigned(int32_t,
-		    sfp->sf_tfiles.nfsuquad[1]) & 0x7fffffff);
-		sbp->f_ffree = (fxdr_unsigned(int32_t,
-		    sfp->sf_ffiles.nfsuquad[1]) & 0x7fffffff);
+		for (bsize = NFS_FABLKSIZE; ; bsize *= 2) {
+			sbp->f_bsize = bsize;
+			tquad = fxdr_hyper(&sfp->sf_tbytes);
+			if (((long)(tquad / bsize) > LONG_MAX) ||
+			    ((long)(tquad / bsize) < LONG_MIN))
+				continue;
+			sbp->f_blocks = tquad / bsize;
+			tquad = fxdr_hyper(&sfp->sf_fbytes);
+			if (((long)(tquad / bsize) > LONG_MAX) ||
+			    ((long)(tquad / bsize) < LONG_MIN))
+				continue;
+			sbp->f_bfree = tquad / bsize;
+			tquad = fxdr_hyper(&sfp->sf_abytes);
+			if (((long)(tquad / bsize) > LONG_MAX) ||
+			    ((long)(tquad / bsize) < LONG_MIN))
+				continue;
+			sbp->f_bavail = tquad / bsize;
+			sbp->f_files = (fxdr_unsigned(int32_t,
+			    sfp->sf_tfiles.nfsuquad[1]) & 0x7fffffff);
+			sbp->f_ffree = (fxdr_unsigned(int32_t,
+			    sfp->sf_ffiles.nfsuquad[1]) & 0x7fffffff);
+			break;
+		}
 	} else {
 		sbp->f_bsize = fxdr_unsigned(int32_t, sfp->sf_bsize);
 		sbp->f_blocks = fxdr_unsigned(int32_t, sfp->sf_blocks);
@@ -772,6 +789,18 @@ nfs_mount(struct mount *mp, char *path, caddr_t data, struct nameidata *ndp,
 		nfs_decode_args(nmp, &args);
 		return (0);
 	}
+
+	/*
+	 * Make the nfs_ip_paranoia sysctl serve as the default connection
+	 * or no-connection mode for those protocols that support 
+	 * no-connection mode (the flag will be cleared later for protocols
+	 * that do not support no-connection mode).  This will allow a client
+	 * to receive replies from a different IP then the request was
+	 * sent to.  Note: default value for nfs_ip_paranoia is 1 (paranoid),
+	 * not 0.
+	 */
+	if (nfs_ip_paranoia == 0)
+		args.flags |= NFSMNT_NOCONN;
 	if (args.fhsize < 0 || args.fhsize > NFSX_V3FHMAX)
 		return (EINVAL);
 	error = copyin((caddr_t)args.fh, (caddr_t)nfh, args.fhsize);

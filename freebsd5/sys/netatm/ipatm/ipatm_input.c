@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.10 2002/09/29 11:59:53 bde Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.11 2003/03/04 23:19:52 jlemon Exp $
  *
  */
 
@@ -57,7 +57,7 @@
 #include <netatm/ipatm/ipatm_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.10 2002/09/29 11:59:53 bde Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.11 2003/03/04 23:19:52 jlemon Exp $");
 #endif
 
 
@@ -162,9 +162,6 @@ ipatm_ipinput(inp, m)
 	 * just call IP directly to avoid the extra unnecessary 
 	 * kernel scheduling.
 	 */
-	if (! IF_HANDOFF(&ipintrq, m, NULL))
-		return (1);
-	schednetisr ( NETISR_IP );
+	netisr_dispatch(NETISR_IP, m);
 	return (0);
 }
-

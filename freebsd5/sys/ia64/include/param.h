@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/include/param.h,v 1.12 2002/09/17 01:48:57 peter Exp $ */
+/* $FreeBSD: src/sys/ia64/include/param.h,v 1.14 2003/04/30 23:16:33 marcel Exp $ */
 /* From: NetBSD: param.h,v 1.20 1997/09/19 13:52:53 leo Exp */
 
 /*
@@ -58,7 +58,7 @@
  *
  */
 #ifndef _ALIGNBYTES
-#define	_ALIGNBYTES		7
+#define	_ALIGNBYTES		15
 #endif
 #ifndef _ALIGN
 #define	_ALIGN(p)		(((u_long)(p) + _ALIGNBYTES) &~ _ALIGNBYTES)
@@ -85,7 +85,6 @@
 #ifndef MACHINE_ARCH
 #define	MACHINE_ARCH	"ia64"
 #endif
-#define	MID_MACHINE	MID_IA64
 
 #ifdef SMP
 #define	MAXCPU		16

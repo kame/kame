@@ -38,7 +38,7 @@
  *
  * From:
  *	$Id: procfs_ctl.c,v 3.2 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_ctl.c,v 1.47 2002/10/01 17:15:51 jmallett Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_ctl.c,v 1.50 2003/04/22 20:00:25 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -144,9 +144,7 @@ procfs_control(struct thread *td, struct proc *p, int op)
 		 * Stop the target.
 		 */
 		p->p_flag |= P_TRACED;
-		mtx_lock_spin(&sched_lock);
 		faultin(p);
-		mtx_unlock_spin(&sched_lock);
 		p->p_xstat = 0;		/* XXX ? */
 		if (p->p_pptr != td->td_proc) {
 			p->p_oppid = p->p_pptr->p_pid;
@@ -242,7 +240,7 @@ out:
 		PROC_UNLOCK(p);
 		sx_xunlock(&proctree_lock);
 
-		wakeup((caddr_t) td->td_proc);	/* XXX for CTL_WAIT below ? */
+		wakeup(td->td_proc);	/* XXX for CTL_WAIT below ? */
 
 		break;
 
@@ -263,8 +261,8 @@ out:
 	 * or some other trap.
 	 */
 	case PROCFS_CTL_RUN:
-		PROC_UNLOCK(p);
 		p->p_flag &= ~P_STOPPED_SIG;	/* this uses SIGSTOP */
+		PROC_UNLOCK(p);
 		break;
 
 	/*
@@ -278,13 +276,13 @@ out:
 					(P_SHOULDSTOP(p)) &&
 					(p->p_flag & P_TRACED) &&
 					(p->p_pptr == td->td_proc))
-				error = msleep((caddr_t) p, &p->p_mtx,
+				error = msleep(p, &p->p_mtx,
 						PWAIT|PCATCH, "procfsx", 0);
 			if (error == 0 && !TRACE_WAIT_P(td->td_proc, p))
 				error = EBUSY;
 		} else {
 			while (error == 0 && P_SHOULDSTOP(p))
-				error = msleep((caddr_t) p, &p->p_mtx,
+				error = msleep(p, &p->p_mtx,
 						PWAIT|PCATCH, "procfs", 0);
 		}
 		PROC_UNLOCK(p);
@@ -349,9 +347,9 @@ procfs_doprocctl(PFS_FILL_ARGS)
 				/* XXXKSE: */
 				FIX_SSTEP(FIRST_THREAD_IN_PROC(p));
 #endif
-				mtx_lock_spin(&sched_lock);
 				/* XXXKSE: */
 				p->p_flag &= ~P_STOPPED_SIG;
+				mtx_lock_spin(&sched_lock);
 				thread_unsuspend(p);
 				mtx_unlock_spin(&sched_lock);
 			} else

@@ -1,5 +1,5 @@
 /*	$NetBSD: natm.c,v 1.5 1996/11/09 03:26:26 chuck Exp $	*/
-/* $FreeBSD: src/sys/netnatm/natm.c,v 1.19 2002/05/31 11:52:33 tanimura Exp $ */
+/* $FreeBSD: src/sys/netnatm/natm.c,v 1.23 2003/04/08 14:25:46 des Exp $ */
 
 /*
  *
@@ -698,24 +698,14 @@ done:
  */
 
 void
-natmintr()
-
+natmintr(struct mbuf *m)
 {
   int s;
-  struct mbuf *m;
   struct socket *so;
   struct natmpcb *npcb;
 
-next:
-  s = splimp();
-  IF_DEQUEUE(&natmintrq, m);
-  splx(s);
-  if (m == NULL)
-    return;
-
 #ifdef DIAGNOSTIC
-  if ((m->m_flags & M_PKTHDR) == 0)
-    panic("natmintr no HDR");
+  M_ASSERTPKTHDR(m);
 #endif
 
   npcb = (struct natmpcb *) m->m_pkthdr.rcvif; /* XXX: overloaded */
@@ -729,12 +719,12 @@ next:
     m_freem(m);
     if (npcb->npcb_inq == 0)
       FREE(npcb, M_PCB);			/* done! */
-    goto next;
+    return;
   }
 
   if (npcb->npcb_flags & NPCB_FREE) {
     m_freem(m);					/* drop */
-    goto next;
+    return;
   }
 
 #ifdef NEED_TO_RESTORE_IFP
@@ -760,20 +750,7 @@ m->m_pkthdr.rcvif = NULL;	/* null it out to be safe */
 #endif
     m_freem(m);
   }
-
-  goto next;
 }
-
-#if defined(__FreeBSD__)
-static void
-netisr_natm_setup(void *dummy __unused)
-{
-
-	register_netisr(NETISR_NATM, natmintr);
-}
-SYSINIT(natm_setup, SI_SUB_CPU, SI_ORDER_ANY, netisr_natm_setup, NULL);
-#endif
-
 
 /* 
  * natm0_sysctl: not used, but here in case we want to add something

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/linux/Makefile,v 1.60 2002/09/08 02:59:38 peter Exp $
+# $FreeBSD: src/sys/modules/linux/Makefile,v 1.61 2003/02/03 17:43:20 ume Exp $
 
 MAINTAINER=	emulation@FreeBSD.org
 
@@ -8,8 +8,8 @@ KMOD=	linux
 SRCS=	linux_dummy.c linux_file.c linux_getcwd.c linux_ioctl.c linux_ipc.c \
 	linux_machdep.c linux_mib.c linux_misc.c linux_signal.c linux_socket.c \
 	linux_stats.c linux_sysctl.c linux_sysent.c linux_sysvec.c \
-	linux_util.c opt_compat.h opt_linux.h opt_mac.h opt_vmpage.h \
-	vnode_if.h
+	linux_util.c opt_compat.h opt_inet6.h opt_linux.h opt_mac.h \
+	opt_vmpage.h vnode_if.h
 OBJS=	linux_locore.o
 
 .if ${MACHINE_ARCH} == "i386"
@@ -41,5 +41,8 @@ linux_genassym.o: linux_genassym.c linux.h @ machine
 
 opt_compat.h:
 	echo "#define COMPAT_43 1" > opt_compat.h
+
+opt_inet6.h:
+	echo "#define INET6 1" > opt_inet6.h
 
 .include <bsd.kmod.mk>

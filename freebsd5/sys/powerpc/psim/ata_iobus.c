@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/psim/ata_iobus.c,v 1.1 2002/09/19 04:57:10 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/psim/ata_iobus.c,v 1.4 2003/04/18 02:47:12 grehan Exp $
  */
 
 /*
@@ -34,17 +34,14 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/disk.h>
 #include <sys/module.h>
 #include <sys/bus.h>
-#include <sys/bio.h>
 #include <sys/malloc.h>
-#include <sys/devicestat.h>
-#include <sys/sysctl.h>
 #include <machine/stdarg.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
+#include <sys/ata.h>
 #include <dev/ata/ata-all.h>
 
 #include <dev/ofw/openfirm.h>
@@ -127,7 +124,6 @@ ata_iobus_print_child(device_t dev, device_t child)
     int retval = 0;
 
     retval += bus_print_child_header(dev, child);
-    retval += printf(": at 0x%lx", rman_get_start(ch->r_io));
     /* irq ? */
     retval += bus_print_child_footer(dev, child);
 
@@ -232,6 +228,17 @@ static driver_t ata_iobus_sub_driver = {
 
 DRIVER_MODULE(ata, ataiobus, ata_iobus_sub_driver, ata_devclass, 0, 0);
 
+static void
+ata_iobus_locknoop(struct ata_channel *ch, int type)
+{
+}
+
+static void
+ata_iobus_setmode(struct ata_device *atadev, int mode)
+{
+	atadev->mode = ATA_PIO;
+}
+
 static int
 ata_iobus_sub_probe(device_t dev)
 {
@@ -239,6 +246,10 @@ ata_iobus_sub_probe(device_t dev)
 
 	/* Only a single unit per controller thus far */
 	ch->unit = 0;
+	ch->flags = (ATA_USE_16BIT|ATA_NO_SLAVE);
+	ch->locking = ata_iobus_locknoop;
+	ch->device[MASTER].setmode = ata_iobus_setmode;
+	ch->device[SLAVE].setmode = ata_iobus_setmode;
 
 	return ata_probe(dev);
 }

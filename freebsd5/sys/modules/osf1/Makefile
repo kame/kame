@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/osf1/Makefile,v 1.10 2002/08/18 05:45:10 mike Exp $
+# $FreeBSD: src/sys/modules/osf1/Makefile,v 1.11 2003/02/25 00:42:40 marcel Exp $
 
 MAINTAINER=	gallatin@FreeBSD.org
 
@@ -7,8 +7,8 @@ MAINTAINER=	gallatin@FreeBSD.org
 KMOD=	osf1
 SRCS=	osf1_ioctl.c osf1_misc.c osf1_signal.c osf1_sysent.c \
 	osf1_mount.c imgact_osf1.c osf1_sysvec.c opt_compat.h \
-	opt_simos.h opt_ddb.h opt_mac.h opt_nfs.h device_if.h \
-	bus_if.h vnode_if.h
+	opt_ddb.h opt_mac.h opt_nfs.h device_if.h bus_if.h \
+	vnode_if.h
 
 #CFLAGS+=  -g
 

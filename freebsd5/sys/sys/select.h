@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/select.h,v 1.17 2002/11/28 15:34:32 mike Exp $
+ * $FreeBSD: src/sys/sys/select.h,v 1.18 2002/12/31 04:13:50 mike Exp $
  */
 
 #ifndef _SYS_SELECT_H_
@@ -40,14 +40,8 @@
 #include <sys/_types.h>
 
 #include <sys/_sigset.h>
+#include <sys/_timeval.h>
 #include <sys/timespec.h>
-
-/*
- * XXX
- * Other things required for this header which we do not presently implement:
- *
- * struct timeval (with suseconds_t)
- */
 
 typedef	unsigned long	__fd_mask;
 #if __BSD_VISIBLE
@@ -103,7 +97,6 @@ typedef	struct fd_set {
 } while (0)
 
 #ifndef _KERNEL
-struct timeval;
 
 __BEGIN_DECLS
 int pselect(int, fd_set *__restrict, fd_set *__restrict, fd_set *__restrict,

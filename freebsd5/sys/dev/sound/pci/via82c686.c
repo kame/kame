@@ -33,7 +33,7 @@
 
 #include <dev/sound/pci/via82c686.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.19 2002/08/17 16:13:29 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.24 2003/03/28 16:33:15 orion Exp $");
 
 #define VIA_PCI_ID 0x30581106
 #define	NSEGS		4	/* Number of segments in SGD table */
@@ -63,6 +63,7 @@ struct via_chinfo {
 	struct pcm_channel *channel;
 	struct snd_dbuf *buffer;
 	struct via_dma_op *sgd_table;
+	bus_addr_t sgd_addr;
 	int dir, blksz;
 	int base, count, mode, ctrl;
 };
@@ -73,6 +74,7 @@ struct via_info {
 	bus_dma_tag_t parent_dmat;
 	bus_dma_tag_t sgd_dmat;
 	bus_dmamap_t sgd_dmamap;
+	bus_addr_t sgd_addr;
 
 	struct resource *reg, *irq;
 	int regid, irqid;
@@ -224,7 +226,7 @@ via_buildsgdt(struct via_chinfo *ch)
 	 */
 	seg_size = ch->blksz;
 	segs = sndbuf_getsize(ch->buffer) / seg_size;
-	phys_addr = vtophys(sndbuf_getbuf(ch->buffer));
+	phys_addr = sndbuf_getbufaddr(ch->buffer);
 
 	for (i = 0; i < segs; i++) {
 		flag = (i == segs - 1)? VIA_DMAOP_EOL : VIA_DMAOP_FLAG;
@@ -240,24 +242,30 @@ static void *
 viachan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *c, int dir)
 {
 	struct via_info *via = devinfo;
-	struct via_chinfo *ch = (dir == PCMDIR_PLAY)? &via->pch : &via->rch;
+	struct via_chinfo *ch;
+
+	if (dir == PCMDIR_PLAY) {
+		ch = &via->pch;
+		ch->base = VIA_PLAY_DMAOPS_BASE;
+		ch->count = VIA_PLAY_DMAOPS_COUNT;
+		ch->ctrl = VIA_PLAY_CONTROL;
+		ch->mode = VIA_PLAY_MODE;
+		ch->sgd_addr = via->sgd_addr;
+		ch->sgd_table = &via->sgd_table[0];
+	} else {
+		ch = &via->rch;
+		ch->base = VIA_RECORD_DMAOPS_BASE;
+		ch->count = VIA_RECORD_DMAOPS_COUNT;
+		ch->ctrl = VIA_RECORD_CONTROL;
+		ch->mode = VIA_RECORD_MODE;
+		ch->sgd_addr = via->sgd_addr + sizeof(struct via_dma_op) * SEGS_PER_CHAN;
+		ch->sgd_table = &via->sgd_table[SEGS_PER_CHAN];
+	}
 
 	ch->parent = via;
 	ch->channel = c;
 	ch->buffer = b;
 	ch->dir = dir;
-	ch->sgd_table = &via->sgd_table[(dir == PCMDIR_PLAY)? 0 : SEGS_PER_CHAN];
-	if (ch->dir == PCMDIR_PLAY) {
-		ch->base = VIA_PLAY_DMAOPS_BASE;
-		ch->count = VIA_PLAY_DMAOPS_COUNT;
-		ch->ctrl = VIA_PLAY_CONTROL;
-		ch->mode = VIA_PLAY_MODE;
-	} else {
-		ch->base = VIA_RECORD_DMAOPS_BASE;
-		ch->count = VIA_RECORD_DMAOPS_COUNT;
-		ch->ctrl = VIA_RECORD_CONTROL;
-		ch->mode = VIA_RECORD_MODE;
-	}
 
 	if (sndbuf_alloc(ch->buffer, via->parent_dmat, via->bufsz) == -1)
 		return NULL;
@@ -326,16 +334,17 @@ viachan_trigger(kobj_t obj, void *data, int go)
 	struct via_chinfo *ch = data;
 	struct via_info *via = ch->parent;
 	struct via_dma_op *ado;
+	bus_addr_t sgd_addr = ch->sgd_addr;
 
 	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
 		return 0;
 
 	ado = ch->sgd_table;
-	DEB(printf("ado located at va=%p pa=%x\n", ado, vtophys(ado)));
+	DEB(printf("ado located at va=%p pa=%x\n", ado, sgd_addr));
 
 	if (go == PCMTRIG_START) {
 		via_buildsgdt(ch);
-		via_wr(via, ch->base, vtophys(ado), 4);
+		via_wr(via, ch->base, sgd_addr, 4);
 		via_wr(via, ch->ctrl, VIA_RPCTRL_START, 1);
 	} else
 		via_wr(via, ch->ctrl, VIA_RPCTRL_TERMINATE, 1);
@@ -350,6 +359,7 @@ viachan_getptr(kobj_t obj, void *data)
 	struct via_chinfo *ch = data;
 	struct via_info *via = ch->parent;
 	struct via_dma_op *ado;
+	bus_addr_t sgd_addr = ch->sgd_addr;
 	int ptr, base, base1, len, seg;
 
 	ado = ch->sgd_table;
@@ -364,7 +374,7 @@ viachan_getptr(kobj_t obj, void *data)
 	/* Base points to SGD segment to do, one past current */
 
 	/* Determine how many segments have been done */
-	seg = (base - vtophys(ado)) / sizeof(struct via_dma_op);
+	seg = (base - sgd_addr) / sizeof(struct via_dma_op);
 	if (seg == 0)
 		seg = SEGS_PER_CHAN;
 
@@ -442,6 +452,8 @@ via_probe(device_t dev)
 static void
 dma_cb(void *p, bus_dma_segment_t *bds, int a, int b)
 {
+	struct via_info *via = (struct via_info *)p;
+	via->sgd_addr = bds->ds_addr;
 }
 
 
@@ -450,7 +462,7 @@ via_attach(device_t dev)
 {
 	struct via_info *via = 0;
 	char status[SND_STATUSLEN];
-	u_int32_t data;
+	u_int32_t data, cnt;
 
 	if ((via = malloc(sizeof *via, M_DEVBUF, M_NOWAIT | M_ZERO)) == NULL) {
 		device_printf(dev, "cannot allocate softc\n");
@@ -463,8 +475,36 @@ via_attach(device_t dev)
 	pci_write_config(dev, PCIR_COMMAND, data, 2);
 	data = pci_read_config(dev, PCIR_COMMAND, 2);
 
-	pci_write_config(dev, VIA_PCICONF_MISC,
-		VIA_PCICONF_ACLINKENAB | VIA_PCICONF_ACSGD | VIA_PCICONF_ACNOTRST | VIA_PCICONF_ACVSR, 1);
+	/* Wake up and reset AC97 if necessary */
+	data = pci_read_config(dev, VIA_AC97STATUS, 1);
+
+	if ((data & VIA_AC97STATUS_RDY) == 0) {
+		/* Cold reset per ac97r2.3 spec (page 95) */
+		pci_write_config(dev, VIA_ACLINKCTRL, VIA_ACLINK_EN, 1);			/* Assert low */
+		DELAY(100);									/* Wait T_rst_low */
+		pci_write_config(dev, VIA_ACLINKCTRL, VIA_ACLINK_EN | VIA_ACLINK_NRST, 1);	/* Assert high */
+		DELAY(5);									/* Wait T_rst2clk */
+		pci_write_config(dev, VIA_ACLINKCTRL, VIA_ACLINK_EN, 1);			/* Assert low */
+	} else {
+		/* Warm reset */
+		pci_write_config(dev, VIA_ACLINKCTRL, VIA_ACLINK_EN, 1);			/* Force no sync */
+		DELAY(100);
+		pci_write_config(dev, VIA_ACLINKCTRL, VIA_ACLINK_EN | VIA_ACLINK_SYNC, 1);	/* Sync */
+		DELAY(5);									/* Wait T_sync_high */
+		pci_write_config(dev, VIA_ACLINKCTRL, VIA_ACLINK_EN, 1);			/* Force no sync */
+		DELAY(5);									/* Wait T_sync2clk */
+	}
+
+	/* Power everything up */
+	pci_write_config(dev, VIA_ACLINKCTRL, VIA_ACLINK_DESIRED, 1);	
+
+	/* Wait for codec to become ready (largest reported delay here 310ms) */
+	for (cnt = 0; cnt < 2000; cnt++) {
+		data = pci_read_config(dev, VIA_AC97STATUS, 1);
+		if (data & VIA_AC97STATUS_RDY) 
+			break;
+		DELAY(5000);
+	}
 
 	via->regid = PCIR_MAPS;
 	via->reg = bus_alloc_resource(dev, SYS_RES_IOPORT, &via->regid, 0, ~0, 1, RF_ACTIVE);
@@ -491,7 +531,8 @@ via_attach(device_t dev)
 	if (!via->codec)
 		goto bad;
 
-	mixer_init(dev, ac97_getmixerclass(), via->codec);
+	if (mixer_init(dev, ac97_getmixerclass(), via->codec))
+		goto bad;
 
 	via->codec_caps = ac97_getextcaps(via->codec);
 	ac97_setextmode(via->codec, 
@@ -526,7 +567,7 @@ via_attach(device_t dev)
 
 	if (bus_dmamem_alloc(via->sgd_dmat, (void **)&via->sgd_table, BUS_DMA_NOWAIT, &via->sgd_dmamap) == -1)
 		goto bad;
-	if (bus_dmamap_load(via->sgd_dmat, via->sgd_dmamap, via->sgd_table, NSEGS * sizeof(struct via_dma_op), dma_cb, 0, 0))
+	if (bus_dmamap_load(via->sgd_dmat, via->sgd_dmamap, via->sgd_table, NSEGS * sizeof(struct via_dma_op), dma_cb, via, 0))
 		goto bad;
 
 	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld", rman_get_start(via->reg), rman_get_start(via->irq));

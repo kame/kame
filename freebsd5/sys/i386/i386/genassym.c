@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/i386/i386/genassym.c,v 1.132 2002/12/02 19:58:55 deischen Exp $
+ * $FreeBSD: src/sys/i386/i386/genassym.c,v 1.140 2003/04/17 22:17:28 jhb Exp $
  */
 
 #include "opt_compat.h"
@@ -80,13 +80,10 @@ ASSYM(P_VMSPACE, offsetof(struct proc, p_vmspace));
 ASSYM(VM_PMAP, offsetof(struct vmspace, vm_pmap));
 ASSYM(PM_ACTIVE, offsetof(struct pmap, pm_active));
 ASSYM(P_SFLAG, offsetof(struct proc, p_sflag));
-ASSYM(P_STATE, offsetof(struct proc, p_state));
 ASSYM(P_UAREA, offsetof(struct proc, p_uarea));
 
 ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
-ASSYM(TD_WCHAN, offsetof(struct thread, td_wchan));
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));
-ASSYM(TD_KSE, offsetof(struct thread, td_kse));
 ASSYM(TD_PROC, offsetof(struct thread, td_proc));
 ASSYM(TD_INTR_NESTING_LEVEL, offsetof(struct thread, td_intr_nesting_level));
 ASSYM(TD_CRITNEST, offsetof(struct thread, td_critnest));
@@ -96,10 +93,8 @@ ASSYM(TD_MD, offsetof(struct thread, td_md));
 ASSYM(P_MD, offsetof(struct proc, p_md));
 ASSYM(MD_LDT, offsetof(struct mdproc, md_ldt));
 
-ASSYM(KE_FLAGS, offsetof(struct kse, ke_flags));
-
-ASSYM(KEF_ASTPENDING, KEF_ASTPENDING);
-ASSYM(KEF_NEEDRESCHED, KEF_NEEDRESCHED);
+ASSYM(TDF_ASTPENDING, TDF_ASTPENDING);
+ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
 
 ASSYM(V_TRAP, offsetof(struct vmmeter, v_trap));
 ASSYM(V_SYSCALL, offsetof(struct vmmeter, v_syscall));
@@ -110,8 +105,11 @@ ASSYM(KSTACK_PAGES, KSTACK_PAGES);
 ASSYM(PAGE_SIZE, PAGE_SIZE);
 ASSYM(NPTEPG, NPTEPG);
 ASSYM(NPDEPG, NPDEPG);
-ASSYM(PDESIZE, PDESIZE);
-ASSYM(PTESIZE, PTESIZE);
+ASSYM(NPDEPTD, NPDEPTD);
+ASSYM(NPGPTD, NPGPTD);
+ASSYM(PDESIZE, sizeof(pd_entry_t));
+ASSYM(PTESIZE, sizeof(pt_entry_t));
+ASSYM(PTESHIFT, PTESHIFT);
 ASSYM(PAGE_SHIFT, PAGE_SHIFT);
 ASSYM(PAGE_MASK, PAGE_MASK);
 ASSYM(PDRSHIFT, PDRSHIFT);

@@ -37,7 +37,7 @@
 
 #include <dev/sound/pci/cs4281.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.12 2002/08/23 06:19:28 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.14 2003/02/20 17:31:11 cognet Exp $");
 
 #define CS4281_DEFAULT_BUFSZ 16384
 
@@ -49,9 +49,6 @@ SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.12 2002/08/23 06:
 #define CS4281_DMA_REC  1
 
 /* Misc */
-
-#define MIN(x,y) (x) < (y) ? (x) : (y)
-#define MAX(x,y) (x) > (y) ? (x) : (y)
 
 #define inline __inline
 
@@ -490,7 +487,7 @@ adcdac_prog(struct sc_chinfo *ch)
     if (!ch->dma_setup) {
 	go = adcdac_go(ch, 0);
 	cs4281_wr(sc, CS4281PCI_DBA(ch->dma_chan),
-		  vtophys(sndbuf_getbuf(ch->buffer)));
+		  sndbuf_getbufaddr(ch->buffer));
 	cs4281_wr(sc, CS4281PCI_DBC(ch->dma_chan),
 		  sndbuf_getsize(ch->buffer) / ch->bps - 1);
 	ch->dma_setup = 1;

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_iod.c,v 1.7 2002/10/02 07:44:27 scottl Exp $
+ * $FreeBSD: src/sys/netsmb/smb_iod.c,v 1.11 2003/03/31 22:49:17 jeff Exp $
  */
  
 #include <sys/param.h>
@@ -233,8 +233,8 @@ smb_iod_sendrq(struct smbiod *iod, struct smb_rq *rqp)
 		if (vcp->vc_maxmux != 0 && iod->iod_muxcnt >= vcp->vc_maxmux)
 			return 0;
 #endif
-		*rqp->sr_rqtid = htoles(ssp ? ssp->ss_tid : SMB_TID_UNKNOWN);
-		*rqp->sr_rquid = htoles(vcp ? vcp->vc_smbuid : 0);
+		*rqp->sr_rqtid = htole16(ssp ? ssp->ss_tid : SMB_TID_UNKNOWN);
+		*rqp->sr_rquid = htole16(vcp ? vcp->vc_smbuid : 0);
 		mb_fixhdr(&rqp->sr_rq);
 	}
 	if (rqp->sr_sendcnt++ > 5) {
@@ -356,7 +356,7 @@ smb_iod_recvall(struct smbiod *iod)
 	 */
 	SMB_IOD_RQLOCK(iod);
 	TAILQ_FOREACH(rqp, &iod->iod_rqlist, sr_link) {
-		if (smb_proc_intr(rqp->sr_cred->scr_td->td_proc)) {
+		if (smb_td_intr(rqp->sr_cred->scr_td)) {
 			smb_iod_rqprocessed(rqp, EINTR);
 		}
 	}

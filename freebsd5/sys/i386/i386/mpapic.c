@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mpapic.c,v 1.60 2002/09/21 19:03:42 markm Exp $
+ * $FreeBSD: src/sys/i386/i386/mpapic.c,v 1.61 2003/01/23 01:00:58 peter Exp $
  */
 
 #include <sys/param.h>
@@ -80,8 +80,6 @@ apic_initialize(void)
 	/* set the Task Priority Register as needed */
 	temp = lapic.tpr;
 	temp &= ~APIC_TPR_PRIO;		/* clear priority field */
-	temp |= LOPRIO_LEVEL;		/* allow INT arbitration */
-
 	lapic.tpr = temp;
 
 	/* enable the local APIC */

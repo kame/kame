@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_environment.c,v 1.26.2.1 2002/12/19 09:40:10 alfred Exp $
+ * $FreeBSD: src/sys/kern/kern_environment.c,v 1.32 2003/02/19 05:47:25 imp Exp $
  */
 
 /*

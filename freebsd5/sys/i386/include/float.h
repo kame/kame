@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)float.h	7.1 (Berkeley) 5/8/90
- * $FreeBSD: src/sys/i386/include/float.h,v 1.9 2002/10/25 07:02:52 imp Exp $
+ * $FreeBSD: src/sys/i386/include/float.h,v 1.10 2003/02/08 20:37:54 mike Exp $
  */
 
 #ifndef _MACHINE_FLOAT_H_
@@ -39,6 +39,8 @@
 
 #define FLT_RADIX	2		/* b */
 #define FLT_ROUNDS	1		/* FP addition rounds to nearest */
+#define	FLT_EVAL_METHOD	(-1)		/* i387 semantics are...interesting */
+#define	DECIMAL_DIG	21		/* max precision in decimal digits */
 
 #define FLT_MANT_DIG	24		/* p */
 #define FLT_EPSILON	1.19209290E-07F	/* b**(1-p) */

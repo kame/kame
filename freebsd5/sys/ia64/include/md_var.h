@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/md_var.h,v 1.10 2002/08/30 04:04:35 peter Exp $
+ * $FreeBSD: src/sys/ia64/include/md_var.h,v 1.11 2003/02/01 22:50:09 marcel Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -53,7 +53,6 @@ struct ia64_fdesc {
 void	busdma_swi(void);
 void	cpu_halt(void);
 void	cpu_reset(void);
-int	ia64_running_in_simulator(void);
 int	is_physical_memory(vm_offset_t addr);
 void	os_boot_rendez(void);
 void	os_mca(void);

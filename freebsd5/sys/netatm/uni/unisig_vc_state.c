@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.12 2002/06/13 14:32:51 arr Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.14 2003/02/19 05:47:31 imp Exp $
  *
  */
 
@@ -61,7 +61,7 @@
 #include <netatm/uni/unisig_msg.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.12 2002/06/13 14:32:51 arr Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.14 2003/02/19 05:47:31 imp Exp $");
 #endif
 
 

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.25 2002/09/06 16:38:06 iwasaki Exp $
+ * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.28 2003/03/18 14:57:09 sanpei Exp $
  */
 
 /*
@@ -481,9 +481,34 @@ struct rl_softc {
 #define COREGA_VENDORID				0x1259
 
 /*
- * Coreaga FEther CB-TXD device ID
+ * Corega FEther CB-TXD device ID
  */
-#define COREGA_DEVICEID_CBTXD			0xa117
+#define COREGA_DEVICEID_FETHERCBTXD			0xa117
+
+/*
+ * Corega FEtherII CB-TXD device ID
+ */
+#define COREGA_DEVICEID_FETHERIICBTXD			0xa11e
+
+/*
+ * Peppercon vendor ID
+ */
+#define PEPPERCON_VENDORID			0x1743
+
+/*
+ * Peppercon ROL-F device ID
+ */
+#define PEPPERCON_DEVICEID_ROLF			0x8139
+
+/*
+ * Planex Communications, Inc. vendor ID
+ */
+#define PLANEX_VENDORID                      0x14ea
+
+/*
+ * Planex FNW-3800-TX device ID
+ */
+#define PLANEX_DEVICEID_FNW3800TX                 0xab07
 
 /*
  * PCI low memory base and low I/O base register, and

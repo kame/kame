@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.h	8.3 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/in.h,v 1.73 2002/10/29 16:46:13 fenner Exp $
+ * $FreeBSD: src/sys/netinet/in.h,v 1.78 2003/04/29 22:03:46 mdodd Exp $
  */
 
 #ifndef _NETINET_IN_H_
@@ -273,7 +273,7 @@ __END_DECLS
  * sysctl(3).  (net.inet.ip.port{hi,low}{first,last}_auto)
  *
  * Changing those values has bad security implications if you are
- * using a a stateless firewall that is allowing packets outside of that
+ * using a stateless firewall that is allowing packets outside of that
  * range in order to allow transparent outgoing connections.
  *
  * Such a firewall configuration will generally depend on the use of these
@@ -354,6 +354,7 @@ __END_DECLS
 #define	INADDR_UNSPEC_GROUP	(u_int32_t)0xe0000000	/* 224.0.0.0 */
 #define	INADDR_ALLHOSTS_GROUP	(u_int32_t)0xe0000001	/* 224.0.0.1 */
 #define	INADDR_ALLRTRS_GROUP	(u_int32_t)0xe0000002	/* 224.0.0.2 */
+#define	INADDR_ALLMDNS_GROUP	(u_int32_t)0xe00000fb	/* 224.0.0.251 */
 #define	INADDR_MAX_LOCAL_GROUP	(u_int32_t)0xe00000ff	/* 224.0.0.255 */
 
 #define	IN_LOOPBACKNET		127			/* official! */
@@ -398,6 +399,8 @@ __END_DECLS
 #define	IP_DUMMYNET_DEL		61   /* delete a dummynet pipe from chain */
 #define	IP_DUMMYNET_FLUSH	62   /* flush dummynet */
 #define	IP_DUMMYNET_GET		64   /* get entire dummynet pipes */
+
+#define	IP_RECVTTL		65   /* bool; receive IP TTL w/dgram */
 
 /*
  * Defaults and limits for options

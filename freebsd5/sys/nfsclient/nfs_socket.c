@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_socket.c,v 1.90 2002/10/01 17:15:53 jmallett Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_socket.c,v 1.98 2003/05/13 20:36:01 jhb Exp $");
 
 /*
  * Socket operations for use by nfs
@@ -241,7 +241,7 @@ nfs_connect(struct nfsmount *nmp, struct nfsreq *rep)
 		 */
 		s = splnet();
 		while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0) {
-			(void) tsleep((caddr_t)&so->so_timeo,
+			(void) tsleep(&so->so_timeo,
 			    PSOCK, "nfscon", 2 * hz);
 			if ((so->so_state & SS_ISCONNECTING) &&
 			    so->so_error == 0 && rep &&
@@ -353,7 +353,7 @@ nfs_reconnect(struct nfsreq *rep)
 	while ((error = nfs_connect(nmp, rep)) != 0) {
 		if (error == EINTR || error == ERESTART)
 			return (EINTR);
-		(void) tsleep((caddr_t)&lbolt, PSOCK, "nfscon", 0);
+		(void) tsleep(&lbolt, PSOCK, "nfscon", 0);
 	}
 
 	/*
@@ -1013,7 +1013,7 @@ tryagain:
 				error = 0;
 				waituntil = time_second + trylater_delay;
 				while (time_second < waituntil)
-					(void) tsleep((caddr_t)&lbolt,
+					(void) tsleep(&lbolt,
 						PSOCK, "nqnfstry", 0);
 				trylater_delay *= nfs_backoff[trylater_cnt];
 				if (trylater_cnt < NFS_NBACKOFF - 1)
@@ -1099,12 +1099,9 @@ nfs_timer(void *arg)
 		 */
 		if ((rep->r_flags & R_TPRINTFMSG) == 0 &&
 		     rep->r_rexmit > nmp->nm_deadthresh) {
-			char buf[40];
-			sprintf(buf, "not responding %d > %d",
-			rep->r_rexmit, nmp->nm_deadthresh);
 			nfs_msg(rep->r_td,
 			    nmp->nm_mountp->mnt_stat.f_mntfromname,
-			    buf /* "not responding" */);
+			    "not responding");
 			rep->r_flags |= R_TPRINTFMSG;
 		}
 		if (rep->r_rexmit >= rep->r_retry) {	/* too many */
@@ -1239,11 +1236,17 @@ nfs_sigintr(struct nfsmount *nmp, struct nfsreq *rep, struct thread *td)
 		return (0);
 
 	p = td->td_proc;
+	PROC_LOCK(p);
 	tmpset = p->p_siglist;
-	SIGSETNAND(tmpset, p->p_sigmask);
-	SIGSETNAND(tmpset, p->p_sigignore);
-	if (SIGNOTEMPTY(p->p_siglist) && NFSINT_SIGMASK(tmpset))
+	SIGSETNAND(tmpset, td->td_sigmask);
+	mtx_lock(&p->p_sigacts->ps_mtx);
+	SIGSETNAND(tmpset, p->p_sigacts->ps_sigignore);
+	mtx_unlock(&p->p_sigacts->ps_mtx);
+	if (SIGNOTEMPTY(p->p_siglist) && NFSINT_SIGMASK(tmpset)) {
+		PROC_UNLOCK(p);
 		return (EINTR);
+	}
+	PROC_UNLOCK(p);
 
 	return (0);
 }
@@ -1261,17 +1264,14 @@ nfs_sndlock(struct nfsreq *rep)
 	struct thread *td;
 	int slpflag = 0, slptimeo = 0;
 
-	if (rep) {
-		td = rep->r_td;
-		if (rep->r_nmp->nm_flag & NFSMNT_INT)
-			slpflag = PCATCH;
-	} else
-		td = NULL;
+	td = rep->r_td;
+	if (rep->r_nmp->nm_flag & NFSMNT_INT)
+		slpflag = PCATCH;
 	while (*statep & NFSSTA_SNDLOCK) {
 		if (nfs_sigintr(rep->r_nmp, rep, td))
 			return (EINTR);
 		*statep |= NFSSTA_WANTSND;
-		(void) tsleep((caddr_t)statep, slpflag | (PZERO - 1),
+		(void) tsleep(statep, slpflag | (PZERO - 1),
 			"nfsndlck", slptimeo);
 		if (slpflag == PCATCH) {
 			slpflag = 0;
@@ -1295,7 +1295,7 @@ nfs_sndunlock(struct nfsreq *rep)
 	*statep &= ~NFSSTA_SNDLOCK;
 	if (*statep & NFSSTA_WANTSND) {
 		*statep &= ~NFSSTA_WANTSND;
-		wakeup((caddr_t)statep);
+		wakeup(statep);
 	}
 }
 
@@ -1313,7 +1313,7 @@ nfs_rcvlock(struct nfsreq *rep)
 		if (nfs_sigintr(rep->r_nmp, rep, rep->r_td))
 			return (EINTR);
 		*statep |= NFSSTA_WANTRCV;
-		(void) tsleep((caddr_t)statep, slpflag | (PZERO - 1), "nfsrcvlk",
+		(void) tsleep(statep, slpflag | (PZERO - 1), "nfsrcvlk",
 			slptimeo);
 		/*
 		 * If our reply was recieved while we were sleeping,
@@ -1348,7 +1348,7 @@ nfs_rcvunlock(struct nfsreq *rep)
 	*statep &= ~NFSSTA_RCVLOCK;
 	if (*statep & NFSSTA_WANTRCV) {
 		*statep &= ~NFSSTA_WANTRCV;
-		wakeup((caddr_t)statep);
+		wakeup(statep);
 	}
 }
 

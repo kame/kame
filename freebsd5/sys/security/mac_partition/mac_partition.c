@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_partition/mac_partition.c,v 1.5 2002/11/08 18:04:36 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_partition/mac_partition.c,v 1.6 2003/03/27 19:26:39 rwatson Exp $
  */
 
 /*
@@ -282,5 +282,5 @@ static struct mac_policy_ops mac_partition_ops =
 	.mpo_check_vnode_exec = mac_partition_check_vnode_exec,
 };
 
-MAC_POLICY_SET(&mac_partition_ops, trustedbsd_mac_partition,
-    "TrustedBSD MAC/Partition", MPC_LOADTIME_FLAG_UNLOADOK, &partition_slot);
+MAC_POLICY_SET(&mac_partition_ops, mac_partition, "TrustedBSD MAC/Partition",
+    MPC_LOADTIME_FLAG_UNLOADOK, &partition_slot);

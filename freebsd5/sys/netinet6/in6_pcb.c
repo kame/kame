@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.33 2002/10/16 02:25:05 sam Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.36 2003/02/19 22:32:42 jlemon Exp $	*/
 /*	$KAME: in6_pcb.c,v 1.31 2001/05/21 05:45:10 jinmei Exp $	*/
   
 /*
@@ -614,9 +614,10 @@ in6_pcbdetach(inp)
 #endif /* IPSEC */
 	inp->inp_gencnt = ++ipi->ipi_gencnt;
 	in_pcbremlists(inp);
-	sotoinpcb(so) = 0;
-	sotryfree(so);
-
+	if (so) {
+		so->so_pcb = NULL;
+		sotryfree(so);
+	}
 	if (inp->in6p_options)
 		m_freem(inp->in6p_options);
  	ip6_freepcbopts(inp->in6p_outputopts);
@@ -627,7 +628,6 @@ in6_pcbdetach(inp)
 	if (inp->inp_options)
 		(void)m_free(inp->inp_options);
 	ip_freemoptions(inp->inp_moptions);
-
 	inp->inp_vflag = 0;
 	INP_LOCK_DESTROY(inp);
 	uma_zfree(ipi->ipi_zone, inp);

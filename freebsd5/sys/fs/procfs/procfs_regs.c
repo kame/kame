@@ -38,7 +38,7 @@
  *
  * From:
  *	$Id: procfs_regs.c,v 3.2 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_regs.c,v 1.26 2002/06/29 17:26:15 julian Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_regs.c,v 1.27 2003/05/05 15:12:51 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -76,15 +76,16 @@ procfs_doprocregs(PFS_FILL_ARGS)
 		kl = uio->uio_resid;
 
 	_PHOLD(p);
-	PROC_UNLOCK(p);
 	if (kl < 0)
 		error = EINVAL;
 	else
 		/* XXXKSE: */
 		error = proc_read_regs(FIRST_THREAD_IN_PROC(p), &r);
-	if (error == 0)
+	if (error == 0) {
+		PROC_UNLOCK(p);
 		error = uiomove(kv, kl, uio);
-	PROC_LOCK(p);
+		PROC_LOCK(p);
+	}
 	if (error == 0 && uio->uio_rw == UIO_WRITE) {
 		if (!P_SHOULDSTOP(p))
 			error = EBUSY;

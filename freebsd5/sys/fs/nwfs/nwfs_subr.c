@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/nwfs/nwfs_subr.c,v 1.10 2002/09/01 23:02:10 iedowse Exp $
+ * $FreeBSD: src/sys/fs/nwfs/nwfs_subr.c,v 1.11 2003/02/03 19:49:33 phk Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -596,7 +596,7 @@ ncp_unix2dostime(tsp, tzoff, ddp, dtp, dhp)
 	 * If the time from the last conversion is the same as now, then
 	 * skip the computations and use the saved result.
 	 */
-	t = tsp->tv_sec - tzoff * 60 - tz.tz_minuteswest * 60 -
+	t = tsp->tv_sec - tzoff * 60 - tz_minuteswest * 60 -
 	    (wall_cmos_clock ? adjkerntz : 0);
 	t &= ~1;
 	if (lasttime != t) {
@@ -706,7 +706,7 @@ ncp_dos2unixtime(dd, dt, dh, tzoff, tsp)
 		days += ((dd & DD_DAY_MASK) >> DD_DAY_SHIFT) - 1;
 		lastseconds = (days * 24 * 60 * 60) + SECONDSTO1980;
 	}
-	tsp->tv_sec = seconds + lastseconds + tz.tz_minuteswest * 60 +
+	tsp->tv_sec = seconds + lastseconds + tz_minuteswest * 60 +
 	    tzoff * 60 + (wall_cmos_clock ? adjkerntz : 0);
 	tsp->tv_nsec = (dh % 100) * 10000000;
 }

@@ -52,7 +52,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/mp_machdep.c,v 1.17 2002/11/20 14:09:33 jhb Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/mp_machdep.c,v 1.21 2003/04/08 06:35:09 jake Exp $
  */
 
 #include "opt_ddb.h"
@@ -101,9 +101,9 @@ struct	cpu_start_args cpu_start_args = { 0, -1, -1, 0, 0 };
 struct	ipi_cache_args ipi_cache_args;
 struct	ipi_tlb_args ipi_tlb_args;
 
-vm_offset_t mp_tramp;
+struct	mtx ipi_mtx;
 
-static struct mtx ap_boot_mtx;
+vm_offset_t mp_tramp;
 
 u_int	mp_boot_mid;
 
@@ -224,7 +224,7 @@ cpu_mp_start(void)
 	u_int mid;
 	u_long s;
 
-	mtx_init(&ap_boot_mtx, "ap boot", NULL, MTX_SPIN);
+	mtx_init(&ipi_mtx, "ipi", NULL, MTX_SPIN);
 
 	intr_setup(PIL_AST, cpu_ipi_ast, -1, NULL, NULL);
 	intr_setup(PIL_RENDEZVOUS, (ih_func_t *)smp_rendezvous_action,
@@ -284,8 +284,8 @@ cpu_mp_unleash(void *v)
 {
 	volatile struct cpu_start_args *csa;
 	struct pcpu *pc;
-	vm_offset_t pa;
 	vm_offset_t va;
+	vm_paddr_t pa;
 	u_int ctx_min;
 	u_int ctx_inc;
 	u_long s;
@@ -336,25 +336,6 @@ void
 cpu_mp_bootstrap(struct pcpu *pc)
 {
 	volatile struct cpu_start_args *csa;
-	u_long tag;
-	int i;
-
-	/*
-	 * When secondary cpus start up they often have junk in their tlb.
-	 * Sometimes both the lock bit and the valid bit will be set in the
-	 * tlb entries, which can cause our locked mappings to be replaced,
-	 * and other random behvaiour.  The tags always seems to be zero, so
-	 * we flush all mappings with a tag of zero, regardless of the lock
-	 * and/or valid bits.
-	 */
-	for (i = 0; i < tlb_dtlb_entries; i++) {
-		tag = ldxa(TLB_DAR_SLOT(i), ASI_DTLB_TAG_READ_REG);
-		if (tag == 0)
-			stxa_sync(TLB_DAR_SLOT(i), ASI_DTLB_DATA_ACCESS_REG, 0);
-		tag = ldxa(TLB_DAR_SLOT(i), ASI_ITLB_TAG_READ_REG);
-		if (tag == 0)
-			stxa_sync(TLB_DAR_SLOT(i), ASI_ITLB_DATA_ACCESS_REG, 0);
-	}
 
 	csa = &cpu_start_args;
 	pmap_map_tsb();
@@ -376,7 +357,7 @@ cpu_mp_bootstrap(struct pcpu *pc)
 
 	/* ok, now grab sched_lock and enter the scheduler */
 	mtx_lock_spin(&sched_lock);
-	cpu_throw();	/* doesn't return */
+	cpu_throw(NULL, choosethread());	/* doesn't return */
 }
 
 void

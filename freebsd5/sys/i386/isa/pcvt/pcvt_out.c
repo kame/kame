@@ -44,7 +44,7 @@
  *
  *	Last Edit-Date: [Tue Jun  5 17:27:48 2001]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_out.c,v 1.24 2002/02/23 11:12:52 tanimura Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_out.c,v 1.26 2003/02/19 05:47:23 imp Exp $
  *
  *---------------------------------------------------------------------------*/
 

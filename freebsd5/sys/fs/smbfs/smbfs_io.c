@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_io.c,v 1.14 2002/10/14 03:20:34 mckusick Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_io.c,v 1.20 2003/04/01 09:24:12 jeff Exp $
  *
  */
 #include <sys/param.h>
@@ -92,7 +92,7 @@ smbfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred)
 	np = VTOSMB(vp);
 	SMBVDEBUG("dirname='%s'\n", np->n_name);
 	smb_makescred(&scred, uio->uio_td, cred);
-	offset = uio->uio_offset / DE_SIZE; 	/* offset in the directory */
+	offset = uio->uio_offset / DE_SIZE;	/* offset in the directory */
 	limit = uio->uio_resid / DE_SIZE;
 	if (uio->uio_resid < DE_SIZE || uio->uio_offset < 0)
 		return EINVAL;
@@ -101,7 +101,7 @@ smbfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred)
 		bzero((caddr_t)&de, DE_SIZE);
 		de.d_reclen = DE_SIZE;
 		de.d_fileno = (offset == 0) ? np->n_ino :
-		    (np->n_parent ? np->n_parent->n_ino : 2);
+		    (np->n_parent ? VTOSMB(np->n_parent)->n_ino : 2);
 		if (de.d_fileno == 0)
 			de.d_fileno = 0x7ffffffd + offset;
 		de.d_namlen = offset + 1;
@@ -109,7 +109,7 @@ smbfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred)
 		de.d_name[1] = '.';
 		de.d_name[offset + 1] = '\0';
 		de.d_type = DT_DIR;
-		error = uiomove((caddr_t)&de, DE_SIZE, uio);
+		error = uiomove(&de, DE_SIZE, uio);
 		if (error)
 			return error;
 		offset++;
@@ -161,11 +161,11 @@ smbfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred)
 			if (!error) {
 				cn.cn_nameptr = de.d_name;
 				cn.cn_namelen = de.d_namlen;
-		    		cache_enter(vp, newvp, &cn);
+				cache_enter(vp, newvp, &cn);
 				vput(newvp);
 			}
 		}
-		error = uiomove((caddr_t)&de, DE_SIZE, uio);
+		error = uiomove(&de, DE_SIZE, uio);
 		if (error)
 			break;
 	}
@@ -367,7 +367,7 @@ smbfs_doio(struct buf *bp, struct ucred *cr, struct thread *td)
 		 * the block is reused. This is indicated by setting
 		 * the B_DELWRI and B_NEEDCOMMIT flags.
 		 */
-    		if (error == EINTR
+		if (error == EINTR
 		    || (!error && (bp->b_flags & B_NEEDCOMMIT))) {
 			int s;
 
@@ -382,7 +382,7 @@ smbfs_doio(struct buf *bp, struct ucred *cr, struct thread *td)
 			if ((bp->b_flags & B_ASYNC) == 0)
 			    bp->b_flags |= B_EINTR;
 			splx(s);
-	    	} else {
+		} else {
 			if (error) {
 				bp->b_ioflags |= BIO_ERROR;
 				bp->b_error = error;
@@ -531,7 +531,7 @@ smbfs_getpages(ap)
 			 */
 			;
 		}
-		
+
 		if (i != reqpage) {
 			/*
 			 * Whether or not to leave the page activated is up in
@@ -687,8 +687,8 @@ smbfs_vinvalbuf(vp, flags, cred, td, intrflg)
 	}
 	while (np->n_flag & NFLUSHINPROG) {
 		np->n_flag |= NFLUSHWANT;
-		error = tsleep((caddr_t)&np->n_flag, PRIBIO + 2, "smfsvinv", slptimeo);
-		error = smb_proc_intr(td->td_proc);
+		error = tsleep(&np->n_flag, PRIBIO + 2, "smfsvinv", slptimeo);
+		error = smb_td_intr(td);
 		if (error == EINTR && intrflg)
 			return EINTR;
 	}
@@ -699,7 +699,7 @@ smbfs_vinvalbuf(vp, flags, cred, td, intrflg)
 			np->n_flag &= ~NFLUSHINPROG;
 			if (np->n_flag & NFLUSHWANT) {
 				np->n_flag &= ~NFLUSHWANT;
-				wakeup((caddr_t)&np->n_flag);
+				wakeup(&np->n_flag);
 			}
 			return EINTR;
 		}
@@ -708,7 +708,7 @@ smbfs_vinvalbuf(vp, flags, cred, td, intrflg)
 	np->n_flag &= ~(NMODIFIED | NFLUSHINPROG);
 	if (np->n_flag & NFLUSHWANT) {
 		np->n_flag &= ~NFLUSHWANT;
-		wakeup((caddr_t)&np->n_flag);
+		wakeup(&np->n_flag);
 	}
 	return (error);
 }

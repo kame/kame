@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_rl.c,v 1.79 2002/11/14 23:49:09 sam Exp $
  */
 
 /*
@@ -84,6 +82,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/endian.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
@@ -112,6 +111,8 @@
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
 
+MODULE_DEPEND(rl, pci, 1, 1, 1);
+MODULE_DEPEND(rl, ether, 1, 1, 1);
 MODULE_DEPEND(rl, miibus, 1, 1, 1);
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
@@ -129,10 +130,7 @@ MODULE_DEPEND(rl, miibus, 1, 1, 1);
 
 #include <pci/if_rlreg.h>
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_rl.c,v 1.79 2002/11/14 23:49:09 sam Exp $";
-#endif
+__FBSDID("$FreeBSD: src/sys/pci/if_rl.c,v 1.98 2003/04/21 18:34:04 imp Exp $");
 
 /*
  * Various supported device vendors/types and their names.
@@ -156,8 +154,14 @@ static struct rl_type rl_devs[] = {
 		"D-Link DFE-690TXD 10/100BaseTX" },
 	{ NORTEL_VENDORID, ACCTON_DEVICEID_5030,
 		"Nortel Networks 10/100BaseTX" },
-	{ COREGA_VENDORID, COREGA_DEVICEID_CBTXD,
+	{ COREGA_VENDORID, COREGA_DEVICEID_FETHERCBTXD,
 		"Corega FEther CB-TXD" },
+	{ COREGA_VENDORID, COREGA_DEVICEID_FETHERIICBTXD,
+		"Corega FEtherII CB-TXD" },
+	{ PEPPERCON_VENDORID, PEPPERCON_DEVICEID_ROLF,
+		"Peppercon AG ROL-F" },
+	{ PLANEX_VENDORID, PLANEX_DEVICEID_FNW3800TX,
+		"Planex FNW-3800-TX" },
 	{ 0, 0, NULL }
 };
 
@@ -239,8 +243,8 @@ static driver_t rl_driver = {
 
 static devclass_t rl_devclass;
 
-DRIVER_MODULE(if_rl, pci, rl_driver, rl_devclass, 0, 0);
-DRIVER_MODULE(if_rl, cardbus, rl_driver, rl_devclass, 0, 0);
+DRIVER_MODULE(rl, pci, rl_driver, rl_devclass, 0, 0);
+DRIVER_MODULE(rl, cardbus, rl_driver, rl_devclass, 0, 0);
 DRIVER_MODULE(miibus, rl, miibus_driver, miibus_devclass, 0, 0);
 
 #define EE_SET(x)					\
@@ -428,11 +432,11 @@ rl_mii_send(sc, bits, cnt)
 	MII_CLR(RL_MII_CLK);
 
 	for (i = (0x1 << (cnt - 1)); i; i >>= 1) {
-                if (bits & i) {
+		if (bits & i) {
 			MII_SET(RL_MII_DATAOUT);
-                } else {
+		} else {
 			MII_CLR(RL_MII_DATAOUT);
-                }
+		}
 		DELAY(1);
 		MII_CLR(RL_MII_CLK);
 		DELAY(1);
@@ -447,7 +451,7 @@ static int
 rl_mii_readreg(sc, frame)
 	struct rl_softc		*sc;
 	struct rl_mii_frame	*frame;
-	
+
 {
 	int			i, ack;
 
@@ -460,11 +464,11 @@ rl_mii_readreg(sc, frame)
 	frame->mii_opcode = RL_MII_READOP;
 	frame->mii_turnaround = 0;
 	frame->mii_data = 0;
-	
+
 	CSR_WRITE_2(sc, RL_MII, 0);
 
 	/*
- 	 * Turn on data xmit.
+	 * Turn on data xmit.
 	 */
 	MII_SET(RL_MII_DIR);
 
@@ -490,9 +494,9 @@ rl_mii_readreg(sc, frame)
 	/* Check for ack */
 	MII_CLR(RL_MII_CLK);
 	DELAY(1);
+	ack = CSR_READ_2(sc, RL_MII) & RL_MII_DATAIN;
 	MII_SET(RL_MII_CLK);
 	DELAY(1);
-	ack = CSR_READ_2(sc, RL_MII) & RL_MII_DATAIN;
 
 	/*
 	 * Now try reading data bits. If the ack failed, we still
@@ -541,7 +545,7 @@ static int
 rl_mii_writereg(sc, frame)
 	struct rl_softc		*sc;
 	struct rl_mii_frame	*frame;
-	
+
 {
 	RL_LOCK(sc);
 
@@ -552,9 +556,9 @@ rl_mii_writereg(sc, frame)
 	frame->mii_stdelim = RL_MII_STARTDELIM;
 	frame->mii_opcode = RL_MII_WRITEOP;
 	frame->mii_turnaround = RL_MII_TURNAROUND;
-	
+
 	/*
- 	 * Turn on data output.
+	 * Turn on data output.
 	 */
 	MII_SET(RL_MII_DIR);
 
@@ -821,7 +825,7 @@ rl_reset(sc)
 	if (i == RL_TIMEOUT)
 		printf("rl%d: reset never completed!\n", sc->rl_unit);
 
-        return;
+	return;
 }
 
 /*
@@ -857,15 +861,14 @@ rl_attach(dev)
 	device_t		dev;
 {
 	u_char			eaddr[ETHER_ADDR_LEN];
-	u_int32_t		command;
+	u_int16_t		as[3];
 	struct rl_softc		*sc;
 	struct ifnet		*ifp;
 	u_int16_t		rl_did = 0;
-	int			unit, error = 0, rid;
+	int			unit, error = 0, rid, i;
 
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
-	bzero(sc, sizeof(struct rl_softc));
 
 	mtx_init(&sc->rl_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
@@ -899,25 +902,8 @@ rl_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
-#ifdef RL_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("rl%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("rl%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#endif
-
-	rid = RL_RID; 
+	rid = RL_RID;
 	sc->rl_res = bus_alloc_resource(dev, RL_RES, &rid,
 	    0, ~0, 1, RF_ACTIVE);
 
@@ -940,13 +926,13 @@ rl_attach(dev)
 	sc->rl_btag = rman_get_bustag(sc->rl_res);
 	sc->rl_bhandle = rman_get_bushandle(sc->rl_res);
 
+	/* Allocate interrupt */
 	rid = 0;
 	sc->rl_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->rl_irq == NULL) {
 		printf("rl%d: couldn't map interrupt\n", unit);
-		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -961,7 +947,11 @@ rl_attach(dev)
 	/*
 	 * Get station address from the EEPROM.
 	 */
-	rl_read_eeprom(sc, (caddr_t)&eaddr, RL_EE_EADDR, 3, 0);
+	rl_read_eeprom(sc, (caddr_t)as, RL_EE_EADDR, 3, 0);
+	for (i = 0; i < 3; i++) {
+		eaddr[(i * 2) + 0] = as[i] & 0xff;
+		eaddr[(i * 2) + 1] = as[i] >> 8;
+	}
 
 	/*
 	 * A RealTek chip was detected. Inform the world.
@@ -980,14 +970,15 @@ rl_attach(dev)
 	if (rl_did == RT_DEVICEID_8139 || rl_did == ACCTON_DEVICEID_5030 ||
 	    rl_did == DELTA_DEVICEID_8139 || rl_did == ADDTRON_DEVICEID_8139 ||
 	    rl_did == RT_DEVICEID_8138 || rl_did == DLINK_DEVICEID_530TXPLUS ||
-	    rl_did == DLINK_DEVICEID_690TXD || rl_did == COREGA_DEVICEID_CBTXD)
+	    rl_did == DLINK_DEVICEID_690TXD ||
+	    rl_did == COREGA_DEVICEID_FETHERCBTXD ||
+	    rl_did == COREGA_DEVICEID_FETHERIICBTXD ||
+	    rl_did == PLANEX_DEVICEID_FNW3800TX)
 		sc->rl_type = RL_8139;
 	else if (rl_did == RT_DEVICEID_8129)
 		sc->rl_type = RL_8129;
 	else {
 		printf("rl%d: unknown device ID: %x\n", unit, rl_did);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
-		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -996,15 +987,17 @@ rl_attach(dev)
 	 * Allocate the parent bus DMA tag appropriate for PCI.
 	 */
 #define RL_NSEG_NEW 32
-	error = bus_dma_tag_create(NULL,	/* parent */ 
+	error = bus_dma_tag_create(NULL,	/* parent */
 			1, 0,			/* alignment, boundary */
 			BUS_SPACE_MAXADDR_32BIT,/* lowaddr */
 			BUS_SPACE_MAXADDR,	/* highaddr */
 			NULL, NULL,		/* filter, filterarg */
 			MAXBSIZE, RL_NSEG_NEW,	/* maxsize, nsegments */
-			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */ 
+			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
 			BUS_DMA_ALLOCNOW,	/* flags */
 			&sc->rl_parent_tag);
+	if (error)
+		goto fail;
 
 	/*
 	 * Now allocate a tag for the DMA descriptor lists.
@@ -1020,6 +1013,8 @@ rl_attach(dev)
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
 			0,			/* flags */
 			&sc->rl_tag);
+	if (error)
+		goto fail;
 
 	/*
 	 * Now allocate a chunk of DMA-able memory based on the
@@ -1029,12 +1024,10 @@ rl_attach(dev)
 	    (void **)&sc->rl_cdata.rl_rx_buf, BUS_DMA_NOWAIT,
 	    &sc->rl_cdata.rl_rx_dmamap);
 
-	if (sc->rl_cdata.rl_rx_buf == NULL) {
+	if (error) {
 		printf("rl%d: no memory for list buffers!\n", unit);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
-		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 		bus_dma_tag_destroy(sc->rl_tag);
-		error = ENXIO;
+		sc->rl_tag = NULL;
 		goto fail;
 	}
 
@@ -1046,11 +1039,6 @@ rl_attach(dev)
 	if (mii_phy_probe(dev, &sc->rl_miibus,
 	    rl_ifmedia_upd, rl_ifmedia_sts)) {
 		printf("rl%d: MII without any phy!\n", sc->rl_unit);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
-		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
-		bus_dmamem_free(sc->rl_tag,
-		    sc->rl_cdata.rl_rx_buf, sc->rl_cdata.rl_rx_dmamap);
-		bus_dma_tag_destroy(sc->rl_tag);
 		error = ENXIO;
 		goto fail;
 	}
@@ -1069,31 +1057,37 @@ rl_attach(dev)
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
+	callout_handle_init(&sc->rl_stat_ch);
+
 	/*
 	 * Call MI attach routine.
 	 */
 	ether_ifattach(ifp, eaddr);
 
+	/* Hook interrupt last to avoid having to lock softc */
 	error = bus_setup_intr(dev, sc->rl_irq, INTR_TYPE_NET,
 	    rl_intr, sc, &sc->rl_intrhand);
 
 	if (error) {
 		printf("rl%d: couldn't set up irq\n", unit);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
-		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
-		bus_dmamem_free(sc->rl_tag,
-		    sc->rl_cdata.rl_rx_buf, sc->rl_cdata.rl_rx_dmamap);
-		bus_dma_tag_destroy(sc->rl_tag);
+		ether_ifdetach(ifp);
 		goto fail;
 	}
 
-	callout_handle_init(&sc->rl_stat_ch);
-	return(0);
 fail:
-	mtx_destroy(&sc->rl_mtx);
-	return(error);
+	if (error)
+		rl_detach(dev);
+
+	return (error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 rl_detach(dev)
 	device_t		dev;
@@ -1102,24 +1096,34 @@ rl_detach(dev)
 	struct ifnet		*ifp;
 
 	sc = device_get_softc(dev);
+	KASSERT(mtx_initialized(&sc->rl_mtx), ("rl mutex not initialized"));
 	RL_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	ether_ifdetach(ifp);
-	rl_stop(sc);
-
+	/* These should only be active if attach succeeded */
+	if (device_is_attached(dev)) {
+		rl_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->rl_miibus)
+		device_delete_child(dev, sc->rl_miibus);
 	bus_generic_detach(dev);
-	device_delete_child(dev, sc->rl_miibus);
 
-	bus_teardown_intr(dev, sc->rl_irq, sc->rl_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
-	bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
+	if (sc->rl_intrhand)
+		bus_teardown_intr(dev, sc->rl_irq, sc->rl_intrhand);
+	if (sc->rl_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
+	if (sc->rl_res)
+		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 
-	bus_dmamap_unload(sc->rl_tag, sc->rl_cdata.rl_rx_dmamap);
-	bus_dmamem_free(sc->rl_tag, sc->rl_cdata.rl_rx_buf,
-	    sc->rl_cdata.rl_rx_dmamap);
-	bus_dma_tag_destroy(sc->rl_tag);
-	bus_dma_tag_destroy(sc->rl_parent_tag);
+	if (sc->rl_tag) {
+		bus_dmamap_unload(sc->rl_tag, sc->rl_cdata.rl_rx_dmamap);
+		bus_dmamem_free(sc->rl_tag, sc->rl_cdata.rl_rx_buf,
+		    sc->rl_cdata.rl_rx_dmamap);
+		bus_dma_tag_destroy(sc->rl_tag);
+	}
+	if (sc->rl_parent_tag)
+		bus_dma_tag_destroy(sc->rl_parent_tag);
 
 	RL_UNLOCK(sc);
 	mtx_destroy(&sc->rl_mtx);
@@ -1169,14 +1173,14 @@ rl_list_tx_init(sc)
  *
  * Note: to make the Alpha happy, the frame payload needs to be aligned
  * on a 32-bit boundary. To achieve this, we pass RL_ETHER_ALIGN (2 bytes)
- * as the offset argument to m_devget(). 
+ * as the offset argument to m_devget().
  */
 static void
 rl_rxeof(sc)
 	struct rl_softc		*sc;
 {
-        struct mbuf		*m;
-        struct ifnet		*ifp;
+	struct mbuf		*m;
+	struct ifnet		*ifp;
 	int			total_len = 0;
 	u_int32_t		rxstat;
 	caddr_t			rxbufpos;
@@ -1188,7 +1192,7 @@ rl_rxeof(sc)
 	ifp = &sc->arpcom.ac_if;
 
 	bus_dmamap_sync(sc->rl_tag, sc->rl_cdata.rl_rx_dmamap,
-	    BUS_DMASYNC_POSTWRITE);
+	    BUS_DMASYNC_POSTREAD);
 
 	cur_rx = (CSR_READ_2(sc, RL_CURRXADDR) + 16) % RL_RXBUFLEN;
 
@@ -1209,7 +1213,7 @@ rl_rxeof(sc)
 		}
 #endif /* DEVICE_POLLING */
 		rxbufpos = sc->rl_cdata.rl_rx_buf + cur_rx;
-		rxstat = *(u_int32_t *)rxbufpos;
+		rxstat = le32toh(*(u_int32_t *)rxbufpos);
 
 		/*
 		 * Here's a totally undocumented fact for you. When the
@@ -1221,14 +1225,14 @@ rl_rxeof(sc)
 		 */
 		if ((u_int16_t)(rxstat >> 16) == RL_RXSTAT_UNFINISHED)
 			break;
-	
+
 		if (!(rxstat & RL_RXSTAT_RXOK)) {
 			ifp->if_ierrors++;
 			rl_init(sc);
 			return;
 		}
 
-		/* No errors; receive the packet. */	
+		/* No errors; receive the packet. */
 		total_len = rxstat >> 16;
 		rx_bytes += total_len + 4;
 
@@ -1236,7 +1240,7 @@ rl_rxeof(sc)
 		 * XXX The RealTek chip includes the CRC with every
 		 * received frame, and there's no way to turn this
 		 * behavior off (at least, I can't find anything in
-	 	 * the manual that explains how to do it) so we have
+		 * the manual that explains how to do it) so we have
 		 * to trim off the CRC manually.
 		 */
 		total_len -= ETHER_CRC_LEN;
@@ -1494,20 +1498,12 @@ rl_encap(sc, m_head)
 	 * TX buffers, plus we can only have one fragment buffer
 	 * per packet. We have to copy pretty much all the time.
 	 */
+	m_new = m_defrag(m_head, M_DONTWAIT);
 
-	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-	if (m_new == NULL)
+	if (m_new == NULL) {
+		m_freem(m_head);
 		return(1);
-	if (m_head->m_pkthdr.len > MHLEN) {
-		MCLGET(m_new, M_DONTWAIT);
-		if (!(m_new->m_flags & M_EXT)) {
-			m_freem(m_new);
-			return(1);
-		}
 	}
-	m_copydata(m_head, 0, m_head->m_pkthdr.len, mtod(m_new, caddr_t));
-	m_new->m_pkthdr.len = m_new->m_len = m_head->m_pkthdr.len;
-	m_freem(m_head);
 	m_head = m_new;
 
 	/* Pad frames to at least 60 bytes. */
@@ -1517,7 +1513,7 @@ rl_encap(sc, m_head)
 		 * bytes in the pad area, since we don't know what
 		 * this mbuf cluster buffer's previous user might
 		 * have left in it.
-	 	 */
+		 */
 		bzero(mtod(m_head, char *) + m_head->m_pkthdr.len,
 		     RL_MIN_FRAMELEN - m_head->m_pkthdr.len);
 		m_head->m_pkthdr.len +=
@@ -1550,8 +1546,6 @@ rl_start(ifp)
 			break;
 
 		if (rl_encap(sc, m_head)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
-			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
 
@@ -1563,7 +1557,7 @@ rl_start(ifp)
 
 		/*
 		 * Transmit the frame.
-	 	 */
+		 */
 		bus_dmamap_create(sc->rl_tag, 0, &RL_CUR_DMAMAP(sc));
 		bus_dmamap_load(sc->rl_tag, RL_CUR_DMAMAP(sc),
 		    mtod(RL_CUR_TXMBUF(sc), void *),
@@ -1575,6 +1569,11 @@ rl_start(ifp)
 		    RL_CUR_TXMBUF(sc)->m_pkthdr.len);
 
 		RL_INC(sc->rl_cdata.cur_tx);
+
+		/*
+		 * Set a timeout in case the chip goes out to lunch.
+		 */
+		ifp->if_timer = 5;
 	}
 
 	/*
@@ -1585,10 +1584,6 @@ rl_start(ifp)
 	if (RL_CUR_TXMBUF(sc) != NULL)
 		ifp->if_flags |= IFF_OACTIVE;
 
-	/*
-	 * Set a timeout in case the chip goes out to lunch.
-	 */
-	ifp->if_timer = 5;
 	RL_UNLOCK(sc);
 
 	return;
@@ -1901,9 +1896,9 @@ rl_resume(dev)
 	pci_enable_busmaster(dev);
 	pci_enable_io(dev, RL_RES);
 
-        /* reinitialize interface if necessary */
-        if (ifp->if_flags & IFF_UP)
-                rl_init(sc);
+	/* reinitialize interface if necessary */
+	if (ifp->if_flags & IFF_UP)
+		rl_init(sc);
 
 	sc->suspended = 0;
 

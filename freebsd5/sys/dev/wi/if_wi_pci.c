@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wi_pci.c,v 1.10 2002/06/14 15:32:01 nsayer Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wi_pci.c,v 1.14 2003/04/15 06:37:28 mdodd Exp $
  */
 
 /*
@@ -63,19 +63,22 @@
 #include <net/if_ieee80211.h>
 
 #include <dev/wi/if_wavelan_ieee.h>
-#include <dev/wi/wi_hostap.h>
 #include <dev/wi/if_wivar.h>
 #include <dev/wi/if_wireg.h>
 
 static int wi_pci_probe(device_t);
 static int wi_pci_attach(device_t);
+static int wi_pci_suspend(device_t);
+static int wi_pci_resume(device_t);
 
 static device_method_t wi_pci_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		wi_pci_probe),
 	DEVMETHOD(device_attach,	wi_pci_attach),
-	DEVMETHOD(device_detach,	wi_generic_detach),
+	DEVMETHOD(device_detach,	wi_detach),
 	DEVMETHOD(device_shutdown,	wi_shutdown),
+	DEVMETHOD(device_suspend,	wi_pci_suspend),
+	DEVMETHOD(device_resume,	wi_pci_resume),
 
 	{ 0, 0 }
 };
@@ -99,11 +102,14 @@ static struct {
 	{0x1385, 0x4100, WI_BUS_PCI_PLX, "Netgear MA301"},
 	{0x1638, 0x1100, WI_BUS_PCI_PLX, "PRISM2STA WaveLAN"},
 	{0x111a, 0x1023, WI_BUS_PCI_PLX, "Siemens SpeedStream"},
+	{0x10b5, 0x9050, WI_BUS_PCI_PLX, "SMC 2602W"},
 	{0x16ec, 0x3685, WI_BUS_PCI_PLX, "US Robotics 2415"},
 	{0, 0, 0, NULL}
 };
 
-DRIVER_MODULE(if_wi, pci, wi_pci_driver, wi_devclass, 0, 0);
+DRIVER_MODULE(wi, pci, wi_pci_driver, wi_devclass, 0, 0);
+MODULE_DEPEND(wi, pci, 1, 1, 1);
+MODULE_DEPEND(wi, wlan, 1, 1, 1);
 
 static int
 wi_pci_probe(dev)
@@ -227,9 +233,41 @@ wi_pci_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	error = wi_generic_attach(dev);
+	error = wi_attach(dev);
 	if (error != 0)
 		return (error);
+
+	return (0);
+}
+
+static int
+wi_pci_suspend(device_t dev)
+{
+	struct wi_softc		*sc;
+	struct ifnet *ifp;
+	sc = device_get_softc(dev);
+	ifp = &sc->sc_if;
+
+	wi_stop(ifp, 1);
+	
+	return (0);
+}
+
+static int
+wi_pci_resume(device_t dev)
+{
+	struct wi_softc *sc;
+	struct ifnet *ifp;
+	sc = device_get_softc(dev);
+	ifp = &sc->sc_if;
+
+	if (sc->wi_bus_type != WI_BUS_PCI_NATIVE)
+		return (0);
+
+	ifp->if_init(ifp->if_softc);
+	if (ifp->if_flags & IFF_UP) {
+		ifp->if_start(ifp);
+	}
 
 	return (0);
 }

@@ -37,7 +37,7 @@
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
  * 	from: FreeBSD: src/sys/i386/i386/machdep.c,v 1.477 2001/08/27
- * $FreeBSD: src/sys/sparc64/sparc64/machdep.c,v 1.73.2.1 2003/01/10 00:58:11 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/machdep.c,v 1.94 2003/05/13 20:36:02 jhb Exp $
  */
 
 #include "opt_compat.h"
@@ -92,6 +92,7 @@
 #include <machine/clock.h>
 #include <machine/cpu.h>
 #include <machine/fp.h>
+#include <machine/fsr.h>
 #include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/metadata.h>
@@ -120,7 +121,7 @@ char uarea0[UAREA_PAGES * PAGE_SIZE];
 struct trapframe frame0;
 
 vm_offset_t kstack0;
-vm_offset_t kstack0_phys;
+vm_paddr_t kstack0_phys;
 
 struct kva_md_info kmi;
 
@@ -130,6 +131,11 @@ u_long ofw_tba;
 static struct timecounter tick_tc;
 
 char sparc64_model[32];
+
+static int cpu_use_vis = 1;
+
+cpu_block_copy_t *cpu_block_copy;
+cpu_block_zero_t *cpu_block_zero;
 
 static timecounter_get_t tick_get_timecount;
 void sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3,
@@ -146,6 +152,11 @@ CTASSERT(sizeof(struct reg) == 256);
 CTASSERT(sizeof(struct fpreg) == 272);
 CTASSERT(sizeof(struct __mcontext) == 512);
 
+CTASSERT((sizeof(struct pcb) & (64 - 1)) == 0);
+CTASSERT((offsetof(struct pcb, pcb_kfp) & (64 - 1)) == 0);
+CTASSERT((offsetof(struct pcb, pcb_ufp) & (64 - 1)) == 0);
+CTASSERT(sizeof(struct pcb) <= ((KSTACK_PAGES * PAGE_SIZE) / 8));
+
 CTASSERT(sizeof(struct pcpu) <= ((PCPU_PAGES * PAGE_SIZE) / 2));
 
 static void
@@ -159,8 +170,8 @@ cpu_startup(void *arg)
 	tick_tc.tc_name = "tick";
 	tc_init(&tick_tc);
 
-	cpu_identify(rdpr(ver), tick_freq, PCPU_GET(cpuid));
-	printf("Model: %s\n", sparc64_model);
+	printf("real memory  = %lu (%lu MB)\n", physmem * PAGE_SIZE,
+	    physmem / ((1024 * 1024) / PAGE_SIZE));
 
 	vm_ksubmap_init(&kmi);
 
@@ -169,6 +180,14 @@ cpu_startup(void *arg)
 
 	EVENTHANDLER_REGISTER(shutdown_final, sparc64_shutdown_final, NULL,
 	    SHUTDOWN_PRI_LAST);
+
+	printf("avail memory = %lu (%lu MB)\n", cnt.v_free_count * PAGE_SIZE,
+	    cnt.v_free_count / ((1024 * 1024) / PAGE_SIZE));
+
+	if (bootverbose)
+		printf("machine: %s\n", sparc64_model);
+
+	cpu_identify(rdpr(ver), tick_freq, PCPU_GET(cpuid));
 }
 
 void
@@ -198,7 +217,6 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 	phandle_t root;
 	struct pcpu *pc;
 	vm_offset_t end;
-	vm_offset_t va;
 	caddr_t kmdp;
 	u_int clock;
 	char *env;
@@ -206,6 +224,12 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 
 	end = 0;
 	kmdp = NULL;
+
+	/*
+	 * Find out what kind of cpu we have first, for anything that changes
+	 * behaviour.
+	 */
+	cpu_impl = VER_IMPL(rdpr(ver));
 
 	/*
 	 * Initialize openfirmware (needed for console).
@@ -262,12 +286,16 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 	}
 	if (child == 0)
 		panic("cpu_startup: no cpu\n");
-	OF_getprop(child, "#dtlb-entries", &tlb_dtlb_entries,
-	    sizeof(tlb_dtlb_entries));
-	OF_getprop(child, "#itlb-entries", &tlb_itlb_entries,
-	    sizeof(tlb_itlb_entries));
-
 	cache_init(child);
+
+	getenv_int("machdep.use_vis", &cpu_use_vis);
+	if (cpu_use_vis) {
+		cpu_block_copy = spitfire_block_copy;
+		cpu_block_zero = spitfire_block_zero;
+	} else {
+		cpu_block_copy = bcopy;
+		cpu_block_zero = bzero;
+	}
 
 #ifdef DDB
 	kdb_init();
@@ -339,10 +367,8 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 	cpu_setregs(pc);
 
 	/*
-	 * Map and initialize the message buffer (after setting trap table).
+	 * Initialize the message buffer (after setting trap table).
 	 */
-	va = (vm_offset_t)msgbufp;
-	pmap_map(&va, msgbuf_phys, msgbuf_phys + MSGBUF_SIZE, 0);
 	msgbufinit(msgbufp, MSGBUF_SIZE);
 
 	mutex_init();
@@ -377,7 +403,9 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	oonstack = 0;
 	td = curthread;
 	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 	tf = td->td_frame;
 	sp = tf->tf_sp + SPOFF;
 	oonstack = sigonstack(sp);
@@ -411,6 +439,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		    p->p_sigstk.ss_size - sizeof(struct sigframe));
 	} else
 		sfp = (struct sigframe *)sp - 1;
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	fp = (struct frame *)sfp - 1;
@@ -450,6 +479,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	    tf->tf_sp);
 
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 
 #ifndef	_SYS_SYSPROTO_H_
@@ -489,9 +519,9 @@ sigreturn(struct thread *td, struct sigreturn_args *uap)
 	bcopy(mc, tf, sizeof(*tf));
 
 	PROC_LOCK(p);
-	p->p_sigmask = uc.uc_sigmask;
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	td->td_sigmask = uc.uc_sigmask;
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 
 	CTR4(KTR_SIG, "sigreturn: return td=%p pc=%#lx sp=%#lx tstate=%#lx",
@@ -509,17 +539,54 @@ freebsd4_sigreturn(struct thread *td, struct freebsd4_sigreturn_args *uap)
 #endif
 
 int
-get_mcontext(struct thread *td, mcontext_t *mcp)
+get_mcontext(struct thread *td, mcontext_t *mc, int clear_ret)
 {
+	struct trapframe *tf;
+	struct pcb *pcb;
 
-	return (ENOSYS);
+	tf = td->td_frame;
+	pcb = td->td_pcb;
+	bcopy(tf, mc, sizeof(*tf));
+	if (clear_ret != 0) {
+		mc->mc_out[0] = 0;
+		mc->mc_out[1] = 0;
+	}
+	mc->mc_flags = _MC_VERSION;
+	critical_enter();
+	if ((tf->tf_fprs & FPRS_FEF) != 0) {
+		savefpctx(pcb->pcb_ufp);
+		tf->tf_fprs &= ~FPRS_FEF;
+		pcb->pcb_flags |= PCB_FEF;
+	}
+	if ((pcb->pcb_flags & PCB_FEF) != 0) {
+		bcopy(pcb->pcb_ufp, mc->mc_fp, sizeof(mc->mc_fp));
+		mc->mc_fprs |= FPRS_FEF;
+	}
+	critical_exit();
+	return (0);
 }
 
 int
-set_mcontext(struct thread *td, const mcontext_t *mcp)
+set_mcontext(struct thread *td, const mcontext_t *mc)
 {
+	struct trapframe *tf;
+	struct pcb *pcb;
+	uint64_t wstate;
 
-	return (ENOSYS);
+	if (!TSTATE_SECURE(mc->mc_tstate) ||
+	    (mc->mc_flags & ((1L << _MC_VERSION_BITS) - 1)) != _MC_VERSION)
+		return (EINVAL);
+	tf = td->td_frame;
+	pcb = td->td_pcb;
+	wstate = tf->tf_wstate;
+	bcopy(mc, tf, sizeof(*tf));
+	tf->tf_wstate = wstate;
+	if ((mc->mc_fprs & FPRS_FEF) != 0) {
+		tf->tf_fprs = 0;
+		bcopy(mc->mc_fp, pcb->pcb_ufp, sizeof(pcb->pcb_ufp));
+		pcb->pcb_flags |= PCB_FEF;
+	}
+	return (0);
 }
 
 /*
@@ -650,10 +717,13 @@ fill_regs(struct thread *td, struct reg *regs)
 int
 set_regs(struct thread *td, struct reg *regs)
 {
+	struct trapframe *tf;
 
 	if (!TSTATE_SECURE(regs->r_tstate))
 		return (EINVAL);
-	bcopy(regs, td->td_frame, sizeof(*regs));
+	tf = td->td_frame;
+	regs->r_wstate = tf->tf_wstate;
+	bcopy(regs, tf, sizeof(*regs));
 	return (0);
 }
 
@@ -679,8 +749,7 @@ fill_fpregs(struct thread *td, struct fpreg *fpregs)
 
 	pcb = td->td_pcb;
 	tf = td->td_frame;
-	bcopy(pcb->pcb_fpstate.fp_fb, fpregs->fr_regs,
-	    sizeof(pcb->pcb_fpstate.fp_fb));
+	bcopy(pcb->pcb_ufp, fpregs->fr_regs, sizeof(fpregs->fr_regs));
 	fpregs->fr_fsr = tf->tf_fsr;
 	fpregs->fr_gsr = tf->tf_gsr;
 	return (0);
@@ -694,8 +763,8 @@ set_fpregs(struct thread *td, struct fpreg *fpregs)
 
 	pcb = td->td_pcb;
 	tf = td->td_frame;
-	bcopy(fpregs->fr_regs, pcb->pcb_fpstate.fp_fb,
-	    sizeof(fpregs->fr_regs));
+	tf->tf_fprs &= ~FPRS_FEF;
+	bcopy(fpregs->fr_regs, pcb->pcb_ufp, sizeof(pcb->pcb_ufp));
 	tf->tf_fsr = fpregs->fr_fsr;
 	tf->tf_gsr = fpregs->fr_gsr;
 	return (0);

@@ -31,18 +31,20 @@
  * SUCH DAMAGE.
  *
  *	@(#)disklabel.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/diskpc98.h,v 1.93 2002/10/07 10:02:11 nyan Exp $
+ * $FreeBSD: src/sys/sys/diskpc98.h,v 1.99 2003/05/01 14:40:16 nyan Exp $
  */
 
 #ifndef _SYS_DISKPC98_H_
 #define	_SYS_DISKPC98_H_
+
+#include <sys/ioccom.h>
 
 #define	DOSBBSECTOR	0	/* DOS boot block relative sector number */
 #define	DOSPARTOFF	0
 #define	NDOSPART	16
 #define	DOSPTYP_386BSD	0x94	/* 386BSD partition type */
 
-struct dos_partition {
+struct pc98_partition {
     	unsigned char	dp_mid;
 #define	DOSMID_386BSD		(0x14|0x80) /* 386bsd|bootable */
 	unsigned char	dp_sid;
@@ -61,7 +63,12 @@ struct dos_partition {
 	unsigned char	dp_name[16];
 };
 #ifdef CTASSERT
-CTASSERT(sizeof (struct dos_partition) == 32);
+CTASSERT(sizeof (struct pc98_partition) == 32);
 #endif
+
+void pc98_partition_dec(void const *pp, struct pc98_partition *d);
+void pc98_partition_enc(void *pp, struct pc98_partition *d);
+
+#define DIOCSPC98	_IOW('M', 129, u_char[8192])
 
 #endif /* !_SYS_DISKPC98_H_ */

@@ -28,30 +28,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/buffer.c,v 1.13 2002/11/25 17:17:41 cg Exp $");
-
-#define	MIN(x, y) (((x) < (y))? (x) : (y))
-
-#define SNDBUF_NAMELEN	48
-struct snd_dbuf {
-	device_t dev;
-        u_int8_t *buf, *tmpbuf;
-        unsigned int bufsize, maxsize;
-        volatile int dl; /* transfer size */
-        volatile int rp; /* pointers to the ready area */
-	volatile int rl; /* length of ready area */
-	volatile int hp;
-	volatile u_int32_t total, prev_total;
-	int isadmachan, dir;       /* dma channel */
-	u_int32_t fmt, spd, bps;
-	unsigned int blksz, blkcnt;
-	int xrun;
-	u_int32_t flags;
-	bus_dmamap_t dmamap;
-	bus_dma_tag_t dmatag;
-	struct selinfo sel;
-	char name[SNDBUF_NAMELEN];
-};
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/buffer.c,v 1.19 2003/04/20 17:08:56 orion Exp $");
 
 struct snd_dbuf *
 sndbuf_create(device_t dev, char *drv, char *desc)
@@ -71,6 +48,12 @@ sndbuf_destroy(struct snd_dbuf *b)
 	free(b, M_DEVBUF);
 }
 
+bus_addr_t
+sndbuf_getbufaddr(struct snd_dbuf *buf)
+{
+	return (buf->buf_addr);
+}
+
 static void
 sndbuf_setmap(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
@@ -81,12 +64,14 @@ sndbuf_setmap(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 		       (unsigned long)segs->ds_len);
 		printf("%p -> %lx\n", b->buf, (unsigned long)vtophys(b->buf));
 	}
+	b->buf_addr = segs->ds_addr;
 }
 
 /*
  * Allocate memory for DMA buffer. If the device does not use DMA transfers,
  * the driver can call malloc(9) and sndbuf_setup() itself.
  */
+
 int
 sndbuf_alloc(struct snd_dbuf *b, bus_dma_tag_t dmatag, unsigned int size)
 {
@@ -128,6 +113,7 @@ sndbuf_free(struct snd_dbuf *b)
 int
 sndbuf_resize(struct snd_dbuf *b, unsigned int blkcnt, unsigned int blksz)
 {
+	u_int8_t *tmpbuf;
 	if (b->maxsize == 0)
 		return 0;
 	if (blkcnt == 0)
@@ -141,9 +127,12 @@ sndbuf_resize(struct snd_dbuf *b, unsigned int blkcnt, unsigned int blksz)
 	b->blkcnt = blkcnt;
 	b->blksz = blksz;
 	b->bufsize = blkcnt * blksz;
-	if (b->tmpbuf)
-		free(b->tmpbuf, M_DEVBUF);
-	b->tmpbuf = malloc(b->bufsize, M_DEVBUF, M_NOWAIT);
+
+	tmpbuf = malloc(b->bufsize, M_DEVBUF, M_NOWAIT);
+	if (tmpbuf == NULL) 
+		return ENOMEM;
+	free(b->tmpbuf, M_DEVBUF);
+	b->tmpbuf = tmpbuf;
 	sndbuf_reset(b);
 	return 0;
 }
@@ -158,7 +147,6 @@ sndbuf_remalloc(struct snd_dbuf *b, unsigned int blkcnt, unsigned int blksz)
 		return EINVAL;
 
 	bufsize = blksz * blkcnt;
-
 
 	buf = malloc(bufsize, M_DEVBUF, M_NOWAIT);
 	if (buf == NULL)
@@ -587,79 +575,5 @@ sndbuf_setflags(struct snd_dbuf *b, u_int32_t flags, int on)
 	b->flags &= ~flags;
 	if (on)
 		b->flags |= flags;
-}
-
-/************************************************************/
-
-int
-sndbuf_isadmasetup(struct snd_dbuf *b, struct resource *drq)
-{
-	/* should do isa_dma_acquire/isa_dma_release here */
-	if (drq == NULL) {
-		b->isadmachan = -1;
-	} else {
-		sndbuf_setflags(b, SNDBUF_F_ISADMA, 1);
-		b->isadmachan = rman_get_start(drq);
-	}
-	return 0;
-}
-
-int
-sndbuf_isadmasetdir(struct snd_dbuf *b, int dir)
-{
-	KASSERT(b, ("sndbuf_isadmasetdir called with b == NULL"));
-	KASSERT(sndbuf_getflags(b) & SNDBUF_F_ISADMA, ("sndbuf_isadmasetdir called on non-ISA buffer"));
-
-	b->dir = (dir == PCMDIR_PLAY)? ISADMA_WRITE : ISADMA_READ;
-	return 0;
-}
-
-void
-sndbuf_isadma(struct snd_dbuf *b, int go)
-{
-	KASSERT(b, ("sndbuf_isadma called with b == NULL"));
-	KASSERT(sndbuf_getflags(b) & SNDBUF_F_ISADMA, ("sndbuf_isadma called on non-ISA buffer"));
-
-	switch (go) {
-	case PCMTRIG_START:
-		/* isa_dmainit(b->chan, size); */
-		isa_dmastart(b->dir | ISADMA_RAW, b->buf, b->bufsize, b->isadmachan);
-		break;
-
-	case PCMTRIG_STOP:
-	case PCMTRIG_ABORT:
-		isa_dmastop(b->isadmachan);
-		isa_dmadone(b->dir | ISADMA_RAW, b->buf, b->bufsize, b->isadmachan);
-		break;
-	}
-
-	DEB(printf("buf 0x%p ISA DMA %s, channel %d\n",
-		b,
-		(go == PCMTRIG_START)? "started" : "stopped",
-		b->isadmachan));
-}
-
-int
-sndbuf_isadmaptr(struct snd_dbuf *b)
-{
-	int i;
-
-	KASSERT(b, ("sndbuf_isadmaptr called with b == NULL"));
-	KASSERT(sndbuf_getflags(b) & SNDBUF_F_ISADMA, ("sndbuf_isadmaptr called on non-ISA buffer"));
-
-	if (!sndbuf_runsz(b))
-		return 0;
-	i = isa_dmastatus(b->isadmachan);
-	KASSERT(i >= 0, ("isa_dmastatus returned %d", i));
-	return b->bufsize - i;
-}
-
-void
-sndbuf_isadmabounce(struct snd_dbuf *b)
-{
-	KASSERT(b, ("sndbuf_isadmabounce called with b == NULL"));
-	KASSERT(sndbuf_getflags(b) & SNDBUF_F_ISADMA, ("sndbuf_isadmabounce called on non-ISA buffer"));
-
-	/* tell isa_dma to bounce data in/out */
 }
 

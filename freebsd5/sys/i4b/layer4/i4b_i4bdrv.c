@@ -27,7 +27,7 @@
  *	i4b_i4bdrv.c - i4b userland interface driver
  *	--------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.29 2002/09/02 00:52:11 brooks Exp $
+ * $FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.34 2003/03/03 12:15:50 phk Exp $
  *
  *      last edit-date: [Sun Aug 11 12:42:46 2002]
  *
@@ -50,10 +50,6 @@
 
 #include "i4bing.h"
 #include "i4bisppp.h"
-
-#ifdef DEVFS
-#include <sys/devfsext.h>
-#endif
 
 #include <machine/i4b_debug.h>
 #include <machine/i4b_ioctl.h>
@@ -83,31 +79,17 @@ static	d_poll_t	i4bpoll;
 #define CDEV_MAJOR 60
 
 static struct cdevsw i4b_cdevsw = {
-	/* open */      i4bopen,
-	/* close */     i4bclose,
-	/* read */      i4bread,
-	/* write */     nowrite,
-	/* ioctl */     i4bioctl,
-	/* poll */      i4bpoll,
-	/* mmap */      nommap,
-	/* strategy */  nostrategy,
-	/* name */      "i4b",
-	/* maj */       CDEV_MAJOR,
-	/* dump */      nodump,
-	/* psize */     nopsize,
-	/* flags */     0,
+	.d_open =	i4bopen,
+	.d_close =	i4bclose,
+	.d_read =	i4bread,
+	.d_ioctl =	i4bioctl,
+	.d_poll =	i4bpoll,
+	.d_name =	"i4b",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static void i4battach(void *);
 PSEUDO_SET(i4battach, i4b_i4bdrv);
-
-static void
-i4b_drvinit(void *unused)
-{
-	cdevsw_add(&i4b_cdevsw);
-}
-
-SYSINIT(i4bdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,i4b_drvinit,NULL)
 
 /*---------------------------------------------------------------------------*
  *	interface attach routine
@@ -180,7 +162,7 @@ i4bread(dev_t dev, struct uio *uio, int ioflag)
 	{
 		readflag = 1;
 
-		error = msleep((caddr_t) &i4b_rdqueue, &i4b_rdqueue.ifq_mtx,
+		error = msleep( &i4b_rdqueue, &i4b_rdqueue.ifq_mtx,
 			(PZERO + 1) | PCATCH, "bird", 0);
 
 		if (error != 0) {
@@ -832,7 +814,7 @@ i4bputqueue(struct mbuf *m)
 	if(readflag)
 	{
 		readflag = 0;
-		wakeup((caddr_t) &i4b_rdqueue);
+		wakeup( &i4b_rdqueue);
 	}
 
 	if(selflag)
@@ -875,7 +857,7 @@ i4bputqueue_hipri(struct mbuf *m)
 	if(readflag)
 	{
 		readflag = 0;
-		wakeup((caddr_t) &i4b_rdqueue);
+		wakeup( &i4b_rdqueue);
 	}
 
 	if(selflag)

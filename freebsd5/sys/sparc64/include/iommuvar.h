@@ -27,7 +27,7 @@
  *
  *	from: NetBSD: iommuvar.h,v 1.9 2001/07/20 00:07:13 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/include/iommuvar.h,v 1.6 2002/07/16 18:16:46 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/iommuvar.h,v 1.11 2003/05/26 04:00:52 scottl Exp $
  */
 
 #ifndef _MACHINE_IOMMUVAR_H_
@@ -47,7 +47,7 @@ struct iommu_state {
 	u_int64_t		is_dvmabase;
 	int64_t			is_cr;		/* IOMMU control register value */
 
-	vm_offset_t		is_flushpa[2];
+	vm_paddr_t		is_flushpa[2];
 	volatile int64_t	*is_flushva[2];
 	/*
 	 * When a flush is completed, 64 bytes will be stored at the given
@@ -77,7 +77,7 @@ struct iommu_state {
 /* interfaces for PCI/SBUS code */
 void iommu_init(char *, struct iommu_state *, int, u_int32_t, int);
 void iommu_reset(struct iommu_state *);
-void iommu_enter(struct iommu_state *, vm_offset_t, vm_offset_t, int);
+void iommu_enter(struct iommu_state *, vm_offset_t, vm_paddr_t, int);
 void iommu_remove(struct iommu_state *, vm_offset_t, size_t);
 void iommu_decode_fault(struct iommu_state *, vm_offset_t);
 
@@ -87,10 +87,14 @@ int iommu_dvmamap_destroy(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
     bus_dmamap_t);
 int iommu_dvmamap_load(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
     bus_dmamap_t, void *, bus_size_t, bus_dmamap_callback_t *, void *, int);
+int iommu_dvmamap_load_mbuf(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
+    bus_dmamap_t, struct mbuf *, bus_dmamap_callback2_t *, void *, int);
+int iommu_dvmamap_load_uio(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
+    bus_dmamap_t, struct uio *, bus_dmamap_callback2_t *, void *, int);
 void iommu_dvmamap_unload(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
     bus_dmamap_t);
 void iommu_dvmamap_sync(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    bus_dmamap_t, bus_dmasync_op_t);
+    bus_dmamap_t, int);
 int iommu_dvmamem_alloc(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
     void **, int, bus_dmamap_t *);
 void iommu_dvmamem_free(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mly/mlyvar.h,v 1.4 2001/12/10 08:09:42 obrien Exp $
+ *	$FreeBSD: src/sys/dev/mly/mlyvar.h,v 1.5 2003/02/06 23:46:32 scottl Exp $
  */
 
 /********************************************************************************
@@ -148,6 +148,7 @@ struct mly_command {
     void	(* mc_complete)(struct mly_command *mc);	/* completion handler */
     void	*mc_private;					/* caller-private data */
 
+    int				mc_timestamp;
 };
 
 /*
@@ -237,6 +238,7 @@ struct mly_softc {
     /* command-completion task */
     struct task		mly_task_complete;	/* deferred-completion task */
 #endif
+    int				mly_qfrzn_cnt;		/* Track simq freezes */
 };
 
 /*

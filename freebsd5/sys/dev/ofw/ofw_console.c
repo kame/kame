@@ -23,10 +23,11 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.7 2002/11/18 06:19:12 jake Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.12 2003/04/03 21:36:31 obrien Exp $");
+
+#include "opt_ddb.h"
+#include "opt_comconsole.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -39,6 +40,8 @@ static const char rcsid[] =
 
 #include <dev/ofw/openfirm.h>
 
+#include <ddb/ddb.h>
+
 #define	OFW_POLL_HZ	4
 
 static d_open_t		ofw_dev_open;
@@ -48,25 +51,24 @@ static d_ioctl_t	ofw_dev_ioctl;
 #define	CDEV_MAJOR	97
 
 static struct cdevsw ofw_cdevsw = {
-	/* open */	ofw_dev_open,
-	/* close */	ofw_dev_close,
-	/* read */	ttyread,
-	/* write */	ttywrite,
-	/* ioctl */	ofw_dev_ioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"ofw",
-	/* major */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	ofw_dev_open,
+	.d_close =	ofw_dev_close,
+	.d_read =	ttyread,
+	.d_write =	ttywrite,
+	.d_ioctl =	ofw_dev_ioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"ofw",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static struct tty		*ofw_tp = NULL;
 static int			polltime;
 static struct callout_handle	ofw_timeouthandle
     = CALLOUT_HANDLE_INITIALIZER(&ofw_timeouthandle);
+
+#if defined(DDB) && defined(ALT_BREAK_TO_DEBUGGER)
+static int			alt_break_state;
+#endif
 
 static void	ofw_tty_start(struct tty *);
 static int	ofw_tty_param(struct tty *, struct termios *);
@@ -93,8 +95,9 @@ cn_drvinit(void *unused)
 		    OF_getprop(options, "output-device", output,
 		    sizeof(output)) == -1)
 			return;
-		make_dev(&ofw_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "ofwcons");
-		make_dev_alias(ofw_consdev.cn_dev, "%s", output);
+		make_dev(&ofw_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "%s",
+		    output);
+		make_dev_alias(ofw_consdev.cn_dev, "ofwcons");
 	}
 }
 
@@ -214,7 +217,7 @@ ofw_tty_start(struct tty *tp)
 
 	tp->t_state |= TS_BUSY;
 	while (tp->t_outq.c_cc != 0) {
-		ofw_cons_putc(tp->t_dev, getc(&tp->t_outq));
+		ofw_cons_putc(NULL, getc(&tp->t_outq));
 	}
 	tp->t_state &= ~TS_BUSY;
 
@@ -240,7 +243,7 @@ ofw_timeout(void *v)
 
 	tp = (struct tty *)v;
 
-	while ((c = ofw_cons_checkc(tp->t_dev)) != -1) {
+	while ((c = ofw_cons_checkc(NULL)) != -1) {
 		if (tp->t_state & TS_ISOPEN) {
 			(*linesw[tp->t_line].l_rint)(c, tp);
 		}
@@ -282,7 +285,7 @@ ofw_cons_init(struct consdev *cp)
 }
 
 static int
-ofw_cons_getc(dev_t dev)
+ofw_cons_getc(struct consdev *cp)
 {
 	unsigned char ch;
 	int l;
@@ -295,15 +298,24 @@ ofw_cons_getc(dev_t dev)
 		}
 	}
 
+#if defined(DDB) && defined(ALT_BREAK_TO_DEBUGGER)
+	if (db_alt_break(ch, &alt_break_state))
+		breakpoint();
+#endif
+
 	return (ch);
 }
 
 static int
-ofw_cons_checkc(dev_t dev)
+ofw_cons_checkc(struct consdev *cp)
 {
 	unsigned char ch;
 
 	if (OF_read(stdin, &ch, 1) > 0) {
+#if defined(DDB) && defined(ALT_BREAK_TO_DEBUGGER)
+		if (db_alt_break(ch, &alt_break_state))
+			breakpoint();
+#endif
 		return (ch);
 	}
 
@@ -311,7 +323,7 @@ ofw_cons_checkc(dev_t dev)
 }
 
 static void
-ofw_cons_putc(dev_t dev, int c)
+ofw_cons_putc(struct consdev *cp, int c)
 {
 	char cbuf;
 

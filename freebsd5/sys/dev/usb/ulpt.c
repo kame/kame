@@ -1,5 +1,5 @@
-/*	$NetBSD: ulpt.c,v 1.51 2002/08/15 09:32:50 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.50.2.1 2002/12/17 00:05:25 des Exp $	*/
+/*	$NetBSD: ulpt.c,v 1.55 2002/10/23 09:14:01 jdolecek Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.55 2003/03/03 12:15:47 phk Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -126,7 +126,17 @@ struct ulpt_softc {
 #endif
 };
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
+dev_type_open(ulptopen);
+dev_type_close(ulptclose);
+dev_type_write(ulptwrite);
+dev_type_ioctl(ulptioctl);
+
+const struct cdevsw ulpt_cdevsw = {
+	ulptopen, ulptclose, noread, ulptwrite, ulptioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
+#elif defined(__OpenBSD__)
 cdev_decl(ulpt);
 #elif defined(__FreeBSD__)
 Static d_open_t ulptopen;
@@ -137,19 +147,12 @@ Static d_ioctl_t ulptioctl;
 #define ULPT_CDEV_MAJOR 113
 
 Static struct cdevsw ulpt_cdevsw = {
-	/* open */	ulptopen,
-	/* close */	ulptclose,
-	/* read */	noread,
-	/* write */	ulptwrite,
-	/* ioctl */	ulptioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"ulpt",
-	/* maj */	ULPT_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	ulptopen,
+	.d_close =	ulptclose,
+	.d_write =	ulptwrite,
+	.d_ioctl =	ulptioctl,
+	.d_name =	"ulpt",
+	.d_maj =	ULPT_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
 	/* bmaj */	-1
 #endif
@@ -226,7 +229,7 @@ USB_ATTACH(ulpt)
 #ifdef DIAGNOSTIC
 	if (ifcd < (usb_interface_descriptor_t *)cdesc ||
 	    ifcd >= iend)
-		panic("ulpt: iface desc out of range\n");
+		panic("ulpt: iface desc out of range");
 #endif
 	/* Step through all the descriptors looking for bidir mode */
 	for (id = ifcd, altno = 0;
@@ -356,7 +359,6 @@ ulpt_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		sc->sc_dying = 1;
@@ -398,9 +400,13 @@ USB_DETACH(ulpt)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	/* locate the major number */
+#if defined(__NetBSD__)
+	maj = cdevsw_lookup_major(&ulpt_cdevsw);
+#elif defined(__OpenBSD__)
 	for (maj = 0; maj < nchrdev; maj++)
 		if (cdevsw[maj].d_open == ulptopen)
 			break;
+#endif
 
 	/* Nuke the vnodes for any open instances (calls close). */
 	mn = self->dv_unit;
@@ -534,7 +540,7 @@ ulptopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 		}
 
 		/* wait 1/4 second, give up if we get a signal */
-		error = tsleep((caddr_t)sc, LPTPRI | PCATCH, "ulptop", STEP);
+		error = tsleep(sc, LPTPRI | PCATCH, "ulptop", STEP);
 		if (error != EWOULDBLOCK) {
 			sc->sc_state = 0;
 			goto done;
@@ -726,7 +732,7 @@ ulptioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 #if 0
 /* XXX This does not belong here. */
 /*
- * Print select parts of a IEEE 1284 device ID.
+ * Print select parts of an IEEE 1284 device ID.
  */
 void
 ieee1284_print_id(char *str)

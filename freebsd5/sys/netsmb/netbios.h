@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/netbios.h,v 1.3 2002/04/17 03:12:24 bp Exp $
+ * $FreeBSD: src/sys/netsmb/netbios.h,v 1.4 2003/03/05 19:24:23 peter Exp $
  */
 #ifndef _NETSMB_NETBIOS_H_
 #define	_NETSMB_NETBIOS_H_
@@ -44,9 +44,6 @@
 #ifndef _NETIPX_IPX_H_
 #include <netipx/ipx.h>
 #endif
-
-#define AF_NETBIOS	AF_NS		/* XXX: should go to socket.h */
-#define PF_NETBIOS	AF_NETBIOS
 
 #define	NBPROTO_TCPSSN	1		/* NETBIOS session over TCP */
 #define	NBPROTO_IPXSSN	11		/* NETBIOS over IPX */

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/vm/uma_core.c,v 1.44 2002/11/18 08:27:14 jeff Exp $
+ * $FreeBSD: src/sys/vm/uma_core.c,v 1.55 2003/04/28 06:11:32 alc Exp $
  *
  */
 
@@ -703,10 +703,15 @@ slab_zalloc(uma_zone_t zone, int wait)
 		wait &= ~M_ZERO;
 
 	if (booted || (zone->uz_flags & UMA_ZFLAG_PRIVALLOC)) {
-		mtx_lock(&Giant);
-		mem = zone->uz_allocf(zone, 
-		    zone->uz_ppera * UMA_SLAB_SIZE, &flags, wait);
-		mtx_unlock(&Giant);
+		if ((wait & M_NOWAIT) == 0) {
+			mtx_lock(&Giant);
+			mem = zone->uz_allocf(zone, 
+			    zone->uz_ppera * UMA_SLAB_SIZE, &flags, wait);
+			mtx_unlock(&Giant);
+		} else {
+			mem = zone->uz_allocf(zone, 
+			    zone->uz_ppera * UMA_SLAB_SIZE, &flags, wait);
+		}
 		if (mem == NULL) {
 			ZONE_LOCK(zone);
 			return (NULL);
@@ -830,8 +835,10 @@ obj_alloc(uma_zone_t zone, int bytes, u_int8_t *flags, int wait)
 	 * This looks a little weird since we're getting one page at a time
 	 */
 	while (bytes > 0) {
+		VM_OBJECT_LOCK(zone->uz_obj);
 		p = vm_page_alloc(zone->uz_obj, pages,
 		    VM_ALLOC_INTERRUPT);
+		VM_OBJECT_UNLOCK(zone->uz_obj);
 		if (p == NULL)
 			return (NULL);
 
@@ -1036,7 +1043,7 @@ zone_ctor(void *mem, int size, void *udata)
 	/*
 	 * If we're putting the slab header in the actual page we need to
 	 * figure out where in each page it goes.  This calculates a right 
-	 * justified offset into the memory on a ALIGN_PTR boundary.
+	 * justified offset into the memory on an ALIGN_PTR boundary.
 	 */
 	if (!(zone->uz_flags & UMA_ZFLAG_OFFPAGE)) {
 		int totsize;
@@ -1133,8 +1140,8 @@ zone_dtor(void *arg, int size, void *udata)
 
 	ZONE_LOCK(zone);
 	if (zone->uz_free != 0)
-		printf("Zone %s was not empty.  Lost %d pages of memory.\n",
-		    zone->uz_name, zone->uz_pages);
+		printf("Zone %s was not empty (%d items).  Lost %d pages of memory.\n",
+		    zone->uz_name, zone->uz_free, zone->uz_pages);
 
 	if ((zone->uz_flags & UMA_ZFLAG_INTERNAL) == 0)
 		for (cpu = 0; cpu < maxcpu; cpu++)
@@ -1327,7 +1334,8 @@ uma_zalloc_arg(uma_zone_t zone, void *udata, int flags)
 	if (!(flags & M_NOWAIT)) {
 		KASSERT(curthread->td_intr_nesting_level == 0,
 		   ("malloc(M_WAITOK) in interrupt context"));
-		WITNESS_SLEEP(1, NULL);
+		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
+		    "malloc() of \"%s\"", zone->uz_name);
 	}
 
 zalloc_restart:
@@ -1476,10 +1484,10 @@ uma_zone_slab(uma_zone_t zone, int flags)
 		    zone->uz_pages >= zone->uz_maxpages) {
 			zone->uz_flags |= UMA_ZFLAG_FULL;
 
-			if (flags & M_WAITOK)
-				msleep(zone, &zone->uz_lock, PVM, "zonelimit", 0);
-			else 
+			if (flags & M_NOWAIT)
 				break;
+			else 
+				msleep(zone, &zone->uz_lock, PVM, "zonelimit", 0);
 			continue;
 		}
 		zone->uz_recurse++;
@@ -1499,7 +1507,7 @@ uma_zone_slab(uma_zone_t zone, int flags)
 		 * could have while we were unlocked.  Check again before we
 		 * fail.
 		 */
-		if ((flags & M_WAITOK) == 0)
+		if (flags & M_NOWAIT)
 			flags |= M_NOVM;
 	}
 	return (slab);
@@ -1587,7 +1595,6 @@ uma_zalloc_bucket(uma_zone_t zone, int flags)
 		}
 		/* Don't block on the next fill */
 		flags |= M_NOWAIT;
-		flags &= ~M_WAITOK;
 	}
 
 	zone->uz_fills--;
@@ -1934,10 +1941,11 @@ uma_zone_set_obj(uma_zone_t zone, struct vm_object *obj, int count)
 	if (obj == NULL)
 		obj = vm_object_allocate(OBJT_DEFAULT,
 		    pages);
-	else 
+	else {
+		VM_OBJECT_LOCK_INIT(obj);
 		_vm_object_allocate(OBJT_DEFAULT,
 		    pages, obj);
-
+	}
 	ZONE_LOCK(zone);
 	zone->uz_kva = kva;
 	zone->uz_obj = obj;
@@ -2017,7 +2025,13 @@ uma_large_malloc(int size, int wait)
 	if (slab == NULL)
 		return (NULL);
 
-	mem = page_alloc(NULL, size, &flags, wait);
+	/* XXX: kmem_malloc panics if Giant isn't held and sleep allowed */
+	if ((wait & M_NOWAIT) == 0 && !mtx_owned(&Giant)) {
+		mtx_lock(&Giant);
+		mem = page_alloc(NULL, size, &flags, wait);
+		mtx_unlock(&Giant);
+	} else
+		mem = page_alloc(NULL, size, &flags, wait);
 	if (mem) {
 		vsetslab((vm_offset_t)mem, slab);
 		slab->us_data = mem;
@@ -2035,7 +2049,17 @@ void
 uma_large_free(uma_slab_t slab)
 {
 	vsetobj((vm_offset_t)slab->us_data, kmem_object);
-	page_free(slab->us_data, slab->us_size, slab->us_flags);
+	/* 
+	 * XXX: We get a lock order reversal if we don't have Giant:
+	 * vm_map_remove (locks system map) -> vm_map_delete ->
+	 *    vm_map_entry_unwire -> vm_fault_unwire -> mtx_lock(&Giant)
+	 */
+	if (!mtx_owned(&Giant)) {
+		mtx_lock(&Giant);
+		page_free(slab->us_data, slab->us_size, slab->us_flags);
+		mtx_unlock(&Giant);
+	} else
+		page_free(slab->us_data, slab->us_size, slab->us_flags);
 	uma_zfree_internal(slabzone, slab, NULL, 0);
 }
 

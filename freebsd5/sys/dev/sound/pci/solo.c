@@ -33,7 +33,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/solo.c,v 1.24 2002/08/25 02:00:49 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/solo.c,v 1.25 2003/02/20 17:31:11 cognet Exp $");
 
 #define SOLO_DEFAULT_BUFSZ 16384
 #define ABS(x) (((x) < 0)? -(x) : (x))
@@ -572,7 +572,7 @@ esschan_trigger(kobj_t obj, void *data, int go)
 
 	switch (go) {
 	case PCMTRIG_START:
-		ess_dmasetup(sc, ch->hwch, vtophys(sndbuf_getbuf(ch->buffer)), sndbuf_getsize(ch->buffer), ch->dir);
+		ess_dmasetup(sc, ch->hwch, sndbuf_getbufaddr(ch->buffer), sndbuf_getsize(ch->buffer), ch->dir);
 		ess_dmatrigger(sc, ch->hwch, 1);
 		ess_start(ch);
 		break;

@@ -28,7 +28,7 @@
  * its contributors.
  */
 
-/* $FreeBSD: src/sys/dev/usb/ufm.c,v 1.9 2002/11/06 14:29:27 joe Exp $ */
+/* $FreeBSD: src/sys/dev/usb/ufm.c,v 1.12 2003/03/03 12:15:47 phk Exp $ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,13 +87,14 @@ d_open_t  ufmopen;
 d_close_t ufmclose;
 d_ioctl_t ufmioctl;
 
-#define UFM_CDEV_MAJOR	200
+#define UFM_CDEV_MAJOR	MAJOR_AUTO
 
 Static struct cdevsw ufm_cdevsw = {
-	ufmopen,	ufmclose,	noread,		nowrite,
- 	ufmioctl,	nopoll,		nommap,		nostrategy,
- 	"ufm",		UFM_CDEV_MAJOR,	nodump,		nopsize,
- 	0,
+	.d_open =	ufmopen,	
+	.d_close =	ufmclose,	
+	.d_ioctl =	ufmioctl,	
+	.d_name =	"ufm",
+	.d_maj =	UFM_CDEV_MAJOR,
 #if (__FreeBSD_version < 500014)
  	-1
 #endif

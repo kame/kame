@@ -28,9 +28,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_ste.c,v 1.41.2.1 2003/01/02 20:02:44 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_ste.c,v 1.52 2003/04/21 18:34:04 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,12 +72,9 @@
 
 #include <pci/if_stereg.h>
 
+MODULE_DEPEND(ste, pci, 1, 1, 1);
+MODULE_DEPEND(ste, ether, 1, 1, 1);
 MODULE_DEPEND(ste, miibus, 1, 1, 1);
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ste.c,v 1.41.2.1 2003/01/02 20:02:44 phk Exp $";
-#endif
 
 /*
  * Various supported device vendors/types and their names.
@@ -161,7 +159,7 @@ static driver_t ste_driver = {
 
 static devclass_t ste_devclass;
 
-DRIVER_MODULE(if_ste, pci, ste_driver, ste_devclass, 0, 0);
+DRIVER_MODULE(ste, pci, ste_driver, ste_devclass, 0, 0);
 DRIVER_MODULE(miibus, ste, miibus_driver, miibus_devclass, 0, 0);
 
 #define STE_SETBIT4(sc, reg, x)				\
@@ -282,9 +280,9 @@ ste_mii_readreg(sc, frame)
 	/* Check for ack */
 	MII_CLR(STE_PHYCTL_MCLK);
 	DELAY(1);
+	ack = CSR_READ_2(sc, STE_PHYCTL) & STE_PHYCTL_MDATA;
 	MII_SET(STE_PHYCTL_MCLK);
 	DELAY(1);
-	ack = CSR_READ_2(sc, STE_PHYCTL) & STE_PHYCTL_MDATA;
 
 	/*
 	 * Now try reading data bits. If the ack failed, we still
@@ -911,14 +909,12 @@ static int
 ste_attach(dev)
 	device_t		dev;
 {
-	u_int32_t		command;
 	struct ste_softc	*sc;
 	struct ifnet		*ifp;
 	int			unit, error = 0, rid;
 
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
-	bzero(sc, sizeof(struct ste_softc));
 	sc->ste_dev = dev;
 
 	/*
@@ -933,7 +929,6 @@ ste_attach(dev)
 
 	mtx_init(&sc->ste_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-	STE_LOCK(sc);
 
 	/*
 	 * Handle power management nonsense.
@@ -962,23 +957,6 @@ ste_attach(dev)
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-#ifdef STE_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		printf("ste%d: failed to enable I/O ports!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		printf("ste%d: failed to enable memory mapping!\n", unit);
-		error = ENXIO;
-		goto fail;
-	}
-#endif
 
 	rid = STE_RID;
 	sc->ste_res = bus_alloc_resource(dev, STE_RES, &rid,
@@ -993,24 +971,14 @@ ste_attach(dev)
 	sc->ste_btag = rman_get_bustag(sc->ste_res);
 	sc->ste_bhandle = rman_get_bushandle(sc->ste_res);
 
+	/* Allocate interrupt */
 	rid = 0;
 	sc->ste_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->ste_irq == NULL) {
 		printf("ste%d: couldn't map interrupt\n", unit);
-		bus_release_resource(dev, STE_RES, STE_RID, sc->ste_res);
 		error = ENXIO;
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->ste_irq, INTR_TYPE_NET,
-	    ste_intr, sc, &sc->ste_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ste_irq);
-		bus_release_resource(dev, STE_RES, STE_RID, sc->ste_res);
-		printf("ste%d: couldn't set up irq\n", unit);
 		goto fail;
 	}
 
@@ -1025,9 +993,6 @@ ste_attach(dev)
 	if (ste_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
 	    STE_EEADDR_NODE0, 3, 0)) {
 		printf("ste%d: failed to read station address\n", unit);
-		bus_teardown_intr(dev, sc->ste_irq, sc->ste_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ste_irq);
-		bus_release_resource(dev, STE_RES, STE_RID, sc->ste_res);
 		error = ENXIO;;
 		goto fail;
 	}
@@ -1046,9 +1011,6 @@ ste_attach(dev)
 
 	if (sc->ste_ldata == NULL) {
 		printf("ste%d: no memory for list buffers!\n", unit);
-		bus_teardown_intr(dev, sc->ste_irq, sc->ste_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ste_irq);
-		bus_release_resource(dev, STE_RES, STE_RID, sc->ste_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -1057,13 +1019,8 @@ ste_attach(dev)
 
 	/* Do MII setup. */
 	if (mii_phy_probe(dev, &sc->ste_miibus,
-		ste_ifmedia_upd, ste_ifmedia_sts)) {
+	    ste_ifmedia_upd, ste_ifmedia_sts)) {
 		printf("ste%d: MII without any phy!\n", sc->ste_unit);
-		bus_teardown_intr(dev, sc->ste_irq, sc->ste_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ste_irq);
-		bus_release_resource(dev, STE_RES, STE_RID, sc->ste_res);
-		contigfree(sc->ste_ldata,
-		    sizeof(struct ste_list_data), M_DEVBUF);
 		error = ENXIO;
 		goto fail;
 	}
@@ -1095,15 +1052,30 @@ ste_attach(dev)
 	ifp->if_data.ifi_hdrlen = sizeof(struct ether_vlan_header);
 	ifp->if_capabilities |= IFCAP_VLAN_MTU;
 
-	STE_UNLOCK(sc);
-	return(0);
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->ste_irq, INTR_TYPE_NET,
+	    ste_intr, sc, &sc->ste_intrhand);
+
+	if (error) {
+		printf("ste%d: couldn't set up irq\n", unit);
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
-	STE_UNLOCK(sc);
-	mtx_destroy(&sc->ste_mtx);
+	if (error)
+		ste_detach(dev);
+
 	return(error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 ste_detach(dev)
 	device_t		dev;
@@ -1112,20 +1084,30 @@ ste_detach(dev)
 	struct ifnet		*ifp;
 
 	sc = device_get_softc(dev);
+	KASSERT(mtx_initialized(&sc->ste_mtx), ("ste mutex not initialized"));
 	STE_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	ste_stop(sc);
-	ether_ifdetach(ifp);
-
+	/* These should only be active if attach succeeded */
+	if (device_is_attached(dev)) {
+		ste_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->ste_miibus)
+		device_delete_child(dev, sc->ste_miibus);
 	bus_generic_detach(dev);
-	device_delete_child(dev, sc->ste_miibus);
 
-	bus_teardown_intr(dev, sc->ste_irq, sc->ste_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ste_irq);
-	bus_release_resource(dev, STE_RES, STE_RID, sc->ste_res);
+	if (sc->ste_intrhand)
+		bus_teardown_intr(dev, sc->ste_irq, sc->ste_intrhand);
+	if (sc->ste_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ste_irq);
+	if (sc->ste_res)
+		bus_release_resource(dev, STE_RES, STE_RID, sc->ste_res);
 
-	contigfree(sc->ste_ldata, sizeof(struct ste_list_data), M_DEVBUF);
+	if (sc->ste_ldata) {
+		contigfree(sc->ste_ldata, sizeof(struct ste_list_data),
+		    M_DEVBUF);
+	}
 
 	STE_UNLOCK(sc);
 	mtx_destroy(&sc->ste_mtx);

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/kern/imgact_gzip.c,v 1.48 2002/09/21 22:07:16 jake Exp $
+ * $FreeBSD: src/sys/kern/imgact_gzip.c,v 1.49 2003/01/01 18:48:54 schweikh Exp $
  *
  * This module handles execution of a.out files which have been run through
  * "gzip".  This saves diskspace, but wastes cpu-cycles and VM.
@@ -329,7 +329,7 @@ Flush(void *vp, u_char * ptr, u_long siz)
 	u_char         *p = ptr, *q;
 	int             i;
 
-	/* First, find a a.out-header */
+	/* First, find an a.out-header. */
 	if (gz->output < sizeof gz->a_out) {
 		q = (u_char *) & gz->a_out;
 		i = min(siz, sizeof gz->a_out - gz->output);

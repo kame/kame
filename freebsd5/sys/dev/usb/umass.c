@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.67 2002/11/08 07:57:42 mr Exp $
+ *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.84 2003/05/21 00:22:07 njl Exp $
  *	$NetBSD: umass.c,v 1.28 2000/04/02 23:46:53 augustss Exp $
  */
 
@@ -118,7 +118,6 @@
 #include <cam/scsi/scsi_all.h>
 #include <cam/scsi/scsi_da.h>
 
-#include <sys/devicestat.h>
 #include <cam/cam_periph.h>
 
 #ifdef USB_DEBUG
@@ -163,28 +162,10 @@ SYSCTL_INT(_hw_usb_umass, OID_AUTO, debug, CTLFLAG_RW,
 
 /* CAM specific definitions */
 
-/* We only have one bus */
-#define UMASS_SCSI_BUS		0
-
-/* All USB drives are 'connected' to one SIM (SCSI controller). umass3
- * ends up being target 3 on that SIM. When a request for target 3
- * comes in we fetch the softc with devclass_get_softc(target_id).
- *
- * The SIM is the highest target number, so umass0 corresponds to SCSI target 0.
- */
-#ifndef USB_DEBUG
-#define UMASS_SCSIID_MAX	32	/* maximum number of drives expected */
-#else
-/* while debugging avoid unnecessary clutter in the output at umass_cam_rescan
- * (XPT_PATH_INQ)
- */
-#define UMASS_SCSIID_MAX	3	/* maximum number of drives expected */
-#endif
+#define UMASS_SCSIID_MAX	1	/* maximum number of drives expected */
 #define UMASS_SCSIID_HOST	UMASS_SCSIID_MAX
 
-#define UMASS_SIM_UNIT		0	/* we use one sim for all drives */
-
-#define MS_TO_TICKS(ms) ((ms) * hz / 1000)                            
+#define MS_TO_TICKS(ms) ((ms) * hz / 1000)
 
 
 /* Bulk-Only features */
@@ -320,12 +301,32 @@ struct umass_devdescr_t {
 #	define NO_GETMAXLUN		0x0100
 	/* The device uses a weird CSWSIGNATURE. */
 #	define WRONG_CSWSIG		0x0200
+	/* Device cannot handle INQUIRY so fake a generic response */
+#	define NO_INQUIRY		0x0400
+	/* Device cannot handle INQUIRY EVPD, return CHECK CONDITION */
+#	define NO_INQUIRY_EVPD		0x0800
 };
 
 Static struct umass_devdescr_t umass_devdescrs[] = {
+	{ USB_VENDOR_ASAHIOPTICAL, PID_WILDCARD, RID_WILDCARD,
+	  UMASS_PROTO_ATAPI | UMASS_PROTO_CBI_I,
+	  RS_NO_CLEAR_UA
+	},
 	{ USB_VENDOR_FUJIPHOTO, USB_PRODUCT_FUJIPHOTO_MASS0100, RID_WILDCARD,
 	  UMASS_PROTO_ATAPI | UMASS_PROTO_CBI_I,
 	  RS_NO_CLEAR_UA
+	},
+	{ USB_VENDOR_GENESYS,  USB_PRODUCT_GENESYS_GL641USB2IDE, RID_WILDCARD,
+	  UMASS_PROTO_SCSI | UMASS_PROTO_BBB,
+	  FORCE_SHORT_INQUIRY | NO_START_STOP | IGNORE_RESIDUE 
+	},
+	{ USB_VENDOR_GENESYS,  USB_PRODUCT_GENESYS_GL641USB, RID_WILDCARD,
+	  UMASS_PROTO_SCSI | UMASS_PROTO_BBB,
+	  FORCE_SHORT_INQUIRY | NO_START_STOP | IGNORE_RESIDUE 
+	},
+	{ USB_VENDOR_HITACHI, USB_PRODUCT_HITACHI_DVDCAM_USB, RID_WILDCARD,
+	  UMASS_PROTO_ATAPI | UMASS_PROTO_CBI_I,
+	  NO_INQUIRY
 	},
 	{ USB_VENDOR_HP, USB_PRODUCT_HP_CDW8200, RID_WILDCARD,
 	  UMASS_PROTO_ATAPI | UMASS_PROTO_CBI_I,
@@ -341,9 +342,17 @@ Static struct umass_devdescr_t umass_devdescrs[] = {
 	  UMASS_PROTO_SCSI | UMASS_PROTO_BBB,
 	  NO_TEST_UNIT_READY
 	},
+	{ USB_VENDOR_MELCO,  USB_PRODUCT_MELCO_DUBPXXG, RID_WILDCARD,
+	  UMASS_PROTO_SCSI | UMASS_PROTO_BBB,
+	  FORCE_SHORT_INQUIRY | NO_START_STOP | IGNORE_RESIDUE 
+	},
 	{ USB_VENDOR_MICROTECH, USB_PRODUCT_MICROTECH_DPCM, RID_WILDCARD,
 	  UMASS_PROTO_SCSI | UMASS_PROTO_CBI,
 	  NO_TEST_UNIT_READY | NO_START_STOP
+	},
+	{ USB_VENDOR_MSYSTEMS, USB_PRODUCT_MSYSTEMS_DISKONKEY, RID_WILDCARD,
+	  UMASS_PROTO_SCSI | UMASS_PROTO_BBB,
+	  IGNORE_RESIDUE | NO_GETMAXLUN | RS_NO_CLEAR_UA
 	},
 	{ USB_VENDOR_OLYMPUS, USB_PRODUCT_OLYMPUS_C1, RID_WILDCARD,
 	  UMASS_PROTO_SCSI | UMASS_PROTO_BBB,
@@ -365,11 +374,14 @@ Static struct umass_devdescr_t umass_devdescrs[] = {
 	  UMASS_PROTO_RBC | UMASS_PROTO_CBI,
 	  NO_QUIRKS
 	},
+	{ USB_VENDOR_TREK, USB_PRODUCT_TREK_THUMBDRIVE_8MB, RID_WILDCARD,
+          UMASS_PROTO_ATAPI | UMASS_PROTO_BBB,
+	  IGNORE_RESIDUE
+	},
 	{ USB_VENDOR_YANO,  USB_PRODUCT_YANO_U640MO, RID_WILDCARD,
 	  UMASS_PROTO_ATAPI | UMASS_PROTO_CBI_I,
 	  FORCE_SHORT_INQUIRY
 	},
-
 	{ VID_EOT, PID_EOT, RID_EOT, 0, 0 }
 };
 
@@ -378,6 +390,8 @@ Static struct umass_devdescr_t umass_devdescrs[] = {
 struct umass_softc {
 	USBBASEDEVICE		sc_dev;		/* base device */
 	usbd_device_handle	sc_udev;	/* USB device */
+
+	struct cam_sim		*umass_sim;	/* SCSI Interface Module */
 
 	unsigned char		flags;		/* various device flags */
 #	define UMASS_FLAGS_GONE		0x01	/* devices is no more */
@@ -518,8 +532,11 @@ char *states[TSTATE_STATES+1] = {
 };
 #endif
 
-Static struct cam_sim *umass_sim;	/* SCSI Interface Module */
-
+/* If device cannot return valid inquiry data, fake it */
+Static uint8_t fake_inq_data[SHORT_INQUIRY_LENGTH] = {
+	0, /*removable*/ 0x80, SCSI_REV_2, SCSI_REV_2,
+	/*additional_length*/ 31, 0, 0, 0
+};
 
 /* USB device probe/attach/detach functions */
 USB_DECLARE_DRIVER(umass);
@@ -585,10 +602,9 @@ Static void umass_cam_rescan_callback
 				(struct cam_periph *periph,union ccb *ccb);
 Static void umass_cam_rescan	(void *addr);
 
-Static int umass_cam_attach_sim	(void);
+Static int umass_cam_attach_sim	(struct umass_softc *sc);
 Static int umass_cam_attach	(struct umass_softc *sc);
-Static int umass_cam_detach_sim	(void);
-Static int umass_cam_detach	(struct umass_softc *sc);
+Static int umass_cam_detach_sim	(struct umass_softc *sc);
 
 
 /* SCSI specific functions */
@@ -685,16 +701,25 @@ umass_match_proto(struct umass_softc *sc, usbd_interface_handle iface,
 	 * check for wildcarded and fully matched. First match wins.
 	 */
 	for (i = 0; umass_devdescrs[i].vid != VID_EOT && !found; i++) {
-		if (umass_devdescrs[i].vid == UGETW(dd->idVendor)
-		    && umass_devdescrs[i].pid == UGETW(dd->idProduct)) {
+		if (umass_devdescrs[i].vid == VID_WILDCARD &&
+		    umass_devdescrs[i].pid == PID_WILDCARD &&
+		    umass_devdescrs[i].rid == RID_WILDCARD) {
+			printf("umass: ignoring invalid wildcard quirk\n");
+			continue;
+		}
+		if ((umass_devdescrs[i].vid == UGETW(dd->idVendor) ||
+		     umass_devdescrs[i].vid == VID_WILDCARD)
+		 && (umass_devdescrs[i].pid == UGETW(dd->idProduct) ||
+		     umass_devdescrs[i].pid == PID_WILDCARD)) {
 		    	if (umass_devdescrs[i].rid == RID_WILDCARD) {
-			    sc->proto = umass_devdescrs[i].proto;
-			    sc->quirks = umass_devdescrs[i].quirks;
-			    return UMATCH_VENDOR_PRODUCT;
-			} else if (umass_devdescrs[i].rid == UGETW(dd->bcdDevice)) {
-			    sc->proto = umass_devdescrs[i].proto;
-			    sc->quirks = umass_devdescrs[i].quirks;
-			    return UMATCH_VENDOR_PRODUCT_REV;
+				sc->proto = umass_devdescrs[i].proto;
+				sc->quirks = umass_devdescrs[i].quirks;
+				return (UMATCH_VENDOR_PRODUCT);
+			} else if (umass_devdescrs[i].rid ==
+			    UGETW(dd->bcdDevice)) {
+				sc->proto = umass_devdescrs[i].proto;
+				sc->quirks = umass_devdescrs[i].quirks;
+				return (UMATCH_VENDOR_PRODUCT_REV);
 			} /* else RID does not match */
 		}
 	}
@@ -990,18 +1015,16 @@ USB_ATTACH(umass)
 		sc->cam_scsi_sense.opcode = REQUEST_SENSE;
 		sc->cam_scsi_test_unit_ready.opcode = TEST_UNIT_READY;
 
-		/* If this is the first device register the SIM */
-		if (umass_sim == NULL) {
-			err = umass_cam_attach_sim();
-			if (err) {
-				umass_detach(self);
-				USB_ATTACH_ERROR_RETURN;
-			}
+		/* register the SIM */
+		err = umass_cam_attach_sim(sc);
+		if (err) {
+			umass_detach(self);
+			USB_ATTACH_ERROR_RETURN;
 		}
-
-		/* Attach the new device to our SCSI host controller (SIM) */
+		/* scan the new sim */
 		err = umass_cam_attach(sc);
 		if (err) {
+			umass_cam_detach_sim(sc);
 			umass_detach(self);
 			USB_ATTACH_ERROR_RETURN;
 		}
@@ -1030,8 +1053,8 @@ USB_DETACH(umass)
 	    (sc->proto & UMASS_PROTO_ATAPI) ||
 	    (sc->proto & UMASS_PROTO_UFI) ||
 	    (sc->proto & UMASS_PROTO_RBC))
-		/* detach the device from the SCSI host controller (SIM) */
-		err = umass_cam_detach(sc);
+		/* detach the SCSI host controller (SIM) */
+		err = umass_cam_detach_sim(sc);
 
 	for (i = 0; i < XFER_NR; i++)
 		if (sc->transfer_xfer[i])
@@ -1486,6 +1509,12 @@ umass_bbb_state(usbd_xfer_handle xfer, usbd_private_handle priv,
 		    UGETDW(sc->csw.dCSWSignature) == CSWSIGNATURE_OLYMPUS_C1)
 			USETDW(sc->csw.dCSWSignature, CSWSIGNATURE);
 
+		int Residue;
+		Residue = UGETDW(sc->csw.dCSWDataResidue);
+		if (Residue == 0 &&
+		    sc->transfer_datalen - sc->transfer_actlen != 0)
+			Residue = sc->transfer_datalen - sc->transfer_actlen;
+
 		/* Check CSW and handle any error */
 		if (UGETDW(sc->csw.dCSWSignature) != CSWSIGNATURE) {
 			/* Invalid CSW: Wrong signature or wrong tag might
@@ -1519,8 +1548,7 @@ umass_bbb_state(usbd_xfer_handle xfer, usbd_private_handle priv,
 			return;
 		} else if (sc->csw.bCSWStatus == CSWSTATUS_PHASE) {
 			printf("%s: Phase Error, residue = %d\n",
-				USBDEVNAME(sc->sc_dev),
-				UGETDW(sc->csw.dCSWDataResidue));
+				USBDEVNAME(sc->sc_dev), Residue);
 				
 			umass_bbb_reset(sc, STATUS_WIRE_FAILED);
 			return;
@@ -1530,34 +1558,20 @@ umass_bbb_state(usbd_xfer_handle xfer, usbd_private_handle priv,
 			panic("%s: transferred %db instead of %db\n",
 				USBDEVNAME(sc->sc_dev),
 				sc->transfer_actlen, sc->transfer_datalen);
-		} else if (sc->transfer_datalen - sc->transfer_actlen
-			   != UGETDW(sc->csw.dCSWDataResidue)
-			   && !(sc->quirks & IGNORE_RESIDUE)) {
-			printf("%s: Residue incorrect, was %d, "
-			      "should've been %d\n",
-				USBDEVNAME(sc->sc_dev),
-				UGETDW(sc->csw.dCSWDataResidue),
-			      sc->transfer_datalen-sc->transfer_actlen);
-			umass_bbb_reset(sc, STATUS_WIRE_FAILED);
-			return;
 
 		} else if (sc->csw.bCSWStatus == CSWSTATUS_FAILED) {
 			DPRINTF(UDMASS_BBB, ("%s: Command Failed, res = %d\n",
-				USBDEVNAME(sc->sc_dev),
-				UGETDW(sc->csw.dCSWDataResidue)));
+				USBDEVNAME(sc->sc_dev), Residue));
 
 			/* SCSI command failed but transfer was succesful */
 			sc->transfer_state = TSTATE_IDLE;
-			sc->transfer_cb(sc, sc->transfer_priv,
-					UGETDW(sc->csw.dCSWDataResidue),
+			sc->transfer_cb(sc, sc->transfer_priv, Residue,
 					STATUS_CMD_FAILED);
-
 			return;
 
 		} else {	/* success */
 			sc->transfer_state = TSTATE_IDLE;
-			sc->transfer_cb(sc, sc->transfer_priv,
-					UGETDW(sc->csw.dCSWDataResidue),
+			sc->transfer_cb(sc, sc->transfer_priv, Residue,
 					STATUS_CMD_OK);
 
 			return;
@@ -2050,7 +2064,7 @@ umass_cbi_state(usbd_xfer_handle xfer, usbd_private_handle priv,
  */
 
 Static int
-umass_cam_attach_sim()
+umass_cam_attach_sim(struct umass_softc *sc)
 {
 	struct cam_devq	*devq;		/* Per device Queue */
 
@@ -2064,17 +2078,20 @@ umass_cam_attach_sim()
 	if (devq == NULL)
 		return(ENOMEM);
 
-	umass_sim = cam_sim_alloc(umass_cam_action, umass_cam_poll, DEVNAME_SIM,
-				NULL /*priv*/, UMASS_SIM_UNIT /*unit number*/,
+	sc->umass_sim = cam_sim_alloc(umass_cam_action, umass_cam_poll,
+				DEVNAME_SIM,
+				sc /*priv*/,
+				USBDEVUNIT(sc->sc_dev) /*unit number*/,
 				1 /*maximum device openings*/,
 				0 /*maximum tagged device openings*/,
 				devq);
-	if (umass_sim == NULL) {
+	if (sc->umass_sim == NULL) {
 		cam_simq_free(devq);
 		return(ENOMEM);
 	}
 
-	if(xpt_bus_register(umass_sim, UMASS_SCSI_BUS) != CAM_SUCCESS)
+	if(xpt_bus_register(sc->umass_sim, USBDEVUNIT(sc->sc_dev)) !=
+	    CAM_SUCCESS)
 		return(ENOMEM);
 
 	return(0);
@@ -2085,12 +2102,12 @@ umass_cam_rescan_callback(struct cam_periph *periph, union ccb *ccb)
 {
 #ifdef USB_DEBUG
 	if (ccb->ccb_h.status != CAM_REQ_CMP) {
-		DPRINTF(UDMASS_SCSI, ("scbus%d: Rescan failed, 0x%04x\n",
-			cam_sim_path(umass_sim),
+		DPRINTF(UDMASS_SCSI, ("%s:%d Rescan failed, 0x%04x\n",
+			periph->periph_name, periph->unit_number,
 			ccb->ccb_h.status));
 	} else {
-		DPRINTF(UDMASS_SCSI, ("scbus%d: Rescan succeeded\n",
-			cam_sim_path(umass_sim)));
+		DPRINTF(UDMASS_SCSI, ("%s%d: Rescan succeeded\n",
+			periph->periph_name, periph->unit_number));
 	}
 #endif
 
@@ -2101,24 +2118,18 @@ umass_cam_rescan_callback(struct cam_periph *periph, union ccb *ccb)
 Static void
 umass_cam_rescan(void *addr)
 {
-	/* Note: The sc is only passed in for debugging prints. If the device
-	 * is disconnected before umass_cam_rescan has been able to run the
-	 * driver might bomb.
-	 */
-#ifdef USB_DEBUG
 	struct umass_softc *sc = (struct umass_softc *) addr;
-#endif
 	struct cam_path *path;
 	union ccb *ccb = malloc(sizeof(union ccb), M_USBDEV, M_WAITOK);
 
 	memset(ccb, 0, sizeof(union ccb));
 
 	DPRINTF(UDMASS_SCSI, ("scbus%d: scanning for %s:%d:%d:%d\n",
-		cam_sim_path(umass_sim),
-		USBDEVNAME(sc->sc_dev), cam_sim_path(umass_sim),
+		cam_sim_path(sc->umass_sim),
+		USBDEVNAME(sc->sc_dev), cam_sim_path(sc->umass_sim),
 		USBDEVUNIT(sc->sc_dev), CAM_LUN_WILDCARD));
 
-	if (xpt_create_path(&path, xpt_periph, cam_sim_path(umass_sim),
+	if (xpt_create_path(&path, xpt_periph, cam_sim_path(sc->umass_sim),
 			    CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD)
 	    != CAM_REQ_CMP)
 		return;
@@ -2135,27 +2146,13 @@ umass_cam_rescan(void *addr)
 Static int
 umass_cam_attach(struct umass_softc *sc)
 {
-	/* SIM already attached at module load. The device is a target on the
-	 * one SIM we registered: target device_get_unit(self).
-	 */
-
-	/* The artificial limit UMASS_SCSIID_MAX is there because CAM expects
-	 * a limit to the number of targets that are present on a SIM.
-	 */
-	if (device_get_unit(sc->sc_dev) >= UMASS_SCSIID_MAX) {
-		printf("scbus%d: Increase UMASS_SCSIID_MAX (currently %d) in %s"
-		       " and try again.\n", 
-		       cam_sim_path(umass_sim), UMASS_SCSIID_MAX, __FILE__);
-		return(1);
-	}
-
 #ifndef USB_DEBUG
 	if (bootverbose)
 #endif
-		printf("%s:%d:%d:%d: Attached to scbus%d as device %d\n",
-		       USBDEVNAME(sc->sc_dev), cam_sim_path(umass_sim),
-		       USBDEVUNIT(sc->sc_dev), CAM_LUN_WILDCARD,
-		       cam_sim_path(umass_sim), USBDEVUNIT(sc->sc_dev));
+		printf("%s:%d:%d:%d: Attached to scbus%d\n",
+			USBDEVNAME(sc->sc_dev), cam_sim_path(sc->umass_sim),
+			USBDEVUNIT(sc->sc_dev), CAM_LUN_WILDCARD,
+			cam_sim_path(sc->umass_sim));
 
 	if (!cold) {
 		/* Notify CAM of the new device after 1 second delay. Any
@@ -2179,44 +2176,19 @@ umass_cam_attach(struct umass_softc *sc)
  */
 
 Static int
-umass_cam_detach_sim()
+umass_cam_detach_sim(struct umass_softc *sc)
 {
-	if (umass_sim) {
-		if (xpt_bus_deregister(cam_sim_path(umass_sim)))
-			cam_sim_free(umass_sim, /*free_devq*/TRUE);
+	if (sc->umass_sim) {
+		if (xpt_bus_deregister(cam_sim_path(sc->umass_sim)))
+			cam_sim_free(sc->umass_sim, /*free_devq*/TRUE);
 		else
 			return(EBUSY);
 
-		umass_sim = NULL;
+		sc->umass_sim = NULL;
 	}
 
 	return(0);
 }
-
-Static int
-umass_cam_detach(struct umass_softc *sc)
-{
-	struct cam_path *path;
-
-	if (umass_sim) {
-		/* detach of sim not done until module unload */
-		DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d: losing CAM device entry\n",
-			USBDEVNAME(sc->sc_dev), cam_sim_path(umass_sim),
-			USBDEVUNIT(sc->sc_dev), CAM_LUN_WILDCARD));
-
-		if (xpt_create_path(&path, NULL, cam_sim_path(umass_sim),
-			    USBDEVUNIT(sc->sc_dev), CAM_LUN_WILDCARD)
-		    != CAM_REQ_CMP)
-			return(ENOMEM);
-
-		xpt_async(AC_LOST_DEVICE, path, NULL);
-		xpt_free_path(path);
-	}
-
-	return(0);
-}
-
-
 
 /* umass_cam_action
  * 	CAM requests for action come through here
@@ -2225,8 +2197,7 @@ umass_cam_detach(struct umass_softc *sc)
 Static void
 umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 {
-	struct umass_softc *sc = devclass_get_softc(umass_devclass,
-					       ccb->ccb_h.target_id);
+	struct umass_softc *sc = (struct umass_softc *)sim->softc;
 
 	/* The softc is still there, but marked as going away. umass_cam_detach
 	 * has not yet notified CAM of the lost device however.
@@ -2234,7 +2205,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 	if (sc && (sc->flags & UMASS_FLAGS_GONE)) {
 		DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:func_code 0x%04x: "
 			"Invalid target (gone)\n",
-			USBDEVNAME(sc->sc_dev), cam_sim_path(umass_sim),
+			USBDEVNAME(sc->sc_dev), cam_sim_path(sc->umass_sim),
 			ccb->ccb_h.target_id, ccb->ccb_h.target_lun,
 			ccb->ccb_h.func_code));
 		ccb->ccb_h.status = CAM_TID_INVALID;
@@ -2259,7 +2230,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 		if (sc == NULL) {
 			printf("%s:%d:%d:%d:func_code 0x%04x: "
 				"Invalid target (target needed)\n",
-				DEVNAME_SIM, cam_sim_path(umass_sim),
+				DEVNAME_SIM, cam_sim_path(sc->umass_sim),
 				ccb->ccb_h.target_id, ccb->ccb_h.target_lun,
 				ccb->ccb_h.func_code);
 
@@ -2277,7 +2248,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 		if (sc == NULL && ccb->ccb_h.target_id != CAM_TARGET_WILDCARD) {
 			DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:func_code 0x%04x: "
 				"Invalid target (no wildcard)\n",
-				DEVNAME_SIM, cam_sim_path(umass_sim),
+				DEVNAME_SIM, cam_sim_path(sc->umass_sim),
 				ccb->ccb_h.target_id, ccb->ccb_h.target_lun,
 				ccb->ccb_h.func_code));
 
@@ -2305,7 +2276,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 		DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:XPT_SCSI_IO: "
 			"cmd: 0x%02x, flags: 0x%02x, "
 			"%db cmd/%db data/%db sense\n",
-			USBDEVNAME(sc->sc_dev), cam_sim_path(umass_sim),
+			USBDEVNAME(sc->sc_dev), cam_sim_path(sc->umass_sim),
 			ccb->ccb_h.target_id, ccb->ccb_h.target_lun,
 			csio->cdb_io.cdb_bytes[0],
 			ccb->ccb_h.flags & CAM_DIR_MASK,
@@ -2323,7 +2294,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 		if (sc->transfer_state != TSTATE_IDLE) {
 			DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:XPT_SCSI_IO: "
 				"I/O in progress, deferring (state %d, %s)\n",
-				USBDEVNAME(sc->sc_dev), cam_sim_path(umass_sim),
+				USBDEVNAME(sc->sc_dev), cam_sim_path(sc->umass_sim),
 				ccb->ccb_h.target_id, ccb->ccb_h.target_lun,
 				sc->transfer_state,states[sc->transfer_state]));
 			ccb->ccb_h.status = CAM_SCSI_BUSY;
@@ -2363,6 +2334,41 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 		 */
 
 		if (sc->transform(sc, cmd, cmdlen, &rcmd, &rcmdlen)) {
+			/* 
+			 * Handle EVPD inquiry for broken devices first
+			 * NO_INQUIRY also implies NO_INQUIRY_EVPD
+			 */
+			if ((sc->quirks & (NO_INQUIRY_EVPD | NO_INQUIRY)) &&
+			    rcmd[0] == INQUIRY && (rcmd[1] & SI_EVPD)) {
+				struct scsi_sense_data *sense;
+
+				sense = &ccb->csio.sense_data;
+				bzero(sense, sizeof(*sense));
+				sense->error_code = SSD_CURRENT_ERROR;
+				sense->flags = SSD_KEY_ILLEGAL_REQUEST;
+				sense->add_sense_code = 0x24;
+				sense->extra_len = 10;
+ 				ccb->csio.scsi_status = SCSI_STATUS_CHECK_COND;
+				ccb->ccb_h.status = CAM_SCSI_STATUS_ERROR |
+				    CAM_AUTOSNS_VALID;
+				xpt_done(ccb);
+				return;
+			}
+			/* Return fake inquiry data for broken devices */
+			if ((sc->quirks & NO_INQUIRY) && rcmd[0] == INQUIRY) {
+				struct ccb_scsiio *csio = &ccb->csio;
+
+				memcpy(csio->data_ptr, &fake_inq_data,
+				    sizeof(fake_inq_data));
+				csio->scsi_status = SCSI_STATUS_OK;
+				ccb->ccb_h.status = CAM_REQ_CMP;
+				xpt_done(ccb);
+				return;
+			}
+			if ((sc->quirks & FORCE_SHORT_INQUIRY) &&
+			    rcmd[0] == INQUIRY) {
+				csio->dxfer_len = SHORT_INQUIRY_LENGTH;
+			}
 			sc->transfer(sc, ccb->ccb_h.target_lun, rcmd, rcmdlen,
 				     csio->data_ptr,
 				     csio->dxfer_len, dir,
@@ -2380,7 +2386,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 
 		DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:XPT_PATH_INQ:.\n",
 			(sc == NULL? DEVNAME_SIM:USBDEVNAME(sc->sc_dev)),
-			cam_sim_path(umass_sim),
+			cam_sim_path(sc->umass_sim),
 			ccb->ccb_h.target_id, ccb->ccb_h.target_lun));
 
 		/* host specific information */
@@ -2395,7 +2401,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 		strncpy(cpi->hba_vid, "USB SCSI", HBA_IDLEN);
 		strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
 		cpi->unit_number = cam_sim_unit(sim);
-		cpi->bus_id = UMASS_SCSI_BUS;
+		cpi->bus_id = USBDEVUNIT(sc->sc_dev);
 
 		if (sc == NULL) {
 			cpi->base_transfer_speed = 0;
@@ -2416,7 +2422,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 	case XPT_RESET_DEV:
 	{
 		DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:XPT_RESET_DEV:.\n",
-			USBDEVNAME(sc->sc_dev), cam_sim_path(umass_sim),
+			USBDEVNAME(sc->sc_dev), cam_sim_path(sc->umass_sim),
 			ccb->ccb_h.target_id, ccb->ccb_h.target_lun));
 
 		ccb->ccb_h.status = CAM_REQ_INPROG;
@@ -2428,7 +2434,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 		struct ccb_trans_settings *cts = &ccb->cts;
 
 		DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:XPT_GET_TRAN_SETTINGS:.\n",
-			USBDEVNAME(sc->sc_dev), cam_sim_path(umass_sim),
+			USBDEVNAME(sc->sc_dev), cam_sim_path(sc->umass_sim),
 			ccb->ccb_h.target_id, ccb->ccb_h.target_lun));
 
 		cts->valid = 0;
@@ -2441,7 +2447,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 	case XPT_SET_TRAN_SETTINGS:
 	{
 		DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:XPT_SET_TRAN_SETTINGS:.\n",
-			USBDEVNAME(sc->sc_dev), cam_sim_path(umass_sim),
+			USBDEVNAME(sc->sc_dev), cam_sim_path(sc->umass_sim),
 			ccb->ccb_h.target_id, ccb->ccb_h.target_lun));
 
 		ccb->ccb_h.status = CAM_FUNC_NOTAVAIL;
@@ -2476,7 +2482,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 	{
 		DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:XPT_NOOP:.\n",
 			(sc == NULL? DEVNAME_SIM:USBDEVNAME(sc->sc_dev)),
-			cam_sim_path(umass_sim),
+			cam_sim_path(sc->umass_sim),
 			ccb->ccb_h.target_id, ccb->ccb_h.target_lun));
 
 		ccb->ccb_h.status = CAM_REQ_CMP;
@@ -2487,7 +2493,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 		DPRINTF(UDMASS_SCSI, ("%s:%d:%d:%d:func_code 0x%04x: "
 			"Not implemented\n",
 			(sc == NULL? DEVNAME_SIM:USBDEVNAME(sc->sc_dev)),
-			cam_sim_path(umass_sim),
+			cam_sim_path(sc->umass_sim),
 			ccb->ccb_h.target_id, ccb->ccb_h.target_lun,
 			ccb->ccb_h.func_code));
 
@@ -2555,6 +2561,9 @@ umass_cam_cb(struct umass_softc *sc, void *priv, int residue, int status)
 				    (unsigned char *) &sc->cam_scsi_sense,
 				    sizeof(sc->cam_scsi_sense),
 				    &rcmd, &rcmdlen)) {
+				if ((sc->quirks & FORCE_SHORT_INQUIRY) && (rcmd[0] == INQUIRY)) {
+					csio->sense_len = SHORT_INQUIRY_LENGTH;
+				}
 				sc->transfer(sc, ccb->ccb_h.target_lun,
 					     rcmd, rcmdlen,
 					     &csio->sense_data,
@@ -2606,7 +2615,7 @@ umass_cam_sense_cb(struct umass_softc *sc, void *priv, int residue, int status)
 		/* Getting sense data always succeeds (apart from wire
 		 * failures).
 		 */
-		if (sc->quirks & RS_NO_CLEAR_UA
+		if ((sc->quirks & RS_NO_CLEAR_UA)
 		    && csio->cdb_io.cdb_bytes[0] == INQUIRY
 		    && (csio->sense_data.flags & SSD_KEY)
 		    				== SSD_KEY_UNIT_ATTENTION) {
@@ -2622,20 +2631,25 @@ umass_cam_sense_cb(struct umass_softc *sc, void *priv, int residue, int status)
 			 * CCI)
 			 */
 			ccb->ccb_h.status = CAM_REQ_CMP;
-		} else if ((sc->quirks & RS_NO_CLEAR_UA) && /* XXX */
+		} else if ((sc->quirks & RS_NO_CLEAR_UA) &&
 			   (csio->cdb_io.cdb_bytes[0] == READ_CAPACITY) &&
 			   ((csio->sense_data.flags & SSD_KEY)
 			    == SSD_KEY_UNIT_ATTENTION)) {
-
-			/* Some devices do not clear the unit attention error
+			/*
+			 * Some devices do not clear the unit attention error
 			 * on request sense. We insert a test unit ready
 			 * command to make sure we clear the unit attention
-			 * condition.
+			 * condition, then allow the retry to proceed as
+			 * usual.
 			 */
 
 			ccb->ccb_h.status = CAM_SCSI_STATUS_ERROR
 					    | CAM_AUTOSNS_VALID;
 			csio->scsi_status = SCSI_STATUS_CHECK_COND;
+
+#if 0
+			DELAY(300000);
+#endif
 
 			DPRINTF(UDMASS_SCSI,("%s: Doing a sneaky"
 					     "TEST_UNIT_READY\n",
@@ -2675,6 +2689,11 @@ umass_cam_sense_cb(struct umass_softc *sc, void *priv, int residue, int status)
 	}
 }
 
+/*
+ * This completion code just handles the fact that we sent a test-unit-ready
+ * after having previously failed a READ CAPACITY with CHECK_COND.  Even
+ * though this command succeeded, we have to tell CAM to retry.
+ */
 Static void
 umass_cam_quirk_cb(struct umass_softc *sc, void *priv, int residue, int status)
 {
@@ -2682,27 +2701,21 @@ umass_cam_quirk_cb(struct umass_softc *sc, void *priv, int residue, int status)
 
 	DPRINTF(UDMASS_SCSI, ("%s: Test unit ready returned status %d\n",
 	USBDEVNAME(sc->sc_dev), status));
+#if 0
 	ccb->ccb_h.status = CAM_REQ_CMP;
+#endif
+	ccb->ccb_h.status = CAM_SCSI_STATUS_ERROR
+			    | CAM_AUTOSNS_VALID;
+	ccb->csio.scsi_status = SCSI_STATUS_CHECK_COND;
 	xpt_done(ccb);
 }
 
 Static int
 umass_driver_load(module_t mod, int what, void *arg)
 {
-	int err;
-
 	switch (what) {
 	case MOD_UNLOAD:
-		err = umass_cam_detach_sim();
-		if (err)
-			return(err);
-		return(usbd_driver_load(mod, what, arg));
 	case MOD_LOAD:
-		/* We don't attach to CAM at this point, because it will try
-		 * and malloc memory for it. This is not possible when the
-		 * boot loader loads umass as a module before the kernel
-		 * has been bootstrapped.
-		 */
 	default:
 		return(usbd_driver_load(mod, what, arg));
 	}
@@ -2728,6 +2741,15 @@ umass_scsi_transform(struct umass_softc *sc, unsigned char *cmd, int cmdlen,
 			memset(*rcmd, 0, *rcmdlen);
 			(*rcmd)[0] = START_STOP_UNIT;
 			(*rcmd)[4] = SSS_START;
+			return 1;
+		}
+		/* fallthrough */
+	case INQUIRY:
+		/* some drives wedge when asked for full inquiry information. */
+		if (sc->quirks & FORCE_SHORT_INQUIRY) {
+			memcpy(*rcmd, cmd, cmdlen);
+			*rcmdlen = cmdlen;
+			(*rcmd)[4] = SHORT_INQUIRY_LENGTH;
 			return 1;
 		}
 		/* fallthrough */
@@ -2797,22 +2819,6 @@ umass_scsi_6_to_10(unsigned char *cmd, int cmdlen, unsigned char **rcmd,
 	 * | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 	 * -----------------------------------------
 	 *  OP |B2 |    ADDRESS    |RSV|  LEN  |CTRL
-	 *
-	 * For mode sense/select, the format is:
-	 *
-	 * 6 byte:
-	 * -------------------------
-	 * | 0 | 1 | 2 | 3 | 4 | 5 |
-	 * -------------------------
-	 *  OP |B2 |PAG|UNU|LEN|CTRL
-	 *
-	 * 10 byte:
-	 * -----------------------------------------
-	 * | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
-	 * -----------------------------------------
-	 *  OP |B2 |PAG|     UNUSED    |  LEN  |CTRL
-	 *
-	 * with the exception that mode select does not have a page field.
 	 */
 	switch (cmd[0]) {
 	case READ_6:
@@ -2820,12 +2826,6 @@ umass_scsi_6_to_10(unsigned char *cmd, int cmdlen, unsigned char **rcmd,
 		break;
 	case WRITE_6:
 		(*rcmd)[0] = WRITE_10;
-		break;
-	case MODE_SENSE_6:
-		(*rcmd)[0] = MODE_SENSE_10;
-		break;
-	case MODE_SELECT_6:
-		(*rcmd)[0] = MODE_SELECT_6;
 		break;
 	default:
 		return (0);
@@ -2835,11 +2835,6 @@ umass_scsi_6_to_10(unsigned char *cmd, int cmdlen, unsigned char **rcmd,
 	case READ_6:
 	case WRITE_6:
 		memcpy(&(*rcmd)[3], &cmd[1], 3);
-		break;
-	case MODE_SENSE_6:
-		(*rcmd)[2] = cmd[2];
-	case MODE_SELECT_6:
-		(*rcmd)[1] = cmd[1];
 		break;
 	}
 	(*rcmd)[8] = cmd[4];
@@ -2924,7 +2919,7 @@ Static int
 umass_atapi_transform(struct umass_softc *sc, unsigned char *cmd, int cmdlen,
 		      unsigned char **rcmd, int *rcmdlen)
 {
-	/* A ATAPI command is always 12 bytes in length */
+	/* An ATAPI command is always 12 bytes in length. */
 	KASSERT(*rcmdlen >= ATAPI_COMMAND_LENGTH,
 		("rcmdlen = %d < %d, buffer too small",
 		 *rcmdlen, ATAPI_COMMAND_LENGTH));

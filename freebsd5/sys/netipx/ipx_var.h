@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_var.h
  *
- * $FreeBSD: src/sys/netipx/ipx_var.h,v 1.16 2002/03/20 02:39:13 alfred Exp $
+ * $FreeBSD: src/sys/netipx/ipx_var.h,v 1.17 2003/03/04 23:19:53 jlemon Exp $
  */
 
 #ifndef _NETIPX_IPX_VAR_H_
@@ -95,7 +95,6 @@ int	ipx_ctloutput(struct socket *so, struct sockopt *sopt);
 void	ipx_drop(struct ipxpcb *ipxp, int errno);
 void	ipx_init(void);
 void	ipx_input(struct mbuf *m, struct ipxpcb *ipxp);
-void	ipxintr(void);
 int	ipx_outputfl(struct mbuf *m0, struct route *ro, int flags);
 int	ipx_output_type20(struct mbuf *);
 int	ipx_peeraddr(struct socket *so, struct sockaddr **nam);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/isa/orm.c,v 1.1 2001/06/01 20:58:32 imp Exp $
+ *	$FreeBSD: src/sys/isa/orm.c,v 1.2 2003/03/25 04:34:33 mdodd Exp $
  */
 
 /*
@@ -101,7 +101,7 @@ orm_identify(driver_t* driver, device_t parent)
 		    IOMEM_STEP);
 		rid = sc->rnum;
 		res = bus_alloc_resource(child, SYS_RES_MEMORY, &rid, 0ul, 
-		    ~0ul, IOMEM_STEP, RF_ACTIVE);
+		    ~0ul, 1, RF_ACTIVE);
 		if (res == NULL) {
 			bus_delete_resource(child, SYS_RES_MEMORY, sc->rnum);
 			chunk += IOMEM_STEP;
@@ -133,7 +133,7 @@ orm_identify(driver_t* driver, device_t parent)
 		    rom_size);
 		rid = sc->rnum;
 		res = bus_alloc_resource(child, SYS_RES_MEMORY, &rid, 0ul,
-		    ~0ul, rom_size, 0);
+		    ~0ul, 1, 0);
 		if (res == NULL) {
 			bus_delete_resource(child, SYS_RES_MEMORY, sc->rnum);
 			chunk += IOMEM_STEP;

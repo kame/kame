@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_usrreq.c
  *
- * $FreeBSD: src/sys/netipx/ipx_usrreq.c,v 1.34 2002/05/31 11:52:33 tanimura Exp $
+ * $FreeBSD: src/sys/netipx/ipx_usrreq.c,v 1.37 2003/03/08 06:58:22 tjr Exp $
  */
 
 #include "opt_ipx.h"
@@ -404,13 +404,6 @@ ipx_ctloutput(so, sopt)
 			error = ipxip_route(so, sopt);
 			break;
 #endif /* IPXIP */
-#ifdef IPTUNNEL
-#if 0
-		case SO_IPXTUNNEL_ROUTE:
-			error = ipxtun_route(so, sopt);
-			break;
-#endif
-#endif
 		default:
 			error = EINVAL;
 		}

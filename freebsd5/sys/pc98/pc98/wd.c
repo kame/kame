@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)wd.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/pc98/pc98/wd.c,v 1.128 2002/10/16 13:41:12 phk Exp $
+ * $FreeBSD: src/sys/pc98/pc98/wd.c,v 1.133 2003/04/16 20:55:02 phk Exp $
  */
 
 /* TODO:
@@ -66,10 +66,7 @@
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/disk.h>
-#include <sys/disklabel.h>
-#include <sys/diskslice.h>
 #include <sys/bio.h>
-#include <sys/devicestat.h>
 #include <sys/malloc.h>
 #include <machine/bootinfo.h>
 #include <sys/cons.h>
@@ -186,9 +183,6 @@ struct softc {
 	struct diskgeom dk_dd;	/* device configuration data */
 	struct diskslices *dk_slices;	/* virtual drives */
 	void	*dk_dmacookie;	/* handle for DMA services */
-
-	struct devstat dk_stats;	/* devstat entry */
-
 	struct disk disk;
 };
 
@@ -235,6 +229,8 @@ static void wderror(struct bio *bp, struct softc *du, char *mesg);
 static void wdflushirq(struct softc *du, int old_ipl);
 static int wdreset(struct softc *du);
 static void wdsleep(int ctrlr, char *wmesg);
+static disk_open_t wdopen;
+static disk_strategy_t wdstrategy;
 static timeout_t wdtimeout;
 static int wdunwedge(struct softc *du);
 static int wdwait(struct softc *du, u_char bits_wanted, int timeout);
@@ -246,29 +242,6 @@ struct isa_driver wdcdriver = {
 	"wdc",
 };
 COMPAT_ISA_DRIVER(wdc, wdcdriver);
-
-static	d_open_t	wdopen;
-static	d_strategy_t	wdstrategy;
-
-#define CDEV_MAJOR 3
-
-static struct cdevsw wd_cdevsw = {
-	/* open */	wdopen,
-	/* close */	nullclose,
-	/* read */	physread,
-	/* write */	physwrite,
-	/* ioctl */	noioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	wdstrategy,
-	/* name */	"wd",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_DISK,
-};
-
-static struct cdevsw wddisk_cdevsw;
 
 static int      atapictrlr;
 static int      eide_quirks;
@@ -471,7 +444,6 @@ wdattach(struct isa_device *dvp)
 	struct wdparams *wp;
 	static char buf[] = "wdcXXX";
 	const char *dname;
-	dev_t dev;
 
 	dvp->id_intr = wdintr;
 
@@ -587,21 +559,14 @@ wdattach(struct isa_device *dvp)
 			wdtimeout(du);
 
 			/*
-			 * Export the drive to the devstat interface.
-			 */
-			devstat_add_entry(&du->dk_stats, "wd", 
-					  lunit, du->dk_dd.d_secsize,
-					  DEVSTAT_NO_ORDERED_TAGS,
-					  DEVSTAT_TYPE_DIRECT |
-					  DEVSTAT_TYPE_IF_IDE,
-					  DEVSTAT_PRIORITY_DISK);
-
-			/*
 			 * Register this media as a disk
 			 */
-			dev = disk_create(lunit, &du->disk, 0, &wd_cdevsw,
-				    &wddisk_cdevsw);
-			dev->si_drv1 = du;
+			du->disk.d_open = wdopen;
+			du->disk.d_strategy = wdstrategy;
+			du->disk.d_drv1 = du;
+			du->disk.d_maxsize = 248 * 512;
+			du->disk.d_name = "wd";
+			disk_create(lunit, &du->disk, 0, NULL, NULL);
 			
 		} else {
 			free(du, M_TEMP);
@@ -645,13 +610,13 @@ next: ;
  * be a multiple of a sector in length.
  */
 void
-wdstrategy(register struct bio *bp)
+wdstrategy(struct bio *bp)
 {
 	struct softc *du;
 	int	lunit;
 	int	s;
 
-	du = bp->bio_dev->si_drv1;
+	du = bp->bio_disk->d_drv1;
 	if (du == NULL ||  bp->bio_blkno < 0 ||
 	    bp->bio_bcount % DEV_BSIZE != 0) {
 
@@ -674,16 +639,13 @@ wdstrategy(register struct bio *bp)
 		du->dk_state = WANTOPEN;
 	}
 
-	bioqdisksort(&drive_queue[lunit], bp);
+	bioq_disksort(&drive_queue[lunit], bp);
 
 	if (wdutab[lunit].b_active == 0)
 		wdustart(du);	/* start drive */
 
 	if (wdtab[du->dk_ctrlr_cmd640].b_active == 0)
 		wdstart(du->dk_ctrlr);	/* start controller */
-
-	/* Tell devstat that we have started a transaction on this drive */
-	devstat_start_transaction(&du->dk_stats);
 
 	splx(s);
 	return;
@@ -1213,7 +1175,7 @@ done: ;
 		bp->bio_resid = bp->bio_bcount - du->dk_skip * DEV_BSIZE;
 		wdutab[du->dk_lunit].b_active = 0;
 		du->dk_skip = 0;
-		biofinish(bp, &du->dk_stats, 0);
+		biodone(bp);
 	}
 
 	/* controller idle */
@@ -1229,15 +1191,14 @@ done: ;
  * Initialize a drive.
  */
 int
-wdopen(dev_t dev, int flags, int fmt, struct thread *td)
+wdopen(struct disk *dp)
 {
 	register struct softc *du;
 
-	du = dev->si_drv1;
+	du = dp->d_drv1;
 	if (du == NULL)
 		return (ENXIO);
 
-	dev->si_iosize_max = 248 * 512;
 #ifdef PC98
 	outb(0x432,(du->dk_unit)%2);
 #endif

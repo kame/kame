@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/tdfx/tdfx_pci.c,v 1.21.2.1 2003/01/10 05:18:08 rwatson Exp $
+ *   $FreeBSD: src/sys/dev/tdfx/tdfx_pci.c,v 1.26 2003/03/25 00:07:01 jake Exp $
  */
 
 /* 3dfx driver for FreeBSD 4.x - Finished 11 May 2000, 12:25AM ET
@@ -103,19 +103,12 @@ LINUX_IOCTL_SET(tdfx, LINUX_IOCTL_TDFX_MIN, LINUX_IOCTL_TDFX_MAX);
 
 /* Char. Dev. file operations structure */
 static struct cdevsw tdfx_cdev = {
-	tdfx_open,		/* open */
-	tdfx_close,		/* close */
-	noread,			/* read */
-	nowrite,			/* write */
-	tdfx_ioctl,		/* ioctl */
-	nopoll,			/* poll */
-	tdfx_mmap,		/* mmap */
-	nostrategy,		/* strategy */
-	"tdfx",			/* dev name */
-	CDEV_MAJOR, 	/* char major */
-	nodump,			/* dump */
-	nopsize,			/* size */
-	0,					/* flags (no set flags) */
+	.d_open =	tdfx_open,
+	.d_close =	tdfx_close,
+	.d_ioctl =	tdfx_ioctl,
+	.d_mmap =	tdfx_mmap,
+	.d_name =	"tdfx",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static int
@@ -441,7 +434,7 @@ tdfx_close(dev_t dev, int fflag, int devtype, struct thread *td)
 }
 
 static int
-tdfx_mmap(dev_t dev, vm_offset_t offset, int nprot)
+tdfx_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	/* 
 	 * mmap(2) is called by a user process to request that an area of memory
@@ -472,14 +465,17 @@ tdfx_mmap(dev_t dev, vm_offset_t offset, int nprot)
 	/* We must stay within the bound of our address space */
 	if((offset & 0xff000000) == tdfx_info[0]->addr0) {
 		offset &= 0xffffff;
-		return atop(rman_get_start(tdfx_info[0]->memrange) + offset);
+		*paddr = rman_get_start(tdfx_info[0]->memrange) + offset;
+		return 0;
 	}
 	
 	if(tdfx_count > 1) {
 		tdfx_info[1] = (struct tdfx_softc*)devclass_get_softc(tdfx_devclass, 1);
 		if((offset & 0xff000000) == tdfx_info[1]->addr0) {
 			offset &= 0xffffff;
-			return atop(rman_get_start(tdfx_info[1]->memrange) + offset);
+			*paddr = rman_get_start(tdfx_info[1]->memrange) +
+			    offset;
+			return 0;
 		}
 	}
 

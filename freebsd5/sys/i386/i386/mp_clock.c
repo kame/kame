@@ -29,7 +29,7 @@
  * not protected against the fact that the bits can be wrong in two
  * directions.  If we only cared about monosity two reads would be enough.
  *
- * $FreeBSD: src/sys/i386/i386/mp_clock.c,v 1.11 2002/11/13 17:50:59 mux Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_clock.c,v 1.12 2003/04/06 18:42:22 des Exp $
  *
  */
 
@@ -101,12 +101,11 @@ piix_probe (device_t dev)
 	switch (pci_get_devid(dev)) {
 	case 0x71138086:
 		d = pci_read_config(dev, 0x4, 2);
-		if (!(d & 1))
-			return 0;	/* IO space not mapped */
-		d = pci_read_config(dev, 0x40, 4);
-		piix_timecounter_address = (d & 0xffc0) + 8;
-		piix_timecounter.tc_frequency = piix_freq;
-		tc_init(&piix_timecounter);
+		if (d & 1)
+			return (0);
+		printf("PIIX I/O space not mapped\n");
+		return (ENXIO);
+	default:
 		return (ENXIO);
 	};
 	return (ENXIO);
@@ -115,8 +114,13 @@ piix_probe (device_t dev)
 static int
 piix_attach (device_t dev)
 {
-	
-	return 0;
+	u_int32_t	d;
+
+	d = pci_read_config(dev, 0x40, 4);
+	piix_timecounter_address = (d & 0xffc0) + 8;
+	piix_timecounter.tc_frequency = piix_freq;
+	tc_init(&piix_timecounter);
+	return (0);
 }
 
 static device_method_t piix_methods[] = {

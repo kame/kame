@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/mii/pnphy.c,v 1.12 2002/10/14 22:31:52 alfred Exp $
  */
 
 /*
@@ -38,6 +36,9 @@
  * only support manual mode selection. This is lame, but getting
  * NWAY to work right is amazingly difficult.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/pnphy.c,v 1.14 2003/04/03 21:36:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,7 +56,7 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-#include <dev/mii/miidevs.h>
+#include "miidevs.h"
 
 #include <machine/bus_pio.h>
 #include <machine/bus_memio.h>
@@ -66,11 +67,6 @@
 #include <pci/if_dcreg.h>
 
 #include "miibus_if.h"
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/pnphy.c,v 1.12 2002/10/14 22:31:52 alfred Exp $";
-#endif
 
 #define DC_SETBIT(sc, reg, x)                           \
         CSR_WRITE_4(sc, reg,                            \

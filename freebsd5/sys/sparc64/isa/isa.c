@@ -26,7 +26,7 @@
  *
  *	from: FreeBSD: src/sys/alpha/isa/isa.c,v 1.26 2001/07/11
  *
- * $FreeBSD: src/sys/sparc64/isa/isa.c,v 1.5 2002/11/07 16:07:46 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/isa/isa.c,v 1.6 2003/05/30 20:48:05 tmm Exp $
  */
 
 #include <sys/param.h>
@@ -134,7 +134,7 @@ isa_init(device_t dev)
 		if (ino > 7)
 			panic("isa_init: XXX: ino too large");
 		isa_ino[ino] = ofw_bus_route_intr(node, ino,
-		    ofw_pci_orb_callback);
+		    ofw_pci_orb_callback, dev);
 	}
 
 	for (nbr -= 1; nbr >= 0; nbr--) {

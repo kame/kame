@@ -100,7 +100,7 @@
  *	from: @(#)sbus.c	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: sbus.c,v 1.46 2001/10/07 20:30:41 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/sbus/sbus.c,v 1.6 2002/12/01 23:30:26 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/sbus/sbus.c,v 1.19 2003/05/27 04:59:59 scottl Exp $
  */
 
 /*
@@ -237,6 +237,10 @@ static int sbus_dmamap_create(bus_dma_tag_t, bus_dma_tag_t, int,
 static int sbus_dmamap_destroy(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t);
 static int sbus_dmamap_load(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t, void *,
     bus_size_t, bus_dmamap_callback_t *, void *, int);
+static int sbus_dmamap_load_mbuf(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
+    struct mbuf *, bus_dmamap_callback2_t *, void *, int);
+static int sbus_dmamap_load_uio(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
+    struct uio *, bus_dmamap_callback2_t *, void *, int);
 static void sbus_dmamap_unload(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t);
 static void sbus_dmamap_sync(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
     bus_dmasync_op_t);
@@ -337,14 +341,16 @@ sbus_probe(device_t dev)
 	    0x3ffffffff, 0xff, 0xffffffff, 0, &sc->sc_cdmatag) != 0)
 		panic("bus_dma_tag_create failed");
 	/* Customize the tag */
-	sc->sc_cdmatag->cookie = sc;
-	sc->sc_cdmatag->dmamap_create = sbus_dmamap_create;
-	sc->sc_cdmatag->dmamap_destroy = sbus_dmamap_destroy;
-	sc->sc_cdmatag->dmamap_load = sbus_dmamap_load;
-	sc->sc_cdmatag->dmamap_unload = sbus_dmamap_unload;
-	sc->sc_cdmatag->dmamap_sync = sbus_dmamap_sync;
-	sc->sc_cdmatag->dmamem_alloc = sbus_dmamem_alloc;
-	sc->sc_cdmatag->dmamem_free = sbus_dmamem_free;
+	sc->sc_cdmatag->dt_cookie = sc;
+	sc->sc_cdmatag->dt_dmamap_create = sbus_dmamap_create;
+	sc->sc_cdmatag->dt_dmamap_destroy = sbus_dmamap_destroy;
+	sc->sc_cdmatag->dt_dmamap_load = sbus_dmamap_load;
+	sc->sc_cdmatag->dt_dmamap_load_mbuf = sbus_dmamap_load_mbuf;
+	sc->sc_cdmatag->dt_dmamap_load_uio = sbus_dmamap_load_uio;
+	sc->sc_cdmatag->dt_dmamap_unload = sbus_dmamap_unload;
+	sc->sc_cdmatag->dt_dmamap_sync = sbus_dmamap_sync;
+	sc->sc_cdmatag->dt_dmamem_alloc = sbus_dmamem_alloc;
+	sc->sc_cdmatag->dt_dmamem_free = sbus_dmamem_free;
 	/* XXX: register as root dma tag (kluge). */
 	sparc64_root_dma_tag = sc->sc_cdmatag;
 
@@ -379,7 +385,7 @@ sbus_probe(device_t dev)
 		sc->sc_rd[i].rd_rman.rm_descr = "SBus Device Memory";
 		if (rman_init(&sc->sc_rd[i].rd_rman) != 0 ||
 		    rman_manage_region(&sc->sc_rd[i].rd_rman, 0, size) != 0)
-			panic("psycho_probe: failed to set up memory rman");
+			panic("sbus_probe: failed to set up memory rman");
 		sc->sc_rd[i].rd_poffset = phys;
 		sc->sc_rd[i].rd_pend = phys + size;
 		sc->sc_rd[i].rd_res = res;
@@ -419,7 +425,7 @@ sbus_probe(device_t dev)
 	 * DMA pointer will be translated by the first page of the IOTSB.
 	 * To detect bugs we'll allocate and ignore the first entry.
 	 */
-	iommu_init(name, &sc->sc_is, 0, -1, 1);
+	iommu_init(name, &sc->sc_is, 3, -1, 1);
 
 	/* Enable the over-temperature and power-fail intrrupts. */
 	rid = 0;
@@ -736,6 +742,10 @@ sbus_teardown_intr(device_t dev, device_t child,
 	return (error);
 }
 
+/*
+ * There is no need to handle pass-throughs here; there are no bridges to
+ * SBuses.
+ */
 static struct resource *
 sbus_alloc_resource(device_t bus, device_t child, int type, int *rid,
     u_long start, u_long end, u_long count, u_int flags)
@@ -768,8 +778,8 @@ sbus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	}
 	switch (type) {
 	case SYS_RES_IRQ:
-		rv = bus_alloc_resource(bus, type, rid, start, end,
-		    count, flags);
+		rv = BUS_ALLOC_RESOURCE(device_get_parent(bus), child, type,
+		    rid, start, end, count, flags);
 		if (rv == NULL)
 			return (NULL);
 		break;
@@ -818,8 +828,10 @@ sbus_activate_resource(device_t bus, device_t child, int type, int rid,
     struct resource *r)
 {
 
-	if (type == SYS_RES_IRQ)
-		return (bus_activate_resource(bus, type, rid, r));
+	if (type == SYS_RES_IRQ) {
+		return (BUS_ACTIVATE_RESOURCE(device_get_parent(bus),
+		    child, type, rid, r));
+	}
 	return (rman_activate_resource(r));
 }
 
@@ -828,8 +840,10 @@ sbus_deactivate_resource(device_t bus, device_t child, int type, int rid,
     struct resource *r)
 {
 
-	if (type == SYS_RES_IRQ)
-		return (bus_deactivate_resource(bus, type, rid, r));
+	if (type == SYS_RES_IRQ) {
+		return (BUS_DEACTIVATE_RESOURCE(device_get_parent(bus),
+		    child, type, rid, r));
+	}
 	return (rman_deactivate_resource(r));
 }
 
@@ -837,16 +851,30 @@ static int
 sbus_release_resource(device_t bus, device_t child, int type, int rid,
     struct resource *r)
 {
-	int error;
+	struct sbus_devinfo *sdi;
+	struct resource_list_entry *rle;
+	int error = 0;
 
 	if (type == SYS_RES_IRQ)
-		return (bus_release_resource(bus, type, rid, r));
-	if (rman_get_flags(r) & RF_ACTIVE) {
-		error = bus_deactivate_resource(child, type, rid, r);
-		if (error)
-			return error;
+		error = BUS_RELEASE_RESOURCE(device_get_parent(bus), child,
+		    type, rid, r);
+	else {
+		if ((rman_get_flags(r) & RF_ACTIVE) != 0)
+			error = bus_deactivate_resource(child, type, rid, r);
+		if (error != 0)
+			return (error);
+		error = rman_release_resource(r);
 	}
-	return (rman_release_resource(r));
+	if (error != 0)
+		return (error);
+	sdi = device_get_ivars(child);
+	rle = resource_list_find(&sdi->sdi_rl, type, rid);
+	if (rle == NULL)
+		panic("sbus_release_resource: can't find resource");
+	if (rle->res == NULL)
+		panic("sbus_release_resource: resource entry is not busy");
+	rle->res = NULL;
+	return (0);
 }
 
 /*
@@ -885,9 +913,9 @@ sbus_alloc_bustag(struct sbus_softc *sc)
 		panic("sbus_alloc_bustag: out of memory");
 
 	bzero(sbt, sizeof *sbt);
-	sbt->cookie = sc;
-	sbt->parent = sc->sc_bustag;
-	sbt->type = SBUS_BUS_SPACE;
+	sbt->bst_cookie = sc;
+	sbt->bst_parent = sc->sc_bustag;
+	sbt->bst_type = SBUS_BUS_SPACE;
 	return (sbt);
 }
 
@@ -895,7 +923,7 @@ static int
 sbus_dmamap_create(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, int flags,
     bus_dmamap_t *mapp)
 {
-	struct sbus_softc *sc = (struct sbus_softc *)pdmat->cookie;
+	struct sbus_softc *sc = (struct sbus_softc *)pdmat->dt_cookie;
 
 	return (iommu_dvmamap_create(pdmat, ddmat, &sc->sc_is, flags, mapp));
 
@@ -904,7 +932,7 @@ sbus_dmamap_create(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, int flags,
 static int
 sbus_dmamap_destroy(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map)
 {
-	struct sbus_softc *sc = (struct sbus_softc *)pdmat->cookie;
+	struct sbus_softc *sc = (struct sbus_softc *)pdmat->dt_cookie;
 
 	return (iommu_dvmamap_destroy(pdmat, ddmat, &sc->sc_is, map));
 }
@@ -914,16 +942,38 @@ sbus_dmamap_load(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map,
     void *buf, bus_size_t buflen, bus_dmamap_callback_t *callback,
     void *callback_arg, int flags)
 {
-	struct sbus_softc *sc = (struct sbus_softc *)pdmat->cookie;
+	struct sbus_softc *sc = (struct sbus_softc *)pdmat->dt_cookie;
 
 	return (iommu_dvmamap_load(pdmat, ddmat, &sc->sc_is, map, buf, buflen,
+	    callback, callback_arg, flags));
+}
+
+static int
+sbus_dmamap_load_mbuf(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
+    bus_dmamap_t map, struct mbuf *m, bus_dmamap_callback2_t *callback,
+    void *callback_arg, int flags)
+{
+	struct sbus_softc *sc = (struct sbus_softc *)pdmat->dt_cookie;
+
+	return (iommu_dvmamap_load_mbuf(pdmat, ddmat, &sc->sc_is, map, m,
+	    callback, callback_arg, flags));
+}
+
+static int
+sbus_dmamap_load_uio(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat,
+    bus_dmamap_t map, struct uio *uio, bus_dmamap_callback2_t *callback,
+    void *callback_arg, int flags)
+{
+	struct sbus_softc *sc = (struct sbus_softc *)pdmat->dt_cookie;
+
+	return (iommu_dvmamap_load_uio(pdmat, ddmat, &sc->sc_is, map, uio,
 	    callback, callback_arg, flags));
 }
 
 static void
 sbus_dmamap_unload(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map)
 {
-	struct sbus_softc *sc = (struct sbus_softc *)pdmat->cookie;
+	struct sbus_softc *sc = (struct sbus_softc *)pdmat->dt_cookie;
 
 	iommu_dvmamap_unload(pdmat, ddmat, &sc->sc_is, map);
 }
@@ -932,7 +982,7 @@ static void
 sbus_dmamap_sync(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, bus_dmamap_t map,
     bus_dmasync_op_t op)
 {
-	struct sbus_softc *sc = (struct sbus_softc *)pdmat->cookie;
+	struct sbus_softc *sc = (struct sbus_softc *)pdmat->dt_cookie;
 
 	iommu_dvmamap_sync(pdmat, ddmat, &sc->sc_is, map, op);
 }
@@ -941,7 +991,7 @@ static int
 sbus_dmamem_alloc(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, void **vaddr,
     int flags, bus_dmamap_t *mapp)
 {
-	struct sbus_softc *sc = (struct sbus_softc *)pdmat->cookie;
+	struct sbus_softc *sc = (struct sbus_softc *)pdmat->dt_cookie;
 
 	return (iommu_dvmamem_alloc(pdmat, ddmat, &sc->sc_is, vaddr, flags,
 		    mapp));
@@ -951,7 +1001,7 @@ static void
 sbus_dmamem_free(bus_dma_tag_t pdmat, bus_dma_tag_t ddmat, void *vaddr,
     bus_dmamap_t map)
 {
-	struct sbus_softc *sc = (struct sbus_softc *)pdmat->cookie;
+	struct sbus_softc *sc = (struct sbus_softc *)pdmat->dt_cookie;
 
 	iommu_dvmamem_free(pdmat, ddmat, &sc->sc_is, vaddr, map);
 }

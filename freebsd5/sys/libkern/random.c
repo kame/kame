@@ -31,18 +31,24 @@
  * SUCH DAMAGE.
  *
  *	@(#)random.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/libkern/random.c,v 1.7 1999/08/28 00:46:36 peter Exp $
+ * $FreeBSD: src/sys/libkern/random.c,v 1.10 2003/02/05 21:28:52 ache Exp $
  */
 
 #include <sys/libkern.h>
 
-static u_long randseed = 1;
+#define NSHUFF 100      /* to drop part of seed -> 1st value correlation */
+
+static u_long randseed = 892053144; /* after srandom(1), NSHUFF counted */
 
 void
 srandom(seed)
 	u_long seed;
 {
+	int i;
+
 	randseed = seed;
+	for (i = 0; i < NSHUFF; i++)
+		(void)random();
 }
 
 /*
@@ -61,11 +67,13 @@ random()
 	 * Park and Miller, Communications of the ACM, vol. 31, no. 10,
 	 * October 1988, p. 1195.
 	 */
-	x = randseed;
+	/* Can't be initialized with 0, so use another value. */
+	if ((x = randseed) == 0)
+		x = 123459876;
 	hi = x / 127773;
 	lo = x % 127773;
 	t = 16807 * lo - 2836 * hi;
-	if (t <= 0)
+	if (t < 0)
 		t += 0x7fffffff;
 	randseed = t;
 	return (t);

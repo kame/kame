@@ -25,8 +25,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ng_hci_cmds.c,v 1.22 2002/10/30 00:18:18 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_cmds.c,v 1.1 2002/11/20 23:01:56 julian Exp $
+ * $Id: ng_hci_cmds.c,v 1.3 2003/04/01 18:15:25 max Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_cmds.c,v 1.4 2003/05/10 21:44:40 julian Exp $
  */
 
 #include <sys/param.h>

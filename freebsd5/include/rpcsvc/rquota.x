@@ -7,9 +7,9 @@
 %#ifndef lint
 %/*static char sccsid[] = "from: @(#)rquota.x 1.2 87/09/20 Copyr 1987 Sun Micro";*/
 %/*static char sccsid[] = "from: @(#)rquota.x	2.1 88/08/01 4.0 RPCSRC";*/
-%static const char rcsid[] =
-%  "$FreeBSD: src/include/rpcsvc/rquota.x,v 1.6 1999/08/27 23:45:10 peter Exp $";
 %#endif /* not lint */
+%#include <sys/cdefs.h>
+%__FBSDID("$FreeBSD: src/include/rpcsvc/rquota.x,v 1.7 2003/05/04 02:51:42 obrien Exp $");
 #endif
 
 const RQ_PATHLEN = 1024;

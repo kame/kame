@@ -27,7 +27,7 @@
  *
  *	from BSDI $Id: mutex_witness.c,v 1.1.2.20 2000/04/27 03:10:27 cp Exp $
  *	and BSDI $Id: synch_machdep.c,v 2.3.2.39 2000/04/27 03:10:25 cp Exp $
- * $FreeBSD: src/sys/kern/kern_mutex.c,v 1.116 2002/10/25 08:40:20 phk Exp $
+ * $FreeBSD: src/sys/kern/kern_mutex.c,v 1.126 2003/04/17 22:28:58 jhb Exp $
  */
 
 /*
@@ -49,7 +49,6 @@
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
 #include <sys/sbuf.h>
-#include <sys/stdint.h>
 #include <sys/sysctl.h>
 #include <sys/vmmeter.h>
 
@@ -70,10 +69,6 @@
 
 #define mtx_owner(m)	(mtx_unowned((m)) ? NULL \
 	: (struct thread *)((m)->mtx_lock & MTX_FLAGMASK))
-
-/* XXXKSE This test will change. */
-#define	thread_running(td)						\
-	((td)->td_kse != NULL && (td)->td_kse->ke_oncpu != NOCPU)
 
 /*
  * Lock classes for sleep and spin mutexes.
@@ -218,11 +213,9 @@ struct mutex_prof {
 	const char	*name;
 	const char	*file;
 	int		line;
-	struct {
-		uintmax_t	max;
-		uintmax_t	tot;
-		uintmax_t	cur;
-	} cnt;
+	uintmax_t	cnt_max;
+	uintmax_t	cnt_tot;
+	uintmax_t	cnt_cur;
 	struct mutex_prof *next;
 };
 
@@ -237,6 +230,8 @@ static struct mutex_prof mprof_buf[NUM_MPROF_BUFFERS];
 static int first_free_mprof_buf;
 #define	MPROF_HASH_SIZE		1009
 static struct mutex_prof *mprof_hash[MPROF_HASH_SIZE];
+/* SWAG: sbuf size = avg stat. line size * number of locks */
+#define MPROF_SBUF_SIZE		256 * 400
 
 static int mutex_prof_acquisitions;
 SYSCTL_INT(_debug_mutex_prof, OID_AUTO, acquisitions, CTLFLAG_RD,
@@ -277,12 +272,14 @@ dump_mutex_prof_stats(SYSCTL_HANDLER_ARGS)
 {
 	struct sbuf *sb;
 	int error, i;
+	static int multiplier = 1;
 
 	if (first_free_mprof_buf == 0)
 		return (SYSCTL_OUT(req, "No locking recorded",
 		    sizeof("No locking recorded")));
 
-	sb = sbuf_new(NULL, NULL, 1024, SBUF_AUTOEXTEND);
+retry_sbufops:
+	sb = sbuf_new(NULL, NULL, MPROF_SBUF_SIZE * multiplier, SBUF_FIXEDLEN);
 	sbuf_printf(sb, "%6s %12s %11s %5s %s\n",
 	    "max", "total", "count", "avg", "name");
 	/*
@@ -292,14 +289,21 @@ dump_mutex_prof_stats(SYSCTL_HANDLER_ARGS)
 	 * computation here).
 	 */
 	mtx_lock_spin(&mprof_mtx);
-	for (i = 0; i < first_free_mprof_buf; ++i)
+	for (i = 0; i < first_free_mprof_buf; ++i) {
 		sbuf_printf(sb, "%6ju %12ju %11ju %5ju %s:%d (%s)\n",
-		    mprof_buf[i].cnt.max / 1000,
-		    mprof_buf[i].cnt.tot / 1000,
-		    mprof_buf[i].cnt.cur,
-		    mprof_buf[i].cnt.cur == 0 ? (uintmax_t)0 :
-			mprof_buf[i].cnt.tot / (mprof_buf[i].cnt.cur * 1000),
+		    mprof_buf[i].cnt_max / 1000,
+		    mprof_buf[i].cnt_tot / 1000,
+		    mprof_buf[i].cnt_cur,
+		    mprof_buf[i].cnt_cur == 0 ? (uintmax_t)0 :
+			mprof_buf[i].cnt_tot / (mprof_buf[i].cnt_cur * 1000),
 		    mprof_buf[i].file, mprof_buf[i].line, mprof_buf[i].name);
+		if (sbuf_overflowed(sb)) {
+			mtx_unlock_spin(&mprof_mtx);
+			sbuf_delete(sb);
+			multiplier++;
+			goto retry_sbufops;
+		}
+	}
 	mtx_unlock_spin(&mprof_mtx);
 	sbuf_finish(sb);
 	error = SYSCTL_OUT(req, sbuf_data(sb), sbuf_len(sb) + 1);
@@ -362,7 +366,8 @@ _mtx_unlock_flags(struct mtx *m, int opts, const char *file, int line)
 		m->mtx_acqtime = 0;
 		if (now <= acqtime)
 			goto out;
-		for (p = m->mtx_filename; strncmp(p, "../", 3) == 0; p += 3)
+		for (p = m->mtx_filename;
+		    p != NULL && strncmp(p, "../", 3) == 0; p += 3)
 			/* nothing */ ;
 		if (p == NULL || *p == '\0')
 			p = unknown;
@@ -393,10 +398,10 @@ _mtx_unlock_flags(struct mtx *m, int opts, const char *file, int line)
 		 * Record if the mutex has been held longer now than ever
 		 * before.
 		 */
-		if (now - acqtime > mpp->cnt.max)
-			mpp->cnt.max = now - acqtime;
-		mpp->cnt.tot += now - acqtime;
-		mpp->cnt.cur++;
+		if (now - acqtime > mpp->cnt_max)
+			mpp->cnt_max = now - acqtime;
+		mpp->cnt_tot += now - acqtime;
+		mpp->cnt_cur++;
 unlock:
 		mtx_unlock_spin(&mprof_mtx);
 	}
@@ -444,8 +449,10 @@ _mtx_unlock_spin_flags(struct mtx *m, int opts, const char *file, int line)
 
 /*
  * The important part of mtx_trylock{,_flags}()
- * Tries to acquire lock `m.' We do NOT handle recursion here; we assume that
- * if we're called, it's because we know we don't already own this lock.
+ * Tries to acquire lock `m.' We do NOT handle recursion here.  If this
+ * function is called on a recursed mutex, it will return failure and
+ * will not recursively acquire the lock.  You are expected to know what
+ * you are doing.
  */
 int
 _mtx_trylock(struct mtx *m, int opts, const char *file, int line)
@@ -457,16 +464,9 @@ _mtx_trylock(struct mtx *m, int opts, const char *file, int line)
 	rval = _obtain_lock(m, curthread);
 
 	LOCK_LOG_TRY("LOCK", &m->mtx_object, opts, rval, file, line);
-	if (rval) {
-		/*
-		 * We do not handle recursion in _mtx_trylock; see the
-		 * note at the top of the routine.
-		 */
-		KASSERT(!mtx_recursed(m),
-		    ("mtx_trylock() called on a recursed mutex"));
+	if (rval)
 		WITNESS_LOCK(&m->mtx_object, opts | LOP_EXCLUSIVE | LOP_TRYLOCK,
 		    file, line);
-	}
 
 	return (rval);
 }
@@ -481,14 +481,16 @@ void
 _mtx_lock_sleep(struct mtx *m, int opts, const char *file, int line)
 {
 	struct thread *td = curthread;
+	struct thread *td1;
 #if defined(SMP) && defined(ADAPTIVE_MUTEXES)
 	struct thread *owner;
 #endif
+	uintptr_t v;
 #ifdef KTR
 	int cont_logged = 0;
 #endif
 
-	if ((m->mtx_lock & MTX_FLAGMASK) == (uintptr_t)td) {
+	if (mtx_owned(m)) {
 		m->mtx_recurse++;
 		atomic_set_ptr(&m->mtx_lock, MTX_RECURSED);
 		if (LOCK_LOG_TEST(&m->mtx_object, opts))
@@ -502,15 +504,15 @@ _mtx_lock_sleep(struct mtx *m, int opts, const char *file, int line)
 		    m->mtx_object.lo_name, (void *)m->mtx_lock, file, line);
 
 	while (!_obtain_lock(m, td)) {
-		uintptr_t v;
-		struct thread *td1;
 
 		mtx_lock_spin(&sched_lock);
+		v = m->mtx_lock;
+
 		/*
 		 * Check if the lock has been released while spinning for
 		 * the sched_lock.
 		 */
-		if ((v = m->mtx_lock) == MTX_UNOWNED) {
+		if (v == MTX_UNOWNED) {
 			mtx_unlock_spin(&sched_lock);
 #ifdef __i386__
 			ia32_pause();
@@ -554,9 +556,9 @@ _mtx_lock_sleep(struct mtx *m, int opts, const char *file, int line)
 		 * CPU, spin instead of blocking.
 		 */
 		owner = (struct thread *)(v & MTX_FLAGMASK);
-		if (m != &Giant && thread_running(owner)) {
+		if (m != &Giant && TD_IS_RUNNING(owner)) {
 			mtx_unlock_spin(&sched_lock);
-			while (mtx_owner(m) == owner && thread_running(owner)) {
+			while (mtx_owner(m) == owner && TD_IS_RUNNING(owner)) {
 #ifdef __i386__
 				ia32_pause();
 #endif
@@ -904,7 +906,7 @@ mtx_init(struct mtx *m, const char *name, const char *type, int opts)
 	struct lock_object *lock;
 
 	MPASS((opts & ~(MTX_SPIN | MTX_QUIET | MTX_RECURSE |
-	    MTX_SLEEPABLE | MTX_NOWITNESS | MTX_DUPOK)) == 0);
+	    MTX_NOWITNESS | MTX_DUPOK)) == 0);
 
 #ifdef MUTEX_DEBUG
 	/* Diagnostic and error correction */
@@ -925,8 +927,6 @@ mtx_init(struct mtx *m, const char *name, const char *type, int opts)
 		lock->lo_flags = LO_QUIET;
 	if (opts & MTX_RECURSE)
 		lock->lo_flags |= LO_RECURSABLE;
-	if (opts & MTX_SLEEPABLE)
-		lock->lo_flags |= LO_SLEEPABLE;
 	if ((opts & MTX_NOWITNESS) == 0)
 		lock->lo_flags |= LO_WITNESS;
 	if (opts & MTX_DUPOK)
@@ -984,47 +984,4 @@ mutex_init(void)
 	mtx_init(&sched_lock, "sched lock", NULL, MTX_SPIN | MTX_RECURSE);
 	mtx_init(&proc0.p_mtx, "process lock", NULL, MTX_DEF | MTX_DUPOK);
 	mtx_lock(&Giant);
-}
-
-/*
- * Encapsulated Giant mutex routines.  These routines provide encapsulation
- * control for the Giant mutex, allowing sysctls to be used to turn on and
- * off Giant around certain subsystems.  The default value for the sysctls
- * are set to what developers believe is stable and working in regards to
- * the Giant pushdown.  Developers should not turn off Giant via these
- * sysctls unless they know what they are doing.
- *
- * Callers of mtx_lock_giant() are expected to pass the return value to an
- * accompanying mtx_unlock_giant() later on.  If multiple subsystems are
- * effected by a Giant wrap, all related sysctl variables must be zero for
- * the subsystem call to operate without Giant (as determined by the caller).
- */
-
-SYSCTL_NODE(_kern, OID_AUTO, giant, CTLFLAG_RD, NULL, "Giant mutex manipulation");
-
-static int kern_giant_all = 0;
-SYSCTL_INT(_kern_giant, OID_AUTO, all, CTLFLAG_RW, &kern_giant_all, 0, "");
-
-int kern_giant_proc = 1;	/* Giant around PROC locks */
-int kern_giant_file = 1;	/* Giant around struct file & filedesc */
-int kern_giant_ucred = 1;	/* Giant around ucred */
-SYSCTL_INT(_kern_giant, OID_AUTO, proc, CTLFLAG_RW, &kern_giant_proc, 0, "");
-SYSCTL_INT(_kern_giant, OID_AUTO, file, CTLFLAG_RW, &kern_giant_file, 0, "");
-SYSCTL_INT(_kern_giant, OID_AUTO, ucred, CTLFLAG_RW, &kern_giant_ucred, 0, "");
-
-int
-mtx_lock_giant(int sysctlvar)
-{
-	if (sysctlvar || kern_giant_all) {
-		mtx_lock(&Giant);
-		return(1);
-	}
-	return(0);
-}
-
-void
-mtx_unlock_giant(int s)
-{
-	if (s)
-		mtx_unlock(&Giant);
 }

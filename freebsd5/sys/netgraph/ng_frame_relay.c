@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_frame_relay.c,v 1.19 2001/12/10 08:09:47 obrien Exp $
+ * $FreeBSD: src/sys/netgraph/ng_frame_relay.c,v 1.21 2003/02/19 05:47:31 imp Exp $
  * $Whistle: ng_frame_relay.c,v 1.20 1999/11/01 09:24:51 julian Exp $
  */
 

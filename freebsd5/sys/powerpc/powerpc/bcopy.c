@@ -42,10 +42,8 @@ static char *sccsid = "from: @(#)bcopy.c      5.11 (Berkeley) 6/21/91";
 static char *rcsid = "$NetBSD: bcopy.c,v 1.2 1997/04/16 22:09:41 thorpej Exp $";
 #endif
 #endif /* LIBC_SCCS and not lint */
-#ifndef lint
-static char *rcsid =
-  "$FreeBSD: src/sys/powerpc/powerpc/bcopy.c,v 1.2 2002/06/29 09:34:54 benno Exp $";
-#endif
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/bcopy.c,v 1.4 2003/04/04 17:29:55 des Exp $");
 
 #include <sys/param.h>
 #ifdef _KERNEL
@@ -153,9 +151,3 @@ bcopy(const void *src0, void *dst0, size_t length)
 	memcpy(dst0, src0, length);
 }
 
-void
-ovbcopy(const void *src0, void *dst0, size_t length)
-{
-
-	memcpy(dst0, src0, length);
-}

@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvcache.c,v 1.32 2002/07/15 19:40:22 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvcache.c,v 1.35 2003/03/02 16:54:38 des Exp $");
 
 /*
  * Reference: Chet Juszczak, "Improving the Performance and Correctness
@@ -171,7 +171,7 @@ loop:
 		        NFS_DPF(RC, ("H%03x", rp->rc_xid & 0xfff));
 			if ((rp->rc_flag & RC_LOCKED) != 0) {
 				rp->rc_flag |= RC_WANTED;
-				(void) tsleep((caddr_t)rp, PZERO-1, "nfsrc", 0);
+				(void) tsleep(rp, PZERO-1, "nfsrc", 0);
 				goto loop;
 			}
 			rp->rc_flag |= RC_LOCKED;
@@ -203,7 +203,7 @@ loop:
 			rp->rc_flag &= ~RC_LOCKED;
 			if (rp->rc_flag & RC_WANTED) {
 				rp->rc_flag &= ~RC_WANTED;
-				wakeup((caddr_t)rp);
+				wakeup(rp);
 			}
 			return (ret);
 		}
@@ -219,7 +219,7 @@ loop:
 		rp = TAILQ_FIRST(&nfsrvlruhead);
 		while ((rp->rc_flag & RC_LOCKED) != 0) {
 			rp->rc_flag |= RC_WANTED;
-			(void) tsleep((caddr_t)rp, PZERO-1, "nfsrc", 0);
+			(void) tsleep(rp, PZERO-1, "nfsrc", 0);
 			rp = TAILQ_FIRST(&nfsrvlruhead);
 		}
 		rp->rc_flag |= RC_LOCKED;
@@ -252,7 +252,7 @@ loop:
 	rp->rc_flag &= ~RC_LOCKED;
 	if (rp->rc_flag & RC_WANTED) {
 		rp->rc_flag &= ~RC_WANTED;
-		wakeup((caddr_t)rp);
+		wakeup(rp);
 	}
 	return (RC_DOIT);
 }
@@ -274,7 +274,7 @@ loop:
 			NFS_DPF(RC, ("U%03x", rp->rc_xid & 0xfff));
 			if ((rp->rc_flag & RC_LOCKED) != 0) {
 				rp->rc_flag |= RC_WANTED;
-				(void) tsleep((caddr_t)rp, PZERO-1, "nfsrc", 0);
+				(void) tsleep(rp, PZERO-1, "nfsrc", 0);
 				goto loop;
 			}
 			rp->rc_flag |= RC_LOCKED;
@@ -310,7 +310,7 @@ loop:
 			rp->rc_flag &= ~RC_LOCKED;
 			if (rp->rc_flag & RC_WANTED) {
 				rp->rc_flag &= ~RC_WANTED;
-				wakeup((caddr_t)rp);
+				wakeup(rp);
 			}
 			return;
 		}

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_xxx.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/subr_xxx.c,v 1.19 2002/03/31 22:36:47 phk Exp $
+ * $FreeBSD: src/sys/kern/subr_xxx.c,v 1.24 2003/03/25 00:07:04 jake Exp $
  */
 
 /*
@@ -128,22 +128,22 @@ nokqfilter(dev, kn)
 	struct knote *kn;
 {
 
+	return (1);
+}
+
+int
+nommap(dev, offset, paddr, nprot)
+	dev_t dev;
+	vm_offset_t offset;
+	vm_paddr_t *paddr;
+	int nprot;
+{
+
 	return (ENODEV);
 }
 
 int
-nommap(dev, offset, nprot)
-	dev_t dev;
-	vm_offset_t offset;
-	int nprot;
-{
-
-	/* Don't return ENODEV.  That would allow mapping address ENODEV! */
-	return (-1);
-}
-
-int
-nodump(dev_t dev, void *virtual __unused, vm_offset_t physical __unused, off_t offset __unused, size_t length __unused)
+nodump(void *arg, void *virtual __unused, vm_offset_t physical __unused, off_t offset __unused, size_t length __unused)
 {
 
 	return (ENODEV);

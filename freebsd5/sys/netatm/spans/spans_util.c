@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/spans/spans_util.c,v 1.8 2002/04/19 17:45:20 arr Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/spans/spans_util.c,v 1.9 2002/12/30 21:18:09 schweikh Exp $
  *
  */
 
@@ -55,7 +55,7 @@
 #include <netatm/spans/spans_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_util.c,v 1.8 2002/04/19 17:45:20 arr Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_util.c,v 1.9 2002/12/30 21:18:09 schweikh Exp $");
 #endif
 
 
@@ -325,7 +325,7 @@ spans_find_vpvc(spp, vpi, vci, dir)
  *
  * Arguments:
  *	spp	pointer to SPANS protocol instance
- *	p	pointer to an spans_atm_conn structure
+ *	p	pointer to a spans_atm_conn structure
  *
  * Returns:
  *	0	there is no such VCCB

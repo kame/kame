@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/mii/e1000phy.c,v 1.7 2002/10/29 00:20:47 semenu Exp $ */
+/* $FreeBSD: src/sys/dev/mii/e1000phy.c,v 1.8 2003/01/19 02:59:32 obrien Exp $ */
 /*
  * Principal Author: Parag Patel
  * Copyright (c) 2001
@@ -47,7 +47,7 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-#include <dev/mii/miidevs.h>
+#include "miidevs.h"
 
 #include <dev/mii/e1000phyreg.h>
 

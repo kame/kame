@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_bmap.c	8.7 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_bmap.c,v 1.52 2002/05/18 19:12:38 iedowse Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_bmap.c,v 1.54 2003/03/04 00:04:42 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -185,7 +185,7 @@ ext2_bmaparray(vp, bn, bnp, runp, runb)
 			bqrelse(bp);
 
 		ap->in_exists = 1;
-		bp = getblk(vp, metalbn, mp->mnt_stat.f_iosize, 0, 0);
+		bp = getblk(vp, metalbn, mp->mnt_stat.f_iosize, 0, 0, 0);
 		if ((bp->b_flags & B_CACHE) == 0) {
 #ifdef DIAGNOSTIC
 			if (!daddr)
@@ -196,7 +196,7 @@ ext2_bmaparray(vp, bn, bnp, runp, runb)
 			bp->b_flags &= ~B_INVAL;
 			bp->b_ioflags &= ~BIO_ERROR;
 			vfs_busy_pages(bp, 0);
-			BUF_STRATEGY(bp);
+			VOP_STRATEGY(bp->b_vp, bp);
 			curproc->p_stats->p_ru.ru_inblock++;	/* XXX */
 			error = bufwait(bp);
 			if (error) {

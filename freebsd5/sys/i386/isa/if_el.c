@@ -6,7 +6,7 @@
  *
  * Questions, comments, bug reports and fixes to kimmel@cs.umass.edu.
  *
- * $FreeBSD: src/sys/i386/isa/if_el.c,v 1.56 2002/11/15 00:00:14 sam Exp $
+ * $FreeBSD: src/sys/i386/isa/if_el.c,v 1.59 2003/02/19 05:47:22 imp Exp $
  */
 /* Except of course for the portions of code lifted from other FreeBSD
  * drivers (mainly elread, elget and el_ioctl)
@@ -653,7 +653,7 @@ elintr(void *xsc)
 }
 
 /*
- * Pull read data off a interface.
+ * Pull read data off an interface.
  * Len is length of data, with local net header stripped.
  */
 static struct mbuf *

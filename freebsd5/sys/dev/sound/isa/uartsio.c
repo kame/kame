@@ -42,7 +42,7 @@
  * This handles io against /dev/midi, the midi {in, out}put event queues
  * and the event/message transmittion to/from a serial port interface.
  *
- * $FreeBSD: src/sys/dev/sound/isa/uartsio.c,v 1.12 2002/04/04 21:03:16 jhb Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/uartsio.c,v 1.13 2002/12/18 22:53:23 semenu Exp $
  *
  */
 
@@ -479,7 +479,7 @@ uartsio_readport(sc_p scp, int off)
 static void
 uartsio_writeport(sc_p scp, int off, u_int8_t value)
 {
-	return bus_space_write_1(rman_get_bustag(scp->io), rman_get_bushandle(scp->io), off, value);
+	bus_space_write_1(rman_get_bustag(scp->io), rman_get_bushandle(scp->io), off, value);
 }
 
 /* Allocates resources other than IO ports. */

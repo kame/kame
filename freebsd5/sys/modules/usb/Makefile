@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/usb/Makefile,v 1.11 2002/01/11 15:49:01 ru Exp $ 
+# $FreeBSD: src/sys/modules/usb/Makefile,v 1.12 2003/04/14 14:04:08 ticso Exp $ 
 
 MAINTAINER=	n_hibma@freebsd.org
 
@@ -24,6 +24,7 @@ SRCS=	bus_if.h device_if.h usb_if.h usb_if.c \
 	
 SRCS+=	uhci_pci.c uhci.c uhcireg.h uhcivar.h
 SRCS+=	ohci_pci.c ohci.c ohcireg.h ohcivar.h
+SRCS+=	ehci_pci.c ehci.c ehcireg.h ehcivar.h
 SRCS+=	opt_bus.h pci_if.h
 
 .include <bsd.kmod.mk>

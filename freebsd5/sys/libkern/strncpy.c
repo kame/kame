@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/libkern/strncpy.c,v 1.7 2002/08/22 20:08:07 jhb Exp $
+ * $FreeBSD: src/sys/libkern/strncpy.c,v 1.8 2003/02/10 00:36:27 hsu Exp $
  */
 
 #include <sys/libkern.h>
@@ -43,10 +43,7 @@
  * Return dst.
  */
 char *
-strncpy(dst, src, n)
-	char *dst;
-	const char *src;
-	register size_t n;
+strncpy(char * __restrict dst, const char * __restrict src, size_t n)
 {
 	if (n != 0) {
 		register char *d = dst;

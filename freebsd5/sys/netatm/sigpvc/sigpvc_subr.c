@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.10 2002/09/29 12:01:36 bde Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.12 2003/02/19 05:47:31 imp Exp $
  *
  */
 
@@ -53,7 +53,7 @@
 #include <vm/uma.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.10 2002/09/29 12:01:36 bde Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.12 2003/02/19 05:47:31 imp Exp $");
 #endif
 
 extern uma_zone_t	sigpvc_vc_zone;

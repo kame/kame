@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/ppc.c,v 1.37 2002/03/23 15:36:13 nsouch Exp $
+ * $FreeBSD: src/sys/isa/ppc.c,v 1.39 2003/04/30 12:57:39 markm Exp $
  *
  */
 
@@ -60,7 +60,7 @@
 
 #define DEVTOSOFTC(dev) ((struct ppc_data *)device_get_softc(dev))
   
-devclass_t ppc_devclass;
+static devclass_t ppc_devclass;
 
 static int ppc_probe(device_t dev);
 static int ppc_attach(device_t dev);
@@ -1614,7 +1614,7 @@ ppcintr(void *arg)
 				ppc->ppc_dmastat = PPC_DMA_COMPLETE;
 
 				/* wakeup the waiting process */
-				wakeup((caddr_t)ppc);
+				wakeup(ppc);
 			}
 		}
 	} else if (ppc->ppc_irqstat & PPC_IRQ_FIFO) {
@@ -1720,7 +1720,7 @@ ppc_write(device_t dev, char *buf, int len, int how)
 		 */
 		do {
 			/* release CPU */
-			error = tsleep((caddr_t)ppc,
+			error = tsleep(ppc,
 				PPBPRI | PCATCH, "ppcdma", 0);
 
 		} while (error == EWOULDBLOCK);
@@ -1752,7 +1752,7 @@ ppc_write(device_t dev, char *buf, int len, int how)
 #ifdef PPC_DEBUG
 			printf("Z");
 #endif
-			error = tsleep((caddr_t)ppc, PPBPRI | PCATCH, "ppcfifo", hz/100);
+			error = tsleep(ppc, PPBPRI | PCATCH, "ppcfifo", hz/100);
 			if (error != EWOULDBLOCK) {
 #ifdef PPC_DEBUG
 				printf("I");

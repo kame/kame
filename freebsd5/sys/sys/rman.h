@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/rman.h,v 1.18 2002/11/27 03:55:22 imp Exp $
+ * $FreeBSD: src/sys/sys/rman.h,v 1.19 2003/02/12 07:00:59 imp Exp $
  */
 
 #ifndef _SYS_RMAN_H_
@@ -134,6 +134,7 @@ uint32_t rman_make_alignment_flags(uint32_t size);
 
 u_long	rman_get_start(struct resource *_r);
 u_long	rman_get_end(struct resource *_r);
+struct device *rman_get_device(struct resource *);
 u_long	rman_get_size(struct resource *_r);
 u_int	rman_get_flags(struct resource *_r);
 void	rman_set_virtual(struct resource *_r, void *_v);

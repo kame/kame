@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.11 2002/08/31 20:29:46 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.21 2003/05/14 09:37:46 wilko Exp $");
 
 /*
  * PCI "universal" communications card driver configuration data (used to
@@ -857,7 +857,7 @@ const struct puc_device_description puc_devices[] = {
 	 */
 
 	/* Oxford Semiconductor OX16PCI954 PCI UARTs */
-	{   "Qxford Semiconductor OX16PCI954 UARTs",
+	{   "Oxford Semiconductor OX16PCI954 UARTs",
 	    NULL,
 	    {	0x1415,	0x9501,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0	},
@@ -870,7 +870,7 @@ const struct puc_device_description puc_devices[] = {
 	},
 
 	/* Oxford Semiconductor OX16PCI954 PCI Parallel port */
-	{   "Qxford Semiconductor OX16PCI954 Parallel port",
+	{   "Oxford Semiconductor OX16PCI954 Parallel port",
 	    NULL,
 	    {	0x1415,	0x9513,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0	},
@@ -888,6 +888,19 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+	    },
+	},
+
+	/* NetMos 4S0P PCI: 4S, 0P */
+	{   "NetMos NM9845 Quad UART",
+	    NULL,
+	    {	0x9710,	0x9845,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
 	    },
 	},
 
@@ -916,6 +929,19 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x3e8, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x10, 0x3f8, COM_FREQ },
 		{ PUC_PORT_TYPE_LPT, 0x10, 0x000, 0x00 },
+	    },
+	},
+
+	/* Moxa Technologies Co., Ltd. PCI I/O Card 4S RS232 */
+	{   "Moxa Technologies, Smartio C104H/PCI",
+	    NULL,
+	    {   0x1393, 0x1040, 0,      0       },
+	    {   0xffff, 0xffff, 0,      0,      },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
 	    },
 	},
 
@@ -993,6 +1019,90 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x1c, 0x08, COM_FREQ },
 	    },
+	},
+
+	{   "IC Book Labs Ironclad x8 Lite",
+	    NULL,
+	    {   0xb00c, 0x041c, 0,      0       },
+	    {   0xffff, 0xffff, 0,      0       },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x20, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x28, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x30, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x38, COM_FREQ }
+	    },
+	    PUC_ILR_TYPE_DIGI, { 0x07 },
+	},
+
+	{   "IC Book Labs Ironclad x8 Pro",
+	    NULL,
+	    {   0xb00c, 0x051c, 0,      0       },
+	    {   0xffff, 0xffff, 0,      0       },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x20, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x28, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x30, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x38, COM_FREQ }
+	    },
+	    PUC_ILR_TYPE_DIGI, { 0x07 },
+	},
+
+	{   "IC Book Labs Dreadnought x16 Lite",
+	    NULL,
+	    {	0xb00c, 0x091c, 0,	0	},
+	    {   0xffff, 0xffff, 0,      0       },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x20, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x28, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x30, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x38, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x40, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x48, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x50, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x58, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x60, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x68, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x70, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x78, COM_FREQ },
+	    },
+	    PUC_ILR_TYPE_DIGI, { 0x07, 0x47 },
+	},
+
+	{   "IC Book Labs Dreadnought x16 Pro",
+	    NULL,
+	    {   0xb00c, 0x081c, 0,      0       },
+	    {   0xffff, 0xffff, 0,      0       },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x20, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x28, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x30, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x38, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x40, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x48, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x50, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x58, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x60, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x68, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x70, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x78, COM_FREQ * 8, 0x200000 },
+	    },
+	    PUC_ILR_TYPE_DIGI, { 0x07, 0x47 },
 	},
 
 	{ 0 }

@@ -30,15 +30,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/libkern/strcpy.c,v 1.8 2002/08/22 20:08:07 jhb Exp $
+ * $FreeBSD: src/sys/libkern/strcpy.c,v 1.9 2003/02/10 00:36:27 hsu Exp $
  */
 
 #include <sys/libkern.h>
 
 char *
-strcpy(to, from)
-	register char *to;
-	register const char *from;
+strcpy(char * __restrict to, const char * __restrict from)
 {
 	char *save = to;
 

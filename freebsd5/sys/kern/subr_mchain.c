@@ -29,9 +29,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_mchain.c,v 1.9 2002/10/22 18:44:59 jhb Exp $
+ * $FreeBSD: src/sys/kern/subr_mchain.c,v 1.14 2003/02/19 10:12:42 tjr Exp $
  */
-
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -140,42 +139,42 @@ mb_put_uint8(struct mbchain *mbp, u_int8_t x)
 int
 mb_put_uint16be(struct mbchain *mbp, u_int16_t x)
 {
-	x = htobes(x);
+	x = htobe16(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_uint16le(struct mbchain *mbp, u_int16_t x)
 {
-	x = htoles(x);
+	x = htole16(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_uint32be(struct mbchain *mbp, u_int32_t x)
 {
-	x = htobel(x);
+	x = htobe32(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_uint32le(struct mbchain *mbp, u_int32_t x)
 {
-	x = htolel(x);
+	x = htole32(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_int64be(struct mbchain *mbp, int64_t x)
 {
-	x = htobeq(x);
+	x = htobe64(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_int64le(struct mbchain *mbp, int64_t x)
 {
-	x = htoleq(x);
+	x = htole64(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
@@ -196,8 +195,8 @@ mb_put_mem(struct mbchain *mbp, c_caddr_t source, int size, int type)
 				m = m_getm(m, size, M_TRYWAIT, MT_DATA);
 				if (m == NULL)
 					return ENOBUFS;
-			}
-			m = m->m_next;
+			} else
+				m = m->m_next;
 			mleft = M_TRAILINGSPACE(m);
 			continue;
 		}
@@ -377,7 +376,7 @@ md_get_uint16le(struct mdchain *mdp, u_int16_t *x)
 	int error = md_get_uint16(mdp, &v);
 
 	if (x != NULL)
-		*x = letohs(v);
+		*x = le16toh(v);
 	return error;
 }
 
@@ -387,7 +386,7 @@ md_get_uint16be(struct mdchain *mdp, u_int16_t *x) {
 	int error = md_get_uint16(mdp, &v);
 
 	if (x != NULL)
-		*x = betohs(v);
+		*x = be16toh(v);
 	return error;
 }
 
@@ -405,7 +404,7 @@ md_get_uint32be(struct mdchain *mdp, u_int32_t *x)
 
 	error = md_get_uint32(mdp, &v);
 	if (x != NULL)
-		*x = betohl(v);
+		*x = be32toh(v);
 	return error;
 }
 
@@ -417,7 +416,7 @@ md_get_uint32le(struct mdchain *mdp, u_int32_t *x)
 
 	error = md_get_uint32(mdp, &v);
 	if (x != NULL)
-		*x = letohl(v);
+		*x = le32toh(v);
 	return error;
 }
 
@@ -435,7 +434,7 @@ md_get_int64be(struct mdchain *mdp, int64_t *x)
 
 	error = md_get_int64(mdp, &v);
 	if (x != NULL)
-		*x = betohq(v);
+		*x = be64toh(v);
 	return error;
 }
 
@@ -447,7 +446,7 @@ md_get_int64le(struct mdchain *mdp, int64_t *x)
 
 	error = md_get_int64(mdp, &v);
 	if (x != NULL)
-		*x = letohq(v);
+		*x = le64toh(v);
 	return error;
 }
 

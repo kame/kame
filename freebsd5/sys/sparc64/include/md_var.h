@@ -27,11 +27,14 @@
  * SUCH DAMAGE.
  *
  *	from: FreeBSD: src/sys/i386/include/md_var.h,v 1.40 2001/07/12
- * $FreeBSD: src/sys/sparc64/include/md_var.h,v 1.12 2002/08/30 04:04:37 peter Exp $
+ * $FreeBSD: src/sys/sparc64/include/md_var.h,v 1.14 2003/04/08 06:35:08 jake Exp $
  */
 
 #ifndef	_MACHINE_MD_VAR_H_
 #define	_MACHINE_MD_VAR_H_
+
+typedef void cpu_block_copy_t(const void *src, void *dst, size_t len);
+typedef void cpu_block_zero_t(void *dst, size_t len);
 
 extern	char	tl0_base[];
 extern	char	_end[];
@@ -39,19 +42,21 @@ extern	char	_end[];
 extern	long	Maxmem;
 
 extern	vm_offset_t kstack0;
-extern	vm_offset_t kstack0_phys;
+extern	vm_paddr_t kstack0_phys;
 
-struct	dbreg;
-struct	fpreg;
-struct	thread;
-struct	reg;
 struct	pcpu;
 
 void	cpu_halt(void);
 void	cpu_identify(u_long vers, u_int clock, u_int id);
 void	cpu_reset(void);
 void	cpu_setregs(struct pcpu *pc);
-int	is_physical_memory(vm_offset_t addr);
+int	is_physical_memory(vm_paddr_t addr);
 void	swi_vm(void *v);
+
+cpu_block_copy_t spitfire_block_copy;
+cpu_block_zero_t spitfire_block_zero;
+
+extern	cpu_block_copy_t *cpu_block_copy;
+extern	cpu_block_zero_t *cpu_block_zero;
 
 #endif /* !_MACHINE_MD_VAR_H_ */

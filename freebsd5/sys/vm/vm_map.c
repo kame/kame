@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.c,v 1.273.2.1 2002/12/22 03:30:33 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_map.c,v 1.296 2003/04/30 19:18:09 alc Exp $
  */
 
 /*
@@ -79,7 +79,7 @@
 #include <sys/vnode.h>
 #include <sys/resourcevar.h>
 #include <sys/sysent.h>
-#include <sys/stdint.h>
+#include <sys/shm.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -133,6 +133,7 @@
  *	maps and requires map entries.
  */
 
+static struct mtx map_sleep_mtx;
 static uma_zone_t mapentzone;
 static uma_zone_t kmapentzone;
 static uma_zone_t mapzone;
@@ -152,6 +153,7 @@ static void vmspace_zdtor(void *mem, int size, void *arg);
 void
 vm_map_startup(void)
 {
+	mtx_init(&map_sleep_mtx, "vm map sleep mutex", NULL, MTX_DEF);
 	mapzone = uma_zcreate("MAP", sizeof(struct vm_map), NULL,
 #ifdef INVARIANTS
 	    vm_map_zdtor,
@@ -195,7 +197,7 @@ vm_map_zfini(void *mem, int size)
 	vm_map_t map;
 
 	map = (vm_map_t)mem;
-
+	mtx_destroy(&map->system_mtx);
 	lockdestroy(&map->lock);
 }
 
@@ -208,6 +210,7 @@ vm_map_zinit(void *mem, int size)
 	map->nentries = 0;
 	map->size = 0;
 	map->infork = 0;
+	mtx_init(&map->system_mtx, "system map", NULL, MTX_DEF | MTX_DUPOK);
 	lockinit(&map->lock, PVM, "thrd_sleep", 0, LK_NOPAUSE);
 }
 
@@ -275,13 +278,19 @@ vm_init2(void)
 #endif
 	    vmspace_zinit, vmspace_zfini, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	pmap_init2();
-	vm_object_init2();
 }
 
 static __inline void
 vmspace_dofree(struct vmspace *vm)
 {
 	CTR1(KTR_VM, "vmspace_free: %p", vm);
+
+	/*
+	 * Make sure any SysV shm is freed, it might not have been in
+	 * exit1().
+	 */
+	shmexit(vm);
+
 	/*
 	 * Lock the map, to wait out all other references to it.
 	 * Delete all of the mappings and pages they hold, then call
@@ -336,6 +345,8 @@ vmspace_exitfree(struct proc *p)
  * vmspace_swap_count() - count the approximate swap useage in pages for a
  *			  vmspace.
  *
+ *	The map must be locked.
+ *
  *	Swap useage is determined by taking the proportional swap used by
  *	VM objects backing the VM map.  To make up for fractional losses,
  *	if the VM object has any swap use at all the associated map entries
@@ -348,23 +359,22 @@ vmspace_swap_count(struct vmspace *vmspace)
 	vm_map_entry_t cur;
 	int count = 0;
 
-	vm_map_lock_read(map);
 	for (cur = map->header.next; cur != &map->header; cur = cur->next) {
 		vm_object_t object;
 
 		if ((cur->eflags & MAP_ENTRY_IS_SUB_MAP) == 0 &&
-		    (object = cur->object.vm_object) != NULL &&
-		    object->type == OBJT_SWAP
-		) {
-			int n = (cur->end - cur->start) / PAGE_SIZE;
+		    (object = cur->object.vm_object) != NULL) {
+			VM_OBJECT_LOCK(object);
+			if (object->type == OBJT_SWAP &&
+			    object->un_pager.swp.swp_bcount != 0) {
+				int n = (cur->end - cur->start) / PAGE_SIZE;
 
-			if (object->un_pager.swp.swp_bcount) {
 				count += object->un_pager.swp.swp_bcount *
 				    SWAP_META_PAGES * n / object->size + 1;
 			}
+			VM_OBJECT_UNLOCK(object);
 		}
 	}
-	vm_map_unlock_read(map);
 	return (count);
 }
 
@@ -374,9 +384,11 @@ _vm_map_lock(vm_map_t map, const char *file, int line)
 	int error;
 
 	if (map->system_map)
-		GIANT_REQUIRED;
-	error = lockmgr(&map->lock, LK_EXCLUSIVE, NULL, curthread);
-	KASSERT(error == 0, ("%s: failed to get lock", __func__));
+		_mtx_lock_flags(&map->system_mtx, 0, file, line);
+	else {
+		error = lockmgr(&map->lock, LK_EXCLUSIVE, NULL, curthread);
+		KASSERT(error == 0, ("%s: failed to get lock", __func__));
+	}
 	map->timestamp++;
 }
 
@@ -384,7 +396,10 @@ void
 _vm_map_unlock(vm_map_t map, const char *file, int line)
 {
 
-	lockmgr(&map->lock, LK_RELEASE, NULL, curthread);
+	if (map->system_map)
+		_mtx_unlock_flags(&map->system_mtx, 0, file, line);
+	else
+		lockmgr(&map->lock, LK_RELEASE, NULL, curthread);
 }
 
 void
@@ -393,16 +408,21 @@ _vm_map_lock_read(vm_map_t map, const char *file, int line)
 	int error;
 
 	if (map->system_map)
-		GIANT_REQUIRED;
-	error = lockmgr(&map->lock, LK_EXCLUSIVE, NULL, curthread);
-	KASSERT(error == 0, ("%s: failed to get lock", __func__));
+		_mtx_lock_flags(&map->system_mtx, 0, file, line);
+	else {
+		error = lockmgr(&map->lock, LK_EXCLUSIVE, NULL, curthread);
+		KASSERT(error == 0, ("%s: failed to get lock", __func__));
+	}
 }
 
 void
 _vm_map_unlock_read(vm_map_t map, const char *file, int line)
 {
 
-	lockmgr(&map->lock, LK_RELEASE, NULL, curthread);
+	if (map->system_map)
+		_mtx_unlock_flags(&map->system_mtx, 0, file, line);
+	else
+		lockmgr(&map->lock, LK_RELEASE, NULL, curthread);
 }
 
 int
@@ -410,9 +430,22 @@ _vm_map_trylock(vm_map_t map, const char *file, int line)
 {
 	int error;
 
-	if (map->system_map)
-		GIANT_REQUIRED;
-	error = lockmgr(&map->lock, LK_EXCLUSIVE | LK_NOWAIT, NULL, curthread);
+	error = map->system_map ?
+	    !_mtx_trylock(&map->system_mtx, 0, file, line) :
+	    lockmgr(&map->lock, LK_EXCLUSIVE | LK_NOWAIT, NULL, curthread);
+	if (error == 0)
+		map->timestamp++;
+	return (error == 0);
+}
+
+int
+_vm_map_trylock_read(vm_map_t map, const char *file, int line)
+{
+	int error;
+
+	error = map->system_map ?
+	    !_mtx_trylock(&map->system_mtx, 0, file, line) :
+	    lockmgr(&map->lock, LK_EXCLUSIVE | LK_NOWAIT, NULL, curthread);
 	return (error == 0);
 }
 
@@ -420,8 +453,13 @@ int
 _vm_map_lock_upgrade(vm_map_t map, const char *file, int line)
 {
 
-	KASSERT(lockstatus(&map->lock, curthread) == LK_EXCLUSIVE,
-		("%s: lock not held", __func__));
+	if (map->system_map) {
+#ifdef INVARIANTS
+		_mtx_assert(&map->system_mtx, MA_OWNED, file, line);
+#endif
+	} else
+		KASSERT(lockstatus(&map->lock, curthread) == LK_EXCLUSIVE,
+		    ("%s: lock not held", __func__));
 	map->timestamp++;
 	return (0);
 }
@@ -430,8 +468,13 @@ void
 _vm_map_lock_downgrade(vm_map_t map, const char *file, int line)
 {
 
-	KASSERT(lockstatus(&map->lock, curthread) == LK_EXCLUSIVE,
-		("%s: lock not held", __func__));
+	if (map->system_map) {
+#ifdef INVARIANTS
+		_mtx_assert(&map->system_mtx, MA_OWNED, file, line);
+#endif
+	} else
+		KASSERT(lockstatus(&map->lock, curthread) == LK_EXCLUSIVE,
+		    ("%s: lock not held", __func__));
 }
 
 /*
@@ -440,13 +483,10 @@ _vm_map_lock_downgrade(vm_map_t map, const char *file, int line)
 int
 vm_map_unlock_and_wait(vm_map_t map, boolean_t user_wait)
 {
-	int retval;
 
-	mtx_lock(&Giant);
+	mtx_lock(&map_sleep_mtx);
 	vm_map_unlock(map);
-	retval = tsleep(&map->root, PVM, "vmmapw", 0);
-	mtx_unlock(&Giant);
-	return (retval);
+	return (msleep(&map->root, &map_sleep_mtx, PDROP | PVM, "vmmaps", 0));
 }
 
 /*
@@ -457,12 +497,12 @@ vm_map_wakeup(vm_map_t map)
 {
 
 	/*
-	 * Acquire and release Giant to prevent a wakeup() from being
-	 * performed (and lost) between the vm_map_unlock() and the
-	 * tsleep() in vm_map_unlock_and_wait().
+	 * Acquire and release map_sleep_mtx to prevent a wakeup()
+	 * from being performed (and lost) between the vm_map_unlock()
+	 * and the msleep() in vm_map_unlock_and_wait().
 	 */
-	mtx_lock(&Giant);
-	mtx_unlock(&Giant);
+	mtx_lock(&map_sleep_mtx);
+	mtx_unlock(&map_sleep_mtx);
 	wakeup(&map->root);
 }
 
@@ -514,6 +554,7 @@ void
 vm_map_init(vm_map_t map, vm_offset_t min, vm_offset_t max)
 {
 	_vm_map_init(map, min, max);
+	mtx_init(&map->system_mtx, "system map", NULL, MTX_DEF | MTX_DUPOK);
 	lockinit(&map->lock, PVM, "thrd_sleep", 0, LK_NOPAUSE);
 }
 
@@ -771,17 +812,22 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	if (cow & MAP_DISABLE_COREDUMP)
 		protoeflags |= MAP_ENTRY_NOCOREDUMP;
 
-	if (object) {
+	if (object != NULL) {
 		/*
-		 * When object is non-NULL, it could be shared with another
-		 * process.  We have to set or clear OBJ_ONEMAPPING 
-		 * appropriately.
+		 * OBJ_ONEMAPPING must be cleared unless this mapping
+		 * is trivially proven to be the only mapping for any
+		 * of the object's pages.  (Object granularity
+		 * reference counting is insufficient to recognize
+		 * aliases with precision.) 
 		 */
-		vm_object_lock(object);
-		if ((object->ref_count > 1) || (object->shadow_count != 0)) {
+		if (object != kmem_object)
+			mtx_lock(&Giant);
+		VM_OBJECT_LOCK(object);
+		if (object->ref_count > 1 || object->shadow_count != 0)
 			vm_object_clear_flag(object, OBJ_ONEMAPPING);
-		}
-		vm_object_unlock(object);
+		VM_OBJECT_UNLOCK(object);
+		if (object != kmem_object)
+			mtx_unlock(&Giant);
 	}
 	else if ((prev_entry != &map->header) &&
 		 (prev_entry->eflags == protoeflags) &&
@@ -935,9 +981,7 @@ vm_map_findspace(
 	if (map == kernel_map) {
 		vm_offset_t ksize;
 		if ((ksize = round_page(start + length)) > kernel_vm_end) {
-			mtx_lock(&Giant);
 			pmap_growkernel(ksize);
-			mtx_unlock(&Giant);
 		}
 	}
 	return (0);
@@ -1933,22 +1977,24 @@ vm_map_clean(
 			vn_lock(object->handle, LK_EXCLUSIVE | LK_RETRY, curthread);
 			flags = (syncio || invalidate) ? OBJPC_SYNC : 0;
 			flags |= invalidate ? OBJPC_INVAL : 0;
+			VM_OBJECT_LOCK(object);
 			vm_object_page_clean(object,
 			    OFF_TO_IDX(offset),
 			    OFF_TO_IDX(offset + size + PAGE_MASK),
 			    flags);
+			VM_OBJECT_UNLOCK(object);
 			VOP_UNLOCK(object->handle, 0, curthread);
 			vm_object_deallocate(object);
 		}
 		if (object && invalidate &&
 		    ((object->type == OBJT_VNODE) ||
 		     (object->type == OBJT_DEVICE))) {
-			vm_object_reference(object);
+			VM_OBJECT_LOCK(object);
 			vm_object_page_remove(object,
 			    OFF_TO_IDX(offset),
 			    OFF_TO_IDX(offset + size + PAGE_MASK),
 			    FALSE);
-			vm_object_deallocate(object);
+			VM_OBJECT_UNLOCK(object);
                 }
 		start += size;
 	}
@@ -2081,26 +2127,33 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end)
 
 		offidxend = offidxstart + count;
 
-		if ((object == kernel_object) || (object == kmem_object)) {
+		if (object == kernel_object || object == kmem_object) {
+			if (object == kernel_object)
+				GIANT_REQUIRED;
+			VM_OBJECT_LOCK(object);
 			vm_object_page_remove(object, offidxstart, offidxend, FALSE);
+			VM_OBJECT_UNLOCK(object);
 		} else {
 			mtx_lock(&Giant);
 			vm_page_lock_queues();
 			pmap_remove(map->pmap, s, e);
 			vm_page_unlock_queues();
-			if (object != NULL &&
-			    object->ref_count != 1 &&
-			    (object->flags & (OBJ_NOSPLIT|OBJ_ONEMAPPING)) == OBJ_ONEMAPPING &&
-			    (object->type == OBJT_DEFAULT || object->type == OBJT_SWAP)) {
-				vm_object_collapse(object);
-				vm_object_page_remove(object, offidxstart, offidxend, FALSE);
-				if (object->type == OBJT_SWAP) {
-					swap_pager_freespace(object, offidxstart, count);
+			if (object != NULL) {
+				VM_OBJECT_LOCK(object);
+				if (object->ref_count != 1 &&
+				    (object->flags & (OBJ_NOSPLIT|OBJ_ONEMAPPING)) == OBJ_ONEMAPPING &&
+				    (object->type == OBJT_DEFAULT || object->type == OBJT_SWAP)) {
+					VM_OBJECT_UNLOCK(object);
+					vm_object_collapse(object);
+					VM_OBJECT_LOCK(object);
+					vm_object_page_remove(object, offidxstart, offidxend, FALSE);
+					if (object->type == OBJT_SWAP)
+						swap_pager_freespace(object, offidxstart, count);
+					if (offidxend >= object->size &&
+					    offidxstart < object->size)
+						object->size = offidxstart;
 				}
-				if (offidxend >= object->size &&
-				    offidxstart < object->size) {
-					object->size = offidxstart;
-				}
+				VM_OBJECT_UNLOCK(object);
 			}
 			mtx_unlock(&Giant);
 		}
@@ -2145,9 +2198,14 @@ vm_map_remove(vm_map_t map, vm_offset_t start, vm_offset_t end)
 /*
  *	vm_map_check_protection:
  *
- *	Assert that the target map allows the specified
- *	privilege on the entire address region given.
- *	The entire region must be allocated.
+ *	Assert that the target map allows the specified privilege on the
+ *	entire address region given.  The entire region must be allocated.
+ *
+ *	WARNING!  This code does not and should not check whether the
+ *	contents of the region is accessible.  For example a smaller file
+ *	might be mapped into a larger address space.
+ *
+ *	NOTE!  This code is also called by munmap().
  */
 boolean_t
 vm_map_check_protection(vm_map_t map, vm_offset_t start, vm_offset_t end,
@@ -2239,7 +2297,9 @@ vm_map_copy_entry(
 			}
 
 			vm_object_reference(src_object);
+			VM_OBJECT_LOCK(src_object);
 			vm_object_clear_flag(src_object, OBJ_ONEMAPPING);
+			VM_OBJECT_UNLOCK(src_object);
 			dst_entry->object.vm_object = src_object;
 			src_entry->eflags |= (MAP_ENTRY_COW|MAP_ENTRY_NEEDS_COPY);
 			dst_entry->eflags |= (MAP_ENTRY_COW|MAP_ENTRY_NEEDS_COPY);
@@ -2329,7 +2389,9 @@ vmspace_fork(struct vmspace *vm1)
 				vm_object_deallocate(object);
 				object = old_entry->object.vm_object;
 			}
+			VM_OBJECT_LOCK(object);
 			vm_object_clear_flag(object, OBJ_ONEMAPPING);
+			VM_OBJECT_UNLOCK(object);
 
 			/*
 			 * Clone the entry, referencing the shared object.
@@ -2837,253 +2899,6 @@ vm_map_lookup_done(vm_map_t map, vm_map_entry_t entry)
 	 */
 	vm_map_unlock_read(map);
 }
-
-#ifdef ENABLE_VFS_IOOPT
-/*
- * Experimental support for zero-copy I/O
- *
- * Implement uiomove with VM operations.  This handles (and collateral changes)
- * support every combination of source object modification, and COW type
- * operations.
- */
-int
-vm_uiomove(
-	vm_map_t mapa,
-	vm_object_t srcobject,
-	off_t cp,
-	int cnta,
-	vm_offset_t uaddra,
-	int *npages)
-{
-	vm_map_t map;
-	vm_object_t first_object, oldobject, object;
-	vm_map_entry_t entry;
-	vm_prot_t prot;
-	boolean_t wired;
-	int tcnt, rv;
-	vm_offset_t uaddr, start, end, tend;
-	vm_pindex_t first_pindex, oindex;
-	vm_size_t osize;
-	off_t ooffset;
-	int cnt;
-
-	GIANT_REQUIRED;
-
-	if (npages)
-		*npages = 0;
-
-	cnt = cnta;
-	uaddr = uaddra;
-
-	while (cnt > 0) {
-		map = mapa;
-
-		if ((vm_map_lookup(&map, uaddr,
-			VM_PROT_READ, &entry, &first_object,
-			&first_pindex, &prot, &wired)) != KERN_SUCCESS) {
-			return EFAULT;
-		}
-
-		vm_map_clip_start(map, entry, uaddr);
-
-		tcnt = cnt;
-		tend = uaddr + tcnt;
-		if (tend > entry->end) {
-			tcnt = entry->end - uaddr;
-			tend = entry->end;
-		}
-
-		vm_map_clip_end(map, entry, tend);
-
-		start = entry->start;
-		end = entry->end;
-
-		osize = atop(tcnt);
-
-		oindex = OFF_TO_IDX(cp);
-		if (npages) {
-			vm_size_t idx;
-			for (idx = 0; idx < osize; idx++) {
-				vm_page_t m;
-				if ((m = vm_page_lookup(srcobject, oindex + idx)) == NULL) {
-					vm_map_lookup_done(map, entry);
-					return 0;
-				}
-				/*
-				 * disallow busy or invalid pages, but allow
-				 * m->busy pages if they are entirely valid.
-				 */
-				if ((m->flags & PG_BUSY) ||
-					((m->valid & VM_PAGE_BITS_ALL) != VM_PAGE_BITS_ALL)) {
-					vm_map_lookup_done(map, entry);
-					return 0;
-				}
-			}
-		}
-
-/*
- * If we are changing an existing map entry, just redirect
- * the object, and change mappings.
- */
-		if ((first_object->type == OBJT_VNODE) &&
-			((oldobject = entry->object.vm_object) == first_object)) {
-
-			if ((entry->offset != cp) || (oldobject != srcobject)) {
-				/*
-   				* Remove old window into the file
-   				*/
-				vm_page_lock_queues();
-				pmap_remove(map->pmap, uaddr, tend);
-				vm_page_unlock_queues();
-
-				/*
-   				* Force copy on write for mmaped regions
-   				*/
-				vm_object_pmap_copy_1 (srcobject, oindex, oindex + osize);
-
-				/*
-   				* Point the object appropriately
-   				*/
-				if (oldobject != srcobject) {
-
-				/*
-   				* Set the object optimization hint flag
-   				*/
-					vm_object_set_flag(srcobject, OBJ_OPT);
-					vm_object_reference(srcobject);
-					entry->object.vm_object = srcobject;
-
-					if (oldobject) {
-						vm_object_deallocate(oldobject);
-					}
-				}
-
-				entry->offset = cp;
-				map->timestamp++;
-			} else {
-				vm_page_lock_queues();
-				pmap_remove(map->pmap, uaddr, tend);
-				vm_page_unlock_queues();
-			}
-
-		} else if ((first_object->ref_count == 1) &&
-			(first_object->size == osize) &&
-			((first_object->type == OBJT_DEFAULT) ||
-				(first_object->type == OBJT_SWAP)) ) {
-
-			oldobject = first_object->backing_object;
-
-			if ((first_object->backing_object_offset != cp) ||
-				(oldobject != srcobject)) {
-				/*
-   				* Remove old window into the file
-   				*/
-				vm_page_lock_queues();
-				pmap_remove(map->pmap, uaddr, tend);
-				vm_page_unlock_queues();
-
-				/*
-				 * Remove unneeded old pages
-				 */
-				vm_object_page_remove(first_object, 0, 0, 0);
-
-				/*
-				 * Invalidate swap space
-				 */
-				if (first_object->type == OBJT_SWAP) {
-					swap_pager_freespace(first_object,
-						0,
-						first_object->size);
-				}
-
-				/*
-   				 * Force copy on write for mmaped regions
-   				 */
-				vm_object_pmap_copy_1 (srcobject, oindex, oindex + osize);
-
-				/*
-   				 * Point the object appropriately
-   				 */
-				if (oldobject != srcobject) {
-					/*
-   					 * Set the object optimization hint flag
-   					 */
-					vm_object_set_flag(srcobject, OBJ_OPT);
-					vm_object_reference(srcobject);
-
-					if (oldobject) {
-						TAILQ_REMOVE(&oldobject->shadow_head,
-							first_object, shadow_list);
-						oldobject->shadow_count--;
-						/* XXX bump generation? */
-						vm_object_deallocate(oldobject);
-					}
-
-					TAILQ_INSERT_TAIL(&srcobject->shadow_head,
-						first_object, shadow_list);
-					srcobject->shadow_count++;
-					/* XXX bump generation? */
-
-					first_object->backing_object = srcobject;
-				}
-				first_object->backing_object_offset = cp;
-				map->timestamp++;
-			} else {
-				vm_page_lock_queues();
-				pmap_remove(map->pmap, uaddr, tend);
-				vm_page_unlock_queues();
-			}
-/*
- * Otherwise, we have to do a logical mmap.
- */
-		} else {
-
-			vm_object_set_flag(srcobject, OBJ_OPT);
-			vm_object_reference(srcobject);
-
-			vm_page_lock_queues();
-			pmap_remove(map->pmap, uaddr, tend);
-			vm_page_unlock_queues();
-
-			vm_object_pmap_copy_1 (srcobject, oindex, oindex + osize);
-			vm_map_lock_upgrade(map);
-
-			if (entry == &map->header) {
-				map->first_free = &map->header;
-			} else if (map->first_free->start >= start) {
-				map->first_free = entry->prev;
-			}
-
-			vm_map_entry_delete(map, entry);
-
-			object = srcobject;
-			ooffset = cp;
-
-			rv = vm_map_insert(map, object, ooffset, start, tend,
-				VM_PROT_ALL, VM_PROT_ALL, MAP_COPY_ON_WRITE);
-
-			if (rv != KERN_SUCCESS)
-				panic("vm_uiomove: could not insert new entry: %d", rv);
-		}
-
-/*
- * Map the window directly, if it is already in memory
- */
-		pmap_object_init_pt(map->pmap, uaddr,
-			srcobject, oindex, tcnt, 0);
-
-		map->timestamp++;
-		vm_map_unlock(map);
-
-		cnt -= tcnt;
-		uaddr += tcnt;
-		cp += tcnt;
-		if (npages)
-			*npages += osize;
-	}
-	return 0;
-}
-#endif
 
 #include "opt_ddb.h"
 #ifdef DDB

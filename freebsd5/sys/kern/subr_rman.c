@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_rman.c,v 1.27 2002/11/27 03:55:22 imp Exp $
+ * $FreeBSD: src/sys/kern/subr_rman.c,v 1.29 2003/02/12 07:00:59 imp Exp $
  */
 
 /*
@@ -229,7 +229,7 @@ rman_reserve_resource_bound(struct rman *rm, u_long start, u_long end,
 		 */
 		do {
 			rstart = (rstart + amask) & ~amask;
-			if (((rstart ^ (rstart + count)) & bmask) != 0)
+			if (((rstart ^ (rstart + count - 1)) & bmask) != 0)
 				rstart += bound - (rstart & ~bmask);
 		} while ((rstart & amask) != 0 && rstart < end &&
 		    rstart < s->r_end);
@@ -684,4 +684,10 @@ int
 rman_get_rid(struct resource *r)
 {
 	return (r->r_rid);
+}
+
+struct device *
+rman_get_device(struct resource *r)
+{
+	return (r->r_dev);
 }

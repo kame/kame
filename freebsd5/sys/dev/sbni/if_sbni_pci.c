@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbni/if_sbni_pci.c,v 1.6 2002/09/28 20:59:59 phk Exp $
+ * $FreeBSD: src/sys/dev/sbni/if_sbni_pci.c,v 1.7 2003/04/15 06:37:26 mdodd Exp $
  */
 
  
@@ -67,8 +67,8 @@ static driver_t sbni_pci_driver = {
 
 static devclass_t sbni_pci_devclass;
 
-DRIVER_MODULE(if_sbni, pci, sbni_pci_driver, sbni_pci_devclass, 0, 0);
-
+DRIVER_MODULE(sbni, pci, sbni_pci_driver, sbni_pci_devclass, 0, 0);
+MODULE_DEPEND(sbni, pci, 1, 1, 1);
 
 static int
 sbni_pci_probe(device_t dev)

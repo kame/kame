@@ -31,10 +31,8 @@
  * $NetBSD: ofw_machdep.c,v 1.5 2000/05/23 13:25:43 tsubai Exp $
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/powerpc/powerpc/ofw_machdep.c,v 1.6 2002/09/19 04:31:39 grehan Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/ofw_machdep.c,v 1.7 2003/04/03 21:36:33 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>

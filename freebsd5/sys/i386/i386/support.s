@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/support.s,v 1.93 2002/09/22 04:45:20 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/support.s,v 1.96 2003/04/04 17:29:54 des Exp $
  */
 
 #include "opt_npx.h"
@@ -48,8 +48,8 @@
 	.globl	bcopy_vector
 bcopy_vector:
 	.long	generic_bcopy
-	.globl	bzero
-bzero:
+	.globl	bzero_vector
+bzero_vector:
 	.long	generic_bzero
 	.globl	copyin_vector
 copyin_vector:
@@ -57,9 +57,6 @@ copyin_vector:
 	.globl	copyout_vector
 copyout_vector:
 	.long	generic_copyout
-	.globl	ovbcopy_vector
-ovbcopy_vector:
-	.long	generic_bcopy
 #if defined(I586_CPU) && defined(DEV_NPX)
 kernel_fpu_lock:
 	.byte	0xfe
@@ -72,6 +69,10 @@ kernel_fpu_lock:
  * bcopy family
  * void bzero(void *buf, u_int len)
  */
+
+ENTRY(bzero)
+	MEXITCOUNT
+	jmp	*bzero_vector
 
 ENTRY(generic_bzero)
 	pushl	%edi
@@ -361,7 +362,7 @@ ENTRY(i686_pagezero)
 1:
 	xorl	%eax, %eax
 	repe
-	scasl	
+	scasl
 	jnz	2f
 
 	popl	%ebx
@@ -445,10 +446,6 @@ ENTRY(bcopyb)
 ENTRY(bcopy)
 	MEXITCOUNT
 	jmp	*bcopy_vector
-
-ENTRY(ovbcopy)
-	MEXITCOUNT
-	jmp	*ovbcopy_vector
 
 /*
  * generic_bcopy(src, dst, cnt)
@@ -1171,6 +1168,36 @@ fastmove_tail_fault:
 	movl	$EFAULT,%eax
 	ret
 #endif /* I586_CPU && defined(DEV_NPX) */
+
+/*
+ * casuptr.  Compare and set user pointer.  Returns -1 or the current value.
+ */
+ENTRY(casuptr)
+	movl	PCPU(CURPCB),%ecx
+	movl	$fusufault,PCB_ONFAULT(%ecx)
+	movl	4(%esp),%edx			/* dst */
+	movl	8(%esp),%eax			/* old */
+	movl	12(%esp),%ecx			/* new */
+
+	cmpl	$VM_MAXUSER_ADDRESS-4,%edx	/* verify address is valid */
+	ja	fusufault
+
+#if defined(SMP)
+	lock cmpxchgl %ecx, (%edx)		/* Compare and set. */
+#else	/* !SMP */
+	cmpxchgl %ecx, (%edx)
+#endif	/* !SMP */
+
+	/*
+	 * The old value is in %eax.  If the store succeeded it will be the
+	 * value we expected (old) from before the store, otherwise it will
+	 * be the current value.
+	 */
+
+	movl	PCPU(CURPCB),%ecx
+	movl	$fusufault,PCB_ONFAULT(%ecx)
+	movl	$0,PCB_ONFAULT(%ecx)
+	ret
 
 /*
  * fu{byte,sword,word} - MP SAFE

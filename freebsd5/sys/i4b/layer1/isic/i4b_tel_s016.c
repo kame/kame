@@ -37,7 +37,7 @@
  *	isic - I4B Siemens ISDN Chipset Driver for Teles S0/16 and clones
  *	=================================================================
  *
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_tel_s016.c,v 1.6 2002/09/02 00:52:08 brooks Exp $
+ * $FreeBSD: src/sys/i4b/layer1/isic/i4b_tel_s016.c,v 1.7 2003/03/25 00:07:03 jake Exp $
  *
  *      last edit-date: [Wed Jan 24 09:27:24 2001]
  *
@@ -220,7 +220,7 @@ isic_probe_s016(device_t dev)
 			break;
 
 		default:
-			printf("isic%d: Error, invalid memory address 0x%lx for Teles S0/16!\n",
+			printf("isic%d: Error, invalid memory address 0x%x for Teles S0/16!\n",
 				unit, kvtop(sc->sc_vmem_addr));
 			isic_detach_common(dev);
 			return(ENXIO);

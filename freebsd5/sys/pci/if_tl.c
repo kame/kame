@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_tl.c,v 1.72 2002/11/14 23:49:09 sam Exp $
  */
 
 /*
@@ -178,6 +176,9 @@
  * itself thereby reducing the load on the host CPU.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_tl.c,v 1.83 2003/04/21 18:34:04 imp Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -218,15 +219,12 @@
 
 #include <pci/if_tlreg.h>
 
+MODULE_DEPEND(tl, pci, 1, 1, 1);
+MODULE_DEPEND(tl, ether, 1, 1, 1);
 MODULE_DEPEND(tl, miibus, 1, 1, 1);
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_tl.c,v 1.72 2002/11/14 23:49:09 sam Exp $";
-#endif
 
 /*
  * Various supported device vendors/types and their names.
@@ -356,7 +354,7 @@ static driver_t tl_driver = {
 
 static devclass_t tl_devclass;
 
-DRIVER_MODULE(if_tl, pci, tl_driver, tl_devclass, 0, 0);
+DRIVER_MODULE(tl, pci, tl_driver, tl_devclass, 0, 0);
 DRIVER_MODULE(miibus, tl, miibus_driver, miibus_devclass, 0, 0);
 
 static u_int8_t tl_dio_read8(sc, reg)
@@ -1116,7 +1114,6 @@ tl_attach(dev)
 	device_t		dev;
 {
 	int			i;
-	u_int32_t		command;
 	u_int16_t		did, vid;
 	struct tl_type		*t;
 	struct ifnet		*ifp;
@@ -1127,7 +1124,6 @@ tl_attach(dev)
 	did = pci_get_device(dev);
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
-	bzero(sc, sizeof(struct tl_softc));
 
 	t = tl_devs;
 	while(t->tl_name != NULL) {
@@ -1138,27 +1134,18 @@ tl_attach(dev)
 
 	if (t->tl_name == NULL) {
 		device_printf(dev, "unknown device!?\n");
-		goto fail;
+		return (ENXIO);
 	}
 
 	mtx_init(&sc->tl_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-	TL_LOCK(sc);
 
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
-	pci_enable_io(dev, SYS_RES_IOPORT);
-	pci_enable_io(dev, SYS_RES_MEMORY);
-	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
 #ifdef TL_USEIOSPACE
-	if (!(command & PCIM_CMD_PORTEN)) {
-		device_printf(dev, "failed to enable I/O ports!\n");
-		error = ENXIO;
-		goto fail;
-	}
 
 	rid = TL_PCI_LOIO;
 	sc->tl_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
@@ -1174,12 +1161,6 @@ tl_attach(dev)
 		    0, ~0, 1, RF_ACTIVE);
 	}
 #else
-	if (!(command & PCIM_CMD_MEMEN)) {
-		device_printf(dev, "failed to enable memory mapping!\n");
-		error = ENXIO;
-		goto fail;
-	}
-
 	rid = TL_PCI_LOMEM;
 	sc->tl_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
 	    0, ~0, 1, RF_ACTIVE);
@@ -1217,19 +1198,8 @@ tl_attach(dev)
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->tl_irq == NULL) {
-		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
 		device_printf(dev, "couldn't map interrupt\n");
 		error = ENXIO;
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->tl_irq, INTR_TYPE_NET,
-	    tl_intr, sc, &sc->tl_intrhand);
-
-	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
-		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
-		device_printf(dev, "couldn't set up irq\n");
 		goto fail;
 	}
 
@@ -1240,9 +1210,6 @@ tl_attach(dev)
 	    M_NOWAIT, 0, 0xffffffff, PAGE_SIZE, 0);
 
 	if (sc->tl_ldata == NULL) {
-		bus_teardown_intr(dev, sc->tl_irq, sc->tl_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
-		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
 		device_printf(dev, "no memory for list buffers!\n");
 		error = ENXIO;
 		goto fail;
@@ -1266,11 +1233,6 @@ tl_attach(dev)
 	 */
 	if (tl_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
 				sc->tl_eeaddr, ETHER_ADDR_LEN)) {
-		bus_teardown_intr(dev, sc->tl_irq, sc->tl_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
-		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
-		contigfree(sc->tl_ldata,
-		    sizeof(struct tl_list_data), M_DEVBUF);
 		device_printf(dev, "failed to read station address\n");
 		error = ENXIO;
 		goto fail;
@@ -1349,15 +1311,31 @@ tl_attach(dev)
 	 * Call MI attach routine.
 	 */
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
-	TL_UNLOCK(sc);
-	return(0);
+
+	/* Hook interrupt last to avoid having to lock softc */
+	error = bus_setup_intr(dev, sc->tl_irq, INTR_TYPE_NET,
+	    tl_intr, sc, &sc->tl_intrhand);
+
+	if (error) {
+		device_printf(dev, "couldn't set up irq\n");
+		ether_ifdetach(ifp);
+		goto fail;
+	}
 
 fail:
-	TL_UNLOCK(sc);
-	mtx_destroy(&sc->tl_mtx);
+	if (error)
+		tl_detach(dev);
+
 	return(error);
 }
 
+/*
+ * Shutdown hardware and free up resources. This can be called any
+ * time after the mutex has been initialized. It is called in both
+ * the error case in attach and the normal detach case so it needs
+ * to be careful about only freeing resources that have actually been
+ * allocated.
+ */
 static int
 tl_detach(dev)
 	device_t		dev;
@@ -1366,22 +1344,30 @@ tl_detach(dev)
 	struct ifnet		*ifp;
 
 	sc = device_get_softc(dev);
+	KASSERT(mtx_initialized(&sc->tl_mtx), ("tl mutex not initialized"));
 	TL_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	tl_stop(sc);
-	ether_ifdetach(ifp);
-
+	/* These should only be active if attach succeeded */
+	if (device_is_attached(dev)) {
+		tl_stop(sc);
+		ether_ifdetach(ifp);
+	}
+	if (sc->tl_miibus)
+		device_delete_child(dev, sc->tl_miibus);
 	bus_generic_detach(dev);
-	device_delete_child(dev, sc->tl_miibus);
 
-	contigfree(sc->tl_ldata, sizeof(struct tl_list_data), M_DEVBUF);
+	if (sc->tl_ldata)
+		contigfree(sc->tl_ldata, sizeof(struct tl_list_data), M_DEVBUF);
 	if (sc->tl_bitrate)
 		ifmedia_removeall(&sc->ifmedia);
 
-	bus_teardown_intr(dev, sc->tl_irq, sc->tl_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
-	bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
+	if (sc->tl_intrhand)
+		bus_teardown_intr(dev, sc->tl_irq, sc->tl_intrhand);
+	if (sc->tl_irq)
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
+	if (sc->tl_res)
+		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
 
 	TL_UNLOCK(sc);
 	mtx_destroy(&sc->tl_mtx);
@@ -2128,6 +2114,8 @@ tl_init(xsc)
 			mii = device_get_softc(sc->tl_miibus);
 			mii_mediachg(mii);
 		}
+	} else {
+		tl_ifmedia_upd(ifp);
 	}
 
 	/* Send the RX go command */

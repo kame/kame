@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_subr.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/fs/unionfs/union_subr.c,v 1.65 2002/10/14 03:20:34 mckusick Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_subr.c,v 1.70 2003/03/02 16:54:36 des Exp $
  */
 
 #include <sys/param.h>
@@ -112,7 +112,7 @@ union_list_lock(ix)
 {
 	if (unvplock[ix] & UNVP_LOCKED) {
 		unvplock[ix] |= UNVP_WANT;
-		(void) tsleep((caddr_t) &unvplock[ix], PINOD, "unllck", 0);
+		(void) tsleep( &unvplock[ix], PINOD, "unllck", 0);
 		return (1);
 	}
 	unvplock[ix] |= UNVP_LOCKED;
@@ -127,7 +127,7 @@ union_list_unlock(ix)
 
 	if (unvplock[ix] & UNVP_WANT) {
 		unvplock[ix] &= ~UNVP_WANT;
-		wakeup((caddr_t) &unvplock[ix]);
+		wakeup( &unvplock[ix]);
 	}
 }
 
@@ -1329,7 +1329,7 @@ union_dircheck(struct thread *td, struct vnode **vp, struct file *fp)
 			}
 			VOP_UNLOCK(lvp, 0, td);
 			FILE_LOCK(fp);
-			fp->f_data = (caddr_t) lvp;
+			fp->f_data = lvp;
 			fp->f_offset = 0;
 			FILE_UNLOCK(fp);
 			error = vn_close(*vp, FREAD, fp->f_cred, td);

@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.38 2002/10/16 08:57:14 phk Exp $
+ * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.44 2003/03/20 20:50:22 dwmalone Exp $
  */
 
 #include "opt_cpu.h"
@@ -70,22 +70,22 @@ static void	init_6x86MX(void);
 static void	init_ppro(void);
 static void	init_mendocino(void);
 #endif
-void	enable_sse(void);
 
-int	hw_instruction_sse = 0;
+static int	hw_instruction_sse;
 SYSCTL_INT(_hw, OID_AUTO, instruction_sse, CTLFLAG_RD,
-	   &hw_instruction_sse, 0,
-	   "SIMD/MMX2 instructions available in CPU");
+    &hw_instruction_sse, 0, "SIMD/MMX2 instructions available in CPU");
 
 /* Must *NOT* be BSS or locore will bzero these after setting them */
 int	cpu = 0;		/* Are we 386, 386sx, 486, etc? */
-u_int	cpu_id = 0;		/* Stepping ID */
 u_int	cpu_feature = 0;	/* Feature flags */
 u_int	cpu_high = 0;		/* Highest arg to CPUID */
-#ifdef CPU_ENABLE_SSE
-u_int	cpu_fxsr = 0;		/* SSE enabled */
-#endif
+u_int	cpu_id = 0;		/* Stepping ID */
+u_int	cpu_procinfo = 0;	/* HyperThreading Info / Brand Index / CLFUSH */
 char	cpu_vendor[20] = "";	/* CPU Origin code */
+
+#ifdef CPU_ENABLE_SSE
+u_int	cpu_fxsr;		/* SSE enabled */
+#endif
 
 #ifdef I486_CPU
 /*
@@ -593,7 +593,8 @@ initializecpu(void)
 			 */
 			if ((cpu_feature & CPUID_XMM) == 0 &&
 			    ((cpu_id & ~0xf) == 0x660 ||
-			     (cpu_id & ~0xf) == 0x670)) {
+			     (cpu_id & ~0xf) == 0x670 ||
+			     (cpu_id & ~0xf) == 0x680)) {
 				u_int regs[4];
 				wrmsr(0xC0010015, rdmsr(0xC0010015) & ~0x08000);
 				do_cpuid(1, regs);

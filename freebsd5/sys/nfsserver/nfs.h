@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfsserver/nfs.h,v 1.68 2002/07/24 22:27:35 peter Exp $
+ * $FreeBSD: src/sys/nfsserver/nfs.h,v 1.69 2003/05/25 06:17:33 truckman Exp $
  */
 
 #ifndef _NFSSERVER_NFS_H_
@@ -332,7 +332,8 @@ void	nfsm_srvpostopattr(struct nfsrv_descript *, int, struct vattr *,
 int	netaddr_match(int, union nethostaddr *, struct sockaddr *);
 int	nfs_namei(struct nameidata *, fhandle_t *, int,
 	    struct nfssvc_sock *, struct sockaddr *, struct mbuf **,
-	    caddr_t *, struct vnode **, struct thread *, int);
+	    caddr_t *, struct vnode **, int, struct vattr *, int *,
+	    struct thread *, int);
 void	nfsm_adj(struct mbuf *, int, int);
 int	nfsm_mbuftouio(struct mbuf **, struct uio *, int, caddr_t *);
 void	nfsrv_initcache(void);

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/Makefile,v 1.294 2002/12/13 00:32:29 jake Exp $
+# $FreeBSD: src/sys/modules/Makefile,v 1.323 2003/05/13 11:26:08 nyan Exp $
 
 .if exists(${.CURDIR}/../opencrypto) && !defined(NOCRYPT)
 _crypto=	crypto
@@ -8,19 +8,15 @@ _cryptodev=	cryptodev
 _random=	random
 .endif
 
-# Removed while KSE settles in:
-#	ncp \
-#	nwfs \
-
 SUBDIR=	accf_data \
 	accf_http \
-	agp \
 	aha \
 	aic7xxx \
 	aio \
 	amr \
 	an \
 	aue \
+	axe \
 	bge \
 	bridge \
 	cam \
@@ -34,6 +30,7 @@ SUBDIR=	accf_data \
 	de \
 	digi \
 	dummynet \
+	en \
 	fdc \
 	fdescfs \
 	firewire \
@@ -69,6 +66,7 @@ SUBDIR=	accf_data \
 	mac_mls \
 	mac_none \
 	mac_partition \
+	mac_portacl \
 	mac_seeotheruids \
 	mac_test \
 	mcd \
@@ -77,6 +75,7 @@ SUBDIR=	accf_data \
 	mlx \
 	mpt \
 	msdosfs \
+	my \
 	nfsclient \
 	nfsserver \
 	nge \
@@ -94,8 +93,11 @@ SUBDIR=	accf_data \
 	raidframe \
 	${_random} \
 	rc \
+	rc4 \
 	rl \
 	rp \
+	rue \
+	sbsh \
 	sf \
 	sis \
 	sk \
@@ -136,6 +138,7 @@ SUBDIR=	accf_data \
 	vr \
 	vx \
 	wb \
+	wlan \
 	xl
 
 .if defined(WANT_EXT2FS_MODULE)
@@ -154,6 +157,7 @@ SUBDIR+=syscons
 # XXX some of these can move now, but are untested on other architectures.
 .if ${MACHINE_ARCH} == "i386"
 SUBDIR+=3dfx \
+	agp \
 	aic \
 	aout \
 	apm \
@@ -162,7 +166,9 @@ SUBDIR+=3dfx \
 	awi \
 	bktr \
 	coff \
+	drm \
 	ed \
+	elink \
 	em \
 	ep \
 	fe \
@@ -171,12 +177,15 @@ SUBDIR+=3dfx \
 	hea \
 	hfa \
 	ibcs2 \
+	ie \
 	linprocfs \
 	linux \
 	lnc \
+	ncp \
 	ncv \
 	netgraph \
 	nsp \
+	nwfs \
 	oltr \
 	pccard \
 	pecoff \
@@ -185,6 +194,7 @@ SUBDIR+=3dfx \
 	scsi_low \
 	smbfs \
 	sound \
+	speaker \
 	splash \
 	sppp \
 	sr \
@@ -198,21 +208,25 @@ SUBDIR+=3dfx \
 SUBDIR+=aac \
 	acpi \
 	asr \
-	atspeaker \
+	bios \
 	cardbus \
 	cbb \
 	ciss \
 	cm \
-	drm \
+	dpt \
 	el \
+	ex \
 	exca \
+	idt \
 	iir \
+	ips \
 	mly \
 	s3 \
 	vesa
 	
 .elif ${MACHINE} == "pc98"
-SUBDIR+=pcspeaker \
+SUBDIR+=canbepm \
+	canbus \
 	pmc \
 	snc
 .endif
@@ -258,7 +272,8 @@ SUBDIR+=aic \
 .endif
 
 .if ${MACHINE_ARCH} == "alpha"
-SUBDIR+=linprocfs \
+SUBDIR+=agp \
+	linprocfs \
 	linux \
 	osf1 \
 	sound \
@@ -266,13 +281,21 @@ SUBDIR+=linprocfs \
 	vinum
 .endif
 
+.if ${MACHINE_ARCH} == "powerpc" || ${MACHINE_ARCH} == "sparc64"
+SUBDIR+=gem
+.endif
+
+.if ${MACHINE_ARCH} == "sparc64"
+SUBDIR+=hme
+.endif
+
 .if defined(MODULES_OVERRIDE) && !defined(ALL_MODULES)
 SUBDIR=${MODULES_OVERRIDE}
 .endif
 
 # Calling kldxref(8) for each module is expensive.
-.if !defined(NO_XREF) && ${MACHINE_ARCH} != "sparc64"
-.MAKEFLAGS:=	${.MAKEFLAGS} -DNO_XREF
+.if !defined(NO_XREF)
+.MAKEFLAGS+=	-DNO_XREF
 afterinstall:
 	@if type kldxref >/dev/null 2>&1; then \
 		${ECHO} kldxref ${DESTDIR}${KMODDIR}; \

@@ -35,7 +35,7 @@
  *
  *	@(#)fdesc_vnops.c	8.9 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/fs/fdescfs/fdesc_vnops.c,v 1.79 2002/10/26 18:16:19 mux Exp $
+ * $FreeBSD: src/sys/fs/fdescfs/fdesc_vnops.c,v 1.88 2003/03/03 19:15:37 njl Exp $
  */
 
 /*
@@ -122,7 +122,7 @@ loop:
 	 */
 	if (fdcache_lock & FDL_LOCKED) {
 		fdcache_lock |= FDL_WANT;
-		(void) tsleep((caddr_t) &fdcache_lock, PINOD, "fdalvp", 0);
+		(void) tsleep( &fdcache_lock, PINOD, "fdalvp", 0);
 		goto loop;
 	}
 	fdcache_lock |= FDL_LOCKED;
@@ -151,7 +151,7 @@ out:
 
 	if (fdcache_lock & FDL_WANT) {
 		fdcache_lock &= ~FDL_WANT;
-		wakeup((caddr_t) &fdcache_lock);
+		wakeup( &fdcache_lock);
 	}
 
 	return (error);
@@ -189,7 +189,7 @@ fdesc_lookup(ap)
 	VOP_UNLOCK(dvp, 0, td);
 	if (cnp->cn_namelen == 1 && *pname == '.') {
 		*vpp = dvp;
-		VREF(dvp);	
+		VREF(dvp);
 		vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY, td);
 		return (0);
 	}
@@ -395,7 +395,7 @@ fdesc_setattr(ap)
 		}
 		return (error);
 	}
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0) {
 		fdrop(fp, ap->a_td);
 		return (error);
@@ -476,7 +476,7 @@ fdesc_readdir(ap)
 		 * And ship to userland
 		 */
 		FILEDESC_UNLOCK(fdp);
-		error = uiomove((caddr_t) dp, UIO_MX, uio);
+		error = uiomove(dp, UIO_MX, uio);
 		if (error)
 			goto done;
 		FILEDESC_LOCK(fdp);
@@ -545,13 +545,9 @@ static struct vnodeopv_entry_desc fdesc_vnodeop_entries[] = {
 	{ &vop_open_desc,		(vop_t *) fdesc_open },
 	{ &vop_pathconf_desc,		(vop_t *) vop_stdpathconf },
 	{ &vop_poll_desc,		(vop_t *) fdesc_poll },
-	{ &vop_print_desc,		(vop_t *) vop_null },
 	{ &vop_readdir_desc,		(vop_t *) fdesc_readdir },
 	{ &vop_reclaim_desc,		(vop_t *) fdesc_reclaim },
 	{ &vop_setattr_desc,		(vop_t *) fdesc_setattr },
-	{ &vop_lock_desc,		(vop_t *) vop_stdlock },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ NULL, NULL }
 };
 static struct vnodeopv_desc fdesc_vnodeop_opv_desc =

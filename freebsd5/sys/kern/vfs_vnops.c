@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_vnops.c	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.175 2002/10/25 00:20:36 mckusick Exp $
+ * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.184 2003/04/29 13:36:03 kan Exp $
  */
 
 #include "opt_mac.h"
@@ -47,6 +47,7 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/proc.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mac.h>
 #include <sys/mount.h>
@@ -61,24 +62,17 @@
 #include <sys/conf.h>
 #include <sys/syslog.h>
 
-#include <machine/limits.h>
-
-static int vn_closefile(struct file *fp, struct thread *td);
-static int vn_ioctl(struct file *fp, u_long com, void *data, 
-		struct ucred *active_cred, struct thread *td);
-static int vn_read(struct file *fp, struct uio *uio, 
-		struct ucred *active_cred, int flags, struct thread *td);
-static int vn_poll(struct file *fp, int events, struct ucred *active_cred,
-		struct thread *td);
-static int vn_kqfilter(struct file *fp, struct knote *kn);
-static int vn_statfile(struct file *fp, struct stat *sb,
-		struct ucred *active_cred, struct thread *td);
-static int vn_write(struct file *fp, struct uio *uio, 
-		struct ucred *active_cred, int flags, struct thread *td);
+static fo_rdwr_t	vn_read;
+static fo_rdwr_t	vn_write;
+static fo_ioctl_t	vn_ioctl;
+static fo_poll_t	vn_poll;
+static fo_kqfilter_t	vn_kqfilter;
+static fo_stat_t	vn_statfile;
+static fo_close_t	vn_closefile;
 
 struct 	fileops vnops = {
 	vn_read, vn_write, vn_ioctl, vn_poll, vn_kqfilter,
-	vn_statfile, vn_closefile
+	vn_statfile, vn_closefile, DFLAG_PASSABLE
 };
 
 int
@@ -276,6 +270,7 @@ bad:
 	NDFREE(ndp, NDF_ONLY_PNBUF);
 	vput(vp);
 	*flagp = fmode;
+	ndp->ni_vp = NULL;
 	return (error);
 }
 
@@ -345,9 +340,9 @@ sequential_heuristic(struct uio *uio, struct file *fp)
 		 * are.
 		 */
 		fp->f_seqcount += (uio->uio_resid + BKVASIZE - 1) / BKVASIZE;
-		if (fp->f_seqcount >= 127)
-			fp->f_seqcount = 127;
-		return(fp->f_seqcount << 16);
+		if (fp->f_seqcount > IO_SEQMAX)
+			fp->f_seqcount = IO_SEQMAX;
+		return(fp->f_seqcount << IO_SEQSHIFT);
 	}
 
 	/*
@@ -506,7 +501,7 @@ vn_read(fp, uio, active_cred, flags, td)
 	mtx_lock(&Giant);
 	KASSERT(uio->uio_td == td, ("uio_td %p is not td %p",
 	    uio->uio_td, td));
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	ioflag = 0;
 	if (fp->f_flag & FNONBLOCK)
 		ioflag |= IO_NDELAY;
@@ -517,9 +512,11 @@ vn_read(fp, uio, active_cred, flags, td)
 	 * According to McKusick the vn lock is protecting f_offset here.
 	 * Once this field has it's own lock we can acquire this shared.
 	 */
-	vn_lock(vp, LK_EXCLUSIVE | LK_NOPAUSE | LK_RETRY, td);
-	if ((flags & FOF_OFFSET) == 0)
+	if ((flags & FOF_OFFSET) == 0) {
+		vn_lock(vp, LK_EXCLUSIVE | LK_NOPAUSE | LK_RETRY, td);
 		uio->uio_offset = fp->f_offset;
+	} else
+		vn_lock(vp, LK_SHARED | LK_NOPAUSE | LK_RETRY, td);
 
 	ioflag |= sequential_heuristic(uio, fp);
 
@@ -554,7 +551,7 @@ vn_write(fp, uio, active_cred, flags, td)
 	mtx_lock(&Giant);
 	KASSERT(uio->uio_td == td, ("uio_td %p is not td %p",
 	    uio->uio_td, td));
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	if (vp->v_type == VREG)
 		bwillwrite();
 	ioflag = IO_UNIT;
@@ -602,7 +599,7 @@ vn_statfile(fp, sb, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	struct vnode *vp = (struct vnode *)fp->f_data;
+	struct vnode *vp = fp->f_data;
 	int error;
 
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
@@ -745,7 +742,7 @@ vn_ioctl(fp, com, data, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	register struct vnode *vp = ((struct vnode *)fp->f_data);
+	struct vnode *vp = fp->f_data;
 	struct vnode *vpold;
 	struct vattr vattr;
 	int error;
@@ -827,7 +824,7 @@ vn_poll(fp, events, active_cred, td)
 	int error;
 #endif
 
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 #ifdef MAC
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	error = mac_check_vnode_poll(active_cred, fp->f_cred, vp);
@@ -895,8 +892,7 @@ vn_closefile(fp, td)
 {
 
 	fp->f_ops = &badfileops;
-	return (vn_close(((struct vnode *)fp->f_data), fp->f_flag,
-		fp->f_cred, td));
+	return (vn_close(fp->f_data, fp->f_flag, fp->f_cred, td));
 }
 
 /*
@@ -1047,7 +1043,7 @@ static int
 vn_kqfilter(struct file *fp, struct knote *kn)
 {
 
-	return (VOP_KQFILTER(((struct vnode *)fp->f_data), kn));
+	return (VOP_KQFILTER(fp->f_data, kn));
 }
 
 /*

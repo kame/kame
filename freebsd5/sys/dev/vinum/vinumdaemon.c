@@ -35,7 +35,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumdaemon.c,v 1.8 2000/01/03 05:22:03 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumdaemon.c,v 1.23 2002/11/07 21:52:50 jhb Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumdaemon.c,v 1.25 2003/04/22 19:45:26 jhb Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -71,10 +71,10 @@ vinum_daemon(void)
 
     PROC_LOCK(curproc);
     curproc->p_flag |= P_SYSTEM;			    /* we're a system process */
-    PROC_UNLOCK(curproc);
     mtx_lock_spin(&sched_lock);
     curproc->p_sflag |= PS_INMEM;
     mtx_unlock_spin(&sched_lock);
+    PROC_UNLOCK(curproc);
     daemon_save_config();				    /* start by saving the configuration */
     daemonpid = curproc->p_pid;				    /* mark our territory */
     while (1) {
@@ -210,7 +210,7 @@ recover_io(struct request *rq)
      *
      * Negotiate with phk to get it fixed.
      */
-    DEV_STRATEGY(rq->bp, 0);				    /* reissue the command */
+    DEV_STRATEGY(rq->bp);				    /* reissue the command */
 }
 
 /* Functions called to interface with the daemon */

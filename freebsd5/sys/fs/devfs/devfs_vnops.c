@@ -31,19 +31,18 @@
  *	@(#)kernfs_vnops.c	8.15 (Berkeley) 5/21/95
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vnops.c 1.43
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_vnops.c,v 1.55 2002/12/09 03:44:27 rwatson Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_vnops.c,v 1.64 2003/03/03 19:15:37 njl Exp $
  */
 
 /*
  * TODO:
  *	remove empty directories
- *	mknod: hunt down DE_DELETED, compare name, reinstantiate. 
+ *	mknod: hunt down DE_DELETED, compare name, reinstantiate.
  *	mkdir: want it ?
  */
 
 #include <opt_devfs.h>
 #include <opt_mac.h>
-#ifndef NODEVFS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -72,9 +71,6 @@ static int	devfs_read(struct vop_read_args *ap);
 static int	devfs_readdir(struct vop_readdir_args *ap);
 static int	devfs_readlink(struct vop_readlink_args *ap);
 static int	devfs_reclaim(struct vop_reclaim_args *ap);
-#ifdef MAC
-static int	devfs_refreshlabel(struct vop_refreshlabel_args *ap);
-#endif
 static int	devfs_remove(struct vop_remove_args *ap);
 static int	devfs_revoke(struct vop_revoke_args *ap);
 static int	devfs_setattr(struct vop_setattr_args *ap);
@@ -88,7 +84,7 @@ static vop_t **devfs_specop_p;
 
 /*
  * Construct the fully qualified path name relative to the mountpoint
- */ 
+ */
 static char *
 devfs_fqpn(char *buf, struct vnode *dvp, struct componentname *cnp)
 {
@@ -184,13 +180,24 @@ devfs_access(ap)
 {
 	struct vnode *vp = ap->a_vp;
 	struct devfs_dirent *de;
+	int error;
 
 	de = vp->v_data;
 	if (vp->v_type == VDIR)
 		de = de->de_dir;
 
-	return (vaccess(vp->v_type, de->de_mode, de->de_uid, de->de_gid,
-	    ap->a_mode, ap->a_cred, NULL));
+	error = vaccess(vp->v_type, de->de_mode, de->de_uid, de->de_gid,
+	    ap->a_mode, ap->a_cred, NULL);
+	if (!error)
+		return (error);
+	if (error != EACCES)
+		return (error);
+	/* We do, however, allow access to the controlling terminal */
+	if (!(ap->a_td->td_proc->p_flag & P_CONTROLT))
+		return (error);
+	if (ap->a_td->td_proc->p_session->s_ttyvp == de->de_vnode)
+		return (0);
+	return (error);
 }
 
 static int
@@ -216,7 +223,7 @@ devfs_getattr(ap)
 	vap->va_uid = de->de_uid;
 	vap->va_gid = de->de_gid;
 	vap->va_mode = de->de_mode;
-	if (vp->v_type == VLNK) 
+	if (vp->v_type == VLNK)
 		vap->va_size = de->de_dirent->d_namlen;
 	else if (vp->v_type == VDIR)
 		vap->va_size = vap->va_bytes = DEV_BSIZE;
@@ -305,7 +312,7 @@ devfs_lookupx(ap)
 	dmp = VFSTODEVFS(dvp->v_mount);
 	cloned = 0;
 	dd = dvp->v_data;
-	
+
 	*vpp = NULLVP;
 	cnp->cn_flags &= ~PDIRUNLOCK;
 
@@ -446,11 +453,11 @@ static int
 devfs_mknod(struct vop_mknod_args *ap)
 /*
 struct vop_mknod_args {
-        struct vnodeop_desc *a_desc;
-        struct vnode *a_dvp;
-        struct vnode **a_vpp;
-        struct componentname *a_cnp;
-        struct vattr *a_vap;
+	struct vnodeop_desc *a_desc;
+	struct vnode *a_dvp;
+	struct vnode **a_vpp;
+	struct componentname *a_cnp;
+	struct vattr *a_vap;
 };
 */
 {
@@ -473,7 +480,7 @@ struct vop_mknod_args {
 	nameiop = cnp->cn_nameiop;
 	cloned = 0;
 	dd = dvp->v_data;
-	
+
 	error = ENOENT;
 	TAILQ_FOREACH(de, &dd->de_dlist, de_list) {
 		if (cnp->cn_namelen != de->de_dirent->d_namlen)
@@ -580,7 +587,7 @@ devfs_readdir(ap)
 	off = 0;
 	oldoff = uio->uio_offset;
 	TAILQ_FOREACH(dd, &de->de_dlist, de_list) {
-		if (dd->de_flags & DE_WHITEOUT) 
+		if (dd->de_flags & DE_WHITEOUT)
 			continue;
 		if (dd->de_dirent->d_type == DT_DIR)
 			de = dd->de_dir;
@@ -592,7 +599,7 @@ devfs_readdir(ap)
 		dp->d_fileno = de->de_inode;
 		if (off >= uio->uio_offset) {
 			ncookies++;
-			error = uiomove((caddr_t)dp, dp->d_reclen, uio);
+			error = uiomove(dp, dp->d_reclen, uio);
 			if (error)
 				break;
 		}
@@ -600,13 +607,13 @@ devfs_readdir(ap)
 	}
 	if( !error && ap->a_ncookies != NULL && ap->a_cookies != NULL ) {
 		MALLOC(cookiebuf, u_long *, ncookies * sizeof(u_long),
-                       M_TEMP, M_WAITOK);
+		       M_TEMP, M_WAITOK);
 		cookiep = cookiebuf;
 		dps = (struct dirent *)((char *)uio->uio_iov->iov_base -
 		    (uio->uio_offset - oldoff));
 		dpe = (struct dirent *) uio->uio_iov->iov_base;
-		for( dp = dps; 
-			dp < dpe; 
+		for( dp = dps;
+			dp < dpe;
 			dp = (struct dirent *)((caddr_t) dp + dp->d_reclen)) {
 				oldoff += dp->d_reclen;
 				*cookiep++ = (u_long) oldoff;
@@ -657,20 +664,6 @@ devfs_reclaim(ap)
 	}
 	return (0);
 }
-
-#ifdef MAC
-static int
-devfs_refreshlabel(ap)
-	struct vop_refreshlabel_args /* {
-		struct vnode *a_vp;
-		struct ucred *a_cred;
-	} */ *ap;
-{
-
-	/* Labels are always in sync. */
-	return (0);
-}
-#endif
 
 static int
 devfs_remove(ap)
@@ -882,27 +875,20 @@ static struct vnodeopv_entry_desc devfs_vnodeop_entries[] = {
 	{ &vop_access_desc,		(vop_t *) devfs_access },
 	{ &vop_getattr_desc,		(vop_t *) devfs_getattr },
 	{ &vop_ioctl_desc,		(vop_t *) devfs_ioctl },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
-	{ &vop_lock_desc,		(vop_t *) vop_stdlock },
 	{ &vop_lookup_desc,		(vop_t *) devfs_lookup },
 	{ &vop_mknod_desc,		(vop_t *) devfs_mknod },
 	{ &vop_pathconf_desc,		(vop_t *) devfs_pathconf },
-	{ &vop_print_desc,		(vop_t *) vop_null },
 	{ &vop_read_desc,		(vop_t *) devfs_read },
 	{ &vop_readdir_desc,		(vop_t *) devfs_readdir },
 	{ &vop_readlink_desc,		(vop_t *) devfs_readlink },
 	{ &vop_reclaim_desc,		(vop_t *) devfs_reclaim },
 	{ &vop_remove_desc,		(vop_t *) devfs_remove },
-#ifdef MAC
-	{ &vop_refreshlabel_desc,	(vop_t *) devfs_refreshlabel },
-#endif
 	{ &vop_revoke_desc,		(vop_t *) devfs_revoke },
 	{ &vop_setattr_desc,		(vop_t *) devfs_setattr },
 #ifdef MAC
 	{ &vop_setlabel_desc,		(vop_t *) devfs_setlabel },
 #endif
 	{ &vop_symlink_desc,		(vop_t *) devfs_symlink },
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ NULL, NULL }
 };
 static struct vnodeopv_desc devfs_vnodeop_opv_desc =
@@ -914,25 +900,17 @@ static struct vnodeopv_entry_desc devfs_specop_entries[] = {
 	{ &vop_default_desc,		(vop_t *) spec_vnoperate },
 	{ &vop_access_desc,		(vop_t *) devfs_access },
 	{ &vop_getattr_desc,		(vop_t *) devfs_getattr },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
-	{ &vop_lock_desc,		(vop_t *) vop_stdlock },
 	{ &vop_pathconf_desc,		(vop_t *) devfs_pathconf },
-	{ &vop_print_desc,		(vop_t *) vop_null },
 	{ &vop_reclaim_desc,		(vop_t *) devfs_reclaim },
-#ifdef MAC
-	{ &vop_refreshlabel_desc,	(vop_t *) devfs_refreshlabel },
-#endif
 	{ &vop_remove_desc,		(vop_t *) devfs_remove },
 	{ &vop_revoke_desc,		(vop_t *) devfs_revoke },
 	{ &vop_setattr_desc,		(vop_t *) devfs_setattr },
 #ifdef MAC
 	{ &vop_setlabel_desc,		(vop_t *) devfs_setlabel },
 #endif
-	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ NULL, NULL }
 };
 static struct vnodeopv_desc devfs_specop_opv_desc =
 	{ &devfs_specop_p, devfs_specop_entries };
 
 VNODEOP_SET(devfs_specop_opv_desc);
-#endif

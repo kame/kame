@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.8 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.100 2002/10/14 03:20:34 mckusick Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.104 2003/03/04 00:04:42 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -686,7 +686,7 @@ ext2_mountfs(devvp, mp, td)
 	ump = bsd_malloc(sizeof *ump, M_EXT2MNT, M_WAITOK);
 	bzero((caddr_t)ump, sizeof *ump);
 	/* I don't know whether this is the right strategy. Note that
-	   we dynamically allocate both a ext2_sb_info and a ext2_super_block
+	   we dynamically allocate both an ext2_sb_info and an ext2_super_block
 	   while Linux keeps the super block in a locked buffer
 	 */
 	ump->um_e2fs = bsd_malloc(sizeof(struct ext2_sb_info), 
@@ -955,7 +955,7 @@ loop:
 }
 
 /*
- * Look up a EXT2FS dinode number to find its incore vnode, otherwise read it
+ * Look up an EXT2FS dinode number to find its incore vnode, otherwise read it
  * in from disk.  If it is in core, wait for the lock bit to clear, then
  * return the inode locked.  Detection and handling of mount points must be
  * done by the calling routine.
@@ -1179,7 +1179,7 @@ ext2_sbupdate(mp, waitfor)
 /*
 printf("\nupdating superblock, waitfor=%s\n", waitfor == MNT_WAIT ? "yes":"no");
 */
-	bp = getblk(mp->um_devvp, SBLOCK, SBSIZE, 0, 0);
+	bp = getblk(mp->um_devvp, SBLOCK, SBSIZE, 0, 0, 0);
 	bcopy((caddr_t)es, bp->b_data, (u_int)sizeof(struct ext2_super_block));
 	if (waitfor == MNT_WAIT)
 		error = bwrite(bp);

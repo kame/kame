@@ -35,9 +35,9 @@
 %#ifndef lint
 %/*static char sccsid[] = "from: @(#)mount.x 1.2 87/09/18 Copyr 1987 Sun Micro";*/
 %/*static char sccsid[] = "from: @(#)mount.x	2.1 88/08/01 4.0 RPCSRC";*/
-%static const char rcsid[] =
-%  "$FreeBSD: src/include/rpcsvc/mount.x,v 1.6 1999/08/27 23:45:08 peter Exp $";
 %#endif /* not lint */
+%#include <sys/cdefs.h>
+%__FBSDID("$FreeBSD: src/include/rpcsvc/mount.x,v 1.7 2003/05/04 02:51:42 obrien Exp $");
 #endif
 
 const MNTPATHLEN = 1024;	/* maximum bytes in a pathname argument */

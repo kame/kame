@@ -66,7 +66,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	$NetBSD: bus.h,v 1.9.4.1 2000/06/30 16:27:30 simonb Exp $
- * $FreeBSD: src/sys/powerpc/include/bus.h,v 1.4 2002/09/19 04:44:04 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/include/bus.h,v 1.10 2003/05/27 04:59:58 scottl Exp $
  */
 
 #ifndef	_MACPPC_BUS_H_
@@ -76,7 +76,7 @@
 
 #define BUS_SPACE_MAXSIZE_24BIT 0xFFFFFF
 #define BUS_SPACE_MAXSIZE_32BIT 0xFFFFFFFF
-#define BUS_SPACE_MAXSIZE       (128 * 1024) /* Maximum supported size */
+#define BUS_SPACE_MAXSIZE       0xFFFFFFFF
 #define BUS_SPACE_MAXADDR_24BIT 0xFFFFFF
 #define BUS_SPACE_MAXADDR_32BIT 0xFFFFFFFF
 #define BUS_SPACE_MAXADDR       0xFFFFFFFF
@@ -87,20 +87,7 @@
  * Values for the macppc bus space tag, not to be used directly by MI code.
  */
 
-#define	__BUS_SPACE_HAS_STREAM_METHODS
-
-/*
- * Values for the ppc bus space tag, not to be used directly by MI code.
- * Low byte contains the shift value
- */
-#define PPC_BUS_SPACE_MEM      0x100       /* space is mem space */
-#define PPC_BUS_MEM_MASK       0x0ff
-
-/*
- * Flags for bus_resource_alloc(MEM|IOPORT). XXX this is very bad: it's
- * assumed that this won't conflict with resource flags :-(
- */
-#define PPC_BUS_SPARSE4  0x800000  /* shift offset left 4 bits */
+#define	__BUS_SPACE_HAS_STREAM_METHODS 1
 
 /*
  * Bus address and size types
@@ -109,17 +96,23 @@ typedef u_int32_t bus_addr_t;
 typedef u_int32_t bus_size_t;
 
 /*
+ * Define the PPC tag values
+ */
+#define PPC_BUS_SPACE_MEM	1	/* space is mem space */
+#define PPC_BUS_SPACE_IO	2	/* space is io space */
+
+/*
  * Access methods for bus resources and address space.
  */
 typedef u_int32_t bus_space_tag_t;
 typedef u_int32_t bus_space_handle_t;
 
 static __inline void *
-__ppc_ba(bus_space_tag_t tag, bus_space_handle_t handle, bus_size_t offset)
+__ppc_ba(bus_space_tag_t tag __unused, bus_space_handle_t handle, 
+    bus_size_t offset)
 {
-	return ((void *)(handle + (offset << (tag & PPC_BUS_MEM_MASK))));
+	return ((void *)(handle + offset));
 }
-
 
 /*
  *	int bus_space_map(bus_space_tag_t t, bus_addr_t addr,
@@ -138,7 +131,11 @@ bus_space_map(t, addr, size, flags, bshp) ! not implemented !
  * Unmap a region of bus space.
  */
 
-#define bus_space_unmap(t, bsh, size)
+static __inline void
+bus_space_unmap(bus_space_tag_t t __unused, bus_space_handle_t bsh __unused,
+                bus_size_t size __unused)
+{
+}
 
 /*
  *	int bus_space_subregion(bus_space_tag_t t,
@@ -148,8 +145,13 @@ bus_space_map(t, addr, size, flags, bshp) ! not implemented !
  * Get a new handle for a subregion of an already-mapped area of bus space.
  */
 
-#define	bus_space_subregion(t, bsh, offset, size, bshp)			\
-	((*(bshp) = (bus_space_handle_t)__ppc_ba(t, bsh, offset)), 0)
+static __inline int
+bus_space_subregion(bus_space_tag_t t __unused, bus_space_handle_t bsh, 
+    bus_size_t offset, bus_size_t size __unused, bus_space_handle_t *nbshp)
+{
+	*nbshp = bsh + offset;
+	return (0);
+}
 
 /*
  *	int bus_space_alloc(bus_space_tag_t t, bus_addr_t rstart,
@@ -182,18 +184,48 @@ bus_space_map(t, addr, size, flags, bshp) ! not implemented !
  * described by tag/handle/offset.
  */
 
-#define	bus_space_read_1(t, h, o)	(in8(__ppc_ba(t, h, o)))
-#define	bus_space_read_2(t, h, o)	(in16rb(__ppc_ba(t, h, o)))
-#define	bus_space_read_4(t, h, o)	(in32rb(__ppc_ba(t, h, o)))
+static __inline u_int8_t
+bus_space_read_1(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o)
+{
+	return (in8(__ppc_ba(t, h, o)));
+}
+
+static __inline u_int16_t
+bus_space_read_2(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o)
+{
+	return (in16rb(__ppc_ba(t, h, o)));
+}
+
+static __inline u_int32_t
+bus_space_read_4(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o)
+{
+	return (in32rb(__ppc_ba(t, h, o)));
+}
+
 #if 0	/* Cause a link error for bus_space_read_8 */
 #define	bus_space_read_8(t, h, o)	!!! unimplemented !!!
 #endif
 
-#define	bus_space_read_stream_1(t, h, o)	(in8(__ppc_ba(t, h, o)))
-#define	bus_space_read_stream_2(t, h, o)	(in16(__ppc_ba(t, h, o)))
-#define	bus_space_read_stream_4(t, h, o)	(in32(__ppc_ba(t, h, o)))
+static __inline u_int8_t
+bus_space_read_stream_1(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o)
+{
+	return (in8(__ppc_ba(t, h, o)));
+}
+
+static __inline u_int16_t
+bus_space_read_stream_2(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o)
+{
+	return (in16(__ppc_ba(t, h, o)));
+}
+
+static __inline u_int32_t
+bus_space_read_stream_4(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o)
+{
+	return (in32(__ppc_ba(t, h, o)));
+}
+
 #if 0	/* Cause a link error for bus_space_read_stream_8 */
-#define	bus_space_read_8(t, h, o)	!!! unimplemented !!!
+#define	bus_space_read_stream_8(t, h, o)	!!! unimplemented !!!
 #endif
 
 /*
@@ -205,33 +237,51 @@ bus_space_map(t, addr, size, flags, bshp) ! not implemented !
  * described by tag/handle/offset and copy into buffer provided.
  */
 
-#define	bus_space_read_multi_1(t, h, o, a, c) do {			\
-		ins8(__ppc_ba(t, h, o), (a), (c));		       	\
-	} while (0)
+static __inline void
+bus_space_read_multi_1(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    u_int8_t *a, size_t c) 
+{
+	ins8(__ppc_ba(t, h, o), a, c);
+}
 
-#define	bus_space_read_multi_2(t, h, o, a, c) do {			\
-		ins16rb(__ppc_ba(t, h, o), (a), (c));			\
-	} while (0)
+static __inline void
+bus_space_read_multi_2(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    u_int16_t *a, size_t c) 
+{
+	ins16rb(__ppc_ba(t, h, o), a, c);
+}
 
-#define	bus_space_read_multi_4(t, h, o, a, c) do {			\
-		ins32rb(__ppc_ba(t, h, o), (a), (c));			\
-	} while (0)
+static __inline void
+bus_space_read_multi_4(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    u_int32_t *a, size_t c) 
+{
+	ins32rb(__ppc_ba(t, h, o), a, c);
+}
 
 #if 0	/* Cause a link error for bus_space_read_multi_8 */
 #define	bus_space_read_multi_8		!!! unimplemented !!!
 #endif
 
-#define	bus_space_read_multi_stream_1(t, h, o, a, c) do {		\
-		ins8(__ppc_ba(t, h, o), (a), (c));		       	\
-	} while (0)
+static __inline void
+bus_space_read_multi_stream_1(bus_space_tag_t t, bus_space_handle_t h,
+    bus_size_t o, u_int8_t *a, size_t c)
+{
+	ins8(__ppc_ba(t, h, o), a, c);
+}
 
-#define	bus_space_read_multi_stream_2(t, h, o, a, c) do {		\
-		ins16(__ppc_ba(t, h, o), (a), (c));		       	\
-	} while (0)
+static __inline void
+bus_space_read_multi_stream_2(bus_space_tag_t t, bus_space_handle_t h,
+    bus_size_t o, u_int16_t *a, size_t c)
+{
+	ins16(__ppc_ba(t, h, o), a, c);
+}
 
-#define	bus_space_read_multi_stream_4(t, h, o, a, c) do {		\
-		ins32(__ppc_ba(t, h, o), (a), (c));		       	\
-	} while (0)
+static __inline void
+bus_space_read_multi_stream_4(bus_space_tag_t t, bus_space_handle_t h,
+    bus_size_t o, u_int32_t *a, size_t c)
+{
+	ins32(__ppc_ba(t, h, o), a, c);
+}
 
 #if 0	/* Cause a link error for bus_space_read_multi_stream_8 */
 #define	bus_space_read_multi_stream_8	!!! unimplemented !!!
@@ -321,17 +371,56 @@ bus_space_read_region_stream_4(bus_space_tag_t tag, bus_space_handle_t bsh,
  * described by tag/handle/offset.
  */
 
-#define bus_space_write_1(t, h, o, v)	out8(__ppc_ba(t, h, o), (v))
-#define bus_space_write_2(t, h, o, v)	out16rb(__ppc_ba(t, h, o), (v))
-#define bus_space_write_4(t, h, o, v)	out32rb(__ppc_ba(t, h, o), (v))
+static __inline void
+bus_space_write_1(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    uint8_t v)
+{
+	out8(__ppc_ba(t, h, o), v);
+}
 
-#define bus_space_write_stream_1(t, h, o, v)	out8(__ppc_ba(t, h, o), (v))
-#define bus_space_write_stream_2(t, h, o, v)	out16(__ppc_ba(t, h, o), (v))
-#define bus_space_write_stream_4(t, h, o, v)	out32(__ppc_ba(t, h, o), (v))
+static __inline void
+bus_space_write_2(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    uint16_t v)
+{
+	out16rb(__ppc_ba(t, h, o), v);
+}
+
+static __inline void
+bus_space_write_4(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    uint32_t v)
+{
+	out32rb(__ppc_ba(t, h, o), v);
+}
 
 #if 0	/* Cause a link error for bus_space_write_8 */
 #define bus_space_write_8		!!! unimplemented !!!
 #endif
+
+static __inline void
+bus_space_write_stream_1(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    uint8_t v)
+{
+	out8(__ppc_ba(t, h, o), v);
+}
+
+static __inline void
+bus_space_write_stream_2(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    uint16_t v)
+{
+	out16(__ppc_ba(t, h, o), v);
+}
+
+static __inline void
+bus_space_write_stream_4(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    uint32_t v)
+{
+	out32(__ppc_ba(t, h, o), v);
+}
+
+#if 0	/* Cause a link error for bus_space_write_stream_8 */
+#define bus_space_write_stream_8       	!!! unimplemented !!!
+#endif
+
 
 /*
  *	void bus_space_write_multi_N(bus_space_tag_t tag,
@@ -342,29 +431,51 @@ bus_space_read_region_stream_4(bus_space_tag_t tag, bus_space_handle_t bsh,
  * provided to bus space described by tag/handle/offset.
  */
 
-#define bus_space_write_multi_1(t, h, o, a, c) do {			\
-		outsb(__ppc_ba(t, h, o), (a), (c));		       	\
-	} while (0)
+static __inline void
+bus_space_write_multi_1(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    uint8_t *a, size_t c)
+{
+	outsb(__ppc_ba(t, h, o), a, c);
+}
 
-#define bus_space_write_multi_2(t, h, o, a, c) do {			\
-		outsw(__ppc_ba(t, h, o), (a), (c));		       	\
-	} while (0)
+static __inline void
+bus_space_write_multi_2(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    uint16_t *a, size_t c)
+{
+	outsw(__ppc_ba(t, h, o), a, c);
+}
 
-#define bus_space_write_multi_4(t, h, o, a, c) do {			\
-		outsl(__ppc_ba(t, h, o), (a), (c));		       	\
-	} while (0)
+static __inline void
+bus_space_write_multi_4(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+    uint32_t *a, size_t c)
+{
+	outsl(__ppc_ba(t, h, o), a, c);
+}
 
 #if 0
 #define bus_space_write_multi_8		!!! unimplemented !!!
 #endif
 
-#define bus_space_write_multi_stream_2(t, h, o, a, c) do {		\
-		outsw(__ppc_ba(t, h, o), (a), (c));		       	\
-	} while (0)
+static __inline void
+bus_space_write_multi_stream_1(bus_space_tag_t t, bus_space_handle_t h,
+    bus_size_t o, const u_int8_t *a, size_t c)
+{
+	outsb(__ppc_ba(t, h, o), a, c);
+}
 
-#define bus_space_write_multi_stream_4(t, h, o, a, c) do {		\
-		outsl(__ppc_ba(t, h, o), (a), (c));		       	\
-	} while (0)
+static __inline void
+bus_space_write_multi_stream_2(bus_space_tag_t t, bus_space_handle_t h,
+    bus_size_t o, const u_int16_t *a, size_t c)
+{
+	outsw(__ppc_ba(t, h, o), a, c);
+}
+
+static __inline void
+bus_space_write_multi_stream_4(bus_space_tag_t t, bus_space_handle_t h,
+    bus_size_t o, const u_int32_t *a, size_t c)
+{
+	outsl(__ppc_ba(t, h, o), a, c);
+}
 
 #if 0
 #define bus_space_write_multi_stream_8	!!! unimplemented !!!
@@ -643,16 +754,13 @@ struct mbuf;
 struct uio;
 
 /*
- *      bus_dmasync_op_t
- *
  *      Operations performed by bus_dmamap_sync().
  */
-typedef enum {
-	BUS_DMASYNC_PREREAD,
-	BUS_DMASYNC_POSTREAD,
-	BUS_DMASYNC_PREWRITE,
-	BUS_DMASYNC_POSTWRITE
-} bus_dmasync_op_t;
+typedef int bus_dmasync_op_t;
+#define	BUS_DMASYNC_PREREAD	1
+#define	BUS_DMASYNC_POSTREAD	2
+#define	BUS_DMASYNC_PREWRITE	4
+#define	BUS_DMASYNC_POSTWRITE	8
 
 /*
  *      bus_dma_tag_t
@@ -754,6 +862,29 @@ typedef void bus_dmamap_callback_t(void *, bus_dma_segment_t *, int, int);
 int bus_dmamap_load(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 		    bus_size_t buflen, bus_dmamap_callback_t *callback,
 		    void *callback_arg, int flags);
+
+/*
+ * Like bus_dmamap_callback but includes map size in bytes.  This is
+ * defined as a separate interface to maintain compatiiblity for users
+ * of bus_dmamap_callback_t--at some point these interfaces should be merged.
+ */
+typedef void bus_dmamap_callback2_t(void *, bus_dma_segment_t *, int, bus_size_t, int);
+/*
+ * Like bus_dmamap_load but for mbufs.  Note the use of the
+ * bus_dmamap_callback2_t interface.
+ */
+int bus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map,
+			 struct mbuf *mbuf,
+			 bus_dmamap_callback2_t *callback, void *callback_arg,
+			 int flags);
+/*
+ * Like bus_dmamap_load but for uios.  Note the use of the
+ * bus_dmamap_callback2_t interface.
+ */
+int bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map,
+			struct uio *ui,
+			bus_dmamap_callback2_t *callback, void *callback_arg,
+			int flags);
 
 /*
  * Perform a syncronization operation on the given map.

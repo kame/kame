@@ -40,7 +40,7 @@
  *
  */
 
-/* $FreeBSD: src/sys/dev/scd/scd.c,v 1.74 2002/11/10 03:45:49 mdodd Exp $ */
+/* $FreeBSD: src/sys/dev/scd/scd.c,v 1.76 2003/04/01 15:06:24 phk Exp $ */
 
 #undef	SCD_DEBUG
 
@@ -146,19 +146,14 @@ static	d_strategy_t	scdstrategy;
 #define CDEV_MAJOR 45
 
 static struct cdevsw scd_cdevsw = {
-	/* open */	scdopen,
-	/* close */	scdclose,
-	/* read */	physread,
-	/* write */	nowrite,
-	/* ioctl */	scdioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	scdstrategy,
-	/* name */	"scd",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_DISK,
+	.d_open =	scdopen,
+	.d_close =	scdclose,
+	.d_read =	physread,
+	.d_ioctl =	scdioctl,
+	.d_strategy =	scdstrategy,
+	.d_name =	"scd",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_DISK,
 };
 
 int
@@ -296,7 +291,7 @@ scdstrategy(struct bio *bp)
 
 	/* queue it */
 	s = splbio();
-	bioqdisksort(&sc->data.head, bp);
+	bioq_disksort(&sc->data.head, bp);
 	splx(s);
 
 	/* now check whether we can perform processing */

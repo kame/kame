@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_elf.c,v 1.132 2002/11/08 20:49:50 rwatson Exp $
+ * $FreeBSD: src/sys/kern/imgact_elf.c,v 1.138 2003/02/19 05:47:24 imp Exp $
  */
 
 #include <sys/param.h>
@@ -67,9 +67,6 @@
 
 #define OLD_EI_BRAND	8
 
-__ElfType(Brandinfo);
-__ElfType(Auxargs);
-
 static int __elfN(check_header)(const Elf_Ehdr *hdr);
 static Elf_Brandinfo *__elfN(get_brandinfo)(const Elf_Ehdr *hdr,
     const char *interp);
@@ -81,15 +78,24 @@ static int __elfN(load_section)(struct proc *p,
     vm_prot_t prot, size_t pagesize);
 static int __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp);
 
+SYSCTL_NODE(_kern, OID_AUTO, __CONCAT(elf, __ELF_WORD_SIZE), CTLFLAG_RW, 0,
+    "");
+
+int __elfN(fallback_brand) = -1;
+SYSCTL_INT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO,
+    fallback_brand, CTLFLAG_RW, &__elfN(fallback_brand), 0,
+    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE)) " brand of last resort");
+TUNABLE_INT("kern.elf" __XSTRING(__ELF_WORD_SIZE) ".fallback_brand",
+    &__elfN(fallback_brand));
+
 static int elf_trace = 0;
-#if __ELF_WORD_SIZE == 32
-SYSCTL_INT(_debug, OID_AUTO, elf32_trace, CTLFLAG_RW, &elf_trace, 0, "");
-#else
-SYSCTL_INT(_debug, OID_AUTO, elf64_trace, CTLFLAG_RW, &elf_trace, 0, "");
-#endif
+SYSCTL_INT(_debug, OID_AUTO, __elfN(trace), CTLFLAG_RW, &elf_trace, 0, "");
+
+static int elf_legacy_coredump = 0;
+SYSCTL_INT(_debug, OID_AUTO, __elfN(legacy_coredump), CTLFLAG_RW, 
+    &elf_legacy_coredump, 0, "");
 
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
-extern int fallback_elf_brand;
 
 int
 __elfN(insert_brand_entry)(Elf_Brandinfo *entry)
@@ -179,7 +185,7 @@ __elfN(get_brandinfo)(const Elf_Ehdr *hdr, const char *interp)
 	for (i = 0; i < MAX_BRANDS; i++) {
 		bi = elf_brand_list[i];
 		if (bi != NULL && hdr->e_machine == bi->machine &&
-		    fallback_elf_brand == bi->brand)
+		    __elfN(fallback_brand) == bi->brand)
 			return (bi);
 	}
 	return (NULL);
@@ -349,7 +355,7 @@ __elfN(load_section)(struct proc *p, struct vmspace *vmspace,
 {
 	size_t map_len;
 	vm_offset_t map_addr;
-	int error, rv;
+	int error, rv, cow;
 	size_t copy_len;
 	vm_offset_t file_addr;
 	vm_offset_t data_buf = 0;
@@ -392,6 +398,11 @@ __elfN(load_section)(struct proc *p, struct vmspace *vmspace,
 
 	if (map_len != 0) {
 		vm_object_reference(object);
+
+		/* cow flags: don't dump readonly sections in core */
+		cow = MAP_COPY_ON_WRITE | MAP_PREFAULT |
+		    (prot & VM_PROT_WRITE ? 0 : MAP_DISABLE_COREDUMP);
+
 		rv = __elfN(map_insert)(&vmspace->vm_map,
 				      object,
 				      file_addr,	/* file offset */
@@ -399,7 +410,7 @@ __elfN(load_section)(struct proc *p, struct vmspace *vmspace,
 				      map_addr + map_len,/* virtual end */
 				      prot,
 				      VM_PROT_ALL,
-				      MAP_COPY_ON_WRITE | MAP_PREFAULT);
+				      cow);
 		if (rv != KERN_SUCCESS) {
 			vm_object_deallocate(object);
 			return (EINVAL);
@@ -839,22 +850,16 @@ fail:
 	return (error);
 }
 
-#if __ELF_WORD_SIZE == 32
-#define suword	suword32
-#define stacktype u_int32_t
-#else
-#define suword	suword64
-#define stacktype u_int64_t
-#endif
+#define	suword __CONCAT(suword, __ELF_WORD_SIZE)
 
 int
 __elfN(freebsd_fixup)(register_t **stack_base, struct image_params *imgp)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
-	stacktype *base;
-	stacktype *pos;
+	Elf_Addr *base;
+	Elf_Addr *pos;
 
-	base = (stacktype *)*stack_base;
+	base = (Elf_Addr *)*stack_base;
 	pos = base + (imgp->argc + imgp->envc + 2);
 
 	if (args->trace) {
@@ -1042,17 +1047,29 @@ each_writable_segment(p, func, closure)
 	    entry = entry->next) {
 		vm_object_t obj;
 
-		if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) ||
-		    (entry->protection & (VM_PROT_READ|VM_PROT_WRITE)) !=
-		    (VM_PROT_READ|VM_PROT_WRITE))
-			continue;
+		/*
+		 * Don't dump inaccessible mappings, deal with legacy
+		 * coredump mode.
+		 *
+		 * Note that read-only segments related to the elf binary
+		 * are marked MAP_ENTRY_NOCOREDUMP now so we no longer
+		 * need to arbitrarily ignore such segments.
+		 */
+		if (elf_legacy_coredump) {
+			if ((entry->protection & VM_PROT_RW) != VM_PROT_RW)
+				continue;
+		} else {
+			if ((entry->protection & VM_PROT_ALL) == 0)
+				continue;
+		}
 
 		/*
-		** Dont include memory segment in the coredump if
-		** MAP_NOCORE is set in mmap(2) or MADV_NOCORE in
-		** madvise(2).
-		*/
-		if (entry->eflags & MAP_ENTRY_NOCOREDUMP)
+		 * Dont include memory segment in the coredump if
+		 * MAP_NOCORE is set in mmap(2) or MADV_NOCORE in
+		 * madvise(2).  Do not dump submaps (i.e. parts of the
+		 * kernel map).
+		 */
+		if (entry->eflags & (MAP_ENTRY_NOCOREDUMP|MAP_ENTRY_IS_SUB_MAP))
 			continue;
 
 		if ((obj = entry->object.vm_object) == NULL)
@@ -1238,10 +1255,8 @@ __elfN(putnote)(void *dst, size_t *off, const char *name, int type,
 /*
  * Tell kern_execve.c about it, with a little help from the linker.
  */
-#if __ELF_WORD_SIZE == 32
-static struct execsw elf_execsw = {exec_elf32_imgact, "ELF32"};
-EXEC_SET(elf32, elf_execsw);
-#else
-static struct execsw elf_execsw = {exec_elf64_imgact, "ELF64"};
-EXEC_SET(elf64, elf_execsw);
-#endif
+static struct execsw __elfN(execsw) = {
+	__CONCAT(exec_, __elfN(imgact)),
+	__XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+};
+EXEC_SET(__CONCAT(elf, __ELF_WORD_SIZE), __elfN(execsw));

@@ -44,7 +44,7 @@
  *
  * From:
  *	$Id: procfs_regs.c,v 3.2 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_dbregs.c,v 1.21 2002/06/29 17:26:15 julian Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_dbregs.c,v 1.22 2003/05/05 15:12:51 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -87,8 +87,11 @@ procfs_doprocdbregs(PFS_FILL_ARGS)
 	else
 		/* XXXKSE: */
 		error = proc_read_dbregs(FIRST_THREAD_IN_PROC(p), &r);
-	if (error == 0)
+	if (error == 0) {
+		PROC_UNLOCK(p);
 		error = uiomove(kv, kl, uio);
+		PROC_LOCK(p);
+	}
 	if (error == 0 && uio->uio_rw == UIO_WRITE) {
 		if (!P_SHOULDSTOP(p)) /* XXXKSE should be P_TRACED? */
 			error = EBUSY;

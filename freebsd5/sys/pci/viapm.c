@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/viapm.c,v 1.2 2002/11/09 20:13:16 alfred Exp $
+ * $FreeBSD: src/sys/pci/viapm.c,v 1.3 2003/04/15 06:37:30 mdodd Exp $
  *
  */
 #include <sys/param.h>
@@ -919,6 +919,8 @@ static driver_t viapropm_driver = {
 DRIVER_MODULE(viapm, pci, viapm_driver, viapm_devclass, 0, 0);
 DRIVER_MODULE(viapropm, pci, viapropm_driver, viapropm_devclass, 0, 0);
 
+MODULE_DEPEND(viapm, pci, 1, 1, 1);
+MODULE_DEPEND(viaprom, pci, 1, 1, 1);
 MODULE_DEPEND(viapm, iicbb, IICBB_MINVER, IICBB_PREFVER, IICBB_MAXVER);
 MODULE_DEPEND(viapropm, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);
 MODULE_VERSION(viapm, 1);

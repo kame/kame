@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/support.s,v 1.15 2002/06/20 07:40:53 peter Exp $
+ * $FreeBSD: src/sys/ia64/ia64/support.s,v 1.18 2003/05/27 01:00:12 marcel Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -69,7 +69,6 @@
  *	ar.bsp	tranlated to new mode
  */
 ENTRY(ia64_change_mode, 0)
-
 	rsm	psr.i | psr.ic
 	mov	r19=ar.rsc		// save rsc while we change mode
 	tbit.nz	p6,p7=r14,17		// physical or virtual ?
@@ -106,7 +105,6 @@ ENTRY(ia64_change_mode, 0)
 	
 2:	mov	ar.rsc=r19		// restore ar.rsc
 	br.ret.sptk.few rp		// now in new mode
-	
 END(ia64_change_mode)
 
 /*
@@ -121,7 +119,6 @@ END(ia64_change_mode)
  *	psr.i	cleared
  */
 ENTRY(ia64_physical_mode, 0)
-
 	mov	r14=psr
 	mov	ret0=psr
 	movl	r15=(IA64_PSR_I|IA64_PSR_IT|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFL|IA64_PSR_DFH)
@@ -133,7 +130,6 @@ ENTRY(ia64_physical_mode, 0)
 	or	ret0=ret0,r16		// make sure BN=1
 
 	br.cond.sptk.many ia64_change_mode
-
 END(ia64_physical_mode)
 
 /*
@@ -148,7 +144,6 @@ END(ia64_physical_mode)
  *
  */
 ENTRY(ia64_call_efi_physical, 6)
-
 	.prologue
 	.regstk	6,4,5,0
 	.save	ar.pfs,loc0
@@ -183,195 +178,487 @@ ENTRY(ia64_call_efi_physical, 6)
 	mov	ar.pfs=loc0
 	;;
 	br.ret.sptk.many rp
-
 END(ia64_call_efi_physical)
 	
 /**************************************************************************/
-	
+
+ENTRY(fusufault, 0)
+{	.mib
+	st8.rel		[r15]=r0		// Clear onfault.
+	add		ret0=-1,r0
+	br.ret.sptk	rp
+	;;
+}
+END(fusufault)
+
 /*
- * fu{byte,word} : fetch a byte (word) from user memory
+ * casuptr(intptr_t *p, intptr_t old, intptr_t new)
+ *	Perform a compare-exchange in user space.
  */
-	
-ENTRY(suword64, 2)
-XENTRY(suword)
+ENTRY(casuptr, 3)
+{	.mlx
+	add		r15=PC_CURTHREAD,r13
+	movl		r14=VM_MAX_ADDRESS
+	;;
+}
+{	.mib
+	ld8		r15=[r15]		// r15 = curthread
+	cmp.geu		p6,p0=in0,r14
+(p6)	br.dpnt.few	1f
+	;;
+}
+{	.mlx
+	add		r15=TD_PCB,r15
+	movl		r14=fusufault
+	;;
+}
+{	.mmi
+	ld8		r15=[r15]		// r15 = PCB
+	;;
+	mov		ar.ccv=in1
+	add		r15=PCB_ONFAULT,r15
+	;;
+}
+{	.mmi
+	st8		[r15]=r14		// Set onfault
+	;;
+	cmpxchg8.rel	ret0=[in0],in2,ar.ccv
+	nop		0
+	;;
+}
+{	.mfb
+	st8.rel		[r15]=r0		// Clear onfault
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+1:
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+END(casuptr)
 
-	movl	r14=VM_MAXUSER_ADDRESS;;	// make sure address is ok
-	cmp.geu	p6,p0=in0,r14
-(p6)	br.dpnt.few fusufault
+/*
+ * subyte(void *addr, int byte)
+ * suword16(void *addr, int word)
+ * suword32(void *addr, int word)
+ * suword64|suword(void *addr, long word)
+ *	Store in user space
+ */
 
-	movl	r14=fusufault			// set up fault handler.
-	add	r15=PC_CURTHREAD,r13		// find curthread
-	;;
-	ld8	r15=[r15]
-	;;
-	add	r15=TD_PCB,r15			// find pcb
-	;;
-	ld8	r15=[r15]
-	;;
-	add	r15=PCB_ONFAULT,r15
-	;;
-	st8	[r15]=r14
-	;;
-	st8.rel	[in0]=in1			// try the store
-	;;
-	st8	[r15]=r0			// clean up
-
-	mov	ret0=r0
-	br.ret.sptk.few rp
-
-END(suword64)
-	
-ENTRY(suword32, 2)
-
-	movl	r14=VM_MAXUSER_ADDRESS;;	// make sure address is ok
-	cmp.geu	p6,p0=in0,r14
-(p6)	br.dpnt.few fusufault
-
-	movl	r14=fusufault			// set up fault handler.
-	add	r15=PC_CURTHREAD,r13		// find curthread
-	;;
-	ld8	r15=[r15]
-	;;
-	add	r15=TD_PCB,r15			// find pcb
-	;;
-	ld8	r15=[r15]
-	;;
-	add	r15=PCB_ONFAULT,r15
-	;;
-	st8	[r15]=r14
-	;;
-	st4.rel	[in0]=in1			// try the store
-	;;
-	st8	[r15]=r0			// clean up
-
-	mov	ret0=r0
-	br.ret.sptk.few rp
-
-END(suword32)
-	
 ENTRY(subyte, 2)
-
-	movl	r14=VM_MAXUSER_ADDRESS;;	// make sure address is ok
-	cmp.geu	p6,p0=in0,r14
-(p6)	br.dpnt.few fusufault
-
-	movl	r14=fusufault			// set up fault handler.
-	add	r15=PC_CURTHREAD,r13		// find curthread
+{	.mlx
+	add		r15=PC_CURTHREAD,r13
+	movl		r14=VM_MAX_ADDRESS
 	;;
-	ld8	r15=[r15]
+}
+{	.mib
+	ld8		r15=[r15]		// r15 = curthread
+	cmp.geu		p6,p0=in0,r14
+(p6)	br.dpnt.few	1f
 	;;
-	add	r15=TD_PCB,r15			// find pcb
+}
+{	.mlx
+	add		r15=TD_PCB,r15
+	movl		r14=fusufault
 	;;
-	ld8	r15=[r15]
+}
+{	.mmi
+	ld8		r15=[r15]		// r15 = PCB
 	;;
-	add	r15=PCB_ONFAULT,r15
+	nop		0
+	add		r15=PCB_ONFAULT,r15
 	;;
-	st8	[r15]=r14
+}
+{	.mmi
+	st8		[r15]=r14		// Set onfault
 	;;
-	st1.rel	[in0]=in1			// try the store
+	st1.rel		[in0]=in1
+	nop		0
 	;;
-	st8	[r15]=r0			// clean up
-
-	mov	ret0=r0
-	br.ret.sptk.few rp
-
+}
+{	.mib
+	st8.rel		[r15]=r0		// Clear onfault
+	mov		ret0=r0
+	br.ret.sptk	rp
+	;;
+}
+1:
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
 END(subyte)
 
-ENTRY(fuword64, 1)
-XENTRY(fuword)
+ENTRY(suword16, 2)
+{	.mlx
+	add		r15=PC_CURTHREAD,r13
+	movl		r14=VM_MAX_ADDRESS
+	;;
+}
+{	.mib
+	ld8		r15=[r15]		// r15 = curthread
+	cmp.geu		p6,p0=in0,r14
+(p6)	br.dpnt.few	1f
+	;;
+}
+{	.mlx
+	add		r15=TD_PCB,r15
+	movl		r14=fusufault
+	;;
+}
+{	.mmi
+	ld8		r15=[r15]		// r15 = PCB
+	;;
+	nop		0
+	add		r15=PCB_ONFAULT,r15
+	;;
+}
+{	.mmi
+	st8		[r15]=r14		// Set onfault
+	;;
+	st2.rel		[in0]=in1
+	nop		0
+	;;
+}
+{	.mib
+	st8.rel		[r15]=r0		// Clear onfault
+	mov		ret0=r0
+	br.ret.sptk	rp
+	;;
+}
+1:
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+END(suword16)
 
-	movl	r14=VM_MAXUSER_ADDRESS;;	// make sure address is ok
-	cmp.geu	p6,p0=in0,r14
-(p6)	br.dpnt.few fusufault
+ENTRY(suword32, 2)
+{	.mlx
+	add		r15=PC_CURTHREAD,r13
+	movl		r14=VM_MAX_ADDRESS
+	;;
+}
+{	.mib
+	ld8		r15=[r15]		// r15 = curthread
+	cmp.geu		p6,p0=in0,r14
+(p6)	br.dpnt.few	1f
+	;;
+}
+{	.mlx
+	add		r15=TD_PCB,r15
+	movl		r14=fusufault
+	;;
+}
+{	.mmi
+	ld8		r15=[r15]		// r15 = PCB
+	;;
+	nop		0
+	add		r15=PCB_ONFAULT,r15
+	;;
+}
+{	.mmi
+	st8		[r15]=r14		// Set onfault
+	;;
+	st4.rel		[in0]=in1
+	nop		0
+	;;
+}
+{	.mib
+	st8.rel		[r15]=r0		// Clear onfault
+	mov		ret0=r0
+	br.ret.sptk	rp
+	;;
+}
+1:
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+END(suword32)
 
-	movl	r14=fusufault			// set up fault handler.
-	add	r15=PC_CURTHREAD,r13		// find curthread
+ENTRY(suword64, 2)
+XENTRY(suword)
+{	.mlx
+	add		r15=PC_CURTHREAD,r13
+	movl		r14=VM_MAX_ADDRESS
 	;;
-	ld8	r15=[r15]
+}
+{	.mib
+	ld8		r15=[r15]		// r15 = curthread
+	cmp.geu		p6,p0=in0,r14
+(p6)	br.dpnt.few	1f
 	;;
-	add	r15=TD_PCB,r15			// find pcb
+}
+{	.mlx
+	add		r15=TD_PCB,r15
+	movl		r14=fusufault
 	;;
-	ld8	r15=[r15]
+}
+{	.mmi
+	ld8		r15=[r15]		// r15 = PCB
 	;;
-	add	r15=PCB_ONFAULT,r15
+	nop		0
+	add		r15=PCB_ONFAULT,r15
 	;;
-	st8	[r15]=r14
+}
+{	.mmi
+	st8		[r15]=r14		// Set onfault
 	;;
-	ld8.acq	ret0=[in0]			// try the fetch
+	st8.rel		[in0]=in1
+	nop		0
 	;;
-	st8	[r15]=r0			// clean up
+}
+{	.mib
+	st8.rel		[r15]=r0		// Clear onfault
+	mov		ret0=r0
+	br.ret.sptk	rp
+	;;
+}
+1:
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+END(suword64)
 
-	br.ret.sptk.few rp
-
-END(fuword64)
-
-ENTRY(fuword32, 1)
-
-	movl	r14=VM_MAXUSER_ADDRESS;;	// make sure address is ok
-	cmp.geu	p6,p0=in0,r14
-(p6)	br.dpnt.few fusufault
-
-	movl	r14=fusufault			// set up fault handler.
-	add	r15=PC_CURTHREAD,r13		// find curthread
-	;;
-	ld8	r15=[r15]
-	;;
-	add	r15=TD_PCB,r15			// find pcb
-	;;
-	ld8	r15=[r15]
-	;;
-	add	r15=PCB_ONFAULT,r15
-	;;
-	st8	[r15]=r14
-	;;
-	ld4.acq	ret0=[in0]			// try the fetch
-	;;
-	st8	[r15]=r0			// clean up
-
-	br.ret.sptk.few rp
-
-END(fuword32)
+/*
+ * fubyte(void *addr, int byte)
+ * fuword16(void *addr, int word)
+ * fuword32(void *addr, int word)
+ * fuword64|fuword(void *addr, long word)
+ *	Fetch from user space
+ */
 
 ENTRY(fubyte, 1)
-
-	movl	r14=VM_MAXUSER_ADDRESS;;	// make sure address is ok
-	cmp.geu	p6,p0=in0,r14
-(p6)	br.dpnt.few fusufault
-
-	movl	r14=fusufault			// set up fault handler.
-	add	r15=PC_CURTHREAD,r13		// find curthread
+{	.mlx
+	add		r15=PC_CURTHREAD,r13
+	movl		r14=VM_MAX_ADDRESS
 	;;
-	ld8	r15=[r15]
+}
+{	.mib
+	ld8		r15=[r15]		// r15 = curthread
+	cmp.geu		p6,p0=in0,r14
+(p6)	br.dpnt.few	1f
 	;;
-	add	r15=TD_PCB,r15			// find pcb
+}
+{	.mlx
+	add		r15=TD_PCB,r15
+	movl		r14=fusufault
 	;;
-	ld8	r15=[r15]
+}
+{	.mmi
+	ld8		r15=[r15]		// r15 = PCB
 	;;
-	add	r15=PCB_ONFAULT,r15
+	nop		0
+	add		r15=PCB_ONFAULT,r15
 	;;
-	st8	[r15]=r14
+}
+{	.mmi
+	st8		[r15]=r14		// Set onfault
 	;;
-	ld1.acq	ret0=[in0]			// try the fetch
+	mf
+	nop		0
 	;;
-	st8	[r15]=r0			// clean up
-
-	br.ret.sptk.few rp
-
+}
+{	.mmb
+	ld1		ret0=[in0]
+	st8.rel		[r15]=r0		// Clear onfault
+	br.ret.sptk	rp
+	;;
+}
+1:
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
 END(fubyte)
-	
-ENTRY(fusufault, 0)
-	st8	[r15]=r0 ;;			// r15 points at onfault
-	mov	ret0=r0
-	br.ret.sptk.few rp
-END(fusufault)
-	
+
+ENTRY(fuword16, 2)
+{	.mlx
+	add		r15=PC_CURTHREAD,r13
+	movl		r14=VM_MAX_ADDRESS
+	;;
+}
+{	.mib
+	ld8		r15=[r15]		// r15 = curthread
+	cmp.geu		p6,p0=in0,r14
+(p6)	br.dpnt.few	1f
+	;;
+}
+{	.mlx
+	add		r15=TD_PCB,r15
+	movl		r14=fusufault
+	;;
+}
+{	.mmi
+	ld8		r15=[r15]		// r15 = PCB
+	;;
+	nop		0
+	add		r15=PCB_ONFAULT,r15
+	;;
+}
+{	.mmi
+	st8		[r15]=r14		// Set onfault
+	;;
+	mf
+	nop		0
+	;;
+}
+{	.mmb
+	ld2		ret0=[in0]
+	st8.rel		[r15]=r0		// Clear onfault
+	br.ret.sptk	rp
+	;;
+}
+1:
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+END(fuword16)
+
+ENTRY(fuword32, 2)
+{	.mlx
+	add		r15=PC_CURTHREAD,r13
+	movl		r14=VM_MAX_ADDRESS
+	;;
+}
+{	.mib
+	ld8		r15=[r15]		// r15 = curthread
+	cmp.geu		p6,p0=in0,r14
+(p6)	br.dpnt.few	1f
+	;;
+}
+{	.mlx
+	add		r15=TD_PCB,r15
+	movl		r14=fusufault
+	;;
+}
+{	.mmi
+	ld8		r15=[r15]		// r15 = PCB
+	;;
+	nop		0
+	add		r15=PCB_ONFAULT,r15
+	;;
+}
+{	.mmi
+	st8		[r15]=r14		// Set onfault
+	;;
+	mf
+	nop		0
+	;;
+}
+{	.mmb
+	ld4		ret0=[in0]
+	st8.rel		[r15]=r0		// Clear onfault
+	br.ret.sptk	rp
+	;;
+}
+1:
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+END(fuword32)
+
+ENTRY(fuword64, 2)
+XENTRY(fuword)
+{	.mlx
+	add		r15=PC_CURTHREAD,r13
+	movl		r14=VM_MAX_ADDRESS
+	;;
+}
+{	.mib
+	ld8		r15=[r15]		// r15 = curthread
+	cmp.geu		p6,p0=in0,r14
+(p6)	br.dpnt.few	1f
+	;;
+}
+{	.mlx
+	add		r15=TD_PCB,r15
+	movl		r14=fusufault
+	;;
+}
+{	.mmi
+	ld8		r15=[r15]		// r15 = PCB
+	;;
+	nop		0
+	add		r15=PCB_ONFAULT,r15
+	;;
+}
+{	.mmi
+	st8		[r15]=r14		// Set onfault
+	;;
+	mf
+	nop		0
+	;;
+}
+{	.mmb
+	ld8		ret0=[in0]
+	st8.rel		[r15]=r0		// Clear onfault
+	br.ret.sptk	rp
+	;;
+}
+1:
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+END(fuword64)
+
+/*
+ * fuswintr(void *addr)
+ * suswintr(void *addr)
+ */
+
 ENTRY(fswintrberr, 0)
-XENTRY(fuswintr)			/* XXX 16 bit short for profiling */
-XENTRY(suswintr)			/* XXX 16 bit short for profiling */
-	mov	ret0=-1
-	br.ret.sptk.few rp
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
 END(fswintrberr)
-	
+
+ENTRY(fuswintr, 1)
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+END(fuswintr)
+
+ENTRY(suswintr, 0)
+{	.mfb
+	add		ret0=-1,r0
+	nop		0
+	br.ret.sptk	rp
+	;;
+}
+END(suswintr)
+
 /**************************************************************************/
 
 /*
@@ -410,7 +697,6 @@ ENTRY(copystr, 4)
 
 4:	mov	ret0=0			// return 0.
 	br.ret.sptk.few rp
-	
 END(copystr)
 
 ENTRY(copyinstr, 4)
@@ -422,7 +708,7 @@ ENTRY(copyinstr, 4)
 	mov	loc1=rp
 	.body
 
-	movl	loc2=VM_MAXUSER_ADDRESS		// make sure that src addr
+	movl	loc2=VM_MAX_ADDRESS		// make sure that src addr
 	;; 
 	cmp.geu	p6,p0=in0,loc2			// is in user space.
 	;; 
@@ -450,55 +736,12 @@ ENTRY(copyinstr, 4)
 	mov	ar.pfs=loc0			// restore ar.pfs
 	mov	rp=loc1				// restore ra.
 	br.ret.sptk.few rp			// ret0 left over from copystr
-
 END(copyinstr)
-
-ENTRY(copyoutstr, 4)
-	.prologue
-	.regstk	4, 3, 4, 0
-	.save	ar.pfs,loc0
-	alloc	loc0=ar.pfs,4,3,4,0
-	.save	rp,loc1
-	mov	loc1=rp
-	.body
-
-	movl	loc2=VM_MAXUSER_ADDRESS		// make sure that dest addr
-	;; 
-	cmp.geu	p6,p0=in1,loc2			// is in user space.
-	;; 
-(p6)	br.cond.spnt.few copyerr		// if it's not, error out.
-	movl	r14=copyerr			// set up fault handler.
-	add	r15=PC_CURTHREAD,r13		// find curthread
-	;;
-	ld8	r15=[r15]
-	;;
-	add	r15=TD_PCB,r15			// find pcb
-	;;
-	ld8	r15=[r15]
-	;;
-	add	loc2=PCB_ONFAULT,r15
-	;;
-	st8	[loc2]=r14
-	;;
-	mov	out0=in0
-	mov	out1=in1
-	mov	out2=in2
-	mov	out3=in3
-	;;
-	br.call.sptk.few rp=copystr		// do the copy.
-	st8	[loc2]=r0			// kill the fault handler.
-	mov	ar.pfs=loc0			// restore ar.pfs
-	mov	rp=loc1				// restore ra.
-	br.ret.sptk.few rp			// ret0 left over from copystr
-
-END(copyoutstr)
 
 /*
  * Not the fastest bcopy in the world.
  */
 ENTRY(bcopy, 3)
-XENTRY(ovbcopy)
-
 	mov	ret0=r0				// return zero for copy{in,out}
 	;; 
 	cmp.le	p6,p0=in2,r0			// bail if len <= 0
@@ -560,29 +803,25 @@ XENTRY(ovbcopy)
 (p6)	br.cond.spnt.few 6b
 
 	br.ret.sptk.few rp
-
 END(bcopy)
 
 ENTRY(memcpy,3)
-	
 	mov	r14=in0 ;;
 	mov	in0=in1 ;;
 	mov	in1=r14
 	br.cond.sptk.few bcopy
-	
 END(memcpy)
 	
 ENTRY(copyin, 3)
-	
 	.prologue
-	.regstk	4, 3, 4, 0
+	.regstk	3, 3, 3, 0
 	.save	ar.pfs,loc0
-	alloc	loc0=ar.pfs,4,3,4,0
+	alloc	loc0=ar.pfs,3,3,3,0
 	.save	rp,loc1
 	mov	loc1=rp
 	.body
 
-	movl	loc2=VM_MAXUSER_ADDRESS		// make sure that src addr
+	movl	loc2=VM_MAX_ADDRESS		// make sure that src addr
 	;; 
 	cmp.geu	p6,p0=in0,loc2			// is in user space.
 	;; 
@@ -609,20 +848,18 @@ ENTRY(copyin, 3)
 	mov	ar.pfs=loc0			// restore ar.pfs
 	mov	rp=loc1				// restore ra.
 	br.ret.sptk.few rp			// ret0 left over from bcopy
-	
 END(copyin)
 
 ENTRY(copyout, 3)
-	
 	.prologue
-	.regstk	4, 3, 4, 0
+	.regstk	3, 3, 3, 0
 	.save	ar.pfs,loc0
-	alloc	loc0=ar.pfs,4,3,4,0
+	alloc	loc0=ar.pfs,3,3,3,0
 	.save	rp,loc1
 	mov	loc1=rp
 	.body
 
-	movl	loc2=VM_MAXUSER_ADDRESS		// make sure that dest addr
+	movl	loc2=VM_MAX_ADDRESS		// make sure that dest addr
 	;; 
 	cmp.geu	p6,p0=in1,loc2			// is in user space.
 	;; 
@@ -649,11 +886,9 @@ ENTRY(copyout, 3)
 	mov	ar.pfs=loc0			// restore ar.pfs
 	mov	rp=loc1				// restore ra.
 	br.ret.sptk.few rp			// ret0 left over from bcopy
-	
 END(copyout)
 
 ENTRY(copyerr, 0)
-
 	add	r14=PC_CURTHREAD,r13 ;;		// find curthread
 	ld8	r14=[r14] ;;
 	add	r14=TD_PCB,r14 ;;		// curthread->td_addr
@@ -663,5 +898,4 @@ ENTRY(copyerr, 0)
 	
 	mov	ret0=EFAULT			// return EFAULT
 	br.ret.sptk.few rp
-
 END(copyerr)

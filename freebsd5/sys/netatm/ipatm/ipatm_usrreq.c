@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_usrreq.c,v 1.9 2002/04/21 01:41:04 arr Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_usrreq.c,v 1.10 2003/01/28 12:10:11 phk Exp $
  *
  */
 
@@ -61,7 +61,7 @@
 #include <netatm/ipatm/ipatm_serv.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_usrreq.c,v 1.9 2002/04/21 01:41:04 arr Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_usrreq.c,v 1.10 2003/01/28 12:10:11 phk Exp $");
 #endif
 
 
@@ -238,7 +238,14 @@ ipatm_ioctl(code, data, arg1)
 
 		/*
 		 * Notify the responsible ARP service
+		 *
+		 * XXX: if there is one.  No idea how this happens, but at
+		 * least don't panic on a NULL pointer if it does.
 		 */
+		if (inp->inf_serv == NULL) {
+			err = ENXIO;
+			break;
+		}
 		err = (*inp->inf_serv->is_ioctl)(code, data, inp->inf_isintf);
 		break;
 

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/rc/rc.c,v 1.74 2002/11/08 18:32:57 jhb Exp $
+ * $FreeBSD: src/sys/dev/rc/rc.c,v 1.80 2003/03/05 08:16:28 das Exp $
  */
 
 /*
@@ -35,11 +35,12 @@
 
 /*#define RCDEBUG*/
 
+#include "opt_tty.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/dkstat.h>
 #include <sys/fcntl.h>
 #include <sys/interrupt.h>
 #include <sys/kernel.h>
@@ -147,20 +148,16 @@ static	d_ioctl_t	rcioctl;
 
 #define	CDEV_MAJOR	63
 static struct cdevsw rc_cdevsw = {
-	/* open */	rcopen,
-	/* close */	rcclose,
-	/* read */	ttyread,
-	/* write */	ttywrite,
-	/* ioctl */	rcioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"rc",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	rcopen,
+	.d_close =	rcclose,
+	.d_read =	ttyread,
+	.d_write =	ttywrite,
+	.d_ioctl =	rcioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"rc",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 static devclass_t rc_devclass;
@@ -819,11 +816,10 @@ done1: ;
 				critical_exit();
 				(*linesw[tp->t_line].l_start)(tp);
 			}
+			if (sc->sc_scheduled_event == 0)
+				break;
 		}
-		if (sc->sc_scheduled_event == 0)
-			break;
-	}
-	while (sc->sc_scheduled_event >= LOTS_OF_EVENTS);
+	} while (sc->sc_scheduled_event >= LOTS_OF_EVENTS);
 }
 
 static void
@@ -1009,7 +1005,7 @@ rc_hardclose(struct rc_chans *rc)
 		}
 	}
 	rc->rc_flags &= ~RC_ACTOUT;
-	wakeup((caddr_t) &rc->rc_rcb);  /* wake bi */
+	wakeup( &rc->rc_rcb);  /* wake bi */
 	wakeup(TSA_CARR_ON(tp));
 	(void) splx(s);
 }

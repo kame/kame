@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/disk.h,v 1.26 2002/09/20 19:36:05 phk Exp $
+ * $FreeBSD: src/sys/sys/disk.h,v 1.39 2003/04/01 18:55:04 phk Exp $
  *
  */
 
@@ -17,34 +17,13 @@
 
 #ifdef _KERNEL
 
-#include <sys/queue.h>
+#ifndef _SYS_CONF_H_
+#include <sys/conf.h>	/* XXX: temporary to avoid breakage */
+#endif
 
-struct disk {
-	u_int			d_flags;
-	u_int			d_dsflags;
-	struct cdevsw		*d_devsw;
-	dev_t			d_dev;
-
-	/* These four fields must be valid while opened */
-	u_int			d_sectorsize;
-	off_t			d_mediasize;
-	u_int			d_fwsectors;
-	u_int			d_fwheads;
-
-	struct diskslices	*d_slice;
-	struct disklabel	*d_label;
-	LIST_ENTRY(disk)	d_list;
-	void			*d_softc;
-};
-
-#define DISKFLAG_LOCK		0x1
-#define DISKFLAG_WANTED		0x2
-
-dev_t disk_create(int unit, struct disk *disk, int flags, struct cdevsw *cdevsw, struct cdevsw *diskdevsw);
-void disk_destroy(dev_t dev);
+struct disk;
 struct disk *disk_enumerate(struct disk *disk);
 void disk_err(struct bio *bp, const char *what, int blkdone, int nl);
-void disk_invalidate(struct disk *disk);
 
 #endif
 

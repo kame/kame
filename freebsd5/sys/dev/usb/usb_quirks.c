@@ -1,5 +1,5 @@
-/*	$NetBSD: usb_quirks.c,v 1.38 2001/04/15 10:26:36 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.28 2002/04/06 13:28:02 phk Exp $	*/
+/*	$NetBSD: usb_quirks.c,v 1.42 2003/01/02 04:19:00 imp Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.33 2003/04/10 08:25:09 mdodd Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,7 +40,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
- 
+
 #include <dev/usb/usb.h>
 
 #include <dev/usb/usbdevs.h>
@@ -59,7 +59,7 @@ Static const struct usbd_quirk_entry {
 	struct usbd_quirks quirks;
 } usb_quirks[] = {
  { USB_VENDOR_KYE, USB_PRODUCT_KYE_NICHE,	    0x100, { UQ_NO_SET_PROTO}},
- { USB_VENDOR_INSIDEOUT, USB_PRODUCT_INSIDEOUT_EDGEPORT4, 
+ { USB_VENDOR_INSIDEOUT, USB_PRODUCT_INSIDEOUT_EDGEPORT4,
    						    0x094, { UQ_SWAP_UNICODE}},
  { USB_VENDOR_BTC, USB_PRODUCT_BTC_BTC7932,	    0x100, { UQ_NO_STRINGS }},
  { USB_VENDOR_ADS, USB_PRODUCT_ADS_UBS10BT,	    0x002, { UQ_NO_STRINGS }},
@@ -75,12 +75,15 @@ Static const struct usbd_quirk_entry {
  { USB_VENDOR_MCT, USB_PRODUCT_MCT_USB232,          0x102, { UQ_BUS_POWERED }},
  { USB_VENDOR_METRICOM, USB_PRODUCT_METRICOM_RICOCHET_GS,
  	0x100, { UQ_ASSUME_CM_OVER_DATA | UQ_NO_STRINGS }},
+ { USB_VENDOR_SANYO, USB_PRODUCT_SANYO_SCP4900,
+ 	0x000, { UQ_ASSUME_CM_OVER_DATA | UQ_NO_STRINGS }},
  { USB_VENDOR_TI, USB_PRODUCT_TI_UTUSB41,	    0x110, { UQ_POWER_CLAIM }},
  { USB_VENDOR_ACERP, USB_PRODUCT_ACERP_ACERSCAN_320U,
 						    0x000, { UQ_NO_STRINGS }},
  { USB_VENDOR_TELEX, USB_PRODUCT_TELEX_MIC1,	    0x009, { UQ_AU_NO_FRAC }},
  { USB_VENDOR_SILICONPORTALS, USB_PRODUCT_SILICONPORTALS_YAPPHONE,
    						    0x100, { UQ_AU_INP_ASYNC }},
+ { USB_VENDOR_NEODIO, USB_PRODUCT_NEODIO_ND5010,    0x100, { UQ_NO_STRINGS }},
  /* XXX These should have a revision number, but I don't know what they are. */
  { USB_VENDOR_HP, USB_PRODUCT_HP_895C,		    ANY,   { UQ_BROKEN_BIDIR }},
  { USB_VENDOR_HP, USB_PRODUCT_HP_880C,		    ANY,   { UQ_BROKEN_BIDIR }},
@@ -88,6 +91,16 @@ Static const struct usbd_quirk_entry {
  { USB_VENDOR_HP, USB_PRODUCT_HP_810C,		    ANY,   { UQ_BROKEN_BIDIR }},
  { USB_VENDOR_HP, USB_PRODUCT_HP_830C,		    ANY,   { UQ_BROKEN_BIDIR }},
  { USB_VENDOR_HP, USB_PRODUCT_HP_1220C,		    ANY,   { UQ_BROKEN_BIDIR }},
+ /* YAMAHA router's ucdDevice is the version of farmware and often changes. */
+ { USB_VENDOR_YAMAHA, USB_PRODUCT_YAMAHA_RTA54I,
+	ANY, { UQ_ASSUME_CM_OVER_DATA }},
+ { USB_VENDOR_YAMAHA, USB_PRODUCT_YAMAHA_RTA55I,
+	ANY, { UQ_ASSUME_CM_OVER_DATA }},
+ { USB_VENDOR_YAMAHA, USB_PRODUCT_YAMAHA_RTW65B,
+	ANY, { UQ_ASSUME_CM_OVER_DATA }},
+ { USB_VENDOR_YAMAHA, USB_PRODUCT_YAMAHA_RTW65I,
+	ANY, { UQ_ASSUME_CM_OVER_DATA }},
+ { USB_VENDOR_LOGITECH, USB_PRODUCT_LOGITECH_WMRPAD,  ANY, { UQ_NO_STRINGS }},
 
  { 0, 0, 0, { 0 } }
 };
@@ -110,7 +123,7 @@ usbd_find_quirk(usb_device_descriptor_t *d)
 	}
 #ifdef USB_DEBUG
 	if (usbdebug && t->quirks.uq_flags)
-		logprintf("usbd_find_quirk 0x%04x/0x%04x/%x: %d\n", 
+		logprintf("usbd_find_quirk 0x%04x/0x%04x/%x: %d\n",
 			  UGETW(d->idVendor), UGETW(d->idProduct),
 			  UGETW(d->bcdDevice), t->quirks.uq_flags);
 #endif

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb.h,v 1.6 2002/09/16 09:26:07 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb.h,v 1.9 2003/01/01 18:48:56 schweikh Exp $
  */
 
 /*
@@ -68,7 +68,7 @@ enum smb_dialects {
  */
 #define	SMB_SIGNATURE		"\xFFSMB"
 #define	SMB_SIGLEN		4
-#define	SMB_HDRMID(p)		(letohs(*(u_short*)((u_char*)(p) + 30)))
+#define	SMB_HDRMID(p)		(le16toh(*(u_short*)((u_char*)(p) + 30)))
 #define	SMB_HDRLEN		32
 /*
  * bits in the smb_flags field
@@ -334,7 +334,7 @@ enum smb_dialects {
 #define SMBSUCCESS	0x00
 #define ERRDOS		0x01
 #define ERRSRV		0x02
-#define ERRHRD		0x03	/* Error is an hardware error. */
+#define ERRHRD		0x03	/* Error is a hardware error. */
 #define ERRCMD		0xFF	/* Command was not in the "SMB" format. */
 
 /*
@@ -432,7 +432,7 @@ enum smb_dialects {
 #define ERRwrite	29	/* Write fault */
 #define ERRread		30	/* Read fault */
 #define ERRgeneral	31	/* General failure */
-#define	ERRbadshare	32	/* A open conflicts with an existing open */
+#define	ERRbadshare	32	/* An open conflicts with an existing open */
 #define	ERRlock		33	/* lock/unlock conflict */
 #define ERRwrongdisk	34	/* The wrong disk was found in a drive */
 #define ERRFCBunavail	35	/* No FCBs available */

@@ -59,7 +59,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm.h,v 1.21 2002/03/10 21:52:46 eivind Exp $
+ * $FreeBSD: src/sys/vm/vm.h,v 1.22 2002/12/16 19:24:43 dillon Exp $
  */
 
 #ifndef VM_H
@@ -81,6 +81,7 @@ typedef u_char vm_prot_t;	/* protection codes */
 #define	VM_PROT_OVERRIDE_WRITE	((vm_prot_t) 0x08)	/* copy-on-write */
 
 #define	VM_PROT_ALL		(VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE)
+#define VM_PROT_RW		(VM_PROT_READ|VM_PROT_WRITE)
 #define	VM_PROT_DEFAULT		VM_PROT_ALL
 
 union vm_map_object;

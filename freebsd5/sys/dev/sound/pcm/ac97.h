@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/ac97.h,v 1.12 2002/08/23 06:19:28 orion Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/ac97.h,v 1.13 2003/01/25 16:54:05 orion Exp $
  */
 
 #define AC97_MUTE	0x8000
@@ -100,4 +100,7 @@ int ac97_setextmode(struct ac97_info *codec, u_int16_t mode);
 u_int16_t ac97_getextmode(struct ac97_info *codec);
 u_int16_t ac97_getextcaps(struct ac97_info *codec);
 u_int16_t ac97_getcaps(struct ac97_info *codec);
+
+u_int16_t ac97_rdcd(struct ac97_info *codec, int reg);
+void	  ac97_wrcd(struct ac97_info *codec, int reg, u_int16_t val);
 

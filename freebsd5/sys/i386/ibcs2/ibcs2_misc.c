@@ -45,7 +45,7 @@
  *
  *	@(#)sun_misc.c	8.1 (Berkeley) 6/18/93
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_misc.c,v 1.41.2.1 2002/12/19 09:40:08 alfred Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_misc.c,v 1.49 2003/02/19 05:47:22 imp Exp $
  */
 
 /*
@@ -323,7 +323,7 @@ ibcs2_getdents(td, uap)
 		fdrop(fp, td);
 		return (EBADF);
 	}
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	if (vp->v_type != VDIR) {	/* XXX  vnode readdir op should do this */
 		fdrop(fp, td);
 		return (EINVAL);
@@ -411,7 +411,7 @@ again:
 			break;
 		}
 		/*
-		 * Massage in place to make a iBCS2-shaped dirent (otherwise
+		 * Massage in place to make an iBCS2-shaped dirent (otherwise
 		 * we have to worry about touching user memory outside of
 		 * the copyout() call).
 		 */
@@ -480,7 +480,7 @@ ibcs2_read(td, uap)
 		fdrop(fp, td);
 		return (EBADF);
 	}
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
 		return read(td, (struct read_args *)uap);
@@ -574,7 +574,7 @@ again:
 			break;
 		}
 		/*
-		 * Massage in place to make a iBCS2-shaped dirent (otherwise
+		 * Massage in place to make an iBCS2-shaped dirent (otherwise
 		 * we have to worry about touching user memory outside of
 		 * the copyout() call).
 		 *

@@ -1,12 +1,12 @@
-# $Id: Makefile,v 1.5 2002/09/04 21:36:51 max Exp $
-# $FreeBSD: src/sys/modules/netgraph/bluetooth/hci/Makefile,v 1.2 2002/11/21 07:21:44 imp Exp $
+# $Id: Makefile,v 1.1 2002/11/24 20:40:05 max Exp $
+# $FreeBSD: src/sys/modules/netgraph/bluetooth/hci/Makefile,v 1.3 2003/05/10 21:44:38 julian Exp $
 
 .PATH: ${.CURDIR}/../../../../netgraph/bluetooth/hci
 
 CFLAGS+=	-g -I${.CURDIR}/../../../../netgraph/bluetooth/include \
-		-I${.CURDIR}/../../../../netgraph/bluetooth/hci \
-		-DINVARIANTS=1 -DINVARIANT_SUPPORT=1 \
-		-DWITNESS=1 -DWITNESS_SKIPSPIN=1
+		-I${.CURDIR}/../../../../netgraph/bluetooth/hci
+
+#CFLAGS+=	-DINVARIANTS=1 -DINVARIANT_SUPPORT=1 
 
 KMOD=		ng_hci
 SRCS=		ng_hci_main.c ng_hci_cmds.c ng_hci_evnt.c  \

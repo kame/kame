@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/sal.c,v 1.11 2002/08/29 05:49:04 jake Exp $
+ * $FreeBSD: src/sys/ia64/ia64/sal.c,v 1.12 2003/02/01 22:50:09 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -85,7 +85,7 @@ ia64_sal_init(struct sal_system_table *saltab)
 	u_int8_t *p;
 	int i;
 
-	if (memcmp(saltab->sal_signature, "SST_", 4)) {
+	if (memcmp(saltab->sal_signature, SAL_SIGNATURE, 4)) {
 		printf("Bad signature for SAL System Table\n");
 		return;
 	}

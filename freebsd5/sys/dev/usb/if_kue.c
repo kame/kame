@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/usb/if_kue.c,v 1.42 2002/11/14 23:54:55 sam Exp $
  */
 
 /*
@@ -64,6 +62,9 @@
  * the development of this driver.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.47 2003/04/15 06:37:27 mdodd Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -92,12 +93,8 @@
 #include <dev/usb/if_kuereg.h>
 #include <dev/usb/kue_fw.h>
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.42 2002/11/14 23:54:55 sam Exp $";
-#endif
-
-MODULE_DEPEND(if_kue, usb, 1, 1, 1);
+MODULE_DEPEND(kue, usb, 1, 1, 1);
+MODULE_DEPEND(kue, ether, 1, 1, 1);
 
 /*
  * Various supported device vendors/products.
@@ -117,6 +114,7 @@ Static struct kue_type kue_devs[] = {
 	{ USB_VENDOR_SMC, USB_PRODUCT_SMC_2102USB },
 	{ USB_VENDOR_LINKSYS, USB_PRODUCT_LINKSYS_USB10T },
 	{ USB_VENDOR_KLSI, USB_PRODUCT_KLSI_DUH3E10BT },
+	{ USB_VENDOR_KLSI, USB_PRODUCT_KLSI_DUH3E10BTN },
 	{ USB_VENDOR_PERACOM, USB_PRODUCT_PERACOM_ENET3 },
 	{ USB_VENDOR_IODATA, USB_PRODUCT_IODATA_USBETT },
 	{ USB_VENDOR_ABOCOM, USB_PRODUCT_ABOCOM_URE450 },
@@ -170,7 +168,7 @@ Static driver_t kue_driver = {
 
 Static devclass_t kue_devclass;
 
-DRIVER_MODULE(if_kue, uhub, kue_driver, kue_devclass, usbd_driver_load, 0);
+DRIVER_MODULE(kue, uhub, kue_driver, kue_devclass, usbd_driver_load, 0);
 
 /*
  * We have a custom do_request function which is almost like the

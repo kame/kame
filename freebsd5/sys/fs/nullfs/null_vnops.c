@@ -40,7 +40,7 @@
  *	...and...
  *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  *
- * $FreeBSD: src/sys/fs/nullfs/null_vnops.c,v 1.60 2002/10/16 08:00:32 phk Exp $
+ * $FreeBSD: src/sys/fs/nullfs/null_vnops.c,v 1.62 2003/03/03 19:15:38 njl Exp $
  */
 
 /*
@@ -157,7 +157,7 @@
  * is appropriate in different situations.  In both cases,
  * it is the responsibility of the aliasing layer to make
  * the operation arguments "correct" for the lower layer
- * by mapping an vnode arguments to the lower layer.
+ * by mapping a vnode arguments to the lower layer.
  *
  * The first approach is to call the aliasing layer's bypass routine.
  * This method is most suitable when you wish to invoke the operation
@@ -771,8 +771,7 @@ null_print(ap)
 	} */ *ap;
 {
 	register struct vnode *vp = ap->a_vp;
-	printf("\ttag %s, vp=%p, lowervp=%p\n", vp->v_tag, vp,
-	       NULLVPTOLOWERVP(vp));
+	printf("\tvp=%p, lowervp=%p\n", vp, NULLVPTOLOWERVP(vp));
 	return (0);
 }
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)uipc_usrreq.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_usrreq.c,v 1.98 2002/10/28 21:17:53 rwatson Exp $
+ * $FreeBSD: src/sys/kern/uipc_usrreq.c,v 1.110 2003/03/23 19:41:34 cognet Exp $
  */
 
 #include "opt_mac.h"
@@ -220,6 +220,14 @@ uipc_peeraddr(struct socket *so, struct sockaddr **nam)
 	if (unp->unp_conn && unp->unp_conn->unp_addr)
 		*nam = dup_sockaddr((struct sockaddr *)unp->unp_conn->unp_addr,
 				    1);
+	else {
+		/*
+		 * XXX: It seems that this test always fails even when
+		 * connection is established.  So, this else clause is
+		 * added as workaround to return PF_LOCAL sockaddr.
+		 */
+		*nam = dup_sockaddr((struct sockaddr *)&sun_noname, 1);
+	}
 	return 0;
 }
 
@@ -404,7 +412,7 @@ uipc_sense(struct socket *so, struct stat *sb)
 	}
 	sb->st_dev = NOUDEV;
 	if (unp->unp_ino == 0)
-		unp->unp_ino = unp_ino++;
+		unp->unp_ino = (++unp_ino == 0) ? ++unp_ino : unp_ino;
 	sb->st_ino = unp->unp_ino;
 	return (0);
 }
@@ -541,9 +549,6 @@ unp_attach(so)
 	unp_count++;
 	LIST_INIT(&unp->unp_refs);
 	unp->unp_socket = so;
-	FILEDESC_LOCK(curproc->p_fd);
-	unp->unp_rvnode = curthread->td_proc->p_fd->fd_rdir;
-	FILEDESC_UNLOCK(curproc->p_fd);
 	LIST_INSERT_HEAD(so->so_type == SOCK_DGRAM ? &unp_dhead
 			 : &unp_shead, unp, unp_link);
 	so->so_pcb = unp;
@@ -638,9 +643,7 @@ restart:
 	}
 	VATTR_NULL(&vattr);
 	vattr.va_type = VSOCK;
-	FILEDESC_LOCK(td->td_proc->p_fd);
 	vattr.va_mode = (ACCESSPERMS & ~td->td_proc->p_fd->fd_cmask);
-	FILEDESC_UNLOCK(td->td_proc->p_fd);
 #ifdef MAC
 	error = mac_check_vnode_create(td->td_ucred, nd.ni_dvp, &nd.ni_cnd,
 	    &vattr);
@@ -1008,7 +1011,7 @@ unp_externalize(control, controlp)
 			newfds = datalen / sizeof(struct file *);
 			rp = data;
 
-			/* If we're not outputting the discriptors free them. */
+			/* If we're not outputting the descriptors free them. */
 			if (error || controlp == NULL) {
 				unp_freerights(rp, newfds);
 				goto next;
@@ -1095,10 +1098,6 @@ unp_init(void)
 	LIST_INIT(&unp_shead);
 }
 
-#ifndef MIN
-#define	MIN(a,b) (((a)<(b))?(a):(b))
-#endif
-
 static int
 unp_internalize(controlp, td)
 	struct mbuf **controlp;
@@ -1172,6 +1171,13 @@ unp_internalize(controlp, td)
 					error = EBADF;
 					goto out;
 				}
+				fp = fdescp->fd_ofiles[fd];
+				if (!(fp->f_ops->fo_flags & DFLAG_PASSABLE)) {
+					FILEDESC_UNLOCK(fdescp);
+					error = EOPNOTSUPP;
+					goto out;
+				}
+
 			}
 			/*
 			 * Now replace the integer FDs with pointers to
@@ -1305,7 +1311,7 @@ unp_gc()
 			 * Now check if it is possibly one of OUR sockets.
 			 */ 
 			if (fp->f_type != DTYPE_SOCKET ||
-			    (so = (struct socket *)fp->f_data) == 0) {
+			    (so = fp->f_data) == NULL) {
 				FILE_UNLOCK(fp);
 				continue;
 			}
@@ -1412,9 +1418,10 @@ unp_gc()
 	for (i = nunref, fpp = extra_ref; --i >= 0; ++fpp) {
 		struct file *tfp = *fpp;
 		FILE_LOCK(tfp);
-		if (tfp->f_type == DTYPE_SOCKET && tfp->f_data != NULL) {
+		if (tfp->f_type == DTYPE_SOCKET &&
+		    tfp->f_data != NULL) {
 			FILE_UNLOCK(tfp);
-			sorflush((struct socket *)(tfp->f_data));
+			sorflush(tfp->f_data);
 		} else
 			FILE_UNLOCK(tfp);
 	}

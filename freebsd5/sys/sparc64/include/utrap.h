@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/utrap.h,v 1.3 2002/10/27 17:22:43 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/utrap.h,v 1.4 2003/04/29 21:30:59 jake Exp $
  */
 
 #ifndef	_MACHINE_UTRAP_H_
@@ -62,7 +62,9 @@
 #define	UT_TRAP_INSTRUCTION_29		31
 #define	UT_TRAP_INSTRUCTION_30		32
 #define	UT_TRAP_INSTRUCTION_31		33
-#define	UT_MAX				34
+#define	UT_INSTRUCTION_MISS		34
+#define	UT_DATA_MISS			35
+#define	UT_MAX				36
 
 #define	ST_SUNOS_SYSCALL		0
 #define	ST_BREAKPOINT			1

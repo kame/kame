@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mii/inphy.c,v 1.10 2002/10/29 00:20:47 semenu Exp $
+ *	$FreeBSD: src/sys/dev/mii/inphy.c,v 1.12 2003/02/19 00:32:01 peter Exp $
  */
 
 /*
@@ -44,7 +44,7 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-#include <dev/mii/miidevs.h>
+#include "miidevs.h"
 
 #include <dev/mii/inphyreg.h>
 
@@ -79,10 +79,8 @@ static int
 inphy_probe(device_t dev)
 {
 	struct mii_attach_args *ma;
-	device_t parent;
 
 	ma = device_get_ivars(dev);
-	parent = device_get_parent(device_get_parent(dev));
 
 	/* Intel 82553 A/B steppings */
 	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxINTEL &&

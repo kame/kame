@@ -29,12 +29,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/bde/g_bde.c,v 1.6.2.1 2002/12/20 21:52:03 phk Exp $
+ * $FreeBSD: src/sys/geom/bde/g_bde.c,v 1.19 2003/05/05 08:58:12 phk Exp $
  *
  */
 
 #include <sys/param.h>
-#include <sys/stdint.h>
 #include <sys/bio.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -66,7 +65,6 @@ g_bde_start(struct bio *bp)
 		g_bde_start1(bp);
 		break;
 	case BIO_GETATTR:
-	case BIO_SETATTR:
 		g_io_deliver(bp, EOPNOTSUPP);
 		break;
 	default:
@@ -120,86 +118,32 @@ g_bde_access(struct g_provider *pp, int dr, int dw, int de)
 }
 
 static int
-g_bde_config(struct g_configargs *ga)
+g_bde_create_geom(struct gctl_req *req, struct g_class *mp, struct g_provider *pp)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
-	struct g_provider *pp;
 	struct g_bde_key *kp;
-	int error;
+	int error, i;
 	u_int sectorsize;
 	off_t mediasize;
 	struct g_bde_softc *sc;
+	void *pass;
+	void *key;
 
-	g_trace(G_T_TOPOLOGY, "g_bde_config(%d)", ga->flag);
+	if (pp == NULL)
+		return (gctl_error(req, "Provider needed"));
+	g_trace(G_T_TOPOLOGY, "g_bde_create_geom(%s, %s)", mp->name, pp->name);
 	g_topology_assert();
 	gp = NULL;
-	if (ga->flag == GCFG_DISMANTLE) {
-		/*
-		 * Orderly detachment.
-		 */
-		if (ga->geom != NULL) {
-			gp = ga->geom;
-		} else if (ga->provider != NULL) {
-			if (ga->provider->geom->class == ga->class) {
-				gp = ga->provider->geom;
-			} else {
-				LIST_FOREACH(cp, &ga->provider->consumers,
-				    consumers) {
-					if (cp->geom->class == ga->class) {
-						gp = cp->geom;
-						break;
-					}
-				}
-			}
-			if (gp == NULL)
-				return (EINVAL);
-		} else {
-			return (EINVAL);
-		}
-		KASSERT(gp != NULL, ("NULL geom"));
-		pp = LIST_FIRST(&gp->provider);
-		KASSERT(pp != NULL, ("NULL provider"));
-		if (pp->acr > 0 || pp->acw > 0 || pp->ace > 0)
-			return (EBUSY);
-		g_orphan_provider(pp, ENXIO);
-		sc = gp->softc;
-		cp = LIST_FIRST(&gp->consumer);
-		KASSERT(cp != NULL, ("NULL consumer"));
-		sc->dead = 1;
-		wakeup(sc);
-		error = g_access_rel(cp, -1, -1, -1);
-		KASSERT(error == 0, ("error on close"));
-		g_detach(cp);
-		g_destroy_consumer(cp);
-		g_topology_unlock();
-		while (sc->dead != 2 && !LIST_EMPTY(&pp->consumers))
-			tsleep(sc, PRIBIO, "g_bdedie", hz);
-		g_waitidle();
-		g_topology_lock();
-		g_destroy_provider(pp);
-		mtx_destroy(&sc->worklist_mutex);
-		bzero(&sc->key, sizeof sc->key);
-		g_free(sc);
-		g_destroy_geom(gp);
-		return (0);
-	}
 
-	if (ga->flag != GCFG_CREATE)
-		return (EOPNOTSUPP);
 
-	if (ga->provider == NULL)
-		return (EINVAL);
-	/*
-	 * Attach
-	 */
-	gp = g_new_geomf(ga->class, "%s.bde", ga->provider->name);
+	gp = g_new_geomf(mp, "%s.bde", pp->name);
 	gp->start = g_bde_start;
 	gp->orphan = g_bde_orphan;
 	gp->access = g_bde_access;
 	gp->spoiled = g_std_spoiled;
 	cp = g_new_consumer(gp);
-	g_attach(cp, ga->provider);
+	g_attach(cp, pp);
 	error = g_access_rel(cp, 1, 1, 1);
 	if (error) {
 		g_detach(cp);
@@ -209,7 +153,19 @@ g_bde_config(struct g_configargs *ga)
 	}
 	g_topology_unlock();
 	g_waitidle();
-	while (1) {
+	pass = NULL;
+	key = NULL;
+	do {
+		pass = gctl_get_param(req, "pass", &i);
+		if (pass == NULL || i != SHA512_DIGEST_LENGTH) {
+			error = gctl_error(req, "No usable key presented");
+			break;
+		}
+		key = gctl_get_param(req, "key", &i);
+		if (key != NULL && i != 16) {
+			error = gctl_error(req, "Invalid key presented");
+			break;
+		}
 		sectorsize = cp->provider->sectorsize;
 		mediasize = cp->provider->mediasize;
 		sc = g_malloc(sizeof(struct g_bde_softc), M_WAITOK | M_ZERO);
@@ -217,8 +173,7 @@ g_bde_config(struct g_configargs *ga)
 		sc->geom = gp;
 		sc->consumer = cp;
 
-		error = g_bde_decrypt_lock(sc, ga->ptr,
-		    (u_char *)ga->ptr + (sizeof sc->sha2),
+		error = g_bde_decrypt_lock(sc, pass, key,
 		    mediasize, sectorsize, NULL);
 		bzero(sc->sha2, sizeof sc->sha2);
 		if (error)
@@ -247,19 +202,35 @@ g_bde_config(struct g_configargs *ga)
 		mtx_unlock(&Giant);
 		g_topology_lock();
 		pp = g_new_providerf(gp, gp->name);
+#if 0
+		/*
+		 * XXX: Disable this for now.  Appearantly UFS no longer
+		 * XXX: issues BIO_DELETE requests correctly, with the obvious
+		 * XXX: outcome that userdata is trashed.
+		 */
+		pp->flags |= G_PF_CANDELETE;
+#endif
+		pp->stripesize = kp->zone_cont;
+		pp->stripeoffset = 0;
 		pp->mediasize = sc->mediasize;
 		pp->sectorsize = sc->sectorsize;
 		g_error_provider(pp, 0);
 		g_topology_unlock();
 		break;
+	} while (0);
+	if (pass != NULL) {
+		bzero(pass, SHA512_DIGEST_LENGTH);
+		g_free(pass);
+	}
+	if (key != NULL) {
+		bzero(key, 16);
+		g_free(key);
 	}
 	g_topology_lock();
 	if (error == 0) {
-		ga->geom = gp;
 		return (0);
-	} else {
-		g_access_rel(cp, -1, -1, -1);
 	}
+	g_access_rel(cp, -1, -1, -1);
 	g_detach(cp);
 	g_destroy_consumer(cp);
 	if (gp->softc != NULL)
@@ -268,10 +239,52 @@ g_bde_config(struct g_configargs *ga)
 	return (error);
 }
 
+
+static int
+g_bde_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
+{
+	struct g_consumer *cp;
+	struct g_provider *pp;
+	int error;
+	struct g_bde_softc *sc;
+
+	g_trace(G_T_TOPOLOGY, "g_bde_destroy_geom(%s, %s)", mp->name, gp->name);
+	g_topology_assert();
+	/*
+	 * Orderly detachment.
+	 */
+	KASSERT(gp != NULL, ("NULL geom"));
+	pp = LIST_FIRST(&gp->provider);
+	KASSERT(pp != NULL, ("NULL provider"));
+	if (pp->acr > 0 || pp->acw > 0 || pp->ace > 0)
+		return (EBUSY);
+	g_orphan_provider(pp, ENXIO);
+	sc = gp->softc;
+	cp = LIST_FIRST(&gp->consumer);
+	KASSERT(cp != NULL, ("NULL consumer"));
+	sc->dead = 1;
+	wakeup(sc);
+	error = g_access_rel(cp, -1, -1, -1);
+	KASSERT(error == 0, ("error on close"));
+	g_detach(cp);
+	g_destroy_consumer(cp);
+	g_topology_unlock();
+	while (sc->dead != 2 && !LIST_EMPTY(&pp->consumers))
+		tsleep(sc, PRIBIO, "g_bdedie", hz);
+	g_waitidle();
+	g_topology_lock();
+	g_destroy_provider(pp);
+	mtx_destroy(&sc->worklist_mutex);
+	bzero(&sc->key, sizeof sc->key);
+	g_free(sc);
+	g_destroy_geom(gp);
+	return (0);
+}
+
 static struct g_class g_bde_class	= {
-	BDE_CLASS_NAME,
-	NULL,
-	g_bde_config,
+	.name = BDE_CLASS_NAME,
+	.create_geom = g_bde_create_geom,
+	.destroy_geom = g_bde_destroy_geom,
 	G_CLASS_INITIALIZER
 };
 

@@ -29,12 +29,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_lock.c,v 1.30 2002/11/20 15:21:06 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_lock.c,v 1.36 2003/05/30 17:15:56 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/fcntl.h>
 #include <sys/kernel.h>		/* for hz */
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/lockf.h>		/* for hz */ /* Must come after sys/malloc.h */
@@ -47,8 +48,6 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_lock.c,v 1.30 2002/11/20 15:21:06 alfr
 #include <sys/socket.h>
 #include <sys/unistd.h>
 #include <sys/vnode.h>
-
-#include <machine/limits.h>
 
 #include <net/if.h>
 
@@ -116,6 +115,7 @@ nfs_dolock(struct vop_advlock_args *ap)
 		MALLOC(p->p_nlminfo, struct nlminfo *,
 			sizeof(struct nlminfo), M_LOCKF, M_WAITOK | M_ZERO);
 		p->p_nlminfo->pid_start = p->p_stats->p_start;
+		timevaladd(&p->p_nlminfo->pid_start, &boottime);
 	}
 	msg.lm_msg_ident.pid_start = p->p_nlminfo->pid_start;
 	msg.lm_msg_ident.msg_seq = ++(p->p_nlminfo->msg_seq);
@@ -143,10 +143,20 @@ nfs_dolock(struct vop_advlock_args *ap)
 	 */
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, _PATH_LCKFIFO, td);
 
-	fmode = FFLAGS(O_WRONLY);
+	fmode = FFLAGS(O_WRONLY | O_NONBLOCK);
 	error = vn_open_cred(&nd, &fmode, 0, thread0.td_ucred);
-	if (error != 0) {
-		return (error == ENOENT ? EOPNOTSUPP : error);
+	switch (error) {
+	case ENOENT:
+	case ENXIO:
+		/*
+		 * Map a failure to find the fifo or no listener on the
+		 * fifo to locking not being supported.
+		 */
+		return (EOPNOTSUPP);
+	case 0:
+		break;
+	default:
+		return (error);
 	}
 	wvp = nd.ni_vp;
 	VOP_UNLOCK(wvp, 0, td);		/* vn_open leaves it locked */
@@ -181,7 +191,7 @@ nfs_dolock(struct vop_advlock_args *ap)
 		 * on a local network).  XXX Probably should use a back-off
 		 * scheme.
 		 */
-		error = tsleep(p->p_nlminfo, PCATCH | PUSER, "lockd", 20*hz);
+		error = tsleep(p->p_nlminfo, PUSER, "lockd", 20*hz);
 		if (error != 0) {
 			if (error == EWOULDBLOCK) {
 				/*

@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)conf.h	8.5 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/conf.h,v 1.150.2.1 2002/12/17 22:36:33 mckusick Exp $
+ * $FreeBSD: src/sys/sys/conf.h,v 1.172 2003/03/25 00:07:05 jake Exp $
  */
 
 #ifndef _SYS_CONF_H_
@@ -63,6 +63,7 @@ struct cdev {
 #define SI_DEVOPEN	0x0020	/* opened by device */
 #define SI_CONSOPEN	0x0040	/* opened by console */
 #define SI_DUMPDEV	0x0080	/* is kernel dumpdev */
+#define SI_CANDELETE	0x0100	/* can do BIO_DELETE */
 	struct timespec	si_atime;
 	struct timespec	si_ctime;
 	struct timespec	si_mtime;
@@ -73,10 +74,12 @@ struct cdev {
 	LIST_ENTRY(cdev)	si_siblings;
 	dev_t		si_parent;
 	u_int		si_inode;
-	char		si_name[SPECNAMELEN + 1];
+	char		*si_name;
 	void		*si_drv1, *si_drv2;
 	struct cdevsw	*si_devsw;
 	int		si_iosize_max;	/* maximum I/O size (for physio &al) */
+	u_int		si_stripesize;
+	u_int		si_stripeoffset;
 	uid_t		si_uid;
 	gid_t		si_gid;
 	mode_t		si_mode;
@@ -86,7 +89,6 @@ struct cdev {
 			struct tty *__sit_tty;
 		} __si_tty;
 		struct {
-			struct disk *__sid_disk;
 			struct mount *__sid_mountpoint;
 			int __sid_bsize_phys; /* min physical block size */
 			int __sid_bsize_best; /* optimal block size */
@@ -96,10 +98,10 @@ struct cdev {
 			int (*__sid_copyonwrite)(struct vnode *, struct buf *);
 		} __si_disk;
 	} __si_u;
+	char		__si_namebuf[SPECNAMELEN + 1];
 };
 
 #define si_tty		__si_u.__si_tty.__sit_tty
-#define si_disk		__si_u.__si_disk.__sid_disk
 #define si_mountpoint	__si_u.__si_disk.__sid_mountpoint
 #define si_bsize_phys	__si_u.__si_disk.__sid_bsize_phys
 #define si_bsize_best	__si_u.__si_disk.__sid_bsize_best
@@ -147,14 +149,13 @@ typedef int d_close_t(dev_t dev, int fflag, int devtype, struct thread *td);
 typedef void d_strategy_t(struct bio *bp);
 typedef int d_ioctl_t(dev_t dev, u_long cmd, caddr_t data,
 		      int fflag, struct thread *td);
-typedef int d_dump_t(dev_t dev,void *virtual, vm_offset_t physical, off_t offset, size_t length);
-typedef int d_psize_t(dev_t dev);
 
 typedef int d_read_t(dev_t dev, struct uio *uio, int ioflag);
 typedef int d_write_t(dev_t dev, struct uio *uio, int ioflag);
 typedef int d_poll_t(dev_t dev, int events, struct thread *td);
 typedef int d_kqfilter_t(dev_t dev, struct knote *kn);
-typedef int d_mmap_t(dev_t dev, vm_offset_t offset, int nprot);
+typedef int d_mmap_t(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr,
+   		     int nprot);
 
 typedef int l_open_t(dev_t dev, struct tty *tp);
 typedef int l_close_t(struct tty *tp, int flag);
@@ -166,22 +167,21 @@ typedef int l_rint_t(int c, struct tty *tp);
 typedef int l_start_t(struct tty *tp);
 typedef int l_modem_t(struct tty *tp, int flag);
 
-/*
- * XXX: The dummy argument can be used to do what strategy1() never
- * did anywhere:  Create a per device flag to lock the device during
- * label/slice surgery, all calls with a dummy == 0 gets stalled on
- * a queue somewhere, whereas dummy == 1 are let through.  Once out
- * of surgery, reset the flag and restart all the stuff on the stall
- * queue.
- */
-#define BIO_STRATEGY(bp, dummy)						\
+typedef int dumper_t(
+	void *priv,		/* Private to the driver. */
+	void *virtual,		/* Virtual (mapped) address. */
+	vm_offset_t physical,	/* Physical address of virtual. */
+	off_t offset,		/* Byte-offset to write at. */
+	size_t length);		/* Number of bytes to dump. */
+
+#define BIO_STRATEGY(bp)						\
 	do {								\
 	if ((!(bp)->bio_cmd) || ((bp)->bio_cmd & ((bp)->bio_cmd - 1)))	\
 		Debugger("bio_cmd botch");				\
 	(*devsw((bp)->bio_dev)->d_strategy)(bp);			\
 	} while (0)
 
-#define DEV_STRATEGY(bp, dummy)						\
+#define DEV_STRATEGY(bp)						\
 	do {								\
 	if ((bp)->b_flags & B_PHYS)					\
 		(bp)->b_io.bio_offset = (bp)->b_offset;			\
@@ -189,7 +189,7 @@ typedef int l_modem_t(struct tty *tp, int flag);
 		(bp)->b_io.bio_offset = dbtob((bp)->b_blkno);		\
 	(bp)->b_io.bio_done = bufdonebio;				\
 	(bp)->b_io.bio_caller2 = (bp);					\
-	BIO_STRATEGY(&(bp)->b_io, dummy);				\
+	BIO_STRATEGY(&(bp)->b_io);					\
 	} while (0)
 
 #endif /* _KERNEL */
@@ -211,16 +211,17 @@ typedef int l_modem_t(struct tty *tp, int flag);
  */
 #define	D_MEMDISK	0x00010000	/* memory type disk */
 #define	D_NAGGED	0x00020000	/* nagged about missing make_dev() */
-#define	D_CANFREE	0x00040000	/* can free blocks */
 #define	D_TRACKCLOSE	0x00080000	/* track all closes */
 #define D_MMAP_ANON	0x00100000	/* special treatment in vm_mmap.c */
-#define D_KQFILTER	0x00200000	/* has kqfilter entry */
 #define D_NOGIANT	0x00400000	/* Doesn't want Giant */
 
 /*
  * Character device switch table
  */
 struct cdevsw {
+	int		d_maj;
+	u_int		d_flags;
+	const char	*d_name;
 	d_open_t	*d_open;
 	d_close_t	*d_close;
 	d_read_t	*d_read;
@@ -229,12 +230,7 @@ struct cdevsw {
 	d_poll_t	*d_poll;
 	d_mmap_t	*d_mmap;
 	d_strategy_t	*d_strategy;
-	const char	*d_name;	/* base device name, e.g. 'vn' */
-	int		d_maj;
-	d_dump_t	*d_dump;
-	d_psize_t	*d_psize;
-	u_int		d_flags;
-	/* additions below are not binary compatible with 4.2 and below */
+	dumper_t	*d_dump;
 	d_kqfilter_t	*d_kqfilter;
 };
 
@@ -261,21 +257,6 @@ void ldisc_deregister(int);
 #define LDISC_LOAD 	-1		/* Loadable line discipline */
 #endif /* _KERNEL */
 
-/*
- * Swap device table
- */
-struct swdevt {
-	udev_t	sw_dev;			/* For quasibogus swapdev reporting */
-	int	sw_flags;
-	int	sw_nblks;
-	int     sw_used;
-	struct	vnode *sw_vp;
-	dev_t	sw_device;
-};
-#define	SW_FREED	0x01
-#define	SW_SEQUENTIAL	0x02
-#define	sw_freed	sw_flags	/* XXX compat */
-
 #ifdef _KERNEL
 d_open_t	noopen;
 d_close_t	noclose;
@@ -287,14 +268,16 @@ d_kqfilter_t	nokqfilter;
 #define	nostrategy	((d_strategy_t *)NULL)
 #define	nopoll	seltrue
 
-d_dump_t	nodump;
+dumper_t	nodump;
 
 #define NUMCDEVSW 256
+
+#define	MAJOR_AUTO	0	/* XXX: Not GM */
 
 /*
  * nopsize is little used, so not worth having dummy functions for.
  */
-#define	nopsize	((d_psize_t *)NULL)
+#define	nopsize	(NULL)
 
 d_open_t	nullopen;
 d_close_t	nullclose;
@@ -320,8 +303,6 @@ static moduledata_t name##_mod = {					\
 DECLARE_MODULE(name, name##_mod, SI_SUB_DRIVERS, SI_ORDER_MIDDLE)
 
 
-int	cdevsw_add(struct cdevsw *_new);
-int	cdevsw_remove(struct cdevsw *_old);
 int	count_dev(dev_t _dev);
 void	destroy_dev(dev_t _dev);
 void	revoke_and_destroy_dev(dev_t _dev);
@@ -330,7 +311,6 @@ const char *devtoname(dev_t _dev);
 int	dev_named(dev_t _pdev, const char *_name);
 void	dev_depends(dev_t _pdev, dev_t _cdev);
 void	freedev(dev_t _dev);
-int	iszerodev(dev_t _dev);
 dev_t	makebdev(int _maj, int _min);
 dev_t	make_dev(struct cdevsw *_devsw, int _minor, uid_t _uid, gid_t _gid,
 		int _perms, const char *_fmt, ...) __printflike(6, 7);
@@ -340,13 +320,8 @@ int	unit2minor(int _unit);
 void	setconf(void);
 dev_t	getdiskbyname(char *_name);
 
-/* This is type of the function DEVFS uses to hook into the kernel with */
-typedef void devfs_create_t(dev_t dev);
-typedef void devfs_destroy_t(dev_t dev);
-
-extern devfs_create_t *devfs_create_hook;
-extern devfs_destroy_t *devfs_destroy_hook;
-extern int devfs_present;
+void devfs_create(dev_t dev);
+void devfs_destroy(dev_t dev);
 
 #define		UID_ROOT	0
 #define		UID_BIN		3
@@ -365,13 +340,6 @@ int dev_stdclone(char *_name, char **_namep, const char *_stem, int *_unit);
 EVENTHANDLER_DECLARE(dev_clone, dev_clone_fn);
 
 /* Stuff relating to kernel-dump */
-
-typedef int dumper_t(
-	void *priv,		/* Private to the driver. */
-	void *virtual,		/* Virtual (mapped) address. */
-	vm_offset_t physical,	/* Physical address of virtual. */
-	off_t offset,		/* Byte-offset to write at. */
-	size_t length);		/* Number of bytes to dump. */
 
 struct dumperinfo {
 	dumper_t *dumper;	/* Dumping function. */

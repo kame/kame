@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/tty_subr.c,v 1.35 2002/03/19 21:24:06 alfred Exp $
+ * $FreeBSD: src/sys/kern/tty_subr.c,v 1.38 2003/02/19 05:47:26 imp Exp $
  */
 
 /*
@@ -149,7 +149,7 @@ cblock_alloc_cblocks(number)
 }
 
 /*
- * Set the cblock allocation policy for a a clist.
+ * Set the cblock allocation policy for a clist.
  * Must be called in process context at spltty().
  */
 void

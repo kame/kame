@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_ipc.c,v 1.23 2002/04/01 21:31:00 jhb Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_ipc.c,v 1.24 2003/01/13 23:04:31 dillon Exp $ */
 /*	$NetBSD: sysv_ipc.c,v 1.7 1994/06/29 06:33:11 cgd Exp $	*/
 
 /*
@@ -42,7 +42,7 @@
 #include <sys/ucred.h>
 
 void (*shmfork_hook)(struct proc *, struct proc *) = NULL;
-void (*shmexit_hook)(struct proc *) = NULL;
+void (*shmexit_hook)(struct vmspace *) = NULL;
 
 /* called from kern_fork.c */
 void
@@ -57,12 +57,11 @@ shmfork(p1, p2)
 
 /* called from kern_exit.c */
 void
-shmexit(p)
-	struct proc *p;
+shmexit(struct vmspace *vm)
 {
 
 	if (shmexit_hook != NULL)
-		shmexit_hook(p);
+		shmexit_hook(vm);
 	return;
 }
 

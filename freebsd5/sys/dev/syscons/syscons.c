@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.390 2002/10/17 05:48:56 kbyanc Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.402 2003/05/09 18:24:40 peter Exp $
  */
 
 #include "opt_syscons.h"
@@ -100,6 +100,7 @@ static	char		sc_malloc = FALSE;
 
 static	int		saver_mode = CONS_NO_SAVER; /* LKM/user saver */
 static	int		run_scrn_saver = FALSE;	/* should run the saver? */
+static	int		enable_bell = TRUE; /* enable beeper */
 static	long        	scrn_blank_time = 0;    /* screen saver timeout value */
 #ifdef DEV_SPLASH
 static	int     	scrn_blanked;		/* # of blanked screen */
@@ -113,6 +114,8 @@ SYSCTL_NODE(_hw, OID_AUTO, syscons, CTLFLAG_RD, 0, "syscons");
 SYSCTL_NODE(_hw_syscons, OID_AUTO, saver, CTLFLAG_RD, 0, "saver");
 SYSCTL_INT(_hw_syscons_saver, OID_AUTO, keybonly, CTLFLAG_RW,
     &sc_saver_keyb_only, 0, "screen saver interrupted by input only");
+SYSCTL_INT(_hw_syscons, OID_AUTO, bell, CTLFLAG_RW, &enable_bell, 
+    0, "enable bell");
 #if !defined(SC_NO_FONT_LOADING) && defined(SC_DFLT_FONT)
 #include "font.h"
 #endif
@@ -142,7 +145,7 @@ static kbd_callback_func_t sckbdevent;
 static int scparam(struct tty *tp, struct termios *t);
 static void scstart(struct tty *tp);
 static void scinit(int unit, int flags);
-#if __i386__ || __ia64__
+#if __i386__ || __ia64__ || __amd64__
 static void scterm(int unit, int flags);
 #endif
 static void scshutdown(void *arg, int howto);
@@ -209,20 +212,17 @@ static	d_ioctl_t	scioctl;
 static	d_mmap_t	scmmap;
 
 static struct cdevsw sc_cdevsw = {
-	/* open */	scopen,
-	/* close */	scclose,
-	/* read */	scread,
-	/* write */	ttywrite,
-	/* ioctl */	scioctl,
-	/* poll */	ttypoll,
-	/* mmap */	scmmap,
-	/* strategy */	nostrategy,
-	/* name */	"sc",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter
+	.d_open =	scopen,
+	.d_close =	scclose,
+	.d_read =	scread,
+	.d_write =	ttywrite,
+	.d_ioctl =	scioctl,
+	.d_poll =	ttypoll,
+	.d_mmap =	scmmap,
+	.d_name =	"sc",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter
 };
 
 int
@@ -1009,7 +1009,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	scp = SC_STAT(SC_DEV(sc, i));
 	if (scp == scp->sc->cur_scp)
 	    return 0;
-	while ((error=tsleep((caddr_t)&scp->smode, PZERO|PCATCH,
+	while ((error=tsleep(&scp->smode, PZERO|PCATCH,
 			     "waitvt", 0)) == ERESTART) ;
 	return error;
 
@@ -1361,7 +1361,7 @@ scstart(struct tty *tp)
 static void
 sccnprobe(struct consdev *cp)
 {
-#if __i386__ || __ia64__
+#if __i386__ || __ia64__ || __amd64__
     int unit;
     int flags;
 
@@ -1379,7 +1379,7 @@ sccnprobe(struct consdev *cp)
 
     /* initialize required fields */
     cp->cn_dev = makedev(CDEV_MAJOR, SC_CONSOLECTL);
-#endif /* __i386__ || __ia64__ */
+#endif /* __i386__ || __ia64__ || __amd64__ */
 
 #if __alpha__
     /*
@@ -1394,7 +1394,7 @@ sccnprobe(struct consdev *cp)
 static void
 sccninit(struct consdev *cp)
 {
-#if __i386__ || __ia64__
+#if __i386__ || __ia64__ || __amd64__
     int unit;
     int flags;
 
@@ -1402,7 +1402,7 @@ sccninit(struct consdev *cp)
     scinit(unit, flags | SC_KERNEL_CONSOLE);
     sc_console_unit = unit;
     sc_console = SC_STAT(sc_get_softc(unit, SC_KERNEL_CONSOLE)->dev[0]);
-#endif /* __i386__ */
+#endif /* __i386__ || __ia64__ || __amd64__ */
 
 #if __alpha__
     /* SHOULDN'T REACH HERE */
@@ -1417,7 +1417,7 @@ sccnterm(struct consdev *cp)
     if (sc_console_unit < 0)
 	return;			/* shouldn't happen */
 
-#if __i386__ || __ia64__
+#if __i386__ || __ia64__ || __amd64__
 #if 0 /* XXX */
     sc_clear_screen(sc_console);
     sccnupdate(sc_console);
@@ -1425,7 +1425,7 @@ sccnterm(struct consdev *cp)
     scterm(sc_console_unit, SC_KERNEL_CONSOLE);
     sc_console_unit = -1;
     sc_console = NULL;
-#endif /* __i386__ */
+#endif /* __i386__ || __ia64__ || __amd64__ */
 
 #if __alpha__
     /* do nothing XXX */
@@ -1465,7 +1465,7 @@ sccnattach(void)
 #endif /* __alpha__ */
 
 static void
-sccnputc(dev_t dev, int c)
+sccnputc(struct consdev *cd, int c)
 {
     u_char buf[1];
     scr_stat *scp = sc_console;
@@ -1507,19 +1507,19 @@ sccnputc(dev_t dev, int c)
 }
 
 static int
-sccngetc(dev_t dev)
+sccngetc(struct consdev *cd)
 {
     return sccngetch(0);
 }
 
 static int
-sccncheckc(dev_t dev)
+sccncheckc(struct consdev *cd)
 {
     return sccngetch(SCGETC_NONBLOCK);
 }
 
 static void
-sccndbctl(dev_t dev, int on)
+sccndbctl(struct consdev *cd, int on)
 {
     /* assert(sc_console_unit >= 0) */
     /* try to switch to the kernel console screen */
@@ -1535,6 +1535,10 @@ sccndbctl(dev_t dev, int on)
 	    && sc_console->smode.mode == VT_AUTO) {
 	    sc_console->sc->cur_scp->status |= MOUSE_HIDDEN;
 	    ++debugger;		/* XXX */
+#ifdef DDB
+	    /* unlock vty switching */
+	    sc_console->sc->flags &= ~SC_SCRN_VTYLOCK;
+#endif
 	    sc_switch_scr(sc_console->sc, sc_console->index);
 	    --debugger;		/* XXX */
 	}
@@ -2082,7 +2086,7 @@ stop_scrn_saver(sc_softc_t *sc, void (*saver)(sc_softc_t *, int))
     if (sc->delayed_next_scr)
 	sc_switch_scr(sc, sc->delayed_next_scr - 1);
     if (debugger == 0)
-	wakeup((caddr_t)&scrn_blanked);
+	wakeup(&scrn_blanked);
 }
 
 static int
@@ -2096,7 +2100,7 @@ wait_scrn_saver_stop(sc_softc_t *sc)
 	    error = 0;
 	    break;
 	}
-	error = tsleep((caddr_t)&scrn_blanked, PZERO | PCATCH, "scrsav", 0);
+	error = tsleep(&scrn_blanked, PZERO | PCATCH, "scrsav", 0);
 	if ((error != 0) && (error != ERESTART))
 	    break;
     }
@@ -2295,7 +2299,7 @@ sc_switch_scr(sc_softc_t *sc, u_int next_scr)
 	 * be invoked at splhigh().
 	 */
 	if (debugger == 0)
-	    wakeup((caddr_t)&sc->new_scp->smode);
+	    wakeup(&sc->new_scp->smode);
 	splx(s);
 	DPRINTF(5, ("switch done (new == old)\n"));
 	return 0;
@@ -2318,7 +2322,7 @@ sc_switch_scr(sc_softc_t *sc, u_int next_scr)
 
     /* wake up processes waiting for this vty */
     if (debugger == 0)
-	wakeup((caddr_t)&sc->cur_scp->smode);
+	wakeup(&sc->cur_scp->smode);
 
     /* wait for the controlling process to acknowledge, if necessary */
     if (signal_vt_acq(sc->cur_scp)) {
@@ -2344,7 +2348,7 @@ do_switch_scr(sc_softc_t *sc, int s)
     exchange_scr(sc);
     s = spltty();
     /* sc->cur_scp == sc->new_scp */
-    wakeup((caddr_t)&sc->cur_scp->smode);
+    wakeup(&sc->cur_scp->smode);
 
     /* wait for the controlling process to acknowledge, if necessary */
     if (!signal_vt_acq(sc->cur_scp)) {
@@ -2802,7 +2806,7 @@ scinit(int unit, int flags)
     sc->flags |= SC_INIT_DONE;
 }
 
-#if __i386__ || __ia64__
+#if __i386__ || __ia64__ || __amd64__
 static void
 scterm(int unit, int flags)
 {
@@ -2858,7 +2862,7 @@ scterm(int unit, int flags)
     sc->keyboard = -1;
     sc->adapter = -1;
 }
-#endif
+#endif /* __i386__ || __ia64__ || __amd64__ */
 
 static void
 scshutdown(void *arg, int howto)
@@ -3361,14 +3365,14 @@ next_code:
 }
 
 static int
-scmmap(dev_t dev, vm_offset_t offset, int nprot)
+scmmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
     scr_stat *scp;
 
     scp = SC_STAT(dev);
     if (scp != scp->sc->cur_scp)
 	return -1;
-    return (*vidsw[scp->sc->adapter]->mmap)(scp->sc->adp, offset, nprot);
+    return (*vidsw[scp->sc->adapter]->mmap)(scp->sc->adp, offset, paddr, nprot);
 }
 
 static int
@@ -3530,7 +3534,7 @@ sc_paste(scr_stat *scp, u_char *p, int count)
 void
 sc_bell(scr_stat *scp, int pitch, int duration)
 {
-    if (cold || shutdown_in_progress)
+    if (cold || shutdown_in_progress || !enable_bell)
 	return;
 
     if (scp != scp->sc->cur_scp && (scp->sc->flags & SC_QUIET_BELL))
@@ -3543,7 +3547,7 @@ sc_bell(scr_stat *scp, int pitch, int duration)
 	if (scp != scp->sc->cur_scp)
 	    scp->sc->blink_in_progress += 2;
 	blink_screen(scp->sc->cur_scp);
-    } else {
+    } else if (duration != 0 && pitch != 0) {
 	if (scp != scp->sc->cur_scp)
 	    pitch *= 2;
 	sysbeep(pitch, duration);

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_pci.c,v 1.89 2002/10/11 17:28:01 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_pci.c,v 1.92 2003/02/19 05:47:06 imp Exp $ */
 /*
  * PCI specific probe and attach routines for Qlogic ISP SCSI adapters.
  * FreeBSD Version.
@@ -1538,9 +1538,10 @@ tdma_mkfc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 		cto->rsp.m0.ct_dataseg[cto->ct_seg_count].ds_count =
 		    dm_segs[segcnt].ds_len;
 		cto->rsp.m0.ct_xfrlen += dm_segs[segcnt].ds_len;
-		isp_prt(isp, ISP_LOGTDEBUG1, "isp_send_ctio2: ent0[%d]0x%x:%d",
-		    cto->ct_seg_count, dm_segs[segcnt].ds_addr,
-		    dm_segs[segcnt].ds_len);
+		isp_prt(isp, ISP_LOGTDEBUG1,
+		    "isp_send_ctio2: ent0[%d]0x%llx:%lld",
+		    cto->ct_seg_count, (long long)dm_segs[segcnt].ds_addr,
+		    (long long)dm_segs[segcnt].ds_len);
 	}
 
 	while (segcnt < nseg) {
@@ -1567,9 +1568,10 @@ tdma_mkfc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 			crq->req_dataseg[seg].ds_base = dm_segs[segcnt].ds_addr;
 			crq->req_dataseg[seg].ds_count = dm_segs[segcnt].ds_len;
 			isp_prt(isp, ISP_LOGTDEBUG1,
-			    "isp_send_ctio2: ent%d[%d]%x:%u",
+			    "isp_send_ctio2: ent%d[%d]0x%llx:%lld",
 			    cto->ct_header.rqs_entry_count-1, seg,
-			    dm_segs[segcnt].ds_addr, dm_segs[segcnt].ds_len);
+			    (long long) dm_segs[segcnt].ds_addr,
+			    (long long) dm_segs[segcnt].ds_len);
 			cto->rsp.m0.ct_xfrlen += dm_segs[segcnt].ds_len;
 			cto->ct_seg_count++;
 		}

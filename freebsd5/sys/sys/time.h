@@ -31,23 +31,15 @@
  * SUCH DAMAGE.
  *
  *	@(#)time.h	8.5 (Berkeley) 5/4/95
- * $FreeBSD: src/sys/sys/time.h,v 1.58 2002/11/01 18:52:20 phk Exp $
+ * $FreeBSD: src/sys/sys/time.h,v 1.61 2003/02/23 10:18:31 phk Exp $
  */
 
 #ifndef _SYS_TIME_H_
 #define _SYS_TIME_H_
 
+#include <sys/_timeval.h>
 #include <sys/types.h>
 #include <sys/timespec.h>
-
-/*
- * Structure returned by gettimeofday(2) system call,
- * and used in other calls.
- */
-struct timeval {
-	long	tv_sec;		/* seconds */
-	long	tv_usec;	/* and microseconds */
-};
 
 struct timezone {
 	int	tz_minuteswest;	/* minutes west of Greenwich */
@@ -251,6 +243,7 @@ struct clockinfo {
 #endif
 #define CLOCK_VIRTUAL	1
 #define CLOCK_PROF	2
+#define CLOCK_MONOTONIC	4
 
 #define TIMER_RELTIME	0x0	/* relative timer */
 #ifndef TIMER_ABSTIME
@@ -302,6 +295,8 @@ void	getmicrotime(struct timeval *tvp);
 /* Other functions */
 int	itimerdecr(struct itimerval *itp, int usec);
 int	itimerfix(struct timeval *tv);
+int	ppsratecheck(struct timeval *, int *, int);
+int	ratecheck(struct timeval *, const struct timeval *);
 void	timevaladd(struct timeval *t1, struct timeval *t2);
 void	timevalsub(struct timeval *t1, struct timeval *t2);
 int	tvtohz(struct timeval *tv);

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/i386/include/physio_proc.h,v 1.4 2002/03/20 05:48:58 alfred Exp $	*/
+/*	$FreeBSD: src/sys/i386/include/physio_proc.h,v 1.5 2003/04/01 09:02:58 phk Exp $	*/
 /*	$NecBSD: physio_proc.h,v 3.4 1999/07/23 20:47:03 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -32,8 +32,9 @@
  */
 #ifndef _I386_PHYSIO_PROC_H_
 #define _I386_PHYSIO_PROC_H_
-#include <sys/buf.h>
 #include <sys/queue.h>
+
+struct buf;
 
 struct physio_proc {
 };

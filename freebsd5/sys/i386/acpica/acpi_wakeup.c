@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/i386/acpica/acpi_wakeup.c,v 1.17 2002/12/04 18:40:39 alc Exp $
+ *      $FreeBSD: src/sys/i386/acpica/acpi_wakeup.c,v 1.19 2003/05/13 16:59:46 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -57,6 +57,11 @@
 #include <dev/acpica/acpivar.h>
 
 #include "acpi_wakecode.h"
+
+#if __FreeBSD_version < 500000
+#define	vm_page_lock_queues()
+#define	vm_page_unlock_queues()
+#endif
 
 extern void initializecpu(void);
 
@@ -181,7 +186,7 @@ int
 acpi_sleep_machdep(struct acpi_softc *sc, int state)
 {
 	ACPI_STATUS		status;
-	vm_offset_t		oldphys;
+	vm_paddr_t		oldphys;
 	struct pmap		*pm;
 	vm_page_t		page;
 	static vm_page_t	opage = NULL;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_module.c,v 1.35.2.2 2003/01/10 07:10:27 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_module.c,v 1.41 2003/02/19 05:47:25 imp Exp $
  */
 
 #include <sys/param.h>

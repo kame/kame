@@ -4,7 +4,7 @@
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  *
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_linux_balloc.c,v 1.17 2002/05/16 19:07:59 iedowse Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_linux_balloc.c,v 1.18 2002/12/30 21:18:08 schweikh Exp $
  */
 /*
  *  linux/fs/ext2/balloc.c
@@ -47,7 +47,7 @@
 #elif __alpha__
 #include <gnu/ext2fs/alpha-bitops.h>
 #else
-#error Provide an bitops.h file, please !
+#error Provide a bitops.h file, please!
 #endif
 
 #define in_range(b, first, len)		((b) >= (first) && (b) <= (first) + (len) - 1)

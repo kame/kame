@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/vx/if_vx_pci.c,v 1.22 2000/11/07 00:56:14 wpaul Exp $
+ * $FreeBSD: src/sys/dev/vx/if_vx_pci.c,v 1.23 2003/04/15 06:37:28 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -69,7 +69,9 @@ static driver_t vx_driver = {
 
 static devclass_t vx_devclass;
 
-DRIVER_MODULE(if_vx, pci, vx_driver, vx_devclass, 0, 0);
+DRIVER_MODULE(vx, pci, vx_driver, vx_devclass, 0, 0);
+MODULE_DEPEND(vx, pci, 1, 1, 1);
+MODULE_DEPEND(vx, ether, 1, 1, 1);
 
 static void
 vx_pci_shutdown(

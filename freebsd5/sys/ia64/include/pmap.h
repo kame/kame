@@ -43,7 +43,7 @@
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
  *	from: i386 pmap.h,v 1.54 1997/11/20 19:30:35 bde Exp
- * $FreeBSD: src/sys/ia64/include/pmap.h,v 1.10 2002/10/12 20:35:56 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/pmap.h,v 1.14 2003/05/19 04:16:30 marcel Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -58,14 +58,6 @@
 #define	NKPT		30	/* initial number of kernel page tables */
 #endif
 #define MAXKPT		(PAGE_SIZE/sizeof(vm_offset_t))
-
-/*
- *	Routine:	pmap_kextract
- *	Function:
- *		Extract the physical page address associated
- *		kernel virtual address.
- */
-#define	pmap_kextract	ia64_tpa
 
 #define	vtophys(va)	pmap_kextract(((vm_offset_t) (va)))
 
@@ -114,8 +106,6 @@ typedef struct pv_entry {
 	TAILQ_ENTRY(pv_entry)	pv_plist;
 } *pv_entry_t;
 
-#define	PV_ENTRY_NULL	((pv_entry_t) 0)
-
 #ifdef	_KERNEL
 
 extern vm_offset_t avail_end;
@@ -128,15 +118,17 @@ extern vm_offset_t virtual_end;
 
 vm_offset_t pmap_steal_memory(vm_size_t);
 void	pmap_bootstrap(void);
+void	pmap_kenter(vm_offset_t va, vm_offset_t pa);
+vm_paddr_t pmap_kextract(vm_offset_t va);
+void	pmap_kremove(vm_offset_t);
 void	pmap_setdevram(unsigned long long basea, vm_offset_t sizea);
 int	pmap_uses_prom_console(void);
 void	*pmap_mapdev(vm_offset_t, vm_size_t);
 void	pmap_unmapdev(vm_offset_t, vm_size_t);
 unsigned *pmap_pte(pmap_t, vm_offset_t) __pure2;
-vm_page_t pmap_use_pt(pmap_t, vm_offset_t);
 void	pmap_set_opt	(unsigned *);
 void	pmap_set_opt_bsp	(void);
-struct pmap *pmap_install(struct pmap *pmap);
+struct pmap *pmap_switch(struct pmap *pmap);
 
 #endif /* _KERNEL */
 

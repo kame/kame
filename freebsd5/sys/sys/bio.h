@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/bio.h,v 1.122 2002/10/09 07:11:03 phk Exp $
+ * $FreeBSD: src/sys/sys/bio.h,v 1.133 2003/04/12 09:13:01 phk Exp $
  */
 
 #ifndef _SYS_BIO_H_
@@ -44,17 +44,10 @@
 
 #include <sys/queue.h>
 
+struct disk;
 struct bio;
 
-struct iodone_chain {
-	long	ic_prev_flags;
-	void	(*ic_prev_iodone)(struct bio *);
-	void	*ic_prev_iodone_chain;
-	struct {
-		long	ia_long;
-		void	*ia_ptr;
-	}	ic_args[5];
-};
+typedef void bio_task_t(struct bio *, void *);
 
 /*
  * The bio structure describes an I/O operation in the kernel.
@@ -62,6 +55,7 @@ struct iodone_chain {
 struct bio {
 	u_int	bio_cmd;		/* I/O operation. */
 	dev_t	bio_dev;		/* Device to do I/O on. */
+	struct disk *bio_disk;		/* Valid below geom_disk.c only */
 	daddr_t bio_blkno;		/* Underlying physical block number. */
 	off_t	bio_offset;		/* Offset into file. */
 	long	bio_bcount;		/* Valid bytes in buffer. */
@@ -81,11 +75,15 @@ struct bio {
 	off_t	bio_length;		/* Like bio_bcount */
 	off_t	bio_completed;		/* Inverse of bio_resid */
 	u_int	bio_children;		/* Number of spawned bios */
+	u_int	bio_inbed;		/* Children safely home by now */
+	struct bio *bio_parent;		/* Pointer to parent */
+	struct bintime bio_t0;		/* Time request started */
+
+	bio_task_t *bio_task;		/* Task_queue handler */
+	void	*bio_task_arg;		/* Argument to above */
 
 	/* XXX: these go away when bio chaining is introduced */
 	daddr_t bio_pblkno;               /* physical block number */
-	struct	iodone_chain *bio_done_chain;
-	struct bio *bio_linkage;
 };
 
 /* bio_cmd */
@@ -93,7 +91,6 @@ struct bio {
 #define BIO_WRITE	0x00000002
 #define BIO_DELETE	0x00000004
 #define BIO_GETATTR	0x00000008
-#define BIO_SETATTR	0x00000010
 #define BIO_CMD1	0x40000000	/* Available for local hacks */
 #define BIO_CMD2	0x80000000	/* Available for local hacks */
 
@@ -113,33 +110,17 @@ struct bio_queue_head {
 	daddr_t last_pblkno;
 	struct	bio *insert_point;
 	struct	bio *switch_point;
-	int busy;
 };
-
-static __inline void bioq_insert_tail(struct bio_queue_head *head,
-				      struct bio *bp);
-static __inline struct bio *bioq_first(struct bio_queue_head *head);
-
-static __inline void
-bioq_insert_tail(struct bio_queue_head *head, struct bio *bp)
-{
-
-	TAILQ_INSERT_TAIL(&head->queue, bp, bio_queue);
-}
-
-static __inline struct bio *
-bioq_first(struct bio_queue_head *head)
-{
-
-	return (TAILQ_FIRST(&head->queue));
-}
 
 void biodone(struct bio *bp);
 void biofinish(struct bio *bp, struct devstat *stat, int error);
 int biowait(struct bio *bp, const char *wchan);
+
 void bioq_disksort(struct bio_queue_head *ap, struct bio *bp);
-#define bioqdisksort(foo, bar) bioq_disksort(foo, bar)
+struct bio *bioq_first(struct bio_queue_head *head);
+void bioq_flush(struct bio_queue_head *head, struct devstat *stp, int error);
 void bioq_init(struct bio_queue_head *head);
+void bioq_insert_tail(struct bio_queue_head *head, struct bio *bp);
 void bioq_remove(struct bio_queue_head *head, struct bio *bp);
 
 int	physio(dev_t dev, struct uio *uio, int ioflag);

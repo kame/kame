@@ -33,13 +33,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/libkern/strtoq.c,v 1.3 1999/12/01 22:56:51 archie Exp $
+ * $FreeBSD: src/sys/libkern/strtoq.c,v 1.4 2003/04/29 13:36:04 kan Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ctype.h>
-#include <machine/limits.h>
+#include <sys/limits.h>
 
 /*
  * Convert a string to a quad integer.

@@ -1,5 +1,5 @@
 /*	$NetBSD: uhid.c,v 1.45 2001/10/26 17:58:21 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.52 2002/08/08 12:05:50 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.56 2003/04/09 08:43:01 mdodd Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -149,19 +149,14 @@ d_poll_t	uhidpoll;
 #define		UHID_CDEV_MAJOR 122
 
 Static struct cdevsw uhid_cdevsw = {
-	/* open */	uhidopen,
-	/* close */	uhidclose,
-	/* read */	uhidread,
-	/* write */	uhidwrite,
-	/* ioctl */	uhidioctl,
-	/* poll */	uhidpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"uhid",
-	/* maj */	UHID_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	uhidopen,
+	.d_close =	uhidclose,
+	.d_read =	uhidread,
+	.d_write =	uhidwrite,
+	.d_ioctl =	uhidioctl,
+	.d_poll =	uhidpoll,
+	.d_name =	"uhid",
+	.d_maj =	UHID_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
 	/* bmaj */	-1
 #endif
@@ -694,6 +689,10 @@ uhid_do_ioctl(struct uhid_softc *sc, u_long cmd, caddr_t addr, int flag,
 			  size);
 		if (err)
 			return (EIO);
+		break;
+
+	case USB_GET_REPORT_ID:
+		*(int *)addr = 0;	/* XXX: we only support reportid 0? */
 		break;
 
 	default:

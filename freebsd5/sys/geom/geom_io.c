@@ -32,35 +32,28 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_io.c,v 1.19.2.1 2002/12/20 21:52:02 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_io.c,v 1.42 2003/05/07 05:37:31 phk Exp $
  */
 
 
 #include <sys/param.h>
-#include <sys/stdint.h>
-#ifndef _KERNEL
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <err.h>
-#include <sched.h>
-#else
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/bio.h>
-#endif
 
 #include <sys/errno.h>
 #include <geom/geom.h>
 #include <geom/geom_int.h>
+#include <sys/devicestat.h>
+
+#include <vm/uma.h>
 
 static struct g_bioq g_bio_run_down;
 static struct g_bioq g_bio_run_up;
-static struct g_bioq g_bio_idle;
 
 static u_int pace;
+static uma_zone_t	biozone;
 
 #include <machine/atomic.h>
 
@@ -100,13 +93,11 @@ g_bioq_first(struct g_bioq *bq)
 {
 	struct bio *bp;
 
-	g_bioq_lock(bq);
 	bp = TAILQ_FIRST(&bq->bio_queue);
 	if (bp != NULL) {
 		TAILQ_REMOVE(&bq->bio_queue, bp, bio_queue);
 		bq->bio_queue_length--;
 	}
-	g_bioq_unlock(bq);
 	return (bp);
 }
 
@@ -125,10 +116,7 @@ g_new_bio(void)
 {
 	struct bio *bp;
 
-	bp = g_bioq_first(&g_bio_idle);
-	if (bp == NULL)
-		bp = g_malloc(sizeof *bp, M_NOWAIT | M_ZERO);
-	/* g_trace(G_T_BIO, "g_new_bio() = %p", bp); */
+	bp = uma_zalloc(biozone, M_NOWAIT | M_ZERO);
 	return (bp);
 }
 
@@ -136,9 +124,7 @@ void
 g_destroy_bio(struct bio *bp)
 {
 
-	/* g_trace(G_T_BIO, "g_destroy_bio(%p)", bp); */
-	bzero(bp, sizeof *bp);
-	g_bioq_enqueue_tail(bp, &g_bio_idle);
+	uma_zfree(biozone, bp);
 }
 
 struct bio *
@@ -146,17 +132,16 @@ g_clone_bio(struct bio *bp)
 {
 	struct bio *bp2;
 
-	bp2 = g_new_bio();
+	bp2 = uma_zalloc(biozone, M_NOWAIT | M_ZERO);
 	if (bp2 != NULL) {
-		bp2->bio_linkage = bp;
+		bp2->bio_parent = bp;
 		bp2->bio_cmd = bp->bio_cmd;
 		bp2->bio_length = bp->bio_length;
 		bp2->bio_offset = bp->bio_offset;
 		bp2->bio_data = bp->bio_data;
 		bp2->bio_attribute = bp->bio_attribute;
-		bp->bio_children++;	/* XXX: atomic ? */
+		bp->bio_children++;
 	}
-	/* g_trace(G_T_BIO, "g_clone_bio(%p) = %p", bp, bp2); */
 	return(bp2);
 }
 
@@ -166,28 +151,11 @@ g_io_init()
 
 	g_bioq_init(&g_bio_run_down);
 	g_bioq_init(&g_bio_run_up);
-	g_bioq_init(&g_bio_idle);
+	biozone = uma_zcreate("g_bio", sizeof (struct bio),
+	    NULL, NULL,
+	    NULL, NULL,
+	    0, 0);
 }
-
-int
-g_io_setattr(const char *attr, struct g_consumer *cp, int len, void *ptr)
-{
-	struct bio *bp;
-	int error;
-
-	g_trace(G_T_BIO, "bio_setattr(%s)", attr);
-	bp = g_new_bio();
-	bp->bio_cmd = BIO_SETATTR;
-	bp->bio_done = NULL;
-	bp->bio_attribute = attr;
-	bp->bio_length = len;
-	bp->bio_data = ptr;
-	g_io_request(bp, cp);
-	error = biowait(bp, "gsetattr");
-	g_destroy_bio(bp);
-	return (error);
-}
-
 
 int
 g_io_getattr(const char *attr, struct g_consumer *cp, int *len, void *ptr)
@@ -209,104 +177,80 @@ g_io_getattr(const char *attr, struct g_consumer *cp, int *len, void *ptr)
 	return (error);
 }
 
-void
-g_io_request(struct bio *bp, struct g_consumer *cp)
+static int
+g_io_check(struct bio *bp)
 {
-	int error;
-	off_t excess;
+	struct g_consumer *cp;
+	struct g_provider *pp;
 
-	KASSERT(cp != NULL, ("NULL cp in g_io_request"));
-	KASSERT(bp != NULL, ("NULL bp in g_io_request"));
-	KASSERT(bp->bio_data != NULL, ("NULL bp->data in g_io_request"));
-	error = 0;
-	bp->bio_from = cp;
-	bp->bio_to = cp->provider;
-	bp->bio_error = 0;
-	bp->bio_completed = 0;
+	cp = bp->bio_from;
+	pp = bp->bio_to;
 
-	/* begin_stats(&bp->stats); */
-
-	atomic_add_int(&cp->biocount, 1);
-	/* Fail on unattached consumers */
-	if (bp->bio_to == NULL) {
-		g_io_deliver(bp, ENXIO);
-		return;
-	}
-	/* Fail if access doesn't allow operation */
+	/* Fail if access counters dont allow the operation */
 	switch(bp->bio_cmd) {
 	case BIO_READ:
 	case BIO_GETATTR:
-		if (cp->acr == 0) {
-			g_io_deliver(bp, EPERM);
-			return;
-		}
+		if (cp->acr == 0)
+			return (EPERM);
 		break;
 	case BIO_WRITE:
 	case BIO_DELETE:
-		if (cp->acw == 0) {
-			g_io_deliver(bp, EPERM);
-			return;
-		}
-		break;
-	case BIO_SETATTR:
-		/* XXX: Should ideally check for (cp->ace == 0) */
-		if ((cp->acw == 0)) {
-#ifdef DIAGNOSTIC
-			printf("setattr on %s mode (%d,%d,%d)\n",
-				cp->provider->name,
-				cp->acr, cp->acw, cp->ace);
-#endif
-			g_io_deliver(bp, EPERM);
-			return;
-		}
+		if (cp->acw == 0)
+			return (EPERM);
 		break;
 	default:
-		g_io_deliver(bp, EPERM);
-		return;
+		return (EPERM);
 	}
 	/* if provider is marked for error, don't disturb. */
-	if (bp->bio_to->error) {
-		g_io_deliver(bp, bp->bio_to->error);
-		return;
-	}
+	if (pp->error)
+		return (pp->error);
+
 	switch(bp->bio_cmd) {
 	case BIO_READ:
 	case BIO_WRITE:
 	case BIO_DELETE:
 		/* Reject I/O not on sector boundary */
-		if (bp->bio_offset % bp->bio_to->sectorsize) {
-			g_io_deliver(bp, EINVAL);
-			return;
-		}
+		if (bp->bio_offset % pp->sectorsize)
+			return (EINVAL);
 		/* Reject I/O not integral sector long */
-		if (bp->bio_length % bp->bio_to->sectorsize) {
-			g_io_deliver(bp, EINVAL);
-			return;
-		}
+		if (bp->bio_length % pp->sectorsize)
+			return (EINVAL);
 		/* Reject requests past the end of media. */
-		if (bp->bio_offset > bp->bio_to->mediasize) {
-			g_io_deliver(bp, EIO);
-			return;
-		}
-		/* Truncate requests to the end of providers media. */
-		excess = bp->bio_offset + bp->bio_length;
-		if (excess > bp->bio_to->mediasize) {
-			excess -= bp->bio_to->mediasize;
-			bp->bio_length -= excess;
-		}
-		/* Deliver zero length transfers right here. */
-		if (bp->bio_length == 0) {
-			g_io_deliver(bp, 0);
-			return;
-		}
+		if (bp->bio_offset > pp->mediasize)
+			return (EIO);
 		break;
 	default:
 		break;
 	}
+	return (0);
+}
+
+void
+g_io_request(struct bio *bp, struct g_consumer *cp)
+{
+	struct g_provider *pp;
+
+	pp = cp->provider;
+	KASSERT(cp != NULL, ("NULL cp in g_io_request"));
+	KASSERT(bp != NULL, ("NULL bp in g_io_request"));
+	KASSERT(bp->bio_data != NULL, ("NULL bp->data in g_io_request"));
+	KASSERT(pp != NULL, ("consumer not attached in g_io_request"));
+
+	bp->bio_from = cp;
+	bp->bio_to = pp;
+	bp->bio_error = 0;
+	bp->bio_completed = 0;
+
+	if (g_collectstats) {
+		devstat_start_transaction_bio(cp->stat, bp);
+		devstat_start_transaction_bio(pp->stat, bp);
+	}
+	cp->nstart++;
+	pp->nstart++;
+
 	/* Pass it on down. */
 	g_trace(G_T_BIO, "bio_request(%p) from %p(%s) to %p(%s) cmd %d",
-	    bp, bp->bio_from, bp->bio_from->geom->name,
-	    bp->bio_to, bp->bio_to->name, bp->bio_cmd);
+	    bp, cp, cp->geom->name, pp, pp->name, bp->bio_cmd);
 	g_bioq_enqueue_tail(bp, &g_bio_run_down);
 	wakeup(&g_wait_down);
 }
@@ -314,30 +258,39 @@ g_io_request(struct bio *bp, struct g_consumer *cp)
 void
 g_io_deliver(struct bio *bp, int error)
 {
+	struct g_consumer *cp;
+	struct g_provider *pp;
 
+	cp = bp->bio_from;
+	pp = bp->bio_to;
 	KASSERT(bp != NULL, ("NULL bp in g_io_deliver"));
-	KASSERT(bp->bio_from != NULL, ("NULL bio_from in g_io_deliver"));
-	KASSERT(bp->bio_from->geom != NULL, ("NULL bio_from->geom in g_io_deliver"));
-	KASSERT(bp->bio_to != NULL, ("NULL bio_to in g_io_deliver"));
+	KASSERT(cp != NULL, ("NULL bio_from in g_io_deliver"));
+	KASSERT(cp->geom != NULL, ("NULL bio_from->geom in g_io_deliver"));
+	KASSERT(pp != NULL, ("NULL bio_to in g_io_deliver"));
+
 	g_trace(G_T_BIO,
-	    "g_io_deliver(%p) from %p(%s) to %p(%s) cmd %d error %d off %jd len %jd",
-	    bp, bp->bio_from, bp->bio_from->geom->name,
-	    bp->bio_to, bp->bio_to->name, bp->bio_cmd, error,
+"g_io_deliver(%p) from %p(%s) to %p(%s) cmd %d error %d off %jd len %jd",
+	    bp, cp, cp->geom->name, pp, pp->name, bp->bio_cmd, error,
 	    (intmax_t)bp->bio_offset, (intmax_t)bp->bio_length);
-	/* finish_stats(&bp->stats); */
+
+	bp->bio_bcount = bp->bio_length;
+	if (g_collectstats) {
+		bp->bio_resid = bp->bio_bcount - bp->bio_completed;
+		devstat_end_transaction_bio(cp->stat, bp);
+		devstat_end_transaction_bio(pp->stat, bp);
+	}
+	cp->nend++;
+	pp->nend++;
 
 	if (error == ENOMEM) {
-		printf("ENOMEM %p on %p(%s)\n",
-			bp, bp->bio_to, bp->bio_to->name);
-		g_io_request(bp, bp->bio_from);
+		if (bootverbose)
+			printf("ENOMEM %p on %p(%s)\n", bp, pp, pp->name);
+		g_io_request(bp, cp);
 		pace++;
 		return;
 	}
-
 	bp->bio_error = error;
-
 	g_bioq_enqueue_tail(bp, &g_bio_run_up);
-
 	wakeup(&g_wait_up);
 }
 
@@ -345,16 +298,53 @@ void
 g_io_schedule_down(struct thread *tp __unused)
 {
 	struct bio *bp;
+	off_t excess;
+	int error;
+	struct mtx mymutex;
+ 
+	bzero(&mymutex, sizeof mymutex);
+	mtx_init(&mymutex, "g_xdown", MTX_DEF, 0);
 
 	for(;;) {
+		g_bioq_lock(&g_bio_run_down);
 		bp = g_bioq_first(&g_bio_run_down);
-		if (bp == NULL)
-			break;
-		bp->bio_to->geom->start(bp);
-		if (pace) {
+		if (bp == NULL) {
+			msleep(&g_wait_down, &g_bio_run_down.bio_queue_lock,
+			    PRIBIO | PDROP, "g_down", hz/10);
+			continue;
+		}
+		g_bioq_unlock(&g_bio_run_down);
+		if (pace > 0) {
+			msleep(&error, NULL, PRIBIO, "g_down", hz/10);
 			pace--;
+		}
+		error = g_io_check(bp);
+		if (error) {
+			g_io_deliver(bp, error);
+			continue;
+		}
+		switch (bp->bio_cmd) {
+		case BIO_READ:
+		case BIO_WRITE:
+		case BIO_DELETE:
+			/* Truncate requests to the end of providers media. */
+			excess = bp->bio_offset + bp->bio_length;
+			if (excess > bp->bio_to->mediasize) {
+				excess -= bp->bio_to->mediasize;
+				bp->bio_length -= excess;
+			}
+			/* Deliver zero length transfers right here. */
+			if (bp->bio_length == 0) {
+				g_io_deliver(bp, 0);
+				continue;
+			}
+			break;
+		default:
 			break;
 		}
+		mtx_lock(&mymutex);
+		bp->bio_to->geom->start(bp);
+		mtx_unlock(&mymutex);
 	}
 }
 
@@ -362,17 +352,22 @@ void
 g_io_schedule_up(struct thread *tp __unused)
 {
 	struct bio *bp;
-	struct g_consumer *cp;
-
+	struct mtx mymutex;
+ 
+	bzero(&mymutex, sizeof mymutex);
+	mtx_init(&mymutex, "g_xup", MTX_DEF, 0);
 	for(;;) {
+		g_bioq_lock(&g_bio_run_up);
 		bp = g_bioq_first(&g_bio_run_up);
-		if (bp == NULL)
-			break;
-
-		cp = bp->bio_from;
-
-		atomic_add_int(&cp->biocount, -1);
-		biodone(bp);
+		if (bp != NULL) {
+			g_bioq_unlock(&g_bio_run_up);
+			mtx_lock(&mymutex);
+			biodone(bp);
+			mtx_unlock(&mymutex);
+			continue;
+		}
+		msleep(&g_wait_up, &g_bio_run_up.bio_queue_lock,
+		    PRIBIO | PDROP, "g_up", hz/10);
 	}
 }
 

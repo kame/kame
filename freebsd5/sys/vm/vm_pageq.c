@@ -2,7 +2,7 @@
  *	(c)Copyright 1998, Matthew Dillon.  Terms for use and redistribution
  *	are covered by the BSD Copyright as found in /usr/src/COPYRIGHT.
  *
- * $FreeBSD: src/sys/vm/vm_pageq.c,v 1.7 2002/07/20 05:06:20 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_pageq.c,v 1.9 2003/03/25 00:07:06 jake Exp $
  */
 
 #include <sys/param.h>
@@ -90,7 +90,7 @@ vm_pageq_enqueue(int queue, vm_page_t m)
  *	Must be called at splhigh().
  */
 vm_page_t
-vm_pageq_add_new_page(vm_offset_t pa)
+vm_pageq_add_new_page(vm_paddr_t pa)
 {
 	vm_page_t m;
 
@@ -141,7 +141,6 @@ vm_pageq_remove(vm_page_t m)
 	int queue = m->queue;
 	struct vpgqueues *pq;
 
-	GIANT_REQUIRED;
 	if (queue != PQ_NONE) {
 		m->queue = PQ_NONE;
 		pq = &vm_page_queues[queue];

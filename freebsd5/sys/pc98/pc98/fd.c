@@ -50,7 +50,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)fd.c	7.4 (Berkeley) 5/25/91
- * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.127 2002/11/17 02:39:55 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.134 2003/04/01 15:06:25 phk Exp $
  */
 
 #include "opt_fdc.h"
@@ -383,7 +383,7 @@ struct fd_data {
 	int	options;	/* user configurable options, see fdcio.h */
 	struct	callout_handle toffhandle;
 	struct	callout_handle tohandle;
-	struct	devstat device_stats;
+	struct	devstat *device_stats;
 	eventhandler_tag clonetag;
 	dev_t	masterdev;
 	dev_t	clonedevs[NUMDENS - 1];
@@ -620,19 +620,15 @@ fdin_rd(fdc_p fdc)
 
 #define CDEV_MAJOR 9
 static struct cdevsw fd_cdevsw = {
-	/* open */	Fdopen,
-	/* close */	fdclose,
-	/* read */	physread,
-	/* write */	physwrite,
-	/* ioctl */	fdioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	fdstrategy,
-	/* name */	"fd",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_DISK,
+	.d_open =	Fdopen,
+	.d_close =	fdclose,
+	.d_read =	physread,
+	.d_write =	physwrite,
+	.d_ioctl =	fdioctl,
+	.d_strategy =	fdstrategy,
+	.d_name =	"fd",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_DISK,
 };
 
 /*
@@ -1447,6 +1443,9 @@ fd_clone(void *arg, char *name, int namelen, dev_t *dev)
 		return;
 	if (dev_stdclone(name, &n, "fd", &u) != 2)
 		return;
+	if (u != fd->fdu)
+		/* unit # mismatch */
+		return;
 	l = strlen(n);
 	if (l == 1 && *n >= 'a' && *n <= 'h') {
 		/*
@@ -1721,20 +1720,15 @@ static int
 fd_attach(device_t dev)
 {
 	struct	fd_data *fd;
-	static	int cdevsw_add_done;
 	int i;
 
-	if (!cdevsw_add_done) {
-		cdevsw_add(&fd_cdevsw);	/* XXX */
-		cdevsw_add_done = 1;
-	}
 	fd = device_get_softc(dev);
 	fd->clonetag = EVENTHANDLER_REGISTER(dev_clone, fd_clone, fd, 1000);
 	fd->masterdev = make_dev(&fd_cdevsw, fd->fdu << 6,
 				 UID_ROOT, GID_OPERATOR, 0640, "fd%d", fd->fdu);
 	for (i = 0; i < NUMDENS - 1; i++)
 		fd->clonedevs[i] = NODEV;
-	devstat_add_entry(&fd->device_stats, device_get_name(dev), 
+	fd->device_stats = devstat_new_entry(device_get_name(dev), 
 			  device_get_unit(dev), 0, DEVSTAT_NO_ORDERED_TAGS,
 			  DEVSTAT_TYPE_FLOPPY | DEVSTAT_TYPE_IF_OTHER,
 			  DEVSTAT_PRIORITY_FD);
@@ -1749,12 +1743,11 @@ fd_detach(device_t dev)
 
 	fd = device_get_softc(dev);
 	untimeout(fd_turnoff, fd, fd->toffhandle);
-	devstat_remove_entry(&fd->device_stats);
+	devstat_remove_entry(fd->device_stats);
 	destroy_dev(fd->masterdev);
 	for (i = 0; i < NUMDENS - 1; i++)
 		if (fd->clonedevs[i] != NODEV)
 			destroy_dev(fd->clonedevs[i]);
-	cdevsw_remove(&fd_cdevsw);
 	EVENTHANDLER_DEREGISTER(dev_clone, fd->clonetag);
 
 	return (0);
@@ -2158,9 +2151,9 @@ fdstrategy(struct bio *bp)
 	}
  	bp->bio_pblkno = blknum;
 	s = splbio();
-	bioqdisksort(&fdc->head, bp);
+	bioq_disksort(&fdc->head, bp);
 	untimeout(fd_turnoff, fd, fd->toffhandle); /* a good idea */
-	devstat_start_transaction(&fd->device_stats);
+	devstat_start_transaction_bio(fd->device_stats, bp);
 	device_busy(fd->dev);
 	fdstart(fdc);
 	splx(s);
@@ -2918,7 +2911,7 @@ fdstate(fdc_p fdc)
 			bp->bio_resid = 0;
 			fdc->bp = NULL;
 			device_unbusy(fd->dev);
-			biofinish(bp, &fd->device_stats, 0);
+			biofinish(bp, fd->device_stats, 0);
 			fdc->fd = (fd_p) 0;
 			fdc->fdu = -1;
 			fdc->state = FINDWORK;
@@ -3085,7 +3078,7 @@ retrier(struct fdc_data *fdc)
 		fdc->bp = NULL;
 		fdc->fd->skip = 0;
 		device_unbusy(fd->dev);
-		biofinish(bp, &fdc->fd->device_stats, 0);
+		biofinish(bp, fdc->fd->device_stats, 0);
 		fdc->state = FINDWORK;
 		fdc->flags |= FDC_NEEDS_RESET;
 		fdc->fd = (fd_p) 0;
@@ -3119,7 +3112,7 @@ fdmisccmd(dev_t dev, u_int cmd, void *data)
 	finfo = (struct fd_formb *)data;
 	idfield = (struct fdc_readid *)data;
 
-	bp = malloc(sizeof(struct bio), M_TEMP, M_ZERO);
+	bp = malloc(sizeof(struct bio), M_TEMP, M_WAITOK | M_ZERO);
 
 	/*
 	 * Set up a bio request for fdstrategy().  bio_blkno is faked

@@ -23,13 +23,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_intr.c,v 1.85 2002/10/17 21:02:02 robert Exp $
+ * $FreeBSD: src/sys/kern/kern_intr.c,v 1.95 2003/05/02 00:33:11 julian Exp $
  *
  */
 
 
 #include <sys/param.h>
 #include <sys/bus.h>
+#include <sys/conf.h>
 #include <sys/rtprio.h>
 #include <sys/systm.h>
 #include <sys/interrupt.h>
@@ -159,7 +160,7 @@ ithread_update(struct ithd *ithd)
 		ithd->it_flags |= IT_ENTROPY;
 	else
 		ithd->it_flags &= ~IT_ENTROPY;
-	CTR2(KTR_INTR, "%s: updated %s\n", __func__, p->p_comm);
+	CTR2(KTR_INTR, "%s: updated %s", __func__, p->p_comm);
 }
 
 int
@@ -196,14 +197,15 @@ ithread_create(struct ithd **ithread, int vector, int flags,
 		return (error);
 	}
 	td = FIRST_THREAD_IN_PROC(p);	/* XXXKSE */
+	mtx_lock_spin(&sched_lock);
 	td->td_ksegrp->kg_pri_class = PRI_ITHD;
 	td->td_priority = PRI_MAX_ITHD;
 	TD_SET_IWAIT(td);
+	mtx_unlock_spin(&sched_lock);
 	ithd->it_td = td;
 	td->td_ithd = ithd;
 	if (ithread != NULL)
 		*ithread = ithd;
-
 	CTR2(KTR_INTR, "%s: created %s", __func__, ithd->it_name);
 	return (0);
 }
@@ -395,15 +397,15 @@ ithread_schedule(struct ithd *ithread, int do_switch)
 			KASSERT((TD_IS_RUNNING(ctd)),
 			    ("ithread_schedule: Bad state for curthread."));
 			ctd->td_proc->p_stats->p_ru.ru_nivcsw++;
-			if (ctd->td_kse->ke_flags & KEF_IDLEKSE)
+			if (ctd->td_flags & TDF_IDLETD)
 				ctd->td_state = TDS_CAN_RUN; /* XXXKSE */
 			mi_switch();
 		} else {
-			curthread->td_kse->ke_flags |= KEF_NEEDRESCHED;
+			curthread->td_flags |= TDF_NEEDRESCHED;
 		}
 	} else {
 		CTR4(KTR_INTR, "%s: pid %d: it_need %d, state %d",
-		    __func__, p->p_pid, ithread->it_need, p->p_state);
+		    __func__, p->p_pid, ithread->it_need, td->td_state);
 	}
 	mtx_unlock_spin(&sched_lock);
 
@@ -461,7 +463,7 @@ swi_sched(void *cookie, int flags)
 	 */
 	atomic_store_rel_int(&ih->ih_need, 1);
 	if (!(flags & SWI_DELAY)) {
-		error = ithread_schedule(it, !cold);
+		error = ithread_schedule(it, !cold && !dumping);
 		KASSERT(error == 0, ("stray software interrupt"));
 	}
 }
@@ -543,6 +545,7 @@ restart:
 		 * lock.  This may take a while and it_need may get
 		 * set again, so we have to check it again.
 		 */
+		WITNESS_WARN(WARN_PANIC, NULL, "suspending ithread");
 		mtx_assert(&Giant, MA_NOTOWNED);
 		mtx_lock_spin(&sched_lock);
 		if (!ithd->it_need) {
@@ -567,15 +570,17 @@ restart:
 static void
 start_softintr(void *dummy)
 {
+	struct proc *p;
 
 	if (swi_add(&clk_ithd, "clock", softclock, NULL, SWI_CLOCK,
 		INTR_MPSAFE, &softclock_ih) ||
 	    swi_add(NULL, "vm", swi_vm, NULL, SWI_VM, 0, &vm_ih))
 		panic("died while creating standard software ithreads");
 
-	PROC_LOCK(clk_ithd->it_td->td_proc);
-	clk_ithd->it_td->td_proc->p_flag |= P_NOLOAD;
-	PROC_UNLOCK(clk_ithd->it_td->td_proc);
+	p = clk_ithd->it_td->td_proc;
+	PROC_LOCK(p);
+	p->p_flag |= P_NOLOAD;
+	PROC_UNLOCK(p);
 }
 SYSINIT(start_softintr, SI_SUB_SOFTINTR, SI_ORDER_FIRST, start_softintr, NULL)
 

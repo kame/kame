@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/mac.h,v 1.34 2002/12/09 03:44:28 rwatson Exp $
+ * $FreeBSD: src/sys/sys/mac.h,v 1.40 2003/04/18 19:57:37 rwatson Exp $
  */
 /*
  * Userland/kernel interface for Mandatory Access Control.
@@ -47,14 +47,6 @@
 #ifndef _POSIX_MAC
 #define	_POSIX_MAC
 #endif
-
-/*
- * XXXMAC: The single MAC extended attribute will be deprecated once
- * compound EA writes on a single target file can be performed cleanly
- * with UFS2.
- */
-#define	FREEBSD_MAC_EXTATTR_NAME	"freebsd.mac"
-#define	FREEBSD_MAC_EXTATTR_NAMESPACE	EXTATTR_NAMESPACE_SYSTEM
 
 /*
  * MAC framework-related constants and limits.
@@ -117,6 +109,7 @@ struct ifnet;
 struct ifreq;
 struct image_params;
 struct ipq;
+struct m_tag;
 struct mbuf;
 struct mount;
 struct proc;
@@ -141,14 +134,16 @@ void	mac_init_bpfdesc(struct bpf_d *);
 void	mac_init_cred(struct ucred *);
 void	mac_init_devfsdirent(struct devfs_dirent *);
 void	mac_init_ifnet(struct ifnet *);
-void	mac_init_ipq(struct ipq *);
+int	mac_init_ipq(struct ipq *, int flag);
 int	mac_init_socket(struct socket *, int flag);
 void	mac_init_pipe(struct pipe *);
-int	mac_init_mbuf(struct mbuf *m, int flag);
+int	mac_init_mbuf(struct mbuf *mbuf, int flag);
+int	mac_init_mbuf_tag(struct m_tag *, int flag);
 void	mac_init_mount(struct mount *);
 void	mac_init_proc(struct proc *);
 void	mac_init_vnode(struct vnode *);
 void	mac_init_vnode_label(struct label *);
+void	mac_copy_mbuf_tag(struct m_tag *, struct m_tag *);
 void	mac_copy_vnode_label(struct label *, struct label *label);
 void	mac_destroy_bpfdesc(struct bpf_d *);
 void	mac_destroy_cred(struct ucred *);
@@ -158,7 +153,7 @@ void	mac_destroy_ipq(struct ipq *);
 void	mac_destroy_socket(struct socket *);
 void	mac_destroy_pipe(struct pipe *);
 void	mac_destroy_proc(struct proc *);
-void	mac_destroy_mbuf(struct mbuf *);
+void	mac_destroy_mbuf_tag(struct m_tag *);
 void	mac_destroy_mount(struct mount *);
 void	mac_destroy_vnode(struct vnode *);
 void	mac_destroy_vnode_label(struct label *);
@@ -264,11 +259,13 @@ int	mac_check_socket_listen(struct ucred *cred, struct socket *so);
 int	mac_check_socket_receive(struct ucred *cred, struct socket *so);
 int	mac_check_socket_send(struct ucred *cred, struct socket *so);
 int	mac_check_socket_visible(struct ucred *cred, struct socket *so);
+int	mac_check_sysarch_ioperm(struct ucred *cred);
 int	mac_check_system_acct(struct ucred *cred, struct vnode *vp);
 int	mac_check_system_nfsd(struct ucred *cred);
 int	mac_check_system_reboot(struct ucred *cred, int howto);
 int	mac_check_system_settime(struct ucred *cred);
 int	mac_check_system_swapon(struct ucred *cred, struct vnode *vp);
+int	mac_check_system_swapoff(struct ucred *cred, struct vnode *vp);
 int	mac_check_system_sysctl(struct ucred *cred, int *name,
 	    u_int namelen, void *old, size_t *oldlenp, int inkernel,
 	    void *new, size_t newlen);

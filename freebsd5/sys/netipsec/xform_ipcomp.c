@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/xform_ipcomp.c,v 1.1 2002/10/16 02:10:08 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/xform_ipcomp.c,v 1.2 2003/02/23 07:25:47 sam Exp $	*/
 /* $OpenBSD: ip_ipcomp.c,v 1.1 2001/07/05 12:08:52 jjbg Exp $ */
 
 /*
@@ -173,7 +173,7 @@ ipcomp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 
 	/* Crypto operation descriptor */
 	crp->crp_ilen = m->m_pkthdr.len - (skip + hlen);
-	crp->crp_flags = CRYPTO_F_IMBUF | CRYPTO_F_NODELAY;
+	crp->crp_flags = CRYPTO_F_IMBUF;
 	crp->crp_buf = (caddr_t) m;
 	crp->crp_callback = ipcomp_input_cb;
 	crp->crp_sid = sav->tdb_cryptoid;

@@ -37,15 +37,15 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumlock.c,v 1.13 2000/05/02 23:25:02 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumlock.c,v 1.23 2001/05/22 02:34:30 grog Exp $
+ * $Id: vinumlock.c,v 1.19 2003/05/23 01:07:18 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumlock.c,v 1.26 2003/05/23 01:14:35 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
 #include <dev/vinum/request.h>
 
 /* Lock a drive, wait if it's in use */
-#if VINUMDEBUG
+#ifdef VINUMDEBUG
 int
 lockdrive(struct drive *drive, char *file, int line)
 #else
@@ -132,11 +132,11 @@ lockrange(daddr_t stripe, struct buf *bp, struct plex *plex)
      * increment all addresses by 1.
      */
     stripe++;
-    mtx_lock(&plex->lockmtx);
+    mtx_lock(plex->lockmtx);
 
     /* Wait here if the table is full */
     while (plex->usedlocks == PLEX_LOCKS)		    /* all in use */
-	msleep(&plex->usedlocks, &plex->lockmtx, PRIBIO, "vlock", 0);
+	msleep(&plex->usedlocks, plex->lockmtx, PRIBIO, "vlock", 0);
 
 #ifdef DIAGNOSTIC
     if (plex->usedlocks >= PLEX_LOCKS)
@@ -164,7 +164,7 @@ lockrange(daddr_t stripe, struct buf *bp, struct plex *plex)
 		    }
 #endif
 		    plex->lockwaits++;			    /* waited one more time */
-		    msleep(lock, &plex->lockmtx, PRIBIO, "vrlock", 0);
+		    msleep(lock, plex->lockmtx, PRIBIO, "vrlock", 0);
 		    lock = &plex->lock[-1];		    /* start again */
 		    foundlocks = 0;
 		    pos = NULL;
@@ -188,7 +188,7 @@ lockrange(daddr_t stripe, struct buf *bp, struct plex *plex)
     pos->stripe = stripe;
     pos->bp = bp;
     plex->usedlocks++;					    /* one more lock */
-    mtx_unlock(&plex->lockmtx);
+    mtx_unlock(plex->lockmtx);
 #ifdef VINUMDEBUG
     if (debug & DEBUG_LOCKREQS) {
 	struct rangelockinfo lockinfo;
@@ -234,7 +234,7 @@ unlockrange(int plexno, struct rangelock *lock)
     wakeup((void *) lock);
 }
 
-/* Get a lock for the global config, wait if it's not available */
+/* Get a lock for the global config.  Wait if it's not available. */
 int
 lock_config(void)
 {
@@ -249,7 +249,7 @@ lock_config(void)
     return 0;
 }
 
-/* Unlock and wake up any waiters  */
+/* Unlock global config and wake up any waiters. */
 void
 unlock_config(void)
 {

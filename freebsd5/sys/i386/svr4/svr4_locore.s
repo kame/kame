@@ -3,12 +3,12 @@
 
 #include <compat/svr4/svr4_syscall.h>		/* system call numbers */
 
-/* $FreeBSD: src/sys/i386/svr4/svr4_locore.s,v 1.13 2001/02/25 06:29:04 jake Exp $ */
+/* $FreeBSD: src/sys/i386/svr4/svr4_locore.s,v 1.14 2003/04/21 16:30:12 obrien Exp $ */
 	
 NON_GPROF_ENTRY(svr4_sigcode)
 	call	*SVR4_SIGF_HANDLER(%esp)
-	leal	SVR4_SIGF_UC(%esp),%eax	# ucp (the call may have clobbered the
-					# copy at SIGF_UCP(%esp))
+	leal	SVR4_SIGF_UC(%esp),%eax	/* ucp (the call may have clobbered the
+					   copy at SIGF_UCP(%esp)) */
 #ifdef VM86
 #warning "VM86 doesn't work yet - do you really want this?"
 	testl	$PSL_VM,SVR4_UC_EFLAGS(%eax)
@@ -30,4 +30,3 @@ svr4_szsigcode:
 	.long	svr4_esigcode - svr4_sigcode
 
 	.text
-

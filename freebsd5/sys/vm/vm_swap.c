@@ -31,11 +31,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_swap.c	8.5 (Berkeley) 2/17/94
- * $FreeBSD: src/sys/vm/vm_swap.c,v 1.124 2002/10/27 06:54:06 rwatson Exp $
+ * $FreeBSD: src/sys/vm/vm_swap.c,v 1.133 2003/03/05 23:50:15 rwatson Exp $
  */
 
 #include "opt_mac.h"
 #include "opt_swap.h"
+#include "opt_vm.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,13 +45,13 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/namei.h>
-#include <sys/dmap.h>		/* XXX */
 #include <sys/vnode.h>
 #include <sys/fcntl.h>
 #include <sys/blist.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/conf.h>
+#include <sys/disk.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <sys/mac.h>
@@ -58,12 +59,15 @@
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_param.h>
+#include <vm/vm_pageout.h>
 #include <vm/swap_pager.h>
 #include <vm/uma.h>
 
 /*
  * Indirect driver for multi-controller paging.
  */
+
+typedef	int32_t	swblk_t;	/* swap offset */
 
 #ifndef NSWAPDEV
 #define NSWAPDEV	4
@@ -73,6 +77,8 @@ struct swdevt *swdevt = should_be_malloced;
 static int nswap;		/* first block after the interleaved devs */
 int nswdev = NSWAPDEV;
 int vm_swap_size;
+static int swdev_syscall_active = 0; /* serialize swap(on|off) */
+
 
 static int swapdev_strategy(struct vop_strategy_args *ap);
 struct vnode *swapdev_vp;
@@ -159,17 +165,21 @@ swapdev_strategy(ap)
 	}
 	bp->b_vp = sp->sw_vp;
 	splx(s);
-	BUF_STRATEGY(bp);
+	if (bp->b_vp->v_type == VCHR)
+		VOP_SPECSTRATEGY(bp->b_vp, bp);
+	else
+		VOP_STRATEGY(bp->b_vp, bp);
 	return 0;
 }
 
 /*
  * Create a special vnode op vector for swapdev_vp - we only use
- * VOP_STRATEGY(), everything else returns an error.
+ * VOP_STRATEGY() and reclaim; everything else returns an error.
  */
 vop_t **swapdev_vnodeop_p;
 static struct vnodeopv_entry_desc swapdev_vnodeop_entries[] = {  
 	{ &vop_default_desc,		(vop_t *) vop_defaultop },
+	{ &vop_reclaim_desc,		(vop_t *) vop_null },
 	{ &vop_strategy_desc,		(vop_t *) swapdev_strategy },
 	{ NULL, NULL }
 };
@@ -208,19 +218,23 @@ swapon(td, uap)
 	if (error)
 		goto done2;
 
+	while (swdev_syscall_active)
+	    tsleep(&swdev_syscall_active, PUSER - 1, "swpon", 0);
+	swdev_syscall_active = 1;
+
 	/*
 	 * Swap metadata may not fit in the KVM if we have physical
 	 * memory of >1GB.
 	 */
 	if (swap_zone == NULL) {
 		error = ENOMEM;
-		goto done2;
+		goto done;
 	}
 
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, uap->name, td);
 	error = namei(&nd);
 	if (error)
-		goto done2;
+		goto done;
 
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	vp = nd.ni_vp;
@@ -239,6 +253,9 @@ swapon(td, uap)
 
 	if (error)
 		vrele(vp);
+done:
+	swdev_syscall_active = 0;
+	wakeup_one(&swdev_syscall_active);
 done2:
 	mtx_unlock(&Giant);
 	return (error);
@@ -252,8 +269,6 @@ done2:
  *
  * The new swap code uses page-sized blocks.  The old swap code used
  * DEV_BSIZE'd chunks.
- *
- * XXX locking when multiple swapon's run in parallel
  */
 int
 swaponvp(td, vp, dev, nblks)
@@ -269,6 +284,7 @@ swaponvp(td, vp, dev, nblks)
 	swblk_t dvbase;
 	int error;
 	u_long aligned_nblks;
+	off_t mediasize;
 
 	if (!swapdev_vp) {
 		error = getnewvnode("none", NULL, swapdev_vnodeop_p,
@@ -298,11 +314,16 @@ swaponvp(td, vp, dev, nblks)
 	if (error)
 		return (error);
 
-	if (nblks == 0 && dev != NODEV && (devsw(dev)->d_psize == 0 ||
-	    (nblks = (*devsw(dev)->d_psize) (dev)) == -1)) {
-		(void) VOP_CLOSE(vp, FREAD | FWRITE, td->td_ucred, td);
-		return (ENXIO);
-	}
+	error = VOP_IOCTL(vp, DIOCGMEDIASIZE, (caddr_t)&mediasize,
+	    FREAD, td->td_ucred, td);
+	if (error == 0)
+            nblks = mediasize / DEV_BSIZE;
+	else
+	    nblks = 0;
+	/*
+	 * XXX: We should also check that the sectorsize makes sense
+	 * XXX: it should be a power of two, no larger than the page size.
+	 */
 	if (nblks == 0) {
 		(void) VOP_CLOSE(vp, FREAD | FWRITE, td->td_ucred, td);
 		return (ENXIO);
@@ -330,7 +351,7 @@ swaponvp(td, vp, dev, nblks)
 	sp->sw_vp = vp;
 	sp->sw_dev = dev2udev(dev);
 	sp->sw_device = dev;
-	sp->sw_flags |= SW_FREED;
+	sp->sw_flags = SW_FREED;
 	sp->sw_nblks = nblks;
 	sp->sw_used = 0;
 
@@ -339,7 +360,7 @@ swaponvp(td, vp, dev, nblks)
 	 * DEV_BSIZE'd.   aligned_nblks is used to calculate the
 	 * size of the swap bitmap, taking into account the stripe size.
 	 */
-	aligned_nblks = (nblks + (dmmax - 1)) & ~(u_long)(dmmax - 1);
+	aligned_nblks = (nblks + (dmmax -1)) & ~(u_long)(dmmax -1);
 
 	if (aligned_nblks * nswdev > nswap)
 		nswap = aligned_nblks * nswdev;
@@ -356,7 +377,133 @@ swaponvp(td, vp, dev, nblks)
 		vm_swap_size += blk;
 	}
 
+	swap_pager_full = 0;
+
 	return (0);
+}
+
+/*
+ * SYSCALL: swapoff(devname)
+ *
+ * Disable swapping on the given device.
+ */
+#ifndef _SYS_SYSPROTO_H_
+struct swapoff_args {
+	char *name;
+};
+#endif
+
+/*
+ * MPSAFE
+ */
+/* ARGSUSED */
+int
+swapoff(td, uap)
+	struct thread *td;
+	struct swapoff_args *uap;
+{
+	struct vnode *vp;
+	struct nameidata nd;
+	struct swdevt *sp;
+	swblk_t dvbase, vsbase;
+	u_long nblks, aligned_nblks, blk;
+	int error, index;
+
+	mtx_lock(&Giant);
+
+	error = suser(td);
+	if (error)
+		goto done2;
+
+	while (swdev_syscall_active)
+	    tsleep(&swdev_syscall_active, PUSER - 1, "swpoff", 0);
+	swdev_syscall_active = 1;
+
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, uap->name, td);
+	error = namei(&nd);
+	if (error)
+		goto done;
+	NDFREE(&nd, NDF_ONLY_PNBUF);
+	vp = nd.ni_vp;
+
+	for (sp = swdevt, index = 0 ; index < nswdev; index++, sp++) {
+		if (sp->sw_vp == vp)
+			goto found;
+	}
+	error = EINVAL;
+	goto done;
+found:
+#ifdef MAC
+	(void) vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
+	error = mac_check_system_swapoff(td->td_ucred, vp);
+	(void) VOP_UNLOCK(vp, 0, td);
+	if (error != 0)
+		goto done;
+#endif
+	
+	nblks = sp->sw_nblks;
+
+	/*
+	 * We can turn off this swap device safely only if the
+	 * available virtual memory in the system will fit the amount
+	 * of data we will have to page back in, plus an epsilon so
+	 * the system doesn't become critically low on swap space.
+	 */
+	if (cnt.v_free_count + cnt.v_cache_count + vm_swap_size <
+	    nblks + nswap_lowat) {
+		error = ENOMEM;
+		goto done;
+	}
+
+	/*
+	 * Prevent further allocations on this device.
+	 */
+	sp->sw_flags |= SW_CLOSING;
+	for (dvbase = dmmax; dvbase < nblks; dvbase += dmmax) {
+		blk = min(nblks - dvbase, dmmax);
+		vsbase = index * dmmax + dvbase * nswdev;
+		vm_swap_size -= blist_fill(swapblist, vsbase, blk);
+	}
+
+	/*
+	 * Page in the contents of the device and close it.
+	 */
+#ifndef NO_SWAPPING
+       	vm_proc_swapin_all(index);
+#endif /* !NO_SWAPPING */
+	swap_pager_swapoff(index, &sp->sw_used);
+
+	VOP_CLOSE(vp, FREAD | FWRITE, td->td_ucred, td);
+	vrele(vp);
+	sp->sw_vp = NULL;
+
+	/*
+	 * Resize the bitmap based on the new largest swap device,
+	 * or free the bitmap if there are no more devices.
+	 */
+	for (sp = swdevt, nblks = 0; sp < swdevt + nswdev; sp++) {
+		if (sp->sw_vp == NULL)
+			continue;
+		nblks = max(nblks, sp->sw_nblks);
+	}
+
+	aligned_nblks = (nblks + (dmmax -1)) & ~(u_long)(dmmax -1);
+	nswap = aligned_nblks * nswdev;
+
+	if (nswap == 0) {
+		blist_destroy(swapblist);
+		swapblist = NULL;
+		vrele(swapdev_vp);
+		swapdev_vp = NULL;
+	} else
+		blist_resize(&swapblist, nswap, 0);
+
+done:
+	swdev_syscall_active = 0;
+	wakeup_one(&swdev_syscall_active);
+done2:
+	mtx_unlock(&Giant);
+	return (error);
 }
 
 static int

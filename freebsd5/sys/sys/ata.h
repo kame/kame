@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 2000 - 2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/ata.h,v 1.15 2002/04/05 18:03:33 sos Exp $
+ * $FreeBSD: src/sys/sys/ata.h,v 1.19 2003/05/18 16:40:38 sos Exp $
  */
 
 #ifndef _SYS_ATA_H_
@@ -339,14 +339,20 @@ struct ata_params {
 #define ATA_PIO2		0x0a
 #define ATA_PIO3		0x0b
 #define ATA_PIO4		0x0c
+#define ATA_PIO_MAX		0x0f
 #define ATA_DMA			0x10
-#define ATA_WDMA		0x20
+#define ATA_WDMA0		0x20
+#define ATA_WDMA1		0x21
 #define ATA_WDMA2		0x22
-#define ATA_UDMA		0x40
+#define ATA_UDMA0		0x40
+#define ATA_UDMA1		0x41
 #define ATA_UDMA2		0x42
+#define ATA_UDMA3		0x43
 #define ATA_UDMA4		0x44
 #define ATA_UDMA5		0x45
 #define ATA_UDMA6		0x46
+#define ATA_SA150		0x47
+#define ATA_DMA_MAX		0x4f
 
 struct ata_cmd {
     int				channel;
@@ -364,6 +370,8 @@ struct ata_cmd {
 #define ATARAIDDELETE		10
 #define ATARAIDSTATUS		11
 #define ATAENCSTAT		12
+#define ATAGMAXCHANNEL		13
+#define ATARAIDADDSPARE		14
 
     union {
 	struct {
@@ -385,6 +393,9 @@ struct ata_cmd {
 	    int			interleave;
 	    int			unit;
 	} raid_setup;
+	struct {
+	    int			disk;
+	} raid_spare;
 	struct raid_status {
 	    int			type;
 	    int			total_disks;
@@ -416,6 +427,7 @@ struct ata_cmd {
 	    int			error;
 	    char		sense_data[18];
 	} atapi;
+	int			maxchan;
     } u;
 };
 

@@ -23,10 +23,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/powerpc/powerpc/sys_machdep.c,v 1.2 2001/09/20 00:47:17 mp Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/sys_machdep.c,v 1.4 2003/04/25 20:04:02 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -37,5 +35,5 @@ int
 sysarch(struct thread *td, struct sysarch_args *uap)
 {
 
-	return (EOPNOTSUPP);
+	return (EINVAL);
 }

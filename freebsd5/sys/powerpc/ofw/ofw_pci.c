@@ -28,7 +28,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * from NetBSD: pci_machdep.c,v 1.18 2001/07/22 11:29:48 wiz Exp
- * $FreeBSD: src/sys/powerpc/ofw/ofw_pci.c,v 1.1 2002/07/09 13:27:58 benno Exp $
+ * $FreeBSD: src/sys/powerpc/ofw/ofw_pci.c,v 1.3 2003/03/03 12:05:06 grehan Exp $
  */
 
 #include <sys/param.h>
@@ -54,15 +54,15 @@ phandle_t
 ofw_pci_find_node(device_t dev)
 {
 	phandle_t	node, nextnode;
-	u_int		reg[5];
+	struct		ofw_pci_register pcir;
 	int		l, b, s, f;
 
 	for (node = OF_peer(0); node; node = nextnode) {
-		l = OF_getprop(node, "assigned-addresses", reg, sizeof(reg));
+		l = OF_getprop(node, "reg", &pcir, sizeof(pcir));
 		if (l > 4) {
-			b = (reg[0] >> 16) & 0xff;
-			s = (reg[0] >> 11) & 0x1f;
-			f = (reg[0] >> 8) & 0x07;
+			b = OFW_PCI_PHYS_HI_BUS(pcir.phys_hi);
+			s = OFW_PCI_PHYS_HI_DEVICE(pcir.phys_hi);
+			f = OFW_PCI_PHYS_HI_FUNCTION(pcir.phys_hi);
 
 			if (b == pci_get_bus(dev) && s == pci_get_slot(dev) &&
 			    f == pci_get_function(dev))
@@ -84,26 +84,10 @@ ofw_pci_find_node(device_t dev)
 void
 ofw_pci_fixup(device_t dev, u_int bus, phandle_t parentnode)
 {
-	phandle_t	node, nextnode, childnode;
-	u_int32_t	busrange[2];
-	int		sz;
-	
-	for (node = parentnode; node; node = nextnode) {
-		sz = OF_getprop(node, "bus-range", busrange, 8);
-		if (sz != 8 || busrange[0] != device_get_unit(dev)) {
-			for (childnode = OF_child(node); childnode;
-			    childnode = OF_peer(childnode)) {
-				fixup_node(dev, childnode);
-			}
-		}
+	phandle_t	node;
 
-		if ((nextnode = OF_child(node)) != 0)
-			continue;
-		while ((nextnode = OF_peer(node)) == 0) {
-			node = OF_parent(node);
-			if (node == parentnode)
-				return;
-		}
+	for (node = OF_child(parentnode); node; node = OF_peer(node)) {
+		fixup_node(dev, node);
 	}
 }
 

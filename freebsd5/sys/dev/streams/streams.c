@@ -30,7 +30,7 @@
  * skeleton produced from /usr/share/examples/drivers/make_pseudo_driver.sh
  * in 3.0-980524-SNAP then hacked a bit (but probably not enough :-).
  *
- * $FreeBSD: src/sys/dev/streams/streams.c,v 1.30.2.1 2002/12/19 09:40:08 alfred Exp $
+ * $FreeBSD: src/sys/dev/streams/streams.c,v 1.39 2003/03/03 12:15:46 phk Exp $
  */
 
 #include <sys/param.h>
@@ -99,25 +99,15 @@ static dev_t dt_ptm, dt_arp, dt_icmp, dt_ip, dt_tcp, dt_udp, dt_rawip,
 	dt_unix_dgram, dt_unix_stream, dt_unix_ord_stream;
 
 static struct fileops svr4_netops = {
-	soo_read, soo_write, soo_ioctl, soo_poll, sokqfilter,
+	soo_read, soo_write, soo_ioctl, soo_poll, soo_kqfilter,
 	soo_stat, svr4_soo_close
 };
  
 #define CDEV_MAJOR 103
 static struct cdevsw streams_cdevsw = {
-	/* open */	streamsopen,
-	/* close */	noclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	noioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"streams",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	streamsopen,
+	.d_name =	"streams",
+	.d_maj =	CDEV_MAJOR,
 };
  
 struct streams_softc {
@@ -274,7 +264,7 @@ streamsopen(dev_t dev, int oflags, int devtype, struct thread *td)
 	}
 
 	FILEDESC_LOCK(p->p_fd);
-	fp->f_data = (caddr_t)so;
+	fp->f_data = so;
 	fp->f_flag = FREAD|FWRITE;
 	fp->f_ops = &svr4_netops;
 	fp->f_type = DTYPE_SOCKET;
@@ -357,7 +347,7 @@ svr4_stream_get(fp)
 	if (fp == NULL || fp->f_type != DTYPE_SOCKET)
 		return NULL;
 
-	so = (struct socket *) fp->f_data;
+	so = fp->f_data;
 
 	/*
 	 * mpfixme: lock socketbuffer here
@@ -395,7 +385,7 @@ svr4_delete_socket(p, fp)
 	struct file *fp;
 {
 	struct svr4_sockcache_entry *e;
-	void *cookie = ((struct socket *) fp->f_data)->so_emuldata;
+	void *cookie = ((struct socket *)fp->f_data)->so_emuldata;
 
 	while (svr4_str_initialized != 2) {
 		if (atomic_cmpset_acq_int(&svr4_str_initialized, 0, 1)) {
@@ -418,7 +408,7 @@ svr4_delete_socket(p, fp)
 static int
 svr4_soo_close(struct file *fp, struct thread *td)
 {
-        struct socket *so = (struct socket *)fp->f_data;
+        struct socket *so = fp->f_data;
 	
 	/*	CHECKUNIT_DIAG(ENXIO);*/
 

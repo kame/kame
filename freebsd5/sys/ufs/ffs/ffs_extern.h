@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_extern.h	8.6 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_extern.h,v 1.52.2.1 2002/12/29 14:54:19 phk Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_extern.h,v 1.55 2003/02/22 00:29:50 mckusick Exp $
  */
 
 #ifndef _UFS_FFS_EXTERN_H
@@ -63,12 +63,13 @@ int	ffs_blkatoff(struct vnode *, off_t, char **, struct buf **);
 void	ffs_blkfree(struct fs *, struct vnode *, ufs2_daddr_t, long, ino_t);
 ufs2_daddr_t ffs_blkpref_ufs1(struct inode *, ufs_lbn_t, int, ufs1_daddr_t *);
 ufs2_daddr_t ffs_blkpref_ufs2(struct inode *, ufs_lbn_t, int, ufs2_daddr_t *);
+int	ffs_checkfreefile(struct fs *, struct vnode *, ino_t);
 void	ffs_clrblock(struct fs *, u_char *, ufs1_daddr_t);
 void	ffs_clusteracct	(struct fs *, struct cg *, ufs1_daddr_t, int);
 vfs_fhtovp_t ffs_fhtovp;
 int	ffs_flushfiles(struct mount *, int, struct thread *);
 void	ffs_fragacct(struct fs *, int, int32_t [], int);
-int	ffs_freefile(struct fs *, struct vnode *, ino_t, int );
+int	ffs_freefile(struct fs *, struct vnode *, ino_t, int);
 int	ffs_isblock(struct fs *, u_char *, ufs1_daddr_t);
 void	ffs_load_inode(struct buf *, struct inode *, struct fs *, ino_t);
 int	ffs_mountroot(void);

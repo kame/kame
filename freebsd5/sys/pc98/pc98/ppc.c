@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/ppc.c,v 1.12 2001/12/10 08:09:49 obrien Exp $
+ * $FreeBSD: src/sys/pc98/pc98/ppc.c,v 1.13 2003/03/02 16:54:39 des Exp $
  *
  */
 
@@ -1619,7 +1619,7 @@ ppcintr(void *arg)
 				ppc->ppc_dmastat = PPC_DMA_COMPLETE;
 
 				/* wakeup the waiting process */
-				wakeup((caddr_t)ppc);
+				wakeup(ppc);
 			}
 		}
 	} else if (ppc->ppc_irqstat & PPC_IRQ_FIFO) {
@@ -1725,7 +1725,7 @@ ppc_write(device_t dev, char *buf, int len, int how)
 		 */
 		do {
 			/* release CPU */
-			error = tsleep((caddr_t)ppc,
+			error = tsleep(ppc,
 				PPBPRI | PCATCH, "ppcdma", 0);
 
 		} while (error == EWOULDBLOCK);
@@ -1757,7 +1757,7 @@ ppc_write(device_t dev, char *buf, int len, int how)
 #ifdef PPC_DEBUG
 			printf("Z");
 #endif
-			error = tsleep((caddr_t)ppc, PPBPRI | PCATCH, "ppcfifo", hz/100);
+			error = tsleep(ppc, PPBPRI | PCATCH, "ppcfifo", hz/100);
 			if (error != EWOULDBLOCK) {
 #ifdef PPC_DEBUG
 				printf("I");

@@ -37,34 +37,29 @@
  *	from: hp300: @(#)pmap.h 7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h        7.4 (Berkeley) 5/12/91
  *	from: FreeBSD: src/sys/i386/include/pmap.h,v 1.70 2000/11/30
- * $FreeBSD: src/sys/sparc64/include/pmap.h,v 1.28 2002/11/13 05:39:58 alc Exp $
+ * $FreeBSD: src/sys/sparc64/include/pmap.h,v 1.36 2003/04/13 21:54:58 jake Exp $
  */
 
 #ifndef	_MACHINE_PMAP_H_
 #define	_MACHINE_PMAP_H_
 
 #include <sys/queue.h>
+#include <machine/cache.h>
 #include <machine/tte.h>
-
-#define	DCACHE_COLOR_BITS	(1)
-#define	DCACHE_COLORS		(1 << DCACHE_COLOR_BITS)
-#define	DCACHE_COLOR_MASK	(DCACHE_COLORS - 1)
-#define	DCACHE_COLOR(va)	(((va) >> PAGE_SHIFT) & DCACHE_COLOR_MASK)
-#define	DCACHE_OTHER_COLOR(color) \
-	((color) ^ DCACHE_COLOR_BITS)
 
 #define	PMAP_CONTEXT_MAX	8192
 
-#define	pmap_page_is_mapped(m)	(!STAILQ_EMPTY(&(m)->md.tte_list))
+#define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.tte_list))
 #define	pmap_resident_count(pm)	(pm->pm_stats.resident_count)
 
 typedef	struct pmap *pmap_t;
 
 struct md_page {
-	STAILQ_HEAD(, tte) tte_list;
-	int	colors[DCACHE_COLORS];
-	int	color;
-	int	flags;
+	TAILQ_HEAD(, tte) tte_list;
+	struct	pmap *pmap;
+	uint32_t colors[DCACHE_COLORS];
+	int32_t	color;
+	uint32_t flags;
 };
 
 struct pmap {
@@ -76,11 +71,11 @@ struct pmap {
 };
 
 void	pmap_bootstrap(vm_offset_t ekva);
-void	pmap_context_rollover(void);
-vm_offset_t pmap_kextract(vm_offset_t va);
-void	pmap_kenter_flags(vm_offset_t va, vm_offset_t pa, u_long flags);
+vm_paddr_t pmap_kextract(vm_offset_t va);
+void	pmap_kenter(vm_offset_t va, vm_page_t m);
+void	pmap_kremove(vm_offset_t);
+void	pmap_kenter_flags(vm_offset_t va, vm_paddr_t pa, u_long flags);
 void	pmap_kremove_flags(vm_offset_t va);
-void	pmap_qenter_flags(vm_offset_t va, vm_page_t *m, int count, u_long fl);
 
 int	pmap_cache_enter(vm_page_t m, vm_offset_t va);
 void	pmap_cache_remove(vm_page_t m, vm_offset_t va);
@@ -96,15 +91,15 @@ void	pmap_clear_write(vm_page_t m);
 
 #define	vtophys(va)	pmap_kextract(((vm_offset_t)(va)))
 
-extern	vm_offset_t avail_start;
-extern	vm_offset_t avail_end;
+extern	vm_paddr_t avail_start;
+extern	vm_paddr_t avail_end;
 extern	struct pmap kernel_pmap_store;
 #define	kernel_pmap	(&kernel_pmap_store)
-extern	vm_offset_t phys_avail[];
+extern	vm_paddr_t phys_avail[];
 extern	vm_offset_t virtual_avail;
 extern	vm_offset_t virtual_end;
 
-extern	vm_offset_t msgbuf_phys;
+extern	vm_paddr_t msgbuf_phys;
 
 static __inline int
 pmap_track_modified(pmap_t pm, vm_offset_t va)
@@ -114,5 +109,24 @@ pmap_track_modified(pmap_t pm, vm_offset_t va)
 	else
 		return (1);
 }
+
+#ifdef PMAP_STATS
+
+SYSCTL_DECL(_debug_pmap_stats);
+
+#define	PMAP_STATS_VAR(name) \
+	static long name; \
+	SYSCTL_LONG(_debug_pmap_stats, OID_AUTO, name, CTLFLAG_RW, \
+	    &name, 0, "")
+
+#define	PMAP_STATS_INC(var) \
+	atomic_add_long(&var, 1)
+
+#else
+
+#define	PMAP_STATS_VAR(name)
+#define	PMAP_STATS_INC(var)
+
+#endif
 
 #endif /* !_MACHINE_PMAP_H_ */

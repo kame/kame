@@ -47,7 +47,7 @@
  * http://samba.org/picturebook/ Special thanks also to Ian Dowse, who
  * also provided sample code upon which this driver was based.
  *
- * $FreeBSD: src/sys/i386/isa/spic.c,v 1.4 2002/03/24 03:07:07 will Exp $
+ * $FreeBSD: src/sys/i386/isa/spic.c,v 1.7 2003/03/03 12:15:49 phk Exp $
  */
 
 #include <sys/param.h>
@@ -64,7 +64,6 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
-#include <sys/dkstat.h>
 #include <sys/malloc.h>
 #include <sys/sysctl.h>
 #include <sys/uio.h>
@@ -85,19 +84,13 @@ static d_ioctl_t	spicioctl;
 static d_poll_t		spicpoll;
 
 static struct cdevsw spic_cdevsw = {
-        /* open */      spicopen,
-        /* close */     spicclose,
-        /* read */      spicread,
-        /* write */     nowrite,
-        /* ioctl */     spicioctl,
-        /* poll */      spicpoll,
-        /* mmap */      nommap,
-        /* strategy */  nostrategy,
-        /* name */      "spic",
-        /* maj */       CDEV_MAJOR,
-        /* dump */      nodump,
-        /* psize */     nopsize,
-        /* flags */     0,
+	.d_open =	spicopen,
+	.d_close =	spicclose,
+	.d_read =	spicread,
+	.d_ioctl =	spicioctl,
+	.d_poll =	spicpoll,
+	.d_name =	"spic",
+	.d_maj =	CDEV_MAJOR,
 };
 
 #define SCBUFLEN 128
@@ -437,7 +430,7 @@ spictimeout(void *arg)
 	if (sc->sc_count) {
 		if (sc->sc_sleeping) {
 			sc->sc_sleeping = 0;
-			wakeup((caddr_t) sc);
+			wakeup( sc);
 		}
 		selwakeup(&sc->sc_rsel);
 	}
@@ -492,7 +485,7 @@ spicread(dev_t dev, struct uio *uio, int flag)
 	s = spltty();
 	while (!(sc->sc_count)) {
 		sc->sc_sleeping=1;
-		error = tsleep((caddr_t) sc, PZERO | PCATCH, "jogrea", 0);
+		error = tsleep( sc, PZERO | PCATCH, "jogrea", 0);
 		sc->sc_sleeping=0;
 		if (error) {
 			splx(s);

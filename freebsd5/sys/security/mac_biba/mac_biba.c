@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_biba/mac_biba.c,v 1.49 2002/12/10 16:20:33 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_biba/mac_biba.c,v 1.59.2.2 2003/06/02 18:59:29 rwatson Exp $
  */
 
 /*
@@ -49,6 +49,7 @@
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
+#include <sys/sbuf.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/sysent.h>
@@ -528,36 +529,45 @@ mac_biba_destroy_label(struct label *label)
 }
 
 /*
- * mac_biba_element_to_string() is basically an snprintf wrapper with
- * the same properties as snprintf().  It returns the length it would
- * have added to the string in the event the string is too short.
+ * mac_biba_element_to_string() accepts an sbuf and Biba element.  It
+ * converts the Biba element to a string and stores the result in the
+ * sbuf; if there isn't space in the sbuf, -1 is returned.
  */
-static size_t
-mac_biba_element_to_string(char *string, size_t size,
-    struct mac_biba_element *element)
+static int
+mac_biba_element_to_string(struct sbuf *sb, struct mac_biba_element *element)
 {
-	int pos, bit = 1;
+	int i, first;
 
 	switch (element->mbe_type) {
 	case MAC_BIBA_TYPE_HIGH:
-		return (snprintf(string, size, "high"));
+		return (sbuf_printf(sb, "high"));
 
 	case MAC_BIBA_TYPE_LOW:
-		return (snprintf(string, size, "low"));
+		return (sbuf_printf(sb, "low"));
 
 	case MAC_BIBA_TYPE_EQUAL:
-		return (snprintf(string, size, "equal"));
+		return (sbuf_printf(sb, "equal"));
 
 	case MAC_BIBA_TYPE_GRADE:
-		pos = snprintf(string, size, "%d:", element->mbe_grade);
-		for (bit = 1; bit <= MAC_BIBA_MAX_COMPARTMENTS; bit++) {
-			if (MAC_BIBA_BIT_TEST(bit, element->mbe_compartments))
-				pos += snprintf(string + pos, size - pos,
-				    "%d+", bit);
+		if (sbuf_printf(sb, "%d", element->mbe_grade) == -1)
+			return (-1);
+
+		first = 1;
+		for (i = 1; i <= MAC_BIBA_MAX_COMPARTMENTS; i++) {
+			if (MAC_BIBA_BIT_TEST(i, element->mbe_compartments)) {
+				if (first) {
+					if (sbuf_putc(sb, ':') == -1)
+						return (-1);
+					if (sbuf_printf(sb, "%d", i) == -1)
+						return (-1);
+					first = 0;
+				} else {
+					if (sbuf_printf(sb, "+%d", i) == -1)
+						return (-1);
+				}
+			}
 		}
-		if (string[pos - 1] == '+' || string[pos - 1] == ':')
-			string[--pos] = '\0';
-		return (pos);
+		return (0);
 
 	default:
 		panic("mac_biba_element_to_string: invalid type (%d)",
@@ -565,60 +575,48 @@ mac_biba_element_to_string(char *string, size_t size,
 	}
 }
 
+/*
+ * mac_biba_to_string() converts an Biba label to a string, placing the
+ * results in the passed string buffer.  It returns 0 on success,
+ * or EINVAL if there isn't room in the buffer.  The size of the
+ * string appended, leaving out the nul termination, is returned to
+ * the caller via *caller_len.  Eventually, we should expose the
+ * sbuf to the caller rather than using C strings at this layer.
+ */
 static int
 mac_biba_to_string(char *string, size_t size, size_t *caller_len,
     struct mac_biba *mac_biba)
 {
-	size_t left, len;
-	char *curptr;
+	struct sbuf sb;
 
-	bzero(string, size);
-	curptr = string;
-	left = size;
+	sbuf_new(&sb, string, size, SBUF_FIXEDLEN);
 
 	if (mac_biba->mb_flags & MAC_BIBA_FLAG_SINGLE) {
-		len = mac_biba_element_to_string(curptr, left,
-		    &mac_biba->mb_single);
-		if (len >= left)
+		if (mac_biba_element_to_string(&sb, &mac_biba->mb_single)
+		    == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 	}
 
 	if (mac_biba->mb_flags & MAC_BIBA_FLAG_RANGE) {
-		len = snprintf(curptr, left, "(");
-		if (len >= left)
+		if (sbuf_putc(&sb, '(') == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 
-		len = mac_biba_element_to_string(curptr, left,
-		    &mac_biba->mb_rangelow);
-		if (len >= left)
+		if (mac_biba_element_to_string(&sb, &mac_biba->mb_rangelow)
+		    == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 
-		len = snprintf(curptr, left, "-");
-		if (len >= left)
+		if (sbuf_putc(&sb, '-') == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 
-		len = mac_biba_element_to_string(curptr, left,
-		    &mac_biba->mb_rangehigh);
-		if (len >= left)
+		if (mac_biba_element_to_string(&sb, &mac_biba->mb_rangehigh)
+		    == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 
-		len = snprintf(curptr, left, ")");
-		if (len >= left)
+		if (sbuf_putc(&sb, ')') == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 	}
 
+	sbuf_finish(&sb);
 	*caller_len = strlen(string);
 	return (0);
 }
@@ -640,13 +638,14 @@ mac_biba_externalize_label(struct label *label, char *element_name,
 	if (error)
 		return (error);
 
-	*len = strlen(element_data);
 	return (0);
 }
 
 static int
 mac_biba_parse_element(struct mac_biba_element *element, char *string)
 {
+	char *compartment, *end, *grade;
+	int value;
 
 	if (strcmp(string, "high") == 0 ||
 	    strcmp(string, "hi") == 0) {
@@ -661,38 +660,36 @@ mac_biba_parse_element(struct mac_biba_element *element, char *string)
 		element->mbe_type = MAC_BIBA_TYPE_EQUAL;
 		element->mbe_grade = MAC_BIBA_TYPE_UNDEF;
 	} else {
-		char *p0, *p1;
-		int d;
-
-		p0 = string;
-		d = strtol(p0, &p1, 10);
-	
-		if (d < 0 || d > 65535)
-			return (EINVAL);
 		element->mbe_type = MAC_BIBA_TYPE_GRADE;
-		element->mbe_grade = d;
 
-		if (*p1 != ':')  {
-			if (p1 == p0 || *p1 != '\0')
+		/*
+		 * Numeric grade piece of the element.
+		 */
+		grade = strsep(&string, ":");
+		value = strtol(grade, &end, 10);
+		if (end == grade || *end != '\0')
+			return (EINVAL);
+		if (value < 0 || value > 65535)
+			return (EINVAL);
+		element->mbe_grade = value;
+
+		/*
+		 * Optional compartment piece of the element.  If none
+		 * are included, we assume that the label has no
+		 * compartments.
+		 */
+		if (string == NULL)
+			return (0);
+		if (*string == '\0')
+			return (0);
+
+		while ((compartment = strsep(&string, "+")) != NULL) {
+			value = strtol(compartment, &end, 10);
+			if (compartment == end || *end != '\0')
 				return (EINVAL);
-			else
-				return (0);
-		}
-		else
-			if (*(p1 + 1) == '\0')
-				return (0);
-
-		while ((p0 = ++p1)) {
-			d = strtol(p0, &p1, 10);
-			if (d < 1 || d > MAC_BIBA_MAX_COMPARTMENTS)
+			if (value < 1 || value > MAC_BIBA_MAX_COMPARTMENTS)
 				return (EINVAL);
-
-			MAC_BIBA_BIT_SET(d, element->mbe_compartments);
-
-			if (*p1 == '\0')
-				break;
-			if (p1 == p0 || *p1 != '+')
-				return (EINVAL);
+			MAC_BIBA_BIT_SET(value, element->mbe_compartments);
 		}
 	}
 
@@ -706,38 +703,30 @@ mac_biba_parse_element(struct mac_biba_element *element, char *string)
 static int
 mac_biba_parse(struct mac_biba *mac_biba, char *string)
 {
-	char *range, *rangeend, *rangehigh, *rangelow, *single;
+	char *rangehigh, *rangelow, *single;
 	int error;
 
-	/* Do we have a range? */
-	single = string;
-	range = index(string, '(');
-	if (range == single)
+	single = strsep(&string, "(");
+	if (*single == '\0')
 		single = NULL;
-	rangelow = rangehigh = NULL;
-	if (range != NULL) {
-		/* Nul terminate the end of the single string. */
-		*range = '\0';
-		range++;
-		rangelow = range;
-		rangehigh = index(rangelow, '-');
-		if (rangehigh == NULL)
+
+	if (string != NULL) {
+		rangelow = strsep(&string, "-");
+		if (string == NULL)
 			return (EINVAL);
-		rangehigh++;
-		if (*rangelow == '\0' || *rangehigh == '\0')
+		rangehigh = strsep(&string, ")");
+		if (string == NULL)
 			return (EINVAL);
-		rangeend = index(rangehigh, ')');
-		if (rangeend == NULL)
+		if (*string != '\0')
 			return (EINVAL);
-		if (*(rangeend + 1) != '\0')
-			return (EINVAL);
-		/* Nul terminate the ends of the ranges. */
-		*(rangehigh - 1) = '\0';
-		*rangeend = '\0';
+	} else {
+		rangelow = NULL;
+		rangehigh = NULL;
 	}
+
 	KASSERT((rangelow != NULL && rangehigh != NULL) ||
 	    (rangelow == NULL && rangehigh == NULL),
-	    ("mac_biba_internalize_label: range mismatch"));
+	    ("mac_biba_parse: range mismatch"));
 
 	bzero(mac_biba, sizeof(*mac_biba));
 	if (single != NULL) {
@@ -1127,21 +1116,21 @@ mac_biba_create_ifnet(struct ifnet *ifnet, struct label *ifnetlabel)
 	char tifname[IFNAMSIZ], ifname[IFNAMSIZ], *p, *q;
 	char tiflist[sizeof(trusted_interfaces)];
 	struct mac_biba *dest;
-	int len, grade;
+	int len, type;
 
 	dest = SLOT(ifnetlabel);
 
 	if (ifnet->if_type == IFT_LOOP) {
-		grade = MAC_BIBA_TYPE_EQUAL;
+		type = MAC_BIBA_TYPE_EQUAL;
 		goto set;
 	}
 
 	if (trust_all_interfaces) {
-		grade = MAC_BIBA_TYPE_HIGH;
+		type = MAC_BIBA_TYPE_HIGH;
 		goto set;
 	}
 
-	grade = MAC_BIBA_TYPE_LOW;
+	type = MAC_BIBA_TYPE_LOW;
 
 	if (trusted_interfaces[0] == '\0' ||
 	    !strvalid(trusted_interfaces, sizeof(trusted_interfaces)))
@@ -1161,7 +1150,7 @@ mac_biba_create_ifnet(struct ifnet *ifnet, struct label *ifnetlabel)
 				bzero(tifname, sizeof(tifname));
 				bcopy(q, tifname, len);
 				if (strcmp(tifname, ifname) == 0) {
-					grade = MAC_BIBA_TYPE_HIGH;
+					type = MAC_BIBA_TYPE_HIGH;
 					break;
 				}
 			} else {
@@ -1176,8 +1165,8 @@ mac_biba_create_ifnet(struct ifnet *ifnet, struct label *ifnetlabel)
 		}
 	}
 set:
-	mac_biba_set_single(dest, grade, 0, NULL);
-	mac_biba_set_range(dest, grade, 0, NULL, grade, 0, NULL);
+	mac_biba_set_single(dest, type, 0, NULL);
+	mac_biba_set_range(dest, type, 0, NULL, type, 0, NULL);
 }
 
 static void
@@ -1422,6 +1411,16 @@ mac_biba_check_cred_relabel(struct ucred *cred, struct label *newlabel)
 	 */
 	if (new->mb_flags & MAC_BIBA_FLAGS_BOTH) {
 		/*
+		 * If the change request modifies both the Biba label
+		 * single and range, check that the new single will be
+		 * in the new range.
+		 */
+		if ((new->mb_flags & MAC_BIBA_FLAGS_BOTH) ==
+		    MAC_BIBA_FLAGS_BOTH &&
+		    !mac_biba_single_in_range(new, new))
+			return (EINVAL);
+
+		/*
 		 * To change the Biba single label on a credential, the
 		 * new single label must be in the current range.
 		 */
@@ -1447,12 +1446,6 @@ mac_biba_check_cred_relabel(struct ucred *cred, struct label *newlabel)
 			if (error)
 				return (error);
 		}
-
-		/*
-		 * XXXMAC: Additional consistency tests regarding the
-		 * single and range of the new label might be performed
-		 * here.
-		 */
 	}
 
 	return (0);
@@ -1536,6 +1529,43 @@ mac_biba_check_ifnet_transmit(struct ifnet *ifnet, struct label *ifnetlabel,
 	i = SLOT(ifnetlabel);
 
 	return (mac_biba_single_in_range(p, i) ? 0 : EACCES);
+}
+
+static int
+mac_biba_check_kld_load(struct ucred *cred, struct vnode *vp,
+    struct label *label)
+{
+	struct mac_biba *subj, *obj;
+	int error;
+
+	if (!mac_biba_enabled)
+		return (0);
+
+	subj = SLOT(&cred->cr_label);
+
+	error = mac_biba_subject_privileged(subj);
+	if (error)
+		return (error);
+
+	obj = SLOT(label);
+	if (!mac_biba_high_single(obj))
+		return (EACCES);
+
+	return (0);
+}
+
+
+static int
+mac_biba_check_kld_unload(struct ucred *cred)
+{
+	struct mac_biba *subj;
+
+	if (!mac_biba_enabled)
+		return (0);
+
+	subj = SLOT(&cred->cr_label);
+
+	return (mac_biba_subject_privileged(subj));
 }
 
 static int
@@ -1837,6 +1867,24 @@ mac_biba_check_socket_visible(struct ucred *cred, struct socket *socket,
 }
 
 static int
+mac_biba_check_sysarch_ioperm(struct ucred *cred)
+{
+	struct mac_biba *subj;
+	int error;
+
+	if (!mac_biba_enabled)
+		return (0);
+
+	subj = SLOT(&cred->cr_label);
+
+	error = mac_biba_subject_privileged(subj);
+	if (error)
+		return (error);
+
+	return (0);
+}
+
+static int
 mac_biba_check_system_acct(struct ucred *cred, struct vnode *vp,
     struct label *label)
 {
@@ -1899,6 +1947,26 @@ mac_biba_check_system_swapon(struct ucred *cred, struct vnode *vp,
 
 	if (!mac_biba_high_single(obj))
 		return (EACCES);
+
+	return (0);
+}
+
+static int
+mac_biba_check_system_swapoff(struct ucred *cred, struct vnode *vp,
+    struct label *label)
+{
+	struct mac_biba *subj, *obj;
+	int error;
+
+	if (!mac_biba_enabled)
+		return (0);
+
+	subj = SLOT(&cred->cr_label);
+	obj = SLOT(label);
+
+	error = mac_biba_subject_privileged(subj);
+	if (error)
+		return (error);
 
 	return (0);
 }
@@ -2542,7 +2610,7 @@ static struct mac_policy_ops mac_biba_ops =
 	.mpo_init_cred_label = mac_biba_init_label,
 	.mpo_init_devfsdirent_label = mac_biba_init_label,
 	.mpo_init_ifnet_label = mac_biba_init_label,
-	.mpo_init_ipq_label = mac_biba_init_label,
+	.mpo_init_ipq_label = mac_biba_init_label_waitcheck,
 	.mpo_init_mbuf_label = mac_biba_init_label_waitcheck,
 	.mpo_init_mount_label = mac_biba_init_label,
 	.mpo_init_mount_fs_label = mac_biba_init_label,
@@ -2562,6 +2630,7 @@ static struct mac_policy_ops mac_biba_ops =
 	.mpo_destroy_socket_label = mac_biba_destroy_label,
 	.mpo_destroy_socket_peer_label = mac_biba_destroy_label,
 	.mpo_destroy_vnode_label = mac_biba_destroy_label,
+	.mpo_copy_mbuf_label = mac_biba_copy_label,
 	.mpo_copy_pipe_label = mac_biba_copy_label,
 	.mpo_copy_vnode_label = mac_biba_copy_label,
 	.mpo_externalize_cred_label = mac_biba_externalize_label,
@@ -2618,6 +2687,8 @@ static struct mac_policy_ops mac_biba_ops =
 	.mpo_check_cred_visible = mac_biba_check_cred_visible,
 	.mpo_check_ifnet_relabel = mac_biba_check_ifnet_relabel,
 	.mpo_check_ifnet_transmit = mac_biba_check_ifnet_transmit,
+	.mpo_check_kld_load = mac_biba_check_kld_load,
+	.mpo_check_kld_unload = mac_biba_check_kld_unload,
 	.mpo_check_mount_stat = mac_biba_check_mount_stat,
 	.mpo_check_pipe_ioctl = mac_biba_check_pipe_ioctl,
 	.mpo_check_pipe_poll = mac_biba_check_pipe_poll,
@@ -2631,9 +2702,11 @@ static struct mac_policy_ops mac_biba_ops =
 	.mpo_check_socket_deliver = mac_biba_check_socket_deliver,
 	.mpo_check_socket_relabel = mac_biba_check_socket_relabel,
 	.mpo_check_socket_visible = mac_biba_check_socket_visible,
+	.mpo_check_sysarch_ioperm = mac_biba_check_sysarch_ioperm,
 	.mpo_check_system_acct = mac_biba_check_system_acct,
 	.mpo_check_system_settime = mac_biba_check_system_settime,
 	.mpo_check_system_swapon = mac_biba_check_system_swapon,
+	.mpo_check_system_swapoff = mac_biba_check_system_swapoff,
 	.mpo_check_system_sysctl = mac_biba_check_system_sysctl,
 	.mpo_check_vnode_access = mac_biba_check_vnode_open,
 	.mpo_check_vnode_chdir = mac_biba_check_vnode_chdir,
@@ -2667,5 +2740,5 @@ static struct mac_policy_ops mac_biba_ops =
 	.mpo_check_vnode_write = mac_biba_check_vnode_write,
 };
 
-MAC_POLICY_SET(&mac_biba_ops, trustedbsd_mac_biba, "TrustedBSD MAC/Biba",
-    MPC_LOADTIME_FLAG_NOTLATE, &mac_biba_slot);
+MAC_POLICY_SET(&mac_biba_ops, mac_biba, "TrustedBSD MAC/Biba",
+    MPC_LOADTIME_FLAG_NOTLATE | MPC_LOADTIME_FLAG_LABELMBUFS, &mac_biba_slot);

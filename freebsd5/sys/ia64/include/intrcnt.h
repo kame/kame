@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/include/intrcnt.h,v 1.4 2002/10/28 00:50:39 marcel Exp $ */
+/* $FreeBSD: src/sys/ia64/include/intrcnt.h,v 1.5 2003/01/05 22:00:19 marcel Exp $ */
 /* $NetBSD: intrcnt.h,v 1.17 1998/11/19 01:48:04 ross Exp $ */
 
 /*
@@ -32,7 +32,7 @@
 #define	INTRCNT_ISA_IRQ		(INTRCNT_CLOCK + 1)
 #define	INTRCNT_ISA_IRQ_LEN	16
 #define	INTRCNT_OTHER_BASE	(INTRCNT_ISA_IRQ + INTRCNT_ISA_IRQ_LEN)
-#define	INTRCNT_OTHER_LEN	48
+#define	INTRCNT_OTHER_LEN	240
 #define	INTRCNT_COUNT		(INTRCNT_OTHER_BASE + INTRCNT_OTHER_LEN)
 
 /*

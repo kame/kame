@@ -55,10 +55,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/powerpc/powerpc/clock.c,v 1.9 2002/06/29 09:28:21 benno Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/clock.c,v 1.15 2003/04/03 21:36:33 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -84,8 +82,8 @@ static const char rcsid[] =
  * Initially we assume a processor with a bus frequency of 12.5 MHz.
  */
 u_int			tickspending;
+u_long			ns_per_tick = 80;
 static u_long		ticks_per_sec = 12500000;
-static u_long		ns_per_tick = 80;
 static long		ticks_per_intr;
 static volatile u_long	lasttb;
 
@@ -99,14 +97,14 @@ extern int adb_set_date_time(int);
 
 static int		clockinitted = 0;
 
-static timecounter_get_t	powerpc_get_timecount;
+static timecounter_get_t	decr_get_timecount;
 
-static struct timecounter	powerpc_timecounter = {
-	powerpc_get_timecount,	/* get_timecount */
+static struct timecounter	decr_timecounter = {
+	decr_get_timecount,	/* get_timecount */
 	0,			/* no poll_pps */
 	~0u,			/* counter_mask */
 	0,			/* frequency */
-	"powerpc"		/* name */
+	"decrementer"		/* name */
 };
 
 void
@@ -115,10 +113,31 @@ inittodr(time_t base)
 	time_t		deltat;
 	u_int		rtc_time;
 	struct timespec	ts;
+	phandle_t	phandle;
+	ihandle_t	ihandle;
+	char		rtcpath[128];
+	u_int		rtcsecs;
 
 	/*
 	 * If we can't read from RTC, use the fs time.
 	 */
+	phandle = OF_finddevice("rtc");
+	if (phandle != -1) {
+		OF_package_to_path(phandle, rtcpath, sizeof(rtcpath));
+		ihandle = OF_open(rtcpath);
+		if (ihandle != -1) {
+			if (OF_call_method("read-rtc", ihandle,
+			    0, 1, &rtcsecs))
+				printf("RTC call method error\n");
+			else {
+				ts.tv_sec = rtcsecs - DIFF19041970;
+				ts.tv_nsec = 0;
+				tc_setclock(&ts);
+				return;
+			}
+		}
+	}
+
 #if NADB > 0
 	if (adb_read_date_time(&rtc_time) < 0)
 #endif
@@ -215,6 +234,13 @@ decr_intr(struct clockframe *frame)
 void
 cpu_initclocks(void)
 {
+
+	return;
+}
+
+void
+decr_init(void)
+{
 	int qhandle, phandle;
 	char name[32];
 	unsigned int msr;
@@ -235,8 +261,8 @@ cpu_initclocks(void)
 			msr = mfmsr();
 			mtmsr(msr & ~(PSL_EE|PSL_RI));
 
-			powerpc_timecounter.tc_frequency = ticks_per_sec;
-			tc_init(&powerpc_timecounter);
+			decr_timecounter.tc_frequency = ticks_per_sec;
+			tc_init(&decr_timecounter);
 
 			ns_per_tick = 1000000000 / ticks_per_sec;
 			ticks_per_intr = ticks_per_sec / hz;
@@ -271,7 +297,7 @@ mftb(void)
 }
 
 static unsigned
-powerpc_get_timecount(struct timecounter *tc)
+decr_get_timecount(struct timecounter *tc)
 {
 	return mftb();
 }
@@ -282,24 +308,25 @@ powerpc_get_timecount(struct timecounter *tc)
 void
 delay(int n)
 {
-	u_quad_t	tb;
-	u_long		tbh, tbl, scratch;
+	u_quad_t	tb, ttb;
 	
 	tb = mftb();
-	tb += (n * 1000 + ns_per_tick - 1) / ns_per_tick;
-	tbh = tb >> 32;
-	tbl = tb;
-	__asm ("1: mftbu %0; cmplw %0,%1; blt 1b; bgt 2f;"
-	       "mftb %0; cmplw %0,%2; blt 1b; 2:"
-	       : "=r"(scratch) : "r"(tbh), "r"(tbl));
+	ttb = tb + (n * 1000 + ns_per_tick - 1) / ns_per_tick;
+	while (tb < ttb)
+		tb = mftb();
 }
 
 /*
  * Nothing to do.
  */
 void
-setstatclockrate(int arg)
+cpu_startprofclock(void)
 {
 
 	/* Do nothing */
+}
+
+void
+cpu_stopprofclock(void)
+{
 }

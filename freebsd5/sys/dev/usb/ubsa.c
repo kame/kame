@@ -60,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ubsa.c,v 1.2 2002/10/19 21:58:11 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ubsa.c,v 1.6 2003/02/19 05:47:15 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -92,7 +92,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/ubsa.c,v 1.2 2002/10/19 21:58:11 kan Exp $")
 
 #include <dev/usb/ucomvar.h>
 
-#ifdef UBSA_DEBUG
+#ifdef USB_DEBUG
 Static int	ubsadebug = 0;
 SYSCTL_NODE(_hw_usb, OID_AUTO, ubsa, CTLFLAG_RW, 0, "USB ubsa");
 SYSCTL_INT(_hw_usb_ubsa, OID_AUTO, debug, CTLFLAG_RW,
@@ -617,9 +617,10 @@ ubsa_param(void *addr, int portno, struct termios *ti)
 {
 	struct ubsa_softc *sc;
 
+	sc = addr;
+
 	DPRINTF(("ubsa_param: sc = %p\n", sc));
 
-	sc = addr;
 	ubsa_baudrate(sc, ti->c_ospeed);
 	ubsa_parity(sc, ti->c_cflag);
 	ubsa_databits(sc, ti->c_cflag);

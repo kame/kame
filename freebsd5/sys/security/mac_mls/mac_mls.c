@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_mls/mac_mls.c,v 1.37 2002/12/10 16:20:33 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_mls/mac_mls.c,v 1.47.2.2 2003/06/02 18:59:29 rwatson Exp $
  */
 
 /*
@@ -49,6 +49,7 @@
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
+#include <sys/sbuf.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/sysent.h>
@@ -493,36 +494,45 @@ mac_mls_destroy_label(struct label *label)
 }
 
 /*
- * mac_mls_element_to_string() is basically an snprintf wrapper with
- * the same properties as snprintf().  It returns the length it would
- * have added to the string in the event the string is too short.
+ * mac_mls_element_to_string() accepts an sbuf and MLS element.  It
+ * converts the MLS element to a string and stores the result in the
+ * sbuf; if there isn't space in the sbuf, -1 is returned.
  */
-static size_t
-mac_mls_element_to_string(char *string, size_t size,
-    struct mac_mls_element *element)
+static int
+mac_mls_element_to_string(struct sbuf *sb, struct mac_mls_element *element)
 {
-	int pos, bit = 1;
+	int i, first;
 
 	switch (element->mme_type) {
 	case MAC_MLS_TYPE_HIGH:
-		return (snprintf(string, size, "high"));
+		return (sbuf_printf(sb, "high"));
 
 	case MAC_MLS_TYPE_LOW:
-		return (snprintf(string, size, "low"));
+		return (sbuf_printf(sb, "low"));
 
 	case MAC_MLS_TYPE_EQUAL:
-		return (snprintf(string, size, "equal"));
+		return (sbuf_printf(sb, "equal"));
 
 	case MAC_MLS_TYPE_LEVEL:
-		pos = snprintf(string, size, "%d:", element->mme_level);
-		for (bit = 1; bit <= MAC_MLS_MAX_COMPARTMENTS; bit++) {
-			if (MAC_MLS_BIT_TEST(bit, element->mme_compartments))
-				pos += snprintf(string + pos, size - pos,
-				    "%d+", bit);
+		if (sbuf_printf(sb, "%d", element->mme_level) == -1)
+			return (-1);
+
+		first = 1;
+		for (i = 1; i <= MAC_MLS_MAX_COMPARTMENTS; i++) {
+			if (MAC_MLS_BIT_TEST(i, element->mme_compartments)) {
+				if (first) {
+					if (sbuf_putc(sb, ':') == -1)
+						return (-1);
+					if (sbuf_printf(sb, "%d", i) == -1)
+						return (-1);
+					first = 0;
+				} else {
+					if (sbuf_printf(sb, "+%d", i) == -1)
+						return (-1);
+				}
+			}
 		}
-		if (string[pos - 1] == '+' || string[pos - 1] == ':')
-			string[--pos] = NULL;
-		return (pos);
+		return (0);
 
 	default:
 		panic("mac_mls_element_to_string: invalid type (%d)",
@@ -530,60 +540,48 @@ mac_mls_element_to_string(char *string, size_t size,
 	}
 }
 
-static size_t
+/*
+ * mac_mls_to_string() converts an MLS label to a string, placing the
+ * results in the passed string buffer.  It returns 0 on success,
+ * or EINVAL if there isn't room in the buffer.  The size of the
+ * string appended, leaving out the nul termination, is returned to
+ * the caller via *caller_len.  Eventually, we should expose the
+ * sbuf to the caller rather than using C strings at this layer.
+ */
+static int
 mac_mls_to_string(char *string, size_t size, size_t *caller_len,
     struct mac_mls *mac_mls)
 {
-	size_t left, len;
-	char *curptr;
+	struct sbuf sb;
 
-	bzero(string, size);
-	curptr = string;
-	left = size;
+	sbuf_new(&sb, string, size, SBUF_FIXEDLEN);
 
 	if (mac_mls->mm_flags & MAC_MLS_FLAG_SINGLE) {
-		len = mac_mls_element_to_string(curptr, left,
-		    &mac_mls->mm_single);
-		if (len >= left)
+		if (mac_mls_element_to_string(&sb, &mac_mls->mm_single)
+		    == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 	}
 
 	if (mac_mls->mm_flags & MAC_MLS_FLAG_RANGE) {
-		len = snprintf(curptr, left, "(");
-		if (len >= left)
+		if (sbuf_putc(&sb, '(') == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 
-		len = mac_mls_element_to_string(curptr, left,
-		    &mac_mls->mm_rangelow);
-		if (len >= left)
+		if (mac_mls_element_to_string(&sb, &mac_mls->mm_rangelow)
+		    == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 
-		len = snprintf(curptr, left, "-");
-		if (len >= left)
+		if (sbuf_putc(&sb, '-') == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 
-		len = mac_mls_element_to_string(curptr, left,
-		    &mac_mls->mm_rangehigh);
-		if (len >= left)
+		if (mac_mls_element_to_string(&sb, &mac_mls->mm_rangehigh)
+		    == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 
-		len = snprintf(curptr, left, ")");
-		if (len >= left)
+		if (sbuf_putc(&sb, ')') == -1)
 			return (EINVAL);
-		left -= len;
-		curptr += len;
 	}
 
+	sbuf_finish(&sb);
 	*caller_len = strlen(string);
 	return (0);
 }
@@ -606,13 +604,14 @@ mac_mls_externalize_label(struct label *label, char *element_name,
 	if (error)
 		return (error);
 
-	*len = strlen(element_data);
 	return (0);
 }
 
 static int
 mac_mls_parse_element(struct mac_mls_element *element, char *string)
 {
+	char *compartment, *end, *level;
+	int value;
 
 	if (strcmp(string, "high") == 0 ||
 	    strcmp(string, "hi") == 0) {
@@ -627,38 +626,36 @@ mac_mls_parse_element(struct mac_mls_element *element, char *string)
 		element->mme_type = MAC_MLS_TYPE_EQUAL;
 		element->mme_level = MAC_MLS_TYPE_UNDEF;
 	} else {
-		char *p0, *p1;
-		int d;
-
-		p0 = string;
-		d = strtol(p0, &p1, 10);
-
-		if (d < 0 || d > 65535)
-			return (EINVAL);
 		element->mme_type = MAC_MLS_TYPE_LEVEL;
-		element->mme_level = d;
 
-		if (*p1 != ':')  {
-			if (p1 == p0 || *p1 != '\0')
+		/*
+		 * Numeric level piece of the element.
+		 */
+		level = strsep(&string, ":");
+		value = strtol(level, &end, 10);
+		if (end == level || *end != '\0')
+			return (EINVAL);
+		if (value < 0 || value > 65535)
+			return (EINVAL);
+		element->mme_level = value;
+
+		/*
+		 * Optional compartment piece of the element.  If none
+		 * are included, we assume that the label has no
+		 * compartments.
+		 */
+		if (string == NULL)
+			return (0);
+		if (*string == '\0')
+			return (0);
+
+		while ((compartment = strsep(&string, "+")) != NULL) {
+			value = strtol(compartment, &end, 10);
+			if (compartment == end || *end != '\0')
 				return (EINVAL);
-			else
-				return (0);
-		}
-		else
-			if (*(p1 + 1) == '\0')
-				return (0);
-
-		while ((p0 = ++p1)) {
-			d = strtol(p0, &p1, 10);
-			if (d < 1 || d > MAC_MLS_MAX_COMPARTMENTS)
+			if (value < 1 || value > MAC_MLS_MAX_COMPARTMENTS)
 				return (EINVAL);
-
-			MAC_MLS_BIT_SET(d, element->mme_compartments);
-
-			if (*p1 == '\0')
-				break;
-			if (p1 == p0 || *p1 != '+')
-				return (EINVAL);
+			MAC_MLS_BIT_SET(value, element->mme_compartments);
 		}
 	}
 
@@ -672,38 +669,30 @@ mac_mls_parse_element(struct mac_mls_element *element, char *string)
 static int
 mac_mls_parse(struct mac_mls *mac_mls, char *string)
 {
-	char *range, *rangeend, *rangehigh, *rangelow, *single;
+	char *rangehigh, *rangelow, *single;
 	int error;
 
-	/* Do we have a range? */
-	single = string;
-	range = index(string, '(');
-	if (range == single)
+	single = strsep(&string, "(");
+	if (*single == '\0')
 		single = NULL;
-	rangelow = rangehigh = NULL;
-	if (range != NULL) {
-		/* Nul terminate the end of the single string. */
-		*range = '\0';
-		range++;
-		rangelow = range;
-		rangehigh = index(rangelow, '-');
-		if (rangehigh == NULL)
+
+	if (string != NULL) {
+		rangelow = strsep(&string, "-");
+		if (string == NULL)
 			return (EINVAL);
-		rangehigh++;
-		if (*rangelow == '\0' || *rangehigh == '\0')
+		rangehigh = strsep(&string, ")");
+		if (string == NULL)
 			return (EINVAL);
-		rangeend = index(rangehigh, ')');
-		if (rangeend == NULL)
+		if (*string != '\0')
 			return (EINVAL);
-		if (*(rangeend + 1) != '\0')
-			return (EINVAL);
-		/* Nul terminate the ends of the ranges. */
-		*(rangehigh - 1) = '\0';
-		*rangeend = '\0';
+	} else {
+		rangelow = NULL;
+		rangehigh = NULL;
 	}
+
 	KASSERT((rangelow != NULL && rangehigh != NULL) ||
 	    (rangelow == NULL && rangehigh == NULL),
-	    ("mac_mls_internalize_label: range mismatch"));
+	    ("mac_mls_parse: range mismatch"));
 
 	bzero(mac_mls, sizeof(*mac_mls));
 	if (single != NULL) {
@@ -1094,17 +1083,17 @@ static void
 mac_mls_create_ifnet(struct ifnet *ifnet, struct label *ifnetlabel)
 {
 	struct mac_mls *dest;
-	int level;
+	int type;
 
 	dest = SLOT(ifnetlabel);
 
 	if (ifnet->if_type == IFT_LOOP)
-		level = MAC_MLS_TYPE_EQUAL;
+		type = MAC_MLS_TYPE_EQUAL;
 	else
-		level = MAC_MLS_TYPE_LOW;
+		type = MAC_MLS_TYPE_LOW;
 
-	mac_mls_set_single(dest, level, 0, NULL);
-	mac_mls_set_range(dest, level, 0, NULL, level, 0, NULL);
+	mac_mls_set_single(dest, type, 0, NULL);
+	mac_mls_set_range(dest, type, 0, NULL, type, 0, NULL);
 }
 
 static void
@@ -1349,6 +1338,16 @@ mac_mls_check_cred_relabel(struct ucred *cred, struct label *newlabel)
 	 */
 	if (new->mm_flags & MAC_MLS_FLAGS_BOTH) {
 		/*
+		 * If the change request modifies both the MLS label single
+		 * and range, check that the new single will be in the
+		 * new range.
+		 */
+		if ((new->mm_flags & MAC_MLS_FLAGS_BOTH) ==
+		    MAC_MLS_FLAGS_BOTH &&
+		    !mac_mls_single_in_range(new, new))
+			return (EINVAL);
+
+		/*
 		 * To change the MLS single label on a credential, the
 		 * new single label must be in the current range.
 		 */
@@ -1358,7 +1357,7 @@ mac_mls_check_cred_relabel(struct ucred *cred, struct label *newlabel)
 
 		/*
 		 * To change the MLS range label on a credential, the
-		 * new range label must be in the current range.
+		 * new range must be in the current range.
 		 */
 		if (new->mm_flags & MAC_MLS_FLAG_RANGE &&
 		    !mac_mls_range_in_range(new, subj))
@@ -1374,11 +1373,6 @@ mac_mls_check_cred_relabel(struct ucred *cred, struct label *newlabel)
 			if (error)
 				return (error);
 		}
-
-		/*
-		 * XXXMAC: Additional consistency tests regarding the single
-		 * and range of the new label might be performed here.
-		 */
 	}
 
 	return (0);
@@ -1751,6 +1745,25 @@ mac_mls_check_socket_visible(struct ucred *cred, struct socket *socket,
 
 	if (!mac_mls_dominate_single(subj, obj))
 		return (ENOENT);
+
+	return (0);
+}
+
+static int
+mac_mls_check_system_swapon(struct ucred *cred, struct vnode *vp,
+    struct label *label)
+{
+	struct mac_mls *subj, *obj;
+
+	if (!mac_mls_enabled)
+		return (0);
+
+	subj = SLOT(&cred->cr_label);
+	obj = SLOT(label);
+
+	if (!mac_mls_dominate_single(obj, subj) ||
+	    !mac_mls_dominate_single(subj, obj))
+		return (EACCES);
 
 	return (0);
 }
@@ -2360,7 +2373,7 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_init_cred_label = mac_mls_init_label,
 	.mpo_init_devfsdirent_label = mac_mls_init_label,
 	.mpo_init_ifnet_label = mac_mls_init_label,
-	.mpo_init_ipq_label = mac_mls_init_label,
+	.mpo_init_ipq_label = mac_mls_init_label_waitcheck,
 	.mpo_init_mbuf_label = mac_mls_init_label_waitcheck,
 	.mpo_init_mount_label = mac_mls_init_label,
 	.mpo_init_mount_fs_label = mac_mls_init_label,
@@ -2380,6 +2393,7 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_destroy_socket_label = mac_mls_destroy_label,
 	.mpo_destroy_socket_peer_label = mac_mls_destroy_label,
 	.mpo_destroy_vnode_label = mac_mls_destroy_label,
+	.mpo_copy_mbuf_label = mac_mls_copy_label,
 	.mpo_copy_pipe_label = mac_mls_copy_label,
 	.mpo_copy_vnode_label = mac_mls_copy_label,
 	.mpo_externalize_cred_label = mac_mls_externalize_label,
@@ -2449,6 +2463,7 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_check_socket_deliver = mac_mls_check_socket_deliver,
 	.mpo_check_socket_relabel = mac_mls_check_socket_relabel,
 	.mpo_check_socket_visible = mac_mls_check_socket_visible,
+	.mpo_check_system_swapon = mac_mls_check_system_swapon,
 	.mpo_check_vnode_access = mac_mls_check_vnode_open,
 	.mpo_check_vnode_chdir = mac_mls_check_vnode_chdir,
 	.mpo_check_vnode_chroot = mac_mls_check_vnode_chroot,
@@ -2481,5 +2496,5 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_check_vnode_write = mac_mls_check_vnode_write,
 };
 
-MAC_POLICY_SET(&mac_mls_ops, trustedbsd_mac_mls, "TrustedBSD MAC/MLS",
-    MPC_LOADTIME_FLAG_NOTLATE, &mac_mls_slot);
+MAC_POLICY_SET(&mac_mls_ops, mac_mls, "TrustedBSD MAC/MLS",
+    MPC_LOADTIME_FLAG_NOTLATE | MPC_LOADTIME_FLAG_LABELMBUFS, &mac_mls_slot);

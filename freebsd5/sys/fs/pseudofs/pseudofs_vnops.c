@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/fs/pseudofs/pseudofs_vnops.c,v 1.32 2002/10/26 14:38:20 rwatson Exp $
+ *	$FreeBSD: src/sys/fs/pseudofs/pseudofs_vnops.c,v 1.35 2003/03/02 22:23:45 des Exp $
  */
 
 #include <sys/param.h>
@@ -652,7 +652,7 @@ pfs_readdir(struct vop_readdir_args *va)
 			panic("%s has unexpected node type: %d", pn->pn_name, pn->pn_type);
 		}
 		PFS_TRACE((entry.d_name));
-		if ((error = uiomove((caddr_t)&entry, PFS_DELEN, uio))) {
+		if ((error = uiomove(&entry, PFS_DELEN, uio))) {
 			sx_sunlock(&allproc_lock);
 			PFS_RETURN (error);
 		}
@@ -821,18 +821,12 @@ static struct vnodeopv_entry_desc pfs_vnodeop_entries[] = {
 	{ &vop_readdir_desc,		(vop_t *)pfs_readdir	},
 	{ &vop_readlink_desc,		(vop_t *)pfs_readlink	},
 	{ &vop_reclaim_desc,		(vop_t *)pfs_reclaim	},
-#ifdef MAC
-	{ &vop_refreshlabel_desc,	(vop_t *)pfs_refreshlabel },
-#endif
 	{ &vop_remove_desc,		(vop_t *)vop_eopnotsupp	},
 	{ &vop_rename_desc,		(vop_t *)vop_eopnotsupp	},
 	{ &vop_rmdir_desc,		(vop_t *)vop_eopnotsupp	},
 	{ &vop_setattr_desc,		(vop_t *)pfs_setattr	},
 	{ &vop_symlink_desc,		(vop_t *)vop_eopnotsupp	},
 	{ &vop_write_desc,		(vop_t *)pfs_write	},
-	{ &vop_lock_desc,		(vop_t *)vop_stdlock	},
-	{ &vop_unlock_desc,		(vop_t *)vop_stdunlock	},
-	{ &vop_islocked_desc,		(vop_t *)vop_stdislocked},
 	/* XXX I've probably forgotten a few that need vop_eopnotsupp */
 	{ NULL,				(vop_t *)NULL		}
 };

@@ -10,7 +10,7 @@
  * - added inflateIncomp and deflateOutputPending
  * - allow strm->next_out to be NULL, meaning discard the output
  *
- * $FreeBSD: src/sys/net/zlib.c,v 1.15 2002/11/09 12:55:06 alfred Exp $
+ * $FreeBSD: src/sys/net/zlib.c,v 1.17 2003/02/02 13:52:24 alfred Exp $
  */
 
 /* 
@@ -56,6 +56,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/systm.h>
+#include <sys/param.h>
 #  define HAVE_MEMCPY
 
 #else
@@ -2055,8 +2056,6 @@ local void send_bits(s, value, length)
 }
 #endif /* DEBUG_ZLIB */
 
-
-#define MAX(a,b) (a >= b ? a : b)
 /* the arguments must not have side effects */
 
 /* ===========================================================================

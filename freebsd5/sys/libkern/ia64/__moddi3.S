@@ -1,6 +1,6 @@
 .file "__moddi3.s"
 
-// $FreeBSD: src/sys/libkern/ia64/__moddi3.S,v 1.1 2000/10/04 17:53:03 dfr Exp $
+// $FreeBSD: src/sys/libkern/ia64/__moddi3.S,v 1.3 2003/02/11 20:15:11 schweikh Exp $
 //  
 // Copyright (c) 2000, Intel Corporation
 // All rights reserved.
@@ -48,8 +48,8 @@ __moddi3:
   // 64-BIT SIGNED INTEGER REMAINDER BEGINS HERE
 
   // general register used:
-  //    r32 - 64-bit signed integer dividend
-  //    r33 - 64-bit signed integer divisor
+  //    r32 - 64-bit signed integer dividend, called a below
+  //    r33 - 64-bit signed integer divisor, called b below
   //    r8 - 64-bit signed integer result
   //    r2 - scratch register
   // floating-point registers used: f6, f7, f8, f9, f10, f11, f12

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_subr.c,v 1.13 2002/11/08 18:27:30 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_subr.c,v 1.14 2003/02/23 22:26:39 obrien Exp $
  *
  */
 
@@ -60,7 +60,7 @@
 #include <netatm/uni/sscop_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop_subr.c,v 1.13 2002/11/08 18:27:30 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop_subr.c,v 1.14 2003/02/23 22:26:39 obrien Exp $");
 #endif
 
 
@@ -147,7 +147,7 @@ sscop_stat_getelem(m, pelem)
 	/*
 	 * Put element (sequence number) into host order
 	 */
-	NTOHL(*pelem);
+	*pelem = ntohl(*pelem);
 
 	/*
 	 * Get pointers set for next call

@@ -25,7 +25,7 @@
  *
  */
 /*
- * $FreeBSD: src/sys/kern/kern_context.c,v 1.1 2002/11/16 06:35:53 deischen Exp $
+ * $FreeBSD: src/sys/kern/kern_context.c,v 1.5 2003/04/25 01:50:29 deischen Exp $
  */
 
 #include <sys/param.h>
@@ -44,8 +44,7 @@
  * the machine context.  The next field is uc_link; we want to
  * avoid destroying the link when copying out contexts.
  */
-#define	UC_COPY_SIZE	(sizeof(sigset_t) + sizeof(mcontext_t))
-
+#define	UC_COPY_SIZE	offsetof(ucontext_t, uc_link)
 
 #ifndef _SYS_SYSPROTO_H_
 struct getcontext_args {
@@ -67,13 +66,15 @@ int
 getcontext(struct thread *td, struct getcontext_args *uap)
 {
 	ucontext_t uc;
-	int ret;	
+	int ret;
 
 	if (uap->ucp == NULL)
 		ret = EINVAL;
 	else {
-		get_mcontext(td, &uc.uc_mcontext);
-		uc.uc_sigmask = td->td_proc->p_sigmask;
+		get_mcontext(td, &uc.uc_mcontext, 1);
+		PROC_LOCK(td->td_proc);
+		uc.uc_sigmask = td->td_sigmask;
+		PROC_UNLOCK(td->td_proc);
 		ret = copyout(&uc, uap->ucp, UC_COPY_SIZE);
 	}
 	return (ret);
@@ -97,12 +98,12 @@ setcontext(struct thread *td, struct setcontext_args *uap)
 			if (ret == 0) {
 				SIG_CANTMASK(uc.uc_sigmask);
 				PROC_LOCK(td->td_proc);
-				td->td_proc->p_sigmask = uc.uc_sigmask;
+				td->td_sigmask = uc.uc_sigmask;
 				PROC_UNLOCK(td->td_proc);
 			}
 		}
 	}
-	return (ret);
+	return (ret == 0 ? EJUSTRETURN : ret);
 }
 
 int
@@ -114,8 +115,10 @@ swapcontext(struct thread *td, struct swapcontext_args *uap)
 	if (uap->oucp == NULL || uap->ucp == NULL)
 		ret = EINVAL;
 	else {
-		get_mcontext(td, &uc.uc_mcontext);
-		uc.uc_sigmask = td->td_proc->p_sigmask;
+		get_mcontext(td, &uc.uc_mcontext, 1);
+		PROC_LOCK(td->td_proc);
+		uc.uc_sigmask = td->td_sigmask;
+		PROC_UNLOCK(td->td_proc);
 		ret = copyout(&uc, uap->oucp, UC_COPY_SIZE);
 		if (ret == 0) {
 			ret = copyin(uap->ucp, &uc, UC_COPY_SIZE);
@@ -124,11 +127,11 @@ swapcontext(struct thread *td, struct swapcontext_args *uap)
 				if (ret == 0) {
 					SIG_CANTMASK(uc.uc_sigmask);
 					PROC_LOCK(td->td_proc);
-					td->td_proc->p_sigmask = uc.uc_sigmask;
+					td->td_sigmask = uc.uc_sigmask;
 					PROC_UNLOCK(td->td_proc);
 				}
 			}
 		}
 	}
-	return (ret);
+	return (ret == 0 ? EJUSTRETURN : ret);
 }

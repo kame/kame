@@ -7,7 +7,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/vm/vm_zeroidle.c,v 1.18 2002/10/12 05:32:24 jeff Exp $
+ * $FreeBSD: src/sys/vm/vm_zeroidle.c,v 1.19 2003/04/04 12:08:42 des Exp $
  */
 
 #include <sys/param.h>
@@ -143,10 +143,10 @@ vm_pagezero(void)
 	}
 }
 
-static struct proc *pagezero;
+static struct proc *pagezero_proc;
 static struct kproc_desc pagezero_kp = {
 	 "pagezero",
 	 vm_pagezero,
-	 &pagezero
+	 &pagezero_proc
 };
 SYSINIT(pagezero, SI_SUB_KTHREAD_VM, SI_ORDER_ANY, kproc_start, &pagezero_kp)

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)paths.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/include/paths.h,v 1.17 2002/07/14 13:04:15 sobomax Exp $
+ * $FreeBSD: src/include/paths.h,v 1.19 2003/05/05 22:49:22 obrien Exp $
  */
 
 #ifndef _PATHS_H_
@@ -59,14 +59,19 @@
 #define	_PATH_DRUM	"/dev/drum"
 #define	_PATH_ETC	"/etc"
 #define	_PATH_FTPUSERS	"/etc/ftpusers"
+#define	_PATH_HALT	"/sbin/halt"
+#define	_PATH_IFCONFIG	"/sbin/ifconfig"
 #define	_PATH_KMEM	"/dev/kmem"
+#define	_PATH_LIBMAP_CONF	"/etc/libmap.conf"
 #define	_PATH_LOGIN	"/usr/bin/login"
 #define	_PATH_MAILDIR	"/var/mail"
 #define	_PATH_MAN	"/usr/share/man"
 #define	_PATH_MEM	"/dev/mem"
 #define	_PATH_NOLOGIN	"/var/run/nologin"
 #define	_PATH_RCP	"/bin/rcp"
+#define	_PATH_REBOOT	"/sbin/reboot"
 #define	_PATH_RLOGIN	"/usr/bin/rlogin"
+#define	_PATH_RM	"/bin/rm"
 #define	_PATH_RSH	"/usr/bin/rsh"
 #define	_PATH_SENDMAIL	"/usr/sbin/sendmail"
 #define	_PATH_SHELLS	"/etc/shells"

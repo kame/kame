@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vnops.c	8.32 (Berkeley) 6/23/95
- * $FreeBSD: src/sys/fs/unionfs/union_vnops.c,v 1.95 2002/10/16 08:04:11 phk Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_vnops.c,v 1.97 2003/03/03 19:15:39 njl Exp $
  */
 
 #include <sys/param.h>
@@ -1756,7 +1756,7 @@ union_print(ap)
 {
 	struct vnode *vp = ap->a_vp;
 
-	printf("\ttag %s, vp=%p, uppervp=%p, lowervp=%p\n", vp->v_tag,
+	printf("\tvp=%p, uppervp=%p, lowervp=%p\n",
 	       vp, UPPERVP(vp), LOWERVP(vp));
 	if (UPPERVP(vp) != NULLVP)
 		vprint("union: upper", UPPERVP(vp));
@@ -1851,7 +1851,6 @@ static struct vnodeopv_entry_desc union_vnodeop_entries[] = {
 	{ &vop_getvobject_desc,		(vop_t *) union_getvobject },
 	{ &vop_inactive_desc,		(vop_t *) union_inactive },
 	{ &vop_ioctl_desc,		(vop_t *) union_ioctl },
-	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_lease_desc,		(vop_t *) union_lease },
 	{ &vop_link_desc,		(vop_t *) union_link },
 	{ &vop_lookup_desc,		(vop_t *) union_lookup },

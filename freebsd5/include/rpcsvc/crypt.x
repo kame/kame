@@ -31,10 +31,8 @@
  */
 
 #ifndef RPC_HDR
-%#ifndef lint
-%static const char rcsid[] =
-%  "$FreeBSD: src/include/rpcsvc/crypt.x,v 1.4 2001/08/13 14:06:20 ru Exp $";
-%#endif
+%#include <sys/cdefs.h>
+%__FBSDID("$FreeBSD: src/include/rpcsvc/crypt.x,v 1.5 2003/05/04 02:51:42 obrien Exp $");
 #endif
 
 /*

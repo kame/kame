@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/link_elf.c,v 1.68 2002/11/19 22:12:42 rwatson Exp $
+ * $FreeBSD: src/sys/kern/link_elf.c,v 1.73 2003/05/12 15:08:10 phk Exp $
  */
 
 #include "opt_ddb.h"
@@ -116,6 +116,7 @@ static int	link_elf_lookup_set(linker_file_t, const char *,
 static int	link_elf_each_function_name(linker_file_t,
 				int (*)(const char *, void *),
 				void *);
+static void	link_elf_reloc_local(linker_file_t);
 
 static kobj_method_t link_elf_methods[] = {
     KOBJMETHOD(linker_lookup_symbol,	link_elf_lookup_symbol),
@@ -257,7 +258,9 @@ link_elf_init(void* arg)
 
     dp = (Elf_Dyn*) &_DYNAMIC;
     modname = NULL;
-    modptr = preload_search_by_type("elf kernel");
+    modptr = preload_search_by_type("elf" __XSTRING(__ELF_WORD_SIZE) " kernel");
+    if (modptr == NULL)
+	modptr = preload_search_by_type("elf kernel");
     if (modptr)
 	modname = (char *)preload_search_info(modptr, MODINFO_NAME);
     if (modname == NULL)
@@ -461,7 +464,9 @@ link_elf_link_preload(linker_class_t cls,
     baseptr = preload_search_info(modptr, MODINFO_ADDR);
     sizeptr = preload_search_info(modptr, MODINFO_SIZE);
     dynptr = preload_search_info(modptr, MODINFO_METADATA|MODINFOMD_DYNAMIC);
-    if (type == NULL || strcmp(type, "elf module") != 0)
+    if (type == NULL ||
+	(strcmp(type, "elf" __XSTRING(__ELF_WORD_SIZE) " module") != 0 &&
+	 strcmp(type, "elf module") != 0))
 	return (EFTYPE);
     if (baseptr == NULL || sizeptr == NULL || dynptr == NULL)
 	return (EINVAL);
@@ -488,6 +493,7 @@ link_elf_link_preload(linker_class_t cls,
 	linker_file_unload(lf);
 	return error;
     }
+    link_elf_reloc_local(lf);
     *result = lf;
     return (0);
 }
@@ -640,6 +646,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		error = ENOEXEC;
 		goto out;
 	    }
+	    /*
+	     * XXX: We just trust they come in right order ??
+	     */
 	    segs[nsegs] = phdr;
 	    ++nsegs;
 	    break;
@@ -662,6 +671,11 @@ link_elf_load_file(linker_class_t cls, const char* filename,
     }
     if (phdyn == NULL) {
 	link_elf_error("Object is not dynamically-linked");
+	error = ENOEXEC;
+	goto out;
+    }
+    if (nsegs != 2) {
+	link_elf_error("Too few sections");
 	error = ENOEXEC;
 	goto out;
     }
@@ -748,6 +762,8 @@ link_elf_load_file(linker_class_t cls, const char* filename,
     error = parse_dynamic(ef);
     if (error)
 	goto out;
+    link_elf_reloc_local(lf);
+
     error = linker_load_dependencies(lf);
     if (error)
 	goto out;
@@ -1265,4 +1281,32 @@ elf_lookup(linker_file_t lf, Elf_Word symidx, int deps)
 		return (0);
 
 	return ((Elf_Addr)linker_file_lookup_symbol(lf, symbol, deps));
+}
+
+static void
+link_elf_reloc_local(linker_file_t lf)
+{
+    const Elf_Rel *rellim;
+    const Elf_Rel *rel;
+    const Elf_Rela *relalim;
+    const Elf_Rela *rela;
+    elf_file_t ef = (elf_file_t)lf;
+
+    /* Perform relocations without addend if there are any: */
+    if ((rel = ef->rel) != NULL) {
+	rellim = (const Elf_Rel *)((const char *)ef->rel + ef->relsize);
+	while (rel < rellim) {
+	    elf_reloc_local(lf, rel, ELF_RELOC_REL);
+	    rel++;
+	}
+    }
+
+    /* Perform relocations with addend if there are any: */
+    if ((rela = ef->rela) != NULL) {
+	relalim = (const Elf_Rela *)((const char *)ef->rela + ef->relasize);
+	while (rela < relalim) {
+	    elf_reloc_local(lf, rela, ELF_RELOC_RELA);
+	    rela++;
+	}
+    }
 }

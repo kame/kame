@@ -34,7 +34,7 @@
  *
  * Author: Dave Chapeskie <dchapeskie@sandvine.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_source.c,v 1.4 2002/11/05 01:08:11 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_source.c,v 1.8 2003/02/19 05:47:32 imp Exp $
  */
 
 /*
@@ -481,10 +481,12 @@ ng_source_store_output_ifp(sc_p sc, struct ng_mesg *msg)
 	 * way of verifying if_index is valid since if_indexlim is
 	 * local to if_attach()
 	 */
+	IFNET_RLOCK();
 	TAILQ_FOREACH(ifp, &ifnet, if_link) {
 		if (ifp->if_index == if_index)
 			break;
 	}
+	IFNET_RUNLOCK();
 
 	if (ifp == NULL) {
 		printf("%s: can't find interface %d\n", __FUNCTION__, if_index);
@@ -638,7 +640,7 @@ ng_source_send (sc_p sc, int tosend, int *sent_p)
 			break;
 
 		/* duplicate the packet */
-		m2 = m_copypacket(m, M_NOWAIT);
+		m2 = m_copypacket(m, M_DONTWAIT);
 		if (m2 == NULL) {
 			s = splnet();
 			IF_PREPEND(&sc->snd_queue, m);

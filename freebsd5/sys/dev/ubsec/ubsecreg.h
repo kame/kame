@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/ubsec/ubsecreg.h,v 1.2 2002/10/07 20:02:34 sam Exp $ */
+/* $FreeBSD: src/sys/dev/ubsec/ubsecreg.h,v 1.5 2003/04/27 04:26:22 sam Exp $ */
 /*	$OpenBSD: ubsecreg.h,v 1.27 2002/09/11 22:40:31 jason Exp $	*/
 
 /*
@@ -46,6 +46,7 @@
 
 #define	PCI_VENDOR_BROADCOM	0x14e4		/* Broadcom */
 #define	PCI_VENDOR_BLUESTEEL	0x15ab		/* Bluesteel Networks */
+#define	PCI_VENDOR_SUN		0x108e		/* Sun Microsystems */
 
 /* Bluesteel Networks */
 #define	PCI_PRODUCT_BLUESTEEL_5501	0x0000		/* 5501 */
@@ -54,10 +55,17 @@
 /* Broadcom */
 #define	PCI_PRODUCT_BROADCOM_BCM5700	0x1644		/* BCM5700 */
 #define	PCI_PRODUCT_BROADCOM_BCM5701	0x1645		/* BCM5701 */
+#define	PCI_PRODUCT_BROADCOM_5801	0x5801		/* 5801 */
+#define	PCI_PRODUCT_BROADCOM_5802	0x5802		/* 5802 */
 #define	PCI_PRODUCT_BROADCOM_5805	0x5805		/* 5805 */
 #define	PCI_PRODUCT_BROADCOM_5820	0x5820		/* 5820 */
 #define	PCI_PRODUCT_BROADCOM_5821	0x5821		/* 5821 */
 #define	PCI_PRODUCT_BROADCOM_5822	0x5822		/* 5822 */
+#define	PCI_PRODUCT_BROADCOM_5823	0x5823		/* 5823 */
+
+/* Sun Microsystems */
+#define PCI_PRODUCT_SUN_5821		0x5454		/* Crypto 5821 */
+#define PCI_PRODUCT_SUN_SCA1K		0x5455		/* Crypto 1K */
 
 #define	UBS_PCI_RTY_SHIFT			8
 #define	UBS_PCI_RTY_MASK			0xff

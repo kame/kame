@@ -33,7 +33,7 @@
  *
  *	From: @(#)ansi.h	8.2 (Berkeley) 1/4/94
  *	From: @(#)types.h	8.3 (Berkeley) 1/5/94
- * $FreeBSD: src/sys/powerpc/include/_types.h,v 1.2 2002/08/23 16:49:05 mike Exp $
+ * $FreeBSD: src/sys/powerpc/include/_types.h,v 1.5 2003/03/25 00:07:05 jake Exp $
  */
 
 #ifndef _MACHINE__TYPES_H_
@@ -48,16 +48,29 @@ typedef	short			__int16_t;
 typedef	unsigned short		__uint16_t;
 typedef	int			__int32_t;
 typedef	unsigned int		__uint32_t;
+
+#if defined(lint)
 /* LONGLONG */
-typedef	long long		__int64_t;
+typedef long long		__int64_t;
 /* LONGLONG */
-typedef	unsigned long long	__uint64_t;
+typedef unsigned long long	__uint64_t;
+#elif defined(__GNUC__)
+typedef int __attribute__((__mode__(__DI__)))		__int64_t;
+typedef unsigned int __attribute__((__mode__(__DI__)))	__uint64_t;
+#else
+/* LONGLONG */
+typedef long long		__int64_t;
+/* LONGLONG */
+typedef unsigned long long	__uint64_t;
+#endif
 
 /*
  * Standard type definitions.
  */
 typedef	__uint32_t	__clock_t;		/* clock()... */
 typedef	__int32_t	__critical_t;
+typedef	double		__double_t;
+typedef	double		__float_t;
 typedef	__int32_t	__intfptr_t;
 typedef	__int64_t	__intmax_t;
 typedef	__int32_t	__intptr_t;
@@ -89,6 +102,7 @@ typedef	__uint64_t	__uint_least64_t;
 typedef	__uint32_t	__u_register_t;
 typedef	__uint32_t	__vm_offset_t;
 typedef	__int64_t	__vm_ooffset_t;
+typedef	__uint32_t	__vm_paddr_t;
 typedef	__uint64_t	__vm_pindex_t;
 typedef	__uint32_t	__vm_size_t;
 

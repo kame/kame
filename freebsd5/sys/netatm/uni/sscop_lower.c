@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_lower.c,v 1.12 2002/11/08 18:27:30 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_lower.c,v 1.13 2002/12/30 21:18:09 schweikh Exp $
  *
  */
 
@@ -59,7 +59,7 @@
 #include <netatm/uni/sscop_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop_lower.c,v 1.12 2002/11/08 18:27:30 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop_lower.c,v 1.13 2002/12/30 21:18:09 schweikh Exp $");
 #endif
 
 
@@ -67,7 +67,7 @@ __RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop_lower.c,v 1.12 2002/11/08 18:27
  * Local variables
  */
 /*
- * Stack commands with arg1 containing an buffer pointer
+ * Stack commands with arg1 containing a buffer pointer
  */
 static u_char	sscop_buf1[] = {
 		0,

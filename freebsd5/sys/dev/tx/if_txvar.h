@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/tx/if_txvar.h,v 1.14 2002/10/25 22:06:03 sam Exp $
+ * $FreeBSD: src/sys/dev/tx/if_txvar.h,v 1.18 2003/04/20 18:08:00 mux Exp $
  */
 
 /*
@@ -52,11 +52,13 @@
 
 /* This is driver's structure to define EPIC descriptors */
 struct epic_rx_buffer {
-	struct mbuf *		mbuf;		/* mbuf receiving packet */
+	struct mbuf *mbuf;		/* mbuf receiving packet */
+	bus_dmamap_t map;		/* DMA map */
 };
 
 struct epic_tx_buffer {
-	struct mbuf *		mbuf;		/* mbuf contained packet */
+	struct mbuf *mbuf;		/* mbuf contained packet */
+	bus_dmamap_t map;		/* DMA map */
 };
 
 /* PHY, known by tx driver */
@@ -80,6 +82,14 @@ typedef struct {
 	void			*sc_ih;
 	bus_space_tag_t		sc_st;
 	bus_space_handle_t	sc_sh;
+	bus_dma_tag_t		mtag;
+	bus_dma_tag_t		rtag;
+	bus_dmamap_t		rmap;
+	bus_dma_tag_t		ttag;
+	bus_dmamap_t		tmap;
+	bus_dma_tag_t		ftag;
+	bus_dmamap_t		fmap;
+	bus_dmamap_t		sparemap;
 
 	struct epic_rx_buffer	rx_buffer[RX_RING_SIZE];
 	struct epic_tx_buffer	tx_buffer[TX_RING_SIZE];
@@ -89,6 +99,9 @@ typedef struct {
 	struct epic_rx_desc	*rx_desc;
 	struct epic_tx_desc	*tx_desc;
 	struct epic_frag_list	*tx_flist;
+	u_int32_t		rx_addr;
+	u_int32_t		tx_addr;
+	u_int32_t		frag_addr;
 	u_int32_t		flags;
 	u_int32_t		tx_threshold;
 	u_int32_t		txcon;
@@ -131,16 +144,3 @@ struct epic_type {
 	epic_read_phy_reg((sc), (phy), (reg))
 #define	PHY_WRITE_2(sc, phy, reg, val)					\
 	epic_write_phy_reg((sc), (phy), (reg), (val))
-
-/* Macro to get either mbuf cluster or nothing */
-#define EPIC_MGETCLUSTER(m)						\
-	{ MGETHDR((m),M_DONTWAIT,MT_DATA);				\
-	  if (m) {							\
-	    MCLGET((m),M_DONTWAIT);					\
-	    if( 0 == ((m)->m_flags & M_EXT) ) {				\
-	      m_freem(m);						\
-	      (m) = NULL;						\
-	    }								\
-	  }								\
-	}
-

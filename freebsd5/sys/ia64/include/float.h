@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/include/float.h,v 1.2 2001/10/06 15:57:22 dfr Exp $ */
+/* $FreeBSD: src/sys/ia64/include/float.h,v 1.4 2003/03/27 20:38:22 das Exp $ */
 /* From: NetBSD: float.h,v 1.6 1997/07/17 21:36:03 thorpej Exp */
 
 /*
@@ -41,6 +41,8 @@
 
 #define FLT_RADIX	2		/* b */
 #define FLT_ROUNDS	1		/* FP addition rounds to nearest */
+#define	FLT_EVAL_METHOD	0		/* no promotions */
+#define	DECIMAL_DIG	35		/* max precision in decimal digits */
 
 #define FLT_MANT_DIG	24		/* p */
 #define FLT_EPSILON	1.19209290E-07F	/* b**(1-p) */
@@ -62,14 +64,14 @@
 #define DBL_MAX		1.7976931348623157E+308
 #define DBL_MAX_10_EXP	308
 
-#define LDBL_MANT_DIG	DBL_MANT_DIG
-#define LDBL_EPSILON	DBL_EPSILON
-#define LDBL_DIG	DBL_DIG
-#define LDBL_MIN_EXP	DBL_MIN_EXP
-#define LDBL_MIN	DBL_MIN
-#define LDBL_MIN_10_EXP	DBL_MIN_10_EXP
-#define LDBL_MAX_EXP	DBL_MAX_EXP
-#define LDBL_MAX	DBL_MAX
-#define LDBL_MAX_10_EXP	DBL_MAX_10_EXP
+#define LDBL_MANT_DIG	64
+#define LDBL_EPSILON	1.0842021724855044340E-19L
+#define LDBL_DIG	18
+#define LDBL_MIN_EXP	(-16381)
+#define LDBL_MIN	3.3621031431120935063E-4932L
+#define LDBL_MIN_10_EXP	(-4931)
+#define LDBL_MAX_EXP	16384
+#define LDBL_MAX	1.1897314953572317650E+4932L
+#define LDBL_MAX_10_EXP	4932
 
 #endif	/* _MACHINE_FLOAT_H_ */

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mly/mly.c,v 1.17 2002/11/14 13:25:53 mux Exp $
+ *	$FreeBSD: src/sys/dev/mly/mly.c,v 1.27 2003/03/08 08:01:29 phk Exp $
  */
 
 #include <sys/param.h>
@@ -34,7 +34,6 @@
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/ctype.h>
-#include <sys/devicestat.h>
 #include <sys/ioccom.h>
 #include <sys/stat.h>
 
@@ -121,6 +120,7 @@ static void	mly_print_packet(struct mly_command *mc);
 static void	mly_panic(struct mly_softc *sc, char *reason);
 #endif
 void		mly_print_controller(int controller);
+static int	mly_timeout(struct mly_softc *sc);
 
 
 static d_open_t		mly_user_open;
@@ -129,6 +129,7 @@ static d_ioctl_t	mly_user_ioctl;
 static int	mly_user_command(struct mly_softc *sc, struct mly_user_command *uc);
 static int	mly_user_health(struct mly_softc *sc, struct mly_user_health *uh);
 
+#define MLY_CMD_TIMEOUT		20
 
 static device_method_t mly_methods[] = {
     /* Device interface */
@@ -151,19 +152,11 @@ DRIVER_MODULE(mly, pci, mly_pci_driver, mly_devclass, 0, 0);
 #define MLY_CDEV_MAJOR  158
 
 static struct cdevsw mly_cdevsw = {
-    mly_user_open,
-    mly_user_close,
-    noread,
-    nowrite,
-    mly_user_ioctl,
-    nopoll,
-    nommap,
-    nostrategy,
-    "mly",
-    MLY_CDEV_MAJOR,
-    nodump,
-    nopsize,
-    0
+	.d_open =	mly_user_open,
+	.d_close =	mly_user_close,
+	.d_ioctl =	mly_user_ioctl,
+	.d_name =	"mly",
+	.d_maj =	MLY_CDEV_MAJOR,
 };
 
 /********************************************************************************
@@ -329,6 +322,10 @@ mly_attach(device_t dev)
 
     /* enable interrupts now */
     MLY_UNMASK_INTERRUPTS(sc);
+
+#ifdef MLY_DEBUG
+    timeout((timeout_t *)mly_timeout, sc, MLY_CMD_TIMEOUT * hz);
+#endif
 
  out:
     if (error != 0)
@@ -684,6 +681,9 @@ mly_free(struct mly_softc *sc)
 {
     
     debug_called(1);
+
+    /* Remove the management device */
+    destroy_dev(sc->mly_dev_t);
 
     /* detach from CAM */
     mly_cam_detach(sc);
@@ -1360,6 +1360,7 @@ mly_process_event(struct mly_softc *sc, struct mly_event *me)
 	break;
     case 'e':
 	mly_printf(sc, tp, me->target, me->lun);
+	printf("\n");
 	break;
     case 'c':
 	mly_printf(sc, "controller %s\n", tp);
@@ -1469,6 +1470,10 @@ mly_start(struct mly_command *mc)
      */
     mly_map_command(mc);
     mc->mc_packet->generic.command_id = mc->mc_slot;
+
+#ifdef MLY_DEBUG
+    mc->mc_timestamp = time_second;
+#endif
 
     s = splcam();
 
@@ -1596,7 +1601,7 @@ mly_done(struct mly_softc *sc)
     if (worked) {
 #if __FreeBSD_version >= 500005
 	if (sc->mly_state & MLY_STATE_INTERRUPTS_ON)
-	    taskqueue_enqueue(taskqueue_swi, &sc->mly_task_complete);
+	    taskqueue_enqueue(taskqueue_swi_giant, &sc->mly_task_complete);
 	else
 #endif
 	    mly_complete(sc, 0);
@@ -2170,6 +2175,7 @@ mly_cam_action_io(struct cam_sim *sim, struct ccb_scsiio *csio)
     struct mly_command_scsi_small	*ss;
     int					bus, target;
     int					error;
+    int					s;
 
     bus = cam_sim_bus(sim);
     target = csio->ccb_h.target_id;
@@ -2228,8 +2234,11 @@ mly_cam_action_io(struct cam_sim *sim, struct ccb_scsiio *csio)
      * Get a command, or push the ccb back to CAM and freeze the queue.
      */
     if ((error = mly_alloc_command(sc, &mc))) {
+	s = splcam();
 	xpt_freeze_simq(sim, 1);
 	csio->ccb_h.status |= CAM_REQUEUE_REQ;
+	sc->mly_qfrzn_cnt++;
+	splx(s);
 	return(error);
     }
     
@@ -2273,8 +2282,11 @@ mly_cam_action_io(struct cam_sim *sim, struct ccb_scsiio *csio)
 
     /* give the command to the controller */
     if ((error = mly_start(mc))) {
+	s = splcam();
 	xpt_freeze_simq(sim, 1);
 	csio->ccb_h.status |= CAM_REQUEUE_REQ;
+	sc->mly_qfrzn_cnt++;
+	splx(s);
 	return(error);
     }
 
@@ -2306,6 +2318,7 @@ mly_cam_complete(struct mly_command *mc)
     struct mly_btl		*btl;
     u_int8_t			cmd;
     int				bus, target;
+    int				s;
 
     debug_called(2);
 
@@ -2357,6 +2370,14 @@ mly_cam_complete(struct mly_command *mc)
 	csio->ccb_h.status = CAM_REQ_CMP_ERR;
 	break;
     }
+
+    s = splcam();
+    if (sc->mly_qfrzn_cnt) {
+	csio->ccb_h.status |= CAM_RELEASE_SIMQ;
+	sc->mly_qfrzn_cnt--;
+    }
+    splx(s);
+
     xpt_done((union ccb *)csio);
     mly_release_command(mc);
 }
@@ -2941,4 +2962,24 @@ mly_user_health(struct mly_softc *sc, struct mly_user_health *uh)
     error = copyout(&sc->mly_mmbox->mmm_health.status, uh->HealthStatusBuffer, 
 		    sizeof(uh->HealthStatusBuffer));
     return(error);
+}
+
+static int
+mly_timeout(struct mly_softc *sc)
+{
+	struct mly_command *mc;
+	int deadline;
+
+	deadline = time_second - MLY_CMD_TIMEOUT;
+	TAILQ_FOREACH(mc, &sc->mly_busy, mc_link) {
+		if ((mc->mc_timestamp < deadline)) {
+			device_printf(sc->mly_dev,
+			    "COMMAND %p TIMEOUT AFTER %d SECONDS\n", mc,
+			    (int)(time_second - mc->mc_timestamp));
+		}
+	}
+
+	timeout((timeout_t *)mly_timeout, sc, MLY_CMD_TIMEOUT * hz);
+
+	return (0);
 }

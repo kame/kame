@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/bridge.c,v 1.59 2002/11/14 23:57:09 sam Exp $
+ * $FreeBSD: src/sys/net/bridge.c,v 1.67 2003/02/19 05:47:28 imp Exp $
  */
 
 /*
@@ -239,7 +239,7 @@ add_cluster(u_int16_t cluster_id, struct arpcom *ac)
 	    goto found;
 
     /* Not found, need to reallocate */
-    c = malloc((1+n_clusters) * sizeof (*c), M_IFADDR, M_DONTWAIT | M_ZERO);
+    c = malloc((1+n_clusters) * sizeof (*c), M_IFADDR, M_NOWAIT | M_ZERO);
     if (c == NULL) {/* malloc failure */
 	printf("-- bridge: cannot add new cluster\n");
 	return NULL;
@@ -302,6 +302,7 @@ bridge_off(void)
     int i, s;
 
     DEB(printf("bridge_off: n_clusters %d\n", n_clusters);)
+    IFNET_RLOCK();
     TAILQ_FOREACH(ifp, &ifnet, if_link) {
 	struct bdg_softc *b;
 
@@ -322,6 +323,7 @@ bridge_off(void)
 	b->cluster = NULL;
 	bdg_stats.s[ifp->if_index].name[0] = '\0';
     }
+    IFNET_RUNLOCK();
     /* flush_tables */
 
     s = splimp();
@@ -345,6 +347,7 @@ bridge_on(void)
     struct ifnet *ifp ;
     int s ;
 
+    IFNET_RLOCK();
     TAILQ_FOREACH(ifp, &ifnet, if_link) {
 	struct bdg_softc *b = &ifp2sc[ifp->if_index];
 
@@ -370,6 +373,7 @@ bridge_on(void)
 	    b->flags &= ~IFF_MUTE;
 	}
     }
+    IFNET_RUNLOCK();
 }
 
 /**
@@ -435,6 +439,7 @@ parse_bdg_cfg()
 	/*
 	 * now search in interface list for a matching name
 	 */
+	IFNET_RLOCK();		/* could sleep XXX */
 	TAILQ_FOREACH(ifp, &ifnet, if_link) {
 	    char buf[IFNAMSIZ];
 
@@ -460,6 +465,7 @@ parse_bdg_cfg()
 		break ;
 	    }
 	}
+	IFNET_RUNLOCK();
 	if (!found)
 	    printf("interface %s Not found in bridge\n", beg);
 	*p = c;
@@ -793,7 +799,7 @@ static struct mbuf *
 bdg_forward(struct mbuf *m0, struct ifnet *dst)
 {
 #define	EH_RESTORE(_m) do {						   \
-    M_PREPEND((_m), ETHER_HDR_LEN, M_NOWAIT);			   	   \
+    M_PREPEND((_m), ETHER_HDR_LEN, M_DONTWAIT);			   	   \
     if ((_m) == NULL) {							   \
 	bdg_dropped++;							   \
 	return NULL;							   \
@@ -847,17 +853,10 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 	printf("xx ouch, bdg_forward for local pkt\n");
 	return m0;
     }
-    if (dst == BDG_BCAST || dst == BDG_MCAST || dst == BDG_UNKNOWN) {
-	ifp = TAILQ_FIRST(&ifnet) ; /* scan all ports */
-	once = 0 ;
-	if (dst != BDG_UNKNOWN) /* need a copy for the local stack */
-	    shared = 1 ;
-    } else {
-	ifp = dst ;
-	once = 1 ;
+    if (dst == BDG_BCAST || dst == BDG_MCAST) {
+	 /* need a copy for the local stack */
+	 shared = 1 ;
     }
-    if ((uintptr_t)(ifp) <= (u_int)BDG_FORWARD)
-	panic("bdg_forward: bad dst");
 
     /*
      * Do filtering in a very similar way to what is done in ip_output.
@@ -905,7 +904,7 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 	 * NetBSD-style generic packet filter, pfil(9), hooks.
 	 * Enables ipf(8) in bridging.
 	 */
-	if (m0->m_pkthdr.len >= sizeof(struct ip) &&
+	if (pfh != NULL && m0->m_pkthdr.len >= sizeof(struct ip) &&
 		ntohs(save_eh.ether_type) == ETHERTYPE_IP) {
 	    /*
 	     * before calling the firewall, swap fields the same as IP does.
@@ -916,7 +915,7 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 	    ip->ip_len = ntohs(ip->ip_len);
 	    ip->ip_off = ntohs(ip->ip_off);
 
-	    for (; pfh; pfh = TAILQ_NEXT(pfh, pfil_link))
+	    do {
 		if (pfh->pfil_func) {
 		    rv = pfh->pfil_func(ip, ip->ip_hl << 2, src, 0, &m0);
 		    if (m0 == NULL) {
@@ -929,6 +928,7 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 		    }
 		    ip = mtod(m0, struct ip *);
 		}
+	    } while ((pfh = TAILQ_NEXT(pfh, pfil_link)) != NULL);
 	    /*
 	     * If we get here, the firewall has passed the pkt, but the mbuf
 	     * pointer might have changed. Restore ip and the fields ntohs()'d.
@@ -960,7 +960,8 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 	i = ip_fw_chk_ptr(&args);
 	m0 = args.m;		/* in case the firewall used the mbuf	*/
 
-	EH_RESTORE(m0);		/* restore Ethernet header */
+	if (m0 != NULL)
+		EH_RESTORE(m0);	/* restore Ethernet header */
 
 	if ( (i & IP_FW_PORT_DENY_FLAG) || m0 == NULL) /* drop */
 	    return m0 ;
@@ -1023,6 +1024,17 @@ forward:
 	real_dst = src ;
 
     last = NULL;
+    IFNET_RLOCK();
+    if (dst == BDG_BCAST || dst == BDG_MCAST || dst == BDG_UNKNOWN) {
+	ifp = TAILQ_FIRST(&ifnet) ; /* scan all ports */
+	once = 0 ;
+    } else {
+	ifp = dst ;
+	once = 1 ;
+    }
+    if ((uintptr_t)(ifp) <= (u_int)BDG_FORWARD)
+	panic("bdg_forward: bad dst");
+
     for (;;) {
 	if (last) { /* need to forward packet leftover from previous loop */
 	    struct mbuf *m ;
@@ -1032,6 +1044,7 @@ forward:
 	    } else {
 		m = m_copypacket(m0, M_DONTWAIT);
 		if (m == NULL) {
+		    IFNET_RUNLOCK();
 		    printf("bdg_forward: sorry, m_copypacket failed!\n");
 		    bdg_dropped++ ;
 		    return m0 ; /* the original is still there... */
@@ -1062,6 +1075,7 @@ forward:
 	if (ifp == NULL)
 	    once = 1 ;
     }
+    IFNET_RUNLOCK();
     DEB(bdg_fw_ticks += (u_long)(rdtsc() - ticks) ; bdg_fw_count++ ;
 	if (bdg_fw_count != 0) bdg_fw_avg = bdg_fw_ticks/bdg_fw_count; )
     return m0 ;

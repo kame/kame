@@ -34,11 +34,11 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa.h	5.7 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/isa/isareg.h,v 1.7 2001/10/23 15:17:33 imp Exp $
+ * $FreeBSD: src/sys/isa/isareg.h,v 1.8 2003/02/02 13:06:18 nyan Exp $
  */
 
 #ifdef PC98
-#error isa.h is included from PC-9801 source
+#error isareg.h is included from PC-9801 source
 #endif
 
 #ifndef _ISA_ISA_H_

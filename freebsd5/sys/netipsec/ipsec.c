@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec.c,v 1.1 2002/10/16 02:10:07 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec.c,v 1.4 2003/02/28 20:06:29 sam Exp $	*/
 /*	$KAME: ipsec.c,v 1.103 2001/05/24 07:14:18 sakane Exp $	*/
 
 /*
@@ -280,7 +280,6 @@ ipsec_getpolicybysock(m, dir, inp, error)
 	struct inpcbpolicy *pcbsp = NULL;
 	struct secpolicy *currsp = NULL;	/* policy on socket */
 	struct secpolicy *sp;
-	int af;
 
 	KASSERT(m != NULL, ("ipsec_getpolicybysock: null mbuf"));
 	KASSERT(inp != NULL, ("ipsec_getpolicybysock: null inpcb"));
@@ -288,26 +287,17 @@ ipsec_getpolicybysock(m, dir, inp, error)
 	KASSERT(dir == IPSEC_DIR_INBOUND || dir == IPSEC_DIR_OUTBOUND,
 		("ipsec_getpolicybysock: invalid direction %u", dir));
 
-	af = inp->inp_socket->so_proto->pr_domain->dom_family;
-	KASSERT(af == AF_INET || af == AF_INET6,
-		("ipsec_getpolicybysock: unexpected protocol family %u", af));
-
-	switch (af) {
-	case AF_INET:
-		/* set spidx in pcb */
-		*error = ipsec4_setspidx_inpcb(m, inp);
-		pcbsp = inp->inp_sp;
-		break;
+	/* set spidx in pcb */
+	if (inp->inp_vflag & INP_IPV6PROTO) {
 #ifdef INET6
-	case AF_INET6:
-		/* set spidx in pcb */
 		*error = ipsec6_setspidx_in6pcb(m, inp);
 		pcbsp = inp->in6p_sp;
-		break;
+#else
+		*error = EINVAL;		/* should not happen */
 #endif
-	default:
-		*error = EPFNOSUPPORT;
-		break;
+	} else {
+		*error = ipsec4_setspidx_inpcb(m, inp);
+		pcbsp = inp->inp_sp;
 	}
 	if (*error)
 		return NULL;
@@ -409,7 +399,7 @@ ipsec_getpolicybyaddr(m, dir, flag, error)
 
 	sp = NULL;
 	if (key_havesp(dir)) {
-		/* make a index to look for a policy */
+		/* Make an index to look for a policy. */
 		*error = ipsec_setspidx(m, &spidx,
 					(flag & IP_FORWARDING) ? 0 : 1);
 		if (*error != 0) {
@@ -1571,8 +1561,6 @@ ipsec4_hdrsiz(m, dir, inp)
 	size_t size;
 
 	KASSERT(m != NULL, ("ipsec4_hdrsiz: null mbuf"));
-	KASSERT(inp == NULL || inp->inp_socket != NULL,
-		("ipsec4_hdrsize: socket w/o inpcb"));
 
 	/* get SP for this packet.
 	 * When we are called from ip_forward(), we call

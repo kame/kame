@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_lockf.c	8.3 (Berkeley) 1/6/94
- * $FreeBSD: src/sys/kern/kern_lockf.c,v 1.44 2002/11/07 21:56:05 mux Exp $
+ * $FreeBSD: src/sys/kern/kern_lockf.c,v 1.48 2003/04/29 13:36:02 kan Exp $
  */
 
 #include "opt_debug_lockf.h"
@@ -42,6 +42,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mount.h>
 #include <sys/mutex.h>
@@ -51,9 +52,6 @@
 #include <sys/malloc.h>
 #include <sys/fcntl.h>
 #include <sys/lockf.h>
-#include <sys/stdint.h>
-
-#include <machine/limits.h>
 
 /*
  * This variable controls the maximum number of processes that will

@@ -26,18 +26,19 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/elink.h,v 1.7 2002/03/20 07:39:47 alfred Exp $
+ * $FreeBSD: src/sys/i386/isa/elink.h,v 1.8 2003/03/29 13:18:20 mdodd Exp $
  */
 
 #ifdef PC98
 #define	ELINK_ID_PORT	0x71d0
 #else
-#define	ELINK_ID_PORT	0x110
+#define	ELINK_ID_PORT	0x100
 #endif
 #define	ELINK_RESET	0xc0
 
 #define	ELINK_507_POLY	0xe7
 #define	ELINK_509_POLY	0xcf
+#define	TLINK_619_POLY	0x63
 
 void elink_reset(void);
 void elink_idseq(u_char p);

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/lnc/if_lnc_pci.c,v 1.26 2002/11/14 23:54:53 sam Exp $
+ * $FreeBSD: src/sys/dev/lnc/if_lnc_pci.c,v 1.27 2003/04/15 06:37:25 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -220,4 +220,6 @@ static driver_t lnc_pci_driver = {
 	sizeof(struct lnc_softc),
 };
 
-DRIVER_MODULE(if_lnc, pci, lnc_pci_driver, lnc_devclass, 0, 0);
+DRIVER_MODULE(lnc, pci, lnc_pci_driver, lnc_devclass, 0, 0);
+MODULE_DEPEND(lnc, pci, 1, 1, 1);
+MODULE_DEPEND(lnc, ether, 1, 1, 1);

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.8 2002/11/14 23:54:54 sam Exp $
+ * $FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.10 2003/02/19 05:47:10 imp Exp $
  */
 
 /*

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)pwd.h	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/include/pwd.h,v 1.13 2002/08/21 16:19:55 mike Exp $
+ * $FreeBSD: src/include/pwd.h,v 1.15 2003/04/18 14:11:17 nectar Exp $
  */
 
 #ifndef _PWD_H_
@@ -60,6 +60,11 @@ typedef	__uid_t		uid_t;
 #define	_UID_T_DECLARED
 #endif
 
+#ifndef _SIZE_T_DECLARED
+typedef __size_t	size_t;
+#define _SIZE_T_DECLARED
+#endif
+
 #define _PATH_PWD		"/etc"
 #define	_PATH_PASSWD		"/etc/passwd"
 #define	_PASSWD			"passwd"
@@ -73,11 +78,36 @@ typedef	__uid_t		uid_t;
 
 #define	_PATH_PWD_MKDB		"/usr/sbin/pwd_mkdb"
 
-#define	_PW_KEYBYNAME		'1'	/* stored by name */
-#define	_PW_KEYBYNUM		'2'	/* stored by entry in the "file" */
-#define	_PW_KEYBYUID		'3'	/* stored by uid */
-#define _PW_KEYYPENABLED	'4'	/* YP is enabled */
-#define	_PW_KEYYPBYNUM		'5'	/* special +@netgroup entries */
+/* Historically, the keys in _PATH_MP_DB/_PATH_SMP_DB had the format
+ * `1 octet tag | key', where the tag is one of the _PW_KEY* values
+ * listed below.  These values happen to be ASCII digits.  Starting
+ * with FreeBSD 5.1, the tag is now still a single octet, but the
+ * upper 4 bits are interpreted as a version.  Pre-FreeBSD 5.1 format
+ * entries are version `3' -- this conveniently results in the same
+ * key values as before.  The new, architecture-independent entries
+ * are version `4'.
+ * As it happens, some applications read the database directly.
+ * (Bad app, no cookie!)  Thus, we leave the _PW_KEY* symbols at their
+ * old pre-FreeBSD 5.1 values so these apps still work.  Consequently
+ * we have to do muck around a bit more to get the correct, versioned
+ * tag, and that is what the _PW_VERSIONED macros is about.
+ */
+
+#define _PW_VERSION_MASK	'0xF0'
+#define _PW_VERSIONED(x, v)	((unsigned char)(((x) & 0xCF) | ((v)<<4)))
+
+#define	_PW_KEYBYNAME		'\x31'	/* stored by name */
+#define	_PW_KEYBYNUM		'\x32'	/* stored by entry in the "file" */
+#define	_PW_KEYBYUID		'\x33'	/* stored by uid */
+#define _PW_KEYYPENABLED	'\x34'	/* YP is enabled */
+#define	_PW_KEYYPBYNUM		'\x35'	/* special +@netgroup entries */
+
+/* The database also contains a key to indicate the format version of
+ * the entries therein.  There may be other, older versioned entries
+ * as well.
+ */
+#define _PWD_VERSION_KEY	"\xFF" "VERSION"
+#define _PWD_CURRENT_VERSION	'\x04'
 
 #define	_PASSWORD_EFMT1		'_'	/* extended encryption format */
 
@@ -110,6 +140,9 @@ struct passwd {
 #define _PWF_SHELL	_PWF(8)
 #define _PWF_EXPIRE	_PWF(9)
 
+/* XXX These flags are bogus.  With nsswitch, there are many
+ * possible sources and they cannot be represented in a small integer.
+ */                           
 #define _PWF_SOURCE	0x3000
 #define _PWF_FILES	0x1000
 #define _PWF_NIS	0x2000
@@ -123,12 +156,14 @@ struct passwd	*getpwuid(uid_t);
 void		 endpwent(void);
 struct passwd	*getpwent(void);
 void		 setpwent(void);
-/*
- * XXX missing getpwnam_r() and getpwuid_r().
- */
+int		 getpwnam_r(const char *, struct passwd *, char *, size_t,
+		    struct passwd **);
+int		 getpwuid_r(uid_t, struct passwd *, char *, size_t,
+		    struct passwd **);
 #endif
 
 #if __BSD_VISIBLE
+int		 getpwent_r(struct passwd *, char *, size_t, struct passwd **);
 int		 setpassent(int);
 const char	*user_from_uid(uid_t, int);
 #endif

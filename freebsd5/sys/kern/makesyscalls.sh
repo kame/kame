@@ -1,6 +1,6 @@
 #! /bin/sh -
 #	@(#)makesyscalls.sh	8.1 (Berkeley) 6/10/93
-# $FreeBSD: src/sys/kern/makesyscalls.sh,v 1.58 2002/10/29 15:47:06 dwmalone Exp $
+# $FreeBSD: src/sys/kern/makesyscalls.sh,v 1.60 2003/04/01 01:12:24 jeff Exp $
 
 set -e
 
@@ -117,7 +117,10 @@ s/\$//g
 		printf "#define\t%s\n\n", sysproto_h > sysarg
 		printf "#include <sys/signal.h>\n" > sysarg
 		printf "#include <sys/acl.h>\n" > sysarg
+		printf "#include <sys/thr.h>\n" > sysarg
+		printf "#include <sys/umtx.h>\n" > sysarg
 		printf "#include <posix4/_semaphore.h>\n\n" > sysarg
+		printf "#include <sys/ucontext.h>\n\n" > sysarg
 		printf "struct proc;\n\n" > sysarg
 		printf "struct thread;\n\n" > sysarg
 		printf "#define\tPAD_(t)\t(sizeof(register_t) <= sizeof(t) ? \\\n" > sysarg

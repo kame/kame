@@ -1,5 +1,5 @@
 /*	$NecBSD: bsif.h,v 1.5 1997/10/23 20:52:34 honda Exp $	*/
-/* $FreeBSD: src/sys/i386/isa/bs/bsif.h,v 1.21 2002/03/20 07:39:50 alfred Exp $ */
+/* $FreeBSD: src/sys/i386/isa/bs/bsif.h,v 1.22 2003/04/16 20:52:26 phk Exp $ */
 /*
  * Copyright (c) HONDA Naofumi, KATO Takenori, 1996.  All rights reserved.
  * 
@@ -74,7 +74,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/disklabel.h>
 #include <sys/bio.h>
 #include <sys/queue.h>
 #include <sys/malloc.h>

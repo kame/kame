@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/sys/sem.h,v 1.25 2002/03/19 20:18:41 alfred Exp $ */
+/* $FreeBSD: src/sys/sys/sem.h,v 1.26 2003/01/25 21:27:37 alfred Exp $ */
 /*	$NetBSD: sem.h,v 1.5 1994/06/29 06:45:15 cgd Exp $	*/
 
 /*
@@ -96,12 +96,23 @@ void	semexit(struct proc *p);
 
 #ifndef _KERNEL
 #include <sys/cdefs.h>
+#include <sys/_types.h>
+
+#ifndef _SIZE_T_DECLARED
+typedef __size_t        size_t;
+#define _SIZE_T_DECLARED
+#endif
+
+#ifndef _PID_T_DECLARED
+typedef __pid_t         pid_t;
+#define _PID_T_DECLARED
+#endif
 
 __BEGIN_DECLS
 int semsys(int, ...);
 int semctl(int, int, int, ...);
 int semget(key_t, int, int);
-int semop(int, struct sembuf *,unsigned);
+int semop(int, struct sembuf *,size_t);
 __END_DECLS
 #endif /* !_KERNEL */
 

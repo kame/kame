@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $FreeBSD: src/sys/sys/vnode.h,v 1.217 2002/10/27 18:07:41 wollman Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.223 2003/04/26 08:36:06 alc Exp $
  */
 
 #ifndef _SYS_VNODE_H_
@@ -108,8 +108,10 @@ struct vnode {
 	int	v_holdcnt;			/* i page & buffer references */
 	struct	buflists v_cleanblkhd;		/* i SORTED clean blocklist */
 	struct buf	*v_cleanblkroot;	/* i clean buf splay tree  */
+	int	v_cleanbufcnt;			/* i number of clean buffers */
 	struct	buflists v_dirtyblkhd;		/* i SORTED dirty blocklist */
 	struct buf	*v_dirtyblkroot;	/* i dirty buf splay tree */
+	int	v_dirtybufcnt;			/* i number of dirty buffers */
 	u_long	v_vflag;			/* v vnode flags */
 	int	v_writecount;			/* v ref count of writers */
 	struct vm_object *v_object;		/* v Place to store VM object */
@@ -214,6 +216,7 @@ struct xvnode {
 #define	VI_DOOMED	0x0080	/* This vnode is being recycled */
 #define	VI_FREE		0x0100	/* This vnode is on the freelist */
 #define	VI_OBJDIRTY	0x0400	/* object might be dirty */
+#define	VI_DOINGINACT	0x0800	/* VOP_INACTIVE is in progress */
 /*
  * XXX VI_ONWORKLST could be replaced with a check for NULL list elements
  * in v_synclist.
@@ -280,6 +283,9 @@ struct vattr {
 #define	IO_EXT		0x0400		/* operate on external attributes */
 #define	IO_NORMAL	0x0800		/* operate on regular data */
 #define	IO_NOMACCHECK	0x1000		/* MAC checks unnecessary */
+
+#define IO_SEQMAX	0x7F		/* seq heuristic max value */
+#define IO_SEQSHIFT	16		/* seq heuristic in upper 16 bits */
 
 /*
  *  Modes.  Some values same as Ixxx entries from inode.h for now.
@@ -360,7 +366,6 @@ extern	int desiredvnodes;		/* number of vnodes desired */
 extern	struct uma_zone *namei_zone;
 extern	int prtactive;			/* nonzero to call vprint() */
 extern	struct vattr va_null;		/* predefined null vattr structure */
-extern	int vfs_ioopt;
 
 /*
  * Macro/function to check for client cache inconsistency w.r.t. leasing.
@@ -373,14 +378,14 @@ extern void	(*lease_updatetime)(int deltat);
 
 /* Requires interlock */
 #define	VSHOULDFREE(vp)	\
-	(!((vp)->v_iflag & (VI_FREE|VI_DOOMED)) && \
+	(!((vp)->v_iflag & (VI_FREE|VI_DOOMED|VI_DOINGINACT)) && \
 	 !(vp)->v_holdcnt && !(vp)->v_usecount && \
 	 (!(vp)->v_object || \
 	  !((vp)->v_object->ref_count || (vp)->v_object->resident_page_count)))
 
 /* Requires interlock */
 #define VMIGHTFREE(vp) \
-	(!((vp)->v_iflag & (VI_FREE|VI_DOOMED|VI_XLOCK)) &&	\
+	(!((vp)->v_iflag & (VI_FREE|VI_DOOMED|VI_XLOCK|VI_DOINGINACT)) && \
 	 LIST_EMPTY(&(vp)->v_cache_src) && !(vp)->v_usecount)
 
 /* Requires interlock */
@@ -604,6 +609,8 @@ int	cache_lookup(struct vnode *dvp, struct vnode **vpp,
 void	cache_purge(struct vnode *vp);
 void	cache_purgevfs(struct mount *mp);
 int	cache_leaf_test(struct vnode *vp);
+int	change_dir(struct vnode *vp, struct thread *td);
+int	change_root(struct vnode *vp, struct thread *td);
 void	cvtstat(struct stat *st, struct ostat *ost);
 void	cvtnstat(struct stat *sb, struct nstat *nsb);
 int	getnewvnode(const char *tag, struct mount *mp, vop_t **vops,
@@ -684,6 +691,7 @@ void	vfs_timestamp(struct timespec *);
 void	vfs_write_resume(struct mount *mp);
 int	vfs_write_suspend(struct mount *mp);
 int	vop_stdbmap(struct vop_bmap_args *);
+int	vop_stdfsync(struct vop_fsync_args *);
 int	vop_stdgetwritemount(struct vop_getwritemount_args *);
 int	vop_stdgetpages(struct vop_getpages_args *);
 int	vop_stdinactive(struct vop_inactive_args *);

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fs.h	8.7 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/gnu/ext2fs/fs.h,v 1.11 2002/05/16 19:07:59 iedowse Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/fs.h,v 1.13 2003/03/13 07:07:16 jeff Exp $
  */
 
 /*
@@ -168,9 +168,9 @@ extern u_char *fragtbl[];
 	long flags; \
 	int s; \
 	s = splbio(); \
+	BUF_LOCK(bp, LK_EXCLUSIVE, NULL); \
 	flags = (bp)->b_flags; \
 	(bp)->b_flags &= ~(B_DIRTY | B_LOCKED); \
-	BUF_LOCK(bp, LK_EXCLUSIVE); \
 	bremfree(bp); \
 	splx(s); \
 	if (flags & B_DIRTY) \

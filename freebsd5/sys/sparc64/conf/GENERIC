@@ -18,12 +18,11 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/sparc64/conf/GENERIC,v 1.41.2.1 2002/12/18 08:11:25 scottl Exp $
+# $FreeBSD: src/sys/sparc64/conf/GENERIC,v 1.55.2.2 2003/05/31 15:18:41 scottl Exp $
 
 machine		sparc64
 cpu		SUN4U
 ident		GENERIC
-maxusers	0
 
 #To statically compile in device wiring instead of /boot/device.hints
 #hints		"GENERIC.hints"		#Default places to look for devices.
@@ -33,6 +32,7 @@ maxusers	0
 # Platforms supported
 #	At this time all platforms are supported, as-is.
 
+options 	SCHED_4BSD		#4BSD scheduler
 options 	INET			#InterNETworking
 options 	INET6			#IPv6 communications protocols
 options 	FFS			#Berkeley Fast Filesystem
@@ -72,6 +72,8 @@ device		ebus
 device		isa
 device		pci
 device		sbus
+device		central
+device		fhc
 
 # Floppy drives
 #device		fdc
@@ -96,12 +98,12 @@ device		sym		# NCR/Symbios Logic (newer chipsets + those of `ncr')
 
 # SCSI peripherals
 device		scbus		# SCSI bus (required)
-#device		ch		# SCSI media changers
+device		ch		# SCSI media changers
 device		da		# Direct Access (disks)
-#device		sa		# Sequential Access (tape etc)
+device		sa		# Sequential Access (tape etc)
 device		cd		# CD
 device		pass		# Passthrough device (direct SCSI access)
-#device		ses		# SCSI Environmental Services (and SAF-TE)
+device		ses		# SCSI Environmental Services (and SAF-TE)
 
 # RAID controllers
 #device		amr		# AMI MegaRAID
@@ -128,7 +130,8 @@ device		"mk48txx"	# Mostek MK48T02, MK48T08, MK48T59 clock
 
 # Serial (COM) ports
 #device		sio		# 8250, 16[45]50 based serial ports
-#device		sab		# Siemens SAB82532 based serial ports
+device		sab		# Siemens SAB82532 based serial ports
+device		zs		# Zilog 8530 based serial ports
 
 # Parallel port
 #device		ppc
@@ -147,18 +150,18 @@ device		"mk48txx"	# Mostek MK48T02, MK48T08, MK48T59 clock
 # PCI Ethernet NICs that use the common MII bus controller code.
 device		miibus		# MII bus support
 #device		dc		# DEC/Intel 21143 and workalikes
-#device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
+device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
 device		gem		# Sun GEM/Sun ERI/Apple GMAC
 device		hme		# Sun HME (Happy Meal Ethernet)
 #device		pcn		# AMD Am79C97x PCI 10/100 NICs
-#device		rl		# RealTek 8129/8139
+device		rl		# RealTek 8129/8139
 #device		sf		# Adaptec AIC-6915 (``Starfire'')
 #device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
 #device		ste		# Sundance ST201 (D-Link DFE-550TX)
 #device		tl		# Texas Instruments ThunderLAN
 #device		vr		# VIA Rhine, Rhine II
 #device		wb		# Winbond W89C840F
-#device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
+device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
 # Pseudo devices - the number indicates how many units to allocated.
 device		random		# Entropy device
@@ -188,12 +191,11 @@ device		bpf		#Berkeley packet filter
 #device		ums		# Mouse
 # USB Ethernet
 #device		aue		# ADMtek USB ethernet
+#device		axe		# ASIX Electronics USB ethernet
 #device		cue		# CATC USB ethernet
 #device		kue		# Kawasaki LSI USB ethernet
 
-options 	KTR
-options 	KTR_COMPILE=0xffffffff
-options 	KTR_ENTRIES=8192
-options 	KTR_MASK=KTR_TRAP
-
-options 	OFW_PCI_DEBUG
+# FireWire support
+device		firewire	# FireWire bus code
+device		sbp		# SCSI over FireWire (Requires scbus and da)
+device		fwe		# Ethernet over FireWire (non-standard!)

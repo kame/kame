@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_msg.c,v 1.43.2.1 2002/12/15 13:54:55 maxim Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_msg.c,v 1.48 2003/02/19 05:47:25 imp Exp $ */
 
 /*
  * Implementation of SVID messages
@@ -566,7 +566,7 @@ done2:
 #ifndef _SYS_SYSPROTO_H_
 struct msgsnd_args {
 	int	msqid;
-	void	*msgp;
+	const void	*msgp;
 	size_t	msgsz;
 	int	msgflg;
 };
@@ -581,7 +581,7 @@ msgsnd(td, uap)
 	register struct msgsnd_args *uap;
 {
 	int msqid = uap->msqid;
-	void *user_msgp = uap->msgp;
+	const void *user_msgp = uap->msgp;
 	size_t msgsz = uap->msgsz;
 	int msgflg = uap->msgflg;
 	int segs_needed, error = 0;
@@ -772,7 +772,7 @@ msgsnd(td, uap)
 		goto done2;
 	}
 	mtx_lock(&msq_mtx);
-	user_msgp = (char *)user_msgp + sizeof(msghdr->msg_type);
+	user_msgp = (const char *)user_msgp + sizeof(msghdr->msg_type);
 
 	/*
 	 * Validate the message type
@@ -815,7 +815,7 @@ msgsnd(td, uap)
 		}
 		mtx_lock(&msq_mtx);
 		msgsz -= tlen;
-		user_msgp = (char *)user_msgp + tlen;
+		user_msgp = (const char *)user_msgp + tlen;
 		next = msgmaps[next].next;
 	}
 	if (next != -1)

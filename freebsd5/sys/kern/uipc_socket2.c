@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket2.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.106 2002/11/05 18:52:25 kbyanc Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.112 2003/04/30 12:57:40 markm Exp $
  */
 
 #include "opt_mac.h"
@@ -67,7 +67,7 @@ void (*aio_swake)(struct socket *, struct sockbuf *);
  */
 
 u_long	sb_max = SB_MAX;
-u_long	sb_max_adj =
+static	u_long sb_max_adj =
     SB_MAX * MCLBYTES / (MSIZE + MCLBYTES); /* adjusted sb_max */
 
 static	u_long sb_efficiency = 8;	/* parameter for sbreserve() */
@@ -125,7 +125,7 @@ soisconnected(so)
 			so->so_upcallarg = head->so_accf->so_accept_filter_arg;
 			so->so_rcv.sb_flags |= SB_UPCALL;
 			so->so_options &= ~SO_ACCEPTFILTER;
-			so->so_upcall(so, so->so_upcallarg, 0);
+			so->so_upcall(so, so->so_upcallarg, M_TRYWAIT);
 			return;
 		}
 		TAILQ_REMOVE(&head->so_incomp, so, so_list);
@@ -383,10 +383,10 @@ sysctl_handle_sb_max(SYSCTL_HANDLER_ARGS)
 	int error = 0;
 	u_long old_sb_max = sb_max;
 
-	error = SYSCTL_OUT(req, arg1, sizeof(int));
+	error = SYSCTL_OUT(req, arg1, sizeof(u_long));
 	if (error || !req->newptr)
 		return (error);
-	error = SYSCTL_IN(req, arg1, sizeof(int));
+	error = SYSCTL_IN(req, arg1, sizeof(u_long));
 	if (error)
 		return (error);
 	if (sb_max < MSIZE + MCLBYTES) {
@@ -705,7 +705,9 @@ sbcompress(sb, m, n)
 			    (unsigned)m->m_len);
 			n->m_len += m->m_len;
 			sb->sb_cc += m->m_len;
-			if (m->m_type != MT_DATA) /* XXX: Probably don't need.*/
+			if (m->m_type != MT_DATA && m->m_type != MT_HEADER &&
+			    m->m_type != MT_OOBDATA)
+				/* XXX: Probably don't need.*/
 				sb->sb_ctl += m->m_len;
 			m = m_free(m);
 			continue;
@@ -776,7 +778,8 @@ sbdrop(sb, len)
 			m->m_len -= len;
 			m->m_data += len;
 			sb->sb_cc -= len;
-			if (m->m_type != MT_DATA)
+			if (m->m_type != MT_DATA && m->m_type != MT_HEADER &&
+			    m->m_type != MT_OOBDATA)
 				sb->sb_ctl -= len;
 			break;
 		}
@@ -986,11 +989,11 @@ SYSCTL_NODE(_kern, KERN_IPC, ipc, CTLFLAG_RW, 0, "IPC");
 /* This takes the place of kern.maxsockbuf, which moved to kern.ipc. */
 static int dummy;
 SYSCTL_INT(_kern, KERN_DUMMY, dummy, CTLFLAG_RW, &dummy, 0, "");
-SYSCTL_OID(_kern_ipc, KIPC_MAXSOCKBUF, maxsockbuf, CTLTYPE_INT|CTLFLAG_RW, 
-    &sb_max, 0, sysctl_handle_sb_max, "I", "Maximum socket buffer size");
+SYSCTL_OID(_kern_ipc, KIPC_MAXSOCKBUF, maxsockbuf, CTLTYPE_ULONG|CTLFLAG_RW, 
+    &sb_max, 0, sysctl_handle_sb_max, "LU", "Maximum socket buffer size");
 SYSCTL_INT(_kern_ipc, OID_AUTO, maxsockets, CTLFLAG_RD, 
     &maxsockets, 0, "Maximum number of sockets avaliable");
-SYSCTL_INT(_kern_ipc, KIPC_SOCKBUF_WASTE, sockbuf_waste_factor, CTLFLAG_RW,
+SYSCTL_ULONG(_kern_ipc, KIPC_SOCKBUF_WASTE, sockbuf_waste_factor, CTLFLAG_RW,
     &sb_efficiency, 0, "");
 
 /*

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ppp.c,v 1.41 2002/11/08 21:13:18 jhb Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ppp.c,v 1.46 2003/04/29 13:36:04 kan Exp $
  * $Whistle: ng_ppp.c,v 1.24 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -47,13 +47,12 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/time.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/errno.h>
 #include <sys/ctype.h>
-
-#include <machine/limits.h>
 
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
@@ -1418,6 +1417,7 @@ ng_ppp_frag_checkstale(node_p node)
 	meta_p meta;
 	int i, seq;
 	item_p item;
+	int endseq;
 
 	now.tv_sec = 0;			/* uninitialized state */
 	while (1) {
@@ -1468,11 +1468,12 @@ ng_ppp_frag_checkstale(node_p node)
 		}
 
 		/* Extract completed packet */
+		endseq = end->seq;
 		ng_ppp_get_packet(node, &m, &meta);
 
 		/* Bump MSEQ if necessary */
-		if (MP_RECV_SEQ_DIFF(priv, priv->mseq, end->seq) < 0) {
-			priv->mseq = end->seq;
+		if (MP_RECV_SEQ_DIFF(priv, priv->mseq, endseq) < 0) {
+			priv->mseq = endseq;
 			for (i = 0; i < priv->numActiveLinks; i++) {
 				struct ng_ppp_link *const alink =
 				    &priv->links[priv->activeLinks[i]];
@@ -1595,7 +1596,7 @@ deliver:
 			/* Split off next fragment as "m2" */
 			m2 = m;
 			if (!lastFragment) {
-				struct mbuf *n = m_split(m, len, M_NOWAIT);
+				struct mbuf *n = m_split(m, len, M_DONTWAIT);
 
 				if (n == NULL) {
 					NG_FREE_M(m);
@@ -1916,7 +1917,7 @@ ng_ppp_addproto(struct mbuf *m, int proto, int compOK)
 static struct mbuf *
 ng_ppp_prepend(struct mbuf *m, const void *buf, int len)
 {
-	M_PREPEND(m, len, M_NOWAIT);
+	M_PREPEND(m, len, M_DONTWAIT);
 	if (m == NULL || (m->m_len < len && (m = m_pullup(m, len)) == NULL))
 		return (NULL);
 	bcopy(buf, mtod(m, u_char *), len);

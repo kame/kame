@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_aes.c,v 1.8.2.1 2002/12/20 21:52:02 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_aes.c,v 1.20 2003/05/05 15:52:11 phk Exp $
  *
  * This method provides AES encryption with a compiled in key (default
  * all zeroes).
@@ -41,13 +41,6 @@
  */
 
 #include <sys/param.h>
-#ifndef _KERNEL
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <err.h>
-#else
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/conf.h>
@@ -56,7 +49,6 @@
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/libkern.h>
-#endif
 #include <sys/endian.h>
 #include <sys/md5.h>
 #include <sys/errno.h>
@@ -228,7 +220,6 @@ g_aes_start(struct bio *bp)
 		g_io_request(bp2, cp);
 		break;
 	case BIO_GETATTR:
-	case BIO_SETATTR:
 		bp2 = g_clone_bio(bp);
 		if (bp2 == NULL) {
 			g_io_deliver(bp, ENOMEM);
@@ -249,9 +240,7 @@ static void
 g_aes_orphan(struct g_consumer *cp)
 {
 	struct g_geom *gp;
-	struct g_provider *pp;
 	struct g_aes_softc *sc;
-	int error;
 
 	g_trace(G_T_TOPOLOGY, "g_aes_orphan(%p/%s)", cp, cp->provider->name);
 	g_topology_assert();
@@ -260,11 +249,9 @@ g_aes_orphan(struct g_consumer *cp)
 
 	gp = cp->geom;
 	sc = gp->softc;
-	gp->flags |= G_GEOM_WITHER;
-	error = cp->provider->error;
-	LIST_FOREACH(pp, &gp->provider, provider)
-		g_orphan_provider(pp, error);
+	g_wither_geom(gp, cp->provider->error);
 	bzero(sc, sizeof(struct g_aes_softc));	/* destroy evidence */
+	g_free(sc);
 	return;
 }
 
@@ -313,7 +300,7 @@ g_aes_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	}
 	buf = NULL;
 	g_topology_unlock();
-	while (1) {
+	do {
 		if (gp->rank != 2)
 			break;
 		sectorsize = cp->provider->sectorsize;
@@ -335,6 +322,7 @@ g_aes_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 			g_free(sc);
 			break;
 		}
+		g_free(buf);
 		gp->softc = sc;
 		gp->access = g_aes_access;
 		sc->sectorsize = sectorsize;
@@ -368,8 +356,7 @@ g_aes_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 		pp->sectorsize = sectorsize;
 		g_error_provider(pp, 0);
 		g_topology_unlock();
-		break;
-	}
+	} while(0);
 	g_topology_lock();
 	if (buf)
 		g_free(buf);
@@ -383,9 +370,8 @@ g_aes_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 }
 
 static struct g_class g_aes_class	= {
-	AES_CLASS_NAME,
-	g_aes_taste,
-	NULL,
+	.name = AES_CLASS_NAME,
+	.taste = g_aes_taste,
 	G_CLASS_INITIALIZER
 };
 

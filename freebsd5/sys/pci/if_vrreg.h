@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.14 2002/11/25 05:15:27 silby Exp $
+ * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.17 2003/02/01 01:27:05 silby Exp $
  */
 
 /*
@@ -464,11 +464,14 @@ struct vr_softc {
 	u_int8_t		vr_unit;	/* interface number */
 	u_int8_t		vr_type;
 	u_int8_t		vr_revid;	/* Rhine chip revision */
+	u_int8_t                vr_flags;       /* See VR_F_* below */
 	struct vr_list_data	*vr_ldata;
 	struct vr_chain_data	vr_cdata;
 	struct callout_handle	vr_stat_ch;
 	struct mtx		vr_mtx;
 };
+
+#define VR_F_RESTART		0x01		/* Restart unit on next tick */
 
 #define	VR_LOCK(_sc)		mtx_lock(&(_sc)->vr_mtx)
 #define	VR_UNLOCK(_sc)		mtx_unlock(&(_sc)->vr_mtx)
@@ -506,6 +509,8 @@ struct vr_softc {
 #define	VIA_DEVICEID_RHINE		0x3043
 #define VIA_DEVICEID_RHINE_II		0x6100
 #define VIA_DEVICEID_RHINE_II_2		0x3065
+#define VIA_DEVICEID_RHINE_III		0x3106
+#define VIA_DEVICEID_RHINE_III_M	0x3053
 
 /*
  * Delta Electronics device ID.
@@ -537,6 +542,7 @@ struct vr_softc {
 #define REV_ID_VT3065_A			0x40
 #define REV_ID_VT3065_B			0x41
 #define REV_ID_VT3065_C			0x42
+#define REV_ID_VT6102_APOLLO		0x74
 #define REV_ID_VT3106			0x80
 #define REV_ID_VT3106_J			0x80    /* 0x80-0x8F */
 #define REV_ID_VT3106_S			0x90    /* 0x90-0xA0 */
@@ -563,6 +569,9 @@ struct vr_softc {
 #define VR_PCI_MINLAT		0x0F
 #define VR_PCI_RESETOPT		0x48
 #define VR_PCI_EEPROM_DATA	0x4C
+#define VR_PCI_MODE		0x50
+
+#define VR_MODE3_MIION		0x04
 
 /* power management registers */
 #define VR_PCI_CAPID		0xDC /* 8 bits */

@@ -11,12 +11,11 @@
 #else
 %#include <sys/cdefs.h>
 %#ifndef lint
-%static const char rcsid[] =
-%  "$FreeBSD: src/include/rpcsvc/nlm_prot.x,v 1.10 2001/04/17 20:45:17 alfred Exp $";
 %/*static char sccsid[] = "from: @(#)nlm_prot.x 1.8 87/09/21 Copyr 1987 Sun Micro";*/
 %/*static char sccsid[] = "from: * @(#)nlm_prot.x	2.1 88/08/01 4.0 RPCSRC";*/
 %__RCSID("$NetBSD: nlm_prot.x,v 1.6 2000/06/07 14:30:15 bouyer Exp $");
 %#endif /* not lint */
+%__FBSDID("$FreeBSD: src/include/rpcsvc/nlm_prot.x,v 1.11 2003/05/04 02:51:42 obrien Exp $");
 #endif
 
 /*

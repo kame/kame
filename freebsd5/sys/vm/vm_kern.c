@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_kern.c,v 1.87 2002/08/25 00:22:31 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_kern.c,v 1.97 2003/04/15 01:16:05 alc Exp $
  */
 
 /*
@@ -200,9 +200,11 @@ kmem_alloc(map, size)
 				VM_ALLOC_ZERO | VM_ALLOC_RETRY);
 		if ((mem->flags & PG_ZERO) == 0)
 			pmap_zero_page(mem);
+		vm_page_lock_queues();
 		mem->valid = VM_PAGE_BITS_ALL;
 		vm_page_flag_clear(mem, PG_ZERO);
 		vm_page_wakeup(mem);
+		vm_page_unlock_queues();
 	}
 
 	/*
@@ -309,7 +311,8 @@ kmem_malloc(map, size, flags)
 	vm_page_t m;
 	int pflags;
 
-	GIANT_REQUIRED;
+	if ((flags & M_NOWAIT) == 0)
+		GIANT_REQUIRED;
 
 	size = round_page(size);
 	addr = vm_map_min(map);
@@ -330,12 +333,12 @@ kmem_malloc(map, size, flags)
 				printf("Out of mbuf address space!\n");
 				printf("Consider increasing NMBCLUSTERS\n");
 			}
-			goto bad;
+			return (0);
 		}
 		if ((flags & M_NOWAIT) == 0)
 			panic("kmem_malloc(%ld): kmem_map too small: %ld total allocated",
 				(long)size, (long)map->size);
-		goto bad;
+		return (0);
 	}
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	vm_object_reference(kmem_object);
@@ -352,14 +355,14 @@ kmem_malloc(map, size, flags)
 	 */
 
 	if ((flags & (M_NOWAIT|M_USE_RESERVE)) == M_NOWAIT)
-		pflags = VM_ALLOC_INTERRUPT;
+		pflags = VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED;
 	else
-		pflags = VM_ALLOC_SYSTEM;
+		pflags = VM_ALLOC_SYSTEM | VM_ALLOC_WIRED;
 
 	if (flags & M_ZERO)
 		pflags |= VM_ALLOC_ZERO;
 
-
+	VM_OBJECT_LOCK(kmem_object);
 	for (i = 0; i < size; i += PAGE_SIZE) {
 retry:
 		m = vm_page_alloc(kmem_object, OFF_TO_IDX(offset + i), pflags);
@@ -371,9 +374,11 @@ retry:
 		 */
 		if (m == NULL) {
 			if ((flags & M_NOWAIT) == 0) {
+				VM_OBJECT_UNLOCK(kmem_object);
 				vm_map_unlock(map);
 				VM_WAIT;
 				vm_map_lock(map);
+				VM_OBJECT_LOCK(kmem_object);
 				goto retry;
 			}
 			/* 
@@ -387,18 +392,23 @@ retry:
 				m = vm_page_lookup(kmem_object,
 						   OFF_TO_IDX(offset + i));
 				vm_page_lock_queues();
+				vm_page_unwire(m, 0);
 				vm_page_free(m);
 				vm_page_unlock_queues();
 			}
+			VM_OBJECT_UNLOCK(kmem_object);
 			vm_map_delete(map, addr, addr + size);
 			vm_map_unlock(map);
-			goto bad;
+			return (0);
 		}
 		if (flags & M_ZERO && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
+		vm_page_lock_queues();
 		vm_page_flag_clear(m, PG_ZERO);
 		m->valid = VM_PAGE_BITS_ALL;
+		vm_page_unlock_queues();
 	}
+	VM_OBJECT_UNLOCK(kmem_object);
 
 	/*
 	 * Mark map entry as non-pageable. Assert: vm_map_insert() will never
@@ -420,23 +430,21 @@ retry:
 	 * splimp...)
 	 */
 	for (i = 0; i < size; i += PAGE_SIZE) {
+		VM_OBJECT_LOCK(kmem_object);
 		m = vm_page_lookup(kmem_object, OFF_TO_IDX(offset + i));
-		vm_page_lock_queues();
-		vm_page_wire(m);
-		vm_page_wakeup(m);
-		vm_page_unlock_queues();
+		VM_OBJECT_UNLOCK(kmem_object);
 		/*
 		 * Because this is kernel_pmap, this call will not block.
 		 */
 		pmap_enter(kernel_pmap, addr + i, m, VM_PROT_ALL, 1);
+		vm_page_lock_queues();
 		vm_page_flag_set(m, PG_WRITEABLE | PG_REFERENCED);
+		vm_page_wakeup(m);
+		vm_page_unlock_queues();
 	}
 	vm_map_unlock(map);
 
 	return (addr);
-
-bad:	
-	return (0);
 }
 
 /*
@@ -514,11 +522,11 @@ kmem_init(start, end)
 	vm_map_t m;
 
 	m = vm_map_create(kernel_pmap, VM_MIN_KERNEL_ADDRESS, end);
+	m->system_map = 1;
 	vm_map_lock(m);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
 	kernel_map = m;
-	kernel_map->system_map = 1;
-	(void) vm_map_insert(m, NULL, (vm_offset_t) 0,
+	(void) vm_map_insert(m, NULL, (vm_ooffset_t) 0,
 	    VM_MIN_KERNEL_ADDRESS, start, VM_PROT_ALL, VM_PROT_ALL, 0);
 	/* ... and ending with the completion of the above `insert' */
 	vm_map_unlock(m);

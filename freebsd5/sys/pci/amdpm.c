@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/amdpm.c,v 1.5 2002/09/21 21:43:49 nsouch Exp $
+ * $FreeBSD: src/sys/pci/amdpm.c,v 1.6 2003/04/15 06:37:29 mdodd Exp $
  *
  */
 
@@ -676,6 +676,7 @@ static driver_t nfpm_driver = {
 DRIVER_MODULE(amdpm, pci, amdpm_driver, amdpm_devclass, 0, 0);
 DRIVER_MODULE(nfpm, pci, nfpm_driver, nfpm_devclass, 0, 0);
 
+MODULE_DEPEND(amdpm, pci, 1, 1, 1);
 MODULE_DEPEND(amdpm, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);
 MODULE_VERSION(amdpm, 1);
 

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pcib_private.h,v 1.3 2002/11/22 17:50:47 jhb Exp $
+ * $FreeBSD: src/sys/dev/pci/pcib_private.h,v 1.4 2003/01/14 11:37:56 benno Exp $
  */
 
 #ifndef __PCIB_PRIVATE_H__
@@ -71,6 +71,7 @@ struct resource *pcib_alloc_resource(device_t dev, device_t child, int type, int
 int		pcib_maxslots(device_t dev);
 u_int32_t	pcib_read_config(device_t dev, int b, int s, int f, int reg, int width);
 void		pcib_write_config(device_t dev, int b, int s, int f, int reg, u_int32_t val, int width);
+int		pcib_route_interrupt(device_t pcib, device_t dev, int pin);
 
 extern devclass_t pcib_devclass;
 

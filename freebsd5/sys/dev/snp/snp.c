@@ -12,7 +12,7 @@
  *
  * Snoop stuff.
  *
- * $FreeBSD: src/sys/dev/snp/snp.c,v 1.74 2002/11/11 10:45:31 tmm Exp $
+ * $FreeBSD: src/sys/dev/snp/snp.c,v 1.80 2003/03/03 12:15:46 phk Exp $
  */
 
 #include <sys/param.h>
@@ -38,19 +38,14 @@ static	d_poll_t	snppoll;
 
 #define CDEV_MAJOR 53
 static struct cdevsw snp_cdevsw = {
-	/* open */	snpopen,
-	/* close */	snpclose,
-	/* read */	snpread,
-	/* write */	snpwrite,
-	/* ioctl */	snpioctl,
-	/* poll */	snppoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"snp",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	snpopen,
+	.d_close =	snpclose,
+	.d_read =	snpread,
+	.d_write =	snpwrite,
+	.d_ioctl =	snpioctl,
+	.d_poll =	snppoll,
+	.d_name =	"snp",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static struct linesw snpdisc = {
@@ -257,7 +252,7 @@ snpread(dev, uio, flag)
 			if (flag & IO_NDELAY)
 				return (EWOULDBLOCK);
 			snp->snp_flags |= SNOOP_RWAIT;
-			error = tsleep((caddr_t)snp, (PZERO + 1) | PCATCH,
+			error = tsleep(snp, (PZERO + 1) | PCATCH,
 			    "snprd", 0);
 			if (error != 0)
 				return (error);
@@ -351,7 +346,7 @@ snp_in(snp, buf, n)
 			snp->snp_flags |= SNOOP_OFLOW;
 			if (snp->snp_flags & SNOOP_RWAIT) {
 				snp->snp_flags &= ~SNOOP_RWAIT;
-				wakeup((caddr_t)snp);
+				wakeup(snp);
 			}
 			splx(s);
 			return (0);
@@ -371,7 +366,7 @@ snp_in(snp, buf, n)
 
 	if (snp->snp_flags & SNOOP_RWAIT) {
 		snp->snp_flags &= ~SNOOP_RWAIT;
-		wakeup((caddr_t)snp);
+		wakeup(snp);
 	}
 	selwakeup(&snp->snp_sel);
 
@@ -640,7 +635,6 @@ snp_modevent(mod, type, data)
 		/* XXX error checking. */
 		eh_tag = EVENTHANDLER_REGISTER(dev_clone, snp_clone, 0, 1000);
 		snooplinedisc = ldisc_register(LDISC_LOAD, &snpdisc);
-		cdevsw_add(&snp_cdevsw);
 		break;
 	case MOD_UNLOAD:
 		if (!LIST_EMPTY(&snp_sclist))
@@ -649,7 +643,6 @@ snp_modevent(mod, type, data)
 		if (snpbasedev != NOUDEV)
 			destroy_dev(udev2dev(snpbasedev, 0));
 		ldisc_deregister(snooplinedisc);
-		cdevsw_remove(&snp_cdevsw);
 		break;
 	default:
 		break;

@@ -46,7 +46,7 @@
  * device parameters, then call the board-specific routines if
  * available, or try to perform the task using the default code.
  *
- * $FreeBSD: src/sys/dev/sound/midi/midi.c,v 1.10 2002/04/04 21:03:16 jhb Exp $
+ * $FreeBSD: src/sys/dev/sound/midi/midi.c,v 1.13 2003/03/03 12:15:46 phk Exp $
  *
  */
 
@@ -70,19 +70,14 @@ static int midi_readstatus(char *buf, int *ptr, struct uio *uio);
 
 #define CDEV_MAJOR MIDI_CDEV_MAJOR
 static struct cdevsw midi_cdevsw = {
-	/* open */	midiopen,
-	/* close */	midiclose,
-	/* read */	midiread,
-	/* write */	midiwrite,
-	/* ioctl */	midiioctl,
-	/* poll */	midipoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"midi",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	midiopen,
+	.d_close =	midiclose,
+	.d_read =	midiread,
+	.d_write =	midiwrite,
+	.d_ioctl =	midiioctl,
+	.d_poll =	midipoll,
+	.d_name =	"midi",
+	.d_maj =	CDEV_MAJOR,
 };
 
 /*

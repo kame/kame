@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_rq.c,v 1.8 2002/09/18 19:44:13 phk Exp $
+ * $FreeBSD: src/sys/netsmb/smb_rq.c,v 1.12 2003/03/31 22:49:17 jeff Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -184,7 +184,7 @@ smb_rq_enqueue(struct smb_rq *rqp)
 		if (ssp->ss_flags & SMBS_RECONNECTING) {
 			msleep(&ssp->ss_vcgenid, SMBS_ST_LOCKPTR(ssp),
 			    PWAIT | PDROP, "90trcn", hz);
-			if (smb_proc_intr(rqp->sr_cred->scr_td->td_proc))
+			if (smb_td_intr(rqp->sr_cred->scr_td))
 				return EINTR;
 			continue;
 		}
@@ -242,17 +242,15 @@ smb_rq_bend(struct smb_rq *rqp)
 	bcnt = rqp->sr_rq.mb_count;
 	if (bcnt > 0xffff)
 		SMBERROR("byte count too large (%d)\n", bcnt);
-	*rqp->sr_bcount = htoles(bcnt);
+	*rqp->sr_bcount = htole16(bcnt);
 }
 
 int
 smb_rq_intr(struct smb_rq *rqp)
 {
-	struct proc *p = rqp->sr_cred->scr_td->td_proc;
-
 	if (rqp->sr_flags & SMBR_INTR)
 		return EINTR;
-	return smb_proc_intr(p);
+	return smb_td_intr(rqp->sr_cred->scr_td);
 }
 
 int

@@ -3,13 +3,15 @@
  * Garrett Wollman, September 1994.
  * This file is in the public domain.
  *
- * $FreeBSD: src/sys/ia64/include/clock.h,v 1.6 2002/10/04 01:57:46 peter Exp $
+ * $FreeBSD: src/sys/ia64/include/clock.h,v 1.8 2003/01/06 01:39:25 marcel Exp $
  */
 
 #ifndef _MACHINE_CLOCK_H_
 #define	_MACHINE_CLOCK_H_
 
 #ifdef _KERNEL
+
+#define	CLOCK_VECTOR	254
 
 extern	int	disable_rtc_set;
 extern	int	wall_cmos_clock;
@@ -21,7 +23,6 @@ extern u_int64_t	itm_reload;
 int	sysbeep(int pitch, int period);
 int	acquire_timer2(int mode);
 int	release_timer2(void);
-void	handleclock(void *arg);
 
 #endif
 

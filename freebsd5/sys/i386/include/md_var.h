@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/md_var.h,v 1.54 2002/10/25 19:10:56 peter Exp $
+ * $FreeBSD: src/sys/i386/include/md_var.h,v 1.62 2003/04/04 17:29:54 des Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -36,16 +36,20 @@
  * Miscellaneous machine-dependent declarations.
  */
 
-extern	long	Maxmem;
-extern	u_int	atdevbase;	/* offset in virtual memory of ISA io mem */
 extern	void	(*bcopy_vector)(const void *from, void *to, size_t len);
-extern	int	busdma_swi_pending;
+extern	void	(*bzero_vector)(void *buf, size_t len);
 extern	int	(*copyin_vector)(const void *udaddr, void *kaddr, size_t len);
 extern	int	(*copyout_vector)(const void *kaddr, void *udaddr, size_t len);
+
+extern	long	Maxmem;
+extern	u_int	atdevbase;	/* offset in virtual memory of ISA io mem */
+extern	int	busdma_swi_pending;
+extern	u_int	cpu_exthigh;
 extern	u_int	cpu_feature;
+extern	u_int	cpu_fxsr;
 extern	u_int	cpu_high;
 extern	u_int	cpu_id;
-extern	u_int	cpu_fxsr;
+extern	u_int	cpu_procinfo;
 extern	char	cpu_vendor[];
 extern	u_int	cyrix_did;
 extern	uint16_t *elan_mmcr;
@@ -54,7 +58,6 @@ extern	char	kstack[];
 extern	int	need_pre_dma_flush;
 extern	int	need_post_dma_flush;
 #endif
-extern	void	(*ovbcopy_vector)(const void *from, void *to, size_t len);
 extern	char	sigcode[];
 extern	int	szsigcode;
 #ifdef COMPAT_FREEBSD4
@@ -62,6 +65,22 @@ extern	int	szfreebsd4_sigcode;
 #endif
 #ifdef COMPAT_43
 extern	int	szosigcode;
+#endif
+#ifdef SWTCH_OPTIM_STATS
+extern int stupid_switch;
+extern int swtch_optim_stats;
+extern int tlb_flush_count;
+extern int lazy_flush_count;
+extern int lazy_flush_fixup;
+#ifdef SMP
+extern int lazy_flush_smpfixup;
+extern int lazy_flush_smpipi;
+extern int lazy_flush_smpbadcr3;
+extern int lazy_flush_smpmiss;
+#endif
+#endif
+#ifdef LAZY_SWITCH
+extern int lazy_flush_enable;
 #endif
 
 typedef void alias_for_inthand_t(u_int cs, u_int ef, u_int esp, u_int ss);
@@ -84,6 +103,7 @@ void	doreti_popl_es(void) __asm(__STRING(doreti_popl_es));
 void	doreti_popl_es_fault(void) __asm(__STRING(doreti_popl_es_fault));
 void	doreti_popl_fs(void) __asm(__STRING(doreti_popl_fs));
 void	doreti_popl_fs_fault(void) __asm(__STRING(doreti_popl_fs_fault));
+void	enable_sse(void);
 void	fillw(int /*u_short*/ pat, void *base, size_t cnt);
 void	i486_bzero(void *buf, size_t len);
 void	i586_bcopy(const void *from, void *to, size_t len);
@@ -93,7 +113,7 @@ int	i586_copyout(const void *kaddr, void *udaddr, size_t len);
 void	i686_pagezero(void *addr);
 void	init_AMD_Elan_sc520(void);
 int	is_physical_memory(vm_offset_t addr);
-u_long	kvtop(void *addr);
+vm_paddr_t kvtop(void *addr);
 void	setidt(int idx, alias_for_inthand_t *func, int typ, int dpl, int selec);
 void	swi_vm(void *);
 int     user_dbreg_trap(void);

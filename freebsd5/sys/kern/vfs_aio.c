@@ -13,7 +13,7 @@
  * bad that happens because of using this software isn't the responsibility
  * of the author.  This software is distributed AS-IS.
  *
- * $FreeBSD: src/sys/kern/vfs_aio.c,v 1.146 2002/11/17 04:15:34 alfred Exp $
+ * $FreeBSD: src/sys/kern/vfs_aio.c,v 1.161 2003/04/29 13:36:03 kan Exp $
  */
 
 /*
@@ -25,12 +25,14 @@
 #include <sys/malloc.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
+#include <sys/eventhandler.h>
 #include <sys/sysproto.h>
 #include <sys/filedesc.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/unistd.h>
@@ -54,8 +56,6 @@
 #include <vm/vm_map.h>
 #include <vm/uma.h>
 #include <sys/aio.h>
-
-#include <machine/limits.h>
 
 #include "opt_vfs_aio.h"
 
@@ -253,7 +253,7 @@ static void	aio_process(struct aiocblist *aiocbe);
 static int	aio_newproc(void);
 static int	aio_aqueue(struct thread *td, struct aiocb *job, int type);
 static void	aio_physwakeup(struct buf *bp);
-static void	aio_proc_rundown(struct proc *p);
+static void	aio_proc_rundown(void *arg, struct proc *p);
 static int	aio_fphysio(struct aiocblist *aiocbe);
 static int	aio_qphysio(struct proc *p, struct aiocblist *iocb);
 static void	aio_daemon(void *uproc);
@@ -277,6 +277,8 @@ static uma_zone_t kaio_zone, aiop_zone, aiocb_zone, aiol_zone, aiolio_zone;
 /* kqueue filters for aio */
 static struct filterops aio_filtops =
 	{ 0, filt_aioattach, filt_aiodetach, filt_aio };
+
+static eventhandler_tag exit_tag, exec_tag;
 
 /*
  * Main operations function for use as a kernel module.
@@ -330,8 +332,10 @@ aio_onceonly(void)
 
 	/* XXX: should probably just use so->callback */
 	aio_swake = &aio_swake_cb;
-	at_exit(aio_proc_rundown);
-	at_exec(aio_proc_rundown);
+	exit_tag = EVENTHANDLER_REGISTER(process_exit, aio_proc_rundown, NULL,
+	    EVENTHANDLER_PRI_ANY);
+	exec_tag = EVENTHANDLER_REGISTER(process_exec, aio_proc_rundown, NULL,
+	    EVENTHANDLER_PRI_ANY);
 	kqueue_add_filteropts(EVFILT_AIO, &aio_filtops);
 	TAILQ_INIT(&aio_freeproc);
 	TAILQ_INIT(&aio_activeproc);
@@ -373,8 +377,8 @@ aio_unload(void)
 
 	async_io_version = 0;
 	aio_swake = NULL;
-	rm_at_exit(aio_proc_rundown);
-	rm_at_exec(aio_proc_rundown);
+	EVENTHANDLER_DEREGISTER(process_exit, exit_tag);
+	EVENTHANDLER_DEREGISTER(process_exec, exec_tag);
 	kqueue_del_filteropts(EVFILT_AIO);
 	p31b_setcfg(CTL_P1003_1B_AIO_LISTIO_MAX, -1);
 	p31b_setcfg(CTL_P1003_1B_AIO_MAX, -1);
@@ -390,6 +394,7 @@ static void
 aio_init_aioinfo(struct proc *p)
 {
 	struct kaioinfo *ki;
+
 	if (p->p_aioinfo == NULL) {
 		ki = uma_zalloc(kaio_zone, M_WAITOK);
 		p->p_aioinfo = ki;
@@ -485,7 +490,7 @@ aio_free_entry(struct aiocblist *aiocbe)
 
 	if (aiocbe->jobstate == JOBST_JOBQBUF) {
 		if ((error = aio_fphysio(aiocbe)) != 0)
-			return error;
+			return (error);
 		if (aiocbe->jobstate != JOBST_JOBBFINISHED)
 			panic("aio_free_entry: invalid physio finish-up state");
 		s = splbio();
@@ -517,14 +522,14 @@ aio_free_entry(struct aiocblist *aiocbe)
 	fdrop(aiocbe->fd_file, curthread);
 	crfree(aiocbe->cred);
 	uma_zfree(aiocb_zone, aiocbe);
-	return 0;
+	return (0);
 }
 
 /*
  * Rundown the jobs for a given process.  
  */
 static void
-aio_proc_rundown(struct proc *p)
+aio_proc_rundown(void *arg, struct proc *p)
 {
 	int s;
 	struct kaioinfo *ki;
@@ -555,7 +560,7 @@ aio_proc_rundown(struct proc *p)
 		aiocbn = TAILQ_NEXT(aiocbe, plist);
 		fp = aiocbe->fd_file;
 		if (fp != NULL) {
-			so = (struct socket *)fp->f_data;
+			so = fp->f_data;
 			TAILQ_REMOVE(&so->so_aiojobq, aiocbe, list);
 			if (TAILQ_EMPTY(&so->so_aiojobq)) {
 				so->so_snd.sb_flags &= ~SB_AIO;
@@ -659,12 +664,12 @@ aio_selectjob(struct aiothreadlist *aiop)
 		if (ki->kaio_active_count < ki->kaio_maxactive_count) {
 			TAILQ_REMOVE(&aio_jobs, aiocbe, list);
 			splx(s);
-			return aiocbe;
+			return (aiocbe);
 		}
 	}
 	splx(s);
 
-	return NULL;
+	return (NULL);
 }
 
 /*
@@ -767,10 +772,7 @@ aio_daemon(void *uproc)
 	mycp = td->td_proc;
 	myvm = mycp->p_vmspace;
 
-	if (mycp->p_textvp) {
-		vrele(mycp->p_textvp);
-		mycp->p_textvp = NULL;
-	}
+	KASSERT(mycp->p_textvp == NULL, ("kthread has a textvp"));
 
 	/*
 	 * Allocate and ready the aio control info.  There is one aiop structure
@@ -808,9 +810,6 @@ aio_daemon(void *uproc)
 	enterpgrp(mycp, mycp->p_pid, newpgrp, newsess);
 	sx_xunlock(&proctree_lock);
 	mtx_lock(&Giant);
-
-	/* Mark special process type. */
-	mycp->p_flag |= P_SYSTEM;
 
 	/*
 	 * Wakeup parent process.  (Parent sleeps to keep from blasting away
@@ -1010,7 +1009,7 @@ aio_daemon(void *uproc)
  * AIO daemon modifies its environment itself.
  */
 static int
-aio_newproc()
+aio_newproc(void)
 {
 	int error;
 	struct proc *p;
@@ -1018,7 +1017,7 @@ aio_newproc()
 	error = kthread_create(aio_daemon, curproc, &p, RFNOWAIT, 0, "aiod%d",
 			       num_aio_procs);
 	if (error)
-		return error;
+		return (error);
 
 	/*
 	 * Wait until daemon is started, but continue on just in case to
@@ -1028,7 +1027,7 @@ aio_newproc()
 
 	num_aio_procs++;
 
-	return error;
+	return (error);
 }
 
 /*
@@ -1059,7 +1058,7 @@ aio_qphysio(struct proc *p, struct aiocblist *aiocbe)
 	if (fp->f_type != DTYPE_VNODE) 
 		return (-1);
 
-	vp = (struct vnode *)fp->f_data;
+	vp = fp->f_data;
 
 	/*
 	 * If its not a disk, we don't want to return a positive error.
@@ -1099,7 +1098,7 @@ aio_qphysio(struct proc *p, struct aiocblist *aiocbe)
 	 */
 	bp->b_caller1 = p;
 	bp->b_dev = vp->v_rdev;
-	error = bp->b_error = 0;
+	error = 0;
 
 	bp->b_bcount = cb->aio_nbytes;
 	bp->b_bufsize = cb->aio_nbytes;
@@ -1108,23 +1107,15 @@ aio_qphysio(struct proc *p, struct aiocblist *aiocbe)
 	bp->b_saveaddr = bp->b_data;
 	bp->b_data = (void *)(uintptr_t)cb->aio_buf;
 	bp->b_blkno = btodb(cb->aio_offset);
+	bp->b_iocmd = cb->aio_lio_opcode == LIO_WRITE ? BIO_WRITE : BIO_READ;
 
-	if (cb->aio_lio_opcode == LIO_WRITE) {
-		bp->b_iocmd = BIO_WRITE;
-		if (!useracc(bp->b_data, bp->b_bufsize, VM_PROT_READ)) {
-			error = EFAULT;
-			goto doerror;
-		}
-	} else {
-		bp->b_iocmd = BIO_READ;
-		if (!useracc(bp->b_data, bp->b_bufsize, VM_PROT_WRITE)) {
-			error = EFAULT;
-			goto doerror;
-		}
+	/*
+	 * Bring buffer into kernel space.
+	 */
+	if (vmapbuf(bp) < 0) {
+		error = EFAULT;
+		goto doerror;
 	}
-
-	/* Bring buffer into kernel space. */
-	vmapbuf(bp);
 
 	s = splbio();
 	aiocbe->bp = bp;
@@ -1139,7 +1130,7 @@ aio_qphysio(struct proc *p, struct aiocblist *aiocbe)
 	splx(s);
 	
 	/* Perform transfer. */
-	DEV_STRATEGY(bp, 0);
+	DEV_STRATEGY(bp);
 
 	notify = 0;
 	s = splbio();
@@ -1173,7 +1164,7 @@ aio_qphysio(struct proc *p, struct aiocblist *aiocbe)
 	splx(s);
 	if (notify)
 		KNOTE(&aiocbe->klist, 0);
-	return 0;
+	return (0);
 
 doerror:
 	ki->kaio_buffer_count--;
@@ -1181,7 +1172,7 @@ doerror:
 		lj->lioj_buffer_count--;
 	aiocbe->bp = NULL;
 	relpbuf(bp, NULL);
-	return error;
+	return (error);
 }
 
 /*
@@ -1201,7 +1192,7 @@ aio_fphysio(struct aiocblist *iocb)
 		if (tsleep(bp, PRIBIO, "physstr", aiod_timeout)) {
 			if ((bp->b_flags & B_DONE) == 0) {
 				splx(s);
-				return EINPROGRESS;
+				return (EINPROGRESS);
 			} else
 				break;
 		}
@@ -1303,12 +1294,12 @@ _aio_aqueue(struct thread *td, struct aiocb *job, struct aio_liojob *lj, int typ
 	if (error) {
 		suword(&job->_aiocb_private.error, error);
 		uma_zfree(aiocb_zone, aiocbe);
-		return error;
+		return (error);
 	}
 	if (aiocbe->uaiocb.aio_sigevent.sigev_notify == SIGEV_SIGNAL &&
 		!_SIG_VALID(aiocbe->uaiocb.aio_sigevent.sigev_signo)) {
 		uma_zfree(aiocb_zone, aiocbe);
-		return EINVAL;
+		return (EINVAL);
 	}
 
 	/* Save userspace address of the job info. */
@@ -1326,23 +1317,27 @@ _aio_aqueue(struct thread *td, struct aiocb *job, struct aio_liojob *lj, int typ
 	/*
 	 * Range check file descriptor.
 	 */
+	FILEDESC_LOCK(fdp);
 	fd = aiocbe->uaiocb.aio_fildes;
 	if (fd >= fdp->fd_nfiles) {
+		FILEDESC_UNLOCK(fdp);
 		uma_zfree(aiocb_zone, aiocbe);
 		if (type == 0)
 			suword(&job->_aiocb_private.error, EBADF);
-		return EBADF;
+		return (EBADF);
 	}
 
 	fp = aiocbe->fd_file = fdp->fd_ofiles[fd];
 	if ((fp == NULL) || ((opcode == LIO_WRITE) && ((fp->f_flag & FWRITE) ==
 	    0))) {
+		FILEDESC_UNLOCK(fdp);
 		uma_zfree(aiocb_zone, aiocbe);
 		if (type == 0)
 			suword(&job->_aiocb_private.error, EBADF);
-		return EBADF;
+		return (EBADF);
 	}
 	fhold(fp);
+	FILEDESC_UNLOCK(fdp);
 
 	if (aiocbe->uaiocb.aio_offset == -1LL) {
 		error = EINVAL;
@@ -1367,7 +1362,7 @@ _aio_aqueue(struct thread *td, struct aiocb *job, struct aio_liojob *lj, int typ
 			suword(&job->_aiocb_private.status, 0);
 			suword(&job->_aiocb_private.kernelinfo, 0);
 		}
-		return 0;
+		return (0);
 	}
 	if ((opcode != LIO_READ) && (opcode != LIO_WRITE)) {
 		if (type == 0)
@@ -1402,7 +1397,7 @@ _aio_aqueue(struct thread *td, struct aiocb *job, struct aio_liojob *lj, int typ
 		error = EBADF;
 		goto aqueue_fail;
 	}
-	kq = (struct kqueue *)kq_fp->f_data;
+	kq = kq_fp->f_data;
 	kev.ident = (uintptr_t)aiocbe->uuaiocb;
 	kev.filter = EVFILT_AIO;
 	kev.flags = EV_ADD | EV_ENABLE | EV_FLAG1;
@@ -1437,7 +1432,7 @@ no_kqueue:
 		 * socket, and set the flags so we get a call when sbnotify()
 		 * happens.
 		 */
-		so = (struct socket *)fp->f_data;
+		so = fp->f_data;
 		s = splnet();
 		if (((opcode == LIO_READ) && (!soreadable(so))) || ((opcode ==
 		    LIO_WRITE) && (!sowriteable(so)))) {
@@ -1507,7 +1502,7 @@ retryproc:
 	}
 	splx(s);
 done:
-	return error;
+	return (error);
 }
 
 /*
@@ -1523,11 +1518,11 @@ aio_aqueue(struct thread *td, struct aiocb *job, int type)
 		aio_init_aioinfo(p);
 
 	if (num_queue_count >= max_queue_count)
-		return EAGAIN;
+		return (EAGAIN);
 
 	ki = p->p_aioinfo;
 	if (ki->kaio_queue_count >= ki->kaio_qallowed_count)
-		return EAGAIN;
+		return (EAGAIN);
 
 	return _aio_aqueue(td, job, NULL, type);
 }
@@ -1549,11 +1544,11 @@ aio_return(struct thread *td, struct aio_return_args *uap)
 	ujob = uap->aiocbp;
 	jobref = fuword(&ujob->_aiocb_private.kernelinfo);
 	if (jobref == -1 || jobref == 0)
-		return EINVAL;
+		return (EINVAL);
 
 	ki = p->p_aioinfo;
 	if (ki == NULL)
-		return EINVAL;
+		return (EINVAL);
 	TAILQ_FOREACH(cb, &ki->kaio_jobdone, plist) {
 		if (((intptr_t) cb->uaiocb._aiocb_private.kernelinfo) ==
 		    jobref) {
@@ -1608,14 +1603,14 @@ aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 	long *ijoblist;
 	struct aiocb **ujoblist;
 	
-	if (uap->nent > AIO_LISTIO_MAX)
-		return EINVAL;
+	if (uap->nent < 0 || uap->nent > AIO_LISTIO_MAX)
+		return (EINVAL);
 
 	timo = 0;
 	if (uap->timeout) {
 		/* Get timespec struct. */
 		if ((error = copyin(uap->timeout, &ts, sizeof(ts))) != 0)
-			return error;
+			return (error);
 
 		if (ts.tv_nsec < 0 || ts.tv_nsec >= 1000000000)
 			return (EINVAL);
@@ -1628,7 +1623,7 @@ aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 
 	ki = p->p_aioinfo;
 	if (ki == NULL)
-		return EAGAIN;
+		return (EAGAIN);
 
 	njoblist = 0;
 	ijoblist = uma_zalloc(aiol_zone, M_WAITOK);
@@ -1647,7 +1642,7 @@ aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 	if (njoblist == 0) {
 		uma_zfree(aiol_zone, ijoblist);
 		uma_zfree(aiol_zone, ujoblist);
-		return 0;
+		return (0);
 	}
 
 	error = 0;
@@ -1661,7 +1656,7 @@ aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 						error = EINVAL;
 					uma_zfree(aiol_zone, ijoblist);
 					uma_zfree(aiol_zone, ujoblist);
-					return error;
+					return (error);
 				}
 			}
 		}
@@ -1678,7 +1673,7 @@ aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 						error = EINVAL;
 					uma_zfree(aiol_zone, ijoblist);
 					uma_zfree(aiol_zone, ujoblist);
-					return error;
+					return (error);
 				}
 			}
 		}
@@ -1690,16 +1685,16 @@ aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 		if (error == ERESTART || error == EINTR) {
 			uma_zfree(aiol_zone, ijoblist);
 			uma_zfree(aiol_zone, ujoblist);
-			return EINTR;
+			return (EINTR);
 		} else if (error == EWOULDBLOCK) {
 			uma_zfree(aiol_zone, ijoblist);
 			uma_zfree(aiol_zone, ujoblist);
-			return EAGAIN;
+			return (EAGAIN);
 		}
 	}
 
 /* NOTREACHED */
-	return EINVAL;
+	return (EINVAL);
 }
 
 /*
@@ -1727,14 +1722,14 @@ aio_cancel(struct thread *td, struct aio_cancel_args *uap)
 		return (EBADF);
 
         if (fp->f_type == DTYPE_VNODE) {
-		vp = (struct vnode *)fp->f_data;
+		vp = fp->f_data;
 		
 		if (vn_isdisk(vp,&error)) {
 			td->td_retval[0] = AIO_NOTCANCELED;
-        	        return 0;
+        	        return (0);
 		}
 	} else if (fp->f_type == DTYPE_SOCKET) {
-		so = (struct socket *)fp->f_data;
+		so = fp->f_data;
 
 		s = splnet();
 
@@ -1769,7 +1764,7 @@ aio_cancel(struct thread *td, struct aio_cancel_args *uap)
 
 		if ((cancelled) && (uap->aiocbp)) {
 			td->td_retval[0] = AIO_CANCELED;
-			return 0;
+			return (0);
 		}
 	}
 	ki=p->p_aioinfo;
@@ -1810,15 +1805,15 @@ aio_cancel(struct thread *td, struct aio_cancel_args *uap)
 done:
 	if (notcancelled) {
 		td->td_retval[0] = AIO_NOTCANCELED;
-		return 0;
+		return (0);
 	}
 	if (cancelled) {
 		td->td_retval[0] = AIO_CANCELED;
-		return 0;
+		return (0);
 	}
 	td->td_retval[0] = AIO_ALLDONE;
 
-	return 0;
+	return (0);
 }
 
 /*
@@ -1837,17 +1832,17 @@ aio_error(struct thread *td, struct aio_error_args *uap)
 
 	ki = p->p_aioinfo;
 	if (ki == NULL)
-		return EINVAL;
+		return (EINVAL);
 
 	jobref = fuword(&uap->aiocbp->_aiocb_private.kernelinfo);
 	if ((jobref == -1) || (jobref == 0))
-		return EINVAL;
+		return (EINVAL);
 
 	TAILQ_FOREACH(cb, &ki->kaio_jobdone, plist) {
 		if (((intptr_t)cb->uaiocb._aiocb_private.kernelinfo) ==
 		    jobref) {
 			td->td_retval[0] = cb->uaiocb._aiocb_private.error;
-			return 0;
+			return (0);
 		}
 	}
 
@@ -1859,7 +1854,7 @@ aio_error(struct thread *td, struct aio_error_args *uap)
 		    jobref) {
 			td->td_retval[0] = EINPROGRESS;
 			splx(s);
-			return 0;
+			return (0);
 		}
 	}
 
@@ -1869,7 +1864,7 @@ aio_error(struct thread *td, struct aio_error_args *uap)
 		    jobref) {
 			td->td_retval[0] = EINPROGRESS;
 			splx(s);
-			return 0;
+			return (0);
 		}
 	}
 	splx(s);
@@ -1881,7 +1876,7 @@ aio_error(struct thread *td, struct aio_error_args *uap)
 		    jobref) {
 			td->td_retval[0] = cb->uaiocb._aiocb_private.error;
 			splx(s);
-			return 0;
+			return (0);
 		}
 	}
 
@@ -1891,7 +1886,7 @@ aio_error(struct thread *td, struct aio_error_args *uap)
 		    jobref) {
 			td->td_retval[0] = EINPROGRESS;
 			splx(s);
-			return 0;
+			return (0);
 		}
 	}
 	splx(s);
@@ -1904,7 +1899,7 @@ aio_error(struct thread *td, struct aio_error_args *uap)
 	if (status == -1)
 		return fuword(&uap->aiocbp->_aiocb_private.error);
 #endif
-	return EINVAL;
+	return (EINVAL);
 }
 
 /* syscall - asynchronous read from a file (REALTIME) */
@@ -1923,7 +1918,7 @@ aio_write(struct thread *td, struct aio_write_args *uap)
 	return aio_aqueue(td, uap->aiocbp, LIO_WRITE);
 }
 
-/* syscall - XXX undocumented */
+/* syscall - list directed I/O (REALTIME) */
 int
 lio_listio(struct thread *td, struct lio_listio_args *uap)
 {
@@ -1939,25 +1934,25 @@ lio_listio(struct thread *td, struct lio_listio_args *uap)
 	int s;
 
 	if ((uap->mode != LIO_NOWAIT) && (uap->mode != LIO_WAIT))
-		return EINVAL;
+		return (EINVAL);
 
 	nent = uap->nent;
-	if (nent > AIO_LISTIO_MAX)
-		return EINVAL;
+	if (nent < 0 || nent > AIO_LISTIO_MAX)
+		return (EINVAL);
 
 	if (p->p_aioinfo == NULL)
 		aio_init_aioinfo(p);
 
 	if ((nent + num_queue_count) > max_queue_count)
-		return EAGAIN;
+		return (EAGAIN);
 
 	ki = p->p_aioinfo;
 	if ((nent + ki->kaio_queue_count) > ki->kaio_qallowed_count)
-		return EAGAIN;
+		return (EAGAIN);
 
 	lj = uma_zalloc(aiolio_zone, M_WAITOK);
 	if (!lj)
-		return EAGAIN;
+		return (EAGAIN);
 
 	lj->lioj_flags = 0;
 	lj->lioj_buffer_count = 0;
@@ -1974,11 +1969,11 @@ lio_listio(struct thread *td, struct lio_listio_args *uap)
 			       sizeof(lj->lioj_signal));
 		if (error) {
 			uma_zfree(aiolio_zone, lj);
-			return error;
+			return (error);
 		}
 		if (!_SIG_VALID(lj->lioj_signal.sigev_signo)) {
 			uma_zfree(aiolio_zone, lj);
-			return EINVAL;
+			return (EINVAL);
 		}
 		lj->lioj_flags |= LIOJ_SIGNAL;
 	}
@@ -2004,7 +1999,7 @@ lio_listio(struct thread *td, struct lio_listio_args *uap)
 	 * If we haven't queued any, then just return error.
 	 */
 	if (nentqueued == 0)
-		return 0;
+		return (0);
 
 	/*
 	 * Calculate the appropriate error return.
@@ -2038,7 +2033,8 @@ lio_listio(struct thread *td, struct lio_listio_args *uap)
 					continue;
 				}
 
-				jobref = fuword(&iocb->_aiocb_private.kernelinfo);
+				jobref =
+				    fuword(&iocb->_aiocb_private.kernelinfo);
 
 				TAILQ_FOREACH(cb, &ki->kaio_jobdone, plist) {
 					if (((intptr_t)cb->uaiocb._aiocb_private.kernelinfo)
@@ -2076,19 +2072,19 @@ lio_listio(struct thread *td, struct lio_listio_args *uap)
 			 * return.
 			 */
 			if (found == nentqueued)
-				return runningcode;
+				return (runningcode);
 			
 			ki->kaio_flags |= KAIO_WAKEUP;
 			error = tsleep(p, PRIBIO | PCATCH, "aiospn", 0);
 
 			if (error == EINTR)
-				return EINTR;
+				return (EINTR);
 			else if (error == EWOULDBLOCK)
-				return EAGAIN;
+				return (EAGAIN);
 		}
 	}
 
-	return runningcode;
+	return (runningcode);
 }
 
 /*
@@ -2205,7 +2201,7 @@ aio_waitcomplete(struct thread *td, struct aio_waitcomplete_args *uap)
 		/* Get timespec struct. */
 		error = copyin(uap->timeout, &ts, sizeof(ts));
 		if (error)
-			return error;
+			return (error);
 
 		if ((ts.tv_nsec < 0) || (ts.tv_nsec >= 1000000000))
 			return (EINVAL);
@@ -2218,7 +2214,7 @@ aio_waitcomplete(struct thread *td, struct aio_waitcomplete_args *uap)
 
 	ki = p->p_aioinfo;
 	if (ki == NULL)
-		return EAGAIN;
+		return (EAGAIN);
 
 	for (;;) {
 		if ((cb = TAILQ_FIRST(&ki->kaio_jobdone)) != 0) {
@@ -2233,7 +2229,7 @@ aio_waitcomplete(struct thread *td, struct aio_waitcomplete_args *uap)
 				cb->inputcharge = 0;
 			}
 			aio_free_entry(cb);
-			return cb->uaiocb._aiocb_private.error;
+			return (cb->uaiocb._aiocb_private.error);
 		}
 
 		s = splbio();
@@ -2242,7 +2238,7 @@ aio_waitcomplete(struct thread *td, struct aio_waitcomplete_args *uap)
 			suword(uap->aiocbp, (uintptr_t)cb->uuaiocb);
 			td->td_retval[0] = cb->uaiocb._aiocb_private.status;
 			aio_free_entry(cb);
-			return cb->uaiocb._aiocb_private.error;
+			return (cb->uaiocb._aiocb_private.error);
 		}
 
 		ki->kaio_flags |= KAIO_WAKEUP;
@@ -2250,13 +2246,13 @@ aio_waitcomplete(struct thread *td, struct aio_waitcomplete_args *uap)
 		splx(s);
 
 		if (error == ERESTART)
-			return EINTR;
+			return (EINTR);
 		else if (error < 0)
-			return error;
+			return (error);
 		else if (error == EINTR)
-			return EINTR;
+			return (EINTR);
 		else if (error == EWOULDBLOCK)
-			return EAGAIN;
+			return (EAGAIN);
 	}
 }
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/smbus/smb.c,v 1.27 2002/09/19 03:25:46 peter Exp $
+ * $FreeBSD: src/sys/dev/smbus/smb.c,v 1.28 2003/03/03 12:15:46 phk Exp $
  *
  */
 #include <sys/param.h>
@@ -89,19 +89,13 @@ static	d_ioctl_t	smbioctl;
 
 #define CDEV_MAJOR 106
 static struct cdevsw smb_cdevsw = {
-	/* open */	smbopen,
-	/* close */	smbclose,
-	/* read */	smbread,
-	/* write */	smbwrite,
-	/* ioctl */	smbioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"smb",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	smbopen,
+	.d_close =	smbclose,
+	.d_read =	smbread,
+	.d_write =	smbwrite,
+	.d_ioctl =	smbioctl,
+	.d_name =	"smb",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static void

@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sio/sio_pci.c,v 1.8 2002/07/10 17:26:11 sobomax Exp $
+ * $FreeBSD: src/sys/dev/sio/sio_pci.c,v 1.11 2003/02/27 14:09:36 phk Exp $
  */
 
 #include <sys/param.h>
@@ -50,6 +50,7 @@ static device_method_t sio_pci_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		sio_pci_probe),
 	DEVMETHOD(device_attach,	sio_pci_attach),
+	DEVMETHOD(device_detach,	siodetach),
 
 	{ 0, 0 }
 };
@@ -77,6 +78,13 @@ static struct pci_ids pci_ids[] = {
 	{ 0x0000151f, "SmartLink 5634PCV SurfRider", 0x10 },
 	{ 0x0103115d, "Xircom Cardbus modem", 0x10 },
 	{ 0x98459710, "Netmos Nm9845 PCI Bridge with Dual UART", 0x10 },
+	{ 0x01c0135c, "Quatech SSCLP-200/300", 0x18 
+		/* 
+		 * NB: You must mount the "SPAD" jumper to correctly detect
+		 * the FIFO on the UART.  Set the options on the jumpers,
+		 * we do not support the extra registers on the Quatech.
+		 */
+	},
 	{ 0x00000000, NULL, 0 }
 };
 
@@ -86,6 +94,7 @@ sio_pci_attach(dev)
 {
 	u_int32_t	type;
 	struct pci_ids	*id;
+	int		flags;
 
 	type = pci_get_devid(dev);
 	id = pci_ids;
@@ -94,6 +103,9 @@ sio_pci_attach(dev)
 	if (id->desc == NULL)
 		return (ENXIO);
 	sio_pci_kludge_unit(dev);
+	if (resource_int_value("sio", device_get_unit(dev), "flags", &flags)
+	     == 0)
+		device_set_flags(dev, flags);
 	return (sioattach(dev, id->rid, 0UL));
 }
 

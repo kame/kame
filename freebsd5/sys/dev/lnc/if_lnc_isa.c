@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/lnc/if_lnc_isa.c,v 1.13 2002/11/14 23:54:53 sam Exp $
+ * $FreeBSD: src/sys/dev/lnc/if_lnc_isa.c,v 1.14 2003/04/15 06:37:25 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -283,4 +283,6 @@ static driver_t lnc_isa_driver = {
 	sizeof(struct lnc_softc),
 };
 
-DRIVER_MODULE(if_lnc, isa, lnc_isa_driver, lnc_devclass, 0, 0);
+DRIVER_MODULE(lnc, isa, lnc_isa_driver, lnc_devclass, 0, 0);
+MODULE_DEPEND(lnc, isa, 1, 1, 1);
+MODULE_DEPEND(lnc, ether, 1, 1, 1);

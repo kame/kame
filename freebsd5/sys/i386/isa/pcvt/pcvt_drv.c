@@ -50,7 +50,7 @@
  *
  *	Last Edit-Date: [Sat Jul 15 15:06:06 2000]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_drv.c,v 1.72 2002/04/09 11:18:40 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_drv.c,v 1.77 2003/03/25 00:07:03 jake Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -96,20 +96,17 @@ static	d_mmap_t	pcvt_mmap;
 #define	CDEV_MAJOR	12
 
 static struct cdevsw vt_cdevsw = {
-	/* open */	pcvt_open,
-	/* close */	pcvt_close,
-	/* read */	ttyread,
-	/* write */	ttywrite,
-	/* ioctl */	pcvt_ioctl,
-	/* poll */	ttypoll,
-	/* mmap */	pcvt_mmap,
-	/* strategy */	nostrategy,
-	/* name */	"vt",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	D_TTY | D_KQFILTER,
-	/* kqfilter */	ttykqfilter,
+	.d_open =	pcvt_open,
+	.d_close =	pcvt_close,
+	.d_read =	ttyread,
+	.d_write =	ttywrite,
+	.d_ioctl =	pcvt_ioctl,
+	.d_poll =	ttypoll,
+	.d_mmap =	pcvt_mmap,
+	.d_name =	"vt",
+	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY,
+	.d_kqfilter =	ttykqfilter,
 };
 
 static int pcvt_probe(device_t dev);
@@ -420,11 +417,12 @@ pcvt_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
  *	driver mmap
  *---------------------------------------------------------------------------*/
 static int
-pcvt_mmap(dev_t dev, vm_offset_t offset, int nprot)
+pcvt_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	if (offset > 0x20000 - PAGE_SIZE)
 		return -1;
-	return i386_btop((0xa0000 + offset));
+	*paddr = 0xa0000 + offset;
+	return 0;
 }
 
 /*---------------------------------------------------------------------------*
@@ -725,7 +723,7 @@ pcvt_cn_term(struct consdev *cp)
  *	console put char
  *---------------------------------------------------------------------------*/
 static void
-pcvt_cn_putc(dev_t dev, int c)
+pcvt_cn_putc(struct consdev *cd, int c)
 {
 	if (c == '\n')
 		sput("\r", 1, 1, 0);
@@ -739,7 +737,7 @@ pcvt_cn_putc(dev_t dev, int c)
  *	console get char
  *---------------------------------------------------------------------------*/
 static int
-pcvt_cn_getc(dev_t dev)
+pcvt_cn_getc(struct consdev *cd)
 {
 	register int s;
 	static u_char *cp, cbuf[4]; /* Temp buf for multi-char key sequence. */
@@ -789,7 +787,7 @@ pcvt_cn_getc(dev_t dev)
  *	console check for char
  *---------------------------------------------------------------------------*/
 static int
-pcvt_cn_checkc(dev_t dev)
+pcvt_cn_checkc(struct consdev *cd)
 {
 	char *cp;
 	int x;

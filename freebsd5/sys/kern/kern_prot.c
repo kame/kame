@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_prot.c	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_prot.c,v 1.164 2002/08/01 17:47:55 rwatson Exp $
+ * $FreeBSD: src/sys/kern/kern_prot.c,v 1.169 2003/05/01 21:21:42 jhb Exp $
  */
 
 /*
@@ -84,16 +84,13 @@ int
 getpid(struct thread *td, struct getpid_args *uap)
 {
 	struct proc *p = td->td_proc;
-	int s;
 
-	s = mtx_lock_giant(kern_giant_proc);
 	td->td_retval[0] = p->p_pid;
 #if defined(COMPAT_43) || defined(COMPAT_SUNOS)
 	PROC_LOCK(p);
 	td->td_retval[1] = p->p_pptr->p_pid;
 	PROC_UNLOCK(p);
 #endif
-	mtx_unlock_giant(s);
 	return (0);
 }
 
@@ -110,13 +107,10 @@ int
 getppid(struct thread *td, struct getppid_args *uap)
 {
 	struct proc *p = td->td_proc;
-	int s;
 
-	s = mtx_lock_giant(kern_giant_proc);
 	PROC_LOCK(p);
 	td->td_retval[0] = p->p_pptr->p_pid;
 	PROC_UNLOCK(p);
-	mtx_unlock_giant(s);
 	return (0);
 }
 
@@ -135,13 +129,10 @@ int
 getpgrp(struct thread *td, struct getpgrp_args *uap)
 {
 	struct proc *p = td->td_proc;
-	int s;
 
-	s = mtx_lock_giant(kern_giant_proc);
 	PROC_LOCK(p);
 	td->td_retval[0] = p->p_pgrp->pg_id;
 	PROC_UNLOCK(p);
-	mtx_unlock_giant(s);
 	return (0);
 }
 
@@ -157,26 +148,25 @@ struct getpgid_args {
 int
 getpgid(struct thread *td, struct getpgid_args *uap)
 {
-	struct proc *p = td->td_proc;
-	struct proc *pt;
+	struct proc *p;
 	int error;
 
-	mtx_lock(&Giant);
-	error = 0;
 	if (uap->pid == 0) {
+		p = td->td_proc;
 		PROC_LOCK(p);
-		td->td_retval[0] = p->p_pgrp->pg_id;
-		PROC_UNLOCK(p);
-	} else if ((pt = pfind(uap->pid)) == NULL)
-		error = ESRCH;
-	else {
-		error = p_cansee(td, pt);
-		if (error == 0)
-			td->td_retval[0] = pt->p_pgrp->pg_id;
-		PROC_UNLOCK(pt);
+	} else {
+		p = pfind(uap->pid);
+		if (p == NULL)
+			return (ESRCH);
+		error = p_cansee(td, p);
+		if (error) {
+			PROC_UNLOCK(p);
+			return (error);
+		}
 	}
-	mtx_unlock(&Giant);
-	return (error);
+	td->td_retval[0] = p->p_pgrp->pg_id;
+	PROC_UNLOCK(p);
+	return (0);
 }
 
 /*
@@ -193,26 +183,25 @@ struct getsid_args {
 int
 getsid(struct thread *td, struct getsid_args *uap)
 {
-	struct proc *p = td->td_proc;
-	struct proc *pt;
+	struct proc *p;
 	int error;
 
-	mtx_lock(&Giant);
-	error = 0;
 	if (uap->pid == 0) {
+		p = td->td_proc;
 		PROC_LOCK(p);
-		td->td_retval[0] = p->p_session->s_sid;
-		PROC_UNLOCK(p);
-	} else if ((pt = pfind(uap->pid)) == NULL)
-		error = ESRCH;
-	else {
-		error = p_cansee(td, pt);
-		if (error == 0)
-			td->td_retval[0] = pt->p_session->s_sid;
-		PROC_UNLOCK(pt);
+	} else {
+		p = pfind(uap->pid);
+		if (p == NULL)
+			return (ESRCH);
+		error = p_cansee(td, p);
+		if (error) {
+			PROC_UNLOCK(p);
+			return (error);
+		}
 	}
-	mtx_unlock(&Giant);
-	return (error);
+	td->td_retval[0] = p->p_session->s_sid;
+	PROC_UNLOCK(p);
+	return (0);
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -507,7 +496,6 @@ setuid(struct thread *td, struct setuid_args *uap)
 	struct uidinfo *uip;
 	int error;
 
-	mtx_lock(&Giant);
 	uid = uap->uid;
 	newcred = crget();
 	uip = uifind(uid);
@@ -542,7 +530,6 @@ setuid(struct thread *td, struct setuid_args *uap)
 		PROC_UNLOCK(p);
 		uifree(uip);
 		crfree(newcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 
@@ -593,7 +580,6 @@ setuid(struct thread *td, struct setuid_args *uap)
 	PROC_UNLOCK(p);
 	uifree(uip);
 	crfree(oldcred);
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -616,7 +602,6 @@ seteuid(struct thread *td, struct seteuid_args *uap)
 	int error;
 
 	euid = uap->euid;
-	mtx_lock(&Giant);
 	newcred = crget();
 	euip = uifind(euid);
 	PROC_LOCK(p);
@@ -627,7 +612,6 @@ seteuid(struct thread *td, struct seteuid_args *uap)
 		PROC_UNLOCK(p);
 		uifree(euip);
 		crfree(newcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 	/*
@@ -643,7 +627,6 @@ seteuid(struct thread *td, struct seteuid_args *uap)
 	PROC_UNLOCK(p);
 	uifree(euip);
 	crfree(oldcred);
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -665,7 +648,6 @@ setgid(struct thread *td, struct setgid_args *uap)
 	int error;
 
 	gid = uap->gid;
-	mtx_lock(&Giant);
 	newcred = crget();
 	PROC_LOCK(p);
 	oldcred = p->p_ucred;
@@ -691,7 +673,6 @@ setgid(struct thread *td, struct setgid_args *uap)
 	    (error = suser_cred(oldcred, PRISON_ROOT)) != 0) {
 		PROC_UNLOCK(p);
 		crfree(newcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 
@@ -738,7 +719,6 @@ setgid(struct thread *td, struct setgid_args *uap)
 	p->p_ucred = newcred;
 	PROC_UNLOCK(p);
 	crfree(oldcred);
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -760,7 +740,6 @@ setegid(struct thread *td, struct setegid_args *uap)
 	int error;
 
 	egid = uap->egid;
-	mtx_lock(&Giant);
 	newcred = crget();
 	PROC_LOCK(p);
 	oldcred = p->p_ucred;
@@ -769,7 +748,6 @@ setegid(struct thread *td, struct setegid_args *uap)
 	    (error = suser_cred(oldcred, PRISON_ROOT)) != 0) {
 		PROC_UNLOCK(p);
 		crfree(newcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 	crcopy(newcred, oldcred);
@@ -780,7 +758,6 @@ setegid(struct thread *td, struct setegid_args *uap)
 	p->p_ucred = newcred;
 	PROC_UNLOCK(p);
 	crfree(oldcred);
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -805,12 +782,10 @@ setgroups(struct thread *td, struct setgroups_args *uap)
 	ngrp = uap->gidsetsize;
 	if (ngrp > NGROUPS)
 		return (EINVAL);
-	mtx_lock(&Giant);
 	tempcred = crget();
 	error = copyin(uap->gidset, tempcred->cr_groups, ngrp * sizeof(gid_t));
 	if (error != 0) {
 		crfree(tempcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 	newcred = crget();
@@ -821,7 +796,6 @@ setgroups(struct thread *td, struct setgroups_args *uap)
 		PROC_UNLOCK(p);
 		crfree(newcred);
 		crfree(tempcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 		
@@ -848,7 +822,6 @@ setgroups(struct thread *td, struct setgroups_args *uap)
 	PROC_UNLOCK(p);
 	crfree(tempcred);
 	crfree(oldcred);
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -873,7 +846,6 @@ setreuid(register struct thread *td, struct setreuid_args *uap)
 
 	euid = uap->euid;
 	ruid = uap->ruid;
-	mtx_lock(&Giant);
 	newcred = crget();
 	euip = uifind(euid);
 	ruip = uifind(ruid);
@@ -888,7 +860,6 @@ setreuid(register struct thread *td, struct setreuid_args *uap)
 		uifree(ruip);
 		uifree(euip);
 		crfree(newcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 	crcopy(newcred, oldcred);
@@ -910,7 +881,6 @@ setreuid(register struct thread *td, struct setreuid_args *uap)
 	uifree(ruip);
 	uifree(euip);
 	crfree(oldcred);
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -934,7 +904,6 @@ setregid(register struct thread *td, struct setregid_args *uap)
 
 	egid = uap->egid;
 	rgid = uap->rgid;
-	mtx_lock(&Giant);
 	newcred = crget();
 	PROC_LOCK(p);
 	oldcred = p->p_ucred;
@@ -945,7 +914,6 @@ setregid(register struct thread *td, struct setregid_args *uap)
 	    (error = suser_cred(oldcred, PRISON_ROOT)) != 0) {
 		PROC_UNLOCK(p);
 		crfree(newcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 
@@ -966,7 +934,6 @@ setregid(register struct thread *td, struct setregid_args *uap)
 	p->p_ucred = newcred;
 	PROC_UNLOCK(p);
 	crfree(oldcred);
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -998,7 +965,6 @@ setresuid(register struct thread *td, struct setresuid_args *uap)
 	euid = uap->euid;
 	ruid = uap->ruid;
 	suid = uap->suid;
-	mtx_lock(&Giant);
 	newcred = crget();
 	euip = uifind(euid);
 	ruip = uifind(ruid);
@@ -1018,7 +984,6 @@ setresuid(register struct thread *td, struct setresuid_args *uap)
 		uifree(ruip);
 		uifree(euip);
 		crfree(newcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 
@@ -1040,7 +1005,6 @@ setresuid(register struct thread *td, struct setresuid_args *uap)
 	uifree(ruip);
 	uifree(euip);
 	crfree(oldcred);
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -1071,7 +1035,6 @@ setresgid(register struct thread *td, struct setresgid_args *uap)
 	egid = uap->egid;
 	rgid = uap->rgid;
 	sgid = uap->sgid;
-	mtx_lock(&Giant);
 	newcred = crget();
 	PROC_LOCK(p);
 	oldcred = p->p_ucred;
@@ -1087,7 +1050,6 @@ setresgid(register struct thread *td, struct setresgid_args *uap)
 	    (error = suser_cred(oldcred, PRISON_ROOT)) != 0) {
 		PROC_UNLOCK(p);
 		crfree(newcred);
-		mtx_unlock(&Giant);
 		return (error);
 	}
 
@@ -1107,7 +1069,6 @@ setresgid(register struct thread *td, struct setresgid_args *uap)
 	p->p_ucred = newcred;
 	PROC_UNLOCK(p);
 	crfree(oldcred);
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -1833,13 +1794,11 @@ cred_update_thread(struct thread *td)
 
 	p = td->td_proc;
 	cred = td->td_ucred;
-	mtx_lock(&Giant);
 	PROC_LOCK(p);
 	td->td_ucred = crhold(p->p_ucred);
 	PROC_UNLOCK(p);
 	if (cred != NULL)
 		crfree(cred);
-	mtx_unlock(&Giant);
 }
 
 /*

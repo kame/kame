@@ -1,5 +1,5 @@
 /*	$NetBSD: usb.c,v 1.67 2002/02/11 15:11:49 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb.c,v 1.83 2002/09/15 22:35:58 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb.c,v 1.87 2003/04/14 14:04:07 ticso Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -136,19 +136,13 @@ d_ioctl_t usbioctl;
 d_poll_t usbpoll;
 
 struct cdevsw usb_cdevsw = {
-	/* open */      usbopen,
-	/* close */     usbclose,
-	/* read */      usbread,
-	/* write */     nowrite,
-	/* ioctl */     usbioctl,
-	/* poll */      usbpoll,
-	/* mmap */      nommap,
-	/* strategy */  nostrategy,
-	/* name */      "usb",
-	/* maj */       USB_CDEV_MAJOR,
-	/* dump */      nodump,
-	/* psize */     nopsize,
-	/* flags */     0,
+	.d_open =	usbopen,
+	.d_close =	usbclose,
+	.d_read =	usbread,
+	.d_ioctl =	usbioctl,
+	.d_poll =	usbpoll,
+	.d_name =	"usb",
+	.d_maj =	USB_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
 	/* bmaj */      -1
 #endif
@@ -912,4 +906,5 @@ usb_detach(device_t self)
 #if defined(__FreeBSD__)
 DRIVER_MODULE(usb, ohci, usb_driver, usb_devclass, 0, 0);
 DRIVER_MODULE(usb, uhci, usb_driver, usb_devclass, 0, 0);
+DRIVER_MODULE(usb, ehci, usb_driver, usb_devclass, 0, 0);
 #endif

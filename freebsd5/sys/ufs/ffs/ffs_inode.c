@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_inode.c	8.13 (Berkeley) 4/21/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.83 2002/09/25 02:49:48 jeff Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.87 2003/03/04 00:04:43 jeff Exp $
  */
 
 #include "opt_quota.h"
@@ -549,7 +549,7 @@ ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 	 * explicitly instead of letting bread do everything for us.
 	 */
 	vp = ITOV(ip);
-	bp = getblk(vp, lbn, (int)fs->fs_bsize, 0, 0);
+	bp = getblk(vp, lbn, (int)fs->fs_bsize, 0, 0, 0);
 	if ((bp->b_flags & B_CACHE) == 0) {
 		curproc->p_stats->p_ru.ru_inblock++;	/* pay for read */
 		bp->b_iocmd = BIO_READ;
@@ -559,7 +559,7 @@ ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 			panic("ffs_indirtrunc: bad buffer size");
 		bp->b_blkno = dbn;
 		vfs_busy_pages(bp, 0);
-		BUF_STRATEGY(bp);
+		VOP_STRATEGY(bp->b_vp, bp);
 		error = bufwait(bp);
 	}
 	if (error) {

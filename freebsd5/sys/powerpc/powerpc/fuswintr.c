@@ -31,10 +31,8 @@
  * $NetBSD: fuswintr.c,v 1.2 2000/06/08 07:29:54 kleink Exp $
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/powerpc/powerpc/fuswintr.c,v 1.2 2002/02/14 01:39:11 benno Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/fuswintr.c,v 1.3 2003/04/03 21:36:33 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

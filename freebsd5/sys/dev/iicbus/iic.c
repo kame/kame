@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/iicbus/iic.c,v 1.26 2002/09/19 03:25:42 peter Exp $
+ * $FreeBSD: src/sys/dev/iicbus/iic.c,v 1.27 2003/03/03 12:15:42 phk Exp $
  *
  */
 #include <sys/param.h>
@@ -94,19 +94,13 @@ static	d_ioctl_t	iicioctl;
 
 #define CDEV_MAJOR 105
 static struct cdevsw iic_cdevsw = {
-	/* open */	iicopen,
-	/* close */	iicclose,
-	/* read */	iicread,
-	/* write */	iicwrite,
-	/* ioctl */	iicioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"iic",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	iicopen,
+	.d_close =	iicclose,
+	.d_read =	iicread,
+	.d_write =	iicwrite,
+	.d_ioctl =	iicioctl,
+	.d_name =	"iic",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static void

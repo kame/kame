@@ -42,7 +42,7 @@
  *
  * Version 1.7, December 1995.
  *
- * $FreeBSD: src/sys/i386/isa/spigot.c,v 1.55 2002/04/01 21:30:42 jhb Exp $
+ * $FreeBSD: src/sys/i386/isa/spigot.c,v 1.58 2003/03/25 00:07:03 jake Exp $
  *
  */
 
@@ -106,19 +106,14 @@ static	d_mmap_t	spigot_mmap;
 
 #define CDEV_MAJOR 11
 static struct cdevsw spigot_cdevsw = {
-	/* open */	spigot_open,
-	/* close */	spigot_close,
-	/* read */	spigot_read,
-	/* write */	spigot_write,
-	/* ioctl */	spigot_ioctl,
-	/* poll */	nopoll,
-	/* mmap */	spigot_mmap,
-	/* strategy */	nostrategy,
-	/* name */	"spigot",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	spigot_open,
+	.d_close =	spigot_close,
+	.d_read =	spigot_read,
+	.d_write =	spigot_write,
+	.d_ioctl =	spigot_ioctl,
+	.d_mmap =	spigot_mmap,
+	.d_name =	"spigot",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static ointhand2_t	spigintr;
@@ -273,7 +268,7 @@ struct	spigot_softc	*ss = (struct spigot_softc *)&spigot_softc[unit];
 }
 
 static	int
-spigot_mmap(dev_t dev, vm_offset_t offset, int nprot)
+spigot_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 struct	spigot_softc	*ss = (struct spigot_softc *)&spigot_softc[0];
 
@@ -285,5 +280,6 @@ struct	spigot_softc	*ss = (struct spigot_softc *)&spigot_softc[0];
 	if(nprot & PROT_EXEC)
 		return -1;
 
-	return i386_btop(ss->maddr);
+	*paddr = ss->maddr;
+	return 0;
 }

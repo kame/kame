@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/powerpc/powerpc/genassym.c,v 1.47 2002/10/21 05:27:41 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/powerpc/genassym.c,v 1.49 2003/03/20 10:28:20 grehan Exp $
  */
 
 #include <sys/param.h>
@@ -137,18 +137,18 @@ ASSYM(PCB_LR, offsetof(struct pcb, pcb_lr));
 ASSYM(PCB_USR, offsetof(struct pcb, pcb_usr));
 ASSYM(PCB_ONFAULT, offsetof(struct pcb, pcb_onfault));
 ASSYM(PCB_FLAGS, offsetof(struct pcb, pcb_flags));
+ASSYM(PCB_FPU, PCB_FPU);
 
 ASSYM(TD_PROC, offsetof(struct thread, td_proc));
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));
-ASSYM(TD_KSE, offsetof(struct thread, td_kse));
 
 ASSYM(P_VMSPACE, offsetof(struct proc, p_vmspace));
 
 ASSYM(VM_PMAP, offsetof(struct vmspace, vm_pmap));
 
-ASSYM(KE_FLAGS, offsetof(struct kse, ke_flags));
+ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
 
-ASSYM(KEF_ASTPENDING, KEF_ASTPENDING);
-ASSYM(KEF_NEEDRESCHED, KEF_NEEDRESCHED);
+ASSYM(TDF_ASTPENDING, TDF_ASTPENDING);
+ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
 
 ASSYM(SF_UC, offsetof(struct sigframe, sf_uc));

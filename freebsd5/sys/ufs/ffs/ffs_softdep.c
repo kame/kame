@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.129.2.1 2002/12/29 14:54:19 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.139 2003/03/18 08:45:24 phk Exp $");
 
 /*
  * For now we want the safety net that the DIAGNOSTIC and DEBUG flags provide.
@@ -54,7 +54,6 @@ __FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.129.2.1 2002/12/29 14:54:1
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/stdint.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
 #include <sys/malloc.h>
@@ -327,7 +326,7 @@ interlocked_sleep(lk, op, ident, mtx, flags, wmesg, timo)
 		retval = msleep(ident, mtx, flags, wmesg, timo);
 		break;
 	case LOCKBUF:
-		retval = BUF_LOCK((struct buf *)ident, flags);
+		retval = BUF_LOCK((struct buf *)ident, flags, NULL);
 		break;
 	default:
 		panic("interlocked_sleep: unknown operation");
@@ -388,7 +387,7 @@ sema_get(semap, interlock)
 			    semap->timo);
 			FREE_LOCK(interlock);
 		} else {
-			tsleep((caddr_t)semap, semap->prio, semap->name,
+			tsleep(semap, semap->prio, semap->name,
 			    semap->timo);
 		}
 		return (0);
@@ -495,10 +494,12 @@ workitem_free(item, type)
  * Workitem queue management
  */
 static struct workhead softdep_workitem_pending;
+static struct worklist *worklist_tail;
 static int num_on_worklist;	/* number of worklist items to be processed */
 static int softdep_worklist_busy; /* 1 => trying to do unmount */
 static int softdep_worklist_req; /* serialized waiters */
 static int max_softdeps;	/* maximum number of structs before slowdown */
+static int maxindirdeps = 50;	/* max number of indirdeps before slowdown */
 static int tickdelay = 2;	/* number of ticks to pause during slowdown */
 static int proc_waiting;	/* tracks whether we have a timeout posted */
 static int *stat_countp;	/* statistic to count in proc_waiting timeout */
@@ -527,6 +528,7 @@ static int stat_dir_entry;	/* bufs redirtied as dir entry cannot write */
 #include <sys/sysctl.h>
 SYSCTL_INT(_debug, OID_AUTO, max_softdeps, CTLFLAG_RW, &max_softdeps, 0, "");
 SYSCTL_INT(_debug, OID_AUTO, tickdelay, CTLFLAG_RW, &tickdelay, 0, "");
+SYSCTL_INT(_debug, OID_AUTO, maxindirdeps, CTLFLAG_RW, &maxindirdeps, 0, "");
 SYSCTL_INT(_debug, OID_AUTO, worklist_push, CTLFLAG_RW, &stat_worklist_push, 0,"");
 SYSCTL_INT(_debug, OID_AUTO, blk_limit_push, CTLFLAG_RW, &stat_blk_limit_push, 0,"");
 SYSCTL_INT(_debug, OID_AUTO, ino_limit_push, CTLFLAG_RW, &stat_ino_limit_push, 0,"");
@@ -550,7 +552,6 @@ static void
 add_to_worklist(wk)
 	struct worklist *wk;
 {
-	static struct worklist *worklist_tail;
 
 	if (wk->wk_state & ONWORKLIST) {
 		if (lk.lkt_held != NOHOLDER)
@@ -677,7 +678,7 @@ process_worklist_item(matchmnt, flags)
 	struct mount *matchmnt;
 	int flags;
 {
-	struct worklist *wk;
+	struct worklist *wk, *wkend;
 	struct mount *mp;
 	struct vnode *vp;
 	int matchcnt = 0;
@@ -715,7 +716,20 @@ process_worklist_item(matchmnt, flags)
 		FREE_LOCK(&lk);
 		return (-1);
 	}
+	/*
+	 * Remove the item to be processed. If we are removing the last
+	 * item on the list, we need to recalculate the tail pointer.
+	 * As this happens rarely and usually when the list is short,
+	 * we just run down the list to find it rather than tracking it
+	 * in the above loop.
+	 */
 	WORKLIST_REMOVE(wk);
+	if (wk == worklist_tail) {
+		LIST_FOREACH(wkend, &softdep_workitem_pending, wk_list)
+			if (LIST_NEXT(wkend, wk_list) == NULL)
+				break;
+		worklist_tail = wkend;
+	}
 	num_on_worklist -= 1;
 	FREE_LOCK(&lk);
 	switch (wk->wk_type) {
@@ -992,7 +1006,7 @@ static long	num_inodedep;	/* number of inodedep allocated */
 static struct sema inodedep_in_progress;
 
 /*
- * Look up a inodedep. Return 1 if found, 0 if not found.
+ * Look up an inodedep. Return 1 if found, 0 if not found.
  * If not found, allocate if DEPALLOC flag is passed.
  * Found or allocated entry is returned in inodedeppp.
  * This routine must be called with splbio interrupts blocked.
@@ -1862,8 +1876,7 @@ setup_allocindir_phase2(bp, ip, aip)
 				handle_workitem_freefrag(freefrag);
 		}
 		if (newindirdep) {
-			if (indirdep->ir_savebp != NULL)
-				brelse(newindirdep->ir_savebp);
+			brelse(newindirdep->ir_savebp);
 			WORKITEM_FREE((caddr_t)newindirdep, D_INDIRDEP);
 		}
 		if (indirdep)
@@ -1882,7 +1895,7 @@ setup_allocindir_phase2(bp, ip, aip)
 			bp->b_blkno = blkno;
 		}
 		newindirdep->ir_savebp =
-		    getblk(ip->i_devvp, bp->b_blkno, bp->b_bcount, 0, 0);
+		    getblk(ip->i_devvp, bp->b_blkno, bp->b_bcount, 0, 0, 0);
 		BUF_KERNPROC(newindirdep->ir_savebp);
 		bcopy(bp->b_data, newindirdep->ir_savebp->b_data, bp->b_bcount);
 	}
@@ -2125,6 +2138,7 @@ deallocate_dependencies(bp, inodedep)
 				panic("deallocate_dependencies: already gone");
 			}
 			indirdep->ir_state |= GOINGAWAY;
+			VFSTOUFS(bp->b_vp->v_mount)->um_numindirdeps += 1;
 			while ((aip = LIST_FIRST(&indirdep->ir_deplisthd)) != 0)
 				free_allocindir(aip, inodedep);
 			if (bp->b_lblkno >= 0 ||
@@ -2564,6 +2578,7 @@ indir_trunc(freeblks, dbn, level, lbn, countp)
 			FREE_LOCK(&lk);
 			panic("indir_trunc: dangling dep");
 		}
+		VFSTOUFS(freeblks->fb_mnt)->um_numindirdeps -= 1;
 		FREE_LOCK(&lk);
 	} else {
 		FREE_LOCK(&lk);
@@ -3454,7 +3469,8 @@ softdep_disk_io_initiation(bp)
 			 * dependency can be freed.
 			 */
 			if (LIST_FIRST(&indirdep->ir_deplisthd) == NULL) {
-				indirdep->ir_savebp->b_flags |= B_INVAL | B_NOCACHE;
+				indirdep->ir_savebp->b_flags |=
+				    B_INVAL | B_NOCACHE;
 				brelse(indirdep->ir_savebp);
 				/* inline expand WORKLIST_REMOVE(wk); */
 				wk->wk_state &= ~ONWORKLIST;
@@ -4873,11 +4889,11 @@ softdep_fsync_mountdev(vp)
 	VI_LOCK(vp);
 	for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
 		nbp = TAILQ_NEXT(bp, b_vnbufs);
-		VI_UNLOCK(vp);
 		/* 
 		 * If it is already scheduled, skip to the next buffer.
 		 */
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT)) {
+		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK,
+		    VI_MTX(vp))) {
 			VI_LOCK(vp);
 			continue;
 		}
@@ -5410,8 +5426,11 @@ softdep_slowdown(vp)
 
 	max_softdeps_hard = max_softdeps * 11 / 10;
 	if (num_dirrem < max_softdeps_hard / 2 &&
-	    num_inodedep < max_softdeps_hard)
-		return (0);
+	    num_inodedep < max_softdeps_hard &&
+	    VFSTOUFS(vp->v_mount)->um_numindirdeps < maxindirdeps)
+  		return (0);
+	if (VFSTOUFS(vp->v_mount)->um_numindirdeps >= maxindirdeps)
+		speedup_syncer();
 	stat_sync_limit_hit += 1;
 	return (1);
 }
@@ -5787,7 +5806,8 @@ getdirtybuf(bpp, waitfor)
 	for (;;) {
 		if ((bp = *bpp) == NULL)
 			return (0);
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT) == 0) {
+		/* XXX Probably needs interlock */
+		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT, NULL) == 0) {
 			if ((bp->b_xflags & BX_BKGRDINPROG) == 0)
 				break;
 			BUF_UNLOCK(bp);

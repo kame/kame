@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netncp/ncp_rq.h,v 1.6 2001/09/12 08:37:58 julian Exp $
+ * $FreeBSD: src/sys/netncp/ncp_rq.h,v 1.7 2003/02/26 21:25:55 fjoe Exp $
  */
 #ifndef _NETNCP_NCP_RQ_H_
 #define _NETNCP_NCP_RQ_H_
@@ -51,11 +51,6 @@
 #define setwbe(buf,ofs,val) getwle(buf,ofs)=htons(val)
 #define setdle(buf,ofs,val) getdle(buf,ofs)=val
 #define setdbe(buf,ofs,val) getdle(buf,ofs)=htonl(val)
-
-#define htoles(x)	((u_int16_t)(x))
-#define letohs(x)	((u_int16_t)(x))
-#define	htolel(x)	((u_int32_t)(x))
-#define	letohl(x)	((u_int32_t)(x))
 
 #else
 #error "Macros for Big-Endians are incomplete"

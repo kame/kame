@@ -44,7 +44,6 @@
  */
 
 #include "opt_inet.h"
-#include "opt_ns.h"
 #include "opt_atalk.h"
 
 #include <sys/param.h>
@@ -74,11 +73,6 @@
 #include <machine/in_cksum.h>
 #else
 #error ip_gre input without IP?
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
 #endif
 
 #ifdef NETATALK
@@ -146,8 +140,7 @@ static int
 gre_input2(struct mbuf *m ,int hlen, u_char proto)
 {
 	struct greip *gip = mtod(m, struct greip *);
-	int s;
-	struct ifqueue *ifq;
+	int isr;
 	struct gre_softc *sc;
 	u_short flags;
 
@@ -180,18 +173,11 @@ gre_input2(struct mbuf *m ,int hlen, u_char proto)
 		switch (ntohs(gip->gi_ptype)) { /* ethertypes */
 		case ETHERTYPE_IP: /* shouldn't need a schednetisr(), as */
 		case WCCP_PROTOCOL_TYPE: /* we are in ip_input */
-			ifq = &ipintrq;
+			isr = NETISR_IP; 	
 			break;
-#ifdef NS
-		case ETHERTYPE_NS:
-			ifq = &nsintrq;
-			schednetisr(NETISR_NS);
-			break;
-#endif
 #ifdef NETATALK
 		case ETHERTYPE_ATALK:
-			ifq = &atintrq1;
-			schednetisr(NETISR_ATALK);
+			isr = NETISR_ATALK1;
 			break;
 #endif
 		case ETHERTYPE_IPV6:
@@ -222,14 +208,7 @@ gre_input2(struct mbuf *m ,int hlen, u_char proto)
 
 	m->m_pkthdr.rcvif = &sc->sc_if;
 
-	s = splnet();		/* possible */
-	if (_IF_QFULL(ifq)) {
-		_IF_DROP(ifq);
-		m_freem(m);
-	} else {
-		IF_ENQUEUE(ifq,m);
-	}
-	splx(s);
+	netisr_dispatch(isr, m);
 
 	return(1);	/* packet is done, no further processing needed */
 }
@@ -252,9 +231,8 @@ gre_mobile_input(m, va_alist)
 {
 	struct ip *ip = mtod(m, struct ip *);
 	struct mobip_h *mip = mtod(m, struct mobip_h *);
-	struct ifqueue *ifq;
 	struct gre_softc *sc;
-	int hlen,s;
+	int hlen;
 	va_list ap;
 	u_char osrc = 0;
 	int msiz;
@@ -317,15 +295,7 @@ gre_mobile_input(m, va_alist)
 
 	m->m_pkthdr.rcvif = &sc->sc_if;
 
-	ifq = &ipintrq;
-	s = splnet();       /* possible */
-	if (_IF_QFULL(ifq)) {
-		_IF_DROP(ifq);
-		m_freem(m);
-	} else {
-		IF_ENQUEUE(ifq,m);
-	}
-	splx(s);
+	netisr_dispatch(NETISR_IP, m);
 }
 
 /*

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)file.h	8.3 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/file.h,v 1.54 2002/10/04 20:34:30 sam Exp $
+ * $FreeBSD: src/sys/sys/file.h,v 1.60 2003/02/15 06:04:55 alfred Exp $
  */
 
 #ifndef _SYS_FILE_H_
@@ -53,6 +53,7 @@ struct knote;
 struct vnode;
 struct socket;
 
+
 #endif /* _KERNEL */
 
 #define	DTYPE_VNODE	1	/* file */
@@ -64,6 +65,36 @@ struct socket;
 
 #ifdef _KERNEL
 
+struct file;
+struct ucred;
+
+typedef int fo_rdwr_t(struct file *fp, struct uio *uio,
+		    struct ucred *active_cred, int flags,
+		    struct thread *td);
+#define	FOF_OFFSET	1	/* Use the offset in uio argument */
+typedef	int fo_ioctl_t(struct file *fp, u_long com, void *data,
+		    struct ucred *active_cred, struct thread *td);
+typedef	int fo_poll_t(struct file *fp, int events,
+		    struct ucred *active_cred, struct thread *td);
+typedef	int fo_kqfilter_t(struct file *fp, struct knote *kn);
+typedef	int fo_stat_t(struct file *fp, struct stat *sb,
+		    struct ucred *active_cred, struct thread *td);
+typedef	int fo_close_t(struct file *fp, struct thread *td);
+typedef	int fo_flags_t;
+
+struct fileops {
+	fo_rdwr_t	*fo_read;
+	fo_rdwr_t	*fo_write;
+	fo_ioctl_t	*fo_ioctl;
+	fo_poll_t	*fo_poll;
+	fo_kqfilter_t	*fo_kqfilter;
+	fo_stat_t	*fo_stat;
+	fo_close_t	*fo_close;
+	fo_flags_t	fo_flags;	/* DFLAG_* below */
+};
+
+#define DFLAG_PASSABLE	0x01	/* may be passed via unix sockets. */
+
 /*
  * Kernel descriptor table.
  * One entry for each open kernel vnode and socket.
@@ -74,6 +105,7 @@ struct socket;
  * (f)	f_mtx in struct file
  * none	not locked
  */
+
 struct file {
 	LIST_ENTRY(file) f_list;/* (fl) list of active files */
 	short	f_gcflag;	/* used by thread doing fd garbage collection */
@@ -81,23 +113,7 @@ struct file {
 	int	f_count;	/* (f) reference count */
 	int	f_msgcount;	/* (f) references from message queue */
 	struct	ucred *f_cred;	/* credentials associated with descriptor */
-	struct fileops {
-		int	(*fo_read)(struct file *fp, struct uio *uio,
-			    struct ucred *active_cred, int flags,
-			    struct thread *td);
-		int	(*fo_write)(struct file *fp, struct uio *uio,
-			    struct ucred *active_cred, int flags,
-			    struct thread *td);
-#define	FOF_OFFSET	1
-		int	(*fo_ioctl)(struct file *fp, u_long com, void *data,
-			    struct ucred *active_cred, struct thread *td);
-		int	(*fo_poll)(struct file *fp, int events,
-			    struct ucred *active_cred, struct thread *td);
-		int	(*fo_kqfilter)(struct file *fp, struct knote *kn);
-		int	(*fo_stat)(struct file *fp, struct stat *sb,
-			    struct ucred *active_cred, struct thread *td);
-		int	(*fo_close)(struct file *fp, struct thread *td);
-	} *f_ops;
+	struct fileops *f_ops;	/* File operations */
 	int	f_seqcount;	/*
 				 * count of sequential accesses -- cleared
 				 * by most seek operations.
@@ -106,7 +122,7 @@ struct file {
 				 * offset of next expected read or write
 				 */
 	off_t	f_offset;
-	void	*f_data;		/* vnode or socket */
+	void	*f_data;	/* file descriptor specific data */
 	u_int	f_flag;		/* see fcntl.h */
 	struct mtx	*f_mtxp;	/* mutex to protect data */
 };
@@ -126,7 +142,7 @@ struct xfile {
 	int	xf_count;	/* reference count */
 	int	xf_msgcount;	/* references from message queue */
 	off_t	xf_offset;	/* file offset */
-	void	*xf_data;	/* pointer to vnode or socket */
+	void	*xf_data;	/* file descriptor specific data */
 	u_int	xf_flag;	/* flags (see fcntl.h) */
 };
 
@@ -140,6 +156,7 @@ LIST_HEAD(filelist, file);
 extern struct filelist filehead; /* (fl) head of list of open files */
 extern struct fileops vnops;
 extern struct fileops badfileops;
+extern struct fileops socketops;
 extern int maxfiles;		/* kernel limit on number of open files */
 extern int maxfilesperproc;	/* per process limit on number of open files */
 extern int nfiles;		/* (fl) actual number of open files */
@@ -150,6 +167,19 @@ int fget_read(struct thread *td, int fd, struct file **fpp);
 int fget_write(struct thread *td, int fd, struct file **fpp);
 int fdrop(struct file *fp, struct thread *td);
 int fdrop_locked(struct file *fp, struct thread *td);
+
+/*
+ * The socket operations are used a couple of places.
+ * XXX: This is wrong, they should go through the operations vector for
+ * XXX: sockets instead of going directly for the individual functions. /phk
+ */
+fo_rdwr_t	soo_read;
+fo_rdwr_t	soo_write;
+fo_ioctl_t	soo_ioctl;
+fo_poll_t	soo_poll;
+fo_kqfilter_t	soo_kqfilter;
+fo_stat_t	soo_stat;
+fo_close_t	soo_close;
 
 /* Lock a file. */
 #define	FILE_LOCK(f)	mtx_lock((f)->f_mtxp)
@@ -177,19 +207,13 @@ void fputsock(struct socket *sp);
 		FILE_UNLOCK(fp);					\
 	} while (0)
 
-static __inline int fo_read(struct file *fp, struct uio *uio,
-    struct ucred *active_cred, int flags, struct thread *td);
-static __inline int fo_write(struct file *fp, struct uio *uio,
-    struct ucred *active_cred, int flags, struct thread *td);
-static __inline int fo_ioctl(struct file *fp, u_long com, void *data,
-    struct ucred *active_cred, struct thread *td);
-static __inline int fo_poll(struct file *fp, int events,
-    struct ucred *active_cred, struct thread *td);
-static __inline int fo_stat(struct file *fp, struct stat *sb,
-    struct ucred *active_cred, struct thread *td);
-static __inline int fo_close(struct file *fp, struct thread *td);
-static __inline int fo_kqfilter(struct file *fp, struct knote *kn);
-struct proc;
+static __inline fo_rdwr_t	fo_read;
+static __inline fo_rdwr_t	fo_write;
+static __inline fo_ioctl_t	fo_ioctl;
+static __inline fo_poll_t	fo_poll;
+static __inline fo_kqfilter_t	fo_kqfilter;
+static __inline fo_stat_t	fo_stat;
+static __inline fo_close_t	fo_close;
 
 static __inline int
 fo_read(fp, uio, active_cred, flags, td)
@@ -208,8 +232,8 @@ fo_write(fp, uio, active_cred, flags, td)
 	struct file *fp;
 	struct uio *uio;
 	struct ucred *active_cred;
-	struct thread *td;
 	int flags;
+	struct thread *td;
 {
 
 	return ((*fp->f_ops->fo_write)(fp, uio, active_cred, flags, td));

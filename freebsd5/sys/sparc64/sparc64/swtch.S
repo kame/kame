@@ -22,69 +22,78 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/sparc64/sparc64/swtch.S,v 1.22 2002/10/22 18:03:15 jake Exp $
  */
+
+#include <machine/asm.h>
+__FBSDID("$FreeBSD: src/sys/sparc64/sparc64/swtch.S,v 1.32 2003/04/29 00:37:41 jake Exp $");
 
 #include <machine/asmacros.h>
 #include <machine/asi.h>
 #include <machine/ktr.h>
 #include <machine/tstate.h>
 
+#include "assym.s"
+
 	.register	%g2, #ignore
 	.register	%g3, #ignore
 
-#include "assym.s"
-
+/*
+ * void cpu_throw(struct thread *old, struct thread *new)
+ */
 ENTRY(cpu_throw)
 	save	%sp, -CCFSZ, %sp
-	call	choosethread
-	 ldx	[PCPU(CURTHREAD)], %l0
 	flushw
-	b,a	%xcc, .Lsw1
-	 nop
+	ba	%xcc, .Lsw1
+	 mov	%i1, %i0
 END(cpu_throw)
 
+/*
+ * void cpu_switch(struct thread *old, struct thread *new)
+ */
 ENTRY(cpu_switch)
-	/*
-	 * Choose a new thread.  If its the same as the current one, do
-	 * nothing.
-	 */
 	save	%sp, -CCFSZ, %sp
-	call	choosethread
-	 ldx	[PCPU(CURTHREAD)], %l0
-	cmp	%l0, %o0
-	be,a,pn	%xcc, 4f
-	 nop
-	ldx	[%l0 + TD_PCB], %l1
+	mov	%i1, %i0
 
 	/*
-	 * If the current thread was using floating point, save its context.
+	 * If the current thread was using floating point in the kernel, save
+	 * its context.  The userland floating point context has already been
+	 * saved in that case.
 	 */
-	ldx	[%l0 + TD_FRAME], %l2
+	rd	%fprs, %l2
+	andcc	%l2, FPRS_FEF, %g0
+	bz,a,pt %xcc, 1f
+	 nop
+	call	savefpctx
+	 add	PCB_REG, PCB_KFP, %o0
+	ba,a	%xcc, 2f
+	 nop
+
+	/*
+	 * If the current thread was using floating point in userland, save
+	 * its context.
+	 */
+1:	sub	PCB_REG, TF_SIZEOF, %l2
 	ldx	[%l2 + TF_FPRS], %l3
 	andcc	%l3, FPRS_FEF, %g0
-	bz,a,pt	%xcc, 1f
+	bz,a,pt	%xcc, 2f
 	 nop
-	wr	%g0, FPRS_FEF, %fprs
-	wr	%g0, ASI_BLK_S, %asi
-	stda	%f0, [%l1 + PCB_FPSTATE + FP_FB0] %asi
-	stda	%f16, [%l1 + PCB_FPSTATE + FP_FB1] %asi
-	stda	%f32, [%l1 + PCB_FPSTATE + FP_FB2] %asi
-	stda	%f48, [%l1 + PCB_FPSTATE + FP_FB3] %asi
-	membar	#Sync
-	wr	%g0, 0, %fprs
+	call	savefpctx
+	 add	PCB_REG, PCB_UFP, %o0
 	andn	%l3, FPRS_FEF, %l3
 	stx	%l3, [%l2 + TF_FPRS]
+
+	ldx	[PCB_REG + PCB_FLAGS], %l3
+	or	%l3, PCB_FEF, %l3
+	stx	%l3, [PCB_REG + PCB_FLAGS]
 
 	/*
 	 * Flush the windows out to the stack and save the current frame
 	 * pointer and program counter.
 	 */
-1:	flushw
+2:	flushw
 	wrpr	%g0, 0, %cleanwin
-	stx	%fp, [%l1 + PCB_FP]
-	stx	%i7, [%l1 + PCB_PC]
+	stx	%fp, [PCB_REG + PCB_SP]
+	stx	%i7, [PCB_REG + PCB_PC]
 
 	/*
 	 * Load the new thread's frame pointer and program counter, and set
@@ -94,42 +103,41 @@ ENTRY(cpu_switch)
 #if KTR_COMPILE & KTR_PROC
 	CATR(KTR_PROC, "cpu_switch: new td=%p pc=%#lx fp=%#lx"
 	    , %g1, %g2, %g3, 7, 8, 9)
-	stx	%o0, [%g1 + KTR_PARM1]
-	ldx	[%o0 + TD_PCB], %g2
+	stx	%i0, [%g1 + KTR_PARM1]
+	ldx	[%i0 + TD_PCB], %g2
 	ldx	[%g2 + PCB_PC], %g3
 	stx	%g3, [%g1 + KTR_PARM2]
-	ldx	[%g2 + PCB_FP], %g3
+	ldx	[%g2 + PCB_SP], %g3
 	stx	%g3, [%g1 + KTR_PARM3]
 9:
 #endif
-	ldx	[%o0 + TD_PCB], %o1
-	ldx	[%o1 + PCB_FP], %fp
-	ldx	[%o1 + PCB_PC], %i7
-	sub	%fp, CCFSZ, %sp
-	stx	%o0, [PCPU(CURTHREAD)]
-	stx	%o1, [PCPU(CURPCB)]
+	ldx	[%i0 + TD_PCB], %i1
 
-	SET(sched_lock, %o3, %o2)
-	stx	%o0, [%o2 + MTX_LOCK]
+	stx	%i0, [PCPU(CURTHREAD)]
+	stx	%i1, [PCPU(CURPCB)]
 
 	wrpr	%g0, PSTATE_NORMAL, %pstate
-	mov	%o1, PCB_REG
+	mov	%i1, PCB_REG
 	wrpr	%g0, PSTATE_ALT, %pstate
-	mov	%o1, PCB_REG
+	mov	%i1, PCB_REG
 	wrpr	%g0, PSTATE_KERNEL, %pstate
+
+	ldx	[PCB_REG + PCB_SP], %fp
+	ldx	[PCB_REG + PCB_PC], %i7
+	sub	%fp, CCFSZ, %sp
 
 	/*
 	 * Point to the vmspaces of the new process, and of the last non-kernel
 	 * process to run.
 	 */
-	ldx	[%o0 + TD_PROC], %o2
+	ldx	[%i0 + TD_PROC], %i2
 	ldx	[PCPU(VMSPACE)], %l2
-	ldx	[%o2 + P_VMSPACE], %o2
+	ldx	[%i2 + P_VMSPACE], %i2
 
 #if KTR_COMPILE & KTR_PROC
 	CATR(KTR_PROC, "cpu_switch: new vm=%p old vm=%p"
 	    , %g1, %g2, %g3, 7, 8, 9)
-	stx	%o2, [%g1 + KTR_PARM1]
+	stx	%i2, [%g1 + KTR_PARM1]
 	stx	%l2, [%g1 + KTR_PARM2]
 9:
 #endif
@@ -137,32 +145,23 @@ ENTRY(cpu_switch)
 	/*
 	 * If they are the same we are done.
 	 */
-	cmp	%l2, %o2
-	be,a,pn %xcc, 4f
+	cmp	%l2, %i2
+	be,a,pn %xcc, 5f
 	 nop
 
 	/*
-	 * If the new process has nucleus context we are done.
+	 * If the new process is a kernel thread we can just leave the old
+	 * context active and avoid recycling its context number.
 	 */
-	lduw	[PCPU(CPUID)], %o3
-	sllx	%o3, INT_SHIFT, %o3
-	add	%o2, VM_PMAP + PM_CONTEXT, %o4
-	lduw	[%o3 + %o4], %o5
-
-#if KTR_COMPILE & KTR_PROC
-	CATR(KTR_PROC, "cpu_switch: ctx=%#lx"
-	    , %g1, %g2, %g3, 7, 8, 9)
-	stx	%o5, [%g1 + KTR_PARM1]
-9:
-#endif
-
-	brz,a,pn %o5, 4f
+	SET(vmspace0, %i4, %i3)
+	cmp	%i2, %i3
+	be,a,pn %xcc, 5f
 	 nop
 
 	/*
 	 * If there was no non-kernel vmspace, don't try to deactivate it.
 	 */
-	brz,a,pn %l2, 2f
+	brz,a,pn %l2, 3f
 	 nop
 
 	/*
@@ -175,7 +174,7 @@ ENTRY(cpu_switch)
 	stw	%l3, [%l2 + VM_PMAP + PM_ACTIVE]
 
 	/*
-	 * Take away its context.
+	 * Take away its context number.
 	 */
 	lduw	[PCPU(CPUID)], %l3
 	sllx	%l3, INT_SHIFT, %l3
@@ -184,85 +183,64 @@ ENTRY(cpu_switch)
 	stw	%l5, [%l3 + %l4]
 
 	/*
-	 * Find the current free tlb context for this cpu and install it as
-	 * the new primary context.
+	 * Find a new tlb context.  If we've run out we have to flush all user
+	 * mappings from the tlb and reset the context numbers.
 	 */
-2:	lduw	[PCPU(TLB_CTX)], %o5
-	stw	%o5, [%o3 + %o4]
-	mov	AA_DMMU_PCXR, %o4
-	stxa	%o5, [%o4] ASI_DMMU
-	membar	#Sync
-
-	/*
-	 * See if we have run out of free contexts.
-	 */
-	lduw	[PCPU(TLB_CTX_MAX)], %o3
-
-#if KTR_COMPILE & KTR_PROC
-	CATR(KTR_PROC, "cpu_switch: ctx=%#lx next=%#lx max=%#lx"
-	    , %g1, %g2, %g3, 7, 8, 9)
-	stx	%o5, [%g1 + KTR_PARM1]
-	add	%o5, 1, %g2
-	stx	%g2, [%g1 + KTR_PARM2]
-	stx	%o3, [%g1 + KTR_PARM3]
-9:
-#endif
-
-	add	%o5, 1, %o5
-	cmp	%o3, %o5
-	bne,a,pt %xcc, 3f
-	 stw	%o5, [PCPU(TLB_CTX)]
-
-#if KTR_COMPILE & KTR_PROC
-	CATR(KTR_PROC, "cpu_switch: context rollover"
-	    , %g1, %g2, %g3, 7, 8, 9)
-9:
-#endif
-
-	/*
-	 * We will start re-using contexts on the next switch.  Flush all
-	 * non-nucleus mappings from the tlb, and reset the next free context.
-	 */
-	call	pmap_context_rollover
+3:	lduw	[PCPU(TLB_CTX)], %i3
+	lduw	[PCPU(TLB_CTX_MAX)], %i4
+	cmp	%i3, %i4
+	bne,a,pt %xcc, 4f
 	 nop
-	ldx	[PCPU(CURTHREAD)], %o0
-	ldx	[%o0 + TD_PROC], %o2
-	ldx	[%o2 + P_VMSPACE], %o2
+	SET(tlb_flush_user, %i5, %i4)
+	ldx	[%i4], %i5
+	call	%i5
+	 nop
+	lduw	[PCPU(TLB_CTX_MIN)], %i3
+
+	/*
+	 * Advance next free context.
+	 */
+4:	add	%i3, 1, %i4
+	stw	%i4, [PCPU(TLB_CTX)]
+
+	/*
+	 * Set the new context number in the pmap.
+	 */
+	lduw	[PCPU(CPUID)], %i4
+	sllx	%i4, INT_SHIFT, %i4
+	add	%i2, VM_PMAP + PM_CONTEXT, %i5
+	stw	%i3, [%i4 + %i5]
 
 	/*
 	 * Mark the pmap as active on this cpu.
 	 */
-3:	lduw	[%o2 + VM_PMAP + PM_ACTIVE], %o3
-	lduw	[PCPU(CPUMASK)], %o4
-	or	%o3, %o4, %o3
-	stw	%o3, [%o2 + VM_PMAP + PM_ACTIVE]
+	lduw	[%i2 + VM_PMAP + PM_ACTIVE], %i4
+	lduw	[PCPU(CPUMASK)], %i5
+	or	%i4, %i5, %i4
+	stw	%i4, [%i2 + VM_PMAP + PM_ACTIVE]
 
 	/*
 	 * Make note of the change in vmspace.
 	 */
-	stx	%o2, [PCPU(VMSPACE)]
+	stx	%i2, [PCPU(VMSPACE)]
 
 	/*
-	 * Load the tsb registers.
+	 * Fiddle the hardware bits.  Set the tsb registers and install the
+	 * new context number in the cpu.
 	 */
-	ldx	[%o2 + VM_PMAP + PM_TSB], %o3
-	mov	AA_DMMU_TSB, %o4
-	stxa	%o3, [%o4] ASI_DMMU
-	mov	AA_IMMU_TSB, %o4
-	stxa	%o3, [%o4] ASI_IMMU
+	ldx	[%i2 + VM_PMAP + PM_TSB], %i4
+	mov	AA_DMMU_TSB, %i5
+	stxa	%i4, [%i5] ASI_DMMU
+	mov	AA_IMMU_TSB, %i5
+	stxa	%i4, [%i5] ASI_IMMU
+	mov	AA_DMMU_PCXR, %i5
+	stxa	%i3, [%i5] ASI_DMMU
 	membar	#Sync
-
-4:
-#if KTR_COMPILE & KTR_PROC
-	CATR(KTR_PROC, "cpu_switch: return"
-	    , %g1, %g2, %g3, 7, 8, 9)
-9:
-#endif
 
 	/*
 	 * Done.  Return and load the new process's window from the stack.
 	 */
-	ret
+5:	ret
 	 restore
 END(cpu_switch)
 
@@ -270,39 +248,24 @@ ENTRY(savectx)
 	save	%sp, -CCFSZ, %sp
 	flushw
 	call	savefpctx
-	 mov	%i0, %o0
-	stx	%fp, [%i0 + PCB_FP]
+	 add	%i0, PCB_UFP, %o0
+	stx	%fp, [%i0 + PCB_SP]
 	stx	%i7, [%i0 + PCB_PC]
 	ret
 	 restore %g0, 0, %o0
 END(savectx)
 
 /*
- * void savefpctx(struct fpstate *);
+ * void savefpctx(uint32_t *);
  */
 ENTRY(savefpctx)
 	wr	%g0, FPRS_FEF, %fprs
 	wr	%g0, ASI_BLK_S, %asi
-	stda	%f0, [%o0 + PCB_FPSTATE + FP_FB0] %asi
-	stda	%f16, [%o0 + PCB_FPSTATE + FP_FB1] %asi
-	stda	%f32, [%o0 + PCB_FPSTATE + FP_FB2] %asi
-	stda	%f48, [%o0 + PCB_FPSTATE + FP_FB3] %asi
+	stda	%f0, [%o0 + (0 * 64)] %asi
+	stda	%f16, [%o0 + (1 * 64)] %asi
+	stda	%f32, [%o0 + (2 * 64)] %asi
+	stda	%f48, [%o0 + (3 * 64)] %asi
 	membar	#Sync
 	retl
 	 wr	%g0, 0, %fprs
 END(savefpctx)
-
-/*
- * void restorefpctx(struct fpstate *);
- */	
-ENTRY(restorefpctx)
-	wr	%g0, FPRS_FEF, %fprs
-	wr	%g0, ASI_BLK_S, %asi
-	ldda	[%o0 + PCB_FPSTATE + FP_FB0] %asi, %f0
-	ldda	[%o0 + PCB_FPSTATE + FP_FB1] %asi, %f16
-	ldda	[%o0 + PCB_FPSTATE + FP_FB2] %asi, %f32
-	ldda	[%o0 + PCB_FPSTATE + FP_FB3] %asi, %f48
-	membar	#Sync
-	retl
-	 wr	%g0, 0, %fprs
-END(restorefpctx)

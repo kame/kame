@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pdq/if_fpa.c,v 1.17 2002/06/02 20:05:45 schweikh Exp $
+ * $FreeBSD: src/sys/dev/pdq/if_fpa.c,v 1.19 2003/04/16 03:16:55 mdodd Exp $
  *
  */
 
@@ -119,21 +119,6 @@ pdq_pci_attach(device_t dev)
      * Map control/status registers.
      */
     pci_enable_busmaster(dev);
-    pci_enable_io(dev, SYS_RES_IOPORT);
-    pci_enable_io(dev, SYS_RES_MEMORY);
-    command = pci_read_config(dev, PCIR_COMMAND, 4);
-
-    if (!(command & PCIM_CMD_PORTEN)) {
-	device_printf(dev, "Failed to enable PCI I/O ports.\n");
-	error = ENXIO;
-	goto bad;
-    }
-
-    if (!(command & PCIM_CMD_MEMEN)) {
-	device_printf(dev, "Failed to enable PCI memory mapping.\n");
-	error = ENXIO;
-	goto bad;
-    }
 
     command = pci_read_config(dev, PCIR_LATTIMER, 1);
     if (command < DEFPA_LATENCY) {
@@ -231,6 +216,6 @@ static driver_t pdq_pci_driver = {
     sizeof(pdq_softc_t),
 };
 
-DRIVER_MODULE(if_fpa, pci, pdq_pci_driver, pdq_devclass, 0, 0);
-/* MODULE_DEPEND(if_fpa, pci, 1, 1, 1); */
-MODULE_DEPEND(if_fpa, fddi, 1, 1, 1);
+DRIVER_MODULE(fpa, pci, pdq_pci_driver, pdq_devclass, 0, 0);
+MODULE_DEPEND(fpa, pci, 1, 1, 1);
+MODULE_DEPEND(fpa, fddi, 1, 1, 1);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uio.h	8.5 (Berkeley) 2/22/94
- * $FreeBSD: src/sys/sys/uio.h,v 1.23 2002/10/11 18:21:50 mike Exp $
+ * $FreeBSD: src/sys/sys/uio.h,v 1.27 2003/03/06 03:41:01 alc Exp $
  */
 
 #ifndef _SYS_UIO_H_
@@ -39,23 +39,11 @@
 
 #include <sys/cdefs.h>
 #include <sys/_types.h>
-
-#ifndef _SIZE_T_DECLARED
-typedef	__size_t	size_t;
-#define	_SIZE_T_DECLARED
-#endif
+#include <sys/_iovec.h>
 
 #ifndef _SSIZE_T_DECLARED
 typedef	__ssize_t	ssize_t;
 #define	_SSIZE_T_DECLARED
-#endif
-
-#ifndef _STRUCT_IOVEC_DECLARED
-#define	_STRUCT_IOVEC_DECLARED
-struct iovec {
-	void	*iov_base;	/* Base address. */
-	size_t	 iov_len;	/* Length. */
-};
 #endif
 
 #if __BSD_VISIBLE
@@ -98,9 +86,8 @@ struct uio {
 struct vm_object;
 
 void	uio_yield(void);
-int	uiomove(caddr_t, int, struct uio *);
-int	uiomoveco(caddr_t, int, struct uio *, struct vm_object *, int);
-int	uioread(int, struct uio *, struct vm_object *, int *);
+int	uiomove(void *, int, struct uio *);
+int	uiomoveco(void *, int, struct uio *, struct vm_object *, int);
 int	copyinfrom(const void *src, void *dst, size_t len, int seg);
 int	copyinstrfrom(const void *src, void *dst, size_t len,
 	    size_t *copied, int seg);

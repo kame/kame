@@ -37,8 +37,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumobj.h,v 1.2 2001/05/23 23:04:18 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumobj.h,v 1.6 2002/05/16 21:23:45 trhodes Exp $
+ * $Id: vinumobj.h,v 1.7 2003/05/23 01:08:58 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumobj.h,v 1.9 2003/05/23 01:15:30 grog Exp $
  */
 
 /*
@@ -66,7 +66,7 @@ enum objflags {
     VF_WLABEL = 0x20,					    /* label area is writable */
     VF_LABELLING = 0x40,				    /* unit is currently being labelled */
     VF_WANTED = 0x80,					    /* someone is waiting to obtain a lock */
-    VF_RAW = 0x100,					    /* raw volume (no filesystem) */
+    VF_RAW = 0x100,					    /* raw volume (no file system) */
     VF_LOADED = 0x200,					    /* module is loaded */
     VF_CONFIGURING = 0x400,				    /* somebody is changing the config */
     VF_WILL_CONFIGURE = 0x800,				    /* somebody wants to change the config */
@@ -108,13 +108,19 @@ struct __vinum_conf
     struct _volume *volume;
 #endif
 
-    /* the number allocated */
+    /* the number allocated of each object */
     int drives_allocated;
     int subdisks_allocated;
     int plexes_allocated;
     int volumes_allocated;
 
     /* and the number currently in use */
+    /*
+     * Note that drives_used is not valid during drive recognition
+     * (vinum_scandisk and friends).  Many invalid drives are added and
+     * later removed; the count isn't correct until we leave
+     * vinum_scandisk.
+     */
     int drives_used;
     int subdisks_used;
     int plexes_used;
@@ -207,6 +213,7 @@ struct _sd
      */
     int64_t plexoffset;					    /* offset in plex */
     u_int64_t sectors;					    /* and length in sectors */
+    int sectorsize;					    /* sector size for DIOCGSECTORSIZE */
     int plexno;						    /* index of plex, if it belongs */
     int driveno;					    /* index of the drive on which it is located */
     int sdno;						    /* our index in vinum_conf */
@@ -242,6 +249,7 @@ struct _plex
     u_int64_t length;					    /* total length of plex (sectors) */
     int flags;
     int stripesize;					    /* size of stripe or raid band, in sectors */
+    int sectorsize;					    /* sector size for DIOCGSECTORSIZE */
     int subdisks;					    /* number of associated subdisks */
     int subdisks_allocated;				    /* number of subdisks allocated space for */
     int *sdnos;						    /* list of component subdisks */
@@ -266,7 +274,7 @@ struct _plex
     char name[MAXPLEXNAME];				    /* name of plex */
 #ifdef _KERNEL
     struct rangelock *lock;				    /* ranges of locked addresses */
-    struct mtx lockmtx;
+    struct mtx *lockmtx;				    /* lock mutex, one of plexmutex [] */
     dev_t dev;						    /* associated device */
 #endif
 };
@@ -280,7 +288,8 @@ struct _volume
     char name[MAXVOLNAME];				    /* name of volume */
     enum volumestate state;				    /* current state */
     int plexes;						    /* number of plexes */
-    int preferred_plex;					    /* plex to read from, -1 for round-robin */
+    int preferred_plex;					    /* index of plex to read from,
+							    * -1 for round-robin */
     /*
      * index of plex used for last read, for
      * round-robin.
@@ -291,6 +300,7 @@ struct _volume
     int openflags;					    /* flags supplied to last open(2) */
     u_int64_t size;					    /* size of volume */
     int blocksize;					    /* logical block size */
+    int sectorsize;					    /* sector size for DIOCGSECTORSIZE */
     int active;						    /* number of outstanding requests active */
     int subops;						    /* and the number of suboperations */
     /* Statistics */

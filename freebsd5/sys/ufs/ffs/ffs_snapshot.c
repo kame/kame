@@ -31,11 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_snapshot.c	8.11 (McKusick) 7/23/00
- * $FreeBSD: src/sys/ufs/ffs/ffs_snapshot.c,v 1.53.2.3 2002/12/21 03:07:24 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_snapshot.c,v 1.69 2003/04/30 12:57:40 markm Exp $
  */
 
 #include <sys/param.h>
-#include <sys/stdint.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -43,6 +42,7 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/namei.h>
+#include <sys/sched.h>
 #include <sys/stat.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
@@ -104,7 +104,7 @@ int dopersistence = 0;
 #ifdef DEBUG
 #include <sys/sysctl.h>
 SYSCTL_INT(_debug, OID_AUTO, dopersistence, CTLFLAG_RW, &dopersistence, 0, "");
-int snapdebug = 0;
+static int snapdebug = 0;
 SYSCTL_INT(_debug, OID_AUTO, snapdebug, CTLFLAG_RW, &snapdebug, 0, "");
 int collectsnapstats = 0;
 SYSCTL_INT(_debug, OID_AUTO, collectsnapstats, CTLFLAG_RW, &collectsnapstats,
@@ -119,16 +119,15 @@ ffs_snapshot(mp, snapfile)
 	struct mount *mp;
 	char *snapfile;
 {
-	ufs2_daddr_t numblks, blkno;
+	ufs2_daddr_t numblks, blkno, *blkp, *snapblklist;
 	int error, cg, snaploc;
 	int i, size, len, loc;
 	int flag = mp->mnt_flag;
 	struct timespec starttime = {0, 0}, endtime;
 	char saved_nice = 0;
-	long redo = 0, snaplistsize;
+	long redo = 0, snaplistsize = 0;
 	int32_t *lp;
 	void *space;
-	daddr_t *snapblklist;
 	struct fs *copy_fs = NULL, *fs = VFSTOUFS(mp)->um_fs;
 	struct snaphead *snaphead;
 	struct thread *td = curthread;
@@ -254,7 +253,7 @@ restart:
 	 * Allocate all cylinder group blocks.
 	 */
 	for (cg = 0; cg < fs->fs_ncg; cg++) {
-		error = UFS_BALLOC(vp, (off_t)(cgtod(fs, cg)) << fs->fs_fshift,
+		error = UFS_BALLOC(vp, lfragtosize(fs, cgtod(fs, cg)),
 		    fs->fs_bsize, KERNCRED, 0, &nbp);
 		if (error)
 			goto out;
@@ -272,7 +271,7 @@ restart:
 	MALLOC(fs->fs_active, int *, len, M_DEVBUF, M_WAITOK);
 	bzero(fs->fs_active, len);
 	for (cg = 0; cg < fs->fs_ncg; cg++) {
-		error = UFS_BALLOC(vp, (off_t)(cgtod(fs, cg)) << fs->fs_fshift,
+		error = UFS_BALLOC(vp, lfragtosize(fs, cgtod(fs, cg)),
 		    fs->fs_bsize, KERNCRED, 0, &nbp);
 		if (error)
 			goto out;
@@ -301,8 +300,12 @@ restart:
 	 * Recind nice scheduling while running with the filesystem suspended.
 	 */
 	if (td->td_ksegrp->kg_nice > 0) {
+		PROC_LOCK(td->td_proc);
+		mtx_lock_spin(&sched_lock);
 		saved_nice = td->td_ksegrp->kg_nice;
-		td->td_ksegrp->kg_nice = 0;
+		sched_nice(td->td_ksegrp, 0);
+		mtx_unlock_spin(&sched_lock);
+		PROC_UNLOCK(td->td_proc);
 	}
 	/*
 	 * Suspend operation on filesystem.
@@ -328,7 +331,7 @@ restart:
 		if ((ACTIVECGNUM(fs, cg) & ACTIVECGOFF(cg)) != 0)
 			continue;
 		redo++;
-		error = UFS_BALLOC(vp, (off_t)(cgtod(fs, cg)) << fs->fs_fshift,
+		error = UFS_BALLOC(vp, lfragtosize(fs, cgtod(fs, cg)),
 		    fs->fs_bsize, KERNCRED, 0, &nbp);
 		if (error)
 			goto out1;
@@ -353,9 +356,9 @@ restart:
 	bcopy(fs, copy_fs, fs->fs_sbsize);
 	if ((fs->fs_flags & (FS_UNCLEAN | FS_NEEDSFSCK)) == 0)
 		copy_fs->fs_clean = 1;
-	if (fs->fs_sbsize < SBLOCKSIZE)
-		bzero(&sbp->b_data[loc + fs->fs_sbsize],
-		    SBLOCKSIZE - fs->fs_sbsize);
+	size = fs->fs_bsize < SBLOCKSIZE ? fs->fs_bsize : SBLOCKSIZE;
+	if (fs->fs_sbsize < size)
+		bzero(&sbp->b_data[loc + fs->fs_sbsize], size - fs->fs_sbsize);
 	size = blkroundup(fs, fs->fs_cssize);
 	if (fs->fs_contigsumsize > 0)
 		size += fs->fs_ncg * sizeof(int32_t);
@@ -394,7 +397,11 @@ restart:
 	 * spec_strategy about writing on a suspended filesystem.
 	 * Note that we skip unlinked snapshot files as they will
 	 * be handled separately below.
+	 *
+	 * We also calculate the needed size for the snapshot list.
 	 */
+	snaplistsize = fs->fs_ncg + howmany(fs->fs_cssize, fs->fs_bsize) +
+	    FSMAXSNAP + 1 /* superblock */ + 1 /* last block */ + 1 /* size */;
 	mp->mnt_kern_flag &= ~MNTK_SUSPENDED;
 	mtx_lock(&mntvnode_mtx);
 loop:
@@ -410,7 +417,7 @@ loop:
 		mp_fixme("Unlocked GETATTR.");
 		if (vrefcnt(xvp) == 0 || xvp->v_type == VNON ||
 		    (VTOI(xvp)->i_flags & SF_SNAPSHOT) ||
-		    (VOP_GETATTR(xvp, &vat, td->td_proc->p_ucred, td) == 0 &&
+		    (VOP_GETATTR(xvp, &vat, td->td_ucred, td) == 0 &&
 		    vat.va_nlink > 0)) {
 			mtx_lock(&mntvnode_mtx);
 			continue;
@@ -420,6 +427,10 @@ loop:
 		if (vn_lock(xvp, LK_EXCLUSIVE, td) != 0)
 			goto loop;
 		xp = VTOI(xvp);
+		if (ffs_checkfreefile(copy_fs, vp, xp->i_number)) {
+			VOP_UNLOCK(xvp, 0, td);
+			continue;
+		}
 		/*
 		 * If there is a fragment, clear it here.
 		 */
@@ -434,6 +445,7 @@ loop:
 				DIP(xp, i_db[loc]) = 0;
 			}
 		}
+		snaplistsize += 1;
 		if (xp->i_ump->um_fstype == UFS1)
 			error = expunge_ufs1(vp, xp, copy_fs, fullacct_ufs1,
 			    BLK_NOCOPY);
@@ -483,6 +495,36 @@ loop:
 	transferlockers(&vp->v_lock, vp->v_vnlock);
 	lockmgr(&vp->v_lock, LK_RELEASE, NULL, td);
 	/*
+	 * If this is the first snapshot on this filesystem, then we need
+	 * to allocate the space for the list of preallocated snapshot blocks.
+	 * This list will be refined below, but this preliminary one will
+	 * keep us out of deadlock until the full one is ready.
+	 */
+	if (xp == NULL) {
+		MALLOC(snapblklist, daddr_t *, snaplistsize * sizeof(daddr_t),
+		    M_UFSMNT, M_WAITOK);
+		blkp = &snapblklist[1];
+		*blkp++ = lblkno(fs, fs->fs_sblockloc);
+		blkno = fragstoblks(fs, fs->fs_csaddr);
+		for (cg = 0; cg < fs->fs_ncg; cg++) {
+			if (fragstoblks(fs, cgtod(fs, cg) > blkno))
+				break;
+			*blkp++ = fragstoblks(fs, cgtod(fs, cg));
+		}
+		len = howmany(fs->fs_cssize, fs->fs_bsize);
+		for (loc = 0; loc < len; loc++)
+			*blkp++ = blkno + loc;
+		for (; cg < fs->fs_ncg; cg++)
+			*blkp++ = fragstoblks(fs, cgtod(fs, cg));
+		snapblklist[0] = blkp - snapblklist;
+		VI_LOCK(devvp);
+		if (devvp->v_rdev->si_snapblklist != NULL)
+			panic("ffs_snapshot: non-empty list");
+		devvp->v_rdev->si_snapblklist = snapblklist;
+		devvp->v_rdev->si_snaplistsize = blkp - snapblklist;
+		VI_UNLOCK(devvp);
+	}
+	/*
 	 * Record snapshot inode. Since this is the newest snapshot,
 	 * it must be placed at the end of the list.
 	 */
@@ -531,10 +573,8 @@ out1:
 		}
 	}
 	/*
-	 * Allocate the space for the list of preallocated snapshot blocks.
+	 * Allocate space for the full list of preallocated snapshot blocks.
 	 */
-	snaplistsize = fs->fs_ncg + howmany(fs->fs_cssize, fs->fs_bsize) +
-	    FSMAXSNAP + 1 /* superblock */ + 1 /* last block */ + 1 /* size */;
 	MALLOC(snapblklist, daddr_t *, snaplistsize * sizeof(daddr_t),
 	    M_UFSMNT, M_WAITOK);
 	ip->i_snapblklist = &snapblklist[1];
@@ -552,6 +592,8 @@ out1:
 		FREE(snapblklist, M_UFSMNT);
 		goto done;
 	}
+	if (snaplistsize < ip->i_snapblklist - snapblklist)
+		panic("ffs_snapshot: list too small");
 	snaplistsize = ip->i_snapblklist - snapblklist;
 	snapblklist[0] = snaplistsize;
 	ip->i_snapblklist = 0;
@@ -596,16 +638,23 @@ out1:
 	 * should replace the previous list.
 	 */
 	VI_LOCK(devvp);
-	FREE(devvp->v_rdev->si_snapblklist, M_UFSMNT);
+	space = devvp->v_rdev->si_snapblklist;
 	devvp->v_rdev->si_snapblklist = snapblklist;
 	devvp->v_rdev->si_snaplistsize = snaplistsize;
+	if (space != NULL)
+		FREE(space, M_UFSMNT);
 	VI_UNLOCK(devvp);
 done:
 	free(copy_fs->fs_csp, M_UFSMNT);
 	bawrite(sbp);
 out:
-	if (saved_nice > 0)
-		td->td_ksegrp->kg_nice = saved_nice;
+	if (saved_nice > 0) {
+		PROC_LOCK(td->td_proc);
+		mtx_lock_spin(&sched_lock);
+		sched_nice(td->td_ksegrp, saved_nice);
+		mtx_unlock_spin(&sched_lock);
+		PROC_UNLOCK(td->td_proc);
+	}
 	if (fs->fs_active != 0) {
 		FREE(fs->fs_active, M_DEVBUF);
 		fs->fs_active = 0;
@@ -859,7 +908,7 @@ indiracct_ufs1(snapvp, cancelvp, level, blkno, lbn, rlbn, remblks,
 	 * We have to expand bread here since it will deadlock looking
 	 * up the block number for any blocks that are not in the cache.
 	 */
-	bp = getblk(cancelvp, lbn, fs->fs_bsize, 0, 0);
+	bp = getblk(cancelvp, lbn, fs->fs_bsize, 0, 0, 0);
 	bp->b_blkno = fsbtodb(fs, blkno);
 	if ((bp->b_flags & (B_DONE | B_DELWRI)) == 0 &&
 	    (error = readblock(bp, fragstoblks(fs, blkno)))) {
@@ -1134,7 +1183,7 @@ indiracct_ufs2(snapvp, cancelvp, level, blkno, lbn, rlbn, remblks,
 	 * We have to expand bread here since it will deadlock looking
 	 * up the block number for any blocks that are not in the cache.
 	 */
-	bp = getblk(cancelvp, lbn, fs->fs_bsize, 0, 0);
+	bp = getblk(cancelvp, lbn, fs->fs_bsize, 0, 0, 0);
 	bp->b_blkno = fsbtodb(fs, blkno);
 	if ((bp->b_flags & (B_DONE | B_DELWRI)) == 0 &&
 	    (error = readblock(bp, fragstoblks(fs, blkno)))) {

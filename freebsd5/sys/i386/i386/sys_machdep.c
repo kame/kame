@@ -31,15 +31,17 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
- * $FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.74 2002/10/04 20:19:36 jhb Exp $
+ * $FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.81 2003/04/25 20:04:02 jhb Exp $
  *
  */
 
 #include "opt_kstack_pages.h"
+#include "opt_mac.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
+#include <sys/mac.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
@@ -86,8 +88,9 @@ sysarch(td, uap)
 	struct thread *td;
 	register struct sysarch_args *uap;
 {
-	int error = 0;
+	int error;
 
+	mtx_lock(&Giant);
 	switch(uap->op) {
 	case I386_GET_LDT:
 		error = i386_get_ldt(td, uap->parms);
@@ -106,9 +109,10 @@ sysarch(td, uap)
 		error = vm86_sysarch(td, uap->parms);
 		break;
 	default:
-		error = EOPNOTSUPP;
+		error = EINVAL;
 		break;
 	}
+	mtx_unlock(&Giant);
 	return (error);
 }
 
@@ -129,7 +133,7 @@ i386_extend_pcb(struct thread *td)
 		0			/* granularity */
 	};
 
-	if (td->td_proc->p_flag & P_KSES)
+	if (td->td_proc->p_flag & P_THREADED)
 		return (EINVAL);		/* XXXKSE */
 /* XXXKSE  All the code below only works in 1:1   needs changing */
 	ext = (struct pcb_ext *)kmem_alloc(kernel_map, ctob(IOPAGES+1));
@@ -165,7 +169,7 @@ i386_extend_pcb(struct thread *td)
 	td->td_pcb->pcb_ext = ext;
 	
 	/* switch to the new TSS after syscall completes */
-	td->td_kse->ke_flags |= KEF_NEEDRESCHED;
+	td->td_flags |= TDF_NEEDRESCHED;
 	mtx_unlock_spin(&sched_lock);
 
 	return 0;
@@ -183,6 +187,10 @@ i386_set_ioperm(td, args)
 	if ((error = copyin(args, &ua, sizeof(struct i386_ioperm_args))) != 0)
 		return (error);
 
+#ifdef MAC
+	if ((error = mac_check_sysarch_ioperm(td->td_ucred)) != 0)
+		return (error);
+#endif
 	if ((error = suser(td)) != 0)
 		return (error);
 	if ((error = securelevel_gt(td->td_ucred, 0)) != 0)
@@ -276,7 +284,7 @@ static void
 set_user_ldt_rv(struct thread *td)
 {
 
-	if (td != PCPU_GET(curthread))
+	if (td->td_proc != curthread->td_proc)
 		return;
 
 	mtx_lock_spin(&sched_lock);

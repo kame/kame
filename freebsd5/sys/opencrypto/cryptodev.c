@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.4.4.1 2003/01/07 21:45:24 sam Exp $	*/
+/*	$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.11 2003/03/03 12:15:52 phk Exp $	*/
 /*	$OpenBSD: cryptodev.c,v 1.52 2002/06/19 07:22:46 deraadt Exp $	*/
 
 /*
@@ -134,7 +134,7 @@ cryptof_ioctl(
 	struct thread *td)
 {
 	struct cryptoini cria, crie;
-	struct fcrypt *fcr = (struct fcrypt *)fp->f_data;
+	struct fcrypt *fcr = fp->f_data;
 	struct csession *cse;
 	struct session_op *sop;
 	struct crypt_op *cop;
@@ -382,7 +382,8 @@ cryptodev_op(
 	}
 
 	crp->crp_ilen = cop->len;
-	crp->crp_flags = CRYPTO_F_IOV;
+	crp->crp_flags = CRYPTO_F_IOV | CRYPTO_F_CBIMM
+		       | (cop->flags & COP_F_BATCH);
 	crp->crp_buf = (caddr_t)&cse->uio;
 	crp->crp_callback = (int (*) (struct cryptop *)) cryptodev_cb;
 	crp->crp_sid = cse->sid;
@@ -608,7 +609,7 @@ cryptof_stat(
 static int
 cryptof_close(struct file *fp, struct thread *td)
 {
-	struct fcrypt *fcr = (struct fcrypt *)fp->f_data;
+	struct fcrypt *fcr = fp->f_data;
 	struct csession *cse;
 
 	while ((cse = TAILQ_FIRST(&fcr->csessions))) {
@@ -733,7 +734,7 @@ cryptoioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 		f->f_flag = FREAD | FWRITE;
 		f->f_type = DTYPE_CRYPTO;
 		f->f_ops = &cryptofops;
-		f->f_data = (caddr_t) fcr;
+		f->f_data = fcr;
 		*(u_int32_t *)data = fd;
 		fdrop(f, td);
 		break;
@@ -746,20 +747,13 @@ cryptoioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 
 #define	CRYPTO_MAJOR	70		/* from openbsd */
 static struct cdevsw crypto_cdevsw = {
-	/* open */	cryptoopen,
-	/* close */	nullclose,
-	/* read */	cryptoread,
-	/* write */	cryptowrite,
-	/* ioctl */	cryptoioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* dev name */	"crypto",
-	/* dev major */	CRYPTO_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
-	/* kqfilter */	NULL
+	.d_open =	cryptoopen,
+	.d_close =	nullclose,
+	.d_read =	cryptoread,
+	.d_write =	cryptowrite,
+	.d_ioctl =	cryptoioctl,
+	.d_name =	"crypto",
+	.d_maj =	CRYPTO_MAJOR,
 };
 static dev_t crypto_dev;
 

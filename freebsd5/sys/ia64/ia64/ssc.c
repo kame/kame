@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/ia64/ssc.c,v 1.12 2002/04/09 08:53:57 dfr Exp $
+ *	$FreeBSD: src/sys/ia64/ia64/ssc.c,v 1.15 2003/03/03 12:15:50 phk Exp $
  */
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -59,19 +59,14 @@ static	d_ioctl_t	sscioctl;
 
 #define CDEV_MAJOR 97
 static struct cdevsw ssc_cdevsw = {
-	/* open */	sscopen,
-	/* close */	sscclose,
-	/* read */	ttyread,
-	/* write */	ttywrite,
-	/* ioctl */	sscioctl,
-	/* poll */	ttypoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"ssc",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	sscopen,
+	.d_close =	sscclose,
+	.d_read =	ttyread,
+	.d_write =	ttywrite,
+	.d_ioctl =	sscioctl,
+	.d_poll =	ttypoll,
+	.d_name =	"ssc",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static struct tty *ssc_tp = NULL;
@@ -99,9 +94,6 @@ ssc(u_int64_t in0, u_int64_t in1, u_int64_t in2, u_int64_t in3, int which)
 static void
 ssccnprobe(struct consdev *cp)
 {
-	if (!ia64_running_in_simulator())
-		return;
-
 	cp->cn_dev = makedev(CDEV_MAJOR, 0);
 	cp->cn_pri = CN_INTERNAL;
 }
@@ -114,20 +106,18 @@ ssccninit(struct consdev *cp)
 static void
 ssccnattach(void *arg)
 {
-	if (!ia64_running_in_simulator())
-		return;
 	make_dev(&ssc_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "ssccons");
 }
 SYSINIT(ssccnattach, SI_SUB_DRIVERS, SI_ORDER_ANY, ssccnattach, 0);
 
 static void
-ssccnputc(dev_t dev, int c)
+ssccnputc(struct consdev *cp, int c)
 {
 	ssc(c, 0, 0, 0, SSC_PUTCHAR);
 }
 
 static int
-ssccngetc(dev_t dev)
+ssccngetc(struct consdev *cp)
 {
 	int c;
 	do {
@@ -138,7 +128,7 @@ ssccngetc(dev_t dev)
 }
 
 static int
-ssccncheckc(dev_t dev)
+ssccncheckc(struct consdev *cp)
 {
     int c;
     c = ssc(0, 0, 0, 0, SSC_GETCHAR);
@@ -247,7 +237,7 @@ sscstart(struct tty *tp)
 
 	tp->t_state |= TS_BUSY;
 	while (tp->t_outq.c_cc != 0)
-		ssccnputc(tp->t_dev, getc(&tp->t_outq));
+		ssccnputc(NULL, getc(&tp->t_outq));
 	tp->t_state &= ~TS_BUSY;
 
 	ttwwakeup(tp);
@@ -275,7 +265,7 @@ ssctimeout(void *v)
 	struct tty *tp = v;
 	int c;
 
-	while ((c = ssccncheckc(tp->t_dev)) != -1) {
+	while ((c = ssccncheckc(NULL)) != -1) {
 		if (tp->t_state & TS_ISOPEN)
 			(*linesw[tp->t_line].l_rint)(c, tp);
 	}

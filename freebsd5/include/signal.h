@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)signal.h	8.3 (Berkeley) 3/30/94
- * $FreeBSD: src/include/signal.h,v 1.23 2002/10/16 07:01:10 bde Exp $
+ * $FreeBSD: src/include/signal.h,v 1.24 2003/03/31 23:30:41 jeff Exp $
  */
 
 #ifndef _SIGNAL_H_
@@ -85,11 +85,11 @@ int	sigwait(const sigset_t * __restrict, int * __restrict);
  * in scope (in the current implementation), so we can't use it here.
  */
 int	sigqueue(__pid_t, int, const union sigval);
+#endif
 struct timespec;
 int	sigtimedwait(const sigset_t * __restrict, siginfo_t * __restrict,
 	    const struct timespec * __restrict);
 int	sigwaitinfo(const sigset_t * __restrict, siginfo_t * __restrict);
-#endif
 #endif
 
 #if __XSI_VISIBLE

@@ -72,6 +72,9 @@
  * datasheet from www.qualitysemi.com
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/qsphy.c,v 1.11 2003/04/03 21:36:30 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -85,16 +88,11 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-#include <dev/mii/miidevs.h>
+#include "miidevs.h"
 
 #include <dev/mii/qsphyreg.h>
 
 #include "miibus_if.h"
-
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/qsphy.c,v 1.9 2002/10/14 22:31:52 alfred Exp $";
-#endif
 
 static int qsphy_probe(device_t);
 static int qsphy_attach(device_t);

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_subr.c,v 1.1 2001/04/10 07:59:05 bp Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_subr.c,v 1.3 2003/02/03 19:49:34 phk Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -108,7 +108,7 @@ static u_short lastdtime;
 void
 smb_time_local2server(struct timespec *tsp, int tzoff, u_long *seconds)
 {
-	*seconds = tsp->tv_sec - tzoff * 60 /*- tz.tz_minuteswest * 60 -
+	*seconds = tsp->tv_sec - tzoff * 60 /*- tz_minuteswest * 60 -
 	    (wall_cmos_clock ? adjkerntz : 0)*/;
 }
 
@@ -116,7 +116,7 @@ void
 smb_time_server2local(u_long seconds, int tzoff, struct timespec *tsp)
 {
 	tsp->tv_sec = seconds + tzoff * 60;
-	    /*+ tz.tz_minuteswest * 60 + (wall_cmos_clock ? adjkerntz : 0)*/;
+	    /*+ tz_minuteswest * 60 + (wall_cmos_clock ? adjkerntz : 0)*/;
 }
 
 /*
@@ -270,7 +270,7 @@ smb_fphelp(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *np,
 			return ENAMETOOLONG;
 		}
 		*npp++ = np;
-		np = np->n_parent;
+		np = VTOSMB(np->n_parent);
 	}
 /*	if (i == 0)
 		return smb_put_dmem(mbp, vcp, "\\", 2, caseopt);*/

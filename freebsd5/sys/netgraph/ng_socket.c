@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.39 2002/08/22 00:30:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.44 2003/02/19 05:47:32 imp Exp $
  * $Whistle: ng_socket.c,v 1.28 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -562,7 +562,7 @@ ng_detach_common(struct ngpcb *pcbp, int which)
 
 #ifdef NOTYET
 /*
- * File descriptors can be passed into a AF_NETGRAPH socket.
+ * File descriptors can be passed into an AF_NETGRAPH socket.
  * Note, that file descriptors cannot be passed OUT.
  * Only character device descriptors are accepted.
  * Character devices are useful to connect a graph to a device,
@@ -597,11 +597,11 @@ ng_internalize(struct mbuf *control, struct thread *td)
 		return (error);
 
 	/* Depending on what kind of resource it is, act differently. For
-	 * devices, we treat it as a file. For a AF_NETGRAPH socket,
+	 * devices, we treat it as a file. For an AF_NETGRAPH socket,
 	 * shortcut straight to the node. */
 	switch (fp->f_type) {
 	case DTYPE_VNODE:
-		vn = (struct vnode *) fp->f_data;
+		vn = fp->f_data;
 		if (vn && (vn->v_type == VCHR)) {
 			/* for a VCHR, actually reference the FILE */
 			fp->f_count++;

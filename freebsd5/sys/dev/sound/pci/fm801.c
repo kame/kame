@@ -29,7 +29,7 @@
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/fm801.c,v 1.15 2002/09/03 08:58:15 sobomax Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/fm801.c,v 1.17 2003/02/20 17:31:11 cognet Exp $");
 
 #define PCI_VENDOR_FORTEMEDIA	0x1319
 #define PCI_DEVICE_FORTEMEDIA1	0x08011319
@@ -184,15 +184,17 @@ fm801_rd(struct fm801_info *fm801, int regno, int size)
 static void
 fm801_wr(struct fm801_info *fm801, int regno, u_int32_t data, int size)
 {
+
 	switch(size) {
 	case 1:
-		return bus_space_write_1(fm801->st, fm801->sh, regno, data);
+		bus_space_write_1(fm801->st, fm801->sh, regno, data);
+		break;
 	case 2:
-		return bus_space_write_2(fm801->st, fm801->sh, regno, data);
+		bus_space_write_2(fm801->st, fm801->sh, regno, data);
+		break;
 	case 4:
-		return bus_space_write_4(fm801->st, fm801->sh, regno, data);
-	default:
-		return;
+		bus_space_write_4(fm801->st, fm801->sh, regno, data);
+		break;
 	}
 }
 
@@ -434,7 +436,7 @@ fm801ch_trigger(kobj_t obj, void *data, int go)
 {
 	struct fm801_chinfo *ch = data;
 	struct fm801_info *fm801 = ch->parent;
-	u_int32_t baseaddr = vtophys(sndbuf_getbuf(ch->buffer));
+	u_int32_t baseaddr = sndbuf_getbufaddr(ch->buffer);
 	u_int32_t k1;
 
 	DPRINT("fm801ch_trigger go %d , ", go);

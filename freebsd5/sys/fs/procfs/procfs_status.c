@@ -38,10 +38,11 @@
  *
  * From:
  *	$Id: procfs_status.c,v 3.1 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.45 2002/09/21 22:07:16 jake Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.48 2003/05/01 16:59:22 des Exp $
  */
 
 #include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/exec.h>
 #include <sys/lock.h>
@@ -70,6 +71,7 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 	struct thread *tdfirst;
 	struct tty *tp;
 	struct ucred *cr;
+	const char *wmesg;
 	char *pc;
 	char *sep;
 	int pid, ppid, pgid, sid;
@@ -95,7 +97,7 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 			sbuf_putc(sb, *pc);
 	} while (*++pc);
 	sbuf_printf(sb, " %d %d %d %d ", pid, ppid, pgid, sid);
-	if ((p->p_flag&P_CONTROLT) && (tp = sess->s_ttyp))
+	if ((p->p_flag & P_CONTROLT) && (tp = sess->s_ttyp))
 		sbuf_printf(sb, "%d,%d ", major(tp->t_dev), minor(tp->t_dev));
 	else
 		sbuf_printf(sb, "%d,%d ", -1, -1);
@@ -115,14 +117,27 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 	}
 
 	mtx_lock_spin(&sched_lock);
+	if (p->p_flag & P_THREADED)
+		wmesg = "-kse- ";
+	else {
+		tdfirst = FIRST_THREAD_IN_PROC(p);
+		if (tdfirst->td_wchan != NULL) {
+			KASSERT(tdfirst->td_wmesg != NULL,
+			    ("wchan %p has no wmesg", tdfirst->td_wchan));
+			wmesg = tdfirst->td_wmesg;
+		} else
+			wmesg = "nochan";
+	}
+
 	if (p->p_sflag & PS_INMEM) {
-		struct timeval ut, st;
+		struct timeval start, ut, st;
 
 		calcru(p, &ut, &st, (struct timeval *) NULL);
 		mtx_unlock_spin(&sched_lock);
-		sbuf_printf(sb, " %lld,%ld %ld,%ld %ld,%ld",
-		    (long long)p->p_stats->p_start.tv_sec,
-		    p->p_stats->p_start.tv_usec,
+		start = p->p_stats->p_start;
+		timevaladd(&start, &boottime);
+		sbuf_printf(sb, " %ld,%ld %ld,%ld %ld,%ld",
+		    start.tv_sec, start.tv_usec,
 		    ut.tv_sec, ut.tv_usec,
 		    st.tv_sec, st.tv_usec);
 	} else {
@@ -130,14 +145,7 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 		sbuf_printf(sb, " -1,-1 -1,-1 -1,-1");
 	}
 
-	if (p->p_flag & P_KSES)
-		sbuf_printf(sb, " %s", "-kse- ");
-	else {
-		tdfirst = FIRST_THREAD_IN_PROC(p);	/* XXX diff from td? */
-		sbuf_printf(sb, " %s",
-		    (tdfirst->td_wchan && tdfirst->td_wmesg) ?
-		    tdfirst->td_wmesg : "nochan");
-	}
+	sbuf_printf(sb, " %s", wmesg);
 
 	cr = p->p_ucred;
 

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/keysock.c,v 1.1 2002/10/16 02:10:07 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/keysock.c,v 1.5 2003/04/08 14:25:46 des Exp $	*/
 /*	$KAME: keysock.c,v 1.25 2001/08/13 20:07:41 itojun Exp $	*/
 
 /*
@@ -114,8 +114,7 @@ key_output(m, va_alist)
 		}
 	}
 
-	if ((m->m_flags & M_PKTHDR) == 0)
-		panic("key_output: not M_PKTHDR ??");
+	M_ASSERTPKTHDR(m);
 
 	KEYDEBUG(KEYDEBUG_KEY_DUMP, kdebug_mbuf(m));
 
@@ -152,7 +151,7 @@ key_sendup0(rp, m, promisc)
 	if (promisc) {
 		struct sadb_msg *pmsg;
 
-		M_PREPEND(m, sizeof(struct sadb_msg), M_NOWAIT);
+		M_PREPEND(m, sizeof(struct sadb_msg), M_DONTWAIT);
 		if (m && m->m_len < sizeof(struct sadb_msg))
 			m = m_pullup(m, sizeof(struct sadb_msg));
 		if (!m) {

@@ -1,5 +1,5 @@
 /*	$NetBSD: if_gre.c,v 1.42 2002/08/14 00:23:27 itojun Exp $ */
-/*	 $FreeBSD: src/sys/net/if_gre.c,v 1.9 2002/11/15 00:00:15 sam Exp $ */
+/*	 $FreeBSD: src/sys/net/if_gre.c,v 1.12 2003/03/05 19:24:22 peter Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,7 +48,6 @@
 
 #include "opt_atalk.h"
 #include "opt_inet.h"
-#include "opt_ns.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -335,11 +334,6 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 #ifdef NETATALK
 		case AF_APPLETALK:
 			etype = ETHERTYPE_ATALK;
-			break;
-#endif
-#ifdef NS
-		case AF_NS:
-			etype = ETHERTYPE_NS;
 			break;
 #endif
 		default:

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_balloc.c	8.4 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_balloc.c,v 1.17 2002/05/18 19:12:38 iedowse Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_balloc.c,v 1.18 2003/03/04 00:04:42 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -147,7 +147,7 @@ ext2_debug("ext2_balloc called (%d, %d, %d)\n",
 			    nsize, cred, &newb);
 			if (error)
 				return (error);
-			bp = getblk(vp, bn, nsize, 0, 0);
+			bp = getblk(vp, bn, nsize, 0, 0, 0);
 			bp->b_blkno = fsbtodb(fs, newb);
 			if (flags & B_CLRBUF)
 				vfs_bio_clrbuf(bp);
@@ -194,7 +194,7 @@ ext2_debug("ext2_balloc called (%d, %d, %d)\n",
 		    cred, &newb)) != 0)
 			return (error);
 		nb = newb;
-		bp = getblk(vp, indirs[1].in_lbn, fs->s_blocksize, 0, 0);
+		bp = getblk(vp, indirs[1].in_lbn, fs->s_blocksize, 0, 0, 0);
 		bp->b_blkno = fsbtodb(fs, newb);
 		vfs_bio_clrbuf(bp);
 		/*
@@ -246,7 +246,7 @@ ext2_debug("ext2_balloc called (%d, %d, %d)\n",
 			return (error);
 		}
 		nb = newb;
-		nbp = getblk(vp, indirs[i].in_lbn, fs->s_blocksize, 0, 0);
+		nbp = getblk(vp, indirs[i].in_lbn, fs->s_blocksize, 0, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 		vfs_bio_clrbuf(nbp);
 		/*
@@ -281,7 +281,7 @@ ext2_debug("ext2_balloc called (%d, %d, %d)\n",
 			return (error);
 		}
 		nb = newb;
-		nbp = getblk(vp, lbn, fs->s_blocksize, 0, 0);
+		nbp = getblk(vp, lbn, fs->s_blocksize, 0, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 		if (flags & B_CLRBUF)
 			vfs_bio_clrbuf(nbp);
@@ -306,7 +306,7 @@ ext2_debug("ext2_balloc called (%d, %d, %d)\n",
 			return (error);
 		}
 	} else {
-		nbp = getblk(vp, lbn, fs->s_blocksize, 0, 0);
+		nbp = getblk(vp, lbn, fs->s_blocksize, 0, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 	}
 	*bpp = nbp;

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/raidframe/rf_types.h,v 1.2 2002/10/28 17:08:07 scottl Exp $ */
+/*	$FreeBSD: src/sys/dev/raidframe/rf_types.h,v 1.3 2003/04/29 13:36:00 kan Exp $ */
 /*	$NetBSD: rf_types.h,v 1.6 1999/09/05 03:05:55 oster Exp $	*/
 /*
  * rf_types.h
@@ -64,8 +64,8 @@
  */
 
 #include <sys/types.h>
+#include <sys/limits.h>
 #include <machine/endian.h>
-#include <machine/limits.h>
 
 #if BYTE_ORDER == BIG_ENDIAN
 #define RF_IS_BIG_ENDIAN    1

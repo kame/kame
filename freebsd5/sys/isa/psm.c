@@ -20,7 +20,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/psm.c,v 1.47 2002/08/25 13:17:16 charnier Exp $
+ * $FreeBSD: src/sys/isa/psm.c,v 1.55 2003/04/30 12:57:39 markm Exp $
  */
 
 /*
@@ -77,7 +77,7 @@
 #include <sys/time.h>
 #include <sys/uio.h>
 
-#include <machine/limits.h>
+#include <sys/limits.h>
 #include <sys/mouse.h>
 #include <machine/resource.h>
 
@@ -129,15 +129,6 @@
 #define PSM_NBLOCKIO(dev)	(minor(dev) & 1)
 #define PSM_MKMINOR(unit,block)	(((unit) << 1) | ((block) ? 0:1))
 
-#ifndef max
-#define max(x,y)		((x) > (y) ? (x) : (y))
-#endif
-#ifndef min
-#define min(x,y)		((x) < (y) ? (x) : (y))
-#endif
-
-#define abs(x)			(((x) < 0) ? -(x) : (x))
-
 /* ring buffer */
 typedef struct ringbuf {
     int           count;	/* # of valid elements in the buffer */
@@ -173,7 +164,7 @@ struct psm_softc {		/* Driver status information */
     dev_t	  dev;
     dev_t	  bdev;
 };
-devclass_t psm_devclass;
+static devclass_t psm_devclass;
 #define PSM_SOFTC(unit)	((struct psm_softc*)devclass_get_softc(psm_devclass, unit))
 
 /* driver state flags (state) */
@@ -335,19 +326,13 @@ static driver_t psm_driver = {
 #define CDEV_MAJOR        21
 
 static struct cdevsw psm_cdevsw = {
-	/* open */	psmopen,
-	/* close */	psmclose,
-	/* read */	psmread,
-	/* write */	nowrite,
-	/* ioctl */	psmioctl,
-	/* poll */	psmpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	PSM_DRIVER_NAME,
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	psmopen,
+	.d_close =	psmclose,
+	.d_read =	psmread,
+	.d_ioctl =	psmioctl,
+	.d_poll =	psmpoll,
+	.d_name =	PSM_DRIVER_NAME,
+	.d_maj =	CDEV_MAJOR,
 };
 
 /* debug message level */
@@ -1491,24 +1476,24 @@ tame_mouse(struct psm_softc *sc, mousestatus_t *status, unsigned char *buf)
 	    mapped |= MOUSE_BUTTON1DOWN;
         status->button = mapped;
         buf[0] = MOUSE_PS2_SYNC | butmapps2[mapped & MOUSE_STDBUTTONS];
-        i = max(min(status->dx, 255), -256);
+        i = imax(imin(status->dx, 255), -256);
 	if (i < 0)
 	    buf[0] |= MOUSE_PS2_XNEG;
         buf[1] = i;
-        i = max(min(status->dy, 255), -256);
+        i = imax(imin(status->dy, 255), -256);
 	if (i < 0)
 	    buf[0] |= MOUSE_PS2_YNEG;
         buf[2] = i;
 	return MOUSE_PS2_PACKETSIZE;
     } else if (sc->mode.level == PSM_LEVEL_STANDARD) {
         buf[0] = MOUSE_MSC_SYNC | butmapmsc[status->button & MOUSE_STDBUTTONS];
-        i = max(min(status->dx, 255), -256);
+        i = imax(imin(status->dx, 255), -256);
         buf[1] = i >> 1;
         buf[3] = i - buf[1];
-        i = max(min(status->dy, 255), -256);
+        i = imax(imin(status->dy, 255), -256);
         buf[2] = i >> 1;
         buf[4] = i - buf[2];
-        i = max(min(status->dz, 127), -128);
+        i = imax(imin(status->dz, 127), -128);
         buf[5] = (i >> 1) & 0x7f;
         buf[6] = (i - (i >> 1)) & 0x7f;
         buf[7] = (~status->button >> 3) & 0x7f;
@@ -1537,7 +1522,7 @@ psmread(dev_t dev, struct uio *uio, int flag)
             return EWOULDBLOCK;
         }
         sc->state |= PSM_ASLP;
-        error = tsleep((caddr_t) sc, PZERO | PCATCH, "psmrea", 0);
+        error = tsleep( sc, PZERO | PCATCH, "psmrea", 0);
         sc->state &= ~PSM_ASLP;
         if (error) {
             splx(s);
@@ -1553,7 +1538,7 @@ psmread(dev_t dev, struct uio *uio, int flag)
     /* copy data to the user land */
     while ((sc->queue.count > 0) && (uio->uio_resid > 0)) {
         s = spltty();
-	l = min(sc->queue.count, uio->uio_resid);
+	l = imin(sc->queue.count, uio->uio_resid);
 	if (l > sizeof(buf))
 	    l = sizeof(buf);
 	if (l > sizeof(sc->queue.buf) - sc->queue.head) {
@@ -2363,7 +2348,7 @@ psmintr(void *arg)
 
         /* queue data */
         if (sc->queue.count + sc->inputbytes < sizeof(sc->queue.buf)) {
-	    l = min(sc->inputbytes, sizeof(sc->queue.buf) - sc->queue.tail);
+	    l = imin(sc->inputbytes, sizeof(sc->queue.buf) - sc->queue.tail);
 	    bcopy(&sc->ipacket[0], &sc->queue.buf[sc->queue.tail], l);
 	    if (sc->inputbytes > l)
 	        bcopy(&sc->ipacket[l], &sc->queue.buf[0], sc->inputbytes - l);
@@ -2375,7 +2360,7 @@ psmintr(void *arg)
 
         if (sc->state & PSM_ASLP) {
             sc->state &= ~PSM_ASLP;
-            wakeup((caddr_t) sc);
+            wakeup( sc);
     	}
         selwakeup(&sc->rsel);
     }
@@ -2830,7 +2815,7 @@ psmresume(device_t dev)
 	 * cannot be accessed anymore.
 	 */
         sc->state &= ~PSM_ASLP;
-        wakeup((caddr_t)sc);
+        wakeup(sc);
     }
 
     if (verbose >= 2)
@@ -2879,7 +2864,10 @@ static struct isa_pnp_id psmcpnp_ids[] = {
 	{ 0x1303d041, "PS/2 port" },			/* PNP0313, XXX */
 	{ 0x80374d24, "IBM PS/2 mouse port" },		/* IBM3780, ThinkPad */
 	{ 0x81374d24, "IBM PS/2 mouse port" },		/* IBM3781, ThinkPad */
-	{ 0x0490d94d, "SONY VAIO PS/2 mouse port"},     /* SNY9004, Vaio*/
+	{ 0x0190d94d, "SONY VAIO PS/2 mouse port"},     /* SNY9001, Vaio */
+	{ 0x0290d94d, "SONY VAIO PS/2 mouse port"},	/* SNY9002, Vaio */
+	{ 0x0390d94d, "SONY VAIO PS/2 mouse port"},	/* SNY9003, Vaio */
+	{ 0x0490d94d, "SONY VAIO PS/2 mouse port"},     /* SNY9004, Vaio */
 	{ 0 }
 };
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)spec_vnops.c	8.14 (Berkeley) 5/21/95
- * $FreeBSD: src/sys/fs/specfs/spec_vnops.c,v 1.186 2002/11/04 07:29:20 mckusick Exp $
+ * $FreeBSD: src/sys/fs/specfs/spec_vnops.c,v 1.199 2003/03/13 07:31:45 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -56,9 +56,7 @@
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
 
-
 static int	spec_advlock(struct vop_advlock_args *);
-static int	spec_bmap(struct vop_bmap_args *);
 static int	spec_close(struct vop_close_args *);
 static int	spec_freeblks(struct vop_freeblks_args *);
 static int	spec_fsync(struct  vop_fsync_args *);
@@ -70,6 +68,7 @@ static int	spec_poll(struct vop_poll_args *);
 static int	spec_print(struct vop_print_args *);
 static int	spec_read(struct vop_read_args *);
 static int	spec_strategy(struct vop_strategy_args *);
+static int	spec_specstrategy(struct vop_specstrategy_args *);
 static int	spec_write(struct vop_write_args *);
 
 vop_t **spec_vnodeop_p;
@@ -77,7 +76,7 @@ static struct vnodeopv_entry_desc spec_vnodeop_entries[] = {
 	{ &vop_default_desc,		(vop_t *) vop_defaultop },
 	{ &vop_access_desc,		(vop_t *) vop_ebadf },
 	{ &vop_advlock_desc,		(vop_t *) spec_advlock },
-	{ &vop_bmap_desc,		(vop_t *) spec_bmap },
+	{ &vop_bmap_desc,		(vop_t *) vop_panic },
 	{ &vop_close_desc,		(vop_t *) spec_close },
 	{ &vop_create_desc,		(vop_t *) vop_panic },
 	{ &vop_freeblks_desc,		(vop_t *) spec_freeblks },
@@ -103,12 +102,10 @@ static struct vnodeopv_entry_desc spec_vnodeop_entries[] = {
 	{ &vop_rename_desc,		(vop_t *) vop_panic },
 	{ &vop_rmdir_desc,		(vop_t *) vop_panic },
 	{ &vop_setattr_desc,		(vop_t *) vop_ebadf },
+	{ &vop_specstrategy_desc,	(vop_t *) spec_specstrategy },
 	{ &vop_strategy_desc,		(vop_t *) spec_strategy },
 	{ &vop_symlink_desc,		(vop_t *) vop_panic },
 	{ &vop_write_desc,		(vop_t *) spec_write },
-	{ &vop_lock_desc,		(vop_t *) vop_nolock },
-	{ &vop_unlock_desc,		(vop_t *) vop_nounlock },
-	{ &vop_islocked_desc,		(vop_t *) vop_noislocked },
 	{ NULL, NULL }
 };
 static struct vnodeopv_desc spec_vnodeop_opv_desc =
@@ -125,8 +122,6 @@ spec_vnoperate(ap)
 {
 	return (VOCALL(spec_vnodeop_p, ap->a_desc->vdesc_offset, ap));
 }
-
-static void spec_getpages_iodone(struct buf *bp);
 
 /*
  * Open a special file.
@@ -395,8 +390,6 @@ spec_kqfilter(ap)
 
 	dev = ap->a_vp->v_rdev;
 	dsw = devsw(dev);
-	if (!(dsw->d_flags & D_KQFILTER))
-		return (1);
 	if (dsw->d_flags & D_NOGIANT) {
 		DROP_GIANT();
 		error = dsw->d_kqfilter(dev, ap->a_kn);
@@ -419,89 +412,10 @@ spec_fsync(ap)
 		struct thread *a_td;
 	} */ *ap;
 {
-	struct vnode *vp = ap->a_vp;
-	struct buf *bp;
-	struct buf *nbp;
-	int s, error = 0;
-	int maxretry = 100;	/* large, arbitrarily chosen */
-
-	if (!vn_isdisk(vp, NULL))
+	if (!vn_isdisk(ap->a_vp, NULL))
 		return (0);
 
-	VI_LOCK(vp);
-loop1:
-	/*
-	 * MARK/SCAN initialization to avoid infinite loops.
-	 */
-	s = splbio();
-        TAILQ_FOREACH(bp, &vp->v_dirtyblkhd, b_vnbufs) {
-                bp->b_flags &= ~B_SCANNED;
-		bp->b_error = 0;
-	}
-	splx(s);
-
-	/*
-	 * Flush all dirty buffers associated with a block device.
-	 */
-loop2:
-	s = splbio();
-	for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp != NULL; bp = nbp) {
-		nbp = TAILQ_NEXT(bp, b_vnbufs);
-		if ((bp->b_flags & B_SCANNED) != 0)
-			continue;
-		VI_UNLOCK(vp);
-		bp->b_flags |= B_SCANNED;
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT)) {
-			VI_LOCK(vp);
-			continue;
-		}
-		if ((bp->b_flags & B_DELWRI) == 0)
-			panic("spec_fsync: not dirty");
-		if ((vp->v_vflag & VV_OBJBUF) && (bp->b_flags & B_CLUSTEROK)) {
-			BUF_UNLOCK(bp);
-			vfs_bio_awrite(bp);
-			splx(s);
-		} else {
-			bremfree(bp);
-			splx(s);
-			bawrite(bp);
-		}
-		VI_LOCK(vp);
-		goto loop2;
-	}
-
-	/*
-	 * If synchronous the caller expects us to completely resolve all
-	 * dirty buffers in the system.  Wait for in-progress I/O to
-	 * complete (which could include background bitmap writes), then
-	 * retry if dirty blocks still exist.
-	 */
-	if (ap->a_waitfor == MNT_WAIT) {
-		while (vp->v_numoutput) {
-			vp->v_iflag |= VI_BWAIT;
-			msleep((caddr_t)&vp->v_numoutput, VI_MTX(vp),
-			    PRIBIO + 1, "spfsyn", 0);
-		}
-		if (!TAILQ_EMPTY(&vp->v_dirtyblkhd)) {
-			/*
-			 * If we are unable to write any of these buffers
-			 * then we fail now rather than trying endlessly
-			 * to write them out.
-			 */
-			TAILQ_FOREACH(bp, &vp->v_dirtyblkhd, b_vnbufs)
-				if ((error = bp->b_error) == 0)
-					continue;
-			if (error == 0 && --maxretry >= 0) {
-				splx(s);
-				goto loop1;
-			}
-			vprint("spec_fsync: giving up on dirty", vp);
-			error = EAGAIN;
-		}
-	}
-	VI_UNLOCK(vp);
-	splx(s);
-	return (error);
+	return (vop_stdfsync(ap));
 }
 
 /*
@@ -523,22 +437,13 @@ SYSCTL_INT(_debug, OID_AUTO, doslowdown, CTLFLAG_RW, &doslowdown, 0, "");
  * Just call the device strategy routine
  */
 static int
-spec_strategy(ap)
-	struct vop_strategy_args /* {
-		struct vnode *a_vp;
-		struct buf *a_bp;
-	} */ *ap;
+spec_xstrategy(struct vnode *vp, struct buf *bp)
 {
-	struct buf *bp;
-	struct vnode *vp;
 	struct mount *mp;
 	int error;
 	struct cdevsw *dsw;
 	struct thread *td = curthread;
 	
-	bp = ap->a_bp;
-	vp = ap->a_vp;
-
 	KASSERT(bp->b_iocmd == BIO_READ ||
 		bp->b_iocmd == BIO_WRITE ||
 		bp->b_iocmd == BIO_DELETE, 
@@ -602,12 +507,47 @@ spec_strategy(ap)
 	
 	if (dsw->d_flags & D_NOGIANT) {
 		DROP_GIANT();
-		DEV_STRATEGY(bp, 0);
+		DEV_STRATEGY(bp);
 		PICKUP_GIANT();
 	} else
-		DEV_STRATEGY(bp, 0);
+		DEV_STRATEGY(bp);
 		
 	return (0);
+}
+
+/*
+ * Decoy strategy routine.  We should always come in via the specstrategy
+ * method, but in case some code has botched it, we have a strategy as
+ * well.  We will deal with the request anyway and first time around we
+ * print some debugging useful information.
+ */
+
+static int
+spec_strategy(ap)
+	struct vop_strategy_args /* {
+		struct vnode *a_vp;
+		struct buf *a_bp;
+	} */ *ap;
+{
+	static int once;
+
+	if (!once) {
+		vprint("VOP_STRATEGY on VCHR", ap->a_vp);
+		backtrace();
+		once++;
+	}
+	return spec_xstrategy(ap->a_vp, ap->a_bp);
+}
+
+static int
+spec_specstrategy(ap)
+	struct vop_specstrategy_args /* {
+		struct vnode *a_vp;
+		struct buf *a_bp;
+	} */ *ap;
+{
+
+	return spec_xstrategy(ap->a_vp, ap->a_bp);
 }
 
 static int
@@ -618,15 +558,13 @@ spec_freeblks(ap)
 		daddr_t a_length;
 	} */ *ap;
 {
-	struct cdevsw *bsw;
 	struct buf *bp;
 
 	/*
 	 * XXX: This assumes that strategy does the deed right away.
 	 * XXX: this may not be TRTTD.
 	 */
-	bsw = devsw(ap->a_vp->v_rdev);
-	if ((bsw->d_flags & D_CANFREE) == 0)
+	if ((ap->a_vp->v_rdev->si_flags & SI_CANDELETE) == 0)
 		return (0);
 	bp = geteblk(ap->a_length);
 	bp->b_iocmd = BIO_DELETE;
@@ -635,40 +573,7 @@ spec_freeblks(ap)
 	bp->b_offset = dbtob(ap->a_addr);
 	bp->b_bcount = ap->a_length;
 	BUF_KERNPROC(bp);
-	DEV_STRATEGY(bp, 0);
-	return (0);
-}
-
-/*
- * Implement degenerate case where the block requested is the block
- * returned, and assume that the entire device is contiguous in regards
- * to the contiguous block range (runp and runb).
- */
-static int
-spec_bmap(ap)
-	struct vop_bmap_args /* {
-		struct vnode *a_vp;
-		daddr_t  a_bn;
-		struct vnode **a_vpp;
-		daddr_t *a_bnp;
-		int *a_runp;
-		int *a_runb;
-	} */ *ap;
-{
-	struct vnode *vp = ap->a_vp;
-	int runp = 0;
-	int runb = 0;
-
-	if (ap->a_vpp != NULL)
-		*ap->a_vpp = vp;
-	if (ap->a_bnp != NULL)
-		*ap->a_bnp = ap->a_bn;
-	if (vp->v_mount != NULL)
-		runp = runb = MAXBSIZE / vp->v_mount->mnt_stat.f_iosize;
-	if (ap->a_runp != NULL)
-		*ap->a_runp = runp;
-	if (ap->a_runb != NULL)
-		*ap->a_runb = runb;
+	DEV_STRATEGY(bp);
 	return (0);
 }
 
@@ -760,8 +665,7 @@ spec_print(ap)
 	} */ *ap;
 {
 
-	printf("tag %s, dev %s\n", ap->a_vp->v_tag,
-	       devtoname(ap->a_vp->v_rdev));
+	printf("\tdev %s\n", devtoname(ap->a_vp->v_rdev));
 	return (0);
 }
 
@@ -781,15 +685,6 @@ spec_advlock(ap)
 {
 
 	return (ap->a_flags & F_FLOCK ? EOPNOTSUPP : EINVAL);
-}
-
-static void
-spec_getpages_iodone(bp)
-	struct buf *bp;
-{
-
-	bp->b_flags |= B_DONE;
-	wakeup(bp);
 }
 
 static int
@@ -849,7 +744,7 @@ spec_getpages(ap)
 
 	/* Build a minimal buffer header. */
 	bp->b_iocmd = BIO_READ;
-	bp->b_iodone = spec_getpages_iodone;
+	bp->b_iodone = bdone;
 
 	/* B_PHYS is not set, but it is nice to fill this in. */
 	KASSERT(bp->b_rcred == NOCRED, ("leaking read ucred"));
@@ -869,14 +764,10 @@ spec_getpages(ap)
 	cnt.v_vnodepgsin += pcount;
 
 	/* Do the input. */
-	BUF_STRATEGY(bp);
+	spec_xstrategy(bp->b_vp, bp);
 
 	s = splbio();
-
-	/* We definitely need to be at splbio here. */
-	while ((bp->b_flags & B_DONE) == 0)
-		tsleep(bp, PVM, "spread", 0);
-
+	bwait(bp, PVM, "spread");
 	splx(s);
 
 	if ((bp->b_ioflags & BIO_ERROR) != 0) {

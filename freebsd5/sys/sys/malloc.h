@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)malloc.h	8.5 (Berkeley) 5/3/95
- * $FreeBSD: src/sys/sys/malloc.h,v 1.68 2002/11/01 18:58:12 phk Exp $
+ * $FreeBSD: src/sys/sys/malloc.h,v 1.74 2003/03/25 00:07:05 jake Exp $
  */
 
 #ifndef _SYS_MALLOC_H_
@@ -46,11 +46,11 @@
 /*
  * flags to malloc.
  */
-#define	M_WAITOK	0x0000
 #define	M_NOWAIT	0x0001		/* do not block */
-#define	M_USE_RESERVE	0x0002		/* can alloc out of reserve memory */
-#define	M_ZERO		0x0004		/* bzero the allocation */
-#define	M_NOVM		0x0008		/* don't ask VM for pages */
+#define	M_WAITOK	0x0002		/* do not block */
+#define	M_ZERO		0x0100		/* bzero the allocation */
+#define	M_NOVM		0x0200		/* don't ask VM for pages */
+#define	M_USE_RESERVE	0x0400		/* can alloc out of reserve memory */
 
 #define	M_MAGIC		877983977	/* time when first defined :-) */
 
@@ -103,7 +103,7 @@ extern struct mtx malloc_mtx;
 /* XXX struct malloc_type is unused for contig*(). */
 void	contigfree(void *addr, unsigned long size, struct malloc_type *type);
 void	*contigmalloc(unsigned long size, struct malloc_type *type, int flags,
-	    unsigned long low, unsigned long high, unsigned long alignment,
+	    vm_paddr_t low, vm_paddr_t high, unsigned long alignment,
 	    unsigned long boundary);
 void	free(void *addr, struct malloc_type *type);
 void	*malloc(unsigned long size, struct malloc_type *type, int flags);

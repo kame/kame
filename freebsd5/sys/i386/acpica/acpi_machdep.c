@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/i386/acpica/acpi_machdep.c,v 1.6 2002/11/21 20:55:22 jhb Exp $
+ *      $FreeBSD: src/sys/i386/acpica/acpi_machdep.c,v 1.9 2003/05/13 16:59:46 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -52,7 +52,11 @@ static device_t	acpi_dev;
 #include <machine/apm_bios.h>
 #include <machine/pc/bios.h>
 
+#if __FreeBSD_version < 500000
 #include <i386/apm/apm.h>
+#else
+#include <i386/bios/apm.h>
+#endif
 
 static struct apm_softc	apm_softc;
 
@@ -64,19 +68,13 @@ static d_poll_t apmpoll;
 
 #define CDEV_MAJOR 39
 static struct cdevsw apm_cdevsw = {
-	/* open */	apmopen,
-	/* close */	apmclose,
-	/* read */	noread,
-	/* write */	apmwrite,
-	/* ioctl */	apmioctl,
-	/* poll */	apmpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"apm",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	apmopen,
+	.d_close =	apmclose,
+	.d_write =	apmwrite,
+	.d_ioctl =	apmioctl,
+	.d_poll =	apmpoll,
+	.d_name =	"apm",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static int

@@ -29,51 +29,30 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/mchain.h,v 1.5 2002/11/08 21:26:32 jhb Exp $
+ * $FreeBSD: src/sys/sys/mchain.h,v 1.7 2003/02/21 16:24:49 bmilekic Exp $
  */
 #ifndef _SYS_MCHAIN_H_
 #define _SYS_MCHAIN_H_
 
 #include <machine/endian.h>
 
-#ifdef _KERNEL
-
-/*
- * XXX: remove these defines and change the function calls in the code. Use
- * it unconditionally if (when) the extended byte order functions become
- * available in user space.
- */
-#define	htoles(x)	htole16((x))
-#define	letohs(x)	le16toh((x))
-#define	htolel(x)	htole32((x))
-#define	letohl(x)	le32toh((x))
-#define	htoleq(x)	htole64((int64_t)(x))
-#define	letohq(x)	le64toh((int64_t)(x))
-
-#define	htobes(x)	htobe16((x))
-#define	betohs(x)	be16toh((x))
-#define	htobel(x)	htobe32((x))
-#define	betohl(x)	be32toh((x))
-#define	htobeq(x)	htobe64((int64_t)(x))
-#define	betohq(x)	be64toh((int64_t)(x))
-
-#else
+#ifndef _KERNEL
 /*
  * This macros probably belongs to the endian.h
  */
 #if (BYTE_ORDER == LITTLE_ENDIAN)
 
-#define htoles(x)	((u_int16_t)(x))
-#define letohs(x)	((u_int16_t)(x))
+#define	htoles(x)	((u_int16_t)(x))
+#define	letohs(x)	((u_int16_t)(x))
 #define	htolel(x)	((u_int32_t)(x))
 #define	letohl(x)	((u_int32_t)(x))
 #define	htoleq(x)	((int64_t)(x))
 #define	letohq(x)	((int64_t)(x))
 
-#define htobes(x)	(__htons(x))
-#define betohs(x)	(__ntohs(x))
-#define htobel(x)	(__htonl(x))
-#define betohl(x)	(__ntohl(x))
+#define	htobes(x)	(__htons(x))
+#define	betohs(x)	(__ntohs(x))
+#define	htobel(x)	(__htonl(x))
+#define	betohl(x)	(__ntohl(x))
 
 static __inline int64_t
 htobeq(int64_t x)
@@ -94,8 +73,8 @@ betohq(int64_t x)
 #error "Macros for Big-Endians are incomplete"
 
 /*
-#define htoles(x)	((u_int16_t)(x))
-#define letohs(x)	((u_int16_t)(x))
+#define	htoles(x)	((u_int16_t)(x))
+#define	letohs(x)	((u_int16_t)(x))
 #define	htolel(x)	((u_int32_t)(x))
 #define	letohl(x)	((u_int32_t)(x))
 */
@@ -109,8 +88,8 @@ betohq(int64_t x)
  * Type of copy for mb_{put|get}_mem()
  */
 #define	MB_MSYSTEM	0		/* use bcopy() */
-#define MB_MUSER	1		/* use copyin()/copyout() */
-#define MB_MINLINE	2		/* use an inline copy loop */
+#define	MB_MUSER	1		/* use copyin()/copyout() */
+#define	MB_MINLINE	2		/* use an inline copy loop */
 #define	MB_MZERO	3		/* bzero(), mb_put_mem only */
 #define	MB_MCUSTOM	4		/* use an user defined function */
 

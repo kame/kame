@@ -37,7 +37,7 @@
  * Authors: Archie Cobbs <archie@freebsd.org>
  *	    Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.25 2002/11/14 23:44:37 sam Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.26 2002/12/22 05:35:02 hsu Exp $
  */
 
 /*
@@ -728,11 +728,13 @@ ng_ether_mod_event(module_t mod, int event, void *data)
 		ng_ether_input_orphan_p = ng_ether_input_orphan;
 
 		/* Create nodes for any already-existing Ethernet interfaces */
+		IFNET_RLOCK();
 		TAILQ_FOREACH(ifp, &ifnet, if_link) {
 			if (ifp->if_type == IFT_ETHER
 			    || ifp->if_type == IFT_L2VLAN)
 				ng_ether_attach(ifp);
 		}
+		IFNET_RUNLOCK();
 		break;
 
 	case MOD_UNLOAD:

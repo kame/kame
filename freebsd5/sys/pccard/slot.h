@@ -32,7 +32,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/slot.h,v 1.37 2002/07/22 06:46:10 imp Exp $
+ * $FreeBSD: src/sys/pccard/slot.h,v 1.38 2003/04/23 23:39:21 imp Exp $
  */
 
 #ifndef _PCCARD_SLOT_H
@@ -91,6 +91,8 @@ struct pccard_devinfo {
 	uint8_t		misc[DEV_MISC_LEN]; /* For any random info */
 	uint8_t		manufstr[DEV_MAX_CIS_LEN];
 	uint8_t		versstr[DEV_MAX_CIS_LEN];
+	uint8_t		cis3str[DEV_MAX_CIS_LEN];
+	uint8_t		cis4str[DEV_MAX_CIS_LEN];
 	uint32_t	manufacturer;	/* Manufacturer ID */
 	uint32_t	product;	/* Product ID */
 	uint32_t	prodext;	/* Product ID (extended) */

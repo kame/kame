@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/sparc64/sparc64/genassym.c,v 1.43 2002/10/22 18:03:15 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/genassym.c,v 1.51 2003/04/29 00:37:41 jake Exp $
  */
 
 #include <sys/param.h>
@@ -33,6 +33,8 @@
 #include <sys/ktr.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/signal.h>
 #include <sys/smp.h>
 #include <sys/systm.h>
@@ -69,6 +71,7 @@
 #include <machine/utrap.h>
 
 ASSYM(KERNBASE, KERNBASE);
+ASSYM(VM_MIN_PROM_ADDRESS, VM_MIN_PROM_ADDRESS);
 
 ASSYM(EFAULT, EFAULT);
 ASSYM(ENAMETOOLONG, ENAMETOOLONG);
@@ -93,9 +96,7 @@ ASSYM(TLB_DEMAP_NUCLEUS, TLB_DEMAP_NUCLEUS);
 ASSYM(TLB_DEMAP_PRIMARY, TLB_DEMAP_PRIMARY);
 ASSYM(TLB_DEMAP_CONTEXT, TLB_DEMAP_CONTEXT);
 ASSYM(TLB_DEMAP_PAGE, TLB_DEMAP_PAGE);
-ASSYM(TLB_DIRECT_MASK, TLB_DIRECT_MASK);
-ASSYM(TLB_DIRECT_UNCACHEABLE, TLB_DIRECT_UNCACHEABLE);
-ASSYM(TLB_DIRECT_SHIFT, TLB_DIRECT_SHIFT);
+ASSYM(TLB_DIRECT_TO_TTE_MASK, TLB_DIRECT_TO_TTE_MASK);
 
 ASSYM(TSB_BUCKET_MASK, TSB_BUCKET_MASK);
 ASSYM(TSB_BUCKET_SHIFT, TSB_BUCKET_SHIFT);
@@ -219,8 +220,8 @@ ASSYM(IV_PRI, offsetof(struct intr_vector, iv_pri));
 
 ASSYM(IV_MAX, IV_MAX);
 
-ASSYM(KEF_ASTPENDING, KEF_ASTPENDING);
-ASSYM(KEF_NEEDRESCHED, KEF_NEEDRESCHED);
+ASSYM(TDF_ASTPENDING, TDF_ASTPENDING);
+ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
 
 ASSYM(MD_UTRAP, offsetof(struct mdproc, md_utrap));
 
@@ -234,34 +235,28 @@ ASSYM(P_VMSPACE, offsetof(struct proc, p_vmspace));
 
 ASSYM(RW_SHIFT, RW_SHIFT);
 
-ASSYM(KE_FLAGS, offsetof(struct kse, ke_flags));
+ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
 
 ASSYM(TD_FRAME, offsetof(struct thread, td_frame));
-ASSYM(TD_KSE, offsetof(struct thread, td_kse));
 ASSYM(TD_KSTACK, offsetof(struct thread, td_kstack));
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));
 ASSYM(TD_PROC, offsetof(struct thread, td_proc));
 
 ASSYM(PCB_SIZEOF, sizeof(struct pcb));
-ASSYM(PCB_FPSTATE, offsetof(struct pcb, pcb_fpstate));
-ASSYM(PCB_FP, offsetof(struct pcb, pcb_fp));
-ASSYM(PCB_PC, offsetof(struct pcb, pcb_pc));
-ASSYM(PCB_NSAVED, offsetof(struct pcb, pcb_nsaved));
-ASSYM(PCB_RWSP, offsetof(struct pcb, pcb_rwsp));
 ASSYM(PCB_RW, offsetof(struct pcb, pcb_rw));
+ASSYM(PCB_KFP, offsetof(struct pcb, pcb_kfp));
+ASSYM(PCB_UFP, offsetof(struct pcb, pcb_ufp));
+ASSYM(PCB_RWSP, offsetof(struct pcb, pcb_rwsp));
+ASSYM(PCB_FLAGS, offsetof(struct pcb, pcb_flags));
+ASSYM(PCB_NSAVED, offsetof(struct pcb, pcb_nsaved));
+ASSYM(PCB_PC, offsetof(struct pcb, pcb_pc));
+ASSYM(PCB_SP, offsetof(struct pcb, pcb_sp));
+ASSYM(PCB_FEF, PCB_FEF);
 
 ASSYM(VM_PMAP, offsetof(struct vmspace, vm_pmap));
 ASSYM(PM_ACTIVE, offsetof(struct pmap, pm_active));
 ASSYM(PM_CONTEXT, offsetof(struct pmap, pm_context));
 ASSYM(PM_TSB, offsetof(struct pmap, pm_tsb));
-
-ASSYM(FP_FB0, offsetof(struct fpstate, fp_fb[0]));
-ASSYM(FP_FB1, offsetof(struct fpstate, fp_fb[1]));
-ASSYM(FP_FB2, offsetof(struct fpstate, fp_fb[2]));
-ASSYM(FP_FB3, offsetof(struct fpstate, fp_fb[3]));
-
-ASSYM(CCFSZ, sizeof(struct frame));
-ASSYM(SPOFF, SPOFF);
 
 ASSYM(SF_UC, offsetof(struct sigframe, sf_uc));
 

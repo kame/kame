@@ -25,7 +25,7 @@
  *
  *	from: FreeBSD: src/sys/i386/i386/busdma_machdep.c,v 1.25 2002/01/05
  *
- * $FreeBSD: src/sys/sparc64/include/bus_private.h,v 1.1 2002/03/24 02:50:47 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/bus_private.h,v 1.4 2003/01/21 18:22:26 tmm Exp $
  */
 
 #ifndef	_MACHINE_BUS_PRIVATE_H_
@@ -33,15 +33,30 @@
 
 #include <sys/queue.h>
 
-struct bus_dmamap {
-	bus_dma_tag_t	dmat;
-	void		*buf;		/* unmapped buffer pointer */
-	bus_size_t	buflen;		/* unmapped buffer length */
-	bus_addr_t	start;		/* start of mapped region */
-	struct resource *res;		/* associated resource */
-	bus_size_t	dvmaresv;	/* reseved DVMA memory */
-	STAILQ_ENTRY(bus_dmamap)	maplruq;
-	int		onq;
+/*
+ * This is more or less arbitrary, except for the stack space consumed by
+ * the segments array. Choose more than ((BUS_SPACE_MAXSIZE / PAGE_SIZE) + 1),
+ * since in practice we could be map pages more than once.
+ */
+#define	BUS_DMAMAP_NSEGS	64
+
+struct bus_dmamap_res {
+	struct resource		*dr_res;
+	bus_size_t		dr_used;
+	SLIST_ENTRY(bus_dmamap_res)	dr_link;
 };
+
+struct bus_dmamap {
+	TAILQ_ENTRY(bus_dmamap)	dm_maplruq;
+	SLIST_HEAD(, bus_dmamap_res)	dm_reslist;
+	int			dm_onq;
+	int			dm_loaded;
+};
+
+static __inline void
+sparc64_dmamap_init(struct bus_dmamap *m)
+{
+	SLIST_INIT(&m->dm_reslist);
+}
 
 #endif /* !_MACHINE_BUS_PRIVATE_H_ */

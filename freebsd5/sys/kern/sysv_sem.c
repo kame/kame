@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.56 2002/10/19 02:07:35 alfred Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.61 2003/03/24 21:15:34 jhb Exp $ */
 
 /*
  * Implementation of SVID semaphores
@@ -13,6 +13,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/lock.h>
@@ -35,7 +36,7 @@ static MALLOC_DEFINE(M_SEM, "sem", "SVID compatible semaphores");
 static void seminit(void);
 static int sysvsem_modload(struct module *, int, void *);
 static int semunload(void);
-static void semexit_myhook(struct proc *p);
+static void semexit_myhook(void *arg, struct proc *p);
 static int sysctl_sema(SYSCTL_HANDLER_ARGS);
 static int semvalid(int semid, struct semid_ds *semaptr);
 
@@ -66,6 +67,7 @@ static struct mtx *sema_mtx;	/* semaphore id pool mutexes*/
 static struct sem *sem;		/* semaphore pool */
 SLIST_HEAD(, sem_undo) semu_list;	/* list of active undo structures */
 static int	*semu;		/* undo structure pool */
+static eventhandler_tag semexit_tag;
 
 #define SEMUNDO_MTX		sem_mtx
 #define SEMUNDO_LOCK()		mtx_lock(&SEMUNDO_MTX);
@@ -203,8 +205,9 @@ seminit(void)
 		suptr->un_proc = NULL;
 	}
 	SLIST_INIT(&semu_list);
-	at_exit(semexit_myhook);
 	mtx_init(&sem_mtx, "sem", NULL, MTX_DEF);
+	semexit_tag = EVENTHANDLER_REGISTER(process_exit, semexit_myhook, NULL,
+	    EVENTHANDLER_PRI_ANY);
 }
 
 static int
@@ -215,10 +218,10 @@ semunload(void)
 	if (semtot != 0)
 		return (EBUSY);
 
+	EVENTHANDLER_DEREGISTER(process_exit, semexit_tag);
 	free(sem, M_SEM);
 	free(sema, M_SEM);
 	free(semu, M_SEM);
-	rm_at_exit(semexit_myhook);
 	for (i = 0; i < seminfo.semmni; i++)
 		mtx_destroy(&sema_mtx[i]);
 	mtx_destroy(&sem_mtx);
@@ -858,7 +861,7 @@ done2:
 struct semop_args {
 	int	semid;
 	struct	sembuf *sops;
-	u_int	nsops;
+	size_t	nsops;
 };
 #endif
 
@@ -871,14 +874,15 @@ semop(td, uap)
 	struct semop_args *uap;
 {
 	int semid = uap->semid;
-	u_int nsops = uap->nsops;
+	size_t nsops = uap->nsops;
 	struct sembuf *sops;
 	struct semid_ds *semaptr;
 	struct sembuf *sopptr = 0;
 	struct sem *semptr = 0;
 	struct sem_undo *suptr;
 	struct mtx *sema_mtxp;
-	int i, j, error;
+	size_t i, j, k;
+	int error;
 	int do_wakeup, do_undos;
 
 	DPRINTF(("call to semop(%d, 0x%x, %u)\n", semid, sops, nsops));
@@ -1085,14 +1089,15 @@ done:
 			 * we applied them.  This guarantees that we won't run
 			 * out of space as we roll things back out.
 			 */
-			for (j = i - 1; j >= 0; j--) {
-				if ((sops[j].sem_flg & SEM_UNDO) == 0)
+			for (j = 0; j < i; j++) {
+				k = i - j - 1;
+				if ((sops[k].sem_flg & SEM_UNDO) == 0)
 					continue;
-				adjval = sops[j].sem_op;
+				adjval = sops[k].sem_op;
 				if (adjval == 0)
 					continue;
 				if (semundo_adjust(td, &suptr, semid,
-				    sops[j].sem_num, adjval) != 0)
+				    sops[k].sem_num, adjval) != 0)
 					panic("semop - can't undo undos");
 			}
 
@@ -1137,7 +1142,8 @@ done2:
  * semaphores.
  */
 static void
-semexit_myhook(p)
+semexit_myhook(arg, p)
+	void *arg;
 	struct proc *p;
 {
 	struct sem_undo *suptr;

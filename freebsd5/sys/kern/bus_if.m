@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/kern/bus_if.m,v 1.24 2002/10/07 05:06:38 imp Exp $
+# $FreeBSD: src/sys/kern/bus_if.m,v 1.25 2003/03/25 04:32:52 mdodd Exp $
 #
 
 #include <sys/bus.h>
@@ -54,7 +54,7 @@ CODE {
 METHOD int print_child {
 	device_t dev;
 	device_t child;
-};
+} DEFAULT bus_generic_print_child;
 
 # 
 # Called for each child device that 

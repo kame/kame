@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/xform_ah.c,v 1.1 2002/10/16 02:10:07 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/xform_ah.c,v 1.2 2003/02/23 07:25:47 sam Exp $	*/
 /*	$OpenBSD: ip_ah.c,v 1.63 2001/06/26 06:18:58 angelos Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
@@ -687,7 +687,7 @@ ah_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 
 	/* Crypto operation descriptor. */
 	crp->crp_ilen = m->m_pkthdr.len; /* Total input length. */
-	crp->crp_flags = CRYPTO_F_IMBUF | CRYPTO_F_NODELAY;
+	crp->crp_flags = CRYPTO_F_IMBUF;
 	crp->crp_buf = (caddr_t) m;
 	crp->crp_callback = ah_input_cb;
 	crp->crp_sid = sav->tdb_cryptoid;

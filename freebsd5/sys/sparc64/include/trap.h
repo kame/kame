@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/trap.h,v 1.10 2002/10/25 16:00:47 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/trap.h,v 1.11 2003/04/29 21:30:59 jake Exp $
  */
 
 #ifndef	_MACHINE_TRAP_H_
@@ -65,13 +65,13 @@
 #define	T_TRAP_INSTRUCTION_29		31
 #define	T_TRAP_INSTRUCTION_30		32
 #define	T_TRAP_INSTRUCTION_31		33
+#define	T_INSTRUCTION_MISS		34
+#define	T_DATA_MISS			35
 
-#define	T_INTERRUPT			34
-#define	T_PA_WATCHPOINT			35
-#define	T_VA_WATCHPOINT			36
-#define	T_CORRECTED_ECC_ERROR		37
-#define	T_INSTRUCTION_MISS		38
-#define	T_DATA_MISS			39
+#define	T_INTERRUPT			36
+#define	T_PA_WATCHPOINT			37
+#define	T_VA_WATCHPOINT			38
+#define	T_CORRECTED_ECC_ERROR		39
 #define	T_SPILL				40
 #define	T_FILL				41
 #define	T_FILL_RET			42

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)autoconf.c	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/i386/autoconf.c,v 1.170 2002/09/22 00:59:01 jake Exp $
+ * $FreeBSD: src/sys/i386/i386/autoconf.c,v 1.172 2003/04/30 12:57:39 markm Exp $
  */
 
 /*
@@ -96,8 +96,6 @@ SYSINIT(configure1, SI_SUB_CONFIGURE, SI_ORDER_FIRST, configure_first, NULL);
 SYSINIT(configure2, SI_SUB_CONFIGURE, SI_ORDER_THIRD, configure, NULL);
 /* SI_ORDER_MIDDLE is hookable */
 SYSINIT(configure3, SI_SUB_CONFIGURE, SI_ORDER_ANY, configure_final, NULL);
-
-device_t nexus_dev;
 
 /*
  * Determine i/o configuration for a machine.
@@ -163,7 +161,6 @@ static void
 configure_final(dummy)
 	void *dummy;
 {
-	int i;
 
 	cninit_finish(); 
 
@@ -173,6 +170,9 @@ configure_final(dummy)
 		imen_dump();
 #endif /* APIC_IO */
 
+#ifdef PC98
+		{
+		int i;
 		/*
 		 * Print out the BIOS's idea of the disk geometries.
 		 */
@@ -202,6 +202,8 @@ configure_final(dummy)
 			       max_sector, max_sector);
 		}
 		printf(" %d accounted for\n", bootinfo.bi_n_bios_used);
+		}
+#endif
 
 		printf("Device configuration finished.\n");
 	}

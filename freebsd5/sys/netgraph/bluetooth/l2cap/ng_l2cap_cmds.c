@@ -25,8 +25,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ng_l2cap_cmds.c,v 1.14 2002/09/04 21:38:38 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_cmds.c,v 1.1 2002/11/20 23:01:57 julian Exp $
+ * $Id: ng_l2cap_cmds.c,v 1.1 2002/11/24 19:47:06 max Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_cmds.c,v 1.2 2003/05/10 21:44:41 julian Exp $
  */
 
 #include <sys/param.h>

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.175 2002/12/10 02:33:44 julian Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.198 2003/05/13 20:35:59 jhb Exp $
  */
 
 #include "opt_ktrace.h"
@@ -45,6 +45,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
+#include <sys/eventhandler.h>
 #include <sys/filedesc.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
@@ -76,37 +77,13 @@
 #include <sys/user.h>
 #include <machine/critical.h>
 
-static MALLOC_DEFINE(M_ATFORK, "atfork", "atfork callback");
-
-/*
- * These are the stuctures used to create a callout list for things to do
- * when forking a process
- */
-struct forklist {
-	forklist_fn function;
-	TAILQ_ENTRY(forklist) next;
-};
-
-static struct sx fork_list_lock;
-
-TAILQ_HEAD(forklist_head, forklist);
-static struct forklist_head fork_list = TAILQ_HEAD_INITIALIZER(fork_list);
-
 #ifndef _SYS_SYSPROTO_H_
 struct fork_args {
 	int     dummy;
 };
 #endif
 
-int forksleep; /* Place for fork1() to sleep on. */
-
-static void
-init_fork_list(void *data __unused)
-{
-
-	sx_init(&fork_list_lock, "fork list");
-}
-SYSINIT(fork_list, SI_SUB_INTRINSIC, SI_ORDER_ANY, init_fork_list, NULL);
+static int forksleep; /* Place for fork1() to sleep on. */
 
 /*
  * MPSAFE
@@ -120,13 +97,11 @@ fork(td, uap)
 	int error;
 	struct proc *p2;
 
-	mtx_lock(&Giant);
 	error = fork1(td, RFFDG | RFPROC, 0, &p2);
 	if (error == 0) {
 		td->td_retval[0] = p2->p_pid;
 		td->td_retval[1] = 0;
 	}
-	mtx_unlock(&Giant);
 	return error;
 }
 
@@ -142,13 +117,11 @@ vfork(td, uap)
 	int error;
 	struct proc *p2;
 
-	mtx_lock(&Giant);
 	error = fork1(td, RFFDG | RFPROC | RFPPWAIT | RFMEM, 0, &p2);
 	if (error == 0) {
 		td->td_retval[0] = p2->p_pid;
 		td->td_retval[1] = 0;
 	}
-	mtx_unlock(&Giant);
 	return error;
 }
 
@@ -166,13 +139,18 @@ rfork(td, uap)
 	/* Don't allow kernel only flags. */
 	if ((uap->flags & RFKERNELONLY) != 0)
 		return (EINVAL);
-	mtx_lock(&Giant);
+	/* 
+	 * Don't allow sharing of file descriptor table unless
+	 * RFTHREAD flag is supplied
+	 */
+	if ((uap->flags & (RFPROC | RFTHREAD | RFFDG | RFCFDG)) ==
+	    RFPROC)
+		return(EINVAL);
 	error = fork1(td, uap->flags, 0, &p2);
 	if (error == 0) {
 		td->td_retval[0] = p2 ? p2->p_pid : 0;
 		td->td_retval[1] = 0;
 	}
-	mtx_unlock(&Giant);
 	return error;
 }
 
@@ -230,22 +208,19 @@ fork1(td, flags, pages, procp)
 	int trypid;
 	int ok;
 	static int pidchecked = 0;
-	struct forklist *ep;
 	struct filedesc *fd;
 	struct proc *p1 = td->td_proc;
 	struct thread *td2;
 	struct kse *ke2;
 	struct ksegrp *kg2;
 	struct sigacts *newsigacts;
-	struct procsig *newprocsig;
 	int error;
-
-	GIANT_REQUIRED;
 
 	/* Can't copy and clear */
 	if ((flags & (RFFDG|RFCFDG)) == (RFFDG|RFCFDG))
 		return (EINVAL);
 
+	mtx_lock(&Giant);
 	/*
 	 * Here we don't create a new process, but we divorce
 	 * certain parts of a process from itself.
@@ -258,8 +233,8 @@ fork1(td, flags, pages, procp)
 		 */
 		if (flags & RFCFDG) {
 			struct filedesc *fdtmp;
-			fdtmp = fdinit(td);	/* XXXKSE */
-			fdfree(td);		/* XXXKSE */
+			fdtmp = fdinit(td->td_proc->p_fd);
+			fdfree(td);
 			p1->p_fd = fdtmp;
 		}
 
@@ -271,18 +246,24 @@ fork1(td, flags, pages, procp)
 			if (p1->p_fd->fd_refcnt > 1) {
 				struct filedesc *newfd;
 
-				newfd = fdcopy(td);
+				newfd = fdcopy(td->td_proc->p_fd);
 				FILEDESC_UNLOCK(p1->p_fd);
 				fdfree(td);
 				p1->p_fd = newfd;
 			} else
 				FILEDESC_UNLOCK(p1->p_fd);
 		}
+		mtx_unlock(&Giant);
 		*procp = NULL;
 		return (0);
 	}
 
-	if (p1->p_flag & P_KSES) {
+	/*
+	 * Note 1:1 allows for forking with one thread coming out on the
+	 * other side with the expectation that the process is about to
+	 * exec.
+	 */
+	if (p1->p_flag & P_THREADED) {
 		/*
 		 * Idle the other threads for a second.
 		 * Since the user space is copied, it must remain stable.
@@ -295,6 +276,7 @@ fork1(td, flags, pages, procp)
 		if (thread_single(SINGLE_NO_EXIT)) {
 			/* Abort.. someone else is single threading before us */
 			PROC_UNLOCK(p1);
+			mtx_unlock(&Giant);
 			return (ERESTART);
 		}
 		PROC_UNLOCK(p1);
@@ -429,29 +411,22 @@ again:
 	/*
 	 * Malloc things while we don't hold any locks.
 	 */
-	if (flags & RFSIGSHARE) {
-		MALLOC(newsigacts, struct sigacts *,
-		    sizeof(struct sigacts), M_SUBPROC, M_WAITOK);
-		newprocsig = NULL;
-	} else {
+	if (flags & RFSIGSHARE)
 		newsigacts = NULL;
-		MALLOC(newprocsig, struct procsig *, sizeof(struct procsig),
-		    M_SUBPROC, M_WAITOK);
-	}
+	else
+		newsigacts = sigacts_alloc();
 
 	/*
 	 * Copy filedesc.
-	 * XXX: This is busted.  fd*() need to not take proc
-	 * arguments or something.
 	 */
 	if (flags & RFCFDG)
-		fd = fdinit(td);
+		fd = fdinit(td->td_proc->p_fd);
 	else if (flags & RFFDG) {
 		FILEDESC_LOCK(p1->p_fd);
-		fd = fdcopy(td);
+		fd = fdcopy(td->td_proc->p_fd);
 		FILEDESC_UNLOCK(p1->p_fd);
 	} else
-		fd = fdshare(p1);
+		fd = fdshare(p1->p_fd);
 
 	/*
 	 * Make a proc table entry for the new process.
@@ -466,6 +441,9 @@ again:
 	if (pages != 0)
 		pmap_new_altkstack(td2, pages);
 
+	PROC_LOCK(p2);
+	PROC_LOCK(p1);
+
 #define RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
 
 	bzero(&p2->p_startzero,
@@ -476,10 +454,6 @@ again:
 	    (unsigned) RANGEOF(struct thread, td_startzero, td_endzero));
 	bzero(&kg2->kg_startzero,
 	    (unsigned) RANGEOF(struct ksegrp, kg_startzero, kg_endzero));
-
-	mtx_init(&p2->p_mtx, "process lock", NULL, MTX_DEF | MTX_DUPOK);
-	PROC_LOCK(p2);
-	PROC_LOCK(p1);
 
 	bcopy(&p1->p_startcopy, &p2->p_startcopy,
 	    (unsigned) RANGEOF(struct proc, p_startcopy, p_endcopy));
@@ -493,23 +467,22 @@ again:
 	ke2->ke_state = KES_THREAD;
 	ke2->ke_thread = td2;
 	td2->td_kse = ke2;
-	td2->td_flags &= ~TDF_UNBOUND; /* For the rest of this syscall. */
 
 	/*
 	 * Duplicate sub-structures as needed.
 	 * Increase reference counts on shared objects.
-	 * The p_stats and p_sigacts substructs are set in vm_forkproc.
+	 * The p_stats substruct is set in vm_forkproc.
 	 */
 	p2->p_flag = 0;
+	if (p1->p_flag & P_PROFIL)
+		startprofclock(p2);
 	mtx_lock_spin(&sched_lock);
 	p2->p_sflag = PS_INMEM;
-	if (p1->p_sflag & PS_PROFIL)
-		startprofclock(p2);
 	/*
 	 * Allow the scheduler to adjust the priority of the child and
 	 * parent while we hold the sched_lock.
 	 */
-	sched_fork(td->td_ksegrp, kg2);
+	sched_fork(p1, p2);
 
 	mtx_unlock_spin(&sched_lock);
 	p2->p_ucred = crhold(td->td_ucred);
@@ -518,25 +491,10 @@ again:
 	pargs_hold(p2->p_args);
 
 	if (flags & RFSIGSHARE) {
-		p2->p_procsig = p1->p_procsig;
-		p2->p_procsig->ps_refcnt++;
-		if (p1->p_sigacts == &p1->p_uarea->u_sigacts) {
-			/*
-			 * Set p_sigacts to the new shared structure.
-			 * Note that this is updating p1->p_sigacts at the
-			 * same time, since p_sigacts is just a pointer to
-			 * the shared p_procsig->ps_sigacts.
-			 */
-			p2->p_sigacts  = newsigacts;
-			newsigacts = NULL;
-			*p2->p_sigacts = p1->p_uarea->u_sigacts;
-		}
+		p2->p_sigacts = sigacts_hold(p1->p_sigacts);
 	} else {
-		p2->p_procsig = newprocsig;
-		newprocsig = NULL;
-		bcopy(p1->p_procsig, p2->p_procsig, sizeof(*p2->p_procsig));
-		p2->p_procsig->ps_refcnt = 1;
-		p2->p_sigacts = NULL;	/* finished in vm_forkproc() */
+		sigacts_copy(newsigacts, p1->p_sigacts);
+		p2->p_sigacts = newsigacts;
 	}
 	if (flags & RFLINUXTHPN) 
 	        p2->p_sigparent = SIGUSR1;
@@ -552,17 +510,10 @@ again:
 	PROC_UNLOCK(p2);
 
 	/*
-	 * If p_limit is still copy-on-write, bump refcnt,
-	 * otherwise get a copy that won't be modified.
-	 * (If PL_SHAREMOD is clear, the structure is shared
-	 * copy-on-write.)
+	 * p_limit is copy-on-write, bump refcnt,
 	 */
-	if (p1->p_limit->p_lflags & PL_SHAREMOD)
-		p2->p_limit = limcopy(p1->p_limit);
-	else {
-		p2->p_limit = p1->p_limit;
-		p2->p_limit->p_refcnt++;
-	}
+	p2->p_limit = p1->p_limit;
+	p2->p_limit->p_refcnt++;
 
 	/*
 	 * Setup linkage for kernel based threading
@@ -605,7 +556,7 @@ again:
 	PROC_LOCK(p1);
 
 	/*
-	 * Preserve some more flags in subprocess.  PS_PROFIL has already
+	 * Preserve some more flags in subprocess.  P_PROFIL has already
 	 * been preserved.
 	 */
 	p2->p_flag |= p1->p_flag & (P_SUGID | P_ALTSTACK);
@@ -620,18 +571,22 @@ again:
 	PGRP_UNLOCK(p1->p_pgrp);
 	LIST_INIT(&p2->p_children);
 
-	callout_init(&p2->p_itcallout, 0);
+	callout_init(&p2->p_itcallout, 1);
 
 #ifdef KTRACE
 	/*
 	 * Copy traceflag and tracefile if enabled.
 	 */
 	mtx_lock(&ktrace_mtx);
-	KASSERT(p2->p_tracep == NULL, ("new process has a ktrace vnode"));
+	KASSERT(p2->p_tracevp == NULL, ("new process has a ktrace vnode"));
 	if (p1->p_traceflag & KTRFAC_INHERIT) {
 		p2->p_traceflag = p1->p_traceflag;
-		if ((p2->p_tracep = p1->p_tracep) != NULL)
-			VREF(p2->p_tracep);
+		if ((p2->p_tracevp = p1->p_tracevp) != NULL) {
+			VREF(p2->p_tracevp);
+			KASSERT(p1->p_tracecred != NULL,
+			    ("ktrace vnode with no cred"));
+			p2->p_tracecred = crhold(p1->p_tracecred);
+		}
 	}
 	mtx_unlock(&ktrace_mtx);
 #endif
@@ -665,12 +620,12 @@ again:
 		pptr = p1;
 	p2->p_pptr = pptr;
 	LIST_INSERT_HEAD(&pptr->p_children, p2, p_sibling);
-	PROC_UNLOCK(p2);
 	sx_xunlock(&proctree_lock);
 
-	KASSERT(newprocsig == NULL, ("unused newprocsig"));
-	if (newsigacts != NULL)
-		FREE(newsigacts, M_SUBPROC);
+	/* Inform accounting that we have forked. */
+	p2->p_acflag = AFORK;
+	PROC_UNLOCK(p2);
+
 	/*
 	 * Finish creating the child process.  It will return via a different
 	 * execution path later.  (ie: directly into user mode)
@@ -700,18 +655,13 @@ again:
 	 * to adjust anything.
 	 *   What if they have an error? XXX
 	 */
-	sx_slock(&fork_list_lock);
-	TAILQ_FOREACH(ep, &fork_list, next) {
-		(*ep->function)(p1, p2, flags);
-	}
-	sx_sunlock(&fork_list_lock);
+	EVENTHANDLER_INVOKE(process_fork, p1, p2, flags);
 
 	/*
 	 * If RFSTOPPED not requested, make child runnable and add to
 	 * run queue.
 	 */
-	microtime(&(p2->p_stats->p_start));
-	p2->p_acflag = AFORK;
+	microuptime(&p2->p_stats->p_start);
 	if ((flags & RFSTOPPED) == 0) {
 		mtx_lock_spin(&sched_lock);
 		p2->p_state = PRS_NORMAL;
@@ -745,7 +695,7 @@ again:
 	/*
 	 * If other threads are waiting, let them continue now
 	 */
-	if (p1->p_flag & P_KSES) {
+	if (p1->p_flag & P_THREADED) {
 		PROC_LOCK(p1);
 		thread_single_end();
 		PROC_UNLOCK(p1);
@@ -754,74 +704,20 @@ again:
 	/*
 	 * Return child proc pointer to parent.
 	 */
+	mtx_unlock(&Giant);
 	*procp = p2;
 	return (0);
 fail:
 	sx_xunlock(&allproc_lock);
 	uma_zfree(proc_zone, newproc);
-	if (p1->p_flag & P_KSES) {
+	if (p1->p_flag & P_THREADED) {
 		PROC_LOCK(p1);
 		thread_single_end();
 		PROC_UNLOCK(p1);
 	}
 	tsleep(&forksleep, PUSER, "fork", hz / 2);
+	mtx_unlock(&Giant);
 	return (error);
-}
-
-/*
- * The next two functionms are general routines to handle adding/deleting
- * items on the fork callout list.
- *
- * at_fork():
- * Take the arguments given and put them onto the fork callout list,
- * However first make sure that it's not already there.
- * Returns 0 on success or a standard error number.
- */
-
-int
-at_fork(function)
-	forklist_fn function;
-{
-	struct forklist *ep;
-
-#ifdef INVARIANTS
-	/* let the programmer know if he's been stupid */
-	if (rm_at_fork(function)) 
-		printf("WARNING: fork callout entry (%p) already present\n",
-		    function);
-#endif
-	ep = malloc(sizeof(*ep), M_ATFORK, M_NOWAIT);
-	if (ep == NULL)
-		return (ENOMEM);
-	ep->function = function;
-	sx_xlock(&fork_list_lock);
-	TAILQ_INSERT_TAIL(&fork_list, ep, next);
-	sx_xunlock(&fork_list_lock);
-	return (0);
-}
-
-/*
- * Scan the exit callout list for the given item and remove it..
- * Returns the number of items removed (0 or 1)
- */
-
-int
-rm_at_fork(function)
-	forklist_fn function;
-{
-	struct forklist *ep;
-
-	sx_xlock(&fork_list_lock);
-	TAILQ_FOREACH(ep, &fork_list, next) {
-		if (ep->function == function) {
-			TAILQ_REMOVE(&fork_list, ep, next);
-			sx_xunlock(&fork_list_lock);
-			free(ep, M_ATFORK);
-			return(1);
-		}
-	}
-	sx_xunlock(&fork_list_lock);
-	return (0);
 }
 
 /*
@@ -843,7 +739,7 @@ fork_exit(callout, arg, frame)
 	}
 	td = curthread;
 	p = td->td_proc;
-	td->td_kse->ke_oncpu = PCPU_GET(cpuid);
+	td->td_oncpu = PCPU_GET(cpuid);
 	p->p_state = PRS_NORMAL;
 	/*
 	 * Finish setting up thread glue.  We need to initialize

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_print.c,v 1.9 2002/03/20 08:00:54 alfred Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_print.c,v 1.10 2003/01/01 18:48:55 schweikh Exp $
  *
  */
 
@@ -54,7 +54,7 @@
 #include <netatm/uni/unisig_print.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_print.c,v 1.9 2002/03/20 08:00:54 alfred Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_print.c,v 1.10 2003/01/01 18:48:55 schweikh Exp $");
 #endif
 
 
@@ -178,7 +178,7 @@ find_type(tbl, type)
  * Print an ATM address
  *
  * Arguments:
- *	p	pointer to a Atm_address
+ *	p	pointer to an Atm_address
  *
  * Returns:
  *	none

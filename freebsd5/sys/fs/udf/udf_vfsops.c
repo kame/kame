@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/udf/udf_vfsops.c,v 1.7 2002/10/14 03:20:34 mckusick Exp $
+ * $FreeBSD: src/sys/fs/udf/udf_vfsops.c,v 1.12 2003/05/04 07:41:07 scottl Exp $
  */
 
 /* udf_vfsops.c */
@@ -95,7 +95,6 @@
 
 MALLOC_DEFINE(M_UDFMOUNT, "UDF mount", "UDF mount structure");
 MALLOC_DEFINE(M_UDFFENTRY, "UDF fentry", "UDF file entry structure");
-MALLOC_DEFINE(M_UDFSTABLE, "UDF s_table", "UDF sparing table");
 
 /* Zones */
 uma_zone_t udf_zone_trans = NULL;
@@ -119,7 +118,7 @@ static struct vfsops udf_vfsops = {
 	udf_root,
 	vfs_stdquotactl,
 	udf_statfs,
-	vfs_stdsync,
+	vfs_stdnosync,
 	udf_vget,
 	udf_fhtovp,
 	vfs_stdcheckexp,
@@ -446,10 +445,11 @@ udf_mountfs(struct vnode *devvp, struct mount *mp, struct thread *td) {
 	brelse(bp);
 	bp = NULL;
 
-	TAILQ_INIT(&udfmp->udf_tqh);
 	devvp->v_rdev->si_mountpoint = mp;
 
 	mtx_init(&udfmp->hash_mtx, "udf_hash", NULL, MTX_DEF);
+	udfmp->hashtbl = phashinit(UDF_HASHTBLSIZE, M_UDFMOUNT, &udfmp->hashsz);
+
 	return 0;
 
 bail:
@@ -481,7 +481,11 @@ udf_unmount(struct mount *mp, int mntflags, struct thread *td)
 	vrele(udfmp->im_devvp);
 
 	if (udfmp->s_table != NULL)
-		FREE(udfmp->s_table, M_UDFSTABLE);
+		FREE(udfmp->s_table, M_UDFMOUNT);
+
+	if (udfmp->hashtbl != NULL)
+		FREE(udfmp->hashtbl, M_UDFMOUNT);
+
 	FREE(udfmp, M_UDFMOUNT);
 
 	mp->mnt_data = (qaddr_t)0;
@@ -724,7 +728,7 @@ udf_find_partmaps(struct udf_mnt *udfmp, struct logvol_desc *lvd)
 
 		pms = &pmap->pms;
 		MALLOC(udfmp->s_table, struct udf_sparing_table *, pms->st_size,
-		    M_UDFSTABLE, M_NOWAIT | M_ZERO);
+		    M_UDFMOUNT, M_NOWAIT | M_ZERO);
 		if (udfmp->s_table == NULL)
 			return (ENOMEM);
 

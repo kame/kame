@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/tcp_timer.h,v 1.22 2002/08/16 09:07:59 alfred Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.h,v 1.24 2003/03/08 22:06:20 jlemon Exp $
  */
 
 #ifndef _NETINET_TCP_TIMER_H_
@@ -151,7 +151,14 @@ extern int tcp_msl;
 extern int tcp_ttl;			/* time to live for TCP segs */
 extern int tcp_backoff[];
 
+struct tcptw;
+
+void	tcp_timer_init(void);
 void	tcp_timer_2msl(void *xtp);
+struct tcptw *
+	tcp_timer_2msl_tw(int _reuse);		/* XXX temporary */
+void	tcp_timer_2msl_reset(struct tcptw *_tw, int _timeo);
+void	tcp_timer_2msl_stop(struct tcptw *_tw);
 void	tcp_timer_keep(void *xtp);
 void	tcp_timer_persist(void *xtp);
 void	tcp_timer_rexmt(void *xtp);

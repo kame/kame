@@ -55,7 +55,7 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/sym/sym_fw1.h,v 1.5 2001/11/11 18:02:11 groudier Exp $ */
+/* $FreeBSD: src/sys/dev/sym/sym_fw1.h,v 1.6 2002/12/30 21:18:08 schweikh Exp $ */
 
 /*
  *  Scripts for SYMBIOS-Processor
@@ -821,7 +821,7 @@ static struct SYM_FWA_SCR SYM_FWA_SCR = {
 		HADDR_1 (ccb_head.status),
 	/*
 	 *  If QUIRK_AUTOSAVE is set,
-	 *  do an "save pointer" operation.
+	 *  do a "save pointer" operation.
 	 */
 	SCR_FROM_REG (QU_REG),
 		0,

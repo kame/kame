@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/svr4/svr4_machdep.c,v 1.26.2.1 2002/12/19 09:40:09 alfred Exp $
+ * $FreeBSD: src/sys/i386/svr4/svr4_machdep.c,v 1.32 2003/05/13 20:35:58 jhb Exp $
  */
 
 #include <sys/types.h>
@@ -216,8 +216,10 @@ svr4_setcontext(td, uc)
 	 * set to 0 right now?
 	 */
 
-	if ((uc->uc_flags & SVR4_UC_CPU) == 0)
+	if ((uc->uc_flags & SVR4_UC_CPU) == 0) {
+		PROC_UNLOCK(p);
 		return 0;
+	}
 
 	DPRINTF(("svr4_setcontext(%d)\n", p->p_pid));
 
@@ -244,8 +246,10 @@ svr4_setcontext(td, uc)
 		 * the trap, rather than doing all of the checking here.
 		 */
 		if (((r[SVR4_X86_EFL] ^ tf->tf_eflags) & PSL_USERSTATIC) != 0 ||
-		    !USERMODE(r[SVR4_X86_CS], r[SVR4_X86_EFL]))
+		    !USERMODE(r[SVR4_X86_CS], r[SVR4_X86_EFL])) {
+			PROC_UNLOCK(p);
 			return (EINVAL);
+		}
 
 #if defined(__NetBSD__)
 		/* %fs and %gs were restored by the trampoline. */
@@ -293,8 +297,8 @@ svr4_setcontext(td, uc)
 #endif
 		svr4_to_bsd_sigset(&uc->uc_sigmask, &mask);
 		SIG_CANTMASK(mask);
-		p->p_sigmask = mask;
-		signotify(p);
+		td->td_sigmask = mask;
+		signotify(td);
 	}
 	PROC_UNLOCK(p);
 
@@ -424,6 +428,7 @@ svr4_sendsig(catcher, sig, mask, code)
 #endif
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 
 	tf = td->td_frame;
 	oonstack = sigonstack(tf->tf_esp);
@@ -439,6 +444,7 @@ svr4_sendsig(catcher, sig, mask, code)
 	} else {
 		fp = (struct svr4_sigframe *)tf->tf_esp - 1;
 	}
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/* 
@@ -501,6 +507,7 @@ svr4_sendsig(catcher, sig, mask, code)
 	load_gs(_udatasel);
 	tf->tf_ss = _udatasel;
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 #endif
 }
 

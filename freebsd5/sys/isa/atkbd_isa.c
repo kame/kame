@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/atkbd_isa.c,v 1.13 2001/09/23 08:42:06 yokota Exp $
+ * $FreeBSD: src/sys/isa/atkbd_isa.c,v 1.14 2003/04/30 12:57:39 markm Exp $
  */
 
 #include "opt_kbd.h"
@@ -50,7 +50,7 @@ typedef struct {
 	void		*ih;
 } atkbd_softc_t;
 
-devclass_t	atkbd_devclass;
+static devclass_t	atkbd_devclass;
 
 static void	atkbdidentify(driver_t *driver, device_t dev);
 static int	atkbdprobe(device_t dev);

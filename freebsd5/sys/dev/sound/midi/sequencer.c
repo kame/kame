@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/midi/sequencer.c,v 1.12 2002/04/04 21:03:16 jhb Exp $
+ * $FreeBSD: src/sys/dev/sound/midi/sequencer.c,v 1.15 2003/03/03 12:15:46 phk Exp $
  *
  */
 
@@ -135,19 +135,14 @@ static d_poll_t seqpoll;
 
 #define CDEV_MAJOR SEQ_CDEV_MAJOR
 static struct cdevsw seq_cdevsw = {
-	/* open */	seqopen,
-	/* close */	seqclose,
-	/* read */	seqread,
-	/* write */	seqwrite,
-	/* ioctl */	seqioctl,
-	/* poll */	seqpoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"midi", /* XXX */
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	seqopen,
+	.d_close =	seqclose,
+	.d_read =	seqread,
+	.d_write =	seqwrite,
+	.d_ioctl =	seqioctl,
+	.d_poll =	seqpoll,
+	.d_name =	"midi", /* XXX */
+	.d_maj =	CDEV_MAJOR,
 };
 
 

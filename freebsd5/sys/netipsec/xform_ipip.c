@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/xform_ipip.c,v 1.1 2002/10/16 02:10:08 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/xform_ipip.c,v 1.5 2003/03/04 23:19:53 jlemon Exp $	*/
 /*	$OpenBSD: ip_ipip.c,v 1.25 2002/06/10 18:04:55 itojun Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
@@ -165,7 +165,6 @@ _ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 	register struct sockaddr_in *sin;
 	register struct ifnet *ifp;
 	register struct ifaddr *ifa;
-	struct ifqueue *ifq = NULL;
 	struct ip *ipo;
 #ifdef INET6
 	register struct sockaddr_in6 *sin6;
@@ -309,6 +308,7 @@ _ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 	if ((m->m_pkthdr.rcvif == NULL ||
 	    !(m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK)) &&
 	    ipip_allow != 2) {
+	    	IFNET_RLOCK();
 		for (ifp = ifnet.tqh_first; ifp != 0;
 		     ifp = ifp->if_list.tqe_next) {
 			for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
@@ -325,6 +325,7 @@ _ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 					    ipo->ip_src.s_addr)	{
 						ipipstat.ipips_spoof++;
 						m_freem(m);
+						IFNET_RUNLOCK();
 						return;
 					}
 				}
@@ -341,6 +342,7 @@ _ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 					if (IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &ip6->ip6_src)) {
 						ipipstat.ipips_spoof++;
 						m_freem(m);
+						IFNET_RUNLOCK();
 						return;
 					}
 
@@ -348,6 +350,7 @@ _ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 #endif /* INET6 */
 			}
 		}
+		IFNET_RUNLOCK();
 	}
 
 	/* Statistics */
@@ -364,13 +367,11 @@ _ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 	switch (v >> 4) {
 #ifdef INET
 	case 4:
-		ifq = &ipintrq;
 		isr = NETISR_IP;
 		break;
 #endif
 #ifdef INET6
 	case 6:
-		ifq = &ip6intrq;
 		isr = NETISR_IPV6;
 		break;
 #endif
@@ -378,12 +379,9 @@ _ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 		panic("ipip_input: should never reach here");
 	}
 
-	if (!IF_HANDOFF(ifq, m, NULL)) {
+	if (!netisr_queue(isr, m)) {
 		ipipstat.ipips_qfull++;
-
 		DPRINTF(("ipip_input: packet dropped because of full queue\n"));
-	} else {
-		schednetisr(isr);
 	}
 }
 

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vfsops.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/fs/unionfs/union_vfsops.c,v 1.57 2002/10/06 11:42:14 mux Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_vfsops.c,v 1.61 2003/03/11 22:15:09 kan Exp $
  */
 
 /*
@@ -85,6 +85,7 @@ union_mount(mp, ndp, td)
 	int op;
 	int len;
 	size_t size;
+	struct componentname fakecn;
 
 	UDEBUG(("union_mount(mp = %p)\n", (void *)mp));
 
@@ -230,7 +231,15 @@ union_mount(mp, ndp, td)
 	 * supports whiteout operations.
 	 */
 	if ((mp->mnt_flag & MNT_RDONLY) == 0) {
-		error = VOP_WHITEOUT(um->um_uppervp, NULL, LOOKUP);
+		/*
+		 * XXX Fake up a struct componentname with only cn_nameiop
+		 * and cn_thread valid; union_whiteout() needs to use the
+		 * thread pointer to lock the vnode.
+		 */
+		bzero(&fakecn, sizeof(fakecn));
+		fakecn.cn_nameiop = LOOKUP;
+		fakecn.cn_thread = td;
+		error = VOP_WHITEOUT(um->um_uppervp, &fakecn, LOOKUP);
 		if (error)
 			goto bad;
 	}
@@ -493,7 +502,7 @@ static struct vfsops union_vfsops = {
 	union_root,
 	vfs_stdquotactl,
 	union_statfs,
-	vfs_stdsync,    /* XXX assumes no cached data on union level */
+	vfs_stdnosync,    /* XXX assumes no cached data on union level */
 	vfs_stdvget,
 	vfs_stdfhtovp,
 	vfs_stdcheckexp,

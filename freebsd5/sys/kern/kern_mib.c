@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_mib.c,v 1.62 2002/11/07 23:57:17 tmm Exp $
+ * $FreeBSD: src/sys/kern/kern_mib.c,v 1.65 2003/04/30 12:57:39 markm Exp $
  */
 
 #include "opt_posix.h"
@@ -231,7 +231,7 @@ SYSCTL_INT(_regression, OID_AUTO, securelevel_nonmonotonic, CTLFLAG_RW,
 #endif
 
 int securelevel = -1;
-struct mtx securelevel_mtx;
+static struct mtx securelevel_mtx;
 
 MTX_SYSINIT(securelevel_lock, &securelevel_mtx, "securelevel mutex lock",
     MTX_DEF);
@@ -361,3 +361,10 @@ SYSCTL_INT(_debug_sizeof, OID_AUTO, buf, CTLFLAG_RD,
 #include <sys/user.h>
 SYSCTL_INT(_debug_sizeof, OID_AUTO, kinfo_proc, CTLFLAG_RD,
     0, sizeof(struct kinfo_proc), "sizeof(struct kinfo_proc)");
+
+/* XXX compatibility, remove for 6.0 */
+#include <sys/imgact.h>
+#include <sys/imgact_elf.h>
+SYSCTL_INT(_kern, OID_AUTO, fallback_elf_brand, CTLFLAG_RW,
+    &__elfN(fallback_brand), sizeof(__elfN(fallback_brand)),
+    "compatibility for kern.fallback_elf_brand");

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/wchar.h,v 1.33 2002/10/27 11:30:36 tjr Exp $
+ * $FreeBSD: src/include/wchar.h,v 1.35 2003/04/28 22:40:05 kan Exp $
  */
 
 /*-
@@ -69,6 +69,7 @@
 
 #include <sys/cdefs.h>
 #include <sys/_types.h>
+#include <machine/_limits.h>
 
 #ifndef NULL
 #define	NULL	0
@@ -94,6 +95,11 @@ typedef	__wchar_t	wchar_t;
 #ifndef _WINT_T_DECLARED
 typedef	__wint_t	wint_t;
 #define	_WINT_T_DECLARED
+#endif
+
+#ifndef	WCHAR_MIN 
+#define	WCHAR_MIN	__INT_MIN
+#define	WCHAR_MAX	__INT_MAX
 #endif
 
 #ifndef WEOF
@@ -174,6 +180,9 @@ int	vfwscanf(struct __sFILE * __restrict, const wchar_t * __restrict,
 int	vswscanf(const wchar_t * __restrict, const wchar_t * __restrict,
 	    __va_list);
 int	vwscanf(const wchar_t * __restrict, __va_list);
+float	wcstof(const wchar_t * __restrict, wchar_t ** __restrict);
+long double
+	wcstold(const wchar_t * __restrict, wchar_t ** __restrict);
 #ifdef __LONG_LONG_SUPPORTED
 /* LONGLONG */
 long long

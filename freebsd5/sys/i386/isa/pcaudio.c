@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pcaudio.c,v 1.67 2002/10/01 20:05:58 jhb Exp $
+ * $FreeBSD: src/sys/i386/isa/pcaudio.c,v 1.68 2003/03/03 12:15:49 phk Exp $
  */
 
 #include <sys/param.h>
@@ -155,19 +155,13 @@ static	d_poll_t	pcapoll;
 
 #define CDEV_MAJOR 24
 static struct cdevsw pca_cdevsw = {
-	/* open */	pcaopen,
-	/* close */	pcaclose,
-	/* read */	noread,
-	/* write */	pcawrite,
-	/* ioctl */	pcaioctl,
-	/* poll */	pcapoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"pca",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	pcaopen,
+	.d_close =	pcaclose,
+	.d_write =	pcawrite,
+	.d_ioctl =	pcaioctl,
+	.d_poll =	pcapoll,
+	.d_name =	"pca",
+	.d_maj =	CDEV_MAJOR,
 };
 
 static void pca_continue(void);

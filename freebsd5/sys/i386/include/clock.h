@@ -3,7 +3,7 @@
  * Garrett Wollman, September 1994.
  * This file is in the public domain.
  *
- * $FreeBSD: src/sys/i386/include/clock.h,v 1.41 2002/03/20 05:48:58 alfred Exp $
+ * $FreeBSD: src/sys/i386/include/clock.h,v 1.44 2003/02/05 09:20:40 phk Exp $
  */
 
 #ifndef _MACHINE_CLOCK_H_
@@ -16,10 +16,12 @@
  */
 extern int	adjkerntz;
 extern int	disable_rtc_set;
+extern int	pscnt;
+extern int	psdiv;
 extern int	statclock_disable;
 extern u_int	timer_freq;
 extern int	timer0_max_count;
-extern u_int	tsc_freq;
+extern uint64_t	tsc_freq;
 extern int	tsc_is_broken;
 extern int	wall_cmos_clock;
 #ifdef APIC_IO
@@ -43,6 +45,7 @@ int	release_timer1(void);
 #endif
 int	sysbeep(int pitch, int period);
 void	timer_restore(void);
+void	init_TSC(void);
 
 #endif /* _KERNEL */
 

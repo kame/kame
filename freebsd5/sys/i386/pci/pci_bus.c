@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/pci/pci_bus.c,v 1.96 2002/11/13 21:30:44 peter Exp $
+ * $FreeBSD: src/sys/i386/pci/pci_bus.c,v 1.98 2003/02/18 03:36:48 peter Exp $
  *
  */
 
@@ -186,8 +186,8 @@ nexus_pcib_is_host_bridge(int bus, int slot, int func,
 #ifdef CPU_ELAN
 		init_AMD_Elan_sc520();
 #else
-		printf("*** WARNING: kernel option CPU_ELAN missing"
-		    " -- timekeeping may be wrong.\n");
+		printf(
+"*** WARNING: missing CPU_ELAN -- timekeeping may be wrong\n");
 #endif
 		break;
 	case 0x70061022:
@@ -310,7 +310,6 @@ nexus_pcib_identify(driver_t *driver, device_t parent)
 	int pcifunchigh;
 	int found824xx = 0;
 	int found_orion = 0;
-	int found_pcibios_flaming_death = 0;
 	device_t child;
 	devclass_t pci_devclass;
 
@@ -398,23 +397,6 @@ nexus_pcib_identify(driver_t *driver, device_t parent)
 	}
 	if (found824xx && bus == 0) {
 		bus++;
-		goto retry;
-	}
-
-	/*
-	 * This is just freaking brilliant!  Some BIOS writers have
-	 * decided that we must be forcibly prevented from using
-	 * PCIBIOS to query the host->pci bridges.  If you try and
-	 * access configuration registers, it pretends there is
-	 * no pci device at that bus:device:function address.
-	 */
-	if (!found && pci_pcibios_active() && !found_pcibios_flaming_death) {
-		/* retry with the old mechanism, or fail */
-		if (pci_kill_pcibios() == 0)
-			return;
-		printf("nexus_pcib_identify: found broken PCIBIOS - disabling it and retrying.\n");
-		printf("nexus_pcib_identify: it is bogusly censoring host->pci bridges.\n");
-		found_pcibios_flaming_death = 1;
 		goto retry;
 	}
 

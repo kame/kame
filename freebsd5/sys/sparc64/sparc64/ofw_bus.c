@@ -54,7 +54,7 @@
  *
  *	from: $NetBSD: ofw_machdep.c,v 1.16 2001/07/20 00:07:14 eeh Exp $
  *
- * $FreeBSD: src/sys/sparc64/sparc64/ofw_bus.c,v 1.3 2002/11/07 16:07:46 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/ofw_bus.c,v 1.6 2003/05/30 20:48:05 tmm Exp $
  */
 
 /*
@@ -160,7 +160,7 @@ ofw_bus_find_intr(u_int8_t *intr, int intrsz, u_int8_t *regs, int physsz,
  * This should work for all bus systems.
  */
 u_int32_t
-ofw_bus_route_intr(phandle_t node, int intrp, obr_callback_t *cb)
+ofw_bus_route_intr(phandle_t node, int intrp, obr_callback_t *cb, void *cookie)
 {
 	u_int8_t *reg, *intr, *tintr, *imap, *imapmsk;
 	phandle_t parent;
@@ -201,7 +201,7 @@ ofw_bus_route_intr(phandle_t node, int intrp, obr_callback_t *cb)
 			 */
 			if (cb != NULL) {
 				tisz = cb(parent, intr, isz, reg, regsz, &tintr,
-				    &found);
+				    &found, cookie);
 				if (tisz != -1) {
 					isz = tisz;
 					free(intr, M_OFWPROP);

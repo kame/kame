@@ -30,7 +30,7 @@
  * This file should be kept in sync with src/lib/libmd/md5c.c
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/md5c.c,v 1.20 2002/10/20 22:33:42 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/md5c.c,v 1.21 2003/05/05 07:22:35 phk Exp $");
 
 #include <sys/types.h>
 
@@ -78,7 +78,7 @@ Decode (u_int32_t *output, const unsigned char *input, unsigned int len)
 	const u_int32_t *ip = (const u_int32_t *)input;
 
 	for (i = 0; i < len / 4; i++)
-		output[i] = le32toh(ip[i]);
+		output[i] = le32dec(&ip[i]);
 }
 #endif
 

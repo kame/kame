@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/atkbdc_isa.c,v 1.24 2001/09/25 16:59:28 yokota Exp $
+ * $FreeBSD: src/sys/isa/atkbdc_isa.c,v 1.25 2003/04/30 12:57:39 markm Exp $
  */
 
 #include "opt_kbd.h"
@@ -56,7 +56,7 @@ typedef struct atkbdc_device {
 } atkbdc_device_t;
 
 /* kbdc */
-devclass_t atkbdc_devclass;
+static devclass_t atkbdc_devclass;
 
 static int	atkbdc_probe(device_t dev);
 static int	atkbdc_attach(device_t dev);

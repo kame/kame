@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unpcb.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/unpcb.h,v 1.14 2002/05/16 21:28:26 trhodes Exp $
+ * $FreeBSD: src/sys/sys/unpcb.h,v 1.16 2003/02/06 01:34:43 hsu Exp $
  */
 
 #ifndef _SYS_UNPCB_H_
@@ -44,7 +44,7 @@
  * Protocol control block for an active
  * instance of a UNIX internal protocol.
  *
- * A socket may be associated with an vnode in the
+ * A socket may be associated with a vnode in the
  * filesystem.  If so, the unp_vnode pointer holds
  * a reference count to this vnode, which should be irele'd
  * when the socket goes away.
@@ -72,7 +72,6 @@ struct unpcb {
 	LIST_ENTRY(unpcb) unp_link; 	/* glue on list of all PCBs */
 	struct	socket *unp_socket;	/* pointer back to socket */
 	struct	vnode *unp_vnode;	/* if associated with file */
-	struct	vnode *unp_rvnode;	/* root vp for creating process */
 	ino_t	unp_ino;		/* fake inode number */
 	struct	unpcb *unp_conn;	/* control block of connected socket */
 	struct	unp_head unp_refs;	/* referencing socket linked list */

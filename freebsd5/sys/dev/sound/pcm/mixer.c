@@ -28,7 +28,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/mixer.c,v 1.28 2002/11/26 18:16:27 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/mixer.c,v 1.31 2003/03/03 12:15:46 phk Exp $");
 
 MALLOC_DEFINE(M_MIXER, "mixer", "mixer");
 
@@ -73,19 +73,11 @@ static d_open_t mixer_open;
 static d_close_t mixer_close;
 
 static struct cdevsw mixer_cdevsw = {
-	/* open */	mixer_open,
-	/* close */	mixer_close,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	mixer_ioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"mixer",
-	/* maj */	SND_CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	mixer_open,
+	.d_close =	mixer_close,
+	.d_ioctl =	mixer_ioctl,
+	.d_name =	"mixer",
+	.d_maj =	SND_CDEV_MAJOR,
 };
 
 #ifdef USING_DEVFS

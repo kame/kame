@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)locore.s	7.3 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/locore.s,v 1.161 2002/12/02 19:58:55 deischen Exp $
+ * $FreeBSD: src/sys/i386/i386/locore.s,v 1.171 2003/04/03 23:44:34 jake Exp $
  *
  *		originally from: locore.s, by William F. Jolitz
  *
@@ -69,27 +69,11 @@
 /*
  * PTmap is recursive pagemap at top of virtual address space.
  * Within PTmap, the page directory can be found (third indirection).
- *
- * NOTE: PTDpde, PTmap, and PTD are being defined as address symbols.
- * In C you access them directly, and not with a '*'. Storage is not being 
- * allocated. They will magically address the correct locations in KVM
- * which C will treat as normal variables of the type they are defined in 
- * machine/pmap.h, i.e.  PTDpde = XX ; to set a PDE entry, NOT *PTDpde = XX;
  */
 	.globl	PTmap,PTD,PTDpde
 	.set	PTmap,(PTDPTDI << PDRSHIFT)
 	.set	PTD,PTmap + (PTDPTDI * PAGE_SIZE)
 	.set	PTDpde,PTD + (PTDPTDI * PDESIZE)
-
-/*
- * APTmap, APTD is the alternate recursive pagemap.
- * It's used when modifying another process's page tables.
- * See the note above. It is true here as well.
- */
-	.globl	APTmap,APTD,APTDpde
-	.set	APTmap,APTDPTDI << PDRSHIFT
-	.set	APTD,APTmap + (APTDPTDI * PAGE_SIZE)
-	.set	APTDpde,PTD + (APTDPTDI * PDESIZE)
 
 #ifdef SMP
 /*
@@ -138,6 +122,11 @@ SMPpt:		.long	0		/* relocated version */
 	.globl	IdlePTD
 IdlePTD:	.long	0		/* phys addr of kernel PTD */
 
+#ifdef PAE
+	.globl	IdlePDPT
+IdlePDPT:	.long	0		/* phys addr of kernel PDPT */
+#endif
+
 #ifdef SMP
 	.globl	KPTphys
 #endif
@@ -154,11 +143,6 @@ vm86phystk:	.long	0		/* PA of vm86/bios stack */
 	.globl	vm86paddr, vm86pa
 vm86paddr:	.long	0		/* address of vm86 region */
 vm86pa:		.long	0		/* phys addr of vm86 region */
-
-#ifdef BDE_DEBUGGER
-	.globl	_bdb_exists		/* flag to indicate BDE debugger is present */
-_bdb_exists:	.long	0
-#endif
 
 #ifdef PC98
 	.globl	pc98_system_parameter
@@ -195,13 +179,13 @@ pc98_system_parameter:
  *	prot = protection bits
  */
 #define	fillkpt(base, prot)		  \
-	shll	$2,%ebx			; \
+	shll	$PTESHIFT,%ebx		; \
 	addl	base,%ebx		; \
 	orl	$PG_V,%eax		; \
 	orl	prot,%eax		; \
 1:	movl	%eax,(%ebx)		; \
 	addl	$PAGE_SIZE,%eax		; /* increment physical address */ \
-	addl	$4,%ebx			; /* next pte */ \
+	addl	$PTESIZE,%ebx		; /* next pte */ \
 	loop	1b
 
 /*
@@ -232,16 +216,6 @@ NON_GPROF_ENTRY(btext)
 	rep
 	movsb
 #else	/* IBM-PC */
-#ifdef BDE_DEBUGGER
-#ifdef BIOS_STEALS_3K
-	cmpl	$0x0375c339,0x95504
-#else
-	cmpl	$0x0375c339,0x96104	/* XXX - debugger signature */
-#endif
-	jne	1f
-	movb	$1,R(_bdb_exists)
-1:
-#endif
 /* Tell the bios to warmboot next time */
 	movw	$0x1234,0x472
 #endif	/* PC98 */
@@ -314,8 +288,8 @@ NON_GPROF_ENTRY(btext)
  *
  * XXX the gdt and idt are still somewhere in the boot program.  We
  * depend on the convention that the boot program is below 1MB and we
- * are above 1MB to keep the gdt and idt  away from the bss and page
- * tables.  The idt is only used if BDE_DEBUGGER is enabled.
+ * are above 1MB to keep the gdt and idt away from the bss and page
+ * tables.
  */
 	movl	$R(end),%ecx
 	movl	$R(edata),%edi
@@ -337,29 +311,20 @@ NON_GPROF_ENTRY(btext)
 	movl	%eax, %cr4
 1:
 
-#ifdef BDE_DEBUGGER
-/*
- * Adjust as much as possible for paging before enabling paging so that the
- * adjustments can be traced.
- */
-	call	bdb_prepare_paging
-#endif
-
 /* Now enable paging */
+#ifdef PAE
+	movl	R(IdlePDPT), %eax
+	movl	%eax, %cr3
+	movl	%cr4, %eax
+	orl	$CR4_PAE, %eax
+	movl	%eax, %cr4
+#else
 	movl	R(IdlePTD), %eax
 	movl	%eax,%cr3		/* load ptd addr into mmu */
+#endif
 	movl	%cr0,%eax		/* get control word */
 	orl	$CR0_PE|CR0_PG,%eax	/* enable paging */
 	movl	%eax,%cr0		/* and let's page NOW! */
-
-#ifdef BDE_DEBUGGER
-/*
- * Complete the adjustments for paging so that we can keep tracing through
- * initi386() after the low (physical) addresses for the gdt and idt become
- * invalid.
- */
-	call	bdb_commit_paging
-#endif
 
 	pushl	$begin			/* jump to high virtualized address */
 	ret
@@ -373,7 +338,11 @@ begin:
 
 	xorl	%ebp,%ebp		/* mark end of frames */
 
+#ifdef PAE
+	movl	IdlePDPT,%esi
+#else
 	movl	IdlePTD,%esi
+#endif
 	movl	%esi,(KSTACK_PAGES*PAGE_SIZE-PCB_SIZE+PCB_CR3)(%eax)
 
 	pushl	physfree		/* value of first for init386(first) */
@@ -720,6 +689,7 @@ trycpuid:	/* Use the `cpuid' instruction. */
 	movl	$1,%eax
 	cpuid					# cpuid 1
 	movl	%eax,R(cpu_id)			# store cpu_id
+	movl	%ebx,R(cpu_procinfo)		# store cpu_procinfo
 	movl	%edx,R(cpu_feature)		# store cpu_feature
 	rorl	$8,%eax				# extract family type
 	andl	$15,%eax
@@ -780,7 +750,12 @@ no_kernend:
 	movl	%esi,R(KPTphys)
 
 /* Allocate Page Table Directory */
+#ifdef PAE
+	/* XXX only need 32 bytes (easier for now) */
 	ALLOCPAGES(1)
+	movl	%esi,R(IdlePDPT)
+#endif
+	ALLOCPAGES(NPGPTD)
 	movl	%esi,R(IdlePTD)
 
 /* Allocate UPAGES */
@@ -818,11 +793,6 @@ no_kernend:
 
 /* Map read-only from zero to the end of the kernel text section */
 	xorl	%eax, %eax
-#ifdef BDE_DEBUGGER
-/* If the debugger is present, actually map everything read-write. */
-	cmpl	$0,R(_bdb_exists)
-	jne	map_read_write
-#endif
 	xorl	%edx,%edx
 	movl	$R(etext),%ecx
 	addl	$PAGE_MASK,%ecx
@@ -833,7 +803,6 @@ no_kernend:
 	movl	$R(etext),%eax
 	addl	$PAGE_MASK, %eax
 	andl	$~PAGE_MASK, %eax
-map_read_write:
 	movl	$PG_RW,%edx
 	movl	R(KERNend),%ecx
 	subl	%eax,%ecx
@@ -841,8 +810,14 @@ map_read_write:
 	fillkptphys(%edx)
 
 /* Map page directory. */
-	movl	R(IdlePTD), %eax
+#ifdef PAE
+	movl	R(IdlePDPT), %eax
 	movl	$1, %ecx
+	fillkptphys($PG_RW)
+#endif
+
+	movl	R(IdlePTD), %eax
+	movl	$NPGPTD, %ecx
 	fillkptphys($PG_RW)
 
 /* Map proc0's UPAGES in the physical way ... */
@@ -923,87 +898,14 @@ map_read_write:
 /* install a pde recursively mapping page directory as a page table */
 	movl	R(IdlePTD), %eax
 	movl	$PTDPTDI, %ebx
-	movl	$1,%ecx
+	movl	$NPGPTD,%ecx
 	fillkpt(R(IdlePTD), $PG_RW)
 
+#ifdef PAE
+	movl	R(IdlePTD), %eax
+	xorl	%ebx, %ebx
+	movl	$NPGPTD, %ecx
+	fillkpt(R(IdlePDPT), $0x0)
+#endif
+
 	ret
-
-#ifdef BDE_DEBUGGER
-bdb_prepare_paging:
-	cmpl	$0,R(_bdb_exists)
-	je	bdb_prepare_paging_exit
-
-	subl	$6,%esp
-
-	/*
-	 * Copy and convert debugger entries from the bootstrap gdt and idt
-	 * to the kernel gdt and idt.  Everything is still in low memory.
-	 * Tracing continues to work after paging is enabled because the
-	 * low memory addresses remain valid until everything is relocated.
-	 * However, tracing through the setidt() that initializes the trace
-	 * trap will crash.
-	 */
-	sgdt	(%esp)
-	movl	2(%esp),%esi		/* base address of bootstrap gdt */
-	movl	$R(_gdt),%edi
-	movl	%edi,2(%esp)		/* prepare to load kernel gdt */
-	movl	$8*18/4,%ecx
-	cld
-	rep				/* copy gdt */
-	movsl
-	movl	$R(_gdt),-8+2(%edi)	/* adjust gdt self-ptr */
-	movb	$0x92,-8+5(%edi)
-	lgdt	(%esp)
-
-	sidt	(%esp)
-	movl	2(%esp),%esi		/* base address of current idt */
-	movl	8+4(%esi),%eax		/* convert dbg descriptor to ... */
-	movw	8(%esi),%ax
-	movl	%eax,R(bdb_dbg_ljmp+1)	/* ... immediate offset ... */
-	movl	8+2(%esi),%eax
-	movw	%ax,R(bdb_dbg_ljmp+5)	/* ... and selector for ljmp */
-	movl	24+4(%esi),%eax		/* same for bpt descriptor */
-	movw	24(%esi),%ax
-	movl	%eax,R(bdb_bpt_ljmp+1)
-	movl	24+2(%esi),%eax
-	movw	%ax,R(bdb_bpt_ljmp+5)
-	movl	R(_idt),%edi
-	movl	%edi,2(%esp)		/* prepare to load kernel idt */
-	movl	$8*4/4,%ecx
-	cld
-	rep				/* copy idt */
-	movsl
-	lidt	(%esp)
-
-	addl	$6,%esp
-
-bdb_prepare_paging_exit:
-	ret
-
-/* Relocate debugger gdt entries and gdt and idt pointers. */
-bdb_commit_paging:
-	cmpl	$0,_bdb_exists
-	je	bdb_commit_paging_exit
-
-	movl	$gdt+8*9,%eax		/* adjust slots 9-17 */
-	movl	$9,%ecx
-reloc_gdt:
-	movb	$KERNBASE>>24,7(%eax)	/* top byte of base addresses, was 0, */
-	addl	$8,%eax			/* now KERNBASE>>24 */
-	loop	reloc_gdt
-
-	subl	$6,%esp
-	sgdt	(%esp)
-	addl	$KERNBASE,2(%esp)
-	lgdt	(%esp)
-	sidt	(%esp)
-	addl	$KERNBASE,2(%esp)
-	lidt	(%esp)
-	addl	$6,%esp
-
-	int	$3
-
-bdb_commit_paging_exit:
-	ret
-
-#endif /* BDE_DEBUGGER */

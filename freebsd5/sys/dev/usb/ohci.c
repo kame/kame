@@ -1,5 +1,5 @@
 /*	$NetBSD: ohci.c,v 1.125 2002/05/28 12:42:38 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ohci.c,v 1.116 2002/12/09 01:41:24 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ohci.c,v 1.118 2003/03/05 13:17:15 shiba Exp $	*/
 
 /* Also, already ported:
  *	$NetBSD: ohci.c,v 1.127 2002/08/07 20:03:19 augustss Exp $
@@ -501,9 +501,8 @@ ohci_alloc_std_chain(struct ohci_pipe *opipe, ohci_softc_t *sc,
 	len = alen;
 	cur = sp;
 
-
 	dataphys = DMAADDR(dma, 0);
-	dataphysend = OHCI_PAGE(dataphys + len - 1);
+	dataphysend = OHCI_PAGE(DMAADDR(dma, len - 1));
 	tdflags = htole32(
 	    (rd ? OHCI_TD_IN : OHCI_TD_OUT) |
 	    (flags & USBD_SHORT_XFER_OK ? OHCI_TD_R : 0) |
@@ -518,8 +517,8 @@ ohci_alloc_std_chain(struct ohci_pipe *opipe, ohci_softc_t *sc,
 
 		/* The OHCI hardware can handle at most one page crossing. */
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-		if (OHCI_PAGE(dataphys) == OHCI_PAGE(dataphysend) ||
-		    OHCI_PAGE(dataphys) + OHCI_PAGE_SIZE == OHCI_PAGE(dataphysend))
+		if (OHCI_PAGE(dataphys) == dataphysend ||
+		    OHCI_PAGE(dataphys) + OHCI_PAGE_SIZE == dataphysend)
 #elif defined(__FreeBSD__)
 		/* XXX This is pretty broken: Because we do not allocate
 		 * a contiguous buffer (contiguous in physical pages) we
@@ -527,7 +526,7 @@ ohci_alloc_std_chain(struct ohci_pipe *opipe, ohci_softc_t *sc,
 		 * So check whether the start and end of the buffer are on
 		 * the same page.
 		 */
-		if (OHCI_PAGE(dataphys) == OHCI_PAGE(dataphysend))
+		if (OHCI_PAGE(dataphys) == dataphysend)
 #endif
 		{
 			/* we can handle it in this TD */
@@ -544,6 +543,8 @@ ohci_alloc_std_chain(struct ohci_pipe *opipe, ohci_softc_t *sc,
 			/* must use multiple TDs, fill as much as possible. */
 			curlen = 2 * OHCI_PAGE_SIZE -
 				 OHCI_PAGE_MASK(dataphys);
+			if (curlen > len)	/* may have fit in one page */
+				curlen = len;
 #elif defined(__FreeBSD__)
 			/* See comment above (XXX) */
 			curlen = OHCI_PAGE_SIZE -
@@ -568,6 +569,9 @@ ohci_alloc_std_chain(struct ohci_pipe *opipe, ohci_softc_t *sc,
 			    dataphys, dataphys + curlen - 1));
 		if (len == 0)
 			break;
+		if (len < 0)
+			panic("Length went negative: %d curlen %d dma %p offset %08x", len, curlen, *dma, (int)offset);
+
 		DPRINTFN(10,("ohci_alloc_std_chain: extend chain\n"));
 		offset += curlen;
 		cur = next;
@@ -575,6 +579,10 @@ ohci_alloc_std_chain(struct ohci_pipe *opipe, ohci_softc_t *sc,
 	if ((flags & USBD_FORCE_SHORT_XFER) &&
 	    alen % UGETW(opipe->pipe.endpoint->edesc->wMaxPacketSize) == 0) {
 		/* Force a 0 length transfer at the end. */
+
+		cur->td.td_flags = htole32(tdflags | OHCI_TD_NOINTR);
+		cur = next;
+
 		next = ohci_alloc_std(sc);
 		if (next == NULL)
 			goto nomem;
@@ -583,11 +591,10 @@ ohci_alloc_std_chain(struct ohci_pipe *opipe, ohci_softc_t *sc,
 		cur->td.td_cbp = 0; /* indicate 0 length packet */
 		cur->nexttd = next;
 		cur->td.td_nexttd = htole32(next->physaddr);
-		cur->td.td_be = htole32(dataphys - 1);
+		cur->td.td_be = ~0;
 		cur->len = 0;
 		cur->flags = 0;
 		cur->xfer = xfer;
-		cur = next;
 		DPRINTFN(2,("ohci_alloc_std_chain: add 0 xfer\n"));
 	}
 	cur->flags = OHCI_CALL_DONE | OHCI_ADD_LEN;

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.16 2002/11/08 18:27:29 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.19 2003/03/04 23:19:52 jlemon Exp $
  *
  */
 
@@ -57,7 +57,7 @@
 #include <netatm/atm_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.16 2002/11/08 18:27:29 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.19 2003/03/04 23:19:52 jlemon Exp $");
 #endif
 
 
@@ -99,6 +99,7 @@ static struct t_atm_cause	atm_dev_cause = {
 	{0, 0, 0, 0}
 };
 
+extern struct ifqueue atm_intrq;
 
 /*
  * ATM Device Stack Instantiation

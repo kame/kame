@@ -37,7 +37,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_mppc.c,v 1.4 1999/11/25 00:10:12 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_mppc.c,v 1.18 2002/08/22 00:30:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_mppc.c,v 1.20 2003/02/05 19:11:11 ambrisko Exp $
  */
 
 /*
@@ -90,8 +90,14 @@ MALLOC_DEFINE(M_NETGRAPH_MPPC, "netgraph_mppc", "netgraph mppc node ");
 /* Key length */
 #define KEYLEN(b)		(((b) & MPPE_128) ? 16 : 8)
 
-/* What sequence number jump is too far */
-#define MPPC_INSANE_JUMP	256
+/*
+ * When packets are lost with MPPE, we may have to re-key arbitrarily
+ * many times to 'catch up' to the new jumped-ahead sequence number.
+ * Since this can be expensive, we pose a limit on how many re-keyings
+ * we will do at one time to avoid a possible D.O.S. vulnerability.
+ * This should instead be a configurable parameter.
+ */
+#define MPPE_MAX_REKEY		1000
 
 /* MPPC packet header bits */
 #define MPPC_FLAG_FLUSHED	0x8000		/* xmitter reset state */
@@ -163,6 +169,11 @@ static struct ng_type ng_mppc_typestruct = {
 	NULL
 };
 NETGRAPH_INIT(mppc, &ng_mppc_typestruct);
+
+#ifdef NETGRAPH_MPPC_ENCRYPTION
+/* Depend on separate rc4 module */
+MODULE_DEPEND(ng_mppc, rc4, 1, 1, 1);
+#endif
 
 /* Fixed bit pattern to weaken keysize down to 40 or 56 bits */
 static const u_char ng_mppe_weakenkey[3] = { 0xd1, 0x26, 0x9e };
@@ -261,7 +272,8 @@ ng_mppc_rcvmsg(node_p node, item_p item, hook_p lasthook)
 				cfg->bits = 0;
 
 			/* Save return address so we can send reset-req's */
-			priv->ctrlnode = NGI_RETADDR(item);
+			if (!isComp)
+				priv->ctrlnode = NGI_RETADDR(item);
 
 			/* Configuration is OK, reset to it */
 			d->cfg = *cfg;
@@ -566,7 +578,8 @@ ng_mppc_decompress(node_p node, struct mbuf *m, struct mbuf **resultp)
 {
 	const priv_p priv = NG_NODE_PRIVATE(node);
 	struct ng_mppc_dir *const d = &priv->recv;
-	u_int16_t header, cc, numLost;
+	u_int16_t header, cc;
+	u_int numLost;
 	u_char *buf;
 	int len;
 
@@ -584,13 +597,8 @@ ng_mppc_decompress(node_p node, struct mbuf *m, struct mbuf **resultp)
 		return (ENOMEM);
 	m_copydata(m, MPPC_HDRLEN, len, (caddr_t)buf);
 
-	/* Check for insane jumps in sequence numbering (D.O.S. attack) */
+	/* Check for an unexpected jump in the sequence number */
 	numLost = ((cc - d->cc) & MPPC_CCOUNT_MASK);
-	if (numLost >= MPPC_INSANE_JUMP) {
-		log(LOG_ERR, "%s: insane jump %d", __func__, numLost);
-		priv->recv.cfg.enable = 0;
-		goto failed;
-	}
 
 	/* If flushed bit set, we can always handle packet */
 	if ((header & MPPC_FLAG_FLUSHED) != 0) {
@@ -600,10 +608,22 @@ ng_mppc_decompress(node_p node, struct mbuf *m, struct mbuf **resultp)
 #endif
 #ifdef NETGRAPH_MPPC_ENCRYPTION
 		if ((d->cfg.bits & MPPE_BITS) != 0) {
+			u_int rekey;
 
-			/* Resync as necessary, skipping lost packets */
+			/* How many times are we going to have to re-key? */
+			rekey = ((d->cfg.bits & MPPE_STATELESS) != 0) ?
+			    numLost : (numLost / (MPPE_UPDATE_MASK + 1));
+			if (rekey > MPPE_MAX_REKEY) {
+				log(LOG_ERR, "%s: too many (%d) packets"
+				    " dropped, disabling node %p!",
+				    __func__, numLost, node);
+				priv->recv.cfg.enable = 0;
+				goto failed;
+			}
+
+			/* Re-key as necessary to catch up to peer */
 			while (d->cc != cc) {
-				if ((d->cfg.bits & MPPE_STATELESS)
+				if ((d->cfg.bits & MPPE_STATELESS) != 0
 				    || (d->cc & MPPE_UPDATE_MASK)
 				      == MPPE_UPDATE_FLAG) {
 					ng_mppc_updatekey(d->cfg.bits,

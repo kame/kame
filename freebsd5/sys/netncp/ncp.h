@@ -4,14 +4,14 @@
  *  Copyright (C) 1995 by Volker Lendecke
  *  New version derived from original ncp.h, 1998 Boris Popov
  *
- * $FreeBSD: src/sys/netncp/ncp.h,v 1.5 2002/09/23 18:54:32 alfred Exp $
+ * $FreeBSD: src/sys/netncp/ncp.h,v 1.6 2003/02/28 04:31:29 tjr Exp $
  */
 
 #ifndef _NETNCP_NCP_H_
 #define _NETNCP_NCP_H_
 
 #define NCP_VERMAJ	1
-#define NCP_VERMIN	3400
+#define NCP_VERMIN	3500
 #define NCP_VERSION	(NCP_VERMAJ*100000 + NCP_VERMIN)
 
 typedef u_int32_t	nwdirent;

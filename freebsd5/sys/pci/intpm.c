@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/intpm.c,v 1.27 2002/11/08 15:01:02 jhb Exp $
+ * $FreeBSD: src/sys/pci/intpm.c,v 1.28 2003/02/26 13:46:40 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -673,10 +673,10 @@ intpm_attach(device_t dev)
 		sciic->smbsh=rman_get_bushandle(res);
 		
 #ifdef __i386__
-		device_printf(dev,"%s %x\n",
+		device_printf(dev,"%s %lx\n",
 			      (sciic->smbst==I386_BUS_SPACE_IO)?
 			      "I/O mapped":"Memory",
-			      sciic->smbsh);
+			      rman_get_start(res));
 #endif
 		
 

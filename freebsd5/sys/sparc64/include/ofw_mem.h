@@ -23,20 +23,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/ofw_mem.h,v 1.1 2002/10/20 17:03:15 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/ofw_mem.h,v 1.2 2003/04/08 06:35:08 jake Exp $
  */
 
 #ifndef _MACHINE_OFW_MEM_H_
 #define	_MACHINE_OFW_MEM_H_
 
 struct ofw_mem_region {
-	vm_offset_t mr_start;
-	vm_offset_t mr_size;
+	vm_paddr_t mr_start;
+	vm_size_t mr_size;
 };
 
 struct ofw_map {
 	vm_offset_t om_start;
-	vm_offset_t om_size;
+	vm_size_t om_size;
 	u_long	om_tte;
 };
 

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/ucontext.h,v 1.9 2002/11/16 06:35:53 deischen Exp $
+ * $FreeBSD: src/sys/sys/ucontext.h,v 1.10 2003/04/25 01:50:30 deischen Exp $
  */
 
 #ifndef _SYS_UCONTEXT_H_
@@ -84,7 +84,7 @@ __END_DECLS
 struct thread;
 
 /* Machine-dependent functions: */
-int	get_mcontext(struct thread *td, mcontext_t *mcp);
+int	get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret);
 int	set_mcontext(struct thread *td, const mcontext_t *mcp);
 
 #endif /* !_KERNEL */

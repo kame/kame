@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.h	8.3 (Berkeley) 4/4/95
- * $FreeBSD: src/sys/sys/param.h,v 1.139 2002/11/01 09:38:33 dfr Exp $
+ * $FreeBSD: src/sys/sys/param.h,v 1.156.2.1 2003/06/04 05:55:09 scottl Exp $
  */
 
 #ifndef _SYS_PARAM_H_
@@ -55,7 +55,7 @@
  *	doc/en_US.ISO8859-1/books/porters-handbook/book.sgml
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 500043	/* Master, propagated to newvers */
+#define __FreeBSD_version 501000	/* Master, propagated to newvers */
 
 #ifndef NULL
 #define	NULL	0
@@ -83,7 +83,7 @@
 #define	NOFILE		OPEN_MAX	/* max open files per process */
 #define	NOGROUP		65535		/* marker for empty group set member */
 #define MAXHOSTNAMELEN	256		/* max hostname size */
-#define SPECNAMELEN	15		/* max length of devicename */
+#define SPECNAMELEN	63		/* max length of devicename */
 
 /* More types and definitions used throughout the kernel. */
 #ifdef _KERNEL
@@ -104,7 +104,7 @@
 /* Machine type dependent parameters. */
 #include <machine/param.h>
 #ifndef _KERNEL
-#include <machine/limits.h>
+#include <sys/limits.h>
 #endif
 
 #ifndef _NO_NAMESPACE_POLLUTION
@@ -252,10 +252,8 @@
 #define powerof2(x)	((((x)-1)&(x))==0)
 
 /* Macros for min/max. */
-#ifndef _KERNEL
 #define	MIN(a,b) (((a)<(b))?(a):(b))
 #define	MAX(a,b) (((a)>(b))?(a):(b))
-#endif
 
 #ifdef _KERNEL
 /*

@@ -32,54 +32,44 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_int.h,v 1.7 2002/10/28 22:43:54 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_int.h,v 1.26 2003/04/23 20:54:42 phk Exp $
  */
 
 LIST_HEAD(class_list_head, g_class);
 TAILQ_HEAD(g_tailq_head, g_geom);
-TAILQ_HEAD(event_tailq_head, g_event);
 
-extern struct event_tailq_head events;
+extern int g_collectstats;
 extern int g_debugflags;
-/* 1	G_T_TOPOLOGY		*/
-/* 2	G_T_BIO			*/
-/* 4	G_T_ACCESS		*/
-/* 8	enable sanity checks	*/
+/*
+ * 1	G_T_TOPOLOGY
+ * 2	G_T_BIO
+ * 4	G_T_ACCESS
+ * 8	Enable sanity checks
+ * 16	Allow footshooting on rank#1 providers
+ * 32	G_T_DETAILS
+ */
+#define G_F_DISKIOCTL	64
+#define G_F_CTLDUMP	128
 
 /*
- * Various internal actions are tracked by tagging g_event[s] onto
- * an internal eventqueue.
+ * We actually have a number of drivers sharing the same major number
+ * so we coordinate the major/minor usage here
  */
-enum g_events {
-	EV_NEW_CLASS,		/* class */
-	EV_NEW_PROVIDER,	/* provider */
-	EV_SPOILED,		/* provider, consumer */
-	EV_CALL_ME,		/* func, arg */
-	EV_LAST
-};
-
-struct g_event {
-	enum g_events 		event;
-	TAILQ_ENTRY(g_event)	events;
-	struct g_class		*class;
-	struct g_geom		*geom;
-	struct g_provider	*provider;
-	struct g_consumer	*consumer;
-	void			*arg;
-	g_call_me_t		*func;
-};
+#define GEOM_MAJOR		4
+#define GEOM_MINOR_STATS	0
+#define GEOM_MINOR_PROVIDERS	10
 
 /* geom_dump.c */
-void g_confxml(void *);
+void g_confxml(void *, int flag);
 void g_conf_specific(struct sbuf *sb, struct g_class *mp, struct g_geom *gp, struct g_provider *pp, struct g_consumer *cp);
-void g_confdot(void *);
-void g_conftxt(void *);
-
+void g_confdot(void *, int flag);
+void g_conftxt(void *, int flag);
 
 /* geom_event.c */
 void g_event_init(void);
-void g_post_event(enum g_events ev, struct g_class *mp, struct g_geom *gp, struct g_provider *pp, struct g_consumer *cp);
 void g_run_events(void);
+void g_stall_events(void);
+void g_release_events(void);
 
 /* geom_subr.c */
 extern struct class_list_head g_classes;
@@ -92,3 +82,7 @@ void g_io_schedule_up(struct thread *tp);
 
 /* geom_kern.c / geom_kernsim.c */
 void g_init(void);
+extern int g_shutdown;
+
+/* geom_ctl.c */
+void g_ctl_init(void);

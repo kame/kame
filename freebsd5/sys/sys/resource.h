@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)resource.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/resource.h,v 1.18 2002/06/26 00:29:28 dillon Exp $
+ * $FreeBSD: src/sys/sys/resource.h,v 1.19 2003/02/16 13:30:29 phk Exp $
  */
 
 #ifndef _SYS_RESOURCE_H_
@@ -134,8 +134,16 @@ struct loadavg {
 	long	fscale;
 };
 
+#define	CP_USER		0
+#define	CP_NICE		1
+#define	CP_SYS		2
+#define	CP_INTR		3
+#define	CP_IDLE		4
+#define	CPUSTATES	5
+
 #ifdef _KERNEL
 extern struct loadavg averunnable;
+extern long cp_time[CPUSTATES];
 
 int	dosetrlimit(struct thread *, u_int, struct rlimit *);
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_usrreq.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/raw_usrreq.c,v 1.27 2002/11/20 19:00:53 luigi Exp $
+ * $FreeBSD: src/sys/net/raw_usrreq.c,v 1.28 2002/12/28 02:29:19 kbyanc Exp $
  */
 
 #include <sys/param.h>
@@ -72,7 +72,6 @@ raw_input(m0, proto, src, dst)
 {
 	register struct rawcb *rp;
 	register struct mbuf *m = m0;
-	register int sockets = 0;
 	struct socket *last;
 
 	last = 0;
@@ -106,7 +105,6 @@ raw_input(m0, proto, src, dst)
 					m_freem(n);
 				else {
 					sorwakeup(last);
-					sockets++;
 				}
 			}
 		}
@@ -118,7 +116,6 @@ raw_input(m0, proto, src, dst)
 			m_freem(m);
 		else {
 			sorwakeup(last);
-			sockets++;
 		}
 	} else
 		m_freem(m);

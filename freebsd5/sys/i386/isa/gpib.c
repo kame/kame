@@ -15,7 +15,7 @@
  * or modify this software as long as this message is kept with the software,
  * all derivative works or modified versions.
  *
- * $FreeBSD: src/sys/i386/isa/gpib.c,v 1.35 2002/11/09 12:55:06 alfred Exp $
+ * $FreeBSD: src/sys/i386/isa/gpib.c,v 1.39 2003/03/03 12:15:49 phk Exp $
  */
 
 /* Please read the README file for usage information */
@@ -34,8 +34,6 @@
 #ifndef COMPAT_OLDISA
 #error "The gpib device requires the old isa compatibility shims"
 #endif
-
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 #define GPIBPRI  (PZERO + 8) | PCATCH
 #define SLEEP_MAX 1000
@@ -75,19 +73,12 @@ static	d_ioctl_t	gpioctl;
 
 #define CDEV_MAJOR 44
 static struct cdevsw gp_cdevsw = {
-	/* open */	gpopen,
-	/* close */	gpclose,
-	/* read */	noread,
-	/* write */	gpwrite,
-	/* ioctl */	gpioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"gp",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
+	.d_open =	gpopen,
+	.d_close =	gpclose,
+	.d_write =	gpwrite,
+	.d_ioctl =	gpioctl,
+	.d_name =	"gp",
+	.d_maj =	CDEV_MAJOR,
 };
 
 #define	BUFSIZE		1024

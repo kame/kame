@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/scmouse.c,v 1.30 2002/08/22 20:44:17 peter Exp $
+ * $FreeBSD: src/sys/dev/syscons/scmouse.c,v 1.33 2003/04/29 13:36:01 kan Exp $
  */
 
 #include "opt_syscons.h"
@@ -33,6 +33,7 @@
 #include <sys/conf.h>
 #include <sys/consio.h>
 #include <sys/fbio.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mouse.h>
@@ -41,7 +42,6 @@
 #include <sys/random.h>
 #include <sys/signalvar.h>
 #include <sys/tty.h>
-#include <machine/limits.h>
 
 #include <dev/syscons/syscons.h>
 

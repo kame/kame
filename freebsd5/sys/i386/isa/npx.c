@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)npx.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/isa/npx.c,v 1.136 2002/11/16 06:35:52 deischen Exp $
+ * $FreeBSD: src/sys/i386/isa/npx.c,v 1.140 2003/04/04 17:29:55 des Exp $
  */
 
 #include "opt_cpu.h"
@@ -260,7 +260,7 @@ npx_intr(dummy)
 	if (td != NULL) {
 		td->td_pcb->pcb_flags |= PCB_NPXTRAP;
 		mtx_lock_spin(&sched_lock);
-		td->td_kse->ke_flags |= KEF_ASTPENDING;
+		td->td_flags |= TDF_ASTPENDING;
 		mtx_unlock_spin(&sched_lock);
 	}
 }
@@ -507,12 +507,10 @@ npx_attach(dev)
 	if (cpu_class == CPUCLASS_586 && npx_ex16 && npx_exists &&
 	    timezero("i586_bzero()", i586_bzero) <
 	    timezero("bzero()", bzero) * 4 / 5) {
-		if (!(flags & NPX_DISABLE_I586_OPTIMIZED_BCOPY)) {
+		if (!(flags & NPX_DISABLE_I586_OPTIMIZED_BCOPY))
 			bcopy_vector = i586_bcopy;
-			ovbcopy_vector = i586_bcopy;
-		}
 		if (!(flags & NPX_DISABLE_I586_OPTIMIZED_BZERO))
-			bzero = i586_bzero;
+			bzero_vector = i586_bzero;
 		if (!(flags & NPX_DISABLE_I586_OPTIMIZED_COPYIO)) {
 			copyin_vector = i586_copyin;
 			copyout_vector = i586_copyout;
@@ -960,9 +958,8 @@ npxgetregs(td, addr)
 			bzero(addr, sizeof(*addr));
 		return (_MC_FPOWNED_NONE);
 	}
-
 	s = intr_disable();
-	if (curthread == PCPU_GET(fpcurthread)) {
+	if (td == PCPU_GET(fpcurthread)) {
 		fpusave(addr);
 #ifdef CPU_ENABLE_SSE
 		if (!cpu_fxsr)
@@ -996,7 +993,7 @@ npxsetregs(td, addr)
 		return;
 
 	s = intr_disable();
-	if (curthread == PCPU_GET(fpcurthread)) {
+	if (td == PCPU_GET(fpcurthread)) {
 		fpurstor(addr);
 		intr_restore(s);
 	} else {

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.23 2002/10/16 02:25:05 sam Exp $
+ * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.26 2003/02/19 22:32:43 jlemon Exp $
  */
 
 /*
@@ -180,7 +180,7 @@ rip6_input(mp, offp, proto)
 			/*
 			 * Check AH/ESP integrity.
 			 */
-			if (n && ipsec6_in_reject_so(n, last->inp_socket)) {
+			if (n && ipsec6_in_reject(n, last)) {
 				m_freem(n);
 				ipsec6stat.in_polvio++;
 				/* do not inject data into pcb */
@@ -219,7 +219,7 @@ rip6_input(mp, offp, proto)
 	/*
 	 * Check AH/ESP integrity.
 	 */
-	if (last && ipsec6_in_reject_so(m, last->inp_socket)) {
+	if (last && ipsec6_in_reject(m, last)) {
 		m_freem(m);
 		ipsec6stat.in_polvio++;
 		ip6stat.ip6s_delivered--;

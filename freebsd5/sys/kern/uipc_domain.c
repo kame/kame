@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_domain.c	8.2 (Berkeley) 10/18/93
- * $FreeBSD: src/sys/kern/uipc_domain.c,v 1.30 2002/05/31 11:52:30 tanimura Exp $
+ * $FreeBSD: src/sys/kern/uipc_domain.c,v 1.31 2003/03/07 22:47:32 bbraun Exp $
  */
 
 #include <sys/param.h>
@@ -90,7 +90,7 @@ net_init_domain(struct domain *dp)
 			(*pr->pr_init)();
 	}
 	/*
-	 * update global informatio about maximums
+	 * update global information about maximums
 	 */
 	max_hdr = max_linkhdr + max_protohdr;
 	max_datalen = MHLEN - max_hdr;

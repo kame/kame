@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/schistory.c,v 1.14 2002/08/19 23:56:01 peter Exp $
+ * $FreeBSD: src/sys/dev/syscons/schistory.c,v 1.16 2003/02/19 05:47:12 imp Exp $
  */
 
 #include "opt_syscons.h"

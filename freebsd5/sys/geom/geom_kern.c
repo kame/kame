@@ -32,12 +32,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_kern.c,v 1.15.2.1 2003/01/02 19:59:57 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_kern.c,v 1.31 2003/04/30 12:57:39 markm Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/eventhandler.h>
 #include <sys/malloc.h>
 #include <sys/bio.h>
 #include <sys/sysctl.h>
@@ -57,6 +58,8 @@ struct sx topology_lock;
 static struct proc *g_up_proc;
 
 int g_debugflags;
+int g_collectstats = 1;
+int g_shutdown;
 
 /*
  * G_UP and G_DOWN are the two threads which push I/O through the
@@ -81,16 +84,11 @@ g_up_procbody(void)
 {
 	struct proc *p = g_up_proc;
 	struct thread *tp = FIRST_THREAD_IN_PROC(p);
-	struct mtx mymutex;
 
 	mtx_assert(&Giant, MA_NOTOWNED);
-	bzero(&mymutex, sizeof mymutex);
-	mtx_init(&mymutex, "g_up", MTX_DEF, 0);
-	mtx_lock(&mymutex);
 	tp->td_base_pri = PRIBIO;
 	for(;;) {
 		g_io_schedule_up(tp);
-		msleep(&g_wait_up, &mymutex, PRIBIO, "g_up", hz/10);
 	}
 }
 
@@ -107,16 +105,11 @@ g_down_procbody(void)
 {
 	struct proc *p = g_down_proc;
 	struct thread *tp = FIRST_THREAD_IN_PROC(p);
-	struct mtx mymutex;
 
 	mtx_assert(&Giant, MA_NOTOWNED);
-	bzero(&mymutex, sizeof mymutex);
-	mtx_init(&mymutex, "g_down", MTX_DEF, 0);
-	mtx_lock(&mymutex);
 	tp->td_base_pri = PRIBIO;
 	for(;;) {
 		g_io_schedule_down(tp);
-		msleep(&g_wait_down, &mymutex, PRIBIO, "g_down", hz/10);
 	}
 }
 
@@ -142,24 +135,33 @@ g_event_procbody(void)
 	}
 }
 
-struct kproc_desc g_event_kp = {
+static struct kproc_desc g_event_kp = {
 	"g_event",
 	g_event_procbody,
 	&g_event_proc,
 };
 
+static void
+geom_shutdown(void *foo __unused)
+{
+
+	g_shutdown = 1;
+}
+
 void
 g_init(void)
 {
-	printf("Initializing GEOMetry subsystem\n");
 	sx_init(&topology_lock, "GEOM topology");
 	g_io_init();
 	g_event_init();
+	g_ctl_init();
 	mtx_lock(&Giant);
 	kproc_start(&g_event_kp);
 	kproc_start(&g_up_kp);
 	kproc_start(&g_down_kp);
 	mtx_unlock(&Giant);
+	EVENTHANDLER_REGISTER(shutdown_pre_sync, geom_shutdown, NULL,
+		SHUTDOWN_PRI_FIRST);
 }
 
 static int
@@ -170,10 +172,7 @@ sysctl_kern_geom_conftxt(SYSCTL_HANDLER_ARGS)
 
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
 	sbuf_clear(sb);
-	g_call_me(g_conftxt, sb);
-	do {
-		tsleep(sb, PZERO, "g_dot", hz);
-	} while(!sbuf_done(sb));
+	g_waitfor_event(g_conftxt, sb, M_WAITOK, NULL);
 	error = SYSCTL_OUT(req, sbuf_data(sb), sbuf_len(sb) + 1);
 	sbuf_delete(sb);
 	return error;
@@ -187,10 +186,7 @@ sysctl_kern_geom_confdot(SYSCTL_HANDLER_ARGS)
 
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
 	sbuf_clear(sb);
-	g_call_me(g_confdot, sb);
-	do {
-		tsleep(sb, PZERO, "g_dot", hz);
-	} while(!sbuf_done(sb));
+	g_waitfor_event(g_confdot, sb, M_WAITOK, NULL);
 	error = SYSCTL_OUT(req, sbuf_data(sb), sbuf_len(sb) + 1);
 	sbuf_delete(sb);
 	return error;
@@ -204,10 +200,7 @@ sysctl_kern_geom_confxml(SYSCTL_HANDLER_ARGS)
 
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
 	sbuf_clear(sb);
-	g_call_me(g_confxml, sb);
-	do {
-		tsleep(sb, PZERO, "g_xml", hz);
-	} while(!sbuf_done(sb));
+	g_waitfor_event(g_confxml, sb, M_WAITOK, NULL);
 	error = SYSCTL_OUT(req, sbuf_data(sb), sbuf_len(sb) + 1);
 	sbuf_delete(sb);
 	return error;
@@ -230,6 +223,9 @@ SYSCTL_PROC(_kern_geom, OID_AUTO, conftxt, CTLTYPE_STRING|CTLFLAG_RD,
 SYSCTL_INT(_kern_geom, OID_AUTO, debugflags, CTLFLAG_RW,
 	&g_debugflags, 0, "");
 
+SYSCTL_INT(_kern_geom, OID_AUTO, collectstats, CTLFLAG_RW,
+	&g_collectstats, 0, "");
+
 SYSCTL_INT(_debug_sizeof, OID_AUTO, g_class, CTLFLAG_RD,
 	0, sizeof(struct g_class), "");
 SYSCTL_INT(_debug_sizeof, OID_AUTO, g_geom, CTLFLAG_RD,
@@ -240,5 +236,3 @@ SYSCTL_INT(_debug_sizeof, OID_AUTO, g_consumer, CTLFLAG_RD,
 	0, sizeof(struct g_consumer), "");
 SYSCTL_INT(_debug_sizeof, OID_AUTO, g_bioq, CTLFLAG_RD,
 	0, sizeof(struct g_bioq), "");
-SYSCTL_INT(_debug_sizeof, OID_AUTO, g_event, CTLFLAG_RD,
-	0, sizeof(struct g_event), "");

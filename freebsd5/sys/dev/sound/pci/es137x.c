@@ -59,7 +59,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/es137x.c,v 1.42 2002/04/28 22:38:23 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/es137x.c,v 1.43 2003/02/20 17:31:11 cognet Exp $");
 
 static int debug = 0;
 SYSCTL_INT(_debug, OID_AUTO, es_debug, CTLFLAG_RW, &debug, 0, "");
@@ -283,11 +283,11 @@ eschan_setdir(kobj_t obj, void *data, int dir)
 
 	if (dir == PCMDIR_PLAY) {
 		bus_space_write_1(es->st, es->sh, ES1370_REG_MEMPAGE, ES1370_REG_DAC2_FRAMEADR >> 8);
-		bus_space_write_4(es->st, es->sh, ES1370_REG_DAC2_FRAMEADR & 0xff, vtophys(sndbuf_getbuf(ch->buffer)));
+		bus_space_write_4(es->st, es->sh, ES1370_REG_DAC2_FRAMEADR & 0xff, sndbuf_getbufaddr(ch->buffer));
 		bus_space_write_4(es->st, es->sh, ES1370_REG_DAC2_FRAMECNT & 0xff, (ch->bufsz >> 2) - 1);
 	} else {
 		bus_space_write_1(es->st, es->sh, ES1370_REG_MEMPAGE, ES1370_REG_ADC_FRAMEADR >> 8);
-		bus_space_write_4(es->st, es->sh, ES1370_REG_ADC_FRAMEADR & 0xff, vtophys(sndbuf_getbuf(ch->buffer)));
+		bus_space_write_4(es->st, es->sh, ES1370_REG_ADC_FRAMEADR & 0xff, sndbuf_getbufaddr(ch->buffer));
 		bus_space_write_4(es->st, es->sh, ES1370_REG_ADC_FRAMECNT & 0xff, (ch->bufsz >> 2) - 1);
 	}
 	ch->dir = dir;

@@ -29,8 +29,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumkw.h,v 1.17 2000/05/20 08:23:07 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumkw.h,v 1.20 2001/05/22 02:33:32 grog Exp $
+ * $Id: vinumkw.h,v 1.19 2003/04/26 02:00:49 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumkw.h,v 1.22 2003/05/05 05:35:28 grog Exp $
  */
 
 /*
@@ -95,7 +95,13 @@ enum keyword {
     kw_v,
     kw_w,
     kw_round,						    /* round robin */
+    /*
+     * The first of these is a volume attibute ("prefer plex"), and the
+     * second is a plex attribute ("preferred" means that the volume
+     * prefers this plex).
+     */
     kw_prefer,						    /* prefer plex */
+    kw_preferred,					    /* preferred plex */
     kw_device,
     kw_init,
     kw_label,
@@ -112,9 +118,7 @@ enum keyword {
     kw_saveconfig,
     kw_hotspare,
     kw_detached,
-#ifdef VINUMDEBUG
     kw_debug,						    /* go into debugger */
-#endif
     kw_stripe,
     kw_mirror,
     kw_info,

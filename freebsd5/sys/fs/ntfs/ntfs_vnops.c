@@ -35,7 +35,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs_vnops.c,v 1.34 2002/09/25 23:55:06 semenu Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_vnops.c,v 1.38 2003/03/03 19:15:38 njl Exp $
  *
  */
 
@@ -761,12 +761,8 @@ struct vnodeopv_entry_desc ntfs_vnodeop_entries[] = {
 	{ &vop_getattr_desc, (vop_t *)ntfs_getattr },
 	{ &vop_inactive_desc, (vop_t *)ntfs_inactive },
 	{ &vop_reclaim_desc, (vop_t *)ntfs_reclaim },
-	{ &vop_print_desc, (vop_t *)vop_null },
 	{ &vop_pathconf_desc, ntfs_pathconf },
 
-	{ &vop_islocked_desc, (vop_t *)vop_stdislocked },
-	{ &vop_unlock_desc, (vop_t *)vop_stdunlock },
-	{ &vop_lock_desc, (vop_t *)vop_stdlock },
 	{ &vop_cachedlookup_desc, (vop_t *)ntfs_lookup },
 	{ &vop_lookup_desc, (vop_t *)vfs_cache_lookup },
 

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_acct.c	8.1 (Berkeley) 6/14/93
- * $FreeBSD: src/sys/kern/kern_acct.c,v 1.55.2.1 2002/12/19 09:40:10 alfred Exp $
+ * $FreeBSD: src/sys/kern/kern_acct.c,v 1.64 2003/05/01 16:59:22 des Exp $
  */
 
 #include "opt_mac.h"
@@ -140,8 +140,7 @@ acct(td, uap)
 	 * appending and make sure it's a 'normal'.
 	 */
 	if (uap->path != NULL) {
-		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->path,
-		       td);
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->path, td);
 		flags = FWRITE | O_APPEND;
 		error = vn_open(&nd, &flags, 0);
 		if (error)
@@ -239,6 +238,7 @@ acct_process(td)
 	 * Get process accounting information.
 	 */
 
+	PROC_LOCK(p);
 	/* (1) The name of the command that ran */
 	bcopy(p->p_comm, acct.ac_comm, sizeof acct.ac_comm);
 
@@ -250,8 +250,10 @@ acct_process(td)
 	acct.ac_stime = encode_comp_t(st.tv_sec, st.tv_usec);
 
 	/* (3) The elapsed time the command ran (and its starting time) */
-	acct.ac_btime = p->p_stats->p_start.tv_sec;
-	microtime(&tmp);
+	tmp = boottime;
+	timevaladd(&tmp, &p->p_stats->p_start);
+	acct.ac_btime = tmp.tv_sec;
+	microuptime(&tmp);
 	timevalsub(&tmp, &p->p_stats->p_start);
 	acct.ac_etime = encode_comp_t(tmp.tv_sec, tmp.tv_usec);
 
@@ -273,17 +275,16 @@ acct_process(td)
 	acct.ac_gid = p->p_ucred->cr_rgid;
 
 	/* (7) The terminal from which the process was started */
-	PROC_LOCK(p);
 	SESS_LOCK(p->p_session);
 	if ((p->p_flag & P_CONTROLT) && p->p_pgrp->pg_session->s_ttyp)
 		acct.ac_tty = dev2udev(p->p_pgrp->pg_session->s_ttyp->t_dev);
 	else
 		acct.ac_tty = NOUDEV;
 	SESS_UNLOCK(p->p_session);
-	PROC_UNLOCK(p);
 
 	/* (8) The boolean flags that tell how the process terminated, etc. */
 	acct.ac_flag = p->p_acflag;
+	PROC_UNLOCK(p);
 
 	/*
 	 * Write the accounting information to the file.
@@ -295,11 +296,10 @@ acct_process(td)
 	/*
 	 * Eliminate any file size rlimit.
 	 */
-	if (p->p_limit->p_refcnt > 1 &&
-	    (p->p_limit->p_lflags & PL_SHAREMOD) == 0) {
+	if (p->p_limit->p_refcnt > 1) {
 		p->p_limit->p_refcnt--;
 		p->p_limit = limcopy(p->p_limit);
-	} 
+	}
 	p->p_rlimit[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 
 	VOP_LEASE(vp, td, uc, LEASE_WRITE);
@@ -368,7 +368,7 @@ acctwatch(a)
 	/*
 	 * XXX arr: Need to fix the issue of holding acct_mtx over
 	 * the below vnode operations.
-	 */ 
+	 */
 
 	if (savacctp != NULLVP) {
 		if (savacctp->v_type == VBAD) {

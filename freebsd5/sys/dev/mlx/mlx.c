@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mlx/mlx.c,v 1.33 2002/03/18 23:38:16 bde Exp $
+ *	$FreeBSD: src/sys/dev/mlx/mlx.c,v 1.38 2003/04/01 15:06:24 phk Exp $
  */
 
 /*
@@ -37,8 +37,6 @@
 
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/devicestat.h>
-#include <sys/disk.h>
 #include <sys/stat.h>
 
 #include <machine/resource.h>
@@ -48,6 +46,8 @@
 #include <machine/clock.h>
 #include <sys/rman.h>
 
+#include <geom/geom_disk.h>
+
 #include <dev/mlx/mlx_compat.h>
 #include <dev/mlx/mlxio.h>
 #include <dev/mlx/mlxvar.h>
@@ -56,19 +56,11 @@
 #define MLX_CDEV_MAJOR	130
 
 static struct cdevsw mlx_cdevsw = {
-		/* open */	mlx_open,
-		/* close */	mlx_close,
-		/* read */	noread,
-		/* write */	nowrite,
-		/* ioctl */	mlx_ioctl,
-		/* poll */	nopoll,
-		/* mmap */	nommap,
-		/* strategy */	nostrategy,
-		/* name */ 	"mlx",
-		/* maj */	MLX_CDEV_MAJOR,
-		/* dump */	nodump,
-		/* psize */ 	nopsize,
-		/* flags */	0,
+	.d_open =	mlx_open,
+	.d_close =	mlx_close,
+	.d_ioctl =	mlx_ioctl,
+	.d_name =	"mlx",
+	.d_maj =	MLX_CDEV_MAJOR,
 };
 
 devclass_t	mlx_devclass;

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/uvscom.c,v 1.10 2002/11/17 14:22:37 joe Exp $
+ * $FreeBSD: src/sys/dev/usb/uvscom.c,v 1.16 2003/03/09 11:50:27 akiyama Exp $
  */
 
 /*
@@ -33,6 +33,8 @@
  * adapter.  It supports DDI Pocket's Air H" C@rd, C@rd H" 64, NTT's P-in,
  * P-in m@ater and various data communication card adapters.
  */
+
+#include "opt_uvscom.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,9 +71,9 @@
 
 #include <dev/usb/ucomvar.h>
 
+SYSCTL_NODE(_hw_usb, OID_AUTO, uvscom, CTLFLAG_RW, 0, "USB uvscom");
 #ifdef USB_DEBUG
 static int	uvscomdebug = 0;
-SYSCTL_NODE(_hw_usb, OID_AUTO, uvscom, CTLFLAG_RW, 0, "USB uvscom");
 SYSCTL_INT(_hw_usb_uvscom, OID_AUTO, debug, CTLFLAG_RW,
 	   &uvscomdebug, 0, "uvscom debug level");
 
@@ -173,8 +175,12 @@ struct	uvscom_softc {
  * These are the maximum number of bytes transferred per frame.
  * The output buffer size cannot be increased due to the size encoding.
  */
-#define UVSCOMIBUFSIZE 512
-#define UVSCOMOBUFSIZE 64
+#define UVSCOMIBUFSIZE		512
+#define UVSCOMOBUFSIZE		64
+
+#ifndef UVSCOM_DEFAULT_OPKTSIZE
+#define UVSCOM_DEFAULT_OPKTSIZE	8
+#endif
 
 Static	usbd_status uvscom_shutdown(struct uvscom_softc *);
 Static	usbd_status uvscom_reset(struct uvscom_softc *);
@@ -208,6 +214,10 @@ struct ucom_callback uvscom_callback = {
 };
 
 static const struct usb_devno uvscom_devs [] = {
+	/* SUNTAC U-Cable type D2 */
+	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_DS96L },
+	/* SUNTAC Ir-Trinity */
+	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_IS96U },
 	/* SUNTAC U-Cable type P1 */
 	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_PS64P1 },
 	/* SUNTAC Slipper U */
@@ -234,8 +244,32 @@ Static driver_t uvscom_driver = {
 };
 
 DRIVER_MODULE(uvscom, uhub, uvscom_driver, ucom_devclass, usbd_driver_load, 0);
+MODULE_DEPEND(uvscom, usb, 1, 1, 1);
 MODULE_DEPEND(uvscom, ucom, UCOM_MINVER, UCOM_PREFVER, UCOM_MAXVER);
 MODULE_VERSION(uvscom, UVSCOM_MODVER);
+
+static int	uvscomobufsiz = UVSCOM_DEFAULT_OPKTSIZE;
+
+static int
+sysctl_hw_usb_uvscom_opktsize(SYSCTL_HANDLER_ARGS)
+{
+	int err, val;
+
+	val = uvscomobufsiz;
+	err = sysctl_handle_int(oidp, &val, sizeof(val), req);
+	if (err != 0 || req->newptr == NULL)
+		return (err);
+	if (0 < val && val <= UVSCOMOBUFSIZE)
+		uvscomobufsiz = val;
+	else
+		err = EINVAL;
+
+	return (err);
+}
+
+SYSCTL_PROC(_hw_usb_uvscom, OID_AUTO, opktsize, CTLTYPE_INT | CTLFLAG_RW,
+	    0, sizeof(int), sysctl_hw_usb_uvscom_opktsize,
+	    "I", "uvscom output packet size");
 
 USB_MATCH(uvscom)
 {
@@ -359,7 +393,7 @@ USB_ATTACH(uvscom)
 	ucom->sc_portno = UCOM_UNK_PORTNO;
 	/* bulkin, bulkout set above */
 	ucom->sc_ibufsize = UVSCOMIBUFSIZE;
-	ucom->sc_obufsize = UVSCOMOBUFSIZE;
+	ucom->sc_obufsize = uvscomobufsiz;
 	ucom->sc_ibufsizepad = UVSCOMIBUFSIZE;
 	ucom->sc_opkthdrlen = 0;
 	ucom->sc_callback = &uvscom_callback;

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_if.c,v 1.12 2002/11/08 18:27:29 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_if.c,v 1.14 2003/02/19 05:47:30 imp Exp $
  *
  */
 
@@ -61,7 +61,7 @@
 #include <netatm/ipatm/ipatm_serv.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_if.c,v 1.12 2002/11/08 18:27:29 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_if.c,v 1.14 2003/02/19 05:47:30 imp Exp $");
 #endif
 
 

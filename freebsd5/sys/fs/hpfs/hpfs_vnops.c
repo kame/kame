@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/hpfs/hpfs_vnops.c,v 1.35 2002/10/14 03:20:33 mckusick Exp $
+ * $FreeBSD: src/sys/fs/hpfs/hpfs_vnops.c,v 1.43 2003/03/04 00:04:42 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -87,48 +87,15 @@ hpfs_fsync(ap)
 		struct thread *a_td;
 	} */ *ap;
 {
-	struct vnode *vp = ap->a_vp;
-	int s;
-	struct buf *bp, *nbp;
-
 	/*
-	 * Flush all dirty buffers associated with a vnode.
+	 * Flush our dirty buffers.
 	 */
-loop:
-	VI_LOCK(vp);
-	s = splbio();
-	for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
-		nbp = TAILQ_NEXT(bp, b_vnbufs);
-		VI_UNLOCK(vp);
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT)) {
-			VI_LOCK(vp);
-			continue;
-		}
-		if ((bp->b_flags & B_DELWRI) == 0)
-			panic("hpfs_fsync: not dirty");
-		bremfree(bp);
-		splx(s);
-		(void) bwrite(bp);
-		goto loop;
-	}
-	while (vp->v_numoutput) {
-		vp->v_iflag |= VI_BWAIT;
-		msleep((caddr_t)&vp->v_numoutput, VI_MTX(vp), PRIBIO + 1,
-		    "hpfsn", 0);
-	}
-#ifdef DIAGNOSTIC
-	if (!TAILQ_EMPTY(&vp->v_dirtyblkhd)) {
-		vprint("hpfs_fsync: dirty", vp);
-		goto loop;
-	}
-#endif
-	VI_UNLOCK(vp);
-	splx(s);
+	vop_stdfsync(ap);
 
 	/*
 	 * Write out the on-disc version of the vnode.
 	 */
-	return hpfs_update(VTOHP(vp));
+	return hpfs_update(VTOHP(ap->a_vp));
 }
 
 static int
@@ -405,7 +372,7 @@ hpfs_write(ap)
 			bn, runl, towrite, xfersz));
 
 		if ((off == 0) && (towrite == xfersz)) {
-			bp = getblk(hp->h_devvp, bn, xfersz, 0, 0);
+			bp = getblk(hp->h_devvp, bn, xfersz, 0, 0, 0);
 			clrbuf(bp);
 		} else {
 			error = bread(hp->h_devvp, bn, xfersz, NOCRED, &bp);
@@ -579,7 +546,7 @@ hpfs_setattr(ap)
 }
 
 /*
- * Last reference to an node.  If necessary, write or delete it.
+ * Last reference to a node.  If necessary, write or delete it.
  */
 int
 hpfs_inactive(ap)
@@ -661,7 +628,7 @@ hpfs_print(ap)
 	register struct vnode *vp = ap->a_vp;
 	register struct hpfsnode *hp = VTOHP(vp);
 
-	printf("ino 0x%x\n", hp->h_no);
+	printf("\tino 0x%x\n", hp->h_no);
 	return (0);
 }
 
@@ -706,7 +673,7 @@ hpfs_strategy(ap)
 		return (0);
 	}
 	bp->b_dev = hp->h_devvp->v_rdev;
-	VOP_STRATEGY(hp->h_devvp, bp);
+	VOP_SPECSTRATEGY(hp->h_devvp, bp);
 	return (0);
 }
 
@@ -1267,9 +1234,6 @@ struct vnodeopv_entry_desc hpfs_vnodeop_entries[] = {
 	{ &vop_print_desc, (vop_t *)hpfs_print },
 	{ &vop_create_desc, (vop_t *)hpfs_create },
 	{ &vop_remove_desc, (vop_t *)hpfs_remove },
-	{ &vop_islocked_desc, (vop_t *)vop_stdislocked },
-	{ &vop_unlock_desc, (vop_t *)vop_stdunlock },
-	{ &vop_lock_desc, (vop_t *)vop_stdlock },
 	{ &vop_cachedlookup_desc, (vop_t *)hpfs_lookup },
 	{ &vop_lookup_desc, (vop_t *)vfs_cache_lookup },
 	{ &vop_access_desc, (vop_t *)hpfs_access },

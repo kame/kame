@@ -35,7 +35,7 @@
  *
  *	from: @(#)DEFS.h	5.1 (Berkeley) 4/23/90
  *	from: FreeBSD: src/sys/i386/include/asm.h,v 1.7 2000/01/25
- * $FreeBSD: src/sys/sparc64/include/asm.h,v 1.3 2002/03/23 02:01:27 obrien Exp $
+ * $FreeBSD: src/sys/sparc64/include/asm.h,v 1.6 2003/04/29 00:37:41 jake Exp $
  */
 
 #ifndef _MACHINE_ASM_H_
@@ -73,9 +73,11 @@
 #define	CCFSZ	192
 #define	SPOFF	2047
 
+#define	_ALIGN_TEXT	.align 32
+
 #define _START_ENTRY \
 	.text ; \
-	.p2align 4
+	_ALIGN_TEXT
 
 /*
  * Define a function entry point.
@@ -101,6 +103,7 @@ CNAME(x):
  * Kernel RCS ID tag and copyright macros
  */
 
+#undef __FBSDID
 #if !defined(lint) && !defined(STRIP_FBSDID)
 #define __FBSDID(s)	.ident s
 #else

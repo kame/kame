@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_proto.c
  *
- * $FreeBSD: src/sys/netipx/ipx_proto.c,v 1.15 1999/08/28 00:49:41 peter Exp $
+ * $FreeBSD: src/sys/netipx/ipx_proto.c,v 1.16 2003/03/08 06:58:22 tjr Exp $
  */
 
 #include "opt_ipx.h"
@@ -90,16 +90,6 @@ static struct protosw ipxsw[] = {
   0,		0,		0,		0,
   &ripx_usrreqs
 },
-#ifdef IPTUNNEL
-#if 0
-{ SOCK_RAW,	&ipxdomain,	IPPROTO_IPX,	PR_ATOMIC|PR_ADDR,
-  iptun_input,	rip_output,	iptun_ctlinput,	0,
-  0,
-  0,		0,		0,		0,
-  &rip_usrreqs
-},
-#endif
-#endif
 };
 
 static struct	domain ipxdomain =

@@ -54,10 +54,8 @@
  *	$NetBSD: machdep.c,v 1.74.2.1 2000/11/01 16:13:48 tv Exp $
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/powerpc/powerpc/machdep.c,v 1.44 2002/11/16 06:35:53 deischen Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/machdep.c,v 1.57 2003/05/13 20:36:01 jhb Exp $");
 
 #include "opt_ddb.h"
 #include "opt_compat.h"
@@ -154,14 +152,10 @@ int             setfault(faultbuf);             /* defined in locore.S */
 
 long		Maxmem = 0;
 
-static int	chosen;
-
 struct pmap	ofw_pmap;
 extern int	ofmsr;
 
 struct bat	battable[16];
-
-static void	identifycpu(void);
 
 struct kva_md_info kmi;
 
@@ -178,9 +172,14 @@ cpu_startup(void *dummy)
 {
 
 	/*
+	 * Initialise the decrementer-based clock.
+	 */
+	decr_init();
+
+	/*
 	 * Good {morning,afternoon,evening,night}.
 	 */
-	identifycpu();
+	cpu_setup(PCPU_GET(cpuid));
 
 	/* startrtclock(); */
 #ifdef PERFMON
@@ -226,83 +225,6 @@ cpu_startup(void *dummy)
 	mp_start();			/* fire up the secondaries */
 	mp_announce();
 #endif  /* SMP */
-}
-
-void
-identifycpu()
-{
-	unsigned int pvr, version, revision;
-
-	/*
-	 * Find cpu type (Do it by OpenFirmware?)
-	 */
-	__asm ("mfpvr %0" : "=r"(pvr));
-	version = pvr >> 16;
-	revision = pvr & 0xffff;
-	switch (version) {
-	case 0x0000:
-		sprintf(model, "Simulator (psim)");
-		break;
-	case 0x0001:
-		sprintf(model, "601");
-		break;
-	case 0x0003:
-		sprintf(model, "603 (Wart)");
-		break;
-	case 0x0004:
-		sprintf(model, "604 (Zephyr)");
-		break;
-	case 0x0005:
-		sprintf(model, "602 (Galahad)");
-		break;
-	case 0x0006:
-		sprintf(model, "603e (Stretch)");
-		break;
-	case 0x0007:
-		if ((revision && 0xf000) == 0x0000)
-			sprintf(model, "603ev (Valiant)");
-		else
-			sprintf(model, "603r (Goldeneye)");
-		break;
-	case 0x0008:
-		if ((revision && 0xf000) == 0x0000)
-			sprintf(model, "G3 / 750 (Arthur)");
-		else
-			sprintf(model, "G3 / 755 (Goldfinger)");
-		break;
-	case 0x0009:
-		if ((revision && 0xf000) == 0x0000)
-			sprintf(model, "604e (Sirocco)");
-		else
-			sprintf(model, "604r (Mach V)");
-		break;
-	case 0x000a:
-		sprintf(model, "604r (Mach V)");
-		break;
-	case 0x000c:
-		sprintf(model, "G4 / 7400 (Max)");
-		break;
-	case 0x0014:
-		sprintf(model, "620 (Red October)");
-		break;
-	case 0x0081:
-		sprintf(model, "8240 (Kahlua)");
-		break;
-	case 0x8000:
-		sprintf(model, "G4 / 7450 (V'ger)");
-		break;
-	case 0x800c:
-		sprintf(model, "G4 / 7410 (Nitro)");
-		break;
-	case 0x8081:
-		sprintf(model, "8245 (Kahlua II)");
-		break;
-	default:
-		sprintf(model, "Version %x", version);
-		break;
-	}
-	sprintf(model + strlen(model), " (Revision %x)", revision);
-	printf("CPU: PowerPC %s\n", model);
 }
 
 extern char	kernel_text[], _end[];
@@ -368,10 +290,10 @@ powerpc_init(u_int startkernel, u_int endkernel, u_int basekernel, void *mdp)
 #ifdef DDB
 	kdb_init();
 #endif
-
 	/*
 	 * XXX: Initialize the interrupt tables.
 	 */
+	bcopy(&trapcode, (void *)EXC_MCHK, (size_t)&trapsize);
 	bcopy(&dsitrap,  (void *)EXC_DSI,  (size_t)&dsisize);
 	bcopy(&isitrap,  (void *)EXC_ISI,  (size_t)&isisize);
 	bcopy(&trapcode, (void *)EXC_EXI,  (size_t)&trapsize);
@@ -381,6 +303,7 @@ powerpc_init(u_int startkernel, u_int endkernel, u_int basekernel, void *mdp)
 	bcopy(&trapcode, (void *)EXC_DECR, (size_t)&trapsize);
 	bcopy(&trapcode, (void *)EXC_SC,   (size_t)&trapsize);
 	bcopy(&trapcode, (void *)EXC_TRC,  (size_t)&trapsize);
+	__syncicache(EXC_RSVD, EXC_LAST - EXC_RSVD);
 
 	/*
 	 * Start initializing proc0 and thread0.
@@ -485,7 +408,9 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 
 	td = curthread;
 	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 	tf = td->td_frame;
 	oonstack = sigonstack(tf->fixreg[1]);
 
@@ -516,7 +441,6 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	} else {
 		sfp = (struct sigframe *)(tf->fixreg[1] - rndfsize);
 	}
-	PROC_UNLOCK(p);
 
 	/* 
 	 * Translate the signal if appropriate (Linux emu ?)
@@ -543,9 +467,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	tf->fixreg[1] = (register_t)sfp;
 	tf->fixreg[FIRSTARG] = sig;
 	tf->fixreg[FIRSTARG+2] = (register_t)&sfp->sf_uc;
-
-	PROC_LOCK(p);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig)) {
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* 
 		 * Signal handler installed with SA_SIGINFO.
 		 */
@@ -561,6 +483,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		/* Old FreeBSD-style arguments. */
 		tf->fixreg[FIRSTARG+1] = code;
 	}
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	tf->srr0 = (register_t)(PS_STRINGS - *(p->p_sysent->sv_szsigcode));
@@ -581,6 +504,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	     tf->srr0, tf->fixreg[1]);
 
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 
 int
@@ -613,9 +537,9 @@ sigreturn(struct thread *td, struct sigreturn_args *uap)
 
 	p = td->td_proc;
 	PROC_LOCK(p);
-	p->p_sigmask = uc.uc_sigmask;
-	SIG_CANTMASK(p->p_sigmask);
-	signotify(p);
+	td->td_sigmask = uc.uc_sigmask;
+	SIG_CANTMASK(td->td_sigmask);
+	signotify(td);
 	PROC_UNLOCK(p);
 
 	/*
@@ -639,7 +563,7 @@ freebsd4_sigreturn(struct thread *td, struct freebsd4_sigreturn_args *uap)
 #endif
 
 int
-get_mcontext(struct thread *td, mcontext_t *mcp)
+get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 {
 
 	return (ENOSYS);
@@ -827,3 +751,11 @@ kcopy(const void *src, void *dst, size_t len)
 	td->td_pcb->pcb_onfault = oldfault;
 	return (0);
 }
+
+
+intptr_t
+casuptr(intptr_t *p, intptr_t old, intptr_t new)
+{
+	return (-1);
+}
+

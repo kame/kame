@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)limits.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/include/limits.h,v 1.14 2002/10/27 18:03:02 wollman Exp $
+ * $FreeBSD: src/include/limits.h,v 1.16 2003/04/29 13:35:58 kan Exp $
  */
 
 #ifndef _LIMITS_H_
@@ -123,7 +123,9 @@
 #define	NL_TEXTMAX		2048
 #endif
 
-#include <machine/limits.h>
+#define	MB_LEN_MAX		6	/* 31-bit UTF-8 */
+
+#include <sys/limits.h>
 
 #if __POSIX_VISIBLE
 #include <sys/syslimits.h>

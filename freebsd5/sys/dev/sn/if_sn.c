@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/sn/if_sn.c,v 1.22 2002/11/14 23:54:54 sam Exp $
+ *   $FreeBSD: src/sys/dev/sn/if_sn.c,v 1.25 2003/03/05 19:24:21 peter Exp $
  */
 
 /*
@@ -106,11 +106,6 @@
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
 #endif
 
 #include <net/bpf.h>

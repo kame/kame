@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/twe/twe_compat.h,v 1.4 2002/11/09 12:55:05 alfred Exp $
+ * $FreeBSD: src/sys/dev/twe/twe_compat.h,v 1.7 2003/03/15 12:16:33 phk Exp $
  */
 /*
  * Portability and compatibility interfaces.
@@ -165,14 +165,14 @@ typedef struct bio_queue_head		twe_bioq;
 # define TWE_BIO_DATA(bp)		(bp)->bio_data
 # define TWE_BIO_LENGTH(bp)		(bp)->bio_bcount
 # define TWE_BIO_LBA(bp)		(bp)->bio_pblkno
-# define TWE_BIO_SOFTC(bp)		(bp)->bio_dev->si_drv1
-# define TWE_BIO_UNIT(bp)		*(int *)((bp)->bio_dev->si_drv2)
+# define TWE_BIO_SOFTC(bp)		(bp)->bio_disk->d_drv1
+# define TWE_BIO_UNIT(bp)		*(int *)(bp->bio_driver1)
 # define TWE_BIO_SET_ERROR(bp, err)	do { (bp)->bio_error = err; (bp)->bio_flags |= BIO_ERROR;} while(0)
 # define TWE_BIO_HAS_ERROR(bp)		((bp)->bio_flags & BIO_ERROR)
 # define TWE_BIO_RESID(bp)		(bp)->bio_resid
 # define TWE_BIO_DONE(bp)		biodone(bp)
-# define TWE_BIO_STATS_START(bp)	devstat_start_transaction(&((struct twed_softc *)TWE_BIO_SOFTC(bp))->twed_stats)
-# define TWE_BIO_STATS_END(bp)		devstat_end_transaction_bio(&((struct twed_softc *)TWE_BIO_SOFTC(bp))->twed_stats, bp)
+# define TWE_BIO_STATS_START(bp)
+# define TWE_BIO_STATS_END(bp)
 #endif
 
 #endif /* FreeBSD */

@@ -8,9 +8,6 @@
  * contract N66001-01-C-8035 ("CBOSS"), as part of the DARPA CHATS
  * research program
  *
- * Copyright (c) 1982, 1989, 1993
- *	The Regents of the University of California.  All rights reserved.
- * (c) UNIX System Laboratories, Inc.
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -43,7 +40,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_alloc.c	8.18 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.103 2002/12/06 02:08:46 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.113 2003/03/20 21:15:54 jhb Exp $
  */
 
 #include "opt_quota.h"
@@ -54,11 +51,11 @@
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/file.h>
+#include <sys/filedesc.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/kernel.h>
-#include <sys/stdint.h>
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
 
@@ -841,7 +838,7 @@ ffs_valloc(pvp, mode, cred, vpp)
 		ipref = ffs_dirpref(pip);
 	else
 		ipref = pip->i_number;
-	if ((unsigned)ipref >= fs->fs_ncg * fs->fs_ipg)
+	if (ipref >= fs->fs_ncg * fs->fs_ipg)
 		ipref = 0;
 	cg = ino_to_cg(fs, ipref);
 	/*
@@ -881,7 +878,7 @@ ffs_valloc(pvp, mode, cred, vpp)
 	 * Set up a new generation number for this inode.
 	 */
 	if (ip->i_gen == 0 || ++ip->i_gen == 0)
-		ip->i_gen = random() / 2 + 1;
+		ip->i_gen = arc4random() / 2 + 1;
 	DIP(ip, i_gen) = ip->i_gen;
 	if (fs->fs_magic == FS_UFS2_MAGIC) {
 		vfs_timestamp(&ts);
@@ -1628,11 +1625,11 @@ gotit:
 	    cgp->cg_initediblk < cgp->cg_niblk) {
 		ibp = getblk(ip->i_devvp, fsbtodb(fs,
 		    ino_to_fsba(fs, cg * fs->fs_ipg + cgp->cg_initediblk)),
-		    (int)fs->fs_bsize, 0, 0);
+		    (int)fs->fs_bsize, 0, 0, 0);
 		bzero(ibp->b_data, (int)fs->fs_bsize);
 		dp2 = (struct ufs2_dinode *)(ibp->b_data);
 		for (i = 0; i < INOPB(fs); i++) {
-			dp2->di_gen = random() / 2 + 1;
+			dp2->di_gen = arc4random() / 2 + 1;
 			dp2++;
 		}
 		bawrite(ibp);
@@ -1648,7 +1645,7 @@ gotit:
  * check if a block is free
  */
 static int
-ffs_isfreeblock(struct fs *fs, unsigned char *cp, ufs1_daddr_t h)
+ffs_isfreeblock(struct fs *fs, u_char *cp, ufs1_daddr_t h)
 {
 
 	switch ((int)fs->fs_frag) {
@@ -1896,8 +1893,8 @@ ffs_freefile(fs, devvp, ino, mode)
 		cgbno = fsbtodb(fs, cgtod(fs, cg));
 	}
 	if ((u_int)ino >= fs->fs_ipg * fs->fs_ncg)
-		panic("ffs_vfree: range: dev = %s, ino = %d, fs = %s",
-		    devtoname(dev), ino, fs->fs_fsmnt);
+		panic("ffs_freefile: range: dev = %s, ino = %lu, fs = %s",
+		    devtoname(dev), (u_long)ino, fs->fs_fsmnt);
 	if ((error = bread(devvp, cgbno, (int)fs->fs_cgsize, NOCRED, &bp))) {
 		brelse(bp);
 		return (error);
@@ -1915,7 +1912,7 @@ ffs_freefile(fs, devvp, ino, mode)
 		printf("dev = %s, ino = %lu, fs = %s\n", devtoname(dev),
 		    (u_long)ino + cg * fs->fs_ipg, fs->fs_fsmnt);
 		if (fs->fs_ronly == 0)
-			panic("ffs_vfree: freeing free inode");
+			panic("ffs_freefile: freeing free inode");
 	}
 	clrbit(inosused, ino);
 	if (ino < cgp->cg_irotor)
@@ -1933,6 +1930,47 @@ ffs_freefile(fs, devvp, ino, mode)
 		atomic_clear_int(&ACTIVECGNUM(fs, cg), ACTIVECGOFF(cg));
 	bdwrite(bp);
 	return (0);
+}
+
+/*
+ * Check to see if a file is free.
+ */
+int
+ffs_checkfreefile(fs, devvp, ino)
+	struct fs *fs;
+	struct vnode *devvp;
+	ino_t ino;
+{
+	struct cg *cgp;
+	struct buf *bp;
+	ufs2_daddr_t cgbno;
+	int error, ret, cg;
+	u_int8_t *inosused;
+
+	cg = ino_to_cg(fs, ino);
+	if (devvp->v_type != VCHR) {
+		/* devvp is a snapshot */
+		cgbno = fragstoblks(fs, cgtod(fs, cg));
+	} else {
+		/* devvp is a normal disk device */
+		cgbno = fsbtodb(fs, cgtod(fs, cg));
+	}
+	if ((u_int)ino >= fs->fs_ipg * fs->fs_ncg)
+		return (1);
+	if ((error = bread(devvp, cgbno, (int)fs->fs_cgsize, NOCRED, &bp))) {
+		brelse(bp);
+		return (1);
+	}
+	cgp = (struct cg *)bp->b_data;
+	if (!cg_chkmagic(cgp)) {
+		brelse(bp);
+		return (1);
+	}
+	inosused = cg_inosused(cgp);
+	ino %= fs->fs_ipg;
+	ret = isclr(inosused, ino);
+	brelse(bp);
+	return (ret);
 }
 
 /*
@@ -2106,11 +2144,11 @@ ffs_fserr(fs, inum, cp)
 	ino_t inum;
 	char *cp;
 {
-	struct proc *p = curproc;	/* XXX */
+	struct thread *td = curthread;	/* XXX */
+	struct proc *p = td->td_proc;
 
 	log(LOG_ERR, "pid %d (%s), uid %d inumber %d on %s: %s\n",
-	    p ? p->p_pid : -1, p ? p->p_comm : "-",
-	    p ? p->p_ucred->cr_uid : 0, inum, fs->fs_fsmnt, cp);
+	    p->p_pid, p->p_comm, td->td_ucred->cr_uid, inum, fs->fs_fsmnt, cp);
 }
 
 /*
@@ -2183,7 +2221,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		return (ERPCMISMATCH);
 	if ((error = getvnode(curproc->p_fd, cmd.handle, &fp)) != 0)
 		return (error);
-	vn_start_write((struct vnode *)fp->f_data, &mp, V_WAIT);
+	vn_start_write(fp->f_data, &mp, V_WAIT);
 	if (mp == 0 || strncmp(mp->mnt_stat.f_fstypename, "ufs", MFSNAMELEN)) {
 		vn_finished_write(mp);
 		fdrop(fp, curthread);

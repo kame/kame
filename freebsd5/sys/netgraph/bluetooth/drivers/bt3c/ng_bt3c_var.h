@@ -25,8 +25,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ng_bt3c_var.h,v 1.1 2002/11/09 19:07:56 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/bt3c/ng_bt3c_var.h,v 1.1 2002/11/20 23:01:56 julian Exp $
+ * $Id: ng_bt3c_var.h,v 1.1 2002/11/24 19:46:54 max Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/bt3c/ng_bt3c_var.h,v 1.2 2003/05/10 21:44:39 julian Exp $
  *
  * XXX XXX XX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
  *

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from BSDI: locore.s,v 1.36.2.15 1999/08/23 22:34:41 cp Exp
+ *	BSDI $Id: locore.s,v 1.36.2.15 1999/08/23 22:34:41 cp Exp $
  */
 /*-
  * Copyright (c) 2001 Jake Burkholder.
@@ -51,9 +51,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/sparc64/sparc64/exception.S,v 1.52 2002/10/27 17:22:43 jake Exp $
  */
+
+#include <machine/asm.h>
+__FBSDID("$FreeBSD: src/sys/sparc64/sparc64/exception.S,v 1.66 2003/04/29 21:30:59 jake Exp $");
 
 #include "opt_compat.h"
 #include "opt_ddb.h"
@@ -433,6 +434,7 @@ END(rsf_fatal)
 
 	.macro	tl0_setup	type
 	tl0_split
+	clr	%o1
 	set	trap, %o2
 	ba	%xcc, tl0_utrap
 	 mov	\type, %o0
@@ -456,16 +458,29 @@ END(rsf_fatal)
 	.endr
 	.endm
 
-	.macro	tl0_fp_restore
-	wr	%g0, FPRS_FEF, %fprs
-	wr	%g0, ASI_BLK_S, %asi
-	ldda	[PCB_REG + PCB_FPSTATE + FP_FB0] %asi, %f0
-	ldda	[PCB_REG + PCB_FPSTATE + FP_FB1] %asi, %f16
-	ldda	[PCB_REG + PCB_FPSTATE + FP_FB2] %asi, %f32
-	ldda	[PCB_REG + PCB_FPSTATE + FP_FB3] %asi, %f48
-	membar	#Sync
-	done
+	.macro	tl1_split
+	rdpr	%wstate, %g1
+	wrpr	%g1, WSTATE_NESTED, %wstate
+	save	%sp, -(CCFSZ + TF_SIZEOF), %sp
+	.endm
+
+	.macro	tl1_setup	type
+	tl1_split
+	clr	%o1
+	set	trap, %o2
+	b	%xcc, tl1_trap
+	 mov	\type | T_KERNEL, %o0
+	.endm
+
+	.macro	tl1_gen		type
+	tl1_setup \type
 	.align	32
+	.endm
+
+	.macro	tl1_reserved	count
+	.rept	\count
+	tl1_gen	T_RESERVED
+	.endr
 	.endm
 
 	.macro	tl0_insn_excptn
@@ -505,6 +520,7 @@ END(rsf_fatal)
 
 ENTRY(tl0_sfsr_trap)
 	tl0_split
+	clr	%o1
 	set	trap, %o2
 	mov	%g3, %o4
 	mov	%g4, %o5
@@ -556,7 +572,14 @@ END(tl0_sfsr_trap)
 	.align	32
 	.endm
 
-	.macro	immu_miss_user
+	.macro	tl0_immu_miss
+	/*
+	 * Load the virtual page number and context from the tag access
+	 * register.  We ignore the context.
+	 */
+	wr	%g0, ASI_IMMU, %asi
+	ldxa	[%g0 + AA_IMMU_TAR] %asi, %g1
+
 	/*
 	 * Initialize the page size walker.
 	 */
@@ -650,20 +673,6 @@ END(tl0_sfsr_trap)
 	 cmp	%g2, TS_MAX
 	bne,pt	%xcc, 1b
 	 add	%g2, 1, %g2
-	.endm
-
-	.macro	tl0_immu_miss
-	/*
-	 * Load the virtual page number and context from the tag access
-	 * register.  We ignore the context.
-	 */
-	wr	%g0, ASI_IMMU, %asi
-	ldxa	[%g0 + AA_IMMU_TAR] %asi, %g1
-
-	/*
-	 * Try a fast inline lookup of the user tsb.
-	 */
-	immu_miss_user
 
 	/*
 	 * Not in user tsb, call c code.
@@ -714,16 +723,25 @@ ENTRY(tl0_immu_miss_trap)
 	 * Save the tag access register, and call common trap code.
 	 */
 	tl0_split
+	clr	%o1
 	set	trap, %o2
 	mov	%g2, %o3
-	b	%xcc, tl0_trap
+	ba	%xcc, tl0_utrap
 	 mov	T_INSTRUCTION_MISS, %o0
 END(tl0_immu_miss_trap)
 
-	.macro	dmmu_miss_user
+	.macro	tl0_dmmu_miss
+	/*
+	 * Load the virtual page number and context from the tag access
+	 * register.  We ignore the context.
+	 */
+	wr	%g0, ASI_DMMU, %asi
+	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g1
+
 	/*
 	 * Initialize the page size walker.
 	 */
+tl1_dmmu_miss_user:
 	mov	TS_MIN, %g2
 
 	/*
@@ -786,7 +804,7 @@ END(tl0_immu_miss_trap)
 	 * Set the reference bit, if it's currently clear.
 	 */
 	 andcc	%g7, TD_REF, %g0
-	bz,a,pn	%xcc, dmmu_miss_user_set_ref
+	bz,a,pn	%xcc, tl0_dmmu_miss_set_ref
 	 nop
 
 	/*
@@ -812,9 +830,15 @@ END(tl0_immu_miss_trap)
 	 cmp	%g2, TS_MAX
 	bne,pt	%xcc, 1b
 	 add	%g2, 1, %g2
+
+	/*
+	 * Not in user tsb, call c code.
+	 */
+	ba,a	%xcc, tl0_dmmu_miss_trap
+	.align	128
 	.endm
 
-ENTRY(dmmu_miss_user_set_ref)
+ENTRY(tl0_dmmu_miss_set_ref)
 	/*
 	 * Set the reference bit.
 	 */
@@ -832,27 +856,7 @@ ENTRY(dmmu_miss_user_set_ref)
 	stxa	%g1, [%g0 + AA_DMMU_TAR] %asi
 	stxa	%g2, [%g0] ASI_DTLB_DATA_IN_REG
 1:	retry
-END(dmmu_miss_user_set_ref)
-
-	.macro	tl0_dmmu_miss
-	/*
-	 * Load the virtual page number and context from the tag access
-	 * register.  We ignore the context.
-	 */
-	wr	%g0, ASI_DMMU, %asi
-	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g1
-
-	/*
-	 * Try a fast inline lookup of the primary tsb.
-	 */
-	dmmu_miss_user
-
-	/*
-	 * Not in user tsb, call c code.
-	 */
-	ba,a	%xcc, tl0_dmmu_miss_trap
-	.align	128
-	.endm
+END(tl0_dmmu_miss_set_ref)
 
 ENTRY(tl0_dmmu_miss_trap)
 	/*
@@ -868,6 +872,14 @@ ENTRY(tl0_dmmu_miss_trap)
 	wrpr	%g0, PSTATE_ALT, %pstate
 
 	/*
+	 * Check if we actually came from the kernel.
+	 */
+	rdpr	%tl, %g1
+	cmp	%g1, 1
+	bgt,a,pn %xcc, 1f
+	 nop
+
+	/*
 	 * Reload the tag access register.
 	 */
 	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g2
@@ -876,16 +888,48 @@ ENTRY(tl0_dmmu_miss_trap)
 	 * Save the tag access register and call common trap code.
 	 */
 	tl0_split
+	clr	%o1
 	set	trap, %o2
 	mov	%g2, %o3
-	b	%xcc, tl0_trap
+	ba	%xcc, tl0_utrap
 	 mov	T_DATA_MISS, %o0
+
+	/*
+	 * Handle faults during window spill/fill.
+	 */
+1:	RESUME_SPILLFILL_MMU
+
+	/*
+	 * Reload the tag access register.
+	 */
+	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g2
+
+	tl1_split
+	clr	%o1
+	set	trap, %o2
+	mov	%g2, %o3
+	b	%xcc, tl1_trap
+	 mov	T_DATA_MISS | T_KERNEL, %o0
 END(tl0_dmmu_miss_trap)
 
-	.macro	dmmu_prot_user
+	.macro	tl0_dmmu_prot
+	ba,a	%xcc, tl0_dmmu_prot_1
+	 nop
+	.align	128
+	.endm
+
+ENTRY(tl0_dmmu_prot_1)
+	/*
+	 * Load the virtual page number and context from the tag access
+	 * register.  We ignore the context.
+	 */
+	wr	%g0, ASI_DMMU, %asi
+	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g1
+
 	/*
 	 * Initialize the page size walker.
 	 */
+tl1_dmmu_prot_user:
 	mov	TS_MIN, %g2
 
 	/*
@@ -985,26 +1029,6 @@ END(tl0_dmmu_miss_trap)
 	 cmp	%g2, TS_MAX
 	bne,pt	%xcc, 1b
 	 add	%g2, 1, %g2
-	.endm
-
-	.macro	tl0_dmmu_prot
-	ba,a	%xcc, tl0_dmmu_prot_1
-	 nop
-	.align	128
-	.endm
-
-ENTRY(tl0_dmmu_prot_1)
-	/*
-	 * Load the virtual page number and context from the tag access
-	 * register.  We ignore the context.
-	 */
-	wr	%g0, ASI_DMMU, %asi
-	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g1
-
-	/*
-	 * Try a fast inline lookup of the tsb.
-	 */
-	dmmu_prot_user
 
 	/*
 	 * Not in user tsb, call c code.
@@ -1027,6 +1051,14 @@ ENTRY(tl0_dmmu_prot_trap)
 	wrpr	%g0, PSTATE_ALT, %pstate
 
 	/*
+	 * Check if we actually came from the kernel.
+	 */
+	rdpr	%tl, %g1
+	cmp	%g1, 1
+	bgt,a,pn %xcc, 1f
+	 nop
+
+	/*
 	 * Load the tar, sfar and sfsr.
 	 */
 	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g2
@@ -1039,12 +1071,36 @@ ENTRY(tl0_dmmu_prot_trap)
 	 * Save the mmu registers and call common trap code.
 	 */
 	tl0_split
+	clr	%o1
 	set	trap, %o2
 	mov	%g2, %o3
 	mov	%g3, %o4
 	mov	%g4, %o5
 	ba	%xcc, tl0_utrap
 	 mov	T_DATA_PROTECTION, %o0
+
+	/*
+	 * Handle faults during window spill/fill.
+	 */
+1:	RESUME_SPILLFILL_MMU_CLR_SFSR
+
+	/*
+	 * Load the sfar, sfsr and tar.  Clear the sfsr.
+	 */
+	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g2
+	ldxa	[%g0 + AA_DMMU_SFAR] %asi, %g3
+	ldxa	[%g0 + AA_DMMU_SFSR] %asi, %g4
+	stxa	%g0, [%g0 + AA_DMMU_SFSR] %asi
+	membar	#Sync
+
+	tl1_split
+	clr	%o1
+	set	trap, %o2
+	mov	%g2, %o3
+	mov	%g3, %o4
+	mov	%g4, %o5
+	b	%xcc, tl1_trap
+	 mov	T_DATA_PROTECTION | T_KERNEL, %o0
 END(tl0_dmmu_prot_trap)
 
 	.macro	tl0_spill_0_n
@@ -1092,6 +1148,7 @@ ENTRY(tl0_sftrap)
 	and	%g1, TSTATE_CWP_MASK, %g1
 	wrpr	%g1, 0, %cwp
 	tl0_split
+	clr	%o1
 	set	trap, %o2
 	b	%xcc, tl0_trap
 	 mov	%g2, %o0
@@ -1113,36 +1170,33 @@ END(tl0_sftrap)
 
 	.macro	tl0_syscall
 	tl0_split
+	clr	%o1
 	set	syscall, %o2
 	ba	%xcc, tl0_trap
 	 mov	T_SYSCALL, %o0
 	.align	32
 	.endm
 
-	.macro	tl1_split
-	rdpr	%wstate, %g1
-	wrpr	%g1, WSTATE_NESTED, %wstate
-	save	%sp, -(CCFSZ + TF_SIZEOF), %sp
-	.endm
-
-	.macro	tl1_setup	type
-	tl1_split
-	clr	%o1
-	set	trap, %o2
-	b	%xcc, tl1_trap
-	 mov	\type | T_KERNEL, %o0
-	.endm
-
-	.macro	tl1_gen		type
-	tl1_setup \type
+	.macro	tl0_fp_restore
+	ba,a	%xcc, tl0_fp_restore
+	 nop
 	.align	32
 	.endm
 
-	.macro	tl1_reserved	count
-	.rept	\count
-	tl1_gen	T_RESERVED
-	.endr
-	.endm
+ENTRY(tl0_fp_restore)
+	ldx	[PCB_REG + PCB_FLAGS], %g1
+	andn	%g1, PCB_FEF, %g1
+	stx	%g1, [PCB_REG + PCB_FLAGS]
+
+	wr	%g0, FPRS_FEF, %fprs
+	wr	%g0, ASI_BLK_S, %asi
+	ldda	[PCB_REG + PCB_UFP + (0 * 64)] %asi, %f0
+	ldda	[PCB_REG + PCB_UFP + (1 * 64)] %asi, %f16
+	ldda	[PCB_REG + PCB_UFP + (2 * 64)] %asi, %f32
+	ldda	[PCB_REG + PCB_UFP + (3 * 64)] %asi, %f48
+	membar	#Sync
+	done
+END(tl0_fp_restore)
 
 	.macro	tl1_insn_excptn
 	wrpr	%g0, PSTATE_ALT, %pstate
@@ -1165,6 +1219,36 @@ ENTRY(tl1_insn_exceptn_trap)
 	b	%xcc, tl1_trap
 	 mov	%g2, %o0
 END(tl1_insn_exceptn_trap)
+
+	.macro	tl1_fp_disabled
+	ba,a	%xcc, tl1_fp_disabled_1
+	 nop
+	.align	32
+	.endm
+
+ENTRY(tl1_fp_disabled_1)
+	rdpr	%tpc, %g1
+	set	fpu_fault_begin, %g2
+	sub	%g1, %g2, %g1
+	cmp	%g1, fpu_fault_size
+	bgeu,a,pn %xcc, 1f
+	 nop
+
+	wr	%g0, FPRS_FEF, %fprs
+	wr	%g0, ASI_BLK_S, %asi
+	ldda	[PCB_REG + PCB_KFP + (0 * 64)] %asi, %f0
+	ldda	[PCB_REG + PCB_KFP + (1 * 64)] %asi, %f16
+	ldda	[PCB_REG + PCB_KFP + (2 * 64)] %asi, %f32
+	ldda	[PCB_REG + PCB_KFP + (3 * 64)] %asi, %f48
+	membar	#Sync
+	retry
+
+1:	tl1_split
+	clr	%o1
+	set	trap, %o2
+	ba	%xcc, tl1_trap
+	 mov	T_FP_DISABLED | T_KERNEL, %o0
+END(tl1_fp_disabled_1)
 
 	.macro	tl1_data_excptn
 	wrpr	%g0, PSTATE_ALT, %pstate
@@ -1334,7 +1418,7 @@ END(tl1_immu_miss_trap)
 	/*
 	 * Extract the context from the contents of the tag access register.
 	 * If its non-zero this is a fault on a user address.  Note that the
-	 * faulting address is passed in %g2.
+	 * faulting address is passed in %g1.
 	 */
 	sllx	%g5, 64 - TAR_VPN_SHIFT, %g6
 	brnz,a,pn %g6, tl1_dmmu_miss_user
@@ -1430,9 +1514,9 @@ ENTRY(tl1_dmmu_miss_trap)
 	 */
 	wrpr	%g0, PSTATE_ALT, %pstate
 
-	KSTACK_CHECK
-
 	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g2
+
+	KSTACK_CHECK
 
 	tl1_split
 	clr	%o1
@@ -1444,26 +1528,15 @@ END(tl1_dmmu_miss_trap)
 
 ENTRY(tl1_dmmu_miss_direct)
 	/*
-	 * Check the cache bits in the virtual address to see if this mapping
-	 * is virtually cacheable.  We set this up so that the masks fit in
-	 * immediates...  Note that the arithmetic shift sign extends, keeping
-	 * all the top bits set.
-	 */
-	srax	%g5, TLB_DIRECT_SHIFT, %g5
-	andcc	%g5, TLB_DIRECT_UNCACHEABLE, %g0
-	mov	TD_CP | TD_CV | TD_W, %g6
-	movnz	%xcc, TD_CP | TD_W, %g6
-	or	%g5, %g6, %g5
-
-	/*
 	 * Mask off the high bits of the virtual address to get the physical
-	 * address, and or in the tte bits.  The high bit is left set in the
-	 * physical address, which corresponds to the tte valid bit, so that
-	 * we don't have to include it in the tte bits.  We ignore the cache
-	 * bits, since they get shifted into the soft tte bits anyway.
+	 * address, and or in the tte bits.  The virtual address bits that
+	 * correspond to the tte valid and page size bits are left set, so
+	 * they don't have to be included in the tte bits below.  We know they
+	 * are set because the virtual address is in the upper va hole.
 	 */
-	setx	TLB_DIRECT_MASK & ~TD_V, %g7, %g6
-	andn	%g5, %g6, %g5
+	setx	TLB_DIRECT_TO_TTE_MASK, %g7, %g6
+	and	%g5, %g6, %g5
+	or	%g5, TD_CP | TD_CV | TD_W, %g5
 
 	/*
 	 * Load the tte data into the TLB and retry the instruction.
@@ -1471,42 +1544,6 @@ ENTRY(tl1_dmmu_miss_direct)
 	stxa	%g5, [%g0] ASI_DTLB_DATA_IN_REG
 	retry
 END(tl1_dmmu_miss_direct)
-
-ENTRY(tl1_dmmu_miss_user)
-	/*
-	 * Try a fast inline lookup of the user tsb.
-	 */
-	dmmu_miss_user
-
-	/*
-	 * Put back the contents of the tag access register, in case we
-	 * faulted.
-	 */
-	stxa	%g1, [%g0 + AA_DMMU_TAR] %asi
-	membar	#Sync
-
-	/*
-	 * Switch to alternate globals.
-	 */
-	wrpr	%g0, PSTATE_ALT, %pstate
-
-	/*
-	 * Handle faults during window spill/fill.
-	 */
-	RESUME_SPILLFILL_MMU
-
-	/*
-	 * Reload the tag access register.
-	 */
-	ldxa	[%g0 + AA_DMMU_TAR] %asi, %g2
-
-	tl1_split
-	clr	%o1
-	set	trap, %o2
-	mov	%g2, %o3
-	b	%xcc, tl1_trap
-	 mov	T_DATA_MISS | T_KERNEL, %o0
-END(tl1_dmmu_miss_user)
 
 	.macro	tl1_dmmu_prot
 	ba,a	%xcc, tl1_dmmu_prot_1
@@ -1524,8 +1561,8 @@ ENTRY(tl1_dmmu_prot_1)
 
 	/*
 	 * Extract the context from the contents of the tag access register.
-	 * If its non-zero this is a fault on a user address, otherwise get
-	 * the virtual page number.
+	 * If its non-zero this is a fault on a user address.  Note that the
+	 * faulting address is passed in %g1.
 	 */
 	sllx	%g5, 64 - TAR_VPN_SHIFT, %g6
 	brnz,a,pn %g6, tl1_dmmu_prot_user
@@ -1603,31 +1640,6 @@ tl1_dmmu_prot_patch_2:
 	stxa	%g6, [%g0] ASI_DTLB_DATA_IN_REG
 1:	retry
 END(tl1_dmmu_prot_1)
-
-ENTRY(tl1_dmmu_prot_user)
-	/*
-	 * Try a fast inline lookup of the user tsb.
-	 */
-	dmmu_prot_user
-
-	/*
-	 * Put back the contents of the tag access register, in case we
-	 * faulted.
-	 */
-	stxa	%g1, [%g0 + AA_DMMU_TAR] %asi
-	membar	#Sync
-
-	/*
-	 * Switch to alternate globals.
-	 */
-	wrpr	%g0, PSTATE_ALT, %pstate
-
-	/* Handle faults during window spill/fill. */
-	RESUME_SPILLFILL_MMU_CLR_SFSR
-
-	b,a	%xcc, tl1_dmmu_prot_trap
-	 nop
-END(tl1_dmmu_prot_user)
 
 ENTRY(tl1_dmmu_prot_trap)
 	/*
@@ -1932,7 +1944,7 @@ tl1_priv_opcode:
 	tl1_gen		T_PRIVILEGED_OPCODE		! 0x211
 	tl1_reserved	14				! 0x212-0x21f
 tl1_fp_disabled:
-	tl1_gen		T_FP_DISABLED			! 0x220
+	tl1_fp_disabled					! 0x220
 tl1_fp_ieee:
 	tl1_gen		T_FP_EXCEPTION_IEEE_754		! 0x221
 tl1_fp_other:
@@ -2182,7 +2194,7 @@ ENTRY(tl0_trap)
 
 	wr	%g0, FPRS_FEF, %fprs
 	stx	%fsr, [%sp + SPOFF + CCFSZ + TF_FSR]
-	rd	%asr19, %l6
+	rd	%gsr, %l6
 	stx	%l6, [%sp + SPOFF + CCFSZ + TF_GSR]
 	wr	%g0, 0, %fprs
 
@@ -2190,11 +2202,6 @@ ENTRY(tl0_trap)
 	mov	PCPU_REG, %l1
 	wrpr	%g0, PSTATE_NORMAL, %pstate
 
-	stx	%g1, [%sp + SPOFF + CCFSZ + TF_G1]
-	stx	%g2, [%sp + SPOFF + CCFSZ + TF_G2]
-	stx	%g3, [%sp + SPOFF + CCFSZ + TF_G3]
-	stx	%g4, [%sp + SPOFF + CCFSZ + TF_G4]
-	stx	%g5, [%sp + SPOFF + CCFSZ + TF_G5]
 	stx	%g6, [%sp + SPOFF + CCFSZ + TF_G6]
 	stx	%g7, [%sp + SPOFF + CCFSZ + TF_G7]
 
@@ -2210,6 +2217,12 @@ ENTRY(tl0_trap)
 	stx	%i5, [%sp + SPOFF + CCFSZ + TF_O5]
 	stx	%i6, [%sp + SPOFF + CCFSZ + TF_O6]
 	stx	%i7, [%sp + SPOFF + CCFSZ + TF_O7]
+
+	stx	%g1, [%sp + SPOFF + CCFSZ + TF_G1]
+	stx	%g2, [%sp + SPOFF + CCFSZ + TF_G2]
+	stx	%g3, [%sp + SPOFF + CCFSZ + TF_G3]
+	stx	%g4, [%sp + SPOFF + CCFSZ + TF_G4]
+	stx	%g5, [%sp + SPOFF + CCFSZ + TF_G5]
 
 	set	tl0_ret - 8, %o7
 	jmpl	%o2, %g0
@@ -2248,7 +2261,7 @@ ENTRY(tl0_intr)
 #endif
 
 	wrpr	%o0, 0, %pil
-	wr	%o1, 0, %asr21
+	wr	%o1, 0, %clear_softint
 
 	and	%l5, WSTATE_NORMAL_MASK, %l5
 	sllx	%l5, WSTATE_OTHER_SHIFT, %l5
@@ -2268,7 +2281,7 @@ ENTRY(tl0_intr)
 
 	wr	%g0, FPRS_FEF, %fprs
 	stx	%fsr, [%sp + SPOFF + CCFSZ + TF_FSR]
-	rd	%asr19, %l6
+	rd	%gsr, %l6
 	stx	%l6, [%sp + SPOFF + CCFSZ + TF_GSR]
 	wr	%g0, 0, %fprs
 
@@ -2343,10 +2356,10 @@ ENTRY(tl0_ret)
 	 */
 	wrpr	%g0, PIL_TICK, %pil
 	ldx	[PCPU(CURTHREAD)], %l0
-	ldx	[%l0 + TD_KSE], %l1
-	lduw	[%l1 + KE_FLAGS], %l2
-	and	%l2, KEF_ASTPENDING | KEF_NEEDRESCHED, %l2
-	brz,a,pt %l2, 1f
+	lduw	[%l0 + TD_FLAGS], %l1
+	set	TDF_ASTPENDING | TDF_NEEDRESCHED, %l2
+	and	%l1, %l2, %l1
+	brz,a,pt %l1, 1f
 	 nop
 
 	/*
@@ -2379,8 +2392,8 @@ ENTRY(tl0_ret)
 	 nop
 
 	/*
-	 * Restore the out registers from the trapframe.  These are ins
-	 * now, they will become the outs when we restore below.
+	 * Restore the out and most global registers from the trapframe.
+	 * The ins will become the outs when we restore below.
 	 */
 2:	ldx	[%sp + SPOFF + CCFSZ + TF_O0], %i0
 	ldx	[%sp + SPOFF + CCFSZ + TF_O1], %i1
@@ -2390,6 +2403,12 @@ ENTRY(tl0_ret)
 	ldx	[%sp + SPOFF + CCFSZ + TF_O5], %i5
 	ldx	[%sp + SPOFF + CCFSZ + TF_O6], %i6
 	ldx	[%sp + SPOFF + CCFSZ + TF_O7], %i7
+
+	ldx	[%sp + SPOFF + CCFSZ + TF_G1], %g1
+	ldx	[%sp + SPOFF + CCFSZ + TF_G2], %g2
+	ldx	[%sp + SPOFF + CCFSZ + TF_G3], %g3
+	ldx	[%sp + SPOFF + CCFSZ + TF_G4], %g4
+	ldx	[%sp + SPOFF + CCFSZ + TF_G5], %g5
 
 	/*
 	 * Load everything we need to restore below before disabling
@@ -2404,18 +2423,12 @@ ENTRY(tl0_ret)
 	ldx	[%sp + SPOFF + CCFSZ + TF_WSTATE], %l6
 
 	/*
-	 * Disable interrupts to restore the globals.  We need to restore
-	 * %g6 and %g7 which are used as global variables in the kernel.
-	 * They are not saved and restored for kernel traps, so an interrupt
-	 * at the wrong time would clobber them.
+	 * Disable interrupts to restore the special globals.  They are not
+	 * saved and restored for all kernel traps, so an interrupt at the
+	 * wrong time would clobber them.
 	 */
 	wrpr	%g0, PSTATE_NORMAL, %pstate
 
-	ldx	[%sp + SPOFF + CCFSZ + TF_G1], %g1
-	ldx	[%sp + SPOFF + CCFSZ + TF_G2], %g2
-	ldx	[%sp + SPOFF + CCFSZ + TF_G3], %g3
-	ldx	[%sp + SPOFF + CCFSZ + TF_G4], %g4
-	ldx	[%sp + SPOFF + CCFSZ + TF_G5], %g5
 	ldx	[%sp + SPOFF + CCFSZ + TF_G6], %g6
 	ldx	[%sp + SPOFF + CCFSZ + TF_G7], %g7
 
@@ -2445,11 +2458,10 @@ ENTRY(tl0_ret)
 	/*
 	 * Restore %fsr and %gsr.  These need floating point enabled in %fprs,
 	 * so we set it temporarily and then clear it.
-	 * XXX %asr19 should be %gsr but gas is invoked incorrectly.
 	 */
 	wr	%g0, FPRS_FEF, %fprs
 	ldx	[%sp + SPOFF + CCFSZ + TF_FSR], %fsr
-	wr	%l1, 0, %asr19
+	wr	%l1, 0, %gsr
 	wr	%g0, 0, %fprs
 
 	/*
@@ -2652,11 +2664,8 @@ ENTRY(tl1_trap)
 	mov	PCPU_REG, %l1
 	wrpr	%g0, PSTATE_NORMAL, %pstate
 
-	stx	%g1, [%sp + SPOFF + CCFSZ + TF_G1]
-	stx	%g2, [%sp + SPOFF + CCFSZ + TF_G2]
-	stx	%g3, [%sp + SPOFF + CCFSZ + TF_G3]
-	stx	%g4, [%sp + SPOFF + CCFSZ + TF_G4]
-	stx	%g5, [%sp + SPOFF + CCFSZ + TF_G5]
+	stx	%g6, [%sp + SPOFF + CCFSZ + TF_G6]
+	stx	%g7, [%sp + SPOFF + CCFSZ + TF_G7]
 
 	mov	%l0, PCB_REG
 	mov	%l1, PCPU_REG
@@ -2670,6 +2679,12 @@ ENTRY(tl1_trap)
 	stx	%i5, [%sp + SPOFF + CCFSZ + TF_O5]
 	stx	%i6, [%sp + SPOFF + CCFSZ + TF_O6]
 	stx	%i7, [%sp + SPOFF + CCFSZ + TF_O7]
+
+	stx	%g1, [%sp + SPOFF + CCFSZ + TF_G1]
+	stx	%g2, [%sp + SPOFF + CCFSZ + TF_G2]
+	stx	%g3, [%sp + SPOFF + CCFSZ + TF_G3]
+	stx	%g4, [%sp + SPOFF + CCFSZ + TF_G4]
+	stx	%g5, [%sp + SPOFF + CCFSZ + TF_G5]
 
 	set	tl1_ret - 8, %o7
 	jmpl	%o2, %g0
@@ -2686,19 +2701,29 @@ ENTRY(tl1_ret)
 	ldx	[%sp + SPOFF + CCFSZ + TF_O6], %i6
 	ldx	[%sp + SPOFF + CCFSZ + TF_O7], %i7
 
-	ldx	[%sp + SPOFF + CCFSZ + TF_TSTATE], %l0
-	ldx	[%sp + SPOFF + CCFSZ + TF_TPC], %l1
-	ldx	[%sp + SPOFF + CCFSZ + TF_TNPC], %l2
-	ldx	[%sp + SPOFF + CCFSZ + TF_PIL], %l3
-	ldx	[%sp + SPOFF + CCFSZ + TF_Y], %l4
-
 	ldx	[%sp + SPOFF + CCFSZ + TF_G1], %g1
 	ldx	[%sp + SPOFF + CCFSZ + TF_G2], %g2
 	ldx	[%sp + SPOFF + CCFSZ + TF_G3], %g3
 	ldx	[%sp + SPOFF + CCFSZ + TF_G4], %g4
 	ldx	[%sp + SPOFF + CCFSZ + TF_G5], %g5
 
-	wrpr	%g0, PSTATE_ALT, %pstate
+	ldx	[%sp + SPOFF + CCFSZ + TF_TSTATE], %l0
+	ldx	[%sp + SPOFF + CCFSZ + TF_TPC], %l1
+	ldx	[%sp + SPOFF + CCFSZ + TF_TNPC], %l2
+	ldx	[%sp + SPOFF + CCFSZ + TF_PIL], %l3
+	ldx	[%sp + SPOFF + CCFSZ + TF_Y], %l4
+
+	set	VM_MIN_PROM_ADDRESS, %l5
+	cmp	%l1, %l5
+	bl,a,pt	%xcc, 1f
+	 nop
+
+	wrpr	%g0, PSTATE_NORMAL, %pstate
+
+	ldx	[%sp + SPOFF + CCFSZ + TF_G6], %g6
+	ldx	[%sp + SPOFF + CCFSZ + TF_G7], %g7
+
+1:	wrpr	%g0, PSTATE_ALT, %pstate
 
 	andn	%l0, TSTATE_CWP_MASK, %g1
 	mov	%l1, %g2
@@ -2759,7 +2784,7 @@ ENTRY(tl1_intr)
 #endif
 
 	wrpr	%o0, 0, %pil
-	wr	%o1, 0, %asr21
+	wr	%o1, 0, %clear_softint
 
 	wrpr	%g0, 1, %tl
 

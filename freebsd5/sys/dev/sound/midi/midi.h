@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/midi/midi.h,v 1.10 2002/03/25 09:23:41 mike Exp $
+ * $FreeBSD: src/sys/dev/sound/midi/midi.h,v 1.11 2003/04/29 13:36:00 kan Exp $
  *
  */
 
@@ -62,7 +62,7 @@
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
 #include <machine/clock.h>	/* for DELAY */
-#include <machine/limits.h>
+#include <sys/limits.h>
 #include <sys/soundcard.h>
 #include <sys/rman.h>
 #include <sys/mman.h>

@@ -1,10 +1,6 @@
-# $FreeBSD: src/sys/modules/apm/Makefile,v 1.5 2002/11/06 13:46:58 nyan Exp $
+# $FreeBSD: src/sys/modules/apm/Makefile,v 1.7 2003/03/25 05:19:17 mdodd Exp $
 
-.if ${MACHINE} == "pc98"
-.PATH: ${.CURDIR}/../../pc98/apm
-.else
-.PATH: ${.CURDIR}/../../i386/apm
-.endif
+.PATH: ${.CURDIR}/../../i386/bios
 
 KMOD=	apm
 SRCS=	apm.c apm.h \

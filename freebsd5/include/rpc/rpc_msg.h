@@ -30,7 +30,7 @@
  *
  *	from: @(#)rpc_msg.h 1.7 86/07/16 SMI
  *	from: @(#)rpc_msg.h	2.1 88/07/29 4.0 RPCSRC
- * $FreeBSD: src/include/rpc/rpc_msg.h,v 1.14 2002/03/23 17:24:55 imp Exp $
+ * $FreeBSD: src/include/rpc/rpc_msg.h,v 1.15 2003/01/01 18:48:42 schweikh Exp $
  */
 
 /*
@@ -187,7 +187,7 @@ extern bool_t	xdr_replymsg(XDR *, struct rpc_msg *);
 
 
 /*
- * XDR routine to handle a accepted rpc reply.
+ * XDR routine to handle an accepted rpc reply.
  * xdr_accepted_reply(xdrs, rej)
  * 	XDR *xdrs;
  * 	struct accepted_reply *rej;

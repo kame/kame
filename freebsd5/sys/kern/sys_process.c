@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/sys_process.c,v 1.104 2002/10/16 16:28:33 jhb Exp $
+ * $FreeBSD: src/sys/kern/sys_process.c,v 1.108 2003/04/25 20:02:16 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -82,15 +82,14 @@
 #define	PROC_ACTION(action) do {					\
 	int error;							\
 									\
-	mtx_lock_spin(&sched_lock);					\
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);			\
 	if ((td->td_proc->p_sflag & PS_INMEM) == 0)			\
 		error = EIO;						\
 	else								\
 		error = (action);					\
-	mtx_unlock_spin(&sched_lock);					\
 	return (error);							\
 } while(0)
-	
+
 int
 proc_read_regs(struct thread *td, struct reg *regs)
 {
@@ -248,7 +247,7 @@ proc_rwmem(struct proc *p, struct uio *uio)
 
 			pindex += OFF_TO_IDX(object->backing_object_offset);
 			object = object->backing_object;
-			
+
 			m = vm_page_lookup(object, pindex);
 		}
 
@@ -322,6 +321,9 @@ struct ptrace_args {
 };
 #endif
 
+/*
+ * MPSAFE
+ */
 int
 ptrace(struct thread *td, struct ptrace_args *uap)
 {
@@ -410,7 +412,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 	default:
 		break;
 	}
-		
+
 	write = 0;
 	if (req == PT_TRACE_ME) {
 		p = td->td_proc;
@@ -435,7 +437,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		error = EINVAL;
 		goto fail;
 	}
-	
+
 	/*
 	 * Permissions check
 	 */
@@ -598,8 +600,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		/* deliver or queue signal */
 		if (P_SHOULDSTOP(p)) {
 			p->p_xstat = data;
-			mtx_lock_spin(&sched_lock);
 			p->p_flag &= ~(P_STOPPED_TRACE|P_STOPPED_SIG);
+			mtx_lock_spin(&sched_lock);
 			thread_unsuspend(p);
 			setrunnable(td2);	/* XXXKSE */
 			/* Need foreach kse in proc, ... make_kse_queued(). */
@@ -607,7 +609,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		} else if (data)
 			psignal(p, data);
 		PROC_UNLOCK(p);
-		
+
 		return (0);
 
 	case PT_WRITE_I:
@@ -628,7 +630,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		uio.uio_segflg = UIO_SYSSPACE;	/* i.e.: the uap */
 		uio.uio_rw = write ? UIO_WRITE : UIO_READ;
 		uio.uio_td = td;
+		mtx_lock(&Giant);
 		error = proc_rwmem(p, &uio);
+		mtx_unlock(&Giant);
 		if (uio.uio_resid != 0) {
 			/*
 			 * XXX proc_rwmem() doesn't currently return ENOSPC,
@@ -669,7 +673,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		default:
 			return (EINVAL);
 		}
+		mtx_lock(&Giant);
 		error = proc_rwmem(p, &uio);
+		mtx_unlock(&Giant);
 		piod->piod_len -= uio.uio_resid;
 		return (error);
 
@@ -743,9 +749,8 @@ void
 stopevent(struct proc *p, unsigned int event, unsigned int val)
 {
 
-	PROC_LOCK_ASSERT(p, MA_OWNED | MA_NOTRECURSED);
+	PROC_LOCK_ASSERT(p, MA_OWNED);
 	p->p_step = 1;
-
 	do {
 		p->p_xstat = val;
 		p->p_stype = event;	/* Which event caused the stop? */

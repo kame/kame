@@ -29,13 +29,12 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/channel.c,v 1.85 2002/11/25 17:17:42 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/channel.c,v 1.88 2003/02/26 14:38:19 orion Exp $");
 
 #define MIN_CHUNK_SIZE 		256	/* for uiomove etc. */
 #define	DMA_ALIGN_THRESHOLD	4
 #define	DMA_ALIGN_MASK		(~(DMA_ALIGN_THRESHOLD - 1))
 
-#define	MIN(x, y) (((x) < (y))? (x) : (y))
 #define CANCHANGE(c) (!(c->flags & CHN_F_TRIGGERED))
 
 /*
@@ -768,8 +767,8 @@ chn_setdir(struct pcm_channel *c, int dir)
 	CHN_LOCKASSERT(c);
 	c->direction = dir;
 	r = CHANNEL_SETDIR(c->methods, c->devinfo, c->direction);
-	if (!r && ISA_DMA(b))
-		sndbuf_isadmasetdir(b, c->direction);
+	if (!r && SND_DMA(b))
+		sndbuf_dmasetdir(b, c->direction);
 	return r;
 }
 
@@ -857,7 +856,7 @@ chn_setspeed(struct pcm_channel *c, int speed)
 	r = chn_tryspeed(c, speed);
 	if (r) {
 		DEB(printf("Failed to set speed %d falling back to %d\n", speed, oldspeed));
-		chn_tryspeed(c, oldspeed);
+		r = chn_tryspeed(c, oldspeed);
 	}
 	return r;
 }
@@ -981,8 +980,8 @@ chn_trigger(struct pcm_channel *c, int go)
 	int ret;
 
 	CHN_LOCKASSERT(c);
-	if (ISA_DMA(b) && (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD))
-		sndbuf_isadmabounce(b);
+	if (SND_DMA(b) && (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD))
+		sndbuf_dmabounce(b);
 	ret = CHANNEL_TRIGGER(c->methods, c->devinfo, go);
 
 	return ret;

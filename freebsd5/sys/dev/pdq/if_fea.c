@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pdq/if_fea.c,v 1.23 2002/06/02 20:05:45 schweikh Exp $
+ * $FreeBSD: src/sys/dev/pdq/if_fea.c,v 1.24 2003/04/15 06:37:25 mdodd Exp $
  */
 
 /*
@@ -293,6 +293,6 @@ static driver_t pdq_eisa_driver = {
 	sizeof(pdq_softc_t),
 };
 
-DRIVER_MODULE(if_fea, eisa, pdq_eisa_driver, pdq_devclass, 0, 0);
-/* MODULE_DEPEND(if_fea, eisa, 1, 1, 1); */
-MODULE_DEPEND(if_fea, fddi, 1, 1, 1);
+DRIVER_MODULE(fea, eisa, pdq_eisa_driver, pdq_devclass, 0, 0);
+/* MODULE_DEPEND(fea, eisa, 1, 1, 1); */
+MODULE_DEPEND(fea, fddi, 1, 1, 1);

@@ -23,11 +23,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/include/cpufunc.h,v 1.15 2002/09/19 04:45:06 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/include/cpufunc.h,v 1.18 2003/02/23 13:47:44 grehan Exp $
  */
 
 #ifndef _MACHINE_CPUFUNC_H_
 #define	_MACHINE_CPUFUNC_H_
+
+/*
+ * Required for user-space atomic.h includes
+ */
+static __inline void
+powerpc_mb(void)
+{
+
+	__asm __volatile("eieio; sync" : : : "memory");
+}
 
 #ifdef _KERNEL
 
@@ -101,6 +111,16 @@ mfdec(void)
 	return (value);
 }
 
+static __inline register_t
+mfpvr(void)
+{
+	register_t	value;
+
+	__asm __volatile ("mfpvr %0" : "=r"(value));
+
+	return (value);
+}
+
 static __inline void
 eieio(void)
 {
@@ -137,13 +157,6 @@ restore_intr(unsigned int msr)
 {
 
 	mtmsr(msr);
-}
-
-static __inline void
-powerpc_mb(void)
-{
-
-	__asm __volatile("eieio; sync" : : : "memory");
 }
 
 static __inline struct pcpu *

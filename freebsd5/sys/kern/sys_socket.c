@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_socket.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/sys_socket.c,v 1.47 2002/11/01 21:31:13 kbyanc Exp $
+ * $FreeBSD: src/sys/kern/sys_socket.c,v 1.53 2003/02/20 03:26:11 cognet Exp $
  */
 
 #include "opt_mac.h"
@@ -39,23 +39,24 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/file.h>
+#include <sys/filedesc.h>
 #include <sys/mac.h>
 #include <sys/protosw.h>
+#include <sys/sigio.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/filio.h>			/* XXX */
 #include <sys/sockio.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
-#include <sys/filedesc.h>
 #include <sys/ucred.h>
 
 #include <net/if.h>
 #include <net/route.h>
 
 struct	fileops socketops = {
-	soo_read, soo_write, soo_ioctl, soo_poll, sokqfilter,
-	soo_stat, soo_close
+	soo_read, soo_write, soo_ioctl, soo_poll, soo_kqfilter,
+	soo_stat, soo_close, DFLAG_PASSABLE
 };
 
 /* ARGSUSED */
@@ -67,7 +68,7 @@ soo_read(fp, uio, active_cred, flags, td)
 	struct thread *td;
 	int flags;
 {
-	struct socket *so = (struct socket *)fp->f_data;
+	struct socket *so = fp->f_data;
 	int error;
 
 	mtx_lock(&Giant);
@@ -92,7 +93,7 @@ soo_write(fp, uio, active_cred, flags, td)
 	struct thread *td;
 	int flags;
 {
-	struct socket *so = (struct socket *)fp->f_data;
+	struct socket *so = fp->f_data;
 	int error;
 
 	mtx_lock(&Giant);
@@ -117,7 +118,7 @@ soo_ioctl(fp, cmd, data, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	register struct socket *so = (struct socket *)fp->f_data;
+	register struct socket *so = fp->f_data;
 
 	switch (cmd) {
 
@@ -181,7 +182,7 @@ soo_poll(fp, events, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	struct socket *so = (struct socket *)fp->f_data;
+	struct socket *so = fp->f_data;
 	return so->so_proto->pr_usrreqs->pru_sopoll(so, events,
 	    fp->f_cred, td);
 }
@@ -193,7 +194,7 @@ soo_stat(fp, ub, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	struct socket *so = (struct socket *)fp->f_data;
+	struct socket *so = fp->f_data;
 
 	bzero((caddr_t)ub, sizeof (*ub));
 	ub->st_mode = S_IFSOCK;
@@ -227,9 +228,9 @@ soo_close(fp, td)
 	int error = 0;
 	struct socket *so;
 
-	so = (struct socket *)fp->f_data;
+	so = fp->f_data;
 	fp->f_ops = &badfileops;
-	fp->f_data = 0;
+	fp->f_data = NULL;
 
 	if (so)
 		error = soclose(so);
