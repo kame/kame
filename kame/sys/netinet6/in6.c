@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.127 2001/01/20 18:23:30 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.128 2001/01/21 11:20:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1159,10 +1159,11 @@ in6_unlink_ifa(ia, ifp)
 	in6h_delifa(oia);
 #endif
 
-#if 1
-	/* release another refcnt for the link from in6_ifaddr */
+	/*
+	 * release another refcnt for the link from in6_ifaddr
+	 * Note that we should decrement the refcnt at least once for all *BSD.
+	 */
 	IFAFREE(&oia->ia_ifa);
-#endif
 
 	splx(s);
 }
