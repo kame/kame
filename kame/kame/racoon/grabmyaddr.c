@@ -1,4 +1,4 @@
-/*	$KAME: grabmyaddr.c,v 1.32 2002/06/10 09:36:11 itojun Exp $	*/
+/*	$KAME: grabmyaddr.c,v 1.33 2002/06/10 17:05:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -199,7 +199,7 @@ grab_myaddrs()
 				addr1, sizeof(addr1),
 				NULL, 0,
 				NI_NUMERICHOST | niflags))
-		strlcpy(addr1, "(invalid)", addr1);
+		strlcpy(addr1, "(invalid)", sizeof(addr1));
 		plog(LLV_DEBUG, LOCATION, NULL,
 			"my interface: %s (%s)\n",
 			addr1, ifap->ifa_name);
