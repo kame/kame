@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.33 2001/03/28 07:08:29 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.34 2001/04/24 08:56:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <sys/queue.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <stdio.h>
