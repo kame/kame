@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.89 2002/04/02 03:37:27 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.90 2002/04/16 03:52:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -65,6 +65,13 @@
 /*
  *
  */
+
+/* for backward compatibility */
+#ifndef MLD_LISTENER_QUERY
+#define	MLD_LISTENER_QUERY	MLD6_LISTENER_QUERY
+#define	MLD_LISTENER_REPORT	MLD6_LISTENER_REPORT
+#define	MLD_LISTENER_DONE	MLD6_LISTENER_DONE
+#endif
 
 #define	FTP_DATA		20
 #define	FTP_CONTROL	21
