@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.41 2000/01/12 07:21:16 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.42 2000/01/12 15:10:31 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -86,35 +86,38 @@
 #include "isakmp_newg.h"
 #include "strnames.h"
 
+static int nostate1 __P((struct ph1handle *, vchar_t *));
+static int nostate2 __P((struct ph2handle *, vchar_t *));
+
 static int (*ph1exchange[][2][PHASE1ST_MAX])
 	__P((struct ph1handle *, vchar_t *)) = {
  { /* Identity Protection exchange */
-  { NULL, ident_i1send, NULL, ident_i2recv, ident_i2send,
-    ident_i3recv, ident_i3send, ident_i4recv, ident_i4send, NULL, },
-  { NULL, ident_r1recv, ident_r1send, ident_r2recv, ident_r2send,
-    ident_r3recv, ident_r3send, NULL, NULL, NULL, },
+  { nostate1, ident_i1send, nostate1, ident_i2recv, ident_i2send,
+    ident_i3recv, ident_i3send, ident_i4recv, ident_i4send, nostate1, },
+  { nostate1, ident_r1recv, ident_r1send, ident_r2recv, ident_r2send,
+    ident_r3recv, ident_r3send, nostate1, nostate1, nostate1, },
  },
  { /* Aggressive exchange */
-  { NULL, agg_i1send, NULL, agg_i2recv, agg_i2send,
-    NULL, NULL, NULL, NULL, NULL, },
-  { NULL, agg_r1recv, agg_r1send, agg_r2recv, agg_r2send,
-    NULL, NULL, NULL, NULL, NULL, },
+  { nostate1, agg_i1send, nostate1, agg_i2recv, agg_i2send,
+    nostate1, nostate1, nostate1, nostate1, nostate1, },
+  { nostate1, agg_r1recv, agg_r1send, agg_r2recv, agg_r2send,
+    nostate1, nostate1, nostate1, nostate1, nostate1, },
  },
  { /* Base exchange */
-  { NULL, base_i1send, NULL, base_i2recv, base_i2send,
-    base_i3recv, NULL, NULL, NULL, NULL, },
-  { NULL, base_r1recv, base_r1send, base_r2recv, base_r2send,
-    NULL, NULL, NULL, NULL, NULL, },
+  { nostate1, base_i1send, nostate1, base_i2recv, base_i2send,
+    base_i3recv, nostate1, nostate1, nostate1, nostate1, },
+  { nostate1, base_r1recv, base_r1send, base_r2recv, base_r2send,
+    nostate1, nostate1, nostate1, nostate1, nostate1, },
  },
 };
 
 static int (*ph2exchange[][2][PHASE2ST_MAX])
 	__P((struct ph2handle *, vchar_t *)) = {
  { /* Quick mode for IKE*/
-  { NULL, NULL, quick_i1prep, NULL, quick_i1send,
-    quick_i2recv, quick_i2send, quick_i3recv, NULL, NULL, },
-  { NULL, quick_r1recv, quick_r1prep, NULL, quick_r2send,
-    quick_r3recv, quick_r3prep, quick_r3send, NULL, NULL, }
+  { nostate2, nostate2, quick_i1prep, nostate2, quick_i1send,
+    quick_i2recv, quick_i2send, quick_i3recv, nostate2, nostate2, },
+  { nostate2, quick_r1recv, quick_r1prep, nostate2, quick_r2send,
+    quick_r3recv, quick_r3prep, quick_r3send, nostate2, nostate2, }
  },
 };
 
@@ -1857,4 +1860,26 @@ copy_ph1addresses(iph1, rmconf, remote)
 	_INPORTBYSA(iph1->local) = getmyaddrsport(iph1->local);
 
 	return 0;
+}
+
+static int
+nostate1(iph1, msg)
+	struct ph1handle *iph1;
+	vchar_t *msg;
+{
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, iph1->remote, "wrong state %u.\n",
+			iph1->status));
+	return -1;
+}
+
+static int
+nostate2(iph2, msg)
+	struct ph2handle *iph2;
+	vchar_t *msg;
+{
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, iph2->ph1->remote, "wrong state %u.\n",
+			iph2->status));
+	return -1;
 }
