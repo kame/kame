@@ -1,4 +1,4 @@
-/*	$KAME: defs.h,v 1.7 2001/09/06 09:46:05 fujisawa Exp $	*/
+/*	$KAME: defs.h,v 1.8 2001/10/24 05:45:14 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -41,6 +41,10 @@
 #define	PROTO_ICMP		0x01
 #define	PROTO_TCP		0x02
 #define	PROTO_UDP		0x04
+
+#define	NATPT_MAP64		1
+#define	NATPT_MAP46		2
+#define	NATPT_MAP44		3
 
 
 #define	GETA			64
