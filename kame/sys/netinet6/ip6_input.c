@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.90 2000/05/30 10:16:24 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.91 2000/05/30 11:53:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,6 +185,11 @@ int ip6_sourcecheck_interval;		/* XXX */
 const int int6intrq_present = 1;
 #endif
 
+#ifdef MEASURE_PERFORMANCE
+#define IP6_PERFORM_LOGSIZE 10000
+unsigned long long ip6_performance_log[IP6_PERFORM_LOGSIZE];
+#endif
+
 #ifdef IPV6FIREWALL
 /* firewall hooks */
 ip6_fw_chk_t *ip6_fw_chk_ptr;
@@ -211,6 +216,11 @@ extern void ip_forward	__P((struct mbuf *, int));
 #ifdef MIP6
 int (*mip6_new_packet_hook)(struct mbuf *m) = 0;
 int (*mip6_route_optimize_hook)(struct mbuf *m) = 0;
+#endif
+
+#ifdef MEASURE_PERFORMANCE
+static __inline unsigned long long read_tsc __P((void));
+static __inline void add_performance_log __P((unsigned long long)); 
 #endif
 
 /*
@@ -337,6 +347,9 @@ ip6_input(m)
 	struct ifnet *deliverifp = NULL;
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
+#endif
+#ifdef MEASURE_PERFORMANCE
+	unsigned long long ctr_beg, ctr_end;
 #endif
 
 #ifdef IPSEC
@@ -500,6 +513,9 @@ ip6_input(m)
 	/*
 	 * Multicast check
 	 */
+#ifdef MEASURE_PERFORMANCE
+	ctr_beg = read_tsc();
+#endif
 	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 	  	struct	in6_multi *in6m = 0;
 
@@ -659,12 +675,20 @@ ip6_input(m)
 	 * and we're not a router.
 	 */
 	if (!ip6_forwarding) {
+#ifdef MEASURE_PERFORMANCE
+		ctr_end = read_tsc();
+		add_performance_log(ctr_end - ctr_beg);
+#endif
 		ip6stat.ip6s_cantforward++;
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);
 		goto bad;
 	}
 
   hbhcheck:
+#ifdef MEASURE_PERFORMANCE
+		ctr_end = read_tsc();
+		add_performance_log(ctr_end - ctr_beg);
+#endif
 	/*
 	 * Process Hop-by-Hop options header if it's contained.
 	 * m may be modified in ip6_hopopts_input().
@@ -2007,3 +2031,24 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	}
 }
 #endif /* __bsdi__ */
+
+#ifdef MEASURE_PERFORMANCE
+static __inline unsigned long long 
+read_tsc(void)
+{
+     unsigned int h,l;
+     /* read Pentium counter */
+     __asm__(".byte 0x0f,0x31" :"=a" (l), "=d" (h));
+     return ((unsigned long long)h<<32) | l;
+}
+
+static __inline void
+add_performance_log(val)
+	unsigned long long val;
+{
+	static int logentry = 0;
+
+	logentry = (logentry + 1) % IP6_PERFORM_LOGSIZE;
+	ip6_performance_log[logentry] = val;
+}
+#endif
