@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 2.2.8
 KAME project
-$Id: INSTALL,v 1.10 1999/12/13 01:03:28 itojun Exp $
+$Id: INSTALL,v 1.11 2000/01/18 11:35:39 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -114,14 +114,18 @@ E-2. If you would like to use IPv6-ready inetd, you will need to stop using
      or "udp6", like below:
 >ftp	stream	tcp6	nowait	root	/usr/local/v6/libexec/ftpd	ftpd -l
 
-E-3. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
+E-3. If you wish to use ALTQ, you may need to invoke /dev/MAKEDEV.altq.
+	# cd /dev
+	# sh MAKEDEV.altq all
+
+E-4. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
      For daily use, you will need to add both of (or either of) them
      into your command search path (consult manpage for your favorite
      shell).  Make sure to make them used before /usr/bin or /usr/sbin,
      otherwise you end up using OS-supplied (hence not IPv6 nor IPsec capable)
      commands.
 
-E-4. There are batch of documents installed into /usr/local/v6/man
+E-5. There are batch of documents installed into /usr/local/v6/man
      and /usr/local/v6/share/doc.  Please read them as necessary.
      If you wish to develop your own programs, we suggest you to read through
      supplied documents, RFCs, and other documents to learn how.
