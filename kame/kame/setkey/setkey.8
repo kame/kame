@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.51 2001/07/09 00:33:11 itojun Exp $
+.\"	$KAME: setkey.8,v 1.52 2001/08/12 09:31:09 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -341,7 +341,9 @@ accepts
 only.
 .Pp
 .Ar key
-must be double-quoted character string or series of hexadecimal digits.
+must be double-quoted character string, or a series of hexadecimal digits
+preceded by
+.Dq Li 0x .
 .Pp
 Possible values for
 .Ar ealgo ,
@@ -594,13 +596,13 @@ lzs		rfc2395
 .Sh EXAMPLES
 .Bd -literal -offset
 add	3ffe:501:4819::1 3ffe:501:481d::1 esp 123457
-		-E des-cbc "ESP SA!!" ;
+		-E des-cbc 0x3ffe05014819ffff ;
 
 add	3ffe:501:4819::1 3ffe:501:481d::1 ah 123456
 		-A hmac-sha1 "AH SA configuration!" ;
 
 add	10.0.11.41 10.0.11.33 esp 0x10001
-		-E des-cbc "ESP with"
+		-E des-cbc 0x3ffe05014819ffff
 		-A hmac-md5 "authentication!!" ;
 
 get	3ffe:501:4819::1 3ffe:501:481d::1 ah 123456 ;
