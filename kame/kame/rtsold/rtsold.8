@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: rtsold.8,v 1.8 2000/01/02 06:25:14 itojun Exp $
+.\"     $Id: rtsold.8,v 1.9 2000/07/04 14:44:38 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt RTSOLD 8
@@ -176,5 +176,16 @@ command, which first appeared in WIDE/KAME IPv6 protocol stack kit.
 .Nm rtsol
 is now integrated into
 .Xr rtsold 8 .
-.\" .Sh BUGS
-.\" (to be written)
+.\"
+.Sh BUGS
+In some operating systems, when a PCMCIA network card is removed
+and reinserted, the corresponding interface index is changed.
+However,
+.Nm
+does not assume such changes, and always uses the index that
+it got at invocation. As a result,
+.Nm
+may not work if you reinsert a network card.
+In such a case,
+.Nm
+should be killed and restarted.
