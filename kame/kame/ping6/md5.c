@@ -1,4 +1,4 @@
-/*	$KAME: md5.c,v 1.2 2000/05/27 07:07:48 jinmei Exp $	*/
+/*	$KAME: md5.c,v 1.3 2000/05/27 07:14:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,9 +33,7 @@
 #include <sys/types.h>
 #include <sys/cdefs.h>
 #include <sys/time.h>
-#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
-#include <sys/systm.h>
-#endif
+#include <string.h>
 #include "md5.h"
 
 #define SHIFT(X, s) (((X) << (s)) | ((X) >> (32 - (s))))
