@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.7 2000/05/13 07:45:43 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.8 2000/05/13 07:52:46 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -222,8 +222,12 @@ main(argc, argv)
 	int all;
 
 	if (argc < 2) {
-		fprintf(stderr, "usage: gifconfig interface %s",
-		    "[ af ] physsrc physdst\n");
+		fprintf(stderr,
+		    "usage: gifconfig interface [af] [physsrc physdst]\n");
+		fprintf(stderr,
+		    "       gifconfig interface delete\n");
+		fprintf(stderr,
+		    "       gifconfig -a\n");
 		exit(1);
 	}
 	argc--, argv++;
