@@ -14,6 +14,7 @@ MASTER_SITES=	http://www.tcpdump.org/weekly/
 MAINTAINER=	sumikawa@kame.net
 
 BUILD_DEPENDS=	${LOCALBASE}/lib/libpcap.a:../libpcap
+BUILD_DEPENDS=	autoreconf:${PORTSDIR}/devel/autoconf
 
 GNU_CONFIGURE=	yes
 CONFIGURE_ENV+=	LIBS="-L${PREFIX}/lib"
