@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.95 2001/03/27 02:39:57 thorpej Exp $	*/
+/*	$KAME: cfparse.y,v 1.96 2001/04/03 15:51:54 thorpej Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -42,9 +42,7 @@
 #include "isakmp.h"
 #include "ipsec_doi.h"
 #include "strnames.h"
-#ifdef GC
 #include "gcmalloc.h"
-#endif
 #ifdef HAVE_GSSAPI
 #include "gssapi.h"
 #endif
@@ -211,7 +209,7 @@ path_statement
 
 			/* free old pathinfo */
 			if (lcconf->pathinfo[$2])
-				free(lcconf->pathinfo[$2]);
+				racoon_free(lcconf->pathinfo[$2]);
 
 			/* set new pathinfo */
 			lcconf->pathinfo[$2] = strdup($3->v);
@@ -723,7 +721,7 @@ sainfo_id
 			case AF_INET:
 				if ($5 == IPPROTO_ICMPV6) {
 					yyerror("upper layer protocol mismatched.\n");
-					free(saddr);
+					racoon_free(saddr);
 					return -1;
 				}
 				$$ = ipsecdoi_sockaddr2id(saddr,
@@ -734,7 +732,7 @@ sainfo_id
 			case AF_INET6:
 				if ($5 == IPPROTO_ICMP) {
 					yyerror("upper layer protocol mismatched.\n");
-					free(saddr);
+					racoon_free(saddr);
 					return -1;
 				}
 				$$ = ipsecdoi_sockaddr2id(saddr,
@@ -746,7 +744,7 @@ sainfo_id
 				yyerror("invalid family: %d", saddr->sa_family);
 				break;
 			}
-			free(saddr);
+			racoon_free(saddr);
 			if ($$ == NULL)
 				return -1;
 		}
@@ -852,7 +850,7 @@ algorithm
 			$$->alg = algtype2doi(cur_algclass, $1);
 			if ($$->alg == -1) {
 				yyerror("algorithm mismatched");
-				free($$);
+				racoon_free($$);
 				return -1;
 			}
 
@@ -860,13 +858,13 @@ algorithm
 			if (defklen == 0) {
 				if ($2) {
 					yyerror("keylen not allowed");
-					free($$);
+					racoon_free($$);
 					return -1;
 				}
 			} else {
 				if ($2 && check_keylen(cur_algclass, $1, $2) < 0) {
 					yyerror("invalid keylen %d", $2);
-					free($$);
+					racoon_free($$);
 					return -1;
 				}
 			}
@@ -885,7 +883,7 @@ algorithm
 					a = IPSECDOI_PROTO_IPSEC_AH;
 				yyerror("algorithm %s not supported",
 					s_ipsecdoi_trns(a, b));
-				free($$);
+				racoon_free($$);
 				return -1;
 			}
 		}
@@ -1073,7 +1071,7 @@ exchange_types
 	|	exchange_types EXCHANGETYPE
 		{
 			struct etypes *new;
-			new = malloc(sizeof(struct etypes));
+			new = racoon_malloc(sizeof(struct etypes));
 			if (new == NULL) {
 				yyerror("filed to allocate etypes");
 				return -1;
@@ -1267,7 +1265,7 @@ newprspec()
 {
 	struct proposalspec *new;
 
-	new = CALLOC(sizeof(*new), struct proposalspec *);
+	new = racoon_calloc(1, sizeof(*new));
 	if (new == NULL)
 		yyerror("failed to allocate proposal");
 
@@ -1284,7 +1282,7 @@ cleanprhead()
 
 	for (p = prhead; p != NULL; p = next) {
 		next = p->next;
-		free(p);
+		racoon_free(p);
 	}
 
 	prhead = NULL;
@@ -1309,7 +1307,7 @@ newspspec()
 {
 	struct secprotospec *new;
 
-	new = CALLOC(sizeof(*new), struct secprotospec *);
+	new = racoon_calloc(1, sizeof(*new));
 	if (new == NULL) {
 		yyerror("failed to allocate spproto");
 		return NULL;
@@ -1515,7 +1513,7 @@ expand_isakmpspec(prop_no, trns_no, types,
 	if (gssid != NULL) {
 		new->gssid = vmalloc(strlen(gssid) + 1);
 		memcpy(new->gssid->v, gssid, new->gssid->l);
-		free(gssid);
+		racoon_free(gssid);
 	} else
 		new->gssid = NULL;
 #endif

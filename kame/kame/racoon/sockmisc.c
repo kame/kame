@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.27 2001/03/23 15:03:55 sakane Exp $	*/
+/*	$KAME: sockmisc.c,v 1.28 2001/04/03 15:51:57 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -56,6 +56,7 @@
 #include "plog.h"
 #include "sockmisc.h"
 #include "debug.h"
+#include "gcmalloc.h"
 
 #ifdef NI_WITHSCOPEID
 const int niflags = NI_WITHSCOPEID;
@@ -229,7 +230,7 @@ getlocaladdr(remote)
 	int s;	/* for dummy connection */
 
 	/* allocate buffer */
-	if ((local = CALLOC(local_len, struct sockaddr *)) == NULL) {
+	if ((local = racoon_calloc(1, local_len)) == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get address buffer.\n");
 		goto err;
@@ -261,7 +262,7 @@ getlocaladdr(remote)
 
     err:
 	if (local != NULL)
-		free(local);
+		racoon_free(local);
 	return NULL;
 }
 
@@ -596,7 +597,7 @@ setsockopt_bypass(so, family)
 			strerror(errno));
 		return -1;
 	}
-	free(buf);
+	racoon_free(buf);
 
 	policy = "out bypass";
 	buf = ipsec_set_policy(policy, strlen(policy));
@@ -615,7 +616,7 @@ setsockopt_bypass(so, family)
 			strerror(errno));
 		return -1;
 	}
-	free(buf);
+	racoon_free(buf);
 
 	return 0;
 }
@@ -626,7 +627,7 @@ newsaddr(len)
 {
 	struct sockaddr *new;
 
-	new = CALLOC(len, struct sockaddr *);
+	new = racoon_calloc(1, len);
 	if (new == NULL)
 		plog(LLV_ERROR, LOCATION, NULL,
 			"%s\n", strerror(errno)); 
@@ -643,7 +644,7 @@ dupsaddr(src)
 {
 	struct sockaddr *dst;
 
-	dst = CALLOC(src->sa_len, struct sockaddr *);
+	dst = racoon_calloc(1, src->sa_len);
 	if (dst == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"%s\n", strerror(errno)); 
@@ -715,7 +716,7 @@ str2saddr(host, port)
 			"taking the first one",
 			host, port ? "," : "", port ? port : "");
 	}
-	saddr = malloc(res->ai_addrlen);
+	saddr = racoon_malloc(res->ai_addrlen);
 	if (saddr == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to allocate buffer.\n");

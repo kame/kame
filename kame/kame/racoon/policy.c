@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.38 2001/03/23 01:19:08 sakane Exp $	*/
+/*	$KAME: policy.c,v 1.39 2001/04/03 15:51:56 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -56,6 +56,7 @@
 #include "oakley.h"
 #include "handler.h"
 #include "strnames.h"
+#include "gcmalloc.h"
 
 static TAILQ_HEAD(_sptree, secpolicy) sptree;
 
@@ -301,7 +302,7 @@ newsp()
 {
 	struct secpolicy *new;
 
-	new = CALLOC(sizeof(*new), struct secpolicy *);
+	new = racoon_calloc(1, sizeof(*new));
 	if (new == NULL)
 		return NULL;
 
@@ -316,10 +317,10 @@ delsp(sp)
 
 	for (req = sp->req; req; req = next) {
 		next = req->next;
-		free(req);
+		racoon_free(req);
 	}
 	
-	free(sp);
+	racoon_free(sp);
 }
 
 void
@@ -359,7 +360,7 @@ newipsecreq()
 {
 	struct ipsecrequest *new;
 
-	new = CALLOC(sizeof(*new), struct ipsecrequest *);
+	new = racoon_calloc(1, sizeof(*new));
 	if (new == NULL)
 		return NULL;
 

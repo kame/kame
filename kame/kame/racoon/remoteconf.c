@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.c,v 1.22 2001/03/27 02:39:57 thorpej Exp $	*/
+/*	$KAME: remoteconf.c,v 1.23 2001/04/03 15:51:56 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,6 +64,7 @@
 #include "grabmyaddr.h"
 #include "proposal.h"
 #include "vendorid.h"
+#include "gcmalloc.h"
 
 static LIST_HEAD(_rmtree, remoteconf) rmtree;
 
@@ -140,7 +141,7 @@ newrmconf()
 {
 	struct remoteconf *new;
 
-	new = CALLOC(sizeof(*new), struct remoteconf *);
+	new = racoon_calloc(1, sizeof(*new));
 	if (new == NULL)
 		return NULL;
 
@@ -177,7 +178,7 @@ delrmconf(rmconf)
 		oakley_dhgrp_free(rmconf->dhgrp);
 	if (rmconf->proposal)
 		delisakmpsa(rmconf->proposal);
-	free(rmconf);
+	racoon_free(rmconf);
 }
 
 void
@@ -192,7 +193,7 @@ delisakmpsa(sa)
 	if (sa->gssid)
 		vfree(sa->gssid);
 #endif
-	free(sa);
+	racoon_free(sa);
 }
 
 void
@@ -201,7 +202,7 @@ deletypes(e)
 {
 	if (e->next)
 		deletypes(e->next);
-	free(e);
+	racoon_free(e);
 }
 
 /*
@@ -261,7 +262,7 @@ newisakmpsa()
 {
 	struct isakmpsa *new;
 
-	new = CALLOC(sizeof(*new), struct isakmpsa *);
+	new = racoon_calloc(1, sizeof(*new));
 	if (new == NULL)
 		return NULL;
 

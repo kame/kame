@@ -1377,8 +1377,8 @@ EOF
 
 	if test "x$gc_dir" = "x"; then
 		
-echo $ac_n "checking for gc containing GC_malloc""... $ac_c" 1>&6
-echo "configure:1382: checking for gc containing GC_malloc" >&5
+echo $ac_n "checking for leak containing GC_malloc""... $ac_c" 1>&6
+echo "configure:1382: checking for leak containing GC_malloc" >&5
 if eval "test \"`echo '$''{'ac_cv_search_GC_malloc'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1403,7 +1403,7 @@ else
   echo "configure: failed program was:" >&5
   cat conftest.$ac_ext >&5
   rm -rf conftest*
-  LIBS="-lgc $LIBS"
+  LIBS="-lleak $LIBS"
 	cat > conftest.$ac_ext <<EOF
 #line 1409 "configure"
 #include "confdefs.h"
@@ -1418,7 +1418,7 @@ GC_malloc()
 EOF
 if { (eval echo configure:1420: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
   rm -rf conftest*
-  ac_cv_search_GC_malloc="-lgc"
+  ac_cv_search_GC_malloc="-lleak"
 else
   echo "configure: failed program was:" >&5
   cat conftest.$ac_ext >&5
@@ -1428,7 +1428,7 @@ fi
 rm -f conftest*
 LIBS="$ac_func_search_save_LIBS"
 test "$ac_cv_search_GC_malloc" = "no" && for i in ; do
-LIBS="-L$i -lgc $ac_func_search_save_LIBS"
+LIBS="-L$i -lleak $ac_func_search_save_LIBS"
 cat > conftest.$ac_ext <<EOF
 #line 1434 "configure"
 #include "confdefs.h"
@@ -1443,7 +1443,7 @@ GC_malloc()
 EOF
 if { (eval echo configure:1445: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
   rm -rf conftest*
-  ac_cv_search_GC_malloc="-L$i -lgc"
+  ac_cv_search_GC_malloc="-L$i -lleak"
 break
 else
   echo "configure: failed program was:" >&5
@@ -1463,8 +1463,8 @@ else :
 fi
 	else
 		
-echo $ac_n "checking for gc containing GC_malloc""... $ac_c" 1>&6
-echo "configure:1468: checking for gc containing GC_malloc" >&5
+echo $ac_n "checking for leak containing GC_malloc""... $ac_c" 1>&6
+echo "configure:1468: checking for leak containing GC_malloc" >&5
 if eval "test \"`echo '$''{'ac_cv_search_GC_malloc'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1489,7 +1489,7 @@ else
   echo "configure: failed program was:" >&5
   cat conftest.$ac_ext >&5
   rm -rf conftest*
-  LIBS="-lgc $LIBS"
+  LIBS="-lleak $LIBS"
 	cat > conftest.$ac_ext <<EOF
 #line 1495 "configure"
 #include "confdefs.h"
@@ -1504,7 +1504,7 @@ GC_malloc()
 EOF
 if { (eval echo configure:1506: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
   rm -rf conftest*
-  ac_cv_search_GC_malloc="-lgc"
+  ac_cv_search_GC_malloc="-lleak"
 else
   echo "configure: failed program was:" >&5
   cat conftest.$ac_ext >&5
@@ -1514,7 +1514,7 @@ fi
 rm -f conftest*
 LIBS="$ac_func_search_save_LIBS"
 test "$ac_cv_search_GC_malloc" = "no" && for i in $gc_dir; do
-LIBS="-L$i -lgc $ac_func_search_save_LIBS"
+LIBS="-L$i -lleak $ac_func_search_save_LIBS"
 cat > conftest.$ac_ext <<EOF
 #line 1520 "configure"
 #include "confdefs.h"
@@ -1529,7 +1529,7 @@ GC_malloc()
 EOF
 if { (eval echo configure:1531: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
   rm -rf conftest*
-  ac_cv_search_GC_malloc="-L$i -lgc"
+  ac_cv_search_GC_malloc="-L$i -lleak"
 break
 else
   echo "configure: failed program was:" >&5

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.69 2001/03/21 15:59:42 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.70 2001/04/03 15:51:55 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -800,7 +800,7 @@ isakmp_info_recv_n(iph1, msg)
 		type, s_isakmp_notify_msg(type),
 		ntohl(n->doi), n->proto_id, spi, n->spi_size);
 
-	free(spi);
+	racoon_free(spi);
 
 	return(0);
 }
@@ -998,13 +998,13 @@ info_recv_initialcontact(iph1)
 		deleteallph2(iph1->remote, iph1->local, proto_id);
 	}
 
-	free(loc);
-	free(rem);
+	racoon_free(loc);
+	racoon_free(rem);
 	return;
 
  the_hard_way:
-	free(loc);
-	free(rem);
+	racoon_free(loc);
+	racoon_free(rem);
 #endif
 
 	buf = pfkey_dump_sadb(SADB_SATYPE_UNSPEC);

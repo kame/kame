@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.54 2001/03/21 22:10:11 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.55 2001/04/03 15:51:54 thorpej Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -562,7 +562,7 @@ yycf_clean_buffer()
 	for (i = 0; i < MAX_INCLUDE_DEPTH; i++) {
 		if (incstack[i].path != NULL) {
 			fclose(incstack[i].fp);
-			free(incstack[i].path);
+			racoon_free(incstack[i].path);
 			incstack[i].path = NULL;
 		}
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.136 2001/03/23 15:02:31 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.137 2001/04/03 15:51:55 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -353,8 +353,8 @@ isakmp_main(msg, remote, local)
 				"remote address mismatched. db=%s, act=%s\n",
 				saddr_db, saddr_act);
 
-			free(saddr_db);
-			free(saddr_act);
+			racoon_free(saddr_db);
+			racoon_free(saddr_act);
 		}
 		/*
 		 * don't check of exchange type here because other type will be
@@ -779,7 +779,7 @@ isakmp_ph1begin_i(rmconf, remote)
 	plog(LLV_INFO, LOCATION, NULL,
 		"initiate new phase 1 negotiation: %s<=>%s\n",
 		a, saddr2str(iph1->remote));
-	free(a);
+	racoon_free(a);
     }
 	plog(LLV_INFO, LOCATION, NULL,
 		"begin %s mode.\n",
@@ -862,7 +862,7 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	plog(LLV_INFO, LOCATION, NULL,
 		"responde new phase 1 negotiation: %s<=>%s\n",
 		a, saddr2str(iph1->remote));
-	free(a);
+	racoon_free(a);
     }
 	plog(LLV_INFO, LOCATION, NULL,
 		"begin %s mode.\n", s_isakmp_etype(etype));
@@ -973,7 +973,7 @@ isakmp_ph2begin_r(iph1, msg)
 	plog(LLV_INFO, LOCATION, NULL,
 		"responde new phase 2 negotiation: %s<=>%s\n",
 		a, saddr2str(iph2->dst));
-	free(a);
+	racoon_free(a);
     }
 
 	error = (ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
@@ -1279,7 +1279,7 @@ isakmp_open()
 		continue;
 
 	err_and_next:
-		free(p->addr);
+		racoon_free(p->addr);
 		p->addr = NULL;
 		if (! lcconf->autograbaddr && lcconf->strict_address)
 			return -1;
@@ -1306,8 +1306,8 @@ isakmp_close()
 		if (!p->addr)
 			continue;
 		close(p->sock);
-		free(p->addr);
-		free(p);
+		racoon_free(p->addr);
+		racoon_free(p);
 	}
 
 	lcconf->myaddrs = NULL;
@@ -1455,8 +1455,8 @@ isakmp_ph1expire(iph1)
 		"ISAKMP-SA expired %s-%s spi:%s\n",
 		src, dst,
 		isakmp_pindex(&iph1->index, 0));
-	free(src);
-	free(dst);
+	racoon_free(src);
+	racoon_free(dst);
 
 	SCHED_INIT(iph1->sce);
 
@@ -1496,8 +1496,8 @@ isakmp_ph1delete(iph1)
 	plog(LLV_INFO, LOCATION, NULL,
 		"ISAKMP-SA deleted %s-%s spi:%s\n",
 		src, dst, isakmp_pindex(&iph1->index, 0));
-	free(src);
-	free(dst);
+	racoon_free(src);
+	racoon_free(dst);
 
 	remph1(iph1);
 	delph1(iph1);
@@ -1531,8 +1531,8 @@ isakmp_ph2expire(iph2)
 	dst = strdup(saddrwop2str(iph2->dst));
 	plog(LLV_INFO, LOCATION, NULL,
 		"phase2 sa expired %s-%s\n", src, dst);
-	free(src);
-	free(dst);
+	racoon_free(src);
+	racoon_free(dst);
 
 	iph2->status = PHASE2ST_EXPIRED;
 
@@ -1562,8 +1562,8 @@ isakmp_ph2delete(iph2)
 	dst = strdup(saddrwop2str(iph2->dst));
 	plog(LLV_INFO, LOCATION, NULL,
 		"phase2 sa deleted %s-%s\n", src, dst);
-	free(src);
-	free(dst);
+	racoon_free(src);
+	racoon_free(dst);
 
 	unbindph12(iph2);
 	remph2(iph2);
@@ -1908,7 +1908,7 @@ isakmp_newcookie(place, remote, local)
 
 	sa1 = val2str(place, sizeof (cookie_t));
 	plog(LLV_DEBUG, LOCATION, NULL, "new cookie:\n%s\n", sa1);
-	free(sa1);
+	racoon_free(sa1);
 
 	error = 0;
 end:
@@ -2322,8 +2322,8 @@ log_ph1established(iph1)
 		"ISAKMP-SA established %s-%s spi:%s\n",
 		src, dst,
 		isakmp_pindex(&iph1->index, 0));
-	free(src);
-	free(dst);
+	racoon_free(src);
+	racoon_free(dst);
 
 	return;
 }

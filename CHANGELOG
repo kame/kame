@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1633 2001/04/03 12:46:14 itojun Exp $
+$KAME: CHANGELOG,v 1.1634 2001/04/03 15:51:53 thorpej Exp $
 
 <200104>
+2001-04-03  Jason R. Thorpe  <thorpej@zembu.com>
+
+	* racoon: Better integration of debugging malloc libraries.
+	Use wrapper macros (racoon_{malloc,calloc,free,realloc}())
+	so that debugging malloc implementations can get file/line
+	info, and also put traditional malloc/calloc/free/realloc
+	stubs in the main program so that libraries linked with
+	racoon get the debugging allocators, as well.
+
 Mon Apr  3 JST 2001  itojun@iijlab.net
 	* sys/netinet6/tcp6_output.c (freebsd2/bsdi3),
 	  sys/netinet/tcp_output.c (netbsd/openbsd/bsdi4):

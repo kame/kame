@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.107 2001/03/16 04:12:09 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.108 2001/04/03 15:51:56 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,6 +83,7 @@
 #include "admin.h"
 #include "strnames.h"
 #include "backupsa.h"
+#include "gcmalloc.h"
 
 /* prototype */
 static u_int ipsecdoi2pfkey_aalg __P((u_int));
@@ -249,7 +250,7 @@ pfkey_handler()
 	error = 0;
 end:
 	if (msg)
-		free(msg);
+		racoon_free(msg);
 	return(error);
 }
 
@@ -283,7 +284,7 @@ pfkey_dump_sadb(satype)
 
 	while (1) {
 		if (msg)
-			free(msg);
+			racoon_free(msg);
 		msg = pk_recv(s, &len);
 		if (msg == NULL) {
 			if (len < 0)
@@ -316,7 +317,7 @@ fail:
 	buf = NULL;
 done:
 	if (msg)
-		free(msg);
+		racoon_free(msg);
 	if (s >= 0)
 		close(s);
 	return buf;
@@ -1900,7 +1901,7 @@ pk_sendeacquire(iph2)
 	int len;
 
 	len = sizeof(struct sadb_msg);
-	newmsg = CALLOC(len, struct sadb_msg *);
+	newmsg = racoon_calloc(1, len);
 	if (newmsg == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send acquire.\n");
@@ -1920,7 +1921,7 @@ pk_sendeacquire(iph2)
 	/* send message */
 	len = pfkey_send(lcconf->sock_pfkey, newmsg, len);
 
-	free(newmsg);
+	racoon_free(newmsg);
 
 	return 0;
 }
@@ -1997,24 +1998,24 @@ pk_recv(so, lenp)
 		return NULL;
 
 	reallen = PFKEY_UNUNIT64(buf.sadb_msg_len);
-	if ((newmsg = CALLOC(reallen, struct sadb_msg *)) == NULL)
+	if ((newmsg = racoon_calloc(1, reallen)) == NULL)
 		return NULL;
 
 	*lenp = recv(so, (caddr_t)newmsg, reallen, MSG_PEEK);
 	if (*lenp < 0) {
-		free(newmsg);
+		racoon_free(newmsg);
 		return NULL;	/*fatal*/
 	} else if (*lenp != reallen) {
-		free(newmsg);
+		racoon_free(newmsg);
 		return NULL;
 	}
 
 	*lenp = recv(so, (caddr_t)newmsg, reallen, 0);
 	if (*lenp < 0) {
-		free(newmsg);
+		racoon_free(newmsg);
 		return NULL;	/*fatal*/
 	} else if (*lenp != reallen) {
-		free(newmsg);
+		racoon_free(newmsg);
 		return NULL;
 	}
 

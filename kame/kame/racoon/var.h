@@ -1,4 +1,4 @@
-/*	$KAME: var.h,v 1.8 2000/10/04 17:41:04 itojun Exp $	*/
+/*	$KAME: var.h,v 1.9 2001/04/03 15:51:57 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,9 +55,6 @@
 #ifndef TRUE
 #define TRUE 1
 #endif
-
-#include <stdlib.h>
-#define CALLOC(size, cast) (cast)calloc(1, (size))
 
 #include <sys/socket.h>
 
