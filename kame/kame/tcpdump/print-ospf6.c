@@ -23,7 +23,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: print-ospf.c,v 1.24 97/04/26 13:31:46 leres Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-ospf6.c,v 1.1.1.1 1999/08/08 23:32:08 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -620,7 +620,7 @@ ospf6_print(register const u_char *bp, register u_int length)
 	/* value.  If it's not valid, say so and return */
 	TCHECK(op->ospf6_type);
 	cp = tok2str(type2str, "type%d", op->ospf6_type);
-	printf(" OSPFv%d-%s %d:", op->ospf6_version, cp, length);
+	printf("OSPFv%d-%s %d:", op->ospf6_version, cp, length);
 	if (*cp == 't')
 		return;
 
