@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.26 2000/02/23 12:25:42 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.27 2000/02/28 10:10:07 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -107,8 +107,8 @@ static struct cipher_algorithm cipher[] = {
 static int oakley_compute_keymat_x __P((struct ph2handle *iph2, int side, int sa_dir));
 #ifdef HAVE_SIGNING_C
 static char *oakley_getidstr __P((struct ipsecdoi_id_b *id, int len));
-#endif
 static char *getdirnamebyid __P((int identtype));
+#endif
 
 int
 oakley_get_defaultlifetime()
@@ -1594,6 +1594,7 @@ oakley_savecert(iph1, gen)
 	return 0;
 }
 
+#ifdef HAVE_SIGNING_C
 static char *
 getdirnamebyid(identtype)
 	int identtype;
@@ -1619,6 +1620,7 @@ getdirnamebyid(identtype)
 	/* NOTREACHED */
 	return NULL;
 }
+#endif
 
 /*
  * compute SKEYID
