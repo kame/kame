@@ -49,7 +49,6 @@ MAN8=	pim6sd.8
 
 # FreeBSD special
 SRCS+=y.tab.h
-y.tab.h: cfparse.y
 
 afterinstall:
 	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
