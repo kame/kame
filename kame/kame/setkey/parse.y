@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.45 2001/08/16 17:19:31 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.46 2001/08/16 18:27:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -52,21 +52,18 @@
 #include "vchar.h"
 
 #define ATOX(c) \
-  (isdigit(c) ? (c - '0') : (isupper(c) ? (c - 'A' + 10) : (c - 'a' + 10) ))
+  (isdigit(c) ? (c - '0') : (isupper(c) ? (c - 'A' + 10) : (c - 'a' + 10)))
 
 u_int p_type;
 u_int32_t p_spi;
 int p_no_spi;
 struct sockaddr *p_src, *p_dst;
-u_int p_prefs, p_prefd, p_upper;
+u_int p_upper;
 u_int p_satype, p_ext, p_alg_enc, p_alg_auth, p_replay, p_mode;
 u_int32_t p_reqid;
 u_int p_key_enc_len, p_key_auth_len;
 caddr_t p_key_enc, p_key_auth;
 time_t p_lt_hard, p_lt_soft;
-
-static u_int p_policy_len;
-static char *p_policy;
 
 static int p_aiflags = 0, p_aifamily = PF_UNSPEC;
 
@@ -81,6 +78,8 @@ void parse_init __P((void));
 void free_buffer __P((void));
 
 int setkeymsg0 __P((struct sadb_msg *, unsigned int, unsigned int, size_t));
+static int setkeymsg_spdaddr __P((unsigned int, vchar_t *,
+	struct addrinfo *, unsigned int, struct addrinfo *, unsigned int));
 extern int setkeymsg __P((char *, size_t *));
 extern int sendkeymsg __P((char *, size_t));
 
@@ -95,6 +94,7 @@ extern void yyerror __P((const char *));
 	unsigned int intnum;
 	vchar_t val;
 	struct sockaddr *sa;
+	struct addrinfo *res;
 }
 
 %token EOT
@@ -113,16 +113,19 @@ extern void yyerror __P((const char *));
 %token F_AIFLAGS
 
 %type <s> command flush_command dump_command spdflush_command spddump_command
+%type <s> spdadd_command spddelete_command
 %type <num> PREFIX EXTENSION MODE
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %type <num> DECSTRING
 %type <intnum> prefix port protocol_spec
-%type <val> PORT PL_REQUESTS
+%type <val> PORT PL_REQUESTS portstr
 %type <val> key_string policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
 %type <val> F_AIFLAGS
+%type <val> policy_spec
 %type <sa> ipaddress
+%type <res> ipaddr
 
 %%
 commands
@@ -172,11 +175,11 @@ command
 		}
 	|	spdadd_command
 		{
-			$$ = 0;
+			$$ = $1;
 		}
 	|	spddelete_command
 		{
-			$$ = 0;
+			$$ = $1;
 		}
 	|	spddump_command
 		{
@@ -467,18 +470,33 @@ extension
 	/* definition about command for SPD management */
 	/* spdadd */
 spdadd_command
-	:	SPDADD sp_selector_spec policy_spec EOT
+	:	SPDADD ipaddropts STRING prefix portstr STRING prefix portstr upper_spec policy_spec EOT
 		{
-			p_type = SADB_X_SPDADD;
-			p_satype = SADB_SATYPE_UNSPEC;
+			int status;
+
+			status = setkeymsg_spdaddr(SADB_X_SPDADD, &$10,
+			    parse_addr($3.buf, $5.buf), $4,
+			    parse_addr($6.buf, $8.buf), $7);
+			if (status < 0)
+				return -1;
+
+			$$ = 1;
 		}
 	;
 
-spddelete_command:
-		SPDDELETE sp_selector_spec policy_spec EOT
+spddelete_command
+	:	SPDDELETE ipaddropts STRING prefix portstr STRING prefix portstr upper_spec policy_spec EOT
 		{
-			p_type = SADB_X_SPDDELETE;
-			p_satype = SADB_SATYPE_UNSPEC;
+			int status;
+
+			status = setkeymsg_spdaddr(SADB_X_SPDDELETE, &$10,
+			    parse_addr($3.buf, $5.buf), $4,
+			    parse_addr($6.buf, $8.buf), $7);
+			if (status < 0)
+				return -1;
+
+			$$ = 1;
+
 		}
 	;
 
@@ -501,41 +519,6 @@ spdflush_command:
 			    sizeof(msg));
 			sendkeymsg((char *)&msg, sizeof(msg));
 			$$ = 1;
-		}
-	;
-
-	/* sp_selector_spec */
-sp_selector_spec
-	:	ipaddropts ipaddress prefix port ipaddress prefix port upper_spec
-		{
-			p_src = $2;
-			p_prefs = $3;
-			switch (p_src->sa_family) {
-			case AF_INET:
-				((struct sockaddr_in *)p_src)->sin_port = $4;
-				break;
-#ifdef INET6
-			case AF_INET6:
-				((struct sockaddr_in6 *)p_src)->sin6_port = $4;
-				break;
-#endif
-			default:
-				exit(1); /*XXX*/
-			}
-			p_dst = $5;
-			p_prefd = $6;
-			switch (p_dst->sa_family) {
-			case AF_INET:
-				((struct sockaddr_in *)p_dst)->sin_port = $7;
-				break;
-#ifdef INET6
-			case AF_INET6:
-				((struct sockaddr_in6 *)p_dst)->sin6_port = $7;
-				break;
-#endif
-			default:
-				exit(1); /*XXX*/
-			}
 		}
 	;
 
@@ -581,6 +564,12 @@ ipaddress
 				/* yyerror already called by parse_addr */
 				return -1;
 			}
+			if (res->ai_next != NULL) {
+				free($1.buf);
+				freeaddrinfo(res);
+				yyerror("resolved to multiple address");
+				return -1;
+			}
 			$$ = malloc(res->ai_addrlen);
 			if (!$$) {
 				freeaddrinfo(res);
@@ -594,9 +583,37 @@ ipaddress
 		}
 	;
 
+ipaddr
+	:	STRING
+		{
+			struct addrinfo *res;
+
+			res = parse_addr($1.buf, NULL);
+			if (res == NULL) {
+				free($1.buf);
+				/* yyerror already called by parse_addr */
+				return -1;
+			}
+			$$ = res;
+			free($1.buf);
+		}
+	;
+
 prefix
 	:	/*NOTHING*/ { $$ = ~0; }
 	|	PREFIX { $$ = $1; }
+	;
+
+portstr
+	:	/*NOTHING*/
+		{
+			$$.buf = strdup("0");
+			$$.len = strlen($$.buf);
+		}
+	|	PORT
+		{
+			$$ = $1;
+		}
 	;
 
 port
@@ -656,17 +673,16 @@ upper_spec
 policy_spec
 	:	F_POLICY policy_requests
 		{
-			p_policy = ipsec_set_policy($2.buf, $2.len);
-			if (p_policy == NULL) {
-				free($2.buf);
-				p_policy = NULL;
+			char *policy;
+
+			policy = ipsec_set_policy($2.buf, $2.len);
+			if (policy == NULL) {
 				yyerror(ipsec_strerror());
 				return -1;
 			}
 
-			p_policy_len = ipsec_get_policylen(p_policy);
-
-			free($2.buf);
+			$$.buf = policy;
+			$$.len = ipsec_get_policylen(policy);
 		}
 	;
 
@@ -696,6 +712,108 @@ setkeymsg0(msg, type, satype, l)
 }
 
 /* XXX NO BUFFER OVERRUN CHECK! BAD BAD! */
+static int
+setkeymsg_spdaddr(type, policy, srcs, splen, dsts, dplen)
+	unsigned int type;
+	vchar_t *policy;
+	struct addrinfo *srcs;
+	unsigned int splen;
+	struct addrinfo *dsts;
+	unsigned int dplen;
+{
+	struct sadb_msg *msg;
+	char buf[BUFSIZ];
+	int l, l0;
+	struct sadb_address m_addr;
+	struct addrinfo *s, *d;
+	int n;
+	int plen;
+	struct sockaddr_storage ss;
+	int salen;
+
+	msg = (struct sadb_msg *)buf;
+
+	if (!srcs || !dsts)
+		return -1;
+
+	/* fix up length afterwards */
+	setkeymsg0(msg, type, SADB_SATYPE_UNSPEC, 0);
+	l = sizeof(struct sadb_msg);
+
+	memcpy(buf + l, policy->buf, policy->len);
+	l += policy->len;
+
+	l0 = l;
+	n = 0;
+
+	/* do it for all src/dst pairs */
+	for (s = srcs; s; s = s->ai_next) {
+		for (d = dsts; d; d = d->ai_next) {
+			/* rewind pointer */
+			l = l0;
+
+			if (s->ai_addr->sa_family != d->ai_addr->sa_family)
+				continue;
+			if (s->ai_addr->sa_len != d->ai_addr->sa_len)
+				continue;
+			if (s->ai_addr->sa_len > sizeof(ss))
+				continue;
+			switch (s->ai_addr->sa_family) {
+			case AF_INET:
+				plen = sizeof(struct in_addr) << 3;
+				break;
+#ifdef INET6
+			case AF_INET6:
+				plen = sizeof(struct in6_addr) << 3;
+				break;
+#endif
+			default:
+				continue;
+			}
+
+			/* set src */
+			salen = s->ai_addr->sa_len;
+			memcpy(&ss, s->ai_addr, salen);
+			m_addr.sadb_address_len = PFKEY_UNIT64(sizeof(m_addr) +
+			    PFKEY_ALIGN8(salen));
+			m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
+			m_addr.sadb_address_proto = p_upper;
+			m_addr.sadb_address_prefixlen =
+			    (splen != ~0 ? splen : plen);
+			m_addr.sadb_address_reserved = 0;
+
+			setvarbuf(buf, &l, (struct sadb_ext *)&m_addr,
+			    sizeof(m_addr), (caddr_t)&ss, salen);
+
+			/* set dst */
+			salen = d->ai_addr->sa_len;
+			memcpy(&ss, d->ai_addr, salen);
+			m_addr.sadb_address_len = PFKEY_UNIT64(sizeof(m_addr) +
+			    PFKEY_ALIGN8(salen));
+			m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_DST;
+			m_addr.sadb_address_proto = p_upper;
+			m_addr.sadb_address_prefixlen =
+			    (dplen != ~0 ? dplen : plen);
+			m_addr.sadb_address_reserved = 0;
+
+			setvarbuf(buf, &l, (struct sadb_ext *)&m_addr,
+			    sizeof(m_addr), (caddr_t)&ss, salen);
+
+			msg->sadb_msg_len = PFKEY_UNIT64(l);
+
+			sendkeymsg(buf, l);
+
+			n++;
+		}
+	}
+
+	if (n == 0)
+		return -1;
+	else
+		return 0;
+}
+
+/* XXX NO BUFFER OVERRUN CHECK! BAD BAD! */
 int
 setkeymsg(buf, lenp)
 	char *buf;
@@ -708,10 +826,6 @@ setkeymsg(buf, lenp)
 	l = sizeof(struct sadb_msg);
 
 	switch (p_type) {
-	case SADB_FLUSH:
-	case SADB_DUMP:
-		break;
-
 	case SADB_ADD:
 		/* set encryption algorithm, if present. */
 		if (p_satype != SADB_X_SATYPE_IPCOMP && p_alg_enc != SADB_EALG_NONE) {
@@ -866,77 +980,9 @@ setkeymsg(buf, lenp)
 	    }
 		break;
 
-	/* for SPD management */
-	case SADB_X_SPDFLUSH:
-	case SADB_X_SPDDUMP:
-		break;
-
-	case SADB_X_SPDADD:
-	case SADB_X_SPDDELETE:
-	    {
-		struct sadb_address m_addr;
-		u_int8_t plen;
-
-		memcpy(buf + l, p_policy, p_policy_len);
-		l += p_policy_len;
-		free(p_policy);
-		p_policy = NULL;
-
-		/* set src */
-		m_addr.sadb_address_len =
-			PFKEY_UNIT64(sizeof(m_addr)
-			           + PFKEY_ALIGN8(p_src->sa_len));
-		m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
-		m_addr.sadb_address_proto = p_upper;
-		switch (p_src->sa_family) {
-		case AF_INET:
-			plen = sizeof(struct in_addr) << 3;
-			break;
-#ifdef INET6
-		case AF_INET6:
-			plen = sizeof(struct in6_addr) << 3;
-			break;
-#endif
-		default:
-			yyerror("unsupported address family");
-			exit(1);	/*XXX*/
-		}
-		m_addr.sadb_address_prefixlen =
-		    (p_prefs != ~0 ? p_prefs : plen);
-		m_addr.sadb_address_reserved = 0;
-
-		setvarbuf(buf, &l,
-			(struct sadb_ext *)&m_addr, sizeof(m_addr),
-			(caddr_t)p_src, p_src->sa_len);
-
-		/* set dst */
-		m_addr.sadb_address_len =
-			PFKEY_UNIT64(sizeof(m_addr)
-			           + PFKEY_ALIGN8(p_dst->sa_len));
-		m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_DST;
-		m_addr.sadb_address_proto = p_upper;
-		switch (p_dst->sa_family) {
-		case AF_INET:
-			plen = sizeof(struct in_addr) << 3;
-			break;
-#ifdef INET6
-		case AF_INET6:
-			plen = sizeof(struct in6_addr) << 3;
-			break;
-#endif
-		default:
-			yyerror("unsupported address family");
-			exit(1);	/*XXX*/
-		}
-		m_addr.sadb_address_prefixlen =
-		    (p_prefd != ~0 ? p_prefd : plen);
-		m_addr.sadb_address_reserved = 0;
-
-		setvarbuf(buf, &l,
-			(struct sadb_ext *)&m_addr, sizeof(m_addr),
-			(caddr_t)p_dst, p_dst->sa_len);
-	    }
-		break;
+	default:
+		yyerror("should not reach here");
+		return -1;
 	}
 
 	((struct sadb_msg *)buf)->sadb_msg_len = PFKEY_UNIT64(l);
@@ -962,11 +1008,6 @@ parse_addr(host, port)
 	if (error != 0) {
 		yyerror(gai_strerror(error));
 		return NULL;
-	}
-	if (res->ai_next != NULL) {
-		freeaddrinfo(res);
-		yyerror("resolved to multiple address");
-		res = NULL;
 	}
 	return res;
 }
@@ -996,7 +1037,6 @@ parse_init()
 	p_no_spi = 0;
 
 	p_src = 0, p_dst = 0;
-	p_prefs = p_prefd = ~0;
 	p_upper = 0;
 
 	p_satype = 0;
@@ -1009,9 +1049,6 @@ parse_init()
 	p_key_enc_len = p_key_auth_len = 0;
 	p_key_enc = p_key_auth = 0;
 	p_lt_hard = p_lt_soft = 0;
-
-	p_policy_len = 0;
-	p_policy = NULL;
 
 	p_aiflags = 0;
 	p_aifamily = PF_UNSPEC;
