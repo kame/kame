@@ -3,12 +3,12 @@
 # Whom:			Peter Mutsaers
 #
 # $FreeBSD: ports/www/wwwoffle/Makefile,v 1.10 2000/07/10 22:35:32 ben Exp $
-# $KAME: Makefile,v 1.8 2000/11/20 17:46:12 sumikawa Exp $
+# $KAME: Makefile,v 1.9 2000/11/20 17:48:49 sumikawa Exp $
 #
 
 PORTNAME=	wwwoffle
 PORTVERSION= 	2.6
-CATEGORIES=	www
+CATEGORIES=	www ipv6
 MASTER_SITES=	ftp://ftp.demon.co.uk/pub/unix/httpd/ \
 		${MASTER_SITE_SUNSITE}
 MASTER_SITE_SUBDIR=	apps/www/servers
