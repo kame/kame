@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1480 2001/01/15 15:47:03 itojun Exp $
+$KAME: CHANGELOG,v 1.1481 2001/01/16 01:44:47 jinmei Exp $
 
 <200101>
+2001-01-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dtcp/dtcps.rb (tunnelcleanup): deleted the pair of
+	physical addresses by "gifconfig delete" after the session. This
+	would prevent a garbage pair.
+
 Tue Jan 16 00:43:19 JST 2001  itojun@iijab.net
 	* sys/netinet6/mld6.c: emit MLD6 packet correctly (MTU setting was
 	  wrong and the packet did not go out of the node).  the bug was
