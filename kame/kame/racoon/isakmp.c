@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.149 2001/07/29 13:42:31 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.150 2001/07/31 07:08:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -699,14 +699,6 @@ quick_main(iph2, msg)
 	if (iph2->status == PHASE2ST_ESTABLISHED
 	 || iph2->status == PHASE2ST_GETSPISENT)
 		return 0;
-
-	/* don't process it because there is no suitable phase1-sa. */
-	if (iph2->ph1->status == PHASE2ST_EXPIRED) {
-		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
-			"the negotiation is stopped, "
-			"because there is no suitable ISAKMP-SA.\n");
-		return -1;
-	}
 
 	/* add the message to received-list before processing it */
 	if (add_recvedpkt(msg, &iph2->rlist)) {
@@ -1582,9 +1574,15 @@ isakmp_ph1expire(iph1)
 
 	iph1->status = PHASE1ST_EXPIRED;
 
-	iph1->sce = sched_new(1, isakmp_ph1delete_stub, iph1);
+	/*
+	 * the phase1 deletion is postponed until there is no phase2.
+	 */
+	if (LIST_FIRST(&iph1->ph2tree) != NULL) {
+		iph1->sce = sched_new(1, isakmp_ph1expire_stub, iph1);
+		return;
+	}
 
-	return;
+	iph1->sce = sched_new(1, isakmp_ph1delete_stub, iph1);
 }
 
 /* called from scheduler */
