@@ -722,11 +722,17 @@ client6_recvreply(s, serv)
 		/* NOTREACHED */
 	}
 
-	if (len < sizeof(*dh6r))
+	if (len < sizeof(*dh6r)) {
+		dprintf((stderr, "client6_recvreply: short packet (len=%d)\n",
+			 len));
 		return(-1);
+	}
 	dh6r = (struct dhcp6_reply *)rbuf;
-	if (dh6r->dh6rep_msgtype != DH6_REPLY)
+	if (dh6r->dh6rep_msgtype != DH6_REPLY) {
+		dprintf((stderr, "client6_recvreply: bad message type(%d)\n",
+			 dh6r->dh6rep_msgtype));
 		return(-1);
+	}
 
 	/* 11.2. Reply Message Validation */
 
