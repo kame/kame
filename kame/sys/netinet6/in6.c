@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.197 2001/07/18 08:37:23 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.198 2001/07/18 09:12:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1977,11 +1977,8 @@ in6_purgemkludge(ifp)
 			continue;
 
 		/* leave from all multicast groups joined */
-		while ((in6m = LIST_FIRST(&mk->mk_head)) != NULL) {
-			printf("in6_purgemkludge: %s\n",
-			       ip6_sprintf(&in6m->in6m_addr));
+		while ((in6m = LIST_FIRST(&mk->mk_head)) != NULL)
 			in6_delmulti(in6m);
-		}
 		LIST_REMOVE(mk, mk_entry);
 		free(mk, M_IPMADDR);
 		break;
