@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2011 2001/12/18 02:26:58 jinmei Exp $
+$KAME: CHANGELOG,v 1.2012 2001/12/18 04:07:26 jinmei Exp $
 
 <200112>
+2001-12-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/{kame,sys}/(many files): replaced mld6_xxx and MLD6_XXX
+	with mld_xxx and MLD_XXX according to the change below.
+
 2001-12-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet/icmp6.h: revised MLD-related definitions:
 	- used mld_xxx and MLD_xxx instead of mld6_xxx and MLD6_xxx
