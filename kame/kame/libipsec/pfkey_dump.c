@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.35 2001/11/13 12:38:47 jinmei Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.36 2002/05/13 05:30:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -446,15 +446,15 @@ pfkey_spdump(m)
 
 	/* lifetime */
 	if (m_lftc) {
-		printf("\tcreated:%s ",
+		printf("\tcreated: %s  ",
 			str_time(m_lftc->sadb_lifetime_addtime));
-		printf("lastused:%s\n",
+		printf("lastused: %s\n",
 			str_time(m_lftc->sadb_lifetime_usetime));
 	}
 	if (m_lfth) {
-		printf("\tlifetime:%lu(s) ",
+		printf("\tlifetime: %lu(s) ",
 			(u_long)m_lfth->sadb_lifetime_addtime);
-		printf("validtime:%lu(s)\n",
+		printf("validtime: %lu(s)\n",
 			(u_long)m_lfth->sadb_lifetime_usetime);
 	}
 
