@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1581 2001/03/02 07:12:46 itojun Exp $
+$KAME: CHANGELOG,v 1.1582 2001/03/02 11:06:47 sumikawa Exp $
 
 <200103>
+Fri Mar  2 20:05:23 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* netbsd/usr.bin/tftp/main.c: port checking fix.
+	  from h-yamamo@db3.so-net.ne.jp.
+
 Fri Mar  2 16:11:17 JST 2001  itojun@iijlab.net
 	* sys/crypto/{twofish,rijndael}: change key initialization API to
 	  pass binary keys instead of hexadecimal string keys.
