@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet6.c,v 1.6 2000/05/17 11:54:50 itojun Exp $	*/
+/*	$OpenBSD: inet6.c,v 1.11 2000/08/26 03:01:50 itojun Exp $	*/
 /*	BSDI inet.c,v 2.3 1995/10/24 02:19:29 prb Exp	*/
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$OpenBSD: inet6.c,v 1.6 2000/05/17 11:54:50 itojun Exp $");*/
+/*__RCSID("$OpenBSD: inet6.c,v 1.11 2000/08/26 03:01:50 itojun Exp $");*/
 /*__RCSID("KAME Id: inet6.c,v 1.10 2000/02/09 10:49:31 itojun Exp");*/
 #endif
 #endif /* not lint */
@@ -172,7 +172,7 @@ static	char *ip6nh[] = {
 	"#86",
 	"#87",
 	"#88",
-	"#89",	
+	"OSPF",	
 	"#80",
 	"#91",
 	"#92",
@@ -395,8 +395,8 @@ ip6_stats(off, name)
 			printf("\t\t%s: %qu\n", ip6nh[i],
 			       ip6stat.ip6s_nxthist[i]);
 		}
-	printf("\tMbuf statics:\n");
-	printf("\t\t%qu one mbuf\n", ip6stat.ip6s_m1);
+	printf("\tMbuf statistics:\n");
+	p(ip6s_m1, "\t\t%qu one mbuf%s\n");
 	for (first = 1, i = 0; i < 32; i++) {
 		char ifbuf[IFNAMSIZ];
 		if (ip6stat.ip6s_m2m[i] != 0) {		
@@ -409,43 +409,11 @@ ip6_stats(off, name)
 			       ip6stat.ip6s_m2m[i]);
 		}
 	}
-	printf("\t\t%qu one ext mbuf\n", ip6stat.ip6s_mext1);
-	printf("\t\t%qu two or more ext mbuf\n", ip6stat.ip6s_mext2m);	
+	p(ip6s_mext1, "\t\t%qu one ext mbuf%s\n");
+	p(ip6s_mext2m, "\t\t%qu two or more ext mbuf%s\n");
 	p(ip6s_exthdrtoolong, "\t%qu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%qu tunneling packet%s that can't find gif\n");
-	p(ip6s_toomanyhdr, "\t%qu packet%s discarded due to too may headers\n");
-
-	if (ip6stat.ip6s_exthdrget || ip6stat.ip6s_exthdrget0) {
-		p(ip6s_exthdrget, "\t%qu use%s of IP6_EXTHDR_GET\n");
-		p(ip6s_exthdrget0, "\t%qu use%s of IP6_EXTHDR_GET0\n");
-		p(ip6s_pulldown, "\t%qu call%s to m_pulldown\n");
-		p(ip6s_pulldown_alloc,
-		    "\t%qu mbuf allocation%s in m_pulldown\n");
-		if (ip6stat.ip6s_pulldown_copy != 1) {
-			p1(ip6s_pulldown_copy,
-			    "\t%qu mbuf copies in m_pulldown\n");
-		} else {
-			p1(ip6s_pulldown_copy,
-			    "\t%qu mbuf copy in m_pulldown\n");
-		}
-		p(ip6s_pullup, "\t%qu call%s to m_pullup\n");
-		p(ip6s_pullup_alloc, "\t%qu mbuf allocation%s in m_pullup\n");
-		if (ip6stat.ip6s_pullup_copy != 1) {
-			p1(ip6s_pullup_copy, "\t%qu mbuf copies in m_pullup\n");
-		} else {
-			p1(ip6s_pullup_copy, "\t%qu mbuf copy in m_pullup\n");
-		}
-		p(ip6s_pullup_fail, "\t%qu failure%s in m_pullup\n");
-		p(ip6s_pullup2, "\t%qu call%s to m_pullup2\n");
-		p(ip6s_pullup2_alloc, "\t%qu mbuf allocation%s in m_pullup2\n");
-		if (ip6stat.ip6s_pullup2_copy != 1) {
-			p1(ip6s_pullup2_copy,
-			    "\t%qu mbuf copies in m_pullup2\n");
-		} else {
-			p1(ip6s_pullup2_copy, "\t%qu mbuf copy in m_pullup2\n");
-		}
-		p(ip6s_pullup2_fail, "\t%qu failure%s in m_pullup2\n");
-	}
+	p(ip6s_toomanyhdr, "\t%qu packet%s discarded due to too many headers\n");
 
 	/* for debugging source address selection */
 #define PRINT_SCOPESTAT(s,i) do {\
@@ -515,6 +483,9 @@ ip6_stats(off, name)
 			PRINT_SCOPESTAT(ip6s_sources_deprecated[i], i);
 		}
 	}
+
+	p1(ip6s_forward_cachehit, "\t%llu forward cache hit\n");
+	p1(ip6s_forward_cachemiss, "\t%llu forward cache miss\n");
 #undef p
 #undef p1
 }
@@ -852,10 +823,14 @@ icmp6_stats(off, name)
 
 #define	p(f, m) if (icmp6stat.f || sflag <= 1) \
     printf(m, icmp6stat.f, plural(icmp6stat.f))
+#define p_5(f, m) if (icmp6stat.f || sflag <= 1) \
+    printf(m, icmp6stat.f)
 
 	p(icp6s_error, "\t%qu call%s to icmp6_error\n");
 	p(icp6s_canterror,
 	    "\t%qu error%s not generated because old message was icmp6 or so\n");
+	p(icp6s_toofreq,
+	    "\t%qu error%s not generated because rate limitation\n");
 	for (first = 1, i = 0; i < 256; i++)
 		if (icmp6stat.icp6s_outhist[i] != 0) {
 			if (first) {
@@ -878,7 +853,24 @@ icmp6_stats(off, name)
 			printf("\t\t%s: %qu\n", icmp6names[i],
 				icmp6stat.icp6s_inhist[i]);
 		}
+	printf("\tHistogram of error messages to be generated:\n");
+	p_5(icp6s_odst_unreach_noroute, "\t\t%qu no route\n");
+	p_5(icp6s_odst_unreach_admin, "\t\t%qu administratively prohibited\n");
+	p_5(icp6s_odst_unreach_beyondscope, "\t\t%qu beyond scope\n");
+	p_5(icp6s_odst_unreach_addr, "\t\t%qu address unreachable\n");
+	p_5(icp6s_odst_unreach_noport, "\t\t%qu port unreachable\n");
+	p_5(icp6s_opacket_too_big, "\t\t%qu packet too big\n");
+	p_5(icp6s_otime_exceed_transit, "\t\t%qu time exceed transit\n");
+	p_5(icp6s_otime_exceed_reassembly, "\t\t%qu time exceed reassembly\n");
+	p_5(icp6s_oparamprob_header, "\t\t%qu erroneous header field\n");
+	p_5(icp6s_oparamprob_nextheader, "\t\t%qu unrecognized next header\n");
+	p_5(icp6s_oparamprob_option, "\t\t%qu unrecognized option\n");
+	p_5(icp6s_oredirect, "\t\t%qu redirect\n");
+	p_5(icp6s_ounknown, "\t\t%qu unknown\n");
+
 	p(icp6s_reflect, "\t%qu message response%s generated\n");
+	p(icp6s_nd_toomanyopt, "\t%qu message%s with too many ND options\n");
+#undef p_5
 #undef p
 }
 

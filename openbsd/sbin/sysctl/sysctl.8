@@ -1,4 +1,4 @@
-.\"	$OpenBSD: sysctl.8,v 1.45 2000/04/25 22:12:53 deraadt Exp $
+.\"	$OpenBSD: sysctl.8,v 1.56 2000/10/14 01:06:44 itojun Exp $
 .\"	$NetBSD: sysctl.8,v 1.4 1995/09/30 07:12:49 thorpej Exp $
 .\"
 .\" Copyright (c) 1993
@@ -101,7 +101,7 @@ For a detailed description of these variable see
 .Xr sysctl 3 .
 The changeable column indicates whether a process with appropriate
 privilege can change the value.
-.Bl -column net.inet.ip.forwardingxxxxxx integerxxx
+.Bl -column net.inet.ip.ipsec-expire-acquirexxxx integerxxx
 .It Sy Name	Type	Changeable
 .It kern.ostype	string	no
 .It kern.osrelease	string	no
@@ -144,7 +144,9 @@ privilege can change the value.
 .It kern.arandom	u_int	no
 .It vm.loadavg	struct	no
 .It vm.psstrings	struct	no
-.It vm.swapencrypt	integer	yes
+.It vm.swapencrypt.enable	integer	yes
+.It vm.swapencrypt.keyscreated	integer	no
+.It vm.swapencrypt.keysdeleted	integer	no
 .It fs.posix.setuid	integer	yes
 .It net.inet.ip.forwarding	integer	yes
 .It net.inet.ip.redirect	integer	yes
@@ -158,7 +160,6 @@ privilege can change the value.
 .It net.inet.ip.porthilast	integer	yes
 .It net.inet.ip.maxqueue	integer	yes
 .It net.inet.ip.encdebug	integer	yes
-.It net.inet.ip.ipsec-acl	integer	yes
 .It net.inet.ip.ipsec-pfs	integer	yes
 .It net.inet.ip.ipsec-soft-allocs	integer	yes
 .It net.inet.ip.ipsec-allocs	integer	yes
@@ -170,9 +171,13 @@ privilege can change the value.
 .It net.inet.ip.ipsec-firstuse	integer	yes
 .It net.inet.ip.ipsec-enc-alg	string	yes
 .It net.inet.ip.ipsec-auth-alg	string	yes
+.It net.inet.ip.ipsec-expire-acquire	integer	yes
 .It net.inet.ip.ipsec-invalid-life	integer	yes
+.It net.inet.ip.mtudisc	integer	yes
+.It net.inet.ip.mtudisctimeout	integer	yes
 .It net.inet.icmp.maskrepl	integer	yes
 .It net.inet.icmp.bmcastecho	integer	yes
+.It net.inet.icmp.errppslimit	integer	yes
 .It net.inet.ipip.allow	integer	yes
 .It net.inet.etherip.allow	integer	yes
 .It net.inet.tcp.rfc1323	integer	yes
@@ -181,15 +186,19 @@ privilege can change the value.
 .It net.inet.tcp.keepintvl	integer	yes
 .It net.inet.tcp.slowhz	integer	no
 .It net.inet.tcp.baddynamic	array	yes
+.It net.inet.tcp.recvspace	integer	yes
+.It net.inet.tcp.sendspace	integer	yes
 .It net.inet.tcp.sack	integer	yes
 .It net.inet.tcp.mssdflt	integer	yes
+.It net.inet.tcp.rstppslimit	integer	yes
 .It net.inet.udp.checksum	integer	yes
 .It net.inet.udp.baddynamic	array	yes
+.It net.inet.udp.recvspace	integer	yes
+.It net.inet.udp.sendspace	integer	yes
 .It net.inet.esp.enable	integer	yes
 .It net.inet.ah.enable	integer	yes
 .It net.inet.gre.allow	integer	yes
 .It net.inet.mobileip.allow	integer	yes
-.It net.inet6.ipip.allow	integer	yes
 .It net.inet6.ip6.forwarding	integer	yes
 .It net.inet6.ip6.redirect	integer	yes
 .It net.inet6.ip6.hlim	integer	yes
@@ -201,20 +210,19 @@ privilege can change the value.
 .It net.inet6.ip6.dad_count	integer	yes
 .It net.inet6.ip6.auto_flowlabel	integer	yes
 .It net.inet6.ip6.defmcasthlim	integer	yes
-.It net.inet6.ip6.gifhlim	integer	yes
 .It net.inet6.ip6.kame_version	string	no
 .It net.inet6.ip6.use_deprecated	integer	yes
 .It net.inet6.ip6.rr_prune	integer	yes
 .It net.inet6.icmp6.rediraccept	integer	yes
 .It net.inet6.icmp6.redirtimeout	integer	yes
-.It net.inet6.icmp6.errratelimit	integer	yes
 .It net.inet6.icmp6.nd6_prune	integer	yes
 .It net.inet6.icmp6.nd6_delay	integer	yes
 .It net.inet6.icmp6.nd6_umaxtries	integer	yes
 .It net.inet6.icmp6.nd6_mmaxtries	integer	yes
 .It net.inet6.icmp6.nd6_useloopback	integer	yes
-.It net.inet6.icmp6.nd6_proxyall	integer	yes
 .It net.inet6.icmp6.nodeinfo	integer	yes
+.It net.inet6.icmp6.errppslimit	integer	yes
+.It net.inet6.icmp6.nd6_maxnudhint	integer	yes
 .It net.ipx.ipx.checksum	integer	yes
 .It net.ipx.ipx.forwarding	integer	yes
 .It net.ipx.ipx.netbios	integer	yes
@@ -238,6 +246,8 @@ privilege can change the value.
 .It machdep.apmwarn	integer	yes (i386 only)
 .It machdep.kbdreset	integer	yes (i386 only)
 .It machdep.allowaperture	integer	yes (i386 only, XFree86)
+.It machdep.led_blink	integer	yes (sparc only)
+.It machdep.vsyncblank	integer	yes (sparc only)
 .It user.cs_path	string	no
 .It user.bc_base_max	integer	no
 .It user.bc_dim_max	integer	no
@@ -264,6 +274,12 @@ privilege can change the value.
 .It ddb.tab_stop_width	integer	yes
 .It ddb.panic	integer	yes
 .It ddb.console	integer	yes
+.It vfs.mounts.*	struct	no
+.It vfs.ffs.doasyncfree	integer	yes
+.It vfs.ffs.doclusterread	integer	yes
+.It vfs.ffs.doclusterwrite	integer	yes
+.It vfs.ffs.doreallocblks	integer	yes
+.It vfs.nfs.iothreads	integer	yes
 .El
 .Pp
 The
@@ -280,7 +296,7 @@ can extract information about the filesystems that have been compiled
 into the running system.
 This information can be obtained by using the command:
 .Bd -literal -offset indent
-sysctl vfs
+sysctl vfs.mounts
 .Ed
 By default, only filesystems that are actively being used are listed.
 Use of the
@@ -331,8 +347,23 @@ It is also possible to add or remove ports from the current list.
 sysctl -w net.inet.tcp.baddynamic=+748
 sysctl -w net.inet.tcp.baddynamic=-871
 .Ed
+.Pp
+To adjust the number of kernel
+.Nm nfsio
+threads used to service asynchronous
+I/O requests on an NFS client machine use
+.Bd -literal -offset indent -compact
+sysctl -w vfs.nfs.iothreads=4
+.Ed
+.Pp
+The number of 4 is the default, where the 20 is the maximum.
+See
+.Xr nfssvc 2
+and
+.Xr nfsd 8
+for futher discussion.
 .Sh FILES
-.Bl -tag -width <netinet/icmpXvar.h> -compact
+.Bl -tag -width <ufs/ffs/ffs_extern.h> -compact
 .It Pa <sys/sysctl.h>
 definitions for top level identifiers, second level kernel and hardware
 identifiers, and user level identifiers
@@ -346,11 +377,15 @@ definitions for second level network identifiers
 definitions for third level profiling identifiers
 .It Pa <vm/vm_param.h>
 definitions for second level virtual memory identifiers
+.It Pa <uvm/uvm_swap_encrypt.h>
+definitions for third level virtual memory identifiers
 .It Pa <netinet/in.h>
-definitions for third level Internet identifiers and
-fourth level IP identifiers
+definitions for third level IPv4/v6 identifiers and
+fourth level IPv4/v6 identifiers
 .It Pa <netinet/icmp_var.h>
 definitions for fourth level ICMP identifiers
+.It Pa <netinet6/icmp6.h>
+definitions for fourth level ICMPv6 identifiers
 .It Pa <netinet/tcp_var.h>
 definitions for fourth level TCP identifiers
 .It Pa <netinet/udp_var.h>
@@ -360,9 +395,16 @@ definitions for third level IPX identifiers and
 fourth level IPX identifiers
 .It Pa <ddb/db_var.h>
 definitions for second level ddb identifiers
+.It Pa <sys/mount.h>
+definitions for second level vfs identifiers
+.It Pa <nfs/nfs.h>
+definitions for third level NFS identifiers
+.It Pa <ufs/ffs/ffs_extern.h>
+definitions for third level FFS identifiers
 .El
 .Sh SEE ALSO
-.Xr sysctl 3
+.Xr sysctl 3 ,
+.Xr sysctl.conf 5
 .Sh HISTORY
 .Nm sysctl
 first appeared in
