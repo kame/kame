@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.21 2002/01/21 07:49:28 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.22 2002/01/21 11:37:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -188,6 +188,7 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 struct mip6_config {
 	u_int8_t mcfg_type;
 	u_int8_t mcfg_use_ipsec;
+	u_int8_t mcfg_use_authdata;
 	u_int8_t mcfg_debug;
 };
 #define MIP6_CONFIG_TYPE_MN 1

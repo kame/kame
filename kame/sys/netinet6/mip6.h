@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.45 2002/01/21 07:49:28 k-sugyou Exp $	*/
+/*	$KAME: mip6.h,v 1.46 2002/01/21 11:37:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -31,8 +31,16 @@
 #ifndef _MIP6_H_
 #define _MIP6_H_
 
-#define SIOCENABLEMN _IOW('m', 120, int)
-#define SIOCENABLEHA _IOW('m', 121, int)
+#define SIOCSMIP6CFG _IOW('m', 120, int)
+#define SIOCSMIP6CFG_ENABLEMN        0
+#define SIOCSMIP6CFG_DISABLEMN       1
+#define SIOCSMIP6CFG_ENABLEHA        2
+#define SIOCSMIP6CFG_ENABLEIPSEC     3
+#define SIOCSMIP6CFG_DISABLEIPSEC    4
+#define SIOCSMIP6CFG_ENABLEAUTHDATA  5
+#define SIOCSMIP6CFG_DISABLEAUTHDATA 6
+#define SIOCSMIP6CFG_ENABLEDEBUG     128
+#define SIOCSMIP6CFG_DISABLEDEBUG    129
 #define SIOCGBC      _IOWR('m', 122, struct mip6_req)
 #define SIOCSUNUSEHA _IOW('m', 123, struct mip6_req)
 #define SIOCGUNUSEHA _IOWR('m', 124, struct mip6_req)

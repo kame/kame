@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.105 2002/01/21 07:49:27 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.106 2002/01/21 11:37:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -99,6 +99,9 @@
 #ifndef MIP6_CONFIG_USE_IPSEC
 #define MIP6_CONFIG_USE_IPSEC 1
 #endif /* !MIP6_CONFIG_USE_IPSEC */
+#ifndef MIP6_CONFIG_USE_AUTHDATA
+#define MIP6_CONFIG_USE_AUTHDATA 1
+#endif /* !MIP6CONFIG_USE_AUTHDATA */
 
 extern struct mip6_subnet_list mip6_subnet_list;
 extern struct mip6_prefix_list mip6_prefix_list;
@@ -168,8 +171,9 @@ mip6_init()
 {
 	bzero(&mip6_config, sizeof(mip6_config));
 	mip6_config.mcfg_type = 0;
-	mip6_config.mcfg_debug = MIP6_CONFIG_DEBUG;
 	mip6_config.mcfg_use_ipsec = MIP6_CONFIG_USE_IPSEC;
+	mip6_config.mcfg_use_authdata = MIP6_CONFIG_USE_AUTHDATA;
+	mip6_config.mcfg_debug = MIP6_CONFIG_DEBUG;
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
         callout_init(&mip6_pfx_ch);
@@ -1160,6 +1164,8 @@ mip6_ioctl(cmd, data)
 	u_long cmd;
 	caddr_t data;
 {
+	int subcmd;
+	struct hif_softc *sc;
 	struct mip6_req *mr = (struct mip6_req *)data;
 	int s;
 
@@ -1170,18 +1176,17 @@ mip6_ioctl(cmd, data)
 #endif
 
 	switch (cmd) {
-	case SIOCENABLEMN:
-	{
-		int on;
-		struct hif_softc *sc;
-
-		on = *(int *)data;
-		if (on == 1) {
+	case SIOCSMIP6CFG:
+		subcmd = *(int *)data;
+		switch (subcmd) {
+		case SIOCSMIP6CFG_ENABLEMN:
 			mip6log((LOG_INFO,
 				 "%s:%d: MN function enabled\n",
 				 __FILE__, __LINE__));
 			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_MN;
-		} else {
+			break;
+
+		case SIOCSMIP6CFG_DISABLEMN:
 			mip6log((LOG_INFO,
 				 "%s:%d: MN function disabled\n",
 				 __FILE__, __LINE__));
@@ -1193,15 +1198,61 @@ mip6_ioctl(cmd, data)
 			}
 			hif_coa = in6addr_any;
 			mip6_config.mcfg_type = 0;
-		}
-	}
-		break;
+			break;
 
-	case SIOCENABLEHA:
-		mip6log((LOG_INFO,
-			 "%s:%d: HA function enabled\n",
-			 __FILE__, __LINE__));
-		mip6_config.mcfg_type = MIP6_CONFIG_TYPE_HA;
+		case SIOCSMIP6CFG_ENABLEHA:
+			mip6log((LOG_INFO,
+				 "%s:%d: HA function enabled\n",
+				 __FILE__, __LINE__));
+			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_HA;
+			break;
+
+		case SIOCSMIP6CFG_ENABLEIPSEC:
+			mip6log((LOG_INFO,
+				 "%s:%d: IPsec protection enabled\n",
+				 __FILE__, __LINE__));
+			mip6_config.mcfg_use_ipsec = 1;
+			break;
+			
+		case SIOCSMIP6CFG_DISABLEIPSEC:
+			mip6log((LOG_INFO,
+				 "%s:%d: IPsec protection disabled\n",
+				 __FILE__, __LINE__));
+			mip6_config.mcfg_use_ipsec = 0;
+			break;
+			
+		case SIOCSMIP6CFG_ENABLEAUTHDATA:
+			mip6log((LOG_INFO,
+				 "%s:%d: Authdata protection enabled\n",
+				 __FILE__, __LINE__));
+			mip6_config.mcfg_use_authdata = 1;
+			break;
+			
+		case SIOCSMIP6CFG_DISABLEAUTHDATA:
+			mip6log((LOG_INFO,
+				 "%s:%d: Authdata protection disabled\n",
+				 __FILE__, __LINE__));
+			mip6_config.mcfg_use_authdata = 0;
+			break;
+
+		case SIOCSMIP6CFG_ENABLEDEBUG:
+			mip6log((LOG_INFO,
+				 "%s:%d: debug message enabled\n",
+				 __FILE__, __LINE__));
+			mip6_config.mcfg_debug = 1;
+			break;
+			
+		case SIOCSMIP6CFG_DISABLEDEBUG:
+			mip6log((LOG_INFO,
+				 "%s:%d: debug message disabled\n",
+				 __FILE__, __LINE__));
+			mip6_config.mcfg_debug = 0;
+			break;
+
+		default:
+			splx(s);
+			return (EINVAL);
+		}
 		break;
 
 	case SIOCGBC:
@@ -1676,7 +1727,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 			sav = isr->sav;
 		}
 	}
-	if (sav == NULL && mip6_config.mcfg_use_ipsec != 0)
+	if (sav == NULL && mip6_config.mcfg_use_authdata != 0)
 	{
 		/* no security association. */
 		mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT; /* XXX */
@@ -1774,46 +1825,46 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
-if (sav != NULL) {	/* XXX */
-	/*
-	 * create and insert an authentication data sub-option.
-	 */
-	authdata = mip6_authdata_create(sav);
-	if (authdata == NULL) {
-		free(optbuf.buf, M_IP6OPT);
-		mip6log((LOG_ERR,
-			 "%s:%d: authdata create failed.\n",
-			 __FILE__, __LINE__));
-		error = ENOMEM;
-		goto freesp;
-	}
-	authdata_pos = (struct mip6_subopt_authdata *)
-		mip6_add_subopt2dh((u_int8_t *)authdata,
-				   (u_int8_t *)bu_opt_pos, &optbuf);
-	free(authdata, M_TEMP);
-	if (authdata_pos == NULL) {
-		free(optbuf.buf, M_IP6OPT);
-		mip6log((LOG_ERR,
-			 "%s:%d: authdata create failed.\n",
-			 __FILE__, __LINE__));
-		error = ENOMEM;
-		goto freesp;
-	}
+	if (mip6_config.mcfg_use_authdata != 0) {
+		/*
+		 * create and insert an authentication data sub-option.
+		 */
+		authdata = mip6_authdata_create(sav);
+		if (authdata == NULL) {
+			free(optbuf.buf, M_IP6OPT);
+			mip6log((LOG_ERR,
+				 "%s:%d: authdata create failed.\n",
+				 __FILE__, __LINE__));
+			error = ENOMEM;
+			goto freesp;
+		}
+		authdata_pos = (struct mip6_subopt_authdata *)
+			mip6_add_subopt2dh((u_int8_t *)authdata,
+					   (u_int8_t *)bu_opt_pos, &optbuf);
+		free(authdata, M_TEMP);
+		if (authdata_pos == NULL) {
+			free(optbuf.buf, M_IP6OPT);
+			mip6log((LOG_ERR,
+				 "%s:%d: authdata create failed.\n",
+				 __FILE__, __LINE__));
+			error = ENOMEM;
+			goto freesp;
+		}
 
-	/* calc checksum. */
-	error = mip6_bu_authdata_calc(sav, src, dst, &mbu->mbu_coa,
-				      bu_opt_pos,
-				      authdata_pos,
-				      (caddr_t)(authdata_pos + 1));
-	if (error) {
-		free(optbuf.buf, M_IP6OPT);
-		mip6log((LOG_ERR,
-			 "%s:%d: authdata create failed.\n",
-			 __FILE__, __LINE__));
-		error = ENOMEM;
-		goto freesp;
+		/* calc checksum. */
+		error = mip6_bu_authdata_calc(sav, src, dst, &mbu->mbu_coa,
+					      bu_opt_pos,
+					      authdata_pos,
+					      (caddr_t)(authdata_pos + 1));
+		if (error) {
+			free(optbuf.buf, M_IP6OPT);
+			mip6log((LOG_ERR,
+				 "%s:%d: authdata create failed.\n",
+				 __FILE__, __LINE__));
+			error = ENOMEM;
+			goto freesp;
+		}
 	}
-}
 #endif /* !MIP6_DRAFT13 */
 #endif /* IPSEC && !__OpenBSD__ */
 	
@@ -2012,7 +2063,7 @@ mip6_ba_destopt_create(pktopt_badest2, src, dst,
 			sav = isr->sav;
 		}
 	}
-	if (sav == NULL && mip6_config.mcfg_use_ipsec != 0)
+	if (sav == NULL && mip6_config.mcfg_use_authdata != 0)
 	{
 		/* no security association. */
 		error = EACCES;
@@ -2049,45 +2100,46 @@ mip6_ba_destopt_create(pktopt_badest2, src, dst,
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
-if (sav != NULL) {	/* XXX */
-	/*
-	 * create and insert an authentication data sub-option.
-	 */
-	authdata = mip6_authdata_create(sav);
-	if (authdata == NULL) {
-		free(optbuf.buf, M_IP6OPT);
-		mip6log((LOG_ERR,
-			 "%s:%d: authdata create failed.\n",
-			 __FILE__, __LINE__));
-		error = ENOMEM;
-		goto freesp;
-	}
-	authdata_pos = (struct mip6_subopt_authdata *)
-		mip6_add_subopt2dh((u_int8_t *)authdata,
-				   (u_int8_t *)ba_opt_pos, &optbuf);
-	free(authdata, M_TEMP);
-	if (authdata_pos == NULL) {
-		free(optbuf.buf, M_IP6OPT);
-		mip6log((LOG_ERR,
-			 "%s:%d: authdata create failed.\n",
-			 __FILE__, __LINE__));
-		error = ENOMEM;
-		goto freesp;
-	}
+	if (mip6_config.mcfg_use_authdata != 0) {
+		/*
+		 * create and insert an authentication data
+		 * sub-option.
+		 */
+		authdata = mip6_authdata_create(sav);
+		if (authdata == NULL) {
+			free(optbuf.buf, M_IP6OPT);
+			mip6log((LOG_ERR,
+				 "%s:%d: authdata create failed.\n",
+				 __FILE__, __LINE__));
+			error = ENOMEM;
+			goto freesp;
+		}
+		authdata_pos = (struct mip6_subopt_authdata *)
+			mip6_add_subopt2dh((u_int8_t *)authdata,
+					   (u_int8_t *)ba_opt_pos, &optbuf);
+		free(authdata, M_TEMP);
+		if (authdata_pos == NULL) {
+			free(optbuf.buf, M_IP6OPT);
+			mip6log((LOG_ERR,
+				 "%s:%d: authdata create failed.\n",
+				 __FILE__, __LINE__));
+			error = ENOMEM;
+			goto freesp;
+		}
 
-	/* calc checksum. */
-	error = mip6_ba_authdata_calc(sav, src, dst,
-				      ba_opt_pos,
-				      authdata_pos,
-				      (caddr_t)(authdata_pos + 1));
-	if (error) {
-		free(optbuf.buf, M_IP6OPT);
-		mip6log((LOG_ERR,
-			 "%s:%d: authdata calculation failed.\n",
-			 __FILE__, __LINE__));
-		goto freesp;
+		/* calc checksum. */
+		error = mip6_ba_authdata_calc(sav, src, dst,
+					      ba_opt_pos,
+					      authdata_pos,
+					      (caddr_t)(authdata_pos + 1));
+		if (error) {
+			free(optbuf.buf, M_IP6OPT);
+			mip6log((LOG_ERR,
+				 "%s:%d: authdata calculation failed.\n",
+				 __FILE__, __LINE__));
+			goto freesp;
+		}
 	}
-}
 #endif /* !MIP6_DRAFT13 */
 #endif /* IPSEC && !__OpenBSD__ */
 

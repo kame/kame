@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.66 2002/01/21 10:41:40 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.67 2002/01/21 11:37:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -926,7 +926,7 @@ mip6_validate_bu(m, opt)
 	 * if the packet is protected by the ipsec, we believe it.
 	 * otherwise, check the authentication data sub-option.
 	 */
-	if (ipsec_protected == 0) {
+	if ((ipsec_protected == 0) && (mip6_config.mcfg_use_authdata != 0)) {
 		if (authdata == NULL) {
 			/*
 			 * if the packet is not protected by the ipsec
@@ -2291,7 +2291,7 @@ mip6_validate_ba(m, opt)
 	 * if the packet is protected by the ipsec, we believe it.
 	 * otherwise, check the authentication sub-option.
 	 */
-	if (ipsec_protected == 0) {
+	if ((ipsec_protected == 0) && (mip6_config.mcfg_use_authdata != 0)) {
 		if (authdata == NULL) {
 			/*
 			 * if the packet is not protected by the ipsec

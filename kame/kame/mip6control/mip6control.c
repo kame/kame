@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.17 2002/01/21 07:49:27 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.18 2002/01/21 11:37:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,8 +141,14 @@ main(argc, argv)
 	char kvm_err[_POSIX2_LINE_MAX];
 	int unuseha_s = 0, unuseha_d = 0, unuseha_g = 0;
 	char *uharg = NULL;
+	int debug = 0;
+	char *debugarg = NULL;
+	int ipsec = 0;
+	char *ipsecarg = NULL;
+	int authdata = 0;
+	char *authdataarg = NULL;
 
-	while ((ch = getopt(argc, argv, "mMngli:H:hP:A:L:abcu:v:w")) != -1) {
+	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcu:v:wD:S:T:")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
@@ -201,6 +207,18 @@ main(argc, argv)
 		case 'w':
 			unuseha_g = 1;
 			break;
+		case 'D':
+			debug = 1;
+			debugarg = optarg;
+			break;
+		case 'S':
+			ipsec = 1;
+			ipsecarg = optarg;
+			break;
+		case 'T':
+			authdata = 1;
+			authdataarg = optarg;
+			break;
 		}
 	}
 
@@ -219,24 +237,24 @@ main(argc, argv)
 	}
 
 	if (enablemn) {
-		int enable = 1;
-		if(ioctl(s, SIOCENABLEMN, (caddr_t)&enable) == -1) {
+		int subcmd = SIOCSMIP6CFG_ENABLEMN;
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
 			perror("ioctl");
 			exit(1);
 		}
 	}
 
 	if (disablemn) {
-		int enable = 0;
-		if(ioctl(s, SIOCENABLEMN, (caddr_t)&enable) == -1) {
+		int subcmd = SIOCSMIP6CFG_DISABLEMN;
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
 			perror("ioctl");
 			exit(1);
 		}
 	}
 
 	if (enableha) {
-		int enable = 1;
-		if(ioctl(s, SIOCENABLEHA, (caddr_t)&enable) == -1) {
+		int subcmd = SIOCSMIP6CFG_ENABLEHA;
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
 			perror("ioctl");
 			exit(1);
 		}
@@ -487,6 +505,60 @@ main(argc, argv)
 			if (uh->unuse_port)
 				printf("#%d", ntohs(uh->unuse_port));
 			printf("\n");
+		}
+	}
+
+	if (debug && debugarg) {
+		int arg = atoi(debugarg);
+		int subcmd = 0;
+
+		switch (arg) {
+		case 0:
+			subcmd = SIOCSMIP6CFG_DISABLEDEBUG;
+			break;
+		default:
+			subcmd = SIOCSMIP6CFG_ENABLEDEBUG;
+			break;
+		}
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
+			perror("ioctl");
+			exit(1);
+		}
+	}
+	
+	if (ipsec && ipsecarg) {
+		int arg = atoi(ipsecarg);
+		int subcmd = 0;
+
+		switch (arg) {
+		case 0:
+			subcmd = SIOCSMIP6CFG_DISABLEIPSEC;
+			break;
+		default:
+			subcmd = SIOCSMIP6CFG_ENABLEIPSEC;
+			break;
+		}
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
+			perror("ioctl");
+			exit(1);
+		}
+	}
+	
+	if (authdata && authdataarg) {
+		int arg = atoi(authdataarg);
+		int subcmd = 0;
+
+		switch (arg) {
+		case 0:
+			subcmd = SIOCSMIP6CFG_DISABLEAUTHDATA;
+			break;
+		default:
+			subcmd = SIOCSMIP6CFG_ENABLEAUTHDATA;
+			break;
+		}
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
+			perror("ioctl");
+			exit(1);
 		}
 	}
 	

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.258 2002/01/21 07:49:27 k-sugyou Exp $	*/
+/*	$KAME: in6.c,v 1.259 2002/01/21 11:37:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -475,8 +475,7 @@ in6_control(so, cmd, data, ifp)
 
 #ifdef MIP6
 	switch (cmd) {
-	case SIOCENABLEMN:
-	case SIOCENABLEHA:
+	case SIOCSMIP6CFG:
 		if (!privileged)
 			return(EPERM);
 		return(mip6_ioctl(cmd, data));
