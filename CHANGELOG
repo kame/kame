@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.655 2000/03/06 04:40:29 itojun Exp $
+$Id: CHANGELOG,v 1.656 2000/03/06 07:56:00 itojun Exp $
 
 <200003>
+Mon Mar  6 16:54:29 JST 2000  itojun@iijlab.net
+	* kame/libinet6/getnameinfo.c: comment out NI_NOFQDN support,
+	  since the behavior is specwise incorrect.
+
 Mon Mar  6 13:38:59 JST 2000  itojun@iijlab.net
 	* sys/netinet/ip_encap.c: add new api, encap_attach_func(), which
 	  allows you to attach decapsulator with packet matcher function.
