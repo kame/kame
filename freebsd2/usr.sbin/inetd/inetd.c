@@ -1264,7 +1264,7 @@ getconfigent()
 	static char TCPMUX_TOKEN[] = "tcpmux/";
 #define MUX_LEN		(sizeof(TCPMUX_TOKEN)-1)
 #ifdef IPSEC
-	char *policy = NULL;
+	char *policy = NULL, *dummy;
 #endif
 	struct sockaddr_storage baddr;
 	struct addrinfo hints, *res;
@@ -1282,15 +1282,19 @@ more:
 				if (policy)
 					free(policy);
 				policy = NULL;
-			} else if (ipsec_get_policylen(p) >= 0) {
-				if (policy)
-					free(policy);
-				policy = newstr(p);
 			} else {
-				syslog(LOG_ERR,
-					"%s: invalid ipsec policy \"%s\"",
-					CONFIG, p);
-				exit(EX_CONFIG);
+				dummy = ipsec_set_policy(p, strlen(p));
+				if (dummy != NULL) {
+					free(dummy);
+					if (policy)
+						free(policy);
+					policy = newstr(p);
+				} else {
+					syslog(LOG_ERR,
+						"%s: invalid ipsec policy \"%s\"",
+						CONFIG, p);
+					exit(EX_CONFIG);
+				}
 			}
 		}
 #endif
