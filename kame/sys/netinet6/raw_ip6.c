@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.100 2001/11/12 11:30:09 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.101 2001/11/12 12:54:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -478,6 +478,7 @@ rip6_output(m, va_alist)
 
 	in6p = sotoin6pcb(so);
 	stickyopt = in6p->in6p_outputopts;
+	dst = &dstsock->sin6_addr;
 
 	priv = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -516,11 +517,6 @@ rip6_output(m, va_alist)
 
 	M_PREPEND(m, sizeof(*ip6), M_WAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
-
-	/* KAME hack: embed scopeid */
-	dst = &dstsock->sin6_addr;
-	if ((error = in6_embedscope(dst, dstsock)) != 0)
-		goto bad;
 
 	/*
 	 * Source address selection.
@@ -975,16 +971,25 @@ rip6_usrreq(so, req, m, nam, control, p)
 				error = ENOTCONN;
 				break;
 			}
-			if (nam->m_len != sizeof(tmp))
-				return(EINVAL);
+			if (nam->m_len != sizeof(tmp)) {
+				error = EINVAL;
+				break;
+			}
 			tmp = *mtod(nam, struct sockaddr_in6 *);
 			dst = &tmp;
-			if (dst->sin6_family != AF_INET6)
-				return(EAFNOSUPPORT);
-		}
-		if (ip6_use_defzone && dst->sin6_scope_id == 0) {
-			dst->sin6_scope_id =
-				scope6_addr2default(&dst->sin6_addr);
+			if (dst->sin6_family != AF_INET6) {
+				error = EAFNOSUPPORT;
+				break;
+			}
+			/* KAME hack: embed scopeid */
+			if (ip6_use_defzone && dst->sin6_scope_id == 0) {
+				dst->sin6_scope_id =
+					scope6_addr2default(&dst->sin6_addr);
+			}
+			if ((error = in6_embedscope(&dst->sin6_addr,
+						    dst)) != 0) {
+				break;
+			}
 		}
 		error = rip6_output(m, so, dst, control);
 		m = NULL;
