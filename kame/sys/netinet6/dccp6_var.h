@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_var.h,v 1.1 2003/10/31 08:47:12 ono Exp $	*/
+/*	$KAME: dccp6_var.h,v 1.2 2003/11/04 11:38:40 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark
@@ -43,7 +43,18 @@ extern struct	in6pcb dccpb6;
 
 void	dccp6_ctlinput(int, struct sockaddr *, void *);
 int	dccp6_input(struct mbuf **, int *, int);
-#ifdef __NetBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+int	dccp6_bind(struct socket *, struct sockaddr *, struct thread *);
+int	dccp6_listen(struct socket *, struct thread *);
+int	dccp6_connect(struct socket *, struct sockaddr *, struct thread *);
+int	dccp6_accept(struct socket *, struct sockaddr **);
+#elif defined(__FreeBSD__)
+int	dccp6_bind(struct socket *, struct sockaddr *, struct proc *);
+int	dccp6_listen(struct socket *, struct proc *);
+int	dccp6_connect(struct socket *, struct sockaddr *, struct proc *);
+int	dccp6_accept(struct socket *, struct sockaddr **);
+#else
+int	dccp6_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
 int	dccp6_bind(struct socket *, struct mbuf *, struct proc *);
 int	dccp6_listen(struct socket *, struct proc *);
 int	dccp6_connect(struct socket *, struct mbuf *, struct proc *);
