@@ -93,14 +93,15 @@
 #include "debug.h"
 #include "mld6_proto.h"
 #include "route.h"
-
+#include "trace.h"
 
 /*
  * Exported variables.
  */
 
-char           *mld6_recv_buf;	/* input packet buffer               */
-int             mld6_socket;	/* socket for all network I/O        */
+char *mld6_recv_buf;		/* input packet buffer */
+char *mld6_send_buf;		/* output packet buffer */
+int mld6_socket;		/* socket for all network I/O */
 struct sockaddr_in6 allrouters_group = {sizeof(struct sockaddr_in6), AF_INET6};
 struct sockaddr_in6 allnodes_group = {sizeof(struct sockaddr_in6), AF_INET6};
 
@@ -109,11 +110,10 @@ struct sockaddr_in6 allnodes_group = {sizeof(struct sockaddr_in6), AF_INET6};
 extern struct in6_addr in6addr_linklocal_allnodes;
 
 /* local variables. */
-
+static struct sockaddr_in6 *dstp;
 static struct sockaddr_in6 	dst = {sizeof(dst), AF_INET6};
 static struct msghdr 		sndmh,
                 		rcvmh;
-static struct mld6_hdr 		mldh;
 static struct iovec 		sndiov[2];
 static struct iovec 		rcviov[2];
 static struct sockaddr_in6 	from;
@@ -141,8 +141,10 @@ init_mld6()
     u_int8_t        raopt[IP6OPT_RTALERT_LEN];
     u_short         rtalert_code = htons(IP6OPT_RTALERT_MLD);
 
-    if ((mld6_recv_buf = malloc(RECV_BUF_SIZE)) == NULL)
-		log(LOG_ERR, 0, "malloca failed");
+    if (!mld6_recv_buf && (mld6_recv_buf = malloc(RECV_BUF_SIZE)) == NULL)
+	    log(LOG_ERR, 0, "malloca failed");
+    if (!mld6_send_buf && (mld6_send_buf = malloc(RECV_BUF_SIZE)) == NULL)
+	    log(LOG_ERR, 0, "malloca failed");
 
     IF_DEBUG(DEBUG_KERN)
         log(LOG_DEBUG,0,"%d octets allocated for the emit/recept buffer mld6",RECV_BUF_SIZE);
@@ -193,8 +195,7 @@ init_mld6()
     rcvmh.msg_controllen = sizeof(rcvcmsgbuf);
 
     /* initialize msghdr for sending packets */
-    sndiov[0].iov_base = (caddr_t) & mldh;
-    sndiov[0].iov_len = sizeof(mldh);
+    sndiov[0].iov_base = (caddr_t)mld6_send_buf;
     sndmh.msg_namelen = sizeof(struct sockaddr_in6);
     sndmh.msg_iov = sndiov;
     sndmh.msg_iovlen = 1;
@@ -336,6 +337,13 @@ accept_mld6(recvlen)
 	    inet6_fmt(&src->sin6_addr), inet6_fmt(dst));
 #endif				/* NOSUCHDEF */
 
+    /* for an mtrace message, we don't need strict checks */
+    if (mldh->mld6_type == MLD6_MTRACE) {
+	accept_mtrace(src, dst, group, ifindex, mld6_recv_buf,
+		      mldh->mld6_code, recvlen);
+	return;
+    }
+
     /* scope check */
     if (IN6_IS_ADDR_MC_NODELOCAL(&mldh->mld6_addr))
     {
@@ -383,23 +391,45 @@ accept_mld6(recvlen)
 }
 
 static void
-make_mld6_msg(type, src, group, ifindex, delay)
-    int             type,
-                    ifindex,
-                    delay;
-    struct sockaddr_in6 *src;
+make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen)
+    int type, code, ifindex, delay, datalen;
+    struct sockaddr_in6 *src, *dst;
     struct in6_addr *group;
 {
-    if (IN6_IS_ADDR_UNSPECIFIED(group))
-	dst.sin6_addr = allnodes_group.sin6_addr;
-    else
-	dst.sin6_addr = *group;
-    sndmh.msg_name = (caddr_t) & dst;
+    static struct sockaddr_in6 dst_sa = {sizeof(dst_sa), AF_INET6};
+    struct mld6_hdr *mhp = (struct mld6_hdr *)mld6_send_buf;
+    int octllen;
 
-    bzero(&mldh, sizeof(mldh));
-    mldh.mld6_type = type;
-    mldh.mld6_maxdelay = htons(delay);
-    mldh.mld6_addr = *group;
+    switch(type) {
+    case MLD6_MTRACE:
+    case MLD6_MTRACE_RESP:
+	sndmh.msg_name = (caddr_t)dst;
+	/*
+	 * XXX: a router alert option must not be contained in an
+	 * mtrace message. We should be more generic, though.
+	 */
+	octllen = sndmh.msg_controllen;
+	sndmh.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	sndmh.msg_controllen = octllen;
+	break;
+    default:
+	if (IN6_IS_ADDR_UNSPECIFIED(group))
+	    dst_sa.sin6_addr = allnodes_group.sin6_addr;
+	else
+	    dst_sa.sin6_addr = *group;
+	dstp = &dst_sa;
+	sndmh.msg_name = (caddr_t)&dst_sa;
+	datalen = sizeof(struct mld6_hdr);
+	break;
+    }
+
+    bzero(mhp, sizeof(*mhp));
+    mhp->mld6_type = type;
+    mhp->mld6_code = 0;
+    mhp->mld6_maxdelay = htons(delay);
+    mhp->mld6_addr = *group;
+
+    sndiov[0].iov_len = datalen;
 
     /* specify the outgoing interface and the source address */
     sndpktinfo->ipi6_ifindex = ifindex;
@@ -408,29 +438,29 @@ make_mld6_msg(type, src, group, ifindex, delay)
 }
 
 void
-send_mld6(type, src, group, index, delay)
-    int             type;
+send_mld6(type, code, src, dst, group, index, delay, datalen)
+    int type;
+    int code;		/* for trace packets only */
     struct sockaddr_in6 *src;
+    struct sockaddr_in6 *dst; /* may be NULL */
     struct in6_addr *group;
-    int             index,
-                    delay;
+    int index, delay;
+    int datalen;		/* for trace packets only */
 {
-    int             setloop = 0;
-
-    make_mld6_msg(type, src, group, index, delay);
-    if (IN6_ARE_ADDR_EQUAL(&dst.sin6_addr, &allnodes_group.sin6_addr))
-    {
+    int setloop = 0;
+	
+    make_mld6_msg(type, code, src, dst, group, index, delay, datalen);
+    if (IN6_ARE_ADDR_EQUAL(&dstp->sin6_addr, &allnodes_group.sin6_addr)) {
 	setloop = 1;
 	k_set_loop(mld6_socket, TRUE);
     }
-    if (sendmsg(mld6_socket, &sndmh, 0) < 0)
-    {
+    if (sendmsg(mld6_socket, &sndmh, 0) < 0) {
 	if (errno == ENETDOWN)
 	    check_vif_state();
 	else
 	    log(log_level(IPPROTO_ICMPV6, type, 0), errno,
 		"sendto to %s with src %s on %s",
-		inet6_fmt(&dst.sin6_addr),
+		inet6_fmt(&dstp->sin6_addr),
 		inet6_fmt(&src->sin6_addr),
 		ifindex2str(index));
 
@@ -438,10 +468,10 @@ send_mld6(type, src, group, index, delay)
 	    k_set_loop(mld6_socket, FALSE);
 	return;
     }
-
-    IF_DEBUG(DEBUG_PKT | debug_kind(IPPROTO_IGMP, type, 0))
+    
+    IF_DEBUG(DEBUG_PKT|debug_kind(IPPROTO_IGMP, type, 0))
 	log(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
 	    packet_kind(IPPROTO_ICMPV6, type, 0),
 	    inet6_fmt(&src->sin6_addr),
-	    inet6_fmt(&dst.sin6_addr));
+	    inet6_fmt(&dstp->sin6_addr));
 }

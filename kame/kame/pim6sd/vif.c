@@ -79,7 +79,7 @@ struct uvif	uvifs[MAXMIFS];	/*the list of virtualsinterfaces */
 vifi_t numvifs;				/*total number of interface */
 int vifs_down;
 vifi_t reg_vif_num;		   /*register interface*/
-int phys_vif;			/* An enabled vif */
+int phys_vif; /* An enabled vif that has a global address */
 int udp_socket;
 int total_interfaces;
 if_set			if_nullset;
@@ -144,8 +144,21 @@ void init_vifs()
 			continue;
 		if(v->uv_linklocal == NULL)
 			log(LOG_ERR,0,"there is no link-local address on vif %s",v->uv_name);
-		if (phys_vif == -1)
-			phys_vif = vifi;
+		if (phys_vif == -1) {
+			struct phaddr *p;
+
+			/*
+			 * If this vif has a global address, set its id
+			 * to phys_vif.
+			 */
+			for(p = v->uv_addrs; p; p = p->pa_next) {
+				if (!IN6_IS_ADDR_LINKLOCAL(&p->pa_addr.sin6_addr) &&
+				    !IN6_IS_ADDR_SITELOCAL(&p->pa_addr.sin6_addr)) {
+					phys_vif = vifi;
+					break;
+				}
+			}
+		}
 		enabled_vifs++;
 	}
 	if (enabled_vifs < 2)
@@ -484,6 +497,16 @@ max_global_address()
 
 	return(pmax ? &pmax->pa_addr : NULL);
 }
+
+struct sockaddr_in6 *
+uv_global(vifi)
+	vifi_t vifi;
+{
+	struct uvif *v = &uvifs[vifi];
+
+	return(NULL);		/* XXX: tmp. */
+}
+
 /*
  * Check if the interface exists in the mif table. If true 
  * return the highest address of the interface else return NULL.

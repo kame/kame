@@ -75,6 +75,7 @@ extern int udp_socket;
 extern struct uvif uvifs[];
 extern vifi_t numvifs;
 extern int vifs_down; 
+extern int phys_vif;
 extern vifi_t reg_vif_num;
 
 #define NO_VIF            	((vifi_t)MAXVIFS) /* An invalid vif index */
@@ -236,6 +237,7 @@ extern void    init_vifs               __P(());
 extern void    stop_all_vifs           __P(());
 extern void    check_vif_state         __P(());
 struct sockaddr_in6 * max_global_address();
+struct sockaddr_in6 * uv_global __P(());
 extern vifi_t   local_address       __P((struct sockaddr_in6 *src));
 struct sockaddr_in6 * local_iface( char *ifname );
 extern vifi_t   find_vif_direct     __P((struct sockaddr_in6 *src));
