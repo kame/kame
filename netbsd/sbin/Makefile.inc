@@ -2,7 +2,7 @@
 #	@(#)Makefile.inc	8.1 (Berkeley) 6/8/93
 
 BINDIR?=	/usr/local/v6/sbin
-MANDIR=	/usr/local/v6/man
+MANDIR?=	/usr/local/v6/man
 CFLAGS+=-DHAVE_SCOPELIB
 
 LDSTATIC?=	-static
