@@ -703,7 +703,7 @@ remote_index
 		{
 			$$ = newsaddr($1->ai_addrlen);
 			if ($$ == NULL) {
-				yyerror("filed to allocate sockaddr");
+				yyerror("failed to allocate sockaddr");
 				return -1;
 			}
 			memcpy($$, $1->ai_addr, $1->ai_addrlen);
