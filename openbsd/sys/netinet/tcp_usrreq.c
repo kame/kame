@@ -86,10 +86,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 extern int	check_ipsec_policy __P((struct inpcb *, u_int32_t));
 #endif
 
-#ifdef INET6
-#include <sys/domain.h>
-#endif /* INET6 */
-
 /*
  * TCP protocol interface to socket abstraction.
  */
@@ -217,20 +213,6 @@ tcp_usrreq(so, req, m, nam, control)
 			error = in_pcbbind(inp, nam);
 		if (error)
 			break;
-#ifdef INET6
-		/*
-		 * If we bind to an address, set up the tp->pf accordingly!
-		 */
-		if (inp->inp_flags & INP_IPV6) {
-			/* If a PF_INET6 socket... */
-			if (inp->inp_flags & INP_IPV6_MAPPED)
-				tp->pf = AF_INET;
-			else if ((inp->inp_flags & INP_IPV6_UNDEC) == 0)
-				tp->pf = AF_INET6;
-			/* else tp->pf is still 0. */
-		}
-		/* else socket is PF_INET, and tp->pf is PF_INET. */
-#endif /* INET6 */
 		break;
 
 	/*
@@ -309,33 +291,12 @@ tcp_usrreq(so, req, m, nam, control)
 		if (error)
 			break;
 
-#ifdef INET6
-		/*
-		 * With a connection, I now know the version of IP
-		 * is in use and hence can set tp->pf with authority. 
-		 */
-		if (inp->inp_flags & INP_IPV6) {
-			if (inp->inp_flags & INP_IPV6_MAPPED)
-				tp->pf = PF_INET;
-			else
-				tp->pf = PF_INET6;
-		}
-		/* else I'm a PF_INET socket, and hence tp->pf is PF_INET. */
-#endif /* INET6 */
-
 		tp->t_template = tcp_template(tp);
 		if (tp->t_template == 0) {
 			in_pcbdisconnect(inp);
 			error = ENOBUFS;
 			break;
 		}
-
-#ifdef INET6
-		if ((inp->inp_flags & INP_IPV6) && (tp->pf == PF_INET)) {
-			inp->inp_ip.ip_ttl = ip_defttl;
-			inp->inp_ip.ip_tos = 0;
-		}
-#endif /* INET6 */
 
 		so->so_state |= SS_CONNECTOUT;
 		/* Compute window scaling to request.  */
@@ -720,6 +681,15 @@ tcp_attach(so)
 		return (ENOBUFS);
 	}
 	tp->t_state = TCPS_CLOSED;
+#ifdef INET6
+	/* we disallow IPv4 mapped address completely. */
+	if (inp->inp_flags & INP_IPV6)
+		tp->pf = PF_INET6;
+	else
+		tp->pf = PF_INET;
+#else
+	tp->pf = PF_INET;
+#endif
 	return (0);
 }
 
