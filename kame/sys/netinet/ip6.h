@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.45 2003/06/05 04:46:38 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.46 2003/06/26 09:42:48 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -289,6 +289,7 @@ struct ip6_mobility {
 #define IP6M_BINDING_UPDATE	5
 #define IP6M_BINDING_ACK	6
 #define IP6M_BINDING_ERROR	7
+#define IP6M_LAST_TYPE		7
 
 /* Binding Refresh Request (BRR) message */
 struct ip6m_binding_request {

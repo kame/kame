@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.57 2003/06/25 17:21:24 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.58 2003/06/26 09:42:49 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -232,7 +232,8 @@ dest6_input(mp, offp, proto)
 #ifdef MIP6
 	/* if haopt is non-NULL, we are sure we have seen fresh HA option */
 	if (verified)
-		dest6_swap_hao(ip6, ip6a, haopt);
+		if (dest6_swap_hao(ip6, ip6a, haopt) < 0)
+			goto bad;
 #endif /* MIP6 */
 
 	*offp = off;
@@ -365,6 +366,11 @@ dest6_mip6_hao(m, mhoff, nxt)
 		m_copydata(m, mhoff, sizeof(mh), (caddr_t)&mh);
 		if (mh.ip6m_type == IP6M_BINDING_UPDATE)
 			swap = 1;
+		else if (mh.ip6m_type == IP6M_HOME_TEST_INIT ||
+			 mh.ip6m_type == IP6M_CAREOF_TEST_INIT)
+			return (-1);
+		else if (mh.ip6m_type > IP6M_LAST_TYPE)
+			return (0);
 	}
 
 	if (swap) {
