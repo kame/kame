@@ -223,12 +223,6 @@ options 	ALTQ		#alternate queueing
 # Network Address Translation - Protocol Translation (NAT-PT)
 #options 	NATPT
 
-# mobile-ip6 options
-# NOTE: Don't define with IPsec options
-# NOTE: may not work due to prefix management changes (Feb2001)
-#options 	"MIP6"
-##options 	"MIP6_DEBUG"
-
 #pseudo-device	atm
 #pseudo-device	dummy	1
 #pseudo-device	stf
