@@ -3608,7 +3608,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	if (curr_rp_count == 0)
 	{
 	    group_.sin6_addr = curr_group_addr.mcast_addr;
-		delete_grp_mask(&cand_rp_list, &grp_mask_list,
+	    delete_grp_mask(&cand_rp_list, &grp_mask_list,
 			    &group_, curr_group_mask);
 	    continue;
 	}
@@ -3645,7 +3645,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	
 		add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
 				 &rpp_, curr_rp_priority,
-			     curr_rp_holdtime, &group_,
+				 curr_rp_holdtime, &group_,
 				 curr_group_mask,
 				 curr_bsr_hash_mask,
 				 curr_bsr_fragment_tag);

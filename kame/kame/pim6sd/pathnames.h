@@ -59,7 +59,8 @@
 #ifndef PATHNAMES_H
 #define PATHNAMES_H
 
-#define _PATH_PIM6D_CONF		"/usr/local/v6/etc/pim6sd.conf"
+#define _PATH_PIM6D_CONF	"/usr/local/v6/etc/pim6sd.conf"
+#define _PATH_PIM6D_LOGFILE	"/var/log/pim6sd.log"
 
 #if (defined(BSD) && (BSD >= 199103))
 	#define _PATH_PIM6D_PID		"/var/run/pim6sd.pid"

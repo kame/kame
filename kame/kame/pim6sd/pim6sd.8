@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: pim6sd.8,v 1.1 1999/08/08 23:31:00 itojun Exp $
+.\"     $Id: pim6sd.8,v 1.2 1999/09/27 05:19:38 jinmei Exp $
 .\"
 .Dd June 10, 1999
 .Dt PIM6SD 8
@@ -37,6 +37,7 @@
 .Nm
 .Op Fl c Ar configfile
 .Op Fl d Op debug_level Op ,debug_level
+.Op Fl f
 .Sh DESCRIPTION
 .Nm Pim6sd
 is an IPv6 multicast routing daemon, which supports
@@ -68,6 +69,9 @@ Valid debug levels are
 .Ic mrt, routers, mrouters, neighbors, timers,
 and
 .Ic asserts.
+.It Fl f
+Do not become daemon, run in foreground. This option is for debugging
+use.
 .El
 .Pp
 .Nm Pim6sd 

@@ -52,6 +52,7 @@
 
 extern unsigned long	debug;
 extern int log_nmsgs;
+extern FILE *log_fp;
 #define IF_DEBUG(l)	if (debug && debug & (l))
 
 #define LOG_MAX_MSGS	20	/* if > 20/minute then shut up for a while */

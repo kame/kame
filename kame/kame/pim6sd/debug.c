@@ -83,7 +83,6 @@
 #include <varargs.h>
 #endif
 
-extern int      haveterminal;
 extern char    *progname;
 
 int             log_nmsgs = 0;
@@ -420,24 +419,25 @@ va_dcl
      * Log to stderr if we haven't forked yet and it's a warning or worse, or
      * if we're debugging.
      */
-
-    if (haveterminal && (debug || severity <= LOG_WARNING))
+    if (debug || severity <= LOG_WARNING)
     {
 	time_t t;
+	FILE *fp = log_fp ? log_fp : stderr;
+
 	gettimeofday(&now, NULL);
 	t = (time_t)now.tv_sec;
 	thyme = localtime(&t);
 	if (!debug)
-	    fprintf(stderr, "%s: ", progname);
-	fprintf(stderr, "%02d:%02d:%02d.%03ld %s", thyme->tm_hour,
+	    fprintf(fp, "%s: ", progname);
+	fprintf(fp, "%02d:%02d:%02d.%03ld %s", thyme->tm_hour,
 		thyme->tm_min, thyme->tm_sec, now.tv_usec / 1000, msg);
 	if (syserr == 0)
-	    fprintf(stderr, "\n");
+	    fprintf(fp, "\n");
 	else
 	    if (syserr < sys_nerr)
-		fprintf(stderr, ": %s\n", sys_errlist[syserr]);
+		fprintf(fp, ": %s\n", sys_errlist[syserr]);
 	    else
-		fprintf(stderr, ": errno %d\n", syserr);
+		fprintf(fp, ": errno %d\n", syserr);
     }
 
     /*
@@ -772,7 +772,8 @@ dump_rp_set(fp)
 	{
 	    grp_mask = rp_grp_entry->group;
 	    fprintf(fp, "%-14.14s %-3u        %-3u\n",
-		    net6name(&grp_mask->group_addr.sin6_addr, &grp_mask->group_mask),
+		    net6name(&grp_mask->group_addr.sin6_addr,
+			     &grp_mask->group_mask),
 		    rp_grp_entry->priority, rp_grp_entry->holdtime);
 
 	    for (rp_grp_entry = rp_grp_entry->rp_grp_next;

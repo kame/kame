@@ -351,25 +351,24 @@ add_grp_mask(used_grp_mask_list, group_addr, group_mask, hash_mask)
     struct sockaddr_in6	prefix_h2;
     int 		i;
 
-/* I compare on the adresses , inet6_equal use the scope too */
-
-	prefix_h.sin6_scope_id = prefix_h2.sin6_scope_id = 0;
-
+    /* I compare on the adresses, inet6_equal use the scope, too */
+    prefix_h.sin6_scope_id = prefix_h2.sin6_scope_id = 0;
 
     for (i = 0; i < sizeof(struct in6_addr); i++)
-	prefix_h.sin6_addr.s6_addr[i] = group_addr->sin6_addr.s6_addr[i]&group_mask.s6_addr[i];
-
+	prefix_h.sin6_addr.s6_addr[i] =
+		group_addr->sin6_addr.s6_addr[i] & group_mask.s6_addr[i];
 
     /* The ordering is: bigger first */
     for (grp_mask = *used_grp_mask_list; grp_mask != (grp_mask_t *) NULL;
 	 grp_mask_prev = grp_mask, grp_mask = grp_mask->next)
     {
 	for (i = 0; i < sizeof(struct in6_addr); i++)
-	    prefix_h2.sin6_addr.s6_addr[i] = grp_mask->group_addr.sin6_addr.s6_addr[i]&grp_mask->group_mask.s6_addr[i];
-
-	if (inet6_greaterthan(&prefix_h2 , &prefix_h) )
+	    prefix_h2.sin6_addr.s6_addr[i] =
+		    (grp_mask->group_addr.sin6_addr.s6_addr[i] &
+		     grp_mask->group_mask.s6_addr[i]);
+	if (inet6_greaterthan(&prefix_h2, &prefix_h) )
 	    continue;
-	if (inet6_equal(&prefix_h2 ,&prefix_h))
+	if (inet6_equal(&prefix_h2, &prefix_h))
 	    return (grp_mask);
 	else
 	    break;

@@ -221,6 +221,7 @@ mtrace_loop()
 			exit(0); /* XXX try again? */
 		}
 
+		fromlen = sizeof(from_ss);
 		if ((rcvcc = recvfrom(mldsoc, frombuf, sizeof(frombuf),  0,
 				      from_sock, &fromlen))
 		     < 0)

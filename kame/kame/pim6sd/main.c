@@ -80,15 +80,17 @@
 
 char            	configfilename[256] = _PATH_PIM6D_CONF;
 char            	versionstring[100];
+char			logfilename[256] = _PATH_PIM6D_LOGFILE;
 
 /* TODO: not used 
 static char 		genidfilename[] = _PATH_PIM6D_GENID;
 */
 static char     	pidfilename[] = _PATH_PIM6D_PID;
 
-int             	haveterminal = 1;
+FILE			*log_fp = stderr;
 char           		*progname;
 
+static int		foreground = 0;
 static int      	sighandled = 0;
 
 #define GOT_SIGINT      0x01
@@ -117,7 +119,7 @@ static struct debugname
     {   "mld_proto",	DEBUG_MLD_PROTO,		5     },
     {   "mld_timer",	DEBUG_MLD_TIMER,		5     },
     {   "mld_member",	DEBUG_MLD_MEMBER,		5     },
-    {   "mld",			DEBUG_MLD,				3  	},
+    {   "mld",			DEBUG_MLD,		3     },
     {   "switch",		DEBUG_SWITCH,		2     },
     {   "trace",		DEBUG_TRACE,		2     },
     {   "mtrace",		DEBUG_TRACE,		2     },
@@ -225,9 +227,7 @@ main(argc, argv)
     char            c;
     int             tmpd;
 
-
     setlinebuf(stderr);
-
 
     if (geteuid() != 0)
     {
@@ -310,9 +310,7 @@ main(argc, argv)
 	    else
 		debug = DEBUG_DEFAULT;
 	}
-	else
-	    if (strcmp(*argv, "-c") == 0)
-	    {
+	else if (strcmp(*argv, "-c") == 0) {
 		if (argc > 1)
 		{
 		    argv++;
@@ -321,9 +319,12 @@ main(argc, argv)
 		}
 		else
 		    goto usage;
-	    }
-		else
+	}
+	else if (strcmp(*argv, "-f") == 0)
+		foreground = 1;
+	else
 		    goto usage;
+
 	argv++;
 	argc--;
     }
@@ -374,6 +375,10 @@ usage:
 #else
     (void) openlog("pim6sd", LOG_PID);
 #endif				/* LOG_DAEMON */
+    /* open a log file */
+    if ((log_fp = fopen(logfilename, "w")) == NULL)
+	    log(LOG_ERR, errno, "fopen(%s)", logfilename);
+    setlinebuf(log_fp);
 
     sprintf(versionstring, "pim6sd version %s", todaysversion);
 
@@ -426,22 +431,20 @@ usage:
     }
 
     IF_DEBUG(DEBUG_IF)
-	dump_vifs(stderr);
+	dump_vifs(log_fp);
     IF_DEBUG(DEBUG_PIM_MRT)
-	dump_pim_mrt(stderr);
+	dump_pim_mrt(log_fp);
 
     /* schedule first timer interrupt */
     timer_setTimer(timer_interval, timer, NULL);
 
-    if (debug == 0)
+    if (foreground == 0)
     {
 	/* Detach from the terminal */
-
 #ifdef TIOCNOTTY
 	int             t;
 #endif				/* TIOCNOTTY */
 
-	haveterminal = 0;
 	if (fork())
 	    exit(0);
 
@@ -534,7 +537,6 @@ usage:
 		log(LOG_WARNING, errno, "select failed");
 	    continue;
 	}
-
 
 	/*
 	 * Handle timeout queue.

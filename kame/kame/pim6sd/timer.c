@@ -246,7 +246,7 @@ age_vifs()
     }
 
     IF_DEBUG(DEBUG_IF)
-	dump_vifs(stderr);
+	dump_vifs(log_fp);
 }
 
 /*
@@ -1172,7 +1172,7 @@ age_routes()
     }
 
     IF_DEBUG(DEBUG_PIM_MRT)
-	dump_pim_mrt(stderr);
+	dump_pim_mrt(log_fp);
     return;
 }
 
@@ -1264,6 +1264,6 @@ age_misc()
 
 
     IF_DEBUG(DEBUG_PIM_BOOTSTRAP | DEBUG_PIM_CAND_RP)
-	dump_rp_set(stderr);
+	dump_rp_set(log_fp);
     /* TODO: XXX: anything else to timeout */
 }
