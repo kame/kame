@@ -266,17 +266,13 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 #endif
 
  out:
-	*txsegsizep = min(tp->t_peermss, size);
 	/*
-	 * XXX it looks awkward to determine segment size for incoming packets
-	 * based on MSS advertisement from peer.  we may want to avoid using
-	 * the variable "size".
+	 * *rxsegsizep holds *estimated* inbound segment size (estimation
+	 * assumes that path MTU is the same for both ways).  this is only
+	 * for silly window avoidance, do not use the value for other purposes.
 	 */
-#if 0
-	*rxsegsizep = tp->t_ourmss;
-#else
+	*txsegsizep = min(tp->t_peermss, size);
 	*rxsegsizep = min(tp->t_ourmss, size);
-#endif
 
 	if (*txsegsizep != tp->t_segsz) {
 		/*
