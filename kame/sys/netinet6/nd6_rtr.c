@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.130 2001/07/21 03:54:45 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.131 2001/07/21 03:56:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -744,6 +744,8 @@ defrouter_delreq(dr)
  * 3) When no routers on the list are known to be reachable or
  *    probably reachable, routers SHOULD be selected in a round-robin
  *    fashion.
+ *
+ * We assume nd_defrouter is sorted by router preference value.
  */
 void
 defrouter_select()
@@ -772,12 +774,6 @@ defrouter_select()
 		return;
 	}
 
-	/*
-	 * Search for a (probably) reachable router from the list.
-	 * XXX: nd_defrouter_primary is initialized to point to the first entry
-	 * of the list, in case of all the entries are not
-	 * "probably reachable".
-	 */
 	installedpref = -2;	/* invalid preference XXX should #define */
 	installcount = 0;
 
@@ -788,6 +784,9 @@ defrouter_select()
 	if (!TAILQ_FIRST(&nd_defrouter))
 		goto empty;
 
+	/*
+	 * Search for a (probably) reachable router from the list.
+	 */
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
 		install = 0;
