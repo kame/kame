@@ -435,7 +435,7 @@ rip6_output(m, so, dstsock, control)
 
  freectl:
 	if (control) {
-		ip6_clearpktopts(in6p->in6p_outputopts, 0, -1);
+		ip6_clearpktopts(in6p->in6p_outputopts, -1);
 		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}

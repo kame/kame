@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.50 2001/12/07 07:07:11 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.51 2001/12/24 17:52:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -530,7 +530,7 @@ release:
 
 releaseopt:
 	if (control) {
-		ip6_clearpktopts(in6p->in6p_outputopts, 0, -1);
+		ip6_clearpktopts(in6p->in6p_outputopts, -1);
 		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}

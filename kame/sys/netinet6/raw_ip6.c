@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.110 2001/12/21 07:54:38 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.111 2001/12/24 17:52:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -608,7 +608,7 @@ rip6_output(m, va_alist)
 
  freectl:
 	if (control) {
-		ip6_clearpktopts(in6p->in6p_outputopts, 0, -1);
+		ip6_clearpktopts(in6p->in6p_outputopts, -1);
 		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}

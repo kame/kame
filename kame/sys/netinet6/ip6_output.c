@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.260 2001/12/24 17:33:28 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.261 2001/12/24 17:52:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3155,7 +3155,7 @@ ip6_pcbopts(pktopt, m, so)
 		opt->ip6po_rhinfo.ip6po_rhi_rthdr)
 		    printf("ip6_pcbopts: all specified options are cleared.\n");
 #endif
-		ip6_clearpktopts(opt, 1, -1);
+		ip6_clearpktopts(opt, -1);
 	} else
 		opt = malloc(sizeof(*opt), M_IP6OPT, M_WAITOK);
 	*pktopt = NULL;
@@ -3178,7 +3178,7 @@ ip6_pcbopts(pktopt, m, so)
 		priv = 1;
 #endif
 	if ((error = ip6_setpktoptions(m, opt, priv, 1)) != 0) {
-		ip6_clearpktopts(opt, 1, -1); /* XXX: discard all options */
+		ip6_clearpktopts(opt, -1); /* XXX: discard all options */
 		return(error);
 	}
 	*pktopt = opt;
@@ -3290,24 +3290,15 @@ ip6_getpcbopt(pktopt, optname, datap, datalenp)
 }
 
 void
-ip6_clearpktopts(pktopt, needfree, optname)
+ip6_clearpktopts(pktopt, optname)
 	struct ip6_pktopts *pktopt;
-	int needfree, optname;
+	int optname;
 {
+	int needfree = pktopt->needfree;
+
 	if (pktopt == NULL)
 		return;
 
-#ifdef DIAGNOSTIC
-	if ((needfree && !pktopt->needfree) ||
-	    (!needfree && pktopt->needfree)) {
-#if 0
-		panic("needfree inconsistent");
-#else
-		printf("needfree inconsistent: %p %d %d\n", pktopt, needfree,
-		    pktopt->needfree);
-#endif
-	}
-#endif
 	if (optname == -1 || optname == IPV6_PKTINFO) {
 		if (needfree && pktopt->ip6po_pktinfo)
 			free(pktopt->ip6po_pktinfo, M_IP6OPT);
@@ -3425,7 +3416,7 @@ ip6_freepcbopts(pktopt)
 	if (pktopt == NULL)
 		return;
 
-	ip6_clearpktopts(pktopt, 1, -1);
+	ip6_clearpktopts(pktopt, -1);
 
 	free(pktopt, M_IP6OPT);
 }
@@ -3919,7 +3910,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		struct in6_pktinfo *pktinfo;
 
 		if (len == 0) {	/* just remove the option */
-			ip6_clearpktopts(opt, 1, IPV6_PKTINFO);
+			ip6_clearpktopts(opt, IPV6_PKTINFO);
 			break;
 		}
 
@@ -3940,7 +3931,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		if (sticky && optname == IPV6_PKTINFO && opt->ip6po_pktinfo) {
 			if (pktinfo->ipi6_ifindex == 0 &&
 			    IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
-				ip6_clearpktopts(opt, 1, optname);
+				ip6_clearpktopts(opt, optname);
 				break;
 			}
 		}
@@ -4033,7 +4024,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			return(EPERM);
 
 		if (len == 0) {	/* just remove the option */
-			ip6_clearpktopts(opt, 1, IPV6_NEXTHOP);
+			ip6_clearpktopts(opt, IPV6_NEXTHOP);
 			break;
 		}
 
@@ -4075,7 +4066,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 
 		/* turn off the previous option */
 		if (sticky) {
-			ip6_clearpktopts(opt, 1, IPV6_NEXTHOP);
+			ip6_clearpktopts(opt, IPV6_NEXTHOP);
 
 			opt->ip6po_nexthop = malloc(*buf, M_IP6OPT, M_WAITOK);
 			bcopy(buf, opt->ip6po_nexthop, *buf);
@@ -4098,7 +4089,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			return(EPERM);
 
 		if (len == 0) {
-			ip6_clearpktopts(opt, 1, IPV6_HOPOPTS);
+			ip6_clearpktopts(opt, IPV6_HOPOPTS);
 			break;	/* just remove the option */
 		}
 
@@ -4118,7 +4109,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 
 		if (sticky) {
 			/* turn off the previous option */
-			ip6_clearpktopts(opt, 1, IPV6_HOPOPTS);
+			ip6_clearpktopts(opt, IPV6_HOPOPTS);
 		
 			opt->ip6po_hbh = malloc(hbhlen, M_IP6OPT, M_WAITOK);
 			bcopy(hbh, opt->ip6po_hbh, hbhlen);
@@ -4139,7 +4130,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			return(EPERM);
 
 		if (len == 0) {
-			ip6_clearpktopts(opt, 1, optname);
+			ip6_clearpktopts(opt, optname);
 			break;	/* just remove the option */
 		}
 
@@ -4191,7 +4182,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 
 		if (sticky) {
 			/* turn off the previous option */
-			ip6_clearpktopts(opt, 1, optname);
+			ip6_clearpktopts(opt, optname);
 		
 			*newdest = malloc(destlen, M_IP6OPT, M_WAITOK);
 			bcopy(dest, *newdest, destlen);
@@ -4208,7 +4199,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		int rthlen;
 
 		if (len == 0) {
-			ip6_clearpktopts(opt, 1, IPV6_RTHDR);
+			ip6_clearpktopts(opt, IPV6_RTHDR);
 			break;	/* just remove the option */
 		}
 
@@ -4242,7 +4233,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 
 		if (sticky) {
 			/* turn off the previous option */
-			ip6_clearpktopts(opt, 1, IPV6_RTHDR);
+			ip6_clearpktopts(opt, IPV6_RTHDR);
 
 			opt->ip6po_rthdr = malloc(rthlen, M_IP6OPT, M_WAITOK);
 			bcopy(rth, opt->ip6po_rthdr, rthlen);
