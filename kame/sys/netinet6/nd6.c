@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.158 2001/07/17 02:19:18 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.159 2001/07/17 03:28:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -513,7 +513,6 @@ nd6_timer(ignored_arg)
 #endif
 
 	ln = llinfo_nd6.ln_next;
-	/* XXX BSD/OS separates this code -- itojun */
 	while (ln && ln != &llinfo_nd6) {
 		struct rtentry *rt;
 		struct sockaddr_in6 *dst;
