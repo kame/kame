@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1523 2001/02/02 02:13:02 jinmei Exp $
+$KAME: CHANGELOG,v 1.1524 2001/02/03 12:28:59 jinmei Exp $
 
 <200102>
 2001-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -33,7 +33,7 @@ Wed Jan 31 17:43:23 JST 2001 sakane@ydc.cojp
 	Because SAs will remain at the peer.  In this case, you can use -B
 	option then SAs will revive.  
 
-	XXX racoon simply adds a SAs to the end of the file specified.
+	XXX racoon simply adds SAs to the end of the file specified.
 
 Tue Jan 30 05:03:01 JST 2001  itojun@iijlab.net
 	* route6d: correctd RTA_NETMASK handling (do not look at sa_family).
