@@ -1259,8 +1259,13 @@ bgp_process_update(struct rpcb *bnp)
 	int              poctets;   /* (minimum len in octet bound)  */
 	struct ifinfo   *ife;       /* search for                    */
 	struct rt_entry *orte;      /* which I had                   */
+	time_t tloc;
 
 	MALLOC(rte, struct rt_entry);
+
+	/* log update time */
+	(void)time(&tloc);
+	rte->rt_time = tloc;
 
 	orte = NULL;
 

@@ -69,6 +69,7 @@ struct rt_entry {
   struct rtproto       rt_proto;    /* protocol from which this route got */
   struct aspath       *rt_aspath;   /* AS path                            */
   struct aggrinfo      rt_aggr;     /* aggregate info                     */
+  time_t rt_time;		/* last update time (BGP routes only) */
 };
 
 #define rt_gw rt_gwinfo._rt_gw
