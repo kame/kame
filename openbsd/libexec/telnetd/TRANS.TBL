@@ -1,0 +1,16 @@
+F AUTHENC.C                         	authenc.c
+D CVS                               	CVS
+F DEFS.H                            	defs.h
+F EXT.H                             	ext.h
+F GLOBAL.C                          	global.c
+F MAKEFILE                          	Makefile
+L OBJ                               	obj	/usr/obj/libexec/telnetd
+F PATHNAME.H                        	pathnames.h
+F SLC.C                             	slc.c
+F STATE.C                           	state.c
+F SYS_TERM.C                        	sys_term.c
+F TELNETD.8                         	telnetd.8
+F TELNETD.C                         	telnetd.c
+F TELNETD.H                         	telnetd.h
+F TERMSTAT.C                        	termstat.c
+F UTILITY.C                         	utility.c
