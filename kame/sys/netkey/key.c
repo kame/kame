@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.28 1999/11/29 18:05:55 sakane Exp $ */
+/* KAME $Id: key.c,v 1.29 1999/11/30 17:11:23 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -5561,14 +5561,6 @@ key_align(msg, mhp)
 	ext = (struct sadb_ext *)((caddr_t)msg + sizeof(struct sadb_msg));
 
 	while (tlen > 0) {
-		/* duplicate check */
-		/* XXX Are there duplication either KEY_AUTH or KEY_ENCRYPT ?*/
-		if (mhp[ext->sadb_ext_type] != NULL) {
-			printf("key_align: duplicate ext_type %u is passed.\n",
-				ext->sadb_ext_type);
-			return EINVAL;
-		}
-
 		/* set pointer */
 		switch (ext->sadb_ext_type) {
 		case SADB_EXT_SA:
@@ -5579,9 +5571,7 @@ key_align(msg, mhp)
 		case SADB_EXT_ADDRESS_DST:
 		case SADB_EXT_ADDRESS_PROXY:
 		case SADB_EXT_KEY_AUTH:
-			/* must to be chek weak keys. */
 		case SADB_EXT_KEY_ENCRYPT:
-			/* must to be chek weak keys. */
 		case SADB_EXT_IDENTITY_SRC:
 		case SADB_EXT_IDENTITY_DST:
 		case SADB_EXT_SENSITIVITY:
@@ -5590,6 +5580,17 @@ key_align(msg, mhp)
 		case SADB_EXT_SUPPORTED_ENCRYPT:
 		case SADB_EXT_SPIRANGE:
 		case SADB_X_EXT_POLICY:
+			/* duplicate check */
+			/*
+			 * XXX Are there duplication payloads of either
+			 * KEY_AUTH or KEY_ENCRYPT ?
+			 */
+			if (mhp[ext->sadb_ext_type] != NULL) {
+				printf("key_align: duplicate ext_type %u "
+					"is passed.\n",
+					ext->sadb_ext_type);
+				return EINVAL;
+			}
 			mhp[ext->sadb_ext_type] = (caddr_t)ext;
 			break;
 		default:
