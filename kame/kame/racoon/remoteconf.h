@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.1 2000/01/09 01:31:31 itojun Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.2 2000/01/11 01:06:29 sakane Exp $ */
 
 /* remote configuration */
 
@@ -41,9 +41,6 @@ struct remoteconf {
 	struct sockaddr *remote;	/* remote IP address */
 					/* if family is AF_UNSPEC, that is
 					 * for anonymous configuration. */
-	struct sockaddr *local;		/* address to be accepted packet from
-					 * remote address.  autoconfigurated.
-					 * when anonymous, this points to 0. */
 
 	struct etypes *etypes;		/* exchange type list. the head
 					 * is a type to be sent first. */
@@ -91,4 +88,3 @@ extern struct etypes *check_etypeok
 
 extern struct isakmpsa *newisakmpsa __P((void));
 extern void insisakmpsa __P((struct isakmpsa *new, struct remoteconf *rmconf));
-extern void setmyaddrtormconf __P((void));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.4 2000/01/09 01:31:32 itojun Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.5 2000/01/11 01:06:29 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -98,7 +98,6 @@ session(void)
 		exit(1);
 
 	initmyaddr();
-	setmyaddrtormconf();
 
 	if (isakmp_init() < 0)
 		exit(1);
@@ -179,7 +178,6 @@ session(void)
 					isakmp_close();
 					grab_myaddrs();
 					autoconf_myaddrsport();
-					setmyaddrtormconf();
 					isakmp_open();
 				}
 			} else

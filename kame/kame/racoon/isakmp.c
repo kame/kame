@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.26 2000/01/11 01:02:18 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.27 2000/01/11 01:06:29 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1797,32 +1797,19 @@ copy_ph1addresses(iph1, rmconf, remote)
 	struct sockaddr *remote;
 {
 	/* XXX the reason is described in handler.h */
-	if (rmconf->local == NULL) {
-		/* If anonymous configuration */
-		iph1->remote = dupsaddr(remote);
-		if (remote == NULL) {
-			delph1(iph1);
-			return -1;
-		}
-		_INPORTBYSA(iph1->remote) = _INPORTBYSA(rmconf->remote);
-		iph1->local = getlocaladdr(remote);
-		if (iph1->local == NULL) {
-			delph1(iph1);
-			return -1;
-		}
-		_INPORTBYSA(iph1->local) = getmyaddrsport(iph1->local);
-	} else {
-		iph1->remote = dupsaddr(rmconf->remote);
-		if (remote == NULL) {
-			delph1(iph1);
-			return -1;
-		}
-		iph1->local = dupsaddr(rmconf->local);
-		if (iph1->local == NULL) {
-			delph1(iph1);
-			return -1;
-		}
+	/* If anonymous configuration */
+	iph1->remote = dupsaddr(remote);
+	if (remote == NULL) {
+		delph1(iph1);
+		return -1;
 	}
+	_INPORTBYSA(iph1->remote) = _INPORTBYSA(rmconf->remote);
+	iph1->local = getlocaladdr(remote);
+	if (iph1->local == NULL) {
+		delph1(iph1);
+		return -1;
+	}
+	_INPORTBYSA(iph1->local) = getmyaddrsport(iph1->local);
 
 	return 0;
 }

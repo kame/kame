@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.2 2000/01/10 22:38:39 itojun Exp $ */
+/* YIPS @(#)$Id: remoteconf.c,v 1.3 2000/01/11 01:06:29 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -234,22 +234,3 @@ insisakmpsa(new, rmconf)
 	return;
 }
 
-/*
- * set my address to be received packet.
- */
-void
-setmyaddrtormconf()
-{
-	struct remoteconf *p;
-
-	LIST_FOREACH(p, &rmtree, chain) {
-		if (p->local)
-			free(p->local);
-		p->local = getlocaladdr(p->remote);
-		if (p->local == NULL) {
-			/* ignore */
-			continue;
-		}
-		_INPORTBYSA(p->local) = getmyaddrsport(p->local);
-	}
-}
