@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.151 2002/11/29 05:26:21 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.152 2002/12/03 09:02:05 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2241,6 +2241,7 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		ts->rewrite[cv4->fromto] = 1;
 		break;
 	}
+	return (delta);
 
  FTP6response:;
 	/*
@@ -2270,9 +2271,14 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		break;
 
 	case FTPS_PORT:
+		if (ftp6.cmd != 200)
+			return (0);
+
+		snprintf(wow, sizeof(wow), "200 PORT command successful.\r\n");
+		delta = natpt_rewriteMbuf(cv4->m, kb, (kk-kb), wow, strlen(wow));
+		ts->rewrite[cv4->fromto] = 1;
 		break;
 	}
-
 	return (delta);
 }
 
@@ -2281,6 +2287,7 @@ int
 natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 {
 	int		delta = 0;
+	int		rv;
 	char		*tstr;
 	char		*d;
 	u_char		*h, *p;
@@ -2293,6 +2300,8 @@ natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 	struct sockaddr_in sin;
 	struct ftpparam	ftp4;
 	char		Wow[128];
+	char		*wp;
+	int		 wl;
 
 	kb = (caddr_t)th6 + (th6->th_off << 2);
 	kk = (caddr_t)ip6 + sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen);
@@ -2318,6 +2327,38 @@ natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 		return (delta);
 
 	case FTP4_PORT:
+		ts->ftpstate = FTPS_PORT;
+		if (natpt_parsePORT(ftp4.arg, kk, &sin) == NULL)
+			return (0);
+
+		/* v6 side; initiator */
+		bzero(&local, sizeof(struct pAddr));
+		local.sa_family = AF_INET6;
+		local.addr[0] = ats->remote.addr[0];	/* 0: v6 server address */
+							/* 1: v6 translated address */
+
+		/* v4 side; responder */
+		bzero(&remote, sizeof(struct pAddr));
+		remote.sa_family = AF_INET;
+		remote.addr[0] = ats->local.addr[1];	/* 0: v4 client address */
+							/* 1: v4 server address */
+
+		if (natpt_openIncomingV4Rule(IPPROTO_TCP, &local, &remote) == 0)
+			return (0);
+
+		wp = Wow;
+		wl = sizeof(Wow);
+
+		rv = snprintf(wp, wl, "EPRT |2|");
+		wp += rv;
+		wl -= rv;
+		rv = natpt_ntop(AF_INET6, (const u_char *)&ats->remote.addr[1], wp, wl);
+		wp += rv;
+		wl -= rv;
+		rv = snprintf(wp, wl, "|%d|\r\n", htons(sin.sin_port));
+
+		ts->rewrite[cv6->fromto] = 1;
+		delta = natpt_rewriteMbuf(cv6->m, kb, (kk-kb), Wow, strlen(Wow));
 		return (delta);
 	}
 
