@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1686 2001/05/22 11:03:04 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1687 2001/05/23 12:23:56 fujisawa Exp $
 
 <200105>
+2001-05-23  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{defs.h,trans.c}
+	- Fix a bug in calculation of TCP ack.
+	- Remove unused function(s).  These functions were unnecessary.
+	    decrementSeq() and incrementAck().
+
 Tue May 22 20:01:05 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4/usr.bin/telnet: make buildable with 2292bis API.
 
