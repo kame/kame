@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.69 2000/11/30 11:13:35 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.70 2000/12/06 23:29:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,7 +65,7 @@
  */
 
 #ifndef __KAME_NETINET_IN_H_INCLUDED_
-#error "do not include netinet6/in6.h directly, include netinet/in.h"
+#error "do not include netinet6/in6.h directly, include netinet/in.h.  see RFC2553"
 #endif
 
 #ifndef _NETINET6_IN6_H_
