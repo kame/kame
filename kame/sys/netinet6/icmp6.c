@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.356 2003/08/25 00:13:14 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.357 2003/08/25 05:48:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -159,12 +159,6 @@
 #define in6p_sp		inp_sp
 #define in6p_next	inp_next
 #define in6p_prev	inp_prev
-
-/*
- * for KAME src sync over BSD*'s.  XXX: FreeBSD (>=3) are VERY different from
- * others...
- */
-#define in6p_ip6_nxt	inp_ipv6.ip6_nxt
 #endif
 
 extern struct domain inet6domain;
@@ -2351,7 +2345,13 @@ icmp6_rip6_input(mp, off, src, dst)
 		if (!(in6p->in6p_flags & INP_IPV6))
 			continue;
 #endif
+#ifdef __FreeBSD__
+		if (in6p->inp_ip_p != IPPROTO_ICMPV6)
+#elif defined(HAVE_NRL_INPCB)
 		if (in6p->inp_ipv6.ip6_nxt != IPPROTO_ICMPV6)
+#else
+		if (in6p->in6p_ip6.ip6_nxt != IPPROTO_ICMPV6)
+#endif
 			continue;
 		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
 		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
