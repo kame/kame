@@ -15,10 +15,6 @@ static const char rcsid[] = "@(#)Id: ip_auth.c,v 2.0.2.21.2.7 1998/11/22 01:50:1
 #endif
 #endif
 
-#ifdef _KERNEL
-#include "opt_inet.h"
-#endif
-
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -62,11 +58,6 @@ static const char rcsid[] = "@(#)Id: ip_auth.c,v 2.0.2.21.2.7 1998/11/22 01:50:1
 #include <net/af.h>
 #endif
 #include <net/route.h>
-#ifdef _KERNEL
-#ifndef INET
-#error ipfilter assumes options INET
-#endif
-#endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
