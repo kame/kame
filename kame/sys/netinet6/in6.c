@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.65 2000/03/29 03:45:56 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.66 2000/03/29 16:23:26 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -384,8 +384,11 @@ in6_control(so, cmd, data, ifp)
 	int privileged;
 
 	privileged = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
+		privileged++;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+	if (p && !suser(p))
 		privileged++;
 #else
 	if ((so->so_state & SS_PRIV) != 0)
