@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.65 2001/09/21 05:16:28 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.66 2001/09/21 10:44:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -456,12 +456,27 @@ spdadd_command
 	:	SPDADD ipaddropts STRING prefix portstr STRING prefix portstr upper_spec policy_spec EOT
 		{
 			int status;
+			struct addrinfo *src, *dst;
+
+			src = parse_addr($3.buf, $5.buf);
+			dst = parse_addr($6.buf, $8.buf);
+			if (!src || !dst) {
+				/* yyerror is already called */
+				return -1;
+			}
+			if (src->ai_next || dst->ai_next) {
+				yyerror("multiple address specified");
+				freeaddrinfo(src);
+				freeaddrinfo(dst);
+				return -1;
+			}
 
 			status = setkeymsg_spdaddr(SADB_X_SPDADD, $9, &$10,
-			    parse_addr($3.buf, $5.buf), $4,
-			    parse_addr($6.buf, $8.buf), $7);
+			    src, $4, dst, $7);
 			if (status < 0)
 				return -1;
+			freeaddrinfo(src);
+			freeaddrinfo(dst);
 		}
 	;
 
