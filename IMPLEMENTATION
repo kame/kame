@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.251 2001/07/27 14:13:41 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.252 2001/07/27 14:24:13 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1689,7 +1689,8 @@ For example, if we would like to propose the use of following packet:
 some implementation proposes it as "AH transport and ESP tunnel", since
 this is more logical from packet construction point of view.  Some
 implementation proposes it as "AH tunnel and ESP tunnel".
-Racoon follows the former route.
+Racoon follows the latter route (previously it followed the former, and
+the latter interpretation seems to be popular/consensus).
 This raises real interoperability issue.  We hope this to be resolved quickly.
 
 4.3 AH and ESP handling
