@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.100 2000/09/19 02:46:23 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.101 2000/09/19 07:25:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.100 2000/09/19 02:46:23 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.101 2000/09/19 07:25:31 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -897,7 +897,7 @@ get_ph2approvalx(iph2, pp)
 					"my single bundle:\n");
 				printsaprop0(q2););
 
-			pr = cmpsaprop_alloc(iph2->ph1, q1, q2);
+			pr = cmpsaprop_alloc(iph2->ph1, q1, q2, iph2->side);
 			if (pr != NULL)
 				goto found;
 
@@ -920,13 +920,20 @@ found:
 
 	ret = NULL;
 
-	for (sp = pr->head, p = pp;
-	     sp && p;
-	     sp = sp->next, p = p->next) {
-		if (sp->proto_id != p->prop->proto_id)
-			goto err;	/* XXX */
+	for (p = pp; p; p = p->next) {
+		/*
+		 * find a proposal with matching proto_id.
+		 * we have analyzed validity already, in cmpsaprop_alloc().
+		 */
+		for (sp = pr->head; sp; sp = sp->next) {
+			if (sp->proto_id == p->prop->proto_id)
+				break;
+		}
+		if (!sp)
+			goto err;
 		if (sp->head->next)
 			goto err;	/* XXX */
+
 		for (x = p; x; x = x->tnext)
 			if (sp->head->trns_no == x->trns->t_no)
 				break;
@@ -1360,13 +1367,18 @@ ipsecdoi_updatespi(iph2)
 	pp = iph2->approval;
 
 	/* create proposal payloads */
-	for (p = pair[i], pr = pp->head;
-	     p && pr;
-	     p = p->next, pr = pr->next) {
-
-		/* validity check */
-		if (p->prop->proto_id != pr->proto_id
-		 || p->trns->t_id != pr->head->trns_id)
+	for (p = pair[i]; p; p = p->next) {
+		/*
+		 * find a proposal/transform with matching proto_id/t_id.
+		 * we have analyzed validity already, in cmpsaprop_alloc().
+		 */
+		for (pr = pp->head; pr; pr = pr->next) {
+			if (p->prop->proto_id == pr->proto_id &&
+			    p->trns->t_id == pr->head->trns_id) {
+				break;
+			}
+		}
+		if (!pr)
 			goto end;
 
 		memcpy((caddr_t)p->prop + sizeof(*p->prop), &pr->spi,

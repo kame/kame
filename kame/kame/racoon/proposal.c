@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.17 2000/09/19 02:46:23 itojun Exp $	*/
+/*	$KAME: proposal.c,v 1.18 2000/09/19 07:25:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.17 2000/09/19 02:46:23 itojun Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.18 2000/09/19 07:25:32 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -168,13 +168,16 @@ inssatrns(pr, new)
  * XXX cannot understand the comment!
  */
 struct saprop *
-cmpsaprop_alloc(ph1, pp1, pp2)
+cmpsaprop_alloc(ph1, pp1, pp2, side)
 	struct ph1handle *ph1;
 	const struct saprop *pp1, *pp2;
+	int side;
 {
 	struct saprop *newpp = NULL;
 	struct saproto *pr1, *pr2, *newpr = NULL;
 	struct satrns *tr1, *tr2, *newtr;
+	const int ordermatters = 0;
+	int npr1, npr2;
 
 	newpp = newsaprop();
 	if (newpp == NULL) {
@@ -289,11 +292,46 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 		goto err;
 	}
 
+	npr1 = npr2 = 0;
+	for (pr1 = pp1->head; pr1; pr1 = pr1->next)
+		npr1++;
+	for (pr2 = pp2->head; pr2; pr2 = pr2->next)
+		npr2++;
+	if (npr1 != npr2)
+		goto err;
+
 	/* check protocol order */
 	pr1 = pp1->head;
 	pr2 = pp2->head;
 
-	while (pr1 && pr2) {
+	while (1) {
+		if (!ordermatters) {
+			/*
+			 * XXX does not work if we have multiple proposals
+			 * with the same proto_id
+			 */
+			switch (side) {
+			case RESPONDER:
+				if (!pr2)
+					break;
+				for (pr1 = pp1->head; pr1; pr1 = pr1->next) {
+					if (pr1->proto_id == pr2->proto_id)
+						break;
+				}
+				break;
+			case INITIATOR:
+				if (!pr1)
+					break;
+				for (pr2 = pp2->head; pr2; pr2 = pr2->next) {
+					if (pr2->proto_id == pr1->proto_id)
+						break;
+				}
+				break;
+			}
+		}
+		if (!pr1 || !pr2)
+			break;
+
 		if (pr1->proto_id != pr2->proto_id) {
 			YIPSDEBUG(DEBUG_SA,
 				plog(logp, LOCATION, NULL,
@@ -359,6 +397,20 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 
 		pr1 = pr1->next;
 		pr2 = pr2->next;
+	}
+
+	/* XXX should check if we have visited all items or not */
+	if (!ordermatters) {
+		switch (side) {
+		case RESPONDER:
+			if (!pr2)
+				pr1 = NULL;
+			break;
+		case INITIATOR:
+			if (!pr1)
+				pr2 = NULL;
+			break;
+		}
 	}
 
 	/* should be matched all protocols in a proposal */

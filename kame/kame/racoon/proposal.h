@@ -1,4 +1,4 @@
-/*	$KAME: proposal.h,v 1.8 2000/09/19 04:25:58 itojun Exp $	*/
+/*	$KAME: proposal.h,v 1.9 2000/09/19 07:25:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.h,v 1.8 2000/09/19 04:25:58 itojun Exp $ */
+/* YIPS @(#)$Id: proposal.h,v 1.9 2000/09/19 07:25:32 itojun Exp $ */
 
 #include <sys/queue.h>
 
@@ -181,8 +181,8 @@ extern void inssaprop __P((struct saprop **, struct saprop *));
 extern void inssaproto __P((struct saprop *, struct saproto *));
 extern struct satrns *newsatrns __P((void));
 extern void inssatrns __P((struct saproto *, struct satrns *));
-extern struct saprop *cmpsaprop_alloc
-	__P((struct ph1handle *, const struct saprop *, const struct saprop *));
+extern struct saprop *cmpsaprop_alloc __P((struct ph1handle *,
+	const struct saprop *, const struct saprop *, int));
 extern int cmpsaprop __P((const struct saprop *, const struct saprop *));
 extern int cmpsatrns __P((const struct satrns *, const struct satrns *));
 extern int set_satrnsbysainfo __P((struct saproto *, struct sainfo *));
