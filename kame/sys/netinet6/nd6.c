@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.271 2002/05/30 04:50:24 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.272 2002/06/03 00:46:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,23 +71,24 @@
 #include <net/if_atm.h>
 #endif
 #include <net/route.h>
+#ifdef __NetBSD__
+#include <net/if_ether.h>
+#include <net/if_fddi.h>
+#include <net/if_arc.h>
+#elif !defined(__FreeBSD__)
+#include <net/if_fddi.h>
+#endif
 
 #include <netinet/in.h>
 #ifndef __NetBSD__
 #include <netinet/if_ether.h>
+#endif
 #ifdef __FreeBSD__
 #include <netinet/if_fddi.h>
-#else
-#include <net/if_fddi.h>
 #endif
 #ifdef __OpenBSD__
 #include <netinet/ip_ipsp.h>
 #endif
-#else /* __NetBSD__ */
-#include <net/if_ether.h>
-#include <netinet/if_inarp.h>
-#include <net/if_fddi.h>
-#endif /* __NetBSD__ */
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -258,35 +259,17 @@ nd6_setmtu0(ifp, ndi)
 	omaxmtu = ndi->maxmtu;
 
 	switch (ifp->if_type) {
-	case IFT_ARCNET:	/* XXX MTU handling needs more work */
-		ndi->maxmtu = MIN(60480, ifp->if_mtu);
+#ifdef ARC_PHDS_MAXMTU
+	case IFT_ARCNET:
+		ndi->maxmtu = MIN(ARC_PHDS_MAXMTU, ifp->if_mtu); /* RFC2497 */
 		break;
-	case IFT_ETHER:
-		ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
-		break;
+#endif
 #ifdef IFT_FDDI
 	case IFT_FDDI:
 #ifdef FDDIIPMTU
 		ndi->maxmtu = MIN(FDDIIPMTU, ifp->if_mtu);
 #else
 		ndi->maxmtu = MIN(FDDIMTU, ifp->if_mtu);
-#endif
-		break;
-#endif
-#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
-	case IFT_ATM:
-		ndi->maxmtu = MIN(ATMMTU, ifp->if_mtu);
-		break;
-#endif
-	case IFT_IEEE1394:	/* XXX should be IEEE1394MTU(1500) */
-		ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
-		break;
-#ifdef IFT_IEEE80211
-	case IFT_IEEE80211:	/* XXX should be IEEE80211MTU(1500) */
-#ifdef IEEE80211_MTU
-		ndi->maxmtu = MIN(IEEE80211_MTU, ifp->if_mtu);
-#else
-		ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
 #endif
 		break;
 #endif
