@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.55 2000/08/29 09:09:38 itojun Exp $
+	$KAME: RELNOTES,v 1.56 2000/09/06 00:31:09 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -23,6 +23,10 @@ abnormal program termination and other things:
   (like FreeBSD-origin LKM binary and KAME kernel)
 - mix dynamic linked modules for non-IPv6 ready program, with IPv6-ready
   parent program (like non-IPv6 apache modules and IPv6-ready apache)
+- mix non-KAME userland binary with KAME kernel.  it depends on what kind of
+  kernel API the binary uses.
+  Example: *BSD-origin netstat will not work with KAME kernel, as it touches
+	kmem and we changed the size of inpcb between *BSD and KAME kernel.
 
 The caveat does not apply to KAME code merged into *BSD - merged code
 will maintain the backward compatibility policy decided by *BSD team.
