@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.46 2001/08/01 09:20:14 sumikawa Exp $
+$KAME: FAQ,v 1.47 2001/08/02 14:32:24 jinmei Exp $
 
 
 GENERAL
@@ -409,6 +409,9 @@ Q: Don't you release new IPv6 patch for apache1.3.x?
 
 	martti.kuparinen@iki.fi takes over the maintainance. Latest
 	IPv6 patch are available at ftp://ftp.piuha.net/pub/misc/.
+
+Q: Why don't KAME's getaddrinfo/getnameinfo support PF_LOCAL?
+	A: TBD
 
 LICENSE AND CRYPTO EXPORT
 =========================
