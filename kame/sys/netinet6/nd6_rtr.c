@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.123 2001/06/26 14:01:18 sakane Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.124 2001/06/29 04:30:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -697,6 +697,20 @@ defrouter_select()
 	struct llinfo_nd6 *ln = NULL;
 
 	/*
+	 * This function should be called only when acting as an autoconfigured
+	 * host.  Although the remaining part of this function is not effective
+	 * if the node is not an autoconfigured host, we explicitly exclude
+	 * such cases here for safety.
+	 */
+	if (ip6_forwarding || !ip6_accept_rtadv) {
+#ifdef DIAGNOSTIC
+		printf("defrouter_select: called unexpectedly (forwarding=%d, "
+		       "accept_rtadv=%d)\n", ip6_forwarding, ip6_accept_rtadv);
+#endif
+		return;
+	}
+
+	/*
 	 * Search for a (probably) reachable router from the list.
 	 * XXX: nd_defrouter_primary is initialized to point to the first entry
 	 * of the list, in case of all the entries are not
@@ -738,6 +752,9 @@ defrouter_select()
 		 * XXX: The specification does not say this mechanism should
 		 * be restricted to hosts, but this would be not useful
 		 * (even harmful) for routers.
+		 * This test is meaningless due to a test at the beginning of
+		 * the function, but we intentionally keep it to make the note
+		 * clear.
 		 */
 		if (!ip6_forwarding) {
 			/*
