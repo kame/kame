@@ -110,7 +110,15 @@ extern struct ifnet encif;
 int	rttrash;		/* routes not in table but not freed */
 struct	sockaddr wildcard;	/* zero valued cookie for wildcard searches */
 
+/* XXX do these values make any sense? */
+static int rt_cache_hiwat = 4096;
+static int rt_cache_lowat = 1024;
+
+static int rt_cachetimeout = 3600;	/* should be configurable */
+static struct rttimer_queue *rt_cache_timeout_q = NULL;
+
 static int okaytoclone __P((u_int, int));
+static void rt_draincache __P((void));
 
 #ifdef IPSEC
 
@@ -142,6 +150,8 @@ route_init()
 	rn_art_init();	/* initialize all zeroes, all ones, mask table */
 #endif
 	rtable_init((void **)rt_tables);
+
+	rt_cache_timeout_q = rt_timer_queue_create(rt_cachetimeout);
 }
 
 void
@@ -183,8 +193,8 @@ rtalloc2(dst, report,howstrict)
 		newrt = rt = (struct rtentry *)rn;
 		if (report && (rt->rt_flags & RTF_CLONING) &&
 		    okaytoclone(rt->rt_flags, howstrict)) {
-			err = rtrequest(RTM_RESOLVE, dst, SA(0), SA(0), 0,
-			    &newrt);
+			err = rtrequest(RTM_RESOLVE, dst, SA(0), SA(0),
+			    RTF_CACHE, &newrt);
 			if (err) {
 				newrt = rt;
 				rt->rt_refcnt++;
@@ -237,7 +247,7 @@ rtalloc1(dst, report)
 		newrt = rt = (struct rtentry *)rn;
 		if (report && (rt->rt_flags & RTF_CLONING)) {
 			err = rtrequest(RTM_RESOLVE, dst, SA(NULL),
-			    SA(NULL), 0, &newrt);
+			    SA(NULL), RTF_CACHE, &newrt);
 			if (err) {
 				newrt = rt;
 				rt->rt_refcnt++;
@@ -569,6 +579,7 @@ rtrequest1(req, info, ret_nrt)
 	struct rtentry **ret_nrt;
 {
 	int s = splsoftnet(); int error = 0;
+	int cache = 0;
 	register struct rtentry *rt;
 	register struct radix_node *rn;
 	register struct radix_node_head *rnh;
@@ -580,6 +591,8 @@ rtrequest1(req, info, ret_nrt)
 		senderr(EAFNOSUPPORT);
 	if (flags & RTF_HOST)
 		netmask = 0;
+	if (flags & RTF_CACHE)
+		cache = 1;
 	switch (req) {
 	case RTM_DELETE:
 		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh)) == NULL)
@@ -618,6 +631,18 @@ rtrequest1(req, info, ret_nrt)
 			senderr(error);
 		ifa = info->rti_ifa;
 	makeroute:
+		if (cache) {
+			unsigned long rtcount;
+
+			rtcount = rt_timer_count(rt_cache_timeout_q);
+			if (0 <= rt_cache_hiwat && rtcount > rt_cache_hiwat) {
+				senderr(ENOBUFS);
+			} else if (0 <= rt_cache_lowat &&
+				   rtcount > rt_cache_lowat) {
+				/* remove stale routes */
+				rt_draincache();
+			}
+		}
 		R_Malloc(rt, struct rtentry *, sizeof(*rt));
 		if (rt == NULL)
 			senderr(ENOBUFS);
@@ -667,6 +692,9 @@ rtrequest1(req, info, ret_nrt)
 			*ret_nrt = rt;
 			rt->rt_refcnt++;
 		}
+
+		if (cache)
+			rt_timer_add(rt, NULL, rt_cache_timeout_q);
 		break;
 	}
 bad:
@@ -1054,4 +1082,27 @@ rt_timer_timer(arg)
 	splx(s);
 
 	timeout_add(to, hz);		/* every second */
+}
+
+static void
+rt_draincache()
+{
+	int s;
+	struct rttimer *r, *r_next;
+
+	s = splsoftnet();
+
+	for (r = TAILQ_FIRST(&rt_cache_timeout_q->rtq_head); r; r = r_next) {
+		r_next = TAILQ_NEXT(r, rtt_next);
+
+		if (r->rtt_rt->rt_refcnt == 0) {
+			/*
+			 * we expect RTTIMER_CALLOUT calls rtrequest(DELETE),
+			 * which will remove the associated route and unlink
+			 * the timer entry.
+			 */
+			RTTIMER_CALLOUT(r);
+		}
+	}
+	splx(s);
 }

@@ -158,6 +158,8 @@ struct ortentry {
 #define RTF_PROTO2	0x4000		/* protocol specific routing flag */
 #define RTF_PROTO1	0x8000		/* protocol specific routing flag */
 
+#define RTF_CACHE	0x10000		/* cached route in general */
+
 #ifndef _KERNEL
 /* obsoleted */
 #define	RTF_TUNNEL	0x100000	/* Tunnelling bit. */
