@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.70 2000/08/11 04:50:44 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.71 2000/08/13 20:06:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -220,7 +220,7 @@ long npackets;			/* max packets to transmit */
 long nreceived;			/* # of packets we got back */
 long nrepeats;			/* number of duplicates */
 long ntransmitted;		/* sequence # for outbound packets = #sent */
-int interval = 1;		/* interval between packets */
+struct timeval interval = {1, 0}; /* interval between packets */
 int hoplimit = -1;		/* hoplimit */
 
 /* timing */
@@ -293,6 +293,7 @@ main(argc, argv)
 	char *policy_in = NULL;
 	char *policy_out = NULL;
 #endif
+	double intval;
 
 	/* just to be sure */
 	memset(&smsghdr, 0, sizeof(&smsghdr));
@@ -390,10 +391,23 @@ main(argc, argv)
 #endif
 			break;
 		case 'i':		/* wait between sending packets */
-			interval = strtol(optarg, &e, 10);
-			if (interval <= 0 || *optarg == '\0' || *e != '\0')
-				errx(1,
-				    "illegal timing interval -- %s", optarg);
+			intval = strtod(optarg, &e);
+			if (*optarg == '\0' || *e != '\0')
+				errx(1, "illegal timing interval %s", optarg);
+			if (intval < 1 && getuid()) {
+				errx(1, "%s: only root may use interval < 1s",
+				    strerror(EPERM));
+			}
+			interval.tv_sec = (long)intval;
+			interval.tv_usec =
+			    (long)((intval - interval.tv_sec) * 1000000);
+			if (interval.tv_sec < 0)
+				errx(1, "illegal timing interval %s", optarg);
+			/* less than 1/hz does not make sense */
+			if (interval.tv_sec == 0 && interval.tv_usec < 10000) {
+				warnx("too small interval, raised to 0.01");
+				interval.tv_usec = 10000;
+			}
 			options |= F_INTERVAL;
 			break;
 		case 'l':
@@ -897,8 +911,7 @@ main(argc, argv)
 
 	if ((options & F_FLOOD) == 0) {
 		(void)signal(SIGALRM, onalrm);
-		itimer.it_interval.tv_sec = interval;
-		itimer.it_interval.tv_usec = 0;
+		itimer.it_interval = interval;
 		itimer.it_value.tv_sec = 0;
 		itimer.it_value.tv_usec = 1;
 		(void)setitimer(ITIMER_REAL, &itimer, NULL);
