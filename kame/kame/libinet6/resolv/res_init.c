@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_init.c	8.1 (Berkeley) 6/7/93";
-static char rcsid[] = "$Id: res_init.c,v 1.10 2000/06/18 20:56:00 itojun Exp $";
+static char rcsid[] = "$Id: res_init.c,v 1.11 2000/11/06 16:50:07 sumikawa Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -375,6 +375,8 @@ res_init()
 			}
 			nserv++;
 		    }
+		    if (res)
+			freeaddrinfo(res);
 #else /* INET6 */
 		    if ((*cp != '\0') && (*cp != '\n') && inet_aton(cp, &a)) {
 			_res.nsaddr_list[nserv].sin_addr = a;
