@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.188 1999/10/17 13:41:15 jinmei Exp $
+$Id: CHANGELOG,v 1.189 1999/10/17 13:46:02 jinmei Exp $
 
 <199910>
+1999-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_lookup): added a sanity check for
+	the interface at the end of the function. This will prevent
+	invalid redirect messages when there is rooting loop with an
+	adjacent router.
+
 1999-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/ripng.c (rip_process_response): logged prefix and
 	interface for non-routable prefixes or for a prefix with an
