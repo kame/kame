@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.16 2001/04/02 06:59:12 jinmei Exp $
+$Id: INSTALL,v 1.17 2001/04/27 01:56:28 jinmei Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -116,3 +116,12 @@ E-5. /etc/rc.d/network executes "route -n flush" by default, which removes
      flushroutes=NO
      Note that the latter approach suppresses the flush of IPv4
      routes.
+
+     Note: as for fe80::%lo0/64, KAME snaps after 2001-04-27 would
+     prevent the route from being removed accidentally.  However,
+     executing 'route flush' could still be confusing, since it would
+     remove the default route automatically installed by the kernel
+     upon receiving Router Advertisements.  Once removed, the default
+     route would not be reinstalled even solicting additional router
+     advertisements, because the kernel still believes the existence
+     of the router using its internal list.
