@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.58 2000/03/07 05:27:51 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.59 2000/03/11 09:30:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -376,7 +376,8 @@ in6_control(so, cmd, data, ifp)
 #ifdef COMPAT_IN6IFIOCTL
 	struct sockaddr_in6 net;
 #endif 
-	int	error = 0, hostIsNew, prefixIsNew;
+	int error = 0, hostIsNew, prefixIsNew;
+	int newifaddr;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_t time_second = (time_t)time.tv_sec;
 #endif
@@ -598,7 +599,10 @@ in6_control(so, cmd, data, ifp)
 			    ifa_list);
 #endif
 			ia->ia_ifa.ifa_refcnt++;
-		}
+
+			newifaddr = 1;
+		} else
+			newifaddr = 0;
 
 		if (cmd == SIOCAIFADDR_IN6) {
 			/* sanity for overflow - beware unsigned */
@@ -749,7 +753,44 @@ in6_control(so, cmd, data, ifp)
 		break;
 
 	case SIOCSIFADDR_IN6:
-		return(in6_ifinit(ifp, ia, &ifr->ifr_addr, 1));
+		error = in6_ifinit(ifp, ia, &ifr->ifr_addr, 1);
+  undo:
+		if (error && newifaddr) {
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+			if ((ifa = ifp->if_addrlist) == ia62ifa(ia))
+				ifp->if_addrlist = ifa->ifa_next;
+			else {
+				while (ifa->ifa_next &&
+				       (ifa->ifa_next != ia62ifa(ia)))
+					ifa = ifa->ifa_next;
+				if (ifa->ifa_next)
+					ifa->ifa_next = ia62ifa(ia)->ifa_next;
+				else {
+					printf("Couldn't unlink in6_ifaddr "
+					    "from ifp\n");
+				}
+			}
+#else
+			TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
+#endif
+			IFAFREE(&ia->ia_ifa);
+
+			oia = ia;
+			if (oia == (ia = in6_ifaddr))
+				in6_ifaddr = ia->ia_next;
+			else {
+				while (ia->ia_next && (ia->ia_next != oia))
+					ia = ia->ia_next;
+				if (ia->ia_next)
+					ia->ia_next = oia->ia_next;
+				else {
+					printf("Didn't unlink in6_ifaddr "
+					    "from list\n");
+				}
+			}
+			IFAFREE(&ia->ia_ifa);
+		}
+		return error;
 
 #ifdef COMPAT_IN6IFIOCTL		/* XXX should be unused */
 	case SIOCSIFNETMASK_IN6:
@@ -829,8 +870,11 @@ in6_control(so, cmd, data, ifp)
 			}
 			prefixIsNew = 1; /* We lie; but effect's the same */
 		}
-		if (hostIsNew || prefixIsNew)
+		if (hostIsNew || prefixIsNew) {
 			error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0);
+			if (error)
+				goto undo;
+		}
 		if (hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
 			int error_local = 0;
 
