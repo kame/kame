@@ -476,31 +476,31 @@ in6_multientry(mc)
 			printf("mldv?(%d)", rt6i.rt6i_type);
 			break;
 		}
-	}
 
 #ifdef HAVE_MLDV2
-	if (multi.in6m_source == NULL) {
-		printf("\n");
-		return(multi.in6m_entry.le_next);
-	}
+		if (multi.in6m_source == NULL) {
+			printf("\n");
+			return(multi.in6m_entry.le_next);
+		}
 
-	KREAD(multi.in6m_source, &src, struct in6_multi_source);
-	printf(" mode=%s grpjoin=%d\n",
-		src.i6ms_mode == MCAST_INCLUDE ? "include" :
-		src.i6ms_mode == MCAST_EXCLUDE ? "exclude" :
-		"???",
-		src.i6ms_grpjoin);
-	in6_addr_slistentry(src.i6ms_cur, "current");
-	in6_addr_slistentry(src.i6ms_rec, "recorded");
-	in6_addr_slistentry(src.i6ms_in, "included");
-	in6_addr_slistentry(src.i6ms_ex, "excluded");
-	in6_addr_slistentry(src.i6ms_alw, "allowed");
-	in6_addr_slistentry(src.i6ms_blk, "blocked");
-	in6_addr_slistentry(src.i6ms_toin, "to-include");
-	in6_addr_slistentry(src.i6ms_ex, "to-exclude");
+		KREAD(multi.in6m_source, &src, struct in6_multi_source);
+		printf(" mode=%s grpjoin=%d\n",
+		    src.i6ms_mode == MCAST_INCLUDE ? "include" :
+		    src.i6ms_mode == MCAST_EXCLUDE ? "exclude" :
+		    "???",
+		    src.i6ms_grpjoin);
+		in6_addr_slistentry(src.i6ms_cur, "current");
+		in6_addr_slistentry(src.i6ms_rec, "recorded");
+		in6_addr_slistentry(src.i6ms_in, "included");
+		in6_addr_slistentry(src.i6ms_ex, "excluded");
+		in6_addr_slistentry(src.i6ms_alw, "allowed");
+		in6_addr_slistentry(src.i6ms_blk, "blocked");
+		in6_addr_slistentry(src.i6ms_toin, "to-include");
+		in6_addr_slistentry(src.i6ms_ex, "to-exclude");
 #else
-	printf("\n");
+		printf("\n");
 #endif
+	}
 	return(multi.in6m_entry.le_next);
 }
 
@@ -670,36 +670,36 @@ in_multientry(mc)
 			printf("igmpv?(%d)", rti.rti_type);
 			break;
 		}
-	}
 
 #ifdef HAVE_IGMPV3
-	if (multi.inm_source == NULL) {
+		if (multi.inm_source == NULL) {
+			printf("\n");
+			return (multi.inm_list.le_next);
+		}
+
+		KREAD(multi.inm_source, &src, struct in_multi_source);
+		printf(" mode=%s grpjoin=%d\n",
+		    src.ims_mode == MCAST_INCLUDE ? "include" :
+		    src.ims_mode == MCAST_EXCLUDE ? "exclude" :
+		    "???",
+		    src.ims_grpjoin);
+		in_addr_slistentry(src.ims_cur, "current");
+		in_addr_slistentry(src.ims_rec, "recorded");
+		in_addr_slistentry(src.ims_in, "included");
+		in_addr_slistentry(src.ims_ex, "excluded");
+		in_addr_slistentry(src.ims_alw, "allowed");
+		in_addr_slistentry(src.ims_blk, "blocked");
+		in_addr_slistentry(src.ims_toin, "to-include");
+		in_addr_slistentry(src.ims_ex, "to-exclude");
+#else
 		printf("\n");
-		return(multi.inm_list.le_next);
+#endif
 	}
 
-	KREAD(multi.inm_source, &src, struct in_multi_source);
-	printf(" mode=%s grpjoin=%d\n",
-		src.ims_mode == MCAST_INCLUDE ? "include" :
-		src.ims_mode == MCAST_EXCLUDE ? "exclude" :
-		"???",
-		src.ims_grpjoin);
-	in_addr_slistentry(src.ims_cur, "current");
-	in_addr_slistentry(src.ims_rec, "recorded");
-	in_addr_slistentry(src.ims_in, "included");
-	in_addr_slistentry(src.ims_ex, "excluded");
-	in_addr_slistentry(src.ims_alw, "allowed");
-	in_addr_slistentry(src.ims_blk, "blocked");
-	in_addr_slistentry(src.ims_toin, "to-include");
-	in_addr_slistentry(src.ims_ex, "to-exclude");
-#else
-	printf("\n");
-#endif
-
 #ifdef __bsdi__
-	return(multi.inm_next);
+	return (multi.inm_next);
 #else
-	return(multi.inm_list.le_next);
+	return (multi.inm_list.le_next);
 #endif
 #ifdef __bsdi__
 #undef rti_type
