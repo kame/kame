@@ -1,4 +1,4 @@
-/*	$KAME: dns6conv.c,v 1.7 2001/09/05 03:31:47 jinmei Exp $ */
+/*	$KAME: dns6conv.c,v 1.8 2001/09/07 06:47:38 jinmei Exp $ */
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -47,6 +47,7 @@ static struct sockaddr_in6 *cut __P((const struct sockaddr_in6 *, int, int));
 static char *cut_bitlabel __P((const struct in6_addr *, int, int));
 static void print_bitstring __P((const char *, int));
 static void print_nibble __P((const char *, int));
+static char *fmt_t2s __P((int));
 static void usage __P((void));
 
 int
@@ -111,6 +112,10 @@ main(argc, argv)
 	/* bit length validation: 0 <= beg < end <= 128 */
 	if (beg < 0 || end < 0 || beg > 128 || end > 128 || beg > end)
 		errx(1, "beginbit(%d) or endbit(%d) are invalid", beg, end);
+
+	fprintf(stderr,
+		"dns6conv: translate %s into the %s format, from %d to %d\n",
+		addr, fmt_t2s(fmttype), beg, end);
 
 	switch(fmttype) {
 	case a6:
@@ -274,6 +279,21 @@ print_nibble(cp0, blen)
 	printf("\n");
 
 	return;
+}
+
+static char *
+fmt_t2s(int fmttype)
+{
+	switch(fmttype) {
+	case a6:
+		return("a6");
+	case bitlabel:
+		return("bitlabel");
+	case nibble:
+		return("nibble");
+	}
+
+	return(NULL);
 }
 
 static void
