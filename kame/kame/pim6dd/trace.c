@@ -1,4 +1,4 @@
-/*	$KAME: trace.c,v 1.8 2001/12/18 03:10:42 jinmei Exp $	*/
+/*	$KAME: trace.c,v 1.9 2003/09/02 09:57:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -119,7 +119,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	if (datalen == QLEN) {
 		type = QUERY;
 		IF_DEBUG(DEBUG_TRACE)
-			log(LOG_DEBUG, 0, "Initial traceroute query rcvd "
+			log_msg(LOG_DEBUG, 0, "Initial traceroute query rcvd "
 			    "from %s to %s",
 			    inet6_fmt(&src->sin6_addr),
 			    inet6_fmt(dst));
@@ -127,18 +127,18 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	else if ((datalen - QLEN) % RLEN == 0) {
 		type = RESP;
 		IF_DEBUG(DEBUG_TRACE)
-			log(LOG_DEBUG, 0, "In-transit traceroute query rcvd "
+			log_msg(LOG_DEBUG, 0, "In-transit traceroute query rcvd "
 			    "from %s to %s",
 			    inet6_fmt(&src->sin6_addr),
 			    inet6_fmt(dst));
 		if (IN6_IS_ADDR_MULTICAST(dst)) {
 			IF_DEBUG(DEBUG_TRACE)
-				log(LOG_DEBUG, 0, "Dropping multicast response");
+				log_msg(LOG_DEBUG, 0, "Dropping multicast response");
 			return;
 		}
 	}
 	else {
-		log(LOG_WARNING, 0, "%s from %s to %s",
+		log_msg(LOG_WARNING, 0, "%s from %s to %s",
 		    "Non decipherable traceroute request recieved",
 		    inet6_fmt(&src->sin6_addr), inet6_fmt(dst));
 		return;
@@ -161,17 +161,17 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	 */
 	if ((rcount = (datalen - QLEN)/RLEN) == no) {
 		IF_DEBUG(DEBUG_TRACE)
-			log(LOG_DEBUG, 0, "packet with all reports filled in");
+			log_msg(LOG_DEBUG, 0, "packet with all reports filled in");
 		return;
 	}
 
 	IF_DEBUG(DEBUG_TRACE) {
-		log(LOG_DEBUG, 0, "s: %s g: %s d: %s ",
+		log_msg(LOG_DEBUG, 0, "s: %s g: %s d: %s ",
 		    inet6_fmt(&qry->tr_src),
 		    inet6_fmt(group), inet6_fmt(&qry->tr_dst));
-		log(LOG_DEBUG, 0, "rhlim: %d rd: %s", qry->tr_rhlim,
+		log_msg(LOG_DEBUG, 0, "rhlim: %d rd: %s", qry->tr_rhlim,
 		    inet6_fmt(&qry->tr_raddr));
-		log(LOG_DEBUG, 0, "rcount:%d, qid:%06x", rcount, qry->tr_qid);
+		log_msg(LOG_DEBUG, 0, "rcount:%d, qid:%06x", rcount, qry->tr_qid);
 	}
 
 	/* determine the routing table entry for this traceroute */
@@ -183,16 +183,16 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 				parent_address = mrt->upstream->address.sin6_addr;
 			else
 				parent_address = in6addr_any;
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "mrt parent mif: %d rtr: %s metric: %d",
 			    mrt->incoming,
 			    inet6_fmt(&parent_address), mrt->metric);
 			/* TODO
-			   log(LOG_DEBUG, 0, "mrt origin %s",
+			   log_msg(LOG_DEBUG, 0, "mrt origin %s",
 			   RT_FMT(rt, s1));
 			*/
 		} else
-			log(LOG_DEBUG, 0, "...no route");
+			log_msg(LOG_DEBUG, 0, "...no route");
 	}
     
 	/*
@@ -214,14 +214,14 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 			 * interfaces on the router, it is not fatal.
 			 */
 			IF_DEBUG(DEBUG_TRACE)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "ignoring duplicate traceroute packet");
 			return;
 		}
 
 		if (mrt == (mrtentry_t *)NULL) {
 			IF_DEBUG(DEBUG_TRACE)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "Mcast traceroute: no route entry %s",
 				    inet6_fmt(&qry->tr_src));
 #if 0
@@ -237,7 +237,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 			 * my subnet vifs.
 			 */
 			IF_DEBUG(DEBUG_TRACE)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "Destination %s not an interface",
 				    inet6_fmt(&qry->tr_dst));
 			if (IN6_IS_ADDR_MULTICAST(dst))
@@ -246,7 +246,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		} else if (mrt != (mrtentry_t *)NULL &&
 			   !IF_ISSET(vifi, &mrt->oifs)) {
 			IF_DEBUG(DEBUG_TRACE)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "Destination %s not on forwarding tree "
 				    "for src %s",
 				    inet6_fmt(&qry->tr_dst),
@@ -264,7 +264,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		 */
 		if ((vifi = find_vif_direct(src)) == NO_VIF) {
 			IF_DEBUG(DEBUG_TRACE)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "Wrong interface for packet");
 			errcode = TR_WRONG_IF;
 		}
@@ -274,7 +274,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	oqid = qry->tr_qid;
 
 	IF_DEBUG(DEBUG_TRACE)
-		log(LOG_DEBUG, 0, "Sending traceroute response");
+		log_msg(LOG_DEBUG, 0, "Sending traceroute response");
     
 	/* copy the packet to the sending buffer */
 	p = mld6_send_buf + sizeof(struct mld_hdr);
@@ -308,7 +308,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	resp->tr_outifid = (vifi == NO_VIF) ? TR_NO_VIF : htonl(vifi);
 	resp->tr_rflags  = errcode;
 	if ((sa_global = max_global_address()) == NULL)	/* impossible */
-		log(LOG_ERR, 0, "acept_mtrace: max_global_address returns NULL");
+		log_msg(LOG_ERR, 0, "acept_mtrace: max_global_address returns NULL");
 	resp->tr_lcladdr = sa_global->sin6_addr;
 
 	/*
@@ -397,7 +397,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		resp->tr_rmtaddr = parent_address;
 		if (!IF_ISSET(vifi, &mrt->oifs)) {
 			IF_DEBUG(DEBUG_TRACE)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "Destination %s not on forwarding tree "
 				    "for src %s",
 				    inet6_fmt(&qry->tr_dst),
@@ -429,7 +429,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	 * mtrace, set an error code and send to requestor anyway.
 	 */
 	IF_DEBUG(DEBUG_TRACE)
-		log(LOG_DEBUG, 0, "rcount:%d, no:%d", rcount, no);
+		log_msg(LOG_DEBUG, 0, "rcount:%d, no:%d", rcount, no);
 
 	ovifi = NO_VIF;		/* unspecified */
 	if ((rcount + 1 == no) || (mrt == NULL) || (mrt->metric == 1)) {
@@ -438,7 +438,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		if (IN6_IS_ADDR_LINKLOCAL(&resp_sa6.sin6_addr) ||
 		    IN6_IS_ADDR_MC_LINKLOCAL(&resp_sa6.sin6_addr)) {
 			if ((ovifi = find_vif_direct(&dst_sa6)) == NO_VIF) {
-				log(LOG_INFO, 0,
+				log_msg(LOG_INFO, 0,
 				    "can't determine outgoing i/f for mtrace "
 				    "response.");
 				return;
@@ -457,7 +457,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 #ifdef SM_ONLY
 		if (mrt->incoming &&
 		    (uvifs[mrt->incoming].uv_flags & MIFF_REGISTER)) {
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "incoming i/f is for register. "
 			    "Can't be forwarded anymore.");
 				resp_sa6.sin6_addr = qry->tr_raddr;
@@ -492,14 +492,14 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 			if (phys_vif != -1 &&
 			    (sa6 = uv_global(phys_vif)) != NULL) {
 				IF_DEBUG(DEBUG_TRACE)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "Sending reply to %s from %s",
 					    inet6_fmt(dst),
 					    inet6_fmt(&sa6->sin6_addr));
 				ifindex = uvifs[phys_vif].uv_ifindex;
 			}
 			else {
-				log(LOG_INFO, 0, "No enabled phyints -- %s",
+				log_msg(LOG_INFO, 0, "No enabled phyints -- %s",
 				    "dropping traceroute reply");
 				return;
 			}
@@ -519,7 +519,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		}
 
 		IF_DEBUG(DEBUG_TRACE)
-			log(LOG_DEBUG, 0, "Sending %s to %s from %s",
+			log_msg(LOG_DEBUG, 0, "Sending %s to %s from %s",
 			    resptype == MLD_MTRACE_RESP ?
 			    "reply" : "request on",
 			    inet6_fmt(dst),

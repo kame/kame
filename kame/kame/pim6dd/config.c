@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.9 2002/06/21 13:55:04 suz Exp $	*/
+/*	$KAME: config.c,v 1.10 2003/09/02 09:57:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -86,7 +86,7 @@ config_vifs_from_kernel()
     
 #ifdef HAVE_GETIFADDRS
     if (getifaddrs(&ifap))
-	log(LOG_ERR, errno, "getiaddrs");
+	log_msg(LOG_ERR, errno, "getiaddrs");
 
     /*
      * Loop through all of the interfaces.
@@ -168,7 +168,7 @@ config_vifs_from_kernel()
 	 * If there is room in the uvifs array, install this interface.
 	 */
 	if (numvifs == MAXMIFS) {
-	    log(LOG_WARNING, 0, "too many ifs, ignoring %s", ifa->ifa_name);
+	    log_msg(LOG_WARNING, 0, "too many ifs, ignoring %s", ifa->ifa_name);
 	    continue;
 	}
 
@@ -207,7 +207,7 @@ config_vifs_from_kernel()
 	
 	if (flags & IFF_POINTOPOINT)
 	    v->uv_flags |= (VIFF_REXMIT_PRUNES | VIFF_POINT_TO_POINT);
-	log(LOG_INFO, 0,
+	log_msg(LOG_INFO, 0,
 	    "installing %s as if #%u - rate=%d",
 	    v->uv_name, numvifs, v->uv_rate_limit);
 	++numvifs;
@@ -230,7 +230,7 @@ config_vifs_from_kernel()
 	caddr_t newbuf;
 
 	if (ioctl(udp_socket, SIOCGIFCONF, (char *)&ifc) < 0)
-	    log(LOG_ERR, errno, "ioctl SIOCGIFCONF");
+	    log_msg(LOG_ERR, errno, "ioctl SIOCGIFCONF");
 	
 	/*
 	 * If the buffer was large enough to hold all the addresses
@@ -253,7 +253,7 @@ config_vifs_from_kernel()
 	ifc.ifc_buf = newbuf;
     }
     if (ifc.ifc_buf == NULL)
-	log(LOG_ERR, 0, "config_vifs_from_kernel: ran out of memory");
+	log_msg(LOG_ERR, 0, "config_vifs_from_kernel: ran out of memory");
     
     ifrp = (struct ifreq *)ifc.ifc_buf;
     ifend = (struct ifreq *)(ifc.ifc_buf + ifc.ifc_len);
@@ -295,7 +295,7 @@ config_vifs_from_kernel()
 	 * support multicast.
 	 */
 	if (ioctl(udp_socket, SIOCGIFFLAGS, (char *)&ifr) < 0)
-	    log(LOG_ERR, errno, "ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
+	    log_msg(LOG_ERR, errno, "ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
 	flags = ifr.ifr_flags;
 	if ((flags & (IFF_LOOPBACK | IFF_MULTICAST)) != IFF_MULTICAST)
 	    continue;
@@ -305,7 +305,7 @@ config_vifs_from_kernel()
 	 */
 	ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifrp->ifr_addr;
 	if (ioctl(udp_socket, SIOCGIFNETMASK_IN6, (char *)&ifr6) < 0)
-	    log(LOG_ERR, errno, "ioctl SIOCGIFNETMASK_IN6 for %s",
+	    log_msg(LOG_ERR, errno, "ioctl SIOCGIFNETMASK_IN6 for %s",
 		ifr6.ifr_name);
 	memcpy(&mask, &ifr6.ifr_addr.sin6_addr, sizeof(mask));
 
@@ -341,7 +341,7 @@ config_vifs_from_kernel()
 	 * If there is room in the uvifs array, install this interface.
 	 */
 	if (numvifs == MAXMIFS) {
-	    log(LOG_WARNING, 0, "too many ifs, ignoring %s", ifr.ifr_name);
+	    log_msg(LOG_WARNING, 0, "too many ifs, ignoring %s", ifr.ifr_name);
 	    continue;
 	}
 
@@ -380,7 +380,7 @@ config_vifs_from_kernel()
 	
 	if (flags & IFF_POINTOPOINT)
 	    v->uv_flags |= (VIFF_REXMIT_PRUNES | VIFF_POINT_TO_POINT);
-	log(LOG_INFO, 0,
+	log_msg(LOG_INFO, 0,
 	    "installing %s as if #%u - rate=%d",
 	    v->uv_name, numvifs, v->uv_rate_limit);
 	++numvifs;
@@ -408,7 +408,7 @@ add_phaddr(v, addr, mask, rmt)
 	int i;
 
 	if ((pa = malloc(sizeof(*pa))) == NULL)
-		log(LOG_ERR, 0, "add_phaddr: memory exhausted");
+		log_msg(LOG_ERR, 0, "add_phaddr: memory exhausted");
 
 	memset(pa, 0, sizeof(*pa));
 	pa->pa_addr = *addr;
@@ -427,7 +427,7 @@ add_phaddr(v, addr, mask, rmt)
 
 	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {
 		if (v->uv_linklocal) {
-			log(LOG_WARNING, 0,
+			log_msg(LOG_WARNING, 0,
 			    "add_phaddr: found more than one link-local "
 			    "address on %s",
 			    v->uv_name);
@@ -503,14 +503,14 @@ parse_phyint(s)
     u_int n;
     
     if (EQUAL((w = next_word(&s)), "")) {
-	log(LOG_WARNING, 0, "Missing phyint in %s", configfilename);
+	log_msg(LOG_WARNING, 0, "Missing phyint in %s", configfilename);
 	return(FALSE);
     }		/* if empty */
     ifname = w;
     
     for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
 	if (vifi == numvifs) {
-	    log(LOG_WARNING, 0,
+	    log_msg(LOG_WARNING, 0,
 		"phyint %s in %s is not a configured interface",
 		ifname, configfilename);
 	    return(FALSE);
@@ -526,18 +526,18 @@ parse_phyint(s)
 		v->uv_flags |= VIFF_NOLISTENER;
 	    else if(EQUAL(w, "preference")) {
                 if(EQUAL((w = next_word(&s)), "")) 
-                    log(LOG_WARNING, 0,
+                    log_msg(LOG_WARNING, 0,
                         "Missing preference for phyint %s in %s",
                         ifname, configfilename);
                 else if (sscanf(w, "%u%c", &n, &c) != 1 ||
                          n < 1 || n > 255 )
-                    log(LOG_WARNING, 0,
+                    log_msg(LOG_WARNING, 0,
                         "Invalid preference '%s' for phyint %s in %s",
                         w, ifname,
                         configfilename);
 		else {
 		    IF_DEBUG(DEBUG_ASSERT)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "Config setting default local preference on %s to %d.", 
 			    ifname, n);
 		    v->uv_local_pref = n;
@@ -545,18 +545,18 @@ parse_phyint(s)
 	    
 	    } else if(EQUAL(w, "metric")) {
                 if(EQUAL((w = next_word(&s)), "")) 
-                    log(LOG_WARNING, 0,
+                    log_msg(LOG_WARNING, 0,
                         "Missing metric for phyint %s in %s",
                         ifname, configfilename);
                 else if (sscanf(w, "%u%c", &n, &c) != 1 ||
                          n < 1 || n > 1024 )
-                    log(LOG_WARNING, 0,
+                    log_msg(LOG_WARNING, 0,
                         "Invalid metric '%s' for phyint %s in %s",
                         w, ifname,
                         configfilename);
 		else {
 		    IF_DEBUG(DEBUG_ASSERT)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "Config setting default local metric on %s to %d.", 
 			    ifname, n);
 		    v->uv_local_metric = n;
@@ -580,7 +580,7 @@ parse_filter(s)
 	int plen = 0, filtertype;
 
 	if (EQUAL((groups = next_word(&s)), "")) {
-		log(LOG_WARNING, 0, "Missing multicast group in %s",
+		log_msg(LOG_WARNING, 0, "Missing multicast group in %s",
 		    configfilename);
 		return(FALSE);
 	}
@@ -599,12 +599,12 @@ parse_filter(s)
 		*p = '\0';
 		if (inet_pton(AF_INET6, maddr1, (void *)&grp1) != 1 ||
 		    !IN6_IS_ADDR_MULTICAST(&grp1)) {
-			log(LOG_WARNING, 0, "invalid group address %s", maddr1);
+			log_msg(LOG_WARNING, 0, "invalid group address %s", maddr1);
 			return(FALSE);
 		}
 		if (inet_pton(AF_INET6, maddr2, (void *)&grp2) != 1 ||
 		    !IN6_IS_ADDR_MULTICAST(&grp2)) {
-			log(LOG_WARNING, 0, "invalid group address %s", maddr2);
+			log_msg(LOG_WARNING, 0, "invalid group address %s", maddr2);
 			return(FALSE);
 		}
 		filtertype = FILTER_RANGE;
@@ -615,18 +615,18 @@ parse_filter(s)
 		*p = '\0';
 		if (inet_pton(AF_INET6, mprefix, (void *)&grp1) != 1 ||
 		    !IN6_IS_ADDR_MULTICAST(&grp1)) {
-			log(LOG_WARNING, 0, "invalid group prefix %s", mprefix);
+			log_msg(LOG_WARNING, 0, "invalid group prefix %s", mprefix);
 			return(FALSE);
 		}
 		if (plen < 0 || plen > 128) {
-			log(LOG_WARNING, 0, "invalid prefix length %s", p + 1);
+			log_msg(LOG_WARNING, 0, "invalid prefix length %s", p + 1);
 			return(FALSE);
 		}
 		filtertype = FILTER_PREFIX;
 	}
 	else {
 		if (inet_pton(AF_INET6, groups, (void *)&grp1) != 1) {
-			log(LOG_WARNING, 0, "invalid group address %s", groups);
+			log_msg(LOG_WARNING, 0, "invalid group address %s", groups);
 			return(FALSE);
 		}
 		plen = 128;	/* exact match */
@@ -637,7 +637,7 @@ parse_filter(s)
 	while (!EQUAL((w = next_word(&s)), "")) {
 		if ((mifi = ifname2mifi(w)) == MAXMIFS) {
 			/* XXX: scope consideration?? */
-			log(LOG_WARNING, 0,
+			log_msg(LOG_WARNING, 0,
 			    "phyint %s in %s is not a configured interface",
 			    w, configfilename);
 			return(FALSE);
@@ -646,7 +646,7 @@ parse_filter(s)
 		IF_SET(mifi, &filterset);
 	}
 	if (IF_ISEMPTY(&filterset)) {
-		log(LOG_WARNING, 0,
+		log_msg(LOG_WARNING, 0,
 		    "filter set is empty. ignore it.");
 		return(FALSE);
 	}
@@ -680,17 +680,17 @@ parse_default_source_metric(s)
 
     value = DEFAULT_LOCAL_METRIC;
     if (EQUAL((w = next_word(&s)), "")) {
-        log(LOG_WARNING, 0,
+        log_msg(LOG_WARNING, 0,
             "Missing default source metric; set to default %u",
             DEFAULT_LOCAL_METRIC);
     } else if (sscanf(w, "%u", &value) != 1) {
-        log(LOG_WARNING, 0,
+        log_msg(LOG_WARNING, 0,
             "Invalid default source metric; set to default %u",
             DEFAULT_LOCAL_METRIC);
         value = DEFAULT_LOCAL_METRIC;
     }
     default_source_metric = value;
-    log(LOG_INFO, 0, "default_source_metric is %u", value);
+    log_msg(LOG_INFO, 0, "default_source_metric is %u", value);
 
     for (vifi = 0, v = uvifs; vifi < MAXMIFS; ++vifi, ++v) {
 	v->uv_local_metric = default_source_metric;
@@ -722,17 +722,17 @@ parse_default_source_preference(s)
 
     value = DEFAULT_LOCAL_PREF;
     if (EQUAL((w = next_word(&s)), "")) {
-        log(LOG_WARNING, 0,
+        log_msg(LOG_WARNING, 0,
             "Missing default source preference; set to default %u",
             DEFAULT_LOCAL_PREF);
     } else if (sscanf(w, "%u", &value) != 1) {
-        log(LOG_WARNING, 0,
+        log_msg(LOG_WARNING, 0,
             "Invalid default source preference; set to default %u",
             DEFAULT_LOCAL_PREF);
         value = DEFAULT_LOCAL_PREF;
     }
     default_source_preference = value;
-    log(LOG_INFO, 0, "default_source_preference is %u", value);
+    log_msg(LOG_INFO, 0, "default_source_preference is %u", value);
 
     for (vifi = 0, v = uvifs; vifi < MAXMIFS; ++vifi, ++v) {
 	v->uv_local_pref = default_source_preference;
@@ -751,7 +751,7 @@ config_vifs_from_file()
 	int option;
 
 	if ((f = fopen(configfilename, "r")) == NULL) {
-		if (errno != ENOENT) log(LOG_WARNING, errno, "can't open %s", 
+		if (errno != ENOENT) log_msg(LOG_WARNING, errno, "can't open %s", 
 					 configfilename);
 		return;
 	}
@@ -771,7 +771,7 @@ config_vifs_from_file()
 			 parse_filter(s);
 			 break;
 		 default:
-			 log(LOG_WARNING, 0, "unknown command '%s' in %s",
+			 log_msg(LOG_WARNING, 0, "unknown command '%s' in %s",
 			     w, configfilename);
 		}
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.4 2000/12/04 06:33:10 itojun Exp $	*/
+/*	$KAME: mrt.c,v 1.5 2003/09/02 09:57:04 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -410,7 +410,7 @@ create_srcentry(source)
     
     srcentry_ptr = (srcentry_t *)malloc(sizeof(srcentry_t));
     if (srcentry_ptr == (srcentry_t *)NULL) {
-	log(LOG_WARNING, 0, "Memory allocation error for srcentry %s",
+	log_msg(LOG_WARNING, 0, "Memory allocation error for srcentry %s",
 	    inet6_fmt(&source->sin6_addr));
 	return (srcentry_t *)NULL;
     }
@@ -433,7 +433,7 @@ create_srcentry(source)
 	srcentry_ptr->next->prev = srcentry_ptr;
     
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "create source entry, source %s",
+	log_msg(LOG_DEBUG, 0, "create source entry, source %s",
 	    inet6_fmt(&source->sin6_addr));
     return (srcentry_ptr);
 }
@@ -451,7 +451,7 @@ create_grpentry(group)
     
     grpentry_ptr = (grpentry_t *)malloc(sizeof(grpentry_t));
     if (grpentry_ptr == (grpentry_t *)NULL) {
-	log(LOG_WARNING, 0, "Memory allocation error for grpentry %s",
+	log_msg(LOG_WARNING, 0, "Memory allocation error for grpentry %s",
 	    inet6_fmt(&group->sin6_addr));
 	return (grpentry_t *)NULL;
     }
@@ -467,7 +467,7 @@ create_grpentry(group)
 	grpentry_ptr->next->prev = grpentry_ptr;
     
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "create group entry, group %s",
+	log_msg(LOG_DEBUG, 0, "create group entry, group %s",
 	    inet6_fmt(&group->sin6_addr));
     return(grpentry_ptr);
 }
@@ -597,7 +597,7 @@ alloc_mrtentry(srcentry_ptr, grpentry_ptr)
     
     mrtentry_ptr = (mrtentry_t *)malloc(sizeof(mrtentry_t));
     if (mrtentry_ptr == (mrtentry_t *)NULL) {
-	log(LOG_WARNING, 0, "alloc_mrtentry(): out of memory");
+	log_msg(LOG_WARNING, 0, "alloc_mrtentry(): out of memory");
 	return (mrtentry_t *)NULL;
     }
     
@@ -650,7 +650,7 @@ alloc_mrtentry(srcentry_ptr, grpentry_ptr)
 	(mrtentry_ptr->prune_delay_timerids == (u_long *)NULL) ||
 	(mrtentry_ptr->last_assert == (u_long *)NULL) ||
 	(mrtentry_ptr->last_prune == (u_long *)NULL)) {
-	log(LOG_WARNING, 0, "alloc_mrtentry(): out of memory");
+	log_msg(LOG_WARNING, 0, "alloc_mrtentry(): out of memory");
 	FREE_MRTENTRY(mrtentry_ptr);
 	return (mrtentry_t *)NULL;
     }
@@ -701,7 +701,7 @@ create_mrtentry(srcentry_ptr, grpentry_ptr, flags)
 	 * Hmmm, search_grpmrtlink() didn't find the entry, but
 	 * search_srcmrtlink() did find it! Shoudn't happen. Panic!
 	 */
-	log(LOG_ERR, 0, "MRT inconsistency for src %s and grp %s\n",
+	log_msg(LOG_ERR, 0, "MRT inconsistency for src %s and grp %s\n",
 	    inet6_fmt(&source->sin6_addr), inet6_fmt(&group->sin6_addr));
 	/* not reached but to make lint happy */
 	return (mrtentry_t *)NULL;
@@ -771,7 +771,7 @@ add_filter(type, maddr1, maddr2, plen)
 	struct sockaddr_in6 from, to;
 
 	if ((f = malloc(sizeof(*f))) == NULL)
-		log(LOG_ERR, 0, "add_filter: malloc failed"); /* assert */
+		log_msg(LOG_ERR, 0, "add_filter: malloc failed"); /* assert */
 	memset((void *)f, 0, sizeof(*f));
 
 	f->type = type;

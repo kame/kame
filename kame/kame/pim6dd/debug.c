@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.14 2001/12/18 03:10:41 jinmei Exp $	*/
+/*	$KAME: debug.c,v 1.15 2003/09/02 09:57:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -352,7 +352,7 @@ dump_vifs(fp)
  */
 #ifdef __STDC__
 void
-log(int severity, int syserr, char *format, ...)
+log_msg(int severity, int syserr, char *format, ...)
 {
     va_list ap;
     static char fmt[211] = "warning - ";
@@ -364,7 +364,7 @@ log(int severity, int syserr, char *format, ...)
 #else
 /*VARARGS3*/
 void
-log(severity, syserr, format, va_alist)
+log_msg(severity, syserr, format, va_alist)
     int severity, syserr;
     char *format;
     va_dcl

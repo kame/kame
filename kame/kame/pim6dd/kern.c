@@ -1,4 +1,4 @@
-/*	$KAME: kern.c,v 1.3 2001/06/25 04:54:12 itojun Exp $	*/
+/*	$KAME: kern.c,v 1.4 2003/09/02 09:57:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -59,11 +59,11 @@ k_init_pim(socket)
     
     if (setsockopt(socket, IPPROTO_IPV6,
 		   MRT6_INIT, (char *)&v, sizeof(int)) < 0)
-	log(LOG_ERR, errno, "cannot enable multicast routing in kernel");
+	log_msg(LOG_ERR, errno, "cannot enable multicast routing in kernel");
     
     if(setsockopt(socket, IPPROTO_IPV6,
 		  MRT6_PIM, (char *)&v, sizeof(int)) < 0)
-	log(LOG_ERR, errno, "cannot set ASSERT flag in kernel");
+	log_msg(LOG_ERR, errno, "cannot set ASSERT flag in kernel");
 }
 
 
@@ -79,10 +79,10 @@ k_stop_pim(socket)
 
     if(setsockopt(socket, IPPROTO_IPV6, MRT6_PIM,
 		  (char *)&v, sizeof(int)) < 0)
-	log(LOG_ERR, errno, "cannot reset ASSERT flag in kernel");
+	log_msg(LOG_ERR, errno, "cannot reset ASSERT flag in kernel");
 
     if (setsockopt(socket, IPPROTO_IPV6, MRT6_DONE, (char *)NULL, 0) < 0)
-	log(LOG_ERR, errno, "cannot disable multicast routing in kernel");
+	log_msg(LOG_ERR, errno, "cannot disable multicast routing in kernel");
     
 }
 
@@ -123,13 +123,13 @@ void k_set_rcvbuf(socket, bufsize, minsize)
 	    }
 	}
 	if (bufsize < minsize) {
-	    log(LOG_ERR, 0, "OS-allowed buffer size %u < app min %u",
+	    log_msg(LOG_ERR, 0, "OS-allowed buffer size %u < app min %u",
 		bufsize, minsize);
 	    /*NOTREACHED*/
 	}
     }
     IF_DEBUG(DEBUG_KERN)
-	log(LOG_DEBUG, 0, "Got %d byte buffer size in %d iterations",
+	log_msg(LOG_DEBUG, 0, "Got %d byte buffer size in %d iterations",
 	    bufsize, iter);
 }
 
@@ -149,7 +149,7 @@ void k_hdr_include(socket, bool)
 #ifdef IP_HDRINCL
     if (setsockopt(socket, IPPROTO_IP, IP_HDRINCL,
 		   (char *)&bool, sizeof(bool)) < 0)
-	log(LOG_ERR, errno, "setsockopt IP_HDRINCL %u", bool);
+	log_msg(LOG_ERR, errno, "setsockopt IP_HDRINCL %u", bool);
 #endif
 }
 #endif /* 0 */
@@ -169,7 +169,7 @@ void k_set_hlim(socket, h)
     
     if (setsockopt(socket, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
 		   (char *)&hlim, sizeof(hlim)) < 0)
-	log(LOG_ERR, errno, "setsockopt IPV6_MULTICAST_HOPS %u", hlim);
+	log_msg(LOG_ERR, errno, "setsockopt IPV6_MULTICAST_HOPS %u", hlim);
 #endif
 }
 
@@ -186,7 +186,7 @@ void k_set_loop(socket, flag)
     loop = flag;
     if (setsockopt(socket, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
 		   (char *)&loop, sizeof(loop)) < 0)
-	log(LOG_ERR, errno, "setsockopt IPV6_MULTICAST_LOOP %u", loop);
+	log_msg(LOG_ERR, errno, "setsockopt IPV6_MULTICAST_LOOP %u", loop);
 }
 
 
@@ -200,7 +200,7 @@ void k_set_if(socket, ifindex)
 {
     if (setsockopt(socket, IPPROTO_IPV6, IPV6_MULTICAST_IF,
 		   (char *)&ifindex, sizeof(ifindex)) < 0)
-	log(LOG_ERR, errno, "setsockopt IPV6_MULTICAST_IF for %s",
+	log_msg(LOG_ERR, errno, "setsockopt IPV6_MULTICAST_IF for %s",
 	    ifindex2str(ifindex));
 }
 
@@ -220,7 +220,7 @@ void k_join(socket, grp, ifindex)
 
     if (setsockopt(socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 		   (char *)&mreq, sizeof(mreq)) < 0)
-	log(LOG_WARNING, errno, "cannot join group %s on interface %s",
+	log_msg(LOG_WARNING, errno, "cannot join group %s on interface %s",
 	    inet6_fmt(grp), ifindex2str(ifindex));
 }
 
@@ -240,7 +240,7 @@ void k_leave(socket, grp, ifindex)
     
     if (setsockopt(socket, IPPROTO_IPV6, IPV6_LEAVE_GROUP,
 		   (char *)&mreq, sizeof(mreq)) < 0)
-	log(LOG_WARNING, errno, "cannot leave group %s on interface %s",
+	log_msg(LOG_WARNING, errno, "cannot leave group %s on interface %s",
 	    inet6_fmt(grp), ifindex2str(ifindex));
 }
 
@@ -267,7 +267,7 @@ void k_add_vif(socket, vifi, v)
 
     if (setsockopt(socket, IPPROTO_IPV6, MRT6_ADD_MIF,
 		   (char *)&mc, sizeof(mc)) < 0)
-	log(LOG_ERR, errno, "setsockopt MRT6_ADD_MIF on mif %d", vifi);
+	log_msg(LOG_ERR, errno, "setsockopt MRT6_ADD_MIF on mif %d", vifi);
 }
 
 /*
@@ -279,7 +279,7 @@ void k_del_vif(socket, vifi)
 {
     if (setsockopt(socket, IPPROTO_IPV6, MRT6_DEL_MIF,
 		   (char *)&vifi, sizeof(vifi)) < 0)
-	log(LOG_ERR, errno, "setsockopt MRT6_DEL_MIF on mif %d", vifi);
+	log_msg(LOG_ERR, errno, "setsockopt MRT6_DEL_MIF on mif %d", vifi);
 }
 
 
@@ -299,12 +299,12 @@ k_del_mfc(socket, source, group)
 	
     if (setsockopt(socket, IPPROTO_IPV6, MRT6_DEL_MFC, (char *)&mc,
 		   sizeof(mc)) < 0) {
-	log(LOG_WARNING, errno, "setsockopt MRT6_DEL_MFC");
+	log_msg(LOG_WARNING, errno, "setsockopt MRT6_DEL_MFC");
 	return FALSE;
     }
 	
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "Deleted MFC entry: src %s, grp %s",
+	log_msg(LOG_DEBUG, 0, "Deleted MFC entry: src %s, grp %s",
 	    inet6_fmt(&source->sin6_addr),
 	    inet6_fmt(&group->sin6_addr));
 
@@ -340,7 +340,7 @@ k_chg_mfc(socket, source, group, iif, oifs)
     
     if (setsockopt(socket, IPPROTO_IPV6, MRT6_ADD_MFC, (char *)&mc,
                    sizeof(mc)) < 0) {
-        log(LOG_WARNING, errno,
+        log_msg(LOG_WARNING, errno,
 	    "setsockopt MRT6_ADD_MFC for source %s and group %s",
 	    inet6_fmt(&source->sin6_addr), inet6_fmt(&group->sin6_addr));
         return(FALSE);
@@ -363,7 +363,7 @@ int k_get_vif_count(vifi, retval)
     
     mreq.mifi = vifi;
     if (ioctl(udp_socket, SIOCGETMIFCNT_IN6, (char *)&mreq) < 0) {
-	log(LOG_WARNING, errno, "SIOCGETMIFCNT_IN6 on vif %d", vifi);
+	log_msg(LOG_WARNING, errno, "SIOCGETMIFCNT_IN6 on vif %d", vifi);
 	retval->icount = retval->ocount = retval->ibytes =
 	    retval->obytes = 0xffffffff;
 	return (1);
@@ -392,7 +392,7 @@ k_get_sg_cnt(socket, source, group, retval)
     sgreq.src = *source;
     sgreq.grp = *group;
     if (ioctl(socket, SIOCGETSGCNT_IN6, (char *)&sgreq) < 0) {
-	log(LOG_WARNING, errno, "SIOCGETSGCNT_IN6 on (%s %s)",
+	log_msg(LOG_WARNING, errno, "SIOCGETSGCNT_IN6 on (%s %s)",
 	    inet6_fmt(&source->sin6_addr), inet6_fmt(&group->sin6_addr));
 	retval->pktcnt = retval->bytecnt = retval->wrong_if = ~0; /* XXX */
 	return(1);

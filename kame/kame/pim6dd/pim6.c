@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.10 2002/08/01 03:35:01 itojun Exp $	*/
+/*	$KAME: pim6.c,v 1.11 2003/09/02 09:57:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -95,7 +95,7 @@ init_pim6()
 
 	sndcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	if ((pim6_socket = socket(AF_INET6, SOCK_RAW, IPPROTO_PIM)) < 0) 
-		log(LOG_ERR, errno, "PIM6 socket");
+		log_msg(LOG_ERR, errno, "PIM6 socket");
 
 	k_set_rcvbuf(pim6_socket, SO_RECV_BUF_SIZE_MAX,
 		     SO_RECV_BUF_SIZE_MIN); /* lots of input buffering */
@@ -106,11 +106,11 @@ init_pim6()
 	allpim6routers_group.sin6_family = AF_INET6;
 	if (inet_pton(AF_INET6, "ff02::d",
 		      (void *)&allpim6routers_group.sin6_addr) != 1)
-		log(LOG_ERR, 0, "inet_pton failed for ff02::d");
+		log_msg(LOG_ERR, 0, "inet_pton failed for ff02::d");
     
 	if ((pim6_recv_buf = malloc(RECV_BUF_SIZE)) == NULL ||
 	    (pim6_send_buf = malloc(RECV_BUF_SIZE)) == NULL) {
-		log(LOG_ERR, 0, "init_pim6: malloc failed\n");
+		log_msg(LOG_ERR, 0, "init_pim6: malloc failed\n");
 	}
 
 	/* initialize msghdr for sending packets */
@@ -118,7 +118,7 @@ init_pim6()
 	sndmh.msg_iov = sndiov;
 	sndmh.msg_iovlen = 1;
 	if (sndcmsgbuf == NULL && (sndcmsgbuf = malloc(sndcmsglen)) == NULL)
-		log(LOG_ERR, 0, "malloc failed");
+		log_msg(LOG_ERR, 0, "malloc failed");
 	sndmh.msg_control = (caddr_t)sndcmsgbuf;
 	sndmh.msg_controllen = sndcmsglen;
 	/* initilization cmsg for specifing outgoing interfaces and source */
@@ -129,7 +129,7 @@ init_pim6()
 	sndpktinfo = (struct in6_pktinfo *)CMSG_DATA(cmsgp);
 
 	if (register_input_handler(pim6_socket, pim6_read) < 0)
-		log(LOG_ERR, 0,
+		log_msg(LOG_ERR, 0,
 		    "cannot register pim6_read() as an input handler");
 
 	IF_ZERO(&nbr_mifs);
@@ -154,7 +154,7 @@ pim6_read(f, rfd)
 
 	if (pim6_recvlen < 0) {
 		if (errno != EINTR)
-			log(LOG_ERR, errno, "PIM6 recvmsg");
+			log_msg(LOG_ERR, errno, "PIM6 recvmsg");
 		return;
 	}
 
@@ -162,7 +162,7 @@ pim6_read(f, rfd)
 	(void)sigemptyset(&block);
 	(void)sigaddset(&block, SIGALRM);
 	if (sigprocmask(SIG_BLOCK, &block, &oblock) < 0)
-		log(LOG_ERR, errno, "sigprocmask");
+		log_msg(LOG_ERR, errno, "sigprocmask");
 #else
 	/* Use of omask taken from main() */
 	omask = sigblock(sigmask(SIGALRM));
@@ -187,7 +187,7 @@ accept_pim6(pimlen)
 
 	/* sanity check */
 	if (pimlen < sizeof(pim)) {
-		log(LOG_WARNING, 0,
+		log_msg(LOG_WARNING, 0,
 		    "data field too short (%u bytes) for PIM header, from %s", 
 		    pimlen, inet6_fmt(&src->sin6_addr));
 		return;
@@ -197,10 +197,10 @@ accept_pim6(pimlen)
 #ifdef NOSUCHDEF   /* TODO: delete. Too noisy */
 	IF_DEBUG(DEBUG_PIM_DETAIL) {
 		IF_DEBUG(DEBUG_PIM) {
-			log(LOG_DEBUG, 0, "Receiving %s from %s",
+			log_msg(LOG_DEBUG, 0, "Receiving %s from %s",
 			    packet_kind(IPPROTO_PIM, pim->pim_type, 0), 
 			    inet6_fmt(&src->sin6_addr));
-			log(LOG_DEBUG, 0, "PIM type is %u", pim->pim_type);
+			log_msg(LOG_DEBUG, 0, "PIM type is %u", pim->pim_type);
 		}
 	}
 #endif /* NOSUCHDEF */
@@ -218,12 +218,12 @@ accept_pim6(pimlen)
 		 receive_pim6_hello(src, (char *)(pim), pimlen); 
 		 break;
 	 case PIM_REGISTER:
-		 log(LOG_INFO, 0, "ignore %s from %s",
+		 log_msg(LOG_INFO, 0, "ignore %s from %s",
 		     packet_kind(IPPROTO_PIM, pim->pim_type, 0),
 		     inet6_fmt(&src->sin6_addr));
 		 break;
 	 case PIM_REGISTER_STOP:
-		 log(LOG_INFO, 0, "ignore %s from %s",
+		 log_msg(LOG_INFO, 0, "ignore %s from %s",
 		     packet_kind(IPPROTO_PIM, pim->pim_type, 0),
 		     inet6_fmt(&src->sin6_addr));
 		 break;
@@ -231,7 +231,7 @@ accept_pim6(pimlen)
 		 receive_pim6_join_prune(src, (char *)(pim), pimlen); 
 		 break;
 	 case PIM_BOOTSTRAP:
-		 log(LOG_INFO, 0, "ignore %s from %s",
+		 log_msg(LOG_INFO, 0, "ignore %s from %s",
 		     packet_kind(IPPROTO_PIM, pim->pim_type, 0),
 		     inet6_fmt(&src->sin6_addr));
 		 break;
@@ -243,12 +243,12 @@ accept_pim6(pimlen)
 		 receive_pim6_graft(src, (char *)(pim), pimlen, pim->pim_type);
 		 break;
 	 case PIM_CAND_RP_ADV:
-		 log(LOG_INFO, 0, "ignore %s from %s",
+		 log_msg(LOG_INFO, 0, "ignore %s from %s",
 		     packet_kind(IPPROTO_PIM, pim->pim_type, 0),
 		     inet6_fmt(&src->sin6_addr));
 		 break;
 	 default:
-		 log(LOG_INFO, 0,
+		 log_msg(LOG_INFO, 0,
 		     "ignore unknown PIM message code %u from %s",
 		     pim->pim_type,
 		     inet6_fmt(&src->sin6_addr));
@@ -296,7 +296,7 @@ send_pim6(buf, src, dst, type, datalen)
 	}
 	else {
 		sndpktinfo->ipi6_ifindex = 0; /* make sure to be cleared */
-		log(LOG_WARNING, 0,
+		log_msg(LOG_WARNING, 0,
 		    "send_pim6: could not determine the outgoint IF; send anyway");
 	}
 
@@ -320,7 +320,7 @@ send_pim6(buf, src, dst, type, datalen)
 		if (errno == ENETDOWN)
 			check_vif_state();
 		else
-			log(LOG_WARNING, errno, "sendto from %s to %s",
+			log_msg(LOG_WARNING, errno, "sendto from %s to %s",
 			    inet6_fmt(&src->sin6_addr),
 			    inet6_fmt(&dst->sin6_addr));
 		if (setloop)
@@ -335,7 +335,7 @@ send_pim6(buf, src, dst, type, datalen)
 		IF_DEBUG(DEBUG_PIM) {
 			char ifname[IFNAMSIZ];
 
-			log(LOG_DEBUG, 0, "SENT %s from %-15s to %s on %s",
+			log_msg(LOG_DEBUG, 0, "SENT %s from %-15s to %s on %s",
 			    packet_kind(IPPROTO_PIM, type, 0),
 			    inet6_fmt(&src->sin6_addr),
 			    inet6_fmt(&dst->sin6_addr),

@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.8 2002/06/21 13:55:04 suz Exp $	*/
+/*	$KAME: vif.c,v 1.9 2003/09/02 09:57:05 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -89,7 +89,7 @@ init_vifs()
     udp_socket = mld6_socket;
 #else
     if ((udp_socket = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-	log(LOG_ERR, errno, "UDP6 socket");
+	log_msg(LOG_ERR, errno, "UDP6 socket");
 #endif
 
     /*
@@ -118,9 +118,9 @@ init_vifs()
 	v->uv_local_metric      = default_source_metric;
     }
 
-    log(LOG_INFO, 0, "Getting ifs from kernel");
+    log_msg(LOG_INFO, 0, "Getting ifs from kernel");
     config_vifs_from_kernel();
-    log(LOG_INFO, 0, "Getting ifs from %s", configfilename);
+    log_msg(LOG_INFO, 0, "Getting ifs from %s", configfilename);
     config_vifs_from_file();
 
     /*
@@ -134,7 +134,7 @@ init_vifs()
 	if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN))
 	    continue;
 	if (v->uv_linklocal == NULL)
-		log(LOG_ERR, 0,
+		log_msg(LOG_ERR, 0,
 		    "there is no link-local address on vif#%d", vifi);
 	if (phys_vif == -1) {
 	    struct phaddr *p;
@@ -155,7 +155,7 @@ init_vifs()
     }
 
     if (enabled_vifs < 2)
-	log(LOG_ERR, 0, "can't forward: %s",
+	log_msg(LOG_ERR, 0, "can't forward: %s",
 	    enabled_vifs == 0 ? "no enabled ifs" : "only one enabled if");
 
     memset(&if_nullset, 0, sizeof(if_nullset));
@@ -175,11 +175,11 @@ start_all_vifs()
 	/* Start vif if not DISABLED or DOWN */
 	if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN)) {
 	    if (v->uv_flags & VIFF_DISABLED)
-		log(LOG_INFO, 0,
+		log_msg(LOG_INFO, 0,
 		    "%s is DISABLED; if #%u out of service", 
 		    v->uv_name, vifi);
 	    else
-		log(LOG_INFO, 0,
+		log_msg(LOG_INFO, 0,
 		    "%s is DOWN; if #%u out of service", 
 		    v->uv_name, vifi);
 	    }
@@ -229,7 +229,7 @@ start_vif(vifi)
     
     /* Tell kernel to add, i.e. start this vif */
     k_add_vif(mld6_socket, vifi, &uvifs[vifi]);   
-    log(LOG_INFO, 0, "%s comes up; if #%u now in service", v->uv_name, vifi);
+    log_msg(LOG_INFO, 0, "%s comes up; if #%u now in service", v->uv_name, vifi);
     
     /*
      * Join the PIM multicast group on the interface.
@@ -328,7 +328,7 @@ stop_vif(vifi)
     }
 
     vifs_down = TRUE;
-    log(LOG_INFO, 0,
+    log_msg(LOG_INFO, 0,
 	"%s goes down; if #%u out of service", v->uv_name, vifi);
 }		
 
@@ -425,7 +425,7 @@ check_vif_state()
 	strncpy(ifr.ifr_name, v->uv_name, IFNAMSIZ);
 	/* get the interface flags */
 	if (ioctl(udp_socket, SIOCGIFFLAGS, (char *)&ifr) < 0)
-	    log(LOG_ERR, errno,
+	    log_msg(LOG_ERR, errno,
 		"check_vif_state: ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
 
 	if (v->uv_flags & VIFF_DOWN) {
@@ -436,7 +436,7 @@ check_vif_state()
 	}
 	else {
 	    if (!(ifr.ifr_flags & IFF_UP)) {
-		log(LOG_NOTICE, 0,
+		log_msg(LOG_NOTICE, 0,
 		    "%s has gone down; if #%u taken out of service",
 		    v->uv_name, vifi);
 		stop_vif(vifi);

@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.7 2000/12/04 06:33:10 itojun Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.8 2003/09/02 09:57:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -127,7 +127,7 @@ receive_pim6_hello(src, pim_message, datalen)
 		 * non-directly connected router. Ignore it.
 		 */
 		if (local_address(src) == NO_VIF)
-			log(LOG_INFO, 0,
+			log_msg(LOG_INFO, 0,
 			    "Ignoring PIM_HELLO from non-neighbor router %s",
 			    inet6_fmt(&src->sin6_addr));
 		return(FALSE);
@@ -142,7 +142,7 @@ receive_pim6_hello(src, pim_message, datalen)
 	if (parse_pim6_hello(pim_message, datalen, src, &holdtime) == FALSE)
 		return(FALSE);
 	IF_DEBUG(DEBUG_PIM_HELLO | DEBUG_PIM_TIMER)
-		log(LOG_DEBUG, 0, "PIM HELLO holdtime from %s is %u",
+		log_msg(LOG_DEBUG, 0, "PIM HELLO holdtime from %s is %u",
 		    inet6_fmt(&src->sin6_addr), holdtime);
     
 	for (prev_nbr = (pim_nbr_entry_t *)NULL, nbr = v->uv_pim_neighbors;
@@ -162,7 +162,7 @@ receive_pim6_hello(src, pim_message, datalen)
 				 * going down and wants to inform us by sending
 				 * "holdtime=0". Thanks buddy and see you again!
 				 */
-				log(LOG_INFO, 0,
+				log_msg(LOG_INFO, 0,
 				    "PIM HELLO received: neighbor %s going down",
 				    inet6_fmt(&src->sin6_addr));
 				delete_pim6_nbr(nbr);
@@ -370,7 +370,7 @@ parse_pim6_hello(pim_message, datalen, src, holdtime)
 		 case PIM_MESSAGE_HELLO_HOLDTIME:
 			 if (PIM_MESSAGE_HELLO_HOLDTIME_LENGTH != option_length) {
 				 IF_DEBUG(DEBUG_PIM_HELLO)
-					 log(LOG_DEBUG, 0,
+					 log_msg(LOG_DEBUG, 0,
 					     "PIM HELLO Holdtime from %s: "
 					     "invalid OptionLength = %u",
 					     inet6_fmt(&src->sin6_addr),
@@ -488,7 +488,7 @@ schedule_delayed_join(mrtentry_ptr, target)
 #endif
     
 	IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-		log(LOG_DEBUG, 0, "Scheduling join for src %s, grp %s, delay %ld",
+		log_msg(LOG_DEBUG, 0, "Scheduling join for src %s, grp %s, delay %ld",
 		    inet6_fmt(&mrtentry_ptr->source->address.sin6_addr),
 		    inet6_fmt(&mrtentry_ptr->group->group.sin6_addr),
 		    random_delay);
@@ -530,7 +530,7 @@ delayed_prune_job(arg)
 
 	if(IF_ISSET(cbk->mifi, &mrtentry_ptr->oifs)) {
 		IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "Deleting pruned mif %d for src %s, grp %s",
 			    cbk->mifi, 
 			    inet6_fmt(&cbk->source.sin6_addr),
@@ -610,7 +610,7 @@ receive_pim6_join_prune(src, pim_message, datalen)
 		 * non-directly connected router. Ignore it.
 		 */
 		if (local_address(src) == NO_VIF)
-			log(LOG_INFO, 0,
+			log_msg(LOG_INFO, 0,
 			    "Ignoring PIM_JOIN_PRUNE from non-neighbor router %s",
 			    inet6_fmt(&src->sin6_addr));
 		return(FALSE);
@@ -634,7 +634,7 @@ receive_pim6_join_prune(src, pim_message, datalen)
 	target.sin6_scope_id = inet6_uvif2scopeid(&target, v);
 
 	IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "PIM Join/Prune received from %s : target %s, holdtime %d",
 		    inet6_fmt(&src->sin6_addr),
 		    inet6_fmt(&target.sin6_addr),
@@ -696,7 +696,7 @@ receive_pim6_join_prune(src, pim_message, datalen)
 					continue;
 
 				IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "\tJOIN src %s, group %s - canceling "
 					    "delayed join",
 					    inet6_fmt(&source.sin6_addr),
@@ -738,7 +738,7 @@ receive_pim6_join_prune(src, pim_message, datalen)
 
 				if(!(IF_ISEMPTY(&mrtentry_ptr->oifs))) {
 					IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-						log(LOG_DEBUG, 0,
+						log_msg(LOG_DEBUG, 0,
 						    "\tPRUNE src %s, group %s "
 						    "- scheduling delayed join",
 						    inet6_fmt(&source.sin6_addr),
@@ -765,7 +765,7 @@ receive_pim6_join_prune(src, pim_message, datalen)
 			GET_HOSTSHORT(num_j_srcs, data_ptr);
 			GET_HOSTSHORT(num_p_srcs, data_ptr);
 			IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "PIM Join/Prune received: grp: %s plen: %d, "
 				    "%d jsrc, %d psrc",
 				    inet6_fmt(&encod_group.mcast_addr),
@@ -801,7 +801,7 @@ receive_pim6_join_prune(src, pim_message, datalen)
 					continue;
 
 				IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "\tJOIN src %s, group %s - canceling "
 					    "delayed prune",
 					    inet6_fmt(&source.sin6_addr),
@@ -835,7 +835,7 @@ receive_pim6_join_prune(src, pim_message, datalen)
 					if(IF_ISSET(mifi, &mrtentry_ptr->oifs)) {
 
 						IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-							log(LOG_DEBUG, 0,
+							log_msg(LOG_DEBUG, 0,
 							    "\tPRUNE(P2P) src %s,"
 							    "group %s - pruning "
 							    "mif",
@@ -843,7 +843,7 @@ receive_pim6_join_prune(src, pim_message, datalen)
 							    inet6_fmt(&group.sin6_addr));
 		
 						IF_DEBUG(DEBUG_MRT)
-							log(LOG_DEBUG, 0, "Deleting pruned mif %d for src %s, grp %s",
+							log_msg(LOG_DEBUG, 0, "Deleting pruned mif %d for src %s, grp %s",
 							    mifi, 
 							    inet6_fmt(&source.sin6_addr),
 							    inet6_fmt(&group.sin6_addr));
@@ -870,7 +870,7 @@ receive_pim6_join_prune(src, pim_message, datalen)
 				 */
 				else {
 					IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-						log(LOG_DEBUG, 0,
+						log_msg(LOG_DEBUG, 0,
 						    "\tPRUNE(LAN) src %s, group "
 						    "%s - scheduling delayed prune",
 						    inet6_fmt(&source.sin6_addr),
@@ -910,7 +910,7 @@ send_pim6_jp(mrtentry_ptr, action, mifi, target_addr, holdtime, echo)
 	}
     
 	IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "Sending %s:  vif %s, src %s, group %s, "
 		    "target %s, holdtime %d",
 		    action==PIM_ACTION_JOIN ? "JOIN" : "PRUNE",
@@ -991,7 +991,7 @@ receive_pim6_assert(src, pim_message, datalen)
 		 * non-directly connected router. Ignore it.
 		 */
 		if (local_address(src) == NO_VIF)
-			log(LOG_INFO, 0,
+			log_msg(LOG_INFO, 0,
 			    "Ignoring PIM_ASSERT from non-neighbor router %s",
 			    inet6_fmt(&src->sin6_addr));
 		return(FALSE);
@@ -1016,7 +1016,7 @@ receive_pim6_assert(src, pim_message, datalen)
 	group.sin6_scope_id = inet6_uvif2scopeid(&group, v);
  
 	IF_DEBUG(DEBUG_PIM_ASSERT)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "PIM Assert received from %s: src %s, grp %s, "
 		    "pref %d, metric %d",
 		    inet6_fmt(&src->sin6_addr),
@@ -1027,7 +1027,7 @@ receive_pim6_assert(src, pim_message, datalen)
 	if ((mrtentry_ptr = find_route(&source, &group, MRTF_SG, CREATE))
 	    == NULL) {
 		IF_DEBUG(DEBUG_PIM_ASSERT)
-			log(LOG_INFO, 0,
+			log_msg(LOG_INFO, 0,
 			    "\tFailed to create a mrtentry src:%s grp:%s",
 			    inet6_fmt(&source.sin6_addr),
 			    inet6_fmt(&group.sin6_addr));
@@ -1040,7 +1040,7 @@ receive_pim6_assert(src, pim_message, datalen)
 		 * we know by the assert that there are upstream forwarders. 
 		 */
 		IF_DEBUG(DEBUG_PIM_ASSERT)
-			log(LOG_DEBUG, 0, "\tNo MRT entry - creating...");
+			log_msg(LOG_DEBUG, 0, "\tNo MRT entry - creating...");
 
 		mrtentry_ptr->flags &= ~MRTF_NEW;
 
@@ -1095,7 +1095,7 @@ receive_pim6_assert(src, pim_message, datalen)
 		if(local_wins == TRUE) {
 			/* the assert-sender loses, so discard the assert */
 			IF_DEBUG(DEBUG_PIM_ASSERT)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "\tAssert sender %s loses",
 				    inet6_fmt(&src->sin6_addr));
 			return(TRUE);
@@ -1103,11 +1103,11 @@ receive_pim6_assert(src, pim_message, datalen)
 
 		/* The assert sender wins: upstream must be changed to the winner */
 		IF_DEBUG(DEBUG_PIM_ASSERT)
-			log(LOG_DEBUG, 0, "\tAssert sender %s wins",
+			log_msg(LOG_DEBUG, 0, "\tAssert sender %s wins",
 			    inet6_fmt(&src->sin6_addr));
 		if(inet6_equal(&mrtentry_ptr->upstream->address, src)) {
 			IF_DEBUG(DEBUG_PIM_ASSERT)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "\tChanging upstream nbr to %s",
 				    inet6_fmt(&src->sin6_addr));
 			mrtentry_ptr->preference = assert_preference;
@@ -1144,7 +1144,7 @@ receive_pim6_assert(src, pim_message, datalen)
 			/* Assert sender wins - prune the interface */
 
 			IF_DEBUG(DEBUG_PIM_ASSERT)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "\tAssert sender %s wins - pruning...",
 				    inet6_fmt(&src->sin6_addr));
 
@@ -1186,7 +1186,7 @@ receive_pim6_assert(src, pim_message, datalen)
 			 */
 
 			IF_DEBUG(DEBUG_PIM_ASSERT)
-				log(LOG_DEBUG, 0,
+				log_msg(LOG_DEBUG, 0,
 				    "\tAssert sender %s loses - "
 				    "sending assert and scheuling prune", 
 				    inet6_fmt(&src->sin6_addr));
@@ -1234,7 +1234,7 @@ send_pim6_assert(source, group, mifi, mrtentry_ptr)
 	PUT_HOSTLONG(local_metric, data_ptr);
 
 	IF_DEBUG(DEBUG_PIM_ASSERT)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "PIM Assert sending: src %s, grp %s, "
 		    "pref %d, metric %d",
 		    inet6_fmt(&source->sin6_addr),
@@ -1335,7 +1335,7 @@ retransmit_pim6_graft(mrtentry_ptr)
 	}
 
 	IF_DEBUG(DEBUG_PIM_GRAFT)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "Sending GRAFT:  vif %s, src %s, grp %s, dst %s",
 		    inet6_fmt(&uvifs[mrtentry_ptr->incoming].uv_linklocal->pa_addr.sin6_addr),
 		    inet6_fmt(&mrtentry_ptr->source->address.sin6_addr),
@@ -1376,7 +1376,7 @@ retransmit_all_pim6_grafts(arg)
 	pim_graft_entry_t *graft_ptr;
 
 	IF_DEBUG(DEBUG_PIM_GRAFT)
-		log(LOG_DEBUG, 0, "Retransmitting all pending PIM-Grafts");
+		log_msg(LOG_DEBUG, 0, "Retransmitting all pending PIM-Grafts");
   
 
 	for(graft_ptr = graft_list; 
@@ -1384,7 +1384,7 @@ retransmit_all_pim6_grafts(arg)
 	    graft_ptr = graft_ptr->next) {
 
 		IF_DEBUG(DEBUG_PIM_GRAFT)
-			log(LOG_DEBUG, 0, "\tGRAFT src %s, grp %s",
+			log_msg(LOG_DEBUG, 0, "\tGRAFT src %s, grp %s",
 			    inet6_fmt(&graft_ptr->mrtlink->source->address.sin6_addr),
 			    inet6_fmt(&graft_ptr->mrtlink->group->group.sin6_addr));
 
@@ -1426,7 +1426,7 @@ receive_pim6_graft(src, pim_message, datalen, pimtype)
 		 * non-directly connected router. Ignore it.
 		 */
 		if (local_address(src) == NO_VIF)
-			log(LOG_INFO, 0,
+			log_msg(LOG_INFO, 0,
 			    "Ignoring PIM_GRAFT from non-neighbor router %s",
 			    inet6_fmt(&src->sin6_addr));
 		return(FALSE);
@@ -1446,7 +1446,7 @@ receive_pim6_graft(src, pim_message, datalen, pimtype)
 	GET_HOSTSHORT(holdtime, data_ptr);
 
 	IF_DEBUG(DEBUG_PIM_GRAFT)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "PIM %s received from %s on mif %d, grps: %d",
 		    pimtype == PIM_GRAFT ? "GRAFT" : "GRAFT-ACK",
 		    inet6_fmt(&src->sin6_addr), mifi, num_groups);
@@ -1460,7 +1460,7 @@ receive_pim6_graft(src, pim_message, datalen, pimtype)
 		GET_HOSTSHORT(num_j_srcs, data_ptr);
 		GET_HOSTSHORT(num_p_srcs, data_ptr);
 		IF_DEBUG(DEBUG_PIM_GRAFT)
-			log(LOG_DEBUG, 0,
+			log_msg(LOG_DEBUG, 0,
 			    "  PIM graft: grp: %s, plen: %d, %d jsrcs, %d psrcs",
 			    inet6_fmt(&encod_group.mcast_addr),
 			    encod_group.masklen, num_j_srcs, num_p_srcs);
@@ -1494,7 +1494,7 @@ receive_pim6_graft(src, pim_message, datalen, pimtype)
 			if(pimtype == PIM_GRAFT) {
 				/* Graft */
 				IF_DEBUG(DEBUG_PIM_GRAFT)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "\tGRAFT src %s, group %s - "
 					    "forward data on mif %d",
 					    inet6_fmt(&source.sin6_addr),
@@ -1525,7 +1525,7 @@ receive_pim6_graft(src, pim_message, datalen, pimtype)
 			else {
 				/* Graft-Ack */
 				IF_DEBUG(DEBUG_PIM_GRAFT)
-					log(LOG_DEBUG, 0,
+					log_msg(LOG_DEBUG, 0,
 					    "\tGRAFT-ACK src %s, group %s - "
 					    "forward data on mif %d",
 					    inet6_fmt(&source.sin6_addr),
@@ -1541,7 +1541,7 @@ receive_pim6_graft(src, pim_message, datalen, pimtype)
 	/* Respond to graft with a graft-ack */
 	if(pimtype == PIM_GRAFT) {
 		IF_DEBUG(DEBUG_PIM_GRAFT)
-			log(LOG_DEBUG, 0, "Sending GRAFT-ACK: mif %s, dst %s",
+			log_msg(LOG_DEBUG, 0, "Sending GRAFT-ACK: mif %s, dst %s",
 			    inet6_fmt(&uvifs[mifi].uv_linklocal->pa_addr.sin6_addr),
 			    inet6_fmt(&src->sin6_addr));
 		bcopy(pim_message, pim6_send_buf, datalen);
@@ -1571,7 +1571,7 @@ send_pim6_graft(mrtentry_ptr)
 	/* Set up retransmission */
 	new_graft = (pim_graft_entry_t *)malloc(sizeof(pim_graft_entry_t));
 	if (new_graft == (pim_graft_entry_t *)NULL) {
-		log(LOG_WARNING, 0, 
+		log_msg(LOG_WARNING, 0, 
 		    "Memory allocation error for graft entry src %s, grp %s",
 		    inet6_fmt(&mrtentry_ptr->source->address.sin6_addr),
 		    inet6_fmt(&mrtentry_ptr->group->group.sin6_addr));

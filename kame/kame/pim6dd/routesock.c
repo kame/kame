@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.8 2002/06/21 13:55:04 suz Exp $	*/
+/*	$KAME: routesock.c,v 1.9 2003/09/02 09:57:05 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -93,11 +93,11 @@ init_routesock()
     pid = getpid();
     routing_socket = socket(PF_ROUTE, SOCK_RAW, AF_INET6);
     if (routing_socket < 0) {
-	log(LOG_ERR, 0, "\nRouting socket error");
+	log_msg(LOG_ERR, 0, "\nRouting socket error");
 	return -1;
     }
     if (fcntl(routing_socket, F_SETFL, O_NONBLOCK) == -1){
-	log(LOG_ERR, 0, "\n Routing socket error");
+	log_msg(LOG_ERR, 0, "\n Routing socket error");
 	return -1;
     }
 #if 0
@@ -108,7 +108,7 @@ init_routesock()
     if (setsockopt(routing_socket, SOL_SOCKET,
 		   SO_USELOOPBACK, (char *)&off,
 		   sizeof(off)) < 0){
-	log(LOG_ERR, 0 , "\n setsockopt(SO_USELOOPBACK,0)");
+	log_msg(LOG_ERR, 0 , "\n setsockopt(SO_USELOOPBACK,0)");
 	return -1;
     }
     }
@@ -200,10 +200,10 @@ k_req_incoming(source, rpfp)
     if ((rlen = write(routing_socket, (char *)&m_rtmsg, l)) < 0) {
 	IF_DEBUG(DEBUG_RPF | DEBUG_KERN) {
 	    if (errno == ESRCH)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "Writing to routing socket: no such route\n");
 	    else
-		log(LOG_DEBUG, 0, "Error writing to routing socket");
+		log_msg(LOG_DEBUG, 0, "Error writing to routing socket");
 	}
 	return(FALSE); 
     }
@@ -214,7 +214,7 @@ k_req_incoming(source, rpfp)
     
     if (l < 0) {
 	IF_DEBUG(DEBUG_RPF | DEBUG_KERN)
-	    log(LOG_DEBUG, 0, "Read from routing socket failed: %s", strerror(errno));
+	    log_msg(LOG_DEBUG, 0, "Read from routing socket failed: %s", strerror(errno));
 	return(FALSE);
     }
     
@@ -249,7 +249,7 @@ getmsg(rtm, msglen, rpfinfop)
     
     sin6 = (struct sockaddr_in6 *)&so_dst;
     IF_DEBUG(DEBUG_RPF)
-	log(LOG_DEBUG, 0, "route to: %s", inet6_fmt(&sin6->sin6_addr));
+	log_msg(LOG_DEBUG, 0, "route to: %s", inet6_fmt(&sin6->sin6_addr));
     cp = ((char *)(rtm + 1));
     if (rtm->rtm_addrs)
 	for (i = 1; i; i <<= 1)
@@ -276,7 +276,7 @@ getmsg(rtm, msglen, rpfinfop)
     
     if (!ifp){ 	/* No incoming interface */
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0,
+	    log_msg(LOG_DEBUG, 0,
 		"No incoming interface for destination %s",
 		inet6_fmt(&sin6->sin6_addr));
 	return(FALSE);
@@ -286,13 +286,13 @@ getmsg(rtm, msglen, rpfinfop)
     if (dst) {
 	sin6 = (struct sockaddr_in6 *)dst;
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0, " destination is: %s",
+	    log_msg(LOG_DEBUG, 0, " destination is: %s",
 		inet6_fmt(&sin6->sin6_addr));
     }
     if (gate && rtm->rtm_flags & RTF_GATEWAY) {
 	sin6 = (struct sockaddr_in6 *)gate;
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0, " gateway is: %s", inet6_fmt(&sin6->sin6_addr));
+	    log_msg(LOG_DEBUG, 0, " gateway is: %s", inet6_fmt(&sin6->sin6_addr));
 	rpfinfop->rpfneighbor = *sin6;
 
 	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
@@ -317,13 +317,13 @@ getmsg(rtm, msglen, rpfinfop)
 	    break;
     
     IF_DEBUG(DEBUG_RPF)
-	log(LOG_DEBUG, 0, " iif is %d", vifi);
+	log_msg(LOG_DEBUG, 0, " iif is %d", vifi);
     
     rpfinfop->iif = vifi;
     
     if (vifi >= numvifs){
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0,
+	    log_msg(LOG_DEBUG, 0,
 		"Invalid incoming interface for destination %s, because of invalid virtual interface",
 		inet6_fmt(&sin6->sin6_addr));
 	return(FALSE);/* invalid iif */
@@ -352,7 +352,7 @@ k_req_incoming(source, rpfcinfo)
     memset(&rpfcinfo->rpfneighbor, 0, sizeof(rpfcinfo->rpfneighbor));  /* initialized */
     
     if (ioctl(udp_socket, SIOCGETRPF, (char *) rpfcinfo) < 0){
-	log(LOG_ERR, errno, "ioctl SIOCGETRPF k_req_incoming");
+	log_msg(LOG_ERR, errno, "ioctl SIOCGETRPF k_req_incoming");
 	return(FALSE);
     }
     return (TRUE);

@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.7 2000/12/04 06:33:11 itojun Exp $	*/
+/*	$KAME: timer.c,v 1.8 2003/09/02 09:57:05 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -235,7 +235,7 @@ age_routes()
 		 * received and non-null oiflist.
 		 */
 		IF_DEBUG(DEBUG_MFC)
-		    log(LOG_DEBUG, 0, 
+		    log_msg(LOG_DEBUG, 0, 
 			"Refreshing src %s, dst %s after %ld bytes forwarded",
 			inet6_fmt(&mrtentry_ptr->source->address.sin6_addr),
 			inet6_fmt(&mrtentry_ptr->group->group.sin6_addr),

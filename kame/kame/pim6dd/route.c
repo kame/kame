@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.4 2000/12/04 06:33:11 itojun Exp $	*/
+/*	$KAME: route.c,v 1.5 2003/09/02 09:57:04 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -151,7 +151,7 @@ set_incoming(srcentry_ptr, srctype)
 	    IN6_IS_ADDR_UNSPECIFIED(&rpfc.rpfneighbor.sin6_addr)) {
 	    /* couldn't find a route */
 	    IF_DEBUG(DEBUG_PIM_MRT | DEBUG_RPF)
-		log(LOG_DEBUG, 0, "NO ROUTE found for %s",
+		log_msg(LOG_DEBUG, 0, "NO ROUTE found for %s",
 		    inet6_fmt(&source->sin6_addr));
 	    return(FALSE);
 	}
@@ -184,7 +184,7 @@ set_incoming(srcentry_ptr, srctype)
 	     */
 	    srcentry_ptr->upstream = n;
 	    IF_DEBUG(DEBUG_RPF)
-		log(LOG_DEBUG, 0,
+		log_msg(LOG_DEBUG, 0,
 		    "For src %s, iif is %d, next hop router is %s",
 		    inet6_fmt(&source->sin6_addr), srcentry_ptr->incoming,
 		    inet6_fmt(&neighbor_addr->sin6_addr));
@@ -194,7 +194,7 @@ set_incoming(srcentry_ptr, srctype)
     }
     
     /* TODO: control the number of messages! */
-    log(LOG_INFO, 0,
+    log_msg(LOG_INFO, 0,
 	"For src %s, iif is %d, next hop router is %s: NOT A PIM ROUTER",
 	inet6_fmt(&source->sin6_addr), srcentry_ptr->incoming,
 	inet6_fmt(&neighbor_addr->sin6_addr));
@@ -250,7 +250,7 @@ add_leaf(vifi, source, group)
 	if(!(IF_ISSET(vifi, &mrtentry_srcs->leaves))) {
 
 	    IF_DEBUG(DEBUG_MRT)
-		log(LOG_DEBUG, 0, "Adding leaf vif %d for src %s group %s", 
+		log_msg(LOG_DEBUG, 0, "Adding leaf vif %d for src %s group %s", 
 		    vifi,
 		    inet6_fmt(&mrtentry_srcs->source->address.sin6_addr),
 		    inet6_fmt(&group->sin6_addr));
@@ -311,7 +311,7 @@ delete_leaf(vifi, source, group)
 	if(IF_ISSET(vifi, &mrtentry_srcs->leaves)) {
 
 	    IF_DEBUG(DEBUG_MRT)
-		log(LOG_DEBUG, 0, "Deleting leaf vif %d for src %s, group %s",
+		log_msg(LOG_DEBUG, 0, "Deleting leaf vif %d for src %s, group %s",
 		    vifi,
 		    inet6_fmt(&mrtentry_srcs->source->address.sin6_addr), 
 		    inet6_fmt(&group->sin6_addr));
@@ -494,7 +494,7 @@ process_kernel_call()
 	break;
     default:
 	IF_DEBUG(DEBUG_KERN)
-	    log(LOG_DEBUG, 0, "Unknown kernel_call code, %d", im->im6_msgtype);
+	    log_msg(LOG_DEBUG, 0, "Unknown kernel_call code, %d", im->im6_msgtype);
 	break;
     }
 }
@@ -524,7 +524,7 @@ process_cache_miss(im)
     source.sin6_scope_id = inet6_uvif2scopeid(&source, &uvifs[im->im6_mif]);
     
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "Cache miss, src %s, dst %s",
+	log_msg(LOG_DEBUG, 0, "Cache miss, src %s, dst %s",
 	    inet6_fmt(&source.sin6_addr), inet6_fmt(&group.sin6_addr)); 
 
     /* Don't create routing entries for the LAN scoped addresses */
@@ -602,7 +602,7 @@ process_wrong_iif(im)
 			uvifs[mifi].uv_rmt_addr, 
 			max_prune_timeout(mrtentry_ptr), 0);
 	else 
-	    log(LOG_WARNING, 0, 
+	    log_msg(LOG_WARNING, 0, 
 		"Can't send wrongvif prune on p2p %s: no remote address",
 		uvifs[mifi].uv_lcl_addr);
     } else 
@@ -627,7 +627,7 @@ trigger_prune_alert(mrtentry_ptr)
      mrtentry_t *mrtentry_ptr;
 {
     IF_DEBUG(DEBUG_MRT)
-	log(LOG_DEBUG, 0, "Now negative cache for src %s, grp %s - pruning",
+	log_msg(LOG_DEBUG, 0, "Now negative cache for src %s, grp %s - pruning",
 	    inet6_fmt(&mrtentry_ptr->source->address.sin6_addr), 
 	    inet6_fmt(&mrtentry_ptr->group->group.sin6_addr));
 
@@ -646,7 +646,7 @@ trigger_join_alert(mrtentry_ptr)
      mrtentry_t *mrtentry_ptr;
 {
     IF_DEBUG(DEBUG_MRT)
-	log(LOG_DEBUG, 0, "Now forwarding state for src %s, grp %s - grafting",
+	log_msg(LOG_DEBUG, 0, "Now forwarding state for src %s, grp %s - grafting",
 	    inet6_fmt(&mrtentry_ptr->source->address.sin6_addr), 
 	    inet6_fmt(&mrtentry_ptr->group->group.sin6_addr));
 

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.24 2002/11/12 11:20:51 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.25 2003/09/02 09:57:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -124,20 +124,20 @@ init_mld6()
 
     rtalert_code = htons(IP6OPT_RTALERT_MLD);
     if (!mld6_recv_buf && (mld6_recv_buf = malloc(RECV_BUF_SIZE)) == NULL)
-	    log(LOG_ERR, 0, "malloc failed");
+	    log_msg(LOG_ERR, 0, "malloc failed");
     if (!mld6_send_buf && (mld6_send_buf = malloc(RECV_BUF_SIZE)) == NULL)
-	    log(LOG_ERR, 0, "malloc failed");
+	    log_msg(LOG_ERR, 0, "malloc failed");
 
     rcvcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 	    CMSG_SPACE(sizeof(int));
     if (rcvcmsgbuf == NULL && (rcvcmsgbuf = malloc(rcvcmsglen)) == NULL)
-	    log(LOG_ERR, 0,"malloc failed");
+	    log_msg(LOG_ERR, 0,"malloc failed");
     
     IF_DEBUG(DEBUG_KERN)
-        log(LOG_DEBUG,0,"%d octets allocated for the emit/recept buffer mld6",RECV_BUF_SIZE);
+        log_msg(LOG_DEBUG,0,"%d octets allocated for the emit/recept buffer mld6",RECV_BUF_SIZE);
 
     if ((mld6_socket = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0)
-		log(LOG_ERR, errno, "MLD6 socket");
+		log_msg(LOG_ERR, errno, "MLD6 socket");
 
     k_set_rcvbuf(mld6_socket, SO_RECV_BUF_SIZE_MAX,
 		 SO_RECV_BUF_SIZE_MIN);	/* lots of input buffering */
@@ -154,7 +154,7 @@ init_mld6()
     allnodes_group.sin6_addr = in6addr_linklocal_allnodes;
     if (inet_pton(AF_INET6, "ff02::2",
 		  (void *) &allrouters_group.sin6_addr) != 1)
-	log(LOG_ERR, 0, "inet_pton failed for ff02::2");
+	log_msg(LOG_ERR, 0, "inet_pton failed for ff02::2");
 
     /* filter all non-MLD ICMP messages */
     ICMP6_FILTER_SETBLOCKALL(&filt);
@@ -165,29 +165,29 @@ init_mld6()
     ICMP6_FILTER_SETPASS(MLD_MTRACE, &filt);
     if (setsockopt(mld6_socket, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 		   sizeof(filt)) < 0)
-	log(LOG_ERR, errno, "setsockopt(ICMP6_FILTER)");
+	log_msg(LOG_ERR, errno, "setsockopt(ICMP6_FILTER)");
 
     /* specify to tell receiving interface */
     on = 1;
 #ifdef IPV6_RECVPKTINFO
     if (setsockopt(mld6_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
 		   sizeof(on)) < 0)
-	log(LOG_ERR, errno, "setsockopt(IPV6_RECVPKTINFO)");
+	log_msg(LOG_ERR, errno, "setsockopt(IPV6_RECVPKTINFO)");
 #else  /* old adv. API */
     if (setsockopt(mld6_socket, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 		   sizeof(on)) < 0)
-	log(LOG_ERR, errno, "setsockopt(IPV6_PKTINFO)");
+	log_msg(LOG_ERR, errno, "setsockopt(IPV6_PKTINFO)");
 #endif 
     on = 1;
     /* specify to tell value of hoplimit field of received IP6 hdr */
 #ifdef IPV6_RECVHOPLIMIT
     if (setsockopt(mld6_socket, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
 		   sizeof(on)) < 0)
-	log(LOG_ERR, errno, "setsockopt(IPV6_RECVHOPLIMIT)");
+	log_msg(LOG_ERR, errno, "setsockopt(IPV6_RECVHOPLIMIT)");
 #else  /* old adv. API */
     if (setsockopt(mld6_socket, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
 		   sizeof(on)) < 0)
-	log(LOG_ERR, errno, "setsockopt(IPV6_HOPLIMIT)");
+	log_msg(LOG_ERR, errno, "setsockopt(IPV6_HOPLIMIT)");
 #endif 
     /* initialize msghdr for receiving packets */
     rcviov[0].iov_base = (caddr_t) mld6_recv_buf;
@@ -213,7 +213,7 @@ init_mld6()
 
     /* register MLD message handler */
     if (register_input_handler(mld6_socket, mld6_read) < 0)
-	log(LOG_ERR, 0,
+	log_msg(LOG_ERR, 0,
 	    "Couldn't register mld6_read as an input handler");
 }
 
@@ -230,7 +230,7 @@ mld6_read(i, rfd)
     if (mld6_recvlen < 0)
     {
 	if (errno != EINTR)
-	    log(LOG_ERR, errno, "MLD6 recvmsg");
+	    log_msg(LOG_ERR, errno, "MLD6 recvmsg");
 	return;
     }
 
@@ -256,7 +256,7 @@ int recvlen;
 
 	if (recvlen < sizeof(struct mld_hdr))
 	{
-		log(LOG_WARNING, 0,
+		log_msg(LOG_WARNING, 0,
 		    "received packet too short (%u bytes) for MLD header",
 		    recvlen);
 		return;
@@ -298,7 +298,7 @@ int recvlen;
 	}
 	if (hlimp == NULL)
 	{
-		log(LOG_WARNING, 0,
+		log_msg(LOG_WARNING, 0,
 		    "failed to get receiving hop limit");
 		return;
 	}
@@ -308,7 +308,7 @@ int recvlen;
 #ifdef NOSUCHDEF
 	IF_DEBUG(DEBUG_PKT | debug_kind(IPPROTO_ICMPV6, mldh->mld_type,
 					mldh->mld_code))
-		log(LOG_DEBUG, 0, "RECV %s from %s to %s",
+		log_msg(LOG_DEBUG, 0, "RECV %s from %s to %s",
 		    packet_kind(IPPROTO_ICMPV6,
 				mldh->mld_type, mldh->mld_code),
 		    inet6_fmt(&src->sin6_addr), inet6_fmt(dst));
@@ -324,21 +324,21 @@ int recvlen;
 	/* hop limit check */
 	if (*hlimp != 1)
 	{
-		log(LOG_WARNING, 0,
+		log_msg(LOG_WARNING, 0,
 		    "received an MLD6 message with illegal hop limit(%d) from %s",
 		    *hlimp, inet6_fmt(&src->sin6_addr));
 		/* but accept the packet */
 	}
 	if (ifindex == 0)
 	{
-		log(LOG_WARNING, 0, "failed to get receiving interface");
+		log_msg(LOG_WARNING, 0, "failed to get receiving interface");
 		return;
 	}
 
 	/* scope check */
 	if (IN6_IS_ADDR_MC_NODELOCAL(&mldh->mld_addr))
 	{
-		log(LOG_INFO, 0,
+		log_msg(LOG_INFO, 0,
 		    "RECV %s with an invalid scope: %s from %s",
 		    packet_kind(IPPROTO_ICMPV6, mldh->mld_type,
 				mldh->mld_code),
@@ -350,7 +350,7 @@ int recvlen;
 	/* source address check */
 	if (!IN6_IS_ADDR_LINKLOCAL(&src->sin6_addr))
 	{
-		log(LOG_INFO, 0,
+		log_msg(LOG_INFO, 0,
 		    "RECV %s from a non link local address: %s",
 		    packet_kind(IPPROTO_ICMPV6, mldh->mld_type,
 				mldh->mld_code),
@@ -375,7 +375,7 @@ int recvlen;
 
 	default:
 		/* This must be impossible since we set a type filter */
-		log(LOG_INFO, 0,
+		log_msg(LOG_INFO, 0,
 		    "ignoring unknown ICMPV6 message type %x from %s to %s",
 		    mldh->mld_type, inet6_fmt(&src->sin6_addr),
 		    inet6_fmt(dst));
@@ -427,12 +427,12 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
     if (alert) {
 #ifdef USE_RFC2292BIS
 	if ((hbhlen = inet6_opt_init(NULL, 0)) == -1)
-		log(LOG_ERR, 0, "inet6_opt_init(0) failed");
+		log_msg(LOG_ERR, 0, "inet6_opt_init(0) failed");
 	if ((hbhlen = inet6_opt_append(NULL, 0, hbhlen, IP6OPT_ROUTER_ALERT, 2,
 				       2, NULL)) == -1)
-		log(LOG_ERR, 0, "inet6_opt_append(0) failed");
+		log_msg(LOG_ERR, 0, "inet6_opt_append(0) failed");
 	if ((hbhlen = inet6_opt_finish(NULL, 0, hbhlen)) == -1)
-		log(LOG_ERR, 0, "inet6_opt_finish(0) failed");
+		log_msg(LOG_ERR, 0, "inet6_opt_finish(0) failed");
 	ctllen += CMSG_SPACE(hbhlen);
 #else  /* old advanced API */
 	hbhlen = inet6_option_space(sizeof(raopt));
@@ -445,7 +445,7 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 	    if (sndcmsgbuf)
 		    free(sndcmsgbuf);
 	    if ((sndcmsgbuf = malloc(ctllen)) == NULL)
-		    log(LOG_ERR, 0, "make_mld6_msg: malloc failed"); /* assert */
+		    log_msg(LOG_ERR, 0, "make_mld6_msg: malloc failed"); /* assert */
 	    ctlbuflen = ctllen;
     }
     /* store ancillary data */
@@ -480,25 +480,25 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 		    hbhbuf = CMSG_DATA(cmsgp);
 
 		    if ((currentlen = inet6_opt_init(hbhbuf, hbhlen)) == -1)
-			    log(LOG_ERR, 0, "inet6_opt_init(len = %d) failed",
+			    log_msg(LOG_ERR, 0, "inet6_opt_init(len = %d) failed",
 				hbhlen);
 		    if ((currentlen = inet6_opt_append(hbhbuf, hbhlen,
 						       currentlen,
 						       IP6OPT_ROUTER_ALERT, 2,
 						       2, &optp)) == -1)
-			    log(LOG_ERR, 0,
+			    log_msg(LOG_ERR, 0,
 				"inet6_opt_append(len = %d) failed",
 				currentlen, hbhlen);
 		    (void)inet6_opt_set_val(optp, 0, &rtalert_code,
 					    sizeof(rtalert_code));
 		    if (inet6_opt_finish(hbhbuf, hbhlen, currentlen) == -1)
-			    log(LOG_ERR, 0, "inet6_opt_finish(buf) failed");
+			    log_msg(LOG_ERR, 0, "inet6_opt_finish(buf) failed");
 #else  /* old advanced API */
 		    if (inet6_option_init((void *)cmsgp, &cmsgp, IPV6_HOPOPTS))
-			    log(LOG_ERR, 0, /* assert */
+			    log_msg(LOG_ERR, 0, /* assert */
 				"make_mld6_msg: inet6_option_init failed");
 		    if (inet6_option_append(cmsgp, raopt, 4, 0))
-			    log(LOG_ERR, 0, /* assert */
+			    log_msg(LOG_ERR, 0, /* assert */
 				"make_mld6_msg: inet6_option_append failed");
 #endif 
 		    cmsgp = CMSG_NXTHDR(&sndmh, cmsgp);
@@ -533,7 +533,7 @@ send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
 	if (errno == ENETDOWN)
 	    check_vif_state();
 	else
-	    log(log_level(IPPROTO_ICMPV6, type, 0), errno,
+	    log_msg(log_level(IPPROTO_ICMPV6, type, 0), errno,
 		"sendmsg to %s with src %s on %s",
 		inet6_fmt(&dstp->sin6_addr),
 		src ? inet6_fmt(&src->sin6_addr) : "(unspec)",
@@ -543,7 +543,7 @@ send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
     }
     
     IF_DEBUG(DEBUG_PKT|debug_kind(IPPROTO_IGMP, type, 0))
-	log(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
+	log_msg(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
 	    packet_kind(IPPROTO_ICMPV6, type, 0),
 	    src ? inet6_fmt(&src->sin6_addr) : "unspec",
 	    inet6_fmt(&dstp->sin6_addr));
