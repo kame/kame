@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.440 2004/03/16 03:18:15 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.441 2004/03/16 03:21:59 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -5022,10 +5022,12 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			error = EINVAL;
 			break;
 		}
-		if (ifp == NULL) {
-			error = EINVAL;
+
+		error = in6_getmopt_ifargs(optname, ifp, sin6_grp,
+					   greq->gr_interface);
+		if (error)
 			break;
-		}
+
 		/* Fill in the scope zone ID */
 		if (in6_addr2zoneid(*ifp, &sin6_grp->sin6_addr,
 		    &sin6_grp->sin6_scope_id)) {
@@ -5036,11 +5038,6 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			error = EADDRNOTAVAIL; /* XXX: should not happen */
 			break;
 		}
-
-		/*
-		 * Get a pointer to the ifnet structure.
-		 */
-		error = in6_getmopt_ifargs(optname, ifp, sin6_grp, greq->gr_interface);
 
 		break;
 	    }
@@ -5065,27 +5062,10 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			break;
 		}
 
-		/*
-		 * bcopy(gsreq->gsr_XXX, ss_XXX) should not be used here,
-		 * since I have to clear all the fields other than address,
-		 * which are just regarded as a garbage in IPv6 multicast 
-		 * group management.
-		 */
-		sin6_src = SIN6(ss_src);
-		bzero(sin6_src, sizeof(*sin6_src));
-		sin6_src->sin6_addr = SIN6(&gsreq->gsr_source)->sin6_addr;
-		sin6_src->sin6_len = sizeof(*sin6_src);
-		sin6_src->sin6_family = AF_INET6;
-		/* Fill in the scope zone ID */
-		if (in6_addr2zoneid(*ifp, &sin6_src->sin6_addr,
-		    &sin6_src->sin6_scope_id)) {
-			error = EADDRNOTAVAIL; /* XXX: should not happen */
+		error = in6_getmopt_ifargs(optname, ifp, SIN6(ss_grp),
+					   gsreq->gsr_interface);
+		if (error)
 			break;
-		}
-		if (in6_embedscope(&sin6_src->sin6_addr, sin6_src)) {
-			error = EADDRNOTAVAIL; /* XXX: should not happen */
-			break;
-		}
 
 		sin6_grp = SIN6(ss_grp);
 		bzero(sin6_grp, sizeof(*sin6_grp));
@@ -5113,6 +5093,29 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			error = EINVAL;
 			break;
 		}
+
+		/*
+		 * bcopy(gsreq->gsr_XXX, ss_XXX) should not be used here,
+		 * since I have to clear all the fields other than address,
+		 * which are just regarded as a garbage in IPv6 multicast 
+		 * group management.
+		 */
+		sin6_src = SIN6(ss_src);
+		bzero(sin6_src, sizeof(*sin6_src));
+		sin6_src->sin6_addr = SIN6(&gsreq->gsr_source)->sin6_addr;
+		sin6_src->sin6_len = sizeof(*sin6_src);
+		sin6_src->sin6_family = AF_INET6;
+
+		/* Fill in the scope zone ID */
+		if (in6_addr2zoneid(*ifp, &sin6_src->sin6_addr,
+		    &sin6_src->sin6_scope_id)) {
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
+			break;
+		}
+		if (in6_embedscope(&sin6_src->sin6_addr, sin6_src)) {
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
+			break;
+		}
 		if (SS_IS_ADDR_MULTICAST(ss_src) ||
 		    SS_IS_ADDR_UNSPECIFIED(ss_src)) {
 #ifdef MLDV2_DEBUG
@@ -5122,9 +5125,6 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			error = EINVAL;
 			break;
 		}
-
-		error = in6_getmopt_ifargs(optname, ifp, sin6_grp,
-					   gsreq->gsr_interface);
 
 		break;
 	    }
