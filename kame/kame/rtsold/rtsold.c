@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.48 2002/05/31 10:13:57 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.49 2002/05/31 10:19:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,6 +83,8 @@ static int fflag = 0;
 
 /* a == b */
 #define TIMEVAL_EQ(a, b) (((a).tv_sec==(b).tv_sec) && ((a).tv_usec==(b).tv_usec))
+
+int main __P((int, char **));
 
 /* static variables and functions */
 static int mobile_node = 0;
