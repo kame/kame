@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.19 2000/09/21 16:38:18 itojun Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.20 2000/09/21 17:53:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -207,10 +207,68 @@ do { \
 
 		zerror = mode ? inflate(&zs, Z_NO_FLUSH)
 			      : deflate(&zs, Z_NO_FLUSH);
+
+		if (zerror == Z_STREAM_END)
+			; /*once more.*/
+		else if (zerror == Z_OK) {
+			/* inflate: Z_OK can indicate the end of decode */
+			if (mode && !p && zs.avail_out != 0)
+				goto terminate;
+			else
+				; /*once more.*/
+		} else {
+			if (zs.msg) {
+				ipseclog((LOG_ERR, "ipcomp_%scompress: "
+				    "%sflate(Z_NO_FLUSH): %s\n",
+				    mode ? "de" : "", mode ? "in" : "de",
+				    zs.msg));
+			} else {
+				ipseclog((LOG_ERR, "ipcomp_%scompress: "
+				    "%sflate(Z_NO_FLUSH): unknown error (%d)\n",
+				    mode ? "de" : "", mode ? "in" : "de",
+				    zerror));
+			}
+			mode ? inflateEnd(&zs) : deflateEnd(&zs);
+			error = EINVAL;
+			goto fail;
+		}
 	}
 
 	if (zerror == Z_STREAM_END)
 		goto terminate;
+
+	/* output stream only */
+	while (1) {
+		/* get output buffer */
+		if (zs.next_out == NULL || zs.avail_out == 0) {
+			MOREBLOCK();
+		}
+
+		zerror = mode ? inflate(&zs, Z_SYNC_FLUSH)
+			      : deflate(&zs, Z_SYNC_FLUSH);
+
+		if (zerror == Z_STREAM_END)
+			goto terminate;
+		else if (zerror == Z_OK)
+			; /*once more.*/
+		else {
+			if (zs.msg) {
+				ipseclog((LOG_ERR, "ipcomp_%scompress: "
+				    "%sflate(Z_SYNC_FLUSH): %s\n",
+				    mode ? "de" : "", mode ? "in" : "de",
+				    zs.msg));
+			} else {
+				ipseclog((LOG_ERR, "ipcomp_%scompress: "
+				    "%sflate(Z_SYNC_FLUSH): "
+				    "unknown error (%d)\n",
+				    mode ? "de" : "", mode ? "in" : "de",
+				    zerror));
+			}
+			mode ? inflateEnd(&zs) : deflateEnd(&zs);
+			error = EINVAL;
+			goto fail;
+		}
+	}
 
 	/* termination */
 	while (1) {
@@ -227,9 +285,17 @@ do { \
 		else if (zerror == Z_OK)
 			; /*once more.*/
 		else {
-			ipseclog((LOG_ERR, "ipcomp_%scompress: %sflate: %s\n",
-				mode ? "de" : "", mode ? "in" : "de",
-				zs.msg ? zs.msg : "unknown error"));
+			if (zs.msg) {
+				ipseclog((LOG_ERR, "ipcomp_%scompress: "
+				    "%sflate(Z_FINISH): %s\n",
+				    mode ? "de" : "", mode ? "in" : "de",
+				    zs.msg));
+			} else {
+				ipseclog((LOG_ERR, "ipcomp_%scompress: "
+				    "%sflate(Z_FINISH): unknown error (%d)\n",
+				    mode ? "de" : "", mode ? "in" : "de",
+				    zerror));
+			}
 			mode ? inflateEnd(&zs) : deflateEnd(&zs);
 			error = EINVAL;
 			goto fail;
@@ -239,9 +305,17 @@ do { \
 terminate:
 	zerror = mode ? inflateEnd(&zs) : deflateEnd(&zs);
 	if (zerror != Z_OK) {
-		ipseclog((LOG_ERR, "ipcomp_%scompress: %sflate: %s\n",
-			mode ? "de" : "", mode ? "in" : "de",
-			zs.msg ? zs.msg : "unknown error"));
+		if (zs.msg) {
+			ipseclog((LOG_ERR, "ipcomp_%scompress: "
+			    "%sflateEnd: %s\n",
+			    mode ? "de" : "", mode ? "in" : "de",
+			    zs.msg));
+		} else {
+			ipseclog((LOG_ERR, "ipcomp_%scompress: "
+			    "%sflateEnd: unknown error (%d)\n",
+			    mode ? "de" : "", mode ? "in" : "de",
+			    zerror));
+		}
 		error = EINVAL;
 		goto fail;
 	}
