@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.162 2001/02/04 02:06:02 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.163 2001/02/04 08:45:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2432,13 +2432,20 @@ in6_ifawithscope(oifp, dst)
 			 * Also, if the current address has a smaller scope
 			 * than dst, ignore it unless ifa_best also has a
 			 * smaller scope.
+			 * Consequently, after the two if-clause below,
+			 * the followings must be satisfied:
+			 * (scope(src) < scope(dst) &&
+			 *  scope(best) < scope(dst))
+			 *  OR
+			 * (scope(best) >= scope(dst) &&
+			 *  scope(src) >= scope(dst))
 			 */
 			if (IN6_ARE_SCOPE_CMP(best_scope, dst_scope) < 0 &&
 			    IN6_ARE_SCOPE_CMP(src_scope, dst_scope) >= 0)
-				goto replace;
+				goto replace; /* (A) */
 			if (IN6_ARE_SCOPE_CMP(src_scope, dst_scope) < 0 &&
 			    IN6_ARE_SCOPE_CMP(best_scope, dst_scope) >= 0)
-				continue;
+				continue; /* (B) */
 
 			/*
 			 * A deprecated address SHOULD NOT be used in new
@@ -2467,13 +2474,36 @@ in6_ifawithscope(oifp, dst)
 			/*
 			 * A non-deprecated address is always preferred
 			 * to a deprecated one regardless of scopes and
-			 * address matching.
-			 * XXX: is this true???
+			 * address matching (Note invariants ensured by the
+			 * conditions (A) and (B) above.)
 			 */
 			if ((ifa_best->ia6_flags & IN6_IFF_DEPRECATED) &&
 			    (((struct in6_ifaddr *)ifa)->ia6_flags &
 			     IN6_IFF_DEPRECATED) == 0)
 				goto replace;
+
+			/*
+			 * When we use temporary address described in
+			 * RFC 3041, we prefer temporary addresses to
+			 * public autoconf addresses.  Again, note the
+			 * invariants from (A) and (B).  Also note that we
+			 * don't have any preference between static addresses
+			 * and autoconf addresses (despite of whether or not
+			 * the latter is temporary or public.)
+			 */
+			if (ip6_use_tempaddr) {
+				struct in6_ifaddr *ifat;
+
+				ifat = (struct in6_ifaddr *)ifa;
+				if ((ifa_best->ia6_flags &
+				     (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY))
+				     == IN6_IFF_AUTOCONF &&
+				    (ifat->ia6_flags &
+				     (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY))
+				     == (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY)) {
+					goto replace;
+				}
+			}
 
 			/*
 			 * At this point, we have two cases:
@@ -2501,84 +2531,65 @@ in6_ifawithscope(oifp, dst)
 			 *   Smaller scopes are the last resort.
 			 * - A deprecated address is chosen only when we have
 			 *   no address that has an enough scope, but is
-			 *   prefered to any addresses of smaller scopes.
-			 * - Longest address match against dst is considered
-			 *   only for addresses that has the same scope of dst.
+			 *   prefered to any addresses of smaller scopes
+			 *   (this must be already done above.)
+			 * - addresses on the outgoing I/F are preferred to
+			 *   ones on other interfaces if none of above
+			 *   tiebreaks.
 			 * - If there is no other reasons to choose one,
-			 *   addresses on the outgoing I/F are preferred.
+			 *   longest address match against dst is considered.
 			 *
 			 * The precise decision table is as follows:
-			 * dscopecmp bscopecmp matchcmp outI/F | replace?
-			 *    !equal     equal      N/A    Yes |      Yes (1)
-			 *    !equal     equal      N/A     No |       No (2)
-			 *    larger    larger      N/A    N/A |       No (3)
-			 *    larger   smaller      N/A    N/A |      Yes (4)
-			 *   smaller    larger      N/A    N/A |      Yes (5)
-			 *   smaller   smaller      N/A    N/A |       No (6)
-			 *     equal   smaller      N/A    N/A |      Yes (7)
-			 *     equal    larger       (already done)
-			 *     equal     equal   larger    N/A |      Yes (8)
-			 *     equal     equal  smaller    N/A |       No (9)
-			 *     equal     equal    equal    Yes |      Yes (a)
-			 *     eaual     eqaul    equal     No |       No (b)
+			 * dscopecmp bscopecmp matchcmp  bI oI | replace?
+			 *       N/A     equal     N/A    Y  N |       No (1)
+			 *       N/A     equal     N/A    N  Y |      Yes (2)
+			 *       N/A     equal   larger    N/A |      Yes (3)
+			 *       N/A     equal  !larger    N/A |       No (4)
+			 *    larger    larger      N/A    N/A |       No (5)
+			 *    larger   smaller      N/A    N/A |      Yes (6)
+			 *   smaller    larger      N/A    N/A |      Yes (7)
+			 *   smaller   smaller      N/A    N/A |       No (8)
+			 *     equal   smaller      N/A    N/A |      Yes (9)
+			 *     equal    larger       (already done at A above)
 			 */
 			dscopecmp = IN6_ARE_SCOPE_CMP(src_scope, dst_scope);
 			bscopecmp = IN6_ARE_SCOPE_CMP(src_scope, best_scope);
 
-			if (dscopecmp && bscopecmp == 0) {
-				if (oifp == ifp) /* (1) */
+			if (bscopecmp == 0) {
+				struct ifnet *bifp = ifa_best->ia_ifp;
+
+				if (bifp == oifp && ifp != oifp) /* (1) */
+					continue;
+				if (bifp != oifp && ifp == oifp) /* (2) */
 					goto replace;
-				continue; /* (2) */
+
+				/*
+				 * Both bifp and ifp are on the outgoing
+				 * interface, or both two are on a different
+				 * interface from the outgoing I/F.
+				 * now we need address matching against dst
+				 * for tiebreaking.
+				 */
+				tlen = in6_matchlen(IFA_IN6(ifa), dst);
+				matchcmp = tlen - blen;
+				if (matchcmp > 0) /* (3) */
+					goto replace;
+				continue; /* (4) */
 			}
 			if (dscopecmp > 0) {
-				if (bscopecmp > 0) /* (3) */
+				if (bscopecmp > 0) /* (5) */
 					continue;
-				goto replace; /* (4) */
+				goto replace; /* (6) */
 			}
 			if (dscopecmp < 0) {
-				if (bscopecmp > 0) /* (5) */
+				if (bscopecmp > 0) /* (7) */
 					goto replace;
-				continue; /* (6) */
+				continue; /* (8) */
 			}
 
 			/* now dscopecmp must be 0 */
 			if (bscopecmp < 0)
-				goto replace; /* (7) */
-
-			/*
-			 * At last both dscopecmp and bscopecmp must be 0.
-			 */
-
-			/*
-			 * If we prefer temporary addresses, and we've found
-			 * a non-deprecated temporary one, replace the
-			 * candidate with it.
-			 */
-			if (ip6_use_tempaddr) {
-				struct in6_ifaddr *ifat;
-
-				ifat = (struct in6_ifaddr *)ifa;
-				if ((ifa_best->ia6_flags & IN6_IFF_TEMPORARY)
-				    == 0 &&
-				    (ifat->ia6_flags & IN6_IFF_TEMPORARY)
-				    != 0 &&
-				    ifat->ia6_lifetime.ia6t_pltime > 0)	/* XXX wrong */
-					goto replace;
-			}
-
-			/*
-			 * Now we need address matching against dst for
-			 * tiebreaking.
-			 */
-			tlen = in6_matchlen(IFA_IN6(ifa), dst);
-			matchcmp = tlen - blen;
-			if (matchcmp > 0) /* (8) */
-				goto replace;
-			if (matchcmp < 0) /* (9) */
-				continue;
-			if (oifp == ifp) /* (a) */
-				goto replace;
-			continue; /* (b) */
+				goto replace; /* (9) */
 
 		  replace:
 			ifa_best = (struct in6_ifaddr *)ifa;
