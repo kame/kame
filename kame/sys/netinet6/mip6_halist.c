@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.9 2003/08/28 18:56:22 t-momose Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.10 2003/09/29 02:09:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -108,11 +108,21 @@ mip6_ha_create(addr, flags, pref, lifetime)
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr)
 	    || IN6_IS_ADDR_LOOPBACK(&addr->sin6_addr)
-	    || IN6_IS_ADDR_MULTICAST(&addr->sin6_addr))
-		panic ("mip6_ha_create: invalid address.");
+	    || IN6_IS_ADDR_MULTICAST(&addr->sin6_addr)) {
+		mip6log((LOG_ERR,
+		    "mip6_ha_create: an invalid home agent address(%s).",
+		    ip6_sprintf(&addr->sin6_addr)));
+		return (NULL);
+	}
+
 	if (!IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)
-	    && ((flags & ND_RA_FLAG_HOME_AGENT) == 0))
-		panic ("mip6_ha_create: non link-local address must have H bit.");
+	    && ((flags & ND_RA_FLAG_HOME_AGENT) == 0)) {
+		mip6log((LOG_ERR,
+		    "mip6_ha_create: non link-local address(%s) "
+		    "must have H bit in router flags.\n",
+		    ip6_sprintf(&addr->sin6_addr)));
+		return (NULL);
+	}
 
 	MALLOC(mha, struct mip6_ha *, sizeof(struct mip6_ha), M_TEMP,
 	    M_NOWAIT);
