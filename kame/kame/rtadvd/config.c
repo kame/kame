@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.52 2001/10/09 10:23:23 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.53 2001/10/09 10:25:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -850,9 +850,11 @@ make_packet(struct rainfo *rainfo)
 	struct nd_opt_advinterval *ndopt_advint;
 	struct nd_opt_homeagent_info *ndopt_hai;
 #endif
+#ifdef ND_OPT_ROUTE_INFO
 	struct nd_opt_route_info *ndopt_rti;
-	struct prefix *pfx;
 	struct rtinfo *rti;
+#endif
+	struct prefix *pfx;
 
 	/* calculate total length */
 	packlen = sizeof(struct nd_router_advert);
