@@ -220,8 +220,13 @@ http_parse(struct fetch_state *fs, const char *u)
 	 */
 	https->http_hostname = safe_strdup(hostname);
 	https->http_port = port;
-	hosthdr = alloca(sizeof("Host: :\r\n") + 5 + strlen(hostname));
-	sprintf(hosthdr, "Host: %s:%d\r\n", hostname, port);
+	if (strchr(hostname, ':')) {
+		hosthdr = alloca(sizeof("Host: :\r\n") + 7 + strlen(hostname));
+		sprintf(hosthdr, "Host: [%s]:%d\r\n", hostname, port);
+	} else {
+		hosthdr = alloca(sizeof("Host: :\r\n") + 5 + strlen(hostname));
+		sprintf(hosthdr, "Host: %s:%d\r\n", hostname, port);
+	}
 	https->http_host_header = safe_strdup(hosthdr);
 
 	/*
