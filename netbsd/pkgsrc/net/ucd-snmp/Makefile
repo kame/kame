@@ -1,13 +1,13 @@
 # New ports collection makefile for:	ucd-snmp-v6
-# Version required:			3.6.2 + IPv6 19990904
+# Version required:			4.0.1
 # Date created:				26 June 1996
 # Whom:					itojun@iijlab.net
 #
-# $Id: Makefile,v 1.3 1999/09/04 09:45:25 itojun Exp $
+# $Id: Makefile,v 1.4 1999/10/21 14:46:53 itojun Exp $
 #
 
-DISTNAME=	ucd-snmp-3.6.2
-PKGNAME=	ucd-snmp-v6-3.6.2.19990904
+DISTNAME=	ucd-snmp-4.0.1
+PKGNAME=	ucd-snmp-v6-4.0.1.19991021
 CATEGORIES=	net
 MASTER_SITES= 	ftp://ucd-snmp.ucdavis.edu/ \
 		ftp://sunsite.cnlab-switch.ch/mirror/ucd-snmp/ \
@@ -15,7 +15,7 @@ MASTER_SITES= 	ftp://ucd-snmp.ucdavis.edu/ \
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	ucd-snmp-3.6.2-v6-19990904.diff.gz
+PATCHFILES=	ucd-snmp-4.0.1-v6-19991021.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@iijlab.net
@@ -33,15 +33,16 @@ CONFIGURE_ARGS+= --with-defaults --with-sys-contact=nobody@no.where
 IS_INTERACTIVE= yes
 .endif
 
-MAN1=		snmpbulkwalk.1 snmpd.1 snmpdelta.1 snmpget.1 snmpgetnext.1 \
-		snmpnetstat.1 snmpset.1 snmpstatus.1 snmptable.1 snmptest.1 \
-		snmptranslate.1 snmptrap.1 snmpwalk.1 snmpcmd.1
-MAN3=		mib_api.3 snmp_api.3
-MAN5=		snmpd.conf.5 variables.5
-MAN8=		snmptrapd.8
-BIN=		snmpbulkwalk snmpget snmpgetnext snmpnetstat snmpset \
-		snmpstatus snmptest snmptranslate snmptrap snmpwalk
-SBIN=		snmpd snmptrapd
+MAN1=	snmpdelta.1 snmpcmd.1 snmpd.1 snmptable.1 snmptranslate.1 \
+	snmpbulkwalk.1 snmpwalk.1 snmpusm.1 snmptrap.1 snmpstatus.1 \
+	snmpnetstat.1 snmpget.1 snmpset.1 snmptest.1 snmpgetnext.1
+MAN3=	read_config.3 mib_api.3 snmp_api.3 snmp_sess_api.3
+MAN5=	snmptrapd.conf.5 snmpd.conf.5 snmp.conf.5 snmp_config.5 variables.5
+MAN8=	snmptrapd.8
+BIN=	encode_keychange snmptest snmpdelta snmpstatus \
+	snmptranslate snmptrap snmptable snmpbulkwalk snmpwalk snmpusm \
+	snmpset snmpgetnext snmpget snmpnetstat
+SBIN=	snmpd snmptrapd
 
 post-install:
 	( cd ${PREFIX}/bin; strip ${BIN} )
