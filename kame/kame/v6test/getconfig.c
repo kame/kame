@@ -47,6 +47,15 @@
 	var = t;					\
      }
 
+struct new_ip6_rthdr0 {
+	u_int8_t  ip6r0_nxt;		/* next header */
+	u_int8_t  ip6r0_len;		/* length in units of 8 octets */
+	u_int8_t  ip6r0_type;		/* always zero */
+	u_int8_t  ip6r0_segleft;	/* segments left */
+	u_int32_t  ip6r0_reserved;	/* reserved field */
+	/* followed by up to 127 struct in6_addr */
+} __attribute__((__packed__));
+
 #define nextopt nexthdr
 #define TBUFSIZ 2048
 #define MAXPKTSIZ 4096
@@ -378,7 +387,7 @@ make_rthdr(char *name)
 	char hopstr[BUFSIZ];	/* XXX */
 	char *bp = area, *addr;
 	struct ip6_rthdr *rthdr = (struct ip6_rthdr *)pbp;
-	struct ip6_rthdr0 *rthdr0;
+	struct new_ip6_rthdr0 *rthdr0;
 	int i, hops;
 	int rthdrlen = 0;
 
@@ -406,7 +415,7 @@ make_rthdr(char *name)
 		}
 		else if (hops == 0)
 			hops = (rthdrlen - 8) / sizeof(struct in6_addr);
-		rthdr0 = (struct ip6_rthdr0 *)rthdr;
+		rthdr0 = (struct new_ip6_rthdr0 *)rthdr;
 		rthdr0->ip6r0_reserved = 0;
 		for (i = 0; i < hops; i++) {
 			sprintf(hopstr, "hop%d", i);
@@ -426,7 +435,7 @@ make_rthdr(char *name)
 			}
 		}
 		if (rthdrlen == 0)
-			rthdrlen = sizeof(struct ip6_rthdr0) +
+			rthdrlen = sizeof(struct new_ip6_rthdr0) +
 				sizeof(struct in6_addr) * hops;
 		break;
 	default:
