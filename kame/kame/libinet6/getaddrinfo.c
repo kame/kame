@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.159 2003/05/08 05:19:15 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.160 2003/05/17 01:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1443,10 +1443,9 @@ get_canonname(pai, ai, str)
 	const char *str;
 {
 	if ((pai->ai_flags & AI_CANONNAME) != 0) {
-		ai->ai_canonname = (char *)malloc(strlen(str) + 1);
+		ai->ai_canonname = strdup(str);
 		if (ai->ai_canonname == NULL)
 			return EAI_MEMORY;
-		strlcpy(ai->ai_canonname, str, strlen(str) + 1);
 	}
 	return 0;
 }
