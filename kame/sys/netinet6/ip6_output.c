@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.301 2002/05/29 04:42:18 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.302 2002/05/31 03:10:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1368,11 +1368,7 @@ skip_ipsec2:;
 	 * spec.)
 	 */
 	if (opt && (opt->ip6po_flags & IP6PO_DONTFRAG) &&
-	    tlen > IN6_LINKMTU(ifp)
-#ifdef notyet
-	    && !(ifp->if_flags & IFF_FRAGMENTABLE)
-#endif
-		) {
+	    tlen > IN6_LINKMTU(ifp)) {
 		u_int32_t mtu32;
 		struct ip6ctlparam ip6cp;
 
@@ -1384,22 +1380,7 @@ skip_ipsec2:;
 		error = EMSGSIZE;
 		goto bad;
 	}
-	if (tlen <= mtu || (opt && (opt->ip6po_flags & IP6PO_DONTFRAG))
-#ifdef notyet
-	    /*
-	     * On any link that cannot convey a 1280-octet packet in one piece,
-	     * link-specific fragmentation and reassembly must be provided at
-	     * a layer below IPv6. [RFC 2460, sec.5]
-	     * Thus if the interface has ability of link-level fragmentation,
-	     * we can just send the packet even if the packet size is
-	     * larger than the link's MTU.
-	     * XXX: IFF_FRAGMENTABLE (or such) flag has not been defined yet...
-	     */
-	
-	    || (ifp->if_flags & IFF_FRAGMENTABLE)
-#endif
-	    )
-	{
+	if (tlen <= mtu || (opt && (opt->ip6po_flags & IP6PO_DONTFRAG))) {
 		struct in6_ifaddr *ia6;
 
 		ip6 = mtod(m, struct ip6_hdr *);
