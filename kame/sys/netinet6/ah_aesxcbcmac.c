@@ -1,4 +1,4 @@
-/*	$KAME: ah_aesxcbcmac.c,v 1.5 2003/07/20 18:01:20 itojun Exp $	*/
+/*	$KAME: ah_aesxcbcmac.c,v 1.6 2003/07/22 02:30:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 2003 WIDE Project.
@@ -142,7 +142,7 @@ ah_aes_xcbc_mac_loop(state, addr, len)
 		addr += sizeof(ctx->buf) - ctx->buflen;
 		ctx->buflen = 0;
 	}
-	/* due to the special processing for M[n], "<=" is not correct here */
+	/* due to the special processing for M[n], "=" case is not included */
 	while (addr + AES_BLOCKSIZE < ep) {
 		bcopy(addr, buf, AES_BLOCKSIZE);
 		for (i = 0; i < sizeof(buf); i++)
