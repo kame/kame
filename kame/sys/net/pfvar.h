@@ -391,6 +391,7 @@ struct pf_rule {
 	u_int8_t		 quick;
 	u_int8_t		 ifnot;
 	u_int8_t		 match_tag_not;
+	u_int8_t		 natpass;
 
 #define PF_STATE_NORMAL		0x1
 #define PF_STATE_MODULATE	0x2
@@ -799,8 +800,6 @@ struct pf_tagname {
 	u_int16_t		tag;
 	int			ref;
 };
-
-TAILQ_HEAD(pf_tagnames, pf_tagname);
 
 #define PFFRAG_FRENT_HIWAT	5000	/* Number of fragment entries */
 #define PFFRAG_FRAG_HIWAT	1000	/* Number of fragmented packets */

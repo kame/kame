@@ -716,7 +716,6 @@ pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 #endif
 	pf_dynaddr_update(aw->p.dyn);
 	return (0);
-	return (1);
 }
 
 void
@@ -2369,6 +2368,8 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 	int			 tag = -1;
 	u_int16_t		 mss = tcp_mssdflt;
 
+	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
+
 	if (direction == PF_OUT) {
 		bport = nport = th->th_sport;
 		/* check outgoing packet for BINAT/NAT */
@@ -2379,6 +2380,8 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 			pf_change_ap(saddr, &th->th_sport, pd->ip_sum,
 			    &th->th_sum, &naddr, nport, 0, af);
 			rewrite++;
+			if (nat->natpass)
+				r = NULL;
 		}
 	} else {
 		bport = nport = th->th_dport;
@@ -2390,10 +2393,11 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 			pf_change_ap(daddr, &th->th_dport, pd->ip_sum,
 			    &th->th_sum, &naddr, nport, 0, af);
 			rewrite++;
+			if (rdr->natpass)
+				r = NULL;
 		}
 	}
 
-	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
 	while (r != NULL) {
 		r->evaluations++;
 		if (r->ifp != NULL && ((r->ifp != ifp && !r->ifnot) ||
@@ -2433,10 +2437,10 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		    !pf_match_gid(r->gid.op, r->gid.gid[0], r->gid.gid[1],
 		    gid))
 			r = TAILQ_NEXT(r, entries);
-		else if (r->anchorname[0] && r->anchor == NULL)
-			r = TAILQ_NEXT(r, entries);
 		else if (r->match_tag &&
 		    !pf_match_tag(m, r, nat, rdr, pftag, &tag))
+			r = TAILQ_NEXT(r, entries);
+		else if (r->anchorname[0] && r->anchor == NULL)
 			r = TAILQ_NEXT(r, entries);
 		else {
 			if (r->tag)
@@ -2705,6 +2709,8 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 	struct pf_tag		*pftag = NULL;
 	int			 tag = -1;
 
+	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
+
 	if (direction == PF_OUT) {
 		bport = nport = uh->uh_sport;
 		/* check outgoing packet for BINAT/NAT */
@@ -2715,6 +2721,8 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 			pf_change_ap(saddr, &uh->uh_sport, pd->ip_sum,
 			    &uh->uh_sum, &naddr, nport, 1, af);
 			rewrite++;
+			if (nat->natpass)
+				r = NULL;
 		}
 	} else {
 		bport = nport = uh->uh_dport;
@@ -2726,10 +2734,11 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 			pf_change_ap(daddr, &uh->uh_dport, pd->ip_sum,
 			    &uh->uh_sum, &naddr, nport, 1, af);
 			rewrite++;
+			if (rdr->natpass)
+				r = NULL;
 		}
 	}
 
-	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
 	while (r != NULL) {
 		r->evaluations++;
 		if (r->ifp != NULL && ((r->ifp != ifp && !r->ifnot) ||
@@ -2848,13 +2857,14 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
 #endif
 		}
-		if (s == NULL)
+		if (s == NULL) {
+			REASON_SET(&reason, PFRES_MEMORY);
 			return (PF_DROP);
+		}
 		bzero(s, sizeof(*s));
 		r->states++;
 		if (a != NULL)
 			a->states++;
-
 		s->rule.ptr = r;
 		if (nat != NULL)
 			s->nat_rule.ptr = nat;
@@ -2983,6 +2993,8 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 #endif /* INET6 */
 	}
 
+	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
+
 	if (direction == PF_OUT) {
 		/* check outgoing packet for BINAT/NAT */
 		if ((nat = pf_get_translation(PF_OUT, ifp, pd->proto,
@@ -3003,6 +3015,8 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 				break;
 #endif /* INET6 */
 			}
+			if (nat->natpass)
+				r = NULL;
 		}
 	} else {
 		/* check incoming packet for BINAT/RDR */
@@ -3024,10 +3038,11 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 				break;
 #endif /* INET6 */
 			}
+			if (rdr->natpass)
+				r = NULL;
 		}
 	}
 
-	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
 	while (r != NULL) {
 		r->evaluations++;
 		if (r->ifp != NULL && ((r->ifp != ifp && !r->ifnot) ||
@@ -3114,13 +3129,14 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 #else
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
 #endif
-		if (s == NULL)
+		if (s == NULL) {
+			REASON_SET(&reason, PFRES_MEMORY);
 			return (PF_DROP);
+		}
 		bzero(s, sizeof(*s));
 		r->states++;
 		if (a != NULL)
 			a->states++;
-
 		s->rule.ptr = r;
 		if (nat != NULL)
 			s->nat_rule.ptr = nat;
@@ -3212,6 +3228,8 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 	struct pf_tag		*pftag = NULL;
 	int			 tag = -1;
 
+	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
+
 	if (direction == PF_OUT) {
 		/* check outgoing packet for BINAT/NAT */
 		if ((nat = pf_get_translation(PF_OUT, ifp, pd->proto,
@@ -3249,10 +3267,13 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 				break;
 #endif /* INET6 */
 			}
+			if (nat->natpass)
+				r = NULL;
+			if (rdr->natpass)
+				r = NULL;
 		}
 	}
 
-	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
 	while (r != NULL) {
 		r->evaluations++;
 		if (r->ifp != NULL && ((r->ifp != ifp && !r->ifnot) ||
@@ -3360,13 +3381,14 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
 #endif
 		}
-		if (s == NULL)
+		if (s == NULL) {
+			REASON_SET(&reason, PFRES_MEMORY);
 			return (PF_DROP);
+		}
 		bzero(s, sizeof(*s));
 		r->states++;
 		if (a != NULL)
 			a->states++;
-
 		s->rule.ptr = r;
 		if (nat != NULL)
 			s->nat_rule.ptr = nat;
@@ -3912,7 +3934,7 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 
 	/* Any packets which have gotten here are to be passed */
 
-	/* translate source/destination address, if needed */
+	/* translate source/destination address, if necessary */
 	if (STATE_TRANSLATE(*state)) {
 		if (direction == PF_OUT)
 			pf_change_ap(pd->src, &th->th_sport, pd->ip_sum,
@@ -3954,8 +3976,8 @@ pf_test_state_udp(struct pf_state **state, int direction, struct ifnet *ifp,
 	key.proto = IPPROTO_UDP;
 	PF_ACPY(&key.addr[0], pd->src, key.af);
 	PF_ACPY(&key.addr[1], pd->dst, key.af);
-	key.port[0] = pd->hdr.udp->uh_sport;
-	key.port[1] = pd->hdr.udp->uh_dport;
+	key.port[0] = uh->uh_sport;
+	key.port[1] = uh->uh_dport;
 
 	STATE_LOOKUP();
 
@@ -4081,7 +4103,7 @@ pf_test_state_icmp(struct pf_state **state, int direction, struct ifnet *ifp,
 #endif
 		(*state)->timeout = PFTM_ICMP_ERROR_REPLY;
 
-		/* translate source/destination address, if needed */
+		/* translate source/destination address, if necessary */
 		if (PF_ANEQ(&(*state)->lan.addr, &(*state)->gwy.addr, pd->af)) {
 			if (direction == PF_OUT) {
 				switch (pd->af) {
