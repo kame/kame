@@ -16,10 +16,6 @@ PREFIX= /usr/local/v6
 DIRS=	${PREFIX} ${PREFIX}/bin ${PREFIX}/sbin ${PREFIX}/lib ${PREFIX}/etc \
 	${PREFIX}/libexec ${PREFIX}/man ${PREFIX}/share/doc/kame
 SECTIONS=1 2 3 4 5 6 7 8 9 n
-DOCS=	CHANGELOG CHANGELOG.1998 CHANGELOG.1997 CHANGELOG.1996 \
-	COPYRIGHT COPYRIGHT.jp IMPLEMENTATION INSTALL \
-	INSTALL.anoncvs Makefile PORTABILITY VERSION prepare.pl \
-	TODO.new-repository RELNOTES README USAGE
 
 beforeinstall:
 	for i in ${DIRS}; do \
@@ -48,3 +44,4 @@ afterinstall:
 	cp ${.CURDIR}/INSTALL ${DESTDIR}${PREFIX}/share/doc/kame/INSTALL.freebsd2
 
 .include <bsd.subdir.mk>
+.include "../Makefile.inc"

@@ -14,8 +14,6 @@ PREFIX= /usr/local/v6
 DIRS=	$(PREFIX) $(PREFIX)/bin $(PREFIX)/sbin $(PREFIX)/lib $(PREFIX)/etc \
 	$(PREFIX)/libexec $(PREFIX)/man $(PREFIX)/share/doc/kame
 SECTIONS=1 2 3 4 5 6 7 8 9 n
-DOCS=	CHANGELOG COPYRIGHT COPYRIGHT.jp IMPLEMENTATION INSTALL INSTALL.cvsup \
-	INSTALL.anoncvs PORTABILITY README RELNOTES TODO USAGE RELNOTES
 
 beforeinstall:
 	for i in $(DIRS); do \
@@ -40,3 +38,4 @@ afterinstall:
 	done
 
 .include <bsd.subdir.mk>
+.include "../Makefile.inc"
