@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.168 2001/09/21 12:35:13 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.169 2001/10/11 08:37:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1343,7 +1343,7 @@ prelist_update(new, dr, m)
 
 	/* 5.5.3 (a). Ignore the prefix without the A bit set. */
 	if (!new->ndpr_raf_auto)
-		goto afteraddrconf;
+		goto end;
 
 	/*
 	 * 5.5.3 (b). the link-local prefix should have been ignored in
@@ -1556,7 +1556,6 @@ prelist_update(new, dr, m)
 		}
 	}
 
-  afteraddrconf:
  end:
 	splx(s);
 	return error;
