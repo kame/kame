@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.124 2001/01/24 02:33:44 thorpej Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.125 2001/01/26 00:09:06 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -284,7 +284,7 @@ saok:
 				iph1->gi_i = gssapi_get_default_id(iph1);
 		}
 		if (sa->gssid == NULL)
-			sa->gssid = iph1->gi_i;
+			sa->gssid = vdup(iph1->gi_i);
 		iph1->approval = sa;
 	}
 	if (iph1->gi_i != NULL)
