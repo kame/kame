@@ -1,4 +1,4 @@
-.\"	$KAME: rtsold.8,v 1.18 2003/01/17 03:49:44 suz Exp $
+.\"	$KAME: rtsold.8,v 1.19 2003/04/11 10:14:56 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -38,15 +38,19 @@
 .Sh SYNOPSIS
 .Nm rtsold
 .Op Fl dDfm1
+.Op Fl O Ar script-name
 .Ar interface ...
 .Nm rtsold
 .Op Fl dDfm1
+.Op Fl O Ar script-name
 .Fl a
 .Nm rtsol
 .Op Fl dD
+.Op Fl O Ar script-name
 .Ar interface ...
 .Nm rtsol
 .Op Fl dD
+.Op Fl O Ar script-name
 .Fl a
 .\"
 .Sh DESCRIPTION
@@ -126,6 +130,21 @@ When sending a Router Solicitation on an interface,
 .Nm
 includes a Source Link-layer address option if the interface
 has a link-layer address.
+.Lp
+.Nm
+manages a per-interface parameter to detect if a separate protocol is
+needed for configuration parameters other than host's addresses.
+At the invocation time, the flag is FALSE, and becomes TRUE when
+the daemon receives a router advertisement with the OtherConfig flag
+being set.
+A script file can be specified to deal with the case
+.Pq see below .
+When
+.Nm
+start resending router solicitation messages by one of the conditions
+events,
+the daemon resets the parameter because the event may indicate a
+change on the attached link.
 .Pp
 Upon receipt of signal
 .Dv SIGUSR1 ,
@@ -176,6 +195,19 @@ Transmit Router Solicitation packets until at least one valid Router
 Advertisement packet has arrived on each
 .Ar interface ,
 then exit.
+.It Fl O Ar script-name
+Specifies a supplement script file to handle the Other Configuration
+flag of the router advertisement.
+When the flag changes from FALSE to TRUE,
+.Nm
+will invoke
+.Ar script-name ,
+expecting the script will then start a protocol for the other
+configuration.
+.Ar script-name
+must be the absolute path from root to the script file, be a regular
+file, and be created by the same owner who runs
+.Nm .
 .El
 .Sh RETURN VALUES
 The

@@ -1,4 +1,4 @@
-/*	$KAME: rtsol.c,v 1.19 2003/01/08 06:08:14 suz Exp $	*/
+/*	$KAME: rtsol.c,v 1.20 2003/04/11 10:14:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,6 +34,8 @@
 #include <sys/uio.h>
 #include <sys/time.h>
 #include <sys/queue.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -47,6 +49,7 @@
 #include <arpa/inet.h>
 
 #include <time.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <err.h>
@@ -66,7 +69,11 @@ static struct sockaddr_in6 from;
 
 int rssock;
 
-static struct sockaddr_in6 sin6_allrouters = {sizeof(sin6_allrouters), AF_INET6};
+static struct sockaddr_in6 sin6_allrouters =
+{sizeof(sin6_allrouters), AF_INET6};
+
+static void call_script __P((char *));
+static int safefile __P((const char *));
 
 int
 sockopen()
@@ -228,8 +235,9 @@ sendpacket(struct ifinfo *ifinfo)
 		i = sendmsg(rssock, &sndmhdr, 0);
 		if (i < 0 || i != ifinfo->rs_datalen) {
 			/*
-			 * ENETDOWN is not so serious, especially when using several
-			 * network cards on a mobile node. We ignore it.
+			 * ENETDOWN is not so serious, especially when using
+			 * several network cards on a mobile node.
+			 * We ignore it.
 			 */
 			if (errno != ENETDOWN || dflag > 0)
 				warnmsg(LOG_ERR, __func__, "sendmsg on %s: %s",
@@ -251,6 +259,7 @@ rtsol_input(int s)
 	struct in6_pktinfo *pi = NULL;
 	struct ifinfo *ifi = NULL;
 	struct icmp6_hdr *icp;
+	struct nd_router_advert *nd_ra;
 	struct cmsghdr *cm;
 
 	/* get message */
@@ -346,6 +355,23 @@ rtsol_input(int s)
 	    inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf, INET6_ADDRSTRLEN),
 	    ifi->ifname, ifi->state);
 
+	nd_ra = (struct nd_router_advert *)icp;
+
+	/*
+	 * Process the "O bit."
+	 * If the value of OtherConfigFlag changes from FALSE to TRUE, the
+	 * host should invoke the stateful autoconfiguration protocol,
+	 * requesting information.
+	 * [RFC 2462 Section 5.5.3]
+	 */
+	if (((nd_ra->nd_ra_flags_reserved) & ND_RA_FLAG_OTHER) &&
+	    !ifi->otherconfig) {
+		warnmsg(LOG_DEBUG, __func__,
+		    "OtherConfigFlag on %s is turned on", ifi->ifname);
+		ifi->otherconfig = 1;
+		call_script(otherconf_script);
+	}
+
 	ifi->racnt++;
 
 	switch (ifi->state) {
@@ -358,4 +384,106 @@ rtsol_input(int s)
 		rtsol_timer_update(ifi);
 		break;
 	}
+}
+
+static void
+call_script(scriptpath)
+	char *scriptpath;
+{
+	pid_t pid, wpid;
+
+	if (scriptpath == NULL)
+		return;
+
+	/* launch the script */
+	pid = fork();
+	if (pid < 0) {
+		warnmsg(LOG_ERR, __func__,
+		    "failed to fork: %s", strerror(errno));
+		return;
+	} else if (pid) {
+		int wstatus;
+
+		do {
+			wpid = wait(&wstatus);
+		} while (wpid != pid && wpid > 0);
+
+		if (wpid < 0)
+			warnmsg(LOG_ERR, __func__,
+			    "wait: %s", strerror(errno));
+		else {
+			warnmsg(LOG_DEBUG, __func__,
+			    "script \"%s\" terminated", scriptpath);
+		}
+	} else {
+		char *argv[2];
+		int fd;
+
+		argv[0] = scriptpath;
+		argv[1] = NULL;
+
+		if (safefile(scriptpath)) {
+			warnmsg(LOG_ERR, __func__,
+			    "script \"%s\" cannot be executed safely",
+			    scriptpath);
+			exit(1);
+		}
+
+		if ((fd = open("/dev/null", O_RDWR)) != -1) {
+			dup2(fd, STDIN_FILENO);
+			dup2(fd, STDOUT_FILENO);
+			dup2(fd, STDERR_FILENO);
+			if (fd > STDERR_FILENO)
+				close(fd);
+		}
+
+		execv(scriptpath, argv);
+
+		warnmsg(LOG_ERR, __func__, "child: exec failed: %s",
+		    strerror(errno));
+		exit(0);
+	}
+
+	return;
+}
+
+static int
+safefile(path)
+	const char *path;
+{
+	struct stat s;
+	uid_t myuid;
+
+	/* no setuid */
+	if (getuid() != geteuid()) {
+		warnmsg(LOG_NOTICE, __func__,
+		    "setuid'ed execution not allowed\n");
+		return (-1);
+	}
+
+	if (lstat(path, &s) != 0) {
+		warnmsg(LOG_NOTICE, __func__, "lstat failed: %s",
+		    strerror(errno));
+		return (-1);
+	}
+
+	/* the file must be owned by the running uid */
+	myuid = getuid();
+	if (s.st_uid != myuid) {
+		warnmsg(LOG_NOTICE, __func__,
+		    "%s has invalid owner uid\n", path);
+		return (-1);
+	}
+
+	switch (s.st_mode & S_IFMT) {
+	case S_IFREG:
+		break;
+	default:
+		warnmsg(LOG_NOTICE, __func__,
+		    "%s is an invalid file type 0x%o\n",
+		    path, (s.st_mode & S_IFMT));
+		return (-1);
+	}
+
+	return (0);
 }

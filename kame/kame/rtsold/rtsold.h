@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.h,v 1.17 2003/01/17 04:15:25 suz Exp $	*/
+/*	$KAME: rtsold.h,v 1.18 2003/04/11 10:14:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,9 +42,11 @@ struct ifinfo {
 	char ifname[IF_NAMESIZE]; /* interface name */
 	u_int32_t linkid;	/* link ID of this interface */
 	int active;		/* interface status */
-	int probeinterval;	/* interval of probe timer(if necessary) */
+	int probeinterval;	/* interval of probe timer (if necessary) */
 	int probetimer;		/* rest of probe timer */
 	int mediareqok;		/* wheter the IF supports SIOCGIFMEDIA */
+	int otherconfig;	/* need a separate protocol for the "other"
+				 * configuration */
 	int state;
 	int probes;
 	int dadcount;
@@ -69,6 +71,7 @@ struct ifinfo {
 extern struct timeval tm_max;
 extern int dflag;
 extern int aflag;
+extern char *otherconf_script;
 extern int ifconfig __P((char *));
 extern void iflist_init __P((void));
 struct ifinfo *find_ifinfo __P((int));
