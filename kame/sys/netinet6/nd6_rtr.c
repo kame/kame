@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.235 2003/05/16 16:58:04 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.236 2003/06/03 10:09:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,7 +154,7 @@ nd6_rs_input(m, off, icmp6len)
 	union nd_opts ndopts;
 
 	/* If I'm not a router, ignore it. */
-	if (ip6_accept_rtadv != 0 || ip6_forwarding != 1)
+	if (ip6_accept_rtadv != 0 || !ip6_forwarding)
 		goto freeit;
 
 	/* Sanity checks */
