@@ -300,7 +300,7 @@ accept_mld6(recvlen)
     {
 	log(LOG_WARNING, 0,
 	    "received an MLD6 message with illegal hop limit(%d) from %s",
-	    inet6_fmt(&src->sin6_addr), *hlimp);
+	    *hlimp, inet6_fmt(&src->sin6_addr));
 	/* but accept the packet */
     }
     if (ifindex == 0)
