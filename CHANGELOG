@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2117 2002/04/08 09:40:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.2118 2002/04/08 11:20:12 jinmei Exp $
 
 <200204>
+2002-04-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_proto.c: added a new sysctl knob
+	"net.inet6.ip6.pmtu_expire" to configure the timer value (in
+	seconds).
+	(only available in freebsd4)
+
 2002-04-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_mtudisc_timeout): enabled the
 	function for FreeBSD to purge stale path MTU information.
