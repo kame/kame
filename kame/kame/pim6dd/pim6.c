@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: pim6.c,v 1.4 2000/02/28 05:39:36 jinmei Exp $
+ *  $Id: pim6.c,v 1.5 2000/02/28 07:16:37 itojun Exp $
  */
 
 #include "defs.h"
@@ -97,9 +97,10 @@ void
 init_pim6()
 {
 	static u_char *sndcmsgbuf = NULL;
-	static int sndcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	static int sndcmsglen;
 	struct cmsghdr *cmsgp = (struct cmsghdr *)sndcmsgbuf;
 
+	sndcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	if ((pim6_socket = socket(AF_INET6, SOCK_RAW, IPPROTO_PIM)) < 0) 
 		log(LOG_ERR, errno, "PIM6 socket");
 
