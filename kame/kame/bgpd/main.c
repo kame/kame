@@ -232,9 +232,6 @@ main_listen_accept()
   int                 fromaddrlen;
   int                   myaddrlen;   /* length of my address   */
   struct rpcb          *bnp;
-#ifdef ADVANCEDAPI
-  int                   on;          /* socket option          */
-#endif
 
   extern struct rpcb *bgb;
   extern int          bgpsock, ripsock, ospfsock;
