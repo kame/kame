@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.48 2003/08/18 17:59:00 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.49 2003/12/08 13:53:44 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -863,8 +863,7 @@ relay_to_client(dh6relay, len, from)
 		}
 	} else {
 		dprintf(LOG_INFO, FNAME,
-		    "Interface ID is not included from %s",
-		    addr2str(from));
+		    "Interface ID is not included from %s", addr2str(from));
 		/*
 		 * the responding server should be buggy, but we deal with it.
 		 */
