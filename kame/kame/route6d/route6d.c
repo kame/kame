@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.65 2001/06/02 00:12:41 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.66 2001/06/02 00:16:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.65 2001/06/02 00:12:41 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.66 2001/06/02 00:16:31 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -431,6 +431,8 @@ main(argc, argv)
 	alarm(ripinterval(INIT_INTERVAL6));
 
 	for (ifcp = ifc; ifcp; ifcp = ifcp->ifc_next) {
+		if (iff_find(ifcp, 'N'))
+			continue;
 		if (ifcp->ifc_index > 0 && (ifcp->ifc_flags & IFF_UP))
 			sendrequest(ifcp);
 	}
