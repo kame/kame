@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.238 2001/08/03 11:56:01 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.239 2001/08/03 12:37:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -128,7 +128,9 @@
 #include <net/if_faith.h>
 #endif
 
+#ifdef MIP6
 #include <netinet6/mip6.h>
+#endif
 
 #include <net/net_osdep.h>
 
