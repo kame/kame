@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.225 2001/08/03 11:56:02 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.226 2001/08/03 13:09:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1354,10 +1354,12 @@ in6_update_ifa(ifp, ifra, ia)
 	 */
 #ifdef MIP6
 	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia) &&
+	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0)
 #else /* MIP6 */
 	if (hostIsNew && in6if_do_dad(ifp) &&
+	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0)
 #endif /* MIP6 */
-	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0) {
+	{
 		nd6_dad_start((struct ifaddr *)ia, NULL);
 	}
 
