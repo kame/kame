@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.24 2000/01/10 23:15:24 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.25 2000/01/11 00:28:49 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -114,7 +114,7 @@ static int (*ph2exchange[][2][PHASE2ST_MAX])
   { NULL, NULL, quick_i1prep, NULL, quick_i1send,
     quick_i2recv, quick_i2send, quick_i3recv, NULL, NULL, },
   { NULL, quick_r1recv, quick_r1prep, NULL, quick_r2send,
-    quick_r3recv, quick_r3send, quick_r3prep, NULL, NULL, }
+    quick_r3recv, quick_r3prep, quick_r3send, NULL, NULL, }
  },
 };
 
