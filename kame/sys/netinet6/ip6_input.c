@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.308 2003/04/02 10:06:48 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.309 2003/04/04 09:28:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1336,6 +1336,7 @@ ip6_getpktaddrs(m, src, dst)
 	if (((struct ip6aux *)(mtag + 1))->ip6a_src.sin6_family != AF_INET6 ||
 	    ((struct ip6aux *)(mtag + 1))->ip6a_dst.sin6_family != AF_INET6) {
 		printf("ip6_getpktaddrs: src or dst are invalid\n");
+		return (-1);
 	}
 
 	if (src)
