@@ -92,6 +92,8 @@ static const struct icmptypeent icmp_type[] = {
 	{ "maskrep",	ICMP_MASKREPLY },
 #ifdef ICMP_TRACEROUTE
 	{ "trace",	ICMP_TRACEROUTE },
+#endif
+#ifdef ICMP_DATACONVERR 
 	{ "dataconv",	ICMP_DATACONVERR },
 	{ "mobredir",	ICMP_MOBILE_REDIRECT },
 	{ "ipv6-where",	ICMP_IPV6_WHEREAREYOU },
@@ -99,6 +101,8 @@ static const struct icmptypeent icmp_type[] = {
 	{ "mobregreq",	ICMP_MOBILE_REGREQUEST },
 	{ "mobregrep",	ICMP_MOBILE_REGREPLY },
 	{ "skip",	ICMP_SKIP },
+#endif
+#ifdef ICMP_PHOTURIS 
 	{ "photuris",	ICMP_PHOTURIS }
 #endif
 };
@@ -165,6 +169,8 @@ static const struct icmpcodeent icmp_code[] = {
 	{ "badhead",		ICMP_PARAMPROB,	ICMP_PARAMPROB_ERRATPTR },
 	{ "optmiss",		ICMP_PARAMPROB,	ICMP_PARAMPROB_OPTABSENT },
 	{ "badlen",		ICMP_PARAMPROB,	ICMP_PARAMPROB_LENGTH },
+#endif
+#ifdef ICMP_PHOTURIS
 	{ "unknown-ind",	ICMP_PHOTURIS,	ICMP_PHOTURIS_UNKNOWN_INDEX },
 	{ "auth-fail",		ICMP_PHOTURIS,	ICMP_PHOTURIS_AUTH_FAILED },
 	{ "decrypt-fail",	ICMP_PHOTURIS,	ICMP_PHOTURIS_DECRYPT_FAILED }

@@ -1074,6 +1074,7 @@ rate2str(double rate)
 u_int32_t
 getifspeed(char *ifname)
 {
+#ifdef SIOCGIFDATA
 	int		s;
 	struct ifreq	ifr;
 	struct if_data	ifrdat;
@@ -1091,6 +1092,9 @@ getifspeed(char *ifname)
 	if (close(s))
 		err(1, "close");
 	return ((u_int32_t)ifrdat.ifi_baudrate);
+#else
+	return (0);
+#endif
 }
 
 u_long

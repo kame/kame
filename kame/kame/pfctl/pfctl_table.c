@@ -34,7 +34,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <netinet/in.h>
 #include <limits.h>
 #endif

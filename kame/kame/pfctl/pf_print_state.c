@@ -35,7 +35,7 @@
 #include <net/if.h>
 #define TCPSTATES
 #include <netinet/tcp_fsm.h>
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <netinet/in.h>
 #endif
 #include <net/pfvar.h>
