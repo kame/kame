@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.48 2001/04/25 03:28:17 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.49 2001/04/26 23:16:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,7 +81,9 @@ static const struct afd {
 };
 
 struct sockinet {
+#ifdef HAVE_SA_LEN
 	u_char	si_len;
+#endif
 	u_char	si_family;
 	u_short	si_port;
 };
@@ -136,7 +138,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
  found:
 	if (salen != afd->a_socklen)
 		return EAI_FAIL;
-	
+
 	/* network byte order */
 	port = ((const struct sockinet *)sa)->si_port;
 	addr = (const char *)sa + afd->a_off;
