@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1898 2001/10/08 23:48:56 sakane Exp $
+$KAME: CHANGELOG,v 1.1899 2001/10/08 23:52:16 sakane Exp $
 
 <200110>
 Tue Oct  9 08:43:04 JST 2001 sakane@kame.net
@@ -7,7 +7,7 @@ Tue Oct  9 08:43:04 JST 2001 sakane@kame.net
 	the entry of the schedule is marked with dead before the function in
 	the entry will be called.  some schedules, check_rtsock(),
 	check_flushsa_stub, woulbe be remained in the schulder even after they
-	were excuted.
+	were excuted. sched_scrub_param() is unnecessary probably anymore.
 
 2001-10-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/contrib/bind/src/lib/irs/dns_ho.c (add_hostent):
