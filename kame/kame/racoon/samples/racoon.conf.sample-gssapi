@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample-gssapi,v 1.4 2001/08/14 12:10:22 sakane Exp $
+# $KAME: racoon.conf.sample-gssapi,v 1.5 2001/08/16 06:33:40 itojun Exp $
 
 # sample configuration for GSSAPI authentication (basically, kerberos).
 # doc/README.gssapi gives some idea on how to configure it.
@@ -33,7 +33,7 @@ sainfo anonymous {
 
 	lifetime time 30 min;
 
-	encryption_algorithm blowfish;
+	encryption_algorithm blowfish 448;
 	authentication_algorithm hmac_sha1;
 	compression_algorithm deflate;
 }

@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.in,v 1.17 2001/08/14 12:10:22 sakane Exp $
+# $KAME: racoon.conf.in,v 1.18 2001/08/16 06:33:40 itojun Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -118,7 +118,7 @@ sainfo address ::1 icmp6 address ::1 icmp6
 {
 	pfs_group 1;
 	lifetime time 60 sec;
-	encryption_algorithm 3des, cast128, blowfish, des ;
+	encryption_algorithm 3des, cast128, blowfish 448, des ;
 	authentication_algorithm hmac_sha1, hmac_md5 ;
 	compression_algorithm deflate ;
 }

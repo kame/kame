@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.86 2001/08/14 05:58:13 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.87 2001/08/16 06:33:39 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -546,6 +546,8 @@ Therefore you have to define all of the potential algorithms
 in the phase 2 proposals even if there is a algorithm which will not be used.
 These algorithms are define by using the following three directives,
 and they are lined with single comma as the separator.
+Variable-length algorithms can be followed by the key length, like
+.Dq Li blowfish 448 .
 .Xr racoon 8
 will compute the actual phase 2 proposals by computing
 the permutation of the specified algorithms,
@@ -677,7 +679,7 @@ sainfo anonymous
 {
 	pfs_group 2;
 	lifetime time 12 hour ;
-	encryption_algorithm 3des, blowfish, twofish, rijndael ;
+	encryption_algorithm 3des, blowfish 448, twofish, rijndael ;
 	authentication_algorithm hmac_sha1, hmac_md5 ;
 	compression_algorithm deflate ;
 }
