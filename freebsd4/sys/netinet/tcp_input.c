@@ -1052,7 +1052,7 @@ after_listen:
 				if (SEQ_GT(tp->snd_una, tp->snd_high) &&
 				    SEQ_LEQ(th->th_ack, tp->snd_high))
 					tp->snd_high = th->th_ack - 1;
-				tp->snd_recover = th->th_una;
+				tp->snd_recover = th->th_ack;
 #endif
 				tp->t_dupacks = 0;
 				m_freem(m);
