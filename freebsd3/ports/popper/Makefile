@@ -1,57 +1,59 @@
-# New ports collection makefile for:	popper
+# New ports collection makefile for:	qpopper
 # Date created:		1 April 1995
 # Whom:			pst
 #
-# $Id: Makefile,v 1.3 2000/06/25 10:58:42 sumikawa Exp $
+# $FreeBSD: ports/mail/qpopper/Makefile,v 1.42 2000/12/11 03:17:04 steve Exp $
 #
 
 PORTNAME=	qpopper
-PORTVERSION=	2.53
+PORTVERSION= 	3.1.2
 CATEGORIES=	mail
-MASTER_SITES=   ftp://ftp.qualcomm.com/eudora/servers/unix/popper/
-EXTRACT_SUFX=	.tar.Z
-DISTNAME=       ${PORTNAME}${PORTVERSION}
+MASTER_SITES=	ftp://ftp.qualcomm.com/eudora/servers/unix/popper/ \
+		ftp://ftp.gmxuk.net/pub/qpopper/ \
+		ftp://sunsite.doc.ic.ac.uk/Mirrors/ftp.qualcomm.com/eudora/servers/unix/popper/ \
+		ftp://ftp.kracked.com/pub/qpopper/
+DISTNAME=	${PORTNAME}${PORTVERSION}
 
+PATCH_SITES=	http://www.imasy.or.jp/~ume/ipv6/
+PATCHFILES=	qpopper3.1.2-ipv6-20001210.diff.gz
+PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
 
-BROKEN=		"security hole"
+GNU_CONFIGURE=	yes
+CONFIGURE_ENV=	LIBS="-lmd -lutil" \
+		OS_DEFS="-DSETPROCTITLE ${OS_DEFS}"
+CONFIGURE_ARGS=	--enable-apop=${PREFIX}/etc/qpopper/pop.auth \
+		--enable-nonauth-file=/etc/ftpusers \
+		--with-apopuid=pop \
+		--enable-keep-temp-drop
 
-#
-# If APOP_ONLY variable present in the environment, popper builds
-# with APOP authentification only
-#
+MAN8=		qpopauth.8 qpopper.8
 
-O_DEFS=         -DSETPROCTITLE -DKEEP_TEMP_DROP -DBSD44_DBM -DBIND43 \
-		-DBULLDB -DNONAUTHFILE='\"/etc/ftpusers\"'
-
-.if !defined(APOP_ONLY)
-.if exists(/usr/lib/libskey.a)
-P_LIBS=         -lskey
-O_DEFS+=        -DSKEY
-.endif
-.else
-O_DEFS+=        -DAPOP_ONLY
+# If APOP_ONLY variable present in the environment, qpopper builds
+# with APOP authentification only.
+.if defined(APOP_ONLY)
+OS_DEFS+=	-DAPOP_ONLY
 .endif
 
-P_LIBS+=        -lmd -lutil
-
-GNU_CONFIGURE=          yes
-CONFIGURE_ARGS=         --enable-apop=${PREFIX}/etc/popper/pop.auth \
-			--with-apopuid=pop --enable-debugging
-CONFIGURE_ENV=          LIBS="${P_LIBS} -L/usr/local/v6/lib -linet6" O_DEFS="${O_DEFS}" CFLAGS="-DINET6" APOP=/usr/local/etc/pop.auth
-
-MAN8=   popauth.8 popper.8
+# If FULL_POPD_DEBUG variable present in the environment, qpopper builds
+# with more verbose debugging. See also -d option to qpopper
+.if defined(FULL_POPD_DEBUG)
+CONFIGURE_ARGS+=	--enable-debugging
+.endif
 
 post-patch:
-	$(RM) ${WRKSRC}/md5.h
+	@${RM} -f ${WRKSRC}/popper/md5.h
+	@${PERL} -pi -e "s|%%PREFIX%%|${PREFIX}|g" ${WRKSRC}/man/*
 
 do-install:
-	cd ${WRKSRC} && \
-		${INSTALL_PROGRAM} -o pop -m 4111 popauth ${PREFIX}/bin
-	cd ${WRKSRC} && \
-		${INSTALL_PROGRAM} popper ${PREFIX}/libexec
-	cd ${WRKSRC} && \
-		${INSTALL_MAN} ${MAN8} ${PREFIX}/man/man8
+	${INSTALL_PROGRAM} ${WRKSRC}/popper/popauth ${PREFIX}/bin/qpopauth
+	${INSTALL_PROGRAM} ${WRKSRC}/popper/popper ${PREFIX}/libexec/qpopper
+	${INSTALL_MAN} ${WRKSRC}/man/popauth.8 ${MANPREFIX}/man/man8/qpopauth.8
+	${INSTALL_MAN} ${WRKSRC}/man/popper.8 ${MANPREFIX}/man/man8/qpopper.8
+	${LN} -sf ${PREFIX}/bin/qpopauth ${PREFIX}/bin/qapopauth
+
+post-install:
+	@${SED} -e "s:/usr/local:${PREFIX}:g" ${PKGMESSAGE}
 
 .include <bsd.port.mk>

@@ -1,76 +1,45 @@
-*** Makefile.in.orig	Thu Nov 20 00:20:38 1997
---- Makefile.in	Thu Nov 20 17:23:56 1997
-***************
-*** 1,20 ****
-! CSRCS		=	flock.c pop_dele.c pop_dropcopy.c \
-  			pop_get_command.c pop_get_subcommand.c pop_init.c \
-  			pop_last.c pop_list.c pop_log.c pop_lower.c \
-  			pop_msg.c pop_parse.c pop_pass.c pop_quit.c \
-  			pop_rset.c pop_send.c pop_stat.c pop_updt.c \
-  			pop_user.c pop_xtnd.c pop_xmit.c popper.c \
-! 			pop_bull.c xtnd_xlst.c pop_uidl.c mktemp.c \
-! 			pop_rpop.c pop_apop.c md5.c pop_auth.c
-  
-! OBJS		=	flock.o pop_dele.o pop_dropcopy.o \
-  			pop_get_command.o pop_get_subcommand.o pop_init.o \
-  			pop_last.o pop_list.o pop_log.o pop_lower.o \
-  			pop_msg.o pop_parse.o pop_pass.o pop_quit.o \
-  			pop_rset.o pop_send.o pop_stat.o pop_updt.o \
-  			pop_user.o pop_xtnd.o pop_xmit.o popper.o \
-! 			pop_bull.o xtnd_xlst.o pop_uidl.o mktemp.o \
-! 			pop_rpop.o pop_apop.o md5.o pop_auth.o
-  
-  DOCS		=	README pop3.rfc1081 pop3e.rfc1082 popper.8
-  
---- 1,20 ----
-! CSRCS           =       pop_dele.c pop_dropcopy.c \
-  			pop_get_command.c pop_get_subcommand.c pop_init.c \
-  			pop_last.c pop_list.c pop_log.c pop_lower.c \
-  			pop_msg.c pop_parse.c pop_pass.c pop_quit.c \
-  			pop_rset.c pop_send.c pop_stat.c pop_updt.c \
-  			pop_user.c pop_xtnd.c pop_xmit.c popper.c \
-! 			pop_bull.c xtnd_xlst.c pop_uidl.c \
-! 			pop_rpop.c pop_apop.c pop_auth.c
-  
-! OBJS            =       pop_dele.o pop_dropcopy.o \
-  			pop_get_command.o pop_get_subcommand.o pop_init.o \
-  			pop_last.o pop_list.o pop_log.o pop_lower.o \
-  			pop_msg.o pop_parse.o pop_pass.o pop_quit.o \
-  			pop_rset.o pop_send.o pop_stat.o pop_updt.o \
-  			pop_user.o pop_xtnd.o pop_xmit.o popper.o \
-! 			pop_bull.o xtnd_xlst.o pop_uidl.o \
-! 			pop_rpop.o pop_apop.o pop_auth.o
-  
-  DOCS		=	README pop3.rfc1081 pop3e.rfc1082 popper.8
-  
-***************
-*** 52,59 ****
-  popper: ${OBJS}
-  	${CC}  ${OBJS} -o popper ${LIBS}
-  
-! popauth: popauth.o flock.o
-! 	${CC}  -o popauth popauth.o  flock.o ${DBM_LIBS}
-  
-  .c.o: 
-  	${CC} -c -I. -I${srcdir} ${CFLAGS} ${DEFS} ${O_DEFS} $< -o $@
---- 52,59 ----
-  popper: ${OBJS}
-  	${CC}  ${OBJS} -o popper ${LIBS}
-  
-! popauth: popauth.o
-! 	${CC}  -o popauth popauth.o ${DBM_LIBS}
-  
-  .c.o: 
-  	${CC} -c -I. -I${srcdir} ${CFLAGS} ${DEFS} ${O_DEFS} $< -o $@
-***************
-*** 74,82 ****
-  	rm -f core *.o *.Z* config.h config.status config.cache config.log
-  
-  ${OBJS}:    ${INCLUDES}
-- pop_dropcopy.o: flock.h
-- pop_updt.o: flock.h
-- flock.o: flock.h
-  
-  
-  
---- 74,79 ----
+--- popper/Makefile.in.orig	Thu Aug 17 01:36:14 2000
++++ popper/Makefile.in	Wed Nov  1 11:37:31 2000
+@@ -74,9 +74,9 @@
+ 			pop_msg.o pop_parse.o pop_pass.o pop_quit.o \
+ 			pop_rset.o pop_send.o pop_stat.o pop_updt.o \
+ 			pop_user.o pop_xtnd.o pop_xmit.o popper.o \
+-			pop_bull.o xtnd_xlst.o pop_uidl.o mktemp.o \
+-			pop_rpop.o pop_apop.o md5.o pop_auth.o pop_pope.o \
+-                        pop_extend.o scram.o hmac.o base64.o pop_util.o \
++			pop_bull.o xtnd_xlst.o pop_uidl.o \
++			pop_rpop.o pop_apop.o pop_auth.o pop_pope.o \
++                        pop_extend.o scram.o hmac.o pop_util.o \
+                         get_sub_opt.o msg_ptr.o drac.o pop_config.o main.o
+ 
+ SRCS		=	pop_dele.c pop_dropcopy.c \
+@@ -85,15 +85,15 @@
+ 			pop_msg.c pop_parse.c pop_pass.c pop_quit.c \
+ 			pop_rset.c pop_send.c pop_stat.c pop_updt.c \
+ 			pop_user.c pop_xtnd.c pop_xmit.c popper.c \
+-			pop_bull.c xtnd_xlst.c pop_uidl.c mktemp.c \
+-			pop_rpop.c pop_apop.c md5.c pop_auth.c pop_pope.c \
+-                        pop_extend.c scram.c hmac.c base64.c pop_util.c \
++			pop_bull.c xtnd_xlst.c pop_uidl.c \
++			pop_rpop.c pop_apop.c pop_auth.c pop_pope.c \
++                        pop_extend.c scram.c hmac.c pop_util.c \
+                         get_sub_opt.c msg_ptr.c drac.c pop_config.c main.c
+ 
+-POPAUTHOBJS     =       base64.o scram.o md5.o \
++POPAUTHOBJS     =       scram.o \
+ 			hmac.o popauth.o
+ 
+-POPAUTHSRCS	=       base64.c scram.c md5.c \
++POPAUTHSRCS	=       scram.c \
+ 			hmac.c popauth.c
+ 
+ INCLUDES	=	${srcdir}/popper.h ${srcdir}/version.h \
+@@ -133,7 +133,7 @@
+ 	        -I${common_srcdir} ${common_dir}/libcommon.a
+ 
+ popauth: ${POPAUTHOBJS}
+-	${CC}  -o popauth ${POPAUTHOBJS} ${NETWORK_LIBS} ${DBM_LIBS} \
++	${CC}  -o popauth ${POPAUTHOBJS} ${LIBS} ${NETWORK_LIBS} ${DBM_LIBS} \
+ 		${common_dir}/libcommon.a
+ 
+ .c.o: 
