@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2015 2001/12/20 14:01:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2016 2001/12/21 05:39:06 itojun Exp $
 
 <200112>
+Fri Dec 21 14:38:15 JST 2001  itojun@iijlab.net
+	* sys/netinet6/in6_gif.c: correct default hoplimit value for
+	  IPvX-over-IPv6 tunnel (has been set to 0 due to #include mistake).
+
 2001-12-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c: supported a new IPv6 socket
 	option IPV6_DONTFRAG as described in rfc2292bis-03.  This option
