@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/12 00:45:58 $
+			$Date: 1999/10/19 01:52:01 $
 
 1. IPv6
 
@@ -955,6 +955,12 @@ The following algorithms are NOT supported:
 	HMAC MD5 with 128bit crypto checksum + 64bit replay prevention
 		(rfc2085.txt)
 	keyed SHA1 with 160bit crypto checksum + 32bit padding (rfc1852.txt)
+
+IPsec (in kernel) and IKE (in userland as "racoon") has been tested
+at several interoperability test events, and it is known to interoperate
+with many other implementations well.  Also, KAME IPsec has quite wide
+coverage for IPsec crypto algorithms documented in RFC (we cover
+algorithms without intellectual property issues only).
 
 4.5 ECN consideration on IPsec tunnels
 
