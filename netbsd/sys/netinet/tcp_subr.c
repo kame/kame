@@ -187,7 +187,7 @@ void	tcp6_mtudisc_callback __P((struct in6_addr *));
 #endif
 
 void	tcp_mtudisc __P((struct inpcb *, int));
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 void	tcp6_mtudisc __P((struct in6pcb *, int));
 #endif
 
@@ -1106,7 +1106,7 @@ tcp_notify(inp, error)
 	sowwakeup(so);
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 void
 tcp6_notify(in6p, error)
 	struct in6pcb *in6p;
@@ -1137,7 +1137,7 @@ tcp6_notify(in6p, error)
 }
 #endif
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 void
 tcp6_ctlinput(cmd, sa, d)
 	int cmd;
@@ -1338,7 +1338,7 @@ tcp_quench(inp, errno)
 		tp->snd_cwnd = tp->t_segsz;
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 void
 tcp6_quench(in6p, errno)
 	struct in6pcb *in6p;
@@ -1397,7 +1397,7 @@ tcp_mtudisc(inp, errno)
 	}
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 /*
  * Path MTU Discovery handlers.
  */
@@ -1455,7 +1455,7 @@ tcp6_mtudisc(in6p, errno)
 		tcp_output(tp);
 	}
 }
-#endif /* INET6 && !TCP6 */
+#endif /* INET6 */
 
 /*
  * Compute the MSS to advertise to the peer.  Called only during
@@ -1555,11 +1555,7 @@ tcp_mss_from_peer(tp, offer)
 	else if (tp->t_in6pcb) {
 		so = tp->t_in6pcb->in6p_socket;
 #if defined(RTV_SPIPE) || defined(RTV_SSTHRESH)
-#ifdef TCP6
-		rt = NULL;
-#else
 		rt = in6_pcbrtentry(tp->t_in6pcb);
-#endif
 #endif
 	}
 #endif
@@ -1641,11 +1637,7 @@ tcp_established(tp)
 	else if (tp->t_in6pcb) {
 		so = tp->t_in6pcb->in6p_socket;
 #if defined(RTV_RPIPE)
-#ifdef TCP6
-		rt = NULL;
-#else
 		rt = in6_pcbrtentry(tp->t_in6pcb);
-#endif
 #endif
 	}
 #endif
@@ -1683,13 +1675,8 @@ tcp_rmx_rtt(tp)
 	if (tp->t_inpcb)
 		rt = in_pcbrtentry(tp->t_inpcb);
 #ifdef INET6
-	else if (tp->t_in6pcb) {
-#ifdef TCP6
-		rt = NULL;
-#else
+	else if (tp->t_in6pcb)
 		rt = in6_pcbrtentry(tp->t_in6pcb);
-#endif
-	}
 #endif
 	if (rt == NULL)
 		return;
@@ -1808,7 +1795,7 @@ ipsec4_hdrsiz_tcp(tp)
 	return hdrsiz;
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 size_t
 ipsec6_hdrsiz_tcp(tp)
 	struct tcpcb *tp;

@@ -178,7 +178,7 @@ tcp_slowtimo()
 {
 	register struct inpcb *inp, *ninp;
 	register struct tcpcb *tp;
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 	register struct in6pcb *in6p, *nin6p;
 #endif
 	int s;
@@ -225,7 +225,7 @@ tpgone:
 		;
 	}
 dotcb6:
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 	mask |= 2;
 	in6p = tcb6.in6p_next;
 	if (in6p == (struct in6pcb *)0) {			/* XXX */

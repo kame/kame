@@ -199,7 +199,7 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 
 	if (inp)
 		rt = in_pcbrtentry(inp);
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 	else if (in6p)
 		rt = in6_pcbrtentry(in6p);
 #endif
@@ -252,7 +252,7 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 		/* XXX size -= ip_optlen(in6p); */
 	}
 	else if (in6p && tp->t_family == AF_INET6) {
-#if defined(IPSEC) && !defined(TCP6)
+#if defined(IPSEC)
 		size -= ipsec6_hdrsiz_tcp(tp);
 #endif
 		size -= ip6_optlen(in6p);
@@ -597,7 +597,7 @@ send:
 
 		if (tp->t_inpcb)
 			rt = in_pcbrtentry(tp->t_inpcb);
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 		else if (tp->t_in6pcb)
 			rt = in6_pcbrtentry(tp->t_in6pcb);
 #endif
