@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.56 2002/01/02 09:05:25 jinmei Exp $	*/
+/*	$KAME: handler.c,v 1.57 2002/01/21 08:45:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -748,7 +748,7 @@ check_recvdpkt(remote, local, rbuf)
 	} else
 		r->time_send = t;
 
-	return 0;
+	return 1;
 }
 
 /*
