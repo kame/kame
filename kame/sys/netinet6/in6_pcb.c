@@ -122,6 +122,12 @@ in6_pcballoc(so, head)
 	in6p->in6p_socket = so;
 	in6p->in6p_hops = -1;	/* use kernel default */
 	in6p->in6p_icmp6filt = NULL;
+	/* XXX: we should allocate inputopts only when we need it. */
+	MALLOC(in6p->in6p_inputopts, struct ip6_recvpktopts *,
+	       sizeof(struct ip6_recvpktopts), M_IP6OPT, M_NOWAIT);
+	if (in6p->in6p_inputopts == NULL)
+		return(ENOBUFS); /* XXX */
+	bzero(in6p->in6p_inputopts, sizeof(struct ip6_recvpktopts));
 #if 0
 	insque(in6p, head);
 #else
@@ -756,9 +762,12 @@ in6_pcbdetach(in6p)
 #endif /* IPSEC */
 	sotoin6pcb(so) = 0;
 	sofree(so);
-	
-	if (in6p->in6p_inputopts.head) /* Free all received options. */
-		m_freem(in6p->in6p_inputopts.head);
+
+	/* Free all received options. */
+	if (in6p->in6p_inputopts) {
+		m_freem(in6p->in6p_inputopts->head); /* this safe */
+		FREE(in6p->in6p_inputopts, M_IP6OPT);
+	}
 
 	ip6_freepcbopts(in6p->in6p_outputopts);
 	ip6_freemoptions(in6p->in6p_moptions);

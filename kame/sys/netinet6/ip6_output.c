@@ -1304,9 +1304,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 
 #if defined(HAVE_NRL_INPCB)
-	rcvopts = &inp->inp_inputopts6;
+	rcvopts = inp->inp_inputopts6;
 #else
-	rcvopts = &in6p->in6p_inputopts;
+	rcvopts = in6p->in6p_inputopts;
 #endif
 
 	if (level == IPPROTO_IPV6) {
@@ -1746,9 +1746,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 			case IPV6_PKTOPTIONS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				if (in6p->in6p_inputopts.head) {
+				if (in6p->in6p_inputopts &&
+				    in6p->in6p_inputopts->head) {
 					error = soopt_mcopyout(sopt, 
-							       in6p->in6p_inputopts.head);
+							       in6p->in6p_inputopts->head);
 				} else
 					sopt->sopt_valsize = 0;
 #elif defined(HAVE_NRL_INPCB)
@@ -1760,8 +1761,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 					(*mp)->m_len = 0;
 				}
 #else
-				if (in6p->in6p_inputopts.head) {
-					*mp = m_copym(in6p->in6p_inputopts.head,
+				if (in6p->in6p_inputopts &&
+				    in6p->in6p_inputopts->head) {
+					*mp = m_copym(in6p->in6p_inputopts->head,
 						      0, M_COPYALL, M_WAIT);
 				} else {
 					*mp = m_get(M_WAIT, MT_SOOPTS);

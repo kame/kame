@@ -93,7 +93,7 @@ struct	in6pcb {
 	int	in6p_flags;		/* generic IP6/datagram flags */
 	int	in6p_hops;		/* default hop limit */
 	struct	ip6_hdr in6p_ip6;	/* header prototype */
-	struct	ip6_recvpktopts in6p_inputopts; /* IP6 options for incoming packets */
+	struct	ip6_recvpktopts *in6p_inputopts; /* IP6 options for incoming packets */
 	struct	ip6_pktopts *in6p_outputopts; /* IP6 options for outgoing packets */
 	struct	ip6_moptions *in6p_moptions; /* IP6 multicast options */
 

@@ -620,8 +620,8 @@ findpcb:
 		struct ip6_recvpktopts opts;
 
 		bzero(&opts, sizeof(opts));
-		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
-		ip6_update_recvpcbopt(&in6p->in6p_inputopts, &opts);
+		ip6_savecontrol(in6p, ip6, m, &opts, in6p->in6p_inputopts);
+		ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
 		if (opts.head) {
 			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
 					    NULL, opts.head)
@@ -718,8 +718,8 @@ findpcb:
 			if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
 				bzero(&newopts, sizeof(newopts));
 				ip6_savecontrol(in6p, ip6, m, &newopts,
-						&in6p->in6p_inputopts);
-				ip6_update_recvpcbopt(&in6p->in6p_inputopts,
+						in6p->in6p_inputopts);
+				ip6_update_recvpcbopt(in6p->in6p_inputopts,
 						      &newopts);
 				if (newopts.head) {
 					if (sbappendcontrol(&so->so_rcv, NULL,
@@ -2513,8 +2513,8 @@ syn_cache_get6(so, m, off, len)
 	in6p->in6p_faddr = sc->sc_src;
 	in6p->in6p_fport = sc->sc_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
-		ip6_update_recvpcbopt(&in6p->in6p_inputopts, &opts);
+		ip6_savecontrol(in6p, ip6, m, &opts, in6p->in6p_inputopts);
+		ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
 		if (opts.head) {
 			if (sbappendcontrol(&so->so_rcv, NULL, opts.head) == 0)
 				m_freem(opts.head);
