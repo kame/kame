@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.27 2004/05/31 12:31:01 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.28 2004/05/31 12:38:08 suz Exp $
  */
 
 /*
@@ -539,7 +539,7 @@ accept_multicast_record(vifi, mard, src, grp)
 
 		    s = (struct listaddr *) malloc(sizeof(struct listaddr));
 		    if (s == NULL)
-			log_msg(LOG_ERR, 0, "ran out of memory");	/*fatal */
+			log_msg(LOG_ERR, 0, "ran out of memory"); /* fatal */
 		    s->al_addr = source_sa;
 		    s->sources = NULL;
 
@@ -548,8 +548,7 @@ accept_multicast_record(vifi, mard, src, grp)
 		     * link it to the chain of group 
 		     */
 
-		    if (g == NULL)
-		    {
+		    if (g == NULL) {
 			IF_DEBUG(DEBUG_MLD)
 			    log_msg(LOG_DEBUG, 0,
 				"The group too , trying to add it");
@@ -557,7 +556,7 @@ accept_multicast_record(vifi, mard, src, grp)
 			g = (struct listaddr *)
 			    malloc(sizeof(struct listaddr));
 			if (g == NULL)
-			    log_msg(LOG_ERR, 0, "ran out of memory");	/*fatal */
+			    log_msg(LOG_ERR, 0, "ran out of memory"); /* fatal */
 			g->al_addr = *grp;
 			g->sources = NULL;
 
@@ -587,7 +586,8 @@ accept_multicast_record(vifi, mard, src, grp)
 		     */
 		    IF_DEBUG(DEBUG_MLD)
 			log_msg(LOG_DEBUG, 0,
-			    "*** notify routing daemon *** : group(%s),source(%s) should be forwarded on %s",
+			    "*** notify routing daemon *** : "
+			    "group(%s),source(%s) should be forwarded on %s",
 			    sa6_fmt(&g->al_addr),
 			    sa6_fmt(&s->al_addr), v->uv_name);
 
@@ -760,7 +760,8 @@ DelVifV2(arg)
 
     IF_DEBUG(DEBUG_MLD)
 	log_msg(LOG_DEBUG, 0,
-	    "*** notify routing daemon ***: group(%s),source(%s) has no more listeners on %s",
+	    "*** notify routing daemon ***: "
+	    "group(%s),source(%s) has no more listeners on %s",
 	    sa6_fmt(&g->al_addr), sa6_fmt(&s->al_addr), v->uv_name);
 
     delete_leaf(vifi, &s->al_addr, &g->al_addr);
@@ -885,7 +886,7 @@ mld_shift_to_v1mode(mifi, src, grp)
 	if (g == NULL) {
 		g = (struct listaddr *) malloc(sizeof(struct listaddr));
 		if (g == NULL)
-			log_msg(LOG_ERR, 0, "ran out of memory");	/* fatal */
+			log_msg(LOG_ERR, 0, "ran out of memory"); /* fatal */
 
 		memset(g, 0, sizeof(*g));
 		g->al_addr = *grp;
