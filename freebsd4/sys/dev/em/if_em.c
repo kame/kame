@@ -31,11 +31,9 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em.c,v 1.2.2.18 2004/02/14 00:56:44 pdeuskar Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em.c,v 1.2.2.20.2.1 2005/01/04 23:55:03 tackerman Exp $*/
 
 #include <dev/em/if_em.h>
-
-
 
 /*********************************************************************
  *  Set this to one to display debug statistics                                                   
@@ -53,7 +51,7 @@ struct adapter *em_adapter_list = NULL;
  *  Driver version
  *********************************************************************/
 
-char em_driver_version[] = "1.7.25";
+char em_driver_version[] = "1.7.42";
 
 
 /*********************************************************************
@@ -101,6 +99,8 @@ static em_vendor_info_t em_vendor_info_array[] =
         { 0x8086, 0x1079, PCI_ANY_ID, PCI_ANY_ID, 0},
         { 0x8086, 0x107A, PCI_ANY_ID, PCI_ANY_ID, 0},
         { 0x8086, 0x107B, PCI_ANY_ID, PCI_ANY_ID, 0},
+        { 0x8086, 0x107C, PCI_ANY_ID, PCI_ANY_ID, 0},
+        { 0x8086, 0x108A, PCI_ANY_ID, PCI_ANY_ID, 0},
         /* required last entry */
         { 0, 0, 0, 0, 0}
 };
@@ -741,7 +741,7 @@ em_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 	default:
-		IOCTL_DEBUGOUT1("ioctl received: UNKNOWN (0x%x)\n", (int)command);
+		IOCTL_DEBUGOUT1("ioctl received: UNKNOWN (0x%x)", (int)command);
 		error = EINVAL;
 	}
 
@@ -798,6 +798,7 @@ static void
 em_init(void *arg)
 {
 	int             s;
+	uint32_t	pba;
 	struct ifnet   *ifp;
 	struct adapter * adapter = arg;
 
@@ -807,6 +808,36 @@ em_init(void *arg)
 
 	em_stop(adapter);
 
+	/* Packet Buffer Allocation (PBA)
+	 * Writing PBA sets the receive portion of the buffer
+	 * the remainder is used for the transmit buffer.
+	 *
+	 * Devices before the 82547 had a Packet Buffer of 64K.
+	 *   Default allocation: PBA=48K for Rx, leaving 16K for Tx.
+	 * After the 82547 the buffer was reduced to 40K.
+	 *   Default allocation: PBA=30K for Rx, leaving 10K for Tx.
+	 *   Note: default does not leave enough room for Jumbo Frame >10k.
+	 */
+	if(adapter->hw.mac_type < em_82547) {
+		/* Total FIFO is 64K */
+		if(adapter->rx_buffer_len > EM_RXBUFFER_8192)
+			pba = E1000_PBA_40K; /* 40K for Rx, 24K for Tx */
+		else
+			pba = E1000_PBA_48K; /* 48K for Rx, 16K for Tx */
+	} else {
+		/* Total FIFO is 40K */
+		if(adapter->hw.max_frame_size > EM_RXBUFFER_8192) {
+			pba = E1000_PBA_22K; /* 22K for Rx, 18K for Tx */
+		} else {
+		        pba = E1000_PBA_30K; /* 30K for Rx, 10K for Tx */
+		}
+		adapter->tx_fifo_head = 0;
+		adapter->tx_head_addr = pba << EM_TX_HEAD_ADDR_SHIFT;
+		adapter->tx_fifo_size = (E1000_PBA_40K - pba) << EM_PBA_BYTES_SHIFT;
+	}
+	INIT_DEBUGOUT1("em_init: pba=%dK",pba);
+	E1000_WRITE_REG(&adapter->hw, PBA, pba);
+	
 	/* Get the latest mac address, User can use a LAA */
 	bcopy(adapter->interface_data.ac_enaddr, adapter->hw.mac_addr,
               ETHER_ADDR_LEN);
@@ -1098,10 +1129,6 @@ em_media_change(struct ifnet *ifp)
 	return(0);
 }
 
-#define EM_FIFO_HDR              0x10
-#define EM_82547_PKT_THRESH      0x3e0
-#define EM_82547_TX_FIFO_SIZE    0x2800
-#define EM_82547_TX_FIFO_BEGIN   0xf00
 /*********************************************************************
  *
  *  This routine maps the mbufs to tx descriptors.
@@ -1298,7 +1325,7 @@ em_82547_move_tail(void *arg)
 
 		if(eop) {
 			if (em_82547_fifo_workaround(adapter, length)) {
-				adapter->tx_fifo_wrk++;
+				adapter->tx_fifo_wrk_cnt++;
 				adapter->tx_fifo_timer_handle = 
 					timeout(em_82547_move_tail,
 						adapter, 1);
@@ -1324,7 +1351,7 @@ em_82547_fifo_workaround(struct adapter *adapter, int len)
 	fifo_pkt_len = EM_ROUNDUP(len + EM_FIFO_HDR, EM_FIFO_HDR);
 
 	if (adapter->link_duplex == HALF_DUPLEX) {
-		fifo_space = EM_82547_TX_FIFO_SIZE - adapter->tx_fifo_head;
+		fifo_space = adapter->tx_fifo_size - adapter->tx_fifo_head;
 
 		if (fifo_pkt_len >= (EM_82547_PKT_THRESH + fifo_space)) {
 			if (em_82547_tx_fifo_reset(adapter)) {
@@ -1346,8 +1373,8 @@ em_82547_update_fifo_head(struct adapter *adapter, int len)
 	
 	/* tx_fifo_head is always 16 byte aligned */
 	adapter->tx_fifo_head += fifo_pkt_len;
-	if (adapter->tx_fifo_head >= EM_82547_TX_FIFO_SIZE) {
-		adapter->tx_fifo_head -= EM_82547_TX_FIFO_SIZE;
+	if (adapter->tx_fifo_head >= adapter->tx_fifo_size) {
+		adapter->tx_fifo_head -= adapter->tx_fifo_size;
 	}
 
 	return;
@@ -1372,17 +1399,17 @@ em_82547_tx_fifo_reset(struct adapter *adapter)
 		E1000_WRITE_REG(&adapter->hw, TCTL, tctl & ~E1000_TCTL_EN);
 
 		/* Reset FIFO pointers */
-		E1000_WRITE_REG(&adapter->hw, TDFT, EM_82547_TX_FIFO_BEGIN);
-		E1000_WRITE_REG(&adapter->hw, TDFH, EM_82547_TX_FIFO_BEGIN);
-		E1000_WRITE_REG(&adapter->hw, TDFTS, EM_82547_TX_FIFO_BEGIN);
-		E1000_WRITE_REG(&adapter->hw, TDFHS, EM_82547_TX_FIFO_BEGIN);
+		E1000_WRITE_REG(&adapter->hw, TDFT,  adapter->tx_head_addr);
+		E1000_WRITE_REG(&adapter->hw, TDFH,  adapter->tx_head_addr);
+		E1000_WRITE_REG(&adapter->hw, TDFTS, adapter->tx_head_addr);
+		E1000_WRITE_REG(&adapter->hw, TDFHS, adapter->tx_head_addr);
 
 		/* Re-enable TX unit */
 		E1000_WRITE_REG(&adapter->hw, TCTL, tctl);
 		E1000_WRITE_FLUSH(&adapter->hw);
 
 		adapter->tx_fifo_head = 0;
-		adapter->tx_fifo_reset++;
+		adapter->tx_fifo_reset_cnt++;
 
 		return(TRUE);
 	}
@@ -1396,13 +1423,23 @@ em_set_promisc(struct adapter * adapter)
 {
 
 	u_int32_t       reg_rctl;
+	u_int32_t       ctrl;
 	struct ifnet   *ifp = &adapter->interface_data.ac_if;
 
 	reg_rctl = E1000_READ_REG(&adapter->hw, RCTL);
+	ctrl = E1000_READ_REG(&adapter->hw, CTRL);
 
 	if (ifp->if_flags & IFF_PROMISC) {
 		reg_rctl |= (E1000_RCTL_UPE | E1000_RCTL_MPE);
 		E1000_WRITE_REG(&adapter->hw, RCTL, reg_rctl);
+		
+		/* Disable VLAN stripping in promiscous mode 
+		 * This enables bridging of vlan tagged frames to occur 
+		 * and also allows vlan tags to be seen in tcpdump
+		 */
+		ctrl &= ~E1000_CTRL_VME; 
+		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
+
 	} else if (ifp->if_flags & IFF_ALLMULTI) {
 		reg_rctl |= E1000_RCTL_MPE;
 		reg_rctl &= ~E1000_RCTL_UPE;
@@ -1423,6 +1460,7 @@ em_disable_promisc(struct adapter * adapter)
 	reg_rctl &=  (~E1000_RCTL_MPE);
 	E1000_WRITE_REG(&adapter->hw, RCTL, reg_rctl);
 
+	em_enable_vlans(adapter);
 	return;
 }
 
@@ -1779,8 +1817,12 @@ em_setup_interface(device_t dev, struct adapter * adapter)
 	INIT_DEBUGOUT("em_setup_interface: begin");
 
 	ifp = &adapter->interface_data.ac_if;
+#if __FreeBSD_version >= 502000
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
+#else
 	ifp->if_unit = adapter->unit;
 	ifp->if_name = "em";
+#endif
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_output = ether_output;
 	ifp->if_baudrate = 1000000000;
@@ -2672,8 +2714,20 @@ em_enable_intr(struct adapter * adapter)
 static void
 em_disable_intr(struct adapter *adapter)
 {
-	E1000_WRITE_REG(&adapter->hw, IMC, 
-			(0xffffffff & ~E1000_IMC_RXSEQ));
+	/*
+	 * The first version of 82542 had an errata where when link was forced it
+	 * would stay up even up even if the cable was disconnected.  Sequence errors
+	 * were used to detect the disconnect and then the driver would unforce the link.
+	 * This code in the in the ISR.  For this to work correctly the Sequence error 
+	 * interrupt had to be enabled all the time.
+	 */
+
+	if (adapter->hw.mac_type == em_82542_rev2_0)
+	    E1000_WRITE_REG(&adapter->hw, IMC, 
+	        (0xffffffff & ~E1000_IMC_RXSEQ));
+	else
+	    E1000_WRITE_REG(&adapter->hw, IMC, 
+	        0xffffffff);
 	return;
 }
 
@@ -2916,6 +2970,10 @@ em_print_debug_info(struct adapter *adapter)
 	uint8_t *hw_addr = adapter->hw.hw_addr;
 
 	printf("em%d: Adapter hardware address = %p \n", unit, hw_addr);
+	printf("em%d:CTRL  = 0x%x\n", unit, 
+		E1000_READ_REG(&adapter->hw, CTRL)); 
+	printf("em%d:RCTL  = 0x%x PS=(0x8402)\n", unit, 
+		E1000_READ_REG(&adapter->hw, RCTL)); 
 	printf("em%d:tx_int_delay = %d, tx_abs_int_delay = %d\n", unit, 
 	       E1000_READ_REG(&adapter->hw, TIDV),
 	       E1000_READ_REG(&adapter->hw, TADV));
@@ -2929,8 +2987,8 @@ em_print_debug_info(struct adapter *adapter)
 	       adapter->clean_tx_interrupts);
 #endif
 	printf("em%d: fifo workaround = %lld, fifo_reset = %lld\n", unit, 
-	       (long long)adapter->tx_fifo_wrk, 
-	       (long long)adapter->tx_fifo_reset);
+	       (long long)adapter->tx_fifo_wrk_cnt, 
+	       (long long)adapter->tx_fifo_reset_cnt);
 	printf("em%d: hw tdh = %d, hw tdt = %d\n", unit,
 	       E1000_READ_REG(&adapter->hw, TDH), 
 	       E1000_READ_REG(&adapter->hw, TDT));

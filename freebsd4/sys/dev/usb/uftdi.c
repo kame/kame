@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uftdi.c,v 1.3.2.5 2004/04/16 18:12:57 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uftdi.c,v 1.3.2.6 2004/06/13 06:18:25 sanpei Exp $");
 
 /*
  * FTDI FT8U100AX serial adapter driver
@@ -153,6 +153,7 @@ USB_MATCH(uftdi)
 	if (uaa->vendor == USB_VENDOR_FTDI &&
 	    (uaa->product == USB_PRODUCT_FTDI_SERIAL_8U100AX ||
 	     uaa->product == USB_PRODUCT_FTDI_SERIAL_8U232AM ||
+	     uaa->product == USB_PRODUCT_FTDI_SEMC_DSS20 ||
 	     uaa->product == USB_PRODUCT_FTDI_CFA_631 ||
 	     uaa->product == USB_PRODUCT_FTDI_CFA_632 ||
 	     uaa->product == USB_PRODUCT_FTDI_CFA_633 ||
@@ -213,6 +214,7 @@ USB_ATTACH(uftdi)
 		sc->sc_type = UFTDI_TYPE_SIO;
 		sc->sc_hdrlen = 1;
 		break;
+	case USB_PRODUCT_FTDI_SEMC_DSS20:
 	case USB_PRODUCT_FTDI_SERIAL_8U232AM:
 	case USB_PRODUCT_FTDI_CFA_631:
 	case USB_PRODUCT_FTDI_CFA_632:

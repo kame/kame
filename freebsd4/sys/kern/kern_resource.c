@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_resource.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_resource.c,v 1.55.2.5 2001/11/03 01:41:08 ps Exp $
+ * $FreeBSD: src/sys/kern/kern_resource.c,v 1.55.2.7 2004/06/22 05:36:59 bde Exp $
  */
 
 #include "opt_compat.h"
@@ -206,6 +206,7 @@ donice(curp, chgp, n)
 	register int n;
 {
 	register struct pcred *pcred = curp->p_cred;
+	int s;
 
 	if (pcred->pc_ucred->cr_uid && pcred->p_ruid &&
 	    pcred->pc_ucred->cr_uid != chgp->p_ucred->cr_uid &&
@@ -218,7 +219,11 @@ donice(curp, chgp, n)
 	if (n < chgp->p_nice && suser(curp))
 		return (EACCES);
 	chgp->p_nice = n;
+	s = splstatclock();
 	(void)resetpriority(chgp);
+	if (chgp->p_priority >= PUSER)
+		chgp->p_priority = chgp->p_usrpri;
+	splx(s);
 	return (0);
 }
 
@@ -510,10 +515,10 @@ calcru(p, up, sp, ip)
 	struct timeval *sp;
 	struct timeval *ip;
 {
+	struct timeval tv;
 	/* {user, system, interrupt, total} {ticks, usec}; previous tu: */
 	u_int64_t ut, uu, st, su, it, iu, tt, tu, ptu;
-	int s;
-	struct timeval tv;
+	int problemcase, s;
 
 	/* XXX: why spl-protect ?  worst case is an off-by-one report */
 	s = splstatclock();
@@ -529,6 +534,7 @@ calcru(p, up, sp, ip)
 	}
 
 	tu = p->p_runtime;
+	problemcase = 0;
 	if (p == curproc) {
 		/*
 		 * Adjust for the current time slice.  This is actually fairly
@@ -543,12 +549,36 @@ calcru(p, up, sp, ip)
 		else
 			tu += (tv.tv_usec - switchtime.tv_usec) +
 			    (tv.tv_sec - switchtime.tv_sec) * (int64_t)1000000;
+	} else if (p->p_stat == SRUN || p->p_stat == SZOMB) {
+		/*
+		 * XXX: this case should add the difference between
+		 * the current time and the switch time as above,
+		 * but the switch time is inaccessible, so we can't
+		 * do the adjustment and will end up with a wrong
+		 * runtime.  A previous call with a different
+		 * curthread may have obtained a (right or wrong)
+		 * runtime that is in advance of ours.  Just set a
+		 * flag to avoid warning about this known problem.
+		 *
+		 * In the SRUN case, the inaccessibility is due to
+		 * the switch time being in the PCPU info for a
+		 * different CPU.  In the SZOMB case, it is caused
+		 * by the relevant switch time going away in exit1()
+		 * and neglecting to use it to update p_runtime there.
+		 */
+		problemcase = 1;
 	}
 	ptu = p->p_uu + p->p_su + p->p_iu;
-	if (tu < ptu || (int64_t)tu < 0) {
-		/* XXX no %qd in kernel.  Truncate. */
-		printf("calcru: negative time of %ld usec for pid %d (%s)\n",
-		       (long)tu, p->p_pid, p->p_comm);
+	if (tu < ptu) {
+		if (!problemcase)
+			printf(
+"calcru: runtime went backwards from %qu usec to %qu usec for pid %d (%s)\n",
+			    (unsigned long long)ptu, (unsigned long long)tu,
+			    p->p_pid, p->p_comm);
+	}
+	if ((int64_t)tu < 0) {
+		printf("calcru: negative runtime of %qd usec for pid %d (%s)\n",
+		    (long long)tu, p->p_pid, p->p_comm);
 		tu = ptu;
 	}
 

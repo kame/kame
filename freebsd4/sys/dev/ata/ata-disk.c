@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-disk.c,v 1.60.2.27 2003/09/05 18:27:38 dg Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-disk.c,v 1.60.2.29 2004/09/18 10:26:12 dds Exp $
  */
 
 #include "opt_ata.h"
@@ -90,9 +90,11 @@ static u_int32_t adp_lun_map = 0;
 static int ata_dma = 1;
 static int ata_wc = 1;
 static int ata_tags = 0; 
+static int ata_suspend = 0;
 TUNABLE_INT("hw.ata.ata_dma", &ata_dma);
 TUNABLE_INT("hw.ata.wc", &ata_wc);
 TUNABLE_INT("hw.ata.tags", &ata_tags);
+TUNABLE_INT("hw.ata.suspend", &ata_suspend);
 static MALLOC_DEFINE(M_AD, "AD driver", "ATA disk driver");
 
 /* sysctl vars */
@@ -103,7 +105,9 @@ SYSCTL_INT(_hw_ata, OID_AUTO, wc, CTLFLAG_RD, &ata_wc, 0,
 	   "ATA disk write caching");
 SYSCTL_INT(_hw_ata, OID_AUTO, tags, CTLFLAG_RD, &ata_tags, 0,
 	   "ATA disk tagged queuing support");
-
+SYSCTL_INT(_hw_ata, OID_AUTO, suspend, CTLFLAG_RD, &ata_suspend, 0,
+	   "ATA disk suspend timer");
+  
 void
 ad_attach(struct ata_device *atadev, int alreadylocked)
 {
@@ -189,6 +193,35 @@ ad_attach(struct ata_device *atadev, int alreadylocked)
 			0, 0, ATA_C_F_DIS_SRVIRQ, ATA_WAIT_INTR))
 	    ata_prtdev(atadev, "disabling service interrupt failed\n");
     }
+
+    if (ata_suspend > 0) {
+        /* 
+	 * Attempt to set the standby timer.
+	 * The parameters are documented in sections 8.42.4 p. 210 and
+	 * 8.14.4 (table 23) p. 118 of the ATAPI-5 interface spec 
+	 * http://www.t13.org.
+	 */  
+	int value = ata_suspend;
+	if (atadev->param->stdby_ovlap) {
+	    /* 
+	     * The device supports the standard values.
+	     * Scale the seconds in value appropriately.
+	     */
+	    if (value <= 1200)
+		/* Values 1-240 specify 5 second increments. */
+		value /= 5;
+	    else if (value <= 18000)
+		/* Values 241-251 specify 30 minute increments. */
+		value = (value / 60 / 30) + 241;
+	    else
+		/* A period between 8 and 12 hours. */
+		value = 253;
+	} else
+		ata_prtdev(atadev, "timer value is vendor-specific\n");
+        if (ata_command(atadev, ATA_C_STANDBY, 0, value, 0, ATA_WAIT_INTR))
+	    ata_prtdev(atadev, "suspend mode failed\n");
+    }
+  
 
     ATA_UNLOCK_CH(atadev->channel);
 

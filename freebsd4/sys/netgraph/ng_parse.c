@@ -37,7 +37,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_parse.c,v 1.3 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.c,v 1.3.2.9 2004/01/09 08:58:06 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.c,v 1.3.2.10 2004/05/01 18:41:19 jdp Exp $
  */
 
 #include <sys/types.h>
@@ -1679,6 +1679,7 @@ ng_get_string_token(const char *s, int *startp, int *lenp)
 			strcpy(p, v);
 		}
 	}
+	FREE(cbuf, M_NETGRAPH);
 	return (NULL);		/* no closing quote */
 }
 

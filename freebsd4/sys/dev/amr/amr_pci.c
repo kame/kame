@@ -52,7 +52,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1.2.9 2002/12/20 15:12:04 emoore Exp $
+ *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1.2.10 2004/12/08 18:53:23 mp Exp $
  */
 
 #include <sys/param.h>
@@ -129,6 +129,7 @@ static struct
     {0x1000, 0x0407, 0},
     {0x1028, 0x000e, PROBE_SIGNATURE}, /* perc4/di i960 */
     {0x1028, 0x000f, 0}, /* perc4/di Verde*/
+    {0x1028, 0x0013, 0}, /* perc4/di */
     {0, 0, 0}
 };
 
@@ -180,7 +181,8 @@ amr_pci_attach(device_t dev)
      */
     command = pci_read_config(dev, PCIR_COMMAND, 1);
     if ((pci_get_device(dev) == 0x1960) || (pci_get_device(dev) == 0x0407) ||
-	(pci_get_device(dev) == 0x000e) || (pci_get_device(dev) == 0x000f)) {
+	(pci_get_device(dev) == 0x000e) || (pci_get_device(dev) == 0x000f) ||
+	(pci_get_device(dev) == 0x0013)) {
 	/*
 	 * Make sure we are going to be able to talk to this board.
 	 */

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.21.2.8 2003/09/14 16:25:23 sobomax Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.21.2.8.6.1 2005/01/14 00:07:56 kensmith Exp $
  */
 
 #include <sys/param.h>
@@ -64,10 +64,32 @@ DUMMY(rt_sigqueueinfo);
 DUMMY(capget);
 DUMMY(capset);
 DUMMY(sendfile);
-DUMMY(mmap2);
 DUMMY(truncate64);
 DUMMY(setfsuid);
 DUMMY(setfsgid);
 DUMMY(pivot_root);
 DUMMY(mincore);
+DUMMY(fadvise64);
 DUMMY(madvise);
+
+#define DUMMY_XATTR(s)						\
+int								\
+linux_ ## s ## xattr(						\
+    struct proc *p, struct linux_ ## s ## xattr_args *arg)	\
+{								\
+								\
+	return (ENOATTR);					\
+}
+DUMMY_XATTR(set);
+DUMMY_XATTR(lset);
+DUMMY_XATTR(fset);
+DUMMY_XATTR(get);
+DUMMY_XATTR(lget);
+DUMMY_XATTR(fget);
+DUMMY_XATTR(list);
+DUMMY_XATTR(llist);
+DUMMY_XATTR(flist);
+DUMMY_XATTR(remove);
+DUMMY_XATTR(lremove);
+DUMMY_XATTR(fremove);
+

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/mpt/mpt_pci.c,v 1.3.2.3 2002/09/24 21:37:25 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/mpt/mpt_pci.c,v 1.3.2.3.10.1 2005/01/03 16:39:20 sobomax Exp $ */
 /*
  * PCI specific probe and attach routines for LSI '909 FC  adapters.
  * FreeBSD Version.
@@ -67,6 +67,10 @@
 
 #ifndef	PCI_PRODUCT_LSI_FC929
 #define	PCI_PRODUCT_LSI_FC929		0x0622
+#endif
+
+#ifndef	PCI_PRODUCT_LSI_FC929X
+#define	PCI_PRODUCT_LSI_FC929X		0x0626
 #endif
 
 #ifndef	PCI_PRODUCT_LSI_1030
@@ -156,6 +160,9 @@ mpt_probe(device_t dev)
 		break;
 	case PCI_PRODUCT_LSI_FC929:
 		desc = "LSILogic FC929 FC Adapter";
+		break;
+	case PCI_PRODUCT_LSI_FC929X:
+		desc = "LSILogic FC929X FC Adapter";
 		break;
 	case PCI_PRODUCT_LSI_1030:
 		desc = "LSILogic 1030 Ultra4 Adapter";

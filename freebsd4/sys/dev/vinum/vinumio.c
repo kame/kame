@@ -34,7 +34,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumio.c,v 1.30 2000/05/10 23:23:30 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.52.2.7 2004/03/09 10:18:47 le Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.52.2.9 2004/04/26 20:32:59 le Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -559,10 +559,9 @@ format_config(char *config, int len)
 		drivename = "*invalid*";
 	    snprintf(s,
 		configend - s,
-		"sd name %s drive %s plex %s len %llus driveoffset %llus state %s",
+		"sd name %s drive %s len %llus driveoffset %llus state %s",
 		sd->name,
 		drivename,
-		vinum_conf.plex[sd->plexno].name,
 		(unsigned long long) sd->sectors,
 		(unsigned long long) sd->driveoffset,
 		sd_state(sd->state));
@@ -571,7 +570,8 @@ format_config(char *config, int len)
 	    if (sd->plexno >= 0)
 		snprintf(s,
 		    configend - s,
-		    " plexoffset %llds",
+		    " plex %s plexoffset %llds",
+		    vinum_conf.plex[sd->plexno].name,
 		    (long long) sd->plexoffset);
 	    else
 		snprintf(s, configend - s, " detached");
@@ -985,6 +985,7 @@ vinum_scandisk(char *devicename[], int drives)
 	drive->flags |= VF_CONFIGURED;			    /* read this drive's configuration */
     }
 
+    Free(config_line);
     Free(config_text);
     Free(drivelist);
     vinum_conf.flags &= ~VF_READING_CONFIG;		    /* no longer reading from disk */

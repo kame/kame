@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ufs/ufs/dirhash.h,v 1.2.2.1 2001/08/01 19:33:39 iedowse Exp $
+ * $FreeBSD: src/sys/ufs/ufs/dirhash.h,v 1.2.2.2 2004/12/08 11:54:13 dwmalone Exp $
  */
 
 #ifndef _UFS_UFS_DIRHASH_H_
@@ -38,7 +38,7 @@
  * long linear searches. Deleted entries that are not the last
  * in a chain must be marked DIRHASH_DEL.
  *
- * We also maintain a information about free space in each block
+ * We also maintain information about free space in each block
  * to speed up creations.
  */
 #define DIRHASH_EMPTY	(-1)	/* entry unused */

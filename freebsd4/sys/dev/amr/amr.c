@@ -52,7 +52,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/amr/amr.c,v 1.7.2.14 2003/10/29 09:11:38 ps Exp $
+ *	$FreeBSD: src/sys/dev/amr/amr.c,v 1.7.2.15 2004/07/22 16:35:18 ps Exp $
  */
 
 /*
@@ -985,7 +985,7 @@ amr_quartz_poll_command(struct amr_command *ac)
 
     s = splbio();
 
-    if (sc->amr_state & AMR_STATE_INTEN) {
+    if ((sc->amr_state & AMR_STATE_CRASHDUMP) == 0) {
 	count=0;
 	while (sc->amr_busyslots){
 	    tsleep(sc, PRIBIO | PCATCH, "amrpoll", hz);
@@ -1798,7 +1798,7 @@ amr_dump_blocks(struct amr_softc *sc, int unit, u_int32_t lba, void *data, int b
 
     debug_called(1);
 
-    sc->amr_state &= ~AMR_STATE_INTEN;
+    sc->amr_state |= AMR_STATE_CRASHDUMP;
 
     /* get ourselves a command buffer */
     if ((ac = amr_alloccmd(sc)) == NULL)
@@ -1825,7 +1825,7 @@ amr_dump_blocks(struct amr_softc *sc, int unit, u_int32_t lba, void *data, int b
     if (ac != NULL)
 	amr_releasecmd(ac);
 
-    sc->amr_state |= AMR_STATE_INTEN;
+    sc->amr_state &= ~AMR_STATE_CRASHDUMP;
 
     return (error);	
 }

@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.36 2003/06/01 04:23:00 nyan Exp $
+# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.37 2004/12/08 22:33:11 rsm Exp $
 
 machine		pc98
 cpu		I386_CPU
@@ -358,6 +358,7 @@ pseudo-device	bpf		#Berkeley packet filter
 #device		urio		# Diamond Rio MP3 Player
 # USB Ethernet, requires mii
 #device		aue		# ADMtek USB ethernet
+#device		axe		# ASIX Electronics USB ethernet
 #device		cue		# CATC USB ethernet
 #device		kue		# Kawasaki LSI USB ethernet
 

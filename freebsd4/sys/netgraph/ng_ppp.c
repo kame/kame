@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ppp.c,v 1.15.2.10 2003/03/10 17:55:48 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ppp.c,v 1.15.2.11 2004/12/12 19:37:52 archie Exp $
  * $Whistle: ng_ppp.c,v 1.24 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -744,7 +744,7 @@ ng_ppp_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 	case HOOK_INDEX_VJC_VJIP:
 		if (priv->conf.enableCompression
 		    && priv->hooks[HOOK_INDEX_COMPRESS] != NULL) {
-			if ((m = ng_ppp_addproto(m, proto, 1)) == NULL) {
+			if ((m = ng_ppp_addproto(m, proto, 0)) == NULL) {
 				NG_FREE_META(meta);
 				return (ENOBUFS);
 			}

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.24 2004/02/10 17:37:11 bms Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.26 2004/06/17 00:08:21 fjoe Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -233,6 +233,9 @@ struct mbstat {
 	u_long	m_minclsize;	/* min length of data to allocate a cluster */
 	u_long	m_mlen;		/* length of data in an mbuf */
 	u_long	m_mhlen;	/* length of data in a header mbuf */
+	u_long	sf_iocnt;	/* times sendfile had to do disk I/O */
+	u_long	sf_allocfail;	/* times sfbuf allocation failed */
+	u_long	sf_allocwait;	/* times sfbuf allocation had to wait */
 };
 
 /*
@@ -579,7 +582,9 @@ extern	union mcluster	*mclfree;
 extern	struct mbuf	*mmbfree;
 extern	int		 nmbclusters;
 extern	int		 nmbufs;
-extern	int		 nsfbufs;
+extern	int		 nsfbufs;	/* Number of sendfile(2) bufs alloced */
+extern	int		 nsfbufspeak;	/* Peak of nsfbufsused */
+extern	int		 nsfbufsused;	/* Number of sendfile(2) bufs in use */
 
 void		 m_adj(struct mbuf *, int);
 int		 m_apply(struct mbuf *, int, int,
@@ -637,11 +642,11 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  * a private cookie value so that packet tag-related definitions
  * can be maintained privately.
  *
- * Note that the packet tag returned by m_tag_allocate has the default
+ * Note that the packet tag returned by m_tag_alloc has the default
  * memory alignment implemented by malloc.  To reference private data
  * one can use a construct like:
  *
- *	struct m_tag *mtag = m_tag_allocate(...);
+ *	struct m_tag *mtag = m_tag_alloc(...);
  *	struct foo *p = (struct foo *)(mtag+1);
  *
  * if the alignment of struct m_tag is sufficient for referencing members
@@ -652,7 +657,7 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  *		struct m_tag	tag;
  *		...
  *	};
- *	struct foo *p = (struct foo *) m_tag_allocate(...);
+ *	struct foo *p = (struct foo *) m_tag_alloc(...);
  *	struct m_tag *mtag = &p->tag;
  */
 

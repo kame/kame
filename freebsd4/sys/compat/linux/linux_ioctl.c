@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_ioctl.c,v 1.55.2.12 2003/07/03 07:43:50 marcel Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_ioctl.c,v 1.55.2.14 2004/08/28 06:29:51 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -933,19 +933,21 @@ linux_ioctl_cdrom(struct proc *p, struct linux_ioctl_args *args)
 	}
 
 	case LINUX_CDROMREADTOCENTRY: {
-		struct linux_cdrom_tocentry lte, *ltep =
-		    (struct linux_cdrom_tocentry *)args->arg;
+		struct linux_cdrom_tocentry lte;
 		struct ioc_read_toc_single_entry irtse;
-		irtse.address_format = ltep->cdte_format;
-		irtse.track = ltep->cdte_track;
+
+		error = copyin((caddr_t)args->arg, &lte, sizeof(lte));
+		if (error)
+			return (error);
+		irtse.address_format = lte.cdte_format;
+		irtse.track = lte.cdte_track;
 		error = fo_ioctl(fp, CDIOREADTOCENTRY, (caddr_t)&irtse, p);
 		if (!error) {
-			lte = *ltep;
 			lte.cdte_ctrl = irtse.entry.control;
 			lte.cdte_adr = irtse.entry.addr_type;
 			bsd_to_linux_msf_lba(irtse.address_format,
 			    &irtse.entry.addr, &lte.cdte_addr);
-			copyout(&lte, (caddr_t)args->arg, sizeof(lte));
+			error = copyout(&lte, (caddr_t)args->arg, sizeof(lte));
 		}
 		return (error);
 	}
@@ -1113,6 +1115,10 @@ linux_ioctl_sound(struct proc *p, struct linux_ioctl_args *args)
 		args->cmd = SOUND_MIXER_READ_DEVMASK;
 		return (ioctl(p, (struct ioctl_args *)args));
 
+	case LINUX_SOUND_MIXER_WRITE_RECSRC:
+		args->cmd = SETDIR(SOUND_MIXER_WRITE_RECSRC);
+		return (ioctl(p, (struct ioctl_args *)args));
+
 	case LINUX_SNDCTL_DSP_RESET:
 		args->cmd = SNDCTL_DSP_RESET;
 		return (ioctl(p, (struct ioctl_args *)args));
@@ -1268,6 +1274,7 @@ static int
 linux_ioctl_console(struct proc *p, struct linux_ioctl_args *args)
 {
 	struct file *fp = p->p_fd->fd_ofiles[args->fd];
+	int error;
 
 	switch (args->cmd & 0xffff) {
 
@@ -1326,11 +1333,16 @@ linux_ioctl_console(struct proc *p, struct linux_ioctl_args *args)
 		return  (ioctl(p, (struct ioctl_args *)args));
 
 	case LINUX_VT_SETMODE: {
-		struct vt_mode *mode;
+		struct vt_mode mode;
+		error = copyin((caddr_t)args->arg, &mode, sizeof(mode));
+		if (error)
+			return (error);
+		if (!ISSIGVALID(mode.frsig) && ISSIGVALID(mode.acqsig))
+			mode.frsig = mode.acqsig;
+		error = copyout(&mode, (caddr_t)args->arg, sizeof(mode));
+		if (error)
+			return (error);
 		args->cmd = VT_SETMODE;
-		mode = (struct vt_mode *)args->arg;
-		if (!ISSIGVALID(mode->frsig) && ISSIGVALID(mode->acqsig))
-			mode->frsig = mode->acqsig;
 		return (ioctl(p, (struct ioctl_args *)args));
 	}
 

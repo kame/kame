@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.27 2003/12/08 16:55:21 bms Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.28 2004/10/26 17:36:16 bms Exp $
  */
 
 /*
@@ -184,6 +184,7 @@ arp_rtrequest(req, rt, info)
 		 * restore cloning bit.
 		 */
 		if ((rt->rt_flags & RTF_HOST) == 0 &&
+		    rt_mask(rt) != NULL &&
 		    SIN(rt_mask(rt))->sin_addr.s_addr != 0xffffffff)
 			rt->rt_flags |= RTF_CLONING;
 		if (rt->rt_flags & RTF_CLONING) {

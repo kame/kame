@@ -35,7 +35,7 @@
  *
  *	$Id$
  *
- * $FreeBSD: src/sys/i4b/layer1/ifpi2/i4b_ifpi2_pci.c,v 1.6.2.2 2002/05/15 08:12:42 gj Exp $
+ * $FreeBSD: src/sys/i4b/layer1/ifpi2/i4b_ifpi2_pci.c,v 1.6.2.3 2004/07/26 09:12:57 gj Exp $
  *
  *      last edit-date: [Fri Jan 12 17:01:26 2001]
  *
@@ -155,6 +155,7 @@ struct l1_softc *ifpi2_scp[IFPI2_MAXUNIT];
 /*
  *	AVM PCI Status Latch 0 read only bits
  */
+#define ASL_RESET		0x01
 #define ASL_TIMERRESET 		0x04
 #define ASL_ENABLE_INT		0x08
 
@@ -566,6 +567,13 @@ avma1pp2_attach_avma1pp(device_t dev)
 #ifdef AVMA1PCI_V2_DEBUG
 	printf("avma1pp2_attach: 1 HSCX_STAT %x\n", v);
 #endif
+
+	bus_space_write_1(btag, bhandle, STAT0_OFFSET, 0);
+	DELAY(SEC_DELAY/100); /* 10 ms */
+	bus_space_write_1(btag, bhandle, STAT0_OFFSET, ASL_RESET);
+	DELAY(SEC_DELAY/100); /* 10 ms */
+	bus_space_write_1(btag, bhandle, STAT0_OFFSET, 0);
+	DELAY(SEC_DELAY/100); /* 10 ms */
 
 	bus_space_write_1(btag, bhandle, STAT0_OFFSET, ASL_TIMERRESET);
 	DELAY(SEC_DELAY/100); /* 10 ms */

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.24.2.4 2004/05/22 23:09:19 kensmith Exp $
+ * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.31.2.1 2005/01/01 19:53:59 kensmith Exp $
  */
 
 /*
@@ -70,14 +70,14 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 #include <sys/proc.h>
 #include <sys/vmmeter.h>
 #include <sys/mman.h>
 #include <sys/vnode.h>
 #include <sys/resourcevar.h>
 #include <sys/file.h>
-#include <sys/kernel.h>
-#include <sys/sysctl.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -1535,6 +1535,7 @@ vm_map_user_pageable(map, start, real_end, new_pageable)
 	vm_map_entry_t entry;
 	vm_map_entry_t start_entry;
 	vm_offset_t end;
+	boolean_t fictitious;
 	int rv = KERN_SUCCESS;
 
 	vm_map_lock(map);
@@ -1599,11 +1600,13 @@ vm_map_user_pageable(map, start, real_end, new_pageable)
 			 * manipulated to avoid deadlocks.  The in-transition
 			 * flag protects the entries. 
 			 */
+			fictitious = entry->object.vm_object != NULL &&
+			    entry->object.vm_object->type == OBJT_DEVICE;
 			save_start = entry->start;
 			save_end = entry->end;
 			vm_map_unlock(map);
 			map->timestamp++;
-			rv = vm_fault_user_wire(map, save_start, save_end);
+			rv = vm_fault_wire(map, save_start, save_end, 1, fictitious);
 			vm_map_lock(map);
 			if (rv) {
 				CLIP_CHECK_BACK(entry, save_start);
@@ -1674,7 +1677,9 @@ vm_map_user_pageable(map, start, real_end, new_pageable)
 			entry->eflags &= ~MAP_ENTRY_USER_WIRED;
 			entry->wired_count--;
 			if (entry->wired_count == 0)
-				vm_fault_unwire(map, entry->start, entry->end);
+				vm_fault_unwire(map, entry->start, entry->end,
+				    entry->object.vm_object != NULL &&
+				    entry->object.vm_object->type == OBJT_DEVICE);
 			entry = entry->next;
 		}
 	}
@@ -1707,6 +1712,7 @@ vm_map_pageable(map, start, real_end, new_pageable)
 	vm_map_entry_t entry;
 	vm_map_entry_t start_entry;
 	vm_offset_t end;
+	boolean_t fictitious;
 	int rv = KERN_SUCCESS;
 	int s;
 
@@ -1820,8 +1826,10 @@ vm_map_pageable(map, start, real_end, new_pageable)
 			vm_offset_t save_start = entry->start;
 			vm_offset_t save_end = entry->end;
 
+			fictitious = entry->object.vm_object != NULL &&
+			    entry->object.vm_object->type == OBJT_DEVICE;
 			if (entry->wired_count == 1)
-				rv = vm_fault_wire(map, entry->start, entry->end);
+				rv = vm_fault_wire(map, entry->start, entry->end, 0, fictitious);
 			if (rv) {
 				CLIP_CHECK_BACK(entry, save_start);
 				for (;;) {
@@ -1887,7 +1895,9 @@ vm_map_pageable(map, start, real_end, new_pageable)
 		while ((entry != &map->header) && (entry->start < end)) {
 			entry->wired_count--;
 			if (entry->wired_count == 0)
-				vm_fault_unwire(map, entry->start, entry->end);
+				vm_fault_unwire(map, entry->start, entry->end,
+				    entry->object.vm_object != NULL &&
+				    entry->object.vm_object->type == OBJT_DEVICE);
 			entry = entry->next;
 		}
 	}
@@ -1981,8 +1991,8 @@ vm_map_clean(map, start, end, syncio, invalidate)
 		 * may start out with a NULL object.
 		 */
 		while (object && object->backing_object) {
-			object = object->backing_object;
 			offset += object->backing_object_offset;
+			object = object->backing_object;
 			if (object->size < OFF_TO_IDX( offset + size))
 				size = IDX_TO_OFF(object->size) - offset;
 		}
@@ -2043,7 +2053,9 @@ vm_map_entry_unwire(map, entry)
 	vm_map_t map;
 	vm_map_entry_t entry;
 {
-	vm_fault_unwire(map, entry->start, entry->end);
+	vm_fault_unwire(map, entry->start, entry->end,
+	    entry->object.vm_object != NULL &&
+	    entry->object.vm_object->type == OBJT_DEVICE);
 	entry->wired_count = 0;
 }
 

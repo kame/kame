@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.10 2004/01/13 14:43:22 ume Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.11 2004/08/28 12:39:07 yar Exp $	*/
 /*	$KAME: in6_pcb.c,v 1.31 2001/05/21 05:45:10 jinmei Exp $	*/
   
 /*
@@ -198,6 +198,8 @@ in6_pcbbind(inp, nam, p)
 				    &sin6->sin6_addr, lport,
 				    INPLOOKUP_WILDCARD);
 				if (t &&
+				    (so->so_type != SOCK_STREAM ||
+				     IN6_IS_ADDR_UNSPECIFIED(&t->in6p_faddr)) &&
 				    (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) ||
 				     !IN6_IS_ADDR_UNSPECIFIED(&t->in6p_laddr) ||
 				     (t->inp_socket->so_options &
@@ -214,12 +216,11 @@ in6_pcbbind(inp, nam, p)
 						sin.sin_addr, lport,
 						INPLOOKUP_WILDCARD);
 					if (t &&
+					    (so->so_type != SOCK_STREAM ||
+					     ntohl(t->inp_faddr.s_addr) ==
+					      INADDR_ANY) &&
 					    (so->so_cred->cr_uid !=
-					     t->inp_socket->so_cred->cr_uid) &&
-					    (ntohl(t->inp_laddr.s_addr) !=
-					     INADDR_ANY ||
-					     INP_SOCKAF(so) ==
-					     INP_SOCKAF(t->inp_socket)))
+					     t->inp_socket->so_cred->cr_uid))
 						return (EADDRINUSE);
 				}
 			}

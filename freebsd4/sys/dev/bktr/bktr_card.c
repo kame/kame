@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_card.c,v 1.9.2.6 2003/06/17 16:55:08 fjoe Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_card.c,v 1.9.2.7 2004/08/15 12:17:36 sanpei Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -354,6 +354,18 @@ static const struct CARDTYPE cards[] = {
 	   /* Tuner, Extern, Intern, Mute, Enabled */
 	   { 0x10000, 0, 0x10000, 0, 1 },	/* audio MUX values */
 	   0x10f00 },				/* GPIO mask */
+
+	{  CARD_AOPEN_VA1000,			/* the card id */
+	  "AOpen VA1000",			/* the 'name' */
+	   NULL,				/* the tuner */
+	   0,					/* the tuner i2c address */
+	   0,					/* dbx is optional */
+	   0,
+	   0,
+	   0,					/* EEProm unknown */
+	   0,					/* size unknown */
+	   { 0x02, 0x00, 0x00, 0x00, 1 },	/* audio MUX values */
+	   0x18e0 },				/* GPIO mask */
 
 };
 

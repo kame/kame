@@ -31,7 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em_osdep.h,v 1.1.2.13 2003/11/18 17:25:53 pdeuskar Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em_osdep.h,v 1.1.2.14 2004/10/15 23:27:42 tackerman Exp $*/
 
 #ifndef _FREEBSD_OS_H_
 #define _FREEBSD_OS_H_
@@ -51,8 +51,13 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <machine/clock.h>
+#if __FreeBSD_version >= 502000
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#else
 #include <pci/pcivar.h>
 #include <pci/pcireg.h>
+#endif
 
 
 #define ASSERT(x) if(!(x)) panic("EM: x")

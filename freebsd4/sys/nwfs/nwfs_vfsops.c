@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6.2.6 2001/10/25 19:18:54 dillon Exp $
+ * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6.2.6.14.1 2004/12/19 15:20:10 bp Exp $
  */
 #include "opt_ncp.h"
 #ifndef NCP
@@ -389,11 +389,13 @@ int
 nwfs_init(struct vfsconf *vfsp)
 {
 #ifndef SMP
+	size_t olen, plen;
 	int name[2];
-	int olen, ncpu, plen, error;
+	int ncpu, error;
 
 	name[0] = CTL_HW;
 	name[1] = HW_NCPU;
+	olen = sizeof(ncpu);
 	error = kernel_sysctl(curproc, name, 2, &ncpu, &olen, NULL, 0, &plen);
 	if (error == 0 && ncpu > 1)
 		printf("warning: nwfs module compiled without SMP support.");

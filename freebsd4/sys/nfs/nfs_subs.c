@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_subs.c  8.8 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/nfs/nfs_subs.c,v 1.90.2.2 2001/10/25 19:18:53 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_subs.c,v 1.90.2.3.2.1 2005/01/14 00:07:56 kensmith Exp $
  */
 
 /*
@@ -204,7 +204,7 @@ static u_char nfsrv_v2errmap[ELAST] = {
   NFSERR_IO,	NFSERR_IO,	NFSERR_IO,	NFSERR_IO,	NFSERR_IO,
   NFSERR_IO,	NFSERR_IO,	NFSERR_IO,	NFSERR_IO,	NFSERR_IO,
   NFSERR_IO,	NFSERR_IO,	NFSERR_IO,	NFSERR_IO,	NFSERR_IO,
-  NFSERR_IO /* << Last is 86 */
+  NFSERR_IO,	NFSERR_IO /* << Last is 87 */
 };
 
 /*
@@ -1335,12 +1335,19 @@ nfs_loadattrcache(vpp, mdp, dposp, vaper, dontshrink)
 				vap->va_size = np->n_size;
 				np->n_attrstamp = 0;
 			} else if (np->n_flag & NMODIFIED) {
-				if (vap->va_size < np->n_size)
+				/*
+				 * We've modified the file: Use the larger
+				 * of our size, and the server's size.
+				 */
+				if (vap->va_size < np->n_size) {
 					vap->va_size = np->n_size;
-				else
+				} else {
 					np->n_size = vap->va_size;
+					np->n_flag |= NSIZECHANGED;
+				}
 			} else {
 				np->n_size = vap->va_size;
+				np->n_flag |= NSIZECHANGED;
 			}
 			vnode_pager_setsize(vp, np->n_size);
 		} else {

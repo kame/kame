@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.14 2003/09/09 19:09:22 bms Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.14.6.1 2005/01/02 05:03:16 silby Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
@@ -160,6 +160,7 @@ extern struct	pr_usrreqs rip_usrreqs;
 
 int	 ip_ctloutput(struct socket *, struct sockopt *sopt);
 void	 ip_drain(void);
+void	 ip_fini(void *xtp);
 int	 ip_fragment(struct ip *ip, struct mbuf **m_frag, int mtu,
 	    u_long if_hwassist_flags, int sw_csum);
 void	 ip_freemoptions(struct ip_moptions *);

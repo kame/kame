@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
- * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.24.2.1 2004/04/30 03:05:35 kensmith Exp $
+ * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.26 2004/06/02 07:04:21 phk Exp $
  */
 
 /*-
@@ -2347,7 +2347,7 @@ retry:
 static int pmap_prefault_pageorder[] = {
 	-PAGE_SIZE, PAGE_SIZE,
 	-2 * PAGE_SIZE, 2 * PAGE_SIZE,
-	-3 * PAGE_SIZE, 3 * PAGE_SIZE
+	-3 * PAGE_SIZE, 3 * PAGE_SIZE,
 	-4 * PAGE_SIZE, 4 * PAGE_SIZE
 };
 

@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.20 2003/12/16 16:32:28 jhb Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.22 2004/06/02 14:42:59 jhb Exp $
  */
 
 #include "opt_cpu.h"
@@ -984,6 +984,15 @@ mptable_pass2(void)
 					logical_cpus_mask |= (1 << cpu);
 					cpu++;
 				}
+			} else if (logical_cpus != 0) {
+				u_int id = ((proc_entry_ptr)position)->apic_id;
+
+				/*
+				 * If this is an already-enumerated logical
+				 * CPU, add it to the bitmap.
+				 */
+				if (id % logical_cpus != 0)
+					logical_cpus_mask |= (1 << ID_TO_CPU(id));
 			}
 			break;
 		case 1:

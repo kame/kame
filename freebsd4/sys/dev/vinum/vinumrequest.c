@@ -38,12 +38,14 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumrequest.c,v 1.30 2001/01/09 04:20:55 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.44.2.5 2002/08/28 04:30:56 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.44.2.7 2004/12/13 01:59:28 mckay Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
 #include <dev/vinum/request.h>
 #include <sys/resourcevar.h>
+
+#define abs(x)	(((x) < 0) ? -(x) : (x))
 
 enum requeststatus bre(struct request *rq,
     int plexno,
@@ -238,10 +240,18 @@ vinumstart(struct buf *bp, int reviveok)
 	if (vol != NULL) {
 	    plexno = vol->preferred_plex;		    /* get the plex to use */
 	    if (plexno < 0) {				    /* round robin */
-		plexno = vol->last_plex_read;
-		vol->last_plex_read++;
-		if (vol->last_plex_read >= vol->plexes)	    /* got the the end? */
-		    vol->last_plex_read = 0;		    /* wrap around */
+		for (plexno = 0; plexno < vol->plexes; plexno++)
+		    if (abs(bp->b_blkno - PLEX[vol->plex[plexno]].last_addr) <= ROUNDROBIN_SWITCH)
+		        break;
+		if (plexno >= vol->plexes) {
+		    vol->last_plex_read++;
+		    if (vol->last_plex_read >= vol->plexes)
+			vol->last_plex_read = 0;
+		    plexno = vol->last_plex_read;
+		} else {
+		    vol->last_plex_read = plexno;
+		};
+		PLEX[vol->plex[plexno]].last_addr = bp->b_blkno;
 	    }
 	    status = build_read_request(rq, plexno);	    /* build a request */
 	} else {

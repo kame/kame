@@ -1,5 +1,5 @@
 /*	$NetBSD: usbdi.h,v 1.62 2002/07/11 21:14:35 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi.h,v 1.21.2.4 2004/03/01 00:07:23 julian Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi.h,v 1.21.2.6 2004/12/08 08:22:05 julian Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -84,6 +84,9 @@ typedef void (*usbd_callback)(usbd_xfer_handle, usbd_private_handle,
 #define USBD_SYNCHRONOUS	0x02	/* wait for completion */
 /* in usb.h #define USBD_SHORT_XFER_OK	0x04*/	/* allow short reads */
 #define USBD_FORCE_SHORT_XFER	0x08	/* force last short packet on write */
+
+/* XXX Temporary hack XXX */
+#define USBD_NO_TSLEEP		0x80	/* XXX use busy wait */
 
 #define USBD_NO_TIMEOUT 0
 #define USBD_DEFAULT_TIMEOUT 5000 /* ms = 5 s */
@@ -263,6 +266,9 @@ struct usb_attach_arg {
 #define UMATCH_NONE					(ENXIO)
 
 #endif
+
+#define USBD_SHOW_DEVICE_CLASS		0x1
+#define USBD_SHOW_INTERFACE_CLASS	0x2
 
 #if defined(__FreeBSD__)
 int usbd_driver_load(module_t mod, int what, void *arg);

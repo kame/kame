@@ -5,7 +5,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.2.2.20 2004/04/16 18:12:58 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.2.2.21 2004/09/20 05:08:29 sanpei Exp $");
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -169,6 +169,9 @@ static const struct uscan_info uscanner_devs[] = {
   /* National */
  {{ USB_VENDOR_NATIONAL, USB_PRODUCT_NATIONAL_BEARPAW1200 }, 0 },
  {{ USB_VENDOR_NATIONAL, USB_PRODUCT_NATIONAL_BEARPAW2400 }, 0 },
+
+  /* Nikon */
+ {{ USB_VENDOR_NIKON, USB_PRODUCT_NIKON_LS40 }, 0 },
 
   /* Primax */
  {{ USB_VENDOR_PRIMAX, USB_PRODUCT_PRIMAX_G2X300 }, 0 },

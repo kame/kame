@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/files,v 1.340.2.153 2004/04/13 03:39:16 rwatson Exp $
+# $FreeBSD: src/sys/conf/files,v 1.340.2.154.2.2 2005/01/14 03:07:39 scottl Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -342,6 +342,8 @@ dev/dpt/dpt_scsi.c	optional dpt
 dev/dpt/dpt_eisa.c	optional dpt eisa
 dev/dpt/dpt_pci.c	optional dpt pci
 dev/ed/if_ed_pci.c	optional ed pci
+dev/em/if_em.c		optional em
+dev/em/if_em_hw.c	optional em
 dev/ep/if_ep.c		optional ep
 dev/ep/if_ep_isa.c	optional ep isa
 dev/ep/if_ep_eisa.c	optional ep eisa
@@ -394,6 +396,11 @@ dev/ida/ida.c		optional ida
 dev/ida/ida_disk.c	optional ida
 dev/ida/ida_eisa.c	optional ida eisa
 dev/ida/ida_pci.c	optional ida pci
+dev/ips/ips.c		optional ips
+dev/ips/ips_pci.c	optional ips pci
+dev/ips/ips_disk.c	optional ips
+dev/ips/ips_commands.c	optional ips
+dev/ips/ips_ioctl.c	optional ips
 dev/isp/isp_freebsd.c	optional isp
 dev/isp/isp.c		optional isp
 dev/isp/isp_pci.c	optional isp
@@ -1369,6 +1376,7 @@ dev/usb/umodem.c	optional umodem
 dev/usb/uhub.c		optional usb
 dev/usb/uscanner.c	optional uscanner
 dev/usb/if_aue.c	optional aue
+dev/usb/if_axe.c	optional axe
 dev/usb/if_cue.c	optional cue
 dev/usb/if_kue.c	optional kue
 dev/usb/if_rue.c	optional rue

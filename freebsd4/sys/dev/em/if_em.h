@@ -31,7 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em.h,v 1.1.2.16 2003/11/18 17:25:52 pdeuskar Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em.h,v 1.1.2.17 2004/10/15 23:27:41 tackerman Exp $*/
 
 #ifndef _EM_H_DEFINED_
 #define _EM_H_DEFINED_
@@ -69,8 +69,13 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <machine/clock.h>
+#if __FreeBSD_version >= 502000
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#else
 #include <pci/pcivar.h>
 #include <pci/pcireg.h>
+#endif
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 #include "opt_bdg.h"
@@ -376,8 +381,6 @@ struct adapter {
 	struct mbuf        *fmp;
 	struct mbuf        *lmp;
 
-	u_int16_t          tx_fifo_head;
-
 	struct sysctl_ctx_list sysctl_ctx;
         struct sysctl_oid *sysctl_tree;
 
@@ -387,8 +390,21 @@ struct adapter {
 	unsigned long   mbuf_cluster_failed;
 	unsigned long   no_tx_desc_avail1;
 	unsigned long   no_tx_desc_avail2;
-	u_int64_t       tx_fifo_reset;
-	u_int64_t       tx_fifo_wrk;
+
+	/* Used in for 82547 10Mb Half workaround */
+	#define EM_PBA_BYTES_SHIFT	0xA
+	#define EM_TX_HEAD_ADDR_SHIFT	7
+	#define EM_PBA_TX_MASK		0xFFFF0000
+	#define EM_FIFO_HDR              0x10
+
+	#define EM_82547_PKT_THRESH      0x3e0
+
+	u_int32_t       tx_fifo_size;
+	u_int32_t       tx_fifo_head;
+	u_int32_t       tx_fifo_head_addr;
+	u_int64_t       tx_fifo_reset_cnt;
+	u_int64_t       tx_fifo_wrk_cnt;
+	u_int32_t       tx_head_addr;
 
 	/* For 82544 PCIX Workaround */
 	boolean_t pcix_82544;

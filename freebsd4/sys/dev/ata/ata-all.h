@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-all.h,v 1.26.2.13 2003/09/05 07:29:10 luoqi Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-all.h,v 1.26.2.14 2004/09/17 20:28:30 dds Exp $
  */
 
 /* ATA register defines */
@@ -82,6 +82,7 @@
 #define		ATA_C_READ_DMA		0xc8	/* read w/DMA command */
 #define		ATA_C_WRITE_DMA		0xca	/* write w/DMA command */
 #define		ATA_C_WRITE_DMA_QUEUED	0xcc	/* write w/DMA QUEUED command */
+#define		ATA_C_STANDBY		0xe2	/* standby command */
 #define		ATA_C_SLEEP		0xe6	/* sleep command */
 #define		ATA_C_FLUSHCACHE	0xe7	/* flush cache to disk */
 #define		ATA_C_FLUSHCACHE48	0xea	/* flush cache to disk */

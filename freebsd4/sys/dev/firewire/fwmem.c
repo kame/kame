@@ -35,7 +35,7 @@
 
 #ifdef __FreeBSD__
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/firewire/fwmem.c,v 1.1.2.14 2004/03/28 11:50:42 simokawa Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/firewire/fwmem.c,v 1.1.2.15 2004/12/01 06:55:47 simokawa Exp $");
 #endif
 
 #include <sys/param.h>
@@ -309,7 +309,7 @@ fwmem_close (dev_t dev, int flags, int fmt, fw_proc *td)
 	if (fwmem_debug)
 		printf("%s: refcount=%d\n", __func__, fms->refcount);
 	if (fms->refcount < 1) {
-		free(dev->si_drv1, M_FW);
+		free(dev->si_drv1, M_FWMEM);
 		dev->si_drv1 = NULL;
 	}
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fs.h	8.13 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.14.2.3 2001/09/21 19:15:22 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.14.2.4 2004/05/31 16:55:12 krion Exp $
  */
 
 #ifndef _UFS_FFS_FS_H_
@@ -150,7 +150,7 @@
  * which tell the system the average file size and the average number
  * of files per directory. These defaults are well selected for typical
  * filesystems, but may need to be tuned for odd cases like filesystems
- * being used for sqiud caches or news spools.
+ * being used for squid caches or news spools.
  */
 #define AVFILESIZ      16384   /* expected average file size */
 #define AFPDIR         64      /* expected number of files per directory */

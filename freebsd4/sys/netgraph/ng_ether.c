@@ -37,7 +37,7 @@
  * Authors: Archie Cobbs <archie@freebsd.org>
  *	    Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.2.2.14 2004/01/09 08:58:06 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.2.2.16 2004/06/06 19:47:58 archie Exp $
  */
 
 /*
@@ -71,8 +71,8 @@
 struct private {
 	struct ifnet	*ifp;		/* associated interface */
 	hook_p		upper;		/* upper hook connection */
-	hook_p		lower;		/* lower OR orphan hook connection */
-	u_char		lowerOrphan;	/* whether lower is lower or orphan */
+	hook_p		lower;		/* lower hook connection */
+	hook_p		orphan;		/* orphan hook connection */
 	u_char		autoSrcAddr;	/* always overwrite source address */
 	u_char		promisc;	/* promiscuous mode enabled */
 	u_long		hwassist;	/* hardware checksum capabilities */
@@ -89,7 +89,7 @@ static void	ng_ether_attach(struct ifnet *ifp);
 static void	ng_ether_detach(struct ifnet *ifp); 
 
 /* Other functions */
-static void	ng_ether_input2(node_p node,
+static void	ng_ether_input2(hook_p hook,
 		    struct mbuf **mp, struct ether_header *eh);
 static int	ng_ether_glueback_header(struct mbuf **mp,
 			struct ether_header *eh);
@@ -201,9 +201,9 @@ ng_ether_input(struct ifnet *ifp,
 	const priv_p priv = node->private;
 
 	/* If "lower" hook not connected, let packet continue */
-	if (priv->lower == NULL || priv->lowerOrphan)
+	if (priv->lower == NULL)
 		return;
-	ng_ether_input2(node, mp, eh);
+	ng_ether_input2(priv->lower, mp, eh);
 }
 
 /*
@@ -220,11 +220,11 @@ ng_ether_input_orphan(struct ifnet *ifp,
 	const priv_p priv = node->private;
 
 	/* If "orphan" hook not connected, let packet continue */
-	if (priv->lower == NULL || !priv->lowerOrphan) {
+	if (priv->orphan == NULL) {
 		m_freem(m);
 		return;
 	}
-	ng_ether_input2(node, &m, eh);
+	ng_ether_input2(priv->orphan, &m, eh);
 	if (m != NULL)
 		m_freem(m);
 }
@@ -237,9 +237,9 @@ ng_ether_input_orphan(struct ifnet *ifp,
  * NOTE: this function will get called at splimp()
  */
 static void
-ng_ether_input2(node_p node, struct mbuf **mp, struct ether_header *eh)
+ng_ether_input2(hook_p hook, struct mbuf **mp, struct ether_header *eh)
 {
-	const priv_p priv = node->private;
+	const priv_p priv = hook->node->private;
 	meta_p meta = NULL;
 	int error;
 
@@ -248,7 +248,7 @@ ng_ether_input2(node_p node, struct mbuf **mp, struct ether_header *eh)
 		return;
 
 	/* Send out lower/orphan hook */
-	(void)ng_queue_data(priv->lower, *mp, meta);
+	(void)ng_queue_data(hook, *mp, meta);
 	*mp = NULL;
 }
 
@@ -399,7 +399,6 @@ static	int
 ng_ether_newhook(node_p node, hook_p hook, const char *name)
 {
 	const priv_p priv = node->private;
-	u_char orphan = priv->lowerOrphan;
 	hook_p *hookptr;
 
 	/* Divert hook is an alias for lower */
@@ -409,13 +408,11 @@ ng_ether_newhook(node_p node, hook_p hook, const char *name)
 	/* Which hook? */
 	if (strcmp(name, NG_ETHER_HOOK_UPPER) == 0)
 		hookptr = &priv->upper;
-	else if (strcmp(name, NG_ETHER_HOOK_LOWER) == 0) {
+	else if (strcmp(name, NG_ETHER_HOOK_LOWER) == 0)
 		hookptr = &priv->lower;
-		orphan = 0;
-	} else if (strcmp(name, NG_ETHER_HOOK_ORPHAN) == 0) {
-		hookptr = &priv->lower;
-		orphan = 1;
-	} else
+	else if (strcmp(name, NG_ETHER_HOOK_ORPHAN) == 0)
+		hookptr = &priv->orphan;
+	else
 		return (EINVAL);
 
 	/* Check if already connected (shouldn't be, but doesn't hurt) */
@@ -428,7 +425,6 @@ ng_ether_newhook(node_p node, hook_p hook, const char *name)
 
 	/* OK */
 	*hookptr = hook;
-	priv->lowerOrphan = orphan;
 	return (0);
 }
 
@@ -547,7 +543,7 @@ ng_ether_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 	const node_p node = hook->node;
 	const priv_p priv = node->private;
 
-	if (hook == priv->lower)
+	if (hook == priv->lower || hook == priv->orphan)
 		return ng_ether_rcv_lower(node, m, meta);
 	if (hook == priv->upper)
 		return ng_ether_rcv_upper(node, m, meta);
@@ -555,7 +551,7 @@ ng_ether_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 }
 
 /*
- * Handle an mbuf received on the "lower" hook.
+ * Handle an mbuf received on the "lower" or "orphan" hook.
  */
 static int
 ng_ether_rcv_lower(node_p node, struct mbuf *m, meta_p meta)
@@ -658,10 +654,11 @@ ng_ether_disconnect(hook_p hook)
 	if (hook == priv->upper) {
 		priv->upper = NULL;
 		priv->ifp->if_hwassist = priv->hwassist;  /* restore h/w csum */
-	} else if (hook == priv->lower) {
+	} else if (hook == priv->lower)
 		priv->lower = NULL;
-		priv->lowerOrphan = 0;
-	} else
+	else if (hook == priv->orphan)
+		priv->orphan = NULL;
+	else
 		panic("%s: weird hook", __FUNCTION__);
 	if (hook->node->numhooks == 0)
 		ng_rmnode(hook->node);	/* reset node */

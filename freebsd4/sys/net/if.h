@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if.h,v 1.58.2.10 2003/12/08 16:55:20 bms Exp $
+ * $FreeBSD: src/sys/net/if.h,v 1.58.2.13 2004/12/12 21:08:33 brooks Exp $
  */
 
 #ifndef _NET_IF_H_
@@ -97,6 +97,8 @@ struct if_data {
 	u_char	ifi_hdrlen;		/* media header length */
 	u_char	ifi_recvquota;		/* polling quota for receive intrs */
 	u_char	ifi_xmitquota;		/* polling quota for xmit intrs */
+	u_char	ifi_do_not_use;		/* pad for ifi_datalen's position */
+	u_char	ifi_datalen;		/* length of this data struct */
 	u_long	ifi_mtu;		/* maximum transmission unit */
 	u_long	ifi_metric;		/* routing metric (external only) */
 	u_long	ifi_baudrate;		/* linespeed */
@@ -155,6 +157,7 @@ struct if_data {
 #define IFCAP_RXCSUM		0x0001  /* can offload checksum on RX */
 #define IFCAP_TXCSUM		0x0002  /* can offload checksum on TX */
 #define IFCAP_NETCONS		0x0004  /* can be a network console */
+#define	IFCAP_POLLING		0x0040	/* driver supports polling */
 
 #define IFCAP_HWCSUM		(IFCAP_RXCSUM | IFCAP_TXCSUM)
 

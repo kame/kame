@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.19 2003/10/22 19:04:08 jhb Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.20 2004/07/01 11:38:41 nyan Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -139,6 +139,9 @@ GUS_IRQ			opt_sound.h
 
 # Video spigot
 SPIGOT_UNSECURE		opt_spigot.h
+
+# Enables NETGRAPH support for Cronyx adapters
+NETGRAPH_CRONYX		opt_ng_cronyx.h
 
 # -------------------------------
 # isdn4bsd: passive ISA cards

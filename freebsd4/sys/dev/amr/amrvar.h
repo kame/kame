@@ -52,7 +52,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.2.2.6 2003/10/29 09:11:38 ps Exp $
+ *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.2.2.7 2004/07/22 16:35:18 ps Exp $
  */
 
 #if __FreeBSD_version >= 500005
@@ -185,6 +185,7 @@ struct amr_softc
 #define AMR_STATE_SUSPEND	(1<<1)
 #define AMR_STATE_INTEN		(1<<2)
 #define AMR_STATE_SHUTDOWN	(1<<3)
+#define AMR_STATE_CRASHDUMP	(1<<4)
 
     /* per-controller queues */
     struct bio_queue_head 	amr_bioq;		/* pending I/O with no commands */

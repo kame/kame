@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.8.2.6 2004/03/01 00:07:22 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.8.2.8 2004/09/20 04:50:09 sanpei Exp $");
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -210,6 +210,9 @@ static const struct uplcom_product {
 	{ USB_VENDOR_RATOC, USB_PRODUCT_RATOC_REXUSB60 },
 	/* ELECOM UC-SGT */
 	{ USB_VENDOR_ELECOM, USB_PRODUCT_ELECOM_UCSGT },
+	{ USB_VENDOR_ELECOM, USB_PRODUCT_ELECOM_UCSGT0 },
+	/* Sony Ericsson USB Cable */
+	{ USB_VENDOR_SONYERICSSON, USB_PRODUCT_SONYERICSSON_DCU10 },
 	/* SOURCENEXT KeikaiDenwa 8 */
 	{ USB_VENDOR_SOURCENEXT, USB_PRODUCT_SOURCENEXT_KEIKAI8 },
 	/* SOURCENEXT KeikaiDenwa 8 with charger */

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)ffs_softdep.c	9.59 (McKusick) 6/21/00
- * $FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.57.2.12 2004/03/15 18:04:41 fjoe Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.57.2.13 2004/06/27 05:32:39 jmg Exp $
  */
 
 /*
@@ -4250,7 +4250,7 @@ loop:
 			 * rather than panic, just flush it.
 			 */
 			nbp = WK_BMSAFEMAP(wk)->sm_buf;
-			if (getdirtybuf(&nbp, waitfor) == 0)
+			if (getdirtybuf(&nbp, MNT_NOWAIT) == 0)
 				break;
 			FREE_LOCK(&lk);
 			if (waitfor == MNT_NOWAIT) {

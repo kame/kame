@@ -27,7 +27,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/soundcard.h,v 1.33.2.4 2003/06/07 21:31:56 mbr Exp $
+ * $FreeBSD: src/sys/sys/soundcard.h,v 1.33.2.5 2004/07/20 13:49:30 netchild Exp $
  */
 
 #ifndef _SYS_SOUNDCARD_H_
@@ -296,6 +296,7 @@ typedef struct _snd_capabilities {
 #define SNDCTL_PMGR_ACCESS	_IOWR('Q',16, struct patmgr_info)
 #define SNDCTL_SEQ_PANIC	_IO  ('Q',17)
 #define SNDCTL_SEQ_OUTOFBAND	_IOW ('Q',18, struct seq_event_rec)
+#define SNDCTL_SEQ_GETTIME	_IOR ('Q',19, int)
 
 struct seq_event_rec {
 	u_char arr[8];
@@ -690,6 +691,7 @@ struct synth_info {	/* Read only */
 	int	synth_subtype;
 #define FM_TYPE_ADLIB			0x00
 #define FM_TYPE_OPL3			0x01
+#define MIDI_TYPE_MPU401		0x401
 
 #define SAMPLE_TYPE_BASIC		0x10
 #define SAMPLE_TYPE_GUS			SAMPLE_TYPE_BASIC

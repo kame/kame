@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_object.c,v 1.171.2.9 2003/08/09 16:21:21 luoqi Exp $
+ * $FreeBSD: src/sys/vm/vm_object.c,v 1.171.2.9.6.1 2005/01/01 19:54:00 kensmith Exp $
  */
 
 /*
@@ -974,10 +974,10 @@ shadowlookup:
 			/*
 			 * next object
 			 */
-			tobject = tobject->backing_object;
-			if (tobject == NULL)
+			if (tobject->backing_object == NULL)
 				continue;
 			tpindex += OFF_TO_IDX(tobject->backing_object_offset);
+			tobject = tobject->backing_object;
 			goto shadowlookup;
 		}
 

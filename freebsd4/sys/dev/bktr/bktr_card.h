@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_card.h,v 1.2.4.3 2003/02/08 02:04:57 orion Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_card.h,v 1.2.4.4 2004/08/15 12:17:36 sanpei Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -77,7 +77,8 @@
 #define CARD_LEADTEK		15
 #define CARD_TERRATVPLUS	16
 #define CARD_IO_BCTV3		17
-#define Bt848_MAX_CARD		18
+#define CARD_AOPEN_VA1000	18
+#define Bt848_MAX_CARD		19
 
 #define CARD_IO_GV		CARD_IO_BCTV2
 

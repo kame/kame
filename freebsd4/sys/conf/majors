@@ -1,4 +1,4 @@
-$FreeBSD: src/sys/conf/majors,v 1.98.2.23 2004/04/14 02:16:22 vkashyap Exp $
+$FreeBSD: src/sys/conf/majors,v 1.98.2.27.2.1 2005/01/14 03:07:39 scottl Exp $
 
 This list is obsoleted by DEVFS in 5.x and later and is only here for
 major number allocation for drivers on the RELENG_4 and earlier branches.
@@ -48,7 +48,7 @@ maj 	name		comments
 38	lkm		assigned to Loadable Kernel Modules
 39	*apm		Advanced Power Management also ACPI
 40	*ctx		Cortex
-42	*cx		Cronyx/Sigma serial adapter
+42	*cx		Cronyx Sigma-ISA serial adapters
 43	vn		vnode "disk" device (retired)
 44	*gp		GPIB
 45	*scd		Sony CDROM interface <mdodd>
@@ -100,7 +100,7 @@ maj 	name		comments
 96	altq		alternate queueing (including cbq, red, wfq)
 97	*prom		Alpha PROM console
 98	loe		Loopback pseudo-ethernet (sbabkin@dcn.att.com)
-99	ct		Cronyx/Tau serial adaptor
+99	*ct		Cronyx Tau-ISA serial adapters (driver name "ctau")
 103	*streams	SVR4 Streams emulation <newton@atdot.dotat.org>
 104	*xpt		CAM Transport Layer Services
 105	*iic		I2C bus generic i/o
@@ -125,7 +125,7 @@ maj 	name		comments
 128	arla		Arla (AFS-clone) driver
 129	i2o		Intelligent I/O Character Device
 130	*mlx		Mylex DAC960 RAID (control device)
-134	taupci		Cronyx Tau-PCI card <vak@hanoi.cronyx.ru>
+134	*cp		Cronyx Tau-PCI synchronous WAN adapters
 135	*zsc		TurboLaser console uart
 136	ipr		Iprobe on-chip perf. counters (gallatin@freebsd.org)
 137	nfp		nFast PCI crypto accelerator (support@ncipher.com)
@@ -160,12 +160,15 @@ maj 	name		comments
 173	*devctl		Devd control device <imp>
 174	pciwd		Berkshire Watchdog PCI <marcel@progressix.com>
 175	ips		IBM/Adaptec ServeRAID (control device)
+176	ipsd		IBM/Adaptec ServeRAID (disk device)
 180	nvidia		NVIDIA (nvidiaN/nvidiactl) <mdodd>
 181	casm		HP/Compaq ProLiant Advanced Server Management <peter>
 183	*smapi		SMAPI BIOS interface <mdodd>
 184	dcons		Dumb console driver <simokawa>
 185	ce		Cronyx Tau-32 E1 adapter <rik@cronyx.ru>
 186	sx		Specialix I/O8+ driver <frank@exit.com>
+187	aoe		ATA over Ethernet <sah@softcardsystems.com>
+188	*pbio		8255A mode 0 (Advantech PCL-724 and compatibles)  <dds>
 200	??		entries from 200-252 are reserved for local use
 248	*isp		dev/isp/isp_freebsd.c
 252	??		entries from 200-252 are reserved for local use

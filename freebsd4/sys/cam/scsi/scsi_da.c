@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.49 2004/04/20 17:59:44 njl Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.55 2004/08/21 06:40:07 sanpei Exp $
  */
 
 #ifdef _KERNEL
@@ -227,6 +227,13 @@ static struct da_quirk_entry da_quirk_table[] =
 		{T_DIRECT, SIP_MEDIA_FIXED, quantum, "VIKING 2*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE
 	},
+	{
+		/*
+		 * The CISS RAID controllers do not support SYNC_CACHE
+		 */
+		{T_DIRECT, SIP_MEDIA_FIXED, "COMPAQ", "RAID*", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE
+	},
 	/* XXX USB floppy quirks temporarily enabled for 4.9R */
 	/* USB floppy devices supported by umass(4) */
 	{
@@ -309,6 +316,38 @@ static struct da_quirk_entry da_quirk_table[] =
 		 */
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "SigmaTel", "MSCN", "*"},
 		/*quirks*/ DA_Q_NO_SYNC_CACHE|DA_Q_NO_PREVENT
+	},
+	{
+		/*
+		 * Neuros USB Digital Audio Computer
+		 * PR: kern/63645
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "NEUROS", "dig. audio comp.",
+		"*"}, /*quirks*/ DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * SEAGRAND NP-900 MP3 Player
+		 * PR: kern/64563
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "SEAGRAND", "NP-900*", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE|DA_Q_NO_PREVENT
+	},
+	{
+		/*
+		 * iRiver iFP MP3 player (with UMS Firmware)
+		 * PR: kern/54881, i386/63941, kern/66124
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "iRiver", "iFP*", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE
+ 	},
+	{
+		/*
+		 * Frontier Labs NEX IA+ Digital Audio Player, rev 1.10/0.01
+		 * PR: kern/70158
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "FL" , "NexIA+*", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE
 	},
 };
 

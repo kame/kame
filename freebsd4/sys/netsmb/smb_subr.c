@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netsmb/smb_subr.c,v 1.1.2.3 2004/01/10 04:17:50 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_subr.c,v 1.1.2.3.4.1 2004/12/19 15:24:22 bp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -370,11 +370,13 @@ smb_put_asunistring(struct smb_rq *rqp, const char *src)
 int
 smb_checksmp(void)
 {
+	size_t olen, plen;
 	int name[2];
-	int olen, ncpu, plen, error;
+	int ncpu, error;
 
 	name[0] = CTL_HW;
 	name[1] = HW_NCPU;
+	olen = sizeof(ncpu);
 	error = kernel_sysctl(curproc, name, 2, &ncpu, &olen, NULL, 0, &plen);
 	if (error)
 		return error;

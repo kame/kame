@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_alloc.c	8.18 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.64.2.3.2.1 2004/05/14 23:03:50 kensmith Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.64.2.5 2004/05/19 18:07:15 kensmith Exp $
  */
 
 #include "opt_quota.h"
@@ -239,8 +239,7 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 		allocbuf(bp, nsize);
 		bp->b_flags |= B_DONE;
 		if ((bp->b_flags & (B_MALLOC | B_VMIO)) != B_VMIO)
-			bzero((char *)bp->b_data + osize,
-			    (u_int)nsize - osize);
+			bzero((char *)bp->b_data + osize, nsize - osize);
 		else
 			vfs_bio_clrbuf(bp);
 		*bpp = bp;
@@ -308,8 +307,7 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 		allocbuf(bp, nsize);
 		bp->b_flags |= B_DONE;
 		if ((bp->b_flags & (B_MALLOC | B_VMIO)) != B_VMIO)
-			bzero((char *)bp->b_data + osize,
-			    (u_int)nsize - osize);
+			bzero((char *)bp->b_data + osize, nsize - osize);
 		else
 			vfs_bio_clrbuf(bp);
 		*bpp = bp;

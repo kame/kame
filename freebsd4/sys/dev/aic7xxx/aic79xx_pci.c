@@ -46,7 +46,7 @@
 #include "aic79xx_inline.h"
 #else
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic79xx_pci.c,v 1.3.2.7.2.1 2004/05/19 18:25:46 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic79xx_pci.c,v 1.3.2.8 2004/05/19 17:33:42 scottl Exp $");
 #include <dev/aic7xxx/aic79xx_osm.h>
 #include <dev/aic7xxx/aic79xx_inline.h>
 #endif
@@ -168,7 +168,7 @@ struct ahd_pci_identity ahd_pci_ident_table [] =
 		"Adaptec 39320 Ultra320 SCSI adapter",
 		ahd_aic7902_setup
 	},
-	{
+        {
 		ID_AHA_39320_B_DELL,
 		ID_ALL_MASK,
 		"Adaptec (Dell OEM) 39320 Ultra320 SCSI adapter",

@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_raudio_pxy.c,v 1.7.2.3 2002/04/27 17:37:12 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_raudio_pxy.c,v 1.7.2.4 2004/07/04 09:24:39 darrenr Exp $
  */
 #if SOLARIS && defined(_KERNEL)
 extern	kmutex_t	ipf_rw;
@@ -66,9 +66,6 @@ nat_t *nat;
 	tcphdr_t *tcp;
 	int len = 0;
 	mb_t *m;
-#if	SOLARIS
-	mb_t *m1;
-#endif
 
 	/*
 	 * If we've already processed the start messages, then nothing left
@@ -181,9 +178,6 @@ nat_t *nat;
 	nat_t *ipn;
 	u_char swp;
 	mb_t *m;
-#if	SOLARIS
-	mb_t *m1;
-#endif
 
 	/*
 	 * Wait until we've seen the end of the start messages and even then

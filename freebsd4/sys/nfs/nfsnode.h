@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfsnode.h	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/nfs/nfsnode.h,v 1.32.2.1 2001/06/26 04:20:11 bp Exp $
+ * $FreeBSD: src/sys/nfs/nfsnode.h,v 1.32.2.2 2004/06/25 12:28:50 mckay Exp $
  */
 
 
@@ -144,6 +144,7 @@ struct nfsnode {
 #define	NCHG		0x0400	/* Special file times changed */
 #define NLOCKED		0x0800  /* node is locked */
 #define NWANTED		0x0100  /* someone wants to lock */
+#define	NSIZECHANGED	0x2000  /* File size has changed: need cache inval */
 
 /*
  * Convert between nfsnode pointers and vnode pointers

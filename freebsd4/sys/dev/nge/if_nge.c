@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.14 2004/04/03 07:11:11 ru Exp $
+ * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.15 2004/04/22 22:03:27 ru Exp $
  */
 
 /*
@@ -132,7 +132,7 @@ MODULE_DEPEND(nge, miibus, 1, 1, 1);
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.14 2004/04/03 07:11:11 ru Exp $";
+  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.15 2004/04/22 22:03:27 ru Exp $";
 #endif
 
 #define NGE_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP)
@@ -968,6 +968,9 @@ static int nge_attach(dev)
 	ifp->if_snd.ifq_maxlen = NGE_TX_LIST_CNT - 1;
 	ifp->if_hwassist = NGE_CSUM_FEATURES;
 	ifp->if_capabilities = IFCAP_HWCSUM;
+#ifdef DEVICE_POLLING
+	ifp->if_capabilities |= IFCAP_POLLING;
+#endif
 	ifp->if_capenable = ifp->if_capabilities;
 
 	/*
@@ -1601,6 +1604,10 @@ nge_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 {
 	struct  nge_softc *sc = ifp->if_softc;
 
+	if (!(ifp->if_capenable & IFCAP_POLLING)) {
+		ether_poll_deregister(ifp);
+		cmd = POLL_DEREGISTER;
+	}
 	if (cmd == POLL_DEREGISTER) {	/* final call, enable interrupts */
 		CSR_WRITE_4(sc, NGE_IER, 1);
 		return;
@@ -1652,7 +1659,8 @@ static void nge_intr(arg)
 #ifdef DEVICE_POLLING
 	if (ifp->if_ipending & IFF_POLLING)
 		return;
-	if (ether_poll_register(nge_poll, ifp)) { /* ok, disable interrupts */
+	if ((ifp->if_capenable & IFCAP_POLLING) &&
+	    ether_poll_register(nge_poll, ifp)) { /* ok, disable interrupts */
 		CSR_WRITE_4(sc, NGE_IER, 0);
 		nge_poll(ifp, 0, 1);
 		return;
@@ -2230,6 +2238,9 @@ static int nge_ioctl(ifp, command, data)
 			error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, 
 					      command);
 		}
+		break;
+	case SIOCSIFCAP:
+		ifp->if_capenable = ifr->ifr_reqcap;
 		break;
 	default:
 		error = EINVAL;

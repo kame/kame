@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)errno.h	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/errno.h,v 1.14.2.2 2002/01/22 10:46:56 keramida Exp $
+ * $FreeBSD: src/sys/sys/errno.h,v 1.14.2.2.14.1 2005/01/14 00:07:56 kensmith Exp $
  */
 
 #ifndef _SYS_ERRNO_H_
@@ -167,7 +167,8 @@ __END_DECLS
 #define	EOVERFLOW	84		/* Value too large to be stored in data type */
 #define	ECANCELED	85		/* Operation canceled */
 #define	EILSEQ		86		/* Illegal byte sequence */
-#define	ELAST		86		/* Must be equal largest errno */
+#define	ENOATTR		87		/* Attribute not found */
+#define	ELAST		87		/* Must be equal largest errno */
 
 #endif /* _POSIX_SOURCE */
 

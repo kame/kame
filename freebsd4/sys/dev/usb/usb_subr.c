@@ -4,10 +4,13 @@
  *	$NetBSD: usb_subr.c,v 1.102 2003/01/01 16:21:50 augustss Exp $
  *	$NetBSD: usb_subr.c,v 1.103 2003/01/10 11:19:13 augustss Exp $
  *	$NetBSD: usb_subr.c,v 1.111 2004/03/15 10:35:04 augustss Exp $
+ *	$NetBSD: usb_subr.c,v 1.114 2004/06/23 02:30:52 mycroft Exp $
+ *	$NetBSD: usb_subr.c,v 1.115 2004/06/23 05:23:19 mycroft Exp $
+ *	$NetBSD: usb_subr.c,v 1.116 2004/06/23 06:27:54 mycroft Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/usb_subr.c,v 1.23.2.14 2004/04/06 00:46:02 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/usb_subr.c,v 1.23.2.20 2004/12/08 08:52:30 julian Exp $");
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -157,7 +160,7 @@ usbd_errstr(usbd_status err)
 
 usbd_status
 usbd_get_string_desc(usbd_device_handle dev, int sindex, int langid,
-		     usb_string_descriptor_t *sdesc)
+		     usb_string_descriptor_t *sdesc, int *sizep)
 {
 	usb_device_request_t req;
 	usbd_status err;
@@ -173,11 +176,22 @@ usbd_get_string_desc(usbd_device_handle dev, int sindex, int langid,
 	if (err)
 		return (err);
 
-	if (actlen < 1)
+	if (actlen < 2)
 		return (USBD_SHORT_XFER);
 
 	USETW(req.wLength, sdesc->bLength);	/* the whole string */
-	return (usbd_do_request(dev, &req, sdesc));
+	err = usbd_do_request_flags(dev, &req, sdesc, USBD_SHORT_XFER_OK,
+		&actlen, USBD_DEFAULT_TIMEOUT);
+	if (err)
+		return (err);
+
+	if (actlen != sdesc->bLength) {
+		DPRINTFN(-1, ("usbd_get_string_desc: expected %d, got %d\n",
+		    sdesc->bLength, actlen));
+	}
+
+	*sizep = actlen;
+	return (USBD_NORMAL_COMPLETION);
 }
 
 char *
@@ -189,6 +203,7 @@ usbd_get_string(usbd_device_handle dev, int si, char *buf)
 	int i, n;
 	u_int16_t c;
 	usbd_status err;
+	int size;
 
 	if (si == 0)
 		return (0);
@@ -196,19 +211,20 @@ usbd_get_string(usbd_device_handle dev, int si, char *buf)
 		return (0);
 	if (dev->langid == USBD_NOLANG) {
 		/* Set up default language */
-		err = usbd_get_string_desc(dev, USB_LANGUAGE_TABLE, 0, &us);
-		if (err || us.bLength < 4) {
+		err = usbd_get_string_desc(dev, USB_LANGUAGE_TABLE, 0, &us,
+		    &size);
+		if (err || size < 4) {
 			dev->langid = 0; /* Well, just pick something then */
 		} else {
 			/* Pick the first language as the default. */
 			dev->langid = UGETW(us.bString[0]);
 		}
 	}
-	err = usbd_get_string_desc(dev, si, dev->langid, &us);
+	err = usbd_get_string_desc(dev, si, dev->langid, &us, &size);
 	if (err)
 		return (0);
 	s = buf;
-	n = us.bLength / 2 - 1;
+	n = size / 2 - 1;
 	for (i = 0; i < n; i++) {
 		c = UGETW(us.bString[i]);
 		/* Convert from Unicode, handle buggy strings. */
@@ -305,15 +321,17 @@ void
 usbd_devinfo(usbd_device_handle dev, int showclass, char *cp)
 {
 	usb_device_descriptor_t *udd = &dev->ddesc;
+	usbd_interface_handle iface;
 	char vendor[USB_MAX_STRING_LEN];
 	char product[USB_MAX_STRING_LEN];
 	int bcdDevice, bcdUSB;
+	usb_interface_descriptor_t *id;
 
 	usbd_devinfo_vp(dev, vendor, product, 1);
 	cp += sprintf(cp, "%s %s", vendor, product);
-	if (showclass)
+	if (showclass & USBD_SHOW_DEVICE_CLASS)
 		cp += sprintf(cp, ", class %d/%d",
-			      udd->bDeviceClass, udd->bDeviceSubClass);
+		    udd->bDeviceClass, udd->bDeviceSubClass);
 	bcdUSB = UGETW(udd->bcdUSB);
 	bcdDevice = UGETW(udd->bcdDevice);
 	cp += sprintf(cp, ", rev ");
@@ -321,6 +339,14 @@ usbd_devinfo(usbd_device_handle dev, int showclass, char *cp)
 	*cp++ = '/';
 	cp += usbd_printBCD(cp, bcdDevice);
 	cp += sprintf(cp, ", addr %d", dev->address);
+	if (showclass & USBD_SHOW_INTERFACE_CLASS)
+	{
+		/* fetch the interface handle for the first interface */
+		(void)usbd_device2interface_handle(dev, 0, &iface);
+		id = usbd_get_interface_descriptor(iface);
+		cp += sprintf(cp, ", iclass %d/%d",
+		    id->bInterfaceClass, id->bInterfaceSubClass);
+	}
 	*cp = 0;
 }
 
@@ -592,11 +618,19 @@ usbd_set_config_index(usbd_device_handle dev, int index, int msg)
 
 	DPRINTFN(5,("usbd_set_config_index: dev=%p index=%d\n", dev, index));
 
-	/* XXX check that all interfaces are idle */
 	if (dev->config != USB_UNCONFIG_NO) {
+		nifc = dev->cdesc->bNumInterface;
+
+		/* Check that all interfaces are idle */
+		for (ifcidx = 0; ifcidx < nifc; ifcidx++) {
+			if (LIST_EMPTY(&dev->ifaces[ifcidx].pipes))
+				continue;
+			DPRINTF(("usbd_set_config_index: open pipes exist\n"));
+			return (USBD_IN_USE);
+		}
+
 		DPRINTF(("usbd_set_config_index: free old config\n"));
 		/* Free all configuration data structures. */
-		nifc = dev->cdesc->bNumInterface;
 		for (ifcidx = 0; ifcidx < nifc; ifcidx++)
 			usbd_free_iface_data(dev, ifcidx);
 		free(dev->ifaces, M_USB);
@@ -784,9 +818,14 @@ usbd_setup_pipe(usbd_device_handle dev, usbd_interface_handle iface,
 	/* Clear any stall and make sure DATA0 toggle will be used next. */
 	if (UE_GET_ADDR(ep->edesc->bEndpointAddress) != USB_CONTROL_ENDPOINT) {
 		err = usbd_clear_endpoint_stall(p);
-		/* Some devices reject this command, so ignore a STALL. */
-		if (err && err != USBD_STALLED) {
-			printf("usbd_setup_pipe: failed to start endpoint, %s\n", usbd_errstr(err));
+		/*
+		 * Some devices reject this command, so ignore a STALL.
+		 * Some device just time out on this command, so ignore
+		 * that too.
+		 */
+		if (err && err != USBD_STALLED && err != USBD_TIMEOUT) {
+			printf("usbd_setup_pipe: failed to start "
+			    "endpoint, %s\n", usbd_errstr(err));
 			return (err);
 		}
 	}
@@ -985,13 +1024,14 @@ usbd_status
 usbd_new_device(device_ptr_t parent, usbd_bus_handle bus, int depth,
 		int speed, int port, struct usbd_port *up)
 {
-	usbd_device_handle dev;
+	usbd_device_handle dev, adev;
 	struct usbd_device *hub;
 	usb_device_descriptor_t *dd;
 	usb_port_status_t ps;
 	usbd_status err;
 	int addr;
 	int i;
+	int p;
 
 	DPRINTF(("usbd_new_device bus=%p port=%d depth=%d speed=%d\n",
 		 bus, port, depth, speed));
@@ -1025,11 +1065,27 @@ usbd_new_device(device_ptr_t parent, usbd_bus_handle bus, int depth,
 	dev->depth = depth;
 	dev->powersrc = up;
 	dev->myhub = up->parent;
-	for (hub = up->parent;
+
+	up->device = dev;
+
+	/* Locate port on upstream high speed hub */
+	for (adev = dev, hub = up->parent;
 	     hub != NULL && hub->speed != USB_SPEED_HIGH;
-	     hub = hub->myhub)
+	     adev = hub, hub = hub->myhub)
 		;
-	dev->myhighhub = hub;
+	if (hub) {
+		for (p = 0; p < hub->hub->hubdesc.bNbrPorts; p++) {
+			if (hub->hub->ports[p].device == adev) {
+				dev->myhsport = &hub->hub->ports[p];
+				goto found;
+			}
+		}
+		panic("usbd_new_device: cannot find HS port\n");
+	found:
+		DPRINTFN(1,("usbd_new_device: high speed port %d\n", p));
+	} else {
+		dev->myhsport = NULL;
+	}
 	dev->speed = speed;
 	dev->langid = USBD_NOLANG;
 	dev->cookie.cookie = ++usb_cookie_no;
@@ -1041,8 +1097,6 @@ usbd_new_device(device_ptr_t parent, usbd_bus_handle bus, int depth,
 		usbd_remove_device(dev, up);
 		return (err);
 	}
-
-	up->device = dev;
 
 	/* Set the address.  Do this early; some devices need that. */
 	/* Try a few times in case the device is slow (i.e. outside specs.) */
@@ -1167,8 +1221,8 @@ usbd_remove_device(usbd_device_handle dev, struct usbd_port *up)
 
 	if (dev->default_pipe != NULL)
 		usbd_kill_pipe(dev->default_pipe);
-	up->device = 0;
-	dev->bus->devices[dev->address] = 0;
+	up->device = NULL;
+	dev->bus->devices[dev->address] = NULL;
 
 	free(dev, M_USB);
 }

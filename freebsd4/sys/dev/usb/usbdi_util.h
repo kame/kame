@@ -1,5 +1,5 @@
 /*	$NetBSD: usbdi_util.h,v 1.23 2001/10/26 17:58:22 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi_util.h,v 1.9.2.3 2004/03/01 00:07:23 julian Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi_util.h,v 1.9.2.4 2004/12/08 07:55:48 julian Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -69,7 +69,8 @@ usbd_status	usbd_read_report_desc(usbd_interface_handle ifc, void **descp,
 				      int *sizep, usb_malloc_type mem);
 usbd_status	usbd_get_config(usbd_device_handle dev, u_int8_t *conf);
 usbd_status	usbd_get_string_desc(usbd_device_handle dev, int sindex,
-				     int langid, usb_string_descriptor_t *sdesc);
+				     int langid,usb_string_descriptor_t *sdesc,
+				     int *sizep);
 void		usbd_delay_ms(usbd_device_handle, u_int);
 
 

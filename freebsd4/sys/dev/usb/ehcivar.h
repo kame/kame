@@ -1,5 +1,5 @@
 /*	$NetBSD: ehcivar.h,v 1.12 2001/12/31 12:16:57 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ehcivar.h,v 1.1.6.2 2004/03/02 23:27:41 julian Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ehcivar.h,v 1.1.6.3.2.1 2005/01/07 19:23:07 julian Exp $	*/
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -51,8 +51,10 @@ typedef struct ehci_soft_qtd {
 typedef struct ehci_soft_qh {
 	ehci_qh_t qh;
 	struct ehci_soft_qh *next;
+	struct ehci_soft_qh *prev;
 	struct ehci_soft_qtd *sqtd;
 	ehci_physaddr_t physaddr;
+	int islot;		/* Interrupt list slot. */
 } ehci_soft_qh_t;
 #define EHCI_SQH_SIZE ((sizeof (struct ehci_soft_qh) + EHCI_QH_ALIGN - 1) / EHCI_QH_ALIGN * EHCI_QH_ALIGN)
 #define EHCI_SQH_CHUNK (EHCI_PAGE_SIZE / EHCI_SQH_SIZE)
@@ -69,12 +71,28 @@ struct ehci_xfer {
 };
 #define EXFER(xfer) ((struct ehci_xfer *)(xfer))
 
+/*
+ * Information about an entry in the interrupt list.
+ */
+struct ehci_soft_islot {
+	ehci_soft_qh_t *sqh;		/* Queue Head. */
+};
+
+#define EHCI_FRAMELIST_MAXCOUNT	1024
+#define EHCI_IPOLLRATES		8	/* Poll rates (1ms, 2, 4, 8 ... 128) */
+#define EHCI_INTRQHS		((1 << EHCI_IPOLLRATES) - 1)
+#define EHCI_IQHIDX(lev, pos)	\
+    ((((pos) & ((1 << (lev)) - 1)) | (1 << (lev))) - 1)
+#define EHCI_ILEV_IVAL(lev)	(1 << (lev))
 
 #define EHCI_HASH_SIZE 128
 #define EHCI_COMPANION_MAX 8
 
+#define EHCI_SCFLG_DONEINIT	0x0001	/* ehci_init() has been called. */
+
 typedef struct ehci_softc {
 	struct usbd_bus sc_bus;		/* base device */
+	int sc_flags;
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh;
 	bus_size_t sc_size;
@@ -89,6 +107,7 @@ typedef struct ehci_softc {
 	char sc_vendor[16];		/* vendor string for root hub */
 	int sc_id_vendor;		/* vendor ID for root hub */
 
+	u_int32_t sc_cmd;		/* shadow of cmd reg during suspend */
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	void *sc_powerhook;		/* cookie from power hook */
 	void *sc_shutdownhook;		/* cookie from shutdown hook */
@@ -99,7 +118,10 @@ typedef struct ehci_softc {
 	struct usbd_bus *sc_comps[EHCI_COMPANION_MAX];
 
 	usb_dma_t sc_fldma;
+	ehci_link_t *sc_flist;
 	u_int sc_flsize;
+
+	struct ehci_soft_islot sc_islots[EHCI_INTRQHS];
 
 	LIST_HEAD(, ehci_xfer) sc_intrhead;
 
@@ -146,10 +168,12 @@ typedef struct ehci_softc {
 
 usbd_status	ehci_init(ehci_softc_t *);
 int		ehci_intr(void *);
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 int		ehci_detach(ehci_softc_t *, int);
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 int		ehci_activate(device_ptr_t, enum devact);
 #endif
+void		ehci_power(int state, void *priv);
+void		ehci_shutdown(void *v);
 
 #define MS_TO_TICKS(ms) ((ms) * hz / 1000)
 

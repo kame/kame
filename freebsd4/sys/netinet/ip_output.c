@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.44 2004/04/07 10:01:39 ru Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.45 2004/06/01 07:38:56 maxim Exp $
  */
 
 #define _IP_VHL
@@ -1729,7 +1729,7 @@ ip_pcbopts(optname, pcbopt, m)
 			ovbcopy((caddr_t)(&cp[IPOPT_OFFSET+1] +
 			    sizeof(struct in_addr)),
 			    (caddr_t)&cp[IPOPT_OFFSET+1],
-			    (unsigned)cnt + sizeof(struct in_addr));
+			    (unsigned)cnt - (IPOPT_MINOFF - 1));
 			break;
 		}
 	}

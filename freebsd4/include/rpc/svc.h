@@ -28,7 +28,7 @@
  *
  *	from: @(#)svc.h 1.20 88/02/08 SMI
  *	from: @(#)svc.h	2.2 88/07/29 4.0 RPCSRC
- * $FreeBSD: src/include/rpc/svc.h,v 1.16 1999/12/29 05:00:43 peter Exp $
+ * $FreeBSD: src/include/rpc/svc.h,v 1.16.2.1 2004/10/26 02:25:17 alfred Exp $
  */
 
 /*
@@ -269,7 +269,7 @@ extern fd_set svc_fdset;
  * a small program implemented by the svc_rpc implementation itself;
  * also see clnt.h for protocol numbers.
  */
-extern void rpctest_service();
+extern void rpctest_service __P((void));
 #endif
 
 __BEGIN_DECLS

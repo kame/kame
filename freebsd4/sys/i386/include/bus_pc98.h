@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/i386/include/bus_pc98.h,v 1.8.2.5 2002/03/03 05:42:50 nyan Exp $ */
+/* $FreeBSD: src/sys/i386/include/bus_pc98.h,v 1.8.2.6 2004/05/06 13:23:59 nyan Exp $ */
 /*	$NecBSD: busio.h,v 3.25.4.2.2.1 2000/06/12 03:53:08 honda Exp $	*/
 /*	$NetBSD: bus.h,v 1.12 1997/10/01 08:25:15 fvdl Exp $	*/
 
@@ -65,7 +65,7 @@ typedef u_int bus_size_t;
 
 #define BUS_SPACE_UNRESTRICTED	(~0)
 
-#define BUS_SPACE_IAT_MAXSIZE	32
+#define BUS_SPACE_IAT_MAXSIZE	33
 
 /*
  * Access methods for bus resources and address space.

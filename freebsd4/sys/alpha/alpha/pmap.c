@@ -43,7 +43,7 @@
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
  *	from:	i386 Id: pmap.c,v 1.193 1998/04/19 15:22:48 bde Exp
  *		with some ideas from NetBSD's alpha pmap
- * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.9.10.1 2004/04/30 03:05:35 kensmith Exp $
+ * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.11 2004/06/02 07:04:20 phk Exp $
  */
 
 /*
@@ -2338,7 +2338,7 @@ pmap_object_init_pt(pmap_t pmap, vm_offset_t addr, vm_prot_t prot,
 static int pmap_prefault_pageorder[] = {
 	-PAGE_SIZE, PAGE_SIZE,
 	-2 * PAGE_SIZE, 2 * PAGE_SIZE,
-	-3 * PAGE_SIZE, 3 * PAGE_SIZE
+	-3 * PAGE_SIZE, 3 * PAGE_SIZE,
 	-4 * PAGE_SIZE, 4 * PAGE_SIZE
 };
 

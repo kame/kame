@@ -28,7 +28,7 @@
  *
  *	from: @(#)xdr.h 1.19 87/04/22 SMI
  *	from: @(#)xdr.h	2.2 88/07/29 4.0 RPCSRC
- * $FreeBSD: src/include/rpc/xdr.h,v 1.14.2.1 2003/03/20 12:59:55 jedgar Exp $
+ * $FreeBSD: src/include/rpc/xdr.h,v 1.14.2.2 2004/10/26 02:25:17 alfred Exp $
  */
 
 /*
@@ -135,7 +135,7 @@ typedef	bool_t (*xdrproc_t) __P((XDR *, void *, u_int));
 /*
  * XXX can't actually prototype it, because some take two args!!!
  */
-typedef	bool_t (*xdrproc_t) __P((/* XDR *, void *, u_int */));
+typedef	bool_t (*xdrproc_t) __P((XDR *, ...));
 #endif
 
 /*

@@ -100,7 +100,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.29 2004/03/19 23:21:05 silby Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.30 2004/08/13 14:42:18 roam Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -3274,7 +3274,8 @@ xl_stop(sc)
 			sc->xl_cdata.xl_rx_chain[i].xl_mbuf = NULL;
 		}
 	}
-	bzero(sc->xl_ldata.xl_rx_list, XL_RX_LIST_SZ);
+	if (sc->xl_ldata.xl_rx_list != NULL)
+		bzero(sc->xl_ldata.xl_rx_list, XL_RX_LIST_SZ);
 	/*
 	 * Free the TX list buffers.
 	 */
@@ -3288,7 +3289,8 @@ xl_stop(sc)
 			sc->xl_cdata.xl_tx_chain[i].xl_mbuf = NULL;
 		}
 	}
-	bzero(sc->xl_ldata.xl_tx_list, XL_TX_LIST_SZ);
+	if (sc->xl_ldata.xl_tx_list != NULL)
+		bzero(sc->xl_ldata.xl_tx_list, XL_TX_LIST_SZ);
 
 	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
 

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_tuner.c,v 1.5.2.3 2000/10/26 16:38:46 roger Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_tuner.c,v 1.5.2.4 2004/07/24 10:36:28 schweikh Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -699,7 +699,9 @@ frequency_lookup( bktr_ptr_t bktr, int channel )
 #undef TBL_CHNL
 
 
-#define TBL_IF	freqTable[ bktr->tuner.chnlset ].ptr[ 1 ]
+#define	TBL_IF	(bktr->format_params == BT848_IFORM_F_NTSCJ || \
+                 bktr->format_params == BT848_IFORM_F_NTSCM ? \
+                 nabcst[1] : weurope[1])
 
 
 /* Initialise the tuner structures in the bktr_softc */

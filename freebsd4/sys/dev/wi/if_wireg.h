@@ -29,11 +29,11 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wireg.h,v 1.31.2.2 2002/08/02 07:11:34 imp Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wireg.h,v 1.31.2.3 2004/05/18 06:57:33 imp Exp $
  */
 
 #define WI_DELAY	5
-#define WI_TIMEOUT	(500000/WI_DELAY)	/* 500 ms */
+#define WI_TIMEOUT	(10000/WI_DELAY)	/* 10 ms */
 
 #define WI_PORT0	0
 #define WI_PORT1	1

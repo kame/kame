@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_hole.h,v 1.1.4.1 2000/10/24 18:36:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_hole.h,v 1.1.4.2 2004/05/26 08:53:59 ru Exp $
  * $Whistle: ng_hole.h,v 1.3 1999/01/20 00:22:13 archie Exp $
  */
 
@@ -46,5 +46,25 @@
 /* Node type name and magic cookie */
 #define NG_HOLE_NODE_TYPE	"hole"
 #define NGM_HOLE_COOKIE		915433206
+
+/* Statistics structure for one hook. */
+struct ng_hole_hookstat {
+	uint64_t	frames;
+	uint64_t	octets;
+};
+
+/* Keep this in sync with the above structure definition. */
+#define	NG_HOLE_HOOKSTAT_TYPE_INFO {				\
+	{ "frames",	&ng_parse_uint64_type },		\
+	{ "octets",	&ng_parse_uint64_type },		\
+	{ NULL }						\
+}
+
+/* Netgraph commands. */
+enum {
+	NGM_HOLE_GET_STATS = 1,
+	NGM_HOLE_CLR_STATS,
+	NGM_HOLE_GETCLR_STATS,
+};
 
 #endif /* _NETGRAPH_HOLE_H_ */

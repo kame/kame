@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.8 2003/09/09 19:09:22 bms Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.8.6.1 2005/01/02 05:03:16 silby Exp $
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -310,6 +310,7 @@ extern int	ipport_firstauto;
 extern int	ipport_lastauto;
 extern int	ipport_hifirstauto;
 extern int	ipport_hilastauto;
+extern struct callout ipport_tick_callout;
 
 void	in_pcbpurgeif0 __P((struct inpcb *, struct ifnet *));
 void	in_losing __P((struct inpcb *));
@@ -335,6 +336,7 @@ void	in_pcbrehash __P((struct inpcb *));
 int	in_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 void	in_pcbremlists __P((struct inpcb *inp));
+void	ipport_tick(void *xtp);
 int	prison_xinpcb __P((struct proc *p, struct inpcb *inp));
 #endif /* _KERNEL */
 

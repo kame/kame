@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.7.2.8 2004/04/16 18:12:57 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.7.2.9 2004/11/26 00:34:20 julian Exp $");
 
 /*
  * CATC USB-EL1210A USB to ethernet driver. Used in the CATC Netmate
@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.7.2.8 2004/04/16 18:12:57 julia
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.7.2.8 2004/04/16 18:12:57 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.7.2.9 2004/11/26 00:34:20 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -174,7 +174,8 @@ cue_csr_read_1(struct cue_softc *sc, int reg)
 	USETW(req.wIndex, reg);
 	USETW(req.wLength, 1);
 
-	err = usbd_do_request(sc->cue_udev, &req, &val);
+	err = usbd_do_request_flags(sc->cue_udev, &req, &val,
+	    USBD_NO_TSLEEP, NULL, USBD_DEFAULT_TIMEOUT);
 
 	CUE_UNLOCK(sc);
 
@@ -202,7 +203,8 @@ cue_csr_read_2(struct cue_softc *sc, int reg)
 	USETW(req.wIndex, reg);
 	USETW(req.wLength, 2);
 
-	err = usbd_do_request(sc->cue_udev, &req, &val);
+	err = usbd_do_request_flags(sc->cue_udev, &req, &val,
+	    USBD_NO_TSLEEP, NULL, USBD_DEFAULT_TIMEOUT);
 
 	CUE_UNLOCK(sc);
 
@@ -229,7 +231,8 @@ cue_csr_write_1(struct cue_softc *sc, int reg, int val)
 	USETW(req.wIndex, reg);
 	USETW(req.wLength, 0);
 
-	err = usbd_do_request(sc->cue_udev, &req, NULL);
+	err = usbd_do_request_flags(sc->cue_udev, &req, &val,
+	    USBD_NO_TSLEEP, NULL, USBD_DEFAULT_TIMEOUT);
 
 	CUE_UNLOCK(sc);
 
@@ -257,7 +260,8 @@ cue_csr_write_2(struct cue_softc *sc, int reg, int val)
 	USETW(req.wIndex, reg);
 	USETW(req.wLength, 0);
 
-	err = usbd_do_request(sc->cue_udev, &req, NULL);
+	err = usbd_do_request_flags(sc->cue_udev,
+	    &req, &val, USBD_NO_TSLEEP, NULL);
 
 	CUE_UNLOCK(sc);
 
@@ -288,7 +292,8 @@ cue_mem(struct cue_softc *sc, int cmd, int addr, void *buf, int len)
 	USETW(req.wIndex, addr);
 	USETW(req.wLength, len);
 
-	err = usbd_do_request(sc->cue_udev, &req, buf);
+	err = usbd_do_request_flags(sc->cue_udev, &req, &buf,
+	    USBD_NO_TSLEEP, NULL, USBD_DEFAULT_TIMEOUT);
 
 	CUE_UNLOCK(sc);
 
@@ -315,7 +320,8 @@ cue_getmac(struct cue_softc *sc, void *buf)
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, ETHER_ADDR_LEN);
 
-	err = usbd_do_request(sc->cue_udev, &req, buf);
+	err = usbd_do_request_flags(sc->cue_udev, &req, buf,
+	    USBD_NO_TSLEEP, NULL, USBD_DEFAULT_TIMEOUT);
 
 	CUE_UNLOCK(sc);
 
@@ -415,7 +421,9 @@ cue_reset(struct cue_softc *sc)
 	USETW(req.wValue, 0);
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, 0);
-	err = usbd_do_request(sc->cue_udev, &req, NULL);
+	err = usbd_do_request_flags(sc->cue_udev, &req, NULL,
+	    USBD_NO_TSLEEP, NULL, USBD_DEFAULT_TIMEOUT);
+
 	if (err)
 		printf("cue%d: reset failed\n", sc->cue_unit);
 
@@ -780,6 +788,7 @@ cue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	struct cue_softc	*sc;
 	struct cue_chain	*c;
 	struct ifnet		*ifp;
+	struct mbuf		*m;
 	usbd_status		err;
 
 	c = priv;
@@ -801,13 +810,16 @@ cue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	}
 
 	ifp->if_timer = 0;
-	ifp->if_flags &= ~IFF_OACTIVE;
-	usbd_get_xfer_status(c->cue_xfer, NULL, NULL, NULL, &err);
 
-	if (c->cue_mbuf != NULL) {
-		c->cue_mbuf->m_pkthdr.rcvif = ifp;
-		usb_tx_done(c->cue_mbuf);
-		c->cue_mbuf = NULL;
+	usbd_get_xfer_status(c->cue_xfer, NULL, NULL, NULL, &err);
+	m = c->cue_mbuf;
+	c->cue_mbuf = NULL;
+
+	ifp->if_flags &= ~IFF_OACTIVE;
+
+	if (m != NULL) {
+		m->m_pkthdr.rcvif = ifp;
+		usb_tx_done(m);
 	}
 
 	if (err)
@@ -1042,6 +1054,11 @@ cue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	CUE_LOCK(sc);
 
 	switch(command) {
+	case SIOCSIFADDR:
+	case SIOCGIFADDR:
+	case SIOCSIFMTU:
+		error = ether_ioctl(ifp, command, data);
+		break;
 	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_flags & IFF_RUNNING &&
@@ -1069,7 +1086,7 @@ cue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 	default:
-		error = ether_ioctl(ifp, command, data);
+		error = EINVAL;
 		break;
 	}
 

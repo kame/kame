@@ -1,4 +1,4 @@
-$FreeBSD: src/sys/dev/usb/FILES,v 1.2.2.2 2004/03/01 00:07:21 julian Exp $
+$FreeBSD: src/sys/dev/usb/FILES,v 1.2.2.3 2004/12/08 22:17:28 rsm Exp $
 
 A small roadmap of the USB files:
 
@@ -16,6 +16,8 @@ hid.c			subroutines to parse and access HID data
 hid.h			API for hid.c
 if_aue.c		USB Pegasus Ethernet driver
 if_auereg.h		  and definitions for it
+if_axe.c		USB ASIX Electronics Ethernet driver
+if_axereg.h		  and definitions for it
 if_cue.c		USB CATC Ethernet driver
 if_cuereg.h		  and definitions for it
 if_kue.c		USB Kawasaki Ethernet driver

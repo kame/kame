@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.11.2.30.2.1 2004/05/06 13:16:06 sanpei Exp $
+ *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.11.2.35 2004/09/20 05:30:42 sanpei Exp $
  *	$NetBSD: umass.c,v 1.28 2000/04/02 23:46:53 augustss Exp $
  */
 
@@ -672,6 +672,10 @@ umass_match_proto(struct umass_softc *sc, usbd_interface_handle iface,
 	id = usbd_get_interface_descriptor(iface);
 	if (id == NULL || id->bInterfaceClass != UICLASS_MASS)
 		return(UMATCH_NONE);
+	if (UGETW(dd->idVendor) == USB_VENDOR_SONY &&
+	    UGETW(dd->idProduct) == USB_PRODUCT_SONY_HANDYCAM) {
+		sc->proto =  UMASS_PROTO_RBC | UMASS_PROTO_CBI;
+	}
 	
 	if (UGETW(dd->idVendor) == USB_VENDOR_SONY
 		&& id->bInterfaceSubClass==0xff) {
@@ -725,6 +729,11 @@ umass_match_proto(struct umass_softc *sc, usbd_interface_handle iface,
 	    UGETW(dd->idProduct) == USB_PRODUCT_MSYSTEMS_DISKONKEY2) {
 		sc->proto = UMASS_PROTO_ATAPI | UMASS_PROTO_BBB;
 	}
+	if (UGETW(dd->idVendor) == USB_VENDOR_NEODIO &&
+	    UGETW(dd->idProduct) == USB_PRODUCT_NEODIO_ND3260) {
+		sc->proto = UMASS_PROTO_SCSI | UMASS_PROTO_BBB;
+		sc->quirks |= FORCE_SHORT_INQUIRY;
+	}
 	if (UGETW(dd->idVendor) == USB_VENDOR_PANASONIC &&
 	    UGETW(dd->idProduct) == USB_PRODUCT_PANASONIC_KXLCB20AN) {
 		sc->proto = UMASS_PROTO_SCSI | UMASS_PROTO_BBB;
@@ -742,6 +751,16 @@ umass_match_proto(struct umass_softc *sc, usbd_interface_handle iface,
 	    UGETW(dd->idProduct) == USB_PRODUCT_PNY_ATTACHE) {
 		sc->proto = UMASS_PROTO_SCSI | UMASS_PROTO_BBB;
 		sc->quirks |= IGNORE_RESIDUE;
+	}
+	if (UGETW(dd->idVendor) == USB_VENDOR_SANDISK &&
+	    UGETW(dd->idProduct) == USB_PRODUCT_SANDISK_SDCZ2_256) {
+		sc->proto = UMASS_PROTO_SCSI | UMASS_PROTO_BBB;
+		sc->quirks |= IGNORE_RESIDUE;
+	}
+	if (UGETW(dd->idVendor) == USB_VENDOR_WESTERN &&
+	    UGETW(dd->idProduct) == USB_PRODUCT_WESTERN_EXTHDD) {
+		sc->proto = UMASS_PROTO_SCSI | UMASS_PROTO_BBB;
+		sc->quirks |= FORCE_SHORT_INQUIRY | NO_START_STOP | IGNORE_RESIDUE;
 	}
 
 	switch (id->bInterfaceSubClass) {

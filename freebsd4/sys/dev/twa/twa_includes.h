@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/twa/twa_includes.h,v 1.2.2.1 2004/04/07 20:18:16 vkashyap Exp $
+ *	$FreeBSD: src/sys/dev/twa/twa_includes.h,v 1.2.2.1.4.1 2005/01/10 23:55:09 vkashyap Exp $
  */
 
 /*
@@ -35,6 +35,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/libkern.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>

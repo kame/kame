@@ -37,7 +37,7 @@
  * 
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_l2tp.c,v 1.1.2.1 2002/08/20 23:48:15 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_l2tp.c,v 1.1.2.2 2004/11/06 21:43:16 archie Exp $
  */
 
 /*
@@ -203,7 +203,7 @@ static const struct ng_parse_type ng_l2tp_sess_config_type = {
 /* Parse type for struct ng_l2tp_stats */
 static const struct ng_parse_struct_field
 	ng_l2tp_stats_type_fields[] = NG_L2TP_STATS_TYPE_INFO;
-static const struct ng_parse_type ng_pptp_stats_type = {
+static const struct ng_parse_type ng_l2tp_stats_type = {
 	&ng_parse_struct_type,
 	&ng_l2tp_stats_type_fields
 };
@@ -243,7 +243,7 @@ static const struct ng_cmdlist ng_l2tp_cmdlist[] = {
 	  NGM_L2TP_GET_STATS,
 	  "getstats",
 	  NULL,
-	  &ng_pptp_stats_type
+	  &ng_l2tp_stats_type
 	},
 	{
 	  NGM_L2TP_COOKIE,
@@ -257,7 +257,7 @@ static const struct ng_cmdlist ng_l2tp_cmdlist[] = {
 	  NGM_L2TP_GETCLR_STATS,
 	  "getclrstats",
 	  NULL,
-	  &ng_pptp_stats_type
+	  &ng_l2tp_stats_type
 	},
 	{
 	  NGM_L2TP_COOKIE,

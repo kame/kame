@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.21.2.10 2004/03/01 00:07:22 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.21.2.11 2004/09/20 05:23:08 sanpei Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,6 +104,8 @@ Static const struct usbd_quirk_entry {
 	ANY, { UQ_ASSUME_CM_OVER_DATA }},
  { USB_VENDOR_LOGITECH, USB_PRODUCT_LOGITECH_WMRPAD,  ANY, { UQ_NO_STRINGS }},
  { USB_VENDOR_QUALCOMM, USB_PRODUCT_QUALCOMM_CDMA_MSM,
+	ANY, { UQ_ASSUME_CM_OVER_DATA }},
+ { USB_VENDOR_QUALCOMM2, USB_PRODUCT_QUALCOMM_CDMA_MSM,
 	ANY, { UQ_ASSUME_CM_OVER_DATA }},
  { USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_AS64LX,
 	0x100, { UQ_ASSUME_CM_OVER_DATA }},
