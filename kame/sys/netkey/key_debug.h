@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.h,v 1.7 2000/07/04 04:08:16 itojun Exp $	*/
+/*	$KAME: key_debug.h,v 1.8 2001/07/27 04:15:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -53,7 +53,8 @@
 #define KEYDEBUG_IPSEC_DATA	(KEYDEBUG_IPSEC | KEYDEBUG_DATA)
 #define KEYDEBUG_IPSEC_DUMP	(KEYDEBUG_IPSEC | KEYDEBUG_DUMP)
 
-#define KEYDEBUG(lev,arg) if ((key_debug_level & (lev)) == (lev)) { arg; }
+#define KEYDEBUG(lev,arg) \
+	do { if ((key_debug_level & (lev)) == (lev)) { arg; } } while (0)
 
 #ifdef _KERNEL
 extern u_int32_t key_debug_level;
