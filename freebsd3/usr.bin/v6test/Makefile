@@ -4,11 +4,11 @@ PROG=	v6test
 SRCS=	v6test.c cksum.c testcap.c getconfig.c
 
 CFLAGS+=-I${SRCDIR} -DIPSEC
-CFLAGS+=-I${.OBJDIR}/../../kame/libpcap -DHAVE_PCAP
+CFLAGS+=-I${.OBJDIR}/../../kame/libpcap -DHAVE_LIBPCAP
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6 \
 	-L${.OBJDIR}/../../lib/libpcap \
-	-L/usr/local/v6/lib -linet6 -lpcap
+	-L/usr/local/v6/lib -lpcap -linet6
 DPADD+= ${.OBJDIR}/../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a \
 	${.OBJDIR}/../../lib/libpcap/libcap.a \
