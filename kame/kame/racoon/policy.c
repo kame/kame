@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.7 2000/01/11 17:16:12 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.8 2000/01/12 00:33:19 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -134,8 +134,8 @@ cmpspidx(a, b)
 		plog(logp, LOCATION, NULL, "%p: %s\n", a, spidx2str(a));
 		plog(logp, LOCATION, NULL, "%p: %s\n", b, spidx2str(b)););
 
-	if (a->dir != b->dir
-	 || a->prefs != b->prefs
+	/* XXX don't check direction now, but it's to be checked carefully. */
+	if (a->prefs != b->prefs
 	 || a->prefd != b->prefd
 	 || a->ul_proto != b->ul_proto
 	 || a->action != b->action)
