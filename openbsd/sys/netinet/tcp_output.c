@@ -890,8 +890,9 @@ send:
 #endif /* INET */
 #ifdef INET6
 	case AF_INET6:
+		m->m_pkthdr.len = hdrlen + len;
   		th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
-			hdrlen + len);
+			hdrlen - sizeof(struct ip6_hdr) + len);
 		break;
 #endif /* INET6 */
 	}
@@ -1004,6 +1005,7 @@ send:
 		{
 			struct ip6_hdr *ipv6;
 			
+			ipv6 = mtod(m, struct ip6_hdr *);
 			ipv6->ip6_plen = m->m_pkthdr.len -
 				sizeof(struct ip6_hdr);
 			ipv6->ip6_nxt = IPPROTO_TCP;

@@ -307,14 +307,14 @@ iophy_status(sc)
 		}
 		ext0 = PHY_READ(sc, MII_IOPHY_EXT0);
 
-		if (ext0 & EXT0_SPEED)
+		if (ext0 & EXT0_SPEED) {
 			if (bmsr & BMSR_100T4) {
 				mii->mii_media_active |= IFM_100_T4;
 				return;
 			} else {
 				mii->mii_media_active |= IFM_100_TX;
 			}
-		else
+		} else
 			mii->mii_media_active |= IFM_10_T;
 
 		if (ext0 & EXT0_DUPLEX)
