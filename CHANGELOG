@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1209 2000/08/17 10:29:47 itojun Exp $
+$KAME: CHANGELOG,v 1.1210 2000/08/18 02:35:59 itojun Exp $
 
 <200008>
+Fri Aug 18 11:34:01 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/zebra: upgrade to 0.88.
+
 Thu Aug 17 19:27:34 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/zebra: upgrade to 0.88pre2.
 
