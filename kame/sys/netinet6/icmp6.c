@@ -516,12 +516,28 @@ icmp6_input(mp, offp, proto)
 		if ((n->m_flags & M_EXT) != 0
 		 || n->m_len < off + sizeof(struct icmp6_hdr)) {
 			struct mbuf *n0 = n;
+			const int maxlen = sizeof(*nip6) + sizeof(*nicmp6);
 
 			/*
 			 * Prepare an internal mbuf. m_pullup() doesn't
 			 * always copy the length we specified.
 			 */
 			MGETHDR(n, M_DONTWAIT, n0->m_type);
+			if (maxlen >= MCLBYTES) {
+#ifdef DIAGNOSTIC
+				printf("MCLBYTES too small\n");
+#endif
+				/* Give up remote */
+				m_freem(n0);
+				break;
+			}
+			if (n && maxlen >= MHLEN) {
+				MCLGET(n, M_DONTWAIT);
+				if ((n->m_flags & M_EXT) == 0) {
+					m_free(n);
+					n = NULL;
+				}
+			}
 			if (n == NULL) {
 				/* Give up remote */
 				m_freem(n0);
@@ -622,12 +638,32 @@ icmp6_input(mp, offp, proto)
 				noff = sizeof(struct ip6_hdr);
 		} else {
 			u_char *p;
+			int maxlen, maxhlen;
 
+			maxlen = sizeof(*nip6) + sizeof(*nicmp6) + 4;
+			if (maxlen >= MCLBYTES) {
+#ifdef DIAGNOSTIC
+				printf("MCLBYTES too small\n");
+#endif
+				/* Give up remote */
+				break;
+			}
 			MGETHDR(n, M_DONTWAIT, m->m_type);
+			if (n && maxlen > MHLEN) {
+				MCLGET(n, M_DONTWAIT);
+				if ((n->m_flags & M_EXT) == 0) {
+					m_free(n);
+					n = NULL;
+				}
+			}
 			if (n == NULL) {
 				/* Give up remote */
 				break;
 			}
+			n->m_len = 0;
+			maxhlen = M_TRAILINGSPACE(n) - maxlen;
+			if (maxhlen > hostnamelen)
+				maxhlen = hostnamelen;
 			/*
 			 * Copy IPv6 and ICMPv6 only.
 			 */
@@ -637,11 +673,11 @@ icmp6_input(mp, offp, proto)
 			bcopy(icmp6, nicmp6, sizeof(struct icmp6_hdr));
 			p = (u_char *)(nicmp6 + 1);
 			bzero(p, 4);
-			bcopy(hostname, p + 4, hostnamelen);
+			bcopy(hostname, p + 4, maxhlen);
 			noff = sizeof(struct ip6_hdr);
 			M_COPY_PKTHDR(n, m); /* just for recvif */
 			n->m_pkthdr.len = n->m_len = sizeof(struct ip6_hdr) +
-				sizeof(struct icmp6_hdr) + 4 + hostnamelen;
+				sizeof(struct icmp6_hdr) + 4 + maxhlen;
 			nicmp6->icmp6_type = ICMP6_WRUREPLY;
 			nicmp6->icmp6_code = 0;
 		}
