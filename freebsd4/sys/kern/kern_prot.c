@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_prot.c	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53.2.5 2000/10/29 03:40:53 truckman Exp $
+ * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53.2.6 2000/12/09 02:44:47 ps Exp $
  */
 
 /*
@@ -895,8 +895,7 @@ issetugid(p, uap)
 	 * a user without an exec - programs cannot know *everything*
 	 * that libc *might* have put in their data segment.
 	 */
-	if (p->p_flag & P_SUGID)
-		return (1);
+	p->p_retval[0] = (p->p_flag & P_SUGID) ? 1 : 0;
 	return (0);
 }
 

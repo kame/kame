@@ -4,7 +4,7 @@
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  *
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_lookup.c,v 1.21.2.1 2000/10/27 10:08:37 bde Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_lookup.c,v 1.21.2.2 2001/03/05 13:08:59 obrien Exp $
  */
 /*
  * Copyright (c) 1989, 1993
@@ -45,8 +45,6 @@
  *
  *	@(#)ufs_lookup.c	8.6 (Berkeley) 4/1/94
  */
-
-#include <stddef.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>

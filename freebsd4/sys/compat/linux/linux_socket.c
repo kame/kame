@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_socket.c,v 1.19.2.2 2000/11/02 23:31:28 obrien Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_socket.c,v 1.19.2.6 2001/03/04 08:38:20 assar Exp $
  */
 
 /* XXX we use functions that might not exist. */
@@ -40,7 +40,9 @@
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/fcntl.h>
+#include <sys/file.h>
 #include <sys/socket.h>
+#include <sys/socketvar.h>
 #include <sys/uio.h>
 
 #include <netinet/in.h>
@@ -53,6 +55,7 @@
 #else
 #include <machine/../linux/linux_proto.h>
 #endif
+#include <compat/linux/linux_socket.h>
 #include <compat/linux/linux_util.h>
 
 #ifndef __alpha__
@@ -144,6 +147,46 @@ linux_to_bsd_so_sockopt(int opt)
 		return (SO_LINGER);
 	}
 	return (-1);
+}
+
+static int
+linux_to_bsd_msg_flags(int flags)
+{
+	int ret_flags = 0;
+
+	if (flags & LINUX_MSG_OOB)
+		ret_flags |= MSG_OOB;
+	if (flags & LINUX_MSG_PEEK)
+		ret_flags |= MSG_PEEK;
+	if (flags & LINUX_MSG_DONTROUTE)
+		ret_flags |= MSG_DONTROUTE;
+	if (flags & LINUX_MSG_CTRUNC)
+		ret_flags |= MSG_CTRUNC;
+	if (flags & LINUX_MSG_TRUNC)
+		ret_flags |= MSG_TRUNC;
+	if (flags & LINUX_MSG_DONTWAIT)
+		ret_flags |= MSG_DONTWAIT;
+	if (flags & LINUX_MSG_EOR)
+		ret_flags |= MSG_EOR;
+	if (flags & LINUX_MSG_WAITALL)
+		ret_flags |= MSG_WAITALL;
+#if 0 /* not handled */
+	if (flags & LINUX_MSG_PROXY)
+		;
+	if (flags & LINUX_MSG_FIN)
+		;
+	if (flags & LINUX_MSG_SYN)
+		;
+	if (flags & LINUX_MSG_CONFIRM)
+		;
+	if (flags & LINUX_MSG_RST)
+		;
+	if (flags & LINUX_MSG_ERRQUEUE)
+		;
+	if (flags & LINUX_MSG_NOSIGNAL)
+		;
+#endif
+	return ret_flags;
 }
 
 /* Return 0 if IP_HDRINCL is set for the given socket. */
@@ -343,8 +386,10 @@ struct linux_connect_args {
 	struct sockaddr * name;
 	int namelen;
 };
+int linux_connect(struct proc *, struct linux_connect_args *);
+#endif /* !__alpha__*/
 
-static int
+int
 linux_connect(struct proc *p, struct linux_connect_args *args)
 {
 	struct linux_connect_args linux_args;
@@ -353,70 +398,44 @@ linux_connect(struct proc *p, struct linux_connect_args *args)
 		caddr_t name;
 		int namelen;
 	} */ bsd_args;
+	struct socket *so;
+	struct file *fp;
 	int error;
 
+#ifdef __alpha__
+	bcopy(args, &linux_args, sizeof(linux_args));
+#else
 	if ((error = copyin(args, &linux_args, sizeof(linux_args))))
 		return (error);
+#endif /* __alpha__ */
 
 	bsd_args.s = linux_args.s;
 	bsd_args.name = (caddr_t)linux_args.name;
 	bsd_args.namelen = linux_args.namelen;
 	error = connect(p, &bsd_args);
-	if (error == EISCONN) {
-		/*
-		 * Linux doesn't return EISCONN the first time it occurs,
-		 * when on a non-blocking socket. Instead it returns the
-		 * error getsockopt(SOL_SOCKET, SO_ERROR) would return on BSD.
-		 */
-		struct fcntl_args /* {
-			int fd;
-			int cmd;
-			int arg;
-		} */ bsd_fcntl_args;
-		struct getsockopt_args /* {
-			int s;
-			int level;
-			int name;
-			caddr_t val;
-			int *avalsize;
-		} */ bsd_getsockopt_args;
-		void *status, *statusl;
-		int stat, statl = sizeof stat;
-		caddr_t sg;
+	if (error != EISCONN)
+		return (error);
 
-		/* Check for non-blocking */
-		bsd_fcntl_args.fd = linux_args.s;
-		bsd_fcntl_args.cmd = F_GETFL;
-		bsd_fcntl_args.arg = 0;
-		error = fcntl(p, &bsd_fcntl_args);
-		if (error == 0 && (p->p_retval[0] & O_NONBLOCK)) {
-			sg = stackgap_init();
-			status = stackgap_alloc(&sg, sizeof stat);
-			statusl = stackgap_alloc(&sg, sizeof statusl);
-
-			if ((error = copyout(&statl, statusl, sizeof statl)))
-				return (error);
-
-			bsd_getsockopt_args.s = linux_args.s;
-			bsd_getsockopt_args.level = SOL_SOCKET;
-			bsd_getsockopt_args.name = SO_ERROR;
-			bsd_getsockopt_args.val = status;
-			bsd_getsockopt_args.avalsize = statusl;
-
-			error = getsockopt(p, &bsd_getsockopt_args);
-			if (error)
-				return (error);
-
-			if ((error = copyin(status, &stat, sizeof stat)))
-				return (error);
-
-			p->p_retval[0] = stat;
-			return (0);
-		}
+	/*
+	 * Linux doesn't return EISCONN the first time it occurs,
+	 * when on a non-blocking socket. Instead it returns the
+	 * error getsockopt(SOL_SOCKET, SO_ERROR) would return on BSD.
+	 */
+	error = holdsock(p->p_fd, linux_args.s, &fp);
+	if (error)
+		return (error);
+	error = EISCONN;
+	if (fp->f_flag & FNONBLOCK) {
+		so = (struct socket *)fp->f_data;
+		if ((u_int)so->so_emuldata == 0)
+			error = so->so_error;
+		so->so_emuldata = (void *)1;
 	}
-
+	fdrop(fp, p);
 	return (error);
 }
+
+#ifndef __alpha__
 
 struct linux_listen_args {
 	int s;
@@ -697,10 +716,36 @@ linux_recvfrom(struct proc *p, struct linux_recvfrom_args *args)
 	bsd_args.s = linux_args.s;
 	bsd_args.buf = linux_args.buf;
 	bsd_args.len = linux_args.len;
-	bsd_args.flags = linux_args.flags;
+	bsd_args.flags = linux_to_bsd_msg_flags(linux_args.flags);
 	bsd_args.from = linux_args.from;
 	bsd_args.fromlenaddr = linux_args.fromlen;
 	return (orecvfrom(p, &bsd_args));
+}
+
+struct linux_recvmsg_args {
+	int s;
+	struct msghdr *msg;
+	int flags;
+};
+
+static int
+linux_recvmsg(struct proc *p, struct linux_recvmsg_args *args)
+{
+	struct linux_recvmsg_args linux_args;
+	struct recvmsg_args /* {
+		int	s;
+		struct	msghdr *msg;
+		int	flags;
+	} */ bsd_args;
+	int error;
+
+	if ((error = copyin(args, &linux_args, sizeof(linux_args))))
+		return (error);
+
+	bsd_args.s = linux_args.s;
+	bsd_args.msg = linux_args.msg;
+	bsd_args.flags = linux_to_bsd_msg_flags(linux_args.flags);
+	return (recvmsg(p, &bsd_args));
 }
 
 struct linux_shutdown_args {
@@ -901,7 +946,7 @@ linux_socketcall(struct proc *p, struct linux_socketcall_args *args)
 			return (sendmsg(p, args->args));
 		} while (0);
 	case LINUX_RECVMSG:
-		return (recvmsg(p, args->args));
+		return (linux_recvmsg(p, args->args));
 	}
 
 	uprintf("LINUX: 'socket' typ=%d not implemented\n", args->what);

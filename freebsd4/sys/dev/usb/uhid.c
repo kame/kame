@@ -1,5 +1,5 @@
 /*	$NetBSD: uhid.c,v 1.38 2000/04/27 15:26:48 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.27.2.4 2000/10/31 22:31:29 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.27.2.5 2001/03/06 03:35:47 jkh Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -375,6 +375,18 @@ uhidopen(dev, flag, mode, p)
 {
 	struct uhid_softc *sc;
 	usbd_status err;
+#if defined(__FreeBSD__) && defined(__i386__)
+	static int hid_opened;
+
+	if (hid_opened == 0) {
+		int s;
+		s = splhigh();
+		tty_imask |= bio_imask;
+		update_intr_masks();
+		splx(s);
+		hid_opened = 1;
+	}
+#endif
 
 	USB_GET_SC_OPEN(uhid, UHIDUNIT(dev), sc);
 

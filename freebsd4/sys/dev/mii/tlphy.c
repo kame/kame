@@ -77,6 +77,7 @@
 #include <sys/errno.h>
 #include <sys/module.h>
 #include <sys/bus.h>
+#include <sys/malloc.h>
 
 #include <machine/bus.h>
 #include <machine/clock.h>
@@ -94,7 +95,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.2 1999/08/28 02:16:30 peter Exp $";
+  "$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.2.2.1 2001/02/09 09:50:15 asmodai Exp $";
 #endif
 
 struct tlphy_softc {
@@ -179,6 +180,7 @@ static int tlphy_attach(dev)
 				break;
 			}
 		}
+		free(devlist, M_TEMP);
 	}
 
 	mii->mii_instance++;

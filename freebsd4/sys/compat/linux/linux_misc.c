@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.85.2.2 2000/11/02 23:31:28 obrien Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.85.2.3 2001/03/28 02:33:47 gallatin Exp $
  */
 
 #include "opt_compat.h"
@@ -629,7 +629,12 @@ struct linux_times_argv {
     long    tms_cstime;
 };
 
+#ifdef __alpha__
+#define CLK_TCK 1024	/* Linux uses 1024 on alpha */
+#else
 #define CLK_TCK 100	/* Linux uses 100 */
+#endif
+
 #define CONVTCK(r)	(r.tv_sec * CLK_TCK + r.tv_usec / (1000000 / CLK_TCK))
 
 int

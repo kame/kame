@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/diskslice.h,v 1.36 2000/01/16 09:25:34 phk Exp $
+ * $FreeBSD: src/sys/sys/diskslice.h,v 1.36.2.1 2001/01/29 01:50:50 ken Exp $
  */
 
 #ifndef	_SYS_DISKSLICE_H_
@@ -80,6 +80,7 @@ struct diskslices {
 /* Flags for dsopen(). */
 #define	DSO_NOLABELS	1
 #define	DSO_ONESLICE	2
+#define	DSO_COMPATLABEL	4
 
 #define	dsgetlabel(dev, ssp)	(ssp->dss_slices[dkslice(dev)].ds_label)
 

@@ -70,7 +70,7 @@
 /*
  * Additional Copyright (c) 1999 by Andrew Gallatin
  *
- * $FreeBSD: src/sys/alpha/alpha/dec_1000a.c,v 1.2.2.2 2000/07/20 06:12:12 obrien Exp $
+ * $FreeBSD: src/sys/alpha/alpha/dec_1000a.c,v 1.2.2.3 2001/02/17 00:04:03 gallatin Exp $
  */
 
 #include "opt_ddb.h"
@@ -146,6 +146,15 @@ dec_1000a_init(int cputype)
 	case PCS_PROC_EV4:
 	case PCS_PROC_EV45:
 		platform.iobus = "apecs";
+		break;
+
+	default:
+		platform.iobus = "cia";
+		break;
+	}
+	platform.cons_init = dec_1000a_cons_init;
+	switch (cputype) {
+	case ST_DEC_1000:
 		platform.pci_intr_map = dec_1000_intr_map;
 		platform.pci_intr_disable = dec_1000_intr_disable;
 		platform.pci_intr_enable = dec_1000_intr_enable;
@@ -153,14 +162,13 @@ dec_1000a_init(int cputype)
 		break;
 
 	default:
-		platform.iobus = "cia";
 		platform.pci_intr_map = dec_1000a_intr_map;
 		platform.pci_intr_disable = dec_1000a_intr_disable;
 		platform.pci_intr_enable = dec_1000a_intr_enable;
 		platform.pci_intr_init = dec_1000a_intr_init;
 		break;
 	}
-	platform.cons_init = dec_1000a_cons_init;
+
 }
 
 /* XXX for forcing comconsole when srm serial console is used */
@@ -401,5 +409,5 @@ dec_1000a_intr_init()
 /*
  * Enable cascade interrupt.
  */
-	dec_1000_intr_enable(2);
+	dec_1000a_intr_enable(2);
 }

@@ -33,8 +33,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumext.h,v 1.25 2000/05/10 06:08:43 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumext.h,v 1.25.2.1 2000/05/11 08:49:22 grog Exp $
+ * $Id: vinumext.h,v 1.26 2000/05/16 07:38:08 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinumext.h,v 1.25.2.2 2001/03/13 02:59:43 grog Exp $
  */
 
 /* vinumext.h: external definitions */
@@ -243,6 +243,25 @@ int vinum_finddaemon(void);
 int vinum_setdaemonopts(int);
 extern struct daemonq *daemonq;				    /* daemon's work queue */
 extern struct daemonq *dqend;				    /* and the end of the queue */
+
+#undef Free						    /* defined in some funny net stuff */
+#ifdef _KERNEL
+#ifdef VINUMDEBUG
+#define Malloc(x)  MMalloc ((x), __FILE__, __LINE__)	    /* show where we came from */
+#define Free(x)	   FFree ((x), __FILE__, __LINE__)	    /* show where we came from */
+caddr_t MMalloc(int size, char *, int);
+void FFree(void *mem, char *, int);
+#define LOCKDRIVE(d) lockdrive (d, __FILE__, __LINE__)
+#else
+#define Malloc(x)  malloc((x), M_DEVBUF, \
+	curproc->p_intr_nesting_level == 0? M_WAITOK: M_NOWAIT)
+#define Free(x)    free((x), M_DEVBUF)
+#define LOCKDRIVE(d) lockdrive (d)
+#endif
+#else
+#define Malloc(x)  malloc ((x))				    /* just the size */
+#define Free(x)	   free ((x))				    /* just the address */
+#endif
 
 /* Local Variables: */
 /* fill-column: 50 */

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adwcam.c,v 1.7.2.1 2000/10/31 08:09:50 dwmalone Exp $
+ * $FreeBSD: src/sys/dev/advansys/adwcam.c,v 1.7.2.2 2001/03/05 13:08:55 obrien Exp $
  */
 /*
  * Ported from:
@@ -44,7 +44,6 @@
  * code retain the above copyright notice and this comment without
  * modification.
  */
-#include <stddef.h>	/* For offsetof */
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -26,17 +26,17 @@
  *
  * 	From Id: probe_keyboard.c,v 1.13 1997/06/09 05:10:55 bde Exp
  *
- * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.5 1999/12/03 13:20:55 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.5.2.1 2000/12/30 12:01:06 nyan Exp $
  */
 
 #include <stand.h>
 #include <bootstrap.h>
 #include <btxv86.h>
 #include <machine/psl.h>
-#include "libi386.h"
 #ifdef PC98
 #include <machine/cpufunc.h>
 #endif
+#include "libi386.h"
 
 #if KEYBOARD_PROBE
 #include <machine/cpufunc.h>
@@ -52,13 +52,14 @@ static int	vidc_ischar(void);
 static int	vidc_started;
 
 #ifdef TERM_EMU
-void		end_term();
+void		end_term(void);
 void		bail_out(int c);
 void		vidc_term_emu(int c);
 void		get_pos(void);
 void		curs_move(int x, int y);
 void		write_char(int c, int fg, int bg);
 void		scroll_up(int rows, int fg, int bg);
+int		pow10(int i);
 void		AB(void);
 void		AF(void);
 void		CD(void);
@@ -117,7 +118,7 @@ vidc_init(int arg)
 #endif
 
     if (vidc_started && arg == 0)
-	return;
+	return(0);
     vidc_started = 1;
 #ifdef PC98
     Crtat = (unsigned short *)PTOV(0xA0000);
@@ -341,7 +342,7 @@ curs_move(int x, int y)
  * inserted in the window.
  */
 void
-scroll_up(int rows, int fg, int bg)
+scroll_up(int rows, int fgcol, int bgcol)
 {
 #ifdef PC98
         unsigned short *cp;
@@ -354,7 +355,7 @@ scroll_up(int rows, int fg, int bg)
 	    cp += col;
 	}
 	for (i = 0; i < col; i++) {
-	    *(cp + 0x1000) = at2pc98(fg, bg);
+	    *(cp + 0x1000) = at2pc98(fgcol, bgcol);
 	    *cp++ = ' ';
 	}
 #else
@@ -362,7 +363,7 @@ scroll_up(int rows, int fg, int bg)
 	v86.ctl = 0;
 	v86.addr = 0x10;
 	v86.eax = 0x0600+(0x00ff & rows);
-	v86.ebx = (bg<<12)+(fg<<8);
+	v86.ebx = (bgcol<<12)+(fgcol<<8);
 	v86.ecx = 0x0;
 	v86.edx = 0x184f;
 	v86int();
@@ -371,16 +372,16 @@ scroll_up(int rows, int fg, int bg)
 
 /* Write character and attribute at cursor position. */
 void
-write_char(int c, int fg, int bg)
+write_char(int c, int fgcol, int bgcol)
 {
 #ifdef PC98
 	*crtat = (c == 0x5c ? 0xfc : c);
-	*(crtat + 0x1000) = at2pc98(fg, bg);
+	*(crtat + 0x1000) = at2pc98(fgcol, bgcol);
 #else
 	v86.ctl=0;
     	v86.addr = 0x10;
     	v86.eax = 0x0900+(0x00ff & c);
-	v86.ebx = (bg<<4)+fg;
+	v86.ebx = (bgcol<<4)+fgcol;
     	v86.ecx = 0x1;
     	v86int();
 #endif

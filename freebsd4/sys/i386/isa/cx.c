@@ -15,7 +15,7 @@
  *
  * Version 1.9, Wed Oct  4 18:58:15 MSK 1995
  *
- * $FreeBSD: src/sys/i386/isa/cx.c,v 1.45 2000/01/29 16:17:31 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/cx.c,v 1.45.2.1 2001/02/26 04:23:09 jlemon Exp $
  *
  */
 #undef DEBUG
@@ -101,8 +101,9 @@ struct cdevsw cx_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 #else
 struct tty *cx_tty [NCX*NCHAN];         /* tty data */

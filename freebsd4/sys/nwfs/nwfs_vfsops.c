@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6.2.2 2000/10/25 02:28:42 bp Exp $
+ * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6.2.4 2001/02/22 09:21:20 bp Exp $
  */
 #include "opt_ncp.h"
 #ifndef NCP
@@ -122,7 +122,6 @@ nwfs_initnls(struct nwmount *nmp) {
 		return 0;
 	}
 	MALLOC(pe, char *, 256 * 4, M_NWFSDATA, M_WAITOK);
-	if (pe == NULL) return ENOMEM;
 	pc = pe;
 	do {
 		COPY_TABLE(nmp->m.nls.to_lower, ncp_defnls.to_lower);
@@ -180,13 +179,12 @@ static int nwfs_mount(struct mount *mp, char *path, caddr_t data,
 	ncp_conn_unlock(conn,p);	/* we keep the ref */
 	mp->mnt_stat.f_iosize = conn->buffer_size;
         /* We must malloc our own mount info */
-        MALLOC(nmp,struct nwmount *,sizeof(struct nwmount),M_NWFSDATA,M_USE_RESERVE);
+        MALLOC(nmp,struct nwmount *,sizeof(struct nwmount),M_NWFSDATA,M_USE_RESERVE | M_ZERO);
         if (nmp == NULL) {
                 nwfs_printf("could not alloc nwmount\n");
                 error = ENOMEM;
 		goto bad;
         }
-	bzero(nmp,sizeof(*nmp));
         mp->mnt_data = (qaddr_t)nmp;
 	nmp->connh = handle;
 	nmp->n_root = NULL;
@@ -497,9 +495,9 @@ nwfs_sync(mp, waitfor, cred, p)
 	 * Force stale buffer cache information to be flushed.
 	 */
 loop:
-	for (vp = mp->mnt_vnodelist.lh_first;
+	for (vp = LIST_FIRST(&mp->mnt_vnodelist);
 	     vp != NULL;
-	     vp = vp->v_mntvnodes.le_next) {
+	     vp = LIST_NEXT(vp, v_mntvnodes)) {
 		/*
 		 * If the vnode that we are about to sync is no longer
 		 * associated with this mount point, start over.

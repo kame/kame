@@ -29,9 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aicasm_gram.y,v 1.1.1.1 2000/11/21 08:39:02 kawa Exp $
+ * $Id: aicasm_gram.y,v 1.1.1.2 2001/04/23 13:09:50 sumikawa Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_gram.y,v 1.11.2.2 2000/10/31 18:55:16 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_gram.y,v 1.11.2.3 2001/01/07 22:52:35 gibbs Exp $
  */
 
 #include <inttypes.h>

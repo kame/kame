@@ -1,8 +1,13 @@
-# $FreeBSD: src/sys/boot/i386/kgzldr/Makefile,v 1.3 1999/08/28 00:40:10 peter Exp $
+# $FreeBSD: src/sys/boot/i386/kgzldr/Makefile,v 1.3.2.1 2001/03/04 05:04:33 obrien Exp $
 
 PROG=	kgzldr.o
 SRCS=	start.s boot.c inflate.c lib.c crt.s sio.s
-CFLAGS=	-fno-builtin -Os
+CFLAGS=	-fno-builtin
+.if ${OBJFORMAT} == aout
+CFLAGS+=-O2
+.else
+CFLAGS+=-Os
+.endif
 CFLAGS+=-DKZIP
 LDFLAGS=-nostdlib -static -r
 NOMAN=

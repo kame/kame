@@ -36,7 +36,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/miivar.h,v 1.3 1999/12/29 04:35:41 peter Exp $
+ * $FreeBSD: src/sys/dev/mii/miivar.h,v 1.3.2.1 2000/12/12 19:29:14 wpaul Exp $
  */
 
 #ifndef _DEV_MII_MIIVAR_H_
@@ -120,6 +120,7 @@ struct mii_softc {
 
 	mii_downcall_t mii_service;	/* our downcall */
 	struct mii_data *mii_pdata;	/* pointer to parent's mii_data */
+	struct callout_handle mii_auto_ch; /* callout handle for phy autoneg */
 
 	int mii_flags;			/* misc. flags; see below */
 	int mii_capabilities;		/* capabilities from BMSR */
@@ -170,6 +171,7 @@ void	mii_add_media __P((struct mii_data *, int, int));
 int	mii_media_from_bmcr __P((int));
 
 int	mii_phy_auto __P((struct mii_softc *, int));
+void	mii_phy_auto_stop __P((struct mii_softc *));
 void	mii_phy_reset __P((struct mii_softc *));
 
 void	ukphy_status __P((struct mii_softc *));

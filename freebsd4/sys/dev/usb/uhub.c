@@ -1,5 +1,5 @@
-/*	$NetBSD: uhub.c,v 1.34 1999/11/18 23:32:29 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhub.c,v 1.21.2.4 2000/10/31 22:33:54 n_hibma Exp $	*/
+/*	$NetBSD: uhub.c,v 1.47 2000/09/24 02:08:38 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhub.c,v 1.21.2.5 2001/01/18 00:25:11 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -119,7 +119,7 @@ Static device_method_t uhubroot_methods[] = {
 	DEVMETHOD(device_attach, uhub_attach),
 	/* detach is not allowed for a root hub */
 	DEVMETHOD(device_suspend, bus_generic_suspend),
-	DEVMETHOD(device_resume, bus_generic_suspend),
+	DEVMETHOD(device_resume, bus_generic_resume),
 	DEVMETHOD(device_shutdown, bus_generic_shutdown),
 	{0,0}
 };

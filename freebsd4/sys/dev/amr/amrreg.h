@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/dev/amr/amrreg.h,v 1.1.2.1 2000/10/28 10:16:59 msmith Exp $
+ *      $FreeBSD: src/sys/dev/amr/amrreg.h,v 1.1.2.2 2000/12/22 22:24:32 msmith Exp $
  */
 
 /********************************************************************************
@@ -436,7 +436,8 @@ struct amr_passthrough
  ********************************************************************************/
 
 #define AMR_CFG_SIG		0xa0		/* PCI config register for signature */
-#define AMR_SIGNATURE		0x3344		/* signature for Quartz adapters */
+#define AMR_SIGNATURE_1		0xCCCC		/* i960 signature (older adapters) */
+#define AMR_SIGNATURE_2		0x3344		/* i960 signature (newer adapters) */
 
 /*
  * Doorbell registers

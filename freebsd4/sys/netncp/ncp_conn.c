@@ -28,7 +28,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * $FreeBSD: src/sys/netncp/ncp_conn.c,v 1.3.2.3 2000/10/25 02:35:42 bp Exp $
+ * $FreeBSD: src/sys/netncp/ncp_conn.c,v 1.3.2.5 2001/02/22 08:54:11 bp Exp $
  *
  * Connection tables
  */
@@ -182,10 +182,8 @@ ncp_conn_alloc(struct proc *p, struct ucred *cred, struct ncp_conn **conn)
 	struct ncp_conn *ncp;
 
 	MALLOC(ncp, struct ncp_conn *, sizeof(struct ncp_conn), 
-	    M_NCPDATA, M_WAITOK);
-	if (ncp == NULL) return ENOMEM;
+	    M_NCPDATA, M_WAITOK | M_ZERO);
 	error = 0;
-	bzero(ncp,sizeof(*ncp));
 	lockinit(&ncp->nc_lock, PZERO, "ncplck", 0, 0);
 	ncp_conn_cnt++;
 	ncp->nc_id = ncp_next_ref++;
@@ -405,9 +403,8 @@ ncp_conn_gethandle(struct ncp_conn *conn, struct proc *p, struct ncp_handle **ha
 		lockmgr(&lhlock, LK_RELEASE, 0, p);
 		return 0;
 	}
-	MALLOC(refp,struct ncp_handle *,sizeof(struct ncp_handle),M_NCPDATA,M_WAITOK);
-	if (refp == NULL) return ENOMEM;
-	bzero(refp,sizeof(*refp));
+	MALLOC(refp,struct ncp_handle *,sizeof(struct ncp_handle),M_NCPDATA,
+	    M_WAITOK | M_ZERO);
 	SLIST_INSERT_HEAD(&lhlist,refp,nh_next);
 	refp->nh_ref++;
 	refp->nh_proc = p;
@@ -465,8 +462,8 @@ ncp_conn_putprochandles(struct proc *p) {
 	int haveone = 0;
 
 	lockmgr(&lhlock, LK_EXCLUSIVE, 0, p);
-	for (hp = lhlist.slh_first; hp; hp = nhp) {
-		nhp = hp->nh_next.sle_next;
+	for (hp = SLIST_FIRST(&lhlist); hp; hp = nhp) {
+		nhp = SLIST_NEXT(hp, nh_next);
 		if (hp->nh_proc != p) continue;
 		haveone = 1;
 		hp->nh_conn->ref_cnt -= hp->nh_ref;

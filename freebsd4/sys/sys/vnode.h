@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $FreeBSD: src/sys/sys/vnode.h,v 1.111.2.2 2000/06/20 18:26:59 des Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.111.2.4 2000/12/30 01:51:10 dillon Exp $
  */
 
 #ifndef _SYS_VNODE_H_
@@ -128,6 +128,7 @@ struct vnode {
 		short	vpi_events;		/* what they are looking for */
 		short	vpi_revents;		/* what has happened */
 	} v_pollinfo;
+	struct proc *v_vxproc;			/* proc owning VXLOCK */
 #ifdef	DEBUG_LOCKS
 	const char *filename;			/* Source file doing locking */
 	int line;				/* Line number doing locking */
@@ -211,6 +212,7 @@ struct vattr {
 #define	IO_NDELAY	0x10		/* FNDELAY flag set in file table */
 #define	IO_VMIO		0x20		/* data already in VMIO space */
 #define	IO_INVAL	0x40		/* invalidate after I/O */
+#define IO_ASYNC	0x80		/* bawrite rather then bdwrite */
 
 /*
  *  Modes.  Some values same as Ixxx entries from inode.h for now.

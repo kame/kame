@@ -7,7 +7,7 @@
  *
  * @(#)ip_frag.h	1.5 3/24/96
  * $Id: ip_frag.h,v 2.2 1999/08/06 06:26:38 darrenr Exp $
- * $FreeBSD: src/sys/netinet/ip_frag.h,v 1.7.2.1 2000/07/19 23:27:55 darrenr Exp $
+ * $FreeBSD: src/sys/netinet/ip_frag.h,v 1.7.2.3 2001/04/07 03:40:31 darrenr Exp $
  */
 
 #ifndef	__IP_FRAG_H__
@@ -20,11 +20,13 @@ typedef	struct	ipfr	{
 	void	*ipfr_data;
 	struct	in_addr	ipfr_src;
 	struct	in_addr	ipfr_dst;
+	void	*ipfr_ifp;
 	u_short	ipfr_id;
 	u_char	ipfr_p;
 	u_char	ipfr_tos;
 	u_short	ipfr_off;
-	u_short	ipfr_ttl;
+	u_char	ipfr_ttl;
+	u_char	ipfr_seen0;
 	frentry_t *ipfr_rule;
 } ipfr_t;
 
@@ -40,7 +42,8 @@ typedef	struct	ipfrstat {
 	struct	ipfr	**ifs_nattab;
 } ipfrstat_t;
 
-#define	IPFR_CMPSZ	(4 + 4 + 2 + 1 + 1)
+#define	IPFR_CMPSZ	(offsetof(ipfr_t, ipfr_off) - \
+			 offsetof(ipfr_t, ipfr_src))
 
 extern	int	fr_ipfrttl;
 extern	int	fr_frag_lock;
@@ -61,6 +64,6 @@ extern	void	ipfr_slowtimer __P((void *));
 # endif
 #else
 extern	int	ipfr_slowtimer __P((void));
-#endif
+#endif /* (BSD >= 199306) || SOLARIS */
 
 #endif	/* __IP_FIL_H__ */

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000 Søren Schmidt
+ * Copyright (c) 2000,2001 Søren Schmidt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/cdrio.h,v 1.1 2000/01/06 22:38:33 sos Exp $
+ * $FreeBSD: src/sys/sys/cdrio.h,v 1.1.2.1 2001/02/25 21:34:04 sos Exp $
  */
 
 #ifndef	_SYS_CDRIO_H_
@@ -34,7 +34,7 @@
 #include <sys/ioccom.h>
 
 struct cdr_track {
-        int track_type;         	/* type of this track */
+        int datablock_type;         	/* data type code */
 #define CDR_DB_RAW              0x0     /* 2352 bytes of raw data */
 #define CDR_DB_RAW_PQ           0x1     /* 2368 bytes raw data + P/Q subchan */
 #define CDR_DB_RAW_PW           0x2     /* 2448 bytes raw data + P-W subchan */
@@ -57,11 +57,14 @@ struct cdr_track {
 };
 
 #define CDRIOCBLANK		_IOW('c', 100, int)
+#define CDR_B_ALL		0x0
+#define CDR_B_MIN		0x1
+#define CDR_B_SESSION		0x6
+
 #define CDRIOCNEXTWRITEABLEADDR	_IOR('c', 101, int)
 
 #define CDRIOCOPENDISK		_IO('c', 102)
-#define CDRIOCCLOSEDISK		_IO('c', 103)
-
+#define CDRIOCCLOSEDISK		_IOW('c', 103, int)
 #define CDRIOCOPENTRACK		_IOW('c', 104, struct cdr_track)
 #define CDRIOCCLOSETRACK	_IO('c', 105)
 

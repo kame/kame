@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/linux/linux.h,v 1.46.2.1 2000/11/04 07:30:08 obrien Exp $
+ * $FreeBSD: src/sys/alpha/linux/linux.h,v 1.46.2.3 2001/02/22 05:14:58 marcel Exp $
  */
 
 #ifndef _ALPHA_LINUX_LINUX_H_
@@ -159,6 +159,8 @@ struct linux_new_utsname {
 #define	LINUX_SIGISMEMBER(set, sig)	SIGISMEMBER(set, sig)
 #define	LINUX_SIGADDSET(set, sig)	SIGADDSET(set, sig)
 
+#define	LINUX_MINSIGSTKSZ	4096
+
 typedef void	(*linux_handler_t)(int);
 typedef u_long	linux_osigset_t;
 
@@ -267,15 +269,17 @@ int	linux_ioctl_unregister_handlers(struct linker_set *s);
 #define	LINUX_F_SETFD		2
 #define	LINUX_F_GETFL		3
 #define	LINUX_F_SETFL		4
-#define	LINUX_F_GETLK		5
-#define	LINUX_F_SETLK		6
-#define	LINUX_F_SETLKW		7
-#define	LINUX_F_SETOWN		8
-#define	LINUX_F_GETOWN		9
+#define	LINUX_F_SETOWN		5
+#define	LINUX_F_GETOWN		6
+#define	LINUX_F_GETLK		7
+#define	LINUX_F_SETLK		8
+#define	LINUX_F_SETLKW		9
+#define	LINUX_F_SETSIG		10
+#define	LINUX_F_GETSIG		11
 
-#define	LINUX_F_RDLCK		0
-#define	LINUX_F_WRLCK		1
-#define	LINUX_F_UNLCK		2
+#define	LINUX_F_RDLCK		1
+#define	LINUX_F_WRLCK		2
+#define	LINUX_F_UNLCK		8
 
 /*
  * SystemV IPC defines

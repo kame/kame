@@ -91,7 +91,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/ukphy.c,v 1.2 1999/08/28 00:42:16 peter Exp $";
+  "$FreeBSD: src/sys/dev/mii/ukphy.c,v 1.2.2.1 2000/12/12 19:29:15 wpaul Exp $";
 #endif
 
 static int ukphy_probe		__P((device_t));
@@ -194,6 +194,7 @@ static int ukphy_detach(dev)
 
 	sc = device_get_softc(dev);
 	mii = device_get_softc(device_get_parent(dev));
+	mii_phy_auto_stop(sc);
 	sc->mii_dev = NULL;
 	LIST_REMOVE(sc, mii_list);
 

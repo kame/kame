@@ -1,5 +1,5 @@
 /*	$NetBSD: i82365reg.h,v 1.3 1998/12/20 17:53:28 nathanw Exp $	*/
-/* $FreeBSD: src/sys/dev/pcic/i82365reg.h,v 1.3.2.1 2000/10/15 04:12:41 sanpei Exp $ */
+/* $FreeBSD: src/sys/dev/pcic/i82365reg.h,v 1.3.2.2 2000/12/23 14:09:25 sanpei Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -349,3 +349,4 @@
 #define PCIC_PNP_82365_CARDBUS	0x030ED041	/* PNP0E03 */
 #define PCIC_PNP_ACTIONTEC	0x1802A904	/* AEI0218 */
 #define PCIC_PNP_SCM_SWAPBOX	0x1802A904	/* SCM0469 */
+#define PCIC_PNP_SCM_SWAPBOX2	0x69046d4c	/* SCM SwapBox Classic X2P */

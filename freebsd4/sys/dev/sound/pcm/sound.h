@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.10.2.6 2000/10/05 05:05:10 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.10.2.9 2001/03/05 16:25:22 cg Exp $
  */
 
 /*
@@ -63,9 +63,17 @@
 #include <sys/mman.h>
 #include <sys/poll.h>
 #include <sys/soundcard.h>
+#include <sys/sysctl.h>
 #include <isa/isavar.h>
+#include <sys/kobj.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
+
+#if __FreeBSD_version > 500000
+#define USING_MUTEX
+#define USING_DEVFS
+#endif
+#define SND_DYNSYSCTL
 
 #else
 struct isa_device { int dummy; };
@@ -81,6 +89,7 @@ struct isa_device { int dummy; };
 
 #include <dev/sound/pcm/datatypes.h>
 #include <dev/sound/pcm/channel.h>
+#include <dev/sound/pcm/buffer.h>
 #include <dev/sound/pcm/feeder.h>
 #include <dev/sound/pcm/mixer.h>
 #include <dev/sound/pcm/dsp.h>
@@ -114,10 +123,12 @@ struct isa_device { int dummy; };
 /* make figuring out what a format is easier. got AFMT_STEREO already */
 #define AFMT_32BIT (AFMT_S32_LE | AFMT_S32_BE | AFMT_U32_LE | AFMT_U32_BE)
 #define AFMT_16BIT (AFMT_S16_LE | AFMT_S16_BE | AFMT_U16_LE | AFMT_U16_BE)
+#define AFMT_8BIT (AFMT_U8 | AFMT_S8)
 #define AFMT_SIGNED (AFMT_S16_LE | AFMT_S16_BE | AFMT_S8)
 #define AFMT_BIGENDIAN (AFMT_S16_BE | AFMT_U16_BE)
 
 int fkchan_setup(pcm_channel *c);
+int fkchan_kill(pcm_channel *c);
 
 /*
  * Minor numbers for the sound driver.
@@ -160,14 +171,24 @@ int fkchan_setup(pcm_channel *c);
 #define DEB(x)
 #endif
 
-int pcm_addchan(device_t dev, int dir, pcm_channel *templ, void *devinfo);
+SYSCTL_DECL(_hw_snd);
+
+int pcm_addchan(device_t dev, int dir, kobj_class_t cls, void *devinfo);
 int pcm_register(device_t dev, void *devinfo, int numplay, int numrec);
 int pcm_unregister(device_t dev);
 int pcm_setstatus(device_t dev, char *str);
 u_int32_t pcm_getflags(device_t dev);
 void pcm_setflags(device_t dev, u_int32_t val);
 void *pcm_getdevinfo(device_t dev);
-void pcm_setswap(device_t dev, pcm_swap_t *swap);
+
+int snd_setup_intr(device_t dev, struct resource *res, int flags,
+		   driver_intr_t hand, void *param, void **cookiep);
+
+void *snd_mtxcreate(const char *desc);
+void snd_mtxfree(void *m);
+void snd_mtxassert(void *m);
+void snd_mtxlock(void *m);
+void snd_mtxunlock(void *m);
 
 #endif /* _KERNEL */
 

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.7 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_readwrite.c,v 1.18.2.1 2000/04/26 20:36:30 dillon Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_readwrite.c,v 1.18.2.2 2000/12/22 18:44:33 dillon Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -238,10 +238,19 @@ WRITE(ap)
 		if (uio->uio_offset + xfersize > ip->i_size)
 			vnode_pager_setsize(vp, uio->uio_offset + xfersize);
 
+		/*  
+		 * Avoid a data-consistency race between write() and mmap()
+		 * by ensuring that newly allocated blocks are zerod.  The
+		 * race can occur even in the case where the write covers
+		 * the entire block.
+		 */
+		flags |= B_CLRBUF;
+#if 0
 		if (fs->s_frag_size > xfersize)
 			flags |= B_CLRBUF;
 		else
 			flags &= ~B_CLRBUF;
+#endif
 
 		error = ext2_balloc(ip,
 		    lbn, blkoffset + xfersize, ap->a_cred, &bp, flags);

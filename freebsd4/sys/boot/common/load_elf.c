@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/load_elf.c,v 1.13 2000/02/25 05:10:42 bp Exp $
+ * $FreeBSD: src/sys/boot/common/load_elf.c,v 1.13.2.1 2000/12/28 13:12:35 ps Exp $
  */
 
 #include <sys/param.h>
@@ -208,6 +208,7 @@ elf_loadimage(struct loaded_module *mp, int fd, vm_offset_t off,
     vm_offset_t lastaddr;
     void	*buf;
     size_t	resid, chunk;
+    ssize_t	result;
     vm_offset_t	dest;
     vm_offset_t	ssym, esym;
     Elf_Dyn	*dp;
@@ -218,7 +219,7 @@ elf_loadimage(struct loaded_module *mp, int fd, vm_offset_t off,
     int		symstrindex;
     int		symtabindex;
     long	size;
-    int		fpcopy;
+    u_int	fpcopy;
 
     dp = NULL;
     shdr = NULL;

@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.1.2.1 2000/10/03 18:46:51 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.1.2.2 2000/12/12 19:29:15 wpaul Exp $
  */
 
 /*
@@ -64,7 +64,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.1.2.1 2000/10/03 18:46:51 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.1.2.2 2000/12/12 19:29:15 wpaul Exp $";
 #endif
 
 static int pnaphy_probe		__P((device_t));
@@ -169,6 +169,7 @@ static int pnaphy_detach(dev)
 
 	sc = device_get_softc(dev);
 	mii = device_get_softc(device_get_parent(dev));
+	mii_phy_auto_stop(sc);
 	sc->mii_dev = NULL;
 	LIST_REMOVE(sc, mii_list);
 

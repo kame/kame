@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32 1999/12/29 04:40:59 peter Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.2 2001/03/01 20:00:09 jlemon Exp $
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -274,6 +274,7 @@ extern int	ipport_hifirstauto;
 extern int	ipport_hilastauto;
 
 void	in_losing __P((struct inpcb *));
+void	in_rtchange __P((struct inpcb *, int));
 int	in_pcballoc __P((struct socket *, struct inpcbinfo *, struct proc *));
 int	in_pcbbind __P((struct inpcb *, struct sockaddr *, struct proc *));
 int	in_pcbconnect __P((struct inpcb *, struct sockaddr *, struct proc *));
@@ -289,8 +290,8 @@ struct inpcb *
 	in_pcblookup_hash __P((struct inpcbinfo *,
 			       struct in_addr, u_int, struct in_addr, u_int,
 			       int, struct ifnet *));
-void	in_pcbnotify __P((struct inpcbhead *, struct sockaddr *,
-	    u_int, struct in_addr, u_int, int, void (*)(struct inpcb *, int)));
+void	in_pcbnotifyall __P((struct inpcbhead *, struct in_addr,
+	    int, void (*)(struct inpcb *, int)));
 void	in_pcbrehash __P((struct inpcb *));
 int	in_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in_setsockaddr __P((struct socket *so, struct sockaddr **nam));

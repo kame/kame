@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/pccard/card_if.m,v 1.1.2.1 2000/05/23 03:56:59 imp Exp $
+# $FreeBSD: src/sys/dev/pccard/card_if.m,v 1.1.2.2 2001/01/02 22:49:15 dmlb Exp $
 #
 
 #include <sys/bus.h>
@@ -60,6 +60,13 @@ METHOD int set_memory_offset {
 	device_t  child;
         int	  rid;
         u_int32_t offset;
+}
+
+METHOD int get_memory_offset {
+	device_t  dev;
+	device_t  child;
+        int	  rid;
+        u_int32_t *offset;
 }
 
 METHOD int attach_card {

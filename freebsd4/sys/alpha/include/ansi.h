@@ -1,6 +1,3 @@
-/* $FreeBSD: src/sys/alpha/include/ansi.h,v 1.5 1999/08/28 00:38:39 peter Exp $ */
-/* From: NetBSD: ansi.h,v 1.9 1997/11/23 20:20:53 kleink Exp */
-
 /*-
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -34,6 +31,8 @@
  * SUCH DAMAGE.
  *
  *	@(#)ansi.h	8.2 (Berkeley) 1/4/94
+ *	From: NetBSD: ansi.h,v 1.9 1997/11/23 20:20:53 kleink Exp
+ * $FreeBSD: src/sys/alpha/include/ansi.h,v 1.5.2.5 2001/03/05 13:08:49 obrien Exp $
  */
 
 #ifndef	_ANSI_H_
@@ -49,20 +48,19 @@
  *	#endif
  */
 #define	_BSD_CLOCK_T_		int		/* clock() */
+#define	_BSD_CLOCKID_T_		int		/* clockid_t */
 #define	_BSD_PTRDIFF_T_		long		/* ptr1 - ptr2 */
 #define	_BSD_SIZE_T_		unsigned long	/* sizeof() */
+#define	_BSD_SOCKLEN_T_		__uint32_t
 #define	_BSD_SSIZE_T_		long		/* byte count or error */
 #define	_BSD_TIME_T_		int		/* time() */
+#define	_BSD_TIMER_T_		int		/* timer_t */
 typedef struct {
 	char *__base;
 	int __offset;
 	int __pad;
 } __va_list;
 #define	_BSD_VA_LIST_		__va_list	/* va_list */
-#define	_BSD_CLOCKID_T_		int		/* clockid_t */
-#define	_BSD_TIMER_T_		int		/* timer_t */
-#define	_BSD_SUSECONDS_T_	int		/* suseconds_t */
-#define	_BSD_USECONDS_T_	unsigned int	/* useconds_t */
 
 /*
  * Types which are fundamental to the implementation and must be used
@@ -104,6 +102,11 @@ typedef struct {
  */
 #define	_BSD_CLK_TCK_		100
 #define	_BSD_CLOCKS_PER_SEC_	100
+
+/*
+ * We define this here since both <stddef.h> and <sys/types.h> needs it.
+ */
+#define __offsetof(type, field) ((size_t)(&((type *)0)->field))
 
 /*
  * Internal names for basic integral types.  Omit the typedef if

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_node.c	8.6 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/nfs/nfs_node.c,v 1.36 2000/01/05 05:11:36 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_node.c,v 1.36.2.1 2001/03/21 10:50:59 peter Exp $
  */
 
 
@@ -45,6 +45,7 @@
 #include <sys/namei.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
+#include <sys/fnv_hash.h>
 
 #include <vm/vm_zone.h>
 
@@ -70,25 +71,6 @@ nfs_nhinit()
 {
 	nfsnode_zone = zinit("NFSNODE", sizeof(struct nfsnode), 0, 0, 1);
 	nfsnodehashtbl = hashinit(desiredvnodes, M_NFSHASH, &nfsnodehash);
-}
-
-/*
- * Compute an entry in the NFS hash table structure
- */
-u_long
-nfs_hash(fhp, fhsize)
-	register nfsfh_t *fhp;
-	int fhsize;
-{
-	register u_char *fhpp;
-	register u_long fhsum;
-	register int i;
-
-	fhpp = &fhp->fh_bytes[0];
-	fhsum = 0;
-	for (i = 0; i < fhsize; i++)
-		fhsum += *fhpp++;
-	return (fhsum);
 }
 
 /*
@@ -126,7 +108,7 @@ nfs_nget(mntp, fhp, fhsize, npp)
 		rsflags = 0;
 
 retry:
-	nhpp = NFSNOHASH(nfs_hash(fhp, fhsize));
+	nhpp = NFSNOHASH(fnv_32_buf(fhp->fh_bytes, fhsize, FNV1_32_INIT));
 loop:
 	for (np = nhpp->lh_first; np != 0; np = np->n_hash.le_next) {
 		if (mntp != NFSTOV(np)->v_mount || np->n_fhsize != fhsize ||

@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/i386/include/bus_at386.h,v 1.8.2.1 2000/04/14 13:08:54 nyan Exp $ */
+/* $FreeBSD: src/sys/i386/include/bus_at386.h,v 1.8.2.2 2001/03/02 05:37:50 mdodd Exp $ */
 
 #ifndef _I386_BUS_AT386_H_
 #define _I386_BUS_AT386_H_
@@ -603,7 +603,6 @@ bus_space_write_multi_2(bus_space_tag_t tag, bus_space_handle_t bsh,
 		__asm __volatile("				\n\
 			cld					\n\
 		1:	lodsw					\n\
-			movw %%ax,(%1)				\n\
 			movw %%ax,(%2)				\n\
 			loop 1b"				:
 		    "=S" (addr), "=c" (count)			:

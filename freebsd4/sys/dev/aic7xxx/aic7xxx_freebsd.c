@@ -1,7 +1,7 @@
 /*
  * Bus independent FreeBSD shim for the aic7xxx based adaptec SCSI controllers
  *
- * Copyright (c) 1994, 1995, 1996, 1997, 1998, 1999, 2000 Justin T. Gibbs.
+ * Copyright (c) 1994-2001 Justin T. Gibbs.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,15 +28,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aic7xxx_freebsd.c,v 1.1.1.1 2000/11/21 08:39:02 kawa Exp $
+ * $Id: aic7xxx_freebsd.c,v 1.1.1.2 2001/04/23 13:09:48 sumikawa Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_freebsd.c,v 1.3.2.11 2000/10/31 18:54:59 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_freebsd.c,v 1.3.2.17 2001/03/12 14:57:44 gibbs Exp $
  */
 
 #include <dev/aic7xxx/aic7xxx_freebsd.h>
 #include <dev/aic7xxx/aic7xxx_inline.h>
-
-#include <sys/eventhandler.h>
 
 #ifndef AHC_TMODE_ENABLE
 #define AHC_TMODE_ENABLE 0
@@ -47,8 +45,6 @@
 #ifdef AHC_DEBUG
 static int     ahc_debug = AHC_DEBUG;
 #endif
-
-static void ahc_freebsd_intr(void *arg);
 
 #if UNUSED
 static void	ahc_dump_targcmd(struct target_cmd *cmd);
@@ -115,7 +111,7 @@ ahc_attach(struct ahc_softc *ahc)
 	ahc_lock(ahc, &s);
 	/* Hook up our interrupt handler */
 	if ((error = bus_setup_intr(ahc->dev_softc, ahc->platform_data->irq,
-				    INTR_TYPE_CAM, ahc_freebsd_intr, ahc,
+				    INTR_TYPE_CAM, ahc_platform_intr, ahc,
 				    &ahc->platform_data->ih)) != 0) {
 		device_printf(ahc->dev_softc, "bus_setup_intr() failed: %d\n",
 			      error);
@@ -126,7 +122,8 @@ ahc_attach(struct ahc_softc *ahc)
 	 * Attach secondary channel first if the user has
 	 * declared it the primary channel.
 	 */
-	if ((ahc->flags & AHC_CHANNEL_B_PRIMARY) != 0) {
+	if ((ahc->features & AHC_TWIN) != 0
+	 && (ahc->flags & AHC_PRIMARY_CHANNEL) != 0) {
 		bus_id = 1;
 		bus_id2 = 0;
 	} else {
@@ -137,7 +134,7 @@ ahc_attach(struct ahc_softc *ahc)
 	/*
 	 * Create the device queue for our SIM(s).
 	 */
-	devq = cam_simq_alloc(AHC_SCB_MAX - 1);
+	devq = cam_simq_alloc(AHC_MAX_QUEUE);
 	if (devq == NULL)
 		goto fail;
 
@@ -146,7 +143,7 @@ ahc_attach(struct ahc_softc *ahc)
 	 */
 	sim = cam_sim_alloc(ahc_action, ahc_poll, "ahc", ahc,
 			    device_get_unit(ahc->dev_softc),
-			    1, AHC_SCB_MAX - 1, devq);
+			    1, AHC_MAX_QUEUE, devq);
 	if (sim == NULL) {
 		cam_simq_free(devq);
 		goto fail;
@@ -178,7 +175,7 @@ ahc_attach(struct ahc_softc *ahc)
 	if (ahc->features & AHC_TWIN) {
 		sim2 = cam_sim_alloc(ahc_action, ahc_poll, "ahc",
 				    ahc, device_get_unit(ahc->dev_softc), 1,
-				    AHC_SCB_MAX - 1, devq);
+				    AHC_MAX_QUEUE, devq);
 
 		if (sim2 == NULL) {
 			printf("ahc_attach: Unable to attach second "
@@ -216,7 +213,8 @@ ahc_attach(struct ahc_softc *ahc)
 	}
 
 fail:
-	if ((ahc->flags & AHC_CHANNEL_B_PRIMARY) != 0) {
+	if ((ahc->features & AHC_TWIN) != 0
+	 && (ahc->flags & AHC_PRIMARY_CHANNEL) != 0) {
 		ahc->platform_data->sim_b = sim;
 		ahc->platform_data->path_b = path;
 		ahc->platform_data->sim = sim2;
@@ -231,8 +229,9 @@ fail:
 
 	if (count != 0)
 		/* We have to wait until after any system dumps... */
-		EVENTHANDLER_REGISTER(shutdown_final, ahc_shutdown,
-				      ahc, SHUTDOWN_PRI_DEFAULT);
+		ahc->platform_data->eh =
+		    EVENTHANDLER_REGISTER(shutdown_final, ahc_shutdown,
+					  ahc, SHUTDOWN_PRI_DEFAULT);
 
 	return (count);
 }
@@ -241,7 +240,7 @@ fail:
  * Catch an interrupt from the adapter
  */
 void
-ahc_freebsd_intr(void *arg)
+ahc_platform_intr(void *arg)
 {
 	struct	ahc_softc *ahc;
 
@@ -266,8 +265,10 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 	LIST_REMOVE(scb, pending_links);
 	if ((scb->flags & SCB_UNTAGGEDQ) != 0) {
 		struct scb_tailq *untagged_q;
+		int target_offset;
 
-		untagged_q = &ahc->untagged_queues[ccb->ccb_h.target_id];
+		target_offset = SCB_GET_TARGET_OFFSET(ahc, scb);
+		untagged_q = &ahc->untagged_queues[target_offset];
 		TAILQ_REMOVE(untagged_q, scb, links.tqe);
 		scb->flags &= ~SCB_UNTAGGEDQ;
 		ahc_run_untagged_queue(ahc, untagged_q);
@@ -309,22 +310,19 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 		 */
 		LIST_FOREACH(list_scb, &ahc->pending_scbs, pending_links) {
 			union ccb *ccb;
+			uint64_t time;
 
 			ccb = list_scb->io_ctx;
+			if (ccb->ccb_h.timeout == CAM_TIME_INFINITY)
+				continue;
+
+			time = ccb->ccb_h.timeout;
+			time *= hz;
+			time /= 1000;
 			ccb->ccb_h.timeout_ch = 
-			    timeout(ahc_timeout, list_scb,
-				    (ccb->ccb_h.timeout * hz)/1000);
+			    timeout(ahc_timeout, list_scb, time);
 		}
 
-		/*
-		 * Ensure that we didn't put a second instance of this
-		 * SCB into the QINFIFO.
-		 */
-		ahc_search_qinfifo(ahc, SCB_GET_TARGET(ahc, scb),
-				   SCB_GET_CHANNEL(ahc, scb),
-				   SCB_GET_LUN(scb), scb->hscb->tag,
-				   ROLE_INITIATOR, /*status*/0,
-				   SEARCH_REMOVE);
 		if (ahc_get_transaction_status(scb) == CAM_BDR_SENT
 		 || ahc_get_transaction_status(scb) == CAM_REQ_ABORTED)
 			ahc_set_transaction_status(scb, CAM_CMD_TIMEOUT);
@@ -349,7 +347,7 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 		 */
 		memset(&ccb->csio.sense_data, 0, sizeof(ccb->csio.sense_data));
 		memcpy(&ccb->csio.sense_data,
-		       &ahc->scb_data->sense[scb->hscb->tag],
+		       ahc_get_sense_buf(ahc, scb),
 		       (scb->sg_list->len & AHC_SG_LEN_MASK)
 		       - ccb->csio.sense_resid);
 		scb->io_ctx->ccb_h.status |= CAM_AUTOSNS_VALID;
@@ -849,7 +847,7 @@ ahc_action(struct cam_sim *sim, union ccb *ccb)
 		cpi->hba_misc = 0;
 		cpi->hba_eng_cnt = 0;
 		cpi->max_target = (ahc->features & AHC_WIDE) ? 15 : 7;
-		cpi->max_lun = 64;
+		cpi->max_lun = AHC_NUM_LUNS - 1;
 		if (SIM_IS_SCSIBUS_B(ahc, sim)) {
 			cpi->initiator_id = ahc->our_id_b;
 			if ((ahc->flags & AHC_RESET_BUS_B) == 0)
@@ -1194,7 +1192,9 @@ ahc_execute_scb(void *arg, bus_dma_segment_t *dm_segs, int nsegments,
 		scb->hscb->control |= DISCENB;
 
 	if ((ccb->ccb_h.flags & CAM_NEGOTIATE) != 0
-	 && (tinfo->current.width != 0 || tinfo->current.period != 0)) {
+	 && (tinfo->goal.width != 0
+	  || tinfo->goal.period != 0
+	  || tinfo->goal.ppr_options != 0)) {
 		scb->flags |= SCB_NEGOTIATE;
 		scb->hscb->control |= MK_MESSAGE;
 	}
@@ -1204,11 +1204,16 @@ ahc_execute_scb(void *arg, bus_dma_segment_t *dm_segs, int nsegments,
 	ccb->ccb_h.status |= CAM_SIM_QUEUED;
 
 	if (ccb->ccb_h.timeout != CAM_TIME_INFINITY) {
+		uint64_t time;
+
 		if (ccb->ccb_h.timeout == CAM_TIME_DEFAULT)
 			ccb->ccb_h.timeout = 5 * 1000;
+
+		time = ccb->ccb_h.timeout;
+		time *= hz;
+		time /= 1000;
 		ccb->ccb_h.timeout_ch =
-		    timeout(ahc_timeout, (caddr_t)scb,
-			    (ccb->ccb_h.timeout * hz) / 1000);
+		    timeout(ahc_timeout, (caddr_t)scb, time);
 	}
 
 	/*
@@ -1218,10 +1223,12 @@ ahc_execute_scb(void *arg, bus_dma_segment_t *dm_segs, int nsegments,
 	 * table in SCB space.
 	 */
 	if ((scb->hscb->control & (TARGET_SCB|TAG_ENB)) == 0
-	 && (ahc->features & AHC_SCB_BTT) == 0) {
+	 && (ahc->flags & AHC_SCB_BTT) == 0) {
 		struct scb_tailq *untagged_q;
+		int target_offset;
 
-		untagged_q = &(ahc->untagged_queues[ccb->ccb_h.target_id]);
+		target_offset = SCB_GET_TARGET_OFFSET(ahc, scb);
+		untagged_q = &(ahc->untagged_queues[target_offset]);
 		TAILQ_INSERT_TAIL(untagged_q, scb, links.tqe);
 		scb->flags |= SCB_UNTAGGEDQ;
 		if (TAILQ_FIRST(untagged_q) != scb) {
@@ -1232,12 +1239,12 @@ ahc_execute_scb(void *arg, bus_dma_segment_t *dm_segs, int nsegments,
 	scb->flags |= SCB_ACTIVE;
 
 	if ((scb->flags & SCB_TARGET_IMMEDIATE) != 0) {
-		pause_sequencer(ahc);
+		ahc_pause(ahc);
 		if ((ahc->flags & AHC_PAGESCBS) == 0)
 			ahc_outb(ahc, SCBPTR, scb->hscb->tag);
 		ahc_outb(ahc, SCB_TAG, scb->hscb->tag);
 		ahc_outb(ahc, RETURN_1, CONT_MSG_LOOP);
-		unpause_sequencer(ahc);
+		ahc_unpause(ahc);
 	} else {
 		ahc_queue_scb(ahc, scb);
 	}
@@ -1410,25 +1417,13 @@ ahc_timeout(void *arg)
 
 	ahc_lock(ahc, &s);
 
-	/*
-	 * Ensure that the card doesn't do anything
-	 * behind our back.  Also make sure that we
-	 * didn't "just" miss an interrupt that would
-	 * affect this timeout.
-	 */
-	do {
-		ahc_freebsd_intr(ahc);
-		pause_sequencer(ahc);
-	} while (ahc_inb(ahc, INTSTAT) & INT_PEND);
-
-	/* Make sure the sequencer is in a safe location. */
-	ahc_clear_critical_section(ahc);
+	ahc_pause_and_flushwork(ahc);
 
 	if ((scb->flags & SCB_ACTIVE) == 0) {
 		/* Previous timeout took care of me already */
 		printf("%s: Timedout SCB already complete. "
 		       "Interrupts may not be functioning.\n", ahc_name(ahc));
-		unpause_sequencer(ahc);
+		ahc_unpause(ahc);
 		ahc_unlock(ahc, &s);
 		return;
 	}
@@ -1445,11 +1440,7 @@ ahc_timeout(void *arg)
 	 */
 	last_phase = ahc_inb(ahc, LASTPHASE);
 
-	for (i = 0; i < num_phases; i++) {
-		if (last_phase == phase_table[i].phase)
-			break;
-	}
-	printf("%s", phase_table[i].phasemsg);
+	printf("%s", ahc_lookup_phase_entry(last_phase)->phasemsg);
 
 	printf(", SEQADDR == 0x%x\n",
 	       ahc_inb(ahc, SEQADDR0) | (ahc_inb(ahc, SEQADDR1) << 8));
@@ -1511,6 +1502,7 @@ bus_reset:
 		active_scb_index = ahc_inb(ahc, SCB_TAG);
 
 		if (last_phase != P_BUSFREE 
+		  && (ahc_inb(ahc, SEQ_FLAGS) & IDENTIFY_SEEN) != 0
 		  && (active_scb_index < ahc->scb_data->numscbs)) {
 			struct scb *active_scb;
 
@@ -1522,8 +1514,8 @@ bus_reset:
 			 */ 
 			active_scb = ahc_lookup_scb(ahc, active_scb_index);
 			if (active_scb != scb) {
-				struct	ccb_hdr *ccbh;
-				u_int	newtimeout;
+				struct	 ccb_hdr *ccbh;
+				uint64_t newtimeout;
 
 				ahc_print_path(ahc, scb);
 				printf("Other SCB Timeout%s",
@@ -1533,10 +1525,12 @@ bus_reset:
 				newtimeout =
 				    MAX(active_scb->io_ctx->ccb_h.timeout,
 					scb->io_ctx->ccb_h.timeout);
+				newtimeout *= hz;
+				newtimeout /= 1000;
 				ccbh = &scb->io_ctx->ccb_h;
 				scb->io_ctx->ccb_h.timeout_ch =
-				    timeout(ahc_timeout, scb,
-					    (newtimeout * hz) / 1000);
+				    timeout(ahc_timeout, scb, newtimeout);
+				ahc_unpause(ahc);
 				ahc_unlock(ahc, &s);
 				return;
 			} 
@@ -1555,7 +1549,7 @@ bus_reset:
 				ahc_done(ahc, scb);
 
 				/* Will clear us from the bus */
-				restart_sequencer(ahc);
+				ahc_restart(ahc);
 				ahc_unlock(ahc, &s);
 				return;
 			}
@@ -1568,7 +1562,7 @@ bus_reset:
 			active_scb->flags |= SCB_DEVICE_RESET;
 			active_scb->io_ctx->ccb_h.timeout_ch =
 			    timeout(ahc_timeout, (caddr_t)active_scb, 2 * hz);
-			unpause_sequencer(ahc);
+			ahc_unpause(ahc);
 		} else {
 			int	 disconnected;
 
@@ -1582,7 +1576,7 @@ bus_reset:
 				/* Hung target selection.  Goto busfree */
 				printf("%s: Hung target selection\n",
 				       ahc_name(ahc));
-				restart_sequencer(ahc);
+				ahc_restart(ahc);
 				ahc_unlock(ahc, &s);
 				return;
 			}
@@ -1637,7 +1631,7 @@ bus_reset:
 				 * reslection, set the MK_MESSAGE flag in
 				 * the card's copy of the SCB.
 				 */
-				if ((ahc->flags & AHC_PAGESCBS) != 0) {
+				if ((ahc->flags & AHC_PAGESCBS) == 0) {
 					ahc_outb(ahc, SCBPTR, scb->hscb->tag);
 					ahc_outb(ahc, SCB_CONTROL,
 						 ahc_inb(ahc, SCB_CONTROL)
@@ -1662,7 +1656,7 @@ bus_reset:
 				ahc_outb(ahc, SCBPTR, saved_scbptr);
 				scb->io_ctx->ccb_h.timeout_ch =
 				    timeout(ahc_timeout, (caddr_t)scb, 2 * hz);
-				unpause_sequencer(ahc);
+				ahc_unpause(ahc);
 			} else {
 				/* Go "immediatly" to the bus reset */
 				/* This shouldn't happen */
@@ -1798,6 +1792,7 @@ ahc_send_async(struct ahc_softc *ahc, char channel, u_int target,
 		panic("ahc_send_async: Unexpected async event");
 	}
 	xpt_async(code, path, arg);
+	xpt_free_path(path);
 }
 
 void
@@ -1819,18 +1814,36 @@ ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg)
 void
 ahc_platform_free(struct ahc_softc *ahc)
 {
-	if (ahc->platform_data != NULL) {
-		if (ahc->platform_data->regs != NULL)
-			bus_release_resource(ahc->dev_softc,
-					     ahc->platform_data->regs_res_type,
-					     ahc->platform_data->regs_res_id,
-					     ahc->platform_data->regs);
+	struct ahc_platform_data *pdata;
 
-		if (ahc->platform_data->irq != NULL)
+	pdata = ahc->platform_data;
+	if (pdata != NULL) {
+		device_printf(ahc->dev_softc, "Platform free\n");
+		if (pdata->regs != NULL)
 			bus_release_resource(ahc->dev_softc,
-					 ahc->platform_data->irq_res_type,
-					 0, ahc->platform_data->irq);
+					     pdata->regs_res_type,
+					     pdata->regs_res_id,
+					     pdata->regs);
 
+		if (pdata->irq != NULL)
+			bus_release_resource(ahc->dev_softc,
+					     pdata->irq_res_type,
+					     0, pdata->irq);
+
+		if (pdata->sim_b != NULL) {
+			xpt_async(AC_LOST_DEVICE, pdata->path_b, NULL);
+			xpt_free_path(pdata->path_b);
+			xpt_bus_deregister(cam_sim_path(pdata->sim_b));
+			cam_sim_free(pdata->sim_b, /*free_devq*/TRUE);
+		}
+		if (pdata->sim != NULL) {
+			xpt_async(AC_LOST_DEVICE, pdata->path, NULL);
+			xpt_free_path(pdata->path);
+			xpt_bus_deregister(cam_sim_path(pdata->sim));
+			cam_sim_free(pdata->sim, /*free_devq*/TRUE);
+		}
+		if (pdata->eh != NULL)
+			EVENTHANDLER_DEREGISTER(shutdown_final, pdata->eh);
 		free(ahc->platform_data, M_DEVBUF);
 	}
 }
@@ -1839,6 +1852,21 @@ int
 ahc_softc_comp(struct ahc_softc *lahc, struct ahc_softc *rahc)
 {
 	/* We don't sort softcs under FreeBSD so report equal always */
+	return (0);
+}
+
+int
+ahc_detach(device_t dev)
+{
+	struct ahc_softc *ahc;
+	u_long s;
+
+	device_printf(dev, "detaching device\n");
+	ahc = device_get_softc(dev);
+	ahc_lock(ahc, &s);
+	bus_teardown_intr(dev, ahc->platform_data->irq, ahc->platform_data->ih);
+	ahc_unlock(ahc, &s);
+	ahc_free(ahc);
 	return (0);
 }
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/t4dwave.h,v 1.3 1999/12/12 02:16:14 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/t4dwave.h,v 1.3.2.1 2001/02/03 01:29:10 cg Exp $
  */
 
 #ifndef _T4DWAVE_REG_H
@@ -81,11 +81,13 @@
 
 #define	TR_REG_STARTA	0x80
 #define TR_REG_STOPA	0x84
+#define	TR_REG_CSPF_A	0x90
 #define TR_REG_ADDRINTA	0x98
 #define TR_REG_INTENA	0xa4
 
 #define	TR_REG_STARTB	0xb4
 #define TR_REG_STOPB	0xb8
+#define	TR_REG_CSPF_B	0xbc
 #define TR_REG_ADDRINTB	0xd8
 #define TR_REG_INTENB	0xdc
 

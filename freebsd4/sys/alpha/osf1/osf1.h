@@ -24,13 +24,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/osf1/osf1.h,v 1.2.2.1 2000/10/28 02:00:45 gallatin Exp $ 
+ * $FreeBSD: src/sys/alpha/osf1/osf1.h,v 1.2.2.2 2001/02/22 05:15:00 marcel Exp $ 
  */
 
 extern struct sysent osf1_sysent[];
 extern int bsd_to_osf1_sig[];
 extern int bsd_to_osf1_errno[];
 
+#define	OSF1_MINSIGSTKSZ	4096
 
 /* osf/1 ioctls */
 #define	OSF1_IOCPARM_MASK	0x1fff	/* parameter length, at most 13 bits */

@@ -28,9 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aicasm_symbol.h,v 1.1.1.1 2000/11/21 08:39:02 kawa Exp $
+ * $Id: aicasm_symbol.h,v 1.1.1.2 2001/04/23 13:09:50 sumikawa Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_symbol.h,v 1.11.2.1 2000/09/23 00:24:23 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_symbol.h,v 1.11.2.2 2001/01/07 22:52:36 gibbs Exp $
  */
 
 #ifdef __linux__

@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)ffs_softdep_stub.c	9.1 (McKusick) 7/10/97
- * $FreeBSD: src/sys/ufs/ffs/ffs_softdep_stub.c,v 1.7 2000/01/10 00:24:22 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_softdep_stub.c,v 1.7.2.1 2000/12/28 11:01:45 ps Exp $
  */
 
 /* 
@@ -254,5 +254,12 @@ softdep_sync_metadata(ap)
 {
 
 	return (0);
+}
+
+int
+softdep_slowdown(vp)
+	struct vnode *vp;
+{
+	panic("softdep_slowdown called");
 }
 #endif	/* SOFTUPDATES not configured in */

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.15.2.2 2000/09/22 17:04:46 archie Exp $
+# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.15.2.3 2000/12/28 13:12:37 ps Exp $
 #
 LIB=			i386
 NOPIC=
@@ -23,8 +23,10 @@ CFLAGS+=	-DCOMSPEED=${BOOT_COMCONSOLE_SPEED}
 # the location of libstand
 CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
 
+.ifdef(BOOT_BIOSDISK_DEBUG)
 # Make the disk code more talkative
-#CFLAGS+= -DDISK_DEBUG
+CFLAGS+= -DDISK_DEBUG
+.endif
 
 # Include simple terminal emulation (cons25-compatible)
 CFLAGS+= -DTERM_EMU

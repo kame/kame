@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_inode.c	8.13 (Berkeley) 4/21/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.56 1999/08/28 00:52:21 peter Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.56.2.2 2000/12/28 11:01:44 ps Exp $
  */
 
 #include "opt_quota.h"
@@ -45,6 +45,7 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/resourcevar.h>
+#include <sys/vmmeter.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -108,6 +109,8 @@ ffs_update(vp, waitfor)
 	*((struct dinode *)bp->b_data +
 	    ino_to_fsbo(fs, ip->i_number)) = ip->i_din;
 	if (waitfor && !DOINGASYNC(vp)) {
+		return (bwrite(bp));
+	} else if (vm_page_count_severe() || buf_dirty_count_severe()) {
 		return (bwrite(bp));
 	} else {
 		if (bp->b_bufsize == fs->fs_bsize)
@@ -175,7 +178,7 @@ ffs_truncate(vp, length, flags, cred, p)
 #endif
 	ovp->v_lasta = ovp->v_clen = ovp->v_cstart = ovp->v_lastw = 0;
 	if (DOINGSOFTDEP(ovp)) {
-		if (length > 0) {
+		if (length > 0 || softdep_slowdown(ovp)) {
 			/*
 			 * If a file is only partially truncated, then
 			 * we have to clean up the data structures
@@ -283,7 +286,7 @@ ffs_truncate(vp, length, flags, cred, p)
 	for (i = NDADDR - 1; i > lastblock; i--)
 		oip->i_db[i] = 0;
 	oip->i_flag |= IN_CHANGE | IN_UPDATE;
-	allerror = UFS_UPDATE(ovp, ((length > 0) ? 0 : 1));
+	allerror = UFS_UPDATE(ovp, 1);
 	
 	/*
 	 * Having written the new inode to disk, save its new configuration

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/stg/tmc18c30var.h,v 1.1.2.1 2000/10/29 11:05:43 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/stg/tmc18c30var.h,v 1.1.2.2 2001/03/03 14:45:00 non Exp $	*/
 /*	$NecBSD: tmc18c30var.h,v 1.12 1998/11/30 00:08:30 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -50,6 +50,8 @@ struct stg_softc {
 
 	void *sc_ih;
 
+	int sc_wc;			/* weight counter */
+
 	u_int sc_chip;			/* chip type */
 	u_int sc_fsz;			/* fifo size */
 	u_int sc_idbit;			/* host id bit */
@@ -75,12 +77,12 @@ struct stg_softc {
 };
 
 /*****************************************************************
- * Lun information 
+ * Target information 
  *****************************************************************/
-struct stg_lun_info {
-	struct lun_info sli_li;		/* generic data */
+struct stg_targ_info {
+	struct targ_info sti_ti;	/* generic data */
 
-	u_int8_t sli_reg_synch;		/* synch register per lun */
+	u_int8_t sti_reg_synch;		/* synch register per target */
 };
 
 /*****************************************************************

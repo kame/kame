@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_rfc1490.c,v 1.6.2.2 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_rfc1490.c,v 1.6.2.3 2001/01/09 00:52:45 julian Exp $
  * $Whistle: ng_rfc1490.c,v 1.22 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -319,6 +319,7 @@ ng_rfc1490_rmnode(node_p node)
 	ng_unname(node);
 	bzero(priv, sizeof(*priv));
 	node->private = NULL;
+	FREE(priv, M_NETGRAPH);
 	ng_unref(node);		/* let the node escape */
 	return (0);
 }

@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/osf1/osf1_sysvec.c,v 1.1.2.1 2000/11/04 07:35:46 obrien Exp $
+ * $FreeBSD: src/sys/alpha/osf1/osf1_sysvec.c,v 1.1.2.3 2001/02/22 05:15:00 marcel Exp $
  */
 
 /* XXX we use functions that might not exist. */
@@ -63,8 +63,8 @@ struct sysentvec osf1_sysvec = {
 	OSF1_SYS_MAXSYSCALL,
 	osf1_sysent,
         0x0,
-	NSIG,
-	bsd_to_osf1_sig,
+	0,
+	0,
 	0,
 	0,
 	0,			/* trap-to-signal translation function */
@@ -74,8 +74,9 @@ struct sysentvec osf1_sysvec = {
         &osf1_szsigcode,	/* use generic trampoline size */
         0,			/* prepsyscall */
 	"OSF/1 ECOFF",
-	NULL			/* we don't have an ECOFF coredump function */
-	
+	NULL,			/* we don't have an ECOFF coredump function */
+	NULL,
+	OSF1_MINSIGSTKSZ
 };
 
 /*

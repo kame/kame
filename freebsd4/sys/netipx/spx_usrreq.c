@@ -33,7 +33,7 @@
  *
  *	@(#)spx_usrreq.h
  *
- * $FreeBSD: src/sys/netipx/spx_usrreq.c,v 1.27 1999/08/28 18:21:55 jhay Exp $
+ * $FreeBSD: src/sys/netipx/spx_usrreq.c,v 1.27.2.1 2001/02/22 09:44:18 bp Exp $
  */
 
 #include <sys/param.h>
@@ -1330,13 +1330,12 @@ spx_attach(so, proto, p)
 	}
 	ipxp = sotoipxpcb(so);
 
-	MALLOC(cb, struct spxpcb *, sizeof *cb, M_PCB, M_NOWAIT);
+	MALLOC(cb, struct spxpcb *, sizeof *cb, M_PCB, M_NOWAIT | M_ZERO);
 
 	if (cb == NULL) {
 		error = ENOBUFS;
 		goto spx_attach_end;
 	}
-	bzero(cb, sizeof *cb);
 	sb = &so->so_snd;
 
 	mm = m_getclr(M_DONTWAIT, MT_HEADER);

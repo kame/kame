@@ -27,7 +27,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/cy.c,v 1.97 2000/01/23 11:50:38 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/cy.c,v 1.97.2.1 2001/02/26 04:23:10 jlemon Exp $
  */
 
 #include "opt_compat.h"
@@ -383,8 +383,9 @@ static struct cdevsw sio_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 static	int	comconsole = -1;

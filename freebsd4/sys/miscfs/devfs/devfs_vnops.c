@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/miscfs/devfs/devfs_vnops.c,v 1.90.2.1 2000/03/17 10:47:32 ps Exp $
+ * $FreeBSD: src/sys/miscfs/devfs/devfs_vnops.c,v 1.90.2.2 2000/12/30 01:51:08 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -1849,6 +1849,8 @@ devfs_getpages(struct vop_getpages_args *ap)
 	bp->b_bcount = size;
 	bp->b_bufsize = size;
 	bp->b_resid = 0;
+	bp->b_runningbufspace = bp->b_bufsize;
+	runningbufspace += bp->b_runningbufspace;
 
 	cnt.v_vnodein++;
 	cnt.v_vnodepgsin += pcount;

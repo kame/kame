@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/arc/lib/bootinfo.c,v 1.2 1999/08/28 00:39:37 peter Exp $
+ * $FreeBSD: src/sys/boot/arc/lib/bootinfo.c,v 1.2.2.1 2001/03/04 04:40:41 obrien Exp $
  */
 
 #include <stand.h>
@@ -70,7 +70,7 @@ bi_copyenv(vm_offset_t addr)
  * used as a directory for loaded modules.
  *
  * Module data is presented in a self-describing format.  Each datum
- * is preceeded by a 32-bit identifier and a 32-bit size field.
+ * is preceded by a 32-bit identifier and a 32-bit size field.
  *
  * Currently, the following data are saved:
  *

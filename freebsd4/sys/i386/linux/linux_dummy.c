@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.21.2.3 2000/07/20 05:31:56 marcel Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.21.2.4 2001/02/21 23:01:57 gallatin Exp $
  */
 
 #include <sys/param.h>
@@ -94,7 +94,6 @@ DUMMY(query_module);
 DUMMY(nfsservctl);
 DUMMY(getresgid);
 DUMMY(prctl);
-DUMMY(rt_sigreturn);
 DUMMY(rt_sigpending);
 DUMMY(rt_sigtimedwait);
 DUMMY(rt_sigqueueinfo);

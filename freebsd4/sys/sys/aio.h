@@ -13,7 +13,7 @@
  * bad that happens because of using this software isn't the responsibility
  * of the author.  This software is distributed AS-IS.
  *
- * $FreeBSD: src/sys/sys/aio.h,v 1.13.2.3 2000/10/14 20:19:16 alc Exp $
+ * $FreeBSD: src/sys/sys/aio.h,v 1.13.2.5 2001/03/17 22:17:03 alc Exp $
  */
 
 #ifndef _SYS_AIO_H_
@@ -25,7 +25,6 @@
 
 /*
  * Returned by aio_cancel:
- *  (Note that FreeBSD's aio is not cancellable -- yet.)
  */
 #define	AIO_CANCELED		0x1
 #define	AIO_NOTCANCELED		0x2
@@ -122,8 +121,7 @@ int	aio_error(const struct aiocb *);
 ssize_t	aio_return(struct aiocb *);
 
 /*
- * Cancel I/O -- implemented only to return AIO_NOTCANCELLED or
- *	AIO_ALLDONE.  No cancellation operation will occur.
+ * Cancel I/O
  */
 int	aio_cancel(int, struct aiocb *);
 
@@ -131,11 +129,6 @@ int	aio_cancel(int, struct aiocb *);
  * Suspend until all specified I/O or timeout is complete.
  */
 int	aio_suspend(const struct aiocb * const[], int, const struct timespec *);
-
-/*
- * Retrieve the status of the specified I/O request.
- */
-int	aio_error(const struct aiocb *);
 
 int	aio_waitcomplete(struct aiocb **, struct timespec *);
 
@@ -157,6 +150,7 @@ struct aiocblist {
         int	jobflags;
         int	jobstate;
         int	inputcharge, outputcharge;
+	struct	callout_handle timeouthandle;
         struct	buf *bp;		/* Buffer pointer */
         struct	proc *userproc;		/* User process */
         struct	file *fd_file;		/* Pointer to file structure */ 

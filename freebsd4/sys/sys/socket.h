@@ -31,11 +31,16 @@
  * SUCH DAMAGE.
  *
  *	@(#)socket.h	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/sys/socket.h,v 1.39.2.3 2000/09/22 14:44:16 asmodai Exp $
+ * $FreeBSD: src/sys/sys/socket.h,v 1.39.2.6 2001/02/26 07:24:22 ume Exp $
  */
 
 #ifndef _SYS_SOCKET_H_
 #define	_SYS_SOCKET_H_
+
+#include <machine/ansi.h>
+#define _NO_NAMESPACE_POLLUTION
+#include <machine/param.h>
+#undef _NO_NAMESPACE_POLLUTION
 
 /*
  * Definitions related to sockets: types, address families, options.
@@ -45,7 +50,10 @@
  * Data types.
  */
 typedef u_char		sa_family_t;
-typedef u_int32_t	socklen_t;
+#ifdef	_BSD_SOCKLEN_T_
+typedef	_BSD_SOCKLEN_T_	socklen_t;
+#undef	_BSD_SOCKLEN_T_
+#endif
  
 /*
  * Types
@@ -93,9 +101,9 @@ struct	linger {
 	int	l_linger;		/* linger time */
 };
 
-struct accept_filter_arg {
-	char    af_name[16];
-	char    af_arg[256-16];
+struct	accept_filter_arg {
+	char	af_name[16];
+	char	af_arg[256-16];
 };
 
 /*
@@ -358,22 +366,22 @@ struct cmsgcred {
 
 /* given pointer to struct cmsghdr, return pointer to data */
 #define	CMSG_DATA(cmsg)		((u_char *)(cmsg) + \
-				 ALIGN(sizeof(struct cmsghdr)))
+				 _ALIGN(sizeof(struct cmsghdr)))
 
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
-	(((caddr_t)(cmsg) + ALIGN((cmsg)->cmsg_len) + \
-	  ALIGN(sizeof(struct cmsghdr)) > \
+	(((caddr_t)(cmsg) + _ALIGN((cmsg)->cmsg_len) + \
+	  _ALIGN(sizeof(struct cmsghdr)) > \
 	    (caddr_t)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)NULL : \
-	    (struct cmsghdr *)((caddr_t)(cmsg) + ALIGN((cmsg)->cmsg_len)))
+	    (struct cmsghdr *)((caddr_t)(cmsg) + _ALIGN((cmsg)->cmsg_len)))
 
 #define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
 
 /* RFC 2292 additions */
-
-#define	CMSG_SPACE(l)		(ALIGN(sizeof(struct cmsghdr)) + ALIGN(l))
-#define	CMSG_LEN(l)		(ALIGN(sizeof(struct cmsghdr)) + (l))
+	
+#define	CMSG_SPACE(l)		(_ALIGN(sizeof(struct cmsghdr)) + _ALIGN(l))
+#define	CMSG_LEN(l)		(_ALIGN(sizeof(struct cmsghdr)) + (l))
 
 /* "Socket"-level control message types: */
 #define	SCM_RIGHTS	0x01		/* access rights (array of int) */

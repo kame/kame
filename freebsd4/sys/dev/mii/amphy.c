@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/amphy.c,v 1.2 1999/09/19 21:56:08 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/amphy.c,v 1.2.2.1 2000/12/12 19:29:14 wpaul Exp $
  */
 
 /*
@@ -58,7 +58,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/amphy.c,v 1.2 1999/09/19 21:56:08 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/mii/amphy.c,v 1.2.2.1 2000/12/12 19:29:14 wpaul Exp $";
 #endif
 
 static int amphy_probe		__P((device_t));
@@ -162,6 +162,7 @@ static int amphy_detach(dev)
 
 	sc = device_get_softc(dev);
 	mii = device_get_softc(device_get_parent(dev));
+	mii_phy_auto_stop(sc);
 	sc->mii_dev = NULL;
 	LIST_REMOVE(sc, mii_list);
 

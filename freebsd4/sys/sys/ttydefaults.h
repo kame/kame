@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ttydefaults.h	8.4 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/ttydefaults.h,v 1.13 1999/08/28 00:52:07 peter Exp $
+ * $FreeBSD: src/sys/sys/ttydefaults.h,v 1.13.2.1 2001/03/06 03:37:08 jkh Exp $
  */
 
 /*
@@ -61,6 +61,7 @@
 #define	CEOF		CTRL('d')
 #define	CEOL		0xff		/* XXX avoid _POSIX_VDISABLE */
 #define	CERASE		0177
+#define	CERASE2		CTRL('h')
 #define	CINTR		CTRL('c')
 #define	CSTATUS		CTRL('t')
 #define	CKILL		CTRL('u')
@@ -90,7 +91,7 @@
 #ifdef TTYDEFCHARS
 static cc_t	ttydefchars[NCCS] = {
 	CEOF,	CEOL,	CEOL,	CERASE, CWERASE, CKILL, CREPRINT,
-	_POSIX_VDISABLE, CINTR,	CQUIT,	CSUSP,	CDSUSP,	CSTART,	CSTOP,	CLNEXT,
+	CERASE2, CINTR,	CQUIT,	CSUSP,	CDSUSP,	CSTART,	CSTOP,	CLNEXT,
 	CDISCARD, CMIN,	CTIME,  CSTATUS, _POSIX_VDISABLE
 };
 #undef TTYDEFCHARS

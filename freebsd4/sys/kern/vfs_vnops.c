@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_vnops.c	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.87.2.3 2000/07/27 11:43:16 asmodai Exp $
+ * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.87.2.6 2001/02/26 04:23:16 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -53,9 +53,6 @@
 #include <sys/ttycom.h>
 #include <sys/conf.h>
 
-#include <ufs/ufs/quota.h>
-#include <ufs/ufs/inode.h>
-
 static int vn_closefile __P((struct file *fp, struct proc *p));
 static int vn_ioctl __P((struct file *fp, u_long com, caddr_t data, 
 		struct proc *p));
@@ -63,30 +60,14 @@ static int vn_read __P((struct file *fp, struct uio *uio,
 		struct ucred *cred, int flags, struct proc *p));
 static int vn_poll __P((struct file *fp, int events, struct ucred *cred,
 		struct proc *p));
+static int vn_kqfilter __P((struct file *fp, struct knote *kn));
 static int vn_statfile __P((struct file *fp, struct stat *sb, struct proc *p));
 static int vn_write __P((struct file *fp, struct uio *uio, 
 		struct ucred *cred, int flags, struct proc *p));
 
-struct 	fileops vnops =
-	{ vn_read, vn_write, vn_ioctl, vn_poll, vn_statfile, vn_closefile };
-
-static int	filt_nullattach(struct knote *kn);
-static int	filt_vnattach(struct knote *kn);
-static void	filt_vndetach(struct knote *kn);
-static int	filt_vnode(struct knote *kn, long hint);
-static int	filt_vnread(struct knote *kn, long hint);
-
-struct filterops vn_filtops =
-	{ 1, filt_vnattach, filt_vndetach, filt_vnode };
-
-/*
- * XXX
- * filt_vnread is ufs-specific, so the attach routine should really
- * switch out to different filterops based on the vn filetype
- */
-struct filterops vn_rwfiltops[] = {
-	{ 1, filt_vnattach, filt_vndetach, filt_vnread },
-	{ 1, filt_nullattach, NULL, NULL },
+struct 	fileops vnops = {
+	vn_read, vn_write, vn_ioctl, vn_poll, vn_kqfilter,
+	vn_statfile, vn_closefile
 };
 
 /*
@@ -627,12 +608,14 @@ debug_vn_lock(vp, flags, p, filename, line)
 	do {
 		if ((flags & LK_INTERLOCK) == 0)
 			simple_lock(&vp->v_interlock);
-		if (vp->v_flag & VXLOCK) {
+		if ((vp->v_flag & VXLOCK) && vp->v_vxproc != curproc) {
 			vp->v_flag |= VXWANT;
 			simple_unlock(&vp->v_interlock);
 			tsleep((caddr_t)vp, PINOD, "vn_lock", 0);
 			error = ENOENT;
 		} else {
+			if (vp->v_vxproc != NULL)
+				printf("VXLOCK interlock avoided in vn_lock\n");
 #ifdef	DEBUG_LOCKS
 			vp->filename = filename;
 			vp->line = line;
@@ -662,56 +645,8 @@ vn_closefile(fp, p)
 }
 
 static int
-filt_vnattach(struct knote *kn)
-{
-	struct vnode *vp;
-
-	if (kn->kn_fp->f_type != DTYPE_VNODE &&
-	    kn->kn_fp->f_type != DTYPE_FIFO)
-		return (EBADF);
-
-	vp = (struct vnode *)kn->kn_fp->f_data;
-
-        simple_lock(&vp->v_pollinfo.vpi_lock);
-	SLIST_INSERT_HEAD(&vp->v_pollinfo.vpi_selinfo.si_note, kn, kn_selnext);
-        simple_unlock(&vp->v_pollinfo.vpi_lock);
-
-	return (0);
-}
-
-static void
-filt_vndetach(struct knote *kn)
-{
-	struct vnode *vp = (struct vnode *)kn->kn_fp->f_data;
-
-        simple_lock(&vp->v_pollinfo.vpi_lock);
-	SLIST_REMOVE(&vp->v_pollinfo.vpi_selinfo.si_note,
-	    kn, knote, kn_selnext);
-        simple_unlock(&vp->v_pollinfo.vpi_lock);
-}
-
-static int
-filt_vnode(struct knote *kn, long hint)
+vn_kqfilter(struct file *fp, struct knote *kn)
 {
 
-	if (kn->kn_sfflags & hint)
-		kn->kn_fflags |= hint;
-	return (kn->kn_fflags != 0);
-}
-
-static int
-filt_nullattach(struct knote *kn)
-{
-	return (ENXIO);
-}
-
-/*ARGSUSED*/
-static int
-filt_vnread(struct knote *kn, long hint)
-{
-	struct vnode *vp = (struct vnode *)kn->kn_fp->f_data;
-	struct inode *ip = VTOI(vp);
-
-	kn->kn_data = ip->i_size - kn->kn_fp->f_offset;
-	return (kn->kn_data != 0);
+	return (VOP_KQFILTER(((struct vnode *)fp->f_data), kn));
 }

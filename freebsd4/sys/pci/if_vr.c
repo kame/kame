@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.4 2000/08/04 23:45:28 peter Exp $
+ * $FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.6 2001/03/07 21:00:15 wpaul Exp $
  */
 
 /*
@@ -100,7 +100,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.4 2000/08/04 23:45:28 peter Exp $";
+  "$FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.6 2001/03/07 21:00:15 wpaul Exp $";
 #endif
 
 /*
@@ -1255,14 +1255,14 @@ static int vr_encap(sc, c, m_head)
 
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL) {
-			printf("vr%d: no memory for tx list", sc->vr_unit);
+			printf("vr%d: no memory for tx list\n", sc->vr_unit);
 			return(1);
 		}
 		if (m_head->m_pkthdr.len > MHLEN) {
 			MCLGET(m_new, M_DONTWAIT);
 			if (!(m_new->m_flags & M_EXT)) {
 				m_freem(m_new);
-				printf("vr%d: no memory for tx list",
+				printf("vr%d: no memory for tx list\n",
 						sc->vr_unit);
 				return(1);
 			}
@@ -1336,7 +1336,12 @@ static void vr_start(ifp)
 		sc->vr_cdata.vr_tx_free = cur_tx->vr_nextdesc;
 
 		/* Pack the data into the descriptor. */
-		vr_encap(sc, cur_tx, m_head);
+		if (vr_encap(sc, cur_tx, m_head)) {
+			IF_PREPEND(&ifp->if_snd, m_head);
+			ifp->if_flags |= IFF_OACTIVE;
+			cur_tx = NULL;
+			break;
+		}
 
 		if (cur_tx != start_tx)
 			VR_TXOWN(cur_tx) = VR_TXSTAT_OWN;
@@ -1377,7 +1382,7 @@ static void vr_init(xsc)
 	struct vr_softc		*sc = xsc;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 	struct mii_data		*mii;
-	int			s;
+	int			s, i;
 
 	s = splimp();
 
@@ -1388,6 +1393,12 @@ static void vr_init(xsc)
 	 */
 	vr_stop(sc);
 	vr_reset(sc);
+
+	/*
+	 * Set our station address.
+	 */
+	for (i = 0; i < ETHER_ADDR_LEN; i++)
+		CSR_WRITE_1(sc, VR_PAR0 + i, sc->arpcom.ac_enaddr[i]);
 
 	VR_CLRBIT(sc, VR_RXCFG, VR_RXCFG_RX_THRESH);
 	VR_SETBIT(sc, VR_RXCFG, VR_RXTHRESH_STORENFWD);

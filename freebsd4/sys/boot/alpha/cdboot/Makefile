@@ -1,11 +1,12 @@
-#	$FreeBSD: src/sys/boot/alpha/cdboot/Makefile,v 1.3 1999/09/03 19:42:14 msmith Exp $
+#	$FreeBSD: src/sys/boot/alpha/cdboot/Makefile,v 1.3.2.1 2000/11/27 02:16:39 obrien Exp $
 
+BINDIR=		/boot
 BASE= 		cdboot
 PROG= 		${BASE}
 NOMAN=
-NEWVERSWHAT=	"SRM CD9660 boot" alpha
-LOAD_ADDRESS=	${PRIMARY_LOAD_ADDRESS}
+STRIP=
 
-CFLAGS+=	-DLOADER_CDROM_SUPPORT
+${BASE}: ${BASE}-4.0R.gz.uu
+	uudecode -p ${.CURDIR}/${BASE}-4.0R.gz.uu | gunzip > ${BASE}
 
-.include	<${.CURDIR}/../common/Makefile.common>
+.include <bsd.prog.mk>

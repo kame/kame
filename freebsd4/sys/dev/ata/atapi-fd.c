@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000 Søren Schmidt
+ * Copyright (c) 1998,1999,2000,2001 Søren Schmidt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-fd.c,v 1.44.2.4 2000/11/13 08:22:07 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-fd.c,v 1.44.2.5 2001/02/25 21:35:20 sos Exp $
  */
 
 #include <sys/param.h>
@@ -77,7 +77,7 @@ static int afd_prevent_allow(struct afd_softc *, int);
 
 /* internal vars */
 static u_int32_t afd_lun_map = 0;
-MALLOC_DEFINE(M_AFD, "AFD driver", "ATAPI floppy driver buffers");
+static MALLOC_DEFINE(M_AFD, "AFD driver", "ATAPI floppy driver buffers");
 
 int 
 afdattach(struct atapi_softc *atp)
@@ -85,12 +85,11 @@ afdattach(struct atapi_softc *atp)
     struct afd_softc *fdp;
     dev_t dev;
 
-    fdp = malloc(sizeof(struct afd_softc), M_AFD, M_NOWAIT);
+    fdp = malloc(sizeof(struct afd_softc), M_AFD, M_NOWAIT | M_ZERO);
     if (!fdp) {
 	printf("afd: out of memory\n");
 	return -1;
     }
-    bzero(fdp, sizeof(struct afd_softc));
     bufq_init(&fdp->bio_queue);
     fdp->atp = atp;
     fdp->lun = ata_get_lun(&afd_lun_map);

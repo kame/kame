@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.34.2.3 2000/10/02 15:00:55 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.34.2.6 2001/04/18 17:55:23 kris Exp $
  */
 
 #include "opt_compat.h"
@@ -132,8 +132,8 @@ tcp_slowtimo()
 
 	tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
 
-	tcp_iss += TCP_ISSINCR/PR_SLOWHZ;		/* increment iss */
 #ifdef TCP_COMPAT_42
+	tcp_iss += TCP_ISSINCR/PR_SLOWHZ;		/* increment iss */
 	if ((int)tcp_iss < 0)
 		tcp_iss = TCP_ISSINCR;			/* XXX */
 #endif
@@ -152,6 +152,9 @@ tcp_canceltimers(tp)
 	callout_stop(tp->tt_keep);
 	callout_stop(tp->tt_rexmt);
 }
+
+int	tcp_syn_backoff[TCP_MAXRXTSHIFT + 1] =
+    { 1, 1, 1, 1, 1, 2, 4, 8, 16, 32, 64, 64, 64 };
 
 int	tcp_backoff[TCP_MAXRXTSHIFT + 1] =
     { 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64, 64 };
@@ -393,7 +396,10 @@ tcp_timer_rexmt(xtp)
 		tp->t_badrxtwin = ticks + (tp->t_srtt >> (TCP_RTT_SHIFT + 1));
 	}
 	tcpstat.tcps_rexmttimeo++;
-	rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
+	if (tp->t_state == TCPS_SYN_SENT)
+		rexmt = TCP_REXMTVAL(tp) * tcp_syn_backoff[tp->t_rxtshift];
+	else
+		rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
 	TCPT_RANGESET(tp->t_rxtcur, rexmt,
 		      tp->t_rttmin, TCPTV_REXMTMAX);
 	/*
@@ -415,6 +421,11 @@ tcp_timer_rexmt(xtp)
 		tp->t_srtt = 0;
 	}
 	tp->snd_nxt = tp->snd_una;
+	/*
+	 * Note:  We overload snd_recover to function also as the
+	 * snd_last variable described in RFC 2582
+	 */
+	tp->snd_recover = tp->snd_max;
 	/*
 	 * Force a segment to be sent.
 	 */

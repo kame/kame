@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.3 2000/09/25 12:09:20 ps Exp $
+ * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.4 2001/02/22 09:29:41 jhb Exp $
  */
 
 #include "opt_compat.h"
@@ -316,8 +316,8 @@ sysctl_remove_oid(struct sysctl_oid *oidp, int del, int recurse)
  */
 struct sysctl_oid *
 sysctl_add_oid(struct sysctl_ctx_list *clist, struct sysctl_oid_list *parent,
-	int number, char *name, int kind, void *arg1, int arg2,
-	int (*handler)(SYSCTL_HANDLER_ARGS), char *fmt, char *descr)
+	int number, const char *name, int kind, void *arg1, int arg2,
+	int (*handler)(SYSCTL_HANDLER_ARGS), const char *fmt, const char *descr)
 {
 	struct sysctl_oid *oidp;
 	ssize_t len;

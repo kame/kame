@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/scterm-sc.c,v 1.4.2.7 2000/07/27 20:31:36 ache Exp $
+ * $FreeBSD: src/sys/dev/syscons/scterm-sc.c,v 1.4.2.9 2001/03/19 21:10:47 jhb Exp $
  */
 
 #include "opt_syscons.h"
@@ -172,10 +172,22 @@ static void
 scterm_scan_esc(scr_stat *scp, term_stat *tcp, u_char c)
 {
 	static u_char ansi_col[16] = {
+#ifdef __alpha__
+		/*
+		 * DEC is evil.  They switch the red and blue attributes in
+		 * the palette in the system console.  As a simple work-around,
+		 * re-map the ANSI colors appropriately.
+		 */
+		FG_BLACK,     FG_BLUE,         FG_GREEN,      FG_CYAN,
+		FG_RED,       FG_MAGENTA,      FG_BROWN,      FG_LIGHTGREY,
+		FG_DARKGREY,  FG_LIGHTBLUE,    FG_LIGHTGREEN, FG_LIGHTCYAN,
+		FG_LIGHTRED,  FG_LIGHTMAGENTA, FG_YELLOW,     FG_WHITE
+#else
 		FG_BLACK,     FG_RED,          FG_GREEN,      FG_BROWN,
 		FG_BLUE,      FG_MAGENTA,      FG_CYAN,       FG_LIGHTGREY,
 		FG_DARKGREY,  FG_LIGHTRED,     FG_LIGHTGREEN, FG_YELLOW,
 		FG_LIGHTBLUE, FG_LIGHTMAGENTA, FG_LIGHTCYAN,  FG_WHITE
+#endif
 	};
 	sc_softc_t *sc;
 	int i, n;

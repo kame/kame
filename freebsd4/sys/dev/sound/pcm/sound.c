@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/sound.c,v 1.17.2.3 2000/10/05 05:05:10 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/sound.c,v 1.17.2.8 2001/03/18 17:16:55 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -88,14 +88,84 @@ nomenclature:
 
 static devclass_t pcm_devclass;
 
-#if __FreeBSD_version > 500000
-#define USING_DEVFS
-#endif
-
 #ifdef USING_DEVFS
 int snd_unit;
-TUNABLE_INT_DECL("hw.sndunit", 0, snd_unit);
+TUNABLE_INT_DECL("hw.snd.unit", 0, snd_unit);
+#endif
 
+SYSCTL_NODE(_hw, OID_AUTO, snd, CTLFLAG_RD, 0, "Sound driver");
+
+void *
+snd_mtxcreate(const char *desc)
+{
+#ifdef USING_MUTEX
+	struct mtx *m;
+
+	m = malloc(sizeof(*m), M_DEVBUF, M_WAITOK | M_ZERO);
+	if (m == NULL)
+		return NULL;
+	mtx_init(m, desc, MTX_RECURSE);
+	return m;
+#else
+	return (void *)0xcafebabe;
+#endif
+}
+
+void
+snd_mtxfree(void *m)
+{
+#ifdef USING_MUTEX
+	struct mtx *mtx = m;
+
+	mtx_assert(mtx, MA_OWNED);
+	mtx_destroy(mtx);
+	free(mtx, M_DEVBUF);
+#endif
+}
+
+void
+snd_mtxassert(void *m)
+{
+#ifdef USING_MUTEX
+	struct mtx *mtx = m;
+
+	mtx_assert(mtx, MA_OWNED);
+#endif
+}
+
+void
+snd_mtxlock(void *m)
+{
+#ifdef USING_MUTEX
+	struct mtx *mtx = m;
+
+	mtx_lock(mtx);
+#endif
+}
+
+void
+snd_mtxunlock(void *m)
+{
+#ifdef USING_MUTEX
+	struct mtx *mtx = m;
+
+	mtx_unlock(mtx);
+#endif
+}
+
+int
+snd_setup_intr(device_t dev, struct resource *res, int flags, driver_intr_t hand, void *param, void **cookiep)
+{
+#ifdef USING_MUTEX
+	flags &= INTR_MPSAFE;
+	flags |= INTR_TYPE_TTY;
+#else
+	flags = INTR_TYPE_TTY;
+#endif
+	return bus_setup_intr(dev, res, flags, hand, param, cookiep);
+}
+
+#ifdef USING_DEVFS
 static void
 pcm_makelinks(void *dummy)
 {
@@ -151,17 +221,18 @@ sysctl_hw_sndunit(SYSCTL_HANDLER_ARGS)
 	}
 	return (error);
 }
-SYSCTL_PROC(_hw, OID_AUTO, sndunit, CTLTYPE_INT | CTLFLAG_RW,
+SYSCTL_PROC(_hw_snd, OID_AUTO, unit, CTLTYPE_INT | CTLFLAG_RW,
             0, sizeof(int), sysctl_hw_sndunit, "I", "");
 #endif
 
 int
-pcm_addchan(device_t dev, int dir, pcm_channel *templ, void *devinfo)
+pcm_addchan(device_t dev, int dir, kobj_class_t cls, void *devinfo)
 {
     	int unit = device_get_unit(dev), idx;
     	snddev_info *d = device_get_softc(dev);
 	pcm_channel *chns, *ch;
 	char *dirs;
+	int err;
 
 	dirs = ((dir == PCMDIR_PLAY)? "play" : "record");
 	chns = ((dir == PCMDIR_PLAY)? d->play : d->rec);
@@ -172,10 +243,11 @@ pcm_addchan(device_t dev, int dir, pcm_channel *templ, void *devinfo)
 		return 1;
 	}
 	ch = &chns[idx];
-	*ch = *templ;
+	ch->methods = kobj_create(cls, M_DEVBUF, M_WAITOK);
 	ch->parent = d;
-	if (chn_init(ch, devinfo, dir)) {
-		device_printf(dev, "chn_init() for (%s:%d) failed\n", dirs, idx);
+	err = chn_init(ch, devinfo, dir);
+	if (err) {
+		device_printf(dev, "chn_init() for (%s:%d) failed: err = %d\n", dirs, idx, err);
 		return 1;
 	}
 	make_dev(&snd_cdevsw, PCMMKMINOR(unit, SND_DEV_DSP, d->chancount),
@@ -187,7 +259,7 @@ pcm_addchan(device_t dev, int dir, pcm_channel *templ, void *devinfo)
 	/* XXX SND_DEV_NORESET? */
 	d->chancount++;
 #ifdef USING_DEVFS
-    	if (d->chancount == d->maxchans)
+    	if (d->chancount == 1)
 		pcm_makelinks(NULL);
 #endif
 	return 0;
@@ -215,6 +287,8 @@ pcm_killchan(device_t dev, int dir)
 		device_printf(dev, "chn_kill() for (%s:%d) failed\n", dirs, idx);
 		return 1;
 	}
+	kobj_delete(ch->methods, M_DEVBUF);
+	ch->methods = NULL;
 	d->chancount--;
 	pdev = makedev(CDEV_MAJOR, PCMMKMINOR(unit, SND_DEV_DSP, d->chancount));
 	destroy_dev(pdev);
@@ -254,13 +328,6 @@ pcm_getdevinfo(device_t dev)
 	return d->devinfo;
 }
 
-void
-pcm_setswap(device_t dev, pcm_swap_t *swap)
-{
-    	snddev_info *d = device_get_softc(dev);
-	d->swap = swap;
-}
-
 /* This is the generic init routine */
 int
 pcm_register(device_t dev, void *devinfo, int numplay, int numrec)
@@ -294,6 +361,10 @@ pcm_register(device_t dev, void *devinfo, int numplay, int numrec)
 		d->ref = (int *)malloc(sz, M_DEVBUF, M_NOWAIT);
     		if (!d->ref) goto no;
     		bzero(d->ref, sz);
+
+		d->atype = (int *)malloc(sz, M_DEVBUF, M_NOWAIT);
+    		if (!d->atype) goto no;
+    		bzero(d->atype, sz);
 	}
 
 	if (numplay > 0) {
@@ -312,13 +383,23 @@ pcm_register(device_t dev, void *devinfo, int numplay, int numrec)
 	} else
 		d->rec = NULL;
 
+#ifdef SND_DYNSYSCTL
+	sysctl_ctx_init(&d->sysctl_tree);
+	d->sysctl_tree_top = SYSCTL_ADD_NODE(&d->sysctl_tree,
+				 SYSCTL_STATIC_CHILDREN(_hw_snd), OID_AUTO,
+				 device_get_nameunit(dev), CTLFLAG_RD, 0, "");
+	if (d->sysctl_tree_top == NULL) {
+		sysctl_ctx_free(&d->sysctl_tree);
+		goto no;
+	}
+#endif
+
 	if (numplay == 0 || numrec == 0)
 		d->flags |= SD_F_SIMPLEX;
 
 	fkchan_setup(&d->fakechan);
 	chn_init(&d->fakechan, NULL, 0);
 	d->magic = MAGIC(unit); /* debugging... */
-	d->swap = NULL;
 
     	return 0;
 no:
@@ -327,6 +408,7 @@ no:
 	if (d->arec) free(d->arec, M_DEVBUF);
 	if (d->rec) free(d->rec, M_DEVBUF);
 	if (d->ref) free(d->ref, M_DEVBUF);
+	if (d->atype) free(d->atype, M_DEVBUF);
 	return ENXIO;
 }
 
@@ -337,6 +419,12 @@ pcm_unregister(device_t dev)
     	snddev_info *d = device_get_softc(dev);
 	dev_t pdev;
 
+#ifdef SND_DYNSYSCTL
+	sysctl_remove_oid(d->sysctl_tree_top, 1, 1);
+	d->sysctl_tree_top = NULL;
+	sysctl_ctx_free(&d->sysctl_tree);
+#endif
+
 	r = 0;
 	for (i = 0; i < d->chancount; i++)
 		if (d->ref[i]) r = EBUSY;
@@ -344,7 +432,7 @@ pcm_unregister(device_t dev)
 		device_printf(dev, "unregister: channel busy");
 		return r;
 	}
-	if (mixer_isbusy(d)) {
+	if (mixer_isbusy(d->mixer)) {
 		device_printf(dev, "unregister: mixer busy");
 		return EBUSY;
 	}
@@ -364,6 +452,10 @@ pcm_unregister(device_t dev)
 	if (d->arec) free(d->arec, M_DEVBUF);
 	if (d->rec) free(d->rec, M_DEVBUF);
 	if (d->ref) free(d->ref, M_DEVBUF);
+	if (d->atype) free(d->atype, M_DEVBUF);
+
+	chn_kill(&d->fakechan);
+	fkchan_kill(&d->fakechan);
 
 #ifdef USING_DEVFS
 	pcm_makelinks(NULL);
@@ -428,7 +520,7 @@ sndopen(dev_t i_dev, int flags, int mode, struct proc *p)
 		return 0;
 
     	case SND_DEV_CTL:
-		return d? mixer_busy(d, 1) : ENXIO;
+		return d? mixer_busy(d->mixer, 1) : ENXIO;
 
     	case SND_DEV_AUDIO:
     	case SND_DEV_DSP:
@@ -456,7 +548,7 @@ sndclose(dev_t i_dev, int flags, int mode, struct proc *p)
 		return 0;
 
     	case SND_DEV_CTL:
-		return d? mixer_busy(d, 0) : ENXIO;
+		return d? mixer_busy(d->mixer, 0) : ENXIO;
 
     	case SND_DEV_AUDIO:
     	case SND_DEV_DSP:

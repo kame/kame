@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.6 2000/11/01 18:28:22 wpaul Exp $
+ * $FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.9 2001/03/05 02:30:35 peter Exp $
  */
 
 /*
@@ -97,7 +97,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.6 2000/11/01 18:28:22 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.9 2001/03/05 02:30:35 peter Exp $";
 #endif
 
 /*
@@ -106,7 +106,8 @@ static const char rcsid[] =
 Static struct aue_type aue_devs[] = {
 	{ USB_VENDOR_ADMTEK, USB_PRODUCT_ADMTEK_PEGASUS },
 	{ USB_VENDOR_BILLIONTON, USB_PRODUCT_BILLIONTON_USB100 },
-	{ USB_VENDOR_MELCO, USB_PRODUCT_MELCO_LUATX },
+	{ USB_VENDOR_MELCO, USB_PRODUCT_MELCO_LUATX1 },
+	{ USB_VENDOR_MELCO, USB_PRODUCT_MELCO_LUATX5 },
 	{ USB_VENDOR_DLINK, USB_PRODUCT_DLINK_DSB650 },
 	{ USB_VENDOR_DLINK, USB_PRODUCT_DLINK_DSB650TX },
 	{ USB_VENDOR_DLINK, USB_PRODUCT_DLINK_DSB650TX_PNA },
@@ -114,6 +115,7 @@ Static struct aue_type aue_devs[] = {
 	{ USB_VENDOR_LINKSYS, USB_PRODUCT_LINKSYS_USB100TX },
 	{ USB_VENDOR_LINKSYS, USB_PRODUCT_LINKSYS_USB10TA },
 	{ USB_VENDOR_COREGA, USB_PRODUCT_COREGA_FETHER_USB_TX },
+	{ USB_VENDOR_KINGSTON, USB_PRODUCT_KINGSTON_KNU101TX, },
 	{ 0, 0 }
 };
 

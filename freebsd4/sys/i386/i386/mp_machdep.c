@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.4 2000/09/30 02:49:32 ps Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.7 2001/03/17 10:48:59 peter Exp $
  */
 
 #include "opt_cpu.h"
@@ -560,6 +560,9 @@ mp_enable(u_int boot_addr)
 	if (x)
 		default_mp_table(x);
 
+	/* initialize all SMP locks */
+	init_locks();
+
 	/* post scan cleanup */
 	fix_mp_table();
 	setup_apic_irq_mapping();
@@ -615,9 +618,6 @@ mp_enable(u_int boot_addr)
 #endif  /** TEST_TEST1 */
 
 #endif	/* APIC_IO */
-
-	/* initialize all SMP locks */
-	init_locks();
 
 	/* start each Application Processor */
 	start_all_aps(boot_addr);
@@ -876,7 +876,7 @@ mptable_pass2(void)
 	    M_DEVBUF, M_WAITOK);
 	MALLOC(ioapic, volatile ioapic_t **, sizeof(ioapic_t *) * mp_napics,
 	    M_DEVBUF, M_WAITOK);
-	MALLOC(io_apic_ints, io_int *, sizeof(io_int) * nintrs,
+	MALLOC(io_apic_ints, io_int *, sizeof(io_int) * (nintrs + 1),
 	    M_DEVBUF, M_WAITOK);
 	MALLOC(bus_data, bus_datum *, sizeof(bus_datum) * mp_nbusses,
 	    M_DEVBUF, M_WAITOK);
@@ -917,7 +917,7 @@ mptable_pass2(void)
 		bus_data[x].bus_id = 0xff;
 
 	/* clear IO APIC INT table */
-	for (x = 0; x < nintrs; ++x) {
+	for (x = 0; x < (nintrs + 1); ++x) {
 		io_apic_ints[x].int_type = 0xff;
 		io_apic_ints[x].int_vector = 0xff;
 	}
@@ -1031,6 +1031,37 @@ revoke_apic_irq(int irq)
 	}
 }
 
+
+static void
+allocate_apic_irq(int intr)
+{
+	int apic;
+	int intpin;
+	int irq;
+	
+	if (io_apic_ints[intr].int_vector != 0xff)
+		return;		/* Interrupt handler already assigned */
+	
+	if (io_apic_ints[intr].int_type != 0 &&
+	    (io_apic_ints[intr].int_type != 3 ||
+	     (io_apic_ints[intr].dst_apic_id == IO_TO_ID(0) &&
+	      io_apic_ints[intr].dst_apic_int == 0)))
+		return;		/* Not INT or ExtInt on != (0, 0) */
+	
+	irq = 0;
+	while (irq < APIC_INTMAPSIZE &&
+	       int_to_apicintpin[irq].ioapic != -1)
+		irq++;
+	
+	if (irq >= APIC_INTMAPSIZE)
+		return;		/* No free interrupt handlers */
+	
+	apic = ID_TO_IO(io_apic_ints[intr].dst_apic_id);
+	intpin = io_apic_ints[intr].dst_apic_int;
+	
+	assign_apic_irq(apic, intpin, irq);
+	io_apic_setup_intpin(apic, intpin);
+}
 
 
 static void
@@ -1230,6 +1261,17 @@ fix_mp_table(void)
 		panic("Free physical APIC ID not usable");
 	}
 	fix_id_to_io_mapping();
+
+	/* detect and fix broken Compaq MP table */
+	if (apic_int_type(0, 0) == -1) {
+		printf("APIC_IO: MP table broken: 8259->APIC entry missing!\n");
+		io_apic_ints[nintrs].int_type = 3;	/* ExtInt */
+		io_apic_ints[nintrs].int_vector = 0xff;	/* Unassigned */
+		/* XXX fixme, set src bus id etc, but it doesn't seem to hurt */
+		io_apic_ints[nintrs].dst_apic_id = IO_TO_ID(0);
+		io_apic_ints[nintrs].dst_apic_int = 0;	/* Pin 0 */
+		nintrs++;
+	}
 }
 
 
@@ -1263,46 +1305,18 @@ setup_apic_irq_mapping(void)
 		}
 	}
 
-	/* Assign interrupts on first 24 intpins on IOAPIC #0 */
+	/* Assign ExtInt entry if no ISA/EISA interrupt 0 entry */
 	for (x = 0; x < nintrs; x++) {
-		int_vector = io_apic_ints[x].dst_apic_int;
-		if (int_vector < APIC_INTMAPSIZE &&
+		if (io_apic_ints[x].dst_apic_int == 0 &&
 		    io_apic_ints[x].dst_apic_id == IO_TO_ID(0) &&
 		    io_apic_ints[x].int_vector == 0xff && 
-		    int_to_apicintpin[int_vector].ioapic == -1 &&
-		    (io_apic_ints[x].int_type == 0 ||
-		     io_apic_ints[x].int_type == 3)) {
-			assign_apic_irq(0,
-					io_apic_ints[x].dst_apic_int,
-					int_vector);
+		    int_to_apicintpin[0].ioapic == -1 &&
+		    io_apic_ints[x].int_type == 3) {
+			assign_apic_irq(0, 0, 0);
+			break;
 		}
 	}
-	/* 
-	 * Assign interrupts for remaining intpins.
-	 * Skip IOAPIC #0 intpin 0 if the type is ExtInt, since this indicates
-	 * that an entry for ISA/EISA irq 0 exist, and a fallback to mixed mode
-	 * due to 8254 interrupts not being delivered can reuse that low level
-	 * interrupt handler.
-	 */
-	int_vector = 0;
-	while (int_vector < APIC_INTMAPSIZE &&
-	       int_to_apicintpin[int_vector].ioapic != -1)
-		int_vector++;
-	for (x = 0; x < nintrs && int_vector < APIC_INTMAPSIZE; x++) {
-		if ((io_apic_ints[x].int_type == 0 ||
-		     (io_apic_ints[x].int_type == 3 &&
-		      (io_apic_ints[x].dst_apic_id != IO_TO_ID(0) ||
-		       io_apic_ints[x].dst_apic_int != 0))) &&
-		    io_apic_ints[x].int_vector == 0xff) {
-			assign_apic_irq(ID_TO_IO(io_apic_ints[x].dst_apic_id),
-					io_apic_ints[x].dst_apic_int,
-					int_vector);
-			int_vector++;
-			while (int_vector < APIC_INTMAPSIZE &&
-			       int_to_apicintpin[int_vector].ioapic != -1)
-				int_vector++;
-		}
-	}
+	/* PCI interrupt assignment is deferred */
 }
 
 
@@ -1475,8 +1489,11 @@ isa_apic_irq(int isa_irq)
 		if (INTTYPE(intr) == 0) {		/* standard INT */
 			if (SRCBUSIRQ(intr) == isa_irq) {
 				if (apic_int_is_bus_type(intr, ISA) ||
-			            apic_int_is_bus_type(intr, EISA))
+			            apic_int_is_bus_type(intr, EISA)) {
+					if (INTIRQ(intr) == 0xff)
+						return -1; /* unassigned */
 					return INTIRQ(intr);	/* found */
+				}
 			}
 		}
 	}
@@ -1502,8 +1519,13 @@ pci_apic_irq(int pciBus, int pciDevice, int pciInt)
 		    && (SRCBUSID(intr) == pciBus)
 		    && (SRCBUSDEVICE(intr) == pciDevice)
 		    && (SRCBUSLINE(intr) == pciInt))	/* a candidate IRQ */
-			if (apic_int_is_bus_type(intr, PCI))
+			if (apic_int_is_bus_type(intr, PCI)) {
+				if (INTIRQ(intr) == 0xff)
+					allocate_apic_irq(intr);
+				if (INTIRQ(intr) == 0xff)
+					return -1;	/* unassigned */
 				return INTIRQ(intr);	/* exact match */
+			}
 
 	return -1;					/* NOT found */
 }
@@ -1963,6 +1985,7 @@ start_all_aps(u_int boot_addr)
 	u_long  mpbioswarmvec;
 	struct globaldata *gd;
 	char *stack;
+	uintptr_t kptbase;
 
 	POSTCODE(START_ALL_APS_POST);
 
@@ -1984,8 +2007,12 @@ start_all_aps(u_int boot_addr)
 	/* record BSP in CPU map */
 	all_cpus = 1;
 
-	/* set up 0 -> 4MB P==V mapping for AP boot */
-	*(int *)PTD = PG_V | PG_RW | ((uintptr_t)(void *)KPTphys & PG_FRAME);
+	/* set up temporary P==V mapping for AP boot */
+	/* XXX this is a hack, we should boot the AP on its own stack/PTD */
+	kptbase = (uintptr_t)(void *)KPTphys;
+	for (x = 0; x < NKPT; x++)
+		PTD[x] = (pd_entry_t)(PG_V | PG_RW |
+		    ((kptbase + x * PAGE_SIZE) & PG_FRAME));
 	invltlb();
 
 	/* start each AP */
@@ -2080,7 +2107,8 @@ start_all_aps(u_int boot_addr)
 		SMPpt[5 + i] = (pt_entry_t)
 		    (PG_V | PG_RW | vtophys(PAGE_SIZE * i + stack));
 
-	*(int *)PTD = 0;
+	for (x = 0; x < NKPT; x++)
+		PTD[x] = 0;
 	pmap_set_opt();
 
 	/* number of APs actually started */

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74.2.1 2000/07/08 14:35:56 bp Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74.2.4 2001/03/14 12:03:50 bp Exp $
  */
 
 #include <sys/param.h>
@@ -92,6 +92,7 @@ static struct vfsops cd9660_vfsops = {
 	vfs_stdextattrctl,
 };
 VFS_SET(cd9660_vfsops, cd9660, VFCF_READONLY);
+MODULE_VERSION(cd9660, 1);
 
 
 /*
@@ -357,7 +358,8 @@ iso_mountfs(devvp, mp, p, argp)
 					if (bcmp(sup->escape, "%/E", 3) == 0)
 						joliet_level = 3;
 
-					if (isonum_711 (sup->flags) & 1)
+					if ((isonum_711 (sup->flags) & 1) &&
+					    (argp->flags & ISOFSMNT_BROKENJOLIET) == 0)
 						joliet_level = 0;
 				}
 			}
@@ -488,7 +490,7 @@ iso_mountfs(devvp, mp, p, argp)
 	/* Decide whether to use the Joliet descriptor */
 
 	if (isomp->iso_ftype != ISO_FTYPE_RRIP && joliet_level) {
-		log(LOG_INFO, "cd9660: Joliet Extension\n");
+		log(LOG_INFO, "cd9660: Joliet Extension (Level %d)\n", joliet_level);
 		rootp = (struct iso_directory_record *)
 			sup->root_directory_record;
 		bcopy (rootp, isomp->root, sizeof isomp->root);

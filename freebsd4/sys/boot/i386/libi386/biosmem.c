@@ -23,13 +23,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/biosmem.c,v 1.4 1999/12/29 09:54:29 msmith Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/biosmem.c,v 1.4.2.1 2000/12/28 13:12:39 ps Exp $
  */
 
 /*
  * Obtain memory configuration information from the BIOS
  */
 #include <stand.h>
+#include "libi386.h"
 #include "btxv86.h"
 
 vm_offset_t	memtop;

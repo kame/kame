@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)disklabel.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/disklabel.h,v 1.49.2.4 2000/10/31 01:29:18 jkh Exp $
+ * $FreeBSD: src/sys/sys/disklabel.h,v 1.49.2.6 2001/03/05 03:15:09 obrien Exp $
  */
 
 #ifndef _SYS_DISKLABEL_H_
@@ -180,6 +180,22 @@ struct disklabel {
 #define	p_sgs	__partition_u1.sgs
 	} d_partitions[MAXPARTITIONS];	/* actually may be more */
 };
+
+static u_int16_t dkcksum(struct disklabel *lp);
+
+static __inline u_int16_t
+dkcksum(struct disklabel *lp)
+{
+	u_int16_t *start, *end;
+	u_int16_t sum = 0;
+
+	start = (u_int16_t *)lp;
+	end = (u_int16_t *)&lp->d_partitions[lp->d_npartitions];
+	while (start < end)
+		sum ^= *start++;
+	return (sum);
+}
+
 #else /* LOCORE */
 	/*
 	 * offsets for asm boot files.
@@ -389,6 +405,7 @@ struct dos_partition {
 #define DIOCSDINFO	_IOW('d', 102, struct disklabel)/* set */
 #define DIOCWDINFO	_IOW('d', 103, struct disklabel)/* set, update disk */
 #define DIOCGPART	_IOW('d', 104, struct partinfo)	/* get partition */
+#define DIOCGDVIRGIN	_IOR('d', 105, struct disklabel) /* get virgin label */
 
 #define DIOCWLABEL	_IOW('d', 109, int)	/* write en/disable label */
 
@@ -447,7 +464,6 @@ int	bounds_check_with_label __P((struct buf *bp, struct disklabel *lp,
 void	diskerr __P((struct buf *bp, char *what, int pri, int blkdone,
 		     struct disklabel *lp));
 void	disksort __P((struct buf *ap, struct buf *bp));
-u_int	dkcksum __P((struct disklabel *lp));
 char	*readdisklabel __P((dev_t dev, struct disklabel *lp));
 void	bufqdisksort __P((struct buf_queue_head *ap, struct buf *bp));
 int	setdisklabel __P((struct disklabel *olp, struct disklabel *nlp,

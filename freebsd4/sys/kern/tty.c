@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty.c	8.8 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/tty.c,v 1.129.2.2 2000/08/03 00:09:33 ps Exp $
+ * $FreeBSD: src/sys/kern/tty.c,v 1.129.2.4 2001/03/06 06:50:48 jhb Exp $
  */
 
 /*-
@@ -113,6 +113,10 @@ static void	ttyrub __P((int c, struct tty *tp));
 static void	ttyrubo __P((struct tty *tp, int cnt));
 static void	ttyunblock __P((struct tty *tp));
 static int	ttywflush __P((struct tty *tp));
+static int	filt_ttyread __P((struct knote *kn, long hint));
+static void 	filt_ttyrdetach __P((struct knote *kn));
+static int	filt_ttywrite __P((struct knote *kn, long hint));
+static void 	filt_ttywdetach __P((struct knote *kn));
 
 /*
  * Table with character classes and parity. The 8th bit indicates parity,
@@ -452,9 +456,9 @@ parmrk:
 		 * processing takes place.
 		 */
 		/*
-		 * erase (^H / ^?)
+		 * erase or erase2 (^H / ^?)
 		 */
-		if (CCEQ(cc[VERASE], c)) {
+		if (CCEQ(cc[VERASE], c) || CCEQ(cc[VERASE2], c) ) {
 			if (tp->t_rawq.c_cc)
 				ttyrub(unputc(&tp->t_rawq), tp);
 			goto endcase;
@@ -656,9 +660,16 @@ ttyoutput(c, tp)
 	if (c == '\n' && ISSET(tp->t_oflag, ONLCR)) {
 		tk_nout++;
 		tp->t_outcc++;
-		if (putc('\r', &tp->t_outq))
+		if (!ISSET(tp->t_lflag, FLUSHO) && putc('\r', &tp->t_outq))
 			return (c);
 	}
+	/* If OCRNL is set, translate "\r" into "\n". */
+	else if (c == '\r' && ISSET(tp->t_oflag, OCRNL))
+		c = '\n';
+	/* If ONOCR is set, don't transmit CRs when on column 0. */
+	else if (c == '\r' && ISSET(tp->t_oflag, ONOCR) && tp->t_column == 0)
+		return (-1);
+
 	tk_nout++;
 	tp->t_outcc++;
 	if (!ISSET(tp->t_lflag, FLUSHO) && putc(c, &tp->t_outq))
@@ -673,6 +684,9 @@ ttyoutput(c, tp)
 	case CONTROL:
 		break;
 	case NEWLINE:
+		if (ISSET(tp->t_oflag, ONLCR | ONLRET))
+			col = 0;
+		break;
 	case RETURN:
 		col = 0;
 		break;
@@ -1083,6 +1097,89 @@ ttypoll(dev, events, p)
 	}
 	splx(s);
 	return (revents);
+}
+
+static struct filterops ttyread_filtops =
+	{ 1, NULL, filt_ttyrdetach, filt_ttyread };
+static struct filterops ttywrite_filtops =
+	{ 1, NULL, filt_ttywdetach, filt_ttywrite };
+
+int
+ttykqfilter(dev, kn)
+	dev_t dev;
+	struct knote *kn;
+{
+	struct tty *tp = dev->si_tty;
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &tp->t_rsel.si_note;
+		kn->kn_fop = &ttyread_filtops;
+		break;
+	case EVFILT_WRITE:
+		klist = &tp->t_wsel.si_note;
+		kn->kn_fop = &ttywrite_filtops;
+		break;
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = (caddr_t)dev;
+
+	s = spltty();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
+static void
+filt_ttyrdetach(struct knote *kn)
+{
+	struct tty *tp = ((dev_t)kn->kn_hook)->si_tty;
+	int s = spltty();
+
+	SLIST_REMOVE(&tp->t_rsel.si_note, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_ttyread(struct knote *kn, long hint)
+{
+	struct tty *tp = ((dev_t)kn->kn_hook)->si_tty;
+
+	kn->kn_data = ttnread(tp);
+	if (ISSET(tp->t_state, TS_ZOMBIE)) {
+		kn->kn_flags |= EV_EOF;
+		return (1);
+	}
+	return (kn->kn_data > 0);
+}
+
+static void
+filt_ttywdetach(struct knote *kn)
+{
+	struct tty *tp = ((dev_t)kn->kn_hook)->si_tty;
+	int s = spltty();
+
+	SLIST_REMOVE(&tp->t_wsel.si_note, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_ttywrite(kn, hint)
+	struct knote *kn;
+	long hint;
+{
+	struct tty *tp = ((dev_t)kn->kn_hook)->si_tty;
+
+	kn->kn_data = tp->t_outq.c_cc;
+	if (ISSET(tp->t_state, TS_ZOMBIE))
+		return (1);
+	return (kn->kn_data <= tp->t_olowat &&
+	    ISSET(tp->t_state, TS_CONNECTED));
 }
 
 /*
@@ -2003,8 +2100,17 @@ ttyrub(c, tp)
 			(void)ttyoutput('\\', tp);
 		}
 		ttyecho(c, tp);
-	} else
+	} else {
 		ttyecho(tp->t_cc[VERASE], tp);
+		/*
+		 * This code may be executed not only when an ERASE key
+		 * is pressed, but also when ^U (KILL) or ^W (WERASE) are.
+		 * So, I didn't think it was worthwhile to pass the extra
+		 * information (which would need an extra parameter,
+		 * changing every call) needed to distinguish the ERASE2
+		 * case from the ERASE.
+		 */
+	}
 	--tp->t_rocount;
 }
 
@@ -2102,6 +2208,7 @@ ttwakeup(tp)
 	if (ISSET(tp->t_state, TS_ASYNC) && tp->t_sigio != NULL)
 		pgsigio(tp->t_sigio, SIGIO, (tp->t_session != NULL));
 	wakeup(TSA_HUP_OR_INPUT(tp));
+	KNOTE(&tp->t_rsel.si_note, 0);
 }
 
 /*
@@ -2126,6 +2233,7 @@ ttwwakeup(tp)
 		CLR(tp->t_state, TS_SO_OLOWAT);
 		wakeup(TSA_OLOWAT(tp));
 	}
+	KNOTE(&tp->t_wsel.si_note, 0);
 }
 
 /*

@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/sys/boot/forth/loader.conf.5,v 1.7 1999/11/26 08:09:04 dcs Exp $
+.\" $FreeBSD: src/sys/boot/forth/loader.conf.5,v 1.7.2.4 2001/03/04 05:01:15 obrien Exp $
 .Dd April 18, 1999
 .Dt LOADER.CONF 5
 .Os
@@ -55,7 +55,7 @@ If no
 exists at installworld time, one with the above lines will be installed.
 .Sh SYNTAX
 Though
-.Nm loader.conf Ns No 's
+.Nm Ns 's
 format was defined explicitly to resemble
 .Xr rc.conf 5 ,
 and can be sourced by
@@ -79,7 +79,7 @@ All settings have the following format:
 .Pp
 Unless it belongs to one of the classes of settings that receive special
 treatment, a setting will set the value of a
-.Xr loader 8 's
+.Xr loader 8 Ns 's
 environment variable. The settings that receive special
 treatment are listed below. The ones beginning with a
 .Qq *
@@ -135,7 +135,7 @@ which aborts the bootstrap process, use of this setting should be avoided.
 .El
 .Sh DEFAULT SETTINGS
 Most of
-.Nm loader.conf Ns No 's
+.Nm Ns 's
 default settings can be ignored. The few of them which are important
 or useful are:
 .Bl -tag -width bootfile -offset indent
@@ -181,19 +181,19 @@ be displayed.
 default settings -- do not change this file.
 .It Pa /boot/loader.4th
 defines the commands used by loader to read and process
-.Nm loader.conf .
+.Nm .
 .It Pa /boot/loader.conf
 user defined settings.
 .It Pa /boot/loader.conf.local
 machine-specific settings for sites with a common loader.conf.
 .It Pa /boot/loader.rc
 contains the instructions to automatically process
-.Nm loader.conf .
+.Nm .
 .El
 .Sh SEE ALSO
 .Xr boot 8 ,
 .Xr loader 8 ,
-.Xr loader.4th 8 .
+.Xr loader.4th 8
 .Sh HISTORY
 The file
 .Nm
@@ -202,4 +202,3 @@ first appeared in
 .Sh AUTHORS
 This manual page was written by
 .An Daniel C. Sobral Aq dcs@FreeBSD.org .
-

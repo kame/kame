@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.5 2000/08/03 00:09:33 ps Exp $
+ * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.7 2000/11/26 02:55:11 dillon Exp $
  */
 
 /*
@@ -524,6 +524,7 @@ getnewvnode(tag, mp, vops, vpp)
 
 	if (vp) {
 		vp->v_flag |= VDOOMED;
+		vp->v_flag &= ~VFREE;
 		TAILQ_REMOVE(&vnode_free_list, vp, v_freelist);
 		freevnodes--;
 		simple_unlock(&vnode_free_list_slock);
@@ -1363,10 +1364,14 @@ vget(vp, flags, p)
 		simple_lock(&vp->v_interlock);
 	}
 	if (vp->v_flag & VXLOCK) {
-		vp->v_flag |= VXWANT;
-		simple_unlock(&vp->v_interlock);
-		tsleep((caddr_t)vp, PINOD, "vget", 0);
-		return (ENOENT);
+		if (vp->v_vxproc == curproc) {
+			printf("VXLOCK interlock avoided\n");
+		} else {
+			vp->v_flag |= VXWANT;
+			simple_unlock(&vp->v_interlock);
+			tsleep((caddr_t)vp, PINOD, "vget", 0);
+			return (ENOENT);
+		}
 	}
 
 	vp->v_usecount++;
@@ -1646,6 +1651,7 @@ vclean(vp, flags, p)
 	if (vp->v_flag & VXLOCK)
 		panic("vclean: deadlock");
 	vp->v_flag |= VXLOCK;
+	vp->v_vxproc = curproc;
 	/*
 	 * Even if the count is zero, the VOP_INACTIVE routine may still
 	 * have the object locked while it cleans it out. The VOP_LOCK
@@ -1731,6 +1737,7 @@ vclean(vp, flags, p)
 	vn_pollgone(vp);
 	vp->v_tag = VT_NON;
 	vp->v_flag &= ~VXLOCK;
+	vp->v_vxproc = NULL;
 	if (vp->v_flag & VXWANT) {
 		vp->v_flag &= ~VXWANT;
 		wakeup((caddr_t) vp);

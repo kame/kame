@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/buf.h,v 1.88.2.1 2000/04/26 20:36:33 dillon Exp $
+ * $FreeBSD: src/sys/sys/buf.h,v 1.88.2.3 2000/12/30 01:51:10 dillon Exp $
  */
 
 #ifndef _SYS_BUF_H_
@@ -106,6 +106,7 @@ struct buf {
 	struct lock b_lock;		/* Buffer lock */
 	int	b_error;		/* Errno value. */
 	long	b_bufsize;		/* Allocated buffer size. */
+	long	b_runningbufspace;	/* when I/O is running, pipelining */
 	long	b_bcount;		/* Valid bytes in buffer. */
 	long	b_resid;		/* Remaining I/O. */
 	dev_t	b_dev;			/* Device associated with buffer. */
@@ -450,6 +451,7 @@ bufq_first(struct buf_queue_head *head)
 
 #ifdef _KERNEL
 extern int	nbuf;			/* The number of buffer headers */
+extern int	runningbufspace;
 extern int      buf_maxio;              /* nominal maximum I/O for buffer */
 extern struct	buf *buf;		/* The buffer headers. */
 extern char	*buffers;		/* The buffer contents. */
@@ -464,6 +466,7 @@ struct uio;
 caddr_t bufhashinit __P((caddr_t));
 void	bufinit __P((void));
 void	bwillwrite __P((void));
+int	buf_dirty_count_severe __P((void));
 void	bremfree __P((struct buf *));
 int	bread __P((struct vnode *, daddr_t, int,
 	    struct ucred *, struct buf **));

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)radix.c	8.4 (Berkeley) 11/2/94
- * $FreeBSD: src/sys/net/radix.c,v 1.20.2.1 2000/05/03 19:17:11 wollman Exp $
+ * $FreeBSD: src/sys/net/radix.c,v 1.20.2.2 2001/03/06 00:56:50 obrien Exp $
  */
 
 /*
@@ -344,6 +344,7 @@ rn_newpair(v, b, nodes)
 	tt->rn_key = (caddr_t)v;
 	tt->rn_parent = t;
 	tt->rn_flags = t->rn_flags = RNF_ACTIVE;
+	tt->rn_mklist = t->rn_mklist = 0;
 #ifdef RN_DEBUG
 	tt->rn_info = rn_nodenum++; t->rn_info = rn_nodenum++;
 	tt->rn_twin = t;

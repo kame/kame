@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.4 2000/10/29 16:59:32 dwmalone Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.5 2001/01/16 12:26:21 phk Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -115,6 +115,7 @@ int	kvprintf __P((char const *, void (*)(int, void*), void *, int,
 		      _BSD_VA_LIST_)) __printflike(1, 0);
 int	log __P((int, const char *, ...)) __printflike(2, 3);
 void	logwakeup __P((void));
+void	log_console __P((struct uio *));
 int	printf __P((const char *, ...)) __printflike(1, 2);
 int	snprintf __P((char *, size_t, const char *, ...)) __printflike(3, 4);
 int	sprintf __P((char *buf, const char *, ...)) __printflike(2, 3);

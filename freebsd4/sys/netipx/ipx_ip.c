@@ -33,7 +33,7 @@
  * 
  *	@(#)ipx_ip.c
  *
- * $FreeBSD: src/sys/netipx/ipx_ip.c,v 1.24 1999/12/20 18:43:04 eivind Exp $
+ * $FreeBSD: src/sys/netipx/ipx_ip.c,v 1.24.2.1 2001/02/22 09:44:18 bp Exp $
  */
 
 /*
@@ -101,10 +101,9 @@ ipxipattach()
 		ifp->if_flags = IFF_POINTOPOINT;
 	}
 
-	MALLOC((m), struct ifnet_en *, sizeof(*m), M_PCB, M_NOWAIT);
+	MALLOC((m), struct ifnet_en *, sizeof(*m), M_PCB, M_NOWAIT | M_ZERO);
 	if (m == NULL)
 		return (NULL);
-	bzero(m, sizeof(*m));
 	m->ifen_next = ipxip_list;
 	ipxip_list = m;
 	ifp = &m->ifen_ifnet;
@@ -357,12 +356,12 @@ ipxip_route(so, sopt)
 		register struct in_ifaddr *ia;
 		struct ifnet *ifp = ro.ro_rt->rt_ifp;
 
-		for (ia = in_ifaddrhead.tqh_first; ia != NULL; 
-		     ia = ia->ia_link.tqe_next)
+		for (ia = TAILQ_FIRST(&in_ifaddrhead); ia != NULL; 
+		     ia = TAILQ_NEXT(ia, ia_link))
 			if (ia->ia_ifp == ifp)
 				break;
 		if (ia == NULL)
-			ia = in_ifaddrhead.tqh_first;
+			ia = TAILQ_FIRST(&in_ifaddrhead);
 		if (ia == NULL) {
 			RTFREE(ro.ro_rt);
 			return (EADDRNOTAVAIL);

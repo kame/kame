@@ -1,10 +1,18 @@
-# $FreeBSD: src/sys/boot/i386/btx/btx/Makefile,v 1.7.2.1 2000/07/06 23:04:28 obrien Exp $
+# $FreeBSD: src/sys/boot/i386/btx/btx/Makefile,v 1.7.2.2 2000/12/28 12:08:22 ps Exp $
 
 M4?=	m4
 
 .if defined(PAGING)
 M4FLAGS+=	-DPAGING
 .endif
+
+.if defined(BOOT_BTX_NOHANG)
+BOOT_BTX_FLAGS=0x1
+.else
+BOOT_BTX_FLAGS=0x0
+.endif
+
+AFLAGS+=	--defsym BTX_FLAGS=${BOOT_BTX_FLAGS}
 
 ORG=	0x9000
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.3 2000/05/16 06:58:11 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.5 2001/02/22 05:15:04 marcel Exp $
  */
 
 #include "opt_compat.h"
@@ -797,7 +797,7 @@ sigaltstack(p, uap)
 		p->p_sigstk.ss_flags = ss.ss_flags;
 		return (0);
 	}
-	if (ss.ss_size < MINSIGSTKSZ)
+	if (ss.ss_size < p->p_sysent->sv_minsigstksz)
 		return (ENOMEM);
 	p->p_flag |= P_ALTSTACK;
 	p->p_sigstk = ss;
@@ -954,7 +954,7 @@ trapsignal(p, sig, code)
 	register struct sigacts *ps = p->p_sigacts;
 
 	if ((p->p_flag & P_TRACED) == 0 && SIGISMEMBER(p->p_sigcatch, sig) &&
-	    SIGISMEMBER(p->p_sigmask, sig)) {
+	    !SIGISMEMBER(p->p_sigmask, sig)) {
 		p->p_stats->p_ru.ru_nsignals++;
 #ifdef KTRACE
 		if (KTRPOINT(p, KTR_PSIG))

@@ -23,8 +23,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: maestro_reg.h,v 1.1.1.1 2000/11/21 08:39:17 kawa Exp $
- * $FreeBSD: src/sys/dev/sound/pci/maestro_reg.h,v 1.1.2.1 2000/10/05 05:30:46 cg Exp $
+ *	$Id: maestro_reg.h,v 1.1.1.2 2001/04/23 13:10:46 sumikawa Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/maestro_reg.h,v 1.1.2.2 2001/02/03 01:29:10 cg Exp $
  */
 
 #ifndef	MAESTRO_REG_H_INCLUDED
@@ -139,6 +139,10 @@
 #define PORT_HWVOL_VOICE	0x1d	/* BYTE RW */
 #define PORT_HWVOL_MASTER_SHADOW 0x1e	/* BYTE RW */
 #define PORT_HWVOL_MASTER	0x1f	/* BYTE RW */
+#define HWVOL_NOP		0x88
+#define HWVOL_MUTE		0x99
+#define HWVOL_UP		0xaa
+#define HWVOL_DOWN		0x66
 
 /* CODEC */
 #define	PORT_CODEC_CMD	0x30	/* BYTE W */

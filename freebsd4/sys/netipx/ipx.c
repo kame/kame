@@ -33,7 +33,7 @@
  * 
  *	@(#)ipx.c
  *
- * $FreeBSD: src/sys/netipx/ipx.c,v 1.17 1999/08/28 00:49:38 peter Exp $
+ * $FreeBSD: src/sys/netipx/ipx.c,v 1.17.2.1 2001/02/22 09:44:18 bp Exp $
  */
 
 #include <sys/param.h>
@@ -130,10 +130,10 @@ ipx_control(so, cmd, data, ifp, p)
 	case SIOCSIFDSTADDR:
 		if (ia == NULL) {
 			oia = (struct ipx_ifaddr *)
-				malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
+				malloc(sizeof(*ia), M_IFADDR,
+				M_WAITOK | M_ZERO);
 			if (oia == NULL)
 				return (ENOBUFS);
-			bzero((caddr_t)oia, sizeof(*oia));
 			if ((ia = ipx_ifaddr) != NULL) {
 				for ( ; ia->ia_next != NULL; ia = ia->ia_next)
 					;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)syslog.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/syslog.h,v 1.19 1999/12/29 04:24:48 peter Exp $
+ * $FreeBSD: src/sys/sys/syslog.h,v 1.19.2.1 2001/01/09 06:51:34 phk Exp $
  */
 
 #ifndef _SYS_SYSLOG_H_
@@ -107,6 +107,7 @@ CODE prioritynames[] = {
 #define	LOG_FTP		(11<<3)	/* ftp daemon */
 #define	LOG_NTP		(12<<3)	/* NTP subsystem */
 #define	LOG_SECURITY	(13<<3) /* security subsystems (firewalling, etc.) */
+#define	LOG_CONSOLE	(14<<3) /* /dev/console output */
 
 	/* other codes through 15 reserved for system use */
 #define	LOG_LOCAL0	(16<<3)	/* reserved for local use */
@@ -127,6 +128,7 @@ CODE prioritynames[] = {
 CODE facilitynames[] = {
 	{ "auth",	LOG_AUTH,	},
 	{ "authpriv",	LOG_AUTHPRIV,	},
+	{ "console", 	LOG_CONSOLE,	},
 	{ "cron", 	LOG_CRON,	},
 	{ "daemon",	LOG_DAEMON,	},
 	{ "ftp",	LOG_FTP,	},

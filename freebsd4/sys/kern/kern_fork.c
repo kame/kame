@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.5 2000/09/14 23:21:18 truckman Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.6 2001/02/18 15:41:10 ume Exp $
  */
 
 #include "opt_ktrace.h"
@@ -63,6 +63,7 @@
 #include <vm/vm_extern.h>
 #include <vm/vm_zone.h>
 
+#include <sys/vmmeter.h>
 #include <sys/user.h>
 
 static MALLOC_DEFINE(M_ATFORK, "atfork", "atfork callback");
@@ -484,6 +485,20 @@ again:
 	 * execution path later.  (ie: directly into user mode)
 	 */
 	vm_fork(p1, p2, flags);
+
+	if (flags == (RFFDG | RFPROC)) {
+		cnt.v_forks++;
+		cnt.v_forkpages += p2->p_vmspace->vm_dsize + p2->p_vmspace->vm_ssize;
+	} else if (flags == (RFFDG | RFPROC | RFPPWAIT | RFMEM)) {
+		cnt.v_vforks++;
+		cnt.v_vforkpages += p2->p_vmspace->vm_dsize + p2->p_vmspace->vm_ssize;
+	} else if (p1 == &proc0) {
+		cnt.v_kthreads++;
+		cnt.v_kthreadpages += p2->p_vmspace->vm_dsize + p2->p_vmspace->vm_ssize;
+	} else {
+		cnt.v_rforks++;
+		cnt.v_rforkpages += p2->p_vmspace->vm_dsize + p2->p_vmspace->vm_ssize;
+	}
 
 	/*
 	 * Both processes are set up, now check if any loadable modules want

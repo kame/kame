@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_util.c	8.3 (Berkeley) 12/5/94
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_util.c,v 1.13 1999/08/28 00:46:07 peter Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_util.c,v 1.13.2.1 2001/02/27 12:36:34 sobomax Exp $
  */
 
 #include <sys/param.h>
@@ -45,6 +45,14 @@
 #include <sys/vnode.h>
 
 #include <isofs/cd9660/iso.h>
+
+/*
+ * XXX: limited support for loading of Unicode
+ * conversion routine as a kld at a run-time.
+ * Should be removed when native Unicode kernel
+ * interfaces have been introduced.
+ */
+u_char (*cd9660_wchar2char)(u_int32_t wchar) = NULL;
 
 /*
  * Get one character out of an iso filename
@@ -72,6 +80,10 @@ isochar(isofn, isoend, joliet_level, c)
               *c = *isofn;
               break;
       }
+      /* XXX: if Unicode conversion routine is loaded then use it */
+      if (cd9660_wchar2char != NULL)
+            *c = cd9660_wchar2char((*(isofn - 1) << 8) | *isofn);
+
       return 2;
 }
 

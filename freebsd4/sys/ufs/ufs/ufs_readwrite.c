@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.11 (Berkeley) 5/8/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.2 2000/05/05 03:50:07 jlemon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.6 2000/12/30 01:51:11 dillon Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -48,6 +48,7 @@
 #include <vm/vm_map.h>
 #include <vm/vnode_pager.h>
 #include <sys/event.h>
+#include <sys/vmmeter.h>
 
 #define VN_KNOTE(vp, b) \
 	KNOTE((struct klist *)&vp->v_pollinfo.vpi_selinfo.si_note, (b))
@@ -467,10 +468,19 @@ WRITE(ap)
 		if (uio->uio_offset + xfersize > ip->i_size)
 			vnode_pager_setsize(vp, uio->uio_offset + xfersize);
 
+		/*      
+		 * Avoid a data-consistency race between write() and mmap()
+		 * by ensuring that newly allocated blocks are zerod.  The
+		 * race can occur even in the case where the write covers
+		 * the entire block.
+		 */
+		flags |= B_CLRBUF;
+#if 0
 		if (fs->fs_bsize > xfersize)
 			flags |= B_CLRBUF;
 		else
 			flags &= ~B_CLRBUF;
+#endif
 /* XXX is uio->uio_offset the right thing here? */
 		error = VOP_BALLOC(vp, uio->uio_offset, xfersize,
 		    ap->a_cred, flags, &bp);
@@ -494,6 +504,11 @@ WRITE(ap)
 
 		if (ioflag & IO_SYNC) {
 			(void)bwrite(bp);
+		} else if (vm_page_count_severe() || 
+			    buf_dirty_count_severe() ||
+			    (ioflag & IO_ASYNC)) {
+			bp->b_flags |= B_CLUSTEROK;
+			bawrite(bp);
 		} else if (xfersize + blkoffset == fs->fs_bsize) {
 			if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERW) == 0) {
 				bp->b_flags |= B_CLUSTEROK;

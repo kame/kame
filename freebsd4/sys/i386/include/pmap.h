@@ -42,7 +42,7 @@
  *
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/include/pmap.h,v 1.65.2.1 2000/08/04 22:31:07 peter Exp $
+ * $FreeBSD: src/sys/i386/include/pmap.h,v 1.65.2.2 2000/11/30 01:54:42 peter Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -88,7 +88,7 @@
 #define VADDR(pdi, pti) ((vm_offset_t)(((pdi)<<PDRSHIFT)|((pti)<<PAGE_SHIFT)))
 
 #ifndef NKPT
-#define	NKPT			17	/* actual number of kernel page tables */
+#define	NKPT			30	/* actual number of kernel page tables */
 #endif
 #ifndef NKPDE
 #ifdef SMP

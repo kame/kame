@@ -55,14 +55,13 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/sym/sym_hipd.c,v 1.6.2.4 2000/09/17 18:50:20 groudier Exp $ */
+/* $FreeBSD: src/sys/dev/sym/sym_hipd.c,v 1.6.2.8 2001/04/09 05:43:49 mjacob Exp $ */
 
 #define SYM_DRIVER_NAME	"sym-1.6.5-20000902"
 
 /* #define SYM_DEBUG_GENERIC_SUPPORT */
 
 #include <pci.h>
-#include <stddef.h>	/* For offsetof */
 #include <sys/param.h>
 
 /*
@@ -394,9 +393,6 @@ static __inline struct sym_quehead *sym_remque_tail(struct sym_quehead *head)
 /*
  *  These ones should have been already defined.
  */
-#ifndef offsetof
-#define offsetof(t, m)	((size_t) (&((t *)0)->m))
-#endif
 #ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif
@@ -2077,7 +2073,7 @@ sym_fw2_patch(hcb_p np)
 	 *  they are not desirable. See `sym_fw2.h' for more details.
 	 */
 	if (!(np->device_id == PCI_ID_LSI53C1010_2 &&
-	      /* np->revision_id < 0xff */ 1 &&
+	      np->revision_id < 0x1 &&
 	      np->pciclk_khz < 60000)) {
 		scripta0->datao_phase[0] = cpu_to_scr(SCR_NO_OP);
 		scripta0->datao_phase[1] = cpu_to_scr(0);
@@ -2808,7 +2804,7 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 	 *  are used. Disable internal cycles.
 	 */
 	if (np->device_id == PCI_ID_LSI53C1010 &&
-	    /* np->revision_id < 0xff */ 1)
+	    np->revision_id < 0x2)
 		np->rv_ccntl0	|=  DILS;
 
 	/*
@@ -2908,7 +2904,7 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 					np->scsi_mode = SMODE_HVD;
 			}
 			else if (nvram->type == SYM_SYMBIOS_NVRAM) {
-				if (INB(nc_gpreg) & 0x08)
+				if (!(INB(nc_gpreg) & 0x08))
 					np->scsi_mode = SMODE_HVD;
 			}
 		}
@@ -5228,7 +5224,7 @@ static void sym_sir_task_recovery(hcb_p np, int num)
 		target = (INB (nc_sdid) & 0xf);
 		tp = &np->target[target];
 
-		np->abrt_tbl.addr = vtobus(np->abrt_msg);
+		np->abrt_tbl.addr = cpu_to_scr(vtobus(np->abrt_msg));
 
 		/*
 		 *  If the target is to be reset, prepare a 
@@ -5899,6 +5895,15 @@ static void sym_ppr_nego(hcb_p np, tcb_p tp, ccb_p cp)
 	};
 
 	/*
+	 *  get requested values.
+	 */
+	chg  = 0;
+	per  = np->msgin[3];
+	ofs  = np->msgin[5];
+	wide = np->msgin[6];
+	dt   = np->msgin[7] & PPR_OPT_DT;
+
+	/*
 	 * request or answer ?
 	 */
 	if (INB (HS_PRT) == HS_NEGOTIATE) {
@@ -5907,15 +5912,6 @@ static void sym_ppr_nego(hcb_p np, tcb_p tp, ccb_p cp)
 			goto reject_it;
 		req = 0;
 	}
-
-	/*
-	 *  get requested values.
-	 */
-	chg  = 0;
-	per  = np->msgin[3];
-	ofs  = np->msgin[5];
-	wide = np->msgin[6];
-	dt   = np->msgin[7] & PPR_OPT_DT;
 
 	/*
 	 *  check values against our limits.
@@ -6010,6 +6006,17 @@ static void sym_ppr_nego(hcb_p np, tcb_p tp, ccb_p cp)
 reject_it:
 	sym_setpprot (np, cp, 0, 0, 0, 0, 0, 0);
 	OUTL_DSP (SCRIPTB_BA (np, msg_bad));
+	/*
+	 *  If it was a device response that should result in  
+	 *  ST, we may want to try a legacy negotiation later.
+	 */
+	if (!req && !dt) {
+		tp->tinfo.goal.options = 0;
+		tp->tinfo.goal.width   = wide;
+		tp->tinfo.goal.period  = per;
+		tp->tinfo.goal.offset  = ofs;
+	}
+	return;
 }
 
 /*
@@ -6122,6 +6129,9 @@ reject_it:
  *
  *  Called when a negotiation does not succeed either 
  *  on rejection or on protocol error.
+ *
+ *  If it was a PPR that made problems, we may want to 
+ *  try a legacy negotiation later.
  */
 static void sym_nego_default(hcb_p np, tcb_p tp, ccb_p cp)
 {
@@ -6131,7 +6141,15 @@ static void sym_nego_default(hcb_p np, tcb_p tp, ccb_p cp)
 	 */
 	switch (cp->nego_status) {
 	case NS_PPR:
+#if 0
 		sym_setpprot (np, cp, 0, 0, 0, 0, 0, 0);
+#else
+		tp->tinfo.goal.options = 0;
+		if (tp->tinfo.goal.period < np->minsync)
+			tp->tinfo.goal.period = np->minsync;
+		if (tp->tinfo.goal.offset > np->maxoffs)
+			tp->tinfo.goal.offset = np->maxoffs;
+#endif
 		break;
 	case NS_SYNC:
 		sym_setsync (np, cp, 0, 0, 0, 0);
@@ -8942,6 +8960,14 @@ sym_pci_attach2(pcici_t pci_tag, int unit)
 	snprintf(np->inst_name, sizeof(np->inst_name), "sym%d", np->unit);
 
 	/*
+	 *  Initialyze the CCB free and busy queues.
+	 */
+	sym_que_init(&np->free_ccbq);
+	sym_que_init(&np->busy_ccbq);
+	sym_que_init(&np->comp_ccbq);
+	sym_que_init(&np->cam_ccbq);
+
+	/*
 	 *  Allocate a tag for the DMA of user data.
 	 */
 #ifdef	FreeBSD_Bus_Dma_Abstraction
@@ -9176,19 +9202,10 @@ sym_pci_attach2(pcici_t pci_tag, int unit)
 		goto attach_failed;
 
 	/*
-	 *  Initialyze the CCB free and busy queues.
 	 *  Allocate some CCB. We need at least ONE.
 	 */
-	sym_que_init(&np->free_ccbq);
-	sym_que_init(&np->busy_ccbq);
-	sym_que_init(&np->comp_ccbq);
 	if (!sym_alloc_ccb(np))
 		goto attach_failed;
-
-	/*
-	 * Initialyze the CAM CCB pending queue.
-	 */
-	sym_que_init(&np->cam_ccbq);
 
 	/*
 	 *  Calculate BUS addresses where we are going 

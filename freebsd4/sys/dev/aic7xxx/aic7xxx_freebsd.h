@@ -2,7 +2,7 @@
  * FreeBSD platform specific driver option settings, data structures,
  * function declarations and includes.
  *
- * Copyright (c) 1994, 1995, 1996, 1997, 1998, 1999, 2000 Justin T. Gibbs.
+ * Copyright (c) 1994-2001 Justin T. Gibbs.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,9 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aic7xxx_freebsd.h,v 1.1.1.1 2000/11/21 08:39:02 kawa Exp $
+ * $Id: aic7xxx_freebsd.h,v 1.1.1.2 2001/04/23 13:09:49 sumikawa Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_freebsd.h,v 1.2.2.2 2000/10/05 04:32:20 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_freebsd.h,v 1.2.2.5 2001/03/12 14:57:44 gibbs Exp $
  */
 
 #ifndef _AIC7XXX_FREEBSD_H_
@@ -40,17 +40,16 @@
 #include <opt_aic7xxx.h>	/* for config options */
 #include <pci.h>		/* for NPCI */
 
-#include <stddef.h>		/* For offsetof */
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>		/* For device_t */
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/queue.h>
 
 #if NPCI > 0
-#define AHC_SUPPORT_PCI 1
+#define AHC_PCI_CONFIG 1
 #ifdef AHC_ALLOW_MEMIO
 #include <machine/bus_memio.h>
 #endif
@@ -94,6 +93,9 @@
 	(SCB_GET_CHANNEL(ahc, scb) == 'A' ? (ahc)->platform_data->sim \
 					  : (ahc)->platform_data->sim_b)
 
+#ifndef offsetof
+#define offsetof(type, member)  ((size_t)(&((type *)0)->member))
+#endif
 /************************* Forward Declarations *******************************/
 typedef device_t ahc_dev_softc_t;
 typedef union ccb *ahc_io_ctx_t;
@@ -167,10 +169,30 @@ struct ahc_platform_data {
 	struct resource		*regs;
 	struct resource		*irq;
 	void			*ih;
+	eventhandler_tag	 eh;
 };
 
 struct scb_platform_data {
 };
+
+/********************************* Byte Order *********************************/
+/*
+ * XXX Waiting for FreeBSD byte swapping functions.
+ * For now assume host is Little Endian.
+ */
+#define ahc_htobe16(x) x
+#define ahc_htobe32(x) x
+#define ahc_htobe64(x) x
+#define ahc_htole16(x) x
+#define ahc_htole32(x) x
+#define ahc_htole64(x) x
+
+#define ahc_be16toh(x) x
+#define ahc_be32toh(x) x
+#define ahc_be64toh(x) x
+#define ahc_le16toh(x) x
+#define ahc_le32toh(x) x
+#define ahc_le64toh(x) x
 
 /***************************** Core Includes **********************************/
 #include <dev/aic7xxx/aic7xxx.h>
@@ -385,7 +407,7 @@ ahc_platform_scb_free(struct ahc_softc *ahc, struct scb *scb)
 }
 
 /********************************** PCI ***************************************/
-#ifdef AHC_SUPPORT_PCI
+#ifdef AHC_PCI_CONFIG
 static __inline uint32_t ahc_pci_read_config(ahc_dev_softc_t pci,
 					     int reg, int width);
 static __inline void	 ahc_pci_write_config(ahc_dev_softc_t pci,
@@ -427,10 +449,21 @@ ahc_get_pci_bus(ahc_dev_softc_t pci)
 {
 	return (pci_get_bus(pci));
 }
+
+typedef enum
+{
+	AHC_POWER_STATE_D0,
+	AHC_POWER_STATE_D1,
+	AHC_POWER_STATE_D2,
+	AHC_POWER_STATE_D3
+} ahc_power_state;
+
+void ahc_power_state_change(struct ahc_softc *ahc,
+			    ahc_power_state new_state);
 #endif
 /******************************** VL/EISA *************************************/
 int aic7770_map_registers(struct ahc_softc *ahc);
-int aic7770_map_int(struct ahc_softc *ahc);
+int aic7770_map_int(struct ahc_softc *ahc, int irq);
 
 /********************************* Debug **************************************/
 static __inline void	ahc_print_path(struct ahc_softc *, struct scb *);
@@ -453,11 +486,20 @@ void	  ahc_notify_xfer_settings_change(struct ahc_softc *,
 void	  ahc_platform_set_tags(struct ahc_softc *, struct ahc_devinfo *,
 				int /*enable*/);
 
-/***************************** Initialization *********************************/
+/************************* Initialization/Teardown ****************************/
 int	  ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg);
 void	  ahc_platform_free(struct ahc_softc *ahc);
 int	  ahc_attach(struct ahc_softc *);
 int	  ahc_softc_comp(struct ahc_softc *lahc, struct ahc_softc *rahc);
+int	  ahc_detach(device_t);
+
+/****************************** Interrupts ************************************/
+void			ahc_platform_intr(void *);
+static __inline void	ahc_platform_flushwork(struct ahc_softc *ahc);
+static __inline void
+ahc_platform_flushwork(struct ahc_softc *ahc)
+{
+}
 
 /************************ Misc Function Declarations **************************/
 timeout_t ahc_timeout;

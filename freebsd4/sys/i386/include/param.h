@@ -34,23 +34,39 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/i386/include/param.h,v 1.54.2.2 2000/09/30 02:49:34 ps Exp $
+ * $FreeBSD: src/sys/i386/include/param.h,v 1.54.2.4 2000/12/29 10:59:18 asmodai Exp $
  */
-
-#ifndef _MACHINE_PARAM_H_
-#define	_MACHINE_PARAM_H_
 
 /*
  * Machine dependent constants for Intel 386.
  */
+
+/*
+ * Round p (pointer or byte index) up to a correctly-aligned value
+ * for all data types (int, long, ...).   The result is unsigned int
+ * and must be cast to any desired pointer type.
+ */
+#ifndef _ALIGNBYTES
+#define _ALIGNBYTES	(sizeof(int) - 1)
+#endif
+#ifndef _ALIGN
+#define _ALIGN(p)	(((unsigned)(p) + _ALIGNBYTES) & ~_ALIGNBYTES)
+#endif
+
 #ifndef _MACHINE
 #define	_MACHINE	i386
 #endif
-#ifndef MACHINE
-#define MACHINE		"i386"
-#endif
 #ifndef _MACHINE_ARCH
 #define	_MACHINE_ARCH	i386
+#endif
+
+#ifndef _NO_NAMESPACE_POLLUTION
+
+#ifndef _MACHINE_PARAM_H_
+#define	_MACHINE_PARAM_H_
+
+#ifndef MACHINE
+#define MACHINE		"i386"
 #endif
 #ifndef MACHINE_ARCH
 #define	MACHINE_ARCH	"i386"
@@ -70,13 +86,8 @@
 #define MAXCPU		1
 #endif /* SMP */
 
-/*
- * Round p (pointer or byte index) up to a correctly-aligned value
- * for all data types (int, long, ...).   The result is unsigned int
- * and must be cast to any desired pointer type.
- */
-#define ALIGNBYTES	(sizeof(int) - 1)
-#define ALIGN(p)	(((unsigned)(p) + ALIGNBYTES) & ~ALIGNBYTES)
+#define ALIGNBYTES	_ALIGNBYTES
+#define ALIGN(p)	_ALIGN(p)
 
 #define PAGE_SHIFT	12		/* LOG2(PAGE_SIZE) */
 #define PAGE_SIZE	(1<<PAGE_SHIFT)	/* bytes/page */
@@ -96,6 +107,7 @@
 #endif
 #define DFLTPHYS	(64 * 1024)	/* default max raw I/O transfer size */
 #define MAXPHYS		(128 * 1024)	/* max raw I/O transfer size */
+#define MAXDUMPPGS	(DFLTPHYS/PAGE_SIZE)
 
 #define IOPAGES	2		/* pages of i/o permission bitmap */
 #define UPAGES	2		/* pages of u-area */
@@ -158,3 +170,4 @@
 #define	pgtok(x)		((x) * (PAGE_SIZE / 1024))
 
 #endif /* !_MACHINE_PARAM_H_ */
+#endif /* !_NO_NAMESPACE_POLLUTION */

@@ -3,7 +3,7 @@
 # Makefile.i386 -- with config changes.
 # Copyright 1990 W. Jolitz
 #	from: @(#)Makefile.i386	7.1 5/10/91
-# $FreeBSD: src/sys/conf/Makefile.pc98,v 1.82.2.2 2000/07/07 12:36:58 nyan Exp $
+# $FreeBSD: src/sys/conf/Makefile.pc98,v 1.82.2.5 2001/03/28 09:24:06 kris Exp $
 #
 # Makefile for FreeBSD
 #
@@ -37,7 +37,10 @@ M=	${MACHINE_ARCH}
 SIZE?=		size
 OBJCOPY?=	objcopy
 
-COPTFLAGS?=-O
+COPTFLAGS?=-O -pipe
+.if !defined(NO_CPU_COPTFLAGS)
+COPTFLAGS+= ${_CPUCFLAGS}
+.endif
 INCLUDES= -nostdinc -I- -I. -I$S
 # This hack is to allow kernel compiles to succeed on machines w/out srcdist
 .if exists($S/../include)
@@ -234,23 +237,23 @@ reinstall reinstall.debug: modules-reinstall
 
 modules:
 	@mkdir -p ${.OBJDIR}/modules
-	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules ${MAKE} obj all
+	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules MACHINE=pc98 ${MAKE} obj all
 
 modules-depend:
 	@mkdir -p ${.OBJDIR}/modules
-	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules ${MAKE} obj depend
+	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules MACHINE=pc98 ${MAKE} obj depend
 
 modules-clean:
-	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules ${MAKE} clean
+	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules MACHINE=pc98 ${MAKE} clean
 
 modules-cleandepend:
-	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules ${MAKE} cleandepend
+	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules MACHINE=pc98 ${MAKE} cleandepend
 
 modules-cleandir:
-	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules ${MAKE} cleandir
+	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules MACHINE=pc98 ${MAKE} cleandir
 
 modules-tags:
-	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules ${MAKE} tags
+	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules MACHINE=pc98 ${MAKE} tags
 
 modules-install modules-install.debug:
 .if !defined(NO_MODULES_OLD)
@@ -259,10 +262,10 @@ modules-install modules-install.debug:
 		cp -p ${DESTDIR}/modules/* ${DESTDIR}/modules.old; \
 	fi;
 .endif
-	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules ${MAKE} install
+	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules MACHINE=pc98 ${MAKE} install
 
 modules-reinstall modules-reinstall.debug:
-	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules ${MAKE} install
+	cd $S/modules && env MAKEOBJDIRPREFIX=${.OBJDIR}/modules MACHINE=pc98 ${MAKE} install
 
 config.o:
 	${NORMAL_C}

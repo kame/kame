@@ -1,7 +1,7 @@
 /*
  * mjs copyright
  *
- * $FreeBSD: src/sys/boot/common/pnp.c,v 1.9.2.1 2000/08/03 00:48:57 peter Exp $
+ * $FreeBSD: src/sys/boot/common/pnp.c,v 1.9.2.2 2000/12/28 13:12:36 ps Exp $
  */
 /*
  * "Plug and Play" functionality.
@@ -19,8 +19,6 @@ STAILQ_HEAD(,pnpinfo)	pnp_devices;
 static int		pnp_devices_initted = 0;
 
 static void		pnp_discard(void);
-static int		pnp_readconf(char *path);
-static int		pnp_scankernel(void);
 
 /*
  * Perform complete enumeration sweep

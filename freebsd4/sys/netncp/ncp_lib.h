@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, Boris Popov
+ * Copyright (c) 1999, 2000, 2001 Boris Popov
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netncp/ncp_lib.h,v 1.2 1999/10/31 03:39:02 bp Exp $
+ * $FreeBSD: src/sys/netncp/ncp_lib.h,v 1.2.2.1 2001/02/22 09:09:51 bp Exp $
  */
 
 #ifndef _NETNCP_NCP_LIB_H_
@@ -53,7 +53,7 @@
 		   case 'N':case 'U':case 'R':case 'S':case 'T': \
 		   case 'W':case 'O':case 'P'
 
-#define STDPARAM_OPT	"A:BCI:M:N:O:P:U:R:S:T:W:"
+#define STDPARAM_OPT	"A:BCI:M:NO:P:U:R:S:T:W:"
 
 #ifndef min
 #define	min(a,b)	(((a)<(b)) ? (a) : (b))

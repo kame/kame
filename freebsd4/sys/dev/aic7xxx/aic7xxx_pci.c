@@ -3,7 +3,7 @@
  *      3940, 2940, aic7895, aic7890, aic7880,
  *	aic7870, aic7860 and aic7850 SCSI controllers
  *
- * Copyright (c) 1995, 1996, 1997, 1998, 1999, 2000 Justin T. Gibbs
+ * Copyright (c) 1995-2000 Justin T. Gibbs
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,9 +30,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aic7xxx_pci.c,v 1.1.1.1 2000/11/21 08:39:02 kawa Exp $
+ * $Id: aic7xxx_pci.c,v 1.1.1.2 2001/04/23 13:09:49 sumikawa Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_pci.c,v 1.2.2.4 2000/10/31 18:54:59 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_pci.c,v 1.2.2.10 2001/03/12 18:46:33 gibbs Exp $
  */
 
 #ifdef	__linux__
@@ -63,85 +63,164 @@ ahc_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
 	return (id);
 }
 
-#define ID_ALL_MASK		0xFFFFFFFFFFFFFFFFull
-#define ID_DEV_VENDOR_MASK	0xFFFFFFFF00000000ull
-#define ID_AIC7850		0x5078900400000000ull
-#define ID_AHA_2910_15_20_30C	0x5078900478509004ull
-#define ID_AIC7855		0x5578900400000000ull
-#define ID_AIC7859		0x3860900400000000ull
-#define ID_AHA_2930CU		0x3860900438699004ull
-#define ID_AIC7860		0x6078900400000000ull
-#define ID_AIC7860C		0x6078900478609004ull
-#define ID_AHA_1480A		0x6075900400000000ull
-#define ID_AHA_2940AU_0		0x6178900400000000ull
-#define ID_AHA_2940AU_1		0x6178900478619004ull
-#define ID_AHA_2940AU_CN	0x2178900478219004ull
-#define ID_AHA_2930C_VAR	0x6038900438689004ull
+#define ID_ALL_MASK			0xFFFFFFFFFFFFFFFFull
+#define ID_DEV_VENDOR_MASK		0xFFFFFFFF00000000ull
+#define ID_9005_GENERIC_MASK		0xFFF0FFFF00000000ull
+#define ID_9005_SISL_MASK		0x000FFFFF00000000ull
+#define ID_9005_SISL_ID			0x0005900500000000ull
+#define ID_AIC7850			0x5078900400000000ull
+#define ID_AHA_2902_04_10_15_20_30C	0x5078900478509004ull
+#define ID_AIC7855			0x5578900400000000ull
+#define ID_AIC7859			0x3860900400000000ull
+#define ID_AHA_2930CU			0x3860900438699004ull
+#define ID_AIC7860			0x6078900400000000ull
+#define ID_AIC7860C			0x6078900478609004ull
+#define ID_AHA_1480A			0x6075900400000000ull
+#define ID_AHA_2940AU_0			0x6178900400000000ull
+#define ID_AHA_2940AU_1			0x6178900478619004ull
+#define ID_AHA_2940AU_CN		0x2178900478219004ull
+#define ID_AHA_2930C_VAR		0x6038900438689004ull
 
-#define ID_AIC7870		0x7078900400000000ull
-#define ID_AHA_2940		0x7178900400000000ull
-#define ID_AHA_3940		0x7278900400000000ull
-#define ID_AHA_398X		0x7378900400000000ull
-#define ID_AHA_2944		0x7478900400000000ull
-#define ID_AHA_3944		0x7578900400000000ull
-#define ID_AHA_4944		0x7678900400000000ull
+#define ID_AIC7870			0x7078900400000000ull
+#define ID_AHA_2940			0x7178900400000000ull
+#define ID_AHA_3940			0x7278900400000000ull
+#define ID_AHA_398X			0x7378900400000000ull
+#define ID_AHA_2944			0x7478900400000000ull
+#define ID_AHA_3944			0x7578900400000000ull
+#define ID_AHA_4944			0x7678900400000000ull
 
-#define ID_AIC7880		0x8078900400000000ull
-#define ID_AIC7880_B		0x8078900478809004ull
-#define ID_AHA_2940U		0x8178900400000000ull
-#define ID_AHA_3940U		0x8278900400000000ull
-#define ID_AHA_2944U		0x8478900400000000ull
-#define ID_AHA_3944U		0x8578900400000000ull
-#define ID_AHA_398XU		0x8378900400000000ull
-#define ID_AHA_4944U		0x8678900400000000ull
-#define ID_AHA_2940UB		0x8178900478819004ull
-#define ID_AHA_2930U		0x8878900478889004ull
-#define ID_AHA_2940U_PRO	0x8778900478879004ull
-#define ID_AHA_2940U_CN		0x0078900478009004ull
+#define ID_AIC7880			0x8078900400000000ull
+#define ID_AIC7880_B			0x8078900478809004ull
+#define ID_AHA_2940U			0x8178900400000000ull
+#define ID_AHA_3940U			0x8278900400000000ull
+#define ID_AHA_2944U			0x8478900400000000ull
+#define ID_AHA_3944U			0x8578900400000000ull
+#define ID_AHA_398XU			0x8378900400000000ull
+#define ID_AHA_4944U			0x8678900400000000ull
+#define ID_AHA_2940UB			0x8178900478819004ull
+#define ID_AHA_2930U			0x8878900478889004ull
+#define ID_AHA_2940U_PRO		0x8778900478879004ull
+#define ID_AHA_2940U_CN			0x0078900478009004ull
 
-#define ID_AIC7895		0x7895900478959004ull
-#define ID_AIC7895_RAID_PORT	0x7893900478939004ull
-#define ID_AHA_2940U_DUAL	0x7895900478919004ull
-#define ID_AHA_3940AU		0x7895900478929004ull
-#define ID_AHA_3944AU		0x7895900478949004ull
+#define ID_AIC7895			0x7895900478959004ull
+#define ID_AIC7895_ARO			0x7890900478939004ull
+#define ID_AIC7895_ARO_MASK		0xFFF0FFFFFFFFFFFFull
+#define ID_AHA_2940U_DUAL		0x7895900478919004ull
+#define ID_AHA_3940AU			0x7895900478929004ull
+#define ID_AHA_3944AU			0x7895900478949004ull
 
-#define ID_AIC7890		0x001F9005000F9005ull
-#define ID_AAA_131U2		0x0013900500039005ull
-#define ID_AHA_2930U2		0x0011900501819005ull
-#define ID_AHA_2940U2B		0x00109005A1009005ull
-#define ID_AHA_2940U2_OEM	0x0010900521809005ull
-#define ID_AHA_2940U2		0x00109005A1809005ull
-#define ID_AHA_2950U2B		0x00109005E1009005ull
+#define ID_AIC7890			0x001F9005000F9005ull
+#define ID_AIC7890_ARO			0x00139005000F9005ull
+#define ID_AAA_131U2			0x0013900500039005ull
+#define ID_AHA_2930U2			0x0011900501819005ull
+#define ID_AHA_2940U2B			0x00109005A1009005ull
+#define ID_AHA_2940U2_OEM		0x0010900521809005ull
+#define ID_AHA_2940U2			0x00109005A1809005ull
+#define ID_AHA_2950U2B			0x00109005E1009005ull
 
-#define ID_AIC7892		0x008F9005FFFF9005ull
-#define ID_AHA_29160		0x00809005E2A09005ull
-#define ID_AHA_29160_CPQ	0x00809005E2A00E11ull
-#define ID_AHA_29160N		0x0080900562A09005ull
-#define ID_AHA_29160B		0x00809005E2209005ull
-#define ID_AHA_19160B		0x0081900562A19005ull
+#define ID_AIC7892			0x008F9005FFFF9005ull
+#define ID_AIC7892_ARO			0x00839005FFFF9005ull
+#define ID_AHA_29160			0x00809005E2A09005ull
+#define ID_AHA_29160_CPQ		0x00809005E2A00E11ull
+#define ID_AHA_29160N			0x0080900562A09005ull
+#define ID_AHA_29160C			0x0080900562209005ull
+#define ID_AHA_29160B			0x00809005E2209005ull
+#define ID_AHA_19160B			0x0081900562A19005ull
 
-#define ID_AIC7896		0x005F9005FFFF9005ull
-#define ID_AHA_3950U2B_0	0x00509005FFFF9005ull
-#define ID_AHA_3950U2B_1	0x00509005F5009005ull
-#define ID_AHA_3950U2D_0	0x00519005FFFF9005ull
-#define ID_AHA_3950U2D_1	0x00519005B5009005ull
+#define ID_AIC7896			0x005F9005FFFF9005ull
+#define ID_AIC7896_ARO			0x00539005FFFF9005ull
+#define ID_AHA_3950U2B_0		0x00509005FFFF9005ull
+#define ID_AHA_3950U2B_1		0x00509005F5009005ull
+#define ID_AHA_3950U2D_0		0x00519005FFFF9005ull
+#define ID_AHA_3950U2D_1		0x00519005B5009005ull
 
-#define ID_AIC7899		0x00CF9005FFFF9005ull
-#define ID_AHA_3960D		0x00C09005F6209005ull /* AKA AHA-39160 */
-#define ID_AHA_3960D_CPQ	0x00C09005F6200E11ull
+#define ID_AIC7899			0x00CF9005FFFF9005ull
+#define ID_AIC7899_ARO			0x00C39005FFFF9005ull
+#define ID_AHA_3960D			0x00C09005F6209005ull
+#define ID_AHA_3960D_CPQ		0x00C09005F6200E11ull
 
-#define ID_AIC7810		0x1078900400000000ull
-#define ID_AIC7815		0x7815900400000000ull
+#define ID_AIC7810			0x1078900400000000ull
+#define ID_AIC7815			0x7815900400000000ull
 
-static ahc_device_setup_t ahc_aic7850_setup;
-static ahc_device_setup_t ahc_aic7855_setup;
+#define DEVID_9005_TYPE(id) ((id) & 0xF)
+#define		DEVID_9005_TYPE_HBA		0x0	/* Standard Card */
+#define		DEVID_9005_TYPE_AAA		0x3	/* RAID Card */
+#define		DEVID_9005_TYPE_SISL		0x5	/* Low Cost Card */
+#define		DEVID_9005_TYPE_MB		0xF	/* On Motherboard */
+
+#define DEVID_9005_MAXRATE(id) (((id) & 0x30) >> 4)
+#define		DEVID_9005_MAXRATE_U160		0x0
+#define		DEVID_9005_MAXRATE_ULTRA2	0x1
+#define		DEVID_9005_MAXRATE_ULTRA	0x2
+#define		DEVID_9005_MAXRATE_FAST		0x3
+
+#define DEVID_9005_MFUNC(id) (((id) & 0x40) >> 6)
+
+#define DEVID_9005_CLASS(id) (((id) & 0xFF00) >> 8)
+#define		DEVID_9005_CLASS_SPI		0x0	/* Parallel SCSI */
+
+#define SUBID_9005_TYPE(id) ((id) & 0xF)
+#define		SUBID_9005_TYPE_MB		0xF	/* On Motherboard */
+#define		SUBID_9005_TYPE_CARD		0x0	/* Standard Card */
+#define		SUBID_9005_TYPE_LCCARD		0x1	/* Low Cost Card */
+#define		SUBID_9005_TYPE_RAID		0x3	/* Combined with Raid */
+
+#define SUBID_9005_TYPE_KNOWN(id)			\
+	  ((((id) & 0xF) == SUBID_9005_TYPE_MB)		\
+	|| (((id) & 0xF) == SUBID_9005_TYPE_CARD)	\
+	|| (((id) & 0xF) == SUBID_9005_TYPE_LCCARD)	\
+	|| (((id) & 0xF) == SUBID_9005_TYPE_RAID))
+
+#define SUBID_9005_MAXRATE(id) (((id) & 0x30) >> 4)
+#define		SUBID_9005_MAXRATE_ULTRA2	0x0
+#define		SUBID_9005_MAXRATE_ULTRA	0x1
+#define		SUBID_9005_MAXRATE_U160		0x2
+#define		SUBID_9005_MAXRATE_RESERVED	0x3
+
+#define SUBID_9005_SEEPTYPE(id)						\
+	((SUBID_9005_TYPE(id) == SUBID_9005_TYPE_MB)			\
+	 ? ((id) & 0xC0) >> 6						\
+	 : ((id) & 0x300) >> 8)
+#define		SUBID_9005_SEEPTYPE_NONE	0x0
+#define		SUBID_9005_SEEPTYPE_1K		0x1
+#define		SUBID_9005_SEEPTYPE_2K_4K	0x2
+#define		SUBID_9005_SEEPTYPE_RESERVED	0x3
+#define SUBID_9005_AUTOTERM(id)						\
+	((SUBID_9005_TYPE(id) == SUBID_9005_TYPE_MB)			\
+	 ? (((id) & 0x400) >> 10) == 0					\
+	 : (((id) & 0x40) >> 6) == 0)
+
+#define SUBID_9005_NUMCHAN(id)						\
+	((SUBID_9005_TYPE(id) == SUBID_9005_TYPE_MB)			\
+	 ? ((id) & 0x300) >> 8						\
+	 : ((id) & 0xC00) >> 10)
+
+#define SUBID_9005_LEGACYCONN(id)					\
+	((SUBID_9005_TYPE(id) == SUBID_9005_TYPE_MB)			\
+	 ? 0								\
+	 : ((id) & 0x80) >> 7)
+
+#define SUBID_9005_MFUNCENB(id)						\
+	((SUBID_9005_TYPE(id) == SUBID_9005_TYPE_MB)			\
+	 ? ((id) & 0x800) >> 11						\
+	 : ((id) & 0x1000) >> 12)
+/*
+ * Informational only. Should use chip register to be
+ * ceratian, but may be use in identification strings.
+ */
+#define SUBID_9005_CARD_SCSIWIDTH_MASK	0x2000
+#define SUBID_9005_CARD_PCIWIDTH_MASK	0x4000
+#define SUBID_9005_CARD_SEDIFF_MASK	0x8000
+
+static ahc_device_setup_t ahc_aic785X_setup;
 static ahc_device_setup_t ahc_aic7860_setup;
+static ahc_device_setup_t ahc_apa1480_setup;
 static ahc_device_setup_t ahc_aic7870_setup;
 static ahc_device_setup_t ahc_aha394X_setup;
 static ahc_device_setup_t ahc_aha494X_setup;
 static ahc_device_setup_t ahc_aha398X_setup;
 static ahc_device_setup_t ahc_aic7880_setup;
-static ahc_device_setup_t ahc_2940Pro_setup;
+static ahc_device_setup_t ahc_aha2940Pro_setup;
 static ahc_device_setup_t ahc_aha394XU_setup;
 static ahc_device_setup_t ahc_aha398XU_setup;
 static ahc_device_setup_t ahc_aic7890_setup;
@@ -149,6 +228,7 @@ static ahc_device_setup_t ahc_aic7892_setup;
 static ahc_device_setup_t ahc_aic7895_setup;
 static ahc_device_setup_t ahc_aic7896_setup;
 static ahc_device_setup_t ahc_aic7899_setup;
+static ahc_device_setup_t ahc_aha29160C_setup;
 static ahc_device_setup_t ahc_raid_setup;
 static ahc_device_setup_t ahc_aha394XX_setup;
 static ahc_device_setup_t ahc_aha494XX_setup;
@@ -158,10 +238,10 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 {
 	/* aic7850 based controllers */
 	{
-		ID_AHA_2910_15_20_30C,
+		ID_AHA_2902_04_10_15_20_30C,
 		ID_ALL_MASK,
-		"Adaptec 2910/15/20/30C SCSI adapter",
-		ahc_aic7850_setup
+		"Adaptec 2902/04/10/15/20/30C SCSI adapter",
+		ahc_aic785X_setup
 	},
 	/* aic7860 based controllers */
 	{
@@ -174,7 +254,7 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		ID_AHA_1480A & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
 		"Adaptec 1480A Ultra SCSI adapter",
-		ahc_aic7860_setup
+		ahc_apa1480_setup
 	},
 	{
 		ID_AHA_2940AU_0 & ID_DEV_VENDOR_MASK,
@@ -282,13 +362,20 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		ID_AHA_2940U_PRO & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
 		"Adaptec 2940 Pro Ultra SCSI adapter",
-		ahc_2940Pro_setup
+		ahc_aha2940Pro_setup
 	},
 	{
 		ID_AHA_2940U_CN & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
 		"Adaptec 2940/CN Ultra SCSI adapter",
 		ahc_aic7880_setup
+	},
+	/* Ignore all SISL (AAC on MB) based controllers. */
+	{
+		ID_9005_SISL_ID,
+		ID_9005_SISL_MASK,
+		NULL,
+		NULL
 	},
 	/* aic7890 based controllers */
 	{
@@ -322,6 +409,12 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		ahc_aic7890_setup
 	},
 	{
+		ID_AIC7890_ARO,
+		ID_ALL_MASK,
+		"Adaptec aic7890/91 Ultra2 SCSI adapter (ARO)",
+		ahc_aic7890_setup
+	},
+	{
 		ID_AAA_131U2,
 		ID_ALL_MASK,
 		"Adaptec AAA-131 Ultra2 RAID adapter",
@@ -347,6 +440,12 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		ahc_aic7892_setup
 	},
 	{
+		ID_AHA_29160C,
+		ID_ALL_MASK,
+		"Adaptec 29160C Ultra160 SCSI adapter",
+		ahc_aha29160C_setup
+	},
+	{
 		ID_AHA_29160B,
 		ID_ALL_MASK,
 		"Adaptec 29160B Ultra160 SCSI adapter",
@@ -356,6 +455,12 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		ID_AHA_19160B,
 		ID_ALL_MASK,
 		"Adaptec 19160B Ultra160 SCSI adapter",
+		ahc_aic7892_setup
+	},
+	{
+		ID_AIC7892_ARO,
+		ID_ALL_MASK,
+		"Adaptec aic7892 Ultra2 SCSI adapter (ARO)",
 		ahc_aic7892_setup
 	},
 	/* aic7895 based controllers */	
@@ -375,6 +480,12 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		ID_AHA_3944AU,
 		ID_ALL_MASK,
 		"Adaptec 3944A Ultra SCSI adapter",
+		ahc_aic7895_setup
+	},
+	{
+		ID_AIC7895_ARO,
+		ID_AIC7895_ARO_MASK,
+		"Adaptec aic7895 Ultra SCSI adapter (ARO)",
 		ahc_aic7895_setup
 	},
 	/* aic7896/97 based controllers */	
@@ -402,6 +513,12 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		"Adaptec 3950D Ultra2 SCSI adapter",
 		ahc_aic7896_setup
 	},
+	{
+		ID_AIC7896_ARO,
+		ID_ALL_MASK,
+		"Adaptec aic7896/97 Ultra2 SCSI adapter (ARO)",
+		ahc_aic7896_setup
+	},
 	/* aic7899 based controllers */	
 	{
 		ID_AHA_3960D,
@@ -415,18 +532,24 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		"Adaptec (Compaq OEM) 3960D Ultra160 SCSI adapter",
 		ahc_aic7899_setup
 	},
+	{
+		ID_AIC7899_ARO,
+		ID_ALL_MASK,
+		"Adaptec aic7899 Ultra160 SCSI adapter (ARO)",
+		ahc_aic7899_setup
+	},
 	/* Generic chip probes for devices we don't know 'exactly' */
 	{
 		ID_AIC7850 & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
 		"Adaptec aic7850 SCSI adapter",
-		ahc_aic7850_setup
+		ahc_aic785X_setup
 	},
 	{
 		ID_AIC7855 & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
 		"Adaptec aic7855 SCSI adapter",
-		ahc_aic7855_setup
+		ahc_aic785X_setup
 	},
 	{
 		ID_AIC7859 & ID_DEV_VENDOR_MASK,
@@ -453,14 +576,14 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		ahc_aic7880_setup
 	},
 	{
-		ID_AIC7890 & ID_DEV_VENDOR_MASK,
-		ID_DEV_VENDOR_MASK,
+		ID_AIC7890 & ID_9005_GENERIC_MASK,
+		ID_9005_GENERIC_MASK,
 		"Adaptec aic7890/91 Ultra2 SCSI adapter",
 		ahc_aic7890_setup
 	},
 	{
-		ID_AIC7892 & ID_DEV_VENDOR_MASK,
-		ID_DEV_VENDOR_MASK,
+		ID_AIC7892 & ID_9005_GENERIC_MASK,
+		ID_9005_GENERIC_MASK,
 		"Adaptec aic7892 Ultra160 SCSI adapter",
 		ahc_aic7892_setup
 	},
@@ -471,20 +594,14 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		ahc_aic7895_setup
 	},
 	{
-		ID_AIC7895_RAID_PORT & ID_DEV_VENDOR_MASK,
-		ID_DEV_VENDOR_MASK,
-		"Adaptec aic7895 Ultra SCSI adapter (RAID PORT)",
-		ahc_aic7895_setup
-	},
-	{
-		ID_AIC7896 & ID_DEV_VENDOR_MASK,
-		ID_DEV_VENDOR_MASK,
+		ID_AIC7896 & ID_9005_GENERIC_MASK,
+		ID_9005_GENERIC_MASK,
 		"Adaptec aic7896/97 Ultra2 SCSI adapter",
 		ahc_aic7896_setup
 	},
 	{
-		ID_AIC7899 & ID_DEV_VENDOR_MASK,
-		ID_DEV_VENDOR_MASK,
+		ID_AIC7899 & ID_9005_GENERIC_MASK,
+		ID_9005_GENERIC_MASK,
 		"Adaptec aic7899 Ultra160 SCSI adapter",
 		ahc_aic7899_setup
 	},
@@ -502,7 +619,7 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 	}
 };
 
-const int ahc_num_pci_devs = NUM_ELEMENTS(ahc_pci_ident_table);
+const u_int ahc_num_pci_devs = NUM_ELEMENTS(ahc_pci_ident_table);
 		
 #define AHC_394X_SLOT_CHANNEL_A	4
 #define AHC_394X_SLOT_CHANNEL_B	5
@@ -518,6 +635,7 @@ const int ahc_num_pci_devs = NUM_ELEMENTS(ahc_pci_ident_table);
 
 #define	DEVCONFIG		0x40
 #define		SCBSIZE32	0x00010000ul	/* aic789X only */
+#define		REXTVALID	0x00001000ul	/* ultra cards only */
 #define		MPORTMODE	0x00000400ul	/* aic7870 only */
 #define		RAMPSM		0x00000200ul	/* aic7870 only */
 #define		VOLSENSE	0x00000100ul
@@ -583,10 +701,21 @@ ahc_find_pci_device(ahc_dev_softc_t pci)
 				 subdevice,
 				 subvendor);
 
+	/* If the second function is not hooked up, ignore it. */
+	if (ahc_get_pci_function(pci) > 0
+	 && subvendor == 0x9005
+	 && SUBID_9005_TYPE_KNOWN(subdevice) != 0
+	 && SUBID_9005_MFUNCENB(subdevice) == 0)
+		return (NULL);
+
 	for (i = 0; i < ahc_num_pci_devs; i++) {
 		entry = &ahc_pci_ident_table[i];
-		if (entry->full_id == (full_id & entry->id_mask))
+		if (entry->full_id == (full_id & entry->id_mask)) {
+			/* Honor exclusion entries. */
+			if (entry->name == NULL)
+				return (NULL);
 			return (entry);
+		}
 	}
 	return (NULL);
 }
@@ -616,6 +745,8 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	if (error != 0)
 		return (error);
 
+	ahc_power_state_change(ahc, AHC_POWER_STATE_D0);
+
 	/* Ensure busmastering is enabled */
 	command = ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, /*bytes*/1);
 	command |= PCIM_CMD_BUSMASTEREN;
@@ -629,13 +760,19 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 		return (error);
 
 	/* Remeber how the card was setup in case there is no SEEPROM */
-	pause_sequencer(ahc);
-	if ((ahc->features & AHC_ULTRA2) != 0)
-		our_id = ahc_inb(ahc, SCSIID_ULTRA2) & OID;
-	else
-		our_id = ahc_inb(ahc, SCSIID) & OID;
-	sxfrctl1 = ahc_inb(ahc, SXFRCTL1) & STPWEN;
-	scsiseq = ahc_inb(ahc, SCSISEQ);
+	if ((ahc_inb(ahc, HCNTRL) & POWRDN) == 0) {
+		ahc_pause(ahc);
+		if ((ahc->features & AHC_ULTRA2) != 0)
+			our_id = ahc_inb(ahc, SCSIID_ULTRA2) & OID;
+		else
+			our_id = ahc_inb(ahc, SCSIID) & OID;
+		sxfrctl1 = ahc_inb(ahc, SXFRCTL1) & STPWEN;
+		scsiseq = ahc_inb(ahc, SCSISEQ);
+	} else {
+		sxfrctl1 = STPWEN;
+		our_id = 7;
+		scsiseq = 0;
+	}
 
 	error = ahc_reset(ahc);
 	if (error != 0)
@@ -648,14 +785,11 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 		sfunct = ahc_inb(ahc, SFUNCT) & ~ALT_MODE;
 		ahc_outb(ahc, SFUNCT, sfunct | ALT_MODE);
 		ahc_outb(ahc, OPTIONMODE, OPTIONMODE_DEFAULTS);
-		/* Send CRC info in target mode every 4K */
-		ahc_outb(ahc, TARGCRCCNT, 0);
-		ahc_outb(ahc, TARGCRCCNT + 1, 0x10);
 		ahc_outb(ahc, SFUNCT, sfunct);
 
 		/* Normal mode setup */
 		ahc_outb(ahc, CRCCONTROL1, CRCVALCHKEN|CRCENDCHKEN|CRCREQCHKEN
-					  |TARGCRCENDEN|TARGCRCCNTEN);
+					  |TARGCRCENDEN);
 	}
 
 	error = ahc_pci_map_int(ahc);
@@ -715,6 +849,7 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 			printf("%s: Using left over BIOS settings\n",
 				ahc_name(ahc));
 			ahc->flags &= ~AHC_USEDEFAULTS;
+			ahc->flags |= AHC_BIOS_ENABLED;
 		} else {
 			/*
 			 * Assume only one connector and always turn
@@ -741,6 +876,20 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	 */
 	if ((sxfrctl1 & STPWEN) != 0)
 		ahc->flags |= AHC_TERM_ENB_A;
+
+	/*
+	 * We cannot perform ULTRA speeds without
+	 * the presense of the external precision
+	 * resistor.
+	 */
+	if ((ahc->features & AHC_ULTRA) != 0) {
+		uint32_t devconfig;
+
+		devconfig = ahc_pci_read_config(ahc->dev_softc,
+						DEVCONFIG, /*bytes*/4);
+		if ((devconfig & REXTVALID) == 0)
+			ahc->flags |= AHC_ULTRA_DISABLED;
+	}
 
 	/* Core initialization */
 	error = ahc_init(ahc);
@@ -1004,32 +1153,37 @@ check_extport(struct ahc_softc *ahc, u_int *sxfrctl1)
 			}
 			sd.sd_chip = C56_66;
 		}
+		release_seeprom(&sd);
 	}
 
-#if 0
 	if (!have_seeprom) {
 		/*
 		 * Pull scratch ram settings and treat them as
 		 * if they are the contents of an seeprom if
 		 * the 'ADPT' signature is found in SCB2.
+		 * We manually compose the data as 16bit values
+		 * to avoid endian issues.
 		 */
 		ahc_outb(ahc, SCBPTR, 2);
 		if (ahc_inb(ahc, SCB_BASE) == 'A'
 		 && ahc_inb(ahc, SCB_BASE + 1) == 'D'
 		 && ahc_inb(ahc, SCB_BASE + 2) == 'P'
 		 && ahc_inb(ahc, SCB_BASE + 3) == 'T') {
-			uint8_t *sc_bytes;
+			uint16_t *sc_data;
 			int	  i;
 
-			sc_bytes = (uint8_t *)&sc;
-			for (i = 0; i < 64; i++)
-				sc_bytes[i] = ahc_inb(ahc, TARG_SCSIRATE + i);
-			/* Byte 0x1c is stored in byte 4 of SCB2 */
-			sc_bytes[0x1c] = ahc_inb(ahc, SCB_BASE + 4);
+			sc_data = (uint16_t *)&sc;
+			for (i = 0; i < 32; i++) {
+				uint16_t val;
+				int	 j;
+
+				j = i * 2;
+				val = ahc_inb(ahc, SRAM_BASE + j)
+				    | ahc_inb(ahc, SRAM_BASE + j + 1) << 8;
+			}
 			have_seeprom = verify_cksum(&sc);
 		}
 	}
-#endif
 
 	if (!have_seeprom) {
 		if (bootverbose)
@@ -1115,8 +1269,14 @@ check_extport(struct ahc_softc *ahc, u_int *sxfrctl1)
 		if (sc.adapter_control & CFRESETB)
 			scsi_conf |= RESET_SCSI;
 
+		ahc->flags |=
+		    (sc.adapter_control & CFBOOTCHAN) >> CFBOOTCHANSHIFT;
+
 		if (sc.bios_control & CFEXTEND)
 			ahc->flags |= AHC_EXTENDED_TRANS_A;
+
+		if (sc.bios_control & CFBIOSEN)
+			ahc->flags |= AHC_BIOS_ENABLED;
 		if (ahc->features & AHC_ULTRA
 		 && (ahc->flags & AHC_NEWEEPROM_FMT) == 0) {
 			/* Should we enable Ultra mode? */
@@ -1125,7 +1285,8 @@ check_extport(struct ahc_softc *ahc, u_int *sxfrctl1)
 				ultraenb = 0;
 		}
 
-		if (sc.signature == CFSIGNATURE) {
+		if (sc.signature == CFSIGNATURE
+		 || sc.signature == CFSIGNATURE2) {
 			uint32_t devconfig;
 
 			/* Honor the STPWLEVEL settings */
@@ -1169,10 +1330,11 @@ check_extport(struct ahc_softc *ahc, u_int *sxfrctl1)
 			have_autoterm = FALSE;
 	}
 
-	if (have_autoterm)
+	if (have_autoterm) {
+		acquire_seeprom(ahc, &sd);
 		configure_termination(ahc, &sd, adapter_control, sxfrctl1);
-
-	release_seeprom(&sd);
+		release_seeprom(&sd);
+	}
 }
 
 static void
@@ -1207,6 +1369,7 @@ configure_termination(struct ahc_softc *ahc,
 		int enableSEC_high;
 		int enablePRI_low;
 		int enablePRI_high;
+		int sum;
 
 		enableSEC_low = 0;
 		enableSEC_high = 0;
@@ -1251,21 +1414,22 @@ configure_termination(struct ahc_softc *ahc,
 		if ((ahc->features & AHC_WIDE) == 0)
 			internal68_present = 0;
 
-		if (bootverbose) {
-			if ((ahc->features & AHC_ULTRA2) == 0) {
-				printf("%s: internal 50 cable %s present, "
-				       "internal 68 cable %s present\n",
-				       ahc_name(ahc),
-				       internal50_present ? "is":"not",
-				       internal68_present ? "is":"not");
+		if (bootverbose
+		 && (ahc->features & AHC_ULTRA2) == 0) {
+			printf("%s: internal 50 cable %s present",
+			       ahc_name(ahc),
+			       internal50_present ? "is":"not");
 
-				printf("%s: external cable %s present\n",
-				       ahc_name(ahc),
-				       externalcable_present ? "is":"not");
-			}
+			if ((ahc->features & AHC_WIDE) != 0)
+				printf(", internal 68 cable %s present",
+				       internal68_present ? "is":"not");
+			printf("\n%s: external cable %s present\n",
+			       ahc_name(ahc),
+			       externalcable_present ? "is":"not");
+		}
+		if (bootverbose)
 			printf("%s: BIOS eeprom %s present\n",
 			       ahc_name(ahc), eeprom_present ? "is" : "not");
-		}
 
 		if ((ahc->flags & AHC_INT50_SPEEDFLEX) != 0) {
 			/*
@@ -1287,9 +1451,9 @@ configure_termination(struct ahc_softc *ahc,
 		 * Primary High Term Enable = BRDDAT4 (7890)
 		 */
 		if ((ahc->features & AHC_ULTRA2) == 0
-		    && (internal50_present != 0)
-		    && (internal68_present != 0)
-		    && (externalcable_present != 0)) {
+		 && (internal50_present != 0)
+		 && (internal68_present != 0)
+		 && (externalcable_present != 0)) {
 			printf("%s: Illegal cable configuration!!. "
 			       "Only two connectors on the "
 			       "adapter may be used at a "
@@ -1313,10 +1477,9 @@ configure_termination(struct ahc_softc *ahc,
 			}
 		}
 
-		if (((internal50_present ? 1 : 0)
-		   + (internal68_present ? 1 : 0)
-		   + (externalcable_present ? 1 : 0)) <= 1
-		 || (enableSEC_low != 0)) {
+		sum = internal50_present + internal68_present
+		    + externalcable_present;
+		if (sum < 2 || (enableSEC_low != 0)) {
 			if ((ahc->features & AHC_ULTRA2) != 0)
 				brddat |= BRDDAT5;
 			else
@@ -1367,7 +1530,8 @@ configure_termination(struct ahc_softc *ahc,
 								    : "");
 		}
 
-		if ((adapter_control & CFWSTERM) != 0) {
+		if ((adapter_control & CFWSTERM) != 0
+		 && (ahc->features & AHC_WIDE) != 0) {
 			brddat |= BRDDAT6;
 			if (bootverbose)
 				printf("%s: %sHigh byte termination Enabled\n",
@@ -1382,7 +1546,8 @@ configure_termination(struct ahc_softc *ahc,
 		 */
 		ahc_outb(ahc, SXFRCTL1, *sxfrctl1);
 
-		write_brdctl(ahc, brddat);
+		if ((ahc->features & AHC_WIDE) != 0)
+			write_brdctl(ahc, brddat);
 	}
 	SEEPROM_OUTB(sd, sd->sd_MS); /* Clear CS */
 }
@@ -1431,8 +1596,8 @@ aic787X_cable_detect(struct ahc_softc *ahc, int *internal50_present,
 	 * BRDDAT7 is INT68.
 	 */
 	brdctl = read_brdctl(ahc);
-	*internal50_present = !(brdctl & BRDDAT6);
-	*internal68_present = !(brdctl & BRDDAT7);
+	*internal50_present = (brdctl & BRDDAT6) ? 0 : 1;
+	*internal68_present = (brdctl & BRDDAT7) ? 0 : 1;
 
 	/*
 	 * Set the rom bank to 1 and determine
@@ -1446,8 +1611,8 @@ aic787X_cable_detect(struct ahc_softc *ahc, int *internal50_present,
 	 * BRDDAT7 is EPROMPS.
 	 */
 	brdctl = read_brdctl(ahc);
-	*externalcable_present = !(brdctl & BRDDAT6);
-	*eeprom_present = brdctl & BRDDAT7;
+	*externalcable_present = (brdctl & BRDDAT6) ? 0 : 1;
+	*eeprom_present = (brdctl & BRDDAT7) ? 1 : 0;
 }
 
 static void
@@ -1459,10 +1624,10 @@ aic785X_cable_detect(struct ahc_softc *ahc, int *internal50_present,
 	ahc_outb(ahc, BRDCTL, BRDRW|BRDCS);
 	ahc_outb(ahc, BRDCTL, 0);
 	brdctl = ahc_inb(ahc, BRDCTL);
-	*internal50_present = !(brdctl & BRDDAT5);
-	*externalcable_present = !(brdctl & BRDDAT6);
+	*internal50_present = (brdctl & BRDDAT5) ? 0 : 1;
+	*externalcable_present = (brdctl & BRDDAT6) ? 0 : 1;
 
-	*eeprom_present = (ahc_inb(ahc, SPIOCAP) & EEPROM) != 0;
+	*eeprom_present = (ahc_inb(ahc, SPIOCAP) & EEPROM) ? 1 : 0;
 }
 	
 static int
@@ -1515,16 +1680,16 @@ write_brdctl(struct ahc_softc *ahc, uint8_t value)
 		brdctl = BRDSTB|BRDCS;
 	}
 	ahc_outb(ahc, BRDCTL, brdctl);
-	ahc_delay(20);
+	ahc_flush_device_writes(ahc);
 	brdctl |= value;
 	ahc_outb(ahc, BRDCTL, brdctl);
-	ahc_delay(20);
+	ahc_flush_device_writes(ahc);
 	if ((ahc->features & AHC_ULTRA2) != 0)
 		brdctl |= BRDSTB_ULTRA2;
 	else
 		brdctl &= ~BRDSTB;
 	ahc_outb(ahc, BRDCTL, brdctl);
-	ahc_delay(20);
+	ahc_flush_device_writes(ahc);
 	if ((ahc->features & AHC_ULTRA2) != 0)
 		brdctl = 0;
 	else
@@ -1549,7 +1714,7 @@ read_brdctl(ahc)
 		brdctl = BRDRW|BRDCS;
 	}
 	ahc_outb(ahc, BRDCTL, brdctl);
-	ahc_delay(20);
+	ahc_flush_device_writes(ahc);
 	value = ahc_inb(ahc, BRDCTL);
 	ahc_outb(ahc, BRDCTL, 0);
 	return (value);
@@ -1610,28 +1775,22 @@ ahc_pci_intr(struct ahc_softc *ahc)
 		ahc_outb(ahc, CLRINT, CLRPARERR);
 	}
 
-	unpause_sequencer(ahc);
+	ahc_unpause(ahc);
 }
 
 static int
-ahc_aic7850_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
+ahc_aic785X_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
 {
+	uint8_t rev;
+
 	probe_config->channel = 'A';
 	probe_config->chip = AHC_AIC7850;
 	probe_config->features = AHC_AIC7850_FE;
 	probe_config->bugs |= AHC_TMODE_WIDEODD_BUG|AHC_CACHETHEN_BUG
 			   |  AHC_PCI_MWI_BUG;
-	return (0);
-}
-
-static int
-ahc_aic7855_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
-{
-	probe_config->channel = 'A';
-	probe_config->chip = AHC_AIC7855;
-	probe_config->features = AHC_AIC7855_FE;
-	probe_config->bugs |= AHC_TMODE_WIDEODD_BUG|AHC_CACHETHEN_BUG
-			   |  AHC_PCI_MWI_BUG;
+	rev = ahc_pci_read_config(pci, PCIR_REVID, /*bytes*/1);
+	if (rev >= 1)
+		probe_config->bugs |= AHC_PCI_2_1_RETRY_BUG;
 	return (0);
 }
 
@@ -1648,6 +1807,18 @@ ahc_aic7860_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
 	rev = ahc_pci_read_config(pci, PCIR_REVID, /*bytes*/1);
 	if (rev >= 1)
 		probe_config->bugs |= AHC_PCI_2_1_RETRY_BUG;
+	return (0);
+}
+
+static int
+ahc_apa1480_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
+{
+	int error;
+
+	error = ahc_aic7860_setup(pci, probe_config);
+	if (error != 0)
+		return (error);
+	probe_config->features |= AHC_REMOVABLE;
 	return (0);
 }
 
@@ -1714,7 +1885,7 @@ ahc_aic7880_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
 }
 
 static int
-ahc_2940Pro_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
+ahc_aha2940Pro_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
 {
 	int error;
 
@@ -1843,6 +2014,18 @@ ahc_aic7899_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
 	probe_config->features = AHC_AIC7899_FE;
 	probe_config->flags |= AHC_NEWEEPROM_FMT;
 	probe_config->bugs |= AHC_SCBCHAN_UPLOAD_BUG;
+	return (0);
+}
+
+static int
+ahc_aha29160C_setup(ahc_dev_softc_t pci, struct ahc_probe_config *probe_config)
+{
+	int error;
+
+	error = ahc_aic7899_setup(pci, probe_config);
+	if (error != 0)
+		return (error);
+	probe_config->features |= AHC_REMOVABLE;
 	return (0);
 }
 

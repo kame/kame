@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.7 2000/09/21 17:19:14 ru Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.13 2001/03/11 22:18:00 iedowse Exp $
  */
 
 #define _IP_VHL
@@ -131,7 +131,7 @@ ip_output(m0, opt, ro, flags, imo)
 	int hlen = sizeof (struct ip);
 	int len, off, error = 0;
 	struct sockaddr_in *dst;
-	struct in_ifaddr *ia;
+	struct in_ifaddr *ia = NULL;
 	int isbroadcast, sw_csum;
 #ifdef IPSEC
 	struct route iproute;
@@ -179,6 +179,8 @@ ip_output(m0, opt, ro, flags, imo)
 #endif
             ip = mtod(m, struct ip *);
             hlen = IP_VHL_HL(ip->ip_vhl) << 2 ;
+            if (ro->ro_rt != NULL)
+                ia = (struct in_ifaddr *)ro->ro_rt->rt_ifa;
             goto sendit;
         } else
             rule = NULL ;
@@ -310,8 +312,7 @@ ip_output(m0, opt, ro, flags, imo)
 		if (ip->ip_src.s_addr == INADDR_ANY) {
 			register struct in_ifaddr *ia1;
 
-			for (ia1 = in_ifaddrhead.tqh_first; ia1;
-			     ia1 = ia1->ia_link.tqe_next)
+			TAILQ_FOREACH(ia1, &in_ifaddrhead, ia_link)
 				if (ia1->ia_ifp == ifp) {
 					ip->ip_src = IA_SIN(ia1)->sin_addr;
 					break;
@@ -449,10 +450,10 @@ sendit:
 		    hlen, ifp, &divert_cookie, &m, &rule, &dst);
                 /*
                  * On return we must do the following:
-                 * m == NULL         -> drop the pkt
+                 * IP_FW_PORT_DENY_FLAG		-> drop the pkt (XXX new)
                  * 1<=off<= 0xffff   -> DIVERT
-                 * (off & 0x10000)   -> send to a DUMMYNET pipe
-                 * (off & 0x20000)   -> TEE the packet
+                 * (off & IP_FW_PORT_DYNT_FLAG)	-> send to a DUMMYNET pipe
+                 * (off & IP_FW_PORT_TEE_FLAG)	-> TEE the packet
                  * dst != old        -> IPFIREWALL_FORWARD
                  * off==0, dst==old  -> accept
                  * If some of the above modules is not compiled in, then
@@ -461,10 +462,13 @@ sendit:
                  * unsupported rules), but better play safe and drop
                  * packets in case of doubt.
                  */
-		if (!m) { /* firewall said to reject */
-			error = EACCES;
-			goto done;
+		if ( (off & IP_FW_PORT_DENY_FLAG) || m == NULL) {
+			if (m)
+				m_freem(m);
+			error = EACCES ;
+			goto done ;
 		}
+		ip = mtod(m, struct ip *);
 		if (off == 0 && dst == old) /* common case */
 			goto pass ;
 #ifdef DUMMYNET
@@ -478,9 +482,9 @@ sendit:
                      * XXX note: if the ifp or ro entry are deleted
                      * while a pkt is in dummynet, we are in trouble!
                      */ 
-                    dummynet_io(off & 0xffff, DN_TO_IP_OUT, m,ifp,ro,dst,rule, 
-				flags);
-			goto done;
+		    error = dummynet_io(off & 0xffff, DN_TO_IP_OUT, m,
+				ifp,ro,dst,rule, flags);
+		    goto done;
 		}
 #endif   
 #ifdef IPDIVERT
@@ -553,8 +557,7 @@ sendit:
 			 * as the packet runs through ip_input() as
 			 * it is done through a ISR.
 			 */
-			for (ia = TAILQ_FIRST(&in_ifaddrhead); ia;
-					ia = TAILQ_NEXT(ia, ia_link)) {
+			TAILQ_FOREACH(ia, &in_ifaddrhead, ia_link) {
 				/*
 				 * If the addr to forward to is one
 				 * of ours, we pretend to
@@ -750,7 +753,7 @@ pass:
 			goto bad;
 		}
 	} else {
-		/* nobody uses ia beyond here */
+		ia = ifatoia(ro->ro_rt->rt_ifa);
 		ifp = ro->ro_rt->rt_ifp;
 	}
 
@@ -784,6 +787,13 @@ skip_ipsec:
 				ip->ip_sum = in_cksum(m, hlen);
 			}
 		}
+
+		/* Record statistics for this interface address. */
+		if (!(flags & IP_FORWARDING) && ia != NULL) {
+			ia->ia_ifa.if_opackets++;
+			ia->ia_ifa.if_obytes += m->m_pkthdr.len;
+		}
+
 		error = (*ifp->if_output)(ifp, m,
 				(struct sockaddr *)dst, ro->ro_rt);
 		goto done;
@@ -912,10 +922,16 @@ sendorfree:
 	for (m = m0; m; m = m0) {
 		m0 = m->m_nextpkt;
 		m->m_nextpkt = 0;
-		if (error == 0)
+		if (error == 0) {
+			/* Record statistics for this interface address. */
+			if (ia != NULL) {
+				ia->ia_ifa.if_opackets++;
+				ia->ia_ifa.if_obytes += m->m_pkthdr.len;
+			}
+			
 			error = (*ifp->if_output)(ifp, m,
 			    (struct sockaddr *)dst, ro->ro_rt);
-		else
+		} else
 			m_freem(m);
 	}
 

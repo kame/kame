@@ -10,7 +10,7 @@
 # Note! This script uses strftime() which is a gawk-ism, and the
 # POSIX [[:space:]] character class.
 #
-# $FreeBSD: src/sys/boot/ficl/softwords/softcore.awk,v 1.3.2.1 2000/07/06 23:51:46 obrien Exp $
+# $FreeBSD: src/sys/boot/ficl/softwords/softcore.awk,v 1.3.2.2 2001/03/04 04:55:10 obrien Exp $
 
 BEGIN \
 {
@@ -20,7 +20,7 @@ BEGIN \
   printf "** Words from CORE set written in FICL\n";
   printf "** Author: John Sadler (john_sadler@alum.mit.edu)\n";
   printf "** Created: 27 December 1997\n";
-  printf "** Last update: %s\n", strftime();
+  printf "** Last update: %s\n", datestamp;
   printf "***************************************************************/\n";
   printf "\n/*\n";
   printf "** This file contains definitions that are compiled into the\n";

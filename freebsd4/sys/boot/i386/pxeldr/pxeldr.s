@@ -13,7 +13,7 @@
 # purpose.
 #
 
-# $FreeBSD: src/sys/boot/i386/pxeldr/pxeldr.s,v 1.1.2.2 2000/07/06 23:04:30 obrien Exp $
+# $FreeBSD: src/sys/boot/i386/pxeldr/pxeldr.s,v 1.1.2.4 2001/03/04 05:08:21 obrien Exp $
 
 #
 # This simple program is a preloader for the normal boot3 loader.  It is simply
@@ -22,7 +22,7 @@
 # boot[12] environment (protected mode, a bootinfo struct, etc.), and then jumps
 # to the start of btxldr to start the boot process.  This method allows a stock
 # /boot/loader to be booted over the network via PXE w/o having to write a
-# seperate PXE-aware client just to load the loader.
+# separate PXE-aware client just to load the loader.
 #
 
 #
@@ -37,6 +37,7 @@
 		.set MEM_BTX_ENTRY,0x9010	# where BTX starts to execute
 		.set MEM_BTX_OFFSET,MEM_PAGE_SIZE # offset of BTX in the loader
 		.set MEM_BTX_CLIENT,0xa000	# where BTX clients live
+		.set MEM_BIOS_KEYBOARD,0x496	# BDA byte with keyboard bit
 #
 # a.out header fields
 #
@@ -52,6 +53,10 @@
 		.set KARGS_FLAGS_PXE,0x2	# flag to indicate booting from
 						#  PXE loader
 #
+# Boot howto bits
+#
+		.set RB_SERIAL,0x1000		# serial console
+#
 # Segment selectors.
 #
 		.set SEL_SDATA,0x8		# Supervisor data
@@ -62,6 +67,10 @@
 # BTX constants
 #
 		.set INT_SYS,0x30		# BTX syscall interrupt
+#
+# Bit in MEM_BIOS_KEYBOARD that is set if an enhanced keyboard is present
+#
+		.set KEYBOARD_BIT,0x10
 #
 # We expect to be loaded by the BIOS at 0x7c00 (standard boot loader entry
 # point)
@@ -101,6 +110,15 @@ start:		cld				# string ops inc
 		orb $KARGS_FLAGS_PXE, 0x8(%bx)	# kargs->bootflags |=
 						#  KARGS_FLAGS_PXE
 		popl 0xc(%bx)			# kargs->pxeinfo = *PXENV+
+ifdef(`PROBE_KEYBOARD',`
+#
+# Look at the BIOS data area to see if we have an enhanced keyboard.  If not,
+# set the RBX_SERIAL bit in the howto byte.
+		testb $KEYBOARD_BIT, MEM_BIOS_KEYBOARD # keyboard present?
+		jnz keyb			# yes, so skip
+		orl $RB_SERIAL, (%bx)		# enable serial console
+keyb:
+')
 #
 # Turn on the A20 address line
 #

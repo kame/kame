@@ -1,7 +1,7 @@
 /*
  * FreeBSD, PCI product support functions
  *
- * Copyright (c) 1995, 1996, 1997, 1998, 1999, 2000 Justin T. Gibbs
+ * Copyright (c) 1995-2001 Justin T. Gibbs
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,9 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ahc_pci.c,v 1.1.1.2 2000/11/21 08:39:02 kawa Exp $
+ * $Id: ahc_pci.c,v 1.1.1.3 2001/04/23 13:09:46 sumikawa Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/ahc_pci.c,v 1.29.2.3 2000/09/23 00:23:59 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/ahc_pci.c,v 1.29.2.6 2001/03/12 14:57:40 gibbs Exp $
  */
 
 #include <dev/aic7xxx/aic7xxx_freebsd.h>
@@ -45,6 +45,7 @@ static device_method_t ahc_pci_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		ahc_pci_probe),
 	DEVMETHOD(device_attach,	ahc_pci_attach),
+	DEVMETHOD(device_detach,	ahc_detach),
 	{ 0, 0 }
 };
 
@@ -57,6 +58,7 @@ static driver_t ahc_pci_driver = {
 static devclass_t ahc_devclass;
 
 DRIVER_MODULE(ahc, pci, ahc_pci_driver, ahc_devclass, 0, 0);
+DRIVER_MODULE(ahc, cardbus, ahc_pci_driver, ahc_devclass, 0, 0);
 
 static int
 ahc_pci_probe(device_t dev)
@@ -92,9 +94,11 @@ ahc_pci_attach(device_t dev)
 	if (name == NULL)
 		return (ENOMEM);
 	strcpy(name, device_get_nameunit(dev));
-	ahc = ahc_alloc(NULL, name);
+	ahc = ahc_alloc(dev, name);
 	if (ahc == NULL)
 		return (ENOMEM);
+
+	ahc_set_unit(ahc, device_get_unit(dev));
 
 	/* Allocate a dmatag for our SCB DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
@@ -139,6 +143,7 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 	regs_id = 0;
 #ifdef AHC_ALLOW_MEMIO
 	if ((command & PCIM_CMD_MEMEN) != 0) {
+
 		regs_type = SYS_RES_MEMORY;
 		regs_id = AHC_PCI_MEMADDR;
 		regs = bus_alloc_resource(ahc->dev_softc, regs_type,
@@ -161,6 +166,11 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 				bus_release_resource(ahc->dev_softc, regs_type,
 						     regs_id, regs);
 				regs = NULL;
+			} else {
+				command &= ~PCIM_CMD_PORTEN;
+				ahc_pci_write_config(ahc->dev_softc,
+						     PCIR_COMMAND,
+						     command, /*bytes*/1);
 			}
 		}
 	}
@@ -172,6 +182,10 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 					  &regs_id, 0, ~0, 1, RF_ACTIVE);
 		ahc->tag = rman_get_bustag(regs);
 		ahc->bsh = rman_get_bushandle(regs);
+		command &= ~PCIM_CMD_MEMEN;
+		ahc_pci_write_config(ahc->dev_softc,
+				     PCIR_COMMAND,
+				     command, /*bytes*/1);
 	}
 	ahc->platform_data->regs_res_type = regs_type;
 	ahc->platform_data->regs_res_id = regs_id;
@@ -198,4 +212,39 @@ ahc_pci_map_int(struct ahc_softc *ahc)
 		return (ENOMEM);
 	ahc->platform_data->irq_res_type = SYS_RES_IRQ;
 	return (0);
+}
+
+void
+ahc_power_state_change(struct ahc_softc *ahc, ahc_power_state new_state)
+{
+	uint32_t cap;
+	u_int cap_offset;
+
+	/*
+	 * Traverse the capability list looking for
+	 * the power management capability.
+	 */
+	cap = 0;
+	cap_offset = ahc_pci_read_config(ahc->dev_softc,
+					 PCIR_CAP_PTR, /*bytes*/1);
+	while (cap_offset != 0) {
+
+		cap = ahc_pci_read_config(ahc->dev_softc,
+					  cap_offset, /*bytes*/4);
+		if ((cap & 0xFF) == 1
+		 && ((cap >> 16) & 0x3) > 0) {
+			uint32_t pm_control;
+
+			pm_control = ahc_pci_read_config(ahc->dev_softc,
+							 cap_offset + 4,
+							 /*bytes*/4);
+			pm_control &= ~0x3;
+			pm_control |= new_state;
+			ahc_pci_write_config(ahc->dev_softc,
+					     cap_offset + 4,
+					     pm_control, /*bytes*/2);
+			break;
+		}
+		cap_offset = (cap >> 8) & 0xFF;
+	}
 }

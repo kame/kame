@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.19.2.5 2000/10/05 05:07:49 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.19.2.7 2001/03/18 17:09:54 cg Exp $
  */
 
 #include <dev/sound/chip.h>
@@ -43,6 +43,7 @@ struct sbc_ihl {
 /* Here is the parameter structure per a device. */
 struct sbc_softc {
 	device_t dev; /* device */
+	device_t child_pcm, child_midi1, child_midi2;
 
 	int io_rid[IO_MAX]; /* io port rids */
 	struct resource *io[IO_MAX]; /* io port resources */
@@ -218,6 +219,7 @@ static struct isa_pnp_id sbc_ids[] = {
 	{0x01100000, "Avance Asound 110"},		/* @@@1001 */
 	{0x01200000, "Avance Logic ALS120"},		/* @@@2001 - ViBRA16X clone */
 
+	{0x81167316, "ESS ES1681"},			/* ESS1681 */
 	{0x02017316, "ESS ES1688"},			/* ESS1688 */
 	{0x68187316, "ESS ES1868"},			/* ESS1868 */
 	{0x03007316, "ESS ES1869"},			/* ESS1869 */
@@ -265,16 +267,20 @@ sbc_probe(device_t dev)
 		if (ver == 0) goto bad2;
 		switch ((ver & 0x00000f00) >> 8) {
 		case 1:
+			device_set_desc(dev, "SoundBlaster 1.0 (not supported)");
+			s = NULL;
+			break;
+
 		case 2:
-			s = "Soundblaster";
+			s = "SoundBlaster 2.0";
 			break;
 
 		case 3:
-			s = (ver & 0x0000f000)? "ESS 488" : "Soundblaster Pro";
+			s = (ver & 0x0000f000)? "ESS 488" : "SoundBlaster Pro";
 			break;
 
 		case 4:
-			s = "Soundblaster 16";
+			s = "SoundBlaster 16";
 			break;
 
 		case 5:
@@ -293,7 +299,6 @@ sbc_attach(device_t dev)
 	char *err = NULL;
 	struct sbc_softc *scp;
 	struct sndcard_func *func;
-	device_t child;
 	u_int32_t logical_id = isa_get_logicalid(dev);
     	int flags = device_get_flags(dev);
 	int f, dh, dl, x, irq, i;
@@ -400,24 +405,24 @@ sbc_attach(device_t dev)
 	if (func == NULL) goto bad;
 	bzero(func, sizeof(*func));
 	func->func = SCF_PCM;
-	child = device_add_child(dev, "pcm", -1);
-	device_set_ivars(child, func);
+	scp->child_pcm = device_add_child(dev, "pcm", -1);
+	device_set_ivars(scp->child_pcm, func);
 
 	/* Midi Interface */
 	func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT);
 	if (func == NULL) goto bad;
 	bzero(func, sizeof(*func));
 	func->func = SCF_MIDI;
-	child = device_add_child(dev, "midi", -1);
-	device_set_ivars(child, func);
+	scp->child_midi1 = device_add_child(dev, "midi", -1);
+	device_set_ivars(scp->child_midi1, func);
 
 	/* OPL FM Synthesizer */
 	func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT);
 	if (func == NULL) goto bad;
 	bzero(func, sizeof(*func));
 	func->func = SCF_SYNTH;
-	child = device_add_child(dev, "midi", -1);
-	device_set_ivars(child, func);
+	scp->child_midi2 = device_add_child(dev, "midi", -1);
+	device_set_ivars(scp->child_midi2, func);
 
 	/* probe/attach kids */
 	bus_generic_attach(dev);
@@ -434,6 +439,9 @@ sbc_detach(device_t dev)
 {
 	struct sbc_softc *scp = device_get_softc(dev);
 
+	device_delete_child(dev, scp->child_midi2);
+	device_delete_child(dev, scp->child_midi1);
+	device_delete_child(dev, scp->child_pcm);
 	release_resource(scp);
 	return bus_generic_detach(dev);
 }
@@ -733,5 +741,3 @@ static driver_t sbc_driver = {
 DRIVER_MODULE(snd_sbc, isa, sbc_driver, sbc_devclass, 0, 0);
 MODULE_DEPEND(snd_sbc, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
 MODULE_VERSION(snd_sbc, 1);
-
-

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000 Søren Schmidt
+ * Copyright (c) 1998,1999,2000,2001 Søren Schmidt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,10 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-disk.c,v 1.60.2.9 2000/11/04 23:04:52 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-disk.c,v 1.60.2.12 2001/04/05 17:21:54 sos Exp $
  */
 
-#include "apm.h"
 #include "opt_global.h"
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -41,6 +40,8 @@
 #include <sys/disk.h>
 #include <sys/devicestat.h>
 #include <sys/cons.h>
+#include <sys/sysctl.h>
+#include <sys/syslog.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <machine/bus.h>
@@ -98,7 +99,20 @@ static int ad_version(u_int16_t);
 
 /* internal vars */
 static u_int32_t adp_lun_map = 0;
-MALLOC_DEFINE(M_AD, "AD driver", "ATA disk driver");
+static MALLOC_DEFINE(M_AD, "AD driver", "ATA disk driver");
+static int ata_dma, ata_wc, ata_tags; 
+TUNABLE_INT_DECL("hw.ata.ata_dma", 1, ata_dma);
+TUNABLE_INT_DECL("hw.ata.wc", 0, ata_wc);
+TUNABLE_INT_DECL("hw.ata.tags", 0, ata_tags);
+
+/* sysctl vars */
+SYSCTL_DECL(_hw_ata);
+SYSCTL_INT(_hw_ata, OID_AUTO, ata_dma, CTLFLAG_RD, &ata_dma, 0,
+	   "ATA disk DMA mode control");
+SYSCTL_INT(_hw_ata, OID_AUTO, wc, CTLFLAG_RD, &ata_wc, 0,
+	   "ATA disk write caching");
+SYSCTL_INT(_hw_ata, OID_AUTO, tags, CTLFLAG_RD, &ata_tags, 0,
+	   "ATA disk tagged queuing support");
 
 /* defines */
 #define	AD_MAX_RETRIES	3
@@ -115,11 +129,10 @@ ad_attach(struct ata_softc *scp, int device)
     int secsperint;
 
 
-    if (!(adp = malloc(sizeof(struct ad_softc), M_AD, M_NOWAIT))) {
+    if (!(adp = malloc(sizeof(struct ad_softc), M_AD, M_NOWAIT | M_ZERO))) {
 	ata_printf(scp, device, "failed to allocate driver storage\n");
 	return;
     }
-    bzero(adp, sizeof(struct ad_softc));
     scp->dev_softc[ATA_DEV(device)] = adp;
     adp->controller = scp;
     adp->unit = device;
@@ -153,16 +166,27 @@ ad_attach(struct ata_softc *scp, int device)
 		    0, 0, 0, 0, ATA_C_F_ENAB_RCACHE, ATA_WAIT_INTR))
 	printf("ad%d: enabling readahead cache failed\n", adp->lun);
 
-    if (ata_command(adp->controller, adp->unit, ATA_C_SETFEATURES,
-		    0, 0, 0, 0, ATA_C_F_ENAB_WCACHE, ATA_WAIT_INTR))
-	printf("ad%d: enabling write cache failed\n", adp->lun);
+    /* enable write cacheing if allowed and not default on device */
+    if (ata_wc || ata_tags) {
+	if (ata_command(adp->controller, adp->unit, ATA_C_SETFEATURES,
+			0, 0, 0, 0, ATA_C_F_ENAB_WCACHE, ATA_WAIT_INTR))
+	ata_printf(scp, device, "enabling write cache failed\n");
+    }
+    else {
+	if (ata_command(adp->controller, adp->unit, ATA_C_SETFEATURES,
+			0, 0, 0, 0, ATA_C_F_DIS_WCACHE, ATA_WAIT_INTR))
+	ata_printf(scp, device, "disabling write cache failed\n");
+    }
 
-    /* use DMA if drive & controller supports it */
-    ata_dmainit(adp->controller, adp->unit,
-    		ata_pmode(AD_PARAM), ata_wmode(AD_PARAM), ata_umode(AD_PARAM));
-
-    /* use tagged queueing if supported */
-    if (ad_tagsupported(adp)) {
+    /* use DMA if allowed and if drive/controller supports it */
+    if (ata_dma)
+	ata_dmainit(adp->controller, adp->unit, ata_pmode(AD_PARAM), 
+		    ata_wmode(AD_PARAM), ata_umode(AD_PARAM));
+    else
+	ata_dmainit(adp->controller, adp->unit, ata_pmode(AD_PARAM), -1, -1);
+ 
+    /* use tagged queueing if allowed and supported */
+    if (ata_tags && ad_tagsupported(adp)) {
 	adp->num_tags = AD_PARAM->queuelen;
 	adp->flags |= AD_F_TAG_ENABLED;
 	adp->controller->flags |= ATA_QUEUED;
@@ -280,7 +304,10 @@ addump(dev_t dev)
     struct ad_request request;
     u_int count, blkno, secsize;
     vm_offset_t addr = 0;
+    long blkcnt;
+    int dumppages = MAXDUMPPGS;
     int error;
+    int i;
 
     if ((error = disk_dumpcheck(dev, &count, &blkno, &secsize)))
 	return error;
@@ -292,18 +319,27 @@ addump(dev_t dev)
     adp->controller->mode[ATA_DEV(adp->unit)] = ATA_PIO;
     ata_reinit(adp->controller);
 
+    blkcnt = howmany(PAGE_SIZE, secsize);
+
     while (count > 0) {
 	caddr_t va = NULL;
 	DELAY(1000);
-	if (is_physical_memory(addr))
-	    va = pmap_kenter_temporary(trunc_page(addr));
-	else
-	    va = pmap_kenter_temporary(trunc_page(0));
+
+	if ((count / blkcnt) < dumppages)
+	    dumppages = count / blkcnt;
+
+	for (i = 0; i < dumppages; ++i) {
+	    vm_offset_t a = addr + (i * PAGE_SIZE);
+	    if (is_physical_memory(a))
+		va = pmap_kenter_temporary(trunc_page(a), i);
+	    else
+		va = pmap_kenter_temporary(trunc_page(0), i);
+	}
 
 	bzero(&request, sizeof(struct ad_request));
 	request.device = adp;
 	request.blockaddr = blkno;
-	request.bytecount = PAGE_SIZE;
+	request.bytecount = PAGE_SIZE * dumppages;
 	request.data = va;
 
 	while (request.bytecount > 0) {
@@ -323,9 +359,9 @@ addump(dev_t dev)
 	    printf("%ld ", (long)(count * DEV_BSIZE) / (1024 * 1024));
 	}
 
-	blkno += howmany(PAGE_SIZE, secsize);
-	count -= howmany(PAGE_SIZE, secsize);
-	addr += PAGE_SIZE;
+	blkno += blkcnt * dumppages;
+	count -= blkcnt * dumppages;
+	addr += PAGE_SIZE * dumppages;
 	if (cncheckc() != -1)
 	    return EINTR;
     }
@@ -364,13 +400,12 @@ ad_start(struct ad_softc *adp)
 	    return;
     }
 
-    if (!(request = malloc(sizeof(struct ad_request), M_AD, M_NOWAIT))) {
+    if (!(request = malloc(sizeof(struct ad_request), M_AD, M_NOWAIT|M_ZERO))) {
 	printf("ad%d: out of memory in start\n", adp->lun);
 	return;
     }
 
     /* setup request */
-    bzero(request, sizeof(struct ad_request));
     request->device = adp;
     request->bp = bp;
     request->blockaddr = bp->b_pblkno;
@@ -580,16 +615,19 @@ ad_interrupt(struct ad_request *request)
 
     /* do we have a corrected soft error ? */
     if (adp->controller->status & ATA_S_CORR)
-	    printf("ad%d: soft error ECC corrected\n", adp->lun); 
+	diskerr(request->bp, "soft (ECC corrected)", LOG_PRINTF,
+		request->blockaddr + (request->donecount / DEV_BSIZE),
+		&adp->disk.d_label);
 
     /* did any real errors happen ? */
     if ((adp->controller->status & ATA_S_ERROR) ||
 	(request->flags & ADR_F_DMA_USED && dma_stat & ATA_BMSTAT_ERROR)) {
 	adp->controller->error = inb(adp->controller->ioaddr + ATA_ERROR);
-	printf("ad%d: %s %s ERROR blk# %d", adp->lun,
-	       (adp->controller->error & ATA_E_ICRC) ? "UDMA ICRC" : "HARD",
-	       (request->flags & ADR_F_READ) ? "READ" : "WRITE",
-	       request->blockaddr + (request->donecount / DEV_BSIZE)); 
+	diskerr(request->bp,
+		(adp->controller->error & ATA_E_ICRC) ?
+		    "UDMA ICRC error" : "hard error",
+		LOG_PRINTF, request->blockaddr + (request->donecount/DEV_BSIZE),
+		&adp->disk.d_label);
 
 	/* if this is a UDMA CRC error, reinject request */
 	if (request->flags & ADR_F_DMA_USED &&
@@ -820,7 +858,6 @@ ad_invalidatequeue(struct ad_softc *adp, struct ad_request *request)
 static int
 ad_tagsupported(struct ad_softc *adp)
 {
-#ifdef ATA_ENABLE_TAGS
     const char *drives[] = {"IBM-DPTA", "IBM-DTLA", NULL};
     int i = 0;
 
@@ -836,7 +873,6 @@ ad_tagsupported(struct ad_softc *adp)
 	    i++;
 	}
     }
-#endif
     return 0;
 }
 

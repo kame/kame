@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty.h	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/tty.h,v 1.53 1999/12/29 04:24:49 peter Exp $
+ * $FreeBSD: src/sys/sys/tty.h,v 1.53.2.1 2001/02/26 04:23:21 jlemon Exp $
  */
 
 #ifndef _SYS_TTY_H_
@@ -263,6 +263,7 @@ struct tty *ttymalloc __P((struct tty *tp));
 int	 ttymodem __P((struct tty *tp, int flag));
 int	 ttyopen __P((dev_t device, struct tty *tp));
 int	 ttypoll __P((dev_t dev, int events, struct proc *p));
+int	 ttykqfilter __P((dev_t dev, struct knote *kn));
 int	 ttyread __P((dev_t dev, struct uio *uio, int flag));
 void	 ttyregister __P((struct tty *tp));
 int	 ttysleep __P((struct tty *tp, void *chan, int pri, char *wmesg,

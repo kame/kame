@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.7 2000/10/23 11:51:56 n_hibma Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.10 2001/04/18 03:48:53 imp Exp $
  */
 
 #ifdef _KERNEL
@@ -228,8 +228,12 @@ static struct da_quirk_entry da_quirk_table[] =
 		 * Sony Memory Stick adapter MSAC-US1,
 		 * does not support READ_6 commands only READ_10. It also does
 		 * not support sync cache (0x35).
+		 * Sony PCG-C1VJ Internal Memory Stick Slot (MSC-U01) also
+		 * has this quirk.  Make all sony MS* products use this
+		 * quirk.  Reported by: TERAMOTO Masahiro
+		 * <teramoto@comm.eng.osaka-u.ac.jp> (PR 23378).
 		 */
-		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "MSAC-US1", "*"},
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "MS*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
 	},
 	{
@@ -239,6 +243,10 @@ static struct da_quirk_entry da_quirk_table[] =
 		 */
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "Sony DSC", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+	{
+		{T_OPTICAL, SIP_MEDIA_REMOVABLE, "FUJITSU", "MCF3064AP", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
 	}
 };
 
@@ -647,7 +655,9 @@ dadump(dev_t dev)
 	long	    blkcnt;
 	vm_offset_t addr;	
 	struct	    ccb_scsiio csio;
+	int         dumppages = MAXDUMPPGS;
 	int	    error;
+	int         i;
 
 	/* toss any characters present prior to dump */
 	while (cncheckc() != -1)
@@ -672,12 +682,17 @@ dadump(dev_t dev)
 	blkcnt = howmany(PAGE_SIZE, secsize);
 
 	while (num > 0) {
-		void *va;
+		caddr_t va = NULL;
 
-		if (is_physical_memory(addr)) {
-			va = pmap_kenter_temporary(trunc_page(addr));
-		} else {
-			va = pmap_kenter_temporary(trunc_page(0));
+		if ((num / blkcnt) < dumppages)
+			dumppages = num / blkcnt;
+
+		for (i = 0; i < dumppages; ++i) {
+			vm_offset_t a = addr + (i * PAGE_SIZE);
+			if (is_physical_memory(a))
+				va = pmap_kenter_temporary(trunc_page(a), i);
+			else
+				va = pmap_kenter_temporary(trunc_page(0), i);
 		}
 
 		xpt_setup_ccb(&csio.ccb_h, periph->path, /*priority*/1);
@@ -690,9 +705,9 @@ dadump(dev_t dev)
 				/*byte2*/0,
 				/*minimum_cmd_size*/ softc->minimum_cmd_size,
 				blknum,
-				blkcnt,
+				blkcnt * dumppages,
 				/*data_ptr*/(u_int8_t *) va,
-				/*dxfer_len*/blkcnt * secsize,
+				/*dxfer_len*/blkcnt * secsize * dumppages,
 				/*sense_len*/SSD_FULL_SIZE,
 				DA_DEFAULT_TIMEOUT * 1000);		
 		xpt_polled_action((union ccb *)&csio);
@@ -719,9 +734,9 @@ dadump(dev_t dev)
 		}
 		
 		/* update block count */
-		num -= blkcnt;
-		blknum += blkcnt;
-		addr += PAGE_SIZE;
+		num -= blkcnt * dumppages;
+		blknum += blkcnt * dumppages;
+		addr += PAGE_SIZE * dumppages;
 
 		/* operator aborting dump? */
 		if (cncheckc() != -1)

@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_input.c
  *
- * $FreeBSD: src/sys/netipx/ipx_input.c,v 1.22.2.1 2000/05/10 02:04:52 obrien Exp $
+ * $FreeBSD: src/sys/netipx/ipx_input.c,v 1.22.2.2 2001/02/22 09:44:18 bp Exp $
  */
 
 #include <sys/param.h>
@@ -497,8 +497,7 @@ struct ifnet *ifp;
 				    ia->ia_addr.sipx_addr.x_host;
 
 			if (ifp != NULL && (ifp->if_flags & IFF_POINTOPOINT))
-			    for(ifa = ifp->if_addrhead.tqh_first; ifa != NULL;
-						ifa = ifa->ifa_link.tqe_next) {
+			    TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 				if (ifa->ifa_addr->sa_family == AF_IPX) {
 				    ipx->ipx_sna = IA_SIPX(ifa)->sipx_addr;
 				    break;

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.13 2000/10/10 10:08:12 tanimura Exp $
+ * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.16 2001/03/12 13:47:29 sanpei Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.234
  */
@@ -398,8 +398,9 @@ static struct cdevsw sio_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 int	comconsole = -1;
@@ -673,15 +674,18 @@ static struct isa_pnp_id sio_ids[] = {
 	{0x1200c31e, NULL},	/* GVC0012 - VF1128HV-R9 (win modem?) */
 	{0x0303c31e, NULL},	/* GVC0303 - MaxTech 33.6 PnP D/F/V */
 	{0x0505c31e, NULL},	/* GVC0505 - GVC 56k Faxmodem */
+	{0x0116c31e, NULL},	/* GVC1601 - Rockwell V.34 Plug & Play Modem */
 	{0x0050c31e, NULL},	/* GVC5000 - some GVC modem */
 	{0x3800f91e, NULL},	/* GWY0038 - Telepath with v.90 */
 	{0x9062f91e, NULL},	/* GWY6290 - Telepath with x2 Technology */
+	{0x8100e425, NULL},	/* IOD0081 - I-O DATA DEVICE,INC. IFML-560 */
 	{0x21002534, NULL},	/* MAE0021 - Jetstream Int V.90 56k Voice Series 2*/
 	{0x0000f435, NULL},	/* MOT0000 - Motorola ModemSURFR 33.6 Intern */
 	{0x5015f435, NULL},	/* MOT1550 - Motorola ModemSURFR 56K Modem */
 	{0xf015f435, NULL},	/* MOT15F0 - Motorola VoiceSURFR 56K Modem */
 	{0x6045f435, NULL},	/* MOT4560 - Motorola ? */
 	{0x61e7a338, NULL},	/* NECE761 - 33.6Modem */
+ 	{0x08804f3f, NULL},	/* OZO8008 - Zoom  (33.6k Modem) */
 	{0x0f804f3f, NULL},	/* OZO800f - Zoom 2812 (56k Modem) */
 	{0x39804f3f, NULL},	/* OZO8039 - Zoom 56k flex */
 	{0x3024a341, NULL},	/* PMC2430 - Pace 56 Voice Internal Modem */

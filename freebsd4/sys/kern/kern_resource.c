@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_resource.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_resource.c,v 1.55.2.3 2000/09/19 09:00:29 ps Exp $
+ * $FreeBSD: src/sys/kern/kern_resource.c,v 1.55.2.4 2001/03/02 17:12:35 tegge Exp $
  */
 
 #include "opt_compat.h"
@@ -471,6 +471,10 @@ dosetrlimit(p, which, limp)
 			limp->rlim_cur = maxprocperuid;
 		if (limp->rlim_max > maxprocperuid)
 			limp->rlim_max = maxprocperuid;
+		if (limp->rlim_cur < 1)
+			limp->rlim_cur = 1;
+		if (limp->rlim_max < 1)
+			limp->rlim_max = 1;
 		break;
 	}
 	*alimp = *limp;

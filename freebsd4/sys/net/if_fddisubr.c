@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	from: if_ethersubr.c,v 1.5 1994/12/13 22:31:45 wollman Exp
- * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41.2.4 2000/11/07 07:41:12 ume Exp $
+ * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41.2.5 2001/03/11 06:35:37 bmilekic Exp $
  */
 
 #include "opt_atalk.h"
@@ -180,8 +180,7 @@ fddi_output(ifp, m, dst, rt0)
 #ifdef INET6
 	case AF_INET6:
 		if (!nd6_storelladdr(&ac->ac_if, rt, m, dst, (u_char *)edst)) {
-			/* this must be impossible, so we bark */
-			printf("nd6_storelladdr failed\n");
+			/* Something bad happened */
 			return(0);
 		}
 		type = htons(ETHERTYPE_IPV6);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_socket.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/sys_socket.c,v 1.28.2.1 2000/08/04 00:49:17 peter Exp $
+ * $FreeBSD: src/sys/kern/sys_socket.c,v 1.28.2.2 2001/02/26 04:23:16 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -50,8 +50,10 @@
 #include <net/if.h>
 #include <net/route.h>
 
-struct	fileops socketops =
-    { soo_read, soo_write, soo_ioctl, soo_poll, soo_stat, soo_close };
+struct	fileops socketops = {
+	soo_read, soo_write, soo_ioctl, soo_poll, sokqfilter,
+	soo_stat, soo_close
+};
 
 /* ARGSUSED */
 int

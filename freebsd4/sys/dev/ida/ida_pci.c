@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.7.2.4 2000/11/15 23:01:52 jlemon Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.7.2.6 2001/03/01 01:57:33 ps Exp $
  */
 
 #include <sys/param.h>
@@ -84,6 +84,10 @@ ida_v3_int_pending(struct ida_softc *ida)
 static void
 ida_v3_int_enable(struct ida_softc *ida, int enable)
 {
+	if (enable)
+		ida->flags |= IDA_INTERRUPTS;
+	else
+		ida->flags &= ~IDA_INTERRUPTS;
 	ida_outl(ida, R_INT_MASK, enable ? INT_ENABLE : INT_DISABLE);
 }
 
@@ -120,6 +124,10 @@ ida_v4_int_pending(struct ida_softc *ida)
 static void
 ida_v4_int_enable(struct ida_softc *ida, int enable)
 {
+	if (enable)
+		ida->flags |= IDA_INTERRUPTS;
+	else
+		ida->flags &= ~IDA_INTERRUPTS;
 	ida_outl(ida, R_42XX_INT_MASK,
 	    enable ? INT_ENABLE_42XX : INT_DISABLE_42XX);
 }
@@ -148,6 +156,7 @@ static struct ida_board board_id[] = {
 	{ 0x40340E11, "Compaq Smart Array 221 controller",    &ida_v3_access },
 
 	{ 0x40400E11, "Compaq Integrated Array controller",   &ida_v4_access },
+	{ 0x40480E11, "Compaq RAID LC2 controller",           &ida_v4_access },
 	{ 0x40500E11, "Compaq Smart Array 4200 controller",   &ida_v4_access },
 	{ 0x40510E11, "Compaq Smart Array 4250ES controller", &ida_v4_access },
 	{ 0x40580E11, "Compaq Smart Array 431 controller",    &ida_v4_access },
@@ -211,6 +220,7 @@ static int
 ida_pci_attach(device_t dev)
 {
 	struct ida_board *board = ida_pci_match(dev);
+	u_int32_t id = pci_get_devid(dev);
 	struct ida_softc *ida;
 	u_int command;
 	int error, rid;
@@ -231,7 +241,7 @@ ida_pci_attach(device_t dev)
 
 	ida->regs_res_type = SYS_RES_MEMORY;
 	ida->regs_res_id = IDA_PCI_MEMADDR;
-	if (board->board == IDA_DEVICEID_DEC_SMART)
+	if (id == IDA_DEVICEID_DEC_SMART)
 		ida->regs_res_id = PCIR_MAPS;
 
 	ida->regs = bus_alloc_resource(dev, ida->regs_res_type,
@@ -276,7 +286,7 @@ ida_pci_attach(device_t dev)
                 return (error);
         }
 	ida_attach(ida);
-	ida->flags |= IDA_ATTACHED; 
+	ida->flags |= IDA_ATTACHED;
 
 	return (0);
 }

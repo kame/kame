@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_extern.h	8.10 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_extern.h,v 1.27 2000/01/10 00:24:23 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_extern.h,v 1.27.2.1 2000/12/28 11:01:46 ps Exp $
  */
 
 #ifndef _UFS_UFS_EXTERN_H_
@@ -103,5 +103,6 @@ void	softdep_setup_remove __P((struct buf *,struct inode *, struct inode *,
 void	softdep_setup_directory_change __P((struct buf *, struct inode *,
 	    struct inode *, long, int));
 void	softdep_change_linkcnt __P((struct inode *));
+int	softdep_slowdown __P((struct vnode *));
 
 #endif /* !_UFS_UFS_EXTERN_H_ */

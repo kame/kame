@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80.2.10 2000/10/31 22:09:59 gibbs Exp $
+ * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80.2.12 2001/03/17 05:24:51 ken Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -489,6 +489,16 @@ static struct xpt_quirk_entry xpt_quirk_table[] =
 		/* TeraSolutions special settings for TRC-22 RAID */
 		{ T_DIRECT, SIP_MEDIA_FIXED, "TERASOLU", "TRC-22", "*" },
 		  /*quirks*/0, /*mintags*/55, /*maxtags*/255
+	},
+	{
+		/*
+		 * Would respond to all LUNs.  Device type and removable
+		 * flag are jumper-selectable.
+		 */
+		{ T_ANY, SIP_MEDIA_REMOVABLE|SIP_MEDIA_FIXED, "MaxOptix",
+		  "Tahiti 1", "*"
+		},
+		CAM_QUIRK_NOLUNS, /*mintags*/0, /*maxtags*/0
 	},
 	{
 		/* Default tagged queuing parameters for all devices */
@@ -5783,22 +5793,24 @@ xpt_set_transfer_settings(struct ccb_trans_settings *cts, struct cam_ed *device,
 			cts->flags &= ~CCB_TRANS_TAG_ENB;
 			cts->flags |= cur_cts.flags & CCB_TRANS_TAG_ENB;
 		}
+
 		if (((device->flags & CAM_DEV_INQUIRY_DATA_VALID) != 0
 		  && (inq_data->flags & SID_Sync) == 0)
-		 || (cpi.hba_inquiry & PI_SDTR_ABLE) == 0) {
+		 || ((cpi.hba_inquiry & PI_SDTR_ABLE) == 0)
+		 || (cts->sync_offset == 0)
+		 || (cts->sync_period == 0)) {
 			/* Force async */
 			cts->sync_period = 0;
 			cts->sync_offset = 0;
-		}
-
-		/*
-		 * Don't allow DT transmission rates if the
-		 * device does not support it.
-		 */
-		if ((device->flags & CAM_DEV_INQUIRY_DATA_VALID) != 0
-		 && (inq_data->spi3data & SID_SPI_CLOCK_DT) == 0
-		 && cts->sync_period <= 0x9)
+		} else if ((device->flags & CAM_DEV_INQUIRY_DATA_VALID) != 0
+			&& (inq_data->spi3data & SID_SPI_CLOCK_DT) == 0
+			&& cts->sync_period <= 0x9) {
+			/*
+			 * Don't allow DT transmission rates if the
+			 * device does not support it.
+			 */
 			cts->sync_period = 0xa;
+		}
 
 		switch (cts->bus_width) {
 		case MSG_EXT_WDTR_BUS_32_BIT:

@@ -1,11 +1,11 @@
-# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34.2.4 2000/11/05 07:41:42 marcel Exp $
+# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34.2.5 2000/11/22 16:20:12 gallatin Exp $
 
 .PATH:	${.CURDIR}/../../compat/linux ${.CURDIR}/../../${MACHINE_ARCH}/linux
 
 MAINTAINER=	marcel@FreeBSD.org
 
 KMOD=	linux
-SRCS=	linux_file.c linux_ioctl.c linux_machdep.c linux_misc.c \
+SRCS=	linux_file.c linux_ioctl.c linux_ipc.c linux_machdep.c linux_misc.c \
 	linux_signal.c linux_socket.c linux_stats.c linux_mib.c \
 	linux_dummy.c linux_sysvec.c linux_util.c \
 	opt_compat.h opt_linux.h opt_vmpage.h vnode_if.h
@@ -13,7 +13,7 @@ OBJS=	linux_locore.o
 MAN8=	linux.8
 
 .if ${MACHINE_ARCH} != "alpha"
-SRCS+=  imgact_linux.c linux_ipc.c
+SRCS+=  imgact_linux.c
 .endif
 
 # CFLAGS+=	-DDEBUG

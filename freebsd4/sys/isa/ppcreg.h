@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1997 Nicolas Souchu
+ * Copyright (c) 2001 Alcove - Nicolas Souchu
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/ppcreg.h,v 1.10.2.2 2000/07/22 09:09:36 dfr Exp $
+ * $FreeBSD: src/sys/isa/ppcreg.h,v 1.10.2.3 2001/03/02 16:03:25 nsouch Exp $
  *
  */
 #ifndef __PPCREG_H
@@ -63,6 +63,7 @@ struct ppc_data {
 
 	int ppc_mode;		/* chipset current mode */
 	int ppc_avm;		/* chipset available modes */
+	int ppc_dtm;		/* chipset detected modes */
 
 #define PPC_IRQ_NONE		0x0
 #define PPC_IRQ_nACK		0x1

@@ -1,6 +1,6 @@
-# $Id: Makefile,v 1.1.1.1 2000/11/21 08:39:02 kawa Exp $
+# $Id: Makefile,v 1.1.1.2 2001/04/23 13:09:49 sumikawa Exp $
 #
-# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.8.2.1 2000/09/23 00:24:22 gibbs Exp $
+# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.8.2.2 2001/01/07 22:52:35 gibbs Exp $
 
 PROG=	aicasm
 
@@ -21,7 +21,7 @@ LDADD+=	-ll
 DEPENDFILE=
 .endif
 
-CFLAGS+= -nostdinc -I${.CURDIR}/../../.. -I. -I/usr/include
+CFLAGS+= -I/usr/include -I.
 NOMAN=	noman
 
 .ifdef DEBUG

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/amr/amr_compat.h,v 1.2.2.1 2000/10/28 10:16:59 msmith Exp $
+ * $FreeBSD: src/sys/dev/amr/amr_compat.h,v 1.2.2.2 2000/11/28 19:25:28 msmith Exp $
  */
 /*
  * Backwards compatibility support.
@@ -32,6 +32,7 @@
 
 #if __FreeBSD_version < 500003		/* old buf style */
 # include <sys/buf.h>
+# include <machine/clock.h>
 
 # define FREEBSD_4
 # define bio					buf

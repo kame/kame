@@ -32,7 +32,7 @@
 .\" 
 .\" Author: Archie Cobbs <archie@freebsd.org>
 .\"
-.\" $FreeBSD: src/sys/modules/netgraph/tee/ng_tee.4,v 1.6.2.2 2000/10/24 22:31:07 julian Exp $
+.\" $FreeBSD: src/sys/modules/netgraph/tee/ng_tee.4,v 1.6.2.3 2001/01/26 11:37:09 julian Exp $
 .\" $Whistle: ng_tee.8,v 1.4 1999/01/25 23:46:27 archie Exp $
 .\"
 .Dd January 19, 1999
@@ -81,9 +81,9 @@ Packets may also be received on
 and
 .Dv left2right ;
 if so, they are forwarded unchanged out hooks
-.Dv left
+.Dv right
 and
-.Dv right ,
+.Dv left ,
 respectively.
 .Sh HOOKS
 This node type supports the following hooks:

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.5 2000/10/27 18:14:42 dillon Exp $
+# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.6 2000/12/19 01:18:34 rnordier Exp $
 
 BASE=		loader
 PROG=		${BASE}
@@ -91,7 +91,7 @@ ${BASE}: ${BASE}.bin ${BTXLDR} ${BTXKERN} ${BTXCRT} ${BASE}.help
 
 ${BASE}.bin: ${BASE}.sym
 	cp ${.ALLSRC} ${.TARGET}
-	strip ${.TARGET}
+	strip -R .comment -R .note ${.TARGET}
 
 ${BASE}.help: help.common help.i386
 	cat ${.ALLSRC} | awk -f ${.CURDIR}/../../common/merge_help.awk > ${.TARGET}

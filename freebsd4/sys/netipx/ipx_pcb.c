@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_pcb.c
  *
- * $FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.18 1999/08/28 18:21:54 jhay Exp $
+ * $FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.18.2.1 2001/02/22 09:44:18 bp Exp $
  */
 
 #include <sys/param.h>
@@ -61,10 +61,9 @@ ipx_pcballoc(so, head, p)
 {
 	register struct ipxpcb *ipxp;
 
-	MALLOC(ipxp, struct ipxpcb *, sizeof *ipxp, M_PCB, M_NOWAIT);
+	MALLOC(ipxp, struct ipxpcb *, sizeof *ipxp, M_PCB, M_NOWAIT | M_ZERO);
 	if (ipxp == NULL)
 		return (ENOBUFS);
-	bzero(ipxp, sizeof *ipxp);
 	ipxp->ipxp_socket = so;
 	if (ipxcksum)
 		ipxp->ipxp_flags |= IPXP_CHECKSUM;

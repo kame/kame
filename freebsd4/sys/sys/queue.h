@@ -31,11 +31,13 @@
  * SUCH DAMAGE.
  *
  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/sys/queue.h,v 1.32.2.2 2000/05/05 01:40:02 archie Exp $
+ * $FreeBSD: src/sys/sys/queue.h,v 1.32.2.4 2001/03/31 03:33:39 hsu Exp $
  */
 
 #ifndef _SYS_QUEUE_H_
 #define	_SYS_QUEUE_H_
+
+#include <machine/ansi.h>	/* for __offsetof */
 
 /*
  * This file defines five types of data structures: singly-linked lists,
@@ -194,7 +196,12 @@ struct {								\
 } while (0)
 
 #define STAILQ_FIRST(head)	((head)->stqh_first)
-#define STAILQ_LAST(head)	(*(head)->stqh_last)
+
+#define	STAILQ_LAST(head, type, field)					\
+	(STAILQ_EMPTY(head) ?						\
+		NULL :							\
+	        ((struct type *)					\
+		((char *)((head)->stqh_last) - __offsetof(struct type, field))))
 
 #define STAILQ_FOREACH(var, head, field)				\
 	for((var) = (head)->stqh_first; (var); (var) = (var)->field.stqe_next)

@@ -7,7 +7,7 @@
  *
  * @(#)ip_state.h	1.3 1/12/96 (C) 1995 Darren Reed
  * $Id: ip_state.h,v 2.13.2.1 2000/07/08 02:15:35 darrenr Exp $
- * $FreeBSD: src/sys/netinet/ip_state.h,v 1.7.2.2 2000/07/19 23:27:56 darrenr Exp $
+ * $FreeBSD: src/sys/netinet/ip_state.h,v 1.7.2.3 2001/02/17 20:42:08 darrenr Exp $
  */
 #ifndef	__IP_STATE_H__
 #define	__IP_STATE_H__
@@ -174,6 +174,7 @@ extern	u_long	fr_tcpclosewait;
 extern	u_long	fr_tcplastack;
 extern	u_long	fr_tcptimeout;
 extern	u_long	fr_tcpclosed;
+extern	u_long	fr_tcphalfclosed;
 extern	u_long	fr_udptimeout;
 extern	u_long	fr_icmptimeout;
 extern	int	fr_state_lock;

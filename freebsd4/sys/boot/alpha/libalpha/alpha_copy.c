@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/alpha/libalpha/alpha_copy.c,v 1.4 1999/08/28 00:39:25 peter Exp $
+ * $FreeBSD: src/sys/boot/alpha/libalpha/alpha_copy.c,v 1.4.2.1 2000/12/28 13:12:24 ps Exp $
  */
 /*
  * MD primitives supporting placement of module data 
@@ -34,22 +34,22 @@
 
 #include "libalpha.h"
 
-int
-alpha_copyin(void *src, vm_offset_t dest, size_t len)
+ssize_t
+alpha_copyin(const void *src, vm_offset_t dest, const size_t len)
 {
-    bcopy(src, dest, len);
+    bcopy(src, (void *)dest, len);
     return(len);
 }
 
-int
-alpha_copyout(vm_offset_t src, void *dest, size_t len)
+ssize_t
+alpha_copyout(const vm_offset_t src, void *dest, const size_t len)
 {
-    bcopy(src, dest, len);
+    bcopy((void *)src, dest, len);
     return(len);
 }
 
-int
-alpha_readin(int fd, vm_offset_t dest, size_t len)
+ssize_t
+alpha_readin(const int fd, vm_offset_t dest, const size_t len)
 {
     return(read(fd, (void *) dest, len));
 }

@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.3.2.1 2000/07/17 21:24:28 archie Exp $
+ * $FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.3.2.2 2001/01/25 19:40:27 imp Exp $
  */
 
 /*
@@ -112,4 +112,4 @@ static driver_t sn_pccard_driver = {
 
 extern devclass_t sn_devclass;
 
-DRIVER_MODULE(sn, pccard, sn_pccard_driver, sn_devclass, 0, 0);
+DRIVER_MODULE(if_sn, pccard, sn_pccard_driver, sn_devclass, 0, 0);

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.4.2.8 2000/10/14 00:44:39 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.4.2.10 2001/03/05 04:17:24 mckay Exp $
  */
 
 /*
@@ -217,10 +217,16 @@
 #define DC_OPMODE_INTLOOP	0x00000400
 #define DC_OPMODE_EXTLOOP	0x00000800
 
+#if 0
 #define DC_TXTHRESH_72BYTES	0x00000000
 #define DC_TXTHRESH_96BYTES	0x00004000
 #define DC_TXTHRESH_128BYTES	0x00008000
 #define DC_TXTHRESH_160BYTES	0x0000C000
+#endif
+
+#define DC_TXTHRESH_MIN		0x00000000
+#define DC_TXTHRESH_INC		0x00004000
+#define DC_TXTHRESH_MAX		0x0000C000
 
 
 /*
@@ -827,6 +833,7 @@ struct dc_softc {
  * Accton device IDs.
  */
 #define DC_DEVICEID_EN1217	0x1217
+#define DC_DEVICEID_EN2242	0x1216
 
 /*
  * PCI low memory base and low I/O base register, and

@@ -34,7 +34,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * $FreeBSD: src/sys/i386/isa/asc.c,v 1.42.2.1 2000/08/08 19:49:53 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/asc.c,v 1.42.2.2 2001/03/01 03:22:39 jlemon Exp $
  */
 
 #include "asc.h"
@@ -874,5 +874,5 @@ ascpoll(dev_t dev, int events, struct proc *p)
 	}
     }
     splx(sps);
-    return 0;
+    return (revents);
 }

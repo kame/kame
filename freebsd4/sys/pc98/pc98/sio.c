@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/sio.c,v 1.124.2.6 2000/08/05 04:46:39 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/sio.c,v 1.124.2.8 2001/02/27 12:20:59 nyan Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.234
  */
@@ -133,7 +133,7 @@
 #define COM_IF_MCRS98		0x14	/* same as COM_IF_MC16550II */
 #define COM_IF_RSB3000		0x15
 #define COM_IF_RSB384		0x16
-#define COM_IF_MODEM_CARD	0x17	/* same as COM_IF_NS16550 */
+#define COM_IF_MODEM_CARD	0x17
 #define COM_IF_RSA98III		0x18
 #define COM_IF_ESP98		0x19
 #define COM_IF_END2		COM_IF_ESP98
@@ -520,8 +520,9 @@ static struct cdevsw sio_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 int	comconsole = -1;
@@ -936,7 +937,11 @@ sio_pccard_probe(dev)
 {
 	/* Do not probe IRQ - pccard doesn't turn on the interrupt line */
 	/* until bus_setup_intr */
+#ifdef PC98
+	SET_FLAG(dev, COM_C_NOPROBE | SET_IFTYPE(COM_IF_MODEM_CARD));
+#else
 	SET_FLAG(dev, COM_C_NOPROBE);
+#endif
 
 	return (sioprobe(dev, 0));
 }
@@ -1149,7 +1154,7 @@ sio_isa_probe(dev)
 #ifdef PC98
 	logical_id = isa_get_logicalid(dev);
 	if (logical_id == 0x0100e4a5)		/* RSA-98III */
-		device_set_flags(dev, SET_IFTYPE(COM_IF_RSA98III));
+		SET_FLAG(dev, SET_IFTYPE(COM_IF_RSA98III));
 #endif
 	return (sioprobe(dev, 0));
 }
@@ -1193,7 +1198,8 @@ sioprobe(dev, xrid)
 	if (IS_8251(iod.if_type)) {
 		port = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
 					  0, ~0, 1, RF_ACTIVE);
-	} else if (iod.if_type == COM_IF_RSA98III ||
+	} else if (iod.if_type == COM_IF_MODEM_CARD ||
+		   iod.if_type == COM_IF_RSA98III ||
 		   isa_get_vendorid(dev)) {
 		port = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
 			if_16550a_type[iod.if_type & 0x0f].iatsz, RF_ACTIVE);
@@ -1728,7 +1734,8 @@ sioattach(dev, xrid)
 	if (IS_8251(if_type)) {
 		port = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
 					  0, ~0, 1, RF_ACTIVE);
-	} else if (if_type == COM_IF_RSA98III ||
+	} else if (if_type == COM_IF_MODEM_CARD ||
+		   if_type == COM_IF_RSA98III ||
 		   isa_get_vendorid(dev)) {
 		port = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
 			if_16550a_type[if_type & 0x0f].iatsz, RF_ACTIVE);

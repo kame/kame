@@ -13,7 +13,7 @@
 # purpose.
 #
 
-# $FreeBSD: src/sys/boot/i386/btx/btx/btx.s,v 1.15.2.3 2000/07/07 21:12:33 jhb Exp $
+# $FreeBSD: src/sys/boot/i386/btx/btx/btx.s,v 1.15.2.4 2000/12/28 12:08:22 ps Exp $
 
 #
 # Memory layout.
@@ -104,7 +104,7 @@ btx_hdr:	.byte 0xeb			# Machine ID
 		.ascii "BTX"			# Magic
 		.byte 0x1			# Major version
 		.byte 0x1			# Minor version
-		.byte 0x0			# Flags
+		.byte BTX_FLAGS			# Flags
 		.word PAG_CNT-MEM_ORG>>0xc	# Paging control
 		.word break-start		# Text size
 		.long 0x0			# Entry address

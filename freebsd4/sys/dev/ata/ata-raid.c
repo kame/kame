@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000 Søren Schmidt
+ * Copyright (c) 2000,2001 Søren Schmidt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-raid.c,v 1.3.2.4 2000/11/13 08:21:26 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-raid.c,v 1.3.2.6 2001/02/25 21:35:20 sos Exp $
  */
 
 #include "opt_global.h"
@@ -428,7 +428,8 @@ ar_promise_conf(struct ad_softc *adp, struct ar_softc **raidp)
     u_int32_t cksum, *ckptr;
     int count, disk_number, array; 
 
-    lba = adp->total_secs - adp->sectors;
+    lba = ((adp->total_secs / (adp->heads * adp->sectors)) *
+	   adp->heads * adp->sectors) - adp->sectors;
 
     if (ar_read(adp, lba, 4 * DEV_BSIZE, (char *)&info)) {
 	if (bootverbose)

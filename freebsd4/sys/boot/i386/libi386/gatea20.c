@@ -1,14 +1,14 @@
 /*
- * $FreeBSD: src/sys/boot/i386/libi386/gatea20.c,v 1.2 1999/08/28 00:40:15 peter Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/gatea20.c,v 1.2.2.1 2000/12/28 13:12:40 ps Exp $
  * From: $NetBSD: gatea20.c,v 1.2 1997/10/29 00:32:49 fvdl Exp $
  */
 
 /* extracted from freebsd:sys/i386/boot/biosboot/io.c */
 
-#include <sys/types.h>
+#include <stand.h>
 #include <machine/cpufunc.h>
 
-#include <stand.h>
+#include <bootstrap.h>
 
 #include "libi386.h"
 
@@ -36,7 +36,7 @@ void gateA20()
 	__asm("pushfl ; cli");
 #ifdef	IBM_L40
 	outb(0x92, 0x2);
-#else	IBM_L40
+#else	/* !IBM_L40 */
 	while (inb(K_STATUS) & K_IBUF_FUL);
 	while (inb(K_STATUS) & K_OBUF_FUL)
 		(void)inb(K_RDWR);
@@ -47,6 +47,6 @@ void gateA20()
 	outb(K_RDWR, x_20);
 	delay(100);
 	while (inb(K_STATUS) & K_IBUF_FUL);
-#endif	IBM_L40
+#endif	/* IBM_L40 */
 	__asm("popfl");
 }

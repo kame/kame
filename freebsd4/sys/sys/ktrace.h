@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ktrace.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/ktrace.h,v 1.19.2.2 2000/07/15 06:32:25 green Exp $
+ * $FreeBSD: src/sys/sys/ktrace.h,v 1.19.2.3 2001/01/06 09:58:23 alfred Exp $
  */
 
 #ifndef _SYS_KTRACE_H_
@@ -136,6 +136,7 @@ struct ktr_csw {
 /*
  * KTR_USER - data comming from userland
  */
+#define	KTR_USER_MAXLEN	2048	/* maximum length of passed data */
 #define KTR_USER	7
 
 /*

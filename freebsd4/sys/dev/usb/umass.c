@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.11.2.5 2000/10/08 19:24:43 n_hibma Exp $
+ *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.11.2.6 2001/01/06 22:36:15 n_hibma Exp $
  *	$NetBSD: umass.c,v 1.28 2000/04/02 23:46:53 augustss Exp $
  */
 
@@ -700,6 +700,8 @@ USB_MATCH(umass)
 {
 	USB_MATCH_START(umass, uaa);
 	struct umass_softc *sc = device_get_softc(self);
+
+	USB_MATCH_SETUP;
 
 	if (uaa->iface == NULL)
 		return(UMATCH_NONE);

@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard.c,v 1.106.2.3 2000/10/15 04:12:43 sanpei Exp $
+ * $FreeBSD: src/sys/pccard/pccard.c,v 1.106.2.4 2001/03/25 15:32:39 iedowse Exp $
  */
 
 #include "opt_pcic.h"
@@ -289,6 +289,7 @@ inserted(void *arg)
 	slt->ctrl->power(slt);
 
 	printf("pccard: card inserted, slot %d\n", slt->slotnum);
+	pccard_insert_beep();
 	/*
 	 *	Now start resetting the card.
 	 */
@@ -321,7 +322,6 @@ pccard_event(struct slot *slt, enum card_event event)
 	case card_inserted:
 		slt->insert_seq = 1;
 		slt->insert_ch = timeout(inserted, (void *)slt, hz/4);
-		pccard_insert_beep();
 		break;
 	}
 }

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000 Søren Schmidt
+ * Copyright (c) 1998,1999,2000,2001 Søren Schmidt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.15.2.4 2000/10/25 06:43:02 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.15.2.6 2001/02/25 21:35:20 sos Exp $
  */
 
 /* CDROM Table Of Contents */
@@ -124,7 +124,7 @@ struct cappage {
     u_int8_t	mode2_form1	:1;	/* mode 2 form 1 (XA) read */
     u_int8_t	mode2_form2	:1;	/* mode 2 form 2 format */
     u_int8_t	multisession	:1;	/* multi-session photo-CD */
-    u_int8_t			:1;
+    u_int8_t	burnproof	:1;	/* supports burnproof */
     u_int8_t	cd_da		:1;	/* audio-CD read supported */
     u_int8_t	cd_da_stream	:1;	/* CD-DA streaming */
     u_int8_t	rw		:1;	/* combined R-W subchannels */
@@ -221,7 +221,9 @@ struct write_param {
 #define CDR_WTYPE_RAW		0x03
 
     u_int8_t	test_write	:1;	/* test write enable */
-    u_int8_t	reserved2_567	:3;
+    u_int8_t	reserved2_5	:1;
+    u_int8_t	burnproof	:1;	/* BurnProof enable */
+    u_int8_t	reserved2_7	:1;
     u_int8_t	track_mode	:4;	/* track mode */
 #define CDR_TMODE_AUDIO		0x00
 #define CDR_TMODE_AUDIO_PREEMP	0x01
@@ -231,30 +233,13 @@ struct write_param {
 
     u_int8_t	copy		:1;	/* generation stamp */
     u_int8_t	fp		:1;	/* fixed packet type */
-    u_int8_t	multi_session	:2;	/* multi-session type */
-#define CDR_MSES_NONE		0x00
-#define CDR_MSES_FINAL		0x01
-#define CDR_MSES_RESERVED	0x02
-#define CDR_MSES_MULTI		0x03
+    u_int8_t	session_type	:2;	/* session type */
+#define CDR_SESS_NONE		0x00
+#define CDR_SESS_FINAL		0x01
+#define CDR_SESS_RESERVED	0x02
+#define CDR_SESS_MULTI		0x03
 
-    u_int8_t	data_block_type :4;	/* data block type code */
-#define CDR_DB_RAW		0x0	/* 2352 bytes of raw data */
-#define CDR_DB_RAW_PQ		0x1	/* 2368 bytes raw data + P/Q subchan */
-#define CDR_DB_RAW_PW		0x2	/* 2448 bytes raw data + P-W subchan */
-#define CDR_DB_RAW_PW_R		0x3	/* 2448 bytes raw data + P-W raw sub */
-#define CDR_DB_RES_4		0x4	/* reserved */
-#define CDR_DB_RES_5		0x5	/* reserved */
-#define CDR_DB_RES_6		0x6	/* reserved */
-#define CDR_DB_VS_7		0x7	/* vendor specific */
-#define CDR_DB_ROM_MODE1	0x8	/* 2048 bytes Mode 1 (ISO/IEC 10149) */
-#define CDR_DB_ROM_MODE2	0x9	/* 2336 bytes Mode 2 (ISO/IEC 10149) */
-#define CDR_DB_XA_MODE1		0xa	/* 2048 bytes Mode 1 (CD-ROM XA 1) */
-#define CDR_DB_XA_MODE2_F1	0xb	/* 2056 bytes Mode 2 (CD-ROM XA 1) */
-#define CDR_DB_XA_MODE2_F2	0xc	/* 2324 bytes Mode 2 (CD-ROM XA 2) */
-#define CDR_DB_XA_MODE2_MIX	0xd	/* 2332 bytes Mode 2 (CD-ROM XA 1/2) */
-#define CDR_DB_RES_14		0xe	/* reserved */
-#define CDR_DB_VS_15		0xf	/* vendor specific */
-
+    u_int8_t	datablock_type	:4;	/* data type code (see cdrio.h) */
     u_int8_t	reserved4_4567	:4;
     u_int8_t	reserved5;
     u_int8_t	reserved6;

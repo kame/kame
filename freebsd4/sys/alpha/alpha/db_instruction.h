@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/db_instruction.h,v 1.2.6.1 2000/08/03 00:48:03 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/db_instruction.h,v 1.2.6.2 2001/03/05 21:24:16 gallatin Exp $ */
 /* $NetBSD: db_instruction.h,v 1.4 1997/09/16 22:53:32 thorpej Exp $ */
 
 /* 
@@ -62,6 +62,15 @@ typedef union {
 	unsigned int	bits;
 
 	/*
+	 *	Generic instruction pseudo format; look at
+	 *	opcode to see how to interpret the rest.
+	 */
+	struct {
+		unsigned	  bits : 26,
+				opcode : 6;
+	} generic_format;
+
+	/*
 	 *	Memory instructions contain a 16 bit
 	 *	signed immediate value and two register
 	 *	specifiers
@@ -110,6 +119,16 @@ typedef union {
 	 *	a second source register or with a literal
 	 *	specifier.  Bit 12 sez which is which.
 	 */
+	struct {
+		unsigned	rc : 5,
+				function : 7,
+				is_lit : 1,
+				sbz_or_litlo : 3,
+				rb_or_lithi : 5,
+				ra : 5,
+				opcode : 6;
+	} operate_generic_format;
+			
 	struct {
 		unsigned	rd : 5,
 				function : 7,

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.15.2.2 2000/08/08 19:05:17 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.15.2.5 2001/04/08 19:24:41 mjacob Exp $ */
 /* $NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $ */
 
 /*
@@ -261,6 +261,7 @@ badaddr_read(addr, size, rptr)
 		panic("badaddr: invalid size (%ld)\n", size);
 	}
 	alpha_mb();
+	alpha_mb(); /* magic for ev5 2100A  & maybe more */
 
 	/* Make sure we took the machine check, if we caused one. */
 	alpha_pal_draina();

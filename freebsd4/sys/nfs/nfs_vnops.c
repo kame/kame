@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_vnops.c	8.16 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.150 2000/01/05 00:32:18 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.150.2.2 2001/03/02 16:45:12 dillon Exp $
  */
 
 
@@ -1436,8 +1436,21 @@ again:
 		}
 		if (newvp)
 			vput(newvp);
-	} else if (v3 && (fmode & O_EXCL))
+	} else if (v3 && (fmode & O_EXCL)) {
+		/*
+		 * We are normally called with only a partially initialized
+		 * VAP.  Since the NFSv3 spec says that server may use the
+		 * file attributes to store the verifier, the spec requires
+		 * us to do a SETATTR RPC. FreeBSD servers store the verifier
+		 * in atime, but we can't really assume that all servers will
+		 * so we ensure that our SETATTR sets both atime and mtime.
+		 */
+		if (vap->va_mtime.tv_sec == VNOVAL)
+			vfs_timestamp(&vap->va_mtime);
+		if (vap->va_atime.tv_sec == VNOVAL)
+			vap->va_atime = vap->va_mtime;
 		error = nfs_setattrrpc(newvp, vap, cnp->cn_cred, cnp->cn_proc);
+	}
 	if (!error) {
 		if (cnp->cn_flags & MAKEENTRY)
 			cache_enter(dvp, newvp, cnp);
@@ -2852,6 +2865,9 @@ again:
 			 * NOTE: we are not clearing B_DONE here, so we have
 			 * to do it later on in this routine if we intend to 
 			 * initiate I/O on the bp.
+			 *
+			 * Note: to avoid loopback deadlocks, we do not
+			 * assign b_runningbufspace.
 			 */
 			if (wcred == NULL)
 				wcred = bp->b_wcred;
@@ -3122,7 +3138,12 @@ nfs_writebp(bp, force, procp)
 	curproc->p_stats->p_ru.ru_oublock++;
 	splx(s);
 
+	/*
+	 * Note: to avoid loopback deadlocks, we do not
+	 * assign b_runningbufspace.
+	 */
 	vfs_busy_pages(bp, 1);
+
 	if (force)
 		bp->b_flags |= B_WRITEINPROG;
 	BUF_KERNPROC(bp);

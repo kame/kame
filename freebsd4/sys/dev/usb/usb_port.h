@@ -1,5 +1,5 @@
 /*	$NetBSD: usb_port.h,v 1.15 1999/11/16 12:04:28 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.25.2.4 2000/10/31 23:23:30 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.25.2.5 2001/01/06 22:36:15 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -106,6 +106,8 @@ __CONCAT(dname,_match)(parent, match, aux) \
 
 #define USB_MATCH_START(dname, uaa) \
 	struct usb_attach_arg *uaa = aux
+
+#define USB_MATCH_SETUP		/* nop */
 
 #define USB_ATTACH(dname) \
 void \
@@ -221,6 +223,8 @@ __CONCAT(dname,_match)(parent, match, aux) \
 #define USB_MATCH_START(dname, uaa) \
 	struct usb_attach_arg *uaa = aux
 
+#define USB_MATCH_SETUP		/* nop */
+
 #define USB_ATTACH(dname) \
 void \
 __CONCAT(dname,_attach)(parent, self, aux) \
@@ -328,6 +332,9 @@ __CONCAT(dname,_match)(device_t self)
 
 #define USB_MATCH_START(dname, uaa) \
         struct usb_attach_arg *uaa = device_get_ivars(self)
+
+#define USB_MATCH_SETUP \
+	sc->sc_dev = self
 
 #define USB_ATTACH(dname) \
 Static int \

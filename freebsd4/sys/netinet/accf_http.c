@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/netinet/accf_http.c,v 1.1.2.2 2000/09/20 21:19:22 ps Exp $
+ *	$FreeBSD: src/sys/netinet/accf_http.c,v 1.1.2.3 2001/01/03 19:52:37 alfred Exp $
  */
 
 #define ACCEPT_FILTER_MOD
@@ -169,7 +169,7 @@ static void
 sohashttpget(struct socket *so, void *arg, int waitflag)
 {
 
-	if ((so->so_state & SS_CANTRCVMORE) == 0 || !sbfull(&so->so_rcv)) {
+	if ((so->so_state & SS_CANTRCVMORE) == 0 && !sbfull(&so->so_rcv)) {
 		struct mbuf *m;
 		char *cmp;
 		int	cmplen, cc;

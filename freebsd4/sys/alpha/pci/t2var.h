@@ -23,7 +23,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/pci/t2var.h,v 1.1.2.1 2000/07/04 01:42:22 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/pci/t2var.h,v 1.1.2.2 2001/03/04 00:28:07 gallatin Exp $
  */
+
+extern vm_offset_t     sable_lynx_base;
 
 extern void t2_init(void);

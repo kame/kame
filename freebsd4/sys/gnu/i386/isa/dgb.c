@@ -1,5 +1,5 @@
 /*-
- *  dgb.c $FreeBSD: src/sys/gnu/i386/isa/dgb.c,v 1.56 2000/01/29 18:42:44 peter Exp $
+ *  dgb.c $FreeBSD: src/sys/gnu/i386/isa/dgb.c,v 1.56.2.1 2001/02/26 04:23:09 jlemon Exp $
  *
  *  Digiboard driver.
  *
@@ -218,8 +218,9 @@ static struct cdevsw dgb_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 static	speed_t	dgbdefaultrate = TTYDEF_SPEED;

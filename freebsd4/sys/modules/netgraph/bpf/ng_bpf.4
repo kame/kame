@@ -32,7 +32,7 @@
 .\" 
 .\" Author: Archie Cobbs <archie@freebsd.org>
 .\"
-.\" $FreeBSD: src/sys/modules/netgraph/bpf/ng_bpf.4,v 1.3.2.3 2000/10/24 22:31:02 julian Exp $
+.\" $FreeBSD: src/sys/modules/netgraph/bpf/ng_bpf.4,v 1.3.2.5 2001/02/19 04:08:04 archie Exp $
 .\" $Whistle: ng_bpf.8,v 1.2 1999/12/03 01:57:12 archie Exp $
 .\"
 .Dd December 2, 1999
@@ -52,7 +52,7 @@ node type allows Berkeley Packet Filter (see
 filters to be applied to data travelling through a Netgraph network.
 Each node allows an arbitrary number of connections to arbitrarily
 named hooks.  With each hook is associated a
-.Xf bpf 4
+.Xr bpf 4
 filter program which is applied to incoming data only, a destination hook
 for matching packets, a destination hook for non-matching packets,
 and various statistics counters.
@@ -133,6 +133,44 @@ except that the statistics are also atomically cleared.
 This node shuts down upon receipt of a
 .Dv NGM_SHUTDOWN
 control message, or when all hooks have been disconnected.
+.Sh EXAMPLE
+It is possible to configure a node from the command line, using
+.Xr tcpdump 8 
+to generate raw BPF instructions which are then fed into an
+.Xr awk 1
+script to create the ASCII form of a
+.Dv NGM_BPF_SET_PROGRAM
+control message, as demonstrated here:
+.Bd -literal -offset 4n
+#!/bin/sh
+
+PATTERN="tcp dst port 80"
+NODEPATH="my_node:"
+INHOOK="hook1"
+MATCHHOOK="hook2"
+NOTMATCHHOOK="hook3"
+
+cat > /tmp/bpf.awk << xxENDxx
+{
+  if (!init) {
+    printf "bpf_prog_len=%d bpf_prog=[", \\$1;
+    init=1;
+  } else {
+    printf " { code=%d jt=%d jf=%d k=%d }", \\$1, \\$2, \\$3, \\$4;
+  }
+}
+END {
+  print " ]"
+}
+xxENDxx
+
+BPFPROG=`tcpdump -ddd ${PATTERN} | awk -f /tmp/bpf.awk`
+
+ngctl msg ${NODEPATH} setprogram { thisHook=\\"${INHOOK}\\" \\
+  ifMatch=\\"${MATCHHOOK}\\" \\
+  ifNotMatch=\\"${NOTMATCHHOOK}\\" \\
+  ${BPFPROG} } }
+.Ed
 .Sh BUGS
 When built as a loadable kernel module, this module includes the file
 .Pa net/bpf_filter.c .

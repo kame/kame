@@ -6,7 +6,7 @@
  * to the original author and the contributors.
  *
  * $Id: ip_auth.h,v 2.1 1999/08/04 17:29:54 darrenr Exp $
- * $FreeBSD: src/sys/netinet/ip_auth.h,v 1.8.2.1 2000/07/19 23:27:54 darrenr Exp $
+ * $FreeBSD: src/sys/netinet/ip_auth.h,v 1.8.2.2 2001/02/17 20:42:07 darrenr Exp $
  *
  */
 #ifndef	__IP_AUTH_H__
@@ -47,8 +47,6 @@ typedef struct  fr_authstat {
 extern	frentry_t	*ipauth;
 extern	struct fr_authstat	fr_authstats;
 extern	int	fr_defaultauthage;
-extern	int	fr_authstart;
-extern	int	fr_authend;
 extern	int	fr_authsize;
 extern	int	fr_authused;
 extern	int	fr_auth_lock;

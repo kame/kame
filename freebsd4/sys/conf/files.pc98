@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.11 2000/11/02 01:41:17 nyan Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.13 2001/02/08 13:43:40 nyan Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -130,7 +130,8 @@ gnu/i386/fpemul/wm_sqrt.s	optional	gpl_math_emulate
 gnu/i386/isa/dgb.c		optional	dgb
 gnu/i386/isa/dgm.c		optional	dgm
 gnu/i386/isa/sound/awe_wave.c	optional	awe
-i386/apm/apm.c			optional	apm
+pc98/apm/apm.c			optional	apm
+pc98/apm/apm_bioscall.s		optional	apm
 i386/i386/atomic.c		standard				\
 	compile-with	"${CC} -c ${CFLAGS} ${DEFINED_PROF:S/^$/-fomit-frame-pointer/} ${.IMPSRC}"
 i386/i386/autoconf.c		standard
@@ -211,7 +212,6 @@ pc98/pc98/fd.c			optional	fd
 i386/isa/gpib.c			optional	gp
 i386/isa/gsc.c			optional	gsc
 i386/isa/if_ar.c		optional	ar
-i386/isa/if_cs.c		optional	cs
 i386/isa/if_cx.c		optional	cx
 i386/isa/if_el.c		optional	el
 i386/isa/if_le.c		optional	le

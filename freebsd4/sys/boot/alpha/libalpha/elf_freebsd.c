@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/boot/alpha/libalpha/elf_freebsd.c,v 1.8.2.1 2000/07/06 00:34:02 ps Exp $ */
+/* $FreeBSD: src/sys/boot/alpha/libalpha/elf_freebsd.c,v 1.8.2.2 2001/03/04 05:21:25 obrien Exp $ */
 /* $NetBSD: loadfile.c,v 1.10 1998/06/25 06:45:46 ross Exp $ */
 
 /*-
@@ -118,12 +118,10 @@ elf_exec(struct loaded_module *mp)
 	return(err);
 
     /*
-     * Fill in the bootinfo for the kernel.
+     * Fill in rest of bootinfo for the kernel.
      */
-    strncpy(bootinfo_v1.booted_kernel, mp->m_name,
-	    sizeof(bootinfo_v1.booted_kernel));
     flen = prom_getenv(PROM_E_BOOTED_OSFLAGS, bootinfo_v1.boot_flags,
-		sizeof(bootinfo_v1.boot_flags));
+	sizeof(bootinfo_v1.boot_flags));
     bootinfo_v1.hwrpb = (void *)HWRPB_ADDR;
     bootinfo_v1.hwrpbsize = ((struct rpb *)HWRPB_ADDR)->rpb_size;
     bootinfo_v1.cngetc = NULL;

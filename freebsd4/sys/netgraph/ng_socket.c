@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11.2.2 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11.2.3 2001/02/02 11:59:27 julian Exp $
  * $Whistle: ng_socket.c,v 1.28 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -395,7 +395,7 @@ ng_setsockaddr(struct socket *so, struct sockaddr **addr)
 
 	s = splnet();
 	pcbp = sotongpcb(so);
-	if (pcbp == 0) {
+	if ((pcbp == 0) || (pcbp->sockdata == NULL)) {
 		splx(s);
 		return (EINVAL);
 	}

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/cam/scsi/scsi_low.h,v 1.1.2.1 2000/10/29 11:05:45 non Exp $	*/
+/*	$FreeBSD: src/sys/cam/scsi/scsi_low.h,v 1.1.2.3 2001/03/03 14:45:02 non Exp $	*/
 /*	$NecBSD: scsi_low.h,v 1.24 1999/07/23 21:00:05 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -223,16 +223,6 @@ struct lun_info {
 	u_int li_flags;				/* real control flags */
 	u_int li_cfgflags;			/* given target cfgflags */
 	u_int li_quirks;			/* given target quirk */
-
-	/*
-	 * lun synch and wide data
- 	 */
-	struct synch {
-		u_int8_t offset;
-		u_int8_t period;
-	} li_maxsynch;		/* synch data */
-
-	u_int li_width;
 };
 
 struct targ_info {
@@ -319,9 +309,14 @@ struct targ_info {
 	u_int ti_msgoutlen;			/* msgout strlen */
 
 	/*
-	 * lun info size.
+	 * synch and wide data
  	 */
-	int ti_lunsize;	
+	struct synch {
+		u_int8_t offset;
+		u_int8_t period;
+	} ti_maxsynch;		/* synch data */
+
+	u_int ti_width;
 };
 
 /*************************************************
@@ -335,7 +330,7 @@ typedef struct scsi_low_softc *sc_low_t;
 
 #define	SC_LOW_INIT_T (int (*) __P((sc_low_t, int)))
 #define	SC_LOW_BUSRST_T (void (*) __P((sc_low_t)))
-#define	SC_LOW_LUN_INIT_T (int (*) __P((sc_low_t, struct targ_info *, struct lun_info *)))
+#define	SC_LOW_TARG_INIT_T (int (*) __P((sc_low_t, struct targ_info *)))
 #define	SC_LOW_SELECT_T (int (*) __P((sc_low_t, struct slccb *)))
 #define	SC_LOW_ATTEN_T (void (*) __P((sc_low_t)))
 #define	SC_LOW_NEXUS_T (int (*) __P((sc_low_t, struct targ_info *)))
@@ -346,7 +341,7 @@ typedef struct scsi_low_softc *sc_low_t;
 struct scsi_low_funcs {
 	int (*scsi_low_init) __P((sc_low_t, int));
 	void (*scsi_low_bus_reset) __P((sc_low_t));
-	int (*scsi_low_lun_init) __P((sc_low_t, struct targ_info *, struct lun_info *));
+	int (*scsi_low_targ_init) __P((sc_low_t, struct targ_info *));
 
 	int (*scsi_low_start_bus) __P((sc_low_t, struct slccb *));
 	int (*scsi_low_establish_nexus) __P((sc_low_t, struct targ_info *));
@@ -446,7 +441,7 @@ struct scsi_low_softc {
 	/* interface functions */
 	struct scsi_low_funcs *sl_funcs;
 
-#if	defined(i386)
+#if	defined(__i386__)
 	u_int sl_irq;		/* XXX */
 #endif	/* i386 */
 #ifdef __FreeBSD__

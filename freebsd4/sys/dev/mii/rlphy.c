@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/rlphy.c,v 1.2 1999/09/01 17:07:27 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/rlphy.c,v 1.2.2.1 2000/12/12 19:29:15 wpaul Exp $
  */
 
 /*
@@ -53,7 +53,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-   "$FreeBSD: src/sys/dev/mii/rlphy.c,v 1.2 1999/09/01 17:07:27 wpaul Exp $";
+   "$FreeBSD: src/sys/dev/mii/rlphy.c,v 1.2.2.1 2000/12/12 19:29:15 wpaul Exp $";
 #endif
 
 static int rlphy_probe		__P((device_t));
@@ -175,6 +175,7 @@ static int rlphy_detach(dev)
 
 	sc = device_get_softc(dev);
 	mii = device_get_softc(device_get_softc(dev));
+	mii_phy_auto_stop(sc);
 	sc->mii_dev = NULL;
 	LIST_REMOVE(sc, mii_list);
 

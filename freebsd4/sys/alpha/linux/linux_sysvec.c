@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/linux/linux_sysvec.c,v 1.66.2.1 2000/11/04 07:30:08 obrien Exp $
+ * $FreeBSD: src/sys/alpha/linux/linux_sysvec.c,v 1.66.2.2 2001/02/22 05:14:58 marcel Exp $
  */
 
 /* XXX we use functions that might not exist. */
@@ -186,7 +186,8 @@ struct sysentvec elf_linux_sysvec = {
 	0,
 	"Linux ELF",
 	elf_coredump,
-	exec_linux_imgact_try
+	exec_linux_imgact_try,
+	LINUX_MINSIGSTKSZ
 };
 
 static Elf64_Brandinfo linux_brand = {

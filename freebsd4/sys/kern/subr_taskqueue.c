@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/kern/subr_taskqueue.c,v 1.1.2.1 2000/07/18 21:12:41 dfr Exp $
+ *	$FreeBSD: src/sys/kern/subr_taskqueue.c,v 1.1.2.2 2001/03/31 03:33:44 hsu Exp $
  */
 
 #include <sys/param.h>
@@ -136,7 +136,7 @@ taskqueue_enqueue(struct taskqueue *queue, struct task *task)
 	/*
 	 * Optimise the case when all tasks have the same priority.
 	 */
-	prev = STAILQ_LAST(&queue->tq_queue);
+	prev = STAILQ_LAST(&queue->tq_queue, task, ta_link);
 	if (!prev || prev->ta_priority >= task->ta_priority) {
 		STAILQ_INSERT_TAIL(&queue->tq_queue, task, ta_link);
 	} else {

@@ -23,13 +23,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/pc98/libpc98/biosmem.c,v 1.3 2000/01/03 15:43:51 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/libpc98/biosmem.c,v 1.3.2.1 2000/12/30 12:01:06 nyan Exp $
  */
 
 /*
  * Obtain memory configuration information from the BIOS
  */
 #include <stand.h>
+#include "libi386.h"
 #include "btxv86.h"
 
 vm_offset_t	memtop;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.9 2000/10/20 18:26:30 bp Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.15 2001/03/13 22:00:32 luigi Exp $
  */
 
 #include "opt_atalk.h"
@@ -183,8 +183,7 @@ ether_output(ifp, m, dst, rt0)
 #ifdef INET6
 	case AF_INET6:
 		if (!nd6_storelladdr(&ac->ac_if, rt, m, dst, (u_char *)edst)) {
-			/* this must be impossible, so we bark */
-			printf("nd6_storelladdr failed\n");
+			/* Something bad happened */
 			return(0);
 		}
 		off = m->m_pkthdr.len - m->m_len;
@@ -368,14 +367,13 @@ ether_output_frame(ifp, m)
 	int s, error = 0;
 
 #ifdef BRIDGE
-	if (do_bridge) {
-		struct ether_header hdr;
+	if (do_bridge && BDG_USED(ifp) ) {
+		struct ether_header *eh; /* a ptr suffices */
 
 		m->m_pkthdr.rcvif = NULL;
-		bcopy(mtod(m, struct ether_header *), &hdr, ETHER_HDR_LEN);
+		eh = mtod(m, struct ether_header *);
 		m_adj(m, ETHER_HDR_LEN);
-		ifp = bridge_dst_lookup(&hdr);
-		bdg_forward(&m, &hdr, ifp);
+		m = bdg_forward(m, eh, ifp);
 		if (m != NULL)
 			m_freem(m);
 		return (0);
@@ -417,6 +415,9 @@ ether_input(ifp, eh, m)
 	struct ether_header *eh;
 	struct mbuf *m;
 {
+#ifdef BRIDGE
+	struct ether_header save_eh;
+#endif
 
 	/* Check for a BPF tap */
 	if (ifp->if_bpf != NULL) {
@@ -438,7 +439,7 @@ ether_input(ifp, eh, m)
 
 #ifdef BRIDGE
 	/* Check for bridging mode */
-	if (do_bridge) {
+	if (do_bridge && BDG_USED(ifp) ) {
 		struct ifnet *bif;
 
 		/* Check with bridging code */
@@ -446,8 +447,24 @@ ether_input(ifp, eh, m)
 			m_freem(m);
 			return;
 		}
-		if (bif != BDG_LOCAL)
-			bdg_forward(&m, eh, bif);	/* needs forwarding */
+		if (bif != BDG_LOCAL) {
+			struct mbuf *oldm = m ;
+
+			save_eh = *eh ; /* because it might change */
+			m = bdg_forward(m, eh, bif);	/* needs forwarding */
+			/*
+			 * Do not continue if bdg_forward() processed our
+			 * packet (and cleared the mbuf pointer m) or if
+			 * it dropped (m_free'd) the packet itself.
+			 */
+			if (m == NULL) {
+			    if (bif == BDG_BCAST || bif == BDG_MCAST)
+				printf("bdg_forward drop MULTICAST PKT\n");
+			    return;
+			}
+			if (m != oldm) /* m changed! */
+			    eh = &save_eh ;
+		}
 		if (bif == BDG_LOCAL
 		    || bif == BDG_BCAST
 		    || bif == BDG_MCAST)
@@ -459,16 +476,6 @@ ether_input(ifp, eh, m)
 		return;
        }
 #endif
-
-	/* Discard packet if upper layers shouldn't see it. This should
-	   only happen when the interface is in promiscuous mode. */
-	if ((ifp->if_flags & IFF_PROMISC) != 0
-	    && (eh->ether_dhost[0] & 1) == 0
-	    && bcmp(eh->ether_dhost,
-	      IFP2AC(ifp)->ac_enaddr, ETHER_ADDR_LEN) != 0) {
-		m_freem(m);
-		return;
-	}
 
 #ifdef BRIDGE
 recvLocal:
@@ -492,6 +499,21 @@ ether_demux(ifp, eh, m)
 #if defined(NETATALK)
 	register struct llc *l;
 #endif
+
+#ifdef BRIDGE
+    if (! (do_bridge && BDG_USED(ifp) ) )
+#endif
+	/* Discard packet if upper layers shouldn't see it because it was
+	   unicast to a different Ethernet address. If the driver is working
+	   properly, then this situation can only happen when the interface
+	   is in promiscuous mode. */
+	if ((ifp->if_flags & IFF_PROMISC) != 0
+	    && (eh->ether_dhost[0] & 1) == 0
+	    && bcmp(eh->ether_dhost,
+	      IFP2AC(ifp)->ac_enaddr, ETHER_ADDR_LEN) != 0) {
+		m_freem(m);
+		return;
+	}
 
 	/* Discard packet if interface is not up */
 	if ((ifp->if_flags & IFF_UP) == 0) {

@@ -1,5 +1,5 @@
 /*	
- * $FreeBSD: src/sys/boot/common/dev_net.c,v 1.6.2.4 2000/09/18 08:09:39 ps Exp $
+ * $FreeBSD: src/sys/boot/common/dev_net.c,v 1.6.2.5 2001/03/04 04:44:42 obrien Exp $
  * From: $NetBSD: dev_net.c,v 1.12 1997/12/10 20:38:37 gwr Exp $
  */
 
@@ -83,6 +83,7 @@ static int	net_init(void);
 static int	net_open(struct open_file *, ...);
 static int	net_close(struct open_file *);
 static int	net_strategy();
+static void	net_print(int);
 
 static int net_getparams(int sock);
 
@@ -93,7 +94,8 @@ struct devsw netdev = {
     net_strategy, 
     net_open, 
     net_close, 
-    noioctl
+    noioctl,
+    net_print
 };
 
 int
@@ -283,4 +285,10 @@ net_getparams(sock)
     }
     printf("net_open: server path: %s\n", rootpath);	    
     return (0);
+}
+
+static void
+net_print(int verbose)
+{
+    return;
 }

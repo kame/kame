@@ -6,7 +6,7 @@
  * to the original author and the contributors.
  *
  * $Id: ip_proxy.h,v 2.1.2.1 1999/09/19 12:18:20 darrenr Exp $
- * $FreeBSD: src/sys/netinet/ip_proxy.h,v 1.7.2.1 2000/07/19 23:27:55 darrenr Exp $
+ * $FreeBSD: src/sys/netinet/ip_proxy.h,v 1.7.2.2 2001/02/17 20:42:07 darrenr Exp $
  */
 
 #ifndef	__IP_PROXY_H__
@@ -97,6 +97,7 @@ typedef struct  ftpside {
 	char	*ftps_rptr;
 	char	*ftps_wptr;
 	u_32_t	ftps_seq;
+	u_32_t	ftps_len;
 	int	ftps_junk;
 	char	ftps_buf[FTP_BUFSZ];
 } ftpside_t;

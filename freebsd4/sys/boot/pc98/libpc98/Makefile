@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.3.2.2 2000/09/23 01:42:58 nyan Exp $
+# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.3.2.3 2000/12/30 12:01:06 nyan Exp $
 #
 LIB=			pc98
 NOPIC=
@@ -27,8 +27,10 @@ CFLAGS+=	-DCOMSPEED=${BOOT_COMCONSOLE_SPEED}
 # the location of libstand
 CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
 
+.ifdef(BOOT_BIOSDISK_DEBUG)
 # Make the disk code more talkative
-#CFLAGS+= -DDISK_DEBUG
+CFLAGS+= -DDISK_DEBUG
+.endif
 
 # Include simple terminal emulation (cons25-compatible)
 CFLAGS+= -DTERM_EMU

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vm_page.c	7.4 (Berkeley) 5/7/91
- * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.3 2000/08/04 22:31:11 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.6 2001/03/03 23:06:09 gallatin Exp $
  */
 
 /*
@@ -185,14 +185,14 @@ vm_page_startup(starta, enda, vaddr)
 	register vm_offset_t mapped;
 	register struct vm_page **bucket;
 	vm_size_t npages, page_range;
-	register vm_offset_t new_start;
+	register vm_offset_t new_end;
 	int i;
 	vm_offset_t pa;
 	int nblocks;
-	vm_offset_t first_managed_page;
+	vm_offset_t last_pa;
 
 	/* the biggest memory array is the second group of pages */
-	vm_offset_t start;
+	vm_offset_t end;
 	vm_offset_t biggestone, biggestsize;
 
 	vm_offset_t total;
@@ -219,7 +219,7 @@ vm_page_startup(starta, enda, vaddr)
 		total += size;
 	}
 
-	start = phys_avail[biggestone];
+	end = phys_avail[biggestone+1];
 
 	/*
 	 * Initialize the queue headers for the free queue, the active queue
@@ -255,13 +255,11 @@ vm_page_startup(starta, enda, vaddr)
 	/*
 	 * Validate these addresses.
 	 */
-
-	new_start = start + vm_page_bucket_count * sizeof(struct vm_page *);
-	new_start = round_page(new_start);
+	new_end = end - vm_page_bucket_count * sizeof(struct vm_page *);
+	new_end = trunc_page(new_end);
 	mapped = round_page(vaddr);
-	vaddr = pmap_map(mapped, start, new_start,
+	vaddr = pmap_map(mapped, new_end, end,
 	    VM_PROT_READ | VM_PROT_WRITE);
-	start = new_start;
 	vaddr = round_page(vaddr);
 	bzero((caddr_t) mapped, vaddr - mapped);
 
@@ -280,8 +278,9 @@ vm_page_startup(starta, enda, vaddr)
 
 	page_range = phys_avail[(nblocks - 1) * 2 + 1] / PAGE_SIZE - first_page;
 	npages = (total - (page_range * sizeof(struct vm_page)) -
-	    (start - phys_avail[biggestone])) / PAGE_SIZE;
+	    (end - new_end)) / PAGE_SIZE;
 
+	end = new_end;
 	/*
 	 * Initialize the mem entry structures now, and put them in the free
 	 * queue.
@@ -292,12 +291,10 @@ vm_page_startup(starta, enda, vaddr)
 	/*
 	 * Validate these addresses.
 	 */
-	new_start = round_page(start + page_range * sizeof(struct vm_page));
-	mapped = pmap_map(mapped, start, new_start,
-	    VM_PROT_READ | VM_PROT_WRITE);
-	start = new_start;
 
-	first_managed_page = start / PAGE_SIZE;
+	new_end = trunc_page(end - page_range * sizeof(struct vm_page));
+	mapped = pmap_map(mapped, new_end, end,
+	    VM_PROT_READ | VM_PROT_WRITE);
 
 	/*
 	 * Clear all of the page structures
@@ -314,11 +311,12 @@ vm_page_startup(starta, enda, vaddr)
 	cnt.v_page_count = 0;
 	cnt.v_free_count = 0;
 	for (i = 0; phys_avail[i + 1] && npages > 0; i += 2) {
+		pa = phys_avail[i];
 		if (i == biggestone)
-			pa = ptoa(first_managed_page);
+			last_pa = new_end;
 		else
-			pa = phys_avail[i];
-		while (pa < phys_avail[i + 1] && npages-- > 0) {
+			last_pa = phys_avail[i + 1];
+		while (pa < last_pa && npages-- > 0) {
 			vm_add_new_page(pa);
 			pa += PAGE_SIZE;
 		}
@@ -860,7 +858,7 @@ loop:
 	 * Don't wakeup too often - wakeup the pageout daemon when
 	 * we would be nearly out of memory.
 	 */
-	if (vm_paging_needed() || cnt.v_free_count < cnt.v_pageout_free_min)
+	if (vm_paging_needed())
 		pagedaemon_wakeup();
 
 	splx(s);
@@ -882,10 +880,10 @@ vm_wait()
 	s = splvm();
 	if (curproc == pageproc) {
 		vm_pageout_pages_needed = 1;
-		tsleep(&vm_pageout_pages_needed, PSWP, "vmwait", 0);
+		tsleep(&vm_pageout_pages_needed, PSWP, "VMWait", 0);
 	} else {
 		if (!vm_pages_needed) {
-			vm_pages_needed++;
+			vm_pages_needed = 1;
 			wakeup(&vm_pages_needed);
 		}
 		tsleep(&cnt.v_free_count, PVM, "vmwait", 0);
@@ -1030,7 +1028,8 @@ vm_page_free_wakeup()
 	 * if pageout daemon needs pages, then tell it that there are
 	 * some free.
 	 */
-	if (vm_pageout_pages_needed) {
+	if (vm_pageout_pages_needed &&
+	    cnt.v_cache_count + cnt.v_free_count >= cnt.v_pageout_free_min) {
 		wakeup(&vm_pageout_pages_needed);
 		vm_pageout_pages_needed = 0;
 	}
@@ -1039,9 +1038,9 @@ vm_page_free_wakeup()
 	 * high water mark. And wakeup scheduler process if we have
 	 * lots of memory. this process will swapin processes.
 	 */
-	if (vm_pages_needed && vm_page_count_min()) {
-		wakeup(&cnt.v_free_count);
+	if (vm_pages_needed && !vm_page_count_min()) {
 		vm_pages_needed = 0;
+		wakeup(&cnt.v_free_count);
 	}
 }
 
@@ -1244,6 +1243,9 @@ vm_page_wire(m)
  *	processes.  This optimization causes one-time-use metadata to be
  *	reused more quickly.
  *
+ *	BUT, if we are in a low-memory situation we have no choice but to
+ *	put clean pages on the cache queue.
+ *
  *	A number of routines use vm_page_unwire() to guarantee that the page
  *	will go into either the inactive or active queues, and will NEVER
  *	be placed in the cache - for example, just after dirtying a page.
@@ -1273,6 +1275,7 @@ vm_page_unwire(m, activate)
 				vm_page_queues[PQ_ACTIVE].lcnt++;
 				cnt.v_active_count++;
 			} else {
+				vm_page_flag_clear(m, PG_WINATCFLS);
 				TAILQ_INSERT_TAIL(&vm_page_queues[PQ_INACTIVE].pl, m, pageq);
 				m->queue = PQ_INACTIVE;
 				vm_page_queues[PQ_INACTIVE].lcnt++;
@@ -1311,6 +1314,7 @@ _vm_page_deactivate(vm_page_t m, int athead)
 	if (m->wire_count == 0 && (m->flags & PG_UNMANAGED) == 0) {
 		if ((m->queue - m->pc) == PQ_CACHE)
 			cnt.v_reactivated++;
+		vm_page_flag_clear(m, PG_WINATCFLS);
 		vm_page_unqueue(m);
 		if (athead)
 			TAILQ_INSERT_HEAD(&vm_page_queues[PQ_INACTIVE].pl, m, pageq);
@@ -1327,6 +1331,25 @@ void
 vm_page_deactivate(vm_page_t m)
 {
     _vm_page_deactivate(m, 0);
+}
+
+/*
+ * vm_page_try_to_cache:
+ *
+ * Returns 0 on failure, 1 on success
+ */
+int
+vm_page_try_to_cache(vm_page_t m)
+{
+	if (m->dirty || m->hold_count || m->busy || m->wire_count ||
+	    (m->flags & (PG_BUSY|PG_UNMANAGED))) {
+		return(0);
+	}
+	vm_page_test_dirty(m);
+	if (m->dirty)
+		return(0);
+	vm_page_cache(m);
+	return(1);
 }
 
 /*

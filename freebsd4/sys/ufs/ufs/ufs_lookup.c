@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_lookup.c	8.15 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.33.2.2 2000/11/03 15:55:49 bp Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.33.2.4 2001/02/10 17:43:29 iedowse Exp $
  */
 
 #include <sys/param.h>
@@ -240,7 +240,8 @@ searchloop:
 		 * "dirchk" to be true.
 		 */
 		ep = (struct direct *)((char *)bp->b_data + entryoffsetinblock);
-		if (ep->d_reclen == 0 ||
+		if (ep->d_reclen == 0 || ep->d_reclen >
+		    DIRBLKSIZ - (entryoffsetinblock & (DIRBLKSIZ - 1)) ||
 		    (dirchk && ufs_dirbadentry(vdp, ep, entryoffsetinblock))) {
 			int i;
 
@@ -590,7 +591,7 @@ ufs_dirbad(ip, offset, how)
 	mp = ITOV(ip)->v_mount;
 	(void)printf("%s: bad dir ino %lu at offset %ld: %s\n",
 	    mp->mnt_stat.f_mntonname, (u_long)ip->i_number, (long)offset, how);
-	if ((mp->mnt_stat.f_flags & MNT_RDONLY) == 0)
+	if ((mp->mnt_flag & MNT_RDONLY) == 0)
 		panic("ufs_dirbad: bad dir");
 }
 
@@ -922,7 +923,12 @@ out:
 			softdep_change_linkcnt(ip);
 			softdep_setup_remove(bp, dp, ip, isrmdir);
 		}
-		bdwrite(bp);
+		if (softdep_slowdown(dvp)) {
+			error = VOP_BWRITE(bp->b_vp, bp);
+		} else {
+			bdwrite(bp);
+			error = 0;
+		}
 	} else {
 		if (ip) {
 			ip->i_effnlink--;

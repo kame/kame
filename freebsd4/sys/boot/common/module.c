@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/module.c,v 1.13 2000/02/25 05:10:44 bp Exp $
+ * $FreeBSD: src/sys/boot/common/module.c,v 1.13.2.1 2000/12/28 13:12:35 ps Exp $
  */
 
 /*
@@ -47,7 +47,7 @@ static struct module_metadata 	*metadata_next(struct module_metadata *md, int ty
 /* load address should be tweaked by first module loaded (kernel) */
 static vm_offset_t	loadaddr = 0;
 
-static char		*default_searchpath ="/;/boot;/modules";
+static const char	*default_searchpath ="/;/boot;/modules";
 
 struct loaded_module *loaded_modules = NULL;
 

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/pc98/loader/Makefile,v 1.12.2.5 2000/10/28 10:10:31 nyan Exp $
+# $FreeBSD: src/sys/boot/pc98/loader/Makefile,v 1.12.2.6 2000/12/23 03:45:09 nyan Exp $
 
 BASE=		loader
 PROG=		${BASE}
@@ -94,7 +94,7 @@ ${BASE}: ${BASE}.bin ${BTXLDR} ${BTXKERN} ${BTXCRT} ${BASE}.help
 
 ${BASE}.bin: ${BASE}.sym
 	cp ${.ALLSRC} ${.TARGET}
-	strip ${.TARGET}
+	strip -R .comment -R .note ${.TARGET}
 
 ${BASE}.help: help.common help.i386
 	cat ${.ALLSRC} | awk -f ${.CURDIR}/../../common/merge_help.awk > ${.TARGET}

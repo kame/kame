@@ -2,7 +2,7 @@
  * Product specific probe and attach routines for:
  * 	27/284X and aic7770 motherboard SCSI controllers
  *
- * Copyright (c) 1994, 1995, 1996, 1997, 1998, 2000 Justin T. Gibbs.
+ * Copyright (c) 1994-1998, 2000, 2001 Justin T. Gibbs.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -13,6 +13,9 @@
  *    this list of conditions, and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
+ *
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU Public License ("GPL").
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -26,9 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aic7770.c,v 1.1.1.1 2000/11/21 08:39:02 kawa Exp $
+ * $Id: aic7770.c,v 1.1.1.2 2001/04/23 13:09:46 sumikawa Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7770.c,v 1.1.2.1 2000/09/23 00:24:00 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7770.c,v 1.1.2.3 2001/03/12 14:57:40 gibbs Exp $
  */
 
 #ifdef	__linux__
@@ -98,6 +101,8 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry)
 	struct	ahc_probe_config probe_config;
 	int	error;
 	u_int	hostconf;
+	u_int   irq;
+	u_int	intdef;
 
 	ahc_init_probe_config(&probe_config);
 	error = entry->setup(ahc->dev_softc, &probe_config);
@@ -111,11 +116,30 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry)
 	probe_config.description = entry->name;
 	error = ahc_softc_init(ahc, &probe_config);
 
-	error = aic7770_map_int(ahc);
+	error = ahc_reset(ahc);
 	if (error != 0)
 		return (error);
 
-	error = ahc_reset(ahc);
+	/* Make sure we have a valid interrupt vector */
+	intdef = ahc_inb(ahc, INTDEF);
+	irq = intdef & VECTOR;
+	switch (irq) {
+	case 9:
+	case 10:
+	case 11:
+	case 12:
+	case 14:
+	case 15:
+		break;
+	default:
+		printf("aic7770_config: illegal irq setting %d\n", intdef);
+		return (ENXIO);
+	}
+
+	if ((intdef & EDGE_TRIG) != 0)
+		ahc->flags |= AHC_EDGE_INTERRUPT;
+
+	error = aic7770_map_int(ahc, irq);
 	if (error != 0)
 		return (error);
 
@@ -132,7 +156,7 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry)
 
 		/* Get the primary channel information */
 		if ((biosctrl & CHANNEL_B_PRIMARY) != 0)
-			ahc->flags |= AHC_CHANNEL_B_PRIMARY;
+			ahc->flags |= 1;
 
 		if ((biosctrl & BIOSMODE) == BIOSDISABLED) {
 			ahc->flags |= AHC_USEDEFAULTS;
@@ -182,6 +206,11 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry)
 	error = ahc_init(ahc);
 	if (error != 0)
 		return (error);
+
+	/*
+	 * Link this softc in with all other ahc instances.
+	 */
+	ahc_softc_insert(ahc);
 
 	/*
 	 * Enable the board's BUS drivers

@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/sn/if_sn.c,v 1.7.2.2 2000/07/17 21:24:27 archie Exp $
+ *   $FreeBSD: src/sys/dev/sn/if_sn.c,v 1.7.2.3 2001/02/04 04:38:38 toshi Exp $
  */
 
 /*
@@ -155,7 +155,8 @@ static const char *chip_ids[15] = {
 	 /* 5 */ "SMC91C95",
 	NULL,
 	 /* 7 */ "SMC91C100",
-	NULL, NULL, NULL, NULL,
+	 /* 8 */ "SMC91C100FD",
+	NULL, NULL, NULL,
 	NULL, NULL, NULL
 };
 

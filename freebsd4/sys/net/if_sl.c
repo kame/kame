@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_sl.c	8.6 (Berkeley) 2/1/94
- * $FreeBSD: src/sys/net/if_sl.c,v 1.84 2000/02/21 08:06:18 ru Exp $
+ * $FreeBSD: src/sys/net/if_sl.c,v 1.84.2.1 2000/12/26 02:22:57 peter Exp $
  */
 
 /*
@@ -104,6 +104,10 @@
 #include <net/slip.h>
 
 #include <net/bpf.h>
+
+#ifdef __i386__
+#include <i386/isa/intr_machdep.h>
+#endif
 
 static void slattach __P((void *));
 PSEUDO_SET(slattach, if_sl);
@@ -234,6 +238,18 @@ slinit(sc)
 {
 	register caddr_t p;
 
+#ifdef __i386__
+	int s;
+
+	s = splhigh();
+	tty_imask |= net_imask;
+	net_imask = tty_imask;
+	update_intr_masks();
+	splx(s);
+	if (bootverbose)
+		printf("new imasks: bio %x, tty %x, net %x\n",
+		    bio_imask, tty_imask, net_imask);
+#endif
 	if (sc->sc_ep == (u_char *) 0) {
 		MCLALLOC(p, M_WAIT);
 		if (p)

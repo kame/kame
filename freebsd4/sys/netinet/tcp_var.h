@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56.2.2 2000/08/16 06:14:23 jayanth Exp $
+ * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56.2.5 2001/04/18 17:55:24 kris Exp $
  */
 
 #ifndef _NETINET_TCP_VAR_H_
@@ -120,6 +120,8 @@ struct tcpcb {
 					 * for slow start exponential to
 					 * linear switch
 					 */
+	tcp_seq	snd_recover;		/* for use in fast recovery */
+
 	u_int	t_maxopd;		/* mss plus options */
 
 	u_long	t_rcvtime;		/* inactivity time */
@@ -366,6 +368,7 @@ extern	struct inpcbinfo tcbinfo;
 extern	struct tcpstat tcpstat;	/* tcp statistics */
 extern	int tcp_mssdflt;	/* XXX */
 extern	int tcp_delack_enabled;
+extern	int tcp_do_newreno;
 extern	int ss_fltsz;
 extern	int ss_fltsz_local;
 
@@ -384,6 +387,7 @@ void	 tcp_init __P((void));
 void	 tcp_input __P((struct mbuf *, int, int));
 void	 tcp_mss __P((struct tcpcb *, int));
 int	 tcp_mssopt __P((struct tcpcb *));
+void	 tcp_drop_syn_sent __P((struct inpcb *, int));
 void	 tcp_mtudisc __P((struct inpcb *, int));
 struct tcpcb *
 	 tcp_newtcpcb __P((struct inpcb *));
@@ -405,6 +409,10 @@ void	 tcp_trace __P((int, int, struct tcpcb *, void *, struct tcphdr *,
 extern	struct pr_usrreqs tcp_usrreqs;
 extern	u_long tcp_sendspace;
 extern	u_long tcp_recvspace;
+void	tcp_rndiss_init __P((void));
+tcp_seq	tcp_rndiss_next __P((void));
+u_int16_t
+	tcp_rndiss_encrypt __P((u_int16_t));
 
 #endif /* _KERNEL */
 

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_lnc.c,v 1.68.2.3 2000/07/17 21:24:30 archie Exp $
+ * $FreeBSD: src/sys/i386/isa/if_lnc.c,v 1.68.2.4 2001/01/08 15:37:59 ume Exp $
  */
 
 /*
@@ -597,12 +597,22 @@ lnc_rint(struct lnc_softc *sc)
 				head->m_pkthdr.len = pkt_len ;
 				eh = (struct ether_header *) head->m_data;
 
-				/* Skip over the ether header */
-				head->m_data += sizeof *eh;
-				head->m_len -= sizeof *eh;
-				head->m_pkthdr.len -= sizeof *eh;
+				/*
+				 * vmware ethernet hardware emulation loops
+				 * packets back to itself, violates IFF_SIMPLEX.
+				 * drop it if it is from myself.
+				 */
+				if (bcmp(eh->ether_shost,
+				      sc->arpcom.ac_enaddr, ETHER_ADDR_LEN) == 0) {
+					m_freem(head);
+				} else {
+					/* Skip over the ether header */
+					head->m_data += sizeof *eh;
+					head->m_len -= sizeof *eh;
+					head->m_pkthdr.len -= sizeof *eh;
 
-				ether_input(&sc->arpcom.ac_if, eh, head);
+					ether_input(&sc->arpcom.ac_if, eh, head);
+				}
 
 			} else {
 				int unit = sc->arpcom.ac_if.if_unit;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_aout.c,v 1.59 1999/11/21 12:38:15 phk Exp $
+ * $FreeBSD: src/sys/kern/imgact_aout.c,v 1.59.2.1 2001/02/22 05:15:03 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -70,7 +70,9 @@ struct sysentvec aout_sysvec = {
 	&szsigcode,
 	0,
 	"FreeBSD a.out",
-	aout_coredump
+	aout_coredump,
+	NULL,
+	MINSIGSTKSZ
 };
 
 static int

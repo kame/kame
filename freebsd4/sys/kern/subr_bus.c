@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_bus.c,v 1.54.2.7 2000/08/03 06:36:38 imp Exp $
+ * $FreeBSD: src/sys/kern/subr_bus.c,v 1.54.2.8 2001/01/18 00:19:50 n_hibma Exp $
  */
 
 #include "opt_bus.h"
@@ -1140,6 +1140,7 @@ device_probe_and_attach(device_t dev)
 {
     device_t bus = dev->parent;
     int error = 0;
+    int hasclass = (dev->devclass != 0);
 
     if (dev->state >= DS_ALIVE)
 	return 0;
@@ -1155,6 +1156,9 @@ device_probe_and_attach(device_t dev)
 	    else {
 		printf("device_probe_and_attach: %s%d attach returned %d\n",
 		       dev->driver->name, dev->unit, error);
+		/* Unset the class that was set in device_probe_child */
+		if (!hasclass)
+		    device_set_devclass(dev, 0);
 		device_set_driver(dev, NULL);
 		dev->state = DS_NOTPRESENT;
 	    }

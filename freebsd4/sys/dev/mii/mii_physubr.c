@@ -61,7 +61,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/mii_physubr.c,v 1.2 1999/08/28 00:42:14 peter Exp $";
+  "$FreeBSD: src/sys/dev/mii/mii_physubr.c,v 1.2.2.1 2000/12/12 19:29:14 wpaul Exp $";
 #endif
 
 void	mii_phy_auto_timeout __P((void *));
@@ -107,9 +107,19 @@ mii_phy_auto(mii, waitfor)
 	 */
 	if ((mii->mii_flags & MIIF_DOINGAUTO) == 0) {
 		mii->mii_flags |= MIIF_DOINGAUTO;
-		timeout(mii_phy_auto_timeout, mii, hz >> 1);
+		mii->mii_auto_ch = timeout(mii_phy_auto_timeout, mii, hz >> 1);
 	}
 	return (EJUSTRETURN);
+}
+
+void
+mii_phy_auto_stop(sc)
+	struct mii_softc *sc;
+{
+	if (sc->mii_flags & MIIF_DOINGAUTO) {
+		sc->mii_flags &= ~MIIF_DOINGAUTO;
+		untimeout(mii_phy_auto_timeout, sc, sc->mii_auto_ch);
+	}
 }
 
 void

@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/svr4/svr4_sysvec.c,v 1.10 2000/01/03 20:34:39 newton Exp $
+ * $FreeBSD: src/sys/svr4/svr4_sysvec.c,v 1.10.2.1 2001/02/22 05:15:12 marcel Exp $
  */
 
 /* XXX we use functions that might not exist. */
@@ -179,7 +179,9 @@ struct sysentvec svr4_sysvec = {
   &svr4_szsigcode,
   NULL,
   "SVR4",
-  elf_coredump
+  elf_coredump,
+  NULL,
+  SVR4_MINSIGSTKSZ
 };
 
 Elf32_Brandinfo svr4_brand = {

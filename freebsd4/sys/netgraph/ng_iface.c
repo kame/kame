@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.7.2.3 2000/10/24 18:36:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.7.2.4 2001/01/10 07:16:09 julian Exp $
  * $Whistle: ng_iface.c,v 1.33 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -767,6 +767,7 @@ ng_iface_rmnode(node_p node)
 	ng_unname(node);
 	bpfdetach(priv->ifp);
 	if_detach(priv->ifp);
+	FREE(priv->ifp, M_NETGRAPH);
 	priv->ifp = NULL;
 	ng_iface_free_unit(priv->unit);
 	FREE(priv, M_NETGRAPH);

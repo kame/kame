@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/isa/gusc.c,v 1.5.2.2 2000/10/05 05:07:49 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/gusc.c,v 1.5.2.3 2001/02/03 01:29:08 cg Exp $
  */
 
 #include <sys/param.h>
@@ -35,7 +35,6 @@
 #include <sys/module.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
-#include <machine/clock.h>
 #include <sys/rman.h>
 #include <sys/soundcard.h>
 #include <dev/sound/pcm/sound.h>

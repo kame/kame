@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)types.h	8.3 (Berkeley) 1/5/94
- * $FreeBSD: src/sys/i386/include/types.h,v 1.19 1999/12/29 04:33:09 peter Exp $
+ * $FreeBSD: src/sys/i386/include/types.h,v 1.19.2.1 2001/03/21 10:50:58 peter Exp $
  */
 
 #ifndef _MACHINE_TYPES_H_
@@ -53,7 +53,7 @@ typedef	unsigned int	vm_pindex_t;
 typedef	unsigned int	vm_size_t;
 
 typedef	__int32_t	register_t;
-
+typedef	__uint32_t	u_register_t;
 
 #ifdef _KERNEL
 typedef	int		intfptr_t;

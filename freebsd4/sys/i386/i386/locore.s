@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)locore.s	7.3 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132.2.2 2000/07/07 00:38:46 obrien Exp $
+ * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132.2.3 2001/03/17 10:48:59 peter Exp $
  *
  *		originally from: locore.s, by William F. Jolitz
  *
@@ -915,7 +915,7 @@ map_read_write:
 /* install a pde for temporary double map of bottom of VA */
 	movl	R(_KPTphys), %eax
 	xorl	%ebx, %ebx
-	movl	$1, %ecx
+	movl	$NKPT, %ecx
 	fillkpt(R(_IdlePTD), $PG_RW)
 
 /* install pde's for pt's */

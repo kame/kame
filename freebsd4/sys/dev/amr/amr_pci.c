@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1.2.3 2000/10/28 10:48:00 msmith Exp $
+ *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1.2.4 2000/12/22 22:24:32 msmith Exp $
  */
 
 #include <sys/param.h>
@@ -103,7 +103,7 @@ static struct
 static int
 amr_pci_probe(device_t dev)
 {
-    int		i;
+    int		i, sig;
 
     debug_called(1);
 
@@ -112,9 +112,11 @@ amr_pci_probe(device_t dev)
 	    (pci_get_device(dev) == amr_device_ids[i].device)) {
 
 	    /* do we need to test for a signature? */
-	    if ((amr_device_ids[i].flag & PROBE_SIGNATURE) &&
-		(pci_read_config(dev, AMR_CFG_SIG, 2) != AMR_SIGNATURE))
-		continue;
+	    if (amr_device_ids[i].flag & PROBE_SIGNATURE) {
+		sig = pci_read_config(dev, AMR_CFG_SIG, 2);
+		if ((sig != AMR_SIGNATURE_1) && (sig != AMR_SIGNATURE_2))
+		    continue;
+	    }
 	    device_set_desc(dev, "AMI MegaRAID");
 	    return(-10);	/* allow room to be overridden */
 	}

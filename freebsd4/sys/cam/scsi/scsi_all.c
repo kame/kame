@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14.2.2 2000/09/22 23:10:54 gibbs Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14.2.5 2001/02/24 19:25:30 gibbs Exp $
  */
 
 #include <sys/param.h>
@@ -708,7 +708,7 @@ scsi_op_desc(u_int16_t opcode, struct scsi_inquiry_data *inq_data)
 	asc, ascq, action, desc
 #else 
 #define SST(asc, ascq, action, desc) \
-	asc, asc, action
+	asc, ascq, action
 #endif 
 
 static const char quantum[] = "QUANTUM";
@@ -2176,18 +2176,19 @@ scsi_interpret_sense(struct cam_device *device, union ccb *ccb,
 			/* FALLTHROUGH */
 		case SSD_KEY_EQUAL:
 			/* These should be filtered by the peripheral drivers */
-			/* FALLTHROUGH */
-		case SSD_KEY_MISCOMPARE:
 			print_sense = FALSE;
 			/* FALLTHROUGH */
-		case SSD_KEY_RECOVERED_ERROR:
-
+		case SSD_KEY_MISCOMPARE:
 			/* decrement the number of retries */
 			retry = ccb->ccb_h.retry_count > 0;
-			if (retry)
+			if (retry) {
+				error = ERESTART;
 				ccb->ccb_h.retry_count--;
-
-			error = 0;
+			} else {
+				error = EIO;
+			}
+		case SSD_KEY_RECOVERED_ERROR:
+			error = 0;	/* not an error */
 			break;
 		case SSD_KEY_ILLEGAL_REQUEST:
 			if (((sense_flags & SF_QUIET_IR) != 0)
@@ -2242,6 +2243,7 @@ scsi_interpret_sense(struct cam_device *device, union ccb *ccb,
 				}
 			}
 			break;
+		case SSD_KEY_ABORTED_COMMAND:
 		default:
 			/* decrement the number of retries */
 			retry = ccb->ccb_h.retry_count > 0;
@@ -2256,6 +2258,13 @@ scsi_interpret_sense(struct cam_device *device, union ccb *ccb,
 
 				error = error_action & SS_ERRMASK;
 			}
+			/*
+			 * Make sure ABORTED COMMAND errors get
+			 * printed as they're indicative of marginal
+			 * SCSI busses that people should address.
+			 */
+			if (sense_key == SSD_KEY_ABORTED_COMMAND)
+				print_sense = TRUE;
 		}
 		break;
 	}

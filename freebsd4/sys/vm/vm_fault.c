@@ -66,7 +66,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_fault.c,v 1.108.2.2 2000/08/04 22:31:11 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_fault.c,v 1.108.2.5 2001/03/14 07:05:05 dillon Exp $
  */
 
 /*
@@ -725,6 +725,12 @@ readrest:
 			vput(fs.vp);
 			fs.vp = NULL;
 		}
+		
+		if (fs.map->infork) {
+			release_page(&fs);
+			unlock_and_deallocate(&fs);
+			goto RetryFault;
+		}
 
 		/*
 		 * To avoid trying to write_lock the map while another process
@@ -795,15 +801,18 @@ readrest:
 		 * Also tell the backing pager, if any, that it should remove
 		 * any swap backing since the page is now dirty.
 		 */
+		if (fs.entry->eflags & MAP_ENTRY_NOSYNC) {
+			if (fs.m->dirty == 0)
+				vm_page_flag_set(fs.m, PG_NOSYNC);
+		} else {
+			vm_page_flag_clear(fs.m, PG_NOSYNC);
+		}
 		if (fault_flags & VM_FAULT_DIRTY) {
-			if (fs.entry->eflags & MAP_ENTRY_NOSYNC) {
-				if (fs.m->dirty == 0)
-					vm_page_flag_set(fs.m, PG_NOSYNC);
-			} else {
-				vm_page_flag_clear(fs.m, PG_NOSYNC);
-			}
+			int s;
 			vm_page_dirty(fs.m);
+			s = splvm();
 			vm_pager_page_unswapped(fs.m);
+			splx(s);
 		}
 	}
 

@@ -21,7 +21,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/sys/modules/osf1/osf1.8,v 1.1 1999/12/14 22:35:36 gallatin Exp $
+.\" $FreeBSD: src/sys/modules/osf1/osf1.8,v 1.1.2.2 2000/12/27 13:50:35 ru Exp $
 .\"
 .Dd December 31, 1998
 .Dt OSF1 8
@@ -30,7 +30,7 @@
 .Nm osf1
 .Nd load the OSF/1 emulator kernel module
 .Sh SYNOPSIS
-.Nm osf1
+.Nm
 .Sh DESCRIPTION
 The
 .Nm
@@ -39,6 +39,7 @@ utility loads the OSF/1 image activator kernel module.
 .Bl -tag -width /modules/osf1.ko 
 .It Pa /modules/osf1.ko
 OSF/1 image activator loadable kernel module.
+.El
 .Sh SEE ALSO
 .Xr kld 4 ,
 .Xr kldload 8 ,

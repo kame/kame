@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/sn/if_snreg.h,v 1.2 1999/12/22 08:44:13 imp Exp $
+ *   $FreeBSD: src/sys/dev/sn/if_snreg.h,v 1.2.2.1 2001/02/04 04:38:38 toshi Exp $
  */
 
 /*
@@ -337,6 +337,7 @@
 #define CHIP_9194       4
 #define CHIP_9195       5
 #define CHIP_91100      7
+#define CHIP_91100FD    8
 
 /* When packets are stuffed into the card or sucked out of the card
  * they are set up more or less as follows:

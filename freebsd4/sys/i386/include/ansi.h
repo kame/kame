@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ansi.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/i386/include/ansi.h,v 1.18 2000/01/14 10:41:39 sheldonh Exp $
+ * $FreeBSD: src/sys/i386/include/ansi.h,v 1.18.2.2 2001/03/05 13:09:00 obrien Exp $
  */
 
 #ifndef _MACHINE_ANSI_H_
@@ -51,6 +51,7 @@
 #define	_BSD_PTRDIFF_T_	int			/* ptr1 - ptr2 */
 #define	_BSD_RUNE_T_	_BSD_CT_RUNE_T_		/* rune_t (see below) */
 #define	_BSD_SIZE_T_	unsigned int		/* sizeof() */
+#define	_BSD_SOCKLEN_T_	__uint32_t
 #define	_BSD_SSIZE_T_	int			/* byte count or error */
 #define	_BSD_TIME_T_	long			/* time()... */
 #define	_BSD_TIMER_T_	int			/* timer_gettime()... */
@@ -91,6 +92,11 @@
  */
 #define	_BSD_CLK_TCK_		128
 #define	_BSD_CLOCKS_PER_SEC_	128
+
+/*
+ * We define this here since both <stddef.h> and <sys/types.h> needs it.
+ */
+#define __offsetof(type, field) ((size_t)(&((type *)0)->field))
 
 /*
  * Typedefs for especially magic types.  #define's wouldn't work in the

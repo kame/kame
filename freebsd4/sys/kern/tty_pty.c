@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty_pty.c	8.4 (Berkeley) 2/20/95
- * $FreeBSD: src/sys/kern/tty_pty.c,v 1.74 2000/02/09 03:32:11 rwatson Exp $
+ * $FreeBSD: src/sys/kern/tty_pty.c,v 1.74.2.1 2001/02/26 04:23:16 jlemon Exp $
  */
 
 /*
@@ -87,8 +87,9 @@ static struct cdevsw pts_cdevsw = {
 	/* maj */	CDEV_MAJOR_S,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 #define	CDEV_MAJOR_C	6
@@ -105,8 +106,9 @@ static struct cdevsw ptc_cdevsw = {
 	/* maj */	CDEV_MAJOR_C,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 #define BUFSIZ 100		/* Chunk size iomoved to/from user */

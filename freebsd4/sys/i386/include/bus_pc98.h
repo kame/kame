@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/i386/include/bus_pc98.h,v 1.8.2.3 2000/10/29 13:07:55 nyan Exp $ */
+/* $FreeBSD: src/sys/i386/include/bus_pc98.h,v 1.8.2.4 2001/03/05 06:05:10 nyan Exp $ */
 
 #ifndef _I386_BUS_PC98_H_
 #define _I386_BUS_PC98_H_
@@ -718,7 +718,6 @@ bus_space_write_multi_2(bus_space_tag_t tag, bus_space_handle_t bsh,
 		__asm __volatile("				\n\
 			cld					\n\
 		1:	lodsw					\n\
-			movw %%ax,(%1)				\n\
 			movw %%ax,(%2)				\n\
 			loop 1b"				:
 		    "=S" (addr), "=c" (count)			:

@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic.c,v 1.89.2.3 2000/10/15 04:12:43 sanpei Exp $
+ * $FreeBSD: src/sys/pccard/pcic.c,v 1.89.2.5 2001/01/02 22:44:13 dmlb Exp $
  */
 
 #include <sys/param.h>
@@ -89,6 +89,7 @@ static struct isa_pnp_id pcic_ids[] = {
 	{PCIC_PNP_82365_CARDBUS,	NULL},		/* PNP0E03 */
 	{PCIC_PNP_ACTIONTEC,            NULL},          /* AEI0218 */
 	{PCIC_PNP_SCM_SWAPBOX,		NULL},		/* SCM0469 */ 
+	{PCIC_PNP_SCM_SWAPBOX2,		NULL},		/* SCM SwapBox Classic X2P */
 	{0}
 };
 
@@ -928,10 +929,17 @@ pcic_set_res_flags(device_t bus, device_t child, int restype, int rid,
 	switch (restype) {
 	case SYS_RES_MEMORY: {
 		struct mem_desc *mp = &devi->slt->mem[rid];
-		if (value)
-			mp->flags |= MDF_ATTR;
-		else
+		switch (value) {
+		case 0:
 			mp->flags &= ~MDF_ATTR;
+			break;
+		case 1:
+			mp->flags |= MDF_ATTR;
+			break;
+		case 2:
+			mp->flags &= ~MDF_16BITS;
+			break;
+		}
 		err = pcic_memory(devi->slt, rid);
 		break;
 	}
@@ -945,13 +953,52 @@ static int
 pcic_get_res_flags(device_t bus, device_t child, int restype, int rid,
     u_long *value)
 {
-	return (EOPNOTSUPP);
+	struct pccard_devinfo *devi = device_get_ivars(child);
+	int err = 0;
+
+	if (value == 0)
+		return (ENOMEM);
+
+	switch (restype) {
+	case SYS_RES_IOPORT: {
+		struct io_desc *ip = &devi->slt->io[rid];
+		*value = ip->flags;
+		break;
+	}
+	case SYS_RES_MEMORY: {
+		struct mem_desc *mp = &devi->slt->mem[rid];
+		*value = mp->flags;
+		break;
+	}
+	default:
+		err = EOPNOTSUPP;
+	}
+	return (0);
 }
 
 static int
 pcic_set_memory_offset(device_t bus, device_t child, int rid, u_int32_t offset)
 {
-	return (EOPNOTSUPP);
+	struct pccard_devinfo *devi = device_get_ivars(child);
+	struct mem_desc *mp = &devi->slt->mem[rid];
+
+	mp->card = offset;
+
+	return (pcic_memory(devi->slt, rid));
+}
+
+static int
+pcic_get_memory_offset(device_t bus, device_t child, int rid, u_int32_t *offset)
+{
+	struct pccard_devinfo *devi = device_get_ivars(child);
+	struct mem_desc *mp = &devi->slt->mem[rid];
+
+	if (offset == 0)
+		return (ENOMEM);
+
+	*offset = mp->card;
+
+	return (0);
 }
 
 static device_method_t pcic_methods[] = {
@@ -976,6 +1023,7 @@ static device_method_t pcic_methods[] = {
 	DEVMETHOD(card_set_res_flags,	pcic_set_res_flags),
 	DEVMETHOD(card_get_res_flags,	pcic_get_res_flags),
 	DEVMETHOD(card_set_memory_offset, pcic_set_memory_offset),
+	DEVMETHOD(card_get_memory_offset, pcic_get_memory_offset),
 
 	{ 0, 0 }
 };

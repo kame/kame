@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_cluster.c	8.7 (Berkeley) 2/13/94
- * $FreeBSD: src/sys/kern/vfs_cluster.c,v 1.92.2.1 2000/04/26 20:36:31 dillon Exp $
+ * $FreeBSD: src/sys/kern/vfs_cluster.c,v 1.92.2.5 2001/03/02 16:45:12 dillon Exp $
  */
 
 #include "opt_debug_cluster.h"
@@ -47,6 +47,7 @@
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/resourcevar.h>
+#include <sys/vmmeter.h>
 #include <vm/vm.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
@@ -243,8 +244,9 @@ single_block_read:
 			printf("S(%ld,%ld,%d) ",
 			    (long)bp->b_lblkno, bp->b_bcount, seqcount);
 #endif
-		if ((bp->b_flags & B_CLUSTER) == 0)
+		if ((bp->b_flags & B_CLUSTER) == 0) {
 			vfs_busy_pages(bp, 0);
+		}
 		bp->b_flags &= ~(B_ERROR|B_INVAL);
 		if (bp->b_flags & (B_ASYNC|B_CALL))
 			BUF_KERNPROC(bp);
@@ -278,8 +280,9 @@ single_block_read:
 			}
 #endif
 
-			if ((rbp->b_flags & B_CLUSTER) == 0)
+			if ((rbp->b_flags & B_CLUSTER) == 0) {
 				vfs_busy_pages(rbp, 0);
+			}
 			rbp->b_flags &= ~(B_ERROR|B_INVAL);
 			if (rbp->b_flags & (B_ASYNC|B_CALL))
 				BUF_KERNPROC(rbp);
@@ -383,15 +386,22 @@ cluster_rbuild(vp, filesize, lbn, blkno, size, run, fbp)
 
 			tbp = getblk(vp, lbn + i, size, 0, 0);
 
-			if ((tbp->b_flags & B_CACHE) ||
-				(tbp->b_flags & B_VMIO) == 0) {
+			/*
+			 * If the buffer is already fully valid or locked
+			 * (which could also mean that a background write is
+			 * in progress), or the buffer is not backed by VMIO,
+			 * stop.
+			 */
+			if ((tbp->b_flags & (B_CACHE|B_LOCKED)) ||
+			    (tbp->b_flags & B_VMIO) == 0) {
 				bqrelse(tbp);
 				break;
 			}
 
-			for (j = 0;j < tbp->b_npages; j++)
+			for (j = 0;j < tbp->b_npages; j++) {
 				if (tbp->b_pages[j]->valid)
 					break;
+			}
 
 			if (j != tbp->b_npages) {
 				bqrelse(tbp);
@@ -656,6 +666,11 @@ cluster_write(bp, filesize, seqcount)
 			cluster_wbuild_wb(vp, lblocksize, vp->v_cstart, vp->v_clen + 1);
 		vp->v_clen = 0;
 		vp->v_cstart = lbn + 1;
+	} else if (vm_page_count_severe()) {
+		/*
+		 * We are low on memory, get it going NOW
+		 */
+		bawrite(bp);
 	} else {
 		/*
 		 * In the middle of a cluster, so just delay the I/O for now.
@@ -687,8 +702,13 @@ cluster_wbuild(vp, size, start_lbn, len)
 
 	while (len > 0) {
 		s = splbio();
+		/*
+		 * If the buffer is not delayed-write (i.e. dirty), or it 
+		 * is delayed-write but either locked or inval, it cannot 
+		 * partake in the clustered write.
+		 */
 		if (((tbp = gbincore(vp, start_lbn)) == NULL) ||
-		  ((tbp->b_flags & (B_INVAL | B_DELWRI)) != B_DELWRI) ||
+		  ((tbp->b_flags & (B_LOCKED | B_INVAL | B_DELWRI)) != B_DELWRI) ||
 		  BUF_LOCK(tbp, LK_EXCLUSIVE | LK_NOWAIT)) {
 			++start_lbn;
 			--len;
@@ -760,12 +780,16 @@ cluster_wbuild(vp, size, start_lbn, len)
 
 				/*
 				 * If it IS in core, but has different
-				 * characteristics, don't cluster with it.
+				 * characteristics, or is locked (which
+				 * means it could be undergoing a background
+				 * I/O or be in a weird state), then don't
+				 * cluster with it.
 				 */
 				if ((tbp->b_flags & (B_VMIO | B_CLUSTEROK |
 				    B_INVAL | B_DELWRI | B_NEEDCOMMIT))
 				  != (B_DELWRI | B_CLUSTEROK |
 				    (bp->b_flags & (B_VMIO | B_NEEDCOMMIT))) ||
+				    (tbp->b_flags & B_LOCKED) ||
 				    tbp->b_wcred != bp->b_wcred ||
 				    BUF_LOCK(tbp, LK_EXCLUSIVE | LK_NOWAIT)) {
 					splx(s);

@@ -37,7 +37,7 @@
  *	@(#)procfs_ctl.c	8.4 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_ctl.c,v 1.20 1999/12/08 08:59:36 phk Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_ctl.c,v 1.20.2.1 2000/12/17 03:13:05 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -111,6 +111,20 @@ procfs_control(curp, p, op)
 	int error;
 
 	/*
+	 * Authorization check: rely on normal debugging protection, except
+	 * allow processes to disengage debugging on a process onto which
+	 * they have previously attached, but no longer have permission to
+	 * debug.
+	 */
+	if (op != PROCFS_CTL_DETACH) {
+		if (securelevel > 0 && p->p_pid == 1)
+			return (EPERM);
+
+		if (!CHECKIO(curp, p) || p_trespass(curp, p))
+			return (EPERM);
+	}
+
+	/*
 	 * Attach - attaches the target process for debugging
 	 * by the calling process.
 	 */
@@ -122,10 +136,6 @@ procfs_control(curp, p, op)
 		/* can't trace yourself! */
 		if (p->p_pid == curp->p_pid)
 			return (EINVAL);
-
-		/* can't trace init when securelevel > 0 */
-		if (securelevel > 0 && p->p_pid == 1)
-			return (EPERM);
 
 		/*
 		 * Go ahead and set the trace flag.

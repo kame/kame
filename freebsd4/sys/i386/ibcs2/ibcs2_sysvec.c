@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_sysvec.c,v 1.17 1999/09/29 15:12:10 marcel Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_sysvec.c,v 1.17.2.1 2001/02/22 05:15:01 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -60,7 +60,9 @@ struct sysentvec ibcs2_svr3_sysvec = {
 	&szsigcode,	/* use generic trampoline size */
 	0,		/* prepsyscall */
 	"IBCS2 COFF",
-	NULL		/* we don't have a COFF coredump function */
+	NULL,		/* we don't have a COFF coredump function */
+	NULL,
+	IBCS2_MINSIGSTKSZ
 };
 
 /*

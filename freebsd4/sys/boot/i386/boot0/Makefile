@@ -1,4 +1,6 @@
-# $FreeBSD: src/sys/boot/i386/boot0/Makefile,v 1.8.2.2 2000/07/17 21:27:26 jhb Exp $
+# $FreeBSD: src/sys/boot/i386/boot0/Makefile,v 1.8.2.5 2000/12/28 21:52:32 ps Exp $
+
+MAINTAINER=	rnordier
 
 PROG=		boot0
 NOMAN=
@@ -8,8 +10,7 @@ BINMODE=	444
 
 M4?=	m4
 
-# update, packet mode, and all slices enabled by default
-B0FLAGS=0x8f
+B0FLAGS=0xf
 B0TICKS=0xb6
 
 ORG=	0x600

@@ -64,7 +64,7 @@
  *
  *	@(#)swap_pager.c	8.9 (Berkeley) 3/21/94
  *
- * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130.2.5 2000/10/13 07:13:22 dillon Exp $
+ * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130.2.8 2001/03/24 20:28:24 dwmalone Exp $
  */
 
 #include <sys/param.h>
@@ -79,6 +79,7 @@
 #include <sys/sysctl.h>
 #include <sys/blist.h>
 #include <sys/lock.h>
+#include <sys/vmmeter.h>
 
 #ifndef MAX_PAGEOUT_CLUSTER
 #define MAX_PAGEOUT_CLUSTER 16
@@ -311,6 +312,8 @@ swap_pager_swap_init()
 	    ZONE_INTERRUPT, 
 	    1
 	);
+	if (swap_zone == NULL)
+		panic("swap_pager_swap_init: swap_zone == NULL");
 
 	/*
 	 * Initialize our meta-data hash table.  The swapper does not need to
@@ -1542,8 +1545,10 @@ swp_pager_async_iodone(bp)
 				 * be overridden by the original caller of
 				 * getpages so don't play cute tricks here.
 				 *
-				 * XXX it may not be legal to free the page
-				 * here as this messes with the object->memq's.
+				 * XXX IT IS NOT LEGAL TO FREE THE PAGE HERE
+				 * AS THIS MESSES WITH object->memq, and it is
+				 * not legal to mess with object->memq from an
+				 * interrupt.
 				 */
 
 				m->valid = 0;
@@ -1617,10 +1622,11 @@ swp_pager_async_iodone(bp)
 			 * status, then finish the I/O ( which decrements the 
 			 * busy count and possibly wakes waiter's up ).
 			 */
-			vm_page_protect(m, VM_PROT_READ);
 			pmap_clear_modify(m);
 			vm_page_undirty(m);
 			vm_page_io_finish(m);
+			if (!vm_page_count_severe() || !vm_page_try_to_cache(m))
+				vm_page_protect(m, VM_PROT_READ);
 		}
 	}
 

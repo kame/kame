@@ -43,12 +43,10 @@
  *	from: wd.c,v 1.55 1994/10/22 01:57:12 phk Exp $
  *	from: @(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
  *	from: ufs_disksubr.c,v 1.8 1994/06/07 01:21:39 phk Exp $
- * $FreeBSD: src/sys/kern/subr_diskslice.c,v 1.82.2.2 2000/10/31 01:29:18 jkh Exp $
+ * $FreeBSD: src/sys/kern/subr_diskslice.c,v 1.82.2.5 2001/03/05 13:09:01 obrien Exp $
  */
 
 #include "opt_devfs.h"
-
-#include <stddef.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -366,12 +364,46 @@ dsioctl(dev, cmd, data, flags, sspp)
 	int	slice;
 	struct diskslice *sp;
 	struct diskslices *ssp;
+	struct partition *pp;
 
 	slice = dkslice(dev);
 	ssp = *sspp;
 	sp = &ssp->dss_slices[slice];
 	lp = sp->ds_label;
 	switch (cmd) {
+
+	case DIOCGDVIRGIN:
+		lp = (struct disklabel *)data;
+		if (ssp->dss_slices[WHOLE_DISK_SLICE].ds_label) {
+			*lp = *ssp->dss_slices[WHOLE_DISK_SLICE].ds_label;
+		} else {
+			bzero(lp, sizeof(struct disklabel));
+		}
+
+		lp->d_magic = DISKMAGIC;
+		lp->d_magic2 = DISKMAGIC;
+		pp = &lp->d_partitions[RAW_PART];
+		pp->p_offset = 0;
+		pp->p_size = sp->ds_size;
+
+		lp->d_npartitions = MAXPARTITIONS;
+		if (lp->d_interleave == 0)
+			lp->d_interleave = 1;
+		if (lp->d_rpm == 0)
+			lp->d_rpm = 3600;
+		if (lp->d_nsectors == 0)
+			lp->d_nsectors = 32;
+		if (lp->d_ntracks == 0)
+			lp->d_ntracks = 64;
+
+		lp->d_bbsize = BBSIZE;
+		lp->d_sbsize = SBSIZE;
+		lp->d_secpercyl = lp->d_nsectors * lp->d_ntracks;
+		lp->d_ncylinders = sp->ds_size / lp->d_secpercyl;
+		lp->d_secperunit = sp->ds_size;
+		lp->d_checksum = 0;
+		lp->d_checksum = dkcksum(lp);
+		return (0);
 
 	case DIOCGDINFO:
 		if (lp == NULL)
@@ -751,8 +783,28 @@ dsopen(dev, mode, flags, sspp, lp)
 		TRACE(("readdisklabel\n"));
 		if (flags & DSO_NOLABELS)
 			msg = NULL;
-		else
+		else {
 			msg = readdisklabel(dev1, lp1);
+
+			/*
+			 * readdisklabel() returns NULL for success, and an
+			 * error string for failure.
+			 *
+			 * If there isn't a label on the disk, and if the
+			 * DSO_COMPATLABEL is set, we want to use the
+			 * faked-up label provided by the caller.
+			 *
+			 * So we set msg to NULL to indicate that there is
+			 * no failure (since we have a faked-up label),
+			 * free lp1, and then clone it again from lp.
+			 * (In case readdisklabel() modified lp1.)
+			 */
+			if (msg != NULL && (flags & DSO_COMPATLABEL)) {
+				msg = NULL;
+				free(lp1, M_DEVBUF);
+				lp1 = clone_label(lp);
+			}
+		}
 		if (msg == NULL)
 			msg = fixlabel(sname, sp, lp1, FALSE);
 		if (msg == NULL && lp1->d_secsize != ssp->dss_secsize)

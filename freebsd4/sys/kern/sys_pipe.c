@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60.2.3 2000/09/14 20:27:13 jlemon Exp $
+ * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60.2.6 2001/02/26 04:23:16 jlemon Exp $
  */
 
 /*
@@ -95,21 +95,24 @@ static int pipe_write __P((struct file *fp, struct uio *uio,
 static int pipe_close __P((struct file *fp, struct proc *p));
 static int pipe_poll __P((struct file *fp, int events, struct ucred *cred,
 		struct proc *p));
+static int pipe_kqfilter __P((struct file *fp, struct knote *kn));
 static int pipe_stat __P((struct file *fp, struct stat *sb, struct proc *p));
 static int pipe_ioctl __P((struct file *fp, u_long cmd, caddr_t data, struct proc *p));
 
-static struct fileops pipeops =
-    { pipe_read, pipe_write, pipe_ioctl, pipe_poll, pipe_stat, pipe_close };
+static struct fileops pipeops = {
+	pipe_read, pipe_write, pipe_ioctl, pipe_poll, pipe_kqfilter,
+	pipe_stat, pipe_close
+};
 
-static int	filt_pipeattach(struct knote *kn);
 static void	filt_pipedetach(struct knote *kn);
 static int	filt_piperead(struct knote *kn, long hint);
 static int	filt_pipewrite(struct knote *kn, long hint);
 
-struct filterops pipe_rwfiltops[] = {
-	{ 1, filt_pipeattach, filt_pipedetach, filt_piperead },
-	{ 1, filt_pipeattach, filt_pipedetach, filt_pipewrite },
-};
+static struct filterops pipe_rfiltops =
+	{ 1, NULL, filt_pipedetach, filt_piperead };
+static struct filterops pipe_wfiltops =
+	{ 1, NULL, filt_pipedetach, filt_pipewrite };
+
 
 /*
  * Default pipe buffer size(s), this can be kind-of large now because pipe
@@ -183,16 +186,35 @@ pipe(p, uap)
 	wpipe->pipe_state |= PIPE_DIRECTOK;
 
 	error = falloc(p, &rf, &fd);
-	if (error)
-		goto free2;
+	if (error) {
+		pipeclose(rpipe);
+		pipeclose(wpipe);
+		return (error);
+	}
+	fhold(rf);
 	p->p_retval[0] = fd;
+
+	/*
+	 * Warning: once we've gotten past allocation of the fd for the
+	 * read-side, we can only drop the read side via fdrop() in order
+	 * to avoid races against processes which manage to dup() the read
+	 * side while we are blocked trying to allocate the write side.
+	 */
 	rf->f_flag = FREAD | FWRITE;
 	rf->f_type = DTYPE_PIPE;
 	rf->f_data = (caddr_t)rpipe;
 	rf->f_ops = &pipeops;
 	error = falloc(p, &wf, &fd);
-	if (error)
-		goto free3;
+	if (error) {
+		if (fdp->fd_ofiles[p->p_retval[0]] == rf) {
+			fdp->fd_ofiles[p->p_retval[0]] = NULL;
+			fdrop(rf, p);
+		}
+		fdrop(rf, p);
+		/* rpipe has been closed by fdrop(). */
+		pipeclose(wpipe);
+		return (error);
+	}
 	wf->f_flag = FREAD | FWRITE;
 	wf->f_type = DTYPE_PIPE;
 	wf->f_data = (caddr_t)wpipe;
@@ -201,15 +223,9 @@ pipe(p, uap)
 
 	rpipe->pipe_peer = wpipe;
 	wpipe->pipe_peer = rpipe;
+	fdrop(rf, p);
 
 	return (0);
-free3:
-	fdp->fd_ofiles[p->p_retval[0]] = 0;
-	ffree(rf);
-free2:
-	(void)pipeclose(wpipe);
-	(void)pipeclose(rpipe);
-	return (error);
 }
 
 /*
@@ -1172,11 +1188,23 @@ pipeclose(cpipe)
 	}
 }
 
+/*ARGSUSED*/
 static int
-filt_pipeattach(struct knote *kn)
+pipe_kqfilter(struct file *fp, struct knote *kn)
 {
 	struct pipe *rpipe = (struct pipe *)kn->kn_fp->f_data;
 
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		kn->kn_fop = &pipe_rfiltops;
+		break;
+	case EVFILT_WRITE:
+		kn->kn_fop = &pipe_wfiltops;
+		break;
+	default:
+		return (1);
+	}
+	
 	SLIST_INSERT_HEAD(&rpipe->pipe_sel.si_note, kn, kn_selnext);
 	return (0);
 }

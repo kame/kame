@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.9 2000/08/04 22:31:05 peter Exp $
+ * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.11 2001/03/05 13:08:49 obrien Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -230,8 +230,6 @@ static vm_offset_t buffer_sva, buffer_eva;
 vm_offset_t clean_sva, clean_eva;
 static vm_offset_t pager_sva, pager_eva;
 
-#define offsetof(type, member)	((size_t)(&((type *)0)->member))
-
 /*
  * Hooked into the shutdown chain; if the system is to be halted,
  * unconditionally drop back to the SRM console.
@@ -363,6 +361,7 @@ again:
 			(nbuf*BKVASIZE) + (nswbuf*MAXPHYS) + pager_map_size);
 	buffer_map = kmem_suballoc(clean_map, &buffer_sva, &buffer_eva,
 				(nbuf*BKVASIZE));
+	buffer_map->system_map = 1;
 	pager_map = kmem_suballoc(clean_map, &pager_sva, &pager_eva,
 				(nswbuf*MAXPHYS) + pager_map_size);
 	pager_map->system_map = 1;

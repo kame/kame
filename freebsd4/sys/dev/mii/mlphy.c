@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/mlphy.c,v 1.2.2.1 2000/04/14 15:33:14 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/mlphy.c,v 1.2.2.3 2001/02/09 09:50:15 asmodai Exp $
  */
 
 /*
@@ -188,6 +188,7 @@ static int mlphy_detach(dev)
 
 	sc = device_get_softc(dev);
 	mii = device_get_softc(device_get_parent(dev));
+	mii_phy_auto_stop(&sc->ml_mii);
 	sc->ml_mii.mii_dev = NULL;
 	LIST_REMOVE(&sc->ml_mii, mii_list);
 
@@ -219,6 +220,7 @@ mlphy_service(xsc, mii, cmd)
 			break;
 		}
 	}
+	free(devlist, M_TEMP);
 
 	switch (cmd) {
 	case MII_POLLSTAT:
@@ -432,6 +434,7 @@ static void mlphy_status(sc)
 			break;
 		}
 	}
+	free(devlist, M_TEMP);
 
 	if (other == NULL)
 		return;

@@ -7,7 +7,7 @@
  *
  * @(#)ip_nat.h	1.5 2/4/96
  * $Id: ip_nat.h,v 2.17.2.6 2000/07/15 14:50:06 darrenr Exp $
- * $FreeBSD: src/sys/netinet/ip_nat.h,v 1.8.2.2 2000/07/19 23:27:55 darrenr Exp $
+ * $FreeBSD: src/sys/netinet/ip_nat.h,v 1.8.2.4 2001/04/07 03:40:32 darrenr Exp $
  */
 
 #ifndef	__IP_NAT_H__
@@ -82,11 +82,11 @@ typedef	struct	nat	{
 	struct	hostmap	*nat_hm;
 	struct	nat	*nat_next;
 	struct	nat	*nat_hnext[2];
-	struct	nat	**nat_hstart[2];
+	struct	nat	**nat_phnext[2];
 	void	*nat_ifp;
 	int	nat_dir;
 	char	nat_ifname[IFNAMSIZ];
-#if SOLARIS || defined(_sgi)
+#if SOLARIS || defined(__sgi)
 	kmutex_t	nat_lock;
 #endif
 } nat_t;
@@ -142,6 +142,11 @@ typedef	struct	ipnat	{
 #define	NAT_REDIRECT	0x02
 #define	NAT_BIMAP	(NAT_MAP|NAT_REDIRECT)
 #define	NAT_MAPBLK	0x04
+/* 0x100 reserved for FI_W_SPORT */
+/* 0x200 reserved for FI_W_DPORT */
+/* 0x400 reserved for FI_W_SADDR */
+/* 0x800 reserved for FI_W_DADDR */
+/* 0x1000 reserved for FI_W_NEWFR */
 
 #define	MAPBLK_MINPORT	1024	/* don't use reserved ports for src port */
 #define	USABLE_PORTS	(65536 - MAPBLK_MINPORT)
@@ -203,6 +208,7 @@ typedef	struct	natstat	{
 	u_int	ns_rultab_sz;
 	u_int	ns_rdrtab_sz;
 	nat_t	*ns_instances;
+	u_int	ns_wilds;
 } natstat_t;
 
 #define	IPN_ANY		0x000
@@ -221,6 +227,7 @@ typedef	struct	natstat	{
 #define	IPN_ROUNDR	0x100
 #define	IPN_NOTSRC	0x080000
 #define	IPN_NOTDST	0x100000
+#define	IPN_FRAG	0x200000
 
 
 typedef	struct	natlog {
@@ -242,6 +249,7 @@ typedef	struct	natlog {
 #define	NL_NEWRDR	NAT_REDIRECT
 #define	NL_NEWBIMAP	NAT_BIMAP
 #define	NL_NEWBLOCK	NAT_MAPBLK
+#define	NL_FLUSH	0xfffe
 #define	NL_EXPIRE	0xffff
 
 #define	NAT_HASH_FN(k,l,m)	(((k) + ((k) >> 12) + l) % (m))
@@ -280,9 +288,9 @@ extern	int	nat_ioctl __P((caddr_t, int, int));
 extern	int	nat_init __P((void));
 extern	nat_t	*nat_new __P((ipnat_t *, ip_t *, fr_info_t *, u_int, int));
 extern	nat_t	*nat_outlookup __P((void *, u_int, u_int, struct in_addr,
-				 struct in_addr, u_32_t));
+				 struct in_addr, u_32_t, int));
 extern	nat_t	*nat_inlookup __P((void *, u_int, u_int, struct in_addr,
-				struct in_addr, u_32_t));
+				struct in_addr, u_32_t, int));
 extern	nat_t	*nat_maplookup __P((void *, u_int, struct in_addr,
 				struct in_addr));
 extern	nat_t	*nat_lookupredir __P((natlookup_t *));
@@ -294,7 +302,8 @@ extern	int	ip_natout __P((ip_t *, fr_info_t *));
 extern	int	ip_natin __P((ip_t *, fr_info_t *));
 extern	void	ip_natunload __P((void)), ip_natexpire __P((void));
 extern	void	nat_log __P((struct nat *, u_int));
-extern	void	fix_incksum __P((u_short *, u_32_t, int));
-extern	void	fix_outcksum __P((u_short *, u_32_t, int));
+extern	void	fix_incksum __P((u_short *, u_32_t));
+extern	void	fix_outcksum __P((u_short *, u_32_t));
+extern	void	fix_datacksum __P((u_short *, u_32_t));
 
 #endif /* __IP_NAT_H__ */

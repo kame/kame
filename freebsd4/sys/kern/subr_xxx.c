@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_xxx.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/subr_xxx.c,v 1.15 1999/09/25 18:24:24 phk Exp $
+ * $FreeBSD: src/sys/kern/subr_xxx.c,v 1.15.2.1 2001/02/26 04:23:16 jlemon Exp $
  */
 
 /*
@@ -128,6 +128,15 @@ noioctl(dev, cmd, data, flags, p)
 	caddr_t data;
 	int flags;
 	struct proc *p;
+{
+
+	return (ENODEV);
+}
+
+int
+nokqfilter(dev, kn)
+	dev_t dev;
+	struct knote *kn;
 {
 
 	return (ENODEV);

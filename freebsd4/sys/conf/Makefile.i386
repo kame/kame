@@ -1,7 +1,7 @@
 # Makefile.i386 -- with config changes.
 # Copyright 1990 W. Jolitz
 #	from: @(#)Makefile.i386	7.1 5/10/91
-# $FreeBSD: src/sys/conf/Makefile.i386,v 1.179.2.2 2000/07/07 00:29:27 obrien Exp $
+# $FreeBSD: src/sys/conf/Makefile.i386,v 1.179.2.4 2001/03/28 09:24:06 kris Exp $
 #
 # Makefile for FreeBSD
 #
@@ -35,7 +35,10 @@ M=	${MACHINE_ARCH}
 SIZE?=		size
 OBJCOPY?=	objcopy
 
-COPTFLAGS?=-O
+COPTFLAGS?=-O -pipe
+.if !defined(NO_CPU_COPTFLAGS)
+COPTFLAGS+= ${_CPUCFLAGS}
+.endif
 INCLUDES= -nostdinc -I- -I. -I$S
 # This hack is to allow kernel compiles to succeed on machines w/out srcdist
 .if exists($S/../include)

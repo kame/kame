@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/socketvar.h,v 1.46.2.3 2000/09/20 21:19:22 ps Exp $
+ * $FreeBSD: src/sys/sys/socketvar.h,v 1.46.2.5 2001/02/26 04:23:21 jlemon Exp $
  */
 
 #ifndef _SYS_SOCKETVAR_H_
@@ -306,6 +306,7 @@ struct sockaddr;
 struct stat;
 struct ucred;
 struct uio;
+struct knote;
 
 /*
  * File operations on sockets.
@@ -320,12 +321,13 @@ int	soo_ioctl __P((struct file *fp, u_long cmd, caddr_t data,
 int	soo_poll __P((struct file *fp, int events, struct ucred *cred,
 	    struct proc *p));
 int	soo_stat __P((struct file *fp, struct stat *ub, struct proc *p));
+int	sokqfilter __P((struct file *fp, struct knote *kn));
 
 /*
  * From uipc_socket and friends
  */
 struct	sockaddr *dup_sockaddr __P((struct sockaddr *sa, int canwait));
-int	getsock __P((struct filedesc *fdp, int fdes, struct file **fpp));
+int	holdsock __P((struct filedesc *fdp, int fdes, struct file **fpp));
 int	sockargs __P((struct mbuf **mp, caddr_t buf, int buflen, int type));
 int	getsockaddr __P((struct sockaddr **namp, caddr_t uaddr, size_t len));
 void	sbappend __P((struct sockbuf *sb, struct mbuf *m));

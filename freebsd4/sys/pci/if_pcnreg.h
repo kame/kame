@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_pcnreg.h,v 1.3.2.2 2000/10/06 23:02:20 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_pcnreg.h,v 1.3.2.3 2001/02/21 22:13:07 wpaul Exp $
  */
 
 /*
@@ -247,7 +247,7 @@
 #define PCN_BCR_SSTYLE		0x14
 #define PCN_BCR_PCILAT		0x16
 #define PCN_BCR_PCISUBVENID	0x17
-#define PCN_BCR_PCISUNSYSID	0x18
+#define PCN_BCR_PCISUBSYSID	0x18
 #define PCN_BCR_SRAMSIZE	0x19
 #define PCN_BCR_SRAMBOUND	0x1A
 #define PCN_BCR_SRAMCTL		0x1B

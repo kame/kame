@@ -6,7 +6,7 @@
  *   of this software, nor does the author assume any responsibility
  *   for damages incurred with its use.
  *
- * $FreeBSD: src/sys/dev/ed/if_edreg.h,v 1.27.2.1 2000/09/10 08:45:11 nyan Exp $
+ * $FreeBSD: src/sys/dev/ed/if_edreg.h,v 1.27.2.2 2001/01/17 13:28:50 toshi Exp $
  */
 /*
  * National Semiconductor DS8390 NIC register definitions
@@ -610,6 +610,7 @@ struct ed_ring	{
 #define ED_FLAGS_TOSH_ETHER		0x10000
 #define ED_FLAGS_GWETHER		0x20000
 #define ED_FLAGS_AX88190		0x30000
+#define ED_FLAGS_LINKSYS		0x80000
 
 #define ED_FLAGS_GETTYPE(flg)		((flg) & 0xff0000)
 

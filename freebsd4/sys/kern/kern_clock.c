@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.3 2000/09/22 08:01:00 des Exp $
+ * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.4 2001/02/18 15:29:14 ume Exp $
  */
 
 #include "opt_ntp.h"
@@ -87,6 +87,9 @@ static __inline unsigned tco_delta __P((struct timecounter *tc));
 
 /* Some of these don't belong here, but it's easiest to concentrate them. */
 long cp_time[CPUSTATES];
+
+SYSCTL_OPAQUE(_kern, OID_AUTO, cp_time, CTLFLAG_RD, &cp_time, sizeof(cp_time),
+    "LU", "CPU time statistics");
 
 long tk_cancc;
 long tk_nin;

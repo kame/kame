@@ -1,5 +1,5 @@
 /*	$NetBSD: umodem.c,v 1.5 1999/01/08 11:58:25 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/umodem.c,v 1.17.2.4 2000/10/31 22:51:23 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/umodem.c,v 1.17.2.6 2001/02/26 04:23:08 jlemon Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -167,8 +167,9 @@ static struct cdevsw umodem_cdevsw = {
 	/* maj */       UMODEM_CDEV_MAJOR,
 	/* dump */      nodump,
 	/* psize */     nopsize,
-	/* flags */     D_TTY,
-	/* bmaj */      -1
+	/* flags */     D_TTY | D_KQFILTER,
+	/* bmaj */      -1,
+	/* kqfilter */	ttykqfilter,
 };
 #endif
 
@@ -229,9 +230,7 @@ USB_ATTACH(umodem)
 	usb_endpoint_descriptor_t *ed;
 	usb_cdc_cm_descriptor_t *cmd;
 	char devinfo[1024];
-#if 0
 	usbd_status err;
-#endif
 	int data_ifaceno;
 	int i;
 	struct tty *tp;
@@ -312,7 +311,9 @@ USB_ATTACH(umodem)
 		goto bad;
 	}
 
-#if 0
+	if (usbd_get_quirks(sc->sc_udev)->uq_flags & UQ_ASSUME_CM_OVER_DATA) {
+		sc->sc_cm_over_data = 1;
+	} else {
 	if (sc->sc_cm_cap & USB_CDC_CM_OVER_DATA) {
 		err = umodem_set_comm_feature(sc, UCDC_ABSTRACT_STATE,
 					    UCDC_DATA_MULTIPLEXED);
@@ -320,7 +321,7 @@ USB_ATTACH(umodem)
 			goto bad;
 		sc->sc_cm_over_data = 1;
 	}
-#endif
+	}
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	sc->sc_tty = tp = ttymalloc();

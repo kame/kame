@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/kern/tty_cons.c,v 1.81.2.1 2000/08/03 00:09:33 ps Exp $
+ * $FreeBSD: src/sys/kern/tty_cons.c,v 1.81.2.3 2001/02/26 04:23:16 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -44,9 +44,9 @@
 #include <sys/conf.h>
 #include <sys/cons.h>
 #include <sys/kernel.h>
+#include <sys/proc.h>
 #include <sys/reboot.h>
 #include <sys/sysctl.h>
-#include <sys/proc.h>
 #include <sys/tty.h>
 #include <sys/uio.h>
 
@@ -58,6 +58,7 @@ static	d_read_t	cnread;
 static	d_write_t	cnwrite;
 static	d_ioctl_t	cnioctl;
 static	d_poll_t	cnpoll;
+static	d_kqfilter_t	cnkqfilter;
 
 #define	CDEV_MAJOR	0
 static struct cdevsw cn_cdevsw = {
@@ -73,8 +74,9 @@ static struct cdevsw cn_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	cnkqfilter,
 };
 
 static dev_t	cn_dev_t; 	/* seems to be never really used */
@@ -353,6 +355,7 @@ cnwrite(dev, uio, flag)
 		dev = constty->t_dev;
 	else
 		dev = cn_tab->cn_dev;
+	log_console(uio);
 	return ((*devsw(dev)->d_write)(dev, uio, flag));
 }
 
@@ -395,6 +398,20 @@ cnpoll(dev, events, p)
 	dev = cn_tab->cn_dev;
 
 	return ((*devsw(dev)->d_poll)(dev, events, p));
+}
+
+static int
+cnkqfilter(dev, kn)
+	dev_t dev;
+	struct knote *kn;
+{
+	if ((cn_tab == NULL) || cn_mute)
+		return (1);
+
+	dev = cn_tab->cn_dev;
+	if (devsw(dev)->d_flags & D_KQFILTER)
+		return ((*devsw(dev)->d_kqfilter)(dev, kn));
+	return (1);
 }
 
 int

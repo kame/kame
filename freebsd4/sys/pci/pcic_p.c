@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pcic_p.c,v 1.20.2.2 2000/08/04 23:41:10 peter Exp $
+ * $FreeBSD: src/sys/pci/pcic_p.c,v 1.20.2.3 2001/03/25 20:20:31 imp Exp $
  */
 
 #include <sys/param.h>
@@ -286,6 +286,9 @@ pcic_pci_probe(device_t dev)
 		break;
 	case PCI_DEVICE_ID_RICOH_RL5C478:
 		desc = "Ricoh RL5C478 PCI-CardBus Bridge";
+		break;
+	case PCI_DEVICE_ID_PCIC_OZ6832:
+		desc = "O2micro 6832 PCI-Cardbus Bridge";
 		break;
 
 	/* 16bit PC-card bridges */

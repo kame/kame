@@ -1,7 +1,7 @@
-/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.26.2.4 2000/10/27 21:57:32 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.26.2.8 2001/03/04 22:14:09 mjacob Exp $ */
 /*
  * Qlogic ISP SCSI Host Adapter FreeBSD Wrapper Definitions (CAM version)
- * Copyright (c) 1997, 1998, 1999, 2000 by Matthew Jacob
+ * Copyright (c) 1997, 1998, 1999, 2000, 2001 by Matthew Jacob
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@
 #define	_ISP_FREEBSD_H
 
 #define	ISP_PLATFORM_VERSION_MAJOR	4
-#define	ISP_PLATFORM_VERSION_MINOR	6
+#define	ISP_PLATFORM_VERSION_MINOR	11
 
 
 #include <sys/param.h>
@@ -38,6 +38,7 @@
 #include <sys/queue.h>
 #include <sys/malloc.h>
 #include <sys/proc.h>
+#include <sys/bus.h>
 
 #include <machine/bus_memio.h>
 #include <machine/bus_pio.h>
@@ -84,9 +85,9 @@ typedef struct tstate {
 
 struct isposinfo {
 	struct ispsoftc *	next;
-	u_int64_t		default_wwn;
-	char			name[8];
-	int			unit;
+	u_int64_t		default_port_wwn;
+	u_int64_t		default_node_wwn;
+	device_t		dev;
 	struct cam_sim		*sim;
 	struct cam_path		*path;
 	struct cam_sim		*sim2;
@@ -95,13 +96,13 @@ struct isposinfo {
 	u_int8_t		mboxwaiting;
 	u_int8_t		simqfrozen;
 	u_int8_t		drain;
-#ifdef	SERVICING_INTERRUPT
 	u_int8_t		intsok;
+#ifdef	ISP_SMPLOCK
+	struct mtx		lock;
 #else
-	u_int8_t		padding;
-#endif
 	volatile u_int32_t	islocked;
 	int			splsaved;
+#endif
 #ifdef	ISP_TARGET_MODE
 #define	TM_WANTED		0x01
 #define	TM_BUSY			0x02
@@ -115,12 +116,24 @@ struct isposinfo {
 };
 
 /*
+ * Locking macros...
+ */
+
+#ifdef	ISP_SMPLOCK
+#define	ISP_LOCK(x)		mtx_enter(&(x)->isp_osinfo.lock, MTX_DEF)
+#define	ISP_UNLOCK(x)		mtx_exit(&(x)->isp_osinfo.lock, MTX_DEF)
+#else
+#define	ISP_LOCK		isp_lock
+#define	ISP_UNLOCK		isp_unlock
+#endif
+
+
+/*
  * Required Macros/Defines
  */
 
 #define	INLINE			__inline
 
-#define	ISP2100_FABRIC		1
 #define	ISP2100_SCRLEN		0x400
 
 #define	MEMZERO			bzero
@@ -128,6 +141,12 @@ struct isposinfo {
 #define	SNPRINTF		snprintf
 #define	STRNCAT			strncat
 #define	USEC_DELAY		DELAY
+#define	USEC_SLEEP(isp, x)		\
+	if (isp->isp_osinfo.intsok)	\
+		ISP_UNLOCK(isp);	\
+	DELAY(x);			\
+	if (isp->isp_osinfo.intsok)	\
+		ISP_LOCK(isp)
 
 #define	NANOTIME_T		struct timespec
 #define	GET_NANOTIME		nanotime
@@ -220,6 +239,7 @@ struct isposinfo {
 	XS_SETERR(ccb, CAM_REQ_INPROG), (ccb)->ccb_h.spriv_field0 = 0
 
 #define	XS_SAVE_SENSE(xs, sp)				\
+	(xs)->ccb_h.status |= CAM_AUTOSNS_VALID,	\
 	bcopy(sp->req_sense_data, &(xs)->sense_data,	\
 	    imin(XS_SNSLEN(xs), sp->req_sense_len))
 
@@ -227,8 +247,8 @@ struct isposinfo {
 
 #define	DEFAULT_IID(x)		7
 #define	DEFAULT_LOOPID(x)	109
-#define	DEFAULT_NODEWWN(isp)	(isp)->isp_osinfo.default_wwn
-#define	DEFAULT_PORTWWN(isp)	(isp)->isp_osinfo.default_wwn
+#define	DEFAULT_NODEWWN(isp)	(isp)->isp_osinfo.default_node_wwn
+#define	DEFAULT_PORTWWN(isp)	(isp)->isp_osinfo.default_port_wwn
 #define	ISP_NODEWWN(isp)	FCPARAM(isp)->isp_nodewwn
 #define	ISP_PORTWWN(isp)	FCPARAM(isp)->isp_portwwn
 
@@ -260,26 +280,13 @@ struct isposinfo {
 #define	isp_path	isp_osinfo.path
 #define	isp_sim2	isp_osinfo.sim2
 #define	isp_path2	isp_osinfo.path2
-#define	isp_unit	isp_osinfo.unit
-#define	isp_name	isp_osinfo.name
+#define	isp_dev		isp_osinfo.dev
 
 /*
  * prototypes for isp_pci && isp_freebsd to share
  */
 extern void isp_attach(struct ispsoftc *);
 extern void isp_uninit(struct ispsoftc *);
-
-/*
- * Locking macros...
- */
-
-#define	ISP_LOCK		isp_lock
-#define	ISP_UNLOCK		isp_unlock
-
-/* not safely working yet */
-#if	0
-#define	SERVICING_INTERRUPT(isp)	(intr_nesting_level != 0)
-#endif
 
 /*
  * Platform private flags
@@ -305,7 +312,7 @@ extern void isp_uninit(struct ispsoftc *);
 /*
  * Platform specific inline functions
  */
-
+#ifndef	ISP_SMPLOCK
 static INLINE void isp_lock(struct ispsoftc *);
 static INLINE void
 isp_lock(struct ispsoftc *isp)
@@ -322,19 +329,37 @@ static INLINE void isp_unlock(struct ispsoftc *);
 static INLINE void
 isp_unlock(struct ispsoftc *isp)
 {
-	if (--isp->isp_osinfo.islocked == 0) {
-		splx(isp->isp_osinfo.splsaved);
+	if (isp->isp_osinfo.islocked) {
+		if (--isp->isp_osinfo.islocked == 0) {
+			splx(isp->isp_osinfo.splsaved);
+		}
 	}
 }
+#endif
 
 static INLINE void isp_mbox_wait_complete(struct ispsoftc *);
 static INLINE void
 isp_mbox_wait_complete(struct ispsoftc *isp)
 {
-#ifdef	SERVICING_INTERRUPT
-	if (isp->isp_osinfo.intsok == 0 || SERVICING_INTERRUPT(isp)) {
+	if (isp->isp_osinfo.intsok) {
+		isp->isp_osinfo.mboxwaiting = 1;
+#ifdef	ISP_SMPLOCK
+		(void) msleep(&isp->isp_osinfo.mboxwaiting,
+		    &isp->isp_osinfo.lock, PRIBIO, "isp_mboxwaiting", 10 * hz);
+#else
+		(void) tsleep(&isp->isp_osinfo.mboxwaiting, PRIBIO,
+		    "isp_mboxwaiting", 10 * hz);
+#endif
+		if (isp->isp_mboxbsy != 0) {
+			isp_prt(isp, ISP_LOGWARN,
+			    "Interrupting Mailbox Command (0x%x) Timeout",
+			    isp->isp_lastmbxcmd);
+			isp->isp_mboxbsy = 0;
+		}
+		isp->isp_osinfo.mboxwaiting = 0;
+	} else {
 		int j;
-		for (j = 0; j < 60 * 2000; j++) {
+		for (j = 0; j < 60 * 10000; j++) {
 			if (isp_intr(isp) == 0) {
 				USEC_DELAY(500);
 			}
@@ -343,29 +368,11 @@ isp_mbox_wait_complete(struct ispsoftc *isp)
 			}
 		}
 		if (isp->isp_mboxbsy != 0) {
-			isp_prt(isp, ISP_LOGWARN, "mailbox timeout");
-		}
-	} else {
-		isp->isp_osinfo.mboxwaiting = 1;
-		while (isp->isp_mboxbsy != 0) {
-			(void) tsleep(&isp->isp_osinfo.mboxwaiting, PRIBIO,
-			    "isp_mailbox", 0);
+			isp_prt(isp, ISP_LOGWARN,
+			    "Polled Mailbox Command (0x%x) Timeout",
+			    isp->isp_lastmbxcmd);
 		}
 	}
-#else
-	int j;
-	for (j = 0; j < 60 * 2000; j++) {
-		if (isp_intr(isp) == 0) {
-			USEC_DELAY(500);
-		}
-		if (isp->isp_mboxbsy == 0) {
-			break;
-		}
-	}
-	if (isp->isp_mboxbsy != 0) {
-		isp_prt(isp, ISP_LOGWARN, "mailbox timeout");
-	}
-#endif
 }
 
 static INLINE u_int64_t nanotime_sub(struct timespec *, struct timespec *);

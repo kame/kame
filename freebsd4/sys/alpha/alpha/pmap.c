@@ -43,7 +43,7 @@
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
  *	from:	i386 Id: pmap.c,v 1.193 1998/04/19 15:22:48 bde Exp
  *		with some ideas from NetBSD's alpha pmap
- * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.4 2000/08/05 00:39:06 peter Exp $
+ * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.5 2000/11/21 00:09:09 ps Exp $
  */
 
 /*
@@ -2206,9 +2206,9 @@ retry:
  * during dump.
  */
 void *
-pmap_kenter_temporary(vm_offset_t pa)
+pmap_kenter_temporary(vm_offset_t pa, int i)
 {
-	return (void *) ALPHA_PHYS_TO_K0SEG(pa);
+	return (void *) ALPHA_PHYS_TO_K0SEG(pa - (i * PAGE_SIZE));
 }
 
 #define MAX_INIT_PT (96)

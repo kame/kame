@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/stallion.c,v 1.39 1999/09/28 11:45:27 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/stallion.c,v 1.39.2.1 2001/02/26 04:23:10 jlemon Exp $
  */
 
 /*****************************************************************************/
@@ -540,8 +540,9 @@ static struct cdevsw stl_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 static void stl_drvinit(void *unused)

@@ -8,7 +8,7 @@
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_frag.c	1.11 3/24/96 (C) 1993-1995 Darren Reed";
 /*static const char rcsid[] = "@(#)$Id: ip_frag.c,v 2.10.2.4 2000/06/06 15:49:15 darrenr Exp $";*/
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_frag.c,v 1.10.2.2 2000/07/19 23:27:55 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_frag.c,v 1.10.2.4 2001/04/07 03:40:31 darrenr Exp $";
 #endif
 
 #if defined(KERNEL) && !defined(_KERNEL)
@@ -142,10 +142,13 @@ fr_info_t *fin;
 u_int pass;
 ipfr_t *table[];
 {
-	ipfr_t	**fp, *fra, frag;
-	u_int	idx;
+	ipfr_t **fp, *fra, frag;
+	u_int idx, off;
 
 	if (ipfr_inuse >= IPFT_SIZE)
+		return NULL;
+
+	if (!(fin->fin_fi.fi_fl & FI_FRAG))
 		return NULL;
 
 	frag.ipfr_p = ip->ip_p;
@@ -157,6 +160,7 @@ ipfr_t *table[];
 	idx += ip->ip_src.s_addr;
 	frag.ipfr_dst.s_addr = ip->ip_dst.s_addr;
 	idx += ip->ip_dst.s_addr;
+	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
 	idx %= IPFT_SIZE;
 
@@ -200,7 +204,10 @@ ipfr_t *table[];
 	/*
 	 * Compute the offset of the expected start of the next packet.
 	 */
-	fra->ipfr_off = (ip->ip_off & IP_OFFMASK) + (fin->fin_dlen >> 3);
+	off = ip->ip_off & IP_OFFMASK;
+	if (!off)
+		fra->ipfr_seen0 = 1;
+	fra->ipfr_off = off + (fin->fin_dlen >> 3);
 	ATOMIC_INCL(ipfr_stats.ifs_new);
 	ATOMIC_INC32(ipfr_inuse);
 	return fra;
@@ -215,7 +222,7 @@ u_int pass;
 	ipfr_t	*ipf;
 
 	if ((ip->ip_v != 4) || (fr_frag_lock))
-		return NULL;
+		return -1;
 	WRITE_ENTER(&ipf_frag);
 	ipf = ipfr_new(ip, fin, pass, ipfr_heads);
 	RWLOCK_EXIT(&ipf_frag);
@@ -232,7 +239,7 @@ nat_t *nat;
 	ipfr_t	*ipf;
 
 	if ((ip->ip_v != 4) || (fr_frag_lock))
-		return NULL;
+		return -1;
 	WRITE_ENTER(&ipf_natfrag);
 	ipf = ipfr_new(ip, fin, pass, ipfr_nattab);
 	if (ipf != NULL) {
@@ -256,6 +263,9 @@ ipfr_t *table[];
 	ipfr_t	*f, frag;
 	u_int	idx;
 
+	if (!(fin->fin_fi.fi_fl & FI_FRAG))
+		return NULL;
+
 	/*
 	 * For fragments, we record protocol, packet id, TOS and both IP#'s
 	 * (these should all be the same for all fragments of a packet).
@@ -271,6 +281,7 @@ ipfr_t *table[];
 	idx += ip->ip_src.s_addr;
 	frag.ipfr_dst.s_addr = ip->ip_dst.s_addr;
 	idx += ip->ip_dst.s_addr;
+	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
 	idx %= IPFT_SIZE;
 
@@ -281,6 +292,19 @@ ipfr_t *table[];
 		if (!bcmp((char *)&frag.ipfr_src, (char *)&f->ipfr_src,
 			  IPFR_CMPSZ)) {
 			u_short	atoff, off;
+
+			/*
+			 * XXX - We really need to be guarding against the
+			 * retransmission of (src,dst,id,offset-range) here
+			 * because a fragmented packet is never resent with
+			 * the same IP ID#.
+			 */
+			off = ip->ip_off & IP_OFFMASK;
+			if (f->ipfr_seen0) {
+				if (!off || (fin->fin_fi.fi_fl & FI_SHORT))
+					continue;
+			} else if (!off)
+				f->ipfr_seen0 = 1;
 
 			if (f != table[idx]) {
 				/*
@@ -294,7 +318,6 @@ ipfr_t *table[];
 				f->ipfr_prev = NULL;
 				table[idx] = f;
 			}
-			off = ip->ip_off & IP_OFFMASK;
 			atoff = off + (fin->fin_dlen >> 3);
 			/*
 			 * If we've follwed the fragments, and this is the

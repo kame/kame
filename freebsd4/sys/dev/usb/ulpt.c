@@ -1,5 +1,5 @@
 /*	$NetBSD: ulpt.c,v 1.29 1999/11/17 23:00:50 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.26.2.5 2000/10/31 22:36:05 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.26.2.6 2001/01/06 15:20:26 iedowse Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -426,6 +426,11 @@ ulptopen(dev, flag, mode, p)
 		if (error != EWOULDBLOCK) {
 			sc->sc_state = 0;
 			return (error);
+		}
+
+		if (sc->sc_dying) {
+			sc->sc_state = 0;
+			return (ENXIO);
 		}
 	}
 

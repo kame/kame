@@ -7,7 +7,7 @@
  */
 #if !defined(lint)
 /*static const char rcsid[] = "@(#)$Id: ip_auth.c,v 2.1.2.2 2000/01/16 10:12:14 darrenr Exp $";*/
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_auth.c,v 1.14.2.4 2000/09/21 17:19:13 ru Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_auth.c,v 1.14.2.6 2001/03/20 21:09:51 jkh Exp $";
 #endif
 
 #include <sys/errno.h>
@@ -314,7 +314,9 @@ frentry_t *fr, **frptr;
 			else
 				faep = &fae->fae_next;
 		if (cmd == SIOCRMAFR) {
-			if (!fae)
+			if (!fr || !frptr)
+				error = EINVAL;
+			else if (!fae)
 				error = ESRCH;
 			else {
 				WRITE_ENTER(&ipf_auth);
@@ -323,7 +325,7 @@ frentry_t *fr, **frptr;
 				RWLOCK_EXIT(&ipf_auth);
 				KFREE(fae);
 			}
-		} else {
+		} else if (fr && frptr) {
 			KMALLOC(fae, frauthent_t *);
 			if (fae != NULL) {
 				bcopy((char *)fr, (char *)&fae->fae_fr,
@@ -339,7 +341,8 @@ frentry_t *fr, **frptr;
 				RWLOCK_EXIT(&ipf_auth);
 			} else
 				error = ENOMEM;
-		}
+		} else
+			error = EINVAL;
 		break;
 	case SIOCATHST:
 		READ_ENTER(&ipf_auth);
@@ -353,7 +356,7 @@ fr_authioctlloop:
 		READ_ENTER(&ipf_auth);
 		if ((fr_authnext != fr_authend) && fr_authpkts[fr_authnext]) {
 			error = IWCOPYPTR((char *)&fr_auth[fr_authnext], data,
-					  sizeof(fr_info_t));
+					  sizeof(frauth_t));
 			RWLOCK_EXIT(&ipf_auth);
 			if (error)
 				break;
@@ -408,7 +411,8 @@ fr_authioctlloop:
 #  if SOLARIS
 			error = fr_qout(fr_auth[i].fra_q, m);
 #  else /* SOLARIS */
-#   if (_BSDI_VERSION >= 199802) || defined(__OpenBSD__)
+#   if ((_BSDI_VERSION >= 199802) && (_BSDI_VERSION < 200005)) || \
+       defined(__OpenBSD__)
 			error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL,
 					  NULL);
 #   else

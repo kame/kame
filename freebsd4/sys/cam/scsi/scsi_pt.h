@@ -1,5 +1,5 @@
 /*
- * Structure and function declartaions for Processor type devices.
+ * Structure and function declarations for Processor type devices.
  *
  * Copyright (c) 1998 Justin T. Gibbs
  * All rights reserved.
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_pt.h,v 1.2 1999/08/28 00:40:48 peter Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_pt.h,v 1.2.2.1 2001/01/12 02:50:39 steve Exp $
  */
 
 #ifndef	_SCSI_SCSI_PT_H

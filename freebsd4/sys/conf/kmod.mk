@@ -1,5 +1,5 @@
 #	From: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD: src/sys/conf/kmod.mk,v 1.82.2.2 2000/07/07 09:49:48 peter Exp $
+# $FreeBSD: src/sys/conf/kmod.mk,v 1.82.2.5 2001/03/05 06:14:21 imp Exp $
 #
 # The include file <bsd.kmod.mk> handles installing Kernel Loadable Device
 # drivers (KLD's).
@@ -34,10 +34,10 @@
 #
 # NOMAN		KLD does not have a manual page if set.
 #
-# PROG          The name of the kernel module to build. 
+# PROG          The name of the kernel module to build.
 #		If not supplied, ${KMOD}.o is used.
 #
-# SRCS          List of source files 
+# SRCS          List of source files
 #
 # KMODDEPS	List of modules which this one is dependant on
 #
@@ -66,7 +66,7 @@
 #               actions immediately before and after the install target
 #		is executed.
 #
-# 	load:	
+# 	load:
 #		Load KLD.
 #
 # 	unload:
@@ -170,7 +170,14 @@ _ILINKS=@ machine
 .MAIN: all
 all: objwarn ${PROG} all-man _SUBDIR
 
-beforedepend ${OBJS}: ${_ILINKS}
+beforedepend: ${_ILINKS}
+# Ensure that the links exist without depending on it when it exists which
+# causes all the modules to be rebuilt when the directory pointed to changes.
+.for _link in ${_ILINKS}
+.if !exists(${.OBJDIR}/${_link})
+${OBJS}: ${_link}
+.endif
+.endfor
 
 # Search for kernel source tree in standard places.
 .for _dir in ${.CURDIR}/../.. ${.CURDIR}/../../.. /sys /usr/src/sys
@@ -272,7 +279,10 @@ ${_src}:
 MFILES?= kern/bus_if.m kern/device_if.m dev/iicbus/iicbb_if.m \
     dev/iicbus/iicbus_if.m isa/isa_if.m dev/mii/miibus_if.m \
     dev/pccard/card_if.m dev/pccard/power_if.m pci/pci_if.m \
-    dev/ppbus/ppbus_if.m dev/smbus/smbus_if.m dev/usb/usb_if.m
+    dev/ppbus/ppbus_if.m dev/smbus/smbus_if.m dev/usb/usb_if.m \
+    dev/sound/pcm/ac97_if.m dev/sound/pcm/channel_if.m \
+    dev/sound/pcm/feeder_if.m dev/sound/pcm/mixer_if.m \
+    pci/agp_if.m
 
 .for _srcsrc in ${MFILES}
 .for _ext in c h
@@ -281,9 +291,9 @@ CLEANFILES+=	${_src}
 .if !target(${_src})
 ${_src}: @
 .if exists(@)
-${_src}: @/kern/makedevops.pl @/${_srcsrc}
+${_src}: @/kern/makeops.pl @/${_srcsrc}
 .endif
-	perl @/kern/makedevops.pl -${_ext} @/${_srcsrc}
+	perl @/kern/makeops.pl -${_ext} @/${_srcsrc}
 .endif
 .endfor # _src
 .endfor # _ext

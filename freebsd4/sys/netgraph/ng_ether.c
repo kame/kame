@@ -37,7 +37,7 @@
  * Authors: Archie Cobbs <archie@freebsd.org>
  *	    Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.2.2.8 2000/09/19 10:11:02 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.2.2.9 2000/12/12 23:15:23 archie Exp $
  */
 
 /*
@@ -692,6 +692,8 @@ ng_ether_disconnect(hook_p hook)
 		priv->lowerOrphan = 0;
 	} else
 		panic("%s: weird hook", __FUNCTION__);
+	if (hook->node->numhooks == 0)
+		ng_rmnode(hook->node);	/* reset node */
 	return (0);
 }
 

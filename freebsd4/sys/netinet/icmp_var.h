@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)icmp_var.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/icmp_var.h,v 1.15 1999/12/29 04:40:58 peter Exp $
+ * $FreeBSD: src/sys/netinet/icmp_var.h,v 1.15.2.1 2001/02/24 21:35:18 bmilekic Exp $
  */
 
 #ifndef _NETINET_ICMP_VAR_H_
@@ -82,6 +82,13 @@ SYSCTL_DECL(_net_inet_icmp);
 #ifdef ICMP_BANDLIM
 extern int badport_bandlim __P((int));
 #endif
+#define BANDLIM_UNLIMITED -1
+#define BANDLIM_ICMP_UNREACH 0
+#define BANDLIM_ICMP_ECHO 1
+#define BANDLIM_ICMP_TSTAMP 2
+#define BANDLIM_RST_CLOSEDPORT 3 /* No connection, and no listeners */
+#define BANDLIM_RST_OPENPORT 4   /* No connection, listener */
+#define BANDLIM_MAX 4
 #endif
 
 #endif

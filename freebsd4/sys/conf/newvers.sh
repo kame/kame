@@ -32,16 +32,12 @@
 # SUCH DAMAGE.
 #
 #	@(#)newvers.sh	8.1 (Berkeley) 4/20/94
-# $FreeBSD: src/sys/conf/newvers.sh,v 1.44.2.9 2000/11/19 19:45:55 jkh Exp $
+# $FreeBSD: src/sys/conf/newvers.sh,v 1.44.2.14.2.1 2001/04/21 03:45:18 jkh Exp $
 
 TYPE="FreeBSD"
-REVISION="4.2"
+REVISION="4.3"
 BRANCH="RELEASE"
-RELEASE="${REVISION}-${BRANCH}"
-SNAPDATE=""
-if [ "X${SNAPDATE}" != "X" ]; then
-	RELEASE="${RELEASE}-${SNAPDATE}"
-fi
+RELEASE=4.3-RELEASE
 VERSION="${TYPE} ${RELEASE}"
 
 if [ "X${PARAMFILE}" != "X" ]; then
@@ -82,7 +78,7 @@ fi
 COPYRIGHT="$COPYRIGHT
 "
 
-LC_TIME=C; export LC_TIME
+LC_ALL=C; export LC_ALL
 if [ ! -r version ]
 then
 	echo 0 > version

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/nwfs/nwfs_node.c,v 1.3.2.4 2000/10/25 02:28:42 bp Exp $
+ * $FreeBSD: src/sys/nwfs/nwfs_node.c,v 1.3.2.7 2001/03/14 11:26:59 bp Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -98,7 +98,7 @@ nwfs_sysctl_vnprint(SYSCTL_HANDLER_ARGS) {
 	printf("Name:uc:hc:fid:pfid\n");
 	for(i = 0; i <= nwnodehash; i++) {
 		nhpp = &nwhashtbl[i];
-		for (np = nhpp->lh_first; np != 0; np = np->n_hash.le_next) {
+		LIST_FOREACH(np, nhpp, n_hash) {
 			vp = NWTOV(np);
 			vprint(NULL, vp);
 			printf("%s:%d:%d:%d:%d\n",np->n_name,vp->v_usecount,vp->v_holdcnt,
@@ -162,14 +162,13 @@ rescan:
 	 * might cause a bogus v_data pointer to get dereferenced
 	 * elsewhere if MALLOC should block.
 	 */
-	MALLOC(np, struct nwnode *, sizeof *np, M_NWNODE, M_WAITOK);
+	MALLOC(np, struct nwnode *, sizeof *np, M_NWNODE, M_WAITOK | M_ZERO);
 	error = getnewvnode(VT_NWFS, mp, nwfs_vnodeop_p, &vp);
 	if (error) {
 		*vpp = NULL;
 		FREE(np, M_NWNODE);
 		return (error);
 	}
-	bzero(np, sizeof(*np));
 	vp->v_data = np;
 	np->n_vnode = vp;
 	np->n_mount = nmp;
@@ -285,6 +284,9 @@ nwfs_attr_cacheenter(struct vnode *vp, struct nw_entry_info *fi)
 	struct vattr *va = &np->n_vattr;
 
 	va->va_type = vp->v_type;		/* vnode type (for create) */
+	np->n_nmlen = fi->nameLen;
+	bcopy(fi->entryName, np->n_name, np->n_nmlen);
+	np->n_name[fi->nameLen] = 0;
 	if (vp->v_type == VREG) {
 		if (va->va_size != fi->dataStreamSize) {
 			va->va_size = fi->dataStreamSize;
@@ -321,6 +323,7 @@ nwfs_attr_cacheenter(struct vnode *vp, struct nw_entry_info *fi)
 		np->n_mtime = va->va_mtime.tv_sec;
 	}
 	np->n_atime = time_second;
+	np->n_dosfid = fi->DosDirNum;
 	return;
 }
 

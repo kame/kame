@@ -1,5 +1,5 @@
 /*	$NetBSD: krpc_subr.c,v 1.12.4.1 1996/06/07 00:52:26 cgd Exp $	*/
-/* $FreeBSD: src/sys/nfs/krpc_subr.c,v 1.13 1999/08/28 00:49:56 peter Exp $	*/
+/* $FreeBSD: src/sys/nfs/krpc_subr.c,v 1.13.2.1 2000/11/20 21:17:14 tegge Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon Ross, Adam Glass
@@ -204,6 +204,7 @@ krpc_call(sa, prog, vers, func, data, from_p, procp)
 	int error, rcvflg, timo, secs, len;
 	static u_int32_t xid = ~0xFF;
 	u_int16_t tport;
+	u_int32_t saddr;
 
 	/*
 	 * Validate address family.
@@ -320,7 +321,7 @@ krpc_call(sa, prog, vers, func, data, from_p, procp)
 			goto out;
 		}
 		error = sosend(so, (struct sockaddr *)sa, NULL, m,
-			       NULL, 0, 0);
+			       NULL, 0, procp);
 		if (error) {
 			printf("krpc_call: sosend: %d\n", error);
 			goto out;
@@ -330,9 +331,14 @@ krpc_call(sa, prog, vers, func, data, from_p, procp)
 		/* Determine new timeout. */
 		if (timo < MAX_RESEND_DELAY)
 			timo++;
-		else
-			printf("RPC timeout for server 0x%lx\n",
-			       (u_long)ntohl(sa->sin_addr.s_addr));
+		else {
+			saddr = ntohl(sa->sin_addr.s_addr);
+			printf("RPC timeout for server %d.%d.%d.%d\n",
+			       (saddr >> 24) & 255,
+			       (saddr >> 16) & 255,
+			       (saddr >> 8) & 255,
+			       saddr & 255);
+		}
 
 		/*
 		 * Wait for up to timo seconds for a reply.

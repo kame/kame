@@ -1,6 +1,3 @@
-/* $FreeBSD: src/sys/alpha/include/limits.h,v 1.2.2.1 2000/10/30 10:28:13 obrien Exp $ */
-/* From: NetBSD: limits.h,v 1.3 1997/04/06 08:47:31 cgd Exp */
-
 /*
  * Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -34,7 +31,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)limits.h	8.3 (Berkeley) 1/4/94
+ *	From: NetBSD: limits.h,v 1.3 1997/04/06 08:47:31 cgd Exp
+ * $FreeBSD: src/sys/alpha/include/limits.h,v 1.2.2.3 2000/12/28 18:22:16 obrien Exp $
  */
+
+#ifndef	_MACHINE_LIMITS_H_
+#define	_MACHINE_LIMITS_H_
 
 #define	CHAR_BIT	8		/* number of bits in a char */
 #define	MB_LEN_MAX	6		/* Allow 31 bit UTF2 */
@@ -100,3 +102,5 @@
 #define	FLT_MAX		3.40282347E+38F
 #define	FLT_MIN		1.17549435E-38F
 #endif
+
+#endif /* !_MACHINE_LIMITS_H_ */

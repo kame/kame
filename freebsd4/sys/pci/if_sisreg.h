@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.1.4.1 2000/08/25 19:09:43 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.1.4.3 2001/02/21 22:17:51 wpaul Exp $
  */
 
 /*
@@ -75,6 +75,7 @@
 #define SIS_GPIO		0xB8
 
 /* NS DP83815 registers */
+#define NS_CLKRUN		0x3C
 #define NS_BMCR			0x80
 #define NS_BMSR			0x84
 #define NS_PHYIDR1		0x88
@@ -91,6 +92,10 @@
 #define NS_PHY_DSPCFG		0xF4
 #define NS_PHY_SDCFG		0xF8
 #define NS_PHY_TDATA		0xFC
+
+#define NS_CLKRUN_PMESTS	0x00008000
+#define NS_CLKRUN_PMEENB	0x00000100
+#define NS_CLNRUN_CLKRUN_ENB	0x00000001
 
 #define SIS_CSR_TX_ENABLE	0x00000001
 #define SIS_CSR_TX_DISABLE	0x00000002
@@ -354,6 +359,13 @@ struct sis_ring_data {
  */
 #define SIS_DEVICEID_900	0x0900
 #define SIS_DEVICEID_7016	0x7016
+
+/*
+ * SiS 900 PCI revision codes.
+ */
+#define SIS_REV_630E		0x0081
+#define SIS_REV_630S		0x0082
+#define SIS_REV_630EA1		0x0083
 
 /*
  * NatSemi vendor ID

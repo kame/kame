@@ -23,13 +23,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.6 2000/09/22 10:01:51 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.8 2001/01/26 13:52:25 nyan Exp $
  */
 
 #include "vt.h"
 #include "wdc.h"
 #include "ar.h"
-#include "cs.h"
 #include "cx.h"
 #include "el.h"
 #include "le.h"
@@ -75,6 +74,7 @@
 #include "fla.h"
 #ifdef PC98
 #include "bs.h"
+#include "olpt.h"
 #endif
 
 struct old_isa_driver {
@@ -85,7 +85,6 @@ struct old_isa_driver {
 extern struct isa_driver  vtdriver;
 extern struct isa_driver wdcdriver;
 extern struct isa_driver  ardriver;
-extern struct isa_driver  csdriver;
 extern struct isa_driver  cxdriver;
 extern struct isa_driver  eldriver;
 extern struct isa_driver  ledriver;
@@ -130,6 +129,7 @@ extern struct isa_driver lorandriver;
 extern struct isa_driver tinadriver;
 #ifdef PC98
 extern struct isa_driver bsdriver;
+extern struct isa_driver olptdriver;
 #endif
 
 
@@ -190,6 +190,9 @@ static struct old_isa_driver old_drivers[] = {
 #if NLORAN > 0
 	{ INTR_TYPE_TTY | INTR_TYPE_FAST, &lorandriver },
 #endif
+#if NOLPT > 0
+	{ INTR_TYPE_TTY, &olptdriver },
+#endif
 
 /* BIO */
 
@@ -216,9 +219,6 @@ static struct old_isa_driver old_drivers[] = {
 #endif
 #if NLNC > 0
 	{ INTR_TYPE_NET, &lncdriver },
-#endif
-#if NCS > 0
-	{ INTR_TYPE_NET, &csdriver },
 #endif
 #if NAR > 0
 	{ INTR_TYPE_NET, &ardriver },

@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/istallion.c,v 1.36 1999/12/20 17:54:05 eivind Exp $
+ * $FreeBSD: src/sys/i386/isa/istallion.c,v 1.36.2.1 2001/02/26 04:23:10 jlemon Exp $
  */
 
 /*****************************************************************************/
@@ -647,8 +647,9 @@ static struct cdevsw stli_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 #endif

@@ -37,7 +37,7 @@
  * Authors: Julian Elischer <julian@freebsd.org>
  *          Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11.2.6 2000/10/24 18:36:44 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11.2.14 2001/02/05 16:01:30 julian Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -264,6 +264,13 @@ static const struct ng_cmdlist ng_generic_cmds[] = {
 	},
 	{
 	  NGM_GENERIC_COOKIE,
+	  NGM_TEXT_CONFIG,
+	  "textconfig",
+	  NULL,
+	  &ng_parse_string_type
+	},
+	{
+	  NGM_GENERIC_COOKIE,
 	  NGM_TEXT_STATUS,
 	  "textstatus",
 	  NULL,
@@ -433,12 +440,16 @@ ng_cutlinks(node_p node)
 void
 ng_unref(node_p node)
 {
+	int	s;
+
+	s = splhigh();
 	if (--node->refs <= 0) {
 		node->type->refs--;
 		LIST_REMOVE(node, nodes);
 		LIST_REMOVE(node, idnodes);
 		FREE(node, M_NETGRAPH);
 	}
+	splx(s);
 }
 
 /*
@@ -499,7 +510,7 @@ ng_ID2node(ng_ID_t ID)
 {
 	node_p np;
 	LIST_FOREACH(np, &ID_hash[ID % ID_HASH_SIZE], idnodes) {
-		if (np->ID == ID)
+		if ((np->flags & NG_INVALID) == 0 && np->ID == ID)
 			break;
 	}
 	return(np);
@@ -586,7 +597,9 @@ ng_findname(node_p this, const char *name)
 
 	/* Find node by name */
 	LIST_FOREACH(node, &nodelist, nodes) {
-		if (node->name != NULL && strcmp(node->name, name) == 0)
+		if ((node->name != NULL)
+		&& (strcmp(node->name, name) == 0)
+		&& ((node->flags & NG_INVALID) == 0))
 			break;
 	}
 	return (node);
@@ -643,8 +656,12 @@ ng_unname(node_p node)
 static void
 ng_unref_hook(hook_p hook)
 {
+	int	s;
+
+	s = splhigh();
 	if (--hook->refs == 0)
 		FREE(hook, M_NETGRAPH);
+	splx(s);
 }
 
 /*
@@ -751,7 +768,9 @@ ng_findhook(node_p node, const char *name)
 	if (node->type->findhook != NULL)
 		return (*node->type->findhook)(node, name);
 	LIST_FOREACH(hook, &node->hooks, hooks) {
-		if (hook->name != NULL && strcmp(hook->name, name) == 0)
+		if (hook->name != NULL
+		    && strcmp(hook->name, name) == 0
+		    && (hook->flags & HK_INVALID) == 0)
 			return (hook);
 	}
 	return (NULL);
@@ -853,7 +872,7 @@ ng_newtype(struct ng_type *tp)
 
 	/* Link in new type */
 	LIST_INSERT_HEAD(&typelist, tp, types);
-	tp->refs = 0;
+	tp->refs = 1;	/* first ref is linked list */
 	return (0);
 }
 
@@ -1120,6 +1139,9 @@ ng_path2node(node_p here, const char *address, node_p *destp, char **rtnp)
  * It is up to the message handler to free the message.
  * If it's a generic message, handle it generically, otherwise
  * call the type's message handler (if it exists)
+ * XXX (race). Remember that a queued message may reference a node
+ * or hook that has just been invalidated. It will exist
+ * as the queue code is holding a reference, but..
  */
 
 #define CALL_MSG_HANDLER(error, node, msg, retaddr, resp)		\
@@ -1351,7 +1373,8 @@ ng_generic_msg(node_p here, struct ng_mesg *msg, const char *retaddr,
 
 		/* Count number of nodes */
 		LIST_FOREACH(node, &nodelist, nodes) {
-			if (unnamed || node->name != NULL)
+			if ((node->flags & NG_INVALID) == 0
+			    && (unnamed || node->name != NULL))
 				num++;
 		}
 
@@ -1433,7 +1456,7 @@ ng_generic_msg(node_p here, struct ng_mesg *msg, const char *retaddr,
 				break;
 			}
 			strncpy(tp->type_name, type->name, NG_TYPELEN);
-			tp->numnodes = type->refs;
+			tp->numnodes = type->refs - 1; /* don't count list */
 			tl->numtypes++;
 		}
 		*resp = rp;
@@ -1585,6 +1608,7 @@ ng_generic_msg(node_p here, struct ng_mesg *msg, const char *retaddr,
 		break;
 	    }
 
+	case NGM_TEXT_CONFIG:
 	case NGM_TEXT_STATUS:
 		/*
 		 * This one is tricky as it passes the command down to the
@@ -1705,16 +1729,23 @@ ng_mod_event(module_t mod, int event, void *data)
 
 		/* Call type specific code */
 		if (type->mod_event != NULL)
-			if ((error = (*type->mod_event)(mod, event, data)) != 0)
+			if ((error = (*type->mod_event)(mod, event, data))) {
+				type->refs--;	/* undo it */
 				LIST_REMOVE(type, types);
+			}
 		splx(s);
 		break;
 
 	case MOD_UNLOAD:
 		s = splnet();
-		if (type->refs != 0)		/* make sure no nodes exist! */
+		if (type->refs > 1) {		/* make sure no nodes exist! */
 			error = EBUSY;
-		else {
+		} else {
+			if (type->refs == 0) {
+				/* failed load, nothing to undo */
+				splx(s);
+				break;
+			}
 			if (type->mod_event != NULL) {	/* check with type */
 				error = (*type->mod_event)(mod, event, data);
 				if (error != 0) {	/* type refuses.. */
@@ -1873,10 +1904,10 @@ ng_queue_data(hook_p hook, struct mbuf *m, meta_p meta)
 	q->body.data.da_hook = hook;
 	q->body.data.da_m = m;
 	q->body.data.da_meta = meta;
+	s = splhigh();		/* protect refs and queue */
 	hook->refs++;		/* don't let it go away while on the queue */
 
 	/* Put it on the queue */
-	s = splhigh();
 	if (ngqbase) {
 		ngqlast->next = q;
 	} else {
@@ -1923,10 +1954,10 @@ ng_queue_msg(node_p here, struct ng_mesg *msg, const char *address)
 	q->body.msg.msg_node = dest;
 	q->body.msg.msg_msg = msg;
 	q->body.msg.msg_retaddr = retaddr;
+	s = splhigh();		/* protect refs and queue */
 	dest->refs++;		/* don't let it go away while on the queue */
 
 	/* Put it on the queue */
-	s = splhigh();
 	if (ngqbase) {
 		ngqlast->next = q;
 	} else {

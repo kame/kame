@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_mount.h	8.1 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_mount.h,v 1.3.2.1 2000/08/03 01:02:16 peter Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_mount.h,v 1.3.2.2 2001/03/14 12:03:50 bp Exp $
  */
 
 /*
@@ -52,3 +52,4 @@ struct iso_args {
 #define	ISOFSMNT_GENS	0x00000002	/* enable generation numbers */
 #define	ISOFSMNT_EXTATT	0x00000004	/* enable extended attributes */
 #define ISOFSMNT_NOJOLIET 0x00000008	/* disable Joliet Ext.*/
+#define ISOFSMNT_BROKENJOLIET 0x00000010/* allow broken Joliet disks */

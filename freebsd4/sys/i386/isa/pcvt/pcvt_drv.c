@@ -50,7 +50,7 @@
  *
  *	Last Edit-Date: [Mon Dec 27 14:03:36 1999]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_drv.c,v 1.63 2000/01/11 14:53:57 yokota Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_drv.c,v 1.63.2.1 2001/02/26 04:23:13 jlemon Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -114,8 +114,9 @@ static struct cdevsw pc_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 #if PCVT_NETBSD > 100	/* NetBSD-current Feb 20 1995 */

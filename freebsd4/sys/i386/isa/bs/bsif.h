@@ -1,5 +1,5 @@
 /*	$NecBSD: bsif.h,v 1.5 1997/10/23 20:52:34 honda Exp $	*/
-/* $FreeBSD: src/sys/i386/isa/bs/bsif.h,v 1.12 1999/11/16 12:28:28 nyan Exp $ */
+/* $FreeBSD: src/sys/i386/isa/bs/bsif.h,v 1.12.2.1 2000/11/23 07:06:02 nyan Exp $ */
 /*
  * Copyright (c) HONDA Naofumi, KATO Takenori, 1996.  All rights reserved.
  * 
@@ -155,7 +155,7 @@
 #include <i386/isa/ic/wd33c93.h>
 #include <i386/isa/ccbque.h>
 
-#include <i386/isa/scsi_dvcfg.h>
+#include <cam/scsi/scsi_dvcfg.h>
 #include <i386/isa/bs/bsvar.h>
 #include <i386/isa/bs/bshw.h>
 #include <i386/isa/bs/bsfunc.h>

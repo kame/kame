@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.24.2.4 2000/11/01 17:58:06 rwatson Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.24.2.5 2001/03/05 13:09:01 obrien Exp $ */
 
 /*
  * Implementation of SVID semaphores
@@ -106,10 +106,6 @@ struct sem_undo {
  * Due to the way semaphore memory is allocated, we have to ensure that
  * SEMUSZ is properly aligned.
  */
-
-#ifndef offsetof
-#define	offsetof(type, member)	((size_t)(&((type *)0)->member))
-#endif
 
 #define SEM_ALIGN(bytes) (((bytes) + (sizeof(long) - 1)) & ~(sizeof(long) - 1))
 

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_page.h,v 1.75.2.3 2000/09/16 01:08:03 jhb Exp $
+ * $FreeBSD: src/sys/vm/vm_page.h,v 1.75.2.5 2000/12/30 01:51:11 dillon Exp $
  */
 
 /*
@@ -242,6 +242,7 @@ extern struct vpgqueues vm_page_queues[PQ_COUNT];
  */
 #define	PG_BUSY		0x0001		/* page is in transit (O) */
 #define	PG_WANTED	0x0002		/* someone is waiting for page (O) */
+#define PG_WINATCFLS	0x0004		/* flush dirty page on inactive q */
 #define	PG_FICTITIOUS	0x0008		/* physical page doesn't exist (O) */
 #define	PG_WRITEABLE	0x0010		/* page is mapped writeable */
 #define PG_MAPPED	0x0020		/* page is mapped */
@@ -251,6 +252,7 @@ extern struct vpgqueues vm_page_queues[PQ_COUNT];
 #define PG_SWAPINPROG	0x0200		/* swap I/O in progress on page	     */
 #define PG_NOSYNC	0x0400		/* do not collect for syncer */
 #define PG_UNMANAGED	0x0800		/* No PV management for page */
+#define PG_MARKER	0x1000		/* special queue marker page */
 
 /*
  * Misc constants.
@@ -403,6 +405,7 @@ void vm_page_activate __P((vm_page_t));
 vm_page_t vm_page_alloc __P((vm_object_t, vm_pindex_t, int));
 vm_page_t vm_page_grab __P((vm_object_t, vm_pindex_t, int));
 void vm_page_cache __P((register vm_page_t));
+int vm_page_try_to_cache __P((vm_page_t));
 void vm_page_dontneed __P((register vm_page_t));
 static __inline void vm_page_copy __P((vm_page_t, vm_page_t));
 static __inline void vm_page_free __P((vm_page_t));

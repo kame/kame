@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.1 2000/07/17 21:24:25 archie Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.2 2000/12/20 21:25:31 archie Exp $
  */
 
 /*
@@ -70,6 +70,11 @@
 
 #include <dev/an/if_aironet_ieee.h>
 #include <dev/an/if_anreg.h>
+
+#ifndef lint
+static const char rcsid[] =
+ "$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.2 2000/12/20 21:25:31 archie Exp $";
+#endif
 
 static struct isa_pnp_id an_ids[] = {
 	{ 0x0100ec06, "Aironet ISA4500/ISA4800" },
@@ -121,6 +126,7 @@ an_attach_isa(dev)
 
 	sc->an_bhandle = rman_get_bushandle(sc->port_res);
 	sc->an_btag = rman_get_bustag(sc->port_res);
+	sc->an_dev = dev;
 
 	return an_attach(sc, device_get_unit(dev), flags);
 } 

@@ -11,13 +11,14 @@
  * Jordan K. Hubbard
  * 29 August 1998
  *
- * $FreeBSD: src/sys/boot/common/interp_backslash.c,v 1.4 1999/08/28 00:39:47 peter Exp $
+ * $FreeBSD: src/sys/boot/common/interp_backslash.c,v 1.4.2.1 2000/12/28 13:12:34 ps Exp $
  *
  * Routine for doing backslash elimination.
  */
 
 #include <stand.h>
 #include <string.h>
+#include "bootstrap.h"
 
 #define DIGIT(x) (isdigit(x) ? (x) - '0' : islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')
 

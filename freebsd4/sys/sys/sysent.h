@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/sysent.h,v 1.27.2.2 2000/05/16 06:58:05 dillon Exp $
+ * $FreeBSD: src/sys/sys/sysent.h,v 1.27.2.3 2001/02/22 05:15:12 marcel Exp $
  */
 
 #ifndef _SYS_SYSENT_H_
@@ -80,6 +80,7 @@ struct sysentvec {
 					    off_t));
 					/* function to dump core, or NULL */
 	int		(*sv_imgact_try) __P((struct image_params *));
+	int		sv_minsigstksz;	/* minimum signal stack size */
 };
 
 #ifdef _KERNEL

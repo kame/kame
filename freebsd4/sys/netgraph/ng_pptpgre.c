@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.2.2.7 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.2.2.8 2001/03/08 22:34:49 archie Exp $
  * $Whistle: ng_pptpgre.c,v 1.7 1999/12/08 00:10:06 archie Exp $
  */
 
@@ -630,7 +630,7 @@ bad:
 		struct ng_pptpgre_ackp *const a = &priv->ackp;
 		const u_int32_t	ack = ntohl(gre->data[gre->hasSeq]);
 		const int index = ack - priv->recvAck - 1;
-		const long sample = ng_pptpgre_time(node) - a->timeSent[index];
+		long sample;
 		long diff;
 
 		/* Sanity check ack value */
@@ -643,6 +643,7 @@ bad:
 		priv->recvAck = ack;
 
 		/* Update adaptive timeout stuff */
+		sample = ng_pptpgre_time(node) - a->timeSent[index];
 		diff = sample - a->rtt;
 		a->rtt += PPTP_ACK_ALPHA(diff);
 		if (diff < 0)

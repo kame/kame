@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/sys/boot/common/loader.8,v 1.18.2.2 2000/08/11 10:34:04 dcs Exp $
+.\" $FreeBSD: src/sys/boot/common/loader.8,v 1.18.2.7 2001/03/06 12:09:31 ru Exp $
 .\"
 .\" Note: The date here should be updated whenever a non-trivial
 .\" change is made to the manual page.
@@ -35,7 +35,9 @@
 .Sh DESCRIPTION
 The program called
 .Nm
-is the final stage of FreeBSD's kernel bootstrapping process.
+is the final stage of
+.Fx Ns 's
+kernel bootstrapping process.
 On IA32 (i386) architectures, it is a
 .Pa BTX
 client.
@@ -112,7 +114,7 @@ will be set and
 .Nm
 will engage interactive mode.
 .Sh BUILTIN COMMANDS
-.Nm Loader Ns No 's
+.Nm Loader Ns 's
 builtin commands take its parameters from the command line.
 Presently,
 the only way to call them from a script is by using
@@ -129,7 +131,7 @@ interpreting mode.
 .Pp
 The builtin commands available are:
 .Pp
-.Bl -tag -width Ds -compact -offset indent
+.Bl -tag -width Ds -compact
 .It Ic autoboot Op Ar seconds
 Proceeds to bootstrap the system after a number of seconds, if not
 interrupted by the user.
@@ -150,6 +152,11 @@ Immediately proceeds to bootstrap the system, loading the kernel
 if necessary.
 Any flags or arguments are passed to the kernel, but they
 must precede the kernel name, if a kernel name is provided.
+.Pp
+.Em WARNING :
+The behavior of this builtin is changed if
+.Xr loader.4th 8
+is loaded.
 .Pp
 .It Ic echo Xo
 .Op Fl n
@@ -294,14 +301,14 @@ Notice that this environment variables are not inherited by any shell
 after the system has been booted.
 .Pp
 A few variables are set automatically by
-.Nm loader .
+.Nm .
 Others can affect either
 .Nm
 or kernel's behavior at boot.
 While some of these may require a value,
 others define behavior just by being set.
 These are described below.
-.Bl -tag -width bootfile -offset indent
+.Bl -tag -width bootfile
 .It Va autoboot_delay
 Number of seconds
 .Ic autoboot
@@ -339,7 +346,7 @@ by the kernel during the boot phase.
 .It Va bootfile
 List of semicolon-separated search path for bootable kernels.
 The default is
-.Li Dq kernel;kernel.old .
+.Dq Li kernel;kernel.old .
 .It Va console
 Defines the current console.
 .It Va currdev
@@ -349,10 +356,10 @@ Syntax for devices is odd.
 Sets the list of binaries which the kernel will try to run as initial
 process.
 The default is
-.Li Dq /sbin/init:/sbin/oinit:/sbin/init.bak:/stand/sysinstall .
+.Dq Li /sbin/init:/sbin/oinit:/sbin/init.bak:/stand/sysinstall .
 .It Va interpret
 Has the value 
-.Li Dq ok
+.Dq Li ok
 if the Forth's current state is interpreting.
 .It Va LINES
 Define the number of lines on the screen, to be used by the pager.
@@ -360,7 +367,7 @@ Define the number of lines on the screen, to be used by the pager.
 Sets the list of directories which will be searched in for modules
 named in a load command or implicitly required by a dependancy.
 The default value for this variable is
-.Li Dq /;/boot;/modules .
+.Dq Li /;/boot;/modules .
 .It Va num_ide_disks
 Sets the number of IDE disks as a work around for some problems in
 finding the root disk at boot.
@@ -368,10 +375,10 @@ This has been deprecated in favour of
 .Va root_disk_unit .
 .It Va prompt
 Value of
-.Nm Ns No 's
+.Nm Ns 's
 prompt.
 Defaults to
-.Li Dq "${currdev}>" .
+.Dq Li "${currdev}>" .
 .It Va root_disk_unit
 If the code which detects the disk unit number for the root disk is
 confused, eg. by a mix of SCSI and IDE disks, or IDE disks with
@@ -389,7 +396,7 @@ explicitly.
 .Pp
 Other variables are used to override kernel tunable parameters.
 The following tunables are available:
-.Bl -tag -width Va -offset indent
+.Bl -tag -width Va
 .It Va kern.ipc.nmbclusters
 Set the number of mbuf clusters to be allocated.
 The value cannot be set below the default
@@ -491,9 +498,9 @@ be passed, even if the builtin accepts no arguments.
 .Pp
 While this behavior has benefits, it has its trade-offs.
 If the execution token of a builtin is acquired (through
-.Ic No '
+.Ic '
 or
-.Ic No ['] ) ,
+.Ic ['] ) ,
 and then passed to
 .Ic catch
 or
@@ -518,7 +525,7 @@ virtual machine library that can be called by C functions and vice
 versa.
 .Pp
 In
-.Nm No ,
+.Nm ,
 each line read interactively is then fed to
 .Tn FICL ,
 which may call
@@ -538,7 +545,7 @@ The
 Forth standard words, extra
 .Tn FICL
 words, extra
-.Os
+.Fx
 words, and the builtin commands.
 The later were already described.
 The
@@ -549,7 +556,7 @@ section.
 The words falling in the two other groups are described in the
 following subsections.
 .Ss FICL EXTRA WORDS
-.Bl -tag -width wid-set-super -offset indent
+.Bl -tag -width wid-set-super
 .It Ic .env
 .It Ic .ver
 .It Ic -roll
@@ -575,7 +582,7 @@ This is the STRING word set's
 .It Ic -rot
 .El
 .Ss FREEBSD EXTRA WORDS
-.Bl -tag -width XXXXXXXX -offset indent
+.Bl -tag -width XXXXXXXX
 .It Ic \&$ Pq --
 Evaluates the remainder of the input buffer, after having printed it first.
 .It Ic \&% Pq --
@@ -635,7 +642,7 @@ Does not work with
 .Ic catch .
 .El
 .Ss FREEBSD DEFINED ENVIRONMENTAL QUERIES
-.Bl -tag -width Ds -offset indent
+.Bl -tag -width Ds
 .It arch-i386
 .Ic TRUE
 if the architecture is IA32.
@@ -651,7 +658,7 @@ version.
 .El
 .Ss SYSTEM DOCUMENTATION
 .Sh FILES
-.Bl -tag -width /dev/loader.helpX -compact
+.Bl -tag -width /boot/defaults/loader.conf -compact
 .It Pa /boot/loader
 .Nm
 itself.
@@ -663,6 +670,12 @@ initialization.
 .Nm
 bootstrapping script.
 Deprecated.
+.It Pa /boot/defaults/loader.conf
+.It Pa /boot/loader.conf
+.It Pa /boot/loader.conf.local
+.Nm
+configuration files, as described in
+.Xr loader.conf 5 .
 .It Pa /boot/loader.rc
 .Nm
 bootstrapping script.
@@ -680,15 +693,13 @@ Loads kernel's user configuration file.
 Notice that a kernel must be loaded before any other
 .Ic load
 command is attempted.
-.Pp
-.Bd -literal -offset indent -compact
+.Bd -literal -offset indent
 load kernel
 load -t userconfig_script /boot/kernel.conf
 .Ed
 .Pp
 Loads the kernel, a splash screen, and then autoboots in five seconds.
-.Pp
-.Bd -literal -offset indent -compact
+.Bd -literal -offset indent
 load kernel
 load splash_bmp
 load -t splash_image_data /boot/chuckrulez.bmp
@@ -698,8 +709,7 @@ autoboot 5
 Sets the disk unit of the root device to 2, and then boots.
 This would be needed in the case of a two IDE disks system,
 with the second IDE hardwired to wd2 instead of wd1.
-.Pp
-.Bd -literal -offset indent -compact
+.Bd -literal -offset indent
 set root_disk_unit=2
 boot /kernel
 .Ed
@@ -772,7 +782,7 @@ bye, forget, see, words,
 \&[else]
 .Ef
 .Em and
-.Li No [then]
+.Li [then]
 .Bf Em
 from the Programming-Tools extension word set, Providing the
 Search-Order extensions word set.
@@ -782,16 +792,14 @@ Search-Order extensions word set.
 first appeared in
 .Fx 3.1 .
 .Sh AUTHORS
-.Bl -item
-.It
+.An -nosplit
 .Nm
 was written by
-.An Michael Smith Aq msmith@freebsd.org .
-.It
+.An Michael Smith Aq msmith@FreeBSD.org .
+.Pp
 .Tn FICL
 was written by
 .An John Sadler Aq john_sadler@alum.mit.edu .
-.El
 .Sh BUGS
 The
 .Ic expect

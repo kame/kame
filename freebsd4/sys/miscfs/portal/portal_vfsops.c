@@ -35,7 +35,7 @@
  *
  *	@(#)portal_vfsops.c	8.11 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/miscfs/portal/portal_vfsops.c,v 1.26 1999/12/19 06:07:49 rwatson Exp $
+ * $FreeBSD: src/sys/miscfs/portal/portal_vfsops.c,v 1.26.2.1 2000/11/26 04:32:41 dillon Exp $
  */
 
 /*
@@ -97,12 +97,14 @@ portal_mount(mp, path, data, ndp, p)
 	if (error)
 		return (error);
 
-	error = getsock(p->p_fd, args.pa_socket, &fp);
+	error = holdsock(p->p_fd, args.pa_socket, &fp);
 	if (error)
 		return (error);
 	so = (struct socket *) fp->f_data;
-	if (so->so_proto->pr_domain->dom_family != AF_UNIX)
+	if (so->so_proto->pr_domain->dom_family != AF_UNIX) {
+		fdrop(fp, p);
 		return (ESOCKTNOSUPPORT);
+	}
 
 	MALLOC(pn, struct portalnode *, sizeof(struct portalnode),
 		M_TEMP, M_WAITOK);
@@ -114,6 +116,7 @@ portal_mount(mp, path, data, ndp, p)
 	if (error) {
 		FREE(fmp, M_PORTALFSMNT);
 		FREE(pn, M_TEMP);
+		fdrop(fp, p);
 		return (error);
 	}
 
@@ -142,6 +145,7 @@ portal_mount(mp, path, data, ndp, p)
 #endif
 
 	(void)portal_statfs(mp, &mp->mnt_stat, p);
+	fdrop(fp, p);
 	return (0);
 }
 

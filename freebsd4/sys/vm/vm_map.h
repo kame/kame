@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.h,v 1.54 2000/02/28 04:10:35 ps Exp $
+ * $FreeBSD: src/sys/vm/vm_map.h,v 1.54.2.1 2001/03/14 07:05:06 dillon Exp $
  */
 
 /*
@@ -162,6 +162,7 @@ struct vm_map {
 	int nentries;			/* Number of entries */
 	vm_size_t size;			/* virtual size */
 	u_char system_map;		/* Am I a system map? */
+	u_char infork;			/* Am I in fork processing? */
 	vm_map_entry_t hint;		/* hint for quick lookups */
 	unsigned int timestamp;		/* Version number */
 	vm_map_entry_t first_free;	/* First free space hint */

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/interp.c,v 1.22.2.2 2000/07/20 10:35:14 kris Exp $
+ * $FreeBSD: src/sys/boot/common/interp.c,v 1.22.2.5 2001/03/04 04:46:18 obrien Exp $
  */
 /*
  * Simple commandline interpreter, toplevel and misc.
@@ -47,6 +47,9 @@ extern FICL_VM *bf_vm;
 #define	MAXARGS	20			/* maximum number of arguments allowed */
 
 static void	prompt(void);
+
+#ifndef BOOT_FORTH
+static int	perform(int argc, char *argv[]);
 
 /*
  * Perform the command
@@ -79,6 +82,7 @@ perform(int argc, char *argv[])
     }
     RETURN(result);
 }
+#endif	/* ! BOOT_FORTH */
 
 /*
  * Interactive mode
@@ -157,7 +161,7 @@ command_include(int argc, char *argv[])
     /* 
      * Since argv is static, we need to save it here.
      */
-    argvbuf = (char**) calloc(argc, sizeof(char*));
+    argvbuf = (char**) calloc((u_int)argc, sizeof(char*));
     for (i = 0; i < argc; i++)
 	argvbuf[i] = strdup(argv[i]);
 
@@ -183,7 +187,7 @@ struct includeline
 };
 
 int
-include(char *filename)
+include(const char *filename)
 {
     struct includeline	*script, *se, *sp;
     char		input[256];			/* big enough? */
@@ -215,7 +219,7 @@ include(char *filename)
 #else
 	flags = 0;
 	/* Discard comments */
-	if (input[0] == '#')
+	if (strncmp(input+strspn(input, " "), "\\ ", 2) == 0)
 	    continue;
 	cp = input;
 	/* Echo? */

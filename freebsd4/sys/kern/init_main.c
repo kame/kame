@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)init_main.c	8.9 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/init_main.c,v 1.134.2.3 2000/09/07 19:13:36 truckman Exp $
+ * $FreeBSD: src/sys/kern/init_main.c,v 1.134.2.5 2001/03/05 09:11:58 obrien Exp $
  */
 
 #include "opt_init_path.h"
@@ -89,6 +89,7 @@ struct	proc *initproc;
 
 int cmask = CMASK;
 extern	struct user *proc0paddr;
+extern int fallback_elf_brand;
 
 struct	vnode *rootvp;
 int	boothowto = 0;		/* initialized so that it can be patched */
@@ -454,8 +455,9 @@ xxx_vfs_root_fdtab(dummy)
 		panic("cannot find root vnode");
 	fdp->fd_fd.fd_cdir = rootvnode;
 	VREF(fdp->fd_fd.fd_cdir);
-	VOP_UNLOCK(rootvnode, 0, &proc0);
 	fdp->fd_fd.fd_rdir = rootvnode;
+	VREF(fdp->fd_fd.fd_rdir);
+	VOP_UNLOCK(rootvnode, 0, &proc0);
 }
 SYSINIT(retrofit, SI_SUB_ROOT_FDTAB, SI_ORDER_FIRST, xxx_vfs_root_fdtab, NULL)
 
@@ -536,6 +538,8 @@ start_init(dummy)
 		strncpy(init_path, var, sizeof init_path);
 		init_path[sizeof init_path - 1] = 0;
 	}
+	if ((var = getenv("kern.fallback_elf_brand")) != NULL)
+		fallback_elf_brand = strtol(var, NULL, 0);
 	
 	for (path = init_path; *path != '\0'; path = next) {
 		while (*path == ':')

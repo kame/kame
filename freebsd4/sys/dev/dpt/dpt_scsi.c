@@ -43,7 +43,7 @@
  *	       arrays that span controllers (Wow!).
  */
 
-#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.28.2.1 2000/08/07 18:48:14 peter Exp $"
+#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.28.2.2 2001/03/05 13:08:56 obrien Exp $"
 
 #define _DPT_C_
 
@@ -53,8 +53,6 @@
 #include <sys/eventhandler.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
-
-#include <stddef.h>	/* For offsetof */
 
 #include <sys/bus.h>
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_generic.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/sys_generic.c,v 1.55.2.7 2000/08/16 19:20:31 alfred Exp $
+ * $FreeBSD: src/sys/kern/sys_generic.c,v 1.55.2.10 2001/03/17 10:39:32 peter Exp $
  */
 
 #include "opt_ktrace.h"
@@ -55,11 +55,15 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/poll.h>
+#include <sys/resourcevar.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
+#include <sys/buf.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
+#include <vm/vm.h>
+#include <vm/vm_page.h>
 
 #include <machine/limits.h>
 
@@ -67,7 +71,7 @@ static MALLOC_DEFINE(M_IOCTLOPS, "ioctlops", "ioctl data buffer");
 static MALLOC_DEFINE(M_SELECT, "select", "select() buffer");
 MALLOC_DEFINE(M_IOV, "iov", "large iov's");
 
-static int	pollscan __P((struct proc *, struct pollfd *, int));
+static int	pollscan __P((struct proc *, struct pollfd *, u_int));
 static int	selscan __P((struct proc *, fd_mask **, fd_mask **, int));
 static int	dofileread __P((struct proc *, struct file *, int, void *,
 		    size_t, off_t, int));
@@ -75,7 +79,7 @@ static int	dofilewrite __P((struct proc *, struct file *, int,
 		    const void *, size_t, off_t, int));
 
 struct file*
-getfp(fdp, fd, flag)
+holdfp(fdp, fd, flag)
 	struct filedesc* fdp;
 	int fd, flag;
 {
@@ -83,8 +87,10 @@ getfp(fdp, fd, flag)
 
 	if (((u_int)fd) >= fdp->fd_nfiles ||
 	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-	    (fp->f_flag & flag) == 0)
+	    (fp->f_flag & flag) == 0) {
 		return (NULL);
+	}
+	fhold(fp);
 	return (fp);
 }
 
@@ -104,10 +110,13 @@ read(p, uap)
 	register struct read_args *uap;
 {
 	register struct file *fp;
+	int error;
 
-	if ((fp = getfp(p->p_fd, uap->fd, FREAD)) == NULL)
+	if ((fp = holdfp(p->p_fd, uap->fd, FREAD)) == NULL)
 		return (EBADF);
-	return (dofileread(p, fp, uap->fd, uap->buf, uap->nbyte, (off_t)-1, 0));
+	error = dofileread(p, fp, uap->fd, uap->buf, uap->nbyte, (off_t)-1, 0);
+	fdrop(fp, p);
+	return(error);
 }
 
 /*
@@ -128,13 +137,18 @@ pread(p, uap)
 	register struct pread_args *uap;
 {
 	register struct file *fp;
+	int error;
 
-	if ((fp = getfp(p->p_fd, uap->fd, FREAD)) == NULL)
+	if ((fp = holdfp(p->p_fd, uap->fd, FREAD)) == NULL)
 		return (EBADF);
-	if (fp->f_type != DTYPE_VNODE)
-		return (ESPIPE);
-	return (dofileread(p, fp, uap->fd, uap->buf, uap->nbyte, uap->offset, 
-	    FOF_OFFSET));
+	if (fp->f_type != DTYPE_VNODE) {
+		error = ESPIPE;
+	} else {
+	    error = dofileread(p, fp, uap->fd, uap->buf, uap->nbyte, 
+		uap->offset, FOF_OFFSET);
+	}
+	fdrop(fp, p);
+	return(error);
 }
 
 /*
@@ -180,10 +194,12 @@ dofileread(p, fp, fd, buf, nbyte, offset, flags)
 	}
 #endif
 	cnt = nbyte;
-	if ((error = fo_read(fp, &auio, fp->f_cred, flags, p)))
+
+	if ((error = fo_read(fp, &auio, fp->f_cred, flags, p))) {
 		if (auio.uio_resid != cnt && (error == ERESTART ||
 		    error == EINTR || error == EWOULDBLOCK))
 			error = 0;
+	}
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
 	if (didktr && error == 0) {
@@ -224,7 +240,7 @@ readv(p, uap)
 	struct uio ktruio;
 #endif
 
-	if ((fp = getfp(fdp, uap->fd, FREAD)) == NULL)
+	if ((fp = holdfp(fdp, uap->fd, FREAD)) == NULL)
 		return (EBADF);
 	/* note: can't use iovlen until iovcnt is validated */
 	iovlen = uap->iovcnt * sizeof (struct iovec);
@@ -265,10 +281,11 @@ readv(p, uap)
 	}
 #endif
 	cnt = auio.uio_resid;
-	if ((error = fo_read(fp, &auio, fp->f_cred, 0, p)))
+	if ((error = fo_read(fp, &auio, fp->f_cred, 0, p))) {
 		if (auio.uio_resid != cnt && (error == ERESTART ||
 		    error == EINTR || error == EWOULDBLOCK))
 			error = 0;
+	}
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
 	if (ktriov != NULL) {
@@ -283,6 +300,7 @@ readv(p, uap)
 #endif
 	p->p_retval[0] = cnt;
 done:
+	fdrop(fp, p);
 	if (needfree)
 		FREE(needfree, M_IOV);
 	return (error);
@@ -304,10 +322,13 @@ write(p, uap)
 	register struct write_args *uap;
 {
 	register struct file *fp;
+	int error;
 
-	if ((fp = getfp(p->p_fd, uap->fd, FWRITE)) == NULL)
+	if ((fp = holdfp(p->p_fd, uap->fd, FWRITE)) == NULL)
 		return (EBADF);
-	return (dofilewrite(p, fp, uap->fd, uap->buf, uap->nbyte, (off_t)-1, 0));
+	error = dofilewrite(p, fp, uap->fd, uap->buf, uap->nbyte, (off_t)-1, 0);
+	fdrop(fp, p);
+	return(error);
 }
 
 /*
@@ -328,13 +349,18 @@ pwrite(p, uap)
 	register struct pwrite_args *uap;
 {
 	register struct file *fp;
+	int error;
 
-	if ((fp = getfp(p->p_fd, uap->fd, FWRITE)) == NULL)
+	if ((fp = holdfp(p->p_fd, uap->fd, FWRITE)) == NULL)
 		return (EBADF);
-	if (fp->f_type != DTYPE_VNODE)
-		return (ESPIPE);
-	return (dofilewrite(p, fp, uap->fd, uap->buf, uap->nbyte, uap->offset,
-	    FOF_OFFSET));
+	if (fp->f_type != DTYPE_VNODE) {
+		error = ESPIPE;
+	} else {
+	    error = dofilewrite(p, fp, uap->fd, uap->buf, uap->nbyte,
+		uap->offset, FOF_OFFSET);
+	}
+	fdrop(fp, p);
+	return(error);
 }
 
 static int
@@ -377,6 +403,8 @@ dofilewrite(p, fp, fd, buf, nbyte, offset, flags)
 	}
 #endif
 	cnt = nbyte;
+	if (fp->f_type == DTYPE_VNODE)
+		bwillwrite();
 	if ((error = fo_write(fp, &auio, fp->f_cred, flags, p))) {
 		if (auio.uio_resid != cnt && (error == ERESTART ||
 		    error == EINTR || error == EWOULDBLOCK))
@@ -424,9 +452,8 @@ writev(p, uap)
 	struct uio ktruio;
 #endif
 
-	if ((fp = getfp(fdp, uap->fd, FWRITE)) == NULL)
+	if ((fp = holdfp(fdp, uap->fd, FWRITE)) == NULL)
 		return (EBADF);
-	fhold(fp);
 	/* note: can't use iovlen until iovcnt is validated */
 	iovlen = uap->iovcnt * sizeof (struct iovec);
 	if (uap->iovcnt > UIO_SMALLIOV) {
@@ -469,6 +496,8 @@ writev(p, uap)
 	}
 #endif
 	cnt = auio.uio_resid;
+	if (fp->f_type == DTYPE_VNODE)
+		bwillwrite();
 	if ((error = fo_write(fp, &auio, fp->f_cred, 0, p))) {
 		if (auio.uio_resid != cnt && (error == ERESTART ||
 		    error == EINTR || error == EWOULDBLOCK))
@@ -549,30 +578,37 @@ ioctl(p, uap)
 	size = IOCPARM_LEN(com);
 	if (size > IOCPARM_MAX)
 		return (ENOTTY);
+
+	fhold(fp);
+
 	memp = NULL;
 	if (size > sizeof (ubuf.stkbuf)) {
 		memp = (caddr_t)malloc((u_long)size, M_IOCTLOPS, M_WAITOK);
 		data = memp;
-	} else
+	} else {
 		data = ubuf.stkbuf;
+	}
 	if (com&IOC_IN) {
 		if (size) {
 			error = copyin(uap->data, data, (u_int)size);
 			if (error) {
 				if (memp)
 					free(memp, M_IOCTLOPS);
+				fdrop(fp, p);
 				return (error);
 			}
-		} else
+		} else {
 			*(caddr_t *)data = uap->data;
-	} else if ((com&IOC_OUT) && size)
+		}
+	} else if ((com&IOC_OUT) && size) {
 		/*
 		 * Zero the buffer so the user always
 		 * gets back something deterministic.
 		 */
 		bzero(data, size);
-	else if (com&IOC_VOID)
+	} else if (com&IOC_VOID) {
 		*(caddr_t *)data = uap->data;
+	}
 
 	switch (com) {
 
@@ -604,6 +640,7 @@ ioctl(p, uap)
 	}
 	if (memp)
 		free(memp, M_IOCTLOPS);
+	fdrop(fp, p);
 	return (error);
 }
 
@@ -803,20 +840,27 @@ struct poll_args {
 #endif
 int
 poll(p, uap)
-	register struct proc *p;
-	register struct poll_args *uap;
+	struct proc *p;
+	struct poll_args *uap;
 {
 	caddr_t bits;
 	char smallbits[32 * sizeof(struct pollfd)];
 	struct timeval atv, rtv, ttv;
 	int s, ncoll, error = 0, timo;
+	u_int nfds;
 	size_t ni;
 
-	if (SCARG(uap, nfds) > p->p_fd->fd_nfiles) {
-		/* forgiving; slightly wrong */
-		SCARG(uap, nfds) = p->p_fd->fd_nfiles;
-	}
-	ni = SCARG(uap, nfds) * sizeof(struct pollfd);
+	nfds = SCARG(uap, nfds);
+	/*
+	 * This is kinda bogus.  We have fd limits, but that is not
+	 * really related to the size of the pollfd array.  Make sure
+	 * we let the process use at least FD_SETSIZE entries and at
+	 * least enough for the current limits.  We want to be reasonably
+	 * safe, but not overly restrictive.
+	 */
+	if (nfds > p->p_rlimit[RLIMIT_NOFILE].rlim_cur && nfds > FD_SETSIZE)
+		return (EINVAL);
+	ni = nfds * sizeof(struct pollfd);
 	if (ni > sizeof(smallbits))
 		bits = malloc(ni, M_TEMP, M_WAITOK);
 	else
@@ -841,7 +885,7 @@ poll(p, uap)
 retry:
 	ncoll = nselcoll;
 	p->p_flag |= P_SELECT;
-	error = pollscan(p, (struct pollfd *)bits, SCARG(uap, nfds));
+	error = pollscan(p, (struct pollfd *)bits, nfds);
 	if (error || p->p_retval[0])
 		goto done;
 	if (atv.tv_sec || atv.tv_usec) {
@@ -885,7 +929,7 @@ static int
 pollscan(p, fds, nfd)
 	struct proc *p;
 	struct pollfd *fds;
-	int nfd;
+	u_int nfd;
 {
 	register struct filedesc *fdp = p->p_fd;
 	int i;
@@ -900,7 +944,7 @@ pollscan(p, fds, nfd)
 			fds->revents = 0;
 		} else {
 			fp = fdp->fd_ofiles[fds->fd];
-			if (fp == 0) {
+			if (fp == NULL) {
 				fds->revents = POLLNVAL;
 				n++;
 			} else {

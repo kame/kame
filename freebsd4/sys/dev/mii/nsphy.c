@@ -92,7 +92,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/nsphy.c,v 1.2.2.1 2000/09/10 19:22:04 semenu Exp $";
+  "$FreeBSD: src/sys/dev/mii/nsphy.c,v 1.2.2.2 2000/12/12 19:29:14 wpaul Exp $";
 #endif
 
 static int nsphy_probe		__P((device_t));
@@ -207,6 +207,7 @@ static int nsphy_detach(dev)
 
 	sc = device_get_softc(dev);
 	mii = device_get_softc(device_get_parent(dev));
+	mii_phy_auto_stop(sc);
 	sc->mii_dev = NULL;
 	LIST_REMOVE(sc, mii_list);
 

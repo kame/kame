@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/types.h,v 1.11.2.1 2000/05/24 14:18:30 gallatin Exp $ */
+/* $FreeBSD: src/sys/alpha/include/types.h,v 1.11.2.2 2001/03/21 10:50:58 peter Exp $ */
 /* From: NetBSD: types.h,v 1.8 1997/04/06 08:47:45 cgd Exp */
 
 /*-
@@ -56,8 +56,8 @@ typedef	long		vm_ooffset_t;
 typedef	unsigned long	vm_pindex_t;
 typedef	unsigned long	vm_size_t;
 
-
 typedef __int64_t		register_t;
+typedef __uint64_t		u_register_t;
 
 #ifdef _KERNEL
 typedef	long		intfptr_t;

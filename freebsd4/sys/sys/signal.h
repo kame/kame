@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)signal.h	8.4 (Berkeley) 5/4/95
- * $FreeBSD: src/sys/sys/signal.h,v 1.23 1999/12/29 04:24:47 peter Exp $
+ * $FreeBSD: src/sys/sys/signal.h,v 1.23.2.2 2001/04/19 01:38:35 alfred Exp $
  */
 
 #ifndef	_SYS_SIGNAL_H_
@@ -53,6 +53,7 @@
 #define	_SIG_IDX(sig)	((sig) - 1)
 #define	_SIG_WORD(sig)	(_SIG_IDX(sig) >> 5)
 #define	_SIG_BIT(sig)	(1 << (_SIG_IDX(sig) & 31))
+#define	_SIG_VALID(sig)	((sig) < _SIG_MAXSIG && (sig) > 0)
 
 /*
  * System defined signals.
@@ -133,12 +134,18 @@ union sigval {
 
 struct sigevent {
 	int	sigev_notify;		/* Notification type */
-	int	sigev_signo;		/* Signal number */
+	union {
+		int	__sigev_signo;	/* Signal number */
+		int	__sigev_notify_kqueue;
+	} __sigev_u;
 	union sigval sigev_value;	/* Signal value */
 };
+#define sigev_signo		__sigev_u.__sigev_signo
+#define sigev_notify_kqueue	__sigev_u.__sigev_notify_kqueue
 
 #define	SIGEV_NONE	0		/* No async notification */
 #define	SIGEV_SIGNAL	1		/* Generate a queued signal */
+#define SIGEV_KEVENT	3		/* Generate a kevent */
 
 typedef struct __siginfo {
 	int	si_signo;		/* signal number */

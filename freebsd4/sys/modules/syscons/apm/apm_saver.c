@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/modules/syscons/apm/apm_saver.c,v 1.1 1999/10/02 03:56:42 nsayer Exp $
+ * $FreeBSD: src/sys/modules/syscons/apm/apm_saver.c,v 1.1.4.2 2001/03/07 21:47:24 nsayer Exp $
  */
 
 #include <sys/param.h>
@@ -42,7 +42,12 @@
 #include <sys/select.h>
 #include <machine/apm_bios.h>
 #include <machine/pc/bios.h>
+#ifdef PC98
+#include <machine/bus.h>
+#include <pc98/apm/apm.h>
+#else
 #include <i386/apm/apm.h>
+#endif
 
 extern int apm_display __P((int newstate));                                     
 
@@ -53,9 +58,7 @@ static int blanked=0;
 static int
 apm_saver(video_adapter_t *adp, int blank)
 {
-	struct apm_softc *sc = &apm_softc;                                      
-
-	if (!sc->initialized || !sc->active)
+	if (!apm_softc.initialized || !apm_softc.active)
 		return 0;
 
 	if (blank==blanked)
@@ -71,9 +74,7 @@ apm_saver(video_adapter_t *adp, int blank)
 static int
 apm_init(video_adapter_t *adp)
 {
-	struct apm_softc *sc = &apm_softc;                                      
-
-	if (!sc->initialized || !sc->active)
+	if (!apm_softc.initialized || !apm_softc.active)
 		printf("WARNING: apm_saver module requires apm enabled\n");
 	return 0;
 }

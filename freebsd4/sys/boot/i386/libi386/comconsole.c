@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/comconsole.c,v 1.7 1999/08/28 00:40:14 peter Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/comconsole.c,v 1.7.2.1 2000/12/28 13:12:40 ps Exp $
  */
 
 #include <stand.h>
@@ -114,7 +114,7 @@ comc_putchar(int c)
 
     for (wait = COMC_TXWAIT; wait > 0; wait--)
         if (inb(COMPORT + com_lsr) & LSR_TXRDY) {
-	    outb(COMPORT + com_data, c);
+	    outb(COMPORT + com_data, (u_char)c);
 	    break;
 	}
 }

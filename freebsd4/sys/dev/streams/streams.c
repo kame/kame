@@ -30,7 +30,7 @@
  * skeleton produced from /usr/share/examples/drivers/make_pseudo_driver.sh
  * in 3.0-980524-SNAP then hacked a bit (but probably not enough :-).
  *
- * $FreeBSD: src/sys/dev/streams/streams.c,v 1.16 1999/11/08 07:43:54 phk Exp $
+ * $FreeBSD: src/sys/dev/streams/streams.c,v 1.16.2.1 2001/02/26 04:23:07 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -99,7 +99,8 @@ dev_t dt_ptm, dt_arp, dt_icmp, dt_ip, dt_tcp, dt_udp, dt_rawip,
 	dt_unix_dgram, dt_unix_stream, dt_unix_ord_stream;
 
 static struct fileops svr4_netops = {
-	soo_read, soo_write, soo_ioctl, soo_poll, soo_stat, svr4_soo_close
+	soo_read, soo_write, soo_ioctl, soo_poll, sokqfilter,
+	soo_stat, svr4_soo_close
 };
  
 #define CDEV_MAJOR 103

@@ -23,13 +23,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_kthread.c,v 1.5 2000/01/10 08:00:58 imp Exp $
+ * $FreeBSD: src/sys/kern/kern_kthread.c,v 1.5.2.1 2001/01/23 13:02:46 asmodai Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/kthread.h>
+#include <sys/ptrace.h>
 #include <sys/resourcevar.h>
 #include <sys/signalvar.h>
 #include <sys/unistd.h>
@@ -100,6 +101,7 @@ kthread_create(void (*func)(void *), void *arg,
 void
 kthread_exit(int ecode)
 {
+	proc_reparent(curproc, initproc);
 	exit1(curproc, W_EXITCODE(ecode, 0));
 }
 

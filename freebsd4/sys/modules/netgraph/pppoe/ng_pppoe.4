@@ -32,7 +32,7 @@
 .\" 
 .\" Author: Archie Cobbs <archie@freebsd.org>
 .\"
-.\" $FreeBSD: src/sys/modules/netgraph/pppoe/ng_pppoe.4,v 1.8.2.3 2000/10/24 22:31:06 julian Exp $
+.\" $FreeBSD: src/sys/modules/netgraph/pppoe/ng_pppoe.4,v 1.8.2.4 2001/01/18 17:31:56 ru Exp $
 .\" $Whistle: ng_pppoe.8,v 1.1 1999/01/25 23:46:27 archie Exp $
 .\"
 .Dd October 28, 1999
@@ -156,7 +156,7 @@ The three commands above use a common data structure:
 struct ngpppoe_sts {
     char    hook[NG_HOOKLEN + 1]; /* hook associated with event session */
 };
-
+.Ed
 .El
 .Sh SHUTDOWN
 This node shuts down upon receipt of a

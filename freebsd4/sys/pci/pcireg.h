@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pcireg.h,v 1.24.2.2 2000/10/02 00:42:47 archie Exp $
+ * $FreeBSD: src/sys/pci/pcireg.h,v 1.24.2.3 2001/01/07 22:48:44 gibbs Exp $
  *
  */
 
@@ -77,6 +77,7 @@
 #define PCIR_SUBDEV_0	0x2e
 #define PCIR_BIOS	0x30
 #define PCIM_BIOS_ENABLE	0x01
+#define PCIR_CAP_PTR	0x34
 #define PCIR_INTLINE	0x3c
 #define PCIR_INTPIN	0x3d
 #define PCIR_MINGNT	0x3e

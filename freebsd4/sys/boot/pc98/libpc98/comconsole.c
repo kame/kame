@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/pc98/libpc98/comconsole.c,v 1.2 1999/08/28 00:40:35 peter Exp $
+ * $FreeBSD: src/sys/boot/pc98/libpc98/comconsole.c,v 1.2.2.1 2000/12/30 12:01:06 nyan Exp $
  */
 
 #include <stand.h>
@@ -118,7 +118,7 @@ comc_putchar(int c)
 
     for (wait = COMC_TXWAIT; wait > 0; wait--)
         if (inb(COMPORT + com_lsr) & LSR_TXRDY) {
-	    outb(COMPORT + com_data, c);
+	    outb(COMPORT + com_data, (u_char)c);
 	    break;
 	}
 }

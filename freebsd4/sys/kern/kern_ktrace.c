@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_ktrace.c	8.2 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/kern/kern_ktrace.c,v 1.35.2.1 2000/07/15 06:32:20 green Exp $
+ * $FreeBSD: src/sys/kern/kern_ktrace.c,v 1.35.2.4 2001/03/05 13:09:01 obrien Exp $
  */
 
 #include "opt_ktrace.h"
@@ -48,11 +48,9 @@
 #include <sys/ktrace.h>
 #include <sys/malloc.h>
 #include <sys/syslog.h>
+#include <sys/sysent.h>
 
 #include <vm/vm_zone.h>
-
-#include <stddef.h>
-
 static MALLOC_DEFINE(M_KTRACE, "KTRACE", "KTRACE");
 
 #ifdef KTRACE
@@ -361,6 +359,8 @@ utrace(curp, uap)
 
 	if (!KTRPOINT(p, KTR_USER))
 		return (0);
+	if (SCARG(uap, len) > KTR_USER_MAXLEN)
+		return (EINVAL);
 	p->p_traceflag |= KTRFAC_ACTIVE;
 	kth = ktrgetheader(KTR_USER);
 	MALLOC(cp, caddr_t, uap->len, M_KTRACE, M_WAITOK);

@@ -1,5 +1,5 @@
 /*-
- * $FreeBSD: src/sys/gnu/i386/isa/dgm.c,v 1.21 2000/01/29 18:42:45 peter Exp $
+ * $FreeBSD: src/sys/gnu/i386/isa/dgm.c,v 1.21.2.1 2001/02/26 04:23:09 jlemon Exp $
  *
  *  This driver and the associated header files support the ISA PC/Xem
  *  Digiboards.  Its evolutionary roots are described below.
@@ -221,8 +221,9 @@ static struct cdevsw dgm_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter,
 };
 
 static	speed_t	dgmdefaultrate = TTYDEF_SPEED;

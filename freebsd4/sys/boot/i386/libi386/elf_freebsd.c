@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/elf_freebsd.c,v 1.7.2.1 2000/07/06 00:34:03 ps Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/elf_freebsd.c,v 1.7.2.2 2000/12/28 13:12:40 ps Exp $
  */
 
 #include <sys/param.h>
@@ -42,8 +42,6 @@
 static int	elf_exec(struct loaded_module *amp);
 
 struct module_format i386_elf = { elf_loadmodule, elf_exec };
-
-static struct bootinfo	bi;
 
 /*
  * There is an a.out kernel and one or more a.out modules loaded.  

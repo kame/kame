@@ -32,7 +32,7 @@
 .\" 
 .\" Author: Archie Cobbs <archie@freebsd.org>
 .\"
-.\" $FreeBSD: src/sys/modules/netgraph/tty/ng_tty.4,v 1.5.2.2 2000/10/24 22:31:07 julian Exp $
+.\" $FreeBSD: src/sys/modules/netgraph/tty/ng_tty.4,v 1.5.2.3 2000/12/27 13:50:35 ru Exp $
 .\" $Whistle: ng_tty.8,v 1.5 1999/01/25 23:46:28 archie Exp $
 .\"
 .Dd January 19, 1999
@@ -108,6 +108,7 @@ so that all received data is forwarded immediately.
 .It Dv NGM_TTY_GET_HOTCHAR
 Returns an integer containing the current hot character in the lower
 eight bits.
+.El
 .Sh SHUTDOWN
 This node shuts down when the corresponding device is closed
 (or the line discipline is uninstalled on the device).

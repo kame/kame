@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/interp_forth.c,v 1.15.2.1 2000/07/07 00:07:08 obrien Exp $
+ * $FreeBSD: src/sys/boot/common/interp_forth.c,v 1.15.2.2 2000/12/28 13:12:34 ps Exp $
  */
 
 #include <sys/param.h>		/* to pick up __FreeBSD_version */
@@ -64,7 +64,7 @@ static void
 bf_command(FICL_VM *vm)
 {
     char			*name, *line, *tail, *cp;
-    int				len;
+    size_t			len;
     struct bootblk_command	**cmdp;
     bootblk_cmd_t		*cmd;
     int				nstrings, i;

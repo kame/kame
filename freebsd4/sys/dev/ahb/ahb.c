@@ -25,10 +25,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.18.2.2 2000/10/31 08:09:50 dwmalone Exp $
+ * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.18.2.3 2001/03/05 13:08:55 obrien Exp $
  */
-
-#include <stddef.h>	/* For offsetof() */
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -38,7 +38,7 @@
  * from: Utah $Hdr: vm_unix.c 1.1 89/11/07$
  *
  *	@(#)vm_unix.c	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/vm/vm_unix.c,v 1.24 1999/11/07 20:03:54 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_unix.c,v 1.24.2.1 2001/02/02 21:26:38 dwmalone Exp $
  */
 
 /*
@@ -73,8 +73,14 @@ obreak(p, uap)
 
 	base = round_page((vm_offset_t) vm->vm_daddr);
 	new = round_page((vm_offset_t)uap->nsize);
+	old = base + ctob(vm->vm_dsize);
 	if (new > base) {
-		if ((new - base) > (unsigned) p->p_rlimit[RLIMIT_DATA].rlim_cur)
+		/*
+		 * We check resource limits here, but alow processes to
+		 * reduce their usage, even if they remain over the limit.
+		 */
+		if (new > old &&
+		    (new - base) > (unsigned) p->p_rlimit[RLIMIT_DATA].rlim_cur)
 			return ENOMEM;
 		if (new >= VM_MAXUSER_ADDRESS)
 			return (ENOMEM);
@@ -86,8 +92,6 @@ obreak(p, uap)
 		 */
 		return EINVAL;
 	}
-
-	old = base + ctob(vm->vm_dsize);
 
 	if (new > old) {
 		vm_size_t diff;

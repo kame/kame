@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.4 2000/10/14 20:01:16 lile Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.10 2001/03/29 09:51:16 yar Exp $
  */
 
 /*
@@ -59,6 +59,10 @@
 #include <net/route.h>
 #include <net/netisr.h>
 #include <net/if_llc.h>
+#ifdef BRIDGE
+#include <net/ethernet.h>
+#include <net/bridge.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -492,6 +496,12 @@ arpintr()
  * We no longer reply to requests for ETHERTYPE_TRAIL protocol either,
  * but formerly didn't normally send requests.
  */
+static int log_arp_wrong_iface = 1;
+
+SYSCTL_INT(_net_link_ether_inet, OID_AUTO, log_arp_wrong_iface, CTLFLAG_RW,
+	&log_arp_wrong_iface, 0,
+	"log arp packets arriving on the wrong interface");
+
 static void
 in_arpinput(m)
 	struct mbuf *m;
@@ -508,26 +518,35 @@ in_arpinput(m)
 	struct in_addr isaddr, itaddr, myaddr;
 	int op, rif_len;
 
+	if (m->m_len < sizeof(struct ether_arp) &&
+	    (m = m_pullup(m, sizeof(struct ether_arp))) == NULL) {
+		log(LOG_ERR, "in_arp: runt packet -- m_pullup failed\n");
+		return;
+	}
+
 	ea = mtod(m, struct ether_arp *);
 	op = ntohs(ea->arp_op);
 	(void)memcpy(&isaddr, ea->arp_spa, sizeof (isaddr));
 	(void)memcpy(&itaddr, ea->arp_tpa, sizeof (itaddr));
-	for (ia = in_ifaddrhead.tqh_first; ia; ia = ia->ia_link.tqe_next)
-#ifdef BRIDGE
+	for (ia = in_ifaddrhead.tqh_first; ia; ia = ia->ia_link.tqe_next) {
 		/*
 		 * For a bridge, we want to check the address irrespective
 		 * of the receive interface. (This will change slightly
 		 * when we have clusters of interfaces).
 		 */
-		{
+#ifdef BRIDGE
+#define BRIDGE_TEST (do_bridge)
 #else
-		if (ia->ia_ifp == &ac->ac_if) {
+#define BRIDGE_TEST (0) /* cc will optimise the test away */
 #endif
+		if ((BRIDGE_TEST) || (ia->ia_ifp == &ac->ac_if)) {
 			maybe_ia = ia;
 			if ((itaddr.s_addr == ia->ia_addr.sin_addr.s_addr) ||
-			     (isaddr.s_addr == ia->ia_addr.sin_addr.s_addr))
+			     (isaddr.s_addr == ia->ia_addr.sin_addr.s_addr)) {
 				break;
+			}
 		}
+	}
 	if (maybe_ia == 0) {
 		m_freem(m);
 		return;
@@ -555,16 +574,16 @@ in_arpinput(m)
 	}
 	la = arplookup(isaddr.s_addr, itaddr.s_addr == myaddr.s_addr, 0);
 	if (la && (rt = la->la_rt) && (sdl = SDL(rt->rt_gateway))) {
-#ifndef BRIDGE /* the following is not an error when doing bridging */
-		if (rt->rt_ifp != &ac->ac_if) {
+		/* the following is not an error when doing bridging */
+		if (!BRIDGE_TEST && rt->rt_ifp != &ac->ac_if) {
+		    if (log_arp_wrong_iface)
 			log(LOG_ERR, "arp: %s is on %s%d but got reply from %6D on %s%d\n",
 			    inet_ntoa(isaddr),
 			    rt->rt_ifp->if_name, rt->rt_ifp->if_unit,
 			    ea->arp_sha, ":",
 			    ac->ac_if.if_name, ac->ac_if.if_unit);
-			goto reply;
+		    goto reply;
 		}
-#endif
 		if (sdl->sdl_alen &&
 		    bcmp((caddr_t)ea->arp_sha, LLADDR(sdl), sdl->sdl_alen)) {
 			if (rt->rt_expire)

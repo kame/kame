@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- ** $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.4 2000/10/29 11:05:47 non Exp $
+ ** $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.6 2001/01/08 09:21:00 nyan Exp $
  **/
 
 /**
@@ -355,7 +355,7 @@ static DEV_INFO device_info[] = {
 {"el",          "3C501 Ethernet adapter",		0,		CLS_NETWORK},
 {"ep",          "3C509 Ethernet adapter",		0,		CLS_NETWORK},
 {"ex",          "Intel EtherExpress Pro/10 Ethernet adapter",	0,	CLS_NETWORK},
-{"fe",          "Fujitsu MD86960A/MB869685A Ethernet adapters",	0,	CLS_NETWORK},
+{"fe",          "Fujitsu MB86960A/MB86965A Ethernet adapters",	0,	CLS_NETWORK},
 {"ie",          "AT&T Starlan 10 and EN100, 3C507, NI5210 Ethernet adapters",0,CLS_NETWORK},
 {"le",          "DEC Etherworks 2 and 3 Ethernet adapters",	0,	CLS_NETWORK},
 {"lnc",         "Isolan, Novell NE2100/NE32-VL Ethernet adapters",	0,CLS_NETWORK},
@@ -1977,13 +1977,12 @@ static void
 helpscreen(void) 
 {
     int		topline = 0;			/* where we are in the text */
+    int		line = 0;			/* last line we displayed */
     int		c, delta = 1;
     char	prompt[80];
 
     for (;;)					/* loop until user quits */
     {
-	int line = 0;
-
 	/* display help text */
 	if (delta) 
 	{
@@ -2424,7 +2423,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.4 2000/10/29 11:05:47 non Exp $
+ * $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.6 2001/01/08 09:21:00 nyan Exp $
  */
 
 #include "scbus.h"

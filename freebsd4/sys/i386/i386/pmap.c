@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
- * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.7 2000/11/07 18:32:15 alfred Exp $
+ * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.9 2001/03/17 10:48:59 peter Exp $
  */
 
 /*
@@ -180,6 +180,12 @@ static caddr_t CADDR2;
 static pt_entry_t *msgbufmap;
 struct msgbuf *msgbufp=0;
 
+/*
+ * Crashdump maps.
+ */
+static pt_entry_t *pt_crashdumpmap;
+static caddr_t crashdumpmap;
+
 #ifdef SMP
 extern pt_entry_t *SMPpt;
 #else
@@ -279,6 +285,7 @@ pmap_bootstrap(firstaddr, loadaddr)
 #ifdef SMP
 	struct globaldata *gd;
 #endif
+	int i;
 
 	avail_start = firstaddr;
 
@@ -330,6 +337,11 @@ pmap_bootstrap(firstaddr, loadaddr)
 	SYSMAP(caddr_t, CMAP2, CADDR2, 1)
 
 	/*
+	 * Crashdump maps.
+	 */
+	SYSMAP(caddr_t, pt_crashdumpmap, crashdumpmap, MAXDUMPPGS);
+
+	/*
 	 * ptvmmap is used for reading arbitrary physical pages via /dev/mem.
 	 * XXX ptmmap is not used.
 	 */
@@ -352,8 +364,8 @@ pmap_bootstrap(firstaddr, loadaddr)
 	virtual_avail = va;
 
 	*(int *) CMAP1 = *(int *) CMAP2 = 0;
-	*(int *) PTD = 0;
-
+	for (i = 0; i < NKPT; i++)
+		PTD[i] = 0;
 
 	pgeflag = 0;
 #if !defined(SMP)			/* XXX - see also mp_machdep.c */
@@ -2227,10 +2239,10 @@ retry:
  * to be used for panic dumps.
  */
 void *
-pmap_kenter_temporary(vm_offset_t pa)
+pmap_kenter_temporary(vm_offset_t pa, int i)
 {
-	pmap_kenter((vm_offset_t)CADDR1, pa);
-	return ((void *)CADDR1);
+	pmap_kenter((vm_offset_t)crashdumpmap + (i * PAGE_SIZE), pa);
+	return ((void *)crashdumpmap);
 }
 
 #define MAX_INIT_PT (96)

@@ -1,6 +1,6 @@
 #!/bin/sh -
 #
-# $FreeBSD: src/sys/boot/common/newvers.sh,v 1.1.2.1 2000/07/06 23:29:47 obrien Exp $
+# $FreeBSD: src/sys/boot/common/newvers.sh,v 1.1.2.2 2001/03/05 13:08:45 ru Exp $
 #	$NetBSD: newvers.sh,v 1.1 1997/07/26 01:50:38 thorpej Exp $
 #
 # Copyright (c) 1984, 1986, 1990, 1993
@@ -36,7 +36,7 @@
 #
 #	@(#)newvers.sh	8.1 (Berkeley) 4/20/94
 
-LC_TIME=C; export LC_TIME
+LC_ALL=C; export LC_ALL
 u=${USER-root} h=`hostname` t=`date`
 #r=`head -n 6 $1 | tail -n 1 | awk -F: ' { print $1 } '`
 r=`awk -F: ' /^[0-9]\.[0-9]+:/ { print $1; exit }' $1`

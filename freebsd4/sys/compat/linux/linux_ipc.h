@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_ipc.h,v 1.2.2.2 2000/11/02 23:31:28 obrien Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_ipc.h,v 1.2.2.3 2000/11/22 16:22:44 gallatin Exp $
  */
 
 #ifndef _LINUX_IPC_H_
@@ -60,6 +60,6 @@ int linux_shmat  __P((struct proc *, struct linux_shmat_args *));
 int linux_shmctl __P((struct proc *, struct linux_shmctl_args *));
 int linux_shmdt  __P((struct proc *, struct linux_shmdt_args *));
 int linux_shmget __P((struct proc *, struct linux_shmget_args *));
-#endif	/*__alpha__*/
+#endif	/*!__alpha__*/
 
 #endif /* _LINUX_IPC_H_ */

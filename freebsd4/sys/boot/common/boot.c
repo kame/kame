@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/boot.c,v 1.15.2.4 2000/10/28 01:04:41 gallatin Exp $
+ * $FreeBSD: src/sys/boot/common/boot.c,v 1.15.2.5 2000/12/28 13:12:33 ps Exp $
  */
 
 /*
@@ -38,7 +38,7 @@
 static char	*getbootfile(int try);
 
 /* List of kernel names to try (may be overwritten by boot.config) XXX should move from here? */
-static char *default_bootfiles = "kernel;kernel.old";
+static const char *default_bootfiles = "kernel;kernel.old";
 
 static int autoboot_tried;
 
@@ -53,7 +53,6 @@ command_boot(int argc, char *argv[])
     struct loaded_module	*km;
     char			*cp;
     int				try;
-    int				i;
     
     /*
      * See if the user has specified an explicit kernel to boot.
@@ -164,7 +163,7 @@ autoboot_maybe()
 }
 
 int
-autoboot(int delay, char *prompt)
+autoboot(int timeout, char *prompt)
 {
     time_t	when, otime, ntime;
     int		c, yes;
@@ -172,19 +171,19 @@ autoboot(int delay, char *prompt)
 
     autoboot_tried = 1;
 
-    if (delay == -1) {
+    if (timeout == -1) {
 	/* try to get a delay from the environment */
 	if ((cp = getenv("autoboot_delay"))) {
-	    delay = strtol(cp, &ep, 0);
+	    timeout = strtol(cp, &ep, 0);
 	    if (cp == ep)
-		delay = -1;
+		timeout = -1;
 	}
     }
-    if (delay == -1)		/* all else fails */
-	delay = 10;
+    if (timeout == -1)		/* all else fails */
+	timeout = 10;
 
     otime = time(NULL);
-    when = otime + delay;	/* when to boot */
+    when = otime + timeout;	/* when to boot */
     yes = 0;
 
     /* XXX could try to work out what we might boot */
@@ -228,7 +227,7 @@ getbootfile(int try)
 {
     static char *name = NULL;
     char	*spec, *ep;
-    int		len;
+    size_t	len;
     
     /* we use dynamic storage */
     if (name != NULL) {

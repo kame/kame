@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_disksubr.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/ufs/ufs/ufs_disksubr.c,v 1.44 1999/09/13 12:59:41 bde Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_disksubr.c,v 1.44.2.3 2001/03/05 05:42:19 obrien Exp $
  */
 
 #include <sys/param.h>
@@ -323,23 +323,6 @@ done:
 }
 
 /*
- * Compute checksum for disk label.
- */
-u_int
-dkcksum(lp)
-	register struct disklabel *lp;
-{
-	register u_short *start, *end;
-	register u_short sum = 0;
-
-	start = (u_short *)lp;
-	end = (u_short *)&lp->d_partitions[lp->d_npartitions];
-	while (start < end)
-		sum ^= *start++;
-	return (sum);
-}
-
-/*
  * Disk error is the preface to plaintive error messages
  * about failing disk transfers.  It prints messages of the form
 
@@ -355,36 +338,30 @@ hp0g: hard error reading fsbn 12345 of 12344-12347 (hp0 bn %d cn %d tn %d sn %d)
  */
 void
 diskerr(bp, what, pri, blkdone, lp)
-	register struct buf *bp;
+	struct buf *bp;
 	char *what;
 	int pri, blkdone;
-	register struct disklabel *lp;
+	struct disklabel *lp;
 {
 	int unit = dkunit(bp->b_dev);
 	int slice = dkslice(bp->b_dev);
 	int part = dkpart(bp->b_dev);
-	register int (*pr) __P((const char *, ...));
 	char partname[2];
 	char *sname;
 	daddr_t sn;
 
-	if (pri != LOG_PRINTF) {
-		log(pri, "%s", "");
-		pr = addlog;
-	} else
-		pr = printf;
 	sname = dsname(bp->b_dev, unit, slice, part, partname);
-	(*pr)("%s%s: %s %sing fsbn ", sname, partname, what,
+	printf("%s%s: %s %sing fsbn ", sname, partname, what,
 	      bp->b_flags & B_READ ? "read" : "writ");
 	sn = bp->b_blkno;
 	if (bp->b_bcount <= DEV_BSIZE)
-		(*pr)("%ld", (long)sn);
+		printf("%ld", (long)sn);
 	else {
 		if (blkdone >= 0) {
 			sn += blkdone;
-			(*pr)("%ld of ", (long)sn);
+			printf("%ld of ", (long)sn);
 		}
-		(*pr)("%ld-%ld", (long)bp->b_blkno,
+		printf("%ld-%ld", (long)bp->b_blkno,
 		    (long)(bp->b_blkno + (bp->b_bcount - 1) / DEV_BSIZE));
 	}
 	if (lp && (blkdone >= 0 || bp->b_bcount <= lp->d_secsize)) {
@@ -399,10 +376,10 @@ diskerr(bp, what, pri, blkdone, lp)
 		 * independent of slices, labels and bad sector remapping,
 		 * but some drivers don't set bp->b_pblkno.
 		 */
-		(*pr)(" (%s bn %ld; cn %ld", sname, (long)sn,
+		printf(" (%s bn %ld; cn %ld", sname, (long)sn,
 		    (long)(sn / lp->d_secpercyl));
 		sn %= (long)lp->d_secpercyl;
-		(*pr)(" tn %ld sn %ld)", (long)(sn / lp->d_nsectors),
+		printf(" tn %ld sn %ld)", (long)(sn / lp->d_nsectors),
 		    (long)(sn % lp->d_nsectors));
 	}
 }

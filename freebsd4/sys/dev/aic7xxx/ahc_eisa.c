@@ -2,7 +2,7 @@
  * FreeBSD, EISA product support functions
  * 
  *
- * Copyright (c) 1994, 1995, 1996, 1997, 1998, 2000 Justin T. Gibbs.
+ * Copyright (c) 1994-1998, 2000, 2001 Justin T. Gibbs.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,9 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ahc_eisa.c,v 1.1.1.2 2000/11/21 08:39:02 kawa Exp $
+ * $Id: ahc_eisa.c,v 1.1.1.3 2001/04/23 13:09:46 sumikawa Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.15.2.1 2000/09/23 00:23:59 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.15.2.4 2001/03/12 14:57:40 gibbs Exp $
  */
 
 #include <dev/aic7xxx/aic7xxx_freebsd.h>
@@ -59,6 +59,7 @@ aic7770_probe(device_t dev)
 
 	eisa_add_iospace(dev, iobase, AHC_EISA_IOSIZE, RESVADDR_NONE);
 
+	rid = 0;
 	regs = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
 				0, ~0, 1, RF_ACTIVE);
 	if (regs == NULL) {
@@ -122,9 +123,11 @@ aic7770_attach(device_t dev)
 	if (name == NULL)
 		return (ENOMEM);
 	strcpy(name, device_get_nameunit(dev));
-	ahc = ahc_alloc(NULL, name);
+	ahc = ahc_alloc(dev, name);
 	if (ahc == NULL)
 		return (ENOMEM);
+
+	ahc_set_unit(ahc, device_get_unit(dev));
 
 	/* Allocate a dmatag for our SCB DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
@@ -161,6 +164,7 @@ aic7770_map_registers(struct ahc_softc *ahc)
 	struct	resource *regs;
 	int	rid;
 
+	rid = 0;
 	regs = bus_alloc_resource(ahc->dev_softc, SYS_RES_IOPORT,
 				  &rid, 0, ~0, 1, RF_ACTIVE);
 	if (regs == NULL) {
@@ -176,7 +180,7 @@ aic7770_map_registers(struct ahc_softc *ahc)
 }
 
 int
-aic7770_map_int(struct ahc_softc *ahc)
+aic7770_map_int(struct ahc_softc *ahc, int irq)
 {
 	int zero;
 
@@ -194,14 +198,14 @@ static device_method_t ahc_eisa_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		aic7770_probe),
 	DEVMETHOD(device_attach,	aic7770_attach),
-
+	DEVMETHOD(device_detach,	ahc_detach),
 	{ 0, 0 }
 };
 
 static driver_t ahc_eisa_driver = {
 	"ahc",
 	ahc_eisa_methods,
-	1,			/* unused */
+	sizeof(struct ahc_softc)
 };
 
 static devclass_t ahc_devclass;

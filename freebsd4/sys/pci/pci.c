@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pci.c,v 1.141.2.4 2000/10/28 23:10:17 msmith Exp $
+ * $FreeBSD: src/sys/pci/pci.c,v 1.141.2.6 2001/02/20 11:13:03 kris Exp $
  *
  */
 
@@ -907,7 +907,7 @@ pci_compat_attach(device_t dev)
 		*dvp->pd_count = unit;
 	if (dvp->pd_attach)
 		dvp->pd_attach(cfg, unit);
-	device_printf(dev, "driver is using old-style compatability shims\n");
+	device_printf(dev, "driver is using old-style compatibility shims\n");
 	return 0;
 }
 

@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/copyright.h,v 1.10.2.1 2000/07/07 18:33:50 obrien Exp $
+ * $FreeBSD: src/sys/sys/copyright.h,v 1.10.2.3 2001/03/05 10:13:24 obrien Exp $
  */
 
 
@@ -30,7 +30,7 @@
   
 /* FreeBSD */
 #define COPYRIGHT_FreeBSD \
-	"Copyright (c) 1992-2000 The FreeBSD Project.\n"
+	"Copyright (c) 1992-2001 The FreeBSD Project.\n"
 
 /* Berkeley */
 #define COPYRIGHT_UCB \
@@ -38,18 +38,9 @@
 
 /* a port of FreeBSD to the NEC PC98, Japan */
 #define COPYRIGHT_PC98 \
-	"Copyright (c) 1994-2000 FreeBSD(98) porting team.\nCopyright (c) 1992  A.Kojima F.Ukai M.Ishii (KMC).\n"
+	"Copyright (c) 1994-2001 FreeBSD(98) porting team.\nCopyright (c) 1992  A.Kojima F.Ukai M.Ishii (KMC).\n"
 
-/* HP + Motorola */
-#define COPYRIGHT_HPFPLIB \
-	"Copyright (c) 1992 Hewlett-Packard Company.\nCopyright (c) 1992 Motorola Inc.\nAll rights reserved.\n"
-
-
-
-#if defined(HPFPLIB)
-char copyright[] = COPYRIGHT_UCB/**/COPYRIGHT_HPFPLIB;
-
-#elif defined(PC98)
+#if defined(PC98)
 char copyright[] = COPYRIGHT_FreeBSD/**/COPYRIGHT_PC98/**/COPYRIGHT_UCB;
 
 #else
