@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.4 2001/10/26 08:48:54 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.5 2001/11/19 09:25:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,8 +84,8 @@ static const char *bc_desc[] = {
 };
 #endif /* MIP6_DRAFT13 */
 static const char *ipaddr_fmt[] = {
-	"%15.15s ",
-	"%31.31s "
+	"%-15.15s ",
+	"%-31s "
 };
 
 int
@@ -224,7 +224,7 @@ main(argc, argv)
 		for (i = 0; i < ifr->ifr_count; i++) {
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mpfx->mpfx_prefix));
-			printf("%7u %7u %7qd",
+			printf("%7u %7u %7qd ",
 			       mpfx->mpfx_prefixlen,
 			       mpfx->mpfx_lifetime,
 			       mpfx->mpfx_remain);
