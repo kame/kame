@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.54 2000/01/17 10:50:07 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.55 2000/01/17 10:54:23 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -202,8 +202,10 @@ SYSCTL_INT(_net_key, KEYCTL_BLOCKACQ_LIFETIME,	blockacq_lifetime, CTLFLAG_RW, \
 typedef void (timeout_t)(void *);
 #endif
 
-#define __LIST_FOREACH(elm, head, field)                                     \
+#ifndef LIST_FOREACH
+#define LIST_FOREACH(elm, head, field)                                     \
 	for (elm = LIST_FIRST(head); elm; elm = LIST_NEXT(elm, field))
+#endif
 #define __LIST_CHAINED(elm) \
 	(!((elm)->chain.le_next == NULL && (elm)->chain.le_prev == NULL))
 #define LIST_INSERT_TAIL(head, elm, type, field) \
@@ -431,7 +433,7 @@ key_allocsp(spidx, dir)
 		printf("*** objects\n");
 		kdebug_secpolicyindex(spidx));
 
-	__LIST_FOREACH(sp, &sptree[dir], chain) {
+	LIST_FOREACH(sp, &sptree[dir], chain) {
 		KEYDEBUG(KEYDEBUG_IPSEC_DATA,
 			printf("*** in SPD\n");
 			kdebug_secpolicyindex(&sp->spidx));
@@ -540,7 +542,7 @@ key_allocsa_policy(saidx)
 	struct secasvar *sav;
 	u_int stateidx, state;
 
-	__LIST_FOREACH(sah, &sahtree, chain) {
+	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
 		if (key_cmpsaidx_withmode(&sah->saidx, saidx))
@@ -583,7 +585,7 @@ key_do_allocsa_policy(sah, state)
 	/* initilize */
 	candidate = NULL;
 
-	__LIST_FOREACH(sav, &sah->savtree[state], chain) {
+	LIST_FOREACH(sav, &sah->savtree[state], chain) {
 
 		/* sanity check */
 		KEY_CHKSASTATE(sav->state, state, "key_do_allocsa_policy");
@@ -660,7 +662,7 @@ key_allocsa(family, src, dst, proto, spi)
 #else
 	s = splnet();	/*called from softclock()*/
 #endif
-	__LIST_FOREACH(sah, &sahtree, chain) {
+	LIST_FOREACH(sah, &sahtree, chain) {
 
 		/* search valid state */
 		for (stateidx = 0;
@@ -668,7 +670,7 @@ key_allocsa(family, src, dst, proto, spi)
 		     stateidx++) {
 
 			state = saorder_state_valid[stateidx];
-			__LIST_FOREACH(sav, &sah->savtree[state], chain) {
+			LIST_FOREACH(sav, &sah->savtree[state], chain) {
 
 				/* sanity check */
 				KEY_CHKSASTATE(sav->state, state, "key_allocsav");
@@ -904,7 +906,7 @@ key_getsp(spidx)
 	if (spidx == NULL)
 		panic("key_getsp: NULL pointer is passed.\n");
 
-	__LIST_FOREACH(sp, &sptree[spidx->dir], chain) {
+	LIST_FOREACH(sp, &sptree[spidx->dir], chain) {
 		if (sp->state == IPSEC_SPSTATE_DEAD)
 			continue;
 		if (key_cmpspidx_exactly(spidx, &sp->spidx)) {
@@ -1509,7 +1511,7 @@ key_spdflush(mhp)
 	msg0 = (struct sadb_msg *)mhp[0];
 
 	for (dir = 0; dir < IPSEC_DIR_MAX; dir++) {
-		__LIST_FOREACH(sp, &sptree[dir], chain) {
+		LIST_FOREACH(sp, &sptree[dir], chain) {
 			sp->state = IPSEC_SPSTATE_DEAD;
 		}
 	}
@@ -1571,7 +1573,7 @@ key_spddump(mhp, so, target)
 	/* search SPD entry and get buffer size. */
 	cnt = 0;
 	for (dir = 0; dir < IPSEC_DIR_MAX; dir++) {
-		__LIST_FOREACH(sp, &sptree[dir], chain) {
+		LIST_FOREACH(sp, &sptree[dir], chain) {
 			cnt++;
 		}
 	}
@@ -1580,7 +1582,7 @@ key_spddump(mhp, so, target)
 		return ENOENT;
 
 	for (dir = 0; dir < IPSEC_DIR_MAX; dir++) {
-		__LIST_FOREACH(sp, &sptree[dir], chain) {
+		LIST_FOREACH(sp, &sptree[dir], chain) {
 			--cnt;
 			m = key_setdumpsp(sp, SADB_X_SPDDUMP,
 			                    cnt, msg0->sadb_msg_pid);
@@ -1991,7 +1993,7 @@ key_getsah(saidx)
 {
 	struct secashead *sah;
 
-	__LIST_FOREACH(sah, &sahtree, chain) {
+	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
 		if (key_cmpsaidx_exactly(&sah->saidx, saidx))
@@ -2023,7 +2025,7 @@ key_checkspidup(saidx, spi)
 	}
 
 	/* check all SAD */
-	__LIST_FOREACH(sah, &sahtree, chain) {
+	LIST_FOREACH(sah, &sahtree, chain) {
 		if (!key_ismyaddr(sah->saidx.dst.ss_family,
 		                  _INADDRBYSA(&sah->saidx.dst)))
 			continue;
@@ -2055,7 +2057,7 @@ key_getsavbyspi(sah, spi)
 	     stateidx++) {
 
 		state = saorder_state_alive[stateidx];
-		__LIST_FOREACH(sav, &sah->savtree[state], chain) {
+		LIST_FOREACH(sav, &sah->savtree[state], chain) {
 
 			/* sanity check */
 			if (sav->state != state) {
@@ -3966,7 +3968,7 @@ key_getsavbyseq(sah, seq)
 	state = SADB_SASTATE_LARVAL;
 
 	/* search SAD with sequence number ? */
-	__LIST_FOREACH(sav, &sah->savtree[state], chain) {
+	LIST_FOREACH(sav, &sah->savtree[state], chain) {
 
 		KEY_CHKSASTATE(state, sav->state, "key_getsabyseq");
 
@@ -4703,7 +4705,7 @@ key_getacq(saidx)
 {
 	struct secacq *acq;
 
-	__LIST_FOREACH(acq, &acqtree, chain) {
+	LIST_FOREACH(acq, &acqtree, chain) {
 		if (key_cmpsaidx_exactly(saidx, &acq->saidx))
 			return acq;
 	}
@@ -4717,7 +4719,7 @@ key_getacqbyseq(seq)
 {
 	struct secacq *acq;
 
-	__LIST_FOREACH(acq, &acqtree, chain) {
+	LIST_FOREACH(acq, &acqtree, chain) {
 		if (acq->seq == seq)
 			return acq;
 	}
@@ -4881,7 +4883,7 @@ key_register(mhp, so)
 		goto setmsg;
 
 	/* check whether existing or not */
-	__LIST_FOREACH(reg, &regtree[msg0->sadb_msg_satype], chain) {
+	LIST_FOREACH(reg, &regtree[msg0->sadb_msg_satype], chain) {
 		if (reg->so == so) {
 			printf("key_register: socket exists already.\n");
 			msg0->sadb_msg_errno = EEXIST;
@@ -5018,7 +5020,7 @@ key_freereg(so)
 	 * one socket is registered to multiple type of SA.
 	 */
 	for (i = 0; i <= SADB_SATYPE_MAX; i++) {
-		__LIST_FOREACH(reg, &regtree[i], chain) {
+		LIST_FOREACH(reg, &regtree[i], chain) {
 			if (reg->so == so
 			 && __LIST_CHAINED(reg)) {
 				LIST_REMOVE(reg, chain);
@@ -5268,7 +5270,7 @@ key_dump(mhp, so, target)
 
 	/* count sav entries to be sent to the userland. */
 	cnt = 0;
-	__LIST_FOREACH(sah, &sahtree, chain) {
+	LIST_FOREACH(sah, &sahtree, chain) {
 
 		if (msg0->sadb_msg_satype != SADB_SATYPE_UNSPEC
 		 && proto != sah->saidx.proto)
@@ -5279,7 +5281,7 @@ key_dump(mhp, so, target)
 		     stateidx++) {
 
 			state = saorder_state_any[stateidx];
-			__LIST_FOREACH(sav, &sah->savtree[state], chain) {
+			LIST_FOREACH(sav, &sah->savtree[state], chain) {
 				cnt++;
 			}
 		}
@@ -5290,7 +5292,7 @@ key_dump(mhp, so, target)
 
 	/* send this to the userland, one at a time. */
 	newmsg = NULL;
-	__LIST_FOREACH(sah, &sahtree, chain) {
+	LIST_FOREACH(sah, &sahtree, chain) {
 
 		if (msg0->sadb_msg_satype != SADB_SATYPE_UNSPEC
 		 && proto != sah->saidx.proto)
@@ -5308,7 +5310,7 @@ key_dump(mhp, so, target)
 		     stateidx++) {
 
 			state = saorder_state_any[stateidx];
-			__LIST_FOREACH(sav, &sah->savtree[state], chain) {
+			LIST_FOREACH(sav, &sah->savtree[state], chain) {
 
 				len = key_getmsglen(sav);
 				KMALLOC(newmsg, struct sadb_msg *, len);
@@ -5417,7 +5419,7 @@ key_sendall(msg, len)
 		panic("key_sendall: NULL pointer is passed.\n");
 
 	/* search table registerd socket to send a message. */
-	__LIST_FOREACH(reg, &regtree[msg->sadb_msg_satype], chain) {
+	LIST_FOREACH(reg, &regtree[msg->sadb_msg_satype], chain) {
 		error = key_sendup(reg->so, msg, len, KEY_SENDUP_ONE);
 		if (error != 0) {
 			if (error == ENOBUFS)
@@ -6051,7 +6053,7 @@ key_sa_routechange(dst)
 	struct secashead *sah;
 	struct route *ro;
 
-	__LIST_FOREACH(sah, &sahtree, chain) {
+	LIST_FOREACH(sah, &sahtree, chain) {
 		ro = &sah->sa_route;
 		if (ro->ro_rt && dst->sa_len == ro->ro_dst.sa_len
 		 && bcmp(dst, &ro->ro_dst, dst->sa_len) == 0) {
