@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.266 2002/02/09 06:57:58 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.267 2002/02/26 03:28:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,8 +303,7 @@ in6_ifremloop(struct ifaddr *ifa)
 	 * (see comments in net/net_osdep.h).  Even for variants that do remove
 	 * cloned routes, they could fail to remove the cloned routes when
 	 * we handle multple addresses that share a common prefix.
-	 * So, we should remove the route corresponding to the deleted address
-	 * regardless of the result of in6_is_ifloop_auto().
+	 * So, we should remove the route corresponding to the deleted address.
 	 */
 
 	/*
@@ -2028,12 +2027,6 @@ in6_ifinit(ifp, ia, sin6, newhost)
 				    RTF_UP | RTF_HOST)) != 0)
 			return(error);
 		ia->ia_flags |= IFA_ROUTE;
-	}
-	if (plen < 128) {
-		/*
-		 * The RTF_CLONING flag is necessary for in6_is_ifloop_auto().
-		 */
-		ia->ia_ifa.ifa_flags |= RTF_CLONING;
 	}
 
 	/* Add ownaddr as loopback rtentry, if necessary (ex. on p2p link). */
