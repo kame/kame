@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.181 2001/02/02 19:09:43 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.182 2001/02/02 19:16:45 itojun Exp $
 
 1. IPv6
 
@@ -1759,7 +1759,8 @@ The KAME developers basically do not make a bother about coding
 style.  However, there is still some agreement on the style, in order
 to make the distribute develoment smooth.
 
-- the tab character should be 8-byte long.
+- the tab character should be 8 columns wide (tabstops are at 8, 16, 24, ...
+  column).  With vi, use ":set ts=8 sw=8".
 - each line should be within 80 characters.
 - keep a single open/close bracket in a comment such as the following
   line:
