@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.83 2001/01/05 16:00:15 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.84 2001/01/05 16:23:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -313,12 +313,11 @@ getaddrinfo(hostname, servname, hints, res)
 	struct addrinfo sentinel;
 	struct addrinfo *cur;
 	int error = 0;
-	struct addrinfo ai;
-	struct addrinfo ai0;
+	struct addrinfo ai, ai0, *afai;
 	struct addrinfo *pai;
 	const struct afd *afd;
 	const struct explore *ex;
-	struct addrinfo *afai[sizeof(afdl)/sizeof(afdl[0])];
+	struct addrinfo *afailist[sizeof(afdl)/sizeof(afdl[0])];
 
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
@@ -474,12 +473,9 @@ getaddrinfo(hostname, servname, hints, res)
 
 	/*
 	 * hostname as alphabetical name.
-	 * we would like to prefer AF_INET6 than AF_INET, so we'll make a
-	 * outer loop by AFs.
+	 * first, try to query DNS for all possible address families.
 	 */
-
-	/* first, try to query DNS for all possible address families */
-	memset(afai, 0, sizeof(afai));
+	memset(afailist, 0, sizeof(afailist));
 	for (afd = afdl; afd->a_af; afd++) {
 		*pai = ai0;
 
@@ -500,52 +496,60 @@ getaddrinfo(hostname, servname, hints, res)
 			pai->ai_family = afd->a_af;
 
 		error = explore_fqdn(pai, hostname, servname,
-		    &afai[afd - afdl]);
+		    &afailist[afd - afdl]);
 	}
 
-	for (afd = afdl; afd->a_af; afd++) {
+	/*
+	 * we would like to prefer AF_INET6 than AF_INET, so we'll make an
+	 * outer loop by AFs.
+	 */
+	for (ex = explore; ex->e_af >= 0; ex++) {
 		*pai = ai0;
 
-		if (!MATCH_FAMILY(pai->ai_family, afd->a_af, 1))
+		if (pai->ai_family == PF_UNSPEC)
+			pai->ai_family = ex->e_af;
+
+		if (!MATCH_FAMILY(pai->ai_family, ex->e_af, WILD_AF(ex)))
+			continue;
+		if (!MATCH(pai->ai_socktype, ex->e_socktype,
+			   WILD_SOCKTYPE(ex))) {
+			continue;
+		}
+		if (!MATCH(pai->ai_protocol, ex->e_protocol,
+			   WILD_PROTOCOL(ex))) {
+			continue;
+		}
+
+		if (pai->ai_family == PF_UNSPEC)
+			pai->ai_family = ex->e_af;
+		if (pai->ai_socktype == ANY && ex->e_socktype != ANY)
+			pai->ai_socktype = ex->e_socktype;
+		if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
+			pai->ai_protocol = ex->e_protocol;
+
+		/*
+		 * if the servname does not match socktype/protocol, ignore it.
+		 */
+		if (get_portmatch(pai, servname) != 0)
 			continue;
 
-		for (ex = explore; ex->e_af >= 0; ex++) {
-			*pai = ai0;
+		if ((afd = find_afd(pai->ai_family)) == NULL)
+			continue;
+		/* XXX assumes that afd points inside afdl[] */
+		afai = afailist[afd - afdl];
+		if (!afai)
+			continue;
 
-			if (pai->ai_family == PF_UNSPEC)
-				pai->ai_family = afd->a_af;
+		error = explore_copy(pai, afai, &cur->ai_next);
 
-			if (!MATCH_FAMILY(pai->ai_family, ex->e_af,
-			    WILD_AF(ex)))
-				continue;
-			if (!MATCH(pai->ai_socktype, ex->e_socktype,
-			    WILD_SOCKTYPE(ex))) {
-				continue;
-			}
-			if (!MATCH(pai->ai_protocol, ex->e_protocol,
-			    WILD_PROTOCOL(ex))) {
-				continue;
-			}
-
-			if (pai->ai_family == PF_UNSPEC)
-				pai->ai_family = ex->e_af;
-			if (pai->ai_socktype == ANY && ex->e_socktype != ANY)
-				pai->ai_socktype = ex->e_socktype;
-			if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
-				pai->ai_protocol = ex->e_protocol;
-
-			error = explore_copy(pai, afai[afd - afdl],
-			    &cur->ai_next);
-
-			while (cur && cur->ai_next)
-				cur = cur->ai_next;
-		}
+		while (cur && cur->ai_next)
+			cur = cur->ai_next;
 	}
 
 	/* clean it up */
 	for (afd = afdl; afd->a_af; afd++) {
-		if (afai[afd - afdl])
-			freeaddrinfo(afai[afd - afdl]);
+		if (afailist[afd - afdl])
+			freeaddrinfo(afailist[afd - afdl]);
 	}
 
 	/* XXX */
