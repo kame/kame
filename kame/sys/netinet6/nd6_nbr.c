@@ -62,6 +62,10 @@
 #include <netinet6/nd6.h>
 #include <netinet6/icmp6.h>
 
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
+
 #include <net/net_osdep.h>
 
 #define SDL(s) ((struct sockaddr_dl *)s)
@@ -975,10 +979,16 @@ nd6_dad_start(ifa, tick)
 	} else {
 		int ntick;
 
+#ifdef __OpenBSD__
+#define random	arc4random
+#endif
 		if (*tick == 0)
 			ntick = random() % (MAX_RTR_SOLICITATION_DELAY * hz);
 		else
 			ntick = *tick + random() % (hz / 2);
+#ifdef __OpenBSD__
+#undef random
+#endif
 		*tick = ntick;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		dp->dad_timer =

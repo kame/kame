@@ -51,6 +51,10 @@
 #endif
 #include <netinet6/icmp6.h>
 
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
+
 #include <net/net_osdep.h>
 
 /*
@@ -81,6 +85,7 @@ MALLOC_DEFINE(M_FTABLE, "fragment", "fragment reassembly header");
 void
 frag6_init()
 {
+#ifndef __OpenBSD__
 	struct timeval tv;
 
 	/*
@@ -88,8 +93,11 @@ frag6_init()
 	 * as initialization during bootstrap time occur in fixed order.
 	 */
 	microtime(&tv);
-	ip6q.ip6q_next = ip6q.ip6q_prev = &ip6q;
 	ip6_id = random() ^ tv.tv_usec;
+#else
+	ip6_id = arc4random();
+#endif
+	ip6q.ip6q_next = ip6q.ip6q_prev = &ip6q;
 }
 
 /*

@@ -124,6 +124,10 @@
 
 #include <netinet6/ip6protosw.h>
 
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
+
 /* we need it for NLOOP. */
 #ifndef __bsdi__
 #include "loop.h"
@@ -189,7 +193,9 @@ ip6_init()
 {
 	register struct ip6protosw *pr;
 	register int i;
+#ifndef __OpenBSD__
 	struct timeval tv;
+#endif
 
 	pr = (struct ip6protosw *)pffindproto(PF_INET6, IPPROTO_RAW, SOCK_RAW);
 	if (pr == 0)
@@ -207,12 +213,16 @@ ip6_init()
 #ifdef IPV6FIREWALL
 	ip6_fw_init();
 #endif
+#ifndef __OpenBSD__
 	/*
 	 * in many cases, random() here does NOT return random number
 	 * as initialization during bootstrap time occur in fixed order.
 	 */
 	microtime(&tv);
 	ip6_flow_seq = random() ^ tv.tv_usec;
+#else
+	ip6_flow_seq = arc4random();
+#endif
 
 #ifndef __FreeBSD__
 	ip6_init2((void *)0);
