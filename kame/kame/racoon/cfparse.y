@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.113 2002/09/27 05:55:52 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.114 2003/02/03 08:27:50 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -577,7 +577,7 @@ algorithm
 
 			$$ = newsainfoalg();
 			if ($$ == NULL) {
-				yyerror("failed to get algorithm alocation");
+				yyerror("failed to get algorithm allocation");
 				return -1;
 			}
 
