@@ -1,4 +1,4 @@
-/*	$KAME: rrenum.c,v 1.6 2000/11/08 07:08:46 jinmei Exp $	*/
+/*	$KAME: rrenum.c,v 1.7 2000/11/11 06:54:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -430,9 +430,41 @@ rr_input(int len, struct icmp6_router_renum *rr, struct in6_pktinfo *pi,
 	       inet_ntop(AF_INET6, &dst, ntopbuf[1], INET6_ADDRSTRLEN),
 	       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 
-	rr_rcvifindex = pi->ipi6_ifindex;
+	/* packet validation based on Section 4.1 of RFC2894 */
+	if (len < sizeof(struct icmp6_router_renum)) {
+		syslog(LOG_NOTICE,
+		       "<%s>: RR short message (size %d) from %s to %s on %s",
+		       __FUNCTION__,
+		       inet_ntop(AF_INET6, &from->sin6_addr,
+				 ntopbuf[0], INET6_ADDRSTRLEN),
+		       inet_ntop(AF_INET6, &dst, ntopbuf[1], INET6_ADDRSTRLEN),
+		       if_indextoname(pi->ipi6_ifindex, ifnamebuf),
+		       len);
+		return;
+	}
 
-	/* TODO: some consistency check. */
+	/*
+	 * If the IPv6 destination address is neither an All Routers multicast
+	 * address [AARCH] nor one of the receiving router's unicast addresses,
+	 * the message MUST be discarded and SHOULD be logged to network
+	 * management.
+	 * We rely on the kernel input routine for unicast addresses, and thus
+	 * check multicast destinations only.
+	 */
+	if (IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr) &&
+	    !IN6_ARE_ADDR_EQUAL(&in6a_site_allrouters, &pi->ipi6_addr)) {
+		syslog(LOG_NOTICE,
+		       "<%s>: RR message with invalid destination (%s) "
+		       "from %s on %s",
+		       __FUNCTION__,
+		       inet_ntop(AF_INET6, &dst, ntopbuf[0], INET6_ADDRSTRLEN),
+		       inet_ntop(AF_INET6, &from->sin6_addr,
+				 ntopbuf[1], INET6_ADDRSTRLEN),
+		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
+		return;
+	}
+
+	rr_rcvifindex = pi->ipi6_ifindex;
 
 	switch (rr->rr_code) {
 	case ICMP6_ROUTER_RENUMBERING_COMMAND:
