@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.70 2002/10/11 07:01:45 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.71 2002/10/23 09:39:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -604,6 +604,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		m_freem(m);
 		bi.mbc_status = IP6MA_STATUS_INVAL_AUTHENTICATOR;
 		bi.mbc_send_ba = 1;
+		error = EINVAL;
 		goto send_ba;
 	}
 #ifdef __NetBSD__
@@ -668,6 +669,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			 */
 			bi.mbc_status = IP6MA_STATUS_SEQNO_TOO_SMALL;
 			bi.mbc_send_ba = 1;
+			error = EINVAL;
 
 			/* discard. */
 			m_freem(m);
