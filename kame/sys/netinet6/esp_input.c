@@ -255,8 +255,12 @@ esp4_input(m, va_alist)
 	}
 
 	/* strip off */
+#if 1
+	m_adj(m, -siz);
+#else
 	m->m_pkthdr.len -= siz;
 	n->m_len -= siz;
+#endif
 	ip = mtod(m, struct ip *);
 #ifdef IPLEN_FLIPPED
 	ip->ip_len = ip->ip_len - siz;
@@ -415,6 +419,9 @@ noreplaycheck:
 	/*
 	 * strip off the trailing pad area.
 	 */
+#if 1
+	m_adj(m, -taillen);
+#else
 	if (taillen < n->m_len) {
 		/* trailing pad data is included in the last mbuf item. */
 		n->m_len -= taillen;
@@ -460,6 +467,7 @@ noreplaycheck:
 
 		m->m_pkthdr.len -= taillen;
 	}
+#endif
 
 #ifdef IPLEN_FLIPPED
 	ip->ip_len = ip->ip_len - taillen;
@@ -477,15 +485,9 @@ noreplaycheck:
 		 * XXX more sanity checks
 		 * XXX relationship with gif?
 		 */
-#if 1	/*debug*/
-		struct ip oip;
-#endif
 		u_int8_t tos;
 
 		tos = ip->ip_tos;
-#if 1	/*debug*/
-		bcopy(mtod(m, struct ip *), &oip, sizeof(oip));
-#endif
 		m_adj(m, off + esplen + ivlen);
 		if (m->m_len < sizeof(*ip)) {
 			m = m_pullup(m, sizeof(*ip));
@@ -732,8 +734,12 @@ esp6_input(mp, offp, proto)
 	}
 
 	/* strip off */
+#if 1
+	m_adj(m, -siz);
+#else
 	m->m_pkthdr.len -= siz;
 	n->m_len -= siz;
+#endif
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - siz);
 
@@ -880,6 +886,9 @@ noreplaycheck:
 	/*
 	 * XXX strip off the padding.
 	 */
+#if 1
+	m_adj(m, -taillen);
+#else
 	if (taillen < n->m_len) {
 		/* trailing pad data is included in the last mbuf item. */
 		n->m_len -= taillen;
@@ -925,6 +934,7 @@ noreplaycheck:
 
 		m->m_pkthdr.len -= taillen;
 	}
+#endif
 
 	ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - taillen);
     }
@@ -964,7 +974,7 @@ noreplaycheck:
 			goto bad;
 		}
 
-#if 0 /* XXX should call ipfw rather than ipsec_inn_reject, shouldn't it ? */
+#if 0 /* XXX should call ipfw rather than ipsec_in_reject, shouldn't it ? */
 		/* drop it if it does not match the default policy */
 		if (ipsec6_in_reject(m, NULL)) {
 			ipsec6stat.in_polvio++;

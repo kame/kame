@@ -112,6 +112,7 @@ ah4_input(m, va_alist)
 	proto = va_arg(ap, int);
 	va_end(ap);
 
+#ifndef PULLDOWN_TEST
 	if (m->m_len < off + sizeof(struct newah)) {
 		m = m_pullup(m, off + sizeof(struct newah));
 		if (!m) {
@@ -124,6 +125,16 @@ ah4_input(m, va_alist)
 
 	ip = mtod(m, struct ip *);
 	ah = (struct ah *)(((caddr_t)ip) + off);
+#else
+	ip = mtod(m, struct ip *);
+	IP6_EXTHDR_GET(ah, struct ah *, m, off, sizeof(struct newah));
+	if (ah == NULL) {
+		printf("IPv4 AH input: can't pullup;"
+			"dropping the packet for simplicity\n");
+		ipsecstat.in_inval++;
+		goto fail;
+	}
+#endif
 	nxt = ah->ah_nxt;
 #ifdef _IP_VHL
 	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
@@ -184,6 +195,7 @@ ah4_input(m, va_alist)
 		goto fail;
 	}
 
+#ifndef PULLDOWN_TEST
 	if (m->m_len < off + sizeof(struct ah) + sizoff + siz1) {
 		m = m_pullup(m, off + sizeof(struct ah) + sizoff + siz1);
 		if (!m) {
@@ -196,6 +208,16 @@ ah4_input(m, va_alist)
 		ip = mtod(m, struct ip *);
 		ah = (struct ah *)(((caddr_t)ip) + off);
 	}
+#else
+	IP6_EXTHDR_GET(ah, struct ah *, m, off,
+		sizeof(struct ah) + sizoff + siz1);
+	if (ah == NULL) {
+		printf("IPv4 AH input: can't pullup;"
+			"dropping the packet for simplicity\n");
+		ipsecstat.in_inval++;
+		goto fail;
+	}
+#endif
     }
 
 	/*
@@ -443,6 +465,7 @@ ah4_input(m, va_alist)
 			stripsiz = sizeof(struct newah) + siz1;
 		}
 
+#ifndef PULLDOWN_TEST
 		ip = mtod(m, struct ip *);
 		ovbcopy((caddr_t)ip, (caddr_t)(((u_char *)ip) + stripsiz), off);
 		m->m_data += stripsiz;
@@ -459,7 +482,9 @@ ah4_input(m, va_alist)
 #endif
 		ip->ip_p = nxt;
 		/* forget about IP hdr checksum, the check has already been passed */
-
+#else
+		off += stripsiz;
+#endif
 		if (nxt != IPPROTO_DONE)
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
 		else
