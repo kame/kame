@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.5 2001/09/20 09:59:36 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.6 2001/09/20 10:14:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,9 +154,9 @@ static int hif_subnet_list_update_withmpfx __P((struct hif_softc *, caddr_t));
 static int hif_ha_list_update_withioctl __P((struct hif_softc *, caddr_t));
 
 #ifdef __FreeBSD__
-void hif_attach __P((void *));
+void hifattach __P((void *));
 #else
-void hif_attach __P((int));
+void hifattach __P((int));
 #endif
 #if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
 static void hif_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
@@ -165,11 +165,11 @@ static void hif_rtrequest __P((int, struct rtentry *, struct sockaddr *));
 #endif
 
 #ifdef __FreeBSD__
-PSEUDO_SET(hif_attach, if_hif);
+PSEUDO_SET(hifattach, if_hif);
 #endif
 
 void
-hif_attach(dummy)
+hifattach(dummy)
 #ifdef __FreeBSD__
 	void *dummy;
 #else
