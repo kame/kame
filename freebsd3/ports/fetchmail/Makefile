@@ -1,5 +1,4 @@
 # New ports collection makefile for:	fetchmail
-# Version required:     5.3.8
 # Date created:		26 Oct 1996
 # Whom:			Ville Eerola <ve@sci.fi>
 #
@@ -12,11 +11,11 @@
 # this Makefile.
 
 PORTNAME=	fetchmail
-PORTVERSION=	5.5.1
+PORTVERSION=	5.5.3
 CATEGORIES=	mail
 MASTER_SITES=	ftp://ftp.ccil.org/pub/esr/fetchmail/
 
-MAINTAINER=	ve@sci.fi
+MAINTAINER=	sumikawa@kame.net
 
 GNU_CONFIGURE=	yes
 CONFIGURE_ARGS= --enable-OPIE --enable-RPA --enable-POP2 --enable-SDPS
