@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.57 2002/12/06 04:41:44 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.58 2002/12/11 12:06:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -427,15 +427,29 @@ natpt_openTemporaryRule(int proto, struct pAddr *local, struct pAddr *remote)
 
 	/* session initiator */
 	cst->local.saddr.sa_family = local->sa_family;
-	cst->local.saddr.addr[0] = local->addr[0];	/* initiator address */
-	cst->local.dport   = local->port[1];		/* destination port */
-	cst->Local.aType   = ADDR_SINGLE;
+	if (local->aType == ADDR_ANY) {
+		cst->local.saddr.addr[0] = local->addr[0];	/* initiator address */
+		cst->local.dport   = local->port[1];		/* destination port */
+		cst->Local.aType   = ADDR_SINGLE;
+	} else {
+		cst->local.daddr = local->addr[1];
+		cst->local.dport = local->port[1];		/* destination port */
+		cst->Local.aType = ADDR_ANY;
+		cst->map |= NATPT_REDIRECT_ADDR | NATPT_REDIRECT_PORT;
+	}
 
 	/* address and port after translation */
 	cst->remote.saddr.sa_family = remote->sa_family;
-	cst->remote.saddr.addr[0] = remote->addr[0];
-	cst->remote.dport   = remote->port[0];
-	cst->Remote.aType   = ADDR_SINGLE;
+	if (remote->aType == ADDR_ANY) {
+		cst->remote.saddr.addr[0] = remote->addr[0];
+		cst->remote.dport   = remote->port[0];
+		cst->Remote.aType   = ADDR_SINGLE;
+	} else {
+		cst->remote.daddr = remote->addr[1];
+		cst->remote.dport = remote->port[1];
+		cst->Remote.aType = ADDR_ANY;
+		cst->map |= NATPT_REDIRECT_ADDR | NATPT_REDIRECT_PORT;
+	}
 
 	natpt_prependRule(cst);
 

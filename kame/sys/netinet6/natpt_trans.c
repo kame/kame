@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.157 2002/12/11 05:47:58 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.158 2002/12/11 12:06:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2189,6 +2189,39 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		 */
 		if (natpt_parse229(ftp6.arg, kk, &sin6) == NULL)
 			return (0);
+
+		/*
+		 * Open rule temporary for 4->6 port redirect.
+		 *
+		 * This part which open rule temporary is is
+		 * unnecessary if you do not want to change port
+		 * number with translation rule.
+		 */
+
+		/* v4 side; initiator */
+		bzero(&local, sizeof(struct pAddr));
+		local.sa_family = AF_INET;
+		local.aType = ADDR_REDIRECT;
+		local.addr[1] = ats->local.addr[1];
+		local.port[1] = sin6.sin6_port;
+				/* ats->[0] = v4 server address */
+				/* ats->[1] = v4 client address */
+
+		/* v6 side; responder */
+		bzero(&remote, sizeof(struct pAddr));
+		remote.sa_family = AF_INET6;
+		remote.aType = ADDR_REDIRECT;
+		remote.addr[1] = ats->remote.addr[0];
+		remote.port[1] = sin6.sin6_port;
+			    /* ats->[0] = v6 client address */
+			    /* ats->[1] = v6 server address */
+
+		if (natpt_openTemporaryRule(IPPROTO_TCP, &local, &remote) == 0)
+			return (0);
+
+		/*
+		 * Rewrite FTP reply
+		 */
 
 		/* v4 client side */
 		local = ats->local;

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.61 2002/12/09 08:21:27 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.62 2002/12/11 12:06:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -248,6 +248,7 @@ struct pAddr {
 #define	ADDR_SINGLE		1
 #define	ADDR_MASK		2
 #define	ADDR_RANGE		3
+#define	ADDR_REDIRECT		4	/* for set from kernel. */
 
 	u_short		port[2];
 
