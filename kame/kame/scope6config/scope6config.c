@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include <sys/types.h>
+#include <sys/queue.h>
 
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -82,7 +83,7 @@ main(argc, argv)
 	if ((aflag && argc != 0) || (!aflag && argc != 1)) {
 		fprintf(stderr,
 			"usage: scope6config [-l linkid] [-s siteid] "
-			"[-o orgid] default\n");
+			"[-o orgid] interface\n");
 		fprintf(stderr,
 			"       scope6config default\n");
 		fprintf(stderr,
