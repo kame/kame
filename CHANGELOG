@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1550 2001/02/10 14:31:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.1551 2001/02/10 15:54:18 jinmei Exp $
 
 <200102>
+2001-02-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6if_do_dad): was added to centralize
+	the decision of whether DAD should be performed on a particular
+	interface.  This function is currently called from
+	in6_update_ifa() and in6_ifattach_linklocal().
+
 2001-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_ifattach.c (in6_ifattach): skipped
 	assignment of link-local addresses when interfaces become up,
