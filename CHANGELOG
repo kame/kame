@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1023 2000/06/15 04:10:16 itojun Exp $
+$Id: CHANGELOG,v 1.1024 2000/06/15 04:31:26 sakane Exp $
 
 <200006>
+Thu Jun 15 13:29:29 JST 2000 sakane@kame.net
+	* kame/kame/racoon/cfparse.y:
+	In racoon.conf, the path of configuration file is complemented by
+	include directive only if there is no '/' in the path.
+
 Thu Jun 15 13:08:25 JST 2000  iotjun@iijlab.net
 	* sys/netinet6/ipsec.[ch]: net.inet.ipsec.inbound_call_ike sysctl
 	  MIB is now gone for good.
