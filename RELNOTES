@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/08 06:09:41 $
+		     $Date: 1999/10/11 10:10:29 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -42,6 +42,8 @@ and the next STABLE release,
   strict about the use of "u" bit in IEEE802/EUI64.  If you upgrade from past
   STABLE kit, you may experience change in interface identifier, and change
   in your IPv6 link-local/global addresses.
+- on freebsd3, traceroute6 may not work properly due to IPsec policy
+  handling issues.
 
 PLATFORM DIFFERENCES
 ====================
