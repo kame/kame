@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.27 2001/11/16 09:48:53 keiichi Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.28 2001/11/28 06:30:59 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -210,8 +210,8 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	}
 
 	if (hai) {
-		pref = hai->nd_opt_hai_preference;
-		lifetime = hai->nd_opt_hai_lifetime;
+		pref = ntohs(hai->nd_opt_hai_preference);
+		lifetime = ntohs(hai->nd_opt_hai_lifetime);
 	}
 
 	/* find an exising entry */
