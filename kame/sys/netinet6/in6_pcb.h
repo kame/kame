@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.44 2001/02/06 09:16:53 itojun Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.45 2001/02/09 05:59:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,6 +122,8 @@ struct	in6pcb {
  * We define KAME's original flags in higher 16 bits as much as possible
  * for compatibility with *bsd*s.
  */
+#define IN6P_IPV6_V6ONLY	0x008000 /* restrict AF_INET6 socket for v6 */
+
 #define IN6P_PKTINFO		0x010000 /* receive IP6 dst and I/F */
 #define IN6P_HOPLIMIT		0x020000 /* receive hoplimit */
 #define IN6P_HOPOPTS		0x040000 /* receive hop-by-hop options */
