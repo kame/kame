@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.55 2000/09/19 00:30:12 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.56 2000/09/19 02:03:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.55 2000/09/19 00:30:12 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.56 2000/09/19 02:03:44 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1886,9 +1886,9 @@ get_proposal_r(iph2)
 	u_int8_t pref;
 
 	spidx.dir = IPSEC_DIR_OUTBOUND;
-	memcpy(&addr, &spidx.src, sizeof(addr));
-	memcpy(&spidx.src, &spidx.dst, sizeof(spidx.src));
-	memcpy(&spidx.dst, &addr, sizeof(spidx.dst));
+	addr = spidx.src;
+	spidx.src = spidx.dst;
+	spidx.dst = addr;
 	pref = spidx.prefs;
 	spidx.prefs = spidx.prefd;
 	spidx.prefd = pref;
