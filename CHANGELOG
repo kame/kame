@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1859 2001/09/03 16:35:53 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1860 2001/09/04 15:33:20 jinmei Exp $
 
 <200109>
+2001-09-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/in_pcb.c (in_pcballoc): when
+	net.inet[6].ip6.v6only is 1, set IN6P_IPV6_V6ONLY (which
+	corresponds to the IPV6_V6ONLY socket option) for all sockets at
+	socket(2).
+
 Tue Sep  4 01:32:49 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4/usr.sbin/ppp: import IPv6 supporting PPP from
 	  FreeBSD-current.
