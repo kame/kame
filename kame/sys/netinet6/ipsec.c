@@ -901,6 +901,7 @@ ipsec6_get_ulp(m, spidx)
 			case IPPROTO_DSTOPTS:
 				break;
 			case IPPROTO_ESP:
+			case IPPROTO_IPCOMP:
 				/* give up */
 				return;
 			default:
@@ -1562,6 +1563,13 @@ ipsec_get_reqlevel(isr)
 				level = ah_net_deflev;
 			else
 				level = ah_trans_deflev;
+		case IPPROTO_IPCOMP:
+			/*
+			 * we don't really care, as IPcomp document says that
+			 * we shouldn't compress small packets
+			 */
+			level = IPSEC_LEVEL_USE;
+			break;
 		default:
 			panic("ipsec_get_reqlevel: "
 				"Illegal protocol defined %u\n",
@@ -1645,6 +1653,12 @@ ipsec_in_reject(sp, m)
 				need_auth++;
 				need_icv++;
 			}
+			break;
+		case IPPROTO_IPCOMP:
+			/*
+			 * we don't really care, as IPcomp document says that
+			 * we shouldn't compress small packets
+			 */
 			break;
 		}
 	}
@@ -3002,6 +3016,9 @@ ipsec6_output_tunnel(state, sp, flags)
 		case IPPROTO_AH:
 			error = ah6_output(state->m, &ip6->ip6_nxt, state->m->m_next, isr);
 			break;
+		case IPPROTO_IPCOMP:
+			/* XXX code should be here */
+			/*FALLTHROUGH*/
 		default:
 			printf("ipsec6_output_tunnel: unknown ipsec protocol %d\n", isr->saidx.proto);
 			m_freem(state->m);

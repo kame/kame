@@ -823,6 +823,7 @@ again:
 	case IPPROTO_UDP:
 	case IPPROTO_TCP:
 	case IPPROTO_ESP:
+	case IPPROTO_IPCOMP:
 		while (m) {
 			tlen = m->m_len - (p - mtod(m, u_char *));
 			(algo->update)(&algos, p, tlen);
@@ -1095,6 +1096,7 @@ again:
 	case IPPROTO_UDP:
 	case IPPROTO_TCP:
 	case IPPROTO_ESP:
+	case IPPROTO_IPCOMP:
 		while (m) {
 			tlen = m->m_len - (p - mtod(m, u_char *));
 			(algo->update)(&algos, p, tlen);

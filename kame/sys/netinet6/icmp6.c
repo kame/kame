@@ -233,6 +233,7 @@ icmp6_error(m, type, code, param)
 		case IPPROTO_UDP:
 		case IPPROTO_TCP:
 		case IPPROTO_ESP:
+		case IPPROTO_IPCOMP:
 		case IPPROTO_FRAGMENT:
 			/*
 			 * ICMPv6 error must not be fragmented.
