@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.271 2001/12/25 08:22:29 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.272 2001/12/26 01:03:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3148,6 +3148,7 @@ ip6_getpcbopt(pktopt, optname, sopt)
 	struct sockopt *sopt;
 	int optname;
 #else
+static int
 ip6_getpcbopt(pktopt, optname, mp)
 	struct ip6_pktopts *pktopt;
 	int optname;
@@ -3160,6 +3161,9 @@ ip6_getpcbopt(pktopt, optname, mp)
 	int error = 0;
 	struct in6_pktinfo null_pktinfo;
 	int deftclass = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	struct mbuf *m;
+#endif
 
 	switch (optname) {
 	case IPV6_PKTINFO:
