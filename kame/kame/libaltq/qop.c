@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop.c,v 1.2 2000/02/22 05:53:47 kjc Exp $
+ * $Id: qop.c,v 1.3 2000/03/02 11:54:43 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -300,8 +300,15 @@ qcmd_delete_filter(const char *ifname, const char *clname, const char *flname)
 		error = QOPERR_BADIF;
 
 	if (error == 0 &&
-	    (clinfo = clname2clinfo(ifinfo, clname)) == NULL)
+	    (clinfo = clname2clinfo(ifinfo, clname)) == NULL) {
+		/*
+		 * there is no matching class.
+		 * check if it is for a traffic conditioner
+		 */
+		if ((ifinfo = input_ifname2ifinfo(ifname)) == NULL ||
+		    (clinfo = clname2clinfo(ifinfo, clname)) == NULL)
 		error = QOPERR_BADCLASS;
+	}
 
 	if (error == 0 &&
 	    (fltrinfo = flname2flinfo(clinfo, flname)) == NULL)
