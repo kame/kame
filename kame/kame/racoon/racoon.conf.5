@@ -237,6 +237,8 @@ enable to send INITIAL-CONTACT message.
 .\"
 .It Ic nonce_size Ar number ;
 define the byte size of nonce value.
+Racoon can send any value although
+RFC2409 specifys that the value MUST be between 8 and 256 bytes.
 .\"
 .It Xo
 .Ic proposal { Ar sub-substatements Ic }
