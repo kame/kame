@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1803 2001/07/23 06:12:52 itojun Exp $
+$KAME: CHANGELOG,v 1.1804 2001/07/23 18:27:53 itojun Exp $
 
 <200107>
 Mon Jul 23 15:10:08 JST 2001  itojun@iijlab.net
 	* sys/netinet6/in6.c: now ff01::/16 prefix means "interface local
 	  multicast", not "node local multicast".  therefore, we now
-	  join ff01::1 in per-interface basis.
+	  join ff01::1 in per-interface basis.  buggy.
 	* *bsd*/usr.*/netstat/route.c: decode embedded scope identifier for
 	  ff01::/16.   NOTE: we still are using IN6_IS_ADDR_MC_NODELOCAL macro,
 	  as there's no "interface local" macro defined in 2553bis-03.
