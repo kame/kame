@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.121 2001/10/18 09:37:53 itojun Exp $
+$KAME: COVERAGE,v 1.122 2001/10/18 09:39:27 itojun Exp $
 
 
 x: supported/integrated
@@ -185,9 +185,9 @@ CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	sysctl	ALIGN	ALIGN	ALIGN
 CMSG passing in unix domain socket obeys CMSG_xx
 		(+)	x	-	x	x	-	x	?
 
-rip6stat	x	x	-	-	-	-	-	-
+rip6stat	x	x	-	x	-	-	x	-
 
-IPV6_V6ONLY	x	x	-	-	-	-	-	-
+IPV6_V6ONLY	x	x	-	x	-	-	x	-
 
 getaddrinfo obeys configured resolv order
 		(+)	x	x	x	x	x	x	-
