@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.78 2000/07/09 04:37:24 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.79 2001/01/05 03:20:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,6 +183,8 @@ static const struct explore explore[] = {
 static int str_isnumber __P((const char *));
 static int explore_fqdn __P((const struct addrinfo *, const char *,
 	const char *, struct addrinfo **));
+static int explore_copy __P((const struct addrinfo *, const struct addrinfo *,
+	struct addrinfo **));
 static int explore_null __P((const struct addrinfo *,
 	const char *, struct addrinfo **));
 static int explore_numeric __P((const struct addrinfo *, const char *,
@@ -193,6 +195,7 @@ static int get_canonname __P((const struct addrinfo *,
 	struct addrinfo *, const char *));
 static struct addrinfo *get_ai __P((const struct addrinfo *,
 	const struct afd *, const char *));
+static struct addrinfo *copy_ai __P((const struct addrinfo *));
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
@@ -315,6 +318,7 @@ getaddrinfo(hostname, servname, hints, res)
 	struct addrinfo *pai;
 	const struct afd *afd;
 	const struct explore *ex;
+	struct addrinfo *afai[sizeof(afdl)/sizeof(afdl[0])];
 
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
@@ -466,6 +470,22 @@ getaddrinfo(hostname, servname, hints, res)
 	 * we would like to prefer AF_INET6 than AF_INET, so we'll make a
 	 * outer loop by AFs.
 	 */
+
+	/* first, try to query DNS for all possible address families */
+	memset(afai, 0, sizeof(afai));
+	for (afd = afdl; afd->a_af; afd++) {
+		*pai = ai0;
+
+		if (!MATCH_FAMILY(pai->ai_family, afd->a_af, 1))
+			continue;
+
+		if (pai->ai_family == PF_UNSPEC)
+			pai->ai_family = afd->a_af;
+
+		error = explore_fqdn(pai, hostname, servname,
+		    &afai[afd - afdl]);
+	}
+
 	for (afd = afdl; afd->a_af; afd++) {
 		*pai = ai0;
 
@@ -496,12 +516,18 @@ getaddrinfo(hostname, servname, hints, res)
 			if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
 				pai->ai_protocol = ex->e_protocol;
 
-			error = explore_fqdn(pai, hostname, servname,
-				&cur->ai_next);
+			error = explore_copy(pai, afai[afd - afdl],
+			    &cur->ai_next);
 
 			while (cur && cur->ai_next)
 				cur = cur->ai_next;
 		}
+	}
+
+	/* clean it up */
+	for (afd = afdl; afd->a_af; afd++) {
+		if (afai[afd - afdl])
+			freeaddrinfo(afai[afd - afdl]);
 	}
 
 	/* XXX */
@@ -724,6 +750,42 @@ free:
 		free(apbuf);
 	if (sentinel.ai_next)
 		freeaddrinfo(sentinel.ai_next);
+	return error;
+}
+
+static int
+explore_copy(pai, src, res)
+	const struct addrinfo *pai;	/*seed*/
+	const struct addrinfo *src;	/*source*/
+	struct addrinfo **res;
+{
+	int error;
+	struct addrinfo sentinel, *cur;
+
+	error = 0;
+	sentinel.ai_next = NULL;
+	cur = &sentinel;
+
+	while (cur && src) {
+		cur->ai_next = copy_ai(src);
+		if (!cur->ai_next) {
+			error = EAI_MEMORY;
+			goto fail;
+		}
+
+		cur->ai_next->ai_socktype = pai->ai_socktype;
+		cur->ai_next->ai_protocol = pai->ai_protocol;
+
+		src = src->ai_next;
+		while (cur && cur->ai_next)
+			cur = cur->ai_next;
+	}
+
+	*res = sentinel.ai_next;
+	return 0;
+
+fail:
+	freeaddrinfo(sentinel.ai_next);
 	return error;
 }
 
@@ -978,6 +1040,39 @@ get_ai(pai, afd, addr)
 	ai->ai_addr->sa_family = ai->ai_family = afd->a_af;
 	p = (char *)(void *)(ai->ai_addr);
 	memcpy(p + afd->a_off, addr, (size_t)afd->a_addrlen);
+	return ai;
+}
+
+/* XXX need to malloc() the same way we do from other functions! */
+static struct addrinfo *
+copy_ai(pai)
+	const struct addrinfo *pai;
+{
+	struct addrinfo *ai;
+	size_t l;
+
+	l = sizeof(*ai) + pai->ai_addrlen;
+	if ((ai = (struct addrinfo *)malloc(l)) == NULL)
+		return NULL;
+	memset(ai, 0, l);
+	memcpy(ai, pai, sizeof(*ai));
+	ai->ai_addr = (struct sockaddr *)(void *)(ai + 1);
+	memcpy(ai->ai_addr, pai->ai_addr, pai->ai_addrlen);
+
+	if (pai->ai_canonname) {
+		l = strlen(pai->ai_canonname) + 1;
+		if ((ai->ai_canonname = malloc(l)) == NULL) {
+			free(ai);
+			return NULL;
+		}
+		strlcpy(ai->ai_canonname, pai->ai_canonname, l);
+	} else {
+		/* just to make sure */
+		ai->ai_canonname = NULL;
+	}
+
+	ai->ai_next = NULL;
+
 	return ai;
 }
 
