@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.102 2001/08/03 11:56:02 keiichi Exp $	*/
+/*	$KAME: in6_proto.c,v 1.103 2001/08/08 23:18:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -467,8 +467,8 @@ struct ip6protosw in6_gif_protosw =
 
 #ifdef MIP6
 struct ip6protosw mip6_tunnel_protosw =
-{ SOCK_RAW,	&inet6domain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
-  mip6_tunnel_input, rip6_output,	0,		rip6_ctloutput,
+{ SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
+  mip6_tunnel_input, rip6_output,	0,	rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
