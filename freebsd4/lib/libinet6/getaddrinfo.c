@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.3 2000/04/28 17:04:24 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.4 2000/05/01 02:29:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -199,6 +199,7 @@ typedef union {
 	u_char buf[MAXPACKET];
 } querybuf;
 
+#if 0
 struct res_target {
 	struct res_target *next;
 	const char *name;	/* domain name */
@@ -207,6 +208,7 @@ struct res_target {
 	int anslen;		/* size of answer buffer */
 	int n;			/* result length */
 };
+#endif
 
 static int str_isnumber __P((const char *));
 static int explore_fqdn __P((const struct addrinfo *, const char *,

@@ -231,6 +231,16 @@ struct res_sym {
 	__aconst char *	humanname;	/* Its fun name, like "mail exchanger" */
 };
 
+/* XXX this shouldn't be used by normal users */
+struct res_target {
+	struct res_target *next;
+	const char *name;	/* domain name */
+	int class, type;	/* class and type of query */
+	u_char *answer;		/* buffer to put answer */
+	int anslen;		/* size of answer buffer */
+	int n;			/* result length */
+};
+
 extern struct __res_state _res;
 #if 1 /* INET6 */
 extern struct __res_state_ext _res_ext;
@@ -286,6 +296,10 @@ extern const struct res_sym __p_type_syms[];
 #define	res_mkquery	__res_mkquery
 #endif
 
+#define	res_queryN	__res_queryN
+#define	res_searchN	__res_searchN
+#define	res_querydomainN	__res_querydomainN
+
 __BEGIN_DECLS
 int		res_hnok __P((const char *));
 int		res_ownok __P((const char *));
@@ -328,6 +342,12 @@ int		res_query __P((const char *, int, int, u_char *, int));
 int		res_search __P((const char *, int, int, u_char *, int));
 int		res_querydomain __P((const char *, const char *, int, int,
 				     u_char *, int));
+#if 0
+int		res_queryN __P((const char *, struct res_target *));
+int		res_searchN __P((const char *, struct res_target *));
+int		res_querydomainN __P((const char *, const char *,
+			struct res_target *));
+#endif
 int		res_mkquery __P((int, const char *, int, int, const u_char *, int,
 				 const u_char *, u_char *, int));
 int		res_send __P((const u_char *, int, u_char *, int));
