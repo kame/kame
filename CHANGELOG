@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.675 2000/03/09 19:21:00 itojun Exp $
+$Id: CHANGELOG,v 1.676 2000/03/09 19:39:42 itojun Exp $
 
 <200003>
 Fri Mar 10 01:05:05 JST 2000  itojun@iijlab.net
@@ -54,8 +54,12 @@ Thu Mar  9 15:06:53 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	<takamiya@po.ntts.co.jp>
 
 Thu Mar  9 09:41:53 JST 2000  itojun@iijlab.net
-	* sys/netinet6/ah_core.c: treat AH checksum as immutable, if there are
-	  multiple AH present on a packet.
+	* sys/netinet6/ah_core.c: except the first AH, treat AH checksum as
+	  immutable if there are multiple AH present on a packet.
+	  note that AH spec does not talk about this case very much, and use
+	  of multiple AH is very rare.
+	  (no interoperability between KAME code prior to this change, and
+	  after this change)
 	* bgpd/cfparse.y: fix endian issue.  found by tahi team.
 
 2000-03-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
