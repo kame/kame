@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.150 2000/10/13 17:07:58 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.151 2000/10/18 17:30:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1055,6 +1055,7 @@ icmp6_input(mp, offp, proto)
 			ip6cp.ip6c_m = m;
 			ip6cp.ip6c_ip6 = (struct ip6_hdr *)(icmp6 + 1);
 			ip6cp.ip6c_off = eoff;
+			ip6cp.ip6c_finaldst = finaldst;
 			(*ctlfunc)(code, (struct sockaddr *)&icmp6src, &ip6cp);
 		}
 	    }

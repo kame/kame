@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.11 2000/10/03 09:59:35 jinmei Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.12 2000/10/18 17:30:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,6 +81,7 @@ struct socket;
 struct domain;
 struct proc;
 struct ip6_hdr;
+struct in6_addr;
 #ifdef __FreeBSD__
 struct pr_usrreqs;
 #endif
@@ -93,6 +94,7 @@ struct ip6ctlparam {
 	struct mbuf *ip6c_m;		/* start of mbuf chain */
 	struct ip6_hdr *ip6c_ip6;	/* ip6 header of target packet */
 	int ip6c_off;			/* offset of the target proto header */
+	struct in6_addr *ip6c_finaldst;	/* final destination address */
 };
 
 struct ip6protosw {
