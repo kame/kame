@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.262 2002/02/04 06:37:43 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.263 2002/02/04 06:51:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -210,32 +210,6 @@ int ip6_sourcecheck_interval;		/* XXX */
 const int int6intrq_present = 1;
 #endif
 
-#ifdef MEASURE_PERFORMANCE
-#define MEASURE_PERFORMANCE_UDPONLY
-#define IP6_PERFORM_LOGSIZE 10000
-int ip6_logentry;
-int ip6_logsize = IP6_PERFORM_LOGSIZE;
-unsigned long long ip6_performance_log[IP6_PERFORM_LOGSIZE];
-unsigned long long ip6_performance_log2[IP6_PERFORM_LOGSIZE];
-struct in6_addr ip6_performance_addrlog[IP6_PERFORM_LOGSIZE];
-#endif
-#ifdef MEASURE_PERFORMANCE
-#define OURS_CHECK_ALG_RTABLE 0
-#define OURS_CHECK_ALG_LINEAR 1
-#define OURS_CHECK_ALG_HASH 2
-#define OURS_CHECK_ALG_LARGEHASH 3
-#ifdef OURS_CHECK_LINEAR
-int ip6_ours_check_algorithm = OURS_CHECK_ALG_LINEAR;
-#elif OURS_CHECK_HASH
-int ip6_ours_check_algorithm = OURS_CHECK_ALG_HASH;
-#else
-int ip6_ours_check_algorithm = OURS_CHECK_ALG_RTABLE;
-#endif
-#else
-int ip6_ours_check_algorithm;
-#endif
-
-
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 /* firewall hooks */
 ip6_fw_chk_t *ip6_fw_chk_ptr;
@@ -258,36 +232,6 @@ static struct mbuf *ip6_pullexthdr __P((struct mbuf *, size_t, int));
 extern int natpt_enable;
 extern int natpt_in6 __P((struct mbuf *, struct mbuf **));
 extern void ip_forward __P((struct mbuf *, int));
-#endif
-
-
-#ifdef MEASURE_PERFORMANCE
-static unsigned long long ctr_beg, ctr_end;
-
-static __inline unsigned long long read_tsc __P((void));
-static __inline void add_performance_log __P((unsigned long long,
-					      struct in6_addr *)); 
-#endif
-
-#ifdef MEASURE_PERFORMANCE
-static __inline unsigned long long 
-read_tsc(void)
-{
-     unsigned int h,l;
-     /* read Pentium counter */
-     __asm__(".byte 0x0f,0x31" :"=a" (l), "=d" (h));
-     return ((unsigned long long)h<<32) | l;
-}
-
-static __inline void
-add_performance_log(val, addr)
-	unsigned long long val;
-	struct in6_addr *addr;
-{
-	ip6_logentry = (ip6_logentry + 1) % ip6_logsize;
-	ip6_performance_log[ip6_logentry] = val;
-	ip6_performance_addrlog[ip6_logentry] = *addr;
-}
 #endif
 
 /*
@@ -355,10 +299,6 @@ ip6_init()
 #ifdef MIP6
 	mip6_init();
 #endif /* MIP6 */
-
-#ifdef MEASURE_PERFORMANCE
-	in6h_hashinit();
-#endif
 }
 
 static void
@@ -805,75 +745,6 @@ ip6_input(m)
 	/*
 	 *  Unicast check
 	 */
-#ifdef MEASURE_PERFORMANCE
-	ctr_beg = read_tsc();
-#endif
-	switch (ip6_ours_check_algorithm) {
-#ifdef MEASURE_PERFORMANCE
-	case OURS_CHECK_ALG_LINEAR:
-	/* traditional linear search: just for measurement */
-	{
-		struct in6_ifaddr *ia;
-
-		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-			if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
-			    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
-					       &ip6->ip6_dst)) {
-#ifdef MEASURE_PERFORMANCE
-				ctr_end = read_tsc();
-#ifdef MEASURE_PERFORMANCE_UDPONLY
-				if (ip6->ip6_nxt == IPPROTO_UDP)
-#else
-				if (1)
-#endif
-					add_performance_log(ctr_end - ctr_beg,
-							    &ip6->ip6_dst);
-#endif
-				/* record address information into m_aux. */
-				(void)ip6_setdstifaddr(m, ia);
-
-				ours = 1;
-				deliverifp = ia->ia_ifp;
-				goto hbhcheck;
-			}
-		}
-	}
-	break;
-	case OURS_CHECK_ALG_HASH:
-	case OURS_CHECK_ALG_LARGEHASH:
-	{
-		struct in6_ifaddr *ia;
-		struct in6hash *ih = NULL;
-
-		if ((ih = in6h_lookup(&ip6->ip6_dst, m->m_pkthdr.rcvif)) !=
-		    NULL && (ia = ih->in6h_ifa) != NULL) {
-#ifdef MEASURE_PERFORMANCE
-			ctr_end = read_tsc();
-#ifdef MEASURE_PERFORMANCE_UDPONLY
-			if (ip6->ip6_nxt == IPPROTO_UDP)
-#else
-			if (1)
-#endif
-				add_performance_log(ctr_end - ctr_beg,
-						    &ip6->ip6_dst);
-#endif
-
-			/* record address information into m_aux. */
-			(void)ip6_setdstifaddr(m, ia);
-
-			ours = 1;
-			deliverifp = m->m_pkthdr.rcvif;
-			goto hbhcheck;
-		}
-	}
-	break;
-#endif /* MEASURE_PERFORMANCE */
-	default:
-		/*
-		 * XXX: I intentionally broke our indentation rule here,
-		 *      since this switch-case is just for measurement and
-		 *      therefore should soon be removed.
-		 */
 	if (ip6_forward_rt.ro_rt != NULL &&
 	    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) != 0 && 
 #ifdef SCOPEDROUTING
@@ -954,16 +825,6 @@ ip6_input(m)
 		struct in6_ifaddr *ia6 =
 			(struct in6_ifaddr *)ip6_forward_rt.ro_rt->rt_ifa;
 
-#ifdef MEASURE_PERFORMANCE
-		ctr_end = read_tsc();
-#ifdef MEASURE_PERFORMANCE_UDPONLY
-		if (ip6->ip6_nxt == IPPROTO_UDP)
-#else
-		if (1)
-#endif
-			add_performance_log(ctr_end - ctr_beg, &ip6->ip6_dst);
-#endif
-
 		/*
 		 * record address information into m_aux.
 		 */
@@ -997,18 +858,6 @@ ip6_input(m)
 			goto bad;
 		}
 	}
-	} /* XXX indentation (see above) */
-
-#ifdef MEASURE_PERFORMANCE
-	/* we detected that packet is not ours thru the basic algorithm */
-	ctr_end = read_tsc();
-#ifdef MEASURE_PERFORMANCE_UDPONLY
-	if (ip6->ip6_nxt == IPPROTO_UDP)
-#else
-	if (1)
-#endif
-		add_performance_log(ctr_end - ctr_beg, &ip6->ip6_dst);
-#endif
 
 	/*
 	 * FAITH (Firewall Aided Internet Translator)
@@ -2554,80 +2403,3 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	}
 }
 #endif /* __bsdi__ */
-
-#ifdef MEASURE_PERFORMANCE
-#ifdef __FreeBSD__
-#include <sys/sysctl.h>
-
-extern int in6_nhash;
-extern int ip6_forward_cache_miss;
-
-/* we lie, but it's rather safe for this temporary purpose... */
-#define IPV6CTL_DEFMTU		4	/* default MTU */
-#define IPV6CTL_OURSALG IPV6CTL_DEFMTU
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-static int sysctl_ip6_oursalg(SYSCTL_HANDLER_ARGS);
-#else
-static int sysctl_ip6_oursalg SYSCTL_HANDLER_ARGS;
-#endif
-
-#ifdef SYSCTL_DECL
-SYSCTL_DECL(_net_inet6_ip6);
-#endif
-#if 0
-SYSCTL_NODE(_net_inet6_ip6, IPV6CTL_OURSALG, oursalg,
-	    CTLFLAG_RW, sysctl_ip6_oursalg, "");
-#endif 
-
-static int
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-sysctl_ip6_oursalg(SYSCTL_HANDLER_ARGS)
-#else
-sysctl_ip6_oursalg SYSCTL_HANDLER_ARGS
-#endif
-{
-	int error = 0;
-	int oldalg;
-	int i, s;
-
-	error = SYSCTL_OUT(req, arg1, sizeof(int));
-	if (error || !req->newptr)
-		return (error);
-	oldalg = ip6_ours_check_algorithm;
-	if ((error = SYSCTL_IN(req, arg1, sizeof(int))) != 0)
-		return(error);
-	if (ip6_ours_check_algorithm > OURS_CHECK_ALG_LARGEHASH) {
-		ip6_ours_check_algorithm = oldalg;
-		return(EINVAL);
-	}
-
-	s = splnet();
-
-	/* clear all statistics */
-	for (i = 0; i < IP6_PERFORM_LOGSIZE; i++) {
-		ip6_performance_log[i] = 0;
-		ip6_performance_log2[i] = 0;
-	}
-	ip6_forward_cache_miss = 0;
-	ip6_logentry = 0;
-
-	switch (ip6_ours_check_algorithm) {
-	case OURS_CHECK_ALG_HASH:
-		in6h_rebuild(23); /* XXX hardcoding */
-		break;
-	case OURS_CHECK_ALG_LARGEHASH:
-		in6h_rebuild(997); /* XXX hardcofing */
-		break;
-	}
-
-	splx(s);
-
-	return(error);
-}
-
-SYSCTL_OID(_net_inet6_ip6, IPV6CTL_OURSALG, oursalg,
-	   CTLTYPE_INT|CTLFLAG_RW, &ip6_ours_check_algorithm, 0,
-	   sysctl_ip6_oursalg, "I", "");
-#endif
-#endif

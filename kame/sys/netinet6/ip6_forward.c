@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.94 2002/02/02 07:06:12 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.95 2002/02/04 06:51:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,41 +113,6 @@ extern struct mip6_bc_list mip6_bc_list;
 struct	route ip6_forward_rt;
 #else
 struct	route_in6 ip6_forward_rt;
-#endif
-
-#ifdef MEASURE_PERFORMANCE
-#define OURS_CHECK_ALG_RTABLE 0	/* XXX: duplicated def. */
-
-extern int ip6_logentry;
-extern int ip6_logsize;
-extern unsigned long long ip6_performance_log[];
-extern long long ip6_performance_log2[];
-extern int ip6_ours_check_algorithm;
-
-int ip6_forward_cache_miss;
-
-static unsigned long long ctr_beg, ctr_end;
-
-static __inline unsigned long long read_tsc __P((void));
-static __inline void add_performance_log2 __P((unsigned long long)); 
-
-/* XXX: duplicated code */
-static __inline unsigned long long 
-read_tsc(void)
-{
-     unsigned int h,l;
-     /* read Pentium counter */
-     __asm__(".byte 0x0f,0x31" :"=a" (l), "=d" (h));
-     return ((unsigned long long)h<<32) | l;
-}
-
-static __inline void
-add_performance_log2(val)
-	unsigned long long val;
-{
-	ip6_performance_log[ip6_logentry] += val;
-	ip6_performance_log2[ip6_logentry] = val;
-}
 #endif
 
 /*
@@ -419,34 +384,15 @@ ip6_forward(m, srcrt)
 
 	dst = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 	if (!srcrt) {
-#ifdef MEASURE_PERFORMANCE
-		ctr_beg = read_tsc();
-#endif
-
 		/* ip6_forward_rt.ro_dst.sin6_addr is equal to ip6->ip6_dst */
 		if (ip6_forward_rt.ro_rt == 0 ||
 		    !(ip6_forward_rt.ro_rt->rt_flags & RTF_UP)
-#ifdef MEASURE_PERFORMANCE
-		    || (ip6_ours_check_algorithm != OURS_CHECK_ALG_RTABLE &&
-#ifdef SCOPEDROUTING
-			!SA6_ARE_ADDR_EQUAL(sa6_dst, dst)
-#else
-			!IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr,
-					    &dst->sin6_addr)
-#endif
-#endif
 			) {
 			if (ip6_forward_rt.ro_rt) {
 				RTFREE(ip6_forward_rt.ro_rt);
 				ip6_forward_rt.ro_rt = 0;
 			}
-#ifdef MEASURE_PERFORMANCE
-			ip6_forward_cache_miss++;
-			*dst = *sa6_dst;
-#ifndef SCOPEDROUTING
-			dst->sin6_scope_id = 0;	/* XXX */
-#endif
-#endif
+
 			/* this probably fails but give it a try again */
 #ifdef __FreeBSD__
 			rtalloc_ign((struct route *)&ip6_forward_rt,
@@ -455,14 +401,6 @@ ip6_forward(m, srcrt)
 			rtalloc((struct route *)&ip6_forward_rt);
 #endif
 		}
-
-#ifdef MEASURE_PERFORMANCE
-		ctr_end = read_tsc();
-#ifdef MEASURE_PERFORMANCE_UDPONLY
-		if (ip6->ip6_nxt == IPPROTO_UDP)
-#endif
-			add_performance_log2(ctr_end - ctr_beg);
-#endif
 
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;

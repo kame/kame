@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.260 2002/01/31 14:14:50 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.261 2002/02/04 06:51:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -186,12 +186,6 @@ struct multi6_kludge {
 	struct ifnet *mk_ifp;
 	struct in6_multihead mk_head;
 };
-#endif
-
-#ifdef MEASURE_PERFORMANCE
-static void in6h_delifa __P((struct in6_ifaddr *));
-static void in6h_addhash __P((struct in6hash *));
-static void in6h_delhash __P((struct in6hash *));
 #endif
 
 /*
@@ -959,9 +953,6 @@ in6_update_ifa(ifp, ifra, ia)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_t time_second = (time_t)time.tv_sec;
 #endif
-#ifdef MEASURE_PERFORMANCE
-	int new_ifa = 0;
-#endif
 	struct rtentry *rt;
 
 	/* Validate parameters */
@@ -1147,10 +1138,6 @@ in6_update_ifa(ifp, ifra, ia)
 #ifdef __NetBSD__
 		/* gain another refcnt for the link from if_addrlist */
 		IFAREF(&ia->ia_ifa);
-#endif
-
-#ifdef MEASURE_PERFORMANCE
-		new_ifa = 1;
 #endif
 	}
 
@@ -1422,17 +1409,6 @@ in6_update_ifa(ifp, ifra, ia)
 		}
 	}
 
-#ifdef MEASURE_PERFORMANCE
-	{
-		int s = splnet();
-		if (new_ifa)
-			in6h_addifa(ia);
-		else
-			in6h_rebuild(0);
-		splx(s);
-	}
-#endif
-
 	/*
 	 * make sure to initialize ND6 information.  this is to workaround
 	 * issues with interfaces with IPv6 addresses, which have never brought
@@ -1588,10 +1564,6 @@ in6_unlink_ifa(ia, ifp)
 		in6_savemkludge(oia);
 #endif
 	}
-#endif
-
-#ifdef MEASURE_PERFORMANCE
-	in6h_delifa(oia);
 #endif
 
 	/*
@@ -2887,154 +2859,3 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 	*nam = (struct sockaddr *)sin6_p;
 }
 #endif /* freebsd3 */
-
-#ifdef MEASURE_PERFORMANCE
-#define IN6_MAXADDRHASH 1000
-#ifndef	IN6_ADDRHASH
-#ifndef INET6_SERVER
-#define	IN6_ADDRHASH	23
-#else
-#define	IN6_ADDRHASH	997
-#endif
-#endif
-
-static struct in6hash in6h_hash_any = { NULL, IN6ADDR_ANY_INIT, NULL, 0 };
-struct in6hash *in6hash[IN6_MAXADDRHASH];/* hash buckets for local IPv6 addrs */
-int in6_nhash = IN6_ADDRHASH;		/* number of hash buckets for addrs */
-int in6_hash_nullhit;
-
-#define HASH6(in6) ((in6)->s6_addr32[0]^(in6)->s6_addr32[1]^\
-	(in6)->s6_addr32[2]^(in6)->s6_addr32[3])
-
-/*
- * Initialize the hash by adding entries for IN6ADDR_ANY
- */
-struct in6hash *ih_cache = NULL;
-
-void
-in6h_hashinit()
-{
-	in6h_addhash(&in6h_hash_any);
-}
-
-void
-in6h_addifa(ia)
-	struct in6_ifaddr *ia;
-{
-	if (ia->ia6_hash.in6h_ifa == NULL)
-		ia->ia6_hash.in6h_ifa = ia;
-
-	ia->ia6_hash.in6h_addr = IA6_SIN6(ia)->sin6_addr; /* scope? */
-	if (IN6_IS_ADDR_UNSPECIFIED(&ia->ia6_hash.in6h_addr))
-		return;
-	in6h_addhash(&ia->ia6_hash);
-}
-
-/*
- * Rebuild the hash when any interface addresses have been changed.
- * Since this should happen infrequently we remove all the interfaces
- * from the hash and add them all back.  This insures that the order
- * of addresses in the hash is consistent.
- */
-void
-in6h_rebuild(newhashsiz)
-	int newhashsiz;		/* can be 0, meaning unchange the size */
-{
-	struct in6_ifaddr *ia;
-
-	if (newhashsiz > IN6_MAXADDRHASH)
-		return;		/* XXX invalid */
-
-	for (ia = in6_ifaddr; ia != NULL; ia = ia->ia_next)
-		in6h_delifa(ia);
-
-	if (newhashsiz)
-		in6_nhash = newhashsiz;
-
-	for (ia = in6_ifaddr; ia != NULL; ia = ia->ia_next)
-		in6h_addifa(ia);
-}
-
-/* Remove hash entries for local address on an in6_ifaddr. */
-void
-in6h_delifa(ia)
-	struct in6_ifaddr *ia;
-{
-	if (IN6_IS_ADDR_UNSPECIFIED(&ia->ia6_hash.in6h_addr))
-		return;
-	in6h_delhash(&ia->ia6_hash);
-	ia->ia6_hash.in6h_addr = in6addr_any;
-}
-
-static void
-in6h_addhash(ih)
-	struct in6hash *ih;
-{
-	struct in6hash **prev;
-
-	/* Add to tail of hash list, as address is at end of address list */
-	for (prev = &in6hash[HASH6(&ih->in6h_addr) % in6_nhash]; *prev;
-	     prev = &((*prev)->in6h_next)) {
-		/* however, we always prefer non-global addresses */
-		if (IN6_IS_ADDR_LINKLOCAL(&(*prev)->in6h_addr))
-			break;
-	}
-	ih->in6h_next = *prev;
-	*prev = ih;
-}
-
-static void
-in6h_delhash(ih)
-	struct in6hash *ih;
-{
-	struct in6hash **prev;
-
-	ih_cache = NULL;
-
-	for (prev = &in6hash[HASH6(&ih->in6h_addr) % in6_nhash];
-	     *prev != ih; prev = &((*prev)->in6h_next)) {
-#ifdef DEBUG
-		if (*prev == NULL)
-			panic("in6h_delhash: lost entry");
-#endif
-	}
-	*prev = (*prev)->in6h_next;
-}
-
-/*
- * Look up hash structure for specified IP address
- * and (optional) interface; matches any interface
- * if ifp is null, or this address is not associated
- * with the specified interface.
- */
-struct in6hash *
-in6h_lookup(addr, ifp) 
-	const struct in6_addr *addr;
-	struct ifnet *ifp;
-{
-	struct in6hash *ih, *maybe_ih = NULL;
-
-	/* just for measurement */
-	if ((ih = in6hash[HASH6(addr) % in6_nhash]) == NULL)
-		in6_hash_nullhit++;
-
-	for (; ih; ih = ih->in6h_next) {
-		if (IN6_ARE_ADDR_EQUAL(&ih->in6h_addr, addr)) {
-			ih->in6h_hit++;
-
-			if (ih->in6h_ifa == NULL ||
-			    ih->in6h_ifa->ia_ifp == ifp || ifp == NULL) {
-				ih_cache = ih;
-				return (ih);
-			}
-			if (maybe_ih == NULL)
-				maybe_ih = ih;
-		}
-		else
-			ih->in6h_miss++;
-	}
-	if (maybe_ih)
-		ih_cache = maybe_ih;
-	return (maybe_ih);
-}
-#endif /* MEASURE_PERFORMANCE */
