@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.346 2004/02/13 11:54:30 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.347 2004/02/14 08:00:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -596,7 +596,7 @@ nd6_llinfo_timer(arg)
 			if (mip6_restore_proxynd_entry(m)) {
 				m_freem(m);
 				m = NULL;
-				rt = 0;
+				rt = NULL;
 			}
 #endif
 			if (m) {
@@ -998,7 +998,7 @@ nd6_lookup(addr6, create, ifp)
 		 */
 		if (create) {
 			RTFREE(rt);
-			rt = 0;
+			rt = NULL;
 		}
 	}
 	if (!rt) {
