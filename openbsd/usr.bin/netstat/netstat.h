@@ -86,7 +86,7 @@ void	impstats __P((u_long, u_long));
 
 void	intpr __P((int, u_long));
 
-void	pr_rthdr __P(());
+void	pr_rthdr __P((int));
 void	pr_encaphdr __P(());
 void	pr_family __P((int));
 void	rt_stats __P((u_long));

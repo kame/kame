@@ -169,7 +169,7 @@ routepr(rtree)
 				pr_family(i);
 				do_rtent = 1;
 				if (i != PF_KEY)
-					pr_rthdr();
+					pr_rthdr(af);
 				else
 					pr_encaphdr();
 				p_tree(head.rnh_treetop);
@@ -226,25 +226,34 @@ pr_family(af)
 
 /* column widths; each followed by one space */
 #ifndef INET6
-#define	WID_DST		18	/* width of destination column */
-#define	WID_GW		18	/* width of gateway column */
+#define	WID_DST(af)	18	/* width of destination column */
+#define	WID_GW(af)	18	/* width of gateway column */
 #else
-#define	WID_DST	(nflag ? 28 : 18)	/* width of destination column */
-#define	WID_GW	(nflag ? 26 : 18)	/* width of gateway column */
+/* width of destination/gateway column */
+#ifdef KAME_SCOPEID
+/* strlen("fe80::aaaa:bbbb:cccc:dddd@gif0") == 30, strlen("/128") == 4 */
+#define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 34 : 18) : 18)
+#define	WID_GW(af)	((af) == AF_INET6 ? (nflag ? 30 : 18) : 18)
+#else
+/* strlen("fe80::aaaa:bbbb:cccc:dddd") == 25, strlen("/128") == 4 */
+#define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 29 : 18) : 18)
+#define	WID_GW(af)	((af) == AF_INET6 ? (nflag ? 25 : 18) : 18)
+#endif
 #endif /* INET6 */
 
 /*
  * Print header for routing table columns.
  */
 void
-pr_rthdr()
+pr_rthdr(af)
+	int af;
 {
 
 	if (Aflag)
 		printf("%-*.*s ", PLEN, PLEN, "Address");
 	printf("%-*.*s %-*.*s %-6.6s  %6.6s  %6.6s %6.6s  %s\n",
-		WID_DST, WID_DST, "Destination",
-		WID_GW, WID_GW, "Gateway",
+		WID_DST(af), WID_DST(af), "Destination",
+		WID_GW(af), WID_GW(af), "Gateway",
 		"Flags", "Refs", "Use", "Mtu", "Interface");
 }
 
@@ -594,8 +603,8 @@ p_rtentry(rt)
 	} else
 		mask = 0;
 	
-	p_sockaddr(sa, mask, rt->rt_flags, WID_DST);
-	p_sockaddr(kgetsa(rt->rt_gateway), 0, RTF_HOST, WID_GW);
+	p_sockaddr(sa, mask, rt->rt_flags, WID_DST(sa->sa_family));
+	p_sockaddr(kgetsa(rt->rt_gateway), 0, RTF_HOST, WID_GW(sa->sa_family));
 	p_flags(rt->rt_flags, "%-6.6s ");
 	printf("%6d %8ld ", rt->rt_refcnt, rt->rt_use);
 	if (rt->rt_rmx.rmx_mtu)
