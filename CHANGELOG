@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1882 2001/09/19 13:25:33 jinmei Exp $
+$KAME: CHANGELOG,v 1.1883 2001/09/20 09:40:03 jinmei Exp $
 
 <200109>
+2001-09-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (prelist_update): corrected the
+	definition of "storedlifetime" (used in the two-hour rule) for an
+	address that has an infinite lifetime.  Without this special
+	case, the lifetime of such an address would unintentionally be
+	decreased.
+
 2001-09-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/v6test/: added some tiny improvements/corrections:
 	- added missing NTOHS
@@ -1430,7 +1437,7 @@ Mon Apr  3 JST 2001  itojun@iijlab.net
 	src=::1, dst=invalid (not assigned), rcvif=lo0
         (you can test it by 'ping6 -S ::1 fe80::xxxx%lo0", where xxxx is
 	not an interface ID of lo0)
-	2. omitted a specical case for link-local destinations on a
+	2. omitted a special case for link-local destinations on a
 	loopback interface, because
         - we now have a host route for fe80::1%lo0, so we can accept a
 	  packet to the address using the generic logic.
