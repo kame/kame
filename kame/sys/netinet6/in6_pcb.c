@@ -130,14 +130,10 @@ in6_pcballoc(so, head)
 		return(ENOBUFS); /* XXX */
 	}
 	bzero(in6p->in6p_inputopts, sizeof(struct ip6_recvpktopts));
-#if 0
-	insque(in6p, head);
-#else
 	in6p->in6p_next = head->in6p_next;
 	head->in6p_next = in6p;
 	in6p->in6p_prev = head;
 	in6p->in6p_next->in6p_prev = in6p;
-#endif
 #if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
 	if (ip6_bindv6only)
 		in6p->in6p_flags |= IN6P_BINDV6ONLY;
@@ -777,13 +773,9 @@ in6_pcbdetach(in6p)
 	if (in6p->in6p_route.ro_rt)
 		rtfree(in6p->in6p_route.ro_rt);
 
-#if 0
-	remque(in6p);
-#else
 	in6p->in6p_next->in6p_prev = in6p->in6p_prev;
 	in6p->in6p_prev->in6p_next = in6p->in6p_next;
 	in6p->in6p_prev = NULL;
-#endif
 	FREE(in6p, M_PCB);
 }
 
