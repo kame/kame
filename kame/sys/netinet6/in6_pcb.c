@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.91 2001/05/21 05:37:49 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.92 2001/05/21 05:50:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -930,7 +930,7 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 #ifndef TCP6
 			if (IN6_IS_ADDR_V4MAPPED(laddr6)) {
 #ifndef INET6_BINDV6ONLY
-				if (in6p->in6p_flags & IN6P_IPV6_V6ONLY)
+				if ((in6p->in6p_flags & IN6P_IPV6_V6ONLY))
 					continue;
 				else
 					match = in6p;
