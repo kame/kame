@@ -3,7 +3,7 @@
 # Date created:         Fri Aug 25 16:42:36 CDT 1995
 # Whom:                 ache@nagual.pp.ru
 #
-# $Id: Makefile,v 1.2 1999/08/20 00:12:56 itojun Exp $
+# $Id: Makefile,v 1.3 1999/08/23 14:20:52 shin Exp $
 #
 
 DISTNAME=	apache_1.3.6
@@ -21,7 +21,7 @@ MAINTAINER=	itojun@kame.net
 # Set APACHE_PERF_TUNING env. variable to YES to get maximum performance
 #
 
-GNU_CONFIGURE=  yes
+HAS_CONFIGURE=  yes
 CONFIGURE_SCRIPT=	configure.v6
 CONFIGURE_ARGS= \
 		 --sysconfdir=${PREFIX}/etc/apache \
