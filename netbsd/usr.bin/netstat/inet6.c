@@ -684,7 +684,7 @@ ip6_stats(off, name)
 		}
 	}
 	p(ip6s_mext1, "\t\t%llu one ext mbuf%s\n");
-	p(ip6s_mext2m, "\t\t%llu two or more ext mbuf%s\n");	
+	p(ip6s_mext2m, "\t\t%llu two or more ext mbuf%s\n");
 	p(ip6s_exthdrtoolong,
 	    "\t%llu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%llu tunneling packet%s that can't find gif\n");
