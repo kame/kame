@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.82 2000/08/31 07:18:26 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.83 2000/08/31 07:31:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1730,7 +1730,7 @@ pr_nodeaddr(ni, nilen)
 			(void)printf("unknown qtype");
 			break;
 		}
-		if (ni->ni_flags & NI_NODEADDR_FLAG_ALL)
+		if (ni->ni_flags & NI_NODEADDR_FLAG_TRUNCATE)
 			(void)printf(" truncated");
 	}
 	putchar('\n');
