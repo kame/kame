@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.7 2001/07/22 15:32:28 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.8 2001/07/22 15:34:30 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -163,7 +163,7 @@ rn_mpath_conflict(rnh, rt, netmask)
 		return 0;
 
 	/*
-	 * unlike other functions we have in this file, we have to
+	 * unlike other functions we have in this file, we have to check
 	 * all key/mask/gateway as rnh_lookup can match less specific entry.
 	 */
 	rt1 = (struct rtentry *)rn1;
