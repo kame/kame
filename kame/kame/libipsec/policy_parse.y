@@ -1,4 +1,4 @@
-/*	$KAME: policy_parse.y,v 1.20 2003/11/23 09:10:18 itojun Exp $	*/
+/*	$KAME: policy_parse.y,v 1.21 2003/12/12 08:01:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -396,6 +396,7 @@ policy_parse(msg, msglen)
 	int msglen;
 {
 	int error;
+
 	pbuf = NULL;
 	tlen = 0;
 
