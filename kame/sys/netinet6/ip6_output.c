@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.104 2000/05/19 19:10:07 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.105 2000/05/24 08:25:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -220,8 +220,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* IPSEC */
 
-#define MAKE_EXTHDR(hp,mp)						\
-    {									\
+#define MAKE_EXTHDR(hp, mp)						\
+    do {								\
 	if (hp) {							\
 		struct ip6_ext *eh = (struct ip6_ext *)(hp);		\
 		error = ip6_copyexthdr((mp), (caddr_t)(hp), 		\
@@ -229,7 +229,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		if (error)						\
 			goto freehdrs;					\
 	}								\
-    }
+    } while (0)
 	
 	bzero(&exthdrs, sizeof(exthdrs));
 	
@@ -387,8 +387,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			ip6->ip6_nxt = IPPROTO_DSTOPTS;
 		}
 
-#define MAKE_CHAIN(m,mp,p,i)\
-    {\
+#define MAKE_CHAIN(m, mp, p, i)\
+    do {\
 	if (m) {\
 		if (!hdrsplit) \
 			panic("assumption failed: hdr not split"); \
@@ -399,7 +399,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		(mp)->m_next = (m);\
 		(mp) = (m);\
 	}\
-    }
+    } while (0)
 		/*
 		 * result: IPv6 hbh dest1 rthdr dest2 payload
 		 * m will point to IPv6 header.  mprev will point to the
