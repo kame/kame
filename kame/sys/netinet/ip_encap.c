@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.25 2000/04/17 12:01:12 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.26 2000/04/17 13:29:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -191,7 +191,7 @@ encap4_input(m, va_alist)
 		 * We prioritize the matches by using bit length of the
 		 * matches.  mask_match() and user-supplied matching function
 		 * should return the bit length of the matches (for example,
-		 * if both src/dst are matched, 64 should be returned).
+		 * if both src/dst are matched for IPv4, 64 should be returned).
 		 * 0 or negative return value means "it did not match".
 		 *
 		 * The question is, since we have two "mask" portion, we
