@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.95 2000/08/23 13:21:38 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.96 2000/08/28 17:50:59 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1681,6 +1681,8 @@ check_trns_esp(t_id)
 	case IPSECDOI_ESP_RC5:
 	case IPSECDOI_ESP_CAST:
 	case IPSECDOI_ESP_BLOWFISH:
+	case IPSECDOI_ESP_RIJNDAEL:
+	case IPSECDOI_ESP_TWOFISH:
 		return 0;
 	case IPSECDOI_ESP_DES_IV32:
 	case IPSECDOI_ESP_DES_IV64:

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.20 2000/06/28 07:04:32 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.21 2000/08/28 17:50:59 itojun Exp $ */
 
 /* refered to RFC2407 */
 
@@ -63,6 +63,9 @@
 #define   IPSECDOI_ESP_DES_IV32                        9
 #define   IPSECDOI_ESP_RC4                            10
 #define   IPSECDOI_ESP_NULL                           11
+  /* draft-ietf-ipsec-ciph-aes-cbc-00.txt */
+#define   IPSECDOI_ESP_RIJNDAEL				251
+#define   IPSECDOI_ESP_TWOFISH				253
 
 /* 4.4.1 IPSEC Security Protocol Identifiers */
 #define IPSECDOI_PROTO_IPCOMP                        4

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.70 2000/08/11 08:58:40 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.71 2000/08/28 17:50:59 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -457,6 +457,10 @@ ipsecdoi2pfkey_ealg(t_id)
 		return SADB_EALG_DESCBC;
 	case IPSECDOI_ESP_NULL:
 		return SADB_EALG_NULL;
+	case IPSECDOI_ESP_RIJNDAEL:
+		return SADB_X_EALG_RIJNDAELCBC;
+	case IPSECDOI_ESP_TWOFISH:
+		return SADB_X_EALG_TWOFISHCBC;
 
 	/* not supported */
 	case IPSECDOI_ESP_3IDEA:
@@ -629,6 +633,10 @@ keylen_ealg(t_id, encklen)
 		return 64;
 	case IPSECDOI_ESP_NULL:
 		return 0;
+	case IPSECDOI_ESP_RIJNDAEL:
+		return encklen ? encklen : 128;
+	case IPSECDOI_ESP_TWOFISH:
+		return encklen ? encklen : 128;
 
 	/* not supported */
 	case IPSECDOI_ESP_3IDEA:
