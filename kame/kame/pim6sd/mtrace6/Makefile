@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.3 2000/02/25 06:35:42 itojun Exp $
+# $Id: Makefile,v 1.4 2000/12/04 06:45:02 itojun Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -94,11 +94,13 @@ CFLAGS+= -I$(.CURDIR)/.. -DHAVE_GETIFADDRS
 .else
 CPPFLAGS+= -I$(.CURDIR)/.. -DHAVE_GETIFADDRS
 .endif
+.if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+.endif
 
 .if (${OPSYS} != "NetBSD")
 MAN8=	mtrace6.8
