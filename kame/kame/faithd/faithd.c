@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.22 2000/07/05 17:58:58 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.23 2000/07/10 01:50:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -192,7 +192,7 @@ inetd_main(int argc, char **argv)
 	openlog(logname, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
 
 	if (argc >= MAXARGV)
-		exit_failure("too many augments");
+		exit_failure("too many arguments");
 	serverarg[0] = serverpath = path;
 	for (i = 1; i < argc; i++)
 		serverarg[i] = argv[i];
@@ -275,7 +275,7 @@ daemon_main(int argc, char **argv)
 	default:
 		serverargc = argc - NUMARG;
 		if (serverargc >= MAXARGV)
-			exit_error("too many augments");
+			exit_error("too many arguments");
 
 		serverpath = malloc(strlen(argv[NUMPRG]) + 1);
 		strcpy(serverpath, argv[NUMPRG]);
@@ -360,7 +360,7 @@ daemon_main(int argc, char **argv)
 	syslog(LOG_INFO, "Staring faith daemon for %s port", service);
 
 	play_service(s_wld);
-	/*NOTRECHED*/
+	/* NOTREACHED */
 	exit(1);	/*pacify gcc*/
 }
 
