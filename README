@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.69 2003/02/07 10:44:01 suz Exp $
+	$KAME: README,v 1.70 2004/05/21 08:35:37 itojun Exp $
 
 <<<Project Overview>>>
 
@@ -18,7 +18,8 @@ in Japan has developed, into "Hydrangea".  To identify the joint
 effort, we changed the name from "Hydrangea" to "KAME".
 
 Stabilized portion of KAME software has been merged into FreeBSD, NetBSD,
-OpenBSD, and BSD/OS:
+OpenBSD, and BSD/OS.  Therefore, if you just want to use IPv6, you do not
+need the KAME patch contained in this tar.gz file.
 - FreeBSD: 4.0 and beyond
 - NetBSD: 1.5 and beyond
 - OpenBSD: 2.7 and beyond
