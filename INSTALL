@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$Id: INSTALL,v 1.16 2000/02/10 05:10:03 itojun Exp $
+	$Id: INSTALL,v 1.17 2000/02/11 07:07:33 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
@@ -54,8 +54,8 @@ perform "make obj" unless you are ready to tackle those troubles.
 4. Some parts of the KAME tree will be compiled, only if there are
    certain libraries installed beforehand:
 	usr.sbin/tcpdump:
-		If there is SSLeay or OpenSSL installed beforehand, 
-		tcpdump will let you look inside IPsec packet (-E option).
+		If there OpenSSL 0.9.4 installed, tcpdump will let you look
+		inside IPsec packet (-E option).
 	usr.sbin/racoon:
 		Compiles only when OpenSSL 0.9.4 is installed beforehand,
 		and shell search path is configured to reach "openssl" program.
