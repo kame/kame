@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.24 2000/11/30 15:22:09 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.25 2000/12/01 01:27:21 kawa Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -768,18 +768,23 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg,notify)
 	void (*notify) __P((struct inpcb *, int));
 {
 	struct inpcb *inp, *ninp;
-	struct in6_addr faddr6, laddr6;
+	struct sockaddr_in6 sa6_src, *sa6_dst;
 	u_short	fport = fport_arg, lport = lport_arg;
 	u_int32_t flowinfo;
 	int errno, s;
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return;
-	faddr6 = ((struct sockaddr_in6 *)dst)->sin6_addr;
-	if (IN6_IS_ADDR_UNSPECIFIED(&faddr6))
+
+	sa6_dst = (struct sockaddr_in6 *)dst;
+	if (IN6_IS_ADDR_UNSPECIFIED(&sa6_dst->sin6_addr))
 		return;
-	laddr6 = ((struct sockaddr_in6 *)src)->sin6_addr;
-	flowinfo = ((struct sockaddr_in6 *)src)->sin6_flowinfo;
+
+	/*
+	 * note that src can be NULL when we get notify by local fragmentation.
+	 */
+	sa6_src = (src == NULL) ? sa6_any : *(struct sockaddr_in6 *)src;
+	flowinfo = sa6_src.sin6_flowinfo;
 
 	/*
 	 * Redirects go to all references to the destination,
@@ -792,7 +797,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg,notify)
 	if (PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) {
 		fport = 0;
 		lport = 0;
-		bzero((caddr_t)&laddr6, sizeof(laddr6));
+		bzero((caddr_t)&sa6_src.sin6_addr, sizeof(sa6_src.sin6_addr));
 
 		if (cmd != PRC_HOSTDEAD)
 			notify = in6_rtchange;
@@ -818,7 +823,8 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg,notify)
 		 */
 		if (cmd == PRC_MSGSIZE && (inp->inp_flags & IN6P_MTU) != 0 &&
 		    (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr) ||
-		     IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &faddr6))) {
+		     IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr,
+					&sa6_dst->sin6_addr))) {
 			ip6_notify_pmtu(inp, (struct sockaddr_in6 *)dst,
 					(u_int32_t *)cmdarg);
 		}
@@ -834,13 +840,15 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg,notify)
 		if (lport == 0 && fport == 0 && flowinfo &&
 		    inp->inp_socket != NULL &&
 		    flowinfo == (inp->in6p_flowinfo & IPV6_FLOWLABEL_MASK) &&
-		    IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, &laddr6))
+		    IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, &sa6_src.sin6_addr))
 			goto do_notify;
-		else if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &faddr6) ||
+		else if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr,
+					     &sa6_dst->sin6_addr) ||
 			 inp->inp_socket == 0 ||
 			 (lport && inp->inp_lport != lport) ||
-			 (!IN6_IS_ADDR_UNSPECIFIED(&laddr6) &&
-			  !IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, &laddr6)) ||
+			 (!IN6_IS_ADDR_UNSPECIFIED(&sa6_src.sin6_addr) &&
+			  !IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr,
+					      &sa6_src.sin6_addr)) ||
 			 (fport && inp->inp_fport != fport))
 			continue;
 
