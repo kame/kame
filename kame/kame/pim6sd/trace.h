@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: trace.h,v 1.1 1999/09/02 12:53:57 jinmei Exp $
+ *  $Id: trace.h,v 1.2 1999/09/09 15:47:11 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -80,19 +80,19 @@
 /*
  * The packet format for a traceroute request.
  */
-struct tr_query {
+struct tr6_query {
     struct in6_addr  tr_src;		/* traceroute source */
     struct in6_addr  tr_dst;		/* traceroute destination */
     struct in6_addr  tr_raddr;		/* traceroute response address */
 #if defined(BYTE_ORDER) && (BYTE_ORDER == LITTLE_ENDIAN)
     struct {
-	u_int	qid : 24;	/* traceroute query id */
-	u_int	rhlim : 8;	/* traceroute response ttl */
+	u_int32_t qid : 24;	/* traceroute query id */
+	u_int32_t rhlim : 8;	/* traceroute response ttl */
     } q;
 #else
     struct {
-	u_int   rhlim : 8;	/* traceroute response ttl */
-	u_int   qid : 24;	/* traceroute query id */
+	u_int32_t rhlim : 8;	/* traceroute response ttl */
+	u_int32_t qid : 24;	/* traceroute query id */
     } q;
 #endif /* BYTE_ORDER */
 };
@@ -104,18 +104,19 @@ struct tr_query {
  * Traceroute response format.  A traceroute response has a tr_query at the
  * beginning, followed by one tr_resp for each hop taken.
  */
-struct tr_resp {
-	u_int32 tr_qarr;	/* query arrival time */
+struct tr6_resp {
+	u_int32_t tr_qarr;	/* query arrival time */
 #if 0
 	struct in6_addr tr_inaddr; /* incoming interface address */
 	struct in6_addr tr_outaddr; /* outgoing interface address */
 #endif
-	u_int32 tr_inifid;	/* incoming interface identifier */
-	u_int32 tr_outifid;	/* outgoing interface identifier */
+	u_int32_t tr_inifid;	/* incoming interface identifier */
+	u_int32_t tr_outifid;	/* outgoing interface identifier */
+	struct in6_addr tr_lcladdr; /* router's address(must have largest scope) */
 	struct in6_addr tr_rmtaddr; /* parent address in source tree */
-	u_int32 tr_vifin;	/* input packet count on interface */
-	u_int32 tr_vifout;	/* output packet count on interface */
-	u_int32 tr_pktcnt;	/* total incoming packets for src-grp */
+	u_int32_t tr_vifin;	/* input packet count on interface */
+	u_int32_t tr_vifout;	/* output packet count on interface */
+	u_int32_t tr_pktcnt;	/* total incoming packets for src-grp */
 	u_char  tr_rproto;	/* routing protocol deployed on router */
 #if 0
 	u_char  tr_fhlim;	/* hop limit required to forward on outvif */
@@ -128,8 +129,8 @@ struct tr_resp {
 /* defs within mtrace */
 #define QUERY	1
 #define RESP	2
-#define QLEN	sizeof(struct tr_query)
-#define RLEN	sizeof(struct tr_resp)
+#define QLEN	sizeof(struct tr6_query)
+#define RLEN	sizeof(struct tr6_resp)
 
 /* fields for tr_inifid and tr_outifid */
 #define TR_NO_VIF	0xffffffff/* interface can't be determined */
@@ -169,7 +170,7 @@ struct tr_resp {
 #define PROTO_DVMRP_STATIC 7
 
 #define MASK_TO_VAL(x, i) { \
-			u_int32 _x = ntohl(x); \
+			u_int32_t _x = ntohl(x); \
 			(i) = 1; \
 			while ((_x) <<= 1) \
 				(i)++; \

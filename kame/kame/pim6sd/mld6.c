@@ -110,7 +110,6 @@ struct sockaddr_in6 allnodes_group = {sizeof(struct sockaddr_in6), AF_INET6};
 extern struct in6_addr in6addr_linklocal_allnodes;
 
 /* local variables. */
-static struct sockaddr_in6 *dstp;
 static struct sockaddr_in6 	dst = {sizeof(dst), AF_INET6};
 static struct msghdr 		sndmh,
                 		rcvmh;
@@ -120,6 +119,9 @@ static struct sockaddr_in6 	from;
 static struct in6_pktinfo 	*sndpktinfo;
 static u_char   		rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 			   	CMSG_SPACE(sizeof(int))];
+u_int8_t raopt[IP6OPT_RTALERT_LEN];
+static char *sndcmsgbuf;
+static int ctlbuflen = 0;
 
 /* local functions */
 
@@ -137,8 +139,6 @@ init_mld6()
                     cmsglen;
     u_char         *cmsgbuf;
     struct cmsghdr *cmsgp;
-    static u_char   sndcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
-    u_int8_t        raopt[IP6OPT_RTALERT_LEN];
     u_short         rtalert_code = htons(IP6OPT_RTALERT_MLD);
 
     if (!mld6_recv_buf && (mld6_recv_buf = malloc(RECV_BUF_SIZE)) == NULL)
@@ -199,29 +199,10 @@ init_mld6()
     sndmh.msg_namelen = sizeof(struct sockaddr_in6);
     sndmh.msg_iov = sndiov;
     sndmh.msg_iovlen = 1;
-    sndmh.msg_control = (caddr_t) sndcmsgbuf;
-    sndmh.msg_controllen = sizeof(sndcmsgbuf);
-    cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-	inet6_option_space(sizeof(raopt));
-    if ((cmsgbuf = malloc(cmsglen)) == NULL)
-	log(LOG_ERR, 0, "malloc failed");
-    cmsgp = (struct cmsghdr *) cmsgbuf;
-    sndmh.msg_control = (caddr_t) cmsgbuf;
-    sndmh.msg_controllen = cmsglen;
-    /* initilization cmsg for specifing outgoing interfaces */
-    sndpktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsgp);
-    cmsgp->cmsg_len = CMSG_SPACE(sizeof(struct in6_pktinfo));
-    cmsgp->cmsg_level = IPPROTO_IPV6;
-    cmsgp->cmsg_type = IPV6_PKTINFO;
     /* specifiy to insert router alert option in a hop-by-hop opt hdr. */
-    cmsgp = CMSG_NXTHDR(&sndmh, cmsgp);
-    if (inet6_option_init((void *) cmsgp, &cmsgp, IPV6_HOPOPTS))
-	log(LOG_ERR, 0, "inet6_option_init failed");
     raopt[0] = IP6OPT_RTALERT;
     raopt[1] = IP6OPT_RTALERT_LEN - 2;
     memcpy(&raopt[2], (caddr_t) & rtalert_code, sizeof(u_short));
-    if (inet6_option_append(cmsgp, raopt, 4, 0))
-	log(LOG_ERR, 0, "inet6_option_append failed");
 
     /* register MLD message handler */
     if (register_input_handler(mld6_socket, mld6_read) < 0)
@@ -391,38 +372,30 @@ accept_mld6(recvlen)
 }
 
 static void
-make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen)
-    int type, code, ifindex, delay, datalen;
+make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
+    int type, code, ifindex, delay, datalen, alert;
     struct sockaddr_in6 *src, *dst;
     struct in6_addr *group;
 {
     static struct sockaddr_in6 dst_sa = {sizeof(dst_sa), AF_INET6};
     struct mld6_hdr *mhp = (struct mld6_hdr *)mld6_send_buf;
-    int octllen;
+    int ctllen;
 
     switch(type) {
     case MLD6_MTRACE:
     case MLD6_MTRACE_RESP:
 	sndmh.msg_name = (caddr_t)dst;
-	/*
-	 * XXX: a router alert option must not be contained in an
-	 * mtrace message. We should be more generic, though.
-	 */
-	octllen = sndmh.msg_controllen;
-	sndmh.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
-	sndmh.msg_controllen = octllen;
 	break;
     default:
 	if (IN6_IS_ADDR_UNSPECIFIED(group))
 	    dst_sa.sin6_addr = allnodes_group.sin6_addr;
 	else
 	    dst_sa.sin6_addr = *group;
-	dstp = &dst_sa;
 	sndmh.msg_name = (caddr_t)&dst_sa;
 	datalen = sizeof(struct mld6_hdr);
 	break;
     }
-
+   
     bzero(mhp, sizeof(*mhp));
     mhp->mld6_type = type;
     mhp->mld6_code = 0;
@@ -431,25 +404,69 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen)
 
     sndiov[0].iov_len = datalen;
 
-    /* specify the outgoing interface and the source address */
-    sndpktinfo->ipi6_ifindex = ifindex;
-    memcpy(&sndpktinfo->ipi6_addr, &src->sin6_addr,
-	   sizeof(sndpktinfo->ipi6_addr));
+    /* estimate total ancillary data length */
+    ctllen = 0;
+    if (ifindex != -1 || src)
+	    ctllen += CMSG_SPACE(sizeof(struct in6_pktinfo));
+    if (alert)
+	    ctllen += inet6_option_space(sizeof(raopt));
+    /* extend ancillary data space (if necessary) */
+    if (ctlbuflen < ctllen) {
+	    if (sndcmsgbuf)
+		    free(sndcmsgbuf);
+	    if ((sndcmsgbuf = malloc(ctllen)) == NULL)
+		    log(LOG_ERR, 0, "make_mld6_msg: malloc failed"); /* assert */
+	    ctlbuflen = ctllen;
+    }
+    /* store ancillary data */
+    if ((sndmh.msg_controllen = ctllen) > 0) {
+	    struct cmsghdr *cmsgp;
+
+	    sndmh.msg_control = sndcmsgbuf;
+	    cmsgp = CMSG_FIRSTHDR(&sndmh);
+
+	    if (ifindex != -1 || src) {
+		    struct in6_pktinfo *pktinfo;
+
+		    cmsgp->cmsg_len = CMSG_SPACE(sizeof(struct in6_pktinfo));
+		    cmsgp->cmsg_level = IPPROTO_IPV6;
+		    cmsgp->cmsg_type = IPV6_PKTINFO;
+		    pktinfo = (struct in6_pktinfo *)CMSG_DATA(cmsgp);
+		    memset((caddr_t)pktinfo, 0, sizeof(*pktinfo));
+		    if (ifindex != -1)
+			    pktinfo->ipi6_ifindex = ifindex;
+		    if (src)
+			    pktinfo->ipi6_addr = src->sin6_addr;
+		    cmsgp = CMSG_NXTHDR(&sndmh, cmsgp);
+	    }
+	    if (alert) {
+		    if (inet6_option_init((void *)cmsgp, &cmsgp, IPV6_HOPOPTS))
+			    log(LOG_ERR, 0, /* assert */
+				"make_mld6_msg: inet6_option_init failed");
+		    if (inet6_option_append(cmsgp, raopt, 4, 0))
+			    log(LOG_ERR, 0, /* assert */
+				"make_mld6_msg: inet6_option_append failed");
+		    cmsgp = CMSG_NXTHDR(&sndmh, cmsgp);
+	    }
+    }
+    else
+	    sndmh.msg_control = NULL; /* clear for safety */
 }
 
 void
-send_mld6(type, code, src, dst, group, index, delay, datalen)
+send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
     int type;
     int code;		/* for trace packets only */
     struct sockaddr_in6 *src;
     struct sockaddr_in6 *dst; /* may be NULL */
     struct in6_addr *group;
-    int index, delay;
+    int index, delay, alert;
     int datalen;		/* for trace packets only */
 {
     int setloop = 0;
+    struct sockaddr_in6 *dstp = (struct sockaddr_in6 *)sndmh.msg_name;
 	
-    make_mld6_msg(type, code, src, dst, group, index, delay, datalen);
+    make_mld6_msg(type, code, src, dst, group, index, delay, datalen, alert);
     if (IN6_ARE_ADDR_EQUAL(&dstp->sin6_addr, &allnodes_group.sin6_addr)) {
 	setloop = 1;
 	k_set_loop(mld6_socket, TRUE);
@@ -459,9 +476,9 @@ send_mld6(type, code, src, dst, group, index, delay, datalen)
 	    check_vif_state();
 	else
 	    log(log_level(IPPROTO_ICMPV6, type, 0), errno,
-		"sendto to %s with src %s on %s",
+		"sendmsg to %s with src %s on %s",
 		inet6_fmt(&dstp->sin6_addr),
-		inet6_fmt(&src->sin6_addr),
+		src ? inet6_fmt(&src->sin6_addr) : "(unspec)",
 		ifindex2str(index));
 
 	if (setloop)
@@ -472,6 +489,6 @@ send_mld6(type, code, src, dst, group, index, delay, datalen)
     IF_DEBUG(DEBUG_PKT|debug_kind(IPPROTO_IGMP, type, 0))
 	log(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
 	    packet_kind(IPPROTO_ICMPV6, type, 0),
-	    inet6_fmt(&src->sin6_addr),
+	    src ? inet6_fmt(&src->sin6_addr) : "unspec",
 	    inet6_fmt(&dstp->sin6_addr));
 }
