@@ -40,9 +40,7 @@
 #include "ripng_var.h"
 #include "parse.h"
 #include "ospf.h"
-#ifdef USE_LEX_YACC
 #include "cfparse.h"
-#endif 
 
 int confcheck = 0;		/* configuration check only */
 int              rtsock;       /* the routing socket               */
