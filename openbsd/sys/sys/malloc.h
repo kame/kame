@@ -1,4 +1,4 @@
-/*	$OpenBSD: malloc.h,v 1.68 2003/06/21 00:42:58 tedu Exp $	*/
+/*	$OpenBSD: malloc.h,v 1.70 2004/01/14 19:34:05 grange Exp $	*/
 /*	$NetBSD: malloc.h,v 1.39 1998/07/12 19:52:01 augustss Exp $	*/
 
 /*
@@ -87,12 +87,13 @@
 #define	M_SHM		29	/* SVID compatible shared memory segments */
 #define	M_VMMAP		30	/* VM map structures */
 #define	M_SEM		31	/* SVID compatible semaphores */
-/* 32-33 - free */
+#define	M_DIRHASH	32	/* UFS dirhash */
+/* 33 - free */
 #define	M_VMPMAP	34	/* VM pmap */
 /* 35-37 - free */
 #define	M_FILE		38	/* Open file structure */
 #define	M_FILEDESC	39	/* Open file descriptor table */
-#define	M_LOCKF		40	/* Byte-range locking structures */
+/* 40 - free */
 #define	M_PROC		41	/* Proc structures */
 #define	M_SUBPROC	42	/* Proc sub-structures */
 #define	M_VCLUSTER	43	/* Cluster for VFS */
@@ -209,7 +210,7 @@
 	"shm",		/* 29 M_SHM */ \
 	"VM map",	/* 30 M_VMMAP */ \
 	"sem",		/* 31 M_SEM */ \
-	NULL, \
+	"dirhash",	/* 32 M_DIRHASH */ \
 	NULL, \
 	"VM pmap",	/* 34 M_VMPMAP */ \
 	NULL,	/* 35 */ \
@@ -217,7 +218,7 @@
 	NULL,	/* 37 */ \
 	"file",		/* 38 M_FILE */ \
 	"file desc",	/* 39 M_FILEDESC */ \
-	"lockf",	/* 40 M_LOCKF */ \
+	NULL,	/* 40 */ \
 	"proc",		/* 41 M_PROC */ \
 	"subproc",	/* 42 M_SUBPROC */ \
 	"VFS cluster",	/* 43 M_VCLUSTER */ \

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.c,v 1.48 2003/06/02 23:28:13 millert Exp $	*/
+/*	$OpenBSD: if_ether.c,v 1.53 2003/12/18 09:23:14 ho Exp $	*/
 /*	$NetBSD: if_ether.c,v 1.31 1996/05/11 12:59:58 mycroft Exp $	*/
 
 /*
@@ -39,6 +39,7 @@
  */
 
 #ifdef INET
+#include "carp.h"
 
 #include "bridge.h"
 
@@ -59,6 +60,9 @@
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/if_ether.h>
+#if NCARP > 0
+#include <netinet/ip_carp.h>
+#endif
 
 #define SIN(s) ((struct sockaddr_in *)s)
 #define SDL(s) ((struct sockaddr_dl *)s)
@@ -89,9 +93,9 @@ int	useloopback = 1;	/* use loopback interface for local traffic */
 int	arpinit_done = 0;
 
 /* revarp state */
-static struct in_addr myip, srv_ip;
-static int myip_initialized = 0;
-static int revarp_in_progress = 0;
+struct in_addr myip, srv_ip;
+int myip_initialized = 0;
+int revarp_in_progress = 0;
 struct ifnet *myip_ifp = NULL;
 
 #ifdef DDB
@@ -119,7 +123,7 @@ arptimer(arg)
 	timeout_add(to, arpt_prune * hz);
 	for (la = LIST_FIRST(&llinfo_arp); la != LIST_END(&llinfo_arp);
 	    la = nla) {
-		register struct rtentry *rt = la->la_rt;
+		struct rtentry *rt = la->la_rt;
 
 		nla = LIST_NEXT(la, la_list);
 		if (rt->rt_expire && rt->rt_expire <= time.tv_sec)
@@ -134,11 +138,11 @@ arptimer(arg)
 void
 arp_rtrequest(req, rt, info)
 	int req;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	struct rt_addrinfo *info;
 {
-	register struct sockaddr *gate = rt->rt_gateway;
-	register struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;
+	struct sockaddr *gate = rt->rt_gateway;
+	struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
 	struct in_ifaddr *ia;
 	struct ifaddr *ifa;
@@ -316,13 +320,13 @@ arp_rtrequest(req, rt, info)
  */
 void
 arprequest(ifp, sip, tip, enaddr)
-	register struct ifnet *ifp;
-	register u_int32_t *sip, *tip;
-	register u_int8_t *enaddr;
+	struct ifnet *ifp;
+	u_int32_t *sip, *tip;
+	u_int8_t *enaddr;
 {
-	register struct mbuf *m;
-	register struct ether_header *eh;
-	register struct ether_arp *ea;
+	struct mbuf *m;
+	struct ether_header *eh;
+	struct ether_arp *ea;
 	struct sockaddr sa;
 
 	if ((m = m_gethdr(M_DONTWAIT, MT_DATA)) == NULL)
@@ -363,13 +367,13 @@ arprequest(ifp, sip, tip, enaddr)
  */
 int
 arpresolve(ac, rt, m, dst, desten)
-	register struct arpcom *ac;
-	register struct rtentry *rt;
+	struct arpcom *ac;
+	struct rtentry *rt;
 	struct mbuf *m;
-	register struct sockaddr *dst;
-	register u_char *desten;
+	struct sockaddr *dst;
+	u_char *desten;
 {
-	register struct llinfo_arp *la;
+	struct llinfo_arp *la;
 	struct sockaddr_dl *sdl;
 
 	if (m->m_flags & M_BCAST) {	/* broadcast */
@@ -450,8 +454,8 @@ arpresolve(ac, rt, m, dst, desten)
 void
 arpintr()
 {
-	register struct mbuf *m;
-	register struct arphdr *ar;
+	struct mbuf *m;
+	struct arphdr *ar;
 	int s, len;
 
 	while (arpintrq.ifq_head) {
@@ -503,11 +507,11 @@ void
 in_arpinput(m)
 	struct mbuf *m;
 {
-	register struct ether_arp *ea;
-	register struct arpcom *ac = (struct arpcom *)m->m_pkthdr.rcvif;
+	struct ether_arp *ea;
+	struct arpcom *ac = (struct arpcom *)m->m_pkthdr.rcvif;
 	struct ether_header *eh;
-	register struct llinfo_arp *la = 0;
-	register struct rtentry *rt;
+	struct llinfo_arp *la = 0;
+	struct rtentry *rt;
 	struct in_ifaddr *ia;
 #if NBRIDGE > 0
 	struct in_ifaddr *bridge_ia = NULL;
@@ -515,6 +519,7 @@ in_arpinput(m)
 	struct sockaddr_dl *sdl;
 	struct sockaddr sa;
 	struct in_addr isaddr, itaddr, myaddr;
+	u_int8_t *enaddr = NULL;
 	int op;
 
 	ea = mtod(m, struct ether_arp *);
@@ -550,6 +555,14 @@ in_arpinput(m)
 		    m->m_pkthdr.rcvif->if_bridge == ia->ia_ifp->if_bridge)
 			bridge_ia = ia;
 #endif
+
+#if NCARP > 0
+		if (ac->ac_if.if_carp) {
+			if (carp_iamatch(ac->ac_if.if_carp, ia,
+			    &isaddr, &enaddr)) 
+				break;
+		}
+#endif
 	}
 
 #if NBRIDGE > 0
@@ -582,23 +595,19 @@ in_arpinput(m)
 	if (ia == NULL)
 		goto out;
 
+	if (!enaddr)
+		enaddr = ac->ac_enaddr;
 	myaddr = ia->ia_addr.sin_addr;
 
-	if (!bcmp((caddr_t)ea->arp_sha, (caddr_t)ac->ac_enaddr,
-	    sizeof (ea->arp_sha)))
+	if (!bcmp((caddr_t)ea->arp_sha, enaddr, sizeof (ea->arp_sha)))
 		goto out;	/* it's from me, ignore it. */
-	if (ETHER_IS_MULTICAST (&ea->arp_sha[0])) {
+	if (ETHER_IS_MULTICAST (&ea->arp_sha[0]))
 		if (!bcmp((caddr_t)ea->arp_sha, (caddr_t)etherbroadcastaddr,
-		    sizeof (ea->arp_sha)))
-		    log(LOG_ERR,
-			"arp: ether address is broadcast for IP address %s!\n",
-			inet_ntoa(isaddr));
-		else
-		    log(LOG_ERR,
-			"arp: ether address is multicast for IP address %s!\n",
-			inet_ntoa(isaddr));
-		goto out;
-	}
+		    sizeof (ea->arp_sha))) {
+			log(LOG_ERR, "arp: ether address is broadcast for "
+			    "IP address %s!\n", inet_ntoa(isaddr));
+			goto out;
+		}
 	if (myaddr.s_addr && isaddr.s_addr == myaddr.s_addr) {
 		log(LOG_ERR,
 		   "duplicate IP address %s sent from ethernet address %s\n",
@@ -609,7 +618,7 @@ in_arpinput(m)
 	la = arplookup(isaddr.s_addr, itaddr.s_addr == myaddr.s_addr, 0);
 	if (la && (rt = la->la_rt) && (sdl = SDL(rt->rt_gateway))) {
 		if (sdl->sdl_alen) {
-		    if (bcmp((caddr_t)ea->arp_sha, LLADDR(sdl), sdl->sdl_alen)) {
+		    if (bcmp(ea->arp_sha, LLADDR(sdl), sdl->sdl_alen)) {
 		  	if (rt->rt_flags & RTF_PERMANENT_ARP) {
 				log(LOG_WARNING,
 				   "arp: attempt to overwrite permanent "
@@ -645,7 +654,7 @@ in_arpinput(m)
 			ac->ac_if.if_xname);
 		    goto out;
 		}
-		bcopy((caddr_t)ea->arp_sha, LLADDR(sdl),
+		bcopy(ea->arp_sha, LLADDR(sdl),
 		    sdl->sdl_alen = sizeof(ea->arp_sha));
 		if (rt->rt_expire)
 			rt->rt_expire = time.tv_sec + arpt_keep;
@@ -665,30 +674,25 @@ reply:
 	}
 	if (itaddr.s_addr == myaddr.s_addr) {
 		/* I am the target */
-		bcopy((caddr_t)ea->arp_sha, (caddr_t)ea->arp_tha,
-		    sizeof(ea->arp_sha));
-		bcopy((caddr_t)ac->ac_enaddr, (caddr_t)ea->arp_sha,
-		    sizeof(ea->arp_sha));
+		bcopy(ea->arp_sha, ea->arp_tha, sizeof(ea->arp_sha));
+		bcopy(enaddr, ea->arp_sha, sizeof(ea->arp_sha));
 	} else {
 		la = arplookup(itaddr.s_addr, 0, SIN_PROXY);
 		if (la == 0)
 			goto out;
 		rt = la->la_rt;
-		bcopy((caddr_t)ea->arp_sha, (caddr_t)ea->arp_tha,
-		    sizeof(ea->arp_sha));
+		bcopy(ea->arp_sha, ea->arp_tha, sizeof(ea->arp_sha));
 		sdl = SDL(rt->rt_gateway);
-		bcopy(LLADDR(sdl), (caddr_t)ea->arp_sha, sizeof(ea->arp_sha));
+		bcopy(LLADDR(sdl), ea->arp_sha, sizeof(ea->arp_sha));
 	}
 
-	bcopy((caddr_t)ea->arp_spa, (caddr_t)ea->arp_tpa, sizeof(ea->arp_spa));
-	bcopy((caddr_t)&itaddr, (caddr_t)ea->arp_spa, sizeof(ea->arp_spa));
+	bcopy(ea->arp_spa, ea->arp_tpa, sizeof(ea->arp_spa));
+	bcopy(&itaddr, ea->arp_spa, sizeof(ea->arp_spa));
 	ea->arp_op = htons(ARPOP_REPLY);
 	ea->arp_pro = htons(ETHERTYPE_IP); /* let's be sure! */
 	eh = (struct ether_header *)sa.sa_data;
-	bcopy((caddr_t)ea->arp_tha, (caddr_t)eh->ether_dhost,
-	    sizeof(eh->ether_dhost));
-	bcopy((caddr_t)ac->ac_enaddr, (caddr_t)eh->ether_shost,
-	    sizeof(eh->ether_shost));
+	bcopy(ea->arp_tha, eh->ether_dhost, sizeof(eh->ether_dhost));
+	bcopy(enaddr, eh->ether_shost, sizeof(eh->ether_shost));
 	eh->ether_type = htons(ETHERTYPE_ARP);
 	sa.sa_family = AF_UNSPEC;
 	sa.sa_len = sizeof(sa);
@@ -701,10 +705,10 @@ reply:
  */
 void
 arptfree(la)
-	register struct llinfo_arp *la;
+	struct llinfo_arp *la;
 {
-	register struct rtentry *rt = la->la_rt;
-	register struct sockaddr_dl *sdl;
+	struct rtentry *rt = la->la_rt;
+	struct sockaddr_dl *sdl;
 
 	if (rt == 0)
 		panic("arptfree");
@@ -727,7 +731,7 @@ arplookup(addr, create, proxy)
 	u_int32_t addr;
 	int create, proxy;
 {
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	static struct sockaddr_inarp sin;
 
 	sin.sin_len = sizeof(sin);
@@ -740,10 +744,18 @@ arplookup(addr, create, proxy)
 	rt->rt_refcnt--;
 	if ((rt->rt_flags & RTF_GATEWAY) || (rt->rt_flags & RTF_LLINFO) == 0 ||
 	    rt->rt_gateway->sa_family != AF_LINK) {
-		if (create)
+		if (create) {
 			log(LOG_DEBUG,
 			    "arplookup: unable to enter address for %s\n",
 			    inet_ntoa(sin.sin_addr));
+			if (rt->rt_refcnt <= 0 &&
+			    (rt->rt_flags & RTF_CLONED) != 0) {
+				rtrequest(RTM_DELETE,
+				    (struct sockaddr *)rt_key(rt),
+				    rt->rt_gateway, rt_mask(rt), rt->rt_flags,
+				    0);
+			}
+		}
 		return (0);
 	}
 	return ((struct llinfo_arp *)rt->rt_llinfo);

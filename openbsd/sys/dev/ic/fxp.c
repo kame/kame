@@ -1,4 +1,4 @@
-/*	$OpenBSD: fxp.c,v 1.42 2003/05/28 11:23:19 henric Exp $	*/
+/*	$OpenBSD: fxp.c,v 1.47.2.1 2004/05/14 21:28:43 brad Exp $	*/
 /*	$NetBSD: if_fxp.c,v 1.2 1997/06/05 02:01:55 thorpej Exp $	*/
 
 /*
@@ -82,8 +82,6 @@
 
 #include <netinet/if_ether.h>
 
-#include <uvm/uvm_extern.h>
-
 #include <machine/cpu.h>
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -144,7 +142,7 @@ static u_char fxp_cb_config_template[] = {
 	0x60,	/* 12 interfrm_spacing */
 	0x00,	/* 13 void31 */
 	0xf2,	/* 14 void32 */
-	0x48,	/* 15 promiscous */
+	0x48,	/* 15 promiscuous */
 	0x00,	/* 16 void41 */
 	0x40,	/* 17 void42 */
 	0xf3,	/* 18 stripping */
@@ -415,7 +413,7 @@ fxp_attach_common(sc, enaddr, intrstr)
 
 	/*
 	 * Add shutdown hook so that DMA is disabled prior to reboot. Not
-	 * doing do could allow DMA to corrupt kernel memory during the
+	 * doing so could allow DMA to corrupt kernel memory during the
 	 * reboot before the driver initializes.
 	 */
 	sc->sc_sdhook = shutdownhook_establish(fxp_shutdown, sc);
@@ -483,7 +481,7 @@ fxp_detach(sc)
  *
  * 559's can have either 64-word or 256-word EEPROMs, the 558
  * datasheet only talks about 64-word EEPROMs, and the 557 datasheet
- * talks about the existance of 16 to 256 word EEPROMs.
+ * talks about the existence of 16 to 256 word EEPROMs.
  *
  * The only known sizes are 64 and 256, where the 256 version is used
  * by CardBus cards to store CIS information.
@@ -524,9 +522,9 @@ fxp_autosize_eeprom(sc)
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
 		    reg | FXP_EEPROM_EESK);
-		DELAY(1);
+		DELAY(4);
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
-		DELAY(1);
+		DELAY(4);
 	}
 	/*
 	 * Shift in address.
@@ -536,14 +534,14 @@ fxp_autosize_eeprom(sc)
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
 			FXP_EEPROM_EECS | FXP_EEPROM_EESK);
-		DELAY(1);
+		DELAY(4);
 		if ((CSR_READ_2(sc, FXP_CSR_EEPROMCONTROL) & FXP_EEPROM_EEDO) == 0)
 			break;
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
-		DELAY(1);
+		DELAY(4);
 	}
 	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, 0);
-	DELAY(1);
+	DELAY(4);
 	sc->eeprom_size = x;
 }
 /*
@@ -577,9 +575,9 @@ fxp_read_eeprom(sc, data, offset, words)
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
 			    reg | FXP_EEPROM_EESK);
-			DELAY(1);
+			DELAY(4);
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
-			DELAY(1);
+			DELAY(4);
 		}
 		/*
 		 * Shift in address.
@@ -593,9 +591,9 @@ fxp_read_eeprom(sc, data, offset, words)
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
 			    reg | FXP_EEPROM_EESK);
-			DELAY(1);
+			DELAY(4);
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
-			DELAY(1);
+			DELAY(4);
 		}
 		reg = FXP_EEPROM_EECS;
 		data[i] = 0;
@@ -605,16 +603,16 @@ fxp_read_eeprom(sc, data, offset, words)
 		for (x = 16; x > 0; x--) {
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
 			    reg | FXP_EEPROM_EESK);
-			DELAY(1);
+			DELAY(4);
 			if (CSR_READ_2(sc, FXP_CSR_EEPROMCONTROL) &
 			    FXP_EEPROM_EEDO)
 				data[i] |= (1 << (x - 1));
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
-			DELAY(1);
+			DELAY(4);
 		}
-		data[i] = htole16(data[i]);
+		data[i] = letoh16(data[i]);
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, 0);
-		DELAY(1);
+		DELAY(4);
 	}
 }
 
@@ -739,8 +737,10 @@ fxp_intr(arg)
 	struct fxp_softc *sc = arg;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	u_int8_t statack;
-	int claimed = 0, rnr;
-
+	bus_dmamap_t rxmap;
+	int claimed = 0;
+	int rnr = 0;
+	
 	/*
 	 * If the interface isn't running, don't try to
 	 * service the interrupt.. just ack it and bail.
@@ -756,8 +756,7 @@ fxp_intr(arg)
 
 	while ((statack = CSR_READ_1(sc, FXP_CSR_SCB_STATACK)) != 0) {
 		claimed = 1;
-		rnr = 0;
-
+		rnr = (statack & FXP_SCB_STATACK_RNR) ? 1 : 0;
 		/*
 		 * First ACK all the interrupts in this pass.
 		 */
@@ -808,7 +807,6 @@ fxp_intr(arg)
 		 */
 		if (statack & (FXP_SCB_STATACK_FR | FXP_SCB_STATACK_RNR)) {
 			struct mbuf *m;
-			bus_dmamap_t rxmap;
 			u_int8_t *rfap;
 rcvloop:
 			m = sc->rfa_headm;
@@ -860,15 +858,16 @@ rcvloop:
 				}
 				goto rcvloop;
 			}
-			if (rnr) {
-				rxmap = *((bus_dmamap_t *)
-				    sc->rfa_headm->m_ext.ext_buf);
-				fxp_scb_wait(sc);
-				CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL,
+		}
+		if (rnr) {
+			rxmap = *((bus_dmamap_t *)
+				  sc->rfa_headm->m_ext.ext_buf);
+			fxp_scb_wait(sc);
+			CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL,
 				    rxmap->dm_segs[0].ds_addr +
 				    RFA_ALIGNMENT_FUDGE);
-				fxp_scb_cmd(sc, FXP_SCB_COMMAND_RU_START);
-			}
+			fxp_scb_cmd(sc, FXP_SCB_COMMAND_RU_START);
+			
 		}
 	}
 	return (claimed);

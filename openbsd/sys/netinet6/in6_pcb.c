@@ -1,4 +1,4 @@
-/*	$OpenBSD: in6_pcb.c,v 1.35 2003/08/15 20:32:20 tedu Exp $	*/
+/*	$OpenBSD: in6_pcb.c,v 1.42 2004/02/06 21:05:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,7 +131,6 @@
 #include <dev/rndvar.h>
 
 extern struct in6_ifaddr *in6_ifaddr;
-extern struct in_ifaddr *in_ifaddr;
 
 /*
  * Globals
@@ -181,7 +180,7 @@ in6_pcbbind(inp, nam)
 	 * REMINDER:  Once up to speed, flow label processing should go here,
 	 * too.  (Same with in6_pcbconnect.)
 	 */
-	if (in6_ifaddr == 0 || in_ifaddr == 0)
+	if (in6_ifaddr == 0)
 		return EADDRNOTAVAIL;
 
 	if (inp->inp_lport != 0 || !IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
@@ -284,23 +283,16 @@ in6_pcbbind(inp, nam)
 				return EADDRINUSE;
 		}
 		inp->inp_laddr6 = sin6->sin6_addr;
-
-#if 0
-		if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-			inp->inp_ipv6.ip6_flow = htonl(0x60000000) |
-			    (sin6->sin6_flowinfo & htonl(0x0fffffff));
-		}
-#endif
 	}
 
 	if (lport == 0) {
 		error = in6_pcbsetport(&inp->inp_laddr6, inp, p);
 		if (error != 0)
 			return error;
-	} else
+	} else {
 		inp->inp_lport = lport;
-
-	in_pcbrehash(inp);
+		in_pcbrehash(inp);
+	}
 
 	return 0;
 }
@@ -409,6 +401,10 @@ portloop:
 	inp->inp_lport = lport;
 	in_pcbrehash(inp);
 
+#if 0
+	inp->inp_flowinfo = 0;	/* XXX */
+#endif
+
 	return 0;
 }
 
@@ -431,7 +427,6 @@ in6_pcbconnect(inp, nam)
 	struct sockaddr_in6 *sin6 = mtod(nam, struct sockaddr_in6 *);
 	struct ifnet *ifp = NULL;	/* outgoing interface */
 	int error = 0;
-	struct in6_addr mapped;
 	struct sockaddr_in6 tmp;
 
 	(void)&in6a;				/* XXX fool gcc */
@@ -448,15 +443,8 @@ in6_pcbconnect(inp, nam)
 		return EADDRNOTAVAIL;
 
 	/* sanity check for mapped address case */
-	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
-			inp->inp_laddr6.s6_addr16[5] = htons(0xffff);
-		if (!IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6))
-			return EINVAL;
-	} else {
-		if (IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6))
-			return EINVAL;
-	}
+	if (IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6))
+		return EINVAL;
 
 	/* protect *sin6 from overwrites */
 	tmp = *sin6;
@@ -466,45 +454,20 @@ in6_pcbconnect(inp, nam)
 		return(error);
 
 	/* Source address selection. */
-	if (IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6) &&
-	    inp->inp_laddr6.s6_addr32[3] == 0) {
-		struct sockaddr_in sin, *sinp;
-
-		bzero(&sin, sizeof(sin));
-		sin.sin_len = sizeof(sin);
-		sin.sin_family = AF_INET;
-		bcopy(&sin6->sin6_addr.s6_addr32[3], &sin.sin_addr,
-		    sizeof(sin.sin_addr));
-		sinp = in_selectsrc(&sin, (struct route *)&inp->inp_route6,
-		    inp->inp_socket->so_options, NULL, &error);
-		if (sinp == 0) {
-			if (error == 0)
-				error = EADDRNOTAVAIL;
-			return (error);
-		}
-		bzero(&mapped, sizeof(mapped));
-		mapped.s6_addr16[5] = htons(0xffff);
-		bcopy(&sinp->sin_addr, &mapped.s6_addr32[3], sizeof(sinp->sin_addr));
-		in6a = &mapped;
-	} else {
-		/*
-		 * XXX: in6_selectsrc might replace the bound local address
-		 * with the address specified by setsockopt(IPV6_PKTINFO).
-		 * Is it the intended behavior?
-		 */
-		in6a = in6_selectsrc(sin6, inp->inp_outputopts6,
-		    inp->inp_moptions6, &inp->inp_route6, &inp->inp_laddr6,
-		    &ifp, &error);
-		if (in6a == 0) {
-			if (error == 0)
-				error = EADDRNOTAVAIL;
-			return (error);
-		}
-		if (ifp && sin6->sin6_scope_id == 0 &&
-		    (error = scope6_setzoneid(ifp, sin6)) != 0) {
-			return(error);
-		}
+	/*
+	 * XXX: in6_selectsrc might replace the bound local address
+	 * with the address specified by setsockopt(IPV6_PKTINFO).
+	 * Is it the intended behavior?
+	 */
+	in6a = in6_selectsrc(sin6, inp->inp_outputopts6,
+	    inp->inp_moptions6, &inp->inp_route6, &inp->inp_laddr6,
+	    &ifp, &error);
+	if (in6a == 0) {
+		if (error == 0)
+			error = EADDRNOTAVAIL;
+		return (error);
 	}
+
 	if (ifp == NULL && inp->inp_route6.ro_rt)
 		ifp = inp->inp_route6.ro_rt->rt_ifp;
 
@@ -515,18 +478,15 @@ in6_pcbconnect(inp, nam)
 	    inp->inp_lport, INPLOOKUP_IPV6)) {
 		return (EADDRINUSE);
 	}
-	if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) ||
-	    (IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6) &&
-	     inp->inp_laddr6.s6_addr32[3] == 0)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6)) {
 		if (inp->inp_lport == 0)
 			(void)in6_pcbbind(inp, (struct mbuf *)0);
 		inp->inp_laddr6 = *in6a;
 	}
 	inp->inp_faddr6 = sin6->sin6_addr;
 	inp->inp_fport = sin6->sin6_port;
-	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 	inp->inp_flowinfo &= ~IPV6_FLOWLABEL_MASK;
-	if (inp->inp_flags & IN6P_AUTOFLOWLABEL)
+	if (ip6_auto_flowlabel)
 		inp->inp_flowinfo |=
 		    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
 	in_pcbrehash(inp);
@@ -563,15 +523,19 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	int errno, nmatch = 0;
 	u_int32_t flowinfo;
 
-	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
-		return 1;
+	if ((unsigned)cmd >= PRC_NCMDS || dst->sa_family != AF_INET6)
+		return (0);
 
 	sa6_dst = (struct sockaddr_in6 *)dst;
 	if (IN6_IS_ADDR_UNSPECIFIED(&sa6_dst->sin6_addr))
-		return 1;
-	if (IN6_IS_ADDR_V4MAPPED(&sa6_dst->sin6_addr))
+		return (0);
+	if (IN6_IS_ADDR_V4MAPPED(&sa6_dst->sin6_addr)) {
+#ifdef DIAGNOSTIC
 		printf("Huh?  Thought in6_pcbnotify() never got "
 		       "called with mapped!\n");
+#endif
+		return (0);
+	}
 
 	/*
 	 * note that src can be NULL when we get notify by local fragmentation.
@@ -597,9 +561,9 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	}
 	errno = inet6ctlerrmap[cmd];
 
-	for (inp = head->inpt_queue.cqh_first;
-	     inp != (struct inpcb *)&head->inpt_queue; inp = ninp) {
-		ninp = inp->inp_queue.cqe_next;
+	for (inp = CIRCLEQ_FIRST(&head->inpt_queue);
+	     inp != CIRCLEQ_END(&head->inpt_queue); inp = ninp) {
+		ninp = CIRCLEQ_NEXT(inp, inp_queue);
 
 		if ((inp->inp_flags & INP_IPV6) == 0)
 			continue;
@@ -666,7 +630,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		if (notify)
 			(*notify)(inp, errno);
 	}
-	return 0;
+	return (nmatch);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.c,v 1.32 2003/06/23 08:09:21 itojun Exp $	*/
+/*	$OpenBSD: in.c,v 1.34 2004/03/28 17:39:12 deraadt Exp $	*/
 /*	$NetBSD: in.c,v 1.26 1996/02/13 23:41:39 christos Exp $	*/
 
 /*
@@ -146,7 +146,7 @@ int
 in_localaddr(in)
 	struct in_addr in;
 {
-	register struct in_ifaddr *ia;
+	struct in_ifaddr *ia;
 
 	if (subnetsarelocal) {
 		for (ia = in_ifaddr.tqh_first; ia != 0; ia = ia->ia_list.tqe_next)
@@ -169,7 +169,7 @@ int
 in_canforward(in)
 	struct in_addr in;
 {
-	register u_int32_t net;
+	u_int32_t net;
 
 	if (IN_EXPERIMENTAL(in.s_addr) || IN_MULTICAST(in.s_addr))
 		return (0);
@@ -188,8 +188,8 @@ void
 in_socktrim(ap)
 	struct sockaddr_in *ap;
 {
-	register char *cplim = (char *) &ap->sin_addr;
-	register char *cp = (char *) (&ap->sin_addr + 1);
+	char *cplim = (char *) &ap->sin_addr;
+	char *cp = (char *) (&ap->sin_addr + 1);
 
 	ap->sin_len = 0;
 	while (--cp >= cplim)
@@ -249,10 +249,10 @@ in_control(so, cmd, data, ifp)
 	struct socket *so;
 	u_long cmd;
 	caddr_t data;
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 {
-	register struct ifreq *ifr = (struct ifreq *)data;
-	register struct in_ifaddr *ia = 0;
+	struct ifreq *ifr = (struct ifreq *)data;
+	struct in_ifaddr *ia = 0;
 	struct in_aliasreq *ifra = (struct in_aliasreq *)data;
 	struct sockaddr_in oldaddr;
 	int error, hostIsNew, maskIsNew;
@@ -452,7 +452,9 @@ in_control(so, cmd, data, ifp)
 		splx(s);
 		return (error);
 
-	case SIOCDIFADDR:
+	case SIOCDIFADDR: {
+		struct in_multi *inm;
+
 		/*
 		 * Even if the individual steps were safe, shouldn't
 		 * these kinds of changes happen atomically?  What 
@@ -463,10 +465,13 @@ in_control(so, cmd, data, ifp)
 		in_ifscrub(ifp, ia);
 		TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 		TAILQ_REMOVE(&in_ifaddr, ia, ia_list);
+		while ((inm = LIST_FIRST(&ia->ia_multiaddrs)) != NULL)
+			in_delmulti(inm);
 		IFAFREE((&ia->ia_ifa));
 		dohooks(ifp->if_addrhooks, 0);
 		splx(s);
 		break;
+		}
 
 #ifdef MROUTING
 	case SIOCGETVIFCNT:
@@ -688,8 +693,8 @@ in_lifaddr_ioctl(so, cmd, data, ifp)
  */
 void
 in_ifscrub(ifp, ia)
-	register struct ifnet *ifp;
-	register struct in_ifaddr *ia;
+	struct ifnet *ifp;
+	struct in_ifaddr *ia;
 {
 
 	in_scrubprefix(ia);
@@ -701,12 +706,12 @@ in_ifscrub(ifp, ia)
  */
 int
 in_ifinit(ifp, ia, sin, scrub)
-	register struct ifnet *ifp;
-	register struct in_ifaddr *ia;
+	struct ifnet *ifp;
+	struct in_ifaddr *ia;
 	struct sockaddr_in *sin;
 	int scrub;
 {
-	register u_int32_t i = sin->sin_addr.s_addr;
+	u_int32_t i = sin->sin_addr.s_addr;
 	struct sockaddr_in oldaddr;
 	int s = splimp(), flags = RTF_UP, error;
 
@@ -915,7 +920,7 @@ in_broadcast(in, ifp)
 	struct ifnet *ifp;
 {
 	struct ifnet *ifn, *if_first, *if_target;
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 
 	if (in.s_addr == INADDR_BROADCAST ||
 	    in.s_addr == INADDR_ANY)
@@ -965,8 +970,8 @@ in_addmulti(ap, ifp, numsrc, ss, mode, init, error)
 #else
 in_addmulti(ap, ifp)
 #endif
-	register struct in_addr *ap;
-	register struct ifnet *ifp;
+	struct in_addr *ap;
+	struct ifnet *ifp;
 #ifdef IGMPV3
 	u_int16_t numsrc;
 	struct sockaddr_storage *ss;
@@ -975,7 +980,7 @@ in_addmulti(ap, ifp)
 	int *error;			/* return code of each sub routine */
 #endif
 {
-	register struct in_multi *inm;
+	struct in_multi *inm;
 	struct ifreq ifr;
 	struct in_ifaddr *ia;
 #ifdef IGMPV3
@@ -1221,7 +1226,7 @@ in_delmulti(inm, numsrc, ss, mode, final, error)
 #else
 in_delmulti(inm)
 #endif
-	register struct in_multi *inm;
+	struct in_multi *inm;
 #ifdef IGMPV3
 	u_int16_t numsrc;
 	struct sockaddr_storage *ss;

@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.109 2004/05/20 08:15:54 suz Exp $	*/
+/*	$KAME: in6_gif.c,v 1.110 2004/05/27 05:05:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,7 +109,7 @@ struct ip6protosw in6_gif_protosw =
 #endif
 };
 
-extern LIST_HEAD(, gif_softc) gif_softc_list;
+extern struct gif_softc_list gif_softc_list;
 
 #ifndef offsetof
 #define offsetof(s, e) ((int)&((s *)0)->e)

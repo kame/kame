@@ -1,4 +1,4 @@
-/*	$OpenBSD: igmp.c,v 1.18 2003/07/09 22:03:16 itojun Exp $	*/
+/*	$OpenBSD: igmp.c,v 1.20 2004/01/03 14:08:53 espie Exp $	*/
 /*	$NetBSD: igmp.c,v 1.15 1996/02/13 23:41:25 christos Exp $	*/
 
 /*
@@ -61,7 +61,7 @@
 #include <netinet/igmp_var.h>
 #include <dev/rndvar.h>
 
-#include <machine/stdarg.h>
+#include <sys/stdarg.h>
 
 #define IP_MULTICASTOPTS	0
 
@@ -217,7 +217,7 @@ static int
 rti_fill(inm)
 	struct in_multi *inm;
 {
-	register struct router_info *rti;
+	struct router_info *rti;
 
 	for (rti = rti_head; rti != 0; rti = rti->rti_next) {
 		if (rti->rti_ifp == inm->inm_ifp) {
@@ -243,7 +243,7 @@ static struct router_info *
 rti_find(ifp)
 	struct ifnet *ifp;
 {
-	register struct router_info *rti;
+	struct router_info *rti;
 
 	for (rti = rti_head; rti != 0; rti = rti->rti_next) {
 		if (rti->rti_ifp == ifp)
@@ -348,11 +348,11 @@ rti_delete(ifp)
 void
 igmp_input(struct mbuf *m, ...)
 {
-	register int iphlen;
-	register struct ifnet *ifp = m->m_pkthdr.rcvif;
-	register struct ip *ip = mtod(m, struct ip *);
-	register struct igmp *igmp;
-	register int igmplen;
+	int iphlen;
+	struct ifnet *ifp = m->m_pkthdr.rcvif;
+	struct ip *ip = mtod(m, struct ip *);
+	struct igmp *igmp;
+	int igmplen;
 #ifdef PULLDOWN_TEST
 	struct mbuf *n;
 	int off;
@@ -361,7 +361,7 @@ igmp_input(struct mbuf *m, ...)
 	struct in_multi *inm;
 	struct in_multistep step;
 	struct router_info *rti;
-	register struct in_ifaddr *ia;
+	struct in_ifaddr *ia;
 	int timer;
 	va_list ap;
 
@@ -813,7 +813,7 @@ igmp_leavegroup(inm)
 void
 igmp_fasttimo()
 {
-	register struct in_multi *inm;
+	struct in_multi *inm;
 	struct in_multistep step;
 	struct ifnet *ifp = NULL;
 #ifdef IGMPV3
@@ -944,7 +944,7 @@ igmp_fasttimo()
 void
 igmp_slowtimo()
 {
-	register struct router_info *rti;
+	struct router_info *rti;
 	int s;
 
 	s = splsoftnet();

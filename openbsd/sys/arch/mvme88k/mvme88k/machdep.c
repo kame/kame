@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.110 2003/09/08 20:44:52 miod Exp $	*/
+/* $OpenBSD: machdep.c,v 1.136 2004/03/10 23:02:54 tom Exp $	*/
 /*
  * Copyright (c) 1998, 1999, 2000, 2001 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -53,17 +53,13 @@
 #include <sys/buf.h>
 #include <sys/reboot.h>
 #include <sys/conf.h>
-#include <sys/file.h>
-#include <sys/timeout.h>
 #include <sys/malloc.h>
-#include <sys/mbuf.h>
 #include <sys/mount.h>
 #include <sys/msgbuf.h>
 #include <sys/syscallargs.h>
 #ifdef SYSVMSG
 #include <sys/msg.h>
 #endif
-#include <sys/ioctl.h>
 #include <sys/exec.h>
 #include <sys/sysctl.h>
 #include <sys/errno.h>
@@ -88,15 +84,18 @@
 #include <machine/trap.h>
 #ifdef M88100
 #include <machine/m88100.h>		/* DMT_VALID	*/
-#endif 
+#endif
 
 #include <dev/cons.h>
 
 #include <uvm/uvm_extern.h>
 
+#ifdef MVME188
 #include <mvme88k/dev/sysconreg.h>
-#include <mvme88k/dev/pcctworeg.h>
+#endif
+#ifdef MVME197
 #include <mvme88k/dev/busswreg.h>
+#endif
 
 #include "ksyms.h"
 #if DDB
@@ -113,9 +112,9 @@
 #endif /* DDB */
 
 struct intrhand *intr_handlers[256];
-vm_offset_t interrupt_stack[MAX_CPUS] = {0};
+vaddr_t interrupt_stack[MAX_CPUS];
 
-/* machine dependant function pointers. */
+/* machine dependent function pointers. */
 struct md_p md;
 
 /* prototypes */
@@ -123,17 +122,16 @@ void setupiackvectors(void);
 void regdump(struct trapframe *f);
 void dumpsys(void);
 void consinit(void);
-vm_offset_t size_memory(void);
-vm_offset_t memsize187(void);
+vaddr_t size_memory(void);
+vaddr_t memsize187(void);
 int getcpuspeed(void);
-int getscsiid(void);
 void identifycpu(void);
-void save_u_area(struct proc *, vm_offset_t);
+void save_u_area(struct proc *, vaddr_t);
 void load_u_area(struct proc *);
 void dumpconf(void);
-void m187_ext_int(u_int v, struct m88100_saved_state *eframe);
-void m188_ext_int(u_int v, struct m88100_saved_state *eframe);
-void m197_ext_int(u_int v, struct m88100_saved_state *eframe);
+void m187_ext_int(u_int v, struct trapframe *eframe);
+void m188_ext_int(u_int v, struct trapframe *eframe);
+void m197_ext_int(u_int v, struct trapframe *eframe);
 
 unsigned char *volatile ivec[] = {
 	(unsigned char *)0xFFFE0003, /* not used, no such thing as int 0 */
@@ -158,13 +156,20 @@ unsigned int *volatile int_mask_reg[MAX_CPUS] = {
 	(unsigned int *)IEN2_REG,
 	(unsigned int *)IEN3_REG
 };
-#endif 
+#endif
 
-volatile vm_offset_t bugromva;
-volatile vm_offset_t sramva;
-volatile vm_offset_t obiova;
+#if defined(MVME187) || defined(MVME197)
+volatile vaddr_t obiova;
+#ifdef MVME187
+volatile vaddr_t bugromva;
+volatile vaddr_t sramva;
+#endif
+#ifdef MVME197
+volatile vaddr_t flashva;
+#endif
+#endif
 #ifdef MVME188
-volatile vm_offset_t utilva;
+volatile vaddr_t utilva;
 #endif
 
 int ssir;
@@ -222,19 +227,6 @@ caddr_t allocsys(caddr_t);
 char  machine[] = MACHINE;	 /* cpu "architecture" */
 char  cpu_model[120];
 
-struct bugenv bugargs;
-
-struct kernel {
-	void *entry;
-	void *symtab;
-	void *esym;
-	int   bflags;
-	int   bdev;
-	char *kname;
-	void *smini;
-	void *emini;
-	void *end_load;
-}kflags;
 #if defined(DDB) || NKSYMS > 0
 extern char *esym;
 #endif
@@ -243,34 +235,31 @@ int boothowto;	/* set in locore.S */
 int bootdev;	/* set in locore.S */
 int cputyp;	/* set in locore.S */
 int brdtyp;	/* set in locore.S */
-int cpumod = 0; /* set in mvme_bootstrap() */
-int cpuspeed = 25;   /* 25 MHZ XXX should be read from NVRAM */
+int cpumod;	/* set in mvme_bootstrap() */
+int cpuspeed;
 
-vm_offset_t first_addr = 0;
-vm_offset_t last_addr = 0;
+vaddr_t first_addr;
+vaddr_t last_addr;
 
-vm_offset_t avail_start, avail_end;
-vm_offset_t virtual_avail, virtual_end;
+vaddr_t avail_start, avail_end;
+vaddr_t virtual_avail, virtual_end;
 
-pcb_t    curpcb;
+extern struct pcb *curpcb;
 extern struct user *proc0paddr;
 
-/* 
- *  XXX this is to fake out the console routines, while 
- *  booting. New and improved! :-) smurph
+/*
+ * This is to fake out the console routines, while booting.
+ * We could use directly the bugtty console, but we want to be able to
+ * configure a kernel without bugtty since we do not necessarily need a
+ * full-blown console driver.
  */
-void bootcnprobe(struct consdev *);
-void bootcninit(struct consdev *);
-void bootcnputc(dev_t, int);
-int  bootcngetc(dev_t);
-extern void nullcnpollc(dev_t, int);
-
+cons_decl(boot);
 #define bootcnpollc nullcnpollc
 
 struct consdev bootcons = {
-	NULL, 
-	NULL, 
-	bootcngetc, 
+	NULL,
+	NULL,
+	bootcngetc,
 	bootcnputc,
 	bootcnpollc,
 	NULL,
@@ -279,20 +268,15 @@ struct consdev bootcons = {
 };
 
 /*
- * Console initialization: called early on from main,
- * before vm init or startup.  Do enough configuration
- * to choose and initialize a console.
+ * Early console initialization: called early on from main, before vm init.
+ * We want to stick to the BUG routines for now, and we'll switch to the
+ * real console in cpu_startup().
  */
 void
 consinit()
 {
-	extern struct consdev *cn_tab;
 
-	/*
-	 * Initialize the console before we print anything out.
-	 */
-	cn_tab = NULL;
-	cninit();
+	cn_tab = &bootcons;
 
 #if defined(DDB)
 	db_machine_init();
@@ -307,17 +291,17 @@ consinit()
  * Figure out how much memory is available, by querying the memory controllers
  */
 #include <mvme88k/dev/memcreg.h>
-vm_offset_t
+vaddr_t
 memsize187()
 {
 	struct memcreg *memc;
-	vm_offset_t x;
+	vaddr_t x;
 
-	memc = (struct memcreg *)0xfff43000;
+	memc = (struct memcreg *)MEM_CTLR;
 	x = MEMC_MEMCONF_RTOB(memc->memc_memconf);
 
-	memc = (struct memcreg *)0xfff43100;
-	if (!badaddr((vm_offset_t)&memc->memc_memconf, 1))
+	memc = (struct memcreg *)(MEM_CTLR + 0x100);
+	if (!badaddr((vaddr_t)&memc->memc_memconf, 1))
 		x += MEMC_MEMCONF_RTOB(memc->memc_memconf);
 
 	return x;
@@ -330,7 +314,7 @@ memsize187()
  * Start looking from the megabyte after the end of the kernel data,
  * until we find non-memory.
  */
-vm_offset_t
+vaddr_t
 size_memory()
 {
 	unsigned int *volatile look;
@@ -368,11 +352,7 @@ size_memory()
 			break;
 		*look = save;
 	}
-	if ((look > (unsigned int *)0x01FFF000) && (brdtyp == BRD_188)) {
-                /* temp hack to fake 32Meg on MVME188 */
-		look = (unsigned int *)0x01FFF000; 
-	}
-	
+
 	return (trunc_page((unsigned)look));
 }
 #endif	/* defined(MVME188) || defined(MVME197) */
@@ -383,32 +363,29 @@ getcpuspeed()
 	struct mvmeprom_brdid brdid;
 	int speed = 0;
 	int i, c;
+
 	bugbrdid(&brdid);
-	for (i=0; i<4; i++) {
-		c=(unsigned char)brdid.speed[i];
-		c-= '0';
-		speed *=10;
-		speed +=c;
+
+	for (i = 0; i < 4; i++) {
+		c = (unsigned char)brdid.speed[i];
+		if (c == ' ')
+			c = '0';
+		else if (c > '9' || c < '0')
+			goto fail;
+		speed = speed * 10 + (c - '0');
 	}
 	speed = speed / 100;
 	return (speed);
-}
 
-int
-getscsiid()
-{
-	struct mvmeprom_brdid brdid;
-	int scsiid = 0;
-	int i, c;
-	bugbrdid(&brdid);
-	for (i=0; i<2; i++) {
-		c=(unsigned char)brdid.scsiid[i];
-		scsiid *=10;
-		c-= '0';
-		scsiid +=c;
-	}
-	printf("SCSI ID = %d\n", scsiid);
-	return (7); /* hack! */
+fail:
+	/*
+	 * If we end up here, the board information block is
+	 * damaged and we can't trust it.
+	 * Suppose we are running at 25MHz and hope for the best.
+	 */
+	printf("WARNING: Board Configuration Data invalid, "
+	    "replace NVRAM and restore values\n");
+	return (25);
 }
 
 void
@@ -417,7 +394,6 @@ identifycpu()
 	cpuspeed = getcpuspeed();
 	snprintf(cpu_model, sizeof cpu_model,
 	    "Motorola MVME%x, %dMHz", brdtyp, cpuspeed);
-	printf("Model: %s\n", cpu_model);
 }
 
 /*
@@ -425,60 +401,50 @@ identifycpu()
  */
 
 void
-save_u_area(struct proc *p, vm_offset_t va)
+save_u_area(struct proc *p, vaddr_t va)
 {
-	int i; 
-	for (i=0; i<UPAGES; i++) {
-		p->p_md.md_upte[i] = *((pt_entry_t *)kvtopte((va + (i * NBPG))));
+	int i;
+
+	for (i = 0; i < UPAGES; i++) {
+		p->p_md.md_upte[i] = *((pt_entry_t *)kvtopte(va));
+		va += NBPG;
 	}
 }
 
 void
 load_u_area(struct proc *p)
 {
+	int i;
+	vaddr_t va;
 	pt_entry_t *t;
 
-	int i; 
-	for (i=0; i<UPAGES; i++) {
-		t = kvtopte((UADDR + (i * NBPG)));
+	for (i = 0, va = UADDR; i < UPAGES; i++) {
+		t = kvtopte(va);
 		*t = p->p_md.md_upte[i];
+		va += NBPG;
 	}
-	for (i=0; i<UPAGES; i++) {
-		cmmu_flush_tlb(1, (UADDR + (i * NBPG)), NBPG);
-	}
+	cmmu_flush_tlb(cpu_number(), 1, UADDR, USPACE);
 }
 
 /*
  * Set up real-time clocks.
  * These function pointers are set in dev/clock.c and dev/sclock.c
  */
-void 
+void
 cpu_initclocks()
 {
-#ifdef DEBUG
-	printf("cpu_initclocks(): ");
-#endif 
 	if (md.clock_init_func != NULL) {
-#ifdef DEBUG
-		printf("[interval clock] ");
-#endif 
 		(*md.clock_init_func)();
 	}
 	if (md.statclock_init_func != NULL) {
-#ifdef DEBUG
-		printf("[statistics clock]");
-#endif 
 		(*md.statclock_init_func)();
 	}
-#ifdef DEBUG
-	printf("\n");
-#endif 
 }
 
 void
 setstatclockrate(int newhz)
 {
-   /* function stub */
+	/* function stub */
 }
 
 
@@ -487,7 +453,7 @@ cpu_startup()
 {
 	caddr_t v;
 	int sz, i;
-	vm_size_t size;    
+	vsize_t size;
 	int base, residual;
 	vaddr_t minaddr, maxaddr, uarea_pages;
 
@@ -496,8 +462,8 @@ cpu_startup()
 	 * avail_end was pre-decremented in mvme_bootstrap() to compensate.
 	 */
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
-		pmap_kenter_pa((vm_offset_t)msgbufp + i * NBPG,
-			   avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE);
+		pmap_kenter_pa((paddr_t)msgbufp + i * NBPG,
+		    avail_end + i * NBPG, VM_PROT_READ | VM_PROT_WRITE);
 	pmap_update(pmap_kernel());
 	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
@@ -524,70 +490,78 @@ cpu_startup()
 	 */
 	uarea_pages = UADDR;
 	uvm_map(kernel_map, (vaddr_t *)&uarea_pages, USPACE,
-		NULL, UVM_UNKNOWN_OFFSET, 0, UVM_MAPFLAG(UVM_PROT_NONE, 
-						     UVM_PROT_NONE,
-						     UVM_INH_NONE,
-						     UVM_ADV_NORMAL, 0));
-	if (uarea_pages != UADDR) {
-		printf("uarea_pages %x: UADDR not free\n", uarea_pages);
-		panic("bad UADDR");
-	}
-	
-	/* 
-	 * Grab machine dependant memory spaces
+	    NULL, UVM_UNKNOWN_OFFSET, 0,
+	      UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+	        UVM_ADV_NORMAL, 0));
+	if (uarea_pages != UADDR)
+		panic("uarea_pages %lx: UADDR not free", uarea_pages);
+
+	/*
+	 * Grab machine dependent memory spaces
 	 */
 	switch (brdtyp) {
 #ifdef MVME187
 	case BRD_187:
+	case BRD_8120:
 		/*
 		 * Grab the SRAM space that we hardwired in pmap_bootstrap
 		 */
 		sramva = SRAM_START;
 		uvm_map(kernel_map, (vaddr_t *)&sramva, SRAM_SIZE,
-			NULL, UVM_UNKNOWN_OFFSET, 0, UVM_MAPFLAG(UVM_PROT_NONE, 
-							     UVM_PROT_NONE,
-							     UVM_INH_NONE,
-							     UVM_ADV_NORMAL, 0));
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		      UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+		        UVM_ADV_NORMAL, 0));
+		if (sramva != SRAM_START)
+			panic("sramva %lx: SRAM not free", sramva);
 
-		if (sramva != SRAM_START) {
-			printf("sramva %x: SRAM not free\n", sramva);
-			panic("bad sramva");
-		}
-#endif 
-#ifdef MVME197
-	case BRD_197:
-#endif 
-#if defined(MVME187) || defined(MVME197)
 		/*
 		 * Grab the BUGROM space that we hardwired in pmap_bootstrap
 		 */
-		bugromva = BUGROM_START;
+		bugromva = BUG187_START;
+		uvm_map(kernel_map, (vaddr_t *)&bugromva, BUG187_SIZE,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		      UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+		        UVM_ADV_NORMAL, 0));
+		if (bugromva != BUG187_START)
+			panic("bugromva %lx: BUGROM not free", bugromva);
 
-		uvm_map(kernel_map, (vaddr_t *)&bugromva, BUGROM_SIZE,
-			NULL, UVM_UNKNOWN_OFFSET, 0, UVM_MAPFLAG(UVM_PROT_NONE, 
-							     UVM_PROT_NONE,
-							     UVM_INH_NONE,
-							     UVM_ADV_NORMAL, 0));
-		if (bugromva != BUGROM_START) {
-			printf("bugromva %x: BUGROM not free\n", bugromva);
-			panic("bad bugromva");
-		}
-		
 		/*
 		 * Grab the OBIO space that we hardwired in pmap_bootstrap
 		 */
 		obiova = OBIO_START;
 		uvm_map(kernel_map, (vaddr_t *)&obiova, OBIO_SIZE,
-			NULL, UVM_UNKNOWN_OFFSET, 0, UVM_MAPFLAG(UVM_PROT_NONE, 
-							     UVM_PROT_NONE,
-							     UVM_INH_NONE,
-							     UVM_ADV_NORMAL, 0));
-		if (obiova != OBIO_START) {
-			printf("obiova %x: OBIO not free\n", obiova);
-			panic("bad OBIO");
-		}
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		      UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+		        UVM_ADV_NORMAL, 0));
+		if (obiova != OBIO_START)
+			panic("obiova %lx: OBIO not free", obiova);
 		break;
-#endif 
+#endif
+#ifdef MVME197
+	case BRD_197:
+		/*
+		 * Grab the FLASH space that we hardwired in pmap_bootstrap
+		 */
+		flashva = FLASH_START;
+		uvm_map(kernel_map, (vaddr_t *)&flashva, FLASH_SIZE,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		      UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+		        UVM_ADV_NORMAL, 0));
+		if (flashva != FLASH_START)
+			panic("flashva %lx: FLASH not free", flashva);
+
+		/*
+		 * Grab the OBIO space that we hardwired in pmap_bootstrap
+		 */
+		obiova = OBIO_START;
+		uvm_map(kernel_map, (vaddr_t *)&obiova, OBIO_SIZE,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		      UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+		        UVM_ADV_NORMAL, 0));
+		if (obiova != OBIO_START)
+			panic("obiova %lx: OBIO not free", obiova);
+		break;
+#endif
 #ifdef MVME188
 	case BRD_188:
 		/*
@@ -595,14 +569,11 @@ cpu_startup()
 		 */
 		utilva = MVME188_UTILITY;
 		uvm_map(kernel_map, (vaddr_t *)&utilva, MVME188_UTILITY_SIZE,
-			NULL, UVM_UNKNOWN_OFFSET, 0, UVM_MAPFLAG(UVM_PROT_NONE, 
-							     UVM_PROT_NONE,
-							     UVM_INH_NONE,
-							     UVM_ADV_NORMAL, 0));
-		if (utilva != MVME188_UTILITY) {
-			printf("utilva %x: UTILITY area not free\n", utilva);
-			panic("bad utilva");
-		}
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		      UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+		        UVM_ADV_NORMAL, 0));
+		if (utilva != MVME188_UTILITY)
+			panic("utilva %lx: UTILITY area not free", utilva);
 		break;
 #endif
 	}
@@ -613,9 +584,8 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET, 0,
-		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)))
+	    NULL, UVM_UNKNOWN_OFFSET, 0, UVM_MAPFLAG(UVM_PROT_NONE,
+	      UVM_PROT_NONE, UVM_INH_NONE, UVM_ADV_NORMAL, 0)))
 		panic("cpu_startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 
@@ -637,7 +607,7 @@ cpu_startup()
 		 * for the first "residual" buffers, and then we allocate
 		 * "base" pages for the rest.
 		 */
-		curbuf = (vm_offset_t) buffers + (i * MAXBSIZE);
+		curbuf = (vaddr_t)buffers + (i * MAXBSIZE);
 		curbufsize = PAGE_SIZE * ((i < residual) ? (base+1) : base);
 
 		while (curbufsize) {
@@ -646,7 +616,7 @@ cpu_startup()
 				panic("cpu_startup: not enough memory for "
 				      "buffer cache");
 			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-			    VM_PROT_READ|VM_PROT_WRITE);
+			    VM_PROT_READ | VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
@@ -658,26 +628,26 @@ cpu_startup()
 	 * limits the number of processes exec'ing at any time.
 	 */
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
-	
+	    16 * NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
+
 	/*
 	 * Allocate map for physio.
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   VM_PHYS_SIZE, 0, FALSE, NULL);
+	    VM_PHYS_SIZE, 0, FALSE, NULL);
 
-	/* 
+	/*
 	 * Allocate map for external I/O.
 	 */
 	iomap_map = uvm_km_suballoc(kernel_map, &iomapbase, &maxaddr,
-				   IOMAP_SIZE, 0, FALSE, NULL);
+	    IOMAP_SIZE, 0, FALSE, NULL);
 
 	iomap_extent = extent_create("iomap", iomapbase,
 	    iomapbase + IOMAP_SIZE, M_DEVBUF, NULL, 0, EX_NOWAIT);
 	if (iomap_extent == NULL)
 		panic("unable to allocate extent for iomap");
 
-	printf("avail mem = %ld (%ld pages)\n", ptoa(uvmexp.free), uvmexp.free);
+	printf("avail mem = %ld (%d pages)\n", ptoa(uvmexp.free), uvmexp.free);
 	printf("using %d buffers containing %d bytes of memory\n", nbuf,
 	    bufpages * PAGE_SIZE);
 
@@ -715,7 +685,7 @@ cpu_startup()
  */
 caddr_t
 allocsys(v)
-	register caddr_t v;
+	caddr_t v;
 {
 
 #define	valloc(name, type, num) \
@@ -749,8 +719,8 @@ allocsys(v)
 
 	/* Restrict to at most 70% filled kvm */
 	if (nbuf >
-	    (VM_MAX_KERNEL_ADDRESS-VM_MIN_KERNEL_ADDRESS) / MAXBSIZE * 7 / 10) 
-		nbuf = (VM_MAX_KERNEL_ADDRESS-VM_MIN_KERNEL_ADDRESS) /
+	    (VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) / MAXBSIZE * 7 / 10)
+		nbuf = (VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) /
 		    MAXBSIZE * 7 / 10;
 
 	/* More buffer pages than fits into the buffers is senseless.  */
@@ -773,7 +743,7 @@ setregs(p, pack, stack, retval)
 	u_long stack;
 	int retval[2];
 {
-	register struct trapframe *tf = USER_REGS(p);
+	struct trapframe *tf = (struct trapframe *)USER_REGS(p);
 
 	/*
 	 * The syscall will ``return'' to snip; set it.
@@ -803,23 +773,23 @@ setregs(p, pack, stack, retval)
 	}
 #endif /* 0 */
 	bzero((caddr_t)tf, sizeof *tf);
-	
+
 	if (cputyp == CPU_88110) {
-		/* 
-		 * user mode, serialize mem, interrupts enabled, 
-		 * graphics unit, fp enabled 
+		/*
+		 * user mode, serialize mem, interrupts enabled,
+		 * graphics unit, fp enabled
 		 */
-		tf->epsr = PSR_SRM | PSR_SFD;  
+		tf->tf_epsr = PSR_SRM | PSR_SFD;
 		/*
 		 * XXX disable OoO for now...
 		 */
-		tf->epsr |= PSR_SER;
+		tf->tf_epsr |= PSR_SER;
 	} else {
-		/* 
-		 * user mode, interrupts enabled, 
-		 * no graphics unit, fp enabled 
+		/*
+		 * user mode, interrupts enabled,
+		 * no graphics unit, fp enabled
 		 */
-		tf->epsr = PSR_SFD | PSR_SFD2;
+		tf->tf_epsr = PSR_SFD | PSR_SFD2;
 	}
 
 	/*
@@ -830,16 +800,16 @@ setregs(p, pack, stack, retval)
 	 * fetched.  mc88110 - just set exip to pack->ep_entry.
 	 */
 	if (cputyp == CPU_88110) {
-		tf->exip = pack->ep_entry & ~3;
+		tf->tf_exip = pack->ep_entry & ~3;
 #ifdef DEBUG
-		printf("exec @ 0x%x\n", tf->exip);
+		printf("exec @ 0x%x\n", tf->tf_exip);
 #endif
 	} else {
-		tf->snip = pack->ep_entry & ~3;
-		tf->sfip = (pack->ep_entry & ~3) | FIP_V;
+		tf->tf_snip = pack->ep_entry & ~3;
+		tf->tf_sfip = (pack->ep_entry & ~3) | FIP_V;
 	}
-	tf->r[2] = stack;
-	tf->r[31] = stack;
+	tf->tf_r[2] = stack;
+	tf->tf_r[31] = stack;
 	retval[1] = 0;
 }
 
@@ -850,15 +820,15 @@ struct sigstate {
 
 /*
  * WARNING: code in locore.s assumes the layout shown for sf_signo
- * thru sf_handler so... don't screw with them!
+ * through sf_handler so... don't screw with them!
  */
 struct sigframe {
-	int   sf_signo;	     /* signo for handler */
-	siginfo_t *sf_sip;
-	struct   sigcontext *sf_scp;  /* context ptr for handler */
-	sig_t sf_handler;    /* handler addr for u_sigc */
-	struct   sigcontext sf_sc; /* actual context */
-	siginfo_t sf_si;
+	int			sf_signo;	/* signo for handler */
+	siginfo_t *		sf_sip;
+	struct sigcontext *	sf_scp;		/* context ptr for handler */
+	sig_t			sf_handler;	/* handler addr for u_sigc */
+	struct sigcontext	sf_sc;		/* actual context */
+	siginfo_t		sf_si;
 };
 
 #ifdef DEBUG
@@ -880,9 +850,9 @@ sendsig(catcher, sig, mask, code, type, val)
 	int type;
 	union sigval val;
 {
-	register struct proc *p = curproc;
-	register struct trapframe *tf;
-	register struct sigacts *psp = p->p_sigacts;
+	struct proc *p = curproc;
+	struct trapframe *tf;
+	struct sigacts *psp = p->p_sigacts;
 	struct sigframe *fp;
 	int oonstack, fsize;
 	struct sigframe sf;
@@ -905,8 +875,13 @@ sendsig(catcher, sig, mask, code, type, val)
 					 psp->ps_sigstk.ss_size - fsize);
 		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
 	} else
-		fp = (struct sigframe *)(tf->r[31] - fsize);
-	if ((unsigned)fp <= USRSTACK - ctob(p->p_vmspace->vm_ssize)) 
+		fp = (struct sigframe *)(tf->tf_r[31] - fsize);
+
+	/* make sure the frame is aligned on a 8 byte boundary */
+	if (((vaddr_t)fp & 0x07) != 0)
+		fp = (struct sigframe *)((vaddr_t)fp & ~0x07);
+
+	if ((unsigned)fp <= USRSTACK - ctob(p->p_vmspace->vm_ssize))
 		(void)uvm_grow(p, (unsigned)fp);
 
 #ifdef DEBUG
@@ -933,85 +908,32 @@ sendsig(catcher, sig, mask, code, type, val)
 	 * Copy the whole user context into signal context that we
 	 * are building.
 	 */
-	bcopy((caddr_t)tf->r, (caddr_t)sf.sf_sc.sc_regs,
-	      sizeof(sf.sf_sc.sc_regs));
-	if (cputyp != CPU_88110) {
-		/* mc88100 */
-		sf.sf_sc.sc_xip = tf->sxip & ~3;
-		sf.sf_sc.sc_nip = tf->snip & ~3;
-		sf.sf_sc.sc_fip = tf->sfip & ~3;
-	} else {
-		/* mc88110 */
-		sf.sf_sc.sc_xip = tf->exip & ~3;
-		sf.sf_sc.sc_nip = tf->enip & ~3;
-		sf.sf_sc.sc_fip = 0;
-	}
-	sf.sf_sc.sc_ps = tf->epsr;
-	sf.sf_sc.sc_sp  = tf->r[31];
-	sf.sf_sc.sc_fpsr = tf->fpsr;
-	sf.sf_sc.sc_fpcr = tf->fpcr;
-	if (cputyp != CPU_88110) {
-		/* mc88100 */
-		sf.sf_sc.sc_ssbr = tf->ssbr;
-		sf.sf_sc.sc_dmt0 = tf->dmt0;
-		sf.sf_sc.sc_dmd0 = tf->dmd0;
-		sf.sf_sc.sc_dma0 = tf->dma0;
-		sf.sf_sc.sc_dmt1 = tf->dmt1;
-		sf.sf_sc.sc_dmd1 = tf->dmd1;
-		sf.sf_sc.sc_dma1 = tf->dma1;
-		sf.sf_sc.sc_dmt2 = tf->dmt2;
-		sf.sf_sc.sc_dmd2 = tf->dmd2;
-		sf.sf_sc.sc_dma2 = tf->dma2;
-	} else {
-		/* mc88110 */
-		sf.sf_sc.sc_dsr  = tf->dsr;
-		sf.sf_sc.sc_dlar = tf->dlar;
-		sf.sf_sc.sc_dpar = tf->dpar;
-		sf.sf_sc.sc_isr  = tf->isr;
-		sf.sf_sc.sc_ilar = tf->ilar;
-		sf.sf_sc.sc_ipar = tf->ipar;
-		sf.sf_sc.sc_isap = tf->isap;
-		sf.sf_sc.sc_dsap = tf->dsap;
-		sf.sf_sc.sc_iuap = tf->iuap;
-		sf.sf_sc.sc_duap = tf->duap;
-	}
-	sf.sf_sc.sc_fpecr = tf->fpecr;
-	sf.sf_sc.sc_fphs1 = tf->fphs1;
-	sf.sf_sc.sc_fpls1 = tf->fpls1;
-	sf.sf_sc.sc_fphs2 = tf->fphs2;
-	sf.sf_sc.sc_fpls2 = tf->fpls2;
-	sf.sf_sc.sc_fppt = tf->fppt;
-	sf.sf_sc.sc_fprh = tf->fprh;
-	sf.sf_sc.sc_fprl = tf->fprl;
-	sf.sf_sc.sc_fpit = tf->fpit;
+	bcopy((const void *)&tf->tf_regs, (void *)&sf.sf_sc.sc_regs,
+	    sizeof(sf.sf_sc.sc_regs));
+
 	if (copyout((caddr_t)&sf, (caddr_t)fp, sizeof sf)) {
 		/*
 		 * Process has trashed its stack; give it an illegal
 		 * instruction to halt it in its tracks.
 		 */
-		SIGACTION(p, SIGILL) = SIG_DFL;
-		sig = sigmask(SIGILL);
-		p->p_sigignore &= ~sig;
-		p->p_sigcatch &= ~sig;
-		p->p_sigmask &= ~sig;
-		psignal(p, SIGILL);
-		return;
+		sigexit(p, SIGILL);
+		/* NOTREACHED */
 	}
-	/* 
+	/*
 	 * Build the argument list for the signal handler.
 	 * Signal trampoline code is at base of user stack.
 	 */
 	addr = p->p_sigcode;
 	if (cputyp != CPU_88110) {
 		/* mc88100 */
-		tf->snip = (addr & ~3) | NIP_V;
-		tf->sfip = (tf->snip + 4) | FIP_V;
+		tf->tf_snip = (addr & ~3) | NIP_V;
+		tf->tf_sfip = (tf->tf_snip + 4) | FIP_V;
 	} else {
 		/* mc88110 */
-		tf->exip = (addr & ~3);
-		tf->enip = (tf->exip + 4);
+		tf->tf_exip = (addr & ~3);
+		tf->tf_enip = (tf->tf_exip + 4);
 	}
-	tf->r[31] = (unsigned)fp;
+	tf->tf_r[31] = (unsigned)fp;
 #ifdef DEBUG
 	if ((sigdebug & SDB_FOLLOW) ||
 	    ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid))
@@ -1040,8 +962,8 @@ sys_sigreturn(p, v, retval)
 	struct sys_sigreturn_args /* {
 	   syscallarg(struct sigcontext *) sigcntxp;
 	} */ *uap = v;
-	register struct sigcontext *scp;
-	register struct trapframe *tf;
+	struct sigcontext *scp;
+	struct trapframe *tf;
 	struct sigcontext ksc;
 
 	scp = (struct sigcontext *)SCARG(uap, sigcntxp);
@@ -1049,91 +971,30 @@ sys_sigreturn(p, v, retval)
 	if (sigdebug & SDB_FOLLOW)
 		printf("sigreturn: pid %d, scp %x\n", p->p_pid, scp);
 #endif
-	if ((int)scp & 3 ||
+	if (((vaddr_t)scp & 3) != 0 ||
 	    copyin((caddr_t)scp, (caddr_t)&ksc, sizeof(struct sigcontext)))
 		return (EINVAL);
 
 	tf = p->p_md.md_tf;
 	scp = &ksc;
-	/*
-	 * xip, nip and fip must be multiples of 4.  This is all
-	 * that is required; if it holds, just do it.
-	 */
-#if 0
-	if (((scp->sc_xip | scp->sc_nip | scp->sc_fip) & 3) != 0)
-		return (EINVAL);
-#endif /* 0 */
-#if DIAGNOSTIC
-	if (((scp->sc_xip | scp->sc_nip | scp->sc_fip) & 3) != 0){
-		printf("xip %x nip %x fip %x\n",
-		       scp->sc_xip, scp->sc_nip, scp->sc_fip);
-		return (EINVAL);
-	}
-#endif 
+
 	/*
 	 * this can be improved by doing
 	 *	 bcopy(sc_reg to tf, sizeof sigcontext - 2 words)
 	 * XXX nivas
 	 */
-	bcopy((caddr_t)scp->sc_regs, (caddr_t)tf->r, sizeof(scp->sc_regs));
-	if (cputyp != CPU_88110) {
-		/* mc88100 */
-		tf->sxip = (scp->sc_xip) | XIP_V;
-		tf->snip = (scp->sc_nip) | NIP_V;
-		tf->sfip = (scp->sc_fip) | FIP_V;
-	} else {
-		/* mc88110 */
-		tf->exip = (scp->sc_xip);
-		tf->enip = (scp->sc_nip);
-		tf->sfip = 0;
-	}
-	tf->epsr = scp->sc_ps;
-	tf->r[31] = scp->sc_sp;
-	tf->fpsr = scp->sc_fpsr;
-	tf->fpcr = scp->sc_fpcr;
-	if (cputyp != CPU_88110) {
-		/* mc88100 */
-		tf->ssbr = scp->sc_ssbr;
-		tf->dmt0 = scp->sc_dmt0;
-		tf->dmd0 = scp->sc_dmd0;
-		tf->dma0 = scp->sc_dma0;
-		tf->dmt1 = scp->sc_dmt1;
-		tf->dmd1 = scp->sc_dmd1;
-		tf->dma1 = scp->sc_dma1;
-		tf->dmt2 = scp->sc_dmt2;
-		tf->dmd2 = scp->sc_dmd2;
-		tf->dma2 = scp->sc_dma2;
-	} else {
-		/* mc88110 */
-		tf->dsr  = scp->sc_dsr;
-		tf->dlar = scp->sc_dlar;
-		tf->dpar = scp->sc_dpar;
-		tf->isr  = scp->sc_isr;
-		tf->ilar = scp->sc_ilar;
-		tf->ipar = scp->sc_ipar;
-		tf->isap = scp->sc_isap;
-		tf->dsap = scp->sc_dsap;
-		tf->iuap = scp->sc_iuap;
-		tf->duap = scp->sc_duap;
-	}
-	tf->fpecr = scp->sc_fpecr;
-	tf->fphs1 = scp->sc_fphs1;
-	tf->fpls1 = scp->sc_fpls1;
-	tf->fphs2 = scp->sc_fphs2;
-	tf->fpls2 = scp->sc_fpls2;
-	tf->fppt = scp->sc_fppt;
-	tf->fprh = scp->sc_fprh;
-	tf->fprl = scp->sc_fprl;
-	tf->fpit = scp->sc_fpit;
+	bcopy((const void *)&scp->sc_regs, (caddr_t)&tf->tf_regs,
+	    sizeof(scp->sc_regs));
 
 	/*
 	 * Restore the user supplied information
 	 */
-	if (scp->sc_onstack & 01)
+	if (scp->sc_onstack & SS_ONSTACK)
 		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
 		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
 	p->p_sigmask = scp->sc_mask & ~sigcantmask;
+
 	return (EJUSTRETURN);
 }
 
@@ -1148,7 +1009,7 @@ _doboot()
 
 __dead void
 boot(howto)
-	register int howto;
+	int howto;
 {
 	/* take a snapshot before clobbering any registers */
 	if (curproc && curproc->p_addr)
@@ -1156,7 +1017,9 @@ boot(howto)
 
 	/* If system is cold, just halt. */
 	if (cold) {
-		howto |= RB_HALT;
+		/* (Unless the user explicitly asked for reboot.) */
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
 		goto haltsys;
 	}
 
@@ -1196,7 +1059,7 @@ haltsys:
 }
 
 #ifdef MVME188
-void 
+void
 m188_reset()
 {
 	volatile int cnt;
@@ -1350,7 +1213,7 @@ abort:
 	case 0:
 		printf("succeeded\n");
 		break;
-	
+
 	case ENXIO:
 		printf("device bad\n");
 		break;
@@ -1383,10 +1246,10 @@ abort:
 void
 setupiackvectors()
 {
-	register u_char *vaddr;
+	u_char *vaddr;
 #undef MAP_VEC /* Switching to new virtual addresses XXX smurph */
 #ifdef MAP_VEC
-	extern vm_offset_t iomap_mapin(vm_offset_t, vm_size_t,  boolean_t);
+	extern vaddr_t iomap_mapin(paddr_t, psize_t,  boolean_t);
 #endif
 	/*
 	 * map a page in for phys address 0xfffe0000 (M187) and set the
@@ -1395,6 +1258,7 @@ setupiackvectors()
 	switch (brdtyp) {
 #ifdef MVME187
 	case BRD_187:
+	case BRD_8120:
 #ifdef MAP_VEC /* do for MVME188 too */
 		vaddr = (u_char *)iomap_mapin(M187_IACK, NBPG, 1);
 #else
@@ -1433,7 +1297,7 @@ setupiackvectors()
 	}
 #ifdef DEBUG
 	printf("interrupt ACK address mapped at 0x%x\n", vaddr);
-#endif 
+#endif
 
 #if defined(MVME187) || defined(MVME197)
 	if (brdtyp != BRD_188) {
@@ -1450,17 +1314,17 @@ setupiackvectors()
 }
 
 /* gets an interrupt stack for slave processors */
-vm_offset_t 
+vaddr_t
 get_slave_stack()
 {
-	vm_offset_t addr = 0;
-	addr = (vm_offset_t)uvm_km_zalloc(kernel_map, INTSTACK_SIZE + 4096);
+	vaddr_t addr;
+
+	addr = (vaddr_t)uvm_km_zalloc(kernel_map, INTSTACK_SIZE);
 
 	if (addr == NULL)
-		panic("Cannot allocate slave stack");
+		panic("Cannot allocate slave stack for cpu %d",
+		    cpu_number());
 
-	if (interrupt_stack[0] == 0)
-		interrupt_stack[0] = (vm_offset_t) intstack;
 	interrupt_stack[cpu_number()] = addr;
 	return addr;
 }
@@ -1500,10 +1364,10 @@ intr_findvec(start, end)
 {
 	int vec;
 
-#ifdef DIAGNOSTIC
+#ifdef DEBUG
 	/* Sanity check! */
 	if (start < 0 || end > 255 || start > end)
-		panic("intr_findvec(): bad parameters");
+		panic("intr_findvec(%d,%d): bad parameters", start, end);
 #endif
 
 	for (vec = start; vec < end; vec++){
@@ -1511,7 +1375,7 @@ intr_findvec(start, end)
 			return (vec);
 	}
 #ifdef DIAGNOSTIC
-	printf("intr_findvec(): uh oh....\n", vec);
+	printf("intr_findvec(%d,%d): no vector available\n", start, end);
 #endif
 	return (-1);
 }
@@ -1524,7 +1388,7 @@ intr_findvec(start, end)
 int
 intr_establish(int vec, struct intrhand *ihand)
 {
-	register struct intrhand *intr;
+	struct intrhand *intr;
 
 	if (vec < 0 || vec > 255) {
 #if DIAGNOSTIC
@@ -1577,26 +1441,26 @@ unsigned obio_vec[32] = {
 	0,0,0,0,0,0,0,0,
 	0,0,0,0,0,0,0,0,
         0,SYSCV_SCC,0,0,SYSCV_SYSF,SYSCV_TIMER2,0,0,
-	0,0,0,0,SYSCV_TIMER1,0,SYSCV_ACF,SYSCV_ABRT, 
+	0,0,0,0,SYSCV_TIMER1,0,SYSCV_ACF,SYSCV_ABRT,
 };
 
 #define GET_MASK(cpu, val)	*int_mask_reg[cpu] & (val)
 #define VME_VECTOR_MASK		0x1ff 		/* mask into VIACK register */
 #define VME_BERR_MASK		0x100 		/* timeout during VME IACK cycle */
 
-void 
-m188_ext_int(u_int v, struct m88100_saved_state *eframe)
+void
+m188_ext_int(u_int v, struct trapframe *eframe)
 {
-	register int cpu = cpu_number();
-	register unsigned int cur_mask;
-	register unsigned int level, old_spl;
-	register struct intrhand *intr;
+	int cpu = cpu_number();
+	unsigned int cur_mask;
+	unsigned int level, old_spl;
+	struct intrhand *intr;
 	int ret, intbit;
 	unsigned vec;
 
 	cur_mask = ISR_GET_CURRENT_MASK(cpu);
 	old_spl = m188_curspl[cpu];
-	eframe->mask = old_spl;
+	eframe->tf_mask = old_spl;
 
 	if (cur_mask == 0) {
 		/*
@@ -1604,22 +1468,22 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 		 * DUART interrupts.
 		 */
 		flush_pipeline();
-		return;
+		goto out;
 	}
 
 	uvmexp.intrs++;
 
-	/* 
+	/*
 	 * We want to service all interrupts marked in the IST register
 	 * They are all valid because the mask would have prevented them
 	 * from being generated otherwise.  We will service them in order of
-	 * priority. 
+	 * priority.
 	 */
 	do {
 		level = safe_level(cur_mask, old_spl);
 
 		if (old_spl >= level) {
-			register int i;
+			int i;
 
 			printf("safe level %d <= old level %d\n", level, old_spl);
 			printf("cur_mask = 0x%b\n", cur_mask, IST_STRING);
@@ -1635,30 +1499,35 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 			for(;;) ;
 		}
 
+#ifdef DEBUG
 		if (level > 7 || (char)level < 0) {
 			panic("int level (%x) is not between 0 and 7", level);
 		}
+#endif
 
 		setipl(level);
-	  
-		enable_interrupt();
-		
+
+		/*
+		 * Do not enable interrupts yet if we know, from cur_mask,
+		 * that we have not cleared enough conditions yet.
+		 * For now, only the timer interrupt requires its condition
+		 * to be cleared before interrupts are enabled.
+		 */
+		if ((cur_mask & DTI_BIT) == 0) {
+			enable_interrupt();
+		}
+
 		/* generate IACK and get the vector */
 
-		/* 
-		 * This is tricky.  If you don't catch all the 
-		 * interrupts, you die. Game over. Insert coin... 
+		/*
+		 * This is tricky.  If you don't catch all the
+		 * interrupts, you die. Game over. Insert coin...
 		 * XXX smurph
 		 */
 
 		/* find the first bit set in the current mask */
 		intbit = ff1(cur_mask);
 		if (OBIO_INTERRUPT_MASK & (1 << intbit)) {
-			if (guarded_access(ivec[level], 4, (u_char *)&vec) ==
-			    EFAULT) {
-				panic("unable to get vector for this vmebus "
-				    "interrupt (level %x)", level);
-			}
 			vec = obio_vec[intbit];
 			if (vec == 0) {
 				panic("unknown onboard interrupt: mask = 0x%b",
@@ -1678,7 +1547,8 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 			}
 			vec &= VME_VECTOR_MASK;
 			if (vec & VME_BERR_MASK) {
-				panic("vme vec timeout");
+				printf("vme vec timeout");
+				break;
 			}
 			if (vec == 0) {
 				panic("unknown vme interrupt: mask = 0x%b",
@@ -1689,15 +1559,10 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 			    "mask = 0x%b",
 			    level, intbit, 1 << intbit, IST_STRING);
 		}
-		if (vec > 0xFF) {
-			panic("interrupt vector 0x%x greater than 255!"
-			    "level = %d iack = 0x%x", 
-			    vec, level, ivec[level]);
-		}
 
 		if ((intr = intr_handlers[vec]) == NULL) {
 			/* increment intr counter */
-			intrcnt[M88K_SPUR_IRQ]++; 
+			intrcnt[M88K_SPUR_IRQ]++;
 			printf("Spurious interrupt: level = %d vec = 0x%x, "
 			    "intbit = %d mask = 0x%b\n",
 			    level, vec, intbit, 1 << intbit, IST_STRING);
@@ -1714,7 +1579,7 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 					ret = (*intr->ih_fn)(intr->ih_arg);
 				if (ret != 0) {
 					/* increment intr counter */
-					intrcnt[level]++; 
+					intrcnt[level]++;
 					break;
 				}
 			}
@@ -1733,15 +1598,15 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 * returning to assembler
 	 */
 	disable_interrupt();
-	if (eframe->dmt0 & DMT_VALID)
+out:
+	if (eframe->tf_dmt0 & DMT_VALID)
 		m88100_trap(T_DATAFLT, eframe);
 
 	/*
 	 * Restore the mask level to what it was when the interrupt
 	 * was taken.
 	 */
-	setipl(eframe->mask);
-	flush_pipeline();
+	setipl(eframe->tf_mask);
 }
 
 #endif /* MVME188 */
@@ -1757,7 +1622,7 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 
 #ifdef MVME187
 void
-m187_ext_int(u_int v, struct m88100_saved_state *eframe)
+m187_ext_int(u_int v, struct trapframe *eframe)
 {
 	int mask, level;
 	struct intrhand *intr;
@@ -1768,6 +1633,7 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 	mask = *md.intr_mask & 0x07;
 	level = *md.intr_ipl & 0x07;
 
+#ifdef DIAGNOSTIC
 	/*
 	 * It is really bizarre for the mask and level to the be the same.
 	 * pcc2 for 187 blocks all interrupts at and below the mask value,
@@ -1787,11 +1653,7 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 	if (level == 0) {
 		panic("Bogons... level %x and mask %x", level, mask);
 	}
-
-	/* and block interrupts at level or lower */
-	setipl(level);
-	/* and stash it away in the trap frame */
-	eframe->mask = mask;
+#endif
 
 	uvmexp.intrs++;
 
@@ -1804,19 +1666,24 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 	flush_pipeline();
 	flush_pipeline();
 
+	/* block interrupts at level or lower */
+	setipl(level);
+
 	enable_interrupt();
 
 	if ((intr = intr_handlers[vec]) == NULL) {
 		/* increment intr counter */
-		intrcnt[M88K_SPUR_IRQ]++; 
+		intrcnt[M88K_SPUR_IRQ]++;
 		printf("Spurious interrupt (level %x and vec %x)\n",
 		       level, vec);
 	} else {
+#ifdef DIAGNOSTIC
 		if (intr && intr->ih_ipl != level) {
 			panic("Handler ipl %x not the same as level %x. "
 			    "vec = 0x%x",
 			    intr->ih_ipl, level, vec);
 		}
+#endif
 
 		/*
 		 * Walk through all interrupt handlers in the chain for the
@@ -1831,7 +1698,7 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 				ret = (*intr->ih_fn)(intr->ih_arg);
 			if (ret != 0) {
 				/* increment intr counter */
-				intrcnt[level]++; 
+				intrcnt[level]++;
 				break;
 			}
 		}
@@ -1847,20 +1714,20 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 * returning to assembler
 	 */
 	disable_interrupt();
-	if (eframe->dmt0 & DMT_VALID)
+	if (eframe->tf_dmt0 & DMT_VALID)
 		m88100_trap(T_DATAFLT, eframe);
 
 	/*
 	 * Restore the mask level to what it was when the interrupt
 	 * was taken.
 	 */
-	setipl(eframe->mask);
+	setipl(mask);
 }
 #endif /* MVME187 */
 
 #ifdef MVME197
 void
-m197_ext_int(u_int v, struct m88100_saved_state *eframe)
+m197_ext_int(u_int v, struct trapframe *eframe)
 {
 	int mask, level, src;
 	struct intrhand *intr;
@@ -1870,7 +1737,7 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 	/* get src and mask */
 	mask = *md.intr_mask & 0x07;
 	src = *md.intr_src;
-	
+
 	if (v == T_NON_MASK) {
 		/* This is the abort switch */
 		level = IPL_NMI;
@@ -1880,6 +1747,7 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 		level = *md.intr_ipl & 0x07;
 	}
 
+#ifdef DIAGNOSTIC
 	/*
 	 * Interrupting level cannot be 0--0 doesn't produce an interrupt.
 	 * Weird! XXX nivas
@@ -1888,11 +1756,7 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 	if (level == 0) {
 		panic("Bogons... level %x and mask %x", level, mask);
 	}
-
-	/* and block interrupts at level or lower */
-	setipl(level);
-	/* and stash it away in the trap frame */
-	eframe->mask = mask;
+#endif
 
 	uvmexp.intrs++;
 
@@ -1907,25 +1771,31 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 		flush_pipeline();
 	}
 
+	/* block interrupts at level or lower */
+	setipl(level);
+
 	enable_interrupt();
 
 	if ((intr = intr_handlers[vec]) == NULL) {
 		/* increment intr counter */
-		intrcnt[M88K_SPUR_IRQ]++; 
+		intrcnt[M88K_SPUR_IRQ]++;
 		printf("Spurious interrupt (level %x and vec %x)\n",
 		       level, vec);
 	} else {
+#ifdef DIAGNOSTIC
 		if (intr && intr->ih_ipl != level) {
 			panic("Handler ipl %x not the same as level %x. "
 			    "vec = 0x%x",
 			    intr->ih_ipl, level, vec);
 		}
+#endif
 
 		/*
 		 * Walk through all interrupt handlers in the chain for the
 		 * given vector, calling each handler in turn, till some handler
 		 * returns a value != 0.
 		 */
+
 		for (ret = 0; intr; intr = intr->ih_next) {
 			if (intr->ih_wantframe != 0)
 				ret = (*intr->ih_fn)((void *)eframe);
@@ -1933,7 +1803,7 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 				ret = (*intr->ih_fn)(intr->ih_arg);
 			if (ret != 0) {
 				/* increment intr counter */
-				intrcnt[level]++; 
+				intrcnt[level]++;
 				break;
 			}
 		}
@@ -1950,41 +1820,17 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 * Restore the mask level to what it was when the interrupt
 	 * was taken.
 	 */
-	setipl(eframe->mask);
+	setipl(mask);
 }
-#endif 
+#endif	/* MVME197 */
 
 int
 cpu_exec_aout_makecmds(p, epp)
 	struct proc *p;
 	struct exec_package *epp;
 {
-#ifdef COMPAT_25
-	/*
-	 * Keep compatibility with older OpenBSD/mvme88k binaries
-	 * for a while, to make transition easier.
-	 */
-	u_long midmag, magic;
-	u_short mid;
-	struct exec *execp = epp->ep_hdr;
 
-	midmag = ntohl(execp->a_midmag);
-	mid = (midmag >> 16) & 0x3ff;
-	magic = midmag & 0xffff;
-
-	midmag = mid << 16 | magic;
-
-	switch (midmag) {
-	case (OLD_MID_MACHINE << 16) | ZMAGIC:
-		return exec_aout_prep_zmagic(p, epp);
-	case (OLD_MID_MACHINE << 16) | NMAGIC:
-		return exec_aout_prep_nmagic(p, epp);
-	case (OLD_MID_MACHINE << 16) | OMAGIC:
-		return exec_aout_prep_omagic(p, epp);
-	}
-#endif
-
-	return ENOEXEC;
+	return (ENOEXEC);
 }
 
 int
@@ -2038,14 +1884,14 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 }
 
 /*
- * insert an element into a queue 
+ * insert an element into a queue
  */
 
 void
 _insque(velement, vhead)
 	void *velement, *vhead;
 {
-	register struct prochd *element, *head;
+	struct prochd *element, *head;
 	element = velement;
 	head = vhead;
 	element->ph_link = head->ph_link;
@@ -2062,7 +1908,7 @@ void
 _remque(velement)
 	void *velement;
 {
-	register struct prochd *element;
+	struct prochd *element;
 	element = velement;
 	((struct prochd *)(element->ph_link))->ph_rlink = element->ph_rlink;
 	((struct prochd *)(element->ph_rlink))->ph_link = element->ph_link;
@@ -2097,14 +1943,14 @@ copystr(fromaddr, toaddr, maxlength, lencopied)
 
 void
 setrunqueue(p)
-	register struct proc *p;
+	struct proc *p;
 {
-	register struct prochd *q;
-	register struct proc *oldlast;
-	register int which = p->p_priority >> 2;
+	struct prochd *q;
+	struct proc *oldlast;
+	int which = p->p_priority >> 2;
 
 	if (p->p_back != NULL)
-		panic("setrunqueue %x", p);
+		panic("setrunqueue %p", p);
 	q = &qs[which];
 	whichqs |= 1 << which;
 	p->p_forw = (struct proc *)q;
@@ -2121,12 +1967,12 @@ void
 remrunqueue(vp)
 	struct proc *vp;
 {
-	register struct proc *p = vp;
-	register int which = p->p_priority >> 2;
-	register struct prochd *q;
+	struct proc *p = vp;
+	int which = p->p_priority >> 2;
+	struct prochd *q;
 
 	if ((whichqs & (1 << which)) == 0)
-		panic("remrq %x", p);
+		panic("remrq %p", p);
 	p->p_forw->p_back = p->p_back;
 	p->p_back->p_forw = p->p_forw;
 	p->p_back = NULL;
@@ -2151,6 +1997,8 @@ myetheraddr(cp)
 	bugbrdid(&brdid);
 	bcopy(&brdid.etheraddr, cp, 6);
 }
+
+int netisr;
 
 void
 dosoftint()
@@ -2202,7 +2050,7 @@ MY_info(f, p, flags, s)
 {
 	regdump(f);
 	printf("proc %x flags %x type %s\n", p, flags, s);
-}  
+}
 
 void
 MY_info_done(f, flags)
@@ -2210,7 +2058,7 @@ MY_info_done(f, flags)
 	int         flags;
 {
 	regdump(f);
-} 
+}
 
 #endif
 
@@ -2218,7 +2066,7 @@ void
 nmihand(void *framep)
 {
 #if 0
-	struct m88100_saved_state *frame = framep;
+	struct trapframe *frame = framep;
 #endif
 
 #if DDB
@@ -2232,7 +2080,7 @@ nmihand(void *framep)
 void
 regdump(struct trapframe *f)
 {
-#define R(i) f->r[i]
+#define R(i) f->tf_r[i]
 	printf("R00-05: 0x%08x  0x%08x  0x%08x  0x%08x  0x%08x  0x%08x\n",
 	       R(0),R(1),R(2),R(3),R(4),R(5));
 	printf("R06-11: 0x%08x  0x%08x  0x%08x  0x%08x  0x%08x  0x%08x\n",
@@ -2245,40 +2093,47 @@ regdump(struct trapframe *f)
 	       R(24),R(25),R(26),R(27),R(28),R(29));
 	printf("R30-31: 0x%08x  0x%08x\n",R(30),R(31));
 	if (cputyp == CPU_88110) {
-		printf("exip %x enip %x\n", f->exip, f->enip);
+		printf("exip %x enip %x\n", f->tf_exip, f->tf_enip);
 	} else {
-		printf("sxip %x snip %x sfip %x\n", f->sxip, f->snip, f->sfip);
+		printf("sxip %x snip %x sfip %x\n",
+		    f->tf_sxip, f->tf_snip, f->tf_sfip);
 	}
 #ifdef M88100
-	if (f->vector == 0x3 && cputyp != CPU_88110) {
+	if (f->tf_vector == 0x3 && cputyp != CPU_88110) {
 		/* print dmt stuff for data access fault */
-		printf("dmt0 %x dmd0 %x dma0 %x\n", f->dmt0, f->dmd0, f->dma0);
-		printf("dmt1 %x dmd1 %x dma1 %x\n", f->dmt1, f->dmd1, f->dma1);
-		printf("dmt2 %x dmd2 %x dma2 %x\n", f->dmt2, f->dmd2, f->dma2);
-		printf("fault type %d\n", (f->dpfsr >> 16) & 0x7);
+		printf("dmt0 %x dmd0 %x dma0 %x\n",
+		    f->tf_dmt0, f->tf_dmd0, f->tf_dma0);
+		printf("dmt1 %x dmd1 %x dma1 %x\n",
+		    f->tf_dmt1, f->tf_dmd1, f->tf_dma1);
+		printf("dmt2 %x dmd2 %x dma2 %x\n",
+		    f->tf_dmt2, f->tf_dmd2, f->tf_dma2);
+		printf("fault type %d\n", (f->tf_dpfsr >> 16) & 0x7);
 		dae_print((unsigned *)f);
 	}
 	if (longformat && cputyp != CPU_88110) {
-		printf("fpsr %x fpcr %x epsr %x ssbr %x\n", 
-		       f->fpsr, f->fpcr, f->epsr, f->ssbr);
-		printf("fpecr %x fphs1 %x fpls1 %x fphs2 %x fpls2 %x\n", 
-		       f->fpecr, f->fphs1, f->fpls1, f->fphs2, f->fpls2);
-		printf("fppt %x fprh %x fprl %x fpit %x\n", 
-		       f->fppt, f->fprh, f->fprl, f->fpit);
-		printf("vector %d mask %x mode %x scratch1 %x cpu %x\n", 
-		       f->vector, f->mask, f->mode, f->scratch1, f->cpu);
+		printf("fpsr %x fpcr %x epsr %x ssbr %x\n",
+		    f->tf_fpsr, f->tf_fpcr, f->tf_epsr, f->tf_ssbr);
+		printf("fpecr %x fphs1 %x fpls1 %x fphs2 %x fpls2 %x\n",
+		    f->tf_fpecr, f->tf_fphs1, f->tf_fpls1,
+		    f->tf_fphs2, f->tf_fpls2);
+		printf("fppt %x fprh %x fprl %x fpit %x\n",
+		    f->tf_fppt, f->tf_fprh, f->tf_fprl, f->tf_fpit);
+		printf("vector %d mask %x mode %x scratch1 %x cpu %x\n",
+		    f->tf_vector, f->tf_mask, f->tf_mode,
+		    f->tf_scratch1, f->tf_cpu);
 	}
-#endif 
+#endif
 #ifdef M88110
 	if (longformat && cputyp == CPU_88110) {
-		printf("fpsr %x fpcr %x fpecr %x epsr %x\n", 
-		       f->fpsr, f->fpcr, f->fpecr, f->epsr);
+		printf("fpsr %x fpcr %x fpecr %x epsr %x\n",
+		    f->tf_fpsr, f->tf_fpcr, f->tf_fpecr, f->tf_epsr);
 		printf("dsap %x duap %x dsr %x dlar %x dpar %x\n",
-		       f->dsap, f->duap, f->dsr, f->dlar, f->dpar);
+		    f->tf_dsap, f->tf_duap, f->tf_dsr, f->tf_dlar, f->tf_dpar);
 		printf("isap %x iuap %x isr %x ilar %x ipar %x\n",
-		       f->isap, f->iuap, f->isr, f->ilar, f->ipar);
-		printf("vector %d mask %x mode %x scratch1 %x cpu %x\n", 
-		       f->vector, f->mask, f->mode, f->scratch1, f->cpu);
+		    f->tf_isap, f->tf_iuap, f->tf_isr, f->tf_ilar, f->tf_ipar);
+		printf("vector %d mask %x mode %x scratch1 %x cpu %x\n",
+		    f->tf_vector, f->tf_mask, f->tf_mode,
+		    f->tf_scratch1, f->tf_cpu);
 	}
 #endif
 #ifdef MVME188
@@ -2287,11 +2142,11 @@ regdump(struct trapframe *f)
 
 		istr = *(int *volatile)IST_REG;
 		cur_mask = GET_MASK(0, istr);
-		printf("emask = 0x%b\n", f->mask, IST_STRING);
+		printf("emask = 0x%b\n", f->tf_mask, IST_STRING);
 		printf("istr  = 0x%b\n", istr, IST_STRING);
 		printf("cmask = 0x%b\n", cur_mask, IST_STRING);
 	}
-#endif 
+#endif
 }
 
 /*
@@ -2304,33 +2159,35 @@ mvme_bootstrap()
 {
 	extern int kernelstart;
 	extern struct consdev *cn_tab;
+#ifdef MVME197
+	extern struct cmmu_p cmmu88110;
+#endif
+#if defined(MVME187) || defined(MVME188)
+	extern struct cmmu_p cmmu8820x;
+#endif
 	extern void set_tcfp(void);
 
 	struct mvmeprom_brdid brdid;
-	
+
 	/*
 	 * Must initialize p_addr before autoconfig or
 	 * the fault handler will get a NULL reference.
-	 * Do this early so that we can take a data or 
+	 * Do this early so that we can take a data or
 	 * instruction fault and survive it. XXX smurph
 	 */
 	proc0.p_addr = proc0paddr;
 	curproc = &proc0;
 	curpcb = &proc0paddr->u_pcb;
 
-	/* zero out the machine dependant function pointers */
+	/* zero out the machine dependent function pointers */
 	bzero(&md, sizeof(struct md_p));
 
 	buginit(); /* init the bug routines */
 	bugbrdid(&brdid);
 	brdtyp = brdid.model;
 
-	/* to support the M8120.  It's based off of MVME187 */
-	if (brdtyp == BRD_8120)
-		brdtyp = BRD_187;
-
-	/* 
-	 * set up interrupt and fp exception handlers 
+	/*
+	 * set up interrupt and fp exception handlers
 	 * based on the machine.
 	 */
 	switch (brdtyp) {
@@ -2350,6 +2207,7 @@ mvme_bootstrap()
 #endif /* MVME188 */
 #ifdef MVME187
 	case BRD_187:
+	case BRD_8120:
 		cmmu = &cmmu8820x;
 		md.interrupt_func = &m187_ext_int;
 		md.intr_mask = (u_char *)M187_IMASK;
@@ -2381,6 +2239,7 @@ mvme_bootstrap()
 	switch (brdtyp) {
 #ifdef MVME187
 	case BRD_187:
+	case BRD_8120:
 		last_addr = memsize187();
 		break;
 #endif
@@ -2405,17 +2264,32 @@ mvme_bootstrap()
 	cmmu_init();
 	master_cpu = cmmu_cpu_number();
 	set_cpu_number(master_cpu);
-	printf("CPU%d is master CPU\n", master_cpu);
 
-#ifdef notevenclose
-	if (brdtyp == BRD_188 && (boothowto & RB_MINIROOT)) {
+	/*
+	 * If we have more than one CPU, mention which one is the master.
+	 * We will also want to spin up slave CPUs on the long run...
+	 */
+	switch (brdtyp) {
+	case BRD_188:
+		printf("CPU%d is master CPU\n", master_cpu);
+
+#if 0
 		int i;
-		for (i=0; i<MAX_CPUS; i++) {
+		for (i = 0; i < MAX_CPUS; i++) {
 			if (!spin_cpu(i))
 				printf("CPU%d started\n", i);
 		}
+#endif
+		break;
+	case BRD_197:
+		/*
+		 * In the 197DP case, mention which CPU is the master
+		 * there too...
+		 * XXX TBD
+		 */
+		break;
 	}
-#endif 
+
 	avail_start = first_addr;
 	avail_end = last_addr;
 	/*
@@ -2425,19 +2299,19 @@ mvme_bootstrap()
 
 #ifdef DEBUG
 	printf("MVME%x boot: memory from 0x%x to 0x%x\n", brdtyp, avail_start, avail_end);
-#endif 
-	pmap_bootstrap((vm_offset_t)trunc_page((unsigned)&kernelstart) /* = loadpt */, 
+#endif
+	pmap_bootstrap((vaddr_t)trunc_page((unsigned)&kernelstart) /* = loadpt */,
 		       &avail_start, &avail_end, &virtual_avail,
 		       &virtual_end);
 	/*
-	 * Tell the VM system about available physical memory.  
+	 * Tell the VM system about available physical memory.
 	 * mvme88k only has one segment.
 	 */
 	uvm_page_physload(atop(avail_start), atop(avail_end),
 			  atop(avail_start), atop(avail_end),VM_FREELIST_DEFAULT);
 
 	/* Initialize cached PTEs for u-area mapping. */
-	save_u_area(&proc0, (vm_offset_t)proc0paddr);
+	save_u_area(&proc0, (vaddr_t)proc0paddr);
 
 	/*
 	 * Map proc0's u-area at the standard address (UADDR).
@@ -2448,11 +2322,11 @@ mvme_bootstrap()
 	bzero((caddr_t)UADDR, UPAGES*NBPG);
 #ifdef DEBUG
 	printf("leaving mvme_bootstrap()\n");
-#endif 
+#endif
 }
 
 /*
- * Boot console routines: 
+ * Boot console routines:
  * Enables printing of boot messages before consinit().
  */
 void

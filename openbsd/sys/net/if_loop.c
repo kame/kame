@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_loop.c,v 1.29 2003/06/02 23:28:12 millert Exp $	*/
+/*	$OpenBSD: if_loop.c,v 1.32 2003/12/16 20:33:25 markus Exp $	*/
 /*	$NetBSD: if_loop.c,v 1.15 1996/05/07 02:40:33 thorpej Exp $	*/
 
 /*
@@ -173,50 +173,83 @@
 static void lo_altqstart(struct ifnet *);
 #endif
 
+int	loop_clone_create(struct if_clone *, int);
+int	loop_clone_destroy(struct ifnet *);
+
+struct if_clone loop_cloner =
+    IF_CLONE_INITIALIZER("lo", loop_clone_create, loop_clone_destroy);
+
+/* ARGSUSED */
 void
 loopattach(n)
 	int n;
 {
-	register int i;
-	register struct ifnet *ifp;
+	(void) loop_clone_create(&loop_cloner, 0);
+	if_clone_attach(&loop_cloner);
+}
 
-	for (i = n; i--; ) {
-		MALLOC(ifp, struct ifnet *, sizeof(*ifp), M_DEVBUF, M_NOWAIT);
-		if (ifp == NULL)
-			return;
-		bzero(ifp, sizeof(struct ifnet));
-		if (i == 0)
-			lo0ifp = ifp;
-		snprintf(ifp->if_xname, sizeof ifp->if_xname, "lo%d", i);
-		ifp->if_softc = NULL;
-		ifp->if_mtu = LOMTU;
-		ifp->if_flags = IFF_LOOPBACK | IFF_MULTICAST;
-		ifp->if_ioctl = loioctl;
-		ifp->if_output = looutput;
-		ifp->if_type = IFT_LOOP;
-		ifp->if_hdrlen = sizeof(u_int32_t);
-		ifp->if_addrlen = 0;
-		IFQ_SET_READY(&ifp->if_snd);
+int
+loop_clone_create(ifc, unit)
+	struct if_clone *ifc;
+	int unit;
+{
+	struct ifnet *ifp;
+
+	MALLOC(ifp, struct ifnet *, sizeof(*ifp), M_DEVBUF, M_NOWAIT);
+	if (ifp == NULL)
+		return (ENOMEM);
+	bzero(ifp, sizeof(struct ifnet));
+
+	snprintf(ifp->if_xname, sizeof ifp->if_xname, "lo%d", unit);
+	ifp->if_softc = NULL;
+	ifp->if_mtu = LOMTU;
+	ifp->if_flags = IFF_LOOPBACK | IFF_MULTICAST;
+	ifp->if_ioctl = loioctl;
+	ifp->if_output = looutput;
+	ifp->if_type = IFT_LOOP;
+	ifp->if_hdrlen = sizeof(u_int32_t);
+	ifp->if_addrlen = 0;
+	IFQ_SET_READY(&ifp->if_snd);
 #ifdef ALTQ
-		ifp->if_start = lo_altqstart;
+	ifp->if_start = lo_altqstart;
 #endif
+	if (unit == 0) {
+		lo0ifp = ifp;
 		if_attachhead(ifp);
-		if_alloc_sadl(ifp);
+	} else
+		if_attach(ifp);
+	if_alloc_sadl(ifp);
 #if NBPFILTER > 0
-		bpfattach(&ifp->if_bpf, ifp, DLT_LOOP, sizeof(u_int32_t));
+	bpfattach(&ifp->if_bpf, ifp, DLT_LOOP, sizeof(u_int32_t));
 #endif
-	}
+	return (0);
+}
+
+int
+loop_clone_destroy(ifp)
+	struct ifnet *ifp;
+{
+	if (ifp == lo0ifp)
+		return (EPERM);
+
+#if NBPFILTER > 0
+	bpfdetach(ifp);
+#endif
+	if_detach(ifp);
+
+	free(ifp, M_DEVBUF);
+	return (0);
 }
 
 int
 looutput(ifp, m, dst, rt)
 	struct ifnet *ifp;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct sockaddr *dst;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 {
 	int s, isr;
-	register struct ifqueue *ifq = 0;
+	struct ifqueue *ifq = 0;
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("looutput: no header mbuf");
@@ -437,13 +470,13 @@ lortrequest(cmd, rt, info)
 /* ARGSUSED */
 int
 loioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long cmd;
 	caddr_t data;
 {
-	register struct ifaddr *ifa;
-	register struct ifreq *ifr;
-	register int error = 0;
+	struct ifaddr *ifa;
+	struct ifreq *ifr;
+	int error = 0;
 
 	switch (cmd) {
 

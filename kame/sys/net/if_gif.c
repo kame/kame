@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.108 2004/05/26 09:54:46 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.109 2004/05/27 05:05:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,7 +113,7 @@
 
 #if NGIF > 0
 
-LIST_HEAD(, gif_softc) gif_softc_list;
+struct gif_softc_list gif_softc_list;
 
 #ifdef __FreeBSD__
 void gifattach __P((void *));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_txp.c,v 1.69 2003/06/02 19:03:37 jason Exp $	*/
+/*	$OpenBSD: if_txp.c,v 1.71 2003/12/29 23:06:55 brad Exp $	*/
 
 /*
  * Copyright (c) 2001
@@ -66,7 +66,6 @@
 #include <net/if_vlan_var.h>
 #endif
 
-#include <uvm/uvm_extern.h>              /* for vtophys */
 #include <machine/bus.h>
 
 #include <dev/mii/mii.h>
@@ -139,6 +138,7 @@ struct cfdriver txp_cd = {
 
 const struct pci_matchid txp_devices[] = {
 	{ PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3CR990 },
+	{ PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3CR990TX },
 	{ PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3CR990TX95 },
 	{ PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3CR990TX97 },
 	{ PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3CR990SVR95 },

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbuf.h,v 1.72 2003/08/12 05:09:17 mickey Exp $	*/
+/*	$OpenBSD: mbuf.h,v 1.74 2003/12/08 07:07:36 mcbride Exp $	*/
 /*	$NetBSD: mbuf.h,v 1.19 1996/02/09 18:25:14 christos Exp $	*/
 
 /*
@@ -611,8 +611,10 @@ struct m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
 #define	PACKET_TAG_PF_QID			14 /* PF queue id */
 #define PACKET_TAG_PF_TAG			15 /* PF tags */
-#define PACKET_TAG_ENCAP			16 /* encapsulation data */
-#define PACKET_TAG_INET6			17 /* IPv6 info */
+#define PACKET_TAG_CARP				16 /* CARP info */
+#define PACKET_TAG_PF_TRANSLATE_LOCALHOST	17 /* translated to localhost */
+#define PACKET_TAG_ENCAP			18 /* encapsulation data */
+#define PACKET_TAG_INET6			19 /* IPv6 info */
 
 #ifdef MBTYPES
 int mbtypes[] = {				/* XXX */

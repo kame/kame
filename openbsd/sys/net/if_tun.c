@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tun.c,v 1.49 2003/08/15 20:32:19 tedu Exp $	*/
+/*	$OpenBSD: if_tun.c,v 1.58 2004/03/02 23:09:29 markus Exp $	*/
 /*	$NetBSD: if_tun.c,v 1.24 1996/05/07 02:40:48 thorpej Exp $	*/
 
 /*
@@ -53,6 +53,7 @@
 #include <sys/device.h>
 #include <sys/vnode.h>
 #include <sys/signalvar.h>
+#include <sys/poll.h>
 #include <sys/conf.h>
 
 #include <machine/cpu.h>
@@ -105,6 +106,8 @@ struct tun_softc {
 	uid_t	tun_sigeuid;		/* euid for process that set tun_pgid */
 	struct	selinfo	tun_rsel;	/* read select */
 	struct	selinfo	tun_wsel;	/* write select (not used) */
+	int	tun_unit;
+	LIST_ENTRY(tun_softc) tun_list;	/* all tunnel interfaces */
 };
 
 #ifdef	TUN_DEBUG
@@ -113,9 +116,6 @@ int	tundebug = TUN_DEBUG;
 #else
 #define TUNDEBUG(a)	/* (tundebug? printf a : 0) */
 #endif
-
-struct tun_softc *tunctl;
-int ntun;
 
 extern int ifqmaxlen;
 
@@ -128,55 +128,128 @@ int	tun_output(struct ifnet *, struct mbuf *, struct sockaddr *,
 int	tunioctl(dev_t, u_long, caddr_t, int, struct proc *);
 int	tunread(dev_t, struct uio *, int);
 int	tunwrite(dev_t, struct uio *, int);
-int	tunselect(dev_t, int, struct proc *);
+int	tunpoll(dev_t, int, struct proc *);
 int	tunkqfilter(dev_t, struct knote *);
-
+int	tun_clone_create(struct if_clone *, int);
+int	tun_clone_destroy(struct ifnet *);
+struct	tun_softc *tun_lookup(int);
+void	tun_wakeup(struct tun_softc *);
 
 static int tuninit(struct tun_softc *);
 #ifdef ALTQ
 static void tunstart(struct ifnet *);
 #endif
+int	filt_tunread(struct knote *, long);
+int	filt_tunwrite(struct knote *, long);
+void	filt_tunrdetach(struct knote *);
+void	filt_tunwdetach(struct knote *);
+
+struct filterops tunread_filtops =
+	{ 1, NULL, filt_tunrdetach, filt_tunread};
+
+struct filterops tunwrite_filtops =
+	{ 1, NULL, filt_tunwdetach, filt_tunwrite};
+
+LIST_HEAD(, tun_softc) tun_softc_list;
+
+struct if_clone tun_cloner =
+    IF_CLONE_INITIALIZER("tun", tun_clone_create, tun_clone_destroy);
 
 void
 tunattach(n)
 	int n;
 {
-	register int i;
+	LIST_INIT(&tun_softc_list);
+	if_clone_attach(&tun_cloner);
+}
+
+int
+tun_clone_create(ifc, unit)
+	struct if_clone *ifc;
+	int unit;
+{
+	struct tun_softc *tp;
 	struct ifnet *ifp;
+	int s;
 
-	ntun = n;
-	tunctl = malloc(ntun * sizeof(*tunctl), M_DEVBUF, M_WAITOK);
-	bzero(tunctl, ntun * sizeof(*tunctl));
-	for (i = 0; i < ntun; i++) {
-		tunctl[i].tun_flags = TUN_INITED;
+	tp = malloc(sizeof(*tp), M_DEVBUF, M_NOWAIT);
+	if (!tp)
+		return (ENOMEM);
+	bzero(tp, sizeof(*tp));
 
-		ifp = &tunctl[i].tun_if;
-		snprintf(ifp->if_xname, sizeof ifp->if_xname, "tun%d", i);
-		ifp->if_softc = &tunctl[i];
-		ifp->if_mtu = TUNMTU;
-		ifp->if_ioctl = tun_ioctl;
-		ifp->if_output = tun_output;
+	tp->tun_unit = unit;
+	tp->tun_flags = TUN_INITED;
+
+	ifp = &tp->tun_if;
+	snprintf(ifp->if_xname, sizeof ifp->if_xname, "%s%d", ifc->ifc_name, 
+	    unit);
+	ifp->if_softc = tp;
+	ifp->if_mtu = TUNMTU;
+	ifp->if_ioctl = tun_ioctl;
+	ifp->if_output = tun_output;
 #ifdef ALTQ
-		ifp->if_start = tunstart;
+	ifp->if_start = tunstart;
 #endif
-		ifp->if_flags = IFF_POINTOPOINT;
-		ifp->if_type  = IFT_PROPVIRTUAL;
-		IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
-		IFQ_SET_READY(&ifp->if_snd);
-		ifp->if_hdrlen = sizeof(u_int32_t);
-		ifp->if_collisions = 0;
-		ifp->if_ierrors = 0;
-		ifp->if_oerrors = 0;
-		ifp->if_ipackets = 0;
-		ifp->if_opackets = 0;
-		ifp->if_ibytes = 0;
-		ifp->if_obytes = 0;
-		if_attach(ifp);
-		if_alloc_sadl(ifp);
+	ifp->if_flags = IFF_POINTOPOINT;
+	ifp->if_type  = IFT_PROPVIRTUAL;
+	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
+	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_hdrlen = sizeof(u_int32_t);
+	ifp->if_collisions = 0;
+	ifp->if_ierrors = 0;
+	ifp->if_oerrors = 0;
+	ifp->if_ipackets = 0;
+	ifp->if_opackets = 0;
+	ifp->if_ibytes = 0;
+	ifp->if_obytes = 0;
+	if_attach(ifp);
+	if_alloc_sadl(ifp);
 #if NBPFILTER > 0
-		bpfattach(&ifp->if_bpf, ifp, DLT_LOOP, sizeof(u_int32_t));
+	bpfattach(&ifp->if_bpf, ifp, DLT_LOOP, sizeof(u_int32_t));
 #endif
-	}
+	s = splimp();
+	LIST_INSERT_HEAD(&tun_softc_list, tp, tun_list);
+	splx(s);
+
+	return (0);
+}
+
+int
+tun_clone_destroy(ifp)
+	struct ifnet *ifp;
+{
+	struct tun_softc *tp = ifp->if_softc;
+	int s;
+
+	s = splhigh();
+	klist_invalidate(&tp->tun_rsel.si_note);
+	klist_invalidate(&tp->tun_wsel.si_note);
+	splx(s);
+
+	s = splimp();
+	LIST_REMOVE(tp, tun_list);
+	splx(s);
+
+	tun_wakeup(tp);
+#if NBPFILTER > 0
+	bpfdetach(ifp);
+#endif
+	if_detach(ifp);
+
+	free(tp, M_DEVBUF);
+	return (0);
+}
+
+struct tun_softc *
+tun_lookup(unit)
+	int unit;
+{
+	struct tun_softc *tp;
+
+	LIST_FOREACH(tp, &tun_softc_list, tun_list)
+		if (tp->tun_unit == unit)
+			return (tp);
+	return (NULL);
 }
 
 /*
@@ -191,15 +264,19 @@ tunopen(dev, flag, mode, p)
 {
 	struct tun_softc *tp;
 	struct ifnet	*ifp;
-	register int	unit, error;
+	int error;
 
 	if ((error = suser(p, 0)) != 0)
 		return (error);
 
-	if ((unit = minor(dev)) >= ntun)
-		return (ENXIO);
+	if ((tp = tun_lookup(minor(dev))) == NULL) {
+		/* create on demand */
+                (void) tun_clone_create(&tun_cloner, minor(dev));
 
-	tp = &tunctl[unit];
+		if ((tp = tun_lookup(minor(dev))) == NULL)
+			return (ENXIO);
+	}
+
 	if (tp->tun_flags & TUN_OPEN)
 		return EBUSY;
 
@@ -220,14 +297,13 @@ tunclose(dev, flag, mode, p)
 	int	mode;
 	struct proc *p;
 {
-	register int	unit, s;
+	int	s;
 	struct tun_softc *tp;
 	struct ifnet	*ifp;
 
-	if ((unit = minor(dev)) >= ntun)
+	if ((tp = tun_lookup(minor(dev))) == NULL)
 		return (ENXIO);
 
-	tp = &tunctl[unit];
 	ifp = &tp->tun_if;
 	tp->tun_flags &= ~TUN_OPEN;
 
@@ -243,7 +319,7 @@ tunclose(dev, flag, mode, p)
 		if_down(ifp);
 		if (ifp->if_flags & IFF_RUNNING) {
 			/* find internet addresses and delete routes */
-			register struct ifaddr *ifa;
+			struct ifaddr *ifa;
 			TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 #ifdef INET
 				if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -258,6 +334,7 @@ tunclose(dev, flag, mode, p)
 	}
 	tp->tun_pgid = 0;
 	selwakeup(&tp->tun_rsel);
+	KNOTE(&tp->tun_rsel.si_note, 0);
 		
 	TUNDEBUG(("%s: closed\n", ifp->if_xname));
 	return (0);
@@ -268,7 +345,7 @@ tuninit(tp)
 	struct tun_softc *tp;
 {
 	struct ifnet	*ifp = &tp->tun_if;
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 
 	TUNDEBUG(("%s: tuninit\n", ifp->if_xname));
 
@@ -425,6 +502,14 @@ tun_output(ifp, m0, dst, rt)
 	ifp->if_opackets++;
 	ifp->if_obytes += len;
 
+	tun_wakeup(tp);
+	return 0;
+}
+
+void
+tun_wakeup(tp)
+	struct tun_softc *tp;
+{
 	if (tp->tun_flags & TUN_RWAIT) {
 		tp->tun_flags &= ~TUN_RWAIT;
 		wakeup((caddr_t)tp);
@@ -433,7 +518,7 @@ tun_output(ifp, m0, dst, rt)
 		csignal(tp->tun_pgid, SIGIO,
 		    tp->tun_siguid, tp->tun_sigeuid);
 	selwakeup(&tp->tun_rsel);
-	return 0;
+	KNOTE(&tp->tun_rsel.si_note, 0);
 }
 
 /*
@@ -447,15 +532,13 @@ tunioctl(dev, cmd, data, flag, p)
 	int		flag;
 	struct proc	*p;
 {
-	int		unit, s;
+	int		s;
 	struct tun_softc *tp;
 	struct tuninfo *tunp;
 	struct mbuf *m;
 
-	if ((unit = minor(dev)) >= ntun)
+	if ((tp = tun_lookup(minor(dev))) == NULL)
 		return (ENXIO);
-
-	tp = &tunctl[unit];
 
 	s = splimp();
 	switch (cmd) {
@@ -544,16 +627,14 @@ tunread(dev, uio, ioflag)
 	struct uio	*uio;
 	int		ioflag;
 {
-	int		unit;
 	struct tun_softc *tp;
 	struct ifnet	*ifp;
 	struct mbuf	*m, *m0;
 	int		error = 0, len, s;
 
-	if ((unit = minor(dev)) >= ntun)
+	if ((tp = tun_lookup(minor(dev))) == NULL)
 		return (ENXIO);
 
-	tp = &tunctl[unit];
 	ifp = &tp->tun_if;
 	TUNDEBUG(("%s: read\n", ifp->if_xname));
 	if ((tp->tun_flags & TUN_READY) != TUN_READY) {
@@ -615,7 +696,7 @@ tunwrite(dev, uio, ioflag)
 	struct uio	*uio;
 	int		ioflag;
 {
-	int		unit;
+	struct tun_softc *tp;
 	struct ifnet	*ifp;
 	struct ifqueue	*ifq;
 	u_int32_t	*th;
@@ -623,10 +704,10 @@ tunwrite(dev, uio, ioflag)
 	int		isr;
 	int		error=0, s, tlen, mlen;
 
-	if ((unit = minor(dev)) >= ntun)
+	if ((tp = tun_lookup(minor(dev))) == NULL)
 		return (ENXIO);
 
-	ifp = &tunctl[unit].tun_if;
+	ifp = &tp->tun_if;
 	TUNDEBUG(("%s: tunwrite\n", ifp->if_xname));
 
 	if (uio->uio_resid == 0 || uio->uio_resid > TUNMRU) {
@@ -648,7 +729,7 @@ tunwrite(dev, uio, ioflag)
 		error = uiomove(mtod (m, caddr_t), m->m_len, uio);
 		*mp = m;
 		mp = &m->m_next;
-		if (uio->uio_resid > 0) {
+		if (error == 0 && uio->uio_resid > 0) {
 			MGET (m, M_DONTWAIT, MT_DATA);
 			if (m == 0) {
 				error = ENOBUFS;
@@ -742,50 +823,161 @@ tunwrite(dev, uio, ioflag)
  * anyway, it either accepts the packet or drops it.
  */
 int
-tunselect(dev, rw, p)
+tunpoll(dev, events, p)
 	dev_t		dev;
-	int		rw;
+	int		events;
 	struct proc	*p;
 {
-	int		unit, s;
+	int		revents, s;
 	struct tun_softc *tp;
 	struct ifnet	*ifp;
 	struct mbuf	*m;
 
-	if ((unit = minor(dev)) >= ntun)
+	if ((tp = tun_lookup(minor(dev))) == NULL)
 		return (ENXIO);
 
-	tp = &tunctl[unit];
 	ifp = &tp->tun_if;
+	revents = 0;
 	s = splimp();
-	TUNDEBUG(("%s: tunselect\n", ifp->if_xname));
+	TUNDEBUG(("%s: tunpoll\n", ifp->if_xname));
 
-	switch (rw) {
-	case FREAD:
+	if (events & (POLLIN | POLLRDNORM)) {
 		IFQ_POLL(&ifp->if_snd, m);
 		if (m != NULL) {
-			splx(s);
 			TUNDEBUG(("%s: tunselect q=%d\n", ifp->if_xname,
 				  ifp->if_snd.ifq_len));
-			return 1;
+			revents |= events & (POLLIN | POLLRDNORM);
+		} else {
+			TUNDEBUG(("%s: tunpoll waiting\n", ifp->if_xname));
+			selrecord(p, &tp->tun_rsel);
 		}
-		selrecord(curproc, &tp->tun_rsel);
-		break;
-	case FWRITE:
-		splx(s);
-		return 1;
 	}
+	if (events & (POLLOUT | POLLWRNORM))
+		revents |= events & (POLLOUT | POLLWRNORM);
 	splx(s);
-	TUNDEBUG(("%s: tunselect waiting\n", ifp->if_xname));
-	return 0;
+	return (revents);
 }
 
-/* Does not currently work */
-
+/*
+ * kqueue(2) support.
+ *
+ * The tun driver uses an array of tun_softc's based on the minor number
+ * of the device.  kn->kn_hook gets set to the specific tun_softc.
+ *
+ * filt_tunread() sets kn->kn_data to the iface qsize
+ * filt_tunwrite() sets kn->kn_data to the MTU size
+ */
 int
 tunkqfilter(dev_t dev,struct knote *kn)
 {
-	return (1);
+	int s;
+	struct klist *klist;
+	struct tun_softc *tp;
+	struct ifnet *ifp;
+
+	if ((tp = tun_lookup(minor(dev))) == NULL)
+		return (ENXIO);
+
+	ifp = &tp->tun_if;
+
+	s = splimp();
+	TUNDEBUG(("%s: tunselect\n", ifp->if_xname));
+	splx(s);
+
+	switch (kn->kn_filter) {
+		case EVFILT_READ:
+			klist = &tp->tun_rsel.si_note;
+			kn->kn_fop = &tunread_filtops;
+			break;
+		case EVFILT_WRITE:
+			klist = &tp->tun_wsel.si_note;
+			kn->kn_fop = &tunwrite_filtops;
+			break;
+		default:
+			return EPERM;	/* 1 */
+	}
+
+	kn->kn_hook = (caddr_t)tp;
+
+	s = splhigh();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return 0;
+}
+
+void
+filt_tunrdetach(struct knote *kn)
+{
+	int s;
+	struct tun_softc *tp = (struct tun_softc *)kn->kn_hook;
+
+	s = splhigh();
+	if (!(kn->kn_status & KN_DETACHED))
+		SLIST_REMOVE(&tp->tun_rsel.si_note, kn, knote, kn_selnext);
+	splx(s);
+}
+
+int
+filt_tunread(struct knote *kn, long hint)
+{
+	int s;
+	struct tun_softc *tp;
+	struct ifnet *ifp;
+	struct mbuf *m;
+
+	if (kn->kn_status & KN_DETACHED) {
+		kn->kn_data = 0;
+		return 1;
+	}
+
+	tp = (struct tun_softc *)kn->kn_hook;
+	ifp = &tp->tun_if;
+
+	s = splnet();
+	IFQ_POLL(&ifp->if_snd, m);
+	if (m != NULL) {
+		splx(s);
+		kn->kn_data = ifp->if_snd.ifq_len;
+
+		TUNDEBUG(("%s: tunkqread q=%d\n", ifp->if_xname,
+					ifp->if_snd.ifq_len));
+		return 1;
+	}
+	splx(s);
+	TUNDEBUG(("%s: tunkqread waiting\n", ifp->if_xname));
+	return 0;
+}
+
+void
+filt_tunwdetach(struct knote *kn)
+{
+	int s;
+	struct tun_softc *tp = (struct tun_softc *)kn->kn_hook;
+
+	s = splhigh();
+	if (!(kn->kn_status & KN_DETACHED))
+		SLIST_REMOVE(&tp->tun_wsel.si_note, kn, knote, kn_selnext);
+	splx(s);
+}
+
+int
+filt_tunwrite(struct knote *kn, long hint)
+{
+	struct tun_softc *tp;
+	struct ifnet *ifp;
+
+	if (kn->kn_status & KN_DETACHED) {
+		kn->kn_data = 0;
+		return 1;
+	}
+
+	tp = (struct tun_softc *)kn->kn_hook;
+	ifp = &tp->tun_if;
+
+	kn->kn_data = ifp->if_mtu;
+
+	return 1;
 }
 
 #ifdef ALTQ
@@ -806,15 +998,7 @@ tunstart(ifp)
 		return;
 
 	IFQ_POLL(&ifp->if_snd, m);
-	if (m != NULL) {
-		if (tp->tun_flags & TUN_RWAIT) {
-			tp->tun_flags &= ~TUN_RWAIT;
-			wakeup((caddr_t)tp);
-		}
-		if (tp->tun_flags & TUN_ASYNC && tp->tun_pgid)
-			csignal(tp->tun_pgid, SIGIO,
-			    tp->tun_siguid, tp->tun_sigeuid);
-		selwakeup(&tp->tun_rsel);
-	}
+	if (m != NULL)
+		tun_wakeup(tp);
 }
 #endif

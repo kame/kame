@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipsec_input.c,v 1.69 2003/07/28 10:10:16 markus Exp $	*/
+/*	$OpenBSD: ipsec_input.c,v 1.71 2004/02/17 12:07:45 markus Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -75,7 +75,6 @@
 
 #include "bpfilter.h"
 
-int ipsec_common_input(struct mbuf *, int, int, int, int);
 void *ipsec_common_ctlinput(int, struct sockaddr *, void *, int);
 
 #ifdef ENCDEBUG
@@ -89,6 +88,10 @@ int esp_enable = 1;
 int ah_enable = 1;
 int ipcomp_enable = 0;
 
+int *espctl_vars[ESPCTL_MAXID] = ESPCTL_VARS;
+int *ahctl_vars[AHCTL_MAXID] = AHCTL_VARS;
+int *ipcompctl_vars[IPCOMPCTL_MAXID] = IPCOMPCTL_VARS;
+
 #ifdef INET6
 extern struct ip6protosw inet6sw[];
 extern u_char ip6_protox[];
@@ -101,7 +104,8 @@ extern u_char ip6_protox[];
  * filtering).
  */
 int
-ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto)
+ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto,
+    int udpencap)
 {
 #define IPSEC_ISTAT(x,y,z) (sproto == IPPROTO_ESP ? (x)++ : \
 			    sproto == IPPROTO_AH ? (y)++ : (z)++)
@@ -211,6 +215,14 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto)
 		return EINVAL;
 	}
 
+	if (udpencap && !(tdbp->tdb_flags & TDBF_UDPENCAP)) {
+		splx(s);
+		DPRINTF(("ipsec_common_input(): attempted to use non-udpencap SA %s/%08x/%u\n", ipsp_address(dst_address), ntohl(spi), tdbp->tdb_sproto));
+		m_freem(m);
+		espstat.esps_udpinval++;
+		return EINVAL;
+	}
+
 	if (tdbp->tdb_xform == NULL) {
 		splx(s);
 		DPRINTF(("ipsec_common_input(): attempted to use uninitialized SA %s/%08x/%u\n", ipsp_address(dst_address), ntohl(spi), tdbp->tdb_sproto));
@@ -228,7 +240,7 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto)
 		 */
 		m->m_pkthdr.rcvif = &encif[0].sc_if;
 	}
-
+	
 	/* Register first use, setup expiration timer. */
 	if (tdbp->tdb_first_use == 0) {
 		int pri;
@@ -633,54 +645,33 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff,
 }
 
 int
-esp_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlen, void *newp,
+esp_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
     size_t newlen)
 {
-	/* All sysctl names at this level are terminal. */
-	if (namelen != 1)
-		return ENOTDIR;
-
-	switch (name[0]) {
-	case ESPCTL_ENABLE:
-		return sysctl_int(oldp, oldlen, newp, newlen, &esp_enable);
-	default:
-		return ENOPROTOOPT;
-	}
-	/* NOTREACHED */
+	if (name[0] < ESPCTL_MAXID)
+		return (sysctl_int_arr(espctl_vars, name, namelen,
+		    oldp, oldlenp, newp, newlen));
+	return (ENOPROTOOPT);
 }
 
 int
-ah_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlen, void *newp,
+ah_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
     size_t newlen)
 {
-	/* All sysctl names at this level are terminal. */
-	if (namelen != 1)
-		return ENOTDIR;
-
-	switch (name[0]) {
-	case AHCTL_ENABLE:
-		return sysctl_int(oldp, oldlen, newp, newlen, &ah_enable);
-	default:
-		return ENOPROTOOPT;
-    }
-    /* NOTREACHED */
+	if (name[0] < AHCTL_MAXID)
+		return (sysctl_int_arr(ahctl_vars, name, namelen,
+		    oldp, oldlenp, newp, newlen));
+	return (ENOPROTOOPT);
 }
 
 int
-ipcomp_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlen, void *newp,
+ipcomp_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
     size_t newlen)
 {
-	/* All sysctl names at this level are terminal. */
-	if (namelen != 1)
-		return ENOTDIR;
-
-	switch (name[0]) {
-	case IPCOMPCTL_ENABLE:
-		return sysctl_int(oldp, oldlen, newp, newlen, &ipcomp_enable);
-	default:
-		return ENOPROTOOPT;
-	}
-	/* NOTREACHED */
+	if (name[0] < IPCOMPCTL_MAXID)
+		return (sysctl_int_arr(ipcompctl_vars, name, namelen,
+		    oldp, oldlenp, newp, newlen));
+	return (ENOPROTOOPT);
 }
 
 #ifdef INET
@@ -696,7 +687,7 @@ ah4_input(struct mbuf *m, ...)
 	va_end(ap);
 
 	ipsec_common_input(m, skip, offsetof(struct ip, ip_p), AF_INET,
-	    IPPROTO_AH);
+	    IPPROTO_AH, 0);
 	return;
 }
 
@@ -752,7 +743,7 @@ esp4_input(struct mbuf *m, ...)
 	va_end(ap);
 
 	ipsec_common_input(m, skip, offsetof(struct ip, ip_p), AF_INET,
-	    IPPROTO_ESP);
+	    IPPROTO_ESP, 0);
 }
 
 /* IPv4 ESP callback. */
@@ -794,7 +785,7 @@ ipcomp4_input(struct mbuf *m, ...)
 	va_end(ap);
 
 	ipsec_common_input(m, skip, offsetof(struct ip, ip_p), AF_INET,
-	    IPPROTO_IPCOMP);
+	    IPPROTO_IPCOMP, 0);
 }
 
 /* IPv4 IPCOMP callback */
@@ -941,7 +932,7 @@ ah6_input(struct mbuf **mp, int *offp, int proto)
 		}
 		protoff += offsetof(struct ip6_ext, ip6e_nxt);
 	}
-	ipsec_common_input(*mp, *offp, protoff, AF_INET6, proto);
+	ipsec_common_input(*mp, *offp, protoff, AF_INET6, proto, 0);
 	return IPPROTO_DONE;
 }
 
@@ -1027,7 +1018,7 @@ esp6_input(struct mbuf **mp, int *offp, int proto)
 		}
 		protoff += offsetof(struct ip6_ext, ip6e_nxt);
 	}
-	ipsec_common_input(*mp, *offp, protoff, AF_INET6, proto);
+	ipsec_common_input(*mp, *offp, protoff, AF_INET6, proto, 0);
 	return IPPROTO_DONE;
 
 }
@@ -1081,7 +1072,7 @@ ipcomp6_input(struct mbuf **mp, int *offp, int proto)
 
 		protoff += offsetof(struct ip6_ext, ip6e_nxt);
 	}
-	ipsec_common_input(*mp, *offp, protoff, AF_INET6, proto);
+	ipsec_common_input(*mp, *offp, protoff, AF_INET6, proto, 0);
 	return IPPROTO_DONE;
 }
 

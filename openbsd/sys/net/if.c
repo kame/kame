@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.70 2003/08/27 00:33:34 henric Exp $	*/
+/*	$OpenBSD: if.c,v 1.84 2004/02/28 09:14:10 mcbride Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -63,6 +63,8 @@
 
 #include "bpfilter.h"
 #include "bridge.h"
+#include "carp.h"
+#include "pf.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,18 +107,31 @@
 #include <net/if_bridge.h>
 #endif
 
+#if NCARP > 0
+#include <netinet/ip_carp.h>
+#endif
+
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
+
 void	if_attachsetup(struct ifnet *);
 void	if_attachdomain1(struct ifnet *);
 int	if_detach_rtdelete(struct radix_node *, void *);
 
 int	ifqmaxlen = IFQ_MAXLEN;
-int	netisr;
 
 void	if_detach_queues(struct ifnet *, struct ifqueue *);
 void	if_detached_start(struct ifnet *);
 int	if_detached_ioctl(struct ifnet *, u_long, caddr_t);
 int	if_detached_init(struct ifnet *);
 void	if_detached_watchdog(struct ifnet *);
+
+int	if_clone_list(struct if_clonereq *);
+struct if_clone	*if_clone_lookup(const char *, int *);
+
+LIST_HEAD(, if_clone) if_cloners = LIST_HEAD_INITIALIZER(if_cloners);
+int if_cloners_count;
 
 /*
  * Network interface utility routines.
@@ -150,8 +165,36 @@ if_attachsetup(ifp)
 	struct ifnet *ifp;
 {
 	struct ifaddr *ifa;
+	int wrapped = 0;
 
-	ifp->if_index = ++if_index;
+	if (ifindex2ifnet == 0)
+		if_index = 1;
+	else {
+		while (if_index < if_indexlim &&
+		    ifindex2ifnet[if_index] != NULL) {
+			if_index++;
+			/*
+			 * If we hit USHRT_MAX, we skip back to 1 since
+			 * there are a number of places where the value
+			 * of ifp->if_index or if_index itself is compared
+			 * to or stored in an unsigned short.  By
+			 * jumping back, we won't botch those assignments
+			 * or comparisons.
+			 */
+			if (if_index == USHRT_MAX) {
+				if_index = 1;
+				/*
+				 * However, if we have to jump back to 1
+				 * *twice* without finding an empty
+				 * slot in ifindex2ifnet[], then there
+				 * there are too many (>65535) interfaces.
+				 */
+				if (wrapped++)
+					panic("too many interfaces");
+			}
+		}
+	}
+	ifp->if_index = if_index;
 
 	/*
 	 * We have some arrays that should be indexed by if_index.
@@ -206,6 +249,12 @@ if_attachsetup(ifp)
 
 	if (domains)
 		if_attachdomain1(ifp);
+#if NPF > 0
+	pfi_attach_ifnet(ifp);
+#endif
+
+	/* Announce the interface. */
+	rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
 }
 
 /*
@@ -250,7 +299,7 @@ if_alloc_sadl(ifp)
 	sdl->sdl_alen = ifp->if_addrlen;
 	sdl->sdl_index = ifp->if_index;
 	sdl->sdl_type = ifp->if_type;
-	ifnet_addrs[if_index] = ifa;
+	ifnet_addrs[ifp->if_index] = ifa;
 	ifa->ifa_ifp = ifp;
 	ifa->ifa_rtrequest = link_rtrequest;
 	TAILQ_INSERT_HEAD(&ifp->if_addrlist, ifa, ifa_list);
@@ -281,11 +330,12 @@ if_free_sadl(ifp)
 
 	s = splnet();
 	rtinit(ifa, RTM_DELETE, 0);
+#if 0
 	TAILQ_REMOVE(&ifp->if_addrlist, ifa, ifa_list);
-
+	ifnet_addrs[ifp->if_index] = NULL;
+#endif
 	ifp->if_sadl = NULL;
 
-	ifnet_addrs[ifp->if_index] = NULL;
 	splx(s);
 }
 
@@ -354,6 +404,11 @@ if_attach(ifp)
 /*
  * Delete a route if it has a specific interface for output.
  * This function complies to the rn_walktree callback API.
+ *
+ * Note that deleting a RTF_CLONING route can trigger the
+ * deletion of more entries, so we need to cancel the walk
+ * and return EAGAIN.  The caller should restart the walk
+ * as long as EAGAIN is returned.
  */
 int
 if_detach_rtdelete(rn, vifp)
@@ -363,9 +418,13 @@ if_detach_rtdelete(rn, vifp)
 	struct ifnet *ifp = vifp;
 	struct rtentry *rt = (struct rtentry *)rn;
 
-	if (rt->rt_ifp == ifp)
-		rtrequest(RTM_DELETE, rt_key(rt), rt->rt_gateway, rt_mask(rt),
-		    0, NULL);
+	if (rt->rt_ifp == ifp) {
+		int cloning = (rt->rt_flags & RTF_CLONING);
+
+		if (rtrequest(RTM_DELETE, rt_key(rt), rt->rt_gateway,
+		    rt_mask(rt), 0, NULL) == 0 && cloning)
+			return (EAGAIN);
+	}
 
 	/*
 	 * XXX There should be no need to check for rt_ifa belonging to this
@@ -396,10 +455,20 @@ if_detach(ifp)
 	ifp->if_init = if_detached_init;
 	ifp->if_watchdog = if_detached_watchdog;
 
+#if NPF > 0
+	pfi_detach_ifnet(ifp);
+#endif
+
 #if NBRIDGE > 0
 	/* Remove the interface from any bridge it is part of.  */
 	if (ifp->if_bridge)
 		bridge_ifdetach(ifp);
+#endif
+
+#if NCARP > 0
+	/* Remove the interface from any carp group it is a part of.  */
+	if (ifp->if_carp)
+		carp_ifdetach(ifp);
 #endif
 
 #if NBPFILTER > 0
@@ -421,7 +490,9 @@ if_detach(ifp)
 	for (i = 1; i <= AF_MAX; i++) {
 		rnh = rt_tables[i];
 		if (rnh)
-			(*rnh->rnh_walktree)(rnh, if_detach_rtdelete, ifp);
+			while ((*rnh->rnh_walktree)(rnh,
+			    if_detach_rtdelete, ifp) == EAGAIN)
+				;
 	}
 
 #ifdef INET
@@ -498,10 +569,15 @@ do { \
 			TAILQ_REMOVE(&in_ifaddr, (struct in_ifaddr *)ifa,
 			    ia_list);
 #endif
+		/* XXX if_free_sadl needs this */
+		if (ifa == ifnet_addrs[ifp->if_index])
+			continue;
+
 		free(ifa, M_IFADDR);
 	}
+	if_free_sadl(ifp);
 
-	ifp->if_sadl = NULL;
+	free(ifnet_addrs[ifp->if_index], M_IFADDR);
 	ifnet_addrs[ifp->if_index] = NULL;
 
 	free(ifp->if_addrhooks, M_TEMP);
@@ -511,6 +587,9 @@ do { \
 			(*dp->dom_ifdetach)(ifp,
 			    ifp->if_afdata[dp->dom_family]);
 	}
+
+	/* Announce that the interface is gone. */
+	rt_ifannouncemsg(ifp, IFAN_DEPARTURE);
 
 	splx(s);
 }
@@ -548,6 +627,158 @@ if_detach_queues(ifp, q)
 		m_freem(m);
 		IF_DROP(q);
 	}
+} 
+
+/*
+ * Create a clone network interface.
+ */
+int
+if_clone_create(name)
+	const char *name;
+{
+	struct if_clone *ifc;
+	int unit;
+
+	ifc = if_clone_lookup(name, &unit);
+	if (ifc == NULL)
+		return (EINVAL);
+
+	if (ifunit(name) != NULL)
+		return (EEXIST);
+
+	return ((*ifc->ifc_create)(ifc, unit));
+}
+
+/*
+ * Destroy a clone network interface.
+ */
+int
+if_clone_destroy(name)
+	const char *name;
+{
+	struct if_clone *ifc;
+	struct ifnet *ifp;
+
+	ifc = if_clone_lookup(name, NULL);
+	if (ifc == NULL)
+		return (EINVAL);
+
+	ifp = ifunit(name);
+	if (ifp == NULL)
+		return (ENXIO);
+
+	if (ifc->ifc_destroy == NULL)
+		return (EOPNOTSUPP);
+
+	return ((*ifc->ifc_destroy)(ifp));
+}
+
+/*
+ * Look up a network interface cloner.
+ */
+struct if_clone *
+if_clone_lookup(name, unitp)
+	const char *name;
+	int *unitp;
+{
+	struct if_clone *ifc;
+	const char *cp;
+	int unit;
+
+	/* separate interface name from unit */
+	for (cp = name;
+	    cp - name < IFNAMSIZ && *cp && (*cp < '0' || *cp > '9');
+	    cp++)
+		continue;
+
+	if (cp == name || cp - name == IFNAMSIZ || !*cp)
+		return (NULL);	/* No name or unit number */
+
+	if (cp - name < IFNAMSIZ-1 && *cp == '0' && cp[1] != '\0')
+		return (NULL);	/* unit number 0 padded */
+
+	LIST_FOREACH(ifc, &if_cloners, ifc_list) {
+		if (strlen(ifc->ifc_name) == cp - name &&
+		    !strncmp(name, ifc->ifc_name, cp - name))
+			break;
+	}
+
+	if (ifc == NULL)
+		return (NULL);
+
+	unit = 0;
+	while (cp - name < IFNAMSIZ && *cp) {
+		if (*cp < '0' || *cp > '9' ||
+		    unit > (INT_MAX - (*cp - '0')) / 10) {
+			/* Bogus unit number. */
+			return (NULL);
+		}
+		unit = (unit * 10) + (*cp++ - '0');
+	}
+
+	if (unitp != NULL)
+		*unitp = unit;
+	return (ifc);
+}
+
+/*
+ * Register a network interface cloner.
+ */
+void
+if_clone_attach(ifc)
+	struct if_clone *ifc;
+{
+	LIST_INSERT_HEAD(&if_cloners, ifc, ifc_list);
+	if_cloners_count++;
+#if NPF > 0
+	pfi_attach_clone(ifc);
+#endif
+}
+
+/*
+ * Unregister a network interface cloner.
+ */
+void
+if_clone_detach(ifc)
+	struct if_clone *ifc;
+{
+
+	LIST_REMOVE(ifc, ifc_list);
+	if_cloners_count--;
+}
+
+/*
+ * Provide list of interface cloners to userspace.
+ */
+int
+if_clone_list(ifcr)
+	struct if_clonereq *ifcr;
+{
+	char outbuf[IFNAMSIZ], *dst;
+	struct if_clone *ifc;
+	int count, error = 0;
+
+	ifcr->ifcr_total = if_cloners_count;
+	if ((dst = ifcr->ifcr_buffer) == NULL) {
+		/* Just asking how many there are. */
+		return (0);
+	}
+
+	if (ifcr->ifcr_count < 0)
+		return (EINVAL);
+
+	count = (if_cloners_count < ifcr->ifcr_count) ?
+	    if_cloners_count : ifcr->ifcr_count;
+
+	for (ifc = LIST_FIRST(&if_cloners); ifc != NULL && count != 0;
+	     ifc = LIST_NEXT(ifc, ifc_list), count--, dst += IFNAMSIZ) {
+		strlcpy(outbuf, ifc->ifc_name, IFNAMSIZ);
+		error = copyout(outbuf, dst, IFNAMSIZ);
+		if (error)
+			break;
+	}
+
+	return (error);
 }
 
 /*
@@ -556,10 +787,10 @@ if_detach_queues(ifp, q)
 /*ARGSUSED*/
 struct ifaddr *
 ifa_ifwithaddr(addr)
-	register struct sockaddr *addr;
+	struct sockaddr *addr;
 {
-	register struct ifnet *ifp;
-	register struct ifaddr *ifa;
+	struct ifnet *ifp;
+	struct ifaddr *ifa;
 
 #define	equal(a1, a2) \
   (bcmp((caddr_t)(a1), (caddr_t)(a2), ((struct sockaddr *)(a1))->sa_len) == 0)
@@ -584,10 +815,10 @@ ifa_ifwithaddr(addr)
 /*ARGSUSED*/
 struct ifaddr *
 ifa_ifwithdstaddr(addr)
-	register struct sockaddr *addr;
+	struct sockaddr *addr;
 {
-	register struct ifnet *ifp;
-	register struct ifaddr *ifa;
+	struct ifnet *ifp;
+	struct ifaddr *ifa;
 
 	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 	    if (ifp->if_flags & IFF_POINTOPOINT)
@@ -610,20 +841,21 @@ struct ifaddr *
 ifa_ifwithnet(addr)
 	struct sockaddr *addr;
 {
-	register struct ifnet *ifp;
-	register struct ifaddr *ifa;
+	struct ifnet *ifp;
+	struct ifaddr *ifa;
 	struct ifaddr *ifa_maybe = 0;
 	u_int af = addr->sa_family;
 	char *addr_data = addr->sa_data, *cplim;
 
 	if (af == AF_LINK) {
-	    register struct sockaddr_dl *sdl = (struct sockaddr_dl *)addr;
-	    if (sdl->sdl_index && sdl->sdl_index <= if_index)
-		return (ifnet_addrs[sdl->sdl_index]);
+		struct sockaddr_dl *sdl = (struct sockaddr_dl *)addr;
+		if (sdl->sdl_index && sdl->sdl_index < if_indexlim &&
+		    ifindex2ifnet[sdl->sdl_index])
+			return (ifnet_addrs[sdl->sdl_index]);
 	}
 	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
-			register char *cp, *cp2, *cp3;
+			char *cp, *cp2, *cp3;
 
 			if (ifa->ifa_addr->sa_family != af ||
 			    ifa->ifa_netmask == 0)
@@ -651,10 +883,10 @@ ifa_ifwithnet(addr)
  */
 struct ifaddr *
 ifa_ifwithaf(af)
-	register int af;
+	int af;
 {
-	register struct ifnet *ifp;
-	register struct ifaddr *ifa;
+	struct ifnet *ifp;
+	struct ifaddr *ifa;
 
 	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
@@ -672,11 +904,11 @@ ifa_ifwithaf(af)
 struct ifaddr *
 ifaof_ifpforaddr(addr, ifp)
 	struct sockaddr *addr;
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 {
-	register struct ifaddr *ifa;
-	register char *cp, *cp2, *cp3;
-	register char *cplim;
+	struct ifaddr *ifa;
+	char *cp, *cp2, *cp3;
+	char *cplim;
 	struct ifaddr *ifa_maybe = 0;
 	u_int af = addr->sa_family;
 
@@ -713,10 +945,10 @@ ifaof_ifpforaddr(addr, ifp)
 void
 link_rtrequest(cmd, rt, info)
 	int cmd;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	struct rt_addrinfo *info;
 {
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 	struct sockaddr *dst;
 	struct ifnet *ifp;
 
@@ -786,9 +1018,9 @@ if_up(struct ifnet *ifp)
  */
 void
 if_qflush(ifq)
-	register struct ifqueue *ifq;
+	struct ifqueue *ifq;
 {
-	register struct mbuf *m, *n;
+	struct mbuf *m, *n;
 
 	n = ifq->ifq_head;
 	while ((m = n) != NULL) {
@@ -829,9 +1061,9 @@ if_slowtimo(arg)
  */
 struct ifnet *
 ifunit(name)
-	register char *name;
+	const char *name;
 {
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 
 	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		if (strcmp(ifp->if_xname, name) == 0)
@@ -850,8 +1082,8 @@ ifioctl(so, cmd, data, p)
 	caddr_t data;
 	struct proc *p;
 {
-	register struct ifnet *ifp;
-	register struct ifreq *ifr;
+	struct ifnet *ifp;
+	struct ifreq *ifr;
 	int error = 0;
 	short oif_flags;
 
@@ -862,6 +1094,19 @@ ifioctl(so, cmd, data, p)
 		return (ifconf(cmd, data));
 	}
 	ifr = (struct ifreq *)data;
+
+	switch (cmd) {
+	case SIOCIFCREATE:
+	case SIOCIFDESTROY:
+		if ((error = suser(p, 0)) != 0)
+			return (error);
+		return ((cmd == SIOCIFCREATE) ?
+			if_clone_create(ifr->ifr_name) :
+			if_clone_destroy(ifr->ifr_name));
+	case SIOCIFGCLONERS:
+		return (if_clone_list((struct if_clonereq *)data));
+	}
+
 	ifp = ifunit(ifr->ifr_name);
 	if (ifp == 0)
 		return (ENXIO);
@@ -1038,16 +1283,16 @@ ifconf(cmd, data)
 	u_long cmd;
 	caddr_t data;
 {
-	register struct ifconf *ifc = (struct ifconf *)data;
-	register struct ifnet *ifp;
-	register struct ifaddr *ifa;
+	struct ifconf *ifc = (struct ifconf *)data;
+	struct ifnet *ifp;
+	struct ifaddr *ifa;
 	struct ifreq ifr, *ifrp;
 	int space = ifc->ifc_len, error = 0;
 
 	/* If ifc->ifc_len is 0, fill it in with the needed size and return. */
 	if (space == 0) {
 		TAILQ_FOREACH(ifp, &ifnet, if_list) {
-			register struct sockaddr *sa;
+			struct sockaddr *sa;
 
 			if (TAILQ_EMPTY(&ifp->if_addrlist))
 				space += sizeof (ifr);
@@ -1083,7 +1328,7 @@ ifconf(cmd, data)
 			    space >= sizeof (ifr) &&
 			    ifa != TAILQ_END(&ifp->if_addrlist);
 			    ifa = TAILQ_NEXT(ifa, ifa_list)) {
-				register struct sockaddr *sa = ifa->ifa_addr;
+				struct sockaddr *sa = ifa->ifa_addr;
 #if defined(COMPAT_43) || defined(COMPAT_LINUX) || defined(COMPAT_SVR4)
 				if (cmd == OSIOCGIFCONF) {
 					struct osockaddr *osa =

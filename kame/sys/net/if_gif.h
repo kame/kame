@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.36 2004/05/26 09:54:46 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.37 2004/05/27 05:05:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,6 +97,7 @@ struct gif_softc {
 
 extern int ngif;
 extern struct gif_softc *gif_softc;
+extern LIST_HEAD(gif_softc_list, gif_softc) gif_softc_list;
 
 /* Prototypes */
 void gifattach0 __P((struct gif_softc *));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: an.c,v 1.28 2003/08/15 20:32:16 tedu Exp $	*/
+/*	$OpenBSD: an.c,v 1.34 2003/10/21 18:58:48 jmc Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -241,13 +241,13 @@ an_attach(sc)
 	IFQ_SET_READY(&ifp->if_snd);
 
 	bzero(sc->an_config.an_nodename, sizeof(sc->an_config.an_nodename));
-	bcopy(AN_DEFAULT_NODENAME, sc->an_config.an_nodename,
-	    sizeof(AN_DEFAULT_NODENAME) - 1);
+	strlcpy(sc->an_config.an_nodename, AN_DEFAULT_NODENAME,
+	    sizeof(sc->an_config.an_nodename));
 
 	bzero(sc->an_ssidlist.an_ssid1, sizeof(sc->an_ssidlist.an_ssid1));
-	bcopy(AN_DEFAULT_NETNAME, sc->an_ssidlist.an_ssid1,
-	    sizeof(AN_DEFAULT_NETNAME) - 1);
-	sc->an_ssidlist.an_ssid1_len = strlen(AN_DEFAULT_NETNAME);
+	strlcpy(sc->an_ssidlist.an_ssid1, AN_DEFAULT_NETNAME,
+	    sizeof(sc->an_ssidlist.an_ssid1));
+	sc->an_ssidlist.an_ssid1_len = strlen(sc->an_ssidlist.an_ssid1);
 
 	sc->an_config.an_opmode = AN_OPMODE_INFRASTRUCTURE_STATION;
 
@@ -607,9 +607,9 @@ an_read_record(sc, ltv)
 	struct an_softc		*sc;
 	struct an_ltv_gen	*ltv;
 {
-	u_int16_t	*ptr, len;
+	u_int16_t	*ptr, len, rlen, ltv_data_length;
+	volatile u_int16_t v;
 	int		i;
-	u_int16_t	ltv_data_length;
 
 	if (ltv->an_len < 4 || ltv->an_type == 0)
 		return(EINVAL);
@@ -633,7 +633,7 @@ an_read_record(sc, ltv)
 	 * matches what we expect (this verifies that we have enough
 	 * room to hold all of the returned data).
 	 */
-	len = CSR_READ_2(sc, AN_DATA1);
+	rlen = len = CSR_READ_2(sc, AN_DATA1);
 
 	/*
 	 * Work out record's data length, which is struct length - type word
@@ -641,17 +641,18 @@ an_read_record(sc, ltv)
 	 */
 	ltv_data_length = ltv->an_len - sizeof(u_int16_t);
 
-	if (len > ltv_data_length) {
-		printf("%s: RID 0x%04x record length mismatch -- expected %d, "
-		    "got %d\n", sc->sc_dev.dv_xname, ltv->an_type,
-		    ltv_data_length, len);
-		return(ENOSPC);
-	}
+	if (rlen > ltv_data_length)
+		rlen = ltv_data_length;
 
 	/* Now read the data. */
+	len -= 2; rlen -= 2;	/* skip the type */
 	ptr = ltv->an_val;
-	for (i = 0; i < (len - 1) >> 1; i++)
-		ptr[i] = CSR_READ_2(sc, AN_DATA1);
+	for (i = 0; (rlen - i) > 1; i += 2)
+		*ptr++ = CSR_READ_2(sc, AN_DATA1);
+	if (rlen - i == 1)
+		*(u_int8_t *)ptr = CSR_READ_1(sc, AN_DATA1);
+	for (; i < len; i++)
+		v = CSR_READ_1(sc, AN_DATA1);
 
 #if BYTE_ORDER == BIG_ENDIAN
 	switch (ltv->an_type) {
@@ -1283,7 +1284,7 @@ an_start(ifp)
 		an_write_data(sc, id, 0x44, (caddr_t)&sc->an_txbuf, len);
 
 		/*
-		 * If there's a BPF listner, bounce a copy of
+		 * If there's a BPF listener, bounce a copy of
 		 * this frame to him.
 		 */
 #if NBPFILTER > 0

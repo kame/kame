@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.103 2003/06/27 16:57:14 nate Exp $	*/
+/*	$OpenBSD: conf.c,v 1.106 2004/02/10 01:31:21 millert Exp $	*/
 /*	$NetBSD: conf.c,v 1.75 1996/05/03 19:40:20 christos Exp $	*/
 
 /*
@@ -58,8 +58,6 @@ bdev_decl(wt);
 #include "mcd.h"
 bdev_decl(mcd);
 #include "vnd.h"
-#include "scd.h"
-bdev_decl(scd);
 #include "ccd.h"
 #include "raid.h"
 #include "rd.h"
@@ -81,7 +79,7 @@ struct bdevsw	bdevsw[] =
 	bdev_lkm_dummy(),		/* 12 */
 	bdev_lkm_dummy(),		/* 13 */
 	bdev_disk_init(NVND,vnd),	/* 14: vnode disk driver */
-	bdev_disk_init(NSCD,scd),	/* 15: Sony CD-ROM */
+	bdev_notdef(),			/* 15 */
 	bdev_disk_init(NCCD,ccd),	/* 16: concatenated disk driver */
 	bdev_disk_init(NRD,rd),		/* 17: ram disk driver */
 	bdev_notdef(),			/* 18 */
@@ -93,7 +91,7 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #define cdev_pc_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-	dev_init(c,n,tty), ttselect, dev_init(c,n,mmap), D_TTY }
+	dev_init(c,n,tty), ttpoll, dev_init(c,n,mmap), D_TTY }
 
 /* open, close, read, ioctl */
 #define cdev_joy_init(c,n) { \
@@ -109,11 +107,11 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
         (dev_type_stop((*))) enodev, 0,  seltrue, \
         (dev_type_mmap((*))) enodev, 0 }
 
-/* open, close, ioctl, select -- XXX should be a generic device */
+/* open, close, ioctl, poll -- XXX should be a generic device */
 #define cdev_ocis_init(c,n) { \
         dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
         (dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
-        (dev_type_stop((*))) enodev, 0,  dev_init(c,n,select), \
+        (dev_type_stop((*))) enodev, 0,  dev_init(c,n,poll), \
         (dev_type_mmap((*))) enodev, 0 }
 
 /* open, close, read, ioctl */
@@ -135,7 +133,6 @@ cdev_decl(wd);
 cdev_decl(com);
 cdev_decl(fd);
 cdev_decl(wt);
-cdev_decl(scd);
 #include "ss.h"
 #include "lpt.h"
 cdev_decl(lpt);
@@ -222,7 +219,7 @@ struct cdevsw	cdevsw[] =
 #endif
 	cdev_disk_init(NFD,fd),		/* 9: floppy disk */
 	cdev_tape_init(NWT,wt),		/* 10: QIC-02/QIC-36 tape */
-	cdev_disk_init(NSCD,scd),	/* 11: Sony CD-ROM */
+	cdev_notdef(),			/* 11 */
 	cdev_wsdisplay_init(NWSDISPLAY,	/* 12: frame buffers, etc. */
 	    wsdisplay),
 	cdev_disk_init(NSD,sd),		/* 13: SCSI disk */
@@ -311,7 +308,8 @@ struct cdevsw	cdevsw[] =
 	cdev_usbdev_init(NUSCANNER,uscanner),	/* 77: USB scanners */
 	cdev_systrace_init(NSYSTRACE,systrace),	/* 78: system call tracing */
  	cdev_oci_init(NBIO,bio),	/* 79: ioctl tunnel */
-	cdev_ch_init(NGPR,gpr)		/* 80: GPR400 SmartCard reader */
+	cdev_ch_init(NGPR,gpr),		/* 80: GPR400 SmartCard reader */
+	cdev_ptm_init(NPTY,ptm),	/* 81: pseudo-tty ptm device */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

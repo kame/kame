@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.348 2003/09/02 20:44:33 david Exp $
+#	$OpenBSD: GENERIC,v 1.355 2004/03/10 01:23:24 deraadt Exp $
 #	$NetBSD: GENERIC,v 1.48 1996/05/20 18:17:23 mrg Exp $
 #
 #	GENERIC -- everything that's currently supported
@@ -62,11 +62,13 @@ pcib*	at pci? dev ? function ?	# PCI-ISA bridge
 # power management and other environmental stuff
 #amdpm*	at pci? dev ? function ?	# AMD768MPX
 elansc*	at pci? dev ? function ?	# AMD Elan SC520 System Controller
+geodesc* at pci? dev ? function ?	# Geode SC1100/SCx200 IAOC
 
 # National Semiconductor LM7[89] and compatible hardware monitors
 lm0	at isa? port 0x290
 #lm1	at isa? port 0x280
 #lm2	at isa? port 0x310
+nsclpcsio*	at isa?			# NS PC87366 hardware monitor
 
 it0	at isa? port 0x290		# IT8705F, IT8712F and SiS970 hardware
 					# monitors
@@ -243,6 +245,8 @@ ahc0	at isa? port ? irq ?		# Adaptec 284x SCSI controllers
 ahc*	at eisa? slot ?			# Adaptec 274x, aic7770 SCSI controllers
 ahc*	at pci? dev ? function ?	# Adaptec 2940 SCSI controllers
 scsibus* at ahc?
+mpt*	at pci? dev ? function ?	# LSI Fusion-MPT SCSI/Fibre
+scsibus* at mpt?
 dpt*	at pci? dev ? function ?	# DPT SmartCache/SmartRAID PCI
 dpt*	at eisa? slot ?			# DPT SmartCache/SmartRAID EISA
 scsibus* at dpt?
@@ -367,7 +371,7 @@ xl*	at pci? dev ? function ?		# 3C9xx ethernet
 xl*	at cardbus? dev ? function ?		# 3C575/3C656 ethernet
 rl*	at pci? dev ? function ?		# RealTek 81[23]9 ethernet
 rl*	at cardbus? dev ? function ?		# RealTek 81[23]9 ethernet
-mtd*	at pci? dev ? function ?		# Myson MTD803
+mtd*	at pci? dev ? function ?		# Myson MTD800/803/891
 tx*	at pci? dev ? function ?		# SMC 83C170 EPIC ethernet
 tl*	at pci? dev ? function ?		# Compaq Thunderlan ethernet
 vr*	at pci? dev ? function ?		# VIA Rhine ethernet
@@ -387,10 +391,12 @@ bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
 stge*	at pci? dev ? function ?		# Sundance TC9021 GigE
 #lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
 hme*	at pci? dev ? function ?		# Sun Happy Meal
+bce*	at pci? dev ? function ?		# Broadcom BCM4401
 
 # Wireless network cards
 wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS
 wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS
+wi*	at uhub? port ?				# WaveLAN IEEE 802.11DS
 #awi*	at pcmcia? function ?			# Bay Networks IEEE 802.11FH
 an*	at pci? dev ? function ?		# Aironet IEEE 802.11DS
 an*	at isapnp?				# Aironet IEEE 802.11DS
@@ -438,7 +444,7 @@ clct*	at pci? dev ? function ?		# CS4281 CrystalClear audio
 fms*	at pci? dev ? function ?		# Forte Media FM801
 maestro* at pci? dev ? function ?		# ESS Maestro PCI
 esa*	at pci? dev ? function ?		# ESS Maestro3 PCI
-yds*	at pci? dev ? function ?		# Yamaha YMF Audio
+yds*	at pci? dev ? function ? flags 0x0000	# Yamaha YMF Audio
 emu*	at pci? dev ? function ?		# SB Live!
 sb0	at isa? port 0x220 irq 5 drq 1		# SoundBlaster
 sb*	at isapnp?

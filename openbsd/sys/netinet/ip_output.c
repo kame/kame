@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_output.c,v 1.156 2003/08/15 20:32:20 tedu Exp $	*/
+/*	$OpenBSD: ip_output.c,v 1.160 2004/02/10 20:20:01 itojun Exp $	*/
 /*	$NetBSD: ip_output.c,v 1.28 1996/02/13 23:43:07 christos Exp $	*/
 
 /*
@@ -766,7 +766,7 @@ sendit:
 
 	error = ip_fragment(m, ifp, mtu);
 	if (error) {
-		m = NULL;
+		m = m0 = NULL;
 		goto bad;
 	}
 
@@ -789,7 +789,7 @@ done:
 	return (error);
 bad:
 #ifdef IPSEC
-	if (error == EMSGSIZE && ip_mtudisc && icmp_mtu != 0)
+	if (error == EMSGSIZE && ip_mtudisc && icmp_mtu != 0 && m != NULL)
 		ipsec_adjust_mtu(m, icmp_mtu);
 #endif
 	m_freem(m0);
@@ -812,8 +812,10 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 	hlen = ip->ip_hl << 2;
 
 	len = (mtu - hlen) &~ 7;
-	if (len < 8)
+	if (len < 8) {
+		m_freem(m);
 		return (EMSGSIZE);
+	}
 
 	/*
 	 * If we are doing fragmentation, we can't defer TCP/UDP
@@ -864,7 +866,7 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 		m->m_next = m_copy(m0, off, len);
 		if (m->m_next == 0) {
 			ipstat.ips_odropped++;
-			error = ENOBUFS;	/* ??? */
+			error = ENOBUFS;
 			goto sendorfree;
 		}
 		m->m_pkthdr.len = mhlen + len;
