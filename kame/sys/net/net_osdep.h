@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.66 2001/11/29 08:09:40 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.67 2001/12/19 13:23:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,6 +34,10 @@
 
 /*
  * OS dependencies:
+ * - ioctl
+ *   FreeBSD 3 and later warn when sys/ioctl.h is included in a kernel source
+ *   file.  For socket ioctl, we are suggested to use sys/sockio.h.
+ *
  * - RTFREE()
  *   bsdi does not escape this macro using do-clause, so it is recommended
  *   to escape the macro explicitly.
