@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.53 2005/03/16 16:35:25 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.54 2005/03/18 10:31:17 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -861,6 +861,7 @@ relay_to_client(dh6relay, len, from)
 			dprintf(LOG_INFO, FNAME,
 			    "unexpected length (%d) for Interface ID from %s",
 			    optinfo.ifidopt_len, addr2str(from));
+			goto out;
 		} else {
 			memcpy(&ifid, optinfo.ifidopt_id, sizeof (ifid));
 			ifid = ntohl(ifid);
@@ -869,6 +870,7 @@ relay_to_client(dh6relay, len, from)
 			if ((if_indextoname(ifid, ifnamebuf)) == NULL) {
 				dprintf(LOG_INFO, FNAME,
 				    "invalid interface ID: %x", ifid);
+				goto out;
 			}
 		}
 	} else {
