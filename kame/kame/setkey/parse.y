@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.53 2001/08/16 21:03:06 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.54 2001/08/16 21:08:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -63,9 +63,6 @@ time_t p_lt_hard, p_lt_soft;
 
 static int p_aiflags = 0, p_aifamily = PF_UNSPEC;
 
-/* temporary buffer */
-static caddr_t pp_key;
-
 static struct addrinfo *parse_addr __P((char *, char *));
 static int setvarbuf __P((char *, int *, struct sadb_ext *, int, caddr_t, int));
 void parse_init __P((void));
@@ -113,8 +110,8 @@ extern void yyerror __P((const char *));
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %type <num> DECSTRING
-%type <intnum> prefix protocol_spec upper_spec key_string
-%type <val> PORT PL_REQUESTS portstr
+%type <intnum> prefix protocol_spec upper_spec
+%type <val> PORT PL_REQUESTS portstr key_string
 %type <val> policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
 %type <val> F_AIFLAGS
@@ -265,7 +262,6 @@ spi
 			}
 			if (v & ~0xffffffff) {
 				yyerror("SPI too big.");
-				free($1.buf);
 				return -1;
 			}
 
@@ -326,8 +322,8 @@ enc_key
 		}
 	|	key_string
 		{
-			p_key_enc_len = $1;
-			p_key_enc = pp_key;
+			p_key_enc_len = $1.len;
+			p_key_enc = $1.buf;
 
 			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_ENCRYPT,
 					p_alg_enc,
@@ -352,8 +348,8 @@ auth_key
 		}
 	|	key_string
 		{
-			p_key_auth_len = $1;
-			p_key_auth = pp_key;
+			p_key_auth_len = $1.len;
+			p_key_auth = $1.buf;
 
 			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_AUTH,
 					p_alg_auth,
@@ -367,12 +363,11 @@ auth_key
 key_string
 	:	QUOTEDSTRING
 		{
-			pp_key = $1.buf;
-			$$ = $1.len;
-			/* free pp_key later */
+			$$ = $1;
 		}
 	|	HEXSTRING
 		{
+			caddr_t pp_key;
 			caddr_t bp;
 			caddr_t yp = $1.buf;
 			int l;
@@ -394,7 +389,8 @@ key_string
 				yp += 2, bp++;
 			}
 
-			$$ = l;
+			$$.len = l;
+			$$.buf = pp_key;
 		}
 	;
 
@@ -523,12 +519,10 @@ ipaddr
 
 			res = parse_addr($1.buf, NULL);
 			if (res == NULL) {
-				free($1.buf);
 				/* yyerror already called by parse_addr */
 				return -1;
 			}
 			$$ = res;
-			free($1.buf);
 		}
 	;
 
@@ -567,11 +561,9 @@ upper_spec
 					$$ = IPPROTO_IPV4;
 				} else {
 					yyerror("invalid upper layer protocol");
-					free($1.buf);
 					return -1;
 				}
 			}
-			free($1.buf);
 		}
 	;
 
@@ -1074,8 +1066,7 @@ parse_init()
 void
 free_buffer()
 {
-	if (p_key_enc) free(p_key_enc);
-	if (p_key_auth) free(p_key_auth);
+	/* we got tons of memory leaks in the parser anyways, leave them */
 
 	return;
 }
