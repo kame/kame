@@ -1,4 +1,4 @@
-/*	$KAME: parser.y,v 1.9 2003/02/07 09:07:07 suz Exp $	*/
+/*	$KAME: parser.y,v 1.10 2004/07/09 14:40:02 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,7 +142,7 @@ statement:
 debug_statement:
 		DEBUG_CMD flag EOS
 		{
-#ifdef YYDEBUG
+#if YYDEBUG
 			yydebug = $2;
 #endif /* YYDEBUG */
 		}
