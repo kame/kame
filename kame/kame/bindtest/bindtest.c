@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.17 2001/05/07 22:39:18 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.18 2001/05/07 23:05:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -310,7 +310,7 @@ test(t1, t2)
 			printf("\tfailed bind for %s, %s\n",
 			       printres(a), strerror(errno));
 		else
-			printf("\t?1");
+			printf("\t?1(%d)", errno);
 		goto fail;
 	}
 
@@ -320,8 +320,12 @@ test(t1, t2)
 		if (!summary)
 			printf("\tfailed bind for %s, %s\n",
 			       printres(b), strerror(errno));
-		else
-			printf(errno == EADDRINUSE ? "\tx" : "\t?2");
+		else {
+			if (errno == EADDRINUSE)
+				printf("\tx");
+			else
+				printf("\t?2(%d)", errno);
+		}
 		goto fail;
 	}
 
