@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.16 2000/12/12 10:54:06 itojun Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.17 2001/03/18 09:58:36 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -524,6 +524,8 @@ natpt_incomingIPv6(int sess, struct ifBox *ifb, struct mbuf *m6, struct mbuf **m
 	    return (IPPROTO_IP);			/* goto mcastcheck	*/
     }
 
+    cv.ats->inbound++;
+
     if ((*m4 = translatingIPv6To4(&cv, &cv.ats->local)) != NULL)
 	return (IPPROTO_IPV4);
 
@@ -556,6 +558,8 @@ natpt_outgoingIPv6(int sess, struct ifBox *ifb, struct mbuf *m6, struct mbuf **m
 	if ((cv6.ats = internOutgoingV6Hash(sess, acs, &cv6)) == NULL)
 	    return (IPPROTO_IP);			/* goto mcastcheck	*/
     }
+
+    cv6.ats->outbound++;
 
     if ((*m4 = translatingIPv6To4(&cv6, &cv6.ats->remote)) != NULL)
 	return (IPPROTO_IPV4);
@@ -718,7 +722,7 @@ checkMTU(struct _cv *cv4)
 						/* This should be 1232[byte]	*/
 
     if ((m4->m_flags & M_PKTHDR)
-	&& (m4->m_pkthdr.len >= mmtu))
+	&& (m4->m_pkthdr.len > mmtu))
     {
 	if (ip4->ip_off & IP_DF)
 	{
