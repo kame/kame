@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.5 2000/02/24 08:32:27 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.6 2000/02/26 12:53:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,7 +80,7 @@ struct ip6_hdr {
 			u_int8_t  ip6_un1_nxt;	/* next header */
 			u_int8_t  ip6_un1_hlim;	/* hop limit */
 		} ip6_un1;
-		u_int8_t ip6_un2_vfc;	/* 4 bits version, 4 bits class */
+		u_int8_t ip6_un2_vfc;	/* 4 bits version, top 4 bits class */
 	} ip6_ctlun;
 	struct in6_addr ip6_src;	/* source address */
 	struct in6_addr ip6_dst;	/* destination address */
