@@ -938,9 +938,9 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 	 * our src addr is taken from the i/f, else punt.
 	 */
 	if (ro->ro_rt &&
-	    (satosin(&ro->ro_dst)->sin_addr.s_addr !=
-		sin->sin_addr.s_addr || 
-	    soopts & SO_DONTROUTE)) {
+	    (ro->ro_dst.sa_family != AF_INET ||
+	     satosin(&ro->ro_dst)->sin_addr.s_addr !=
+	     sin->sin_addr.s_addr || soopts & SO_DONTROUTE)) { 
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)0;
 	}
@@ -948,6 +948,7 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 	    (ro->ro_rt == (struct rtentry *)0 ||
 	    ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
 		/* No route yet, so try to acquire one */
+		bzero(&ro->ro_dst, sizeof(struct sockaddr_in));
 		ro->ro_dst.sa_family = AF_INET;
 		ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
 		satosin(&ro->ro_dst)->sin_addr = sin->sin_addr;

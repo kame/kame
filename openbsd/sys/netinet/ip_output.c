@@ -192,12 +192,14 @@ ip_output(m0, va_alist)
 		 * destination and is still up.  If not, free it and try again.
 		 */
 		if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
+				  dst->sin_family != AF_INET ||
 				  dst->sin_addr.s_addr != ip->ip_dst.s_addr)) {
 		        RTFREE(ro->ro_rt);
 			ro->ro_rt = (struct rtentry *)0;
 		}
 
 		if (ro->ro_rt == 0) {
+			bzero(dst, sizeof(*dst));
 		        dst->sin_family = AF_INET;
 			dst->sin_len = sizeof(*dst);
 			dst->sin_addr = ip->ip_dst;
