@@ -1,3 +1,5 @@
+Mon Jan 10 2000 - Fri Jan 14 2000
+
 vs microsoft
     as responder
 	phase 1の最後のパケットを再送してくる。kame側のstate machineの
