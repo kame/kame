@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.74 2000/08/14 02:48:14 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.75 2000/08/14 08:03:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -254,6 +254,7 @@ void	 pinger __P((void));
 const char *pr_addr __P((struct sockaddr_in6 *));
 void	 pr_icmph __P((struct icmp6_hdr *, u_char *));
 void	 pr_iph __P((struct ip6_hdr *));
+void	 pr_suptypes __P((struct icmp6_nodeinfo *, size_t));
 void	 pr_nodeaddr __P((struct icmp6_nodeinfo *, int));
 int	 myechoreply __P((const struct icmp6_hdr *));
 int	 mynireply __P((const struct icmp6_nodeinfo *));
@@ -1068,7 +1069,8 @@ pinger()
 		icp->icmp6_type = ICMP6_NI_QUERY;
 		icp->icmp6_code = ICMP6_NI_SUBJ_FQDN;	/*empty*/
 		nip->ni_qtype = htons(NI_QTYPE_SUPTYPES);
-		nip->ni_flags = 0;	/* do not support compressed bitmap */
+		/* we support compressed bitmap */
+		nip->ni_flags = htons(NI_SUPTYPE_FLAG_COMPRESS);
 
 		memcpy(nip->icmp6_ni_nonce, nonce, sizeof(nip->icmp6_ni_nonce));
 		*(u_int16_t *)nip->icmp6_ni_nonce = ntohs(seq);
@@ -1344,27 +1346,7 @@ pr_pack(buf, cc, mhdr)
 			printf("NodeInfo NOOP");
 			break;
 		case NI_QTYPE_SUPTYPES:
-			printf("NodeInfo Supported Qtypes");
-			if ((ni->ni_flags & NI_SUPTYPE_FLAG_COMPRESS) != 0) {
-				printf(", compressed bitmap");
-				break;
-			} else {
-				size_t clen;
-				u_int32_t v;
-				cp = (u_char *)(ni + 1);
-				clen = (size_t)(end - cp);
-				if (clen == 0 || clen > 8192 || clen % 4) {
-					printf(", invalid length(%lu)",
-					    (u_long)clen);
-					break;
-				}
-				printf(", bitmap = 0x");
-				for (dp = end - 4; dp >= cp; dp -= 4) {
-					memcpy(&v, dp, sizeof(v));
-					v = (u_int32_t)ntohl(v);
-					printf("%08x", v);
-				}
-			}
+			pr_suptypes(ni, end - (u_char *)ni);
 			break;
 		case NI_QTYPE_NODEADDR:
 			pr_nodeaddr(ni, end - (u_char *)ni);
@@ -1620,6 +1602,103 @@ pr_rthdr(void *extbuf)
 }
 #endif /* USE_RFC2292BIS */
 
+void
+pr_bitrange(v, s)
+	u_int32_t v;
+	int s;
+{
+	int off;
+	int i;
+
+	off = 0;
+	while (off < 32) {
+		/* shift till we have 0x01 */
+		if ((v & 0x01) == 0) {
+			switch (v & 0x0f) {
+			case 0x00:
+				v >>= 4; off += 4; continue;
+			case 0x08:
+				v >>= 3; off += 3; continue;
+			case 0x04: case 0x0c:
+				v >>= 2; off += 2; continue;
+			default:
+				v >>= 1; off += 1; continue;
+			}
+		}
+
+		/* we have 0x01 with us */
+		for (i = 0; i < 32 - off; i++) {
+			if ((v & (0x01 << i)) == 0)
+				break;
+		}
+		if (i == 1)
+			printf(" %u", s + off);
+		else
+			printf(" %u-%u", s + off, s + off + i - 1);
+		v >>= i; off += i;
+	}
+}
+
+void
+pr_suptypes(ni, nilen)
+	struct icmp6_nodeinfo *ni; /* ni->qtype must be SUPTYPES */
+	size_t nilen;
+{
+	size_t clen;
+	u_int32_t v;
+	const u_char *cp, *end;
+	u_int16_t cur;
+	struct cbit {
+		u_int16_t words;	/*32bit count*/
+		u_int16_t skip;
+	} cbit;
+#define MAXQTYPES	(1 << 16)
+	size_t off;
+
+	cp = (u_char *)(ni + 1);
+	end = ((u_char *)ni) + nilen;
+	cur = 0;
+
+	printf("NodeInfo Supported Qtypes");
+	if (options & F_VERBOSE) {
+		if (ni->ni_flags & NI_SUPTYPE_FLAG_COMPRESS)
+			printf(", compressed bitmap");
+		else
+			printf(", raw bitmap");
+	}
+
+	while (cp < end) {
+		clen = (size_t)(end - cp);
+		if ((ni->ni_flags & NI_SUPTYPE_FLAG_COMPRESS) == 0) {
+			if (clen == 0 || clen > MAXQTYPES / 8 ||
+			    clen % sizeof(v)) {
+				printf("???");
+				return;
+			}
+		} else {
+			if (clen < sizeof(cbit) || clen % sizeof(v))
+				return;
+			memcpy(&cbit, cp, sizeof(cbit));
+			if (sizeof(cbit) + ntohs(cbit.words) * sizeof(v) > clen)
+				return;
+			cp += sizeof(cbit);
+			clen = ntohs(cbit.words) * sizeof(v);
+			if (cur + clen * 8 + ntohs(cbit.skip) * 32 > MAXQTYPES)
+				return;
+		}
+
+		for (off = 0; off < clen; off += sizeof(v)) {
+			memcpy(&v, cp + off, sizeof(v));
+			v = (u_int32_t)ntohl(v);
+			pr_bitrange(v, (int)(cur + off * 8));
+		}
+
+		cp += clen;
+		cur += clen * 8;
+		if ((ni->ni_flags & NI_SUPTYPE_FLAG_COMPRESS) != 0)
+			cur += ntohs(cbit.skip) * 32;
+	}
+}
 
 void
 pr_nodeaddr(ni, nilen)
