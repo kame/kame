@@ -1,21 +1,9 @@
-$Id: TODO,v 1.7 2000/02/23 17:05:47 sakane Exp $
+$Id: TODO,v 1.8 2000/04/29 20:11:20 sakane Exp $
 
 Sorry that `racoon' is not stable yet.  But she can exchange the key
 in limited environment.  Try to run with racoon.conf in the case
 which IPsec-SA required.  Please tell me, sakane@ydc.co.jp, bug report
 except following items.  I do modify continuously until she will be stable.
-
-New feature
-o Base mode
-o Commit bit during phase 2.
-o UserFQDN/FQDN type of ID payload on phase 1 for pre-shared key.
-o acceptable IP address check.
-o acceptable SAs check.
-o system logging facility.
-o SA bundle. (caveat: initiator side cannot propose multiple transform of
-  same proto_id, in single proposal)
-o IPcomp SA negotiation
-o RSA signature method.
 
 TODO list
 
@@ -34,22 +22,6 @@ o Support scoped (link-local and site-local) IPv6 addresses.
   related mods in racoon itself.
 o kmstat should be improved.
 o aggressive mode DH group checks/handling on responder side.
-o proposal parser needs to be improved.  this should be like:
-  A. chained list of transform, only for single proto_id
-     (this is same as set of transforms in single proposal payload)
-  B. proposal.  this will point to multiple (A) items (order is important here
-     so pointer to (A) must be ordered array, or chained list). 
-     this covers multiple proposal on a packet if proposal # is the same.
-  C. finally, (B) needs to be connected as chained list.
-
-	---> B[.......] ---> B[...] ---> B[...] ---> B[...]
-	       v v v v
-	       A A A A <-- must preserve order here
-	       t t t t
-	       t t     <--- transforms
-	       t
-  incoming packets needs to be parsed to construct the same structure
-  (we use separate structures, "ipsecsa" and "prop_pair" for those).
 
 SHOULD
 o To be supported bytes lifetimes for ISAKMP-SA.
