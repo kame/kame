@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.62 2000/05/09 11:35:55 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.63 2000/05/17 12:35:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1755,7 +1755,11 @@ fail:
 				(*ifp->if_output)(ifp, ln->ln_hold,
 						  rt_key(rt), rt);
 #else
-				nd6_output(ifp, ln->ln_hold,
+				/*
+				 * we assume ifp is not a p2p here, so just
+				 * set the 2nd argument as the 1st one.
+				 */
+				nd6_output(ifp, ifp, ln->ln_hold,
 					   (struct sockaddr_in6 *)rt_key(rt),
 					   rt);
 #endif
@@ -1869,8 +1873,9 @@ nd6_slowtimo(ignored_arg)
 
 #define senderr(e) { error = (e); goto bad;}
 int
-nd6_output(ifp, m0, dst, rt0)
+nd6_output(ifp, origifp, m0, dst, rt0)
 	register struct ifnet *ifp;
+	struct ifnet *origifp;
 	struct mbuf *m0;
 	struct sockaddr_in6 *dst;
 	struct rtentry *rt0;
@@ -1918,8 +1923,11 @@ nd6_output(ifp, m0, dst, rt0)
 #endif
 			{
 				rt->rt_refcnt--;
-				if (rt->rt_ifp != ifp)
-					return nd6_output(ifp, m0, dst, rt); /* XXX: loop care? */
+				if (rt->rt_ifp != ifp) {
+					/* XXX: loop care? */
+					return nd6_output(ifp, origifp, m0,
+							  dst, rt);
+				}
 			} else
 				senderr(EHOSTUNREACH);
 		}
@@ -2064,6 +2072,13 @@ nd6_output(ifp, m0, dst, rt0)
 	return(0);
 	
   sendpkt:
+
+#ifdef FAKE_LOOPBACK_IF
+	if (ifp->if_flags & IFF_LOOPBACK) {
+		return((*ifp->if_output)(origifp, m, (struct sockaddr *)dst,
+					 rt));
+	}
+#endif
 	return((*ifp->if_output)(ifp, m, (struct sockaddr *)dst, rt));
 
   bad:

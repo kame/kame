@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.32 2000/05/05 13:27:14 sumikawa Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.33 2000/05/17 12:35:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -477,7 +477,7 @@ ip6_forward(m, srcrt)
 					 (struct sockaddr *)dst,
 					 ip6_forward_rt.ro_rt);
 #else
-	error = nd6_output(rt->rt_ifp, m, dst, rt);
+	error = nd6_output(rt->rt_ifp, rt->rt_ifp, m, dst, rt);
 #endif
 	if (error) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_out_discard);

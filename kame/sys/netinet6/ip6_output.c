@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.99 2000/05/08 08:01:29 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.100 2000/05/17 12:35:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -192,7 +192,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct ifnet **ifpp;		/* XXX: just for statistics */
 {
 	struct ip6_hdr *ip6, *mhip6;
-	struct ifnet *ifp;
+	struct ifnet *ifp, *origifp;
 	struct mbuf *m = m0;
 	int hlen, tlen, len, off;
 	struct route_in6 ip6route;
@@ -854,15 +854,40 @@ skip_ipsec2:;
 		}
 	}
 
-	/*
-	 * Fake link-local scope-class addresses
-	 */
-	if ((ifp->if_flags & IFF_LOOPBACK) == 0) {
+	/* Fake scoped addresses */
+	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
+		/*
+		 * If source or destination address is a scoped address, and
+		 * the packet is going to be sent to a loopback interface,
+		 * we should keep the original interface.
+		 */
+
+		/*
+		 * XXX: this is a very experimental and temporary solution.
+		 * We eventually have sockaddr_in6 and use the sin6_scope_id
+		 * field of the structure here.
+		 * We rely on the consistency between two scope zone ids
+		 * of source add destination, which should already be assured
+		 * Larger scopes than link will be supported in the near
+		 * future.
+		 */
+		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
+			origifp = ifindex2ifnet[ntohs(ip6->ip6_src.s6_addr16[1])];
+		else if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
+			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
+	}
+	else
+		origifp = ifp;
+#ifndef FAKE_LOOPBACK_IF
+	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
+#endif
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
 			ip6->ip6_src.s6_addr16[1] = 0;
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
 			ip6->ip6_dst.s6_addr16[1] = 0;
+#ifndef FAKE_LOOPBACK_IF
 	}
+#endif
 
 #ifdef IPV6FIREWALL
 	/*
@@ -951,7 +976,7 @@ skip_ipsec2:;
 		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst,
 					  ro->ro_rt);
 #else
-		error = nd6_output(ifp, m, dst, ro->ro_rt);
+		error = nd6_output(ifp, origifp, m, dst, ro->ro_rt);
 #endif
 		goto done;
 	} else if (mtu < IPV6_MMTU) {
@@ -1084,7 +1109,7 @@ sendorfree:
 						  (struct sockaddr *)dst,
 						  ro->ro_rt);
 #else
-			error = nd6_output(ifp, m, dst, ro->ro_rt);
+			error = nd6_output(ifp, origifp, m, dst, ro->ro_rt);
 #endif
 		} else
 			m_freem(m);

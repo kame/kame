@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.35 2000/05/05 13:27:15 sumikawa Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.36 2000/05/17 12:35:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -788,7 +788,11 @@ nd6_na_input(m, off, icmp6len)
 #ifdef OLDIP6OUTPUT
 		(*ifp->if_output)(ifp, ln->ln_hold, rt_key(rt), rt);
 #else
-		nd6_output(ifp, ln->ln_hold,
+		/*
+		 * we assume ifp is not a p2p here, so just set the 2nd
+		 * argument as the 1st one.
+		 */
+		nd6_output(ifp, ifp, ln->ln_hold,
 			   (struct sockaddr_in6 *)rt_key(rt), rt);
 #endif
 		ln->ln_hold = 0;
