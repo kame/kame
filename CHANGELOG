@@ -1,7 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2475 2003/09/20 09:34:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.2476 2003/09/21 10:17:09 jinmei Exp $
 
 <200309>
+2003-09-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): simplified the
+	case of getsockopt IPV6_PKTOPTIONS by simply returning empty
+	data.  Note that the change does not make any difference from the
+	application's point of view, since we've already quitted storing
+	the options on a socket.
+
+2003-09-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_savecontrol): simplified the
+	function interface as a cleanup.  This change should not make any
+	difference from the API point of view.  Many other kernel files
+	that call this function were changed accordingly.
+
 2003-09-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/if.c (if_nametosdl): made sure to free the
 	temporary buffer.
