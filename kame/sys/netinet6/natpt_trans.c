@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.17 2000/08/19 01:58:21 itojun Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.18 2000/10/17 14:23:55 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -207,8 +207,12 @@ translatingICMPv4To4(struct _cv *cv4from, struct pAddr *pad)
 	break;
 
       case ICMP_UNREACH:
-	if (icmp4from->icmp_code == ICMP_UNREACH_PORT)
+	switch (icmp4from->icmp_code)
+	{
+	  case ICMP_UNREACH_PORT:
+	  case ICMP_UNREACH_NEEDFRAG:
 	    fakeTimxceed(cv4from, m4);
+	}
 	break;
 
       case ICMP_TIMXCEED:
@@ -253,21 +257,24 @@ fakeTimxceed(struct _cv *cv4from, struct mbuf *m4)
 
     {
 	int	cksum;
-	struct {
+	struct
+	{
 		struct in_addr a;
 		u_int16_t p;
-	} Dum, Dee;
+	}	Dum, Dee;
 
 	bcopy(&ats->remote.in4src, &Dum.a, sizeof(Dum.a));
 	bcopy(&ats->remote.in4dst, &Dee.a, sizeof(Dee.a));
-	cksum = adjustChecksum(ntohs(innerip4to->ip_sum), &Dum.a, sizeof(Dum.a),
-	    &Dee.a, sizeof(Dee.a));
+	cksum = adjustChecksum(ntohs(innerip4to->ip_sum),
+			       &Dum.a, sizeof(Dum.a),
+			       &Dee.a, sizeof(Dee.a));
 	innerip4to->ip_sum = htons(cksum);
 
 	Dum.p = ats->remote._sport;
 	Dum.p = ats->local._sport;	/*XXX BUG? */
-	cksum = adjustChecksum(ntohs(icmp4to->icmp_cksum), &Dum, sizeof(Dum),
-	    &Dee, sizeof(Dee));
+	cksum = adjustChecksum(ntohs(icmp4to->icmp_cksum),
+			       &Dum, sizeof(Dum),
+			       &Dee, sizeof(Dee));
 	icmp4to->icmp_cksum = htons(cksum);
     }
     
@@ -356,6 +363,54 @@ translatingTCPUDPv4To4(struct _cv *cv4from, struct pAddr *pad, struct _cv *cv4to
     return (m4);
 }
 
+
+#ifdef NATPT_FRAGMENT
+struct mbuf *
+translatingIPv4To4frag(struct _cv *cv4, struct pAddr *pad)
+{
+    struct timeval	 atv;
+    struct mbuf		*m4 = NULL;
+    struct ip		*ip4to;
+
+    if (isDump(D_FRAGMENTED))
+	natpt_logIp4(LOG_DEBUG, cv4->_ip._ip4, NULL);
+
+    if (isDump(D_FRAGMENTED))
+    {
+	char	Wow[256];
+	
+	sprintf(Wow, "cv4: %p", cv4);
+	natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	
+	if (cv4)
+	{
+	    sprintf(Wow, "cv4->ats: %p", cv4->ats);
+	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	}
+    }
+
+    microtime(&atv);
+    cv4->ats->tstamp = atv.tv_sec;
+
+    m4 = m_copym(cv4->m, 0, M_COPYALL, M_NOWAIT);
+    ReturnEnobufs(m4);
+
+    ip4to = mtod(m4, struct ip *);
+
+    ip4to->ip_src = pad->in4src;
+    ip4to->ip_dst = pad->in4dst;
+
+    ip4to->ip_sum = 0;			/* Header checksum	*/
+    ip4to->ip_sum = in_cksum(m4, sizeof(struct ip));
+    m4->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
+    m4->m_pkthdr.len = cv4->m->m_pkthdr.len;
+
+    if (isDump(D_FRAGMENTED))
+	natpt_logIp4(LOG_DEBUG, ip4to, NULL);
+
+    return (m4);
+}
+#endif	/* ifdef NATPT_FRAGMENT	*/
 #endif	/* ifdef NATPT_NAT	*/
 
 

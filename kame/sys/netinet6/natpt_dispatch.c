@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.13 2000/09/23 17:14:24 sumikawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.14 2000/10/17 14:23:55 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,6 +72,10 @@ int		natpt_gotoOneself;
 u_int		natpt_debug;
 u_int		natpt_dump;
 
+u_long		mtuInside;
+u_long		mtuOutside;
+
+
 static	struct _cell	*ifBox;
 
 struct ifnet	*natpt_ip6src;
@@ -103,6 +107,13 @@ int		 sanityCheckOut6	__P((struct _cv *));
 int		 checkMTU		__P((struct _cv *));
 int		 toOneself4		__P((struct ifBox *, struct _cv *));
 
+void		 setMTU			__P((void));
+int		 checkMTU4		__P((u_long , struct _cv *));
+
+#ifdef NATPT_FRAGMENT
+struct _fragment	*internFragmented	__P((struct _cv *, int));
+struct _tSlot		*lookForFragmented	__P((struct _cv *, int));
+#endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static	MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
@@ -270,12 +281,50 @@ natpt_incomingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m
     struct _cv		 cv;
     struct _cSlot	*acs;
     struct _tSlot	*ats;
+#ifdef NATPT_FRAGMENT
+    struct ip		*ip4;
+    struct _fragment	*frg = NULL;
+#endif
 
     if ((rv = configCv4(sess, m4, &cv)) == IPPROTO_MAX)
 	return (IPPROTO_MAX);				/* discard this packet	*/
 
     if ((rv = sanityCheckIn4(&cv)) != IPPROTO_IPV4)
 	return (IPPROTO_DONE);		/* discard this packet without free	*/
+
+#if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)
+    ip4 = mtod(m4, struct ip *);
+    if ((ip4->ip_off & IP_MF)
+	&& (ip4->ip_off & IP_OFFMASK) == 0)	/* first fragmented packet	*/
+    {
+	frg = internFragmented(&cv, sess);
+    }
+    
+    if ((ip4->ip_off & IP_OFFMASK) != 0)	/* second fragmented packet	*/
+    {
+	struct _tSlot	*tsl;
+
+	if ((tsl = lookForFragmented(&cv, sess)) != NULL)
+	{
+	    if (isDump(D_FRAGMENTED))
+	    {
+		char	Wow[256];
+
+		sprintf(Wow, "2nd slotentry  in: %p", tsl);
+		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+
+		sprintf(Wow, "2nd paddr  in: %p", &tsl->remote);
+		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	    }
+
+	    cv.ats = tsl;
+	    if ((*m6 = translatingIPv4To4frag(&cv, &tsl->local)) != NULL)
+		return (IPPROTO_IPV4);
+	}
+
+	return (IPPROTO_MAX);
+    }
+#endif	/* if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)	*/
 
     cv.ats = lookingForIncomingV4Hash(&cv);
     if ((ats = checkTracerouteReturn(&cv)) != NULL)
@@ -292,9 +341,34 @@ natpt_incomingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m
 
     cv.ats->inbound++;
 
+#ifdef NATPT_FRAGMENT
+    if (frg != NULL)
+    {
+	frg->tslot = cv.ats;
+	if (isDump(D_FRAGMENTED))
+	{
+	    char	Wow[256];
+
+	    sprintf(Wow, "1st slotentry  in: %p", cv.ats);
+	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	}
+    }
+#endif
+
 #ifdef NATPT_NAT
     if (cv.ats->local.sa_family == AF_INET)
     {
+	if (isDump(D_FRAGMENTED))
+	{
+	    char	Wow[256];
+
+	    sprintf(Wow, "1st paddr  in: %p", &cv.ats->local);
+	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	}
+
+	if (checkMTU4(mtuInside, &cv) == IPPROTO_DONE)
+	    return (IPPROTO_DONE);
+
 	if ((*m6 = translatingIPv4To4(&cv, &cv.ats->local)) != NULL)
 	    return (IPPROTO_IPV4);
     }
@@ -319,9 +393,46 @@ natpt_outgoingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m
     struct _cv		 cv;
     struct _cSlot	*acs;
     struct ip		*ip4;
+#ifdef NATPT_FRAGMENT
+    struct _fragment	*frg = NULL;
+#endif
 
     if ((rv = configCv4(sess, m4, &cv)) == IPPROTO_MAX)
 	return (IPPROTO_MAX);				/* discard this packet	*/
+
+#if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)
+    ip4 = mtod(m4, struct ip *);
+    if ((ip4->ip_off & IP_MF)
+	&& (ip4->ip_off & IP_OFFMASK) == 0)	/* first fragmented packet	*/
+    {
+	frg = internFragmented(&cv, sess);
+    }
+    
+    if ((ip4->ip_off & IP_OFFMASK) != 0)	/* second fragmented packet	*/
+    {
+	struct _tSlot	*tsl;
+
+	if ((tsl = lookForFragmented(&cv, sess)) != NULL)
+	{
+	    if (isDump(D_FRAGMENTED))
+	    {
+		char	Wow[256];
+
+		sprintf(Wow, "2nd slotentry out: %p", tsl);
+		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+
+		sprintf(Wow, "2nd paddr out: %p", &tsl->remote);
+		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	    }
+
+	    cv.ats = tsl;
+	    if ((*m6 = translatingIPv4To4frag(&cv, &tsl->remote)) != NULL)
+		return (IPPROTO_IPV4);
+	}
+
+	return (IPPROTO_MAX);
+    }
+#endif	/* if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)	*/
 
     if ((cv.ats = lookingForOutgoingV4Hash(&cv)) == NULL)
     {
@@ -343,9 +454,34 @@ natpt_outgoingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m
 
     cv.ats->outbound++;
 
+#ifdef NATPT_FRAGMENT
+    if (frg != NULL)
+    {
+	frg->tslot = cv.ats;
+	if (isDump(D_FRAGMENTED))
+	{
+	    char	Wow[256];
+
+	    sprintf(Wow, "1st slotentry out: %p", cv.ats);
+	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	}
+    }
+#endif
+
 #ifdef NATPT_NAT
     if (cv.ats->remote.sa_family == AF_INET)
     {
+	if (isDump(D_FRAGMENTED))
+	{
+	    char	Wow[256];
+
+	    sprintf(Wow, "1st paddr out: %p", &cv.ats->remote);
+	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	}
+
+	if (checkMTU4(mtuInside, &cv) == IPPROTO_DONE)
+	    return (IPPROTO_DONE);
+
 	if ((*m6 = translatingIPv4To4(&cv, &cv.ats->remote)) != NULL)
 	    return (IPPROTO_IPV4);
     }
@@ -732,6 +868,73 @@ natpt_setIfBox(char *ifName)
 	return (q);
     }
     return (NULL);
+}
+
+
+void
+setMTU()
+{
+    struct _cell	*p;
+    struct ifnet	*ifnet;
+    struct ifBox	*ifb;
+    char		 Wow[256];
+
+    for (p = ifBox; p; p = CDR(p))
+    {
+	ifb = (struct ifBox *)CAR(p);
+	ifnet = ifb->ifnet;
+
+	if (ifnet->if_flags & IFF_LOOPBACK)
+	    continue;
+
+	if (ifb->side == outSide)
+	{
+	    mtuOutside = ifnet->if_data.ifi_mtu;
+	    sprintf(Wow, "set mtuOutside: %ld\n", mtuOutside);
+	    printf(Wow);
+	    natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
+	}
+	else
+	{
+	    mtuInside  = ifnet->if_data.ifi_mtu;
+	    sprintf(Wow, "set mtuInside: %ld\n", mtuInside);
+	    natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
+	    printf(Wow);
+	}
+    }
+}
+
+
+int
+checkMTU4(u_long mtu, struct _cv *cv4)
+{
+    struct mbuf	*m4  = cv4->m;
+    struct ip	*ip4 = mtod(m4, struct ip *);
+
+    if ((m4->m_flags & M_PKTHDR)
+	&& (m4->m_pkthdr.len > mtu))
+    {
+	if (ip4->ip_off & IP_DF)
+	{
+	    n_long		dest = 0;
+	    struct ifnet	destif;
+	    char		Wow[246];
+
+	    sprintf(Wow, "checkMTU4(): need fragment (%d > %ld)", m4->m_pkthdr.len, mtu);
+	    natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
+
+	    bzero(&destif, sizeof(struct ifnet));
+	    destif.if_mtu = mtu;
+
+	    NTOHS(ip4->ip_id);
+	    icmp_error(m4, ICMP_UNREACH, ICMP_UNREACH_NEEDFRAG, dest, &destif);
+	    return (IPPROTO_DONE);	/* discard this packet without free	*/
+	}
+	
+	cv4->flags |= NATPT_NEEDFRAGMENT;	/* fragment, then translate	*/
+    }
+
+    return (IPPROTO_IPV4);
 }
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.10 2000/04/25 07:52:54 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.11 2000/10/17 14:23:55 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,6 +88,7 @@
 #define	D_PEEKOUTGOINGV4		0x00000002
 #define	D_MATCHINGRULE4			0x00000004
 #define	D_TRANSLATINGIPV4		0x00000010
+#define	D_FRAGMENTED			0x00000100
 #define	D_TRANSLATEDIPV4		0x00001000
 #define	D_FAKETRACEROUTE		0x00004000
 #define	D_TOONESELF4			0x00008000
@@ -200,6 +201,24 @@ union inaddr					/* sizeof():  16[byte]	*/
     struct in_addr	in4;
     struct in6_addr	in6;
 };
+
+
+#ifdef NATPT_FRAGMENT
+struct _fragment
+{
+    struct in_addr	 ip_src;			/* source address	*/
+    struct in_addr	 ip_dst;			/* destination address	*/
+    u_short		 ip_id;				/* identification	*/
+    u_char		 ip_p;				/* protocol		*/
+    u_char		 inout;
+/*	#define	NATPT_UNSPEC		(0)					*/
+/*	#define	NATPT_INBOUND		(1)					*/
+/*	#define	NATPT_OUTBOUND		(2)					*/
+
+    struct _tSlot	*tslot;
+    time_t		 tstamp;
+};
+#endif
 
 
 struct pAddr					/* sizeof():  44[byte]	*/

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.11 2000/04/19 06:48:57 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.12 2000/10/17 14:23:55 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,6 +77,7 @@ extern	struct in6_addr	 natpt_prefixmask;
 extern	void	in4_len2mask	__P((struct in_addr *, int));
 extern	void	in6_len2mask	__P((struct in6_addr *, int));
 extern	int	toOneself4	__P((struct ifBox *, struct _cv *));
+extern	void	setMTU		__P((void));
 
 
 /*
@@ -376,6 +377,7 @@ _natptEnableTrans(caddr_t addr)
     sprintf(Wow, "map enable");
     natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
 
+    setMTU();
     ip6_protocol_tr = 1;
     return (0);
 }

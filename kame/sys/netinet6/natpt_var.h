@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.9 2000/04/25 07:52:56 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.10 2000/10/17 14:23:56 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,7 +80,10 @@ struct mbuf	*translatingIPv4To4		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingICMPv4To4		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingTCPv4To4		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingUDPv4To4		__P((struct _cv *, struct pAddr *));
-#endif
+#ifdef NATPT_FRAGMENT
+struct mbuf	*translatingIPv4To4frag		__P((struct _cv *, struct pAddr *));
+#endif	/* ifdef NATPT_FRAGMENT	*/
+#endif	/* ifdef NATPT_NAT	*/
 
 struct mbuf	*translatingIPv4To6		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingICMPv4To6		__P((struct _cv *, struct pAddr *));
@@ -93,7 +96,6 @@ struct mbuf	*translatingICMPv6To4		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingTCPv6To4		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingUDPv6To4		__P((struct _cv *, struct pAddr *));
 struct mbuf	*translatingTCPUDPv6To4		__P((struct _cv *, struct pAddr *, struct _cv *));
-
 
 /*	natpt_tslot.c		*/
 struct _tSlot	*lookingForOutgoingV4Hash	__P((struct _cv *));

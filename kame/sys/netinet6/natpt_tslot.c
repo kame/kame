@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.11 2000/04/25 07:52:55 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.12 2000/10/17 14:23:56 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,6 +68,9 @@
 
 static	Cell	*_insideHash [NATPT_MAXHASH];
 static	Cell	*_outsideHash[NATPT_MAXHASH];
+#ifdef NATPT_FRAGMENT
+static	Cell	*fragment;
+#endif
 
 static	Cell	*tSlotEntry;
 static	int	 tSlotEntryMax;
@@ -93,6 +96,10 @@ static struct pAddr	*fillupOutgoingV6local	__P((struct _cSlot *, struct _cv *, s
 static struct pAddr	*fillupOutgoingV6Remote	__P((struct _cSlot *, struct _cv *, struct pAddr *));
 static struct pAddr	*remapRemote4Port	__P((struct _cSlot *, struct _cv *, struct pAddr *));
 
+#ifdef NATPT_FRAGMENT
+struct _fragment	*internFragmented	__P((struct _cv *, int));
+struct _tSlot		*lookForFragmented	__P((struct _cv *, int));
+#endif
 
 static struct _tSlot	*registTSlotEntry	__P((struct _tSlot *));
 static void	 _expireTSlot			__P((void *));
@@ -706,6 +713,107 @@ found:;
 
     return (remote);
 }
+
+
+/*
+ *
+ */
+
+
+#ifdef NATPT_FRAGMENT
+struct _fragment *
+internFragmented(struct _cv *cv4, int inout)
+{
+    struct _fragment	*frg;
+    struct ip		*ip4 = cv4->_ip._ip4;
+    struct timeval	 atv;
+
+    if (isDump(D_FRAGMENTED))
+	natpt_logMBuf(LOG_DEBUG, cv4->m, "internFragmented()");
+
+    MALLOC(frg, struct _fragment *, sizeof(struct _fragment), M_NATPT, M_NOWAIT);
+    if (frg == NULL)
+    {
+	printf("ENOBUFS in internFragmented() %d\n", __LINE__);
+	return (NULL);
+    }
+
+    bzero(frg, sizeof(struct _fragment));
+    frg->ip_src = ip4->ip_src;
+    frg->ip_dst = ip4->ip_dst;
+    frg->ip_id  = ip4->ip_id;
+    frg->ip_p   = ip4->ip_p;
+    frg->inout  = inout;
+    microtime(&atv);
+    frg->tstamp = atv.tv_sec;
+
+    LST_hookup_list(&fragment, frg);
+
+    if (isDump(D_FRAGMENTED))
+    {
+	char	Wow[256];
+
+	sprintf(Wow, "intern: %p", frg);
+	natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+    }
+
+    return (frg);
+}
+
+
+struct _tSlot *
+lookForFragmented(struct _cv *cv4, int inout)
+{
+    struct _cell	*p, *q;
+    struct _fragment	*frg;
+    struct _tSlot	*tsl;
+    struct ip		*ip4;
+
+    if (isDump(D_FRAGMENTED))
+	natpt_logMBuf(LOG_DEBUG, cv4->m, "lookForFragmented");
+
+    ip4 = cv4->_ip._ip4;
+    for (p = fragment, q = NULL; p; q = p, p = CDR(p))
+    {
+	frg = (struct _fragment *)CAR(p);
+
+	if ((frg->ip_src.s_addr == ip4->ip_src.s_addr)
+	    && (frg->ip_dst.s_addr == ip4->ip_dst.s_addr)
+	    && (frg->ip_id == ip4->ip_id)
+	    && (frg->ip_p == ip4->ip_p)
+	    && (frg->inout == inout))
+	{
+	    tsl = frg->tslot;
+
+	    if (isDump(D_FRAGMENTED))
+	    {
+		char	Wow[256];
+
+		sprintf(Wow, "found fragment: %p", frg);
+		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+		sprintf(Wow, "found slotentry: %p", tsl);
+		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	    }
+
+	    if (((ip4->ip_off & IP_MF) == 0)		/* this is last fragmented	*/
+		&& (ip4->ip_off & IP_OFFMASK != 0))	/* packet			*/
+	    {
+		if (q == NULL)
+		    fragment = NULL;
+		else
+		    CDR(q) = CDR(p);
+
+		LST_free(p);
+		FREE(frg, M_NATPT);
+	    }
+	
+	    return (tsl);
+	}
+    }
+
+    return (NULL);
+}
+#endif
 
 
 static struct _tSlot *
