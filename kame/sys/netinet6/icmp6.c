@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.291 2002/04/08 08:14:41 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.292 2002/04/08 09:39:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -189,9 +189,6 @@ struct icmp6_mtudisc_callback {
 LIST_HEAD(, icmp6_mtudisc_callback) icmp6_mtudisc_callbacks =
     LIST_HEAD_INITIALIZER(&icmp6_mtudisc_callbacks);
 
-static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
-extern int pmtu_expire;
-
 /* XXX do these values make any sense? */
 static int icmp6_mtudisc_hiwat = 1280;
 static int icmp6_mtudisc_lowat = 256;
@@ -204,6 +201,11 @@ static struct rttimer_queue *icmp6_redirect_timeout_q = NULL;
 /* XXX do these values make any sense? */
 static int icmp6_redirect_hiwat = 1280;
 static int icmp6_redirect_lowat = 1024;
+#endif
+
+#ifndef __bsdi__
+static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
+extern int pmtu_expire;
 #endif
 
 static void icmp6_errcount __P((struct icmp6errstat *, int, int));
@@ -227,16 +229,20 @@ static int icmp6_notify_error __P((struct mbuf *, int, int, int));
 static int icmp6_recover_src __P((struct mbuf *));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rtentry *icmp6_mtudisc_clone __P((struct sockaddr *));
-static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
 static void icmp6_redirect_timeout __P((struct rtentry *, struct rttimer *));
+#endif
+#ifndef __bsdi__
+static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
 #endif
 
 void
 icmp6_init()
 {
 	mld6_init();
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#ifndef __bsdi__
 	icmp6_mtudisc_timeout_q = rt_timer_queue_create(pmtu_expire);
+#endif
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	icmp6_redirect_timeout_q = rt_timer_queue_create(icmp6_redirtimeout);
 #endif
 }
@@ -1442,6 +1448,16 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 	    mtu < rt->rt_ifp->if_mtu && mtu < rt->rt_rmx.rmx_mtu) {
 		icmp6stat.icp6s_pmtuchg++;
 		rt->rt_rmx.rmx_mtu = mtu;
+
+#ifdef __FreeBSD__
+		/*
+		 * We intentionally ignore the error case of rt_timer_add(),
+		 * because the only bad effect is that we won't be able to
+		 * re-increase the path MTU.
+		 */
+		rt_timer_add(rt, icmp6_mtudisc_timeout,
+			     icmp6_mtudisc_timeout_q);
+#endif
 	}
 	if (rt) { /* XXX: need braces to avoid conflict with else in RTFREE. */
 		RTFREE(rt);
@@ -3602,27 +3618,6 @@ icmp6_mtudisc_clone(dst)
 }
 
 static void
-icmp6_mtudisc_timeout(rt, r)
-	struct rtentry *rt;
-	struct rttimer *r;
-{
-	if (rt == NULL)
-		panic("icmp6_mtudisc_timeout: bad route to timeout");
-	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) ==
-	    (RTF_DYNAMIC | RTF_HOST)) {
-		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
-		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
-	} else {
-		/*
-		 * we do not have to check the RTV_MTU flag, which should
-		 * always be off for IPv6.
-		 */
-		if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
-			rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
-	}
-}
-
-static void
 icmp6_redirect_timeout(rt, r)
 	struct rtentry *rt;
 	struct rttimer *r;
@@ -3636,6 +3631,32 @@ icmp6_redirect_timeout(rt, r)
 	}
 }
 #endif /* __NetBSD__ || __OpenBSD__ */
+
+#ifndef __bsdi__
+static void
+icmp6_mtudisc_timeout(rt, r)
+	struct rtentry *rt;
+	struct rttimer *r;
+{
+	if (rt == NULL)
+		panic("icmp6_mtudisc_timeout: bad route to timeout");
+#ifdef __FreeBSD__
+	if (!(rt->rt_rmx.rmx_locks & RTV_MTU)) /* this should be the case... */
+		rt->rt_rmx.rmx_mtu = nd_ifinfo[rt->rt_ifp->if_index].linkmtu;
+#else  /* i.e. netbsd and openbsd */
+	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) ==
+	    (RTF_DYNAMIC | RTF_HOST)) {
+		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
+		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
+	} else {
+		if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
+			rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
+	}
+
+#endif
+}
+#endif
+
 
 #ifdef __bsdi__
 void
