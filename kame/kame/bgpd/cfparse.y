@@ -1324,7 +1324,7 @@ rip_config()
 	cprint("RIP config\n");
 
 	if (yy_rip_sitelocal >= 0) {
-		cprint("Use site-local addresses in RIPng\n");
+		cprint("  Use site-local addresses in RIPng\n");
 		rip_use_sitelocal = yy_rip_sitelocal;
 	}
 
