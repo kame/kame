@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.988 2000/06/09 01:13:07 itojun Exp $
+$Id: CHANGELOG,v 1.989 2000/06/10 12:48:22 sakane Exp $
 
 <200006>
+Sat Jun 10 15:42:25 JST 2000 sakane@ydc.co.jp
+	* kame/sys/{netkey/key.c,net/pfkeyv2.h}:
+	* kame/kame/{stekey,racoon,libipsec}:
+	Moved mode/reqid to new extension from sadb_msg header.
+	New extension is defined sadb_x_sa2 structure.
+
 Fri Jun  9 10:10:08 JST 2000  itojun@iijlab.net
 	* *bsd*/sys/netinet6/in6_pcb.c, kame/sys/netinet6/in6_src.c:
 	  add in6_embedscope() and in6_recoverscope(), to avoid code duplicate
