@@ -287,7 +287,7 @@ struct nd_opt_mtu {		/* MTU option */
 
 struct icmp6_namelookup {
 	struct icmp6_hdr 	icmp6_nl_hdr;
-	u_int64_t	icmp6_nl_nonce;
+	u_int8_t	icmp6_nl_nonce[8];
 	u_int32_t	icmp6_nl_ttl;
 #if 0
 	u_int8_t	icmp6_nl_len;
