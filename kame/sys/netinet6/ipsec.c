@@ -365,7 +365,7 @@ ipsec4_getpolicybysock(m, so, error)
 		return sp;
 
 	default:
-		printf("ipsec4_policybysock: "
+		printf("ipsec4_getpolicybysock: "
 		      "Invalid policy for PCB %d\n",
 			sp->policy);
 		*error = EINVAL;
