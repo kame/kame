@@ -65,7 +65,7 @@ comment		\#.*
 semi		\;
 bcl		\{
 ecl		\}
-string		[a-zA-Z0-9:\._@%][a-zA-Z0-9:\._@%]*
+string		[a-zA-Z0-9:\._@%-][a-zA-Z0-9:\._@%-]*
 digit		[0-9]
 integer 	{digit}+
 number		{integer}|({digit}*\.{integer})
