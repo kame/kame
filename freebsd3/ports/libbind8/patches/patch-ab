@@ -1,0 +1,155 @@
+*** doc/man/Makefile.orig	Sun Jan  7 01:55:14 2001
+--- doc/man/Makefile		Sun Jan  7 01:55:07 2001
+***************
+*** 52,77 ****
+  # Target directory for the manual directory tree. Eg., may be used to 
+  # specify the path of an NFS-mounted directory for common files.
+  #
+! DESTDIR=
+  
+  #
+  # Default location for manual section directories.
+  #
+! DESTMAN= /usr/share/man
+  
+  #
+  # Install manuals in ${MANDIR}N. For systems that generate catable manual 
+  # entries on the fly, use
+  #	MANDIR = man
+  #
+! MANDIR = cat
+  
+  #
+  # Default extension for manual entries. To install the manual entries under
+  # their `real' extensions use 
+  #	CATEXT = $$N
+  #
+! CATEXT = 0
+  
+  #
+  # Command to install manual entries
+--- 52,77 ----
+  # Target directory for the manual directory tree. Eg., may be used to 
+  # specify the path of an NFS-mounted directory for common files.
+  #
+! DESTDIR= ${PREFIX}
+  
+  #
+  # Default location for manual section directories.
+  #
+! DESTMAN= /man
+  
+  #
+  # Install manuals in ${MANDIR}N. For systems that generate catable manual 
+  # entries on the fly, use
+  #	MANDIR = man
+  #
+! MANDIR = man
+  
+  #
+  # Default extension for manual entries. To install the manual entries under
+  # their `real' extensions use 
+  #	CATEXT = $$N
+  #
+! CATEXT = $$N
+  
+  #
+  # Command to install manual entries
+***************
+*** 105,111 ****
+  # can be used. 
+  #	MANROFF = cat
+  #
+! MANROFF = ( tbl | nroff -mandoc )
+  
+  #
+  # Default extensions for installed manual entries. The following variables 
+--- 105,111 ----
+  # can be used. 
+  #	MANROFF = cat
+  #
+! MANROFF = cat
+  
+  #
+  # Default extensions for installed manual entries. The following variables 
+***************
+*** 346,407 ****
+  	@echo "$*.${DESC_SRC_EXT} -> $*.${DESC_OUT_EXT}"
+  	@${MK_MANFILE} <$*.${DESC_SRC_EXT} >$*.${DESC_OUT_EXT}
+  
+! OUTFILES =	${CMD_OUT} ${NAMED_OUT} ${NAMED_XFER_OUT} ${NSLOOKUP_OUT} \
+! 		${NSUPDATE_OUT} ${LIB_NETWORK_OUT} ${FORMAT_OUT} ${DESC_OUT} \
+! 		${NAMED_BOOTCONF_OUT}
+  
+  all:	${OUTFILES}
+  
+  install:	${OUTFILES} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${CMD_EXT_DIR} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${SYS_OPS_EXT_DIR} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${LIB_NETWORK_EXT_DIR} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${FORMAT_EXT_DIR} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${DESC_EXT_DIR}
+! 	@set -x; N=${CMD_EXT}; for f in ${CMD_BASE}; do \
+! 		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+! 		$${f}.${CMD_OUT_EXT} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${CMD_EXT_DIR}/$${f}.${CATEXT}; \
+! 	done
+! 	@set -x; N=${SYS_OPS_EXT}; for f in ${NAMED_BASE}; do \
+! 		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+! 		$${f}.${SYS_OPS_OUT_EXT} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${SYS_OPS_EXT_DIR}/${INDOT}$${f}.${CATEXT}; \
+! 	done
+! 	@set -x; N=${SYS_OPS_EXT}; for f in ${NAMED_XFER_BASE}; do \
+! 		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+! 		$${f}.${SYS_OPS_OUT_EXT} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${SYS_OPS_EXT_DIR}/${XFER_INDOT}$${f}.${CATEXT}; \
+! 	done
+! 	@set -x; N=${SYS_OPS_EXT}; for f in ${NAMED_BOOTCONF_BASE}; do \
+! 		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+! 		$${f}.${SYS_OPS_OUT_EXT} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${SYS_OPS_EXT_DIR}/${XFER_INDOT}$${f}.${CATEXT}; \
+! 	done
+! 	@set -x; N=${SYS_OPS_EXT}; for f in ${NSLOOKUP_BASE}; do \
+! 		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+! 		$${f}.${SYS_OPS_OUT_EXT} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${SYS_OPS_EXT_DIR}/$${f}.${CATEXT}; \
+! 	done
+! 	@set -x; N=${SYS_OPS_EXT}; for f in ${NSUPDATE_BASE}; do \
+! 		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+! 		$${f}.${SYS_OPS_OUT_EXT} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${SYS_OPS_EXT_DIR}/$${f}.${CATEXT}; \
+! 	done
+  	@set -x; N=${LIB_NETWORK_EXT}; for f in ${LIB_NETWORK_BASE}; do \
+  		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+  		$${f}.${LIB_NETWORK_OUT_EXT} \
+  		${DESTDIR}${DESTMAN}/${MANDIR}${LIB_NETWORK_EXT_DIR}/$${f}.${CATEXT}; \
+- 	done
+- 	@set -x; N=${FORMAT_EXT}; for f in ${FORMAT_BASE}; do \
+- 		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+- 		$${f}.${FORMAT_OUT_EXT} \
+- 		${DESTDIR}${DESTMAN}/${MANDIR}${FORMAT_EXT_DIR}/$${f}.${CATEXT}; \
+- 	done
+- 	@set -x; N=${DESC_EXT}; for f in ${DESC_BASE}; do \
+- 		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+- 		$${f}.${DESC_OUT_EXT} \
+- 		${DESTDIR}${DESTMAN}/${MANDIR}${DESC_EXT_DIR}/$${f}.${CATEXT}; \
+  	done
+  
+  ${DESTDIR}${DESTMAN}/${MANDIR}${CMD_EXT_DIR} \
+--- 346,361 ----
+  	@echo "$*.${DESC_SRC_EXT} -> $*.${DESC_OUT_EXT}"
+  	@${MK_MANFILE} <$*.${DESC_SRC_EXT} >$*.${DESC_OUT_EXT}
+  
+! OUTFILES =	${LIB_NETWORK_OUT}
+  
+  all:	${OUTFILES}
+  
+  install:	${OUTFILES} \
+! 		${DESTDIR}${DESTMAN}/${MANDIR}${LIB_NETWORK_EXT_DIR}
+  	@set -x; N=${LIB_NETWORK_EXT}; for f in ${LIB_NETWORK_BASE}; do \
+  		${INSTALL} -c -m 444 ${MAN_OWNER} ${MAN_GROUP} \
+  		$${f}.${LIB_NETWORK_OUT_EXT} \
+  		${DESTDIR}${DESTMAN}/${MANDIR}${LIB_NETWORK_EXT_DIR}/$${f}.${CATEXT}; \
+  	done
+  
+  ${DESTDIR}${DESTMAN}/${MANDIR}${CMD_EXT_DIR} \
