@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1216 2000/08/21 02:30:23 jinmei Exp $
+$KAME: CHANGELOG,v 1.1217 2000/08/21 04:36:24 sumikawa Exp $
 
 <200008>
+Mon Aug 21 13:33:12 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd3/ports/{ct, v6eval}: upgrade to 1.1
+
 2000-08-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (ip6_mforward): do not forward
 	packets with the unspecified source address. This is rather more
