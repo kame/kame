@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.77 2000/12/01 12:06:31 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.78 2000/12/02 07:30:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,13 +155,13 @@ in6_pcballoc(so, head)
 #ifdef __NetBSD__
 int
 in6_pcbbind(in6p, nam, p)
-	register struct in6pcb *in6p;
+	struct in6pcb *in6p;
 	struct mbuf *nam;
 	struct proc *p;
 #else
 int
 in6_pcbbind(in6p, nam)
-	register struct in6pcb *in6p;
+	struct in6pcb *in6p;
 	struct mbuf *nam;
 #endif
 {

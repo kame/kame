@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.34 2000/12/02 07:30:37 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.35 2000/12/03 00:53:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -195,7 +195,7 @@ static int pim6;
  */
 
 #define MF6CFIND(o, g, rt) do { \
-	register struct mf6c *_rt = mf6ctable[MF6CHASH(o,g)]; \
+	struct mf6c *_rt = mf6ctable[MF6CHASH(o,g)]; \
 	rt = NULL; \
 	mrt6stat.mrt6s_mfc_lookups++; \
 	while (_rt) { \
@@ -217,7 +217,7 @@ static int pim6;
  * Borrowed from Van Jacobson's scheduling code
  */
 #define TV_DELTA(a, b, delta) do { \
-	    register int xxs; \
+	    int xxs; \
 		\
 	    delta = (a).tv_usec - (b).tv_usec; \
 	    if ((xxs = (a).tv_sec - (b).tv_sec)) { \
@@ -405,9 +405,9 @@ mrt6_ioctl(cmd, data)
  */
 static int
 get_sg_cnt(req)
-	register struct sioc_sg_req6 *req;
+	struct sioc_sg_req6 *req;
 {
-	register struct mf6c *rt;
+	struct mf6c *rt;
 	int s;
 
 #ifdef __NetBSD__
@@ -435,9 +435,9 @@ get_sg_cnt(req)
  */
 static int
 get_mif6_cnt(req)
-	register struct sioc_mif_req6 *req;
+	struct sioc_mif_req6 *req;
 {
-	register mifi_t mifi = req->mifi;
+	mifi_t mifi = req->mifi;
 
 	if (mifi >= nummifs)
 		return EINVAL;
@@ -651,9 +651,9 @@ static struct sockaddr_in6 sin6 = { sizeof(sin6), AF_INET6 };
  */
 static int
 add_m6if(mifcp)
-	register struct mif6ctl *mifcp;
+	struct mif6ctl *mifcp;
 {
-	register struct mif6 *mifp;
+	struct mif6 *mifp;
 	struct ifnet *ifp;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct in6_ifreq ifr;
@@ -754,8 +754,8 @@ static int
 del_m6if(mifip)
 	mifi_t *mifip;
 {
-	register struct mif6 *mifp = mif6table + *mifip;
-	register mifi_t mifi;
+	struct mif6 *mifp = mif6table + *mifip;
+	mifi_t mifi;
 	struct ifnet *ifp;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct in6_ifreq ifr;
@@ -821,7 +821,7 @@ add_m6fc(mfccp)
 	struct mf6c *rt;
 	u_long hash;
 	struct rtdetq *rte;
-	register u_short nstl;
+	u_short nstl;
 	int s;
 
 	MF6CFIND(mfccp->mf6cc_origin.sin6_addr,
@@ -979,11 +979,11 @@ add_m6fc(mfccp)
  */
 static void
 collate(t)
-	register struct timeval *t;
+	struct timeval *t;
 {
-	register u_long d;
-	register struct timeval tp;
-	register u_long delta;
+	u_long d;
+	struct timeval tp;
+	u_long delta;
 
 	GET_TIME(tp);
 
@@ -1086,13 +1086,13 @@ socket_send(s, mm, src)
 
 int
 ip6_mforward(ip6, ifp, m)
-	register struct ip6_hdr *ip6;
+	struct ip6_hdr *ip6;
 	struct ifnet *ifp;
 	struct mbuf *m;
 {
-	register struct mf6c *rt;
-	register struct mif6 *mifp;
-	register struct mbuf *mm;
+	struct mf6c *rt;
+	struct mif6 *mifp;
+	struct mbuf *mm;
 	int s;
 	mifi_t mifi;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -1158,10 +1158,10 @@ ip6_mforward(ip6, ifp, m)
 		 * send message to routing daemon
 		 */
 
-		register struct mbuf *mb0;
-		register struct rtdetq *rte;
-		register u_long hash;
-/*	register int i, npkts;*/
+		struct mbuf *mb0;
+		struct rtdetq *rte;
+		u_long hash;
+/*		int i, npkts;*/
 #ifdef UPCALL_TIMING
 		struct timeval tp;
 
@@ -1325,7 +1325,7 @@ ip6_mforward(ip6, ifp, m)
 		} else {
 			/* determine if q has overflowed */
 			struct rtdetq **p;
-			register int npkts = 0;
+			int npkts = 0;
 
 			for (p = &rt->mf6c_stall; *p != NULL; p = &(*p)->next)
 				if (++npkts > MAX_UPQ6) {
@@ -1428,14 +1428,14 @@ expire_upcalls(unused)
  */
 static int
 ip6_mdq(m, ifp, rt)
-	register struct mbuf *m;
-	register struct ifnet *ifp;
-	register struct mf6c *rt;
+	struct mbuf *m;
+	struct ifnet *ifp;
+	struct mf6c *rt;
 {
-	register struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	register mifi_t mifi, iif;
-	register struct mif6 *mifp;
-	register int plen = m->m_pkthdr.len;
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	mifi_t mifi, iif;
+	struct mif6 *mifp;
+	int plen = m->m_pkthdr.len;
 
 /*
  * Macro to send packet on mif.  Since RSVP packets don't get counted on
@@ -1482,7 +1482,7 @@ ip6_mdq(m, ifp, rt)
 				static struct sockaddr_in6 sin6 =
 				{ sizeof(sin6), AF_INET6 };
 
-				register struct mbuf *mm;
+				struct mbuf *mm;
 				struct mrt6msg *im;
 #ifdef MRT6_OINIT
 				struct omrt6msg *oim;
@@ -1600,7 +1600,7 @@ phyint_send(ip6, mifp, m)
     struct mif6 *mifp;
     struct mbuf *m;
 {
-	register struct mbuf *mb_copy;
+	struct mbuf *mb_copy;
 	struct ifnet *ifp = mifp->m6_ifp;
 	int error = 0;
 #ifdef __NetBSD__
@@ -1722,12 +1722,12 @@ phyint_send(ip6, mifp, m)
 
 static int
 register_send(ip6, mif, m)
-	register struct ip6_hdr *ip6;
+	struct ip6_hdr *ip6;
 	struct mif6 *mif;
-	register struct mbuf *m;
+	struct mbuf *m;
 {
-	register struct mbuf *mm;
-	register int i, len = m->m_pkthdr.len;
+	struct mbuf *mm;
+	int i, len = m->m_pkthdr.len;
 	static struct sockaddr_in6 sin6 = { sizeof(sin6), AF_INET6 };
 	struct mrt6msg *im6;
 
@@ -1798,9 +1798,9 @@ pim6_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
 {
-        register struct pim *pim; /* pointer to a pim struct */
-        register struct ip6_hdr *ip6;
-        register int pimlen;
+        struct pim *pim; /* pointer to a pim struct */
+        struct ip6_hdr *ip6;
+        int pimlen;
 	struct mbuf *m = *mp;
         int minlen;
 	int off = *offp;

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.18 2000/11/21 12:29:55 kawa Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.19 2000/12/03 00:53:59 itojun Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -522,7 +522,7 @@ ip6_fw_chk(struct ip6_hdr **pip6,
 	}
 #endif /* IP6FW_DIVERT_RESTART */
 	for (; chain; chain = LIST_NEXT(chain, chain)) {
-		register struct ip6_fw *const f = chain->rule;
+		struct ip6_fw *const f = chain->rule;
 
 		if (oif) {
 			/* Check direction outbound */

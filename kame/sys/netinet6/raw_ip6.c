@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.47 2000/12/02 16:00:02 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.48 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -135,8 +135,8 @@ rip6_input(mp, offp, proto)
 	int	*offp, proto;
 {
 	struct mbuf *m = *mp;
-	register struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	register struct in6pcb *in6p;
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 rip6src;
 	struct ip6_recvpktopts opts;
@@ -239,7 +239,7 @@ rip6_ctlinput(cmd, sa, d)
 	struct sockaddr *sa;
 	void *d;
 {
-	register struct ip6_hdr *ip6;
+	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
 	struct ip6ctlparam *ip6cp = NULL;
@@ -510,12 +510,12 @@ extern	u_long rip6_recvspace;
 
 int
 rip6_usrreq(so, req, m, nam, control, p)
-	register struct socket *so;
+	struct socket *so;
 	int req;
 	struct mbuf *m, *nam, *control;
 	struct proc *p;
 {
-	register struct in6pcb *in6p = sotoin6pcb(so);
+	struct in6pcb *in6p = sotoin6pcb(so);
 	int s;
 	int error = 0;
 /*	extern	struct socket *ip6_mrouter; */ /* xxx */

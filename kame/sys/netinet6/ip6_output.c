@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.136 2000/12/02 15:54:08 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.137 2000/12/03 00:53:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1423,7 +1423,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 	void *optdata;
 	struct ip6_recvpktopts *rcvopts;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	register struct inpcb *in6p = sotoinpcb(so);
+	struct inpcb *in6p = sotoinpcb(so);
 	int error, optval;
 	int level, op, optname;
 	int optlen;
@@ -1440,11 +1440,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 	}
 #else
 #ifdef HAVE_NRL_INPCB
-	register struct inpcb *inp = sotoinpcb(so);
+	struct inpcb *inp = sotoinpcb(so);
 #else
-	register struct in6pcb *in6p = sotoin6pcb(so);
+	struct in6pcb *in6p = sotoin6pcb(so);
 #endif
-	register struct mbuf *m = *mp;
+	struct mbuf *m = *mp;
 	int error, optval;
 	int optlen;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -2343,13 +2343,13 @@ ip6_pcbopts(pktopt, m, so, sopt)
 ip6_pcbopts(pktopt, m, so)
 #endif
 	struct ip6_pktopts **pktopt;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct socket *so;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct sockopt *sopt;
 #endif
 {
-	register struct ip6_pktopts *opt = *pktopt;
+	struct ip6_pktopts *opt = *pktopt;
 	int error = 0;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct proc *p = sopt->sopt_p;
@@ -3148,8 +3148,8 @@ ip6_setmoptions(optname, im6op, m)
 static int
 ip6_getmoptions(optname, im6o, mp)
 	int optname;
-	register struct ip6_moptions *im6o;
-	register struct mbuf **mp;
+	struct ip6_moptions *im6o;
+	struct mbuf **mp;
 {
 	u_int *hlim, *loop, *ifindex;
 
@@ -3198,7 +3198,7 @@ ip6_getmoptions(optname, im6o, mp)
  */
 void
 ip6_freemoptions(im6o)
-	register struct ip6_moptions *im6o;
+	struct ip6_moptions *im6o;
 {
 	struct in6_multi_mship *imm;
 
@@ -3223,7 +3223,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 	struct ip6_pktopts *opt;
 	int priv, needcopy;
 {
-	register struct cmsghdr *cm = 0;
+	struct cmsghdr *cm = 0;
 
 	if (control == 0 || opt == 0)
 		return(EINVAL);
@@ -3502,8 +3502,8 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 void
 ip6_mloopback(ifp, m, dst)
 	struct ifnet *ifp;
-	register struct mbuf *m;
-	register struct sockaddr_in6 *dst;
+	struct mbuf *m;
+	struct sockaddr_in6 *dst;
 {
 	struct mbuf *copym;
 	struct ip6_hdr *ip6;

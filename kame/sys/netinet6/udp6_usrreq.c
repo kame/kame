@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.80 2000/12/02 16:00:03 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.81 2000/12/03 00:54:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,7 +137,7 @@ udp6_init()
 static int
 in6_mcmatch(in6p, ia6, ifp)
 	struct in6pcb *in6p;
-	register struct in6_addr *ia6;
+	struct in6_addr *ia6;
 	struct ifnet *ifp;
 {
 	struct ip6_moptions *im6o = in6p->in6p_moptions;
@@ -163,9 +163,9 @@ udp6_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
-	register struct ip6_hdr *ip6;
-	register struct udphdr *uh;
-	register struct in6pcb *in6p;
+	struct ip6_hdr *ip6;
+	struct udphdr *uh;
+	struct in6pcb *in6p;
 	int off = *offp;
 	u_int32_t plen, ulen;
 	struct sockaddr_in6 udp_in6;
@@ -484,7 +484,7 @@ bad:
  */
 static	void
 udp6_notify(in6p, errno)
-	register struct in6pcb *in6p;
+	struct in6pcb *in6p;
 	int errno;
 {
 	in6p->in6p_socket->so_error = errno;
@@ -499,7 +499,7 @@ udp6_ctlinput(cmd, sa, d)
 	void *d;
 {
 	struct udphdr uh;
-	register struct ip6_hdr *ip6;
+	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 	struct mbuf *m;
 	int off;

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.116 2000/12/02 07:47:16 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.117 2000/12/03 00:53:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1474,8 +1474,8 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
  */
 void
 in6_ifscrub(ifp, ia, delloop)
-	register struct ifnet *ifp;
-	register struct in6_ifaddr *ia;
+	struct ifnet *ifp;
+	struct in6_ifaddr *ia;
 	int delloop;
 {
 	int plen;
@@ -1733,8 +1733,8 @@ in6_purgemkludge(ifp)
  */
 struct	in6_multi *
 in6_addmulti(maddr6, ifp, errorp)
-	register struct in6_addr *maddr6;
-	register struct ifnet *ifp;
+	struct in6_addr *maddr6;
+	struct ifnet *ifp;
 	int *errorp;
 {
 	struct	in6_ifaddr *ia;
@@ -1862,8 +1862,8 @@ in6_delmulti(in6m)
  */
 struct	in6_multi *
 in6_addmulti(maddr6, ifp, errorp)
-	register struct in6_addr *maddr6;
-	register struct ifnet *ifp;
+	struct in6_addr *maddr6;
+	struct ifnet *ifp;
 	int *errorp;
 {
 	struct	in6_multi *in6m;
@@ -1953,7 +1953,7 @@ in6ifa_ifpforlinklocal(ifp, ignoreflags)
 	struct ifnet *ifp;
 	int ignoreflags;
 {
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
@@ -1987,7 +1987,7 @@ in6ifa_ifpwithaddr(ifp, addr)
 	struct ifnet *ifp;
 	struct in6_addr *addr;
 {
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
@@ -2015,13 +2015,13 @@ static char digits[] = "0123456789abcdef";
 static int ip6round = 0;
 char *
 ip6_sprintf(addr)
-register struct in6_addr *addr;
+struct in6_addr *addr;
 {
 	static char ip6buf[8][48];
-	register int i;
-	register char *cp;
-	register u_short *a = (u_short *)addr;
-	register u_char *d;
+	int i;
+	char *cp;
+	u_short *a = (u_short *)addr;
+	u_char *d;
 	int dcolon = 0;
 
 	ip6round = (ip6round + 1) & 7;
@@ -2180,8 +2180,8 @@ in6_prefixlen2mask(maskp, len)
  */
 struct in6_ifaddr *
 in6_ifawithscope(oifp, dst)
-	register struct ifnet *oifp;
-	register struct in6_addr *dst;
+	struct ifnet *oifp;
+	struct in6_addr *dst;
 {
 	int dst_scope =	in6_addrscope(dst), src_scope, best_scope = 0;
 	int blen = -1;
@@ -2426,8 +2426,8 @@ in6_ifawithscope(oifp, dst)
  */
 struct in6_ifaddr *
 in6_ifawithifp(ifp, dst)
-	register struct ifnet *ifp;
-	register struct in6_addr *dst;
+	struct ifnet *ifp;
+	struct in6_addr *dst;
 {
 	int dst_scope =	in6_addrscope(dst), blen = -1, tlen;
 	struct ifaddr *ifa;

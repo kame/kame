@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_usrreq.c,v 1.13 2000/03/25 07:24:02 sumikawa Exp $	*/
+/*	$KAME: tcp6_usrreq.c,v 1.14 2000/12/03 00:54:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -139,8 +139,8 @@ tcp6_usrreq(so, req, m, nam, control)
 	struct mbuf *m, *nam, *control;
 #endif
 {
-	register struct in6pcb *in6p;
-	register struct tcp6cb *t6p = (struct tcp6cb *)NULL;
+	struct in6pcb *in6p;
+	struct tcp6cb *t6p = (struct tcp6cb *)NULL;
 	int s;
 	int error = 0;
 	int ostate;
@@ -447,9 +447,9 @@ tcp6_ctloutput(op, so, level, optname, mp)
 {
 	int error = 0, s;
 	struct in6pcb *in6p;
-	register struct tcp6cb *t6p;
-	register struct mbuf *m;
-	register int i;
+	struct tcp6cb *t6p;
+	struct mbuf *m;
+	int i;
 
 #ifdef __NetBSD__
 	s = splsoftnet();
@@ -542,7 +542,7 @@ int
 tcp6_attach(so)
 	struct socket *so;
 {
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 	struct in6pcb *in6p;
 	int error;
 
@@ -587,7 +587,7 @@ tcp6_attach(so)
  */
 struct tcp6cb *
 tcp6_disconnect(t6p)
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 {
 	struct socket *so = t6p->t_in6pcb->in6p_socket;
 
@@ -617,7 +617,7 @@ tcp6_disconnect(t6p)
  */
 struct tcp6cb *
 tcp6_usrclosed(t6p)
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 {
 
 	switch (t6p->t_state) {

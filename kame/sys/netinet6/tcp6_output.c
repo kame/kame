@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.10 2000/03/25 07:24:01 sumikawa Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.11 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -714,9 +714,9 @@ out:
 
 void
 tcp6_setpersist(t6p)
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 {
-	register int t = ((t6p->t_srtt >> 2) + t6p->t_rttvar) >> 1;
+	int t = ((t6p->t_srtt >> 2) + t6p->t_rttvar) >> 1;
 
 	if (t6p->t_timer[TCP6T_REXMT])
 		panic("tcp6_output REXMT");

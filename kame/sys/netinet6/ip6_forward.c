@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.58 2000/11/21 12:29:55 kawa Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.59 2000/12/03 00:53:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -148,8 +148,8 @@ ip6_forward(m, srcrt)
 	int srcrt;
 {
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	register struct sockaddr_in6 *dst;
-	register struct rtentry *rt;
+	struct sockaddr_in6 *dst;
+	struct rtentry *rt;
 	int error, type = 0, code = 0;
 	struct mbuf *mcopy = NULL;
 	struct ifnet *origifp;	/* maybe unnecessary */

@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.12 2000/05/05 11:00:57 sumikawa Exp $	*/
+/*	$KAME: dest6.c,v 1.13 2000/12/03 00:53:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,7 +74,7 @@ dest6_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
 {
-	register struct mbuf *m = *mp;
+	struct mbuf *m = *mp;
 	int off = *offp, dstoptlen, optlen;
 	struct ip6_dest *dstopts;
 	u_int8_t *opt;

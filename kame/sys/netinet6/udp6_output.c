@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.18 2000/11/06 00:08:06 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.19 2000/12/03 00:54:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,27 +145,27 @@
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 int
 udp6_output(in6p, m, addr6, control, p)
-	register struct in6pcb *in6p;
-	register struct mbuf *m;
+	struct in6pcb *in6p;
+	struct mbuf *m;
 	struct mbuf *control;
 	struct sockaddr *addr6;
 	struct proc *p;
 #elif defined(__NetBSD__)
 int
 udp6_output(in6p, m, addr6, control, p)
-	register struct in6pcb *in6p;
-	register struct mbuf *m;
+	struct in6pcb *in6p;
+	struct mbuf *m;
 	struct mbuf *addr6, *control;
 	struct proc *p;
 #else
 int
 udp6_output(in6p, m, addr6, control)
-	register struct in6pcb *in6p;
-	register struct mbuf *m;
+	struct in6pcb *in6p;
+	struct mbuf *m;
 	struct mbuf *addr6, *control;
 #endif
 {
-	register u_int32_t ulen = m->m_pkthdr.len;
+	u_int32_t ulen = m->m_pkthdr.len;
 	u_int32_t plen = sizeof(struct udphdr) + ulen;
 	struct ip6_hdr *ip6;
 	struct udphdr *udp6;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.29 2000/07/04 11:48:05 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.30 2000/12/03 00:53:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -286,7 +286,7 @@ struct mbuf *m_in;  /* Mbuf containing the entire IPv6 packet */
 int         off;    /* Offset (bytes) from beginning of mbuf to start of
                        destination option */
 {
-	register struct ip6_hdr *ip6;  /* IPv6 header */
+	struct ip6_hdr *ip6;  /* IPv6 header */
 	int                      res;  /* Result of function call */
 
 #ifdef MIP6_DEBUG
@@ -864,7 +864,7 @@ void
 mip6_ha2srcaddr(m)
 struct mbuf  *m;  /* The entire IPv6 packet */
 {
-	register struct ip6_hdr  *ip6;  /* IPv6 header */
+	struct ip6_hdr  *ip6;  /* IPv6 header */
 
 #ifdef MIP6_DEBUG
 	mip6_debug("\nReceived Home Address Option\n");

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_timer.c,v 1.9 2000/08/22 09:41:07 sumikawa Exp $	*/
+/*	$KAME: tcp6_timer.c,v 1.10 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -116,7 +116,7 @@ int	tcp6_maxidle;
 void
 tcp6_fasttimo()
 {
-	register struct tcp6cb *t6p, *t6pnext;
+	struct tcp6cb *t6p, *t6pnext;
 #ifdef __NetBSD__
 	int s = splsoftnet();
 #else
@@ -141,14 +141,14 @@ tcp6_fasttimo()
 void
 tcp6_slowtimo()
 {
-	register struct in6pcb *ip6, *ip6nxt;
-	register struct tcp6cb *t6p = (struct tcp6cb *)NULL;
+	struct in6pcb *ip6, *ip6nxt;
+	struct tcp6cb *t6p = (struct tcp6cb *)NULL;
 #ifdef __NetBSD__
 	int s = splsoftnet();
 #else
 	int s = splnet();
 #endif
-	register int i;
+	int i;
 #if 0
 	extern int tcp6_msltime;
 #endif
@@ -246,7 +246,7 @@ void
 tcp6_canceltimers(t6p)
 	struct tcp6cb *t6p;
 {
-	register int i;
+	int i;
 
 	for (i = 0; i < TCP6T_NTIMERS; i++)
 		t6p->t_timer[i] = 0;
@@ -262,10 +262,10 @@ int tcp6_totbackoff = 511;	/* sum of tcp6_backoff[] */
  */
 struct tcp6cb *
 tcp6_timers(t6p, timer)
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 	int timer;
 {
-	register int rexmt;
+	int rexmt;
 
 	switch (timer) {
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_list.h,v 1.7 2000/10/29 11:48:35 fujisawa Exp $	*/
+/*	$KAME: natpt_list.h,v 1.8 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,7 +113,7 @@ LST_free(Cell *cell)
 Cell *
 LST_last(Cell *list)
 {
-    register	Cell	*ptr = NULL;
+    Cell	*ptr = NULL;
 
     if (list == NULL)
 	ptr = NULL;
@@ -127,13 +127,13 @@ LST_last(Cell *list)
 int
 LST_length(Cell *list)
 {
-    register	int	retval = 0;
+    int	retval = 0;
 
     if (list == NULL)
 	retval = 0;
    else
    {
-       register	   Cell	   *ptr;
+       Cell	   *ptr;
 
        for (ptr = list; ptr; retval++, ptr = CDR(ptr)) ;
    }
@@ -145,7 +145,7 @@ LST_length(Cell *list)
 Cell *
 LST_hookup(Cell *list, void *elem)
 {
-    register	Cell	*ptr = NULL;
+    Cell	*ptr = NULL;
 
     if (list == NULL)
 	ptr = LST_cons(elem, NULL);
@@ -159,7 +159,7 @@ LST_hookup(Cell *list, void *elem)
 Cell *
 LST_hookup_list(Cell **list, void *elem)
 {
-    register	Cell	*ptr = NULL;
+    Cell	*ptr = NULL;
 
     if (*list == NULL)
 	*list = LST_cons(elem, NULL);
@@ -173,7 +173,7 @@ LST_hookup_list(Cell **list, void *elem)
 Cell *
 LST_remove_elem(Cell **list, void *elem)
 {
-    register	Cell	*p, *q;
+    Cell	*p, *q;
 
     if (*list == NULL)
 	return (NULL);
@@ -218,9 +218,9 @@ _getCell()
 static	Cell *
 _getEmptyCell()
 {
-    register	int	iter;
-    register	Cell	*ptr = NULL;
-    register	Cell	*p;
+    int	iter;
+    Cell	*ptr = NULL;
+    Cell	*p;
 
 #if (defined(KERNEL)) || (defined(_KERNEL))
     MALLOC(ptr, Cell *, CELL_PAGE, M_NATPT, M_NOWAIT);

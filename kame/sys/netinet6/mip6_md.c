@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.22 2000/12/01 16:09:50 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.23 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -693,7 +693,7 @@ mip6_select_defrtr(prhint, drhint)
 	mip6_debug("pr                  = %s\n", pr ? ip6_sprintf(&pr->ndpr_prefix.sin6_addr) : "NULL");
 #endif
 	if (mip6_primary_prefix && (pr != mip6_primary_prefix)) {
-		register struct llinfo_nd6 *ln;
+		struct llinfo_nd6 *ln;
 
 		/* Taken from nd6_timer() */
 		ln = llinfo_nd6.ln_next;

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_var.h,v 1.7 2000/03/25 07:24:02 sumikawa Exp $	*/
+/*	$KAME: tcp6_var.h,v 1.8 2000/12/03 00:54:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -406,12 +406,12 @@ void	 tcp6_fasttimo __P((void));
 void	 tcp6_init __P((void));
 int	 tcp6_input __P((struct mbuf **, int *, int));
 struct rtentry *
-	 tcp6_rtlookup __P((register struct in6pcb *));
+	 tcp6_rtlookup __P((struct in6pcb *));
 u_int	 tcp6_maxseg __P((struct tcp6cb *, u_int));
 void	 tcp6_maxseg_init __P((struct tcp6cb *));
 void	 tcp6_peer_mss __P((struct tcp6cb *, u_int));
 u_long	 tcp6_send_mss __P((struct tcp6cb *));
-void	 tcp6_changemss __P((register struct tcp6cb *, u_int));
+void	 tcp6_changemss __P((struct tcp6cb *, u_int));
 void	 tcp6_agepathmtu __P((struct in6pcb *, struct rtentry *));
 struct tcp6cb *
 	 tcp6_newtcp6cb __P((struct in6pcb *));

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.21 2000/11/07 13:16:55 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.22 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -376,7 +376,7 @@ mld6_input(m, off)
 void
 mld6_fasttimeo()
 {
-	register struct in6_multi *in6m;
+	struct in6_multi *in6m;
 	struct in6_multistep step;
 	int s;
 

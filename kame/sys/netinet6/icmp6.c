@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.166 2000/11/30 16:11:12 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.167 2000/12/03 00:53:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1740,9 +1740,9 @@ ni6_addrs(ni6, m, ifpp, subj)
 	struct ifnet **ifpp;
 	char *subj;
 {
-	register struct ifnet *ifp;
-	register struct in6_ifaddr *ifa6;
-	register struct ifaddr *ifa;
+	struct ifnet *ifp;
+	struct in6_ifaddr *ifa6;
+	struct ifaddr *ifa;
 	struct sockaddr_in6 *subj_ip6 = NULL; /* XXX pedant */
 	int addrs = 0, addrsofif, iffound = 0;
 	int niflags = ni6->ni_flags;
@@ -1845,12 +1845,12 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 	int resid;
 {
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	register struct ifnet *ifp = ifp0 ? ifp0 : ifnet;
+	struct ifnet *ifp = ifp0 ? ifp0 : ifnet;
 #else
-	register struct ifnet *ifp = ifp0 ? ifp0 : TAILQ_FIRST(&ifnet);
+	struct ifnet *ifp = ifp0 ? ifp0 : TAILQ_FIRST(&ifnet);
 #endif
-	register struct in6_ifaddr *ifa6;
-	register struct ifaddr *ifa;
+	struct in6_ifaddr *ifa6;
+	struct ifaddr *ifa;
 	struct ifnet *ifp_dep = NULL;
 	int copied = 0, allow_deprecated = 0;
 	u_char *cp = (u_char *)(nni6 + 1);
@@ -2004,8 +2004,8 @@ icmp6_rip6_input(mp, off)
 	int	off;
 {
 	struct mbuf *m = *mp;
-	register struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	register struct in6pcb *in6p;
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 rip6src;
 	struct icmp6_hdr *icmp6;
@@ -2318,7 +2318,7 @@ icmp6_redirect_diag(src6, dst6, tgt6)
 
 void
 icmp6_redirect_input(m, off)
-	register struct mbuf *m;
+	struct mbuf *m;
 	int off;
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
@@ -2832,7 +2832,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	int error = 0;
 	int optlen;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	register struct inpcb *inp = sotoinpcb(so);
+	struct inpcb *inp = sotoinpcb(so);
 	int level, op, optname;
 
 	if (sopt) {
@@ -2843,8 +2843,8 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	} else
 		level = op = optname = optlen = 0;
 #else
-	register struct in6pcb *in6p = sotoin6pcb(so);
-	register struct mbuf *m = *mp;
+	struct in6pcb *in6p = sotoin6pcb(so);
+	struct mbuf *m = *mp;
 
 	optlen = m ? m->m_len : 0;
 #endif

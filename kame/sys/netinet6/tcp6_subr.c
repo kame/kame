@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.32 2000/12/02 07:46:41 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.33 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -165,8 +165,8 @@ struct ip6tcp *
 tcp6_template(t6p)
 	struct tcp6cb *t6p;
 {
-	register struct in6pcb *in6p = t6p->t_in6pcb;
-	register struct ip6tcp *n;
+	struct in6pcb *in6p = t6p->t_in6pcb;
+	struct ip6tcp *n;
 
 	if ((n = t6p->t_template) == 0) {
 #ifdef __NetBSD__
@@ -325,7 +325,7 @@ struct tcp6cb *
 tcp6_newtcp6cb(in6p)
 	struct in6pcb *in6p;
 {
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 
 	t6p = malloc(sizeof(*t6p), M_PCB, M_NOWAIT);
 	if (t6p == NULL)
@@ -364,7 +364,7 @@ tcp6_newtcp6cb(in6p)
  */
 struct tcp6cb *
 tcp6_drop(t6p, errno)
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 	int errno;
 {
 	struct socket *so = t6p->t_in6pcb->in6p_socket;
@@ -389,14 +389,14 @@ tcp6_drop(t6p, errno)
  */
 struct tcp6cb *
 tcp6_close(t6p)
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 {
-	register struct ip6tcpreass *t;
+	struct ip6tcpreass *t;
 	struct in6pcb *in6p = t6p->t_in6pcb;
 	struct socket *so = in6p->in6p_socket;
-	register struct mbuf *m;
+	struct mbuf *m;
 #ifdef RTV_RTT
-	register struct rtentry *rt;
+	struct rtentry *rt;
 
 	/*
 	 * If we sent enough data to get some meaningful characteristics,
@@ -413,7 +413,7 @@ tcp6_close(t6p)
 	if (SEQ_LT(t6p->iss + so->so_snd.sb_hiwat * 16, t6p->snd_max) &&
 	    (rt = in6p->in6p_route.ro_rt) &&
 	    (IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr))){
-		register u_long i = 0;
+		u_long i = 0;
 
 		if ((rt->rt_rmx.rmx_locks & RTV_RTT) == 0) {
 			i = t6p->t_srtt *
@@ -520,8 +520,8 @@ tcp6_notify(in6p, error)
 	struct in6pcb *in6p;
 	int error;
 {
-	register struct tcp6cb *t6p = (struct tcp6cb *)in6p->in6p_ppcb;
-	register struct socket *so = in6p->in6p_socket;
+	struct tcp6cb *t6p = (struct tcp6cb *)in6p->in6p_ppcb;
+	struct socket *so = in6p->in6p_socket;
 
 	/*
 	 * If we are hooked up, do not report errors directly,
@@ -716,7 +716,7 @@ tcp6_mtudisc(in6p, errno)
  */
 void
 tcp6_changemss(t6p, usable_mtu)
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 	u_int usable_mtu;
 {
 	u_int win;
@@ -750,7 +750,7 @@ tcp6_changemss(t6p, usable_mtu)
 void
 tcp6_agepathmtu(in6p, rt)
 	struct in6pcb *in6p;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 {
 	unsigned int usable_mtu;
 	unsigned int rt_mtu = rt->rt_rmx.rmx_mtu;

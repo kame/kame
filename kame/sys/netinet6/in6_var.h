@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.44 2000/12/02 07:30:37 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.45 2000/12/03 00:53:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -568,7 +568,7 @@ struct	in6_multistep {
 /* struct ifnet *ifp; */					\
 /* struct in6_multi *in6m; */					\
 do { \
-	register struct ifmultiaddr *ifma; \
+	struct ifmultiaddr *ifma; \
 	for (ifma = (ifp)->if_multiaddrs.lh_first; ifma; \
 	     ifma = ifma->ifma_link.le_next) { \
 		if (ifma->ifma_addr->sa_family == AF_INET6 \
@@ -609,7 +609,7 @@ do { \
 /* struct ifnet *ifp; */					\
 /* struct in6_multi *in6m; */					\
 do {								\
-	register struct in6_ifaddr *ia;				\
+	struct in6_ifaddr *ia;					\
 								\
 	IFP_TO_IA6((ifp), ia);					\
 	if (ia == NULL)						\

@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.21 2000/09/20 23:00:49 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.22 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,9 +68,9 @@ route6_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;	/* proto is unused */
 {
-	register struct ip6_hdr *ip6;
-	register struct mbuf *m = *mp;
-	register struct ip6_rthdr *rh;
+	struct ip6_hdr *ip6;
+	struct mbuf *m = *mp;
+	struct ip6_rthdr *rh;
 	int off = *offp, rhlen;
 
 #ifndef PULLDOWN_TEST

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.13 2000/10/29 11:48:35 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.14 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -128,9 +128,9 @@ MALLOC_DECLARE(M_NATPT);
 struct _tSlot	*
 lookingForIncomingV4Hash(struct _cv *cv)
 {
-    register	Cell		*p;
-    register	struct _tSlot	*ats;
-    register	struct ip	*ip4;
+    Cell		*p;
+    struct _tSlot	*ats;
+    struct ip	*ip4;
 
     int		hv = _hash_ip4(cv);
 
@@ -161,9 +161,9 @@ lookingForIncomingV4Hash(struct _cv *cv)
 struct _tSlot	*
 lookingForOutgoingV4Hash(struct _cv *cv)
 {
-    register	Cell		*p;
-    register	struct _tSlot	*ats;
-    register	struct ip	*ip4;
+    Cell		*p;
+    struct _tSlot	*ats;
+    struct ip	*ip4;
 
     int		hv = _hash_ip4(cv);
 
@@ -194,9 +194,9 @@ lookingForOutgoingV4Hash(struct _cv *cv)
 struct _tSlot	*
 lookingForIncomingV6Hash(struct _cv *cv)
 {
-    register	Cell		*p;
-    register	struct _tSlot	*ats;
-    register	struct ip6_hdr	*ip6;
+    Cell		*p;
+    struct _tSlot	*ats;
+    struct ip6_hdr	*ip6;
 
     int		hv = _hash_ip6(cv);
 
@@ -227,9 +227,9 @@ lookingForIncomingV6Hash(struct _cv *cv)
 struct _tSlot	*
 lookingForOutgoingV6Hash(struct _cv *cv)
 {
-    register	Cell		*p;
-    register	struct _tSlot	*ats;
-    register	struct ip6_hdr	*ip6;
+    Cell		*p;
+    struct _tSlot	*ats;
+    struct ip6_hdr	*ip6;
 
     int		hv = _hash_ip6(cv);
 
@@ -983,7 +983,7 @@ _removeTSlotEntry(struct _cell *p, struct _cell *q)
 static	int
 _removeHash(Cell *(*table)[], int hv, caddr_t node)
 {
-    register	Cell	*p, *q;
+    Cell	*p, *q;
 
     if ((p = (*table)[hv]) == NULL)
 	return (0);
@@ -1131,10 +1131,10 @@ _hash_sockaddr6(struct sockaddr_in6 *sin6)
 /*	This hash routine is byte order sensitive.  Be Careful.		*/
 
 static	int
-_hash_pjw(register u_char *s, int len)
+_hash_pjw(u_char *s, int len)
 {
-    register	u_int	c;
-    register	u_int	h, g;
+    u_int	c;
+    u_int	h, g;
 
     for (c = h = g = 0; c < len; c++, s++)
     {

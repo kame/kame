@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.83 2000/12/02 07:47:16 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.84 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -441,9 +441,9 @@ nd6_timer(ignored_arg)
 	void	*ignored_arg;
 {
 	int s;
-	register struct llinfo_nd6 *ln;
-	register struct nd_defrouter *dr;
-	register struct nd_prefix *pr;
+	struct llinfo_nd6 *ln;
+	struct nd_defrouter *dr;
+	struct nd_prefix *pr;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -834,7 +834,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	struct sockaddr_in6 *addr;
 	struct ifnet *ifp;
 {
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 	int i;
 
 #define IFADDR6(a) ((((struct in6_ifaddr *)(a))->ia_addr).sin6_addr)
@@ -1885,8 +1885,8 @@ nd6_slowtimo(ignored_arg)
 #else
 	int s = splnet();
 #endif
-	register int i;
-	register struct nd_ifinfo *nd6if;
+	int i;
+	struct nd_ifinfo *nd6if;
 
 #ifdef __NetBSD__
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
@@ -1916,14 +1916,14 @@ nd6_slowtimo(ignored_arg)
 #define senderr(e) { error = (e); goto bad;}
 int
 nd6_output(ifp, origifp, m0, dst, rt0)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	struct ifnet *origifp;
 	struct mbuf *m0;
 	struct sockaddr_in6 *dst;
 	struct rtentry *rt0;
 {
-	register struct mbuf *m = m0;
-	register struct rtentry *rt = rt0;
+	struct mbuf *m = m0;
+	struct rtentry *rt = rt0;
 	struct sockaddr_in6 *gw6 = NULL;
 	struct llinfo_nd6 *ln = NULL;
 	int error = 0;

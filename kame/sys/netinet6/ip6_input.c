@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.142 2000/12/02 15:54:08 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.143 2000/12/03 00:53:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -279,8 +279,8 @@ add_performance_log(val, addr)
 void
 ip6_init()
 {
-	register struct ip6protosw *pr;
-	register int i;
+	struct ip6protosw *pr;
+	int i;
 #ifndef __OpenBSD__
 	struct timeval tv;
 #endif
@@ -1189,7 +1189,7 @@ ip6_hopopts_input(plenp, rtalertp, mp, offp)
 	struct mbuf **mp;
 	int *offp;
 {
-	register struct mbuf *m = *mp;
+	struct mbuf *m = *mp;
 	int off = *offp, hbhlen;
 	struct ip6_hbh *hbh;
 	u_int8_t *opt;
@@ -1421,16 +1421,16 @@ ip6_unknown_opt(optp, m, off)
 void
 ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
-	register struct inpcb *in6p;
+	struct inpcb *in6p;
 #else
-	register struct in6pcb *in6p;
+	struct in6pcb *in6p;
 #endif
-	register struct ip6_hdr *ip6;
-	register struct mbuf *m;
+	struct ip6_hdr *ip6;
+	struct mbuf *m;
 	struct ip6_recvpktopts *ctl, **prevctlp;
 {
 #define IS2292(x, y)	((in6p->in6p_flags & IN6P_RFC2292) ? (x) : (y))
-	register struct mbuf **mp;
+	struct mbuf **mp;
 	struct cmsghdr *cm = NULL;
 	struct ip6_recvpktopts *prevctl = NULL;
 #ifdef HAVE_NRL_INPCB
@@ -1911,9 +1911,9 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 void
 ip6_notify_pmtu(in6p, dst, mtu)
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
-	register struct inpcb *in6p;
+	struct inpcb *in6p;
 #else
-	register struct in6pcb *in6p;
+	struct in6pcb *in6p;
 #endif
 	struct sockaddr_in6 *dst;
 	u_int32_t *mtu;
@@ -2351,8 +2351,8 @@ pfctlinput2(cmd, sa, ctlparam)
 	struct sockaddr *sa;
 	void *ctlparam;
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct domain *dp;
+	struct protosw *pr;
 
 	for (dp = domains; dp; dp = dp->dom_next) {
 		/*

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.39 2000/11/09 05:05:25 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.40 2000/12/03 00:54:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -364,7 +364,7 @@ tcp6_reass(t6p, i6tr, th, m, len)
 	 * segment.  If it provides all of our data, drop us.
 	 */
 	if ((struct ip6tcpreass *)q->i6tr_prev != (struct ip6tcpreass *)t6p) {
-		register int i;
+		int i;
 		q = (struct ip6tcpreass *)q->i6tr_prev;
 		/* conversion to int (in i) handles seq wraparound */
 		i = q->i6tr_t->th_seq + q->i6tr_len - th->th_seq;
@@ -390,7 +390,7 @@ tcp6_reass(t6p, i6tr, th, m, len)
 	 * if they are completely covered, dequeue them.
 	 */
 	while (q != (struct ip6tcpreass *)t6p) {
-		register int i = (i6tr->i6tr_t->th_seq + i6tr->i6tr_len)
+		int i = (i6tr->i6tr_t->th_seq + i6tr->i6tr_len)
 			- q->i6tr_t->th_seq;
 		if (i <= 0)
 			break;
@@ -1511,8 +1511,8 @@ trimthenstep6:
 		 * (maxseg * (maxseg / cwnd) per packet).
 		 */
 		{
-		register u_int cw = t6p->snd_cwnd;
-		register u_int incr = t6p->t_maxseg;
+		u_int cw = t6p->snd_cwnd;
+		u_int incr = t6p->t_maxseg;
 
 		if (cw > t6p->snd_ssthresh)
 			incr = incr * incr / cw;
@@ -1904,7 +1904,7 @@ void
 tcp6_pulloutofband(so, th, m, off)
 	struct socket *so;
 	struct tcp6hdr *th;
-	register struct mbuf *m;
+	struct mbuf *m;
 	int off;
 {
 	int cnt = off + th->th_urp - 1;
@@ -1934,10 +1934,10 @@ tcp6_pulloutofband(so, th, m, off)
  */
 void
 tcp6_xmit_timer(t6p, rtt)
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 	short rtt;
 {
-	register short delta;
+	short delta;
 
 	tcp6stat.tcp6s_rttupdated++;
 	if (t6p->t_srtt != 0) {
@@ -2010,10 +2010,10 @@ tcp6_xmit_timer(t6p, rtt)
 
 static void
 tcp6_rtt_init(t6p, rt)
-	register struct tcp6cb *t6p;
-	register struct rtentry *rt;
+	struct tcp6cb *t6p;
+	struct rtentry *rt;
 {
-	register int rtt;
+	int rtt;
 
 	if (t6p->t_srtt == 0 && (rtt = rt->rt_rmx.rmx_rtt)) {
 		/*
@@ -2038,8 +2038,8 @@ tcp6_rtt_init(t6p, rt)
 
 u_int
 tcp6_maxseg(t6p, maxseg)
-	register struct tcp6cb *t6p;
-	register u_int maxseg;
+	struct tcp6cb *t6p;
+	u_int maxseg;
 {
 #if 0
 	/*
@@ -2108,14 +2108,14 @@ tcp6_maxseg_init(t6p)
  */
 struct rtentry *
 tcp6_rtlookup(in6p)
-	register struct in6pcb *in6p;
+	struct in6pcb *in6p;
 {
 #ifdef NEW_STRUCT_ROUTE
 	struct route *ro;
 #else
 	struct route_in6 *ro;
 #endif
-	register struct rtentry *rt;
+	struct rtentry *rt;
 
 	ro = &in6p->in6p_route;
 	if ((rt = ro->ro_rt) != 0) {
@@ -2166,12 +2166,12 @@ tcp6_rtlookup(in6p)
  */
 void
 tcp6_peer_mss(t6p, offer)
-	register struct tcp6cb *t6p;
+	struct tcp6cb *t6p;
 	u_int offer;
 {
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	struct ifnet *ifp;
-	register int mss;		/* mss is size to offer */
+	int mss;		/* mss is size to offer */
 	int maxseg = 0;			/* magseg is size for t_maxseg */
 	u_long bufsize;
 	struct in6pcb *in6p;
@@ -2278,10 +2278,10 @@ u_long
 tcp6_send_mss(t6p)
 	struct tcp6cb *t6p;
 {
-	register struct in6pcb *in6p = t6p->t_in6pcb;
-	register struct rtentry *rt;
+	struct in6pcb *in6p = t6p->t_in6pcb;
+	struct rtentry *rt;
 	struct ifnet *ifp;
-	register unsigned long mss;		/* size to offer */
+	unsigned long mss;		/* size to offer */
 
 	mss = in6_maxmtu;
 
@@ -2512,9 +2512,9 @@ syn_cache_get6(so, m, off, len)
 {
 	struct syn_cache6 *sc, **sc_prev;
 	struct syn_cache_head6 *head;
-	register struct in6pcb *in6p;
-	register struct tcp6cb *t6p = 0;
-	register struct tcp6hdr *th;
+	struct in6pcb *in6p;
+	struct tcp6cb *t6p = 0;
+	struct tcp6hdr *th;
 	struct ip6_hdr *ip6;
 	long win;
 	struct ip6_recvpktopts opts;
@@ -2786,7 +2786,7 @@ syn_cache_respond6(sc, m, ip6, th, win, ts)
 	struct syn_cache6 *sc;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
-	register struct tcp6hdr *th;
+	struct tcp6hdr *th;
 	long win;
 	u_long ts;
 {
