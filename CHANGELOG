@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1809 2001/07/24 08:56:57 itojun Exp $
+$KAME: CHANGELOG,v 1.1810 2001/07/24 13:55:48 jinmei Exp $
 
 <200107>
+2001-07-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_control): in the SIOCDIFADDR_IN6
+	case, if the corresponding prefix can be removed, just call
+	prelist_remove(), not changing the expire value.
+
 Tue Jul 24 17:54:10 JST 2001  itojun@iijlab.net
 	* sys/netinet6/in6_prefix.c: RIP.
 
