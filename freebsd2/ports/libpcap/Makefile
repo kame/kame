@@ -6,8 +6,8 @@
 # $FreeBSD$
 #
 
-DISTNAME=	libpcap-2000_02_14
-PKGNAME=	libpcap-20000214
+DISTNAME=	libpcap-2000_02_28
+PKGNAME=	libpcap-20000228
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
