@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.71 2000/06/14 18:03:35 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.72 2000/06/14 18:07:31 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -135,7 +135,8 @@ static int isakmp_main __P((vchar_t *, struct sockaddr *, struct sockaddr *));
 static int ph1_main __P((struct ph1handle *, vchar_t *));
 static int isakmp_ph1begin_r __P((vchar_t *, struct sockaddr *, u_int8_t));
 static int isakmp_ph2begin_r __P((struct ph1handle *, vchar_t *));
-static int etypesw __P((int));
+static int etypesw1 __P((int));
+static int etypesw2 __P((int));
 
 /*
  * isakmp packet handler
@@ -469,7 +470,7 @@ isakmp_main(msg, remote, local)
 			iph2->flags |= ISAKMP_FLAG_C;
 
 		/* receive */
-		if (ph2exchange[etypesw(isakmp->etype)]
+		if (ph2exchange[etypesw2(isakmp->etype)]
 		               [iph2->side]
 		               [iph2->status] == NULL) {
 			unbindph12(iph2);
@@ -477,7 +478,7 @@ isakmp_main(msg, remote, local)
 			delph2(iph2);
 			return -1;
 		}
-		error = (ph2exchange[etypesw(isakmp->etype)]
+		error = (ph2exchange[etypesw2(isakmp->etype)]
 		                    [iph2->side]
 		                    [iph2->status])(iph2, msg);
 		if (error != 0) {
@@ -517,7 +518,7 @@ isakmp_main(msg, remote, local)
 	
 		/* send */
 		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-		if ((ph2exchange[etypesw(isakmp->etype)]
+		if ((ph2exchange[etypesw2(isakmp->etype)]
 		                [iph2->side]
 		                [iph2->status])(iph2, msg) < 0) {
 			YIPSDEBUG(DEBUG_NOTIFY,
@@ -574,14 +575,14 @@ ph1_main(iph1, msg)
 	}
 
 	/* receive */
-	if (ph1exchange[etypesw(iph1->etype)]
+	if (ph1exchange[etypesw1(iph1->etype)]
 		       [iph1->side]
 		       [iph1->status] == NULL) {
 		plog(logp, LOCATION, iph1->remote,
 			"ERROR: why isn't the function defined.\n");
 		return -1;
 	}
-	if ((ph1exchange[etypesw(iph1->etype)]
+	if ((ph1exchange[etypesw1(iph1->etype)]
 			[iph1->side]
 			[iph1->status])(iph1, msg) < 0) {
 		plog(logp, LOCATION, iph1->remote,
@@ -608,7 +609,7 @@ ph1_main(iph1, msg)
 
 	/* send */
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-	if ((ph1exchange[etypesw(iph1->etype)]
+	if ((ph1exchange[etypesw1(iph1->etype)]
 			[iph1->side]
 			[iph1->status])(iph1, msg) < 0) {
 		plog(logp, LOCATION, iph1->remote,
@@ -677,7 +678,7 @@ isakmp_ph1begin_i(rmconf, remote)
 				s_isakmp_etype(iph1->etype)));
 
 		/* start exchange */
-		if ((ph1exchange[etypesw(iph1->etype)]
+		if ((ph1exchange[etypesw1(iph1->etype)]
 		                [iph1->side]
 		                [iph1->status])(iph1, NULL) == 0) {
 			/* success */
@@ -770,10 +771,10 @@ isakmp_ph1begin_r(msg, remote, etype)
 			"begin %s mode.\n", s_isakmp_etype(etype)));
 
 	/* start exchange */
-	if ((ph1exchange[etypesw(iph1->etype)]
+	if ((ph1exchange[etypesw1(iph1->etype)]
 	                [iph1->side]
 	                [iph1->status])(iph1, msg) < 0
-	 || (ph1exchange[etypesw(iph1->etype)]
+	 || (ph1exchange[etypesw1(iph1->etype)]
 			[iph1->side]
 			[iph1->status])(iph1, msg) < 0) {
 		YIPSDEBUG(DEBUG_NOTIFY,
@@ -878,7 +879,7 @@ isakmp_ph2begin_r(iph1, msg)
 	bindph12(iph1, iph2);
 
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-	error = (ph2exchange[etypesw(ISAKMP_ETYPE_QUICK)]
+	error = (ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
 	                   [iph2->side]
 	                   [iph2->status])(iph2, msg);
 	if (error != 0) {
@@ -899,7 +900,7 @@ isakmp_ph2begin_r(iph1, msg)
 
 	/* send */
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-	if ((ph2exchange[etypesw(isakmp->etype)]
+	if ((ph2exchange[etypesw2(isakmp->etype)]
 			[iph2->side]
 			[iph2->status])(iph2, msg) < 0) {
 		YIPSDEBUG(DEBUG_NOTIFY,
@@ -1492,7 +1493,7 @@ isakmp_post_acquire(iph2)
 	bindph12(iph1, iph2);
 	iph2->status = PHASE2ST_STATUS2;
 
-	if ((ph2exchange[etypesw(ISAKMP_ETYPE_QUICK)]
+	if ((ph2exchange[etypesw1(ISAKMP_ETYPE_QUICK)]
 	                [iph2->side]
 	                [iph2->status])(iph2, NULL) != 0)
 		return -1;
@@ -1507,7 +1508,7 @@ int
 isakmp_post_getspi(iph2)
 	struct ph2handle *iph2;
 {
-	if ((ph2exchange[etypesw(ISAKMP_ETYPE_QUICK)]
+	if ((ph2exchange[etypesw1(ISAKMP_ETYPE_QUICK)]
 	                [iph2->side]
 	                [iph2->status])(iph2, NULL) != 0)
 		return -1;
@@ -1550,7 +1551,7 @@ isakmp_chkph1there(iph2)
 		/* found isakmp-sa */
 		bindph12(iph1, iph2);
 		iph2->status = PHASE2ST_STATUS2;
-		if ((ph2exchange[etypesw(ISAKMP_ETYPE_QUICK)]
+		if ((ph2exchange[etypesw1(ISAKMP_ETYPE_QUICK)]
 		                 [iph2->side]
 		                 [iph2->status])(iph2, NULL) < 0) {
 			unbindph12(iph2);
@@ -1798,7 +1799,7 @@ set_isakmp_payload(buf, src, nptype)
 }
 
 static int
-etypesw(etype)
+etypesw1(etype)
 	int etype;
 {
 	switch (etype) {
@@ -1808,10 +1809,19 @@ etypesw(etype)
 		return 2;
 	case ISAKMP_ETYPE_BASE:
 		return 3;
+	default:
+		return 0;
+	}
+	/*NOTREACHED*/
+}
+
+static int
+etypesw2(etype)
+	int etype;
+{
+	switch (etype) {
 	case ISAKMP_ETYPE_QUICK:
 		return 1;
-	case ISAKMP_ETYPE_NEWGRP:
-		return 2;
 	default:
 		return 0;
 	}
