@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.108 2001/07/27 03:51:29 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.109 2001/07/27 03:53:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -254,7 +254,6 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 	struct inpcbpolicy *pcbsp;
 	int dir;
 {
-	struct secpolicy *cache;
 	struct secpolicyindex spidx;
 	struct timeval tv;
 
@@ -285,7 +284,7 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 	pcbsp->cache[dir]->lastused = tv.tv_sec;
 	pcbsp->cache[dir]->refcnt++;
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-		printf("DP ipsec_fillpcbcache cause refcnt++:%d SP:%p\n",
+		printf("DP ipsec_checkpcbcache cause refcnt++:%d SP:%p\n",
 		pcbsp->cache[dir]->refcnt, pcbsp->cache[dir]));
 	return pcbsp->cache[dir];
 }
