@@ -186,6 +186,7 @@ get_socket(ai0, ifname, srclist, valid)
 
 		/* join multicast group */
 
+#ifdef MCAST_JOIN_SOURCE_GROUP
 		/* in case of SSM join, you can use protocol-independent API */
 		if (srclist != NULL) {
 			struct addrinfo hints, *res, *ptr;
@@ -241,6 +242,7 @@ get_socket(ai0, ifname, srclist, valid)
 			*valid = ai;
 			return so;
 		}
+#endif
 
 		/* in case of ASM join, you have to use protocol-dependent API */
 		switch (ai->ai_family) {
