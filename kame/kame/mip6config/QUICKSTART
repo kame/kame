@@ -1,0 +1,108 @@
+		QUICK GUIDE TO INSTALLATION OF MOBILE IPV6
+		==========================================
+
+KERNEL
+------
+Use FreeBSD 3.4-RELEASE (well tested).
+
+Add the following lines to your kernel config file:
+	options	"MIP6"
+	options	"MIP6_DEBUG"
+and comment out any IPSEC lines.
+
+Compile and install kernel.
+
+The two supporting binaries ``mip6config'' and ``mip6stat'' should have been
+compiled by ordinary kame tree make.
+
+
+
+GENERAL
+-------
+To run a Correspondent Node, you don't have to do anything else.
+
+To run a Mobile Node or a Home Agent, start with a Correspondent Node
+configuration and add a few things, see below. Note that a node can't act 
+as Mobile Node and Home Agent at the same time.
+
+Generally, on any node, create a mip6config config file, that holds the
+settings.
+	# cd /usr/local/v6/etc/
+	# cp mip6.conf.sample mip6.conf
+
+Keep line ``debug'' uncommented to see kernel messages. This is useful for
+every node to see what happens.
+
+Invoke Mobile IPv6 by
+	# mip6config -f /usr/local/v6/etc/mip6.conf
+
+(Note: Correspondent Node is invoked at kernel boot time.)
+
+Correspondent Node needs no other line in the config file.
+
+
+MOBILE NODE
+-----------
+The Mobile Node can be configured in three ways:
+	1. Home Address and Home Agent are discovered automatically.
+	   Add this line to the mip6.conf file:
+		``mip6config -a''
+
+	2. Home Address is specified but Home Agent is discovered
+	   automatically.
+	   Add this line to the mip6.conf file:
+              	``homeaddr <Home addr>/<plen>@<interface>''
+
+	3. Both Home Address and Home Agent is explicitly specified.
+	   Add this line to the mip6.conf file:
+              	``homeaddr <Home addr>/<plen>@<interface>%<Home Agent addr>''
+
+We recommend alternative 3 which will give you the most deterministic 
+behaviour.
+
+
+
+HOME AGENT
+----------
+The Home Agent needs the following line in the mip6.conf file:
+	``enable_ha''
+
+The Home Agent also needs a modified /usr/local/v6/etc/rtadvd.conf file with
+a few new and modified parameters.
+
+	default:\
+		:hatime#100:hapref#10:\
+		:raflags#32:\
+		:pinfoflags#224:
+	ether:\
+		:mtu#1500:tc=default:
+
+	ef0:\
+		:addrs#1:addr="3ffe:501:4819:1000:1234:5678:90ab:cdef":\
+		:tc=ether:
+
+Sometimes needed options:
+	Shorter interval -> faster handover
+	:maxinterval#2:mininterval#1:
+
+	Home Agent is not Default Router of subnet:
+	:rltime#0:
+
+Home Agent needs to run ``rtadvd'' with option -m. Change this in
+/usr/local/v6/etc/rc.net6.
+
+Any Default Router that you wish to support Advertisement Interval option
+must also be started as
+	rtadvd -m <interfaces>
+
+
+
+OTHER
+-----
+When everything is running, use ``mip6stat'' to derive information from the
+kernel on what is going on.
+
+See README_MIP6.txt and the manual pages for ``mip6config'' and ``mip6stat''
+for more information. There are more options.
+
+$KAME: QUICKSTART,v 1.1 2000/04/29 04:06:33 itojun Exp $
