@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.361 2003/10/02 13:37:27 t-momose Exp $	*/
+/*	$KAME: icmp6.c,v 1.362 2003/10/20 13:33:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,7 +337,7 @@ icmp6_error(m, type, code, param)
 	int type, code, param;
 {
 	struct ip6_hdr *oip6, *nip6;
-	struct icmp6_hdr *icmp6;
+	struct icmp6_hdr *icmp6, icp;
 	struct m_tag *mtag;
 	struct ip6aux *ip6a;
 	struct sockaddr_in6 src_sa, dst_sa;
@@ -404,21 +404,9 @@ icmp6_error(m, type, code, param)
 	nxt = -1;
 	off = ip6_lasthdr(m, 0, IPPROTO_IPV6, &nxt);
 	if (off >= 0 && nxt == IPPROTO_ICMPV6) {
-		struct icmp6_hdr *icp;
-
-#ifndef PULLDOWN_TEST
-		IP6_EXTHDR_CHECK(m, 0, off + sizeof(struct icmp6_hdr), );
-		icp = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
-#else
-		IP6_EXTHDR_GET(icp, struct icmp6_hdr *, m, off,
-			sizeof(*icp));
-		if (icp == NULL) {
-			icmp6stat.icp6s_tooshort++;
-			return;
-		}
-#endif
-		if (icp->icmp6_type < ICMP6_ECHO_REQUEST ||
-		    icp->icmp6_type == ND_REDIRECT) {
+		m_copydata(m, off, sizeof(icp), (caddr_t)&icp);
+		if (icp.icmp6_type < ICMP6_ECHO_REQUEST ||
+		    icp.icmp6_type == ND_REDIRECT) {
 			/*
 			 * ICMPv6 error
 			 * Special case: for redirect (which is
