@@ -1,4 +1,4 @@
-/*	$KAME: plog.c,v 1.14 2001/01/10 02:58:58 sakane Exp $	*/
+/*	$KAME: plog.c,v 1.15 2001/03/15 10:07:45 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -198,9 +198,10 @@ plogdump(pri, data, len)
 		i += 2;
 		j++;
 	}
-	if (j % 32 != 0)
+	if (buflen - i >= 2) {
 		buf[i++] = '\n';
-	buf[i] = '\0';
+		buf[i] = '\0';
+	}
 	plog(pri, LOCATION, NULL, "%s", buf);
 
 	free(buf);
