@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.18 2000/05/01 02:29:29 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.19 2000/05/04 03:48:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -215,9 +215,7 @@ static struct addrinfo *get_ai __P((const struct addrinfo *,
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
-#if 0
 static int addrconfig __P((const struct addrinfo *));
-#endif
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
@@ -532,6 +530,33 @@ getaddrinfo(hostname, servname, hints, res)
 		error = explore_fqdn(pai, hostname, servname,
 			&cur->ai_next);
 
+#ifdef AI_ADDRCONFIG
+		/*
+		 * If AI_ADDRCONFIG is specified, check if we are expected to
+		 * return the address family or not.
+		 */
+		if ((pai->ai_flags & AI_ADDRCONFIG) != 0) {
+			struct addrinfo *prev, *next, *p;
+
+			prev = NULL;
+			for (p = cur->ai_next; p; p = next) {
+				next = p->ai_next;
+				if (addrconfig(p)) {
+					prev = p;
+					continue;
+				}
+
+				if (prev == NULL)
+					cur->ai_next = next;
+				else
+					prev->ai_next = next;
+				p->ai_next = NULL;
+				freeaddrinfo(p);
+				p = NULL;	/*just in case*/
+			}
+		}
+#endif
+
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
 	}
@@ -576,16 +601,6 @@ explore_fqdn(pai, hostname, servname, res)
 
 	result = NULL;
 
-#if 0
-	/*
-	 * If AI_ADDRCONFIG is specified, check if we are expected to
-	 * return the address family or not.
-	 * XXX does not handle PF_UNSPEC case, should filter final result
-	 */
-	if ((pai->ai_flags & AI_ADDRCONFIG) != 0 && !addrconfig(pai))
-		return 0;
-#endif
-
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
 	 */
@@ -622,6 +637,28 @@ explore_fqdn(pai, hostname, servname, res)
 		}
 		*res = result;
 		return 0;
+	} else {
+		/* translate error code */
+		switch (h_errno) {
+		case NETDB_SUCCESS:	/*XXX strange */
+			error = EAI_FAIL;
+			break;
+		case HOST_NOT_FOUND:
+			error = EAI_NODATA;
+			break;
+		case TRY_AGAIN:
+			error = EAI_AGAIN;
+			break;
+		case NO_RECOVERY:
+			error = EAI_FAIL;
+			break;
+		case NO_DATA:
+#if NO_ADDRESS != NO_DATA
+		case NO_ADDRESS:
+#endif
+			error = EAI_NODATA;
+			break;
+		}
 	}
 
 free:
@@ -641,7 +678,6 @@ explore_null(pai, servname, res)
 	const char *servname;
 	struct addrinfo **res;
 {
-	int s;
 	const struct afd *afd;
 	struct addrinfo *cur;
 	struct addrinfo sentinel;
@@ -655,12 +691,8 @@ explore_null(pai, servname, res)
 	 * filter out AFs that are not supported by the kernel
 	 * XXX errno?
 	 */
-	s = socket(pai->ai_family, SOCK_DGRAM, 0);
-	if (s < 0) {
-		if (errno != EMFILE)
-			return 0;
-	} else
-		close(s);
+	if (!addrconfig(pai))
+		return 0;
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
@@ -992,7 +1024,7 @@ find_afd(af)
 	return NULL;
 }
 
-#if 0
+#ifdef AI_ADDRCONFIG
 /*
  * post-2553: AI_ADDRCONFIG check.  if we use getipnodeby* as backend, backend
  * will take care of it.
@@ -1007,8 +1039,10 @@ addrconfig(pai)
 
 	/* XXX errno */
 	s = socket(pai->ai_family, SOCK_DGRAM, 0);
-	if (s < 0)
-		return 0;
+	if (s < 0) {
+		if (errno != EMFILE)
+			return 0;
+	}
 	close(s);
 	return 1;
 }
