@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.280 2002/06/07 04:09:10 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.281 2002/06/07 05:49:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -386,8 +386,8 @@ in6_mask2len(mask, lim0)
 	int x = 0, y;
 	u_char *lim = lim0, *p;
 
-	if (lim0 == NULL ||
-	    lim0 - (u_char *)mask > sizeof(*mask)) /* ignore the scope_id part */
+	/* ignore the scope_id part */
+	if (lim0 == NULL || lim0 - (u_char *)mask > sizeof(*mask))
 		lim = (u_char *)mask + sizeof(*mask);
 	for (p = (u_char *)mask; p < lim; x++, p++) {
 		if (*p != 0xff)
