@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.43 2001/01/22 07:27:17 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.44 2001/02/20 08:31:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,6 +39,7 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
+#include "opt_iso.h"
 #endif
 
 #include <sys/param.h>
@@ -406,6 +407,11 @@ int in6_gif_input(mp, offp, proto)
 			ip6_ecn_egress(ECN_ALLOWED, &otos, &ip6->ip6_flow);
 		break;
 	    }
+#endif
+#if defined(__NetBSD__) && defined(ISO)
+	case IPPROTO_EON:
+		af = AF_ISO;
+		break;
 #endif
 	default:
 		ip6stat.ip6s_nogif++;

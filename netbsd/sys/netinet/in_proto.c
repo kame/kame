@@ -139,10 +139,6 @@
 #include <netiso/tp_var.h>
 #endif /* TPIP */
 
-#ifdef EON
-#include <netiso/eonvar.h>
-#endif /* EON */
-
 #include "ipip.h"
 #if NIPIP > 0 || defined(MROUTING)
 #include <netinet/ip_ipip.h>
@@ -254,14 +250,13 @@ struct protosw inetsw[] = {
   tp_init,	0,		tp_slowtimo,	tp_drain,
 },
 #endif /* TPIP */
-/* EON (ISO CLNL over IP) */
-#ifdef EON
+#ifdef ISO
 { SOCK_RAW,	&inetdomain,	IPPROTO_EON,	0,
-  eoninput,	0,		eonctlinput,		0,
-  0,
-  eonprotoinit,	0,		0,		0,
+  encap4_input,	rip_output,	0,		rip_ctloutput,
+  rip_usrreq,	/*XXX*/
+  0,		0,		0,		0,
 },
-#endif /* EON */
+#endif
 #ifdef NSIP
 { SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR,
   idpip_input,	NULL,		nsip_ctlinput,	0,

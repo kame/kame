@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.80 2001/02/09 06:46:30 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.81 2001/02/20 08:31:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,6 +72,7 @@
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
+#include "opt_iso.h"
 #endif
 
 #include <sys/param.h>
@@ -397,7 +398,7 @@ struct ip6protosw inet6sw[] = {
 },
 #endif /*INET*/
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  encap6_input, rip6_output,	 0,		rip6_ctloutput,
+  encap6_input, rip6_output,	0,		rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
@@ -412,6 +413,13 @@ struct ip6protosw inet6sw[] = {
   &rip6_usrreqs
 #endif
 },
+#if defined(__NetBSD__) && defined(ISO)
+{ SOCK_RAW,	&inet6domain,	IPPROTO_EON,	0,
+  encap6_input,	rip6_output,	0,		rip6_ctloutput,
+  rip_usrreq,	/*XXX*/
+  0,		0,		0,		0,
+},
+#endif
 { SOCK_RAW,     &inet6domain,	IPPROTO_PIM,	PR_ATOMIC|PR_ADDR,
   pim6_input,	rip6_output,	0,              rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

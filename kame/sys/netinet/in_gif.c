@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.50 2001/01/22 07:27:16 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.51 2001/02/20 08:31:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,6 +39,7 @@
 #ifdef __NetBSD__
 #include "opt_mrouting.h"
 #include "opt_inet.h"
+#include "opt_iso.h"
 #endif
 
 #include <sys/param.h>
@@ -412,6 +413,11 @@ in_gif_input(m, va_alist)
 		break;
 	    }
 #endif /* INET6 */
+#if defined(__NetBSD__) && defined(ISO)
+	case IPPROTO_EON:
+		af = AF_ISO;
+		break;
+#endif
 	default:
 		ipstat.ips_nogif++;
 		m_freem(m);
