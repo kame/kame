@@ -230,7 +230,7 @@ looutput(ifp, m, dst, rt)
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
 		maxlen = MHLEN;
 		if (n)
-			M_MOVE_PKTHDR(n, m);
+			M_COPY_PKTHDR(n, m);
 		if (n && m->m_pkthdr.len > maxlen) {
 			MCLGET(n, M_DONTWAIT);
 			maxlen = MCLBYTES;
@@ -256,6 +256,7 @@ looutput(ifp, m, dst, rt)
 			n->m_len = maxlen;
 			n->m_next = m;
 			m->m_flags &= ~M_PKTHDR;
+			m_tag_delete_chain(m, NULL);
 		}
 		m = n;
 	}
