@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.269 2003/02/07 10:17:10 suz Exp $	*/
+/*	$KAME: key.c,v 1.270 2003/02/19 03:15:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -7780,6 +7780,10 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 
 		/* found. */
 		*(struct sockaddr_in6 *)&(sa->saidx.dst) = *ncoa;
+		if (sa->sa_route.ro_rt) {
+			RTFREE(sa->sa_route.ro_rt);
+			sa->sa_route.ro_rt = NULL;
+		}
 	}
 	/* update a tunnel endpoint of a mobile node side. */
 	*(struct sockaddr_in6 *)(&sahint->dst) = *ncoa;
@@ -7906,6 +7910,10 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 
 		/* found. */
 		*(struct sockaddr_in6 *)&(sa->saidx.dst) = *ncoa;
+		if (sa->sa_route.ro_rt) {
+			RTFREE(sa->sa_route.ro_rt);
+			sa->sa_route.ro_rt = NULL;
+		}
 	}
 	/* update a tunnel endpoint of a mobile node side. */
 	*(struct sockaddr_in6 *)(&sahint->dst) = *ncoa;
