@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.466 2005/03/02 04:00:50 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.467 2005/03/14 09:13:33 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3732,7 +3732,11 @@ ip6_setmoptions(optname, im6op, m)
 				break;
 			}
 			ifp = ro.ro_rt->rt_ifp;
+#if defined(__FreeBSD__) && __FreeBSD_version > 503000
+			RTFREE(ro.ro_rt);
+#else
 			rtfree(ro.ro_rt);
+#endif
 		} else {
 			/*
 			 * If the interface is specified, validate it.

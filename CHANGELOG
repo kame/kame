@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2735 2005/03/14 08:57:51 suz Exp $
+$KAME: CHANGELOG,v 1.2736 2005/03/14 09:13:32 suz Exp $
 
 <200503>
+2005-03-14  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/sys/netinet6/ip6_output.c: fixed a kernel crash due to a LOR
+	by a multicast-group join without specifying any receiving interface.
+
 2005-03-14  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/in6.c, in6_var.h, nd6.c: introduced an ioctl option
 	 to configure IPv6 host variables from userland.   (intented for a use 
