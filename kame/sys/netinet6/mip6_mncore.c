@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.9 2003/06/22 14:11:32 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.10 2003/06/25 07:36:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -616,7 +616,6 @@ mip6_probe_routers(void)
 		     (ln->ln_state == ND6_LLINFO_STALE))) {
 			ln->ln_asked = 0;
 			ln->ln_state = ND6_LLINFO_DELAY;
-			ln->ln_expire = time_second;
 			nd6_llinfo_settimer(ln, 0);
 		}
 		ln = ln->ln_next;
