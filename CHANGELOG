@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.697 2000/03/16 14:09:58 itojun Exp $
+$Id: CHANGELOG,v 1.698 2000/03/17 16:17:23 itojun Exp $
 
 <200003>
+Sat Mar 18 01:16:26 JST 2000  itojun@iiljab.net
+	* netbsd/pkgsrc/{net/mtr,www/lynx}: mark them BROKEN for vulnerability
+	  reported on bugtraq.
+
 Thu Mar 16 22:33:52 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd}/lib/libinet6/getaddrinfo.c: in res_queryN,
 	  try to visit all of the requests given.  don't stop even if
