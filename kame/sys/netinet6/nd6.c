@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.186 2001/08/05 16:18:46 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.187 2001/08/08 13:26:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2344,7 +2344,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 
 			if (oldp && p + 1 <= pe) {
 				bzero(p, sizeof(*p));
-				sin6 = (struct sockaddr_in6 *)ALIGN(p + 1);
+				sin6 = (struct sockaddr_in6 *)(p + 1);
 
 				p->prefix = pr->ndpr_prefix;
 				if (in6_recoverscope(&p->prefix,
@@ -2391,8 +2391,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 				     pfr = pfr->pfr_next)
 					advrtrs++;
 			}
-			advance = ALIGN(ALIGN(sizeof(*p)) +
-			    sizeof(*sin6) * advrtrs);
+			advance = sizeof(*p) + sizeof(*sin6) * advrtrs;
 			l += advance;
 			if (p)
 				p = (struct in6_prefix *)((caddr_t)p + advance);
@@ -2499,7 +2498,7 @@ nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
 
 		if (p + 1 <= pe) {
 			bzero(p, sizeof(*p));
-			sin6 = (struct sockaddr_in6 *)ALIGN(p + 1);
+			sin6 = (struct sockaddr_in6 *)(p + 1);
 
 			p->prefix = pr->ndpr_prefix;
 			if (in6_recoverscope(&p->prefix,
@@ -2542,7 +2541,7 @@ nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
 		} else 
 			panic("buffer too short");
 
-		advance = ALIGN(ALIGN(sizeof(*p)) + sizeof(*sin6) * advrtrs);
+		advance = sizeof(*p) + sizeof(*sin6) * advrtrs;
 		error = SYSCTL_OUT(req, buf, advance);
 		if (error)
 			break;

@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.74 2001/08/03 12:52:33 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.75 2001/08/08 13:26:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1144,8 +1144,8 @@ plist()
 
 	ep = (struct in6_prefix *)(buf + l);
 	for (p = (struct in6_prefix *)buf; p < ep; p = n) {
-		advrtr = (struct sockaddr_in6 *)ALIGN(p + 1);
-		n = (struct in6_prefix *)ALIGN(&advrtr[p->advrtrs]);
+		advrtr = (struct sockaddr_in6 *)(p + 1);
+		n = (struct in6_prefix *)&advrtr[p->advrtrs];
 
 		if (getnameinfo((struct sockaddr *)&p->prefix,
 		    p->prefix.sin6_len, namebuf, sizeof(namebuf),
