@@ -148,6 +148,24 @@ struct	ip6_pktopts {
 #define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation */
 };
 
+/*
+ * Control options for incoming packets
+ */
+
+struct ip6_recvpktopts {
+	struct mbuf *head;	/* mbuf chain of data passed to a user */
+
+#ifdef SO_TIMESTAMP
+	struct mbuf *timestamp;	/* timestamp */
+#endif 
+	struct mbuf *hlim;	/* received hop limit */
+	struct mbuf *pktinfo;	/* packet information of rcv packet */
+	struct mbuf *hbh;	/* HbH options header of rcv packet */
+	struct mbuf *dest1;	/* Dest opt header of rcv packet */
+	struct mbuf *dest2; /* Dest opt header (after rthdr) of rcv packet */
+	struct mbuf *rthdr;	/* Routing header of rcv packet */
+};
+
 struct	ip6stat {
 	u_quad_t ip6s_total;		/* total packets received */
 	u_quad_t ip6s_tooshort;		/* packet too short */
@@ -231,7 +249,7 @@ extern struct	pr_usrreqs rip6_usrreqs;
 struct sockopt;
 #endif
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
 struct inpcb;
 #endif
 
@@ -253,13 +271,18 @@ char *	ip6_get_prevhdr __P((struct mbuf *, int));
 int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
 int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
-void	ip6_savecontrol __P((struct inpcb *, struct mbuf **, struct ip6_hdr *,
-		struct mbuf *));
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
+void	ip6_savecontrol __P((struct inpcb *, struct ip6_hdr *, struct mbuf *,
+			     struct ip6_recvpktopts *,
+			     struct ip6_recvpktopts *));
 #else
-void	ip6_savecontrol __P((struct in6pcb *, struct mbuf **, struct ip6_hdr *,
-		struct mbuf *));
+void	ip6_savecontrol __P((struct in6pcb *, struct ip6_hdr *, struct mbuf *,
+			     struct ip6_recvpktopts *,
+			     struct ip6_recvpktopts *));
 #endif
+void	ip6_update_recvpcbopt __P((struct ip6_recvpktopts *,
+				   struct ip6_recvpktopts *));
+void	ip6_reset_rcvopt __P((struct ip6_recvpktopts *, int));
 int	ip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 
 void	ip6_forward __P((struct mbuf *, int));
@@ -275,7 +298,7 @@ int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
 int	ip6_setpktoptions __P((struct mbuf *, struct ip6_pktopts *, int, int));
 void	ip6_clearpktopts __P((struct ip6_pktopts *, int, int));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
 int	ip6_optlen __P((struct inpcb *));
 #else
 int	ip6_optlen __P((struct in6pcb *));

@@ -62,10 +62,10 @@
 
 #ifdef INET6
 #include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <netinet6/in6_pcb.h>
 #endif
-#include <netinet6/ip6_var.h>
 #endif
 #include <netinet6/ipcomp.h>
 

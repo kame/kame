@@ -93,8 +93,8 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 #include <netinet6/ip6.h>
-#include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/in6_pcb.h>
 #include <netinet6/icmp6.h>
 #include <netinet6/udp6_var.h>
 #include <netinet6/ip6protosw.h>
@@ -161,10 +161,10 @@ udp6_input(mp, offp, proto)
 	register struct ip6_hdr *ip6;
 	register struct udphdr *uh;
 	register struct in6pcb *in6p;
-	struct	mbuf *opts = 0;
 	int off = *offp;
 	u_int32_t plen, ulen;
 	struct sockaddr_in6 udp_in6;
+	struct ip6_recvpktopts opts;
 
 #if defined(NFAITH) && 0 < NFAITH
 	if (m->m_pkthdr.rcvif) {
@@ -177,6 +177,7 @@ udp6_input(mp, offp, proto)
 #endif
 	udp6stat.udp6s_ipackets++;
 
+	bzero(&opts, sizeof(opts));
 	ip6 = mtod(m, struct ip6_hdr *);
 	/* check for jumbogram is done in ip6_input.  we can trust pkthdr.len */
 	plen = m->m_pkthdr.len - off;
@@ -321,21 +322,21 @@ udp6_input(mp, offp, proto)
 					 || last->in6p_socket->so_options & SO_TIMESTAMP
 #endif
 					    ) {
-						ip6_savecontrol(last, &opts,
-								ip6, n);
+						ip6_savecontrol(last, ip6, n,
+								&opts, NULL);
 					}
 
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
 							(struct sockaddr *)&udp_in6,
-							n, opts) == 0) {
+							n, opts.head) == 0) {
 						m_freem(n);
-						if (opts)
-							m_freem(opts);
+						if (opts.head)
+							m_freem(opts.head);
 						udp6stat.udp6s_fullsock++;
 					} else
 						sorwakeup(last->in6p_socket);
-					opts = 0;
+					bzero(&opts, sizeof(opts));
 				}
 			}
 			last = in6p;
@@ -376,13 +377,13 @@ udp6_input(mp, offp, proto)
 		 || last->in6p_socket->so_options & SO_TIMESTAMP
 #endif
 		    ) {
-			ip6_savecontrol(last, &opts, ip6, m);
+			ip6_savecontrol(last, ip6, m, &opts, NULL);
 		}
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
 				(struct sockaddr *)&udp_in6,
-				m, opts) == 0) {
+				m, opts.head) == 0) {
 			udp6stat.udp6s_fullsock++;
 			goto bad;
 		}
@@ -459,13 +460,13 @@ udp6_input(mp, offp, proto)
 	 || in6p->in6p_socket->so_options & SO_TIMESTAMP
 #endif
 	   ) {
-		ip6_savecontrol(in6p, &opts, ip6, m);
+		ip6_savecontrol(in6p, ip6, m, &opts, NULL);
 	}
 
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
 			(struct sockaddr *)&udp_in6,
-			m, opts) == 0) {
+			m, opts.head) == 0) {
 		udp6stat.udp6s_fullsock++;
 		goto bad;
 	}
@@ -474,8 +475,8 @@ udp6_input(mp, offp, proto)
 bad:
 	if (m)
 		m_freem(m);
-	if (opts)
-		m_freem(opts);
+	if (opts.head)
+		m_freem(opts.head);
 	return IPPROTO_DONE;
 }
 #endif

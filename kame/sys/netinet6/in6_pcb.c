@@ -738,8 +738,9 @@ in6_pcbdetach(in6p)
 #endif /* IPSEC */
 	sotoin6pcb(so) = 0;
 	sofree(so);
-	if (in6p->in6p_options)
-		m_freem(in6p->in6p_options);
+	
+	if (in6p->in6p_inputopts.head) /* Free all received options. */
+		m_freem(in6p->in6p_inputopts.head);
 
 	ip6_freepcbopts(in6p->in6p_outputopts);
 	ip6_freemoptions(in6p->in6p_moptions);

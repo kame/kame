@@ -130,7 +130,7 @@ rip6_input(mp, offp, proto)
 	register struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 rip6src;
-	struct mbuf *opts = NULL;
+	struct ip6_recvpktopts opts;
 
 #if defined(NFAITH) && 0 < NFAITH
 	if (m->m_pkthdr.rcvif) {
@@ -150,6 +150,7 @@ rip6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 
+	bzero(&opts, sizeof(opts));
 	bzero(&rip6src, sizeof(rip6src));
 	rip6src.sin6_len = sizeof(struct sockaddr_in6);
 	rip6src.sin6_family = AF_INET6;
@@ -185,33 +186,35 @@ rip6_input(mp, offp, proto)
 			struct	mbuf *n;
 			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS)
-					ip6_savecontrol(last, &opts, ip6, n);
+					ip6_savecontrol(last, ip6, n, &opts,
+							NULL);
 				/* strip intermediate headers */
 				m_adj(n, *offp);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
 						(struct sockaddr *)&rip6src,
-						 n, opts) == 0) {
+						 n, opts.head) == 0) {
 					/* should notify about lost packet */
 					m_freem(n);
-					if (opts)
-						m_freem(opts);
+					if (opts.head)
+						m_freem(opts.head);
 				} else
 					sorwakeup(last->in6p_socket);
-				opts = NULL;
+				bzero(&opts, sizeof(opts));
 			}
 		}
 		last = in6p;
 	}
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS)
-			ip6_savecontrol(last, &opts, ip6, m);
+			ip6_savecontrol(last, ip6, m, &opts, NULL);
 		/* strip intermediate headers */
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&rip6src, m, opts) == 0) {
+				(struct sockaddr *)&rip6src,
+				 m, opts.head) == 0) {
 			m_freem(m);
-			if (opts)
-				m_freem(opts);
+			if (opts.head)
+				m_freem(opts.head);
 		} else
 			sorwakeup(last->in6p_socket);
 	} else {

@@ -103,8 +103,8 @@
 #include <netinet/in_var.h>
 #include <netinet/in_systm.h>
 #include <netinet6/ip6.h>
-#include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/in6_pcb.h>
 #include <netinet6/tcp6.h>
 #include <netinet6/tcp6_fsm.h>
 #include <netinet6/tcp6_seq.h>
@@ -617,15 +617,23 @@ findpcb:
 
 	/* save packet options if user wanted */
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-		if (in6p->in6p_options) {
-			m_freem(in6p->in6p_options);
-			in6p->in6p_options = 0;
+		struct ip6_recvpktopts opts;
+
+		bzero(&opts, sizeof(opts));
+		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
+		ip6_update_recvpcbopt(&in6p->in6p_inputopts, &opts);
+		if (opts.head) {
+			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
+					    NULL, opts.head)
+			    == 0)
+				m_freem(opts.head);
 		}
-		ip6_savecontrol(in6p, &in6p->in6p_options, ip6, m);
 	}
 
 	so = in6p->in6p_socket;
 	if (so->so_options & (SO_DEBUG|SO_ACCEPTCONN)) {
+		struct ip6_recvpktopts newopts;
+
 		if (so->so_options & SO_DEBUG) {
 			ostate = t6p->t_state;
 			ip6_save = *ip6;
@@ -692,12 +700,20 @@ findpcb:
 			in6p->in6p_flags |=
 				(oin6p->in6p_flags & IN6P_CONTROLOPTS);
 			if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-				if (in6p->in6p_options) {
-					m_freem(in6p->in6p_options);
-					in6p->in6p_options = 0;
+				bzero(&newopts, sizeof(newopts));
+				ip6_savecontrol(in6p, ip6, m, &newopts,
+						&in6p->in6p_inputopts);
+				ip6_update_recvpcbopt(&in6p->in6p_inputopts,
+						      &newopts);
+				if (newopts.head) {
+					if (sbappendcontrol(&so->so_rcv, NULL,
+							    newopts.head)
+					    == 0)
+						m_freem(newopts.head);
 				}
-				ip6_savecontrol(in6p, &in6p->in6p_options,
-						ip6, m);
+#if 0
+				in6p->in6p_recvoptions = NULL;
+#endif
 			}
 #ifdef IPSEC
 			/* copy old policy into new socket's */
@@ -2432,10 +2448,12 @@ syn_cache_get6(so, m, off, len)
 	register struct tcp6hdr *th;
 	struct ip6_hdr *ip6;
 	long win;
+	struct ip6_recvpktopts opts;
 #ifdef IPSEC
 	struct socket *oso;
 #endif
 
+	bzero(&opts, sizeof(opts));
 	ip6 = mtod(m, struct ip6_hdr *);
 	th = (struct tcp6hdr *)((caddr_t)ip6 + off);
 	if ((sc = syn_cache_lookup6(ip6, th, &sc_prev, &head)) == NULL)
@@ -2482,11 +2500,12 @@ syn_cache_get6(so, m, off, len)
 	in6p->in6p_faddr = sc->sc_src;
 	in6p->in6p_fport = sc->sc_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-		if (in6p->in6p_options) {
-			m_freem(in6p->in6p_options);
-			in6p->in6p_options = 0;
+		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
+		ip6_update_recvpcbopt(&in6p->in6p_inputopts, &opts);
+		if (opts.head) {
+			if (sbappendcontrol(&so->so_rcv, NULL, opts.head) == 0)
+				m_freem(opts.head);
 		}
-		ip6_savecontrol(in6p, &in6p->in6p_options, ip6, m);
 	}
 #ifdef IPSEC
 	/* copy old policy into new socket's */

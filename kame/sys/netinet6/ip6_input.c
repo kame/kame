@@ -960,16 +960,18 @@ ip6_unknown_opt(optp, m, off)
  * you are using IP6_EXTHDR_CHECK() not m_pulldown())
  */
 void
-ip6_savecontrol(in6p, mp, ip6, m)
+ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
 	register struct inpcb *in6p;
 #else
 	register struct in6pcb *in6p;
 #endif
-	register struct mbuf **mp;
 	register struct ip6_hdr *ip6;
 	register struct mbuf *m;
+	struct ip6_recvpktopts *ctl, *prevctl;
 {
+	register struct mbuf **mp;
+	struct cmsghdr *cm = NULL;
 #ifdef HAVE_NRL_INPCB
 # define in6p_flags	inp_flags
 #endif
@@ -979,9 +981,14 @@ ip6_savecontrol(in6p, mp, ip6, m)
 #ifdef __bsdi__
 # define sbcreatecontrol	so_cmsg
 #endif
-	int privileged;
+	int privileged = 0;
 
-	privileged = 0;
+
+	if (ctl == NULL)	/* validity check */
+		return;
+	bzero(ctl, sizeof(*ctl)); /* XXX is it really OK? */
+	mp = &ctl->head;
+
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		privileged++;
@@ -1001,33 +1008,62 @@ ip6_savecontrol(in6p, mp, ip6, m)
 
 		microtime(&tv);
 		*mp = sbcreatecontrol((caddr_t) &tv, sizeof(tv),
-			SCM_TIMESTAMP, SOL_SOCKET);
-		if (*mp)
+				      SCM_TIMESTAMP, SOL_SOCKET);
+		if (*mp) {
+			/* always set regradless of the previous value */
+			ctl->timestamp = *mp;
 			mp = &(*mp)->m_next;
+		}
 	}
 #endif
 
 	/* RFC 2292 sec. 5 */
 	if (in6p->in6p_flags & IN6P_PKTINFO) {
-		struct in6_pktinfo pi6;
+		struct in6_pktinfo pi6, *prevpi = NULL;
 		bcopy(&ip6->ip6_dst, &pi6.ipi6_addr, sizeof(struct in6_addr));
 		if (IN6_IS_SCOPE_LINKLOCAL(&pi6.ipi6_addr))
 			pi6.ipi6_addr.s6_addr16[1] = 0;
 		pi6.ipi6_ifindex = (m && m->m_pkthdr.rcvif)
 					? m->m_pkthdr.rcvif->if_index
 					: 0;
-		*mp = sbcreatecontrol((caddr_t) &pi6,
-			sizeof(struct in6_pktinfo), IPV6_PKTINFO,
-			IPPROTO_IPV6);
-		if (*mp)
-			mp = &(*mp)->m_next;
+		if (prevctl && prevctl->pktinfo) {
+			cm = mtod(prevctl->pktinfo, struct cmsghdr *);
+			prevpi = (struct in6_pktinfo *)CMSG_DATA(cm);
+		}
+
+		/*
+		 * Make a new option only if this is the first time or if the
+		 * option value is chaned from last time.
+		 */
+		if (prevpi == NULL || bcmp(prevpi, &pi6, sizeof(pi6))) {
+			*mp = sbcreatecontrol((caddr_t) &pi6,
+					      sizeof(struct in6_pktinfo),
+					      IPV6_PKTINFO,
+					      IPPROTO_IPV6);
+			if (*mp) {
+				ctl->pktinfo = *mp;
+				mp = &(*mp)->m_next;
+			}
+		}
 	}
+
 	if (in6p->in6p_flags & IN6P_HOPLIMIT) {
-		int hlim = ip6->ip6_hlim & 0xff;
-		*mp = sbcreatecontrol((caddr_t) &hlim,
-			sizeof(int), IPV6_HOPLIMIT, IPPROTO_IPV6);
-		if (*mp)
-			mp = &(*mp)->m_next;
+		int hlim = ip6->ip6_hlim & 0xff, oldhlim = -1;
+
+		if (prevctl && prevctl->hlim) {
+			cm = mtod(prevctl->hlim, struct cmsghdr *);
+			oldhlim = (*(int *)CMSG_DATA(cm)) & 0xff;
+		}
+
+		if (oldhlim < 0 || hlim != oldhlim) {
+			*mp = sbcreatecontrol((caddr_t) &hlim,
+					      sizeof(int), IPV6_HOPLIMIT,
+					      IPPROTO_IPV6);
+			if (*mp) {
+				ctl->hlim = *mp;
+				mp = &(*mp)->m_next;
+			}
+		}
 	}
 
 	/*
@@ -1037,6 +1073,8 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	 * See RFC 2292 section 6.
 	 */
 	if ((in6p->in6p_flags & IN6P_HOPOPTS) && privileged) {
+		struct ip6_hbh *prevhbh = NULL;
+
 		/*
 		 * Check if a hop-by-hop options header is contatined in the
 		 * received packet, and if so, store the options as ancillary
@@ -1046,8 +1084,8 @@ ip6_savecontrol(in6p, mp, ip6, m)
 		 */
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 		if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
-			struct ip6_hbh *hbh;
-			int hbhlen;
+			struct ip6_hbh *hbh, *prevhbh = NULL;
+			int hbhlen, prevhbhlen;
 
 #ifndef PULLDOWN_TEST
 			hbh = (struct ip6_hbh *)(ip6 + 1);
@@ -1064,20 +1102,38 @@ ip6_savecontrol(in6p, mp, ip6, m)
 				sizeof(struct ip6_hdr), hbhlen);
 			if (hbh == NULL) {
 				ip6stat.ip6s_tooshort++;
-				return;
+				return;	XXX;
 			}
 #endif
 
+			if (prevctl && prevctl->hbh) {
+				cm = mtod(prevctl->hbh, struct cmsghdr *);
+				prevhbh = (struct ip6_hbh *)CMSG_DATA(cm);
+				prevhbhlen = (prevhbh->ip6h_len + 1) << 3;
+			}
 			/*
-			 * XXX: We copy whole the header even if a jumbo
-			 * payload option is included, which option is to
-			 * be removed before returning in the RFC 2292.
-			 * Note: this constraint is removed in 2292bis. 
+			 * Check if there's difference between the current
+			 * and previous HbH headers.
+			 * XXX: should the next header field be ignored?
 			 */
-			*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
-					      IPV6_HOPOPTS, IPPROTO_IPV6);
-			if (*mp)
-				mp = &(*mp)->m_next;
+			if (prevhbh == NULL || hbhlen != prevhbhlen ||
+			    bcmp(prevhbh, hbh, hbhlen)) {
+				/*
+				 * XXX: We copy whole the header even if a
+				 * jumbo payload option is included, which
+				 * option is to be removed before returning
+				 * in the RFC 2292.
+				 * Note: this constraint is removed in
+				 * 2292bis. 
+				 */
+				*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
+						      IPV6_HOPOPTS,
+						      IPPROTO_IPV6);
+				if (*mp) {
+					ctl->hbh = *mp;
+					mp = &(*mp)->m_next;
+				}
+			}
 		}
 	}
 
@@ -1123,18 +1179,23 @@ ip6_savecontrol(in6p, mp, ip6, m)
 #endif
 
 			switch(nxt) {
-		         case IPPROTO_DSTOPTS:
-				 if ((in6p->in6p_flags &
-				      (IN6P_DSTOPTS | IN6P_RTHDRDSTOPTS)) == 0)
-					 break;
+			case IPPROTO_DSTOPTS:
+			{
+				struct ip6_dest *prevdest1 = NULL,
+					*prevdest2 = NULL;
+				int prevdestlen;
+
+				if ((in6p->in6p_flags &
+				     (IN6P_DSTOPTS | IN6P_RTHDRDSTOPTS)) == 0)
+					break;
 
 				 /*
 				  * We also require super-user privilege for
 				  * the option.
 				  * See the comments on IN6_HOPOPTS.
 				  */
-				 if (!privileged)
-					 break;
+				if (!privileged)
+					break;
 
 				 /*
 				  * Save a dst opt header before a routing
@@ -1143,56 +1204,109 @@ ip6_savecontrol(in6p, mp, ip6, m)
 				  * before a routing header in a single
 				  * ancillary data object.
 				  */
-				 if (rthdr == 0 &&
-				     (in6p->in6p_flags & IN6P_RTHDRDSTOPTS)) {
-					 *mp = sbcreatecontrol((caddr_t)ip6e,
-							       elen,
-							       IPV6_RTHDRDSTOPTS,
-							       IPPROTO_IPV6);
-				 }
-				 /*
-				  * Save a dst opt header after a routing
-				  * header if the user wanted.
-				  * TODO: storing all the dst opt headers
-				  * after a routing header in a single
-				  * ancillary data object.
-				  */
-				 if (rthdr &&
-				     (in6p->in6p_flags & IN6P_DSTOPTS)) {
-					 *mp = sbcreatecontrol((caddr_t)ip6e,
-							       elen,
-							       IPV6_DSTOPTS,
-							       IPPROTO_IPV6);
-				 }
-				 if (*mp)
-					 mp = &(*mp)->m_next;
-				 break;
+				if (rthdr == 0 &&
+				    (in6p->in6p_flags & IN6P_RTHDRDSTOPTS)) {
+					if (prevctl && prevctl->dest1) {
+						cm = mtod(prevctl->dest1,
+							  struct cmsghdr *);
+						prevdest1 = (struct ip6_dest *)CMSG_DATA(cm);
+						prevdestlen = (prevdest1->ip6d_len + 1) << 3;
+					}
 
-			 case IPPROTO_ROUTING:
-				 rthdr++;
-				 if (!in6p->in6p_flags & IN6P_RTHDR)
-					 break;
+					/*
+					 * If this is the 1st dst opt header
+					 * (that is placed before rthdr)
+					 * we enconter and this header is
+					 * not different than the previous one,
+					 * simply ignore the header.
+					 */
+					if (ctl->dest1 == NULL &&
+					    (prevdest1 &&
+					     prevdestlen == elen ||
+					     bcmp(ip6e, prevdest1, elen) == 0))
+						break;
 
-				 *mp = sbcreatecontrol((caddr_t)ip6e, elen,
-						       IPV6_RTHDR,
-						       IPPROTO_IPV6);
-				 if (*mp)
-					 mp = &(*mp)->m_next;
-				 break;
+					*mp = sbcreatecontrol((caddr_t)ip6e,
+							      elen,
+							      IPV6_RTHDRDSTOPTS,
+							      IPPROTO_IPV6);
+					if (ctl->dest1 == NULL)
+						ctl->dest1 = *mp;
+					if (*mp)
+						mp = &(*mp)->m_next;
+				}
+				/*
+				 * Save a dst opt header after a routing
+				 * header if the user wanted.
+				 */
+				if (rthdr &&
+				    (in6p->in6p_flags & IN6P_DSTOPTS)) {
+					if (prevctl && prevctl->dest2) {
+						cm = mtod(prevctl->dest2,
+							  struct cmsghdr *);
+						prevdest2 = (struct ip6_dest *)CMSG_DATA(cm);
+						prevdestlen = (prevdest2->ip6d_len + 1) << 3;
+					}
+					/* see the above comment */
+					if (ctl->dest2 == NULL &&
+					    (prevdest2 &&
+					     prevdestlen == elen ||
+					     bcmp(ip6e, prevdest2, elen) == 0))
+						break;
 
-			 case IPPROTO_UDP:
-			 case IPPROTO_TCP:
-			 case IPPROTO_ICMPV6:
-			 default:
-				 /*
+					*mp = sbcreatecontrol((caddr_t)ip6e,
+							      elen,
+							      IPV6_DSTOPTS,
+							      IPPROTO_IPV6);
+					if (ctl->dest2 == NULL)
+						ctl->dest2 = *mp;
+
+					if (*mp)
+						mp = &(*mp)->m_next;
+				}
+				break;
+			}
+			case IPPROTO_ROUTING:
+			{
+				struct ip6_rthdr *prevrth = NULL;
+				int prevrhlen;
+
+				rthdr++;
+				if (!in6p->in6p_flags & IN6P_RTHDR)
+					break;
+
+				if (prevctl && prevctl->rthdr) {
+					cm = mtod(prevctl->rthdr,
+						  struct cmsghdr *);
+					prevrth = (struct ip6_rthdr *)CMSG_DATA(cm);
+					prevrhlen =
+						(prevrth->ip6r_len + 1) << 3;
+				}
+				if (prevrth == NULL || prevrhlen != elen ||
+				    bcmp(ip6e, prevrth, elen)) {
+					*mp = sbcreatecontrol((caddr_t)ip6e, elen,
+							      IPV6_RTHDR,
+							      IPPROTO_IPV6);
+					if (ctl->rthdr == NULL)
+						ctl->rthdr = *mp;
+					if (*mp)
+						mp = &(*mp)->m_next;
+				}
+				break;   
+			}
+			case IPPROTO_UDP:
+			case IPPROTO_TCP:
+			case IPPROTO_ICMPV6:
+			default:
+				/*
 				  * stop search if we encounter an upper
 				  * layer protocol headers.
 				  */
-				 goto loopend;
+				goto loopend;
 
-			 case IPPROTO_HOPOPTS:
-			 case IPPROTO_AH: /* is it possible? */
-				 break;
+			case IPPROTO_HOPOPTS:
+			case IPPROTO_AH: /* is it possible? */
+				break;
 			}
 
 			/* proceed with the next header. */
@@ -1201,13 +1315,6 @@ ip6_savecontrol(in6p, mp, ip6, m)
 		}
 	  loopend:
 	}
-	if ((in6p->in6p_flags & IN6P_HOPOPTS) && privileged) {
-		/* to be done */
-	}
-	if ((in6p->in6p_flags & IN6P_DSTOPTS) && privileged) {
-		/* to be done */
-	}
-	/* IN6P_RTHDR - to be done */
 
 #ifdef __bsdi__
 # undef sbcreatecontrol
@@ -1215,6 +1322,101 @@ ip6_savecontrol(in6p, mp, ip6, m)
 #ifdef __OpenBSD__
 # undef in6p_flags
 #endif
+}
+
+/*
+ * Merge new IPv6 received options to previous ones.
+ * If a new option is not given, just re-link the option chain.
+ * If an old option exists but a corresponding new one doesn't, just
+ * keep the ole option.
+ * If a new option exists but a corresponding old one doesn't, just
+ * copy the new option.
+ * If both new and old options exist, free old one and overwrite the option
+ * with the new option.
+ * Otherwise, do nothing for the option.
+ * XXX: in any case, options that don't follow the recommend order and
+ *      number of extension headers (RFC 2460 Section 4.1) are simply ignored.
+ * XXX: We assume that each option is stored in a single mbuf.
+ */
+#define MERGE_RECVOPT(new, old, type) if ((new)->type) {\
+		if ((old)->type)\
+			m_free((old)->type);\
+		(old)->type = m_copy((new)->type, 0, (new)->type->m_len);\
+		if (((old)->type) && ((old)->type->m_next)) {\
+			m_freem((old)->type);\
+			old->type = NULL;\
+		}\
+	}
+#define LINK_RECVOPTS(opt, type, p) if ((opt)->type) {\
+		*(p) = (opt)->type;\
+		(p) = &(opt)->type->m_next;\
+	}
+
+void
+ip6_update_recvpcbopt(old, new)
+	struct ip6_recvpktopts *new, *old;
+{
+	struct mbuf **mp;
+
+	if (old == NULL) {
+		printf("ip6_update_recvpcbopt: invalid arguments\n");
+		return;
+	}
+
+	if (new) {
+		MERGE_RECVOPT(new, old, hlim);
+		MERGE_RECVOPT(new, old, pktinfo);
+		MERGE_RECVOPT(new, old, hbh);
+		MERGE_RECVOPT(new, old, dest1);
+		MERGE_RECVOPT(new, old, dest2);
+		MERGE_RECVOPT(new, old, rthdr);
+	}
+
+	/* link options */
+	mp = &old->head;
+	LINK_RECVOPTS(old, hlim, mp);
+	LINK_RECVOPTS(old, pktinfo, mp);
+	LINK_RECVOPTS(old, hbh, mp);
+	LINK_RECVOPTS(old, dest1, mp);
+	LINK_RECVOPTS(old, dest2, mp);
+	LINK_RECVOPTS(old, rthdr, mp);
+	*mp = NULL;
+}
+
+#undef MERGE_RECVOPT
+#undef LINK_RECVOPTS
+
+void
+ip6_reset_rcvopt(opts, optname)
+	struct ip6_recvpktopts *opts;
+	int optname;
+{
+	switch(optname) {
+	case IPV6_RECVPKTINFO:
+		m_freem(opts->pktinfo);
+		break;
+	case IPV6_RECVHOPLIMIT:
+		m_freem(opts->hlim);
+		break;
+	case IPV6_RECVHOPOPTS:
+		m_freem(opts->hbh);
+		break;
+	case IPV6_RECVRTHDRDSTOPTS:
+		m_freem(opts->dest1);
+		break;
+	case IPV6_RECVDSTOPTS:
+		m_freem(opts->dest2);
+		break;
+	case IPV6_RECVRTHDR:
+		m_freem(opts->rthdr);
+		break;
+	default:
+		printf("ip6_reset_rcvopt: invalid option name (%d)\n",
+		       optname);
+		return;
+	}
+
+	ip6_update_recvpcbopt(opts, NULL); /* re-link the option chain */
 }
 
 /*

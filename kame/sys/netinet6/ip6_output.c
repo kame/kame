@@ -1259,6 +1259,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 {
 	int privileged, optdatalen;
 	void *optdata;
+	struct ip6_recvpktopts *rcvopts;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	register struct inpcb *in6p = sotoinpcb(so);
 	int error, optval;
@@ -1300,6 +1301,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 #else
 	privileged = (in6p->in6p_socket->so_state & SS_PRIV);
 #endif
+#endif
+
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
+	rcvopts = &inp->in6p_inputopts;	/* XXX right? */
+#else
+	rcvopts = &in6p->in6p_inputopts;
 #endif
 
 	if (level == IPPROTO_IPV6) {
@@ -1416,14 +1423,24 @@ ip6_ctloutput(op, so, level, optname, mp)
 	else \
 		in6p->in6p_flags &= ~(bit);
 #endif
+#ifdef HAVE_NRL_INPCB
+#define OPTBIT(bit) (inp->inp_flags & (bit) ? 1 : 0)
+#else
+#define OPTBIT(bit) (in6p->in6p_flags & (bit) ? 1 : 0)
+#endif
+
 					case IPV6_RECVPKTINFO:
 						OPTSET(IN6P_PKTINFO);
+						if (OPTBIT(IN6P_PKTINFO) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVPKTINFO);
 						break;
 
 					case IPV6_HOPLIMIT:
 					{
 #ifdef COMPAT_RFC2292
 						OPTSET(IN6P_HOPLIMIT);
+						if (OPTBIT(IN6P_HOPLIMIT) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPLIMIT);
 						break;
 #else  /* new advanced API (2292bis) */
 						struct ip6_pktopts **optp;
@@ -1444,22 +1461,32 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 					case IPV6_RECVHOPLIMIT:
 						OPTSET(IN6P_HOPLIMIT);
+						if (OPTBIT(IN6P_HOPLIMIT) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPLIMIT);
 						break;
 
 					case IPV6_RECVHOPOPTS:
 						OPTSET(IN6P_HOPOPTS);
+						if (OPTBIT(IN6P_HOPOPTS) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPOPTS);
 						break;
 
 					case IPV6_RECVDSTOPTS:
 						OPTSET(IN6P_DSTOPTS);
+						if (OPTBIT(IN6P_DSTOPTS) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVDSTOPTS);
 						break;
 
 					case IPV6_RECVRTHDRDSTOPTS:
 						OPTSET(IN6P_RTHDRDSTOPTS);
+						if (OPTBIT(IN6P_RTHDRDSTOPTS) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDRDSTOPTS);
 						break;
 
 					case IPV6_RECVRTHDR:
 						OPTSET(IN6P_RTHDR);
+						if (OPTBIT(IN6P_RTHDR) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
 						break;
 
 					case IPV6_CHECKSUM:
@@ -1499,6 +1526,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 					switch(optname) {
 					case IPV6_PKTINFO:
 						OPTSET(IN6P_PKTINFO);
+						if (OPTBIT(IN6P_PKTINFO) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVPKTINFO);
 						break;
 					case IPV6_HOPOPTS:
 						/*
@@ -1509,14 +1538,22 @@ ip6_ctloutput(op, so, level, optname, mp)
 						if (!privileged)
 							return(EPERM);
 						OPTSET(IN6P_HOPOPTS);
+						if (OPTBIT(IN6P_HOPOPTS) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPOPTS);
 						break;
 					case IPV6_DSTOPTS:
 						if (!privileged)
 							return(EPERM);
 						OPTSET(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS); /* XXX */
+						if (OPTBIT(IN6P_DSTOPTS) == 0) {
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVDSTOPTS);
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDRDSTOPTS);
+						}
 						break;
 					case IPV6_RTHDR:
 						OPTSET(IN6P_RTHDR);
+						if (OPTBIT(IN6P_RTHDR) == 0)
+							ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
 						break;
 					}
 					break;
@@ -1709,9 +1746,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 			case IPV6_PKTOPTIONS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				if (in6p->in6p_options) {
+				if (in6p->in6p_recvoptions) {
 					error = soopt_mcopyout(sopt, 
-							       in6p->in6p_options);
+							       in6p->in6p_recvoptions);
 				} else
 					sopt->sopt_valsize = 0;
 #elif defined(HAVE_NRL_INPCB)
@@ -1723,9 +1760,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 					(*mp)->m_len = 0;
 				}
 #else
-				if (in6p->in6p_options) {
-					*mp = m_copym(in6p->in6p_options, 0,
-						      M_COPYALL, M_WAIT);
+				if (in6p->in6p_inputopts.head) {
+					*mp = m_copym(in6p->in6p_inputopts.head,
+						      0, M_COPYALL, M_WAIT);
 				} else {
 					*mp = m_get(M_WAIT, MT_SOOPTS);
 					(*mp)->m_len = 0;
@@ -1768,12 +1805,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 					optval = in6p->in6p_hops;
 #endif
 					break;
-
-#ifdef HAVE_NRL_INPCB
-#define OPTBIT(bit) (inp->inp_flags & (bit) ? 1 : 0)
-#else
-#define OPTBIT(bit) (in6p->in6p_flags & (bit) ? 1 : 0)
-#endif
 
 				case IPV6_RECVPKTINFO:
 					optval = OPTBIT(IN6P_PKTINFO);
