@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.34 2002/09/26 16:06:37 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.35 2002/10/02 02:02:45 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -585,6 +585,7 @@ main(argc, argv)
 		struct mip6_req mr;
 
 		bzero(&mr, sizeof(mr));
+		getaddress(dbcarg, &mr.mip6r_ru.mip6r_sin6);
 		if (ioctl(s, SIOCDBC, &mr) < 0) {
 			perror("ioctl");
 			exit(-1);

@@ -1,4 +1,4 @@
-.\"	$KAME: mip6control.8,v 1.10 2002/09/18 05:32:52 k-sugyou Exp $
+.\"	$KAME: mip6control.8,v 1.11 2002/10/02 02:02:45 keiichi Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001 WIDE Project.
 .\" All rights reserved.
@@ -43,6 +43,7 @@
 .Op Fl P Ar prefixlen
 .Op Fl A Ar home_agent_global_addr
 .Op Fl L Ar home_agent_linklocal_addr
+.Op Fl C Ar addr
 .Op Fl u Ar address#port
 .Op Fl v Ar address#port
 .Op Fl F Ar ifp1[:ifp2[:ifp3]]
@@ -51,6 +52,9 @@
 .Sh DESCRIPTION
 .Nm
 sets/gets KAME/MIP6 related information.
+If no argument is specified,
+.Nm
+shows the current status of the node.
 .Bl -tag -width Ds
 .It Fl i Ar ifname
 Speify home interface of the mobile node.
@@ -97,6 +101,14 @@ Show the binding update list.
 Start acting as a home agent.
 .It Fl c
 Show the binding cache entries.
+.It Fl C Ar addr
+Remove the binding cache entry specified by
+.Ar addr .
+.Ar addr
+is a home address of the binding cache entry.
+If :: is specified,
+.Nm
+removes all binding cache entries.
 .It Fl l
 Show information in a long format.
 .It Fl u Ar Address#Port
