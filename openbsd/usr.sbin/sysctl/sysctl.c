@@ -75,8 +75,8 @@ static char *rcsid = "$OpenBSD: sysctl.c,v 1.41 1999/09/02 22:04:38 pjanzen Exp 
 #include <netinet/tcp_var.h>
 
 #ifdef INET6
-#include <netinet6/ip6.h>
-#include <netinet6/icmp6.h>
+#include <netinet/ip6.h>
+#include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/pim6_var.h>
 #endif
