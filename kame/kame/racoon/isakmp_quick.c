@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.79 2001/04/10 15:50:00 thorpej Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.80 2001/06/27 14:15:29 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1580,8 +1580,12 @@ quick_r3prep(iph2, msg0)
 		struct policyindex *spidx;
 		struct sockaddr_storage addr;
 		u_int8_t pref;
+		struct sockaddr *src = iph2->src;
+		struct sockaddr *dst = iph2->dst;
 
 		/* make inbound policy */
+		iph2->src = dst;
+		iph2->dst = src;
 		if (pk_sendspdadd2(iph2) < 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"pfkey spdadd2(inbound) failed.\n");
@@ -1591,6 +1595,8 @@ quick_r3prep(iph2, msg0)
 			"pfkey spdadd2(inbound) sent.\n");
 
 		/* make outbound policy */
+		iph2->src = src;
+		iph2->dst = dst;
 		spidx = (struct policyindex *)iph2->spidx_gen;
 		spidx->dir = IPSEC_DIR_OUTBOUND;
 		addr = spidx->src;
