@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.2 2000/03/06 06:42:41 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.3 2000/03/06 07:26:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -459,17 +459,23 @@ stf_ioctl(ifp, cmd, data)
 {
 	struct ifaddr *ifa;
 	struct ifreq *ifr;
+	struct sockaddr_in6 *sin6;
 	int error;
 
 	error = 0;
 	switch (cmd) {
 	case SIOCSIFADDR:
 		ifa = (struct ifaddr *)data;
-		if (ifa != NULL && ifa->ifa_addr->sa_family == AF_INET6) {
+		if (ifa == NULL || ifa->ifa_addr->sa_family != AF_INET6) {
+			error = EAFNOSUPPORT;
+			break;
+		}
+		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+		if (IN6_IS_ADDR_6TO4(&sin6->sin6_addr)) {
 			ifa->ifa_rtrequest = stf_rtrequest;
 			ifp->if_flags |= IFF_UP;
 		} else
-			error = EAFNOSUPPORT;
+			error = EINVAL;
 		break;
 
 	case SIOCADDMULTI:
