@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.253 2002/07/12 10:10:12 sakane Exp $	*/
+/*	$KAME: key.c,v 1.254 2002/07/17 03:44:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2129,7 +2129,7 @@ key_spddelete2(so, m, mhp)
 }
 
 /*
- * SADB_X_GET processing
+ * SADB_X_SPDGET processing
  * receive
  *   <base, policy(*)>
  * from the user(?),
@@ -2463,7 +2463,7 @@ key_getspreqmsglen(sp)
 }
 
 /*
- * SADB_SPDEXPIRE processing
+ * SADB_X_SPDEXPIRE processing
  * send
  *   <base, address(SD), lifetime(CH), policy>
  * to KMD by PF_KEY.
