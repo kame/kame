@@ -18,13 +18,11 @@
 
 BINDIR=	$(PREFIX)/sbin
 PROG=	rtsold
-SRCS=	rtsold.c rtsol.c if.c probe.c dump.c
+SRCS=	rtsold.c rtsol.c if.c probe.c dump.c rtsock.c
 
 CC=	gcc
 
-.if (${OPSYS} != "NetBSD")
-CFLAGS+=-Wall
-.endif
+CFLAGS+=-Wall -g
 .if (${OPSYS} != "NetBSD")
 CFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 .else
