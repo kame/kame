@@ -61,7 +61,7 @@
 #include <netinet/ip_ecn.h>
 
 #ifdef INET6
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif
 #include <netinet6/ipcomp.h>

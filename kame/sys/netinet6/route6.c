@@ -36,7 +36,7 @@
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 
 #include <netinet/icmp6.h>

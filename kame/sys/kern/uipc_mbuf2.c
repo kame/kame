@@ -80,7 +80,7 @@
 #include <sys/mbuf.h>
 #if defined(PULLDOWN_STAT) && defined(INET6)
 #include <netinet/in.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif
 

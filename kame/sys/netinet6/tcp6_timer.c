@@ -89,10 +89,10 @@
 #include <net/route.h>
 
 #include <netinet/in.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
-#include <netinet6/icmp6.h>
+#include <netinet/icmp6.h>
 #include <netinet6/tcp6.h>
 #include <netinet6/tcp6_fsm.h>
 #include <netinet6/tcp6_seq.h>

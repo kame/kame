@@ -29,7 +29,7 @@
 //# SUCH DAMAGE.
 //#
 //#	$SuMiRe: pm_log.c,v 1.7 1998/09/14 19:49:49 shin Exp $
-//#	$Id: pm_log.c,v 1.2 2000/01/17 09:19:05 sumikawa Exp $
+//#	$Id: pm_log.c,v 1.3 2000/02/06 09:34:18 itojun Exp $
 //#
 //#------------------------------------------------------------------------
 */
@@ -62,7 +62,7 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/ip_var.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif
 #include <netinet/in_pcb.h>

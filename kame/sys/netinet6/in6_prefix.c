@@ -81,7 +81,7 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/in6_prefix.h>
 #include <netinet6/ip6_var.h>
 

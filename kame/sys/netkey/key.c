@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.62 2000/01/29 06:21:00 itojun Exp $ */
+/* KAME $Id: key.c,v 1.63 2000/02/06 09:34:17 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -71,7 +71,7 @@
 #include <netinet/in_var.h>
 
 #ifdef INET6
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
 #endif /* INET6 */
@@ -3046,7 +3046,6 @@ key_ismyaddr(family, addr)
  * 0: other
  * NOTE: derived ip6_input() in KAME. This is necessary to modify more.
  */
-#include <netinet6/in6.h>
 #include <netinet6/in6_var.h>
 
 static int

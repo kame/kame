@@ -55,7 +55,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: in6_rmx.c,v 1.3 1999/08/16 13:42:53 itojun Exp $
+ * $Id: in6_rmx.c,v 1.4 2000/02/06 09:34:05 itojun Exp $
  */
 
 /*
@@ -89,10 +89,10 @@
 #endif
 #include <netinet/in_var.h>
 
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 
-#include <netinet6/icmp6.h>
+#include <netinet/icmp6.h>
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <netinet6/tcp6.h>

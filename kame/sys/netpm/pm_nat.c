@@ -29,7 +29,7 @@
 //# SUCH DAMAGE.
 //#
 //#	$SuMiRe: pm_nat.c,v 1.10 1998/09/14 19:49:52 shin Exp $
-//#	$Id: pm_nat.c,v 1.3 2000/01/17 09:19:05 sumikawa Exp $
+//#	$Id: pm_nat.c,v 1.4 2000/02/06 09:34:19 itojun Exp $
 //#
 //#------------------------------------------------------------------------
 */
@@ -44,7 +44,7 @@
 
 #include <netinet/ip_icmp.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif
 #include <netinet/in_pcb.h>

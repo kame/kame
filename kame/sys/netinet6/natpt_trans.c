@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_trans.c,v 1.6 2000/01/29 13:53:35 fujisawa Exp $
+ *	$Id: natpt_trans.c,v 1.7 2000/02/06 09:34:09 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -62,8 +62,8 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
-#include <netinet6/ip6.h>
-#include <netinet6/icmp6.h>
+#include <netinet/ip6.h>
+#include <netinet/icmp6.h>
 #if !defined(__NetBSD__) && (!defined(__FreeBSD__) || (__FreeBSD__ < 3))
 #include <netinet6/tcp6.h>
 #endif

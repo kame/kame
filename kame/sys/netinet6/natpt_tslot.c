@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_tslot.c,v 1.3 2000/01/06 14:27:05 itojun Exp $
+ *	$Id: natpt_tslot.c,v 1.4 2000/02/06 09:34:09 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -46,9 +46,8 @@
 #include <netinet/tcp_fsm.h>
 #include <netinet/udp.h>
 
-#include <netinet6/in6.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #if !defined(__NetBSD__) && (!defined(__FreeBSD__) || (__FreeBSD__ < 3))
 #include <netinet6/tcp6.h>
 #endif

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_log.c,v 1.2 1999/12/25 02:35:30 fujisawa Exp $
+ *	$Id: natpt_log.c,v 1.3 2000/02/06 09:34:08 itojun Exp $
  */
 
 #include <sys/errno.h>
@@ -42,7 +42,7 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_log.h>

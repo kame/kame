@@ -80,7 +80,7 @@
 #include <netinet/in.h>
 #endif
 #include <netinet6/in6_var.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #endif
 
 #include "bpfilter.h"

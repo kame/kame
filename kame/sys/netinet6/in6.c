@@ -101,7 +101,7 @@
 #endif
 
 #include <netinet6/nd6.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/mld6_var.h>
 #include <netinet6/ip6_mroute.h>

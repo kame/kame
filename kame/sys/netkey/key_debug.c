@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.10 2000/01/29 06:21:01 itojun Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.11 2000/02/06 09:34:18 itojun Exp $ */
 
 #ifdef _KERNEL
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -49,7 +49,6 @@
 #include <netkey/key_debug.h>
 
 #include <netinet/in.h>
-#include <netinet6/in6.h>
 #include <netinet6/ipsec.h>
 
 #ifndef _KERNEL

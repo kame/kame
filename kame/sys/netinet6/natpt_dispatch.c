@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_dispatch.c,v 1.3 2000/01/06 14:27:04 itojun Exp $
+ *	$Id: natpt_dispatch.c,v 1.4 2000/02/06 09:34:08 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -48,9 +48,9 @@
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
-#include <netinet6/icmp6.h>
+#include <netinet/icmp6.h>
 
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_list.h>

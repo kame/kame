@@ -77,11 +77,11 @@
 #include <net/if_fddi.h>
 #endif /* __NetBSD__ */
 #include <netinet6/in6_var.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet6/in6_prefix.h>
-#include <netinet6/icmp6.h>
+#include <netinet/icmp6.h>
 
 #ifndef __bsdi__
 #include "loop.h"

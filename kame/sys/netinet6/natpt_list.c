@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_list.c,v 1.3 2000/01/06 14:27:04 itojun Exp $
+ *	$Id: natpt_list.c,v 1.4 2000/02/06 09:34:08 itojun Exp $
  */
 
 #if (defined(KERNEL)) || (defined(_KERNEL))
@@ -44,8 +44,6 @@
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
-
-#include <netinet6/in6.h>
 
 #include <netinet6/natpt_defs.h>
 
