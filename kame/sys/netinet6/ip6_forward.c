@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.83 2001/09/12 16:52:38 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.84 2001/10/09 10:04:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -368,9 +368,9 @@ ip6_forward(m, srcrt)
 			/* we are acting as a home agent for ip6_dst. */
 			if (mip6_tunnel_output(&m, mbc) != 0) {
 				ip6stat.ip6s_cantforward++;
-				if (mcopy)
-					m_freem(mcopy);
 			}
+			if (mcopy)
+				m_freem(mcopy);
 			return;
 		}
 	}
