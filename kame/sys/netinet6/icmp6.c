@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.265 2001/11/29 04:38:37 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.266 2001/11/30 06:52:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2493,10 +2493,8 @@ icmp6_reflect(m, off)
 	 */
 	ip6_output(m, NULL, NULL, IPV6_MINMTU, NULL, &outif);
 
-	if (outif) {
-		icmp6_ifstat_inc(outif, ifs6_out_msg);
+	if (outif)
 		icmp6_ifoutstat_inc(outif, type, code);
-	}
 
 	return;
 

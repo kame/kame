@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.64 2001/11/29 04:38:36 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.65 2001/11/30 06:52:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -787,8 +787,6 @@ do {								\
 #define icmp6_ifoutstat_inc(ifp, type, code) \
 do { \
 		icmp6_ifstat_inc(ifp, ifs6_out_msg); \
- 		if (type < ICMP6_INFOMSG_MASK) \
- 			icmp6_ifstat_inc(ifp, ifs6_out_error); \
 		switch(type) { \
 		 case ICMP6_DST_UNREACH: \
 			 icmp6_ifstat_inc(ifp, ifs6_out_dstunreach); \
