@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.244 2002/04/22 12:31:03 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.245 2002/04/22 12:32:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -267,10 +267,6 @@ nd6_ifattach(ifp)
 #undef ND
 }
 
-/*
- * Reset ND level link MTU. This function is called when the physical MTU
- * changes, which means we might have to adjust the ND level MTU.
- */
 void
 nd6_setmtu(ifp)
 	struct ifnet *ifp;
