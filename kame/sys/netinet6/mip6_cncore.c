@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.60 2004/02/05 12:38:10 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.61 2004/02/06 07:49:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -670,7 +670,7 @@ mip6_rthdr_create(pktopt_rthdr, coa, opt)
 	rthdr2->ip6r2_type = 2;
 	rthdr2->ip6r2_segleft = 1;
 	rthdr2->ip6r2_reserved = 0;
-	bcopy((caddr_t)&coa, (caddr_t)(rthdr2 + 1), sizeof(struct in6_addr));
+	bcopy((caddr_t)coa, (caddr_t)(rthdr2 + 1), sizeof(struct in6_addr));
 	*pktopt_rthdr = (struct ip6_rthdr *)rthdr2;
 
 	mip6stat.mip6s_orthdr2++;
