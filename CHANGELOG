@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1792 2001/07/21 01:25:32 itojun Exp $
+$KAME: CHANGELOG,v 1.1793 2001/07/21 01:31:40 itojun Exp $
 
 <200107>
 Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
@@ -40,6 +40,7 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	  # route delete -inet 10.1.0.0 10.0.0.2
 	  (it will raise error as there are two routes with the same rt_key)
 	  # route delete -inet 10.1.0.0
+	  (it is not ambiguous, it works)
 	  # route delete -inet 10.1.0.0 10.0.0.3
 	  (now you can erase the route without rt_gateway, as there's only one)
 	  # route delete -inet 10.1.0.0
