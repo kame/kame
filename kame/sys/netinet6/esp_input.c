@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.19 2000/02/23 09:45:55 jinmei Exp $	*/
+/*	$KAME: esp_input.c,v 1.20 2000/02/24 12:07:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -469,9 +469,8 @@ esp6_input(mp, offp, proto)
 	}
 
 #ifndef PULLDOWN_TEST
-	ip6 = mtod(m, struct ip6_hdr *);
 	IP6_EXTHDR_CHECK(m, off, ESPMAXLEN, IPPROTO_DONE);
-	esp = (struct esp *)(((u_int8_t *)ip6) + off);
+	esp = (struct esp *)(mtod(m, caddr_t) + off);
 #else
 	IP6_EXTHDR_GET(esp, struct esp *, m, off, ESPMAXLEN);
 	if (esp == NULL) {
