@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.98 2002/03/14 06:47:47 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.99 2002/03/14 07:26:14 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -95,6 +95,15 @@ extern struct protosw mip6_tunnel_protosw;
 extern struct mip6_prefix_list mip6_prefix_list;
 
 struct mip6_bc_list mip6_bc_list;
+
+#ifndef MIP6_BC_HASH_SIZE
+#define MIP6_BC_HASH_SIZE 35			/* XXX */
+#endif
+#define MIP6_IN6ADDR_HASH(addr)					\
+	((addr)->s6_addr32[0] ^ (addr)->s6_addr32[1] ^		\
+	 (addr)->s6_addr32[2] ^ (addr)->s6_addr32[3])
+#define MIP6_BC_HASH_ID(addr) (MIP6_IN6ADDR_HASH(addr) % MIP6_BC_HASH_SIZE)
+struct mip6_bc *mip6_bc_hash[MIP6_BC_HASH_SIZE];
 
 #ifdef __NetBSD__
 struct callout mip6_bu_ch = CALLOUT_INITIALIZER;
@@ -3520,6 +3529,7 @@ mip6_bc_init()
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
         callout_init(&mip6_bc_ch);
 #endif
+	bzero(&mip6_bc_hash, sizeof(mip6_bc_hash));
 }
 
 #ifdef MIP6_DRAFT13
@@ -3584,7 +3594,14 @@ mip6_bc_list_insert(mbc_list, mbc)
 	struct mip6_bc_list *mbc_list;
 	struct mip6_bc *mbc;
 {
-	LIST_INSERT_HEAD(mbc_list, mbc, mbc_entry);
+	int id = MIP6_BC_HASH_ID(&mbc->mbc_phaddr.sin6_addr);
+
+	if (mip6_bc_hash[id] != NULL) {
+		LIST_INSERT_BEFORE(mbc, mip6_bc_hash[id], mbc_entry);
+	} else {
+		LIST_INSERT_HEAD(mbc_list, mbc, mbc_entry);
+	}
+	mip6_bc_hash[id] = mbc;
 
 	if (mip6_bc_count == 0) {
 		mip6log((LOG_INFO, "%s:%d: BC timer started.\n",
@@ -3602,11 +3619,22 @@ mip6_bc_list_remove(mbc_list, mbc)
 	struct mip6_bc *mbc;
 {
 	int error = 0;
+	int id;
 
 	if ((mbc_list == NULL) || (mbc == NULL)) {
 		return (EINVAL);
 	}
 
+	id = MIP6_BC_HASH_ID(&mbc->mbc_phaddr.sin6_addr);
+	if (mip6_bc_hash[id] == mbc) {
+		struct mip6_bc *next = LIST_NEXT(mbc, mbc_entry);
+		if (next != NULL &&
+		    id == MIP6_BC_HASH_ID(&next->mbc_phaddr.sin6_addr)) {
+			mip6_bc_hash[id] = next;
+		} else {
+			mip6_bc_hash[id] = NULL;
+		}
+	}
 	LIST_REMOVE(mbc, mbc_entry);
 	if (mbc->mbc_flags & IP6_BUF_HOME) {
 		error = mip6_bc_proxy_control(&mbc->mbc_phaddr, NULL,
@@ -3637,9 +3665,12 @@ mip6_bc_list_find_withphaddr(mbc_list, haddr)
 	struct sockaddr_in6 *haddr;
 {
 	struct mip6_bc *mbc;
+	int id = MIP6_BC_HASH_ID(&haddr->sin6_addr);
 
-	for (mbc = LIST_FIRST(mbc_list); mbc;
+	for (mbc = mip6_bc_hash[id]; mbc;
 	     mbc = LIST_NEXT(mbc, mbc_entry)) {
+		if (MIP6_BC_HASH_ID(&mbc->mbc_phaddr.sin6_addr) != id)
+			return NULL;
 		if (SA6_ARE_ADDR_EQUAL(&mbc->mbc_phaddr, haddr))
 			break;
 	}
