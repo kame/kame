@@ -848,8 +848,11 @@ tcp6_connect(tp, nam, p)
 	inp->in6p_faddr = sin6->sin6_addr;
 	inp->in6p_fsa.sin6_scope_id = sin6->sin6_scope_id;
 	inp->inp_fport = sin6->sin6_port;
-	if ((sin6->sin6_flowinfo & IPV6_FLOWINFO_MASK) != NULL)
-		inp->in6p_flowinfo = sin6->sin6_flowinfo;
+	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
+	inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
+	if (inp->in6p_flags & IN6P_AUTOFLOWLABEL)
+		inp->in6p_flowinfo |=
+		    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	in_pcbrehash(inp);
 
 	/* Compute window scaling to request.  */
