@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.2 1999/08/03 01:04:50 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.3 1999/08/12 23:58:26 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367,
@@ -526,10 +526,10 @@ key_checkrequest(isr)
 		break;
 	case IPSEC_MODE_TUNNEL:
 		if (isr->proxy == NULL)
-			panic("key_checkpolicy: No proxy specified.\n");
+			panic("key_checkrequest: No proxy specified.\n");
 		break;
 	default:
-		panic("key_checkpolicy: Invalid policy defined.\n");
+		panic("key_checkrequest: Invalid policy defined.\n");
 	}
 
 	/* get current level */
@@ -578,7 +578,7 @@ key_checkrequest(isr)
 
 	if ((error = key_acquire(&isr->sp->idx, proto, isr->proxy)) != 0) {
 		/* XXX What I do ? */
-		printf("key_checkpolicy: error %d returned "
+		printf("key_checkrequest: error %d returned "
 			"from key_acquire.\n", error);
 		return error;
 	}
@@ -4995,7 +4995,7 @@ key_get(mhp)
 }
 
 /*
- * SADB_ACQUIRE processing called by key_checkpolicy() and key_acquire2().
+ * SADB_ACQUIRE processing called by key_checkrequest() and key_acquire2().
  * send
  *   <base, SA, address(SD), (address(P)),
  *       (identity(SD),) (sensitivity,) proposal>
