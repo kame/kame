@@ -166,7 +166,7 @@ protopr(off, name)
 				printf("%*p ", PLEN, prev);
 #ifdef INET6
 		if (inpcb.inp_flags & INP_IPV6) {
-			strcpy(namebuf, name);
+			strcpy(namebuf, name0);
 			strcat(namebuf, "6");
 			name = namebuf;
 		} else
