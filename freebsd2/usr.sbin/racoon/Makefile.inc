@@ -8,6 +8,11 @@ YFLAGS+=-d
 .if exists(/usr/local/include/idea.h)
 CFLAGS+=-DHAVE_IDEA_H=1
 .endif
+.if exists(/usr/local/include/openssl)
+CFLAGS+=-I/usr/local/include/openssl
+.elif exists(/usr/local/include/ssleay)
+CFLAGS+=-I/usr/local/include/ssleay
+.endif
 
 LDADD+=	-ly -ll -L/usr/local/lib -lcrypto
 LDADD+=	-L${.CURDIR}/../../../lib/libipsec \
