@@ -140,6 +140,7 @@ struct ip6_exthdrs {
 };
 
 static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **, int));
+static int ip6_getpcbopt __P((struct ip6_pktopts *, int, void **, int *));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 			    struct socket *, struct sockopt *sopt));
@@ -1251,7 +1252,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 	struct mbuf **mp;
 #endif
 {
-	int privileged;
+	int privileged, optdatalen;
+	void *optdata;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	register struct inpcb *in6p = sotoinpcb(so);
 	int error, optval;
@@ -1359,7 +1361,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
 #ifdef notyet			/* To be implemented */
-			case IPV6_RTHDRDSTOPTS:
 			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
 #endif 
@@ -1762,8 +1763,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 				break;
 
-			case IPV6_HOPOPTS:
-			case IPV6_DSTOPTS:
 			case IPV6_RECVHOPOPTS:
 			case IPV6_RECVDSTOPTS:
 			case IPV6_RECVRTHDRDSTOPTS:
@@ -1776,16 +1775,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVOPTS:
 			case IPV6_RECVRETOPTS:
 			case IPV6_RECVDSTADDR:
-			case IPV6_PKTINFO:
-			case IPV6_HOPLIMIT:
-			case IPV6_RTHDR:
 			case IPV6_CHECKSUM:
 
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
 #ifdef notyet			/* To be implemented */
-			case IPV6_RTHDRDSTOPTS:
 			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
 #endif 
@@ -1813,17 +1808,14 @@ ip6_ctloutput(op, so, level, optname, mp)
 #define OPTBIT(bit) (in6p->in6p_flags & (bit) ? 1 : 0)
 #endif
 
-				case IPV6_PKTINFO:
 				case IPV6_RECVPKTINFO:
 					optval = OPTBIT(IN6P_PKTINFO);
 					break;
 
-				case IPV6_HOPLIMIT:
 				case IPV6_RECVHOPLIMIT:
 					optval = OPTBIT(IN6P_HOPLIMIT);
 					break;
 
-				case IPV6_HOPOPTS:
 				case IPV6_RECVHOPOPTS:
 					optval = OPTBIT(IN6P_HOPOPTS);
 					break;
@@ -1831,15 +1823,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 				case IPV6_RECVDSTOPTS:
 					optval = OPTBIT(IN6P_DSTOPTS);
 					break;
+
 				case IPV6_RECVRTHDRDSTOPTS:
 					optval = OPTBIT(IN6P_RTHDRDSTOPTS);
-					break;
-				case IPV6_DSTOPTS:
-					optval = OPTBIT(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS);
-					break;
-
-				case IPV6_RTHDR:
-					optval = OPTBIT(IN6P_RTHDR);
 					break;
 
 				case IPV6_CHECKSUM:
@@ -1887,6 +1873,74 @@ ip6_ctloutput(op, so, level, optname, mp)
 				m->m_len = sizeof(int);
 				*mtod(m, int *) = optval;
 #endif
+				break;
+
+			case IPV6_PKTINFO:
+			case IPV6_HOPOPTS:
+			case IPV6_RTHDR:
+			case IPV6_DSTOPTS:
+			case IPV6_RTHDRDSTOPTS:
+#ifdef COMPAT_RFC2292
+				if (optname == IPV6_HOPOPTS ||
+				    optname == IPV6_DSTOPTS ||
+				    !privileged)
+					return(EPERM);
+				switch(optname) {
+				case IPV6_PKTINFO:
+					optbit = OPTBIT(IN6P_PKTINFO);
+					break;
+				case IPV6_HOPLIMIT:
+					optval = OPTBIT(IN6P_HOPLIMIT);
+					break;
+				case IPV6_HOPOPTS:
+					optbit = OPTBIT(IN6P_HOPOPTS);
+					break;
+				case IPV6_RTHDR:
+					optbit = OPTBIT(IN6P_RTHDR);
+					break;
+				case IPV6_DSTOPTS:
+					optbit = OPTBIT(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS);
+					break;
+				case IPV6_RTHDRDSTOPTS:	/* in 2292bis only */
+					return(EOPNOTSUPP);
+				}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				error = sooptcopyout(sopt, &optval,
+					sizeof optval);
+#else
+				*mp = m = m_get(M_WAIT, MT_SOOPTS);
+				m->m_len = sizeof(int);
+				*mtod(m, int *) = optval;
+#endif /* FreeBSD3 */
+#else  /* new advanced API */
+#ifdef HAVE_NRL_INPCB
+#define in6p inp
+#define in6p_outputopts inp_outputopts
+#endif
+				error = ip6_getpcbopt(in6p->in6p_outputopts,
+						      optname, &optdata,
+						      &optdatalen);
+				if (error == 0) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+					/* note that optdatalen maybe 0 */
+					error = sooptcopyout(sopt, optdata,
+							     optdatalen);
+#else  /* !FreeBSD3 */
+					if (optdatalen > MCLBYTES)
+						return(EMSGSIZE); /* XXX */
+					*mp = m = m_get(M_WAIT, MT_SOOPTS);
+					if (optdatalen > MLEN)
+						MCLGET(m, M_WAIT);
+					m->m_len = optdatalen;
+					bcopy(optdata, mtod(m, void *),
+					      optdatalen);
+#endif /* FreeBSD3 */
+				}
+#ifdef HAVE_NRL_INPCB
+#undef in6p
+#undef in6p_outputopts
+#endif
+#endif /* COMPAT_RFC2292 */
 				break;
 
 			case IPV6_MULTICAST_IF:
@@ -2211,9 +2265,9 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 		bcopy(buf, newdest, destlen);
 
 		if (optname == IPV6_DSTOPTS)
-			opt->ip6po_dest1 = newdest;
-		else
 			opt->ip6po_dest2 = newdest;
+		else
+			opt->ip6po_dest1 = newdest;
 
 		break;
 	}
@@ -2258,6 +2312,67 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 	default:
 		return(ENOPROTOOPT);	
 	} /* end of switch */
+
+	return(0);
+}
+
+static int
+ip6_getpcbopt(pktopt, optname, datap, datalenp)
+	struct ip6_pktopts *pktopt;
+	int optname, *datalenp;
+	void **datap;
+{
+	void *optdata = NULL;
+	struct ip6_ext *ip6e;
+	int optdatalen = 0;
+
+	if (pktopt == NULL)
+		goto end;
+
+	switch(optname) {
+	case IPV6_PKTINFO:
+		if (pktopt->ip6po_pktinfo) {
+			optdata = (void *)pktopt->ip6po_pktinfo;
+			optdatalen = sizeof(struct in6_pktinfo);
+		}
+		break;
+	case IPV6_HOPLIMIT:
+		optdata = (void *)&pktopt->ip6po_hlim;
+		optdatalen = sizeof(int);
+		break;
+	case IPV6_HOPOPTS:
+		if (pktopt->ip6po_hbh) {
+			optdata = (void *)pktopt->ip6po_hbh;
+			ip6e = (struct ip6_ext *)pktopt->ip6po_hbh;
+			optdatalen = (ip6e->ip6e_len + 1) << 3;
+		}
+		break;
+	case IPV6_RTHDR:
+		if (pktopt->ip6po_rthdr) {
+			optdata = (void *)pktopt->ip6po_rthdr;
+			ip6e = (struct ip6_ext *)pktopt->ip6po_rthdr;
+			optdatalen = (ip6e->ip6e_len + 1) << 3;
+		}
+		break;
+	case IPV6_RTHDRDSTOPTS:
+		if (pktopt->ip6po_dest1) {
+			optdata = (void *)pktopt->ip6po_dest1;
+			ip6e = (struct ip6_ext *)pktopt->ip6po_dest1;
+			optdatalen = (ip6e->ip6e_len + 1) << 3;
+		}
+		break;
+	case IPV6_DSTOPTS:
+		if (pktopt->ip6po_dest2) {
+			optdata = (void *)pktopt->ip6po_dest2;
+			ip6e = (struct ip6_ext *)pktopt->ip6po_dest2;
+			optdatalen = (ip6e->ip6e_len + 1) << 3;
+		}
+		break;
+	}
+
+  end:
+	*datap = optdata;
+	*datalenp = optdatalen;
 
 	return(0);
 }
