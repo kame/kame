@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.60 2001/11/28 06:05:43 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.61 2001/11/28 08:05:16 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -210,6 +210,7 @@ void		 natpt_composeIPv6Hdr		__P((struct ip *, struct pAddr *,
 						     struct ip6_hdr *));
 void		 natpt_composeIPv4Hdr		__P((struct pcv *, struct pAddr *,
 						     struct pcv *));
+void		 natpt_adjustMBuf		__P((struct mbuf *, struct mbuf *));
 void		 natpt_fixTCPUDP64cksum		__P((int, int, struct pcv *, struct pcv *));
 void		 natpt_fixTCPUDP44cksum		__P((int, struct pcv *, struct pcv *));
 int		 natpt_fixCksum			__P((int, u_char *, int, u_char *, int));
@@ -247,25 +248,8 @@ natpt_translateIPv6To4(struct pcv *cv6, struct pAddr *pad)
 		break;
 	}
 
-	if (m4) {
-		int		 mlen;
-		struct mbuf	*mm;
-		struct ip	*ip4;
-
-		ip4 = mtod(m4, struct ip *);
-		ip4->ip_sum = 0;
-		ip4->ip_sum = in_cksum(m4, sizeof(struct ip));
-		m4->m_pkthdr.rcvif = cv6->m->m_pkthdr.rcvif;
-
-		for (mlen = 0, mm = m4; mm; mm = mm->m_next) {
-			mlen += mm->m_len;
-		}
-
-		m4->m_pkthdr.len = mlen;
-
-		if (isDump(D_TRANSLATEDIPV4))
-			natpt_logIp4(LOG_DEBUG, ip4, NULL);
-	}
+	if (m4)
+		natpt_adjustMBuf(cv6->m, m4);
 
 	return (m4);
 }
@@ -708,25 +692,8 @@ natpt_translateFragment6(struct pcv *cv6, struct pAddr *pad)
 	bcopy(cv6->pyld.caddr, cv4.pyld.caddr, frag6len);
 	cv4.m->m_len = ip4->ip_len;
 
-	if (m4) {
-		int		 mlen;
-		struct mbuf	*mm;
-		struct ip	*ip4;
-
-		ip4 = mtod(m4, struct ip *);
-		ip4->ip_sum = 0;
-		ip4->ip_sum = in_cksum(m4, sizeof(struct ip));
-		m4->m_pkthdr.rcvif = cv6->m->m_pkthdr.rcvif;
-
-		for (mlen = 0, mm = m4; mm; mm = mm->m_next) {
-			mlen += mm->m_len;
-		}
-
-		m4->m_pkthdr.len = mlen;
-
-		if (isDump(D_TRANSLATEDIPV4))
-			natpt_logIp4(LOG_DEBUG, ip4, NULL);
-	}
+	if (m4)
+		natpt_adjustMBuf(cv6->m, m4);
 
 	return (m4);
 }
@@ -1316,25 +1283,8 @@ natpt_translateIPv4To4(struct pcv *cv4, struct pAddr *pad)
 		break;
 	}
 
-	if (m4) {
-		int		 mlen;
-		struct mbuf	*mm;
-		struct ip	*ip4;
-
-		ip4 = mtod(m4, struct ip *);
-		ip4->ip_sum = 0;			/* Header checksum	*/
-		ip4->ip_sum = in_cksum(m4, sizeof(struct ip));
-		m4->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
-
-		for (mlen = 0, mm = m4; mm; mm = mm->m_next) {
-			mlen += mm->m_len;
-		}
-
-		m4->m_pkthdr.len = mlen;
-
-		if (isDump(D_TRANSLATEDIPV4))
-			natpt_logIp4(LOG_DEBUG, ip4, NULL);
-	}
+	if (m4)
+		natpt_adjustMBuf(cv4->m, m4);
 
 	return (m4);
 }
@@ -2359,6 +2309,24 @@ natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 			? IPPROTO_ICMP
 			: cv6->fh->ip6f_nxt;
 	}
+}
+
+
+void
+natpt_adjustMBuf(struct mbuf *mf, struct mbuf *mt)
+{
+	int		 mlen;
+	struct mbuf	*mm;
+	struct ip	*ip4;
+
+	ip4 = mtod(mt, struct ip *);
+	ip4->ip_sum = 0;
+	ip4->ip_sum = in_cksum(mt, sizeof(struct ip));
+	for (mlen = 0, mm = mt; mm; mm = mm->m_next) {
+		mlen += mm->m_len;
+	}
+	mt->m_pkthdr.len = mlen;
+	mt->m_pkthdr.rcvif = mf->m_pkthdr.rcvif;
 }
 
 
