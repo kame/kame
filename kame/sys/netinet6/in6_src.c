@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.125 2002/12/10 11:45:51 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.126 2002/12/10 11:47:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -708,6 +708,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 *sin6_next;
 	struct in6_pktinfo *pi = NULL;
+	struct in6_addr *dst = &dstsock->sin6_addr;
 
 #if 0
 	if (dstsock->sin6_addr.s6_addr32[0] == 0 &&
@@ -731,8 +732,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 		ifp = ifindex2ifnet[pi->ipi6_ifindex];
 #endif
 		if (ifp != NULL &&
-		    (retrt == NULL ||
-		    IN6_IS_ADDR_MULTICAST(&dstsock->sin6_addr))) {
+		    (retrt == NULL || IN6_IS_ADDR_MULTICAST(dst))) {
 			/*
 			 * we do not have to check nor get the route for
 			 * multicast.
@@ -746,7 +746,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	 * If the destination address is a multicast address and the outgoing
 	 * interface for the address is specified by the caller, use it.
 	 */
-	if (IN6_IS_ADDR_MULTICAST(&dstsock->sin6_addr) &&
+	if (IN6_IS_ADDR_MULTICAST(dst) &&
 	    mopts != NULL && (ifp = mopts->im6o_multicast_ifp) != NULL) {
 		goto done; /* we do not need a route for multicast. */
 	}
@@ -816,17 +816,6 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	 * cached destination, in case of sharing the cache with IPv4.
 	 */
 	if (ro) {
-		struct sockaddr_in6 dstsock0;
-
-		if (ifp && dstsock->sin6_scope_id == 0) {
-			dstsock0 = *dstsock;
-			dstsock = &dstsock0;
-			if ((error = scope6_setzoneid(ifp, dstsock)) != 0) {
-				ifp = NULL;
-				goto done;
-			}
-		}
-
 		if (ro->ro_rt &&
 		    (!(ro->ro_rt->rt_flags & RTF_UP) ||
 		     ro->ro_dst.sa_family != AF_INET6 ||
@@ -834,7 +823,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 		     !SA6_ARE_ADDR_EQUAL(&satosin6(&ro->ro_dst), dstsock)
 #else
 		     !IN6_ARE_ADDR_EQUAL(&satosin6(&ro->ro_dst)->sin6_addr,
-					 &dstsock->sin6_addr)
+					 dst)
 #endif
 			    )) {
 			RTFREE(ro->ro_rt);
