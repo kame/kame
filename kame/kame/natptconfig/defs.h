@@ -1,4 +1,4 @@
-/*	$KAME: defs.h,v 1.6 2001/09/02 19:32:27 fujisawa Exp $	*/
+/*	$KAME: defs.h,v 1.7 2001/09/06 09:46:05 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -67,8 +67,8 @@ struct ruletab
 {
 	struct pAddr	*from;
 	struct pAddr	*to;
-	u_short		*sports;
-	u_short		 dport;
+	u_short		*sports;	/* u_short (*)[3] */
+	u_short		*dports;	/* u_short (*)[2] */
 	int		 proto;
 	int		 bidir;
 };

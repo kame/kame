@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.12 2001/09/05 04:15:34 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.13 2001/09/06 09:46:05 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -145,6 +145,7 @@ yyerror(char *msg, ...)
 %token		SIPV6ADDR
 
 
+%type	<Int>	dport
 %type	<pAddr>	ipv4addrs
 %type	<pAddr>	ipv6addrs
 %type	<Ainfo>	ipv4addr
@@ -233,11 +234,11 @@ prefix
 */
 
 rules
-		: SMAP SQUESTION
+		: map SQUESTION
 		    { printHelp(SMAP, NULL); }
 
 		/* IPv6 -> IPv4 */
-		| SMAP SFROM SANY6 STO ipv4addr opt_ports opt_proto
+		| map SFROM SANY6 STO ipv4addr opt_ports opt_proto
 		    {
 			ruletab.from   = NULL;
 			ruletab.to     = getAddrs(AF_INET, ADDR_SINGLE, $5, 0);
@@ -245,7 +246,8 @@ rules
 			ruletab.proto  = $7;
 			setRules(NATPT_MAP64, &ruletab);
 		    }
-		| SMAP SFROM ipv6addrs STO ipv4addrs opt_ports opt_proto
+
+		| map SFROM ipv6addrs STO ipv4addrs opt_ports opt_proto
 		    {
 			ruletab.from   = $3;
 			ruletab.to     = $5;
@@ -255,17 +257,29 @@ rules
 		    }
 
 		/* IPv4 -> IPv6 */
-		| SMAP SFROM ipv4addrs STO ipv6addrs opt_proto
+		| map SFROM ipv4addrs STO ipv6addrs opt_proto
 		    {
 			ruletab.from  = $3;
 			ruletab.to    = $5;
 			ruletab.proto = $6;
 			setRules(NATPT_MAP46, &ruletab);
 		    }
-		| SMAP SFROM ipv4addr dport STO ipv6addr dport opt_proto
+
+		| map SFROM ipv4addr dport STO ipv6addr dport opt_proto
+		    {
+			u_short *us = (u_short *)malloc(sizeof(u_short[2]));
+
+			us[0] = $4;
+			us[1] = $7;
+			ruletab.from = getAddrs(AF_INET,  ADDR_SINGLE, $3, 0);
+			ruletab.to   = getAddrs(AF_INET6, ADDR_SINGLE, $6, 0);
+			ruletab.dports = us;
+			ruletab.proto = $8;
+			setRules(NATPT_MAP46, &ruletab);
+		    }
 
 		/* IPv4 -> IPv4 (outbound) */
-		| SMAP SFROM ipv4addrs STO ipv4addrs opt_ports opt_proto opt_bidir
+		| map SFROM ipv4addrs STO ipv4addrs opt_ports opt_proto opt_bidir
 		    {
 			ruletab.from   = $3;
 			ruletab.to     = $5;
@@ -276,10 +290,15 @@ rules
 
 
 		/* IPv4 -> IPv4 (inbound) */
-		| SMAP SFROM ipv4addr dport STO ipv4addr dport opt_proto
+		| map SFROM ipv4addr dport STO ipv4addr dport opt_proto
 
-		| SMAP SFLUSH opt_all
+		| map SFLUSH opt_all
 		    { flushRules($3); }
+		;
+
+map
+		: SMAP
+		    { bzero(&ruletab, sizeof(struct ruletab)); }
 		;
 
 
@@ -403,6 +422,7 @@ opt_decimal
 
 dport
 		: SDPORT SDECIMAL
+		    { $$ = htons((u_short)($2)); }
 		;
 
 protos

@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.13 2001/09/06 06:11:52 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.14 2001/09/06 09:46:05 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -131,6 +131,12 @@ setRules(int type, struct ruletab *ruletab)
 		f->remote.port[1] = ruletab->sports[2];
 	}
 
+	if (ruletab->dports) {
+		f->map = NATPT_COPY_DPORT;
+		f->local.port[1]  = ruletab->dports[0];
+		f->remote.port[1] = ruletab->dports[1];
+	}
+
 	if (ruletab->proto) {
 		f->proto = ruletab->proto;
 	}
@@ -149,8 +155,7 @@ flushRules(int all)
 	struct natpt_msgBox	 mBox;
 
 	bzero(&mBox, sizeof(struct natpt_msgBox));
-	if (all)
-		mBox.flags = NATPT_FLUSHALL;
+	mBox.flags = NATPT_FLUSHALL;
 
 	if (soctl(sfd, SIOCFLUSHRULE, &mBox) < 0)
 		soctlFailure(fn);
