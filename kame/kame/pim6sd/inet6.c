@@ -1,4 +1,4 @@
-/*	$KAME: inet6.c,v 1.16 2002/06/26 10:40:08 itojun Exp $	*/
+/*	$KAME: inet6.c,v 1.17 2004/11/17 02:16:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -215,11 +215,7 @@ sa6_fmt(struct sockaddr_in6 *sa6)
 {
     static char     ip6buf[8][MAXHOSTNAMELEN];
     static int      ip6round = 0;
-#ifdef NI_WITHSCOPEID
-    int flags = NI_WITHSCOPEID;
-#else
     int flags = 0;
-#endif
     char           *cp;
     struct sockaddr_in6 sa6_tmp; /* local copy for overriding */
 
