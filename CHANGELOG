@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2396 2003/05/15 04:00:37 jinmei Exp $
+$KAME: CHANGELOG,v 1.2397 2003/05/19 09:51:02 keiichi Exp $
 
 <200305>
+Mon May 19 18:47:38 JST 2003	keiichi@iij.ad.jp
+	* kame/kame/rtadvd/advcap.c,config.c,dump.c,rtadvd.[hc]
+	  implemented the rapid router advertisement which is defined in the
+	  mobile ipv6 spec.
+
 2003-05-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/net/if.c (if_detach): be sure to reset the
 	ifindex2ifnet[] entry for the detached interface.
