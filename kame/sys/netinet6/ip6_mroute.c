@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.43 2001/03/08 08:47:33 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.44 2001/03/08 12:14:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1606,9 +1606,9 @@ phyint_send(ip6, mifp, m)
 	struct ifnet *ifp = mifp->m6_ifp;
 	int error = 0;
 #ifdef __NetBSD__
-	int s = splsoftnet();
+	int s = splsoftnet();	/* needs to protect static "ro" below. */
 #else
-	int s = splnet();
+	int s = splnet();	/* needs to protect static "ro" below. */
 #endif
 #ifdef NEW_STRUCT_ROUTE
 	static struct route ro;
