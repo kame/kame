@@ -1,17 +1,16 @@
 # New ports collection makefile for:	vat6
-# Version required:	19981109
 # Date created:		Fri Jul 10 17:29:13 JST 1998
 # Whom:			itojun
 #
-# $Id: Makefile,v 1.4 2000/05/07 17:10:12 sumikawa Exp $
+# $KAME: Makefile,v 1.5 2000/06/25 10:58:49 sumikawa Exp $
 #
 
-DISTNAME=	vat6
-PKGNAME=	vat6-20000506
+PORTNAME=	vat6
+PORTVERSION=	20000506
 CATEGORIES=	mbone tk82
 MASTER_SITES=	http://irl.cs.ucla.edu/software/IPv6/ \
 		ftp://ftp.cs.tu-berlin.de/pub/local/kbs/tubmik/gsm/
-DISTFILES=	${DISTNAME}${EXTRACT_SUFX} ${GSM}${EXTRACT_SUFX}
+DISTFILES=	${PORTNAME}${EXTRACT_SUFX} ${GSM}${EXTRACT_SUFX}
 
 PATCH_SITES=	http://www.v6.csi2.net/setup/mcast/patch/
 PATCHFILES=	vat6-kame-20000506.patch
@@ -22,6 +21,7 @@ MAINTAINER=	itojun@itojun.org
 LIB_DEPENDS=	tk82.1:${PORTSDIR}/x11-toolkits/tk82 \
 		gsm.1:${PORTSDIR}/audio/gsm
 
+WRKSRC=		${WRKDIR}/${PORTNAME}
 USE_X11=	yes
 USE_AUTOCONF=	yes
 CONFIGURE_ARGS=	--with-gsm=${WRKDIR}/${GSMDIR}

@@ -2,13 +2,15 @@
 # Date created:         Wed Jan 26 03:37:49 JST 2000
 # Whom:                 sumikawa
 #
-# $FreeBSD$
+# $KAME: Makefile,v 1.16 2000/06/25 10:58:47 sumikawa Exp $
 #
 
-DISTNAME=	tcpdump-2000_06_19
-PKGNAME=	tcpdump-20000619
+PORTNAME=	tcpdump
+SNAPVERSION=	2000_06_19
+PORTVERSION=	${SNAPVERSION:S/_//g}
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
+DISTNAME=	${PORTNAME}-${SNAPVERSION}
 
 MAINTAINER=	sumikawa@kame.net
 

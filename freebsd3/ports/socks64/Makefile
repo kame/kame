@@ -1,16 +1,16 @@
 # New ports collection makefile for:	socks64
-# Version required:			v1.0r10-20000322
 # Date created:				24 Apr 1996
 # Whom:					pst
 #
-# $Id: Makefile,v 1.3 2000/03/25 05:51:35 sumikawa Exp $
+# $KAME: Makefile,v 1.4 2000/06/25 10:58:45 sumikawa Exp $
 #
 
-DISTNAME=	socks5-v1.0r10
-PKGNAME=	socks64-1.0.10.20000322
+PORTNAME=	socks64
+PORTVERSION=	1.0.10.20000322
 CATEGORIES=	net security
 MASTER_SITES=	ftp://ftp.kame.net/pub/kame/misc/
 DISTFILES=	${DISTNAME}${EXTRACT_SUFX} ${SOCKS64}.tgz
+DISTNAME=	socks5-v1.0r10
 
 PATCH_DIST_STRIP=	-p1
 

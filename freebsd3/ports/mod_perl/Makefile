@@ -5,9 +5,8 @@
 # $FreeBSD: ports/www/mod_perl/Makefile,v 1.8 2000/04/16 11:30:44 paul Exp $
 #
 
-#PORTNAME=	mod_perl
-#PORTVERSION= 	1.24
-DISTNAME=	mod_perl-1.24
+PORTNAME=	mod_perl
+PORTVERSION= 	1.24
 CATEGORIES=	www perl5
 MASTER_SITES=	${MASTER_SITE_PERL_CPAN}
 MASTER_SITE_SUBDIR=	Apache

@@ -1,15 +1,15 @@
 # New ports collection makefile for:	tcptrace
-# Version required:	5.2.1
 # Date created:		3 March 1997
 # Whom:			fenner
 #
-# $Id: Makefile,v 1.2 1999/09/16 00:43:50 itojun Exp $
+# $KAME: Makefile,v 1.3 2000/06/25 10:58:47 sumikawa Exp $
 #
 
-DISTNAME=	tcptrace.5.2.1
-PKGNAME=	tcptrace-5.2.1
+PORTNAME=	tcptrace
+PORTVERSION=	5.2.1
 CATEGORIES=	net
 MASTER_SITES=	http://jarok.cs.ohiou.edu/software/tcptrace/files/5.2.1/
+DISTNAME=	${PORTNAME}.${PORTVERSION}
 
 MAINTAINER=	itojun@kame.net
 

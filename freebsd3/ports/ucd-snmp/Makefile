@@ -1,13 +1,12 @@
 # New ports collection makefile for:	ucd-snmp-v6
-# Version required:			4.0.1 + IPv6 19991104
 # Date created:				26 June 1996
 # Whom:					itojun@iijlab.net
 #
-# $Id: Makefile,v 1.7 1999/11/18 13:33:21 itojun Exp $
+# $KAME: Makefile,v 1.8 2000/06/25 10:58:48 sumikawa Exp $
 #
 
-DISTNAME=	ucd-snmp-4.0.1
-PKGNAME=	ucd-snmp-v6-4.0.1.19991118a
+PORTNAME=	ucd-snmp
+PORTVERSION=	4.0.1
 CATEGORIES=	net
 MASTER_SITES= 	ftp://ucd-snmp.ucdavis.edu/ \
 		ftp://sunsite.cnlab-switch.ch/mirror/ucd-snmp/ \

@@ -1,13 +1,12 @@
 # New ports collection makefile for:	ppp
-# Version required:	1999-03-09
 # Date created:		11 Apr 1999
 # Whom:			shin
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:27 itojun Exp $
+# $KAME: Makefile,v 1.2 2000/06/25 10:58:42 sumikawa Exp $
 #
 
-DISTNAME=	ppp-990309
-PKGNAME=	ppp-990309
+PORTNAME=	ppp
+PORTVERSION=	990309
 CATEGORIES=	www
 MASTER_SITES=	ftp://ftp.kame.net/pub/kame/misc/
 

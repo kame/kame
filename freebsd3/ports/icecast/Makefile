@@ -1,14 +1,14 @@
 # New ports collection makefile for:   icecast
-# Version required:	1.1.0
 # Date created:		28 Jan 1999
 # Whom:			Chip Marshall <chip@eboai.org>
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:09:48 itojun Exp $
+# $KAME: Makefile,v 1.2 2000/06/25 10:58:33 sumikawa Exp $
 #
 
-DISTNAME=	icecast-1.1.4
+PORTNAME=	icecast
+PORTVERSION=	1.1.4
 CATEGORIES=	audio net
-MASTER_SITES=	http://www.icecast.org/releases/	\
+MASTER_SITES=	http://www.icecast.org/releases/ \
 		ftp://ftp.eboai.org/pub/icecast/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \

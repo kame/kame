@@ -1,15 +1,14 @@
 # New ports collection makefile for:	mediator
-# Version required:	19991020
 # Date created:		Thu Apr 15 16:28:43 JST 1999
 # Whom:			Jun-ichiro itojun Hagino
 #
-# $Id: Makefile,v 1.3 1999/12/08 04:20:17 sumikawa Exp $
+# $Id: Makefile,v 1.4 2000/06/25 10:58:38 sumikawa Exp $
 #
 
-DISTNAME=	mediator-SNAP-${PKGVER}
-PKGNAME=	mediator-${PKGVER}
-PKGVER=		19991020
+PORTNAME=	mediator
+PORTVERSION=	19991020
 CATEGORIES=	net
+DISTNAME=	${PORTNAME}-SNAP-${PORTVERSION}
 
 MAINTAINER=	itojun@kame.net
 

@@ -1,13 +1,12 @@
 # New ports collection makefile for:	bind9
-# Version required:	9.0.0b2
 # Date created:		Sat Apr 29 18:50:37 JST 2000
 # Whom:			jinmei
 #
-# $Id: Makefile,v 1.5 2000/06/20 05:59:55 sumikawa Exp $
+# $Id: Makefile,v 1.6 2000/06/25 10:58:31 sumikawa Exp $
 #
 
-DISTNAME=	bind-9.0.0b4
-PKGNAME=	bind-9.0.0.b4
+PORTNAME=	bind
+PORTVERSION=	9.0.0b4
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.isc.org/isc/bind9/9.0.0b4/
 

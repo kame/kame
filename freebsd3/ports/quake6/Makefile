@@ -1,15 +1,15 @@
-# New ports collection makefile for:    quake6
-# Version required:     0.0
+# New ports collection makefile for:    quakeforge
 # Date created:         Wed Feb  2 01:07:07 JST 2000
 # Whom:                 sumikawa
 #
-# $Id: Makefile,v 1.3 2000/05/17 10:13:20 sumikawa Exp $
+# $KAME: Makefile,v 1.4 2000/06/25 10:58:43 sumikawa Exp $
 #
 
-DISTNAME=	qf-current-snapshot
-PKGNAME=	quakeforge-20000512
+PORTNAME=	quakeforge
+PORTVERSION=	20000512
 CATEGORIES=	games
 MASTER_SITES=	http://quake.sourceforge.net/files/
+DISTNAME=	qf-current-snapshot
 
 MAINTAINER=	sumikawa@kame.net
 

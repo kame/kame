@@ -1,14 +1,14 @@
 # New ports collection makefile for:	gated-ipv6
-# Version required:	20000511
 # Date created:		Sat May 13 16:35:26 JST 2000
 # Whom:			suz
-# $Id: Makefile,v 1.4 2000/05/17 02:45:51 suz Exp $
 #
+# $KAME: Makefile,v 1.5 2000/06/25 10:58:32 sumikawa Exp $
 
-DISTNAME=	gated-pub-ipv6-snapshot20000511
-PKGNAME=	gated-ipv6-20000511
+PORTNAME=	gated-ipv6
+PORTVERSION=	20000511
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.gated.org/net-research/gated/
+DISTNAME=	gated-pub-ipv6-snapshot20000511
 
 MAINTAINER=	suz@kame.net
 

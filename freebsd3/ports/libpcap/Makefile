@@ -1,15 +1,16 @@
 # New ports collection makefile for:    libpcap
-# Version required:     20000327
 # Date created:         Wed Jan 26 03:37:49 JST 2000
 # Whom:                 sumikawa
 #
-# $FreeBSD$
+# $KAME: Makefile,v 1.15 2000/06/25 10:58:36 sumikawa Exp $
 #
 
-DISTNAME=	libpcap-2000_06_19
-PKGNAME=	libpcap-20000619
+PORTNAME=	libpcap
+SNAPVERSION=	2000_06_19
+PORTVERSION=	${SNAPVERSION:S/_//g}
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
+DISTNAME=	${PORTNAME}-${SNAPVERSION}
 
 MAINTAINER=	sumikawa@kame.net
 

@@ -1,16 +1,15 @@
-# ex:ts=8
 # New ports collection makefile for:    ncftp3
-# Version required:     3.0
 # Date created:         4 Nov 1994
 # Whom:                 ache
 #
-# $Id: Makefile,v 1.7 2000/04/12 13:22:15 sumikawa Exp $
+# $KAME: Makefile,v 1.8 2000/06/25 10:58:39 sumikawa Exp $
 #
 
-DISTNAME=       ncftp-3.0.1-src
-PKGNAME=        ncftp-3.0.1
+PORTNAME=	ncftp
+PORTVERSION=	3.0.1
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.ncftp.com/ncftp/
+DISTNAME=       ${PKGNAME}-src
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
 PATCHFILES=	ncftp-301-v6-20000412.diff.gz

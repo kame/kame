@@ -1,12 +1,12 @@
 # New ports collection makefile for:	wwwoffle
-# Version required:	2.5
 # Date created:		Thu Oct 28 13:39:54 JST 1999
 # Whom:			jinmei@kame.net
 #
-# $Id: Makefile,v 1.3 1999/10/28 05:49:31 sumikawa Exp $
+# $KAME: Makefile,v 1.4 2000/06/25 10:58:51 sumikawa Exp $
 #
 
-DISTNAME=	wwwoffle-2.5
+PORTNAME=	wwwoffle
+PORTVERSION=	2.5
 CATEGORIES=	www
 MASTER_SITES=	ftp://ftp.demon.co.uk/pub/unix/httpd/ \
 		${MASTER_SITE_SUNSITE:=apps/www/servers/} \

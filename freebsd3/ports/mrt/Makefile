@@ -1,23 +1,21 @@
 # New ports collection makefile for:	mrt
-# Version required:	2.1.2a
 # Date created:		Sat Jun  6 00:09:52 JST 1998
 # Whom:			Jun-ichiro itojun Hagino <itojun@itojun.org>
 #
 # $FreeBSD: ports/net/mrt/Makefile,v 1.4 2000/01/11 19:53:22 sumikawa Exp $
 #
 
-DISTNAME=	mrt-${VERBASE}-src
-PKGNAME=	mrt-${VERBASE}
+PORTNAME=	mrt
+PORTVERSION=	2.1.2a
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.merit.edu/net-research/mrt/
+DISTNAME=	${PORTNAME}-${PORTVERSION}-src
 
 MAINTAINER=	itojun@itojun.org
 
-WRKSRC=		${WRKDIR}/mrt-${VERBASE}/src
+WRKSRC=		${WRKDIR}/mrt-${PORTVERSION}/src
 GNU_CONFIGURE=	yes
 USE_AUTOCONF=	yes
-
-VERBASE=	2.1.2a
 
 MAN8=	mrtd.8
 EXAMPLES=	programs/bgpsim/bgpsim.conf programs/bgpsim/bgpsim6.conf \

@@ -1,11 +1,11 @@
 # New ports collection makefile for:	totd
-# Version required:     1.1
 # Date created:		6 Oct 1999
 # Whom:			feico@pasta.cs.uit.no
 #
-# $Id: Makefile,v 1.4 2000/04/02 13:06:59 itojun Exp $
+# $KAME: Makefile,v 1.5 2000/06/25 10:58:48 sumikawa Exp $
 
-DISTNAME=	totd-1.1p4
+PORTNAME=	totd
+PORTVERSION=	1.1p4
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.pasta.cs.uit.no/pub/Vermicelli/
 

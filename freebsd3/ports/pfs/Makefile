@@ -1,12 +1,12 @@
 # New ports collection makefile for:	pfs
-# Version required:	19990608
 # Date created:		Mon Jun 14 03:59:27 JST 1999
 # Whom:			Jun-ichiro itojun Hagino <itojun@kame.net>
 #
-# $Id: Makefile,v 1.1 1999/08/24 17:29:59 sumikawa Exp $
+# $KAME: Makefile,v 1.2 2000/06/25 10:58:41 sumikawa Exp $
 #
 
-DISTNAME=	pfssrc-19990608
+PORTNAME=	pfssrc
+PORTVERSION=	19990608
 CATEGORIES=	net
 MASTER_SITES=	http://www.spa.is.uec.ac.jp/%7Etate/pfs/
 # you might need debugging, it's a developer release !

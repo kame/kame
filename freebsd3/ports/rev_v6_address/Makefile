@@ -1,12 +1,12 @@
-# New ports collection makefile for:    root
-# Version required:     1.0
+# New ports collection makefile for:    rev-v6-address
 # Date created:         Fri Apr 16 15:52:03 JST 1999
 # Whom:                 sumikawa
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:30 itojun Exp $
+# $KAME: Makefile,v 1.2 2000/06/25 10:58:44 sumikawa Exp $
 #
 
-DISTNAME=	rev-v6-address-1.0
+PORTNAME=	rev-v6-address
+PORTVERSION=	1.0
 CATEGORIES=	textproc
 MASTER_SITES=	http://www.fumi.org/lib/
 DISTFILES=	rev_v6_address.c

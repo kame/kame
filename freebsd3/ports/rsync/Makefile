@@ -1,15 +1,13 @@
-# ex:ts=8
 # Ports collection makefile for:  rsync
-# Version required:               2.4.*
 # Date created:			  Sat Aug 3, 1996
 # Whom:				  David O'Brien (obrien@cs.ucdavis.edu)
 #
 # $FreeBSD: ports/net/rsync/Makefile,v 1.37 2000/02/17 07:37:23 sumikawa Exp $
 #
 
-DISTNAME=       rsync-2.4.3
-#CATEGORIES=	net ipv6
-CATEGORIES=	net
+PORTNAME=	rsync
+PORTVERSION=	2.4.3
+CATEGORIES=	net #ipv6
 MASTER_SITES=	ftp://samba.anu.edu.au/pub/rsync/  \
 		ftp://sunsite.auc.dk/pub/unix/rsync/  \
 		ftp://ftp.sunet.se/pub/unix/admin/rsync/  \

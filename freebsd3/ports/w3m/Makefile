@@ -5,17 +5,15 @@
 # $FreeBSD: ports/www/w3m/Makefile,v 1.5 2000/01/10 14:48:37 sumikawa Exp $
 #
 
-DISTNAME=	w3m-${W3M_DIST_VER}
-PKGNAME?=	w3m-${W3M_VER}
-W3M_DIST_VER=	0.1.9
-W3M_VER=	${W3M_DIST_VER}
-CATEGORIES?=	www #ipv6
+PORTNAME=	w3m
+PORTVERSION=	0.1.9
+CATEGORIES+=	www #ipv6
 MASTER_SITES=	ftp://ei5nazha.yz.yamagata-u.ac.jp/w3m/ \
 		ftp://ftp.firedrake.org/w3m/ \
 		http://www.instinct.org/~pgl/w3m/ \
 		http://grilli.net/mirrors/w3m/download/
 
-MAINTAINER=	nobutaka@nobutaka.com
+MAINTAINER=	sumikawa@kame.net
 
 BUILD_DEPENDS=	${LOCALBASE}/lib/libgc.a:${PORTSDIR}/devel/boehm-gc
 

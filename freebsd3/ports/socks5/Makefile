@@ -1,13 +1,13 @@
 # New ports collection makefile for:	socks5
-# Version required:			v1.0r10-trans-v1.3
 # Date created:				Fri Nov 26 10:41:04 JST 1999
 # Whom:					sumikawa
 #
-# $Id: Makefile,v 1.2 1999/12/28 04:38:05 sumikawa Exp $
+# $KAME: Makefile,v 1.3 2000/06/25 10:58:45 sumikawa Exp $
 #
 
-DISTNAME=	socks5-v1.0r10
-PKGNAME=	socks5-v1.0r10-trans-v1.3
+PORTNAME=	socks5
+PORTVERSION=	v1.0r10
+PKGNAMESUFFIX=	-trans-v1.3
 CATEGORIES=	net security
 MASTER_SITES=	ftp://ftp.kame.net/pub/kame/misc/
 

@@ -1,14 +1,13 @@
 # New ports collection makefile for:	netris
-# Version required:	0.5
 # Date created:	1 August 1996
 # Whom:	desmo
 #
 # $FreeBSD: ports/games/netris/Makefile,v 1.5 2000/02/09 04:17:45 sumikawa Exp $
 #
 
-DISTNAME=		netris-0.5
-#CATEGORIES=		games ipv6
-CATEGORIES=		games
+PORTNAME=		netris
+PORTVERSION=		0.5
+CATEGORIES=		games #ipv6
 MASTER_SITES=		ftp://ftp.netris.org/pub/netris/
 
 PATCH_SITES=		ftp://ftp2.v6.linux.or.jp/pub/Linux/IPv6-2/netris/ \

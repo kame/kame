@@ -1,20 +1,18 @@
 # New ports collection makefile for:	vic
-# Version required:	2.8v6
 # Date created:		1999/8/7
 # Whom:			ichiro
 #
-# $Id: Makefile,v 1.4 1999/12/27 12:37:22 sumikawa Exp $
+# $KAME: Makefile,v 1.5 2000/06/25 10:58:49 sumikawa Exp $
 #
 
-DISTNAME=	vic-2.8v6
+PORTNAME=	vic
+PORTVERSION=	2.8v6
 CATEGORIES=	mbone tk82
 MASTER_SITES=	http://irl.cs.ucla.edu/software/IPv6/
 
-DISTFILES=	vic-2.8v6.tar.gz
-
-PATCH_SITES=            http://www.v6.csi2.net/setup/mcast/patch/
-PATCHFILES=             vic-2.8v6-kame-19990925.patch
-PATCH_DIST_STRIP=       -p1
+PATCH_SITES=	http://www.v6.csi2.net/setup/mcast/patch/
+PATCHFILES=	vic-2.8v6-kame-19990925.patch
+PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	ichiro@ichiro.org
 

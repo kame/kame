@@ -1,13 +1,12 @@
 # New ports collection makefile for:	libident
-# Version required:	0.22
 # Date created:		9 October 1995
 # Whom:			torstenb@FreeBSD.ORG
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:09:57 itojun Exp $
+# $KAME: Makefile,v 1.2 2000/06/25 10:58:36 sumikawa Exp $
 #
 
-DISTNAME=	libident-0.22
-PKGNAME=        libident6-0.22
+PORTNAME=	libident
+PORTVERSION=	0.22
 CATEGORIES=	devel net security
 MASTER_SITES=	ftp://ftp.lysator.liu.se/pub/ident/libs/
 

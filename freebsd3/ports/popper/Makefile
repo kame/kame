@@ -1,18 +1,19 @@
 # New ports collection makefile for:	popper
-# Version required:     2.53
 # Date created:		1 April 1995
 # Whom:			pst
 #
-# $Id: Makefile,v 1.2 2000/05/30 02:18:51 itojun Exp $
+# $Id: Makefile,v 1.3 2000/06/25 10:58:42 sumikawa Exp $
 #
 
-DISTNAME=       qpopper2.53
-PKGNAME=        qpopper-2.53
+PORTNAME=	qpopper
+PORTVERSION=	2.53
 CATEGORIES=	mail
 MASTER_SITES=   ftp://ftp.qualcomm.com/eudora/servers/unix/popper/
 EXTRACT_SUFX=	.tar.Z
+DISTNAME=       ${PORTNAME}${PORTVERSION}
 
-MAINTAINER=	ache@freebsd.org
+
+MAINTAINER=	sumikawa@kame.net
 
 BROKEN=		"security hole"
 

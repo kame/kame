@@ -1,15 +1,15 @@
 # New ports collection makefile for:    sendmail
-# Version required:	8.10 beta
 # Date created:		1 Oct 1997
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.1 1999/12/28 05:23:21 sumikawa Exp $
+# $Id: Makefile,v 1.2 2000/06/25 10:58:44 sumikawa Exp $
 #
 
-DISTNAME=	sendmail.${SENDMAILVER}
-PKGNAME=	sendmail-8.10.0.10
+PORTNAME=	sendmail
+PORTVERSION=	8.10.0.10
 CATEGORIES=	mail
 MASTER_SITES=	ftp://ftp.sendmail.org/pub/sendmail/
+DISTNAME=	sendmail.${SENDMAILVER}
 
 MAINTAINER=	itojun@itojun.org
 

@@ -1,14 +1,12 @@
-# ex:ts=8
 # New ports collection makefile for:    fwtk
-# Version required:                     2.1
 # Date created:                         15th June 1996
 # Whom:                                 gpalmer
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:09:38 itojun Exp $
+# $KAME: Makefile,v 1.2 2000/06/25 10:58:32 sumikawa Exp $
 #
 
-DISTNAME=	fwtk2.1
-PKGNAME=	fwtk6-2.1
+PORTNAME=	fwtk2.1
+PORTVERSION=	2.1
 CATEGORIES=	security net
 EXTRACT_SUFX=	.tar.Z
 DISTFILES=	fwtk2.1${EXTRACT_SUFX} fwtk-doc-only${EXTRACT_SUFX}

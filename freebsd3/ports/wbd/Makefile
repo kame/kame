@@ -1,12 +1,12 @@
 # New ports collection makefile for:	wbd
-# Version required:     1.00a
 # Date created:		Wed Jan 27 21:16:38 JST 1999
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:59 itojun Exp $
+# $KAME: Makefile,v 1.2 2000/06/25 10:58:50 sumikawa Exp $
 #
 
-DISTNAME=       wbd-1.00a
+PORTNAME=	wbd
+PORTVERSION=	1.00a
 CATEGORIES=	mbone tk80
 MASTER_SITES=   http://bashful.lboro.ac.uk/ROPA/
 

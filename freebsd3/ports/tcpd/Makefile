@@ -2,10 +2,11 @@
 # Date created:         Sat Jun 24 01:18:09 JST 2000
 # Whom:			sumikawa@kame.net
 #
-# $Id: Makefile,v 1.1 2000/06/23 16:20:42 sumikawa Exp $
+# $KAME: Makefile,v 1.2 2000/06/25 10:58:46 sumikawa Exp $
 #
 
-DISTNAME=	tcpd-0.0.2
+PORTNAME=	tcpd
+PORTVERSION=	0.0.2
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.pld.org.pl/software/tcpd/
 

@@ -1,18 +1,16 @@
 # New ports collection makefile for:   w3m-ssl
-# Version required:            991028-2
 # Date Created:                12 Oct 1999
 # Whom:                        MANTANI Nobutaka <nobutaka@nobutaka.com>
 #
-# $FreeBSD: ports/www/w3m-ssl/Makefile,v 1.1.1.1 1999/11/21 20:54:44 sada Exp $
+# $FreeBSD: ports/www/w3m-ssl/Makefile,v 1.7 2000/04/14 17:24:56 knu Exp $
 #
 
-PKGNAME=       w3m-ssl-${W3M_VER}
-CATEGORIES=    www
+PKGNAMESUFFIX=	-ssl
 
-MASTERDIR=     ${.CURDIR}/../w3m
-PKGDIR=        ${.CURDIR}/pkg
-PLIST=         ${MASTERDIR}/pkg/PLIST
+MASTERDIR=	${.CURDIR}/../w3m
+PKGDIR=		${.CURDIR}/pkg
+PLIST=		${MASTERDIR}/pkg/PLIST
 
-USE_SSL=       Yes
+USE_SSL=	RSA
 
 .include "${MASTERDIR}/Makefile"

@@ -1,13 +1,12 @@
-# Ports collection Makefile for:	
-# Date created:				
-# Whom:					
+# Ports collection Makefile for:	gbatnav
+# Date created:				Sun Jun 25 17:58:17 JST 2000
+# Whom:					sumikawa
 #
-# $FreeBSD$
+# $KAME: Makefile,v 1.3 2000/06/25 10:58:32 sumikawa Exp $
 #
 
-#PORTNAME=		gbatnav
-#PORTVERSION=		0.74.0
-DISTNAME=		gbatnav-0.74.0
+PORTNAME=		gbatnav
+PORTVERSION=		0.74.0
 CATEGORIES=		games gnome
 MASTER_SITES=		http://download.sourceforge.net/batnav/
 
@@ -17,8 +16,6 @@ LIB_DEPENDS=		panel_applet.4:${PORTSDIR}/x11/gnomecore
 
 GTK_CONFIG?=		${X11BASE}/bin/gtk12-config
 
-#USE_X_PREFIX=		YES
-#USE_BZIP2=		YES
 GNU_CONFIGURE=		YES
 CONFIGURE_ENV=		GTK_CONFIG="${GTK_CONFIG}" \
 			CPPFLAGS="-I${LOCALBASE}/include" \

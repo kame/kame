@@ -1,14 +1,13 @@
 # New ports collection makefile for:    XFree86
-# Version required:     3.3.5
 # Date created:         5 January 1995
 # Whom:                 jmz
 #
 # $FreeBSD: ports/x11/XFree86/Makefile,v 1.69 1999/11/24 23:08:06 jmz Exp $
-# $Id: Makefile,v 1.3 1999/12/14 14:12:05 sumikawa Exp $
+# $KAME: Makefile,v 1.4 2000/06/25 10:58:29 sumikawa Exp $
 #
 
-DISTNAME=	xc
-PKGNAME= 	XFree86-3.3.5
+PORTNAME=	XFree86
+PORTVERSION=	3.3.5
 CATEGORIES=	x11
 MASTER_SITES=	ftp://ftp.xfree86.org/pub/XFree86/3.3.5/source/ \
 		ftp://xfree86.cdrom.com/pub/XFree86/3.3.5/source/ \
@@ -16,6 +15,8 @@ MASTER_SITES=	ftp://ftp.xfree86.org/pub/XFree86/3.3.5/source/ \
 		ftp://ftp.cs.tu-berlin.de/pub/X/XFree86/3.3.5/source/ \
 		ftp://sunsite.doc.ic.ac.uk/packages/XFree86/3.3.5/source/
 DISTFILES=	X335src-1.tgz X335src-2.tgz
+DISTNAME=	xc
+
 PATCH_SITES=	http://www.imasy.or.jp/~ume/ipv6/
 PATCHFILES=	xfree86-3.3.5-ipv6-19990224.diff.gz
 PATCH_DIST_ARGS=-p1 -E -d ${WRKDIR} --quiet

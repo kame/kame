@@ -5,9 +5,8 @@
 # $FreeBSD: ports/news/leafnode+/Makefile,v 1.15 2000/04/09 17:33:01 cpiazza Exp $
 #
 
-#PORTNAME=	leafnode+
-#PORTVERSION=	2.10
-DISTNAME=	leafnode+-2.10
+PORTNAME=	leafnode+
+PORTVERSION=	2.10
 CATEGORIES=	news
 MASTER_SITES=	ftp://hiroshima.isdn.uiuc.edu/leafnode+/
 

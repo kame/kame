@@ -1,15 +1,15 @@
-# New ports collection makefile for:    geta
-# Version required:     1.0
-# Date created:         19 Apr 1999
-# Whom:                 sumikawa
+# New ports collection makefile for:	geta
+# Date created:				19 Apr 1999
+# Whom:					sumikawa
 #
-# $Id: Makefile,v 1.2 1999/08/24 17:34:12 sumikawa Exp $
+# $KAME: Makefile,v 1.3 2000/06/25 10:58:32 sumikawa Exp $
 #
 
-DISTNAME=	pping-19990419
-PKGNAME=	geta-19990419
+PORTNAME=	geta
+PORTVERSION=	19990419
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+DISTNAME=	pping-${PORTVERSION}
 
 MAINTAINER=	sumikawa@kame.net
 

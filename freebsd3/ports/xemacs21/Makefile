@@ -1,14 +1,12 @@
 # New ports collection makefile for:	X-Emacs
-# Version required:	21.1
 # Date created:		24 Apr 1999
 # Whom:			Michael Elbel (me@FreeBSD.org)
 #
 # $FreeBSD: ports/editors/xemacs21/Makefile,v 1.35 1999/11/16 21:14:37 gj Exp $
-# $Id: Makefile,v 1.2 2000/01/05 15:01:38 sumikawa Exp $
 #
 
-DISTNAME=	xemacs-21.1.8
-PKGNAME=	xemacs-21.1
+PORTNAME=	xemacs
+PORTVERSION=	21.1.8
 CATEGORIES=	editors
 MASTER_SITES=	\
 		ftp://ftp.xemacs.org/pub/xemacs/${PKGNAME}/ \
@@ -30,7 +28,6 @@ LIB_DEPENDS=	Xpm.4:${PORTSDIR}/graphics/xpm \
 		png.3:${PORTSDIR}/graphics/png \
 		tiff.4:${PORTSDIR}/graphics/tiff
 
-XEMACS_VER=	21.1.8
 DIST_SUBDIR=	xemacs
 
 USE_GMAKE=	yes
@@ -52,7 +49,7 @@ MAN1=		ctags.1 etags.1 gnuattach.1 gnuclient.1 gnudoit.1 \
 		gnuserv.1 xemacs.1
 ALL_TARGET=	all dist
 
-PLIST_SUB=	XEMACS_VER=${XEMACS_VER} XEMACS_ARCH=${XEMACS_ARCH}
+PLIST_SUB=	XEMACS_VER=${PORTVERSION} XEMACS_ARCH=${XEMACS_ARCH}
 
 pre-fetch:
 	@${ECHO_MSG} "If you want the MULE features, please use the xemacs-mule port"
@@ -79,8 +76,8 @@ WITH_OFFIX?=	--with-offix=no
 .endif
 
 post-install:
-	${LN} -sf xemacs-${XEMACS_VER} ${PREFIX}/bin/xemacs21
-.for file in b2m ctags etags gnuclient xemacs-${XEMACS_VER}
+	${LN} -sf xemacs-${PORTVERSION} ${PREFIX}/bin/xemacs21
+.for file in b2m ctags etags gnuclient xemacs-${PORTVERSION}
 	strip ${PREFIX}/bin/${file}
 .endfor
 # ``make install'' does not set the permissions like pkg_add does.

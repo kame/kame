@@ -1,23 +1,23 @@
 # New ports collection makefile for:	vnc
-# Version required:     3.3.2r3 + IPv6
 # Date created:		24 February 1998
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.2 2000/06/23 16:48:49 sumikawa Exp $
+# $KAME: Makefile,v 1.3 2000/06/25 10:58:49 sumikawa Exp $
 #
 
-DISTNAME=       	vnc-3.3.2r3_unixsrc
-PKGNAME=        	vnc-3.3.2r3
+PORTNAME=		vnc
+PORTVERSION=		3.3.2r3
 CATEGORIES=		net x11
 MASTER_SITES=   	http://www.uk.research.att.com/vnc/dist/
 DISTFILES=		vnc-3.3.2r3_unixsrc.tgz \
 			vnc-3.3.2_doc.tgz
+DISTNAME=		${PKGNAME}_unixsrc
 
 PATCH_SITES=		ftp://ftp.kame.net/pub/kame/misc/
 PATCHFILES=		vnc-3.3.2r3-v6-20000518.diff.gz
 PATCH_DIST_STRIP=	-p1
 
-MAINTAINER=	 	itojun@itojun.org
+MAINTAINER=		itojun@itojun.org
 
 WRKSRC=			${WRKDIR}/vnc_unixsrc
 

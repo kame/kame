@@ -2,10 +2,11 @@
 # Date created:		5 Apr 1999 17:00 JST
 # Whom:			TANAKA Takashi <tanaka@tahi.org>
 #
-# $Id: Makefile,v 1.2 2000/03/02 12:07:46 sumikawa Exp $
+# $KAME: Makefile,v 1.3 2000/06/25 10:58:31 sumikawa Exp $
 #
 
-DISTNAME=	ct-0.6
+PORTNAME=	ct
+PORTVERSION=	0.6
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.tahi.org/pub/TAHI/ct/
 

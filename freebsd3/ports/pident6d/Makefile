@@ -6,9 +6,9 @@
 # $FreeBSD: ports/security/pidentd/Makefile,v 1.29 2000/02/14 15:12:34 sumikawa Exp $
 #
 
-DISTNAME=       pidentd-2.8.5
-#CATEGORIES=	security net ipv6
-CATEGORIES=	security net
+PORTNAME=	pidentd
+PORTVERSION=	2.8.5
+CATEGORIES=	security net #ipv6
 MASTER_SITES=	ftp://ftp.lysator.liu.se/pub/ident/servers/ \
 		ftp://ftp.fu-berlin.de/unix/security/ident/servers/
 

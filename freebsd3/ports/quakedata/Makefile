@@ -3,11 +3,12 @@
 # FreeBSD: ports/games/quakeserver/Makefile,v 1.20 1999/08/31 06:44:23 mharo Exp
 #
 
-DISTNAME=	quake106
-PKGNAME=	quakedata-1.0
+PORTNAME=	quakedata
+PORTVERSION=	1.0
 CATEGORIES=	games
 MASTER_SITES=	ftp://ftp.cdrom.com/pub/quake/planetquake/threewave/unix/ \
 		ftp://ftp.idsoftware.com/idstuff/quake/
+DISTNAME=	quake106
 EXTRACT_SUFX=	.zip
 
 MAINTAINER=	sumikawa@kame.net

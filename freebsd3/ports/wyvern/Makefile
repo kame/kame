@@ -1,11 +1,12 @@
-# New ports collection makefile for:    wyvern
-# Date created:         
-# Whom:                 sumikawa
+# New ports collection makefile for:	wyvern
+# Date created:				Sun Jun 25 19:38:52 JST 2000
+# Whom:					sumikawa
 #
-# $Id: Makefile,v 1.1 2000/06/23 16:00:45 sumikawa Exp $
+# $KAME: Makefile,v 1.2 2000/06/25 10:58:51 sumikawa Exp $
 #
 
-DISTNAME=	wyvern-0.7.7
+PORTNAME=	wyvern
+PORTVERSION=	0.7.7
 CATEGORIES=	net
 MASTER_SITES=	http://www.MysticWALL.com/software/src/
 

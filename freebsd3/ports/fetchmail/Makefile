@@ -11,7 +11,8 @@
 # does not need Python, so there is no RUN_DEPENDS for Python in
 # this Makefile.
 
-DISTNAME=       fetchmail-5.4.0
+PORTNAME=	fetchmail
+PORTVERSION=	5.4.0
 CATEGORIES=	mail
 MASTER_SITES=	ftp://ftp.ccil.org/pub/esr/fetchmail/
 

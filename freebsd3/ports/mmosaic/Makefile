@@ -2,10 +2,11 @@
 # Date created:         Fri Apr 14 10:36:57 JST 2000
 # Whom:                 sumikawa
 #
-# $Id: Makefile,v 1.2 2000/06/22 13:38:25 sumikawa Exp $
+# $Id: Makefile,v 1.3 2000/06/25 10:58:38 sumikawa Exp $
 #
 
-DISTNAME=       mMosaic-3.6.2
+PORTNAME=	mMosaic
+PORTVERSION=	3.6.2
 CATEGORIES=	www
 MASTER_SITES=	ftp://tsi.enst.fr/pub/multicast/mMosaic/
 

@@ -1,12 +1,12 @@
 # New ports collection makefile for:	v6eval
-# Version required:			0.6
 # Date created:		26 Mar 1999 23:00 JST
 # Whom:			TANAKA Takashi <tanaka@tahi.org>
 #
-# $Id: Makefile,v 1.3 2000/03/02 12:07:42 sumikawa Exp $
+# $KAME: Makefile,v 1.4 2000/06/25 10:58:48 sumikawa Exp $
 #
 
-DISTNAME=	v6eval-0.6
+PORTNAME=	v6eval
+PORTVERSION=	0.6
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.tahi.org/pub/TAHI/v6eval/
 # you might need debugging, it's a developer release !

@@ -1,12 +1,12 @@
 # New ports collection makefile for:    kaffe
-# Version required:     1.0.b1
 # Date created:         20 February 1995
 # Whom:                 Tim Wilkinson <tim@sarc.city.ac.uk>
 #
-# $Id: Makefile,v 1.2 1999/12/27 12:37:09 sumikawa Exp $
+# $KAME: Makefile,v 1.3 2000/06/25 10:58:35 sumikawa Exp $
 #
 
-DISTNAME=	kaffe-1.0.b1
+PORTNAME=	kaffe
+PORTVERSION=	1.0.b1
 CATEGORIES=	lang
 MASTER_SITES=	ftp://ftp.transvirtual.com/pub/kaffe/ \
 		ftp://ftp.kame.net/pub/inria/freebsd/ \

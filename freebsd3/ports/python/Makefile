@@ -1,17 +1,16 @@
 # New ports collection makefile for:    python
-# Version required:     1.5.2
 # Date created:         08 August 1995
 # Whom:                 jkh
 #
-# $Id: Makefile,v 1.4 2000/01/21 22:26:57 sumikawa Exp $
 # $FreeBSD: ports/lang/python/Makefile,v 1.55 1999/11/03 09:45:25 tg Exp $
 #
 
-DISTNAME=       py152
-PKGNAME=        python-1.5.2
+PORTNAME=	python
+PORTVERSION=	1.5.2
 CATEGORIES=	lang python tk82
 MASTER_SITES=	ftp://www.python.org/pub/python/src/ \
 		ftp://ftp.cwi.nl/pub/python/src/
+DISTNAME=       py152
 EXTRACT_SUFX=	.tgz
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/

@@ -1,13 +1,12 @@
 # New ports collection makefile for: netperf
-# Version required:	2.1.3
 # Date created:		19 July 1996
 # Whom:			koshy
 #
-# $Id: Makefile,v 1.3 2000/05/18 07:43:48 sumikawa Exp $
+# $Id: Makefile,v 1.4 2000/06/25 10:58:40 sumikawa Exp $
 #
 
-DISTNAME=	netperf-2.1pl3
-PKGNAME=	netperf-2.1.3
+PORTNAME=	netperf
+PORTVERSION=	2.1pl3
 CATEGORIES=	benchmarks
 MASTER_SITES=	ftp://ftp.cup.hp.com/dist/networking/benchmarks/netperf/
 
