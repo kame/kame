@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.156 2001/02/03 16:23:18 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.157 2001/02/03 16:30:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2595,12 +2595,12 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				  &ip6_use_tempaddr);
 	case IPV6CTL_TEMPPLTIME:
-		u_old = ip6_temp_preferred_lifetime;
+		old = ip6_temp_preferred_lifetime;
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 				   &ip6_temp_preferred_lifetime);
 		if (ip6_temp_preferred_lifetime <
 		    ip6_desync_factor + ip6_anon_regen_advance) {
-			ip6_temp_preferred_lifetime = u_old;
+			ip6_temp_preferred_lifetime = old;
 			return(EINVAL);
 		}
 		return(error);
