@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.221 2002/12/18 01:42:51 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.222 2003/01/06 21:49:50 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2053,7 +2053,7 @@ in6_ifadd(pr)
 	 * of DAD.  we omitted DAD for this reason in the past.
 	 * (3) a user can prevent autoconfiguration of global address
 	 * by removing link-local address by hand (this is partly because we
-	 * don't have other way to control the use of IPv6 on a interface.
+	 * don't have other way to control the use of IPv6 on an interface.
 	 * this has been our design choice - cf. NRL's "ifconfig auto").
 	 * (4) it is easier to manage when an interface has addresses
 	 * with the same interface identifier, than to have multiple addresses

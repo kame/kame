@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.174 2002/10/27 04:26:51 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.175 2003/01/06 21:49:50 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -610,7 +610,7 @@ ipsec4_getpolicybyaddr(m, dir, flag, error)
 
 	bzero(&spidx, sizeof(spidx));
 
-	/* make a index to look for a policy */
+	/* make an index to look for a policy */
 	*error = ipsec_setspidx_mbuf(&spidx, AF_INET, m,
 	    (flag & IP_FORWARDING) ? 0 : 1);
 
@@ -820,7 +820,7 @@ ipsec6_getpolicybyaddr(m, dir, flag, error)
 
 	bzero(&spidx, sizeof(spidx));
 
-	/* make a index to look for a policy */
+	/* make an index to look for a policy */
 	*error = ipsec_setspidx_mbuf(&spidx, AF_INET6, m,
 	    (flag & IP_FORWARDING) ? 0 : 1);
 
