@@ -85,6 +85,7 @@ cam/scsi/scsi_target.c	optional targ
 cam/scsi/scsi_targ_bh.c	optional targbh
 crypto/sha1.c		optional ipsec
 crypto/des/des_ecb.c	optional ipsec ipsec_esp
+crypto/des/des_enc.c	optional ipsec ipsec_esp
 crypto/des/des_setkey.c	optional ipsec ipsec_esp
 crypto/blowfish/bf_enc.c	optional ipsec ipsec_esp
 crypto/blowfish/bf_skey.c	optional ipsec ipsec_esp

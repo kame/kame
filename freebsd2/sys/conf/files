@@ -510,6 +510,7 @@ netinet6/ipcomp_output.c	optional ipsec
 netinet6/ip6_fw.c	optional ipv6firewall
 crypto/sha1.c		optional ipsec
 crypto/des/des_ecb.c	optional ipsec_esp
+crypto/des/des_enc.c	optional ipsec_esp
 crypto/des/des_setkey.c	optional ipsec_esp
 crypto/blowfish/bf_enc.c	optional ipsec_esp
 crypto/blowfish/bf_skey.c	optional ipsec_esp
