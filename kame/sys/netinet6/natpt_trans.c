@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.69 2001/12/14 06:39:38 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.70 2001/12/17 11:33:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1436,6 +1436,7 @@ natpt_translateICMPv4To4(struct pcv *cv4from, struct pAddr *pad)
 	cv4to.pyld.caddr = (caddr_t)ip4to + (ip4to->ip_hl << 2);
 	cv4to.fromto = cv4from->fromto;
 
+	ip4to->ip_src = pad->in4dst;
 	ip4to->ip_dst = pad->in4src;
 
 	icmp4from = cv4from->pyld.icmp4;
