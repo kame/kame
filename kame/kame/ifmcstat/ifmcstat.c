@@ -78,6 +78,11 @@ void in6_multilist __P((struct in6_multi *));
 struct in6_multi * in6_multientry __P((struct in6_multi *));
 
 #if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
+#ifdef __bsdi__
+struct ether_addr {
+	u_int8_t ether_addr_octet[6];
+};
+#endif
 static char *ether_ntoa __P((struct ether_addr *));
 #endif
 
