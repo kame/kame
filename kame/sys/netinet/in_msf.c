@@ -677,6 +677,11 @@ in_undomultisrc(inm, numsrc, ss, mode, req)
 			continue; /* skip */
 		for (ias = LIST_FIRST(&head); ias; ias = nias) {
 			nias = LIST_NEXT(ias, ias_list);
+
+			/* sanity check */
+			if (ias->ias_addr.sin_family != sin->sin_family)
+				continue;
+			
 			if (SS_CMP(&ias->ias_addr, <, sin))
 				continue;
 			if (SS_CMP(&ias->ias_addr, >, sin)) {
@@ -1109,7 +1114,15 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 		LIST_FOREACH(in_ias, &inhead, ias_list) {
 			if (in_ias->ias_refcount == 0)
 				continue; /* skip */
+
+			/* sanity check */
+			if (in_ias->ias_addr.sin_family != sin->sin_family)
+				continue;
 			if (SS_CMP(&in_ias->ias_addr, <, sin))
+				continue;
+			
+			/* sanity check */
+			if (ex_ias->ias_addr.sin_family != in_ias->ias_addr.sin_family)
 				continue;
 			if (SS_CMP(&ex_ias->ias_addr, ==, &in_ias->ias_addr)) {
 				LIST_FIRST(&inhead) = LIST_NEXT(in_ias,
@@ -1218,6 +1231,10 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 				continue; /* skip */
 
 			sin = &ias->ias_addr;
+			
+			/* sanity check */
+			if (curias->ias_addr.sin_family != sin->sin_family)
+				continue;
 			if (SS_CMP(&curias->ias_addr, ==, sin)) {
 				++curias->ias_refcount;
 				LIST_FIRST(&head) = LIST_NEXT(ias, ias_list);
@@ -1353,6 +1370,10 @@ in_undo_new_msf_curhead(inm, sin)
 	struct in_addr_source *ias;
 
 	LIST_FOREACH(ias, inm->inm_source->ims_cur->head, ias_list) {
+		/* sanity check */
+		if (ias->ias_addr.sin_family != sin->sin_family)
+			continue;
+	
 		if (SS_CMP(&ias->ias_addr, >=, sin))
 			return;
 
@@ -1440,6 +1461,12 @@ in_merge_msf_state(inm, newhead, newmode, newnumsrc)
 	LIST_FOREACH(newias, newhead, ias_list) {
 		sin = &newias->ias_addr;
 		LIST_FOREACH(ias, &curhead, ias_list) {
+			/* sanity check */
+			if (ias->ias_addr.sin_family != sin->sin_family)
+				continue;
+			if (ias->ias_addr.sin_family != newias->ias_addr.sin_family)
+				continue;
+			
 			if (SS_CMP(&ias->ias_addr, <, sin)) {
 				if (filter == REPORT_FILTER2)
 					continue;
@@ -1973,6 +2000,9 @@ in_free_msf_source_addr(iasl, sin)
 		return;
 	for (ias = LIST_FIRST(iasl->head); ias; ias = nias) {
 		nias = LIST_NEXT(ias, ias_list);
+		if (ias->ias_addr.sin_family != sin->sin_family)
+			continue;
+      
 		if (SS_CMP(&ias->ias_addr, <, sin))
 			continue;
 		else if (SS_CMP(&ias->ias_addr, ==, sin)) {
@@ -2008,6 +2038,10 @@ in_merge_msf_source_addr(iasl, src, req)
 
 	LIST_FOREACH(ias, iasl->head, ias_list) {
 		lastp = ias;
+		/* sanity check */
+		if (ias->ias_addr.sin_family != src->sin_family)
+			continue;
+		
 		if (SS_CMP(&ias->ias_addr, ==, src)) {
 			if (req == IMS_ADD_SOURCE)
 				return (++ias->ias_refcount);
@@ -3354,6 +3388,9 @@ merge_msf_list:
 	LIST_FOREACH(msfsrc, &head, list) {
 		lastp = msfsrc;
 
+		if (ss->ss_family != msfsrc->src.ss_family)
+			continue;
+		
 		if (SS_CMP(ss, >, &msfsrc->src))
 			continue;
 		if (SS_CMP(ss, ==, &msfsrc->src)) {

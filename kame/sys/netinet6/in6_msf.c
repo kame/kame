@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.2 2002/09/06 10:27:54 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.3 2002/09/19 03:35:56 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -695,7 +695,11 @@ in6_undomultisrc(in6m, numsrc, ss, mode, req)
 			continue; /* skip */
 		for (ias = LIST_FIRST(&head); ias; ias = nias) {
 			nias = LIST_NEXT(ias, i6as_list);
-			if (SS_CMP(&ias->i6as_addr, <, (struct sockaddr_in6 *)&ss[i]))
+			/* sanity check */
+			if (ias->i6as_addr.sin6_family != ss[i].sin6_family)
+				continue;
+
+			if (SS_CMP(&ias->i6as_addr, <, &ss[i]))
 				continue;
 			if (SS_CMP(&ias->i6as_addr, >, &ss[i])) {
 				/* XXX strange. this should never occur. */
@@ -1113,6 +1117,10 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 		LIST_FOREACH(in_ias, &inhead, i6as_list) {
 			if (in_ias->i6as_refcount == 0)
 				continue; /* skip */
+			/* sanity check */
+			if (in_ias->i6as_addr.sin6_family != ex_ias->i6as_addr.sin6_family)
+				continue;
+
 			if (SS_CMP(&in_ias->i6as_addr, <, &ex_ias->i6as_addr))
 				continue;
 			if (SS_CMP(&ex_ias->i6as_addr, ==, &in_ias->i6as_addr)) {
@@ -1217,6 +1225,10 @@ in6_merge_msf_head(in6m, iasl, refcount, filter)
 			if ((ias->i6as_refcount == 0) ||
 			    (refcount != 0 && ias->i6as_refcount != refcount))
 				continue; /* skip */
+
+			/* sanity check */
+			if (curias->i6as_addr.sin6_family != ias->i6as_addr.sin6_family)
+				continue;
 
 			if (SS_CMP(&curias->i6as_addr, ==, &ias->i6as_addr)) {
 				++curias->i6as_refcount;
@@ -1355,6 +1367,10 @@ in6_undo_new_msf_curhead(in6m, src)
 	struct in6_addr_source *ias = NULL;
 
 	LIST_FOREACH(ias, in6m->in6m_source->i6ms_cur->head, i6as_list) {
+		/* sanity check */
+		if (ias->i6as_addr.sin6_family != src->sin6_family)
+			continue;
+
 		if (SS_CMP(&ias->i6as_addr, >=, src))
 			return;
 
@@ -1443,6 +1459,10 @@ in6_merge_msf_state(in6m, newhead, newmode, newnumsrc)
 	ias = LIST_FIRST(in6m->in6m_source->i6ms_cur->head);
 	LIST_FOREACH(newias, newhead, i6as_list) {
 		LIST_FOREACH(ias, &curhead, i6as_list) {
+			/* sanity check */
+			if (ias->i6as_addr.sin6_family != newias->i6as_addr.sin6_family)
+				continue;
+
 			if (SS_CMP(&ias->i6as_addr, <, &newias->i6as_addr)) {
 				if (filter == REPORT_FILTER3)
 					continue;
@@ -2009,6 +2029,10 @@ in6_free_msf_source_addr(iasl, src)
 		return;
 	for (ias = LIST_FIRST(iasl->head); ias; ias = nias) {
 		nias = LIST_NEXT(ias, i6as_list);
+		/* sanity check */
+		if (ias->i6as_addr.sin6_family != src->sin6_family)
+			continue;
+
 		if (SS_CMP(&ias->i6as_addr, <, src))
 			continue;
 		else if (SS_CMP(&ias->i6as_addr, ==, src)) {
@@ -2044,6 +2068,10 @@ in6_merge_msf_source_addr(iasl, src, req)
 
 	LIST_FOREACH(ias, iasl->head, i6as_list) {
 		lastp = ias;
+		/* sanity check */
+		if (ias->i6as_addr.sin6_family != src->sin6_family)
+			continue;
+
 		if (SS_CMP(&ias->i6as_addr, ==, src)) {
 			if (req == IMS_ADD_SOURCE)
 				return (++ias->i6as_refcount);
@@ -2217,10 +2245,15 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	 * Find the membership in the membership array.
 	 */
 	for (imm = imop->im6o_memberships.lh_first;
-	     imm != NULL; imm = imm->i6mm_chain.le_next)
+	     imm != NULL; imm = imm->i6mm_chain.le_next) {
+		/* sanity check */
+		if (imm->i6mm_maddr->in6m_sa.sin6_family != sa_grp->sa_family)
+			continue;
+
 		if (imm->i6mm_maddr->in6m_ifp == ifp &&
 		    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, sa_grp))
 			break;
+	}
 	if (imm != NULL) {
 		if ((grpf->gf_fmode == MCAST_EXCLUDE) &&
 		    (grpf->gf_numsrc == 0) &&
@@ -2666,10 +2699,15 @@ sock6_getmopt_srcfilter(sop, grpfp)
 	 * Find the membership in the membership array.
 	 */
 	for (imm = imop->im6o_memberships.lh_first;
-	     imm != NULL; imm = imm->i6mm_chain.le_next)
+	     imm != NULL; imm = imm->i6mm_chain.le_next) {
+		/* sanity check */
+		if (imm->i6mm_maddr->in6m_sa.sin6_family != sa_grp->sa_family)
+			continue;
+
 		if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
 		    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, sa_grp))
 			break;
+	}
 
 	if (imm == NULL) {
 		/* no msf entry */
