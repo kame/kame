@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.17 2002/10/02 10:17:39 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.18 2002/10/04 07:50:40 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -60,7 +60,6 @@ list if there is no parsing problems.  When more than one rule is
 described, rule that has an error is not added, but the rule that has
 no error is added to this list.
 .Pp
-
 .\"
 .Sh DIRECTIVES
 Keywords and special characters that the parser expects exactly are
@@ -127,7 +126,7 @@ range.  Both rules translate incoming IPv6 packet to packet coming out
 of specified IPv4 address.  The number after
 .Sy \&/
 specifies address mask.  When address mask is not specified, it is
-treated as if 
+treated as if
 .Sy \&/
 128 is specified.  If
 .Sy port
@@ -184,7 +183,7 @@ IPv4 packet coming from specified host or address range is translated
 to packet coming out of specified IPv4 address.  The number after
 .Sy \&/
 specifies address mask.  When address mask is not specified, it is
-treated as if 
+treated as if
 .Sy \&/
 32 is specified.  If
 .Sy port
@@ -203,9 +202,9 @@ option.  This option specifies the protocol, specify
 .Sy icmp tcp
 and
 .Sy udp
-separated by 
+separated by
 .Ql Sy \&/ .
-For example, 
+For example,
 .Sy proto tcp/udp .
 There is no meaning in order of protocol to specify, and there is no
 syntax error when you specify more then one same protocol.  This
@@ -223,7 +222,7 @@ network.  So, if you can set nat session as bidirectional, you can
 connect to the host located behind this NAT from public IPv4 network.
 .Pp
 Here are some important points to consider when using
-.Sy bidir 
+.Sy bidir
 option:
 .Bl -bullet
 .It
