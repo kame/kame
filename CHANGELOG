@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1194 2000/08/13 19:08:30 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1195 2000/08/14 07:08:53 itojun Exp $
 
 <200008> 
+Mon Aug 14 16:07:45 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/security/openssl: update to 0.9.5a.
+	* netbsd/pkgsrc/mail/postfix-current: postfix 20000531 + IPv6 patch.
+
 Mon Aug 14 13:05:11 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/ports/mozilla: upgrade to M17.
 
