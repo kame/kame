@@ -59,6 +59,7 @@
 #endif
 #include <netinet6/ip6.h>
 #include <netinet6/ip6_var.h>
+#include "gif.h"
 #include <netinet6/in6_gif.h>
 #ifdef INET6
 #include <netinet6/ip6.h>
