@@ -17,15 +17,18 @@ platform=$1
 if test "x$platform" = "x"; then
 	platform=foo
 fi
-if test "x$otheraddr" = "x"; then
-	echo "speciy an additional IPv4 address."
+if test "x$otheraddr" = "x" -o "x$otheraddr" = "x127.0.0.1" ; then
+	echo "speciy an additional (not 127.0.0.1) IPv4 address on the test node."
+	echo "sample usage: sh test.sh -o 10.0.0.1 result.txt"
 	exit 1
 fi
 
 # In the following sequence, the order of TCP tests is important.
 # Since -1 or -2 options would make some TIME_WAIT sockets, tests without the
 # SO_REUSExxx socket options must be done before others.
-($bindtest -p $port -o $otheraddr
+($bindtest -v
+
+$bindtest -p $port -o $otheraddr
 $bindtest -6 -p $port -o $otheraddr
 $bindtest -A -p $port -o $otheraddr
 $bindtest -A -6 -p $port -o $otheraddr
