@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.54 2001/07/11 13:17:53 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.55 2001/07/11 13:22:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1311,57 +1311,11 @@ eay_hmacsha1_one(key, data)
 	vchar_t *key, *data;
 {
 	vchar_t *res;
-	SHA_CTX c;
-	u_char k_ipad[65], k_opad[65];
-	u_char *nkey;
-	int nkeylen;
-	int i;
-	u_char tk[SHA_DIGEST_LENGTH];
+	caddr_t ctx;
 
-	/* initialize */
-	if ((res = vmalloc(SHA_DIGEST_LENGTH)) == 0)
-		return(0);
-
-	/* if key is longer than 64 bytes reset it to key=SHA1(key) */
-	nkey = key->v;
-	nkeylen = key->l;
-
-	if (nkeylen > 64) {
-		SHA_CTX      ctx;
-
-		SHA1_Init(&ctx);
-		SHA1_Update(&ctx, nkey, nkeylen);
-		SHA1_Final(tk, &ctx);
-
-		nkey = tk;
-		nkeylen = SHA_DIGEST_LENGTH;
-	}
-
-	/* start out by string key in pads */
-	memset(k_ipad, 0, sizeof(k_ipad));
-	memset(k_opad, 0, sizeof(k_opad));
-	memcpy(k_ipad, nkey, nkeylen);
-	memcpy(k_opad, nkey, nkeylen);
-
-	/* XOR key with ipad and opad values */
-	for (i=0; i<64; i++) {
-		k_ipad[i] ^= 0x36;
-		k_opad[i] ^= 0x5c;
-	}
-
-	/* key */
-	SHA1_Init(&c);
-	SHA1_Update(&c, k_ipad, 64);
-
-	/* finish up 1st pass */
-	SHA1_Update(&c, data->v, data->l);
-	SHA1_Final(res->v, &c);
-
-	/* perform outer SHA1 */
-	SHA1_Init(&c);
-	SHA1_Update(&c, k_opad, 64);
-	SHA1_Update(&c, res->v, SHA_DIGEST_LENGTH);
-	SHA1_Final(res->v, &c);
+	ctx = eay_hmacsha1_init(key);
+	eay_hmacsha1_update(ctx, data);
+	res = eay_hmacsha1_final(ctx);
 
 	return(res);
 }
@@ -1415,57 +1369,11 @@ eay_hmacmd5_one(key, data)
 	vchar_t *key, *data;
 {
 	vchar_t *res;
-	MD5_CTX c;
-	u_char k_ipad[65], k_opad[65];
-	u_char *nkey;
-	int nkeylen;
-	int i;
-	u_char tk[MD5_DIGEST_LENGTH];
+	caddr_t ctx;
 
-	/* initialize */
-	if ((res = vmalloc(MD5_DIGEST_LENGTH)) == 0)
-		return(0);
-
-	/* if key is longer than 64 bytes reset it to key=MD5(key) */
-	nkey = key->v;
-	nkeylen = key->l;
-
-	if (nkeylen > 64) {
-		MD5_CTX      ctx;
-
-		MD5_Init(&ctx);
-		MD5_Update(&ctx, nkey, nkeylen);
-		MD5_Final(tk, &ctx);
-
-		nkey = tk;
-		nkeylen = MD5_DIGEST_LENGTH;
-	}
-
-	/* start out by string key in pads */
-	memset(k_ipad, 0, sizeof(k_ipad));
-	memset(k_opad, 0, sizeof(k_opad));
-	memcpy(k_ipad, nkey, nkeylen);
-	memcpy(k_opad, nkey, nkeylen);
-
-	/* XOR key with ipad and opad values */
-	for (i=0; i<64; i++) {
-		k_ipad[i] ^= 0x36;
-		k_opad[i] ^= 0x5c;
-	}
-
-	/* key */
-	MD5_Init(&c);
-	MD5_Update(&c, k_ipad, 64);
-
-	/* finish up 1st pass */
-	MD5_Update(&c, data->v, data->l);
-	MD5_Final(res->v, &c);
-
-	/* perform outer MD5 */
-	MD5_Init(&c);
-	MD5_Update(&c, k_opad, 64);
-	MD5_Update(&c, res->v, MD5_DIGEST_LENGTH);
-	MD5_Final(res->v, &c);
+	ctx = eay_hmacmd5_init(key);
+	eay_hmacmd5_update(ctx, data);
+	res = eay_hmacmd5_final(ctx);
 
 	return(res);
 }
