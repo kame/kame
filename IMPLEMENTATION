@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.182 2001/02/02 19:16:45 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.183 2001/02/04 03:46:30 itojun Exp $
 
 1. IPv6
 
@@ -76,6 +76,10 @@ RFC2553: Basic Socket Interface Extensions for IPv6
 RFC2671: Extension Mechanisms for DNS (EDNS0)
     * see USAGE for how to use it.
     * not supported on kame/freebsd4 and kame/bsdi4.
+RFC2673: Binary Labels in the Domain Name System
+    * KAME/bsdi4 supports A6, DNAME and binary label to some extent.
+    * KAME apps/bind8 repository has resolver library with partial A6, DNAME
+      and binary label support.
 RFC2675: IPv6 Jumbograms
     * See 1.7 in this document for details.
 RFC2710: Multicast Listener Discovery for IPv6
@@ -85,6 +89,10 @@ RFC2732: Format for Literal IPv6 Addresses in URL's
       (like freebsd ftpio(3) and fetch(1), or netbsd ftp(1))
 RFC2766: Network Address Translation - Protocol Translation (NAT-PT)
     * Section 4.2 is implemented by totd (see ports/totd, or pkgsrc/net/totd).
+RFC2874: DNS Extensions to Support IPv6 Address Aggregation and Renumbering
+    * KAME/bsdi4 supports A6, DNAME and binary label to some extent.
+    * KAME apps/bind8 repository has resolver library with partial A6, DNAME
+      and binary label support.
 RFC2893: Transition Mechanisms for IPv6 Hosts and Routers
     * IPv4 compatible address is not supported.
     * automatic tunneling (4.3) is not supported.
