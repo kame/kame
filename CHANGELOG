@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.653 2000/03/05 02:43:16 itojun Exp $
+$Id: CHANGELOG,v 1.654 2000/03/06 02:20:35 itojun Exp $
 
 <200003>
+Mon Mar  6 11:19:24 JST 2000  itojun@iijlab.net
+	* netbsd/libexec/{rlogind,rshd}/{rlogind,rshd}.c:
+	  reject connection from IPv4 mapped address (IPv4 connection via
+	  AF_INET6 socket).
+
 Sun Mar  5 11:41:24 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: correct SA lookup, so that we can always get/use
 	  proper SA even if we use sendto(2).
