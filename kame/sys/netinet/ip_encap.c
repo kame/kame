@@ -164,13 +164,19 @@ encap4_input(m, va_alist)
 		return;
 	}
 
-#ifdef MROUTING
 	/* for backward compatibility */
 	if (proto == IPPROTO_IPV4) {
+#ifdef __OpenBSD__
+#if defined(MROUTING) || defined(IPSEC)
+		ip4_input(m, off, proto);
+#endif
+#else
+#ifdef MROUTING
 		ipip_input(m, off, proto);
+#endif /*MROUTING*/
+#endif
 		return;
 	}
-#endif /*MROUTING*/
 
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);

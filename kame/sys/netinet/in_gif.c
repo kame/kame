@@ -304,23 +304,19 @@ in_gif_input(m, va_alist)
 #endif
 
 	if (gifp == NULL) {
-#ifdef __OpenBSD__
-#if defined(MROUTING) || defined(IPSEC)
 		/* for backward compatibility */
 		if (proto == IPPROTO_IPV4) {
+#ifdef __OpenBSD__
+#if defined(MROUTING) || defined(IPSEC)
 			ip4_input(m, off, proto);
-			return;
-		}
 #endif
 #else
 #ifdef MROUTING
-		/* for backward compatibility */
-		if (proto == IPPROTO_IPV4) {
 			ipip_input(m, off, proto);
-			return;
-		}
 #endif /*MROUTING*/
 #endif
+			return;
+		}
 		m_freem(m);
 		ipstat.ips_nogif++;
 		return;
