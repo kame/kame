@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.11 2003/11/18 08:07:52 ono Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.12 2004/02/11 21:40:59 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -115,7 +115,6 @@ extern u_int16_t dccp_generate_ackvector(struct dccpcb *, u_char *);
 extern u_char dccp_ackvector_state(struct dccpcb *, u_int32_t);
 
 extern int dccp_get_option(char *, int, int, char *, int);
-extern int dccp_add_feature(struct dccpcb *, u_int8_t, u_int8_t, char *, u_int8_t);
 extern int dccp_remove_feature(struct dccpcb *, u_int8_t, u_int8_t);
 
 /**

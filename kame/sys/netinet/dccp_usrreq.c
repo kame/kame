@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.29 2004/02/11 20:11:51 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.30 2004/02/11 21:40:59 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -363,7 +363,7 @@ dccp_input(struct mbuf *m, ...)
 		dccp_in.sin_addr = ip->ip_src;
 	}
 
-	DCCP_DEBUG((LOG_INFO, "Header info: cslen = %u ndp = %u, off = %u, type = %u, reserved = %u, seq = %u\n", dh->dh_cslen, dh->dh_ndp, dh->dh_off, dh->dh_type, dh->dh_res, ntohl(dh->dh_seq << 8)));
+	DCCP_DEBUG((LOG_INFO, "Header info: cslen = %u ndp = %u, off = %u, type = %u, reserved = %u, seq = %lu\n", dh->dh_cslen, dh->dh_ndp, dh->dh_off, dh->dh_type, dh->dh_res, (unsigned long)ntohl(dh->dh_seq << 8)));
 
 	/*
 	 * Make mbuf data length reflect DCCP length.
@@ -601,8 +601,8 @@ dccp_input(struct mbuf *m, ...)
 			in6p->in6p_lport = dh->dh_dport;
 			in6p->in6p_fport = dh->dh_sport;
 #else
-			in6p->in6p_laddr = ip6->ip6_dst;
-			in6p->in6p_faddr = ip6->ip6_src;
+			inp->in6p_laddr = ip6->ip6_dst;
+			inp->in6p_faddr = ip6->ip6_src;
 			inp->inp_lport = dh->dh_dport;
 			inp->inp_fport = dh->dh_sport;
 #endif

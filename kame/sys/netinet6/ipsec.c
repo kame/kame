@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.211 2004/02/11 10:43:36 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.212 2004/02/11 21:40:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,6 +38,7 @@
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
+#include "opt_random_ip_id.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -2299,7 +2300,15 @@ ipsec4_encapsulate(m, sav)
 		ipseclog((LOG_ERR, "IPv4 ipsec: size exceeds limit: "
 		    "leave ip_len as is (invalid packet)\n"));
 	}
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	ip->ip_id = htons(ip_randomid());
+#elif defined(__FreeBSD__)
+#ifdef RANDOM_IP_ID
+	ip->ip_id = htons(ip_randomid());
+#else
+	ip->ip_id = htons(ip_id++);
+#endif
+#endif
 	bcopy(&((struct sockaddr_in *)&sav->sah->saidx.src)->sin_addr,
 		&ip->ip_src, sizeof(ip->ip_src));
 	bcopy(&((struct sockaddr_in *)&sav->sah->saidx.dst)->sin_addr,
