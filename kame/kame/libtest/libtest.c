@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: libtest.c,v 1.4 1999/11/03 19:50:27 itojun Exp $
+ * $Id: libtest.c,v 1.5 1999/11/03 19:51:49 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -220,6 +220,7 @@ test_getnameinfo()
 	else {
 		printf("%s: test %d failed - random behavior\n", FUNCNAME,
 			ntest);
+		fail++;
 	}
 
 	return fail ? 1 : 0;
