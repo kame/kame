@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.187 2001/08/08 13:26:37 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.188 2001/08/28 08:50:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -976,7 +976,6 @@ nd6_lookup(addr6, create, ifp)
 		if (create) {
 			log(LOG_DEBUG, "nd6_lookup: failed to lookup %s (if = %s)\n",
 			    ip6_sprintf(addr6), ifp ? if_name(ifp) : "unspec");
-			/* xxx more logs... kazu */
 		}
 		return(0);
 	}
