@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.24 2001/07/31 14:09:45 suz Exp $	*/
+/*	$KAME: config.c,v 1.25 2001/07/31 14:13:12 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -329,8 +329,8 @@ config_vifs_from_kernel()
 		 * SIOCGIFFLAGS stomps over it because the requests
 		 * are returned in a union.)
 		 */
-		memcpy(ifr.ifr_name,ifrp->ifr_name,sizeof(ifr.ifr_name));
-		memcpy(ifr6.ifr_name,ifrp->ifr_name,sizeof(ifr6.ifr_name));
+		strncpy(ifr.ifr_name,ifrp->ifr_name,sizeof(ifr.ifr_name));
+		strncpy(ifr6.ifr_name,ifrp->ifr_name,sizeof(ifr6.ifr_name));
 
 		if(ioctl(udp_socket,SIOCGIFFLAGS,(char *)&ifr) <0)
         	log(LOG_ERR, errno, "ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
