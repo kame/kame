@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1065 2000/06/26 15:35:28 itojun Exp $
+$Id: CHANGELOG,v 1.1066 2000/06/27 05:05:00 sumikawa Exp $
 
 <200006>
+Tue Jun 27 14:01:39 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/emacs: upgrade to 20.7
+
 Tue Jun 27 00:32:20 JST 2000  itojun@iijlab.net
 	* netbsd/sys/arch/*/conf/GENERIC.v6: enable PULLDOWN_TEST for all
 	  architectures.  this is done because mbuf pullup code in
