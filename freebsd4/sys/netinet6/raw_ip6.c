@@ -216,16 +216,6 @@ rip6_input(mp, offp, proto)
 					sorwakeup(last->in6p_socket);
 				bzero(&opts, sizeof(opts));
 			}
-			/*
-			 * XXX: m_copy above removes m_aux that
-			 * contains the packet addresses, while we
-			 * still need them for IPsec.
-			 */
-			if (!ip6_setpktaddrs(m, src, dst)) {
-				m_freem(m);
-				ip6stat.ip6s_delivered--;
-				return(IPPROTO_DONE); /* XXX */
-			}
 		}
 		last = in6p;
 	}

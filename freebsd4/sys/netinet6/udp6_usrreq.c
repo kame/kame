@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.12 2002/09/03 19:53:04 jmallett Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.58 2002/10/24 09:24:16 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.59 2003/02/05 05:38:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -296,13 +296,6 @@ udp6_input(mp, offp, proto)
 					sorwakeup(last->in6p_socket); \
 				bzero(&opts, sizeof(opts)); \
 			} \
-			/* \
-			 * XXX: m_copy above removes m_aux that \
-			 * contains the packet addresses, while we \
-			 * still need them for IPsec. \
-			 */ \
-			if (!ip6_setpktaddrs(m, src, dst)) \
-				goto bad; /* XXX */ \
 		} \
 		last = in6p; \
 	} while (0)
