@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/04/17 12:11:39 $
+			$Date: 2000/04/19 15:45:44 $
 
 1. IPv6
 
@@ -189,6 +189,13 @@ There are certain limitations, though:
 - RFC2461 is unclear about if it is legal for a host to perform proxy ND.
   We do not prohibit hosts from doing proxy ND, but there will be very limited
   use in it.
+
+Starting mid March 2000, we support Neighbor Unreachability Detection (NUD)
+on p2p interfaces, including tunnel interfaces (gif).  NUD is turned on by
+default.  Before March 2000 KAME stack did not perform NUD on p2p interfaces.
+If the change raises any interoperability issues, you can turn off/on NUD
+by per-interface basis.  Use "ndp -i interface -nud" to turn it off.
+Consult ndp(8) for details.
 
 1.3 Scope Index
 
