@@ -929,9 +929,6 @@ pr_pack(buf, cc, mhdr)
 	struct sockaddr_in6 *from = (struct sockaddr_in6 *)mhdr->msg_name;
 	u_char *cp = NULL, *dp, *end = buf + cc;
 	struct in6_pktinfo *pktinfo = NULL;
-#ifdef OLD_RAWSOCKET
-	struct ip6_hdr *ip;
-#endif
 	struct timeval tv, *tp;
 	double triptime = 0;
 	int dupflag;
@@ -939,57 +936,6 @@ pr_pack(buf, cc, mhdr)
 
 	(void)gettimeofday(&tv, NULL);
 
-#ifdef OLD_RAWSOCKET
-	/* Check the IP header */
-	ip = (struct ip6_hdr *)buf;
-	if (cc < sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr)) {
-		if (options & F_VERBOSE)
-			warnx("packet too short (%d bytes) from %s\n", cc,
-			  inet_ntop(AF_INET6, (void *)&from->sin6_addr,
-				    ntop_buf, sizeof(ntop_buf)));
-		return;
-	}
-
-	/* chase nexthdr link */
-    {
-	u_int8_t nh;
-	struct ah *ah;
-	struct ip6_ext *ip6e;
-
-	off = IP6LEN;
-	nh = ip->ip6_nxt;
-	while (nh != IPPROTO_ICMPV6) {
-		if (options & F_VERBOSE)
-			fprintf(stderr, "header chain: type=0x%x\n", nh);
-
-		switch (nh) {
-#ifdef IPSEC
-		case IPPROTO_AH:
-			ah = (struct ah *)(buf + off);
-			off += sizeof(struct ah);
-			off += (ah->ah_len << 2);
-			nh = ah->ah_nxt;
-			break;
-#endif
-
-		 case IPPROTO_HOPOPTS:
-			ip6e = (struct ip6_ext *)(buf + off);
-			off += (ip6e->ip6e_len + 1) << 3;
-			nh = ip6e->ip6e_nxt;
-			break;
-		default:
-			if (options & F_VERBOSE) {
-				fprintf(stderr,
-					"unknown header type=0x%x: drop it\n",
-					nh);
-			}
-			return;
-		}
-	}
-    }
-	/* Now the ICMP part */
-	icp = (struct icmp6_hdr *)(buf + off);
-#else
 	if (cc < sizeof(struct icmp6_hdr)) {
 		if (options & F_VERBOSE)
 			warnx("packet too short (%d bytes) from %s\n", cc,
@@ -999,7 +945,6 @@ pr_pack(buf, cc, mhdr)
 	}
 	icp = (struct icmp6_hdr *)buf;
 	off = 0;
-#endif
 
 	if ((hoplim = get_hoplim(mhdr)) == -1) {
 		warnx("failed to get receiving hop limit");
