@@ -592,7 +592,8 @@ cmdin(s, event, arg)
 	struct relay *relay = (struct relay *)arg;
 	struct connection *r, *w;
 	ssize_t l;
-	char cmd[5];
+	char cmd[1024];
+	char *p, *ep;
 
 	if (relay->cli.s != s) {
 		logmsg(LOG_ERR, "invalid state: cmdin");
@@ -629,11 +630,25 @@ cmdin(s, event, arg)
 		return;
 	}
 
-	strncpy(cmd, relay->cli.buf, sizeof(cmd) - 1);
-	cmd[sizeof(cmd) - 1] = '\0';
+	ep = &relay->cli.buf[relay->cli.len];
+	for (p = relay->cli.buf; p < ep; p++)
+		if (!isalpha(*p))
+			break;
+	if (p - relay->cli.buf + 1 > sizeof(cmd)) {
+		relay->ser.len = snprintf(relay->ser.buf,
+		    sizeof(relay->ser.buf), "502 command too long.\r\n");
+		event_add(&relay->cli.outbound, NULL);
+		relay->cli.len = 0;
+		event_add(&relay->cli.inbound, NULL);
+		return;
+	}
+
+	memcpy(cmd, relay->cli.buf, p - relay->cli.buf);
+	cmd[p - relay->cli.buf] = '\0';
+	logmsg(LOG_ERR, "<%s>", cmd);
 
 	/* commands that are not relayed */
-	if (strncasecmp(relay->cli.buf, "EPSV ALL", 8) == 0) {
+	if (strcasecmp(cmd, "EPSV") == 0 && strcasestr(relay->cli.buf, "ALL")) {
 		relay->ser.len = snprintf(relay->ser.buf,
 		    sizeof(relay->ser.buf), "502 not implemented.\r\n");
 		event_add(&relay->cli.outbound, NULL);
