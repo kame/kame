@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.11 2001/02/07 05:18:15 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.12 2001/02/07 13:03:50 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -36,6 +36,7 @@
 #include <netinet/in.h>
 
 #include <netinet/ip6.h>
+#include <netinet/icmp6.h>
 
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -85,6 +86,8 @@ main(argc, argv)
 	extern int optind;
 	extern void *malloc();
 	extern char *optarg;
+	int socktype = SOCK_DGRAM;
+	int proto = IPPROTO_UDP;
 
 	while ((ch = getopt(argc, argv, "d:D:h:l:M:mp:s:")) != EOF)
 		switch(ch) {
@@ -128,6 +131,7 @@ main(argc, argv)
 
 	if ((databuf = (char *)malloc(datalen)) == 0)
 		errx(1, "can't allocate memory\n");
+	memset(databuf, 0, sizeof(datalen));
 
 	if (hbhlen > 0) ip6optlen += CMSG_SPACE(calc_opthlen(hbhlen));
 	if (dsthdr1len > 0) ip6optlen += CMSG_SPACE(calc_opthlen(dsthdr1len));
@@ -230,10 +234,20 @@ main(argc, argv)
 	}
 	finaldst = argv[argc - 1];
 
+	if (strcmp(portstr, "echo") == 0) {
+		struct icmp6_hdr *icmp6 = (struct icmp6_hdr *)databuf;
+
+		socktype = SOCK_RAW;
+		proto = IPPROTO_ICMPV6;
+		portstr = NULL;
+
+		icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
+	}
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_protocol = IPPROTO_UDP;
+	hints.ai_socktype = socktype;
+	hints.ai_protocol = proto;
 
 	error = getaddrinfo(finaldst, portstr, &hints, &res);
 	if (error)
