@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.9 2000/03/15 09:47:19 sakane Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.10 2000/03/22 07:04:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: pfkeyv2.h,v 1.9 2000/03/15 09:47:19 sakane Exp $ */
+/* $Id: pfkeyv2.h,v 1.10 2000/03/22 07:04:20 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -68,14 +68,15 @@ you leave this credit intact on any copies of this file.
 
 #define SADB_X_SPDUPDATE  13
 #define SADB_X_SPDADD     14
-#define SADB_X_SPDDELETE  15
+#define SADB_X_SPDDELETE  15	/* by policy index */
 #define SADB_X_SPDGET     16
 #define SADB_X_SPDACQUIRE 17
 #define SADB_X_SPDDUMP    18
 #define SADB_X_SPDFLUSH   19
 #define SADB_X_SPDSETIDX  20
 #define SADB_X_SPDEXPIRE  21	/* not yet */
-#define SADB_MAX          21
+#define SADB_X_SPDDELETE2 22	/* by policy id */
+#define SADB_MAX          22
 
 struct sadb_msg {
   u_int8_t sadb_msg_version;
@@ -222,6 +223,8 @@ struct sadb_x_policy {
   u_int16_t sadb_x_policy_type;		/* See policy type of ipsec.h */
   u_int8_t sadb_x_policy_dir;		/* direction, see ipsec.h */
   u_int8_t sadb_x_policy_reserved;
+  u_int32_t sadb_x_policy_id;
+  u_int32_t sadb_x_policy_reserved2;
 };
 /*
  * When policy_type == IPSEC, it is followed by some of
@@ -409,8 +412,8 @@ int pfkey_send_spdupdate __P((int, struct sockaddr *, u_int,
 	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
 int pfkey_send_spddelete __P((int, struct sockaddr *, u_int,
 	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
-int pfkey_send_spdget __P((int, struct sockaddr *, u_int,
-	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
+int pfkey_send_spddelete2 __P((int, u_int32_t));
+int pfkey_send_spdget __P((int, u_int32_t));
 int pfkey_send_spdsetidx __P((int, struct sockaddr *, u_int,
 	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
 int pfkey_send_spdflush __P((int));
