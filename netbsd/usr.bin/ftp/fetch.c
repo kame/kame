@@ -413,7 +413,9 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 	char		*proxyauth;
 	char		*wwwauth;
 {
-	struct addrinfo		hints, *res;
+	struct addrinfo		hints, *res, *res0;
+	char			hbuf[NI_MAXHOST];
+	const char		*reason;
 	volatile sig_t		oldintr, oldintp;
 	volatile int		s;
 	int 			ischunked, isproxy, rval, hcode;
@@ -661,46 +663,44 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_protocol = 0;
-		error = getaddrinfo(host, port, &hints, &res);
+		error = getaddrinfo(host, port, &hints, &res0);
 		if (error) {
 			warn(gai_strerror(error));
 			goto cleanup_fetch_url;
 		}
-		if (res->ai_canonname)
-			host = res->ai_canonname;
+		if (res0->ai_canonname)
+			host = res0->ai_canonname;
 
-		while (1) {
-			s = socket(res->ai_family,
-				   res->ai_socktype, res->ai_protocol);
+		reason = NULL;
+		for (res = res0; res; res = res->ai_next) {
+			if (getnameinfo(res->ai_addr, res->ai_addrlen,
+					hbuf, sizeof(hbuf), NULL, 0,
+					NI_NUMERICHOST) != 0)
+				strcpy(hbuf, "invalid");
+
+			if (verbose && res != res0)
+				fprintf(ttyout, "Trying %s...\n", hbuf);
+
+			s = socket(res->ai_family, res->ai_socktype,
+				res->ai_protocol);
 			if (s < 0) {
 				warn("Can't create socket");
-				goto cleanup_fetch_url;
+				continue;
 			}
 
 			if (xconnect(s, res->ai_addr, res->ai_addrlen) < 0) {
-				char hbuf[MAXHOSTNAMELEN];
-				getnameinfo(res->ai_addr, res->ai_addrlen,
-					hbuf, sizeof(hbuf), NULL, 0,
-					NI_NUMERICHOST);
 				warn("Connect to address `%s'", hbuf);
 				close(s);
-				res = res->ai_next;
-				if (res) {
-					getnameinfo(res->ai_addr, res->ai_addrlen,
-						hbuf, sizeof(hbuf), NULL, 0,
-						NI_NUMERICHOST);
-					if (verbose)
-						fprintf(ttyout, "Trying %s...\n", hbuf);
-					continue;
-				}
-				warn("Can't connect to %s", host);
-				goto cleanup_fetch_url;
 			}
-		
 			break;
 		}
-#endif
+		freeaddrinfo(res0);
 
+		if (s < 0) {
+			warn("Can't connect to %s", host);
+			goto cleanup_fetch_url;
+		}
+#endif
 
 		fin = fdopen(s, "r+");
 		/*

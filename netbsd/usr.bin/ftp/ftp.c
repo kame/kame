@@ -135,7 +135,7 @@ hookup(host, port)
 	int s, len, tos, error;
 	struct addrinfo hints, *res, *res0;
 	static char hostnamebuf[MAXHOSTNAMELEN];
-	char hbuf[MAXHOSTNAMELEN];
+	char hbuf[NI_MAXHOST];
 	char *cause = "unknown";
 	
 	memset((char *)&hisctladdr, 0, sizeof (hisctladdr));
@@ -166,8 +166,10 @@ hookup(host, port)
 		if (res0->ai_next)	/* if we have multiple possibilities */
 #endif
 		{
-			getnameinfo(res->ai_addr, res->ai_addrlen,
-				hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST);
+			if (getnameinfo(res->ai_addr, res->ai_addrlen,
+					hbuf, sizeof(hbuf), NULL, 0,
+					NI_NUMERICHOST) != 0)
+				strcpy(hbuf, "invalid");
 			fprintf(ttyout, "Trying %s...\n", hbuf);
 		}
 		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
@@ -182,9 +184,10 @@ hookup(host, port)
 		if (error) {
 			/* this "if" clause is to prevent print warning twice */
 			if (res->ai_next) {
-				getnameinfo(res->ai_addr, res->ai_addrlen,
-					hbuf, sizeof(hbuf), NULL, 0,
-					NI_NUMERICHOST);
+				if (getnameinfo(res->ai_addr, res->ai_addrlen,
+						hbuf, sizeof(hbuf), NULL, 0,
+						NI_NUMERICHOST) != 0)
+					strcpy(hbuf, "invalid");
 				warn("connect to address %s", hbuf);
 			}
 			cause = "connect";
@@ -1416,7 +1419,7 @@ noport:
 #define	UC(b)	(((int)b)&0xff)
 
 	if (sendport) {
-		char hname[INET6_ADDRSTRLEN];
+		char hname[NI_MAXHOST];
 		int af;
 
 		switch (data_addr.su_family) {
