@@ -3,7 +3,7 @@
 # Date created:         Fri Aug 25 16:42:36 CDT 1995
 # Whom:                 ache@nagual.pp.ru
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:09:18 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/20 00:12:56 itojun Exp $
 #
 
 DISTNAME=	apache_1.3.6
@@ -12,7 +12,7 @@ CATEGORIES=	www
 MASTER_SITES=	ftp://www.apache.org/dist/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	apache-136-v6-19990724.diff.gz
+PATCHFILES=	apache-136-v6-19990820.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
