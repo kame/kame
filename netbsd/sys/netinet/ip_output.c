@@ -1472,6 +1472,8 @@ ip_mloopback(ifp, m, dst)
 	struct mbuf *copym;
 
 	copym = m_copy(m, 0, M_COPYALL);
+	if (copym != NULL)
+		copym = m_pullup(copym, sizeof(struct ip));
 	if (copym != NULL) {
 		/*
 		 * We don't bother to fragment if the IP length is greater
