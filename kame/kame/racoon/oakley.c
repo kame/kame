@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.85 2001/07/14 14:13:25 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.86 2001/07/17 05:02:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1153,6 +1153,11 @@ oakley_validate_auth(iph1)
 	vchar_t *gsshash = NULL;
 #endif
 
+#ifdef ENABLE_STATS
+    {
+	struct timeval start, end;
+	gettimeofday(&start, NULL);
+#endif
 	switch (iph1->approval->authmethod) {
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
 		/* validate HASH */
@@ -1405,6 +1410,13 @@ oakley_validate_auth(iph1)
 			iph1->approval->authmethod);
 		return -1;
 	}
+#ifdef ENABLE_STATS
+	gettimeofday(&end, NULL);
+	syslog(LOG_NOTICE, "%s(%s): %8.6f", __FUNCTION__,
+		s_oakley_attr_method(iph1->approval->authmethod),
+		timedelta(&start, &end));
+    }
+#endif
 
 	return 0;
 }
