@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.129 2004/08/11 10:20:48 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.130 2004/08/12 04:36:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1838,8 +1838,7 @@ phyint_send(ip6, mifp, m)
 		 * nd6_output on purpose to see if IPv6 operation is allowed
 		 * on the interface.
 		 */
-		error = nd6_output(ifp, ifp, mb_copy,
-		    (struct sockaddr *)&dst6, NULL);
+		error = nd6_output(ifp, ifp, mb_copy, &dst6, NULL);
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)
 			log(LOG_DEBUG, "phyint_send on mif %d err %d\n",
