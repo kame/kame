@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.170 2001/01/26 08:01:57 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.171 2001/01/26 08:11:04 jinmei Exp $
 
 1. IPv6
 
@@ -1757,6 +1757,11 @@ to make the distribute develoment smooth.
   brackets.  Although this type of bracket seems clumsy and is even
   harmful for some other type of vi users and Emacs users, the
   agreement in the KAME developers is to allow it.
+- add the following line to the head of every KAME-derived file:
+  /*	$KAME: */
+  (this is for C. For other language, you should use its own comment line.)
+  Once commited to the CVS repository, this line would contain its
+  version number.  This would make it easy to report a bug.
 - when editting a third-party package, keep its own coding style as
   much as possible, even if the style does not follow the items above.
 
