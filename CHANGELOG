@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2161 2002/05/22 14:17:51 jinmei Exp $
+$KAME: CHANGELOG,v 1.2162 2002/05/23 13:52:21 jinmei Exp $
 
 <200205>
+2002-05-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6[cs].conf.5: provided man pages for
+	configuration files of DHCPv6 client and server.
+
 2002-05-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: supported renewal and rebinding of delegated
 	prefixes.
