@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.12 2001/01/29 18:30:30 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.13 2001/01/29 23:09:30 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -252,8 +252,14 @@ gssapi_get_itoken(struct ph1handle *iph1, int *lenp)
 
 	if (GSS_ERROR(gps->gss_status)) {
 		gssapi_error(gps->gss_status, LOCATION, "init_sec_context\n");
+		maj_stat = gss_release_name(&min_stat, &partner);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION, "release name\n");
 		return -1;
 	}
+	maj_stat = gss_release_name(&min_stat, &partner);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release name\n");
 
 	plog(LLV_DEBUG, LOCATION, NULL, "gss_init_sec_context status %x\n",
 	    gps->gss_status);
@@ -297,9 +303,24 @@ gssapi_get_rtoken(struct ph1handle *iph1, int *lenp)
 	}
 
 	maj_stat = gss_display_name(&min_stat, client_name, &name_token, NULL);
+	if (GSS_ERROR(maj_stat)) {
+		gssapi_error(maj_stat, LOCATION, "gss_display_name\n");
+		maj_stat = gss_release_name(&min_stat, &client_name);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION,
+			    "release client_name\n");
+		return -1;
+	}
+	maj_stat = gss_release_name(&min_stat, &client_name);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release client_name\n");
+
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"gss_accept_sec_context: other side is %s\n",
 		name_token.value);
+	maj_stat = gss_release_buffer(&min_stat, &name_token);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release name buffer\n");
 
 	if (itoken->length != 0)
 		gps->gsscnt++;
@@ -342,6 +363,7 @@ gssapi_gss2vmbuf(gss_buffer_t gsstoken, vchar_t **vmbuf)
 	if (*vmbuf == NULL)
 		return -1;
 	memcpy((*vmbuf)->v, gsstoken->value, gsstoken->length);
+	(*vmbuf)->l = gsstoken->length;
 
 	return 0;
 }
@@ -490,13 +512,26 @@ gssapi_wraphash(struct ph1handle *iph1)
 	    hash_in, NULL, hash_out);
 	if (GSS_ERROR(maj_stat)) {
 		gssapi_error(maj_stat, LOCATION, "wrapping hash value\n");
+		maj_stat = gss_release_buffer(&min_stat, hash_in);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION,
+			    "release hash_in buffer\n");
+		free(hash_in);
 		return NULL;
 	}
 
 	plog(LLV_DEBUG, LOCATION, NULL, "wrapped HASH, ilen %d olen %d\n",
 	    hash_in->length, hash_out->length);
 
+	maj_stat = gss_release_buffer(&min_stat, hash_in);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release hash_in buffer\n");
+	free(hash_in);
+
 	gssapi_gss2vmbuf(hash_out, &outbuf);
+	maj_stat = gss_release_buffer(&min_stat, hash_out);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release hash_out buffer\n");
 
 	return outbuf;
 }
@@ -532,6 +567,9 @@ gssapi_unwraphash(struct ph1handle *iph1)
 	}
 
 	gssapi_gss2vmbuf(hash_out, &outbuf);
+	maj_stat = gss_release_buffer(&min_stat, hash_out);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release hash_out buffer\n");
 
 	return outbuf;
 }
@@ -580,7 +618,7 @@ void
 gssapi_free_state(struct ph1handle *iph1)
 {
 	struct gssapi_ph1_state *gps;
-	OM_uint32 min_stat;
+	OM_uint32 maj_stat, min_stat;
 
 	gps = gssapi_get_state(iph1);
 
@@ -589,8 +627,12 @@ gssapi_free_state(struct ph1handle *iph1)
 
 	gssapi_set_state(iph1, NULL);
 
-	if (gps->gss_cred != GSS_C_NO_CREDENTIAL)
-		gss_release_cred(&min_stat, &gps->gss_cred);
+	if (gps->gss_cred != GSS_C_NO_CREDENTIAL) {
+		maj_stat = gss_release_cred(&min_stat, &gps->gss_cred);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION,
+			    "releasing credentials\n");
+	}
 	free(gps);
 }
 
@@ -608,20 +650,38 @@ gssapi_get_default_id(struct ph1handle *iph1)
 
 	maj_stat = gss_canonicalize_name(&min_stat, defname, GSS_C_NO_OID,
 	    &canon_name);
+	if (GSS_ERROR(maj_stat)) {
+		gssapi_error(maj_stat, LOCATION, "canonicalize name\n");
+		maj_stat = gss_release_name(&min_stat, &defname);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION,
+			    "release default name\n");
+		return NULL;
+	}
+	maj_stat = gss_release_name(&min_stat, &defname);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release default name\n");
 
 	maj_stat = gss_export_name(&min_stat, canon_name, id);
 	if (GSS_ERROR(maj_stat)) {
 		gssapi_error(maj_stat, LOCATION, "export name\n");
+		maj_stat = gss_release_name(&min_stat, &canon_name);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION,
+			    "release canonical name\n");
 		return NULL;
 	}
+	maj_stat = gss_release_name(&min_stat, &canon_name);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release canonical name\n");
 
 	plog(LLV_DEBUG, LOCATION, NULL, "will try to acquire '%*s' creds\n",
 	    id->length, id->value);
 
-	vmbuf = vmalloc(id->length);
-	if (vmbuf == NULL)
-		return NULL;
-	memcpy(vmbuf->v, id->value, vmbuf->l);
+	gssapi_gss2vmbuf(id, &vmbuf);
+	maj_stat = gss_release_buffer(&min_stat, id);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release id buffer\n");
 
 	return vmbuf;
 }
