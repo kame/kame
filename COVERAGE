@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.60 2000/07/26 08:04:08 itojun Exp $
+$KAME: COVERAGE,v 1.61 2000/07/27 13:46:47 itojun Exp $
 
 
 x: supported/integrated
@@ -69,7 +69,15 @@ RFC2367 conformance: SADB_[EAC]ALG
 
 TCP/UDP		see IMPLEMENTATION for details
 
+TCP6 drops packets with unspecified IPv6 source
+		x	x	x	-	notyet	-	-
+
+ip6_forward rejects packets with unspecified IPv6 source
+		x	-	-	-	notyet	-	-
+
 advanced API	2292bis	2292	2292	2292	notyet	2292	2292
+		(*1)
+    (*1) 2292 API is supplied for binary backward compatibility
 
 getifaddrs	x	x	x	x	notyet	x	-
 
