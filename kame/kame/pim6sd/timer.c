@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.17 2001/08/09 08:46:58 suz Exp $	*/
+/*	$KAME: timer.c,v 1.18 2002/03/26 05:23:49 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -380,7 +380,7 @@ age_routes()
     int             	update_rp_iif;
     int             	update_src_iif;
     if_set     	    	new_pruned_oifs;
-    grpentry_t		*g;
+    grpentry_t		*g, *g_next;
 
     /*
      * Timing out of the global `unicast_routing_timer` and `data_rate_timer`
@@ -1226,14 +1226,18 @@ age_routes()
      * SSM specific loop through each (S,G) entry with G in SSM group range
      * for each SSM group 
      */ 
-    for (g = grplist->next; g != (grpentry_t *) NULL; g = g->next)
+    for (g = grplist->next; g != (grpentry_t *) NULL; g = g_next)
     {
+    	g_next = g->next;
+
 	if (!SSMGROUP(&g->group))
 		continue;
 
 	/* for each source */
-        for (mrtentry_srcs = g->mrtlink; mrtentry_srcs != (mrtentry_t *) NULL; mrtentry_srcs = mrtentry_srcs->grpnext)
+        for (mrtentry_srcs = g->mrtlink; mrtentry_srcs != (mrtentry_t *) NULL; mrtentry_srcs = mrtentry_srcs_next)
         {
+	    mrtentry_srcs_next = mrtentry_srcs->grpnext;
+
 	    /* outgoing interfaces timers (joined interfaces) */
 	    change_flag = FALSE;
 	    for (vifi = 0; vifi < numvifs; vifi++)
