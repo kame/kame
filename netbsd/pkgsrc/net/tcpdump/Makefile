@@ -1,7 +1,7 @@
 # $NetBSD$
 
-DISTNAME=	tcpdump-2000_07_24
-PKGNAME=	tcpdump-20000724
+DISTNAME=	tcpdump-2000.08.14
+PKGNAME=	tcpdump-20000814
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
@@ -18,6 +18,6 @@ CONFIGURE_ARGS+=--enable-ipv6
 pre-configure:
 	(cd ${WRKSRC}; autoreconf)
 
-INSTALL_TARGET=	install install-man
+INSTALL_TARGET=	install
 
 .include "../../mk/bsd.pkg.mk"

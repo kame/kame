@@ -1,7 +1,7 @@
 # $NetBSD$
 
-DISTNAME=	libpcap-2000_07_24
-PKGNAME=	libpcap-20000724
+DISTNAME=	libpcap-2000.08.14
+PKGNAME=	libpcap-20000814
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
@@ -11,7 +11,7 @@ HOMEPAGE=	http://www.tcpdump.org/
 GNU_CONFIGURE=	yes
 CONFIGURE_ARGS+=	--enable-ipv6
 
-INSTALL_TARGET=	install install-incl install-man
+INSTALL_TARGET=	install
 
 pre-install:
 	${MKDIR} ${PREFIX}/include/net
