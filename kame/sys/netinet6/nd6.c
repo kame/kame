@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.199 2001/09/21 09:58:37 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.200 2001/09/21 10:07:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1600,10 +1600,12 @@ nd6_ioctl(cmd, data, ifp)
 				/* XXX: we assume time_t is signed. */
 				maxexpire = (-1) &
 					~(1 << ((sizeof(maxexpire) * 8) - 1));
-				if (pr->ndpr_vltime < maxexpire - time_second)
-					prl->prefix[i].expire = time_second +
+				if (pr->ndpr_vltime <
+				    maxexpire - pr->ndpr_lastupdate) {
+					prl->prefix[i].expire =
+						 pr->ndpr_lastupdate +
 						pr->ndpr_vltime;
-				else
+				} else
 					prl->prefix[i].expire = maxexpire;
 			}
 			pfr = pr->ndpr_advrtrs.lh_first;
@@ -2424,7 +2426,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 				p->vltime = pr->ndpr_vltime;
 				p->pltime = pr->ndpr_pltime;
 				p->if_index = pr->ndpr_ifp->if_index;
-				if (p->ndpr_vltime == ND6_INFINITE_LIFETIME)
+				if (pr->ndpr_vltime == ND6_INFINITE_LIFETIME)
 					p->expire = 0;
 				else {
 					time_t maxexpire;
