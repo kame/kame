@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.10 1999/08/13 06:49:34 jinmei Exp $
+$Id: CHANGELOG,v 1.11 1999/08/13 09:52:29 jinmei Exp $
 
 <199908>
+1999-08-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6dd: correctly supported restarting by SIGHUP.
+	Thanks to <mhoerdt@iutsud.u-strasbg.fr> for sending patch.
+
 1999-08-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* pim6dd/pim6_proto.c (receive_pim6_assert): added a sanity check
 	in order prevent core dump when receiving an assert message from a
