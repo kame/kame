@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.62 2000/09/22 03:50:53 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.63 2000/09/22 06:51:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.62 2000/09/22 03:50:53 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.63 2000/09/22 06:51:32 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -478,7 +478,6 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 			plog(logp, LOCATION, NULL, "dupkeymat=%d\n", dupkeymat));
 		if (0 < --dupkeymat) {
 			vchar_t *prev = res;	/* K(n-1) */
-			vchar_t *this = NULL;	/* Kn */
 			vchar_t *seed = NULL;	/* seed for Kn */
 			size_t l;
 
@@ -501,16 +500,22 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 			if (seed == NULL) {
 				plog(logp, LOCATION, NULL,
 					"failed to get keymat buffer.\n");
+				if (prev && prev != res)
+					vfree(prev);
 				goto end;
 			}
 
 			while (dupkeymat--) {
+				vchar_t *this = NULL;	/* Kn */
+
 				memcpy(seed->v, prev->v, prev->l);
 				memcpy(seed->v + prev->l, buf->v, buf->l);
 				this = oakley_prf(iph2->ph1->skeyid_d, seed, iph2->ph1);
 				if (!this) {
 					plog(logp, LOCATION, NULL,
 						"oakley_prf memory overflow\n");
+					if (prev && prev != res)
+						vfree(prev);
 					vfree(this);
 					vfree(seed);
 					goto end;
@@ -520,6 +525,8 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 				if (!VREALLOC(res, l + this->l)) {
 					plog(logp, LOCATION, NULL,
 						"failed to get keymat buffer.\n");
+					if (prev && prev != res)
+						vfree(prev);
 					vfree(this);
 					vfree(seed);
 					goto end;
@@ -543,6 +550,7 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 			pr->keymat = res;
 		else
 			pr->keymat_p = res;
+		res = NULL;
 	}
 
 	error = 0;
@@ -555,7 +563,7 @@ end:
 				pr->keymat = NULL;
 			}
 			if (pr->keymat_p) {
-				vfree(res);
+				vfree(pr->keymat_p);
 				pr->keymat_p = NULL;
 			}
 		}
@@ -563,6 +571,8 @@ end:
 
 	if (buf != NULL)
 		vfree(buf);
+	if (res)
+		vfree(res);
 
 	return error;
 }
@@ -584,7 +594,7 @@ oakley_compute_hashx(struct ph1handle *iph1, ...)
 	/* get buffer length */
 	va_start(ap, iph1);
 	len = 0;
-        while ((s = va_arg(ap, char *)) != NULL) {
+        while ((s = va_arg(ap, vchar_t *)) != NULL) {
 		len += s->l
         }
 	va_end(ap);
@@ -946,7 +956,7 @@ oakley_ph1hash_base_r(iph1, sw)
 	int sw;
 {
 	vchar_t *buf = NULL, *res = NULL, *bp;
-	vchar_t *hash;
+	vchar_t *hash = NULL;
 	char *p;
 	int len;
 	int error = -1;
@@ -1030,7 +1040,6 @@ oakley_ph1hash_base_r(iph1, sw)
 
 	/* compute HASH */
 	res = oakley_prf(hash, buf, iph1);
-	vfree(hash);
 	if (res == NULL)
 		goto end;
 
@@ -1042,6 +1051,8 @@ oakley_ph1hash_base_r(iph1, sw)
 end:
 	if (buf != NULL)
 		vfree(buf);
+	if (hash)
+		vfree(hash);
 	return res;
 }
 
@@ -1201,6 +1212,7 @@ oakley_validate_auth(iph1)
 			plog(logp, LOCATION, NULL,
 				"no supported certtype %d\n",
 				iph1->rmconf->certtype);
+			vfree(my_hash);
 			return -1;
 		}
 
