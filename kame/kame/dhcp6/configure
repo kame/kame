@@ -827,7 +827,7 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-mediator         build with mediator (obsolete)
+  --with-localdbdir=VALUE where to put local DB files
   --with-opt-dns=VALUE    specify DHCP option value for DNS
   --with-opt-dnsname=VALUE    specify DHCP option value for DNS_NAME
   --with-opt-ia-pd=VALUE  specify DHCP option value for IA_PD
@@ -3990,6 +3990,20 @@ fi
 done
 
 
+echo "$as_me:$LINENO: checking for local DB directory" >&5
+echo $ECHO_N "checking for local DB directory... $ECHO_C" >&6
+
+# Check whether --with-localdbdir or --without-localdbdir was given.
+if test "${with_localdbdir+set}" = set; then
+  withval="$with_localdbdir"
+  localdbdir="$withval"
+else
+  localdbdir="/var/db"
+fi;
+echo "$as_me:$LINENO: result: $localdbdir" >&5
+echo "${ECHO_T}$localdbdir" >&6
+
+
 
 for ac_func in arc4random
 do
@@ -4069,23 +4083,6 @@ fi
 done
 
 
-
-echo "$as_me:$LINENO: checking if --enable-mediator option is specified" >&5
-echo $ECHO_N "checking if --enable-mediator option is specified... $ECHO_C" >&6
-
-# Check whether --with-mediator or --without-mediator was given.
-if test "${with_mediator+set}" = set; then
-  withval="$with_mediator"
-  cat >>confdefs.h <<\_ACEOF
-#define MEDIATOR 1
-_ACEOF
-
-	with_mediator=yes
-else
-  with_mediator=no
-fi;
-echo "$as_me:$LINENO: result: $with_mediator" >&5
-echo "${ECHO_T}$with_mediator" >&6;
 
 echo "$as_me:$LINENO: checking if --enable-pedant option is specified" >&5
 echo $ECHO_N "checking if --enable-pedant option is specified... $ECHO_C" >&6
@@ -5091,6 +5088,7 @@ s,@EXEEXT@,$EXEEXT,;t t
 s,@OBJEXT@,$OBJEXT,;t t
 s,@CPP@,$CPP,;t t
 s,@LIBOBJS@,$LIBOBJS,;t t
+s,@localdbdir@,$localdbdir,;t t
 s,@DHCPOPT_DNS@,$DHCPOPT_DNS,;t t
 s,@DH6OPT_DNSNAME@,$DH6OPT_DNSNAME,;t t
 s,@DH6OPT_IA_PD@,$DH6OPT_IA_PD,;t t
