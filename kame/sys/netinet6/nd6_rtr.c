@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.234 2003/05/16 16:21:39 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.235 2003/05/16 16:58:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -556,20 +556,12 @@ nd6_rtmsg(cmd, rt)
 	info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 	info.rti_info[RTAX_NETMASK] = rt_mask(rt);
 	if (rt->rt_ifp) {
-		/*
-		 * XXX If called during if_detach(), ifp->if_addrlist
-		 * could be NULL.  This is not a common case, but as nd6_rtmsg()
-		 * will be called during if_detach(), we need to check for the
-		 * case.
-		 */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		if (rt->rt_ifp->if_addrlist)
-			info.rti_info[RTAX_IFP] =
-			    rt->rt_ifp->if_addrlist->ifa_addr;
+		info.rti_info[RTAX_IFP] =
+		    rt->rt_ifp->if_addrlist->ifa_addr;
 #else
-		if (TAILQ_FIRST(&rt->rt_ifp->if_addrlist))
-			info.rti_info[RTAX_IFP] =
-			    TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
+		info.rti_info[RTAX_IFP] =
+		    TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
 #endif
 		info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 	}
