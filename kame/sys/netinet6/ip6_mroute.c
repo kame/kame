@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.84 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.85 2002/11/07 03:25:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -93,6 +93,9 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#ifdef MULTICAST_PMTUD
+#include <netinet/icmp6.h>
+#endif
 
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
