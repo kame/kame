@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.43 2001/09/02 19:06:26 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.44 2001/09/05 02:25:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -94,10 +94,10 @@
 
 struct ftpparam
 {
-    u_long		 cmd;
-    caddr_t		 arg;		/* argument in mbuf if exist	*/
-    caddr_t		 argend;
-    struct sockaddr	*sa;		/* allocated			*/
+	u_long		 cmd;
+	caddr_t		 arg;		/* argument in mbuf if exist	*/
+	caddr_t		 argend;
+	struct sockaddr	*sa;		/* allocated			*/
 };
 
 
