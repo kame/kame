@@ -70,6 +70,7 @@ static const char rcsid[] =
 #include <string.h>
 #include <sysexits.h>
 #include <unistd.h>
+#include <ifaddrs.h>
 
 struct keytab {
 	char	*kt_cp;
