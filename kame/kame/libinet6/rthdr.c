@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.11 2003/06/06 06:16:29 itojun Exp $	*/
+/*	$KAME: rthdr.c,v 1.12 2003/06/06 06:23:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,8 +67,8 @@ inet6_rthdr_init(bp, type)
     void *bp;
     int type;
 {
-    register struct cmsghdr *ch = (struct cmsghdr *)bp;
-    register struct ip6_rthdr *rthdr;
+    struct cmsghdr *ch = (struct cmsghdr *)bp;
+    struct ip6_rthdr *rthdr;
 
     rthdr = (struct ip6_rthdr *)CMSG_DATA(ch);
 
@@ -101,7 +101,7 @@ inet6_rthdr_add(cmsg, addr, flags)
     const struct in6_addr *addr;
     u_int flags;
 {
-    register struct ip6_rthdr *rthdr;
+    struct ip6_rthdr *rthdr;
 
     rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
@@ -129,6 +129,9 @@ inet6_rthdr_add(cmsg, addr, flags)
 	     b = rt0->ip6r0_segleft % 8;
 	     rt0->ip6r0_slmap[c] |= (1 << (7 - b));
 	 }
+#else
+	 if (flags != IPV6_RTHDR_LOOSE)
+	    return (-1);
 #endif 
 	 rt0->ip6r0_segleft++;
 	 bcopy(addr, (caddr_t)rt0 + ((rt0->ip6r0_len + 1) << 3),
@@ -154,7 +157,7 @@ inet6_rthdr_lasthop(cmsg, flags)
     struct cmsghdr *cmsg;
     unsigned int flags;
 {
-    register struct ip6_rthdr *rthdr;
+    struct ip6_rthdr *rthdr;
 
     rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
@@ -183,6 +186,9 @@ inet6_rthdr_lasthop(cmsg, flags)
 	     b = rt0->ip6r0_segleft % 8;
 	     rt0->ip6r0_slmap[c] |= (1 << (7 - b));
 	 }
+#else
+	 if (flags != IPV6_RTHDR_LOOSE)
+	    return (-1);
 #endif /* COMPAT_RFC1883 */
 	 break;
      }
@@ -214,7 +220,7 @@ int
 inet6_rthdr_segments(cmsg)
     const struct cmsghdr *cmsg;
 {
-    register struct ip6_rthdr *rthdr;
+    struct ip6_rthdr *rthdr;
 
     rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
@@ -248,7 +254,7 @@ inet6_rthdr_getaddr(cmsg, idx)
     struct cmsghdr *cmsg;
     int idx;
 {
-    register struct ip6_rthdr *rthdr;
+    struct ip6_rthdr *rthdr;
 
     rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
@@ -293,7 +299,7 @@ inet6_rthdr_getflags(cmsg, idx)
     const struct cmsghdr *cmsg;
     int idx;
 {
-    register struct ip6_rthdr *rthdr;
+    struct ip6_rthdr *rthdr;
 
     rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
