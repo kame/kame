@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.364 2004/02/13 02:52:09 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.365 2004/02/17 11:35:36 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -205,10 +205,6 @@ const struct in6_addr in6mask128 = IN6MASK128;
 
 const struct sockaddr_in6 sa6_any =
 	{ sizeof(sa6_any), AF_INET6, 0, 0, IN6ADDR_ANY_INIT, 0};
-
-#ifdef MLDV2
-extern int	mld_sendbuf(struct mbuf *, struct ifnet *);
-#endif
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 static int in6_lifaddr_ioctl(struct socket *, u_long, caddr_t,
