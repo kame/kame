@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.h,v 1.2 2000/08/09 17:23:20 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.h,v 1.3 2000/08/09 19:49:11 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -139,8 +139,8 @@ struct prop_pair {
 #define MAXPROPPAIRLEN	256	/* It's enough because field size is 1 octet. */
 
 /*
- * Lifetime length selection refered to the section 4.5.4 of RFC2407.
- * It does not conform to the description of RFC.  There are three type of
+ * Lifetime length selection refered to the section 4.5.4 of RFC2407.  It does
+ * not conform to the description of RFC completely.  There are three type of
  * the behavior.  If the value of "proposal_check" in "remote" directive is;
  *     "obey"
  *         the responder obey the initiator anytime.
