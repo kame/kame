@@ -116,7 +116,6 @@ static struct msghdr 		sndmh,
 static struct iovec 		sndiov[2];
 static struct iovec 		rcviov[2];
 static struct sockaddr_in6 	from;
-static struct in6_pktinfo 	*sndpktinfo;
 static u_char   		rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 			   	CMSG_SPACE(sizeof(int))];
 u_int8_t raopt[IP6OPT_RTALERT_LEN];
@@ -399,7 +398,7 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
    
     bzero(mhp, sizeof(*mhp));
     mhp->mld6_type = type;
-    mhp->mld6_code = 0;
+    mhp->mld6_code = code;
     mhp->mld6_maxdelay = htons(delay);
     mhp->mld6_addr = *group;
 
