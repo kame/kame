@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.8 2000/03/25 07:23:33 sumikawa Exp $	*/
+/*	$KAME: if_gif.h,v 1.9 2000/04/14 08:36:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -59,8 +59,8 @@ struct gif_softc {
 #endif
 	} gifsc_gifscr;
 	int		gif_flags;
-	const struct encaptab *encap_cookie;
-	short		gif_oflags;	/* copy of ifp->if_flags */
+	const struct encaptab *encap_cookie4;
+	const struct encaptab *encap_cookie6;
 };
 
 #define gif_ro gifsc_gifscr.gifscr_ro

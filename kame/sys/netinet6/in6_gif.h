@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.h,v 1.4 2000/03/25 07:23:43 sumikawa Exp $	*/
+/*	$KAME: in6_gif.h,v 1.5 2000/04/14 08:36:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,10 +36,6 @@
 
 int in6_gif_input __P((struct mbuf **, int *, int));
 int in6_gif_output __P((struct ifnet *, int, struct mbuf *, struct rtentry *));
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-int in6_gif_ioctl __P((struct ifnet *, int, caddr_t));
-#else
-int in6_gif_ioctl __P((struct ifnet *, u_long, caddr_t));
-#endif
+int gif_encapcheck6 __P((const struct mbuf *, int, int, void *));
 
 #endif /*_NETINET6_IN6_GIF_H_*/

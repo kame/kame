@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.17 2000/04/11 10:46:00 jinmei Exp $	*/
+/*	$KAME: if_gif.c,v 1.18 2000/04/14 08:36:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,6 +97,13 @@ void gifattach __P((void *));
 #else
 void gifattach __P((int));
 #endif
+static int gif_encapcheck __P((const struct mbuf *, int, int, void *));
+#ifdef INET
+extern struct protosw in_gif_protosw;
+#endif
+#ifdef INET6
+extern struct ip6protosw in6_gif_protosw;
+#endif
 
 /*
  * gif global variable definitions
@@ -137,6 +144,29 @@ gifattach(dummy)
 		sc->gif_if.if_name = "gif";
 		sc->gif_if.if_unit = i;
 #endif
+
+		sc->encap_cookie4 = sc->encap_cookie6 = NULL;
+#ifdef INET
+		sc->encap_cookie4 = encap_attach_func(AF_INET, -1,
+		    gif_encapcheck, &in_gif_protosw, sc);
+		if (sc->encap_cookie4 == NULL) {
+			printf("%s: attach failed\n", if_name(&sc->gif_if));
+			continue;
+		}
+#endif
+#ifdef INET6
+		sc->encap_cookie6 = encap_attach_func(AF_INET6, -1,
+		    gif_encapcheck, (struct protosw *)&in6_gif_protosw, sc);
+		if (sc->encap_cookie6 == NULL) {
+			if (sc->encap_cookie4) {
+				encap_detach(sc->encap_cookie4);
+				sc->encap_cookie4 = NULL;
+			}
+			printf("%s: attach failed\n", if_name(&sc->gif_if));
+			continue;
+		}
+#endif
+
 		sc->gif_if.if_mtu    = GIF_MTU;
 		sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
 		sc->gif_if.if_ioctl  = gif_ioctl;
@@ -156,6 +186,63 @@ gifattach(dummy)
 #ifdef __FreeBSD__
 PSEUDO_SET(gifattach, if_gif);
 #endif
+
+static int
+gif_encapcheck(m, off, proto, arg)
+	const struct mbuf *m;
+	int off;
+	int proto;
+	void *arg;
+{
+	struct ip ip;
+	struct gif_softc *sc;
+
+	sc = (struct gif_softc *)arg;
+	if (sc == NULL)
+		return 0;
+
+	if ((sc->gif_if.if_flags & IFF_UP) == 0)
+		return 0;
+
+	/* no physical address */
+	if (!sc->gif_psrc || !sc->gif_pdst)
+		return 0;
+
+	switch (proto) {
+#ifdef INET
+	case IPPROTO_IPV4:
+		break;
+#endif
+#ifdef INET6
+	case IPPROTO_IPV6:
+		break;
+#endif
+	default:
+		return 0;
+	}
+
+	/* LINTED const cast */
+	m_copydata((struct mbuf *)m, 0, sizeof(ip), (caddr_t)&ip);
+
+	switch (ip.ip_v) {
+#ifdef INET
+	case 4:
+		if (sc->gif_psrc->sa_family != AF_INET ||
+		    sc->gif_pdst->sa_family != AF_INET)
+			return 0;
+		return gif_encapcheck4(m, off, proto, arg);
+#endif
+#ifdef INET6
+	case 6:
+		if (sc->gif_psrc->sa_family != AF_INET6 ||
+		    sc->gif_pdst->sa_family != AF_INET6)
+			return 0;
+		return gif_encapcheck6(m, off, proto, arg);
+#endif
+	default:
+		return 0;
+	}
+}
 
 int
 gif_output(ifp, m, dst, rt)
@@ -229,6 +316,8 @@ gif_output(ifp, m, dst, rt)
 	s = splnet();
 	sc->gif_flags |= GIFF_INUSE;
 #endif
+
+	/* XXX should we check if our outer source is legal? */
 
 	switch (sc->gif_psrc->sa_family) {
 #ifdef INET
@@ -360,6 +449,7 @@ gif_ioctl(ifp, cmd, data)
 	struct ifreq     *ifr = (struct ifreq*)data;
 	int error = 0, size;
 	struct sockaddr *dst, *src;
+	struct sockaddr *sa;
 	int i;
 	struct gif_softc *sc2;
 		
@@ -415,7 +505,7 @@ gif_ioctl(ifp, cmd, data)
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif /* INET6 */
-		/* can't configure same pair of address onto two gif */
+		/* can't configure same pair of address onto two gifs */
 		src = (struct sockaddr *)
 			&(((struct in_aliasreq *)data)->ifra_addr);
 		dst = (struct sockaddr *)
@@ -437,25 +527,50 @@ gif_ioctl(ifp, cmd, data)
 			}
 		}
 
-		switch (ifr->ifr_addr.sa_family) {
-#ifdef INET
-		case AF_INET:
-			return in_gif_ioctl(ifp, cmd, data);
-#endif /* INET */
-#ifdef INET6
-		case AF_INET6:
-			return in6_gif_ioctl(ifp, cmd, data);
-#endif /* INET6 */
-		default:
-			error = EPROTOTYPE;
-			goto bad;
+		if (src->sa_family != dst->sa_family ||
+		    src->sa_len != dst->sa_len) {
+			error = EINVAL;
 			break;
 		}
+		switch (src->sa_family) {
+#ifdef INET
+		case AF_INET:
+			size = sizeof(struct sockaddr_in);
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
+			size = sizeof(struct sockaddr_in6);
+			break;
+#endif
+		default:
+			error = EAFNOSUPPORT;
+			goto bad;
+		}
+		if (src->sa_len != size) {
+			error = EINVAL;
+			break;
+		}
+
+		if (sc->gif_psrc)
+			free((caddr_t)sc->gif_psrc, M_IFADDR);
+		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
+		bcopy((caddr_t)src, (caddr_t)sa, size);
+		sc->gif_psrc = sa;
+
+		if (sc->gif_pdst)
+			free((caddr_t)sc->gif_pdst, M_IFADDR);
+		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
+		bcopy((caddr_t)dst, (caddr_t)sa, size);
+		sc->gif_pdst = sa;
+
+		ifp->if_flags |= IFF_UP;
+		if_up(ifp);		/* send up RTM_IFINFO */
+
+		error = 0;
 		break;
 
 	case SIOCDIFPHYADDR:
-		if (sc->encap_cookie)
-			(void)encap_detach(sc->encap_cookie);
 		if (sc->gif_psrc) {
 			free((caddr_t)sc->gif_psrc, M_IFADDR);
 			sc->gif_psrc = NULL;
@@ -528,22 +643,7 @@ gif_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCSIFFLAGS:
-		if (sc->gif_psrc == NULL)
-			break;
-		switch (sc->gif_psrc->sa_family) {
-#ifdef INET
-		case AF_INET:
-			return in_gif_ioctl(ifp, cmd, data);
-#endif /* INET */
-#ifdef INET6
-		case AF_INET6:
-			return in6_gif_ioctl(ifp, cmd, data);
-#endif /* INET6 */
-		default:
-			error = EPROTOTYPE;
-			goto bad;
-			break;
-		}
+		/* if_ioctl() takes care of it */
 		break;
 
 	default:

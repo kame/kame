@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.28 2000/03/30 01:39:37 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.29 2000/04/14 08:36:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -46,7 +46,6 @@
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
 #endif
-#include <sys/protosw.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/malloc.h>
@@ -66,17 +65,12 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_gif.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/ip6protosw.h>
 #endif
 #include <netinet/ip_ecn.h>
 
 #include <net/if_gif.h>
 
 #include <net/net_osdep.h>
-
-#ifdef INET6
-extern struct ip6protosw in6_gif_protosw;
-#endif
 
 int
 in6_gif_output(ifp, family, m, rt)
@@ -223,45 +217,14 @@ int in6_gif_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
-#if 0
-	struct gif_softc *sc;
-#endif
 	struct ifnet *gifp = NULL;
 	struct ip6_hdr *ip6;
-#if 0
-	int i;
-#endif
 	int af = 0;
 	u_int32_t otos;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 
-#if 0
-#define satoin6(sa)	(((struct sockaddr_in6 *)(sa))->sin6_addr)
-	for (i = 0, sc = gif; i < ngif; i++, sc++) {
-		if (sc->gif_psrc == NULL ||
-		    sc->gif_pdst == NULL ||
-		    sc->gif_psrc->sa_family != AF_INET6 ||
-		    sc->gif_pdst->sa_family != AF_INET6) {
-			continue;
-		}
-		if ((sc->gif_if.if_flags & IFF_UP) == 0)
-			continue;
-		if ((sc->gif_if.if_flags & IFF_LINK0) &&
-		    IN6_ARE_ADDR_EQUAL(&satoin6(sc->gif_psrc), &ip6->ip6_dst) &&
-		    IN6_IS_ADDR_UNSPECIFIED(&satoin6(sc->gif_pdst))) {
-			gifp = &sc->gif_if;
-			continue;
-		}
-		if (IN6_ARE_ADDR_EQUAL(&satoin6(sc->gif_psrc), &ip6->ip6_dst) &&
-		    IN6_ARE_ADDR_EQUAL(&satoin6(sc->gif_pdst), &ip6->ip6_src)) {
-			gifp = &sc->gif_if;
-			break;
-		}
-	}
-#else
 	gifp = (struct ifnet *)encap_getarg(m);
-#endif
 
 	if (gifp == NULL) {
 		m_freem(m);
@@ -323,140 +286,68 @@ int in6_gif_input(mp, offp, proto)
 	return IPPROTO_DONE;
 }
 
+/*
+ * we know that we are in IFF_UP, outer address available, and outer family
+ * matched the physical addr family.  see gif_encapcheck().
+ */
 int
-in6_gif_ioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-	int cmd;
-#else
-	u_long cmd;
-#endif
-	caddr_t data;
+gif_encapcheck6(m, off, proto, arg)
+	const struct mbuf *m;
+	int off;
+	int proto;
+	void *arg;
 {
-	struct gif_softc *sc  = (struct gif_softc*)ifp;
-	struct ifreq     *ifr = (struct ifreq*)data;
-	int error = 0, size;
-	struct sockaddr *sa, *dst, *src;
-	const struct encaptab *p;
-	struct sockaddr_in6 smask6, dmask6;
-		
-	switch (cmd) {
-	case SIOCSIFFLAGS:
-		/*
-		 * whenever we change our idea about multi-destination mode
-		 * we need to update encap attachment.
-		 */
-		if (((ifp->if_flags ^ sc->gif_oflags) & IFF_LINK0) == 0)
-			break;
-		if (sc->gif_psrc == NULL || sc->gif_pdst == NULL ||
-		    sc->gif_psrc->sa_family != sc->gif_pdst->sa_family)
-			break;
-		bzero(&smask6, sizeof(smask6));
-		smask6.sin6_addr.s6_addr32[0] = ~0;
-		smask6.sin6_addr.s6_addr32[1] = ~0;
-		smask6.sin6_addr.s6_addr32[2] = ~0;
-		smask6.sin6_addr.s6_addr32[3] = ~0;
-#if 0	/* we'll need to do this soon */
-		smask6.sin6_scope_id = ~0;
+	struct ip6_hdr ip6;
+	struct gif_softc *sc;
+	struct sockaddr_in6 *src, *dst;
+	int addrmatch;
+
+	/* sanity check done in caller */
+	sc = (struct gif_softc *)arg;
+	src = (struct sockaddr_in6 *)sc->gif_psrc;
+	dst = (struct sockaddr_in6 *)sc->gif_pdst;
+
+	/* LINTED const cast */
+	m_copydata((struct mbuf *)m, 0, sizeof(ip6), (caddr_t)&ip6);
+
+	/* check for address match */
+	addrmatch = 0;
+	if (IN6_ARE_ADDR_EQUAL(&src->sin6_addr, &ip6.ip6_dst))
+		addrmatch |= 1;
+	if (IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &ip6.ip6_src))
+		addrmatch |= 2;
+	else if ((sc->gif_if.if_flags & IFF_LINK0) != 0 &&
+		 IN6_IS_ADDR_UNSPECIFIED(&dst->sin6_addr)) {
+		addrmatch |= 2; /* we accept any source */
+	}
+	if (addrmatch != 3)
+		return 0;
+
+	/* martian filters on outer address - done in ip6_input */
+
+	/* ingress filters on outer address */
+	if ((m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.rcvif) {
+		struct sockaddr_in6 sin6;
+		struct rtentry *rt;
+
+		bzero(&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_addr = ip6.ip6_src;
+		/* XXX scopeid */
+#ifdef __FreeBSD__
+		rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);
+#else
+		rt = rtalloc1((struct sockaddr *)&sin6, 0);
 #endif
-		dmask6 = smask6;
-		if ((ifp->if_flags & IFF_LINK0) == 0 &&
-		    IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)dst)->sin6_addr)) {
-			bzero(&dmask6, sizeof(dmask6));
-#if 0	/* we'll need to do this soon */
-			dmask6.sin6_scope_id = ~0;
-#endif
+		if (!rt)
+			return 0;
+		if (rt->rt_ifp != m->m_pkthdr.rcvif) {
+			rtfree(rt);
+			return 0;
 		}
-		p = encap_attach(sc->gif_psrc->sa_family, -1, sc->gif_psrc,
-			(struct sockaddr *)&smask6, sc->gif_pdst,
-			(struct sockaddr *)&dmask6,
-			(struct protosw *)&in6_gif_protosw, &sc->gif_if);
-		if (p == NULL) {
-			error = EINVAL;
-			goto bad;
-		}
-		if (sc->encap_cookie != NULL)
-			(void)encap_detach(sc->encap_cookie);
-		sc->encap_cookie = p;
-		sc->gif_oflags = ifp->if_flags;
-
-		break;
-
-#ifdef INET6
-	case SIOCSIFPHYADDR_IN6:
-#endif
-		switch (ifr->ifr_addr.sa_family) {
-#ifdef INET6
-		case AF_INET6:
-			src = (struct sockaddr *)
-				&(((struct in6_aliasreq *)data)->ifra_addr);
-			dst = (struct sockaddr *)
-				&(((struct in6_aliasreq *)data)->ifra_dstaddr);
-
-			bzero(&smask6, sizeof(smask6));
-			smask6.sin6_addr.s6_addr32[0] = ~0;
-			smask6.sin6_addr.s6_addr32[1] = ~0;
-			smask6.sin6_addr.s6_addr32[2] = ~0;
-			smask6.sin6_addr.s6_addr32[3] = ~0;
-#if 0	/* we'll need to do this soon */
-			smask6.sin6_scope_id = ~0;
-#endif
-			dmask6 = smask6;
-			if ((ifp->if_flags & IFF_LINK0) == 0 &&
-			    IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)dst)->sin6_addr)) {
-				bzero(&dmask6, sizeof(dmask6));
-#if 0	/* we'll need to do this soon */
-				dmask6.sin6_scope_id = ~0;
-#endif
-			}
-			size = sizeof(struct sockaddr_in6);
-			break;
-#endif /* INET6 */
-		default:
-			error = EAFNOSUPPORT;
-			goto bad;
-		}
-
-		if (sc->encap_cookie != NULL)
-			(void)encap_detach(sc->encap_cookie);
-		if (sc->gif_psrc != NULL) {
-			free((caddr_t)sc->gif_psrc, M_IFADDR);
-			sc->gif_psrc = NULL;
-		}
-		if (sc->gif_pdst != NULL) {
-			free((caddr_t)sc->gif_pdst, M_IFADDR);
-			sc->gif_pdst = NULL;
-		}
-
-		p = encap_attach(ifr->ifr_addr.sa_family, -1, src,
-			(struct sockaddr *)&smask6, dst,
-			(struct sockaddr *)&dmask6,
-			(struct protosw *)&in6_gif_protosw, &sc->gif_if);
-		if (p == NULL) {
-			error = EINVAL;
-			goto bad;
-		}
-		sc->encap_cookie = p;
-		sc->gif_oflags = ifp->if_flags;
-
-		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
-		bcopy((caddr_t)src, (caddr_t)sa, size);
-		sc->gif_psrc = sa;
-		
-		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
-		bcopy((caddr_t)dst, (caddr_t)sa, size);
-		sc->gif_pdst = sa;
-		
-		ifp->if_flags |= IFF_UP;
-		if_up(ifp);		/* send up RTM_IFINFO */
-
-		error = 0;
-		break;
-	default:
-		error = EINVAL;
-		goto bad;
+		rtfree(rt);
 	}
 
- bad:
-	return error;
+	return 1;
 }
