@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.38 2001/11/10 09:42:30 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.39 2001/11/12 05:56:24 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -146,10 +146,10 @@ in6_pcbbind(inp, nam, p)
 			sin6->sin6_scope_id =
 				scope6_addr2default(&sin6->sin6_addr);
 		}
-#ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&sin6->sin6_addr, sin6, inp, NULL) != 0)
+		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
 			return EINVAL;
+#ifndef SCOPEDROUTING
 		/* this must be cleared for ifa_ifwithaddr() */
 		sin6->sin6_scope_id = 0;
 #endif
@@ -293,10 +293,10 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 		sin6->sin6_scope_id =
 			scope6_addr2default(&sin6->sin6_addr);
 	}
-#ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
-	if (in6_embedscope(&sin6->sin6_addr, sin6, inp, NULL) != 0)
+	if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
 		return EINVAL;
+#ifndef SCOPEDROUTING
 	sin6->sin6_scope_id = 0;
 #endif
 

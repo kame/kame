@@ -347,10 +347,9 @@ rip6_output(m, so, dstsock, control)
 	ip6 = mtod(m, struct ip6_hdr *);
 
 	/* KAME hack: embed scopeid */
-	if (in6_embedscope(dst, dstsock, in6p, NULL) != 0) {
-		error = EINVAL;
+	if ((error = in6_embedscope(dst, dstsock)) != 0)
 		goto bad;
-	}
+
 	ip6->ip6_dst = *dst;
 
 	/*
@@ -592,10 +591,10 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (ip6_use_defzone && addr->sin6_scope_id == 0) {
 		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
 	}
-#ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
-	if (in6_embedscope(&addr->sin6_addr, addr, inp, NULL) != 0)
+	if (in6_embedscope(&addr->sin6_addr, addr) != 0)
 		return EINVAL;
+#ifndef SCOPEDROUTING
 	addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
 #endif
 
@@ -629,12 +628,9 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (ip6_use_defzone && addr->sin6_scope_id == 0) {
 		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
 	}
-#ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
-	if (in6_embedscope(&addr->sin6_addr, addr, inp, NULL) != 0)
+	if (in6_embedscope(&addr->sin6_addr, addr) != 0)
 		return EINVAL;
-	addr->sin6_scope_id = 0;
-#endif
 
 	/* Source address selection. XXX: need pcblookup? */
 	in6a = in6_selectsrc(addr, inp->in6p_outputopts,

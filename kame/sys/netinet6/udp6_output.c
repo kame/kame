@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.45 2001/11/12 05:06:04 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.46 2001/11/12 07:41:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,10 +221,8 @@ udp6_output(in6p, m, addr6, control)
 				scope6_addr2default(&sin6->sin6_addr);
 		}
 		/* KAME hack: embed scopeid */
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0)
+		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
 			return(EINVAL);
-#endif
 	}
 
 	if (control) {

@@ -796,11 +796,11 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 	case AF_INET6:
 		is_ipv6 = 1;
 		fin6 = (struct sockaddr_in6 *)&tir.faddr;
-		error = in6_embedscope(&f6, fin6, NULL, NULL);
+		error = in6_embedscope(&f6, fin6);
 		if (error)
 			return EINVAL;	/*?*/
 		lin6 = (struct sockaddr_in6 *)&tir.laddr;
-		error = in6_embedscope(&l6, lin6, NULL, NULL);
+		error = in6_embedscope(&l6, lin6);
 		if (error)
 			return EINVAL;	/*?*/
 		break;

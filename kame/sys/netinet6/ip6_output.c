@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.236 2001/11/10 10:49:05 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.237 2001/11/12 07:41:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3814,15 +3814,13 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 				sin6.sin6_scope_id = zone;
 			}
 			sin6.sin6_addr = pktinfo->ipi6_addr;
-#ifndef SCOPEDROUTING
 			/* XXX: the following may override the original data */
-			if (in6_embedscope(&sin6.sin6_addr, &sin6,
-					   NULL, NULL)) {
+			if (in6_embedscope(&sin6.sin6_addr, &sin6))
 				return(EINVAL);
-			}
+#ifndef SCOPEDROUTING
 			sin6.sin6_scope_id = 0; /* XXX */
-			pktinfo->ipi6_addr = sin6.sin6_addr; /* XXX */
 #endif
+			pktinfo->ipi6_addr = sin6.sin6_addr; /* XXX */
 			ia6 = (struct in6_ifaddr *)ifa_ifwithaddr(sin6tosa(&sin6));
 			if (ia6 == NULL ||
 			    (ia6->ia6_flags & (IN6_IFF_ANYCAST |
@@ -3917,15 +3915,13 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
 				return(EINVAL);
 			}
-			if (sa6->sin6_scope_id == 0) {
+			if (ip6_use_defzone && sa6->sin6_scope_id == 0) {
 				sa6->sin6_scope_id =
 					scope6_addr2default(&sa6->sin6_addr);
 			}
-#ifndef SCOPEDROUTING
-			if (in6_embedscope(&sa6->sin6_addr, sa6, NULL, NULL)
-			    != 0) {
+			if (in6_embedscope(&sa6->sin6_addr, sa6) != 0)
 				return(EINVAL);
-			}
+#ifndef SCOPEDROUTING
 			sa6->sin6_scope_id = 0; /* XXX */
 #endif
 			break;

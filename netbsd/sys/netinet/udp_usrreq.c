@@ -646,9 +646,11 @@ udp6_realinput(af, src, dst, m, off)
 	if (src->sin6_family != AF_INET6 || dst->sin6_family != AF_INET6)
 		goto bad;
 
-	in6_embedscope(&src6, src, NULL, NULL);
+	if (in6_embedscope(&src6, src))
+		goto bad; /* should not fail, but check it just in case */
 	sport = src->sin6_port;
-	in6_embedscope(&dst6, dst, NULL, NULL);
+	if (in6_embedscope(&dst6, dst))
+		goto bad;	/* XXX should not fail. */
 	dport = dst->sin6_port;
 	dst4 = (struct in_addr *)&dst->sin6_addr.s6_addr[12];
 

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.260 2001/11/09 04:58:53 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.261 2001/11/12 07:41:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1234,15 +1234,12 @@ icmp6_notify_error(m, off, icmp6len, code)
 					      &icmp6dst.sin6_addr)) < 0)
 			goto freeit;
 		icmp6dst.sin6_scope_id = zoneid;
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&icmp6dst.sin6_addr, &icmp6dst,
-				   NULL, NULL)) {
+		if (in6_embedscope(&icmp6dst.sin6_addr, &icmp6dst)) {
 			/* should be impossbile */
 			nd6log((LOG_DEBUG,
 			    "icmp6_notify_error: in6_embedscope failed\n"));
 			goto freeit;
 		}
-#endif
 
 		/*
 		 * retrieve parameters from the inner IPv6 header, and convert
@@ -1256,15 +1253,12 @@ icmp6_notify_error(m, off, icmp6len, code)
 					      &icmp6src.sin6_addr)) < 0)
 			goto freeit;
 		icmp6src.sin6_scope_id = zoneid;
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&icmp6src.sin6_addr, &icmp6src,
-				   NULL, NULL)) {
+		if (in6_embedscope(&icmp6src.sin6_addr, &icmp6src)) {
 			/* should be impossbile */
 			nd6log((LOG_DEBUG,
 			    "icmp6_notify_error: in6_embedscope failed\n"));
 			goto freeit;
 		}
-#endif
 		icmp6src.sin6_flowinfo =
 			(eip6->ip6_flow & IPV6_FLOWLABEL_MASK);
 
@@ -1535,9 +1529,8 @@ ni6_input(m, off)
 				goto bad;
 			sin6.sin6_scope_id = zoneid;
 							     
-#ifndef SCOPEDROUTING
-			in6_embedscope(&sin6.sin6_addr, &sin6, NULL, NULL);
-#endif
+			if (in6_embedscope(&sin6.sin6_addr, &sin6))
+				goto bad; /* XXX should not happen */
 			bzero(&sin6_d, sizeof(sin6_d));
 			sin6_d.sin6_family = AF_INET6; /* not used, actually */
 			sin6_d.sin6_len = sizeof(sin6_d); /* ditto */
@@ -1546,9 +1539,8 @@ ni6_input(m, off)
 						      &ip6->ip6_dst)) < 0)
 				goto bad;
 			sin6_d.sin6_scope_id = zoneid;
-#ifndef SCOPEDROUTING
-			in6_embedscope(&sin6_d.sin6_addr, &sin6_d, NULL, NULL);
-#endif
+			if (in6_embedscope(&sin6_d.sin6_addr, &sin6_d))
+				goto bad; /* XXX should not happen */
 			subj = (char *)&sin6;
 			if (SA6_ARE_ADDR_EQUAL(&sin6, &sin6_d))
 				break;
@@ -2376,7 +2368,7 @@ icmp6_reflect(m, off)
 	sa6_src.sin6_len = sizeof(sa6_src);
 	sa6_src.sin6_addr = ip6->ip6_dst;
 	in6_recoverscope(&sa6_src, &ip6->ip6_dst, m->m_pkthdr.rcvif);
-	in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL);
+	in6_embedscope(&sa6_src.sin6_addr, &sa6_src);
 	ip6->ip6_dst = sa6_src.sin6_addr;
 
 	bzero(&sa6_dst, sizeof(sa6_dst));
@@ -2384,7 +2376,7 @@ icmp6_reflect(m, off)
 	sa6_dst.sin6_len = sizeof(sa6_dst);
 	sa6_dst.sin6_addr = t;
 	in6_recoverscope(&sa6_dst, &t, m->m_pkthdr.rcvif);
-	in6_embedscope(&t, &sa6_dst, NULL, NULL);
+	in6_embedscope(&t, &sa6_dst);
 
 	/*
 	 * If the incoming packet was addressed directly to us (i.e. unicast),

@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.70 2001/11/06 08:14:16 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.71 2001/11/12 07:41:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -717,15 +717,7 @@ void	in6_prefix_remove_ifid __P((int iilen, struct in6_ifaddr *ia));
 void	in6_purgeprefix __P((struct ifnet *));
 
 int	in6_is_addr_deprecated __P((struct sockaddr_in6 *));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
-struct inpcb;
-int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
-	struct inpcb *, struct ifnet **));
-#else
-struct in6pcb;
-int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
-	struct in6pcb *, struct ifnet **));
-#endif
+int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *));
 int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
 	struct ifnet *));
 void in6_clearscope __P((struct in6_addr *));

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.96 2001/11/10 09:56:27 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.97 2001/11/12 07:41:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -518,10 +518,8 @@ rip6_output(m, va_alist)
 	ip6 = mtod(m, struct ip6_hdr *);
 
 	/* KAME hack: embed scopeid */
-	if (in6_embedscope(dst, dstsock, in6p, NULL) != 0) {
-		error = EINVAL;
+	if ((error = in6_embedscope(dst, dstsock)) != 0)
 		goto bad;
-	}
 	ip6->ip6_dst = *dst;
 
 	/*
@@ -845,10 +843,10 @@ rip6_usrreq(so, req, m, nam, control, p)
 			addr->sin6_scope_id =
 				scope6_addr2default(&addr->sin6_addr);
 		}
-#ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&addr->sin6_addr, addr, in6p, NULL) != 0)
+		if (in6_embedscope(&addr->sin6_addr, addr) != 0)
 			return EINVAL;
+#ifndef SCOPEDROUTING
 		addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
 #endif
 
@@ -909,10 +907,10 @@ rip6_usrreq(so, req, m, nam, control, p)
 			addr->sin6_scope_id =
 				scope6_addr2default(&addr->sin6_addr);
 		}
-#ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&addr->sin6_addr, addr, in6p, NULL) != 0)
+		if (in6_embedscope(&addr->sin6_addr, addr) != 0)
 			return EINVAL;
+#ifndef SCOPEDROUTING
 		addr->sin6_scope_id = 0;
 #endif
 

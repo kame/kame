@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.78 2001/10/24 02:19:54 sumikawa Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.79 2001/11/12 07:41:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -458,8 +458,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 				if (zone < 0) /* XXX: should not happen! */
 					goto bad;
 				sin6_in.sin6_scope_id = zone;
-				in6_embedscope(&sin6_in.sin6_addr, &sin6_in,
-					       NULL, NULL);
+				in6_embedscope(&sin6_in.sin6_addr, &sin6_in);
 				saddr6 = &sin6_in.sin6_addr;
 			}
 			else

@@ -186,10 +186,10 @@ in6_pcbbind(inp, nam)
 			sin6->sin6_scope_id =
 				scope6_addr2default(&sin6->sin6_addr);
 		}
-#ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&sin6->sin6_addr, sin6, inp, NULL) != 0)
+		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
 			return EINVAL;
+#ifndef SCOPEDROUTING
 		/* this must be cleared for ifa_ifwithaddr() */
 		sin6->sin6_scope_id = 0;
 #endif
@@ -482,10 +482,10 @@ in6_pcbconnect(inp, nam)
 		sin6->sin6_scope_id =
 			scope6_addr2default(&sin6->sin6_addr);
 	}
-#ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
-	if (in6_embedscope(&sin6->sin6_addr, sin6, inp, &ifp) != 0)
+	if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
 		return EINVAL;
+#ifndef SCOPEDROUTING
 	/* this must be cleared for ifa_ifwithaddr() */
 	sin6->sin6_scope_id = 0;
 #endif

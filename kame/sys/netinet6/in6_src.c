@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.88 2001/11/10 10:02:32 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.89 2001/11/12 07:41:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -242,12 +242,12 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			}
 			srcsock.sin6_scope_id = zone;
 		}
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&srcsock.sin6_addr, &srcsock, NULL, NULL)) {
-			*errorp = EINVAL;
+		if ((*errorp = in6_embedscope(&srcsock.sin6_addr, &srcsock))
+		    != 0) {
 			return(NULL);
 		}
-		srcsock.sin6_scope_id = 0; /* XXX */
+#ifndef SCOPEDROUTING
+		srcsock.sin6_scope_id = 0; /* XXX: ifa_ifwithaddr expects 0 */
 #endif
 		ia6 = (struct in6_ifaddr *)ifa_ifwithaddr((struct sockaddr *)(&srcsock));
 		if (ia6 == NULL ||
@@ -1065,89 +1065,55 @@ in6_pcbsetport(laddr, inp, p)
 #endif
 
 /*
- * generate kernel-internal form (scopeid embedded into s6_addr16[1]).
- * If the address scope of is link-local, embed the interface index in the
- * address.  The routine determines our precedence
- * between advanced API scope/interface specification and basic API
- * specification.
+ * Generate kernel-internal form (scopeid embedded into s6_addr16[1]).
+ * If the address scope of is interface-local or link-local, embed the
+ * interface index in the address.
  *
- * this function should be nuked in the future, when we get rid of
- * embedded scopeid thing.
- *
- * XXX actually, it is over-specification to return ifp against sin6_scope_id.
- * there can be multiple interfaces that belong to a particular scope zone
- * (in specification, we have 1:N mapping between a scope zone and interfaces).
- * we may want to change the function to return something other than ifp.
+ * This function should be nuked in the future, when we get rid of embedded
+ * scopeid thing.
  */
 int
-in6_embedscope(in6, sin6, in6p, ifpp)
+in6_embedscope(in6, sin6)
 	struct in6_addr *in6;
 	const struct sockaddr_in6 *sin6;
-#ifdef HAVE_NRL_INPCB
-	struct inpcb *in6p;
-#define in6p_outputopts	inp_outputopts6
-#define in6p_moptions	inp_moptions6
-#else
-	struct in6pcb *in6p;
-#endif
-	struct ifnet **ifpp;
 {
-	struct ifnet *ifp = NULL;
-	u_int32_t scopeid;
+#ifdef SCOPEDROUTING
+	/*
+	 * XXX: the SCOPEDROUTING code path is NOT expected to work at this
+	 * moment (20011112).  We added this just in case.
+	 */
+	return(0);		/* do nothing */
+#else
+	struct ifnet *ifp;
+	u_int32_t zoneid = sin6->sin6_scope_id;
 
 	*in6 = sin6->sin6_addr;
-	scopeid = sin6->sin6_scope_id;
-	if (ifpp)
-		*ifpp = NULL;
 
 	/*
 	 * don't try to read sin6->sin6_addr beyond here, since the caller may
 	 * ask us to overwrite existing sockaddr_in6
 	 */
 
-	/* XXX: a valid ID should already be filled. */
-	if (ip6_use_defzone && scopeid == 0)
-		scopeid = scope6_addr2default(in6);
-
 	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
-		struct in6_pktinfo *pi;
-
-		/*
-		 * KAME assumption: link id == interface id
-		 */
-
-		if (in6p && in6p->in6p_outputopts &&
-		    (pi = in6p->in6p_outputopts->ip6po_pktinfo) &&
-		    pi->ipi6_ifindex) {
+		/* KAME assumption: link id == interface id */
+		if (zoneid) {
+			if (if_index < zoneid)
+				return(ENXIO);  /* XXX EINVAL? */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
-			ifp = ifnet_byindex(pi->ipi6_ifindex);
+			ifp = ifnet_byindex(zoneid);
 #else
-			ifp = ifindex2ifnet[pi->ipi6_ifindex];
+			ifp = ifindex2ifnet[zoneid];
 #endif
-			in6->s6_addr16[1] = htons(pi->ipi6_ifindex);
-		} else if (in6p && IN6_IS_ADDR_MULTICAST(in6) &&
-			   in6p->in6p_moptions &&
-			   in6p->in6p_moptions->im6o_multicast_ifp) {
-			ifp = in6p->in6p_moptions->im6o_multicast_ifp;
-			in6->s6_addr16[1] = htons(ifp->if_index);
-		} else if (scopeid) {
-			/* boundary check */
-			if (scopeid < 0 || if_index < scopeid)
-				return ENXIO;  /* XXX EINVAL? */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-			ifp = ifnet_byindex(scopeid);
-#else
-			ifp = ifindex2ifnet[scopeid];
-#endif
+			if (ifp == NULL) /* XXX: this can happen for some OS */
+				return(ENXIO);
+
 			/* XXX assignment to 16bit from 32bit variable */
-			in6->s6_addr16[1] = htons(scopeid & 0xffff);
+			in6->s6_addr16[1] = htons(zoneid & 0xffff);
 		}
-
-		if (ifpp)
-			*ifpp = ifp;
 	}
 
 	return 0;
+#endif
 }
 #ifdef HAVE_NRL_INPCB
 #undef in6p_outputopts

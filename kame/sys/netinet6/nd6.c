@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.217 2001/11/06 11:21:27 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.218 2001/11/12 07:41:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -611,20 +611,14 @@ nd6_timer(ignored_arg)
 						      sizeof(sin6_in));
 						sin6_in.sin6_addr = ip6_in->ip6_src;
 						sin6_in.sin6_scope_id = szoneid;
-#ifndef SCOPEDROUTING
 						in6_embedscope(&ip6_in->ip6_src,
-							       &sin6_in,
-							       NULL, NULL);
-#endif
+							       &sin6_in);
 						bzero(&sin6_in,
 						      sizeof(sin6_in));
 						sin6_in.sin6_addr = ip6_in->ip6_dst;
 						sin6_in.sin6_scope_id = dzoneid;
-#ifndef SCOPEDROUTING
 						in6_embedscope(&ip6_in->ip6_dst,
-							       &sin6_in,
-							       NULL, NULL);
-#endif
+							       &sin6_in);
 						icmp6_error(m,
 							    ICMP6_DST_UNREACH,
 							    ICMP6_DST_UNREACH_ADDR, 0);
@@ -1631,7 +1625,7 @@ nd6_ioctl(cmd, data, ifp)
 			int j;
 
 			(void)in6_embedscope(&oprl->prefix[i].prefix,
-			    &pr->ndpr_prefix, NULL, NULL);
+					     &pr->ndpr_prefix);
 			oprl->prefix[i].raflags = pr->ndpr_raf;
 			oprl->prefix[i].prefixlen = pr->ndpr_plen;
 			oprl->prefix[i].vltime = pr->ndpr_vltime;

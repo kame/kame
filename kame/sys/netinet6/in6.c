@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.246 2001/11/07 14:14:27 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.247 2001/11/12 07:41:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1012,10 +1012,9 @@ in6_update_ifa(ifp, ifra, ia)
 			dst6.sin6_scope_id = zoneid;
 		else if (dst6.sin6_scope_id != zoneid)
 			return(EINVAL); /* scope ID mismatch. */
-#ifndef SCOPEDROUTING
-		if ((error = in6_embedscope(&dst6.sin6_addr, &dst6, NULL, NULL))
-		    != 0)
+		if ((error = in6_embedscope(&dst6.sin6_addr, &dst6)) != 0)
 			return(error);
+#ifndef SCOPEDROUTING
 		dst6.sin6_scope_id = 0; /* XXX */
 #endif
 	}
