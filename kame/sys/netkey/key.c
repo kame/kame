@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.44 2000/01/14 03:42:04 itojun Exp $ */
+/* KAME $Id: key.c,v 1.45 2000/01/14 07:10:31 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -4395,7 +4395,12 @@ key_delete(mhp)
 		return NULL;
 	}
 
+	/*
+	 * call key_freesav() by 2 times because refcnt incremented
+	 * key_getsavbyspi(), also call it whenever status change to DELETE
+	 */
 	key_sa_chgstate(sav, SADB_SASTATE_DEAD);
+	key_freesav(sav);
 	key_freesav(sav);
 	sav = NULL;
 
