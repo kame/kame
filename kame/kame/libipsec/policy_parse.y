@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: policy_parse.y,v 1.7 2000/01/27 17:59:13 itojun Exp $ */
+/* KAME $Id: policy_parse.y,v 1.8 2000/03/01 09:35:23 sakane Exp $ */
 
 /*
  * IN/OUT bound policy configuration take place such below:
@@ -114,6 +114,14 @@ policy_spec
 				return -1;
 		}
 		rules
+	|	DIR
+		{
+			p_dir = $1;
+			p_type = 0;	/* ignored it by kernel */
+
+			if (init_x_policy())
+				return -1;
+		}
 	;
 
 rules

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.15 2000/02/06 10:56:10 itojun Exp $ */
+/* KAME $Id: parse.y,v 1.16 2000/03/01 09:35:24 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -399,7 +399,7 @@ spddelete_command:
 			p_type = SADB_X_SPDDELETE;
 			p_satype = SADB_SATYPE_UNSPEC;
 		}
-		sp_selector_spec EOT
+		sp_selector_spec policy_spec EOT
 	;
 
 spddump_command:
@@ -682,17 +682,14 @@ setkeymsg()
 		break;
 
 	case SADB_X_SPDADD:
+	case SADB_X_SPDDELETE:
 	    {
+		struct sadb_address m_addr;
+
 		memcpy(m_buf + m_len, p_policy, p_policy_len);
 		m_len += p_policy_len;
 		free(p_policy);
 		p_policy = NULL;
-	    }
-		/* FALLTHROUGH */
-
-	case SADB_X_SPDDELETE:
-	    {
-		struct sadb_address m_addr;
 
 		/* set src */
 		m_addr.sadb_address_len =
