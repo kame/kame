@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.52 2003/08/25 08:37:21 t-momose Exp $	*/
+/*	$KAME: mip6control.c,v 1.53 2003/08/25 11:28:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,21 +85,10 @@ static const char *bu_desc[] = {
 	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltexp\trefresh\tretexp\tseqno\tflags\tpfsm\tsfsm\tstate\n",
 	"paddr\t\t\t\t\thaddr\t\t\t\t\tcoa\t\t\t\t\tlifetim\tltexp\trefresh\tretexp\tseqno\tflags\tpfsm\tsfsm\tstate\n"
 };
-static const char *ha_desc[] = {
-	"lladdr\t\tgaddr\t\tflags\tpref\tlifetim\tltexp\n",
-	"lladdr\t\t\t\t\tgaddr\t\t\t\t\tflags\tpref\tlifetim\tltexp\n"
-};
-#ifdef MIP6_DRAFT13
-static const char *bc_desc[] = {
-	"phaddr\t\tpcoa\t\taddr\t\tflags\tplen\tseqno\tlifetim\tltexp\tstate\n",
-	"phaddr\t\t\t\t\tpcoa\t\t\t\t\taddr\t\t\t\t\tflags\tplen\tseqno\tlifetim\tltexp\tstate\n"
-};
-#else
 static const char *bc_desc[] = {
 	"phaddr\t\tpcoa\t\taddr\t\tflags\tseqno\tlifetim\tltexp\tstate\trefcnt\n",
 	"phaddr\t\t\t\t\tpcoa\t\t\t\t\taddr\t\t\t\t\tflags\tseqno\tlifetim\tltexp\tstate\trefcnt\n"
 };
-#endif /* MIP6_DRAFT13 */
 static const char *ipaddr_fmt[] = {
 	"%-15.15s ",
 	"%-39s "
@@ -160,8 +149,8 @@ main(argc, argv)
 	char *shsparg = NULL;
 	int smhp = 0, gmhp = 0;
 	char *smhparg = NULL;
-	int sha = 0, sll = 0, gha = 0;
-	char *shaarg = NULL, *sllarg = NULL;
+	int sha = 0, gha = 0;
+	char *shaarg = NULL;
 	int gbu = 0;
 	int gbc = 0;
 	int dbc = 0;
@@ -222,10 +211,6 @@ main(argc, argv)
 			break;
 		case 'a':
 			gha = 1;
-			break;
-		case 'L':
-			sll = 1;
-			sllarg = optarg;
 			break;
 		case 'h':
 			gmhp = 1;
@@ -460,7 +445,7 @@ main(argc, argv)
 		}
 	}
 
-	if(shaarg && sllarg) {
+	if(shaarg) {
 		struct hif_ifreq *ifr;
 		struct mip6_ha *mha;
 
@@ -476,14 +461,10 @@ main(argc, argv)
 		mha = (struct mip6_ha *)((caddr_t)ifr 
 					 + sizeof(struct hif_ifreq));
 		ifr->ifr_ifru.ifr_mha = mha;
-		bzero(&mha->mha_lladdr, sizeof(mha->mha_lladdr));
-		mha->mha_lladdr.sin6_len = sizeof(mha->mha_lladdr);
-		mha->mha_lladdr.sin6_family = AF_INET6;
-		getaddress(sllarg, &mha->mha_lladdr);
-		bzero(&mha->mha_gaddr, sizeof(mha->mha_gaddr));
-		mha->mha_gaddr.sin6_len = sizeof(mha->mha_gaddr);
-		mha->mha_gaddr.sin6_family = AF_INET6;
-		getaddress(shaarg, &mha->mha_gaddr);
+		bzero(&mha->mha_addr, sizeof(mha->mha_addr));
+		mha->mha_addr.sin6_len = sizeof(mha->mha_addr);
+		mha->mha_addr.sin6_family = AF_INET6;
+		getaddress(shaarg, &mha->mha_addr);
 		mha->mha_flags = ND_RA_FLAG_HOME_AGENT;
 		mha->mha_pref = 0;
 		mha->mha_lifetime = 0xffff;
@@ -493,38 +474,57 @@ main(argc, argv)
 		}
 	}
 
+#define HAFMT "\t%s\n\t\tflags=%s pref=%d lifetime=%d expire=%ld\n"
 	if (gha) {
 		struct hif_softc *sc;
-		struct mip6_ha *mha, mip6_ha;
-		struct hif_ha *hhal[2], *hha, hif_ha;
-		int i;
+		struct mip6_ha mip6_ha;
+		struct hif_prefix *hpfx, hif_prefix;
+		struct mip6_prefix mip6_prefix;
+		struct mip6_prefix_ha *mpfxha, mip6_prefix_ha;
 		struct timeval time;
 
 		gettimeofday(&time, 0);
 
 		sc = get_hif_softc(ifnarg);
-		hhal[0] = LIST_FIRST(&sc->hif_ha_list_home);
-		hhal[1] = LIST_FIRST(&sc->hif_ha_list_foreign);
-		printf(ha_desc[longdisp]);
-		for (i = 0; i < 2; i++) {
-			for (hha = hhal[i];
-			     hha;
-			     hha = LIST_NEXT(hha, hha_entry)) {
-				KREAD(hha, &hif_ha, hif_ha);
-				hha = &hif_ha;
-				mha = hha->hha_mha;
-				KREAD(mha, &mip6_ha, mip6_ha);
-				mha = &mip6_ha;
-				printf(ipaddr_fmt[longdisp],
-				    ip6_sprintf(&mha->mha_lladdr));
-				printf(ipaddr_fmt[longdisp],
-				    ip6_sprintf(&mha->mha_gaddr));
-				printf("%-7s %7d %7d %7ld\n",
-				    raflg_sprintf(mha->mha_flags),
-				    mha->mha_pref,
-				    mha->mha_lifetime,
-				    mha->mha_expire - time.tv_sec);
+		for (hpfx = LIST_FIRST(&sc->hif_prefix_list_home); hpfx;
+		    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
+			KREAD(hpfx, &hif_prefix, hif_prefix);
+			hpfx = &hif_prefix;
+			KREAD(hpfx->hpfx_mpfx, &mip6_prefix, mip6_prefix);
+			printf("%s\n", ip6_sprintf(&mip6_prefix.mpfx_prefix));
+			for (mpfxha = LIST_FIRST(&mip6_prefix.mpfx_ha_list);
+			    mpfxha; mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+				KREAD(mpfxha, &mip6_prefix_ha, mip6_prefix_ha);
+				mpfxha = &mip6_prefix_ha;
+				KREAD(mpfxha->mpfxha_mha, &mip6_ha, mip6_ha);
+				printf(HAFMT,
+				    ip6_sprintf(&mip6_ha.mha_addr),
+				    raflg_sprintf(mip6_ha.mha_flags),
+				    mip6_ha.mha_pref,
+				    mip6_ha.mha_lifetime,
+				    mip6_ha.mha_expire - time.tv_sec);
 			}
+
+		}
+		for (hpfx = LIST_FIRST(&sc->hif_prefix_list_foreign); hpfx;
+		    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
+			KREAD(hpfx, &hif_prefix, hif_prefix);
+			hpfx = &hif_prefix;
+			KREAD(hpfx->hpfx_mpfx, &mip6_prefix, mip6_prefix);
+			printf("%s\n", ip6_sprintf(&mip6_prefix.mpfx_prefix));
+			for (mpfxha = LIST_FIRST(&mip6_prefix.mpfx_ha_list);
+			    mpfxha; mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+				KREAD(mpfxha, &mip6_prefix_ha, mip6_prefix_ha);
+				mpfxha = &mip6_prefix_ha;
+				KREAD(mpfxha->mpfxha_mha, &mip6_ha, mip6_ha);
+				printf(HAFMT,
+				    ip6_sprintf(&mip6_ha.mha_addr),
+				    raflg_sprintf(mip6_ha.mha_flags),
+				    mip6_ha.mha_pref,
+				    mip6_ha.mha_lifetime,
+				    mip6_ha.mha_expire - time.tv_sec);
+			}
+
 		}
 	}
 
@@ -587,15 +587,8 @@ main(argc, argv)
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mbc->mbc_addr));
 			printf(
-#ifdef MIP6_DRAFT13
-			       "%-7s %7u %7u %7u %7ld %-7s\n",
-#else
 			       "%-7s %7u %7u %7ld %-7s %7u\n",
-#endif /* MIP6_DRAFT13 */
 			       buflg_sprintf(mbc->mbc_flags),
-#ifdef MIP6_DRAFT13
-			       mbc->mbc_prefixlen,
-#endif /* MIP6_DRAFT13 */
 			       mbc->mbc_seqno,
 			       mbc->mbc_lifetime,
 			       mbc->mbc_expire - time.tv_sec,

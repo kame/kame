@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.30 2003/08/20 12:57:15 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.31 2003/08/25 11:28:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -313,24 +313,23 @@ mip6_ioctl(cmd, data)
 
 		case SIOCSMIP6CFG_DISABLEMN:
 			mip6log((LOG_INFO,
-				 "%s:%d: MN function disabled\n",
-				 __FILE__, __LINE__));
-			for (sc = TAILQ_FIRST(&hif_softc_list);
-			     sc;
-			     sc = TAILQ_NEXT(sc, hif_entry)) {
+			    "%s:%d: MN function disabled\n",
+			    __FILE__, __LINE__));
+			for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+			    sc = TAILQ_NEXT(sc, hif_entry)) {
 				if (sc->hif_coa_ifa != NULL)
 					IFAFREE(&sc->hif_coa_ifa->ia_ifa);
 				sc->hif_coa_ifa = NULL;
 				mip6_detach_haddrs(sc);
 				mip6_bu_list_remove_all(&sc->hif_bu_list, 1);
-				while (!LIST_EMPTY(&sc->hif_ha_list_home))
-					hif_ha_list_remove(
-					    &sc->hif_ha_list_home,
-					    LIST_FIRST(&sc->hif_ha_list_home));
-				while (!LIST_EMPTY(&sc->hif_ha_list_foreign))
-					hif_ha_list_remove(
-					    &sc->hif_ha_list_foreign,
-					    LIST_FIRST(&sc->hif_ha_list_foreign));
+				while (!LIST_EMPTY(&sc->hif_prefix_list_home))
+					hif_prefix_list_remove(
+					    &sc->hif_prefix_list_home,
+					    LIST_FIRST(&sc->hif_prefix_list_home));
+				while (!LIST_EMPTY(&sc->hif_prefix_list_foreign))
+					hif_prefix_list_remove(
+					    &sc->hif_prefix_list_foreign,
+					    LIST_FIRST(&sc->hif_prefix_list_foreign));
 				while (!LIST_EMPTY(&sc->hif_sp_list))
 					hif_site_prefix_list_remove(
 					    &sc->hif_sp_list,

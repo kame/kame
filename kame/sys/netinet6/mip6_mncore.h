@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.10 2003/08/20 13:31:14 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.11 2003/08/25 11:28:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -91,18 +91,14 @@ int mip6_bu_send_bu(struct mip6_bu *);
 int mip6_bu_send_cbu(struct mip6_bu *);
 
 /* home agent list processing. */
-struct mip6_ha *mip6_ha_create(struct sockaddr_in6 *, struct sockaddr_in6 *,
-    u_int8_t, u_int16_t, int32_t);
+struct mip6_ha *mip6_ha_create(struct sockaddr_in6 *, u_int8_t, u_int16_t,
+    int32_t);
 int mip6_ha_list_insert(struct mip6_ha_list *, struct mip6_ha *mha);
 int mip6_ha_list_remove(struct mip6_ha_list*, struct mip6_ha *mha);
 struct mip6_ha *mip6_ha_list_find_withaddr(struct mip6_ha_list *,
     struct sockaddr_in6 *);
 int mip6_ha_list_update_hainfo(struct mip6_ha_list *, struct nd_defrouter *,
     struct nd_opt_homeagent_info *);
-int mip6_ha_list_update_withndpr(struct mip6_ha_list *, struct sockaddr_in6 *,
-    struct nd_prefix *);
-int mip6_ha_list_update_gaddr(struct mip6_ha_list*, struct sockaddr_in6 *,
-    struct sockaddr_in6 *);
 
 /* prefix list processing. */
 struct mip6_prefix *mip6_prefix_create(struct sockaddr_in6 *, u_int8_t,

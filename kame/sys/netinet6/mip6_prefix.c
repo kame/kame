@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.25 2003/08/20 12:58:11 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.26 2003/08/25 11:28:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -98,6 +98,7 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 	u_int32_t vltime;
 	u_int32_t pltime;
 {
+	struct in6_addr mask;
 	struct mip6_prefix *mpfx;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
@@ -112,7 +113,12 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 		return (NULL);
 	}
 	bzero(mpfx, sizeof(*mpfx));
+	in6_prefixlen2mask(&mask, prefixlen);
 	mpfx->mpfx_prefix = *prefix;
+	mpfx->mpfx_prefix.sin6_addr.s6_addr32[0] &= mask.s6_addr32[0];
+	mpfx->mpfx_prefix.sin6_addr.s6_addr32[1] &= mask.s6_addr32[1];
+	mpfx->mpfx_prefix.sin6_addr.s6_addr32[2] &= mask.s6_addr32[2];
+	mpfx->mpfx_prefix.sin6_addr.s6_addr32[3] &= mask.s6_addr32[3];
 	mpfx->mpfx_prefixlen = prefixlen;
 	mpfx->mpfx_vltime = vltime;
 	mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
@@ -347,12 +353,25 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 	struct mip6_prefix_list *mpfx_list;
 	struct mip6_prefix *mpfx;
 {
+	struct hif_softc *hif;
 	struct mip6_prefix_ha *mpfxha;
 
 	if ((mpfx_list == NULL) || (mpfx == NULL)) {
 		return (EINVAL);
 	}
 
+	/* remove all references from hif interfaces. */
+	for (hif = TAILQ_FIRST(&hif_softc_list); hif;
+	    hif = TAILQ_NEXT(hif, hif_entry)) {
+		hif_prefix_list_remove(&hif->hif_prefix_list_home,
+		    hif_prefix_list_find_withmpfx(&hif->hif_prefix_list_home,
+			mpfx));
+		hif_prefix_list_remove(&hif->hif_prefix_list_foreign,
+		    hif_prefix_list_find_withmpfx(&hif->hif_prefix_list_foreign,
+			mpfx));
+	}
+
+	/* remove all refernces to advertising routers. */
 	while (!LIST_EMPTY(&mpfx->mpfx_ha_list)) {
 		mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list);
 		mip6_prefix_ha_list_remove(&mpfx->mpfx_ha_list, mpfxha);
@@ -454,7 +473,6 @@ mip6_prefix_ha_list_insert(mpfxha_list, mha)
 		return (NULL);
 	}
 	mpfxha->mpfxha_mha = mha;
-	MIP6_HA_REF(mha);
 	LIST_INSERT_HEAD(mpfxha_list, mpfxha, mpfxha_entry);
 	return (mpfxha);
 }
@@ -465,7 +483,6 @@ mip6_prefix_ha_list_remove(mpfxha_list, mpfxha)
 	struct mip6_prefix_ha *mpfxha;
 {
 	LIST_REMOVE(mpfxha, mpfxha_entry);
-	MIP6_HA_FREE(mpfxha->mpfxha_mha);
 	FREE(mpfxha, M_TEMP);
 }
 
@@ -481,10 +498,7 @@ mip6_prefix_ha_list_find_withaddr(mpfxha_list, addr)
 		if (mpfxha->mpfxha_mha == NULL)
 			continue;
 
-		if (SA6_ARE_ADDR_EQUAL(&mpfxha->mpfxha_mha->mha_lladdr, addr))
-			return (mpfxha);
-		/* XXX multiple gaddrs */
-		if (SA6_ARE_ADDR_EQUAL(&mpfxha->mpfxha_mha->mha_gaddr, addr))
+		if (SA6_ARE_ADDR_EQUAL(&mpfxha->mpfxha_mha->mha_addr, addr))
 			return (mpfxha);
 	}
 	return (NULL);

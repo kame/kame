@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.56 2003/08/14 10:06:07 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.57 2003/08/25 11:28:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -124,6 +124,7 @@ t.
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6protosw.h>
+#include <netinet/icmp6.h>
 #endif /* INET6 */
 
 #if defined(__NetBSD__) && defined(ISO)
@@ -153,8 +154,8 @@ t.
 #if NHIF > 0
 
 static int hif_site_prefix_list_update_withioctl(struct hif_softc *, caddr_t);
-static int hif_ha_list_update_withmpfx(struct hif_softc *, caddr_t);
-static int hif_ha_list_update_withioctl(struct hif_softc *, caddr_t);
+static int hif_prefix_list_update_withprefix(struct hif_softc *, caddr_t);
+static int hif_prefix_list_update_withhaaddr(struct hif_softc *, caddr_t);
 
 struct hif_softc_list hif_softc_list;
 
@@ -222,8 +223,8 @@ hifattach(dummy)
 
 		/* binding update list and home agent list. */
 		LIST_INIT(&sc->hif_bu_list);
-		LIST_INIT(&sc->hif_ha_list_home);
-		LIST_INIT(&sc->hif_ha_list_foreign);
+		LIST_INIT(&sc->hif_prefix_list_home);
+		LIST_INIT(&sc->hif_prefix_list_foreign);
 
 		/* DHAAD related. */
 		sc->hif_dhaad_id = 0;
@@ -285,10 +286,11 @@ hif_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCAHOMEPREFIX_HIF:
-		error = hif_ha_list_update_withmpfx(sc, data);
+		error = hif_prefix_list_update_withprefix(sc, data);
 		break;
 
 	case SIOCGHOMEPREFIX_HIF:
+#if 0 /* not used. */
 		{
 			struct mip6_prefix_ha *mpfxha;
 			struct mip6_prefix *mpfx, *retmpfx;
@@ -319,7 +321,7 @@ hif_ioctl(ifp, cmd, data)
 		ghomeprefix_done:
 			hifr->ifr_count = i;
 		}
-		
+#endif		
 		break;
 
 	case SIOCASITEPREFIX_HIF:
@@ -327,10 +329,11 @@ hif_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCAHOMEAGENT_HIF:
-		error = hif_ha_list_update_withioctl(sc, data);
+		error = hif_prefix_list_update_withhaaddr(sc, data);
 		break;
 
 	case SIOCGHOMEAGENT_HIF:
+#if 0 /* not used. */
 		{
 			struct hif_ha *hha;
 			struct mip6_ha *retmha;
@@ -359,6 +362,7 @@ hif_ioctl(ifp, cmd, data)
 		ghomeagent_done:
 			hifr->ifr_count = i;
 		}
+#endif
 		break;
 
 	case SIOCGBU_HIF:
@@ -418,162 +422,307 @@ hif_restore_location(sc)
 	sc->hif_location = sc->hif_location_prev;
 }
 
-struct hif_ha *
-hif_ha_list_insert(hha_list, mha)
-	struct hif_ha_list *hha_list;
+/*
+ * return the most preferable home agent entry which can be used as a
+ * home agent of this hif interface.
+ */
+struct mip6_ha *
+hif_find_preferable_ha(hif, mpfx)
+	struct hif_softc *hif;
+	struct mip6_prefix *mpfx;
+{
+	struct mip6_prefix_ha *mpfxha;
 	struct mip6_ha *mha;
-{
-	struct hif_ha *hha;
 
-	if ((hha_list == NULL) || (mha == NULL))
-		panic("hha_list nor mha must not be NULL");
-
-	hha = hif_ha_list_find_withmha(hha_list, mha);
-	if (hha != NULL)
-		return (hha);
-
-	MALLOC(hha, struct hif_ha *, sizeof(struct hif_ha), M_TEMP, M_NOWAIT);
-	if (hha == NULL) {
-		mip6log((LOG_ERR, "%s:%d: memory allocation failed.\n",
-		    __FILE__, __LINE__));
-		return (NULL);
+	/* XXX shoud consider home agents related to other prefixes. */
+	for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha != NULL;
+	    mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+		mha = mpfxha->mpfxha_mha;
+		if ((mha->mha_flags & ND_RA_FLAG_HOME_AGENT) == 0)
+			continue;
+		if (IN6_IS_ADDR_UNSPECIFIED(&mha->mha_addr.sin6_addr)
+		    || IN6_IS_ADDR_LOOPBACK(&mha->mha_addr.sin6_addr)
+		    || IN6_IS_ADDR_LINKLOCAL(&mha->mha_addr.sin6_addr)
+		    || IN6_IS_ADDR_SITELOCAL(&mha->mha_addr.sin6_addr))
+			continue;
+		return (mha);
 	}
-	hha->hha_mha = mha;
-	MIP6_HA_REF(mha);
-	LIST_INSERT_HEAD(hha_list, hha, hha_entry);
-	return (hha);
-}
-
-void
-hif_ha_list_remove(hha_list, hha)
-	struct hif_ha_list *hha_list;
-	struct hif_ha *hha;
-{
-	if ((hha_list == NULL) || (hha == NULL))
-		panic("hha_list nor hha must not be NULL");
-
-	LIST_REMOVE(hha, hha_entry);
-	MIP6_HA_FREE(hha->hha_mha);
-	FREE(hha, M_TEMP);
+	/* not found. */
+	return (NULL);
 }
 
 /*
- * return the pointer of the entity of hif_ha structure advertising
- * the specified prefix, which is listed in hif_ha_list structure.
- * even if there are more than one entitiy, return the first found
- * one.
+ * find a hif interface which has an address specified by the argument
+ * as a home address.
  */
-struct hif_ha *
-hif_ha_list_find_withprefix(hif_ha_list, prefix, prefixlen)
-	struct hif_ha_list *hif_ha_list;
-	struct sockaddr_in6 *prefix;
-	int prefixlen;
+struct hif_softc *
+hif_list_find_withhaddr(haddr)
+     struct sockaddr_in6 *haddr;
 {
-	struct hif_ha *hha;
-	struct mip6_prefix_ha *mpfxha;
+	struct hif_softc *hif;
+	struct hif_prefix *hpfx;
 	struct mip6_prefix *mpfx;
 
-	for (hha = LIST_FIRST(hif_ha_list); hha;
-	    hha = LIST_NEXT(hha, hha_entry)) {
-		if (hha->hha_mha == NULL)
-			panic("hha_mha == NULL");
-		for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
-		    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-			if (!in6_are_prefix_equal(&mpfx->mpfx_prefix.sin6_addr,
-				&prefix->sin6_addr, prefixlen))
-				continue;
-			for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
-			    mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
-				if (mpfxha->mpfxha_mha == NULL)
-					continue;
-				if (hha->hha_mha == mpfxha->mpfxha_mha) {
-					/* found. */
-					return (hha);
-				}
-			}
+	for (hif = TAILQ_FIRST(&hif_softc_list); hif;
+	    hif = TAILQ_NEXT(hif, hif_entry)) {
+		for (hpfx = LIST_FIRST(&hif->hif_prefix_list_home); hpfx;
+		    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
+			mpfx = hpfx->hpfx_mpfx;
+			if (SA6_ARE_ADDR_EQUAL(&mpfx->mpfx_haddr, haddr))
+				return (hif);
 		}
 	}
 	/* not found. */
 	return (NULL);
 }
 
-/*
- * return the pointer of the entity of mip6_ha structure which has the
- * specified address (either link-local address or global address).
- * even if there are more than one entitiy, return the first found
- * one.
- */    
-struct hif_ha *
-hif_ha_list_find_withaddr(hif_ha_list, addr)
-	struct hif_ha_list *hif_ha_list;
-	struct sockaddr_in6 *addr;
+static int
+hif_prefix_list_update_withprefix(sc, data)
+     struct hif_softc *sc;
+     caddr_t data;
 {
-	struct hif_ha *hha;
+	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
+	struct mip6_prefix *nmpfx, *mpfx;
+	struct hif_softc *hif;
+	int error = 0;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
 
-	for (hha = LIST_FIRST(hif_ha_list); hha;
-	    hha = LIST_NEXT(hha, hha_entry)) {
-		if (hha->hha_mha == NULL)
-			panic("hha->hha_mha == NULL");
-		if (SA6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_lladdr, addr))
-			return (hha);
-		/* XXX for each gaddr. */
-		if (SA6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_gaddr, addr))
-			return (hha);
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif
+
+	if (hifr == NULL) {
+		return (EINVAL);
 	}
-	/* not found. */
-	return (NULL);
+	if ((nmpfx = hifr->ifr_ifru.ifr_mpfx) == NULL) {
+		return (EINVAL);
+	}
+
+	mpfx = mip6_prefix_list_find(nmpfx);
+	if (mpfx == NULL) {
+		mpfx = mip6_prefix_create(&nmpfx->mpfx_prefix,
+		    nmpfx->mpfx_prefixlen, nmpfx->mpfx_vltime,
+		    nmpfx->mpfx_pltime);
+		if (mpfx == NULL) {
+			mip6log((LOG_ERR,
+			    "%s:%d: mip6_prefix memory allocation failed.\n",
+			     __FILE__, __LINE__));
+			return (ENOMEM);
+		}
+		error = mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
+		if (error) {
+			return (error);
+		}
+
+		for (hif = TAILQ_FIRST(&hif_softc_list); hif;
+		     hif = TAILQ_NEXT(hif, hif_entry)) {
+			if (hif == sc)
+				hif_prefix_list_insert_withmpfx(
+				    &hif->hif_prefix_list_home, mpfx);
+			else
+				hif_prefix_list_insert_withmpfx(
+				    &hif->hif_prefix_list_foreign, mpfx);
+		}
+	}
+
+	mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
+	mpfx->mpfx_vlexpire = mono_time.tv_sec + mpfx->mpfx_vltime;
+	mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
+	mpfx->mpfx_plexpire = mono_time.tv_sec + mpfx->mpfx_pltime;
+	mip6_prefix_settimer(mpfx,
+	    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_pltime) * hz);
+	mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
+
+	return (0);
 }
 
-struct hif_ha *
-hif_ha_list_find_withmpfx(hif_ha_list, mpfx)
-	struct hif_ha_list *hif_ha_list;
-	struct mip6_prefix *mpfx;
+static int
+hif_prefix_list_update_withhaaddr(sc, data)
+     struct hif_softc *sc;
+     caddr_t data;
 {
-	struct mip6_prefix_ha *mpfxha;
-	struct hif_ha *hha;
-
-	for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
-	     mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
-		if (mpfxha->mpfxha_mha == NULL)
-			continue;
-		hha = hif_ha_list_find_withmha(hif_ha_list,
-		    mpfxha->mpfxha_mha);
-		if (hha != NULL)
-			return (hha);
-	}
-	/* not found. */
-	return (NULL);
-}
-
-struct hif_ha *
-hif_ha_list_find_withmha(hif_ha_list, mha)
-	struct hif_ha_list *hif_ha_list;
+	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
+	struct mip6_ha *nmha = (struct mip6_ha *)data;
 	struct mip6_ha *mha;
-{
-	struct hif_ha *hha;
+	struct sockaddr_in6 prefix;
+	struct mip6_prefix *mpfx;
+	struct hif_softc *hif;
+	int error = 0;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
 
-	for (hha = LIST_FIRST(hif_ha_list); hha;
-	    hha = LIST_NEXT(hha, hha_entry)) {
-		if (hha->hha_mha == NULL)
-			panic("hha->hha_mha == NULL");
-		if (hha->hha_mha == mha)
-			return (hha);
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif
+
+	if (hifr == NULL) {
+		return (EINVAL);
+	}
+	if ((nmha = hifr->ifr_ifru.ifr_mha) == NULL) {
+		return (EINVAL);
+	}
+	if (IN6_IS_ADDR_UNSPECIFIED(&nmha->mha_addr.sin6_addr)
+	    ||IN6_IS_ADDR_LOOPBACK(&nmha->mha_addr.sin6_addr)
+	    ||IN6_IS_ADDR_LINKLOCAL(&nmha->mha_addr.sin6_addr)
+	    || IN6_IS_ADDR_SITELOCAL(&nmha->mha_addr.sin6_addr))
+		return (EINVAL);
+
+	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &nmha->mha_addr);
+	if (mha == NULL) {
+		mha = mip6_ha_create(&nmha->mha_addr, nmha->mha_flags,
+		    nmha->mha_pref, nmha->mha_lifetime);
+		if (mha == NULL) {
+			mip6log((LOG_ERR,
+			    "%s:%d: mip6_ha memory allocation failed.\n",
+			    __FILE__, __LINE__));
+			return (ENOMEM);
+		}
+		error = mip6_ha_list_insert(&mip6_ha_list, mha);
+		if (error) {
+			return (error);
+		}
+	}
+
+	mha->mha_addr = nmha->mha_addr;
+	mha->mha_flags = nmha->mha_flags;
+	mha->mha_pref = nmha->mha_pref;
+	mha->mha_lifetime = nmha->mha_lifetime;
+	mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
+
+	/* add mip6_prefix, if needed. */
+	mpfx = mip6_prefix_list_find_withprefix(&mha->mha_addr, 64 /* XXX */);
+	if (mpfx == NULL) {
+		bzero(&prefix, sizeof(prefix));
+		prefix.sin6_len = sizeof(prefix);
+		prefix.sin6_family = AF_INET6;
+		prefix.sin6_addr.s6_addr32[0]
+		    = mha->mha_addr.sin6_addr.s6_addr32[0];
+		prefix.sin6_addr.s6_addr32[1]
+		    = mha->mha_addr.sin6_addr.s6_addr32[1];
+		mpfx = mip6_prefix_create(&prefix, 64 /* XXX */, 
+		    65535 /* XXX */, 0);
+		if (mpfx == NULL)
+			return (ENOMEM);
+		error = mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
+		if (error)
+			return (error);
+		for (hif = TAILQ_FIRST(&hif_softc_list); hif;
+		    hif = TAILQ_NEXT(hif, hif_entry)) {
+			if (sc == hif)
+				hif_prefix_list_insert_withmpfx(
+				    &sc->hif_prefix_list_home, mpfx);
+			else 
+				hif_prefix_list_insert_withmpfx(
+				    &sc->hif_prefix_list_foreign, mpfx);
+		}
+	}
+	mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
+
+	return (0);
+}
+
+struct hif_prefix *
+hif_prefix_list_insert_withmpfx(hif_prefix_list, mpfx)
+	struct hif_prefix_list *hif_prefix_list;
+	struct mip6_prefix *mpfx;
+{
+	struct hif_prefix *hpfx;
+
+	if ((hif_prefix_list == NULL) || (mpfx == NULL))
+		return (NULL);
+
+	hpfx = hif_prefix_list_find_withmpfx(hif_prefix_list, mpfx);
+	if (hpfx != NULL)
+		return (hpfx);
+
+	MALLOC(hpfx, struct hif_prefix *, sizeof(struct hif_prefix), M_TEMP,
+	    M_NOWAIT);
+	if (hpfx == NULL) {
+		mip6log((LOG_ERR, "%s:%d: memory allocation failed.\n",
+		    __FILE__, __LINE__));
+		return (NULL);
+	}
+	hpfx->hpfx_mpfx = mpfx;
+	LIST_INSERT_HEAD(hif_prefix_list, hpfx, hpfx_entry);
+
+	return (hpfx);
+}
+
+void
+hif_prefix_list_remove(hpfx_list, hpfx)
+	struct hif_prefix_list *hpfx_list;
+	struct hif_prefix *hpfx;
+{
+	if ((hpfx_list == NULL) || (hpfx == NULL))
+		return;
+
+	LIST_REMOVE(hpfx, hpfx_entry);
+	FREE(hpfx, M_TEMP);
+}
+
+struct hif_prefix *
+hif_prefix_list_find_withprefix(hif_prefix_list, prefix, prefixlen)
+	struct hif_prefix_list *hif_prefix_list;
+	struct sockaddr_in6 *prefix;
+	int prefixlen;
+{
+	struct hif_prefix *hpfx;
+	struct mip6_prefix *mpfx;
+
+	for (hpfx = LIST_FIRST(hif_prefix_list); hpfx;
+	    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
+		mpfx = hpfx->hpfx_mpfx;
+		if (in6_are_prefix_equal(&prefix->sin6_addr,
+		    &mpfx->mpfx_prefix.sin6_addr, prefixlen)
+		    && (prefixlen == mpfx->mpfx_prefixlen)) {
+			/* found. */
+			return (hpfx);
+		}
 	}
 	/* not found. */
 	return (NULL);
 }
 
-struct hif_ha *
-hif_ha_list_find_preferable(hif_ha_list, mpfx)
-	struct hif_ha_list *hif_ha_list;
+struct hif_prefix *
+hif_prefix_list_find_withhaaddr(hif_prefix_list, haaddr)
+	struct hif_prefix_list *hif_prefix_list;
+	struct sockaddr_in6 *haaddr;
+{
+	struct hif_prefix *hpfx;
+	struct mip6_prefix *mpfx;
+	struct mip6_prefix_ha *mpfxha;
+	struct mip6_ha *mha;
+
+	for (hpfx = LIST_FIRST(hif_prefix_list); hpfx;
+	    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
+		mpfx = hpfx->hpfx_mpfx;
+		for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
+		    mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+			mha = mpfxha->mpfxha_mha;
+			if (SA6_ARE_ADDR_EQUAL(&mha->mha_addr, haaddr))
+				return (hpfx);
+		}
+	}
+	/* not found. */
+	return (NULL);
+}
+
+struct hif_prefix *
+hif_prefix_list_find_withmpfx(hif_prefix_list, mpfx)
+	struct hif_prefix_list *hif_prefix_list;
 	struct mip6_prefix *mpfx;
 {
-	struct hif_ha *hha;
+	struct hif_prefix *hpfx;
 
-	/* XXX */
-	hha = LIST_FIRST(hif_ha_list);
-	if (hha)
-		return(hha);
+	for (hpfx = LIST_FIRST(hif_prefix_list); hpfx;
+	    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
+		if (hpfx->hpfx_mpfx == mpfx)
+			return (hpfx);
+	}
+	/* not found. */
 	return (NULL);
 }
 
@@ -628,153 +777,6 @@ hif_site_prefix_list_update_withioctl(sc, data)
 	hsp->hsp_prefixlen = nhsp->hsp_prefixlen;
 
 	LIST_INSERT_HEAD(&sc->hif_sp_list, hsp, hsp_entry);
-
-	return (0);
-}
-
-static int
-hif_ha_list_update_withioctl(sc, data)
-     struct hif_softc *sc;
-     caddr_t data;
-{
-	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
-	struct mip6_ha *nmha = (struct mip6_ha *)data;
-	struct mip6_ha *mha;
-	struct hif_ha *hha;
-	int error = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
-
-	if (hifr == NULL) {
-		return (EINVAL);
-	}
-	if ((nmha = hifr->ifr_ifru.ifr_mha) == NULL) {
-		return (EINVAL);
-	}
-
-	hha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home,
-	    &nmha->mha_lladdr);
-	if (hha == NULL) {
-		mha = mip6_ha_create(&nmha->mha_lladdr, &nmha->mha_gaddr,
-		    nmha->mha_flags, nmha->mha_pref, nmha->mha_lifetime);
-		if (mha == NULL) {
-			mip6log((LOG_ERR,
-			    "%s:%d: mip6_ha memory allocation failed.\n",
-			    __FILE__, __LINE__));
-			return (ENOMEM);
-		}
-		error = mip6_ha_list_insert(&mip6_ha_list, mha);
-		if (error) {
-			return (error);
-		}
-	} else
-		mha = hha->hha_mha;
-
-	mha->mha_lladdr = nmha->mha_lladdr;
-	mha->mha_gaddr = nmha->mha_gaddr;
-	mha->mha_flags = nmha->mha_flags;
-	mha->mha_pref = nmha->mha_pref;
-	mha->mha_lifetime = nmha->mha_lifetime;
-	mha->mha_expire = time_second + mha->mha_lifetime;
-
-	return (0);
-}
-
-struct hif_softc *
-hif_list_find_withhaddr(haddr)
-     struct sockaddr_in6 *haddr;
-{
-	struct hif_softc *sc;
-	struct mip6_prefix *mpfx;
-	struct mip6_prefix_ha *mpfxha;
-
-	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
-	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (!SA6_ARE_ADDR_EQUAL(&mpfx->mpfx_haddr, haddr))
-			continue;
-		for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
-		     mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
-			if (mpfxha->mpfxha_mha == NULL)
-				continue;
-			for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-			    sc = TAILQ_NEXT(sc, hif_entry)) {
-				if (hif_ha_list_find_withmha(
-				    &sc->hif_ha_list_home,
-				    mpfxha->mpfxha_mha))
-				    return (sc);
-			}
-		}
-	}
-	/* not found. */
-	return (NULL);
-}
-
-static int
-hif_ha_list_update_withmpfx(sc, data)
-     struct hif_softc *sc;
-     caddr_t data;
-{
-	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
-	struct mip6_prefix *nmpfx, *mpfx;
-	int mpfx_is_new = 0;
-	struct mip6_ha *mha;
-	struct hif_softc *hif;
-	struct hif_ha *hha;
-	int error = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
-
-	if (hifr == NULL) {
-		return (EINVAL);
-	}
-	if ((nmpfx = hifr->ifr_ifru.ifr_mpfx) == NULL) {
-		return (EINVAL);
-	}
-
-	mpfx = mip6_prefix_list_find(nmpfx);
-	if (mpfx == NULL) {
-		mpfx = mip6_prefix_create(&nmpfx->mpfx_prefix,
-		    nmpfx->mpfx_prefixlen, nmpfx->mpfx_vltime,
-		    nmpfx->mpfx_pltime);
-		if (mpfx == NULL) {
-			mip6log((LOG_ERR,
-			    "%s:%d: mip6_prefix memory allocation failed.\n",
-			     __FILE__, __LINE__));
-			return (ENOMEM);
-		}
-		mpfx_is_new = 1;
-		error = mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
-		if (error) {
-			return (error);
-		}
-	}
-
-	mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
-	mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
-	mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
-	mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
-
-	if (mpfx_is_new) {
-		hha = hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx);
-		if (hha == NULL) {
-			struct sockaddr_in6 any = sa6_any;
-			mha = mip6_ha_create(&any, NULL, 0, 0,
-			    MIP6_HA_DEFAULT_LIFETIME);
-			mip6_ha_list_insert(&mip6_ha_list, mha);
-			for (hif = TAILQ_FIRST(&hif_softc_list); hif;
-			    hif = TAILQ_NEXT(hif, hif_entry)) {
-				if (hif == sc)
-					hif_ha_list_insert(&hif->hif_ha_list_home, mha);
-				else
-					hif_ha_list_insert(&hif->hif_ha_list_foreign, mha);
-
-			}
-		} else
-			mha = hha->hha_mha;
-		mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
-	}
 
 	return (0);
 }

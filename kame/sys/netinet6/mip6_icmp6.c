@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.75 2003/08/20 13:31:14 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.76 2003/08/25 11:28:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -128,7 +128,6 @@ static int mip6_icmp6_dhaad_rep_input(struct mbuf *, int, int);
 static int mip6_dhaad_ha_list_insert(struct hif_softc *, struct mip6_ha *);
 static int mip6_icmp6_create_haanyaddr(struct sockaddr_in6 *,
     struct mip6_prefix *);
-static int mip6_icmp6_create_linklocal(struct in6_addr *, struct in6_addr *);
 static int mip6_icmp6_mp_adv_input(struct mbuf *, int, int);
 #endif
 
@@ -399,9 +398,8 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	struct dhaad_rep *hdrep;
 	u_int16_t hdrep_id;
 	struct mip6_ha *mha, *mha_prefered = NULL;
-	struct hif_ha *hha;
 	struct in6_addr *haaddrs, *haaddrptr;
-	struct sockaddr_in6 lladdr, haaddr, anyaddr = sa6_any;
+	struct sockaddr_in6 haaddr;
 	int i, hacount = 0;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
@@ -478,12 +476,12 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 		 * XXX we cannot get a correct zone id by looking only
 		 * in6_addr structure.
 		 */
-		in6_addr2zoneid(m->m_pkthdr.rcvif, &haaddr.sin6_addr,
-				&haaddr.sin6_scope_id);
-		in6_embedscope(&haaddr.sin6_addr, &haaddr);
+		if (in6_addr2zoneid(m->m_pkthdr.rcvif, &haaddr.sin6_addr,
+		    &haaddr.sin6_scope_id))
+			continue;
+		if (in6_embedscope(&haaddr.sin6_addr, &haaddr))
+			continue;
 		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &haaddr);
-		hha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home,
-		    &anyaddr);
 		if (mha) {
 			/*
 			 * if this home agent already exists in the list,
@@ -495,41 +493,6 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 			 * how to get the REAL lifetime of the home agent?
 			 */
 			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
-		} else if (hha) {
-			/*
-			 * there is a mip6_ha entry which has an
-			 * unspecified link-local address.  this is
-			 * the bootstrap mip6_ha entry for DHAAD
-			 * request.
-			 */
-			mha = hha->hha_mha;
-			/*
-			 * XXX: TODO
-			 *
-			 * DHAAD reply doesn't include home agents'
-			 * link-local addresses.  how we decide for
-			 * each home agent link-local address?  and
-			 * lifetime determination is a problem, as
-			 * noted above.
-			 */
-			bzero(&mha->mha_lladdr, sizeof(mha->mha_lladdr));
-			mha->mha_lladdr.sin6_len = sizeof(mha->mha_lladdr);
-			mha->mha_lladdr.sin6_family = AF_INET6;
-			mip6_icmp6_create_linklocal(&mha->mha_lladdr.sin6_addr,
-			    haaddrptr);
-			/*
-			 * XXX we cannot get a correct zone id of a
-			 * link-local address of a remote network.
-			 */
-			in6_addr2zoneid(m->m_pkthdr.rcvif,
-			    &mha->mha_lladdr.sin6_addr,
-			    &mha->mha_lladdr.sin6_scope_id);
-			in6_embedscope(&mha->mha_lladdr.sin6_addr,
-			    &mha->mha_lladdr);
-			mha->mha_gaddr = haaddr;
-			mha->mha_flags = ND_RA_FLAG_HOME_AGENT;
-			mha->mha_pref = 0;
-			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
 			mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
 		} else {
 			/*
@@ -537,30 +500,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 			 * to the internal home agent list
 			 * (mip6_ha_list).
 			 */
-			/*
-			 * XXX: TODO
-			 *
-			 * DHAAD reply doesn't include home agents'
-			 * link-local addresses.  how we decide for
-			 * each home agent link-local address?  and
-			 * lifetime determination is a problem, as
-			 * noted above.
-			 */
-			bzero(&lladdr, sizeof(lladdr));
-			lladdr.sin6_len = sizeof(lladdr);
-			lladdr.sin6_family = AF_INET6;
-			mip6_icmp6_create_linklocal(&lladdr.sin6_addr,
-						    haaddrptr);
-			/*
-			 * XXX we cannot get a correct zone id of a
-			 * link-local address of a remote network.
-			 */
-			in6_addr2zoneid(m->m_pkthdr.rcvif, &lladdr.sin6_addr,
-			    &lladdr.sin6_scope_id);
-			in6_embedscope(&lladdr.sin6_addr, &lladdr);
-
-			mha = mip6_ha_create(&lladdr, &haaddr,
-			    ND_RA_FLAG_HOME_AGENT, 0,
+			mha = mip6_ha_create(&haaddr, ND_RA_FLAG_HOME_AGENT, 0,
 			    MIP6_HA_DEFAULT_LIFETIME);
 			if (mha == NULL) {
 				mip6log((LOG_ERR,
@@ -593,7 +533,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 		if ((mbu->mbu_flags & IP6MU_HOME)
 		    && SA6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
 			/* home registration. */
-			mbu->mbu_paddr = mha_prefered->mha_gaddr;
+			mbu->mbu_paddr = mha_prefered->mha_addr;
 			if (!MIP6_IS_BU_BOUND_STATE(mbu)) {
 				if (mip6_bu_send_bu(mbu)) {
 					mip6log((LOG_ERR,
@@ -613,27 +553,16 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 }
 
 static int
-mip6_dhaad_ha_list_insert(homehif, mha)
-	struct hif_softc *homehif;
+mip6_dhaad_ha_list_insert(hif, mha)
+	struct hif_softc *hif;
 	struct mip6_ha *mha;
 {
-	struct hif_softc *hif;
-	struct mip6_prefix *mpfx;
+	struct hif_prefix *hpfx;
 
-	for (hif = TAILQ_FIRST(&hif_softc_list); hif;
-	     hif = TAILQ_NEXT(hif, hif_entry)) {
-		if (hif == homehif)
-			hif_ha_list_insert(&hif->hif_ha_list_home, mha);
-		else
-			hif_ha_list_insert(&hif->hif_ha_list_foreign, mha);
-	}
-
-	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
-	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (in6_are_prefix_equal(&mha->mha_gaddr.sin6_addr,
-		    &mpfx->mpfx_prefix.sin6_addr, mpfx->mpfx_prefixlen)) {
-			mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
-		}
+	for (hpfx = LIST_FIRST(&hif->hif_prefix_list_home); hpfx;
+	    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
+		mip6_prefix_ha_list_insert(&hpfx->hpfx_mpfx->mpfx_ha_list,
+		    mha);
 	}
 
 	return (0);
@@ -679,7 +608,8 @@ mip6_icmp6_dhaad_req_output(sc)
 	 */
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx))
+		if (hif_prefix_list_find_withmpfx(&sc->hif_prefix_list_home,
+		    mpfx))
 			break;
 	}
 	if (mpfx == NULL) {
@@ -765,20 +695,6 @@ mip6_icmp6_create_haanyaddr(haanyaddr, mpfx)
 		mip6_create_addr(haanyaddr, &haanyaddr_ifid64, &ndpr);
 	else
 		mip6_create_addr(haanyaddr, &haanyaddr_ifidnn, &ndpr);
-
-	return (0);
-}
-
-static int
-mip6_icmp6_create_linklocal(lladdr, ifid)
-	struct in6_addr *lladdr;
-	struct in6_addr *ifid;
-{
-	bzero(lladdr, sizeof(struct in6_addr));
-	lladdr->s6_addr[0] = 0xfe;
-	lladdr->s6_addr[1] = 0x80;
-	lladdr->s6_addr32[2] = ifid->s6_addr32[2];
-	lladdr->s6_addr32[3] = ifid->s6_addr32[3];
 
 	return (0);
 }
@@ -884,9 +800,10 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	struct in6_ifaddr *ia6;
 	struct mip6_prefix *mpfx;
 	struct mip6_ha *mha;
-	struct hif_softc *hif;
+	struct hif_softc *hif, *tmphif;
 	struct mip6_bu *mbu;
 	struct ifaddr *ifa;
+	struct hif_prefix *hpfx;
 	int error = 0;
 #ifdef __FreeBSD__
 	struct timeval mono_time;
@@ -972,7 +889,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		}
 	}
 
-	/* check id.  if it doesn't match, send mps. */
+	/* XXX check id.  if it doesn't match, send mps. */
 
 	icmp6len -= sizeof(*mp_adv);
 	nd6_option_init(mp_adv + 1, icmp6len, &ndopts);
@@ -1048,6 +965,17 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 			}
 			mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
 			mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
+			for (tmphif = TAILQ_FIRST(&hif_softc_list); tmphif;
+			     tmphif = TAILQ_NEXT(tmphif, hif_entry)) {
+				if (hif == tmphif)
+					hif_prefix_list_insert_withmpfx(
+					    &tmphif->hif_prefix_list_home,
+					    mpfx);
+				else
+					hif_prefix_list_insert_withmpfx(
+					    &tmphif->hif_prefix_list_foreign,
+					    mpfx);
+			}
 
 			mip6_prefix_haddr_assign(mpfx, hif); /* XXX */
 
@@ -1158,10 +1086,37 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 				ifa6->ia6_updatetime = mono_time.tv_sec;
 			}
 		}
+	}
 
-		if (ndopt_pi->nd_opt_pi_flags_reserved
-		    & ND_OPT_PI_FLAG_ROUTER) {
-			/* XXX multiple global address case. */
+	for (ndopt = (struct nd_opt_hdr *)ndopts.nd_opts_pi;
+	     ndopt <= (struct nd_opt_hdr *)ndopts.nd_opts_pi_end;
+	     ndopt = (struct nd_opt_hdr *)((caddr_t)ndopt
+		 + (ndopt->nd_opt_len << 3))) {
+		if (ndopt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
+			continue;
+		ndopt_pi = (struct nd_opt_prefix_info *)ndopt;
+
+		if ((ndopt_pi->nd_opt_pi_flags_reserved
+		    & ND_OPT_PI_FLAG_ROUTER) == 0)
+			continue;
+
+		bzero(&prefix_sa, sizeof(prefix_sa));
+		prefix_sa.sin6_family = AF_INET6;
+		prefix_sa.sin6_len = sizeof(prefix_sa);
+		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
+		/* XXX scope. */
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &prefix_sa);
+		if (mha == NULL) {
+			mha = mip6_ha_create(&prefix_sa,
+			    ND_RA_FLAG_HOME_AGENT, 0, MIP6_HA_DEFAULT_LIFETIME);
+		} else {
+			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
+			mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
+		}
+		for (hpfx = LIST_FIRST(&hif->hif_prefix_list_home); hpfx;
+		    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
+			mip6_prefix_ha_list_insert(
+			    &hpfx->hpfx_mpfx->mpfx_ha_list, mha);
 		}
 	}
 

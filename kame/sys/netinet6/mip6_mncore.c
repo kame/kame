@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.26 2003/08/20 13:31:14 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.27 2003/08/25 11:28:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -226,10 +226,18 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 	int mha_is_new, mpfx_is_new;
 	struct mip6_ha *mha;
 	struct mip6_prefix tmpmpfx, *mpfx;
-	struct hif_ha *hha;
+	struct mip6_prefix *prefix_list[IPV6_MINMTU/sizeof(struct nd_opt_prefix_info)];
+	int nprefix = 0;
+	struct hif_prefix *hpfx;
+	struct sockaddr_in6 haaddr;
+	int i; 
 	int error = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
 #endif
 
 	/* sanity check. */
@@ -296,9 +304,10 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		prefix_sa.sin6_len = sizeof(prefix_sa);
 		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
 		/* XXX scope? */
-		hha = hif_ha_list_find_withprefix(&sc->hif_ha_list_home,
-		    &prefix_sa, ndopt_pi->nd_opt_pi_prefix_len);
-		if (hha != NULL)
+		hpfx = hif_prefix_list_find_withprefix(
+		    &sc->hif_prefix_list_home, &prefix_sa,
+		    ndopt_pi->nd_opt_pi_prefix_len);
+		if (hpfx != NULL)
 			is_home++;
 
 		if (ndopt_pi->nd_opt_pi_flags_reserved
@@ -308,17 +317,18 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			prefix_sa.sin6_len = sizeof(prefix_sa);
 			prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
 			/* XXX scope? */
-			hha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home,
-			    &prefix_sa);
-			if (hha != NULL)
+			hpfx = hif_prefix_list_find_withhaaddr(
+			    &sc->hif_prefix_list_home, &prefix_sa);
+			if (hpfx != NULL)
 				is_home++;
 		}
 	}
 
-	/* check is the router is on our home agent list. */
-	hha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home, rtaddr);
+	/* check if the router's lladdr is on our home agent list. */
+	hpfx = hif_prefix_list_find_withhaaddr(&sc->hif_prefix_list_home,
+	    rtaddr);
 
-	if ((is_home != 0) || (hha != NULL)) {
+	if ((is_home != 0) || (hpfx != NULL)) {
 		/* we are home. */
 		location = HIF_LOCATION_HOME;
 	} else {
@@ -423,30 +433,97 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			    __FILE__, __LINE__,
 			    ip6_sprintf(&ndopt_pi->nd_opt_pi_prefix)));
 		}
-	skip_prefix_update:
 
-		/* update mip6_ha_list. */
-		mha_is_new = 0;
-		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, rtaddr);
+		/*
+		 *  insert this prefix information to hif structure
+		 *  based on the current location.
+		 */
+		if (location == HIF_LOCATION_HOME) {
+			hpfx = hif_prefix_list_find_withmpfx(
+			    &sc->hif_prefix_list_foreign, mpfx);
+			if (hpfx != NULL)
+				hif_prefix_list_remove(
+				    &sc->hif_prefix_list_foreign, hpfx);
+			if (hif_prefix_list_find_withmpfx(
+			    &sc->hif_prefix_list_home, mpfx) == NULL)
+				hif_prefix_list_insert_withmpfx(
+				    &sc->hif_prefix_list_home, mpfx);
+		} else {
+			hpfx = hif_prefix_list_find_withmpfx(
+			    &sc->hif_prefix_list_home, mpfx);
+			if (hpfx != NULL)
+				hif_prefix_list_remove(
+				    &sc->hif_prefix_list_home, hpfx);
+			if (hif_prefix_list_find_withmpfx(
+			    &sc->hif_prefix_list_foreign, mpfx) == NULL)
+				hif_prefix_list_insert_withmpfx(
+				    &sc->hif_prefix_list_foreign, mpfx);
+		}
+
+		/* remember prefixes advertised with this ND message. */
+		prefix_list[nprefix] = mpfx;
+		nprefix++;
+	skip_prefix_update:
+	}
+
+	/* update/create mip6_ha entry with an lladdr. */
+	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, rtaddr);
+	if (mha) {
+		/* the entry for rtaddr exists.  update information. */
+		mha->mha_flags = dr->flags;
+		mha->mha_lifetime = dr->rtlifetime;
+		mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
+		/* XXX how to handle preference? */
+	} else {
+		/* this is a lladdr mip6_ha entry. */
+		mha = mip6_ha_create(rtaddr, dr->flags, 0, dr->rtlifetime);
+		if (mha == NULL) {
+			mip6log((LOG_ERR,
+			    "%s:%d mip6_ha memory allcation failed.\n",
+			    __FILE__, __LINE__));
+			goto haaddr_update;
+		}
+		error = mip6_ha_list_insert(&mip6_ha_list, mha);
+		if (error) {
+			mip6log((LOG_ERR,
+			    "%s:%d "
+			    "mip6_ha_list_insert failed(%d).\n",
+			    __FILE__, __LINE__, error));
+			goto haaddr_update;
+		}
+	}
+	for (i = 0; i < nprefix; i++) {
+		mip6_prefix_ha_list_insert(&prefix_list[i]->mpfx_ha_list, mha);
+	}
+
+ haaddr_update:
+	/* update/create mip6_ha entry with a global addr. */
+	for (ndopt = (struct nd_opt_hdr *)ndopts->nd_opts_pi;
+	     ndopt <= (struct nd_opt_hdr *)ndopts->nd_opts_pi_end;
+	     ndopt = (struct nd_opt_hdr *)((caddr_t)ndopt
+		 + (ndopt->nd_opt_len << 3))) {
+		if (ndopt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
+			continue;
+		ndopt_pi = (struct nd_opt_prefix_info *)ndopt;
+
+		if ((ndopt_pi->nd_opt_pi_flags_reserved
+		    & ND_OPT_PI_FLAG_ROUTER) == 0)
+			continue;
+
+		bzero(&haaddr, sizeof(haaddr));
+		haaddr.sin6_len = sizeof(haaddr);
+		haaddr.sin6_family = AF_INET6;
+		haaddr.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
+		/* XXX scope. */
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &haaddr);
 		if (mha) {
-			/* the entry for rtaddr exists.  update information. */
-			if (ndopt_pi->nd_opt_pi_flags_reserved
-			    & ND_OPT_PI_FLAG_ROUTER) {
-				/*
-				 * if prefix information has a router flag,
-				 * that entry includes a global address
-				 * of a home agent.
-				 */
-				mha->mha_gaddr = tmpmpfx.mpfx_prefix;
-			}
 			mha->mha_flags = dr->flags;
+			mha->mha_lifetime = dr->rtlifetime;
+			mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
 		} else {
 			/* this is a new ha or a router. */
-			mha = mip6_ha_create(rtaddr,
-			    (ndopt_pi->nd_opt_pi_flags_reserved
-			    & ND_OPT_PI_FLAG_ROUTER)
-			    ? &tmpmpfx.mpfx_prefix : NULL,
-			    dr->flags, 0, dr->rtlifetime);
+			mha = mip6_ha_create(&haaddr, dr->flags, 0,
+			    dr->rtlifetime);
 			if (mha == NULL) {
 				mip6log((LOG_ERR,
 				    "%s:%d mip6_ha memory allcation failed.\n",
@@ -469,30 +546,11 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			    ip6_sprintf(&rtaddr->sin6_addr),
 			    ip6_sprintf(&tmpmpfx.mpfx_prefix.sin6_addr)));
 		}
-	skip_ha_update:
-
-		if (mpfx_is_new || mha_is_new)
-			mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
-
-		if (location == HIF_LOCATION_HOME) {
-			hha = hif_ha_list_find_withmha(
-			    &sc->hif_ha_list_foreign, mha);
-			if (hha != NULL)
-				hif_ha_list_remove(&sc->hif_ha_list_foreign,
-				    hha);
-			if (hif_ha_list_find_withmha(&sc->hif_ha_list_home,
-			    mha) == NULL)
-				hif_ha_list_insert(&sc->hif_ha_list_home, mha);
-		} else {
-			hha = hif_ha_list_find_withmha(&sc->hif_ha_list_home,
-			    mha);
-			if (hha != NULL)
-				hif_ha_list_remove(&sc->hif_ha_list_home, hha);
-			if (hif_ha_list_find_withmha(&sc->hif_ha_list_foreign,
-			    mha) == NULL)
-				hif_ha_list_insert(&sc->hif_ha_list_foreign,
-				    mha);
+		for (i = 0; i < nprefix; i++) {
+			mip6_prefix_ha_list_insert(
+			    &prefix_list[i]->mpfx_ha_list, mha);
 		}
+	skip_ha_update:
 	}
 	return (0);
 }
@@ -563,7 +621,7 @@ mip6_process_pfxlist_status_change(sc)
 
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home,
+		if (hif_prefix_list_find_withmpfx(&sc->hif_prefix_list_home,
 		    mpfx) == NULL)
 			continue;
 		hif_coa = sc->hif_coa_ifa->ia_addr;
@@ -661,10 +719,11 @@ mip6_select_coa(sc)
 	hoa_scope = ia_best_scope = -1;
 	ia_best_matchlen = -1;
 
+	/* get the first HoA registered to a certain home network. */
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx)
-		    == NULL)
+		if (hif_prefix_list_find_withmpfx(&sc->hif_prefix_list_home,
+		    mpfx) == NULL)
 			continue;
 		if (SA6_IS_ADDR_UNSPECIFIED(&mpfx->mpfx_haddr))
 			continue;
@@ -714,8 +773,8 @@ mip6_select_coa(sc)
 		/* prefer a home address. */
 		for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 		    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-			if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home,
-			    mpfx) == NULL)
+			if (hif_prefix_list_find_withmpfx(
+			    &sc->hif_prefix_list_home, mpfx) == NULL)
 				continue;
 			if (SA6_ARE_ADDR_EQUAL(&mpfx->mpfx_haddr, &ia_addr)) {
 				ia_best = ia;
@@ -999,8 +1058,8 @@ mip6_add_haddrs(sc, ifp)
 
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx)
-		    == NULL)
+		if (hif_prefix_list_find_withmpfx(&sc->hif_prefix_list_home,
+		    mpfx) == NULL)
 			continue;
 
 		/*
@@ -1106,8 +1165,8 @@ mip6_remove_haddrs(sc, ifp)
 
 		for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 		     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-			if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home,
-				mpfx) == NULL)
+			if (hif_prefix_list_find_withmpfx(
+			    &sc->hif_prefix_list_home, mpfx) == NULL)
 				continue;
 			
 			if (!in6_are_prefix_equal(&ia6->ia_addr.sin6_addr,
@@ -1598,7 +1657,7 @@ mip6_home_registration(sc)
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu;
 	const struct sockaddr_in6 *haaddr;
-	struct hif_ha *hha;
+	struct mip6_ha *mha;
 
 	/* get current CoA and recover its scope information. */
 	hif_coa = sc->hif_coa_ifa->ia_addr;
@@ -1612,8 +1671,8 @@ mip6_home_registration(sc)
 
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx)
-		    == NULL)
+		if (hif_prefix_list_find_withmpfx(&sc->hif_prefix_list_home,
+		    mpfx) == NULL)
 			continue;
 
 		for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
@@ -1651,10 +1710,9 @@ mip6_home_registration(sc)
 			 */
 
 			/* pick the preferable HA from the list. */
-			hha = hif_ha_list_find_preferable(
-				&sc->hif_ha_list_home, mpfx);
+			mha = hif_find_preferable_ha(sc, mpfx);
 				    
-			if (hha == NULL) {
+			if (mha == NULL) {
 				/*
 				 * if no HA is found, try to find a HA
 				 * using Dynamic Home Agent Discovery.
@@ -1665,7 +1723,7 @@ mip6_home_registration(sc)
 				mip6_icmp6_dhaad_req_output(sc);
 				haaddr = &sin6_any;
 			} else {
-				haaddr = &hha->hha_mha->mha_gaddr;
+				haaddr = &mha->mha_addr;
 			}
 
 			mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
@@ -1759,8 +1817,8 @@ mip6_home_registration2(mbu)
 	prefix_lifetime = 0x7fffffff;
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (hif_ha_list_find_withmpfx(&mbu->mbu_hif->hif_ha_list_home,
-			mpfx) == NULL)
+		if (hif_prefix_list_find_withmpfx(
+		    &mbu->mbu_hif->hif_prefix_list_home, mpfx) == NULL)
 			continue;
 		if (mpfx->mpfx_vltime < prefix_lifetime)
 			prefix_lifetime = mpfx->mpfx_vltime;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.3 2003/07/24 07:11:18 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.4 2003/08/25 11:28:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -82,40 +82,35 @@ mip6_halist_init()
 }
 
 struct mip6_ha *
-mip6_ha_create(lladdr, gaddr, flags, pref, lifetime)
-	struct sockaddr_in6 *lladdr;
-	struct sockaddr_in6 *gaddr;
+mip6_ha_create(addr, flags, pref, lifetime)
+	struct sockaddr_in6 *addr;
 	u_int8_t flags;
 	u_int16_t pref;
 	int32_t lifetime;
 {
 	struct mip6_ha *mha = NULL;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
 #endif
 
-	MALLOC(mha, struct mip6_ha *, sizeof(struct mip6_ha),
-	       M_TEMP, M_NOWAIT);
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif
+
+	MALLOC(mha, struct mip6_ha *, sizeof(struct mip6_ha), M_TEMP,
+	    M_NOWAIT);
 	if (mha == NULL) {
 		mip6log((LOG_ERR,
-			 "%s:%d: memory allocation failed.\n",
-			 __FILE__, __LINE__));
+		    "%s:%d: memory allocation failed.\n",
+		    __FILE__, __LINE__));
 		return (NULL);
 	}
 	bzero(mha, sizeof(*mha));
-	mha->mha_lladdr = *lladdr;
-	if (gaddr)
-		mha->mha_gaddr = *gaddr;
-	else {
-		bzero(&mha->mha_gaddr, sizeof(mha->mha_gaddr));
-		mha->mha_gaddr.sin6_len = sizeof(mha->mha_gaddr);
-		mha->mha_gaddr.sin6_family = AF_INET6;
-		mha->mha_gaddr.sin6_addr = in6addr_any;
-	}
+	mha->mha_addr = *addr;
 	mha->mha_flags = flags;
 	mha->mha_pref = pref;
 	mha->mha_lifetime = lifetime;
-	mha->mha_expire = time_second + mha->mha_lifetime;
+	mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
 
 	return (mha);
 }
@@ -129,13 +124,11 @@ mip6_ha_print(mha)
 #endif
 
 	mip6log((LOG_INFO,
-		 "lladdr   %s\n"
-		 "gaddr    %s\n"
+		 "addr    %s\n"
 		 "pref     %u\n"
 		 "lifetime %u\n"
 		 "remain   %ld\n",
-		 ip6_sprintf(&mha->mha_lladdr.sin6_addr),
-		 ip6_sprintf(&mha->mha_gaddr.sin6_addr),
+		 ip6_sprintf(&mha->mha_addr.sin6_addr),
 		 mha->mha_pref,
 		 mha->mha_lifetime,
 		 mha->mha_expire - time_second));
@@ -151,7 +144,6 @@ mip6_ha_list_insert(mha_list, mha)
 	}
 
 	LIST_INSERT_HEAD(mha_list, mha, mha_entry);
-	MIP6_HA_REF(mha);
 
 	return (0);
 }
@@ -161,6 +153,9 @@ mip6_ha_list_remove(mha_list, mha)
 	struct mip6_ha_list *mha_list;
 	struct mip6_ha *mha;
 {
+	struct mip6_prefix *mpfx;
+	struct mip6_prefix_ha *mpfxha, *mpfxha_next;
+
 	if ((mha_list == NULL) || (mha == NULL)) {
 		return (EINVAL);
 	}
@@ -168,9 +163,19 @@ mip6_ha_list_remove(mha_list, mha)
 #ifdef MIP6_DEBUG
 	mip6_ha_print(mha);
 #endif
+	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
+		for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
+		    mpfxha = mpfxha_next) {
+			mpfxha_next = LIST_NEXT(mpfxha, mpfxha_entry);
+			if (mpfxha->mpfxha_mha == mha)
+				mip6_prefix_ha_list_remove(&mpfx->mpfx_ha_list,
+				    mpfxha);
+		}
+	}
 
 	LIST_REMOVE(mha, mha_entry);
-	MIP6_HA_FREE(mha);
+	FREE(mha, M_TEMP);
 
 	return (0);
 }
@@ -224,43 +229,18 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	return (0);
 }
 
-int
-mip6_ha_list_update_withndpr(mha_list, addr, ndpr)
-	struct mip6_ha_list *mha_list;
-	struct sockaddr_in6 *addr;
-	struct nd_prefix *ndpr;
-{
-	struct mip6_ha *mha;
-
-	mha = mip6_ha_list_find_withaddr(mha_list, addr);
-	if (mha == NULL) {
-		return (0);
-	}
-	mha->mha_gaddr = ndpr->ndpr_prefix;
-
-	return (0);
-}
-
 struct mip6_ha *
 mip6_ha_list_find_withaddr(mha_list, addr)
 	struct mip6_ha_list *mha_list;
 	struct sockaddr_in6 *addr;
 {
-	struct mip6_ha *mha, *match = NULL;
+	struct mip6_ha *mha;
 
 	for (mha = LIST_FIRST(mha_list); mha;
 	     mha = LIST_NEXT(mha, mha_entry)) {
-		if (SA6_ARE_ADDR_EQUAL(&mha->mha_lladdr, addr)) {
-			match = mha;
-			break;
-		}
-		if (SA6_ARE_ADDR_EQUAL(&mha->mha_gaddr, addr)) {
-			match = mha;
-			break;
-		}
-		if (match)
-			break;
+		if (SA6_ARE_ADDR_EQUAL(&mha->mha_addr, addr))
+			return (mha);
 	}
-
-	return (mha);
+	/* not found. */
+	return (NULL);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.100 2003/08/15 12:49:55 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.101 2003/08/25 11:28:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -233,27 +233,15 @@ struct mip6_unuse_hoa {
 };
 LIST_HEAD(mip6_unuse_hoa_list, mip6_unuse_hoa);
 
-/* XXX the home agent entry.  not good. */
 struct mip6_ha {
 	LIST_ENTRY(mip6_ha) mha_entry;
-	struct sockaddr_in6 mha_lladdr;    /* XXX link-local addr */
-	struct sockaddr_in6 mha_gaddr;     /* XXX global addr */
+	struct sockaddr_in6 mha_addr ;     /* lladdr or global addr */
 	u_int8_t            mha_flags;     /* RA flags */
 	u_int16_t           mha_pref;      /* preference */
 	u_int16_t           mha_lifetime;  /* HA lifetime */
 	time_t              mha_expire;    /* expiration time of this HA. */
-	u_int32_t           mha_refcnt;
 };
 LIST_HEAD(mip6_ha_list, mip6_ha);
-#define MIP6_HA_REF(mha)	\
-do {				\
-	(mha)->mha_refcnt++;	\
-} while(0);
-#define MIP6_HA_FREE(mha)		\
-do {					\
-	if (((mha)->mha_refcnt--) == 0)	\
-		FREE(mha, M_TEMP);	\
-} while(0);
 
 struct mip6_prefix_ha {
 	LIST_ENTRY(mip6_prefix_ha) mpfxha_entry;
@@ -270,6 +258,7 @@ struct mip6_prefix {
 	time_t                  mpfx_plexpire;
 	struct sockaddr_in6     mpfx_haddr;
 	LIST_HEAD(mip6_prefix_ha_list, mip6_prefix_ha) mpfx_ha_list;
+	int                     mpfx_refcnt;
 
 	int                     mpfx_state;
 	u_long                  mpfx_expire;
