@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1314 2000/10/03 15:24:20 jinmei Exp $
+$KAME: CHANGELOG,v 1.1315 2000/10/03 15:31:42 sumikawa Exp $
 
 <200010>
+Wed Oct  4 00:29:42 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/lftp: upgrade to 2.3.3.
+
 2000-10-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/netstat/main.c:
 	* kame/kame/netstat/ipsec.c (ipsec6_stats0):
