@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.398 2003/09/10 08:10:55 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.399 2003/09/21 09:48:34 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2713,26 +2713,20 @@ do { \
 #ifdef IPV6_PKTOPTIONS
 			case IPV6_PKTOPTIONS:
 #endif
+				/*
+				 * RFC3542 (effectively) deprecated the
+				 * semantics of the 2292-style pktoptions.
+				 * Since it was not reliable in nature (i.e.,
+				 * applications had to expect the lack of some
+				 * information after all), it would make sense
+				 * to simplify this part by always returning
+				 * empty data.
+				 */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				if (in6p->in6p_inputopts &&
-				    in6p->in6p_inputopts->head) {
-					struct mbuf *m;
-					m = m_copym(in6p->in6p_inputopts->head,
-					    0, M_COPYALL, M_WAIT);
-					error = soopt_mcopyout(sopt, m);
-					if (error == 0)
-						m_freem(m);
-				} else
 					sopt->sopt_valsize = 0;
 #else
-				if (in6p->in6p_inputopts &&
-				    in6p->in6p_inputopts->head) {
-					*mp = m_copym(in6p->in6p_inputopts->head,
-						      0, M_COPYALL, M_WAIT);
-				} else {
 					*mp = m_get(M_WAIT, MT_SOOPTS);
 					(*mp)->m_len = 0;
-				}
 #endif
 				break;
 
