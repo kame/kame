@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1949 2001/10/25 12:49:28 jinmei Exp $
+$KAME: CHANGELOG,v 1.1950 2001/10/25 13:09:15 jinmei Exp $
 
 <200110>
+2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c (dump): skipped non-host routes when
+	printing neighbor cache entries, since they were just confusing.
+
 2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_rtrequest): ignored a route when it
 	is created by cloning and is not a neighbor.  Otherwise, it could
