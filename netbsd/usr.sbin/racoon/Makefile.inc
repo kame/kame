@@ -17,6 +17,12 @@ CPPFLAGS+=-DHAVE_RC5_H=1
 .if exists(/usr/pkg/include/ssleay/idea.h) || exists(/usr/pkg/include/openssl/idea.h)
 CPPFLAGS+=-DHAVE_IDEA_H=1
 .endif
+.if exists(/usr/pkg/include/ssleay/cversion.h) || exists(/usr/pkg/include/openssl/cversion.h)
+CPPFLAGS+=-DHAVE_CVERSION_H=1
+.endif
+.if exists(/usr/pkg/include/ssleay/opensslv.h) || exists(/usr/pkg/include/openssl/opensslv.h)
+CPPFLAGS+=-DHAVE_OPENSSLV_H=1
+.endif
 .if exists(/usr/local/ssl/include/openssl)
 CFLAGS+=-I/usr/local/ssl/include/openssl -I/usr/local/ssl/include
 .elif exists(/usr/pkg/include/ssleay)
