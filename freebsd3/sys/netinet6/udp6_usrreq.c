@@ -763,15 +763,10 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 	inp->in6p_hops = -1;	/* use kernel default */
 	inp->in6p_cksum = -1;	/* just to be sure */
 #ifdef IPSEC
-	error = ipsec_init_policy(&inp->in6p_sp_in);
-	if (error) {
+	error = ipsec_init_policy(so, &inp->in6p_sp);
+	if (error != 0) {
 		in6_pcbdetach(inp);
-		return error;
-	}
-	error = ipsec_init_policy(&inp->in6p_sp_out);
-	if (error) {
-		in6_pcbdetach(inp);
-		return error;
+		return (error);
 	}
 #endif /*IPSEC*/
 	return 0;
