@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.10 2003/07/31 21:44:11 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.11 2003/08/01 00:43:57 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -265,7 +265,7 @@ When an IPv6 prefix is delegated from a DHCPv6 server,
 .Nm dhcp6c
 will assign a prefix on the
 .Ar interface
-.Pq unless the interface receives the DHCPv6 message that contains the prefix
+unless the interface receives the DHCPv6 message that contains the prefix
 with the delegated prefix and the parameters provided in
 .Ar substatements .
 Possible substatements are as follows.
