@@ -1,5 +1,5 @@
 #	From: @(#)Makefile	8.1 (Berkeley) 6/5/93
-# $FreeBSD: src/sbin/ifconfig/Makefile,v 1.14.2.2 2001/04/17 15:21:02 luigi Exp $
+# $FreeBSD: src/sbin/ifconfig/Makefile,v 1.14.2.5 2001/07/21 17:47:39 obrien Exp $
 
 PROG=	ifconfig
 SRCS=	ifconfig.c
@@ -15,9 +15,19 @@ SRCS+=	ifvlan.c
 CFLAGS+=-DUSE_VLANS
 .endif
 
-MAN8=	ifconfig.8
+#comment out to exclude SIOC[GS]IEEE80211 support
+SRCS+=	ifieee80211.c
+CFLAGS+=-DUSE_IEEE80211
+
+MAN=	ifconfig.8
+
+.if defined(RELEASE_CRUNCH)
+CFLAGS+=-DNO_IPX
+.else
 DPADD=	${LIBIPX}
 LDADD=	-lipx
+.endif
+
 COPTS=	-DNS -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings \
 	-Wnested-externs -I..
 

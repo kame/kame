@@ -31,13 +31,14 @@
  *
  * so there!
  *
- * $FreeBSD: src/sbin/ifconfig/ifconfig.h,v 1.5 1999/08/28 00:13:08 peter Exp $
+ * $FreeBSD: src/sbin/ifconfig/ifconfig.h,v 1.5.2.2 2001/07/04 20:49:20 brooks Exp $
  */
 
 extern struct ifreq ifr;
 
 extern char name[32];	/* name of interface */
 extern int allmedia;
+extern int supmedia;
 struct afswtch;
 
 extern void setmedia(const char *, int, int, const struct afswtch *rafp);
@@ -49,3 +50,17 @@ extern void setvlantag(const char *, int, int, const struct afswtch *rafp);
 extern void setvlandev(const char *, int, int, const struct afswtch *rafp);
 extern void unsetvlandev(const char *, int, int, const struct afswtch *rafp);
 extern void vlan_status(int s, struct rt_addrinfo *);
+
+extern void set80211ssid(const char *, int, int, const struct afswtch *rafp);
+extern void set80211stationname(const char *, int, int, const struct afswtch *rafp);
+extern void set80211channel(const char *, int, int, const struct afswtch *rafp);
+extern void set80211authmode(const char *, int, int, const struct afswtch *rafp);
+extern void set80211powersave(const char *, int, int, const struct afswtch *rafp);
+extern void set80211powersavemode(const char *, int, int, const struct afswtch *rafp);
+extern void set80211powersavesleep(const char *, int, int, const struct afswtch *rafp);
+extern void set80211wepmode(const char *, int, int, const struct afswtch *rafp);
+extern void set80211wep(const char *, int, int, const struct afswtch *rafp);
+extern void set80211weptxkey(const char *, int, int, const struct afswtch *rafp);
+extern void set80211wepkey(const char *, int, int, const struct afswtch *rafp);
+extern void set80211nwkey(const char *, int, int, const struct afswtch *rafp);
+extern void ieee80211_status(int s, struct rt_addrinfo *);
