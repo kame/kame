@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.291 2001/12/20 09:27:29 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.292 2001/12/20 09:31:00 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -200,7 +200,7 @@ draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
     * 15/12 drafts are not explicit about padding and string termination.
       at IETF48, the author confirmed that there's no padding/termination
       (and extensions can appear unaligned).  our code follows the comment.
-draft-ietf-ipngwg-rfc2553bis-03.txt:
+draft-ietf-ipngwg-rfc2553bis-04.txt:
 	Basic Socket Interface Extensions for IPv6 (revised)
 draft-ietf-ipngwg-rfc2292bis-03.txt:
 	Advanced Sockets API for IPv6 (revised)
