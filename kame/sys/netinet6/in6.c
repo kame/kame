@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.342 2003/08/05 11:47:35 ono Exp $	*/
+/*	$KAME: in6.c,v 1.343 2003/08/09 15:12:25 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1128,8 +1128,7 @@ in6_update_ifa(ifp, ifra, ia)
 		} else {
 			ia->ia_ifa.ifa_dstaddr = NULL;
 		}
-		ia->ia_ifa.ifa_netmask =
-		    (struct sockaddr *)&ia->ia_prefixmask;
+		ia->ia_ifa.ifa_netmask = (struct sockaddr *)&ia->ia_prefixmask;
 
 		ia->ia_ifp = ifp;
 		if ((oia = in6_ifaddr) != NULL) {
