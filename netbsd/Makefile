@@ -29,5 +29,6 @@ afterinstall:
 	if test -x $(PREFIX)/sbin/inet6d; then \
 		cp kame/inet6d/inet6d.conf $(PREFIX)/etc/inet6d.conf.sample; \
 	fi
+	cp kame/etc/rc.net6 $(PREFIX)/etc/rc.net6.sample
 
 .include <bsd.subdir.mk>
