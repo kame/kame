@@ -1525,7 +1525,7 @@ bgp_process_update(struct rpcb *bnp)
 			 __FUNCTION__,
 			 ip6str(&uprte->rt_ripinfo.rip6_dest, 0),
 			 uprte->rt_ripinfo.rip6_plen,
-			 bgp_peerstr(&bnp->rp_gaddr));
+			 bgp_peerstr(bnp));
 #endif
 		  nrte = uprte->rt_prev; /* XXX */
 		  remque(uprte);
@@ -1542,7 +1542,7 @@ bgp_process_update(struct rpcb *bnp)
 			 __FUNCTION__,
 			 ip6str(&uprte->rt_ripinfo.rip6_dest, 0),
 			 uprte->rt_ripinfo.rip6_plen,
-			 bgp_peerstr(&bnp->rp_gaddr),
+			 bgp_peerstr(bnp),
 			 (uprte->rt_flags & RTF_UP) ? "installed" : "backup");
 #endif 
 
@@ -1590,7 +1590,7 @@ bgp_process_update(struct rpcb *bnp)
 				 __FUNCTION__,
 				 ip6str(&wdrte->rt_ripinfo.rip6_dest, 0),
 				 wdrte->rt_ripinfo.rip6_plen,
-				 bgp_peerstr(&bnp->rp_gaddr));
+				 bgp_peerstr(bnp));
 #endif 
 			  bgp_disable_rte(drte);
 
@@ -1633,7 +1633,7 @@ bgp_process_update(struct rpcb *bnp)
 				 __FUNCTION__,
 				 ip6str(&wdrte->rt_ripinfo.rip6_dest, 0),
 				 wdrte->rt_ripinfo.rip6_plen,
-				 bgp_peerstr(&bnp->rp_gaddr));
+				 bgp_peerstr(bnp));
 
 #endif 
 			  bnp->rp_adj_ribs_in 
@@ -1720,7 +1720,7 @@ bgp_selectroute(rte, bnp)
 			       __FUNCTION__,
 			       ip6str(&orte->rt_ripinfo.rip6_dest, 0),
 			       orte->rt_ripinfo.rip6_plen,
-			       bgp_peerstr(&bnp->rp_gaddr));
+			       bgp_peerstr(bnp));
 #endif 
 			crte = *orte;
 			crte.rt_next = crte.rt_prev = &crte;
