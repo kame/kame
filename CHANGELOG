@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.734 2000/03/29 07:02:33 itojun Exp $
+$Id: CHANGELOG,v 1.735 2000/03/29 07:36:04 sumikawa Exp $
 
 <200003>
+Wed Mar 29 16:34:20 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/ncftp3: upgrade to 3.0.0.
+	* freebsd3: remove MAPPED_ADDR_ENABLED option to easily code
+	  sharing with freebsd4. you can turn on/off mapped-addr
+	  supporting by sysctl instead of it.
+
 Wed Mar 29 16:00:24 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/bind9: use bind 9.0.0beta2.
 
