@@ -23,13 +23,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD: src/sys/i386/acpica/acpi_wakecode.S,v 1.9 2004/01/01 22:57:22 njl Exp $
  */
-
-#include <machine/asm.h>
-__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_wakecode.S,v 1.8 2003/11/01 01:05:53 njl Exp $");
 
 #define LOCORE
 
+#include <machine/asmacros.h>
 #include <machine/param.h>
 #include <machine/specialreg.h>
 

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $FreeBSD: src/sys/sys/vnode.h,v 1.230 2003/11/12 03:14:31 rwatson Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.243 2004/08/15 06:24:42 jmg Exp $
  */
 
 #ifndef _SYS_VNODE_H_
@@ -86,6 +82,7 @@ struct vpollinfo {
  * Lock reference:
  *	c - namecache mutex
  *	f - freelist mutex
+ *	G - Giant
  *	i - interlock
  *	m - mntvnodes mutex
  *	p - pollinfo lock
@@ -112,7 +109,7 @@ struct vnode {
 	u_long	v_iflag;			/* i vnode flags (see below) */
 	int	v_usecount;			/* i ref count of users */
 	long	v_numoutput;			/* i writes in progress */
-	struct thread *v_vxproc;		/* i thread owning VXLOCK */
+	struct thread *v_vxthread;		/* i thread owning VXLOCK */
 	int	v_holdcnt;			/* i page & buffer references */
 	struct	buflists v_cleanblkhd;		/* i SORTED clean blocklist */
 	struct buf	*v_cleanblkroot;	/* i clean buf splay tree  */
@@ -151,14 +148,15 @@ struct vnode {
 	u_long	v_id;				/* c capability identifier */
 	struct	vnode *v_dd;			/* c .. vnode */
 	u_long	v_ddid;				/* c .. capability identifier */
-	struct vpollinfo *v_pollinfo;		/* p Poll events */
+	struct vpollinfo *v_pollinfo;		/* G Poll events, p for *v_pi */
 	struct label *v_label;			/* MAC label for vnode */
 #ifdef	DEBUG_LOCKS
 	const char *filename;			/* Source file doing locking */
 	int line;				/* Line number doing locking */
 #endif
-	udev_t	v_cachedfs;			/* cached fs id */
+	dev_t	v_cachedfs;			/* cached fs id */
 	ino_t	v_cachedid;			/* cached file id */
+	int	v_bsize;			/* block size for I/O */
 };
 #define	v_mountedhere	v_un.vu_mountedhere
 #define	v_socket	v_un.vu_socket
@@ -183,9 +181,9 @@ struct xvnode {
 	union {
 		void	*xvu_socket;		/* socket, if VSOCK */
 		void	*xvu_fifo;		/* fifo, if VFIFO */
-		udev_t	xvu_rdev;		/* maj/min, if VBLK/VCHR */
+		dev_t	xvu_rdev;		/* maj/min, if VBLK/VCHR */
 		struct {
-			udev_t	xvu_dev;	/* device, if VDIR/VREG/VLNK */
+			dev_t	xvu_dev;	/* device, if VDIR/VREG/VLNK */
 			ino_t	xvu_ino;	/* id, if VDIR/VREG/VLNK */
 		} xv_uns;
 	} xv_un;
@@ -203,11 +201,13 @@ struct xvnode {
 			vn_pollevent((vp), (events));		\
 	} while (0)
 
-#define VN_KNOTE(vp, b)						\
+#define VN_KNOTE(vp, b, a)						\
 	do {							\
 		if ((vp)->v_pollinfo != NULL)			\
-			KNOTE(&vp->v_pollinfo->vpi_selinfo.si_note, (b)); \
+			KNOTE(&vp->v_pollinfo->vpi_selinfo.si_note, (b), (a)); \
 	} while (0)
+#define VN_KNOTE_LOCKED(vp, b)		VN_KNOTE(vp, b, 1)
+#define VN_KNOTE_UNLOCKED(vp, b)	VN_KNOTE(vp, b, 0)
 
 /*
  * Vnode flags.
@@ -251,7 +251,7 @@ struct vattr {
 	short		va_nlink;	/* number of references to file */
 	uid_t		va_uid;		/* owner user id */
 	gid_t		va_gid;		/* owner group id */
-	udev_t		va_fsid;	/* filesystem id */
+	dev_t		va_fsid;	/* filesystem id */
 	long		va_fileid;	/* file id */
 	u_quad_t	va_size;	/* file size in bytes */
 	long		va_blocksize;	/* blocksize preferred for i/o */
@@ -261,7 +261,7 @@ struct vattr {
 	struct timespec	va_birthtime;	/* time file created */
 	u_long		va_gen;		/* generation number of file */
 	u_long		va_flags;	/* flags defined for file */
-	udev_t		va_rdev;	/* device the special file represents */
+	dev_t		va_rdev;	/* device the special file represents */
 	u_quad_t	va_bytes;	/* bytes of disk space held by file */
 	u_quad_t	va_filerev;	/* file modification number */
 	u_int		va_vaflags;	/* operations flags, see below */
@@ -351,7 +351,6 @@ extern int		vttoif_tab[];
 
 #define	VREF(vp)	vref(vp)
 
-
 #ifdef DIAGNOSTIC
 #define	VATTR_NULL(vap)	vattr_null(vap)
 #else
@@ -380,22 +379,21 @@ extern	struct vattr va_null;		/* predefined null vattr structure */
 #define	LEASE_READ	0x1		/* Check lease for readers */
 #define	LEASE_WRITE	0x2		/* Check lease for modifiers */
 
-
 extern void	(*lease_updatetime)(int deltat);
 
-/* Requires interlock */
+/* Requires interlock. */
 #define	VSHOULDFREE(vp)	\
 	(!((vp)->v_iflag & (VI_FREE|VI_DOOMED|VI_DOINGINACT)) && \
 	 !(vp)->v_holdcnt && !(vp)->v_usecount && \
 	 (!(vp)->v_object || \
 	  !((vp)->v_object->ref_count || (vp)->v_object->resident_page_count)))
 
-/* Requires interlock */
-#define VMIGHTFREE(vp) \
+/* Requires interlock. */
+#define	VMIGHTFREE(vp) \
 	(!((vp)->v_iflag & (VI_FREE|VI_DOOMED|VI_XLOCK|VI_DOINGINACT)) && \
 	 LIST_EMPTY(&(vp)->v_cache_src) && !(vp)->v_usecount)
 
-/* Requires interlock */
+/* Requires interlock. */
 #define	VSHOULDBUSY(vp)	\
 	(((vp)->v_iflag & VI_FREE) && \
 	 ((vp)->v_holdcnt || (vp)->v_usecount))
@@ -406,7 +404,6 @@ extern void	(*lease_updatetime)(int deltat);
 #define	VI_MTX(vp)	(&(vp)->v_interlock)
 
 #endif /* _KERNEL */
-
 
 /*
  * Mods for extensibility.
@@ -489,6 +486,7 @@ struct vop_generic_args {
 	/* other random data follows, presumably */
 };
 
+#ifdef DEBUG_VFS_LOCKS
 /*
  * Support code to aid in debugging VFS locking problems.  Not totally
  * reliable since if the thread sleeps between changing the lock
@@ -496,45 +494,54 @@ struct vop_generic_args {
  * change the state.  They are good enough for debugging a single
  * filesystem using a single-threaded test.
  */
-void assert_vi_locked(struct vnode *vp, const char *str);
-void assert_vi_unlocked(struct vnode *vp, const char *str);
-void assert_vop_unlocked(struct vnode *vp, const char *str);
-void assert_vop_locked(struct vnode *vp, const char *str);
-void assert_vop_slocked(struct vnode *vp, const char *str);
-void assert_vop_elocked(struct vnode *vp, const char *str);
-void assert_vop_elocked_other(struct vnode *vp, const char *str);
+void	assert_vi_locked(struct vnode *vp, const char *str);
+void	assert_vi_unlocked(struct vnode *vp, const char *str);
+#if 0
+void	assert_vop_elocked(struct vnode *vp, const char *str);
+void	assert_vop_elocked_other(struct vnode *vp, const char *str);
+#endif
+void	assert_vop_locked(struct vnode *vp, const char *str);
+#if 0
+voi0	assert_vop_slocked(struct vnode *vp, const char *str);
+#endif
+void	assert_vop_unlocked(struct vnode *vp, const char *str);
 
-/* These are called from within the actuall VOPS */
-void vop_rename_pre(void *a);
-void vop_strategy_pre(void *a);
-void vop_lookup_pre(void *a);
-void vop_lookup_post(void *a, int rc);
-void vop_lock_pre(void *a);
-void vop_lock_post(void *a, int rc);
-void vop_unlock_pre(void *a);
-void vop_unlock_post(void *a, int rc);
-
-#ifdef DEBUG_VFS_LOCKS
+/* These are called from within the actual VOPS. */
+void	vop_lock_pre(void *a);
+void	vop_lock_post(void *a, int rc);
+void	vop_lookup_post(void *a, int rc);
+void	vop_lookup_pre(void *a);
+void	vop_rename_pre(void *a);
+void	vop_strategy_pre(void *a);
+void	vop_unlock_post(void *a, int rc);
+void	vop_unlock_pre(void *a);
 
 #define	ASSERT_VI_LOCKED(vp, str)	assert_vi_locked((vp), (str))
 #define	ASSERT_VI_UNLOCKED(vp, str)	assert_vi_unlocked((vp), (str))
-#define	ASSERT_VOP_LOCKED(vp, str)	assert_vop_locked((vp), (str))
-#define	ASSERT_VOP_UNLOCKED(vp, str)	assert_vop_unlocked((vp), (str))
+#if 0
 #define	ASSERT_VOP_ELOCKED(vp, str)	assert_vop_elocked((vp), (str))
 #define	ASSERT_VOP_ELOCKED_OTHER(vp, str) assert_vop_locked_other((vp), (str))
+#endif
+#define	ASSERT_VOP_LOCKED(vp, str)	assert_vop_locked((vp), (str))
+#if 0
 #define	ASSERT_VOP_SLOCKED(vp, str)	assert_vop_slocked((vp), (str))
+#endif
+#define	ASSERT_VOP_UNLOCKED(vp, str)	assert_vop_unlocked((vp), (str))
 
-#else
+#else /* !DEBUG_VFS_LOCKS */
 
-#define	ASSERT_VOP_LOCKED(vp, str)
-#define	ASSERT_VOP_UNLOCKED(vp, str)
+#define	ASSERT_VI_LOCKED(vp, str)
+#define	ASSERT_VI_UNLOCKED(vp, str)
+#if 0
 #define	ASSERT_VOP_ELOCKED(vp, str)
 #define	ASSERT_VOP_ELOCKED_OTHER(vp, str)
-#define	ASSERT_VOP_SLOCKED(vp, str)
-#define	ASSERT_VI_UNLOCKED(vp, str)
-#define	ASSERT_VI_LOCKED(vp, str)
-
 #endif
+#define	ASSERT_VOP_LOCKED(vp, str)
+#if 0
+#define	ASSERT_VOP_SLOCKED(vp, str)
+#endif
+#define	ASSERT_VOP_UNLOCKED(vp, str)
+#endif /* DEBUG_VFS_LOCKS */
 
 /*
  * VOCALL calls an op given an ops vector.  We break it out because BSD's
@@ -590,8 +597,8 @@ extern int	(*lease_check_hook)(struct vop_lease_args *);
 extern int	(*softdep_fsync_hook)(struct vnode *);
 extern int	(*softdep_process_worklist_hook)(struct mount *);
 
-struct	vnode *addaliasu(struct vnode *vp, udev_t nvp_rdev);
-int	bdevvp(dev_t dev, struct vnode **vpp);
+struct	vnode *addaliasu(struct vnode *vp, dev_t nvp_rdev);
+int	bdevvp(struct cdev *dev, struct vnode **vpp);
 /* cache_* may belong in namei.h. */
 void	cache_enter(struct vnode *dvp, struct vnode *vp,
 	    struct componentname *cnp);
@@ -622,10 +629,10 @@ void	vattr_null(struct vattr *vap);
 int	vcount(struct vnode *vp);
 void	vdrop(struct vnode *);
 void	vdropl(struct vnode *);
-int	vfinddev(dev_t dev, enum vtype type, struct vnode **vpp);
+int	vfinddev(struct cdev *dev, struct vnode **vpp);
 void	vfs_add_vnodeops(const void *);
 void	vfs_rm_vnodeops(const void *);
-int	vflush(struct mount *mp, int rootrefs, int flags);
+int	vflush(struct mount *mp, int rootrefs, int flags, struct thread *td);
 int	vget(struct vnode *vp, int lockflag, struct thread *td);
 void	vgone(struct vnode *vp);
 void	vgonel(struct vnode *vp, struct thread *td);
@@ -659,13 +666,13 @@ int	vn_rdwr(enum uio_rw rw, struct vnode *vp, caddr_t base,
 	    struct ucred *active_cred, struct ucred *file_cred, int *aresid,
 	    struct thread *td);
 int	vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, caddr_t base,
-	    int len, off_t offset, enum uio_seg segflg, int ioflg,
-	    struct ucred *active_cred, struct ucred *file_cred, int *aresid,
+	    size_t len, off_t offset, enum uio_seg segflg, int ioflg,
+	    struct ucred *active_cred, struct ucred *file_cred, size_t *aresid,
 	    struct thread *td);
 int	vn_stat(struct vnode *vp, struct stat *sb, struct ucred *active_cred,
 	    struct ucred *file_cred, struct thread *td);
 int	vn_start_write(struct vnode *vp, struct mount **mpp, int flags);
-dev_t	vn_todev(struct vnode *vp);
+struct cdev *vn_todev(struct vnode *vp);
 int	vn_write_suspend_wait(struct vnode *vp, struct mount *mp,
 	    int flags);
 int	vn_writechk(struct vnode *vp);
@@ -690,14 +697,10 @@ int	vop_stdislocked(struct vop_islocked_args *);
 int	vop_stdlock(struct vop_lock_args *);
 int	vop_stdputpages(struct vop_putpages_args *);
 int	vop_stdunlock(struct vop_unlock_args *);
-int	vop_noislocked(struct vop_islocked_args *);
-int	vop_nolock(struct vop_lock_args *);
 int	vop_nopoll(struct vop_poll_args *);
-int	vop_nounlock(struct vop_unlock_args *);
 int	vop_stdpathconf(struct vop_pathconf_args *);
 int	vop_stdpoll(struct vop_poll_args *);
 int	vop_revoke(struct vop_revoke_args *);
-int	vop_sharedlock(struct vop_lock_args *);
 int	vop_eopnotsupp(struct vop_generic_args *ap);
 int	vop_ebadf(struct vop_generic_args *ap);
 int	vop_einval(struct vop_generic_args *ap);

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_async.c,v 1.19 2002/05/31 23:48:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_async.c,v 1.21 2004/07/04 16:11:02 stefanf Exp $
  * $Whistle: ng_async.c,v 1.17 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -155,18 +155,15 @@ static const struct ng_cmdlist nga_cmdlist[] = {
 
 /* Define the netgraph node type */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_ASYNC_NODE_TYPE,
-	NULL,
-	nga_constructor,
-	nga_rcvmsg,
-	nga_shutdown,
-	nga_newhook,
-	NULL,
-	NULL,
-	nga_rcvdata,
-	nga_disconnect,
-	nga_cmdlist
+	.version =	NG_ABI_VERSION,
+	.name =		NG_ASYNC_NODE_TYPE,
+	.constructor =	nga_constructor,
+	.rcvmsg =	nga_rcvmsg,
+	.shutdown = 	nga_shutdown,
+	.newhook =	nga_newhook,
+	.rcvdata =	nga_rcvdata,
+	.disconnect =	nga_disconnect,
+	.cmdlist =	nga_cmdlist
 };
 NETGRAPH_INIT(async, &typestruct);
 
@@ -393,7 +390,7 @@ nga_disconnect(hook_p hook)
 /*
  * Encode a byte into the async buffer
  */
-static __inline__ void
+static __inline void
 nga_async_add(const sc_p sc, u_int16_t *fcs, u_int32_t accm, int *len, u_char x)
 {
 	*fcs = PPP_FCS(*fcs, x);

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_l2cap_cmds.c,v 1.2 2003/09/08 19:11:45 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_cmds.c,v 1.3 2003/10/12 22:04:21 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_cmds.c,v 1.4 2004/04/27 16:38:15 emax Exp $
  */
 
 #include <sys/param.h>
@@ -38,15 +38,15 @@
 #include <sys/queue.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
-#include "ng_bluetooth.h"
-#include "ng_hci.h"
-#include "ng_l2cap.h"
-#include "ng_l2cap_var.h"
-#include "ng_l2cap_cmds.h"
-#include "ng_l2cap_evnt.h"
-#include "ng_l2cap_llpi.h"
-#include "ng_l2cap_ulpi.h"
-#include "ng_l2cap_misc.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/include/ng_l2cap.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_var.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_cmds.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_evnt.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_llpi.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_ulpi.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_misc.h>
 
 /******************************************************************************
  ******************************************************************************

@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_poll.c,v 1.15 2003/11/08 22:28:39 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_poll.c,v 1.18 2004/07/03 02:38:03 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -369,6 +369,8 @@ netisr_poll(void)
 		else if (poll_each_burst > poll_burst_max)
 			poll_each_burst = poll_burst_max;
 
+		if (poll_burst > poll_burst_max)
+			poll_burst = poll_burst_max;
 		residual_burst = poll_burst;
 	}
 	cycles = (residual_burst < poll_each_burst) ?
@@ -504,8 +506,7 @@ poll_idle(void)
 			mtx_unlock(&Giant);
 			mtx_assert(&Giant, MA_NOTOWNED);
 			mtx_lock_spin(&sched_lock);
-			td->td_proc->p_stats->p_ru.ru_nvcsw++;
-			mi_switch();
+			mi_switch(SW_VOL, NULL);
 			mtx_unlock_spin(&sched_lock);
 		} else {
 			idlepoll_sleeping = 1;

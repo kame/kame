@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.58 2003/11/14 21:02:22 andre Exp $
+ * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.65 2004/06/15 23:57:41 mlaier Exp $
  *
  */
 
@@ -79,13 +79,12 @@
 #include <netipx/ipx_if.h>
 #endif
 
-static u_char iso88025_broadcastaddr[ISO88025_ADDR_LEN] =
+static const u_char iso88025_broadcastaddr[ISO88025_ADDR_LEN] =
 			{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 static int iso88025_resolvemulti (struct ifnet *, struct sockaddr **,
 				  struct sockaddr *);
 
-#define	IFP2AC(IFP)	((struct arpcom *)IFP)
 #define	senderr(e)	do { error = (e); goto bad; } while (0)
 
 /*
@@ -247,7 +246,6 @@ iso88025_output(ifp, m, dst, rt0)
 	struct iso88025_header gen_th;
 	struct sockaddr_dl *sdl = NULL;
 	struct rtentry *rt;
-	struct arpcom *ac = IFP2AC(ifp);
 
 #ifdef MAC
 	error = mac_check_ifnet_transmit(ifp, m);
@@ -261,11 +259,12 @@ iso88025_output(ifp, m, dst, rt0)
 		senderr(ENETDOWN);
 	getmicrotime(&ifp->if_lastchange);
 
+	/* Calculate routing info length based on arp table entry */
+	/* XXX any better way to do this ? */
 	error = rt_check(&rt, &rt0, dst);
 	if (error)
 		goto bad;
 
-	/* Calculate routing info length based on arp table entry */
 	if (rt && (sdl = (struct sockaddr_dl *)rt->rt_gateway))
 		if (SDL_ISO88025(sdl)->trld_rcf != 0)
 			rif_len = TR_RCF_RIFLEN(SDL_ISO88025(sdl)->trld_rcf);
@@ -273,7 +272,7 @@ iso88025_output(ifp, m, dst, rt0)
 	/* Generate a generic 802.5 header for the packet */
 	gen_th.ac = TR_AC;
 	gen_th.fc = TR_LLC_FRAME;
-	(void)memcpy((caddr_t)gen_th.iso88025_shost, (caddr_t)ac->ac_enaddr,
+	(void)memcpy((caddr_t)gen_th.iso88025_shost, IFP2AC(ifp)->ac_enaddr,
 		     ISO88025_ADDR_LEN);
 	if (rif_len) {
 		gen_th.iso88025_shost[0] |= TR_RII;
@@ -288,17 +287,44 @@ iso88025_output(ifp, m, dst, rt0)
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
-		if (!arpresolve(ifp, rt, m, dst, edst, rt0))
-			return (0);	/* if not yet resolved */
+		error = arpresolve(ifp, rt0, m, dst, edst);
+		if (error)
+			return (error == EWOULDBLOCK ? 0 : error);
 		snap_type = ETHERTYPE_IP;
 		break;
+	case AF_ARP:
+	{
+		struct arphdr *ah;
+		ah = mtod(m, struct arphdr *);
+		ah->ar_hrd = htons(ARPHRD_IEEE802);
+
+		loop_copy = -1; /* if this is for us, don't do it */
+
+		switch(ntohs(ah->ar_op)) {
+		case ARPOP_REVREQUEST:
+		case ARPOP_REVREPLY:
+			snap_type = ETHERTYPE_REVARP;
+			break;
+		case ARPOP_REQUEST:
+		case ARPOP_REPLY:
+		default:
+			snap_type = ETHERTYPE_ARP;
+			break;
+		}
+
+		if (m->m_flags & M_BCAST)
+			bcopy(ifp->if_broadcastaddr, edst, ISO88025_ADDR_LEN);
+		else
+			bcopy(ar_tha(ah), edst, ISO88025_ADDR_LEN);
+
+	}
+	break;
 #endif	/* INET */
 #ifdef INET6
 	case AF_INET6:
-		if (!nd6_storelladdr(&ac->ac_if, rt, m, dst, (u_char *)edst)) {
-			/* Something bad happened */
-			return(0);
-		}
+		error = nd6_storelladdr(ifp, rt0, m, dst, (u_char *)edst);
+		if (error)
+			return (error);
 		snap_type = ETHERTYPE_IPV6;
 		break;
 #endif	/* INET6 */
@@ -404,9 +430,10 @@ iso88025_output(ifp, m, dst, rt0)
 		}       
         }      
 
-	if (! IF_HANDOFF_ADJ(&ifp->if_snd, m, ifp, ISO88025_HDR_LEN + LLC_SNAPFRAMELEN) ) {
+	IFQ_HANDOFF_ADJ(ifp, m, ISO88025_HDR_LEN + LLC_SNAPFRAMELEN, error);
+	if (error) {
 		printf("iso88025_output: packet dropped QFULL.\n");
-		senderr(ENOBUFS);
+		ifp->if_oerrors++;
 	}
 	return (error);
 
@@ -498,8 +525,8 @@ iso88025_input(ifp, m)
 	 * Set mbuf flags for bcast/mcast.
 	 */
 	if (th->iso88025_dhost[0] & 1) {
-		if (bcmp((caddr_t)iso88025_broadcastaddr,
-			 (caddr_t)th->iso88025_dhost, ISO88025_ADDR_LEN) == 0)
+		if (bcmp(iso88025_broadcastaddr, th->iso88025_dhost,
+		    ISO88025_ADDR_LEN) == 0)
 			m->m_flags |= M_BCAST;
 		else
 			m->m_flags |= M_MCAST;

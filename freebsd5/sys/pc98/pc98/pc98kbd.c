@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.26 2003/07/02 16:09:02 jhb Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.27 2004/03/17 17:50:52 njl Exp $
  */
 
 #include "opt_kbd.h"
@@ -134,7 +134,7 @@ pckbdattach(device_t dev)
 				  device_get_flags(dev));
 
 	rid = 0;
-	res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1, RF_ACTIVE);
+	res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
 	if (res == NULL)
 		return ENXIO;
 	BUS_SETUP_INTR(device_get_parent(dev), dev, res, INTR_TYPE_TTY,

@@ -15,11 +15,12 @@
  *
  * Sep, 1994	Implemented on FreeBSD 1.1.5.1R (Toshiba AVS001WD)
  *
- * $FreeBSD: src/sys/i386/bios/apm.h,v 1.3 2003/03/25 05:19:18 mdodd Exp $
+ * $FreeBSD: src/sys/i386/bios/apm.h,v 1.4 2004/06/16 20:27:50 imp Exp $
  */
 
 #define APM_NEVENTS 16
 #define APM_NPMEV   13
+#define APM_UNKNOWN	0xff
 
 /* static data */
 struct apm_softc {

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_dev.h,v 1.3 2001/04/13 10:50:48 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb_dev.h,v 1.4 2004/02/11 12:49:49 tjr Exp $
  */
 #ifndef _NETSMB_DEV_H_
 #define _NETSMB_DEV_H_
@@ -42,7 +42,6 @@
 #include <netsmb/smb.h>
 
 #define	NSMB_NAME		"nsmb"
-#define	NSMB_MAJOR		144
 
 #define NSMB_VERMAJ	1
 #define NSMB_VERMIN	3006

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uio.h	8.5 (Berkeley) 2/22/94
- * $FreeBSD: src/sys/sys/uio.h,v 1.28 2003/10/02 15:00:55 nectar Exp $
+ * $FreeBSD: src/sys/sys/uio.h,v 1.36 2004/07/10 15:42:16 phk Exp $
  */
 
 #ifndef _SYS_UIO_H_
@@ -81,17 +77,25 @@ struct uio {
  * IOV_MAX.
  */
 #define UIO_MAXIOV	1024		/* max 1K of iov's */
-#define UIO_SMALLIOV	8		/* 8 on stack, else malloc */
 
 struct vm_object;
+struct vm_page;
 
+struct uio *cloneuio(struct uio *uiop);
+int	copyinfrom(const void * __restrict src, void * __restrict dst,
+	    size_t len, int seg);
+int	copyiniov(struct iovec *iovp, u_int iovcnt, struct iovec **iov,
+	    int error);
+int	copyinstrfrom(const void * __restrict src, void * __restrict dst,
+	    size_t len, size_t * __restrict copied, int seg);
+int	copyinuio(struct iovec *iovp, u_int iovcnt, struct uio **uiop);
 void	uio_yield(void);
-int	uiomove(void *, int, struct uio *);
+int	uiomove(void *cp, int n, struct uio *uio);
 int	uiomove_frombuf(void *buf, int buflen, struct uio *uio);
-int	uiomoveco(void *, int, struct uio *, struct vm_object *, int);
-int	copyinfrom(const void *src, void *dst, size_t len, int seg);
-int	copyinstrfrom(const void *src, void *dst, size_t len,
-	    size_t *copied, int seg);
+int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
+	    struct uio *uio);
+int	uiomoveco(void *cp, int n, struct uio *uio, struct vm_object *obj,
+	    int disposable);
 
 #else /* !_KERNEL */
 

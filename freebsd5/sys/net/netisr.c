@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/netisr.c,v 1.9 2003/11/08 22:28:39 sam Exp $
+ * $FreeBSD: src/sys/net/netisr.c,v 1.10.2.3 2004/10/14 19:19:24 andre Exp $
  */
 
 #include <sys/param.h>
@@ -53,12 +53,20 @@
 #include <net/if_var.h>
 #include <net/netisr.h>
 
-/*
- * XXX this is a temporary measure to allow folks to
- * XXX disable Giant locking in the network code without
- * XXX recompiling--in case of problems.
+/* 
+ * debug_mpsafenet controls network subsystem-wide use of the Giant lock,
+ * from system calls down to interrupt handlers.  It can be changed only via
+ * a tunable at boot, not at run-time, due to the complexity of unwinding.
+ * The compiled default is set via a kernel option; right now, the default
+ * unless otherwise specified is to run the network stack without Giant.
  */
+#ifdef NET_WITH_GIANT
 int	debug_mpsafenet = 0;
+#else
+int	debug_mpsafenet = 1;
+#endif
+int	debug_mpsafenet_toolatetotwiddle = 0;
+
 TUNABLE_INT("debug.mpsafenet", &debug_mpsafenet);
 SYSCTL_INT(_debug, OID_AUTO, mpsafenet, CTLFLAG_RD, &debug_mpsafenet, 0,
     "Enable/disable MPSAFE network support");
@@ -72,6 +80,78 @@ struct netisr {
 } netisrs[32];
 
 static void *net_ih;
+
+/*
+ * Not all network code is currently capable of running MPSAFE; however,
+ * most of it is.  Since those sections that are not are generally optional
+ * components not shipped with default kernels, we provide a basic way to
+ * determine whether MPSAFE operation is permitted: based on a default of
+ * yes, we permit non-MPSAFE components to use a registration call to
+ * identify that they require Giant.  If the system is early in the boot
+ * process still, then we change the debug_mpsafenet setting to choose a
+ * non-MPSAFE execution mode (degraded).  If it's too late for that (since
+ * the setting cannot be changed at run time), we generate a console warning
+ * that the configuration may be unsafe.
+ */
+static int mpsafe_warn_count;
+
+/*
+ * Function call implementing registration of a non-MPSAFE network component.
+ */
+void
+net_warn_not_mpsafe(const char *component)
+{
+
+	/*
+	 * If we're running with Giant over the network stack, there is no
+	 * problem.
+	 */
+	if (!debug_mpsafenet)
+		return;
+
+	/*
+	 * If it's not too late to change the MPSAFE setting for the network
+	 * stack, do so now.  This effectively suppresses warnings by
+	 * components registering later.
+	 */
+	if (!debug_mpsafenet_toolatetotwiddle) {
+		debug_mpsafenet = 0;
+		printf("WARNING: debug.mpsafenet forced to 0 as %s requires "
+		    "Giant\n", component);
+		return;
+	}
+
+	/*
+	 * We must run without Giant, so generate a console warning with some
+	 * information with what to do about it.  The system may be operating
+	 * unsafely, however.
+	 */
+	printf("WARNING: Network stack Giant-free, but %s requires Giant.\n",
+	    component);
+	if (mpsafe_warn_count == 0)
+		printf("    Consider adding 'options NET_WITH_GIANT' or "
+		    "setting debug.mpsafenet=0\n");
+	mpsafe_warn_count++;
+}
+
+/*
+ * This sysinit is run after any pre-loaded or compiled-in components have
+ * announced that they require Giant, but before any modules loaded at
+ * run-time.
+ */
+static void
+net_mpsafe_toolate(void *arg)
+{
+
+	debug_mpsafenet_toolatetotwiddle = 1;
+
+	if (!debug_mpsafenet)
+		printf("WARNING: MPSAFE network stack disabled, expect "
+		    "reduced performance.\n");
+}
+
+SYSINIT(net_mpsafe_toolate, SI_SUB_SETTINGS, SI_ORDER_ANY, net_mpsafe_toolate,
+    NULL);
 
 void
 legacy_setsoftnet(void)
@@ -103,6 +183,7 @@ netisr_unregister(int num)
 	ni->ni_handler = NULL;
 	if (ni->ni_queue != NULL)
 		IF_DRAIN(ni->ni_queue);
+	ni->ni_queue = NULL;
 }
 
 struct isrstat {
@@ -203,6 +284,8 @@ netisr_dispatch(int num, struct mbuf *m)
  * Same as above, but always queue.
  * This is either used in places where we are not confident that
  * direct dispatch is possible, or where queueing is required.
+ * It returns (0) on success and ERRNO on failure.  On failure the
+ * mbuf has been free'd.
  */
 int
 netisr_queue(int num, struct mbuf *m)
@@ -215,13 +298,13 @@ netisr_queue(int num, struct mbuf *m)
 	if (ni->ni_queue == NULL) {
 		isrstat.isrs_drop++;
 		m_freem(m);
-		return (1);
+		return (ENXIO);
 	}
 	isrstat.isrs_queued++;
 	if (!IF_HANDOFF(ni->ni_queue, m, NULL))
-		return (0);
+		return (ENOBUFS);	/* IF_HANDOFF has free'd the mbuf */
 	schednetisr(num);
-	return (1);
+	return (0);
 }
 
 static void

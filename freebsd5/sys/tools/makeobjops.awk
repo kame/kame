@@ -11,10 +11,6 @@
 # 2. Redistributions in binary form must reproduce the above copyright
 #    notice, this list of conditions and the following disclaimer in the
 #    documentation and/or other materials provided with the distribution.
-# 3. All advertising materials mentioning features or use of this software
-#    must display the following acknowledgement:
-#        This product includes software developed by the University of
-#        California, Berkeley and its contributors.
 # 4. Neither the name of the University nor the names of its contributors
 #    may be used to endorse or promote products derived from this software
 #    without specific prior written permission.
@@ -37,7 +33,7 @@
 # From src/sys/kern/makedevops.pl,v 1.12 1999/11/22 14:40:04 n_hibma Exp
 # From src/sys/kern/makeobjops.pl,v 1.8 2001/11/16 02:02:42 joe Exp
 #
-# $FreeBSD: src/sys/tools/makeobjops.awk,v 1.3 2003/10/16 13:29:26 dfr Exp $
+# $FreeBSD: src/sys/tools/makeobjops.awk,v 1.5 2004/07/11 16:14:24 dfr Exp $
 
 #
 #   Script to produce kobj front-end sugar.
@@ -157,6 +153,21 @@ function handle_interface ()
 }
 
 #
+# Pass doc comments through to the C file
+#
+function handle_doc ()
+{
+	doc = ""
+	while (!/\*\//) {
+		doc = doc $0 "\n";
+		getline < src;
+		lineno++;
+	}
+	doc = doc $0 "\n";
+	return doc;
+}
+
+#
 #   Handle "CODE" and "HEADER" sections.
 #   Returns the code as-is.
 #
@@ -180,7 +191,7 @@ function handle_code ()
 #   Handle "METHOD" and "STATICMETHOD" sections.
 #
 
-function handle_method (static)
+function handle_method (static, doc)
 {
 	#
 	#   Get the return type and function name and delete that from
@@ -286,8 +297,10 @@ function handle_method (static)
 		default = "kobj_error_method";
 
 	# the method description 
+	printh("/** @brief Unique descriptor for the " umname "() method */");
 	printh("extern struct kobjop_desc " mname "_desc;");
 	# the method typedef
+	printh("/** @brief A function implementing the " umname "() method */");
 	prototype = "typedef " ret " " mname "_t(";
 	printh(format_line(prototype argument_list ");",
 	    line_width, length(prototype)));
@@ -302,6 +315,7 @@ function handle_method (static)
 	printc("};\n");
 
 	# Print out the method itself
+	printh(doc);
 	if (0) {		# haven't chosen the format yet
 		printh("static __inline " ret " " umname "(" varname_list ")");
 		printh("\t" join(";\n\t", arguments, num_arguments) ";");
@@ -426,6 +440,7 @@ for (file_i = 0; file_i < num_files; file_i++) {
 	intname = "";
 	lineno = 0;
 	error = 0;		# to signal clean up and gerror setting
+	lastdoc = "";
 
 	while (!error && (getline < src) > 0) {
 		lineno++;
@@ -446,17 +461,23 @@ for (file_i = 0; file_i < num_files; file_i++) {
 
 		if (/^$/) {		# skip empty lines
 		}
-		else if (/^INTERFACE[ 	]+[^ 	;]*[ 	]*;?[ 	]*$/)
+		else if (/^\/\*\*/)
+			lastdoc = handle_doc();
+		else if (/^INTERFACE[ 	]+[^ 	;]*[ 	]*;?[ 	]*$/) {
+			printh(lastdoc);
+			lastdoc = "";
 			handle_interface();
-		else if (/^CODE[ 	]*{$/)
+		} else if (/^CODE[ 	]*{$/)
 			printc(handle_code());
 		else if (/^HEADER[	 ]*{$/)
 			printh(handle_code());
-		else if (/^METHOD/)
-			handle_method(0);
-		else if (/^STATICMETHOD/)
-			handle_method(1);
-		else {
+		else if (/^METHOD/) {
+			handle_method(0, lastdoc);
+			lastdoc = "";
+		} else if (/^STATICMETHOD/) {
+			handle_method(1, lastdoc);
+			lastdoc = "";
+		} else {
 			debug($0);
 			warnsrc("Invalid line encountered");
 			error = 1;

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/pcf.c,v 1.21 2003/06/20 07:22:54 jmg Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/pcf.c,v 1.22 2004/03/14 23:03:57 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,8 +39,6 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/pcf.c,v 1.21 2003/06/20 07:22:54 jmg Exp $"
 
 #include <isa/isareg.h>
 #include <isa/isavar.h>
-
-#include <i386/isa/isa_device.h>
 
 #include <dev/iicbus/iiconf.h>
 #include "iicbus_if.h"

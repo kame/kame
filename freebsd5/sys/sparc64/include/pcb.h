@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/pcb.h,v 1.16 2003/04/03 18:28:03 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/pcb.h,v 1.17 2004/07/10 19:56:00 marcel Exp $
  */
 
 #ifndef	_MACHINE_PCB_H_
@@ -49,6 +49,7 @@ struct pcb {
 } __aligned(64);
 
 #ifdef _KERNEL
+void	makectx(struct trapframe *, struct pcb *);
 int	savectx(struct pcb *pcb);
 #endif
 

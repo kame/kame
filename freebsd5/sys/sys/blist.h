@@ -47,13 +47,21 @@
  *		that.  Managing something like 512MB worth of 4K blocks 
  *		eats around 32 KBytes of memory. 
  *
- * $FreeBSD: src/sys/sys/blist.h,v 1.7 2003/08/12 23:24:05 imp Exp $
+ * $FreeBSD: src/sys/sys/blist.h,v 1.8 2004/06/04 04:03:25 alc Exp $
  */
 
 #ifndef _SYS_BLIST_H_
 #define _SYS_BLIST_H_
 
 typedef	u_int32_t	u_daddr_t;	/* unsigned disk address */
+
+/*
+ * note: currently use SWAPBLK_NONE as an absolute value rather then 
+ * a flag bit.
+ */
+
+#define SWAPBLK_MASK	((daddr_t)((u_daddr_t)-1 >> 1))		/* mask */
+#define SWAPBLK_NONE	((daddr_t)((u_daddr_t)SWAPBLK_MASK + 1))/* flag */
 
 /*
  * blmeta and bl_bitmap_t MUST be a power of 2 in size.

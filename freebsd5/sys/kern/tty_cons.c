@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/tty_cons.c,v 1.118 2003/10/18 12:16:17 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/tty_cons.c,v 1.127 2004/08/15 06:24:41 jmg Exp $");
 
 #include "opt_ddb.h"
 
@@ -48,6 +44,7 @@ __FBSDID("$FreeBSD: src/sys/kern/tty_cons.c,v 1.118 2003/10/18 12:16:17 phk Exp 
 #include <sys/conf.h>
 #include <sys/cons.h>
 #include <sys/fcntl.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/msgbuf.h>
@@ -72,7 +69,13 @@ static	d_ioctl_t	cnioctl;
 static	d_poll_t	cnpoll;
 static	d_kqfilter_t	cnkqfilter;
 
+/*
+ * XXX: We really want major #0, but zero here means
+ * XXX: allocate a major number automatically.
+ * XXX: kern_conf.c knows what to do when it sees 256.
+ */
 static struct cdevsw cn_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	cnopen,
 	.d_close =	cnclose,
 	.d_read =	cnread,
@@ -81,12 +84,7 @@ static struct cdevsw cn_cdevsw = {
 	.d_poll =	cnpoll,
 	.d_name =	"console",
 	.d_maj =	256,
-			/*
-			 * XXX: We really want major #0, but zero here means
-			 * XXX: allocate a major number automatically.
-			 * XXX: kern_conf.c knows what to do when it sees 256.
-			 */
-	.d_flags =	D_TTY,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 	.d_kqfilter =	cnkqfilter,
 };
 
@@ -106,13 +104,14 @@ static STAILQ_HEAD(, cn_device) cn_devlist =
 	(cnd == NULL || cnd->cnd_vp == NULL ||				\
 	    (cnd->cnd_vp->v_type == VBAD && !cn_devopen(cnd, td, 1)))
 
-static udev_t	cn_udev_t;
+static dev_t	cn_udev_t;
 SYSCTL_OPAQUE(_machdep, CPU_CONSDEV, consdev, CTLFLAG_RD,
-	&cn_udev_t, sizeof cn_udev_t, "T,dev_t", "");
+	&cn_udev_t, sizeof cn_udev_t, "T,struct cdev *", "");
 
-int	cons_unavail = 0;	/* XXX:
-				 * physical console not available for
-				 * input (i.e., it is in graphics mode)
+int	cons_avail_mask = 0;	/* Bit mask. Each registered low level console
+				 * which is currently unavailable for inpit
+				 * (i.e., if it is in graphics mode) will have
+				 * this bit cleared.
 				 */
 static int cn_mute;
 static int openflag;			/* how /dev/console was opened */
@@ -125,7 +124,6 @@ static char *console_pausestr=
 "<pause; press any key to proceed to next line or '.' to end pause mode>";
 struct tty *constty;			/* pointer to console "window" tty */
 
-void	cndebug(char *);
 static void constty_timeout(void *arg);
 
 CONS_DRIVER(cons, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
@@ -213,6 +211,10 @@ cnadd(struct consdev *cn)
 		printf("WARNING: console at %p has no name\n", cn);
 	}
 	STAILQ_INSERT_TAIL(&cn_devlist, cnd, cnd_next);
+
+	/* Add device to the active mask. */
+	cnavailable(cn, (cn->cn_flags & CN_FLAG_NOAVAIL) == 0);
+
 	return (0);
 }
 
@@ -220,6 +222,7 @@ void
 cnremove(struct consdev *cn)
 {
 	struct cn_device *cnd;
+	int i;
 
 	STAILQ_FOREACH(cnd, &cn_devlist, cnd_next) {
 		if (cnd->cnd_cn != cn)
@@ -229,6 +232,13 @@ cnremove(struct consdev *cn)
 			vn_close(cnd->cnd_vp, openflag, NOCRED, NULL);
 		cnd->cnd_vp = NULL;
 		cnd->cnd_cn = NULL;
+
+		/* Remove this device from available mask. */
+		for (i = 0; i < CNDEVTAB_SIZE; i++) 
+			if (cnd == &cn_devtab[i]) {
+				cons_avail_mask &= ~(1 << i);
+				break;
+			}
 #if 0
 		/*
 		 * XXX
@@ -259,15 +269,30 @@ cnselect(struct consdev *cn)
 }
 
 void
-cndebug(char *str)
+cnavailable(struct consdev *cn, int available)
 {
-	int i, len;
+	int i;
 
-	len = strlen(str);
-	cnputc('>'); cnputc('>'); cnputc('>'); cnputc(' '); 
-	for (i = 0; i < len; i++)
-		cnputc(str[i]);
-	cnputc('\n');
+	for (i = 0; i < CNDEVTAB_SIZE; i++) {
+		if (cn_devtab[i].cnd_cn == cn)
+			break;
+	}
+	if (available) {
+		if (i < CNDEVTAB_SIZE)
+			cons_avail_mask |= (1 << i); 
+		cn->cn_flags &= ~CN_FLAG_NOAVAIL;
+	} else {
+		if (i < CNDEVTAB_SIZE)
+			cons_avail_mask &= ~(1 << i);
+		cn->cn_flags |= CN_FLAG_NOAVAIL;
+	}
+}
+
+int
+cnunavailable(void)
+{
+
+	return (cons_avail_mask == 0);
 }
 
 /*
@@ -347,9 +372,9 @@ sysctl_kern_consmute(SYSCTL_HANDLER_ARGS)
 	if (error != 0 || req->newptr == NULL)
 		return (error);
 	if (ocn_mute && !cn_mute && cn_is_open)
-		error = cnopen(NODEV, openflag, 0, curthread);
+		error = cnopen(NULL, openflag, 0, curthread);
 	else if (!ocn_mute && cn_mute && cn_is_open) {
-		error = cnclose(NODEV, openflag, 0, curthread);
+		error = cnclose(NULL, openflag, 0, curthread);
 		cn_is_open = 1;		/* XXX hack */
 	}
 	return (error);
@@ -364,7 +389,7 @@ cn_devopen(struct cn_device *cnd, struct thread *td, int forceopen)
 	char path[CNDEVPATHMAX];
 	struct nameidata nd;
 	struct vnode *vp;
-	dev_t dev;
+	struct cdev *dev;
 	int error;
 
 	if ((vp = cnd->cnd_vp) != NULL) {
@@ -390,7 +415,7 @@ cn_devopen(struct cn_device *cnd, struct thread *td, int forceopen)
 }
 
 static int
-cnopen(dev_t dev, int flag, int mode, struct thread *td)
+cnopen(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct cn_device *cnd;
 
@@ -404,7 +429,7 @@ cnopen(dev_t dev, int flag, int mode, struct thread *td)
 }
 
 static int
-cnclose(dev_t dev, int flag, int mode, struct thread *td)
+cnclose(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct cn_device *cnd;
 	struct vnode *vp;
@@ -420,7 +445,7 @@ cnclose(dev_t dev, int flag, int mode, struct thread *td)
 }
 
 static int
-cnread(dev_t dev, struct uio *uio, int flag)
+cnread(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct cn_device *cnd;
 
@@ -432,7 +457,7 @@ cnread(dev_t dev, struct uio *uio, int flag)
 }
 
 static int
-cnwrite(dev_t dev, struct uio *uio, int flag)
+cnwrite(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct cn_device *cnd;
 
@@ -453,7 +478,7 @@ done:
 }
 
 static int
-cnioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+cnioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	struct cn_device *cnd;
 	int error;
@@ -483,7 +508,7 @@ cnioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
  * poll/kqfilter do not appear to be correct
  */
 static int
-cnpoll(dev_t dev, int events, struct thread *td)
+cnpoll(struct cdev *dev, int events, struct thread *td)
 {
 	struct cn_device *cnd;
 
@@ -497,17 +522,17 @@ cnpoll(dev_t dev, int events, struct thread *td)
 }
 
 static int
-cnkqfilter(dev_t dev, struct knote *kn)
+cnkqfilter(struct cdev *dev, struct knote *kn)
 {
 	struct cn_device *cnd;
 
 	cnd = STAILQ_FIRST(&cn_devlist);
 	if (cn_mute || CND_INVALID(cnd, curthread))
-		return (1);
+		return (EINVAL);
 	dev = cnd->cnd_vp->v_rdev;
 	if (dev != NULL)
 		return ((*devsw(dev)->d_kqfilter)(dev, kn));
-	return (1);
+	return (ENXIO);
 }
 
 /*
@@ -538,16 +563,12 @@ cncheckc(void)
 		return (-1);
 	STAILQ_FOREACH(cnd, &cn_devlist, cnd_next) {
 		cn = cnd->cnd_cn;
-#ifdef DDB
-		if (!db_active || !(cn->cn_flags & CN_FLAG_NODEBUG)) {
-#endif
+		if (!kdb_active || !(cn->cn_flags & CN_FLAG_NODEBUG)) {
 			c = cn->cn_checkc(cn);
 			if (c != -1) {
 				return (c);
 			}
-#ifdef DDB
 		}
-#endif
 	}
 	return (-1);
 }
@@ -563,21 +584,13 @@ cnputc(int c)
 		return;
 	STAILQ_FOREACH(cnd, &cn_devlist, cnd_next) {
 		cn = cnd->cnd_cn;
-#ifdef DDB
-		if (!db_active || !(cn->cn_flags & CN_FLAG_NODEBUG)) {
-#endif
+		if (!kdb_active || !(cn->cn_flags & CN_FLAG_NODEBUG)) {
 			if (c == '\n')
 				cn->cn_putc(cn, '\r');
 			cn->cn_putc(cn, c);
-#ifdef DDB
 		}
-#endif
 	}
-#ifdef DDB
-	if (console_pausing && !db_active && (c == '\n')) {
-#else
-	if (console_pausing && (c == '\n')) {
-#endif
+	if (console_pausing && c == '\n' && !kdb_active) {
 		for (cp = console_pausestr; *cp != '\0'; cp++)
 			cnputc(*cp);
 		if (cngetc() == '.')

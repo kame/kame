@@ -25,17 +25,20 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp_sis.c,v 1.9 2003/08/22 07:13:20 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp_sis.c,v 1.14.2.1 2004/08/23 05:23:16 imp Exp $");
 
 #include "opt_bus.h"
+#ifndef PC98
+#include "opt_agp.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/lock.h>
-#include <sys/lockmgr.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
@@ -67,8 +70,48 @@ agp_sis_match(device_t dev)
 	switch (pci_get_devid(dev)) {
 	case 0x00011039:
 		return ("SiS 5591 host to AGP bridge");
+	case 0x05301039:
+		return ("SiS 530 host to AGP bridge");
+	case 0x05401039:
+		return ("SiS 540 host to AGP bridge");
+	case 0x05501039:
+		return ("SiS 550 host to AGP bridge");
+	case 0x06201039:
+		return ("SiS 620 host to AGP bridge");
+	case 0x06301039:
+		return ("SiS 630 host to AGP bridge");
+	case 0x06451039:
+		return ("SiS 645 host to AGP bridge");
+	case 0x06461039:
+		return ("SiS 645DX host to AGP bridge");
 	case 0x06481039:
 		return ("SiS 648 host to AGP bridge");
+	case 0x06501039:
+		return ("SiS 650 host to AGP bridge");
+	case 0x06511039:
+		return ("SiS 651 host to AGP bridge");
+	case 0x06551039:
+		return ("SiS 655 host to AGP bridge");
+	case 0x06611039:
+		return ("SiS 661 host to AGP bridge");
+	case 0x07301039:
+		return ("SiS 730 host to AGP bridge");
+	case 0x07351039:
+		return ("SiS 735 host to AGP bridge");
+	case 0x07401039:
+		return ("SiS 740 host to AGP bridge");
+	case 0x07411039:
+		return ("SiS 741 host to AGP bridge");
+	case 0x07451039:
+		return ("SiS 745 host to AGP bridge");
+	case 0x07461039:
+		return ("SiS 746 host to AGP bridge");
+	case 0x07601039:
+		return ("SiS 760 host to AGP bridge");
+#if defined(__amd64__) || defined(AGP_AMD64_GART)
+	case 0x10221039:	/* AMD64 */
+		return NULL;
+#endif
 	};
 
 	if (pci_get_vendor(dev) == 0x1039)
@@ -82,6 +125,8 @@ agp_sis_probe(device_t dev)
 {
 	const char *desc;
 
+	if (resource_disabled("agp", device_get_unit(dev)))
+		return (ENXIO);
 	desc = agp_sis_match(dev);
 	if (desc) {
 		device_verbose(dev);

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -30,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/support.s,v 1.100 2003/11/03 21:28:54 jhb Exp $
+ * $FreeBSD: src/sys/i386/i386/support.s,v 1.105 2004/05/23 15:37:21 bde Exp $
  */
 
 #include "opt_npx.h"
@@ -1225,10 +1221,11 @@ ENTRY(casuptr)
 	ret
 
 /*
- * fu{byte,sword,word} - MP SAFE
- *
- *	Fetch a byte (sword, word) from user memory
+ * Fetch (load) a 32-bit word, a 16-bit word, or an 8-bit byte from user
+ * memory.  All these functions are MPSAFE.
  */
+
+ALTENTRY(fuword32)
 ENTRY(fuword)
 	movl	PCPU(CURPCB),%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)
@@ -1241,13 +1238,11 @@ ENTRY(fuword)
 	movl	$0,PCB_ONFAULT(%ecx)
 	ret
 
-ENTRY(fuword32)
-	jmp	fuword
-
 /*
- * These two routines are called from the profiling code, potentially
- * at interrupt time. If they fail, that's okay, good things will
- * happen later. Fail all the time for now - until the trap code is
+ * fuswintr() and suswintr() are specialized variants of fuword16() and
+ * suword16(), respectively.  They are called from the profiling code,
+ * potentially at interrupt time.  If they fail, that's okay; good things
+ * will happen later.  They always fail for now, until the trap code is
  * able to deal with this.
  */
 ALTENTRY(suswintr)
@@ -1255,9 +1250,6 @@ ENTRY(fuswintr)
 	movl	$-1,%eax
 	ret
 
-/*
- * fuword16 - MP SAFE
- */
 ENTRY(fuword16)
 	movl	PCPU(CURPCB),%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)
@@ -1270,9 +1262,6 @@ ENTRY(fuword16)
 	movl	$0,PCB_ONFAULT(%ecx)
 	ret
 
-/*
- * fubyte - MP SAFE
- */
 ENTRY(fubyte)
 	movl	PCPU(CURPCB),%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)
@@ -1294,10 +1283,11 @@ fusufault:
 	ret
 
 /*
- * su{byte,sword,word} - MP SAFE (if not I386_CPU)
- *
- *	Write a byte (word, longword) to user memory
+ * Store a 32-bit word, a 16-bit word, or an 8-bit byte to user memory.
+ * All these functions are MPSAFE unless I386_CPU is configured.
  */
+
+ALTENTRY(suword32)
 ENTRY(suword)
 	movl	PCPU(CURPCB),%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)
@@ -1341,12 +1331,6 @@ ENTRY(suword)
 	movl	%eax,PCB_ONFAULT(%ecx)
 	ret
 
-ENTRY(suword32)
-	jmp	suword
-
-/*
- * suword16 - MP SAFE (if not I386_CPU)
- */
 ENTRY(suword16)
 	movl	PCPU(CURPCB),%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)
@@ -1390,9 +1374,6 @@ ENTRY(suword16)
 	movl	%eax,PCB_ONFAULT(%ecx)
 	ret
 
-/*
- * subyte - MP SAFE (if not I386_CPU)
- */
 ENTRY(subyte)
 	movl	PCPU(CURPCB),%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)
@@ -1592,17 +1573,18 @@ ENTRY(lgdt)
 1:
 	/* reload "stale" selectors */
 	movl	$KDSEL,%eax
-	mov	%ax,%ds
-	mov	%ax,%es
-	mov	%ax,%gs
-	mov	%ax,%ss
+	movl	%eax,%ds
+	movl	%eax,%es
+	movl	%eax,%gs
+	movl	%eax,%ss
 	movl	$KPSEL,%eax
-	mov	%ax,%fs
+	movl	%eax,%fs
 
 	/* reload code selector by turning return into intersegmental return */
 	movl	(%esp),%eax
 	pushl	%eax
 	movl	$KCSEL,4(%esp)
+	MEXITCOUNT
 	lret
 
 /* ssdtosd(*ssdp,*sdp) */

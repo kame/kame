@@ -23,11 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/spicreg.h,v 1.2 2002/03/24 03:07:07 will Exp $
+ * $FreeBSD: src/sys/i386/isa/spicreg.h,v 1.3 2004/02/21 19:42:55 phk Exp $
  *
  */
 
-#define CDEV_MAJOR	160
 
 /*
  * Find the PCI device that holds the G10 register needed to map in the SPIC

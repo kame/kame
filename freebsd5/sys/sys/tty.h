@@ -23,10 +23,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -44,7 +40,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty.h	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/tty.h,v 1.72 2003/06/22 02:54:33 iedowse Exp $
+ * $FreeBSD: src/sys/sys/tty.h,v 1.89 2004/07/15 20:47:41 phk Exp $
  */
 
 #ifndef _SYS_TTY_H_
@@ -53,6 +49,8 @@
 #include <sys/termios.h>
 #include <sys/queue.h>
 #include <sys/selinfo.h>
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
 
 /*
  * Clists are character lists, which is a variable length linked list
@@ -66,6 +64,16 @@ struct clist {
 	char	*c_cf;		/* Pointer to the first cblock. */
 	char	*c_cl;		/* Pointer to the last cblock. */
 };
+
+struct tty;
+
+typedef void t_oproc_t(struct tty *);
+typedef void t_stop_t(struct tty *, int);
+typedef int t_param_t(struct tty *, struct termios *);
+typedef int t_modem_t(struct tty *, int, int);
+typedef void t_break_t(struct tty *, int);
+typedef int t_ioctl_t(struct tty *, u_long cmd, void * data,
+		      int fflag, struct thread *td);
 
 /*
  * Per-tty structure.
@@ -82,11 +90,7 @@ struct tty {
 	struct	clist t_outq;		/* Device output queue. */
 	long	t_outcc;		/* Output queue statistics. */
 	int	t_line;			/* Interface to device drivers. */
-	union {
-		dev_t	t_kdev;		/* Device. */
-		udev_t	t_udev;		/* Userland (sysctl) instance. */
-		void	*t_devp;	/* Keep user/kernel size in sync. */
-	} ttyu;
+	struct cdev *t_dev;		/* Device. */
 	int	t_state;		/* Device and driver (TS*) state. */
 	int	t_flags;		/* Tty flags. */
 	int     t_timeout;              /* Timeout for ttywait() */
@@ -97,13 +101,7 @@ struct tty {
 	struct	selinfo t_wsel;		/* Tty write select. */
 	struct	termios t_termios;	/* Termios state. */
 	struct	winsize t_winsize;	/* Window size. */
-					/* Start output. */
-	void	(*t_oproc)(struct tty *);
-					/* Stop output. */
-	void	(*t_stop)(struct tty *, int);
-					/* Set hardware state. */
-	int	(*t_param)(struct tty *, struct termios *);
-	void	*t_sc;			/* XXX: net/if_sl.c:sl_softc. */
+	void	*t_sc;			/* driver private softc pointer. */
 	int	t_column;		/* Tty output column. */
 	int	t_rocount, t_rocol;	/* Tty. */
 	int	t_ififosize;		/* Total size of upstream fifos. */
@@ -114,12 +112,24 @@ struct tty {
 	int	t_olowat;		/* Low water mark for output. */
 	speed_t	t_ospeedwat;		/* t_ospeed override for watermarks. */
 	int	t_gen;			/* Generation number. */
-	SLIST_ENTRY(tty) t_list;	/* Global chain of ttys for pstat(8) */
+	TAILQ_ENTRY(tty) t_list;	/* Global chain of ttys for pstat(8) */
+
+	struct mtx t_mtx;
+	int	t_refcnt;
+	int	t_hotchar;		/* linedisc preferred hot char */
+	int	t_dtr_wait;		/* Inter-session DTR holddown [hz] */
+
+	/* Driver supplied methods */
+	t_oproc_t *t_oproc;		/* Start output. */
+	t_stop_t *t_stop;		/* Stop output. */
+	t_param_t *t_param;		/* Set parameters. */
+	t_modem_t *t_modem;		/* Set modem state (optional). */
+	t_break_t *t_break;		/* Set break state (optional). */
+	t_ioctl_t *t_ioctl;		/* Set ioctl handling (optional). */
 };
 
 #define	t_cc		t_termios.c_cc
 #define	t_cflag		t_termios.c_cflag
-#define	t_dev		ttyu.t_kdev
 #define	t_iflag		t_termios.c_iflag
 #define	t_ispeed	t_termios.c_ispeed
 #define	t_lflag		t_termios.c_lflag
@@ -140,7 +150,7 @@ struct xtty {
 	long	xt_cancc;		/* Canonical queue statistics. */
 	long	xt_outcc;		/* Output queue statistics. */
 	int	xt_line;		/* Interface to device drivers. */
-	udev_t	xt_dev;			/* Userland (sysctl) instance. */
+	dev_t	xt_dev;			/* Userland (sysctl) instance. */
 	int	xt_state;		/* Device and driver (TS*) state. */
 	int	xt_flags;		/* Tty flags. */
 	int     xt_timeout;		/* Timeout for ttywait(). */
@@ -215,6 +225,9 @@ struct xtty {
 #define	TS_DSR_OFLOW	0x800000	/* For CDSR_OFLOW. */
 #endif
 
+#define TS_DTR_WAIT	0x1000000	/* DTR hold-down between sessions */
+#define TS_GONE		0x2000000	/* Hardware detached */
+
 /* Character type information. */
 #define	ORDINARY	0
 #define	CONTROL		1
@@ -257,9 +270,6 @@ struct speedtab {
 #define	TSA_HUP_OR_INPUT(tp)	((void *)&(tp)->t_rawq.c_cf)
 #define	TSA_OCOMPLETE(tp)	((void *)&(tp)->t_outq.c_cl)
 #define	TSA_OLOWAT(tp)		((void *)&(tp)->t_outq)
-#define	TSA_PTC_READ(tp)	((void *)&(tp)->t_outq.c_cf)
-#define	TSA_PTC_WRITE(tp)	((void *)&(tp)->t_rawq.c_cl)
-#define	TSA_PTS_READ(tp)	((void *)&(tp)->t_canq)
 
 #ifdef _KERNEL
 #ifdef MALLOC_DECLARE
@@ -301,23 +311,28 @@ void	 ttwwakeup(struct tty *tp);
 void	 ttyblock(struct tty *tp);
 void	 ttychars(struct tty *tp);
 int	 ttycheckoutq(struct tty *tp, int wait);
-int	 ttyclose(struct tty *tp);
+int	 tty_close(struct tty *tp);
+int	 ttydtrwaitsleep(struct tty *tp);
+void	 ttydtrwaitstart(struct tty *tp);
 void	 ttyflush(struct tty *tp, int rw);
-void	 ttyfree(struct tty *tp);
+void	 ttygone(struct tty *tp);
 void	 ttyinfo(struct tty *tp);
 int	 ttyinput(int c, struct tty *tp);
-int	 ttykqfilter(dev_t dev, struct knote *kn);
 int	 ttylclose(struct tty *tp, int flag);
+void	 ttyldoptim(struct tty *tp);
 struct tty *ttymalloc(struct tty *tp);
 int	 ttymodem(struct tty *tp, int flag);
-int	 ttyopen(dev_t device, struct tty *tp);
-int	 ttypoll(dev_t dev, int events, struct thread *td);
-int	 ttyread(dev_t dev, struct uio *uio, int flag);
-void	 ttyregister(struct tty *tp);
+int	 tty_open(struct cdev *device, struct tty *tp);
+int	 ttyref(struct tty *tp);
+int	 ttyrel(struct tty *tp);
 int	 ttysleep(struct tty *tp, void *chan, int pri, char *wmesg, int timo);
 int	 ttywait(struct tty *tp);
-int	 ttywrite(dev_t dev, struct uio *uio, int flag);
 int	 unputc(struct clist *q);
+
+/*
+ * XXX: temporary
+ */
+#include <sys/linedisc.h>
 
 #endif /* _KERNEL */
 

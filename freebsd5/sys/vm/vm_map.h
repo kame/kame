@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -61,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.h,v 1.106 2003/11/09 05:25:35 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_map.h,v 1.116 2004/08/13 08:06:34 alc Exp $
  */
 
 /*
@@ -71,7 +67,7 @@
 #define	_VM_MAP_
 
 #include <sys/lock.h>
-#include <sys/lockmgr.h>
+#include <sys/sx.h>
 #include <sys/_mutex.h>
 
 /*
@@ -108,6 +104,8 @@ struct vm_map_entry {
 	vm_offset_t start;		/* start address */
 	vm_offset_t end;		/* end address */
 	vm_offset_t avail_ssize;	/* amt can grow if this is a stack */
+	vm_size_t adj_free;		/* amount of adjacent free space */
+	vm_size_t max_free;		/* max free space in subtree */
 	union vm_map_object object;	/* object I point to */
 	vm_ooffset_t offset;		/* offset into object */
 	vm_eflags_t eflags;		/* map entry flags */
@@ -146,6 +144,20 @@ vm_map_entry_behavior(vm_map_entry_t entry)
 {
 	return (entry->eflags & MAP_ENTRY_BEHAV_MASK);
 }
+
+static __inline int
+vm_map_entry_user_wired_count(vm_map_entry_t entry)
+{
+	if (entry->eflags & MAP_ENTRY_USER_WIRED)
+		return (1);
+	return (0);
+}
+
+static __inline int
+vm_map_entry_system_wired_count(vm_map_entry_t entry)
+{
+	return (entry->wired_count - vm_map_entry_user_wired_count(entry));
+}
 #endif	/* _KERNEL */
 
 /*
@@ -168,17 +180,15 @@ vm_map_entry_behavior(vm_map_entry_t entry)
  */
 struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
-	struct lock lock;		/* Lock for map data */
+	struct sx lock;			/* Lock for map data */
 	struct mtx system_mtx;
 	int nentries;			/* Number of entries */
 	vm_size_t size;			/* virtual size */
 	u_int timestamp;		/* Version number */
 	u_char needs_wakeup;
 	u_char system_map;		/* Am I a system map? */
-	u_char infork;			/* Am I in fork processing? */
 	vm_flags_t flags;		/* flags for this vm_map */
 	vm_map_entry_t root;		/* Root of a binary search tree */
-	vm_map_entry_t first_free;	/* First free space hint */
 	pmap_t pmap;			/* (c) Physical map */
 #define	min_offset	header.start	/* (c) */
 #define	max_offset	header.end	/* (c) */
@@ -224,11 +234,7 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 struct vmspace {
 	struct vm_map vm_map;	/* VM address map */
 	struct pmap vm_pmap;	/* private physical map */
-	int vm_refcnt;		/* number of references */
 	struct shmmap_state *vm_shm;	/* SYS5 shared memory private data XXX */
-/* we copy from vm_startcopy to the end of the structure on fork */
-#define vm_startcopy vm_rssize
-	segsz_t vm_rssize;	/* current resident set size in pages */
 	segsz_t vm_swrss;	/* resident set size before last swap */
 	segsz_t vm_tsize;	/* text size (pages) XXX */
 	segsz_t vm_dsize;	/* data size (pages) XXX */
@@ -236,8 +242,8 @@ struct vmspace {
 	caddr_t vm_taddr;	/* (c) user virtual address of text */
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
 	caddr_t vm_maxsaddr;	/* user VA at max stack growth */
-#define	vm_endcopy vm_exitingcnt
 	int	vm_exitingcnt;	/* several processes zombied in exit1  */
+	int	vm_refcnt;	/* number of references */
 };
 
 #ifdef	_KERNEL
@@ -335,9 +341,11 @@ void vm_map_init (struct vm_map *, vm_offset_t, vm_offset_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_offset_t, vm_prot_t, vm_prot_t, int);
 int vm_map_lookup (vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
     vm_pindex_t *, vm_prot_t *, boolean_t *);
+int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
+    vm_pindex_t *, vm_prot_t *, boolean_t *);
 void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
-void vm_map_pmap_enter(vm_map_t map, vm_offset_t addr,
+void vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
     vm_object_t object, vm_pindex_t pindex, vm_size_t size, int flags);
 int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);

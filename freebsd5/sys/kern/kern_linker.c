@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_linker.c,v 1.108 2003/09/23 14:42:38 fjoe Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_linker.c,v 1.113.2.1 2004/09/03 19:49:25 iedowse Exp $");
 
 #include "opt_ddb.h"
 #include "opt_mac.h"
@@ -147,6 +147,7 @@ linker_add_class(linker_class_t lc)
 	if (linker_no_more_classes == 1)
 		return (EPERM);
 	kobj_class_compile((kobj_class_t) lc);
+	((kobj_class_t)lc)->refs++;	/* prevent ops being freed */
 	TAILQ_INSERT_TAIL(&classes, lc, link);
 	return (0);
 }
@@ -465,7 +466,7 @@ out:
 }
 
 int
-linker_file_unload(linker_file_t file)
+linker_file_unload(linker_file_t file, int flags)
 {
 	module_t mod, next;
 	modlist_t ml, nextml;
@@ -499,7 +500,7 @@ linker_file_unload(linker_file_t file)
 			/*
 			 * Give the module a chance to veto the unload.
 			 */
-			if ((error = module_unload(mod)) != 0) {
+			if ((error = module_unload(mod, flags)) != 0) {
 				KLD_DPF(FILE, ("linker_file_unload: module %p"
 				    " vetoes unload\n", mod));
 				goto out;
@@ -515,8 +516,10 @@ linker_file_unload(linker_file_t file)
 	}
 	for (ml = TAILQ_FIRST(&found_modules); ml; ml = nextml) {
 		nextml = TAILQ_NEXT(ml, link);
-		if (ml->container == file)
+		if (ml->container == file) {
 			TAILQ_REMOVE(&found_modules, ml, link);
+			free(ml, M_LINKER);
+		}
 	}
 
 	/* 
@@ -533,7 +536,7 @@ linker_file_unload(linker_file_t file)
 
 	if (file->deps) {
 		for (i = 0; i < file->ndeps; i++)
-			linker_file_unload(file->deps[i]);
+			linker_file_unload(file->deps[i], flags);
 		free(file->deps, M_LINKER);
 		file->deps = NULL;
 	}
@@ -786,8 +789,8 @@ out:
 /*
  * MPSAFE
  */
-int
-kldunload(struct thread *td, struct kldunload_args *uap)
+static int
+kern_kldunload(struct thread *td, int fileid, int flags)
 {
 	linker_file_t lf;
 	int error = 0;
@@ -800,17 +803,20 @@ kldunload(struct thread *td, struct kldunload_args *uap)
 	if ((error = suser(td)) != 0)
 		goto out;
 
-	lf = linker_find_file_by_id(uap->fileid);
+	lf = linker_find_file_by_id(fileid);
 	if (lf) {
 		KLD_DPF(FILE, ("kldunload: lf->userrefs=%d\n", lf->userrefs));
 		if (lf->userrefs == 0) {
+			/*
+			 * XXX: maybe LINKER_UNLOAD_FORCE should override ?
+			 */
 			printf("kldunload: attempt to unload file that was"
 			    " loaded by the kernel\n");
 			error = EBUSY;
 			goto out;
 		}
 		lf->userrefs--;
-		error = linker_file_unload(lf);
+		error = linker_file_unload(lf, flags);
 		if (error)
 			lf->userrefs++;
 	} else
@@ -818,6 +824,29 @@ kldunload(struct thread *td, struct kldunload_args *uap)
 out:
 	mtx_unlock(&Giant);
 	return (error);
+}
+
+/*
+ * MPSAFE
+ */
+int
+kldunload(struct thread *td, struct kldunload_args *uap)
+{
+
+	return (kern_kldunload(td, uap->fileid, LINKER_UNLOAD_NORMAL));
+}
+
+/*
+ * MPSAFE
+ */
+int
+kldunloadf(struct thread *td, struct kldunloadf_args *uap)
+{
+
+	if (uap->flags != LINKER_UNLOAD_NORMAL &&
+	    uap->flags != LINKER_UNLOAD_FORCE)
+		return (EINVAL);
+	return (kern_kldunload(td, uap->fileid, uap->flags));
 }
 
 /*
@@ -1168,15 +1197,15 @@ linker_preload(void *arg)
 			    modptr);
 			continue;
 		}
-		printf("Preloaded %s \"%s\" at %p.\n", modtype, modname,
-		    modptr);
+		if (bootverbose)
+			printf("Preloaded %s \"%s\" at %p.\n", modtype, modname,
+			    modptr);
 		lf = NULL;
 		TAILQ_FOREACH(lc, &classes, link) {
 			error = LINKER_LINK_PRELOAD(lc, modname, &lf);
-			if (error) {
-				lf = NULL;
+			if (!error)
 				break;
-			}
+			lf = NULL;
 		}
 		if (lf)
 			TAILQ_INSERT_TAIL(&loaded_files, lf, loaded);
@@ -1246,7 +1275,8 @@ restart:
 					    nver) != NULL) {
 						printf("module %s already"
 						    " present!\n", modname);
-						linker_file_unload(lf);
+						linker_file_unload(lf,
+						    LINKER_UNLOAD_FORCE);
 						TAILQ_REMOVE(&loaded_files,
 						    lf, loaded);
 						/* we changed tailq next ptr */
@@ -1272,7 +1302,7 @@ restart:
 	 */
 	TAILQ_FOREACH(lf, &loaded_files, loaded) {
 		printf("KLD file %s is missing dependencies\n", lf->filename);
-		linker_file_unload(lf);
+		linker_file_unload(lf, LINKER_UNLOAD_FORCE);
 		TAILQ_REMOVE(&loaded_files, lf, loaded);
 	}
 
@@ -1313,7 +1343,7 @@ restart:
 		if (error) {
 			printf("KLD file %s - could not finalize loading\n",
 			    lf->filename);
-			linker_file_unload(lf);
+			linker_file_unload(lf, LINKER_UNLOAD_FORCE);
 			continue;
 		}
 		linker_file_register_modules(lf);
@@ -1672,7 +1702,7 @@ linker_load_module(const char *kldname, const char *modname,
 			break;
 		if (modname && verinfo &&
 		    modlist_lookup2(modname, verinfo) == NULL) {
-			linker_file_unload(lfdep);
+			linker_file_unload(lfdep, LINKER_UNLOAD_FORCE);
 			error = ENOENT;
 			break;
 		}
@@ -1796,7 +1826,9 @@ sysctl_kern_function_list(SYSCTL_HANDLER_ARGS)
 	if (error)
 		return (error);
 #endif
-	sysctl_wire_old_buffer(req, 0);
+	error = sysctl_wire_old_buffer(req, 0);
+	if (error != 0)
+		return (error);
 	mtx_lock(&kld_mtx);
 	TAILQ_FOREACH(lf, &linker_files, link) {
 		error = LINKER_EACH_FUNCTION_NAME(lf,

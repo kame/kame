@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -32,7 +28,7 @@
  * SUCH DAMAGE.
  *
  *	from: vector.s, 386BSD 0.1 unknown origin
- * $FreeBSD: src/sys/i386/i386/apic_vector.s,v 1.95 2003/12/02 15:02:12 bde Exp $
+ * $FreeBSD: src/sys/i386/i386/apic_vector.s,v 1.101 2004/05/26 07:43:41 bde Exp $
  */
 
 /*
@@ -77,11 +73,11 @@
 IDTVEC(vec_name) ;							\
 	PUSH_FRAME ;							\
 	movl	$KDSEL, %eax ;	/* reload with kernel's data segment */	\
-	mov	%ax, %ds ;						\
-	mov	%ax, %es ;						\
+	movl	%eax, %ds ;						\
+	movl	%eax, %es ;						\
 	movl	$KPSEL, %eax ;	/* reload with per-CPU data segment */	\
-	mov	%ax, %fs ;						\
-	FAKE_MCOUNT(13*4(%esp)) ;					\
+	movl	%eax, %fs ;						\
+	FAKE_MCOUNT(TF_EIP(%esp)) ;					\
 	movl	lapic, %edx ;	/* pointer to local APIC */		\
 	movl	LA_ISR + 16 * (index)(%edx), %eax ;	/* load ISR */	\
 	bsrl	%eax, %eax ;	/* index of highset set bit in ISR */	\
@@ -111,7 +107,6 @@ IDTVEC(spuriousint)
 
 	iret
 
-MCOUNT_LABEL(bintr2)
 	ISR_VEC(1, apic_isr1)
 	ISR_VEC(2, apic_isr2)
 	ISR_VEC(3, apic_isr3)
@@ -119,7 +114,6 @@ MCOUNT_LABEL(bintr2)
 	ISR_VEC(5, apic_isr5)
 	ISR_VEC(6, apic_isr6)
 	ISR_VEC(7, apic_isr7)
-MCOUNT_LABEL(eintr2)
 
 #ifdef SMP
 /*
@@ -131,12 +125,12 @@ IDTVEC(invltlb)
 	pushl	%eax
 	pushl	%ds
 	movl	$KDSEL, %eax		/* Kernel data selector */
-	mov	%ax, %ds
+	movl	%eax, %ds
 
 #ifdef COUNT_XINVLTLB_HITS
 	pushl	%fs
 	movl	$KPSEL, %eax		/* Private space selector */
-	mov	%ax, %fs
+	movl	%eax, %fs
 	movl	PCPU(CPUID), %eax
 	popl	%fs
 	incl	xhits_gbl(,%eax,4)
@@ -164,12 +158,12 @@ IDTVEC(invlpg)
 	pushl	%eax
 	pushl	%ds
 	movl	$KDSEL, %eax		/* Kernel data selector */
-	mov	%ax, %ds
+	movl	%eax, %ds
 
 #ifdef COUNT_XINVLTLB_HITS
 	pushl	%fs
 	movl	$KPSEL, %eax		/* Private space selector */
-	mov	%ax, %fs
+	movl	%eax, %fs
 	movl	PCPU(CPUID), %eax
 	popl	%fs
 	incl	xhits_pg(,%eax,4)
@@ -198,12 +192,12 @@ IDTVEC(invlrng)
 	pushl	%edx
 	pushl	%ds
 	movl	$KDSEL, %eax		/* Kernel data selector */
-	mov	%ax, %ds
+	movl	%eax, %ds
 
 #ifdef COUNT_XINVLTLB_HITS
 	pushl	%fs
 	movl	$KPSEL, %eax		/* Private space selector */
-	mov	%ax, %fs
+	movl	%eax, %fs
 	movl	PCPU(CPUID), %eax
 	popl	%fs
 	incl	xhits_rng(,%eax,4)
@@ -236,10 +230,10 @@ IDTVEC(invlrng)
 IDTVEC(hardclock)
 	PUSH_FRAME
 	movl	$KDSEL, %eax	/* reload with kernel's data segment */
-	mov	%ax, %ds
-	mov	%ax, %es
+	movl	%eax, %ds
+	movl	%eax, %es
 	movl	$KPSEL, %eax
-	mov	%ax, %fs
+	movl	%eax, %fs
 
 	movl	lapic, %edx
 	movl	$0, LA_EOI(%edx)	/* End Of Interrupt to APIC */
@@ -259,15 +253,15 @@ IDTVEC(hardclock)
 IDTVEC(statclock)
 	PUSH_FRAME
 	movl	$KDSEL, %eax	/* reload with kernel's data segment */
-	mov	%ax, %ds
-	mov	%ax, %es
+	movl	%eax, %ds
+	movl	%eax, %es
 	movl	$KPSEL, %eax
-	mov	%ax, %fs
+	movl	%eax, %fs
 
 	movl	lapic, %edx
 	movl	$0, LA_EOI(%edx)	/* End Of Interrupt to APIC */
 
-	FAKE_MCOUNT(13*4(%esp))
+	FAKE_MCOUNT(TF_EIP(%esp))
 
 	pushl	$0		/* XXX convert trapframe to clockframe */
 	call	forwarded_statclock
@@ -288,15 +282,15 @@ IDTVEC(statclock)
 IDTVEC(cpuast)
 	PUSH_FRAME
 	movl	$KDSEL, %eax
-	mov	%ax, %ds		/* use KERNEL data segment */
-	mov	%ax, %es
+	movl	%eax, %ds		/* use KERNEL data segment */
+	movl	%eax, %es
 	movl	$KPSEL, %eax
-	mov	%ax, %fs
+	movl	%eax, %fs
 
 	movl	lapic, %edx
 	movl	$0, LA_EOI(%edx)	/* End Of Interrupt to APIC */
 
-	FAKE_MCOUNT(13*4(%esp))
+	FAKE_MCOUNT(TF_EIP(%esp))
 
 	MEXITCOUNT
 	jmp	doreti
@@ -321,10 +315,10 @@ IDTVEC(cpustop)
 	pushl	%fs
 
 	movl	$KDSEL, %eax
-	mov	%ax, %ds		/* use KERNEL data segment */
-	mov	%ax, %es
+	movl	%eax, %ds		/* use KERNEL data segment */
+	movl	%eax, %es
 	movl	$KPSEL, %eax
-	mov	%ax, %fs
+	movl	%eax, %fs
 
 	movl	lapic, %eax
 	movl	$0, LA_EOI(%eax)	/* End Of Interrupt to APIC */
@@ -379,10 +373,10 @@ IDTVEC(cpustop)
 IDTVEC(rendezvous)
 	PUSH_FRAME
 	movl	$KDSEL, %eax
-	mov	%ax, %ds		/* use KERNEL data segment */
-	mov	%ax, %es
+	movl	%eax, %ds		/* use KERNEL data segment */
+	movl	%eax, %es
 	movl	$KPSEL, %eax
-	mov	%ax, %fs
+	movl	%eax, %fs
 
 	call	smp_rendezvous_action
 
@@ -399,10 +393,10 @@ IDTVEC(rendezvous)
 IDTVEC(lazypmap)
 	PUSH_FRAME
 	movl	$KDSEL, %eax
-	mov	%ax, %ds		/* use KERNEL data segment */
-	mov	%ax, %es
+	movl	%eax, %ds		/* use KERNEL data segment */
+	movl	%eax, %es
 	movl	$KPSEL, %eax
-	mov	%ax, %fs
+	movl	%eax, %fs
 
 	call	pmap_lazyfix_action
 

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)rune.h	8.1 (Berkeley) 6/27/93
- * $FreeBSD: src/include/rune.h,v 1.4 2003/06/25 22:28:33 phantom Exp $
+ * $FreeBSD: src/include/rune.h,v 1.5 2004/06/23 07:01:43 tjr Exp $
  */
 
 #ifndef	_RUNE_H_
@@ -48,13 +48,11 @@
 typedef	__rune_t	rune_t;
 #endif
 
-#define _INVALID_RUNE   _CurrentRuneLocale->invalid_rune
+#define _INVALID_RUNE   _CurrentRuneLocale->__invalid_rune
 
-#define __sgetrune      _CurrentRuneLocale->sgetrune
-#define __sputrune      _CurrentRuneLocale->sputrune
-
-#define sgetrune(s, n, r)       (*__sgetrune)((s), (n), (r))
-#define sputrune(c, s, n, r)    (*__sputrune)((c), (s), (n), (r))
+#define sgetrune(s, n, r)       (_CurrentRuneLocale->__sgetrune)((s), (n), (r))
+#define sputrune(c, s, n, r)    (_CurrentRuneLocale->__sputrune)((c), (s), \
+				    (n), (r))
 
 __BEGIN_DECLS
 char	*mbrune(const char *, rune_t);

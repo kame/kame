@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -41,7 +37,7 @@
  *
  * From: src/sys/sys/vnioctl.h,v 1.4
  *
- * $FreeBSD: src/sys/sys/mdioctl.h,v 1.13 2003/04/09 11:59:28 phk Exp $
+ * $FreeBSD: src/sys/sys/mdioctl.h,v 1.16 2004/08/09 06:45:20 jmg Exp $
  */
 
 #ifndef _SYS_MDIOCTL_H_
@@ -69,6 +65,7 @@ struct md_ioctl {
 };
 
 #define MD_NAME		"md"
+#define MD_MODNAME	"g_md"
 #define MDCTL_NAME	"mdctl"
 #define MDIOVERSION	0
 
@@ -90,5 +87,6 @@ struct md_ioctl {
 #define MD_READONLY	0x08	/* Readonly mode */
 #define MD_COMPRESS	0x10	/* Compression mode */
 #define MD_FORCE	0x20	/* Don't try to prevent foot-shooting */
+#define MD_ASYNC	0x40	/* Don't try to prevent foot-shooting */
 
 #endif	/* _SYS_MDIOCTL_H_*/

@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_snapshot.c,v 1.76 2003/11/13 03:56:32 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_snapshot.c,v 1.84 2004/07/28 06:41:27 kan Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -211,7 +211,7 @@ restart:
 	if (error)
 		goto out;
 	ip->i_size = lblktosize(fs, (off_t)numblks);
-	DIP(ip, i_size) = ip->i_size;
+	DIP_SET(ip, i_size, ip->i_size);
 	ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	if ((error = readblock(bp, numblks - 1)) != 0)
 		goto out;
@@ -286,7 +286,7 @@ restart:
 	 * Change inode to snapshot type file.
 	 */
 	ip->i_flags |= SF_SNAPSHOT;
-	DIP(ip, i_flags) = ip->i_flags;
+	DIP_SET(ip, i_flags, ip->i_flags);
 	ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	/*
 	 * Ensure that the snapshot is completely on disk.
@@ -301,11 +301,11 @@ restart:
 	 *
 	 * Recind nice scheduling while running with the filesystem suspended.
 	 */
-	if (td->td_ksegrp->kg_nice > 0) {
+	if (td->td_proc->p_nice > 0) {
 		PROC_LOCK(td->td_proc);
 		mtx_lock_spin(&sched_lock);
-		saved_nice = td->td_ksegrp->kg_nice;
-		sched_nice(td->td_ksegrp, 0);
+		saved_nice = td->td_proc->p_nice;
+		sched_nice(td->td_proc, 0);
 		mtx_unlock_spin(&sched_lock);
 		PROC_UNLOCK(td->td_proc);
 	}
@@ -367,7 +367,7 @@ restart:
 	space = malloc((u_long)size, M_UFSMNT, M_WAITOK);
 	copy_fs->fs_csp = space;
 	bcopy(fs->fs_csp, copy_fs->fs_csp, fs->fs_cssize);
-	(char *)space += fs->fs_cssize;
+	space = (char *)space + fs->fs_cssize;
 	loc = howmany(fs->fs_cssize, fs->fs_fsize);
 	i = fs->fs_frag - loc % fs->fs_frag;
 	len = (i == fs->fs_frag) ? 0 : i * fs->fs_fsize;
@@ -381,7 +381,7 @@ restart:
 			goto out1;
 		}
 		bcopy(bp->b_data, space, (u_int)len);
-		(char *)space += len;
+		space = (char *)space + len;
 		bp->b_flags |= B_INVAL | B_NOCACHE;
 		brelse(bp);
 	}
@@ -407,14 +407,7 @@ restart:
 	mp->mnt_kern_flag &= ~MNTK_SUSPENDED;
 	MNT_ILOCK(mp);
 loop:
-	for (xvp = TAILQ_FIRST(&mp->mnt_nvnodelist); xvp; xvp = nvp) {
-		/*
-		 * Make sure this vnode wasn't reclaimed in getnewvnode().
-		 * Start over if it has (it won't be on the list anymore).
-		 */
-		if (xvp->v_mount != mp)
-			goto loop;
-		nvp = TAILQ_NEXT(xvp, v_nmntvnodes);
+	MNT_VNODE_FOREACH(xvp, mp, nvp) {
 		VI_LOCK(xvp);
 		MNT_IUNLOCK(mp);
 		if ((xvp->v_iflag & VI_XLOCK) ||
@@ -424,12 +417,21 @@ loop:
 			MNT_ILOCK(mp);
 			continue;
 		}
-		if (snapdebug)
-			vprint("ffs_snapshot: busy vnode", xvp);
+		/*
+		 * We can skip parent directory vnode because it must have
+		 * this snapshot file in it.
+		 */
+		if (xvp == nd.ni_dvp) {
+			VI_UNLOCK(xvp);
+			MNT_ILOCK(mp);
+			continue;
+		}
 		if (vn_lock(xvp, LK_EXCLUSIVE | LK_INTERLOCK, td) != 0) {
 			MNT_ILOCK(mp);
 			goto loop;
 		}
+		if (snapdebug)
+			vprint("ffs_snapshot: busy vnode", xvp);
 		if (VOP_GETATTR(xvp, &vat, td->td_ucred, td) == 0 &&
 		    vat.va_nlink > 0) {
 			VOP_UNLOCK(xvp, 0, td);
@@ -453,7 +455,7 @@ loop:
 				ffs_blkfree(copy_fs, vp, DIP(xp, i_db[loc]),
 				    len, xp->i_number);
 				blkno = DIP(xp, i_db[loc]);
-				DIP(xp, i_db[loc]) = 0;
+				DIP_SET(xp, i_db[loc], 0);
 			}
 		}
 		snaplistsize += 1;
@@ -464,7 +466,7 @@ loop:
 			error = expunge_ufs2(vp, xp, copy_fs, fullacct_ufs2,
 			    BLK_NOCOPY);
 		if (blkno)
-			DIP(xp, i_db[loc]) = blkno;
+			DIP_SET(xp, i_db[loc], blkno);
 		if (!error)
 			error = ffs_freefile(copy_fs, vp, xp->i_number,
 			    xp->i_mode);
@@ -488,9 +490,12 @@ loop:
 	VI_LOCK(devvp);
 	snaphead = &devvp->v_rdev->si_snapshots;
 	if ((xp = TAILQ_FIRST(snaphead)) != NULL) {
-		VI_LOCK(vp);
-		vp->v_vnlock = ITOV(xp)->v_vnlock;
+		struct lock *lkp;
+
+		lkp = ITOV(xp)->v_vnlock;
 		VI_UNLOCK(devvp);
+		VI_LOCK(vp);
+		vp->v_vnlock = lkp;
 	} else {
 		struct lock *lkp;
 
@@ -662,7 +667,7 @@ out:
 	if (saved_nice > 0) {
 		PROC_LOCK(td->td_proc);
 		mtx_lock_spin(&sched_lock);
-		sched_nice(td->td_ksegrp, saved_nice);
+		sched_nice(td->td_proc, saved_nice);
 		mtx_unlock_spin(&sched_lock);
 		PROC_UNLOCK(td->td_proc);
 	}
@@ -733,9 +738,9 @@ cgaccount(cg, vp, nbp, passno)
 	if (base < NDADDR) {
 		for ( ; loc < NDADDR; loc++) {
 			if (ffs_isblock(fs, cg_blksfree(cgp), loc))
-				DIP(ip, i_db[loc]) = BLK_NOCOPY;
+				DIP_SET(ip, i_db[loc], BLK_NOCOPY);
 			else if (passno == 2 && DIP(ip, i_db[loc])== BLK_NOCOPY)
-				DIP(ip, i_db[loc]) = 0;
+				DIP_SET(ip, i_db[loc], 0);
 			else if (passno == 1 && DIP(ip, i_db[loc])== BLK_NOCOPY)
 				panic("ffs_snapshot: lost direct block");
 		}
@@ -1447,12 +1452,13 @@ ffs_snapremove(vp)
 	for (blkno = 1; blkno < NDADDR; blkno++) {
 		dblk = DIP(ip, i_db[blkno]);
 		if (dblk == BLK_NOCOPY || dblk == BLK_SNAP)
-			DIP(ip, i_db[blkno]) = 0;
+			DIP_SET(ip, i_db[blkno], 0);
 		else if ((dblk == blkstofrags(fs, blkno) &&
 		     ffs_snapblkfree(fs, ip->i_devvp, dblk, fs->fs_bsize,
 		     ip->i_number))) {
-			DIP(ip, i_blocks) -= btodb(fs->fs_bsize);
-			DIP(ip, i_db[blkno]) = 0;
+			DIP_SET(ip, i_blocks, DIP(ip, i_blocks) -
+			    btodb(fs->fs_bsize));
+			DIP_SET(ip, i_db[blkno], 0);
 		}
 	}
 	numblks = howmany(ip->i_size, fs->fs_bsize);
@@ -1495,7 +1501,7 @@ ffs_snapremove(vp)
 	 * Clear snapshot flag and drop reference.
 	 */
 	ip->i_flags &= ~SF_SNAPSHOT;
-	DIP(ip, i_flags) = ip->i_flags;
+	DIP_SET(ip, i_flags, ip->i_flags);
 	ip->i_flag |= IN_CHANGE | IN_UPDATE;
 }
 
@@ -1592,7 +1598,7 @@ retry:
 			}
 			snapshot_locked = 1;
 			if (lbn < NDADDR) {
-				DIP(ip, i_db[lbn]) = BLK_NOCOPY;
+				DIP_SET(ip, i_db[lbn], BLK_NOCOPY);
 				ip->i_flag |= IN_CHANGE | IN_UPDATE;
 			} else if (ip->i_ump->um_fstype == UFS1) {
 				((ufs1_daddr_t *)(ibp->b_data))[indiroff] =
@@ -1639,7 +1645,7 @@ retry:
 				    (intmax_t)lbn, inum);
 #endif
 			if (lbn < NDADDR) {
-				DIP(ip, i_db[lbn]) = bno;
+				DIP_SET(ip, i_db[lbn], bno);
 			} else if (ip->i_ump->um_fstype == UFS1) {
 				((ufs1_daddr_t *)(ibp->b_data))[indiroff] = bno;
 				bdwrite(ibp);
@@ -1647,7 +1653,7 @@ retry:
 				((ufs2_daddr_t *)(ibp->b_data))[indiroff] = bno;
 				bdwrite(ibp);
 			}
-			DIP(ip, i_blocks) += btodb(size);
+			DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + btodb(size));
 			ip->i_flag |= IN_CHANGE | IN_UPDATE;
 			VOP_UNLOCK(vp, 0, td);
 			return (1);
@@ -1793,9 +1799,12 @@ ffs_snapshot_mount(mp)
 		 */
 		VI_LOCK(devvp);
 		if ((xp = TAILQ_FIRST(snaphead)) != NULL) {
-			VI_LOCK(vp);
-			vp->v_vnlock = ITOV(xp)->v_vnlock;
+			struct lock *lkp;
+
+			lkp = ITOV(xp)->v_vnlock;
 			VI_UNLOCK(devvp);
+			VI_LOCK(vp);
+			vp->v_vnlock = lkp;
 		} else {
 			struct lock *lkp;
 

@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/sparc64/sparc64/genassym.c,v 1.54 2003/08/24 06:23:36 jmg Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/genassym.c,v 1.55 2004/05/26 12:06:52 tmm Exp $
  */
 
 #include "opt_kstack_pages.h"
@@ -198,7 +198,7 @@ ASSYM(PC_MID, offsetof(struct pcpu, pc_mid));
 ASSYM(PC_TLB_CTX, offsetof(struct pcpu, pc_tlb_ctx));
 ASSYM(PC_TLB_CTX_MAX, offsetof(struct pcpu, pc_tlb_ctx_max));
 ASSYM(PC_TLB_CTX_MIN, offsetof(struct pcpu, pc_tlb_ctx_min));
-ASSYM(PC_VMSPACE, offsetof(struct pcpu, pc_vmspace));
+ASSYM(PC_PMAP, offsetof(struct pcpu, pc_pmap));
 ASSYM(PC_SIZEOF, sizeof(struct pcpu));
 
 ASSYM(IH_SHIFT, IH_SHIFT);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/linker.h,v 1.36 2003/05/01 03:31:17 peter Exp $
+ * $FreeBSD: src/sys/sys/linker.h,v 1.38.2.1 2004/09/03 18:32:24 iedowse Exp $
  */
 
 #ifndef _SYS_LINKER_H_
@@ -135,7 +135,7 @@ linker_file_t linker_make_file(const char* _filename, linker_class_t _cls);
 /*
  * Unload a file, freeing up memory.
  */
-int linker_file_unload(linker_file_t _file);
+int linker_file_unload(linker_file_t _file, int flags);
 
 /*
  * Add a dependency to a file.
@@ -197,6 +197,7 @@ int linker_ddb_symbol_values(c_linker_sym_t _sym, linker_symval_t *_symval);
 #define MODINFOMD_HOWTO		0x0007		/* boothowto */
 #define MODINFOMD_KERNEND	0x0008		/* kernend */
 #endif
+#define MODINFOMD_SHDR		0x0009		/* section header table */
 #define MODINFOMD_NOCOPY	0x8000		/* don't copy this metadata to the kernel */
 
 #define MODINFOMD_DEPLIST	(0x4001 | MODINFOMD_NOCOPY)	/* depends on */
@@ -241,10 +242,11 @@ extern int kld_debug;
 
 #endif
 
+typedef Elf_Addr elf_lookup_fn(linker_file_t, Elf_Word, int);
+
 /* Support functions */
-int	elf_reloc(linker_file_t _lf, const void *_rel, int _type);
-int	elf_reloc_local(linker_file_t _lf, const void *_rel, int _type);
-Elf_Addr elf_lookup(linker_file_t, Elf_Word, int);
+int	elf_reloc(linker_file_t _lf, Elf_Addr base, const void *_rel, int _type, elf_lookup_fn _lu);
+int	elf_reloc_local(linker_file_t _lf, Elf_Addr base, const void *_rel, int _type, elf_lookup_fn _lu);
 const Elf_Sym *elf_get_sym(linker_file_t _lf, Elf_Word _symidx);
 const char *elf_get_symname(linker_file_t _lf, Elf_Word _symidx);
 
@@ -274,6 +276,12 @@ struct kld_sym_lookup {
 };
 #define KLDSYM_LOOKUP	1
 
+/*
+ * Flags for kldunloadf() and linker_file_unload()
+ */
+#define LINKER_UNLOAD_NORMAL	0
+#define LINKER_UNLOAD_FORCE	1
+
 #ifndef _KERNEL
 
 #include <sys/cdefs.h>
@@ -281,6 +289,7 @@ struct kld_sym_lookup {
 __BEGIN_DECLS
 int	kldload(const char* _file);
 int	kldunload(int _fileid);
+int	kldunloadf(int _fileid, int flags);
 int	kldfind(const char* _file);
 int	kldnext(int _fileid);
 int	kldstat(int _fileid, struct kld_file_stat* _stat);

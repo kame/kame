@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/counter.c,v 1.3 2003/02/19 05:47:45 imp Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/counter.c,v 1.5.2.1 2004/10/05 17:01:16 kensmith Exp $
  */
 
 #include <sys/param.h>
@@ -37,6 +37,7 @@
 
 #define	COUNTER_MASK	((1 << 29) - 1)
 #define	COUNTER_FREQ	1000000
+#define	COUNTER_QUALITY	100
 
 /* Bits in the limit register. */
 #define	CTLR_INTEN	(1U << 31)	/* Enable timer interrupts */
@@ -52,7 +53,7 @@
 #define	CTR_LIMIT	0x08
 
 
-static unsigned counter_get_timecount(struct timecounter *tc);
+static unsigned int counter_get_timecount(struct timecounter *tc);
 
 struct ct_softc {
 	bus_space_tag_t		sc_tag;
@@ -72,14 +73,14 @@ sparc64_counter_init(bus_space_tag_t tag, bus_space_handle_t handle,
 	struct timecounter *tc;
 	struct ct_softc *sc;
 
-	printf("initialializing counter-timer\n");
+	printf("initializing counter-timer\n");
 	/*
 	 * Turn off interrupts from both counters. Set the limit to the maximum
 	 * value (although that should not change anything with CTLR_INTEN and
 	 * CTLR_PERIODIC off).
 	 */
-	bus_space_write_8(tag, handle, offset + CTR_CT0 + CTR_LIMIT
-	    , COUNTER_MASK);
+	bus_space_write_8(tag, handle, offset + CTR_CT0 + CTR_LIMIT,
+	    COUNTER_MASK);
 	bus_space_write_8(tag, handle, offset + CTR_CT1 + CTR_LIMIT,
 	    COUNTER_MASK);
 	/* Register as a time counter. */
@@ -94,10 +95,11 @@ sparc64_counter_init(bus_space_tag_t tag, bus_space_handle_t handle,
 	tc->tc_frequency = COUNTER_FREQ;
 	tc->tc_name = "counter-timer";
 	tc->tc_priv = sc;
+	tc->tc_quality = COUNTER_QUALITY;
 	tc_init(tc);
 }
 
-static unsigned
+static unsigned int
 counter_get_timecount(struct timecounter *tc)
 {
 	struct ct_softc *sc;
@@ -106,4 +108,3 @@ counter_get_timecount(struct timecounter *tc)
 	return (bus_space_read_8(sc->sc_tag, sc->sc_handle, sc->sc_offset) &
 	    COUNTER_MASK);
 }
-

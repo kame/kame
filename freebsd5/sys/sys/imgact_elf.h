@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/imgact_elf.h,v 1.25 2003/01/05 03:48:14 jake Exp $
+ * $FreeBSD: src/sys/sys/imgact_elf.h,v 1.27 2004/08/11 02:35:06 marcel Exp $
  */
 
 #ifndef _SYS_IMGACT_ELF_H_
@@ -61,19 +61,23 @@ typedef struct {
 	const char *compat_3_brand;	/* pre Binutils 2.10 method (FBSD 3) */
 	const char *emul_path;
 	const char *interp_path;
-        struct sysentvec *sysvec;
+	struct sysentvec *sysvec;
+	const char *interp_newpath;
 } __ElfN(Brandinfo);
 
 __ElfType(Auxargs);
 __ElfType(Brandinfo);
 
-#define MAX_BRANDS      8
+#define MAX_BRANDS	8
 
 int	__elfN(brand_inuse)(Elf_Brandinfo *entry);
 int	__elfN(insert_brand_entry)(Elf_Brandinfo *entry);
 int	__elfN(remove_brand_entry)(Elf_Brandinfo *entry);
 int	__elfN(freebsd_fixup)(register_t **, struct image_params *);
 int	__elfN(coredump)(struct thread *, struct vnode *, off_t);
+
+/* Machine specific function to dump per-thread information. */
+void	__elfN(dump_thread)(struct thread *, void *, size_t *);
 
 extern	int __elfN(fallback_brand);
 

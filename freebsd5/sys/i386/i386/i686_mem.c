@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.23 2003/10/21 18:28:34 silby Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.24 2004/07/01 07:46:28 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -548,7 +548,8 @@ i686_mrinit(struct mem_range_softc *sc)
 	return;
     }
     nmdesc = mtrrcap & 0xff;
-    printf("Pentium Pro MTRR support enabled\n");
+    if (bootverbose)
+	printf("Pentium Pro MTRR support enabled\n");
 
     /* If fixed MTRRs supported and enabled */
     if ((mtrrcap & 0x100) && (mtrrdef & 0x400)) {

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_sis.c,v 1.90.2.1 2003/12/30 10:47:22 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_sis.c,v 1.103.2.1 2004/10/09 15:20:18 mlaier Exp $");
 
 /*
  * SiS 900/SiS 7016 fast ethernet PCI NIC driver. Datasheets are
@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD: src/sys/pci/if_sis.c,v 1.90.2.1 2003/12/30 10:47:22 phk Exp 
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 
@@ -155,7 +156,7 @@ static void sis_miibus_statchg	(device_t);
 
 static void sis_setmulti_sis	(struct sis_softc *);
 static void sis_setmulti_ns	(struct sis_softc *);
-static u_int32_t sis_mchash	(struct sis_softc *, caddr_t);
+static uint32_t sis_mchash	(struct sis_softc *, const uint8_t *);
 static void sis_reset		(struct sis_softc *);
 static int sis_list_rx_init	(struct sis_softc *);
 static int sis_list_tx_init	(struct sis_softc *);
@@ -839,23 +840,12 @@ sis_miibus_statchg(dev)
 static u_int32_t
 sis_mchash(sc, addr)
 	struct sis_softc	*sc;
-	caddr_t			addr;
+	const uint8_t		*addr;
 {
-	u_int32_t		crc, carry; 
-	int			idx, bit;
-	u_int8_t		data;
+	uint32_t		crc;
 
 	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
+	crc = ether_crc32_be(addr, ETHER_ADDR_LEN);
 
 	/*
 	 * return the filter bit position
@@ -1063,38 +1053,13 @@ sis_attach(dev)
 		sc->sis_type = SIS_TYPE_83815;
 
 	sc->sis_rev = pci_read_config(dev, PCIR_REVID, 1);
-#ifndef BURN_BRIDGES
-	/*
-	 * Handle power management nonsense.
-	 */
-	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		u_int32_t		iobase, membase, irq;
-
-		/* Save important PCI config data. */
-		iobase = pci_read_config(dev, SIS_PCI_LOIO, 4);
-		membase = pci_read_config(dev, SIS_PCI_LOMEM, 4);
-		irq = pci_read_config(dev, SIS_PCI_INTLINE, 4);
-
-		/* Reset the power state. */
-		printf("sis%d: chip is in D%d power mode "
-		    "-- setting to D0\n", unit,
-		    pci_get_powerstate(dev));
-		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
-
-		/* Restore PCI config data. */
-		pci_write_config(dev, SIS_PCI_LOIO, iobase, 4);
-		pci_write_config(dev, SIS_PCI_LOMEM, membase, 4);
-		pci_write_config(dev, SIS_PCI_INTLINE, irq, 4);
-	}
-#endif
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
 
 	rid = SIS_RID;
-	sc->sis_res = bus_alloc_resource(dev, SIS_RES, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->sis_res = bus_alloc_resource_any(dev, SIS_RES, &rid, RF_ACTIVE);
 
 	if (sc->sis_res == NULL) {
 		printf("sis%d: couldn't map ports/memory\n", unit);
@@ -1107,7 +1072,7 @@ sis_attach(dev)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->sis_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->sis_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->sis_irq == NULL) {
@@ -1234,13 +1199,11 @@ sis_attach(dev)
 		break;
 	}
 
-	/*
-	 * A SiS chip was detected. Inform the world.
-	 */
-	printf("sis%d: Ethernet address: %6D\n", unit, eaddr, ":");
-
 	sc->sis_unit = unit;
-	callout_init(&sc->sis_stat_ch, CALLOUT_MPSAFE);
+	if (debug_mpsafenet)
+		callout_init(&sc->sis_stat_ch, CALLOUT_MPSAFE);
+	else
+		callout_init(&sc->sis_stat_ch, 0);
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
 	/*
@@ -1370,12 +1333,13 @@ sis_attach(dev)
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = sis_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = sis_start;
 	ifp->if_watchdog = sis_watchdog;
 	ifp->if_init = sis_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = SIS_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, SIS_TX_LIST_CNT - 1);
+	ifp->if_snd.ifq_drv_maxlen = SIS_TX_LIST_CNT - 1;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do MII setup.
@@ -1397,6 +1361,11 @@ sis_attach(dev)
 	 */
 	ifp->if_data.ifi_hdrlen = sizeof(struct ether_vlan_header);
 	ifp->if_capabilities |= IFCAP_VLAN_MTU;
+
+#ifdef DEVICE_POLLING
+	ifp->if_capabilities |= IFCAP_POLLING;
+#endif
+	ifp->if_capenable = ifp->if_capabilities;
 
 	/* Hook interrupt last to avoid having to lock softc */
 	error = bus_setup_intr(dev, sc->sis_irq, INTR_TYPE_NET | INTR_MPSAFE,
@@ -1760,7 +1729,7 @@ sis_tick(xsc)
 	if (!sc->sis_link && mii->mii_media_status & IFM_ACTIVE &&
 	    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 		sc->sis_link++;
-		if (ifp->if_snd.ifq_head != NULL)
+		if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 			sis_start(ifp);
 	}
 
@@ -1780,6 +1749,10 @@ sis_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	struct	sis_softc *sc = ifp->if_softc;
 
 	SIS_LOCK(sc);
+	if (!(ifp->if_capenable & IFCAP_POLLING)) {
+		ether_poll_deregister(ifp);
+		cmd = POLL_DEREGISTER;
+	}
 	if (cmd == POLL_DEREGISTER) { /* final call, enable interrupts */
 		CSR_WRITE_4(sc, SIS_IER, 1);
 		goto done;
@@ -1795,7 +1768,7 @@ sis_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	sc->rxcycles = count;
 	sis_rxeof(sc);
 	sis_txeof(sc);
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		sis_start(ifp);
 
 	if (sc->rxcycles > 0 || cmd == POLL_AND_CHECK_STATUS) {
@@ -1836,7 +1809,8 @@ sis_intr(arg)
 #ifdef DEVICE_POLLING
 	if (ifp->if_flags & IFF_POLLING)
 		goto done;
-	if (ether_poll_register(sis_poll, ifp)) { /* ok, disable interrupts */
+	if ((ifp->if_capenable & IFCAP_POLLING) &&
+	    ether_poll_register(sis_poll, ifp)) { /* ok, disable interrupts */
 		CSR_WRITE_4(sc, SIS_IER, 0);
 		goto done;
 	}
@@ -1881,7 +1855,7 @@ sis_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, SIS_IER, 1);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		sis_start(ifp);
 done:
 	SIS_UNLOCK(sc);
@@ -1980,7 +1954,7 @@ sis_start(ifp)
 {
 	struct sis_softc	*sc;
 	struct mbuf		*m_head = NULL;
-	u_int32_t		idx;
+	u_int32_t		idx, queued = 0;
 
 	sc = ifp->if_softc;
 	SIS_LOCK(sc);
@@ -1998,15 +1972,17 @@ sis_start(ifp)
 	}
 
 	while(sc->sis_ldata.sis_tx_list[idx].sis_mbuf == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DRV_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (sis_encap(sc, &m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
+			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		queued++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -2016,14 +1992,16 @@ sis_start(ifp)
 
 	}
 
-	/* Transmit */
-	sc->sis_cdata.sis_tx_prod = idx;
-	SIS_SETBIT(sc, SIS_CSR, SIS_CSR_TX_ENABLE);
+	if (queued) {
+		/* Transmit */
+		sc->sis_cdata.sis_tx_prod = idx;
+		SIS_SETBIT(sc, SIS_CSR, SIS_CSR_TX_ENABLE);
 
-	/*
-	 * Set a timeout in case the chip goes out to lunch.
-	 */
-	ifp->if_timer = 5;
+		/*
+		 * Set a timeout in case the chip goes out to lunch.
+		 */
+		ifp->if_timer = 5;
+	}
 
 	SIS_UNLOCK(sc);
 
@@ -2336,6 +2314,10 @@ sis_ioctl(ifp, command, data)
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		SIS_UNLOCK(sc);
 		break;
+	case SIOCSIFCAP:
+		ifp->if_capenable &= ~IFCAP_POLLING;
+		ifp->if_capenable |= ifr->ifr_reqcap & IFCAP_POLLING;
+		break;
 	default:
 		error = ether_ioctl(ifp, command, data);
 		break;
@@ -2361,7 +2343,7 @@ sis_watchdog(ifp)
 	sis_reset(sc);
 	sis_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		sis_start(ifp);
 
 	SIS_UNLOCK(sc);

@@ -14,8 +14,6 @@
  * All advertising materials mentioning features or use of this software
  * must display the following acknowledgement:
  *	This product includes software developed by Harvard University.
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,8 +26,6 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  *	This product includes software developed by Paul Kranenburg.
  *	This product includes software developed by Harvard University.
  * 4. Neither the name of the University nor the names of its contributors
@@ -51,7 +47,7 @@
  *	from: @(#)clock.c	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: clock.c,v 1.41 2001/07/24 19:29:25 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/sparc64/eeprom_ebus.c,v 1.3 2003/08/23 05:56:58 marcel Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/eeprom_ebus.c,v 1.7 2004/08/12 17:41:33 marius Exp $
  */
 
 #include <sys/param.h>
@@ -59,7 +55,10 @@
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/resource.h>
+
+#include <dev/ofw/ofw_bus.h>
 
 #include <machine/bus.h>
 #include <machine/idprom.h>
@@ -67,13 +66,9 @@
 
 #include <sys/rman.h>
 
-#include <dev/ofw/openfirm.h>
-
 #include <machine/eeprom.h>
 
 #include <dev/mk48txx/mk48txxreg.h>
-
-#include <sparc64/ebus/ebusvar.h>
 
 #include "clock_if.h"
 
@@ -81,12 +76,11 @@
  * clock (eeprom) attaches at the sbus or the ebus
  */
 
-static int eeprom_ebus_probe(device_t);
 static int eeprom_ebus_attach(device_t);
 
 static device_method_t eeprom_ebus_methods[] = {
 	/* Device interface */
-	DEVMETHOD(device_probe,		eeprom_ebus_probe),
+	DEVMETHOD(device_probe,		eeprom_probe),
 	DEVMETHOD(device_attach,	eeprom_ebus_attach),
 
 	/* clock interface */
@@ -104,18 +98,6 @@ static driver_t eeprom_ebus_driver = {
 
 DRIVER_MODULE(eeprom, ebus, eeprom_ebus_driver, eeprom_devclass, 0, 0);
 
-
-static int
-eeprom_ebus_probe(device_t dev)
-{
-
-	if (strcmp("eeprom", ebus_get_name(dev)) == 0) {
-		device_set_desc(dev, "EBus EEPROM/clock");
-		return (0);
-	}
-	return (ENXIO);
-}
-
 /*
  * Attach a clock (really `eeprom') to the ebus.
  *
@@ -132,13 +114,12 @@ eeprom_ebus_attach(device_t dev)
 	int rid, error;
 
 	rid = 0;
-	res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0UL, ~0UL, 1,
-	    RF_ACTIVE);
+	res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (res == NULL) {
 		device_printf(dev, "could not allocate resources\n");
 		return (ENXIO);
 	}
-	error = eeprom_attach(dev, ebus_get_node(dev), rman_get_bustag(res),
+	error = eeprom_attach(dev, rman_get_bustag(res),
 	    rman_get_bushandle(res));
 	return (error);
 }

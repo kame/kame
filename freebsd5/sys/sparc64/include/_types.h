@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -33,7 +29,7 @@
  *
  *	From: @(#)ansi.h	8.2 (Berkeley) 1/4/94
  *	From: @(#)types.h	8.3 (Berkeley) 1/5/94
- * $FreeBSD: src/sys/sparc64/include/_types.h,v 1.4 2003/03/25 00:07:05 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/_types.h,v 1.7 2004/04/07 05:00:00 imp Exp $
  */
 
 #ifndef _MACHINE__TYPES_H_
@@ -55,6 +51,7 @@ typedef	unsigned long		__uint64_t;
  * Standard type definitions.
  */
 typedef	__int32_t	__clock_t;		/* clock()... */
+typedef	unsigned int	__cpumask_t;
 typedef	__int64_t	__critical_t;
 typedef	double		__double_t;
 typedef	float		__float_t;
@@ -74,7 +71,7 @@ typedef	__int64_t	__register_t;
 typedef	__int64_t	__segsz_t;		/* segment size (in pages) */
 typedef	__uint64_t	__size_t;		/* sizeof() */
 typedef	__int64_t	__ssize_t;		/* byte count or error */
-typedef	__int32_t	__time_t;		/* time()... */
+typedef	__int64_t	__time_t;		/* time()... */
 typedef	__uint64_t	__uintfptr_t;
 typedef	__uint64_t	__uintmax_t;
 typedef	__uint64_t	__uintptr_t;

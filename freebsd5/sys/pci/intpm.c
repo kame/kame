@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/intpm.c,v 1.30 2003/08/22 07:13:22 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/intpm.c,v 1.31 2004/03/17 17:50:54 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -664,8 +664,7 @@ intpm_attach(device_t dev)
                 }
 
 		rid=PCI_BASE_ADDR_SMB;
-		res=bus_alloc_resource(dev,SYS_RES_IOPORT,&rid,
-				       0,~0,1,RF_ACTIVE);
+		res=bus_alloc_resource_any(dev,SYS_RES_IOPORT,&rid,RF_ACTIVE);
 		if(res==NULL){
 		  device_printf(dev,"Could not allocate Bus space\n");
 		  return ENXIO;

@@ -26,21 +26,14 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_btsocket.h,v 1.8 2003/04/26 22:32:10 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_btsocket.h,v 1.3 2003/11/14 03:45:29 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_btsocket.h,v 1.5.2.1 2004/08/26 20:58:46 julian Exp $
  */
 
 #ifndef _NETGRAPH_BTSOCKET_H_
 #define _NETGRAPH_BTSOCKET_H_
 
 /*
- * XXX FIXME: does not belong here, move to sys/socket.h later and fix AF_MAX
- */
-
-#define AF_BLUETOOTH	36		/* Address family */
-#define PF_BLUETOOTH	AF_BLUETOOTH	/* Protocol family */
-
-/*
- * XXX FIXME: does not belong here, move to other places later
+ * Bluetooth protocols
  */
 
 #define BLUETOOTH_PROTO_HCI	134	/* HCI protocol number */
@@ -48,14 +41,13 @@
 #define BLUETOOTH_PROTO_RFCOMM	136	/* RFCOMM protocol number */
 
 /*
- * XXX FIXME: probably does not belong here
  * Bluetooth version of struct sockaddr for raw HCI sockets
  */
 
 struct sockaddr_hci {
 	u_char		hci_len;	/* total length */
 	u_char		hci_family;	/* address family */
-	char		hci_node[16];	/* address (size == NG_NODELEN  + 1) */
+	char		hci_node[32];	/* address (size == NG_NODESIZ ) */
 };
 
 /* Raw HCI socket options */

@@ -60,7 +60,7 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_gif_demux.c,v 1.7 2003/03/05 19:24:22 peter Exp $
+ * $FreeBSD: src/sys/netgraph/ng_gif_demux.c,v 1.9 2004/07/04 16:11:02 stefanf Exp $
  */
 
 /*
@@ -144,18 +144,15 @@ static const struct ng_cmdlist ng_gif_demux_cmdlist[] = {
 
 /* Node type descriptor */
 static struct ng_type ng_gif_demux_typestruct = {
-	NG_ABI_VERSION,
-	NG_GIF_DEMUX_NODE_TYPE,
-	NULL,
-	ng_gif_demux_constructor,
-	ng_gif_demux_rcvmsg,
-	ng_gif_demux_shutdown,
-	ng_gif_demux_newhook,
-	NULL,
-	NULL,
-	ng_gif_demux_rcvdata,
-	ng_gif_demux_disconnect,
-	ng_gif_demux_cmdlist,
+	.version =	NG_ABI_VERSION,
+	.name =		NG_GIF_DEMUX_NODE_TYPE,
+	.constructor =	ng_gif_demux_constructor,
+	.rcvmsg =	ng_gif_demux_rcvmsg,
+	.shutdown =	ng_gif_demux_shutdown,
+	.newhook =	ng_gif_demux_newhook,
+	.rcvdata =	ng_gif_demux_rcvdata,
+	.disconnect =	ng_gif_demux_disconnect,
+	.cmdlist =	ng_gif_demux_cmdlist,
 };
 NETGRAPH_INIT(gif_demux, &ng_gif_demux_typestruct);
 
@@ -166,7 +163,7 @@ NETGRAPH_INIT(gif_demux, &ng_gif_demux_typestruct);
 /*
  * Get the family descriptor from the family ID
  */
-static __inline__ iffam_p
+static __inline iffam_p
 get_iffam_from_af(sa_family_t family)
 {
 	iffam_p iffam;
@@ -183,7 +180,7 @@ get_iffam_from_af(sa_family_t family)
 /*
  * Get the family descriptor from the hook
  */
-static __inline__ iffam_p
+static __inline iffam_p
 get_iffam_from_hook(priv_p priv, hook_p hook)
 {
 	int k;
@@ -198,7 +195,7 @@ get_iffam_from_hook(priv_p priv, hook_p hook)
  * Get the hook from the iffam descriptor
  */
 
-static __inline__ hook_p *
+static __inline hook_p *
 get_hook_from_iffam(priv_p priv, iffam_p iffam)
 {
 	return (&priv->hooks[iffam - gFamilies]);
@@ -207,7 +204,7 @@ get_hook_from_iffam(priv_p priv, iffam_p iffam)
 /*
  * Get the iffam descriptor from the name
  */
-static __inline__ iffam_p
+static __inline iffam_p
 get_iffam_from_name(const char *name)
 {
 	iffam_p iffam;

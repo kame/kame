@@ -37,7 +37,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpi2/i4b_ifpi2_pci.c,v 1.14 2003/09/02 17:30:39 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpi2/i4b_ifpi2_pci.c,v 1.16 2004/07/18 20:13:31 gj Exp $");
 
 #include "opt_i4b.h"
 
@@ -148,6 +148,7 @@ struct l1_softc *ifpi2_scp[IFPI2_MAXUNIT];
 /*
  *	AVM PCI Status Latch 0 read only bits
  */
+#define ASL_RESET		0x01
 #define ASL_TIMERRESET 		0x04
 #define ASL_ENABLE_INT		0x08
 
@@ -469,9 +470,8 @@ avma1pp2_attach_avma1pp(device_t dev)
 	ifpi2_scp[unit] = sc;
 
 	sc->sc_resources.io_rid[0] = PCIR_BAR(1);
-	sc->sc_resources.io_base[0] = bus_alloc_resource(dev, SYS_RES_IOPORT,
-		&sc->sc_resources.io_rid[0],
-		0, ~0, 1, RF_ACTIVE);
+	sc->sc_resources.io_base[0] = bus_alloc_resource_any(dev,
+		SYS_RES_IOPORT, &sc->sc_resources.io_rid[0], RF_ACTIVE);
 
 	if (sc->sc_resources.io_base[0] == NULL) {
 		printf("ifpi2-%d: couldn't map IO port\n", unit);
@@ -484,8 +484,8 @@ avma1pp2_attach_avma1pp(device_t dev)
 
 	/* Allocate interrupt */
 	sc->sc_resources.irq_rid = 0;
-	sc->sc_resources.irq = bus_alloc_resource(dev, SYS_RES_IRQ,
-		&sc->sc_resources.irq_rid, 0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	sc->sc_resources.irq = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+		&sc->sc_resources.irq_rid, RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->sc_resources.irq == NULL) {
 		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(1), sc->sc_resources.io_base[0]);
@@ -559,6 +559,13 @@ avma1pp2_attach_avma1pp(device_t dev)
 #ifdef AVMA1PCI_V2_DEBUG
 	printf("avma1pp2_attach: 1 HSCX_STAT %x\n", v);
 #endif
+
+	bus_space_write_1(btag, bhandle, STAT0_OFFSET, 0);
+	DELAY(SEC_DELAY/100); /* 10 ms */
+	bus_space_write_1(btag, bhandle, STAT0_OFFSET, ASL_RESET);
+	DELAY(SEC_DELAY/100); /* 10 ms */
+	bus_space_write_1(btag, bhandle, STAT0_OFFSET, 0);
+	DELAY(SEC_DELAY/100); /* 10 ms */
 
 	bus_space_write_1(btag, bhandle, STAT0_OFFSET, ASL_TIMERRESET);
 	DELAY(SEC_DELAY/100); /* 10 ms */

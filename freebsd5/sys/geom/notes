@@ -1,4 +1,4 @@
-$FreeBSD: src/sys/geom/notes,v 1.4 2003/03/23 10:08:13 phk Exp $
+$FreeBSD: src/sys/geom/notes,v 1.4.6.1 2004/09/13 06:26:57 phk Exp $
 
 For the lack of a better place to put them, this file will contain
 notes on some of the more intricate details of geom.
@@ -138,3 +138,13 @@ application     |      |          |          |    X     |  X     |
 geom_slice.h is special in that it documents a "library" for implementing
 a specific kind of class, and consequently does not appear in the above
 matrix.
+-----------------------------------------------------------------------
+Removable media.
+
+In general, the theory is that a drive creates the provider when it has
+a media and destroys it when the media disappears.
+
+In a more realistic world, we will allow a provider to be opened medialess
+(set any sectorsize and a mediasize==0) in order to allow operations like
+open/close tray etc.
+

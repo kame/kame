@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/imgact_elf.c,v 1.141 2003/09/25 01:10:25 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/imgact_elf.c,v 1.155 2004/08/11 02:35:05 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/exec.h>
@@ -201,7 +201,9 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
 	if (!IS_ELF(*hdr) ||
 	    hdr->e_ident[EI_CLASS] != ELF_TARG_CLASS ||
 	    hdr->e_ident[EI_DATA] != ELF_TARG_DATA ||
-	    hdr->e_ident[EI_VERSION] != EV_CURRENT)
+	    hdr->e_ident[EI_VERSION] != EV_CURRENT ||
+	    hdr->e_phentsize != sizeof(Elf_Phdr) ||
+	    hdr->e_version != ELF_TARG_VER)
 		return (ENOEXEC);
 
 	/*
@@ -214,9 +216,6 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
 			break;
 	}
 	if (i == MAX_BRANDS)
-		return (ENOEXEC);
-
-	if (hdr->e_version != ELF_TARG_VER)
 		return (ENOEXEC);
 
 	return (0);
@@ -529,15 +528,9 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	imgp->userspace_envv = NULL;
 	imgp->attr = attr;
 	imgp->firstpage = NULL;
-	imgp->image_header = (char *)kmem_alloc_wait(exec_map, PAGE_SIZE);
+	imgp->image_header = NULL;
 	imgp->object = NULL;
 	imgp->execlabel = NULL;
-
-	if (imgp->image_header == NULL) {
-		nd->ni_vp = NULL;
-		error = ENOMEM;
-		goto fail;
-	}
 
 	/* XXXKSE */
 	NDINIT(nd, LOOKUP, LOCKLEAF|FOLLOW, UIO_SYSSPACE, file, curthread);
@@ -585,9 +578,10 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		goto fail;
 	}
 
-	/* Only support headers that fit within first page for now */
+	/* Only support headers that fit within first page for now      */
+	/*    (multiplication of two Elf_Half fields will not overflow) */
 	if ((hdr->e_phoff > PAGE_SIZE) ||
-	    (hdr->e_phoff + hdr->e_phentsize * hdr->e_phnum) > PAGE_SIZE) {
+	    (hdr->e_phentsize * hdr->e_phnum) > PAGE_SIZE - hdr->e_phoff) {
 		error = ENOEXEC;
 		goto fail;
 	}
@@ -626,9 +620,6 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 fail:
 	if (imgp->firstpage)
 		exec_unmap_first_page(imgp);
-	if (imgp->image_header)
-		kmem_free_wakeup(exec_map, (vm_offset_t)imgp->image_header,
-		    PAGE_SIZE);
 	if (imgp->object)
 		vm_object_deallocate(imgp->object);
 
@@ -708,6 +699,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		goto fail;
 	}
 	sv = brand_info->sysvec;
+	if (interp != NULL && brand_info->interp_newpath != NULL)
+		interp = brand_info->interp_newpath;
 
 	if ((error = exec_extract_strings(imgp)) != 0)
 		goto fail;
@@ -742,6 +735,17 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			    phdr[i].p_memsz, phdr[i].p_filesz, prot,
 			    sv->sv_pagesize)) != 0)
   				goto fail;
+
+			/*
+			 * If this segment contains the program headers,
+			 * remember their virtual address for the AT_PHDR
+			 * aux entry. Static binaries don't usually include
+			 * a PT_PHDR entry.
+			 */
+			if (phdr[i].p_offset == 0 &&
+			    hdr->e_phoff + hdr->e_phnum * hdr->e_phentsize
+				<= phdr[i].p_filesz)
+				proghdr = phdr[i].p_vaddr + hdr->e_phoff;
 
 			seg_addr = trunc_page(phdr[i].p_vaddr);
 			seg_size = round_page(phdr[i].p_memsz +
@@ -792,11 +796,11 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * limits after loading the segments since we do
 	 * not actually fault in all the segments pages.
 	 */
-	if (data_size >
-	    imgp->proc->p_rlimit[RLIMIT_DATA].rlim_cur ||
+	PROC_LOCK(imgp->proc);
+	if (data_size > lim_cur(imgp->proc, RLIMIT_DATA) ||
 	    text_size > maxtsiz ||
-	    total_size >
-	    imgp->proc->p_rlimit[RLIMIT_VMEM].rlim_cur) {
+	    total_size > lim_cur(imgp->proc, RLIMIT_VMEM)) {
+		PROC_UNLOCK(imgp->proc);
 		error = ENOMEM;
 		goto fail;
 	}
@@ -813,26 +817,30 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * its maximum allowed size.
 	 */
 	addr = round_page((vm_offset_t)imgp->proc->p_vmspace->vm_daddr +
-	    imgp->proc->p_rlimit[RLIMIT_DATA].rlim_max);
+	    lim_max(imgp->proc, RLIMIT_DATA));
+	PROC_UNLOCK(imgp->proc);
 
 	imgp->entry_addr = entry;
 
 	imgp->proc->p_sysent = sv;
-	if (interp != NULL) {
+	if (interp != NULL && brand_info->emul_path != NULL &&
+	    brand_info->emul_path[0] != '\0') {
 		path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
 		snprintf(path, MAXPATHLEN, "%s%s", brand_info->emul_path,
 		    interp);
-		if ((error = __elfN(load_file)(imgp->proc, path, &addr,
-		    &imgp->entry_addr, sv->sv_pagesize)) != 0) {
-			if ((error = __elfN(load_file)(imgp->proc, interp,
-			    &addr, &imgp->entry_addr, sv->sv_pagesize)) != 0) {
-				uprintf("ELF interpreter %s not found\n",
-				    path);
-				free(path, M_TEMP);
-				goto fail;
-			}
-		}
+		error = __elfN(load_file)(imgp->proc, path, &addr,
+		    &imgp->entry_addr, sv->sv_pagesize);
 		free(path, M_TEMP);
+		if (error == 0)
+			interp = NULL;
+	}
+	if (interp != NULL) {
+		error = __elfN(load_file)(imgp->proc, interp, &addr,
+		    &imgp->entry_addr, sv->sv_pagesize);
+		if (error != 0) {
+			uprintf("ELF interpreter %s not found\n", interp);
+			goto fail;
+		}
 	}
 
 	/*
@@ -913,11 +921,10 @@ struct sseg_closure {
 
 static void cb_put_phdr(vm_map_entry_t, void *);
 static void cb_size_segment(vm_map_entry_t, void *);
-static void each_writable_segment(struct proc *, segment_callback, void *);
+static void each_writable_segment(struct thread *, segment_callback, void *);
 static int __elfN(corehdr)(struct thread *, struct vnode *, struct ucred *,
     int, void *, size_t);
-static void __elfN(puthdr)(struct proc *, void *, size_t *,
-    const prstatus_t *, const prfpregset_t *, const prpsinfo_t *, int);
+static void __elfN(puthdr)(struct thread *, void *, size_t *, int);
 static void __elfN(putnote)(void *, size_t *, const char *, int,
     const void *, size_t);
 
@@ -926,11 +933,10 @@ extern int osreldate;
 int
 __elfN(coredump)(td, vp, limit)
 	struct thread *td;
-	register struct vnode *vp;
+	struct vnode *vp;
 	off_t limit;
 {
-	register struct proc *p = td->td_proc;
-	register struct ucred *cred = td->td_ucred;
+	struct ucred *cred = td->td_ucred;
 	int error = 0;
 	struct sseg_closure seginfo;
 	void *hdr;
@@ -939,7 +945,7 @@ __elfN(coredump)(td, vp, limit)
 	/* Size the program segments. */
 	seginfo.count = 0;
 	seginfo.size = 0;
-	each_writable_segment(p, cb_size_segment, &seginfo);
+	each_writable_segment(td, cb_size_segment, &seginfo);
 
 	/*
 	 * Calculate the size of the core file header area by making
@@ -947,9 +953,7 @@ __elfN(coredump)(td, vp, limit)
 	 * size is calculated.
 	 */
 	hdrsize = 0;
-	__elfN(puthdr)((struct proc *)NULL, (void *)NULL, &hdrsize,
-	    (const prstatus_t *)NULL, (const prfpregset_t *)NULL,
-	    (const prpsinfo_t *)NULL, seginfo.count);
+	__elfN(puthdr)(td, (void *)NULL, &hdrsize, seginfo.count);
 
 	if (hdrsize + seginfo.size >= limit)
 		return (EFAULT);
@@ -976,7 +980,7 @@ __elfN(coredump)(td, vp, limit)
 			error = vn_rdwr_inchunks(UIO_WRITE, vp,
 			    (caddr_t)(uintptr_t)php->p_vaddr,
 			    php->p_filesz, offset, UIO_USERSPACE,
-			    IO_UNIT | IO_DIRECT, cred, NOCRED, (int *)NULL,
+			    IO_UNIT | IO_DIRECT, cred, NOCRED, NULL,
 			    curthread); /* XXXKSE */
 			if (error != 0)
 				break;
@@ -1042,11 +1046,12 @@ cb_size_segment(entry, closure)
  * caller-supplied data.
  */
 static void
-each_writable_segment(p, func, closure)
-	struct proc *p;
+each_writable_segment(td, func, closure)
+	struct thread *td;
 	segment_callback func;
 	void *closure;
 {
+	struct proc *p = td->td_proc;
 	vm_map_t map = &p->p_vmspace->vm_map;
 	vm_map_entry_t entry;
 
@@ -1109,47 +1114,12 @@ __elfN(corehdr)(td, vp, cred, numsegs, hdr, hdrsize)
 	size_t hdrsize;
 	void *hdr;
 {
-	struct {
-		prstatus_t status;
-		prfpregset_t fpregset;
-		prpsinfo_t psinfo;
-	} *tempdata;
-	struct proc *p = td->td_proc;
 	size_t off;
-	prstatus_t *status;
-	prfpregset_t *fpregset;
-	prpsinfo_t *psinfo;
-
-	tempdata = malloc(sizeof(*tempdata), M_TEMP, M_ZERO | M_WAITOK);
-	status = &tempdata->status;
-	fpregset = &tempdata->fpregset;
-	psinfo = &tempdata->psinfo;
-
-	/* Gather the information for the header. */
-	status->pr_version = PRSTATUS_VERSION;
-	status->pr_statussz = sizeof(prstatus_t);
-	status->pr_gregsetsz = sizeof(gregset_t);
-	status->pr_fpregsetsz = sizeof(fpregset_t);
-	status->pr_osreldate = osreldate;
-	status->pr_cursig = p->p_sig;
-	status->pr_pid = p->p_pid;
-	fill_regs(td, &status->pr_reg);
-
-	fill_fpregs(td, fpregset);
-
-	psinfo->pr_version = PRPSINFO_VERSION;
-	psinfo->pr_psinfosz = sizeof(prpsinfo_t);
-	strlcpy(psinfo->pr_fname, p->p_comm, sizeof(psinfo->pr_fname));
-
-	/* XXX - We don't fill in the command line arguments properly yet. */
-	strlcpy(psinfo->pr_psargs, p->p_comm, sizeof(psinfo->pr_psargs));
 
 	/* Fill in the header. */
 	bzero(hdr, hdrsize);
 	off = 0;
-	__elfN(puthdr)(p, hdr, &off, status, fpregset, psinfo, numsegs);
-
-	free(tempdata, M_TEMP);
+	__elfN(puthdr)(td, hdr, &off, numsegs);
 
 	/* Write it to the core file. */
 	return (vn_rdwr_inchunks(UIO_WRITE, vp, hdr, hdrsize, (off_t)0,
@@ -1158,13 +1128,21 @@ __elfN(corehdr)(td, vp, cred, numsegs, hdr, hdrsize)
 }
 
 static void
-__elfN(puthdr)(struct proc *p, void *dst, size_t *off, const prstatus_t *status,
-    const prfpregset_t *fpregset, const prpsinfo_t *psinfo, int numsegs)
+__elfN(puthdr)(struct thread *td, void *dst, size_t *off, int numsegs)
 {
-	size_t ehoff;
-	size_t phoff;
-	size_t noteoff;
-	size_t notesz;
+	struct {
+		prstatus_t status;
+		prfpregset_t fpregset;
+		prpsinfo_t psinfo;
+	} *tempdata;
+	prstatus_t *status;
+	prfpregset_t *fpregset;
+	prpsinfo_t *psinfo;
+	struct proc *p;
+	struct thread *thr;
+	size_t ehoff, noteoff, notesz, phoff;
+
+	p = td->td_proc;
 
 	ehoff = *off;
 	*off += sizeof(Elf_Ehdr);
@@ -1173,13 +1151,75 @@ __elfN(puthdr)(struct proc *p, void *dst, size_t *off, const prstatus_t *status,
 	*off += (numsegs + 1) * sizeof(Elf_Phdr);
 
 	noteoff = *off;
-	__elfN(putnote)(dst, off, "FreeBSD", NT_PRSTATUS, status,
-	    sizeof *status);
-	__elfN(putnote)(dst, off, "FreeBSD", NT_FPREGSET, fpregset,
-	    sizeof *fpregset);
+	/*
+	 * Don't allocate space for the notes if we're just calculating
+	 * the size of the header. We also don't collect the data.
+	 */
+	if (dst != NULL) {
+		tempdata = malloc(sizeof(*tempdata), M_TEMP, M_ZERO|M_WAITOK);
+		status = &tempdata->status;
+		fpregset = &tempdata->fpregset;
+		psinfo = &tempdata->psinfo;
+	} else {
+		tempdata = NULL;
+		status = NULL;
+		fpregset = NULL;
+		psinfo = NULL;
+	}
+
+	if (dst != NULL) {
+		psinfo->pr_version = PRPSINFO_VERSION;
+		psinfo->pr_psinfosz = sizeof(prpsinfo_t);
+		strlcpy(psinfo->pr_fname, p->p_comm, sizeof(psinfo->pr_fname));
+		/*
+		 * XXX - We don't fill in the command line arguments properly
+		 * yet.
+		 */
+		strlcpy(psinfo->pr_psargs, p->p_comm,
+		    sizeof(psinfo->pr_psargs));
+	}
 	__elfN(putnote)(dst, off, "FreeBSD", NT_PRPSINFO, psinfo,
 	    sizeof *psinfo);
+
+	/*
+	 * To have the debugger select the right thread (LWP) as the initial
+	 * thread, we dump the state of the thread passed to us in td first.
+	 * This is the thread that causes the core dump and thus likely to
+	 * be the right thread one wants to have selected in the debugger.
+	 */
+	thr = td;
+	while (thr != NULL) {
+		if (dst != NULL) {
+			status->pr_version = PRSTATUS_VERSION;
+			status->pr_statussz = sizeof(prstatus_t);
+			status->pr_gregsetsz = sizeof(gregset_t);
+			status->pr_fpregsetsz = sizeof(fpregset_t);
+			status->pr_osreldate = osreldate;
+			status->pr_cursig = p->p_sig;
+			status->pr_pid = thr->td_tid;
+			fill_regs(thr, &status->pr_reg);
+			fill_fpregs(thr, fpregset);
+		}
+		__elfN(putnote)(dst, off, "FreeBSD", NT_PRSTATUS, status,
+		    sizeof *status);
+		__elfN(putnote)(dst, off, "FreeBSD", NT_FPREGSET, fpregset,
+		    sizeof *fpregset);
+		/*
+		 * Allow for MD specific notes, as well as any MD
+		 * specific preparations for writing MI notes.
+		 */
+		__elfN(dump_thread)(thr, dst, off);
+
+		thr = (thr == td) ? TAILQ_FIRST(&p->p_threads) :
+		    TAILQ_NEXT(thr, td_plist);
+		if (thr == td)
+			thr = TAILQ_NEXT(thr, td_plist);
+	}
+
 	notesz = *off - noteoff;
+
+	if (dst != NULL)
+		free(tempdata, M_TEMP);
 
 	/* Align up to a page boundary for the program segments. */
 	*off = round_page(*off);
@@ -1235,7 +1275,7 @@ __elfN(puthdr)(struct proc *p, void *dst, size_t *off, const prstatus_t *status,
 		/* All the writable segments from the program. */
 		phc.phdr = phdr;
 		phc.offset = *off;
-		each_writable_segment(p, cb_put_phdr, &phc);
+		each_writable_segment(td, cb_put_phdr, &phc);
 	}
 }
 

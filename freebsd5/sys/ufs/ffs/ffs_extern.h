@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_extern.h	8.6 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_extern.h,v 1.55 2003/02/22 00:29:50 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_extern.h,v 1.57 2004/07/30 22:08:52 phk Exp $
  */
 
 #ifndef _UFS_FFS_EXTERN_H
@@ -73,7 +69,6 @@ int	ffs_freefile(struct fs *, struct vnode *, ino_t, int);
 int	ffs_isblock(struct fs *, u_char *, ufs1_daddr_t);
 void	ffs_load_inode(struct buf *, struct inode *, struct fs *, ino_t);
 int	ffs_mountroot(void);
-vfs_mount_t ffs_mount;
 int	ffs_reallocblks(struct vop_reallocblks_args *);
 int	ffs_realloccg(struct inode *, ufs2_daddr_t, ufs2_daddr_t,
 	    ufs2_daddr_t, int, int, struct ucred *, struct buf **);

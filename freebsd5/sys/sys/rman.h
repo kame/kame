@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/rman.h,v 1.19 2003/02/12 07:00:59 imp Exp $
+ * $FreeBSD: src/sys/sys/rman.h,v 1.22 2004/07/01 16:20:58 imp Exp $
  */
 
 #ifndef _SYS_RMAN_H_
@@ -34,6 +34,9 @@
 
 #ifndef	_KERNEL
 #include <sys/queue.h>
+#else
+#include <machine/bus.h>
+#include <machine/resource.h>
 #endif
 
 #define	RF_ALLOCATED	0x0001	/* resource has been reserved */
@@ -91,6 +94,7 @@ struct u_rman {
  * addresses on IA32 hardware.
  */
 TAILQ_HEAD(resource_head, resource);
+#ifdef __RMAN_RESOURCE_VISIBLE
 struct resource {
 	TAILQ_ENTRY(resource)	r_link;
 	LIST_ENTRY(resource)	r_sharelink;
@@ -105,6 +109,10 @@ struct resource {
 	struct	rman *r_rm;	/* resource manager from whence this came */
 	int	r_rid;		/* optional rid for this resource. */
 };
+#else
+struct resource;
+struct device;
+#endif
 
 struct rman {
 	struct	resource_head 	rm_list;
@@ -145,6 +153,8 @@ void	rman_set_bushandle(struct resource *_r, bus_space_handle_t _h);
 bus_space_handle_t rman_get_bushandle(struct resource *_r);
 void	rman_set_rid(struct resource *_r, int _rid);
 int	rman_get_rid(struct resource *_r);
+void	rman_set_start(struct resource *_r, u_long _start);
+void	rman_set_end(struct resource *_r, u_long _end);
 
 extern	struct rman_head rman_head;
 #endif /* _KERNEL */

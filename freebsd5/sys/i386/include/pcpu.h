@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/pcpu.h,v 1.41 2003/11/20 23:23:22 peter Exp $
+ * $FreeBSD: src/sys/i386/include/pcpu.h,v 1.42 2004/03/12 21:45:30 trhodes Exp $
  */
 
 #ifndef _MACHINE_PCPU_H_
@@ -59,7 +59,7 @@ extern struct pcpu *pcpup;
 #define PCPU_PTR(member)        (&pcpup->pc_ ## member)
 #define PCPU_SET(member,value)  (pcpup->pc_ ## member = (value))
  
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) || defined (__INTEL_COMPILER)
 
 /*
  * Evaluates to the byte offset of the per-cpu variable name.

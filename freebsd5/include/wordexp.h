@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/wordexp.h,v 1.4 2003/01/03 12:03:38 tjr Exp $
+ * $FreeBSD: src/include/wordexp.h,v 1.5 2004/06/30 13:55:08 tjr Exp $
  */
 
 #ifndef _WORDEXP_H_
@@ -49,7 +49,7 @@ typedef struct {
  * Flags for wordexp().
  */
 #define	WRDE_APPEND	0x1		/* append to previously generated */
-#define	WRDE_DOOFS	0x2		/* we_offs member is valid */
+#define	WRDE_DOOFFS	0x2		/* we_offs member is valid */
 #define	WRDE_NOCMD	0x4		/* disallow command substitution */
 #define	WRDE_REUSE	0x8		/* reuse wordexp_t */
 #define	WRDE_SHOWERR	0x10		/* don't redirect stderr to /dev/null */

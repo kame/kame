@@ -54,7 +54,7 @@
  *---------------------------------------------------------------------------*/ 
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ipr.c,v 1.26 2003/10/31 18:32:07 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ipr.c,v 1.27.2.2 2004/10/14 11:48:05 rwatson Exp $");
 
 #include "i4bipr.h"
 
@@ -106,6 +106,8 @@ __FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ipr.c,v 1.26 2003/10/31 18:32:07 broo
 #include <i4b/include/i4b_l3l4.h>
 
 #include <i4b/layer4/i4b_l4.h>
+
+NET_NEEDS_GIANT("i4b_ipr");
 
 #define I4BIPRMTU	1500		/* regular MTU */
 #define I4BIPRMAXMTU	2000		/* max MTU */
@@ -382,7 +384,7 @@ i4biproutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	if(ip->ip_tos & IPTOS_LOWDELAY)
 		ifq = &sc->sc_fastq;
 	else
-	        ifq = &sc->sc_if.if_snd;
+	        ifq = (struct ifqueue *)&sc->sc_if.if_snd;
 
 	/* check for space in choosen send queue */
 	
@@ -881,15 +883,11 @@ error:
 		BPF_MTAP(&sc->sc_if, &mm);
 	}
 
-	if(! netisr_queue(NETISR_IP, m))
+	if(netisr_queue(NETISR_IP, m))	/* (0) on success. */
 	{
 		NDBGL4(L4_IPRDBG, "ipr%d: ipintrq full!", unit);
 		sc->sc_if.if_ierrors++;
 		sc->sc_if.if_iqdrops++;		
-	}
-	else
-	{
-		schednetisr(NETISR_IP);
 	}
 }
 

@@ -1,7 +1,7 @@
 #
 # PAE -- Generic kernel configuration file for FreeBSD/i386 PAE
 #
-# $FreeBSD: src/sys/i386/conf/PAE,v 1.8 2003/11/03 22:49:19 jhb Exp $
+# $FreeBSD: src/sys/i386/conf/PAE,v 1.9.2.1 2004/10/11 23:59:03 mjacob Exp $
 
 include GENERIC
 
@@ -26,7 +26,8 @@ makeoptions	NO_MODULES=yes
 
 nodevice	ahb
 nodevice	amd
-nodevice	isp
+#nodevice	isp
+device		ispfw
 nodevice	sym
 nodevice	trm
 
@@ -97,3 +98,4 @@ nodevice	aue
 nodevice	axe
 nodevice	cue
 nodevice	kue
+nodevice	rue

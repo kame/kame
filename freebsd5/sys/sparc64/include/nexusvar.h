@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/nexusvar.h,v 1.2 2002/01/02 18:26:59 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/nexusvar.h,v 1.3 2004/04/30 19:50:50 tmm Exp $
  */
 
 #ifndef _MACHINE_NEXUSVAR_H_
@@ -40,11 +40,6 @@ enum nexus_ivars {
 	NEXUS_IVAR_DMATAG,
 };
 
-/*
- * Simplified accessors for nexus devices
- * XXX: These should be made specializations of generic bus accessor macros
- * instead of having multiple implementations around.
- */
 #define NEXUS_ACCESSOR(var, ivar, type)					\
 	__BUS_ACCESSOR(nexus, var, NEXUS, ivar, type)
 

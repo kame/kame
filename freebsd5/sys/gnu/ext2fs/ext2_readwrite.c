@@ -16,10 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.7 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_readwrite.c,v 1.25 2002/05/16 19:43:28 iedowse Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_readwrite.c,v 1.29 2004/04/07 20:46:03 imp Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -70,7 +66,7 @@ READ(ap)
 	off_t bytesinfile;
 	long size, xfersize, blkoffset;
 	int error, orig_resid;
-	int seqcount = ap->a_ioflag >> 16;
+	int seqcount = ap->a_ioflag >> IO_SEQSHIFT;
 	u_short mode;
 
 	vp = ap->a_vp;
@@ -89,10 +85,8 @@ READ(ap)
 		panic("%s: type %d", READ_S, vp->v_type);
 #endif
 	fs = ip->I_FS;
-#if 0
-	if ((u_quad_t)uio->uio_offset > fs->fs_maxfilesize)
+	if ((uoff_t)uio->uio_offset > fs->fs_maxfilesize)
 		return (EFBIG);
-#endif
 
 	orig_resid = uio->uio_resid;
 	for (error = 0, bp = NULL; uio->uio_resid > 0; bp = NULL) {
@@ -114,7 +108,7 @@ READ(ap)
 		else if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERR) == 0)
 			error = cluster_read(vp,
 			    ip->i_size, lbn, size, NOCRED,
-				uio->uio_resid, (ap->a_ioflag >> 16), &bp);
+			    uio->uio_resid, (ap->a_ioflag >> IO_SEQSHIFT), &bp);
 		else if (seqcount > 1) {
 			int nextsize = BLKSIZE(fs, ip, nextlbn);
 			error = breadn(vp, lbn,
@@ -179,7 +173,7 @@ WRITE(ap)
 	int blkoffset, error, flags, ioflag, resid, size, xfersize;
 
 	ioflag = ap->a_ioflag;
-	seqcount = ap->a_ioflag >> 16;
+	seqcount = ap->a_ioflag >> IO_SEQSHIFT;
 	uio = ap->a_uio;
 	vp = ap->a_vp;
 	ip = VTOI(vp);
@@ -207,25 +201,23 @@ WRITE(ap)
 	}
 
 	fs = ip->I_FS;
-#if 0
 	if (uio->uio_offset < 0 ||
-	    (u_quad_t)uio->uio_offset + uio->uio_resid > fs->fs_maxfilesize)
+	    (uoff_t)uio->uio_offset + uio->uio_resid > fs->fs_maxfilesize)
 		return (EFBIG);
-#endif
 	/*
 	 * Maybe this should be above the vnode op call, but so long as
 	 * file servers have no limits, I don't think it matters.
 	 */
 	td = uio->uio_td;
-	/* For p_rlimit. */
-	mtx_assert(&Giant, MA_OWNED);
-	if (vp->v_type == VREG && td &&
-	    uio->uio_offset + uio->uio_resid >
-	    td->td_proc->p_rlimit[RLIMIT_FSIZE].rlim_cur) {
+	if (vp->v_type == VREG && td != NULL) {
 		PROC_LOCK(td->td_proc);
-		psignal(td->td_proc, SIGXFSZ);
+		if (uio->uio_offset + uio->uio_resid >
+		    lim_cur(td->td_proc, RLIMIT_FSIZE)) {
+			psignal(td->td_proc, SIGXFSZ);
+			PROC_UNLOCK(td->td_proc);
+			return (EFBIG);
+		}
 		PROC_UNLOCK(td->td_proc);
-		return (EFBIG);
 	}
 
 	resid = uio->uio_resid;

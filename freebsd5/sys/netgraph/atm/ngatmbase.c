@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/atm/ngatmbase.c,v 1.1 2003/10/24 07:39:11 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/atm/ngatmbase.c,v 1.2 2003/12/08 01:18:04 truckman Exp $");
 
 #include <sys/param.h>
 #include <sys/module.h>
@@ -75,7 +75,8 @@ static struct mtx ngatm_unilist_mtx;
 static void
 uni_msg_init(void)
 {
-	mtx_init(&ngatm_unilist_mtx, "netgraph UNI msg header lists", NULL, 0);
+	mtx_init(&ngatm_unilist_mtx, "netgraph UNI msg header lists", NULL,
+	    MTX_DEF);
 }
 
 /*

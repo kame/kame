@@ -20,8 +20,6 @@
  *    must display the following acknowledgement:
  *	This product includes software developed by Aaron Brown and
  *	Harvard University.
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -41,7 +39,7 @@
  *	from: @(#)cache.h	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: cache.h,v 1.3 2000/08/01 00:28:02 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/include/cache.h,v 1.10 2003/11/11 06:41:54 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/cache.h,v 1.11 2004/04/07 05:00:00 imp Exp $
  */
 
 #ifndef _MACHINE_CACHE_H_

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -45,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_unix.c,v 1.43 2003/08/11 07:14:08 bms Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_unix.c,v 1.45 2004/04/06 20:15:37 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -77,9 +73,15 @@ obreak(td, uap)
 {
 	struct vmspace *vm = td->td_proc->p_vmspace;
 	vm_offset_t new, old, base;
+	rlim_t datalim, vmemlim;
 	int rv;
 	int error = 0;
 	boolean_t do_map_wirefuture;
+
+	PROC_LOCK(td->td_proc);
+	datalim = lim_cur(td->td_proc, RLIMIT_DATA);
+	vmemlim = lim_cur(td->td_proc, RLIMIT_VMEM);
+	PROC_UNLOCK(td->td_proc);
 
 	do_map_wirefuture = FALSE;
 	new = round_page((vm_offset_t)uap->nsize);
@@ -92,8 +94,7 @@ obreak(td, uap)
 		 * Check the resource limit, but allow a process to reduce
 		 * its usage, even if it remains over the limit.
 		 */
-		if (new - base > td->td_proc->p_rlimit[RLIMIT_DATA].rlim_cur &&
-		    new > old) {
+		if (new - base > datalim && new > old) {
 			error = ENOMEM;
 			goto done;
 		}
@@ -111,8 +112,7 @@ obreak(td, uap)
 		goto done;
 	}
 	if (new > old) {
-		if (vm->vm_map.size + (new - old) >
-		    td->td_proc->p_rlimit[RLIMIT_VMEM].rlim_cur) {
+		if (vm->vm_map.size + (new - old) > vmemlim) {
 			error = ENOMEM;
 			goto done;
 		}

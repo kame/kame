@@ -22,16 +22,18 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/pci/ofw_pcib_subr.c,v 1.2 2003/08/22 07:38:07 imp Exp $
+ * $FreeBSD: src/sys/sparc64/pci/ofw_pcib_subr.c,v 1.4 2004/08/12 17:41:32 marius Exp $
  */
 
 #include "opt_ofw_pci.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 
-#include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_pci.h>
+#include <dev/ofw/openfirm.h>
 
 #include <machine/bus.h>
 #include <machine/ofw_bus.h>
@@ -52,7 +54,7 @@ ofw_pcib_gen_setup(device_t bridge)
 	u_int secbus;
 
 	sc->ops_pcib_sc.dev = bridge;
-	sc->ops_node = ofw_pci_get_node(bridge);
+	sc->ops_node = ofw_bus_get_node(bridge);
 	KASSERT(sc->ops_node != 0,
 	    ("ofw_pcib_gen_setup: no ofw pci parent bus!"));
 
@@ -80,7 +82,7 @@ ofw_pcib_gen_route_interrupt(device_t bridge, device_t dev, int intpin)
 	struct ofw_bus_iinfo *ii = &sc->ops_iinfo;
 	struct ofw_pci_register reg;
 	device_t pbridge = device_get_parent(device_get_parent(bridge));
-	phandle_t node = ofw_pci_get_node(dev);
+	phandle_t node = ofw_bus_get_node(dev);
 	ofw_pci_intr_t pintr, mintr;
 	u_int8_t maskbuf[sizeof(reg) + sizeof(pintr)];
 
@@ -131,4 +133,3 @@ ofw_pcib_gen_adjust_busrange(device_t bridge, u_int subbus)
 		OFW_PCI_ADJUST_BUSRANGE(device_get_parent(bridge), subbus);
 	}
 }
-

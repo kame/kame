@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec.h,v 1.4 2003/09/29 22:57:42 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec.h,v 1.7 2004/02/11 04:26:03 bms Exp $	*/
 /*	$KAME: ipsec.h,v 1.53 2001/11/20 08:32:38 itojun Exp $	*/
 
 /*
@@ -161,6 +161,7 @@ struct secspacq {
 #define	IPSEC_MODE_ANY		0	/* i.e. wildcard. */
 #define	IPSEC_MODE_TRANSPORT	1
 #define	IPSEC_MODE_TUNNEL	2
+#define	IPSEC_MODE_TCPMD5	3	/* TCP MD5 mode */
 
 /*
  * Direction of security policy.
@@ -232,6 +233,9 @@ struct ipsecstat {
 	u_quad_t out_esphist[256];
 	u_quad_t out_ahhist[256];
 	u_quad_t out_comphist[256];
+
+	u_quad_t spdcachelookup;
+	u_quad_t spdcachemiss;
 };
 
 /* statistics for ipsec processing */
@@ -343,6 +347,10 @@ extern int crypto_support;
 #define ipseclog(x)	do { if (ipsec_debug) log x; } while (0)
 /* for openbsd compatibility */
 #define	DPRINTF(x)	do { if (ipsec_debug) printf x; } while (0)
+
+/* XXX for KAME code compatibility */
+#define ipsec_pcbconn(_x)
+#define	ipsec_pcbdisconn(_x)
 
 extern	struct ipsecrequest *ipsec_newisr(void);
 extern	void ipsec_delisr(struct ipsecrequest *);

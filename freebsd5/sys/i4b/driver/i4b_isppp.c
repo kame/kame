@@ -39,7 +39,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_isppp.c,v 1.25 2003/10/31 18:32:07 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_isppp.c,v 1.25.4.1 2004/10/14 11:48:05 rwatson Exp $");
 
 #include "i4bisppp.h"
 
@@ -66,6 +66,8 @@ __FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_isppp.c,v 1.25 2003/10/31 18:32:07 br
 #include <i4b/include/i4b_l3l4.h>
 
 #include <i4b/layer4/i4b_l4.h>
+
+NET_NEEDS_GIANT("i4b_isppp");
 
 #define ISPPP_FMT	"isp%d: "
 #define	ISPPP_ARG(sc)	((sc)->sc_if.if_dunit)

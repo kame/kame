@@ -41,7 +41,7 @@
  *
  *	Last Edit-Date: [Wed Apr  5 18:21:32 2000]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_hdr.h,v 1.48 2003/07/27 14:01:33 robert Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_hdr.h,v 1.53 2004/07/10 21:24:36 marcel Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -55,7 +55,9 @@
 #include <sys/callout.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
@@ -570,7 +572,7 @@ EXTERN u_char	color;			/* color or mono display */
 EXTERN u_short	kern_attr;		/* kernel messages char attributes */
 EXTERN u_short	user_attr;		/* character attributes */
 
-EXTERN struct tty pcvt_tty[PCVT_NSCREENS];
+EXTERN struct tty *pcvt_tty[PCVT_NSCREENS];
 
 struct sixels {
 	u_char lower[MAXSIXEL];		/* lower half of char */
@@ -734,7 +736,6 @@ u_char bgansitopc[] = {			/* background ANSI color -> pc */
 	BG_MAGENTA, BG_CYAN, BG_LIGHTGREY
 };
 
-struct tty *pcvt_ttyp = &pcvt_tty[0];	/* ptr to current device */
 video_state *vsp = &vs[0];		/* ptr to current screen parms */
 
 #ifdef XSERVER
@@ -763,6 +764,7 @@ u_char	keyboard_is_initialized = 0;		/* for ddb sanity */
 u_char	kbd_polling		= 0;		/* keyboard is being polled */
 u_char	reset_keyboard		= 0;		/* OK to reset keyboard */
 keyboard_t *kbd			= NULL;
+struct consdev *pcvt_consptr    = NULL;
 
 #if PCVT_SHOWKEYS
 u_char	keyboard_show		= 0;		/* normal display */
@@ -870,7 +872,6 @@ extern int		pcvt_kbd_rptr;
 extern int		pcvt_kbd_count;
 
 extern u_char		vga_type;
-extern struct tty	*pcvt_ttyp;
 extern video_state	*vsp;
 
 #ifdef XSERVER
@@ -899,6 +900,7 @@ extern u_char		keyboard_is_initialized;
 extern u_char		kbd_polling;
 extern u_char		reset_keyboard;
 extern keyboard_t	*kbd;
+extern struct consdev	*pcvt_consptr;
 
 #if PCVT_SHOWKEYS
 extern u_char		keyboard_show;
@@ -947,7 +949,7 @@ void	get_usl_keymap( keymap_t *map );
 
 void	init_sfkl ( struct video_state *svsp );
 void	init_ufkl ( struct video_state *svsp );
-int	kbdioctl ( dev_t dev, int cmd, caddr_t data, int flag );
+int	kbdioctl ( struct cdev *dev, int cmd, caddr_t data, int flag );
 void	kbd_code_init ( void );
 void	kbd_code_init1 ( void );
 
@@ -1000,14 +1002,14 @@ void 	update_hp ( struct video_state *svsp );
 void	update_led ( void );
 
 #ifdef XSERVER
-int	usl_vt_ioctl (dev_t dev, int cmd, caddr_t data, int flag, struct thread *);
+int	usl_vt_ioctl (struct cdev *dev, int cmd, caddr_t data, int flag, struct thread *);
 #endif
 
 void	vga10_vga10 ( u_char *invga, u_char *outvga );
 void	vga10_vga14 ( u_char *invga, u_char *outvga );
 void	vga10_vga16 ( u_char *invga, u_char *outvga );
 void	vga10_vga8 ( u_char *invga, u_char *outvga );
-int	vgaioctl ( dev_t dev, int cmd, caddr_t data, int flag );
+int	vgaioctl ( struct cdev *dev, int cmd, caddr_t data, int flag );
 
 #ifdef XSERVER
 int	vgapage ( int n );

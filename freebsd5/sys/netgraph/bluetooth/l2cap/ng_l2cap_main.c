@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_l2cap_main.c,v 1.2 2003/04/28 21:44:59 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_main.c,v 1.2 2003/05/10 21:44:41 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_main.c,v 1.4 2004/05/29 00:51:17 julian Exp $
  */
 
 #include <sys/param.h>
@@ -38,16 +38,16 @@
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_parse.h>
-#include "ng_bluetooth.h"
-#include "ng_hci.h"
-#include "ng_l2cap.h"
-#include "ng_l2cap_var.h"
-#include "ng_l2cap_cmds.h"
-#include "ng_l2cap_evnt.h"
-#include "ng_l2cap_llpi.h"
-#include "ng_l2cap_ulpi.h"
-#include "ng_l2cap_misc.h"
-#include "ng_l2cap_prse.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/include/ng_l2cap.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_var.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_cmds.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_evnt.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_llpi.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_ulpi.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_misc.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_prse.h>
 
 /******************************************************************************
  ******************************************************************************
@@ -75,19 +75,17 @@ static	ng_rcvmsg_t		ng_l2cap_default_rcvmsg;
 static	ng_rcvdata_t		ng_l2cap_rcvdata;
 
 /* Netgraph node type descriptor */
-static	struct ng_type		typestruct = {
-	NG_ABI_VERSION,
-	NG_L2CAP_NODE_TYPE,	/* typename */
-	NULL,			/* modevent */
-	ng_l2cap_constructor,	/* constructor */
-	ng_l2cap_default_rcvmsg,/* control message */
-	ng_l2cap_shutdown,	/* destructor */
-	ng_l2cap_newhook,	/* new hook */
-	NULL,			/* findhook */
-	ng_l2cap_connect,	/* connect hook */
-	ng_l2cap_rcvdata,	/* data */
-	ng_l2cap_disconnect,	/* disconnect hook */
-	ng_l2cap_cmdlist	/* node command list */
+static	struct ng_type typestruct = {
+	.version =	NG_ABI_VERSION,
+	.name =		NG_L2CAP_NODE_TYPE,
+	.constructor =	ng_l2cap_constructor,
+	.rcvmsg =	ng_l2cap_default_rcvmsg,
+	.shutdown =	ng_l2cap_shutdown,
+	.newhook =	ng_l2cap_newhook,
+	.connect =	ng_l2cap_connect,
+	.rcvdata =	ng_l2cap_rcvdata,
+	.disconnect =	ng_l2cap_disconnect,
+	.cmdlist =	ng_l2cap_cmdlist,
 };
 NETGRAPH_INIT(l2cap, &typestruct);
 MODULE_VERSION(ng_l2cap, NG_BLUETOOTH_VERSION);

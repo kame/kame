@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_subs.c,v 1.122 2003/11/22 02:21:49 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_subs.c,v 1.130 2004/07/04 08:52:34 phk Exp $");
 
 /*
  * These functions support the macros and help fiddle mbuf chains for
@@ -418,8 +414,7 @@ nfs_init(struct vfsconf *vfsp)
 	 * Initialize reply list and start timer
 	 */
 	TAILQ_INIT(&nfs_reqq);
-
-	nfs_timer(0);
+	callout_init(&nfs_callout, 0);
 
 	nfs_prev_nfsclnt_sy_narg = sysent[SYS_nfsclnt].sy_narg;
 	sysent[SYS_nfsclnt].sy_narg = 2;
@@ -434,10 +429,29 @@ nfs_init(struct vfsconf *vfsp)
 int
 nfs_uninit(struct vfsconf *vfsp)
 {
+	int i;
 
-	untimeout(nfs_timer, (void *)NULL, nfs_timer_handle);
+	callout_stop(&nfs_callout);
 	sysent[SYS_nfsclnt].sy_narg = nfs_prev_nfsclnt_sy_narg;
 	sysent[SYS_nfsclnt].sy_call = nfs_prev_nfsclnt_sy_call;
+
+	KASSERT(TAILQ_EMPTY(&nfs_reqq),
+	    ("nfs_uninit: request queue not empty"));
+
+	/*
+	 * Tell all nfsiod processes to exit. Clear nfs_iodmax, and wakeup
+	 * any sleeping nfsiods so they check nfs_iodmax and exit.
+	 */
+	nfs_iodmax = 0;
+	for (i = 0; i < nfs_numasync; i++)
+		if (nfs_iodwant[i])
+			wakeup(&nfs_iodwant[i]);
+	/* The last nfsiod to exit will wake us up when nfs_numasync hits 0 */
+	while (nfs_numasync)
+		tsleep(&nfs_numasync, PWAIT, "ioddie", 0);
+
+	nfs_nhuninit();
+	uma_zdestroy(nfsmount_zone);
 	return (0);
 }
 
@@ -481,7 +495,7 @@ nfs_loadattrcache(struct vnode **vpp, struct mbuf **mdp, caddr_t *dposp,
 	if (v3) {
 		vtyp = nfsv3tov_type(fp->fa_type);
 		vmode = fxdr_unsigned(u_short, fp->fa_mode);
-		rdev = makeudev(fxdr_unsigned(int, fp->fa3_rdev.specdata1),
+		rdev = makedev(fxdr_unsigned(int, fp->fa3_rdev.specdata1),
 			fxdr_unsigned(int, fp->fa3_rdev.specdata2));
 		fxdr_nfsv3time(&fp->fa3_mtime, &mtime);
 	} else {
@@ -528,10 +542,11 @@ nfs_loadattrcache(struct vnode **vpp, struct mbuf **mdp, caddr_t *dposp,
 	np = VTONFS(vp);
 	if (vp->v_type != vtyp) {
 		vp->v_type = vtyp;
-		if (vp->v_type == VFIFO) {
+		if (vp->v_type == VFIFO)
 			vp->v_op = fifo_nfsnodeop_p;
-		}
-		if (vp->v_type == VCHR || vp->v_type == VBLK) {
+		else if (vp->v_type == VBLK)
+			vp->v_op = spec_nfsnodeop_p;
+		else if (vp->v_type == VCHR) {
 			vp->v_op = spec_nfsnodeop_p;
 			vp = addaliasu(vp, rdev);
 			np->n_vnode = vp;
@@ -586,12 +601,19 @@ nfs_loadattrcache(struct vnode **vpp, struct mbuf **mdp, caddr_t *dposp,
 				vap->va_size = np->n_size;
 				np->n_attrstamp = 0;
 			} else if (np->n_flag & NMODIFIED) {
-				if (vap->va_size < np->n_size)
+				/*
+				 * We've modified the file: Use the larger
+				 * of our size, and the server's size.
+				 */
+				if (vap->va_size < np->n_size) {
 					vap->va_size = np->n_size;
-				else
+				} else {
 					np->n_size = vap->va_size;
+					np->n_flag |= NSIZECHANGED;
+				}
 			} else {
 				np->n_size = vap->va_size;
+				np->n_flag |= NSIZECHANGED;
 			}
 			vnode_pager_setsize(vp, np->n_size);
 		} else {
@@ -791,11 +813,7 @@ nfs_clearcommit(struct mount *mp)
 
 	s = splbio();
 	MNT_ILOCK(mp);
-loop:
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp; vp = nvp) {
-		if (vp->v_mount != mp)	/* Paranoia */
-			goto loop;
-		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
+	MNT_VNODE_FOREACH(vp, mp, nvp) {
 		VI_LOCK(vp);
 		if (vp->v_iflag & VI_XLOCK) {
 			VI_UNLOCK(vp);

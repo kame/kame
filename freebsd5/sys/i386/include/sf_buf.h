@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/sf_buf.h,v 1.2 2003/11/17 18:22:23 alc Exp $
+ * $FreeBSD: src/sys/i386/include/sf_buf.h,v 1.3 2003/12/07 22:49:25 alc Exp $
  */
 
 #ifndef _MACHINE_SF_BUF_H_
@@ -35,6 +35,7 @@ struct vm_page;
 
 struct sf_buf {
 	LIST_ENTRY(sf_buf) list_entry;	/* list of buffers */
+	TAILQ_ENTRY(sf_buf) free_entry;	/* list of buffers */
 	struct		vm_page *m;	/* currently mapped page */
 	vm_offset_t	kva;		/* va of mapping */
 	int		ref_count;	/* usage of this mapping */

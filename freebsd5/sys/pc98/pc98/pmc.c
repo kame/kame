@@ -27,13 +27,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pmc.c,v 1.4 2002/06/02 20:05:54 schweikh Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pmc.c,v 1.5 2004/06/03 06:10:02 phk Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/types.h>
 #include <sys/conf.h>

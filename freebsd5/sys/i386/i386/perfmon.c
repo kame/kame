@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/perfmon.c,v 1.35 2003/08/25 09:48:47 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/perfmon.c,v 1.38 2004/06/16 09:47:07 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,13 +71,13 @@ static d_ioctl_t perfmon_ioctl;
 static void perfmon_init_dev(void *);
 SYSINIT(cpu, SI_SUB_DRIVERS, SI_ORDER_ANY, perfmon_init_dev, NULL);
 
-#define CDEV_MAJOR 2	/* We're really a minor of mem.c */
 static struct cdevsw perfmon_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	perfmon_open,
 	.d_close =	perfmon_close,
 	.d_ioctl =	perfmon_ioctl,
 	.d_name =	"perfmon",
-	.d_maj =	CDEV_MAJOR,
 };
 
 /*
@@ -299,7 +299,7 @@ static int writer;
 static int writerpmc;
 
 static int
-perfmon_open(dev_t dev, int flags, int fmt, struct thread *td)
+perfmon_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	if (!perfmon_cpuok)
 		return ENXIO;
@@ -316,7 +316,7 @@ perfmon_open(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-perfmon_close(dev_t dev, int flags, int fmt, struct thread *td)
+perfmon_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	if (flags & FWRITE) {
 		int i;
@@ -331,7 +331,7 @@ perfmon_close(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-perfmon_ioctl(dev_t dev, u_long cmd, caddr_t param, int flags, struct thread *td)
+perfmon_ioctl(struct cdev *dev, u_long cmd, caddr_t param, int flags, struct thread *td)
 {
 	struct pmc *pmc;
 	struct pmc_data *pmcd;

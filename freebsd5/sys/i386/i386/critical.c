@@ -26,12 +26,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/critical.c,v 1.12 2003/11/03 21:06:54 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/critical.c,v 1.13 2004/03/05 14:23:13 bde Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+
 #include <machine/critical.h>
+#include <machine/psl.h>
 
 /*
  * cpu_critical_fork_exit() - cleanup after fork

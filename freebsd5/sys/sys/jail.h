@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/jail.h,v 1.18 2003/04/09 02:55:18 mike Exp $
+ * $FreeBSD: src/sys/sys/jail.h,v 1.21 2004/04/26 19:46:52 bmilekic Exp $
  *
  */
 
@@ -39,6 +39,7 @@ int jail_attach(int);
 #include <sys/queue.h>
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
+#include <sys/_task.h>
 
 #define JAIL_MAX	999999
 
@@ -56,8 +57,8 @@ MALLOC_DECLARE(M_PRISON);
  *   (p) locked by pr_mutex
  *   (c) set only during creation before the structure is shared, no mutex
  *       required to read
+ *   (d) set only during destruction of jail, no mutex needed
  */
-struct mtx;
 struct prison {
 	LIST_ENTRY(prison) pr_list;			/* (a) all prisons */
 	int		 pr_id;				/* (c) prison id */
@@ -68,6 +69,7 @@ struct prison {
 	u_int32_t	 pr_ip;				/* (c) ip addr host */
 	void		*pr_linux;			/* (p) linux abi */
 	int		 pr_securelevel;		/* (p) securelevel */
+	struct task	 pr_task;			/* (d) destroy task */
 	struct mtx	 pr_mtx;
 };
 
@@ -79,6 +81,8 @@ struct prison {
 extern int	jail_set_hostname_allowed;
 extern int	jail_socket_unixiproute_only;
 extern int	jail_sysvipc_allowed;
+extern int	jail_getfsstat_jailrootonly;
+extern int	jail_allow_raw_sockets;
 
 LIST_HEAD(prisonlist, prison);
 extern struct	prisonlist allprison;
@@ -87,10 +91,12 @@ extern struct	prisonlist allprison;
  * Kernel support functions for jail().
  */
 struct ucred;
+struct mount;
 struct sockaddr;
 int jailed(struct ucred *cred);
 void getcredhostname(struct ucred *cred, char *, size_t);
 int prison_check(struct ucred *cred1, struct ucred *cred2);
+int prison_check_mount(struct ucred *cred, struct mount *mp);
 void prison_free(struct prison *pr);
 u_int32_t prison_getip(struct ucred *cred);
 void prison_hold(struct prison *pr);

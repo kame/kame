@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/lnc/Makefile,v 1.6 2002/11/06 13:46:58 nyan Exp $
+# $FreeBSD: src/sys/modules/lnc/Makefile,v 1.7 2004/02/13 10:11:00 ru Exp $
 
 .PATH: ${.CURDIR}/../../dev/lnc
 
@@ -12,6 +12,6 @@ SRCS+=	if_lnc_isa.c
 SRCS+=	opt_inet.h device_if.h bus_if.h isa_if.h pci_if.h
 #SRCS+=	miibus_if.h
 
-CFLAGS+= -g -I${.CURDIR}/../../dev/lnc
+CFLAGS+= -I${.CURDIR}/../../dev/lnc
 
 .include <bsd.kmod.mk>

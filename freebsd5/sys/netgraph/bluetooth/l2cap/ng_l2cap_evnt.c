@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_l2cap_evnt.c,v 1.5 2003/09/08 19:11:45 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_evnt.c,v 1.5 2003/10/12 22:04:21 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_evnt.c,v 1.7 2004/04/27 16:38:15 emax Exp $
  */
 
 #include <sys/param.h>
@@ -38,15 +38,15 @@
 #include <sys/queue.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
-#include "ng_bluetooth.h"
-#include "ng_hci.h"
-#include "ng_l2cap.h"
-#include "ng_l2cap_var.h"
-#include "ng_l2cap_cmds.h"
-#include "ng_l2cap_evnt.h"
-#include "ng_l2cap_llpi.h"
-#include "ng_l2cap_ulpi.h"
-#include "ng_l2cap_misc.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/include/ng_l2cap.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_var.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_cmds.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_evnt.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_llpi.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_ulpi.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_misc.h>
 
 /******************************************************************************
  ******************************************************************************
@@ -109,7 +109,7 @@ ng_l2cap_receive(ng_l2cap_con_p con)
 	/* Check payload size */
 	if (hdr->length != con->rx_pkt->m_pkthdr.len - sizeof(*hdr)) {
 		NG_L2CAP_ERR(
-"%s: %s - invalid L2CAP packet. Payload length mismatch, length=%d, len=%d\n",
+"%s: %s - invalid L2CAP packet. Payload length mismatch, length=%d, len=%zd\n",
 			__func__, NG_NODE_NAME(l2cap->node), hdr->length, 
 			con->rx_pkt->m_pkthdr.len - sizeof(*hdr));
 		error = EMSGSIZE;
@@ -973,7 +973,7 @@ ng_l2cap_process_echo_req(ng_l2cap_con_p con, u_int8_t ident)
 	con->rx_pkt = ng_l2cap_prepend(con->rx_pkt, sizeof(*hdr));
 	if (con->rx_pkt == NULL) {
 		NG_L2CAP_ALERT(
-"%s: %s - ng_l2cap_prepend() failed, size=%d\n",
+"%s: %s - ng_l2cap_prepend() failed, size=%zd\n",
 			__func__, NG_NODE_NAME(l2cap->node), sizeof(*hdr));
 
 		return (ENOBUFS);

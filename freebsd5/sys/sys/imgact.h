@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -30,18 +26,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/imgact.h,v 1.33 2002/11/05 17:51:55 rwatson Exp $
+ * $FreeBSD: src/sys/sys/imgact.h,v 1.36 2004/04/24 06:44:33 bde Exp $
  */
 
 #ifndef _SYS_IMGACT_H_
 #define	_SYS_IMGACT_H_
 
 #define MAXSHELLCMDLEN	128
-
-struct label;
-struct sysentvec;
-struct thread;
-struct vm_object;
 
 struct image_params {
 	struct proc *proc;	/* our process struct */
@@ -63,13 +54,16 @@ struct image_params {
 	char interpreted;	/* flag - this executable is interpreted */
 	char interpreter_name[MAXSHELLCMDLEN]; /* name of the interpreter */
 	void *auxargs;		/* ELF Auxinfo structure pointer */
-	struct vm_page *firstpage;	/* first page that we mapped */
+	struct sf_buf *firstpage;	/* first page that we mapped */
 	char *fname;            /* pointer to filename of executable (user space) */
 	unsigned long ps_strings; /* PS_STRINGS for BSD/OS binaries */
 	size_t auxarg_size;
 };
 
 #ifdef _KERNEL
+struct sysentvec;
+struct thread;
+
 int	exec_check_permissions(struct image_params *);
 register_t *exec_copyout_strings(struct image_params *);
 int	exec_extract_strings(struct image_params *);

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)profile.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/i386/include/profile.h,v 1.31 2003/06/02 00:29:35 obrien Exp $
+ * $FreeBSD: src/sys/i386/include/profile.h,v 1.37 2004/05/20 16:12:19 bde Exp $
  */
 
 #ifndef _MACHINE_PROFILE_H_
@@ -54,14 +50,29 @@
 #define	MCOUNT
 
 #ifdef GUPROF
-#define	CALIB_SCALE	1000
-#define	KCOUNT(p,index)	((p)->kcount[(index) \
-			 / (HISTFRACTION * sizeof(HISTCOUNTER))])
 #define	MCOUNT_DECL(s)
 #define	MCOUNT_ENTER(s)
 #define	MCOUNT_EXIT(s)
-#define	PC_TO_I(p, pc)	((uintfptr_t)(pc) - (uintfptr_t)(p)->lowpc)
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
+#define	MCOUNT_OVERHEAD(label)						\
+	__asm __volatile("pushl %0; call __mcount; popl %%ecx"		\
+			 :						\
+			 : "i" (profil)					\
+			 : "ax", "dx", "cx", "memory")
+#define	MEXITCOUNT_OVERHEAD()						\
+	__asm __volatile("call .mexitcount; 1:"				\
+			 : :						\
+			 : "ax", "dx", "cx", "memory")
+#define	MEXITCOUNT_OVERHEAD_GETLABEL(labelp)				\
+	__asm __volatile("movl $1b,%0" : "=rm" (labelp))
+#elif defined(lint)
+#define	MCOUNT_OVERHEAD(label)
+#define	MEXITCOUNT_OVERHEAD()
+#define	MEXITCOUNT_OVERHEAD_GETLABEL()
 #else
+#error
+#endif /* !(__GNUC__ || __INTEL_COMPILER) */
+#else /* !GUPROF */
 #define	MCOUNT_DECL(s)	u_long s;
 #ifdef SMP
 extern int	mcount_lock;
@@ -82,7 +93,7 @@ extern int	mcount_lock;
 
 #define	_MCOUNT_DECL static __inline void _mcount
 
-#ifdef	__GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 #define	MCOUNT								\
 void									\
 mcount()								\
@@ -101,19 +112,19 @@ mcount()								\
 	 * the caller's frame pointer.  The caller's raddr is in the	\
 	 * caller's frame following the caller's caller's frame pointer.\
 	 */								\
-	__asm("movl (%%ebp),%0" : "=r" (frompc));				\
+	__asm("movl (%%ebp),%0" : "=r" (frompc));			\
 	frompc = ((uintfptr_t *)frompc)[1];				\
 	_mcount(frompc, selfpc);					\
 }
-#else	/* __GNUC__ */
-#define	MCOUNT		\
-void			\
-mcount()		\
-{			\
+#else /* !(__GNUC__ || __INTEL_COMPILER) */
+void									\
+#define	MCOUNT								\
+mcount()								\
+{									\
 }
-#endif	/* __GNUC__ */
+#endif /* __GNUC__ || __INTEL_COMPILER */
 
-typedef	unsigned int	uintfptr_t;
+typedef	u_int	uintfptr_t;
 
 #endif /* _KERNEL */
 
@@ -126,44 +137,17 @@ typedef	u_int	fptrdiff_t;
 #ifdef _KERNEL
 
 void	mcount(uintfptr_t frompc, uintfptr_t selfpc);
-void	kmupetext(uintfptr_t nhighpc);
-
-#ifdef GUPROF
-struct gmonparam;
-
-void	nullfunc_loop_profiled(void);
-void	nullfunc_profiled(void);
-void	startguprof(struct gmonparam *p);
-void	stopguprof(struct gmonparam *p);
-#else
-#define	startguprof(p)
-#define	stopguprof(p)
-#endif /* GUPROF */
 
 #else /* !_KERNEL */
 
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 void	mcount(void) __asm(".mcount");
 #endif
-static void	_mcount(uintfptr_t frompc, uintfptr_t selfpc);
 __END_DECLS
 
 #endif /* _KERNEL */
-
-#ifdef GUPROF
-/* XXX doesn't quite work outside kernel yet. */
-extern int	cputime_bias;
-
-__BEGIN_DECLS
-int	cputime(void);
-void	empty_loop(void);
-void	mexitcount(uintfptr_t selfpc);
-void	nullfunc(void);
-void	nullfunc_loop(void);
-__END_DECLS
-#endif
 
 #endif /* !_MACHINE_PROFILE_H_ */

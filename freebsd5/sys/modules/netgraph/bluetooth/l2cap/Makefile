@@ -1,5 +1,5 @@
 # $Id: Makefile,v 1.1 2002/11/24 20:40:11 max Exp $
-# $FreeBSD: src/sys/modules/netgraph/bluetooth/l2cap/Makefile,v 1.4 2003/10/12 22:04:20 emax Exp $
+# $FreeBSD: src/sys/modules/netgraph/bluetooth/l2cap/Makefile,v 1.5 2004/01/13 11:28:49 ru Exp $
 
 .PATH: ${.CURDIR}/../../../../netgraph/bluetooth/l2cap
 
@@ -9,6 +9,5 @@ CFLAGS+=	-I${.CURDIR}/../../../../netgraph/bluetooth/include \
 KMOD=		ng_l2cap
 SRCS=		ng_l2cap_main.c ng_l2cap_cmds.c ng_l2cap_evnt.c \
 		ng_l2cap_ulpi.c ng_l2cap_llpi.c ng_l2cap_misc.c
-MAN4=		ng_l2cap.4
 
 .include <bsd.kmod.mk>

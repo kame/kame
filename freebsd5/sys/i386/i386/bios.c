@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/bios.c,v 1.64 2003/11/03 22:22:04 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/bios.c,v 1.70 2004/06/23 17:59:01 jhb Exp $");
 
 /*
  * Code for dealing with the BIOS in x86 PC systems.
@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/bios.c,v 1.64 2003/11/03 22:22:04 jhb Exp 
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/pcpu.h>
 #include <vm/vm.h>
@@ -58,7 +59,8 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/bios.c,v 1.64 2003/11/03 22:22:04 jhb Exp 
 
 /* exported lookup results */
 struct bios32_SDentry		PCIbios;
-struct PnPBIOS_table		*PnPBIOStable;
+
+static struct PnPBIOS_table	*PnPBIOStable;
 
 static u_int			bios32_SDCI;
 
@@ -473,6 +475,21 @@ bios16(struct bios_args *args, char *fmt, ...)
     return (i);
 }
 
+const u_char *
+bios_string(u_int from, u_int to, const u_char *string, int len)
+{
+	const char *t, *te;
+
+	if (len == 0)
+		len = strlen(string);
+	t = (const char *)(KERNBASE + from);
+	te = (const char *)(KERNBASE + to);
+	for (; t <= te; t++)
+		if (!memcmp(string, t, len))
+			return (t);
+	return (NULL);
+}
+
 #ifdef DEV_ISA
 /*
  * PnP BIOS interface; enumerate devices only known to the system
@@ -538,8 +555,9 @@ pnpbios_identify(driver_t *driver, device_t parent)
     if (pt == NULL)
 	return;
 
-    /* ACPI already active */
-    if (devclass_get_softc(devclass_find("ACPI"), 0) != NULL)
+    /* Check to see if ACPI is already active. */
+    dev = devclass_get_device(devclass_find("acpi"), 0);
+    if (dev != NULL && device_is_attached(dev)) 
 	return;
 
     /* get count of PnP devices */

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.81 2003/11/15 01:45:56 andre Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.89.2.2 2004/09/23 16:38:53 andre Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
@@ -65,8 +61,6 @@ struct ipq {
 	struct mbuf *ipq_frags;		/* to ip headers of fragments */
 	struct	in_addr ipq_src,ipq_dst;
 	u_char	ipq_nfrags;		/* # frags in this packet */
-	u_int32_t ipq_div_info;		/* ipfw divert port & flags */
-	u_int16_t ipq_div_cookie;	/* ipfw divert cookie */
 	struct label *ipq_label;		/* MAC label */
 };
 #endif /* _KERNEL */
@@ -139,17 +133,19 @@ struct	ipstat {
 #define	IP_ROUTETOIF		SO_DONTROUTE	/* bypass routing tables */
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
 
+/* mbuf flag used by ip_fastfwd */
+#define	M_FASTFWD_OURS		M_PROTO1	/* changed dst to local */
+
 struct ip;
 struct inpcb;
 struct route;
 struct sockopt;
 
 extern struct	ipstat	ipstat;
-#ifndef RANDOM_IP_ID
 extern u_short	ip_id;				/* ip packet ctr, for ids */
-#endif
 extern int	ip_defttl;			/* default IP ttl */
 extern int	ipforwarding;			/* ip forwarding */
+extern int	ip_doopts;			/* process or ignore IP options */
 #ifdef IPSTEALTH
 extern int	ipstealth;			/* stealth forwarding */
 #endif
@@ -172,18 +168,17 @@ extern int	 (*ip_mforward)(struct ip *, struct ifnet *, struct mbuf *,
 int	 ip_output(struct mbuf *,
 	    struct mbuf *, struct route *, int, struct ip_moptions *,
 	    struct inpcb *);
+struct mbuf *
+	 ip_reass(struct mbuf *);
 struct in_ifaddr *
 	 ip_rtaddr(struct in_addr);
 void	 ip_savecontrol(struct inpcb *, struct mbuf **, struct ip *,
 		struct mbuf *);
 void	 ip_slowtimo(void);
 struct mbuf *
-	 ip_srcroute(void);
+	 ip_srcroute(struct mbuf *);
 void	 ip_stripoptions(struct mbuf *, struct mbuf *);
-#ifdef RANDOM_IP_ID
-u_int16_t	
-	 ip_randomid(void);
-#endif
+u_int16_t	ip_randomid(void);
 int	rip_ctloutput(struct socket *, struct sockopt *);
 void	rip_ctlinput(int, struct sockaddr *, void *);
 void	rip_init(void);
@@ -197,20 +192,21 @@ extern int	(*ip_rsvp_vif)(struct socket *, struct sockopt *);
 extern void	(*ip_rsvp_force_done)(struct socket *);
 extern void	(*rsvp_input_p)(struct mbuf *m, int off);
 
-
-#ifdef IPDIVERT
-void	div_init(void);
-void	div_input(struct mbuf *, int);
-void	div_ctlinput(int, struct sockaddr *, void *);
-void	divert_packet(struct mbuf *m, int incoming, int port, int rule);
-extern struct pr_usrreqs div_usrreqs;
-#endif
-
-#ifdef PFIL_HOOKS
-extern	struct pfil_head inet_pfil_hook;
-#endif
+extern	struct pfil_head inet_pfil_hook;	/* packet filter hooks */
 
 void	in_delayed_cksum(struct mbuf *m);
+
+static __inline uint16_t ip_newid(void);
+extern int ip_do_randomid;
+
+static __inline uint16_t
+ip_newid(void)
+{
+	if (ip_do_randomid)
+		return ip_randomid();
+
+	return htons(ip_id++);
+}
 
 #endif /* _KERNEL */
 

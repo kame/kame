@@ -40,10 +40,9 @@
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
  * 	from: FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.167 2001/07/12
- * $FreeBSD: src/sys/sparc64/sparc64/vm_machdep.c,v 1.55 2003/11/16 23:40:06 alc Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/vm_machdep.c,v 1.66.2.1 2004/09/30 17:26:51 kensmith Exp $
  */
 
-#include "opt_kstack_pages.h"
 #include "opt_pmap.h"
 
 #include <sys/param.h>
@@ -87,6 +86,10 @@
 #include <machine/tlb.h>
 #include <machine/tstate.h>
 
+#ifndef NSFBUFS
+#define	NSFBUFS		(512 + maxusers * 16)
+#endif
+
 static void	sf_buf_init(void *arg);
 SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
 
@@ -122,28 +125,6 @@ cpu_exit(struct thread *td)
 }
 
 void
-cpu_sched_exit(struct thread *td)
-{
-	struct vmspace *vm;
-	struct pcpu *pc;
-	struct proc *p;
-
-	mtx_assert(&sched_lock, MA_OWNED);
-
-	p = td->td_proc;
-	vm = p->p_vmspace;
-	if (vm->vm_refcnt > 1)
-		return;
-	SLIST_FOREACH(pc, &cpuhead, pc_allcpu) {
-		if (pc->pc_vmspace == vm) {
-			vm->vm_pmap.pm_active &= ~pc->pc_cpumask;
-			vm->vm_pmap.pm_context[pc->pc_cpuid] = -1;
-			pc->pc_vmspace = NULL;
-		}
-	}
-}
-
-void
 cpu_thread_exit(struct thread *td)
 {
 }
@@ -158,8 +139,9 @@ cpu_thread_setup(struct thread *td)
 {
 	struct pcb *pcb;
 
-	pcb = (struct pcb *)((td->td_kstack + KSTACK_PAGES * PAGE_SIZE -
+	pcb = (struct pcb *)((td->td_kstack + td->td_kstack_pages * PAGE_SIZE -
 	    sizeof(struct pcb)) & ~0x3fUL);
+	pcb->pcb_nsaved = 0;
 	td->td_frame = (struct trapframe *)pcb - 1;
 	td->td_pcb = pcb;
 }
@@ -240,8 +222,8 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 
 	/* The pcb must be aligned on a 64-byte boundary. */
 	pcb1 = td1->td_pcb;
-	pcb2 = (struct pcb *)((td2->td_kstack + KSTACK_PAGES * PAGE_SIZE -
-	    sizeof(struct pcb)) & ~0x3fUL);
+	pcb2 = (struct pcb *)((td2->td_kstack + td2->td_kstack_pages *
+	    PAGE_SIZE - sizeof(struct pcb)) & ~0x3fUL);
 	td2->td_pcb = pcb2;
 
 	/*
@@ -300,6 +282,8 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	fp->fr_local[0] = (u_long)fork_return;
 	fp->fr_local[1] = (u_long)td2;
 	fp->fr_local[2] = (u_long)tf;
+	/* Terminate stack traces at this frame. */
+	fp->fr_pc = fp->fr_fp = 0;
 	pcb2->pcb_sp = (u_long)fp - SPOFF;
 	pcb2->pcb_pc = (u_long)fork_trampoline - 8;
 
@@ -372,6 +356,9 @@ sf_buf_init(void *arg)
 	vm_offset_t sf_base;
 	int i;
 
+	nsfbufs = NSFBUFS;
+	TUNABLE_INT_FETCH("kern.ipc.nsfbufs", &nsfbufs);
+
 	mtx_init(&sf_freelist.sf_lock, "sf_bufs list lock", NULL, MTX_DEF);
 	SLIST_INIT(&sf_freelist.sf_head);
 	sf_base = kmem_alloc_nofault(kernel_map, nsfbufs * PAGE_SIZE);
@@ -388,7 +375,7 @@ sf_buf_init(void *arg)
  * Get an sf_buf from the freelist. Will block if none are available.
  */
 struct sf_buf *
-sf_buf_alloc(struct vm_page *m)
+sf_buf_alloc(struct vm_page *m, int pri)
 {
 	struct sf_buf *sf;
 	int error;
@@ -396,7 +383,8 @@ sf_buf_alloc(struct vm_page *m)
 	mtx_lock(&sf_freelist.sf_lock);
 	while ((sf = SLIST_FIRST(&sf_freelist.sf_head)) == NULL) {
 		sf_buf_alloc_want++;
-		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM|PCATCH,
+		mbstat.sf_allocwait++;
+		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM | pri,
 		    "sfbufa", 0);
 		sf_buf_alloc_want--;
 
@@ -409,6 +397,8 @@ sf_buf_alloc(struct vm_page *m)
 	if (sf != NULL) {
 		SLIST_REMOVE_HEAD(&sf_freelist.sf_head, free_list);
 		sf->m = m;
+		nsfbufsused++;
+		nsfbufspeak = imax(nsfbufspeak, nsfbufsused);
 		pmap_qenter(sf->kva, &sf->m, 1);
 	}
 	mtx_unlock(&sf_freelist.sf_lock);
@@ -416,30 +406,16 @@ sf_buf_alloc(struct vm_page *m)
 }
 
 /*
- * Detatch mapped page and release resources back to the system.
+ * Release resources back to the system.
  */
 void
-sf_buf_free(void *addr, void *args)
+sf_buf_free(struct sf_buf *sf)
 {
-	struct sf_buf *sf;
-	struct vm_page *m;
 
-	sf = args;
-	pmap_qremove((vm_offset_t)addr, 1);
-	m = sf->m;
-	vm_page_lock_queues();
-	vm_page_unwire(m, 0);
-	/*
-	 * Check for the object going away on us. This can
-	 * happen since we don't hold a reference to it.
-	 * If so, we're responsible for freeing the page.
-	 */
-	if (m->wire_count == 0 && m->object == NULL)
-		vm_page_free(m);
-	vm_page_unlock_queues();
-	sf->m = NULL;
+	pmap_qremove(sf->kva, 1);
 	mtx_lock(&sf_freelist.sf_lock);
 	SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf, free_list);
+	nsfbufsused--;
 	if (sf_buf_alloc_want > 0)
 		wakeup_one(&sf_freelist);
 	mtx_unlock(&sf_freelist.sf_lock);

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003 Networks Associates Technology, Inc.
+ * Copyright (c) 2003-2004 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed for the FreeBSD Project by Network
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_portacl/mac_portacl.c,v 1.3 2003/03/18 08:45:24 phk Exp $
+ * $FreeBSD: src/sys/security/mac_portacl/mac_portacl.c,v 1.5 2004/05/15 20:55:19 cperciva Exp $
  */
 
 /*
@@ -142,13 +142,6 @@ static void
 toast_rules(struct rulehead *head)
 {
 	struct rule *rule;
-	int i;
-
-	i = 0;
-	for (rule = TAILQ_FIRST(head);
-	     rule != NULL;
-	     rule = TAILQ_NEXT(rule, r_entries))
-		i++;
 
 	while ((rule = TAILQ_FIRST(head)) != NULL) {
 		TAILQ_REMOVE(head, rule, r_entries);
@@ -450,6 +443,10 @@ check_socket_bind(struct ucred *cred, struct socket *so,
 	struct sockaddr_in *sin;
 	int family, type;
 	u_int16_t port;
+
+	/* Only run if we are enabled. */
+	if (mac_portacl_enabled == 0)
+		return (0);
 
 	/* Only interested in IPv4 and IPv6 sockets. */
 	if (so->so_proto->pr_domain->dom_family != PF_INET &&

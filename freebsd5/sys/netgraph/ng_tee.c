@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.25 2003/07/03 22:09:47 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.31 2004/06/26 22:24:16 julian Exp $
  * $Whistle: ng_tee.c,v 1.18 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -79,6 +79,7 @@ typedef struct privdata *sc_p;
 /* Netgraph methods */
 static ng_constructor_t	ngt_constructor;
 static ng_rcvmsg_t	ngt_rcvmsg;
+static ng_close_t	ngt_close;
 static ng_shutdown_t	ngt_shutdown;
 static ng_newhook_t	ngt_newhook;
 static ng_rcvdata_t	ngt_rcvdata;
@@ -128,18 +129,16 @@ static const struct ng_cmdlist ng_tee_cmds[] = {
 
 /* Netgraph type descriptor */
 static struct ng_type ng_tee_typestruct = {
-	NG_ABI_VERSION,
-	NG_TEE_NODE_TYPE,
-	NULL,
-	ngt_constructor,
-	ngt_rcvmsg,
-	ngt_shutdown,
-	ngt_newhook,
-	NULL,
-	NULL,
-	ngt_rcvdata,
-	ngt_disconnect,
-	ng_tee_cmds
+	.version =	NG_ABI_VERSION,
+	.name =		NG_TEE_NODE_TYPE,
+	.constructor =	ngt_constructor,
+	.rcvmsg =	ngt_rcvmsg,
+	.close =	ngt_close,
+	.shutdown =	ngt_shutdown,
+	.newhook =	ngt_newhook,
+	.rcvdata =	ngt_rcvdata,
+	.disconnect =	ngt_disconnect,
+	.cmdlist =	ng_tee_cmds,
 };
 NETGRAPH_INIT(tee, &ng_tee_typestruct);
 
@@ -292,10 +291,8 @@ ngt_rcvdata(hook_p hook, item_p item)
 	struct hookinfo *dup;
 	int error = 0;
 	struct mbuf *m;
-	meta_p meta;
 
 	m = NGI_M(item);
-	meta = NGI_META(item); /* leave these owned by the item */
 	/* Which hook? */
 	if (hinfo == &sc->left) {
 		dup = &sc->left2right;
@@ -328,58 +325,55 @@ ngt_rcvdata(hook_p hook, item_p item)
 		dup = NULL;
 	}
 
-	/* Duplicate packet and meta info if requried */
-	if (dup != NULL) {
+	/* Duplicate packet if requried */
+	if (dup && dup->hook) {
 		struct mbuf *m2;
-		meta_p meta2;
 
 		/* Copy packet (failure will not stop the original)*/
 		m2 = m_dup(m, M_DONTWAIT);
 		if (m2) {
-
-			/* Copy meta info */
-			/* If we can't get a copy, tough.. */
-			if (meta != NULL) {
-				meta2 = ng_copy_meta(meta);
-			} else
-				meta2 = NULL;
-
 			/* Deliver duplicate */
 			dup->stats.outOctets += m->m_pkthdr.len;
 			dup->stats.outFrames++;
-			NG_SEND_DATA(error, dup->hook, m2, meta2);
+			NG_SEND_DATA_ONLY(error, dup->hook, m2);
 		}
 	}
 	/* Deliver frame out destination hook */
-	dest->stats.outOctets += m->m_pkthdr.len;
-	dest->stats.outFrames++;
-	if (dest->hook)
+	if (dest->hook) {
+		dest->stats.outOctets += m->m_pkthdr.len;
+		dest->stats.outFrames++;
 		NG_FWD_ITEM_HOOK(error, item, dest->hook);
-	else
+	} else
 		NG_FREE_ITEM(item);
 	return (error);
 }
 
 /*
+ * We are going to be shut down soon
+ *
+ * If we have both a left and right hook, then we probably want to extricate
+ * ourselves and leave the two peers still linked to each other. Otherwise we
+ * should just shut down as a normal node would.
+ */
+static int
+ngt_close(node_p node)
+{
+	const sc_p privdata = NG_NODE_PRIVATE(node);
+
+	if (privdata->left.hook && privdata->right.hook)
+		ng_bypass(privdata->left.hook, privdata->right.hook);
+
+	return (0);
+}
+
+/*
  * Shutdown processing
- *
- * This is tricky. If we have both a left and right hook, then we
- * probably want to extricate ourselves and leave the two peers
- * still linked to each other. Otherwise we should just shut down as
- * a normal node would.
- *
- * To keep the scope of info correct the routine to "extract" a node
- * from two links is in ng_base.c.
  */
 static int
 ngt_shutdown(node_p node)
 {
 	const sc_p privdata = NG_NODE_PRIVATE(node);
 
-#if 0 /* can never happen as cutlinks is already called */
-	if (privdata->left.hook && privdata->right.hook)
-		ng_bypass(privdata->left.hook, privdata->right.hook);
-#endif
 	NG_NODE_SET_PRIVATE(node, NULL);
 	NG_NODE_UNREF(privdata->node);
 	FREE(privdata, M_NETGRAPH);

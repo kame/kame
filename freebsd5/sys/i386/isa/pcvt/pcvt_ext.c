@@ -44,7 +44,7 @@
  *
  * 	Last Edit-Date: [Fri Mar  8 19:57:55 2002]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_ext.c,v 1.29.4.1 2004/01/07 16:46:06 joerg Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_ext.c,v 1.34 2004/06/16 09:47:09 phk Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -2098,8 +2098,6 @@ switch_screen(int n, int oldgrafx, int newgrafx)
 	/* update global screen pointers/variables */
 	current_video_screen = n;	/* current screen no */
 
-	pcvt_ttyp = &pcvt_tty[n];		/* current tty */
-
 	vsp = &vs[n];			/* current video state ptr */
 
 	if(oldgrafx && !newgrafx)
@@ -2385,7 +2383,7 @@ vgapage(int new_screen)
 			 * process mode.
 			 */
 			if(pcvt_is_console)
-				cons_unavail = 0;
+				cnavailable(pcvt_consptr, TRUE);
 		}
 	}
 	return 0;
@@ -2395,7 +2393,7 @@ vgapage(int new_screen)
  *	ioctl handling for VT_USL mode
  *---------------------------------------------------------------------------*/
 int
-usl_vt_ioctl(dev_t dev, int cmd, caddr_t data, int flag, struct thread *td)
+usl_vt_ioctl(struct cdev *dev, int cmd, caddr_t data, int flag, struct thread *td)
 {
 	struct proc *p;
 	int i, j, error, opri;
@@ -2470,7 +2468,7 @@ usl_vt_ioctl(dev_t dev, int cmd, caddr_t data, int flag, struct thread *td)
 		 * process mode.
 		 */
 		if(pcvt_is_console)
-			cons_unavail = (newmode.mode == VT_PROCESS);
+			cnavailable(pcvt_consptr, (newmode.mode != VT_PROCESS));
 
 		splx(opri);
 		return 0;
@@ -2549,7 +2547,7 @@ usl_vt_ioctl(dev_t dev, int cmd, caddr_t data, int flag, struct thread *td)
 
 					/* XXX */
 					if(pcvt_is_console)
-						cons_unavail = 0;
+						cnavailable(pcvt_consptr, TRUE);
 				}
 				return 0;
 			}
@@ -2563,7 +2561,7 @@ usl_vt_ioctl(dev_t dev, int cmd, caddr_t data, int flag, struct thread *td)
 
 				/* XXX */
 				if(pcvt_is_console)
-					cons_unavail = 1;
+					cnavailable(pcvt_consptr, FALSE);
 
 				return 0;
 			}

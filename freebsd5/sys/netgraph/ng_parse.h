@@ -37,7 +37,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_parse.h,v 1.2 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.8 2003/11/11 12:30:37 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.10 2004/01/26 14:05:31 harti Exp $
  */
 
 #ifndef _NETGRAPH_NG_PARSE_H_
@@ -404,11 +404,11 @@ extern const struct ng_parse_type ng_parse_sizedstring_type;
 /*
  * COMMONLY USED BOUNDED LENGTH STRING TYPES
  */
-extern const struct ng_parse_type ng_parse_nodebuf_type;  /* NG_NODELEN + 1 */
-extern const struct ng_parse_type ng_parse_hookbuf_type;  /* NG_HOOKLEN + 1 */
-extern const struct ng_parse_type ng_parse_pathbuf_type;  /* NG_PATHLEN + 1 */
-extern const struct ng_parse_type ng_parse_typebuf_type;  /* NG_TYPELEN + 1 */
-extern const struct ng_parse_type ng_parse_cmdbuf_type;   /* NG_CMDSTRLEN + 1 */
+extern const struct ng_parse_type ng_parse_nodebuf_type;  /* NG_NODESIZ */
+extern const struct ng_parse_type ng_parse_hookbuf_type;  /* NG_HOOKSIZ */
+extern const struct ng_parse_type ng_parse_pathbuf_type;  /* NG_PATHSIZ */
+extern const struct ng_parse_type ng_parse_typebuf_type;  /* NG_TYPESIZ */
+extern const struct ng_parse_type ng_parse_cmdbuf_type;   /* NG_CMDSTRSIZ */
 
 /*
  * INTEGER TYPES
@@ -440,6 +440,14 @@ extern const struct ng_parse_type ng_parse_hint64_type;
  *   Additional info:		None required
  */
 extern const struct ng_parse_type ng_parse_ipaddr_type;
+
+/*
+ * ETHERNET ADDRESS TYPE
+ *
+ *   Default value:		None
+ *   Additional info:		None required
+ */
+extern const struct ng_parse_type ng_parse_enaddr_type;
 
 /*
  * VARIABLE LENGTH BYTE ARRAY TYPE

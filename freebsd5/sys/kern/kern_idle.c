@@ -1,10 +1,30 @@
 /*-
- * Copyright (c) 2000, All rights reserved.  See /usr/src/COPYRIGHT
+ * Copyright (C) 2000-2004 The FreeBSD Project. All rights reserved.
  *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_idle.c,v 1.35 2003/10/19 02:43:57 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_idle.c,v 1.40.2.1 2004/09/09 09:56:58 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -16,6 +36,9 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_idle.c,v 1.35 2003/10/19 02:43:57 peter Ex
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
 #include <sys/unistd.h>
+#ifdef SMP
+#include <sys/smp.h>
+#endif
 
 static void idle_setup(void *dummy);
 SYSINIT(idle_setup, SI_SUB_SCHED_IDLE, SI_ORDER_FIRST, idle_setup, NULL)
@@ -57,10 +80,10 @@ idle_setup(void *dummy)
 		PROC_LOCK(p);
 		p->p_flag |= P_NOLOAD;
 		mtx_lock_spin(&sched_lock);
-		p->p_state = PRS_NORMAL;
 		td = FIRST_THREAD_IN_PROC(p);
-		td->td_state = TDS_CAN_RUN;
+		TD_SET_CAN_RUN(td);
 		td->td_flags |= TDF_IDLETD;
+		td->td_priority = PRI_MAX_IDLE;
 		mtx_unlock_spin(&sched_lock);
 		PROC_UNLOCK(p);
 #ifdef SMP
@@ -76,9 +99,18 @@ idle_proc(void *dummy)
 {
 	struct proc *p;
 	struct thread *td;
+#ifdef SMP
+	cpumask_t mycpu;
+#endif
 
 	td = curthread;
 	p = td->td_proc;
+#ifdef SMP
+	mycpu = PCPU_GET(cpumask);
+	mtx_lock_spin(&sched_lock);
+	idle_cpus_mask |= mycpu;
+	mtx_unlock_spin(&sched_lock);
+#endif
 	for (;;) {
 		mtx_assert(&Giant, MA_NOTOWNED);
 
@@ -86,9 +118,13 @@ idle_proc(void *dummy)
 			cpu_idle();
 
 		mtx_lock_spin(&sched_lock);
-		td->td_state = TDS_CAN_RUN;
-		p->p_stats->p_ru.ru_nvcsw++;
-		mi_switch();
+#ifdef SMP
+		idle_cpus_mask &= ~mycpu;
+#endif
+		mi_switch(SW_VOL, NULL);
+#ifdef SMP
+		idle_cpus_mask |= mycpu;
+#endif
 		mtx_unlock_spin(&sched_lock);
 	}
 }

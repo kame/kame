@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -32,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/libkern/bcmp.c,v 1.8 2003/06/11 05:23:04 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/libkern/bcmp.c,v 1.10 2004/04/07 20:46:10 imp Exp $");
 
 #include <sys/libkern.h>
 #include <machine/endian.h>
@@ -135,12 +131,12 @@ bcmp(b1, b2, length)
 			 & ((1L << (len << 3)) - 1)) != 0);
 	}
 #else
-	register char *p1, *p2;
+	const char *p1, *p2;
 
 	if (length == 0)
 		return(0);
-	p1 = (char *)b1;
-	p2 = (char *)b2;
+	p1 = b1;
+	p2 = b2;
 	do
 		if (*p1++ != *p2++)
 			break;

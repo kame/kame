@@ -1,12 +1,12 @@
 /*
- * $FreeBSD: src/sys/netatalk/at_extern.h,v 1.13 2003/03/04 23:19:51 jlemon Exp $
+ * $FreeBSD: src/sys/netatalk/at_extern.h,v 1.14 2004/04/25 09:24:51 luigi Exp $
  */
 struct mbuf;
 struct sockaddr_at;
 
 #ifdef _NET_IF_ARP_H_
 extern timeout_t	aarpprobe;
-extern int	aarpresolve	(struct arpcom *,
+extern int	aarpresolve	(struct ifnet *,
 					struct mbuf *,
 					struct sockaddr_at *,
 					u_char *);

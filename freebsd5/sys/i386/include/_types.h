@@ -33,7 +33,7 @@
  *
  *	From: @(#)ansi.h	8.2 (Berkeley) 1/4/94
  *	From: @(#)types.h	8.3 (Berkeley) 1/5/94
- * $FreeBSD: src/sys/i386/include/_types.h,v 1.7 2003/03/30 05:24:52 jake Exp $
+ * $FreeBSD: src/sys/i386/include/_types.h,v 1.9 2004/03/20 20:41:40 marcel Exp $
  */
 
 #ifndef _MACHINE__TYPES_H_
@@ -54,7 +54,7 @@ typedef	unsigned int		__uint32_t;
 typedef	long long		__int64_t;
 /* LONGLONG */
 typedef	unsigned long long	__uint64_t;
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) || defined(__INTEL_COMPILER)
 typedef	int __attribute__((__mode__(__DI__)))		__int64_t;
 typedef	unsigned int __attribute__((__mode__(__DI__)))	__uint64_t;
 #else
@@ -68,6 +68,7 @@ typedef	unsigned long long	__uint64_t;
  * Standard type definitions.
  */
 typedef	unsigned long	__clock_t;		/* clock()... */
+typedef	unsigned int	__cpumask_t;
 typedef	__int32_t	__critical_t;
 typedef	double		__double_t;
 typedef	double		__float_t;
@@ -113,12 +114,12 @@ typedef	__uint32_t	__vm_size_t;
 /*
  * Unusual type definitions.
  */
-#if defined(__GNUC__) && (__GNUC__ == 2 && __GNUC_MINOR__ > 95 || __GNUC__ >= 3)
+#if (defined(__GNUC__) && (__GNUC__ == 2 && __GNUC_MINOR__ > 95 || __GNUC__ >= 3) && !defined(__INTEL_COMPILER))
 typedef __builtin_va_list	__va_list;	/* internally known to gcc */
 #else
 typedef	char *			__va_list;
-#endif /* post GCC 2.95 */
-#if defined __GNUC__ && !defined(__GNUC_VA_LIST) && !defined(__NO_GNUC_VA_LIST)
+#endif /* ! (__GNUC__ post 2.95 || __INTEL_COMPILER) */
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER) && !defined(__GNUC_VA_LIST) && !defined(__NO_GNUC_VA_LIST)
 #define __GNUC_VA_LIST
 typedef __va_list		__gnuc_va_list;	/* compatibility w/GNU headers*/
 #endif

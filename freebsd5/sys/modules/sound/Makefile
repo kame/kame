@@ -1,7 +1,7 @@
-# $FreeBSD: src/sys/modules/sound/Makefile,v 1.1 2000/07/04 23:32:01 cg Exp $
+# $FreeBSD: src/sys/modules/sound/Makefile,v 1.2 2004/07/16 03:58:46 tanimura Exp $
 
 SUBDIR =
-SUBDIR += pcm
+SUBDIR += sound
 SUBDIR += driver
 
 .include <bsd.subdir.mk>

@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/local_apic.c,v 1.4 2003/12/03 20:33:18 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/local_apic.c,v 1.9 2004/07/14 18:12:15 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -194,7 +194,7 @@ lapic_create(u_int apic_id, int boot_cpu)
 {
 	int i;
 
-	if (apic_id > MAX_APICID) {
+	if (apic_id >= MAX_APICID) {
 		printf("APIC: Ignoring local APIC with ID %d\n", apic_id);
 		if (boot_cpu)
 			panic("Can't ignore BSP");
@@ -423,50 +423,52 @@ lapic_set_lvt_mode(u_int apic_id, u_int pin, u_int32_t mode)
 }
 
 int
-lapic_set_lvt_polarity(u_int apic_id, u_int pin, u_char activehi)
+lapic_set_lvt_polarity(u_int apic_id, u_int pin, enum intr_polarity pol)
 {
 
-	if (pin > LVT_MAX)
+	if (pin > LVT_MAX || pol == INTR_POLARITY_CONFORM)
 		return (EINVAL);
 	if (apic_id == APIC_ID_ALL) {
-		lvts[pin].lvt_activehi = activehi;
+		lvts[pin].lvt_activehi = (pol == INTR_POLARITY_HIGH);
 		if (bootverbose)
 			printf("lapic:");
 	} else {
 		KASSERT(lapics[apic_id].la_present,
 		    ("%s: missing APIC %u", __func__, apic_id));
 		lapics[apic_id].la_lvts[pin].lvt_active = 1;
-		lapics[apic_id].la_lvts[pin].lvt_activehi = activehi;
+		lapics[apic_id].la_lvts[pin].lvt_activehi =
+		    (pol == INTR_POLARITY_HIGH);
 		if (bootverbose)
 			printf("lapic%u:", apic_id);
 	}
 	if (bootverbose)
 		printf(" LINT%u polarity: active-%s\n", pin,
-		    activehi ? "hi" : "lo");
+		    pol == INTR_POLARITY_HIGH ? "high" : "low");
 	return (0);
 }
 
 int
-lapic_set_lvt_triggermode(u_int apic_id, u_int pin, u_char edgetrigger)
+lapic_set_lvt_triggermode(u_int apic_id, u_int pin, enum intr_trigger trigger)
 {
 
-	if (pin > LVT_MAX)
+	if (pin > LVT_MAX || trigger == INTR_TRIGGER_CONFORM)
 		return (EINVAL);
 	if (apic_id == APIC_ID_ALL) {
-		lvts[pin].lvt_edgetrigger = edgetrigger;
+		lvts[pin].lvt_edgetrigger = (trigger == INTR_TRIGGER_EDGE);
 		if (bootverbose)
 			printf("lapic:");
 	} else {
 		KASSERT(lapics[apic_id].la_present,
 		    ("%s: missing APIC %u", __func__, apic_id));
-		lapics[apic_id].la_lvts[pin].lvt_edgetrigger = edgetrigger;
+		lapics[apic_id].la_lvts[pin].lvt_edgetrigger =
+		    (trigger == INTR_TRIGGER_EDGE);
 		lapics[apic_id].la_lvts[pin].lvt_active = 1;
 		if (bootverbose)
 			printf("lapic%u:", apic_id);
 	}
 	if (bootverbose)
 		printf(" LINT%u trigger: %s\n", pin,
-		    edgetrigger ? "edge" : "level");
+		    trigger == INTR_TRIGGER_EDGE ? "edge" : "level");
 	return (0);
 }
 
@@ -600,6 +602,10 @@ apic_init(void *dummy __unused)
 	if (retval != 0)
 		printf("%s: Failed to setup the local APIC: returned %d\n",
 		    best_enum->apic_name, retval);
+#ifdef SMP
+	/* Last, setup the cpu topology now that we have probed CPUs */
+	mp_topology();
+#endif
 }
 SYSINIT(apic_init, SI_SUB_CPU, SI_ORDER_FIRST, apic_init, NULL)
 
@@ -634,7 +640,6 @@ SYSINIT(apic_setup_io, SI_SUB_INTR, SI_ORDER_SECOND, apic_setup_io, NULL)
  * private the sys/i386 code.  The public interface for the rest of the
  * kernel is defined in mp_machdep.c.
  */
-#define DETECT_DEADLOCK
 
 int
 lapic_ipi_wait(int delay)
@@ -688,8 +693,8 @@ lapic_ipi_raw(register_t icrlo, u_int dest)
 	intr_restore(eflags);
 }
 
-#ifdef DETECT_DEADLOCK
 #define	BEFORE_SPIN	1000000
+#ifdef DETECT_DEADLOCK
 #define	AFTER_SPIN	1000
 #endif
 
@@ -720,11 +725,9 @@ lapic_ipi_vectored(u_int vector, int dest)
 		destfield = dest;
 	}
 
-#ifdef DETECT_DEADLOCK
-	/* Check for an earlier stuck IPI. */
+	/* Wait for an earlier IPI to finish. */
 	if (!lapic_ipi_wait(BEFORE_SPIN))
 		panic("APIC: Previous IPI is stuck");
-#endif
 
 	lapic_ipi_raw(icrlo, destfield);
 

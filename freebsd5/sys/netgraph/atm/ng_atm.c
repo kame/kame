@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/atm/ng_atm.c,v 1.6 2003/10/31 18:32:11 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/atm/ng_atm.c,v 1.11 2004/07/28 06:54:55 kan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -324,18 +324,17 @@ static ng_rcvdata_t	ng_atm_rcvdata;
 static ng_rcvdata_t	ng_atm_rcvdrop;
 
 static struct ng_type ng_atm_typestruct = {
-	NG_ABI_VERSION,
-	NG_ATM_NODE_TYPE,
-	ng_atm_mod_event,	/* Module event handler (optional) */
-	ng_atm_constructor,	/* Node constructor */
-	ng_atm_rcvmsg,		/* control messages come here */
-	ng_atm_shutdown,	/* reset, and free resources */
-	ng_atm_newhook,		/* first notification of new hook */
-	NULL,			/* findhook */
-	ng_atm_connect,		/* connect */
-	ng_atm_rcvdata,		/* rcvdata */
-	ng_atm_disconnect,	/* notify on disconnect */
-	ng_atm_cmdlist,
+	.version =	NG_ABI_VERSION,
+	.name =		NG_ATM_NODE_TYPE,
+	.mod_event =	ng_atm_mod_event,
+	.constructor =	ng_atm_constructor,
+	.rcvmsg =	ng_atm_rcvmsg,
+	.shutdown =	ng_atm_shutdown,
+	.newhook =	ng_atm_newhook,
+	.connect =	ng_atm_connect,
+	.rcvdata =	ng_atm_rcvdata,
+	.disconnect =	ng_atm_disconnect,
+	.cmdlist =	ng_atm_cmdlist,
 };
 NETGRAPH_INIT(atm, &ng_atm_typestruct);
 
@@ -346,6 +345,7 @@ static const struct {
 
 
 #define	IFP2NG(IFP)	((node_p)((struct ifatm *)(IFP))->ngpriv)
+#define	IFP2NG_SET(IFP, val)	(((struct ifatm *)(IFP))->ngpriv = (val))
 
 #define	IFFLAGS "\020\001UP\002BROADCAST\003DEBUG\004LOOPBACK" \
 		 "\005POINTOPOINT\006SMART\007RUNNING\010NOARP" \
@@ -559,7 +559,7 @@ ng_atm_event_func(node_p node, hook_p hook, void *arg, int event)
 
 		/* XXX have to figure out how to get that info */
 
-		NG_SEND_MSG_HOOK(error, node, mesg, vcc->hook, NULL);
+		NG_SEND_MSG_HOOK(error, node, mesg, vcc->hook, 0);
 		break;
 	    }
 
@@ -579,7 +579,7 @@ ng_atm_event_func(node_p node, hook_p hook, void *arg, int event)
 		chg->vpi = ev->vpi;
 		chg->state = (ev->up != 0);
 		chg->node = NG_NODE_ID(node);
-		NG_SEND_MSG_HOOK(error, node, mesg, priv->manage, NULL);
+		NG_SEND_MSG_HOOK(error, node, mesg, priv->manage, 0);
 		break;
 	    }
 
@@ -598,7 +598,7 @@ ng_atm_event_func(node_p node, hook_p hook, void *arg, int event)
 		chg->carrier = (ev->carrier != 0);
 		chg->running = (ev->running != 0);
 		chg->node = NG_NODE_ID(node);
-		NG_SEND_MSG_HOOK(error, node, mesg, priv->manage, NULL);
+		NG_SEND_MSG_HOOK(error, node, mesg, priv->manage, 0);
 		break;
 	    }
 
@@ -625,7 +625,7 @@ ng_atm_event_func(node_p node, hook_p hook, void *arg, int event)
 		acr->vpi = ev->vpi;
 		acr->acr = ev->acr;
 
-		NG_SEND_MSG_HOOK(error, node, mesg, vcc->hook, NULL);
+		NG_SEND_MSG_HOOK(error, node, mesg, vcc->hook, 0);
 		break;
 	    }
 	}
@@ -991,7 +991,7 @@ ng_atm_rcvmsg(node_p node, item_p item, hook_p lasthook)
 
 		  case NGM_ATM_GET_VCC:
 		    {
-			char hook[NG_HOOKLEN + 1];
+			char hook[NG_HOOKSIZ];
 			struct atmio_vcctable *vccs;
 			struct ngvcc *vcc;
 			u_int i;
@@ -1000,12 +1000,12 @@ ng_atm_rcvmsg(node_p node, item_p item, hook_p lasthook)
 				error = ENXIO;
 				break;
 			}
-			if (msg->header.arglen != NG_HOOKLEN + 1) {
+			if (msg->header.arglen != NG_HOOKSIZ) {
 				error = EINVAL;
 				break;
 			}
-			strncpy(hook, msg->data, NG_HOOKLEN + 1);
-			hook[NG_HOOKLEN] = '\0';
+			strncpy(hook, msg->data, NG_HOOKSIZ);
+			hook[NG_HOOKSIZ - 1] = '\0';
 			LIST_FOREACH(vcc, &priv->vccs, link)
 				if (strcmp(NG_HOOK_NAME(vcc->hook), hook) == 0)
 					break;
@@ -1281,7 +1281,7 @@ ng_atm_attach(struct ifnet *ifp)
 	NG_NODE_SET_PRIVATE(node, priv);
 	priv->ifp = ifp;
 	LIST_INIT(&priv->vccs);
-	IFP2NG(ifp) = node;
+	IFP2NG_SET(ifp, node);
 
 	if (ng_name_node(node, name) != 0) {
 		log(LOG_WARNING, "%s: can't name node %s\n",
@@ -1304,7 +1304,7 @@ ng_atm_detach(struct ifnet *ifp)
 	NG_NODE_REALLY_DIE(node);
 
 	priv = NG_NODE_PRIVATE(node);
-	IFP2NG(priv->ifp) = NULL;
+	IFP2NG_SET(priv->ifp, NULL);
 	priv->ifp = NULL;
 
 	ng_rmnode_self(node);
@@ -1318,7 +1318,7 @@ ng_atm_shutdown(node_p node)
 {
 	struct priv *priv = NG_NODE_PRIVATE(node);
 
-	if (node->nd_flags & NG_REALLY_DIE) {
+	if (node->nd_flags & NGF_REALLY_DIE) {
 		/*
 		 * We are called from unloading the ATM driver. Really,
 		 * really need to shutdown this node. The ifp was
@@ -1333,9 +1333,9 @@ ng_atm_shutdown(node_p node)
 
 #ifdef NGATM_DEBUG
 	if (!allow_shutdown)
-		node->nd_flags &= ~NG_INVALID;
+		NG_NODE_REVIVE(node);		/* we persist */
 	else {
-		IFP2NG(priv->ifp) = NULL;
+		IFP2NG_SET(priv->ifp, NULL);
 		NG_NODE_SET_PRIVATE(node, NULL);
 		free(priv, M_NETGRAPH);
 		NG_NODE_UNREF(node);
@@ -1344,7 +1344,7 @@ ng_atm_shutdown(node_p node)
 	/*
 	 * We are persistant - reinitialize
 	 */
-	node->nd_flags &= ~NG_INVALID;
+	NG_NODE_REVIVE(node);
 #endif
 	return (0);
 }

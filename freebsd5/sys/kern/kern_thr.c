@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_thr.c,v 1.14 2003/08/14 03:56:24 grehan Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_thr.c,v 1.23.2.6 2004/10/09 15:12:33 mtm Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -34,6 +34,8 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_thr.c,v 1.14 2003/08/14 03:56:24 grehan Ex
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
+#include <sys/sysctl.h>
+#include <sys/smp.h>
 #include <sys/sysent.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -43,76 +45,21 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_thr.c,v 1.14 2003/08/14 03:56:24 grehan Ex
 
 #include <machine/frame.h>
 
+extern int max_threads_per_proc;
+extern int max_groups_per_proc;
+
+SYSCTL_DECL(_kern_threads);
+static int thr_scope_sys = 0;
+SYSCTL_INT(_kern_threads, OID_AUTO, thr_scope_sys, CTLFLAG_RW,
+	&thr_scope_sys, 0, "sys or proc scope scheduling");
+
+static int thr_concurrency = 0;
+SYSCTL_INT(_kern_threads, OID_AUTO, thr_concurrency, CTLFLAG_RW,
+	&thr_concurrency, 0, "a concurrency value if not default");
+
 /*
  * Back end support functions.
  */
-
-void
-thr_exit1(void)
-{
-	struct ksegrp *kg;
-	struct thread *td;
-	struct kse *ke;
-	struct proc *p;
-
-	td = curthread;
-	p = td->td_proc;
-	kg = td->td_ksegrp;
-	ke = td->td_kse;
-
-	mtx_assert(&sched_lock, MA_OWNED);
-	PROC_LOCK_ASSERT(p, MA_OWNED);
-	KASSERT(!mtx_owned(&Giant), ("dying thread owns giant"));
-
-	/*
-	 * Shutting down last thread in the proc.  This will actually
-	 * call exit() in the trampoline when it returns.
-	 */
-	if (p->p_numthreads == 1) {
-		PROC_UNLOCK(p);
-		return;
-	}
-
-	/*
-	 * XXX Undelivered process wide signals should be reposted to the
-	 * proc.
-	 */
-
-	/* Clean up cpu resources. */
-	cpu_thread_exit(td);
-
-	/* XXX make thread_unlink() */
-	TAILQ_REMOVE(&p->p_threads, td, td_plist);
-	p->p_numthreads--;
-	TAILQ_REMOVE(&kg->kg_threads, td, td_kglist);
-	kg->kg_numthreads--;
-
-	ke->ke_state = KES_UNQUEUED;
-	ke->ke_thread = NULL;
-	kse_unlink(ke);
-	sched_exit_kse(TAILQ_NEXT(ke, ke_kglist), ke);
-
-	/*
-	 * If we were stopped while waiting for all threads to exit and this
-	 * is the last thread wakeup the exiting thread.
-	 */
-	if (P_SHOULDSTOP(p) == P_STOPPED_SINGLE)
-		if (p->p_numthreads == 1)
-			thread_unsuspend_one(p->p_singlethread);
-
-	PROC_UNLOCK(p);
-	td->td_kse = NULL;
-	td->td_state = TDS_INACTIVE;
-#if 0
-	td->td_proc = NULL;
-#endif
-	td->td_ksegrp = NULL;
-	td->td_last_kse = NULL;
-	sched_exit_thread(TAILQ_NEXT(td, td_kglist), td);
-	thread_stash(td);
-
-	cpu_throw(td, choosethread());
-}
 
 #define	RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
 
@@ -121,69 +68,106 @@ thr_exit1(void)
  */
 int
 thr_create(struct thread *td, struct thr_create_args *uap)
-    /* ucontext_t *ctx, thr_id_t *id, int flags */
+    /* ucontext_t *ctx, long *id, int flags */
 {
-	struct kse *ke0;
-	struct thread *td0;
+	struct thread *newtd;
 	ucontext_t ctx;
+	long id;
 	int error;
+	struct ksegrp *kg, *newkg;
+	struct proc *p;
+	int scope_sys;
 
+	p = td->td_proc;
+	kg = td->td_ksegrp;
 	if ((error = copyin(uap->ctx, &ctx, sizeof(ctx))))
 		return (error);
 
-	/* Initialize our td. */
-	td0 = thread_alloc();
+	/* Have race condition but it is cheap */
+	if ((p->p_numksegrps >= max_groups_per_proc) ||
+	    (p->p_numthreads >= max_threads_per_proc)) {
+		return (EPROCLIM);
+	}
 
+	/*
+	 * Use a local copy to close a race against the user
+	 * changing thr_scope_sys.
+	 */
+	scope_sys = thr_scope_sys;
+
+	/* Initialize our td and new ksegrp.. */
+	newtd = thread_alloc();
+	if (scope_sys)
+		newkg = ksegrp_alloc();
+	else
+		newkg = kg;
 	/*
 	 * Try the copyout as soon as we allocate the td so we don't have to
 	 * tear things down in a failure case below.
 	 */
-	if ((error = copyout(&td0, uap->id, sizeof(thr_id_t)))) {
-		thread_free(td0);
+	id = newtd->td_tid;
+	if ((error = copyout(&id, uap->id, sizeof(long)))) {
+		if (scope_sys)
+			ksegrp_free(newkg);
+		thread_free(newtd);
 		return (error);
 	}
 
-	bzero(&td0->td_startzero,
-	    (unsigned)RANGEOF(struct thread, td_startzero, td_endzero));
-	bcopy(&td->td_startcopy, &td0->td_startcopy,
+	bzero(&newtd->td_startzero,
+	    (unsigned) RANGEOF(struct thread, td_startzero, td_endzero));
+	bcopy(&td->td_startcopy, &newtd->td_startcopy,
 	    (unsigned) RANGEOF(struct thread, td_startcopy, td_endcopy));
 
-	td0->td_proc = td->td_proc;
-	PROC_LOCK(td->td_proc);
-	td0->td_sigmask = td->td_sigmask;
-	PROC_UNLOCK(td->td_proc);
-	td0->td_ucred = crhold(td->td_ucred);
+	if (scope_sys) {
+		bzero(&newkg->kg_startzero,
+		    (unsigned)RANGEOF(struct ksegrp, kg_startzero, kg_endzero));
+		bcopy(&kg->kg_startcopy, &newkg->kg_startcopy,
+		    (unsigned)RANGEOF(struct ksegrp, kg_startcopy, kg_endcopy));
+	}
 
-	/* Initialize our kse structure. */
-	ke0 = kse_alloc();
-	bzero(&ke0->ke_startzero,
-	    RANGEOF(struct kse, ke_startzero, ke_endzero));
+	newtd->td_proc = td->td_proc;
+	newtd->td_ucred = crhold(td->td_ucred);
 
 	/* Set up our machine context. */
-	cpu_set_upcall(td0, td);
-	error = set_mcontext(td0, &ctx.uc_mcontext);
+	cpu_set_upcall(newtd, td);
+	error = set_mcontext(newtd, &ctx.uc_mcontext);
 	if (error != 0) {
-		kse_free(ke0);
-		thread_free(td0);
+		if (scope_sys)
+			ksegrp_free(newkg);
+		thread_free(newtd);
+		crfree(td->td_ucred);
 		goto out;
-	} 
+	}
 
 	/* Link the thread and kse into the ksegrp and make it runnable. */
+	PROC_LOCK(td->td_proc);
+	if (scope_sys) {
+			sched_init_concurrency(newkg);
+	} else {
+		if ((td->td_proc->p_flag & P_HADTHREADS) == 0) {
+			sched_set_concurrency(kg,
+			    thr_concurrency ? thr_concurrency : (2*mp_ncpus));
+		}
+	}
+			
+	td->td_proc->p_flag |= P_HADTHREADS; 
+	newtd->td_sigmask = td->td_sigmask;
 	mtx_lock_spin(&sched_lock);
+	if (scope_sys)
+		ksegrp_link(newkg, p);
+	thread_link(newtd, newkg);
+	mtx_unlock_spin(&sched_lock);
+	PROC_UNLOCK(p);
 
-	thread_link(td0, td->td_ksegrp);
-	kse_link(ke0, td->td_ksegrp);
+	/* let the scheduler know about these things. */
+	mtx_lock_spin(&sched_lock);
+	if (scope_sys)
+		sched_fork_ksegrp(td, newkg);
+	sched_fork_thread(td, newtd);
 
-	/* Bind this thread and kse together. */
-	td0->td_kse = ke0;
-	ke0->ke_thread = td0;
-
-	sched_fork_kse(td->td_kse, ke0);
-	sched_fork_thread(td, td0);
-
-	TD_SET_CAN_RUN(td0);
+	TD_SET_CAN_RUN(newtd);
 	if ((uap->flags & THR_SUSPENDED) == 0)
-		setrunqueue(td0);
+		setrunqueue(newtd, SRQ_BORING);
 
 	mtx_unlock_spin(&sched_lock);
 
@@ -193,11 +177,13 @@ out:
 
 int
 thr_self(struct thread *td, struct thr_self_args *uap)
-    /* thr_id_t *id */
+    /* long *id */
 {
+	long id;
 	int error;
 
-	if ((error = copyout(&td, uap->id, sizeof(thr_id_t))))
+	id = td->td_tid;
+	if ((error = copyout(&id, uap->id, sizeof(long))))
 		return (error);
 
 	return (0);
@@ -205,28 +191,35 @@ thr_self(struct thread *td, struct thr_self_args *uap)
 
 int
 thr_exit(struct thread *td, struct thr_exit_args *uap)
-    /* NULL */
+    /* long *state */
 {
 	struct proc *p;
 
 	p = td->td_proc;
 
+	/* Signal userland that it can free the stack. */
+	if ((void *)uap->state != NULL)
+		suword((void *)uap->state, 1);
+
 	PROC_LOCK(p);
 	mtx_lock_spin(&sched_lock);
 
 	/*
-	 * This unlocks proc and doesn't return unless this is the last
-	 * thread.
+	 * Shutting down last thread in the proc.  This will actually
+	 * call exit() in the trampoline when it returns.
 	 */
-	thr_exit1();
+	if (p->p_numthreads != 1) {
+		thread_exit();
+		/* NOTREACHED */
+	}
 	mtx_unlock_spin(&sched_lock);
-
+	PROC_UNLOCK(p);
 	return (0);
 }
 
 int
 thr_kill(struct thread *td, struct thr_kill_args *uap)
-    /* thr_id_t id, int sig */
+    /* long id, int sig */
 {
 	struct thread *ttd;
 	struct proc *p;
@@ -236,7 +229,7 @@ thr_kill(struct thread *td, struct thr_kill_args *uap)
 	error = 0;
 	PROC_LOCK(p);
 	FOREACH_THREAD_IN_PROC(p, ttd) {
-		if (ttd == uap->id)
+		if (ttd->td_tid == uap->id)
 			break;
 	}
 	if (ttd == NULL) {
@@ -253,4 +246,61 @@ thr_kill(struct thread *td, struct thr_kill_args *uap)
 out:
 	PROC_UNLOCK(p);
 	return (error);
+}
+
+int
+thr_suspend(struct thread *td, struct thr_suspend_args *uap)
+	/* const struct timespec *timeout */
+{
+	struct timespec ts;
+	struct timeval	tv;
+	int error;
+	int hz;
+
+	hz = 0;
+	error = 0;
+	if (uap->timeout != NULL) {
+		error = copyin((const void *)uap->timeout, (void *)&ts,
+		    sizeof(struct timespec));
+		if (error != 0)
+			return (error);
+		if (ts.tv_nsec < 0 || ts.tv_nsec > 1000000000)
+			return (EINVAL);
+		if (ts.tv_sec == 0 && ts.tv_nsec == 0)
+			return (ETIMEDOUT);
+		TIMESPEC_TO_TIMEVAL(&tv, &ts);
+		hz = tvtohz(&tv);
+	}
+	PROC_LOCK(td->td_proc);
+	if ((td->td_flags & TDF_THRWAKEUP) == 0)
+		error = msleep((void *)td, &td->td_proc->p_mtx,
+		    td->td_priority | PCATCH, "lthr", hz);
+	mtx_lock_spin(&sched_lock);
+	td->td_flags &= ~TDF_THRWAKEUP;
+	mtx_unlock_spin(&sched_lock);
+	PROC_UNLOCK(td->td_proc);
+	return (error == EWOULDBLOCK ? ETIMEDOUT : error);
+}
+
+int
+thr_wake(struct thread *td, struct thr_wake_args *uap)
+	/* long id */
+{
+	struct thread *ttd;
+
+	PROC_LOCK(td->td_proc);
+	FOREACH_THREAD_IN_PROC(td->td_proc, ttd) {
+		if (ttd->td_tid == uap->id)
+			break;
+	}
+	if (ttd == NULL) {
+		PROC_UNLOCK(td->td_proc);
+		return (ESRCH);
+	}
+	mtx_lock_spin(&sched_lock);
+	ttd->td_flags |= TDF_THRWAKEUP;
+	mtx_unlock_spin(&sched_lock);
+	wakeup_one((void *)ttd);
+	PROC_UNLOCK(td->td_proc);
+	return (0);
 }

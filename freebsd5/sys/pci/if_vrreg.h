@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.18 2003/11/14 19:00:32 sam Exp $
+ * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.20 2004/07/09 00:12:41 bms Exp $
  */
 
 /*
@@ -420,9 +420,8 @@ struct vr_chain_data {
 
 	struct vr_chain_onefrag	*vr_rx_head;
 
-	struct vr_chain		*vr_tx_head;
-	struct vr_chain		*vr_tx_tail;
-	struct vr_chain		*vr_tx_free;
+	struct vr_chain		*vr_tx_cons;
+	struct vr_chain		*vr_tx_prod;
 };
 
 struct vr_type {
@@ -469,6 +468,10 @@ struct vr_softc {
 	struct vr_chain_data	vr_cdata;
 	struct callout_handle	vr_stat_ch;
 	struct mtx		vr_mtx;
+	int			suspended;	/* if 1, sleeping/detaching */
+#ifdef DEVICE_POLLING
+	int			rxcycles;
+#endif
 };
 
 #define VR_F_RESTART		0x01		/* Restart unit on next tick */

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vmmeter.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/vmmeter.h,v 1.24 2003/02/02 07:16:39 alc Exp $
+ * $FreeBSD: src/sys/sys/vmmeter.h,v 1.26 2004/06/08 10:37:30 tjr Exp $
  */
 
 #ifndef _SYS_VMMETER_H_
@@ -210,43 +206,5 @@ struct vmtotal {
 	int32_t	t_armshr;	/* active shared real memory */
 	int32_t	t_free;		/* free memory pages */
 };
-
-/*
- * Optional instrumentation.
- */
-#ifdef PGINPROF
-
-#define	NDMON	128
-#define	NSMON	128
-
-#define	DRES	20
-#define	SRES	5
-
-#define	PMONMIN	20
-#define	PRES	50
-#define	NPMON	64
-
-#define	RMONMIN	130
-#define	RRES	5
-#define	NRMON	64
-
-/* data and stack size distribution counters */
-u_int	dmon[NDMON+1];
-u_int	smon[NSMON+1];
-
-/* page in time distribution counters */
-u_int	pmon[NPMON+2];
-
-/* reclaim time distribution counters */
-u_int	rmon[NRMON+2];
-
-int	pmonmin;
-int	pres;
-int	rmonmin;
-int	rres;
-
-u_int rectime;		/* accumulator for reclaim times */
-u_int pgintime;		/* accumulator for page in times */
-#endif
 
 #endif

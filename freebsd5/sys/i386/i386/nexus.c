@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/nexus.c,v 1.54 2003/11/05 23:19:44 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/nexus.c,v 1.58.2.1 2004/08/31 05:26:36 njl Exp $");
 
 /*
  * This code implements a `root nexus' for Intel Architecture
@@ -88,6 +88,8 @@ static device_t nexus_add_child(device_t bus, int order, const char *name,
 				int unit);
 static	struct resource *nexus_alloc_resource(device_t, device_t, int, int *,
 					      u_long, u_long, u_long, u_int);
+static	int nexus_config_intr(device_t, int, enum intr_trigger,
+			      enum intr_polarity);
 static	int nexus_activate_resource(device_t, device_t, int, int,
 				    struct resource *);
 static	int nexus_deactivate_resource(device_t, device_t, int, int,
@@ -98,6 +100,7 @@ static	int nexus_setup_intr(device_t, device_t, struct resource *, int flags,
 			     void (*)(void *), void *, void **);
 static	int nexus_teardown_intr(device_t, device_t, struct resource *,
 				void *);
+static struct resource_list *nexus_get_reslist(device_t dev, device_t child);
 static	int nexus_set_resource(device_t, device_t, int, int, u_long, u_long);
 static	int nexus_get_resource(device_t, device_t, int, int, u_long *, u_long *);
 static void nexus_delete_resource(device_t, device_t, int, int);
@@ -120,6 +123,8 @@ static device_method_t nexus_methods[] = {
 	DEVMETHOD(bus_deactivate_resource, nexus_deactivate_resource),
 	DEVMETHOD(bus_setup_intr,	nexus_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	nexus_teardown_intr),
+	DEVMETHOD(bus_config_intr,	nexus_config_intr),
+	DEVMETHOD(bus_get_resource_list, nexus_get_reslist),
 	DEVMETHOD(bus_set_resource,	nexus_set_resource),
 	DEVMETHOD(bus_get_resource,	nexus_get_resource),
 	DEVMETHOD(bus_delete_resource,	nexus_delete_resource),
@@ -299,6 +304,9 @@ nexus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	struct resource_list_entry *rle;
 	struct	rman *rm;
 	int needactivate = flags & RF_ACTIVE;
+#ifdef PC98
+	bus_space_handle_t bh;
+#endif
 
 	/*
 	 * If this is an allocation of the "default" range for a given RID, and
@@ -348,25 +356,27 @@ nexus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	} else if (type == SYS_RES_IOPORT) {
 		rman_set_bustag(rv, I386_BUS_SPACE_IO);
 #ifndef PC98
-		rman_set_bushandle(rv, rv->r_start);
+		rman_set_bushandle(rv, rman_get_start(rv));
 #endif
 	}
 
 #ifdef PC98
 	if ((type == SYS_RES_MEMORY || type == SYS_RES_IOPORT) &&
-	    i386_bus_space_handle_alloc(rv->r_bustag, rv->r_start, count,
-					&rv->r_bushandle) != 0) {
+	    i386_bus_space_handle_alloc(rman_get_bustag(rv),
+	      rman_get_start(rv), count, &bh) != 0) {
 		rman_release_resource(rv);
 		return 0;
 	}
+	rman_set_bushandle(rv, bh);
 #endif
 
 	if (needactivate) {
 		if (bus_activate_resource(child, type, *rid, rv)) {
 #ifdef PC98
 			if (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT) {
-				i386_bus_space_handle_free(rv->r_bustag,
-				    rv->r_bushandle, rv->r_bushandle->bsh_sz);
+				bh = rman_get_bushandle(rv);
+				i386_bus_space_handle_free(rman_get_bustag(rv),
+				    bh, bh->bsh_sz);
 			}
 #endif
 			rman_release_resource(rv);
@@ -381,6 +391,9 @@ static int
 nexus_activate_resource(device_t bus, device_t child, int type, int rid,
 			struct resource *r)
 {
+#ifdef PC98
+	bus_space_handle_t bh;
+#endif
 	/*
 	 * If this is a memory resource, map it into the kernel.
 	 */
@@ -406,7 +419,8 @@ nexus_activate_resource(device_t bus, device_t child, int type, int rid,
 		rman_set_virtual(r, vaddr);
 #ifdef PC98
 		/* PC-98: the type of bus_space_handle_t is the structure. */
-		r->r_bushandle->bsh_base = (bus_addr_t) vaddr;
+		bh = rman_get_bushandle(r);
+		bh->bsh_base = (bus_addr_t) vaddr;
 #else
 		/* IBM-PC: the type of bus_space_handle_t is u_int */
 		rman_set_bushandle(r, (bus_space_handle_t) vaddr);
@@ -444,8 +458,10 @@ nexus_release_resource(device_t bus, device_t child, int type, int rid,
 	}
 #ifdef PC98
 	if (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT) {
-		i386_bus_space_handle_free(r->r_bustag, r->r_bushandle,
-					   r->r_bushandle->bsh_sz);
+		bus_space_handle_t bh;
+
+		bh = rman_get_bushandle(r);
+		i386_bus_space_handle_free(rman_get_bustag(r), bh, bh->bsh_sz);
 	}
 #endif
 	return (rman_release_resource(r));
@@ -468,7 +484,7 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 		panic("nexus_setup_intr: NULL irq resource!");
 
 	*cookiep = 0;
-	if ((irq->r_flags & RF_SHAREABLE) == 0)
+	if ((rman_get_flags(irq) & RF_SHAREABLE) == 0)
 		flags |= INTR_EXCL;
 
 	/*
@@ -478,8 +494,8 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 	if (error)
 		return (error);
 
-	error = intr_add_handler(device_get_nameunit(child), irq->r_start,
-	    ihand, arg, flags, cookiep);
+	error = intr_add_handler(device_get_nameunit(child),
+	    rman_get_start(irq), ihand, arg, flags, cookiep);
 
 	return (error);
 }
@@ -488,6 +504,21 @@ static int
 nexus_teardown_intr(device_t dev, device_t child, struct resource *r, void *ih)
 {
 	return (intr_remove_handler(ih));
+}
+
+static int
+nexus_config_intr(device_t dev, int irq, enum intr_trigger trig,
+    enum intr_polarity pol)
+{
+	return (intr_config_intr(irq, trig, pol));
+}
+
+static struct resource_list *
+nexus_get_reslist(device_t dev, device_t child)
+{
+	struct nexus_device *ndev = DEVTONX(child);
+
+	return (&ndev->nx_resources);
 }
 
 static int
@@ -509,8 +540,6 @@ nexus_get_resource(device_t dev, device_t child, int type, int rid, u_long *star
 	struct resource_list_entry *rle;
 
 	rle = resource_list_find(rl, type, rid);
-	device_printf(child, "type %d  rid %d  startp %p  countp %p - got %p\n",
-		      type, rid, startp, countp, rle);
 	if (!rle)
 		return(ENOENT);
 	if (startp)

@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/elf_machdep.c,v 1.15 2003/10/28 19:38:25 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/elf_machdep.c,v 1.19 2004/08/11 02:35:05 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -49,7 +49,9 @@
 #include <machine/md_var.h>
 #include <machine/unwind.h>
 
-static int ia64_coredump(struct thread *, struct vnode *, off_t);
+Elf_Addr link_elf_get_gp(linker_file_t);
+
+extern Elf_Addr fptr_storage[];
 
 struct sysentvec elf64_freebsd_sysvec = {
 	SYS_MAXSYSCALL,
@@ -66,7 +68,7 @@ struct sysentvec elf64_freebsd_sysvec = {
 	NULL,		/* &szsigcode */
 	NULL,
 	"FreeBSD ELF64",
-	ia64_coredump,
+	__elfN(coredump),
 	NULL,
 	MINSIGSTKSZ,
 	PAGE_SIZE,
@@ -81,54 +83,42 @@ struct sysentvec elf64_freebsd_sysvec = {
 };
 
 static Elf64_Brandinfo freebsd_brand_info = {
-						ELFOSABI_FREEBSD,
-						EM_IA_64,
-						"FreeBSD",
-						"",
-						"/libexec/ld-elf.so.1",
-						&elf64_freebsd_sysvec
-					  };
-
+	ELFOSABI_FREEBSD,
+	EM_IA_64,
+	"FreeBSD",
+	NULL,
+	"/libexec/ld-elf.so.1",
+	&elf64_freebsd_sysvec,
+	NULL,
+};
 SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
-	(sysinit_cfunc_t) elf64_insert_brand_entry,
-	&freebsd_brand_info);
+    (sysinit_cfunc_t)elf64_insert_brand_entry, &freebsd_brand_info);
 
-Elf_Addr link_elf_get_gp(linker_file_t);
+static Elf64_Brandinfo freebsd_brand_oinfo = {
+	ELFOSABI_FREEBSD,
+	EM_IA_64,
+	"FreeBSD",
+	NULL,
+	"/usr/libexec/ld-elf.so.1",
+	&elf64_freebsd_sysvec,
+	NULL,
+};
+SYSINIT(oelf64, SI_SUB_EXEC, SI_ORDER_ANY,
+    (sysinit_cfunc_t)elf64_insert_brand_entry, &freebsd_brand_oinfo);
 
-extern Elf_Addr fptr_storage[];
 
-static int
-ia64_coredump(struct thread *td, struct vnode *vp, off_t limit)
+void
+elf64_dump_thread(struct thread *td, void *dst, size_t *off __unused)
 {
-	struct trapframe *tf;
-	uint64_t bspst, kstk, ndirty, rnat;
 
-	tf = td->td_frame;
-	ndirty = tf->tf_special.ndirty;
-	if (ndirty != 0) {
-		kstk = td->td_kstack + (tf->tf_special.bspstore & 0x1ffUL);
-		__asm __volatile("mov	ar.rsc=0;;");
-		__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
-		/* Make sure we have all the user registers written out. */
-		if (bspst - kstk < ndirty) {
-			__asm __volatile("flushrs;;");
-			__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
-		}
-		__asm __volatile("mov	%0=ar.rnat;;" : "=r"(rnat));
-		__asm __volatile("mov	ar.rsc=3");
-		copyout((void*)kstk, (void*)tf->tf_special.bspstore, ndirty);
-		kstk += ndirty;
-		tf->tf_special.bspstore += ndirty;
-		tf->tf_special.ndirty = 0;
-		tf->tf_special.rnat =
-		    (bspst > kstk && (bspst & 0x1ffUL) < (kstk & 0x1ffUL))
-		    ? *(uint64_t*)(kstk | 0x1f8UL) : rnat;
-	}
-	return (elf64_coredump(td, vp, limit));
+	/* Flush the dirty registers onto the backingstore. */
+	if (dst == NULL)
+		ia64_flush_dirty(td, &td->td_frame->tf_special);
 }
 
+
 static Elf_Addr
-lookup_fdesc(linker_file_t lf, Elf_Word symidx)
+lookup_fdesc(linker_file_t lf, Elf_Word symidx, elf_lookup_fn lookup)
 {
 	linker_file_t top;
 	Elf_Addr addr;
@@ -136,7 +126,7 @@ lookup_fdesc(linker_file_t lf, Elf_Word symidx)
 	int i;
 	static int eot = 0;
 
-	addr = elf_lookup(lf, symidx, 0);
+	addr = lookup(lf, symidx, 0);
 	if (addr == 0) {
 		top = lf;
 		symname = elf_get_symname(top, symidx);
@@ -176,9 +166,9 @@ lookup_fdesc(linker_file_t lf, Elf_Word symidx)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
+elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+    int type, int local, elf_lookup_fn lookup)
 {
-	Elf_Addr relocbase = (Elf_Addr)lf->address;
 	Elf_Addr *where;
 	Elf_Addr addend, addr;
 	Elf_Word rtype, symidx;
@@ -223,7 +213,7 @@ elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
 	case R_IA64_NONE:
 		break;
 	case R_IA64_DIR64LSB:	/* word64 LSB	S + A */
-		addr = elf_lookup(lf, symidx, 1);
+		addr = lookup(lf, symidx, 1);
 		if (addr == 0)
 			return (-1);
 		*where = addr + addend;
@@ -233,7 +223,7 @@ elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
 			printf("%s: addend ignored for OPD relocation\n",
 			    __func__);
 		}
-		addr = lookup_fdesc(lf, symidx);
+		addr = lookup_fdesc(lf, symidx, lookup);
 		if (addr == 0)
 			return (-1);
 		*where = addr;
@@ -241,7 +231,7 @@ elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
 	case R_IA64_REL64LSB:	/* word64 LSB	BD + A */
 		break;
 	case R_IA64_IPLTLSB:
-		addr = lookup_fdesc(lf, symidx);
+		addr = lookup_fdesc(lf, symidx, lookup);
 		if (addr == 0)
 			return (-1);
 		where[0] = *((Elf_Addr*)addr) + addend;
@@ -257,17 +247,19 @@ elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
 }
 
 int
-elf_reloc(linker_file_t lf, const void *data, int type)
+elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+    elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, data, type, 0));
+	return (elf_reloc_internal(lf, relocbase, data, type, 0, lookup));
 }
 
 int
-elf_reloc_local(linker_file_t lf, const void *data, int type)
+elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+    int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, data, type, 1));
+	return (elf_reloc_internal(lf, relocbase, data, type, 1, lookup));
 }
 
 int

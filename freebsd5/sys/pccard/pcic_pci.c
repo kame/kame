@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic_pci.c,v 1.127 2003/10/21 18:28:36 silby Exp $
+ * $FreeBSD: src/sys/pccard/pcic_pci.c,v 1.128 2004/03/17 17:50:52 njl Exp $
  */
 
 #define OBSOLETE_IN_6
@@ -1141,7 +1141,7 @@ pcic_pci_probe(device_t dev)
 			pci_write_config(dev, PCIR_INTLINE, 255, 1);
 		}
 #endif
-		res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+		res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 		    RF_ACTIVE);
 		if (res)
 			bus_release_resource(dev, SYS_RES_IRQ, rid, res);
@@ -1249,8 +1249,8 @@ pcic_pci_attach(device_t dev)
 	sockbase = pci_read_config(dev, 0x10, 4);
 	if (sockbase & 0x1) {
 		sc->iorid = CB_PCI_SOCKET_BASE;
-		sc->iores = bus_alloc_resource(dev, SYS_RES_IOPORT,
-		    &sc->iorid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+		sc->iores = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+		    &sc->iorid, RF_ACTIVE | RF_SHAREABLE);
 		if (sc->iores == NULL)
 			return (ENOMEM);
 
@@ -1281,8 +1281,8 @@ pcic_pci_attach(device_t dev)
 		intr = pcic_isa_intr;
 	} else {
 		sc->memrid = CB_PCI_SOCKET_BASE;
-		sc->memres = bus_alloc_resource(dev, SYS_RES_MEMORY,
-		    &sc->memrid, 0, ~0, 1, RF_ACTIVE);
+		sc->memres = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+		    &sc->memrid, RF_ACTIVE);
 		if (sc->memres == NULL && pcic_pci_get_memory(dev) != 0)
 			return (ENOMEM);
 		sp->getb = pcic_pci_getb2;
@@ -1317,7 +1317,7 @@ pcic_pci_attach(device_t dev)
 
 	if (sc->csc_route == pcic_iw_pci) {
 		rid = 0;
-		r = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1, 
+		r = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, 
 		    RF_ACTIVE | RF_SHAREABLE);
 		if (r == NULL) {
 			sc->csc_route = pcic_iw_isa;

@@ -1,5 +1,5 @@
 /*	$NetBSD: if_media.h,v 1.3 1997/03/26 01:19:27 thorpej Exp $	*/
-/* $FreeBSD: src/sys/net/if_media.h,v 1.23 2003/07/21 02:48:35 sam Exp $ */
+/* $FreeBSD: src/sys/net/if_media.h,v 1.28 2004/08/12 23:48:26 tackerman Exp $ */
 
 /*
  * Copyright (c) 1997
@@ -138,6 +138,9 @@ int	ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr,
 #define	IFM_1000_CX	15		/* 1000baseCX - 150ohm STP */
 #define	IFM_1000_T	16		/* 1000baseT - 4 pair cat 5 */
 #define	IFM_HPNA_1	17		/* HomePNA 1.0 (1Mb/s) */
+#define	IFM_10GBASE_SR	18		/* 10GBASE-SR 850nm Multi-mode Fiber */
+#define	IFM_10GBASE_LR	19		/* 10GBASE-LR 1310nm Single-mode Fiber */
+
 /* note 31 is the max! */
 
 #define	IFM_ETH_MASTER	0x00000100	/* master mode (1000baseT) */
@@ -189,16 +192,21 @@ int	ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr,
 #define	IFM_IEEE80211_OFDM48	16	/* OFDM 48Mbps */
 #define	IFM_IEEE80211_OFDM54	17	/* OFDM 54Mbps */
 #define	IFM_IEEE80211_OFDM72	18	/* OFDM 72Mbps */
+#define	IFM_IEEE80211_DS354k	19	/* Direct Sequence 354Kbps */
+#define	IFM_IEEE80211_DS512k	20	/* Direct Sequence 512Kbps */
+
 #define	IFM_IEEE80211_ADHOC	0x00000100	/* Operate in Adhoc mode */
 #define	IFM_IEEE80211_HOSTAP	0x00000200	/* Operate in Host AP mode */
 #define	IFM_IEEE80211_IBSS	0x00000400	/* Operate in IBSS mode */
 #define	IFM_IEEE80211_IBSSMASTER 0x00000800	/* Operate as an IBSS master */
 #define	IFM_IEEE80211_TURBO	0x00001000	/* Operate in turbo mode */
 #define	IFM_IEEE80211_MONITOR	0x00002000	/* Operate in monitor mode */
+
 /* operating mode for multi-mode devices */
-#define	IFM_IEEE80211_11A	1	/* 5Ghz, OFDM mode */
-#define	IFM_IEEE80211_11B	2	/* Direct Sequence mode */
-#define	IFM_IEEE80211_11G	3	/* 2Ghz, CCK mode */
+#define	IFM_IEEE80211_11A	0x00010000	/* 5Ghz, OFDM mode */
+#define	IFM_IEEE80211_11B	0x00020000	/* Direct Sequence mode */
+#define	IFM_IEEE80211_11G	0x00030000	/* 2Ghz, CCK mode */
+#define	IFM_IEEE80211_FH	0x00040000	/* 2Ghz, GFSK mode */
 
 /*
  * ATM
@@ -213,6 +221,7 @@ int	ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr,
 #define IFM_ATM_UTP_155		9
 #define IFM_ATM_MM_622		10
 #define IFM_ATM_SM_622		11
+#define	IFM_ATM_VIRTUAL		12
 #define IFM_ATM_SDH		0x00000100	/* SDH instead of SONET */
 #define IFM_ATM_NOSCRAMB	0x00000200	/* no scrambling */
 #define IFM_ATM_UNASSIGNED	0x00000400	/* unassigned cells */
@@ -260,7 +269,7 @@ int	ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr,
 #define	IFM_TYPE_OPTIONS(x) ((x) & IFM_OMASK)
 #define	IFM_INST(x)         (((x) & IFM_IMASK) >> IFM_ISHIFT)
 #define	IFM_OPTIONS(x)	((x) & (IFM_OMASK|IFM_GMASK))
-#define	IFM_MODE(x)	    (((x) & IFM_MMASK) >> IFM_MSHIFT)
+#define	IFM_MODE(x)	    ((x) & IFM_MMASK)
 
 #define	IFM_INST_MAX	IFM_INST(IFM_IMASK)
 
@@ -310,6 +319,8 @@ struct ifmedia_description {
 	{ IFM_1000_T,	"1000baseTX" },					\
 	{ IFM_1000_T,	"1000baseT" },					\
 	{ IFM_HPNA_1,	"homePNA" },					\
+	{ IFM_10GBASE_SR, "10GBASE-SR" },				\
+	{ IFM_10GBASE_LR, "10GBASE-LR" },				\
 	{ 0, NULL },							\
 }
 
@@ -404,6 +415,8 @@ struct ifmedia_description {
 	{ IFM_IEEE80211_OFDM48, "OFDM/48Mbps" },			\
 	{ IFM_IEEE80211_OFDM54, "OFDM/54Mbps" },			\
 	{ IFM_IEEE80211_OFDM72, "OFDM/72Mbps" },			\
+	{ IFM_IEEE80211_DS354k, "DS/354Kbps" },				\
+	{ IFM_IEEE80211_DS512k, "DS/512Kbps" },				\
 	{ 0, NULL },							\
 }
 
@@ -435,6 +448,10 @@ struct ifmedia_description {
 	{ IFM_IEEE80211_DS2, "CCK2" },					\
 	{ IFM_IEEE80211_DS5, "CCK5.5" },				\
 	{ IFM_IEEE80211_DS11, "CCK11" },				\
+	{ IFM_IEEE80211_DS354k, "DS354K" },				\
+	{ IFM_IEEE80211_DS354k, "DirectSequence/354Kbps" },		\
+	{ IFM_IEEE80211_DS512k, "DS512K" },				\
+	{ IFM_IEEE80211_DS512k, "DirectSequence/512Kbps" },		\
 	{ 0, NULL },							\
 }
 
@@ -453,6 +470,7 @@ struct ifmedia_description {
 	{ IFM_IEEE80211_11A, "11a" },					\
 	{ IFM_IEEE80211_11B, "11b" },					\
 	{ IFM_IEEE80211_11G, "11g" },					\
+	{ IFM_IEEE80211_FH, "fh" },					\
 	{ 0, NULL },							\
 }
 
@@ -471,6 +489,7 @@ struct ifmedia_description {
 	{ IFM_ATM_UTP_155,	"UTP/155MBit" },			\
 	{ IFM_ATM_MM_622,	"Multi-mode/622MBit" },			\
 	{ IFM_ATM_SM_622,	"Single-mode/622MBit" },		\
+	{ IFM_ATM_VIRTUAL,	"Virtual" },				\
 	{ 0, NULL },							\
 }
 
@@ -484,6 +503,7 @@ struct ifmedia_description {
 	{ IFM_ATM_UTP_155,	"UTP-155" },				\
 	{ IFM_ATM_MM_622,	"MM-622" },				\
 	{ IFM_ATM_SM_622,	"SM-622" },				\
+	{ IFM_ATM_VIRTUAL,	"VIRTUAL" },				\
 	{ 0, NULL },							\
 }
 

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_bt3c.h,v 1.1 2002/11/24 19:47:05 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_bt3c.h,v 1.2 2003/05/10 21:44:40 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_bt3c.h,v 1.3 2004/05/10 02:24:55 emax Exp $
  *
  * XXX XXX XX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
  *
@@ -39,11 +39,6 @@
 
 #ifndef _NG_BT3C_H_
 #define _NG_BT3C_H_
-
-/* XXX FIME: does not belong here. Move to pccarddevs.h later */
-#define PCMCIA_PRODUCT_3COM_3CRWB609	0x0040
-#define PCMCIA_STR_3COM_3CRWB609	"3Com Bluetooth PC Card 3CRWB60-A"
-#define PCMCIA_CIS_3COM_3CRWB609	{ NULL, NULL, NULL, NULL }
 
 /**************************************************************************
  **************************************************************************

@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/isa_dma.c,v 1.14 2003/06/02 16:32:54 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/isa_dma.c,v 1.16 2004/07/05 20:37:42 phk Exp $");
 
 /*
  * code to manage AT bus
@@ -105,12 +101,20 @@ isa_dmainit(chan, bouncebufsize)
 {
 	void *buf;
 
+	/*
+	 * If a DMA channel is shared, both drivers have to call isa_dmainit
+	 * since they don't know that the other driver will do it.
+	 * Just return if we're already set up good.
+	 * XXX: this only works if they agree on the bouncebuf size.  This
+	 * XXX: is typically the case since they are multiple instances of
+	 * XXX: the same driver.
+	 */
+	if (dma_bouncebuf[chan] != NULL)
+		return;
+
 #ifdef DIAGNOSTIC
 	if (chan & ~VALID_DMA_MASK)
 		panic("isa_dmainit: channel out of range");
-
-	if (dma_bouncebuf[chan] != NULL)
-		panic("isa_dmainit: impossible request"); 
 #endif
 
 	dma_bouncebufsize[chan] = bouncebufsize;

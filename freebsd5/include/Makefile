@@ -1,21 +1,24 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD: src/include/Makefile,v 1.207 2003/11/22 06:08:59 scottl Exp $
+# $FreeBSD: src/include/Makefile,v 1.222.2.2 2004/09/30 23:36:08 dougb Exp $
 #
 # Doing a "make install" builds /usr/include.
 
 CLEANFILES= osreldate.h version vers.c
 SUBDIR= arpa protocols rpcsvc rpc
-INCS=	a.out.h ar.h assert.h bitstring.h complex.h cpio.h ctype.h db.h \
+INCS=	a.out.h ar.h assert.h bitstring.h complex.h cpio.h _ctype.h ctype.h \
+	db.h \
 	dirent.h dlfcn.h elf.h elf-hints.h err.h fmtmsg.h fnmatch.h fstab.h \
-	fts.h getopt.h glob.h grp.h hesiod.h histedit.h ieeefp.h ifaddrs.h \
+	fts.h ftw.h getopt.h glob.h grp.h \
+	hesiod.h histedit.h ieeefp.h ifaddrs.h \
 	inttypes.h iso646.h kenv.h langinfo.h libgen.h limits.h link.h \
 	locale.h malloc.h memory.h monetary.h mpool.h ndbm.h netconfig.h \
 	netdb.h nl_types.h nlist.h nss.h nsswitch.h objformat.h paths.h \
-	pthread.h \
+	proc_service.h pthread.h \
 	pthread_np.h pwd.h ranlib.h readpassphrase.h regex.h regexp.h \
 	resolv.h rune.h runetype.h search.h setjmp.h sgtty.h signal.h stab.h \
 	stdbool.h stddef.h stdio.h stdlib.h string.h stringlist.h \
-	strings.h sysexits.h tar.h time.h timeconv.h timers.h ttyent.h \
+	strings.h sysexits.h tar.h tgmath.h \
+	time.h timeconv.h timers.h ttyent.h \
 	ulimit.h unistd.h utime.h utmp.h uuid.h varargs.h vis.h wchar.h \
 	wctype.h wordexp.h
 
@@ -31,16 +34,20 @@ LDIRS=	cam geom net net80211 netatalk netatm netgraph netinet netinet6 \
 	netipsec netipx netkey netnatm netncp netsmb nfs nfsclient nfsserver \
 	pccard posix4 sys vm
 
-LSUBDIRS=	cam/scsi dev/an dev/ic dev/iicbus dev/firewire dev/ofw \
-	dev/ppbus dev/smbus dev/usb dev/wi dev/utopia fs/devfs \
+LSUBDIRS=	cam/scsi dev/an dev/bktr dev/firewire dev/ic dev/iicbus \
+	dev/ofw dev/ppbus dev/smbus dev/usb dev/wi dev/utopia fs/devfs \
 	fs/fdescfs fs/fifofs fs/msdosfs fs/ntfs fs/nullfs fs/nwfs fs/portalfs \
-	fs/procfs fs/smbfs fs/udf fs/umapfs fs/unionfs isofs/cd9660 \
-	netatm/ipatm netatm/sigpvc netatm/spans netatm/uni \
+	fs/procfs fs/smbfs fs/udf fs/umapfs fs/unionfs \
+	geom/concat geom/gate geom/label geom/mirror geom/nop geom/raid3 \
+	geom/stripe \
+	isofs/cd9660 netatm/ipatm netatm/sigpvc netatm/spans netatm/uni \
 	netgraph/atm security/mac_biba security/mac_bsdextended \
 	security/mac_lomac security/mac_mls security/mac_partition \
 	ufs/ffs ufs/ufs
 
+.if !defined(NO_BLUETOOTH)
 LSUBSUBDIRS=	netgraph/bluetooth/include
+.endif
 
 # Define SHARED to indicate whether you want symbolic links to the system
 # source (``symlinks''), or a separate copy (``copies'').  ``symlinks'' is
@@ -56,7 +63,7 @@ osreldate.h:	${.CURDIR}/../sys/conf/newvers.sh \
 		${.CURDIR}/Makefile
 	@${ECHO} creating osreldate.h from newvers.sh
 	@setvar PARAMFILE ${.CURDIR}/../sys/sys/param.h; \
-	. ${.CURDIR}/../sys/conf/newvers.sh;			\
+	MAKE=${MAKE} . ${.CURDIR}/../sys/conf/newvers.sh;	\
 	echo "$$COPYRIGHT" > osreldate.h;			\
 	echo "#ifdef _KERNEL" >> osreldate.h;			\
 	echo '#error "<osreldate.h> cannot be used in the kernel, use <sys/param.h>"' >> osreldate.h; \
@@ -90,6 +97,11 @@ compat:
 	mtree -deU ${MTREE_FOLLOWS_SYMLINKS} \
 	    -f ${.CURDIR}/../etc/mtree/BSD.include.dist \
 	    -p ${DESTDIR}${INCLUDEDIR}
+.if defined(WITH_BIND_LIBS) && !defined(NO_BIND)
+	mtree -deU ${MTREE_FOLLOWS_SYMLINKS} \
+	    -f ${.CURDIR}/../etc/mtree/BIND.include.dist \
+	    -p ${DESTDIR}${INCLUDEDIR}
+.endif
 
 copies:
 .for i in ${LDIRS} ${LSUBDIRS} crypto machine machine/pc
@@ -100,14 +112,23 @@ copies:
 	done
 .endif
 .endfor
-.for i in ${LDIRS} ${LSUBDIRS} ${LSUBSUBDIRS}
+.for i in ${LDIRS} ${LSUBDIRS:Ndev/bktr} ${LSUBSUBDIRS}
 	cd ${.CURDIR}/../sys; \
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 $i/*.h \
 	    ${DESTDIR}${INCLUDEDIR}/$i
 .endfor
+	cd ${.CURDIR}/../sys/dev/bktr; \
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 ioctl_*.h \
+	    ${DESTDIR}${INCLUDEDIR}/dev/bktr
+	cd ${.CURDIR}/../sys/contrib/altq/altq; \
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
+	    ${DESTDIR}${INCLUDEDIR}/altq
 	cd ${.CURDIR}/../sys/contrib/ipfilter/netinet; \
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
 	    ${DESTDIR}${INCLUDEDIR}/netinet
+	cd ${.CURDIR}/../sys/contrib/pf/net; \
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
+	    ${DESTDIR}${INCLUDEDIR}/net
 	cd ${.CURDIR}/../sys/opencrypto; \
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
 	    ${DESTDIR}${INCLUDEDIR}/crypto
@@ -140,10 +161,20 @@ symlinks:
 		ln -fs ../../../../../sys/$i/$$h ${DESTDIR}${INCLUDEDIR}/$i; \
 	done
 .endfor
+	cd ${.CURDIR}/../sys/contrib/altq/altq; \
+	for h in *.h; do \
+		ln -fs ../../../sys/contrib/altq/altq/$$h \
+		    ${DESTDIR}${INCLUDEDIR}/altq; \
+	done
 	cd ${.CURDIR}/../sys/contrib/ipfilter/netinet; \
 	for h in *.h; do \
 		ln -fs ../../../sys/contrib/ipfilter/netinet/$$h \
 		    ${DESTDIR}${INCLUDEDIR}/netinet; \
+	done
+	cd ${.CURDIR}/../sys/contrib/pf/net; \
+	for h in *.h; do \
+		ln -fs ../../../sys/contrib/pf/net/$$h \
+		    ${DESTDIR}${INCLUDEDIR}/net; \
 	done
 	cd ${.CURDIR}/../sys/opencrypto; \
 	for h in *.h; do \

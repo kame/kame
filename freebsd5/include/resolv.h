@@ -51,7 +51,7 @@
 /*
  *	@(#)resolv.h	8.1 (Berkeley) 6/2/93
  *	From Id: resolv.h,v 8.12 1998/04/28 19:36:46 halley Exp $
- * $FreeBSD: src/include/resolv.h,v 1.22 2003/02/27 13:40:00 nectar Exp $
+ * $FreeBSD: src/include/resolv.h,v 1.25 2004/03/15 17:08:28 des Exp $
  */
 
 #ifndef _RESOLV_H_
@@ -94,6 +94,8 @@
 #define	RES_TIMEOUT		5	/* min. seconds between retries */
 #define	MAXRESOLVSORT		10	/* number of net to sort on */
 #define	RES_MAXNDOTS		15	/* should reflect bit field size */
+#define	RES_MAXRETRANS		30	/* only for resolv.conf/RES_OPTIONS */
+#define	RES_MAXRETRY		5	/* only for resolv.conf/RES_OPTIONS */
 
 struct __res_state {
 	int	retrans;	 	/* retransmition time interval */
@@ -178,14 +180,14 @@ struct __res_state_ext {
 typedef enum { res_goahead, res_nextns, res_modified, res_done, res_error }
 	res_sendhookact;
 
-typedef res_sendhookact (*res_send_qhook)(struct sockaddr_in * const *ns,
+typedef res_sendhookact (*res_send_qhook)(struct sockaddr * const *ns,
 					  const u_char **query,
 					  int *querylen,
 					  u_char *ans,
 					  int anssiz,
 					  int *resplen);
 
-typedef res_sendhookact (*res_send_rhook)(const struct sockaddr_in *ns,
+typedef res_sendhookact (*res_send_rhook)(const struct sockaddr *ns,
 					  const u_char *query,
 					  int querylen,
 					  u_char *ans,
@@ -198,7 +200,12 @@ struct res_sym {
 	char *	humanname;	/* Its fun name, like "mail exchanger" */
 };
 
-extern struct __res_state _res;
+__BEGIN_DECLS
+extern struct __res_state *___res(void);
+extern struct __res_state_ext *___res_ext(void);
+__END_DECLS
+#define	_res		(*___res())
+#define	_res_ext	(*___res_ext())
 /* for INET6 */
 extern struct __res_state_ext _res_ext;
 

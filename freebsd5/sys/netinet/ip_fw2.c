@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.51.2.1 2003/12/23 12:25:56 maxim Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.70.2.7 2004/10/13 22:07:05 green Exp $
  */
 
 #define        DEB(x)
@@ -50,6 +50,8 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
+#include <sys/jail.h>
+#include <sys/module.h>
 #include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -57,6 +59,7 @@
 #include <sys/syslog.h>
 #include <sys/ucred.h>
 #include <net/if.h>
+#include <net/radix.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -66,6 +69,7 @@
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip_fw.h>
+#include <netinet/ip_divert.h>
 #include <netinet/ip_dummynet.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_timer.h>
@@ -83,18 +87,6 @@
 #include <machine/in_cksum.h>	/* XXX for in_cksum */
 
 /*
- * This is used to avoid that a firewall-generated packet
- * loops forever through the firewall.  Note that it must
- * be a flag that is unused by other protocols that might
- * be called from ip_output (e.g. IPsec) and it must be
- * listed in M_COPYFLAGS in mbuf.h so that if the mbuf chain
- * is altered on the way through ip_output it is not lost.
- * It might be better to add an m_tag since the this happens
- * infrequently.
- */
-#define M_SKIP_FIREWALL         M_PROTO6
-
-/*
  * set_disable contains one bit per set value (0..31).
  * If the bit is set, all rules with the corresponding set
  * are disabled. Set RESVD_SET(31) is reserved for the default rule
@@ -110,6 +102,19 @@ static int verbose_limit;
 static struct callout ipfw_timeout;
 #define	IPFW_DEFAULT_RULE	65535
 
+/*
+ * Data structure to cache our ucred related
+ * information. This structure only gets used if
+ * the user specified UID/GID based constraints in
+ * a firewall rule.
+ */
+struct ip_fw_ugid {
+	gid_t		fw_groups[NGROUPS];
+	int		fw_ngroups;
+	uid_t		fw_uid;
+	int		fw_prid;
+};
+
 struct ip_fw_chain {
 	struct ip_fw	*rules;		/* list of rules */
 	struct ip_fw	*reap;		/* list of rules to reap */
@@ -121,7 +126,10 @@ struct ip_fw_chain {
 #define	IPFW_LOCK_DESTROY(_chain)	mtx_destroy(&(_chain)->mtx)
 #define	IPFW_LOCK(_chain)	mtx_lock(&(_chain)->mtx)
 #define	IPFW_UNLOCK(_chain)	mtx_unlock(&(_chain)->mtx)
-#define	IPFW_LOCK_ASSERT(_chain)	mtx_assert(&(_chain)->mtx, MA_OWNED)
+#define	IPFW_LOCK_ASSERT(_chain)	do {				\
+	mtx_assert(&(_chain)->mtx, MA_OWNED);				\
+	NET_ASSERT_GIANT();						\
+} while (0)
 
 /*
  * list of rules for layer 3
@@ -129,6 +137,19 @@ struct ip_fw_chain {
 static struct ip_fw_chain layer3_chain;
 
 MALLOC_DEFINE(M_IPFW, "IpFw/IpAcct", "IpFw/IpAcct chain's");
+MALLOC_DEFINE(M_IPFW_TBL, "ipfw_tbl", "IpFw tables");
+
+struct table_entry {
+	struct radix_node	rn[2];
+	struct sockaddr_in	addr, mask;
+	u_int32_t		value;
+};
+
+#define	IPFW_TABLES_MAX		128
+static struct {
+	struct radix_node_head	*rnh;
+	int			modified;
+} ipfw_tables[IPFW_TABLES_MAX];
 
 static int fw_debug = 1;
 static int autoinc_step = 100; /* bounded to 1..1000 in add_rule() */
@@ -254,10 +275,6 @@ SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, dyn_keepalive, CTLFLAG_RW,
 
 #endif /* SYSCTL_NODE */
 
-
-static ip_fw_chk_t	ipfw_chk;
-
-ip_dn_ruledel_t *ip_dn_ruledel_ptr = NULL;	/* hook into dummynet */
 
 /*
  * This macro maps an ip pointer into a layer3 header pointer of type T
@@ -438,21 +455,27 @@ iface_match(struct ifnet *ifp, ipfw_insn_if *cmd)
 }
 
 /*
+ * The verify_path function checks if a route to the src exists and
+ * if it is reachable via ifp (when provided).
+ * 
  * The 'verrevpath' option checks that the interface that an IP packet
  * arrives on is the same interface that traffic destined for the
- * packet's source address would be routed out of. This is a measure
- * to block forged packets. This is also commonly known as "anti-spoofing"
- * or Unicast Reverse Path Forwarding (Unicast RFP) in Cisco-ese. The
- * name of the knob is purposely reminisent of the Cisco IOS command,
+ * packet's source address would be routed out of.  The 'versrcreach'
+ * option just checks that the source address is reachable via any route
+ * (except default) in the routing table.  These two are a measure to block
+ * forged packets.  This is also commonly known as "anti-spoofing" or Unicast
+ * Reverse Path Forwarding (Unicast RFP) in Cisco-ese. The name of the knobs
+ * is purposely reminiscent of the Cisco IOS command,
  *
  *   ip verify unicast reverse-path
+ *   ip verify unicast source reachable-via any
  *
  * which implements the same functionality. But note that syntax is
  * misleading. The check may be performed on all IP packets whether unicast,
  * multicast, or broadcast.
  */
 static int
-verify_rev_path(struct in_addr src, struct ifnet *ifp)
+verify_path(struct in_addr src, struct ifnet *ifp)
 {
 	struct route ro;
 	struct sockaddr_in *dst;
@@ -467,10 +490,27 @@ verify_rev_path(struct in_addr src, struct ifnet *ifp)
 
 	if (ro.ro_rt == NULL)
 		return 0;
-	if ((ifp == NULL) || (ro.ro_rt->rt_ifp->if_index != ifp->if_index)) {
+
+	/* if ifp is provided, check for equality with rtentry */
+	if (ifp != NULL && ro.ro_rt->rt_ifp != ifp) {
 		RTFREE(ro.ro_rt);
 		return 0;
 	}
+
+	/* if no ifp provided, check if rtentry is not default route */
+	if (ifp == NULL &&
+	     satosin(rt_key(ro.ro_rt))->sin_addr.s_addr == INADDR_ANY) {
+		RTFREE(ro.ro_rt);
+		return 0;
+	}
+
+	/* or if this is a blackhole/reject route */
+	if (ifp == NULL && ro.ro_rt->rt_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+		RTFREE(ro.ro_rt);
+		return 0;
+	}
+
+	/* found valid route */
 	RTFREE(ro.ro_rt);
 	return 1;
 }
@@ -1294,17 +1334,252 @@ lookup_next_rule(struct ip_fw *me)
 	return rule;
 }
 
+static void
+init_tables(void)
+{
+	int i;
+
+	for (i = 0; i < IPFW_TABLES_MAX; i++) {
+		rn_inithead((void **)&ipfw_tables[i].rnh, 32);
+		ipfw_tables[i].modified = 1;
+	}
+}
+
+static int
+add_table_entry(u_int16_t tbl, in_addr_t addr, u_int8_t mlen, u_int32_t value)
+{
+	struct radix_node_head *rnh;
+	struct table_entry *ent;
+
+	if (tbl >= IPFW_TABLES_MAX)
+		return (EINVAL);
+	rnh = ipfw_tables[tbl].rnh;
+	ent = malloc(sizeof(*ent), M_IPFW_TBL, M_NOWAIT | M_ZERO);
+	if (ent == NULL)
+		return (ENOMEM);
+	ent->value = value;
+	ent->addr.sin_len = ent->mask.sin_len = 8;
+	ent->mask.sin_addr.s_addr = htonl(mlen ? ~((1 << (32 - mlen)) - 1) : 0);
+	ent->addr.sin_addr.s_addr = addr & ent->mask.sin_addr.s_addr;
+	RADIX_NODE_HEAD_LOCK(rnh);
+	if (rnh->rnh_addaddr(&ent->addr, &ent->mask, rnh, (void *)ent) ==
+	    NULL) {
+		RADIX_NODE_HEAD_UNLOCK(rnh);
+		free(ent, M_IPFW_TBL);
+		return (EEXIST);
+	}
+	ipfw_tables[tbl].modified = 1;
+	RADIX_NODE_HEAD_UNLOCK(rnh);
+	return (0);
+}
+
+static int
+del_table_entry(u_int16_t tbl, in_addr_t addr, u_int8_t mlen)
+{
+	struct radix_node_head *rnh;
+	struct table_entry *ent;
+	struct sockaddr_in sa, mask;
+
+	if (tbl >= IPFW_TABLES_MAX)
+		return (EINVAL);
+	rnh = ipfw_tables[tbl].rnh;
+	sa.sin_len = mask.sin_len = 8;
+	mask.sin_addr.s_addr = htonl(mlen ? ~((1 << (32 - mlen)) - 1) : 0);
+	sa.sin_addr.s_addr = addr & mask.sin_addr.s_addr;
+	RADIX_NODE_HEAD_LOCK(rnh);
+	ent = (struct table_entry *)rnh->rnh_deladdr(&sa, &mask, rnh);
+	if (ent == NULL) {
+		RADIX_NODE_HEAD_UNLOCK(rnh);
+		return (ESRCH);
+	}
+	ipfw_tables[tbl].modified = 1;
+	RADIX_NODE_HEAD_UNLOCK(rnh);
+	free(ent, M_IPFW_TBL);
+	return (0);
+}
+
+static int
+flush_table_entry(struct radix_node *rn, void *arg)
+{
+	struct radix_node_head * const rnh = arg;
+	struct table_entry *ent;
+
+	ent = (struct table_entry *)
+	    rnh->rnh_deladdr(rn->rn_key, rn->rn_mask, rnh);
+	if (ent != NULL)
+		free(ent, M_IPFW_TBL);
+	return (0);
+}
+
+static int
+flush_table(u_int16_t tbl)
+{
+	struct radix_node_head *rnh;
+
+	if (tbl >= IPFW_TABLES_MAX)
+		return (EINVAL);
+	rnh = ipfw_tables[tbl].rnh;
+	RADIX_NODE_HEAD_LOCK(rnh);
+	rnh->rnh_walktree(rnh, flush_table_entry, rnh);
+	ipfw_tables[tbl].modified = 1;
+	RADIX_NODE_HEAD_UNLOCK(rnh);
+	return (0);
+}
+
+static void
+flush_tables(void)
+{
+	u_int16_t tbl;
+
+	for (tbl = 0; tbl < IPFW_TABLES_MAX; tbl++)
+		flush_table(tbl);
+}
+
+static int
+lookup_table(u_int16_t tbl, in_addr_t addr, u_int32_t *val)
+{
+	struct radix_node_head *rnh;
+	struct table_entry *ent;
+	struct sockaddr_in sa;
+	static in_addr_t last_addr;
+	static int last_tbl;
+	static int last_match;
+	static u_int32_t last_value;
+
+	if (tbl >= IPFW_TABLES_MAX)
+		return (0);
+	if (tbl == last_tbl && addr == last_addr &&
+	    !ipfw_tables[tbl].modified) {
+		if (last_match)
+			*val = last_value;
+		return (last_match);
+	}
+	rnh = ipfw_tables[tbl].rnh;
+	sa.sin_len = 8;
+	sa.sin_addr.s_addr = addr;
+	RADIX_NODE_HEAD_LOCK(rnh);
+	ipfw_tables[tbl].modified = 0;
+	ent = (struct table_entry *)(rnh->rnh_lookup(&sa, NULL, rnh));
+	RADIX_NODE_HEAD_UNLOCK(rnh);
+	last_addr = addr;
+	last_tbl = tbl;
+	if (ent != NULL) {
+		last_value = *val = ent->value;
+		last_match = 1;
+		return (1);
+	}
+	last_match = 0;
+	return (0);
+}
+
+static int
+count_table_entry(struct radix_node *rn, void *arg)
+{
+	u_int32_t * const cnt = arg;
+
+	(*cnt)++;
+	return (0);
+}
+
+static int
+count_table(u_int32_t tbl, u_int32_t *cnt)
+{
+	struct radix_node_head *rnh;
+
+	if (tbl >= IPFW_TABLES_MAX)
+		return (EINVAL);
+	rnh = ipfw_tables[tbl].rnh;
+	*cnt = 0;
+	RADIX_NODE_HEAD_LOCK(rnh);
+	rnh->rnh_walktree(rnh, count_table_entry, cnt);
+	RADIX_NODE_HEAD_UNLOCK(rnh);
+	return (0);
+}
+
+static int
+dump_table_entry(struct radix_node *rn, void *arg)
+{
+	struct table_entry * const n = (struct table_entry *)rn;
+	ipfw_table * const tbl = arg;
+	ipfw_table_entry *ent;
+
+	if (tbl->cnt == tbl->size)
+		return (1);
+	ent = &tbl->ent[tbl->cnt];
+	ent->tbl = tbl->tbl;
+	if (in_nullhost(n->mask.sin_addr))
+		ent->masklen = 0;
+	else
+		ent->masklen = 33 - ffs(ntohl(n->mask.sin_addr.s_addr));
+	ent->addr = n->addr.sin_addr.s_addr;
+	ent->value = n->value;
+	tbl->cnt++;
+	return (0);
+}
+
+static int
+dump_table(ipfw_table *tbl)
+{
+	struct radix_node_head *rnh;
+
+	if (tbl->tbl >= IPFW_TABLES_MAX)
+		return (EINVAL);
+	rnh = ipfw_tables[tbl->tbl].rnh;
+	tbl->cnt = 0;
+	RADIX_NODE_HEAD_LOCK(rnh);
+	rnh->rnh_walktree(rnh, dump_table_entry, tbl);
+	RADIX_NODE_HEAD_UNLOCK(rnh);
+	return (0);
+}
+
+static void
+fill_ugid_cache(struct inpcb *inp, struct ip_fw_ugid *ugp)
+{
+	struct ucred *cr;
+
+	if (inp->inp_socket != NULL) {
+		cr = inp->inp_socket->so_cred;
+		ugp->fw_prid = jailed(cr) ?
+		    cr->cr_prison->pr_id : -1;
+		ugp->fw_uid = cr->cr_uid;
+		ugp->fw_ngroups = cr->cr_ngroups;
+		bcopy(cr->cr_groups, ugp->fw_groups,
+		    sizeof(ugp->fw_groups));
+	}
+}
+
 static int
 check_uidgid(ipfw_insn_u32 *insn,
 	int proto, struct ifnet *oif,
 	struct in_addr dst_ip, u_int16_t dst_port,
-	struct in_addr src_ip, u_int16_t src_port)
+	struct in_addr src_ip, u_int16_t src_port,
+	struct ip_fw_ugid *ugp, int *lookup, struct inpcb *inp)
 {
 	struct inpcbinfo *pi;
 	int wildcard;
 	struct inpcb *pcb;
 	int match;
+	gid_t *gp;
 
+	/*
+	 * Check to see if the UDP or TCP stack supplied us with
+	 * the PCB. If so, rather then holding a lock and looking
+	 * up the PCB, we can use the one that was supplied.
+	 */
+	if (inp && *lookup == 0) {
+		INP_LOCK_ASSERT(inp);
+		if (inp->inp_socket != NULL) {
+			fill_ugid_cache(inp, ugp);
+			*lookup = 1;
+		}
+	}
+	/*
+	 * If we have already been here and the packet has no
+	 * PCB entry associated with it, then we can safely
+	 * assume that this is a no match.
+	 */
+	if (*lookup == -1)
+		return (0);
 	if (proto == IPPROTO_TCP) {
 		wildcard = 0;
 		pi = &tcbinfo;
@@ -1313,37 +1588,49 @@ check_uidgid(ipfw_insn_u32 *insn,
 		pi = &udbinfo;
 	} else
 		return 0;
-
 	match = 0;
-
-	INP_INFO_RLOCK(pi);	/* XXX LOR with IPFW */
-	pcb =  (oif) ?
-		in_pcblookup_hash(pi,
-		    dst_ip, htons(dst_port),
-		    src_ip, htons(src_port),
-		    wildcard, oif) :
-		in_pcblookup_hash(pi,
-		    src_ip, htons(src_port),
-		    dst_ip, htons(dst_port),
-		    wildcard, NULL);
-	if (pcb != NULL) {
-		INP_LOCK(pcb);
-		if (pcb->inp_socket != NULL) {
-#if __FreeBSD_version < 500034
-#define socheckuid(a,b)	((a)->so_cred->cr_uid != (b))
-#endif
-			if (insn->o.opcode == O_UID) {
-				match = !socheckuid(pcb->inp_socket,
-				   (uid_t)insn->d[0]);
-			} else  {
-				match = groupmember((uid_t)insn->d[0],
-				    pcb->inp_socket->so_cred);
+	if (*lookup == 0) {
+		INP_INFO_RLOCK(pi);
+		pcb =  (oif) ?
+			in_pcblookup_hash(pi,
+				dst_ip, htons(dst_port),
+				src_ip, htons(src_port),
+				wildcard, oif) :
+			in_pcblookup_hash(pi,
+				src_ip, htons(src_port),
+				dst_ip, htons(dst_port),
+				wildcard, NULL);
+		if (pcb != NULL) {
+			INP_LOCK(pcb);
+			if (pcb->inp_socket != NULL) {
+				fill_ugid_cache(pcb, ugp);
+				*lookup = 1;
 			}
+			INP_UNLOCK(pcb);
 		}
-		INP_UNLOCK(pcb);
-	}
-	INP_INFO_RUNLOCK(pi);
-
+		INP_INFO_RUNLOCK(pi);
+		if (*lookup == 0) {
+			/*
+			 * If the lookup did not yield any results, there
+			 * is no sense in coming back and trying again. So
+			 * we can set lookup to -1 and ensure that we wont
+			 * bother the pcb system again.
+			 */
+			*lookup = -1;
+			return (0);
+		}
+	} 
+	if (insn->o.opcode == O_UID)
+		match = (ugp->fw_uid == (uid_t)insn->d[0]);
+	else if (insn->o.opcode == O_GID) {
+		for (gp = ugp->fw_groups;
+			gp < &ugp->fw_groups[ugp->fw_ngroups]; gp++)
+			if (*gp == (gid_t)insn->d[0]) {
+				match = 1;
+				break;
+			}
+	} else if (insn->o.opcode == O_JAIL)
+		match = (ugp->fw_prid == (int)insn->d[0]);
 	return match;
 }
 
@@ -1383,7 +1670,7 @@ check_uidgid(ipfw_insn_u32 *insn,
  *		  16 bits as a dummynet pipe number instead of diverting
  */
 
-static int
+int
 ipfw_chk(struct ip_fw_args *args)
 {
 	/*
@@ -1409,6 +1696,16 @@ ipfw_chk(struct ip_fw_args *args)
 	 */
 	struct mbuf *m = args->m;
 	struct ip *ip = mtod(m, struct ip *);
+
+	/*
+	 * For rules which contain uid/gid or jail constraints, cache
+	 * a copy of the users credentials after the pcb lookup has been
+	 * executed. This will speed up the processing of rules with
+	 * these types of constraints, as well as decrease contention
+	 * on pcb related locks.
+	 */
+	struct ip_fw_ugid fw_ugid_cache;
+	int ugid_lookup = 0;
 
 	/*
 	 * oif | args->oif	If NULL, ipfw_chk has been called on the
@@ -1457,6 +1754,7 @@ ipfw_chk(struct ip_fw_args *args)
 	int dyn_dir = MATCH_UNKNOWN;
 	ipfw_dyn_rule *q = NULL;
 	struct ip_fw_chain *chain = &layer3_chain;
+	struct m_tag *mtag;
 
 	if (m->m_flags & M_SKIP_FIREWALL)
 		return 0;	/* accept */
@@ -1545,6 +1843,7 @@ ipfw_chk(struct ip_fw_args *args)
 
 after_ip_checks:
 	IPFW_LOCK(chain);		/* XXX expensive? can we run lock free? */
+	mtag = m_tag_find(m, PACKET_TAG_DIVERT, NULL);
 	if (args->rule) {
 		/*
 		 * Packet has already been tagged. Look for the next rule
@@ -1567,7 +1866,7 @@ after_ip_checks:
 		 * Find the starting rule. It can be either the first
 		 * one, or the one after divert_rule if asked so.
 		 */
-		int skipto = args->divert_rule;
+		int skipto = mtag ? divert_cookie(mtag) : 0;
 
 		f = chain->rules;
 		if (args->eh == NULL && skipto != 0) {
@@ -1583,7 +1882,9 @@ after_ip_checks:
 			}
 		}
 	}
-	args->divert_rule = 0;	/* reset to avoid confusion later */
+	/* reset divert rule to avoid confusion later */
+	if (mtag)
+		m_tag_delete(m, mtag);
 
 	/*
 	 * Now scan the rules, and parse microinstructions for each rule.
@@ -1643,6 +1944,7 @@ check_body:
 
 			case O_GID:
 			case O_UID:
+			case O_JAIL:
 				/*
 				 * We only check offset == 0 && proto != 0,
 				 * as this ensures that we have an IPv4
@@ -1656,7 +1958,8 @@ check_body:
 						    (ipfw_insn_u32 *)cmd,
 						    proto, oif,
 						    dst_ip, dst_port,
-						    src_ip, src_port);
+						    src_ip, src_port, &fw_ugid_cache,
+						    &ugid_lookup, args->inp);
 				break;
 
 			case O_RECV:
@@ -1726,6 +2029,23 @@ check_body:
 				match = (hlen > 0 &&
 				    ((ipfw_insn_ip *)cmd)->addr.s_addr ==
 				    src_ip.s_addr);
+				break;
+
+			case O_IP_SRC_LOOKUP:
+			case O_IP_DST_LOOKUP:
+				if (hlen > 0) {
+				    uint32_t a =
+					(cmd->opcode == O_IP_DST_LOOKUP) ?
+					    dst_ip.s_addr : src_ip.s_addr;
+				    uint32_t v;
+
+				    match = lookup_table(cmd->arg1, a, &v);
+				    if (!match)
+					break;
+				    if (cmdlen == F_INSN_SIZE(ipfw_insn_u32))
+					match =
+					    ((ipfw_insn_u32 *)cmd)->d[0] == v;
+				}
 				break;
 
 			case O_IP_SRC_MASK:
@@ -1904,9 +2224,25 @@ check_body:
 
 			case O_VERREVPATH:
 				/* Outgoing packets automatically pass/match */
-				match = ((oif != NULL) ||
+				match = (hlen > 0 && ((oif != NULL) ||
 				    (m->m_pkthdr.rcvif == NULL) ||
-				    verify_rev_path(src_ip, m->m_pkthdr.rcvif));
+				    verify_path(src_ip, m->m_pkthdr.rcvif)));
+				break;
+
+			case O_VERSRCREACH:
+				/* Outgoing packets automatically pass/match */
+				match = (hlen > 0 && ((oif != NULL) ||
+				     verify_path(src_ip, NULL)));
+				break;
+
+			case O_ANTISPOOF:
+				/* Outgoing packets automatically pass/match */
+				if (oif == NULL && hlen > 0 &&
+				    in_localaddr(src_ip))
+					match = verify_path(src_ip,
+							m->m_pkthdr.rcvif);
+				else
+					match = 1;
 				break;
 
 			case O_IPSEC:
@@ -1915,7 +2251,7 @@ check_body:
 				    PACKET_TAG_IPSEC_IN_DONE, NULL) != NULL);
 #endif
 #ifdef IPSEC
-				match = (ipsec_getnhist(m) != NULL);
+				match = (ipsec_getnhist(m) != 0);
 #endif
 				/* otherwise no match */
 				break;
@@ -2018,14 +2354,29 @@ check_body:
 				goto done;
 
 			case O_DIVERT:
-			case O_TEE:
+			case O_TEE: {
+				struct divert_tag *dt;
+
 				if (args->eh) /* not on layer 2 */
 					break;
-				args->divert_rule = f->rulenum;
-				retval = (cmd->opcode == O_DIVERT) ?
+				mtag = m_tag_get(PACKET_TAG_DIVERT,
+						sizeof(struct divert_tag),
+						M_NOWAIT);
+				if (mtag == NULL) {
+					/* XXX statistic */
+					/* drop packet */
+					IPFW_UNLOCK(chain);
+					return IP_FW_PORT_DENY_FLAG;
+				}
+				dt = (struct divert_tag *)(mtag+1);
+				dt->cookie = f->rulenum;
+				dt->info = (cmd->opcode == O_DIVERT) ?
 				    cmd->arg1 :
 				    cmd->arg1 | IP_FW_PORT_TEE_FLAG;
+				m_tag_prepend(m, mtag);
+				retval = dt->info;
 				goto done;
+			}
 
 			case O_COUNT:
 			case O_SKIPTO:
@@ -2495,6 +2846,11 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 		printf("ipfw: size mismatch (have %d want %d)\n", size, l);
 		return (EINVAL);
 	}
+	if (rule->act_ofs >= rule->cmd_len) {
+		printf("ipfw: bogus action offset (%u > %u)\n",
+		    rule->act_ofs, rule->cmd_len - 1);
+		return (EINVAL);
+	}
 	/*
 	 * Now go for the individual checks. Very simple ones, basically only
 	 * instruction sizes.
@@ -2526,6 +2882,8 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 		case O_TCPOPTS:
 		case O_ESTAB:
 		case O_VERREVPATH:
+		case O_VERSRCREACH:
+		case O_ANTISPOOF:
 		case O_IPSEC:
 			if (cmdlen != F_INSN_SIZE(ipfw_insn))
 				goto bad_size;
@@ -2533,6 +2891,7 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 
 		case O_UID:
 		case O_GID:
+		case O_JAIL:
 		case O_IP_SRC:
 		case O_IP_DST:
 		case O_TCPSEQ:
@@ -2576,6 +2935,18 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 				goto bad_size;
 			break;
 
+		case O_IP_SRC_LOOKUP:
+		case O_IP_DST_LOOKUP:
+			if (cmd->arg1 >= IPFW_TABLES_MAX) {
+				printf("ipfw: invalid table number %d\n",
+				    cmd->arg1);
+				return (EINVAL);
+			}
+			if (cmdlen != F_INSN_SIZE(ipfw_insn) &&
+			    cmdlen != F_INSN_SIZE(ipfw_insn_u32))
+				goto bad_size;
+			break;
+
 		case O_MACADDR2:
 			if (cmdlen != F_INSN_SIZE(ipfw_insn_mac))
 				goto bad_size;
@@ -2610,10 +2981,19 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 			goto check_action;
 
 		case O_FORWARD_IP:
+#ifdef	IPFIREWALL_FORWARD
 			if (cmdlen != F_INSN_SIZE(ipfw_insn_sa))
 				goto bad_size;
 			goto check_action;
+#else
+			return EINVAL;
+#endif
 
+		case O_DIVERT:
+		case O_TEE:
+#ifndef	IPDIVERT
+			return EINVAL;
+#endif
 		case O_FORWARD_MAC: /* XXX not implemented yet */
 		case O_CHECK_STATE:
 		case O_COUNT:
@@ -2621,8 +3001,6 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 		case O_DENY:
 		case O_REJECT:
 		case O_SKIPTO:
-		case O_DIVERT:
-		case O_TEE:
 			if (cmdlen != F_INSN_SIZE(ipfw_insn))
 				goto bad_size;
 check_action:
@@ -2733,6 +3111,10 @@ ipfw_ctl(struct sockopt *sopt)
 	size_t size;
 	struct ip_fw *buf, *rule;
 	u_int32_t rulenum[2];
+
+	error = suser(sopt->sopt_td);
+	if (error)
+		return (error);
 
 	/*
 	 * Disallow modifications in really-really secure mode, but still allow
@@ -2859,6 +3241,87 @@ ipfw_ctl(struct sockopt *sopt)
 			sopt->sopt_name == IP_FW_RESETLOG);
 		break;
 
+	case IP_FW_TABLE_ADD:
+		{
+			ipfw_table_entry ent;
+
+			error = sooptcopyin(sopt, &ent,
+			    sizeof(ent), sizeof(ent));
+			if (error)
+				break;
+			error = add_table_entry(ent.tbl, ent.addr,
+			    ent.masklen, ent.value);
+		}
+		break;
+
+	case IP_FW_TABLE_DEL:
+		{
+			ipfw_table_entry ent;
+
+			error = sooptcopyin(sopt, &ent,
+			    sizeof(ent), sizeof(ent));
+			if (error)
+				break;
+			error = del_table_entry(ent.tbl, ent.addr, ent.masklen);
+		}
+		break;
+
+	case IP_FW_TABLE_FLUSH:
+		{
+			u_int16_t tbl;
+
+			error = sooptcopyin(sopt, &tbl,
+			    sizeof(tbl), sizeof(tbl));
+			if (error)
+				break;
+			error = flush_table(tbl);
+		}
+		break;
+
+	case IP_FW_TABLE_GETSIZE:
+		{
+			u_int32_t tbl, cnt;
+
+			if ((error = sooptcopyin(sopt, &tbl, sizeof(tbl),
+			    sizeof(tbl))))
+				break;
+			if ((error = count_table(tbl, &cnt)))
+				break;
+			error = sooptcopyout(sopt, &cnt, sizeof(cnt));
+		}
+		break;
+
+	case IP_FW_TABLE_LIST:
+		{
+			ipfw_table *tbl;
+
+			if (sopt->sopt_valsize < sizeof(*tbl)) {
+				error = EINVAL;
+				break;
+			}
+			size = sopt->sopt_valsize;
+			tbl = malloc(size, M_TEMP, M_WAITOK);
+			if (tbl == NULL) {
+				error = ENOMEM;
+				break;
+			}
+			error = sooptcopyin(sopt, tbl, size, sizeof(*tbl));
+			if (error) {
+				free(tbl, M_TEMP);
+				break;
+			}
+			tbl->size = (size - sizeof(*tbl)) /
+			    sizeof(ipfw_table_entry);
+			error = dump_table(tbl);
+			if (error) {
+				free(tbl, M_TEMP);
+				break;
+			}
+			error = sooptcopyout(sopt, tbl, size);
+			free(tbl, M_TEMP);
+		}
+		break;
+
 	default:
 		printf("ipfw: ipfw_ctl invalid option %d\n", sopt->sopt_name);
 		error = EINVAL;
@@ -2914,7 +3377,7 @@ done:
 	callout_reset(&ipfw_timeout, dyn_keepalive_period*hz, ipfw_tick, NULL);
 }
 
-static int
+int
 ipfw_init(void)
 {
 	struct ip_fw default_rule;
@@ -2950,7 +3413,13 @@ ipfw_init(void)
 
 	ip_fw_default_rule = layer3_chain.rules;
 	printf("ipfw2 initialized, divert %s, "
-		"rule-based forwarding enabled, default to %s, logging ",
+		"rule-based forwarding "
+#ifdef IPFIREWALL_FORWARD
+		"enabled, "
+#else
+		"disabled, "
+#endif
+		"default to %s, logging ",
 #ifdef IPDIVERT
 		"enabled",
 #else
@@ -2972,64 +3441,33 @@ ipfw_init(void)
 		printf("limited to %d packets/entry by default\n",
 		    verbose_limit);
 
-	ip_fw_chk_ptr = ipfw_chk;
+	init_tables();
 	ip_fw_ctl_ptr = ipfw_ctl;
+	ip_fw_chk_ptr = ipfw_chk;
 	callout_reset(&ipfw_timeout, hz, ipfw_tick, NULL);
 
 	return (0);
 }
 
-static void
+void
 ipfw_destroy(void)
 {
 	struct ip_fw *reap;
 
-	IPFW_LOCK(&layer3_chain);
-	callout_stop(&ipfw_timeout);
 	ip_fw_chk_ptr = NULL;
 	ip_fw_ctl_ptr = NULL;
+	callout_drain(&ipfw_timeout);
+	IPFW_LOCK(&layer3_chain);
 	layer3_chain.reap = NULL;
 	free_chain(&layer3_chain, 1 /* kill default rule */);
 	reap = layer3_chain.reap, layer3_chain.reap = NULL;
 	IPFW_UNLOCK(&layer3_chain);
 	if (reap != NULL)
 		reap_rules(reap);
-
+	flush_tables();
 	IPFW_DYN_LOCK_DESTROY();
 	IPFW_LOCK_DESTROY(&layer3_chain);
 	printf("IP firewall unloaded\n");
 }
 
-static int
-ipfw_modevent(module_t mod, int type, void *unused)
-{
-	int err = 0;
-
-	switch (type) {
-	case MOD_LOAD:
-		if (IPFW_LOADED) {
-			printf("IP firewall already loaded\n");
-			err = EEXIST;
-		} else {
-			err = ipfw_init();
-		}
-		break;
-
-	case MOD_UNLOAD:
-		ipfw_destroy();
-		err = 0;
-		break;
-	default:
-		break;
-	}
-	return err;
-}
-
-static moduledata_t ipfwmod = {
-	"ipfw",
-	ipfw_modevent,
-	0
-};
-DECLARE_MODULE(ipfw, ipfwmod, SI_SUB_PSEUDO, SI_ORDER_ANY);
-MODULE_VERSION(ipfw, 1);
 #endif /* IPFW2 */

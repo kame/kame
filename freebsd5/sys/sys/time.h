@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)time.h	8.5 (Berkeley) 5/4/95
- * $FreeBSD: src/sys/sys/time.h,v 1.63 2003/10/26 02:38:34 alfred Exp $
+ * $FreeBSD: src/sys/sys/time.h,v 1.65 2004/04/07 04:19:49 imp Exp $
  */
 
 #ifndef _SYS_TIME_H_
@@ -253,6 +249,7 @@ struct clockinfo {
 #ifdef _KERNEL
 extern time_t	time_second;
 extern time_t	time_uptime;
+extern struct timeval boottime;
 
 /*
  * Functions for looking at our clock: [get]{bin,nano,micro}[up]time()

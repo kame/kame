@@ -47,7 +47,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_misc.c,v 1.52 2003/10/12 04:25:25 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_misc.c,v 1.55 2004/06/16 00:26:29 julian Exp $");
 
 /*
  * IBCS2 compatibility module.
@@ -93,42 +93,41 @@ ibcs2_ulimit(td, uap)
 	struct thread *td;
 	struct ibcs2_ulimit_args *uap;
 {
-#ifdef notyet
-	int error;
 	struct rlimit rl;
-	struct setrlimit_args {
-		int resource;
-		struct rlimit *rlp;
-	} sra;
-#endif
+	struct proc *p;
+	int error;
 #define IBCS2_GETFSIZE		1
 #define IBCS2_SETFSIZE		2
 #define IBCS2_GETPSIZE		3
 #define IBCS2_GETDTABLESIZE	4
-	
+
+	p = td->td_proc;
 	switch (uap->cmd) {
 	case IBCS2_GETFSIZE:
-		td->td_retval[0] = td->td_proc->p_rlimit[RLIMIT_FSIZE].rlim_cur;
-		if (td->td_retval[0] == -1) td->td_retval[0] = 0x7fffffff;
+		PROC_LOCK(p);
+		td->td_retval[0] = lim_cur(p, RLIMIT_FSIZE);
+		PROC_UNLOCK(p);
+		if (td->td_retval[0] == -1)
+			td->td_retval[0] = 0x7fffffff;
 		return 0;
-	case IBCS2_SETFSIZE:	/* XXX - fix this */
-#ifdef notyet
+	case IBCS2_SETFSIZE:
+		PROC_LOCK(p);
+		rl.rlim_max = lim_max(p, RLIMIT_FSIZE);
+		PROC_UNLOCK(p);
 		rl.rlim_cur = uap->newlimit;
-		sra.resource = RLIMIT_FSIZE;
-		sra.rlp = &rl;
-		error = setrlimit(td, &sra);
-		if (!error)
-			td->td_retval[0] = td->td_proc->p_rlimit[RLIMIT_FSIZE].rlim_cur;
-		else
+		error = kern_setrlimit(td, RLIMIT_FSIZE, &rl);
+		if (!error) {
+			PROC_LOCK(p);
+			td->td_retval[0] = lim_cur(p, RLIMIT_FSIZE);
+			PROC_UNLOCK(p);
+		} else {
 			DPRINTF(("failed "));
+		}
 		return error;
-#else
-		td->td_retval[0] = uap->newlimit;
-		return 0;
-#endif
 	case IBCS2_GETPSIZE:
-		mtx_assert(&Giant, MA_OWNED);
-		td->td_retval[0] = td->td_proc->p_rlimit[RLIMIT_RSS].rlim_cur; /* XXX */
+		PROC_LOCK(p);
+		td->td_retval[0] = lim_cur(p, RLIMIT_RSS); /* XXX */
+		PROC_UNLOCK(p);
 		return 0;
 	case IBCS2_GETDTABLESIZE:
 		uap->cmd = IBCS2_SC_OPEN_MAX;
@@ -145,36 +144,29 @@ ibcs2_wait(td, uap)
 	struct thread *td;
 	struct ibcs2_wait_args *uap;
 {
-	int error, status;
-	struct wait_args w4;
+	int error, options, status;
+	int *statusp;
+	pid_t pid;
         struct trapframe *tf = td->td_frame;
 	
-	w4.rusage = NULL;
-        if ((tf->tf_eflags & (PSL_Z|PSL_PF|PSL_N|PSL_V))
+	if ((tf->tf_eflags & (PSL_Z|PSL_PF|PSL_N|PSL_V))
             == (PSL_Z|PSL_PF|PSL_N|PSL_V)) {
 		/* waitpid */
-		w4.pid = uap->a1;
-		w4.status = (int *)uap->a2;
-		w4.options = uap->a3;
+		pid = uap->a1;
+		statusp = (int *)uap->a2;
+		options = uap->a3;
 	} else {
 		/* wait */
-		w4.pid = WAIT_ANY;
-		w4.status = (int *)uap->a1;
-		w4.options = 0;
+		pid = WAIT_ANY;
+		statusp = (int *)uap->a1;
+		options = 0;
 	}
-	if ((error = wait4(td, &w4)) != 0)
+	error = kern_wait(td, pid, &status, options, NULL);
+	if (error)
 		return error;
-	if (w4.status)	{	/* this is real iBCS brain-damage */
-		error = copyin((caddr_t)w4.status, (caddr_t)&status,
-			       sizeof(w4.status));
-		if(error)
-		  return error;
-
+	if (statusp) {
 		/*
-		 * Convert status/signal result. We must validate the
-		 * signal number stored in the exit status in case
-		 * the user changed it between wait4()'s copyout()
-		 * and our copyin().
+		 * Convert status/signal result.
 		 */
 		if (WIFSTOPPED(status)) {
 			if (WSTOPSIG(status) <= 0 ||
@@ -192,8 +184,7 @@ ibcs2_wait(td, uap)
 
 		/* record result/status */
 		td->td_retval[1] = status;
-		return copyout((caddr_t)&status, (caddr_t)w4.status,
-			       sizeof(w4.status));
+		return copyout(&status, statusp, sizeof(status));
 	}
 
 	return 0;
@@ -775,25 +766,19 @@ ibcs2_sysconf(td, uap)
 	struct ibcs2_sysconf_args *uap;
 {
 	int mib[2], value, len, error;
-	struct sysctl_args sa;
-	struct __getrlimit_args ga;
+	struct proc *p;
 
+	p = td->td_proc;
 	switch(uap->name) {
 	case IBCS2_SC_ARG_MAX:
 		mib[1] = KERN_ARGMAX;
 		break;
 
 	case IBCS2_SC_CHILD_MAX:
-	    {
-		caddr_t sg = stackgap_init();
-
-		ga.which = RLIMIT_NPROC;
-		ga.rlp = stackgap_alloc(&sg, sizeof(struct rlimit *));
-		if ((error = getrlimit(td, &ga)) != 0)
-			return error;
-		td->td_retval[0] = ga.rlp->rlim_cur;
+		PROC_LOCK(p);
+		td->td_retval[0] = lim_cur(td->td_proc, RLIMIT_NPROC);
+		PROC_UNLOCK(p);
 		return 0;
-	    }
 
 	case IBCS2_SC_CLK_TCK:
 		td->td_retval[0] = hz;
@@ -804,16 +789,10 @@ ibcs2_sysconf(td, uap)
 		break;
 
 	case IBCS2_SC_OPEN_MAX:
-	    {
-		caddr_t sg = stackgap_init();
-
-		ga.which = RLIMIT_NOFILE;
-		ga.rlp = stackgap_alloc(&sg, sizeof(struct rlimit *));
-		if ((error = getrlimit(td, &ga)) != 0)
-			return error;
-		td->td_retval[0] = ga.rlp->rlim_cur;
+		PROC_LOCK(p);
+		td->td_retval[0] = lim_cur(td->td_proc, RLIMIT_NOFILE);
+		PROC_UNLOCK(p);
 		return 0;
-	    }
 		
 	case IBCS2_SC_JOB_CONTROL:
 		mib[1] = KERN_JOB_CONTROL;
@@ -841,13 +820,8 @@ ibcs2_sysconf(td, uap)
 
 	mib[0] = CTL_KERN;
 	len = sizeof(value);
-	sa.name = mib;
-	sa.namelen = 2;
-	sa.old = &value;
-	sa.oldlenp = &len;
-	sa.new = NULL;
-	sa.newlen = 0;
-	if ((error = __sysctl(td, &sa)) != 0)
+	error = kernel_sysctl(td, mib, 2, &value, &len, NULL, 0, NULL);
+	if (error)
 		return error;
 	td->td_retval[0] = value;
 	return 0;
@@ -977,10 +951,10 @@ ibcs2_nice(td, uap)
 
 	sa.which = PRIO_PROCESS;
 	sa.who = 0;
-	sa.prio = td->td_ksegrp->kg_nice + uap->incr;
+	sa.prio = td->td_proc->p_nice + uap->incr;
 	if ((error = setpriority(td, &sa)) != 0)
 		return EPERM;
-	td->td_retval[0] = td->td_ksegrp->kg_nice;
+	td->td_retval[0] = td->td_proc->p_nice;
 	return 0;
 }
 

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/bde/g_bde.c,v 1.22 2003/06/01 13:47:51 phk Exp $
+ * $FreeBSD: src/sys/geom/bde/g_bde.c,v 1.28 2004/08/08 07:57:51 phk Exp $
  *
  */
 
@@ -108,7 +108,7 @@ g_bde_access(struct g_provider *pp, int dr, int dw, int de)
 		de--;
 		dr--;
 	}
-	return (g_access_rel(cp, dr, dw, de));
+	return (g_access(cp, dr, dw, de));
 }
 
 static void
@@ -130,18 +130,15 @@ g_bde_create_geom(struct gctl_req *req, struct g_class *mp, struct g_provider *p
 
 
 	gp = g_new_geomf(mp, "%s.bde", pp->name);
-	gp->start = g_bde_start;
-	gp->orphan = g_bde_orphan;
-	gp->access = g_bde_access;
-	gp->spoiled = g_std_spoiled;
 	cp = g_new_consumer(gp);
 	g_attach(cp, pp);
-	error = g_access_rel(cp, 1, 1, 1);
+	error = g_access(cp, 1, 1, 1);
 	if (error) {
 		g_detach(cp);
 		g_destroy_consumer(cp);
 		g_destroy_geom(gp);
 		gctl_error(req, "could not access consumer");
+		return;
 	}
 	pass = NULL;
 	key = NULL;
@@ -185,11 +182,9 @@ g_bde_create_geom(struct gctl_req *req, struct g_class *mp, struct g_provider *p
 		TAILQ_INIT(&sc->freelist);
 		TAILQ_INIT(&sc->worklist);
 		mtx_init(&sc->worklist_mutex, "g_bde_worklist", NULL, MTX_DEF);
-		mtx_lock(&Giant);
 		/* XXX: error check */
 		kthread_create(g_bde_worker, gp, &sc->thread, 0, 0,
 			"g_bde %s", gp->name);
-		mtx_unlock(&Giant);
 		pp = g_new_providerf(gp, gp->name);
 #if 0
 		/*
@@ -212,7 +207,7 @@ g_bde_create_geom(struct gctl_req *req, struct g_class *mp, struct g_provider *p
 		bzero(key, 16);
 	if (error == 0)
 		return;
-	g_access_rel(cp, -1, -1, -1);
+	g_access(cp, -1, -1, -1);
 	g_detach(cp);
 	g_destroy_consumer(cp);
 	if (gp->softc != NULL)
@@ -227,7 +222,6 @@ g_bde_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
 {
 	struct g_consumer *cp;
 	struct g_provider *pp;
-	int error;
 	struct g_bde_softc *sc;
 
 	g_trace(G_T_TOPOLOGY, "g_bde_destroy_geom(%s, %s)", mp->name, gp->name);
@@ -245,8 +239,7 @@ g_bde_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
 	KASSERT(cp != NULL, ("NULL consumer"));
 	sc->dead = 1;
 	wakeup(sc);
-	error = g_access_rel(cp, -1, -1, -1);
-	KASSERT(error == 0, ("error on close"));
+	g_access(cp, -1, -1, -1);
 	g_detach(cp);
 	g_destroy_consumer(cp);
 	while (sc->dead != 2 && !LIST_EMPTY(&pp->consumers))
@@ -279,8 +272,13 @@ g_bde_ctlreq(struct gctl_req *req, struct g_class *mp, char const *verb)
 
 static struct g_class g_bde_class	= {
 	.name = BDE_CLASS_NAME,
+	.version = G_VERSION,
 	.destroy_geom = g_bde_destroy_geom,
 	.ctlreq = g_bde_ctlreq,
+	.start = g_bde_start,
+	.orphan = g_bde_orphan,
+	.access = g_bde_access,
+	.spoiled = g_std_spoiled,
 };
 
 DECLARE_GEOM_CLASS(g_bde_class, g_bde);

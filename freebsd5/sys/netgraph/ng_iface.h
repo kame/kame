@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_iface.h,v 1.5 2003/11/11 12:30:37 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_iface.h,v 1.6 2004/03/07 23:00:44 ru Exp $
  * $Whistle: ng_iface.h,v 1.5 1999/01/20 00:22:13 archie Exp $
  */
 
@@ -69,6 +69,7 @@ enum {
 	NGM_IFACE_GET_IFNAME = 1,	/* returns struct ng_iface_ifname */
 	NGM_IFACE_POINT2POINT,
 	NGM_IFACE_BROADCAST,
+	NGM_IFACE_GET_IFINDEX,
 };
 
 struct ng_iface_ifname {

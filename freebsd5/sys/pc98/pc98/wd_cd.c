@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/wd_cd.c,v 1.50 2003/10/18 17:45:45 phk Exp $
+ * $FreeBSD: src/sys/pc98/pc98/wd_cd.c,v 1.53 2004/06/16 09:47:19 phk Exp $
  */
 
 #include <sys/param.h>
@@ -47,9 +47,9 @@ static d_close_t	acdclose;
 static d_ioctl_t	acdioctl;
 static d_strategy_t	acdstrategy;
 
-#define CDEV_MAJOR 69
 
 static struct cdevsw acd_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	acdopen,
 	.d_close =	acdclose,
 	.d_read =	physread,
@@ -57,8 +57,7 @@ static struct cdevsw acd_cdevsw = {
 	.d_ioctl =	acdioctl,
 	.d_strategy =	acdstrategy,
 	.d_name =	"wcd",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_DISK,
+	.d_flags =	D_DISK | D_NEEDGIANT,
 };
 
 #define NUNIT	16		/* Max # of devices */
@@ -98,7 +97,7 @@ struct acd *
 acd_init_lun(struct atapi *ata, int unit, struct atapi_params *ap, int lun)
 {
     struct acd *ptr;
-    dev_t pdev;
+    struct cdev *pdev;
 
     if (!(ptr = malloc(sizeof(struct acd), M_TEMP, M_NOWAIT | M_ZERO)))
         return NULL;
@@ -361,7 +360,7 @@ acd_describe(struct acd *cdp)
 }
 
 static int
-acdopen(dev_t dev, int flags, int fmt, struct thread *td)
+acdopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
     struct acd *cdp;
 
@@ -386,7 +385,7 @@ acdopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 int 
-acdclose(dev_t dev, int flags, int fmt, struct thread *td)
+acdclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
     struct acd *cdp = dev->si_drv1;
 
@@ -551,7 +550,7 @@ msf2lba(u_char m, u_char s, u_char f)
 }
 
 int 
-acdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+acdioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
     struct acd *cdp = dev->si_drv1;
     int error = 0;

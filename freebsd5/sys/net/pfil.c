@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/net/pfil.c,v 1.8 2003/09/23 17:54:03 sam Exp $ */
+/*	$FreeBSD: src/sys/net/pfil.c,v 1.8.4.3 2004/10/11 03:45:57 green Exp $ */
 /*	$NetBSD: pfil.c,v 1.20 2001/11/12 23:49:46 lukem Exp $	*/
 
 /*
@@ -52,7 +52,7 @@ MTX_SYSINIT(pfil_heads_lock, &pfil_global_lock, "pfil_head_list lock", MTX_DEF);
 static int pfil_list_add(pfil_list_t *, struct packet_filter_hook *, int);
 
 static int pfil_list_remove(pfil_list_t *,
-    int (*)(void *, struct mbuf **, struct ifnet *, int), void *);
+    int (*)(void *, struct mbuf **, struct ifnet *, int, struct inpcb *), void *);
 
 LIST_HEAD(, pfil_head) pfil_head_list =
     LIST_HEAD_INITIALIZER(&pfil_head_list);
@@ -100,9 +100,9 @@ PFIL_TRY_WLOCK(struct pfil_head *ph)
 static __inline void
 PFIL_WUNLOCK(struct pfil_head *ph)
 {
-	ph->ph_want_write = 0;				\
-	mtx_unlock(&ph->ph_mtx);
+	ph->ph_want_write = 0;
 	cv_signal(&ph->ph_cv);
+	mtx_unlock(&ph->ph_mtx);
 }
 
 #define PFIL_LIST_LOCK() mtx_lock(&pfil_global_lock)
@@ -113,20 +113,28 @@ PFIL_WUNLOCK(struct pfil_head *ph)
  */
 int
 pfil_run_hooks(struct pfil_head *ph, struct mbuf **mp, struct ifnet *ifp,
-    int dir)
+    int dir, struct inpcb *inp)
 {
 	struct packet_filter_hook *pfh;
 	struct mbuf *m = *mp;
 	int rv = 0;
 
-	if (ph->ph_busy_count == -1 || ph->ph_want_write)
-		return (0);
+	/*
+	 * Prevent packet filtering from starving the modification of
+	 * the packet filters. We would prefer a reader/writer locking
+	 * mechanism with guaranteed ordering, though.
+	 */
+	if (ph->ph_busy_count == -1 || ph->ph_want_write) {
+		m_freem(*mp);
+		*mp = NULL;
+		return (ENOBUFS);
+	}
 
 	PFIL_RLOCK(ph);
 	for (pfh = pfil_hook_get(dir, ph); pfh != NULL;
 	     pfh = TAILQ_NEXT(pfh, pfil_link)) {
 		if (pfh->pfil_func != NULL) {
-			rv = (*pfh->pfil_func)(pfh->pfil_arg, &m, ifp, dir);
+			rv = (*pfh->pfil_func)(pfh->pfil_arg, &m, ifp, dir, inp);
 			if (rv != 0 || m == NULL)
 				break;
 		}
@@ -233,7 +241,7 @@ pfil_head_get(int type, u_long val)
  *	PFIL_WAITOK	OK to call malloc with M_WAITOK.
  */
 int
-pfil_add_hook(int (*func)(void *, struct mbuf **, struct ifnet *, int),
+pfil_add_hook(int (*func)(void *, struct mbuf **, struct ifnet *, int, struct inpcb *),
     void *arg, int flags, struct pfil_head *ph)
 {
 	struct packet_filter_hook *pfh1 = NULL;
@@ -305,7 +313,7 @@ error:
  * hook list.
  */
 int
-pfil_remove_hook(int (*func)(void *, struct mbuf **, struct ifnet *, int),
+pfil_remove_hook(int (*func)(void *, struct mbuf **, struct ifnet *, int, struct inpcb *),
     void *arg, int flags, struct pfil_head *ph)
 {
 	int err = 0;
@@ -361,7 +369,7 @@ pfil_list_add(pfil_list_t *list, struct packet_filter_hook *pfh1, int flags)
  */
 static int
 pfil_list_remove(pfil_list_t *list,
-    int (*func)(void *, struct mbuf **, struct ifnet *, int), void *arg)
+    int (*func)(void *, struct mbuf **, struct ifnet *, int, struct inpcb *), void *arg)
 {
 	struct packet_filter_hook *pfh;
 

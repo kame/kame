@@ -14,8 +14,6 @@
  * All advertising materials mentioning features or use of this software
  * must display the following acknowledgement:
  *	This product includes software developed by Harvard University.
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,8 +26,6 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  *	This product includes software developed by Paul Kranenburg.
  *	This product includes software developed by Harvard University.
  * 4. Neither the name of the University nor the names of its contributors
@@ -51,7 +47,7 @@
  *	from: @(#)clock.c	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: clock.c,v 1.41 2001/07/24 19:29:25 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/include/eeprom.h,v 1.1 2002/04/05 02:40:54 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/eeprom.h,v 1.3 2004/08/12 17:41:32 marius Exp $
  */
 
 #ifndef _MACHINE_EEPROM_H_
@@ -63,6 +59,7 @@ struct eeprom_softc {
 
 extern devclass_t eeprom_devclass;
 
-int eeprom_attach(device_t, phandle_t, bus_space_tag_t, bus_space_handle_t);
+int eeprom_probe(device_t);
+int eeprom_attach(device_t, bus_space_tag_t, bus_space_handle_t);
 
 #endif /* _MACHINE_EEPROM_H_ */

@@ -11,8 +11,6 @@
  * All advertising materials mentioning features or use of this software
  * must display the following acknowledgement:
  *	This product includes software developed by Harvard University.
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,8 +25,6 @@
  *    must display the following acknowledgement:
  *	This product includes software developed by Aaron Brown and
  *	Harvard University.
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -72,7 +68,7 @@
  *	from: @(#)cache.c	8.2 (Berkeley) 10/30/93
  *	from: NetBSD: cache.c,v 1.5 2000/12/06 01:47:50 mrg Exp
  *
- * $FreeBSD: src/sys/sparc64/sparc64/cache.c,v 1.18 2003/11/11 06:41:54 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/cache.c,v 1.19 2004/04/07 05:00:01 imp Exp $
  */
 
 #include <sys/param.h>

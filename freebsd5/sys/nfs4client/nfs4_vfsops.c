@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/nfs4client/nfs4_vfsops.c,v 1.3 2003/11/22 02:21:49 alfred Exp $ */
+/* $FreeBSD: src/sys/nfs4client/nfs4_vfsops.c,v 1.11 2004/07/30 22:08:52 phk Exp $ */
 /* $Id: nfs_vfsops.c,v 1.38 2003/11/05 14:59:01 rees Exp $ */
 
 /*
@@ -40,10 +40,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -64,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_vfsops.c,v 1.3 2003/11/22 02:21:49 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_vfsops.c,v 1.11 2004/07/30 22:08:52 phk Exp $");
 
 #include "opt_bootp.h"
 #include "opt_nfsroot.h"
@@ -124,7 +120,7 @@ static int	mountnfs(struct nfs_args *, struct mount *,
 		    struct sockaddr *, char *, char *, struct vnode **,
 		    struct ucred *cred);
 static int	nfs4_do_setclientid(struct nfsmount *nmp, struct ucred *cred);
-static vfs_mount_t nfs_mount;
+static vfs_omount_t nfs_omount;
 static vfs_unmount_t nfs_unmount;
 static vfs_root_t nfs_root;
 static vfs_statfs_t nfs_statfs;
@@ -135,7 +131,7 @@ static vfs_sync_t nfs_sync;
  */
 static struct vfsops nfs_vfsops = {
 	.vfs_init =		nfs4_init,
-	.vfs_mount =		nfs_mount,
+	.vfs_omount =		nfs_omount,
 	.vfs_root =		nfs_root,
 	.vfs_statfs =		nfs_statfs,
 	.vfs_sync =		nfs_sync,
@@ -388,8 +384,7 @@ nfs_decode_args(struct nfsmount *nmp, struct nfs_args *argp)
  */
 /* ARGSUSED */
 static int
-nfs_mount(struct mount *mp, char *path, caddr_t data, struct nameidata *ndp,
-    struct thread *td)
+nfs_omount(struct mount *mp, char *path, caddr_t data, struct thread *td)
 {
 	int error;
 	struct nfs_args args;
@@ -509,6 +504,7 @@ nfs4_daemon(void *arg)
 		if (nmounts == 0) {
 			mtx_lock(&Giant);
 			nfs4_daemonproc = NULL;
+			mtx_unlock(&Giant);
 			printf("nfsv4 renewd exiting\n");
 			kthread_exit(0);
 		}
@@ -659,7 +655,7 @@ nfs_unmount(struct mount *mp, int mntflags, struct thread *td)
 	nmp = VFSTONFS(mp);
 	/*
 	 * Goes something like this..
-	 * - Call vflush() to clear out vnodes for this filesystem
+	 * - Call vflush(, td) to clear out vnodes for this filesystem
 	 * - Close the socket
 	 * - Free up the data structures
 	 */
@@ -671,7 +667,7 @@ nfs_unmount(struct mount *mp, int mntflags, struct thread *td)
 		nfs4dev_purge();
 	}
 
-	error = vflush(mp, 0, flags);
+	error = vflush(mp, 0, flags, td);
 	if (error)
 		return (error);
 
@@ -692,7 +688,7 @@ nfs_unmount(struct mount *mp, int mntflags, struct thread *td)
  * Return root of a filesystem
  */
 static int
-nfs_root(struct mount *mp, struct vnode **vpp)
+nfs_root(struct mount *mp, struct vnode **vpp, struct thread *td)
 {
 	struct vnode *vp;
 	struct nfsmount *nmp;
@@ -719,7 +715,7 @@ nfs_root(struct mount *mp, struct vnode **vpp)
 static int
 nfs_sync(struct mount *mp, int waitfor, struct ucred *cred, struct thread *td)
 {
-	struct vnode *vp, *vnp;
+	struct vnode *vp, *nvp;
 	int error, allerror = 0;
 
 	/*
@@ -727,16 +723,7 @@ nfs_sync(struct mount *mp, int waitfor, struct ucred *cred, struct thread *td)
 	 */
 	MNT_ILOCK(mp);
 loop:
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist);
-	     vp != NULL;
-	     vp = vnp) {
-		/*
-		 * If the vnode that we are about to sync is no longer
-		 * associated with this mount point, start over.
-		 */
-		if (vp->v_mount != mp)
-			goto loop;
-		vnp = TAILQ_NEXT(vp, v_nmntvnodes);
+	MNT_VNODE_FOREACH(vp, mp, nvp) {
 		VI_LOCK(vp);
 		MNT_IUNLOCK(mp);
 		if (VOP_ISLOCKED(vp, NULL) || TAILQ_EMPTY(&vp->v_dirtyblkhd) ||
@@ -770,7 +757,7 @@ nfs4_do_setclientid(struct nfsmount *nmp, struct ucred *cred)
 	struct route ro;
 	char *ipsrc = NULL, uaddr[24], name[24];
 	int try = 0;
-	static int seq;
+	static unsigned long seq;
 	int error;
 
 #ifndef NFS4_USE_RPCCLNT
@@ -784,7 +771,7 @@ nfs4_do_setclientid(struct nfsmount *nmp, struct ucred *cred)
 
 	/* Try not to re-use clientids */
 	if (seq == 0)
-		seq = time_second & 0xffffff;
+		seq = time_second;
 
 #ifdef NFS4_USE_RPCCLNT
 	scid.cb_netid = (nmp->nm_rpcclnt.rc_sotype == SOCK_STREAM) ? "tcp" : "udp";
@@ -811,7 +798,7 @@ nfs4_do_setclientid(struct nfsmount *nmp, struct ucred *cred)
 	RTFREE(ro.ro_rt);
 
  try_again:
-	sprintf(name, "%s-%d", ipsrc, seq++);
+	sprintf(name, "%s-%d", ipsrc, (int) ((seq + try) % 1000000L));
 	scid.namelen = strlen(name);
 	scid.name = name;
 	nfs_v4initcompound(&cp);

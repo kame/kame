@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/ia64/interrupt.c,v 1.43 2003/11/17 06:10:14 peter Exp $ */
+/* $FreeBSD: src/sys/ia64/ia64/interrupt.c,v 1.46 2004/07/02 20:21:42 jhb Exp $ */
 /* $NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $ */
 
 /*
@@ -52,6 +52,7 @@
 
 #include <machine/clock.h>
 #include <machine/cpu.h>
+#include <machine/fpu.h>
 #include <machine/frame.h>
 #include <machine/intr.h>
 #include <machine/md_var.h>
@@ -78,7 +79,7 @@ extern int mp_ipi_test;
 volatile int mc_expected, mc_received;
 
 static void 
-dummy_perf(unsigned long vector, struct trapframe *framep)  
+dummy_perf(unsigned long vector, struct trapframe *tf)  
 {
 	printf("performance interrupt!\n");
 }
@@ -124,13 +125,15 @@ SYSCTL_INT(_debug, OID_AUTO, clock_adjust_ticks, CTLFLAG_RW,
     &adjust_ticks, 0, "Total number of ITC interrupts with adjustment");
 
 int
-interrupt(u_int64_t vector, struct trapframe *framep)
+interrupt(u_int64_t vector, struct trapframe *tf)
 {
 	struct thread *td;
 	volatile struct ia64_interrupt_block *ib = IA64_INTERRUPT_BLOCK;
 	uint64_t adj, clk, itc;
 	int64_t delta;
 	int count;
+
+	ia64_set_fpsr(IA64_FPSR_DEFAULT);
 
 	td = curthread;
 	atomic_add_int(&td->td_intr_nesting_level, 1);
@@ -166,12 +169,12 @@ interrupt(u_int64_t vector, struct trapframe *framep)
 		while (delta >= ia64_clock_reload) {
 			/* Only the BSP runs the real clock */
 			if (PCPU_GET(cpuid) == 0)
-				hardclock((struct clockframe *)framep);
+				hardclock((struct clockframe *)tf);
 			else
-				hardclock_process((struct clockframe *)framep);
+				hardclock_process((struct clockframe *)tf);
 			if (profprocs != 0)
-				profclock((struct clockframe *)framep);
-			statclock((struct clockframe *)framep);
+				profclock((struct clockframe *)tf);
+			statclock((struct clockframe *)tf);
 			delta -= ia64_clock_reload;
 			clk += ia64_clock_reload;
 			if (adj != 0)
@@ -231,11 +234,11 @@ interrupt(u_int64_t vector, struct trapframe *framep)
 #endif
 	} else {
 		ints[PCPU_GET(cpuid)]++;
-		ia64_dispatch_intr(framep, vector);
+		ia64_dispatch_intr(tf, vector);
 	}
 
 	atomic_subtract_int(&td->td_intr_nesting_level, 1);
-	return (TRAPF_USERMODE(framep));
+	return (TRAPF_USERMODE(tf));
 }
 
 /*
@@ -381,7 +384,7 @@ ia64_dispatch_intr(void *frame, unsigned long vector)
 		return;
 	}
 
-	error = ithread_schedule(ithd, 0);	/* XXX:no preemption for now */
+	error = ithread_schedule(ithd);
 	KASSERT(error == 0, ("got an impossible stray interrupt"));
 }
 

@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  *
  *	from: @(#)cpu.h 5.4 (Berkeley) 5/9/91
  *	from: FreeBSD: src/sys/i386/include/cpu.h,v 1.62 2001/06/29
- * $FreeBSD: src/sys/sparc64/include/cpu.h,v 1.11 2003/08/16 16:57:57 marcel Exp $
+ * $FreeBSD: src/sys/sparc64/include/cpu.h,v 1.15 2004/08/03 18:44:27 mux Exp $
  */
 
 #ifndef	_MACHINE_CPU_H_
@@ -52,6 +48,7 @@
 
 #define	cpu_getstack(td)	((td)->td_frame->tf_sp)
 #define	cpu_setstack(td, sp)	((td)->td_frame->tf_sp = (sp))
+#define	cpu_spinwait()		/* nothing */
 
 /*
  * CTL_MACHDEP definitions.

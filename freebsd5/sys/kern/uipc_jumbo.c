@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/uipc_jumbo.c,v 1.9 2003/06/11 21:23:04 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/uipc_jumbo.c,v 1.10 2004/07/23 19:36:18 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -110,7 +110,7 @@ jumbo_vm_init(void)
 	SLIST_INIT(&jumbo_kmap_inuse);
 
 	/* grab some kernel virtual address space */
-	jumbo_basekva = kmem_alloc_pageable(kernel_map,
+	jumbo_basekva = kmem_alloc_nofault(kernel_map,
 		PAGE_SIZE * JUMBO_MAX_PAGES);
 	if (jumbo_basekva == 0) {
 		vm_object_deallocate(jumbo_vm_object);

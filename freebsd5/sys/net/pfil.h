@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/net/pfil.h,v 1.10 2003/09/23 17:54:03 sam Exp $ */
+/*	$FreeBSD: src/sys/net/pfil.h,v 1.11.2.1 2004/10/03 17:04:39 mlaier Exp $ */
 /*	$NetBSD: pfil.h,v 1.22 2003/06/23 12:57:08 martin Exp $	*/
 
 /*
@@ -33,13 +33,14 @@
 #define _NET_PFIL_H_
 
 #include <sys/systm.h>
+#include <sys/queue.h>
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
 #include <sys/condvar.h>	/* XXX */
-#include <sys/queue.h>
 
 struct mbuf;
 struct ifnet;
+struct inpcb;
 
 /*
  * The packet filter hooks are designed for anything to call them to
@@ -47,7 +48,7 @@ struct ifnet;
  */
 struct packet_filter_hook {
         TAILQ_ENTRY(packet_filter_hook) pfil_link;
-	int	(*pfil_func)(void *, struct mbuf **, struct ifnet *, int);
+	int	(*pfil_func)(void *, struct mbuf **, struct ifnet *, int, struct inpcb *);
 	void	*pfil_arg;
 	int	pfil_flags;
 };
@@ -84,12 +85,12 @@ struct pfil_head {
 };
 
 int	pfil_run_hooks(struct pfil_head *, struct mbuf **, struct ifnet *,
-	    int);
+	    int, struct inpcb *inp);
 
 int	pfil_add_hook(int (*func)(void *, struct mbuf **,
-	    struct ifnet *, int), void *, int, struct pfil_head *);
+	    struct ifnet *, int, struct inpcb *), void *, int, struct pfil_head *);
 int	pfil_remove_hook(int (*func)(void *, struct mbuf **,
-	    struct ifnet *, int), void *, int, struct pfil_head *);
+	    struct ifnet *, int, struct inpcb *), void *, int, struct pfil_head *);
 
 int	pfil_head_register(struct pfil_head *);
 int	pfil_head_unregister(struct pfil_head *);

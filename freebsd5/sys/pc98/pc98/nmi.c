@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pc98/pc98/nmi.c,v 1.1 2003/11/04 13:01:41 nyan Exp $");
+__FBSDID("$FreeBSD: src/sys/pc98/pc98/nmi.c,v 1.2 2004/04/07 04:59:58 imp Exp $");
 
 #include <sys/types.h>
 #include <sys/syslog.h>

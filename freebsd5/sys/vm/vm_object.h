@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -61,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_object.h,v 1.103 2003/11/09 05:25:35 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_object.h,v 1.106 2004/07/25 07:48:47 alc Exp $
  */
 
 /*
@@ -176,8 +172,9 @@ extern struct vm_object kmem_object_store;
 #define	VM_OBJECT_LOCK(object)		mtx_lock(&(object)->mtx)
 #define	VM_OBJECT_LOCK_ASSERT(object, type) \
 					mtx_assert(&(object)->mtx, (type))
-#define	VM_OBJECT_LOCK_INIT(object)	mtx_init(&(object)->mtx, "vm object", \
-					    NULL, MTX_DEF | MTX_DUPOK)
+#define	VM_OBJECT_LOCK_INIT(object, type) \
+					mtx_init(&(object)->mtx, "vm object", \
+					    (type), MTX_DEF | MTX_DUPOK)
 #define	VM_OBJECT_LOCKED(object)	mtx_owned(&(object)->mtx)
 #define	VM_OBJECT_MTX(object)		(&(object)->mtx)
 #define	VM_OBJECT_TRYLOCK(object)	mtx_trylock(&(object)->mtx)
@@ -203,7 +200,7 @@ void vm_object_pip_wait(vm_object_t object, char *waitid);
 vm_object_t vm_object_allocate (objtype_t, vm_pindex_t);
 vm_object_t vm_object_allocate_wait (objtype_t, vm_pindex_t, int);
 void _vm_object_allocate (objtype_t, vm_pindex_t, vm_object_t);
-boolean_t vm_object_coalesce (vm_object_t, vm_pindex_t, vm_size_t, vm_size_t);
+boolean_t vm_object_coalesce(vm_object_t, vm_ooffset_t, vm_size_t, vm_size_t);
 void vm_object_collapse (vm_object_t);
 void vm_object_deallocate (vm_object_t);
 void vm_object_terminate (vm_object_t);

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/harp/Makefile,v 1.1 2003/07/21 13:56:22 harti Exp $
+# $FreeBSD: src/sys/modules/harp/Makefile,v 1.2 2004/02/13 10:11:00 ru Exp $
 #
 # Author: Harti Brandt <brandt@fokus.gmd.de>
 #
@@ -8,7 +8,6 @@ KMOD=	if_harp
 SRCS=	if_harp.c device_if.h
 
 CFLAGS+= -I${.CURDIR} -I${.CURDIR}/../include
-CFLAGS+= -DDEBUG -DINVARIANTS -g
-LDFLAGS+= -g
+CFLAGS+= -DDEBUG -DINVARIANTS
 
 .include <bsd.kmod.mk>

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_hci_ulpi.c,v 1.7 2003/09/08 18:57:51 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_ulpi.c,v 1.5 2003/10/12 22:04:20 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_ulpi.c,v 1.7 2004/04/27 16:38:14 emax Exp $
  */
 
 #include <sys/param.h>
@@ -38,13 +38,13 @@
 #include <sys/queue.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
-#include "ng_bluetooth.h"
-#include "ng_hci.h"
-#include "ng_hci_var.h"
-#include "ng_hci_cmds.h"
-#include "ng_hci_evnt.h"
-#include "ng_hci_ulpi.h"
-#include "ng_hci_misc.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/hci/ng_hci_var.h>
+#include <netgraph/bluetooth/hci/ng_hci_cmds.h>
+#include <netgraph/bluetooth/hci/ng_hci_evnt.h>
+#include <netgraph/bluetooth/hci/ng_hci_ulpi.h>
+#include <netgraph/bluetooth/hci/ng_hci_misc.h>
 
 /******************************************************************************
  ******************************************************************************
@@ -590,7 +590,7 @@ ng_hci_lp_con_cfm(ng_hci_unit_con_p con, int status)
 					sizeof(ep->bdaddr));
 
 				NG_SEND_MSG_HOOK(error, unit->node, msg,
-					unit->acl, NULL);
+					unit->acl, 0);
 			}
 		} else
 			NG_HCI_INFO(
@@ -613,7 +613,7 @@ ng_hci_lp_con_cfm(ng_hci_unit_con_p con, int status)
 					sizeof(ep->bdaddr));
 
 				NG_SEND_MSG_HOOK(error, unit->node, msg,
-					unit->sco, NULL);
+					unit->sco, 0);
 			}
 		} else
 			NG_HCI_INFO(
@@ -660,7 +660,7 @@ ng_hci_lp_con_ind(ng_hci_unit_con_p con, u_int8_t *uclass)
 		bcopy(uclass, ep->uclass, sizeof(ep->uclass));
 		bcopy(&con->bdaddr, &ep->bdaddr, sizeof(ep->bdaddr));
 
-		NG_SEND_MSG_HOOK(error, unit->node, msg, hook, NULL);
+		NG_SEND_MSG_HOOK(error, unit->node, msg, hook, 0);
 	} else {
 		NG_HCI_WARN(
 "%s: %s - Upstream hook is not connected or not valid, hook=%p\n",
@@ -897,7 +897,7 @@ ng_hci_lp_discon_ind(ng_hci_unit_con_p con, int reason)
 			ep->link_type = con->link_type;
 			ep->con_handle = con->con_handle;
 
-			NG_SEND_MSG_HOOK(error,unit->node,msg,unit->acl,NULL);
+			NG_SEND_MSG_HOOK(error,unit->node,msg,unit->acl,0);
 		} else
 			NG_HCI_INFO(
 "%s: %s - ACL hook is not connected or not valid, hook=%p\n",
@@ -915,7 +915,7 @@ ng_hci_lp_discon_ind(ng_hci_unit_con_p con, int reason)
 		ep->link_type = con->link_type;
 		ep->con_handle = con->con_handle;
 
-		NG_SEND_MSG_HOOK(error, unit->node, msg, unit->sco, NULL);
+		NG_SEND_MSG_HOOK(error, unit->node, msg, unit->sco, 0);
 	} else
 		NG_HCI_INFO(
 "%s: %s - SCO hook is not connected or not valid, hook=%p\n",
@@ -1059,7 +1059,7 @@ ng_hci_lp_qos_cfm(ng_hci_unit_con_p con, int status)
 				ep->con_handle = con->con_handle;
 
 				NG_SEND_MSG_HOOK(error, unit->node, msg,
-					unit->acl, NULL);
+					unit->acl, 0);
 			}
 		} else
 			NG_HCI_INFO(
@@ -1079,7 +1079,7 @@ ng_hci_lp_qos_cfm(ng_hci_unit_con_p con, int status)
 				ep->con_handle = con->con_handle;
 
 				NG_SEND_MSG_HOOK(error, unit->node, msg,
-					unit->sco, NULL);
+					unit->sco, 0);
 			}
 		} else
 			NG_HCI_INFO(
@@ -1118,7 +1118,7 @@ ng_hci_lp_qos_ind(ng_hci_unit_con_p con)
 		ep = (ng_hci_lp_qos_ind_ep *) msg->data;
 		ep->con_handle = con->con_handle;
 
-		NG_SEND_MSG_HOOK(error, unit->node, msg, unit->acl, NULL);
+		NG_SEND_MSG_HOOK(error, unit->node, msg, unit->acl, 0);
 	} else
 		NG_HCI_INFO(
 "%s: %s - ACL hook is not connected or not valid, hook=%p\n",
@@ -1133,7 +1133,7 @@ ng_hci_lp_qos_ind(ng_hci_unit_con_p con)
 		ep = (ng_hci_lp_qos_ind_ep *) msg->data;
 		ep->con_handle = con->con_handle;
 
-		NG_SEND_MSG_HOOK(error, unit->node, msg, unit->sco, NULL);
+		NG_SEND_MSG_HOOK(error, unit->node, msg, unit->sco, 0);
 	} else
 		NG_HCI_INFO(
 "%s: %s - SCO hook is not connected or not valid, hook=%p\n",

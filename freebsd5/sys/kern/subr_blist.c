@@ -84,7 +84,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_blist.c,v 1.16 2003/08/12 23:24:04 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_blist.c,v 1.17 2004/06/04 04:03:25 alc Exp $");
 
 #ifdef _KERNEL
 
@@ -96,11 +96,6 @@ __FBSDID("$FreeBSD: src/sys/kern/subr_blist.c,v 1.16 2003/08/12 23:24:04 imp Exp
 #include <sys/malloc.h>
 #include <sys/proc.h>
 #include <sys/mutex.h> 
-#include <vm/vm.h>
-#include <vm/vm_object.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_page.h>
 
 #else
 

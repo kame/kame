@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_exit.c,v 1.218 2003/11/14 18:49:01 cognet Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_exit.c,v 1.245.2.1.2.1 2004/10/28 02:49:32 kensmith Exp $");
 
 #include "opt_compat.h"
 #include "opt_ktrace.h"
@@ -69,7 +65,6 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_exit.c,v 1.218 2003/11/14 18:49:01 cognet 
 #include <sys/mac.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
-#include <sys/jail.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
@@ -86,8 +81,6 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_exit.c,v 1.218 2003/11/14 18:49:01 cognet 
 /* Required to be non-static for SysVR4 emulator */
 MALLOC_DEFINE(M_ZOMBIE, "zombie", "zombie proc status");
 
-static int wait1(struct thread *, struct wait_args *, int);
-
 /*
  * exit --
  *	Death of process.
@@ -98,7 +91,6 @@ void
 sys_exit(struct thread *td, struct sys_exit_args *uap)
 {
 
-	mtx_lock(&Giant);
 	exit1(td, W_EXITCODE(uap->rval, 0));
 	/* NOTREACHED */
 }
@@ -111,6 +103,7 @@ sys_exit(struct thread *td, struct sys_exit_args *uap)
 void
 exit1(struct thread *td, int rv)
 {
+ 	struct bintime new_switchtime;
 	struct proc *p, *nq, *q;
 	struct tty *tp;
 	struct vnode *ttyvp;
@@ -120,8 +113,15 @@ exit1(struct thread *td, int rv)
 	struct vnode *tracevp;
 	struct ucred *tracecred;
 #endif
+	struct plimit *plim;
+	int refcnt;
 
-	GIANT_REQUIRED;
+	/*
+	 * Drop Giant if caller has it.  Eventually we should warn about
+	 * being called with Giant held.
+	 */ 
+	while (mtx_owned(&Giant))
+		mtx_unlock(&Giant);
 
 	p = td->td_proc;
 	if (p == initproc) {
@@ -134,7 +134,8 @@ exit1(struct thread *td, int rv)
 	 * MUST abort all other threads before proceeding past here.
 	 */
 	PROC_LOCK(p);
-	if (p->p_flag & P_SA || p->p_numthreads > 1) {
+	if (p->p_flag & P_HADTHREADS) {
+retry:
 		/*
 		 * First check if some other thread got here before us..
 		 * if so, act apropriatly, (exit or suspend);
@@ -148,35 +149,24 @@ exit1(struct thread *td, int rv)
 		 * With this state set:
 		 * Any thread entering the kernel from userspace will
 		 * thread_exit() in trap().  Any thread attempting to
-		 * sleep will return immediatly
-		 * with EINTR or EWOULDBLOCK, which will hopefully force them
-		 * to back out to userland, freeing resources as they go, and
-		 * anything attempting to return to userland will thread_exit()
-		 * from userret().  thread_exit() will unsuspend us
-		 * when the last other thread exits.
+		 * sleep will return immediatly with EINTR or EWOULDBLOCK,
+		 * which will hopefully force them to back out to userland,
+		 * freeing resources as they go, and anything attempting
+		 * to return to userland will thread_exit() from userret().
+		 * thread_exit() will unsuspend us when the last other
+		 * thread exits.
+		 * If there is already a thread singler after resumption,
+		 * calling thread_single will fail, in the case, we just
+		 * re-check all suspension request, the thread should
+		 * either be suspended there or exit.
 		 */
-		if (thread_single(SINGLE_EXIT)) {
-			panic ("Exit: Single threading fouled up");
-		}
+		if (thread_single(SINGLE_EXIT))
+			goto retry;
 		/*
 		 * All other activity in this process is now stopped.
-		 * Remove excess KSEs and KSEGRPS. XXXKSE (when we have them)
-		 * ...
-		 * Turn off threading support.
+		 * Threading support has been turned off.
 		 */
-		p->p_flag &= ~P_SA;
-		thread_single_end();	/* Don't need this any more. */
 	}
-	/*
-	 * With this state set:
-	 * Any thread entering the kernel from userspace will thread_exit()
-	 * in trap().  Any thread attempting to sleep will return immediatly
-	 * with EINTR or EWOULDBLOCK, which will hopefully force them
-	 * to back out to userland, freeing resources as they go, and
-	 * anything attempting to return to userland will thread_exit()
-	 * from userret().  thread_exit() will do a wakeup on p->p_numthreads
-	 * if it transitions to 1.
-	 */
 
 	p->p_flag |= P_WEXIT;
 	PROC_UNLOCK(p);
@@ -196,11 +186,10 @@ exit1(struct thread *td, int rv)
 		mtx_unlock(&ppeers_lock);
 	}
 
-#ifdef PGINPROF
-	vmsizmon();
-#endif
-	STOPEVENT(p, S_EXIT, rv);
+	PROC_LOCK(p);
+	_STOPEVENT(p, S_EXIT, rv);
 	wakeup(&p->p_stype);	/* Wakeup anyone in procfs' PIOCWAIT */
+	PROC_UNLOCK(p);
 
 	/*
 	 * Check if any loadable modules need anything done at process exit.
@@ -238,6 +227,7 @@ exit1(struct thread *td, int rv)
 	 * Reset any sigio structures pointing to us as a result of
 	 * F_SETOWN with our pid.
 	 */
+	mtx_lock(&Giant);	/* XXX: not sure if needed */
 	funsetownlst(&p->p_sigiolst);
 
 	/*
@@ -245,6 +235,7 @@ exit1(struct thread *td, int rv)
 	 * This may block!
 	 */
 	fdfree(td);
+	mtx_unlock(&Giant);	
 
 	/*
 	 * Remove ourself from our leader's peer list and wake our leader.
@@ -276,17 +267,19 @@ exit1(struct thread *td, int rv)
 	 * by vmspace_exit() (which decrements exitingcnt) cleans up the
 	 * remainder.
 	 */
-	++vm->vm_exitingcnt;
-	if (--vm->vm_refcnt == 0) {
+	atomic_add_int(&vm->vm_exitingcnt, 1);
+	do
+		refcnt = vm->vm_refcnt;
+	while (!atomic_cmpset_int(&vm->vm_refcnt, refcnt, refcnt - 1));
+	if (refcnt == 1) {
 		shmexit(vm);
-		vm_page_lock_queues();
 		pmap_remove_pages(vmspace_pmap(vm), vm_map_min(&vm->vm_map),
 		    vm_map_max(&vm->vm_map));
-		vm_page_unlock_queues();
 		(void) vm_map_remove(&vm->vm_map, vm_map_min(&vm->vm_map),
 		    vm_map_max(&vm->vm_map));
 	}
 
+	mtx_lock(&Giant);	
 	sx_xlock(&proctree_lock);
 	if (SESS_LEADER(p)) {
 		struct session *sp;
@@ -345,6 +338,7 @@ exit1(struct thread *td, int rv)
 	fixjobc(p, p->p_pgrp, 0);
 	sx_xunlock(&proctree_lock);
 	(void)acct_process(td);
+	mtx_unlock(&Giant);	
 #ifdef KTRACE
 	/*
 	 * release trace file
@@ -358,8 +352,11 @@ exit1(struct thread *td, int rv)
 	p->p_tracecred = NULL;
 	mtx_unlock(&ktrace_mtx);
 	PROC_UNLOCK(p);
-	if (tracevp != NULL)
+	if (tracevp != NULL) {
+		mtx_lock(&Giant);
 		vrele(tracevp);
+		mtx_unlock(&Giant);
+	}
 	if (tracecred != NULL)
 		crfree(tracecred);
 #endif
@@ -368,27 +365,19 @@ exit1(struct thread *td, int rv)
 	 */
 	if ((vtmp = p->p_textvp) != NULL) {
 		p->p_textvp = NULL;
+		mtx_lock(&Giant);	
 		vrele(vtmp);
+		mtx_unlock(&Giant);	
 	}
 
 	/*
 	 * Release our limits structure.
 	 */
-	mtx_assert(&Giant, MA_OWNED);
-	if (--p->p_limit->p_refcnt == 0) {
-		FREE(p->p_limit, M_SUBPROC);
-		p->p_limit = NULL;
-	}
-
-	/*
-	 * Release this thread's reference to the ucred.  The actual proc
-	 * reference will stay around until the proc is harvested by
-	 * wait().  At this point the ucred is immutable (no other threads
-	 * from this proc are around that can change it) so we leave the
-	 * per-thread ucred pointer intact in case it is needed although
-	 * in theory nothing should be using it at this point.
-	 */
-	crfree(td->td_ucred);
+	PROC_LOCK(p);
+	plim = p->p_limit;
+	p->p_limit = NULL;
+	PROC_UNLOCK(p);
+	lim_free(plim);
 
 	/*
 	 * Remove proc from allproc queue and pidhash chain.
@@ -414,7 +403,7 @@ exit1(struct thread *td, int rv)
 		 * since their existence means someone is screwing up.
 		 */
 		if (q->p_flag & P_TRACED) {
-			q->p_flag &= ~P_TRACED;
+			q->p_flag &= ~(P_TRACED | P_STOPPED_TRACE);
 			psignal(q, SIGKILL);
 		}
 		PROC_UNLOCK(q);
@@ -424,25 +413,27 @@ exit1(struct thread *td, int rv)
 	 * Save exit status and final rusage info, adding in child rusage
 	 * info and self times.
 	 */
+	mtx_lock(&Giant);	
 	PROC_LOCK(p);
 	p->p_xstat = rv;
+	p->p_xthread = td;
 	*p->p_ru = p->p_stats->p_ru;
 	mtx_lock_spin(&sched_lock);
 	calcru(p, &p->p_ru->ru_utime, &p->p_ru->ru_stime, NULL);
 	mtx_unlock_spin(&sched_lock);
 	ruadd(p->p_ru, &p->p_stats->p_cru);
 
+	mtx_unlock(&Giant);	
 	/*
 	 * Notify interested parties of our demise.
 	 */
-	KNOTE(&p->p_klist, NOTE_EXIT);
+	KNOTE_LOCKED(&p->p_klist, NOTE_EXIT);
 	/*
 	 * Just delete all entries in the p_klist. At this point we won't
 	 * report any more events, and there are nasty race conditions that
 	 * can beat us if we don't.
 	 */
-	while (SLIST_FIRST(&p->p_klist))
-		SLIST_REMOVE_HEAD(&p->p_klist, kn_selnext);
+	knlist_clear(&p->p_klist, 1);
 
 	/*
 	 * Notify parent that we're gone.  If parent has the PS_NOCLDWAIT
@@ -458,6 +449,7 @@ exit1(struct thread *td, int rv)
 		pp = p->p_pptr;
 		PROC_UNLOCK(pp);
 		proc_reparent(p, initproc);
+		p->p_sigparent = SIGCHLD;
 		PROC_LOCK(p->p_pptr);
 		/*
 		 * If this was the last child of our parent, notify
@@ -469,10 +461,10 @@ exit1(struct thread *td, int rv)
 	} else
 		mtx_unlock(&p->p_pptr->p_sigacts->ps_mtx);
 
-	if (p->p_sigparent && p->p_pptr != initproc)
-		psignal(p->p_pptr, p->p_sigparent);
-	else
+	if (p->p_pptr == initproc)
 		psignal(p->p_pptr, SIGCHLD);
+	else if (p->p_sigparent != 0)
+		psignal(p->p_pptr, p->p_sigparent);
 	PROC_UNLOCK(p->p_pptr);
 
 	/*
@@ -493,32 +485,42 @@ exit1(struct thread *td, int rv)
 	PROC_LOCK(p);
 	PROC_LOCK(p->p_pptr);
 	sx_xunlock(&proctree_lock);
-	mtx_lock_spin(&sched_lock);
 
 	while (mtx_owned(&Giant))
 		mtx_unlock(&Giant);
 
 	/*
 	 * We have to wait until after acquiring all locks before
-	 * changing p_state.  If we block on a mutex then we will be
-	 * back at SRUN when we resume and our parent will never
-	 * harvest us.
+	 * changing p_state.  We need to avoid any possibly context
+	 * switches while marked as a zombie including blocking on
+	 * a mutex.
 	 */
+	mtx_lock_spin(&sched_lock);
 	p->p_state = PRS_ZOMBIE;
+	critical_enter();
+	mtx_unlock_spin(&sched_lock);
 
 	wakeup(p->p_pptr);
 	PROC_UNLOCK(p->p_pptr);
-	cnt.v_swtch++;
-	binuptime(PCPU_PTR(switchtime));
+
+	mtx_lock_spin(&sched_lock);
+	critical_exit();
+
+	/* Do the same timestamp bookkeeping that mi_switch() would do. */
+	binuptime(&new_switchtime);
+	bintime_add(&p->p_runtime, &new_switchtime);
+	bintime_sub(&p->p_runtime, PCPU_PTR(switchtime));
+	PCPU_SET(switchtime, new_switchtime);
 	PCPU_SET(switchticks, ticks);
 
-	cpu_sched_exit(td); /* XXXKSE check if this should be in thread_exit */
+	cnt.v_swtch++;
+	sched_exit(p->p_pptr, td);
+
 	/*
-	 * Allow the scheduler to adjust the priority of the
-	 * parent when a kseg is exiting.
+	 * hopefully no one will try to deliver a signal to the process this
+	 * late in the game.
 	 */
-	if (p->p_pid != 1) 
-		sched_exit(p->p_pptr, p);
+	knlist_destroy(&p->p_klist);
 
 	/*
 	 * Make sure the scheduler takes this thread out of its tables etc.
@@ -530,58 +532,59 @@ exit1(struct thread *td, int rv)
 
 #ifdef COMPAT_43
 /*
- * MPSAFE.  The dirty work is handled by wait1().
+ * MPSAFE.  The dirty work is handled by kern_wait().
  */
 int
 owait(struct thread *td, struct owait_args *uap __unused)
 {
-	struct wait_args w;
+	int error, status;
 
-	w.options = 0;
-	w.rusage = NULL;
-	w.pid = WAIT_ANY;
-	w.status = NULL;
-	return (wait1(td, &w, 1));
+	error = kern_wait(td, WAIT_ANY, &status, 0, NULL);
+	if (error == 0)
+		td->td_retval[1] = status;
+	return (error);
 }
 #endif /* COMPAT_43 */
 
 /*
- * MPSAFE.  The dirty work is handled by wait1().
+ * MPSAFE.  The dirty work is handled by kern_wait().
  */
 int
 wait4(struct thread *td, struct wait_args *uap)
 {
+	struct rusage ru;
+	int error, status;
 
-	return (wait1(td, uap, 0));
+	error = kern_wait(td, uap->pid, &status, uap->options, &ru);
+	if (uap->status != NULL && error == 0)
+		error = copyout(&status, uap->status, sizeof(status));
+	if (uap->rusage != NULL && error == 0)
+		error = copyout(&ru, uap->rusage, sizeof(struct rusage));
+	return (error);
 }
 
-/*
- * MPSAFE
- */
-static int
-wait1(struct thread *td, struct wait_args *uap, int compat)
+int
+kern_wait(struct thread *td, pid_t pid, int *status, int options, struct rusage *rusage)
 {
-	struct rusage ru;
 	int nfound;
 	struct proc *p, *q, *t;
-	int status, error;
+	int error;
 
 	q = td->td_proc;
-	if (uap->pid == 0) {
+	if (pid == 0) {
 		PROC_LOCK(q);
-		uap->pid = -q->p_pgid;
+		pid = -q->p_pgid;
 		PROC_UNLOCK(q);
 	}
-	if (uap->options &~ (WUNTRACED|WNOHANG|WCONTINUED|WLINUXCLONE))
+	if (options &~ (WUNTRACED|WNOHANG|WCONTINUED|WLINUXCLONE))
 		return (EINVAL);
-	mtx_lock(&Giant);
 loop:
 	nfound = 0;
 	sx_xlock(&proctree_lock);
 	LIST_FOREACH(p, &q->p_children, p_sibling) {
 		PROC_LOCK(p);
-		if (uap->pid != WAIT_ANY &&
-		    p->p_pid != uap->pid && p->p_pgid != -uap->pid) {
+		if (pid != WAIT_ANY &&
+		    p->p_pid != pid && p->p_pgid != -pid) {
 			PROC_UNLOCK(p);
 			continue;
 		}
@@ -595,7 +598,7 @@ loop:
 		 * signifies we want to wait for threads and not processes.
 		 */
 		if ((p->p_sigparent != SIGCHLD) ^
-		    ((uap->options & WLINUXCLONE) != 0)) {
+		    ((options & WLINUXCLONE) != 0)) {
 			PROC_UNLOCK(p);
 			continue;
 		}
@@ -603,37 +606,16 @@ loop:
 		nfound++;
 		if (p->p_state == PRS_ZOMBIE) {
 			td->td_retval[0] = p->p_pid;
-#ifdef COMPAT_43
-			if (compat)
-				td->td_retval[1] = p->p_xstat;
-			else
-#endif
-			if (uap->status) {
-				status = p->p_xstat;	/* convert to int */
-				PROC_UNLOCK(p);
-				if ((error = copyout(&status,
-				    uap->status, sizeof(status)))) {
-					sx_xunlock(&proctree_lock);
-					mtx_unlock(&Giant);
-					return (error);
-				}
-				PROC_LOCK(p);
-			}
-			if (uap->rusage) {
-				bcopy(p->p_ru, &ru, sizeof(ru));
-				PROC_UNLOCK(p);
-				if ((error = copyout(&ru,
-				    uap->rusage, sizeof (struct rusage)))) {
-					sx_xunlock(&proctree_lock);
-					mtx_unlock(&Giant);
-					return (error);
-				}
-			} else
-				PROC_UNLOCK(p);
+			if (status)
+				*status = p->p_xstat;	/* convert to int */
+			if (rusage)
+				bcopy(p->p_ru, rusage, sizeof(struct rusage));
+
 			/*
 			 * If we got the child via a ptrace 'attach',
 			 * we need to give it back to the old parent.
 			 */
+			PROC_UNLOCK(p);
 			if (p->p_oppid && (t = pfind(p->p_oppid)) != NULL) {
 				PROC_LOCK(p);
 				p->p_oppid = 0;
@@ -643,7 +625,6 @@ loop:
 				wakeup(t);
 				PROC_UNLOCK(t);
 				sx_xunlock(&proctree_lock);
-				mtx_unlock(&Giant);
 				return (0);
 			}
 
@@ -663,6 +644,7 @@ loop:
 			 * all other writes to this proc are visible now, so
 			 * no more locking is needed for p.
 			 */
+			mtx_lock(&Giant);
 			PROC_LOCK(p);
 			p->p_xstat = 0;		/* XXX: why? */
 			PROC_UNLOCK(p);
@@ -671,6 +653,7 @@ loop:
 			PROC_UNLOCK(q);
 			FREE(p->p_ru, M_ZOMBIE);
 			p->p_ru = NULL;
+			mtx_unlock(&Giant);
 
 			/*
 			 * Decrement the count of procs running with this uid.
@@ -702,79 +685,54 @@ loop:
 			mac_destroy_proc(p);
 #endif
 			KASSERT(FIRST_THREAD_IN_PROC(p),
-			    ("wait1: no residual thread!"));
+			    ("kern_wait: no residual thread!"));
 			uma_zfree(proc_zone, p);
 			sx_xlock(&allproc_lock);
 			nprocs--;
 			sx_xunlock(&allproc_lock);
-			mtx_unlock(&Giant);
 			return (0);
 		}
 		mtx_lock_spin(&sched_lock);
 		if (P_SHOULDSTOP(p) && (p->p_suspcount == p->p_numthreads) &&
 		    ((p->p_flag & P_WAITED) == 0) &&
-		    (p->p_flag & P_TRACED || uap->options & WUNTRACED)) {
+		    (p->p_flag & P_TRACED || options & WUNTRACED)) {
 			mtx_unlock_spin(&sched_lock);
 			p->p_flag |= P_WAITED;
 			sx_xunlock(&proctree_lock);
 			td->td_retval[0] = p->p_pid;
-#ifdef COMPAT_43
-			if (compat) {
-				td->td_retval[1] = W_STOPCODE(p->p_xstat);
-				PROC_UNLOCK(p);
-				error = 0;
-			} else
-#endif
-			if (uap->status) {
-				status = W_STOPCODE(p->p_xstat);
-				PROC_UNLOCK(p);
-				error = copyout(&status,
-					uap->status, sizeof(status));
-			} else {
-				PROC_UNLOCK(p);
-				error = 0;
-			}
-			mtx_unlock(&Giant);
-			return (error);
+			if (status)
+				*status = W_STOPCODE(p->p_xstat);
+			PROC_UNLOCK(p);
+			return (0);
 		}
 		mtx_unlock_spin(&sched_lock);
-		if (uap->options & WCONTINUED && (p->p_flag & P_CONTINUED)) {
+		if (options & WCONTINUED && (p->p_flag & P_CONTINUED)) {
 			sx_xunlock(&proctree_lock);
 			td->td_retval[0] = p->p_pid;
 			p->p_flag &= ~P_CONTINUED;
 			PROC_UNLOCK(p);
 
-			if (uap->status) {
-				status = SIGCONT;
-				error = copyout(&status,
-				    uap->status, sizeof(status));
-			} else
-				error = 0;
-
-			mtx_unlock(&Giant);
-			return (error);
+			if (status)
+				*status = SIGCONT;
+			return (0);
 		}
 		PROC_UNLOCK(p);
 	}
 	if (nfound == 0) {
 		sx_xunlock(&proctree_lock);
-		mtx_unlock(&Giant);
 		return (ECHILD);
 	}
-	if (uap->options & WNOHANG) {
+	if (options & WNOHANG) {
 		sx_xunlock(&proctree_lock);
 		td->td_retval[0] = 0;
-		mtx_unlock(&Giant);
 		return (0);
 	}
 	PROC_LOCK(q);
 	sx_xunlock(&proctree_lock);
 	error = msleep(q, &q->p_mtx, PWAIT | PCATCH, "wait", 0);
 	PROC_UNLOCK(q);
-	if (error) {
-		mtx_unlock(&Giant);
-		return (error);
-	}
+	if (error)
+		return (error);	
 	goto loop;
 }
 

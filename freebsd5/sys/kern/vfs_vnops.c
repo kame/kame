@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_vnops.c,v 1.195 2003/10/04 14:35:22 jeff Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_vnops.c,v 1.207 2004/08/15 06:24:41 jmg Exp $");
 
 #include "opt_mac.h"
 
@@ -47,6 +43,7 @@ __FBSDID("$FreeBSD: src/sys/kern/vfs_vnops.c,v 1.195 2003/10/04 14:35:22 jeff Ex
 #include <sys/systm.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
+#include <sys/kdb.h>
 #include <sys/stat.h>
 #include <sys/proc.h>
 #include <sys/limits.h>
@@ -63,6 +60,7 @@ __FBSDID("$FreeBSD: src/sys/kern/vfs_vnops.c,v 1.195 2003/10/04 14:35:22 jeff Ex
 #include <sys/ttycom.h>
 #include <sys/conf.h>
 #include <sys/syslog.h>
+#include <sys/unistd.h>
 
 static fo_rdwr_t	vn_read;
 static fo_rdwr_t	vn_write;
@@ -118,6 +116,8 @@ vn_open_cred(ndp, flagp, cmode, cred, fdidx)
 
 	exclusive = 0;
 #endif
+
+	GIANT_REQUIRED;
 
 restart:
 	fmode = *flagp;
@@ -317,6 +317,8 @@ vn_close(vp, flags, file_cred, td)
 {
 	int error;
 
+	GIANT_REQUIRED;
+
 	if (flags & FWRITE)
 		vp->v_writecount--;
 	error = VOP_CLOSE(vp, flags, file_cred, td);
@@ -388,6 +390,8 @@ vn_rdwr(rw, vp, base, len, offset, segflg, ioflg, active_cred, file_cred,
 	struct mount *mp;
 	struct ucred *cred;
 	int error;
+
+	GIANT_REQUIRED;
 
 	if ((ioflg & IO_NODELOCKED) == 0) {
 		mp = NULL;
@@ -464,24 +468,38 @@ vn_rdwr_inchunks(rw, vp, base, len, offset, segflg, ioflg, active_cred,
 	enum uio_rw rw;
 	struct vnode *vp;
 	caddr_t base;
-	int len;
+	size_t len;
 	off_t offset;
 	enum uio_seg segflg;
 	int ioflg;
 	struct ucred *active_cred;
 	struct ucred *file_cred;
-	int *aresid;
+	size_t *aresid;
 	struct thread *td;
 {
 	int error = 0;
+	int iaresid;
+
+	GIANT_REQUIRED;
 
 	do {
-		int chunk = (len > MAXBSIZE) ? MAXBSIZE : len;
+		int chunk;
 
+		/*
+		 * Force `offset' to a multiple of MAXBSIZE except possibly
+		 * for the first chunk, so that filesystems only need to
+		 * write full blocks except possibly for the first and last
+		 * chunks.
+		 */
+		chunk = MAXBSIZE - (uoff_t)offset % MAXBSIZE;
+
+		if (chunk > len)
+			chunk = len;
 		if (rw != UIO_READ && vp->v_type == VREG)
 			bwillwrite();
+		iaresid = 0;
 		error = vn_rdwr(rw, vp, base, chunk, offset, segflg,
-		    ioflg, active_cred, file_cred, aresid, td);
+		    ioflg, active_cred, file_cred, &iaresid, td);
 		len -= chunk;	/* aresid calc already includes length */
 		if (error)
 			break;
@@ -490,7 +508,7 @@ vn_rdwr_inchunks(rw, vp, base, len, offset, segflg, ioflg, active_cred,
 		uio_yield();
 	} while (len);
 	if (aresid)
-		*aresid += len;
+		*aresid = len + iaresid;
 	return (error);
 }
 
@@ -508,7 +526,6 @@ vn_read(fp, uio, active_cred, flags, td)
 	struct vnode *vp;
 	int error, ioflag;
 
-	mtx_lock(&Giant);
 	KASSERT(uio->uio_td == td, ("uio_td %p is not td %p",
 	    uio->uio_td, td));
 	vp = fp->f_vnode;
@@ -517,6 +534,7 @@ vn_read(fp, uio, active_cred, flags, td)
 		ioflag |= IO_NDELAY;
 	if (fp->f_flag & O_DIRECT)
 		ioflag |= IO_DIRECT;
+	mtx_lock(&Giant);
 	VOP_LEASE(vp, td, fp->f_cred, LEASE_READ);
 	/*
 	 * According to McKusick the vn lock is protecting f_offset here.
@@ -558,10 +576,10 @@ vn_write(fp, uio, active_cred, flags, td)
 	struct mount *mp;
 	int error, ioflag;
 
-	mtx_lock(&Giant);
 	KASSERT(uio->uio_td == td, ("uio_td %p is not td %p",
 	    uio->uio_td, td));
 	vp = fp->f_vnode;
+	mtx_lock(&Giant);
 	if (vp->v_type == VREG)
 		bwillwrite();
 	ioflag = IO_UNIT;
@@ -612,9 +630,11 @@ vn_statfile(fp, sb, active_cred, td)
 	struct vnode *vp = fp->f_vnode;
 	int error;
 
+	mtx_lock(&Giant);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	error = vn_stat(vp, sb, active_cred, fp->f_cred, td);
 	VOP_UNLOCK(vp, 0, td);
+	mtx_unlock(&Giant);
 
 	return (error);
 }
@@ -634,6 +654,8 @@ vn_stat(vp, sb, active_cred, file_cred, td)
 	register struct vattr *vap;
 	int error;
 	u_short mode;
+
+	GIANT_REQUIRED;
 
 #ifdef MAC
 	error = mac_check_vnode_stat(active_cred, file_cred, vp);
@@ -757,6 +779,8 @@ vn_ioctl(fp, com, data, active_cred, td)
 	struct vattr vattr;
 	int error;
 
+	GIANT_REQUIRED;
+
 	switch (vp->v_type) {
 
 	case VREG:
@@ -790,7 +814,7 @@ vn_ioctl(fp, com, data, active_cred, td)
 		error = VOP_IOCTL(vp, com, data, fp->f_flag, active_cred, td);
 		if (error == ENOIOCTL) {
 #ifdef DIAGNOSTIC
-			Debugger("ENOIOCTL leaked through");
+			kdb_enter("ENOIOCTL leaked through");
 #endif
 			error = ENOTTY;
 		}
@@ -834,6 +858,8 @@ vn_poll(fp, events, active_cred, td)
 	int error;
 #endif
 
+	GIANT_REQUIRED;
+
 	vp = fp->f_vnode;
 #ifdef MAC
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
@@ -869,7 +895,7 @@ debug_vn_lock(vp, flags, td, filename, line)
 	do {
 		if ((flags & LK_INTERLOCK) == 0)
 			VI_LOCK(vp);
-		if ((vp->v_iflag & VI_XLOCK) && vp->v_vxproc != curthread) {
+		if ((vp->v_iflag & VI_XLOCK) && vp->v_vxthread != curthread) {
 			if ((flags & LK_NOWAIT) != 0) {
 				VI_UNLOCK(vp);
 				return (ENOENT);
@@ -903,9 +929,26 @@ vn_closefile(fp, td)
 	struct file *fp;
 	struct thread *td;
 {
+	struct vnode *vp;
+	struct flock lf;
+	int error;
+
+	vp = fp->f_vnode;
+
+	mtx_lock(&Giant);
+	if (fp->f_type == DTYPE_VNODE && fp->f_flag & FHASLOCK) {
+		lf.l_whence = SEEK_SET;
+		lf.l_start = 0;
+		lf.l_len = 0;
+		lf.l_type = F_UNLCK;
+		(void) VOP_ADVLOCK(vp, (caddr_t)fp, F_UNLCK, &lf, F_FLOCK);
+	}
 
 	fp->f_ops = &badfileops;
-	return (vn_close(fp->f_vnode, fp->f_flag, fp->f_cred, td));
+
+	error = vn_close(vp, fp->f_flag, fp->f_cred, td);
+	mtx_unlock(&Giant);
+	return (error);
 }
 
 /*
@@ -922,6 +965,8 @@ vn_start_write(vp, mpp, flags)
 {
 	struct mount *mp;
 	int error;
+
+	GIANT_REQUIRED;
 
 	/*
 	 * If a vnode is provided, get and return the mount point that
@@ -969,6 +1014,8 @@ vn_write_suspend_wait(vp, mp, flags)
 {
 	int error;
 
+	GIANT_REQUIRED;
+
 	if (vp != NULL) {
 		if ((error = VOP_GETWRITEMOUNT(vp, &mp)) != 0) {
 			if (error != EOPNOTSUPP)
@@ -1001,6 +1048,8 @@ vn_finished_write(mp)
 	struct mount *mp;
 {
 
+	GIANT_REQUIRED;
+
 	if (mp == NULL)
 		return;
 	mp->mnt_writeopcount--;
@@ -1020,6 +1069,8 @@ vfs_write_suspend(mp)
 {
 	struct thread *td = curthread;
 	int error;
+
+	GIANT_REQUIRED;
 
 	if (mp->mnt_kern_flag & MNTK_SUSPEND)
 		return (0);
@@ -1042,6 +1093,8 @@ vfs_write_resume(mp)
 	struct mount *mp;
 {
 
+	GIANT_REQUIRED;
+
 	if ((mp->mnt_kern_flag & MNTK_SUSPEND) == 0)
 		return;
 	mp->mnt_kern_flag &= ~(MNTK_SUSPEND | MNTK_SUSPENDED);
@@ -1055,8 +1108,13 @@ vfs_write_resume(mp)
 static int
 vn_kqfilter(struct file *fp, struct knote *kn)
 {
+	int error;
 
-	return (VOP_KQFILTER(fp->f_vnode, kn));
+	mtx_lock(&Giant);
+	error = VOP_KQFILTER(fp->f_vnode, kn);
+	mtx_unlock(&Giant);
+
+	return error;
 }
 
 /*

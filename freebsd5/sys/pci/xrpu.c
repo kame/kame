@@ -15,13 +15,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/xrpu.c,v 1.35 2003/11/03 10:19:33 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/xrpu.c,v 1.39 2004/06/16 09:47:20 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/timetc.h>
 #include <sys/timepps.h>
 #include <sys/xrpuio.h>
@@ -43,6 +44,8 @@ static d_ioctl_t xrpu_ioctl;
 static d_mmap_t xrpu_mmap;
 
 static struct cdevsw xrpu_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	xrpu_open,
 	.d_close =	xrpu_close,
 	.d_ioctl =	xrpu_ioctl,
@@ -110,7 +113,7 @@ xrpu_poll_pps(struct timecounter *tc)
 }
 
 static int
-xrpu_open(dev_t dev, int flag, int mode, struct  thread *td)
+xrpu_open(struct cdev *dev, int flag, int mode, struct  thread *td)
 {
 	struct softc *sc = devclass_get_softc(xrpu_devclass, dev2unit(dev));
 
@@ -121,13 +124,13 @@ xrpu_open(dev_t dev, int flag, int mode, struct  thread *td)
 }
 
 static int
-xrpu_close(dev_t dev, int flag, int mode, struct  thread *td)
+xrpu_close(struct cdev *dev, int flag, int mode, struct  thread *td)
 { 
 	return (0);
 }
 
 static int
-xrpu_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
+xrpu_mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	struct softc *sc = dev->si_drv1;
 	if (offset >= 0x1000000) 
@@ -137,7 +140,7 @@ xrpu_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 }
 
 static int
-xrpu_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct  thread *tdr)
+xrpu_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct  thread *tdr)
 {
 	struct softc *sc = dev->si_drv1;
 	int i, error;
@@ -224,8 +227,7 @@ xrpu_attach(device_t self)
 	sc = device_get_softc(self);
 	sc->mode = NORMAL;
 	rid = PCIR_BAR(0);
-	res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
-				 0, ~0, 1, RF_ACTIVE);
+	res = bus_alloc_resource_any(self, SYS_RES_MEMORY, &rid, RF_ACTIVE);
 	if (res == NULL) {
 		device_printf(self, "Could not map memory\n");
 		return ENXIO;

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,15 +35,15 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_clock.c,v 1.163 2003/10/16 08:39:15 jeff Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_clock.c,v 1.172 2004/07/10 21:36:01 marcel Exp $");
 
 #include "opt_ntp.h"
-#include "opt_ddb.h"
 #include "opt_watchdog.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/ktr.h>
@@ -73,10 +69,6 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_clock.c,v 1.163 2003/10/16 08:39:15 jeff E
 #include <sys/gmon.h>
 #endif
 
-#ifdef DDB
-#include <ddb/ddb.h>
-#endif
-
 #ifdef DEVICE_POLLING
 extern void hardclock_device_poll(void);
 #endif /* DEVICE_POLLING */
@@ -90,21 +82,14 @@ long cp_time[CPUSTATES];
 SYSCTL_OPAQUE(_kern, OID_AUTO, cp_time, CTLFLAG_RD, &cp_time, sizeof(cp_time),
     "LU", "CPU time statistics");
 
-#ifdef WATCHDOG
-static int sysctl_watchdog_reset(SYSCTL_HANDLER_ARGS);
-static void watchdog_fire(void);
+#ifdef SW_WATCHDOG
+#include <sys/watchdog.h>
 
+static int watchdog_ticks;
 static int watchdog_enabled;
-static unsigned int watchdog_ticks;
-static int watchdog_timeout = 20;
-
-SYSCTL_NODE(_debug, OID_AUTO, watchdog, CTLFLAG_RW, 0, "System watchdog");
-SYSCTL_INT(_debug_watchdog, OID_AUTO, enabled, CTLFLAG_RW, &watchdog_enabled,
-	0, "Enable the watchdog");
-SYSCTL_INT(_debug_watchdog, OID_AUTO, timeout, CTLFLAG_RW, &watchdog_timeout,
-	0, "Timeout for watchdog checkins");
-
-#endif /* WATCHDOG */
+static void watchdog_fire(void);
+static void watchdog_config(void *, u_int, int *);
+#endif /* SW_WATCHDOG */
 
 /*
  * Clock handling routines.
@@ -167,6 +152,9 @@ initclocks(dummy)
 	if (profhz == 0)
 		profhz = i;
 	psratio = profhz / i;
+#ifdef SW_WATCHDOG
+	EVENTHANDLER_REGISTER(watchdog_list, watchdog_config, NULL, 0);
+#endif
 }
 
 /*
@@ -251,11 +239,10 @@ hardclock(frame)
 	if (need_softclock)
 		swi_sched(softclock_ih, 0);
 
-#ifdef WATCHDOG
-	if (watchdog_enabled > 0 &&
-	    (int)(ticks - watchdog_ticks) >= (hz * watchdog_timeout))
+#ifdef SW_WATCHDOG
+	if (watchdog_enabled > 0 && --watchdog_ticks <= 0)
 		watchdog_fire();
-#endif /* WATCHDOG */
+#endif /* SW_WATCHDOG */
 }
 
 /*
@@ -359,9 +346,11 @@ stopprofclock(p)
 			p->p_flag |= P_STOPPROF;
 			while (p->p_profthreads != 0)
 				msleep(&p->p_profthreads, &p->p_mtx, PPAUSE,
-				    "stopprof", NULL);
+				    "stopprof", 0);
 			p->p_flag &= ~P_STOPPROF;
 		}
+		if ((p->p_flag & P_PROFIL) == 0)
+			return;
 		mtx_lock_spin(&sched_lock);
 		p->p_flag &= ~P_PROFIL;
 		if (--profprocs == 0)
@@ -381,7 +370,6 @@ void
 statclock(frame)
 	register struct clockframe *frame;
 {
-	struct pstats *pstats;
 	struct rusage *ru;
 	struct vmspace *vm;
 	struct thread *td;
@@ -399,7 +387,7 @@ statclock(frame)
 		if (p->p_flag & P_SA)
 			thread_statclock(1);
 		p->p_uticks++;
-		if (td->td_ksegrp->kg_nice > NZERO)
+		if (p->p_nice > NZERO)
 			cp_time[CP_NICE]++;
 		else
 			cp_time[CP_USER]++;
@@ -434,16 +422,16 @@ statclock(frame)
 	sched_clock(td);
 
 	/* Update resource usage integrals and maximums. */
-	if ((pstats = p->p_stats) != NULL &&
-	    (ru = &pstats->p_ru) != NULL &&
-	    (vm = p->p_vmspace) != NULL) {
-		ru->ru_ixrss += pgtok(vm->vm_tsize);
-		ru->ru_idrss += pgtok(vm->vm_dsize);
-		ru->ru_isrss += pgtok(vm->vm_ssize);
-		rss = pgtok(vmspace_resident_count(vm));
-		if (ru->ru_maxrss < rss)
-			ru->ru_maxrss = rss;
-	}
+	MPASS(p->p_stats != NULL);
+	MPASS(p->p_vmspace != NULL);
+	vm = p->p_vmspace;
+	ru = &p->p_stats->p_ru;
+	ru->ru_ixrss += pgtok(vm->vm_tsize);
+	ru->ru_idrss += pgtok(vm->vm_dsize);
+	ru->ru_isrss += pgtok(vm->vm_ssize);
+	rss = pgtok(vmspace_resident_count(vm));
+	if (ru->ru_maxrss < rss)
+		ru->ru_maxrss = rss;
 	mtx_unlock_spin_flags(&sched_lock, MTX_QUIET);
 }
 
@@ -465,7 +453,6 @@ profclock(frame)
 		 * if there is no related user location yet, don't
 		 * bother trying to count it.
 		 */
-		td = curthread;
 		if (td->td_proc->p_flag & P_PROFIL)
 			addupc_intr(td, CLKF_PC(frame), 1);
 	}
@@ -508,23 +495,23 @@ SYSCTL_PROC(_kern, KERN_CLOCKRATE, clockrate, CTLTYPE_STRUCT|CTLFLAG_RD,
 	0, 0, sysctl_kern_clockrate, "S,clockinfo",
 	"Rate and period of various kernel clocks");
 
-#ifdef WATCHDOG
-/*
- * Reset the watchdog timer to ticks, thus preventing the watchdog
- * from firing for another watchdog timeout period.
- */
-static int
-sysctl_watchdog_reset(SYSCTL_HANDLER_ARGS)
+#ifdef SW_WATCHDOG
+
+static void
+watchdog_config(void *unused __unused, u_int cmd, int *err)
 {
-	int ret;
+	u_int u;
 
-	ret = 0;
-	watchdog_ticks = ticks;
-	return sysctl_handle_int(oidp, &ret, 0, req);
+	u = cmd & WD_INTERVAL;
+	if (cmd && u >= WD_TO_1SEC) {
+		u = cmd & WD_INTERVAL;
+		watchdog_ticks = (1 << (u - WD_TO_1SEC)) * hz;
+		watchdog_enabled = 1;
+		*err = 0;
+	} else {
+		watchdog_enabled = 0;
+	}
 }
-
-SYSCTL_PROC(_debug_watchdog, OID_AUTO, reset, CTLFLAG_RW, 0, 0,
-    sysctl_watchdog_reset, "I", "Reset the watchdog");
 
 /*
  * Handle a watchdog timeout by dumping interrupt information and
@@ -552,12 +539,12 @@ watchdog_fire(void)
 	}
 	printf("Total        %20ju\n", (uintmax_t)inttotal);
 
-#ifdef DDB
-	db_print_backtrace();
-	Debugger("watchdog timeout");
-#else /* !DDB */
+#ifdef KDB
+	kdb_backtrace();
+	kdb_enter("watchdog timeout");
+#else
 	panic("watchdog timeout");
-#endif /* DDB */
+#endif /* KDB */
 }
 
-#endif /* WATCHDOG */
+#endif /* SW_WATCHDOG */

@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/sio_cbus.c,v 1.4 2002/09/29 13:31:26 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/sio_cbus.c,v 1.6 2004/03/07 05:39:38 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -34,7 +34,6 @@
 #include <sys/mutex.h>
 #include <sys/module.h>
 #include <sys/tty.h>
-#include <machine/bus_pio.h>
 #include <machine/bus.h>
 #include <sys/timepps.h>
 
@@ -49,6 +48,7 @@ static device_method_t sio_isa_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		sio_isa_probe),
 	DEVMETHOD(device_attach,	sio_isa_attach),
+	DEVMETHOD(device_detach,	siodetach),
 
 	{ 0, 0 }
 };

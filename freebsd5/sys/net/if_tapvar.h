@@ -34,18 +34,20 @@
  */
 
 /*
- * $FreeBSD: src/sys/net/if_tapvar.h,v 1.4 2001/09/05 01:06:21 brooks Exp $
+ * $FreeBSD: src/sys/net/if_tapvar.h,v 1.8 2004/06/16 09:47:14 phk Exp $
  * $Id: if_tapvar.h,v 0.6 2000/07/11 02:16:08 max Exp $
  */
 
 #ifndef _NET_IF_TAPVAR_H_
 #define _NET_IF_TAPVAR_H_
 
+/*
+ * tap_mtx locks tap_flags, tap_pid.  tap_next locked with global tapmtx.
+ * Other fields locked by owning subsystems.
+ */
 struct tap_softc {
 	struct arpcom	arpcom;			/* ethernet common data      */
 #define tap_if		arpcom.ac_if
-	struct resource	*tap_unit;		/* unit                      */
-
 	u_short		tap_flags;		/* misc flags                */
 #define	TAP_OPEN	(1 << 0)
 #define	TAP_INITED	(1 << 1)
@@ -61,6 +63,8 @@ struct tap_softc {
 	struct selinfo	 tap_rsel;		/* read select               */
 
 	SLIST_ENTRY(tap_softc)	tap_next;	/* next device in chain      */
+	struct cdev *tap_dev;
+	struct mtx	 tap_mtx;		/* per-softc mutex */
 };
 
 #endif /* !_NET_IF_TAPVAR_H_ */

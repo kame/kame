@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom.h,v 1.74.2.1 2003/12/30 12:00:40 phk Exp $
+ * $FreeBSD: src/sys/geom/geom.h,v 1.84.2.1 2004/08/31 06:14:03 phk Exp $
  */
 
 #ifndef _GEOM_GEOM_H_
@@ -87,6 +87,7 @@ typedef void g_dumpconf_t (struct sbuf *, const char *indent, struct g_geom *,
  */
 struct g_class {
 	const char		*name;
+	u_int			version;
 	g_taste_t		*taste;
 	g_config_t		*config;
 	g_ctl_req_t		*ctlreq;
@@ -94,11 +95,23 @@ struct g_class {
 	g_fini_t		*fini;
 	g_ctl_destroy_geom_t	*destroy_geom;
 	/*
+	 * Defaults values for geom methods
+	 */
+	g_start_t		*start;
+	g_spoiled_t		*spoiled;
+	g_dumpconf_t		*dumpconf;
+	g_access_t		*access;
+	g_orphan_t		*orphan;
+	g_ioctl_t		*ioctl;
+	/*
 	 * The remaining elements are private
 	 */
 	LIST_ENTRY(g_class)	class;
 	LIST_HEAD(,g_geom)	geom;
 };
+
+#define G_VERSION_00	0x19950323
+#define G_VERSION	G_VERSION_00
 
 /*
  * The g_geom is an instance of a g_class.
@@ -148,6 +161,10 @@ struct g_consumer {
 	int			spoiled;
 	struct devstat		*stat;
 	u_int			nstart, nend;
+
+	/* Two fields for the implementing class to use */
+	void			*private;
+	u_int			index;
 };
 
 /*
@@ -161,7 +178,6 @@ struct g_provider {
 	int			acr, acw, ace;
 	int			error;
 	TAILQ_ENTRY(g_provider)	orphan;
-	u_int			index;
 	off_t			mediasize;
 	u_int			sectorsize;
 	u_int			stripesize;
@@ -172,14 +188,18 @@ struct g_provider {
 #define G_PF_CANDELETE		0x1
 #define G_PF_WITHER		0x2
 #define G_PF_ORPHAN		0x4
+
+	/* Two fields for the implementing class to use */
+	void			*private;
+	u_int			index;
 };
 
 /* geom_dev.c */
+struct cdev;
 void g_dev_print(void);
-struct g_provider *g_dev_getprovider(dev_t dev);
+struct g_provider *g_dev_getprovider(struct cdev *dev);
 
 /* geom_dump.c */
-void g_hexdump(void *ptr, int length);
 void g_trace(int level, const char *, ...);
 #	define G_T_TOPOLOGY	1
 #	define G_T_BIO		2
@@ -196,8 +216,7 @@ void g_orphan_provider(struct g_provider *pp, int error);
 void g_waitidle(void);
 
 /* geom_subr.c */
-int g_access_abs(struct g_consumer *cp, int nread, int nwrite, int nexcl);
-int g_access_rel(struct g_consumer *cp, int nread, int nwrite, int nexcl);
+int g_access(struct g_consumer *cp, int nread, int nwrite, int nexcl);
 int g_attach(struct g_consumer *cp, struct g_provider *pp);
 void g_destroy_consumer(struct g_consumer *cp);
 void g_destroy_geom(struct g_geom *pp);
@@ -213,12 +232,28 @@ int g_handleattr_off_t(struct bio *bp, const char *attribute, off_t val);
 struct g_consumer * g_new_consumer(struct g_geom *gp);
 struct g_geom * g_new_geomf(struct g_class *mp, const char *fmt, ...);
 struct g_provider * g_new_providerf(struct g_geom *gp, const char *fmt, ...);
-void g_sanity(void const *ptr);
 void g_spoil(struct g_provider *pp, struct g_consumer *cp);
 int g_std_access(struct g_provider *pp, int dr, int dw, int de);
 void g_std_done(struct bio *bp);
 void g_std_spoiled(struct g_consumer *cp);
 void g_wither_geom(struct g_geom *gp, int error);
+
+#ifdef DIAGNOSTIC
+int g_valid_obj(void const *ptr);
+#define G_VALID_CLASS(foo) \
+    KASSERT(g_valid_obj(foo) == 1, ("%p is not a g_class", foo))
+#define G_VALID_GEOM(foo) \
+    KASSERT(g_valid_obj(foo) == 2, ("%p is not a g_geom", foo))
+#define G_VALID_CONSUMER(foo) \
+    KASSERT(g_valid_obj(foo) == 3, ("%p is not a g_consumer", foo))
+#define G_VALID_PROVIDER(foo) \
+    KASSERT(g_valid_obj(foo) == 4, ("%p is not a g_provider", foo))
+#else
+#define G_VALID_CLASS(foo) do { } while (0)
+#define G_VALID_GEOM(foo) do { } while (0)
+#define G_VALID_CONSUMER(foo) do { } while (0)
+#define G_VALID_PROVIDER(foo) do { } while (0)
+#endif
 
 int g_modevent(module_t, int, void *);
 
@@ -229,8 +264,10 @@ void g_io_deliver(struct bio *bp, int error);
 int g_io_getattr(const char *attr, struct g_consumer *cp, int *len, void *ptr);
 void g_io_request(struct bio *bp, struct g_consumer *cp);
 struct bio *g_new_bio(void);
+struct bio *g_alloc_bio(void);
 void * g_read_data(struct g_consumer *cp, off_t offset, off_t length, int *error);
 int g_write_data(struct g_consumer *cp, off_t offset, void *ptr, off_t length);
+void g_print_bio(struct bio *bp);
 
 /* geom_kern.c / geom_kernsim.c */
 
@@ -249,16 +286,17 @@ g_malloc(int size, int flags)
 	void *p;
 
 	p = malloc(size, M_GEOM, flags);
-	g_sanity(p);
-	/* printf("malloc(%d, %x) -> %p\n", size, flags, p); */
 	return (p);
 }
 
 static __inline void
 g_free(void *ptr)
 {
-	g_sanity(ptr);
-	/* printf("free(%p)\n", ptr); */
+
+#ifdef DIAGNOSTIC
+	KASSERT(g_valid_obj(ptr) == 0,
+	    ("g_free(%p) of live object, type %d", ptr, g_valid_obj(ptr)));
+#endif
 	free(ptr, M_GEOM);
 }
 
@@ -272,14 +310,17 @@ extern struct sx topology_lock;
 
 #define g_topology_unlock()					\
 	do {							\
-		g_sanity(NULL);					\
 		sx_xunlock(&topology_lock);			\
 	} while (0)
 
 #define g_topology_assert()					\
 	do {							\
-		g_sanity(NULL);					\
 		sx_assert(&topology_lock, SX_XLOCKED);		\
+	} while (0)
+
+#define g_topology_assert_not()					\
+	do {							\
+		sx_assert(&topology_lock, SX_UNLOCKED);		\
 	} while (0)
 
 #define DECLARE_GEOM_CLASS(class, name) 			\

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_subr.c,v 1.37 2003/06/11 06:31:28 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_subr.c,v 1.39 2004/07/10 20:45:47 marcel Exp $");
 
 #include <sys/param.h>
 
@@ -43,8 +39,6 @@ __FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_subr.c,v 1.37 2003/06/11 06:31:28 obrien
 #include <ufs/ffs/fs.h>
 #include "fsck.h"
 #else
-#include "opt_ddb.h"
-
 #include <sys/systm.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -62,7 +56,7 @@ __FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_subr.c,v 1.37 2003/06/11 06:31:28 obrien
 #include <ufs/ffs/ffs_extern.h>
 #include <ufs/ffs/fs.h>
 
-#ifdef DDB
+#ifdef KDB
 void	ffs_checkoverlap(struct buf *, struct inode *);
 #endif
 
@@ -172,7 +166,7 @@ ffs_fragacct(fs, fragmap, fraglist, cnt)
 	}
 }
 
-#ifdef DDB
+#ifdef KDB
 void
 ffs_checkoverlap(bp, ip)
 	struct buf *bp;
@@ -201,7 +195,7 @@ ffs_checkoverlap(bp, ip)
 		panic("ffs_checkoverlap: Disk buffer overlap");
 	}
 }
-#endif /* DDB */
+#endif /* KDB */
 
 /*
  * block operations

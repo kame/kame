@@ -36,7 +36,7 @@
  * Authors: Julian Elischer <julian@freebsd.org>
  *          Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.72 2003/11/08 22:28:39 sam Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.84 2004/07/27 20:30:55 glebius Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -47,12 +47,12 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
-#include <sys/linker.h>
 #include <sys/queue.h>
 #include <sys/mbuf.h>
 #include <sys/ctype.h>
@@ -109,7 +109,7 @@ struct ng_type ng_deadtype = {
 struct ng_node ng_deadnode = {
 	"dead",
 	&ng_deadtype,	
-	NG_INVALID,
+	NGF_INVALID,
 	1,	/* refs */
 	0,	/* numhooks */
 	NULL,	/* private */
@@ -170,6 +170,7 @@ static struct mtx	ng_idhash_mtx;
 #define NG_IDHASH_FN(ID) ((ID) % (NG_ID_HASH_SIZE))
 #define NG_IDHASH_FIND(ID, node)					\
 	do { 								\
+		mtx_assert(&ng_idhash_mtx, MA_OWNED);			\
 		LIST_FOREACH(node, &ng_ID_hash[NG_IDHASH_FN(ID)],	\
 						nd_idnodes) {		\
 			if (NG_NODE_IS_VALID(node)			\
@@ -199,12 +200,10 @@ static int	ng_mkpeer(node_p node, const char *name,
 						const char *name2, char *type);
 
 /* imported , these used to be externally visible, some may go back */
-int	ng_bypass(hook_p hook1, hook_p hook2);
 void	ng_destroy_hook(hook_p hook);
 node_p	ng_name2noderef(node_p node, const char *name);
 int	ng_path2noderef(node_p here, const char *path,
 	node_p *dest, hook_p *lasthook);
-struct	ng_type *ng_findtype(const char *type);
 int	ng_make_node(const char *type, node_p *nodepp);
 int	ng_path_parse(char *addr, char **node, char **path, char **hook);
 void	ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3);
@@ -216,7 +215,6 @@ MALLOC_DEFINE(M_NETGRAPH, "netgraph", "netgraph structures and ctrl messages");
 MALLOC_DEFINE(M_NETGRAPH_HOOK, "netgraph_hook", "netgraph hook structures");
 MALLOC_DEFINE(M_NETGRAPH_NODE, "netgraph_node", "netgraph node structures");
 MALLOC_DEFINE(M_NETGRAPH_ITEM, "netgraph_item", "netgraph item structures");
-MALLOC_DEFINE(M_NETGRAPH_META, "netgraph_meta", "netgraph name storage");
 MALLOC_DEFINE(M_NETGRAPH_MSG, "netgraph_msg", "netgraph name storage");
 
 /* Should not be visible outside this file */
@@ -323,7 +321,7 @@ ng_alloc_node(void)
 #define NG_FREE_ITEM_REAL(item) do { FREE((item), M_NETGRAPH_ITEM); } while (0)
 
 
-/* Set this to Debugger("X") to catch all errors as they occur */
+/* Set this to kdb_enter("X") to catch all errors as they occur */
 #ifndef TRAP_ERROR
 #define TRAP_ERROR()
 #endif
@@ -547,23 +545,11 @@ ng_make_node(const char *typename, node_p *nodepp)
 		return (EINVAL);
 	}
 
-	/* Locate the node type */
-	if ((type = ng_findtype(typename)) == NULL) {
-		char filename[NG_TYPELEN + 4];
-		linker_file_t lf;
-		int error;
-
-		/* Not found, try to load it as a loadable module */
-		snprintf(filename, sizeof(filename), "ng_%s", typename);
-		error = linker_load_module(NULL, filename, NULL, NULL, &lf);
-		if (error != 0)
-			return (error);
-		lf->userrefs++;		/* pretend loaded by the syscall */
-
-		/* Try again, as now the type should have linked itself in */
-		if ((type = ng_findtype(typename)) == NULL)
-			return (ENXIO);
-	}
+	/* Locate the node type. If we fail we return. Do not try to load
+	 * module.
+	 */
+	if ((type = ng_findtype(typename)) == NULL)
+		return (ENXIO);
 
 	/*
 	 * If we have a constructor, then make the node and
@@ -675,7 +661,7 @@ ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3)
 	hook_p hook;
 
 	/* Check if it's already shutting down */
-	if ((node->nd_flags & NG_CLOSING) != 0)
+	if ((node->nd_flags & NGF_CLOSING) != 0)
 		return;
 
 	if (node == &ng_deadnode) {
@@ -689,10 +675,14 @@ ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3)
 	/*
 	 * Mark it invalid so any newcomers know not to try use it
 	 * Also add our own mark so we can't recurse
-	 * note that NG_INVALID does not do this as it's also set during
+	 * note that NGF_INVALID does not do this as it's also set during
 	 * creation
 	 */
-	node->nd_flags |= NG_INVALID|NG_CLOSING;
+	node->nd_flags |= NGF_INVALID|NGF_CLOSING;
+
+	/* If node has its pre-shutdown method, then call it first*/
+	if (node->nd_type && node->nd_type->close)
+		(*node->nd_type->close)(node);
 
 	/* Notify all remaining connected nodes to disconnect */
 	while ((hook = LIST_FIRST(&node->nd_hooks)) != NULL)
@@ -717,9 +707,9 @@ ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3)
 			 * Presumably it is a persistant node.
 			 * If we REALLY want it to go away,
 			 *  e.g. hardware going away,
-			 * Our caller should set NG_REALLY_DIE in nd_flags.
+			 * Our caller should set NGF_REALLY_DIE in nd_flags.
 			 */ 
-			node->nd_flags &= ~(NG_INVALID|NG_CLOSING);
+			node->nd_flags &= ~(NGF_INVALID|NGF_CLOSING);
 			NG_NODE_UNREF(node); /* Assume they still have theirs */
 			return;
 		}
@@ -816,7 +806,7 @@ ng_name_node(node_p node, const char *name)
 	node_p node2;
 
 	/* Check the name is valid */
-	for (i = 0; i < NG_NODELEN + 1; i++) {
+	for (i = 0; i < NG_NODESIZ; i++) {
 		if (name[i] == '\0' || name[i] == '.' || name[i] == ':')
 			break;
 	}
@@ -837,7 +827,7 @@ ng_name_node(node_p node, const char *name)
 	}
 
 	/* copy it */
-	strncpy(NG_NODE_NAME(node), name, NG_NODELEN);
+	strlcpy(NG_NODE_NAME(node), name, NG_NODESIZ);
 
 	return (0);
 }
@@ -986,7 +976,7 @@ ng_add_hook(node_p node, const char *name, hook_p *hookp)
 	NG_NODE_REF(node);		/* each hook counts as a reference */
 
 	/* Set hook name */
-	strncpy(NG_HOOK_NAME(hook), name, NG_HOOKLEN);
+	strlcpy(NG_HOOK_NAME(hook), name, NG_HOOKSIZ);
 
 	/*
 	 * Check if the node type code has something to say about it
@@ -1145,8 +1135,11 @@ ng_newtype(struct ng_type *tp)
 	/* Check version and type name fields */
 	if ((tp->version != NG_ABI_VERSION)
 	|| (namelen == 0)
-	|| (namelen > NG_TYPELEN)) {
+	|| (namelen >= NG_TYPESIZ)) {
 		TRAP_ERROR();
+		if (tp->version != NG_ABI_VERSION) {
+			printf("Netgraph: Node type rejected. ABI mismatch. Suggest recompile\n");
+		}
 		return (EINVAL);
 	}
 
@@ -1349,7 +1342,7 @@ ng_con_nodes(node_p node, const char *name, node_p node2, const char *name2)
 	NG_HOOK_REF(hook);		/* Add a ref for the peer to each*/
 	NG_HOOK_REF(hook2);
 	hook2->hk_node = &ng_deadnode;  
-	strncpy(NG_HOOK_NAME(hook2), name2, NG_HOOKLEN);
+	strlcpy(NG_HOOK_NAME(hook2), name2, NG_HOOKSIZ);
 
 	/*
 	 * Queue the function above.
@@ -1453,8 +1446,8 @@ ng_rmnode_self(node_p node)
 
 	if (node == &ng_deadnode)
 		return (0);
-	node->nd_flags |= NG_INVALID;
-	if (node->nd_flags & NG_CLOSING)
+	node->nd_flags |= NGF_INVALID;
+	if (node->nd_flags & NGF_CLOSING)
 		return (0);
 
 	error = ng_send_fn(node, NULL, &ng_rmnode, NULL, 0);
@@ -1569,7 +1562,7 @@ int
 ng_path2noderef(node_p here, const char *address,
 				node_p *destp, hook_p *lasthook)
 {
-	char    fullpath[NG_PATHLEN + 1];
+	char    fullpath[NG_PATHSIZ];
 	char   *nodename, *path, pbuf[2];
 	node_p  node, oldnode;
 	char   *cp;
@@ -2068,9 +2061,9 @@ ng_flush_input_queue(struct ng_queue * ngq)
 		}
 		atomic_add_long(&ngq->q_flags, add_arg);
 
-		mtx_lock_spin(&ngq->q_mtx);
-		NG_FREE_ITEM(item);
 		mtx_unlock_spin(&ngq->q_mtx);
+		NG_FREE_ITEM(item);
+		mtx_lock_spin(&ngq->q_mtx);
 	}
 	/*
 	 * Take us off the work queue if we are there.
@@ -2091,7 +2084,6 @@ ng_flush_input_queue(struct ng_queue * ngq)
  *    Reference to destination rcv hook if relevant.
  * Data:
  *    pointer to mbuf
- *    pointer to metadata
  * Control_Message:
  *    pointer to msg.
  *    ID of original sender node. (return address)
@@ -2135,6 +2127,13 @@ ng_snd_item(item_p item, int queue)
 		 * the node is derivable from the hook.
 		 * References are held on both by the item.
 		 */
+
+		/* Protect nodes from sending NULL pointers
+		 * to each other
+		 */
+		if (NGI_M(item) == NULL)
+			return (EINVAL);
+
 		CHECK_DATA_MBUF(NGI_M(item));
 		if (hook == NULL) {
 			NG_FREE_ITEM(item);
@@ -2187,7 +2186,7 @@ ng_snd_item(item_p item, int queue)
 	 * Similarly the node may say one hook always produces writers.
 	 * These are over-rides.
 	 */
-	if ((node->nd_flags & NG_FORCE_WRITER)
+	if ((node->nd_flags & NGF_FORCE_WRITER)
 	|| (hook && (hook->hk_flags & HK_FORCE_WRITER))) {
 			rw = NGQRW_W;
 			item->el_flags &= ~NGQF_READER;
@@ -2553,8 +2552,8 @@ ng_generic_msg(node_p here, item_p item, hook_p lasthook)
 		/* Fill in node info */
 		ni = (struct nodeinfo *) resp->data;
 		if (NG_NODE_HAS_NAME(here))
-			strncpy(ni->name, NG_NODE_NAME(here), NG_NODELEN);
-		strncpy(ni->type, here->nd_type->name, NG_TYPELEN);
+			strcpy(ni->name, NG_NODE_NAME(here));
+		strcpy(ni->type, here->nd_type->name);
 		ni->id = ng_node2ID(here);
 		ni->hooks = here->nd_numhooks;
 		break;
@@ -2578,8 +2577,8 @@ ng_generic_msg(node_p here, item_p item, hook_p lasthook)
 
 		/* Fill in node info */
 		if (NG_NODE_HAS_NAME(here))
-			strncpy(ni->name, NG_NODE_NAME(here), NG_NODELEN);
-		strncpy(ni->type, here->nd_type->name, NG_TYPELEN);
+			strcpy(ni->name, NG_NODE_NAME(here));
+		strcpy(ni->type, here->nd_type->name);
 		ni->id = ng_node2ID(here);
 
 		/* Cycle through the linked list of hooks */
@@ -2594,14 +2593,13 @@ ng_generic_msg(node_p here, item_p item, hook_p lasthook)
 			}
 			if (NG_HOOK_NOT_VALID(hook))
 				continue;
-			strncpy(link->ourhook, NG_HOOK_NAME(hook), NG_HOOKLEN);
-			strncpy(link->peerhook,
-				NG_PEER_HOOK_NAME(hook), NG_HOOKLEN);
+			strcpy(link->ourhook, NG_HOOK_NAME(hook));
+			strcpy(link->peerhook, NG_PEER_HOOK_NAME(hook));
 			if (NG_PEER_NODE_NAME(hook)[0] != '\0')
-				strncpy(link->nodeinfo.name,
-				    NG_PEER_NODE_NAME(hook), NG_NODELEN);
-			strncpy(link->nodeinfo.type,
-			   NG_PEER_NODE(hook)->nd_type->name, NG_TYPELEN);
+				strcpy(link->nodeinfo.name,
+				    NG_PEER_NODE_NAME(hook));
+			strcpy(link->nodeinfo.type,
+			   NG_PEER_NODE(hook)->nd_type->name);
 			link->nodeinfo.id = ng_node2ID(NG_PEER_NODE(hook));
 			link->nodeinfo.hooks = NG_PEER_NODE(hook)->nd_numhooks;
 			ni->hooks++;
@@ -2652,8 +2650,8 @@ ng_generic_msg(node_p here, item_p item, hook_p lasthook)
 			if (!unnamed && (! NG_NODE_HAS_NAME(node)))
 				continue;
 			if (NG_NODE_HAS_NAME(node))
-				strncpy(np->name, NG_NODE_NAME(node), NG_NODELEN);
-			strncpy(np->type, node->nd_type->name, NG_TYPELEN);
+				strcpy(np->name, NG_NODE_NAME(node));
+			strcpy(np->type, node->nd_type->name);
 			np->id = ng_node2ID(node);
 			np->hooks = node->nd_numhooks;
 			nl->numnames++;
@@ -2695,7 +2693,7 @@ ng_generic_msg(node_p here, item_p item, hook_p lasthook)
 				    __func__, "types");
 				break;
 			}
-			strncpy(tp->type_name, type->name, NG_TYPELEN);
+			strcpy(tp->type_name, type->name);
 			tp->numnodes = type->refs - 1; /* don't count list */
 			tl->numtypes++;
 		}
@@ -2880,26 +2878,6 @@ out:
 	return (error);
 }
 
-/*
- * Copy a 'meta'.
- *
- * Returns new meta, or NULL if original meta is NULL or ENOMEM.
- */
-meta_p
-ng_copy_meta(meta_p meta)
-{
-	meta_p meta2;
-
-	if (meta == NULL)
-		return (NULL);
-	MALLOC(meta2, meta_p, meta->used_len, M_NETGRAPH_META, M_NOWAIT);
-	if (meta2 == NULL)
-		return (NULL);
-	meta2->allocated_len = meta->used_len;
-	bcopy(meta, meta2, meta->used_len);
-	return (meta2);
-}
-
 /************************************************************************
 			Module routines
 ************************************************************************/
@@ -2962,7 +2940,7 @@ ng_mod_event(module_t mod, int event, void *data)
 		if (type->mod_event != NULL)
 			error = (*type->mod_event)(mod, event, data);
 		else
-			error = 0;		/* XXX ? */
+			error = EOPNOTSUPP;		/* XXX ? */
 		break;
 	}
 	return (error);
@@ -2981,10 +2959,14 @@ ngb_mod_event(module_t mod, int event, void *data)
 	case MOD_LOAD:
 		/* Register line discipline */
 		mtx_init(&ng_worklist_mtx, "ng_worklist", NULL, MTX_SPIN);
-		mtx_init(&ng_typelist_mtx, "netgraph types mutex", NULL, 0);
-		mtx_init(&ng_nodelist_mtx, "netgraph nodelist mutex", NULL, 0);
-		mtx_init(&ng_idhash_mtx, "netgraph idhash mutex", NULL, 0);
-		mtx_init(&ngq_mtx, "netgraph free item list mutex", NULL, 0);
+		mtx_init(&ng_typelist_mtx, "netgraph types mutex", NULL,
+		    MTX_DEF);
+		mtx_init(&ng_nodelist_mtx, "netgraph nodelist mutex", NULL,
+		    MTX_DEF);
+		mtx_init(&ng_idhash_mtx, "netgraph idhash mutex", NULL,
+		    MTX_DEF);
+		mtx_init(&ngq_mtx, "netgraph free item list mutex", NULL,
+		    MTX_DEF);
 		s = splimp();
 		/* XXX could use NETISR_MPSAFE but need to verify code */
 		netisr_register(NETISR_NETGRAPH, (netisr_t *)ngintr, NULL, 0);
@@ -3108,9 +3090,8 @@ ng_free_item(item_p item)
 	}
 	switch (item->el_flags & NGQF_TYPE) {
 	case NGQF_DATA:
-		/* If we have an mbuf and metadata still attached.. */
+		/* If we have an mbuf still attached.. */
 		NG_FREE_M(_NGI_M(item));
-		NG_FREE_META(_NGI_META(item));
 		break;
 	case NGQF_MESG:
 		_NGI_RETADDR(item) = 0;
@@ -3225,10 +3206,12 @@ ng_dumpnodes(void)
 {
 	node_p node;
 	int i = 1;
+	mtx_lock(&ng_nodelist_mtx);
 	SLIST_FOREACH(node, &ng_allnodes, nd_all) {
 		printf("[%d] ", i++);
 		dumpnode(node, NULL, 0);
 	}
+	mtx_unlock(&ng_nodelist_mtx);
 }
 
 static void
@@ -3236,10 +3219,12 @@ ng_dumphooks(void)
 {
 	hook_p hook;
 	int i = 1;
+	mtx_lock(&ng_nodelist_mtx);
 	SLIST_FOREACH(hook, &ng_allhooks, hk_all) {
 		printf("[%d] ", i++);
 		dumphook(hook, NULL, 0);
 	}
+	mtx_unlock(&ng_nodelist_mtx);
 }
 
 static int
@@ -3289,7 +3274,7 @@ ngintr(void)
 			mtx_unlock_spin(&ng_worklist_mtx);
 			break;
 		}
-		node->nd_flags &= ~NG_WORKQ;	
+		node->nd_flags &= ~NGF_WORKQ;	
 		TAILQ_REMOVE(&ng_worklist, node, nd_work);
 		mtx_unlock_spin(&ng_worklist_mtx);
 		/*
@@ -3326,8 +3311,8 @@ static void
 ng_worklist_remove(node_p node)
 {
 	mtx_lock_spin(&ng_worklist_mtx);
-	if (node->nd_flags & NG_WORKQ) {
-		node->nd_flags &= ~NG_WORKQ;
+	if (node->nd_flags & NGF_WORKQ) {
+		node->nd_flags &= ~NGF_WORKQ;
 		TAILQ_REMOVE(&ng_worklist, node, nd_work);
 		mtx_unlock_spin(&ng_worklist_mtx);
 		NG_NODE_UNREF(node);
@@ -3345,12 +3330,12 @@ static void
 ng_setisr(node_p node)
 {
 	mtx_lock_spin(&ng_worklist_mtx);
-	if ((node->nd_flags & NG_WORKQ) == 0) {
+	if ((node->nd_flags & NGF_WORKQ) == 0) {
 		/*
 		 * If we are not already on the work queue,
 		 * then put us on.
 		 */
-		node->nd_flags |= NG_WORKQ;
+		node->nd_flags |= NGF_WORKQ;
 		TAILQ_INSERT_TAIL(&ng_worklist, node, nd_work);
 		NG_NODE_REF(node); /* XXX fafe in mutex? */
 	}
@@ -3368,12 +3353,12 @@ ng_setisr(node_p node)
 	do {								\
 		if (NGI_NODE(item) ) {					\
 			printf("item already has node");		\
-			Debugger("has node");				\
+			kdb_enter("has node");				\
 			NGI_CLR_NODE(item);				\
 		}							\
 		if (NGI_HOOK(item) ) {					\
 			printf("item already has hook");		\
-			Debugger("has hook");				\
+			kdb_enter("has hook");				\
 			NGI_CLR_HOOK(item);				\
 		}							\
 	} while (0)
@@ -3382,7 +3367,7 @@ ng_setisr(node_p node)
 #endif
 
 /*
- * Put elements into the item.
+ * Put mbuf into the item.
  * Hook and node references will be removed when the item is dequeued.
  * (or equivalent)
  * (XXX) Unsafe because no reference held by peer on remote node.
@@ -3395,20 +3380,18 @@ ng_setisr(node_p node)
  * This is possibly in the critical path for new data.
  */
 item_p
-ng_package_data(struct mbuf *m, meta_p meta)
+ng_package_data(struct mbuf *m, void *dummy)
 {
 	item_p item;
 
 	if ((item = ng_getqblk()) == NULL) {
 		NG_FREE_M(m);
-		NG_FREE_META(meta);
 		return (NULL);
 	}
 	ITEM_DEBUG_CHECKS;
 	item->el_flags = NGQF_DATA;
 	item->el_next = NULL;
 	NGI_M(item) = m;
-	NGI_META(item) = meta;
 	return (item);
 }
 
@@ -3690,16 +3673,14 @@ ng_macro_test(item_p item)
 	node_p node = NULL;
 	hook_p hook = NULL;
 	struct mbuf *m;
-	meta_p meta;
 	struct ng_mesg *msg;
 	ng_ID_t retaddr;
 	int	error;
 
 	NGI_GET_M(item, m);
-	NGI_GET_META(item, meta);
 	NGI_GET_MSG(item, msg);
 	retaddr = NGI_RETADDR(item);
-	NG_SEND_DATA(error, hook, m, meta);
+	NG_SEND_DATA(error, hook, m, NULL);
 	NG_SEND_DATA_ONLY(error, hook, m);
 	NG_FWD_NEW_DATA(error, item, hook, m);
 	NG_FWD_ITEM_HOOK(error, item, hook);

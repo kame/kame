@@ -1,10 +1,9 @@
-# $FreeBSD: src/sys/modules/umct/Makefile,v 1.1 2003/06/28 05:45:55 scottl Exp $
+# $FreeBSD: src/sys/modules/umct/Makefile,v 1.3 2004/06/27 12:33:18 imp Exp $
 
 S=	${.CURDIR}/../..
 .PATH: $S/dev/usb
 
 KMOD=	umct
-SRCS=	umct.c ucomvar.h opt_usb.h device_if.h bus_if.h vnode_if.h
-NOMAN=
+SRCS=	umct.c ucomvar.h opt_usb.h device_if.h bus_if.h vnode_if.h usbdevs.h
 
 .include <bsd.kmod.mk>

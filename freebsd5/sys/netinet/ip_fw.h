@@ -22,12 +22,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.80 2003/10/31 18:32:11 brooks Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.89.2.2 2004/10/03 17:04:40 mlaier Exp $
  */
 
 #ifndef _IPFW2_H
 #define _IPFW2_H
 #define IPFW2  1
+
 /*
  * The kernel representation of ipfw rules is made of a list of
  * 'instructions' (for all practical purposes equivalent to BPF
@@ -44,7 +45,10 @@
  * 64-bit architectures, so the must be handled with care.
  *
  * "enum ipfw_opcodes" are the opcodes supported. We can have up
- * to 256 different opcodes.
+ * to 256 different opcodes. When adding new opcodes, they should
+ * be appended to the end of the opcode list before O_LAST_OPCODE,
+ * this will prevent the ABI from being broken, otherwise users
+ * will have to recompile ipfw(8) when they update the kernel.
  */
 
 enum ipfw_opcodes {		/* arguments (4 byte each)	*/
@@ -95,6 +99,7 @@ enum ipfw_opcodes {		/* arguments (4 byte each)	*/
 	O_TCPOPTS,		/* arg1 = 2*u8 bitmap		*/
 
 	O_VERREVPATH,		/* none				*/
+	O_VERSRCREACH,		/* none				*/
 
 	O_PROBE_STATE,		/* none				*/
 	O_KEEP_STATE,		/* none				*/
@@ -125,6 +130,10 @@ enum ipfw_opcodes {		/* arguments (4 byte each)	*/
 	 * More opcodes.
 	 */
 	O_IPSEC,		/* has ipsec history 		*/
+	O_IP_SRC_LOOKUP,	/* arg1=table number, u32=value	*/
+	O_IP_DST_LOOKUP,	/* arg1=table number, u32=value	*/
+	O_ANTISPOOF,		/* none				*/
+	O_JAIL,			/* u32 = id			*/
 
 	O_LAST_OPCODE		/* not an opcode!		*/
 };
@@ -375,6 +384,23 @@ struct _ipfw_dyn_rule {
 #define	ICMP_REJECT_RST		0x100	/* fake ICMP code (send a TCP RST) */
 
 /*
+ * These are used for lookup tables.
+ */
+typedef struct	_ipfw_table_entry {
+	in_addr_t	addr;		/* network address		*/
+	u_int32_t	value;		/* value			*/
+	u_int16_t	tbl;		/* table number			*/
+	u_int8_t	masklen;	/* mask length			*/
+} ipfw_table_entry;
+
+typedef struct	_ipfw_table {
+	u_int32_t	size;		/* size of entries in bytes	*/
+	u_int32_t	cnt;		/* # of entries			*/
+	u_int16_t	tbl;		/* table number			*/
+	ipfw_table_entry ent[0];	/* entries			*/
+} ipfw_table;
+
+/*
  * Main firewall chains definitions and global var's definitions.
  */
 #ifdef _KERNEL
@@ -395,13 +421,11 @@ struct ip_fw_args {
 	struct ip_fw	*rule;		/* matching rule		*/
 	struct ether_header *eh;	/* for bridged packets		*/
 
-	struct route	*ro;		/* for dummynet			*/
-	struct sockaddr_in *dst;	/* for dummynet			*/
 	int flags;			/* for dummynet			*/
 
 	struct ipfw_flow_id f_id;	/* grabbed from IP header	*/
-	u_int16_t	divert_rule;	/* divert cookie		*/
 	u_int32_t	retval;
+	struct inpcb	*inp;
 };
 
 /*
@@ -412,15 +436,25 @@ struct ip_fw_args {
 struct sockopt;
 struct dn_flow_set;
 
+int ipfw_check_in(void *, struct mbuf **, struct ifnet *, int, struct inpcb *inp);
+int ipfw_check_out(void *, struct mbuf **, struct ifnet *, int, struct inpcb *inp);
+
+int ipfw_chk(struct ip_fw_args *);
+
+int ipfw_init(void);
+void ipfw_destroy(void);
+
 void flush_pipe_ptrs(struct dn_flow_set *match); /* used by dummynet */
 
-typedef int ip_fw_chk_t (struct ip_fw_args *args);
-typedef int ip_fw_ctl_t (struct sockopt *);
-extern ip_fw_chk_t *ip_fw_chk_ptr;
+typedef int ip_fw_ctl_t(struct sockopt *);
 extern ip_fw_ctl_t *ip_fw_ctl_ptr;
 extern int fw_one_pass;
 extern int fw_enable;
-#define	IPFW_LOADED	(ip_fw_chk_ptr != NULL)
-#endif /* _KERNEL */
 
+/* For kernel ipfw_ether and ipfw_bridge. */
+typedef	int ip_fw_chk_t(struct ip_fw_args *args);
+extern	ip_fw_chk_t	*ip_fw_chk_ptr;
+#define	IPFW_LOADED	(ip_fw_chk_ptr != NULL)
+
+#endif /* _KERNEL */
 #endif /* _IPFW2_H */

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_xxx.c,v 1.39 2003/09/13 17:12:22 nectar Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_xxx.c,v 1.42 2004/07/26 07:24:03 cperciva Exp $");
 
 #include "opt_compat.h"
 
@@ -49,7 +45,7 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_xxx.c,v 1.39 2003/09/13 17:12:22 nectar Ex
 #include <sys/utsname.h>
 
 
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 
 #ifndef _SYS_SYSPROTO_H_
 struct gethostname_args {
@@ -99,7 +95,7 @@ osethostname(td, uap)
 	name[0] = CTL_KERN;
 	name[1] = KERN_HOSTNAME;
 	mtx_lock(&Giant);
-	if ((error = suser_cred(td->td_ucred, PRISON_ROOT)) == 0) {
+	if ((error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL)) == 0) {
 		error = userland_sysctl(td, name, 2, 0, 0, 0,
 		    uap->hostname, uap->len, 0);
 	}
@@ -125,7 +121,7 @@ ogethostid(td, uap)
 	*(long *)(td->td_retval) = hostid;
 	return (0);
 }
-#endif /* COMPAT_43 || COMPAT_SUNOS */
+#endif /* COMPAT_43 */
 
 #ifdef COMPAT_43
 #ifndef _SYS_SYSPROTO_H_

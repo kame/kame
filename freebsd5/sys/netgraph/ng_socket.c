@@ -1,4 +1,3 @@
-
 /*
  * ng_socket.c
  *
@@ -36,7 +35,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.45 2003/11/18 00:39:04 rwatson Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.53.2.1 2004/09/02 15:41:44 rwatson Exp $
  * $Whistle: ng_socket.c,v 1.28 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -51,10 +50,13 @@
 #include <sys/param.h>
 #include <sys/domain.h>
 #include <sys/errno.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
+#include <sys/linker.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/mutex.h>
 #include <sys/protosw.h>
 #include <sys/queue.h>
 #include <sys/signalvar.h>
@@ -130,31 +132,36 @@ static int	ship_msg(struct ngpcb *pcbp, struct ng_mesg *msg,
 
 /* Netgraph type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_SOCKET_NODE_TYPE,
-	ngs_mod_event,
-	ngs_constructor,
-	ngs_rcvmsg,
-	ngs_shutdown,
-	ngs_newhook,
-	NULL,
-	ngs_connect,
-	ngs_rcvdata,
-	ngs_disconnect,
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_SOCKET_NODE_TYPE,
+	.mod_event =	ngs_mod_event,
+	.constructor =	ngs_constructor,
+	.rcvmsg =	ngs_rcvmsg,
+	.shutdown =	ngs_shutdown,
+	.newhook =	ngs_newhook,
+	.connect =	ngs_connect,
+	.rcvdata =	ngs_rcvdata,
+	.disconnect =	ngs_disconnect,
 };
 NETGRAPH_INIT(socket, &typestruct);
 
 /* Buffer space */
 static u_long ngpdg_sendspace = 20 * 1024;	/* really max datagram size */
+SYSCTL_INT(_net_graph, OID_AUTO, maxdgram, CTLFLAG_RW,
+    &ngpdg_sendspace , 0, "Maximum outgoing Netgraph datagram size");
 static u_long ngpdg_recvspace = 20 * 1024;
+SYSCTL_INT(_net_graph, OID_AUTO, recvspace, CTLFLAG_RW,
+    &ngpdg_recvspace , 0, "Maximum space for incoming Netgraph datagrams");
 
 /* List of all sockets */
 static LIST_HEAD(, ngpcb) ngsocklist;
 
+static struct mtx	ngsocketlist_mtx;
+MTX_SYSINIT(ngsocketlist, &ngsocketlist_mtx, "ng_socketlist", MTX_DEF);
+
 #define sotongpcb(so) ((struct ngpcb *)(so)->so_pcb)
 
-/* If getting unexplained errors returned, set this to "Debugger("X"); */
+/* If getting unexplained errors returned, set this to "kdb_enter("X"); */
 #ifndef TRAP_ERROR
 #define TRAP_ERROR
 #endif
@@ -275,6 +282,42 @@ printf("errx=%d\n",error);
 	} while (0);
 
 #else
+	/*
+	 * Hack alert!
+	 * We look into the message and if it mkpeers a node of unknown type, we
+	 * try to load it. We need to do this now, in syscall thread, because if
+	 * message gets queued and applied later we will get panic.
+	 */
+	if (msg->header.typecookie == NGM_GENERIC_COOKIE &&
+	    msg->header.cmd == NGM_MKPEER) {
+		struct ngm_mkpeer *const mkp = (struct ngm_mkpeer *) msg->data;
+		struct ng_type *type;
+
+		if ((type = ng_findtype(mkp->type)) == NULL) {
+			char filename[NG_TYPESIZ + 3];
+			linker_file_t lf;
+			int error;
+
+			/* Not found, try to load it as a loadable module */
+			snprintf(filename, sizeof(filename), "ng_%s", mkp->type);
+			mtx_lock(&Giant);
+			error = linker_load_module(NULL, filename, NULL, NULL, &lf);
+			mtx_unlock(&Giant);
+			if (error != 0) {
+				FREE(msg, M_NETGRAPH_MSG);
+				goto release;
+			}
+			lf->userrefs++;
+
+			/* Try again, as now the type should have linked itself in */
+			if ((type = ng_findtype(mkp->type)) == NULL) {
+				FREE(msg, M_NETGRAPH_MSG);
+				error =  ENXIO;
+				goto release;
+			}
+		}
+	}
+
 	/* The callee will free the msg when done. The path is our business. */
 	NG_SEND_MSG_PATH(error, pcbp->sockdata->node, msg, path, 0);
 #endif
@@ -342,7 +385,7 @@ ngd_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	struct sockaddr_ng *const sap = (struct sockaddr_ng *) addr;
 	int     len, error;
 	hook_p  hook = NULL;
-	char	hookname[NG_HOOKLEN + 1];
+	char	hookname[NG_HOOKSIZ];
 
 	if ((pcbp == NULL) || (control != NULL)) {
 		error = EINVAL;
@@ -369,7 +412,7 @@ ngd_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		 */
 		hook = LIST_FIRST(&pcbp->sockdata->node->nd_hooks);
 	} else {
-		if (len > NG_HOOKLEN) {
+		if (len >= NG_HOOKSIZ) {
 			error = EINVAL;
 			goto release;
 		}
@@ -523,7 +566,9 @@ ng_attach_common(struct socket *so, int type)
 	pcbp->ng_socket = so;
 
 	/* Add the socket to linked list */
+	mtx_lock(&ngsocketlist_mtx);
 	LIST_INSERT_HEAD(&ngsocklist, pcbp, socks);
+	mtx_unlock(&ngsocketlist_mtx);
 	return (0);
 }
 
@@ -556,7 +601,9 @@ ng_detach_common(struct ngpcb *pcbp, int which)
 	}
 	pcbp->ng_socket->so_pcb = NULL;
 	pcbp->ng_socket = NULL;
+	mtx_lock(&ngsocketlist_mtx);
 	LIST_REMOVE(pcbp, socks);
+	mtx_unlock(&ngsocketlist_mtx);
 	FREE(pcbp, M_PCB);
 }
 
@@ -694,7 +741,7 @@ ng_bind(struct sockaddr *nam, struct ngpcb *pcbp)
 		return (EINVAL);
 	}
 	if ((sap->sg_len < 4)
-	||  (sap->sg_len > (NG_NODELEN + 3))
+	||  (sap->sg_len > (NG_NODESIZ + 2))
 	||  (sap->sg_data[0] == '\0')
 	||  (sap->sg_data[sap->sg_len - 3] != '\0')) {
 		TRAP_ERROR;
@@ -859,7 +906,7 @@ ngs_rcvdata(hook_p hook, item_p item)
 	struct ngpcb *const pcbp = priv->datasock;
 	struct socket *so;
 	struct sockaddr_ng *addr;
-	char *addrbuf[NG_HOOKLEN + 1 + 4];
+	char *addrbuf[NG_HOOKSIZ + 4];
 	int addrlen;
 	struct mbuf *m;
 
@@ -873,7 +920,7 @@ ngs_rcvdata(hook_p hook, item_p item)
 	so = pcbp->ng_socket;
 
 	/* Get the return address into a sockaddr. */
-	addrlen = strlen(NG_HOOK_NAME(hook));	/* <= NG_HOOKLEN */
+	addrlen = strlen(NG_HOOK_NAME(hook));	/* <= NG_HOOKSIZ - 1 */
 	addr = (struct sockaddr_ng *) addrbuf;
 	addr->sg_len = addrlen + 3;
 	addr->sg_family = AF_NETGRAPH;

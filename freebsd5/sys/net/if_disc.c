@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_disc.c,v 1.37 2003/10/31 18:32:08 brooks Exp $
+ * $FreeBSD: src/sys/net/if_disc.c,v 1.44 2004/07/15 08:26:06 phk Exp $
  */
 
 /*
@@ -49,6 +45,7 @@
 #include <sys/sockio.h>
 
 #include <net/if.h>
+#include <net/if_clone.h>
 #include <net/if_types.h>
 #include <net/route.h>
 #include <net/bpf.h>
@@ -76,10 +73,11 @@ static int	discioctl(struct ifnet *, u_long, caddr_t);
 static int	disc_clone_create(struct if_clone *, int);
 static void	disc_clone_destroy(struct ifnet *);
 
+static struct mtx disc_mtx;
 static MALLOC_DEFINE(M_DISC, DISCNAME, "Discard interface");
 static LIST_HEAD(, disc_softc) disc_softc_list;
-static struct if_clone disc_cloner = IF_CLONE_INITIALIZER(DISCNAME,
-    disc_clone_create, disc_clone_destroy, 0, IF_MAXUNIT);
+
+IFC_SIMPLE_DECLARE(disc, 0);
 
 static int
 disc_clone_create(struct if_clone *ifc, int unit)
@@ -87,8 +85,7 @@ disc_clone_create(struct if_clone *ifc, int unit)
 	struct ifnet		*ifp;
 	struct disc_softc	*sc;
 
-	sc = malloc(sizeof(struct disc_softc), M_DISC, M_WAITOK);
-	bzero(sc, sizeof(struct disc_softc));
+	sc = malloc(sizeof(struct disc_softc), M_DISC, M_WAITOK | M_ZERO);
 
 	ifp = &sc->sc_if;
 
@@ -104,9 +101,21 @@ disc_clone_create(struct if_clone *ifc, int unit)
 	ifp->if_snd.ifq_maxlen = 20;
 	if_attach(ifp);
 	bpfattach(ifp, DLT_NULL, sizeof(u_int));
+	mtx_lock(&disc_mtx);
 	LIST_INSERT_HEAD(&disc_softc_list, sc, sc_list);
+	mtx_unlock(&disc_mtx);
 
 	return (0);
+}
+
+static void
+disc_destroy(struct disc_softc *sc)
+{
+
+	bpfdetach(&sc->sc_if);
+	if_detach(&sc->sc_if);
+
+	free(sc, M_DISC);
 }
 
 static void
@@ -115,38 +124,48 @@ disc_clone_destroy(struct ifnet *ifp)
 	struct disc_softc	*sc;
 
 	sc = ifp->if_softc;
-
+	mtx_lock(&disc_mtx);
 	LIST_REMOVE(sc, sc_list);
-	bpfdetach(ifp);
-	if_detach(ifp);
+	mtx_unlock(&disc_mtx);
 
-	free(sc, M_DISC);
+	disc_destroy(sc);
 }
 
 static int
-disc_modevent(module_t mod, int type, void *data) 
-{ 
-	switch (type) { 
-	case MOD_LOAD: 
+disc_modevent(module_t mod, int type, void *data)
+{
+	struct disc_softc *sc;
+
+	switch (type) {
+	case MOD_LOAD:
+		mtx_init(&disc_mtx, "disc_mtx", NULL, MTX_DEF);
 		LIST_INIT(&disc_softc_list);
 		if_clone_attach(&disc_cloner);
-		break; 
-	case MOD_UNLOAD: 
+		break;
+	case MOD_UNLOAD:
 		if_clone_detach(&disc_cloner);
 
-		while (!LIST_EMPTY(&disc_softc_list))
-			disc_clone_destroy(
-			    &LIST_FIRST(&disc_softc_list)->sc_if);
+		mtx_lock(&disc_mtx);
+		while ((sc = LIST_FIRST(&disc_softc_list)) != NULL) {
+			LIST_REMOVE(sc, sc_list);
+			mtx_unlock(&disc_mtx);
+			disc_destroy(sc);
+			mtx_lock(&disc_mtx);
+		}
+		mtx_unlock(&disc_mtx);
+		mtx_destroy(&disc_mtx);
 		break;
-	} 
-	return 0; 
-} 
+	default:
+		return (EOPNOTSUPP);
+	}
+	return (0);
+}
 
-static moduledata_t disc_mod = { 
-	"if_disc", 
-	disc_modevent, 
+static moduledata_t disc_mod = {
+	"if_disc",
+	disc_modevent,
 	NULL
-}; 
+};
 
 DECLARE_MODULE(if_disc, disc_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 
@@ -154,7 +173,9 @@ static int
 discoutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
     struct rtentry *rt)
 {
+
 	M_ASSERTPKTHDR(m);
+
 	/* BPF write needs to be handled specially */
 	if (dst->sa_family == AF_UNSPEC) {
 		dst->sa_family = *(mtod(m, int *));
@@ -164,21 +185,8 @@ discoutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	}
 
 	if (ifp->if_bpf) {
-		/*
-		 * We need to prepend the address family as
-		 * a four byte field.  Cons up a dummy header
-		 * to pacify bpf.  This is safe because bpf
-		 * will only read from the mbuf (i.e., it won't
-		 * try to free it or keep a pointer a to it).
-		 */
-		struct mbuf m0;
 		u_int af = dst->sa_family;
-
-		m0.m_next = m;
-		m0.m_len = 4;
-		m0.m_data = (char *)&af;
-
-		BPF_MTAP(ifp, &m0);
+		bpf_mtap2(ifp->if_bpf, &af, sizeof(af), m);
 	}
 	m->m_pkthdr.rcvif = ifp;
 
@@ -186,7 +194,7 @@ discoutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	ifp->if_obytes += m->m_pkthdr.len;
 
 	m_freem(m);
-	return 0;
+	return (0);
 }
 
 /* ARGSUSED */

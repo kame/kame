@@ -1,15 +1,11 @@
 /*
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
+ * Copyright (c) 2004, Joerg Wunsch
  *
  * This software was developed by the Computer Systems Engineering group
  * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
  * contributed to Berkeley.
- *
- * All advertising materials mentioning features or use of this software
- * must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -19,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -42,7 +34,7 @@
  *	@(#)sun_disklabel.h	8.1 (Berkeley) 6/11/93
  *	$NetBSD: disklabel.h,v 1.2 1998/08/22 14:55:28 mrg Exp $
  *
- * $FreeBSD: src/sys/sys/sun_disklabel.h,v 1.7 2003/04/23 08:04:30 phk Exp $ 
+ * $FreeBSD: src/sys/sys/sun_disklabel.h,v 1.9 2004/06/01 20:18:25 joerg Exp $ 
  */
 
 #ifndef _SYS_SUN_DISKLABEL_H_
@@ -60,6 +52,8 @@
 #define	SUN_NPART	8
 #define	SUN_RAWPART	2
 #define	SUN_SIZE	512
+#define	SUN_VTOC_VERSION 1
+#define	SUN_VTOC_SANE	0x600DDEEE /* SVR4-compatible VTOC is "sane". */
 /*
  * XXX: I am actually not sure if this should be "16 sectors" or "8192 bytes".
  * XXX: Considering that Sun went to the effort of getting 512 byte compatible
@@ -75,8 +69,40 @@ struct sun_dkpart {
 	u_int32_t	sdkp_nsectors;		/* number of sectors */
 };
 
+struct sun_vtoc_info {
+	u_int16_t	svtoc_tag;		/* partition tag */
+	u_int16_t	svtoc_flag;		/* partition flags */
+};
+
+/* known partition tag values */
+#define	VTOC_UNASSIGNED	0x00
+#define	VTOC_BOOT	0x01
+#define	VTOC_ROOT	0x02
+#define	VTOC_SWAP	0x03
+#define	VTOC_USR	0x04
+#define	VTOC_BACKUP	0x05	/* "c" partition, covers entire disk */
+#define	VTOC_STAND	0x06
+#define	VTOC_VAR	0x07
+#define	VTOC_HOME	0x08
+#define	VTOC_ALTSCTR	0x09	/* alternate sector partition */
+#define	VTOC_CACHE	0x0a	/* Solaris cachefs partition */
+#define	VTOC_VXVM_PUB	0x0e	/* VxVM public region */
+#define	VTOC_VXVM_PRIV	0x0f	/* VxVM private region */
+
+/* VTOC partition flags */
+#define	VTOC_UNMNT	0x01	/* unmountable partition */
+#define	VTOC_RONLY	0x10	/* partition is read/only */
+
 struct sun_disklabel {
 	char		sl_text[128];
+
+	/* SVR4 VTOC information */
+	u_int32_t	sl_vtoc_vers;		/* == SUN_VTOC_VERSION */
+	u_int16_t	sl_vtoc_nparts;		/* == SUN_NPART */
+	struct sun_vtoc_info sl_vtoc_map[SUN_NPART]; /* partition tag/flag */
+	u_int32_t	sl_vtoc_sane;		/* == SUN_VTOC_SANE */
+
+	/* Sun label information */
 	u_int16_t	sl_rpm;			/* rotational speed */
 	u_int16_t	sl_pcylinders;		/* number of physical cyls */
 	u_int16_t	sl_sparespercyl;	/* spare sectors per cylinder */

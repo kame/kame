@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp_ali.c,v 1.9 2003/11/11 21:49:18 anholt Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp_ali.c,v 1.12 2004/05/30 20:00:40 phk Exp $");
 
 #include "opt_bus.h"
 
@@ -33,9 +33,9 @@ __FBSDID("$FreeBSD: src/sys/pci/agp_ali.c,v 1.9 2003/11/11 21:49:18 anholt Exp $
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/lock.h>
-#include <sys/lockmgr.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
@@ -80,6 +80,8 @@ agp_ali_probe(device_t dev)
 {
 	const char *desc;
 
+	if (resource_disabled("agp", device_get_unit(dev)))
+		return (ENXIO);
 	desc = agp_ali_match(dev);
 	if (desc) {
 		device_verbose(dev);

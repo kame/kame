@@ -29,10 +29,13 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
+ * from: FreeBSD: .../i386/vm_machdep.c,v 1.165 2001/07/04 23:27:04 dillon
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_zeroidle.c,v 1.21 2003/08/12 23:24:05 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_zeroidle.c,v 1.26.2.3 2004/09/10 00:04:18 scottl Exp $");
+
+#include <opt_sched.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,6 +48,7 @@ __FBSDID("$FreeBSD: src/sys/vm/vm_zeroidle.c,v 1.21 2003/08/12 23:24:05 imp Exp 
 #include <sys/sched.h>
 #include <sys/sysctl.h>
 #include <sys/kthread.h>
+#include <sys/unistd.h>
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
@@ -52,12 +56,14 @@ __FBSDID("$FreeBSD: src/sys/vm/vm_zeroidle.c,v 1.21 2003/08/12 23:24:05 imp Exp 
 SYSCTL_DECL(_vm_stats_misc);
 
 static int cnt_prezero;
-SYSCTL_INT(_vm_stats_misc, OID_AUTO,
-	cnt_prezero, CTLFLAG_RD, &cnt_prezero, 0, "");
+SYSCTL_INT(_vm_stats_misc, OID_AUTO, cnt_prezero, CTLFLAG_RD,
+    &cnt_prezero, 0, "");
 
-static int idlezero_enable = 1;
+static int idlezero_enable_default = 1;
+TUNABLE_INT("vm.idlezero_enable", &idlezero_enable_default);
+/* Defer setting the enable flag until the kthread is running. */
+static int idlezero_enable = 0;
 SYSCTL_INT(_vm, OID_AUTO, idlezero_enable, CTLFLAG_RW, &idlezero_enable, 0, "");
-TUNABLE_INT("vm.idlezero_enable", &idlezero_enable);
 
 static int idlezero_maxrun = 16;
 SYSCTL_INT(_vm, OID_AUTO, idlezero_maxrun, CTLFLAG_RW, &idlezero_maxrun, 0, "");
@@ -77,7 +83,7 @@ vm_page_zero_check(void)
 {
 
 	if (!idlezero_enable)
-		return 0;
+		return (0);
 	/*
 	 * Attempt to maintain approximately 1/2 of our free pages in a
 	 * PG_ZERO'd state.   Add some hysteresis to (attempt to) avoid
@@ -87,10 +93,10 @@ vm_page_zero_check(void)
 	 * pages because doing so may flush our L1 and L2 caches too much.
 	 */
 	if (zero_state && vm_page_zero_count >= ZIDLE_LO(cnt.v_free_count))
-		return 0;
+		return (0);
 	if (vm_page_zero_count >= ZIDLE_HI(cnt.v_free_count))
-		return 0;
-	return 1;
+		return (0);
+	return (1);
 }
 
 static int
@@ -116,11 +122,10 @@ vm_page_zero_idle(void)
 	}
 	free_rover = (free_rover + PQ_PRIME2) & PQ_L2_MASK;
 	mtx_unlock_spin(&vm_page_queue_free_mtx);
-	return 1;
+	return (1);
 }
 
-
-/* Called by vm_page_free to hint that a new page is available */
+/* Called by vm_page_free to hint that a new page is available. */
 void
 vm_page_zero_idle_wakeup(void)
 {
@@ -130,36 +135,35 @@ vm_page_zero_idle_wakeup(void)
 }
 
 static void
-vm_pagezero(void)
+vm_pagezero(void __unused *arg)
 {
-	struct thread *td;
 	struct proc *p;
 	struct rtprio rtp;
-	int pages = 0;
-	int pri;
+	struct thread *td;
+	int pages, pri;
 
 	td = curthread;
 	p = td->td_proc;
 	rtp.prio = RTP_PRIO_MAX;
 	rtp.type = RTP_PRIO_IDLE;
+	pages = 0;
 	mtx_lock_spin(&sched_lock);
 	rtp_to_pri(&rtp, td->td_ksegrp);
 	pri = td->td_priority;
 	mtx_unlock_spin(&sched_lock);
-	PROC_LOCK(p);
-	p->p_flag |= P_NOLOAD;
-	PROC_UNLOCK(p);
+	idlezero_enable = idlezero_enable_default;
 
 	for (;;) {
 		if (vm_page_zero_check()) {
 			pages += vm_page_zero_idle();
+#ifndef PREEMPTION
 			if (pages > idlezero_maxrun || sched_runnable()) {
 				mtx_lock_spin(&sched_lock);
-				td->td_proc->p_stats->p_ru.ru_nvcsw++;
-				mi_switch();
+				mi_switch(SW_VOL, NULL);
 				mtx_unlock_spin(&sched_lock);
 				pages = 0;
 			}
+#endif
 		} else {
 			tsleep(&zero_state, pri, "pgzero", hz * 300);
 			pages = 0;
@@ -168,9 +172,24 @@ vm_pagezero(void)
 }
 
 static struct proc *pagezero_proc;
-static struct kproc_desc pagezero_kp = {
-	 "pagezero",
-	 vm_pagezero,
-	 &pagezero_proc
-};
-SYSINIT(pagezero, SI_SUB_KTHREAD_VM, SI_ORDER_ANY, kproc_start, &pagezero_kp)
+
+static void
+pagezero_start(void __unused *arg)
+{
+	int error;
+
+	error = kthread_create(vm_pagezero, NULL, &pagezero_proc, RFSTOPPED, 0,
+	    "pagezero");
+	if (error)
+		panic("pagezero_start: error %d\n", error);
+	/*
+	 * We're an idle task, don't count us in the load.
+	 */
+	PROC_LOCK(pagezero_proc);
+	pagezero_proc->p_flag |= P_NOLOAD;
+	PROC_UNLOCK(pagezero_proc);
+	mtx_lock_spin(&sched_lock);
+	setrunqueue(FIRST_THREAD_IN_PROC(pagezero_proc), SRQ_BORING);
+	mtx_unlock_spin(&sched_lock);
+}
+SYSINIT(pagezero, SI_SUB_KTHREAD_VM, SI_ORDER_ANY, pagezero_start, NULL)

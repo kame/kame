@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_disk.c,v 1.80.2.1 2003/12/30 12:00:40 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_disk.c,v 1.91 2004/08/08 07:57:51 phk Exp $");
 
 #include "opt_geom.h"
 
@@ -61,11 +61,19 @@ static struct mtx g_disk_done_mtx;
 static g_access_t g_disk_access;
 static g_init_t g_disk_init;
 static g_fini_t g_disk_fini;
+static g_start_t g_disk_start;
+static g_ioctl_t g_disk_ioctl;
+static g_dumpconf_t g_disk_dumpconf;
 
 struct g_class g_disk_class = {
 	.name = "DISK",
+	.version = G_VERSION,
 	.init = g_disk_init,
 	.fini = g_disk_fini,
+	.start = g_disk_start,
+	.access = g_disk_access,
+	.ioctl = g_disk_ioctl,
+	.dumpconf = g_disk_dumpconf,
 };
 
 static void
@@ -87,17 +95,15 @@ DECLARE_GEOM_CLASS(g_disk_class, g_disk);
 static void __inline
 g_disk_lock_giant(struct disk *dp)
 {
-	if (dp->d_flags & DISKFLAG_NOGIANT)
-		return;
-	mtx_lock(&Giant);
+	if (dp->d_flags & DISKFLAG_NEEDSGIANT)
+		mtx_lock(&Giant);
 }
 
 static void __inline
 g_disk_unlock_giant(struct disk *dp)
 {
-	if (dp->d_flags & DISKFLAG_NOGIANT)
-		return;
-	mtx_unlock(&Giant);
+	if (dp->d_flags & DISKFLAG_NEEDSGIANT)
+		mtx_unlock(&Giant);
 }
 
 static int
@@ -109,12 +115,19 @@ g_disk_access(struct g_provider *pp, int r, int w, int e)
 	g_trace(G_T_ACCESS, "g_disk_access(%s, %d, %d, %d)",
 	    pp->name, r, w, e);
 	g_topology_assert();
+	dp = pp->geom->softc;
+	if (dp == NULL || dp->d_destroyed) {
+		/*
+		 * Allow decreasing access count even if disk is not
+		 * avaliable anymore.
+		 */
+		if (r <= 0 && w <= 0 && e <= 0)
+			return (0);
+		return (ENXIO);
+	}
 	r += pp->acr;
 	w += pp->acw;
 	e += pp->ace;
-	dp = pp->geom->softc;
-	if (dp == NULL)
-		return (ENXIO);
 	error = 0;
 	if ((pp->acr + pp->acw + pp->ace) == 0 && (r + w + e) > 0) {
 		if (dp->d_open != NULL) {
@@ -184,7 +197,6 @@ g_disk_done(struct bio *bp)
 	bp->bio_completed = bp->bio_length - bp->bio_resid;
 
 	bp2 = bp->bio_parent;
-	dp = bp2->bio_to->geom->softc;
 	if (bp2->bio_error == 0)
 		bp2->bio_error = bp->bio_error;
 	bp2->bio_completed += bp->bio_completed;
@@ -192,7 +204,8 @@ g_disk_done(struct bio *bp)
 	bp2->bio_inbed++;
 	if (bp2->bio_children == bp2->bio_inbed) {
 		bp2->bio_resid = bp2->bio_bcount - bp2->bio_completed;
-		devstat_end_transaction_bio(dp->d_devstat, bp2);
+		if ((dp = bp2->bio_to->geom->softc))
+			devstat_end_transaction_bio(dp->d_devstat, bp2);
 		g_io_deliver(bp2, bp2->bio_error);
 	}
 	mtx_unlock(&g_disk_done_mtx);
@@ -225,7 +238,7 @@ g_disk_start(struct bio *bp)
 	off_t off;
 
 	dp = bp->bio_to->geom->softc;
-	if (dp == NULL)
+	if (dp == NULL || dp->d_destroyed)
 		g_io_deliver(bp, ENXIO);
 	error = EJUSTRETURN;
 	switch(bp->bio_cmd) {
@@ -329,11 +342,7 @@ g_disk_create(void *arg, int flag)
 	g_topology_assert();
 	dp = arg;
 	gp = g_new_geomf(&g_disk_class, "%s%d", dp->d_name, dp->d_unit);
-	gp->start = g_disk_start;
-	gp->access = g_disk_access;
-	gp->ioctl = g_disk_ioctl;
 	gp->softc = dp;
-	gp->dumpconf = g_disk_dumpconf;
 	pp = g_new_providerf(gp, "%s", gp->name);
 	pp->mediasize = dp->d_mediasize;
 	pp->sectorsize = dp->d_sectorsize;
@@ -350,27 +359,41 @@ g_disk_create(void *arg, int flag)
 static void
 g_disk_destroy(void *ptr, int flag)
 {
+	struct disk *dp;
 	struct g_geom *gp;
 
 	g_topology_assert();
-	gp = ptr;
+	dp = ptr;
+	gp = dp->d_geom;
 	gp->softc = NULL;
 	g_wither_geom(gp, ENXIO);
+	g_free(dp);
+}
+
+struct disk *
+disk_alloc()
+{
+	struct disk *dp;
+
+	dp = g_malloc(sizeof *dp, M_WAITOK | M_ZERO);
+	return (dp);
 }
 
 void
-disk_create(int unit, struct disk *dp, int flags, void *unused __unused, void * unused2 __unused)
+disk_create(struct disk *dp, int version)
 {
-
-	dp->d_unit = unit;
-	dp->d_flags = flags;
+	if (version != DISK_VERSION_00) {
+		printf("WARNING: Attempt to add disk %s%d %s",
+		    dp->d_name, dp->d_unit,
+		    " using incompatible ABI version of disk(9)\n");
+		printf("WARNING: Ignoring disk %s%d\n",
+		    dp->d_name, dp->d_unit);
+		return;
+	}
 	KASSERT(dp->d_strategy != NULL, ("disk_create need d_strategy"));
 	KASSERT(dp->d_name != NULL, ("disk_create need d_name"));
 	KASSERT(*dp->d_name != 0, ("disk_create need d_name"));
 	KASSERT(strlen(dp->d_name) < SPECNAMELEN - 4, ("disk name too long"));
-	if (bootverbose || 1)
-		printf("GEOM: create disk %s%d dp=%p\n",
-		    dp->d_name, dp->d_unit, dp);
 	if (dp->d_devstat == NULL)
 		dp->d_devstat = devstat_new_entry(dp->d_name, dp->d_unit,
 		    dp->d_sectorsize, DEVSTAT_ALL_SUPPORTED,
@@ -382,19 +405,12 @@ disk_create(int unit, struct disk *dp, int flags, void *unused __unused, void * 
 void
 disk_destroy(struct disk *dp)
 {
-	struct g_geom *gp;
 
-	if (bootverbose || 1)
-		printf("GEOM: destroy disk %s%d dp=%p\n",
-		    dp->d_name, dp->d_unit, dp);
 	g_cancel_event(dp);
-	gp = dp->d_geom;
-	if (gp == NULL)
-		return;
-	gp->softc = NULL;
-	devstat_remove_entry(dp->d_devstat);
-	g_waitfor_event(g_disk_destroy, gp, M_WAITOK, NULL, NULL);
-	dp->d_geom = NULL;
+	dp->d_destroyed = 1;
+	if (dp->d_devstat != NULL)
+		devstat_remove_entry(dp->d_devstat);
+	g_post_event(g_disk_destroy, dp, M_WAITOK, NULL);
 }
 
 static void
@@ -421,7 +437,6 @@ sysctl_disks(SYSCTL_HANDLER_ARGS)
 	struct sbuf *sb;
 
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
-	sbuf_clear(sb);
 	g_waitfor_event(g_kern_disks, sb, M_WAITOK, NULL);
 	error = SYSCTL_OUT(req, sbuf_data(sb), sbuf_len(sb) + 1);
 	sbuf_delete(sb);

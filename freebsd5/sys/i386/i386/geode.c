@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003 Poul-Henning Kamp
+ * Copyright (c) 2003-2004 Poul-Henning Kamp
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,9 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. The names of the authors may not be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -28,17 +25,47 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/geode.c,v 1.1 2003/08/31 16:20:34 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/geode.c,v 1.5 2004/06/16 09:47:07 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/timetc.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
+#include <sys/watchdog.h>
+#include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
+#include <dev/led/led.h>
+#include <machine/pc/bios.h>
 
 static unsigned	cba;
+static unsigned	gpio;
 static unsigned	geode_counter;
+
+static struct cdev *led1, *led2, *led3;
+static int 	led1b, led2b, led3b;
+
+static void
+led_func(void *ptr, int onoff)
+{
+	uint32_t u;
+	int bit;
+
+	bit = *(int *)ptr;
+	if (bit < 0) {
+		bit = -bit;
+		onoff = !onoff;
+	}
+
+	u = inl(gpio + 4);
+	if (onoff)
+		u |= 1 << bit;
+	else
+		u &= ~(1 << bit);
+	outl(gpio, u);
+}
+
 
 static unsigned
 geode_get_timecount(struct timecounter *tc)
@@ -55,20 +82,84 @@ static struct timecounter geode_timecounter = {
 	1000
 };
 
+/*
+ * The GEODE watchdog runs from a 32kHz frequency.  One period of that is
+ * 31250 nanoseconds which we round down to 2^14 nanoseconds.  The watchdog
+ * consists of a power-of-two prescaler and a 16 bit counter, so the math
+ * is quite simple.  The max timeout is 14 + 16 + 13 = 2^43 nsec ~= 2h26m.
+ */
+static void
+geode_watchdog(void *foo __unused, u_int cmd, int *error)
+{
+	u_int u, p, r;
+
+	u = cmd & WD_INTERVAL;
+	if (cmd && u >= 14 && u <= 43) {
+		u -= 14;
+		if (u > 16) {
+			p = u - 16;
+			u -= p;
+		} else {
+			p = 0;
+		}
+		if (u == 16)
+			u = (1 << u) - 1;
+		else
+			u = 1 << u;
+		r = inw(cba + 2) & 0xff00;
+		outw(cba + 2, p | 0xf0 | r);
+		outw(cba, u);
+		*error = 0;
+	} else {
+		outw(cba, 0);
+	}
+}
 
 static int
 geode_probe(device_t self)
 {
 
-	if (pci_get_devid(self) != 0x0515100b)
-		return (ENXIO);
-	if (geode_counter != 0)
-		return (ENXIO);
-	cba = pci_read_config(self, 0x64, 4);
-	printf("Geode CBA@ 0x%x\n", cba);
-	geode_counter = cba + 0x08;
-	outl(cba + 0x0d, 2);
-	tc_init(&geode_timecounter);
+	if (pci_get_devid(self) == 0x0515100b) {
+		if (geode_counter == 0) {
+			/*
+			 * The address of the CBA is written to this register
+			 * by the bios, see p161 in data sheet.
+			 */
+			cba = pci_read_config(self, 0x64, 4);
+			printf("Geode CBA@ 0x%x\n", cba);
+			geode_counter = cba + 0x08;
+			outl(cba + 0x0d, 2);
+			printf("Geode rev: %02x %02x\n",
+				inb(cba + 0x3c), inb(cba + 0x3d));
+			tc_init(&geode_timecounter);
+			EVENTHANDLER_REGISTER(watchdog_list, geode_watchdog,
+			    NULL, 0);
+		}
+	} else if (pci_get_devid(self) == 0x0510100b) {
+		gpio = pci_read_config(self, PCIR_BAR(0), 4);
+		gpio &= ~0x1f;
+		printf("Geode GPIO@ = %x\n", gpio);
+		if (NULL != 
+		    bios_string(0xf0000, 0xf0100, "Soekris Engineering", 0)) {
+			printf("Soekris Engineering NET4801 platform\n");
+			led1b = 20;
+			led1 = led_create(led_func, &led1b, "error");
+		} else if (NULL !=
+		    bios_string(0xf9000, 0xf9000, "PC Engines WRAP.1C ", 0)) {
+			printf("PC Engines WRAP.1C platfrom\n");
+			led1b = -2;
+			led2b = -3;
+			led3b = -18;
+			led1 = led_create(led_func, &led1b, "led1");
+			led2 = led_create(led_func, &led2b, "led2");
+			led3 = led_create(led_func, &led3b, "led3");
+			/*
+			 * Turn on first LED so we don't make people think
+			 * their box just died.
+			 */
+			led_func(&led1b, 1);
+		}
+	}
 	return (ENXIO);
 }
 

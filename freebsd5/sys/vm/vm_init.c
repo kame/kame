@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -67,7 +63,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_init.c,v 1.39 2003/09/01 16:46:47 eivind Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_init.c,v 1.44 2004/08/07 05:58:31 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -113,7 +109,7 @@ vm_mem_init(dummy)
 	 * memory is accounted for, and we use only virtual addresses.
 	 */
 	vm_set_page_size();
-	virtual_avail = vm_page_startup(avail_start, avail_end, virtual_avail);
+	virtual_avail = vm_page_startup(virtual_avail);
 	
 	/*
 	 * Initialize other VM packages
@@ -121,7 +117,7 @@ vm_mem_init(dummy)
 	vm_object_init();
 	vm_map_startup();
 	kmem_init(virtual_avail, virtual_end);
-	pmap_init(avail_start, avail_end);
+	pmap_init();
 	vm_pager_init();
 }
 
@@ -161,13 +157,8 @@ again:
 	 * Discount the physical memory larger than the size of kernel_map
 	 * to avoid eating up all of KVA space.
 	 */
-	if (kernel_map->first_free == NULL) {
-		printf("Warning: no free entries in kernel_map.\n");
-		physmem_est = physmem;
-	} else {
-		physmem_est = lmin(physmem, btoc(kernel_map->max_offset -
-		    kernel_map->min_offset));
-	}
+	physmem_est = lmin(physmem, btoc(kernel_map->max_offset -
+	    kernel_map->min_offset));
 
 	v = kern_vfs_bio_buffer_alloc(v, physmem_est);
 
@@ -189,12 +180,12 @@ again:
 		panic("startup: table size inconsistency");
 
 	clean_map = kmem_suballoc(kernel_map, &kmi->clean_sva, &kmi->clean_eva,
-			(nbuf*BKVASIZE) + (nswbuf*MAXPHYS) + pager_map_size);
+			(nbuf*BKVASIZE) + (nswbuf*MAXPHYS));
 	buffer_map = kmem_suballoc(clean_map, &kmi->buffer_sva,
 			&kmi->buffer_eva, (nbuf*BKVASIZE));
 	buffer_map->system_map = 1;
 	pager_map = kmem_suballoc(clean_map, &kmi->pager_sva, &kmi->pager_eva,
-				(nswbuf*MAXPHYS) + pager_map_size);
+				(nswbuf*MAXPHYS));
 	pager_map->system_map = 1;
 	exec_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr,
 				(16*(ARG_MAX+(PAGE_SIZE*3))));

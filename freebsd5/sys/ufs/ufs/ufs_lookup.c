@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.68 2003/06/11 06:34:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.71 2004/07/28 06:41:27 kan Exp $");
 
 #include "opt_ffs_broken_fixme.h"
 #include "opt_ufs.h"
@@ -469,7 +465,7 @@ found:
 	if (dp->i_offset + DIRSIZ(OFSFMT(vdp), ep) > dp->i_size) {
 		ufs_dirbad(dp, dp->i_offset, "i_size too small");
 		dp->i_size = dp->i_offset + DIRSIZ(OFSFMT(vdp), ep);
-		DIP(dp, i_size) = dp->i_size;
+		DIP_SET(dp, i_size, dp->i_size);
 		dp->i_flag |= IN_CHANGE | IN_UPDATE;
 	}
 	brelse(bp);
@@ -762,7 +758,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp)
 			return (error);
 		}
 		dp->i_size = dp->i_offset + DIRBLKSIZ;
-		DIP(dp, i_size) = dp->i_size;
+		DIP_SET(dp, i_size, dp->i_size);
 		dp->i_flag |= IN_CHANGE | IN_UPDATE;
 		vnode_pager_setsize(dvp, (u_long)dp->i_size);
 		dirp->d_reclen = DIRBLKSIZ;
@@ -805,7 +801,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp)
 			 * can lead to deadlock if we also hold a lock on
 			 * the newly entered node.
 			 */
-			if ((error = BUF_WRITE(bp)))
+			if ((error = bwrite(bp)))
 				return (error);
 			if (tvp != NULL)
 				VOP_UNLOCK(tvp, 0, td);
@@ -818,7 +814,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp)
 			bdwrite(bp);
 			return (UFS_UPDATE(dvp, 0));
 		}
-		error = BUF_WRITE(bp);
+		error = bwrite(bp);
 		ret = UFS_UPDATE(dvp, 1);
 		if (error == 0)
 			return (ret);
@@ -843,7 +839,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp)
 	 */
 	if (dp->i_offset + dp->i_count > dp->i_size) {
 		dp->i_size = dp->i_offset + dp->i_count;
-		DIP(dp, i_size) = dp->i_size;
+		DIP_SET(dp, i_size, dp->i_size);
 	}
 	/*
 	 * Get the block containing the space for the new directory entry.
@@ -945,7 +941,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp)
 			bdwrite(bp);
 			error = 0;
 		} else {
-			error = BUF_WRITE(bp);
+			error = bwrite(bp);
 		}
 	}
 	dp->i_flag |= IN_CHANGE | IN_UPDATE;
@@ -1046,7 +1042,7 @@ out:
 			softdep_setup_remove(bp, dp, ip, isrmdir);
 		}
 		if (softdep_slowdown(dvp)) {
-			error = BUF_WRITE(bp);
+			error = bwrite(bp);
 		} else {
 			bdwrite(bp);
 			error = 0;
@@ -1055,16 +1051,16 @@ out:
 		if (ip) {
 			ip->i_effnlink--;
 			ip->i_nlink--;
-			DIP(ip, i_nlink) = ip->i_nlink;
+			DIP_SET(ip, i_nlink, ip->i_nlink);
 			ip->i_flag |= IN_CHANGE;
 		}
 		if (flags & DOWHITEOUT)
-			error = BUF_WRITE(bp);
+			error = bwrite(bp);
 		else if (DOINGASYNC(dvp) && dp->i_count != 0) {
 			bdwrite(bp);
 			error = 0;
 		} else
-			error = BUF_WRITE(bp);
+			error = bwrite(bp);
 	}
 	dp->i_flag |= IN_CHANGE | IN_UPDATE;
 	/*
@@ -1109,13 +1105,13 @@ ufs_dirrewrite(dp, oip, newinum, newtype, isrmdir)
 		bdwrite(bp);
 	} else {
 		oip->i_nlink--;
-		DIP(oip, i_nlink) = oip->i_nlink;
+		DIP_SET(oip, i_nlink, oip->i_nlink);
 		oip->i_flag |= IN_CHANGE;
 		if (DOINGASYNC(vdp)) {
 			bdwrite(bp);
 			error = 0;
 		} else {
-			error = BUF_WRITE(bp);
+			error = bwrite(bp);
 		}
 	}
 	dp->i_flag |= IN_CHANGE | IN_UPDATE;

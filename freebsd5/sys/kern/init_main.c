@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/init_main.c,v 1.238 2003/10/02 03:57:59 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/init_main.c,v 1.246.2.2 2004/09/09 10:03:19 julian Exp $");
 
 #include "opt_init_path.h"
 #include "opt_mac.h"
@@ -90,14 +90,11 @@ static struct session session0;
 static struct pgrp pgrp0;
 struct	proc proc0;
 struct	thread thread0;
-struct	kse kse0;
 struct	ksegrp ksegrp0;
 static struct filedesc0 filedesc0;
-static struct plimit limit0;
 struct	vmspace vmspace0;
 struct	proc *initproc;
 
-struct	vnode *rootvp;
 int	boothowto = 0;		/* initialized so that it can be patched */
 SYSCTL_INT(_debug, OID_AUTO, boothowto, CTLFLAG_RD, &boothowto, 0, "");
 int	bootverbose;
@@ -248,6 +245,20 @@ print_caddr_t(void *data __unused)
 SYSINIT(announce, SI_SUB_COPYRIGHT, SI_ORDER_FIRST, print_caddr_t, copyright)
 SYSINIT(version, SI_SUB_COPYRIGHT, SI_ORDER_SECOND, print_caddr_t, version)
 
+#ifdef WITNESS
+static char wit_warn[] =
+     "WARNING: WITNESS option enabled, expect reduced performance.\n";
+SYSINIT(witwarn, SI_SUB_COPYRIGHT, SI_ORDER_SECOND + 1,
+   print_caddr_t, wit_warn)
+#endif
+
+#ifdef DIAGNOSTIC
+static char diag_warn[] =
+     "WARNING: DIAGNOSTIC option enabled, expect reduced performance.\n";
+SYSINIT(diagwarn, SI_SUB_COPYRIGHT, SI_ORDER_SECOND + 2,
+    print_caddr_t, diag_warn)
+#endif
+
 static void
 set_boot_verbose(void *data __unused)
 {
@@ -308,18 +319,11 @@ proc0_init(void *dummy __unused)
 	register unsigned i;
 	struct thread *td;
 	struct ksegrp *kg;
-	struct kse *ke;
 
 	GIANT_REQUIRED;
 	p = &proc0;
 	td = &thread0;
-	ke = &kse0;
 	kg = &ksegrp0;
-
-	ke->ke_sched = kse0_sched;
-	kg->kg_sched = ksegrp0_sched;
-	p->p_sched = proc0_sched;
-	td->td_sched = thread0_sched;
 
 	/*
 	 * Initialize magic number.
@@ -327,11 +331,16 @@ proc0_init(void *dummy __unused)
 	p->p_magic = P_MAGIC;
 
 	/*
-	 * Initialize thread, process and pgrp structures.
+	 * Initialize thread, process and ksegrp structures.
 	 */
-	procinit();
-	threadinit();
+	procinit();	/* set up proc zone */
+	threadinit();	/* set up thead, upcall and KSEGRP zones */
 
+	/*
+	 * Initialise scheduler resources.
+	 * Add scheduler specific parts to proc, ksegrp, thread as needed.
+	 */
+	schedinit();	/* scheduler gets its house in order */
 	/*
 	 * Initialize sleep queue hash table
 	 */
@@ -359,26 +368,17 @@ proc0_init(void *dummy __unused)
 	session0.s_leader = p;
 
 	p->p_sysent = &null_sysvec;
-
-	/*
-	 * proc_linkup was already done in init_i386() or alphainit() etc.
-	 * because the earlier code needed to follow td->td_proc. Otherwise
-	 * I would have done it here.. maybe this means this should be
-	 * done earlier too.
-	 */
 	p->p_flag = P_SYSTEM;
 	p->p_sflag = PS_INMEM;
 	p->p_state = PRS_NORMAL;
+	knlist_init(&p->p_klist, &p->p_mtx);
+	p->p_nice = NZERO;
 	td->td_state = TDS_RUNNING;
-	kg->kg_nice = NZERO;
 	kg->kg_pri_class = PRI_TIMESHARE;
 	kg->kg_user_pri = PUSER;
 	td->td_priority = PVM;
 	td->td_base_pri = PUSER;
-	td->td_kse = ke; /* XXXKSE */
 	td->td_oncpu = 0;
-	ke->ke_state = KES_THREAD;
-	ke->ke_thread = td;
 	p->p_peers = 0;
 	p->p_leader = p;
 
@@ -406,6 +406,7 @@ proc0_init(void *dummy __unused)
 	siginit(&proc0);
 
 	/* Create the file descriptor table. */
+	/* XXX this duplicates part of fdinit() */
 	fdp = &filedesc0;
 	p->p_fd = &fdp->fd_fd;
 	p->p_fdtol = NULL;
@@ -415,21 +416,21 @@ proc0_init(void *dummy __unused)
 	fdp->fd_fd.fd_ofiles = fdp->fd_dfiles;
 	fdp->fd_fd.fd_ofileflags = fdp->fd_dfileflags;
 	fdp->fd_fd.fd_nfiles = NDFILE;
+	fdp->fd_fd.fd_map = fdp->fd_dmap;
 
 	/* Create the limits structures. */
-	p->p_limit = &limit0;
-	for (i = 0; i < sizeof(p->p_rlimit)/sizeof(p->p_rlimit[0]); i++)
-		limit0.pl_rlimit[i].rlim_cur =
-		    limit0.pl_rlimit[i].rlim_max = RLIM_INFINITY;
-	limit0.pl_rlimit[RLIMIT_NOFILE].rlim_cur =
-	    limit0.pl_rlimit[RLIMIT_NOFILE].rlim_max = maxfiles;
-	limit0.pl_rlimit[RLIMIT_NPROC].rlim_cur =
-	    limit0.pl_rlimit[RLIMIT_NPROC].rlim_max = maxproc;
+	p->p_limit = lim_alloc();
+	for (i = 0; i < RLIM_NLIMITS; i++)
+		p->p_limit->pl_rlimit[i].rlim_cur =
+		    p->p_limit->pl_rlimit[i].rlim_max = RLIM_INFINITY;
+	p->p_limit->pl_rlimit[RLIMIT_NOFILE].rlim_cur =
+	    p->p_limit->pl_rlimit[RLIMIT_NOFILE].rlim_max = maxfiles;
+	p->p_limit->pl_rlimit[RLIMIT_NPROC].rlim_cur =
+	    p->p_limit->pl_rlimit[RLIMIT_NPROC].rlim_max = maxproc;
 	i = ptoa(cnt.v_free_count);
-	limit0.pl_rlimit[RLIMIT_RSS].rlim_max = i;
-	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_max = i;
-	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_cur = i / 3;
-	limit0.p_refcnt = 1;
+	p->p_limit->pl_rlimit[RLIMIT_RSS].rlim_max = i;
+	p->p_limit->pl_rlimit[RLIMIT_MEMLOCK].rlim_max = i;
+	p->p_limit->pl_rlimit[RLIMIT_MEMLOCK].rlim_cur = i / 3;
 	p->p_cpulimit = RLIM_INFINITY;
 
 	/* Allocate a prototype map so we have something to fork. */
@@ -539,7 +540,7 @@ start_init(void *dummy)
 	vfs_mountroot();
 
 	/* Get the vnode for '/'.  Set p->p_fd->fd_cdir to reference it. */
-	if (VFS_ROOT(TAILQ_FIRST(&mountlist), &rootvnode))
+	if (VFS_ROOT(TAILQ_FIRST(&mountlist), &rootvnode, td))
 		panic("cannot find root vnode");
 	FILEDESC_LOCK(p->p_fd);
 	p->p_fd->fd_cdir = rootvnode;
@@ -681,6 +682,7 @@ create_init(const void *udata __unused)
 	error = fork1(&thread0, RFFDG | RFPROC | RFSTOPPED, 0, &initproc);
 	if (error)
 		panic("cannot fork init: %d\n", error);
+	KASSERT(initproc->p_pid == 1, ("create_init: initproc->p_pid != 1"));
 	/* divorce init's credentials from the kernel's */
 	newcred = crget();
 	PROC_LOCK(initproc);
@@ -712,7 +714,7 @@ kick_init(const void *udata __unused)
 	td = FIRST_THREAD_IN_PROC(initproc);
 	mtx_lock_spin(&sched_lock);
 	TD_SET_CAN_RUN(td);
-	setrunqueue(td);	/* XXXKSE */
+	setrunqueue(td, SRQ_BORING);	/* XXXKSE */
 	mtx_unlock_spin(&sched_lock);
 }
 SYSINIT(kickinit, SI_SUB_KTHREAD_INIT, SI_ORDER_FIRST, kick_init, NULL)

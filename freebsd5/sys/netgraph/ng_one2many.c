@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_one2many.c,v 1.13 2003/02/19 05:47:31 imp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_one2many.c,v 1.17 2004/06/26 22:24:16 julian Exp $
  */
 
 /*
@@ -162,18 +162,15 @@ static const struct ng_cmdlist ng_one2many_cmdlist[] = {
 
 /* Node type descriptor */
 static struct ng_type ng_one2many_typestruct = {
-	NG_ABI_VERSION,
-	NG_ONE2MANY_NODE_TYPE,
-	NULL,
-	ng_one2many_constructor,
-	ng_one2many_rcvmsg,
-	ng_one2many_shutdown,
-	ng_one2many_newhook,
-	NULL,
-	NULL,
-	ng_one2many_rcvdata,
-	ng_one2many_disconnect,
-	ng_one2many_cmdlist,
+	.version =	NG_ABI_VERSION,
+	.name =		NG_ONE2MANY_NODE_TYPE,
+	.constructor =	ng_one2many_constructor,
+	.rcvmsg =	ng_one2many_rcvmsg,
+	.shutdown =	ng_one2many_shutdown,
+	.newhook =	ng_one2many_newhook,
+	.rcvdata =	ng_one2many_rcvdata,
+	.disconnect =	ng_one2many_disconnect,
+	.cmdlist =	ng_one2many_cmdlist,
 };
 NETGRAPH_INIT(one2many, &ng_one2many_typestruct);
 
@@ -384,7 +381,6 @@ ng_one2many_rcvdata(hook_p hook, item_p item)
 	int linkNum;
 	int i;
 	struct mbuf *m;
-	meta_p meta;
 
 	m = NGI_M(item); /* just peaking, mbuf still owned by item */
 	/* Get link number */
@@ -414,7 +410,6 @@ ng_one2many_rcvdata(hook_p hook, item_p item)
 			priv->nextMany = (priv->nextMany + 1) % priv->numActiveMany;
 			break;
 		case NG_ONE2MANY_XMIT_ALL:
-			meta = NGI_META(item); /* peek.. */
 			/* no need to copy data for the 1st one */
 			dst = &priv->many[priv->activeMany[0]];
 
@@ -422,7 +417,6 @@ ng_one2many_rcvdata(hook_p hook, item_p item)
 			 * except the first one, which we'll do last 
 			 */
 			for (i = 1; i < priv->numActiveMany; i++) {
-				meta_p meta2 = NULL;
 				struct mbuf *m2;
 				struct ng_one2many_link *mdst;
 
@@ -434,18 +428,10 @@ ng_one2many_rcvdata(hook_p hook, item_p item)
 					NG_FREE_M(m);
 					return (ENOBUFS);
 				}
-				if (meta != NULL
-				    && (meta2 = ng_copy_meta(meta)) == NULL) {
-					mdst->stats.memoryFailures++;
-					m_freem(m2);
-					NG_FREE_ITEM(item);
-					NG_FREE_M(m);
-					return (ENOMEM);
-				}
 				/* Update transmit stats */
 				mdst->stats.xmitPackets++;
 				mdst->stats.xmitOctets += m->m_pkthdr.len;
-				NG_SEND_DATA(error, mdst->hook, m2, meta2);
+				NG_SEND_DATA_ONLY(error, mdst->hook, m2);
 			}
 			break;
 #ifdef INVARIANTS

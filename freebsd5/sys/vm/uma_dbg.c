@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/uma_dbg.c,v 1.13 2003/09/27 21:33:13 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/uma_dbg.c,v 1.15.2.1 2004/10/16 01:41:34 green Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,13 +51,14 @@ __FBSDID("$FreeBSD: src/sys/vm/uma_dbg.c,v 1.13 2003/09/27 21:33:13 phk Exp $");
 static const u_int32_t uma_junk = 0xdeadc0de;
 
 /*
- * Checks an item to make sure it hasn't been overwritten since freed.
+ * Checks an item to make sure it hasn't been overwritten since it was freed,
+ * prior to subsequent reallocation.
  *
  * Complies with standard ctor arg/return
  *
  */
-void
-trash_ctor(void *mem, int size, void *arg)
+int
+trash_ctor(void *mem, int size, void *arg, int flags)
 {
 	int cnt;
 	u_int32_t *p;
@@ -68,6 +69,7 @@ trash_ctor(void *mem, int size, void *arg)
 		if (*p != uma_junk)
 			panic("Memory modified after free %p(%d) val=%x @ %p\n",
 			    mem, size, *p, p);
+	return (0);
 }
 
 /*
@@ -94,10 +96,11 @@ trash_dtor(void *mem, int size, void *arg)
  * Complies with standard init arg/return
  *
  */
-void
-trash_init(void *mem, int size)
+int
+trash_init(void *mem, int size, int flags)
 {
 	trash_dtor(mem, size, NULL);
+	return (0);
 }
 
 /*
@@ -109,17 +112,11 @@ trash_init(void *mem, int size)
 void
 trash_fini(void *mem, int size)
 {
-	trash_ctor(mem, size, NULL);
+	(void)trash_ctor(mem, size, NULL, 0);
 }
 
-/*
- * Checks an item to make sure it hasn't been overwritten since freed.
- *
- * Complies with standard ctor arg/return
- *
- */
-void
-mtrash_ctor(void *mem, int size, void *arg)
+int
+mtrash_ctor(void *mem, int size, void *arg, int flags)
 {
 	struct malloc_type **ksp;
 	u_int32_t *p = mem;
@@ -137,6 +134,7 @@ mtrash_ctor(void *mem, int size, void *arg)
 			panic("Most recently used by %s\n", (*ksp == NULL)?
 			    "none" : (*ksp)->ks_shortdesc);
 		}
+	return (0);
 }
 
 /*
@@ -164,8 +162,8 @@ mtrash_dtor(void *mem, int size, void *arg)
  * Complies with standard init arg/return
  *
  */
-void
-mtrash_init(void *mem, int size)
+int
+mtrash_init(void *mem, int size, int flags)
 {
 	struct malloc_type **ksp;
 
@@ -174,10 +172,12 @@ mtrash_init(void *mem, int size)
 	ksp = (struct malloc_type **)mem;
 	ksp += (size / sizeof(struct malloc_type *)) - 1;
 	*ksp = NULL;
+	return (0);
 }
 
 /*
- * Checks an item to make sure it hasn't been overwritten since it was freed.
+ * Checks an item to make sure it hasn't been overwritten since it was freed,
+ * prior to freeing it back to available memory.
  *
  * Complies with standard fini arg/return
  *
@@ -185,22 +185,24 @@ mtrash_init(void *mem, int size)
 void
 mtrash_fini(void *mem, int size)
 {
-	mtrash_ctor(mem, size, NULL);
+	(void)mtrash_ctor(mem, size, NULL, 0);
 }
 
 static uma_slab_t
 uma_dbg_getslab(uma_zone_t zone, void *item)
 {
 	uma_slab_t slab;
+	uma_keg_t keg;
 	u_int8_t *mem;
 
+	keg = zone->uz_keg;
 	mem = (u_int8_t *)((unsigned long)item & (~UMA_SLAB_MASK));
-	if (zone->uz_flags & UMA_ZONE_MALLOC) {
+	if (keg->uk_flags & UMA_ZONE_MALLOC) {
 		slab = vtoslab((vm_offset_t)mem);
-	} else if (zone->uz_flags & UMA_ZONE_HASH) {
-		slab = hash_sfind(&zone->uz_hash, mem);
+	} else if (keg->uk_flags & UMA_ZONE_HASH) {
+		slab = hash_sfind(&keg->uk_hash, mem);
 	} else {
-		mem += zone->uz_pgoff;
+		mem += keg->uk_pgoff;
 		slab = (uma_slab_t)mem;
 	}
 
@@ -215,8 +217,11 @@ uma_dbg_getslab(uma_zone_t zone, void *item)
 void
 uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 {
+	uma_keg_t keg;
+	uma_slabrefcnt_t slabref;
 	int freei;
 
+	keg = zone->uz_keg;
 	if (slab == NULL) {
 		slab = uma_dbg_getslab(zone, item);
 		if (slab == NULL) 
@@ -225,9 +230,14 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 	}
 
 	freei = ((unsigned long)item - (unsigned long)slab->us_data)
-	    / zone->uz_rsize;
+	    / keg->uk_rsize;
 
-	slab->us_freelist[freei] = 255;
+	if (keg->uk_flags & UMA_ZONE_REFCNT) {
+		slabref = (uma_slabrefcnt_t)slab;
+		slabref->us_freelist[freei].us_item = 255;
+	} else {
+		slab->us_freelist[freei].us_item = 255;
+	}
 
 	return;
 }
@@ -241,8 +251,11 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 void
 uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 {
+	uma_keg_t keg;
+	uma_slabrefcnt_t slabref;
 	int freei;
 
+	keg = zone->uz_keg;
 	if (slab == NULL) {
 		slab = uma_dbg_getslab(zone, item);
 		if (slab == NULL) 
@@ -251,30 +264,47 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 	}
 
 	freei = ((unsigned long)item - (unsigned long)slab->us_data)
-	    / zone->uz_rsize;
+	    / keg->uk_rsize;
 
-	if (freei >= zone->uz_ipers)
+	if (freei >= keg->uk_ipers)
 		panic("zone: %s(%p) slab %p freelist %d out of range 0-%d\n",
-		    zone->uz_name, zone, slab, freei, zone->uz_ipers-1);
+		    zone->uz_name, zone, slab, freei, keg->uk_ipers-1);
 
-	if (((freei * zone->uz_rsize) + slab->us_data) != item) {
+	if (((freei * keg->uk_rsize) + slab->us_data) != item) {
 		printf("zone: %s(%p) slab %p freed address %p unaligned.\n",
 		    zone->uz_name, zone, slab, item);
 		panic("should be %p\n",
-		    (freei * zone->uz_rsize) + slab->us_data);
+		    (freei * keg->uk_rsize) + slab->us_data);
 	}
 
-	if (slab->us_freelist[freei] != 255) {
-		printf("Slab at %p, freei %d = %d.\n",
-		    slab, freei, slab->us_freelist[freei]);
-		panic("Duplicate free of item %p from zone %p(%s)\n",
-		    item, zone, zone->uz_name);
-	}
+	if (keg->uk_flags & UMA_ZONE_REFCNT) {
+		slabref = (uma_slabrefcnt_t)slab;
+		if (slabref->us_freelist[freei].us_item != 255) {
+			printf("Slab at %p, freei %d = %d.\n",
+			    slab, freei, slabref->us_freelist[freei].us_item);
+			panic("Duplicate free of item %p from zone %p(%s)\n",
+			    item, zone, zone->uz_name);
+		}
 
-	/*
-	 * When this is actually linked into the slab this will change.
-	 * Until then the count of valid slabs will make sure we don't
-	 * accidentally follow this and assume it's a valid index.
-	 */
-	slab->us_freelist[freei] = 0;
+		/*
+		 * When this is actually linked into the slab this will change.
+		 * Until then the count of valid slabs will make sure we don't
+		 * accidentally follow this and assume it's a valid index.
+		 */
+		slabref->us_freelist[freei].us_item = 0;
+	} else {
+		if (slab->us_freelist[freei].us_item != 255) {
+			printf("Slab at %p, freei %d = %d.\n",
+			    slab, freei, slab->us_freelist[freei].us_item);
+			panic("Duplicate free of item %p from zone %p(%s)\n",
+			    item, zone, zone->uz_name);
+		}
+
+		/*
+		 * When this is actually linked into the slab this will change.
+		 * Until then the count of valid slabs will make sure we don't
+		 * accidentally follow this and assume it's a valid index.
+		 */
+		slab->us_freelist[freei].us_item = 0;
+	}
 }

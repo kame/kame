@@ -38,7 +38,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpi/i4b_ifpi_pci.c,v 1.15 2003/09/02 17:30:39 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpi/i4b_ifpi_pci.c,v 1.16 2004/03/17 17:50:49 njl Exp $");
 
 #include "opt_i4b.h"
 
@@ -515,9 +515,8 @@ avma1pp_attach_avma1pp(device_t dev)
 	ifpi_scp[unit] = sc;
 
 	sc->sc_resources.io_rid[0] = PCIR_BAR(1);
-	sc->sc_resources.io_base[0] = bus_alloc_resource(dev, SYS_RES_IOPORT,
-		&sc->sc_resources.io_rid[0],
-		0, ~0, 1, RF_ACTIVE);
+	sc->sc_resources.io_base[0] = bus_alloc_resource_any(dev,
+		SYS_RES_IOPORT, &sc->sc_resources.io_rid[0], RF_ACTIVE);
 
 	if (sc->sc_resources.io_base[0] == NULL) {
 		printf("avma1pp%d: couldn't map IO port\n", unit);
@@ -530,8 +529,8 @@ avma1pp_attach_avma1pp(device_t dev)
 
 	/* Allocate interrupt */
 	sc->sc_resources.irq_rid = 0;
-	sc->sc_resources.irq = bus_alloc_resource(dev, SYS_RES_IRQ,
-		&sc->sc_resources.irq_rid, 0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	sc->sc_resources.irq = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+		&sc->sc_resources.irq_rid, RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->sc_resources.irq == NULL) {
 		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(1), sc->sc_resources.io_base[0]);

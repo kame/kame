@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_bio.c,v 1.425 2003/11/15 09:28:09 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_bio.c,v 1.444 2004/07/25 21:24:21 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,9 +61,11 @@ static MALLOC_DEFINE(M_BIOBUF, "BIO buffer", "BIO buffer");
 
 struct	bio_ops bioops;		/* I/O operation notification */
 
+static int ibwrite(struct buf *);
+
 struct	buf_ops buf_ops_bio = {
 	"buf_ops_bio",
-	bwrite
+	ibwrite
 };
 
 /*
@@ -375,7 +377,7 @@ waitrunningbufspace(void)
  *	bit if the newly extended portion of the buffer does not contain
  *	valid data.
  */
-static __inline__
+static __inline
 void
 vfs_buf_test_cache(struct buf *bp,
 		  vm_ooffset_t foff, vm_offset_t off, vm_offset_t size,
@@ -392,7 +394,7 @@ vfs_buf_test_cache(struct buf *bp,
 }
 
 /* Wake up the buffer deamon if necessary */
-static __inline__
+static __inline
 void
 bd_wakeup(int dirtybuflevel)
 {
@@ -408,7 +410,7 @@ bd_wakeup(int dirtybuflevel)
  * bd_speedup - speedup the buffer cache flushing code
  */
 
-static __inline__
+static __inline
 void
 bd_speedup(void)
 {
@@ -515,7 +517,7 @@ bufinit(void)
 		bp = &buf[i];
 		bzero(bp, sizeof *bp);
 		bp->b_flags = B_INVAL;	/* we're just an empty header */
-		bp->b_dev = NODEV;
+		bp->b_dev = NULL;
 		bp->b_rcred = NOCRED;
 		bp->b_wcred = NOCRED;
 		bp->b_qindex = QUEUE_EMPTY;
@@ -760,9 +762,17 @@ breadn(struct vnode * vp, daddr_t blkno, int size,
  * or in biodone() since the I/O is synchronous.  We put it
  * here.
  */
-
 int
 bwrite(struct buf * bp)
+{
+
+	KASSERT(bp->b_op != NULL && bp->b_op->bop_write != NULL,
+	    ("Martian buffer %p in bwrite: nobody to write it.", bp));
+	return (bp->b_op->bop_write(bp));
+}
+
+static int
+ibwrite(struct buf * bp)
 {
 	int oldflags, s;
 	struct buf *newbp;
@@ -775,7 +785,7 @@ bwrite(struct buf * bp)
 	oldflags = bp->b_flags;
 
 	if (BUF_REFCNT(bp) == 0)
-		panic("bwrite: buffer is not busy???");
+		panic("ibwrite: buffer is not busy???");
 	s = splbio();
 	/*
 	 * If a background write is already in progress, delay
@@ -793,7 +803,7 @@ bwrite(struct buf * bp)
 		bp->b_vflags |= BV_BKGRDWAIT;
 		msleep(&bp->b_xflags, VI_MTX(bp->b_vp), PRIBIO, "bwrbg", 0);
 		if (bp->b_vflags & BV_BKGRDINPROG)
-			panic("bwrite: still writing");
+			panic("ibwrite: still writing");
 	}
 	VI_UNLOCK(bp->b_vp);
 
@@ -814,7 +824,7 @@ bwrite(struct buf * bp)
 	    !buf_dirty_count_severe()) {
 		if (bp->b_iodone != NULL) {
 			printf("bp->b_iodone = %p\n", bp->b_iodone);
-			panic("bwrite: need chained iodone");
+			panic("ibwrite: need chained iodone");
 		}
 
 		/* get a new block */
@@ -876,10 +886,12 @@ bwrite(struct buf * bp)
 	if (oldflags & B_ASYNC)
 		BUF_KERNPROC(bp);
 	bp->b_iooffset = dbtob(bp->b_blkno);
-	if (bp->b_vp->v_type == VCHR)
-		VOP_SPECSTRATEGY(bp->b_vp, bp);
-	else
+	if (bp->b_vp->v_type == VCHR) {
+		if (!buf_prewrite(bp->b_vp, bp))
+			VOP_SPECSTRATEGY(bp->b_vp, bp);
+	} else {
 		VOP_STRATEGY(bp->b_vp, bp);
+	}
 
 	if ((oldflags & B_ASYNC) == 0) {
 		int rtval = bufwait(bp);
@@ -1097,7 +1109,7 @@ bdirty(bp)
 
 	if ((bp->b_flags & B_DELWRI) == 0) {
 		bp->b_flags |= B_DONE | B_DELWRI;
-		reassignbuf(bp, bp->b_vp);
+		reassignbuf(bp);
 		atomic_add_int(&numdirtybuffers, 1);
 		bd_wakeup((lodirtybuffers + hidirtybuffers) / 2);
 	}
@@ -1124,7 +1136,7 @@ bundirty(bp)
 
 	if (bp->b_flags & B_DELWRI) {
 		bp->b_flags &= ~B_DELWRI;
-		reassignbuf(bp, bp->b_vp);
+		reassignbuf(bp);
 		atomic_subtract_int(&numdirtybuffers, 1);
 		numdirtywakeup(lodirtybuffers);
 	}
@@ -1147,7 +1159,7 @@ void
 bawrite(struct buf * bp)
 {
 	bp->b_flags |= B_ASYNC;
-	(void) BUF_WRITE(bp);
+	(void) bwrite(bp);
 }
 
 /*
@@ -1302,9 +1314,7 @@ brelse(struct buf * bp)
 		off_t foff;
 		vm_pindex_t poff;
 		vm_object_t obj;
-		struct vnode *vp;
 
-		vp = bp->b_vp;
 		obj = bp->b_object;
 
 		/*
@@ -1326,9 +1336,6 @@ brelse(struct buf * bp)
 			int had_bogus = 0;
 
 			m = bp->b_pages[i];
-			vm_page_lock_queues();
-			vm_page_flag_clear(m, PG_ZERO);
-			vm_page_unlock_queues();
 
 			/*
 			 * If we hit a bogus page, fixup *all* the bogus pages
@@ -1406,7 +1413,7 @@ brelse(struct buf * bp)
 			bp->b_qindex = QUEUE_EMPTY;
 		}
 		TAILQ_INSERT_HEAD(&bufqueues[bp->b_qindex], bp, b_freelist);
-		bp->b_dev = NODEV;
+		bp->b_dev = NULL;
 	/* buffers with junk contents */
 	} else if (bp->b_flags & (B_INVAL | B_NOCACHE | B_RELBUF) ||
 	    (bp->b_ioflags & BIO_ERROR)) {
@@ -1416,7 +1423,7 @@ brelse(struct buf * bp)
 			panic("losing buffer 2");
 		bp->b_qindex = QUEUE_CLEAN;
 		TAILQ_INSERT_HEAD(&bufqueues[QUEUE_CLEAN], bp, b_freelist);
-		bp->b_dev = NODEV;
+		bp->b_dev = NULL;
 	/* remaining buffers */
 	} else {
 		if (bp->b_flags & B_DELWRI)
@@ -1572,7 +1579,6 @@ vfs_vmio_release(bp)
 			continue;
 			
 		if (m->wire_count == 0) {
-			vm_page_flag_clear(m, PG_ZERO);
 			/*
 			 * Might as well free the page if we can and it has
 			 * no valid data.  We also free the page if the
@@ -1712,7 +1718,7 @@ vfs_bio_awrite(struct buf * bp)
 	 * XXX returns b_bufsize instead of b_bcount for nwritten?
 	 */
 	nwritten = bp->b_bufsize;
-	(void) BUF_WRITE(bp);
+	(void) bwrite(bp);
 
 	return nwritten;
 }
@@ -1911,7 +1917,7 @@ restart:
 		bp->b_ioflags = 0;
 		bp->b_xflags = 0;
 		bp->b_vflags = 0;
-		bp->b_dev = NODEV;
+		bp->b_dev = NULL;
 		bp->b_vp = NULL;
 		bp->b_blkno = bp->b_lblkno = 0;
 		bp->b_offset = NOOFFSET;
@@ -2316,10 +2322,8 @@ vfs_setdirty(struct buf *bp)
 		 * test the pages to see if they have been modified directly
 		 * by users through the VM system.
 		 */
-		for (i = 0; i < bp->b_npages; i++) {
-			vm_page_flag_clear(bp->b_pages[i], PG_ZERO);
+		for (i = 0; i < bp->b_npages; i++)
 			vm_page_test_dirty(bp->b_pages[i]);
-		}
 
 		/*
 		 * Calculate the encompassing dirty range, boffset and eoffset,
@@ -2384,7 +2388,7 @@ vfs_setdirty(struct buf *bp)
  *	case it is returned with B_INVAL clear and B_CACHE set based on the
  *	backing VM.
  *
- *	getblk() also forces a BUF_WRITE() for any B_DELWRI buffer whos
+ *	getblk() also forces a bwrite() for any B_DELWRI buffer whos
  *	B_CACHE bit is clear.
  *	
  *	What this means, basically, is that the caller should use B_CACHE to
@@ -2476,7 +2480,7 @@ loop:
 			    (size > bp->b_kvasize)) {
 				if (bp->b_flags & B_DELWRI) {
 					bp->b_flags |= B_NOCACHE;
-					BUF_WRITE(bp);
+					bwrite(bp);
 				} else {
 					if ((bp->b_flags & B_VMIO) &&
 					   (LIST_FIRST(&bp->b_dep) == NULL)) {
@@ -2484,7 +2488,7 @@ loop:
 						brelse(bp);
 					} else {
 						bp->b_flags |= B_NOCACHE;
-						BUF_WRITE(bp);
+						bwrite(bp);
 					}
 				}
 				goto loop;
@@ -2533,7 +2537,7 @@ loop:
 
 		if ((bp->b_flags & (B_CACHE|B_DELWRI)) == B_DELWRI) {
 			bp->b_flags |= B_NOCACHE;
-			BUF_WRITE(bp);
+			bwrite(bp);
 			goto loop;
 		}
 
@@ -2565,6 +2569,13 @@ loop:
 			bsize = vp->v_mount->mnt_stat.f_iosize;
 		else
 			bsize = size;
+
+		if (vp->v_bsize != bsize) {
+#if 0
+			printf("WARNING: Wrong block size on vnode: %d should be %d\n", vp->v_bsize, bsize);
+#endif
+			vp->v_bsize = bsize;
+		}
 
 		offset = blkno * bsize;
 		vmio = (VOP_GETVOBJECT(vp, NULL) == 0) &&
@@ -2623,8 +2634,9 @@ loop:
 		if (vmio) {
 			bp->b_flags |= B_VMIO;
 #if defined(VFS_BIO_DEBUG)
-			if (vp->v_type != VREG)
-				printf("getblk: vmioing file type %d???\n", vp->v_type);
+			if (vn_canvmio(vp) != TRUE)
+				printf("getblk: VMIO on vnode type %d\n",
+					vp->v_type);
 #endif
 			VOP_GETVOBJECT(vp, &bp->b_object);
 		} else {
@@ -2908,7 +2920,6 @@ allocbuf(struct buf *bp, int size)
 					(cnt.v_free_min + cnt.v_cache_min))) {
 					pagedaemon_wakeup();
 				}
-				vm_page_flag_clear(m, PG_ZERO);
 				vm_page_wire(m);
 				vm_page_unlock_queues();
 				bp->b_pages[bp->b_npages] = m;
@@ -3056,7 +3067,6 @@ bufwait(register struct buf * bp)
 
  /*
   * Call back function from struct bio back up to struct buf.
-  * The corresponding initialization lives in sys/conf.h:DEV_STRATEGY().
   */
 static void
 bufdonebio(struct bio *bp)
@@ -3071,12 +3081,19 @@ bufdonebio(struct bio *bp)
 void
 dev_strategy(struct buf *bp)
 {
+	struct cdevsw *csw;
 
 	if ((!bp->b_iocmd) || (bp->b_iocmd & (bp->b_iocmd - 1)))
 		panic("b_iocmd botch");
 	bp->b_io.bio_done = bufdonebio;
 	bp->b_io.bio_caller2 = bp;
+	csw = devsw(bp->b_io.bio_dev);
+	KASSERT(bp->b_io.bio_dev->si_refcount > 0,
+	    ("dev_strategy on un-referenced struct cdev *(%s)",
+	    devtoname(bp->b_io.bio_dev)));
+	cdevsw_ref(csw);
 	(*devsw(bp->b_io.bio_dev)->d_strategy)(&bp->b_io);
+	cdevsw_rel(csw);
 }
 
 /*
@@ -3104,7 +3121,6 @@ bufdone(struct buf *bp)
 	int s;
 	void    (*biodone)(struct buf *);
 
-	GIANT_REQUIRED;
 
 	s = splbio();
 
@@ -3216,7 +3232,6 @@ bufdone(struct buf *bp)
 			if ((bp->b_iocmd == BIO_READ) && !bogusflag && resid > 0) {
 				vfs_page_set_valid(bp, foff, i, m);
 			}
-			vm_page_flag_clear(m, PG_ZERO);
 
 			/*
 			 * when debugging new filesystems or buffer I/O methods, this
@@ -3299,7 +3314,6 @@ vfs_unbusy_pages(struct buf * bp)
 				pmap_qenter(trunc_page((vm_offset_t)bp->b_data), bp->b_pages, bp->b_npages);
 			}
 			vm_object_pip_subtract(obj, 1);
-			vm_page_flag_clear(m, PG_ZERO);
 			vm_page_io_finish(m);
 		}
 		vm_page_unlock_queues();
@@ -3385,7 +3399,6 @@ retry:
 		for (i = 0; i < bp->b_npages; i++) {
 			vm_page_t m = bp->b_pages[i];
 
-			vm_page_flag_clear(m, PG_ZERO);
 			if ((bp->b_flags & B_CLUSTER) == 0) {
 				vm_object_pip_add(obj, 1);
 				vm_page_io_start(m);
@@ -3515,7 +3528,7 @@ vfs_bio_set_validclean(struct buf *bp, int base, int size)
 void
 vfs_bio_clrbuf(struct buf *bp) 
 {
-	int i, mask = 0;
+	int i, j, mask = 0;
 	caddr_t sa, ea;
 
 	GIANT_REQUIRED;
@@ -3526,9 +3539,10 @@ vfs_bio_clrbuf(struct buf *bp)
 		VM_OBJECT_LOCK(bp->b_object);
 		if( (bp->b_npages == 1) && (bp->b_bufsize < PAGE_SIZE) &&
 		    (bp->b_offset & PAGE_MASK) == 0) {
+			if (bp->b_pages[0] == bogus_page)
+				goto unlock;
 			mask = (1 << (bp->b_bufsize / DEV_BSIZE)) - 1;
-			if (bp->b_pages[0] != bogus_page)
-				VM_OBJECT_LOCK_ASSERT(bp->b_pages[0]->object, MA_OWNED);
+			VM_OBJECT_LOCK_ASSERT(bp->b_pages[0]->object, MA_OWNED);
 			if ((bp->b_pages[0]->valid & mask) == mask)
 				goto unlock;
 			if (((bp->b_pages[0]->flags & PG_ZERO) == 0) &&
@@ -3540,14 +3554,15 @@ vfs_bio_clrbuf(struct buf *bp)
 		}
 		ea = sa = bp->b_data;
 		for(i=0;i<bp->b_npages;i++,sa=ea) {
-			int j = ((vm_offset_t)sa & PAGE_MASK) / DEV_BSIZE;
 			ea = (caddr_t)trunc_page((vm_offset_t)sa + PAGE_SIZE);
 			ea = (caddr_t)(vm_offset_t)ulmin(
 			    (u_long)(vm_offset_t)ea,
 			    (u_long)(vm_offset_t)bp->b_data + bp->b_bufsize);
+			if (bp->b_pages[i] == bogus_page)
+				continue;
+			j = ((vm_offset_t)sa & PAGE_MASK) / DEV_BSIZE;
 			mask = ((1 << ((ea - sa) / DEV_BSIZE)) - 1) << j;
-			if (bp->b_pages[i] != bogus_page)
-				VM_OBJECT_LOCK_ASSERT(bp->b_pages[i]->object, MA_OWNED);
+			VM_OBJECT_LOCK_ASSERT(bp->b_pages[i]->object, MA_OWNED);
 			if ((bp->b_pages[i]->valid & mask) == mask)
 				continue;
 			if ((bp->b_pages[i]->valid & mask) == 0) {
@@ -3562,9 +3577,6 @@ vfs_bio_clrbuf(struct buf *bp)
 				}
 			}
 			bp->b_pages[i]->valid |= mask;
-			vm_page_lock_queues();
-			vm_page_flag_clear(bp->b_pages[i], PG_ZERO);
-			vm_page_unlock_queues();
 		}
 unlock:
 		VM_OBJECT_UNLOCK(bp->b_object);
@@ -3678,8 +3690,6 @@ vmapbuf(struct buf *bp)
 	struct vm_page *m;
 	struct pmap *pmap = &curproc->p_vmspace->vm_pmap;
 
-	GIANT_REQUIRED;
-
 	if (bp->b_bufsize < 0)
 		return (-1);
 	prot = (bp->b_iocmd == BIO_READ) ? VM_PROT_READ | VM_PROT_WRITE :
@@ -3731,8 +3741,6 @@ vunmapbuf(struct buf *bp)
 {
 	int pidx;
 	int npages;
-
-	GIANT_REQUIRED;
 
 	npages = bp->b_npages;
 	pmap_qremove(trunc_page((vm_offset_t)bp->b_data),

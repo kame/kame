@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)clock.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/pc98/pc98/clock.c,v 1.134 2003/11/04 13:15:12 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/clock.c,v 1.140 2004/07/13 12:58:36 nyan Exp $
  */
 
 /*
@@ -59,13 +55,15 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
-#include <sys/limits.h>
 #include <sys/lock.h>
+#include <sys/kdb.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/time.h>
 #include <sys/timetc.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
+#include <sys/module.h>
 #include <sys/sysctl.h>
 #include <sys/cons.h>
 #include <sys/power.h>
@@ -76,7 +74,6 @@
 #include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/psl.h>
-
 #if defined(SMP)
 #include <machine/smp.h>
 #endif
@@ -85,7 +82,6 @@
 #include <i386/isa/icu.h>
 #include <pc98/pc98/pc98.h>
 #include <pc98/pc98/pc98_machdep.h>
-#include <i386/isa/isa_device.h>
 #ifdef DEV_ISA
 #include <isa/isavar.h>
 #endif
@@ -432,13 +428,13 @@ DELAY(int n)
 	 * multiplications and divisions to scale the count take a while).
 	 *
 	 * However, if ddb is active then use a fake counter since reading
-	 * the i8254 counter involves acquiring a lock.  ddb must not go
+	 * the i8254 counter involves acquiring a lock.  ddb must not do
 	 * locking for many reasons, but it calls here for at least atkbd
 	 * input.
 	 */
-#ifdef DDB
-	if (db_active)
-		prev_tick = 0;
+#ifdef KDB
+	if (kdb_active)
+		prev_tick = 1;
 	else
 #endif
 		prev_tick = getit();
@@ -468,10 +464,12 @@ DELAY(int n)
 			     / 1000000;
 
 	while (ticks_left > 0) {
-#ifdef DDB
-		if (db_active) {
+#ifdef KDB
+		if (kdb_active) {
 			outb(0x5f, 0);
-			tick = prev_tick + 1;
+			tick = prev_tick - 1;
+			if (tick <= 0)
+				tick = timer0_max_count;
 		} else
 #endif
 			tick = getit();
@@ -594,7 +592,7 @@ calibrate_clocks(void)
 		else
 			tot_count += prev_count - count;
 		prev_count = count;
-		if ((sec == start_sec + 1200) ||
+		if ((sec == start_sec + 1200) || /* 1200 = 307.2KHz >> 8 */
 		    (sec < start_sec &&
 		        (u_int)sec + 0x10000 == (u_int)start_sec + 1200))
 			break;

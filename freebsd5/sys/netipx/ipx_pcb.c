@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.26 2003/06/11 05:25:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.28.4.1 2004/10/21 09:30:47 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -268,6 +268,8 @@ ipx_pcbdetach(ipxp)
 {
 	struct socket *so = ipxp->ipxp_socket;
 
+	ACCEPT_LOCK();
+	SOCK_LOCK(so);
 	so->so_pcb = 0;
 	sotryfree(so);
 	if (ipxp->ipxp_route.ro_rt != NULL)
@@ -288,7 +290,7 @@ ipx_setsockaddr(ipxp, nam)
 	sipx->sipx_len = sizeof(*sipx);
 	sipx->sipx_family = AF_IPX;
 	sipx->sipx_addr = ipxp->ipxp_laddr;
-	*nam = dup_sockaddr((struct sockaddr *)sipx, 0);
+	*nam = sodupsockaddr((struct sockaddr *)sipx, M_NOWAIT);
 }
 
 void
@@ -303,7 +305,7 @@ ipx_setpeeraddr(ipxp, nam)
 	sipx->sipx_len = sizeof(*sipx);
 	sipx->sipx_family = AF_IPX;
 	sipx->sipx_addr = ipxp->ipxp_faddr;
-	*nam = dup_sockaddr((struct sockaddr *)sipx, 0);
+	*nam = sodupsockaddr((struct sockaddr *)sipx, M_NOWAIT);
 }
 
 /*

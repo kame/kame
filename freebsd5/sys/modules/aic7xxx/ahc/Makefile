@@ -1,9 +1,9 @@
 
-# $FreeBSD: src/sys/modules/aic7xxx/ahc/Makefile,v 1.4 2003/01/22 21:56:54 gibbs Exp $
+# $FreeBSD: src/sys/modules/aic7xxx/ahc/Makefile,v 1.5 2004/08/17 00:14:31 gibbs Exp $
 
 .PATH:	${.CURDIR}/../../../dev/aic7xxx
 KMOD=	ahc
-SUBDIR=	ahc_eisa ahc_pci
+SUBDIR=	ahc_eisa ahc_isa ahc_pci
 
 GENSRCS= aic7xxx_{seq,reg}.h
 AHC_REG_PRETTY_PRINT=1
@@ -29,7 +29,7 @@ ${GENSRCS}:								 \
 			${.CURDIR}/../../../dev/aic7xxx/aic7xxx.seq
 
 SRCS= ${GENSRCS}
-SRCS+= aic7xxx.c aic7xxx_93cx6.c aic7xxx_osm.c
+SRCS+= aic7xxx.c aic7xxx_93cx6.c aic7xxx_osm.c aic7770.c
 SRCS+= opt_scsi.h opt_aic7xxx.h opt_cam.h
 SRCS+= device_if.h bus_if.h pci_if.h
 

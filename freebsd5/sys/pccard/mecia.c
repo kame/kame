@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/mecia.c,v 1.4 2003/11/09 09:17:25 tanimura Exp $
+ * $FreeBSD: src/sys/pccard/mecia.c,v 1.5 2004/03/17 17:50:52 njl Exp $
  *
  * Based heavily on the FreeBSD pcic driver's pcic98 support, derived
  * from PAO3 tree.  This copyright notice likely needs modification for
@@ -153,7 +153,7 @@ mecia_attach(device_t dev)
 	validunits++;
 
 	rid = 0;
-	r = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
+	r = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (!r)
 		return (ENXIO);
 

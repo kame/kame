@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/atm/uni/ng_uni.c,v 1.1 2003/11/07 09:15:14 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/atm/uni/ng_uni.c,v 1.3 2004/05/29 00:51:16 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -185,18 +185,16 @@ static ng_rcvdata_t	ng_uni_rcvupper;
 static int ng_uni_mod_event(module_t, int, void *);
 
 static struct ng_type ng_uni_typestruct = {
-	NG_ABI_VERSION,
-	NG_UNI_NODE_TYPE,
-	ng_uni_mod_event,	/* Module event handler (optional) */
-	ng_uni_constructor,	/* Node constructor */
-	ng_uni_rcvmsg,		/* control messages come here */
-	ng_uni_shutdown,	/* reset, and free resources */
-	ng_uni_newhook,		/* first notification of new hook */
-	NULL,			/* findhook */
-	NULL,			/* connect */
-	ng_uni_rcvlower,	/* rcvdata */
-	ng_uni_disconnect,	/* notify on disconnect */
-	ng_uni_cmdlist,
+	.version =	NG_ABI_VERSION,
+	.name =		NG_UNI_NODE_TYPE,
+	.mod_event =	ng_uni_mod_event,
+	.constructor =	ng_uni_constructor,
+	.rcvmsg =	ng_uni_rcvmsg,
+	.shutdown =	ng_uni_shutdown,
+	.newhook =	ng_uni_newhook,
+	.rcvdata =	ng_uni_rcvlower,
+	.disconnect =	ng_uni_disconnect,
+	.cmdlist =	ng_uni_cmdlist,
 };
 NETGRAPH_INIT(uni, &ng_uni_typestruct);
 
@@ -800,7 +798,8 @@ static const char *unimem_names[UNIMEM_TYPES] = {
 static void
 uni_init(void)
 {
-	mtx_init(&nguni_unilist_mtx, "netgraph UNI structure lists", NULL, 0);
+	mtx_init(&nguni_unilist_mtx, "netgraph UNI structure lists", NULL,
+	    MTX_DEF);
 }
 
 static void

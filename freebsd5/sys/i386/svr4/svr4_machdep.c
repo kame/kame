@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/svr4/svr4_machdep.c,v 1.33 2003/06/10 05:05:54 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/svr4/svr4_machdep.c,v 1.34 2004/01/05 00:29:00 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -206,7 +206,7 @@ svr4_setcontext(td, uc)
 #if defined(DONE_MORE_SIGALTSTACK_WORK)
 	psp = p->p_sigacts;
 #endif
-	sf = &p->p_sigstk;
+	sf = &td->td_sigstk;
 
 	/*
 	 * XXX:
@@ -437,11 +437,11 @@ svr4_sendsig(catcher, sig, mask, code)
 	/*
 	 * Allocate space for the signal handler context.
 	 */
-	if ((p->p_flag & P_ALTSTACK) && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct svr4_sigframe *)(p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(struct svr4_sigframe));
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		fp = (struct svr4_sigframe *)(td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(struct svr4_sigframe));
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 	} else {
 		fp = (struct svr4_sigframe *)tf->tf_esp - 1;
 	}

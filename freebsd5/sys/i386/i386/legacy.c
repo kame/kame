@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/legacy.c,v 1.52 2003/08/25 09:48:47 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/legacy.c,v 1.56 2004/08/16 21:55:29 gibbs Exp $");
 
 /*
  * This code implements a system driver for legacy systems that do not
@@ -40,8 +40,11 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/legacy.c,v 1.52 2003/08/25 09:48:47 obrien
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <machine/bus.h>
+#include <sys/pcpu.h>
 #include <sys/rman.h>
+#include <sys/smp.h>
 
 #include "opt_mca.h"
 #ifdef DEV_MCA
@@ -53,7 +56,6 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/legacy.c,v 1.52 2003/08/25 09:48:47 obrien
 
 static MALLOC_DEFINE(M_LEGACYDEV, "legacydrv", "legacy system device");
 struct legacy_device {
-	struct resource_list	lg_resources;
 	int			lg_pcibus;
 };
 
@@ -65,15 +67,8 @@ static	int legacy_attach(device_t);
 static	int legacy_print_child(device_t, device_t);
 static device_t legacy_add_child(device_t bus, int order, const char *name,
 				int unit);
-static	struct resource *legacy_alloc_resource(device_t, device_t, int, int *,
-					      u_long, u_long, u_long, u_int);
 static	int legacy_read_ivar(device_t, device_t, int, uintptr_t *);
 static	int legacy_write_ivar(device_t, device_t, int, uintptr_t);
-static	int legacy_release_resource(device_t, device_t, int, int,
-				   struct resource *);
-static	int legacy_set_resource(device_t, device_t, int, int, u_long, u_long);
-static	int legacy_get_resource(device_t, device_t, int, int, u_long *, u_long *);
-static void legacy_delete_resource(device_t, device_t, int, int);
 
 static device_method_t legacy_methods[] = {
 	/* Device interface */
@@ -90,11 +85,8 @@ static device_method_t legacy_methods[] = {
 	DEVMETHOD(bus_add_child,	legacy_add_child),
 	DEVMETHOD(bus_read_ivar,	legacy_read_ivar),
 	DEVMETHOD(bus_write_ivar,	legacy_write_ivar),
-	DEVMETHOD(bus_set_resource,	legacy_set_resource),
-	DEVMETHOD(bus_get_resource,	legacy_get_resource),
-	DEVMETHOD(bus_alloc_resource,	legacy_alloc_resource),
-	DEVMETHOD(bus_release_resource,	legacy_release_resource),
-	DEVMETHOD(bus_delete_resource,	legacy_delete_resource),
+	DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
+	DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
 	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
 	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
 	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),
@@ -143,7 +135,9 @@ legacy_probe(device_t dev)
 static int
 legacy_attach(device_t dev)
 {
-	device_t	child;
+	device_t child;
+	int i;
+	struct pcpu *pc;
 
 	/*
 	 * First, let our child driver's identify any child devices that
@@ -152,6 +146,21 @@ legacy_attach(device_t dev)
 	 */
 	bus_generic_probe(dev);
 	bus_generic_attach(dev);
+
+	/* Attach CPU pseudo-driver. */
+	if (!devclass_get_device(devclass_find("cpu"), 0)) {
+		for (i = 0; i <= mp_maxid; i++)
+			if (!CPU_ABSENT(i)) {
+				pc = pcpu_find(i);
+				KASSERT(pc != NULL, ("pcpu_find failed"));
+				child = BUS_ADD_CHILD(dev, 0, "cpu", i);
+				if (child == NULL)
+					panic("legacy_attach cpu");
+				device_probe_and_attach(child);
+				pc->pc_device = child;
+				device_set_ivars(child, pc);
+			}
+	}
 
 	/*
 	 * If we didn't see EISA or ISA on a pci bridge, create some
@@ -182,30 +191,12 @@ legacy_attach(device_t dev)
 }
 
 static int
-legacy_print_all_resources(device_t dev)
-{
-	struct legacy_device *atdev = DEVTOAT(dev);
-	struct resource_list *rl = &atdev->lg_resources;
-	int retval = 0;
-
-	if (SLIST_FIRST(rl) || atdev->lg_pcibus != -1)
-		retval += printf(" at");
-	
-	retval += resource_list_print_type(rl, "port", SYS_RES_IOPORT, "%#lx");
-	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#lx");
-	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%ld");
-
-	return retval;
-}
-
-static int
 legacy_print_child(device_t bus, device_t child)
 {
 	struct legacy_device *atdev = DEVTOAT(child);
 	int retval = 0;
 
 	retval += bus_print_child_header(bus, child);
-	retval += legacy_print_all_resources(child);
 	if (atdev->lg_pcibus != -1)
 		retval += printf(" pcibus %d", atdev->lg_pcibus);
 	retval += printf(" on motherboard\n");	/* XXX "motherboard", ick */
@@ -221,17 +212,18 @@ legacy_add_child(device_t bus, int order, const char *name, int unit)
 
 	atdev = malloc(sizeof(struct legacy_device), M_LEGACYDEV,
 	    M_NOWAIT | M_ZERO);
-	if (!atdev)
-		return(0);
-	resource_list_init(&atdev->lg_resources);
+	if (atdev == NULL)
+		return(NULL);
 	atdev->lg_pcibus = -1;
 
-	child = device_add_child_ordered(bus, order, name, unit); 
+	child = device_add_child_ordered(bus, order, name, unit);
+	if (child == NULL)
+		free(atdev, M_LEGACYDEV);
+	else
+		/* should we free this in legacy_child_detached? */
+		device_set_ivars(child, atdev);
 
-	/* should we free this in legacy_child_detached? */
-	device_set_ivars(child, atdev);
-
-	return(child);
+	return (child);
 }
 
 static int
@@ -265,62 +257,53 @@ legacy_write_ivar(device_t dev, device_t child, int which, uintptr_t value)
 	return 0;
 }
 
+/*
+ * Legacy CPU attachment when ACPI is not available.  Drivers like
+ * cpufreq(4) hang off this.
+ */
+static int	cpu_read_ivar(device_t dev, device_t child, int index,
+		    uintptr_t *result);
 
-static struct resource *
-legacy_alloc_resource(device_t bus, device_t child, int type, int *rid,
-		     u_long start, u_long end, u_long count, u_int flags)
-{
-	struct legacy_device *atdev = DEVTOAT(child);
-	struct resource_list *rl = &atdev->lg_resources;
+static device_method_t cpu_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		bus_generic_probe),
+	DEVMETHOD(device_attach,	bus_generic_attach),
+	DEVMETHOD(device_detach,	bus_generic_detach),
+	DEVMETHOD(device_shutdown,	bus_generic_shutdown),
+	DEVMETHOD(device_suspend,	bus_generic_suspend),
+	DEVMETHOD(device_resume,	bus_generic_resume),
 
-	return (resource_list_alloc(rl, bus, child, type, rid, start, end,
-		    count, flags));
-}
+	/* Bus interface */
+	DEVMETHOD(bus_read_ivar,	cpu_read_ivar),
+	DEVMETHOD(bus_print_child,	bus_generic_print_child),
+	DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
+	DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
+	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
+	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
+	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),
+	DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
+
+	{ 0, 0 }
+};
+
+static driver_t cpu_driver = {
+	"cpu",
+	cpu_methods,
+	1,		/* no softc */
+};
+static devclass_t cpu_devclass;
+DRIVER_MODULE(cpu, legacy, cpu_driver, cpu_devclass, 0, 0);
 
 static int
-legacy_release_resource(device_t bus, device_t child, int type, int rid,
-		       struct resource *r)
+cpu_read_ivar(device_t dev, device_t child, int index, uintptr_t *result)
 {
-	struct legacy_device *atdev = DEVTOAT(child);
-	struct resource_list *rl = &atdev->lg_resources;
+	struct pcpu *pc;
 
-	return (resource_list_release(rl, bus, child, type, rid, r));
-}
-
-static int
-legacy_set_resource(device_t dev, device_t child, int type, int rid,
-    u_long start, u_long count)
-{
-	struct legacy_device *atdev = DEVTOAT(child);
-	struct resource_list *rl = &atdev->lg_resources;
-
-	resource_list_add(rl, type, rid, start, start + count - 1, count);
-	return(0);
-}
-
-static int
-legacy_get_resource(device_t dev, device_t child, int type, int rid,
-    u_long *startp, u_long *countp)
-{
-	struct legacy_device *atdev = DEVTOAT(child);
-	struct resource_list *rl = &atdev->lg_resources;
-	struct resource_list_entry *rle;
-
-	rle = resource_list_find(rl, type, rid);
-	if (!rle)
-		return(ENOENT);
-	if (startp)
-		*startp = rle->start;
-	if (countp)
-		*countp = rle->count;
-	return(0);
-}
-
-static void
-legacy_delete_resource(device_t dev, device_t child, int type, int rid)
-{
-	struct legacy_device *atdev = DEVTOAT(child);
-	struct resource_list *rl = &atdev->lg_resources;
-
-	resource_list_delete(rl, type, rid);
+	if (index != 0)
+		return (ENOENT);
+	pc = device_get_ivars(child);
+	if (pc == NULL)
+		return (ENOENT);
+	*result = (uintptr_t)pc;
+	return (0);
 }

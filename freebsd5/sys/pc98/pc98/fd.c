@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -50,17 +50,14 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)fd.c	7.4 (Berkeley) 5/25/91
- * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.140 2003/10/18 17:51:26 phk Exp $
+ * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.153 2004/07/17 10:07:19 nyan Exp $
  */
 
 #include "opt_fdc.h"
-#include "card.h"
 
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/bio.h>
 #include <sys/bus.h>
-#include <sys/conf.h>
 #include <sys/devicestat.h>
 #include <sys/disk.h>
 #include <sys/fcntl.h>
@@ -72,162 +69,33 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
-#include <sys/syslog.h>
+#include <sys/rman.h>
+#include <sys/systm.h>
 
 #include <machine/bus.h>
-#include <sys/rman.h>
-
 #include <machine/clock.h>
-#include <machine/resource.h>
 #include <machine/stdarg.h>
 
-#include <isa/isavar.h>
 #ifdef PC98
+#include <isa/isavar.h>
 #include <pc98/pc98/pc98.h>
 #include <pc98/pc98/pc98_machdep.h>
 #include <pc98/pc98/epsonio.h>
 #include <pc98/pc98/fdreg.h>
+#include <pc98/pc98/fdcvar.h>
 #else
+#include <isa/isavar.h>
 #include <isa/isareg.h>
-#include <isa/fdreg.h>
+#include <dev/fdc/fdcreg.h>
+#include <dev/fdc/fdcvar.h>
 #include <isa/rtc.h>
 #endif
 
-enum fdc_type
-{
-	FDC_NE765, FDC_ENHANCED, FDC_UNKNOWN = -1
-};
-
-enum fdc_states {
-	DEVIDLE,
-	FINDWORK,
-	DOSEEK,
-	SEEKCOMPLETE ,
-	IOCOMPLETE,
-	RECALCOMPLETE,
-	STARTRECAL,
-	RESETCTLR,
-	SEEKWAIT,
-	RECALWAIT,
-	MOTORWAIT,
-	IOTIMEDOUT,
-	RESETCOMPLETE,
-	PIOREAD
-};
-
-#ifdef	FDC_DEBUG
-static char const * const fdstates[] = {
-	"DEVIDLE",
-	"FINDWORK",
-	"DOSEEK",
-	"SEEKCOMPLETE",
-	"IOCOMPLETE",
-	"RECALCOMPLETE",
-	"STARTRECAL",
-	"RESETCTLR",
-	"SEEKWAIT",
-	"RECALWAIT",
-	"MOTORWAIT",
-	"IOTIMEDOUT",
-	"RESETCOMPLETE",
-	"PIOREAD"
-};
-#endif
-
-/*
- * Per controller structure (softc).
- */
-struct fdc_data
-{
-	int	fdcu;		/* our unit number */
-	int	dmachan;
-	int	flags;
-#define FDC_ATTACHED	0x01
-#define FDC_STAT_VALID	0x08
-#define FDC_HAS_FIFO	0x10
-#define FDC_NEEDS_RESET	0x20
-#define FDC_NODMA	0x40
-#define FDC_ISPNP	0x80
-#define FDC_ISPCMCIA	0x100
-	struct	fd_data *fd;
-	int	fdu;		/* the active drive	*/
-	enum	fdc_states state;
-	int	retry;
-#ifndef PC98
-	int	fdout;		/* mirror of the w/o digital output reg */
-#endif
-	u_int	status[7];	/* copy of the registers */
-	enum	fdc_type fdct;	/* chip version of FDC */
-	int	fdc_errs;	/* number of logged errors */
-	int	dma_overruns;	/* number of DMA overruns */
-	struct	bio_queue_head head;
-	struct	bio *bp;	/* active buffer */
-#ifdef PC98
-	struct	resource *res_ioport, *res_fdsio, *res_fdemsio;
-	struct	resource *res_irq, *res_drq;
-	int	rid_ioport, rid_irq, rid_drq;
-#else
-	struct	resource *res_ioport, *res_ctl, *res_irq, *res_drq;
-	int	rid_ioport, rid_ctl, rid_irq, rid_drq;
-#endif
-	int	port_off;
-	bus_space_tag_t portt;
-	bus_space_handle_t porth;
-#ifdef PC98
-        bus_space_tag_t		sc_fdsiot;
-        bus_space_handle_t	sc_fdsioh;
-        bus_space_tag_t		sc_fdemsiot;
-        bus_space_handle_t	sc_fdemsioh;
-#else
-	bus_space_tag_t ctlt;
-	bus_space_handle_t ctlh;
-#endif
-	void	*fdc_intr;
-	struct	device *fdc_dev;
-#ifndef PC98
-	void	(*fdctl_wr)(struct fdc_data *fdc, u_int8_t v);
-#endif
-};
-
 #define FDBIO_FORMAT	BIO_CMD2
-
-typedef int	fdu_t;
-typedef int	fdcu_t;
-typedef int	fdsu_t;
-typedef	struct fd_data *fd_p;
-typedef struct fdc_data *fdc_p;
-typedef enum fdc_type fdc_t;
-
-#define FDUNIT(s)	(((s) >> 6) & 3)
-#define FDNUMTOUNIT(n)	(((n) & 3) << 6)
-#define FDTYPE(s)	((s) & 0x3f)
-
-/*
- * fdc maintains a set (1!) of ivars per child of each controller.
- */
-enum fdc_device_ivars {
-	FDC_IVAR_FDUNIT,
-};
-
-/*
- * Simple access macros for the ivars.
- */
-#define FDC_ACCESSOR(A, B, T)						\
-static __inline T fdc_get_ ## A(device_t dev)				\
-{									\
-	uintptr_t v;							\
-	BUS_READ_IVAR(device_get_parent(dev), dev, FDC_IVAR_ ## B, &v);	\
-	return (T) v;							\
-}
-FDC_ACCESSOR(fdunit,	FDUNIT,	int)
 
 /* configuration flags for fdc */
 #define FDC_NO_FIFO	(1 << 2)	/* do not enable FIFO  */
 
-/* error returns for fd_cmd() */
-#define FD_FAILED -1
-#define FD_NOT_VALID -2
-#define FDC_ERRMAX	100	/* do not log more */
 /*
  * Stop retrying after this many DMA overruns.  Since each retry takes
  * one revolution, with 300 rpm., 25 retries take approximately 5
@@ -249,13 +117,6 @@ FDC_ACCESSOR(fdunit,	FDUNIT,	int)
 
 /*
  * Number of subdevices that can be used for different density types.
- * By now, the lower 6 bit of the minor number are reserved for this,
- * allowing for up to 64 subdevices, but we only use 16 out of this.
- * Density #0 is used for automatic format detection, the other
- * densities are available as programmable densities (for assignment
- * by fdcontrol(8)).
- * The upper 2 bits of the minor number are reserved for the subunit
- * (drive #) per controller.
  */
 #ifdef PC98
 #define NUMDENS		12
@@ -283,32 +144,38 @@ static struct fd_type fd_native_types[] =
 };
 
 static struct fd_type fd_searchlist_12m[] = {
-{ 15,2,0xFF,0x1B,80,2400,0,2,0x54,1,0,0 },	/* 1.2M */
-{ 10,2,0xFF,0x10,82,1640,1,2,0x30,1,0,0 },	/* 820K */
-{ 10,2,0xFF,0x10,80,1600,1,2,0x30,1,0,0 },	/* 800K */
-{  9,2,0xFF,0x20,80,1440,1,2,0x50,1,0,0 },	/* 720K */
-{  9,2,0xFF,0x20,40, 720,1,2,0x50,1,0,FL_2STEP },/* 360K */
-{  8,2,0xFF,0x2A,80,1280,1,2,0x50,1,0,0 },	/* 640K */
-{  8,3,0xFF,0x35,77,1232,0,2,0x74,1,0,0 },	/* 1.23M 1024/sec */
-
-{  8,3,0xFF,0x35,80,1280,0,2,0x74,1,0,0 },	/* 1.28M 1024/sec */
+{ 15,2,0xFF,0x1B,80,2400,0,2,0x54,1,0,FL_MFM },	/* 1.2M */
+#if 0
+{ 10,2,0xFF,0x10,82,1640,1,2,0x30,1,0,FL_MFM },	/* 820K */
+{ 10,2,0xFF,0x10,80,1600,1,2,0x30,1,0,FL_MFM },	/* 800K */
+#endif
+{  9,2,0xFF,0x20,80,1440,1,2,0x50,1,0,FL_MFM },	/* 720K */
+{  9,2,0xFF,0x20,40, 720,1,2,0x50,1,0,FL_MFM|FL_2STEP },/* 360K */
+{  8,2,0xFF,0x2A,80,1280,1,2,0x50,1,0,FL_MFM },	/* 640K */
+{  8,3,0xFF,0x35,77,1232,0,2,0x74,1,0,FL_MFM },	/* 1.23M 1024/sec */
+#if 0
+{  8,3,0xFF,0x35,80,1280,0,2,0x74,1,0,FL_MFM },	/* 1.28M 1024/sec */
+#endif
 };
 static struct fd_type fd_searchlist_144m[] = {
-{ 21,2,0xFF,0x04,82,3444,2,2,0x0C,2,0,0 },	/* 1.72M in 3mode */
-{ 18,2,0xFF,0x1B,82,2952,2,2,0x54,1,0,0 },	/* 1.48M in 3mode */
-{ 18,2,0xFF,0x1B,80,2880,2,2,0x54,1,0,0 },	/* 1.44M in 3mode */
-{ 15,2,0xFF,0x1B,80,2400,0,2,0x54,1,0,0 },	/* 1.2M */
-{ 10,2,0xFF,0x10,82,1640,1,2,0x30,1,0,0 },	/* 820K */
-{ 10,2,0xFF,0x10,80,1600,1,2,0x30,1,0,0 },	/* 800K */
-{  9,2,0xFF,0x20,80,1440,1,2,0x50,1,0,0 },	/* 720K */
-{  9,2,0xFF,0x20,40, 720,1,2,0x50,1,0,FL_2STEP },/* 360K */
-{  8,2,0xFF,0x2A,80,1280,1,2,0x50,1,0,0 },	/* 640K */
-{  8,3,0xFF,0x35,77,1232,0,2,0x74,1,0,0 },	/* 1.23M 1024/sec */
-
-{  8,3,0xFF,0x35,80,1280,0,2,0x74,1,0,0 },	/* 1.28M 1024/sec */
-{  9,3,0xFF,0x35,82,1476,0,2,0x47,1,0,0 },	/* 1.48M 1024/sec 9sec */
 #if 0
-{ 10,3,0xFF,0x1B,82,1640,2,2,0x54,1,0,0 },	/* 1.64M in 3mode - Reserve */
+{ 21,2,0xFF,0x04,82,3444,2,2,0x0C,2,0,FL_MFM },	/* 1.72M in 3mode */
+{ 18,2,0xFF,0x1B,82,2952,2,2,0x54,1,0,FL_MFM },	/* 1.48M in 3mode */
+#endif
+{ 18,2,0xFF,0x1B,80,2880,2,2,0x54,1,0,FL_MFM },	/* 1.44M in 3mode */
+{ 15,2,0xFF,0x1B,80,2400,0,2,0x54,1,0,FL_MFM },	/* 1.2M */
+#if 0
+{ 10,2,0xFF,0x10,82,1640,1,2,0x30,1,0,FL_MFM },	/* 820K */
+{ 10,2,0xFF,0x10,80,1600,1,2,0x30,1,0,FL_MFM },	/* 800K */
+#endif
+{  9,2,0xFF,0x20,80,1440,1,2,0x50,1,0,FL_MFM },	/* 720K */
+{  9,2,0xFF,0x20,40, 720,1,2,0x50,1,0,FL_MFM|FL_2STEP },/* 360K */
+{  8,2,0xFF,0x2A,80,1280,1,2,0x50,1,0,FL_MFM },	/* 640K */
+{  8,3,0xFF,0x35,77,1232,0,2,0x74,1,0,FL_MFM },	/* 1.23M 1024/sec */
+#if 0
+{  8,3,0xFF,0x35,80,1280,0,2,0x74,1,0,FL_MFM },	/* 1.28M 1024/sec */
+{  9,3,0xFF,0x35,82,1476,0,2,0x47,1,0,FL_MFM },	/* 1.48M 1024/sec 9sec */
+{ 10,3,0xFF,0x1B,82,1640,2,2,0x54,1,0,FL_MFM },	/* 1.64M in 3mode - Reserve */
 #endif
 };
 #else /* PC98 */
@@ -358,7 +225,7 @@ static struct fd_type fd_searchlist_288m[] = {
 				 * up to cyl 82 */
 #define MAX_HEAD	1
 
-static devclass_t fdc_devclass;
+devclass_t fdc_devclass;
 
 /*
  * Per drive structure (softc).
@@ -384,11 +251,7 @@ struct fd_data {
 	struct	callout_handle toffhandle;
 	struct	callout_handle tohandle;
 	struct	devstat *device_stats;
-	dev_t	masterdev;
-#ifdef GONE_IN_5
-	eventhandler_tag clonetag;
-	dev_t	clonedevs[NUMDENS - 1];
-#endif
+	struct cdev *masterdev;
 	device_t dev;
 	fdu_t	fdu;
 #ifdef PC98
@@ -396,13 +259,11 @@ struct fd_data {
 #endif
 };
 
-#ifdef PC98
-static bus_addr_t fdc_iat[] = {0, 2, 4};
-#endif
-
 struct fdc_ivars {
 	int	fdunit;
+	int	fdtype;
 };
+
 static devclass_t fd_devclass;
 
 /* configuration flags for fd */
@@ -485,41 +346,14 @@ nrd_info(addr)
  * as below -- makes locating a particular function in the body much
  * easier.
  */
-#ifndef PC98
-static void fdout_wr(fdc_p, u_int8_t);
-#endif
 static u_int8_t fdsts_rd(fdc_p);
 static void fddata_wr(fdc_p, u_int8_t);
 static u_int8_t fddata_rd(fdc_p);
-#ifndef PC98
-static void fdctl_wr_isa(fdc_p, u_int8_t);
-#if NCARD > 0
-static void fdctl_wr_pcmcia(fdc_p, u_int8_t);
-#endif
-#if 0
-static u_int8_t fdin_rd(fdc_p);
-#endif
-#endif /* PC98 */
 static int fdc_err(struct fdc_data *, const char *);
-static int fd_cmd(struct fdc_data *, int, ...);
 static int enable_fifo(fdc_p fdc);
 static int fd_sense_drive_status(fdc_p, int *);
 static int fd_sense_int(fdc_p, int *, int *);
 static int fd_read_status(fdc_p);
-static int fdc_alloc_resources(struct fdc_data *);
-static void fdc_release_resources(struct fdc_data *);
-static int fdc_read_ivar(device_t, device_t, int, uintptr_t *);
-static int fdc_probe(device_t);
-#if NCARD > 0
-static int fdc_pccard_probe(device_t);
-#endif
-static int fdc_detach(device_t dev);
-static void fdc_add_child(device_t, const char *, int);
-static int fdc_attach(device_t);
-static int fdc_print_child(device_t, device_t);
-#ifdef GONE_IN_5
-static void fd_clone (void *, char *, int, dev_t *);
-#endif
 static int fd_probe(device_t);
 static int fd_attach(device_t);
 static int fd_detach(device_t);
@@ -544,11 +378,11 @@ static timeout_t fd_iotimeout;
 static timeout_t fd_pseudointr;
 static driver_intr_t fdc_intr;
 static int fdcpio(fdc_p, long, caddr_t, u_int);
-static int fdautoselect(dev_t);
+static int fdautoselect(struct cdev *);
 static int fdstate(struct fdc_data *);
 static int retrier(struct fdc_data *);
 static void fdbiodone(struct bio *);
-static int fdmisccmd(dev_t, u_int, void *);
+static int fdmisccmd(struct cdev *, u_int, void *);
 static	d_ioctl_t	fdioctl;
 
 static int fifo_threshold = 8;	/* XXX: should be accessible via sysctl */
@@ -567,7 +401,7 @@ static int volatile fd_debug = 0;
  * Bus space handling (access to low-level IO).
  */
 #ifndef PC98
-static void
+void
 fdout_wr(fdc_p fdc, u_int8_t v)
 {
 	bus_space_write_1(fdc->portt, fdc->porth, FDOUT+fdc->port_off, v);
@@ -601,20 +435,6 @@ fdctl_wr(fdc_p fdc, u_int8_t v)
 #endif
 
 #ifndef PC98
-static void
-fdctl_wr_isa(fdc_p fdc, u_int8_t v)
-{
-	bus_space_write_1(fdc->ctlt, fdc->ctlh, 0, v);
-}
-
-#if NCARD > 0
-static void
-fdctl_wr_pcmcia(fdc_p fdc, u_int8_t v)
-{
-	bus_space_write_1(fdc->portt, fdc->porth, FDCTL+fdc->port_off, v);
-}
-#endif
-
 static u_int8_t
 fdin_rd(fdc_p fdc)
 {
@@ -622,8 +442,8 @@ fdin_rd(fdc_p fdc)
 }
 #endif /* PC98 */
 
-#define CDEV_MAJOR 9
 static struct cdevsw fd_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	fdopen,
 	.d_close =	fdclose,
 	.d_read =	physread,
@@ -631,8 +451,7 @@ static struct cdevsw fd_cdevsw = {
 	.d_ioctl =	fdioctl,
 	.d_strategy =	fdstrategy,
 	.d_name =	"fd",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_DISK,
+	.d_flags =	D_DISK | D_NEEDGIANT,
 };
 
 /*
@@ -660,7 +479,7 @@ fdc_err(struct fdc_data *fdc, const char *s)
  * # of output bytes, output bytes as ints ...,
  * # of input bytes, input bytes as ints ...
  */
-static int
+int
 fd_cmd(struct fdc_data *fdc, int n_out, ...)
 {
 	u_char cmd;
@@ -849,7 +668,7 @@ fd_read_status(fdc_p fdc)
 
 #ifdef PC98
 static int pc98_trans = 0; /* 0 : HD , 1 : DD , 2 : 1.44 */
-static int pc98_trans_prev = 0;
+static int pc98_trans_prev = -1;
 
 static void set_density(fdc_p fdc)
 {
@@ -887,164 +706,71 @@ static int pc98_fd_check_ready(fdu_t fdu)
 	}
 	return -1;
 }
+
+static void pc98_fd_check_type(struct fd_data *fd)
+{
+	struct fdc_data *fdc;
+
+	if (fd->type != FDT_NONE || fd->fdu < 0 || fd->fdu > 3)
+		return;
+
+	fdc = fd->fdc;
+
+	/* Look up what the BIOS thinks we have. */
+	if (!((PC98_SYSTEM_PARAMETER(0x55c) >> fd->fdu) & 0x01)) {
+		fd->type = FDT_NONE;
+		return;
+	}
+	if ((PC98_SYSTEM_PARAMETER(0x5ae) >> fd->fdu) & 0x01) {
+		/* Check 3mode I/F */
+		fd->pc98_trans = 0;
+		bus_space_write_1(fdc->sc_fdemsiot, fdc->sc_fdemsioh, 0,
+				  (fd->fdu << 5) | 0x10);
+		if (!(bus_space_read_1(fdc->sc_fdemsiot, fdc->sc_fdemsioh, 0) &
+		    0x01)) {
+			fd->type = FDT_144M;
+			return;
+		}
+		device_printf(fd->dev,
+			      "Warning: can't control 3mode I/F, fallback to 2mode.\n");
+	}
+
+	fd->type = FDT_12M;
+
+	switch (epson_machine_id) {
+	case 0x20:
+	case 0x27:
+		if ((PC98_SYSTEM_PARAMETER(0x488) >> fd->fdu) & 0x01) {
+#ifdef EPSON_NRDISK
+			if (nrd_check_ready()) {
+				nrd_LED_on();
+				nrdu = fd->fdu;
+			} else
+#endif
+				fd->type = FDT_NONE;
+		}
+		break;
+	}
+}
 #endif /* PC98 */
 
-static int
-fdc_alloc_resources(struct fdc_data *fdc)
-{
-	device_t dev;
-#ifdef PC98
-	int rid;
-#else
-	int ispnp, ispcmcia, nports;
-#endif
-
-	dev = fdc->fdc_dev;
-#ifndef PC98
-	ispnp = (fdc->flags & FDC_ISPNP) != 0;
-	ispcmcia = (fdc->flags & FDC_ISPCMCIA) != 0;
-#endif
-	fdc->rid_ioport = fdc->rid_irq = fdc->rid_drq = 0;
-	fdc->res_ioport = fdc->res_irq = fdc->res_drq = 0;
-
-#ifdef PC98
-	fdc->res_ioport = isa_alloc_resourcev(dev, SYS_RES_IOPORT,
-					      &fdc->rid_ioport, fdc_iat,
-					      3, RF_ACTIVE);
-	if (fdc->res_ioport == 0) {
-		device_printf(dev, "cannot reserve I/O port range\n");
-		return ENXIO;
-	}
-	isa_load_resourcev(fdc->res_ioport, fdc_iat, 3);
-#else
-	/*
-	 * On standard ISA, we don't just use an 8 port range
-	 * (e.g. 0x3f0-0x3f7) since that covers an IDE control
-	 * register at 0x3f6.
-	 *
-	 * Isn't PC hardware wonderful.
-	 *
-	 * The Y-E Data PCMCIA FDC doesn't have this problem, it
-	 * uses the register with offset 6 for pseudo-DMA, and the
-	 * one with offset 7 as control register.
-	 */
-	nports = ispcmcia ? 8 : (ispnp ? 1 : 6);
-	fdc->res_ioport = bus_alloc_resource(dev, SYS_RES_IOPORT,
-					     &fdc->rid_ioport, 0ul, ~0ul, 
-					     nports, RF_ACTIVE);
-	if (fdc->res_ioport == 0) {
-		device_printf(dev, "cannot reserve I/O port range (%d ports)\n",
-			      nports);
-		return ENXIO;
-	}
-#endif
-	fdc->portt = rman_get_bustag(fdc->res_ioport);
-	fdc->porth = rman_get_bushandle(fdc->res_ioport);
-
-#ifdef PC98
-	rid = 3;
-	bus_set_resource(dev, SYS_RES_IOPORT, rid, IO_FDPORT, 1);
-	fdc->res_fdsio = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
-					    1, RF_ACTIVE);
-	if (fdc->res_fdsio == 0)
-		return ENXIO;
-	fdc->sc_fdsiot = rman_get_bustag(fdc->res_fdsio);
-	fdc->sc_fdsioh = rman_get_bushandle(fdc->res_fdsio);
-
-	rid = 4;
-	bus_set_resource(dev, SYS_RES_IOPORT, rid, 0x4be, 1);
-	fdc->res_fdemsio = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
-					      1, RF_ACTIVE);
-	if (fdc->res_fdemsio == 0)
-		return ENXIO;
-	fdc->sc_fdemsiot = rman_get_bustag(fdc->res_fdemsio);
-	fdc->sc_fdemsioh = rman_get_bushandle(fdc->res_fdemsio);
-#endif
-
-#ifndef PC98
-	if (!ispcmcia) {
-		/*
-		 * Some BIOSen report the device at 0x3f2-0x3f5,0x3f7
-		 * and some at 0x3f0-0x3f5,0x3f7. We detect the former
-		 * by checking the size and adjust the port address
-		 * accordingly.
-		 */
-		if (bus_get_resource_count(dev, SYS_RES_IOPORT, 0) == 4)
-			fdc->port_off = -2;
-
-		/*
-		 * Register the control port range as rid 1 if it
-		 * isn't there already. Most PnP BIOSen will have
-		 * already done this but non-PnP configurations don't.
-		 *
-		 * And some (!!) report 0x3f2-0x3f5 and completely
-		 * leave out the control register!  It seems that some
-		 * non-antique controller chips have a different
-		 * method of programming the transfer speed which
-		 * doesn't require the control register, but it's
-		 * mighty bogus as the chip still responds to the
-		 * address for the control register.
-		 */
-		if (bus_get_resource_count(dev, SYS_RES_IOPORT, 1) == 0) {
-			u_long ctlstart;
-
-			/* Find the control port, usually 0x3f7 */
-			ctlstart = rman_get_start(fdc->res_ioport) +
-				fdc->port_off + 7;
-
-			bus_set_resource(dev, SYS_RES_IOPORT, 1, ctlstart, 1);
-		}
-
-		/*
-		 * Now (finally!) allocate the control port.
-		 */
-		fdc->rid_ctl = 1;
-		fdc->res_ctl = bus_alloc_resource(dev, SYS_RES_IOPORT,
-						  &fdc->rid_ctl,
-						  0ul, ~0ul, 1, RF_ACTIVE);
-		if (fdc->res_ctl == 0) {
-			device_printf(dev,
-		"cannot reserve control I/O port range (control port)\n");
-			return ENXIO;
-		}
-		fdc->ctlt = rman_get_bustag(fdc->res_ctl);
-		fdc->ctlh = rman_get_bushandle(fdc->res_ctl);
-	}
-#endif
-
-	fdc->res_irq = bus_alloc_resource(dev, SYS_RES_IRQ,
-					  &fdc->rid_irq, 0ul, ~0ul, 1, 
-					  RF_ACTIVE);
-	if (fdc->res_irq == 0) {
-		device_printf(dev, "cannot reserve interrupt line\n");
-		return ENXIO;
-	}
-
-	if ((fdc->flags & FDC_NODMA) == 0) {
-		fdc->res_drq = bus_alloc_resource(dev, SYS_RES_DRQ,
-						  &fdc->rid_drq, 0ul, ~0ul, 1, 
-						  RF_ACTIVE);
-		if (fdc->res_drq == 0) {
-			device_printf(dev, "cannot reserve DMA request line\n");
-			return ENXIO;
-		}
-		fdc->dmachan = fdc->res_drq->r_start;
-	}
-
-	return 0;
-}
-
-static void
+void
 fdc_release_resources(struct fdc_data *fdc)
 {
 	device_t dev;
 
 	dev = fdc->fdc_dev;
+	if (fdc->fdc_intr) {
+		BUS_TEARDOWN_INTR(device_get_parent(dev), dev, fdc->res_irq,
+		    fdc->fdc_intr);
+		fdc->fdc_intr = NULL;
+	}
 	if (fdc->res_irq != 0) {
 		bus_deactivate_resource(dev, SYS_RES_IRQ, fdc->rid_irq,
 					fdc->res_irq);
 		bus_release_resource(dev, SYS_RES_IRQ, fdc->rid_irq,
 				     fdc->res_irq);
+		fdc->res_irq = NULL;
 	}
 #ifndef PC98
 	if (fdc->res_ctl != 0) {
@@ -1052,6 +778,7 @@ fdc_release_resources(struct fdc_data *fdc)
 					fdc->res_ctl);
 		bus_release_resource(dev, SYS_RES_IOPORT, fdc->rid_ctl,
 				     fdc->res_ctl);
+		fdc->res_ctl = NULL;
 	}
 #endif
 #ifdef PC98
@@ -1059,11 +786,13 @@ fdc_release_resources(struct fdc_data *fdc)
 		bus_deactivate_resource(dev, SYS_RES_IOPORT, 3,
 					fdc->res_fdsio);
 		bus_release_resource(dev, SYS_RES_IOPORT, 3, fdc->res_fdsio);
+		fdc->res_fdsio = NULL;
 	}
 	if (fdc->res_fdemsio != 0) {
 		bus_deactivate_resource(dev, SYS_RES_IOPORT, 4,
 					fdc->res_fdemsio);
 		bus_release_resource(dev, SYS_RES_IOPORT, 4, fdc->res_fdemsio);
+		fdc->res_fdemsio = NULL;
 	}
 #endif
 	if (fdc->res_ioport != 0) {
@@ -1071,12 +800,14 @@ fdc_release_resources(struct fdc_data *fdc)
 					fdc->res_ioport);
 		bus_release_resource(dev, SYS_RES_IOPORT, fdc->rid_ioport,
 				     fdc->res_ioport);
+		fdc->res_ioport = NULL;
 	}
 	if (fdc->res_drq != 0) {
 		bus_deactivate_resource(dev, SYS_RES_DRQ, fdc->rid_drq,
 					fdc->res_drq);
 		bus_release_resource(dev, SYS_RES_DRQ, fdc->rid_drq,
 				     fdc->res_drq);
+		fdc->res_drq = NULL;
 	}
 }
 
@@ -1084,13 +815,7 @@ fdc_release_resources(struct fdc_data *fdc)
  * Configuration/initialization stuff, per controller.
  */
 
-static struct isa_pnp_id fdc_ids[] = {
-	{0x0007d041, "PC standard floppy disk controller"}, /* PNP0700 */
-	{0x0107d041, "Standard floppy controller supporting MS Device Bay Spec"}, /* PNP0701 */
-	{0}
-};
-
-static int
+int
 fdc_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 {
 	struct fdc_ivars *ivars = device_get_ivars(child);
@@ -1099,145 +824,56 @@ fdc_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 	case FDC_IVAR_FDUNIT:
 		*result = ivars->fdunit;
 		break;
+	case FDC_IVAR_FDTYPE:
+		*result = ivars->fdtype;
+		break;
 	default:
-		return ENOENT;
+		return (ENOENT);
 	}
-	return 0;
+	return (0);
 }
 
-static int
-fdc_probe(device_t dev)
+int
+fdc_write_ivar(device_t dev, device_t child, int which, uintptr_t value)
+{
+	struct fdc_ivars *ivars = device_get_ivars(child);
+
+	switch (which) {
+	case FDC_IVAR_FDUNIT:
+		ivars->fdunit = value;
+		break;
+	case FDC_IVAR_FDTYPE:
+		ivars->fdtype = value;
+		break;
+	default:
+		return (ENOENT);
+	}
+	return (0);
+}
+
+int
+fdc_initial_reset(struct fdc_data *fdc)
 {
 #ifdef PC98
-	int	error;
+	/* see if it can handle a command */
+	if (fd_cmd(fdc, 3, NE7CMD_SPECIFY, NE7_SPEC_1(4, 240), 
+		   NE7_SPEC_2(2, 0), 0))
+		return (ENXIO);
 #else
-	int	error, ic_type;
-#endif
-	struct	fdc_data *fdc;
-
-	fdc = device_get_softc(dev);
-	bzero(fdc, sizeof *fdc);
-	fdc->fdc_dev = dev;
-#ifndef PC98
-	fdc->fdctl_wr = fdctl_wr_isa;
-#endif
-
-	/* Check pnp ids */
-	error = ISA_PNP_PROBE(device_get_parent(dev), dev, fdc_ids);
-	if (error == ENXIO)
-		return ENXIO;
-	if (error == 0)
-		fdc->flags |= FDC_ISPNP;
-
-	/* Attempt to allocate our resources for the duration of the probe */
-	error = fdc_alloc_resources(fdc);
-	if (error)
-		goto out;
-
-#ifndef PC98
-	/* First - lets reset the floppy controller */
+	/* First, reset the floppy controller. */
 	fdout_wr(fdc, 0);
 	DELAY(100);
 	fdout_wr(fdc, FDO_FRST);
-#endif
 
-	/* see if it can handle a command */
-#ifdef PC98
-	if (fd_cmd(fdc, 3, NE7CMD_SPECIFY, NE7_SPEC_1(4, 240), 
-		   NE7_SPEC_2(2, 0), 0)) {
-		error = ENXIO;
-		goto out;
-	}
-#else
+	/* Then, see if it can handle a command. */
 	if (fd_cmd(fdc, 3, NE7CMD_SPECIFY, NE7_SPEC_1(3, 240), 
-		   NE7_SPEC_2(2, 0), 0)) {
-		error = ENXIO;
-		goto out;
-	}
+	    NE7_SPEC_2(2, 0), 0))
+		return (ENXIO);
 #endif
-
-#ifndef PC98
-	if (fd_cmd(fdc, 1, NE7CMD_VERSION, 1, &ic_type) == 0) {
-		ic_type = (u_char)ic_type;
-		switch (ic_type) {
-		case 0x80:
-			device_set_desc(dev, "NEC 765 or clone");
-			fdc->fdct = FDC_NE765;
-			break;
-		case 0x81:	/* not mentioned in any hardware doc */
-		case 0x90:
-			device_set_desc(dev,
-		"Enhanced floppy controller (i82077, NE72065 or clone)");
-			fdc->fdct = FDC_ENHANCED;
-			break;
-		default:
-			device_set_desc(dev, "Generic floppy controller");
-			fdc->fdct = FDC_UNKNOWN;
-			break;
-		}
-	}
-#endif
-
-out:
-	fdc_release_resources(fdc);
-	return (error);
+	return (0);
 }
 
-#if NCARD > 0
-
-static int
-fdc_pccard_probe(device_t dev)
-{
-	int	error;
-	struct	fdc_data *fdc;
-
-	fdc = device_get_softc(dev);
-	bzero(fdc, sizeof *fdc);
-	fdc->fdc_dev = dev;
-#ifndef PC98
-	fdc->fdctl_wr = fdctl_wr_pcmcia;
-#endif
-
-	fdc->flags |= FDC_ISPCMCIA | FDC_NODMA;
-
-	/* Attempt to allocate our resources for the duration of the probe */
-	error = fdc_alloc_resources(fdc);
-	if (error)
-		goto out;
-
-#ifndef PC98
-	/* First - lets reset the floppy controller */
-	fdout_wr(fdc, 0);
-	DELAY(100);
-	fdout_wr(fdc, FDO_FRST);
-#endif
-
-	/* see if it can handle a command */
-#ifdef PC98
-	if (fd_cmd(fdc, 3, NE7CMD_SPECIFY, NE7_SPEC_1(4, 240), 
-		   NE7_SPEC_2(2, 0), 0)) {
-		error = ENXIO;
-		goto out;
-	}
-#else
-	if (fd_cmd(fdc, 3, NE7CMD_SPECIFY, NE7_SPEC_1(3, 240), 
-		   NE7_SPEC_2(2, 0), 0)) {
-		error = ENXIO;
-		goto out;
-	}
-#endif
-
-	device_set_desc(dev, "Y-E Data PCMCIA floppy");
-	fdc->fdct = FDC_NE765;
-
-out:
-	fdc_release_resources(fdc);
-	return (error);
-}
-
-#endif /* NCARD > 0 */
-
-static int
+int
 fdc_detach(device_t dev)
 {
 	struct	fdc_data *fdc;
@@ -1257,62 +893,46 @@ fdc_detach(device_t dev)
 	fdout_wr(fdc, 0);
 #endif
 
-	if ((fdc->flags & FDC_NODMA) == 0)
-		isa_dma_release(fdc->dmachan);
-
-	if ((fdc->flags & FDC_ATTACHED) == 0) {
-		device_printf(dev, "already unloaded\n");
-		return (0);
-	}
-	fdc->flags &= ~FDC_ATTACHED;
-
-	BUS_TEARDOWN_INTR(device_get_parent(dev), dev, fdc->res_irq,
-			  fdc->fdc_intr);
 	fdc_release_resources(fdc);
-	device_printf(dev, "unload\n");
 	return (0);
 }
 
 /*
  * Add a child device to the fdc controller.  It will then be probed etc.
  */
-static void
+device_t
 fdc_add_child(device_t dev, const char *name, int unit)
 {
-	int	flags;
+	int flags;
 	struct fdc_ivars *ivar;
 	device_t child;
 
 	ivar = malloc(sizeof *ivar, M_DEVBUF /* XXX */, M_NOWAIT | M_ZERO);
 	if (ivar == NULL)
-		return;
-	if (resource_int_value(name, unit, "drive", &ivar->fdunit) != 0)
-		ivar->fdunit = 0;
+		return (NULL);
 	child = device_add_child(dev, name, unit);
 	if (child == NULL) {
 		free(ivar, M_DEVBUF);
-		return;
+		return (NULL);
 	}
 	device_set_ivars(child, ivar);
+	ivar->fdunit = unit;
+	ivar->fdtype = FDT_NONE;
 	if (resource_int_value(name, unit, "flags", &flags) == 0)
-		 device_set_flags(child, flags);
+		device_set_flags(child, flags);
 	if (resource_disabled(name, unit))
 		device_disable(child);
+	return (child);
 }
 
-static int
+int
 fdc_attach(device_t dev)
 {
 	struct	fdc_data *fdc;
-	const char *name, *dname;
-	int	i, error, dunit;
+	int	error;
 
 	fdc = device_get_softc(dev);
-	error = fdc_alloc_resources(fdc);
-	if (error) {
-		device_printf(dev, "cannot re-acquire resources\n");
-		return error;
-	}
+	fdc->fdc_dev = dev;
 	error = BUS_SETUP_INTR(device_get_parent(dev), dev, fdc->res_irq,
 			       INTR_TYPE_BIO | INTR_ENTROPY, fdc_intr, fdc,
 			       &fdc->fdc_intr);
@@ -1321,17 +941,8 @@ fdc_attach(device_t dev)
 		return error;
 	}
 	fdc->fdcu = device_get_unit(dev);
-	fdc->flags |= FDC_ATTACHED | FDC_NEEDS_RESET;
+	fdc->flags |= FDC_NEEDS_RESET;
 
-	if ((fdc->flags & FDC_NODMA) == 0) {
-		/*
-		 * Acquire the DMA channel forever, the driver will do
-		 * the rest
-		 * XXX should integrate with rman
-		 */
-		isa_dma_acquire(fdc->dmachan);
-		isa_dmainit(fdc->dmachan, MAX_SEC_SIZE);
-	}
 	fdc->state = DEVIDLE;
 
 #ifdef PC98
@@ -1343,22 +954,32 @@ fdc_attach(device_t dev)
 #endif
 	bioq_init(&fdc->head);
 
+	return (0);
+}
+
+int
+fdc_hints_probe(device_t dev)
+{
+	const char *name, *dname;
+	int i, error, dunit;
+
 	/*
 	 * Probe and attach any children.  We should probably detect
 	 * devices from the BIOS unless overridden.
 	 */
 	name = device_get_nameunit(dev);
 	i = 0;
-	while ((resource_find_match(&i, &dname, &dunit, "at", name)) == 0)
+	while ((resource_find_match(&i, &dname, &dunit, "at", name)) == 0) {
+		resource_int_value(dname, dunit, "drive", &dunit);
 		fdc_add_child(dev, dname, dunit);
+	}
 
 	if ((error = bus_generic_attach(dev)) != 0)
 		return (error);
-
 	return (0);
 }
 
-static int
+int
 fdc_print_child(device_t me, device_t child)
 {
 	int retval = 0, flags;
@@ -1373,120 +994,6 @@ fdc_print_child(device_t me, device_t child)
 	return (retval);
 }
 
-static device_method_t fdc_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_probe,		fdc_probe),
-	DEVMETHOD(device_attach,	fdc_attach),
-	DEVMETHOD(device_detach,	fdc_detach),
-	DEVMETHOD(device_shutdown,	bus_generic_shutdown),
-	DEVMETHOD(device_suspend,	bus_generic_suspend),
-	DEVMETHOD(device_resume,	bus_generic_resume),
-
-	/* Bus interface */
-	DEVMETHOD(bus_print_child,	fdc_print_child),
-	DEVMETHOD(bus_read_ivar,	fdc_read_ivar),
-	/* Our children never use any other bus interface methods. */
-
-	{ 0, 0 }
-};
-
-static driver_t fdc_driver = {
-	"fdc",
-	fdc_methods,
-	sizeof(struct fdc_data)
-};
-
-DRIVER_MODULE(fdc, isa, fdc_driver, fdc_devclass, 0, 0);
-#ifndef PC98
-DRIVER_MODULE(fdc, acpi, fdc_driver, fdc_devclass, 0, 0);
-#endif
-
-#if NCARD > 0
-
-static device_method_t fdc_pccard_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_probe,		fdc_pccard_probe),
-	DEVMETHOD(device_attach,	fdc_attach),
-	DEVMETHOD(device_detach,	fdc_detach),
-	DEVMETHOD(device_shutdown,	bus_generic_shutdown),
-	DEVMETHOD(device_suspend,	bus_generic_suspend),
-	DEVMETHOD(device_resume,	bus_generic_resume),
-
-	/* Bus interface */
-	DEVMETHOD(bus_print_child,	fdc_print_child),
-	DEVMETHOD(bus_read_ivar,	fdc_read_ivar),
-	/* Our children never use any other bus interface methods. */
-
-	{ 0, 0 }
-};
-
-static driver_t fdc_pccard_driver = {
-	"fdc",
-	fdc_pccard_methods,
-	sizeof(struct fdc_data)
-};
-
-DRIVER_MODULE(fdc, pccard, fdc_pccard_driver, fdc_devclass, 0, 0);
-
-#endif /* NCARD > 0 */
-
-#ifdef GONE_IN_5
-/*
- * Create a clone device upon request by devfs.
- */
-static void
-fd_clone(void *arg, char *name, int namelen, dev_t *dev)
-{
-	struct	fd_data *fd;
-	int i, u;
-	char *n;
-	size_t l;
-
-	fd = (struct fd_data *)arg;
-	if (*dev != NODEV)
-		return;
-	if (dev_stdclone(name, &n, "fd", &u) != 2)
-		return;
-	if (u != fd->fdu)
-		/* unit # mismatch */
-		return;
-	l = strlen(n);
-	if (l == 1 && *n >= 'a' && *n <= 'h') {
-		/*
-		 * Trailing letters a through h denote
-		 * pseudo-partitions.  We don't support true
-		 * (UFS-style) partitions, so we just implement them
-		 * as symlinks if someone asks us nicely.
-		 */
-		*dev = make_dev_alias(fd->masterdev, name);
-		return;
-	}
-	if (l >= 2 && l <= 5 && *n == '.') {
-		/*
-		 * Trailing numbers, preceded by a dot, denote
-		 * subdevices for different densities.  Historically,
-		 * they have been named by density (like fd0.1440),
-		 * but we allow arbitrary numbers between 1 and 4
-		 * digits, so fd0.1 through fd0.15 are possible as
-		 * well.
-		 */
-		for (i = 1; i < l; i++)
-			if (n[i] < '0' || n[i] > '9')
-				return;
-		for (i = 0; i < NUMDENS - 1; i++)
-			if (fd->clonedevs[i] == NODEV) {
-				*dev = make_dev(&fd_cdevsw,
-						FDNUMTOUNIT(u) + i + 1,
-						UID_ROOT, GID_OPERATOR, 0640,
-						name);
-				fd->clonedevs[i] = *dev;
-				fd->clonedevs[i]->si_drv1 = fd;
-				return;
-			}
-	}
-}
-#endif
-
 /*
  * Configuration/initialization, per drive.
  */
@@ -1500,59 +1007,32 @@ fd_probe(device_t dev)
 	struct	fd_data *fd;
 	struct	fdc_data *fdc;
 	fdsu_t	fdsu;
-	int	flags;
+	int	flags, type;
 
-	fdsu = *(int *)device_get_ivars(dev); /* xxx cheat a bit... */
+	fdsu = fdc_get_fdunit(dev);
 	fd = device_get_softc(dev);
 	fdc = device_get_softc(device_get_parent(dev));
 	flags = device_get_flags(dev);
 
-	bzero(fd, sizeof *fd);
 	fd->dev = dev;
 	fd->fdc = fdc;
 	fd->fdsu = fdsu;
 	fd->fdu = device_get_unit(dev);
-	fd->flags = FD_UA;	/* make sure fdautoselect() will be called */
 
-	fd->type = FD_DTYPE(flags);
-#ifdef PC98
-	if (fd->type == FDT_NONE && fd->fdu >= 0 && fd->fdu <= 3) {
-		/* Look up what the BIOS thinks we have. */
-		if ((PC98_SYSTEM_PARAMETER(0x5ae) >> fd->fdu) & 0x01)
-			fd->type = FDT_144M;
-#ifdef EPSON_NRDISK
-		else if ((PC98_SYSTEM_PARAMETER(0x55c) >> fd->fdu) & 0x01) {
-			fd->type = FDT_12M;
-			switch (epson_machine_id) {
-			case 0x20:
-			case 0x27:
-				if ((PC98_SYSTEM_PARAMETER(0x488) >> fd->fdu)
-				    & 0x01) {
-					if (nrd_check_ready()) {
-						nrd_LED_on();
-						nrdu = fd->fdu;
-					} else {
-						fd->type = FDT_NONE;
-					}
-				}
-				break;
-			}
-		}
-#else /* !EPSON_NRDISK */
-		else if ((PC98_SYSTEM_PARAMETER(0x55c) >> fd->fdu) & 0x01) {
-			fd->type = FDT_12M;
-			switch (epson_machine_id) {
-			case 0x20:
-			case 0x27:
-				if ((PC98_SYSTEM_PARAMETER(0x488) >> fd->fdu)
-				    & 0x01)
-					fd->type = FDT_NONE;
-				break;
-			}
-		}
-#endif /* EPSON_NRDISK */
+	/* Auto-probe if fdinfo is present, but always allow override. */
+	type = FD_DTYPE(flags);
+	if (type == FDT_NONE && (type = fdc_get_fdtype(dev)) != FDT_NONE) {
+		fd->type = type;
+		goto done;
+	} else {
+		/* make sure fdautoselect() will be called */
+		fd->flags = FD_UA;
+		fd->type = type;
 	}
-#else /* PC98 */
+
+#ifdef PC98
+	pc98_fd_check_type(fd);
+#else
 /*
  * XXX I think using __i386__ is wrong here since we actually want to probe
  * for the machine type, not the CPU type (so non-PC arch's like the PC98 will
@@ -1591,15 +1071,6 @@ fd_probe(device_t dev)
 	set_motor(fdc, fdsu, TURNON);
 	fdc_reset(fdc);		/* XXX reset, then unreset, etc. */
 	DELAY(1000000);	/* 1 sec */
-
-	/* XXX This doesn't work before the first set_motor() */
-	if ((fdc->flags & FDC_HAS_FIFO) == 0  &&
-	    fdc->fdct == FDC_ENHANCED &&
-	    (device_get_flags(fdc->fdc_dev) & FDC_NO_FIFO) == 0 &&
-	    enable_fifo(fdc) == 0) {
-		device_printf(device_get_parent(dev),
-		    "FIFO enabled, %d bytes threshold\n", fifo_threshold);
-	}
 
 	if ((flags & FD_NO_PROBE) == 0) {
 		/* If we're at track 0 first seek inwards. */
@@ -1641,23 +1112,23 @@ fd_probe(device_t dev)
 		return (ENXIO);
 #endif /* PC98 */
 
+done:
+#ifndef PC98
+	/* This doesn't work before the first reset. */
+	if ((fdc->flags & FDC_HAS_FIFO) == 0 &&
+	    fdc->fdct == FDC_ENHANCED &&
+	    (device_get_flags(fdc->fdc_dev) & FDC_NO_FIFO) == 0 &&
+	    enable_fifo(fdc) == 0) {
+		device_printf(device_get_parent(dev),
+		    "FIFO enabled, %d bytes threshold\n", fifo_threshold);
+	}
+#endif /* PC98 */
+
 #ifdef PC98
 	switch (fd->type) {
 	case FDT_144M:
-		/* Check 3mode I/F */
-		fd->pc98_trans = 0;
-		bus_space_write_1(fdc->sc_fdemsiot, fdc->sc_fdemsioh, 0,
-				  (fd->fdu << 5) | 0x10);
-		if (!(bus_space_read_1(fdc->sc_fdemsiot, fdc->sc_fdemsioh, 0) &
-		      0x01)) {
-			device_set_desc(dev, "1.44M FDD");
-			fd->type = FDT_144M;
-			break;
-		}
-
-		device_printf(dev,
-		    "Warning: can't control 3mode I/F, fallback to 2mode.\n");
-		/* FALLTHROUGH */
+		device_set_desc(dev, "1.44M FDD");
+		break;
 	case FDT_12M:
 #ifdef EPSON_NRDISK
 		if (fd->fdu == nrdu) {
@@ -1668,7 +1139,6 @@ fd_probe(device_t dev)
 #else
 		device_set_desc(dev, "1M/640K FDD");
 #endif
-		fd->type = FDT_12M;
 		break;
 	default:
 		return (ENXIO);
@@ -1677,23 +1147,18 @@ fd_probe(device_t dev)
 	switch (fd->type) {
 	case FDT_12M:
 		device_set_desc(dev, "1200-KB 5.25\" drive");
-		fd->type = FDT_12M;
 		break;
 	case FDT_144M:
 		device_set_desc(dev, "1440-KB 3.5\" drive");
-		fd->type = FDT_144M;
 		break;
 	case FDT_288M:
 		device_set_desc(dev, "2880-KB 3.5\" drive (in 1440-KB mode)");
-		fd->type = FDT_288M;
 		break;
 	case FDT_360K:
 		device_set_desc(dev, "360-KB 5.25\" drive");
-		fd->type = FDT_360K;
 		break;
 	case FDT_720K:
 		device_set_desc(dev, "720-KB 3.5\" drive");
-		fd->type = FDT_720K;
 		break;
 	default:
 		return (ENXIO);
@@ -1728,19 +1193,9 @@ fd_attach(device_t dev)
 	struct	fd_data *fd;
 
 	fd = device_get_softc(dev);
-#ifdef GONE_IN_5
-	fd->clonetag = EVENTHANDLER_REGISTER(dev_clone, fd_clone, fd, 1000);
-#endif
-	fd->masterdev = make_dev(&fd_cdevsw, fd->fdu << 6,
+	fd->masterdev = make_dev(&fd_cdevsw, fd->fdu,
 				 UID_ROOT, GID_OPERATOR, 0640, "fd%d", fd->fdu);
 	fd->masterdev->si_drv1 = fd;
-#ifdef GONE_IN_5
-	{
-	int i;
-	for (i = 0; i < NUMDENS - 1; i++)
-		fd->clonedevs[i] = NODEV;
-	}
-#endif
 	fd->device_stats = devstat_new_entry(device_get_name(dev), 
 			  device_get_unit(dev), 0, DEVSTAT_NO_ORDERED_TAGS,
 			  DEVSTAT_TYPE_FLOPPY | DEVSTAT_TYPE_IF_OTHER,
@@ -1757,15 +1212,6 @@ fd_detach(device_t dev)
 	untimeout(fd_turnoff, fd, fd->toffhandle);
 	devstat_remove_entry(fd->device_stats);
 	destroy_dev(fd->masterdev);
-#ifdef GONE_IN_5
-	{
-	int i;
-	for (i = 0; i < NUMDENS - 1; i++)
-		if (fd->clonedevs[i] != NODEV)
-			destroy_dev(fd->clonedevs[i]);
-	EVENTHANDLER_DEREGISTER(dev_clone, fd->clonetag);
-	}
-#endif
 
 	return (0);
 }
@@ -1982,12 +1428,13 @@ out_fdc(struct fdc_data *fdc, int x)
  * auxiliary functions).
  */
 static int
-fdopen(dev_t dev, int flags, int mode, struct thread *td)
+fdopen(struct cdev *dev, int flags, int mode, struct thread *td)
 {
-	fdu_t fdu = FDUNIT(minor(dev));
-	int type = FDTYPE(minor(dev));
 	fd_p	fd;
 	fdc_p	fdc;
+#ifdef PC98
+	fdu_t	fdu;
+#endif
  	int rv, unitattn, dflags;
 
 	fd = dev->si_drv1;
@@ -1996,8 +1443,9 @@ fdopen(dev_t dev, int flags, int mode, struct thread *td)
 	fdc = fd->fdc;
 	if ((fdc == NULL) || (fd->type == FDT_NONE))
 		return (ENXIO);
-	if (type > NUMDENS)
-		return (ENXIO);
+#ifdef PC98
+	fdu = fd->fdu;
+#endif
 	dflags = device_get_flags(fd->dev);
 	/*
 	 * This is a bit bogus.  It's still possible that e. g. a
@@ -2015,66 +1463,70 @@ fdopen(dev_t dev, int flags, int mode, struct thread *td)
 		return(EIO);
 #endif
 
-	if (type == 0) {
-		if (flags & FNONBLOCK) {
-			/*
-			 * Unfortunately, physio(9) discards its ioflag
-			 * argument, thus preventing us from seeing the
-			 * IO_NDELAY bit.  So we need to keep track
-			 * ourselves.
-			 */
-			fd->flags |= FD_NONBLOCK;
-			fd->ft = 0;
-		} else {
-			/*
-			 * Figure out a unit attention condition.
-			 *
-			 * If UA has been forced, proceed.
-			 *
-			 * If the drive has no changeline support,
-			 * or if the drive parameters have been lost
-			 * due to previous non-blocking access,
-			 * assume a forced UA condition.
-			 *
-			 * If motor is off, turn it on for a moment
-			 * and select our drive, in order to read the
-			 * UA hardware signal.
-			 *
-			 * If motor is on, and our drive is currently
-			 * selected, just read the hardware bit.
-			 *
-			 * If motor is on, but active for another
-			 * drive on that controller, we are lost.  We
-			 * cannot risk to deselect the other drive, so
-			 * we just assume a forced UA condition to be
-			 * on the safe side.
-			 */
-			unitattn = 0;
-			if ((dflags & FD_NO_CHLINE) != 0 ||
-			    (fd->flags & FD_UA) != 0 ||
-			    fd->ft == 0) {
-				unitattn = 1;
-				fd->flags &= ~FD_UA;
-#ifndef PC98
-			} else if (fdc->fdout & (FDO_MOEN0 | FDO_MOEN1 |
-						 FDO_MOEN2 | FDO_MOEN3)) {
-				if ((fdc->fdout & FDO_FDSEL) == fd->fdsu)
-					unitattn = fdin_rd(fdc) & FDI_DCHG;
-				else
-					unitattn = 1;
-			} else {
-				set_motor(fdc, fd->fdsu, TURNON);
-				unitattn = fdin_rd(fdc) & FDI_DCHG;
-				set_motor(fdc, fd->fdsu, TURNOFF);
-#endif /* PC98 */
-			}
-			if (unitattn && (rv = fdautoselect(dev)) != 0)
-				return (rv);
-		}
+	if (flags & FNONBLOCK) {
+		/*
+		 * Unfortunately, physio(9) discards its ioflag
+		 * argument, thus preventing us from seeing the
+		 * IO_NDELAY bit.  So we need to keep track
+		 * ourselves.
+		 */
+		fd->flags |= FD_NONBLOCK;
+		fd->ft = 0;
 	} else {
-		fd->ft = fd->fts + type;
+		/*
+		 * Figure out a unit attention condition.
+		 *
+		 * If UA has been forced, proceed.
+		 *
+		 * If the drive has no changeline support,
+		 * or if the drive parameters have been lost
+		 * due to previous non-blocking access,
+		 * assume a forced UA condition.
+		 *
+		 * If motor is off, turn it on for a moment
+		 * and select our drive, in order to read the
+		 * UA hardware signal.
+		 *
+		 * If motor is on, and our drive is currently
+		 * selected, just read the hardware bit.
+		 *
+		 * If motor is on, but active for another
+		 * drive on that controller, we are lost.  We
+		 * cannot risk to deselect the other drive, so
+		 * we just assume a forced UA condition to be
+		 * on the safe side.
+		 */
+		unitattn = 0;
+		if ((dflags & FD_NO_CHLINE) != 0 ||
+		    (fd->flags & FD_UA) != 0 ||
+		    fd->ft == 0) {
+			unitattn = 1;
+			fd->flags &= ~FD_UA;
+#ifndef PC98
+		} else if (fdc->fdout & (FDO_MOEN0 | FDO_MOEN1 |
+					 FDO_MOEN2 | FDO_MOEN3)) {
+			if ((fdc->fdout & FDO_FDSEL) == fd->fdsu)
+				unitattn = fdin_rd(fdc) & FDI_DCHG;
+			else
+				unitattn = 1;
+		} else {
+			set_motor(fdc, fd->fdsu, TURNON);
+			unitattn = fdin_rd(fdc) & FDI_DCHG;
+			set_motor(fdc, fd->fdsu, TURNOFF);
+#endif /* PC98 */
+		}
+		if (unitattn && (rv = fdautoselect(dev)) != 0)
+			return (rv);
 	}
 	fd->flags |= FD_OPEN;
+
+	if ((fdc->flags & FDC_NODMA) == 0) {
+		if (fdc->dmacnt++ == 0) {
+			isa_dma_acquire(fdc->dmachan);
+			isa_dmainit(fdc->dmachan, MAX_SEC_SIZE);
+		}
+	}
+
 	/*
 	 * Clearing the DMA overrun counter at open time is a bit messy.
 	 * Since we're only managing one counter per controller, opening
@@ -2092,13 +1544,19 @@ fdopen(dev_t dev, int flags, int mode, struct thread *td)
 }
 
 static int
-fdclose(dev_t dev, int flags, int mode, struct thread *td)
+fdclose(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	struct fd_data *fd;
+ 	fdc_p	fdc;
 
 	fd = dev->si_drv1;
+	fdc = fd->fdc;
 	fd->flags &= ~(FD_OPEN | FD_NONBLOCK);
 	fd->options &= ~(FDOPT_NORETRY | FDOPT_NOERRLOG | FDOPT_NOERROR);
+
+	if ((fdc->flags & FDC_NODMA) == 0)
+		if (--fdc->dmacnt == 0)
+			isa_dma_release(fdc->dmachan);
 
 	return (0);
 }
@@ -2113,11 +1571,8 @@ fdstrategy(struct bio *bp)
  	fd_p	fd;
 	size_t	fdblk;
 
- 	fdu = FDUNIT(minor(bp->bio_dev));
 	fd = bp->bio_dev->si_drv1;
-	if (fd == NULL)
-		panic("fdstrategy: buf for nonexistent device (%#lx, %#lx)",
-		      (u_long)major(bp->bio_dev), (u_long)minor(bp->bio_dev));
+ 	fdu = fd->fdu;
 	fdc = fd->fdc;
 	bp->bio_resid = bp->bio_bcount;
 	if (fd->type == FDT_NONE || fd->ft == 0) {
@@ -2153,6 +1608,13 @@ fdstrategy(struct bio *bp)
 	/*
 	 * Set up block calculations.
 	 */
+#ifndef PC98
+	if (bp->bio_offset >= ((off_t)128 << fd->ft->secsize) * fd->ft->size) {
+		bp->bio_error = EINVAL;
+		bp->bio_flags |= BIO_ERROR;
+		goto bad;
+	}
+#endif
 	blknum = bp->bio_offset / fdblk;
  	nblocks = fd->ft->size;
 	if (blknum + bp->bio_bcount / fdblk > nblocks) {
@@ -2294,15 +1756,13 @@ fdcpio(fdc_p fdc, long flags, caddr_t addr, u_int count)
  * Try figuring out the density of the media present in our device.
  */
 static int
-fdautoselect(dev_t dev)
+fdautoselect(struct cdev *dev)
 {
-	fdu_t fdu;
  	fd_p fd;
 	struct fd_type *fdtp;
 	struct fdc_readid id;
 	int i, n, oopts, rv;
 
- 	fdu = FDUNIT(minor(dev));
 	fd = dev->si_drv1;
 
 	switch (fd->type) {
@@ -2386,7 +1846,12 @@ fdautoselect(dev_t dev)
 	} else {
 		if (bootverbose)
 			device_printf(fd->dev, "autoselected %d KB medium\n",
+#ifdef PC98
+				      (128 << (fd->ft->secsize)) *
+				      fd->ft->size / 1024);
+#else
 				      fd->ft->size / 2);
+#endif
 		return (0);
 	}
 }
@@ -2433,8 +1898,8 @@ fdstate(fdc_p fdc)
 		TRACE1("[fdc%d IDLE]", fdc->fdcu);
  		return (0);
 	}
-	fdu = FDUNIT(minor(bp->bio_dev));
 	fd = bp->bio_dev->si_drv1;
+	fdu = fd->fdu;
 	fdblk = 128 << fd->ft->secsize;
 	if (fdc->fd && (fd != fdc->fd))
 		device_printf(fd->dev, "confused fd pointers\n");
@@ -2533,11 +1998,7 @@ fdstate(fdc_p fdc)
 		return (1);	/* will return immediately */
 
 	case DOSEEK:
-#ifdef PC98
-		blknum = bp->bio_pblkno * DEV_BSIZE / fdblk + fd->skip / fdblk;
-#else
 		blknum = bp->bio_pblkno + fd->skip / fdblk;
-#endif
 		cylinder = blknum / (fd->ft->sectrac * fd->ft->heads);
 		if (cylinder == fd->track)
 		{
@@ -2568,11 +2029,7 @@ fdstate(fdc_p fdc)
 		return(0);	/* will return later */
 
 	case SEEKCOMPLETE : /* seek done, start DMA */
-#ifdef PC98
-		blknum = bp->bio_pblkno * DEV_BSIZE / fdblk + fd->skip / fdblk;
-#else
 		blknum = bp->bio_pblkno + fd->skip / fdblk;
-#endif
 		cylinder = blknum / (fd->ft->sectrac * fd->ft->heads);
 
 		/* Make sure seek really happened. */
@@ -2656,11 +2113,7 @@ fdstate(fdc_p fdc)
 		if (!rdsectid && !(fdc->flags & FDC_NODMA))
 			isa_dmastart(idf, bp->bio_data+fd->skip,
 				format ? bp->bio_bcount : fdblk, fdc->dmachan);
-#ifdef PC98
-		blknum = bp->bio_pblkno * DEV_BSIZE / fdblk + fd->skip / fdblk;
-#else
 		blknum = bp->bio_pblkno + fd->skip / fdblk;
-#endif
 		sectrac = fd->ft->sectrac;
 		sec = blknum %  (sectrac * fd->ft->heads);
 		head = sec / sectrac;
@@ -3051,8 +2504,8 @@ retrier(struct fdc_data *fdc)
 	bp = fdc->bp;
 
 	/* XXX shouldn't this be cached somewhere?  */
-	fdu = FDUNIT(minor(bp->bio_dev));
 	fd = bp->bio_dev->si_drv1;
+	fdu = fd->fdu;
 	if (fd->options & FDOPT_NORETRY)
 		goto fail;
 
@@ -3112,7 +2565,7 @@ fdbiodone(struct bio *bp)
 }
 
 static int
-fdmisccmd(dev_t dev, u_int cmd, void *data)
+fdmisccmd(struct cdev *dev, u_int cmd, void *data)
 {
  	fdu_t fdu;
  	fd_p fd;
@@ -3122,8 +2575,8 @@ fdmisccmd(dev_t dev, u_int cmd, void *data)
 	size_t fdblk;
 	int error;
 
- 	fdu = FDUNIT(minor(dev));
 	fd = dev->si_drv1;
+ 	fdu = fd->fdu;
 	fdblk = 128 << fd->ft->secsize;
 	finfo = (struct fd_formb *)data;
 	idfield = (struct fdc_readid *)data;
@@ -3163,17 +2616,16 @@ fdmisccmd(dev_t dev, u_int cmd, void *data)
 }
 
 static int
-fdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+fdioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
  	fdu_t fdu;
  	fd_p fd;
 	struct fdc_status *fsp;
 	struct fdc_readid *rid;
-	int error, type;
+	int error;
 
- 	fdu = FDUNIT(minor(dev));
-	type = FDTYPE(minor(dev));
  	fd = dev->si_drv1;
+ 	fdu = fd->fdu;
 
 #ifdef PC98
 	pc98_fd_check_ready(fdu);
@@ -3225,30 +2677,20 @@ fdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 		return (0);
 
 	case FD_STYPE:                  /* set drive type */
-		if (type == 0) {
-			/*
-			 * Allow setting drive type temporarily iff
-			 * currently unset.  Used for fdformat so any
-			 * user can set it, and then start formatting.
-			 */
-			if (fd->ft)
-				return (EINVAL); /* already set */
-			fd->ft = fd->fts;
-			*fd->ft = *(struct fd_type *)addr;
-			fd->flags |= FD_UA;
-		} else {
-			/*
-			 * Set density definition permanently.  Only
-			 * allow for superuser.
-			 */
-			if (suser(td) != 0)
-				return (EPERM);
-			fd->fts[type] = *(struct fd_type *)addr;
-		}
+		/*
+		 * Allow setting drive type temporarily iff
+		 * currently unset.  Used for fdformat so any
+		 * user can set it, and then start formatting.
+		 */
+		if (fd->ft)
+			return (EINVAL); /* already set */
+		fd->fts[0] = *(struct fd_type *)addr;
+		fd->ft = &fd->fts[0];
+		fd->flags |= FD_UA;
 		return (0);
 
 	case FD_GOPTS:			/* get drive options */
-		*(int *)addr = fd->options + (type == 0? FDOPT_AUTOSEL: 0);
+		*(int *)addr = fd->options + FDOPT_AUTOSEL;
 		return (0);
 
 	case FD_SOPTS:			/* set drive options */

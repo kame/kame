@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/vesa.c,v 1.44 2003/07/18 00:06:10 robert Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/vesa.c,v 1.47 2004/07/15 08:26:05 phk Exp $");
 
 #include "opt_vga.h"
 #include "opt_vesa.h"
@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/vesa.c,v 1.44 2003/07/18 00:06:10 robert Ex
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
 
 #include <machine/md_var.h>
@@ -1512,22 +1513,26 @@ vesa_bios_info(int level)
 	int i;
 #endif
 
-	/* general adapter information */
-	printf("VESA: v%d.%d, %dk memory, flags:0x%x, mode table:%p (%x)\n", 
-	       ((vesa_adp_info->v_version & 0xf000) >> 12) * 10 
-		   + ((vesa_adp_info->v_version & 0x0f00) >> 8),
-	       ((vesa_adp_info->v_version & 0x00f0) >> 4) * 10 
-		   + (vesa_adp_info->v_version & 0x000f),
-	       vesa_adp_info->v_memsize * 64, vesa_adp_info->v_flags,
-	       vesa_vmodetab, vesa_adp_info->v_modetable);
-	/* OEM string */
-	if (vesa_oemstr != NULL)
-		printf("VESA: %s\n", vesa_oemstr);
+	if (bootverbose) {
+		/* general adapter information */
+		printf(
+	"VESA: v%d.%d, %dk memory, flags:0x%x, mode table:%p (%x)\n", 
+		    ((vesa_adp_info->v_version & 0xf000) >> 12) * 10 +
+		    ((vesa_adp_info->v_version & 0x0f00) >> 8),
+		    ((vesa_adp_info->v_version & 0x00f0) >> 4) * 10 +
+		    (vesa_adp_info->v_version & 0x000f),
+		    vesa_adp_info->v_memsize * 64, vesa_adp_info->v_flags,
+		    vesa_vmodetab, vesa_adp_info->v_modetable);
+
+		/* OEM string */
+		if (vesa_oemstr != NULL)
+			printf("VESA: %s\n", vesa_oemstr);
+	}
 
 	if (level <= 0)
 		return 0;
 
-	if (vesa_adp_info->v_version >= 0x0200) {
+	if (vesa_adp_info->v_version >= 0x0200 && bootverbose) {
 		/* vender name, product name, product revision */
 		printf("VESA: %s %s %s\n",
 			(vesa_venderstr != NULL) ? vesa_venderstr : "unknown",
@@ -1647,7 +1652,7 @@ vesa_mod_event(module_t mod, int type, void *data)
 	case MOD_UNLOAD:
 		return vesa_unload();
 	default:
-		break;
+		return EOPNOTSUPP;
 	}
 	return 0;
 }

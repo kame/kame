@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netipsec/ipsec_output.c,v 1.9 2003/09/29 22:57:43 sam Exp $
+ * $FreeBSD: src/sys/netipsec/ipsec_output.c,v 1.10 2004/01/20 22:45:10 sam Exp $
  */
 
 /*
@@ -426,8 +426,11 @@ ipsec4_process_packet(
 				error = EFAULT;
 			}
 			if (error) {
-				if (mp)
+				if (mp) {
+					/* XXX: Should never happen! */
 					m_freem(mp);
+				}
+				m = NULL; /* ipip_output() already freed it */
 				goto bad;
 			}
 			m = mp, mp = NULL;

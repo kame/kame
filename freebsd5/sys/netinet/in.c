@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.c	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in.c,v 1.72 2003/11/03 03:22:39 sam Exp $
+ * $FreeBSD: src/sys/netinet/in.c,v 1.77 2004/08/16 18:32:07 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -64,8 +60,8 @@ static int	in_ifinit(struct ifnet *,
 	    struct in_ifaddr *, struct sockaddr_in *, int);
 
 static int subnetsarelocal = 0;
-SYSCTL_INT(_net_inet_ip, OID_AUTO, subnets_are_local, CTLFLAG_RW, 
-	&subnetsarelocal, 0, "");
+SYSCTL_INT(_net_inet_ip, OID_AUTO, subnets_are_local, CTLFLAG_RW,
+	&subnetsarelocal, 0, "Treat all subnets as directly connected");
 
 struct in_multihead in_multihead; /* XXX BSS initialization */
 
@@ -95,6 +91,23 @@ in_localaddr(in)
 				return (1);
 	}
 	return (0);
+}
+
+/*
+ * Return 1 if an internet address is for the local host and configured
+ * on one of its interfaces.
+ */
+int
+in_localip(in)
+	struct in_addr in;
+{
+	struct in_ifaddr *ia;
+
+	LIST_FOREACH(ia, INADDR_HASH(in.s_addr), ia_hash) {
+		if (IA_SIN(ia)->sin_addr.s_addr == in.s_addr)
+			return 1;
+	}
+	return 0;
 }
 
 /*
@@ -131,7 +144,7 @@ struct sockaddr_in *ap;
 
     ap->sin_len = 0;
     while (--cp >= cplim)
-        if (*cp) {
+	if (*cp) {
 	    (ap)->sin_len = cp - (char *) (ap) + 1;
 	    break;
 	}
@@ -363,6 +376,8 @@ in_control(so, cmd, data, ifp, td)
 		    (struct sockaddr_in *) &ifr->ifr_addr, 1);
 		if (error != 0 && iaIsNew)
 			break;
+		if (error == 0)
+			EVENTHANDLER_INVOKE(ifaddr_event, ifp);
 		return (0);
 
 	case SIOCSIFNETMASK:
@@ -405,6 +420,8 @@ in_control(so, cmd, data, ifp, td)
 		if ((ifp->if_flags & IFF_BROADCAST) &&
 		    (ifra->ifra_broadaddr.sin_family == AF_INET))
 			ia->ia_broadaddr = ifra->ifra_broadaddr;
+		if (error == 0)
+			EVENTHANDLER_INVOKE(ifaddr_event, ifp);
 		return (error);
 
 	case SIOCDIFADDR:
@@ -427,6 +444,7 @@ in_control(so, cmd, data, ifp, td)
 			in_pcbpurgeif0(&ripcbinfo, ifp);
 			in_pcbpurgeif0(&udbinfo, ifp);
 		}
+		EVENTHANDLER_INVOKE(ifaddr_event, ifp);
 		error = 0;
 		break;
 
@@ -765,7 +783,7 @@ in_ifinit(ifp, ia, sin, scrub)
 int
 in_broadcast(in, ifp)
 	struct in_addr in;
-        struct ifnet *ifp;
+	struct ifnet *ifp;
 {
 	register struct ifaddr *ifa;
 	u_long t;

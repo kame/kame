@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/udbp/Makefile,v 1.6 2002/01/11 15:49:00 ru Exp $ 
+# $FreeBSD: src/sys/modules/udbp/Makefile,v 1.7 2004/06/27 12:33:17 imp Exp $ 
 
 MAINTAINER=	n_hibma@freebsd.org
 
@@ -7,6 +7,6 @@ MAINTAINER=	n_hibma@freebsd.org
 KMOD=	udbp
 SRCS=	bus_if.h device_if.h \
 	opt_usb.h \
-	udbp.c
+	udbp.c usbdevs.h
 
 .include <bsd.kmod.mk>

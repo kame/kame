@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan.c,v 1.55 2003/11/12 12:58:19 ru Exp $
+ * $FreeBSD: src/sys/net/if_vlan.c,v 1.73 2004/08/15 06:24:42 jmg Exp $
  */
 
 /*
@@ -57,10 +57,12 @@
 #include <net/bpf.h>
 #include <net/ethernet.h>
 #include <net/if.h>
+#include <net/if_clone.h>
 #include <net/if_arp.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/if_vlan_var.h>
+#include <net/route.h>
 
 #ifdef INET
 #include <netinet/in.h>
@@ -116,8 +118,6 @@ static struct mtx ifv_mtx;
 #define	VLAN_LOCK()	mtx_lock(&ifv_mtx)
 #define	VLAN_UNLOCK()	mtx_unlock(&ifv_mtx)
 
-static	int vlan_clone_create(struct if_clone *, int);
-static	void vlan_clone_destroy(struct ifnet *);
 static	void vlan_start(struct ifnet *ifp);
 static	void vlan_ifinit(void *foo);
 static	void vlan_input(struct ifnet *ifp, struct mbuf *m);
@@ -125,9 +125,17 @@ static	int vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t addr);
 static	int vlan_setmulti(struct ifnet *ifp);
 static	int vlan_unconfig(struct ifnet *ifp);
 static	int vlan_config(struct ifvlan *ifv, struct ifnet *p);
+static	void vlan_link_state(struct ifnet *ifp, int link);
+static	int vlan_set_promisc(struct ifnet *ifp);
 
-struct if_clone vlan_cloner = IF_CLONE_INITIALIZER(VLANNAME,
-    vlan_clone_create, vlan_clone_destroy, 0, IF_MAXUNIT);
+static	struct ifnet *vlan_clone_match_ethertag(struct if_clone *,
+    const char *, int *);
+static	int vlan_clone_match(struct if_clone *, const char *);
+static	int vlan_clone_create(struct if_clone *, char *, size_t);
+static	int vlan_clone_destroy(struct if_clone *, struct ifnet *);
+
+struct if_clone vlan_cloner = IFC_CLONE_INITIALIZER(VLANNAME, NULL, IF_MAXUNIT,
+    NULL, vlan_clone_match, vlan_clone_create, vlan_clone_destroy);
 
 /*
  * Program our multicast filter. What we're actually doing is
@@ -136,6 +144,9 @@ struct if_clone vlan_cloner = IF_CLONE_INITIALIZER(VLANNAME,
  * traffic that it doesn't really want, which ends up being discarded
  * later by the upper protocol layers. Unfortunately, there's no way
  * to avoid this: there really is only one physical interface.
+ *
+ * XXX: There is a possible race here if more than one thread is
+ *      modifying the multicast state of the vlan interface at the same time.
  */
 static int
 vlan_setmulti(struct ifnet *ifp)
@@ -147,6 +158,8 @@ vlan_setmulti(struct ifnet *ifp)
 	struct sockaddr_dl	sdl;
 	int			error;
 
+	/*VLAN_LOCK_ASSERT();*/
+
 	/* Find the parent. */
 	sc = ifp->if_softc;
 	ifp_p = sc->ifv_p;
@@ -156,22 +169,22 @@ vlan_setmulti(struct ifnet *ifp)
 	 * when we do.
 	 */
 	if (ifp_p == NULL)
-		return(0);
+		return (0);
 
-	bzero((char *)&sdl, sizeof sdl);
-	sdl.sdl_len = sizeof sdl;
+	bzero((char *)&sdl, sizeof(sdl));
+	sdl.sdl_len = sizeof(sdl);
 	sdl.sdl_family = AF_LINK;
 	sdl.sdl_index = ifp_p->if_index;
 	sdl.sdl_type = IFT_ETHER;
 	sdl.sdl_alen = ETHER_ADDR_LEN;
 
 	/* First, remove any existing filter entries. */
-	while(SLIST_FIRST(&sc->vlan_mc_listhead) != NULL) {
+	while (SLIST_FIRST(&sc->vlan_mc_listhead) != NULL) {
 		mc = SLIST_FIRST(&sc->vlan_mc_listhead);
 		bcopy((char *)&mc->mc_addr, LLADDR(&sdl), ETHER_ADDR_LEN);
 		error = if_delmulti(ifp_p, (struct sockaddr *)&sdl);
 		if (error)
-			return(error);
+			return (error);
 		SLIST_REMOVE_HEAD(&sc->vlan_mc_listhead, mc_entries);
 		free(mc, M_VLAN);
 	}
@@ -180,7 +193,9 @@ vlan_setmulti(struct ifnet *ifp)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		mc = malloc(sizeof(struct vlan_mc_entry), M_VLAN, M_WAITOK);
+		mc = malloc(sizeof(struct vlan_mc_entry), M_VLAN, M_NOWAIT);
+		if (mc == NULL)
+			return (ENOMEM);
 		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
 		    (char *)&mc->mc_addr, ETHER_ADDR_LEN);
 		SLIST_INSERT_HEAD(&sc->vlan_mc_listhead, mc, mc_entries);
@@ -188,10 +203,10 @@ vlan_setmulti(struct ifnet *ifp)
 		    LLADDR(&sdl), ETHER_ADDR_LEN);
 		error = if_addmulti(ifp_p, (struct sockaddr *)&sdl, &rifma);
 		if (error)
-			return(error);
+			return (error);
 	}
 
-	return(0);
+	return (0);
 }
 
 /*
@@ -209,51 +224,156 @@ vlan_setmulti(struct ifnet *ifp)
  */
 extern	void (*vlan_input_p)(struct ifnet *, struct mbuf *);
 
-static int
-vlan_modevent(module_t mod, int type, void *data) 
-{ 
+/* For MII eyes only... */
+extern	void (*vlan_link_state_p)(struct ifnet *, int);
 
-	switch (type) { 
-	case MOD_LOAD: 
+static int
+vlan_modevent(module_t mod, int type, void *data)
+{
+
+	switch (type) {
+	case MOD_LOAD:
 		LIST_INIT(&ifv_list);
 		VLAN_LOCK_INIT();
 		vlan_input_p = vlan_input;
+		vlan_link_state_p = vlan_link_state;
 		if_clone_attach(&vlan_cloner);
-		break; 
-	case MOD_UNLOAD: 
+		break;
+	case MOD_UNLOAD:
 		if_clone_detach(&vlan_cloner);
 		vlan_input_p = NULL;
+		vlan_link_state_p = NULL;
 		while (!LIST_EMPTY(&ifv_list))
-			vlan_clone_destroy(&LIST_FIRST(&ifv_list)->ifv_if);
+			vlan_clone_destroy(&vlan_cloner,
+			    &LIST_FIRST(&ifv_list)->ifv_if);
 		VLAN_LOCK_DESTROY();
 		break;
-	} 
-	return 0; 
-} 
+	default:
+		return (EOPNOTSUPP);
+	}
+	return (0);
+}
 
-static moduledata_t vlan_mod = { 
-	"if_vlan", 
-	vlan_modevent, 
+static moduledata_t vlan_mod = {
+	"if_vlan",
+	vlan_modevent,
 	0
-}; 
+};
 
 DECLARE_MODULE(if_vlan, vlan_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+MODULE_DEPEND(if_vlan, miibus, 1, 1, 1);
+
+static struct ifnet *
+vlan_clone_match_ethertag(struct if_clone *ifc, const char *name, int *tag)
+{
+	const char *cp;
+	struct ifnet *ifp;
+	int t = 0;
+
+	/* Check for <etherif>.<vlan> style interface names. */
+	IFNET_RLOCK();
+	TAILQ_FOREACH(ifp, &ifnet, if_link) {
+		if (ifp->if_type != IFT_ETHER)
+			continue;
+		if (strncmp(ifp->if_xname, name, strlen(ifp->if_xname)) != 0)
+			continue;
+		cp = name + strlen(ifp->if_xname);
+		if (*cp != '.')
+			continue;
+		for(; *cp != '\0'; cp++) {
+			if (*cp < '0' || *cp > '9')
+				continue;
+			t = (t * 10) + (*cp - '0');
+		}
+		if (tag != NULL)
+			*tag = t;
+		break;
+	}
+	IFNET_RUNLOCK();
+
+	return (ifp);
+}
 
 static int
-vlan_clone_create(struct if_clone *ifc, int unit)
+vlan_clone_match(struct if_clone *ifc, const char *name)
 {
+	const char *cp;
+
+	if (vlan_clone_match_ethertag(ifc, name, NULL) != NULL)
+		return (1);
+
+	if (strncmp(VLANNAME, name, strlen(VLANNAME)) != 0)
+		return (0);
+	for (cp = name + 4; *cp != '\0'; cp++) {
+		if (*cp < '0' || *cp > '9')
+			return (0);
+	}
+
+	return (1);
+}
+
+static int
+vlan_clone_create(struct if_clone *ifc, char *name, size_t len)
+{
+	char *dp;
+	int wildcard;
+	int unit;
+	int error;
+	int tag;
+	int ethertag;
 	struct ifvlan *ifv;
 	struct ifnet *ifp;
+	struct ifnet *p;
+
+	if ((p = vlan_clone_match_ethertag(ifc, name, &tag)) != NULL) {
+		ethertag = 1;
+		unit = -1;
+		wildcard = 0;
+
+		/*
+		 * Don't let the caller set up a VLAN tag with
+		 * anything except VLID bits.
+		 */
+		if (tag & ~EVL_VLID_MASK)
+			return (EINVAL);
+	} else {
+		ethertag = 0;
+
+		error = ifc_name2unit(name, &unit);
+		if (error != 0)
+			return (error);
+
+		wildcard = (unit < 0);
+	}
+
+	error = ifc_alloc_unit(ifc, &unit);
+	if (error != 0)
+		return (error);
+
+	/* In the wildcard case, we need to update the name. */
+	if (wildcard) {
+		for (dp = name; *dp != '\0'; dp++);
+		if (snprintf(dp, len - (dp-name), "%d", unit) >
+		    len - (dp-name) - 1) {
+			panic("%s: interface name too long", __func__);
+		}
+	}
 
 	ifv = malloc(sizeof(struct ifvlan), M_VLAN, M_WAITOK | M_ZERO);
 	ifp = &ifv->ifv_if;
 	SLIST_INIT(&ifv->vlan_mc_listhead);
 
 	ifp->if_softc = ifv;
-	if_initname(ifp, ifc->ifc_name, unit);
+	/*
+	 * Set the name manually rather then using if_initname because
+	 * we don't conform to the default naming convention for interfaces.
+	 */
+	strlcpy(ifp->if_xname, name, IFNAMSIZ);
+	ifp->if_dname = ifc->ifc_name;
+	ifp->if_dunit = unit;
 	/* NB: flags are not set here */
 	ifp->if_linkmib = &ifv->ifv_mib;
-	ifp->if_linkmiblen = sizeof ifv->ifv_mib;
+	ifp->if_linkmiblen = sizeof(ifv->ifv_mib);
 	/* NB: mtu is not set here */
 
 	ifp->if_init = vlan_ifinit;
@@ -270,13 +390,41 @@ vlan_clone_create(struct if_clone *ifc, int unit)
 	LIST_INSERT_HEAD(&ifv_list, ifv, ifv_list);
 	VLAN_UNLOCK();
 
+	if (ethertag) {
+		VLAN_LOCK();
+		error = vlan_config(ifv, p);
+		if (error != 0) {
+			/*
+			 * Since we've partialy failed, we need to back
+			 * out all the way, otherwise userland could get
+			 * confused.  Thus, we destroy the interface.
+			 */
+			LIST_REMOVE(ifv, ifv_list);
+			vlan_unconfig(ifp);
+			VLAN_UNLOCK();
+			ether_ifdetach(ifp);
+			free(ifv, M_VLAN);
+
+			return (error);
+		}
+		ifv->ifv_tag = tag;
+		ifp->if_flags |= IFF_RUNNING;
+		VLAN_UNLOCK();
+
+		/* Update promiscuous mode, if necessary. */
+		vlan_set_promisc(ifp);
+	}
+
 	return (0);
 }
 
-static void
-vlan_clone_destroy(struct ifnet *ifp)
+static int
+vlan_clone_destroy(struct if_clone *ifc, struct ifnet *ifp)
 {
+	int unit;
 	struct ifvlan *ifv = ifp->if_softc;
+
+	unit = ifp->if_dunit;
 
 	VLAN_LOCK();
 	LIST_REMOVE(ifv, ifv_list);
@@ -286,12 +434,19 @@ vlan_clone_destroy(struct ifnet *ifp)
 	ether_ifdetach(ifp);
 
 	free(ifv, M_VLAN);
+
+	ifc_free_unit(ifc, unit);
+
+	return (0);
 }
 
+/*
+ * The ifp->if_init entry point for vlan(4) is a no-op.
+ */
 static void
 vlan_ifinit(void *foo)
 {
-	return;
+
 }
 
 static void
@@ -301,6 +456,7 @@ vlan_start(struct ifnet *ifp)
 	struct ifnet *p;
 	struct ether_vlan_header *evl;
 	struct mbuf *m;
+	int error;
 
 	ifv = ifp->if_softc;
 	p = ifv->ifv_p;
@@ -330,22 +486,23 @@ vlan_start(struct ifnet *ifp)
 		 * knows how to find the VLAN tag to use, so we attach a
 		 * packet tag that holds it.
 		 */
-		if (p->if_capabilities & IFCAP_VLAN_HWTAGGING) {
+		if (p->if_capenable & IFCAP_VLAN_HWTAGGING) {
 			struct m_tag *mtag = m_tag_alloc(MTAG_VLAN,
 							 MTAG_VLAN_TAG,
-							 sizeof (u_int),
+							 sizeof(u_int),
 							 M_NOWAIT);
 			if (mtag == NULL) {
 				ifp->if_oerrors++;
 				m_freem(m);
 				continue;
 			}
-			*(u_int*)(mtag+1) = ifv->ifv_tag;
+			*(u_int*)(mtag + 1) = ifv->ifv_tag;
 			m_tag_prepend(m, mtag);
 		} else {
 			M_PREPEND(m, ifv->ifv_encaplen, M_DONTWAIT);
 			if (m == NULL) {
-				if_printf(ifp, "unable to prepend VLAN header");
+				if_printf(ifp,
+				    "unable to prepend VLAN header\n");
 				ifp->if_oerrors++;
 				continue;
 			}
@@ -355,7 +512,7 @@ vlan_start(struct ifnet *ifp)
 				m = m_pullup(m, sizeof(*evl));
 				if (m == NULL) {
 					if_printf(ifp,
-					    "cannot pullup VLAN header");
+					    "cannot pullup VLAN header\n");
 					ifp->if_oerrors++;
 					continue;
 				}
@@ -372,7 +529,7 @@ vlan_start(struct ifnet *ifp)
 			evl->evl_encap_proto = htons(ETHERTYPE_VLAN);
 			evl->evl_tag = htons(ifv->ifv_tag);
 #ifdef DEBUG
-			printf("vlan_start: %*D\n", (int)sizeof *evl,
+			printf("vlan_start: %*D\n", (int)sizeof(*evl),
 			    (unsigned char *)evl, ":");
 #endif
 		}
@@ -381,14 +538,13 @@ vlan_start(struct ifnet *ifp)
 		 * Send it, precisely as ether_output() would have.
 		 * We are already running at splimp.
 		 */
-		if (IF_HANDOFF(&p->if_snd, m, p))
+		IFQ_HANDOFF(p, m, error);
+		if (!error)
 			ifp->if_opackets++;
 		else
 			ifp->if_oerrors++;
 	}
 	ifp->if_flags &= ~IFF_OACTIVE;
-
-	return;
 }
 
 static void
@@ -410,8 +566,8 @@ vlan_input(struct ifnet *ifp, struct mbuf *m)
 	} else {
 		switch (ifp->if_type) {
 		case IFT_ETHER:
-			if (m->m_len < sizeof (*evl) &&
-			    (m = m_pullup(m, sizeof (*evl))) == NULL) {
+			if (m->m_len < sizeof(*evl) &&
+			    (m = m_pullup(m, sizeof(*evl))) == NULL) {
 				if_printf(ifp, "cannot pullup VLAN header\n");
 				return;
 			}
@@ -432,7 +588,8 @@ vlan_input(struct ifnet *ifp, struct mbuf *m)
 		default:
 			tag = (u_int) -1;
 #ifdef DIAGNOSTIC
-			panic("vlan_input: unsupported if type %u", ifp->if_type);
+			panic("vlan_input: unsupported if type %u",
+			    ifp->if_type);
 #endif
 			break;
 		}
@@ -447,9 +604,15 @@ vlan_input(struct ifnet *ifp, struct mbuf *m)
 		VLAN_UNLOCK();
 		m_freem(m);
 		ifp->if_noproto++;
-		return;	
+#ifdef DEBUG
+		printf("vlan_input: tag %d, no interface\n", tag);
+#endif
+		return;
 	}
 	VLAN_UNLOCK();		/* XXX extend below? */
+#ifdef DEBUG
+	printf("vlan_input: tag %d, parent %s\n", tag, ifv->ifv_p->if_xname);
+#endif
 
 	if (mtag == NULL) {
 		/*
@@ -479,41 +642,33 @@ vlan_config(struct ifvlan *ifv, struct ifnet *p)
 	VLAN_LOCK_ASSERT();
 
 	if (p->if_data.ifi_type != IFT_ETHER)
-		return EPROTONOSUPPORT;
+		return (EPROTONOSUPPORT);
 	if (ifv->ifv_p)
-		return EBUSY;
+		return (EBUSY);
 
 	ifv->ifv_encaplen = ETHER_VLAN_ENCAP_LEN;
 	ifv->ifv_mintu = ETHERMIN;
 	ifv->ifv_flags = 0;
 
 	/*
-	 * If the parent supports the VLAN_MTU capability,
-	 * i.e. can Tx/Rx larger than ETHER_MAX_LEN frames,
-	 * enable it.
+	 * The active VLAN counter on the parent is used
+	 * at various places to see if there is a vlan(4)
+	 * attached to this physical interface.
 	 */
 	p->if_nvlans++;
-	if (p->if_nvlans == 1 && (p->if_capabilities & IFCAP_VLAN_MTU) != 0) {
-		/*
-		 * Enable Tx/Rx of VLAN-sized frames.
-		 */
-		p->if_capenable |= IFCAP_VLAN_MTU;
-		if (p->if_flags & IFF_UP) {
-			struct ifreq ifr;
-			int error;
 
-			ifr.ifr_flags = p->if_flags;
-			error = (*p->if_ioctl)(p, SIOCSIFFLAGS,
-			    (caddr_t) &ifr);
-			if (error) {
-				p->if_nvlans--;
-				if (p->if_nvlans == 0)
-					p->if_capenable &= ~IFCAP_VLAN_MTU;
-				return (error);
-			}
-		}
+	/*
+	 * If the parent supports the VLAN_MTU capability,
+	 * i.e. can Tx/Rx larger than ETHER_MAX_LEN frames,
+	 * use it.
+	 */
+	if (p->if_capenable & IFCAP_VLAN_MTU) {
+		/*
+		 * No need to fudge the MTU since the parent can
+		 * handle extended frames.
+		 */
 		ifv->ifv_mtufudge = 0;
-	} else if ((p->if_capabilities & IFCAP_VLAN_MTU) == 0) {
+	} else {
 		/*
 		 * Fudge the MTU by the encapsulation size.  This
 		 * makes us incompatible with strictly compliant
@@ -532,7 +687,14 @@ vlan_config(struct ifvlan *ifv, struct ifnet *p)
 	 */
 	ifv->ifv_if.if_flags = (p->if_flags &
 	    (IFF_BROADCAST | IFF_MULTICAST | IFF_SIMPLEX | IFF_POINTOPOINT));
+	ifv->ifv_if.if_link_state = p->if_link_state;
 
+#if 0
+	/*
+	 * Not ready yet.  We need notification from the parent
+	 * when hw checksumming flags in its if_capenable change.
+	 * Flags set in if_capabilities only are useless.
+	 */
 	/*
 	 * If the parent interface can do hardware-assisted
 	 * VLAN encapsulation, then propagate its hardware-
@@ -540,6 +702,7 @@ vlan_config(struct ifvlan *ifv, struct ifnet *p)
 	 */
 	if (p->if_capabilities & IFCAP_VLAN_HWTAGGING)
 		ifv->ifv_if.if_capabilities |= p->if_capabilities & IFCAP_HWCSUM;
+#endif
 
 	/*
 	 * Set up our ``Ethernet address'' to reflect the underlying
@@ -558,9 +721,9 @@ vlan_config(struct ifvlan *ifv, struct ifnet *p)
 	 * Configure multicast addresses that may already be
 	 * joined on the vlan device.
 	 */
-	(void)vlan_setmulti(&ifv->ifv_if);
+	(void)vlan_setmulti(&ifv->ifv_if); /* XXX: VLAN lock held */
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -586,8 +749,8 @@ vlan_unconfig(struct ifnet *ifp)
 		 * empty the list of multicast groups that we may have joined
 		 * while we were alive from the parent's list.
 		 */
-		bzero((char *)&sdl, sizeof sdl);
-		sdl.sdl_len = sizeof sdl;
+		bzero((char *)&sdl, sizeof(sdl));
+		sdl.sdl_len = sizeof(sdl);
 		sdl.sdl_family = AF_LINK;
 		sdl.sdl_index = p->if_index;
 		sdl.sdl_type = IFT_ETHER;
@@ -595,33 +758,23 @@ vlan_unconfig(struct ifnet *ifp)
 
 		while(SLIST_FIRST(&ifv->vlan_mc_listhead) != NULL) {
 			mc = SLIST_FIRST(&ifv->vlan_mc_listhead);
-			bcopy((char *)&mc->mc_addr, LLADDR(&sdl), ETHER_ADDR_LEN);
+			bcopy((char *)&mc->mc_addr, LLADDR(&sdl),
+			    ETHER_ADDR_LEN);
 			error = if_delmulti(p, (struct sockaddr *)&sdl);
 			if (error)
-				return(error);
+				return (error);
 			SLIST_REMOVE_HEAD(&ifv->vlan_mc_listhead, mc_entries);
 			free(mc, M_VLAN);
 		}
 
 		p->if_nvlans--;
-		if (p->if_nvlans == 0) {
-			/*
-			 * Disable Tx/Rx of VLAN-sized frames.
-			 */
-			p->if_capenable &= ~IFCAP_VLAN_MTU;
-			if (p->if_flags & IFF_UP) {
-				struct ifreq ifr;
-
-				ifr.ifr_flags = p->if_flags;
-				(*p->if_ioctl)(p, SIOCSIFFLAGS, (caddr_t) &ifr);
-			}
-		}
 	}
 
 	/* Disconnect from parent. */
 	ifv->ifv_p = NULL;
 	ifv->ifv_if.if_mtu = ETHERMTU;		/* XXX why not 0? */
 	ifv->ifv_flags = 0;
+	ifv->ifv_if.if_link_state = LINK_STATE_UNKNOWN;
 
 	/* Clear our MAC address. */
 	ifa = ifaddr_byindex(ifv->ifv_if.if_index);
@@ -631,7 +784,7 @@ vlan_unconfig(struct ifnet *ifp)
 	bzero(LLADDR(sdl), ETHER_ADDR_LEN);
 	bzero(ifv->ifv_ac.ac_enaddr, ETHER_ADDR_LEN);
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -655,6 +808,23 @@ vlan_set_promisc(struct ifnet *ifp)
 	}
 
 	return (error);
+}
+
+/* Inform all vlans that their parent has changed link state */
+static void
+vlan_link_state(struct ifnet *ifp, int link)
+{
+	struct ifvlan *ifv;
+
+	VLAN_LOCK();
+	LIST_FOREACH(ifv, &ifv_list, ifv_list) {
+		if (ifv->ifv_p == ifp) {
+			ifv->ifv_if.if_link_state = ifv->ifv_p->if_link_state;
+			rt_ifmsg(&(ifv->ifv_if));
+			KNOTE_UNLOCKED(&ifp->if_klist, link);
+		}
+	}
+	VLAN_UNLOCK();
 }
 
 static int
@@ -691,8 +861,8 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			struct sockaddr *sa;
 
 			sa = (struct sockaddr *) &ifr->ifr_data;
-			bcopy(((struct arpcom *)ifp->if_softc)->ac_enaddr,
-			      (caddr_t) sa->sa_data, ETHER_ADDR_LEN);
+			bcopy(IFP2AC(ifp)->ac_enaddr, (caddr_t)sa->sa_data,
+			    ETHER_ADDR_LEN);
 		}
 		break;
 
@@ -706,11 +876,11 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			if (error == 0) {
 				struct ifmediareq *ifmr;
 
-				ifmr = (struct ifmediareq *) data;
+				ifmr = (struct ifmediareq *)data;
 				if (ifmr->ifm_count >= 1 && ifmr->ifm_ulist) {
 					ifmr->ifm_count = 1;
 					error = copyout(&ifmr->ifm_current,
-						ifmr->ifm_ulist, 
+						ifmr->ifm_ulist,
 						sizeof(int));
 				}
 			}
@@ -743,7 +913,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCSETVLAN:
-		error = copyin(ifr->ifr_data, &vlr, sizeof vlr);
+		error = copyin(ifr->ifr_data, &vlr, sizeof(vlr));
 		if (error)
 			break;
 		if (vlr.vlr_parent[0] == '\0') {
@@ -781,9 +951,9 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		/* Update promiscuous mode, if necessary. */
 		vlan_set_promisc(ifp);
 		break;
-		
+
 	case SIOCGETVLAN:
-		bzero(&vlr, sizeof vlr);
+		bzero(&vlr, sizeof(vlr));
 		VLAN_LOCK();
 		if (ifv->ifv_p) {
 			strlcpy(vlr.vlr_parent, ifv->ifv_p->if_xname,
@@ -791,7 +961,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			vlr.vlr_tag = ifv->ifv_tag;
 		}
 		VLAN_UNLOCK();
-		error = copyout(&vlr, ifr->ifr_data, sizeof vlr);
+		error = copyout(&vlr, ifr->ifr_data, sizeof(vlr));
 		break;
 		
 	case SIOCSIFFLAGS:
@@ -805,10 +975,13 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
+		/*VLAN_LOCK();*/
 		error = vlan_setmulti(ifp);
+		/*VLAN_UNLOCK();*/
 		break;
 	default:
 		error = EINVAL;
 	}
-	return error;
+
+	return (error);
 }

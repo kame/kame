@@ -1,12 +1,9 @@
 #
-# SMP -- Generic kernel configuration file for FreeBSD/i386 SMP 
+# SMP -- Generic kernel configuration file for FreeBSD/i386 SMP
+#	 Use this for multi-processor machines
 #
-# $FreeBSD: src/sys/i386/conf/SMP,v 1.4 2003/03/26 19:49:34 ps Exp $
+# $FreeBSD: src/sys/i386/conf/SMP,v 1.5.4.1 2004/10/23 20:04:00 kensmith Exp $
 
 include GENERIC
 
-ident		SMP-GENERIC
-
-# To make an SMP kernel, the next two are needed
-options 	SMP			# Symmetric MultiProcessor Kernel
-options 	APIC_IO			# Symmetric (APIC) I/O
+options	SMP

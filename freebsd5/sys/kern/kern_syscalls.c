@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_syscalls.c,v 1.10 2003/06/11 00:56:56 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_syscalls.c,v 1.11 2004/07/15 08:26:05 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/sysproto.h>
@@ -115,6 +115,9 @@ syscall_module_handler(struct module *mod, int what, void *arg)
                }
                error = syscall_deregister(data->offset, &data->old_sysent);
                return error;
+       default :
+	       return EOPNOTSUPP;
+	
        }
 
        if (data->chainevh)

@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.17 2003/11/19 22:42:34 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.22 2004/08/10 03:26:17 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.17 2003/11/19 22:42:34 sa
 #include <sys/random.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/fcntl.h>
 
 #include <opencrypto/cryptodev.h>
@@ -711,25 +712,25 @@ csefree(struct csession *cse)
 }
 
 static int
-cryptoopen(dev_t dev, int oflags, int devtype, struct thread *td)
+cryptoopen(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	return (0);
 }
 
 static int
-cryptoread(dev_t dev, struct uio *uio, int ioflag)
+cryptoread(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	return (EIO);
 }
 
 static int
-cryptowrite(dev_t dev, struct uio *uio, int ioflag)
+cryptowrite(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	return (EIO);
 }
 
 static int
-cryptoioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+cryptoioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	struct file *f;
 	struct fcrypt *fcr;
@@ -765,6 +766,8 @@ cryptoioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 
 #define	CRYPTO_MAJOR	70		/* from openbsd */
 static struct cdevsw crypto_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	cryptoopen,
 	.d_read =	cryptoread,
 	.d_write =	cryptowrite,
@@ -772,7 +775,7 @@ static struct cdevsw crypto_cdevsw = {
 	.d_name =	"crypto",
 	.d_maj =	CRYPTO_MAJOR,
 };
-static dev_t crypto_dev;
+static struct cdev *crypto_dev;
 
 /*
  * Initialization code, both for static and dynamic loading.

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.234 2003/10/18 14:10:27 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.242.2.1 2004/09/02 01:12:20 csjp Exp $");
 
 #include "opt_mac.h"
 #include "opt_quota.h"
@@ -98,6 +94,7 @@ static int ufs_mkdir(struct vop_mkdir_args *);
 static int ufs_mknod(struct vop_mknod_args *);
 static int ufs_open(struct vop_open_args *);
 static int ufs_pathconf(struct vop_pathconf_args *);
+static int ufs_lock(struct vop_lock_args *);
 static int ufs_print(struct vop_print_args *);
 static int ufs_readlink(struct vop_readlink_args *);
 static int ufs_remove(struct vop_remove_args *);
@@ -166,17 +163,17 @@ ufs_itimes(vp)
 	if ((vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
 		vfs_timestamp(&ts);
 		if (ip->i_flag & IN_ACCESS) {
-			DIP(ip, i_atime) = ts.tv_sec;
-			DIP(ip, i_atimensec) = ts.tv_nsec;
+			DIP_SET(ip, i_atime, ts.tv_sec);
+			DIP_SET(ip, i_atimensec, ts.tv_nsec);
 		}
 		if (ip->i_flag & IN_UPDATE) {
-			DIP(ip, i_mtime) = ts.tv_sec;
-			DIP(ip, i_mtimensec) = ts.tv_nsec;
+			DIP_SET(ip, i_mtime, ts.tv_sec);
+			DIP_SET(ip, i_mtimensec, ts.tv_nsec);
 			ip->i_modrev++;
 		}
 		if (ip->i_flag & IN_CHANGE) {
-			DIP(ip, i_ctime) = ts.tv_sec;
-			DIP(ip, i_ctimensec) = ts.tv_nsec;
+			DIP_SET(ip, i_ctime, ts.tv_sec);
+			DIP_SET(ip, i_ctimensec, ts.tv_nsec);
 		}
 	}
 	ip->i_flag &= ~(IN_ACCESS | IN_CHANGE | IN_UPDATE);
@@ -201,7 +198,7 @@ ufs_create(ap)
 	    ap->a_dvp, ap->a_vpp, ap->a_cnp);
 	if (error)
 		return (error);
-	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
+	VN_KNOTE_UNLOCKED(ap->a_dvp, NOTE_WRITE);
 	return (0);
 }
 
@@ -228,7 +225,7 @@ ufs_mknod(ap)
 	    ap->a_dvp, vpp, ap->a_cnp);
 	if (error)
 		return (error);
-	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
+	VN_KNOTE_UNLOCKED(ap->a_dvp, NOTE_WRITE);
 	ip = VTOI(*vpp);
 	ip->i_flag |= IN_ACCESS | IN_CHANGE | IN_UPDATE;
 	if (vap->va_rdev != VNOVAL) {
@@ -236,7 +233,7 @@ ufs_mknod(ap)
 		 * Want to be able to use this to make badblock
 		 * inodes, so don't truncate the dev number.
 		 */
-		DIP(ip, i_rdev) = vap->va_rdev;
+		DIP_SET(ip, i_rdev, vap->va_rdev);
 	}
 	/*
 	 * Remove inode, then reload it through VFS_VGET so it is
@@ -502,7 +499,7 @@ ufs_setattr(ap)
 		 * Privileged non-jail processes may not modify system flags
 		 * if securelevel > 0 and any existing system flags are set.
 		 */
-		if (!suser_cred(cred, PRISON_ROOT)) {
+		if (!suser_cred(cred, 0)) {
 			if (ip->i_flags
 			    & (SF_NOUNLINK | SF_IMMUTABLE | SF_APPEND)) {
 				error = securelevel_gt(cred, 0);
@@ -516,7 +513,7 @@ ufs_setattr(ap)
 			     (ip->i_flags & SF_SNAPSHOT) != 0))
 				return (EPERM);
 			ip->i_flags = vap->va_flags;
-			DIP(ip, i_flags) = vap->va_flags;
+			DIP_SET(ip, i_flags, vap->va_flags);
 		} else {
 			if (ip->i_flags
 			    & (SF_NOUNLINK | SF_IMMUTABLE | SF_APPEND) ||
@@ -524,7 +521,7 @@ ufs_setattr(ap)
 				return (EPERM);
 			ip->i_flags &= SF_SETTABLE;
 			ip->i_flags |= (vap->va_flags & UF_SETTABLE);
-			DIP(ip, i_flags) = ip->i_flags;
+			DIP_SET(ip, i_flags, ip->i_flags);
 		}
 		ip->i_flag |= IN_CHANGE;
 		if (vap->va_flags & (IMMUTABLE | APPEND))
@@ -593,12 +590,12 @@ ufs_setattr(ap)
 			ip->i_flag |= IN_MODIFIED;
 		ufs_itimes(vp);
 		if (vap->va_atime.tv_sec != VNOVAL) {
-			DIP(ip, i_atime) = vap->va_atime.tv_sec;
-			DIP(ip, i_atimensec) = vap->va_atime.tv_nsec;
+			DIP_SET(ip, i_atime, vap->va_atime.tv_sec);
+			DIP_SET(ip, i_atimensec, vap->va_atime.tv_nsec);
 		}
 		if (vap->va_mtime.tv_sec != VNOVAL) {
-			DIP(ip, i_mtime) = vap->va_mtime.tv_sec;
-			DIP(ip, i_mtimensec) = vap->va_mtime.tv_nsec;
+			DIP_SET(ip, i_mtime, vap->va_mtime.tv_sec);
+			DIP_SET(ip, i_mtimensec, vap->va_mtime.tv_nsec);
 		}
 		if (vap->va_birthtime.tv_sec != VNOVAL &&
 		    ip->i_ump->um_fstype == UFS2) {
@@ -618,7 +615,7 @@ ufs_setattr(ap)
 			return (EPERM);
 		error = ufs_chmod(vp, (int)vap->va_mode, cred, td);
 	}
-	VN_KNOTE(vp, NOTE_ATTRIB);
+	VN_KNOTE_UNLOCKED(vp, NOTE_ATTRIB);
 	return (error);
 }
 
@@ -649,17 +646,17 @@ ufs_chmod(vp, mode, cred, td)
 	 * jail(8).
 	 */
 	if (vp->v_type != VDIR && (mode & S_ISTXT)) {
-		if (suser_cred(cred, PRISON_ROOT))
+		if (suser_cred(cred, SUSER_ALLOWJAIL))
 			return (EFTYPE);
 	}
 	if (!groupmember(ip->i_gid, cred) && (mode & ISGID)) {
-		error = suser_cred(cred, PRISON_ROOT);
+		error = suser_cred(cred, SUSER_ALLOWJAIL);
 		if (error)
 			return (error);
 	}
 	ip->i_mode &= ~ALLPERMS;
 	ip->i_mode |= (mode & ALLPERMS);
-	DIP(ip, i_mode) = ip->i_mode;
+	DIP_SET(ip, i_mode, ip->i_mode);
 	ip->i_flag |= IN_CHANGE;
 	return (0);
 }
@@ -702,7 +699,7 @@ ufs_chown(vp, uid, gid, cred, td)
 	 */
 	if ((uid != ip->i_uid || 
 	    (gid != ip->i_gid && !groupmember(gid, cred))) &&
-	    (error = suser_cred(cred, PRISON_ROOT)))
+	    (error = suser_cred(cred, SUSER_ALLOWJAIL)))
 		return (error);
 	ogid = ip->i_gid;
 	ouid = ip->i_uid;
@@ -726,9 +723,9 @@ ufs_chown(vp, uid, gid, cred, td)
 	}
 #endif
 	ip->i_gid = gid;
-	DIP(ip, i_gid) = gid;
+	DIP_SET(ip, i_gid, gid);
 	ip->i_uid = uid;
-	DIP(ip, i_uid) = uid;
+	DIP_SET(ip, i_uid, uid);
 #ifdef QUOTA
 	if ((error = getinoquota(ip)) == 0) {
 		if (ouid == uid) {
@@ -751,9 +748,9 @@ ufs_chown(vp, uid, gid, cred, td)
 		}
 	}
 	ip->i_gid = ogid;
-	DIP(ip, i_gid) = ogid;
+	DIP_SET(ip, i_gid, ogid);
 	ip->i_uid = ouid;
-	DIP(ip, i_uid) = ouid;
+	DIP_SET(ip, i_uid, ouid);
 	if (getinoquota(ip) == 0) {
 		if (ouid == uid) {
 			dqrele(vp, ip->i_dquot[USRQUOTA]);
@@ -773,9 +770,9 @@ good:
 		panic("ufs_chown: lost quota");
 #endif /* QUOTA */
 	ip->i_flag |= IN_CHANGE;
-	if (suser_cred(cred, PRISON_ROOT) && (ouid != uid || ogid != gid)) {
+	if (suser_cred(cred, SUSER_ALLOWJAIL) && (ouid != uid || ogid != gid)) {
 		ip->i_mode &= ~(ISUID | ISGID);
-		DIP(ip, i_mode) = ip->i_mode;
+		DIP_SET(ip, i_mode, ip->i_mode);
 	}
 	return (0);
 }
@@ -802,8 +799,8 @@ ufs_remove(ap)
 	error = ufs_dirremove(dvp, ip, ap->a_cnp->cn_flags, 0);
 	if (ip->i_nlink <= 0)
 		vp->v_vflag |= VV_NOSYNC;
-	VN_KNOTE(vp, NOTE_DELETE);
-	VN_KNOTE(dvp, NOTE_WRITE);
+	VN_KNOTE_UNLOCKED(vp, NOTE_DELETE);
+	VN_KNOTE_UNLOCKED(dvp, NOTE_WRITE);
 out:
 	return (error);
 }
@@ -845,7 +842,7 @@ ufs_link(ap)
 	}
 	ip->i_effnlink++;
 	ip->i_nlink++;
-	DIP(ip, i_nlink) = ip->i_nlink;
+	DIP_SET(ip, i_nlink, ip->i_nlink);
 	ip->i_flag |= IN_CHANGE;
 	if (DOINGSOFTDEP(vp))
 		softdep_change_linkcnt(ip);
@@ -858,14 +855,14 @@ ufs_link(ap)
 	if (error) {
 		ip->i_effnlink--;
 		ip->i_nlink--;
-		DIP(ip, i_nlink) = ip->i_nlink;
+		DIP_SET(ip, i_nlink, ip->i_nlink);
 		ip->i_flag |= IN_CHANGE;
 		if (DOINGSOFTDEP(vp))
 			softdep_change_linkcnt(ip);
 	}
 out:
-	VN_KNOTE(vp, NOTE_LINK);
-	VN_KNOTE(tdvp, NOTE_WRITE);
+	VN_KNOTE_UNLOCKED(vp, NOTE_LINK);
+	VN_KNOTE_UNLOCKED(tdvp, NOTE_WRITE);
 	return (error);
 }
 
@@ -1040,7 +1037,7 @@ abortit:
 		oldparent = dp->i_number;
 		doingdirectory = 1;
 	}
-	VN_KNOTE(fdvp, NOTE_WRITE);		/* XXX right place? */
+	VN_KNOTE_UNLOCKED(fdvp, NOTE_WRITE);		/* XXX right place? */
 	vrele(fdvp);
 
 	/*
@@ -1060,7 +1057,7 @@ abortit:
 	 */
 	ip->i_effnlink++;
 	ip->i_nlink++;
-	DIP(ip, i_nlink) = ip->i_nlink;
+	DIP_SET(ip, i_nlink, ip->i_nlink);
 	ip->i_flag |= IN_CHANGE;
 	if (DOINGSOFTDEP(fvp))
 		softdep_change_linkcnt(ip);
@@ -1126,7 +1123,7 @@ abortit:
 			}
 			dp->i_effnlink++;
 			dp->i_nlink++;
-			DIP(dp, i_nlink) = dp->i_nlink;
+			DIP_SET(dp, i_nlink, dp->i_nlink);
 			dp->i_flag |= IN_CHANGE;
 			if (DOINGSOFTDEP(tdvp))
 				softdep_change_linkcnt(dp);
@@ -1141,7 +1138,7 @@ abortit:
 			if (doingdirectory && newparent) {
 				dp->i_effnlink--;
 				dp->i_nlink--;
-				DIP(dp, i_nlink) = dp->i_nlink;
+				DIP_SET(dp, i_nlink, dp->i_nlink);
 				dp->i_flag |= IN_CHANGE;
 				if (DOINGSOFTDEP(tdvp))
 					softdep_change_linkcnt(dp);
@@ -1149,7 +1146,7 @@ abortit:
 			}
 			goto bad;
 		}
-		VN_KNOTE(tdvp, NOTE_WRITE);
+		VN_KNOTE_UNLOCKED(tdvp, NOTE_WRITE);
 		vput(tdvp);
 	} else {
 		if (xp->i_dev != dp->i_dev || xp->i_dev != ip->i_dev)
@@ -1220,11 +1217,11 @@ abortit:
 			 */
 			if (!newparent) {
 				dp->i_nlink--;
-				DIP(dp, i_nlink) = dp->i_nlink;
+				DIP_SET(dp, i_nlink, dp->i_nlink);
 				dp->i_flag |= IN_CHANGE;
 			}
 			xp->i_nlink--;
-			DIP(xp, i_nlink) = xp->i_nlink;
+			DIP_SET(xp, i_nlink, xp->i_nlink);
 			xp->i_flag |= IN_CHANGE;
 			ioflag = IO_NORMAL;
 			if (DOINGASYNC(tvp))
@@ -1233,9 +1230,9 @@ abortit:
 			    tcnp->cn_cred, tcnp->cn_thread)) != 0)
 				goto bad;
 		}
-		VN_KNOTE(tdvp, NOTE_WRITE);
+		VN_KNOTE_UNLOCKED(tdvp, NOTE_WRITE);
 		vput(tdvp);
-		VN_KNOTE(tvp, NOTE_DELETE);
+		VN_KNOTE_UNLOCKED(tvp, NOTE_DELETE);
 		vput(tvp);
 		xp = NULL;
 	}
@@ -1305,7 +1302,7 @@ abortit:
 		error = ufs_dirremove(fdvp, xp, fcnp->cn_flags, 0);
 		xp->i_flag &= ~IN_RENAME;
 	}
-	VN_KNOTE(fvp, NOTE_RENAME);
+	VN_KNOTE_UNLOCKED(fvp, NOTE_RENAME);
 	if (dp)
 		vput(fdvp);
 	if (xp)
@@ -1323,7 +1320,7 @@ out:
 	if (vn_lock(fvp, LK_EXCLUSIVE, td) == 0) {
 		ip->i_effnlink--;
 		ip->i_nlink--;
-		DIP(ip, i_nlink) = ip->i_nlink;
+		DIP_SET(ip, i_nlink, ip->i_nlink);
 		ip->i_flag |= IN_CHANGE;
 		ip->i_flag &= ~IN_RENAME;
 		if (DOINGSOFTDEP(fvp))
@@ -1381,7 +1378,7 @@ ufs_mkdir(ap)
 		goto out;
 	ip = VTOI(tvp);
 	ip->i_gid = dp->i_gid;
-	DIP(ip, i_gid) = dp->i_gid;
+	DIP_SET(ip, i_gid, dp->i_gid);
 #ifdef SUIDDIR
 	{
 #ifdef QUOTA
@@ -1400,7 +1397,7 @@ ufs_mkdir(ap)
 		    (dp->i_mode & ISUID) && dp->i_uid) {
 			dmode |= ISUID;
 			ip->i_uid = dp->i_uid;
-			DIP(ip, i_uid) = dp->i_uid;
+			DIP_SET(ip, i_uid, dp->i_uid);
 #ifdef QUOTA
 			if (dp->i_uid != cnp->cn_cred->cr_uid) {
 				/*
@@ -1419,7 +1416,7 @@ ufs_mkdir(ap)
 #endif
 		} else {
 			ip->i_uid = cnp->cn_cred->cr_uid;
-			DIP(ip, i_uid) = ip->i_uid;
+			DIP_SET(ip, i_uid, ip->i_uid);
 		}
 #ifdef QUOTA
 		if ((error = getinoquota(ip)) ||
@@ -1432,7 +1429,7 @@ ufs_mkdir(ap)
 	}
 #else	/* !SUIDDIR */
 	ip->i_uid = cnp->cn_cred->cr_uid;
-	DIP(ip, i_uid) = ip->i_uid;
+	DIP_SET(ip, i_uid, ip->i_uid);
 #ifdef QUOTA
 	if ((error = getinoquota(ip)) ||
 	    (error = chkiq(ip, 1, cnp->cn_cred, 0))) {
@@ -1464,7 +1461,7 @@ ufs_mkdir(ap)
 			if (acl->acl_cnt != 0) {
 				dmode = acl_posix1e_newfilemode(dmode, acl);
 				ip->i_mode = dmode;
-				DIP(ip, i_mode) = dmode;
+				DIP_SET(ip, i_mode, dmode);
 				*dacl = *acl;
 				ufs_sync_acl_from_inode(ip, acl);
 				break;
@@ -1476,7 +1473,7 @@ ufs_mkdir(ap)
 			 * Just use the mode as-is.
 			 */
 			ip->i_mode = dmode;
-			DIP(ip, i_mode) = dmode;
+			DIP_SET(ip, i_mode, dmode);
 			FREE(acl, M_ACL);
 			FREE(dacl, M_ACL);
 			dacl = acl = NULL;
@@ -1492,19 +1489,19 @@ ufs_mkdir(ap)
 	} else {
 #endif /* !UFS_ACL */
 		ip->i_mode = dmode;
-		DIP(ip, i_mode) = dmode;
+		DIP_SET(ip, i_mode, dmode);
 #ifdef UFS_ACL
 	}
 #endif
 	tvp->v_type = VDIR;	/* Rest init'd in getnewvnode(). */
 	ip->i_effnlink = 2;
 	ip->i_nlink = 2;
-	DIP(ip, i_nlink) = 2;
+	DIP_SET(ip, i_nlink, 2);
 	if (DOINGSOFTDEP(tvp))
 		softdep_change_linkcnt(ip);
 	if (cnp->cn_flags & ISWHITEOUT) {
 		ip->i_flags |= UF_OPAQUE;
-		DIP(ip, i_flags) = ip->i_flags;
+		DIP_SET(ip, i_flags, ip->i_flags);
 	}
 
 	/*
@@ -1514,7 +1511,7 @@ ufs_mkdir(ap)
 	 */
 	dp->i_effnlink++;
 	dp->i_nlink++;
-	DIP(dp, i_nlink) = dp->i_nlink;
+	DIP_SET(dp, i_nlink, dp->i_nlink);
 	dp->i_flag |= IN_CHANGE;
 	if (DOINGSOFTDEP(dvp))
 		softdep_change_linkcnt(dp);
@@ -1580,7 +1577,7 @@ ufs_mkdir(ap)
 	    BA_CLRBUF, &bp)) != 0)
 		goto bad;
 	ip->i_size = DIRBLKSIZ;
-	DIP(ip, i_size) = DIRBLKSIZ;
+	DIP_SET(ip, i_size, DIRBLKSIZ);
 	ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	vnode_pager_setsize(tvp, (u_long)ip->i_size);
 	bcopy((caddr_t)&dirtemplate, (caddr_t)bp->b_data, sizeof dirtemplate);
@@ -1600,7 +1597,7 @@ ufs_mkdir(ap)
 	}
 	if ((error = UFS_UPDATE(tvp, !(DOINGSOFTDEP(tvp) |
 				       DOINGASYNC(tvp)))) != 0) {
-		(void)BUF_WRITE(bp);
+		(void)bwrite(bp);
 		goto bad;
 	}
 	/*
@@ -1616,19 +1613,19 @@ ufs_mkdir(ap)
 	 */
 	if (DOINGASYNC(dvp))
 		bdwrite(bp);
-	else if (!DOINGSOFTDEP(dvp) && ((error = BUF_WRITE(bp))))
+	else if (!DOINGSOFTDEP(dvp) && ((error = bwrite(bp))))
 		goto bad;
 	ufs_makedirentry(ip, cnp, &newdir);
 	error = ufs_direnter(dvp, tvp, &newdir, cnp, bp);
 	
 bad:
 	if (error == 0) {
-		VN_KNOTE(dvp, NOTE_WRITE | NOTE_LINK);
+		VN_KNOTE_UNLOCKED(dvp, NOTE_WRITE | NOTE_LINK);
 		*ap->a_vpp = tvp;
 	} else {
 		dp->i_effnlink--;
 		dp->i_nlink--;
-		DIP(dp, i_nlink) = dp->i_nlink;
+		DIP_SET(dp, i_nlink, dp->i_nlink);
 		dp->i_flag |= IN_CHANGE;
 		if (DOINGSOFTDEP(dvp))
 			softdep_change_linkcnt(dp);
@@ -1638,7 +1635,7 @@ bad:
 		 */
 		ip->i_effnlink = 0;
 		ip->i_nlink = 0;
-		DIP(ip, i_nlink) = 0;
+		DIP_SET(ip, i_nlink, 0);
 		ip->i_flag |= IN_CHANGE;
 		if (DOINGSOFTDEP(tvp))
 			softdep_change_linkcnt(ip);
@@ -1716,7 +1713,7 @@ ufs_rmdir(ap)
 		}
 		goto out;
 	}
-	VN_KNOTE(dvp, NOTE_WRITE | NOTE_LINK);
+	VN_KNOTE_UNLOCKED(dvp, NOTE_WRITE | NOTE_LINK);
 	cache_purge(dvp);
 	/*
 	 * Truncate inode. The only stuff left in the directory is "." and
@@ -1727,10 +1724,10 @@ ufs_rmdir(ap)
 	 */
 	if (!DOINGSOFTDEP(vp)) {
 		dp->i_nlink--;
-		DIP(dp, i_nlink) = dp->i_nlink;
+		DIP_SET(dp, i_nlink, dp->i_nlink);
 		dp->i_flag |= IN_CHANGE;
 		ip->i_nlink--;
-		DIP(ip, i_nlink) = ip->i_nlink;
+		DIP_SET(ip, i_nlink, ip->i_nlink);
 		ip->i_flag |= IN_CHANGE;
 		ioflag = IO_NORMAL;
 		if (DOINGASYNC(vp))
@@ -1745,7 +1742,7 @@ ufs_rmdir(ap)
 		ufsdirhash_free(ip);
 #endif
 out:
-	VN_KNOTE(vp, NOTE_DELETE);
+	VN_KNOTE_UNLOCKED(vp, NOTE_DELETE);
 	return (error);
 }
 
@@ -1770,14 +1767,14 @@ ufs_symlink(ap)
 	    vpp, ap->a_cnp);
 	if (error)
 		return (error);
-	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
+	VN_KNOTE_UNLOCKED(ap->a_dvp, NOTE_WRITE);
 	vp = *vpp;
 	len = strlen(ap->a_target);
 	if (len < vp->v_mount->mnt_maxsymlinklen) {
 		ip = VTOI(vp);
 		bcopy(ap->a_target, SHORTLINK(ip), len);
 		ip->i_size = len;
-		DIP(ip, i_size) = len;
+		DIP_SET(ip, i_size, len);
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	} else
 		error = vn_rdwr(UIO_WRITE, vp, ap->a_target, len, (off_t)0,
@@ -1970,8 +1967,36 @@ ufs_strategy(ap)
 	vp = ip->i_devvp;
 	bp->b_dev = vp->v_rdev;
 	bp->b_iooffset = dbtob(bp->b_blkno);
-	VOP_SPECSTRATEGY(vp, bp);
+	if (!buf_prewrite(vp, bp)) 
+		VOP_SPECSTRATEGY(vp, bp);
 	return (0);
+}
+
+/*
+ * Snapshots require all lock requests to be exclusive.
+ */
+static int
+ufs_lock(ap)
+	struct vop_lock_args /* {
+		struct vnode *a_vp;
+		int a_flags;
+		struct thread *a_td;
+	} */ *ap;
+{
+	struct vnode *vp = ap->a_vp;
+	int flags = ap->a_flags;
+
+	if ((VTOI(vp)->i_flags & SF_SNAPSHOT) &&
+	    ((flags & LK_TYPE_MASK) == LK_SHARED)) {
+		flags &= ~LK_TYPE_MASK;
+		flags |= LK_EXCLUSIVE;
+	}
+#ifndef	DEBUG_LOCKS
+	return (lockmgr(vp->v_vnlock, flags, VI_MTX(vp), ap->a_td));
+#else
+	return (debuglockmgr(vp->v_vnlock, flags, VI_MTX(vp),
+	    ap->a_td, "vop_stdlock", vp->filename, vp->line));
+#endif
 }
 
 /*
@@ -2360,7 +2385,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 		return (error);
 	ip = VTOI(tvp);
 	ip->i_gid = pdir->i_gid;
-	DIP(ip, i_gid) = pdir->i_gid;
+	DIP_SET(ip, i_gid, pdir->i_gid);
 #ifdef SUIDDIR
 	{
 #ifdef QUOTA
@@ -2378,7 +2403,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 		    (pdir->i_mode & ISUID) &&
 		    (pdir->i_uid != cnp->cn_cred->cr_uid) && pdir->i_uid) {
 			ip->i_uid = pdir->i_uid;
-			DIP(ip, i_uid) = ip->i_uid;
+			DIP_SET(ip, i_uid, ip->i_uid);
 			mode &= ~07111;
 #ifdef QUOTA
 			/*
@@ -2396,7 +2421,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 #endif
 		} else {
 			ip->i_uid = cnp->cn_cred->cr_uid;
-			DIP(ip, i_uid) = ip->i_uid;
+			DIP_SET(ip, i_uid, ip->i_uid);
 		}
 
 #ifdef QUOTA
@@ -2410,7 +2435,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 	}
 #else	/* !SUIDDIR */
 	ip->i_uid = cnp->cn_cred->cr_uid;
-	DIP(ip, i_uid) = ip->i_uid;
+	DIP_SET(ip, i_uid, ip->i_uid);
 #ifdef QUOTA
 	if ((error = getinoquota(ip)) ||
 	    (error = chkiq(ip, 1, cnp->cn_cred, 0))) {
@@ -2447,7 +2472,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 				 */
 				mode = acl_posix1e_newfilemode(mode, acl);
 				ip->i_mode = mode;
-				DIP(ip, i_mode) = mode;
+				DIP_SET(ip, i_mode, mode);
 				ufs_sync_acl_from_inode(ip, acl);
 				break;
 			}
@@ -2458,7 +2483,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 			 * Just use the mode as-is.
 			 */
 			ip->i_mode = mode;
-			DIP(ip, i_mode) = mode;
+			DIP_SET(ip, i_mode, mode);
 			FREE(acl, M_ACL);
 			acl = NULL;
 			break;
@@ -2473,25 +2498,25 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 	} else {
 #endif
 		ip->i_mode = mode;
-		DIP(ip, i_mode) = mode;
+		DIP_SET(ip, i_mode, mode);
 #ifdef UFS_ACL
 	}
 #endif
 	tvp->v_type = IFTOVT(mode);	/* Rest init'd in getnewvnode(). */
 	ip->i_effnlink = 1;
 	ip->i_nlink = 1;
-	DIP(ip, i_nlink) = 1;
+	DIP_SET(ip, i_nlink, 1);
 	if (DOINGSOFTDEP(tvp))
 		softdep_change_linkcnt(ip);
 	if ((ip->i_mode & ISGID) && !groupmember(ip->i_gid, cnp->cn_cred) &&
-	    suser_cred(cnp->cn_cred, PRISON_ROOT)) {
+	    suser_cred(cnp->cn_cred, SUSER_ALLOWJAIL)) {
 		ip->i_mode &= ~ISGID;
-		DIP(ip, i_mode) = ip->i_mode;
+		DIP_SET(ip, i_mode, ip->i_mode);
 	}
 
 	if (cnp->cn_flags & ISWHITEOUT) {
 		ip->i_flags |= UF_OPAQUE;
-		DIP(ip, i_flags) = ip->i_flags;
+		DIP_SET(ip, i_flags, ip->i_flags);
 	}
 
 	/*
@@ -2552,7 +2577,7 @@ bad:
 	 */
 	ip->i_effnlink = 0;
 	ip->i_nlink = 0;
-	DIP(ip, i_nlink) = 0;
+	DIP_SET(ip, i_nlink, 0);
 	ip->i_flag |= IN_CHANGE;
 	if (DOINGSOFTDEP(tvp))
 		softdep_change_linkcnt(ip);
@@ -2595,9 +2620,9 @@ ufs_kqfilter(ap)
 
 	if (vp->v_pollinfo == NULL)
 		v_addpollinfo(vp);
-	mtx_lock(&vp->v_pollinfo->vpi_lock);
-	SLIST_INSERT_HEAD(&vp->v_pollinfo->vpi_selinfo.si_note, kn, kn_selnext);
-	mtx_unlock(&vp->v_pollinfo->vpi_lock);
+	if (vp->v_pollinfo == NULL)
+		return ENOMEM;
+	knlist_add(&vp->v_pollinfo->vpi_selinfo.si_note, kn, 0);
 
 	return (0);
 }
@@ -2608,10 +2633,7 @@ filt_ufsdetach(struct knote *kn)
 	struct vnode *vp = (struct vnode *)kn->kn_hook;
 
 	KASSERT(vp->v_pollinfo != NULL, ("Mising v_pollinfo"));
-	mtx_lock(&vp->v_pollinfo->vpi_lock);
-	SLIST_REMOVE(&vp->v_pollinfo->vpi_selinfo.si_note,
-	    kn, knote, kn_selnext);
-	mtx_unlock(&vp->v_pollinfo->vpi_lock);
+	knlist_remove(&vp->v_pollinfo->vpi_selinfo.si_note, kn, 0);
 }
 
 /*ARGSUSED*/
@@ -2673,6 +2695,7 @@ static struct vnodeopv_entry_desc ufs_vnodeop_entries[] = {
 	{ &vop_write_desc,		(vop_t *) vop_panic },
 	{ &vop_access_desc,		(vop_t *) ufs_access },
 	{ &vop_advlock_desc,		(vop_t *) ufs_advlock },
+	{ &vop_lock_desc,		(vop_t *) ufs_lock },
 	{ &vop_bmap_desc,		(vop_t *) ufs_bmap },
 	{ &vop_cachedlookup_desc,	(vop_t *) ufs_lookup },
 	{ &vop_close_desc,		(vop_t *) ufs_close },

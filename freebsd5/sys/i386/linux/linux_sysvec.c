@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.126 2003/09/25 01:10:24 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.132 2004/07/15 08:26:05 phk Exp $");
 
 /* XXX we use functions that might not exist. */
 #include "opt_compat.h"
@@ -38,11 +38,14 @@ __FBSDID("$FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.126 2003/09/25 01:10:2
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/exec.h>
 #include <sys/imgact.h>
 #include <sys/imgact_aout.h>
 #include <sys/imgact_elf.h>
+#include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
@@ -53,21 +56,15 @@ __FBSDID("$FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.126 2003/09/25 01:10:2
 #include <sys/vnode.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_page.h>
-#include <vm/vm_extern.h>
-#include <sys/exec.h>
-#include <sys/kernel.h>
-#include <sys/module.h>
-#include <machine/cpu.h>
-#include <machine/md_var.h>
-#include <sys/mutex.h>
-
-#include <vm/vm.h>
-#include <vm/vm_param.h>
 #include <vm/pmap.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
+#include <vm/vm_page.h>
+#include <vm/vm_param.h>
+
+#include <machine/cpu.h>
+#include <machine/md_var.h>
 
 #include <i386/linux/linux.h>
 #include <i386/linux/linux_proto.h>
@@ -293,10 +290,10 @@ linux_rt_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	/*
 	 * Allocate space for the signal handler context.
 	 */
-	if ((p->p_flag & P_ALTSTACK) && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct l_rt_sigframe *)(p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(struct l_rt_sigframe));
+		fp = (struct l_rt_sigframe *)(td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(struct l_rt_sigframe));
 	} else
 		fp = (struct l_rt_sigframe *)regs->tf_esp - 1;
 	mtx_unlock(&psp->ps_mtx);
@@ -326,9 +323,9 @@ linux_rt_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	frame.sf_sc.uc_flags = 0;		/* XXX ??? */
 	frame.sf_sc.uc_link = NULL;		/* XXX ??? */
 
-	frame.sf_sc.uc_stack.ss_sp = p->p_sigstk.ss_sp;
-	frame.sf_sc.uc_stack.ss_size = p->p_sigstk.ss_size;
-	frame.sf_sc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	frame.sf_sc.uc_stack.ss_sp = td->td_sigstk.ss_sp;
+	frame.sf_sc.uc_stack.ss_size = td->td_sigstk.ss_size;
+	frame.sf_sc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? LINUX_SS_ONSTACK : 0) : LINUX_SS_DISABLE;
 	PROC_UNLOCK(p);
 
@@ -357,8 +354,8 @@ linux_rt_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 #ifdef DEBUG
 	if (ldebug(rt_sendsig))
 		printf(LMSG("rt_sendsig flags: 0x%x, sp: %p, ss: 0x%x, mask: 0x%x"),
-		    frame.sf_sc.uc_stack.ss_flags, p->p_sigstk.ss_sp,
-		    p->p_sigstk.ss_size, frame.sf_sc.uc_mcontext.sc_mask);
+		    frame.sf_sc.uc_stack.ss_flags, td->td_sigstk.ss_sp,
+		    td->td_sigstk.ss_size, frame.sf_sc.uc_mcontext.sc_mask);
 #endif
 
 	if (copyout(&frame, fp, sizeof(frame)) != 0) {
@@ -434,10 +431,10 @@ linux_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	/*
 	 * Allocate space for the signal handler context.
 	 */
-	if ((p->p_flag & P_ALTSTACK) && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct l_sigframe *)(p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(struct l_sigframe));
+		fp = (struct l_sigframe *)(td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(struct l_sigframe));
 	} else
 		fp = (struct l_sigframe *)regs->tf_esp - 1;
 	mtx_unlock(&psp->ps_mtx);
@@ -772,7 +769,7 @@ linux_aout_coredump(struct thread *td, struct vnode *vp, off_t limit)
 		    round_page(ctob(vm->vm_ssize)),
 		    (off_t)ctob(uarea_pages + kstack_pages) +
 			ctob(vm->vm_dsize), UIO_USERSPACE,
-		    IO_UNIT | IO_DIRECT, cred, NOCRED, (int *) NULL, td);
+		    IO_UNIT | IO_DIRECT, cred, NOCRED, NULL, td);
 	return (error);
 }
 /*
@@ -899,7 +896,8 @@ static Elf32_Brandinfo linux_brand = {
 					"Linux",
 					"/compat/linux",
 					"/lib/ld-linux.so.1",
-					&elf_linux_sysvec
+					&elf_linux_sysvec,
+					NULL,
 				 };
 
 static Elf32_Brandinfo linux_glibc2brand = {
@@ -908,7 +906,8 @@ static Elf32_Brandinfo linux_glibc2brand = {
 					"Linux",
 					"/compat/linux",
 					"/lib/ld-linux.so.2",
-					&elf_linux_sysvec
+					&elf_linux_sysvec,
+					NULL,
 				 };
 
 Elf32_Brandinfo *linux_brandlist[] = {
@@ -961,7 +960,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 			printf("Could not deinstall ELF interpreter entry\n");
 		break;
 	default:
-		break;
+		return EOPNOTSUPP;
 	}
 	return error;
 }

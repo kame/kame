@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_apple.c,v 1.12 2003/06/11 06:49:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_apple.c,v 1.16 2004/08/08 07:57:51 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -116,11 +116,13 @@ g_apple_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp,
 	mp = gsp->softc;
 	g_slice_dumpconf(sb, indent, gp, cp, pp);
 	if (pp != NULL) {
-		if (indent == NULL)
-			sbuf_printf(sb, " n %s ty %s",
-			    mp->apmpart[pp->index].am_name,
+		if (indent == NULL) {
+			sbuf_printf(sb, " ty %s",
 			    mp->apmpart[pp->index].am_type);
-		else {
+                        if (*mp->apmpart[pp->index].am_name)
+                                sbuf_printf(sb, " sn %s",
+                                    mp->apmpart[pp->index].am_name);
+		} else {
 			sbuf_printf(sb, "%s<name>%s</name>\n", indent,
 			    mp->apmpart[pp->index].am_name);
 			sbuf_printf(sb, "%s<type>%s</type>\n", indent,
@@ -155,7 +157,6 @@ g_apple_taste(struct g_class *mp, struct g_provider *pp, int insist)
 	if (gp == NULL)
 		return (NULL);
 	g_topology_unlock();
-	gp->dumpconf = g_apple_dumpconf;
 	do {
 		if (gp->rank != 2 && insist == 0)
 			break;
@@ -243,7 +244,7 @@ g_apple_taste(struct g_class *mp, struct g_provider *pp, int insist)
 		break;
 	} while(0);
 	g_topology_lock();
-	g_access_rel(cp, -1, 0, 0);
+	g_access(cp, -1, 0, 0);
 	if (LIST_EMPTY(&gp->provider)) {
 		g_slice_spoiled(cp);
 		return (NULL);
@@ -254,7 +255,9 @@ g_apple_taste(struct g_class *mp, struct g_provider *pp, int insist)
 
 static struct g_class g_apple_class	= {
 	.name = APPLE_CLASS_NAME,
+	.version = G_VERSION,
 	.taste = g_apple_taste,
+	.dumpconf = g_apple_dumpconf,
 };
 
 DECLARE_GEOM_CLASS(g_apple_class, g_apple);

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/interrupt.h,v 1.26 2003/11/17 06:08:10 peter Exp $
+ * $FreeBSD: src/sys/sys/interrupt.h,v 1.28 2004/07/02 20:21:43 jhb Exp $
  */
 
 #ifndef _SYS_INTERRUPT_H_
@@ -85,19 +85,18 @@ struct ithd {
 #define	SWI_DELAY	0x2
 
 /*
- * Software interrupt bit numbers in priority order.  The priority only
- * determines which swi will be dispatched next; a higher priority swi
- * may be dispatched when a nested h/w interrupt handler returns.
+ * Software interrupt numbers in priority order.  The priority determines
+ * the priority of the corresponding interrupt thread.
  */
 #define	SWI_TTY		0
 #define	SWI_NET		1
 #define	SWI_CAMNET	2
 #define	SWI_CAMBIO	3
 #define	SWI_VM		4
-#define	SWI_TQ_FAST	5
+#define	SWI_CLOCK	5
+#define	SWI_TQ_FAST	6
+#define	SWI_TQ		6
 #define	SWI_TQ_GIANT	6
-#define	SWI_TQ		7
-#define	SWI_CLOCK	8
 
 extern struct	ithd *tty_ithd;
 extern struct	ithd *clk_ithd;
@@ -123,7 +122,7 @@ int	ithread_add_handler(struct ithd *ithread, const char *name,
 	    driver_intr_t handler, void *arg, u_char pri, enum intr_type flags,
 	    void **cookiep);
 int	ithread_remove_handler(void *cookie);
-int	ithread_schedule(struct ithd *ithread, int do_switch);
+int	ithread_schedule(struct ithd *ithread);
 int     swi_add(struct ithd **ithdp, const char *name,
 	    driver_intr_t handler, void *arg, int pri, enum intr_type flags,
 	    void **cookiep);

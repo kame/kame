@@ -28,7 +28,7 @@
  *
  * Netgraph module to connect NATM interfaces to netgraph.
  *
- * $FreeBSD: src/sys/netgraph/atm/ng_atm.h,v 1.3 2003/11/13 13:00:56 harti Exp $
+ * $FreeBSD: src/sys/netgraph/atm/ng_atm.h,v 1.4 2004/01/26 14:57:49 harti Exp $
  */
 #ifndef _NETGRAPH_ATM_NG_ATM_H_
 #define _NETGRAPH_ATM_NG_ATM_H_
@@ -126,7 +126,7 @@ struct ngm_atm_config {
  * Structure to open a VCC.
  */
 struct ngm_atm_cpcs_init {
-	char		name[NG_HOOKLEN + 1];
+	char		name[NG_HOOKSIZ];
 	uint32_t	flags;		/* flags. (if_atm.h) */
 	uint16_t	vci;		/* VCI to open */
 	uint16_t	vpi;		/* VPI to open */
@@ -177,7 +177,7 @@ struct ngm_atm_cpcs_init {
  * Structure to close a VCI without disconnecting the hook
  */
 struct ngm_atm_cpcs_term {
-	char		name[NG_HOOKLEN + 1];
+	char		name[NG_HOOKSIZ];
 };
 #define NGM_ATM_CPCS_TERM_INFO 					\
 	{							\

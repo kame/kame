@@ -37,7 +37,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_parse.c,v 1.3 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.c,v 1.18 2002/11/08 21:13:18 jhb Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.c,v 1.23 2004/07/28 06:54:55 kan Exp $
  */
 
 #include <sys/types.h>
@@ -46,7 +46,10 @@
 #include <sys/kernel.h>
 #include <sys/errno.h>
 #include <sys/malloc.h>
+#include <sys/mbuf.h>
 #include <sys/ctype.h>
+
+#include <net/ethernet.h>
 
 #include <netinet/in.h>
 
@@ -838,7 +841,7 @@ const struct ng_parse_type ng_parse_fixedstring_type = {
 };
 
 const struct ng_parse_fixedstring_info ng_parse_nodebuf_info = {
-	NG_NODELEN + 1
+	NG_NODESIZ
 };
 const struct ng_parse_type ng_parse_nodebuf_type = {
 	&ng_parse_fixedstring_type,
@@ -846,7 +849,7 @@ const struct ng_parse_type ng_parse_nodebuf_type = {
 };
 
 const struct ng_parse_fixedstring_info ng_parse_hookbuf_info = {
-	NG_HOOKLEN + 1
+	NG_HOOKSIZ
 };
 const struct ng_parse_type ng_parse_hookbuf_type = {
 	&ng_parse_fixedstring_type,
@@ -854,7 +857,7 @@ const struct ng_parse_type ng_parse_hookbuf_type = {
 };
 
 const struct ng_parse_fixedstring_info ng_parse_pathbuf_info = {
-	NG_PATHLEN + 1
+	NG_PATHSIZ
 };
 const struct ng_parse_type ng_parse_pathbuf_type = {
 	&ng_parse_fixedstring_type,
@@ -862,7 +865,7 @@ const struct ng_parse_type ng_parse_pathbuf_type = {
 };
 
 const struct ng_parse_fixedstring_info ng_parse_typebuf_info = {
-	NG_TYPELEN + 1
+	NG_TYPESIZ
 };
 const struct ng_parse_type ng_parse_typebuf_type = {
 	&ng_parse_fixedstring_type,
@@ -870,7 +873,7 @@ const struct ng_parse_type ng_parse_typebuf_type = {
 };
 
 const struct ng_parse_fixedstring_info ng_parse_cmdbuf_info = {
-	NG_CMDSTRLEN + 1
+	NG_CMDSTRSIZ
 };
 const struct ng_parse_type ng_parse_cmdbuf_type = {
 	&ng_parse_fixedstring_type,
@@ -999,6 +1002,62 @@ const struct ng_parse_type ng_parse_ipaddr_type = {
 };
 
 /************************************************************************
+			ETHERNET ADDRESS TYPE
+ ************************************************************************/
+
+static int
+ng_enaddr_parse(const struct ng_parse_type *type,
+	const char *s, int *const off, const u_char *const start,
+	u_char *const buf, int *const buflen)
+{
+	char *eptr;
+	u_long val;
+	int i;
+
+	if (*buflen < ETHER_ADDR_LEN)
+		return (ERANGE);
+	for (i = 0; i < ETHER_ADDR_LEN; i++) {
+		val = strtoul(s + *off, &eptr, 16);
+		if (val > 0xff || eptr == s + *off)
+			return (EINVAL);
+		buf[i] = (u_char)val;
+		*off = (eptr - s);
+		if (i < ETHER_ADDR_LEN - 1) {
+			if (*eptr != ':')
+				return (EINVAL);
+			(*off)++;
+		}
+	}
+	*buflen = ETHER_ADDR_LEN;
+	return (0);
+}
+
+static int
+ng_enaddr_unparse(const struct ng_parse_type *type,
+	const u_char *data, int *off, char *cbuf, int cbuflen)
+{
+	int len;
+
+	len = snprintf(cbuf, cbuflen, "%02x:%02x:%02x:%02x:%02x:%02x",
+	    data[*off], data[*off + 1], data[*off + 2],
+	    data[*off + 3], data[*off + 4], data[*off + 5]);
+	if (len >= cbuflen)
+		return (ERANGE);
+	*off += ETHER_ADDR_LEN;
+	return (0);
+}
+
+const struct ng_parse_type ng_parse_enaddr_type = {
+	NULL,
+	NULL,
+	NULL,
+	ng_enaddr_parse,
+	ng_enaddr_unparse,
+	NULL,
+	0
+};
+
+/************************************************************************
 			BYTE ARRAY TYPE
  ************************************************************************/
 
@@ -1056,7 +1115,7 @@ ng_bytearray_parse(const struct ng_parse_type *type,
 		struct ng_parse_type subtype;
 
 		subtype = ng_parse_bytearray_subtype;
-		(const void *)subtype.private = type->info;
+		*(const void **)&subtype.private = type->info;
 		return ng_array_parse(&subtype, s, off, start, buf, buflen);
 	}
 }
@@ -1068,7 +1127,7 @@ ng_bytearray_unparse(const struct ng_parse_type *type,
 	struct ng_parse_type subtype;
 
 	subtype = ng_parse_bytearray_subtype;
-	(const void *)subtype.private = type->info;
+	*(const void **)&subtype.private = type->info;
 	return ng_array_unparse(&subtype, data, off, cbuf, cbuflen);
 }
 
@@ -1079,7 +1138,7 @@ ng_bytearray_getDefault(const struct ng_parse_type *type,
 	struct ng_parse_type subtype;
 
 	subtype = ng_parse_bytearray_subtype;
-	(const void *)subtype.private = type->info;
+	*(const void **)&subtype.private = type->info;
 	return ng_array_getDefault(&subtype, start, buf, buflen);
 }
 
@@ -1704,6 +1763,7 @@ ng_get_string_token(const char *s, int *startp, int *lenp, int *slenp)
 			strcpy(p, v);
 		}
 	}
+	FREE(cbuf, M_NETGRAPH_PARSE);
 	return (NULL);		/* no closing quote */
 }
 

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,15 +35,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_shutdown.c,v 1.146 2003/08/16 16:57:57 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_shutdown.c,v 1.163.2.2 2004/09/10 00:04:17 scottl Exp $");
 
-#include "opt_ddb.h"
-#include "opt_ddb_trace.h"
-#include "opt_ddb_unattended.h"
+#include "opt_kdb.h"
 #include "opt_hw_wdog.h"
 #include "opt_mac.h"
 #include "opt_panic.h"
 #include "opt_show_busybufs.h"
+#include "opt_sched.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,6 +51,7 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_shutdown.c,v 1.146 2003/08/16 16:57:57 mar
 #include <sys/conf.h>
 #include <sys/cons.h>
 #include <sys/eventhandler.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/mac.h>
@@ -74,9 +70,6 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_shutdown.c,v 1.146 2003/08/16 16:57:57 mar
 #include <machine/smp.h>
 
 #include <sys/signalvar.h>
-#ifdef DDB
-#include <ddb/ddb.h>
-#endif
 
 #ifndef PANIC_REBOOT_WAIT_TIME
 #define PANIC_REBOOT_WAIT_TIME 15 /* default to 15 seconds */
@@ -88,8 +81,8 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_shutdown.c,v 1.146 2003/08/16 16:57:57 mar
  */
 #include <machine/stdarg.h>
 
-#ifdef DDB
-#ifdef DDB_UNATTENDED
+#ifdef KDB
+#ifdef KDB_UNATTENDED
 int debugger_on_panic = 0;
 #else
 int debugger_on_panic = 1;
@@ -97,16 +90,16 @@ int debugger_on_panic = 1;
 SYSCTL_INT(_debug, OID_AUTO, debugger_on_panic, CTLFLAG_RW,
 	&debugger_on_panic, 0, "Run debugger on kernel panic");
 
-#ifdef DDB_TRACE
+#ifdef KDB_TRACE
 int trace_on_panic = 1;
 #else
 int trace_on_panic = 0;
 #endif
 SYSCTL_INT(_debug, OID_AUTO, trace_on_panic, CTLFLAG_RW,
 	&trace_on_panic, 0, "Print stack trace on kernel panic");
-#endif
+#endif /* KDB */
 
-int sync_on_panic = 1;
+int sync_on_panic = 0;
 SYSCTL_INT(_kern, OID_AUTO, sync_on_panic, CTLFLAG_RW,
 	&sync_on_panic, 0, "Do a sync before rebooting from a panic");
 
@@ -131,7 +124,10 @@ const char *panicstr;
 
 int dumping;				/* system is dumping */
 static struct dumperinfo dumper;	/* our selected dumper */
-static struct pcb dumppcb;		/* "You Are Here" sign for dump-debuggers */
+
+/* Context information for dump-debuggers. */
+static struct pcb dumppcb;		/* Registers. */
+static lwpid_t dumptid;			/* Thread ID. */
 
 static void boot(int) __dead2;
 static void poweroff_wait(void *, int);
@@ -236,7 +232,18 @@ static void
 doadump(void)
 {
 
+	/*
+	 * Sometimes people have to call this from the kernel debugger. 
+	 * (if 'panic' can not dump)
+	 * Give them a clue as to why they can't dump.
+	 */
+	if (dumper.dumper == NULL) {
+		printf("Cannot dump. No dump device defined.\n");
+		return;
+	}
+
 	savectx(&dumppcb);
+	dumptid = curthread->td_tid;
 	dumping++;
 	dumpsys(&dumper);
 }
@@ -249,14 +256,13 @@ doadump(void)
 static void
 boot(int howto)
 {
+	static int first_buf_printf = 1;
 
 	/* collect extra flags that shutdown_nice might have set */
 	howto |= shutdown_howto;
 
-#ifdef DDB
 	/* We are out of the debugger now. */
-	db_active = 0;
-#endif
+	kdb_active = 0;
 
 #ifdef SMP
 	if (smp_active)
@@ -273,10 +279,11 @@ boot(int howto)
 	if (!cold && (howto & RB_NOSYNC) == 0 && waittime < 0) {
 		register struct buf *bp;
 		int iter, nbusy, pbusy;
+#ifndef PREEMPTION
 		int subiter;
+#endif
 
 		waittime = 0;
-		printf("\nsyncing disks, buffers remaining... ");
 
 		sync(&thread0, NULL);
 
@@ -297,25 +304,43 @@ boot(int howto)
 					nbusy++;
 				}
 			}
-			if (nbusy == 0)
+			if (nbusy == 0) {
+				if (first_buf_printf)
+					printf("No buffers busy after final sync");
 				break;
+			}
+			if (first_buf_printf) {
+				printf("Syncing disks, buffers remaining... ");
+				first_buf_printf = 0;
+			}
 			printf("%d ", nbusy);
 			if (nbusy < pbusy)
 				iter = 0;
 			pbusy = nbusy;
 			sync(&thread0, NULL);
- 			if (curthread != NULL) {
-				DROP_GIANT();
-   				for (subiter = 0; subiter < 50 * iter; subiter++) {
-     					mtx_lock_spin(&sched_lock);
-					curthread->td_proc->p_stats->p_ru.ru_nvcsw++;
-     					mi_switch(); /* Allow interrupt threads to run */
-     					mtx_unlock_spin(&sched_lock);
-     					DELAY(1000);
-   				}
-				PICKUP_GIANT();
- 			} else
+
+#ifdef PREEMPTION
+			/*
+			 * Drop Giant and spin for a while to allow
+			 * interrupt threads to run.
+			 */
+			DROP_GIANT();
 			DELAY(50000 * iter);
+			PICKUP_GIANT();
+#else
+			/*
+			 * Drop Giant and context switch several times to
+			 * allow interrupt threads to run.
+			 */
+			DROP_GIANT();
+			for (subiter = 0; subiter < 50 * iter; subiter++) {
+				mtx_lock_spin(&sched_lock);
+				mi_switch(SW_VOL, NULL);
+				mtx_unlock_spin(&sched_lock);
+				DELAY(1000);
+			}
+			PICKUP_GIANT();
+#endif
 		}
 		printf("\n");
 		/*
@@ -326,7 +351,7 @@ boot(int howto)
 		for (bp = &buf[nbuf]; --bp >= buf; ) {
 			if (((bp->b_flags&B_INVAL) == 0 && BUF_REFCNT(bp)) ||
 			    ((bp->b_flags & (B_DELWRI|B_INVAL)) == B_DELWRI)) {
-				if (bp->b_dev == NODEV) {
+				if (bp->b_dev == NULL) {
 					TAILQ_REMOVE(&mountlist,
 					    bp->b_vp->v_mount, mnt_list);
 					continue;
@@ -346,10 +371,11 @@ boot(int howto)
 			 * Failed to sync all blocks. Indicate this and don't
 			 * unmount filesystems (thus forcing an fsck on reboot).
 			 */
-			printf("giving up on %d buffers\n", nbusy);
+			printf("Giving up on %d buffers\n", nbusy);
 			DELAY(5000000);	/* 5 seconds */
 		} else {
-			printf("done\n");
+			if (!first_buf_printf)
+				printf("Final sync complete\n");
 			/*
 			 * Unmount filesystems
 			 */
@@ -367,8 +393,7 @@ boot(int howto)
 	 */
 	EVENTHANDLER_INVOKE(shutdown_post_sync, howto);
 	splhigh();
-	if ((howto & (RB_HALT|RB_DUMP)) == RB_DUMP &&
-	    !cold && dumper.dumper != NULL && !dumping) 
+	if ((howto & (RB_HALT|RB_DUMP)) == RB_DUMP && !cold && !dumping) 
 		doadump();
 
 	/* Now that we're going to really halt the system... */
@@ -448,22 +473,6 @@ shutdown_reset(void *junk, int howto)
 	/* NOTREACHED */ /* assuming reset worked */
 }
 
-/*
- * Print a backtrace if we can.
- */
-
-void
-backtrace(void)
-{
-
-#ifdef DDB
-	printf("Stack backtrace:\n");
-	db_print_backtrace();
-#else
-	printf("Sorry, need DDB option to print backtrace");
-#endif
-}
-
 #ifdef SMP
 static u_int panic_cpu = NOCPU;
 #endif
@@ -518,20 +527,14 @@ panic(const char *fmt, ...)
 	}
 	va_end(ap);
 #ifdef SMP
-	/* two separate prints in case of an unmapped page and trap */
-	printf("cpuid = %d; ", PCPU_GET(cpuid));
-#ifdef APIC_IO
-	printf("lapic.id = %08x\n", lapic.id);
-#else
-	printf("\n");
-#endif
+	printf("cpuid = %d\n", PCPU_GET(cpuid));
 #endif
 
-#if defined(DDB)
+#ifdef KDB
 	if (newpanic && trace_on_panic)
-		backtrace();
+		kdb_backtrace();
 	if (debugger_on_panic)
-		Debugger ("panic");
+		kdb_enter("panic");
 #ifdef RESTARTABLE_PANICS
 	/* See if the user aborted the panic, in which case we continue. */
 	if (panicstr == NULL) {
@@ -585,20 +588,22 @@ void
 kproc_shutdown(void *arg, int howto)
 {
 	struct proc *p;
+	char procname[MAXCOMLEN + 1];
 	int error;
 
 	if (panicstr)
 		return;
 
 	p = (struct proc *)arg;
+	strlcpy(procname, p->p_comm, sizeof(procname));
 	printf("Waiting (max %d seconds) for system process `%s' to stop...",
-	    kproc_shutdown_wait, p->p_comm);
+	    kproc_shutdown_wait, procname);
 	error = kthread_suspend(p, kproc_shutdown_wait * hz);
 
 	if (error == EWOULDBLOCK)
 		printf("timed out\n");
 	else
-		printf("stopped\n");
+		printf("done\n");
 }
 
 /* Registration of dumpers */

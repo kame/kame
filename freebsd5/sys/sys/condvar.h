@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/condvar.h,v 1.9 2003/11/09 09:17:26 tanimura Exp $
+ * $FreeBSD: src/sys/sys/condvar.h,v 1.12 2004/05/05 21:57:44 jhb Exp $
  */
 
 #ifndef	_SYS_CONDVAR_H_
@@ -38,15 +38,14 @@ struct thread;
 TAILQ_HEAD(cv_waitq, thread);
 
 /*
- * Condition variable.
+ * Condition variable.  The waiters count is protected by the mutex that
+ * protects the condition; that is, the mutex that is passed to cv_wait*()
+ * and is held across calls to cv_signal() and cv_broadcast().  It is an
+ * optimization to avoid looking up the sleep queue if there are no waiters.
  */
 struct cv {
-	struct cv_waitq	cv_waitq;	/* Queue of condition waiters. */
-	struct mtx	*cv_mtx;	/*
-					 * Mutex passed in by cv_*wait*(),
-					 * currently only used for INVARIANTS.
-					 */
 	const char	*cv_description;
+	int		cv_waiters;
 };
 
 #ifdef _KERNEL
@@ -59,14 +58,10 @@ int	cv_timedwait(struct cv *cvp, struct mtx *mp, int timo);
 int	cv_timedwait_sig(struct cv *cvp, struct mtx *mp, int timo);
 
 void	cv_signal(struct cv *cvp);
-void	cv_broadcastpri(struct cv *cvp, int);
+void	cv_broadcastpri(struct cv *cvp, int pri);
 
 #define cv_broadcast(cvp)	cv_broadcastpri(cvp, -1)
 
-void	cv_waitq_remove(struct thread *td);
-void	cv_abort(struct thread *td);
-
-#define	cv_waitq_empty(cvp)	(TAILQ_EMPTY(&(cvp)->cv_waitq))
 #define	cv_wmesg(cvp)		((cvp)->cv_description)
 
 #endif	/* _KERNEL */

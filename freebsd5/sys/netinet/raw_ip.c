@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,15 +27,15 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.123 2003/11/26 01:40:43 sam Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.142.2.2 2004/10/14 11:45:26 rwatson Exp $
  */
 
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_mac.h"
-#include "opt_random_ip_id.h"
 
 #include <sys/param.h>
+#include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mac.h>
@@ -82,8 +78,8 @@ struct	inpcbhead ripcb;
 struct	inpcbinfo ripcbinfo;
 
 /* control hooks for ipfw and dummynet */
-ip_fw_ctl_t *ip_fw_ctl_ptr;
-ip_dn_ctl_t *ip_dn_ctl_ptr;
+ip_fw_ctl_t *ip_fw_ctl_ptr = NULL;
+ip_dn_ctl_t *ip_dn_ctl_ptr = NULL;
 
 /*
  * hooks for multicast routing. They all default to NULL,
@@ -98,7 +94,7 @@ int (*ip_mrouter_set)(struct socket *, struct sockopt *);
 int (*ip_mrouter_get)(struct socket *, struct sockopt *);
 int (*ip_mrouter_done)(void);
 int (*ip_mforward)(struct ip *, struct ifnet *, struct mbuf *,
-                   struct ip_moptions *);
+		   struct ip_moptions *);
 int (*mrt_ioctl)(int, caddr_t);
 int (*legal_vif_num)(int);
 u_long (*ip_mcast_src)(int);
@@ -145,39 +141,40 @@ raw_append(struct inpcb *last, struct ip *ip, struct mbuf *n)
 {
 	int policyfail = 0;
 
-#ifdef IPSEC
-	/* check AH/ESP integrity. */
-	if (ipsec4_in_reject_so(n, last->inp_socket)) {
-		policyfail = 1;
-		ipsecstat.in_polvio++;
-		/* do not inject data to pcb */
-	}
-#endif /*IPSEC*/
-#ifdef FAST_IPSEC
+	INP_LOCK_ASSERT(last);
+
+#if defined(IPSEC) || defined(FAST_IPSEC)
 	/* check AH/ESP integrity. */
 	if (ipsec4_in_reject(n, last)) {
 		policyfail = 1;
+#ifdef IPSEC
+		ipsecstat.in_polvio++;
+#endif /*IPSEC*/
 		/* do not inject data to pcb */
 	}
-#endif /*FAST_IPSEC*/
+#endif /*IPSEC || FAST_IPSEC*/
 #ifdef MAC
 	if (!policyfail && mac_check_inpcb_deliver(last, n) != 0)
 		policyfail = 1;
 #endif
 	if (!policyfail) {
 		struct mbuf *opts = NULL;
+		struct socket *so;
 
+		so = last->inp_socket;
 		if ((last->inp_flags & INP_CONTROLOPTS) ||
-		    (last->inp_socket->so_options & SO_TIMESTAMP))
+		    (so->so_options & SO_TIMESTAMP))
 			ip_savecontrol(last, &opts, ip, n);
-		if (sbappendaddr(&last->inp_socket->so_rcv,
+		SOCKBUF_LOCK(&so->so_rcv);
+		if (sbappendaddr_locked(&so->so_rcv,
 		    (struct sockaddr *)&ripsrc, n, opts) == 0) {
 			/* should notify about lost packet */
 			m_freem(n);
 			if (opts)
 				m_freem(opts);
+			SOCKBUF_UNLOCK(&so->so_rcv);
 		} else
-			sorwakeup(last->inp_socket);
+			sorwakeup_locked(so);
 	} else
 		m_freem(n);
 	return policyfail;
@@ -210,11 +207,15 @@ rip_input(struct mbuf *m, int off)
 			goto docontinue;
 #endif
 		if (inp->inp_laddr.s_addr &&
-                    inp->inp_laddr.s_addr != ip->ip_dst.s_addr)
+		    inp->inp_laddr.s_addr != ip->ip_dst.s_addr)
 			goto docontinue;
 		if (inp->inp_faddr.s_addr &&
-                    inp->inp_faddr.s_addr != ip->ip_src.s_addr)
+		    inp->inp_faddr.s_addr != ip->ip_src.s_addr)
 			goto docontinue;
+		if (jailed(inp->inp_socket->so_cred))
+			if (htonl(prison_getip(inp->inp_socket->so_cred)) !=
+			    ip->ip_dst.s_addr)
+				goto docontinue;
 		if (last) {
 			struct mbuf *n;
 
@@ -246,12 +247,9 @@ int
 rip_output(struct mbuf *m, struct socket *so, u_long dst)
 {
 	struct ip *ip;
+	int error;
 	struct inpcb *inp = sotoinpcb(so);
 	int flags = (so->so_options & SO_DONTROUTE) | IP_ALLOWBROADCAST;
-
-#ifdef MAC
-	mac_create_mbuf_from_socket(so, m);
-#endif
 
 	/*
 	 * If the user handed us a complete IP packet, use it.
@@ -262,15 +260,21 @@ rip_output(struct mbuf *m, struct socket *so, u_long dst)
 			m_freem(m);
 			return(EMSGSIZE);
 		}
-		M_PREPEND(m, sizeof(struct ip), M_TRYWAIT);
+		M_PREPEND(m, sizeof(struct ip), M_DONTWAIT);
 		if (m == NULL)
 			return(ENOBUFS);
+
+		INP_LOCK(inp);
 		ip = mtod(m, struct ip *);
 		ip->ip_tos = inp->inp_ip_tos;
 		ip->ip_off = 0;
 		ip->ip_p = inp->inp_ip_p;
 		ip->ip_len = m->m_pkthdr.len;
-		ip->ip_src = inp->inp_laddr;
+		if (jailed(inp->inp_socket->so_cred))
+			ip->ip_src.s_addr =
+			    htonl(prison_getip(inp->inp_socket->so_cred));
+		else
+			ip->ip_src = inp->inp_laddr;
 		ip->ip_dst.s_addr = dst;
 		ip->ip_ttl = inp->inp_ip_ttl;
 	} else {
@@ -278,22 +282,28 @@ rip_output(struct mbuf *m, struct socket *so, u_long dst)
 			m_freem(m);
 			return(EMSGSIZE);
 		}
+		INP_LOCK(inp);
 		ip = mtod(m, struct ip *);
+		if (jailed(inp->inp_socket->so_cred)) {
+			if (ip->ip_src.s_addr !=
+			    htonl(prison_getip(inp->inp_socket->so_cred))) {
+				INP_UNLOCK(inp);
+				m_freem(m);
+				return (EPERM);
+			}
+		}
 		/* don't allow both user specified and setsockopt options,
 		   and don't allow packet length sizes that will crash */
 		if (((ip->ip_hl != (sizeof (*ip) >> 2))
 		     && inp->inp_options)
 		    || (ip->ip_len > m->m_pkthdr.len)
 		    || (ip->ip_len < (ip->ip_hl << 2))) {
+			INP_UNLOCK(inp);
 			m_freem(m);
 			return EINVAL;
 		}
 		if (ip->ip_id == 0)
-#ifdef RANDOM_IP_ID
-			ip->ip_id = ip_randomid();
-#else
-			ip->ip_id = htons(ip_id++);
-#endif
+			ip->ip_id = ip_newid();
 		/* XXX prevent ip_output from overwriting header fields */
 		flags |= IP_RAWOUTPUT;
 		ipstat.ips_rawout++;
@@ -302,22 +312,33 @@ rip_output(struct mbuf *m, struct socket *so, u_long dst)
 	if (inp->inp_flags & INP_ONESBCAST)
 		flags |= IP_SENDONES;
 
-	return (ip_output(m, inp->inp_options, NULL, flags,
-			  inp->inp_moptions, inp));
+#ifdef MAC
+	mac_create_mbuf_from_inpcb(inp, m);
+#endif
+
+	error = ip_output(m, inp->inp_options, NULL, flags,
+	    inp->inp_moptions, inp);
+	INP_UNLOCK(inp);
+	return error;
 }
 
 /*
  * Raw IP socket option processing.
  *
- * Note that access to all of the IP administrative functions here is
- * implicitly protected by suser() as gaining access to a raw socket
- * requires either that the thread pass a suser() check, or that it be
- * passed a raw socket by another thread that has passed a suser() check.
- * If FreeBSD moves to a more fine-grained access control mechanism,
- * additional checks will need to be placed here if the raw IP attachment
- * check is not equivilent the the check required for these
- * administrative operations; in some cases, these checks are already
- * present.
+ * IMPORTANT NOTE regarding access control: Traditionally, raw sockets could
+ * only be created by a privileged process, and as such, socket option
+ * operations to manage system properties on any raw socket were allowed to
+ * take place without explicit additional access control checks.  However,
+ * raw sockets can now also be created in jail(), and therefore explicit
+ * checks are now required.  Likewise, raw sockets can be used by a process
+ * after it gives up privilege, so some caution is required.  For options
+ * passed down to the IP layer via ip_ctloutput(), checks are assumed to be
+ * performed in ip_ctloutput() and therefore no check occurs here.
+ * Unilaterally checking suser() here breaks normal IP socket option
+ * operations on raw sockets.
+ *
+ * When adding new socket options here, make sure to add access control
+ * checks here as necessary.
  */
 int
 rip_ctloutput(struct socket *so, struct sockopt *sopt)
@@ -329,7 +350,6 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 		return (EINVAL);
 
 	error = 0;
-
 	switch (sopt->sopt_dir) {
 	case SOPT_GET:
 		switch (sopt->sopt_name) {
@@ -340,14 +360,22 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 
 		case IP_FW_ADD:	/* ADD actually returns the body... */
 		case IP_FW_GET:
-			if (IPFW_LOADED)
+		case IP_FW_TABLE_GETSIZE:
+		case IP_FW_TABLE_LIST:
+			error = suser(curthread);
+			if (error != 0)
+				return (error);
+			if (ip_fw_ctl_ptr != NULL)
 				error = ip_fw_ctl_ptr(sopt);
 			else
 				error = ENOPROTOOPT;
 			break;
 
 		case IP_DUMMYNET_GET:
-			if (DUMMYNET_LOADED)
+			error = suser(curthread);
+			if (error != 0)
+				return (error);
+			if (ip_dn_ctl_ptr != NULL)
 				error = ip_dn_ctl_ptr(sopt);
 			else
 				error = ENOPROTOOPT;
@@ -365,6 +393,9 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 		case MRT_API_CONFIG:
 		case MRT_ADD_BW_UPCALL:
 		case MRT_DEL_BW_UPCALL:
+			error = suser(curthread);
+			if (error != 0)
+				return (error);
 			error = ip_mrouter_get ? ip_mrouter_get(so, sopt) :
 				EOPNOTSUPP;
 			break;
@@ -393,7 +424,13 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 		case IP_FW_FLUSH:
 		case IP_FW_ZERO:
 		case IP_FW_RESETLOG:
-			if (IPFW_LOADED)
+		case IP_FW_TABLE_ADD:
+		case IP_FW_TABLE_DEL:
+		case IP_FW_TABLE_FLUSH:
+			error = suser(curthread);
+			if (error != 0)
+				return (error);
+			if (ip_fw_ctl_ptr != NULL)
 				error = ip_fw_ctl_ptr(sopt);
 			else
 				error = ENOPROTOOPT;
@@ -402,22 +439,34 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 		case IP_DUMMYNET_CONFIGURE:
 		case IP_DUMMYNET_DEL:
 		case IP_DUMMYNET_FLUSH:
-			if (DUMMYNET_LOADED)
+			error = suser(curthread);
+			if (error != 0)
+				return (error);
+			if (ip_dn_ctl_ptr != NULL)
 				error = ip_dn_ctl_ptr(sopt);
 			else
 				error = ENOPROTOOPT ;
 			break ;
 
 		case IP_RSVP_ON:
+			error = suser(curthread);
+			if (error != 0)
+				return (error);
 			error = ip_rsvp_init(so);
 			break;
 
 		case IP_RSVP_OFF:
+			error = suser(curthread);
+			if (error != 0)
+				return (error);
 			error = ip_rsvp_done();
 			break;
 
 		case IP_RSVP_VIF_ON:
 		case IP_RSVP_VIF_OFF:
+			error = suser(curthread);
+			if (error != 0)
+				return (error);
 			error = ip_rsvp_vif ?
 				ip_rsvp_vif(so, sopt) : EINVAL;
 			break;
@@ -434,6 +483,9 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 		case MRT_API_CONFIG:
 		case MRT_ADD_BW_UPCALL:
 		case MRT_DEL_BW_UPCALL:
+			error = suser(curthread);
+			if (error != 0)
+				return (error);
 			error = ip_mrouter_set ? ip_mrouter_set(so, sopt) :
 					EOPNOTSUPP;
 			break;
@@ -511,7 +563,7 @@ u_long	rip_recvspace = RIPRCVQ;
 SYSCTL_INT(_net_inet_raw, OID_AUTO, maxdgram, CTLFLAG_RW,
     &rip_sendspace, 0, "Maximum outgoing raw IP datagram size");
 SYSCTL_INT(_net_inet_raw, OID_AUTO, recvspace, CTLFLAG_RW,
-    &rip_recvspace, 0, "Maximum incoming raw IP datagram size");
+    &rip_recvspace, 0, "Maximum space for incoming raw IP datagrams");
 
 static int
 rip_attach(struct socket *so, int proto, struct thread *td)
@@ -527,7 +579,11 @@ rip_attach(struct socket *so, int proto, struct thread *td)
 		INP_INFO_WUNLOCK(&ripcbinfo);
 		return EINVAL;
 	}
-	if (td && (error = suser(td)) != 0) {
+	if (td && jailed(td->td_ucred) && !jail_allow_raw_sockets) {
+		INP_INFO_WUNLOCK(&ripcbinfo);
+		return (EPERM);
+	}
+	if (td && (error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL)) != 0) {
 		INP_INFO_WUNLOCK(&ripcbinfo);
 		return error;
 	}
@@ -541,7 +597,7 @@ rip_attach(struct socket *so, int proto, struct thread *td)
 		INP_INFO_WUNLOCK(&ripcbinfo);
 		return error;
 	}
-	error = in_pcballoc(so, &ripcbinfo, td, "rawinp");
+	error = in_pcballoc(so, &ripcbinfo, "rawinp");
 	if (error) {
 		INP_INFO_WUNLOCK(&ripcbinfo);
 		return error;
@@ -626,6 +682,14 @@ rip_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 
 	if (nam->sa_len != sizeof(*addr))
 		return EINVAL;
+
+	if (jailed(td->td_ucred)) {
+		if (addr->sin_addr.s_addr == INADDR_ANY)
+			addr->sin_addr.s_addr =
+			    htonl(prison_getip(td->td_ucred));
+		if (htonl(prison_getip(td->td_ucred)) != addr->sin_addr.s_addr)
+			return (EADDRNOTAVAIL);
+	}
 
 	if (TAILQ_EMPTY(&ifnet) ||
 	    (addr->sin_family != AF_INET && addr->sin_family != AF_IMPLINK) ||
@@ -716,9 +780,7 @@ rip_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 		}
 		dst = ((struct sockaddr_in *)nam)->sin_addr.s_addr;
 	}
-	INP_LOCK(inp);
 	ret = rip_output(m, so, dst);
-	INP_UNLOCK(inp);
 	INP_INFO_WUNLOCK(&ripcbinfo);
 	return ret;
 }

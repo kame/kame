@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/net80211/ieee80211_proto.c,v 1.6 2003/10/31 18:32:09 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/net80211/ieee80211_proto.c,v 1.9 2004/07/27 23:20:45 rwatson Exp $");
 
 /*
  * IEEE 802.11 protocol support.
@@ -102,6 +102,7 @@ ieee80211_proto_attach(struct ifnet *ifp)
 #endif
 	ic->ic_fragthreshold = 2346;		/* XXX not used yet */
 	ic->ic_fixed_rate = -1;			/* no fixed rate */
+	ic->ic_protmode = IEEE80211_PROT_CTSONLY;
 
 	mtx_init(&ic->ic_mgtq.ifq_mtx, ifp->if_xname, "mgmt send q", MTX_DEF);
 
@@ -255,8 +256,17 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 			 * Check against supported rates.
 			 */
 			for (j = 0; j < srs->rs_nrates; j++) {
-				if (r == RV(srs->rs_rates[j]))
+				if (r == RV(srs->rs_rates[j])) {
+					/*
+					 * Overwrite with the supported rate
+					 * value so any basic rate bit is set.
+					 * This insures that response we send
+					 * to stations have the necessary basic
+					 * rate bit set.
+					 */
+					nrs->rs_rates[i] = srs->rs_rates[j];
 					break;
+				}
 			}
 			if (j == srs->rs_nrates) {
 				/*
@@ -503,7 +513,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 					IEEE80211_RATE2MBS(ni->ni_rates.rs_rates[ni->ni_txrate]));
 			}
 			ic->ic_mgt_timer = 0;
-			(*ifp->if_start)(ifp);
+			if_start(ifp);
 			break;
 		}
 		break;

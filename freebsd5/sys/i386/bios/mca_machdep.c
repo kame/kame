@@ -25,12 +25,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/bios/mca_machdep.c,v 1.7 2003/06/02 06:02:49 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/bios/mca_machdep.c,v 1.8 2004/06/10 20:30:57 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <machine/pmap.h>
 #include <machine/md_var.h>

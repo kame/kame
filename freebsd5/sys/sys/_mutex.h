@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/_mutex.h,v 1.10 2003/11/11 22:07:29 jhb Exp $
+ * $FreeBSD: src/sys/sys/_mutex.h,v 1.11 2004/01/25 01:59:26 rwatson Exp $
  */
 
 #ifndef _SYS__MUTEX_H_
@@ -47,6 +47,15 @@ struct mtx {
 	u_int64_t		mtx_acqtime;
 	const char		*mtx_filename;
 	int			mtx_lineno;
+	/*
+	 * Fields relating to measuring contention on mutexes.
+	 * holding must be accessed atomically since it's
+	 * modified by threads that don't yet hold the mutex.
+	 * locking is only modified and referenced while
+	 * the mutex is held.
+	 */
+	u_int			mtx_contest_holding;
+	u_int			mtx_contest_locking;
 #endif
 };
 

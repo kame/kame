@@ -16,10 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,9 +35,10 @@
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
  *	from: FreeBSD: src/sys/i386/i386/mem.c,v 1.94 2001/09/26
- *
- * $FreeBSD: src/sys/sparc64/sparc64/mem.c,v 1.9 2003/08/22 07:38:08 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/sparc64/sparc64/mem.c,v 1.15 2004/08/15 21:37:52 marius Exp $");
 
 /*
  * Memory special file
@@ -56,6 +53,9 @@
 #include <sys/fcntl.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/memrange.h>
+#include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
@@ -75,53 +75,13 @@
 #include <machine/tlb.h>
 #include <machine/upa.h>
 
-static dev_t memdev, kmemdev;
+#include <machine/memdev.h>
 
-static	d_open_t	mmopen;
-static	d_close_t	mmclose;
-static	d_read_t	mmrw;
+struct mem_range_softc mem_range_softc;
 
-#define CDEV_MAJOR 2
-static struct cdevsw mem_cdevsw = {
-	.d_open =	mmopen,
-	.d_close =	mmclose,
-	.d_read =	mmrw,
-	.d_write =	mmrw,
-	.d_name =	"mem",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_MEM,
-};
-
-static int
-mmclose(dev_t dev, int flags, int fmt, struct thread *td)
-{
-
-	return (0);
-}
-
-static int
-mmopen(dev_t dev, int flags, int fmt, struct thread *td)
-{
-	int error;
-
-	switch (minor(dev)) {
-	case 0:
-	case 1:
-		if (flags & FWRITE) {
-			error = securelevel_gt(td->td_ucred, 0);
-			if (error != 0)
-				return (error);
-		}
-		break;
-	default:
-		return (ENXIO);
-	}
-	return (0);
-}
-
-/*ARGSUSED*/
-static int
-mmrw(dev_t dev, struct uio *uio, int flags)
+/* ARGSUSED */
+int
+memrw(struct cdev *dev, struct uio *uio, int flags)
 {
 	struct iovec *iov;
 	vm_offset_t eva;
@@ -148,12 +108,10 @@ mmrw(dev_t dev, struct uio *uio, int flags)
 			uio->uio_iov++;
 			uio->uio_iovcnt--;
 			if (uio->uio_iovcnt < 0)
-				panic("mmrw");
+				panic("memrw");
 			continue;
 		}
-		switch (minor(dev)) {
-		case 0:
-			/* mem (physical memory) */
+		if (minor(dev) == CDEV_MINOR_MEM) {
 			pa = uio->uio_offset & ~PAGE_MASK;
 			if (!is_physical_memory(pa)) {
 				error = EFAULT;
@@ -163,8 +121,8 @@ mmrw(dev_t dev, struct uio *uio, int flags)
 			off = uio->uio_offset & PAGE_MASK;
 			cnt = PAGE_SIZE - ((vm_offset_t)iov->iov_base &
 			    PAGE_MASK);
-			cnt = min(cnt, PAGE_SIZE - off);
-			cnt = min(cnt, iov->iov_len);
+			cnt = ulmin(cnt, PAGE_SIZE - off);
+			cnt = ulmin(cnt, iov->iov_len);
 
 			m = NULL;
 			for (i = 0; phys_avail[i] != 0; i += 2) {
@@ -194,8 +152,8 @@ mmrw(dev_t dev, struct uio *uio, int flags)
 				    uio);
 			}
 			break;
-		case 1:
-			/* kmem (kernel memory) */
+		}
+		else if (minor(dev) == CDEV_MINOR_KMEM) {
 			va = trunc_page(uio->uio_offset);
 			eva = round_page(uio->uio_offset + iov->iov_len);
 
@@ -216,40 +174,15 @@ mmrw(dev_t dev, struct uio *uio, int flags)
 
 			error = uiomove((void *)va, iov->iov_len, uio);
 			break;
-		default:
-			return (ENODEV);
 		}
+		/* else panic! */
 	}
 	if (ova != 0)
 		kmem_free_wakeup(kernel_map, ova, PAGE_SIZE * DCACHE_COLORS);
 	return (error);
 }
 
-static int
-mem_modevent(module_t mod, int type, void *data)
+void
+dev_mem_md_init(void)
 {
-	switch(type) {
-	case MOD_LOAD:
-		if (bootverbose)
-			printf("mem: <memory & I/O>\n");
-
-		memdev = make_dev(&mem_cdevsw, 0, UID_ROOT, GID_KMEM,
-			0640, "mem");
-		kmemdev = make_dev(&mem_cdevsw, 1, UID_ROOT, GID_KMEM,
-			0640, "kmem");
-		return 0;
-
-	case MOD_UNLOAD:
-		destroy_dev(memdev);
-		destroy_dev(kmemdev);
-		return 0;
-
-	case MOD_SHUTDOWN:
-		return 0;
-
-	default:
-		return EOPNOTSUPP;
-	}
 }
-
-DEV_MODULE(mem, mem_modevent, NULL);

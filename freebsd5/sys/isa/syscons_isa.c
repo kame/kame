@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/isa/syscons_isa.c,v 1.24 2003/10/29 20:48:13 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/isa/syscons_isa.c,v 1.25 2004/06/10 20:31:00 jhb Exp $");
 
 #include "opt_syscons.h"
 
@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD: src/sys/isa/syscons_isa.c,v 1.24 2003/10/29 20:48:13 njl Exp
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm_param.h>
 
 #include <i386/isa/timerreg.h>
 

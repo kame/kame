@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/pci/pci_bus.c,v 1.106 2003/10/31 21:00:37 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/pci/pci_bus.c,v 1.112.2.2 2004/10/14 23:47:00 imp Exp $");
 
 #include "opt_cpu.h"
 
@@ -33,19 +33,20 @@ __FBSDID("$FreeBSD: src/sys/i386/pci/pci_bus.c,v 1.106 2003/10/31 21:00:37 jhb E
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
-#include <sys/module.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/sysctl.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcib_private.h>
 #include <isa/isavar.h>
+#ifdef CPU_ELAN
+#include <machine/md_var.h>
+#endif
 #include <machine/legacyvar.h>
 #include <machine/pci_cfgreg.h>
-#include <machine/segments.h>
-#include <machine/cputypes.h>
-#include <machine/pc/bios.h>
-#include <machine/md_var.h>
+#include <machine/resource.h>
 
 #include "pcib_if.h"
 
@@ -78,11 +79,11 @@ legacy_pcib_write_config(device_t dev, int bus, int slot, int func,
 
 static const char *
 legacy_pcib_is_host_bridge(int bus, int slot, int func,
-			  u_int32_t id, u_int8_t class, u_int8_t subclass,
-			  u_int8_t *busnum)
+			  uint32_t id, uint8_t class, uint8_t subclass,
+			  uint8_t *busnum)
 {
 	const char *s = NULL;
-	static u_int8_t pxb[4];	/* hack for 450nx */
+	static uint8_t pxb[4];	/* hack for 450nx */
 
 	*busnum = 0;
 
@@ -423,12 +424,23 @@ legacy_pcib_probe(device_t dev)
 	return -100;
 }
 
-int
+static int
 legacy_pcib_attach(device_t dev)
 {
+	device_t pir;
+	int bus;
 
-	device_add_child(dev, "pci", pcib_get_bus(dev));
-
+	/*
+	 * Look for a PCI BIOS interrupt routing table as that will be
+	 * our method of routing interrupts if we have one.
+	 */
+	bus = pcib_get_bus(dev);
+	if (pci_pir_probe(bus, 0)) {
+		pir = BUS_ADD_CHILD(device_get_parent(dev), 0, "pir", 0);
+		if (pir != NULL)
+			device_probe_and_attach(pir);
+	}
+	device_add_child(dev, "pci", bus);
 	return bus_generic_attach(dev);
 }
 
@@ -458,6 +470,37 @@ legacy_pcib_write_ivar(device_t dev, device_t child, int which,
 	return ENOENT;
 }
 
+SYSCTL_DECL(_hw_pci);
+
+static int legacy_host_mem_start = 0x80000000;
+/* No TUNABLE_ULONG :-( */
+TUNABLE_INT("hw.pci.host_mem_start", &legacy_host_mem_start);
+SYSCTL_INT(_hw_pci, OID_AUTO, host_mem_start, CTLFLAG_RDTUN,
+    &legacy_host_mem_start, 0x80000000,
+    "Limit the host bridge memory to being above this address.  Must be\n\
+set at boot via a tunable.");
+
+static struct resource *
+legacy_pcib_alloc_resource(device_t dev, device_t child, int type, int *rid,
+    u_long start, u_long end, u_long count, u_int flags)
+{
+    /*
+     * If no memory preference is given, use upper 32MB slot most
+     * bioses use for their memory window.  Typically other bridges
+     * before us get in the way to assert their preferences on memory.
+     * Hardcoding like this sucks, so a more MD/MI way needs to be
+     * found to do it.  This is typically only used on older laptops
+     * that don't have pci busses behind pci bridge, so assuming > 32MB
+     * is liekly OK.
+     *
+     * However, this can cause problems for other chipsets, so we make
+     * this tunable by hw.pci.host_mem_start.
+     */
+    if (type == SYS_RES_MEMORY && start == 0UL && end == ~0UL)
+	start = legacy_host_mem_start;
+    return (bus_generic_alloc_resource(dev, child, type, rid, start, end,
+	count, flags));
+}
 
 static device_method_t legacy_pcib_methods[] = {
 	/* Device interface */
@@ -472,7 +515,7 @@ static device_method_t legacy_pcib_methods[] = {
 	DEVMETHOD(bus_print_child,	bus_generic_print_child),
 	DEVMETHOD(bus_read_ivar,	legacy_pcib_read_ivar),
 	DEVMETHOD(bus_write_ivar,	legacy_pcib_write_ivar),
-	DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
+	DEVMETHOD(bus_alloc_resource,	legacy_pcib_alloc_resource),
 	DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
 	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
 	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
@@ -662,7 +705,7 @@ pcibios_pcib_probe(device_t dev)
 	bus = pci_read_config(dev, PCIR_SECBUS_1, 1);
 	if (bus == 0)
 		return (ENXIO);
-	if (pci_probe_route_table(bus) == 0)
+	if (!pci_pir_probe(bus, 1))
 		return (ENXIO);
 	device_set_desc(dev, "PCIBIOS PCI-PCI bridge");
 	return (-2000);
@@ -671,6 +714,6 @@ pcibios_pcib_probe(device_t dev)
 static int
 pcibios_pcib_route_interrupt(device_t pcib, device_t dev, int pin)
 {
-	return(pci_cfgintr(pci_get_bus(dev), pci_get_slot(dev), pin,
-		   pci_get_irq(dev)));
+	return (pci_pir_route_interrupt(pci_get_bus(dev), pci_get_slot(dev),
+		pci_get_function(dev), pin));
 }

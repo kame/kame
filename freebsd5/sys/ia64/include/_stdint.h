@@ -34,7 +34,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/_stdint.h,v 1.1 2002/07/29 17:41:08 mike Exp $
+ * $FreeBSD: src/sys/ia64/include/_stdint.h,v 1.2 2004/05/18 16:04:57 stefanf Exp $
  */
 
 #ifndef	_MACHINE__STDINT_H_
@@ -160,11 +160,11 @@
 /* Limits of wchar_t. */
 #define	WCHAR_MIN	INT32_MIN
 #define	WCHAR_MAX	INT32_MAX
+#endif
 
 /* Limits of wint_t. */
 #define	WINT_MIN	INT32_MIN
 #define	WINT_MAX	INT32_MAX
-#endif
 
 #endif /* !defined(__cplusplus) || defined(__STDC_LIMIT_MACROS) */
 

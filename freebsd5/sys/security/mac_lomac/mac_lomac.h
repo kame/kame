@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 1999-2002 Robert N. M. Watson
+ * Copyright (c) 2001-2002 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_lomac/mac_lomac.h,v 1.2 2002/12/03 15:26:01 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_lomac/mac_lomac.h,v 1.3 2004/02/22 00:33:11 rwatson Exp $
  */
 /*
  * Definitions for the TrustedBSD LOMAC integrity policy module.

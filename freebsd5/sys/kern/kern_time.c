@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_time.c,v 1.105 2003/10/26 02:19:00 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_time.c,v 1.108 2004/06/21 22:34:57 kbyanc Exp $");
 
 #include "opt_mac.h"
 
@@ -160,13 +156,31 @@ int
 clock_gettime(struct thread *td, struct clock_gettime_args *uap)
 {
 	struct timespec ats;
+	struct timeval sys, user;
 
-	if (uap->clock_id == CLOCK_REALTIME)
+	switch (uap->clock_id) {
+	case CLOCK_REALTIME:
 		nanotime(&ats);
-	else if (uap->clock_id == CLOCK_MONOTONIC)
+		break;
+	case CLOCK_VIRTUAL:
+		mtx_lock_spin(&sched_lock);
+		calcru(td->td_proc, &user, &sys, NULL);
+		mtx_unlock_spin(&sched_lock);
+		TIMEVAL_TO_TIMESPEC(&user, &ats);
+		break;
+	case CLOCK_PROF:
+		mtx_lock_spin(&sched_lock);
+		calcru(td->td_proc, &user, &sys, NULL);
+		mtx_unlock_spin(&sched_lock);
+		timevaladd(&user, &sys);
+		TIMEVAL_TO_TIMESPEC(&user, &ats);
+		break;
+	case CLOCK_MONOTONIC:
 		nanouptime(&ats);
-	else
+		break;
+	default:
 		return (EINVAL);
+	}
 	return (copyout(&ats, uap->tp, sizeof(ats)));
 }
 
@@ -218,22 +232,29 @@ int
 clock_getres(struct thread *td, struct clock_getres_args *uap)
 {
 	struct timespec ts;
-	int error;
 
-	if (uap->clock_id != CLOCK_REALTIME)
-		return (EINVAL);
-	error = 0;
-	if (uap->tp) {
-		ts.tv_sec = 0;
+	ts.tv_sec = 0;
+	switch (uap->clock_id) {
+	case CLOCK_REALTIME:
+	case CLOCK_MONOTONIC:
 		/*
 		 * Round up the result of the division cheaply by adding 1.
 		 * Rounding up is especially important if rounding down
 		 * would give 0.  Perfect rounding is unimportant.
 		 */
 		ts.tv_nsec = 1000000000 / tc_getfrequency() + 1;
-		error = copyout(&ts, uap->tp, sizeof(ts));
+		break;
+	case CLOCK_VIRTUAL:
+	case CLOCK_PROF:
+		/* Accurately round up here because we can do so cheaply. */
+		ts.tv_nsec = (1000000000 + hz - 1) / hz;
+		break;
+	default:
+		return (EINVAL);
 	}
-	return (error);
+	if (uap->tp == NULL)
+		return (0);
+	return (copyout(&ts, uap->tp, sizeof(ts)));
 }
 
 static int nanowait;

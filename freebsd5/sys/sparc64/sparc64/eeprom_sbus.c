@@ -14,8 +14,6 @@
  * All advertising materials mentioning features or use of this software
  * must display the following acknowledgement:
  *	This product includes software developed by Harvard University.
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,8 +26,6 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  *	This product includes software developed by Paul Kranenburg.
  *	This product includes software developed by Harvard University.
  * 4. Neither the name of the University nor the names of its contributors
@@ -51,7 +47,7 @@
  *	from: @(#)clock.c	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: clock.c,v 1.41 2001/07/24 19:29:25 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/sparc64/eeprom_sbus.c,v 1.3 2003/08/23 05:56:58 marcel Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/eeprom_sbus.c,v 1.7 2004/08/12 17:41:33 marius Exp $
  */
 
 #include <sys/param.h>
@@ -59,7 +55,10 @@
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/resource.h>
+
+#include <dev/ofw/ofw_bus.h>
 
 #include <machine/bus.h>
 #include <machine/idprom.h>
@@ -67,22 +66,17 @@
 
 #include <sys/rman.h>
 
-#include <dev/ofw/openfirm.h>
-
 #include <machine/eeprom.h>
 
 #include <dev/mk48txx/mk48txxreg.h>
 
-#include <sparc64/sbus/sbusvar.h>
-
 #include "clock_if.h"
 
-static int eeprom_sbus_probe(device_t);
 static int eeprom_sbus_attach(device_t);
 
 static device_method_t eeprom_sbus_methods[] = {
 	/* Device interface */
-	DEVMETHOD(device_probe,		eeprom_sbus_probe),
+	DEVMETHOD(device_probe,		eeprom_probe),
 	DEVMETHOD(device_attach,	eeprom_sbus_attach),
 
 	/* clock interface */
@@ -98,22 +92,11 @@ static driver_t eeprom_sbus_driver = {
 	0,
 };
 
+DRIVER_MODULE(eeprom, fhc, eeprom_sbus_driver, eeprom_devclass, 0, 0);
 DRIVER_MODULE(eeprom, sbus, eeprom_sbus_driver, eeprom_devclass, 0, 0);
 
-
-static int
-eeprom_sbus_probe(device_t dev)
-{
-
-	if (strcmp("eeprom", sbus_get_name(dev)) == 0) {
-		device_set_desc(dev, "SBus EEPROM/clock");
-		return (0);
-	}
-	return (ENXIO);
-}
-
 /*
- * Attach a clock (really `eeprom') to the sbus.
+ * Attach a clock (really `eeprom') to fhc or sbus.
  *
  * This is mapped read-only on NetBSD for safety, but this is not possible
  * with the current FreeBSD bus code.
@@ -128,13 +111,12 @@ eeprom_sbus_attach(device_t dev)
 	int rid, error;
 
 	rid = 0;
-	res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0UL, ~0UL, 1,
-	    RF_ACTIVE);
+	res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, RF_ACTIVE);
 	if (res == NULL) {
 		device_printf(dev, "could not allocate resources\n");
 		return (ENXIO);
 	}
-	error = eeprom_attach(dev, sbus_get_node(dev), rman_get_bustag(res),
+	error = eeprom_attach(dev, rman_get_bustag(res),
 	    rman_get_bushandle(res));
 	return (error);
 }

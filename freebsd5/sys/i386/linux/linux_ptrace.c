@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/linux/linux_ptrace.c,v 1.12 2003/06/02 16:56:40 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/linux/linux_ptrace.c,v 1.13.2.1 2004/10/09 17:10:48 das Exp $");
 
 #include "opt_cpu.h"
 
@@ -89,7 +89,7 @@ __FBSDID("$FreeBSD: src/sys/i386/linux/linux_ptrace.c,v 1.12 2003/06/02 16:56:40
 #define LINUX_DBREG_OFFSET	252
 #define LINUX_DBREG_SIZE	(8*sizeof(l_int))
 
-static __inline__ int
+static __inline int
 map_signum(int signum)
 {
 
@@ -386,9 +386,9 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 			goto fail;
 		}
 
-		td2 = FIRST_THREAD_IN_PROC(p);
 		if (req == PTRACE_GETFPXREGS) {
-			_PHOLD(p);
+			_PHOLD(p);	/* may block */
+			td2 = FIRST_THREAD_IN_PROC(p);
 			error = linux_proc_read_fpxregs(td2, &r.fpxreg);
 			_PRELE(p);
 			PROC_UNLOCK(p);
@@ -398,7 +398,8 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		} else {
 			/* clear dangerous bits exactly as Linux does*/
 			r.fpxreg.mxcsr &= 0xffbf;
-			_PHOLD(p);
+			_PHOLD(p);	/* may block */
+			td2 = FIRST_THREAD_IN_PROC(p);
 			error = linux_proc_write_fpxregs(td2, &r.fpxreg);
 			_PRELE(p);
 			PROC_UNLOCK(p);

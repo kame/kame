@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_vnops.c,v 1.94 2003/10/18 14:10:25 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_vnops.c,v 1.98 2004/04/07 20:46:09 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -272,7 +268,7 @@ cd9660_read(ap)
 	int seqcount;
 	long size, n, on;
 
-	seqcount = ap->a_ioflag >> 16;
+	seqcount = ap->a_ioflag >> IO_SEQSHIFT;
 
 	if (uio->uio_resid == 0)
 		return (0);
@@ -430,7 +426,7 @@ cd9660_readdir(ap)
 		struct ucred *a_cred;
 		int *a_eofflag;
 		int *a_ncookies;
-		u_long *a_cookies;
+		u_long **a_cookies;
 	} */ *ap;
 {
 	struct uio *uio = ap->a_uio;
@@ -469,8 +465,8 @@ cd9660_readdir(ap)
 		 * Guess the number of cookies needed.
 		 */
 		ncookies = uio->uio_resid / 16;
-		MALLOC(cookies, u_long *, ncookies * sizeof(u_int), M_TEMP,
-		    M_WAITOK);
+		MALLOC(cookies, u_long *, ncookies * sizeof(u_long),
+		    M_TEMP, M_WAITOK);
 		idp->cookies = cookies;
 		idp->ncookies = ncookies;
 	}

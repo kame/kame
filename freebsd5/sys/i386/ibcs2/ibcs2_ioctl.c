@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_ioctl.c,v 1.29 2003/06/02 06:48:51 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_ioctl.c,v 1.30 2004/06/21 22:57:14 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,6 +57,7 @@ static void stios2stio(struct ibcs2_termios *, struct ibcs2_termio *);
 static void stio2stios(struct ibcs2_termio *, struct ibcs2_termios *);
 
 
+#ifndef BURN_BRIDGES
 int
 ibcs2_gtty(struct thread *td, struct ibcs2_gtty_args *args)
 {
@@ -80,6 +81,7 @@ ibcs2_stty(struct thread *td, struct ibcs2_stty_args *args)
 
 	return ioctl(td, &ioctl_arg);
 }
+#endif /* BURN BRIDGES */
 
 
 /*

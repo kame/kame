@@ -23,10 +23,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -75,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/tty.c,v 1.205 2003/11/09 09:17:24 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/tty.c,v 1.228 2004/08/15 06:24:41 jmg Exp $");
 
 #include "opt_compat.h"
 #include "opt_tty.h"
@@ -87,8 +83,10 @@ __FBSDID("$FreeBSD: src/sys/kern/tty.c,v 1.205 2003/11/09 09:17:24 tanimura Exp 
 #include <sys/mutex.h>
 #include <sys/namei.h>
 #include <sys/sx.h>
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#ifndef BURN_BRIDGES
+#if defined(COMPAT_43)
 #include <sys/ioctl_compat.h>
+#endif
 #endif
 #include <sys/proc.h>
 #define	TTYDEFCHARS
@@ -99,10 +97,12 @@ __FBSDID("$FreeBSD: src/sys/kern/tty.c,v 1.205 2003/11/09 09:17:24 tanimura Exp 
 #include <sys/poll.h>
 #include <sys/kernel.h>
 #include <sys/vnode.h>
+#include <sys/serial.h>
 #include <sys/signalvar.h>
 #include <sys/resourcevar.h>
 #include <sys/malloc.h>
 #include <sys/filedesc.h>
+#include <sys/sched.h>
 #include <sys/sysctl.h>
 
 #include <vm/vm.h>
@@ -214,8 +214,13 @@ static u_char const char_type[] = {
 
 /*
  * list of struct tty where pstat(8) can pick it up with sysctl
+ *
+ * The lock order is to grab the list mutex before the tty mutex.
+ * Together with additions going on the tail of the list, this allows
+ * the sysctl to avoid doing retries.
  */
-static SLIST_HEAD(, tty) tty_list;
+static	TAILQ_HEAD(, tty) tty_list = TAILQ_HEAD_INITIALIZER(tty_list);
+static struct mtx tty_list_mutex;
 
 static int  drainwait = 5*60;
 SYSCTL_INT(_kern, OID_AUTO, drainwait, CTLFLAG_RW, &drainwait,
@@ -225,13 +230,15 @@ SYSCTL_INT(_kern, OID_AUTO, drainwait, CTLFLAG_RW, &drainwait,
  * Initial open of tty, or (re)entry to standard tty line discipline.
  */
 int
-ttyopen(dev_t device, struct tty *tp)
+tty_open(struct cdev *device, struct tty *tp)
 {
 	int s;
 
 	s = spltty();
 	tp->t_dev = device;
+	tp->t_hotchar = 0;
 	if (!ISSET(tp->t_state, TS_ISOPEN)) {
+		ttyref(tp);
 		SET(tp->t_state, TS_ISOPEN);
 		if (ISSET(tp->t_cflag, CLOCAL))
 			SET(tp->t_state, TS_CONNECTED);
@@ -249,12 +256,12 @@ ttyopen(dev_t device, struct tty *tp)
  * Handle close() on a tty line: flush and set to initial state,
  * bumping generation number so that pending read/write calls
  * can detect recycling of the tty.
- * XXX our caller should have done `spltty(); l_close(); ttyclose();'
+ * XXX our caller should have done `spltty(); l_close(); tty_close();'
  * and l_close() should have flushed, but we repeat the spltty() and
  * the flush in case there are buggy callers.
  */
 int
-ttyclose(struct tty *tp)
+tty_close(struct tty *tp)
 {
 	int s;
 
@@ -270,9 +277,13 @@ ttyclose(struct tty *tp)
 
 	tp->t_gen++;
 	tp->t_line = TTYDISC;
+	tp->t_hotchar = 0;
 	tp->t_pgrp = NULL;
 	tp->t_session = NULL;
 	tp->t_state = 0;
+	knlist_clear(&tp->t_rsel.si_note, 0);
+	knlist_clear(&tp->t_wsel.si_note, 0);
+	ttyrel(tp);
 	splx(s);
 	return (0);
 }
@@ -736,7 +747,7 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 	struct proc *p;
 	struct thread *td;
 	struct pgrp *pgrp;
-	int s, error;
+	int s, error, bits, sig, sig2;
 
 	td = curthread;			/* XXX */
 	p = td->td_proc;
@@ -765,7 +776,8 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 	case  TIOCSTI:
 	case  TIOCSTOP:
 	case  TIOCSWINSZ:
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#ifndef BURN_BRIDGES
+#if defined(COMPAT_43)
 	case  TIOCLBIC:
 	case  TIOCLBIS:
 	case  TIOCLSET:
@@ -774,6 +786,7 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 	case  TIOCSETN:
 	case  TIOCSETP:
 	case  TIOCSLTC:
+#endif
 #endif
 		sx_slock(&proctree_lock);
 		PROC_LOCK(p);
@@ -800,6 +813,54 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 		PROC_UNLOCK(p);
 		sx_sunlock(&proctree_lock);
 		break;
+	}
+
+	if (tp->t_break != NULL) {
+		switch (cmd) {
+		case TIOCSBRK:
+			tp->t_break(tp, 1);
+			return (0);
+		case TIOCCBRK:
+			tp->t_break(tp, 0);
+			return (0);
+		default:
+			break;
+		}
+	}
+
+	if (tp->t_modem != NULL) {
+		switch (cmd) {
+		case TIOCSDTR:
+			tp->t_modem(tp, SER_DTR, 0);
+			return (0);
+		case TIOCCDTR:
+			tp->t_modem(tp, 0, SER_DTR);
+			return (0);
+		case TIOCMSET:
+			bits = *(int *)data;
+			sig = (bits & (TIOCM_DTR | TIOCM_RTS)) >> 1;
+			sig2 = ((~bits) & (TIOCM_DTR | TIOCM_RTS)) >> 1;
+			tp->t_modem(tp, sig, sig2);
+			return (0);
+		case TIOCMBIS:
+			bits = *(int *)data;
+			sig = (bits & (TIOCM_DTR | TIOCM_RTS)) >> 1;
+			tp->t_modem(tp, sig, 0);
+			return (0);
+		case TIOCMBIC:
+			bits = *(int *)data;
+			sig = (bits & (TIOCM_DTR | TIOCM_RTS)) >> 1;
+			tp->t_modem(tp, 0, sig);
+			return (0);
+		case TIOCMGET:
+			sig = tp->t_modem(tp, 0, 0);
+			/* See <sys/serial.h. for the "<< 1" stuff */
+			bits = TIOCM_LE + (sig << 1);
+			*(int *)data = bits;
+			return (0);
+		default:
+			break;
+		}
 	}
 
 	switch (cmd) {			/* Process the ioctl. */
@@ -904,6 +965,16 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 		splx(s);
 		break;
 #endif
+	case TIOCMGDTRWAIT:
+		*(int *)data = tp->t_dtr_wait * 100 / hz;
+		break;
+	case TIOCMSDTRWAIT:
+		/* must be root since the wait applies to following logins */
+		error = suser(td);
+		if (error)
+			return (error);
+		tp->t_dtr_wait = *(int *)data * hz / 100;
+		break;
 	case TIOCNXCL:			/* reset exclusive use of tty */
 		s = spltty();
 		CLR(tp->t_state, TS_XCLUDE);
@@ -1011,22 +1082,29 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 	}
 	case TIOCSETD: {		/* set line discipline */
 		int t = *(int *)data;
-		dev_t device = tp->t_dev;
+		struct cdev *device = tp->t_dev;
 
 		if ((u_int)t >= nlinesw)
 			return (ENXIO);
-		if (t != tp->t_line) {
-			s = spltty();
-			(*linesw[tp->t_line].l_close)(tp, flag);
-			error = (*linesw[t].l_open)(device, tp);
-			if (error) {
-				(void)(*linesw[tp->t_line].l_open)(device, tp);
-				splx(s);
-				return (error);
-			}
-			tp->t_line = t;
-			splx(s);
+		if (t == tp->t_line)
+			return (0);
+		s = spltty();
+		ttyld_close(tp, flag);
+		tp->t_line = t;
+		error = ttyld_open(tp, device);
+		if (error) {
+			/*
+			 * If we fail to switch line discipline we cannot
+			 * fall back to the previous, because we can not
+			 * trust that ldisc to open successfully either.
+			 * Fall back to the default ldisc which we know 
+			 * will allways succeed.
+			 */
+			tp->t_line = TTYDISC;
+			(void)ttyld_open(tp, device);
 		}
+		splx(s);
+		return (error);
 		break;
 	}
 	case TIOCSTART:			/* start output, like ^Q */
@@ -1045,7 +1123,7 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 		if (!isctty(p, tp) && suser(td))
 			return (EACCES);
 		s = spltty();
-		(*linesw[tp->t_line].l_rint)(*(u_char *)data, tp);
+		ttyld_rint(tp, *(u_char *)data);
 		splx(s);
 		break;
 	case TIOCSTOP:			/* stop output, like ^S */
@@ -1068,6 +1146,7 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 		tp->t_session = p->p_session;
 		tp->t_pgrp = p->p_pgrp;
 		SESS_LOCK(p->p_session);
+		ttyref(tp);		/* ttyrel(): kern_proc.c:pgdelete() */
 		p->p_session->s_ttyp = tp;
 		SESS_UNLOCK(p->p_session);
 		PROC_LOCK(p);
@@ -1125,8 +1204,12 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 		*(int *)data = tp->t_timeout / hz;
 		break;
 	default:
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
+#ifndef BURN_BRIDGES
 		return (ttcompat(tp, cmd, data, flag));
+#else
+		return (ENOIOCTL);
+#endif
 #else
 		return (ENOIOCTL);
 #endif
@@ -1135,13 +1218,17 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 }
 
 int
-ttypoll(dev_t dev, int events, struct thread *td)
+ttypoll(struct cdev *dev, int events, struct thread *td)
 {
 	int s;
 	int revents = 0;
 	struct tty *tp;
 
+	KASSERT(devsw(dev)->d_flags & D_TTY,
+	    ("ttypoll() called on non D_TTY device (%s)", devtoname(dev)));
 	tp = dev->si_tty;
+	KASSERT(tp != NULL,
+	    ("ttypoll(): no tty pointer on device (%s)", devtoname(dev)));
 	if (tp == NULL)	/* XXX used to return ENXIO, but that means true! */
 		return ((events & (POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM))
 			| POLLHUP);
@@ -1171,12 +1258,17 @@ static struct filterops ttywrite_filtops =
 	{ 1, NULL, filt_ttywdetach, filt_ttywrite };
 
 int
-ttykqfilter(dev_t dev, struct knote *kn)
+ttykqfilter(struct cdev *dev, struct knote *kn)
 {
-	struct tty *tp = dev->si_tty;
-	struct klist *klist;
+	struct tty *tp;
+	struct knlist *klist;
 	int s;
 
+	KASSERT(devsw(dev)->d_flags & D_TTY,
+	    ("ttykqfilter() called on non D_TTY device (%s)", devtoname(dev)));
+	tp = dev->si_tty;
+	KASSERT(tp != NULL,
+	    ("ttykqfilter(): no tty pointer on device (%s)", devtoname(dev)));
 	switch (kn->kn_filter) {
 	case EVFILT_READ:
 		klist = &tp->t_rsel.si_note;
@@ -1187,13 +1279,13 @@ ttykqfilter(dev_t dev, struct knote *kn)
 		kn->kn_fop = &ttywrite_filtops;
 		break;
 	default:
-		return (1);
+		return (EINVAL);
 	}
 
 	kn->kn_hook = (caddr_t)dev;
 
 	s = spltty();
-	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	knlist_add(klist, kn, 0);
 	splx(s);
 
 	return (0);
@@ -1202,17 +1294,17 @@ ttykqfilter(dev_t dev, struct knote *kn)
 static void
 filt_ttyrdetach(struct knote *kn)
 {
-	struct tty *tp = ((dev_t)kn->kn_hook)->si_tty;
+	struct tty *tp = ((struct cdev *)kn->kn_hook)->si_tty;
 	int s = spltty();
 
-	SLIST_REMOVE(&tp->t_rsel.si_note, kn, knote, kn_selnext);
+	knlist_remove(&tp->t_rsel.si_note, kn, 0);
 	splx(s);
 }
 
 static int
 filt_ttyread(struct knote *kn, long hint)
 {
-	struct tty *tp = ((dev_t)kn->kn_hook)->si_tty;
+	struct tty *tp = ((struct cdev *)kn->kn_hook)->si_tty;
 
 	kn->kn_data = ttnread(tp);
 	if (ISSET(tp->t_state, TS_ZOMBIE)) {
@@ -1225,17 +1317,17 @@ filt_ttyread(struct knote *kn, long hint)
 static void
 filt_ttywdetach(struct knote *kn)
 {
-	struct tty *tp = ((dev_t)kn->kn_hook)->si_tty;
+	struct tty *tp = ((struct cdev *)kn->kn_hook)->si_tty;
 	int s = spltty();
 
-	SLIST_REMOVE(&tp->t_wsel.si_note, kn, knote, kn_selnext);
+	knlist_remove(&tp->t_wsel.si_note, kn, 0);
 	splx(s);
 }
 
 static int
 filt_ttywrite(struct knote *kn, long hint)
 {
-	struct tty *tp = ((dev_t)kn->kn_hook)->si_tty;
+	struct tty *tp = ((struct cdev *)kn->kn_hook)->si_tty;
 
 	kn->kn_data = tp->t_outq.c_cc;
 	if (ISSET(tp->t_state, TS_ZOMBIE))
@@ -2275,7 +2367,7 @@ ttwakeup(struct tty *tp)
 	if (ISSET(tp->t_state, TS_ASYNC) && tp->t_sigio != NULL)
 		pgsigio(&tp->t_sigio, SIGIO, (tp->t_session != NULL));
 	wakeup(TSA_HUP_OR_INPUT(tp));
-	KNOTE(&tp->t_rsel.si_note, 0);
+	KNOTE_UNLOCKED(&tp->t_rsel.si_note, 0);
 }
 
 /*
@@ -2299,7 +2391,7 @@ ttwwakeup(struct tty *tp)
 		CLR(tp->t_state, TS_SO_OLOWAT);
 		wakeup(TSA_OLOWAT(tp));
 	}
-	KNOTE(&tp->t_wsel.si_note, 0);
+	KNOTE_UNLOCKED(&tp->t_wsel.si_note, 0);
 }
 
 /*
@@ -2385,87 +2477,103 @@ ttsetwater(struct tty *tp)
 void
 ttyinfo(struct tty *tp)
 {
-	struct proc *p, *pick;
 	struct timeval utime, stime;
-	const char *stmp, *sprefix;
-	long ltmp;
-	int tmp;
+	struct proc *p, *pick;
 	struct thread *td;
+	const char *stateprefix, *state;
+	long rss;
+	int load, pctcpu;
 
 	if (ttycheckoutq(tp,0) == 0)
 		return;
 
 	/* Print load average. */
-	tmp = (averunnable.ldavg[0] * 100 + FSCALE / 2) >> FSHIFT;
-	ttyprintf(tp, "load: %d.%02d ", tmp / 100, tmp % 100);
+	load = (averunnable.ldavg[0] * 100 + FSCALE / 2) >> FSHIFT;
+	ttyprintf(tp, "load: %d.%02d ", load / 100, load % 100);
 
-	if (tp->t_session == NULL)
+	/*
+	 * On return following a ttyprintf(), we set tp->t_rocount to 0 so
+	 * that pending input will be retyped on BS.
+	 */
+	if (tp->t_session == NULL) {
 		ttyprintf(tp, "not a controlling terminal\n");
-	else if (tp->t_pgrp == NULL)
-		ttyprintf(tp, "no foreground process group\n");
-	else {
-		PGRP_LOCK(tp->t_pgrp);
-		if ((p = LIST_FIRST(&tp->t_pgrp->pg_members)) == 0) {
-			PGRP_UNLOCK(tp->t_pgrp);
-			ttyprintf(tp, "empty foreground process group\n");
-		} else {
-			mtx_lock_spin(&sched_lock);
-
-			/* Pick interesting process. */
-			for (pick = NULL; p != 0; p = LIST_NEXT(p, p_pglist))
-				if (proc_compare(pick, p))
-					pick = p;
-			PGRP_UNLOCK(tp->t_pgrp);
-
-			td = FIRST_THREAD_IN_PROC(pick);
-			sprefix = "";
-			if (pick->p_flag & P_SA) {
-				stmp = "KSE" ;  /* XXXKSE */
-			} else {
-				if (td) {
-					if (TD_ON_RUNQ(td) ||
-					    (TD_IS_RUNNING(td))) {
-						stmp = "running";
-					} else if (TD_ON_LOCK(td)) {
-						stmp = td->td_lockname;
-						sprefix = "*";
-					} else if (td->td_wmesg) {
-						stmp = td->td_wmesg;
-					} else {
-						stmp = "iowait";
-					}
-				} else {
-					stmp = "threadless";
-					panic("ttyinfo: no thread!?");
-				}
-			}
-			calcru(pick, &utime, &stime, NULL);
-			if (pick->p_state == PRS_NEW ||
-			    pick->p_state == PRS_ZOMBIE) {
-				ltmp = 0;
-			} else {
-				ltmp = pgtok(
-				    vmspace_resident_count(pick->p_vmspace));
-			}
-			mtx_unlock_spin(&sched_lock);
-
-			ttyprintf(tp, " cmd: %s %d [%s%s] ", pick->p_comm,
-			    pick->p_pid, sprefix, stmp);
-
-			/* Print user time. */
-			ttyprintf(tp, "%ld.%02ldu ",
-			    utime.tv_sec, utime.tv_usec / 10000);
-
-			/* Print system time. */
-			ttyprintf(tp, "%ld.%02lds ",
-			    (long)stime.tv_sec, stime.tv_usec / 10000);
-
-			/* Print percentage cpu, resident set size. */
-			ttyprintf(tp, "%d%% %ldk\n", tmp / 100, ltmp);
-
-		}
+		tp->t_rocount = 0;
+		return;
 	}
-	tp->t_rocount = 0;	/* so pending input will be retyped if BS */
+	if (tp->t_pgrp == NULL) {
+		ttyprintf(tp, "no foreground process group\n");
+		tp->t_rocount = 0;
+		return;
+	}
+	PGRP_LOCK(tp->t_pgrp);
+	if ((p = LIST_FIRST(&tp->t_pgrp->pg_members)) == 0) {
+		PGRP_UNLOCK(tp->t_pgrp);
+		ttyprintf(tp, "empty foreground process group\n");
+		tp->t_rocount = 0;
+		return;
+	}
+
+	/*
+	 * Pick the most interesting process and copy some of its
+	 * state for printing later.  sched_lock must be held for
+	 * most parts of this.  Holding it throughout is simplest
+	 * and prevents even unimportant inconsistencies in the
+	 * copy of the state, but may increase interrupt latency
+	 * too much.
+	 */
+	mtx_lock_spin(&sched_lock);
+	for (pick = NULL; p != 0; p = LIST_NEXT(p, p_pglist))
+		if (proc_compare(pick, p))
+			pick = p;
+	PGRP_UNLOCK(tp->t_pgrp);
+
+	td = FIRST_THREAD_IN_PROC(pick);	/* XXXKSE */
+#if 0
+	KASSERT(td != NULL, ("ttyinfo: no thread"));
+#else
+	if (td == NULL) {
+		mtx_unlock_spin(&sched_lock);
+		ttyprintf(tp, "foreground process without thread\n");
+		tp->t_rocount = 0;
+		return;
+	}
+#endif
+	stateprefix = "";
+	if (TD_IS_RUNNING(td))
+		state = "running";
+	else if (TD_ON_RUNQ(td) || TD_CAN_RUN(td))
+		state = "runnable";
+	else if (TD_IS_SLEEPING(td)) {
+		/* XXX: If we're sleeping, are we ever not in a queue? */
+		if (TD_ON_SLEEPQ(td))
+			state = td->td_wmesg;
+		else
+			state = "sleeping without queue";
+	} else if (TD_ON_LOCK(td)) {
+		state = td->td_lockname;
+		stateprefix = "*";
+	} else if (TD_IS_SUSPENDED(td))
+		state = "suspended";
+	else if (TD_AWAITING_INTR(td))
+		state = "intrwait";
+	else
+		state = "unknown";
+	calcru(pick, &utime, &stime, NULL);
+	pctcpu = (sched_pctcpu(td) * 10000 + FSCALE / 2) >> FSHIFT;
+	if (pick->p_state == PRS_NEW || pick->p_state == PRS_ZOMBIE)
+		rss = 0;
+	else
+		rss = pgtok(vmspace_resident_count(pick->p_vmspace));
+	mtx_unlock_spin(&sched_lock);
+
+	/* Print command, pid, state, utime, stime, %cpu, and rss. */
+	ttyprintf(tp,
+	    " cmd: %s %d [%s%s] %ld.%02ldu %ld.%02lds %d%% %ldk\n",
+	    pick->p_comm, pick->p_pid, stateprefix, state,
+	    (long)utime.tv_sec, utime.tv_usec / 10000,
+	    (long)stime.tv_sec, stime.tv_usec / 10000,
+	    pctcpu / 100, rss);
+	tp->t_rocount = 0;
 }
 
 /*
@@ -2609,47 +2717,101 @@ ttysleep(struct tty *tp, void *chan, int pri, char *wmesg, int timo)
 }
 
 /*
+ * Gain a reference to a TTY
+ */
+int
+ttyref(struct tty *tp)
+{
+	int i;
+	
+	mtx_lock(&tp->t_mtx);
+	KASSERT(tp->t_refcnt > 0,
+	    ("ttyref(): tty refcnt is %d (%s)",
+	    tp->t_refcnt, tp->t_dev != NULL ? devtoname(tp->t_dev) : "??"));
+	i = ++tp->t_refcnt;
+	mtx_unlock(&tp->t_mtx);
+	return (i);
+}
+
+/*
+ * Drop a reference to a TTY.
+ * When reference count drops to zero, we free it.
+ */
+int
+ttyrel(struct tty *tp)
+{
+	int i;
+	
+	mtx_lock(&tty_list_mutex);
+	mtx_lock(&tp->t_mtx);
+	KASSERT(tp->t_refcnt > 0,
+	    ("ttyrel(): tty refcnt is %d (%s)",
+	    tp->t_refcnt, tp->t_dev != NULL ? devtoname(tp->t_dev) : "??"));
+	i = --tp->t_refcnt;
+	if (i != 0) {
+		mtx_unlock(&tp->t_mtx);
+		mtx_unlock(&tty_list_mutex);
+		return (i);
+	}
+	TAILQ_REMOVE(&tty_list, tp, t_list);
+	mtx_unlock(&tp->t_mtx);
+	mtx_unlock(&tty_list_mutex);
+	knlist_destroy(&tp->t_rsel.si_note);
+	knlist_destroy(&tp->t_wsel.si_note);
+	mtx_destroy(&tp->t_mtx);
+	free(tp, M_TTYS);
+	return (i);
+}
+
+/*
  * Allocate a tty struct.  Clists in the struct will be allocated by
- * ttyopen().
+ * tty_open().
  */
 struct tty *
 ttymalloc(struct tty *tp)
 {
+	static int once;
 
-	if (tp)
+	if (!once) {
+		mtx_init(&tty_list_mutex, "ttylist", NULL, MTX_DEF);
+		once++;
+	}
+
+	if (tp) {
+		/*
+		 * XXX: Either this argument should go away, or we should
+		 * XXX: require it and do a ttyrel(tp) here and allocate
+		 * XXX: a new tty.  For now do nothing.
+		 */
 		return(tp);
+	}
 	tp = malloc(sizeof *tp, M_TTYS, M_WAITOK | M_ZERO);
-	ttyregister(tp);
-	return (tp);
-}
-
-#if 0 /* XXX not yet usable: session leader holds a ref (see kern_exit.c). */
-/*
- * Free a tty struct.  Clists in the struct should have been freed by
- * ttyclose().
- */
-void
-ttyfree(struct tty *tp)
-{
-	free(tp, M_TTYS);
-}
-#endif /* 0 */
-
-void
-ttyregister(struct tty *tp)
-{
 	tp->t_timeout = -1;
-	SLIST_INSERT_HEAD(&tty_list, tp, t_list);
+	tp->t_dtr_wait = 3 * hz;
+	mtx_init(&tp->t_mtx, "tty", NULL, MTX_DEF);
+	tp->t_refcnt = 1;
+	mtx_lock(&tty_list_mutex);
+	TAILQ_INSERT_TAIL(&tty_list, tp, t_list);
+	mtx_unlock(&tty_list_mutex);
+	knlist_init(&tp->t_rsel.si_note, &tp->t_mtx);
+	knlist_init(&tp->t_wsel.si_note, &tp->t_mtx);
+	return (tp);
 }
 
 static int
 sysctl_kern_ttys(SYSCTL_HANDLER_ARGS)
 {
-	struct tty *tp;
+	struct tty *tp, *tp2;
 	struct xtty xt;
 	int error;
 
-	SLIST_FOREACH(tp, &tty_list, t_list) {
+	error = 0;
+	mtx_lock(&tty_list_mutex);
+	tp = TAILQ_FIRST(&tty_list);
+	if (tp != NULL)
+		ttyref(tp);
+	mtx_unlock(&tty_list_mutex);
+	while (tp != NULL) {
 		bzero(&xt, sizeof xt);
 		xt.xt_size = sizeof xt;
 #define XT_COPY(field) xt.xt_##field = tp->t_##field
@@ -2657,14 +2819,14 @@ sysctl_kern_ttys(SYSCTL_HANDLER_ARGS)
 		xt.xt_cancc = tp->t_canq.c_cc;
 		xt.xt_outcc = tp->t_outq.c_cc;
 		XT_COPY(line);
-		if (tp->t_dev)
+		if (tp->t_dev != NULL)
 			xt.xt_dev = dev2udev(tp->t_dev);
 		XT_COPY(state);
 		XT_COPY(flags);
 		XT_COPY(timeout);
-		if (tp->t_pgrp)
+		if (tp->t_pgrp != NULL)
 			xt.xt_pgid = tp->t_pgrp->pg_id;
-		if (tp->t_session)
+		if (tp->t_session != NULL)
 			xt.xt_sid = tp->t_session->s_sid;
 		XT_COPY(termios);
 		XT_COPY(winsize);
@@ -2680,8 +2842,17 @@ sysctl_kern_ttys(SYSCTL_HANDLER_ARGS)
 		XT_COPY(ospeedwat);
 #undef XT_COPY
 		error = SYSCTL_OUT(req, &xt, sizeof xt);
-		if (error)
+		if (error != 0) {
+			ttyrel(tp);
 			return (error);
+		}
+		mtx_lock(&tty_list_mutex);
+		tp2 = TAILQ_NEXT(tp, t_list);
+		if (tp2 != NULL)
+			ttyref(tp2);
+		mtx_unlock(&tty_list_mutex);
+		ttyrel(tp);
+		tp = tp2;
 	}
 	return (0);
 }
@@ -2701,23 +2872,133 @@ nottystop(struct tty *tp, int rw)
 }
 
 int
-ttyread(dev_t dev, struct uio *uio, int flag)
+ttyread(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct tty *tp;
 
+	KASSERT(devsw(dev)->d_flags & D_TTY,
+	    ("ttyread() called on non D_TTY device (%s)", devtoname(dev)));
 	tp = dev->si_tty;
+	KASSERT(tp != NULL,
+	    ("ttyread(): no tty pointer on device (%s)", devtoname(dev)));
 	if (tp == NULL)
 		return (ENODEV);
-	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
+	return (ttyld_read(tp, uio, flag));
 }
 
 int
-ttywrite(dev_t dev, struct uio *uio, int flag)
+ttywrite(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct tty *tp;
 
+	KASSERT(devsw(dev)->d_flags & D_TTY,
+	    ("ttywrite() called on non D_TTY device (%s)", devtoname(dev)));
 	tp = dev->si_tty;
+	KASSERT(tp != NULL,
+	    ("ttywrite(): no tty pointer on device (%s)", devtoname(dev)));
 	if (tp == NULL)
 		return (ENODEV);
-	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
+	return (ttyld_write(tp, uio, flag));
 }
+
+int
+ttyioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+{
+	struct	tty *tp;
+	int	error;
+
+	tp = dev->si_tty;
+	error = ttyld_ioctl(tp, cmd, data, flag, td);
+	if (error == ENOIOCTL)
+		error = ttioctl(tp, cmd, data, flag);
+	ttyldoptim(tp);
+	if (error != ENOIOCTL)
+		return (error);
+	return (ENOTTY);
+}
+
+void
+ttyldoptim(struct tty *tp)
+{
+	struct termios	*t;
+
+	t = &tp->t_termios;
+	if (!(t->c_iflag & (ICRNL | IGNCR | IMAXBEL | INLCR | ISTRIP | IXON))
+	    && (!(t->c_iflag & BRKINT) || (t->c_iflag & IGNBRK))
+	    && (!(t->c_iflag & PARMRK)
+		|| (t->c_iflag & (IGNPAR | IGNBRK)) == (IGNPAR | IGNBRK))
+	    && !(t->c_lflag & (ECHO | ICANON | IEXTEN | ISIG | PENDIN))
+	    && linesw[tp->t_line]->l_rint == ttyinput)
+		tp->t_state |= TS_CAN_BYPASS_L_RINT;
+	else
+		tp->t_state &= ~TS_CAN_BYPASS_L_RINT;
+}
+
+static void
+ttydtrwaitwakeup(void *arg)
+{
+	struct tty *tp;
+
+	tp = arg;
+	tp->t_state &= ~TS_DTR_WAIT;
+	wakeup(&tp->t_dtr_wait);
+}
+
+
+void	
+ttydtrwaitstart(struct tty *tp)
+{
+
+	if (tp->t_dtr_wait == 0)
+		return;
+	if (tp->t_state & TS_DTR_WAIT)
+		return;
+	timeout(ttydtrwaitwakeup, tp, tp->t_dtr_wait);
+	tp->t_state |= TS_DTR_WAIT;
+}
+
+int
+ttydtrwaitsleep(struct tty *tp)
+{
+	int error;
+
+	error = 0;
+	while (error == 0) {
+		if (tp->t_state & TS_GONE)
+			error = ENXIO;
+		else if (!(tp->t_state & TS_DTR_WAIT))
+			break;
+		else
+			error = tsleep(&tp->t_dtr_wait, TTIPRI | PCATCH,
+			    "dtrwait", 0);
+	}
+	return (error);
+}
+
+/*
+ * This function is called when the hardware disappears.  We set a flag
+ * and wake up stuff so all sleeping threads will notice.
+ */
+void	
+ttygone(struct tty *tp)
+{
+
+	tp->t_state |= TS_GONE;
+	wakeup(&tp->t_dtr_wait);
+}
+
+/*
+ * Record the relationship between the serial ports notion of modem control
+ * signals and the one used in certain ioctls in a way the compiler can enforce
+ * XXX: We should define TIOCM_* in terms of SER_ if we can limit the
+ * XXX: consequences of the #include work that would take.
+ */
+CTASSERT(SER_DTR == TIOCM_DTR / 2);
+CTASSERT(SER_RTS == TIOCM_RTS / 2);
+CTASSERT(SER_STX == TIOCM_ST / 2);
+CTASSERT(SER_SRX == TIOCM_SR / 2);
+CTASSERT(SER_CTS == TIOCM_CTS / 2);
+CTASSERT(SER_DCD == TIOCM_DCD / 2);
+CTASSERT(SER_RI == TIOCM_RI / 2);
+CTASSERT(SER_DSR == TIOCM_DSR / 2);
+

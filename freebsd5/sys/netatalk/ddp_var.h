@@ -2,7 +2,7 @@
  * Copyright (c) 1990,1994 Regents of The University of Michigan.
  * All Rights Reserved.  See COPYRIGHT.
  *
- * $FreeBSD: src/sys/netatalk/ddp_var.h,v 1.4 1999/12/29 04:45:58 peter Exp $
+ * $FreeBSD: src/sys/netatalk/ddp_var.h,v 1.7 2004/07/12 18:39:59 rwatson Exp $
  */
 
 #ifndef _NETATALK_DDP_VAR_H_
@@ -13,6 +13,7 @@ struct ddpcb {
     struct socket	*ddp_socket;
     struct ddpcb	*ddp_prev, *ddp_next;
     struct ddpcb	*ddp_pprev, *ddp_pnext;
+    struct mtx		 ddp_mtx;
 };
 
 #define sotoddpcb(so)	((struct ddpcb *)(so)->so_pcb)
@@ -32,8 +33,8 @@ struct ddpstat {
 
 #ifdef _KERNEL
 extern int	ddp_cksum;
-extern struct ddpcb		*ddp_ports[ ];
-extern struct ddpcb		*ddpcb;
+extern struct ddpcb		*ddpcb_list;
 extern struct pr_usrreqs	ddp_usrreqs;
+extern struct mtx		 ddp_list_mtx;
 #endif
 #endif /* _NETATALK_DDP_VAR_H_ */

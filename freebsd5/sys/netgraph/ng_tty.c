@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tty.c,v 1.25 2003/02/19 05:47:32 imp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tty.c,v 1.29.2.1 2004/09/03 03:12:57 rwatson Exp $
  * $Whistle: ng_tty.c,v 1.21 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -74,6 +74,8 @@
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_tty.h>
+
+NET_NEEDS_GIANT("ng_tty");
 
 /* Misc defs */
 #define MAX_MBUFQ		3	/* Max number of queued mbufs */
@@ -115,7 +117,7 @@ typedef struct ngt_sc *sc_p;
 #endif
 
 /* Line discipline methods */
-static int	ngt_open(dev_t dev, struct tty *tp);
+static int	ngt_open(struct cdev *dev, struct tty *tp);
 static int	ngt_close(struct tty *tp, int flag);
 static int	ngt_read(struct tty *tp, struct uio *uio, int flag);
 static int	ngt_write(struct tty *tp, struct uio *uio, int flag);
@@ -148,30 +150,35 @@ static struct linesw ngt_disc = {
 	ngt_tioctl,
 	ngt_input,
 	ngt_start,
-	ttymodem,
-	NG_TTY_DFL_HOTCHAR	/* XXX can't change this in serial driver */
+	ttymodem
 };
 
 /* Netgraph node type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_TTY_NODE_TYPE,
-	ngt_mod_event,
-	ngt_constructor,
-	ngt_rcvmsg,
-	ngt_shutdown,
-	ngt_newhook,
-	NULL,
-	ngt_connect,
-	ngt_rcvdata,
-	ngt_disconnect,
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_TTY_NODE_TYPE,
+	.mod_event =	ngt_mod_event,
+	.constructor =	ngt_constructor,
+	.rcvmsg =	ngt_rcvmsg,
+	.shutdown =	ngt_shutdown,
+	.newhook =	ngt_newhook,
+	.connect =	ngt_connect,
+	.rcvdata =	ngt_rcvdata,
+	.disconnect =	ngt_disconnect,
 };
 NETGRAPH_INIT(tty, &typestruct);
 
+/*
+ * XXXRW: ngt_unit is protected by ng_tty_mtx.  ngt_ldisc is constant once
+ * ng_tty is initialized.  ngt_nodeop_ok is untouched, and might want to be a
+ * sleep lock in the future?
+ */
 static int ngt_unit;
 static int ngt_nodeop_ok;	/* OK to create/remove node */
 static int ngt_ldisc;
+
+static struct mtx	ng_tty_mtx;
+MTX_SYSINIT(ng_tty, &ng_tty_mtx, "ng_tty", MTX_DEF);
 
 /******************************************************************
 		    LINE DISCIPLINE METHODS
@@ -182,7 +189,7 @@ static int ngt_ldisc;
  * Called from device open routine or ttioctl() at >= splsofttty()
  */
 static int
-ngt_open(dev_t dev, struct tty *tp)
+ngt_open(struct cdev *dev, struct tty *tp)
 {
 	struct thread *const td = curthread;	/* XXX */
 	char name[sizeof(NG_TTY_NODE_TYPE) + 8];
@@ -195,12 +202,7 @@ ngt_open(dev_t dev, struct tty *tp)
 	s = splnet();
 	(void) spltty();	/* XXX is this necessary? */
 
-	/* Already installed? */
-	if (tp->t_line == NETGRAPHDISC) {
-		sc = (sc_p) tp->t_sc;
-		if (sc != NULL && sc->tp == tp)
-			goto done;
-	}
+	tp->t_hotchar = NG_TTY_DFL_HOTCHAR;
 
 	/* Initialize private struct */
 	MALLOC(sc, sc_p, sizeof(*sc), M_NETGRAPH, M_WAITOK | M_ZERO);
@@ -222,7 +224,9 @@ ngt_open(dev_t dev, struct tty *tp)
 		FREE(sc, M_NETGRAPH);
 		goto done;
 	}
+	mtx_lock(&ng_tty_mtx);
 	snprintf(name, sizeof(name), "%s%d", typestruct.name, ngt_unit++);
+	mtx_unlock(&ng_tty_mtx);
 
 	/* Assign node its name */
 	if ((error = ng_name_node(sc->node, name))) {
@@ -267,7 +271,6 @@ ngt_close(struct tty *tp, int flag)
 	s = spltty();
 	ttyflush(tp, FREAD | FWRITE);
 	clist_free_cblocks(&tp->t_outq);
-	tp->t_line = 0;
 	if (sc != NULL) {
 		if (sc->flags & FLG_TIMEOUT) {
 			untimeout(ngt_timeout, sc, sc->chand);

@@ -49,11 +49,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/spic.c,v 1.10 2003/11/09 09:17:23 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/spic.c,v 1.15 2004/06/16 09:47:08 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
@@ -85,13 +86,14 @@ static d_ioctl_t	spicioctl;
 static d_poll_t		spicpoll;
 
 static struct cdevsw spic_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	spicopen,
 	.d_close =	spicclose,
 	.d_read =	spicread,
 	.d_ioctl =	spicioctl,
 	.d_poll =	spicpoll,
 	.d_name =	"spic",
-	.d_maj =	CDEV_MAJOR,
 };
 
 #define SCBUFLEN 128
@@ -239,8 +241,8 @@ spic_probe(device_t dev)
 	sc->sc_port_addr = (u_short)rman_get_start(sc->sc_port_res);
 
 #ifdef notyet
-	if (!(sc->sc_intr_res = bus_alloc_resource(dev, SYS_RES_IRQ,
-		&sc->sc_intr_rid, 0, ~0, 1, RF_ACTIVE))) {
+	if (!(sc->sc_intr_res = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+		&sc->sc_intr_rid, RF_ACTIVE))) {
 		device_printf(dev,"Couldn't map IRQ\n");
 		bus_release_resource(dev, SYS_RES_IOPORT,
 			sc->sc_port_rid, sc->sc_port_res);
@@ -441,7 +443,7 @@ spictimeout(void *arg)
 }
 
 static int
-spicopen(dev_t dev, int flag, int fmt, struct thread *td)
+spicopen(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct spic_softc *sc;
 
@@ -459,7 +461,7 @@ spicopen(dev_t dev, int flag, int fmt, struct thread *td)
 }
 
 static int
-spicclose(dev_t dev, int flag, int fmt, struct thread *td)
+spicclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct spic_softc *sc;
 
@@ -472,7 +474,7 @@ spicclose(dev_t dev, int flag, int fmt, struct thread *td)
 }
 
 static int
-spicread(dev_t dev, struct uio *uio, int flag)
+spicread(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct spic_softc *sc;
 	int l, s, error;
@@ -506,7 +508,7 @@ spicread(dev_t dev, struct uio *uio, int flag)
 }
 
 static int
-spicioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+spicioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
 	struct spic_softc *sc;
 
@@ -516,7 +518,7 @@ spicioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 }
 
 static int
-spicpoll(dev_t dev, int events, struct thread *td)
+spicpoll(struct cdev *dev, int events, struct thread *td)
 {
 	struct spic_softc *sc;
 	int revents = 0, s;

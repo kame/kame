@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)swap_pager.h	7.1 (Berkeley) 12/5/90
- * $FreeBSD: src/sys/vm/swap_pager.h,v 1.48 2003/08/06 12:08:27 phk Exp $
+ * $FreeBSD: src/sys/vm/swap_pager.h,v 1.49 2004/04/06 20:15:36 imp Exp $
  */
 
 #ifndef	_VM_SWAP_PAGER_H_

@@ -18,17 +18,14 @@
  * 5. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/sys/pipe.h,v 1.25 2003/11/12 03:14:31 rwatson Exp $
+ * $FreeBSD: src/sys/sys/pipe.h,v 1.28 2004/07/21 03:11:41 silby Exp $
  */
 
 #ifndef _SYS_PIPE_H_
 #define _SYS_PIPE_H_
 
 #ifndef _KERNEL
-#include <sys/time.h>			/* for struct timespec */
-#include <sys/selinfo.h>		/* for struct selinfo */
-#include <vm/vm.h>			/* for vm_page_t */
-#include <machine/param.h>		/* for PAGE_SIZE */
+#error "no user-servicable parts inside"
 #endif
 
 /*
@@ -60,7 +57,6 @@
  * See sys_pipe.c for info on what these limits mean. 
  */
 extern int	maxpipekva;
-extern int	maxpipekvawired;
 
 /*
  * Pipe buffer information.
@@ -79,7 +75,6 @@ struct pipebuf {
  * Information to support direct transfers between processes for pipes.
  */
 struct pipemapping {
-	vm_offset_t	kva;		/* kernel virtual address */
 	vm_size_t	cnt;		/* number of chars in buffer */
 	vm_size_t	pos;		/* current position of transfer */
 	int		npages;		/* number of pages */
@@ -113,13 +108,24 @@ struct pipe {
 	struct	timespec pipe_ctime;	/* time of status change */
 	struct	sigio *pipe_sigio;	/* information for async I/O */
 	struct	pipe *pipe_peer;	/* link with other direction */
+	struct	pipepair *pipe_pair;	/* container structure pointer */
 	u_int	pipe_state;		/* pipe status info */
 	int	pipe_busy;		/* busy flag, mostly to handle rundown sanely */
-	struct	label *pipe_label;	/* pipe MAC label - shared */
-	struct	mtx *pipe_mtxp;		/* shared mutex between both pipes */
+	int	pipe_present;		/* still present? */
 };
 
-#define PIPE_MTX(pipe)		(pipe)->pipe_mtxp
+/*
+ * Container structure to hold the two pipe endpoints, mutex, and label
+ * pointer.
+ */
+struct pipepair {
+	struct pipe	pp_rpipe;
+	struct pipe	pp_wpipe;
+	struct mtx	pp_mtx;
+	struct label	*pp_label;
+};
+
+#define PIPE_MTX(pipe)		(&(pipe)->pipe_pair->pp_mtx)
 #define PIPE_LOCK(pipe)		mtx_lock(PIPE_MTX(pipe))
 #define PIPE_UNLOCK(pipe)	mtx_unlock(PIPE_MTX(pipe))
 #define PIPE_LOCK_ASSERT(pipe, type)  mtx_assert(PIPE_MTX(pipe), (type))

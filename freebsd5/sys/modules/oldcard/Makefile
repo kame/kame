@@ -1,11 +1,11 @@
-# $FreeBSD: src/sys/modules/oldcard/Makefile,v 1.10 2002/11/06 13:46:59 nyan Exp $
+# $FreeBSD: src/sys/modules/oldcard/Makefile,v 1.11 2004/05/26 00:53:06 imp Exp $
 
 .PATH: ${.CURDIR}/../../pccard ${.CURDIR}/../../pci
 
 KMOD=	oldcard
 SRCS=	pccard.c pcic.c pccard_beep.c pccard_nbk.c pcic_pci.c pcic_isa.c \
 	opt_pcic.h device_if.h bus_if.h isa_if.h pci_if.h \
-	power_if.h card_if.h 
+	power_if.h card_if.h pccarddevs.h
 
 EXPORT_SYMS=	YES	# XXX evaluate
 

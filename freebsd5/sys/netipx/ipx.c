@@ -35,9 +35,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx.c,v 1.26 2003/06/11 05:25:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx.c,v 1.26.4.1 2004/09/03 03:12:58 rwatson Exp $");
 
 #include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/sockio.h>
@@ -50,6 +51,11 @@ __FBSDID("$FreeBSD: src/sys/netipx/ipx.c,v 1.26 2003/06/11 05:25:14 obrien Exp $
 #include <netipx/ipx_if.h>
 #include <netipx/ipx_var.h>
 
+NET_NEEDS_GIANT("ipx");
+
+/*
+ * XXXRW: Requires synchronization.
+ */
 struct ipx_ifaddr *ipx_ifaddr;
 
 static	void ipx_ifscrub(struct ifnet *ifp, struct ipx_ifaddr *ia);

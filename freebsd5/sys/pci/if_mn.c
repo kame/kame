@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_mn.c,v 1.40 2003/09/02 17:30:40 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_mn.c,v 1.44 2004/06/21 21:57:31 phk Exp $");
 
 /*
  * Stuff to describe the MUNIC32X and FALC54 chips.
@@ -189,18 +189,15 @@ static	ng_rcvdata_t ngmn_rcvdata;
 static	ng_disconnect_t ngmn_disconnect;
 
 static struct ng_type mntypestruct = {
-	NG_ABI_VERSION,
-	NG_MN_NODE_TYPE,
-	NULL, 
-	ngmn_constructor,
-	ngmn_rcvmsg,
-	ngmn_shutdown,
-	ngmn_newhook,
-	NULL,
-	ngmn_connect,
-	ngmn_rcvdata,
-	ngmn_disconnect,
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_MN_NODE_TYPE,
+	.constructor =	ngmn_constructor,
+	.rcvmsg =	ngmn_rcvmsg,
+	.shutdown =	ngmn_shutdown,
+	.newhook =	ngmn_newhook,
+	.connect =	ngmn_connect,
+	.rcvdata =	ngmn_rcvdata,
+	.disconnect =	ngmn_disconnect,
 };
 
 static MALLOC_DEFINE(M_MN, "mn", "Mx driver related");
@@ -260,7 +257,7 @@ struct mn_softc {
 	char		name[8];
 	u_int32_t	falc_irq, falc_state, framer_state;
 	struct schan *ch[M32_CHAN];
-	char	nodename[NG_NODELEN + 1];
+	char	nodename[NG_NODESIZ];
 	node_p	node;
 
 	u_long		cnt_fec;
@@ -371,7 +368,7 @@ ngmn_rcvmsg(node_p node, item_p item, hook_p lasthook)
 		ngmn_config(node, s, r);
 		resp->header.arglen = strlen(r) + 1;
 		NG_RESPOND_MSG(i, node, item, resp);
-		FREE(msg, M_NETGRAPH);
+		NG_FREE_MSG(msg);
 		return (0);
 	}
 	pos = 0;
@@ -1350,8 +1347,7 @@ mn_attach (device_t self)
 	sprintf(sc->name, "mn%d", sc->unit);
 
         rid = PCIR_BAR(0);
-        res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
-            0, ~0, 1, RF_ACTIVE);
+        res = bus_alloc_resource_any(self, SYS_RES_MEMORY, &rid, RF_ACTIVE);
         if (res == NULL) {
                 device_printf(self, "Could not map memory\n");
 		free(sc, M_MN);
@@ -1361,8 +1357,7 @@ mn_attach (device_t self)
         sc->m0p = rman_get_start(res);
 
         rid = PCIR_BAR(1);
-        res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
-            0, ~0, 1, RF_ACTIVE);
+        res = bus_alloc_resource_any(self, SYS_RES_MEMORY, &rid, RF_ACTIVE);
         if (res == NULL) {
                 device_printf(self, "Could not map memory\n");
 		free(sc, M_MN);
@@ -1373,8 +1368,8 @@ mn_attach (device_t self)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->irq = bus_alloc_resource(self, SYS_RES_IRQ, &rid, 0, ~0,
-	    1, RF_SHAREABLE | RF_ACTIVE);
+	sc->irq = bus_alloc_resource_any(self, SYS_RES_IRQ, &rid,
+	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->irq == NULL) {
 		printf("couldn't map interrupt\n");

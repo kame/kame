@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_node.h	8.6 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_node.h,v 1.24 2003/06/24 22:11:20 jmg Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_node.h,v 1.27 2004/06/17 17:16:48 phk Exp $
  */
 
 /*
@@ -56,7 +52,7 @@ typedef	struct	{
 	uid_t		iso_uid;	/* owner user id */
 	gid_t		iso_gid;	/* owner group id */
 	short		iso_links;	/* links of file */
-	udev_t		iso_rdev;	/* Major/Minor number for special */
+	dev_t		iso_rdev;	/* Major/Minor number for special */
 } ISO_RRIP_INODE;
 
 
@@ -117,7 +113,7 @@ void cd9660_defattr(struct iso_directory_record *,
 			struct iso_node *, struct buf *, enum ISO_FTYPE);
 void cd9660_deftstamp(struct iso_directory_record *,
 			struct iso_node *, struct buf *, enum ISO_FTYPE);
-int cd9660_ihashget(dev_t, ino_t, int, struct vnode **);
+int cd9660_ihashget(struct cdev *, ino_t, int, struct vnode **);
 void cd9660_ihashins(struct iso_node *);
 int cd9660_tstamp_conv7(u_char *, struct timespec *, enum ISO_FTYPE);
 int cd9660_tstamp_conv17(u_char *, struct timespec *);

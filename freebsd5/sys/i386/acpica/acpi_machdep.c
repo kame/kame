@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_machdep.c,v 1.15 2003/11/01 00:18:29 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_machdep.c,v 1.25 2004/07/24 22:41:30 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -34,37 +34,29 @@ __FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_machdep.c,v 1.15 2003/11/01 00:18:2
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 #include <sys/uio.h>
+#include <vm/vm.h>
+#include <vm/pmap.h>
 
 #include "acpi.h"
-
 #include <dev/acpica/acpivar.h>
 #include <dev/acpica/acpiio.h>
-
-static device_t	acpi_dev;
 
 /*
  * APM driver emulation 
  */
 
-#if __FreeBSD_version < 500000
-#include <sys/select.h>
-#else
 #include <sys/selinfo.h>
-#endif
 
 #include <machine/apm_bios.h>
 #include <machine/pc/bios.h>
 
-#if __FreeBSD_version < 500000
-#include <i386/apm/apm.h>
-#else
 #include <i386/bios/apm.h>
-#endif
 
-u_int32_t acpi_reset_video = 1;
+uint32_t acpi_reset_video = 1;
 TUNABLE_INT("hw.acpi.reset_video", &acpi_reset_video);
 
-static struct apm_softc	apm_softc;
+static int intr_model = ACPI_INTR_PIC;
+static int apm_active;
 
 static d_open_t apmopen;
 static d_close_t apmclose;
@@ -72,25 +64,23 @@ static d_write_t apmwrite;
 static d_ioctl_t apmioctl;
 static d_poll_t apmpoll;
 
-#define CDEV_MAJOR 39
 static struct cdevsw apm_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	apmopen,
 	.d_close =	apmclose,
 	.d_write =	apmwrite,
 	.d_ioctl =	apmioctl,
 	.d_poll =	apmpoll,
 	.d_name =	"apm",
-	.d_maj =	CDEV_MAJOR,
 };
-
-static int intr_model = ACPI_INTR_PIC;
 
 static int
 acpi_capm_convert_battstate(struct  acpi_battinfo *battp)
 {
 	int	state;
 
-	state = 0xff;	/* XXX unknown */
+	state = APM_UNKNOWN;
 
 	if (battp->state & ACPI_BATT_STAT_DISCHARG) {
 		if (battp->cap >= 50)
@@ -104,12 +94,11 @@ acpi_capm_convert_battstate(struct  acpi_battinfo *battp)
 		state = 3;		/* charging */
 
 	/* If still unknown, determine it based on the battery capacity. */
-	if (state == 0xff) {
-		if (battp->cap >= 50) {
+	if (state == APM_UNKNOWN) {
+		if (battp->cap >= 50)
 			state = 0;	/* high */
-		} else {
+		else
 			state = 1;	/* low */
-		}
 	}
 
 	return (state);
@@ -122,9 +111,9 @@ acpi_capm_convert_battflags(struct  acpi_battinfo *battp)
 
 	flags = 0;
 
-	if (battp->cap >= 50) {
+	if (battp->cap >= 50)
 		flags |= APM_BATT_HIGH;
-	} else {
+	else {
 		if (battp->state & ACPI_BATT_STAT_CRITICAL)
 			flags |= APM_BATT_CRITICAL;
 		else
@@ -147,19 +136,19 @@ acpi_capm_get_info(apm_info_t aip)
 	aip->ai_infoversion = 1;
 	aip->ai_major       = 1;
 	aip->ai_minor       = 2;
-	aip->ai_status      = apm_softc.active;
-	aip->ai_capabilities= 0xff00;	/* XXX unknown */
+	aip->ai_status      = apm_active;
+	aip->ai_capabilities= 0xff00;	/* unknown */
 
 	if (acpi_acad_get_acline(&acline))
-		aip->ai_acline = 0xff;		/* unknown */
+		aip->ai_acline = APM_UNKNOWN;	/* unknown */
 	else
 		aip->ai_acline = acline;	/* on/off */
 
 	if (acpi_battery_get_battinfo(-1, &batt)) {
-		aip->ai_batt_stat = 0xff;	/* unknown */
-		aip->ai_batt_life = 0xff;	/* unknown */
-		aip->ai_batt_time = -1;		/* unknown */
-		aip->ai_batteries = 0;
+		aip->ai_batt_stat = APM_UNKNOWN;
+		aip->ai_batt_life = APM_UNKNOWN;
+		aip->ai_batt_time = -1;		 /* unknown */
+		aip->ai_batteries = ~0U;	 /* unknown */
 	} else {
 		aip->ai_batt_stat = acpi_capm_convert_battstate(&batt);
 		aip->ai_batt_life = batt.cap;
@@ -178,9 +167,8 @@ acpi_capm_get_pwstatus(apm_pwstatus_t app)
 	struct	acpi_battinfo batt;
 
 	if (app->ap_device != PMDV_ALLDEV &&
-	    (app->ap_device < PMDV_BATT0 || app->ap_device > PMDV_BATT_ALL)) {
+	    (app->ap_device < PMDV_BATT0 || app->ap_device > PMDV_BATT_ALL))
 		return (1);
-	}
 
 	if (app->ap_device == PMDV_ALLDEV)
 		batt_unit = -1;			/* all units */
@@ -196,7 +184,7 @@ acpi_capm_get_pwstatus(apm_pwstatus_t app)
 	app->ap_batt_time = (batt.min == -1) ? -1 : batt.min * 60;
 
 	if (acpi_acad_get_acline(&acline))
-		app->ap_acline = 0xff;		/* unknown */
+		app->ap_acline = APM_UNKNOWN;
 	else
 		app->ap_acline = acline;	/* on/off */
 
@@ -204,33 +192,32 @@ acpi_capm_get_pwstatus(apm_pwstatus_t app)
 }
 
 static int
-apmopen(dev_t dev, int flag, int fmt, d_thread_t *td)
+apmopen(struct cdev *dev, int flag, int fmt, d_thread_t *td)
 {
 	return (0);
 }
 
 static int
-apmclose(dev_t dev, int flag, int fmt, d_thread_t *td)
+apmclose(struct cdev *dev, int flag, int fmt, d_thread_t *td)
 {
 	return (0);
 }
 
 static int
-apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
+apmioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
 {
 	int	error = 0;
 	struct	acpi_softc *acpi_sc;
 	struct apm_info info;
 	apm_info_old_t aiop;
 
-	if ((acpi_sc = device_get_softc(acpi_dev)) == NULL)
-		return (ENXIO);
+	acpi_sc = devclass_get_softc(devclass_find("acpi"), 0);
 
 	switch (cmd) {
 	case APMIO_SUSPEND:
 		if ((flag & FWRITE) == 0)
 			return (EPERM);
-		if (apm_softc.active)
+		if (apm_active)
 			acpi_SetSleepState(acpi_sc, acpi_sc->acpi_suspend_sx);
 		else
 			error = EINVAL;
@@ -238,7 +225,7 @@ apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
 	case APMIO_STANDBY:
 		if ((flag & FWRITE) == 0)
 			return (EPERM);
-		if (apm_softc.active)
+		if (apm_active)
 			acpi_SetSleepState(acpi_sc, acpi_sc->acpi_standby_sx);
 		else
 			error = EINVAL;
@@ -265,12 +252,12 @@ apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
 	case APMIO_ENABLE:
 		if ((flag & FWRITE) == 0)
 			return (EPERM);
-		apm_softc.active = 1;
+		apm_active = 1;
 		break;
 	case APMIO_DISABLE:
 		if ((flag & FWRITE) == 0)
 			return (EPERM);
-		apm_softc.active = 0;
+		apm_active = 0;
 		break;
 	case APMIO_HALTCPU:
 		break;
@@ -294,13 +281,13 @@ apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
 }
 
 static int
-apmwrite(dev_t dev, struct uio *uio, int ioflag)
+apmwrite(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	return (uio->uio_resid);
 }
 
 static int
-apmpoll(dev_t dev, int events, d_thread_t *td)
+apmpoll(struct cdev *dev, int events, d_thread_t *td)
 {
 	return (0);
 }
@@ -316,21 +303,15 @@ acpi_machdep_init(device_t dev)
 {
 	struct	acpi_softc *sc;
 
-	acpi_dev = dev;
-	if ((sc = device_get_softc(acpi_dev)) == NULL)
-		return (ENXIO);
-
-	/*
-	 * XXX: Prevent the PnP BIOS code from interfering with
-	 * our own scan of ISA devices.
-	 */
-	PnPBIOStable = NULL;
-
+	sc = devclass_get_softc(devclass_find("acpi"), 0);
 	acpi_capm_init(sc);
 
 	acpi_install_wakeup_handler(sc);
 
-	if (intr_model != ACPI_INTR_PIC)
+	if (intr_model == ACPI_INTR_PIC)
+		BUS_CONFIG_INTR(dev, AcpiGbl_FADT->SciInt, INTR_TRIGGER_LEVEL,
+		    INTR_POLARITY_LOW);
+	else
 		acpi_SetIntrModel(intr_model);
 
 	SYSCTL_ADD_UINT(&sc->acpi_sysctl_ctx,
@@ -346,4 +327,26 @@ acpi_SetDefaultIntrModel(int model)
 {
 
 	intr_model = model;
+}
+
+/* Check BIOS date.  If 1998 or older, disable ACPI. */
+int
+acpi_machdep_quirks(int *quirks)
+{
+    char *va;
+    int year;
+
+    /* BIOS address 0xffff5 contains the date in the format mm/dd/yy. */
+    va = pmap_mapdev(0xffff0, 16);
+    sscanf(va + 11, "%2d", &year);
+    pmap_unmapdev((vm_offset_t)va, 16);
+
+    /* 
+     * Date must be >= 1/1/1999 or we don't trust ACPI.  Note that this
+     * check must be changed by my 114th birthday.
+     */
+    if (year > 90 && year < 99)
+	*quirks = ACPI_Q_BROKEN;
+
+    return (0);
 }

@@ -26,10 +26,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/pci/ofw_pcibus.c,v 1.2 2003/08/22 07:38:07 imp Exp $
+ * $FreeBSD: src/sys/sparc64/pci/ofw_pcibus.c,v 1.4 2004/08/15 21:37:52 marius Exp $
  */
 
 #include "opt_ofw_pci.h"
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -37,8 +38,9 @@
 #include <sys/module.h>
 #include <sys/pciio.h>
 
-#include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_pci.h>
+#include <dev/ofw/openfirm.h>
 
 #include <machine/bus.h>
 #include <machine/bus_common.h>
@@ -62,7 +64,11 @@ static void ofw_pcibus_setup_device(device_t, u_int, u_int, u_int);
 static device_probe_t ofw_pcibus_probe;
 static device_attach_t ofw_pcibus_attach;
 static pci_assign_interrupt_t ofw_pcibus_assign_interrupt;
-static ofw_pci_get_node_t ofw_pcibus_get_node;
+static ofw_bus_get_compat_t ofw_pcibus_get_compat;
+static ofw_bus_get_model_t ofw_pcibus_get_model;
+static ofw_bus_get_name_t ofw_pcibus_get_name;
+static ofw_bus_get_node_t ofw_pcibus_get_node;
+static ofw_bus_get_type_t ofw_pcibus_get_type;
 
 static device_method_t ofw_pcibus_methods[] = {
 	/* Device interface */
@@ -103,14 +109,22 @@ static device_method_t ofw_pcibus_methods[] = {
 	DEVMETHOD(pci_set_powerstate,	pci_set_powerstate_method),
 	DEVMETHOD(pci_assign_interrupt, ofw_pcibus_assign_interrupt),
 
-	/* OFW PCI interface */
-	DEVMETHOD(ofw_pci_get_node,	ofw_pcibus_get_node),
+	/* ofw_bus interface */
+	DEVMETHOD(ofw_bus_get_compat,	ofw_pcibus_get_compat),
+	DEVMETHOD(ofw_bus_get_model,	ofw_pcibus_get_model),
+	DEVMETHOD(ofw_bus_get_name,	ofw_pcibus_get_name),
+	DEVMETHOD(ofw_bus_get_node,	ofw_pcibus_get_node),
+	DEVMETHOD(ofw_bus_get_type,	ofw_pcibus_get_type),
 
 	{ 0, 0 }
 };
 
 struct ofw_pcibus_devinfo {
 	struct pci_devinfo	opd_dinfo;
+	char			*opd_compat;
+	char			*opd_model;
+	char			*opd_name;
+	char			*opd_type;
 	phandle_t		opd_node;
 };
 
@@ -132,7 +146,7 @@ static int
 ofw_pcibus_probe(device_t dev)
 {
 
-	if (ofw_pci_get_node(dev) == 0)
+	if (ofw_bus_get_node(dev) == 0)
 		return (ENXIO);
 	device_set_desc(dev, "OFW PCI bus");
 
@@ -165,7 +179,7 @@ ofw_pcibus_setup_device(device_t bridge, u_int busno, u_int slot, u_int func)
 			PCIR_LATTIMER, 1), lat);
 #endif /* OFW_PCI_DEBUG */
 		PCIB_WRITE_CONFIG(bridge, busno, slot, func,
-		    PCIR_LATTIMER, imin(lat, 255), 1);
+		    PCIR_LATTIMER, min(lat, 255), 1);
 	}
 
 	/*
@@ -173,7 +187,7 @@ ofw_pcibus_setup_device(device_t bridge, u_int busno, u_int slot, u_int func)
 	 * The role of the streaming cache is unclear in write invalidate
 	 * transfers, so it is made sure that it's line size is always reached.
 	 */
-	clnsz = imax(cache.ec_linesize, STRBUF_LINESZ);
+	clnsz = max(cache.ec_linesize, STRBUF_LINESZ);
 	KASSERT((clnsz / STRBUF_LINESZ) * STRBUF_LINESZ == clnsz &&
 	    (clnsz / cache.ec_linesize) * cache.ec_linesize == clnsz &&
 	    (clnsz / 4) * 4 == clnsz, ("bogus cache line size %d", clnsz));
@@ -205,7 +219,7 @@ ofw_pcibus_attach(device_t dev)
 	if (bootverbose)
 		device_printf(dev, "physical bus=%d\n", busno);
 
-	node = ofw_pci_get_node(dev);
+	node = ofw_bus_get_node(dev);
 	for (child = OF_child(node); child != 0; child = OF_peer(child)) {
 		if (OF_getprop(child, "reg", &pcir, sizeof(pcir)) == -1)
 			panic("ofw_pci_attach: OF_getprop failed");
@@ -216,6 +230,14 @@ ofw_pcibus_attach(device_t dev)
 		    busno, slot, func, sizeof(*dinfo));
 		if (dinfo != NULL) {
 			dinfo->opd_node = child;
+			OF_getprop_alloc(child, "compatible", 1,
+			    (void **)&dinfo->opd_compat);
+			OF_getprop_alloc(child, "device_type", 1,
+			    (void **)&dinfo->opd_type);
+			OF_getprop_alloc(child, "model", 1,
+			    (void **)&dinfo->opd_model);
+			OF_getprop_alloc(child, "name", 1,
+			    (void **)&dinfo->opd_name);
 			pci_add_child(dev, (struct pci_devinfo *)dinfo);
 		}
 	}
@@ -228,11 +250,10 @@ ofw_pcibus_assign_interrupt(device_t dev, device_t child)
 {
 	struct ofw_pcibus_devinfo *dinfo = device_get_ivars(child);
 	pcicfgregs *cfg = &dinfo->opd_dinfo.cfg;
-	phandle_t node = ofw_pci_get_node(child);
 	ofw_pci_intr_t intr;
 	int isz;
 
-	isz = OF_getprop(node, "interrupts", &intr, sizeof(intr));
+	isz = OF_getprop(dinfo->opd_node, "interrupts", &intr, sizeof(intr));
 	if (isz != sizeof(intr)) {
 		/* No property; our best guess is the intpin. */
 		intr = cfg->intpin;
@@ -255,10 +276,47 @@ ofw_pcibus_assign_interrupt(device_t dev, device_t child)
 	return (PCIB_ROUTE_INTERRUPT(device_get_parent(dev), child, intr));
 }
 
+static const char *
+ofw_pcibus_get_compat(device_t bus, device_t dev)
+{
+	struct ofw_pcibus_devinfo *dinfo;
+ 
+	dinfo = device_get_ivars(dev);
+	return (dinfo->opd_compat);
+}
+ 
+static const char *
+ofw_pcibus_get_model(device_t bus, device_t dev)
+{
+	struct ofw_pcibus_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->opd_model);
+}
+
+static const char *
+ofw_pcibus_get_name(device_t bus, device_t dev)
+{
+	struct ofw_pcibus_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->opd_name);
+}
+
 static phandle_t
 ofw_pcibus_get_node(device_t bus, device_t dev)
 {
-	struct ofw_pcibus_devinfo *dinfo = device_get_ivars(dev);
+	struct ofw_pcibus_devinfo *dinfo;
 
+	dinfo = device_get_ivars(dev);
 	return (dinfo->opd_node);
+}
+
+static const char *
+ofw_pcibus_get_type(device_t bus, device_t dev)
+{
+	struct ofw_pcibus_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->opd_type);
 }

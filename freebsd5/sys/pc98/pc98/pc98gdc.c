@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98gdc.c,v 1.39 2003/09/26 12:13:35 phk Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98gdc.c,v 1.43 2004/06/16 09:47:19 phk Exp $
  */
 
 #include "opt_gdc.h"
@@ -35,6 +35,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <machine/bus.h>
@@ -46,6 +47,7 @@
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm_param.h>
 
 #include <machine/md_var.h>
 #include <machine/pc/bios.h>
@@ -102,6 +104,8 @@ static d_ioctl_t	gdcioctl;
 static d_mmap_t		gdcmmap;
 
 static struct cdevsw gdc_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	gdcopen,
 	.d_close =	gdcclose,
 	.d_read =	gdcread,
@@ -342,7 +346,7 @@ gdc_release_resource(device_t dev)
 #ifdef FB_INSTALL_CDEV
 
 static int
-gdcopen(dev_t dev, int flag, int mode, struct thread *td)
+gdcopen(struct cdev *dev, int flag, int mode, struct thread *td)
 {
     gdc_softc_t *sc;
 
@@ -356,7 +360,7 @@ gdcopen(dev_t dev, int flag, int mode, struct thread *td)
 }
 
 static int
-gdcclose(dev_t dev, int flag, int mode, struct thread *td)
+gdcclose(struct cdev *dev, int flag, int mode, struct thread *td)
 {
     gdc_softc_t *sc;
 
@@ -365,7 +369,7 @@ gdcclose(dev_t dev, int flag, int mode, struct thread *td)
 }
 
 static int
-gdcread(dev_t dev, struct uio *uio, int flag)
+gdcread(struct cdev *dev, struct uio *uio, int flag)
 {
     gdc_softc_t *sc;
 
@@ -374,7 +378,7 @@ gdcread(dev_t dev, struct uio *uio, int flag)
 }
 
 static int
-gdcwrite(dev_t dev, struct uio *uio, int flag)
+gdcwrite(struct cdev *dev, struct uio *uio, int flag)
 {
     gdc_softc_t *sc;
 
@@ -383,7 +387,7 @@ gdcwrite(dev_t dev, struct uio *uio, int flag)
 }
 
 static int
-gdcioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
+gdcioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 {
     gdc_softc_t *sc;
 
@@ -392,7 +396,7 @@ gdcioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 }
 
 static int
-gdcmmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
+gdcmmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
     gdc_softc_t *sc;
 

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_hci_main.c,v 1.2 2003/03/18 00:09:36 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_main.c,v 1.2 2003/05/10 21:44:40 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_main.c,v 1.4 2004/05/29 00:51:17 julian Exp $
  */
 
 #include <sys/param.h>
@@ -39,14 +39,14 @@
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_parse.h>
-#include "ng_bluetooth.h"
-#include "ng_hci.h"
-#include "ng_hci_var.h"
-#include "ng_hci_prse.h"
-#include "ng_hci_cmds.h"
-#include "ng_hci_evnt.h"
-#include "ng_hci_ulpi.h"
-#include "ng_hci_misc.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/hci/ng_hci_var.h>
+#include <netgraph/bluetooth/hci/ng_hci_prse.h>
+#include <netgraph/bluetooth/hci/ng_hci_cmds.h>
+#include <netgraph/bluetooth/hci/ng_hci_evnt.h>
+#include <netgraph/bluetooth/hci/ng_hci_ulpi.h>
+#include <netgraph/bluetooth/hci/ng_hci_misc.h>
 
 /******************************************************************************
  ******************************************************************************
@@ -76,18 +76,16 @@ static	ng_rcvdata_t		ng_hci_raw_rcvdata;
 
 /* Netgraph node type descriptor */
 static	struct ng_type		typestruct = {
-	NG_ABI_VERSION,
-	NG_HCI_NODE_TYPE,	/* typename */
-	NULL,			/* modevent */
-	ng_hci_constructor,	/* constructor */
-	ng_hci_default_rcvmsg,	/* control message */
-	ng_hci_shutdown,	/* destructor */
-	ng_hci_newhook,		/* new hook */
-	NULL,			/* findhook */
-	ng_hci_connect,		/* connect hook */
-	ng_hci_drv_rcvdata,	/* data */
-	ng_hci_disconnect,	/* disconnect hook */
-	ng_hci_cmdlist		/* node command list */
+	.version =	NG_ABI_VERSION,
+	.name =		NG_HCI_NODE_TYPE,
+	.constructor =	ng_hci_constructor,
+	.rcvmsg =	ng_hci_default_rcvmsg,
+	.shutdown =	ng_hci_shutdown,
+	.newhook =	ng_hci_newhook,
+	.connect =	ng_hci_connect,
+	.rcvdata =	ng_hci_drv_rcvdata,
+	.disconnect =	ng_hci_disconnect,
+	.cmdlist =	ng_hci_cmdlist,
 };
 NETGRAPH_INIT(hci, &typestruct);
 MODULE_VERSION(ng_hci, NG_BLUETOOTH_VERSION);

@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_node.c,v 1.65 2003/11/14 20:54:08 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_node.c,v 1.67 2004/04/11 13:30:20 peadar Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -162,6 +158,16 @@ nfs_nhinit(void)
 	nfsnode_zone = uma_zcreate("NFSNODE", sizeof(struct nfsnode), NULL,
 	    NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
 	nfsnodehashtbl = hashinit(desiredvnodes, M_NFSHASH, &nfsnodehash);
+}
+
+/*
+ * Release hash table resources
+ */
+void
+nfs_nhuninit(void)
+{
+	hashdestroy(nfsnodehashtbl, M_NFSHASH, nfsnodehash);
+	uma_zdestroy(nfsnode_zone);
 }
 
 /*

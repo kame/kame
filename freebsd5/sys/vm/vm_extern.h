@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_extern.h	8.2 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_extern.h,v 1.66 2003/10/05 12:41:08 bms Exp $
+ * $FreeBSD: src/sys/vm/vm_extern.h,v 1.74 2004/07/25 20:08:59 alc Exp $
  */
 
 #ifndef _VM_EXTERN_H_
@@ -62,24 +58,21 @@ int swapon(struct thread *, void *, int *);
 int kernacc(void *, int, int);
 vm_offset_t kmem_alloc(vm_map_t, vm_size_t);
 vm_offset_t kmem_alloc_nofault(vm_map_t, vm_size_t);
-vm_offset_t kmem_alloc_pageable(vm_map_t, vm_size_t);
 vm_offset_t kmem_alloc_wait(vm_map_t, vm_size_t);
 void kmem_free(vm_map_t, vm_offset_t, vm_size_t);
 void kmem_free_wakeup(vm_map_t, vm_offset_t, vm_size_t);
 void kmem_init(vm_offset_t, vm_offset_t);
 vm_offset_t kmem_malloc(vm_map_t, vm_size_t, boolean_t);
 vm_map_t kmem_suballoc(vm_map_t, vm_offset_t *, vm_offset_t *, vm_size_t);
-void munmapfd(struct thread *, int);
 void swapout_procs(int);
 int useracc(void *, int, int);
 int vm_fault(vm_map_t, vm_offset_t, vm_prot_t, int);
 void vm_fault_copy_entry(vm_map_t, vm_map_t, vm_map_entry_t, vm_map_entry_t);
-void vm_fault_unwire(vm_map_t, vm_offset_t, vm_offset_t);
-int vm_fault_wire(vm_map_t, vm_offset_t, vm_offset_t, boolean_t);
+void vm_fault_unwire(vm_map_t, vm_offset_t, vm_offset_t, boolean_t);
+int vm_fault_wire(vm_map_t, vm_offset_t, vm_offset_t, boolean_t, boolean_t);
 void vm_forkproc(struct thread *, struct proc *, struct thread *, int);
 void vm_waitproc(struct proc *);
 int vm_mmap(vm_map_t, vm_offset_t *, vm_size_t, vm_prot_t, vm_prot_t, int, void *, vm_ooffset_t);
-vm_offset_t vm_page_alloc_contig(vm_offset_t, vm_paddr_t, vm_paddr_t, vm_offset_t);
 void vm_set_page_size(void);
 struct vmspace *vmspace_alloc(vm_offset_t, vm_offset_t);
 struct vmspace *vmspace_fork(struct vmspace *);
@@ -88,8 +81,8 @@ void vmspace_unshare(struct proc *);
 void vmspace_free(struct vmspace *);
 void vmspace_exitfree(struct proc *);
 void vnode_pager_setsize(struct vnode *, vm_ooffset_t);
-void vslock(void *, u_int);
-void vsunlock(void *, u_int);
+int vslock(void *, size_t);
+void vsunlock(void *, size_t);
 void vm_object_print(/* db_expr_t */ long, boolean_t, /* db_expr_t */ long,
 			  char *);
 int vm_fault_quick(caddr_t v, int prot);

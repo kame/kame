@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)types.h	8.6 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/types.h,v 1.83 2003/03/28 15:27:30 mike Exp $
+ * $FreeBSD: src/sys/sys/types.h,v 1.90 2004/06/19 17:58:32 marcel Exp $
  */
 
 #ifndef _SYS_TYPES_H_
@@ -53,8 +49,10 @@ typedef	unsigned char	u_char;
 typedef	unsigned short	u_short;
 typedef	unsigned int	u_int;
 typedef	unsigned long	u_long;
+#ifndef _KERNEL
 typedef	unsigned short	ushort;		/* Sys V compatibility */
 typedef	unsigned int	uint;		/* Sys V compatibility */
+#endif
 #endif
 
 /*
@@ -142,7 +140,7 @@ typedef	__fflags_t	fflags_t;	/* file flags */
 #define	_FFLAGS_T_DECLARED
 #endif
 
-typedef	__uint32_t	fixpt_t;	/* fixed point number */
+typedef	__fixpt_t	fixpt_t;	/* fixed point number */
 
 #ifndef _FSBLKCNT_T_DECLARED		/* for statvfs() */
 typedef	__fsblkcnt_t	fsblkcnt_t;
@@ -178,6 +176,11 @@ typedef	__ino_t		ino_t;		/* inode number */
 #ifndef _KEY_T_DECLARED
 typedef	__key_t		key_t;		/* IPC key (for Sys V IPC) */
 #define	_KEY_T_DECLARED
+#endif
+
+#ifndef _LWPID_T_DECLARED
+typedef	__lwpid_t	lwpid_t;	/* Thread ID (a.k.a. LWP) */
+#define	_LWPID_T_DECLARED
 #endif
 
 #ifndef _MODE_T_DECLARED
@@ -235,7 +238,6 @@ typedef	__timer_t	timer_t;
 #endif
 
 typedef	__u_register_t	u_register_t;
-typedef	__udev_t	udev_t;		/* device number */
 
 #ifndef _UID_T_DECLARED
 typedef	__uid_t		uid_t;		/* user id */
@@ -255,6 +257,7 @@ typedef	__vm_size_t	vm_size_t;
 
 #ifdef _KERNEL
 typedef	int		boolean_t;
+typedef	__cpumask_t	cpumask_t;
 typedef	__intfptr_t	intfptr_t;
 
 /*-
@@ -291,8 +294,9 @@ typedef	struct vm_page	*vm_page_t;
  */
 #define major(x)        ((int)(((u_int)(x) >> 8)&0xff)) /* major number */
 #define minor(x)        ((int)((x)&0xffff00ff))         /* minor number */
-#define makedev(x,y)    ((dev_t)(((x) << 8) | (y)))     /* create dev_t */
 #endif /* !_KERNEL */
+
+#define makedev(x,y)    ((dev_t)(((x) << 8) | (y)))     /* create dev_t */
 
 /*
  * These declarations belong elsewhere, but are repeated here and in

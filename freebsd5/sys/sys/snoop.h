@@ -12,7 +12,7 @@
  *
  * Snoop stuff.
  *
- * $FreeBSD: src/sys/sys/snoop.h,v 1.22 2002/11/11 10:45:31 tmm Exp $
+ * $FreeBSD: src/sys/sys/snoop.h,v 1.23 2004/06/17 17:16:52 phk Exp $
  */
 
 #ifndef _SYS_SNOOP_H_
@@ -30,8 +30,8 @@
  * detached from its current tty.
  */
 
-#define SNPSTTY       _IOW('T', 90, udev_t)
-#define SNPGTTY       _IOR('T', 89, udev_t)
+#define SNPSTTY       _IOW('T', 90, dev_t)
+#define SNPGTTY       _IOR('T', 89, dev_t)
 
 /*
  * These values would be returned by FIONREAD ioctl

@@ -3,6 +3,8 @@
  *
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
+ *
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_fs_sb.h,v 1.4 2004/02/19 09:06:06 tjr Exp $
  */
 /*
  *  linux/include/linux/ext2_fs_sb.h
@@ -74,7 +76,7 @@ struct ext2_sb_info {
 	char    s_rd_only;                      /* read-only 		*/
 	char    s_dirt;                         /* fs modified flag */
 	char	s_wasvalid;			/* valid at mount time */
-
+	off_t	fs_maxfilesize;
 	char    fs_fsmnt[MAXMNTLEN];            /* name mounted on */
 };
 

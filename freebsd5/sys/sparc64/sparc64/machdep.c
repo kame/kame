@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
  * 	from: FreeBSD: src/sys/i386/i386/machdep.c,v 1.477 2001/08/27
- * $FreeBSD: src/sys/sparc64/sparc64/machdep.c,v 1.105 2003/11/13 07:41:55 simokawa Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/machdep.c,v 1.112.2.2 2004/10/07 22:18:35 kensmith Exp $
  */
 
 #include "opt_compat.h"
@@ -49,6 +45,7 @@
 #include <sys/systm.h>
 #include <sys/cons.h>
 #include <sys/imgact.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/linker.h>
@@ -113,6 +110,10 @@
 
 typedef int ofw_vec_t(void *);
 
+#ifdef DDB
+extern vm_offset_t ksym_start, ksym_end;
+#endif
+
 struct tlb_entry *kernel_tlbs;
 int kernel_tlb_slots;
 
@@ -131,6 +132,16 @@ struct kva_md_info kmi;
 u_long ofw_vec;
 u_long ofw_tba;
 
+/*
+ * Note: timer quality for CPU's is set low to try and prevent them from
+ * being chosen as the primary timecounter.  The CPU counters are not
+ * synchronized among the CPU's so in MP machines this causes problems
+ * when calculating the time.  With this value the CPU's should only be
+ * chosen as the primary timecounter as a last resort.
+ */
+
+#define	UP_TICK_QUALITY	1000
+#define	MP_TICK_QUALITY	-100
 static struct timecounter tick_tc;
 
 char sparc64_model[32];
@@ -173,6 +184,15 @@ cpu_startup(void *arg)
 	tick_tc.tc_counter_mask = ~0u;
 	tick_tc.tc_frequency = tick_freq;
 	tick_tc.tc_name = "tick";
+	tick_tc.tc_quality = UP_TICK_QUALITY;
+#ifdef SMP
+	/*
+	 * We do not know if each CPU's tick counter is synchronized.
+	 */
+	if (cpu_mp_probe())
+		tick_tc.tc_quality = MP_TICK_QUALITY;
+#endif
+
 	tc_init(&tick_tc);
 
 	physsz = 0;
@@ -240,7 +260,7 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 	cpu_impl = VER_IMPL(rdpr(ver));
 
 	/*
-	 * Initialize openfirmware (needed for console).
+	 * Initialize Open Firmware (needed for console).
 	 */
 	OF_init(vec);
 
@@ -309,10 +329,6 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 		cpu_block_zero = bzero;
 	}
 
-#ifdef DDB
-	kdb_init();
-#endif
-
 #ifdef SMP
 	mp_tramp = mp_tramp_alloc();
 #endif
@@ -345,7 +361,7 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 	/*
 	 * Initialize proc0 stuff (p_contested needs to be done early).
 	 */
-	proc_linkup(&proc0, &ksegrp0, &kse0, &thread0);
+	proc_linkup(&proc0, &ksegrp0, &thread0);
 	proc0.p_md.md_sigtramp = NULL;
 	proc0.p_md.md_utrap = NULL;
 	proc0.p_uarea = (struct user *)uarea0;
@@ -385,11 +401,18 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 	mutex_init();
 	intr_init2();
 
+	/*
+	 * Finish pmap initialization now that we're ready for mutexes.
+	 */
+	PMAP_LOCK_INIT(kernel_pmap);
+
 	OF_getprop(root, "name", sparc64_model, sizeof(sparc64_model) - 1);
 
-#ifdef DDB
+	kdb_init();
+
+#ifdef KDB
 	if (boothowto & RB_KDB)
-		Debugger("Boot flags requested debugger");
+		kdb_enter("Boot flags requested debugger");
 #endif
 }
 
@@ -441,15 +464,15 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	bzero(&sf, sizeof(sf));
 	get_mcontext(td, &sf.sf_uc.uc_mcontext, 0);
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack = p->p_sigstk;
-	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	sf.sf_uc.uc_stack = td->td_sigstk;
+	sf.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 
 	/* Allocate and validate space for the signal handler context. */
-	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sfp = (struct sigframe *)(p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(struct sigframe));
+		sfp = (struct sigframe *)(td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(struct sigframe));
 	} else
 		sfp = (struct sigframe *)sp - 1;
 	mtx_unlock(&psp->ps_mtx);
@@ -567,6 +590,21 @@ freebsd4_sigreturn(struct thread *td, struct freebsd4_sigreturn_args *uap)
 	return sigreturn(td, (struct sigreturn_args *)uap);
 }
 #endif
+
+/*
+ * Construct a PCB from a trapframe. This is called from kdb_trap() where
+ * we want to start a backtrace from the function that caused us to enter
+ * the debugger. We have the context in the trapframe, but base the trace
+ * on the PCB. The PCB doesn't have to be perfect, as long as it contains
+ * enough for a backtrace.
+ */
+void
+makectx(struct trapframe *tf, struct pcb *pcb)
+{
+
+	pcb->pcb_pc = tf->tf_tpc;
+	pcb->pcb_sp = tf->tf_sp;
+}
 
 int
 get_mcontext(struct thread *td, mcontext_t *mc, int flags)
@@ -697,6 +735,13 @@ ptrace_single_step(struct thread *td)
 	return (0);
 }
 
+int
+ptrace_clear_single_step(struct thread *td)
+{
+	/* TODO; */
+	return (0);
+}
+
 void
 exec_setregs(struct thread *td, u_long entry, u_long stack, u_long ps_strings)
 {
@@ -730,16 +775,6 @@ exec_setregs(struct thread *td, u_long entry, u_long stack, u_long ps_strings)
 
 	td->td_retval[0] = tf->tf_out[0];
 	td->td_retval[1] = tf->tf_out[1];
-}
-
-void
-Debugger(const char *msg)
-{
-
-	printf("Debugger(\"%s\")\n", msg);
-	critical_enter();
-	breakpoint();
-	critical_exit();
 }
 
 int

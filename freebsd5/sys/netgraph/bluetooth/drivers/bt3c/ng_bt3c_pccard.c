@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_bt3c_pccard.c,v 1.5 2003/04/01 18:15:21 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/bt3c/ng_bt3c_pccard.c,v 1.4 2003/05/10 21:44:39 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/bt3c/ng_bt3c_pccard.c,v 1.8 2004/05/29 07:16:49 julian Exp $
  *
  * XXX XXX XX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
  *
@@ -59,15 +59,15 @@
 
 #include <dev/pccard/pccardreg.h>
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
+#include "pccarddevs.h"
 
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_parse.h>
-#include <ng_bluetooth.h>
-#include <ng_hci.h>
-#include "ng_bt3c.h"
-#include "ng_bt3c_var.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/include/ng_bt3c.h>
+#include <netgraph/bluetooth/drivers/bt3c/ng_bt3c_var.h>
 
 /* Netgraph methods */
 static ng_constructor_t	ng_bt3c_constructor;
@@ -227,18 +227,16 @@ static const struct ng_cmdlist	ng_bt3c_cmdlist[] = {
 };
 
 static struct ng_type	typestruct = {
-	NG_ABI_VERSION,
-	NG_BT3C_NODE_TYPE,	/* typename */
-	NULL,			/* modevent */
-	ng_bt3c_constructor,	/* constructor */
-	ng_bt3c_rcvmsg,		/* control message */
-	ng_bt3c_shutdown,	/* destructor */
-	ng_bt3c_newhook,	/* new hook */
-	NULL,			/* find hook */
-	ng_bt3c_connect,	/* connect hook */
-	ng_bt3c_rcvdata,	/* data */
-	ng_bt3c_disconnect,	/* disconnect hook */
-        ng_bt3c_cmdlist		/* node command list */
+	.version =	NG_ABI_VERSION,
+	.name = 	NG_BT3C_NODE_TYPE,
+	.constructor = 	ng_bt3c_constructor,
+	.rcvmsg =	ng_bt3c_rcvmsg,
+	.shutdown = 	ng_bt3c_shutdown,
+	.newhook =	ng_bt3c_newhook,
+	.connect =	ng_bt3c_connect,
+	.rcvdata =	ng_bt3c_rcvdata,
+	.disconnect =	ng_bt3c_disconnect,
+        .cmdlist =	ng_bt3c_cmdlist	
 };
 
 /*
@@ -641,8 +639,8 @@ bt3c_pccard_attach(device_t dev)
 
 	/* Allocate IRQ */
 	sc->irq_rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-			0, ~0, 1, RF_ACTIVE);
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+			RF_ACTIVE);
 	if (sc->irq == NULL) {
 		device_printf(dev, "Could not allocate IRQ\n");
 		goto bad;

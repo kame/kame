@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -38,7 +34,7 @@
  *      @(#)bpf.h	8.1 (Berkeley) 6/10/93
  *	@(#)bpf.h	1.34 (LBL)     6/16/96
  *
- * $FreeBSD: src/sys/net/bpf.h,v 1.30 2003/11/28 18:48:59 silby Exp $
+ * $FreeBSD: src/sys/net/bpf.h,v 1.36 2004/05/30 17:03:48 dwmalone Exp $
  */
 
 #ifndef _NET_BPF_H_
@@ -141,7 +137,7 @@ struct bpf_hdr {
 /*
  * Data-link level type codes.
  */
-#define DLT_NULL	0	/* no link-layer encapsulation */
+#define DLT_NULL	0	/* BSD loopback encapsulation */
 #define DLT_EN10MB	1	/* Ethernet (10Mb) */
 #define DLT_EN3MB	2	/* Experimental Ethernet (3Mb) */
 #define DLT_AX25	3	/* Amateur Radio AX.25 */
@@ -182,6 +178,12 @@ struct bpf_hdr {
 #define DLT_PPP_ETHER	51	/* PPP over Ethernet */
 
 /*
+ * Reserved for the Symantec Enterprise Firewall.
+ */
+#define DLT_SYMANTEC_FIREWALL	99
+
+
+/*
  * This value was defined by libpcap 0.5; platforms that have defined
  * it with a different value should define it here with that value -
  * a link type of 104 in a save file will be mapped to DLT_C_HDLC,
@@ -207,6 +209,14 @@ struct bpf_hdr {
  */
 
 /*
+ * Frame Relay; BSD/OS has a DLT_FR with a value of 11, but that collides
+ * with other values.
+ * DLT_FR and DLT_FRELAY packets start with the Q.922 Frame Relay header
+ * (DLCI, etc.).
+ */
+#define DLT_FRELAY	107
+
+/*
  * OpenBSD DLT_LOOP, for loopback devices; it's like DLT_NULL, except
  * that the AF_ type in the link-layer header is in network byte order.
  *
@@ -222,6 +232,13 @@ struct bpf_hdr {
  * link-layer types corresponding to DLT_ types that might differ
  * between platforms; don't use those values for new DLT_ new types.
  */
+
+/*
+ * Encapsulated packets for IPsec; DLT_ENC is 13 in OpenBSD, but that's
+ * DLT_SLIP_BSDOS in NetBSD, so we don't use 13 for it in OSes other
+ * than OpenBSD.
+ */
+#define DLT_ENC	109
 
 /*
  * This is for Linux cooked sockets.
@@ -268,6 +285,95 @@ struct bpf_hdr {
  * (see Doug Ambrisko's FreeBSD patches).
  */
 #define DLT_AIRONET_HEADER	120
+
+/*
+ * Reserved for use by OpenBSD's pfsync device.
+ */
+#define DLT_PFSYNC	121
+
+/*
+ * Reserved for Siemens HiPath HDLC. XXX
+ */
+#define DLT_HHDLC	121
+
+/*
+ * Reserved for RFC 2625 IP-over-Fibre Channel.
+ */
+#define DLT_IP_OVER_FC	122
+
+/*
+ * Reserved for Full Frontal ATM on Solaris.
+ */
+#define DLT_SUNATM	123
+
+/*
+ * Reserved as per request from Kent Dahlgren <kent@praesum.com>
+ * for private use.
+ */
+#define DLT_RIO		124	/* RapidIO */
+#define DLT_PCI_EXP	125	/* PCI Express */
+#define DLT_AURORA	126	/* Xilinx Aurora link layer */
+
+/*
+ * BSD header for 802.11 plus a number of bits of link-layer information
+ * including radio information.
+ */
+#ifndef DLT_IEEE802_11_RADIO
+#define DLT_IEEE802_11_RADIO	127
+#endif
+
+/*
+ * Reserved for TZSP encapsulation.
+ */
+#define DLT_TZSP		128	/* Tazmen Sniffer Protocol */
+
+/*
+ * Reserved for Linux ARCNET.
+ */
+#define DLT_ARCNET_LINUX	129
+
+/*
+ * Juniper-private data link types.
+ */
+#define DLT_JUNIPER_MLPPP	130
+#define DLT_JUNIPER_MLFR	131
+#define DLT_JUNIPER_ES		132
+#define DLT_JUNIPER_GGSN	133
+#define DLT_JUNIPER_MFR		134
+#define DLT_JUNIPER_ATM2	135
+#define DLT_JUNIPER_SERVICES	136
+#define DLT_JUNIPER_ATM1	137
+
+/*
+ * Reserved for Apple IP-over-IEEE-1394.
+ */
+#define DLT_APPLE_IP_OVER_IEEE1394	138
+
+/*
+ * Reserved for DOCSIS.
+ */
+#define DLT_DOCSIS	143
+
+/*
+ * Reserved for Linux IrDA.
+ */
+#define DLT_LINUX_IRDA	144
+
+/*
+ * Reserved for IBM SP switch and IBM Next Federation switch.
+ */
+#define DLT_IBM_SP	145
+#define DLT_IBM_SN	146
+
+/*
+ * Reserved for AbsoluteValue Systems 802.11 capture.
+ */
+#define DLT_IEEE802_11_RADIO_AVS	163
+
+/*
+ * Reserved for Juniper-private DLT.
+ */
+#define DLT_JUNIPER_MONITOR	164
 
 /*
  * The instruction encodings.
@@ -354,6 +460,7 @@ struct bpf_if;
 int	 bpf_validate(const struct bpf_insn *, int);
 void	 bpf_tap(struct bpf_if *, u_char *, u_int);
 void	 bpf_mtap(struct bpf_if *, struct mbuf *);
+void	 bpf_mtap2(struct bpf_if *, void *, u_int, struct mbuf *);
 void	 bpfattach(struct ifnet *, u_int, u_int);
 void	 bpfattach2(struct ifnet *, u_int, u_int, struct bpf_if **);
 void	 bpfdetach(struct ifnet *);
@@ -366,8 +473,16 @@ u_int	 bpf_filter(const struct bpf_insn *, u_char *, u_int, u_int);
 		bpf_tap((_ifp)->if_bpf, (_pkt), (_pktlen));	\
 } while (0)
 #define	BPF_MTAP(_ifp,_m) do {					\
-	if ((_ifp)->if_bpf)					\
+	if ((_ifp)->if_bpf) {					\
+		M_ASSERTVALID(_m);				\
 		bpf_mtap((_ifp)->if_bpf, (_m));			\
+	}							\
+} while (0)
+#define	BPF_MTAP2(_ifp,_data,_dlen,_m) do {			\
+	if ((_ifp)->if_bpf) {					\
+		M_ASSERTVALID(_m);				\
+		bpf_mtap2((_ifp)->if_bpf,(_data),(_dlen),(_m));	\
+	}							\
 } while (0)
 #endif
 

@@ -14,8 +14,6 @@
  * All advertising materials mentioning features or use of this software
  * must display the following acknowledgement:
  *	This product includes software developed by Harvard University.
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,8 +26,6 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  *	This product includes software developed by Paul Kranenburg.
  *	This product includes software developed by Harvard University.
  * 4. Neither the name of the University nor the names of its contributors
@@ -51,7 +47,7 @@
  *	from: @(#)clock.c	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: clock.c,v 1.41 2001/07/24 19:29:25 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/sparc64/eeprom.c,v 1.3 2003/08/23 05:56:58 marcel Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/eeprom.c,v 1.5 2004/08/12 17:41:33 marius Exp $
  */
 
 #include <sys/param.h>
@@ -61,13 +57,13 @@
 #include <sys/malloc.h>
 #include <sys/resource.h>
 
+#include <dev/ofw/ofw_bus.h>
+
 #include <machine/bus.h>
 #include <machine/idprom.h>
 #include <machine/resource.h>
 
 #include <sys/rman.h>
-
-#include <dev/ofw/openfirm.h>
 
 #include <machine/eeprom.h>
 
@@ -77,26 +73,34 @@
 
 devclass_t eeprom_devclass;
 
-
 #define IDPROM_OFFSET (8 * 1024 - 40)	/* XXX - get nvram size from driver */
 
 int
-eeprom_attach(device_t dev, phandle_t node, bus_space_tag_t bt,
-    bus_space_handle_t bh)
+eeprom_probe(device_t dev)
+{
+ 
+	if (strcmp("eeprom", ofw_bus_get_name(dev)) == 0) {
+		device_set_desc(dev, "EEPROM/clock");
+		return (0);
+	}
+	return (ENXIO);
+}
+
+int
+eeprom_attach(device_t dev, bus_space_tag_t bt, bus_space_handle_t bh)
 {
 	struct timespec ts;
 	struct idprom *idp;
-	char *model;
+	const char *model;
 	int error, i;
 	u_int32_t h;
 
-	if (OF_getprop_alloc(node, "model", 1, (void **)&model) == -1)
+	if ((model = ofw_bus_get_model(dev)) == NULL)
 		panic("eeprom_attach: no model property");
 
 	/* Our TOD clock year 0 is 1968 */
 	if ((error = mk48txx_attach(dev, bt, bh, model, 1968)) != 0) {
 		device_printf(dev, "Can't attach %s tod clock", model);
-		free(model, M_OFWPROP);
 		return (error);
 	}
 	/* XXX: register clock device */
@@ -119,4 +123,3 @@ eeprom_attach(device_t dev, phandle_t node, bus_space_tag_t bt,
 
 	return (0);
 }
-

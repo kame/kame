@@ -33,7 +33,7 @@
  *
  *	From: @(#)ansi.h	8.2 (Berkeley) 1/4/94
  *	From: @(#)types.h	8.3 (Berkeley) 1/5/94
- * $FreeBSD: src/sys/ia64/include/_types.h,v 1.7 2003/11/03 05:04:09 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/_types.h,v 1.8 2004/03/20 20:41:40 marcel Exp $
  */
 
 #ifndef _MACHINE__TYPES_H_
@@ -55,6 +55,7 @@ typedef	unsigned long		__uint64_t;
  * Standard type definitions.
  */
 typedef	__int32_t	__clock_t;		/* clock()... */
+typedef	unsigned int	__cpumask_t;
 typedef	__int64_t	__critical_t;
 typedef	double		__double_t;
 typedef	float		__float_t;

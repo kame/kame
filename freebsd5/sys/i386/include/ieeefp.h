@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  * 	from: @(#) ieeefp.h 	1.0 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/i386/include/ieeefp.h,v 1.8 2003/01/19 06:01:33 marcel Exp $
+ * $FreeBSD: src/sys/i386/include/ieeefp.h,v 1.9 2004/03/12 21:45:30 trhodes Exp $
  */
 
 /*
@@ -98,7 +98,7 @@ typedef enum {
 #define FP_RND_OFF	10	/* round control offset */
 #define FP_STKY_OFF	0	/* sticky flags offset */
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 
 #define	__fldenv(addr)	__asm __volatile("fldenv %0" : : "m" (*(addr)))
 #define	__fnstenv(addr)	__asm __volatile("fnstenv %0" : "=m" (*(addr)))
@@ -151,7 +151,7 @@ __fpsetreg(int _m, int _reg, int _fld, int _off)
 	return _p;
 }
 
-#endif /* __GNUC__ */
+#endif /* __GNUC__ || __INTEL_COMPILER */
 
 /*
  * SysV/386 FP control interface

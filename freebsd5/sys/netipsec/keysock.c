@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/keysock.c,v 1.7 2003/11/18 00:39:05 rwatson Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/keysock.c,v 1.8 2004/06/23 01:58:22 bms Exp $	*/
 /*	$KAME: keysock.c,v 1.25 2001/08/13 20:07:41 itojun Exp $	*/
 
 /*
@@ -39,8 +39,10 @@
 #include <sys/domain.h>
 #include <sys/errno.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/mutex.h>
 #include <sys/protosw.h>
 #include <sys/signalvar.h>
 #include <sys/socket.h>

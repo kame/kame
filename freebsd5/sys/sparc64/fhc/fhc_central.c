@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/fhc/fhc_central.c,v 1.2 2003/02/19 08:23:38 jake Exp $
+ * $FreeBSD: src/sys/sparc64/fhc/fhc_central.c,v 1.4 2004/08/12 17:41:32 marius Exp $
  */
 
 #include <sys/param.h>
@@ -31,7 +31,9 @@
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 
+#include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/openfirm.h>
 
 #include <machine/bus.h>
@@ -39,7 +41,6 @@
 
 #include <sys/rman.h>
 
-#include <sparc64/central/centralvar.h>
 #include <sparc64/fhc/fhcreg.h>
 #include <sparc64/fhc/fhcvar.h>
 #include <sparc64/sbus/ofw_sbus.h>
@@ -55,14 +56,19 @@ static device_method_t fhc_central_methods[] = {
 	/* Bus interface. */
 	DEVMETHOD(bus_print_child,	fhc_print_child),
 	DEVMETHOD(bus_probe_nomatch,	fhc_probe_nomatch),
-	DEVMETHOD(bus_read_ivar,	fhc_read_ivar),
-	DEVMETHOD(bus_write_ivar,	fhc_write_ivar),
 	DEVMETHOD(bus_setup_intr,	fhc_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	fhc_teardown_intr),
 	DEVMETHOD(bus_alloc_resource,	fhc_alloc_resource),
 	DEVMETHOD(bus_release_resource,	fhc_release_resource),
 	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
 	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
+
+	/* ofw_bus interface */
+	DEVMETHOD(ofw_bus_get_compat,	fhc_get_compat),
+	DEVMETHOD(ofw_bus_get_model,	fhc_get_model),
+	DEVMETHOD(ofw_bus_get_name,	fhc_get_name),
+	DEVMETHOD(ofw_bus_get_node,	fhc_get_node),
+	DEVMETHOD(ofw_bus_get_type,	fhc_get_type),
 
 	{ NULL, NULL }
 };
@@ -81,7 +87,7 @@ static int
 fhc_central_probe(device_t dev)
 {
 
-	if (strcmp(central_get_name(dev), "fhc") == 0) {
+	if (strcmp(ofw_bus_get_name(dev), "fhc") == 0) {
 		device_set_desc(dev, "fhc");
 		return (fhc_probe(dev));
 	}
@@ -102,7 +108,7 @@ fhc_central_attach(device_t dev)
 	int i;
 
 	sc = device_get_softc(dev);
-	node = central_get_node(dev);
+	node = ofw_bus_get_node(dev);
 	sc->sc_node = node;
 	sc->sc_flags |= FHC_CENTRAL;
 

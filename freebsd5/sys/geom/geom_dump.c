@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_dump.c,v 1.29 2003/07/08 21:12:40 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_dump.c,v 1.31 2004/03/10 08:49:08 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/sbuf.h>
@@ -273,7 +273,6 @@ g_trace(int level, const char *fmt, ...)
 {
 	va_list ap;
 
-	g_sanity(NULL);
 	if (!(g_debugflags & level))
 		return;
 	va_start(ap, fmt);
@@ -281,34 +280,3 @@ g_trace(int level, const char *fmt, ...)
 	va_end(ap);
 	printf("\n");
 }
-
-void
-g_hexdump(void *ptr, int length)
-{
-	int i, j, k;
-	unsigned char *cp;
-
-	cp = ptr;
-	for (i = 0; i < length; i+= 16) {
-		printf("%04x  ", i);
-		for (j = 0; j < 16; j++) {
-			k = i + j;
-			if (k < length)
-				printf(" %02x", cp[k]);
-			else
-				printf("   ");
-		}
-		printf("  |");
-		for (j = 0; j < 16; j++) {
-			k = i + j;
-			if (k >= length)
-				printf(" ");
-			else if (cp[k] >= ' ' && cp[k] <= '~')
-				printf("%c", cp[k]);
-			else
-				printf(".");
-		}
-		printf("|\n");
-	}
-}
-

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netipsec/ipsec_mbuf.c,v 1.9 2003/09/29 22:57:42 sam Exp $
+ * $FreeBSD: src/sys/netipsec/ipsec_mbuf.c,v 1.10 2003/12/15 21:49:41 bms Exp $
  */
 
 /*
@@ -41,8 +41,6 @@
 #include <netinet/in.h>
 
 #include <netipsec/ipsec.h>
-
-extern	struct mbuf *m_getptr(struct mbuf *, int, int *);
 
 /*
  * Create a writable copy of the mbuf chain.  While doing this

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/isa/vga_isa.c,v 1.27 2003/09/26 10:41:43 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/isa/vga_isa.c,v 1.30 2004/06/16 09:47:11 phk Exp $");
 
 #include "opt_vga.h"
 #include "opt_fb.h"
@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD: src/sys/isa/vga_isa.c,v 1.27 2003/09/26 10:41:43 phk Exp $")
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/fbio.h>
@@ -72,6 +73,8 @@ static d_ioctl_t	isavga_ioctl;
 static d_mmap_t		isavga_mmap;
 
 static struct cdevsw isavga_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	isavga_open,
 	.d_close =	isavga_close,
 	.d_read =	isavga_read,
@@ -160,37 +163,37 @@ isavga_attach(device_t dev)
 #ifdef FB_INSTALL_CDEV
 
 static int
-isavga_open(dev_t dev, int flag, int mode, struct thread *td)
+isavga_open(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	return vga_open(dev, VGA_SOFTC(VGA_UNIT(dev)), flag, mode, td);
 }
 
 static int
-isavga_close(dev_t dev, int flag, int mode, struct thread *td)
+isavga_close(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	return vga_close(dev, VGA_SOFTC(VGA_UNIT(dev)), flag, mode, td);
 }
 
 static int
-isavga_read(dev_t dev, struct uio *uio, int flag)
+isavga_read(struct cdev *dev, struct uio *uio, int flag)
 {
 	return vga_read(dev, VGA_SOFTC(VGA_UNIT(dev)), uio, flag);
 }
 
 static int
-isavga_write(dev_t dev, struct uio *uio, int flag)
+isavga_write(struct cdev *dev, struct uio *uio, int flag)
 {
 	return vga_write(dev, VGA_SOFTC(VGA_UNIT(dev)), uio, flag);
 }
 
 static int
-isavga_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
+isavga_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 {
 	return vga_ioctl(dev, VGA_SOFTC(VGA_UNIT(dev)), cmd, arg, flag, td);
 }
 
 static int
-isavga_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
+isavga_mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
 	return vga_mmap(dev, VGA_SOFTC(VGA_UNIT(dev)), offset, paddr, prot);
 }

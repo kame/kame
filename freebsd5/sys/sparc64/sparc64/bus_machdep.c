@@ -42,11 +42,6 @@
  * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
  * contributed to Berkeley.
  *
- * All advertising materials mentioning features or use of this software
- * must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -55,10 +50,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -106,7 +97,7 @@
  *	and
  * 	from: FreeBSD: src/sys/i386/i386/busdma_machdep.c,v 1.24 2001/08/15
  *
- * $FreeBSD: src/sys/sparc64/sparc64/bus_machdep.c,v 1.35 2003/08/24 07:47:52 marcel Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/bus_machdep.c,v 1.39.2.2 2004/09/10 20:22:50 kensmith Exp $
  */
 
 #include <sys/param.h>
@@ -255,21 +246,26 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		newtag->dt_lockfunc = dflt_lock;
 		newtag->dt_lockfuncarg = NULL;
 	}
-       
+
+	newtag->dt_segments = NULL;
+
 	/* Take into account any restrictions imposed by our parent tag */
 	if (parent != NULL) {
 		newtag->dt_lowaddr = ulmin(parent->dt_lowaddr,
 		    newtag->dt_lowaddr);
 		newtag->dt_highaddr = ulmax(parent->dt_highaddr,
 		    newtag->dt_highaddr);
-		/*
-		 * XXX Not really correct??? Probably need to honor boundary
-		 *     all the way up the inheritence chain.
-		 */
-		newtag->dt_boundary = ulmin(parent->dt_boundary,
-		    newtag->dt_boundary);
+                if (newtag->dt_boundary == 0)
+                        newtag->dt_boundary = parent->dt_boundary;
+                else if (parent->dt_boundary != 0)            
+			newtag->dt_boundary = ulmin(parent->dt_boundary,
+			    newtag->dt_boundary);
 		atomic_add_int(&parent->dt_ref_count, 1);
 	}
+
+	if (newtag->dt_boundary > 0)
+		newtag->dt_maxsegsz = ulmin(newtag->dt_maxsegsz,
+		    newtag->dt_boundary);
 
 	*dmat = newtag;
 	return (0);
@@ -287,6 +283,8 @@ bus_dma_tag_destroy(bus_dma_tag_t dmat)
 			parent = dmat->dt_parent;
 			atomic_subtract_int(&dmat->dt_ref_count, 1);
 			if (dmat->dt_ref_count == 0) {
+				if (dmat->dt_segments != NULL)
+					free(dmat->dt_segments, M_DEVBUF);
 				free(dmat, M_DEVBUF);
 				/*
 				 * Last reference count, so
@@ -306,6 +304,13 @@ int
 sparc64_dma_alloc_map(bus_dma_tag_t dmat, bus_dmamap_t *mapp)
 {
 
+	if (dmat->dt_segments == NULL) {
+		dmat->dt_segments = (bus_dma_segment_t *)malloc(
+		    sizeof(bus_dma_segment_t) * dmat->dt_nsegments, M_DEVBUF,
+		    M_NOWAIT);
+		if (dmat->dt_segments == NULL)
+			return (ENOMEM);
+	}
 	*mapp = malloc(sizeof(**mapp), M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (*mapp == NULL)
 		return (ENOMEM);
@@ -345,15 +350,17 @@ nexus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map)
  * first indicates if this is the first invocation of this function.
  */
 static int
-_nexus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dma_segment_t segs[],
-    void *buf, bus_size_t buflen, struct thread *td, int flags,
-    bus_addr_t *lastaddrp, int *segp, int first)
+_nexus_dmamap_load_buffer(bus_dma_tag_t dmat, void *buf, bus_size_t buflen,
+     struct thread *td, int flags, bus_addr_t *lastaddrp, int *segp, int first)
 {
+	bus_dma_segment_t *segs;
 	bus_size_t sgsize;
 	bus_addr_t curaddr, lastaddr, baddr, bmask;
 	vm_offset_t vaddr = (vm_offset_t)buf;
 	int seg;
 	pmap_t pmap;
+
+	segs = dmat->dt_segments;
 
 	if (td != NULL)
 		pmap = vmspace_pmap(td->td_proc->p_vmspace);
@@ -439,19 +446,14 @@ nexus_dmamap_load(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
     bus_size_t buflen, bus_dmamap_callback_t *callback, void *callback_arg,
     int flags)
 {
-#ifdef __GNUC__
-	bus_dma_segment_t dm_segments[dmat->dt_nsegments];
-#else
-	bus_dma_segment_t dm_segments[BUS_DMAMAP_NSEGS];
-#endif
 	bus_addr_t lastaddr;
 	int error, nsegs;
 
-	error = _nexus_dmamap_load_buffer(dmat, dm_segments, buf, buflen,
-	    NULL, flags, &lastaddr, &nsegs, 1);
+	error = _nexus_dmamap_load_buffer(dmat, buf, buflen, NULL, flags,
+	    &lastaddr, &nsegs, 1);
 
 	if (error == 0) {
-		(*callback)(callback_arg, dm_segments, nsegs + 1, 0);
+		(*callback)(callback_arg, dmat->dt_segments, nsegs + 1, 0);
 		map->dm_flags |= DMF_LOADED;
 	} else
 		(*callback)(callback_arg, NULL, 0, error);
@@ -466,11 +468,6 @@ static int
 nexus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map, struct mbuf *m0,
     bus_dmamap_callback2_t *callback, void *callback_arg, int flags)
 {
-#ifdef __GNUC__
-	bus_dma_segment_t dm_segments[dmat->dt_nsegments];
-#else
-	bus_dma_segment_t dm_segments[BUS_DMAMAP_NSEGS];
-#endif
 	int nsegs, error;
 
 	M_ASSERTPKTHDR(m0);
@@ -485,8 +482,8 @@ nexus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map, struct mbuf *m0,
 		for (m = m0; m != NULL && error == 0; m = m->m_next) {
 			if (m->m_len > 0) {
 				error = _nexus_dmamap_load_buffer(dmat,
-				    dm_segments, m->m_data, m->m_len, NULL,
-				    flags, &lastaddr, &nsegs, first);
+				    m->m_data, m->m_len,NULL, flags, &lastaddr,
+				    &nsegs, first);
 				first = 0;
 			}
 		}
@@ -496,10 +493,10 @@ nexus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map, struct mbuf *m0,
 
 	if (error) {
 		/* force "no valid mappings" in callback */
-		(*callback)(callback_arg, dm_segments, 0, 0, error);
+		(*callback)(callback_arg, dmat->dt_segments, 0, 0, error);
 	} else {
 		map->dm_flags |= DMF_LOADED;
-		(*callback)(callback_arg, dm_segments, nsegs + 1,
+		(*callback)(callback_arg, dmat->dt_segments, nsegs + 1,
 		    m0->m_pkthdr.len, error);
 	}
 	return (error);
@@ -513,11 +510,6 @@ nexus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
     bus_dmamap_callback2_t *callback, void *callback_arg, int flags)
 {
 	bus_addr_t lastaddr;
-#ifdef __GNUC__
-	bus_dma_segment_t dm_segments[dmat->dt_nsegments];
-#else
-	bus_dma_segment_t dm_segments[BUS_DMAMAP_NSEGS];
-#endif
 	int nsegs, error, first, i;
 	bus_size_t resid;
 	struct iovec *iov;
@@ -545,8 +537,8 @@ nexus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
 		caddr_t addr = (caddr_t) iov[i].iov_base;
 
 		if (minlen > 0) {
-			error = _nexus_dmamap_load_buffer(dmat, dm_segments,
-			    addr, minlen, td, flags, &lastaddr, &nsegs, first);
+			error = _nexus_dmamap_load_buffer(dmat, addr, minlen,
+			    td, flags, &lastaddr, &nsegs, first);
 			first = 0;
 
 			resid -= minlen;
@@ -555,10 +547,10 @@ nexus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
 
 	if (error) {
 		/* force "no valid mappings" in callback */
-		(*callback)(callback_arg, dm_segments, 0, 0, error);
+		(*callback)(callback_arg, dmat->dt_segments, 0, 0, error);
 	} else {
 		map->dm_flags |= DMF_LOADED;
-		(*callback)(callback_arg, dm_segments, nsegs + 1,
+		(*callback)(callback_arg, dmat->dt_segments, nsegs + 1,
 		    uio->uio_resid, error);
 	}
 	return (error);
@@ -653,9 +645,7 @@ nexus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
 	if ((dmat->dt_maxsize <= PAGE_SIZE))
 		free(vaddr, M_DEVBUF);
 	else {
-		mtx_lock(&Giant);
 		contigfree(vaddr, dmat->dt_maxsize, M_DEVBUF);
-		mtx_unlock(&Giant);
 	}
 }
 
@@ -686,6 +676,7 @@ struct bus_dma_tag nexus_dmatag = {
 	0,
 	0,
 	0,
+	NULL,
 	NULL,
 	NULL,
 	&nexus_dma_methods,
@@ -725,10 +716,10 @@ sparc64_bus_mem_map(bus_space_tag_t tag, bus_space_handle_t handle,
 	if (!(flags & BUS_SPACE_MAP_CACHEABLE))
 		pm_flags |= TD_E;
 
-	if (vaddr != NULL)
+	if (vaddr != 0L)
 		sva = trunc_page(vaddr);
 	else {
-		if ((sva = kmem_alloc_nofault(kernel_map, size)) == NULL)
+		if ((sva = kmem_alloc_nofault(kernel_map, size)) == 0)
 			panic("sparc64_bus_map: cannot allocate virtual "
 			    "memory");
 	}

@@ -9,8 +9,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -28,28 +26,29 @@
  * This node presents a /dev/ngd%d device that interfaces to an other 
  * netgraph node.
  *
- * $FreeBSD: src/sys/netgraph/ng_device.c,v 1.3 2003/03/03 12:15:52 phk Exp $
+ * $FreeBSD: src/sys/netgraph/ng_device.c,v 1.11 2004/07/20 13:16:17 glebius Exp $
  *
  */
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/kernel.h>
-#include <sys/mbuf.h>
-#include <sys/uio.h>
-#include <sys/queue.h>
-#include <sys/malloc.h>
 #include <sys/conf.h>
-#include <sys/poll.h>
 #include <sys/ioccom.h>
+#include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/mbuf.h>
+#include <sys/poll.h>
+#include <sys/queue.h>
+#include <sys/systm.h>
+#include <sys/uio.h>
 
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
-
-#include "ng_device.h"
+#include <netgraph/ng_device.h>
 
 /* turn this on for verbose messages */
 #define NGD_DEBUG
+
+#define	ERROUT(x) do { error = (x); goto done; } while (0)
 
 /* Netgraph methods */
 static ng_constructor_t	ng_device_cons;
@@ -65,18 +64,15 @@ static int get_free_unit(void);
 
 /* Netgraph type */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,			/* version */
-	NG_DEVICE_NODE_TYPE,		/* name */
-	ng_device_mod_event,		/* modevent */
-	ng_device_cons, 		/* constructor */
-	ng_device_rcvmsg, 		/* receive msg */
-	NULL, 				/* shutdown */
-	ng_device_newhook, 		/* newhook */
-	NULL,				/* findhook */
-	ng_device_connect, 		/* connect */
-	ng_device_rcvdata, 		/* receive data */
-	ng_device_disconnect, 		/* disconnect */
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_DEVICE_NODE_TYPE,
+	.mod_event =	ng_device_mod_event,
+	.constructor =	ng_device_cons,
+	.rcvmsg =	ng_device_rcvmsg,
+	.newhook =	ng_device_newhook,
+	.connect = 	ng_device_connect,
+	.rcvdata =	ng_device_rcvdata,
+	.disconnect =	ng_device_disconnect,
 };
 NETGRAPH_INIT(device, &typestruct);
 
@@ -84,7 +80,7 @@ NETGRAPH_INIT(device, &typestruct);
 struct ngd_connection {
 	SLIST_ENTRY(ngd_connection) links;
 
-	dev_t 	ngddev;
+	struct cdev *ngddev;
 	struct 	ng_hook *active_hook;
 	char	*readq;
 	int 	loc;
@@ -96,7 +92,7 @@ struct ngd_softc {
 	SLIST_HEAD(, ngd_connection) head;
 
 	node_p node;
-	char nodename[NG_NODELEN + 1];
+	char nodename[NG_NODESIZ];
 } ngd_softc;
 
 /* the per connection receiving queue maximum */
@@ -112,8 +108,9 @@ static d_write_t ngdwrite;
 static d_ioctl_t ngdioctl;
 static d_poll_t ngdpoll;
 
-#define NGD_CDEV_MAJOR 20
 static struct cdevsw ngd_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	ngdopen,
 	.d_close =	ngdclose,
 	.d_read =	ngdread,
@@ -121,7 +118,6 @@ static struct cdevsw ngd_cdevsw = {
 	.d_ioctl =	ngdioctl,
 	.d_poll =	ngdpoll,
 	.d_name =	"ngd",
-	.d_maj =	NGD_CDEV_MAJOR,
 };
 
 /* 
@@ -274,30 +270,33 @@ ng_device_newhook(node_p node, hook_p hook, const char *name)
 
 #ifdef NGD_DEBUG
 	printf("%s()\n",__func__);
-#endif /* NGD_DEBUG */
+#endif
 
 	new_connection = malloc(sizeof(struct ngd_connection), M_DEVBUF, M_NOWAIT);
 	if(new_connection == NULL) {
 		printf("%s(): ERROR: new_connection == NULL\n",__func__);
-		return(-1);
+		return(ENOMEM);
 	}
 
 	new_connection->unit = get_free_unit();
 	if(new_connection->unit<0) {
 		printf("%s: No free unit found by get_free_unit(), "
-				"increas MAX_NGD\n",__func__);
-		return(-1);
+				"increase MAX_NGD\n",__func__);
+		free(new_connection, M_DEVBUF);
+		return(EINVAL);
 	}
 	new_connection->ngddev = make_dev(&ngd_cdevsw, new_connection->unit, 0, 0,0600,"ngd%d",new_connection->unit);
 	if(new_connection->ngddev == NULL) {
 		printf("%s(): make_dev failed\n",__func__);
-		return(-1);
+		free(new_connection, M_DEVBUF);
+		return(EINVAL);
 	}
 
 	new_connection->readq = malloc(sizeof(char)*NGD_QUEUE_SIZE, M_DEVBUF, M_NOWAIT | M_ZERO);
 	if(new_connection->readq == NULL) {
 		printf("%s(): readq malloc failed\n",__func__);
-		return(-1);
+		free(new_connection, M_DEVBUF);
+		return(ENOMEM);
 	}
 
 	/* point to begin of buffer */
@@ -336,47 +335,42 @@ ng_device_rcvdata(hook_p hook, item_p item)
 	struct ngd_connection * connection = NULL;
 	struct ngd_connection * tmp;
 	char *buffer;
+	int error = 0;
 
 #ifdef NGD_DEBUG
 	printf("%s()\n",__func__);
-#endif /* NGD_DEBUG */
-
-	SLIST_FOREACH(tmp,&sc->head,links) {
-		if(tmp->active_hook == hook) {
-			connection = tmp;
-		}
-	}
-	if(connection == NULL) {
-		printf("%s(): connection is still NULL, no hook found\n",__func__);
-		return(-1);
-	}
+#endif
 
 	NGI_GET_M(item, m);
 	NG_FREE_ITEM(item);
 
-	m = m_pullup(m,m->m_len);
-	if(m == NULL) {
-		printf("%s(): ERROR: m_pullup failed\n",__func__);
-		return(-1);
+	SLIST_FOREACH(tmp,&sc->head,links)
+		if(tmp->active_hook == hook)
+			connection = tmp;
+
+	if (connection == NULL) {
+		printf("%s(): connection is still NULL, no hook found\n",__func__);
+		ERROUT(ENOTCONN);
 	}
 
-	buffer = malloc(sizeof(char)*m->m_len, M_DEVBUF, M_NOWAIT | M_ZERO);
-	if(buffer == NULL) {
-		printf("%s(): ERROR: buffer malloc failed\n",__func__);
-		return(-1);
+	if ((m = m_pullup(m,m->m_len)) == NULL) {
+		printf("%s(): ERROR: m_pullup failed\n",__func__);
+		ERROUT(ENOMEM);
 	}
 
 	buffer = mtod(m,char *);
 
-	if( (connection->loc+m->m_len) < NGD_QUEUE_SIZE) {
-	        memcpy(connection->readq+connection->loc, buffer, m->m_len);
+	if ((connection->loc + m->m_len) < NGD_QUEUE_SIZE) {
+	        memcpy(connection->readq + connection->loc, buffer, m->m_len);
 		connection->loc += m->m_len;
-	} else
+	} else {
 		printf("%s(): queue full, first read out a bit\n",__func__);
+		ERROUT(ENOSPC);
+	}
 
-	free(buffer,M_DEVBUF);
-
-	return(0);
+done:
+	NG_FREE_M(m);
+	return(error);
 }
 
 /*
@@ -391,23 +385,23 @@ ng_device_disconnect(hook_p hook)
 
 #ifdef NGD_DEBUG
 	printf("%s()\n",__func__);
-#endif /* NGD_DEBUG */
+#endif
 
-	SLIST_FOREACH(tmp,&sc->head,links) {
-		if(tmp->active_hook == hook) {
+	SLIST_FOREACH(tmp,&sc->head,links)
+		if(tmp->active_hook == hook)
 			connection = tmp;
-		}
-	}
+
 	if(connection == NULL) {
 		printf("%s(): connection is still NULL, no hook found\n",__func__);
-		return(-1);
+		return(ENOTCONN);
 	}
 
-        free(connection->readq,M_DEVBUF);
+        free(connection->readq, M_DEVBUF);
 
 	destroy_dev(connection->ngddev);
 
 	SLIST_REMOVE(&sc->head,connection,ngd_connection,links);
+	free(connection, M_DEVBUF);
 
 	return(0);
 }
@@ -415,7 +409,7 @@ ng_device_disconnect(hook_p hook)
  * the device is opened 
  */
 static int
-ngdopen(dev_t dev, int flag, int mode, struct thread *td)
+ngdopen(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 
 #ifdef NGD_DEBUG
@@ -429,7 +423,7 @@ ngdopen(dev_t dev, int flag, int mode, struct thread *td)
  * the device is closed 
  */
 static int
-ngdclose(dev_t dev, int flag, int mode, struct thread *td)
+ngdclose(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 
 #ifdef NGD_DEBUG
@@ -447,7 +441,7 @@ ngdclose(dev_t dev, int flag, int mode, struct thread *td)
  * 
  */
 static int
-ngdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+ngdioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
 	struct ngd_softc *sc = &ngd_softc;
 	struct ngd_connection * connection = NULL;
@@ -482,8 +476,7 @@ ngdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 	datap = (struct ngd_param_s *)msg->data;
         datap->p = addr;
 
-	/* NG_SEND_MSG_HOOK(error, here, msg, hook, retaddr) */
-	NG_SEND_MSG_HOOK(error, sc->node, msg, connection->active_hook, NULL);
+	NG_SEND_MSG_HOOK(error, sc->node, msg, connection->active_hook, 0);
 	if(error)
 		printf("%s(): NG_SEND_MSG_HOOK error: %d\n",__func__,error);
 
@@ -499,7 +492,7 @@ nomsg:
  * uiomove.
  */
 static int
-ngdread(dev_t dev, struct uio *uio, int flag)
+ngdread(struct cdev *dev, struct uio *uio, int flag)
 {
 	int ret = 0, amnt;
 	char buffer[uio->uio_resid+1];
@@ -550,7 +543,7 @@ error:
  *
  */
 static int
-ngdwrite(dev_t dev, struct uio *uio, int flag)
+ngdwrite(struct cdev *dev, struct uio *uio, int flag)
 {
 	int ret;
 	int error = 0;
@@ -600,7 +593,7 @@ error:
  * check if there is data available for read
  */
 static int
-ngdpoll(dev_t dev, int events, struct thread *td)
+ngdpoll(struct cdev *dev, int events, struct thread *td)
 {
 	int revents = 0;
 	struct ngd_softc *sc = &ngd_softc;

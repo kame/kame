@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_lock.c,v 1.70 2003/07/16 01:00:38 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_lock.c,v 1.74.2.2 2004/09/03 15:45:31 kan Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -141,7 +141,7 @@ acquire(struct lock **lkpp, int extflags, int wanted) {
 	int s, error;
 
 	CTR3(KTR_LOCK,
-	    "acquire(): lkp == %p, extflags == 0x%x, wanted == 0x%x\n",
+	    "acquire(): lkp == %p, extflags == 0x%x, wanted == 0x%x",
 	    lkp, extflags, wanted);
 
 	if ((extflags & LK_NOWAIT) && (lkp->lk_flags & wanted)) {
@@ -251,16 +251,14 @@ debuglockmgr(lkp, flags, interlkp, td, name, file, line)
 		 * while there is an exclusive lock holder or while an
 		 * exclusive lock request or upgrade request is in progress.
 		 *
-		 * However, if TDF_DEADLKTREAT is set, we override exclusive
+		 * However, if TDP_DEADLKTREAT is set, we override exclusive
 		 * lock requests or upgrade requests ( but not the exclusive
 		 * lock itself ).
 		 */
 		if (lkp->lk_lockholder != thr) {
 			lockflags = LK_HAVE_EXCL;
-			mtx_lock_spin(&sched_lock);
-			if (td != NULL && !(td->td_flags & TDF_DEADLKTREAT))
+			if (td != NULL && !(td->td_pflags & TDP_DEADLKTREAT))
 				lockflags |= LK_WANT_EXCL | LK_WANT_UPGRADE;
-			mtx_unlock_spin(&sched_lock);
 			error = acquire(&lkp, extflags, lockflags);
 			if (error)
 				break;
@@ -337,8 +335,12 @@ debuglockmgr(lkp, flags, interlkp, td, name, file, line)
 			error = acquire(&lkp, extflags, LK_SHARE_NONZERO);
 			lkp->lk_flags &= ~LK_WANT_UPGRADE;
 
-			if (error)
-				break;
+			if (error) {
+			         if ((lkp->lk_flags & ( LK_WANT_EXCL | LK_WAIT_NONZERO)) == (LK_WANT_EXCL | LK_WAIT_NONZERO))
+			                   wakeup((void *)lkp);
+			         break;
+			}
+
 			lkp->lk_flags |= LK_HAVE_EXCL;
 			lkp->lk_lockholder = thr;
 			if (lkp->lk_exclusivecount != 0)
@@ -391,10 +393,13 @@ debuglockmgr(lkp, flags, interlkp, td, name, file, line)
 		/*
 		 * Wait for shared locks and upgrades to finish.
 		 */
-		error = acquire(&lkp, extflags, LK_WANT_UPGRADE | LK_SHARE_NONZERO);
+		error = acquire(&lkp, extflags, LK_HAVE_EXCL | LK_WANT_UPGRADE | LK_SHARE_NONZERO);
 		lkp->lk_flags &= ~LK_WANT_EXCL;
-		if (error)
+		if (error) {
+			if (lkp->lk_flags & LK_WAIT_NONZERO)		
+			         wakeup((void *)lkp);
 			break;
+		}	
 		lkp->lk_flags |= LK_HAVE_EXCL;
 		lkp->lk_lockholder = thr;
 		if (lkp->lk_exclusivecount != 0)
@@ -611,8 +616,9 @@ lockmgr_printinfo(lkp)
 		printf(" lock type %s: SHARED (count %d)", lkp->lk_wmesg,
 		    lkp->lk_sharecount);
 	else if (lkp->lk_flags & LK_HAVE_EXCL)
-		printf(" lock type %s: EXCL (count %d) by thread %p",
-		    lkp->lk_wmesg, lkp->lk_exclusivecount, lkp->lk_lockholder);
+		printf(" lock type %s: EXCL (count %d) by thread %p (pid %d)",
+		    lkp->lk_wmesg, lkp->lk_exclusivecount,
+		    lkp->lk_lockholder, lkp->lk_lockholder->td_proc->p_pid);
 	if (lkp->lk_waitcount > 0)
 		printf(" with %d pending", lkp->lk_waitcount);
 }

@@ -60,7 +60,7 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_gif.c,v 1.9 2003/10/31 18:32:11 brooks Exp $
+ * $FreeBSD: src/sys/netgraph/ng_gif.c,v 1.15 2004/07/28 06:54:55 kan Exp $
  */
 
 /*
@@ -88,6 +88,7 @@
 #include <netgraph/ng_gif.h>
 
 #define IFP2NG(ifp)  ((struct ng_node *)((struct gif_softc *)(ifp))->gif_netgraph)
+#define IFP2NG_SET(ifp, val)  (((struct gif_softc *)(ifp))->gif_netgraph = (val))
 
 /* Per-node private data */
 struct private {
@@ -106,7 +107,7 @@ static void	ng_gif_detach(struct ifnet *ifp);
 /* Other functions */
 static void	ng_gif_input2(node_p node, struct mbuf **mp, int af);
 static int	ng_gif_glue_af(struct mbuf **mp, int af);
-static int	ng_gif_rcv_lower(node_p node, struct mbuf *m, meta_p meta);
+static int	ng_gif_rcv_lower(node_p node, struct mbuf *m);
 
 /* Netgraph node methods */
 static ng_constructor_t	ng_gif_constructor;
@@ -138,18 +139,17 @@ static const struct ng_cmdlist ng_gif_cmdlist[] = {
 };
 
 static struct ng_type ng_gif_typestruct = {
-	NG_ABI_VERSION,
-	NG_GIF_NODE_TYPE,
-	ng_gif_mod_event,
-	ng_gif_constructor,
-	ng_gif_rcvmsg,
-	ng_gif_shutdown,
-	ng_gif_newhook,
-	NULL,
-	ng_gif_connect,
-	ng_gif_rcvdata,
-	ng_gif_disconnect,
-	ng_gif_cmdlist,
+	.version =	NG_ABI_VERSION,
+	.name =		NG_GIF_NODE_TYPE,
+	.mod_event =	ng_gif_mod_event,
+	.constructor =	ng_gif_constructor,
+	.rcvmsg =	ng_gif_rcvmsg,
+	.shutdown =	ng_gif_shutdown,
+	.newhook =	ng_gif_newhook,
+	.connect =	ng_gif_connect,
+	.rcvdata =	ng_gif_rcvdata,
+	.disconnect =	ng_gif_disconnect,
+	.cmdlist =	ng_gif_cmdlist,
 };
 MODULE_VERSION(ng_gif, 1);
 MODULE_DEPEND(ng_gif, if_gif, 1,1,1);
@@ -248,7 +248,7 @@ ng_gif_attach(struct ifnet *ifp)
 	}
 	NG_NODE_SET_PRIVATE(node, priv);
 	priv->ifp = ifp;
-	IFP2NG(ifp) = node;
+	IFP2NG_SET(ifp, node);
 
 	/* Try to give the node the same name as the interface */
 	if (ng_name_node(node, ifp->if_xname) != 0) {
@@ -265,17 +265,18 @@ static void
 ng_gif_detach(struct ifnet *ifp)
 {
 	const node_p node = IFP2NG(ifp);
-	const priv_p priv = NG_NODE_PRIVATE(node);
+	priv_p priv;
 
 	if (node == NULL)		/* no node (why not?), ignore */
 		return;
+	priv = NG_NODE_PRIVATE(node);
 	NG_NODE_REALLY_DIE(node);	/* Force real removal of node */
 	/*
 	 * We can't assume the ifnet is still around when we run shutdown
 	 * So zap it now. XXX We HOPE that anything running at this time
 	 * handles it (as it should in the non netgraph case).
 	 */
-	IFP2NG(ifp) = NULL;
+	IFP2NG_SET(ifp, NULL);
 	priv->ifp = NULL;	/* XXX race if interrupted an output packet */
 	ng_rmnode_self(node);		/* remove all netgraph parts */
 }
@@ -441,13 +442,12 @@ ng_gif_rcvdata(hook_p hook, item_p item)
 	const node_p node = NG_HOOK_NODE(hook);
 	const priv_p priv = NG_NODE_PRIVATE(node);
 	struct mbuf *m;
-	meta_p meta;
 
 	NGI_GET_M(item, m);
-	NGI_GET_META(item, meta);
 	NG_FREE_ITEM(item);
+
 	if (hook == priv->lower)
-		return ng_gif_rcv_lower(node, m, meta);
+		return ng_gif_rcv_lower(node, m);
 	panic("%s: weird hook", __func__);
 }
 
@@ -455,15 +455,12 @@ ng_gif_rcvdata(hook_p hook, item_p item)
  * Handle an mbuf received on the "lower" hook.
  */
 static int
-ng_gif_rcv_lower(node_p node, struct mbuf *m, meta_p meta)
+ng_gif_rcv_lower(node_p node, struct mbuf *m)
 {
 	struct sockaddr	dst;
 	const priv_p priv = NG_NODE_PRIVATE(node);
 
 	bzero(&dst, sizeof(dst));
-
-	/* We don't process metadata. */
-	NG_FREE_META(meta);
 
 	/* Make sure header is fully pulled up */
 	if (m->m_pkthdr.len < sizeof(sa_family_t)) {
@@ -496,7 +493,7 @@ ng_gif_shutdown(node_p node)
 {
 	const priv_p priv = NG_NODE_PRIVATE(node);
 
-	if (node->nd_flags & NG_REALLY_DIE) {
+	if (node->nd_flags & NGF_REALLY_DIE) {
 		/*
 		 * WE came here because the gif interface is being destroyed,
 		 * so stop being persistant.
@@ -508,7 +505,7 @@ ng_gif_shutdown(node_p node)
 		NG_NODE_UNREF(node);	/* free node itself */
 		return (0);
 	}
-	node->nd_flags &= ~NG_INVALID;	/* Signal ng_rmnode we are persisant */
+	NG_NODE_REVIVE(node);		/* Signal ng_rmnode we are persisant */
 	return (0);
 }
 

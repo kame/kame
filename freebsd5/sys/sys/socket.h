@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socket.h	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/sys/socket.h,v 1.73 2003/11/14 18:48:15 bms Exp $
+ * $FreeBSD: src/sys/sys/socket.h,v 1.83 2004/08/11 10:18:49 andre Exp $
  */
 
 #ifndef _SYS_SOCKET_H_
@@ -120,6 +116,7 @@ typedef	__uid_t		uid_t;
 #define	SO_TIMESTAMP	0x0400		/* timestamp received dgram traffic */
 #define	SO_NOSIGPIPE	0x0800		/* no SIGPIPE from EPIPE */
 #define	SO_ACCEPTFILTER	0x1000		/* there is an accept filter */
+#define	SO_BINTIME	0x2000		/* timestamp received dgram traffic */
 #endif
 
 /*
@@ -206,7 +203,9 @@ struct accept_filter_arg {
 #define	AF_NETGRAPH	32		/* Netgraph sockets */
 #define	AF_SLOW		33		/* 802.3ad slow protocol */
 #define	AF_SCLUSTER	34		/* Sitara cluster protocol */
-#define	AF_MAX		35
+#define	AF_ARP		35
+#define	AF_BLUETOOTH	36		/* Bluetooth sockets */
+#define	AF_MAX		37
 #endif
 
 /*
@@ -289,6 +288,8 @@ struct sockaddr_storage {
 #define	PF_NETGRAPH	AF_NETGRAPH
 #define	PF_SLOW		AF_SLOW
 #define PF_SCLUSTER	AF_SCLUSTER
+#define	PF_ARP		AF_ARP
+#define	PF_BLUETOOTH	AF_BLUETOOTH
 
 #define	PF_MAX		AF_MAX
 
@@ -392,7 +393,8 @@ struct msghdr {
 #if __BSD_VISIBLE
 #define	MSG_DONTWAIT	0x80		/* this message should be nonblocking */
 #define	MSG_EOF		0x100		/* data completes connection */
-#define MSG_COMPAT      0x8000		/* used in sendit() */
+#define	MSG_NBIO	0x4000		/* FIONBIO mode, used by fifofs */
+#define	MSG_COMPAT      0x8000		/* used in sendit() */
 #endif
 
 /*
@@ -442,10 +444,17 @@ struct cmsgcred {
 	(((char *)(cmsg) + _ALIGN((cmsg)->cmsg_len) + \
 	  _ALIGN(sizeof(struct cmsghdr)) > \
 	    (char *)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
-	    (struct cmsghdr *)NULL : \
+	    (struct cmsghdr *)0 : \
 	    (struct cmsghdr *)((char *)(cmsg) + _ALIGN((cmsg)->cmsg_len)))
 
-#define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
+/*
+ * RFC 2292 requires to check msg_controllen, in case that the kernel returns
+ * an empty list for some reasons.
+ */
+#define	CMSG_FIRSTHDR(mhdr) \
+	((mhdr)->msg_controllen >= sizeof(struct cmsghdr) ? \
+	 (struct cmsghdr *)(mhdr)->msg_control : \
+	 (struct cmsghdr *)NULL)
 
 #if __BSD_VISIBLE
 /* RFC 2292 additions */
@@ -462,6 +471,7 @@ struct cmsgcred {
 #if __BSD_VISIBLE
 #define	SCM_TIMESTAMP	0x02		/* timestamp (struct timeval) */
 #define	SCM_CREDS	0x03		/* process creds (struct cmsgcred) */
+#define	SCM_BINTIME	0x04		/* timestamp (struct bintime) */
 #endif
 
 #if __BSD_VISIBLE
@@ -503,6 +513,11 @@ struct sf_hdtr {
 	struct iovec *trailers;	/* pointer to an array of trailer struct iovec's */
 	int trl_cnt;		/* number of trailer iovec's */
 };
+
+/*
+ * Sendfile-specific flag(s)
+ */
+#define        SF_NODISKIO     0x00000001
 #endif
 
 #ifndef	_KERNEL
@@ -510,18 +525,15 @@ struct sf_hdtr {
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-/*
- * XXX functions missing restrict type-qualifiers.
- */
-int	accept(int, struct sockaddr *, socklen_t *);
+int	accept(int, struct sockaddr * __restrict, socklen_t * __restrict);
 int	bind(int, const struct sockaddr *, socklen_t);
 int	connect(int, const struct sockaddr *, socklen_t);
-int	getpeername(int, struct sockaddr *, socklen_t *);
-int	getsockname(int, struct sockaddr *, socklen_t *);
-int	getsockopt(int, int, int, void *, socklen_t *);
+int	getpeername(int, struct sockaddr * __restrict, socklen_t * __restrict);
+int	getsockname(int, struct sockaddr * __restrict, socklen_t * __restrict);
+int	getsockopt(int, int, int, void * __restrict, socklen_t * __restrict);
 int	listen(int, int);
 ssize_t	recv(int, void *, size_t, int);
-ssize_t	recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+ssize_t	recvfrom(int, void *, size_t, int, struct sockaddr * __restrict, socklen_t * __restrict);
 ssize_t	recvmsg(int, struct msghdr *, int);
 ssize_t	send(int, const void *, size_t, int);
 ssize_t	sendto(int, const void *,

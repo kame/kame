@@ -54,15 +54,12 @@
  * if there are any other waiters.  If it is the only thread blocked on the
  * lock, then it reclaims the turnstile associated with the lock and removes
  * it from the hash table.
- *
- * XXX: We should probably implement some sort of sleep queue that condition
- * variables and sleepqueue's share.  On Solaris condition variables are
- * implemented using a hash table of sleep queues similar to our current
- * sleep queues.  We might want to investigate doing that ourselves.
  */
 
+#include "opt_turnstile_profiling.h"
+
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_turnstile.c,v 1.134.2.1 2003/12/11 20:01:52 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_turnstile.c,v 1.147.2.2 2004/10/08 19:47:23 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,8 +71,9 @@ __FBSDID("$FreeBSD: src/sys/kern/subr_turnstile.c,v 1.134.2.1 2003/12/11 20:01:5
 #include <sys/proc.h>
 #include <sys/queue.h>
 #include <sys/resourcevar.h>
-#include <sys/turnstile.h>
 #include <sys/sched.h>
+#include <sys/sysctl.h>
+#include <sys/turnstile.h>
 
 /*
  * Constants for the hash table of turnstile chains.  TC_SHIFT is a magic
@@ -94,13 +92,13 @@ __FBSDID("$FreeBSD: src/sys/kern/subr_turnstile.c,v 1.134.2.1 2003/12/11 20:01:5
  * connected by ts_link entries is a per-thread list of all the turnstiles
  * attached to locks that we own.  This is used to fixup our priority when
  * a lock is released.  The other two lists use the ts_hash entries.  The
- * first of these two is turnstile chain list that a turnstile is on when
- * it is attached to a lock.  The second list to use ts_hash is the free
- * list hung off a turnstile that is attached to a lock.
+ * first of these two is the turnstile chain list that a turnstile is on
+ * when it is attached to a lock.  The second list to use ts_hash is the
+ * free list hung off of a turnstile that is attached to a lock.
  *
  * Each turnstile contains two lists of threads.  The ts_blocked list is
  * a linked list of threads blocked on the turnstile's lock.  The
- * ts_pending list is a linked list of threads previously awoken by
+ * ts_pending list is a linked list of threads previously awakened by
  * turnstile_signal() or turnstile_wait() that are waiting to be put on
  * the run queue.
  *
@@ -121,8 +119,20 @@ struct turnstile {
 struct turnstile_chain {
 	LIST_HEAD(, turnstile) tc_turnstiles;	/* List of turnstiles. */
 	struct mtx tc_lock;			/* Spin lock for this chain. */
+#ifdef TURNSTILE_PROFILING
+	u_int	tc_depth;			/* Length of tc_queues. */
+	u_int	tc_max_depth;			/* Max length of tc_queues. */
+#endif
 };
 
+#ifdef TURNSTILE_PROFILING
+u_int turnstile_max_depth;
+SYSCTL_NODE(_debug, OID_AUTO, turnstile, CTLFLAG_RD, 0, "turnstile profiling");
+SYSCTL_NODE(_debug_turnstile, OID_AUTO, chains, CTLFLAG_RD, 0,
+    "turnstile chain stats");
+SYSCTL_UINT(_debug_turnstile, OID_AUTO, max_depth, CTLFLAG_RD,
+    &turnstile_max_depth, 0, "maxmimum depth achieved of a single chain");
+#endif
 static struct mtx td_contested_lock;
 static struct turnstile_chain turnstile_chains[TC_TABLESIZE];
 
@@ -132,6 +142,9 @@ MALLOC_DEFINE(M_TURNSTILE, "turnstiles", "turnstiles");
  * Prototypes for non-exported routines.
  */
 static void	init_turnstile0(void *dummy);
+#ifdef TURNSTILE_PROFILING
+static void	init_turnstile_profiling(void *arg);
+#endif
 static void	propagate_priority(struct thread *);
 static void	turnstile_setowner(struct turnstile *ts, struct thread *owner);
 
@@ -239,7 +252,7 @@ propagate_priority(struct thread *td)
 		 * finish waking this thread up.  We can detect this case
 		 * by checking to see if this thread has been given a
 		 * turnstile by either turnstile_signal() or
-		 * turnstile_wakeup().  In this case, treat the thread as
+		 * turnstile_broadcast().  In this case, treat the thread as
 		 * if it was already running.
 		 */
 		if (td->td_turnstile != NULL) {
@@ -307,6 +320,31 @@ init_turnstiles(void)
 	mtx_init(&td_contested_lock, "td_contested", NULL, MTX_SPIN);
 	thread0.td_turnstile = NULL;
 }
+
+#ifdef TURNSTILE_PROFILING
+static void
+init_turnstile_profiling(void *arg)
+{
+	struct sysctl_oid *chain_oid;
+	char chain_name[10];
+	int i;
+
+	for (i = 0; i < TC_TABLESIZE; i++) {
+		snprintf(chain_name, sizeof(chain_name), "%d", i);
+		chain_oid = SYSCTL_ADD_NODE(NULL, 
+		    SYSCTL_STATIC_CHILDREN(_debug_turnstile_chains), OID_AUTO,
+		    chain_name, CTLFLAG_RD, NULL, "turnstile chain stats");
+		SYSCTL_ADD_UINT(NULL, SYSCTL_CHILDREN(chain_oid), OID_AUTO,
+		    "depth", CTLFLAG_RD, &turnstile_chains[i].tc_depth, 0,
+		    NULL);
+		SYSCTL_ADD_UINT(NULL, SYSCTL_CHILDREN(chain_oid), OID_AUTO,
+		    "max_depth", CTLFLAG_RD, &turnstile_chains[i].tc_max_depth,
+		    0, NULL);
+	}
+}
+SYSINIT(turnstile_profiling, SI_SUB_LOCK, SI_ORDER_ANY,
+    init_turnstile_profiling, NULL);
+#endif
 
 static void
 init_turnstile0(void *dummy)
@@ -443,6 +481,14 @@ turnstile_wait(struct turnstile *ts, struct lock_object *lock,
 
 	/* If the passed in turnstile is NULL, use this thread's turnstile. */
 	if (ts == NULL) {
+#ifdef TURNSTILE_PROFILING
+		tc->tc_depth++;
+		if (tc->tc_depth > tc->tc_max_depth) {
+			tc->tc_max_depth = tc->tc_depth;
+			if (tc->tc_max_depth > turnstile_max_depth)
+				turnstile_max_depth = tc->tc_max_depth;
+		}
+#endif
 		ts = td->td_turnstile;
 		LIST_INSERT_HEAD(&tc->tc_turnstiles, ts, ts_hash);
 		KASSERT(TAILQ_EMPTY(&ts->ts_pending),
@@ -513,8 +559,7 @@ turnstile_wait(struct turnstile *ts, struct lock_object *lock,
 		CTR4(KTR_LOCK, "%s: td %p blocked on [%p] %s", __func__, td,
 		    lock, lock->lo_name);
 
-	td->td_proc->p_stats->p_ru.ru_nvcsw++;
-	mi_switch();
+	mi_switch(SW_VOL, NULL);
 
 	if (LOCK_LOG_TEST(lock, 0))
 		CTR4(KTR_LOCK, "%s: td %p free from blocked on [%p] %s",
@@ -557,10 +602,14 @@ turnstile_signal(struct turnstile *ts)
 	 * turnstile from the free list and give it to the thread.
 	 */
 	empty = TAILQ_EMPTY(&ts->ts_blocked);
-	if (empty)
+	if (empty) {
 		MPASS(LIST_EMPTY(&ts->ts_free));
-	else
+#ifdef TURNSTILE_PROFILING
+		tc->tc_depth--;
+#endif
+	} else
 		ts = LIST_FIRST(&ts->ts_free);
+	MPASS(ts != NULL);
 	LIST_REMOVE(ts, ts_hash);
 	td->td_turnstile = ts;
 
@@ -572,7 +621,7 @@ turnstile_signal(struct turnstile *ts)
  * the turnstile chain locked.
  */
 void
-turnstile_wakeup(struct turnstile *ts)
+turnstile_broadcast(struct turnstile *ts)
 {
 	struct turnstile_chain *tc;
 	struct turnstile *ts1;
@@ -599,8 +648,12 @@ turnstile_wakeup(struct turnstile *ts)
 		if (LIST_EMPTY(&ts->ts_free)) {
 			MPASS(TAILQ_NEXT(td, td_lockq) == NULL);
 			ts1 = ts;
+#ifdef TURNSTILE_PROFILING
+			tc->tc_depth--;
+#endif
 		} else
 			ts1 = LIST_FIRST(&ts->ts_free);
+		MPASS(ts1 != NULL);
 		LIST_REMOVE(ts1, ts_hash);
 		td->td_turnstile = ts1;
 	}
@@ -646,6 +699,7 @@ turnstile_unpend(struct turnstile *ts)
 	ts->ts_owner = NULL;
 	LIST_REMOVE(ts, ts_link);
 	mtx_unlock_spin(&td_contested_lock);
+	critical_enter();
 	mtx_unlock_spin(&tc->tc_lock);
 
 	/*
@@ -683,12 +737,13 @@ turnstile_unpend(struct turnstile *ts)
 			td->td_lockname = NULL;
 			TD_CLR_LOCK(td);
 			MPASS(TD_CAN_RUN(td));
-			setrunqueue(td);
+			setrunqueue(td, SRQ_BORING);
 		} else {
 			td->td_flags |= TDF_TSNOBLOCK;
 			MPASS(TD_IS_RUNNING(td) || TD_ON_RUNQ(td));
 		}
 	}
+	critical_exit();
 	mtx_unlock_spin(&sched_lock);
 }
 

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/linux/linux_machdep.c,v 1.40 2003/06/02 16:56:40 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/linux/linux_machdep.c,v 1.41.2.2 2004/09/09 09:45:26 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -365,7 +365,7 @@ linux_clone(struct thread *td, struct linux_clone_args *args)
 	 */
 	mtx_lock_spin(&sched_lock);
 	TD_SET_CAN_RUN(td2);
-	setrunqueue(td2);
+	setrunqueue(td2, SRQ_BORING);
 	mtx_unlock_spin(&sched_lock);
 
 	td->td_retval[0] = p2->p_pid;
@@ -500,9 +500,10 @@ linux_mmap_common(struct thread *td, struct l_mmap_argv *linux_args)
 			 * mmap'ed region, but some apps do not check
 			 * mmap's return value.
 			 */
-			mtx_assert(&Giant, MA_OWNED);
+			PROC_LOCK(p);
 			p->p_vmspace->vm_maxsaddr = (char *)USRSTACK -
-			    p->p_rlimit[RLIMIT_STACK].rlim_cur;
+			    lim_cur(p, RLIMIT_STACK);
+			PROC_UNLOCK(p);
 		}
 
 		/* This gives us our maximum stack size */
@@ -799,8 +800,8 @@ linux_sigaltstack(struct thread *td, struct linux_sigaltstack_args *uap)
 		ss.ss_size = lss.ss_size;
 		ss.ss_flags = linux_to_bsd_sigaltstack(lss.ss_flags);
 	}
-	error = kern_sigaltstack(td, (uap->uoss != NULL) ? &oss : NULL,
-	    (uap->uss != NULL) ? &ss : NULL);
+	error = kern_sigaltstack(td, (uap->uss != NULL) ? &ss : NULL,
+	    (uap->uoss != NULL) ? &oss : NULL);
 	if (!error && uap->uoss != NULL) {
 		lss.ss_sp = oss.ss_sp;
 		lss.ss_size = oss.ss_size;

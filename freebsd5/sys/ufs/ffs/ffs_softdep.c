@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.149 2003/10/23 21:14:08 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.156 2004/08/08 13:21:54 phk Exp $");
 
 /*
  * For now we want the safety net that the DIAGNOSTIC and DEBUG flags provide.
@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.149 2003/10/23 21:14:08 jh
 #include <sys/systm.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
+#include <sys/kdb.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
@@ -202,6 +203,7 @@ static	void add_to_worklist(struct worklist *);
 /*
  * Exported softdep operations.
  */
+static	int softdep_disk_prewrite(struct vnode *vp, struct buf *bp);
 static	void softdep_disk_io_initiation(struct buf *);
 static	void softdep_disk_write_complete(struct buf *);
 static	void softdep_deallocate_dependencies(struct buf *);
@@ -1152,6 +1154,7 @@ softdep_initialize()
 	softdep_fsync_hook = softdep_fsync;
 
 	/* initialise bioops hack */
+	bioops.io_prewrite = softdep_disk_prewrite;
 	bioops.io_start = softdep_disk_io_initiation;
 	bioops.io_complete = softdep_disk_write_complete;
 	bioops.io_deallocate = softdep_deallocate_dependencies;
@@ -1965,15 +1968,15 @@ softdep_setup_freeblocks(ip, length, flags)
 	} else {
 		freeblks->fb_oldsize = ip->i_size;
 		ip->i_size = 0;
-		DIP(ip, i_size) = 0;
+		DIP_SET(ip, i_size, 0);
 		freeblks->fb_chkcnt = datablocks;
 		for (i = 0; i < NDADDR; i++) {
 			freeblks->fb_dblks[i] = DIP(ip, i_db[i]);
-			DIP(ip, i_db[i]) = 0;
+			DIP_SET(ip, i_db[i], 0);
 		}
 		for (i = 0; i < NIADDR; i++) {
 			freeblks->fb_iblks[i] = DIP(ip, i_ib[i]);
-			DIP(ip, i_ib[i]) = 0;
+			DIP_SET(ip, i_ib[i], 0);
 		}
 		/*
 		 * If the file was removed, then the space being freed was
@@ -1994,7 +1997,7 @@ softdep_setup_freeblocks(ip, length, flags)
 			ip->i_din2->di_extb[i] = 0;
 		}
 	}
-	DIP(ip, i_blocks) -= freeblks->fb_chkcnt;
+	DIP_SET(ip, i_blocks, DIP(ip, i_blocks) - freeblks->fb_chkcnt);
 	/*
 	 * Push the zero'ed inode to to its disk buffer so that we are free
 	 * to delete its dependencies below. Once the dependencies are gone
@@ -2507,7 +2510,8 @@ handle_workitem_freeblocks(freeblks, flags)
 	    VFS_VGET(freeblks->fb_mnt, freeblks->fb_previousinum,
 	    (flags & LK_NOWAIT) | LK_EXCLUSIVE, &vp) == 0) {
 		ip = VTOI(vp);
-		DIP(ip, i_blocks) += freeblks->fb_chkcnt - blocksreleased;
+		DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + \
+		    freeblks->fb_chkcnt - blocksreleased);
 		ip->i_flag |= IN_CHANGE;
 		vput(vp);
 	}
@@ -3312,7 +3316,7 @@ handle_workitem_remove(dirrem, xp)
 	 */
 	if ((dirrem->dm_state & RMDIR) == 0) {
 		ip->i_nlink--;
-		DIP(ip, i_nlink) = ip->i_nlink;
+		DIP_SET(ip, i_nlink, ip->i_nlink);
 		ip->i_flag |= IN_CHANGE;
 		if (ip->i_nlink < ip->i_effnlink) {
 			FREE_LOCK(&lk);
@@ -3333,7 +3337,7 @@ handle_workitem_remove(dirrem, xp)
 	 * the parent decremented to account for the loss of "..".
 	 */
 	ip->i_nlink -= 2;
-	DIP(ip, i_nlink) = ip->i_nlink;
+	DIP_SET(ip, i_nlink, ip->i_nlink);
 	ip->i_flag |= IN_CHANGE;
 	if (ip->i_nlink < ip->i_effnlink) {
 		FREE_LOCK(&lk);
@@ -3412,6 +3416,34 @@ handle_workitem_freefile(freefile)
 		softdep_error("handle_workitem_freefile", error);
 	WORKITEM_FREE(freefile, D_FREEFILE);
 }
+
+static int
+softdep_disk_prewrite(struct vnode *vp, struct buf *bp)
+{
+	int error;
+
+	if (bp->b_iocmd != BIO_WRITE) 
+		return (0);
+	if ((bp->b_flags & B_VALIDSUSPWRT) == 0 &&
+	    bp->b_vp != NULL && bp->b_vp->v_mount != NULL &&
+	    (bp->b_vp->v_mount->mnt_kern_flag & MNTK_SUSPENDED) != 0)
+		panic("softdep_disk_prewrite: bad I/O");
+	bp->b_flags &= ~B_VALIDSUSPWRT;
+	if (LIST_FIRST(&bp->b_dep) != NULL)
+		buf_start(bp);
+	mp_fixme("This should require the vnode lock.");
+	if ((vp->v_vflag & VV_COPYONWRITE) &&
+	    vp->v_rdev->si_copyonwrite &&
+	    (error = (*vp->v_rdev->si_copyonwrite)(vp, bp)) != 0 &&
+	    error != EOPNOTSUPP) {
+		bp->b_error = error;
+		bp->b_ioflags |= BIO_ERROR;
+		bufdone(bp);
+		return (1);
+	}
+	return (0);
+}
+
 
 /*
  * Disk writes.
@@ -4705,7 +4737,7 @@ softdep_update_inodeblock(ip, bp, waitfor)
 	ibp = inodedep->id_buf;
 	ibp = getdirtybuf(&ibp, NULL, MNT_WAIT);
 	FREE_LOCK(&lk);
-	if (ibp && (error = BUF_WRITE(ibp)) != 0)
+	if (ibp && (error = bwrite(ibp)) != 0)
 		softdep_error("softdep_update_inodeblock: bwrite", error);
 	if ((inodedep->id_state & DEPCOMPLETE) == 0)
 		panic("softdep_update_inodeblock: update failed");
@@ -4862,7 +4894,7 @@ softdep_fsync(vp)
 		error = bread(pvp, lbn, blksize(fs, VTOI(pvp), lbn), td->td_ucred,
 		    &bp);
 		if (error == 0)
-			error = BUF_WRITE(bp);
+			error = bwrite(bp);
 		else
 			brelse(bp);
 		vput(pvp);
@@ -5026,7 +5058,7 @@ loop:
 			FREE_LOCK(&lk);
 			if (waitfor == MNT_NOWAIT) {
 				bawrite(nbp);
-			} else if ((error = BUF_WRITE(nbp)) != 0) {
+			} else if ((error = bwrite(nbp)) != 0) {
 				break;
 			}
 			ACQUIRE_LOCK(&lk);
@@ -5043,7 +5075,7 @@ loop:
 			FREE_LOCK(&lk);
 			if (waitfor == MNT_NOWAIT) {
 				bawrite(nbp);
-			} else if ((error = BUF_WRITE(nbp)) != 0) {
+			} else if ((error = bwrite(nbp)) != 0) {
 				break;
 			}
 			ACQUIRE_LOCK(&lk);
@@ -5060,7 +5092,7 @@ loop:
 				if (nbp == NULL)
 					goto restart;
 				FREE_LOCK(&lk);
-				if ((error = BUF_WRITE(nbp)) != 0) {
+				if ((error = bwrite(nbp)) != 0) {
 					break;
 				}
 				ACQUIRE_LOCK(&lk);
@@ -5112,7 +5144,7 @@ loop:
 			FREE_LOCK(&lk);
 			if (waitfor == MNT_NOWAIT) {
 				bawrite(nbp);
-			} else if ((error = BUF_WRITE(nbp)) != 0) {
+			} else if ((error = bwrite(nbp)) != 0) {
 				break;
 			}
 			ACQUIRE_LOCK(&lk);
@@ -5133,7 +5165,7 @@ loop:
 			FREE_LOCK(&lk);
 			if (waitfor == MNT_NOWAIT) {
 				bawrite(nbp);
-			} else if ((error = BUF_WRITE(nbp)) != 0) {
+			} else if ((error = bwrite(nbp)) != 0) {
 				break;
 			}
 			ACQUIRE_LOCK(&lk);
@@ -5286,7 +5318,7 @@ flush_deplist(listhead, waitfor, errorp)
 		FREE_LOCK(&lk);
 		if (waitfor == MNT_NOWAIT) {
 			bawrite(bp);
-		} else if ((*errorp = BUF_WRITE(bp)) != 0) {
+		} else if ((*errorp = bwrite(bp)) != 0) {
 			ACQUIRE_LOCK(&lk);
 			return (1);
 		}
@@ -5395,7 +5427,7 @@ flush_pagedep_deps(pvp, mp, diraddhdp)
 			bp = inodedep->id_buf;
 			bp = getdirtybuf(&bp, NULL, MNT_WAIT);
 			FREE_LOCK(&lk);
-			if (bp && (error = BUF_WRITE(bp)) != 0)
+			if (bp && (error = bwrite(bp)) != 0)
 				break;
 			ACQUIRE_LOCK(&lk);
 			if (dap != LIST_FIRST(diraddhdp))
@@ -5412,7 +5444,7 @@ flush_pagedep_deps(pvp, mp, diraddhdp)
 			brelse(bp);
 			break;
 		}
-		if ((error = BUF_WRITE(bp)) != 0)
+		if ((error = bwrite(bp)) != 0)
 			break;
 		ACQUIRE_LOCK(&lk);
 		/*
@@ -5699,9 +5731,9 @@ clear_inodedeps(td)
 	for (ino = firstino; ino <= lastino; ino++) {
 		if (inodedep_lookup(fs, ino, 0, &inodedep) == 0)
 			continue;
-		FREE_LOCK(&lk);
 		if (vn_start_write(NULL, &mp, V_NOWAIT) != 0)
 			continue;
+		FREE_LOCK(&lk);
 		if ((error = VFS_VGET(mp, ino, LK_EXCLUSIVE, &vp)) != 0) {
 			softdep_error("clear_inodedeps: vget", error);
 			vn_finished_write(mp);
@@ -5836,7 +5868,7 @@ getdirtybuf(bpp, mtx, waitfor)
 		if ((bp = *bpp) == NULL)
 			return (0);
 		if (bp->b_vp == NULL)
-			backtrace();
+			kdb_backtrace();
 		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT, NULL) == 0) {
 			if ((bp->b_vflags & BV_BKGRDINPROG) == 0)
 				break;

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_acl.c,v 1.18 2003/08/04 03:29:13 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_acl.c,v 1.20 2004/08/15 06:24:42 jmg Exp $");
 
 #include "opt_ufs.h"
 #include "opt_quota.h"
@@ -136,7 +136,7 @@ ufs_sync_inode_from_acl(struct acl *acl, struct inode *ip)
 
 	ip->i_mode &= ACL_PRESERVE_MASK;
 	ip->i_mode |= acl_posix1e_acl_to_mode(acl);
-	DIP(ip, i_mode) = ip->i_mode;
+	DIP_SET(ip, i_mode, ip->i_mode);
 }
 
 /*
@@ -397,7 +397,7 @@ ufs_setacl(ap)
 		ip->i_flag |= IN_CHANGE;
 	}
 
-	VN_KNOTE(ap->a_vp, NOTE_ATTRIB);
+	VN_KNOTE_UNLOCKED(ap->a_vp, NOTE_ATTRIB);
 	return (0);
 }
 

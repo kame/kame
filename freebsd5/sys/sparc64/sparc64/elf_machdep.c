@@ -36,7 +36,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *	from: NetBSD: mdreloc.c,v 1.5 2001/04/25 12:24:51 kleink Exp
- * $FreeBSD: src/sys/sparc64/sparc64/elf_machdep.c,v 1.15 2003/09/25 01:10:26 peter Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/elf_machdep.c,v 1.19 2004/08/11 02:35:06 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -91,14 +91,37 @@ static Elf64_Brandinfo freebsd_brand_info = {
 						ELFOSABI_FREEBSD,
 						EM_SPARCV9,
 						"FreeBSD",
-						"",
+						NULL,
 						"/libexec/ld-elf.so.1",
-						&elf64_freebsd_sysvec
+						&elf64_freebsd_sysvec,
+						NULL,
 					  };
 
 SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
 	(sysinit_cfunc_t) elf64_insert_brand_entry,
 	&freebsd_brand_info);
+
+static Elf64_Brandinfo freebsd_brand_oinfo = {
+						ELFOSABI_FREEBSD,
+						EM_SPARCV9,
+						"FreeBSD",
+						NULL,
+						"/usr/libexec/ld-elf.so.1",
+						&elf64_freebsd_sysvec,
+						NULL,
+					  };
+
+SYSINIT(oelf64, SI_SUB_EXEC, SI_ORDER_ANY,
+	(sysinit_cfunc_t) elf64_insert_brand_entry,
+	&freebsd_brand_oinfo);
+
+
+void
+elf64_dump_thread(struct thread *td __unused, void *dst __unused,
+    size_t *off __unused)
+{
+}
+
 
 /*
  * The following table holds for each relocation type:
@@ -237,7 +260,8 @@ static long reloc_target_bitmask[] = {
 #define RELOC_VALUE_BITMASK(t)	(reloc_target_bitmask[t])
 
 int
-elf_reloc_local(linker_file_t lf, const void *data, int type)
+elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+    int type, elf_lookup_fn lookup)
 {
 	const Elf_Rela *rela;
 	Elf_Addr value;
@@ -260,10 +284,10 @@ elf_reloc_local(linker_file_t lf, const void *data, int type)
 
 /* Process one elf relocation with addend. */
 int
-elf_reloc(linker_file_t lf, const void *data, int type)
+elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+    elf_lookup_fn lookup)
 {
 	const Elf_Rela *rela;
-	Elf_Addr relocbase;
 	Elf_Half *where32;
 	Elf_Addr *where;
 	Elf_Word rtype, symidx;
@@ -274,7 +298,6 @@ elf_reloc(linker_file_t lf, const void *data, int type)
 	if (type != ELF_RELOC_RELA)
 		return (-1);
 
-	relocbase = (Elf_Addr)lf->address;
 	rela = (const Elf_Rela *)data;
 	where = (Elf_Addr *)(relocbase + rela->r_offset);
 	where32 = (Elf_Half *)where;
@@ -294,7 +317,7 @@ elf_reloc(linker_file_t lf, const void *data, int type)
 	value = rela->r_addend;
 
 	if (RELOC_RESOLVE_SYMBOL(rtype)) {
-		addr = elf_lookup(lf, symidx, 1);
+		addr = lookup(lf, symidx, 1);
 		if (addr == 0)
 			return (-1);
 		value += addr;

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,13 +27,15 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.83 2003/11/20 20:07:38 andre Exp $
+ * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.100.2.1.2.1 2004/10/30 20:50:06 rwatson Exp $
  */
 
+#include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_mac.h"
 #include "opt_tcpdebug.h"
+#include "opt_tcp_sack.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,7 +102,7 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, local_slowstart_flightsize, CTLFLAG_RW,
 
 int     tcp_do_newreno = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, newreno, CTLFLAG_RW, &tcp_do_newreno,
-        0, "Enable NewReno Algorithms");
+	0, "Enable NewReno Algorithms");
 
 /*
  * Tcp output routine: figure out what should be sent and send it.
@@ -113,8 +111,11 @@ int
 tcp_output(struct tcpcb *tp)
 {
 	struct socket *so = tp->t_inpcb->inp_socket;
-	long len, win;
+	long len, recwin, sendwin;
 	int off, flags, error;
+#ifdef TCP_SIGNATURE
+	int sigoff = 0;
+#endif
 	struct mbuf *m;
 	struct ip *ip = NULL;
 	struct ipovly *ipov = NULL;
@@ -122,6 +123,8 @@ tcp_output(struct tcpcb *tp)
 	u_char opt[TCP_MAXOLEN];
 	unsigned ipoptlen, optlen, hdrlen;
 	int idle, sendalot;
+	int i, sack_rxmit;
+	struct sackhole *p;
 #if 0
 	int maxburst = TCP_MAXBURST;
 #endif
@@ -148,10 +151,10 @@ tcp_output(struct tcpcb *tp)
 		 * We have been idle for "a while" and no acks are
 		 * expected to clock out any data we send --
 		 * slow start to get ack "clock" running again.
-		 *       
+		 *
 		 * Set the slow-start flight size depending on whether
 		 * this is a local network or not.
-		 */      
+		 */
 		int ss = ss_fltsz;
 #ifdef INET6
 		if (isipv6) {
@@ -171,12 +174,70 @@ tcp_output(struct tcpcb *tp)
 		}
 	}
 again:
+	/*
+	 * If we've recently taken a timeout, snd_max will be greater than
+	 * snd_nxt.  There may be SACK information that allows us to avoid
+	 * resending already delivered data.  Adjust snd_nxt accordingly.
+	 */
+	if (tp->sack_enable && SEQ_LT(tp->snd_nxt, tp->snd_max))
+		tcp_sack_adjust(tp);
 	sendalot = 0;
 	off = tp->snd_nxt - tp->snd_una;
-	win = min(tp->snd_wnd, tp->snd_cwnd);
-	win = min(win, tp->snd_bwnd);
+	sendwin = min(tp->snd_wnd, tp->snd_cwnd);
+	sendwin = min(sendwin, tp->snd_bwnd);
 
 	flags = tcp_outflags[tp->t_state];
+	/*
+	 * Send any SACK-generated retransmissions.  If we're explicitly trying
+	 * to send out new data (when sendalot is 1), bypass this function.
+	 * If we retransmit in fast recovery mode, decrement snd_cwnd, since
+	 * we're replacing a (future) new transmission with a retransmission
+	 * now, and we previously incremented snd_cwnd in tcp_input().
+	 */
+	/*
+	 * Still in sack recovery , reset rxmit flag to zero.
+	 */
+	sack_rxmit = 0;
+	len = 0;
+	p = NULL;
+	if (tp->sack_enable && IN_FASTRECOVERY(tp) &&
+	    (p = tcp_sack_output(tp))) {
+		KASSERT(tp->snd_cwnd >= 0,
+			("%s: CWIN is negative : %ld", __func__, tp->snd_cwnd));
+		/* Do not retransmit SACK segments beyond snd_recover */
+		if (SEQ_GT(p->end, tp->snd_recover)) {
+			/*
+			 * (At least) part of sack hole extends beyond
+			 * snd_recover. Check to see if we can rexmit data
+			 * for this hole.
+			 */
+			if (SEQ_GEQ(p->rxmit, tp->snd_recover)) {
+				/*
+				 * Can't rexmit any more data for this hole.
+				 * That data will be rexmitted in the next
+				 * sack recovery episode, when snd_recover
+				 * moves past p->rxmit.
+				 */
+				p = NULL;
+				goto after_sack_rexmit;
+			} else
+				/* Can rexmit part of the current hole */
+				len = ((long)ulmin(tp->snd_cwnd,
+					  tp->snd_recover - p->rxmit));
+		} else
+			len = ((long)ulmin(tp->snd_cwnd, p->end - p->rxmit));
+		off = p->rxmit - tp->snd_una;
+		KASSERT(off >= 0,("%s: sack block to the left of una : %d",
+		    __func__, off));
+		if (len > 0) {
+			sack_rxmit = 1;
+			sendalot = 1;
+			tcpstat.tcps_sack_rexmits++;
+			tcpstat.tcps_sack_rexmit_bytes +=
+			    min(len, tp->t_maxseg);
+		}
+	}
+after_sack_rexmit:
 	/*
 	 * Get standard flags, and add SYN or FIN if requested by 'hidden'
 	 * state flags.
@@ -186,6 +247,7 @@ again:
 	if (tp->t_flags & TF_NEEDSYN)
 		flags |= TH_SYN;
 
+	SOCKBUF_LOCK(&so->so_snd);
 	/*
 	 * If in persist timeout with window of 0, send 1 byte.
 	 * Otherwise, if window is small but nonzero
@@ -193,7 +255,7 @@ again:
 	 * and go to transmit state.
 	 */
 	if (tp->t_force) {
-		if (win == 0) {
+		if (sendwin == 0) {
 			/*
 			 * If we still have some data to send, then
 			 * clear the FIN bit.  Usually this would
@@ -212,7 +274,7 @@ again:
 			 */
 			if (off < so->so_snd.sb_cc)
 				flags &= ~TH_FIN;
-			win = 1;
+			sendwin = 1;
 		} else {
 			callout_stop(tp->tt_persist);
 			tp->t_rxtshift = 0;
@@ -220,9 +282,9 @@ again:
 	}
 
 	/*
-	 * If snd_nxt == snd_max and we have transmitted a FIN, the 
+	 * If snd_nxt == snd_max and we have transmitted a FIN, the
 	 * offset will be > 0 even if so_snd.sb_cc is 0, resulting in
-	 * a negative length.  This can also occur when tcp opens up
+	 * a negative length.  This can also occur when TCP opens up
 	 * its congestion window while receiving additional duplicate
 	 * acks after fast-retransmit because TCP will reset snd_nxt
 	 * to snd_max after the fast-retransmit.
@@ -230,9 +292,12 @@ again:
 	 * In the normal retransmit-FIN-only case, however, snd_nxt will
 	 * be set to snd_una, the offset will be 0, and the length may
 	 * wind up 0.
+	 *
+	 * If sack_rxmit is true we are retransmitting from the scoreboard
+	 * in which case len is already set.
 	 */
-	len = (long)ulmin(so->so_snd.sb_cc, win) - off;
-
+	if (!sack_rxmit)
+		len = ((long)ulmin(so->so_snd.sb_cc, sendwin) - off);
 
 	/*
 	 * Lop off SYN bit if it has already been sent.  However, if this
@@ -246,7 +311,7 @@ again:
 			tcp_hc_gettao(&tp->t_inpcb->inp_inc, &tao);
 		if (len > 0 && tp->t_state == TCPS_SYN_SENT &&
 		     tao.tao_ccsent == 0)
-			return 0;
+			goto just_return;
 	}
 
 	/*
@@ -274,7 +339,7 @@ again:
 		 * close completely, just wait for an ACK.
 		 */
 		len = 0;
-		if (win == 0) {
+		if (sendwin == 0) {
 			callout_stop(tp->tt_rexmt);
 			tp->t_rxtshift = 0;
 			tp->snd_nxt = tp->snd_una;
@@ -292,10 +357,15 @@ again:
 		len = tp->t_maxseg;
 		sendalot = 1;
 	}
-	if (SEQ_LT(tp->snd_nxt + len, tp->snd_una + so->so_snd.sb_cc))
-		flags &= ~TH_FIN;
+	if (sack_rxmit) {
+		if (SEQ_LT(p->rxmit + len, tp->snd_una + so->so_snd.sb_cc))
+			flags &= ~TH_FIN;
+	} else {
+		if (SEQ_LT(tp->snd_nxt + len, tp->snd_una + so->so_snd.sb_cc))
+			flags &= ~TH_FIN;
+	}
 
-	win = sbspace(&so->so_rcv);
+	recwin = sbspace(&so->so_rcv);
 
 	/*
 	 * Sender silly window avoidance.   We transmit under the following
@@ -331,6 +401,8 @@ again:
 			goto send;
 		if (SEQ_LT(tp->snd_nxt, tp->snd_max))	/* retransmit case */
 			goto send;
+		if (sack_rxmit)
+			goto send;
 	}
 
 	/*
@@ -341,13 +413,13 @@ again:
 	 * window, then want to send a window update to peer.
 	 * Skip this if the connection is in T/TCP half-open state.
 	 */
-	if (win > 0 && !(tp->t_flags & TF_NEEDSYN)) {
+	if (recwin > 0 && !(tp->t_flags & TF_NEEDSYN)) {
 		/*
 		 * "adv" is the amount we can increase the window,
 		 * taking into account that we are limited by
 		 * TCP_MAXWIN << tp->rcv_scale.
 		 */
-		long adv = min(win, (long)TCP_MAXWIN << tp->rcv_scale) -
+		long adv = min(recwin, (long)TCP_MAXWIN << tp->rcv_scale) -
 			(tp->rcv_adv - tp->rcv_nxt);
 
 		if (adv >= (long) (2 * tp->t_maxseg))
@@ -374,7 +446,18 @@ again:
 	if (flags & TH_FIN &&
 	    ((tp->t_flags & TF_SENTFIN) == 0 || tp->snd_nxt == tp->snd_una))
 		goto send;
-
+	/*
+	 * In SACK, it is possible for tcp_output to fail to send a segment
+	 * after the retransmission timer has been turned off.  Make sure
+	 * that the retransmission timer is set.
+	 */
+	if (tp->sack_enable && SEQ_GT(tp->snd_max, tp->snd_una) &&
+	    !callout_active(tp->tt_rexmt) &&
+	    !callout_active(tp->tt_persist)) {
+		callout_reset(tp->tt_rexmt, tp->t_rxtcur,
+			      tcp_timer_rexmt, tp);
+		goto just_return;
+	} 
 	/*
 	 * TCP window updates are not reliable, rather a polling protocol
 	 * using ``persist'' packets is used to insure receipt of window
@@ -406,9 +489,12 @@ again:
 	/*
 	 * No reason to send a segment, just return.
 	 */
+just_return:
+	SOCKBUF_UNLOCK(&so->so_snd);
 	return (0);
 
 send:
+	SOCKBUF_LOCK_ASSERT(&so->so_snd);
 	/*
 	 * Before ESTABLISHED, force sending of initial options
 	 * unless TCP set not to do any options.
@@ -435,6 +521,19 @@ send:
 			(void)memcpy(opt + 2, &mss, sizeof(mss));
 			optlen = TCPOLEN_MAXSEG;
 
+			/*
+			 * If this is the first SYN of connection (not a SYN
+			 * ACK), include SACK_PERMIT_HDR option.  If this is a
+			 * SYN ACK, include SACK_PERMIT_HDR option if peer has
+			 * already done so. This is only for active connect,
+			 * since the syncache takes care of the passive connect.
+			 */
+			if (tp->sack_enable && ((flags & TH_ACK) == 0 ||
+			    (tp->t_flags & TF_SACK_PERMIT))) {
+				*((u_int32_t *) (opt + optlen)) =
+					htonl(TCPOPT_SACK_PERMIT_HDR);
+				optlen += 4;
+			}
 			if ((tp->t_flags & TF_REQ_SCALE) &&
 			    ((flags & TH_ACK) == 0 ||
 			    (tp->t_flags & TF_RCVD_SCALE))) {
@@ -446,32 +545,58 @@ send:
 				optlen += 4;
 			}
 		}
- 	}
+	}
 
- 	/*
+	/*
 	 * Send a timestamp and echo-reply if this is a SYN and our side
 	 * wants to use timestamps (TF_REQ_TSTMP is set) or both our side
 	 * and our peer have sent timestamps in our SYN's.
- 	 */
- 	if ((tp->t_flags & (TF_REQ_TSTMP|TF_NOOPT)) == TF_REQ_TSTMP &&
- 	    (flags & TH_RST) == 0 &&
+	 */
+	if ((tp->t_flags & (TF_REQ_TSTMP|TF_NOOPT)) == TF_REQ_TSTMP &&
+	    (flags & TH_RST) == 0 &&
 	    ((flags & TH_ACK) == 0 ||
 	     (tp->t_flags & TF_RCVD_TSTMP))) {
 		u_int32_t *lp = (u_int32_t *)(opt + optlen);
 
- 		/* Form timestamp option as shown in appendix A of RFC 1323. */
- 		*lp++ = htonl(TCPOPT_TSTAMP_HDR);
- 		*lp++ = htonl(ticks);
- 		*lp   = htonl(tp->ts_recent);
- 		optlen += TCPOLEN_TSTAMP_APPA;
- 	}
+		/* Form timestamp option as shown in appendix A of RFC 1323. */
+		*lp++ = htonl(TCPOPT_TSTAMP_HDR);
+		*lp++ = htonl(ticks);
+		*lp   = htonl(tp->ts_recent);
+		optlen += TCPOLEN_TSTAMP_APPA;
+	}
 
- 	/*
+	/*
+	 * Send SACKs if necessary.  This should be the last option processed.
+	 * Only as many SACKs are sent as are permitted by the maximum options
+	 * size.  No more than three SACKs are sent.
+	 */
+	if (tp->sack_enable && tp->t_state == TCPS_ESTABLISHED &&
+	    (tp->t_flags & (TF_SACK_PERMIT|TF_NOOPT)) == TF_SACK_PERMIT &&
+	    tp->rcv_numsacks) {
+		u_int32_t *lp = (u_int32_t *)(opt + optlen);
+		u_int32_t *olp = lp++;
+		int count = 0;  /* actual number of SACKs inserted */
+		int maxsack = (MAX_TCPOPTLEN - (optlen + 4))/TCPOLEN_SACK;
+
+		tcpstat.tcps_sack_send_blocks++;
+		maxsack = min(maxsack, TCP_MAX_SACK);
+		for (i = 0; (i < tp->rcv_numsacks && count < maxsack); i++) {
+			struct sackblk sack = tp->sackblks[i];
+			if (sack.start == 0 && sack.end == 0)
+				continue;
+			*lp++ = htonl(sack.start);
+			*lp++ = htonl(sack.end);
+			count++;
+		}
+		*olp = htonl(TCPOPT_SACK_HDR|(TCPOLEN_SACK*count+2));
+		optlen += TCPOLEN_SACK*count + 4; /* including leading NOPs */
+	}
+	/*
 	 * Send `CC-family' options if our side wants to use them (TF_REQ_CC),
 	 * options are allowed (!TF_NOOPT) and it's not a RST.
- 	 */
- 	if ((tp->t_flags & (TF_REQ_CC|TF_NOOPT)) == TF_REQ_CC &&
- 	     (flags & TH_RST) == 0) {
+	 */
+	if ((tp->t_flags & (TF_REQ_CC|TF_NOOPT)) == TF_REQ_CC &&
+	     (flags & TH_RST) == 0) {
 		switch (flags & (TH_SYN|TH_ACK)) {
 		/*
 		 * This is a normal ACK, send CC if we received CC before
@@ -509,7 +634,7 @@ send:
 						TCPOPT_CCNEW : TCPOPT_CC;
 			opt[optlen++] = TCPOLEN_CC;
 			*(u_int32_t *)&opt[optlen] = htonl(tp->cc_send);
- 			optlen += 4;
+			optlen += 4;
 			break;
 
 		/*
@@ -535,9 +660,33 @@ send:
 			}
 			break;
 		}
- 	}
+	}
 
- 	hdrlen += optlen;
+#ifdef TCP_SIGNATURE
+#ifdef INET6
+	if (!isipv6)
+#endif
+	if (tp->t_flags & TF_SIGNATURE) {
+		int i;
+		u_char *bp;
+
+		/* Initialize TCP-MD5 option (RFC2385) */
+		bp = (u_char *)opt + optlen;
+		*bp++ = TCPOPT_SIGNATURE;
+		*bp++ = TCPOLEN_SIGNATURE;
+		sigoff = optlen + 2;
+		for (i = 0; i < TCP_SIGLEN; i++)
+			*bp++ = 0;
+		optlen += TCPOLEN_SIGNATURE;
+
+		/* Terminate options list and maintain 32-bit alignment. */
+		*bp++ = TCPOPT_NOP;
+		*bp++ = TCPOPT_EOL;
+		optlen += 2;
+	}
+#endif /* TCP_SIGNATURE */
+
+	hdrlen += optlen;
 
 #ifdef INET6
 	if (isipv6)
@@ -570,9 +719,9 @@ send:
 
 /*#ifdef DIAGNOSTIC*/
 #ifdef INET6
- 	if (max_linkhdr + hdrlen > MCLBYTES)
+	if (max_linkhdr + hdrlen > MCLBYTES)
 #else
- 	if (max_linkhdr + hdrlen > MHLEN)
+	if (max_linkhdr + hdrlen > MHLEN)
 #endif
 		panic("tcphdr too big");
 /*#endif*/
@@ -595,6 +744,7 @@ send:
 #ifdef notyet
 		if ((m = m_copypack(so->so_snd.sb_mb, off,
 		    (int)len, max_linkhdr + hdrlen)) == 0) {
+			SOCKBUF_UNLOCK(&so->so_snd);
 			error = ENOBUFS;
 			goto out;
 		}
@@ -606,6 +756,7 @@ send:
 #else
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
 		if (m == NULL) {
+			SOCKBUF_UNLOCK(&so->so_snd);
 			error = ENOBUFS;
 			goto out;
 		}
@@ -613,6 +764,7 @@ send:
 		if (MHLEN < hdrlen + max_linkhdr) {
 			MCLGET(m, M_DONTWAIT);
 			if ((m->m_flags & M_EXT) == 0) {
+				SOCKBUF_UNLOCK(&so->so_snd);
 				m_freem(m);
 				error = ENOBUFS;
 				goto out;
@@ -628,6 +780,7 @@ send:
 		} else {
 			m->m_next = m_copy(so->so_snd.sb_mb, off, (int) len);
 			if (m->m_next == 0) {
+				SOCKBUF_UNLOCK(&so->so_snd);
 				(void) m_free(m);
 				error = ENOBUFS;
 				goto out;
@@ -642,7 +795,9 @@ send:
 		 */
 		if (off + len == so->so_snd.sb_cc)
 			flags |= TH_PUSH;
+		SOCKBUF_UNLOCK(&so->so_snd);
 	} else {
+		SOCKBUF_UNLOCK(&so->so_snd);
 		if (tp->t_flags & TF_ACKNOW)
 			tcpstat.tcps_sndacks++;
 		else if (flags & (TH_SYN|TH_FIN|TH_RST))
@@ -666,9 +821,10 @@ send:
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
 	}
+	SOCKBUF_UNLOCK_ASSERT(&so->so_snd);
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
 #ifdef MAC
-	mac_create_mbuf_from_socket(so, m);
+	mac_create_mbuf_from_inpcb(tp->t_inpcb, m);
 #endif
 #ifdef INET6
 	if (isipv6) {
@@ -677,12 +833,12 @@ send:
 		tcpip_fillheaders(tp->t_inpcb, ip6, th);
 	} else
 #endif /* INET6 */
-      {
-	ip = mtod(m, struct ip *);
-	ipov = (struct ipovly *)ip;
-	th = (struct tcphdr *)(ip + 1);
-	tcpip_fillheaders(tp->t_inpcb, ip, th);
-      }
+	{
+		ip = mtod(m, struct ip *);
+		ipov = (struct ipovly *)ip;
+		th = (struct tcphdr *)(ip + 1);
+		tcpip_fillheaders(tp->t_inpcb, ip, th);
+	}
 
 	/*
 	 * Fill in fields, remembering maximum advertised
@@ -705,11 +861,15 @@ send:
 	 * case, since we know we aren't doing a retransmission.
 	 * (retransmit and persist are mutually exclusive...)
 	 */
-	if (len || (flags & (TH_SYN|TH_FIN)) 
+	if (len || (flags & (TH_SYN|TH_FIN))
 	    || callout_active(tp->tt_persist))
 		th->th_seq = htonl(tp->snd_nxt);
 	else
 		th->th_seq = htonl(tp->snd_max);
+	if (sack_rxmit) {
+		th->th_seq = htonl(p->rxmit);
+		p->rxmit += len;
+	}
 	th->th_ack = htonl(tp->rcv_nxt);
 	if (optlen) {
 		bcopy(opt, th + 1, optlen);
@@ -720,13 +880,14 @@ send:
 	 * Calculate receive window.  Don't shrink window,
 	 * but avoid silly window syndrome.
 	 */
-	if (win < (long)(so->so_rcv.sb_hiwat / 4) && win < (long)tp->t_maxseg)
-		win = 0;
-	if (win < (long)(tp->rcv_adv - tp->rcv_nxt))
-		win = (long)(tp->rcv_adv - tp->rcv_nxt);
-	if (win > (long)TCP_MAXWIN << tp->rcv_scale)
-		win = (long)TCP_MAXWIN << tp->rcv_scale;
-	th->th_win = htons((u_short) (win>>tp->rcv_scale));
+	if (recwin < (long)(so->so_rcv.sb_hiwat / 4) &&
+	    recwin < (long)tp->t_maxseg)
+		recwin = 0;
+	if (recwin < (long)(tp->rcv_adv - tp->rcv_nxt))
+		recwin = (long)(tp->rcv_adv - tp->rcv_nxt);
+	if (recwin > (long)TCP_MAXWIN << tp->rcv_scale)
+		recwin = (long)TCP_MAXWIN << tp->rcv_scale;
+	th->th_win = htons((u_short) (recwin >> tp->rcv_scale));
 
 
 	/*
@@ -737,7 +898,7 @@ send:
 	 * to read more data then can be buffered prior to transmitting on
 	 * the connection.
 	 */
-	if (win == 0)
+	if (recwin == 0)
 		tp->t_flags |= TF_RXWIN0SENT;
 	else
 		tp->t_flags &= ~TF_RXWIN0SENT;
@@ -752,6 +913,15 @@ send:
 		 * number wraparound.
 		 */
 		tp->snd_up = tp->snd_una;		/* drag it along */
+
+#ifdef TCP_SIGNATURE
+#ifdef INET6
+	if (!isipv6)
+#endif
+	if (tp->t_flags & TF_SIGNATURE)
+		tcp_signature_compute(m, sizeof(struct ip), len, optlen,
+		    (u_char *)(th + 1) + sigoff, IPSEC_DIR_OUTBOUND);
+#endif
 
 	/*
 	 * Put TCP length in extended header, and then
@@ -768,16 +938,16 @@ send:
 				       sizeof(struct tcphdr) + optlen + len);
 	else
 #endif /* INET6 */
-      {
-	m->m_pkthdr.csum_flags = CSUM_TCP;
-	m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
-	th->th_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
-	    htons(sizeof(struct tcphdr) + IPPROTO_TCP + len + optlen));
+	{
+		m->m_pkthdr.csum_flags = CSUM_TCP;
+		m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
+		th->th_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
+		    htons(sizeof(struct tcphdr) + IPPROTO_TCP + len + optlen));
 
-	/* IP version must be set here for ipv4/ipv6 checking later */
-	KASSERT(ip->ip_v == IPVERSION,
-	    ("%s: IP version incorrect: %d", __func__, ip->ip_v));
-      }
+		/* IP version must be set here for ipv4/ipv6 checking later */
+		KASSERT(ip->ip_v == IPVERSION,
+		    ("%s: IP version incorrect: %d", __func__, ip->ip_v));
+	}
 
 	/*
 	 * In transmit state, time the transmission and arrange for
@@ -797,6 +967,8 @@ send:
 				tp->t_flags |= TF_SENTFIN;
 			}
 		}
+		if (tp->sack_enable && sack_rxmit)
+			goto timer;
 		tp->snd_nxt += len;
 		if (SEQ_GT(tp->snd_nxt, tp->snd_max)) {
 			tp->snd_max = tp->snd_nxt;
@@ -819,6 +991,17 @@ send:
 		 * Initialize shift counter which is used for backoff
 		 * of retransmit time.
 		 */
+timer:
+		if (tp->sack_enable && sack_rxmit &&
+		    !callout_active(tp->tt_rexmt) &&
+		    tp->snd_nxt != tp->snd_max) {
+			callout_reset(tp->tt_rexmt, tp->t_rxtcur,
+				      tcp_timer_rexmt, tp);
+			if (callout_active(tp->tt_persist)) {
+				callout_stop(tp->tt_persist);
+				tp->t_rxtshift = 0;
+			}
+		}
 		if (!callout_active(tp->tt_rexmt) &&
 		    tp->snd_nxt != tp->snd_una) {
 			if (callout_active(tp->tt_persist)) {
@@ -849,9 +1032,18 @@ send:
 	 * Trace.
 	 */
 	if (so->so_options & SO_DEBUG) {
-		u_short save = ipov->ih_len;
-		ipov->ih_len = htons(m->m_pkthdr.len /* - hdrlen + (th->th_off << 2) */);
+		u_short save = 0;
+#ifdef INET6
+		if (!isipv6)
+#endif
+		{
+			save = ipov->ih_len;
+			ipov->ih_len = htons(m->m_pkthdr.len /* - hdrlen + (th->th_off << 2) */);
+		}
 		tcp_trace(TA_OUTPUT, tp->t_state, tp, mtod(m, void *), th, 0);
+#ifdef INET6
+		if (!isipv6)
+#endif
 		ipov->ih_len = save;
 	}
 #endif
@@ -877,13 +1069,6 @@ send:
 		ip6->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
 
 		/* TODO: IPv6 IP6TOS_ECT bit on */
-#if defined(IPSEC) && !defined(FAST_IPSEC)
-		if (ipsec_setsocket(m, so) != 0) {
-			m_freem(m);
-			error = ENOBUFS;
-			goto out;
-		}
-#endif /*IPSEC*/
 		error = ip6_output(m,
 			    tp->t_inpcb->in6p_outputopts, NULL,
 			    (so->so_options & SO_DONTROUTE), NULL, NULL,
@@ -893,8 +1078,8 @@ send:
     {
 	ip->ip_len = m->m_pkthdr.len;
 #ifdef INET6
- 	if (INP_CHECK_SOCKAF(so, AF_INET6))
- 		ip->ip_ttl = in6_selecthlim(tp->t_inpcb, NULL);
+	if (INP_CHECK_SOCKAF(so, AF_INET6))
+		ip->ip_ttl = in6_selecthlim(tp->t_inpcb, NULL);
 #endif /* INET6 */
 	/*
 	 * If we do path MTU discovery, then we set DF on every packet.
@@ -919,16 +1104,21 @@ send:
 			 * No need to check for TH_FIN here because
 			 * the TF_SENTFIN flag handles that case.
 			 */
-			if ((flags & TH_SYN) == 0)
-				tp->snd_nxt -= len;
+			if ((flags & TH_SYN) == 0) {
+				if (sack_rxmit)
+					p->rxmit -= len;
+				else
+					tp->snd_nxt -= len;
+			}
 		}
 
 out:
+		SOCKBUF_UNLOCK_ASSERT(&so->so_snd);	/* Check gotos. */
 		if (error == ENOBUFS) {
 	                if (!callout_active(tp->tt_rexmt) &&
-                            !callout_active(tp->tt_persist))
+			    !callout_active(tp->tt_persist))
 	                        callout_reset(tp->tt_rexmt, tp->t_rxtcur,
-                                      tcp_timer_rexmt, tp);
+				    tcp_timer_rexmt, tp);
 			tcp_quench(tp->t_inpcb, 0);
 			return (0);
 		}
@@ -957,8 +1147,8 @@ out:
 	 * then remember the size of the advertised window.
 	 * Any pending ACK has now been sent.
 	 */
-	if (win > 0 && SEQ_GT(tp->rcv_nxt+win, tp->rcv_adv))
-		tp->rcv_adv = tp->rcv_nxt + win;
+	if (recwin > 0 && SEQ_GT(tp->rcv_nxt + recwin, tp->rcv_adv))
+		tp->rcv_adv = tp->rcv_nxt + recwin;
 	tp->last_ack_sent = tp->rcv_nxt;
 	tp->t_flags &= ~(TF_ACKNOW | TF_DELACK);
 	if (callout_active(tp->tt_delack))

@@ -8,7 +8,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/if_el.c,v 1.61 2003/10/31 18:32:07 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/if_el.c,v 1.64 2004/05/30 20:34:57 phk Exp $");
 
 /* Except of course for the portions of code lifted from other FreeBSD
  * drivers (mainly elread, elget and el_ioctl)
@@ -27,6 +27,7 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/if_el.c,v 1.61 2003/10/31 18:32:07 brooks E
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
@@ -241,7 +242,7 @@ el_attach(device_t dev)
 		return(ENXIO);
 
 	rid = 0;
-	sc->el_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->el_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
             RF_SHAREABLE | RF_ACTIVE);
 
         if (sc->el_irq == NULL) {
@@ -276,10 +277,6 @@ el_attach(device_t dev)
 	/* Now we can attach the interface */
 	dprintf(("Attaching interface...\n"));
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
-
-	/* Print out some information for the user */
-	device_printf(dev, "3c501 address %6D\n",
-	  sc->arpcom.ac_enaddr, ":");
 
 	dprintf(("el_attach() finished.\n"));
 	return(0);

@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/dump_machdep.c,v 1.6 2003/08/22 07:38:08 imp Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/dump_machdep.c,v 1.7 2003/12/26 14:30:19 obrien Exp $
  */
 
 #include <sys/param.h>
@@ -137,7 +137,7 @@ blk_dump(struct dumperinfo *di, vm_paddr_t pa, vm_size_t size)
 
 	printf("  chunk at %#lx: %ld bytes ", (u_long)pa, (long)size);
 
-	va = NULL;
+	va = 0L;
 	error = counter = twiddle = 0;
 	for (pos = 0; pos < size; pos += MAXDUMPSZ, counter++) {
 		if (counter % 128 == 0)

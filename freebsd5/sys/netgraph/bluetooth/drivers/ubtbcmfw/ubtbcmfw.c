@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ubtbcmfw.c,v 1.3 2003/10/10 19:15:08 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/ubtbcmfw/ubtbcmfw.c,v 1.3 2003/10/12 22:04:20 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/ubtbcmfw/ubtbcmfw.c,v 1.9 2004/06/27 16:51:01 imp Exp $
  */
 
 #include <sys/param.h>
@@ -36,6 +36,7 @@
 #include <sys/filio.h>
 #include <sys/fcntl.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/poll.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
@@ -44,7 +45,8 @@
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
-#include <dev/usb/usbdevs.h>
+
+#include "usbdevs.h"
 
 /*
  * Download firmware to BCM2033.
@@ -60,9 +62,9 @@
 struct ubtbcmfw_softc {
 	USBBASEDEVICE		sc_dev;			/* base device */
 	usbd_device_handle	sc_udev;		/* USB device handle */
-	dev_t			sc_ctrl_dev;		/* control device */
-	dev_t			sc_intr_in_dev;		/* interrupt device */
-	dev_t			sc_bulk_out_dev;	/* bulk device */
+	struct cdev *sc_ctrl_dev;		/* control device */
+	struct cdev *sc_intr_in_dev;		/* interrupt device */
+	struct cdev *sc_bulk_out_dev;	/* bulk device */
 	usbd_pipe_handle	sc_intr_in_pipe;	/* interrupt pipe */
 	usbd_pipe_handle	sc_bulk_out_pipe;	/* bulk out pipe */
 	int			sc_flags;
@@ -91,13 +93,9 @@ Static d_write_t	ubtbcmfw_write;
 Static d_ioctl_t	ubtbcmfw_ioctl;
 Static d_poll_t		ubtbcmfw_poll;
 
-#if __FreeBSD_version < 500104
-#define CDEV_MAJOR	223
-#else
-#define CDEV_MAJOR	MAJOR_AUTO
-#endif
-
 Static struct cdevsw	ubtbcmfw_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	ubtbcmfw_open,
 	.d_close =	ubtbcmfw_close,
 	.d_read =	ubtbcmfw_read,
@@ -105,7 +103,6 @@ Static struct cdevsw	ubtbcmfw_cdevsw = {
 	.d_ioctl =	ubtbcmfw_ioctl,
 	.d_poll =	ubtbcmfw_poll,
 	.d_name =	"ubtbcmfw",
-	.d_maj =	CDEV_MAJOR,
 };
 
 /*
@@ -153,7 +150,7 @@ USB_ATTACH(ubtbcmfw)
 	USB_ATTACH_SETUP;
 	printf("%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
 
-	sc->sc_ctrl_dev = sc->sc_intr_in_dev = sc->sc_bulk_out_dev = NODEV;
+	sc->sc_ctrl_dev = sc->sc_intr_in_dev = sc->sc_bulk_out_dev = NULL;
 	sc->sc_intr_in_pipe = sc->sc_bulk_out_pipe = NULL;
 	sc->sc_flags = sc->sc_refcnt = sc->sc_dying = 0;
 
@@ -233,19 +230,19 @@ USB_DETACH(ubtbcmfw)
 	}
 
 	/* Destroy device nodes */
-	if (sc->sc_bulk_out_dev != NODEV) {
+	if (sc->sc_bulk_out_dev != NULL) {
 		destroy_dev(sc->sc_bulk_out_dev);
-		sc->sc_bulk_out_dev = NODEV;
+		sc->sc_bulk_out_dev = NULL;
 	}
 
-	if (sc->sc_intr_in_dev != NODEV) {
+	if (sc->sc_intr_in_dev != NULL) {
 		destroy_dev(sc->sc_intr_in_dev);
-		sc->sc_intr_in_dev = NODEV;
+		sc->sc_intr_in_dev = NULL;
 	}
 
-	if (sc->sc_ctrl_dev != NODEV) {
+	if (sc->sc_ctrl_dev != NULL) {
 		destroy_dev(sc->sc_ctrl_dev);
-		sc->sc_ctrl_dev = NODEV;
+		sc->sc_ctrl_dev = NULL;
 	}
 
 	/* Close pipes */
@@ -268,7 +265,7 @@ USB_DETACH(ubtbcmfw)
  */
 
 Static int
-ubtbcmfw_open(dev_t dev, int flag, int mode, usb_proc_ptr p)
+ubtbcmfw_open(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	ubtbcmfw_softc_p	sc = NULL;
 	int			error = 0;
@@ -320,7 +317,7 @@ ubtbcmfw_open(dev_t dev, int flag, int mode, usb_proc_ptr p)
  */
 
 Static int
-ubtbcmfw_close(dev_t dev, int flag, int mode, usb_proc_ptr p)
+ubtbcmfw_close(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	ubtbcmfw_softc_p	sc = NULL;
 
@@ -357,7 +354,7 @@ ubtbcmfw_close(dev_t dev, int flag, int mode, usb_proc_ptr p)
  */
 
 Static int
-ubtbcmfw_read(dev_t dev, struct uio *uio, int flag)
+ubtbcmfw_read(struct cdev *dev, struct uio *uio, int flag)
 {
 	ubtbcmfw_softc_p	sc = NULL;
 	u_int8_t		buf[UBTBCMFW_BSIZE];
@@ -421,7 +418,7 @@ ubtbcmfw_read(dev_t dev, struct uio *uio, int flag)
  */
 
 Static int
-ubtbcmfw_write(dev_t dev, struct uio *uio, int flag)
+ubtbcmfw_write(struct cdev *dev, struct uio *uio, int flag)
 {
 	ubtbcmfw_softc_p	sc = NULL;
 	u_int8_t		buf[UBTBCMFW_BSIZE];
@@ -486,7 +483,7 @@ ubtbcmfw_write(dev_t dev, struct uio *uio, int flag)
  */
 
 Static int
-ubtbcmfw_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
+ubtbcmfw_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 {
 	ubtbcmfw_softc_p	sc = NULL;
 	int			error = 0;
@@ -523,7 +520,7 @@ ubtbcmfw_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
  */
 
 Static int
-ubtbcmfw_poll(dev_t dev, int events, usb_proc_ptr p)
+ubtbcmfw_poll(struct cdev *dev, int events, usb_proc_ptr p)
 {
 	ubtbcmfw_softc_p	sc = NULL;
 	int			revents = 0;

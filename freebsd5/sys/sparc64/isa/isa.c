@@ -26,35 +26,28 @@
  *
  *	from: FreeBSD: src/sys/alpha/isa/isa.c,v 1.26 2001/07/11
  *
- * $FreeBSD: src/sys/sparc64/isa/isa.c,v 1.10 2003/08/23 00:11:15 imp Exp $
+ * $FreeBSD: src/sys/sparc64/isa/isa.c,v 1.13 2004/08/12 17:41:32 marius Exp $
  */
-
-#include "opt_ofw_pci.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
-#include <sys/module.h>
 #include <sys/bus.h>
+
 #include <machine/bus.h>
-#include <sys/malloc.h>
-#include <sys/proc.h>
+
 #include <sys/rman.h>
-#include <sys/interrupt.h>
 
 #include <isa/isareg.h>
 #include <isa/isavar.h>
 #include <isa/isa_common.h>
 
-#include <dev/pci/pcireg.h>
-#include <dev/pci/pcivar.h>
-
-#include <dev/ofw/ofw_pci.h>
+#include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/openfirm.h>
 
-#include <machine/intr_machdep.h>
-#include <machine/ofw_bus.h>
 #include <machine/resource.h>
+
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <sparc64/pci/ofw_pci.h>
 #include <sparc64/isa/ofw_isa.h>
@@ -65,19 +58,16 @@ bus_space_handle_t isa_io_hdl;
 bus_space_tag_t isa_mem_bt = NULL;
 bus_space_handle_t isa_mem_hdl;
 
-u_int64_t isa_io_base;
-u_int64_t isa_io_limit;
-u_int64_t isa_mem_base;
-u_int64_t isa_mem_limit;
+static u_int64_t isa_io_base;
+static u_int64_t isa_io_limit;
+static u_int64_t isa_mem_base;
+static u_int64_t isa_mem_limit;
 
 device_t isa_bus_device;
 
 static phandle_t isab_node;
 static ofw_pci_intr_t isa_ino[8];
-
-#ifdef OFW_NEWPCI
 struct ofw_bus_iinfo isa_iinfo;
-#endif
 
 /*
  * XXX: This is really partly partly PCI-specific, but unfortunately is
@@ -117,26 +107,17 @@ isa_init(device_t dev)
 	device_t bridge;
 	phandle_t node;
 	ofw_isa_intr_t ino;
-#ifndef OFW_NEWPCI
-	ofw_pci_intr_t rino;
-#endif
 	struct isa_ranges *br;
 	int nbr, i;
 
 	/* The parent of the bus must be a PCI-ISA bridge. */
 	bridge = device_get_parent(dev);
-#ifdef OFW_NEWPCI
-	isab_node = ofw_pci_get_node(bridge);
-#else
-	isab_node = ofw_pci_node(bridge);
-#endif
+	isab_node = ofw_bus_get_node(bridge);
 	nbr = OF_getprop_alloc(isab_node, "ranges", sizeof(*br), (void **)&br);
 	if (nbr <= 0)
 		panic("isa_init: cannot get bridge range property");
 
-#ifdef OFW_NEWPCI
 	ofw_bus_setup_iinfo(isab_node, &isa_iinfo, sizeof(ofw_isa_intr_t));
-#endif
 
 	/*
 	 * This is really a bad kludge; however, it is needed to provide
@@ -150,13 +131,8 @@ isa_init(device_t dev)
 			continue;
 		if (ino > 7)
 			panic("isa_init: XXX: ino too large");
-#ifdef OFW_NEWPCI
 		isa_ino[ino] = ofw_isa_route_intr(bridge, node, &isa_iinfo,
 		    ino);
-#else
-		rino = ofw_bus_route_intr(node, ino, ofw_pci_orb_callback, dev);
-		isa_ino[ino] = rino == ORIR_NOTFOUND ? PCI_INVALID_IRQ : rino;
-#endif
 	}
 
 	for (nbr -= 1; nbr >= 0; nbr--) {
@@ -202,9 +178,7 @@ isa_alloc_resource(device_t bus, device_t child, int type, int *rid,
 		   u_long start, u_long end, u_long count, u_int flags)
 {
 	/*
-	 * Consider adding a resource definition. We allow rid 0-1 for
-	 * irq and drq, 0-3 for memory and 0-7 for ports which is
-	 * sufficient for isapnp.
+	 * Consider adding a resource definition.
 	 */
 	int passthrough = (device_get_parent(child) != bus);
 	int isdefault = (start == 0UL && end == ~0UL);

@@ -52,14 +52,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/mp_machdep.c,v 1.25 2003/12/03 14:57:25 jhb Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/mp_machdep.c,v 1.26 2004/07/10 23:10:07 marcel Exp $
  */
-
-#include "opt_ddb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/mutex.h>
@@ -75,8 +74,6 @@
 #include <vm/vm_map.h>
 
 #include <dev/ofw/openfirm.h>
-
-#include <ddb/ddb.h>
 
 #include <machine/asi.h>
 #include <machine/atomic.h>
@@ -446,8 +443,8 @@ cpu_ipi_send(u_int mid, u_long d0, u_long d1, u_long d2)
 			return;
 	}
 	if (
-#ifdef DDB
-	    db_active ||
+#ifdef KDB
+	    kdb_active ||
 #endif
 	    panicstr != NULL)
 		printf("ipi_send: couldn't send ipi to module %u\n", mid);

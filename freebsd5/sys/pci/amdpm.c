@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/amdpm.c,v 1.11 2003/09/06 14:04:30 dfr Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/amdpm.c,v 1.13 2004/04/20 13:36:44 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -68,6 +68,7 @@ static int amdpm_debug = 0;
 #define AMDPM_DEVICEID_AMD756PM 0x740b
 #define AMDPM_DEVICEID_AMD766PM 0x7413
 #define AMDPM_DEVICEID_AMD768PM 0x7443
+#define AMDPM_DEVICEID_AMD8111PM 0x746A
 
 /* nVidia nForce chipset */
 #define AMDPM_VENDORID_NVIDIA 0x10de
@@ -150,8 +151,9 @@ amdpm_probe(device_t dev)
 	if ((vid == AMDPM_VENDORID_AMD) &&
 	    ((did == AMDPM_DEVICEID_AMD756PM) ||
 	     (did == AMDPM_DEVICEID_AMD766PM) ||
-	     (did == AMDPM_DEVICEID_AMD768PM))) {
-		device_set_desc(dev, "AMD 756/766/768 Power Management Controller");
+	     (did == AMDPM_DEVICEID_AMD768PM) ||
+	     (did == AMDPM_DEVICEID_AMD8111PM))) {
+		device_set_desc(dev, "AMD 756/766/768/8111 Power Management Controller");
 
 		/* 
 		 * We have to do this, since the BIOS won't give us the
@@ -198,7 +200,8 @@ amdpm_attach(device_t dev)
 		amdpm_sc->rid = AMDPCI_PMBASE;
 	else
 		amdpm_sc->rid = NFPCI_PMBASE;
-	amdpm_sc->res = bus_alloc_resource(dev, SYS_RES_IOPORT, &amdpm_sc->rid, 0, ~0, 1, RF_ACTIVE);
+	amdpm_sc->res = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+		&amdpm_sc->rid, RF_ACTIVE);
 	
 	if (amdpm_sc->res == NULL) {
 		device_printf(dev, "could not map i/o space\n");

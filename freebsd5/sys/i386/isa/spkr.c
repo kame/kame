@@ -7,7 +7,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/spkr.c,v 1.63 2003/06/02 16:32:55 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/spkr.c,v 1.66 2004/06/16 09:47:08 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -33,14 +33,14 @@ static	d_close_t	spkrclose;
 static	d_write_t	spkrwrite;
 static	d_ioctl_t	spkrioctl;
 
-#define CDEV_MAJOR 26
 static struct cdevsw spkr_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	spkropen,
 	.d_close =	spkrclose,
 	.d_write =	spkrwrite,
 	.d_ioctl =	spkrioctl,
 	.d_name =	"spkr",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static MALLOC_DEFINE(M_SPKR, "spkr", "Speaker buffer");
@@ -472,7 +472,7 @@ static char *spkr_inbuf;  /* incoming buf */
 
 static int
 spkropen(dev, flags, fmt, td)
-	dev_t		dev;
+	struct cdev *dev;
 	int		flags;
 	int		fmt;
 	struct thread	*td;
@@ -499,7 +499,7 @@ spkropen(dev, flags, fmt, td)
 
 static int
 spkrwrite(dev, uio, ioflag)
-	dev_t		dev;
+	struct cdev *dev;
 	struct uio	*uio;
 	int		ioflag;
 {
@@ -531,7 +531,7 @@ spkrwrite(dev, uio, ioflag)
 
 static int
 spkrclose(dev, flags, fmt, td)
-	dev_t		dev;
+	struct cdev *dev;
 	int		flags;
 	int		fmt;
 	struct thread	*td;
@@ -554,7 +554,7 @@ spkrclose(dev, flags, fmt, td)
 
 static int
 spkrioctl(dev, cmd, cmdarg, flags, td)
-	dev_t		dev;
+	struct cdev *dev;
 	unsigned long	cmd;
 	caddr_t		cmdarg;
 	int		flags;
@@ -610,7 +610,7 @@ static struct isa_pnp_id speaker_ids[] = {
 	{ 0 }
 };
 
-static dev_t speaker_dev;
+static struct cdev *speaker_dev;
 
 static int
 speaker_probe(device_t dev)

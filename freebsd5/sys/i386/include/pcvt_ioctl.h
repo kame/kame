@@ -1,12 +1,8 @@
 /*
  * Copyright (c) 1992, 2000 Hellmuth Michaelis
- *
  * Copyright (c) 1992, 1995 Joerg Wunsch.
- *
  * Copyright (c) 1992, 1993 Brian Dunford-Shore and Holger Veit.
- *
  * Copyright (C) 1992, 1993 Soeren Schmidt.
- *
  * All rights reserved.
  *
  * For the sake of compatibility, portions of this code regarding the
@@ -53,7 +49,7 @@
  *
  *	Last Edit-Date: [Fri Mar 31 10:22:29 2000]
  *
- * $FreeBSD: src/sys/i386/include/pcvt_ioctl.h,v 1.15 2000/03/31 08:29:21 hm Exp $
+ * $FreeBSD: src/sys/i386/include/pcvt_ioctl.h,v 1.16 2003/12/10 02:49:16 obrien Exp $
  * 
  *---------------------------------------------------------------------------*/
 

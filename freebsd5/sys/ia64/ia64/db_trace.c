@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003, 2004 Marcel Moolenaar
  * Copyright (c) 2000-2001 Doug Rabson
  * All rights reserved.
  *
@@ -23,12 +24,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/ia64/db_trace.c,v 1.18 2003/10/23 06:23:55 marcel Exp $
+ *	$FreeBSD: src/sys/ia64/ia64/db_trace.c,v 1.20 2004/07/21 05:07:09 marcel Exp $
  */
 
 #include <sys/param.h>
+#include <sys/kdb.h>
 #include <sys/proc.h>
+
 #include <machine/db_machdep.h>
+#include <machine/frame.h>
+#include <machine/md_var.h>
+#include <machine/pcb.h>
 #include <machine/unwind.h>
 #include <machine/vmparam.h>
 
@@ -38,14 +44,12 @@
 #include <ddb/db_variables.h>
 #include <ddb/db_output.h>
 
-
 int  db_md_set_watchpoint(db_expr_t addr, db_expr_t size);
 int  db_md_clr_watchpoint(db_expr_t addr, db_expr_t size);
 void db_md_list_watchpoints(void);
 
-void
-db_stack_trace_cmd(db_expr_t addr, boolean_t have_addr, db_expr_t count,
-    char *modif)
+static int
+db_backtrace(struct thread *td, struct pcb *pcb, int count)
 {
 	struct unw_regstate rs;
 	struct trapframe *tf;
@@ -55,8 +59,7 @@ db_stack_trace_cmd(db_expr_t addr, boolean_t have_addr, db_expr_t count,
 	c_db_sym_t sym;
 	int args, error, i;
 
-	tf = &ddb_regs;
-	error = unw_create(&rs, tf);
+	error = unw_create_from_pcb(&rs, pcb);
 	while (!error && count--) {
 		error = unw_get_cfm(&rs, &cfm);
 		if (!error)
@@ -68,15 +71,14 @@ db_stack_trace_cmd(db_expr_t addr, boolean_t have_addr, db_expr_t count,
 		if (error)
 			break;
 
-		args = (cfm >> 7) & 0x7f;
+		args = IA64_CFM_SOL(cfm);
 		if (args > 8)
 			args = 8;
 
 		error = unw_step(&rs);
 		if (!error) {
-			error = unw_get_cfm(&rs, &pfs);
-			if (!error) {
-				i = (pfs & 0x7f) - ((pfs >> 7) & 0x7f);
+			if (!unw_get_cfm(&rs, &pfs)) {
+				i = IA64_CFM_SOF(pfs) - IA64_CFM_SOL(pfs);
 				if (args > i)
 					args = i;
 			}
@@ -115,15 +117,29 @@ db_stack_trace_cmd(db_expr_t addr, boolean_t have_addr, db_expr_t count,
 		/* XXX ask if we should unwind across the trapframe. */
 		db_printf("--- trapframe at %p\n", tf);
 		unw_delete(&rs);
-		error = unw_create(&rs, tf);
+		error = unw_create_from_frame(&rs, tf);
 	}
 
 	unw_delete(&rs);
+	return (error);
 }
 
 void
-db_print_backtrace(void)
+db_trace_self(void)
 {
+	struct pcb pcb;
+
+	savectx(&pcb);
+	db_backtrace(curthread, &pcb, -1);
+}
+
+int
+db_trace_thread(struct thread *td, int count)
+{
+	struct pcb *ctx;
+
+	ctx = kdb_thr_ctx(td);
+	return (db_backtrace(td, ctx, count));
 }
 
 int

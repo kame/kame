@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/runq.h,v 1.4 2002/05/25 01:12:23 jake Exp $
+ * $FreeBSD: src/sys/sys/runq.h,v 1.4.8.1 2004/10/09 05:25:22 julian Exp $
  */
 
 #ifndef	_RUNQ_H_
@@ -62,7 +62,7 @@ struct runq {
 	struct	rqhead rq_queues[RQ_NQS];
 };
 
-void	runq_add(struct runq *, struct kse *);
+void	runq_add(struct runq *, struct kse *, int flags);
 int	runq_check(struct runq *);
 struct	kse *runq_choose(struct runq *);
 void	runq_init(struct runq *);

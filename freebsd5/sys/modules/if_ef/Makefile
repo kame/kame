@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/if_ef/Makefile,v 1.10 2002/01/11 15:48:41 ru Exp $
+# $FreeBSD: src/sys/modules/if_ef/Makefile,v 1.11 2004/01/19 14:00:26 ru Exp $
 
 .PATH: ${.CURDIR}/../../net
 
@@ -28,11 +28,5 @@ opt_ef.h:
 	echo "#define ${frame} 1" >> opt_ef.h
 .endif
 .endfor
-
-load: all
-	/sbin/kldload ./${PROG}
-
-unload:
-	/sbin/kldunload ${PROG}
 
 .include <bsd.kmod.mk>

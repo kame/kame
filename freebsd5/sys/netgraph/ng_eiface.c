@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_eiface.c,v 1.10 2003/11/17 19:13:01 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_eiface.c,v 1.17 2004/07/14 20:26:29 rwatson Exp $
  */
 
 
@@ -33,8 +33,10 @@
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/mutex.h>
 #include <sys/errno.h>
 #include <sys/sockio.h>
 #include <sys/socket.h>
@@ -57,20 +59,12 @@
 #include <net/ethernet.h>
 #include <net/if_arp.h>
 
-static const struct ng_parse_struct_field ng_eiface_par_fields[]
-	= NG_EIFACE_PAR_FIELDS;
-
-static const struct ng_parse_type ng_eiface_par_type = {
-	&ng_parse_struct_type,
-	&ng_eiface_par_fields
-};
-
 static const struct ng_cmdlist ng_eiface_cmdlist[] = {
 	{
 	  NGM_EIFACE_COOKIE,
 	  NGM_EIFACE_SET,
 	  "set",
-	  &ng_eiface_par_type,
+	  &ng_parse_enaddr_type,
 	  NULL
 	},
 	{ 0 }
@@ -79,9 +73,9 @@ static const struct ng_cmdlist ng_eiface_cmdlist[] = {
 
 /* Node private data */
 struct ng_eiface_private {
+	struct arpcom   arpcom;	/* per-interface network data */
 	struct ifnet   *ifp;	/* This interface */
 	int	unit;		/* Interface unit number */
-	struct arpcom   arpcom;	/* per-interface network data */
 	node_p		node;	/* Our netgraph node */
 	hook_p		ether;	/* Hook for ethernet stream */
 };
@@ -106,18 +100,16 @@ static ng_disconnect_t ng_eiface_disconnect;
 
 /* Node type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_EIFACE_NODE_TYPE,
-	NULL,
-	ng_eiface_constructor,
-	ng_eiface_rcvmsg,
-	ng_eiface_rmnode,
-	ng_eiface_newhook,
-	NULL,
-	ng_eiface_connect,
-	ng_eiface_rcvdata,
-	ng_eiface_disconnect,
-	ng_eiface_cmdlist
+	.version =	NG_ABI_VERSION,
+	.name =		NG_EIFACE_NODE_TYPE,
+	.constructor =	ng_eiface_constructor,
+	.rcvmsg =	ng_eiface_rcvmsg,
+	.shutdown =	ng_eiface_rmnode,
+	.newhook =	ng_eiface_newhook,
+	.connect =	ng_eiface_connect,
+	.rcvdata =	ng_eiface_rcvdata,
+	.disconnect =	ng_eiface_disconnect,
+	.cmdlist =	ng_eiface_cmdlist
 };
 NETGRAPH_INIT(eiface, &typestruct);
 
@@ -129,6 +121,8 @@ static int	ng_units_in_use = 0;
 
 #define UNITS_BITSPERWORD	(sizeof(*ng_eiface_units) * NBBY)
 
+static struct mtx	ng_eiface_mtx;
+MTX_SYSINIT(ng_eiface, &ng_eiface_mtx, "ng_eiface", MTX_DEF);
 
 /************************************************************************
 			HELPER STUFF
@@ -137,11 +131,12 @@ static int	ng_units_in_use = 0;
  * Find the first free unit number for a new interface.
  * Increase the size of the unit bitmap as necessary.
  */
-static __inline__ int
+static __inline int
 ng_eiface_get_unit(int *unit)
 {
 	int index, bit;
 
+	mtx_lock(&ng_eiface_mtx);
 	for (index = 0; index < ng_eiface_units_len
 	    && ng_eiface_units[index] == 0; index++);
 	if (index == ng_eiface_units_len) {		/* extend array */
@@ -150,8 +145,10 @@ ng_eiface_get_unit(int *unit)
 		newlen = (2 * ng_eiface_units_len) + 4;
 		MALLOC(newarray, int *, newlen * sizeof(*ng_eiface_units),
 		    M_NETGRAPH, M_NOWAIT);
-		if (newarray == NULL)
+		if (newarray == NULL) {
+			mtx_unlock(&ng_eiface_mtx);
 			return (ENOMEM);
+		}
 		bcopy(ng_eiface_units, newarray,
 		    ng_eiface_units_len * sizeof(*ng_eiface_units));
 		for (i = ng_eiface_units_len; i < newlen; i++)
@@ -167,19 +164,21 @@ ng_eiface_get_unit(int *unit)
 	ng_eiface_units[index] &= ~(1 << bit);
 	*unit = (index * UNITS_BITSPERWORD) + bit;
 	ng_units_in_use++;
+	mtx_unlock(&ng_eiface_mtx);
 	return (0);
 }
 
 /*
  * Free a no longer needed unit number.
  */
-static __inline__ void
+static __inline void
 ng_eiface_free_unit(int unit)
 {
 	int index, bit;
 
 	index = unit / UNITS_BITSPERWORD;
 	bit = unit % UNITS_BITSPERWORD;
+	mtx_lock(&ng_eiface_mtx);
 	KASSERT(index < ng_eiface_units_len,
 	    ("%s: unit=%d len=%d", __func__, unit, ng_eiface_units_len));
 	KASSERT((ng_eiface_units[index] & (1 << bit)) == 0,
@@ -197,6 +196,7 @@ ng_eiface_free_unit(int unit)
 		ng_eiface_units_len = 0;
 		ng_eiface_units = NULL;
 	}
+	mtx_unlock(&ng_eiface_mtx);
 }
 
 /************************************************************************
@@ -496,25 +496,18 @@ ng_eiface_rcvmsg(node_p node, item_p item, hook_p lasthook)
 		switch (msg->header.cmd) {
 		case NGM_EIFACE_SET:
 		{
-			struct ng_eiface_par *eaddr;
+			struct ether_addr *eaddr;
 			struct ifaddr *ifa;
 			struct sockaddr_dl *sdl;
 
-			if (msg->header.arglen != sizeof(struct ng_eiface_par)){
+			if (msg->header.arglen != sizeof(struct ether_addr)){
 				error = EINVAL;
 				break;
 			}
-			eaddr = (struct ng_eiface_par *)(msg->data);
-
-			priv->arpcom.ac_enaddr[0] = eaddr->oct0;
-			priv->arpcom.ac_enaddr[1] = eaddr->oct1;
-			priv->arpcom.ac_enaddr[2] = eaddr->oct2;
-			priv->arpcom.ac_enaddr[3] = eaddr->oct3;
-			priv->arpcom.ac_enaddr[4] = eaddr->oct4;
-			priv->arpcom.ac_enaddr[5] = eaddr->oct5;
+			eaddr = (struct ether_addr *)(msg->data);
+			bcopy(eaddr, priv->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
 			/* And put it in the ifaddr list */
-#define IFP2AC(IFP) ((struct arpcom *)IFP)
 			TAILQ_FOREACH(ifa, &(ifp->if_addrhead), ifa_link) {
 				sdl = (struct sockaddr_dl *)ifa->ifa_addr;
 				if (sdl->sdl_type == IFT_ETHER) {
@@ -604,11 +597,6 @@ ng_eiface_rcvdata(hook_p hook, item_p item)
 	/* Meta-data ends its life here... */
         NG_FREE_ITEM(item);
 
-	if (m == NULL)
-	{
-		printf("ng_eiface: mbuf is null.\n");
-		return (EINVAL);
-	}
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING)) {
 		NG_FREE_M(m);
 		return (ENETDOWN);

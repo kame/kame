@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_rawread.c,v 1.12 2003/11/15 09:28:09 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_rawread.c,v 1.13 2004/06/03 01:47:37 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -436,8 +436,8 @@ ffs_rawread(struct vnode *vp,
 	    uio->uio_iovcnt == 1 && 
 	    uio->uio_segflg == UIO_USERSPACE &&
 	    uio->uio_resid == uio->uio_iov->iov_len &&
-	    (((uio->uio_td != NULL) ? uio->uio_td : curthread)->td_flags &
-	     TDF_DEADLKTREAT) == 0) {
+	    (((uio->uio_td != NULL) ? uio->uio_td : curthread)->td_pflags &
+	     TDP_DEADLKTREAT) == 0) {
 		int secsize;		/* Media sector size */
 		off_t filebytes;	/* Bytes left of file */
 		int blockbytes;		/* Bytes left of file in full blocks */

@@ -31,7 +31,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.38 2003/11/10 14:20:34 gj Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.41 2004/06/16 09:47:10 phk Exp $");
 
 #include "i4bipr.h"
 #include "i4btel.h"
@@ -76,16 +76,16 @@ static	d_read_t	i4bread;
 static	d_ioctl_t	i4bioctl;
 static	d_poll_t	i4bpoll;
 
-#define CDEV_MAJOR 60
 
 static struct cdevsw i4b_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	i4bopen,
 	.d_close =	i4bclose,
 	.d_read =	i4bread,
 	.d_ioctl =	i4bioctl,
 	.d_poll =	i4bpoll,
 	.d_name =	"i4b",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static void i4battach(void *);
@@ -111,7 +111,7 @@ i4battach(void *dummy)
  *	i4bopen - device driver open routine
  *---------------------------------------------------------------------------*/
 static int
-i4bopen(dev_t dev, int flag, int fmt, struct thread *td)
+i4bopen(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	int x;
 	
@@ -133,7 +133,7 @@ i4bopen(dev_t dev, int flag, int fmt, struct thread *td)
  *	i4bclose - device driver close routine
  *---------------------------------------------------------------------------*/
 static int
-i4bclose(dev_t dev, int flag, int fmt, struct thread *td)
+i4bclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	int x = splimp();	
 	openflag = 0;
@@ -147,7 +147,7 @@ i4bclose(dev_t dev, int flag, int fmt, struct thread *td)
  *	i4bread - device driver read routine
  *---------------------------------------------------------------------------*/
 static int
-i4bread(dev_t dev, struct uio *uio, int ioflag)
+i4bread(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct mbuf *m;
 	int x;
@@ -192,7 +192,7 @@ i4bread(dev_t dev, struct uio *uio, int ioflag)
  *	i4bioctl - device driver ioctl routine
  *---------------------------------------------------------------------------*/
 static int
-i4bioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+i4bioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	call_desc_t *cd;
 	int error = 0;
@@ -755,7 +755,7 @@ diag_done:
  *	i4bpoll - device driver poll routine
  *---------------------------------------------------------------------------*/
 static int
-i4bpoll(dev_t dev, int events, struct thread *td)
+i4bpoll(struct cdev *dev, int events, struct thread *td)
 {
 	int x;
 	

@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/acpica/OsdEnvironment.c,v 1.9 2003/08/28 16:26:24 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/acpica/OsdEnvironment.c,v 1.10 2004/05/06 02:18:58 njl Exp $");
 
 /*
  * 6.1 : Environmental support
@@ -37,9 +37,7 @@ __FBSDID("$FreeBSD: src/sys/i386/acpica/OsdEnvironment.c,v 1.9 2003/08/28 16:26:
 
 #include "acpi.h"
 
-#include <machine/pc/bios.h>
-
-u_long i386_acpi_root;
+static u_long i386_acpi_root;
 
 SYSCTL_ULONG(_machdep, OID_AUTO, acpi_root, CTLFLAG_RD, &i386_acpi_root, 0,
 	     "The physical address of the RSDP");

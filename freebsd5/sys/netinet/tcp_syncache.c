@@ -31,13 +31,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/tcp_syncache.c,v 1.49 2003/11/20 20:07:38 andre Exp $
+ * $FreeBSD: src/sys/netinet/tcp_syncache.c,v 1.66.2.1 2004/09/23 16:38:53 andre Exp $
  */
 
+#include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_mac.h"
 #include "opt_tcpdebug.h"
+#include "opt_tcp_sack.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -103,7 +105,7 @@
 
 static int tcp_syncookies = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, syncookies, CTLFLAG_RW,
-    &tcp_syncookies, 0, 
+    &tcp_syncookies, 0,
     "Use TCP SYN cookies if the syncache overflows");
 
 static void	 syncache_drop(struct syncache *, struct syncache_head *);
@@ -115,10 +117,10 @@ static int	 syncache_respond(struct syncache *, struct mbuf *, struct socket *);
 #else
 static int	 syncache_respond(struct syncache *, struct mbuf *);
 #endif
-static struct 	 socket *syncache_socket(struct syncache *, struct socket *,
+static struct	 socket *syncache_socket(struct syncache *, struct socket *,
 		    struct mbuf *m);
 static void	 syncache_timer(void *);
-static u_int32_t syncookie_generate(struct syncache *);
+static u_int32_t syncookie_generate(struct syncache *, u_int32_t *);
 static struct syncache *syncookie_lookup(struct in_conninfo *,
 		    struct tcphdr *, struct socket *);
 
@@ -143,7 +145,6 @@ struct tcp_syncache {
 	u_int	cache_limit;
 	u_int	rexmt_limit;
 	u_int	hash_secret;
-	u_int	next_reseed;
 	TAILQ_HEAD(, syncache) timerq[SYNCACHE_MAXREXMTS + 1];
 	struct	callout tt_timerq[SYNCACHE_MAXREXMTS + 1];
 };
@@ -168,16 +169,16 @@ SYSCTL_INT(_net_inet_tcp_syncache, OID_AUTO, rexmtlimit, CTLFLAG_RW,
 
 static MALLOC_DEFINE(M_SYNCACHE, "syncache", "TCP syncache");
 
-#define SYNCACHE_HASH(inc, mask) 					\
+#define SYNCACHE_HASH(inc, mask)					\
 	((tcp_syncache.hash_secret ^					\
 	  (inc)->inc_faddr.s_addr ^					\
-	  ((inc)->inc_faddr.s_addr >> 16) ^ 				\
+	  ((inc)->inc_faddr.s_addr >> 16) ^				\
 	  (inc)->inc_fport ^ (inc)->inc_lport) & mask)
 
-#define SYNCACHE_HASH6(inc, mask) 					\
+#define SYNCACHE_HASH6(inc, mask)					\
 	((tcp_syncache.hash_secret ^					\
-	  (inc)->inc6_faddr.s6_addr32[0] ^ 				\
-	  (inc)->inc6_faddr.s6_addr32[3] ^ 				\
+	  (inc)->inc6_faddr.s6_addr32[0] ^				\
+	  (inc)->inc6_faddr.s6_addr32[3] ^				\
 	  (inc)->inc_fport ^ (inc)->inc_lport) & mask)
 
 #define ENDPTS_EQ(a, b) (						\
@@ -219,19 +220,18 @@ syncache_init(void)
 	tcp_syncache.cache_limit =
 	    tcp_syncache.hashsize * tcp_syncache.bucket_limit;
 	tcp_syncache.rexmt_limit = SYNCACHE_MAXREXMTS;
-	tcp_syncache.next_reseed = 0;
 	tcp_syncache.hash_secret = arc4random();
 
-        TUNABLE_INT_FETCH("net.inet.tcp.syncache.hashsize",
+	TUNABLE_INT_FETCH("net.inet.tcp.syncache.hashsize",
 	    &tcp_syncache.hashsize);
-        TUNABLE_INT_FETCH("net.inet.tcp.syncache.cachelimit",
+	TUNABLE_INT_FETCH("net.inet.tcp.syncache.cachelimit",
 	    &tcp_syncache.cache_limit);
-        TUNABLE_INT_FETCH("net.inet.tcp.syncache.bucketlimit",
+	TUNABLE_INT_FETCH("net.inet.tcp.syncache.bucketlimit",
 	    &tcp_syncache.bucket_limit);
 	if (!powerof2(tcp_syncache.hashsize)) {
-                printf("WARNING: syncache hash size is not a power of 2.\n");
+		printf("WARNING: syncache hash size is not a power of 2.\n");
 		tcp_syncache.hashsize = 512;	/* safe default */
-        }
+	}
 	tcp_syncache.hashmask = tcp_syncache.hashsize - 1;
 
 	/* Allocate the hash table. */
@@ -257,10 +257,10 @@ syncache_init(void)
 	 * more entry than cache limit, so a new entry can bump out an
 	 * older one.
 	 */
-	tcp_syncache.cache_limit -= 1;
 	tcp_syncache.zone = uma_zcreate("syncache", sizeof(struct syncache),
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	uma_zone_set_max(tcp_syncache.zone, tcp_syncache.cache_limit);
+	tcp_syncache.cache_limit -= 1;
 }
 
 static void
@@ -356,15 +356,15 @@ syncache_timer(xslot)
 	struct inpcb *inp;
 
 	INP_INFO_WLOCK(&tcbinfo);
-        if (callout_pending(&tcp_syncache.tt_timerq[slot]) ||
-            !callout_active(&tcp_syncache.tt_timerq[slot])) {
+	if (callout_pending(&tcp_syncache.tt_timerq[slot]) ||
+	    !callout_active(&tcp_syncache.tt_timerq[slot])) {
 		/* XXX can this happen? */
 		INP_INFO_WUNLOCK(&tcbinfo);
-                return;
-        }
-        callout_deactivate(&tcp_syncache.tt_timerq[slot]);
+		return;
+	}
+	callout_deactivate(&tcp_syncache.tt_timerq[slot]);
 
-        nsc = TAILQ_FIRST(&tcp_syncache.timerq[slot]);
+	nsc = TAILQ_FIRST(&tcp_syncache.timerq[slot]);
 	while (nsc != NULL) {
 		if (ticks < nsc->sc_rxttime)
 			break;
@@ -541,7 +541,7 @@ syncache_socket(sc, lso, m)
 	struct socket *so;
 	struct tcpcb *tp;
 
-	GIANT_REQUIRED;			/* XXX until socket locking */
+	NET_ASSERT_GIANT();
 	INP_INFO_WLOCK_ASSERT(&tcbinfo);
 
 	/*
@@ -560,7 +560,9 @@ syncache_socket(sc, lso, m)
 		goto abort2;
 	}
 #ifdef MAC
+	SOCK_LOCK(so);
 	mac_set_socket_peer_from_mbuf(m, so);
+	SOCK_UNLOCK(so);
 #endif
 
 	inp = sotoinpcb(so);
@@ -590,7 +592,7 @@ syncache_socket(sc, lso, m)
 #ifdef INET6
 		if (sc->sc_inc.inc_isipv6)
 			inp->in6p_laddr = in6addr_any;
-       		else
+		else
 #endif
 			inp->inp_laddr.s_addr = INADDR_ANY;
 		inp->inp_lport = 0;
@@ -610,14 +612,14 @@ syncache_socket(sc, lso, m)
 	if (sc->sc_inc.inc_isipv6) {
 		struct inpcb *oinp = sotoinpcb(lso);
 		struct in6_addr laddr6;
-		struct sockaddr_in6 *sin6;
+		struct sockaddr_in6 sin6;
 		/*
 		 * Inherit socket options from the listening socket.
 		 * Note that in6p_inputopts are not (and should not be)
 		 * copied, since it stores previously received options and is
 		 * used to detect if each new option is different than the
 		 * previous one and hence should be passed to a user.
-                 * If we copied in6p_inputopts, a user would not be able to
+		 * If we copied in6p_inputopts, a user would not be able to
 		 * receive options just after calling the accept system call.
 		 */
 		inp->inp_flags |= oinp->inp_flags & INP_CONTROLOPTS;
@@ -625,53 +627,47 @@ syncache_socket(sc, lso, m)
 			inp->in6p_outputopts =
 			    ip6_copypktopts(oinp->in6p_outputopts, M_NOWAIT);
 
-		MALLOC(sin6, struct sockaddr_in6 *, sizeof *sin6,
-		    M_SONAME, M_NOWAIT | M_ZERO);
-		if (sin6 == NULL)
-			goto abort;
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_len = sizeof(*sin6);
-		sin6->sin6_addr = sc->sc_inc.inc6_faddr;
-		sin6->sin6_port = sc->sc_inc.inc_fport;
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(sin6);
+		sin6.sin6_addr = sc->sc_inc.inc6_faddr;
+		sin6.sin6_port = sc->sc_inc.inc_fport;
+		sin6.sin6_flowinfo = sin6.sin6_scope_id = 0;
 		laddr6 = inp->in6p_laddr;
 		if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
 			inp->in6p_laddr = sc->sc_inc.inc6_laddr;
-		if (in6_pcbconnect(inp, (struct sockaddr *)sin6, &thread0)) {
+		if (in6_pcbconnect(inp, (struct sockaddr *)&sin6,
+		    thread0.td_ucred)) {
 			inp->in6p_laddr = laddr6;
-			FREE(sin6, M_SONAME);
 			goto abort;
 		}
-		FREE(sin6, M_SONAME);
+		/* Override flowlabel from in6_pcbconnect. */
+		inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
+		inp->in6p_flowinfo |= sc->sc_flowlabel;
 	} else
 #endif
 	{
 		struct in_addr laddr;
-		struct sockaddr_in *sin;
+		struct sockaddr_in sin;
 
-		inp->inp_options = ip_srcroute();
+		inp->inp_options = ip_srcroute(m);
 		if (inp->inp_options == NULL) {
 			inp->inp_options = sc->sc_ipopts;
 			sc->sc_ipopts = NULL;
 		}
 
-		MALLOC(sin, struct sockaddr_in *, sizeof *sin,
-		    M_SONAME, M_NOWAIT | M_ZERO);
-		if (sin == NULL)
-			goto abort;
-		sin->sin_family = AF_INET;
-		sin->sin_len = sizeof(*sin);
-		sin->sin_addr = sc->sc_inc.inc_faddr;
-		sin->sin_port = sc->sc_inc.inc_fport;
-		bzero((caddr_t)sin->sin_zero, sizeof(sin->sin_zero));
+		sin.sin_family = AF_INET;
+		sin.sin_len = sizeof(sin);
+		sin.sin_addr = sc->sc_inc.inc_faddr;
+		sin.sin_port = sc->sc_inc.inc_fport;
+		bzero((caddr_t)sin.sin_zero, sizeof(sin.sin_zero));
 		laddr = inp->inp_laddr;
 		if (inp->inp_laddr.s_addr == INADDR_ANY)
 			inp->inp_laddr = sc->sc_inc.inc_laddr;
-		if (in_pcbconnect(inp, (struct sockaddr *)sin, &thread0)) {
+		if (in_pcbconnect(inp, (struct sockaddr *)&sin,
+		    thread0.td_ucred)) {
 			inp->inp_laddr = laddr;
-			FREE(sin, M_SONAME);
 			goto abort;
 		}
-		FREE(sin, M_SONAME);
 	}
 
 	tp = intotcpcb(inp);
@@ -708,7 +704,14 @@ syncache_socket(sc, lso, m)
 		tp->cc_send = sc->sc_cc_send;
 		tp->cc_recv = sc->sc_cc_recv;
 	}
-
+#ifdef TCP_SIGNATURE
+	if (sc->sc_flags & SCF_SIGNATURE)
+		tp->t_flags |= TF_SIGNATURE;
+#endif
+	if (sc->sc_flags & SCF_SACK) {
+		tp->sack_enable = 1;
+		tp->t_flags |= TF_SACK_PERMIT;
+	}
 	/*
 	 * Set up MSS and get cached values from tcp_hostcache.
 	 * This might overwrite some of the defaults we just set.
@@ -719,7 +722,7 @@ syncache_socket(sc, lso, m)
 	 * If the SYN,ACK was retransmitted, reset cwnd to 1 segment.
 	 */
 	if (sc->sc_rxtslot != 0)
-                tp->snd_cwnd = tp->t_maxseg;
+		tp->snd_cwnd = tp->t_maxseg;
 	callout_reset(tp->tt_keep, tcp_keepinit, tcp_timer_keep, tp);
 
 	INP_UNLOCK(inp);
@@ -758,11 +761,11 @@ syncache_expand(inc, th, sop, m)
 	sc = syncache_lookup(inc, &sch);
 	if (sc == NULL) {
 		/*
-		 * There is no syncache entry, so see if this ACK is 
+		 * There is no syncache entry, so see if this ACK is
 		 * a returning syncookie.  To do this, first:
 		 *  A. See if this socket has had a syncache entry dropped in
 		 *     the past.  We don't want to accept a bogus syncookie
- 		 *     if we've never received a SYN.
+		 *     if we've never received a SYN.
 		 *  B. check that the syncookie is valid.  If it is, then
 		 *     cobble up a fake syncache entry, and return.
 		 */
@@ -829,6 +832,7 @@ syncache_add(inc, to, th, sop, m)
 	struct syncache_head *sch;
 	struct mbuf *ipopts = NULL;
 	struct rmxp_tao tao;
+	u_int32_t flowtmp;
 	int i, win;
 
 	INP_INFO_WLOCK_ASSERT(&tcbinfo);
@@ -843,7 +847,7 @@ syncache_add(inc, to, th, sop, m)
 #ifdef INET6
 	if (!inc->inc_isipv6)
 #endif
-		ipopts = ip_srcroute();
+		ipopts = ip_srcroute(m);
 
 	/*
 	 * See if we already have an entry for this connection.
@@ -884,7 +888,7 @@ syncache_add(inc, to, th, sop, m)
 			TAILQ_REMOVE(&tcp_syncache.timerq[sc->sc_rxtslot],
 			    sc, sc_timerq);
 			SYNCACHE_TIMEOUT(sc, sc->sc_rxtslot);
-		 	tcpstat.tcps_sndacks++;
+			tcpstat.tcps_sndacks++;
 			tcpstat.tcps_sndtotal++;
 		}
 		*sop = NULL;
@@ -895,7 +899,7 @@ syncache_add(inc, to, th, sop, m)
 	if (sc == NULL) {
 		/*
 		 * The zone allocator couldn't provide more entries.
-		 * Treat this as if the cache was full; drop the oldest 
+		 * Treat this as if the cache was full; drop the oldest
 		 * entry and insert the new one.
 		 */
 		/* NB: guarded by INP_INFO_WLOCK(&tcbinfo) */
@@ -938,10 +942,25 @@ syncache_add(inc, to, th, sop, m)
 	sc->sc_irs = th->th_seq;
 	sc->sc_flags = 0;
 	sc->sc_peer_mss = to->to_flags & TOF_MSS ? to->to_mss : 0;
-	if (tcp_syncookies)
-		sc->sc_iss = syncookie_generate(sc);
-	else
+	sc->sc_flowlabel = 0;
+	if (tcp_syncookies) {
+		sc->sc_iss = syncookie_generate(sc, &flowtmp);
+#ifdef INET6
+		if (inc->inc_isipv6 &&
+		    (sc->sc_tp->t_inpcb->in6p_flags & IN6P_AUTOFLOWLABEL)) {
+			sc->sc_flowlabel = flowtmp & IPV6_FLOWLABEL_MASK;
+		}
+#endif
+	} else {
 		sc->sc_iss = arc4random();
+#ifdef INET6
+		if (inc->inc_isipv6 &&
+		    (sc->sc_tp->t_inpcb->in6p_flags & IN6P_AUTOFLOWLABEL)) {
+			sc->sc_flowlabel =
+			    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
+		}
+#endif
+	}
 
 	/* Initial receive window: clip sbspace to [0 .. TCP_MAXWIN] */
 	win = sbspace(&so->so_rcv);
@@ -983,6 +1002,20 @@ syncache_add(inc, to, th, sop, m)
 	}
 	if (tp->t_flags & TF_NOOPT)
 		sc->sc_flags = SCF_NOOPT;
+#ifdef TCP_SIGNATURE
+	/*
+	 * If listening socket requested TCP digests, and received SYN
+	 * contains the option, flag this in the syncache so that
+	 * syncache_respond() will do the right thing with the SYN+ACK.
+	 * XXX Currently we always record the option by default and will
+	 * attempt to use it in syncache_respond().
+	 */
+	if (to->to_flags & TOF_SIGNATURE)
+		sc->sc_flags = SCF_SIGNATURE;
+#endif
+
+	if (to->to_flags & TOF_SACK)
+		sc->sc_flags |= SCF_SACK;
 
 	/*
 	 * XXX
@@ -1079,7 +1112,7 @@ syncache_respond(sc, m)
 
 	hlen =
 #ifdef INET6
-	       (sc->sc_inc.inc_isipv6) ? sizeof(struct ip6_hdr) : 
+	       (sc->sc_inc.inc_isipv6) ? sizeof(struct ip6_hdr) :
 #endif
 		sizeof(struct ip);
 
@@ -1096,6 +1129,11 @@ syncache_respond(sc, m)
 		    ((sc->sc_flags & SCF_WINSCALE) ? 4 : 0) +
 		    ((sc->sc_flags & SCF_TIMESTAMP) ? TCPOLEN_TSTAMP_APPA : 0) +
 		    ((sc->sc_flags & SCF_CC) ? TCPOLEN_CC_APPA * 2 : 0);
+#ifdef TCP_SIGNATURE
+		optlen += (sc->sc_flags & SCF_SIGNATURE) ?
+		    TCPOLEN_SIGNATURE + 2 : 0;
+#endif
+		optlen += ((sc->sc_flags & SCF_SACK) ? 4 : 0);
 	}
 	tlen = hlen + sizeof(struct tcphdr) + optlen;
 
@@ -1122,7 +1160,7 @@ syncache_respond(sc, m)
 	inp = sc->sc_tp->t_inpcb;
 	INP_LOCK(inp);
 #ifdef MAC
-	mac_create_mbuf_from_socket(inp->inp_socket, m);
+	mac_create_mbuf_from_inpcb(inp, m);
 #endif
 
 #ifdef INET6
@@ -1134,7 +1172,8 @@ syncache_respond(sc, m)
 		ip6->ip6_dst = sc->sc_inc.inc6_faddr;
 		ip6->ip6_plen = htons(tlen - hlen);
 		/* ip6_hlim is set after checksum */
-		/* ip6_flow = ??? */
+		ip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;
+		ip6->ip6_flow |= sc->sc_flowlabel;
 
 		th = (struct tcphdr *)(ip6 + 1);
 	} else
@@ -1213,6 +1252,31 @@ syncache_respond(sc, m)
 			*lp   = htonl(sc->sc_cc_recv);
 			optp += TCPOLEN_CC_APPA * 2;
 		}
+
+#ifdef TCP_SIGNATURE
+		/*
+		 * Handle TCP-MD5 passive opener response.
+		 */
+		if (sc->sc_flags & SCF_SIGNATURE) {
+			u_int8_t *bp = optp;
+			int i;
+
+			*bp++ = TCPOPT_SIGNATURE;
+			*bp++ = TCPOLEN_SIGNATURE;
+			for (i = 0; i < TCP_SIGLEN; i++)
+				*bp++ = 0;
+			tcp_signature_compute(m, sizeof(struct ip), 0, optlen,
+			    optp + 2, IPSEC_DIR_OUTBOUND);
+			*bp++ = TCPOPT_NOP;
+			*bp++ = TCPOPT_EOL;
+			optp += TCPOLEN_SIGNATURE + 2;
+		}
+#endif /* TCP_SIGNATURE */
+
+	if (sc->sc_flags & SCF_SACK) {
+		*(u_int32_t *)optp = htonl(TCPOPT_SACK_PERMIT_HDR);
+		optp += 4;
+	}
 	}
 
 #ifdef INET6
@@ -1224,7 +1288,7 @@ syncache_respond(sc, m)
 	} else
 #endif
 	{
-        	th->th_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
+		th->th_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
 		    htons(tlen - hlen + IPPROTO_TCP));
 		m->m_pkthdr.csum_flags = CSUM_TCP;
 		m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
@@ -1266,7 +1330,7 @@ syncache_respond(sc, m)
 #define SYNCOOKIE_NSECRETS	(1 << SYNCOOKIE_WNDBITS)
 #define SYNCOOKIE_TIMEOUT \
     (hz * (1 << SYNCOOKIE_WNDBITS) / (1 << SYNCOOKIE_TIMESHIFT))
-#define SYNCOOKIE_DATAMASK 	((3 << SYNCOOKIE_WNDBITS) | SYNCOOKIE_WNDMASK)
+#define SYNCOOKIE_DATAMASK	((3 << SYNCOOKIE_WNDBITS) | SYNCOOKIE_WNDMASK)
 
 static struct {
 	u_int32_t	ts_secbits[4];
@@ -1291,16 +1355,16 @@ CTASSERT(sizeof(struct md5_add) == 28);
 
 /*
  * Consider the problem of a recreated (and retransmitted) cookie.  If the
- * original SYN was accepted, the connection is established.  The second 
- * SYN is inflight, and if it arrives with an ISN that falls within the 
- * receive window, the connection is killed.  
+ * original SYN was accepted, the connection is established.  The second
+ * SYN is inflight, and if it arrives with an ISN that falls within the
+ * receive window, the connection is killed.
  *
  * However, since cookies have other problems, this may not be worth
  * worrying about.
  */
 
 static u_int32_t
-syncookie_generate(struct syncache *sc)
+syncookie_generate(struct syncache *sc, u_int32_t *flowid)
 {
 	u_int32_t md5_buffer[4];
 	u_int32_t data;
@@ -1342,6 +1406,7 @@ syncookie_generate(struct syncache *sc)
 	MD5Add(add);
 	MD5Final((u_char *)&md5_buffer, &syn_ctx);
 	data ^= (md5_buffer[0] & ~SYNCOOKIE_WNDMASK);
+	*flowid = md5_buffer[1];
 	return (data);
 }
 
@@ -1400,11 +1465,14 @@ syncookie_lookup(inc, th, so)
 	sc->sc_ipopts = NULL;
 	sc->sc_inc.inc_fport = inc->inc_fport;
 	sc->sc_inc.inc_lport = inc->inc_lport;
+	sc->sc_tp = sototcpcb(so);
 #ifdef INET6
 	sc->sc_inc.inc_isipv6 = inc->inc_isipv6;
 	if (inc->inc_isipv6) {
 		sc->sc_inc.inc6_faddr = inc->inc6_faddr;
 		sc->sc_inc.inc6_laddr = inc->inc6_laddr;
+		if (sc->sc_tp->t_inpcb->in6p_flags & IN6P_AUTOFLOWLABEL)
+			sc->sc_flowlabel = md5_buffer[1] & IPV6_FLOWLABEL_MASK;
 	} else
 #endif
 	{

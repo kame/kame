@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/xform_ipip.c,v 1.6 2003/09/29 22:57:43 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/xform_ipip.c,v 1.9.2.1 2004/09/15 15:14:19 andre Exp $	*/
 /*	$OpenBSD: ip_ipip.c,v 1.25 2002/06/10 18:04:55 itojun Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
@@ -41,7 +41,6 @@
  */
 #include "opt_inet.h"
 #include "opt_inet6.h"
-#include "opt_random_ip_id.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -309,10 +308,8 @@ _ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 	    !(m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK)) &&
 	    ipip_allow != 2) {
 	    	IFNET_RLOCK();
-		for (ifp = ifnet.tqh_first; ifp != 0;
-		     ifp = ifp->if_list.tqe_next) {
-			for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
-			     ifa = ifa->ifa_list.tqe_next) {
+		TAILQ_FOREACH(ifp, &ifnet, if_link) {
+			TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 #ifdef INET
 				if (ipo) {
 					if (ifa->ifa_addr->sa_family !=
@@ -379,7 +376,7 @@ _ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 		panic("%s: bogus ip version %u", __func__, v>>4);
 	}
 
-	if (!netisr_queue(isr, m)) {
+	if (netisr_queue(isr, m)) {	/* (0) on success. */
 		ipipstat.ipips_qfull++;
 		DPRINTF(("%s: packet dropped because of full queue\n",
 			__func__));
@@ -452,11 +449,7 @@ ipip_output(
 		ipo->ip_src = saidx->src.sin.sin_addr;
 		ipo->ip_dst = saidx->dst.sin.sin_addr;
 
-#ifdef RANDOM_IP_ID
-		ipo->ip_id = ip_randomid();
-#else
-		ipo->ip_id = htons(ip_id++);
-#endif
+		ipo->ip_id = ip_newid();
 
 		/* If the inner protocol is IP... */
 		if (tp == IPVERSION) {
@@ -526,7 +519,6 @@ ipip_output(
 		if (m == 0) {
 			DPRINTF(("%s: M_PREPEND failed\n", __func__));
 			ipipstat.ipips_hdrops++;
-			*mp = NULL;
 			error = ENOBUFS;
 			goto bad;
 		}
@@ -610,7 +602,8 @@ nofamily:
 	return 0;
 bad:
 	if (m)
-		m_freem(m), *mp = NULL;
+		m_freem(m);
+	*mp = NULL;
 	return (error);
 }
 

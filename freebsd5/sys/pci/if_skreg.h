@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_skreg.h,v 1.19 2003/11/14 19:00:32 sam Exp $
+ * $FreeBSD: src/sys/pci/if_skreg.h,v 1.20.2.2 2004/08/25 21:19:06 jmg Exp $
  */
 
 /*
@@ -71,6 +71,11 @@
 #define DEVICEID_SK_V2		0x4320
 
 /*
+ * Belkin F5D5005
+ */
+#define DEVICEID_BELKIN_5005	0x5005
+
+/*
  * 3Com PCI vendor ID
  */
 #define VENDORID_3COM		0x10b7
@@ -89,6 +94,16 @@
  * Linksys gigabit ethernet device ID
  */
 #define DEVICEID_LINKSYS_EG1032	0x1032
+
+/*
+ * D-Link PCI vendor ID
+ */
+#define	VENDORID_DLINK		0x1186
+
+/*
+ * D-Link gigabit ethernet device ID
+ */
+#define DEVICEID_DLINK_DGE530T	0x4c00
 
 /*
  * GEnesis registers. The GEnesis chip has a 256-byte I/O window
@@ -1424,8 +1439,8 @@ struct sk_softc {
 #define	SK_LOCK(_sc)		mtx_lock(&(_sc)->sk_mtx)
 #define	SK_UNLOCK(_sc)		mtx_unlock(&(_sc)->sk_mtx)
 #define	SK_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->sk_mtx, MA_OWNED)
-#define	SK_IF_LOCK(_sc)		mtx_lock(&(_sc)->sk_softc->sk_mtx)
-#define	SK_IF_UNLOCK(_sc)	mtx_unlock(&(_sc)->sk_softc->sk_mtx)
+#define	SK_IF_LOCK(_sc)		SK_LOCK((_sc)->sk_softc)
+#define	SK_IF_UNLOCK(_sc)	SK_UNLOCK((_sc)->sk_softc)
 
 /* Softc for each logical interface */
 struct sk_if_softc {

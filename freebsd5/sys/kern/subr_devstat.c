@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_devstat.c,v 1.47 2003/09/27 12:01:00 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_devstat.c,v 1.49 2004/06/16 09:47:12 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -437,6 +437,8 @@ SYSCTL_INT(_kern_devstat, OID_AUTO, version, CTLFLAG_RD,
 static d_mmap_t devstat_mmap;
 
 static struct cdevsw devstat_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_mmap =	devstat_mmap,
 	.d_name =	"devstat",
 };
@@ -451,7 +453,7 @@ static TAILQ_HEAD(, statspage)	pagelist = TAILQ_HEAD_INITIALIZER(pagelist);
 static MALLOC_DEFINE(M_DEVSTAT, "devstat", "Device statistics");
 
 static int
-devstat_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
+devstat_mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	struct statspage *spp;
 

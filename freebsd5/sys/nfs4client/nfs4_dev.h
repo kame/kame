@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/nfs4client/nfs4_dev.h,v 1.1 2003/11/14 20:54:08 alfred Exp $ */
+/* $FreeBSD: src/sys/nfs4client/nfs4_dev.h,v 1.2 2004/03/26 22:44:59 rees Exp $ */
 /* $Id: nfs4_dev.h,v 1.3 2003/11/05 14:58:59 rees Exp $ */
 
 /*
@@ -47,7 +47,7 @@ struct nfs4dev_msg {
 	uint8_t msg_data[NFS4DEV_MSG_MAX_DATALEN];
 };
 
-#define NFS4DEV_VERSION  (0x3 << 16 | sizeof(struct nfs4dev_msg))
+#define NFS4DEV_VERSION  (0x3 << 16 | (int) sizeof(struct nfs4dev_msg))
 
 /* ioctl commands */
 #define NFS4DEVIOCGET _IOR('A', 0x200, struct nfs4dev_msg)

@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -42,7 +38,7 @@
  *
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/include/pmap.h,v 1.103 2003/11/08 03:01:26 alc Exp $
+ * $FreeBSD: src/sys/i386/include/pmap.h,v 1.112.2.2 2004/10/10 19:08:00 alc Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -100,11 +96,12 @@
  */
 #define VADDR(pdi, pti) ((vm_offset_t)(((pdi)<<PDRSHIFT)|((pti)<<PAGE_SHIFT)))
 
+/* Actual number of kernel page tables */
 #ifndef NKPT
 #ifdef PAE
-#define	NKPT		120	/* actual number of kernel page tables */
+#define	NKPT		240	/* Enough for 16GB (2MB page tables) */
 #else
-#define	NKPT		30	/* actual number of kernel page tables */
+#define	NKPT		30	/* Enough for 4GB (4MB page tables) */
 #endif
 #endif
 #ifndef NKPDE
@@ -140,6 +137,8 @@
 #ifndef LOCORE
 
 #include <sys/queue.h>
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
 
 #ifdef PAE
 
@@ -237,6 +236,8 @@ pte_load_store(pt_entry_t *ptep, pt_entry_t v)
 
 #define	pte_load_clear(ptep)	pte_load_store((ptep), (pt_entry_t)0ULL)
 
+#define	pte_store(ptep, pte)	pte_load_store((ptep), (pt_entry_t)pte)
+
 #else /* PAE */
 
 static __inline pt_entry_t
@@ -253,17 +254,27 @@ pte_load_store(pt_entry_t *ptep, pt_entry_t pte)
 {
 	pt_entry_t r;
 
-	r = *ptep;
-	*ptep = pte;
+	__asm __volatile(
+	    "xchgl %0,%1"
+	    : "=m" (*ptep),
+	      "=r" (r)
+	    : "1" (pte),
+	      "m" (*ptep));
 	return (r);
 }
 
 #define	pte_load_clear(pte)	atomic_readandclear_int(pte)
 
+static __inline void
+pte_store(pt_entry_t *ptep, pt_entry_t pte)
+{
+
+	*ptep = pte;
+}
+
 #endif /* PAE */
 
-#define	pte_clear(ptep)		pte_load_store((ptep), (pt_entry_t)0ULL)
-#define	pte_store(ptep, pte)	pte_load_store((ptep), (pt_entry_t)pte)
+#define	pte_clear(ptep)		pte_store((ptep), (pt_entry_t)0ULL)
 
 #define	pde_store(pdep, pde)	pte_store((pdep), (pde))
 
@@ -280,6 +291,7 @@ struct md_page {
 };
 
 struct pmap {
+	struct mtx		pm_mtx;
 	pd_entry_t		*pm_pdir;	/* KVA of page directory */
 	TAILQ_HEAD(,pv_entry)	pm_pvlist;	/* list of mappings in pmap */
 	u_int			pm_active;	/* active on cpus */
@@ -291,13 +303,22 @@ struct pmap {
 #endif
 };
 
-#define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.pv_list))
-
 typedef struct pmap	*pmap_t;
 
 #ifdef _KERNEL
 extern struct pmap	kernel_pmap_store;
 #define kernel_pmap	(&kernel_pmap_store)
+
+#define	PMAP_LOCK(pmap)		mtx_lock(&(pmap)->pm_mtx)
+#define	PMAP_LOCK_ASSERT(pmap, type) \
+				mtx_assert(&(pmap)->pm_mtx, (type))
+#define	PMAP_LOCK_DESTROY(pmap)	mtx_destroy(&(pmap)->pm_mtx)
+#define	PMAP_LOCK_INIT(pmap)	mtx_init(&(pmap)->pm_mtx, "pmap", \
+				    NULL, MTX_DEF | MTX_DUPOK)
+#define	PMAP_LOCKED(pmap)	mtx_owned(&(pmap)->pm_mtx)
+#define	PMAP_MTX(pmap)		(&(pmap)->pm_mtx)
+#define	PMAP_TRYLOCK(pmap)	mtx_trylock(&(pmap)->pm_mtx)
+#define	PMAP_UNLOCK(pmap)	mtx_unlock(&(pmap)->pm_mtx)
 #endif
 
 /*
@@ -309,7 +330,6 @@ typedef struct pv_entry {
 	vm_offset_t	pv_va;		/* virtual address for mapping */
 	TAILQ_ENTRY(pv_entry)	pv_list;
 	TAILQ_ENTRY(pv_entry)	pv_plist;
-	vm_page_t	pv_ptem;	/* VM page for pte */
 } *pv_entry_t;
 
 #ifdef	_KERNEL
@@ -325,9 +345,6 @@ extern struct ppro_vmtrr PPro_vmtrr[NPPROVMTRR];
 extern caddr_t	CADDR1;
 extern pt_entry_t *CMAP1;
 extern vm_paddr_t avail_end;
-extern vm_paddr_t avail_start;
-extern vm_offset_t clean_eva;
-extern vm_offset_t clean_sva;
 extern vm_paddr_t phys_avail[];
 extern int pseflag;
 extern int pgeflag;
@@ -335,8 +352,11 @@ extern char *ptvmmap;		/* poor name! */
 extern vm_offset_t virtual_avail;
 extern vm_offset_t virtual_end;
 
+#define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.pv_list))
+
 void	pmap_bootstrap(vm_paddr_t, vm_paddr_t);
 void	pmap_kenter(vm_offset_t va, vm_paddr_t pa);
+void	*pmap_kenter_temporary(vm_paddr_t pa, int i);
 void	pmap_kremove(vm_offset_t);
 void	*pmap_mapdev(vm_paddr_t, vm_size_t);
 void	pmap_unmapdev(vm_offset_t, vm_size_t);

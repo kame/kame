@@ -54,10 +54,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -100,20 +96,23 @@
  *	from: @(#)sbus.c	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: sbus.c,v 1.46 2001/10/07 20:30:41 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/sbus/sbus.c,v 1.24 2003/08/23 00:11:16 imp Exp $
+ * $FreeBSD: src/sys/sparc64/sbus/sbus.c,v 1.31 2004/08/12 17:41:33 marius Exp $
  */
 
 /*
  * Sbus support.
  */
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/pcpu.h>
 #include <sys/reboot.h>
 
+#include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/openfirm.h>
 
 #include <machine/bus.h>
@@ -134,7 +133,6 @@
 #include <sparc64/sbus/sbusreg.h>
 #include <sparc64/sbus/sbusvar.h>
 
-
 #ifdef DEBUG
 #define SDB_DVMA	0x1
 #define SDB_INTR	0x2
@@ -146,11 +144,12 @@ int sbus_debug = 0;
 
 struct sbus_devinfo {
 	int			sdi_burstsz;
-	char			*sdi_compat;
+	char			*sdi_compat;	/* PROM compatible */
+	char			*sdi_model;	/* PROM model */
 	char			*sdi_name;	/* PROM name */
 	phandle_t		sdi_node;	/* PROM node */
 	int			sdi_slot;
-	char			*sdi_type;	/* PROM name */
+	char			*sdi_type;	/* PROM device_type */
 
 	struct resource_list	sdi_rl;
 };
@@ -221,6 +220,11 @@ static int sbus_deactivate_resource(device_t, device_t, int, int,
     struct resource *);
 static int sbus_release_resource(device_t, device_t, int, int,
     struct resource *);
+static ofw_bus_get_compat_t sbus_get_compat;
+static ofw_bus_get_model_t sbus_get_model;
+static ofw_bus_get_name_t sbus_get_name;
+static ofw_bus_get_node_t sbus_get_node;
+static ofw_bus_get_type_t sbus_get_type;
 
 static struct sbus_devinfo * sbus_setup_dinfo(struct sbus_softc *sc,
     phandle_t node, char *name);
@@ -247,6 +251,13 @@ static device_method_t sbus_methods[] = {
 	DEVMETHOD(bus_release_resource,	sbus_release_resource),
 	DEVMETHOD(bus_get_resource_list, sbus_get_resource_list),
 	DEVMETHOD(bus_get_resource,	bus_generic_rl_get_resource),
+
+	/* ofw_bus interface */
+	DEVMETHOD(ofw_bus_get_compat,	sbus_get_compat),
+	DEVMETHOD(ofw_bus_get_model,	sbus_get_model),
+	DEVMETHOD(ofw_bus_get_name,	sbus_get_name),
+	DEVMETHOD(ofw_bus_get_node,	sbus_get_node),
+	DEVMETHOD(ofw_bus_get_type,	sbus_get_type),
 
 	{ 0, 0 }
 };
@@ -375,7 +386,7 @@ sbus_probe(device_t dev)
 	sc->sc_is.is_dva = SBR_IOMMU_SVADIAG;
 	sc->sc_is.is_dtcmp = 0;
 	sc->sc_is.is_sb[0] = SBR_STRBUF;
-	sc->sc_is.is_sb[1] = NULL;
+	sc->sc_is.is_sb[1] = 0;
 
 	/* give us a nice name.. */
 	name = (char *)malloc(32, M_DEVBUF, M_NOWAIT);
@@ -460,8 +471,9 @@ sbus_setup_dinfo(struct sbus_softc *sc, phandle_t node, char *name)
 	resource_list_init(&sdi->sdi_rl);
 	sdi->sdi_name = name;
 	sdi->sdi_node = node;
-	OF_getprop_alloc(node, "compat", 1, (void **)&sdi->sdi_compat);
+	OF_getprop_alloc(node, "compatible", 1, (void **)&sdi->sdi_compat);
 	OF_getprop_alloc(node, "device_type", 1, (void **)&sdi->sdi_type);
+	OF_getprop_alloc(node, "model", 1, (void **)&sdi->sdi_model);
 	slot = -1;
 	nreg = OF_getprop_alloc(node, "reg", sizeof(*reg), (void **)&reg);
 	if (nreg == -1) {
@@ -526,6 +538,8 @@ sbus_destroy_dinfo(struct sbus_devinfo *dinfo)
 	resource_list_free(&dinfo->sdi_rl);
 	if (dinfo->sdi_compat != NULL)
 		free(dinfo->sdi_compat, M_OFWPROP);
+	if (dinfo->sdi_model != NULL)
+		free(dinfo->sdi_model, M_OFWPROP);
 	if (dinfo->sdi_type != NULL)
 		free(dinfo->sdi_type, M_OFWPROP);
 	free(dinfo, M_DEVBUF);
@@ -550,19 +564,12 @@ sbus_print_child(device_t dev, device_t child)
 static void
 sbus_probe_nomatch(device_t dev, device_t child)
 {
-	char *name;
-	char *type;
+	const char *type;
 
-	if (BUS_READ_IVAR(dev, child, SBUS_IVAR_NAME,
-	    (uintptr_t *)&name) != 0 ||
-	    BUS_READ_IVAR(dev, child, SBUS_IVAR_DEVICE_TYPE,
-	    (uintptr_t *)&type) != 0)
-		return;
-
-	if (type == NULL)
+	if ((type = ofw_bus_get_type(child)) == NULL)
 		type = "(unknown)";
 	device_printf(dev, "<%s>, type %s (no driver attached)\n",
-	    name, type);
+            ofw_bus_get_name(child), type);
 }
 
 static int
@@ -580,20 +587,8 @@ sbus_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 	case SBUS_IVAR_CLOCKFREQ:
 		*result = sc->sc_clockfreq;
 		break;
-	case SBUS_IVAR_COMPAT:
-		*result = (uintptr_t)dinfo->sdi_compat;
-		break;
-	case SBUS_IVAR_NAME:
-		*result = (uintptr_t)dinfo->sdi_name;
-		break;
-	case SBUS_IVAR_NODE:
-		*result = dinfo->sdi_node;
-		break;
 	case SBUS_IVAR_SLOT:
 		*result = dinfo->sdi_slot;
-		break;
-	case SBUS_IVAR_DEVICE_TYPE:
-		*result = (uintptr_t)dinfo->sdi_type;
 		break;
 	default:
 		return (ENOENT);
@@ -637,7 +632,7 @@ sbus_setup_intr(device_t dev, device_t child,
 	sc = (struct sbus_softc *)device_get_softc(dev);
 	scl = (struct sbus_clr *)malloc(sizeof(*scl), M_DEVBUF, M_NOWAIT);
 	if (scl == NULL)
-		return (NULL);
+		return (0);
 	intrptr = intrmapptr = intrclrptr = 0;
 	intrmap = 0;
 	inr = INTVEC(vec);
@@ -774,7 +769,7 @@ sbus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 			rm = &sc->sc_rd[i].rd_rman;
 			bh = sc->sc_rd[i].rd_bushandle;
 		}
-		if (toffs == NULL)
+		if (toffs == 0L)
 			return (NULL);
 		flags &= ~RF_ACTIVE;
 		rv = rman_reserve_resource(rm, toffs, tend, count, flags,
@@ -891,4 +886,49 @@ sbus_alloc_bustag(struct sbus_softc *sc)
 	sbt->bst_parent = sc->sc_bustag;
 	sbt->bst_type = SBUS_BUS_SPACE;
 	return (sbt);
+}
+
+const char *
+sbus_get_compat(device_t bus, device_t dev)
+{
+	struct sbus_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->sdi_compat);
+}
+
+const char *
+sbus_get_model(device_t bus, device_t dev)
+{
+	struct sbus_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->sdi_model);
+}
+
+const char *
+sbus_get_name(device_t bus, device_t dev)
+{
+	struct sbus_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->sdi_name);
+}
+
+static phandle_t
+sbus_get_node(device_t bus, device_t dev)
+{
+	struct sbus_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->sdi_node);
+}
+
+const char *
+sbus_get_type(device_t bus, device_t dev)
+{
+	struct sbus_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->sdi_type);
 }

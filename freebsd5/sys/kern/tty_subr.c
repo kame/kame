@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/tty_subr.c,v 1.41 2003/07/22 10:36:36 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/tty_subr.c,v 1.42 2004/07/15 20:47:40 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -81,8 +81,8 @@ clist_init(dummy)
 {
 	/*
 	 * Allocate an initial base set of cblocks as a 'slush'.
-	 * We allocate non-slush cblocks with each initial ttyopen() and
-	 * deallocate them with each ttyclose().
+	 * We allocate non-slush cblocks with each initial tty_open() and
+	 * deallocate them with each tty_close().
 	 * We should adjust the slush allocation.  This can't be done in
 	 * the i/o routines because they are sometimes called from
 	 * interrupt handlers when it may be unsafe to call malloc().

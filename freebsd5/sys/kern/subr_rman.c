@@ -56,8 +56,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_rman.c,v 1.31 2003/06/11 00:56:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_rman.c,v 1.35.2.1 2004/08/23 05:12:36 njl Exp $");
 
+#define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -122,6 +123,8 @@ rman_manage_region(struct rman *rm, u_long start, u_long end)
 {
 	struct resource *r, *s;
 
+	DPRINTF(("rman_manage_region: <%s> request: start %#lx, end %#lx\n",
+	    rm->rm_descr, start, end));
 	r = malloc(sizeof *r, M_RMAN, M_NOWAIT | M_ZERO);
 	if (r == 0)
 		return ENOMEM;
@@ -234,7 +237,7 @@ rman_reserve_resource_bound(struct rman *rm, u_long start, u_long end,
 				rstart += bound - (rstart & ~bmask);
 		} while ((rstart & amask) != 0 && rstart < end &&
 		    rstart < s->r_end);
-		rend = ulmin(s->r_end, ulmax(rstart + count, end));
+		rend = ulmin(s->r_end, ulmax(rstart + count - 1, end));
 		if (rstart > rend) {
 			DPRINTF(("adjusted start exceeds end\n"));
 			continue;
@@ -334,7 +337,7 @@ rman_reserve_resource_bound(struct rman *rm, u_long start, u_long end,
 		if ((s->r_flags & flags) != flags)
 			continue;
 		rstart = ulmax(s->r_start, start);
-		rend = ulmin(s->r_end, ulmax(start + count, end));
+		rend = ulmin(s->r_end, ulmax(start + count - 1, end));
 		if (s->r_start >= start && s->r_end <= end
 		    && (s->r_end - s->r_start + 1) == count &&
 		    (s->r_start & amask) == 0 &&
@@ -538,13 +541,20 @@ int_rman_release_resource(struct rman *rm, struct resource *r)
 
 	/*
 	 * Look at the adjacent resources in the list and see if our
-	 * segment can be merged with any of them.
+	 * segment can be merged with any of them.  If either of the
+	 * resources is allocated or is not exactly adjacent then they
+	 * cannot be merged with our segment.
 	 */
 	s = TAILQ_PREV(r, resource_head, r_link);
+	if (s != NULL && ((s->r_flags & RF_ALLOCATED) != 0 ||
+	    s->r_end + 1 != r->r_start))
+		s = NULL;
 	t = TAILQ_NEXT(r, r_link);
+	if (t != NULL && ((t->r_flags & RF_ALLOCATED) != 0 ||
+	    r->r_end + 1 != t->r_start))
+		t = NULL;
 
-	if (s != NULL && (s->r_flags & RF_ALLOCATED) == 0
-	    && t != NULL && (t->r_flags & RF_ALLOCATED) == 0) {
+	if (s != NULL && t != NULL) {
 		/*
 		 * Merge all three segments.
 		 */
@@ -552,13 +562,13 @@ int_rman_release_resource(struct rman *rm, struct resource *r)
 		TAILQ_REMOVE(&rm->rm_list, r, r_link);
 		TAILQ_REMOVE(&rm->rm_list, t, r_link);
 		free(t, M_RMAN);
-	} else if (s != NULL && (s->r_flags & RF_ALLOCATED) == 0) {
+	} else if (s != NULL) {
 		/*
 		 * Merge previous segment with ours.
 		 */
 		s->r_end = r->r_end;
 		TAILQ_REMOVE(&rm->rm_list, r, r_link);
-	} else if (t != NULL && (t->r_flags & RF_ALLOCATED) == 0) {
+	} else if (t != NULL) {
 		/*
 		 * Merge next segment with ours.
 		 */
@@ -677,6 +687,18 @@ void
 rman_set_rid(struct resource *r, int rid)
 {
 	r->r_rid = rid;
+}
+
+void
+rman_set_start(struct resource *r, u_long start)
+{
+	r->r_start = start;
+}
+
+void
+rman_set_end(struct resource *r, u_long end)
+{
+	r->r_end = end;
 }
 
 int

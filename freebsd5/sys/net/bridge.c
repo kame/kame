@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/bridge.c,v 1.72 2003/10/31 18:32:08 brooks Exp $
+ * $FreeBSD: src/sys/net/bridge.c,v 1.82.2.2 2004/10/03 17:04:39 mlaier Exp $
  */
 
 /*
@@ -87,7 +87,6 @@
  *  - be very careful when bridging VLANs
  *  - loop detection is still not very robust.
  */
-#include "opt_pfil_hooks.h"
 
 #include <sys/param.h>
 #include <sys/mbuf.h>
@@ -97,22 +96,21 @@
 #include <sys/socket.h> /* for net/if.h */
 #include <sys/ctype.h>	/* string functions */
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/sysctl.h>
 
+#include <net/ethernet.h>
 #include <net/if.h>
+#include <net/if_arp.h>		/* for struct arpcom */
 #include <net/if_types.h>
 #include <net/if_var.h>
+#include <net/pfil.h>
 
-#include <netinet/in.h> /* for struct arpcom */
+#include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
-#include <netinet/if_ether.h> /* for struct arpcom */
-
-#ifdef PFIL_HOOKS
-#include <net/pfil.h>
 #include <netinet/ip_var.h>
-#endif
 
 #include <net/route.h>
 #include <netinet/ip_fw.h>
@@ -199,7 +197,7 @@ static struct mtx bdg_mtx;
 SYSCTL_DECL(_net_link_ether);
 SYSCTL_NODE(_net_link_ether, OID_AUTO, bridge, CTLFLAG_RD, 0,
 	"Bridge parameters");
-static char bridge_version[] = "$Revision$ $Date$";
+static char bridge_version[] = "031224";
 SYSCTL_STRING(_net_link_ether_bridge, OID_AUTO, version, CTLFLAG_RD,
 	bridge_version, 0, "software version");
 
@@ -299,7 +297,7 @@ static struct callout bdg_callout;
  * updating pointers in ifp2sc.
  */
 static struct cluster_softc *
-add_cluster(u_int16_t cluster_id, struct arpcom *ac)
+add_cluster(u_int16_t cluster_id, struct ifnet *ifp)
 {
     struct cluster_softc *c = NULL;
     int i;
@@ -353,7 +351,7 @@ add_cluster(u_int16_t cluster_id, struct arpcom *ac)
     n_clusters++;
 found:
     c = clusters + i;		/* the right cluster ... */
-    ETHER_ADDR_COPY(c->my_macs[c->ports].etheraddr, ac->ac_enaddr);
+    ETHER_ADDR_COPY(c->my_macs[c->ports].etheraddr, IFP2AC(ifp)->ac_enaddr);
     c->ports++;
     return c;
 bad:
@@ -532,7 +530,7 @@ parse_bdg_cfg(void)
 		    printf("%s already used, skipping\n", ifp->if_xname);
 		    break;
 		}
-		b->cluster = add_cluster(htons(cluster), (struct arpcom *)ifp);
+		b->cluster = add_cluster(htons(cluster), ifp);
 		b->flags |= IFF_USED ;
 		snprintf(bdg_stats.s[ifp->if_index].name,
 		    sizeof(bdg_stats.s[ifp->if_index].name),
@@ -563,6 +561,7 @@ sysctl_bdg(SYSCTL_HANDLER_ARGS)
     int error;
 
     error = sysctl_handle_int(oidp, &enable, 0, req);
+    enable = (enable) ? 1 : 0;
     BDG_LOCK();
     if (enable != do_bridge) {
 	do_bridge = enable;
@@ -913,6 +912,7 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
     struct ifnet *src;
     struct ifnet *ifp, *last;
     int shared = bdg_copy;		/* someone else is using the mbuf */
+    int error;
     struct ifnet *real_dst = dst;	/* real dst from ether_output */
     struct ip_fw_args args;
     struct ether_header save_eh;
@@ -920,14 +920,10 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 
     DDB(quad_t ticks; ticks = rdtsc();)
 
-    args.rule = NULL;		/* did we match a firewall rule ? */
-    /* Fetch state from dummynet tag, ignore others */
-    for (;m0->m_type == MT_TAG; m0 = m0->m_next)
-	if (m0->_m_tag_id == PACKET_TAG_DUMMYNET) {
-	    args.rule = ((struct dn_pkt *)m0)->rule;
-	    shared = 0;			/* For sure this is our own mbuf. */
-	}
-    if (args.rule == NULL)
+    args.rule = ip_dn_claim_rule(m0);
+    if (args.rule)
+	shared = 0;			/* For sure this is our own mbuf. */
+    else
 	bdg_thru++;			/* count 1st time through bdg_forward */
 
     /*
@@ -965,9 +961,7 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
      * and pkts already gone through a pipe.
      */
     if (src != NULL && (
-#ifdef PFIL_HOOKS
 	(inet_pfil_hook.ph_busy_count >= 0 && bdg_ipf != 0) ||
-#endif
 	(IPFW_LOADED && bdg_ipfw != 0))) {
 
 	int i;
@@ -998,11 +992,11 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 	bcopy(eh, &save_eh, ETHER_HDR_LEN);	/* local copy for restore */
 	m_adj(m0, ETHER_HDR_LEN);		/* temporarily strip header */
 
-#ifdef PFIL_HOOKS
 	/*
 	 * NetBSD-style generic packet filter, pfil(9), hooks.
 	 * Enables ipf(8) in bridging.
 	 */
+	if (!IPFW_LOADED) { /* XXX: Prevent ipfw from being run twice. */
 	if (inet_pfil_hook.ph_busy_count >= 0 &&
 	    m0->m_pkthdr.len >= sizeof(struct ip) &&
 	    ntohs(save_eh.ether_type) == ETHERTYPE_IP) {
@@ -1015,7 +1009,7 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 	    ip->ip_len = ntohs(ip->ip_len);
 	    ip->ip_off = ntohs(ip->ip_off);
 
-	    if (pfil_run_hooks(&inet_pfil_hook, &m0, src, PFIL_IN) != 0) {
+	    if (pfil_run_hooks(&inet_pfil_hook, &m0, src, PFIL_IN, NULL) != 0) {
 		/* NB: hook should consume packet */
 		return NULL;
 	    }
@@ -1029,7 +1023,7 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 	    ip->ip_len = htons(ip->ip_len);
 	    ip->ip_off = htons(ip->ip_off);
 	}
-#endif /* PFIL_HOOKS */
+	} /* XXX: Prevent ipfw from being run twice. */
 
 	/*
 	 * Prepare arguments and call the firewall.
@@ -1046,7 +1040,6 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
 
 	args.m = m0;		/* the packet we are looking at		*/
 	args.oif = NULL;	/* this is an input packet		*/
-	args.divert_rule = 0;	/* we do not support divert yet		*/
 	args.next_hop = NULL;	/* we do not support forward yet	*/
 	args.eh = &save_eh;	/* MAC header for bridged/MAC packets	*/
 	i = ip_fw_chk_ptr(&args);
@@ -1134,7 +1127,8 @@ forward:
 			bdg_dropped++;
 			return m0;	/* the original is still there... */
 		    }
-		    if (IF_HANDOFF(&last->if_snd, m, last))
+		    IFQ_HANDOFF(last, m, error);
+		    if (!error)
 			BDG_STAT(last, BDG_OUT);
 		    else
 			bdg_dropped++;
@@ -1158,7 +1152,8 @@ forward:
 	} else {			/* consume original */
 	    m = m0, m0 = NULL;
 	}
-	if (IF_HANDOFF(&last->if_snd, m, last))
+	IFQ_HANDOFF(last, m, error);
+	if (!error)
 	    BDG_STAT(last, BDG_OUT);
 	else
 	    bdg_dropped++;
@@ -1198,7 +1193,7 @@ bdginit(void)
 
     bdgtakeifaces_ptr();		/* XXX does this do anything? */
 
-    callout_init(&bdg_callout, CALLOUT_MPSAFE);
+    callout_init(&bdg_callout, debug_mpsafenet ? CALLOUT_MPSAFE : 0);
     bdg_timeout(0);
     return 0 ;
 }

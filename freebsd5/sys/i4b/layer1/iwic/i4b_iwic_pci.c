@@ -31,7 +31,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/iwic/i4b_iwic_pci.c,v 1.11 2003/09/02 17:30:40 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/iwic/i4b_iwic_pci.c,v 1.12 2004/03/17 17:50:51 njl Exp $");
 
 #include "opt_i4b.h"
 
@@ -200,9 +200,9 @@ iwic_pci_attach(device_t dev)
 	sc->sc_resources.io_rid[0] = BADDR1;
 	
 	if(!(sc->sc_resources.io_base[0] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-						&sc->sc_resources.io_rid[0],
-						0UL, ~0UL, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[0],
+					       RF_ACTIVE)))
 	{
 		printf("iwic%d: Couldn't alloc io port!\n", unit);
 		return(ENXIO);                                       
@@ -211,9 +211,9 @@ iwic_pci_attach(device_t dev)
 	iobase = rman_get_start(sc->sc_resources.io_base[0]);
 
 	if(!(sc->sc_resources.irq =
-			bus_alloc_resource(dev, SYS_RES_IRQ,
-					   &sc->sc_resources.irq_rid,
-					   0UL, ~0UL, 1, RF_SHAREABLE|RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IRQ,
+					       &sc->sc_resources.irq_rid,
+					       RF_SHAREABLE|RF_ACTIVE)))
 	{
 		printf("iwic%d: Couldn't alloc irq!\n",unit);
 		return(ENXIO);                                       

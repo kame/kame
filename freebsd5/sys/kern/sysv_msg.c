@@ -18,7 +18,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/sysv_msg.c,v 1.52 2003/11/07 04:47:14 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/sysv_msg.c,v 1.53 2004/05/30 20:34:58 phk Exp $");
 
 #include "opt_sysvipc.h"
 
@@ -29,6 +29,7 @@ __FBSDID("$FreeBSD: src/sys/kern/sysv_msg.c,v 1.52 2003/11/07 04:47:14 rwatson E
 #include <sys/proc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/module.h>
 #include <sys/msg.h>
 #include <sys/syscall.h>
 #include <sys/sysent.h>

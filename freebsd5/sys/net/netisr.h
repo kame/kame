@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)netisr.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/netisr.h,v 1.30 2003/11/08 22:28:39 sam Exp $
+ * $FreeBSD: src/sys/net/netisr.h,v 1.32 2004/06/09 02:48:23 rwatson Exp $
  */
 
 #ifndef _NET_NETISR_H_
@@ -54,6 +50,7 @@
  */
 #define	NETISR_POLL	0		/* polling callback, must be first */
 #define	NETISR_IP	2		/* same as AF_INET */
+#define	NETISR_ROUTE	14		/* routing socket */
 #define	NETISR_AARP	15		/* Appletalk ARP */
 #define	NETISR_ATALK2	16		/* Appletalk phase 2 */
 #define	NETISR_ATALK1	17		/* Appletalk phase 1 */

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp_intel.c,v 1.19 2003/09/17 02:58:17 anholt Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp_intel.c,v 1.24 2004/05/30 20:00:40 phk Exp $");
 
 #include "opt_bus.h"
 
@@ -33,9 +33,9 @@ __FBSDID("$FreeBSD: src/sys/pci/agp_intel.c,v 1.19 2003/09/17 02:58:17 anholt Ex
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/lock.h>
-#include <sys/lockmgr.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
@@ -111,6 +111,9 @@ agp_intel_match(device_t dev)
 
 	case 0x25788086:
 		return ("Intel 82875P host to AGP bridge");
+
+	case 0x25608086: /* i845G */
+		return ("Intel 82845G host to AGP bridge");
 	};
 
 	if (pci_get_vendor(dev) == 0x8086)
@@ -124,6 +127,8 @@ agp_intel_probe(device_t dev)
 {
 	const char *desc;
 
+	if (resource_disabled("agp", device_get_unit(dev)))
+		return (ENXIO);
 	desc = agp_intel_match(dev);
 	if (desc) {
 		device_verbose(dev);
@@ -212,6 +217,7 @@ agp_intel_attach(device_t dev)
 	case 0x33408086: /* i855 */
 	case 0x25708086: /* i865 */
 	case 0x25788086: /* i875P */
+	case 0x25608086: /* i845G */
 		pci_write_config(dev, AGP_INTEL_I845_MCHCFG,
 				 (pci_read_config(dev, AGP_INTEL_I845_MCHCFG, 1)
 				  | (1 << 1)), 1);
@@ -236,6 +242,7 @@ agp_intel_attach(device_t dev)
 	case 0x25318086: /* i860 */
 	case 0x25708086: /* i865 */
 	case 0x25788086: /* i875P */
+	case 0x25608086: /* i845G */
 		pci_write_config(dev, AGP_INTEL_I8XX_ERRSTS, 0x00ff, 2);
 		break;
 
@@ -278,6 +285,7 @@ agp_intel_detach(device_t dev)
 				& ~(1 << 1)), 1);
 
 	case 0x1a308086: /* i845 */
+	case 0x25608086: /* i845G */
 	case 0x33408086: /* i855 */
 	case 0x25708086: /* i865 */
 	case 0x25788086: /* i875P */

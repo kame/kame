@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/wd_cd.h,v 1.3 2002/09/23 18:54:32 alfred Exp $
+ * $FreeBSD: src/sys/pc98/pc98/wd_cd.h,v 1.4 2004/03/07 14:16:42 nyan Exp $
  */
 
 /*
@@ -347,3 +347,12 @@ struct acd {
 	u_int next_writeable_lba;	/* Next writable position */
 	struct wormio_prepare_track preptrack;	/* Scratch region */
 };
+
+struct ioc_read_audio {
+	u_char address_format;
+	union msf_lba address;
+	int nframes;
+	u_char* buffer;
+};
+
+#define CDIOCREADAUDIO _IOWR('c',31,struct ioc_read_audio)

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/tcp_hostcache.c,v 1.3 2003/12/02 21:25:12 andre Exp $
+ * $FreeBSD: src/sys/netinet/tcp_hostcache.c,v 1.7 2004/08/16 18:32:07 rwatson Exp $
  */
 
 /*
@@ -182,11 +182,11 @@ SYSCTL_PROC(_net_inet_tcp_hostcache, OID_AUTO, list,
 static MALLOC_DEFINE(M_HOSTCACHE, "hostcache", "TCP hostcache");
 
 #define HOSTCACHE_HASH(ip) \
-	(((ip)->s_addr ^ ((ip)->s_addr >> 7) ^ ((ip)->s_addr >> 17)) & 	\
+	(((ip)->s_addr ^ ((ip)->s_addr >> 7) ^ ((ip)->s_addr >> 17)) &	\
 	  tcp_hostcache.hashmask)
 
 /* XXX: What is the recommended hash to get good entropy for IPv6 addresses? */
-#define HOSTCACHE_HASH6(ip6)	 			\
+#define HOSTCACHE_HASH6(ip6)				\
 	(((ip6)->s6_addr32[0] ^				\
 	  (ip6)->s6_addr32[1] ^				\
 	  (ip6)->s6_addr32[2] ^				\
@@ -211,16 +211,16 @@ tcp_hc_init(void)
 	    tcp_hostcache.hashsize * tcp_hostcache.bucket_limit;
 	tcp_hostcache.expire = TCP_HOSTCACHE_EXPIRE;
 
-        TUNABLE_INT_FETCH("net.inet.tcp.hostcache.hashsize",
+	TUNABLE_INT_FETCH("net.inet.tcp.hostcache.hashsize",
 	    &tcp_hostcache.hashsize);
-        TUNABLE_INT_FETCH("net.inet.tcp.hostcache.cachelimit",
+	TUNABLE_INT_FETCH("net.inet.tcp.hostcache.cachelimit",
 	    &tcp_hostcache.cache_limit);
-        TUNABLE_INT_FETCH("net.inet.tcp.hostcache.bucketlimit",
+	TUNABLE_INT_FETCH("net.inet.tcp.hostcache.bucketlimit",
 	    &tcp_hostcache.bucket_limit);
 	if (!powerof2(tcp_hostcache.hashsize)) {
-                printf("WARNING: hostcache hash size is not a power of 2.\n");
+		printf("WARNING: hostcache hash size is not a power of 2.\n");
 		tcp_hostcache.hashsize = 512;	/* safe default */
-        }
+	}
 	tcp_hostcache.hashmask = tcp_hostcache.hashsize - 1;
 
 	/*
@@ -244,7 +244,7 @@ tcp_hc_init(void)
 	 * Allocate the hostcache entries.
 	 */
 	tcp_hostcache.zone = uma_zcreate("hostcache", sizeof(struct hc_metrics),
-	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
+	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
 	uma_zone_set_max(tcp_hostcache.zone, tcp_hostcache.cache_limit);
 
 	/*
@@ -311,7 +311,7 @@ tcp_hc_lookup(struct in_conninfo *inc)
 /*
  * Internal function: insert an entry into the hostcache or return NULL
  * if unable to allocate a new one.
- * 
+ *
  * If an entry has been returned, the caller becomes responsible for
  * unlocking the bucket row after he is done reading/modifying the entry.
  */
@@ -545,7 +545,7 @@ tcp_hc_update(struct in_conninfo *inc, struct hc_metrics_lite *hcml)
 	}
 	if (hcml->rmx_rttvar != 0) {
 	        if (hc_entry->rmx_rttvar == 0)
-        	        hc_entry->rmx_rttvar = hcml->rmx_rttvar;
+			hc_entry->rmx_rttvar = hcml->rmx_rttvar;
 		else
 			hc_entry->rmx_rttvar =
 			    (hc_entry->rmx_rttvar + hcml->rmx_rttvar) / 2;
@@ -581,8 +581,8 @@ tcp_hc_update(struct in_conninfo *inc, struct hc_metrics_lite *hcml)
 		else
 			hc_entry->rmx_sendpipe =
 			    (hc_entry->rmx_sendpipe + hcml->rmx_sendpipe) /2;
-                /* tcpstat.tcps_cachedsendpipe++; */
-        }
+		/* tcpstat.tcps_cachedsendpipe++; */
+	}
 	if (hcml->rmx_recvpipe != 0) {
 		if (hc_entry->rmx_recvpipe == 0)
 			hc_entry->rmx_recvpipe = hcml->rmx_recvpipe;
@@ -676,7 +676,7 @@ sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS)
 				(RTM_RTTUNIT / (hz * TCP_RTT_SCALE))),
 			    msec(hc_entry->rmx_rttvar *
 				(RTM_RTTUNIT / (hz * TCP_RTT_SCALE))),
-			    hc_entry->rmx_bandwidth * hz * 8,
+			    hc_entry->rmx_bandwidth * 8,
 			    hc_entry->rmx_cwnd,
 			    hc_entry->rmx_sendpipe,
 			    hc_entry->rmx_recvpipe,
@@ -700,7 +700,7 @@ sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS)
 static void
 tcp_hc_purge(void *arg)
 {
-	struct hc_metrics *hc_entry;
+	struct hc_metrics *hc_entry, *hc_next;
 	int all = (intptr_t)arg;
 	int i;
 
@@ -711,8 +711,8 @@ tcp_hc_purge(void *arg)
 
 	for (i = 0; i < tcp_hostcache.hashsize; i++) {
 		THC_LOCK(&tcp_hostcache.hashbase[i].hch_mtx);
-		TAILQ_FOREACH(hc_entry, &tcp_hostcache.hashbase[i].hch_bucket,
-			      rmx_q) {
+		TAILQ_FOREACH_SAFE(hc_entry, &tcp_hostcache.hashbase[i].hch_bucket,
+			      rmx_q, hc_next) {
 			if (all || hc_entry->rmx_expire <= 0) {
 				TAILQ_REMOVE(&tcp_hostcache.hashbase[i].hch_bucket,
 					      hc_entry, rmx_q);

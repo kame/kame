@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan_var.h,v 1.16 2003/07/08 21:54:20 wpaul Exp $
+ * $FreeBSD: src/sys/net/if_vlan_var.h,v 1.19 2004/01/18 19:29:04 yar Exp $
  */
 
 #ifndef _NET_IF_VLAN_VAR_H_
@@ -62,10 +62,10 @@ struct	vlanreq {
 /*
  * Drivers that are capable of adding and removing the VLAN header
  * in hardware indicate they support this by marking IFCAP_VLAN_HWTAGGING
- * in if_capabilities.  Drivers for hardware that is also capable
+ * in if_capabilities.  Drivers for hardware that is capable
  * of handling larger MTU's that may include a software-appended
- * VLAN header w/o lowering the normal MTU should mark IFCAP_VLA_MTU
- * in if_capabilities; this notfies the VLAN code it can leave the
+ * VLAN header w/o lowering the normal MTU should mark IFCAP_VLAN_MTU
+ * in if_capabilities; this notifies the VLAN code it can leave the
  * MTU on the vlan interface at the normal setting.
  */
 

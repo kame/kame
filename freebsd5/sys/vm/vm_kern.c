@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -67,7 +63,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_kern.c,v 1.108 2003/11/10 00:44:00 mini Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_kern.c,v 1.120 2004/08/10 14:42:48 green Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -91,30 +87,6 @@ vm_map_t kmem_map=0;
 vm_map_t exec_map=0;
 vm_map_t pipe_map;
 vm_map_t buffer_map=0;
-
-/*
- *	kmem_alloc_pageable:
- *
- *	Allocate pageable memory to the kernel's address map.
- *	"map" must be kernel_map or a submap of kernel_map.
- */
-vm_offset_t
-kmem_alloc_pageable(map, size)
-	vm_map_t map;
-	vm_size_t size;
-{
-	vm_offset_t addr;
-	int result;
-
-	size = round_page(size);
-	addr = vm_map_min(map);
-	result = vm_map_find(map, NULL, 0,
-	    &addr, size, TRUE, VM_PROT_ALL, VM_PROT_ALL, 0);
-	if (result != KERN_SUCCESS) {
-		return (0);
-	}
-	return (addr);
-}
 
 /*
  *	kmem_alloc_nofault:
@@ -202,11 +174,9 @@ kmem_alloc(map, size)
 
 		mem = vm_page_grab(kernel_object, OFF_TO_IDX(offset + i),
 				VM_ALLOC_ZERO | VM_ALLOC_RETRY);
-		if ((mem->flags & PG_ZERO) == 0)
-			pmap_zero_page(mem);
 		mem->valid = VM_PAGE_BITS_ALL;
 		vm_page_lock_queues();
-		vm_page_flag_clear(mem, PG_ZERO);
+		vm_page_unmanage(mem);
 		vm_page_wakeup(mem);
 		vm_page_unlock_queues();
 	}
@@ -260,8 +230,6 @@ kmem_suballoc(parent, min, max, size)
 {
 	int ret;
 	vm_map_t result;
-
-	GIANT_REQUIRED;
 
 	size = round_page(size);
 
@@ -328,16 +296,6 @@ kmem_malloc(map, size, flags)
 	vm_map_lock(map);
 	if (vm_map_findspace(map, vm_map_min(map), size, &addr)) {
 		vm_map_unlock(map);
-		if (map != kmem_map) {
-			static int last_report; /* when we did it (in ticks) */
-			if (ticks < last_report ||
-			    (ticks - last_report) >= hz) {
-				last_report = ticks;
-				printf("Out of mbuf address space!\n");
-				printf("Consider increasing NMBCLUSTERS\n");
-			}
-			return (0);
-		}
 		if ((flags & M_NOWAIT) == 0)
 			panic("kmem_malloc(%ld): kmem_map too small: %ld total allocated",
 				(long)size, (long)map->size);
@@ -408,7 +366,6 @@ retry:
 			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
 		vm_page_lock_queues();
-		vm_page_flag_clear(m, PG_ZERO);
 		vm_page_unmanage(m);
 		vm_page_unlock_queues();
 	}
@@ -426,6 +383,11 @@ retry:
 		panic("kmem_malloc: entry not found or misaligned");
 	entry->wired_count = 1;
 
+	/*
+	 * At this point, the kmem_object must be unlocked because
+	 * vm_map_simplify_entry() calls vm_object_deallocate(), which
+	 * locks the kmem_object.
+	 */
 	vm_map_simplify_entry(map, entry);
 
 	/*
@@ -433,10 +395,9 @@ retry:
 	 * the wired count without wrapping the vm_page_queue_lock in
 	 * splimp...)
 	 */
+	VM_OBJECT_LOCK(kmem_object);
 	for (i = 0; i < size; i += PAGE_SIZE) {
-		VM_OBJECT_LOCK(kmem_object);
 		m = vm_page_lookup(kmem_object, OFF_TO_IDX(offset + i));
-		VM_OBJECT_UNLOCK(kmem_object);
 		/*
 		 * Because this is kernel_pmap, this call will not block.
 		 */
@@ -446,6 +407,7 @@ retry:
 		vm_page_wakeup(m);
 		vm_page_unlock_queues();
 	}
+	VM_OBJECT_UNLOCK(kmem_object);
 	vm_map_unlock(map);
 
 	return (addr);

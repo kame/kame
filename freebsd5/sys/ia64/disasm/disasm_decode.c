@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ia64/disasm/disasm_decode.c,v 1.1 2003/10/23 06:01:52 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ia64/disasm/disasm_decode.c,v 1.2 2004/08/16 18:41:24 arun Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1461,10 +1461,10 @@ asm_decodeM(uint64_t ip, struct asm_bundle *b, int slot)
 				op = ASM_OP_MOV_PSR_L, fmt = ASM_FMT_M35;
 				break;
 			case 0x2E:
-				op = ASM_OP_ITC_D, fmt = ASM_FMT_M42;
+				op = ASM_OP_ITC_D, fmt = ASM_FMT_M41;
 				break;
 			case 0x2F:
-				op = ASM_OP_ITC_I, fmt = ASM_FMT_M42;
+				op = ASM_OP_ITC_I, fmt = ASM_FMT_M41;
 				break;
 			case 0x30:
 				if (FIELD(bits, 36, 1) == 0) /* x */

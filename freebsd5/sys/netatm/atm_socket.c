@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netatm/atm_socket.c,v 1.19 2003/10/31 18:32:10 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/netatm/atm_socket.c,v 1.20.4.1 2004/10/21 09:30:47 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -173,6 +173,8 @@ atm_sock_detach(so)
 	/*
 	 * Break links and free control blocks
 	 */
+	ACCEPT_LOCK();
+	SOCK_LOCK(so);
 	so->so_pcb = NULL;
 	sotryfree(so);
 

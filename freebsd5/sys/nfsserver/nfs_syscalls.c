@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_syscalls.c,v 1.93 2003/11/07 22:57:09 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_syscalls.c,v 1.101 2004/06/17 22:48:11 rwatson Exp $");
 
 #include "opt_inet6.h"
 #include "opt_mac.h"
@@ -90,7 +86,7 @@ MALLOC_DEFINE(M_NFSD, "NFS daemon", "Nfs server daemon structure");
 SYSCTL_DECL(_vfs_nfsrv);
 
 int		nfsd_waiting = 0;
-static int	nfs_numnfsd = 0;
+int		nfsrv_numnfsd = 0;
 static int	notstarted = 1;
 
 static int	nfs_privport = 0;
@@ -138,6 +134,8 @@ nfssvc(struct thread *td, struct nfssvc_args *uap)
 	struct nfsd_args nfsdarg;
 	int error;
 
+	KASSERT(!mtx_owned(&Giant), ("nfssvc(): called with Giant"));
+
 #ifdef MAC
 	error = mac_check_system_nfsd(td->td_ucred);
 	if (error)
@@ -146,11 +144,14 @@ nfssvc(struct thread *td, struct nfssvc_args *uap)
 	error = suser(td);
 	if (error)
 		return (error);
-	mtx_lock(&Giant);
+	NET_LOCK_GIANT();
+	NFSD_LOCK();
 	while (nfssvc_sockhead_flag & SLP_INIT) {
 		 nfssvc_sockhead_flag |= SLP_WANTINIT;
-		(void) tsleep(&nfssvc_sockhead, PSOCK, "nfsd init", 0);
+		(void) msleep(&nfssvc_sockhead, &nfsd_mtx, PSOCK,
+		    "nfsd init", 0);
 	}
+	NFSD_UNLOCK();
 	if (uap->flag & NFSSVC_ADDSOCK) {
 		error = copyin(uap->argp, (caddr_t)&nfsdarg, sizeof(nfsdarg));
 		if (error)
@@ -184,7 +185,7 @@ nfssvc(struct thread *td, struct nfssvc_args *uap)
 	if (error == EINTR || error == ERESTART)
 		error = 0;
 done2:
-	mtx_unlock(&Giant);
+	NET_UNLOCK_GIANT();
 	return (error);
 }
 
@@ -199,10 +200,14 @@ nfssvc_addsock(struct file *fp, struct sockaddr *mynam, struct thread *td)
 	struct socket *so;
 	int error, s;
 
-	GIANT_REQUIRED;		/* XXX until socket locking done */
+	NET_ASSERT_GIANT();
 
 	so = fp->f_data;
 #if 0
+	/*
+	 * XXXRW: If this code is ever enabled, there's a race when running
+	 * MPSAFE.
+	 */
 	tslp = NULL;
 	/*
 	 * Add it to the list, as required.
@@ -258,28 +263,39 @@ nfssvc_addsock(struct file *fp, struct sockaddr *mynam, struct thread *td)
 		val = 1;
 		sosetopt(so, &sopt);
 	}
+	SOCKBUF_LOCK(&so->so_rcv);
 	so->so_rcv.sb_flags &= ~SB_NOINTR;
 	so->so_rcv.sb_timeo = 0;
+	SOCKBUF_UNLOCK(&so->so_rcv);
+	SOCKBUF_LOCK(&so->so_snd);
 	so->so_snd.sb_flags &= ~SB_NOINTR;
 	so->so_snd.sb_timeo = 0;
+	SOCKBUF_UNLOCK(&so->so_snd);
 
 	slp = (struct nfssvc_sock *)
 		malloc(sizeof (struct nfssvc_sock), M_NFSSVC,
 		M_WAITOK | M_ZERO);
 	STAILQ_INIT(&slp->ns_rec);
+	NFSD_LOCK();
 	TAILQ_INSERT_TAIL(&nfssvc_sockhead, slp, ns_chain);
 
 	slp->ns_so = so;
 	slp->ns_nam = mynam;
 	fhold(fp);
 	slp->ns_fp = fp;
+	/*
+	 * XXXRW: Socket locking here?
+	 */
 	s = splnet();
 	so->so_upcallarg = (caddr_t)slp;
 	so->so_upcall = nfsrv_rcv;
+	SOCKBUF_LOCK(&so->so_rcv);
 	so->so_rcv.sb_flags |= SB_UPCALL;
+	SOCKBUF_UNLOCK(&so->so_rcv);
 	slp->ns_flag = (SLP_VALID | SLP_NEEDQ);
 	nfsrv_wakenfsd(slp);
 	splx(s);
+	NFSD_UNLOCK();
 	return (0);
 }
 
@@ -299,6 +315,8 @@ nfssvc_nfsd(struct thread *td)
 	int procrastinate;
 	u_quad_t cur_usec;
 
+	NET_ASSERT_GIANT();
+
 #ifndef nolint
 	cacherep = RC_DOIT;
 	writes_todo = 0;
@@ -306,9 +324,11 @@ nfssvc_nfsd(struct thread *td)
 	nfsd = (struct nfsd *)
 		malloc(sizeof (struct nfsd), M_NFSD, M_WAITOK | M_ZERO);
 	s = splnet();
+	NFSD_LOCK();
+
 	nfsd->nfsd_td = td;
 	TAILQ_INSERT_TAIL(&nfsd_head, nfsd, nfsd_chain);
-	nfs_numnfsd++;
+	nfsrv_numnfsd++;
 
 	/*
 	 * Loop getting rpc requests until SIGKILL.
@@ -319,8 +339,8 @@ nfssvc_nfsd(struct thread *td)
 			    (nfsd_head_flag & NFSD_CHECKSLP) == 0) {
 				nfsd->nfsd_flag |= NFSD_WAITING;
 				nfsd_waiting++;
-				error = tsleep(nfsd, PSOCK | PCATCH,
-				    "-", 0);
+				error = msleep(nfsd, &nfsd_mtx,
+				    PSOCK | PCATCH, "-", 0);
 				nfsd_waiting--;
 				if (error)
 					goto done;
@@ -336,7 +356,7 @@ nfssvc_nfsd(struct thread *td)
 					    break;
 				    }
 				}
-				if (slp == 0)
+				if (slp == NULL)
 					nfsd_head_flag &= ~NFSD_CHECKSLP;
 			}
 			if ((slp = nfsd->nfsd_slp) == NULL)
@@ -347,8 +367,10 @@ nfssvc_nfsd(struct thread *td)
 				else if (slp->ns_flag & SLP_NEEDQ) {
 					slp->ns_flag &= ~SLP_NEEDQ;
 					(void) nfs_slplock(slp, 1);
+					NFSD_UNLOCK();
 					nfsrv_rcv(slp->ns_so, (caddr_t)slp,
 						M_TRYWAIT);
+					NFSD_LOCK();
 					nfs_slpunlock(slp);
 				}
 				error = nfsrv_dorec(slp, nfsd, &nd);
@@ -462,6 +484,7 @@ nfssvc_nfsd(struct thread *td)
 			nd->nd_mrep = NULL;
 			/* FALLTHROUGH */
 		    case RC_REPLY:
+			NFSD_UNLOCK();
 			siz = m_length(mreq, NULL);
 			if (siz <= 0 || siz > NFS_MAXPACKET) {
 				printf("mbuf siz=%d\n",siz);
@@ -478,11 +501,14 @@ nfssvc_nfsd(struct thread *td)
 				M_PREPEND(m, NFSX_UNSIGNED, M_TRYWAIT);
 				*mtod(m, u_int32_t *) = htonl(0x80000000 | siz);
 			}
+			NFSD_LOCK();
 			if (slp->ns_so->so_proto->pr_flags & PR_CONNREQUIRED)
 				(void) nfs_slplock(slp, 1);
-			if (slp->ns_flag & SLP_VALID)
+			if (slp->ns_flag & SLP_VALID) {
+			    NFSD_UNLOCK();
 			    error = nfsrv_send(slp->ns_so, nd->nd_nam2, m);
-			else {
+			    NFSD_LOCK();
+			} else {
 			    error = EPIPE;
 			    m_freem(m);
 			}
@@ -532,13 +558,22 @@ nfssvc_nfsd(struct thread *td)
 			nfsd->nfsd_slp = NULL;
 			nfsrv_slpderef(slp);
 		}
+		KASSERT(!(debug_mpsafenet == 0 && !mtx_owned(&Giant)),
+		    ("nfssvc_nfsd(): debug.mpsafenet=0 && !Giant"));
+		KASSERT(!(debug_mpsafenet == 1 && mtx_owned(&Giant)),
+		    ("nfssvc_nfsd(): debug.mpsafenet=1 && Giant"));
 	}
 done:
+	KASSERT(!(debug_mpsafenet == 0 && !mtx_owned(&Giant)),
+	    ("nfssvc_nfsd(): debug.mpsafenet=0 && !Giant"));
+	KASSERT(!(debug_mpsafenet == 1 && mtx_owned(&Giant)),
+	    ("nfssvc_nfsd(): debug.mpsafenet=1 && Giant"));
 	TAILQ_REMOVE(&nfsd_head, nfsd, nfsd_chain);
 	splx(s);
 	free((caddr_t)nfsd, M_NFSD);
-	if (--nfs_numnfsd == 0)
+	if (--nfsrv_numnfsd == 0)
 		nfsrv_init(TRUE);	/* Reinitialize everything */
+	NFSD_UNLOCK();
 	return (error);
 }
 
@@ -558,16 +593,28 @@ nfsrv_zapsock(struct nfssvc_sock *slp)
 	struct nfsrv_rec *rec;
 	int s;
 
+	NET_ASSERT_GIANT();
+	NFSD_LOCK_ASSERT();
+
+	/*
+	 * XXXRW: By clearing all flags, other threads/etc should ignore
+	 * this slp and we can safely release nfsd_mtx so we can clean
+	 * up the slp safely.
+	 */
 	slp->ns_flag &= ~SLP_ALLFLAGS;
 	fp = slp->ns_fp;
 	if (fp) {
+		NFSD_UNLOCK();
 		slp->ns_fp = NULL;
 		so = slp->ns_so;
+		SOCKBUF_LOCK(&so->so_rcv);
 		so->so_rcv.sb_flags &= ~SB_UPCALL;
+		SOCKBUF_UNLOCK(&so->so_rcv);
 		so->so_upcall = NULL;
 		so->so_upcallarg = NULL;
-		soshutdown(so, 2);
+		soshutdown(so, SHUT_RDWR);
 		closef(fp, NULL);
+		NFSD_LOCK();
 		if (slp->ns_nam)
 			FREE(slp->ns_nam, M_SONAME);
 		m_freem(slp->ns_raw);
@@ -597,6 +644,8 @@ void
 nfsrv_slpderef(struct nfssvc_sock *slp)
 {
 
+	NFSD_LOCK_ASSERT();
+
 	if (--(slp->ns_sref) == 0 && (slp->ns_flag & SLP_VALID) == 0) {
 		TAILQ_REMOVE(&nfssvc_sockhead, slp, ns_chain);
 		free((caddr_t)slp, M_NFSSVC);
@@ -605,17 +654,22 @@ nfsrv_slpderef(struct nfssvc_sock *slp)
 
 /*
  * Lock a socket against others.
+ *
+ * XXXRW: Wait argument is always 1 in the caller.  Replace with a real
+ * sleep lock?
  */
 int
 nfs_slplock(struct nfssvc_sock *slp, int wait)
 {
 	int *statep = &slp->ns_solock;
 
+	NFSD_LOCK_ASSERT();
+
 	if (!wait && (*statep & NFSRV_SNDLOCK))
 		return(0);	/* already locked, fail */
 	while (*statep & NFSRV_SNDLOCK) {
 		*statep |= NFSRV_WANTSND;
-		(void) tsleep(statep, PZERO - 1, "nfsslplck", 0);
+		(void) msleep(statep, &nfsd_mtx, PZERO - 1, "nfsslplck", 0);
 	}
 	*statep |= NFSRV_SNDLOCK;
 	return (1);
@@ -628,6 +682,8 @@ void
 nfs_slpunlock(struct nfssvc_sock *slp)
 {
 	int *statep = &slp->ns_solock;
+
+	NFSD_LOCK_ASSERT();
 
 	if ((*statep & NFSRV_SNDLOCK) == 0)
 		panic("nfs slpunlock");
@@ -648,11 +704,15 @@ nfsrv_init(int terminating)
 {
 	struct nfssvc_sock *slp, *nslp;
 
+	NET_ASSERT_GIANT();
+	NFSD_LOCK_ASSERT();
+
 	if (nfssvc_sockhead_flag & SLP_INIT)
 		panic("nfsd init");
 	nfssvc_sockhead_flag |= SLP_INIT;
 	if (terminating) {
-		for (slp = TAILQ_FIRST(&nfssvc_sockhead); slp != 0; slp = nslp){
+		for (slp = TAILQ_FIRST(&nfssvc_sockhead); slp != NULL;
+		    slp = nslp) {
 			nslp = TAILQ_NEXT(slp, ns_chain);
 			if (slp->ns_flag & SLP_VALID)
 				nfsrv_zapsock(slp);

@@ -37,7 +37,7 @@
  *
  *      from: @(#)trap.c        7.4 (Berkeley) 5/13/91
  * 	from: FreeBSD: src/sys/i386/i386/trap.c,v 1.197 2001/07/19
- * $FreeBSD: src/sys/sparc64/sparc64/trap.c,v 1.69 2003/11/11 06:41:54 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/trap.c,v 1.70.2.2 2004/09/03 06:40:26 julian Exp $
  */
 
 #include "opt_ddb.h"
@@ -45,6 +45,7 @@
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
 #include <sys/interrupt.h>
@@ -283,24 +284,29 @@ trap(struct trapframe *tf)
 			}
 			if (debugger_on_signal &&
 			    (sig == 4 || sig == 10 || sig == 11))
-				Debugger("trapsig");
+				kdb_enter("trapsig");
 			trapsignal(td, sig, tf->tf_type);
 		}
 
 		userret(td, tf, sticks);
 		mtx_assert(&Giant, MA_NOTOWNED);
-#ifdef DIAGNOSTIC
-		cred_free_thread(td);
-#endif
  	} else {
 		KASSERT((tf->tf_type & T_KERNEL) != 0,
 		    ("trap: kernel trap isn't"));
 
+#ifdef KDB
+		if (kdb_active) {
+			kdb_reenter();
+			return;
+		}
+#endif
+
 		switch (tf->tf_type & ~T_KERNEL) {
-#ifdef DDB
+#ifdef KDB
 		case T_BREAKPOINT:
 		case T_KSTACK_FAULT:
-			error = (kdb_trap(tf) == 0);
+			error = (kdb_trap(tf->tf_type, 0, tf) == 0);
+			TF_DONE(tf);
 			break;
 #ifdef notyet
 		case T_PA_WATCHPOINT:
@@ -517,7 +523,7 @@ syscall(struct trapframe *tf)
 	if (td->td_ucred != p->p_ucred)
 		cred_update_thread(td);
 	if (p->p_flag & P_SA)
-		thread_user_enter(p, td);
+		thread_user_enter(td);
 	code = tf->tf_global[1];
 
 	/*
@@ -650,9 +656,6 @@ syscall(struct trapframe *tf)
 
 	PTRACESTOP_SC(p, td, S_PT_SCX);
 
-#ifdef DIAGNOSTIC
-	cred_free_thread(td);
-#endif
 	WITNESS_WARN(WARN_PANIC, NULL, "System call %s returning",
 	    (code >= 0 && code < SYS_MAXSYSCALL) ? syscallnames[code] : "???");
 	mtx_assert(&sched_lock, MA_NOTOWNED);

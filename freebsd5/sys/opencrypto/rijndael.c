@@ -26,14 +26,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/rijndael.c,v 1.2 2003/06/11 05:57:50 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/rijndael.c,v 1.3 2004/02/04 08:44:10 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 
 #include <opencrypto/rijndael.h>
-
-#define FULL_UNROLL
 
 /*
 Te0[x] = S [x].[02, 01, 01, 03];

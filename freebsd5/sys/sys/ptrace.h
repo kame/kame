@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ptrace.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/sys/ptrace.h,v 1.21 2003/10/09 10:17:16 robert Exp $
+ * $FreeBSD: src/sys/sys/ptrace.h,v 1.25 2004/08/08 22:26:11 davidxu Exp $
  */
 
 #ifndef	_SYS_PTRACE_H_
@@ -51,6 +47,13 @@
 #define	PT_ATTACH	10	/* trace some running process */
 #define	PT_DETACH	11	/* stop tracing a process */
 #define PT_IO		12	/* do I/O to/from stopped process. */
+#define	PT_LWPINFO	13	/* Info about the LWP that stopped. */
+#define PT_GETNUMLWPS	14	/* get total number of threads */
+#define PT_GETLWPLIST	15	/* get thread list */
+#define PT_CLEARSTEP	16	/* turn off single step */
+#define PT_SETSTEP	17	/* turn on single step */
+#define PT_SUSPEND	18	/* suspend a thread */
+#define PT_RESUME	19	/* resume a thread */
 
 #define	PT_TO_SCE	20
 #define	PT_TO_SCX	21
@@ -62,8 +65,7 @@
 #define PT_SETFPREGS    36	/* set floating-point registers */
 #define PT_GETDBREGS    37	/* get debugging registers */
 #define PT_SETDBREGS    38	/* set debugging registers */
-
-#define	PT_FIRSTMACH	64	/* for machine-specific requests */
+#define PT_FIRSTMACH    64	/* for machine-specific requests */
 #include <machine/ptrace.h>	/* machine-specific requests, if any */
 
 struct ptrace_io_desc {
@@ -81,6 +83,17 @@ struct ptrace_io_desc {
 #define PIOD_READ_I	3	/* Read from I space */
 #define PIOD_WRITE_I	4	/* Write to I space */
 
+/* Argument structure for PT_LWPINFO. */
+struct ptrace_lwpinfo {
+	lwpid_t	pl_lwpid;	/* LWP described. */
+	int	pl_event;	/* Event that stopped the LWP. */
+#define	PL_EVENT_NONE	0
+#define	PL_EVENT_SIGNAL	1
+	int	pl_flags;	/* LWP flags. */
+#define	PL_FLAG_SA	0x01	/* M:N thread */
+#define	PL_FLAG_BOUND	0x02	/* M:N bound thread */
+};
+
 #ifdef _KERNEL
 
 #define	PTRACESTOP_SC(p, td, flag)				\
@@ -97,6 +110,7 @@ struct ptrace_io_desc {
 
 int	ptrace_set_pc(struct thread *_td, unsigned long _addr);
 int	ptrace_single_step(struct thread *_td);
+int	ptrace_clear_single_step(struct thread *_td);
 
 #ifdef __HAVE_PTRACE_MACHDEP
 int	cpu_ptrace(struct thread *_td, int _req, void *_addr, int _data);

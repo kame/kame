@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_event.c,v 1.43.2.2 2004/01/26 05:18:35 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_event.c,v 1.50 2004/07/08 16:17:14 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -59,7 +59,7 @@ static struct event_tailq_head g_events = TAILQ_HEAD_INITIALIZER(g_events);
 static u_int g_pending_events;
 static TAILQ_HEAD(,g_provider) g_doorstep = TAILQ_HEAD_INITIALIZER(g_doorstep);
 static struct mtx g_eventlock;
-static struct sx g_eventstall;
+static int g_wither_work;
 
 #define G_N_EVENTREFS		20
 
@@ -84,23 +84,10 @@ g_waitidle(void)
 }
 
 void
-g_stall_events(void)
-{
-
-	sx_xlock(&g_eventstall);
-}
-
-void
-g_release_events(void)
-{
-
-	sx_xunlock(&g_eventstall);
-}
-
-void
 g_orphan_provider(struct g_provider *pp, int error)
 {
 
+	/* G_VALID_PROVIDER(pp)  We likely lack topology lock */
 	g_trace(G_T_TOPOLOGY, "g_orphan_provider(%p(%s), %d)",
 	    pp, pp->name, error);
 	KASSERT(error != 0,
@@ -128,8 +115,9 @@ g_orphan_register(struct g_provider *pp)
 	struct g_consumer *cp, *cp2;
 	int wf;
 
-	g_trace(G_T_TOPOLOGY, "g_orphan_register(%s)", pp->name);
 	g_topology_assert();
+	G_VALID_PROVIDER(pp);
+	g_trace(G_T_TOPOLOGY, "g_orphan_register(%s)", pp->name);
 
 	wf = pp->flags & G_PF_WITHER;
 	pp->flags &= ~G_PF_WITHER;
@@ -166,13 +154,14 @@ one_event(void)
 	struct g_event *ep;
 	struct g_provider *pp;
 
-	sx_xlock(&g_eventstall);
 	g_topology_lock();
 	for (;;) {
 		mtx_lock(&g_eventlock);
 		pp = TAILQ_FIRST(&g_doorstep);
-		if (pp != NULL)
+		if (pp != NULL) {
+			G_VALID_PROVIDER(pp);
 			TAILQ_REMOVE(&g_doorstep, pp, orphan);
+		}
 		mtx_unlock(&g_eventlock);
 		if (pp == NULL)
 			break;
@@ -183,7 +172,6 @@ one_event(void)
 	if (ep == NULL) {
 		mtx_unlock(&g_eventlock);
 		g_topology_unlock();
-		sx_xunlock(&g_eventstall);
 		return (0);
 	}
 	TAILQ_REMOVE(&g_events, ep, events);
@@ -201,16 +189,24 @@ one_event(void)
 	if (g_pending_events == 0)
 		wakeup(&g_pending_events);
 	g_topology_unlock();
-	sx_xunlock(&g_eventstall);
 	return (1);
 }
 
 void
 g_run_events()
 {
+	int i;
 
 	while (one_event())
 		;
+	g_topology_lock();
+	i = g_wither_work;
+	while (i) {
+		i = g_wither_washer();
+		g_wither_work = i & 1;
+		i &= 2;
+	}
+	g_topology_unlock();
 }
 
 void
@@ -252,17 +248,20 @@ g_cancel_event(void *ref)
 }
 
 static int
-g_post_event_x(g_event_t *func, void *arg, int flag, struct g_event **epp, va_list ap)
+g_post_event_x(g_event_t *func, void *arg, int flag, int wuflag, struct g_event **epp, va_list ap)
 {
 	struct g_event *ep;
 	void *p;
 	u_int n;
 
-	g_trace(G_T_TOPOLOGY, "g_post_event_x(%p, %p, %d)", func, arg, flag);
+	g_trace(G_T_TOPOLOGY, "g_post_event_x(%p, %p, %d, %d)",
+	    func, arg, flag, wakeup);
+	KASSERT(wuflag == 0 || wuflag == EV_WAKEUP,
+	    ("Wrong wuflag in g_post_event_x(0x%x)", wuflag));
 	ep = g_malloc(sizeof *ep, flag | M_ZERO);
 	if (ep == NULL)
 		return (ENOMEM);
-	ep->flag = flag;
+	ep->flag = wuflag;
 	for (n = 0; n < G_N_EVENTREFS; n++) {
 		p = va_arg(ap, void *);
 		if (p == NULL)
@@ -292,11 +291,17 @@ g_post_event(g_event_t *func, void *arg, int flag, ...)
 	KASSERT(flag == M_WAITOK || flag == M_NOWAIT,
 	    ("Wrong flag to g_post_event"));
 	va_start(ap, flag);
-	i = g_post_event_x(func, arg, flag, NULL, ap);
+	i = g_post_event_x(func, arg, flag, 0, NULL, ap);
 	va_end(ap);
 	return (i);
 }
 
+void
+g_do_wither() {
+
+	g_wither_work = 1;
+	wakeup(&g_wait_event);
+}
 
 /*
  * XXX: It might actually be useful to call this function with topology held.
@@ -312,11 +317,11 @@ g_waitfor_event(g_event_t *func, void *arg, int flag, ...)
 	struct g_event *ep;
 	int error;
 
-	/* g_topology_assert_not(); */
+	g_topology_assert_not();
 	KASSERT(flag == M_WAITOK || flag == M_NOWAIT,
 	    ("Wrong flag to g_post_event"));
 	va_start(ap, flag);
-	error = g_post_event_x(func, arg, flag | EV_WAKEUP, &ep, ap);
+	error = g_post_event_x(func, arg, flag, EV_WAKEUP, &ep, ap);
 	va_end(ap);
 	if (error)
 		return (error);
@@ -334,5 +339,4 @@ g_event_init()
 {
 
 	mtx_init(&g_eventlock, "GEOM orphanage", NULL, MTX_DEF);
-	sx_init(&g_eventstall, "GEOM event stalling");
 }

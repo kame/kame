@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/posix4/semaphore.h,v 1.9 2002/10/04 21:31:33 mike Exp $
+ * $FreeBSD: src/sys/posix4/semaphore.h,v 1.11 2004/02/03 22:27:03 deischen Exp $
  */
 
 /* semaphore.h: POSIX 1003.1b semaphores */
@@ -47,6 +47,8 @@ typedef	struct sem *	sem_t;
 #ifndef _KERNEL
 #include <sys/cdefs.h>
 
+struct timespec;
+
 __BEGIN_DECLS
 int	 sem_close(sem_t *);
 int	 sem_destroy(sem_t *);
@@ -54,6 +56,7 @@ int	 sem_getvalue(sem_t * __restrict, int * __restrict);
 int	 sem_init(sem_t *, int, unsigned int);
 sem_t	*sem_open(const char *, int, ...);
 int	 sem_post(sem_t *);
+int	 sem_timedwait(sem_t * __restrict, const struct timespec * __restrict);
 int	 sem_trywait(sem_t *);
 int	 sem_unlink(const char *);
 int	 sem_wait(sem_t *);

@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sysctl.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/sysctl.h,v 1.122 2003/11/14 21:37:35 trhodes Exp $
+ * $FreeBSD: src/sys/sys/sysctl.h,v 1.132 2004/07/28 07:08:39 kan Exp $
  */
 
 #ifndef _SYS_SYSCTL_H_
@@ -52,7 +48,7 @@ struct thread;
  * respective subsystem header files.
  */
 
-#define CTL_MAXNAME	12	/* largest number of components supported */
+#define CTL_MAXNAME	24	/* largest number of components supported */
 
 /*
  * Each subsystem defined by sysctl defines a list of variables
@@ -139,6 +135,7 @@ struct sysctl_req {
 	size_t		newlen;
 	size_t		newidx;
 	int		(*newfunc)(struct sysctl_req *, void *, size_t);
+	size_t		validlen;
 };
 
 SLIST_HEAD(sysctl_oid_list, sysctl_oid);
@@ -183,6 +180,8 @@ void sysctl_unregister_oid(struct sysctl_oid *oidp);
 /* Hide these in macros */
 #define	SYSCTL_CHILDREN(oid_ptr) (struct sysctl_oid_list *) \
 	(oid_ptr)->oid_arg1
+#define	SYSCTL_CHILDREN_SET(oid_ptr, val) \
+	(oid_ptr)->oid_arg1 = (val);
 #define	SYSCTL_STATIC_CHILDREN(oid_name) \
 	(&sysctl_##oid_name##_children)
 
@@ -354,7 +353,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_BOOTFILE		26	/* string: name of booted kernel */
 #define	KERN_MAXFILESPERPROC	27	/* int: max open files per proc */
 #define	KERN_MAXPROCPERUID 	28	/* int: max processes per uid */
-#define KERN_DUMPDEV		29	/* dev_t: device to dump on */
+#define KERN_DUMPDEV		29	/* struct cdev *: device to dump on */
 #define	KERN_IPC		30	/* node: anything related to IPC */
 #define	KERN_DUMMY		31	/* unused */
 #define	KERN_PS_STRINGS		32	/* int: address of PS_STRINGS */
@@ -421,6 +420,12 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_PROC_ARGS		7	/* get/set arguments/proctitle */
 #define	KERN_PROC_PROC		8	/* only return procs */
 #define	KERN_PROC_SV_NAME	9	/* get syscall vector name */
+#define	KERN_PROC_RGID		10	/* by real group id */
+#define	KERN_PROC_GID		11	/* by effective group id */
+#define	KERN_PROC_INC_THREAD	0x10	/*
+					 * modifier for pid, pgrp, tty,
+					 * uid, ruid, gid, rgid and proc
+					 */
 
 /*
  * KERN_IPC identifiers
@@ -598,6 +603,8 @@ struct sysctl_oid *sysctl_add_oid(struct sysctl_ctx_list *clist,
 		int kind, void *arg1, int arg2,
 		int (*handler) (SYSCTL_HANDLER_ARGS),
 		const char *fmt, const char *descr);
+int	sysctl_move_oid(struct sysctl_oid *oidp,
+		struct sysctl_oid_list *parent);
 int	sysctl_remove_oid(struct sysctl_oid *oidp, int del, int recurse);
 int	sysctl_ctx_init(struct sysctl_ctx_list *clist);
 int	sysctl_ctx_free(struct sysctl_ctx_list *clist);
@@ -619,7 +626,7 @@ int	userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 			size_t *retval);
 int	sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
 			int *nindx, struct sysctl_req *req);
-void	sysctl_wire_old_buffer(struct sysctl_req *req, size_t len);
+int	sysctl_wire_old_buffer(struct sysctl_req *req, size_t len);
 
 #else	/* !_KERNEL */
 #include <sys/cdefs.h>

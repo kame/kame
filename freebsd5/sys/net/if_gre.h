@@ -1,5 +1,5 @@
-/*	$NetBSD: if_gre.h,v 1.10 2002/02/24 17:22:20 martin Exp $ */
-/*	 $FreeBSD: src/sys/net/if_gre.h,v 1.7 2002/12/07 14:22:05 sobomax Exp $ */
+/*	$NetBSD: if_gre.h,v 1.13 2003/11/10 08:51:52 wiz Exp $ */
+/*	 $FreeBSD: src/sys/net/if_gre.h,v 1.11 2004/03/22 16:04:42 rwatson Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -23,7 +23,7 @@
  * 4. Neither the name of The NetBSD Foundation nor the names of its
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
- *    
+ *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -44,6 +44,16 @@
 #ifdef _KERNEL
 #include <sys/queue.h>
 
+/*
+ * Version of the WCCP, need to be configured manually since
+ * header for version 2 is the same but IP payload is prepended
+ * with additional 4-bytes field.
+ */
+typedef enum {
+	WCCP_V1 = 0,
+	WCCP_V2
+} wccp_ver_t;
+
 struct gre_softc {
 	struct ifnet sc_if;
 	LIST_ENTRY(gre_softc) sc_list;
@@ -58,15 +68,17 @@ struct gre_softc {
 	const struct encaptab *encap;	/* encapsulation cookie */
 
 	int called;		/* infinite recursion preventer */
-};	
+
+	wccp_ver_t wccp_ver;	/* version of the WCCP */
+};
 
 
 struct gre_h {
 	u_int16_t flags;	/* GRE flags */
-	u_int16_t ptype;	/* protocol type of payload typically 
+	u_int16_t ptype;	/* protocol type of payload typically
 				   Ether protocol type*/
-/* 
- *  from here on: fields are optional, presence indicated by flags 
+/*
+ *  from here on: fields are optional, presence indicated by flags
  *
 	u_int_16 checksum	checksum (one-complements of GRE header
 				and payload
@@ -116,9 +128,9 @@ struct greip {
  * should be routed over more than one tunnel hop by hop
  */
 struct gre_sre {
-	u_int16_t sre_family;	/* adress family */
+	u_int16_t sre_family;	/* address family */
 	u_char	sre_offset;	/* offset to first octet of active entry */
-	u_char	sre_length;	/* number of octets in the SRE. 
+	u_char	sre_length;	/* number of octets in the SRE.
 				   sre_lengthl==0 -> last entry. */
 	u_char	*sre_rtinfo;	/* the routing information */
 };
@@ -151,12 +163,12 @@ struct mobip_h {
 
 #endif /* _KERNEL */
 
-/* 
- * ioctls needed to manipulate the interface 
+/*
+ * ioctls needed to manipulate the interface
  */
 
 #define GRESADDRS	_IOW('i', 101, struct ifreq)
-#define GRESADDRD	_IOW('i', 102, struct ifreq)   
+#define GRESADDRD	_IOW('i', 102, struct ifreq)
 #define GREGADDRS	_IOWR('i', 103, struct ifreq)
 #define GREGADDRD	_IOWR('i', 104, struct ifreq)
 #define GRESPROTO	_IOW('i' , 105, struct ifreq)
@@ -164,9 +176,10 @@ struct mobip_h {
 
 #ifdef _KERNEL
 LIST_HEAD(gre_softc_head, gre_softc);
+extern struct mtx gre_mtx;
 extern struct gre_softc_head gre_softc_list;
 
-u_short	gre_in_cksum(u_short *p, u_int len);
+u_int16_t	gre_in_cksum(u_int16_t *, u_int);
 #endif /* _KERNEL */
 
 #endif

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_tireg.h,v 1.27 2003/11/14 19:00:32 sam Exp $
+ * $FreeBSD: src/sys/pci/if_tireg.h,v 1.28 2004/06/16 09:47:20 phk Exp $
  */
 
 /*
@@ -1025,7 +1025,7 @@ struct ti_softc {
 	int			ti_txcnt;
 	struct mtx		ti_mtx;
 	ti_flag_vals		ti_flags;
-	dev_t			dev;
+	struct cdev *dev;
 };
 
 #define	TI_LOCK(_sc)		mtx_lock(&(_sc)->ti_mtx)

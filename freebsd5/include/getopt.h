@@ -1,5 +1,5 @@
 /*	$NetBSD: getopt.h,v 1.4 2000/07/07 10:43:54 ad Exp $	*/
-/*	$FreeBSD: src/include/getopt.h,v 1.1 2002/09/29 04:14:30 eric Exp $ */
+/*	$FreeBSD: src/include/getopt.h,v 1.6 2004/02/24 08:09:20 ache Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -41,12 +41,11 @@
 #define _GETOPT_H_
 
 #include <sys/cdefs.h>
-#include <unistd.h>
 
 /*
- * Gnu like getopt_long() and BSD4.4 getsubopt()/optreset extensions
+ * GNU-like getopt_long()/getopt_long_only() with 4.4BSD optreset extension.
+ * getopt() is declared here too for GNU programs.
  */
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
 #define no_argument        0
 #define required_argument  1
 #define optional_argument  2
@@ -66,9 +65,21 @@ struct option {
 };
 
 __BEGIN_DECLS
-int getopt_long __P((int, char * const *, const char *,
-    const struct option *, int *));
-__END_DECLS
+int	getopt_long(int, char * const *, const char *,
+	const struct option *, int *);
+int	getopt_long_only(int, char * const *, const char *,
+	const struct option *, int *);
+#ifndef _GETOPT_DECLARED
+#define	_GETOPT_DECLARED
+int	 getopt(int, char * const [], const char *);
+
+extern char *optarg;			/* getopt(3) external variables */
+extern int optind, opterr, optopt;
 #endif
+#ifndef _OPTRESET_DECLARED
+#define	_OPTRESET_DECLARED
+extern int optreset;			/* getopt(3) external variable */
+#endif
+__END_DECLS
  
 #endif /* !_GETOPT_H_ */

@@ -8,7 +8,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/mp_clock.c,v 1.18 2003/10/24 21:01:31 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/mp_clock.c,v 1.19 2004/05/30 20:34:57 phk Exp $");
 
 /*-
  * Just when we thought life were beautiful, reality pops its grim face over
@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/mp_clock.c,v 1.18 2003/10/24 21:01:31 jhb 
 #include <sys/systm.h>
 #include <sys/timetc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/sysctl.h>
 #include <sys/bus.h>
 

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_ihash.c,v 1.37 2003/10/04 14:03:28 jeff Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_ihash.c,v 1.39 2004/06/16 09:47:25 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,7 +83,7 @@ ufs_ihashuninit()
  */
 struct vnode *
 ufs_ihashlookup(dev, inum)
-	dev_t dev;
+	struct cdev *dev;
 	ino_t inum;
 {
 	struct inode *ip;
@@ -109,7 +105,7 @@ ufs_ihashlookup(dev, inum)
  */
 int
 ufs_ihashget(dev, inum, flags, vpp)
-	dev_t dev;
+	struct cdev *dev;
 	ino_t inum;
 	int flags;
 	struct vnode **vpp;

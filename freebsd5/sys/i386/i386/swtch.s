@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -33,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.143 2003/09/30 08:11:35 jeff Exp $
+ * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.147 2004/07/15 16:37:48 jhb Exp $
  */
 
 #include "opt_npx.h"
@@ -51,7 +47,7 @@
 /*
  * cpu_throw()
  *
- * This is the second half of cpu_swtch(). It is used when the current
+ * This is the second half of cpu_switch(). It is used when the current
  * thread is either a dummy or slated to die, and we no longer care
  * about its state.  This is only a slight optimization and is probably
  * not worth it anymore.  Note that we need to clear the pm_active bits so

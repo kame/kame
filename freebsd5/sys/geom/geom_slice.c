@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_slice.c,v 1.50 2003/06/11 06:49:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_slice.c,v 1.55.2.1 2004/08/19 06:56:50 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,7 +62,10 @@ g_slice_alloc(unsigned nslice, unsigned scsize)
 	struct g_slicer *gsp;
 
 	gsp = g_malloc(sizeof *gsp, M_WAITOK | M_ZERO);
-	gsp->softc = g_malloc(scsize, M_WAITOK | M_ZERO);
+	if (scsize > 0)
+		gsp->softc = g_malloc(scsize, M_WAITOK | M_ZERO);
+	else
+		gsp->softc = NULL;
 	gsp->slices = g_malloc(nslice * sizeof(struct g_slice),
 	    M_WAITOK | M_ZERO);
 	gsp->nslice = nslice;
@@ -73,10 +76,13 @@ static void
 g_slice_free(struct g_slicer *gsp)
 {
 
+	if (gsp == NULL)	/* XXX: phk thinks about this */
+		return;
 	g_free(gsp->slices);
 	if (gsp->hotspot != NULL)
 		g_free(gsp->hotspot);
-	g_free(gsp->softc);
+	if (gsp->softc != NULL)
+		g_free(gsp->softc);
 	g_free(gsp);
 }
 
@@ -95,23 +101,25 @@ g_slice_access(struct g_provider *pp, int dr, int dw, int de)
 	cp = LIST_FIRST(&gp->consumer);
 	KASSERT (cp != NULL, ("g_slice_access but no consumer"));
 	gsp = gp->softc;
-	gsl = &gsp->slices[pp->index];
-	for (u = 0; u < gsp->nslice; u++) {
-		gsl2 = &gsp->slices[u];
-		if (gsl2->length == 0)
-			continue;
-		if (u == pp->index)
-			continue;
-		if (gsl->offset + gsl->length <= gsl2->offset)
-			continue;
-		if (gsl2->offset + gsl2->length <= gsl->offset)
-			continue;
-		/* overlap */
-		pp2 = gsl2->provider;
-		if ((pp->acw + dw) > 0 && pp2->ace > 0)
-			return (EPERM);
-		if ((pp->ace + de) > 0 && pp2->acw > 0)
-			return (EPERM);
+	if (dr > 0 || dw > 0 || de > 0) {
+		gsl = &gsp->slices[pp->index];
+		for (u = 0; u < gsp->nslice; u++) {
+			gsl2 = &gsp->slices[u];
+			if (gsl2->length == 0)
+				continue;
+			if (u == pp->index)
+				continue;
+			if (gsl->offset + gsl->length <= gsl2->offset)
+				continue;
+			if (gsl2->offset + gsl2->length <= gsl->offset)
+				continue;
+			/* overlap */
+			pp2 = gsl2->provider;
+			if ((pp->acw + dw) > 0 && pp2->ace > 0)
+				return (EPERM);
+			if ((pp->ace + de) > 0 && pp2->acw > 0)
+				return (EPERM);
+		}
 	}
 	/* On first open, grab an extra "exclusive" bit */
 	if (cp->acr == 0 && cp->acw == 0 && cp->ace == 0)
@@ -119,7 +127,7 @@ g_slice_access(struct g_provider *pp, int dr, int dw, int de)
 	/* ... and let go of it on last close */
 	if ((cp->acr + dr) == 0 && (cp->acw + dw) == 0 && (cp->ace + de) == 1)
 		de--;
-	error = g_access_rel(cp, dr, dw, de);
+	error = g_access(cp, dr, dw, de);
 	return (error);
 }
 
@@ -457,18 +465,20 @@ g_slice_new(struct g_class *mp, u_int slices, struct g_provider *pp, struct g_co
 	gp->softc = gsp;
 	gp->start = g_slice_start;
 	gp->spoiled = g_slice_spoiled;
-	gp->dumpconf = g_slice_dumpconf;
+	if (gp->dumpconf == NULL)
+		gp->dumpconf = g_slice_dumpconf;
 	if (gp->class->destroy_geom == NULL)
 		gp->class->destroy_geom = g_slice_destroy_geom;
 	cp = g_new_consumer(gp);
 	error = g_attach(cp, pp);
 	if (error == 0)
-		error = g_access_rel(cp, 1, 0, 0);
+		error = g_access(cp, 1, 0, 0);
 	if (error) {
 		g_wither_geom(gp, ENXIO);
 		return (NULL);
 	}
-	*vp = gsp->softc;
+	if (extrap != NULL)
+		*vp = gsp->softc;
 	*cpp = cp;
 	return (gp);
 }

@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/bootp_subr.c,v 1.56 2003/11/14 20:54:08 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/bootp_subr.c,v 1.61 2004/07/28 21:54:57 phk Exp $");
 
 #include "opt_bootp.h"
 
@@ -216,8 +216,10 @@ SYSCTL_STRING(_kern, OID_AUTO, bootp_cookie, CTLFLAG_RD,
 /* mountd RPC */
 static int	md_mount(struct sockaddr_in *mdsin, char *path, u_char *fhp,
 		    int *fhsizep, struct nfs_args *args, struct thread *td);
-static int	setfs(struct sockaddr_in *addr, char *path, char *p);
+static int	setfs(struct sockaddr_in *addr, char *path, char *p,
+		    const struct in_addr *siaddr);
 static int	getdec(char **ptr);
+static int	getip(char **ptr, struct in_addr *ip);
 static char	*substr(char *a, char *b);
 static void	mountopts(struct nfs_args *args, char *p);
 static int	xdr_opaque_decode(struct mbuf **ptr, u_char *buf, int len);
@@ -589,7 +591,7 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 	int retry;
 	const char *s;
 
-	GIANT_REQUIRED;		/* XXX until socket locking done */
+	NET_ASSERT_GIANT();
 
 	/*
 	 * Create socket and set its recieve timeout.
@@ -1157,11 +1159,36 @@ bootpc_adjust_interface(struct bootpc_ifcontext *ifctx,
 }
 
 static int
-setfs(struct sockaddr_in *addr, char *path, char *p)
+setfs(struct sockaddr_in *addr, char *path, char *p,
+    const struct in_addr *siaddr)
 {
+
+	if (getip(&p, &addr->sin_addr) == 0) {
+		if (siaddr != NULL && *p == '/')
+			bcopy(siaddr, &addr->sin_addr, sizeof(struct in_addr));
+		else
+			return 0;
+	} else {
+		if (*p != ':')
+			return 0;
+		p++;
+	}
+		
+	addr->sin_len = sizeof(struct sockaddr_in);
+	addr->sin_family = AF_INET;
+
+	strlcpy(path, p, MNAMELEN);
+	return 1;
+}
+
+static int
+getip(char **ptr, struct in_addr *addr)
+{
+	char *p;
 	unsigned int ip;
 	int val;
 
+	p = *ptr;
 	ip = 0;
 	if (((val = getdec(&p)) < 0) || (val > 255))
 		return 0;
@@ -1184,15 +1211,9 @@ setfs(struct sockaddr_in *addr, char *path, char *p)
 	if (((val = getdec(&p)) < 0) || (val > 255))
 		return 0;
 	ip |= val;
-	if (*p != ':')
-		return 0;
-	p++;
 
-	addr->sin_addr.s_addr = htonl(ip);
-	addr->sin_len = sizeof(struct sockaddr_in);
-	addr->sin_family = AF_INET;
-
-	strncpy(path, p, MNAMELEN - 1);
+	addr->s_addr = htonl(ip);
+	*ptr = p;
 	return 1;
 }
 
@@ -1551,7 +1572,12 @@ bootpc_decode_reply(struct nfsv3_diskless *nd, struct bootpc_ifcontext *ifctx,
 		if (gctx->setrootfs != NULL) {
 			printf("rootfs %s (ignored) ", p);
 		} else 	if (setfs(&nd->root_saddr,
-				  nd->root_hostnam, p)) {
+				  nd->root_hostnam, p, &ifctx->reply.siaddr)) {
+			if (*p == '/') {
+				printf("root_server ");
+				print_sin_addr(&nd->root_saddr);
+				printf(" ");
+			}
 			printf("rootfs %s ", p);
 			gctx->gotrootpath = 1;
 			ifctx->gotrootpath = 1;
@@ -1714,6 +1740,7 @@ bootpc_init(void)
 #endif
 	}
 
+	rootdevnames[0] = "nfs:";
 	mountopts(&nd->root_args, NULL);
 
 	for (ifctx = gctx->interfaces; ifctx != NULL; ifctx = ifctx->next)
@@ -1868,3 +1895,5 @@ out:
 	m_freem(m);
 	return error;
 }
+
+SYSINIT(bootp_rootconf, SI_SUB_ROOT_CONF, SI_ORDER_FIRST, bootpc_init, NULL);

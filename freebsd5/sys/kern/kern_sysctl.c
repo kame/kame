@@ -16,10 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -40,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_sysctl.c,v 1.148 2003/10/05 13:31:33 bms Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_sysctl.c,v 1.159 2004/07/28 06:42:41 kan Exp $");
 
 #include "opt_compat.h"
 #include "opt_mac.h"
@@ -393,8 +389,8 @@ sysctl_add_oid(struct sysctl_ctx_list *clist, struct sysctl_oid_list *parent,
 	oidp->oid_kind = CTLFLAG_DYN | kind;
 	if ((kind & CTLTYPE) == CTLTYPE_NODE) {
 		/* Allocate space for children */
-		SYSCTL_CHILDREN(oidp) = malloc(sizeof(struct sysctl_oid_list),
-		    M_SYSCTLOID, M_WAITOK);
+		SYSCTL_CHILDREN_SET(oidp, malloc(sizeof(struct sysctl_oid_list),
+		    M_SYSCTLOID, M_WAITOK));
 		SLIST_INIT(SYSCTL_CHILDREN(oidp));
 	} else {
 		oidp->oid_arg1 = arg1;
@@ -413,6 +409,26 @@ sysctl_add_oid(struct sysctl_ctx_list *clist, struct sysctl_oid_list *parent,
 	/* Register this oid */
 	sysctl_register_oid(oidp);
 	return (oidp);
+}
+
+/*
+ * Reparent an existing oid.
+ */
+int
+sysctl_move_oid(struct sysctl_oid *oid, struct sysctl_oid_list *parent)
+{
+	struct sysctl_oid *oidp;
+
+	if (oid->oid_parent == parent)
+		return (0);
+	oidp = sysctl_find_oidname(oid->oid_name, parent);
+	if (oidp != NULL)
+		return (EEXIST);
+	sysctl_unregister_oid(oid);
+	oid->oid_parent = parent;
+	oid->oid_number = OID_AUTO;
+	sysctl_register_oid(oid);
+	return (0);
 }
 
 /*
@@ -961,6 +977,7 @@ kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	if (oldlenp) {
 		req.oldlen = *oldlenp;
 	}
+	req.validlen = req.oldlen;
 
 	if (old) {
 		req.oldptr= old;
@@ -979,8 +996,8 @@ kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 
 	error = sysctl_root(0, name, namelen, &req);
 
-	if (req.lock == REQ_WIRED)
-		vsunlock(req.oldptr, req.oldlen);
+	if (req.lock == REQ_WIRED && req.validlen > 0)
+		vsunlock(req.oldptr, req.validlen);
 
 	SYSCTL_UNLOCK();
 
@@ -988,8 +1005,8 @@ kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 		return (error);
 
 	if (retval) {
-		if (req.oldptr && req.oldidx > req.oldlen)
-			*retval = req.oldlen;
+		if (req.oldptr && req.oldidx > req.validlen)
+			*retval = req.validlen;
 		else
 			*retval = req.oldidx;
 	}
@@ -1025,26 +1042,27 @@ static int
 sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 {
 	int error = 0;
-	size_t i = 0;
+	size_t i, len, origidx;
 
-	if (req->lock == REQ_LOCKED && req->oldptr)
+	origidx = req->oldidx;
+	req->oldidx += l;
+	if (req->oldptr == NULL)
+		return (0);
+	if (req->lock == REQ_LOCKED)
 		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 		    "sysctl_old_user()");
-	if (req->oldptr) {
-		i = l;
-		if (req->oldlen <= req->oldidx)
-			i = 0;
-		else
-			if (i > req->oldlen - req->oldidx)
-				i = req->oldlen - req->oldidx;
-		if (i > 0)
-			error = copyout(p, (char *)req->oldptr + req->oldidx,
-					i);
+	i = l;
+	len = req->validlen;
+	if (len <= origidx)
+		i = 0;
+	else {
+		if (i > len - origidx)
+			i = len - origidx;
+		error = copyout(p, (char *)req->oldptr + origidx, i);
 	}
-	req->oldidx += l;
 	if (error)
 		return (error);
-	if (req->oldptr && i < l)
+	if (i < l)
 		return (ENOMEM);
 	return (0);
 }
@@ -1071,14 +1089,28 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
  * a place to save it in the sysctl_req structure so that the matching
  * amount of memory can be unwired in the sysctl exit code.
  */
-void
+int
 sysctl_wire_old_buffer(struct sysctl_req *req, size_t len)
 {
+	int ret;
+	size_t wiredlen;
+
+	wiredlen = (len > 0 && len < req->oldlen) ? len : req->oldlen;
+	ret = 0;
 	if (req->lock == REQ_LOCKED && req->oldptr &&
 	    req->oldfunc == sysctl_old_user) {
-		vslock(req->oldptr, req->oldlen);
+		if (wiredlen != 0) {
+			ret = vslock(req->oldptr, wiredlen);
+			if (ret != 0) {
+				if (ret != ENOMEM)
+					return (ret);
+				wiredlen = 0;
+			}
+		}
 		req->lock = REQ_WIRED;
+		req->validlen = wiredlen;
 	}
+	return (0);
 }
 
 int
@@ -1164,7 +1196,7 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 		int flags;
 
 		if (oid->oid_kind & CTLFLAG_PRISON)
-			flags = PRISON_ROOT;
+			flags = SUSER_ALLOWJAIL;
 		else
 			flags = 0;
 		error = suser_cred(req->td->td_ucred, flags);
@@ -1175,12 +1207,21 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 	if (!oid->oid_handler)
 		return EINVAL;
 
-	if ((oid->oid_kind & CTLTYPE) == CTLTYPE_NODE)
-		error = oid->oid_handler(oid, (int *)arg1 + indx, arg2 - indx,
-		    req);
-	else
-		error = oid->oid_handler(oid, oid->oid_arg1, oid->oid_arg2,
-		    req);
+	if ((oid->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
+		arg1 = (int *)arg1 + indx;
+		arg2 -= indx;
+	} else {
+		arg1 = oid->oid_arg1;
+		arg2 = oid->oid_arg2;
+	}
+#ifdef MAC
+	error = mac_check_system_sysctl(req->td->td_ucred, oid, arg1, arg2,
+	    req);
+	if (error != 0)
+		return (error);
+#endif
+	error = oid->oid_handler(oid, arg1, arg2, req);
+
 	return (error);
 }
 
@@ -1237,7 +1278,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
     size_t *oldlenp, int inkernel, void *new, size_t newlen, size_t *retval)
 {
 	int error = 0;
-	struct sysctl_req req, req2;
+	struct sysctl_req req;
 
 	bzero(&req, sizeof req);
 
@@ -1252,6 +1293,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 				return (error);
 		}
 	}
+	req.validlen = req.oldlen;
 
 	if (old) {
 		if (!useracc(old, req.oldlen, VM_PROT_WRITE))
@@ -1272,23 +1314,14 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 
 	SYSCTL_LOCK();
 
-#ifdef MAC
-	error = mac_check_system_sysctl(td->td_ucred, name, namelen, old,
-	    oldlenp, inkernel, new, newlen);
-	if (error) {
-		SYSCTL_UNLOCK();
-		return (error);
-	}
-#endif
-
 	do {
-	    req2 = req;
-	    error = sysctl_root(0, name, namelen, &req2);
+		req.oldidx = 0;
+		req.newidx = 0;
+		error = sysctl_root(0, name, namelen, &req);
 	} while (error == EAGAIN);
 
-	req = req2;
-	if (req.lock == REQ_WIRED)
-		vsunlock(req.oldptr, req.oldlen);
+	if (req.lock == REQ_WIRED && req.validlen > 0)
+		vsunlock(req.oldptr, req.validlen);
 
 	SYSCTL_UNLOCK();
 
@@ -1296,8 +1329,8 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 		return (error);
 
 	if (retval) {
-		if (req.oldptr && req.oldidx > req.oldlen)
-			*retval = req.oldlen;
+		if (req.oldptr && req.oldidx > req.validlen)
+			*retval = req.validlen;
 		else
 			*retval = req.oldidx;
 	}

@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/security/mac/mac_system.c,v 1.102 2003/11/12 03:14:30 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/security/mac/mac_system.c,v 1.104 2004/05/30 20:27:19 phk Exp $");
 
 #include "opt_mac.h"
 
@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD: src/sys/security/mac/mac_system.c,v 1.102 2003/11/12 03:14:3
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/mac.h>
 #include <sys/systm.h>
@@ -249,8 +250,8 @@ mac_check_system_swapoff(struct ucred *cred, struct vnode *vp)
 }
 
 int
-mac_check_system_sysctl(struct ucred *cred, int *name, u_int namelen,
-    void *old, size_t *oldlenp, int inkernel, void *new, size_t newlen)
+mac_check_system_sysctl(struct ucred *cred, struct sysctl_oid *oidp, void *arg1,
+    int arg2, struct sysctl_req *req)
 {
 	int error;
 
@@ -261,8 +262,7 @@ mac_check_system_sysctl(struct ucred *cred, int *name, u_int namelen,
 	if (!mac_enforce_system)
 		return (0);
 
-	MAC_CHECK(check_system_sysctl, cred, name, namelen, old, oldlenp,
-	    inkernel, new, newlen);
+	MAC_CHECK(check_system_sysctl, cred, oidp, arg1, arg2, req);
 
 	return (error);
 }

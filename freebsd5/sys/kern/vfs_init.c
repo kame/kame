@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_init.c,v 1.66 2003/10/21 18:28:35 silby Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_init.c,v 1.72 2004/07/30 22:08:52 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,7 +57,7 @@ int maxvfsconf = VFS_GENERIC + 1;
  * Single-linked list of configured VFSes.
  * New entries are added/deleted by vfs_register()/vfs_unregister()
  */
-struct vfsconf *vfsconf;
+struct vfsconfhead vfsconf = TAILQ_HEAD_INITIALIZER(vfsconf);
 
 /*
  * vfs_init.c
@@ -216,7 +212,6 @@ vfs_add_vnodeops(const void *data)
 	const struct vnodeopv_desc **newopv;
 	struct vnodeop_desc **newop;
 	int *newref;
-	vop_t **opv_desc_vector;
 	struct vnodeop_desc *desc;
 	int i, j;
 
@@ -232,7 +227,6 @@ vfs_add_vnodeops(const void *data)
 	vnodeopv_num++;
 
 	/* See if we have turned up a new vnode op desc */
-	opv_desc_vector = *(opv->opv_desc_vector_p);
 	for (i = 0; (desc = opv->opv_desc_ops[i].opve_op); i++) {
 		for (j = 0; j < num_op_descs; j++) {
 			if (desc == vfs_op_descs[j]) {
@@ -355,6 +349,17 @@ vfs_rm_vnodeops(const void *data)
  */
 struct vattr va_null;
 
+struct vfsconf *
+vfs_byname(const char *name)
+{
+	struct vfsconf *vfsp;
+
+	TAILQ_FOREACH(vfsp, &vfsconf, vfc_list)
+		if (!strcmp(name, vfsp->vfc_name))
+			return (vfsp);
+	return (NULL);
+}
+
 /*
  * Initialize the vnode structures and initialize each filesystem type.
  */
@@ -372,22 +377,18 @@ int
 vfs_register(struct vfsconf *vfc)
 {
 	struct sysctl_oid *oidp;
-	struct vfsconf *vfsp;
-
 	struct vfsops *vfsops;
 	
-	vfsp = NULL;
-	if (vfsconf)
-		for (vfsp = vfsconf; vfsp->vfc_next; vfsp = vfsp->vfc_next)
-			if (strcmp(vfc->vfc_name, vfsp->vfc_name) == 0)
-				return EEXIST;
+	if (vfc->vfc_version != VFS_VERSION) {
+		printf("ERROR: filesystem %s, unsupported ABI version %x\n",
+		    vfc->vfc_name, vfc->vfc_version);
+		return (EINVAL);
+	}
+	if (vfs_byname(vfc->vfc_name) != NULL)
+		return EEXIST;
 
 	vfc->vfc_typenum = maxvfsconf++;
-	if (vfsp)
-		vfsp->vfc_next = vfc;
-	else
-		vfsconf = vfc;
-	vfc->vfc_next = NULL;
+	TAILQ_INSERT_TAIL(&vfsconf, vfc, vfc_list);
 
 	/*
 	 * If this filesystem has a sysctl node under vfs
@@ -418,8 +419,8 @@ vfs_register(struct vfsconf *vfc)
 	 * Check the mount and unmount operations.
 	 */
 	vfsops = vfc->vfc_vfsops;
-	KASSERT(vfsops->vfs_mount != NULL || vfsops->vfs_nmount != NULL,
-	    ("Filesystem %s has no (n)mount op", vfc->vfc_name));
+	KASSERT(vfsops->vfs_mount != NULL || vfsops->vfs_omount != NULL,
+	    ("Filesystem %s has no (o)mount op", vfc->vfc_name));
 	KASSERT(vfsops->vfs_unmount != NULL,
 	    ("Filesystem %s has no unmount op", vfc->vfc_name));
 
@@ -464,6 +465,8 @@ vfs_register(struct vfsconf *vfc)
 	if (vfsops->vfs_extattrctl == NULL)
 		/* extended attribute control */
 		vfsops->vfs_extattrctl = vfs_stdextattrctl;
+	if (vfsops->vfs_sysctl == NULL)
+		vfsops->vfs_sysctl = vfs_stdsysctl;
 	
 	/*
 	 * Call init function for this VFS...
@@ -478,17 +481,12 @@ vfs_register(struct vfsconf *vfc)
 int
 vfs_unregister(struct vfsconf *vfc)
 {
-	struct vfsconf *vfsp, *prev_vfsp;
+	struct vfsconf *vfsp;
 	int error, i, maxtypenum;
 
 	i = vfc->vfc_typenum;
 
-	prev_vfsp = NULL;
-	for (vfsp = vfsconf; vfsp;
-			prev_vfsp = vfsp, vfsp = vfsp->vfc_next) {
-		if (!strcmp(vfc->vfc_name, vfsp->vfc_name))
-			break;
-	}
+	vfsp = vfs_byname(vfc->vfc_name);
 	if (vfsp == NULL)
 		return EINVAL;
 	if (vfsp->vfc_refcount)
@@ -498,12 +496,9 @@ vfs_unregister(struct vfsconf *vfc)
 		if (error)
 			return (error);
 	}
-	if (prev_vfsp)
-		prev_vfsp->vfc_next = vfsp->vfc_next;
-	else
-		vfsconf = vfsp->vfc_next;
+	TAILQ_REMOVE(&vfsconf, vfsp, vfc_list);
 	maxtypenum = VFS_GENERIC;
-	for (vfsp = vfsconf; vfsp != NULL; vfsp = vfsp->vfc_next)
+	TAILQ_FOREACH(vfsp, &vfsconf, vfc_list)
 		if (maxtypenum < vfsp->vfc_typenum)
 			maxtypenum = vfsp->vfc_typenum;
 	maxvfsconf = maxtypenum + 1;
@@ -532,7 +527,8 @@ vfs_modevent(module_t mod, int type, void *data)
 		if (vfc)
 			error = vfs_unregister(vfc);
 		break;
-	default:	/* including MOD_SHUTDOWN */
+	default:
+		error = EOPNOTSUPP;
 		break;
 	}
 	return (error);

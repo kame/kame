@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_conn.h,v 1.9 2003/07/27 11:36:00 tjr Exp $
+ * $FreeBSD: src/sys/netsmb/smb_conn.h,v 1.10 2004/01/02 22:38:42 tjr Exp $
  */
 
 /*
@@ -268,6 +268,9 @@ struct smb_vc {
 	int		vc_wxmax;	/* max writex data size */
 	struct smbiod *	vc_iod;
 	struct smb_slock vc_stlock;
+	u_int32_t	vc_seqno;	/* my next sequence number */
+	u_int8_t	*vc_mackey;	/* MAC key */
+	int		vc_mackeylen;	/* length of MAC key */
 };
 
 #define vc_maxmux	vc_sopt.sv_maxmux

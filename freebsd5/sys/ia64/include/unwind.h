@@ -23,21 +23,25 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/unwind.h,v 1.5 2003/07/12 04:35:09 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/unwind.h,v 1.6 2004/07/10 22:59:30 marcel Exp $
  */
 
 #ifndef _MACHINE_UNWIND_H_
 #define	_MACHINE_UNWIND_H_
 
+struct pcb;
+struct trapframe;
 struct uwx_env;
 
 struct unw_regstate {
+	struct pcb	*pcb;
 	struct trapframe *frame;
 	struct uwx_env	*env;
 	uint64_t	keyval[8];
 };
 
-int unw_create(struct unw_regstate *s, struct trapframe *tf);
+int unw_create_from_pcb(struct unw_regstate *s, struct pcb *pcb);
+int unw_create_from_frame(struct unw_regstate *s, struct trapframe *tf);
 void unw_delete(struct unw_regstate *s);
 int unw_step(struct unw_regstate *s);
 

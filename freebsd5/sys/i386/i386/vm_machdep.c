@@ -41,54 +41,62 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.219 2003/11/17 18:22:24 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.241 2004/07/20 01:38:59 davidxu Exp $");
 
+#include "opt_isa.h"
 #include "opt_npx.h"
 #ifdef PC98
 #include "opt_pc98.h"
 #endif
 #include "opt_reset.h"
-#include "opt_isa.h"
-#include "opt_kstack_pages.h"
+#include "opt_cpu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/proc.h>
-#include <sys/kse.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
-#include <sys/vnode.h>
-#include <sys/vmmeter.h>
+#include <sys/kse.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/mutex.h>
-#include <sys/smp.h>
+#include <sys/proc.h>
 #include <sys/sf_buf.h>
+#include <sys/smp.h>
 #include <sys/sysctl.h>
 #include <sys/unistd.h>
+#include <sys/user.h>
+#include <sys/vnode.h>
+#include <sys/vmmeter.h>
 
 #include <machine/cpu.h>
+#include <machine/cputypes.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 #include <machine/pcb_ext.h>
 #include <machine/vm86.h>
 
+#ifdef CPU_ELAN
+#include <machine/elan_mmcr.h>
+#endif
+
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <sys/lock.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
-#include <vm/vm_extern.h>
-
-#include <sys/user.h>
+#include <vm/vm_param.h>
 
 #ifdef PC98
 #include <pc98/pc98/pc98.h>
 #else
 #include <i386/isa/isa.h>
+#endif
+
+#ifndef NSFBUFS
+#define	NSFBUFS		(512 + maxusers * 16)
 #endif
 
 static void	cpu_reset_real(void);
@@ -110,7 +118,7 @@ static u_long sf_buf_hashmask;
 
 #define	SF_BUF_HASH(m)	(((m) - vm_page_array) & sf_buf_hashmask)
 
-static struct sf_head sf_buf_freelist;
+static TAILQ_HEAD(, sf_buf) sf_buf_freelist;
 static u_int	sf_buf_alloc_want;
 
 /*
@@ -168,7 +176,8 @@ cpu_fork(td1, p2, td2, flags)
 #endif
 
 	/* Point the pcb to the top of the stack */
-	pcb2 = (struct pcb *)(td2->td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
+	pcb2 = (struct pcb *)(td2->td_kstack +
+	    td2->td_kstack_pages * PAGE_SIZE) - 1;
 	td2->td_pcb = pcb2;
 
 	/* Copy p1's pcb */
@@ -316,10 +325,8 @@ cpu_thread_clean(struct thread *td)
 		 * XXX do we need to move the TSS off the allocated pages
 		 * before freeing them?  (not done here)
 		 */
-		mtx_lock(&Giant);
 		kmem_free(kernel_map, (vm_offset_t)pcb->pcb_ext,
 		    ctob(IOPAGES + 1));
-		mtx_unlock(&Giant);
 		pcb->pcb_ext = 0;
 	}
 }
@@ -335,17 +342,11 @@ cpu_thread_swapout(struct thread *td)
 }
 
 void
-cpu_sched_exit(td)
-	register struct thread *td;
-{
-}
-
-void
 cpu_thread_setup(struct thread *td)
 {
 
-	td->td_pcb =
-	     (struct pcb *)(td->td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
+	td->td_pcb = (struct pcb *)(td->td_kstack +
+	    td->td_kstack_pages * PAGE_SIZE) - 1;
 	td->td_frame = (struct trapframe *)((caddr_t)td->td_pcb - 16) - 1;
 	td->td_pcb->pcb_ext = NULL; 
 }
@@ -440,6 +441,7 @@ cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 	 * Set the trap frame to point at the beginning of the uts
 	 * function.
 	 */
+	td->td_frame->tf_ebp = 0; 
 	td->td_frame->tf_esp =
 	    (int)ku->ku_stack.ss_sp + ku->ku_stack.ss_size - 16;
 	td->td_frame->tf_eip = (int)ku->ku_func;
@@ -539,6 +541,17 @@ static void
 cpu_reset_real()
 {
 
+#ifdef CPU_ELAN
+	if (elan_mmcr != NULL)
+		elan_mmcr->RESCFG = 1;
+#endif
+
+	if (cpu == CPU_GEODE1100) {
+		/* Attempt Geode's own reset */
+		outl(0xcf8, 0x80009044ul);
+		outl(0xcfc, 0xf);
+	}
+
 #ifdef PC98
 	/*
 	 * Attempt to do a CPU reset via CPU reset port.
@@ -582,14 +595,17 @@ sf_buf_init(void *arg)
 	vm_offset_t sf_base;
 	int i;
 
+	nsfbufs = NSFBUFS;
+	TUNABLE_INT_FETCH("kern.ipc.nsfbufs", &nsfbufs);
+
 	sf_buf_active = hashinit(nsfbufs, M_TEMP, &sf_buf_hashmask);
-	LIST_INIT(&sf_buf_freelist);
+	TAILQ_INIT(&sf_buf_freelist);
 	sf_base = kmem_alloc_nofault(kernel_map, nsfbufs * PAGE_SIZE);
 	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
 	    M_NOWAIT | M_ZERO);
 	for (i = 0; i < nsfbufs; i++) {
 		sf_bufs[i].kva = sf_base + i * PAGE_SIZE;
-		LIST_INSERT_HEAD(&sf_buf_freelist, &sf_bufs[i], list_entry);
+		TAILQ_INSERT_TAIL(&sf_buf_freelist, &sf_bufs[i], free_entry);
 	}
 	sf_buf_alloc_want = 0;
 	mtx_init(&sf_buf_lock, "sf_buf", NULL, MTX_DEF);
@@ -599,7 +615,7 @@ sf_buf_init(void *arg)
  * Get an sf_buf from the freelist. Will block if none are available.
  */
 struct sf_buf *
-sf_buf_alloc(struct vm_page *m)
+sf_buf_alloc(struct vm_page *m, int pri)
 {
 	struct sf_head *hash_list;
 	struct sf_buf *sf;
@@ -610,12 +626,18 @@ sf_buf_alloc(struct vm_page *m)
 	LIST_FOREACH(sf, hash_list, list_entry) {
 		if (sf->m == m) {
 			sf->ref_count++;
+			if (sf->ref_count == 1) {
+				TAILQ_REMOVE(&sf_buf_freelist, sf, free_entry);
+				nsfbufsused++;
+				nsfbufspeak = imax(nsfbufspeak, nsfbufsused);
+			}
 			goto done;
 		}
 	}
-	while ((sf = LIST_FIRST(&sf_buf_freelist)) == NULL) {
+	while ((sf = TAILQ_FIRST(&sf_buf_freelist)) == NULL) {
 		sf_buf_alloc_want++;
-		error = msleep(&sf_buf_freelist, &sf_buf_lock, PVM|PCATCH,
+		mbstat.sf_allocwait++;
+		error = msleep(&sf_buf_freelist, &sf_buf_lock, PVM | pri,
 		    "sfbufa", 0);
 		sf_buf_alloc_want--;
 
@@ -625,10 +647,14 @@ sf_buf_alloc(struct vm_page *m)
 		if (error)
 			goto done;
 	}
-	LIST_REMOVE(sf, list_entry);
+	TAILQ_REMOVE(&sf_buf_freelist, sf, free_entry);
+	if (sf->m != NULL)
+		LIST_REMOVE(sf, list_entry);
 	LIST_INSERT_HEAD(hash_list, sf, list_entry);
 	sf->ref_count = 1;
 	sf->m = m;
+	nsfbufsused++;
+	nsfbufspeak = imax(nsfbufspeak, nsfbufsused);
 	pmap_qenter(sf->kva, &sf->m, 1);
 done:
 	mtx_unlock(&sf_buf_lock);
@@ -636,38 +662,24 @@ done:
 }
 
 /*
- * Detatch mapped page and release resources back to the system.
+ * Remove a reference from the given sf_buf, adding it to the free
+ * list when its reference count reaches zero.  A freed sf_buf still,
+ * however, retains its virtual-to-physical mapping until it is
+ * recycled or reactivated by sf_buf_alloc(9).
  */
 void
-sf_buf_free(void *addr, void *args)
+sf_buf_free(struct sf_buf *sf)
 {
-	struct sf_buf *sf;
-	struct vm_page *m;
 
-	sf = args;
 	mtx_lock(&sf_buf_lock);
-	m = sf->m;
 	sf->ref_count--;
 	if (sf->ref_count == 0) {
-		pmap_qremove((vm_offset_t)addr, 1);
-		sf->m = NULL;
-		LIST_REMOVE(sf, list_entry);
-		LIST_INSERT_HEAD(&sf_buf_freelist, sf, list_entry);
+		TAILQ_INSERT_TAIL(&sf_buf_freelist, sf, free_entry);
+		nsfbufsused--;
 		if (sf_buf_alloc_want > 0)
 			wakeup_one(&sf_buf_freelist);
 	}
 	mtx_unlock(&sf_buf_lock);
-
-	vm_page_lock_queues();
-	vm_page_unwire(m, 0);
-	/*
-	 * Check for the object going away on us. This can
-	 * happen since we don't hold a reference to it.
-	 * If so, we're responsible for freeing the page.
-	 */
-	if (m->wire_count == 0 && m->object == NULL)
-		vm_page_free(m);
-	vm_page_unlock_queues();
 }
 
 /*
@@ -688,8 +700,7 @@ swi_vm(void *dummy)
  */
 
 int
-is_physical_memory(addr)
-	vm_offset_t addr;
+is_physical_memory(vm_paddr_t addr)
 {
 
 #ifdef DEV_ISA

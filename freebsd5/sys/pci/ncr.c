@@ -39,7 +39,7 @@
 */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/ncr.c,v 1.178 2003/08/23 02:25:04 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/ncr.c,v 1.182.2.1 2004/09/20 20:57:37 se Exp $");
 
 
 #define NCR_DATE "pl30 98/1/1"
@@ -179,7 +179,9 @@ __FBSDID("$FreeBSD: src/sys/pci/ncr.c,v 1.178 2003/08/23 02:25:04 marcel Exp $")
 #ifdef _KERNEL
 #include <sys/systm.h>
 #include <sys/malloc.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/sysctl.h>
 #include <sys/bus.h>
 #include <machine/md_var.h>
@@ -255,7 +257,7 @@ __FBSDID("$FreeBSD: src/sys/pci/ncr.c,v 1.178 2003/08/23 02:25:04 marcel Exp $")
 		(void)printf("assertion \"%s\" failed: "	\
 			     "file \"%s\", line %d\n",		\
 			     #expression, __FILE__, __LINE__);	\
-	     Debugger("");					\
+	     kdb_enter("");					\
 	}							\
 }
 #else
@@ -3383,8 +3385,8 @@ ncr_attach (device_t dev)
 	*/
 
 	np->reg_rid = 0x14;
-	np->reg_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &np->reg_rid,
-					 0, ~0, 1, RF_ACTIVE);
+	np->reg_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+					     &np->reg_rid, RF_ACTIVE);
 	if (!np->reg_res) {
 		device_printf(dev, "could not map memory\n");
 		return ENXIO;
@@ -3580,9 +3582,9 @@ ncr_attach (device_t dev)
 	*/
 	if ((np->features & FE_RAM) && sizeof(struct script) <= 4096) {
 		np->sram_rid = 0x18;
-		np->sram_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
-						  &np->sram_rid,
-						  0, ~0, 1, RF_ACTIVE);
+		np->sram_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+						      &np->sram_rid,
+						      RF_ACTIVE);
 	}
 
 	/*
@@ -3594,19 +3596,18 @@ ncr_attach (device_t dev)
 		np->bst2 = rman_get_bustag(np->sram_res);
 		np->bsh2 = rman_get_bushandle(np->sram_res);
 	} else if (sizeof (struct script) > PAGE_SIZE) {
-		np->script  = (struct script*) vm_page_alloc_contig 
-			(round_page(sizeof (struct script)), 
-			 0, 0xffffffff, PAGE_SIZE);
+		np->script  = (struct script*) contigmalloc 
+			(round_page(sizeof (struct script)), M_DEVBUF, M_WAITOK,
+			 0, 0xffffffff, PAGE_SIZE, 0);
 	} else {
 		np->script  = (struct script *)
 			malloc (sizeof (struct script), M_DEVBUF, M_WAITOK);
 	}
 
-	/* XXX JGibbs - Use contigmalloc */
 	if (sizeof (struct scripth) > PAGE_SIZE) {
-		np->scripth = (struct scripth*) vm_page_alloc_contig 
-			(round_page(sizeof (struct scripth)), 
-			 0, 0xffffffff, PAGE_SIZE);
+		np->scripth = (struct scripth*) contigmalloc 
+			(round_page(sizeof (struct scripth)), M_DEVBUF, M_WAITOK,
+			 0, 0xffffffff, PAGE_SIZE, 0);
 	} else 
 		{
 		np->scripth = (struct scripth *)
@@ -3761,8 +3762,8 @@ ncr_attach (device_t dev)
 	*/
 
 	rid = 0;
-	np->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
-					 RF_SHAREABLE | RF_ACTIVE);
+	np->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+					     RF_SHAREABLE | RF_ACTIVE);
 	if (np->irq_res == NULL) {
 		device_printf(dev,
 			      "interruptless mode: reduced performance.\n");
@@ -7135,6 +7136,7 @@ static driver_t ncr_driver = {
 static devclass_t ncr_devclass;
 
 DRIVER_MODULE(ncr, pci, ncr_driver, ncr_devclass, 0, 0);
+MODULE_DEPEND(ncr, cam, 1, 1, 1);
 MODULE_DEPEND(ncr, pci, 1, 1, 1);
 
 /*=========================================================================*/

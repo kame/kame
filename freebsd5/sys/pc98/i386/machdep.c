@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.331 2003/11/15 12:37:15 nyan Exp $
+ * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.342.2.1 2004/09/09 10:03:20 julian Exp $
  */
 
 #include "opt_atalk.h"
@@ -56,11 +56,13 @@
 #include <sys/sysproto.h>
 #include <sys/signalvar.h>
 #include <sys/imgact.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/linker.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/memrange.h>
 #include <sys/mutex.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
@@ -91,6 +93,9 @@
 #include <sys/cons.h>
 
 #ifdef DDB
+#ifndef KDB
+#error KDB must be enabled in order for DDB to work!
+#endif
 #include <ddb/ddb.h>
 #include <ddb/db_sym.h>
 #endif
@@ -130,6 +135,9 @@
 #include <sys/ptrace.h>
 #include <machine/sigframe.h>
 
+/* Sanity check for __curthread() */
+CTASSERT(offsetof(struct pcpu, pc_curthread) == 0);
+
 extern void init386(int first);
 extern void dblfault_handler(void);
 
@@ -163,8 +171,12 @@ int	need_pre_dma_flush;	/* If 1, use wbinvd befor DMA transfer. */
 int	need_post_dma_flush;	/* If 1, use invd after DMA transfer. */
 #endif
 
+#ifdef DDB
+extern vm_offset_t ksym_start, ksym_end;
+#endif
+
 int	_udatasel, _ucodesel;
-u_int	atdevbase, basemem;
+u_int	basemem;
 
 #ifdef PC98
 static int	ispc98 = 1;
@@ -201,6 +213,8 @@ static struct pcpu __pcpu;
 #endif
 
 struct mtx icu_lock;
+
+struct mem_range_softc mem_range_softc;
 
 static void
 cpu_startup(dummy)
@@ -285,12 +299,12 @@ osendsig(catcher, sig, mask, code)
 	oonstack = sigonstack(regs->tf_esp);
 
 	/* Allocate space for the signal handler context. */
-	if ((p->p_flag & P_ALTSTACK) && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct osigframe *)(p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(struct osigframe));
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		fp = (struct osigframe *)(td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(struct osigframe));
+#if defined(COMPAT_43)
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else
 		fp = (struct osigframe *)regs->tf_esp - 1;
@@ -417,20 +431,20 @@ freebsd4_sendsig(catcher, sig, mask, code)
 	/* Save user context. */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack = p->p_sigstk;
-	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	sf.sf_uc.uc_stack = td->td_sigstk;
+	sf.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 	sf.sf_uc.uc_mcontext.mc_gs = rgs();
 	bcopy(regs, &sf.sf_uc.uc_mcontext.mc_fs, sizeof(*regs));
 
 	/* Allocate space for the signal handler context. */
-	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sfp = (struct sigframe4 *)(p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(struct sigframe4));
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		sfp = (struct sigframe4 *)(td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(struct sigframe4));
+#if defined(COMPAT_43)
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else
 		sfp = (struct sigframe4 *)regs->tf_esp - 1;
@@ -551,8 +565,8 @@ sendsig(catcher, sig, mask, code)
 	/* Save user context. */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack = p->p_sigstk;
-	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	sf.sf_uc.uc_stack = td->td_sigstk;
+	sf.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 	sf.sf_uc.uc_mcontext.mc_gs = rgs();
@@ -562,12 +576,12 @@ sendsig(catcher, sig, mask, code)
 	fpstate_drop(td);
 
 	/* Allocate space for the signal handler context. */
-	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(struct sigframe);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		sp = td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(struct sigframe);
+#if defined(COMPAT_43)
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else
 		sp = (char *)regs->tf_esp - sizeof(struct sigframe);
@@ -783,11 +797,11 @@ osigreturn(td, uap)
 	regs->tf_eflags = eflags;
 
 	PROC_LOCK(p);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	if (scp->sc_onstack & 1)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
+		td->td_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 	SIGSETOLD(td->td_sigmask, scp->sc_mask);
 	SIG_CANTMASK(td->td_sigmask);
@@ -890,11 +904,11 @@ freebsd4_sigreturn(td, uap)
 	}
 
 	PROC_LOCK(p);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	if (ucp->uc_mcontext.mc_onstack & 1)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
+		td->td_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
 	td->td_sigmask = ucp->uc_sigmask;
@@ -1000,11 +1014,11 @@ sigreturn(td, uap)
 	}
 
 	PROC_LOCK(p);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	if (ucp->uc_mcontext.mc_onstack & 1)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
+		td->td_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
 	td->td_sigmask = ucp->uc_sigmask;
@@ -1157,27 +1171,8 @@ exec_setregs(td, entry, stack, ps_strings)
 	td->td_pcb->pcb_flags &= ~FP_SOFTFP;
 
 	/*
-	 * Arrange to trap the next npx or `fwait' instruction (see npx.c
-	 * for why fwait must be trapped at least if there is an npx or an
-	 * emulator).  This is mainly to handle the case where npx0 is not
-	 * configured, since the npx routines normally set up the trap
-	 * otherwise.  It should be done only at boot time, but doing it
-	 * here allows modifying `npx_exists' for testing the emulator on
-	 * systems with an npx.
-	 */
-	load_cr0(rcr0() | CR0_MP | CR0_TS);
-
-	/* Initialize the npx (if any) for the current process. */
-	/*
-	 * XXX the above load_cr0() also initializes it and is a layering
-	 * violation if NPX is configured.  It drops the npx partially
-	 * and this would be fatal if we were interrupted now, and decided
-	 * to force the state to the pcb, and checked the invariant
-	 * (CR0_TS clear) if and only if PCPU_GET(fpcurthread) != NULL).
-	 * ALL of this can happen except the check.  The check used to
-	 * happen and be fatal later when we didn't complete the drop
-	 * before returning to user mode.  This should be fixed properly
-	 * soon.
+	 * Drop the FP state if we hold it, so that the process gets a
+	 * clean FP state if it uses the FPU again.
 	 */
 	fpstate_drop(td);
 
@@ -1195,10 +1190,11 @@ cpu_setregs(void)
 	unsigned int cr0;
 
 	cr0 = rcr0();
-#ifdef SMP
-	cr0 |= CR0_NE;			/* Done by npxinit() */
-#endif
-	cr0 |= CR0_MP | CR0_TS;		/* Done at every execve() too. */
+	/*
+	 * CR0_MP, CR0_NE and CR0_TS are also set by npx_probe() for the
+	 * BSP.  See the comments there about why we set them.
+	 */
+	cr0 |= CR0_MP | CR0_NE | CR0_TS;
 #ifndef I386_CPU
 	cr0 |= CR0_WP | CR0_AM;
 #endif
@@ -1229,9 +1225,9 @@ SYSCTL_STRUCT(_machdep, CPU_BOOTINFO, bootinfo,
 SYSCTL_INT(_machdep, CPU_WALLCLOCK, wall_cmos_clock,
 	CTLFLAG_RW, &wall_cmos_clock, 0, "");
 
-u_long bootdev;		/* not a dev_t - encoding is different */
+u_long bootdev;		/* not a struct cdev *- encoding is different */
 SYSCTL_ULONG(_machdep, OID_AUTO, guessed_bootdev,
-	CTLFLAG_RD, &bootdev, 0, "Maybe the Boot device (not in dev_t format)");
+	CTLFLAG_RD, &bootdev, 0, "Maybe the Boot device (not in struct cdev *format)");
 
 /*
  * Initialize 386 and configure to run kernel
@@ -2010,13 +2006,12 @@ init386(first)
 	thread0.td_kstack = proc0kstack;
 	thread0.td_pcb = (struct pcb *)
 	   (thread0.td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
-	atdevbase = ISA_HOLE_START + KERNBASE;
 
 	/*
  	 * This may be done better later if it gets more high level
  	 * components in it. If so just link td->td_proc here.
 	 */
-	proc_linkup(&proc0, &ksegrp0, &kse0, &thread0);
+	proc_linkup(&proc0, &ksegrp0, &thread0);
 
 #ifdef PC98
 	/*
@@ -2073,6 +2068,7 @@ init386(first)
 	pcpu_init(pc, 0, sizeof(struct pcpu));
 	PCPU_SET(prvspace, pc);
 	PCPU_SET(curthread, &thread0);
+	PCPU_SET(curpcb, thread0.td_pcb);
 
 	/*
 	 * Initialize mutexes.
@@ -2161,9 +2157,15 @@ init386(first)
 #endif
 
 #ifdef DDB
+	ksym_start = bootinfo.bi_symtab;
+	ksym_end = bootinfo.bi_esymtab;
+#endif
+
 	kdb_init();
+
+#ifdef KDB
 	if (boothowto & RB_KDB)
-		Debugger("Boot flags requested debugger");
+		kdb_enter("Boot flags requested debugger");
 #endif
 
 	finishidentcpu();	/* Final stage of CPU initialization */
@@ -2278,6 +2280,25 @@ f00f_hack(void *unused)
 }
 #endif /* defined(I586_CPU) && !NO_F00F_HACK */
 
+/*
+ * Construct a PCB from a trapframe. This is called from kdb_trap() where
+ * we want to start a backtrace from the function that caused us to enter
+ * the debugger. We have the context in the trapframe, but base the trace
+ * on the PCB. The PCB doesn't have to be perfect, as long as it contains
+ * enough for a backtrace.
+ */
+void
+makectx(struct trapframe *tf, struct pcb *pcb)
+{
+
+	pcb->pcb_edi = tf->tf_edi;
+	pcb->pcb_esi = tf->tf_esi;
+	pcb->pcb_ebp = tf->tf_ebp;
+	pcb->pcb_ebx = tf->tf_ebx;
+	pcb->pcb_eip = tf->tf_eip;
+	pcb->pcb_esp = (ISPL(tf->tf_cs)) ? tf->tf_esp : (int)(tf + 1) - 8;
+}
+
 int
 ptrace_set_pc(struct thread *td, u_long addr)
 {
@@ -2290,6 +2311,13 @@ int
 ptrace_single_step(struct thread *td)
 {
 	td->td_frame->tf_eflags |= PSL_T;
+	return (0);
+}
+
+int
+ptrace_clear_single_step(struct thread *td)
+{
+	td->td_frame->tf_eflags &= ~PSL_T;
 	return (0);
 }
 
@@ -2797,20 +2825,12 @@ user_dbreg_trap(void)
         return 0;
 }
 
-#ifndef DDB
-void
-Debugger(const char *msg)
-{
-	printf("Debugger(\"%s\") called.\n", msg);
-}
-#endif /* no DDB */
-
-#ifdef DDB
+#ifdef KDB
 
 /*
  * Provide inb() and outb() as functions.  They are normally only
  * available as macros calling inlined functions, thus cannot be
- * called inside DDB.
+ * called from the debugger.
  *
  * The actual code is stolen from <machine/cpufunc.h>, and de-inlined.
  */
@@ -2849,4 +2869,4 @@ outb(u_int port, u_char data)
 	__asm __volatile("outb %0,%%dx" : : "a" (al), "d" (port));
 }
 
-#endif /* DDB */
+#endif /* KDB */

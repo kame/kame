@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_vjc.c,v 1.23 2003/02/19 05:47:32 imp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_vjc.c,v 1.24 2004/05/29 00:51:11 julian Exp $
  * $Whistle: ng_vjc.c,v 1.17 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -218,18 +218,15 @@ static const struct ng_cmdlist ng_vjc_cmds[] = {
 
 /* Node type descriptor */
 static struct ng_type ng_vjc_typestruct = {
-	NG_ABI_VERSION,
-	NG_VJC_NODE_TYPE,
-	NULL,
-	ng_vjc_constructor,
-	ng_vjc_rcvmsg,
-	ng_vjc_shutdown,
-	ng_vjc_newhook,
-	NULL,
-	NULL,
-	ng_vjc_rcvdata,
-	ng_vjc_disconnect,
-	ng_vjc_cmds
+	.version =	NG_ABI_VERSION,
+	.name =		NG_VJC_NODE_TYPE,
+	.constructor =	ng_vjc_constructor,
+	.rcvmsg =	ng_vjc_rcvmsg,
+	.shutdown =	ng_vjc_shutdown,
+	.newhook =	ng_vjc_newhook,
+	.rcvdata =	ng_vjc_rcvdata,
+	.disconnect =	ng_vjc_disconnect,
+	.cmdlist =	ng_vjc_cmds,
 };
 NETGRAPH_INIT(vjc, &ng_vjc_typestruct);
 

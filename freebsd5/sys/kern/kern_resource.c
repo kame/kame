@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_resource.c,v 1.128 2003/10/27 07:15:47 jeff Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_resource.c,v 1.143 2004/08/06 22:04:33 rwatson Exp $");
 
 #include "opt_compat.h"
 
@@ -65,6 +61,7 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_resource.c,v 1.128 2003/10/27 07:15:47 jef
 
 static int donice(struct thread *td, struct proc *chgp, int n);
 
+static MALLOC_DEFINE(M_PLIMIT, "plimit", "plimit structures");
 static MALLOC_DEFINE(M_UIDINFO, "uidinfo", "uidinfo structures");
 #define	UIHASH(uid)	(&uihashtbl[(uid) & uihash])
 static struct mtx uihashtbl_mtx;
@@ -92,23 +89,21 @@ getpriority(td, uap)
 	register struct getpriority_args *uap;
 {
 	struct proc *p;
-	int low = PRIO_MAX + 1;
-	int error = 0;
-	struct ksegrp *kg;
+	int error, low;
 
+	error = 0;
+	low = PRIO_MAX + 1;
 	switch (uap->which) {
+
 	case PRIO_PROCESS:
 		if (uap->who == 0)
-			low = td->td_ksegrp->kg_nice;
+			low = td->td_proc->p_nice;
 		else {
 			p = pfind(uap->who);
 			if (p == NULL)
 				break;
 			if (p_cansee(td, p) == 0) {
-				FOREACH_KSEGRP_IN_PROC(p, kg) {
-					if (kg->kg_nice < low)
-						low = kg->kg_nice;
-				}
+				low = p->p_nice;
 			}
 			PROC_UNLOCK(p);
 		}
@@ -132,10 +127,8 @@ getpriority(td, uap)
 		LIST_FOREACH(p, &pg->pg_members, p_pglist) {
 			PROC_LOCK(p);
 			if (!p_cansee(td, p)) {
-				FOREACH_KSEGRP_IN_PROC(p, kg) {
-					if (kg->kg_nice < low)
-						low = kg->kg_nice;
-				}
+				if (p->p_nice < low)
+					low = p->p_nice;
 			}
 			PROC_UNLOCK(p);
 		}
@@ -151,10 +144,8 @@ getpriority(td, uap)
 			PROC_LOCK(p);
 			if (!p_cansee(td, p) &&
 			    p->p_ucred->cr_uid == uap->who) {
-				FOREACH_KSEGRP_IN_PROC(p, kg) {
-					if (kg->kg_nice < low)
-						low = kg->kg_nice;
-				}
+				if (p->p_nice < low)
+					low = p->p_nice;
 			}
 			PROC_UNLOCK(p);
 		}
@@ -181,16 +172,16 @@ struct setpriority_args {
 /*
  * MPSAFE
  */
-/* ARGSUSED */
 int
 setpriority(td, uap)
 	struct thread *td;
 	register struct setpriority_args *uap;
 {
-	struct proc *curp = td->td_proc;
+	struct proc *curp;
 	register struct proc *p;
 	int found = 0, error = 0;
 
+	curp = td->td_proc;
 	switch (uap->which) {
 	case PRIO_PROCESS:
 		if (uap->who == 0) {
@@ -261,18 +252,12 @@ setpriority(td, uap)
 }
 
 /* 
- * Set "nice" for a process. Doesn't really understand threaded processes well
- * but does try. Has the unfortunate side effect of making all the NICE
- * values for a process's ksegrps the same.. This suggests that
- * NICE valuse should be stored as a process nice and deltas for the ksegrps.
- * (but not yet).
+ * Set "nice" for a (whole) process.
  */
 static int
 donice(struct thread *td, struct proc *p, int n)
 {
-	int	error;
-	int low = PRIO_MAX + 1;
-	struct ksegrp *kg;
+	int error;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	if ((error = p_cansched(td, p)))
@@ -281,25 +266,19 @@ donice(struct thread *td, struct proc *p, int n)
 		n = PRIO_MAX;
 	if (n < PRIO_MIN)
 		n = PRIO_MIN;
-	/* 
-	 * Only allow nicing if to more than the lowest nice.
-	 * e.g.  nices of 4,3,2  allow nice to 3 but not 1
-	 */
-	FOREACH_KSEGRP_IN_PROC(p, kg) {
-		if (kg->kg_nice < low)
-			low = kg->kg_nice;
-	}
- 	if (n < low && suser(td))
+ 	if (n <  p->p_nice && suser(td) != 0)
 		return (EACCES);
 	mtx_lock_spin(&sched_lock);
-	FOREACH_KSEGRP_IN_PROC(p, kg) {
-		sched_nice(kg, n);
-	}
+	sched_nice(p, n);
 	mtx_unlock_spin(&sched_lock);
 	return (0);
 }
 
-/* rtprio system call */
+/*
+ * Set realtime priority
+ *
+ * MPSAFE
+ */
 #ifndef _SYS_SYSPROTO_H_
 struct rtprio_args {
 	int		function;
@@ -308,28 +287,24 @@ struct rtprio_args {
 };
 #endif
 
-/*
- * Set realtime priority
- */
-
-/*
- * MPSAFE
- */
-/* ARGSUSED */
 int
 rtprio(td, uap)
-	struct thread *td;
+	struct thread *td;		/* curthread */
 	register struct rtprio_args *uap;
 {
-	struct proc *curp = td->td_proc;
-	register struct proc *p;
+	struct proc *curp;
+	struct proc *p;
+	struct ksegrp *kg;
 	struct rtprio rtp;
-	int error, cierror = 0;
+	int cierror, error;
 
 	/* Perform copyin before acquiring locks if needed. */
 	if (uap->function == RTP_SET)
 		cierror = copyin(uap->rtp, &rtp, sizeof(struct rtprio));
+	else
+		cierror = 0;
 
+	curp = td->td_proc;
 	if (uap->pid == 0) {
 		p = curp;
 		PROC_LOCK(p);
@@ -344,7 +319,33 @@ rtprio(td, uap)
 		if ((error = p_cansee(td, p)))
 			break;
 		mtx_lock_spin(&sched_lock);
-		pri_to_rtp(FIRST_KSEGRP_IN_PROC(p), &rtp);
+		/*
+		 * Return OUR priority if no pid specified,
+		 * or if one is, report the highest priority
+		 * in the process. There isn't much more you can do as 
+		 * there is only room to return a single priority.
+		 * XXXKSE  Maybe need a new interface to report 
+		 * priorities of multiple system scope threads.
+		 * Note: specifying our own pid is not the same
+		 * as leaving it zero.
+		 */
+		if (uap->pid == 0) {
+			pri_to_rtp(td->td_ksegrp, &rtp);
+		} else {
+			struct rtprio rtp2;
+
+			rtp.type = RTP_PRIO_IDLE;
+			rtp.prio = RTP_PRIO_MAX;
+			FOREACH_KSEGRP_IN_PROC(p, kg) {
+				pri_to_rtp(kg, &rtp2);
+				if ((rtp2.type <  rtp.type) ||
+				    ((rtp2.type == rtp.type) &&
+				     (rtp2.prio < rtp.prio))) {
+					rtp.type = rtp2.type;
+					rtp.prio = rtp2.prio;
+				}
+			}
+		}
 		mtx_unlock_spin(&sched_lock);
 		PROC_UNLOCK(p);
 		return (copyout(&rtp, uap->rtp, sizeof(struct rtprio)));
@@ -375,7 +376,21 @@ rtprio(td, uap)
 			}
 		}
 		mtx_lock_spin(&sched_lock);
-		error = rtp_to_pri(&rtp, FIRST_KSEGRP_IN_PROC(p));
+		/*
+		 * If we are setting our own priority, set just our
+		 * KSEGRP but if we are doing another process,
+		 * do all the groups on that process. If we
+		 * specify our own pid we do the latter.
+		 */
+		if (uap->pid == 0) {
+			error = rtp_to_pri(&rtp, td->td_ksegrp);
+		} else {
+			FOREACH_KSEGRP_IN_PROC(p, kg) {
+				if ((error = rtp_to_pri(&rtp, kg)) != 0) {
+					break;
+				}
+			}
+		}
 		mtx_unlock_spin(&sched_lock);
 		break;
 	default:
@@ -435,7 +450,7 @@ pri_to_rtp(struct ksegrp *kg, struct rtprio *rtp)
 	rtp->type = kg->kg_pri_class;
 }
 
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 #ifndef _SYS_SYSPROTO_H_
 struct osetrlimit_args {
 	u_int	which;
@@ -445,7 +460,6 @@ struct osetrlimit_args {
 /*
  * MPSAFE
  */
-/* ARGSUSED */
 int
 osetrlimit(td, uap)
 	struct thread *td;
@@ -459,9 +473,7 @@ osetrlimit(td, uap)
 		return (error);
 	lim.rlim_cur = olim.rlim_cur;
 	lim.rlim_max = olim.rlim_max;
-	mtx_lock(&Giant);
-	error = dosetrlimit(td, uap->which, &lim);
-	mtx_unlock(&Giant);
+	error = kern_setrlimit(td, uap->which, &lim);
 	return (error);
 }
 
@@ -474,30 +486,38 @@ struct ogetrlimit_args {
 /*
  * MPSAFE
  */
-/* ARGSUSED */
 int
 ogetrlimit(td, uap)
 	struct thread *td;
 	register struct ogetrlimit_args *uap;
 {
-	struct proc *p = td->td_proc;
 	struct orlimit olim;
+	struct rlimit rl;
+	struct proc *p;
 	int error;
 
 	if (uap->which >= RLIM_NLIMITS)
 		return (EINVAL);
-	mtx_lock(&Giant);
-	olim.rlim_cur = p->p_rlimit[uap->which].rlim_cur;
-	if (olim.rlim_cur == -1)
-		olim.rlim_cur = 0x7fffffff;
-	olim.rlim_max = p->p_rlimit[uap->which].rlim_max;
-	if (olim.rlim_max == -1)
-		olim.rlim_max = 0x7fffffff;
+	p = td->td_proc;
+	PROC_LOCK(p);
+	lim_rlimit(p, uap->which, &rl);
+	PROC_UNLOCK(p);
+
+	/*
+	 * XXX would be more correct to convert only RLIM_INFINITY to the
+	 * old RLIM_INFINITY and fail with EOVERFLOW for other larger
+	 * values.  Most 64->32 and 32->16 conversions, including not
+	 * unimportant ones of uids are even more broken than what we
+	 * do here (they blindly truncate).  We don't do this correctly
+	 * here since we have little experience with EOVERFLOW yet.
+	 * Elsewhere, getuid() can't fail...
+	 */
+	olim.rlim_cur = rl.rlim_cur > 0x7fffffff ? 0x7fffffff : rl.rlim_cur;
+	olim.rlim_max = rl.rlim_max > 0x7fffffff ? 0x7fffffff : rl.rlim_max;
 	error = copyout(&olim, uap->rlp, sizeof(olim));
-	mtx_unlock(&Giant);
 	return (error);
 }
-#endif /* COMPAT_43 || COMPAT_SUNOS */
+#endif /* COMPAT_43 */
 
 #ifndef _SYS_SYSPROTO_H_
 struct __setrlimit_args {
@@ -508,7 +528,6 @@ struct __setrlimit_args {
 /*
  * MPSAFE
  */
-/* ARGSUSED */
 int
 setrlimit(td, uap)
 	struct thread *td;
@@ -517,29 +536,26 @@ setrlimit(td, uap)
 	struct rlimit alim;
 	int error;
 
-	if ((error = copyin(uap->rlp, &alim, sizeof (struct rlimit))))
+	if ((error = copyin(uap->rlp, &alim, sizeof(struct rlimit))))
 		return (error);
-	mtx_lock(&Giant);
-	error = dosetrlimit(td, uap->which, &alim);
-	mtx_unlock(&Giant);
+	error = kern_setrlimit(td, uap->which, &alim);
 	return (error);
 }
 
 int
-dosetrlimit(td, which, limp)
+kern_setrlimit(td, which, limp)
 	struct thread *td;
 	u_int which;
 	struct rlimit *limp;
 {
-	struct proc *p = td->td_proc;
+	struct plimit *newlim, *oldlim;
+	struct proc *p;
 	register struct rlimit *alimp;
+	rlim_t oldssiz;
 	int error;
-
-	GIANT_REQUIRED;
 
 	if (which >= RLIM_NLIMITS)
 		return (EINVAL);
-	alimp = &p->p_rlimit[which];
 
 	/*
 	 * Preserve historical bugs by treating negative limits as unsigned.
@@ -549,17 +565,23 @@ dosetrlimit(td, which, limp)
 	if (limp->rlim_max < 0)
 		limp->rlim_max = RLIM_INFINITY;
 
+	oldssiz = 0;
+	p = td->td_proc;
+	newlim = lim_alloc();
+	PROC_LOCK(p);
+	oldlim = p->p_limit;
+	alimp = &oldlim->pl_rlimit[which];
 	if (limp->rlim_cur > alimp->rlim_max ||
 	    limp->rlim_max > alimp->rlim_max)
-		if ((error = suser_cred(td->td_ucred, PRISON_ROOT)))
+		if ((error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL))) {
+			PROC_UNLOCK(p);
+			lim_free(newlim);
 			return (error);
+	}
 	if (limp->rlim_cur > limp->rlim_max)
 		limp->rlim_cur = limp->rlim_max;
-	if (p->p_limit->p_refcnt > 1) {
-		p->p_limit->p_refcnt--;
-		p->p_limit = limcopy(p->p_limit);
-		alimp = &p->p_rlimit[which];
-	}
+	lim_copy(newlim, oldlim);
+	alimp = &newlim->pl_rlimit[which];
 
 	switch (which) {
 
@@ -580,32 +602,7 @@ dosetrlimit(td, which, limp)
 			limp->rlim_cur = maxssiz;
 		if (limp->rlim_max > maxssiz)
 			limp->rlim_max = maxssiz;
-		/*
-		 * Stack is allocated to the max at exec time with only
-		 * "rlim_cur" bytes accessible.  If stack limit is going
-		 * up make more accessible, if going down make inaccessible.
-		 */
-		if (limp->rlim_cur != alimp->rlim_cur) {
-			vm_offset_t addr;
-			vm_size_t size;
-			vm_prot_t prot;
-
-			if (limp->rlim_cur > alimp->rlim_cur) {
-				prot = p->p_sysent->sv_stackprot;
-				size = limp->rlim_cur - alimp->rlim_cur;
-				addr = p->p_sysent->sv_usrstack -
-				    limp->rlim_cur;
-			} else {
-				prot = VM_PROT_NONE;
-				size = alimp->rlim_cur - limp->rlim_cur;
-				addr = p->p_sysent->sv_usrstack -
-				    alimp->rlim_cur;
-			}
-			addr = trunc_page(addr);
-			size = round_page(size);
-			(void) vm_map_protect(&p->p_vmspace->vm_map,
-					      addr, addr+size, prot, FALSE);
-		}
+		oldssiz = alimp->rlim_cur;
 		break;
 
 	case RLIMIT_NOFILE:
@@ -627,6 +624,40 @@ dosetrlimit(td, which, limp)
 		break;
 	}
 	*alimp = *limp;
+	p->p_limit = newlim;
+	PROC_UNLOCK(p);
+	lim_free(oldlim);
+
+	if (which == RLIMIT_STACK) {
+		/*
+		 * Stack is allocated to the max at exec time with only
+		 * "rlim_cur" bytes accessible.  If stack limit is going
+		 * up make more accessible, if going down make inaccessible.
+		 */
+		if (limp->rlim_cur != oldssiz) {
+			vm_offset_t addr;
+			vm_size_t size;
+			vm_prot_t prot;
+
+			mtx_lock(&Giant);
+			if (limp->rlim_cur > oldssiz) {
+				prot = p->p_sysent->sv_stackprot;
+				size = limp->rlim_cur - oldssiz;
+				addr = p->p_sysent->sv_usrstack -
+				    limp->rlim_cur;
+			} else {
+				prot = VM_PROT_NONE;
+				size = oldssiz - limp->rlim_cur;
+				addr = p->p_sysent->sv_usrstack -
+				    oldssiz;
+			}
+			addr = trunc_page(addr);
+			size = round_page(size);
+			(void) vm_map_protect(&p->p_vmspace->vm_map,
+					      addr, addr+size, prot, FALSE);
+			mtx_unlock(&Giant);
+		}
+	}
 	return (0);
 }
 
@@ -645,15 +676,17 @@ getrlimit(td, uap)
 	struct thread *td;
 	register struct __getrlimit_args *uap;
 {
+	struct rlimit rlim;
+	struct proc *p;
 	int error;
-	struct proc *p = td->td_proc;
 
 	if (uap->which >= RLIM_NLIMITS)
 		return (EINVAL);
-	mtx_lock(&Giant);
-	error = copyout(&p->p_rlimit[uap->which], uap->rlp,
-		    sizeof (struct rlimit));
-	mtx_unlock(&Giant);
+	p = td->td_proc;
+	PROC_LOCK(p);
+	lim_rlimit(p, uap->which, &rlim);
+	PROC_UNLOCK(p);
+	error = copyout(&rlim, uap->rlp, sizeof(struct rlimit));
 	return(error);
 }
 
@@ -668,10 +701,12 @@ calcru(p, up, sp, ip)
 	struct timeval *sp;
 	struct timeval *ip;
 {
+	struct bintime bt, rt;
+	struct timeval tv;
+	struct thread *td;
 	/* {user, system, interrupt, total} {ticks, usec}; previous tu: */
 	u_int64_t ut, uu, st, su, it, iu, tt, tu, ptu;
-	struct timeval tv;
-	struct bintime bt;
+	int problemcase;
 
 	mtx_assert(&sched_lock, MA_OWNED);
 	/* XXX: why spl-protect ?  worst case is an off-by-one report */
@@ -685,29 +720,45 @@ calcru(p, up, sp, ip)
 		st = 1;
 		tt = 1;
 	}
-		
-	if (curthread->td_proc == p) {
+	rt = p->p_runtime;
+	problemcase = 0;
+	FOREACH_THREAD_IN_PROC(p, td) {
 		/*
 		 * Adjust for the current time slice.  This is actually fairly
 		 * important since the error here is on the order of a time
 		 * quantum, which is much greater than the sampling error.
-		 * XXXKSE use a different test due to threads on other 
-		 * processors also being 'current'.
 		 */
-				
-		binuptime(&bt);
-		bintime_sub(&bt, PCPU_PTR(switchtime));
-		bintime_add(&bt, &p->p_runtime);
-	} else {
-		bt = p->p_runtime;
+		if (td == curthread) {
+			binuptime(&bt);
+			bintime_sub(&bt, PCPU_PTR(switchtime));
+			bintime_add(&rt, &bt);
+		} else if (TD_IS_RUNNING(td)) {
+			/*
+			 * XXX: this case should add the difference between
+			 * the current time and the switch time as above,
+			 * but the switch time is inaccessible, so we can't
+			 * do the adjustment and will end up with a wrong
+			 * runtime.  A previous call with a different
+			 * curthread may have obtained a (right or wrong)
+			 * runtime that is in advance of ours.  Just set a
+			 * flag to avoid warning about this known problem.
+			 */
+			problemcase = 1;
+		}
 	}
-	bintime2timeval(&bt, &tv);
+	bintime2timeval(&rt, &tv);
 	tu = (u_int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
 	ptu = p->p_uu + p->p_su + p->p_iu;
-	if (tu < ptu || (int64_t)tu < 0) {
-		/* XXX no %qd in kernel.  Truncate. */
-		printf("calcru: negative time of %ld usec for pid %d (%s)\n",
-		       (long)tu, p->p_pid, p->p_comm);
+	if (tu < ptu) {
+		if (!problemcase)
+			printf(
+"calcru: runtime went backwards from %ju usec to %ju usec for pid %d (%s)\n",
+			    (uintmax_t)ptu, (uintmax_t)tu, p->p_pid, p->p_comm);
+		tu = ptu;
+	}
+	if ((int64_t)tu < 0) {
+		printf("calcru: negative runtime of %jd usec for pid %d (%s)\n",
+		    (intmax_t)tu, p->p_pid, p->p_comm);
 		tu = ptu;
 	}
 
@@ -715,7 +766,7 @@ calcru(p, up, sp, ip)
 	uu = (tu * ut) / tt;
 	su = (tu * st) / tt;
 	iu = tu - uu - su;
-		
+
 	/* Enforce monotonicity. */
 	if (uu < p->p_uu || su < p->p_su || iu < p->p_iu) {
 		if (uu < p->p_uu)
@@ -732,10 +783,10 @@ calcru(p, up, sp, ip)
 				su = tu - uu - p->p_iu;
 		}
 		KASSERT(uu + su + p->p_iu <= tu,
-		    	("calcru: monotonisation botch 1"));
+		    ("calcru: monotonisation botch 1"));
 		iu = tu - uu - su;
 		KASSERT(iu >= p->p_iu,
-		    	("calcru: monotonisation botch 2"));
+		    ("calcru: monotonisation botch 2"));
 	}
 	p->p_uu = uu;
 	p->p_su = su;
@@ -766,35 +817,33 @@ getrusage(td, uap)
 	register struct thread *td;
 	register struct getrusage_args *uap;
 {
-	struct proc *p = td->td_proc;
-	register struct rusage *rup;
-	int error = 0;
+	struct rusage ru;
+	struct proc *p;
 
-	mtx_lock(&Giant);
-
+	p = td->td_proc;
 	switch (uap->who) {
+
 	case RUSAGE_SELF:
-		rup = &p->p_stats->p_ru;
+		mtx_lock(&Giant);
 		mtx_lock_spin(&sched_lock);
-		calcru(p, &rup->ru_utime, &rup->ru_stime, NULL);
+		calcru(p, &p->p_stats->p_ru.ru_utime, &p->p_stats->p_ru.ru_stime,
+		    NULL);
 		mtx_unlock_spin(&sched_lock);
+		ru = p->p_stats->p_ru;
+		mtx_unlock(&Giant);
 		break;
 
 	case RUSAGE_CHILDREN:
-		rup = &p->p_stats->p_cru;
+		mtx_lock(&Giant);
+		ru = p->p_stats->p_cru;
+		mtx_unlock(&Giant);
 		break;
 
 	default:
-		rup = NULL;
-		error = EINVAL;
+		return (EINVAL);
 		break;
 	}
-	mtx_unlock(&Giant);
-	if (error == 0) {
-		/* XXX Unlocked access to p_stats->p_ru or p_cru. */
-		error = copyout(rup, uap->rusage, sizeof (struct rusage));
-	}
-	return(error);
+	return (copyout(&ru, uap->rusage, sizeof(struct rusage)));
 }
 
 void
@@ -814,21 +863,98 @@ ruadd(ru, ru2)
 }
 
 /*
- * Make a copy of the plimit structure.
- * We share these structures copy-on-write after fork,
- * and copy when a limit is changed.
+ * Allocate a new resource limits structure and initialize its
+ * reference count and mutex pointer.
  */
 struct plimit *
-limcopy(lim)
-	struct plimit *lim;
+lim_alloc()
 {
-	register struct plimit *copy;
+	struct plimit *limp;
 
-	MALLOC(copy, struct plimit *, sizeof(struct plimit),
-	    M_SUBPROC, M_WAITOK);
-	bcopy(lim->pl_rlimit, copy->pl_rlimit, sizeof(struct plimit));
-	copy->p_refcnt = 1;
-	return (copy);
+	limp = (struct plimit *)malloc(sizeof(struct plimit), M_PLIMIT,
+	    M_WAITOK);
+	limp->pl_refcnt = 1;
+	limp->pl_mtx = mtx_pool_alloc(mtxpool_sleep);
+	return (limp);
+}
+
+struct plimit *
+lim_hold(limp)
+	struct plimit *limp;
+{
+
+	LIM_LOCK(limp);
+	limp->pl_refcnt++;
+	LIM_UNLOCK(limp);
+	return (limp);
+}
+
+void
+lim_free(limp)
+	struct plimit *limp;
+{
+
+	LIM_LOCK(limp);
+	KASSERT(limp->pl_refcnt > 0, ("plimit refcnt underflow"));
+	if (--limp->pl_refcnt == 0) {
+		LIM_UNLOCK(limp);
+		free((void *)limp, M_PLIMIT);
+		return;
+	}
+	LIM_UNLOCK(limp);
+}
+
+/*
+ * Make a copy of the plimit structure.
+ * We share these structures copy-on-write after fork.
+ */
+void
+lim_copy(dst, src)
+	struct plimit *dst, *src;
+{
+
+	KASSERT(dst->pl_refcnt == 1, ("lim_copy to shared limit"));
+	bcopy(src->pl_rlimit, dst->pl_rlimit, sizeof(src->pl_rlimit));
+}
+
+/*
+ * Return the hard limit for a particular system resource.  The
+ * which parameter specifies the index into the rlimit array.
+ */
+rlim_t
+lim_max(struct proc *p, int which)
+{
+	struct rlimit rl;
+
+	lim_rlimit(p, which, &rl);
+	return (rl.rlim_max);
+}
+
+/*
+ * Return the current (soft) limit for a particular system resource.
+ * The which parameter which specifies the index into the rlimit array
+ */
+rlim_t
+lim_cur(struct proc *p, int which)
+{
+	struct rlimit rl;
+
+	lim_rlimit(p, which, &rl);
+	return (rl.rlim_cur);
+}
+
+/*
+ * Return a copy of the entire rlimit structure for the system limit
+ * specified by 'which' in the rlimit structure pointed to by 'rlp'.
+ */
+void
+lim_rlimit(struct proc *p, int which, struct rlimit *rlp)
+{
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	KASSERT(which >= 0 && which < RLIM_NLIMITS,
+	    ("request for invalid resource limit"));
+	*rlp = p->p_limit->pl_rlimit[which];
 }
 
 /*
@@ -845,15 +971,15 @@ uihashinit()
 }
 
 /*
- * lookup a uidinfo struct for the parameter uid.
+ * Look up a uidinfo struct for the parameter uid.
  * uihashtbl_mtx must be locked.
  */
 static struct uidinfo *
 uilookup(uid)
 	uid_t uid;
 {
-	struct	uihashhead *uipp;
-	struct	uidinfo *uip;
+	struct uihashhead *uipp;
+	struct uidinfo *uip;
 
 	mtx_assert(&uihashtbl_mtx, MA_OWNED);
 	uipp = UIHASH(uid);
@@ -873,23 +999,21 @@ struct uidinfo *
 uifind(uid)
 	uid_t uid;
 {
-	struct	uidinfo *uip;
+	struct uidinfo *old_uip, *uip;
 
 	mtx_lock(&uihashtbl_mtx);
 	uip = uilookup(uid);
 	if (uip == NULL) {
-		struct  uidinfo *old_uip;
-
 		mtx_unlock(&uihashtbl_mtx);
 		uip = malloc(sizeof(*uip), M_UIDINFO, M_WAITOK | M_ZERO);
 		mtx_lock(&uihashtbl_mtx);
 		/*
 		 * There's a chance someone created our uidinfo while we
 		 * were in malloc and not holding the lock, so we have to
-		 * make sure we don't insert a duplicate uidinfo
+		 * make sure we don't insert a duplicate uidinfo.
 		 */
 		if ((old_uip = uilookup(uid)) != NULL) {
-			/* someone else beat us to it */
+			/* Someone else beat us to it. */
 			free(uip, M_UIDINFO);
 			uip = old_uip;
 		} else {
@@ -960,9 +1084,8 @@ uifree(uip)
 		LIST_REMOVE(uip, ui_hash);
 		mtx_unlock(&uihashtbl_mtx);
 		if (uip->ui_sbsize != 0)
-			/* XXX no %qd in kernel.  Truncate. */
-			printf("freeing uidinfo: uid = %d, sbsize = %ld\n",
-			    uip->ui_uid, (long)uip->ui_sbsize);
+			printf("freeing uidinfo: uid = %d, sbsize = %jd\n",
+			    uip->ui_uid, (intmax_t)uip->ui_sbsize);
 		if (uip->ui_proccnt != 0)
 			printf("freeing uidinfo: uid = %d, proccnt = %ld\n",
 			    uip->ui_uid, uip->ui_proccnt);
@@ -987,7 +1110,7 @@ chgproccnt(uip, diff, max)
 {
 
 	UIDINFO_LOCK(uip);
-	/* don't allow them to exceed max, but allow subtraction */
+	/* Don't allow them to exceed max, but allow subtraction. */
 	if (diff > 0 && uip->ui_proccnt + diff > max && max != 0) {
 		UIDINFO_UNLOCK(uip);
 		return (0);
@@ -1010,22 +1133,18 @@ chgsbsize(uip, hiwat, to, max)
 	rlim_t	max;
 {
 	rlim_t new;
-	int s;
 
-	s = splnet();
 	UIDINFO_LOCK(uip);
 	new = uip->ui_sbsize + to - *hiwat;
-	/* don't allow them to exceed max, but allow subtraction */
+	/* Don't allow them to exceed max, but allow subtraction */
 	if (to > *hiwat && new > max) {
-		splx(s);
 		UIDINFO_UNLOCK(uip);
 		return (0);
 	}
 	uip->ui_sbsize = new;
-	*hiwat = to;
-	if (uip->ui_sbsize < 0)
-		printf("negative sbsize for uid = %d\n", uip->ui_uid);
-	splx(s);
 	UIDINFO_UNLOCK(uip);
+	*hiwat = to;
+	if (new < 0)
+		printf("negative sbsize for uid = %d\n", uip->ui_uid);
 	return (1);
 }

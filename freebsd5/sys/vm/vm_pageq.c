@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_pageq.c,v 1.12 2003/08/12 23:24:05 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_pageq.c,v 1.14 2004/06/07 19:33:05 netchild Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -176,15 +176,15 @@ vm_pageq_remove(vm_page_t m)
  *
  *	The page coloring optimization attempts to locate a page
  *	that does not overload other nearby pages in the object in
- *	the cpu's L1 or L2 caches.  We need this optimization because 
- *	cpu caches tend to be physical caches, while object spaces tend 
+ *	the cpu's L2 cache.  We need this optimization because cpu
+ *	caches tend to be physical caches, while object spaces tend 
  *	to be virtual.
  *
  *	This routine must be called at splvm().
  *	This routine may not block.
  *
- *	This routine may only be called from the vm_page_list_find() macro
- *	in vm_page.h
+ *	This routine may only be called from the vm_pageq_find()
+ *	function in this file.
  */
 static __inline vm_page_t
 _vm_pageq_find(int basequeue, int index)

@@ -32,7 +32,8 @@
  *
  *	@(#)routed.h	8.1 (Berkeley) 6/2/93
  *
- * $FreeBSD: src/include/protocols/routed.h,v 1.15 1999/09/05 17:43:31 peter Exp $
+ * $FreeBSD: src/include/protocols/routed.h,v 1.16 2004/02/25 23:45:57 bms Exp $
+ *	$Revision: 2.26 $
  */
 
 #ifndef _ROUTED_H_
@@ -98,7 +99,9 @@ struct netauth {
 		int8_t	md5_auth_len;	/* 16 */
 		u_int32_t md5_seqno;	/* sequence number */
 		u_int32_t rsvd[2];	/* must be 0 */
-#define	    RIP_AUTH_MD5_LEN RIP_AUTH_PW_LEN
+#define	    RIP_AUTH_MD5_KEY_LEN   RIP_AUTH_PW_LEN
+#define	    RIP_AUTH_MD5_HASH_XTRA (sizeof(struct netauth)-sizeof(struct a_md5))
+#define	    RIP_AUTH_MD5_HASH_LEN  (RIP_AUTH_MD5_KEY_LEN+RIP_AUTH_MD5_HASH_XTRA)
 	    } a_md5;
 	} au;
 };

@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
+ * Copyright (c) 1999-2002 Robert N. M. Watson
+ * Copyright (c) 2001-2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_stub/mac_stub.c,v 1.36 2003/12/06 21:48:02 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_stub/mac_stub.c,v 1.42 2004/06/24 03:34:45 rwatson Exp $
  */
 
 /*
@@ -178,7 +178,7 @@ stub_associate_vnode_singlelabel(struct mount *mp,
 }
 
 static void
-stub_create_devfs_device(struct mount *mp, dev_t dev,
+stub_create_devfs_device(struct mount *mp, struct cdev *dev,
     struct devfs_dirent *devfs_dirent, struct label *label)
 {
 
@@ -263,7 +263,7 @@ stub_create_socket(struct ucred *cred, struct socket *socket,
 }
 
 static void
-stub_create_pipe(struct ucred *cred, struct pipe *pipe,
+stub_create_pipe(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 
@@ -285,7 +285,7 @@ stub_relabel_socket(struct ucred *cred, struct socket *socket,
 }
 
 static void
-stub_relabel_pipe(struct ucred *cred, struct pipe *pipe,
+stub_relabel_pipe(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel, struct label *newlabel)
 {
 
@@ -346,6 +346,13 @@ stub_create_inpcb_from_socket(struct socket *so, struct label *solabel,
 static void
 stub_create_ipq(struct mbuf *fragment, struct label *fragmentlabel,
     struct ipq *ipq, struct label *ipqlabel)
+{
+
+}
+
+static void
+stub_create_mbuf_from_inpcb(struct inpcb *inp, struct label *inplabel,
+    struct mbuf *m, struct label *mlabel)
 {
 
 }
@@ -588,7 +595,7 @@ stub_check_mount_stat(struct ucred *cred, struct mount *mp,
 }
 
 static int
-stub_check_pipe_ioctl(struct ucred *cred, struct pipe *pipe,
+stub_check_pipe_ioctl(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel, unsigned long cmd, void /* caddr_t */ *data)
 {
 
@@ -596,7 +603,7 @@ stub_check_pipe_ioctl(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-stub_check_pipe_poll(struct ucred *cred, struct pipe *pipe,
+stub_check_pipe_poll(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 
@@ -604,7 +611,7 @@ stub_check_pipe_poll(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-stub_check_pipe_read(struct ucred *cred, struct pipe *pipe,
+stub_check_pipe_read(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 
@@ -612,7 +619,7 @@ stub_check_pipe_read(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-stub_check_pipe_relabel(struct ucred *cred, struct pipe *pipe,
+stub_check_pipe_relabel(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel, struct label *newlabel)
 {
 
@@ -620,7 +627,7 @@ stub_check_pipe_relabel(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-stub_check_pipe_stat(struct ucred *cred, struct pipe *pipe,
+stub_check_pipe_stat(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 
@@ -628,7 +635,7 @@ stub_check_pipe_stat(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-stub_check_pipe_write(struct ucred *cred, struct pipe *pipe,
+stub_check_pipe_write(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 
@@ -750,8 +757,8 @@ stub_check_system_swapoff(struct ucred *cred, struct vnode *vp,
 }
 
 static int
-stub_check_system_sysctl(struct ucred *cred, int *name, u_int namelen,
-    void *old, size_t *oldlenp, int inkernel, void *new, size_t newlen)
+stub_check_system_sysctl(struct ucred *cred, struct sysctl_oid *oidp,
+    void *arg1, int arg2, struct sysctl_req *req)
 {
 
 	return (0);
@@ -1050,6 +1057,7 @@ static struct mac_policy_ops mac_stub_ops =
 	.mpo_destroy_socket_peer_label = stub_destroy_label,
 	.mpo_destroy_vnode_label = stub_destroy_label,
 	.mpo_copy_cred_label = stub_copy_label,
+	.mpo_copy_ifnet_label = stub_copy_label,
 	.mpo_copy_mbuf_label = stub_copy_label,
 	.mpo_copy_pipe_label = stub_copy_label,
 	.mpo_copy_socket_label = stub_copy_label,
@@ -1092,6 +1100,7 @@ static struct mac_policy_ops mac_stub_ops =
 	.mpo_create_datagram_from_ipq = stub_create_datagram_from_ipq,
 	.mpo_create_fragment = stub_create_fragment,
 	.mpo_create_ipq = stub_create_ipq,
+	.mpo_create_mbuf_from_inpcb = stub_create_mbuf_from_inpcb,
 	.mpo_create_mbuf_from_mbuf = stub_create_mbuf_from_mbuf,
 	.mpo_create_mbuf_linklayer = stub_create_mbuf_linklayer,
 	.mpo_create_mbuf_from_bpfdesc = stub_create_mbuf_from_bpfdesc,

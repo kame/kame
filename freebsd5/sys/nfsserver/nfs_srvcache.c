@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvcache.c,v 1.35 2003/03/02 16:54:38 des Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvcache.c,v 1.39 2004/07/03 19:17:06 rwatson Exp $");
 
 /*
  * Reference: Chet Juszczak, "Improving the Performance and Correctness
@@ -48,9 +44,11 @@ __FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvcache.c,v 1.35 2003/03/02 16:54:38 
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/systm.h>
+#include <sys/lock.h>
 #include <sys/mbuf.h>
+#include <sys/mutex.h>
 #include <sys/socket.h>
-#include <sys/socketvar.h>	/* for dup_sockaddr */
+#include <sys/socketvar.h>	/* for sodupsockaddr */
 
 #include <netinet/in.h>
 #include <nfs/rpcv2.h>
@@ -76,7 +74,7 @@ static u_long nfsrvhash;
 /*
  * Static array that defines which nfs rpc's are nonidempotent
  */
-static int nonidempotent[NFS_NPROCS] = {
+static const int nonidempotent[NFS_NPROCS] = {
 	FALSE,
 	FALSE,
 	TRUE,
@@ -103,7 +101,7 @@ static int nonidempotent[NFS_NPROCS] = {
 };
 
 /* True iff the rpc reply is an nfs status ONLY! */
-static int nfsv2_repstat[NFS_NPROCS] = {
+static const int nfsv2_repstat[NFS_NPROCS] = {
 	FALSE,
 	FALSE,
 	FALSE,
@@ -158,6 +156,8 @@ nfsrv_getcache(struct nfsrv_descript *nd, struct mbuf **repp)
 	caddr_t bpos;
 	int ret;
 
+	NFSD_LOCK_ASSERT();
+
 	/*
 	 * Don't cache recent requests for reliable transport protocols.
 	 * (Maybe we should for the case of a reconnect, but..)
@@ -171,7 +171,8 @@ loop:
 		        NFS_DPF(RC, ("H%03x", rp->rc_xid & 0xfff));
 			if ((rp->rc_flag & RC_LOCKED) != 0) {
 				rp->rc_flag |= RC_WANTED;
-				(void) tsleep(rp, PZERO-1, "nfsrc", 0);
+				(void) msleep(rp, &nfsd_mtx, PZERO-1,
+				    "nfsrc", 0);
 				goto loop;
 			}
 			rp->rc_flag |= RC_LOCKED;
@@ -192,8 +193,10 @@ loop:
 				ret = RC_REPLY;
 			} else if (rp->rc_flag & RC_REPMBUF) {
 				nfsrvstats.srvcache_nonidemdonehits++;
+				NFSD_UNLOCK();
 				*repp = m_copym(rp->rc_reply, 0, M_COPYALL,
 						M_TRYWAIT);
+				NFSD_LOCK();
 				ret = RC_REPLY;
 			} else {
 				nfsrvstats.srvcache_idemdonehits++;
@@ -211,15 +214,17 @@ loop:
 	nfsrvstats.srvcache_misses++;
 	NFS_DPF(RC, ("M%03x", nd->nd_retxid & 0xfff));
 	if (numnfsrvcache < desirednfsrvcache) {
+		NFSD_UNLOCK();
 		rp = (struct nfsrvcache *)malloc((u_long)sizeof *rp,
 		    M_NFSD, M_WAITOK | M_ZERO);
+		NFSD_LOCK();
 		numnfsrvcache++;
 		rp->rc_flag = RC_LOCKED;
 	} else {
 		rp = TAILQ_FIRST(&nfsrvlruhead);
 		while ((rp->rc_flag & RC_LOCKED) != 0) {
 			rp->rc_flag |= RC_WANTED;
-			(void) tsleep(rp, PZERO-1, "nfsrc", 0);
+			(void) msleep(rp, &nfsd_mtx, PZERO-1, "nfsrc", 0);
 			rp = TAILQ_FIRST(&nfsrvlruhead);
 		}
 		rp->rc_flag |= RC_LOCKED;
@@ -243,8 +248,12 @@ loop:
 /*	case AF_INET6:	*/
 /*	case AF_ISO:	*/
 	default:
+		/*
+		 * XXXRW: Seems like we should only set RC_NAM if we
+		 * actually manage to set rc_nam to something non-NULL.
+		 */
 		rp->rc_flag |= RC_NAM;
-		rp->rc_nam = dup_sockaddr(nd->nd_nam, 1);
+		rp->rc_nam = sodupsockaddr(nd->nd_nam, M_NOWAIT);
 		break;
 	};
 	rp->rc_proc = nd->nd_procnum;
@@ -265,6 +274,8 @@ nfsrv_updatecache(struct nfsrv_descript *nd, int repvalid, struct mbuf *repmbuf)
 {
 	struct nfsrvcache *rp;
 
+	NFSD_LOCK_ASSERT();
+
 	if (!nd->nd_nam2)
 		return;
 loop:
@@ -274,7 +285,8 @@ loop:
 			NFS_DPF(RC, ("U%03x", rp->rc_xid & 0xfff));
 			if ((rp->rc_flag & RC_LOCKED) != 0) {
 				rp->rc_flag |= RC_WANTED;
-				(void) tsleep(rp, PZERO-1, "nfsrc", 0);
+				(void) msleep(rp, &nfsd_mtx, PZERO-1,
+				    "nfsrc", 0);
 				goto loop;
 			}
 			rp->rc_flag |= RC_LOCKED;
@@ -302,8 +314,10 @@ loop:
 					rp->rc_status = nd->nd_repstat;
 					rp->rc_flag |= RC_REPSTATUS;
 				} else {
+					NFSD_UNLOCK();
 					rp->rc_reply = m_copym(repmbuf,
 						0, M_COPYALL, M_TRYWAIT);
+					NFSD_LOCK();
 					rp->rc_flag |= RC_REPMBUF;
 				}
 			}
@@ -325,6 +339,8 @@ void
 nfsrv_cleancache(void)
 {
 	struct nfsrvcache *rp, *nextrp;
+
+	NFSD_LOCK_ASSERT();
 
 	for (rp = TAILQ_FIRST(&nfsrvlruhead); rp != 0; rp = nextrp) {
 		nextrp = TAILQ_NEXT(rp, rc_lru);

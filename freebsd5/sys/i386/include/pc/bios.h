@@ -24,8 +24,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/pc/bios.h,v 1.14 2002/09/23 18:54:31 alfred Exp $
+ * $FreeBSD: src/sys/i386/include/pc/bios.h,v 1.17 2004/06/10 20:43:04 jhb Exp $
  */
+
+#ifndef _MACHINE_PC_BIOS_H_
+#define _MACHINE_PC_BIOS_H_
 
 /* 
  * Signature structure for the BIOS32 Service Directory header 
@@ -61,8 +64,8 @@ extern int		bios32_SDlookup(struct bios32_SDentry *ent);
 extern u_int32_t	bios_sigsearch(u_int32_t start, u_char *sig, int siglen, 
 					 int paralen, int sigofs);
 
-#define BIOS_PADDRTOVADDR(x)	(((x) - ISA_HOLE_START) + atdevbase)
-#define BIOS_VADDRTOPADDR(x)	(((x) - atdevbase) + ISA_HOLE_START)
+#define BIOS_PADDRTOVADDR(x)	((x) + KERNBASE)
+#define BIOS_VADDRTOPADDR(x)	((x) - KERNBASE)
 
 
 /* 
@@ -90,7 +93,6 @@ struct PnPBIOS_table
  * Exported lookup results 
  */
 extern struct bios32_SDentry	PCIbios;
-extern struct PnPBIOS_table	*PnPBIOStable;
 
 struct segment_info {
 	u_int	base;
@@ -278,3 +280,8 @@ struct bios_smap {
     u_int64_t	length;
     u_int32_t	type;
 } __packed;
+
+const u_char *bios_string(u_int from, u_int to, const u_char *string, int len);
+
+
+#endif /* _MACHINE_PC_BIOS_H_ */

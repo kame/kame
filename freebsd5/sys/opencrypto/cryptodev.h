@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/opencrypto/cryptodev.h,v 1.7 2003/06/30 05:09:31 sam Exp $	*/
+/*	$FreeBSD: src/sys/opencrypto/cryptodev.h,v 1.9 2004/02/02 17:06:34 phk Exp $	*/
 /*	$OpenBSD: cryptodev.h,v 1.31 2002/06/11 11:14:29 beck Exp $	*/
 
 /*
@@ -227,6 +227,7 @@ struct cryptodesc {
 					   place, so don't copy. */
 #define	CRD_F_IV_EXPLICIT	0x04	/* IV explicitly provided */
 #define	CRD_F_DSA_SHA_NEEDED	0x08	/* Compute SHA-1 of buffer for DSA */
+#define	CRD_F_KEY_EXPLICIT	0x10	/* Key explicitly provided */
 #define CRD_F_COMP		0x0f    /* Set when doing compression */
 
 	struct cryptoini	CRD_INI; /* Initialization/context data */
@@ -379,9 +380,6 @@ extern	int crypto_devallowsoft;	/* only use hardware crypto */
  * XXX these don't really belong here; but for now they're
  *     kept apart from the rest of the system.
  */
-struct mbuf;
-struct	mbuf	*m_getptr(struct mbuf *, int, int *);
-
 struct uio;
 extern	void cuio_copydata(struct uio* uio, int off, int len, caddr_t cp);
 extern	void cuio_copyback(struct uio* uio, int off, int len, caddr_t cp);

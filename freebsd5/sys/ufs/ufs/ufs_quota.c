@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_quota.c,v 1.70 2003/11/05 04:30:08 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_quota.c,v 1.73 2004/07/26 07:24:04 cperciva Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -407,12 +403,12 @@ quotaon(td, mp, type, fname)
 {
 	struct ufsmount *ump = VFSTOUFS(mp);
 	struct vnode *vp, **vpp;
-	struct vnode *nextvp;
+	struct vnode *nvp;
 	struct dquot *dq;
 	int error, flags;
 	struct nameidata nd;
 
-	error = suser_cred(td->td_ucred, PRISON_ROOT);
+	error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 	if (error)
 		return (error);
 
@@ -457,10 +453,7 @@ quotaon(td, mp, type, fname)
 	 */
 	MNT_ILOCK(mp);
 again:
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nextvp) {
-		if (vp->v_mount != mp)
-			goto again;
-		nextvp = TAILQ_NEXT(vp, v_nmntvnodes);
+	MNT_VNODE_FOREACH(vp, mp, nvp) {
 		VI_LOCK(vp);
 		MNT_IUNLOCK(mp);
 		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
@@ -479,8 +472,6 @@ again:
 		MNT_ILOCK(mp);
 		if (error)
 			break;
-		if (TAILQ_NEXT(vp, v_nmntvnodes) != nextvp)
-			goto again;
 	}
 	MNT_IUNLOCK(mp);
 	ump->um_qflags[type] &= ~QTF_OPENING;
@@ -499,13 +490,13 @@ quotaoff(td, mp, type)
 	int type;
 {
 	struct vnode *vp;
-	struct vnode *qvp, *nextvp;
+	struct vnode *qvp, *nvp;
 	struct ufsmount *ump = VFSTOUFS(mp);
 	struct dquot *dq;
 	struct inode *ip;
 	int error;
 
-	error = suser_cred(td->td_ucred, PRISON_ROOT);
+	error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 	if (error)
 		return (error);
 
@@ -518,11 +509,7 @@ quotaoff(td, mp, type)
 	 */
 	MNT_ILOCK(mp);
 again:
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nextvp) {
-		if (vp->v_mount != mp)
-			goto again;
-		nextvp = TAILQ_NEXT(vp, v_nmntvnodes);
-
+	MNT_VNODE_FOREACH(vp, mp, nvp) {
 		VI_LOCK(vp);
 		MNT_IUNLOCK(mp);
 		if (vp->v_type == VNON) {
@@ -541,8 +528,6 @@ again:
 		VOP_UNLOCK(vp, 0, td);
 		vrele(vp);
 		MNT_ILOCK(mp);
-		if (TAILQ_NEXT(vp, v_nmntvnodes) != nextvp)
-			goto again;
 	}
 	MNT_IUNLOCK(mp);
 	dqflush(qvp);
@@ -578,7 +563,7 @@ getquota(td, mp, id, type, addr)
 	switch (type) {
 	case USRQUOTA:
 		if ((td->td_ucred->cr_uid != id) && !unprivileged_get_quota) {
-			error = suser_cred(td->td_ucred, PRISON_ROOT);
+			error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 			if (error)
 				return (error);
 		}
@@ -586,7 +571,7 @@ getquota(td, mp, id, type, addr)
 
 	case GRPQUOTA:
 		if (!groupmember(id, td->td_ucred) && !unprivileged_get_quota) {
-			error = suser_cred(td->td_ucred, PRISON_ROOT);
+			error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 			if (error)
 				return (error);
 		}
@@ -621,7 +606,7 @@ setquota(td, mp, id, type, addr)
 	struct dqblk newlim;
 	int error;
 
-	error = suser_cred(td->td_ucred, PRISON_ROOT);
+	error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 	if (error)
 		return (error);
 
@@ -687,7 +672,7 @@ setuse(td, mp, id, type, addr)
 	struct dqblk usage;
 	int error;
 
-	error = suser_cred(td->td_ucred, PRISON_ROOT);
+	error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 	if (error)
 		return (error);
 
@@ -732,7 +717,7 @@ qsync(mp)
 {
 	struct ufsmount *ump = VFSTOUFS(mp);
 	struct thread *td = curthread;		/* XXX */
-	struct vnode *vp, *nextvp;
+	struct vnode *vp, *nvp;
 	struct dquot *dq;
 	int i, error;
 
@@ -751,10 +736,7 @@ qsync(mp)
 	 */
 	MNT_ILOCK(mp);
 again:
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nextvp) {
-		if (vp->v_mount != mp)
-			goto again;
-		nextvp = TAILQ_NEXT(vp, v_nmntvnodes);
+	MNT_VNODE_FOREACH(vp, mp, nvp) {
 		VI_LOCK(vp);
 		MNT_IUNLOCK(mp);
 		if (vp->v_type == VNON) {
@@ -776,8 +758,6 @@ again:
 		}
 		vput(vp);
 		MNT_ILOCK(mp);
-		if (TAILQ_NEXT(vp, v_nmntvnodes) != nextvp)
-			goto again;
 	}
 	MNT_IUNLOCK(mp);
 	return (0);

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/buf.h,v 1.162 2003/11/15 09:28:09 phk Exp $
+ * $FreeBSD: src/sys/sys/buf.h,v 1.167 2004/07/25 21:24:23 phk Exp $
  */
 
 #ifndef _SYS_BUF_H_
@@ -62,6 +58,7 @@ LIST_HEAD(workhead, worklist);
  * to each buffer.
  */
 extern struct bio_ops {
+	int	(*io_prewrite)(struct vnode *, struct buf *);
 	void	(*io_start)(struct buf *);
 	void	(*io_complete)(struct buf *);
 	void	(*io_deallocate)(struct buf *);
@@ -403,8 +400,15 @@ struct cluster_save {
 
 #ifdef _KERNEL
 
-#define BUF_WRITE(bp)					\
-	(bp)->b_op->bop_write(bp)
+
+static __inline int
+buf_prewrite(struct vnode *vp, struct buf *bp)
+{
+	if (bioops.io_prewrite)
+		return (*bioops.io_prewrite)(vp, bp);
+	else
+		return (0);
+}
 
 static __inline void
 buf_start(struct buf *bp)
@@ -517,7 +521,7 @@ void	bgetvp(struct vnode *, struct buf *);
 void	pbgetvp(struct vnode *, struct buf *);
 void	pbrelvp(struct buf *);
 int	allocbuf(struct buf *bp, int size);
-void	reassignbuf(struct buf *, struct vnode *);
+void	reassignbuf(struct buf *);
 struct	buf *trypbuf(int *);
 void	bwait(struct buf *, u_char, const char *);
 void	bdone(struct buf *);

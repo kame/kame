@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,12 +27,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_cb.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/raw_cb.c,v 1.25 2003/02/19 05:47:29 imp Exp $
+ * $FreeBSD: src/sys/net/raw_cb.c,v 1.29.4.1 2004/10/21 09:30:46 rwatson Exp $
  */
 
 #include <sys/param.h>
 #include <sys/domain.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/mutex.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -53,10 +51,11 @@
  *	redo address binding to allow wildcards
  */
 
+struct mtx rawcb_mtx;
 struct rawcb_list_head rawcb_list;
 
-static u_long	raw_sendspace = RAWSNDQ;
-static u_long	raw_recvspace = RAWRCVQ;
+const static u_long	raw_sendspace = RAWSNDQ;
+const static u_long	raw_recvspace = RAWRCVQ;
 
 /*
  * Allocate a control block and a nominal amount
@@ -83,7 +82,9 @@ raw_attach(so, proto)
 	rp->rcb_socket = so;
 	rp->rcb_proto.sp_family = so->so_proto->pr_domain->dom_family;
 	rp->rcb_proto.sp_protocol = proto;
+	mtx_lock(&rawcb_mtx);
 	LIST_INSERT_HEAD(&rawcb_list, rp, list);
+	mtx_unlock(&rawcb_mtx);
 	return (0);
 }
 
@@ -97,6 +98,8 @@ raw_detach(rp)
 {
 	struct socket *so = rp->rcb_socket;
 
+	ACCEPT_LOCK();
+	SOCK_LOCK(so);
 	so->so_pcb = 0;
 	sotryfree(so);
 	LIST_REMOVE(rp, list);

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/prof_machdep.c,v 1.18 2003/06/02 16:32:55 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/prof_machdep.c,v 1.20 2004/05/26 09:43:38 bde Exp $");
 
 #ifdef GUPROF
 #include "opt_i586_guprof.h"
@@ -69,7 +69,7 @@ static struct gmonparam saved_gmp;
 #endif
 #endif /* GUPROF */
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 __asm("								\n\
 GM_STATE	=	0					\n\
 GMON_PROF_OFF	=	3					\n\
@@ -122,9 +122,9 @@ __cyg_profile_func_enter:					\n\
 .mcount_exit:							\n\
 	ret							\n\
 ");
-#else /* !__GNUC__ */
+#else /* !(__GNUC__ || __INTEL_COMPILER) */
 #error
-#endif /* __GNUC__ */
+#endif /* __GNUC__ || __INTEL_COMPILER */
 
 #ifdef GUPROF
 /*
@@ -133,7 +133,7 @@ __cyg_profile_func_enter:					\n\
  * dependent file together with cputime(), __mcount and [.]mcount.  cputime()
  * can't just be put in machdep.c because it has to be compiled without -pg.
  */
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 __asm("								\n\
 	.text							\n\
 #								\n\
@@ -168,9 +168,9 @@ __cyg_profile_func_exit:					\n\
 .mexitcount_exit:						\n\
 	ret							\n\
 ");
-#else /* !__GNUC__ */
+#else /* !(__GNUC__ || __INTEL_COMPILER) */
 #error
-#endif /* __GNUC__ */
+#endif /* __GNUC__ || __INTEL_COMPILER */
 
 /*
  * Return the time elapsed since the last call.  The units are machine-
@@ -190,8 +190,15 @@ cputime()
 
 #if (defined(I586_CPU) || defined(I686_CPU)) && !defined(SMP)
 	if (cputime_clock == CPUTIME_CLOCK_TSC) {
-		count = (u_int)rdtsc();
-		delta = (int)(count - prev_count);
+		/*
+		 * Scale the TSC a little to make cputime()'s frequency
+		 * fit in an int, assuming that the TSC frequency fits
+		 * in a u_int.  Use a fixed scale since dynamic scaling
+		 * would be slower and we can't really use the low bit
+		 * of precision.
+		 */
+		count = (u_int)rdtsc() & ~1u;
+		delta = (int)(count - prev_count) >> 1;
 		prev_count = count;
 		return (delta);
 	}
@@ -300,7 +307,7 @@ startguprof(gp)
 	gp->profrate = timer_freq << CPUTIME_CLOCK_I8254_SHIFT;
 #if (defined(I586_CPU) || defined(I686_CPU)) && !defined(SMP)
 	if (cputime_clock == CPUTIME_CLOCK_TSC)
-		gp->profrate = tsc_freq;
+		gp->profrate = tsc_freq >> 1;
 #if defined(PERFMON) && defined(I586_PMC_GUPROF)
 	else if (cputime_clock == CPUTIME_CLOCK_I586_PMC) {
 		if (perfmon_avail() &&
@@ -346,7 +353,7 @@ stopguprof(gp)
 }
 
 #else /* !GUPROF */
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 __asm("								\n\
 	.text							\n\
 	.p2align 4,0x90						\n\
@@ -354,7 +361,7 @@ __asm("								\n\
 " __XSTRING(HIDENAME(mexitcount)) ":				\n\
 	ret							\n\
 ");
-#else /* !__GNUC__ */
+#else /* !(__GNUC__ || __INTEL_COMPILER) */
 #error
-#endif /* __GNUC__ */
+#endif /* __GNUC__ || __INTEL_COMPILER */
 #endif /* GUPROF */

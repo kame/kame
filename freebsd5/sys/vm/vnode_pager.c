@@ -51,7 +51,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vnode_pager.c,v 1.192 2003/11/15 09:54:11 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vnode_pager.c,v 1.196 2004/05/06 05:03:23 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,6 +62,7 @@ __FBSDID("$FreeBSD: src/sys/vm/vnode_pager.c,v 1.192 2003/11/15 09:54:11 tjr Exp
 #include <sys/buf.h>
 #include <sys/vmmeter.h>
 #include <sys/conf.h>
+#include <sys/sf_buf.h>
 
 #include <vm/vm.h>
 #include <vm/vm_object.h>
@@ -122,7 +123,6 @@ vnode_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 
 	ASSERT_VOP_LOCKED(vp, "vnode_pager_alloc");
 
-	mtx_lock(&Giant);
 	/*
 	 * Prevent race condition when allocating the object. This
 	 * can happen with NFS vnodes since the nfsnode isn't locked.
@@ -171,7 +171,6 @@ vnode_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 		wakeup(vp);
 	}
 	VI_UNLOCK(vp);
-	mtx_unlock(&Giant);
 	return (object);
 }
 
@@ -429,7 +428,7 @@ vnode_pager_input_smlfs(object, m)
 	int i;
 	struct vnode *dp, *vp;
 	struct buf *bp;
-	vm_offset_t kva;
+	struct sf_buf *sf;
 	int fileaddr;
 	vm_offset_t bsize;
 	int error = 0;
@@ -444,7 +443,7 @@ vnode_pager_input_smlfs(object, m)
 
 	VOP_BMAP(vp, 0, &dp, 0, NULL, NULL);
 
-	kva = vm_pager_map_page(m);
+	sf = sf_buf_alloc(m, 0);
 
 	for (i = 0; i < PAGE_SIZE / bsize; i++) {
 		vm_ooffset_t address;
@@ -468,7 +467,7 @@ vnode_pager_input_smlfs(object, m)
 			KASSERT(bp->b_wcred == NOCRED, ("leaking write ucred"));
 			bp->b_rcred = crhold(curthread->td_ucred);
 			bp->b_wcred = crhold(curthread->td_ucred);
-			bp->b_data = (caddr_t) kva + i * bsize;
+			bp->b_data = (caddr_t)sf_buf_kva(sf) + i * bsize;
 			bp->b_blkno = fileaddr;
 			pbgetvp(dp, bp);
 			bp->b_bcount = bsize;
@@ -508,13 +507,12 @@ vnode_pager_input_smlfs(object, m)
 			vm_page_set_validclean(m, (i * bsize) & PAGE_MASK, bsize);
 			vm_page_unlock_queues();
 			VM_OBJECT_UNLOCK(object);
-			bzero((caddr_t) kva + i * bsize, bsize);
+			bzero((caddr_t)sf_buf_kva(sf) + i * bsize, bsize);
 		}
 	}
-	vm_pager_unmap_page(kva);
+	sf_buf_free(sf);
 	vm_page_lock_queues();
 	pmap_clear_modify(m);
-	vm_page_flag_clear(m, PG_ZERO);
 	vm_page_unlock_queues();
 	if (error) {
 		return VM_PAGER_ERROR;
@@ -536,7 +534,7 @@ vnode_pager_input_old(object, m)
 	struct iovec aiov;
 	int error;
 	int size;
-	vm_offset_t kva;
+	struct sf_buf *sf;
 	struct vnode *vp;
 
 	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
@@ -558,9 +556,9 @@ vnode_pager_input_old(object, m)
 		 * Allocate a kernel virtual address and initialize so that
 		 * we can use VOP_READ/WRITE routines.
 		 */
-		kva = vm_pager_map_page(m);
+		sf = sf_buf_alloc(m, 0);
 
-		aiov.iov_base = (caddr_t) kva;
+		aiov.iov_base = (caddr_t)sf_buf_kva(sf);
 		aiov.iov_len = size;
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
@@ -577,16 +575,16 @@ vnode_pager_input_old(object, m)
 			if (count == 0)
 				error = EINVAL;
 			else if (count != PAGE_SIZE)
-				bzero((caddr_t) kva + count, PAGE_SIZE - count);
+				bzero((caddr_t)sf_buf_kva(sf) + count,
+				    PAGE_SIZE - count);
 		}
-		vm_pager_unmap_page(kva);
+		sf_buf_free(sf);
 
 		VM_OBJECT_LOCK(object);
 	}
 	vm_page_lock_queues();
 	pmap_clear_modify(m);
 	vm_page_undirty(m);
-	vm_page_flag_clear(m, PG_ZERO);
 	vm_page_unlock_queues();
 	if (!error)
 		m->valid = VM_PAGE_BITS_ALL;
@@ -618,9 +616,11 @@ vnode_pager_getpages(object, m, count, reqpage)
 
 	vp = object->handle;
 	VM_OBJECT_UNLOCK(object);
+	mtx_lock(&Giant);
 	rtval = VOP_GETPAGES(vp, m, bytes, reqpage, 0);
 	KASSERT(rtval != EOPNOTSUPP,
 	    ("vnode_pager: FS getpages not implemented\n"));
+	mtx_unlock(&Giant);
 	VM_OBJECT_LOCK(object);
 	return rtval;
 }
@@ -882,7 +882,6 @@ vnode_pager_generic_getpages(vp, m, bytecount, reqpage)
 			/* vm_page_zero_invalid(mt, FALSE); */
 		}
 		
-		vm_page_flag_clear(mt, PG_ZERO);
 		if (i != reqpage) {
 
 			/*

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002, 2003 Robert N. M. Watson
+ * Copyright (c) 1999-2003 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_acl.c,v 1.43 2003/08/04 02:13:05 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_acl.c,v 1.45 2004/07/26 07:24:03 cperciva Exp $");
 
 #include "opt_mac.h"
 
@@ -92,7 +92,7 @@ vaccess_acl_posix1e(enum vtype type, uid_t file_uid, gid_t file_gid,
 	 * a DAC entry that matches but has failed to allow access.
 	 */
 #ifndef CAPABILITIES
-	if (suser_cred(cred, PRISON_ROOT) == 0)
+	if (suser_cred(cred, SUSER_ALLOWJAIL) == 0)
 		cap_granted = VALLPERM;
 	else
 		cap_granted = 0;
@@ -101,24 +101,24 @@ vaccess_acl_posix1e(enum vtype type, uid_t file_uid, gid_t file_gid,
 
 	if (type == VDIR) {
 		if ((acc_mode & VEXEC) && !cap_check(cred, NULL,
-		     CAP_DAC_READ_SEARCH, PRISON_ROOT))
+		     CAP_DAC_READ_SEARCH, SUSER_ALLOWJAIL))
 			cap_granted |= VEXEC;
 	} else {
 		if ((acc_mode & VEXEC) && !cap_check(cred, NULL,
-		    CAP_DAC_EXECUTE, PRISON_ROOT))
+		    CAP_DAC_EXECUTE, SUSER_ALLOWJAIL))
 			cap_granted |= VEXEC;
 	}
 
 	if ((acc_mode & VREAD) && !cap_check(cred, NULL, CAP_DAC_READ_SEARCH,
-	    PRISON_ROOT))
+	    SUSER_ALLOWJAIL))
 		cap_granted |= VREAD;
 
 	if (((acc_mode & VWRITE) || (acc_mode & VAPPEND)) &&
-	    !cap_check(cred, NULL, CAP_DAC_WRITE, PRISON_ROOT))
+	    !cap_check(cred, NULL, CAP_DAC_WRITE, SUSER_ALLOWJAIL))
 		cap_granted |= (VWRITE | VAPPEND);
 
 	if ((acc_mode & VADMIN) && !cap_check(cred, NULL, CAP_FOWNER,
-	    PRISON_ROOT))
+	    SUSER_ALLOWJAIL))
 		cap_granted |= VADMIN;
 #endif /* CAPABILITIES */
 

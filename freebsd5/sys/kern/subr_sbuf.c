@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_sbuf.c,v 1.25 2003/06/11 00:56:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_sbuf.c,v 1.28 2004/07/09 11:37:44 des Exp $");
 
 #include <sys/param.h>
 
@@ -245,12 +245,12 @@ sbuf_setpos(struct sbuf *s, int pos)
 {
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, 0);
-	
+
 	KASSERT(pos >= 0,
 	    ("attempt to seek to a negative position (%d)", pos));
 	KASSERT(pos < s->s_size,
 	    ("attempt to seek past end of sbuf (%d >= %d)", pos, s->s_size));
-	       
+
 	if (pos < 0 || pos > s->s_len)
 		return (-1);
 	s->s_len = pos;
@@ -261,14 +261,16 @@ sbuf_setpos(struct sbuf *s, int pos)
  * Append a byte string to an sbuf.
  */
 int
-sbuf_bcat(struct sbuf *s, const char *str, size_t len)
+sbuf_bcat(struct sbuf *s, const void *buf, size_t len)
 {
+	const char *str = buf;
+
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, 0);
-	
+
 	if (SBUF_HASOVERFLOWED(s))
 		return (-1);
-	
+
 	for (; len; len--) {
 		if (!SBUF_HASROOM(s) && sbuf_extend(s, len) < 0)
 			break;
@@ -303,7 +305,7 @@ sbuf_bcopyin(struct sbuf *s, const void *uaddr, size_t len)
 	if (copyin(uaddr, s->s_buf + s->s_len, len) != 0)
 		return (-1);
 	s->s_len += len;
-	
+
 	return (0);
 }
 #endif
@@ -312,13 +314,13 @@ sbuf_bcopyin(struct sbuf *s, const void *uaddr, size_t len)
  * Copy a byte string into an sbuf.
  */
 int
-sbuf_bcpy(struct sbuf *s, const char *str, size_t len)
+sbuf_bcpy(struct sbuf *s, const void *buf, size_t len)
 {
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, 0);
-	
+
 	sbuf_clear(s);
-	return (sbuf_bcat(s, str, len));
+	return (sbuf_bcat(s, buf, len));
 }
 
 /*
@@ -329,10 +331,10 @@ sbuf_cat(struct sbuf *s, const char *str)
 {
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, 0);
-	
+
 	if (SBUF_HASOVERFLOWED(s))
 		return (-1);
-	
+
 	while (*str) {
 		if (!SBUF_HASROOM(s) && sbuf_extend(s, strlen(str)) < 0)
 			break;
@@ -353,7 +355,7 @@ int
 sbuf_copyin(struct sbuf *s, const void *uaddr, size_t len)
 {
 	size_t done;
-	
+
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, 0);
 
@@ -376,7 +378,7 @@ sbuf_copyin(struct sbuf *s, const void *uaddr, size_t len)
 	default:
 		return (-1);	/* XXX */
 	}
-	
+
 	return (0);
 }
 #endif
@@ -389,7 +391,7 @@ sbuf_cpy(struct sbuf *s, const char *str)
 {
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, 0);
-	
+
 	sbuf_clear(s);
 	return (sbuf_cat(s, str));
 }
@@ -464,10 +466,10 @@ sbuf_putc(struct sbuf *s, int c)
 {
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, 0);
-	
+
 	if (SBUF_HASOVERFLOWED(s))
 		return (-1);
-	
+
 	if (!SBUF_HASROOM(s) && sbuf_extend(s, 1) < 0) {
 		SBUF_SETFLAG(s, SBUF_OVERFLOWED);
 		return (-1);
@@ -485,10 +487,10 @@ sbuf_trim(struct sbuf *s)
 {
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, 0);
-	
+
 	if (SBUF_HASOVERFLOWED(s))
 		return (-1);
-	
+
 	while (s->s_len && isspace(s->s_buf[s->s_len-1]))
 		--s->s_len;
 
@@ -512,7 +514,7 @@ sbuf_finish(struct sbuf *s)
 {
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, 0);
-	
+
 	s->s_buf[s->s_len] = '\0';
 	SBUF_CLEARFLAG(s, SBUF_OVERFLOWED);
 	SBUF_SETFLAG(s, SBUF_FINISHED);
@@ -526,7 +528,7 @@ sbuf_data(struct sbuf *s)
 {
 	assert_sbuf_integrity(s);
 	assert_sbuf_state(s, SBUF_FINISHED);
-	
+
 	return s->s_buf;
 }
 
@@ -538,7 +540,7 @@ sbuf_len(struct sbuf *s)
 {
 	assert_sbuf_integrity(s);
 	/* don't care if it's finished or not */
-	
+
 	if (SBUF_HASOVERFLOWED(s))
 		return (-1);
 	return s->s_len;
@@ -554,7 +556,7 @@ sbuf_delete(struct sbuf *s)
 
 	assert_sbuf_integrity(s);
 	/* don't care if it's finished or not */
-	
+
 	if (SBUF_ISDYNAMIC(s))
 		SBFREE(s->s_buf);
 	isdyn = SBUF_ISDYNSTRUCT(s);

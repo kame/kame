@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/keydb.h,v 1.3 2003/09/29 22:57:43 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/keydb.h,v 1.3.4.1 2004/09/30 20:11:46 mlaier Exp $	*/
 /*	$KAME: keydb.h,v 1.14 2000/08/02 17:58:26 sakane Exp $	*/
 
 /*
@@ -37,6 +37,8 @@
 
 #include <netipsec/key_var.h>
 
+#ifndef _SOCKADDR_UNION_DEFINED
+#define	_SOCKADDR_UNION_DEFINED
 /*
  * The union of all possible address formats we handle.
  */
@@ -45,6 +47,7 @@ union sockaddr_union {
 	struct sockaddr_in	sin;
 	struct sockaddr_in6	sin6;
 };
+#endif /* _SOCKADDR_UNION_DEFINED */
 
 /* Security Assocciation Index */
 /* NOTE: Ensure to be same address family */

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec_input.c,v 1.7 2003/09/29 22:57:42 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec_input.c,v 1.7.4.1 2004/09/15 15:14:19 andre Exp $	*/
 /*	$OpenBSD: ipsec_input.c,v 1.63 2003/02/20 18:35:43 deraadt Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
@@ -447,13 +447,13 @@ ipsec4_common_input_cb(struct mbuf *m, struct secasvar *sav,
 	/*
 	 * Re-dispatch via software interrupt.
 	 */
-	if (!netisr_queue(NETISR_IP, m)) {
+	if ((error = netisr_queue(NETISR_IP, m))) {
 		IPSEC_ISTAT(sproto, espstat.esps_qfull, ahstat.ahs_qfull,
 			    ipcompstat.ipcomps_qfull);
 
 		DPRINTF(("%s: queue full; proto %u packet dropped\n",
 			__func__, sproto));
-		return ENOBUFS;
+		return error;
 	}
 	return 0;
 bad:

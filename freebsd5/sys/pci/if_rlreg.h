@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.41 2003/11/14 19:00:31 sam Exp $
+ * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.44.2.3 2004/10/12 21:51:20 jmg Exp $
  */
 
 /*
@@ -432,15 +432,15 @@
 #define RL_ETHER_ALIGN	2
 
 struct rl_chain_data {
-	u_int16_t		cur_rx;
-	caddr_t			rl_rx_buf;
-	caddr_t			rl_rx_buf_ptr;
+	uint16_t		cur_rx;
+	uint8_t			*rl_rx_buf;
+	uint8_t			*rl_rx_buf_ptr;
 	bus_dmamap_t		rl_rx_dmamap;
 
 	struct mbuf		*rl_tx_chain[RL_TX_LIST_CNT];
 	bus_dmamap_t		rl_tx_dmamap[RL_TX_LIST_CNT];
-	u_int8_t		last_tx;
-	u_int8_t		cur_tx;
+	uint8_t			last_tx;
+	uint8_t			cur_tx;
 };
 
 #define RL_INC(x)		(x = (x + 1) % RL_TX_LIST_CNT)
@@ -454,25 +454,25 @@ struct rl_chain_data {
 #define RL_LAST_DMAMAP(x)	(x->rl_cdata.rl_tx_dmamap[x->rl_cdata.last_tx])
 
 struct rl_type {
-	u_int16_t		rl_vid;
-	u_int16_t		rl_did;
+	uint16_t		rl_vid;
+	uint16_t		rl_did;
 	int			rl_basetype;
 	char			*rl_name;
 };
 
 struct rl_hwrev {
-	u_int32_t		rl_rev;
+	uint32_t		rl_rev;
 	int			rl_type;
 	char			*rl_desc;
 };
 
 struct rl_mii_frame {
-	u_int8_t		mii_stdelim;
-	u_int8_t		mii_opcode;
-	u_int8_t		mii_phyaddr;
-	u_int8_t		mii_regaddr;
-	u_int8_t		mii_turnaround;
-	u_int16_t		mii_data;
+	uint8_t		mii_stdelim;
+	uint8_t		mii_opcode;
+	uint8_t		mii_phyaddr;
+	uint8_t		mii_regaddr;
+	uint8_t		mii_turnaround;
+	uint16_t	mii_data;
 };
 
 /*
@@ -506,10 +506,10 @@ struct rl_mii_frame {
  */
 
 struct rl_desc {
-	u_int32_t		rl_cmdstat;
-	u_int32_t		rl_vlanctl;
-	u_int32_t		rl_bufaddr_lo;
-	u_int32_t		rl_bufaddr_hi;
+	uint32_t		rl_cmdstat;
+	uint32_t		rl_vlanctl;
+	uint32_t		rl_bufaddr_lo;
+	uint32_t		rl_bufaddr_hi;
 };
 
 #define RL_TDESC_CMD_FRAGLEN	0x0000FFFF
@@ -567,6 +567,8 @@ struct rl_desc {
 #define RL_RDESC_STAT_TCPSUMBAD	0x00002000	/* TCP checksum bad */
 #define RL_RDESC_STAT_FRAGLEN	0x00001FFF	/* RX'ed frame/frag len */
 #define RL_RDESC_STAT_GFRAGLEN	0x00003FFF	/* RX'ed frame/frag len */
+#define RL_RDESC_STAT_ERRS	(RL_RDESC_STAT_GIANT|RL_RDESC_STAT_RUNT| \
+				 RL_RDESC_STAT_CRCERR)
 
 #define RL_RDESC_VLANCTL_TAG	0x00010000	/* VLAN tag available
 						   (rl_vlandata valid)*/
@@ -585,26 +587,38 @@ struct rl_desc {
  * Statistics counter structure (8139C+ and 8169 only)
  */
 struct rl_stats {
-	u_int32_t		rl_tx_pkts_lo;
-	u_int32_t		rl_tx_pkts_hi;
-	u_int32_t		rl_tx_errs_lo;
-	u_int32_t		rl_tx_errs_hi;
-	u_int32_t		rl_tx_errs;
-	u_int16_t		rl_missed_pkts;
-	u_int16_t		rl_rx_framealign_errs;
-	u_int32_t		rl_tx_onecoll;
-	u_int32_t		rl_tx_multicolls;
-	u_int32_t		rl_rx_ucasts_hi;
-	u_int32_t		rl_rx_ucasts_lo;
-	u_int32_t		rl_rx_bcasts_lo;
-	u_int32_t		rl_rx_bcasts_hi;
-	u_int32_t		rl_rx_mcasts;
-	u_int16_t		rl_tx_aborts;
-	u_int16_t		rl_rx_underruns;
+	uint32_t		rl_tx_pkts_lo;
+	uint32_t		rl_tx_pkts_hi;
+	uint32_t		rl_tx_errs_lo;
+	uint32_t		rl_tx_errs_hi;
+	uint32_t		rl_tx_errs;
+	uint16_t		rl_missed_pkts;
+	uint16_t		rl_rx_framealign_errs;
+	uint32_t		rl_tx_onecoll;
+	uint32_t		rl_tx_multicolls;
+	uint32_t		rl_rx_ucasts_hi;
+	uint32_t		rl_rx_ucasts_lo;
+	uint32_t		rl_rx_bcasts_lo;
+	uint32_t		rl_rx_bcasts_hi;
+	uint32_t		rl_rx_mcasts;
+	uint16_t		rl_tx_aborts;
+	uint16_t		rl_rx_underruns;
 };
 
-#define RL_RX_DESC_CNT		64
+/*
+ * Rx/Tx descriptor parameters (8139C+ and 8169 only)
+ *
+ * Tx/Rx count must be equal.  Shared code like re_dma_map_desc assumes this.
+ * Buffers must be a multiple of 8 bytes.  Currently limit to 64 descriptors
+ * due to the 8139C+.  We need to put the number of descriptors in the ring
+ * structure and use that value instead.
+ */
+#if !defined(__i386__) && !defined(__amd64__)
+#define RE_FIXUP_RX	1
+#endif
+
 #define RL_TX_DESC_CNT		64
+#define RL_RX_DESC_CNT		RL_TX_DESC_CNT
 #define RL_RX_LIST_SZ		(RL_RX_DESC_CNT * sizeof(struct rl_desc))
 #define RL_TX_LIST_SZ		(RL_TX_DESC_CNT * sizeof(struct rl_desc))
 #define RL_RING_ALIGN		256
@@ -613,11 +627,19 @@ struct rl_stats {
 #define RL_OWN(x)		(le32toh((x)->rl_cmdstat) & RL_RDESC_STAT_OWN)
 #define RL_RXBYTES(x)		(le32toh((x)->rl_cmdstat) & sc->rl_rxlenmask)
 #define RL_PKTSZ(x)		((x)/* >> 3*/)
+#ifdef RE_FIXUP_RX
+#define RE_ETHER_ALIGN	sizeof(uint64_t)
+#define RE_RX_DESC_BUFLEN	(MCLBYTES - RE_ETHER_ALIGN)
+#else
+#define RE_ETHER_ALIGN	0
+#define RE_RX_DESC_BUFLEN	MCLBYTES
+#endif
 
-#define RL_ADDR_LO(y)	((u_int64_t) (y) & 0xFFFFFFFF)
-#define RL_ADDR_HI(y)	((u_int64_t) (y) >> 32)
+#define RL_ADDR_LO(y)		((uint64_t) (y) & 0xFFFFFFFF)
+#define RL_ADDR_HI(y)		((uint64_t) (y) >> 32)
 
-#define RL_JUMBO_FRAMELEN	9018
+/* see comment in dev/re/if_re.c */
+#define RL_JUMBO_FRAMELEN	7440
 #define RL_JUMBO_MTU		(RL_JUMBO_FRAMELEN-ETHER_HDR_LEN-ETHER_CRC_LEN)
 
 struct rl_softc;
@@ -626,7 +648,7 @@ struct rl_dmaload_arg {
 	struct rl_softc		*sc;
 	int			rl_idx;
 	int			rl_maxsegs;
-	u_int32_t		rl_flags;
+	uint32_t		rl_flags;
 	struct rl_desc		*rl_ring;
 };
 
@@ -664,10 +686,10 @@ struct rl_softc {
 	device_t		rl_miibus;
 	bus_dma_tag_t		rl_parent_tag;
 	bus_dma_tag_t		rl_tag;
-	u_int8_t		rl_unit;	/* interface number */
-	u_int8_t		rl_type;
+	uint8_t			rl_unit;	/* interface number */
+	uint8_t			rl_type;
 	int			rl_eecmd_read;
-	u_int8_t		rl_stats_no_timeout;
+	uint8_t			rl_stats_no_timeout;
 	int			rl_txthresh;
 	struct rl_chain_data	rl_cdata;
 	struct rl_list_data	rl_ldata;
@@ -675,19 +697,13 @@ struct rl_softc {
 	struct mtx		rl_mtx;
 	struct mbuf		*rl_head;
 	struct mbuf		*rl_tail;
-	u_int32_t		rl_hwrev;
-	u_int32_t		rl_rxlenmask;
+	uint32_t		rl_hwrev;
+	uint32_t		rl_rxlenmask;
 	int			rl_testmode;
 	int			suspended;	/* 0 = normal  1 = suspended */
 #ifdef DEVICE_POLLING
 	int			rxcycles;
 #endif
-
-	u_int32_t		saved_maps[5];	/* pci data */
-	u_int32_t		saved_biosaddr;
-	u_int8_t		saved_intline;
-	u_int8_t		saved_cachelnsz;
-	u_int8_t		saved_lattimer;
 };
 
 #define	RL_LOCK(_sc)		mtx_lock(&(_sc)->rl_mtx)
@@ -797,6 +813,11 @@ struct rl_softc {
  * Corega FEtherII CB-TXD device ID
  */
 #define COREGA_DEVICEID_FETHERIICBTXD			0xa11e
+
+/*
+ * Corega CG-LAPCIGT device ID
+ */
+#define COREGA_DEVICEID_CGLAPCIGT		0xc107
 
 /*
  * Peppercon vendor ID

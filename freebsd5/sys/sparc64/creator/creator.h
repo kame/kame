@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/creator/creator.h,v 1.1 2003/08/24 01:15:40 jake Exp $
+ * $FreeBSD: src/sys/sparc64/creator/creator.h,v 1.2 2004/06/16 09:47:23 phk Exp $
  */
 
 #ifndef _DEV_FB_CREATOR_H_
@@ -142,7 +142,7 @@
 struct creator_softc {
 	video_adapter_t		sc_va;			/* XXX must be first */
 
-	dev_t			sc_si;
+	struct cdev *sc_si;
 
 	struct resource		*sc_reg[FFB_NREG];
 	bus_space_tag_t		sc_bt[FFB_NREG];

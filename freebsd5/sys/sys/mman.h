@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mman.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/mman.h,v 1.37 2003/08/11 07:14:07 bms Exp $
+ * $FreeBSD: src/sys/sys/mman.h,v 1.39 2004/04/27 13:13:20 mux Exp $
  */
 
 #ifndef _SYS_MMAN_H_
@@ -167,8 +163,8 @@ typedef	__size_t	size_t;
 
 __BEGIN_DECLS
 /*
- * XXX not yet implemented: mlockall(), munlockall(),
- * posix_mem_offset(), posix_typed_mem_get_info(), posix_typed_mem_open().
+ * XXX not yet implemented: posix_mem_offset(), posix_typed_mem_get_info(),
+ * posix_typed_mem_open().
  */
 #if __BSD_VISIBLE
 int	madvise(void *, size_t, int);

@@ -17,7 +17,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/bios/apm.c,v 1.137 2003/11/09 09:17:23 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/bios/apm.c,v 1.142 2004/06/16 20:27:50 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -26,6 +26,7 @@ __FBSDID("$FreeBSD: src/sys/i386/bios/apm.c,v 1.137 2003/11/09 09:17:23 tanimura
 #include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/poll.h>
 #include <sys/power.h>
 #include <sys/reboot.h>
@@ -107,15 +108,15 @@ static d_write_t apmwrite;
 static d_ioctl_t apmioctl;
 static d_poll_t apmpoll;
 
-#define CDEV_MAJOR 39
 static struct cdevsw apm_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	apmopen,
 	.d_close =	apmclose,
 	.d_write =	apmwrite,
 	.d_ioctl =	apmioctl,
 	.d_poll =	apmpoll,
 	.d_name =	"apm",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static int apm_suspend_delay = 1;
@@ -674,11 +675,11 @@ apm_get_info(apm_info_t aip)
 	sc->bios.r.ecx = 0;
 	sc->bios.r.edx = 0;
 	if (apm_bioscall()) {
-		aip->ai_batteries = -1;	/* Unknown */
+		aip->ai_batteries = 0xffffffff;	/* Unknown */
 		aip->ai_capabilities = 0xff00; /* Unknown, with no bits set */
 	} else {
 		aip->ai_batteries = sc->bios.r.ebx & 0xff;
-		aip->ai_capabilities = sc->bios.r.ecx & 0xf;
+		aip->ai_capabilities = sc->bios.r.ecx & 0xff;
 	}
 
 	bzero(aip->ai_spare, sizeof aip->ai_spare);
@@ -1228,7 +1229,7 @@ apm_attach(device_t dev)
 }
 
 static int
-apmopen(dev_t dev, int flag, int fmt, struct thread *td)
+apmopen(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct apm_softc *sc = &apm_softc;
 	int ctl = APMDEV(dev);
@@ -1256,7 +1257,7 @@ apmopen(dev_t dev, int flag, int fmt, struct thread *td)
 }
 
 static int
-apmclose(dev_t dev, int flag, int fmt, struct thread *td)
+apmclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct apm_softc *sc = &apm_softc;
 	int ctl = APMDEV(dev);
@@ -1279,7 +1280,7 @@ apmclose(dev_t dev, int flag, int fmt, struct thread *td)
 }
 
 static int
-apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+apmioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
 	struct apm_softc *sc = &apm_softc;
 	struct apm_bios_arg *args;
@@ -1433,7 +1434,7 @@ apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 }
 
 static int
-apmwrite(dev_t dev, struct uio *uio, int ioflag)
+apmwrite(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct apm_softc *sc = &apm_softc;
 	u_int event_type;
@@ -1463,7 +1464,7 @@ apmwrite(dev_t dev, struct uio *uio, int ioflag)
 }
 
 static int
-apmpoll(dev_t dev, int events, struct thread *td)
+apmpoll(struct cdev *dev, int events, struct thread *td)
 {
 	struct apm_softc *sc = &apm_softc;
 	int revents = 0;

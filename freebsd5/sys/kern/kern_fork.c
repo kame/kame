@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_fork.c,v 1.208 2003/10/29 15:23:09 bde Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_fork.c,v 1.234.2.4 2004/09/18 04:11:35 julian Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -67,7 +63,6 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_fork.c,v 1.208 2003/10/29 15:23:09 bde Exp
 #include <sys/ktr.h>
 #include <sys/ktrace.h>
 #include <sys/unistd.h>	
-#include <sys/jail.h>
 #include <sys/sx.h>
 
 #include <vm/vm.h>
@@ -135,12 +130,13 @@ rfork(td, uap)
 	struct thread *td;
 	struct rfork_args *uap;
 {
-	int error;
 	struct proc *p2;
+	int error;
 
-	/* Don't allow kernel only flags. */
+	/* Don't allow kernel-only flags. */
 	if ((uap->flags & RFKERNELONLY) != 0)
 		return (EINVAL);
+
 	error = fork1(td, uap->flags, 0, &p2);
 	if (error == 0) {
 		td->td_retval[0] = p2 ? p2->p_pid : 0;
@@ -169,7 +165,9 @@ sysctl_kern_randompid(SYSCTL_HANDLER_ARGS)
 {
 	int error, pid;
 
-	sysctl_wire_old_buffer(req, sizeof(int));
+	error = sysctl_wire_old_buffer(req, sizeof(int));
+	if (error != 0)
+		return(error);
 	sx_xlock(&allproc_lock);
 	pid = randompid;
 	error = sysctl_handle_int(oidp, &pid, 0, req);
@@ -205,7 +203,6 @@ fork1(td, flags, pages, procp)
 	struct filedesc *fd;
 	struct filedesc_to_leader *fdtol;
 	struct thread *td2;
-	struct kse *ke2;
 	struct ksegrp *kg2;
 	struct sigacts *newsigacts;
 	int error;
@@ -215,27 +212,30 @@ fork1(td, flags, pages, procp)
 		return (EINVAL);
 
 	p1 = td->td_proc;
-	mtx_lock(&Giant);
 
 	/*
 	 * Here we don't create a new process, but we divorce
 	 * certain parts of a process from itself.
 	 */
 	if ((flags & RFPROC) == 0) {
+		mtx_lock(&Giant);
 		vm_forkproc(td, NULL, NULL, flags);
+		mtx_unlock(&Giant);
 
 		/*
 		 * Close all file descriptors.
 		 */
 		if (flags & RFCFDG) {
 			struct filedesc *fdtmp;
+			FILEDESC_LOCK(td->td_proc->p_fd);
 			fdtmp = fdinit(td->td_proc->p_fd);
+			FILEDESC_UNLOCK(td->td_proc->p_fd);
 			fdfree(td);
 			p1->p_fd = fdtmp;
 		}
 
 		/*
-		 * Unshare file descriptors (from parent.)
+		 * Unshare file descriptors (from parent).
 		 */
 		if (flags & RFFDG) {
 			FILEDESC_LOCK(p1->p_fd);
@@ -249,7 +249,6 @@ fork1(td, flags, pages, procp)
 			} else
 				FILEDESC_UNLOCK(p1->p_fd);
 		}
-		mtx_unlock(&Giant);
 		*procp = NULL;
 		return (0);
 	}
@@ -259,7 +258,7 @@ fork1(td, flags, pages, procp)
 	 * other side with the expectation that the process is about to
 	 * exec.
 	 */
-	if (p1->p_flag & P_SA) {
+	if (p1->p_flag & P_HADTHREADS) {
 		/*
 		 * Idle the other threads for a second.
 		 * Since the user space is copied, it must remain stable.
@@ -270,9 +269,8 @@ fork1(td, flags, pages, procp)
 		 */
 		PROC_LOCK(p1);
 		if (thread_single(SINGLE_NO_EXIT)) {
-			/* Abort.. someone else is single threading before us */
+			/* Abort. Someone else is single threading before us. */
 			PROC_UNLOCK(p1);
-			mtx_unlock(&Giant);
 			return (ERESTART);
 		}
 		PROC_UNLOCK(p1);
@@ -288,6 +286,10 @@ fork1(td, flags, pages, procp)
 #ifdef MAC
 	mac_init_proc(newproc);
 #endif
+	knlist_init(&newproc->p_klist, &newproc->p_mtx);
+
+	/* We have to lock the process tree while we look for a pid. */
+	sx_slock(&proctree_lock);
 
 	/*
 	 * Although process entries are dynamically created, we still keep
@@ -298,7 +300,9 @@ fork1(td, flags, pages, procp)
 	 */
 	sx_xlock(&allproc_lock);
 	uid = td->td_ucred->cr_ruid;
-	if ((nprocs >= maxproc - 10 && uid != 0) || nprocs >= maxproc) {
+	if ((nprocs >= maxproc - 10 &&
+	    suser_cred(td->td_ucred, SUSER_RUID) != 0) ||
+	    nprocs >= maxproc) {
 		error = EAGAIN;
 		goto fail;
 	}
@@ -309,7 +313,7 @@ fork1(td, flags, pages, procp)
 	 */
 	PROC_LOCK(p1);
 	ok = chgproccnt(td->td_ucred->cr_ruidinfo, 1,
-		(uid != 0) ? p1->p_rlimit[RLIMIT_NPROC].rlim_cur : 0);
+		(uid != 0) ? lim_cur(p1, RLIMIT_NPROC) : 0);
 	PROC_UNLOCK(p1);
 	if (!ok) {
 		error = EAGAIN;
@@ -363,8 +367,10 @@ again:
 		for (; p2 != NULL; p2 = LIST_NEXT(p2, p_list)) {
 			PROC_LOCK(p2);
 			while (p2->p_pid == trypid ||
-			    p2->p_pgrp->pg_id == trypid ||
-			    p2->p_session->s_sid == trypid) {
+			    (p2->p_pgrp != NULL &&
+			    (p2->p_pgrp->pg_id == trypid ||
+			    (p2->p_session != NULL &&
+			    p2->p_session->s_sid == trypid)))) {
 				trypid++;
 				if (trypid >= pidchecked) {
 					PROC_UNLOCK(p2);
@@ -373,12 +379,15 @@ again:
 			}
 			if (p2->p_pid > trypid && pidchecked > p2->p_pid)
 				pidchecked = p2->p_pid;
-			if (p2->p_pgrp->pg_id > trypid &&
-			    pidchecked > p2->p_pgrp->pg_id)
-				pidchecked = p2->p_pgrp->pg_id;
-			if (p2->p_session->s_sid > trypid &&
-			    pidchecked > p2->p_session->s_sid)
-				pidchecked = p2->p_session->s_sid;
+			if (p2->p_pgrp != NULL) {
+				if (p2->p_pgrp->pg_id > trypid &&
+				    pidchecked > p2->p_pgrp->pg_id)
+					pidchecked = p2->p_pgrp->pg_id;
+				if (p2->p_session != NULL &&
+				    p2->p_session->s_sid > trypid &&
+				    pidchecked > p2->p_session->s_sid)
+					pidchecked = p2->p_session->s_sid;
+			}
 			PROC_UNLOCK(p2);
 		}
 		if (!doingzomb) {
@@ -387,6 +396,7 @@ again:
 			goto again;
 		}
 	}
+	sx_sunlock(&proctree_lock);
 
 	/*
 	 * RFHIGHPID does not mess with the lastpid counter during boot.
@@ -415,7 +425,9 @@ again:
 	 * Copy filedesc.
 	 */
 	if (flags & RFCFDG) {
+		FILEDESC_LOCK(td->td_proc->p_fd);
 		fd = fdinit(td->td_proc->p_fd);
+		FILEDESC_UNLOCK(td->td_proc->p_fd);
 		fdtol = NULL;
 	} else if (flags & RFFDG) {
 		FILEDESC_LOCK(p1->p_fd);
@@ -455,9 +467,8 @@ again:
 	 */
 	td2 = FIRST_THREAD_IN_PROC(p2);
 	kg2 = FIRST_KSEGRP_IN_PROC(p2);
-	ke2 = FIRST_KSE_IN_KSEGRP(kg2);
 
-	/* Allocate and switch to an alternate kstack if specified */
+	/* Allocate and switch to an alternate kstack if specified. */
 	if (pages != 0)
 		vm_thread_new_altkstack(td2, pages);
 
@@ -468,8 +479,6 @@ again:
 
 	bzero(&p2->p_startzero,
 	    (unsigned) RANGEOF(struct proc, p_startzero, p_endzero));
-	bzero(&ke2->ke_startzero,
-	    (unsigned) RANGEOF(struct kse, ke_startzero, ke_endzero));
 	bzero(&td2->td_startzero,
 	    (unsigned) RANGEOF(struct thread, td_startzero, td_endzero));
 	bzero(&kg2->kg_startzero,
@@ -483,10 +492,7 @@ again:
 	    (unsigned) RANGEOF(struct ksegrp, kg_startcopy, kg_endcopy));
 #undef RANGEOF
 
-	/* Set up the thread as an active thread (as if runnable). */
-	ke2->ke_state = KES_THREAD;
-	ke2->ke_thread = td2;
-	td2->td_kse = ke2;
+	td2->td_sigstk = td->td_sigstk;
 
 	/*
 	 * Duplicate sub-structures as needed.
@@ -502,7 +508,7 @@ again:
 	 * Allow the scheduler to adjust the priority of the child and
 	 * parent while we hold the sched_lock.
 	 */
-	sched_fork(p1, p2);
+	sched_fork(td, td2);
 
 	mtx_unlock_spin(&sched_lock);
 	p2->p_ucred = crhold(td->td_ucred);
@@ -521,25 +527,25 @@ again:
 	else
 	        p2->p_sigparent = SIGCHLD;
 
-	/* Bump references to the text vnode (for procfs) */
 	p2->p_textvp = p1->p_textvp;
-	if (p2->p_textvp)
-		VREF(p2->p_textvp);
 	p2->p_fd = fd;
 	p2->p_fdtol = fdtol;
+
+	/*
+	 * p_limit is copy-on-write.  Bump its refcount.
+	 */
+	p2->p_limit = lim_hold(p1->p_limit);
 	PROC_UNLOCK(p1);
 	PROC_UNLOCK(p2);
 
-	/*
-	 * p_limit is copy-on-write, bump refcnt,
-	 */
-	p2->p_limit = p1->p_limit;
-	p2->p_limit->p_refcnt++;
+	/* Bump references to the text vnode (for procfs) */
+	if (p2->p_textvp)
+		vref(p2->p_textvp);
 
 	/*
-	 * Setup linkage for kernel based threading
+	 * Set up linkage for kernel based threading.
 	 */
-	if((flags & RFTHREAD) != 0) {
+	if ((flags & RFTHREAD) != 0) {
 		mtx_lock(&ppeers_lock);
 		p2->p_peers = p1->p_peers;
 		p1->p_peers = p2;
@@ -580,7 +586,8 @@ again:
 	 * Preserve some more flags in subprocess.  P_PROFIL has already
 	 * been preserved.
 	 */
-	p2->p_flag |= p1->p_flag & (P_ALTSTACK | P_SUGID);
+	p2->p_flag |= p1->p_flag & P_SUGID;
+	td2->td_pflags |= td->td_pflags & TDP_ALTSTACK;
 	SESS_LOCK(p1->p_session);
 	if (p1->p_session->s_ttyvp != NULL && p1->p_flag & P_CONTROLT)
 		p2->p_flag |= P_CONTROLT;
@@ -588,6 +595,7 @@ again:
 	if (flags & RFPPWAIT)
 		p2->p_flag |= P_PPWAIT;
 
+	p2->p_pgrp = p1->p_pgrp;
 	LIST_INSERT_AFTER(p1, p2, p_pglist);
 	PGRP_UNLOCK(p1->p_pgrp);
 	LIST_INIT(&p2->p_children);
@@ -651,6 +659,7 @@ again:
 	 * Finish creating the child process.  It will return via a different
 	 * execution path later.  (ie: directly into user mode)
 	 */
+	mtx_lock(&Giant);
 	vm_forkproc(td, p2, td2, flags);
 
 	if (flags == (RFFDG | RFPROC)) {
@@ -670,6 +679,7 @@ again:
 		cnt.v_rforkpages += p2->p_vmspace->vm_dsize +
 		    p2->p_vmspace->vm_ssize;
 	}
+	mtx_unlock(&Giant);
 
 	/*
 	 * Both processes are set up, now check if any loadable modules want
@@ -679,17 +689,21 @@ again:
 	EVENTHANDLER_INVOKE(process_fork, p1, p2, flags);
 
 	/*
+	 * Set the child start time and mark the process as being complete.
+	 */
+	microuptime(&p2->p_stats->p_start);
+	mtx_lock_spin(&sched_lock);
+	p2->p_state = PRS_NORMAL;
+
+	/*
 	 * If RFSTOPPED not requested, make child runnable and add to
 	 * run queue.
 	 */
-	microuptime(&p2->p_stats->p_start);
 	if ((flags & RFSTOPPED) == 0) {
-		mtx_lock_spin(&sched_lock);
-		p2->p_state = PRS_NORMAL;
 		TD_SET_CAN_RUN(td2);
-		setrunqueue(td2);
-		mtx_unlock_spin(&sched_lock);
+		setrunqueue(td2, SRQ_BORING);
 	}
+	mtx_unlock_spin(&sched_lock);
 
 	/*
 	 * Now can be swapped.
@@ -700,7 +714,7 @@ again:
 	/*
 	 * Tell any interested parties about the new process.
 	 */
-	KNOTE(&p1->p_klist, NOTE_FORK | p2->p_pid);
+	KNOTE_LOCKED(&p1->p_klist, NOTE_FORK | p2->p_pid);
 
 	PROC_UNLOCK(p1);
 
@@ -715,9 +729,9 @@ again:
 	PROC_UNLOCK(p2);
 
 	/*
-	 * If other threads are waiting, let them continue now
+	 * If other threads are waiting, let them continue now.
 	 */
-	if (p1->p_flag & P_SA) {
+	if (p1->p_flag & P_HADTHREADS) {
 		PROC_LOCK(p1);
 		thread_single_end();
 		PROC_UNLOCK(p1);
@@ -726,22 +740,24 @@ again:
 	/*
 	 * Return child proc pointer to parent.
 	 */
-	mtx_unlock(&Giant);
 	*procp = p2;
 	return (0);
 fail:
+	sx_sunlock(&proctree_lock);
 	if (ppsratecheck(&lastfail, &curfail, 1))
 		printf("maxproc limit exceeded by uid %i, please see tuning(7) and login.conf(5).\n",
 			uid);
 	sx_xunlock(&allproc_lock);
+#ifdef MAC
+	mac_destroy_proc(newproc);
+#endif
 	uma_zfree(proc_zone, newproc);
-	if (p1->p_flag & P_SA) {
+	if (p1->p_flag & P_HADTHREADS) {
 		PROC_LOCK(p1);
 		thread_single_end();
 		PROC_UNLOCK(p1);
 	}
 	tsleep(&forksleep, PUSER, "fork", hz / 2);
-	mtx_unlock(&Giant);
 	return (error);
 }
 
@@ -759,6 +775,21 @@ fork_exit(callout, arg, frame)
 	struct thread *td;
 
 	/*
+	 * Finish setting up thread glue so that it begins execution in a
+	 * non-nested critical section with sched_lock held but not recursed.
+	 */
+	td = curthread;
+	p = td->td_proc;
+	td->td_oncpu = PCPU_GET(cpuid);
+	KASSERT(p->p_state == PRS_NORMAL, ("executing process is still new"));
+
+	sched_lock.mtx_lock = (uintptr_t)td;
+	mtx_assert(&sched_lock, MA_OWNED | MA_NOTRECURSED);
+	cpu_critical_fork_exit();
+	CTR4(KTR_PROC, "fork_exit: new thread %p (kse %p, pid %d, %s)",
+		td, td->td_sched, p->p_pid, p->p_comm);
+
+	/*
 	 * Processes normally resume in mi_switch() after being
 	 * cpu_switch()'ed to, but when children start up they arrive here
 	 * instead, so we must do much the same things as mi_switch() would.
@@ -769,19 +800,6 @@ fork_exit(callout, arg, frame)
 		thread_stash(td);
 	}
 	td = curthread;
-	p = td->td_proc;
-	td->td_oncpu = PCPU_GET(cpuid);
-	p->p_state = PRS_NORMAL;
-
-	/*
-	 * Finish setting up thread glue so that it begins execution in a
-	 * non-nested critical section with sched_lock held but not recursed.
-	 */
-	sched_lock.mtx_lock = (uintptr_t)td;
-	mtx_assert(&sched_lock, MA_OWNED | MA_NOTRECURSED);
-	cpu_critical_fork_exit();
-	CTR3(KTR_PROC, "fork_exit: new thread %p (pid %d, %s)", td, p->p_pid,
-	    p->p_comm);
 	mtx_unlock_spin(&sched_lock);
 
 	/*
@@ -799,15 +817,11 @@ fork_exit(callout, arg, frame)
 	PROC_LOCK(p);
 	if (p->p_flag & P_KTHREAD) {
 		PROC_UNLOCK(p);
-		mtx_lock(&Giant);
 		printf("Kernel thread \"%s\" (pid %d) exited prematurely.\n",
 		    p->p_comm, p->p_pid);
 		kthread_exit(0);
 	}
 	PROC_UNLOCK(p);
-#ifdef DIAGNOSTIC
-	cred_free_thread(td);
-#endif
 	mtx_assert(&Giant, MA_NOTOWNED);
 }
 

@@ -32,13 +32,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netncp/ncp_mod.c,v 1.11 2003/09/27 12:01:00 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_mod.c,v 1.14 2004/06/16 09:47:17 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
 #include <sys/uio.h>
@@ -61,11 +62,13 @@ SYSCTL_INT(_net_ncp, OID_AUTO, version, CTLFLAG_RD, &ncp_version, 0, "");
 MODULE_VERSION(ncp, 1);
 MODULE_DEPEND(ncp, libmchain, 1, 1, 1);
 
-static dev_t		ncp_dev;
+static struct cdev *ncp_dev;
 
 static d_ioctl_t	ncp_ioctl;
 
 static struct cdevsw ncp_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_ioctl =	ncp_ioctl,
 	.d_name =	"ncp",
 };
@@ -79,7 +82,7 @@ static int sncp_connect(struct thread *, struct ncpioc_connect *);
 static int sncp_request(struct thread *, struct ncpioc_request *);
 
 static int
-ncp_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+ncp_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 
 	switch (cmd) {

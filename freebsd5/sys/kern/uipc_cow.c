@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/uipc_cow.c,v 1.16 2003/11/16 06:11:25 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/uipc_cow.c,v 1.20 2004/04/03 09:16:26 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,38 +60,36 @@ __FBSDID("$FreeBSD: src/sys/kern/uipc_cow.c,v 1.16 2003/11/16 06:11:25 alc Exp $
 struct netsend_cow_stats {
 	int attempted;
 	int fail_not_mapped;
-	int fail_wired;
-	int fail_not_anon;
-	int fail_pmap_cow;
-	int fail_pg_error;
-	int fail_kva;
-	int free_post_exit;
+	int fail_sf_buf;
 	int success;
 	int iodone;
-	int freed;
 };
 
-static struct netsend_cow_stats socow_stats = {0,0,0,0,0,0,0,0,0,0,0};
+static struct netsend_cow_stats socow_stats;
 
 static void socow_iodone(void *addr, void *args);
 
 static void
 socow_iodone(void *addr, void *args)
 {	
-	int s;
 	struct sf_buf *sf;
 	vm_page_t pp;
 
 	sf = args;
 	pp = sf_buf_page(sf);
-	s = splvm();
+	sf_buf_free(sf);
 	/* remove COW mapping  */
 	vm_page_lock_queues();
 	vm_page_cowclear(pp);
+	vm_page_unwire(pp, 0);
+	/*
+	 * Check for the object going away on us. This can
+	 * happen since we don't hold a reference to it.
+	 * If so, we're responsible for freeing the page.
+	 */
+	if (pp->wire_count == 0 && pp->object == NULL)
+		vm_page_free(pp);
 	vm_page_unlock_queues();
-	splx(s);
-	/* note that sf_buf_free() unwires the page for us*/
-	sf_buf_free(addr, args);
 	socow_stats.iodone++;
 }
 
@@ -140,8 +138,23 @@ socow_setup(struct mbuf *m0, struct uio *uio)
 	/*
 	 * Allocate an sf buf
 	 */
-	sf = sf_buf_alloc(pp);
-
+	sf = sf_buf_alloc(pp, PCATCH);
+	if (!sf) {
+		vm_page_lock_queues();
+		vm_page_cowclear(pp);
+		vm_page_unwire(pp, 0);
+		/*
+		 * Check for the object going away on us. This can
+		 * happen since we don't hold a reference to it.
+		 * If so, we're responsible for freeing the page.
+		 */
+		if (pp->wire_count == 0 && pp->object == NULL)
+			vm_page_free(pp);
+		vm_page_unlock_queues();
+		socow_stats.fail_sf_buf++;
+		splx(s);
+		return(0);
+	}
 	/* 
 	 * attach to mbuf
 	 */

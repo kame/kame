@@ -31,7 +31,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_usr_sti.c,v 1.7 2003/06/10 23:45:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_usr_sti.c,v 1.8 2004/03/17 17:50:50 njl Exp $");
 
 #include "opt_i4b.h"
 
@@ -224,9 +224,9 @@ usrtai_alloc_port(device_t dev)
 	bus_set_resource(dev, SYS_RES_IOPORT, num, base, 1);
 
 	if(!(sc->sc_resources.io_base[num] =
-		bus_alloc_resource(dev, SYS_RES_IOPORT,
-				   &sc->sc_resources.io_rid[num],
-				   0ul, ~0ul, 1, RF_ACTIVE)))
+		bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+				       &sc->sc_resources.io_rid[num],
+				       RF_ACTIVE)))
 	{
 		printf("isic%d: Error, failed to reserve io #%dport %#x!\n", unit, num, base);
 		isic_detach_common(dev);
@@ -244,9 +244,9 @@ usrtai_alloc_port(device_t dev)
 		bus_set_resource(dev, SYS_RES_IOPORT, num, base+i*1024, 8);
 
 		if(!(sc->sc_resources.io_base[num] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-					   &sc->sc_resources.io_rid[num],
-					   0ul, ~0ul, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[num],
+					       RF_ACTIVE)))
 		{
 			printf("isic%d: Error, failed to reserve io #%d port %#x!\n", unit, num, base+i*1024);
 			isic_detach_common(dev);
@@ -265,9 +265,9 @@ usrtai_alloc_port(device_t dev)
 		bus_set_resource(dev, SYS_RES_IOPORT, num, base+i*1024, 8);
 
 		if(!(sc->sc_resources.io_base[num] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-					   &sc->sc_resources.io_rid[num],
-					   0ul, ~0ul, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[num],
+					       RF_ACTIVE)))
 		{
 			printf("isic%d: Error, failed to reserve io #%d port %#x!\n", unit, num, base+i*1024);
 			isic_detach_common(dev);
@@ -286,9 +286,9 @@ usrtai_alloc_port(device_t dev)
 		bus_set_resource(dev, SYS_RES_IOPORT, num, base+i*1024, 8);
 
 		if(!(sc->sc_resources.io_base[num] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-					   &sc->sc_resources.io_rid[num],
-					   0ul, ~0ul, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[num],
+					       RF_ACTIVE)))
 		{
 			printf("isic%d: Error, failed to reserve io #%d port %#x!\n", unit, num, base+i*1024);
 			isic_detach_common(dev);
@@ -325,9 +325,9 @@ isic_probe_usrtai(device_t dev)
 	/* see if an io base was supplied */
 	
 	if(!(sc->sc_resources.io_base[0] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-	                                   &sc->sc_resources.io_rid[0],
-	                                   0ul, ~0ul, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[0],
+					       RF_ACTIVE)))
 	{
 		printf("isic%d: Could not get iobase for USR Sportster TA!\n",
 				unit);
@@ -385,9 +385,9 @@ isic_probe_usrtai(device_t dev)
 	/* get our irq */
 
 	if(!(sc->sc_resources.irq =
-		bus_alloc_resource(dev, SYS_RES_IRQ,
-				   &sc->sc_resources.irq_rid,
-				   0ul, ~0ul, 1, RF_ACTIVE)))
+		bus_alloc_resource_any(dev, SYS_RES_IRQ,
+				       &sc->sc_resources.irq_rid,
+				       RF_ACTIVE)))
 	{
 		printf("isic%d: Could not get an irq for USR Sportster TA!\n",unit);
 		isic_detach_common(dev);

@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/pc98/pc98/isa_dma.c,v 1.15 2002/04/29 07:43:15 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/isa_dma.c,v 1.17 2004/07/08 13:48:49 nyan Exp $
  */
 
 /*
@@ -134,12 +130,26 @@ isa_dmainit(chan, bouncebufsize)
 {
 	void *buf;
 
+#ifndef PC98
+	/*
+	 * If a DMA channel is shared, both drivers have to call isa_dmainit
+	 * since they don't know that the other driver will do it.
+	 * Just return if we're already set up good.
+	 * XXX: this only works if they agree on the bouncebuf size.  This
+	 * XXX: is typically the case since they are multiple instances of
+	 * XXX: the same driver.
+	 */
+	if (dma_bouncebuf[chan] != NULL)
+		return;
+#endif
+
 #ifdef DIAGNOSTIC
 	if (chan & ~VALID_DMA_MASK)
 		panic("isa_dmainit: channel out of range");
-
+#ifdef PC98
 	if (dma_bouncebuf[chan] != NULL)
 		panic("isa_dmainit: impossible request"); 
+#endif
 #endif
 
 	dma_bouncebufsize[chan] = bouncebufsize;

@@ -33,7 +33,7 @@
  *	related support functions residing
  *	in <arch>/<arch>/critical.c	- prototyped
  *
- * $FreeBSD: src/sys/i386/include/critical.h,v 1.5 2003/11/03 21:06:54 jhb Exp $
+ * $FreeBSD: src/sys/i386/include/critical.h,v 1.8 2004/07/27 16:41:01 rwatson Exp $
  */
 
 #ifndef _MACHINE_CRITICAL_H_
@@ -46,7 +46,7 @@ __BEGIN_DECLS
  */
 void cpu_critical_fork_exit(void);
 
-#ifdef	__GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 
 /*
  *	cpu_critical_enter:
@@ -59,9 +59,9 @@ void cpu_critical_fork_exit(void);
  *	is non-zero will be deferred.
  */
 static __inline void
-cpu_critical_enter(void)
+cpu_critical_enter(struct thread *td)
 {
-	curthread->td_md.md_savecrit = intr_disable();
+	td->td_md.md_savecrit = intr_disable();
 }
 
 /*
@@ -76,17 +76,17 @@ cpu_critical_enter(void)
  *	code for us, so we do not have to do anything fancy.
  */
 static __inline void
-cpu_critical_exit(void)
+cpu_critical_exit(struct thread *td)
 {
-	intr_restore(curthread->td_md.md_savecrit);
+	intr_restore(td->td_md.md_savecrit);
 }
 
-#else /* !__GNUC__ */
+#else /* !(__GNUC__ || __INTEL_COMPILER) */
 
-void cpu_critical_enter(void)
-void cpu_critical_exit(void)
+void cpu_critical_enter(struct thread *td);
+void cpu_critical_exit(struct thread *td);
 
-#endif	/* __GNUC__ */
+#endif        /* __GNUC__ || __INTEL_COMPILER */
 
 __END_DECLS
 

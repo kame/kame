@@ -19,10 +19,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -43,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.116 2003/10/31 07:25:06 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.123 2004/07/28 06:41:26 kan Exp $");
 
 #include "opt_quota.h"
 
@@ -140,7 +136,7 @@ ffs_alloc(ip, lbn, bpref, size, cred, bnp)
 retry:
 	if (size == fs->fs_bsize && fs->fs_cstotal.cs_nbfree == 0)
 		goto nospace;
-	if (suser_cred(cred, PRISON_ROOT) &&
+	if (suser_cred(cred, SUSER_ALLOWJAIL) &&
 	    freespace(fs, fs->fs_minfree) - numfrags(fs, size) < 0)
 		goto nospace;
 #ifdef QUOTA
@@ -156,7 +152,7 @@ retry:
 		cg = dtog(fs, bpref);
 	bno = ffs_hashalloc(ip, cg, bpref, size, ffs_alloccg);
 	if (bno > 0) {
-		DIP(ip, i_blocks) += btodb(size);
+		DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + btodb(size));
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 		*bnp = bno;
 		return (0);
@@ -221,7 +217,7 @@ ffs_realloccg(ip, lbprev, bprev, bpref, osize, nsize, cred, bpp)
 #endif /* DIAGNOSTIC */
 	reclaimed = 0;
 retry:
-	if (suser_cred(cred, PRISON_ROOT) &&
+	if (suser_cred(cred, SUSER_ALLOWJAIL) &&
 	    freespace(fs, fs->fs_minfree) -  numfrags(fs, nsize - osize) < 0)
 		goto nospace;
 	if (bprev == 0) {
@@ -260,11 +256,14 @@ retry:
 	if (bno) {
 		if (bp->b_blkno != fsbtodb(fs, bno))
 			panic("ffs_realloccg: bad blockno");
-		DIP(ip, i_blocks) += btodb(nsize - osize);
+		DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + btodb(nsize - osize));
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 		allocbuf(bp, nsize);
 		bp->b_flags |= B_DONE;
-		bzero((char *)bp->b_data + osize, (u_int)nsize - osize);
+		if ((bp->b_flags & (B_MALLOC | B_VMIO)) != B_VMIO)
+			bzero((char *)bp->b_data + osize, nsize - osize);
+		else
+			vfs_bio_clrbuf(bp);
 		*bpp = bp;
 		return (0);
 	}
@@ -325,11 +324,14 @@ retry:
 		if (nsize < request)
 			ffs_blkfree(fs, ip->i_devvp, bno + numfrags(fs, nsize),
 			    (long)(request - nsize), ip->i_number);
-		DIP(ip, i_blocks) += btodb(nsize - osize);
+		DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + btodb(nsize - osize));
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 		allocbuf(bp, nsize);
 		bp->b_flags |= B_DONE;
-		bzero((char *)bp->b_data + osize, (u_int)nsize - osize);
+		if ((bp->b_flags & (B_MALLOC | B_VMIO)) != B_VMIO)
+			bzero((char *)bp->b_data + osize, nsize - osize);
+		else
+			vfs_bio_clrbuf(bp);
 		*bpp = bp;
 		return (0);
 	}
@@ -872,16 +874,16 @@ ffs_valloc(pvp, mode, cred, vpp)
 	if (DIP(ip, i_blocks) && (fs->fs_flags & FS_UNCLEAN) == 0) {  /* XXX */
 		printf("free inode %s/%lu had %ld blocks\n",
 		    fs->fs_fsmnt, (u_long)ino, (long)DIP(ip, i_blocks));
-		DIP(ip, i_blocks) = 0;
+		DIP_SET(ip, i_blocks, 0);
 	}
 	ip->i_flags = 0;
-	DIP(ip, i_flags) = 0;
+	DIP_SET(ip, i_flags, 0);
 	/*
 	 * Set up a new generation number for this inode.
 	 */
 	if (ip->i_gen == 0 || ++ip->i_gen == 0)
 		ip->i_gen = arc4random() / 2 + 1;
-	DIP(ip, i_gen) = ip->i_gen;
+	DIP_SET(ip, i_gen, ip->i_gen);
 	if (fs->fs_magic == FS_UFS2_MAGIC) {
 		vfs_timestamp(&ts);
 		ip->i_din2->di_birthtime = ts.tv_sec;
@@ -1622,6 +1624,7 @@ gotit:
 	/*
 	 * Check to see if we need to initialize more inodes.
 	 */
+	ibp = NULL;
 	if (fs->fs_magic == FS_UFS2_MAGIC &&
 	    ipref + INOPB(fs) > cgp->cg_initediblk &&
 	    cgp->cg_initediblk < cgp->cg_niblk) {
@@ -1634,12 +1637,13 @@ gotit:
 			dp2->di_gen = arc4random() / 2 + 1;
 			dp2++;
 		}
-		bawrite(ibp);
 		cgp->cg_initediblk += INOPB(fs);
 	}
 	if (fs->fs_active != 0)
 		atomic_clear_int(&ACTIVECGNUM(fs, cg), ACTIVECGOFF(cg));
 	bdwrite(bp);
+	if (ibp != NULL)
+		bawrite(ibp);
 	return (cg * fs->fs_ipg + ipref);
 }
 
@@ -1686,7 +1690,7 @@ ffs_blkfree(fs, devvp, bno, size, inum)
 	ufs2_daddr_t cgblkno;
 	int i, cg, blk, frags, bbase;
 	u_int8_t *blksfree;
-	dev_t dev;
+	struct cdev *dev;
 
 	cg = dtog(fs, bno);
 	if (devvp->v_type != VCHR) {
@@ -1882,7 +1886,7 @@ ffs_freefile(fs, devvp, ino, mode)
 	ufs2_daddr_t cgbno;
 	int error, cg;
 	u_int8_t *inosused;
-	dev_t dev;
+	struct cdev *dev;
 
 	cg = ino_to_cg(fs, ino);
 	if (devvp->v_type != VCHR) {
@@ -2264,7 +2268,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 			break;
 		ip = VTOI(vp);
 		ip->i_nlink += cmd.size;
-		DIP(ip, i_nlink) = ip->i_nlink;
+		DIP_SET(ip, i_nlink, ip->i_nlink);
 		ip->i_effnlink += cmd.size;
 		ip->i_flag |= IN_CHANGE;
 		if (DOINGSOFTDEP(vp))
@@ -2283,7 +2287,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		if ((error = VFS_VGET(mp, (ino_t)cmd.value, LK_EXCLUSIVE, &vp)))
 			break;
 		ip = VTOI(vp);
-		DIP(ip, i_blocks) += cmd.size;
+		DIP_SET(ip, i_blocks, DIP(ip, i_blocks) + cmd.size);
 		ip->i_flag |= IN_CHANGE;
 		vput(vp);
 		break;

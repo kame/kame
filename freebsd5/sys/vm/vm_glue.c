@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -61,7 +57,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_glue.c,v 1.187 2003/11/10 01:37:40 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_glue.c,v 1.202 2004/07/30 20:31:02 alc Exp $");
 
 #include "opt_vm.h"
 #include "opt_kstack_pages.h"
@@ -113,7 +109,7 @@ SYSINIT(vm_limits, SI_SUB_VM_CONF, SI_ORDER_FIRST, vm_init_limits, &proc0)
  * Note: run scheduling should be divorced from the vm system.
  */
 static void scheduler(void *);
-SYSINIT(scheduler, SI_SUB_RUN_SCHEDULER, SI_ORDER_FIRST, scheduler, NULL)
+SYSINIT(scheduler, SI_SUB_RUN_SCHEDULER, SI_ORDER_ANY, scheduler, NULL)
 
 #ifndef NO_SWAPPING
 static void swapout(struct proc *);
@@ -183,33 +179,59 @@ useracc(addr, len, rw)
 	return (rv == TRUE);
 }
 
-/*
- * MPSAFE
- */
-void
-vslock(addr, len)
-	void *addr;
-	u_int len;
+int
+vslock(void *addr, size_t len)
 {
+	vm_offset_t end, last, start;
+	vm_size_t npages;
+	int error;
 
-	vm_map_wire(&curproc->p_vmspace->vm_map, trunc_page((vm_offset_t)addr),
-	    round_page((vm_offset_t)addr + len),
-	    VM_MAP_WIRE_SYSTEM|VM_MAP_WIRE_NOHOLES);
+	last = (vm_offset_t)addr + len;
+	start = trunc_page((vm_offset_t)addr);
+	end = round_page(last);
+	if (last < (vm_offset_t)addr || end < (vm_offset_t)addr)
+		return (EINVAL);
+	npages = atop(end - start);
+	if (npages > vm_page_max_wired)
+		return (ENOMEM);
+	PROC_LOCK(curproc);
+	if (ptoa(npages +
+	    pmap_wired_count(vm_map_pmap(&curproc->p_vmspace->vm_map))) >
+	    lim_cur(curproc, RLIMIT_MEMLOCK)) {
+		PROC_UNLOCK(curproc);
+		return (ENOMEM);
+	}
+	PROC_UNLOCK(curproc);
+#if 0
+	/*
+	 * XXX - not yet
+	 *
+	 * The limit for transient usage of wired pages should be
+	 * larger than for "permanent" wired pages (mlock()).
+	 *
+	 * Also, the sysctl code, which is the only present user
+	 * of vslock(), does a hard loop on EAGAIN.
+	 */
+	if (npages + cnt.v_wire_count > vm_page_max_wired)
+		return (EAGAIN);
+#endif
+	error = vm_map_wire(&curproc->p_vmspace->vm_map, start, end,
+	    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
+	/*
+	 * Return EFAULT on error to match copy{in,out}() behaviour
+	 * rather than returning ENOMEM like mlock() would.
+	 */
+	return (error == KERN_SUCCESS ? 0 : EFAULT);
 }
 
-/*
- * MPSAFE
- */
 void
-vsunlock(addr, len)
-	void *addr;
-	u_int len;
+vsunlock(void *addr, size_t len)
 {
 
-	vm_map_unwire(&curproc->p_vmspace->vm_map,
-	    trunc_page((vm_offset_t)addr),
-	    round_page((vm_offset_t)addr + len),
-	    VM_MAP_WIRE_SYSTEM|VM_MAP_WIRE_NOHOLES);
+	/* Rely on the parameter sanity checks performed by vslock(). */
+	(void)vm_map_unwire(&curproc->p_vmspace->vm_map,
+	    trunc_page((vm_offset_t)addr), round_page((vm_offset_t)addr + len),
+	    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
 }
 
 /*
@@ -596,7 +618,6 @@ vm_forkproc(td, p2, td2, flags)
 	int flags;
 {
 	struct proc *p1 = td->td_proc;
-	struct user *up;
 
 	GIANT_REQUIRED;
 
@@ -617,7 +638,7 @@ vm_forkproc(td, p2, td2, flags)
 
 	if (flags & RFMEM) {
 		p2->p_vmspace = p1->p_vmspace;
-		p1->p_vmspace->vm_refcnt++;
+		atomic_add_int(&p1->p_vmspace->vm_refcnt, 1);
 	}
 
 	while (vm_page_count_severe()) {
@@ -626,29 +647,22 @@ vm_forkproc(td, p2, td2, flags)
 
 	if ((flags & RFMEM) == 0) {
 		p2->p_vmspace = vmspace_fork(p1->p_vmspace);
-
-		pmap_pinit2(vmspace_pmap(p2->p_vmspace));
-
 		if (p1->p_vmspace->vm_shm)
 			shmfork(p1, p2);
 	}
 
-	/* XXXKSE this is unsatisfactory but should be adequate */
-	up = p2->p_uarea;
-	MPASS(p2->p_sigacts != NULL);
-
 	/*
-	 * p_stats currently points at fields in the user struct
-	 * but not at &u, instead at p_addr. Copy parts of
-	 * p_stats; zero the rest of p_stats (statistics).
+	 * p_stats currently points at fields in the user struct.
+	 * Copy parts of p_stats; zero the rest of p_stats (statistics).
 	 */
-	p2->p_stats = &up->u_stats;
-	bzero(&up->u_stats.pstat_startzero,
-	    (unsigned) ((caddr_t) &up->u_stats.pstat_endzero -
-		(caddr_t) &up->u_stats.pstat_startzero));
-	bcopy(&p1->p_stats->pstat_startcopy, &up->u_stats.pstat_startcopy,
-	    ((caddr_t) &up->u_stats.pstat_endcopy -
-		(caddr_t) &up->u_stats.pstat_startcopy));
+#define	RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
+
+	p2->p_stats = &p2->p_uarea->u_stats;
+	bzero(&p2->p_stats->pstat_startzero,
+	    (unsigned) RANGEOF(struct pstats, pstat_startzero, pstat_endzero));
+	bcopy(&p1->p_stats->pstat_startcopy, &p2->p_stats->pstat_startcopy,
+	    (unsigned) RANGEOF(struct pstats, pstat_startcopy, pstat_endcopy));
+#undef RANGEOF
 
 	/*
 	 * cpu_fork will copy and update the pcb, set up the kernel stack,
@@ -667,7 +681,6 @@ vm_waitproc(p)
 	struct proc *p;
 {
 
-	GIANT_REQUIRED;
 	vmspace_exitfree(p);		/* and clean-out the vmspace */
 }
 
@@ -682,6 +695,7 @@ vm_init_limits(udata)
 	void *udata;
 {
 	struct proc *p = udata;
+	struct plimit *limp;
 	int rss_limit;
 
 	/*
@@ -691,14 +705,15 @@ vm_init_limits(udata)
 	 * of memory - half of main memory helps to favor smaller processes,
 	 * and reduces thrashing of the object cache.
 	 */
-	p->p_rlimit[RLIMIT_STACK].rlim_cur = dflssiz;
-	p->p_rlimit[RLIMIT_STACK].rlim_max = maxssiz;
-	p->p_rlimit[RLIMIT_DATA].rlim_cur = dfldsiz;
-	p->p_rlimit[RLIMIT_DATA].rlim_max = maxdsiz;
+	limp = p->p_limit;
+	limp->pl_rlimit[RLIMIT_STACK].rlim_cur = dflssiz;
+	limp->pl_rlimit[RLIMIT_STACK].rlim_max = maxssiz;
+	limp->pl_rlimit[RLIMIT_DATA].rlim_cur = dfldsiz;
+	limp->pl_rlimit[RLIMIT_DATA].rlim_max = maxdsiz;
 	/* limit the limit to no less than 2MB */
 	rss_limit = max(cnt.v_free_count, 512);
-	p->p_rlimit[RLIMIT_RSS].rlim_cur = ptoa(rss_limit);
-	p->p_rlimit[RLIMIT_RSS].rlim_max = RLIM_INFINITY;
+	limp->pl_rlimit[RLIMIT_RSS].rlim_cur = ptoa(rss_limit);
+	limp->pl_rlimit[RLIMIT_RSS].rlim_max = RLIM_INFINITY;
 }
 
 void
@@ -803,7 +818,7 @@ loop:
 				kg = td->td_ksegrp;
 				pri = p->p_swtime + kg->kg_slptime;
 				if ((p->p_sflag & PS_SWAPINREQ) == 0) {
-					pri -= kg->kg_nice * 8;
+					pri -= p->p_nice * 8;
 				}
 
 				/*
@@ -936,7 +951,7 @@ retry:
 		vm = p->p_vmspace;
 		KASSERT(vm != NULL,
 			("swapout_procs: a process has no address space"));
-		++vm->vm_refcnt;
+		atomic_add_int(&vm->vm_refcnt, 1);
 		PROC_UNLOCK(p);
 		if (!vm_map_trylock(&vm->vm_map))
 			goto nextproc1;
@@ -1008,8 +1023,9 @@ retry:
 			}
 
 			/*
-			 * If the process has been asleep for awhile and had
-			 * most of its pages taken away already, swap it out.
+			 * If the pageout daemon didn't free enough pages,
+			 * or if this process is idle and the system is
+			 * configured to swap proactively, swap it out.
 			 */
 			if ((action & VM_SWAP_NORMAL) ||
 				((action & VM_SWAP_IDLE) &&

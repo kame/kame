@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)file.h	8.3 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/file.h,v 1.63 2003/06/22 08:41:43 phk Exp $
+ * $FreeBSD: src/sys/sys/file.h,v 1.65 2004/06/19 11:38:00 phk Exp $
  */
 
 #ifndef _SYS_FILE_H_
@@ -153,6 +149,7 @@ struct xfile {
 	int	xf_msgcount;	/* references from message queue */
 	off_t	xf_offset;	/* file offset */
 	void	*xf_data;	/* file descriptor specific data */
+	void	*xf_vnode;	/* vnode pointer */
 	u_int	xf_flag;	/* flags (see fcntl.h) */
 };
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_fox.c,v 1.3 2003/10/24 18:46:23 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_fox.c,v 1.8 2004/08/08 07:57:51 phk Exp $
  *
  * This is a GEOM module for handling path selection for multi-path
  * storage devices.  It is named "fox" because it, like they, prefer
@@ -90,13 +90,12 @@ g_fox_select_path(void *arg, int flag)
 
 		cp1 = LIST_NEXT(sc->opath, consumer);
 
-		error = g_access_rel(sc->opath, -sc->cr, -sc->cw, -(sc->ce + 1));
-		KASSERT(error == 0, ("Failed close of old path %d", error));
+		g_access(sc->opath, -sc->cr, -sc->cw, -(sc->ce + 1));
 
 		/*
 		 * The attempt to reopen it with a exclusive count
 		 */
-		error = g_access_rel(sc->opath, 0, 0, 1);
+		error = g_access(sc->opath, 0, 0, 1);
 		if (error) {
 			/*
 			 * Ok, ditch this consumer, we can't use it.
@@ -130,7 +129,7 @@ g_fox_select_path(void *arg, int flag)
 		cp1 = LIST_FIRST(&gp->consumer);
 	printf("Open new path (%s) on fox (%s)\n",
 		cp1->provider->name, gp->name);
-	error = g_access_rel(cp1, sc->cr, sc->cw, sc->ce);
+	error = g_access(cp1, sc->cr, sc->cw, sc->ce);
 	if (error) {
 		/*
 		 * If we failed, we take another trip through here
@@ -179,7 +178,7 @@ g_fox_orphan(struct g_consumer *cp)
 	}
 	mtx_unlock(&sc->lock);
 	    
-	g_access_rel(cp, -cp->acr, -cp->acw, -cp->ace);
+	g_access(cp, -cp->acr, -cp->acw, -cp->ace);
 	error = cp->provider->error;
 	g_detach(cp);
 	g_destroy_consumer(cp);	
@@ -290,8 +289,12 @@ g_fox_access(struct g_provider *pp, int dr, int dw, int de)
 	g_topology_assert();
 	gp = pp->geom;
 	sc = gp->softc;
-	if (sc == NULL)
-		return (ENXIO);
+	if (sc == NULL) {
+		if (dr <= 0 && dw <= 0 && de <= 0)
+			return (0);
+		else
+			return (ENXIO);
+	}
 
 	if (sc->cr == 0 && sc->cw == 0 && sc->ce == 0) {
 		/*
@@ -299,7 +302,7 @@ g_fox_access(struct g_provider *pp, int dr, int dw, int de)
 		 */
 		error = 0;
 		LIST_FOREACH(cp1, &gp->consumer, consumer) {
-			error = g_access_rel(cp1, 0, 0, 1);
+			error = g_access(cp1, 0, 0, 1);
 			if (error) {
 				printf("FOX: access(%s,0,0,1) = %d\n",
 				    cp1->provider->name, error);
@@ -309,7 +312,7 @@ g_fox_access(struct g_provider *pp, int dr, int dw, int de)
 		if (error) {
 			LIST_FOREACH(cp1, &gp->consumer, consumer) {
 				if (cp1->ace)
-					g_access_rel(cp1, 0, 0, -1);
+					g_access(cp1, 0, 0, -1);
 			}
 			return (error);
 		}
@@ -319,7 +322,7 @@ g_fox_access(struct g_provider *pp, int dr, int dw, int de)
 	if (sc->path == NULL)
 		error = ENXIO;
 	else
-		error = g_access_rel(sc->path, dr, dw, de);
+		error = g_access(sc->path, dr, dw, de);
 	if (error == 0) {
 		sc->cr += dr;
 		sc->cw += dw;
@@ -329,7 +332,7 @@ g_fox_access(struct g_provider *pp, int dr, int dw, int de)
 			 * Last close, remove e-bit on all consumers
 			 */
 			LIST_FOREACH(cp1, &gp->consumer, consumer)
-				g_access_rel(cp1, 0, 0, -1);
+				g_access(cp1, 0, 0, -1);
 		}
 	}
 	return (error);
@@ -354,13 +357,9 @@ g_fox_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	gp->softc = g_malloc(sizeof(struct g_fox_softc), M_WAITOK | M_ZERO);
 	sc = gp->softc;
 
-	gp->start = g_fox_start;
-	gp->spoiled = g_fox_orphan;
-	gp->orphan = g_fox_orphan;
-	gp->access= g_fox_access;
 	cp = g_new_consumer(gp);
 	g_attach(cp, pp);
-	error = g_access_rel(cp, 1, 0, 0);
+	error = g_access(cp, 1, 0, 0);
 	if (error) {
 		g_free(sc);
 		g_detach(cp);
@@ -401,7 +400,7 @@ g_fox_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 			g_attach(cp2, pp);
 			pp2 = LIST_FIRST(&gp2->provider);
 			if (pp2->acr > 0 || pp2->acw > 0 || pp2->ace > 0) {
-				error = g_access_rel(cp2, 0, 0, 1);
+				error = g_access(cp2, 0, 0, 1);
 				if (error) {
 					/*
 					 * This is bad, or more likely,
@@ -433,7 +432,7 @@ printf("fox %s lock %p\n", gp->name, &sc->lock);
 	} while (0);
 	if (buf != NULL)
 		g_free(buf);
-	g_access_rel(cp, -1, 0, 0);
+	g_access(cp, -1, 0, 0);
 
 	if (!LIST_EMPTY(&gp->provider))
 		return (gp);
@@ -452,17 +451,22 @@ g_fox_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
 
 	g_topology_assert();
 	sc = gp->softc;
-	gp->softc = NULL;
 	mtx_destroy(&sc->lock);
 	g_free(gp->softc);
+	gp->softc = NULL;
 	g_wither_geom(gp, ENXIO);
 	return (0);
 }
 
 static struct g_class g_fox_class	= {
 	.name = FOX_CLASS_NAME,
+	.version = G_VERSION,
 	.taste = g_fox_taste,
 	.destroy_geom = g_fox_destroy_geom,
+	.start = g_fox_start,
+	.spoiled = g_fox_orphan,
+	.orphan = g_fox_orphan,
+	.access= g_fox_access,
 };
 
 DECLARE_GEOM_CLASS(g_fox_class, g_fox);

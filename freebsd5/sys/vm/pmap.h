@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -61,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/pmap.h,v 1.65 2003/10/06 01:47:12 bms Exp $
+ * $FreeBSD: src/sys/vm/pmap.h,v 1.69 2004/04/10 22:41:46 alc Exp $
  */
 
 /*
@@ -109,7 +105,7 @@ vm_paddr_t	 pmap_extract(pmap_t pmap, vm_offset_t va);
 vm_page_t	 pmap_extract_and_hold(pmap_t pmap, vm_offset_t va,
 		    vm_prot_t prot);
 void		 pmap_growkernel(vm_offset_t);
-void		 pmap_init(vm_paddr_t, vm_paddr_t);
+void		 pmap_init(void);
 boolean_t	 pmap_is_modified(vm_page_t m);
 boolean_t	 pmap_is_prefaultable(pmap_t pmap, vm_offset_t va);
 boolean_t	 pmap_ts_referenced(vm_page_t m);
@@ -120,7 +116,6 @@ boolean_t	 pmap_page_exists_quick(pmap_t pmap, vm_page_t m);
 void		 pmap_page_protect(vm_page_t m, vm_prot_t prot);
 void		 pmap_pinit(pmap_t);
 void		 pmap_pinit0(pmap_t);
-void		 pmap_pinit2(pmap_t);
 void		 pmap_protect(pmap_t, vm_offset_t, vm_offset_t, vm_prot_t);
 void		 pmap_qenter(vm_offset_t, vm_page_t *, int);
 void		 pmap_qremove(vm_offset_t, int);
@@ -134,7 +129,6 @@ void		 pmap_zero_page_idle(vm_page_t);
 int		 pmap_mincore(pmap_t pmap, vm_offset_t addr);
 void		 pmap_activate(struct thread *td);
 vm_offset_t	 pmap_addr_hint(vm_object_t obj, vm_offset_t addr, vm_size_t size);
-void		*pmap_kenter_temporary(vm_offset_t pa, int i);
 void		 pmap_init2(void);
 
 #define	pmap_resident_count(pm)	((pm)->pm_stats.resident_count)

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,9 +35,8 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.333 2003/11/12 08:01:39 mckusick Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.356 2004/07/26 07:24:03 cperciva Exp $");
 
-/* For 4.3 integer FS ID compatibility */
 #include "opt_compat.h"
 #include "opt_mac.h"
 
@@ -109,7 +104,7 @@ int async_io_version;
  */
 #ifndef _SYS_SYSPROTO_H_
 struct sync_args {
-        int     dummy;
+	int     dummy;
 };
 #endif
 
@@ -178,7 +173,6 @@ struct quotactl_args {
 	caddr_t arg;
 };
 #endif
-/* ARGSUSED */
 int
 quotactl(td, uap)
 	struct thread *td;
@@ -189,7 +183,7 @@ quotactl(td, uap)
 		caddr_t arg;
 	} */ *uap;
 {
-	struct mount *mp;
+	struct mount *mp, *vmp;
 	int error;
 	struct nameidata nd;
 
@@ -199,12 +193,13 @@ quotactl(td, uap)
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
-	error = vn_start_write(nd.ni_vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(nd.ni_vp, &vmp, V_WAIT | PCATCH);
+	mp = nd.ni_vp->v_mount;
 	vrele(nd.ni_vp);
 	if (error)
 		return (error);
 	error = VFS_QUOTACTL(mp, uap->cmd, uap->uid, uap->arg, td);
-	vn_finished_write(mp);
+	vn_finished_write(vmp);
 	return (error);
 }
 
@@ -217,7 +212,6 @@ struct statfs_args {
 	struct statfs *buf;
 };
 #endif
-/* ARGSUSED */
 int
 statfs(td, uap)
 	struct thread *td;
@@ -269,7 +263,6 @@ struct fstatfs_args {
 	struct statfs *buf;
 };
 #endif
-/* ARGSUSED */
 int
 fstatfs(td, uap)
 	struct thread *td;
@@ -341,6 +334,10 @@ getfsstat(td, uap)
 	count = 0;
 	mtx_lock(&mountlist_mtx);
 	for (mp = TAILQ_FIRST(&mountlist); mp != NULL; mp = nmp) {
+		if (!prison_check_mount(td->td_ucred, mp)) {
+			nmp = TAILQ_NEXT(mp, mnt_list);
+			continue;
+		}
 #ifdef MAC
 		if (mac_check_mount_stat(td->td_ucred, mp) != 0) {
 			nmp = TAILQ_NEXT(mp, mnt_list);
@@ -410,7 +407,6 @@ struct freebsd4_statfs_args {
 	struct ostatfs *buf;
 };
 #endif
-/* ARGSUSED */
 int
 freebsd4_statfs(td, uap)
 	struct thread *td;
@@ -454,7 +450,6 @@ struct freebsd4_fstatfs_args {
 	struct ostatfs *buf;
 };
 #endif
-/* ARGSUSED */
 int
 freebsd4_fstatfs(td, uap)
 	struct thread *td;
@@ -519,6 +514,10 @@ freebsd4_getfsstat(td, uap)
 	count = 0;
 	mtx_lock(&mountlist_mtx);
 	for (mp = TAILQ_FIRST(&mountlist); mp != NULL; mp = nmp) {
+		if (!prison_check_mount(td->td_ucred, mp)) {
+			nmp = TAILQ_NEXT(mp, mnt_list);
+			continue;
+		}
 #ifdef MAC
 		if (mac_check_mount_stat(td->td_ucred, mp) != 0) {
 			nmp = TAILQ_NEXT(mp, mnt_list);
@@ -590,16 +589,11 @@ freebsd4_fhstatfs(td, uap)
 	fhandle_t fh;
 	int error;
 
-	/*
-	 * Must be super user
-	 */
 	error = suser(td);
 	if (error)
 		return (error);
-
 	if ((error = copyin(uap->u_fhp, &fh, sizeof(fhandle_t))) != 0)
 		return (error);
-
 	if ((mp = vfs_getvfs(&fh.fh_fsid)) == NULL)
 		return (ESTALE);
 	if ((error = VFS_FHTOVP(mp, &fh.fh_fid, &vp)))
@@ -666,7 +660,6 @@ struct fchdir_args {
 	int	fd;
 };
 #endif
-/* ARGSUSED */
 int
 fchdir(td, uap)
 	struct thread *td;
@@ -697,7 +690,7 @@ fchdir(td, uap)
 	while (!error && (mp = vp->v_mountedhere) != NULL) {
 		if (vfs_busy(mp, 0, 0, td))
 			continue;
-		error = VFS_ROOT(mp, &tdp);
+		error = VFS_ROOT(mp, &tdp, td);
 		vfs_unbusy(mp, td);
 		if (error)
 			break;
@@ -725,7 +718,6 @@ struct chdir_args {
 	char	*path;
 };
 #endif
-/* ARGSUSED */
 int
 chdir(td, uap)
 	struct thread *td;
@@ -810,7 +802,6 @@ struct chroot_args {
 	char	*path;
 };
 #endif
-/* ARGSUSED */
 int
 chroot(td, uap)
 	struct thread *td;
@@ -821,7 +812,7 @@ chroot(td, uap)
 	int error;
 	struct nameidata nd;
 
-	error = suser_cred(td->td_ucred, PRISON_ROOT);
+	error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 	if (error)
 		return (error);
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, uap->path, td);
@@ -912,6 +903,8 @@ change_root(vp, td)
 /*
  * Check permissions, allocate an open file structure,
  * and call the device open routine if any.
+ *
+ * MP SAFE
  */
 #ifndef _SYS_SYSPROTO_H_
 struct open_args {
@@ -960,8 +953,10 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 	cmode = ((mode &~ fdp->fd_cmask) & ALLPERMS) &~ S_ISTXT;
 	NDINIT(&nd, LOOKUP, FOLLOW, pathseg, path, td);
 	td->td_dupfd = -1;		/* XXX check for fdopen */
+	mtx_lock(&Giant);
 	error = vn_open(&nd, &flags, cmode, indx);
 	if (error) {
+		mtx_unlock(&Giant);
 
 		/*
 		 * If the vn_open replaced the method vector, something
@@ -998,10 +993,12 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 		FILEDESC_LOCK(fdp);
 		if (fdp->fd_ofiles[indx] == fp) {
 			fdp->fd_ofiles[indx] = NULL;
+			fdunused(fdp, indx);
 			FILEDESC_UNLOCK(fdp);
 			fdrop(fp, td);
-		} else
+		} else {
 			FILEDESC_UNLOCK(fdp);
+		}
 
 		if (error == ERESTART)
 			error = EINTR;
@@ -1018,6 +1015,8 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 	 * Handle the case where someone closed the file (via its file
 	 * descriptor) while we were blocked.  The end result should look
 	 * like opening the file succeeded but it was immediately closed.
+	 * We call vn_close() manually because we haven't yet hooked up
+	 * the various 'struct file' fields.
 	 */
 	FILEDESC_LOCK(fdp);
 	FILE_LOCK(fp);
@@ -1028,14 +1027,17 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 		FILE_UNLOCK(fp);
 		VOP_UNLOCK(vp, 0, td);
 		vn_close(vp, flags & FMASK, fp->f_cred, td);
+		mtx_unlock(&Giant);
 		fdrop(fp, td);
 		td->td_retval[0] = indx;
-		return 0;
+		return (0);
 	}
 	fp->f_vnode = vp;
-	fp->f_data = vp;
+	if (fp->f_data == NULL)
+		fp->f_data = vp;
 	fp->f_flag = flags & FMASK;
-	fp->f_ops = &vnops;
+	if (fp->f_ops == &badfileops)
+		fp->f_ops = &vnops;
 	fp->f_seqcount = 1;
 	fp->f_type = (vp->v_type == VFIFO ? DTYPE_FIFO : DTYPE_VNODE);
 	FILEDESC_UNLOCK(fdp);
@@ -1079,6 +1081,7 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 		if (error)
 			goto bad;
 	}
+	mtx_unlock(&Giant);
 	/*
 	 * Release our private reference, leaving the one associated with
 	 * the descriptor table intact.
@@ -1087,13 +1090,16 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 	td->td_retval[0] = indx;
 	return (0);
 bad:
+	mtx_unlock(&Giant);
 	FILEDESC_LOCK(fdp);
 	if (fdp->fd_ofiles[indx] == fp) {
 		fdp->fd_ofiles[indx] = NULL;
+		fdunused(fdp, indx);
 		FILEDESC_UNLOCK(fdp);
 		fdrop(fp, td);
-	} else
+	} else {
 		FILEDESC_UNLOCK(fdp);
+	}
 	fdrop(fp, td);
 	return (error);
 }
@@ -1101,6 +1107,8 @@ bad:
 #ifdef COMPAT_43
 /*
  * Create a file.
+ *
+ * MP SAFE
  */
 #ifndef _SYS_SYSPROTO_H_
 struct ocreat_args {
@@ -1116,16 +1124,9 @@ ocreat(td, uap)
 		int mode;
 	} */ *uap;
 {
-	struct open_args /* {
-		char *path;
-		int flags;
-		int mode;
-	} */ nuap;
 
-	nuap.path = uap->path;
-	nuap.mode = uap->mode;
-	nuap.flags = O_WRONLY | O_CREAT | O_TRUNC;
-	return (open(td, &nuap));
+	return (kern_open(td, uap->path, UIO_USERSPACE,
+	    O_WRONLY | O_CREAT | O_TRUNC, uap->mode));
 }
 #endif /* COMPAT_43 */
 
@@ -1139,7 +1140,6 @@ struct mknod_args {
 	int	dev;
 };
 #endif
-/* ARGSUSED */
 int
 mknod(td, uap)
 	struct thread *td;
@@ -1170,7 +1170,7 @@ kern_mknod(struct thread *td, char *path, enum uio_seg pathseg, int mode,
 		error = suser(td);
 		break;
 	default:
-		error = suser_cred(td->td_ucred, PRISON_ROOT);
+		error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 		break;
 	}
 	if (error)
@@ -1256,7 +1256,6 @@ struct mkfifo_args {
 	int	mode;
 };
 #endif
-/* ARGSUSED */
 int
 mkfifo(td, uap)
 	struct thread *td;
@@ -1331,7 +1330,6 @@ struct link_args {
 	char	*link;
 };
 #endif
-/* ARGSUSED */
 int
 link(td, uap)
 	struct thread *td;
@@ -1340,8 +1338,54 @@ link(td, uap)
 		char *link;
 	} */ *uap;
 {
+	int error;
 
-	return (kern_link(td, uap->path, uap->link, UIO_USERSPACE));
+	mtx_lock(&Giant);
+	error = kern_link(td, uap->path, uap->link, UIO_USERSPACE);
+	mtx_unlock(&Giant);
+	return (error);
+}
+
+SYSCTL_DECL(_security_bsd);
+
+static int hardlink_check_uid = 0;
+SYSCTL_INT(_security_bsd, OID_AUTO, hardlink_check_uid, CTLFLAG_RW,
+    &hardlink_check_uid, 0,
+    "Unprivileged processes cannot create hard links to files owned by other "
+    "users");
+static int hardlink_check_gid = 0;
+SYSCTL_INT(_security_bsd, OID_AUTO, hardlink_check_gid, CTLFLAG_RW,
+    &hardlink_check_gid, 0,
+    "Unprivileged processes cannot create hard links to files owned by other "
+    "groups");
+
+static int
+can_hardlink(struct vnode *vp, struct thread *td, struct ucred *cred)
+{
+	struct vattr va;
+	int error;
+
+	if (suser_cred(cred, SUSER_ALLOWJAIL) == 0)
+		return (0);
+
+	if (!hardlink_check_uid && !hardlink_check_gid)
+		return (0);
+
+	error = VOP_GETATTR(vp, &va, cred, td);
+	if (error != 0)
+		return (error);
+
+	if (hardlink_check_uid) {
+		if (cred->cr_uid != va.va_uid)
+			return (EPERM);
+	}
+
+	if (hardlink_check_gid) {
+		if (!groupmember(va.va_gid, cred))
+			return (EPERM);
+	}
+
+	return (0);
 }
 
 int
@@ -1379,9 +1423,11 @@ kern_link(struct thread *td, char *path, char *link, enum uio_seg segflg)
 		    == 0) {
 			VOP_LEASE(nd.ni_dvp, td, td->td_ucred, LEASE_WRITE);
 			VOP_LEASE(vp, td, td->td_ucred, LEASE_WRITE);
+			error = can_hardlink(vp, td, td->td_ucred);
+			if (error == 0)
 #ifdef MAC
-			error = mac_check_vnode_link(td->td_ucred, nd.ni_dvp,
-			    vp, &nd.ni_cnd);
+				error = mac_check_vnode_link(td->td_ucred,
+				    nd.ni_dvp, vp, &nd.ni_cnd);
 			if (error == 0)
 #endif
 				error = VOP_LINK(nd.ni_dvp, vp, &nd.ni_cnd);
@@ -1406,7 +1452,6 @@ struct symlink_args {
 	char	*link;
 };
 #endif
-/* ARGSUSED */
 int
 symlink(td, uap)
 	struct thread *td;
@@ -1454,7 +1499,7 @@ restart:
 		NDFREE(&nd, NDF_ONLY_PNBUF);
 		vput(nd.ni_dvp);
 		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | PCATCH)) != 0)
-			return (error);
+			goto out;
 		goto restart;
 	}
 	VATTR_NULL(&vattr);
@@ -1489,7 +1534,6 @@ out:
 /*
  * Delete a whiteout from the filesystem.
  */
-/* ARGSUSED */
 int
 undelete(td, uap)
 	struct thread *td;
@@ -1544,7 +1588,6 @@ struct unlink_args {
 	char	*path;
 };
 #endif
-/* ARGSUSED */
 int
 unlink(td, uap)
 	struct thread *td;
@@ -1552,8 +1595,12 @@ unlink(td, uap)
 		char *path;
 	} */ *uap;
 {
+	int error;
 
-	return (kern_unlink(td, uap->path, UIO_USERSPACE));
+	mtx_lock(&Giant);
+	error = kern_unlink(td, uap->path, UIO_USERSPACE);
+	mtx_unlock(&Giant);
+	return (error);
 }
 
 int
@@ -1696,7 +1743,7 @@ lseek(td, uap)
 	return (0);
 }
 
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 /*
  * Reposition read/write file offset.
  */
@@ -1798,10 +1845,6 @@ kern_access(struct thread *td, char *path, enum uio_seg pathseg, int flags)
 	 * Create and modify a temporary credential instead of one that
 	 * is potentially shared.  This could also mess up socket
 	 * buffer accounting which can run in an interrupt context.
-	 *
-	 * XXX - Depending on how "threads" are finally implemented, it
-	 * may be better to explicitly pass the credential to namei()
-	 * rather than to modify the potentially shared process structure.
 	 */
 	cred = td->td_ucred;
 	tmpcred = crdup(cred);
@@ -1855,7 +1898,7 @@ eaccess(td, uap)
 	return (error);
 }
 
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 /*
  * Get file status; this version follows links.
  */
@@ -1865,7 +1908,6 @@ struct ostat_args {
 	struct ostat *ub;
 };
 #endif
-/* ARGSUSED */
 int
 ostat(td, uap)
 	struct thread *td;
@@ -1902,7 +1944,6 @@ struct olstat_args {
 	struct ostat *ub;
 };
 #endif
-/* ARGSUSED */
 int
 olstat(td, uap)
 	struct thread *td;
@@ -1960,7 +2001,7 @@ cvtstat(st, ost)
 	ost->st_flags = st->st_flags;
 	ost->st_gen = st->st_gen;
 }
-#endif /* COMPAT_43 || COMPAT_SUNOS */
+#endif /* COMPAT_43 */
 
 /*
  * Get file status; this version follows links.
@@ -1971,7 +2012,6 @@ struct stat_args {
 	struct stat *ub;
 };
 #endif
-/* ARGSUSED */
 int
 stat(td, uap)
 	struct thread *td;
@@ -2011,7 +2051,6 @@ struct lstat_args {
 	struct stat *ub;
 };
 #endif
-/* ARGSUSED */
 int
 lstat(td, uap)
 	struct thread *td;
@@ -2076,7 +2115,6 @@ struct nstat_args {
 	struct nstat *ub;
 };
 #endif
-/* ARGSUSED */
 int
 nstat(td, uap)
 	struct thread *td;
@@ -2113,7 +2151,6 @@ struct lstat_args {
 	struct stat *ub;
 };
 #endif
-/* ARGSUSED */
 int
 nlstat(td, uap)
 	struct thread *td;
@@ -2152,7 +2189,6 @@ struct pathconf_args {
 	int	name;
 };
 #endif
-/* ARGSUSED */
 int
 pathconf(td, uap)
 	struct thread *td;
@@ -2189,7 +2225,6 @@ struct readlink_args {
 	int	count;
 };
 #endif
-/* ARGSUSED */
 int
 readlink(td, uap)
 	struct thread *td;
@@ -2265,7 +2300,7 @@ setfflags(td, vp, flags)
 	 * chown can't fail when done as root.
 	 */
 	if (vp->v_type == VCHR || vp->v_type == VBLK) {
-		error = suser_cred(td->td_ucred, PRISON_ROOT);
+		error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 		if (error)
 			return (error);
 	}
@@ -2295,7 +2330,6 @@ struct chflags_args {
 	int	flags;
 };
 #endif
-/* ARGSUSED */
 int
 chflags(td, uap)
 	struct thread *td;
@@ -2313,7 +2347,7 @@ chflags(td, uap)
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	error = setfflags(td, nd.ni_vp, uap->flags);
 	vrele(nd.ni_vp);
-	return error;
+	return (error);
 }
 
 /*
@@ -2336,7 +2370,7 @@ lchflags(td, uap)
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	error = setfflags(td, nd.ni_vp, uap->flags);
 	vrele(nd.ni_vp);
-	return error;
+	return (error);
 }
 
 /*
@@ -2348,7 +2382,6 @@ struct fchflags_args {
 	int	flags;
 };
 #endif
-/* ARGSUSED */
 int
 fchflags(td, uap)
 	struct thread *td;
@@ -2393,7 +2426,7 @@ setfmode(td, vp, mode)
 		error = VOP_SETATTR(vp, &vattr, td->td_ucred, td);
 	VOP_UNLOCK(vp, 0, td);
 	vn_finished_write(mp);
-	return error;
+	return (error);
 }
 
 /*
@@ -2405,7 +2438,6 @@ struct chmod_args {
 	int	mode;
 };
 #endif
-/* ARGSUSED */
 int
 chmod(td, uap)
 	struct thread *td;
@@ -2430,7 +2462,7 @@ kern_chmod(struct thread *td, char *path, enum uio_seg pathseg, int mode)
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	error = setfmode(td, nd.ni_vp, mode);
 	vrele(nd.ni_vp);
-	return error;
+	return (error);
 }
 
 /*
@@ -2442,7 +2474,6 @@ struct lchmod_args {
 	int	mode;
 };
 #endif
-/* ARGSUSED */
 int
 lchmod(td, uap)
 	struct thread *td;
@@ -2460,7 +2491,7 @@ lchmod(td, uap)
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	error = setfmode(td, nd.ni_vp, uap->mode);
 	vrele(nd.ni_vp);
-	return error;
+	return (error);
 }
 
 /*
@@ -2472,7 +2503,6 @@ struct fchmod_args {
 	int	mode;
 };
 #endif
-/* ARGSUSED */
 int
 fchmod(td, uap)
 	struct thread *td;
@@ -2520,7 +2550,7 @@ setfown(td, vp, uid, gid)
 		error = VOP_SETATTR(vp, &vattr, td->td_ucred, td);
 	VOP_UNLOCK(vp, 0, td);
 	vn_finished_write(mp);
-	return error;
+	return (error);
 }
 
 /*
@@ -2533,7 +2563,6 @@ struct chown_args {
 	int	gid;
 };
 #endif
-/* ARGSUSED */
 int
 chown(td, uap)
 	struct thread *td;
@@ -2573,7 +2602,6 @@ struct lchown_args {
 	int	gid;
 };
 #endif
-/* ARGSUSED */
 int
 lchown(td, uap)
 	struct thread *td;
@@ -2613,7 +2641,6 @@ struct fchown_args {
 	int	gid;
 };
 #endif
-/* ARGSUSED */
 int
 fchown(td, uap)
 	struct thread *td;
@@ -2662,7 +2689,7 @@ getutimes(usrtvp, tvpseg, tsp)
 		TIMEVAL_TO_TIMESPEC(&tvp[0], &tsp[0]);
 		TIMEVAL_TO_TIMESPEC(&tvp[1], &tsp[1]);
 	}
-	return 0;
+	return (0);
 }
 
 /*
@@ -2705,7 +2732,7 @@ setutimes(td, vp, ts, numtimes, nullflag)
 		error = VOP_SETATTR(vp, &vattr, td->td_ucred, td);
 	VOP_UNLOCK(vp, 0, td);
 	vn_finished_write(mp);
-	return error;
+	return (error);
 }
 
 /*
@@ -2717,7 +2744,6 @@ struct utimes_args {
 	struct	timeval *tptr;
 };
 #endif
-/* ARGSUSED */
 int
 utimes(td, uap)
 	struct thread *td;
@@ -2759,7 +2785,6 @@ struct lutimes_args {
 	struct	timeval *tptr;
 };
 #endif
-/* ARGSUSED */
 int
 lutimes(td, uap)
 	struct thread *td;
@@ -2801,7 +2826,6 @@ struct futimes_args {
 	struct	timeval *tptr;
 };
 #endif
-/* ARGSUSED */
 int
 futimes(td, uap)
 	struct thread *td;
@@ -2841,7 +2865,6 @@ struct truncate_args {
 	off_t	length;
 };
 #endif
-/* ARGSUSED */
 int
 truncate(td, uap)
 	struct thread *td;
@@ -2904,7 +2927,6 @@ struct ftruncate_args {
 	off_t	length;
 };
 #endif
-/* ARGSUSED */
 int
 ftruncate(td, uap)
 	struct thread *td;
@@ -2953,7 +2975,7 @@ ftruncate(td, uap)
 	return (error);
 }
 
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 /*
  * Truncate a file given its path name.
  */
@@ -2963,7 +2985,6 @@ struct otruncate_args {
 	long	length;
 };
 #endif
-/* ARGSUSED */
 int
 otruncate(td, uap)
 	struct thread *td;
@@ -2992,7 +3013,6 @@ struct oftruncate_args {
 	long	length;
 };
 #endif
-/* ARGSUSED */
 int
 oftruncate(td, uap)
 	struct thread *td;
@@ -3011,7 +3031,7 @@ oftruncate(td, uap)
 	nuap.length = uap->length;
 	return (ftruncate(td, &nuap));
 }
-#endif /* COMPAT_43 || COMPAT_SUNOS */
+#endif /* COMPAT_43 */
 
 /*
  * Sync an open file.
@@ -3021,7 +3041,6 @@ struct fsync_args {
 	int	fd;
 };
 #endif
-/* ARGSUSED */
 int
 fsync(td, uap)
 	struct thread *td;
@@ -3071,7 +3090,6 @@ struct rename_args {
 	char	*to;
 };
 #endif
-/* ARGSUSED */
 int
 rename(td, uap)
 	struct thread *td;
@@ -3201,7 +3219,6 @@ struct mkdir_args {
 	int	mode;
 };
 #endif
-/* ARGSUSED */
 int
 mkdir(td, uap)
 	struct thread *td;
@@ -3285,7 +3302,6 @@ struct rmdir_args {
 	char	*path;
 };
 #endif
-/* ARGSUSED */
 int
 rmdir(td, uap)
 	struct thread *td;
@@ -3636,7 +3652,7 @@ getdents(td, uap)
 	ap.buf = uap->buf;
 	ap.count = uap->count;
 	ap.basep = NULL;
-	return getdirentries(td, &ap);
+	return (getdirentries(td, &ap));
 }
 
 /*
@@ -3675,7 +3691,6 @@ struct revoke_args {
 	char	*path;
 };
 #endif
-/* ARGSUSED */
 int
 revoke(td, uap)
 	struct thread *td;
@@ -3712,7 +3727,7 @@ revoke(td, uap)
 	}
 	VOP_UNLOCK(vp, 0, td);
 	if (td->td_ucred->cr_uid != vattr.va_uid) {
-		error = suser_cred(td->td_ucred, PRISON_ROOT);
+		error = suser_cred(td->td_ucred, SUSER_ALLOWJAIL);
 		if (error)
 			goto out;
 	}
@@ -3728,7 +3743,7 @@ out:
 
 /*
  * Convert a user file descriptor to a kernel file entry.
- * The file entry is locked upon returning.
+ * A reference on the file entry is held upon returning.
  */
 int
 getvnode(fdp, fd, fpp)
@@ -3764,6 +3779,41 @@ getvnode(fdp, fd, fpp)
  * Get (NFS) file handle
  */
 #ifndef _SYS_SYSPROTO_H_
+struct lgetfh_args {
+	char	*fname;
+	fhandle_t *fhp;
+};
+#endif
+int
+lgetfh(td, uap)
+	struct thread *td;
+	register struct lgetfh_args *uap;
+{
+	struct nameidata nd;
+	fhandle_t fh;
+	register struct vnode *vp;
+	int error;
+
+	error = suser(td);
+	if (error)
+		return (error);
+	NDINIT(&nd, LOOKUP, NOFOLLOW | LOCKLEAF, UIO_USERSPACE, uap->fname, td);
+	error = namei(&nd);
+	if (error)
+		return (error);
+	NDFREE(&nd, NDF_ONLY_PNBUF);
+	vp = nd.ni_vp;
+	bzero(&fh, sizeof(fh));
+	fh.fh_fsid = vp->v_mount->mnt_stat.f_fsid;
+	error = VFS_VPTOFH(vp, &fh.fh_fid);
+	vput(vp);
+	if (error)
+		return (error);
+	error = copyout(&fh, uap->fhp, sizeof (fh));
+	return (error);
+}
+
+#ifndef _SYS_SYSPROTO_H_
 struct getfh_args {
 	char	*fname;
 	fhandle_t *fhp;
@@ -3779,9 +3829,6 @@ getfh(td, uap)
 	register struct vnode *vp;
 	int error;
 
-	/*
-	 * Must be super user
-	 */
 	error = suser(td);
 	if (error)
 		return (error);
@@ -3832,16 +3879,12 @@ fhopen(td, uap)
 	struct file *fp;
 	register struct filedesc *fdp = p->p_fd;
 	int fmode, mode, error, type;
-	struct file *nfp; 
+	struct file *nfp;
 	int indx;
 
-	/*
-	 * Must be super user
-	 */
 	error = suser(td);
 	if (error)
 		return (error);
-
 	fmode = FFLAGS(uap->flags);
 	/* why not allow a non-read/write open for our lockd? */
 	if (((fmode & (FREAD | FWRITE)) == 0) || (fmode & O_CREAT))
@@ -3857,15 +3900,15 @@ fhopen(td, uap)
 	error = VFS_FHTOVP(mp, &fhp.fh_fid, &vp);
 	if (error)
 		return (error);
- 	/*
+	/*
 	 * from now on we have to make sure not
 	 * to forget about the vnode
-	 * any error that causes an abort must vput(vp) 
+	 * any error that causes an abort must vput(vp)
 	 * just set error = err and 'goto bad;'.
 	 */
 
-	/* 
-	 * from vn_open 
+	/*
+	 * from vn_open
 	 */
 	if (vp->v_type == VLNK) {
 		error = EMLINK;
@@ -3940,7 +3983,7 @@ fhopen(td, uap)
 		vp->v_writecount++;
 
 	/*
-	 * end of vn_open code 
+	 * end of vn_open code
 	 */
 
 	if ((error = falloc(td, &nfp, &indx)) != 0) {
@@ -3949,7 +3992,7 @@ fhopen(td, uap)
 		goto bad;
 	}
 	/* An extra reference on `nfp' has been held for us by falloc(). */
-	fp = nfp;	
+	fp = nfp;
 
 	nfp->f_vnode = vp;
 	nfp->f_data = vp;
@@ -3978,10 +4021,12 @@ fhopen(td, uap)
 			FILEDESC_LOCK(fdp);
 			if (fdp->fd_ofiles[indx] == fp) {
 				fdp->fd_ofiles[indx] = NULL;
+				fdunused(fdp, indx);
 				FILEDESC_UNLOCK(fdp);
 				fdrop(fp, td);
-			} else
+			} else {
 				FILEDESC_UNLOCK(fdp);
+			}
 			/*
 			 * release our private reference
 			 */
@@ -4027,17 +4072,12 @@ fhstat(td, uap)
 	struct vnode *vp;
 	int error;
 
-	/*
-	 * Must be super user
-	 */
 	error = suser(td);
 	if (error)
 		return (error);
-	
 	error = copyin(uap->u_fhp, &fh, sizeof(fhandle_t));
 	if (error)
 		return (error);
-
 	if ((mp = vfs_getvfs(&fh.fh_fsid)) == NULL)
 		return (ESTALE);
 	if ((error = VFS_FHTOVP(mp, &fh.fh_fid, &vp)))
@@ -4067,22 +4107,17 @@ fhstatfs(td, uap)
 		struct statfs *buf;
 	} */ *uap;
 {
-	struct statfs *sp, sb;
+	struct statfs *sp;
 	struct mount *mp;
 	struct vnode *vp;
 	fhandle_t fh;
 	int error;
 
-	/*
-	 * Must be super user
-	 */
 	error = suser(td);
 	if (error)
 		return (error);
-
 	if ((error = copyin(uap->u_fhp, &fh, sizeof(fhandle_t))) != 0)
 		return (error);
-
 	if ((mp = vfs_getvfs(&fh.fh_fsid)) == NULL)
 		return (ESTALE);
 	if ((error = VFS_FHTOVP(mp, &fh.fh_fid, &vp)))
@@ -4103,11 +4138,6 @@ fhstatfs(td, uap)
 	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	if ((error = VFS_STATFS(mp, sp, td)) != 0)
 		return (error);
-	if (suser(td)) {
-		bcopy(sp, &sb, sizeof(sb));
-		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
-		sp = &sb;
-	}
 	return (copyout(sp, uap->buf, sizeof(*sp)));
 }
 
@@ -4197,7 +4227,7 @@ extattrctl(td, uap)
 
 /*-
  * Set a named extended attribute on a file or directory
- * 
+ *
  * Arguments: unlocked vnode "vp", attribute namespace "attrnamespace",
  *            kernelspace string pointer "attrname", userspace buffer
  *            pointer "data", buffer length "nbytes", thread "td".
@@ -4350,7 +4380,7 @@ extattr_set_link(td, uap)
 
 /*-
  * Get a named extended attribute on a file or directory
- * 
+ *
  * Arguments: unlocked vnode "vp", attribute namespace "attrnamespace",
  *            kernelspace string pointer "attrname", userspace buffer
  *            pointer "data", buffer length "nbytes", thread "td".
@@ -4367,15 +4397,6 @@ extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	ssize_t cnt;
 	size_t size, *sizep;
 	int error;
-
-	/*
-	 * XXX: Temporary API compatibility for applications that know
-	 * about this hack ("" means list), but haven't been updated
-	 * for the extattr_list_*() system calls yet.  This will go
-	 * away for FreeBSD 5.3.
-	 */
-	if (strlen(attrname) == 0)
-		return (extattr_list_vp(vp, attrnamespace, data, nbytes, td));
 
 	VOP_LEASE(vp, td, td->td_ucred, LEASE_READ);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
@@ -4524,7 +4545,7 @@ extattr_get_link(td, uap)
 /*
  * extattr_delete_vp(): Delete a named extended attribute on a file or
  *                      directory
- * 
+ *
  * Arguments: unlocked vnode "vp", attribute namespace "attrnamespace",
  *            kernelspace string pointer "attrname", proc "p"
  * Returns: 0 on success, an error number otherwise
@@ -4788,4 +4809,3 @@ extattr_list_link(td, uap)
 	vrele(nd.ni_vp);
 	return (error);
 }
-

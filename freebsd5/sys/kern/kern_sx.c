@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_sx.c,v 1.20 2003/07/13 01:22:20 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_sx.c,v 1.24 2004/02/27 16:13:44 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -112,6 +112,7 @@ _sx_slock(struct sx *sx, const char *file, int line)
 	KASSERT(sx->sx_xholder != curthread,
 	    ("%s (%s): slock while xlock is held @ %s:%d\n", __func__,
 	    sx->sx_object.lo_name, file, line));
+	WITNESS_CHECKORDER(&sx->sx_object, LOP_NEWORDER, file, line);
 
 	/*
 	 * Loop in case we lose the race for lock acquisition.
@@ -165,6 +166,8 @@ _sx_xlock(struct sx *sx, const char *file, int line)
 	KASSERT(sx->sx_xholder != curthread,
 	    ("%s (%s): xlock already held @ %s:%d", __func__,
 	    sx->sx_object.lo_name, file, line));
+	WITNESS_CHECKORDER(&sx->sx_object, LOP_NEWORDER | LOP_EXCLUSIVE, file,
+	    line);
 
 	/* Loop in case we lose the race for lock acquisition. */
 	while (sx->sx_cnt != 0) {
@@ -319,6 +322,8 @@ void
 _sx_assert(struct sx *sx, int what, const char *file, int line)
 {
 
+	if (panicstr != NULL)
+		return;
 	switch (what) {
 	case SX_LOCKED:
 	case SX_SLOCKED:
@@ -328,7 +333,7 @@ _sx_assert(struct sx *sx, int what, const char *file, int line)
 		mtx_lock(sx->sx_lock);
 		if (sx->sx_cnt <= 0 &&
 		    (what == SX_SLOCKED || sx->sx_xholder != curthread))
-			printf("Lock %s not %slocked @ %s:%d\n",
+			panic("Lock %s not %slocked @ %s:%d\n",
 			    sx->sx_object.lo_name, (what == SX_SLOCKED) ?
 			    "share " : "", file, line);
 		mtx_unlock(sx->sx_lock);
@@ -337,9 +342,24 @@ _sx_assert(struct sx *sx, int what, const char *file, int line)
 	case SX_XLOCKED:
 		mtx_lock(sx->sx_lock);
 		if (sx->sx_xholder != curthread)
-			printf("Lock %s not exclusively locked @ %s:%d\n",
+			panic("Lock %s not exclusively locked @ %s:%d\n",
 			    sx->sx_object.lo_name, file, line);
 		mtx_unlock(sx->sx_lock);
+		break;
+	case SX_UNLOCKED:
+#ifdef WITNESS
+		witness_assert(&sx->sx_object, what, file, line);
+#else
+		/*
+		 * We are able to check only exclusive lock here,
+		 * we cannot assert that *this* thread owns slock.
+		 */
+		mtx_lock(sx->sx_lock);
+		if (sx->sx_xholder == curthread)
+			panic("Lock %s exclusively locked @ %s:%d\n",
+			    sx->sx_object.lo_name, file, line);
+		mtx_unlock(sx->sx_lock);
+#endif
 		break;
 	default:
 		panic("Unknown sx lock assertion: %d @ %s:%d", what, file,

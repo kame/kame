@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/sys/sbuf.h,v 1.13 2002/10/04 09:58:13 phk Exp $
+ *      $FreeBSD: src/sys/sys/sbuf.h,v 1.14 2004/07/09 11:35:30 des Exp $
  */
 
 #ifndef _SYS_SBUF_H_
@@ -58,8 +58,8 @@ __BEGIN_DECLS
 struct sbuf	*sbuf_new(struct sbuf *, char *, int, int);
 void		 sbuf_clear(struct sbuf *);
 int		 sbuf_setpos(struct sbuf *, int);
-int		 sbuf_bcat(struct sbuf *, const char *, size_t);
-int		 sbuf_bcpy(struct sbuf *, const char *, size_t);
+int		 sbuf_bcat(struct sbuf *, const void *, size_t);
+int		 sbuf_bcpy(struct sbuf *, const void *, size_t);
 int		 sbuf_cat(struct sbuf *, const char *);
 int		 sbuf_cpy(struct sbuf *, const char *);
 int		 sbuf_printf(struct sbuf *, const char *, ...) __printflike(2, 3);

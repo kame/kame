@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/ia64/ia64/vm_machdep.c,v 1.76 2003/11/16 23:40:06 alc Exp $
+ * $FreeBSD: src/sys/ia64/ia64/vm_machdep.c,v 1.84 2004/05/26 12:09:37 tmm Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -66,8 +66,6 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-
-#include "opt_kstack_pages.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -100,20 +98,6 @@
 
 #include <i386/include/psl.h>
 
-static void	sf_buf_init(void *arg);
-SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
-
-/*
- * Expanded sf_freelist head. Really an SLIST_HEAD() in disguise, with the
- * sf_freelist head with the sf_lock mutex.
- */
-static struct {
-	SLIST_HEAD(, sf_buf) sf_head;
-	struct mtx sf_lock;
-} sf_freelist;
-
-static u_int	sf_buf_alloc_want;
-
 void
 cpu_thread_exit(struct thread *td)
 {
@@ -129,7 +113,7 @@ cpu_thread_setup(struct thread *td)
 {
 	intptr_t sp;
 
-	sp = td->td_kstack + KSTACK_PAGES * PAGE_SIZE;
+	sp = td->td_kstack + td->td_kstack_pages * PAGE_SIZE;
 	sp -= sizeof(struct pcb);
 	td->td_pcb = (struct pcb *)sp;
 	sp -= sizeof(struct trapframe);
@@ -257,7 +241,7 @@ cpu_fork(struct thread *td1, struct proc *p2 __unused, struct thread *td2,
 	 * create an image of the parent's stack and backing store and
 	 * adjust where necessary.
 	 */
-	stackp = (char *)(td2->td_kstack + KSTACK_PAGES * PAGE_SIZE);
+	stackp = (char *)(td2->td_kstack + td2->td_kstack_pages * PAGE_SIZE);
 
 	stackp -= sizeof(struct pcb);
 	td2->td_pcb = (struct pcb *)stackp;
@@ -318,85 +302,25 @@ cpu_exit(struct thread *td)
 	ia64_highfp_drop(td);
 }
 
-void
-cpu_sched_exit(td)
-	register struct thread *td;
-{
-}
-
 /*
- * Allocate a pool of sf_bufs (sendfile(2) or "super-fast" if you prefer. :-))
- */
-static void
-sf_buf_init(void *arg)
-{
-	struct sf_buf *sf_bufs;
-	int i;
-
-	mtx_init(&sf_freelist.sf_lock, "sf_bufs list lock", NULL, MTX_DEF);
-	SLIST_INIT(&sf_freelist.sf_head);
-	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
-	    M_NOWAIT | M_ZERO);
-	for (i = 0; i < nsfbufs; i++)
-		SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf_bufs+i, free_list);
-	sf_buf_alloc_want = 0;
-}
-
-/*
- * Get an sf_buf from the freelist. Will block if none are available.
+ * Allocate an sf_buf for the given vm_page.  On this machine, however, there
+ * is no sf_buf object.  Instead, an opaque pointer to the given vm_page is
+ * returned.
  */
 struct sf_buf *
-sf_buf_alloc(struct vm_page *m)
+sf_buf_alloc(struct vm_page *m, int pri)
 {
-	struct sf_buf *sf;
-	int error;
 
-	mtx_lock(&sf_freelist.sf_lock);
-	while ((sf = SLIST_FIRST(&sf_freelist.sf_head)) == NULL) {
-		sf_buf_alloc_want++;
-		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM|PCATCH,
-		    "sfbufa", 0);
-		sf_buf_alloc_want--;
-
-		/* If we got a signal, don't risk going back to sleep. */
-		if (error)
-			break;
-	}
-	if (sf != NULL) {
-		SLIST_REMOVE_HEAD(&sf_freelist.sf_head, free_list);
-		sf->m = m;
-	}
-	mtx_unlock(&sf_freelist.sf_lock);
-	return (sf);
+	return ((struct sf_buf *)m);
 }
 
 /*
- * Detach mapped page and release resources back to the system.
+ * Free the sf_buf.  In fact, do nothing because there are no resources
+ * associated with the sf_buf.
  */
 void
-sf_buf_free(void *addr, void *args)
+sf_buf_free(struct sf_buf *sf)
 {
-	struct sf_buf *sf;
-	struct vm_page *m;
-
-	sf = args;
-	m = sf->m;
-	vm_page_lock_queues();
-	vm_page_unwire(m, 0);
-	/*
-	 * Check for the object going away on us. This can happen since we
-	 * don't hold a reference to it. If so, we're responsible for freeing
-	 * the page.
-	 */
-	if (m->wire_count == 0 && m->object == NULL)
-		vm_page_free(m);
-	vm_page_unlock_queues();
-	sf->m = NULL;
-	mtx_lock(&sf_freelist.sf_lock);
-	SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf, free_list);
-	if (sf_buf_alloc_want > 0)
-		wakeup_one(&sf_freelist);
-	mtx_unlock(&sf_freelist.sf_lock);
 }
 
 /*

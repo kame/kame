@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_diskless.c,v 1.6 2003/11/14 20:54:08 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_diskless.c,v 1.8 2004/07/28 21:54:57 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -235,3 +231,17 @@ decode_nfshandle(char *ev, u_char *fh)
 		}
 	}
 }
+
+#if !defined(BOOTP_NFSROOT)
+static void
+nfs_rootconf(void)
+{
+
+	nfs_setup_diskless();
+	if (nfs_diskless_valid)
+		rootdevnames[0] = "nfs:";
+}
+
+SYSINIT(cpu_rootconf, SI_SUB_ROOT_CONF, SI_ORDER_FIRST, nfs_rootconf, NULL)
+#endif
+

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netsmb/smb_trantcp.c,v 1.18 2003/06/11 05:32:09 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_trantcp.c,v 1.21 2004/06/17 22:48:11 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/condvar.h>
@@ -238,7 +238,9 @@ nb_connect_in(struct nbpcb *nbp, struct sockaddr_in *to, struct thread *td)
 	nbp->nbp_tso = so;
 	so->so_upcallarg = (caddr_t)nbp;
 	so->so_upcall = nb_upcall;
+	SOCKBUF_LOCK(&so->so_rcv);
 	so->so_rcv.sb_flags |= SB_UPCALL;
+	SOCKBUF_UNLOCK(&so->so_rcv);
 	so->so_rcv.sb_timeo = (5 * hz);
 	so->so_snd.sb_timeo = (5 * hz);
 	error = soreserve(so, nbp->nbp_sndbuf, nbp->nbp_rcvbuf);
@@ -246,8 +248,12 @@ nb_connect_in(struct nbpcb *nbp, struct sockaddr_in *to, struct thread *td)
 		goto bad;
 	nb_setsockopt_int(so, SOL_SOCKET, SO_KEEPALIVE, 1);
 	nb_setsockopt_int(so, IPPROTO_TCP, TCP_NODELAY, 1);
+	SOCKBUF_LOCK(&so->so_rcv);
 	so->so_rcv.sb_flags &= ~SB_NOINTR;
+	SOCKBUF_UNLOCK(&so->so_rcv);
+	SOCKBUF_LOCK(&so->so_snd);
 	so->so_snd.sb_flags &= ~SB_NOINTR;
+	SOCKBUF_UNLOCK(&so->so_snd);
 	error = soconnect(so, (struct sockaddr*)to, td);
 	if (error)
 		goto bad;
@@ -414,8 +420,8 @@ nbssn_recv(struct nbpcb *nbp, struct mbuf **mpp, int *lenp,
 		 * If we don't have one waiting, return.
 		 */
 		error = nbssn_recvhdr(nbp, &len, &rpcode, MSG_DONTWAIT, td);
-		if (so->so_state &
-		    (SS_ISDISCONNECTING | SS_ISDISCONNECTED | SS_CANTRCVMORE)) {
+		if ((so->so_state & (SS_ISDISCONNECTING | SS_ISDISCONNECTED)) ||
+		    (so->so_rcv.sb_state & SBS_CANTRCVMORE)) {
 			nbp->nbp_state = NBST_CLOSED;
 			NBDEBUG("session closed by peer\n");
 			return ECONNRESET;
@@ -564,7 +570,7 @@ smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap, struct thread *td)
 		slen = sap->sa_len;
 		if (slen < NB_MINSALEN)
 			break;
-		snb = (struct sockaddr_nb*)dup_sockaddr(sap, 1);
+		snb = (struct sockaddr_nb*)sodupsockaddr(sap, M_WAITOK);
 		if (snb == NULL) {
 			error = ENOMEM;
 			break;
@@ -597,7 +603,7 @@ smb_nbst_connect(struct smb_vc *vcp, struct sockaddr *sap, struct thread *td)
 		free(nbp->nbp_paddr, M_SONAME);
 		nbp->nbp_paddr = NULL;
 	}
-	snb = (struct sockaddr_nb*)dup_sockaddr(sap, 1);
+	snb = (struct sockaddr_nb*)sodupsockaddr(sap, M_WAITOK);
 	if (snb == NULL)
 		return ENOMEM;
 	nbp->nbp_paddr = snb;

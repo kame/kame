@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.h	8.3 (Berkeley) 5/2/95
- * $FreeBSD: src/sys/netinet/if_ether.h,v 1.28 2003/03/04 23:19:52 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.h,v 1.30 2004/04/07 20:46:13 imp Exp $
  */
 
 #ifndef _NETINET_IF_ETHER_H_
@@ -113,8 +109,8 @@ struct sockaddr_inarp {
 extern u_char	ether_ipmulticast_min[ETHER_ADDR_LEN];
 extern u_char	ether_ipmulticast_max[ETHER_ADDR_LEN];
 
-int	arpresolve(struct ifnet *, struct rtentry *, struct mbuf *,
-	    struct sockaddr *, u_char *, struct rtentry *);
+int	arpresolve(struct ifnet *ifp, struct rtentry *rt,
+		struct mbuf *m, struct sockaddr *dst, u_char *desten);
 void	arp_ifinit(struct ifnet *, struct ifaddr *);
 #endif
 

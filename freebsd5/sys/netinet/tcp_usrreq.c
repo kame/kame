@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,10 +27,11 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.90.2.1 2004/01/09 12:32:36 andre Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.107 2004/08/16 18:32:07 rwatson Exp $
  */
 
 #include "opt_ipsec.h"
+#include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_tcpdebug.h"
 
@@ -89,7 +86,7 @@
  */
 extern	char *tcpstates[];	/* XXX ??? */
 
-static int	tcp_attach(struct socket *, struct thread *td);
+static int	tcp_attach(struct socket *);
 static int	tcp_connect(struct tcpcb *, struct sockaddr *,
 		    struct thread *td);
 #ifdef INET6
@@ -119,7 +116,6 @@ static struct tcpcb *
 static int
 tcp_usr_attach(struct socket *so, int proto, struct thread *td)
 {
-	int s = splnet();
 	int error;
 	struct inpcb *inp;
 	struct tcpcb *tp = 0;
@@ -133,7 +129,7 @@ tcp_usr_attach(struct socket *so, int proto, struct thread *td)
 		goto out;
 	}
 
-	error = tcp_attach(so, td);
+	error = tcp_attach(so);
 	if (error)
 		goto out;
 
@@ -145,7 +141,6 @@ tcp_usr_attach(struct socket *so, int proto, struct thread *td)
 out:
 	TCPDEBUG2(PRU_ATTACH);
 	INP_INFO_WUNLOCK(&tcbinfo);
-	splx(s);
 	return error;
 }
 
@@ -159,7 +154,6 @@ out:
 static int
 tcp_usr_detach(struct socket *so)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
@@ -167,10 +161,9 @@ tcp_usr_detach(struct socket *so)
 
 	INP_INFO_WLOCK(&tcbinfo);
 	inp = sotoinpcb(so);
-	if (inp == 0) {
+	if (inp == NULL) {
 		INP_INFO_WUNLOCK(&tcbinfo);
-		splx(s);
-		return EINVAL;	/* XXX */
+		return error;
 	}
 	INP_LOCK(inp);
 	tp = intotcpcb(inp);
@@ -181,7 +174,6 @@ tcp_usr_detach(struct socket *so)
 	if (tp)
 		INP_UNLOCK(inp);
 	INP_INFO_WUNLOCK(&tcbinfo);
-	splx(s);
 	return error;
 }
 
@@ -202,7 +194,6 @@ tcp_usr_detach(struct socket *so)
 				INP_INFO_RUNLOCK(&tcbinfo);	\
 			else if (inirw == INI_WRITE)		\
 				INP_INFO_WUNLOCK(&tcbinfo);	\
-			splx(s);				\
 			return EINVAL;				\
 		}						\
 		INP_LOCK(inp);					\
@@ -219,7 +210,6 @@ out:	TCPDEBUG2(req);						\
 			INP_UNLOCK(inp);			\
 		if (inirw == INI_WRITE)				\
 			INP_INFO_WUNLOCK(&tcbinfo);		\
-		splx(s);					\
 		return error;					\
 		goto out;					\
 } while(0)
@@ -230,26 +220,25 @@ out:	TCPDEBUG2(req);						\
 static int
 tcp_usr_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
 	struct sockaddr_in *sinp;
 	const int inirw = INI_WRITE;
 
-	COMMON_START();
-
+	sinp = (struct sockaddr_in *)nam;
+	if (nam->sa_len != sizeof (*sinp))
+		return (EINVAL);
 	/*
 	 * Must check for multicast addresses and disallow binding
 	 * to them.
 	 */
-	sinp = (struct sockaddr_in *)nam;
 	if (sinp->sin_family == AF_INET &&
-	    IN_MULTICAST(ntohl(sinp->sin_addr.s_addr))) {
-		error = EAFNOSUPPORT;
-		goto out;
-	}
-	error = in_pcbbind(inp, nam, td);
+	    IN_MULTICAST(ntohl(sinp->sin_addr.s_addr)))
+		return (EAFNOSUPPORT);
+
+	COMMON_START();
+	error = in_pcbbind(inp, nam, td->td_ucred);
 	if (error)
 		goto out;
 	COMMON_END(PRU_BIND);
@@ -259,25 +248,24 @@ tcp_usr_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 static int
 tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
 	struct sockaddr_in6 *sin6p;
 	const int inirw = INI_WRITE;
 
-	COMMON_START();
-
+	sin6p = (struct sockaddr_in6 *)nam;
+	if (nam->sa_len != sizeof (*sin6p))
+		return (EINVAL);
 	/*
 	 * Must check for multicast addresses and disallow binding
 	 * to them.
 	 */
-	sin6p = (struct sockaddr_in6 *)nam;
 	if (sin6p->sin6_family == AF_INET6 &&
-	    IN6_IS_ADDR_MULTICAST(&sin6p->sin6_addr)) {
-		error = EAFNOSUPPORT;
-		goto out;
-	}
+	    IN6_IS_ADDR_MULTICAST(&sin6p->sin6_addr))
+		return (EAFNOSUPPORT);
+
+	COMMON_START();
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
 	if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
@@ -289,11 +277,12 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 			in6_sin6_2_sin(&sin, sin6p);
 			inp->inp_vflag |= INP_IPV4;
 			inp->inp_vflag &= ~INP_IPV6;
-			error = in_pcbbind(inp, (struct sockaddr *)&sin, td);
+			error = in_pcbbind(inp, (struct sockaddr *)&sin,
+			    td->td_ucred);
 			goto out;
 		}
 	}
-	error = in6_pcbbind(inp, nam, td);
+	error = in6_pcbbind(inp, nam, td->td_ucred);
 	if (error)
 		goto out;
 	COMMON_END(PRU_BIND);
@@ -306,7 +295,6 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 static int
 tcp_usr_listen(struct socket *so, struct thread *td)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
@@ -314,7 +302,7 @@ tcp_usr_listen(struct socket *so, struct thread *td)
 
 	COMMON_START();
 	if (inp->inp_lport == 0)
-		error = in_pcbbind(inp, (struct sockaddr *)0, td);
+		error = in_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
 	if (error == 0)
 		tp->t_state = TCPS_LISTEN;
 	COMMON_END(PRU_LISTEN);
@@ -324,7 +312,6 @@ tcp_usr_listen(struct socket *so, struct thread *td)
 static int
 tcp6_usr_listen(struct socket *so, struct thread *td)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
@@ -335,7 +322,7 @@ tcp6_usr_listen(struct socket *so, struct thread *td)
 		inp->inp_vflag &= ~INP_IPV4;
 		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0)
 			inp->inp_vflag |= INP_IPV4;
-		error = in6_pcbbind(inp, (struct sockaddr *)0, td);
+		error = in6_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
 	}
 	if (error == 0)
 		tp->t_state = TCPS_LISTEN;
@@ -353,28 +340,25 @@ tcp6_usr_listen(struct socket *so, struct thread *td)
 static int
 tcp_usr_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
 	struct sockaddr_in *sinp;
 	const int inirw = INI_WRITE;
 
-	COMMON_START();
-
+	sinp = (struct sockaddr_in *)nam;
+	if (nam->sa_len != sizeof (*sinp))
+		return (EINVAL);
 	/*
 	 * Must disallow TCP ``connections'' to multicast addresses.
 	 */
-	sinp = (struct sockaddr_in *)nam;
 	if (sinp->sin_family == AF_INET
-	    && IN_MULTICAST(ntohl(sinp->sin_addr.s_addr))) {
-		error = EAFNOSUPPORT;
-		goto out;
-	}
-
+	    && IN_MULTICAST(ntohl(sinp->sin_addr.s_addr)))
+		return (EAFNOSUPPORT);
 	if (td && jailed(td->td_ucred))
 		prison_remote_ip(td->td_ucred, 0, &sinp->sin_addr.s_addr);
 
+	COMMON_START();
 	if ((error = tcp_connect(tp, nam, td)) != 0)
 		goto out;
 	error = tcp_output(tp);
@@ -385,25 +369,23 @@ tcp_usr_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 static int
 tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
 	struct sockaddr_in6 *sin6p;
 	const int inirw = INI_WRITE;
 
-	COMMON_START();
-
+	sin6p = (struct sockaddr_in6 *)nam;
+	if (nam->sa_len != sizeof (*sin6p))
+		return (EINVAL);
 	/*
 	 * Must disallow TCP ``connections'' to multicast addresses.
 	 */
-	sin6p = (struct sockaddr_in6 *)nam;
 	if (sin6p->sin6_family == AF_INET6
-	    && IN6_IS_ADDR_MULTICAST(&sin6p->sin6_addr)) {
-		error = EAFNOSUPPORT;
-		goto out;
-	}
+	    && IN6_IS_ADDR_MULTICAST(&sin6p->sin6_addr))
+		return (EAFNOSUPPORT);
 
+	COMMON_START();
 	if (IN6_IS_ADDR_V4MAPPED(&sin6p->sin6_addr)) {
 		struct sockaddr_in sin;
 
@@ -444,7 +426,6 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 static int
 tcp_usr_disconnect(struct socket *so)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
@@ -463,7 +444,6 @@ tcp_usr_disconnect(struct socket *so)
 static int
 tcp_usr_accept(struct socket *so, struct sockaddr **nam)
 {
-	int s;
 	int error = 0;
 	struct inpcb *inp = NULL;
 	struct tcpcb *tp = NULL;
@@ -476,12 +456,10 @@ tcp_usr_accept(struct socket *so, struct sockaddr **nam)
 		goto out;
 	}
 
-	s = splnet();
 	INP_INFO_RLOCK(&tcbinfo);
 	inp = sotoinpcb(so);
 	if (!inp) {
 		INP_INFO_RUNLOCK(&tcbinfo);
-		splx(s);
 		return (EINVAL);
 	}
 	INP_LOCK(inp);
@@ -489,7 +467,7 @@ tcp_usr_accept(struct socket *so, struct sockaddr **nam)
 	tp = intotcpcb(inp);
 	TCPDEBUG1();
 
-	/* 
+	/*
 	 * We inline in_setpeeraddr and COMMON_END here, so that we can
 	 * copy the data of interest and defer the malloc until after we
 	 * release the lock.
@@ -500,7 +478,6 @@ tcp_usr_accept(struct socket *so, struct sockaddr **nam)
 out:	TCPDEBUG2(PRU_ACCEPT);
 	if (tp)
 		INP_UNLOCK(inp);
-	splx(s);
 	if (error == 0)
 		*nam = in_sockaddr(port, &addr);
 	return error;
@@ -510,7 +487,6 @@ out:	TCPDEBUG2(PRU_ACCEPT);
 static int
 tcp6_usr_accept(struct socket *so, struct sockaddr **nam)
 {
-	int s;
 	struct inpcb *inp = NULL;
 	int error = 0;
 	struct tcpcb *tp = NULL;
@@ -525,19 +501,17 @@ tcp6_usr_accept(struct socket *so, struct sockaddr **nam)
 		goto out;
 	}
 
-	s = splnet();
 	INP_INFO_RLOCK(&tcbinfo);
 	inp = sotoinpcb(so);
 	if (inp == 0) {
 		INP_INFO_RUNLOCK(&tcbinfo);
-		splx(s);
 		return (EINVAL);
 	}
 	INP_LOCK(inp);
 	INP_INFO_RUNLOCK(&tcbinfo);
 	tp = intotcpcb(inp);
 	TCPDEBUG1();
-	/* 
+	/*
 	 * We inline in6_mapped_peeraddr and COMMON_END here, so that we can
 	 * copy the data of interest and defer the malloc until after we
 	 * release the lock.
@@ -554,7 +528,6 @@ tcp6_usr_accept(struct socket *so, struct sockaddr **nam)
 out:	TCPDEBUG2(PRU_ACCEPT);
 	if (tp)
 		INP_UNLOCK(inp);
-	splx(s);
 	if (error == 0) {
 		if (v4)
 			*nam = in6_v4mapsin6_sockaddr(port, &addr);
@@ -566,8 +539,8 @@ out:	TCPDEBUG2(PRU_ACCEPT);
 #endif /* INET6 */
 
 /*
- * This is the wrapper function for in_setsockaddr. We just pass down 
- * the pcbinfo for in_setsockaddr to lock. We don't want to do the locking 
+ * This is the wrapper function for in_setsockaddr. We just pass down
+ * the pcbinfo for in_setsockaddr to lock. We don't want to do the locking
  * here because in_setsockaddr will call malloc and can block.
  */
 static int
@@ -592,7 +565,6 @@ tcp_peeraddr(struct socket *so, struct sockaddr **nam)
 static int
 tcp_usr_shutdown(struct socket *so)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
@@ -612,7 +584,6 @@ tcp_usr_shutdown(struct socket *so)
 static int
 tcp_usr_rcvd(struct socket *so, int flags)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
@@ -631,10 +602,9 @@ tcp_usr_rcvd(struct socket *so, int flags)
  * generally are caller-frees.
  */
 static int
-tcp_usr_send(struct socket *so, int flags, struct mbuf *m, 
+tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 	     struct sockaddr *nam, struct mbuf *control, struct thread *td)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
@@ -655,7 +625,7 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 	if (inp == NULL) {
 		/*
 		 * OOPS! we lost a race, the TCP session got reset after
-		 * we checked SS_CANTSENDMORE, eg: while doing uiomove or a
+		 * we checked SBS_CANTSENDMORE, eg: while doing uiomove or a
 		 * network interrupt in the non-splnet() section of sosend().
 		 */
 		if (m)
@@ -758,7 +728,7 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 		error = tcp_output(tp);
 		tp->t_force = 0;
 	}
-	COMMON_END((flags & PRUS_OOB) ? PRU_SENDOOB : 
+	COMMON_END((flags & PRUS_OOB) ? PRU_SENDOOB :
 		   ((flags & PRUS_EOF) ? PRU_SEND_EOF : PRU_SEND));
 }
 
@@ -768,7 +738,6 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 static int
 tcp_usr_abort(struct socket *so)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
@@ -785,7 +754,6 @@ tcp_usr_abort(struct socket *so)
 static int
 tcp_usr_rcvoob(struct socket *so, struct mbuf *m, int flags)
 {
-	int s = splnet();
 	int error = 0;
 	struct inpcb *inp;
 	struct tcpcb *tp;
@@ -793,7 +761,7 @@ tcp_usr_rcvoob(struct socket *so, struct mbuf *m, int flags)
 
 	COMMON_START();
 	if ((so->so_oobmark == 0 &&
-	     (so->so_state & SS_RCVATMARK) == 0) ||
+	     (so->so_rcv.sb_state & SBS_RCVATMARK) == 0) ||
 	    so->so_options & SO_OOBINLINE ||
 	    tp->t_oobflags & TCPOOB_HADDATA) {
 		error = EINVAL;
@@ -856,7 +824,7 @@ tcp_connect(tp, nam, td)
 	bzero(&tao, sizeof(tao));
 
 	if (inp->inp_lport == 0) {
-		error = in_pcbbind(inp, (struct sockaddr *)0, td);
+		error = in_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
 		if (error)
 			return error;
 	}
@@ -869,7 +837,7 @@ tcp_connect(tp, nam, td)
 	laddr = inp->inp_laddr;
 	lport = inp->inp_lport;
 	error = in_pcbconnect_setup(inp, nam, &laddr.s_addr, &lport,
-	    &inp->inp_faddr.s_addr, &inp->inp_fport, &oinp, td);
+	    &inp->inp_faddr.s_addr, &inp->inp_fport, &oinp, td->td_ucred);
 	if (error && oinp == NULL)
 		return error;
 	if (oinp) {
@@ -940,7 +908,7 @@ tcp6_connect(tp, nam, td)
 	bzero(&tao, sizeof(tao));
 
 	if (inp->inp_lport == 0) {
-		error = in6_pcbbind(inp, (struct sockaddr *)0, td);
+		error = in6_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
 		if (error)
 			return error;
 	}
@@ -974,8 +942,11 @@ tcp6_connect(tp, nam, td)
 		inp->in6p_laddr = *addr6;
 	inp->in6p_faddr = sin6->sin6_addr;
 	inp->inp_fport = sin6->sin6_port;
-	if ((sin6->sin6_flowinfo & IPV6_FLOWINFO_MASK) != 0)
-		inp->in6p_flowinfo = sin6->sin6_flowinfo;
+	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
+	inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
+	if (inp->in6p_flags & IN6P_AUTOFLOWLABEL)
+		inp->in6p_flowinfo |=
+		    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
 	in_pcbrehash(inp);
 
 	/* Compute window scaling to request.  */
@@ -1026,30 +997,27 @@ tcp_ctloutput(so, sopt)
 	struct socket *so;
 	struct sockopt *sopt;
 {
-	int	error, opt, optval, s;
+	int	error, opt, optval;
 	struct	inpcb *inp;
 	struct	tcpcb *tp;
 
 	error = 0;
-	s = splnet();		/* XXX */
 	INP_INFO_RLOCK(&tcbinfo);
 	inp = sotoinpcb(so);
 	if (inp == NULL) {
 		INP_INFO_RUNLOCK(&tcbinfo);
-		splx(s);
 		return (ECONNRESET);
 	}
 	INP_LOCK(inp);
 	INP_INFO_RUNLOCK(&tcbinfo);
 	if (sopt->sopt_level != IPPROTO_TCP) {
+		INP_UNLOCK(inp);
 #ifdef INET6
 		if (INP_CHECK_SOCKAF(so, AF_INET6))
 			error = ip6_ctloutput(so, sopt);
 		else
 #endif /* INET6 */
 		error = ip_ctloutput(so, sopt);
-		INP_UNLOCK(inp);
-		splx(s);
 		return (error);
 	}
 	tp = intotcpcb(inp);
@@ -1057,6 +1025,19 @@ tcp_ctloutput(so, sopt)
 	switch (sopt->sopt_dir) {
 	case SOPT_SET:
 		switch (sopt->sopt_name) {
+#ifdef TCP_SIGNATURE
+		case TCP_MD5SIG:
+			error = sooptcopyin(sopt, &optval, sizeof optval,
+					    sizeof optval);
+			if (error)
+				break;
+
+			if (optval > 0)
+				tp->t_flags |= TF_SIGNATURE;
+			else
+				tp->t_flags &= ~TF_SIGNATURE;
+			break;
+#endif /* TCP_SIGNATURE */
 		case TCP_NODELAY:
 		case TCP_NOOPT:
 			error = sooptcopyin(sopt, &optval, sizeof optval,
@@ -1117,6 +1098,11 @@ tcp_ctloutput(so, sopt)
 
 	case SOPT_GET:
 		switch (sopt->sopt_name) {
+#ifdef TCP_SIGNATURE
+		case TCP_MD5SIG:
+			optval = (tp->t_flags & TF_SIGNATURE) ? 1 : 0;
+			break;
+#endif
 		case TCP_NODELAY:
 			optval = tp->t_flags & TF_NODELAY;
 			break;
@@ -1138,7 +1124,6 @@ tcp_ctloutput(so, sopt)
 		break;
 	}
 	INP_UNLOCK(inp);
-	splx(s);
 	return (error);
 }
 
@@ -1148,10 +1133,10 @@ tcp_ctloutput(so, sopt)
  * be set by the route).
  */
 u_long	tcp_sendspace = 1024*32;
-SYSCTL_INT(_net_inet_tcp, TCPCTL_SENDSPACE, sendspace, CTLFLAG_RW, 
+SYSCTL_INT(_net_inet_tcp, TCPCTL_SENDSPACE, sendspace, CTLFLAG_RW,
     &tcp_sendspace , 0, "Maximum outgoing TCP datagram size");
 u_long	tcp_recvspace = 1024*64;
-SYSCTL_INT(_net_inet_tcp, TCPCTL_RECVSPACE, recvspace, CTLFLAG_RW, 
+SYSCTL_INT(_net_inet_tcp, TCPCTL_RECVSPACE, recvspace, CTLFLAG_RW,
     &tcp_recvspace , 0, "Maximum incoming TCP datagram size");
 
 /*
@@ -1160,9 +1145,8 @@ SYSCTL_INT(_net_inet_tcp, TCPCTL_RECVSPACE, recvspace, CTLFLAG_RW,
  * bufer space, and entering LISTEN state if to accept connections.
  */
 static int
-tcp_attach(so, td)
+tcp_attach(so)
 	struct socket *so;
-	struct thread *td;
 {
 	register struct tcpcb *tp;
 	struct inpcb *inp;
@@ -1176,7 +1160,7 @@ tcp_attach(so, td)
 		if (error)
 			return (error);
 	}
-	error = in_pcballoc(so, &tcbinfo, td, "tcpinp");
+	error = in_pcballoc(so, &tcbinfo, "tcpinp");
 	if (error)
 		return (error);
 	inp = sotoinpcb(so);

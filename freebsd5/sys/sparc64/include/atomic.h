@@ -25,7 +25,7 @@
  * SUCH DAMAGE.
  *
  *	from: FreeBSD: src/sys/i386/include/atomic.h,v 1.20 2001/02/11
- * $FreeBSD: src/sys/sparc64/include/atomic.h,v 1.6 2002/12/21 08:53:26 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/atomic.h,v 1.8 2004/05/22 00:52:16 marius Exp $
  */
 
 #ifndef	_MACHINE_ATOMIC_H_
@@ -78,7 +78,7 @@
  * Hopefully sun will choose not to change the bit numbers.
  */
 
-#define	itype(sz)	u_int ## sz ## _t
+#define	itype(sz)	uint ## sz ## _t
 
 #define	atomic_cas_32(p, e, s)	casa(p, e, s, __ASI_ATOMIC)
 #define	atomic_cas_64(p, e, s)	casxa(p, e, s, __ASI_ATOMIC)
@@ -269,11 +269,11 @@ atomic_store_rel_ ## name(volatile ptype p, vtype v)			\
 	atomic_store_rel(p, v, sz);					\
 }
 
-ATOMIC_GEN(int, int *, int, int, 32);
-ATOMIC_GEN(32, int *, int, int, 32);
+ATOMIC_GEN(int, u_int *, u_int, u_int, 32);
+ATOMIC_GEN(32, uint32_t *, uint32_t, uint32_t, 32);
 
-ATOMIC_GEN(long, long *, long, long, 64);
-ATOMIC_GEN(64, long *, long, long, 64);
+ATOMIC_GEN(long, u_long *, u_long, u_long, 64);
+ATOMIC_GEN(64, uint64_t *, uint64_t, uint64_t, 64);
 
 ATOMIC_GEN(ptr, void *, void *, uintptr_t, 64);
 

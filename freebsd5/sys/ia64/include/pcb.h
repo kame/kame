@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003 Doug Rabson
+ * Copyright (c) 2003,2004 Marcel Moolenaar
  * Copyright (c) 2000 Doug Rabson
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/include/pcb.h,v 1.13 2003/08/12 03:51:53 marcel Exp $
+ *	$FreeBSD: src/sys/ia64/include/pcb.h,v 1.16 2004/08/16 19:05:08 marcel Exp $
  */
 
 #ifndef _MACHINE_PCB_H_
@@ -46,26 +46,27 @@ struct pcb {
 
 	uint64_t		pcb_onfault;	/* for copy faults */
 
-#if IA32
+	/* IA32 specific registers. */
 	uint64_t		pcb_ia32_cflg;
 	uint64_t		pcb_ia32_eflag;
 	uint64_t		pcb_ia32_fcr;
 	uint64_t		pcb_ia32_fdr;
 	uint64_t		pcb_ia32_fir;
 	uint64_t		pcb_ia32_fsr;
-#endif
 };
 
 #ifdef _KERNEL
 
 #define	savectx(p)	swapctx(p, NULL)
+
+struct trapframe;
+
+void makectx(struct trapframe *, struct pcb *);
 void restorectx(struct pcb *) __dead2;
 int swapctx(struct pcb *old, struct pcb *new);
 
-#if IA32
 void ia32_restorectx(struct pcb *);
 void ia32_savectx(struct pcb *);
-#endif
 
 #endif
 

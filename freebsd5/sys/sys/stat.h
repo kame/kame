@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stat.h	8.12 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/sys/stat.h,v 1.37 2003/05/22 17:07:57 mike Exp $
+ * $FreeBSD: src/sys/sys/stat.h,v 1.40 2004/06/17 17:16:52 phk Exp $
  */
 
 #ifndef _SYS_STAT_H_
@@ -125,13 +121,13 @@ struct ostat {
 #endif /* __BSD_VISIBLE */
 
 struct stat {
-	__udev_t  st_dev;		/* inode's device */
+	__dev_t   st_dev;		/* inode's device */
 	ino_t	  st_ino;		/* inode's number */
 	mode_t	  st_mode;		/* inode protection mode */
 	nlink_t	  st_nlink;		/* number of hard links */
 	uid_t	  st_uid;		/* user ID of the file's owner */
 	gid_t	  st_gid;		/* group ID of the file's group */
-	__udev_t  st_rdev;		/* device type */
+	__dev_t   st_rdev;		/* device type */
 #if __BSD_VISIBLE
 	struct	timespec st_atimespec;	/* time of last access */
 	struct	timespec st_mtimespec;	/* time of last data modification */
@@ -172,13 +168,13 @@ struct stat {
 
 #if __BSD_VISIBLE
 struct nstat {
-	__udev_t st_dev;		/* inode's device */
+	__dev_t   st_dev;		/* inode's device */
 	ino_t	  st_ino;		/* inode's number */
 	__uint32_t st_mode;		/* inode protection mode */
 	__uint32_t st_nlink;		/* number of hard links */
 	uid_t	  st_uid;		/* user ID of the file's owner */
 	gid_t	  st_gid;		/* group ID of the file's group */
-	__udev_t st_rdev;		/* device type */
+	__dev_t   st_rdev;		/* device type */
 	struct	timespec st_atimespec;	/* time of last access */
 	struct	timespec st_mtimespec;	/* time of last data modification */
 	struct	timespec st_ctimespec;	/* time of last file status change */

@@ -31,7 +31,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_tel.c,v 1.31 2003/11/10 14:20:34 gj Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_tel.c,v 1.34 2004/06/16 09:47:10 phk Exp $");
 
 #include "i4btel.h"
 
@@ -132,9 +132,10 @@ static d_read_t i4btelwrite;
 static d_ioctl_t i4btelioctl;
 static d_poll_t i4btelpoll;
 
-#define CDEV_MAJOR 56
 
 static struct cdevsw i4btel_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	i4btelopen,
 	.d_close =	i4btelclose,
 	.d_read =	i4btelread,
@@ -142,7 +143,6 @@ static struct cdevsw i4btel_cdevsw = {
 	.d_ioctl =	i4btelioctl,
 	.d_poll =	i4btelpoll,
 	.d_name =	"i4btel",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static void i4btelattach(void *);
@@ -196,7 +196,7 @@ i4btelattach(void *dummy)
  *	open tel device
  *---------------------------------------------------------------------------*/
 static int
-i4btelopen(dev_t dev, int flag, int fmt, struct thread *td)
+i4btelopen(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	int unit = UNIT(dev);
 	int func = FUNC(dev);
@@ -225,7 +225,7 @@ i4btelopen(dev_t dev, int flag, int fmt, struct thread *td)
  *	close tel device
  *---------------------------------------------------------------------------*/
 static int
-i4btelclose(dev_t dev, int flag, int fmt, struct thread *td)
+i4btelclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	int unit = UNIT(dev);
 	int func = FUNC(dev);
@@ -268,7 +268,7 @@ i4btelclose(dev_t dev, int flag, int fmt, struct thread *td)
  *	i4btelioctl - device driver ioctl routine
  *---------------------------------------------------------------------------*/
 static int
-i4btelioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+i4btelioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	int unit = UNIT(dev);
 	int func = FUNC(dev);
@@ -390,7 +390,7 @@ i4btelioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
  *	read from tel device
  *---------------------------------------------------------------------------*/
 static int
-i4btelread(dev_t dev, struct uio *uio, int ioflag)
+i4btelread(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	int unit = UNIT(dev);
 	int func = FUNC(dev);
@@ -523,7 +523,7 @@ i4btelread(dev_t dev, struct uio *uio, int ioflag)
  *	write to tel device
  *---------------------------------------------------------------------------*/
 static int
-i4btelwrite(dev_t dev, struct uio * uio, int ioflag)
+i4btelwrite(struct cdev *dev, struct uio * uio, int ioflag)
 {
 	int unit = UNIT(dev);
 	int func = FUNC(dev);
@@ -683,7 +683,7 @@ tel_tone(tel_sc_t *sc)
  *	device driver poll
  *---------------------------------------------------------------------------*/
 static int
-i4btelpoll(dev_t dev, int events, struct thread *td)
+i4btelpoll(struct cdev *dev, int events, struct thread *td)
 {
 	int revents = 0;	/* Events we found */
 	int s;

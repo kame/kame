@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -38,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_log.c,v 1.59 2003/11/09 09:17:24 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_log.c,v 1.62 2004/06/16 09:47:12 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,6 +65,8 @@ static	void logtimeout(void *arg);
 
 #define CDEV_MAJOR 7
 static struct cdevsw log_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	logopen,
 	.d_close =	logclose,
 	.d_read =	logread,
@@ -94,7 +92,7 @@ SYSCTL_INT(_kern, OID_AUTO, log_wakeups_per_second, CTLFLAG_RW,
 
 /*ARGSUSED*/
 static	int
-logopen(dev_t dev, int flags, int mode, struct thread *td)
+logopen(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	if (log_open)
 		return (EBUSY);
@@ -112,7 +110,7 @@ logopen(dev_t dev, int flags, int mode, struct thread *td)
 
 /*ARGSUSED*/
 static	int
-logclose(dev_t dev, int flag, int mode, struct thread *td)
+logclose(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 
 	log_open = 0;
@@ -124,7 +122,7 @@ logclose(dev_t dev, int flag, int mode, struct thread *td)
 
 /*ARGSUSED*/
 static	int
-logread(dev_t dev, struct uio *uio, int flag)
+logread(struct cdev *dev, struct uio *uio, int flag)
 {
 	char buf[128];
 	struct msgbuf *mbp = msgbufp;
@@ -159,7 +157,7 @@ logread(dev_t dev, struct uio *uio, int flag)
 
 /*ARGSUSED*/
 static	int
-logpoll(dev_t dev, int events, struct thread *td)
+logpoll(struct cdev *dev, int events, struct thread *td)
 {
 	int s;
 	int revents = 0;
@@ -205,7 +203,7 @@ logtimeout(void *arg)
 
 /*ARGSUSED*/
 static	int
-logioctl(dev_t dev, u_long com, caddr_t data, int flag, struct thread *td)
+logioctl(struct cdev *dev, u_long com, caddr_t data, int flag, struct thread *td)
 {
 
 	switch (com) {

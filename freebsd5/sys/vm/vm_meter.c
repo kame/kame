@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_meter.c,v 1.73 2003/06/11 23:50:50 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_meter.c,v 1.76 2004/08/16 06:16:12 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,6 +51,14 @@ __FBSDID("$FreeBSD: src/sys/vm/vm_meter.c,v 1.73 2003/06/11 23:50:50 obrien Exp 
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <sys/sysctl.h>
+
+/*
+ * Virtual memory MPSAFE temporary workarounds.
+ */
+int debug_mpsafevm;
+TUNABLE_INT("debug.mpsafevm", &debug_mpsafevm);
+SYSCTL_INT(_debug, OID_AUTO, mpsafevm, CTLFLAG_RD, &debug_mpsafevm, 0,
+    "Enable/disable MPSAFE virtual memory support");
 
 struct vmmeter cnt;
 
@@ -100,7 +104,14 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 	GIANT_REQUIRED;
 	mtx_lock(&vm_object_list_mtx);
 	TAILQ_FOREACH(object, &vm_object_list, object_list) {
-		VM_OBJECT_LOCK(object);
+		if (!VM_OBJECT_TRYLOCK(object)) {
+			/*
+			 * Avoid a lock-order reversal.  Consequently,
+			 * the reported number of active pages may be
+			 * greater than the actual number.
+			 */
+			continue;
+		}
 		vm_object_clear_flag(object, OBJ_ACTIVE);
 		VM_OBJECT_UNLOCK(object);
 	}
@@ -176,12 +187,16 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 	 */
 	mtx_lock(&vm_object_list_mtx);
 	TAILQ_FOREACH(object, &vm_object_list, object_list) {
-		VM_OBJECT_LOCK(object);
 		/*
-		 * devices, like /dev/mem, will badly skew our totals
+		 * Perform unsynchronized reads on the object to avoid
+		 * a lock-order reversal.  In this case, the lack of
+		 * synchronization should not impair the accuracy of
+		 * the reported statistics. 
 		 */
 		if (object->type == OBJT_DEVICE) {
-			VM_OBJECT_UNLOCK(object);
+			/*
+			 * Devices, like /dev/mem, will badly skew our totals.
+			 */
 			continue;
 		}
 		totalp->t_vm += object->size;
@@ -199,7 +214,6 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 				totalp->t_armshr += object->resident_page_count;
 			}
 		}
-		VM_OBJECT_UNLOCK(object);
 	}
 	mtx_unlock(&vm_object_list_mtx);
 	totalp->t_free = cnt.v_free_count + cnt.v_cache_count;

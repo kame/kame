@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/locore.S,v 1.33 2003/09/09 05:59:09 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/locore.S,v 1.35 2004/08/07 21:55:15 marcel Exp $
  */
 
 #include <machine/asm.h>
@@ -136,17 +136,10 @@ ENTRY(fork_trampoline, 0)
 	.global		enter_userland
 	.type		enter_userland, @function
 enter_userland:
-{	.mmi
-	add		r14=24,sp
-	;;
-	ld8		r14=[r14]
+{	.mfb
 	nop		0
-	;;
-}
-{	.mbb
-	cmp.eq		p6,p7=r0,r14
-(p6)	br.sptk		exception_restore
-(p7)	br.sptk		epc_syscall_return
+	nop		0
+	br.sptk		epc_syscall_return
 	;;
 }
 END(fork_trampoline)
@@ -190,7 +183,7 @@ ENTRY(os_boot_rendez,0)
 	;;
 	srlz.d
 	mov	r16 = (PTE_P|PTE_MA_WB|PTE_A|PTE_D|PTE_PL_KERN|PTE_AR_RWX)
-	mov	r18 = IA64_ID_PAGE_SHIFT<<2
+	mov	r18 = 28<<2
 	;;
 
 	mov	cr.ifa = r17

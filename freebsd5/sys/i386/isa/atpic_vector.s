@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -32,7 +28,7 @@
  * SUCH DAMAGE.
  *
  *	from: vector.s, 386BSD 0.1 unknown origin
- * $FreeBSD: src/sys/i386/isa/atpic_vector.s,v 1.40 2003/11/14 20:06:24 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/atpic_vector.s,v 1.47 2004/05/26 07:43:41 bde Exp $
  */
 
 /*
@@ -41,12 +37,6 @@
  */
 
 #include <machine/asmacros.h>
-#include <i386/isa/icu.h>
-#ifdef PC98
-#include <pc98/pc98/pc98.h>
-#else
-#include <i386/isa/isa.h>
-#endif
 
 #include "assym.s"
 
@@ -63,13 +53,13 @@ IDTVEC(vec_name) ;							\
 	pushl	%ds ;		/* save data and extra segments ... */	\
 	pushl	%es ;							\
 	pushl	%fs ;							\
-	mov	$KDSEL,%ax ;	/* load kernel ds, es and fs */		\
-	mov	%ax,%ds ;						\
-	mov	%ax,%es ;						\
-	mov	$KPSEL,%ax ;						\
-	mov	%ax,%fs ;						\
+	movl	$KDSEL, %eax ;	/* reload with kernel's data segment */	\
+	movl	%eax, %ds ;						\
+	movl	%eax, %es ;						\
+	movl	$KPSEL, %eax ;	/* reload with per-CPU data segment */	\
+	movl	%eax, %fs ;						\
 ;									\
-	FAKE_MCOUNT(13*4(%esp)) ;	/* XXX late to avoid double count */ \
+	FAKE_MCOUNT(TF_EIP(%esp)) ;					\
 	pushl	$irq_num; 	/* pass the IRQ */			\
 	call	atpic_handle_intr ;					\
 	addl	$4, %esp ;	/* discard the parameter */		\
@@ -77,7 +67,6 @@ IDTVEC(vec_name) ;							\
 	MEXITCOUNT ;							\
 	jmp	doreti
 
-MCOUNT_LABEL(bintr)
 	INTR(0, atpic_intr0)
 	INTR(1, atpic_intr1)
 	INTR(2, atpic_intr2)
@@ -94,4 +83,3 @@ MCOUNT_LABEL(bintr)
 	INTR(13, atpic_intr13)
 	INTR(14, atpic_intr14)
 	INTR(15, atpic_intr15)
-MCOUNT_LABEL(eintr)

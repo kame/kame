@@ -18,7 +18,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_physio.c,v 1.62 2003/11/15 09:28:08 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_physio.c,v 1.64 2004/08/10 21:47:11 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -32,17 +32,14 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_physio.c,v 1.62 2003/11/15 09:28:08 phk Ex
 #include <vm/vm_extern.h>
 
 int
-physio(dev_t dev, struct uio *uio, int ioflag)
+physio(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	int i;
 	int error;
-	int spl;
 	caddr_t sa;
 	u_int iolen;
 	struct buf *bp;
 
-	/* We cannot trust the device driver to hold Giant for us */
-	mtx_lock(&Giant);
 	/* Keep the process UPAGES from being swapped. XXX: why ? */
 	PHOLD(curproc);
 
@@ -99,12 +96,10 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 				}
 
 			DEV_STRATEGY(bp);
-			spl = splbio();
 			if (uio->uio_rw == UIO_READ)
 				bwait(bp, PRIBIO, "physrd");
 			else
 				bwait(bp, PRIBIO, "physwr");
-			splx(spl);
 
 			if (uio->uio_segflg == UIO_USERSPACE)
 				vunmapbuf(bp);
@@ -125,6 +120,5 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 doerror:
 	relpbuf(bp, NULL);
 	PRELE(curproc);
-	mtx_unlock(&Giant);
 	return (error);
 }

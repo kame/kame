@@ -37,7 +37,7 @@
  * Authors: Archie Cobbs <archie@freebsd.org>
  *	    Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.27 2003/10/31 18:32:11 brooks Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.38 2004/07/28 06:54:55 kan Exp $
  */
 
 /*
@@ -64,15 +64,15 @@
 #include <netgraph/ng_parse.h>
 #include <netgraph/ng_ether.h>
 
-#define IFP2AC(IFP)  ((struct arpcom *)IFP)
 #define IFP2NG(ifp)  ((struct ng_node *)((struct arpcom *)(ifp))->ac_netgraph)
+#define IFP2NG_SET(ifp, val)	(((struct arpcom *)(ifp))->ac_netgraph = (val))
 
 /* Per-node private data */
 struct private {
 	struct ifnet	*ifp;		/* associated interface */
 	hook_p		upper;		/* upper hook connection */
-	hook_p		lower;		/* lower OR orphan hook connection */
-	u_char		lowerOrphan;	/* whether lower is lower or orphan */
+	hook_p		lower;		/* lower hook connection */
+	hook_p		orphan;		/* orphan hook connection */
 	u_char		autoSrcAddr;	/* always overwrite source address */
 	u_char		promisc;	/* promiscuous mode enabled */
 	u_long		hwassist;	/* hardware checksum capabilities */
@@ -95,9 +95,8 @@ static void	ng_ether_attach(struct ifnet *ifp);
 static void	ng_ether_detach(struct ifnet *ifp); 
 
 /* Other functions */
-static void	ng_ether_input2(node_p node, struct mbuf **mp);
-static int	ng_ether_rcv_lower(node_p node, struct mbuf *m, meta_p meta);
-static int	ng_ether_rcv_upper(node_p node, struct mbuf *m, meta_p meta);
+static int	ng_ether_rcv_lower(node_p node, struct mbuf *m);
+static int	ng_ether_rcv_upper(node_p node, struct mbuf *m);
 
 /* Netgraph node methods */
 static ng_constructor_t	ng_ether_constructor;
@@ -108,19 +107,6 @@ static ng_connect_t	ng_ether_connect;
 static ng_rcvdata_t	ng_ether_rcvdata;
 static ng_disconnect_t	ng_ether_disconnect;
 static int		ng_ether_mod_event(module_t mod, int event, void *data);
-
-/* Parse type for an Ethernet address */
-static ng_parse_t	ng_enaddr_parse;
-static ng_unparse_t	ng_enaddr_unparse;
-const struct ng_parse_type ng_ether_enaddr_type = {
-	NULL,
-	NULL,
-	NULL,
-	ng_enaddr_parse,
-	ng_enaddr_unparse,
-	NULL,			/* no such thing as a "default" EN address */
-	0
-};
 
 /* List of commands and how to convert arguments to/from ASCII */
 static const struct ng_cmdlist ng_ether_cmdlist[] = {
@@ -143,13 +129,13 @@ static const struct ng_cmdlist ng_ether_cmdlist[] = {
 	  NGM_ETHER_GET_ENADDR,
 	  "getenaddr",
 	  NULL,
-	  &ng_ether_enaddr_type
+	  &ng_parse_enaddr_type
 	},
 	{
 	  NGM_ETHER_COOKIE,
 	  NGM_ETHER_SET_ENADDR,
 	  "setenaddr",
-	  &ng_ether_enaddr_type,
+	  &ng_parse_enaddr_type,
 	  NULL
 	},
 	{
@@ -184,18 +170,17 @@ static const struct ng_cmdlist ng_ether_cmdlist[] = {
 };
 
 static struct ng_type ng_ether_typestruct = {
-	NG_ABI_VERSION,
-	NG_ETHER_NODE_TYPE,
-	ng_ether_mod_event,
-	ng_ether_constructor,
-	ng_ether_rcvmsg,
-	ng_ether_shutdown,
-	ng_ether_newhook,
-	NULL,
-	ng_ether_connect,
-	ng_ether_rcvdata,
-	ng_ether_disconnect,
-	ng_ether_cmdlist,
+	.version =	NG_ABI_VERSION,
+	.name =		NG_ETHER_NODE_TYPE,
+	.mod_event =	ng_ether_mod_event,
+	.constructor =	ng_ether_constructor,
+	.rcvmsg =	ng_ether_rcvmsg,
+	.shutdown =	ng_ether_shutdown,
+	.newhook =	ng_ether_newhook,
+	.connect =	ng_ether_connect,
+	.rcvdata =	ng_ether_rcvdata,
+	.disconnect =	ng_ether_disconnect,
+	.cmdlist =	ng_ether_cmdlist,
 };
 MODULE_VERSION(ng_ether, 1);
 NETGRAPH_INIT(ether, &ng_ether_typestruct);
@@ -215,11 +200,12 @@ ng_ether_input(struct ifnet *ifp, struct mbuf **mp)
 {
 	const node_p node = IFP2NG(ifp);
 	const priv_p priv = NG_NODE_PRIVATE(node);
+	int error;
 
 	/* If "lower" hook not connected, let packet continue */
-	if (priv->lower == NULL || priv->lowerOrphan)
+	if (priv->lower == NULL)
 		return;
-	ng_ether_input2(node, mp);
+	NG_SEND_DATA_ONLY(error, priv->lower, *mp);	/* sets *mp = NULL */
 }
 
 /*
@@ -233,33 +219,14 @@ ng_ether_input_orphan(struct ifnet *ifp, struct mbuf *m)
 {
 	const node_p node = IFP2NG(ifp);
 	const priv_p priv = NG_NODE_PRIVATE(node);
+	int error;
 
-	/* If "orphan" hook not connected, let packet continue */
-	if (priv->lower == NULL || !priv->lowerOrphan) {
+	/* If "orphan" hook not connected, discard packet */
+	if (priv->orphan == NULL) {
 		m_freem(m);
 		return;
 	}
-	ng_ether_input2(node, &m);
-	if (m != NULL)
-		m_freem(m);
-}
-
-/*
- * Handle a packet that has come in on an ethernet interface.
- * The Ethernet header has already been detached from the mbuf,
- * so we have to put it back.
- *
- * NOTE: this function will get called at splimp()
- */
-static void
-ng_ether_input2(node_p node, struct mbuf **mp)
-{
-	const priv_p priv = NG_NODE_PRIVATE(node);
-	int error;
-
-	/* Send out lower/orphan hook */
-	NG_SEND_DATA_ONLY(error, priv->lower, *mp);
-	*mp = NULL;
+	NG_SEND_DATA_ONLY(error, priv->orphan, m);
 }
 
 /*
@@ -310,7 +277,7 @@ ng_ether_attach(struct ifnet *ifp)
 	}
 	NG_NODE_SET_PRIVATE(node, priv);
 	priv->ifp = ifp;
-	IFP2NG(ifp) = node;
+	IFP2NG_SET(ifp, node);
 	priv->autoSrcAddr = 1;
 	priv->hwassist = ifp->if_hwassist;
 
@@ -339,7 +306,7 @@ ng_ether_detach(struct ifnet *ifp)
 	 * So zap it now. XXX We HOPE that anything running at this time
 	 * handles it (as it should in the non netgraph case).
 	 */
-	IFP2NG(ifp) = NULL;
+	IFP2NG_SET(ifp, NULL);
 	priv->ifp = NULL;	/* XXX race if interrupted an output packet */
 	ng_rmnode_self(node);		/* remove all netgraph parts */
 }
@@ -366,7 +333,6 @@ static	int
 ng_ether_newhook(node_p node, hook_p hook, const char *name)
 {
 	const priv_p priv = NG_NODE_PRIVATE(node);
-	u_char orphan = priv->lowerOrphan;
 	hook_p *hookptr;
 
 	/* Divert hook is an alias for lower */
@@ -376,13 +342,11 @@ ng_ether_newhook(node_p node, hook_p hook, const char *name)
 	/* Which hook? */
 	if (strcmp(name, NG_ETHER_HOOK_UPPER) == 0)
 		hookptr = &priv->upper;
-	else if (strcmp(name, NG_ETHER_HOOK_LOWER) == 0) {
+	else if (strcmp(name, NG_ETHER_HOOK_LOWER) == 0)
 		hookptr = &priv->lower;
-		orphan = 0;
-	} else if (strcmp(name, NG_ETHER_HOOK_ORPHAN) == 0) {
-		hookptr = &priv->lower;
-		orphan = 1;
-	} else
+	else if (strcmp(name, NG_ETHER_HOOK_ORPHAN) == 0)
+		hookptr = &priv->orphan;
+	else
 		return (EINVAL);
 
 	/* Check if already connected (shouldn't be, but doesn't hurt) */
@@ -395,7 +359,6 @@ ng_ether_newhook(node_p node, hook_p hook, const char *name)
 
 	/* OK */
 	*hookptr = hook;
-	priv->lowerOrphan = orphan;
 	return (0);
 }
 
@@ -523,32 +486,28 @@ ng_ether_rcvdata(hook_p hook, item_p item)
 	const node_p node = NG_HOOK_NODE(hook);
 	const priv_p priv = NG_NODE_PRIVATE(node);
 	struct mbuf *m;
-	meta_p meta;
 
 	NGI_GET_M(item, m);
-	NGI_GET_META(item, meta);
 	NG_FREE_ITEM(item);
-	if (hook == priv->lower)
-		return ng_ether_rcv_lower(node, m, meta);
+
+	if (hook == priv->lower || hook == priv->orphan)
+		return ng_ether_rcv_lower(node, m);
 	if (hook == priv->upper)
-		return ng_ether_rcv_upper(node, m, meta);
+		return ng_ether_rcv_upper(node, m);
 	panic("%s: weird hook", __func__);
-#ifdef RESTARTABLE_PANICS /* so we don;t get an error msg in LINT */
+#ifdef RESTARTABLE_PANICS /* so we don't get an error msg in LINT */
 	return NULL;
 #endif
 }
 
 /*
- * Handle an mbuf received on the "lower" hook.
+ * Handle an mbuf received on the "lower" or "orphan" hook.
  */
 static int
-ng_ether_rcv_lower(node_p node, struct mbuf *m, meta_p meta)
+ng_ether_rcv_lower(node_p node, struct mbuf *m)
 {
 	const priv_p priv = NG_NODE_PRIVATE(node);
  	struct ifnet *const ifp = priv->ifp;
-
-	/* Discard meta info */
-	NG_FREE_META(meta);
 
 	/* Check whether interface is ready for packets */
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING)) {
@@ -587,12 +546,9 @@ ng_ether_rcv_lower(node_p node, struct mbuf *m, meta_p meta)
  * Handle an mbuf received on the "upper" hook.
  */
 static int
-ng_ether_rcv_upper(node_p node, struct mbuf *m, meta_p meta)
+ng_ether_rcv_upper(node_p node, struct mbuf *m)
 {
 	const priv_p priv = NG_NODE_PRIVATE(node);
-
-	/* Discard meta info */
-	NG_FREE_META(meta);
 
 	m->m_pkthdr.rcvif = priv->ifp;
 
@@ -610,11 +566,7 @@ ng_ether_shutdown(node_p node)
 {
 	const priv_p priv = NG_NODE_PRIVATE(node);
 
-	if (priv->promisc) {		/* disable promiscuous mode */
-		(void)ifpromisc(priv->ifp, 0);
-		priv->promisc = 0;
-	}
-	if (node->nd_flags & NG_REALLY_DIE) {
+	if (node->nd_flags & NGF_REALLY_DIE) {
 		/*
 		 * WE came here because the ethernet card is being unloaded,
 		 * so stop being persistant.
@@ -626,8 +578,13 @@ ng_ether_shutdown(node_p node)
 		NG_NODE_UNREF(node);	/* free node itself */
 		return (0);
 	}
+	if (priv->promisc) {		/* disable promiscuous mode */
+		(void)ifpromisc(priv->ifp, 0);
+		priv->promisc = 0;
+	}
 	priv->autoSrcAddr = 1;		/* reset auto-src-addr flag */
-	node->nd_flags &= ~NG_INVALID;	/* Signal ng_rmnode we are persisant */
+	NG_NODE_REVIVE(node);		/* Signal ng_rmnode we are persisant */
+
 	return (0);
 }
 
@@ -641,57 +598,17 @@ ng_ether_disconnect(hook_p hook)
 
 	if (hook == priv->upper) {
 		priv->upper = NULL;
-		priv->ifp->if_hwassist = priv->hwassist;  /* restore h/w csum */
-	} else if (hook == priv->lower) {
+		if (priv->ifp != NULL)		/* restore h/w csum */
+			priv->ifp->if_hwassist = priv->hwassist;
+	} else if (hook == priv->lower)
 		priv->lower = NULL;
-		priv->lowerOrphan = 0;
-	} else
+	else if (hook == priv->orphan)
+		priv->orphan = NULL;
+	else
 		panic("%s: weird hook", __func__);
 	if ((NG_NODE_NUMHOOKS(NG_HOOK_NODE(hook)) == 0)
 	&& (NG_NODE_IS_VALID(NG_HOOK_NODE(hook))))
 		ng_rmnode_self(NG_HOOK_NODE(hook));	/* reset node */
-	return (0);
-}
-
-static int
-ng_enaddr_parse(const struct ng_parse_type *type,
-	const char *s, int *const off, const u_char *const start,
-	u_char *const buf, int *const buflen)
-{
-	char *eptr;
-	u_long val;
-	int i;
-
-	if (*buflen < ETHER_ADDR_LEN)
-		return (ERANGE);
-	for (i = 0; i < ETHER_ADDR_LEN; i++) {
-		val = strtoul(s + *off, &eptr, 16);
-		if (val > 0xff || eptr == s + *off)
-			return (EINVAL);
-		buf[i] = (u_char)val;
-		*off = (eptr - s);
-		if (i < ETHER_ADDR_LEN - 1) {
-			if (*eptr != ':')
-				return (EINVAL);
-			(*off)++;
-		}
-	}
-	*buflen = ETHER_ADDR_LEN;
-	return (0);
-}
-
-static int
-ng_enaddr_unparse(const struct ng_parse_type *type,
-	const u_char *data, int *off, char *cbuf, int cbuflen)
-{
-	int len;
-
-	len = snprintf(cbuf, cbuflen, "%02x:%02x:%02x:%02x:%02x:%02x",
-	    data[*off], data[*off + 1], data[*off + 2],
-	    data[*off + 3], data[*off + 4], data[*off + 5]);
-	if (len >= cbuflen)
-		return (ERANGE);
-	*off += ETHER_ADDR_LEN;
 	return (0);
 }
 

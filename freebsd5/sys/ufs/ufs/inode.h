@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)inode.h	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ufs/inode.h,v 1.44 2003/08/15 20:03:19 phk Exp $
+ * $FreeBSD: src/sys/ufs/ufs/inode.h,v 1.46 2004/07/28 06:41:27 kan Exp $
  */
 
 #ifndef _UFS_UFS_INODE_H_
@@ -140,6 +136,12 @@ struct inode {
 #define	DIP(ip, field) \
 	(((ip)->i_ump->um_fstype == UFS1) ? \
 	(ip)->i_din1->d##field : (ip)->i_din2->d##field)
+#define	DIP_SET(ip, field, val) do { \
+	if ((ip)->i_ump->um_fstype == UFS1) \
+		(ip)->i_din1->d##field = (val); \
+	else \
+		(ip)->i_din2->d##field = (val); \
+	} while (0)
 
 #define	MAXSYMLINKLEN(ip) \
 	((ip)->i_ump->um_fstype == UFS1) ? \

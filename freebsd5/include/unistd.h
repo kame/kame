@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	8.12 (Berkeley) 4/27/95
- * $FreeBSD: src/include/unistd.h,v 1.69.2.1 2003/12/18 00:59:50 peter Exp $
+ * $FreeBSD: src/include/unistd.h,v 1.73 2004/02/23 04:51:07 ache Exp $
  */
 
 #ifndef _UNISTD_H_
@@ -371,10 +371,13 @@ ssize_t	 write(int, const void *, size_t);
 /* 1003.2-1992 */
 #if __POSIX_VISIBLE >= 199209 || __XSI_VISIBLE
 size_t	 confstr(int, char *, size_t);
+#ifndef _GETOPT_DECLARED
+#define	_GETOPT_DECLARED
 int	 getopt(int, char * const [], const char *);
 
 extern char *optarg;			/* getopt(3) external variables */
 extern int optind, opterr, optopt;
+#endif /* _GETOPT_DECLARED */
 #endif
 
 /* ISO/IEC 9945-1: 1996 */
@@ -539,12 +542,10 @@ int	 undelete(const char *);
 int	 unwhiteout(const char *);
 void	*valloc(size_t);			/* obsoleted by malloc() */
 
-extern char *suboptarg;			/* getsubopt(3) external variable */
-#ifndef _GETSUBOPT_DECLARED
-int	 getsubopt(char **, char * const *, char **);
-#define	_GETSUBOPT_DECLARED
-#endif
+#ifndef _OPTRESET_DECLARED
+#define	_OPTRESET_DECLARED
 extern int optreset;			/* getopt(3) external variable */
+#endif
 #endif /* __BSD_VISIBLE */
 __END_DECLS
 

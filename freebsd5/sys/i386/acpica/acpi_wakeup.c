@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_wakeup.c,v 1.30 2003/11/03 22:18:57 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_wakeup.c,v 1.37.2.1 2004/08/23 05:14:18 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -37,13 +37,10 @@ __FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_wakeup.c,v 1.30 2003/11/03 22:18:57
 #include <sys/sysctl.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/cpufunc.h>
@@ -55,22 +52,17 @@ __FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_wakeup.c,v 1.30 2003/11/03 22:18:57
 
 #include "acpi_wakecode.h"
 
-#if __FreeBSD_version < 500000
-#define	vm_page_lock_queues()
-#define	vm_page_unlock_queues()
-#endif
-
 extern uint32_t	acpi_reset_video;
 extern void	initializecpu(void);
 
 static struct region_descriptor	r_idt, r_gdt, *p_gdt;
-static u_int16_t	r_ldt;
+static uint16_t		r_ldt;
 
-static u_int32_t	r_eax, r_ebx, r_ecx, r_edx, r_ebp, r_esi, r_edi,
+static uint32_t		r_eax, r_ebx, r_ecx, r_edx, r_ebp, r_esi, r_edi,
 			r_efl, r_cr0, r_cr2, r_cr3, r_cr4, ret_addr;
 
-static u_int16_t	r_cs, r_ds, r_es, r_fs, r_gs, r_ss, r_tr;
-static u_int32_t	r_esp = 0;
+static uint16_t		r_cs, r_ds, r_es, r_fs, r_gs, r_ss, r_tr;
+static uint32_t		r_esp = 0;
 
 static void		acpi_printcpu(void);
 static void		acpi_realmodeinst(void *arg, bus_dma_segment_t *segs,
@@ -81,7 +73,7 @@ static void		acpi_alloc_wakeup_handler(void);
 extern int		acpi_savecpu(void);
 extern int		acpi_restorecpu(void);
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 __asm__("				\n\
 	.text				\n\
 	.p2align 2, 0x90		\n\
@@ -148,7 +140,7 @@ acpi_savecpu:				\n\
 	movl	$1,%eax			\n\
 	ret				\n\
 ");
-#endif /* __GNUC__ */
+#endif /* __GNUC__ || __INTEL_COMPILER */
 
 static void
 acpi_printcpu(void)
@@ -168,14 +160,14 @@ acpi_printcpu(void)
 }
 
 #define WAKECODE_FIXUP(offset, type, val) do	{		\
-	void	**addr;						\
-	addr = (void **)(sc->acpi_wakeaddr + offset);		\
-	(type *)*addr = val;					\
+	type	*addr;						\
+	addr = (type *)(sc->acpi_wakeaddr + offset);		\
+	*addr = val;						\
 } while (0)
 
 #define WAKECODE_BCOPY(offset, type, val) do	{		\
-	void	**addr;						\
-	addr = (void **)(sc->acpi_wakeaddr + offset);		\
+	void	*addr;						\
+	addr = (void *)(sc->acpi_wakeaddr + offset);		\
 	bcopy(&(val), addr, sizeof(type));			\
 } while (0)
 
@@ -183,22 +175,20 @@ int
 acpi_sleep_machdep(struct acpi_softc *sc, int state)
 {
 	ACPI_STATUS		status;
-	vm_paddr_t		oldphys;
 	struct pmap		*pm;
 	vm_page_t		page;
-	static vm_page_t	opage = NULL;
-	int			ret = 0;
-	u_int32_t		cr3;
+	int			ret;
+	uint32_t		cr3;
 	u_long			ef;
 	struct proc		*p;
 
+	ret = 0;
 	if (sc->acpi_wakeaddr == 0)
 		return (0);
 
 	AcpiSetFirmwareWakingVector(sc->acpi_wakephys);
 
 	ef = read_eflags();
-	ACPI_DISABLE_IRQS();
 
 	/* Create Identity Mapping */
 	if ((p = curproc) == NULL)
@@ -211,14 +201,12 @@ acpi_sleep_machdep(struct acpi_softc *sc, int state)
 	load_cr3(vtophys(pm->pm_pdir));
 #endif
 
-	oldphys = pmap_extract(pm, sc->acpi_wakephys);
-	if (oldphys)
-		opage = PHYS_TO_VM_PAGE(oldphys);
 	page = PHYS_TO_VM_PAGE(sc->acpi_wakephys);
 	pmap_enter(pm, sc->acpi_wakephys, page,
 		   VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE, 1);
 
 	ret_addr = 0;
+	ACPI_DISABLE_IRQS();
 	if (acpi_savecpu()) {
 		/* Execute Sleep */
 		intr_suspend();
@@ -228,28 +216,28 @@ acpi_sleep_machdep(struct acpi_softc *sc, int state)
 		p_gdt->rd_limit = r_gdt.rd_limit;
 		p_gdt->rd_base = vtophys(r_gdt.rd_base);
 
-		WAKECODE_FIXUP(physical_esp, u_int32_t, vtophys(r_esp));
-		WAKECODE_FIXUP(previous_cr0, u_int32_t, r_cr0);
-		WAKECODE_FIXUP(previous_cr2, u_int32_t, r_cr2);
-		WAKECODE_FIXUP(previous_cr3, u_int32_t, r_cr3);
-		WAKECODE_FIXUP(previous_cr4, u_int32_t, r_cr4);
+		WAKECODE_FIXUP(physical_esp, uint32_t, vtophys(r_esp));
+		WAKECODE_FIXUP(previous_cr0, uint32_t, r_cr0);
+		WAKECODE_FIXUP(previous_cr2, uint32_t, r_cr2);
+		WAKECODE_FIXUP(previous_cr3, uint32_t, r_cr3);
+		WAKECODE_FIXUP(previous_cr4, uint32_t, r_cr4);
 
 		WAKECODE_FIXUP(reset_video, uint32_t, acpi_reset_video);
 
-		WAKECODE_FIXUP(previous_tr,  u_int16_t, r_tr);
+		WAKECODE_FIXUP(previous_tr,  uint16_t, r_tr);
 		WAKECODE_BCOPY(previous_gdt, struct region_descriptor, r_gdt);
-		WAKECODE_FIXUP(previous_ldt, u_int16_t, r_ldt);
+		WAKECODE_FIXUP(previous_ldt, uint16_t, r_ldt);
 		WAKECODE_BCOPY(previous_idt, struct region_descriptor, r_idt);
 
-		WAKECODE_FIXUP(where_to_recover, void, acpi_restorecpu);
+		WAKECODE_FIXUP(where_to_recover, void *, acpi_restorecpu);
 
-		WAKECODE_FIXUP(previous_ds,  u_int16_t, r_ds);
-		WAKECODE_FIXUP(previous_es,  u_int16_t, r_es);
-		WAKECODE_FIXUP(previous_fs,  u_int16_t, r_fs);
-		WAKECODE_FIXUP(previous_gs,  u_int16_t, r_gs);
-		WAKECODE_FIXUP(previous_ss,  u_int16_t, r_ss);
+		WAKECODE_FIXUP(previous_ds,  uint16_t, r_ds);
+		WAKECODE_FIXUP(previous_es,  uint16_t, r_es);
+		WAKECODE_FIXUP(previous_fs,  uint16_t, r_fs);
+		WAKECODE_FIXUP(previous_gs,  uint16_t, r_gs);
+		WAKECODE_FIXUP(previous_ss,  uint16_t, r_ss);
 
-		if (acpi_get_verbose(sc))
+		if (bootverbose)
 			acpi_printcpu();
 
 		/* Call ACPICA to enter the desired sleep state */
@@ -269,28 +257,17 @@ acpi_sleep_machdep(struct acpi_softc *sc, int state)
 		for (;;) ;
 	} else {
 		/* Execute Wakeup */
-#if 0
-		initializecpu();
-#endif
 		intr_resume();
 
-		if (acpi_get_verbose(sc)) {
+		if (bootverbose) {
 			acpi_savecpu();
 			acpi_printcpu();
 		}
 	}
 
 out:
-	vm_page_lock_queues();
 	pmap_remove(pm, sc->acpi_wakephys, sc->acpi_wakephys + PAGE_SIZE);
-	vm_page_unlock_queues();
-	if (opage) {
-		pmap_enter(pm, sc->acpi_wakephys, page,
-			   VM_PROT_READ | VM_PROT_WRITE, 0);
-	}
-
 	load_cr3(cr3);
-
 	write_eflags(ef);
 
 	return (ret);
@@ -303,6 +280,8 @@ static vm_offset_t	acpi_wakeaddr = 0;
 static void
 acpi_alloc_wakeup_handler(void)
 {
+	void *wakeaddr;
+
 	if (!cold)
 		return;
 
@@ -314,12 +293,12 @@ acpi_alloc_wakeup_handler(void)
 		printf("acpi_alloc_wakeup_handler: can't create wake tag\n");
 		return;
 	}
-
-	if (bus_dmamem_alloc(acpi_waketag, (void **)&acpi_wakeaddr,
+	if (bus_dmamem_alloc(acpi_waketag, &wakeaddr,
 			     BUS_DMA_NOWAIT, &acpi_wakemap)) {
 		printf("acpi_alloc_wakeup_handler: can't alloc wake memory\n");
 		return;
 	}
+	acpi_wakeaddr = (vm_offset_t)wakeaddr;
 }
 
 SYSINIT(acpiwakeup, SI_SUB_KMEM, SI_ORDER_ANY, acpi_alloc_wakeup_handler, 0)
@@ -328,9 +307,9 @@ static void
 acpi_realmodeinst(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 {
 	struct acpi_softc	*sc = arg;
-	u_int32_t		*addr;
+	uint32_t		*addr;
 
-	addr = (u_int32_t *)&wakecode[wakeup_sw32 + 2];
+	addr = (uint32_t *)&wakecode[wakeup_sw32 + 2];
 	*addr = segs[0].ds_addr + wakeup_32;
 	bcopy(wakecode, (void *)sc->acpi_wakeaddr, sizeof(wakecode));
 	sc->acpi_wakephys = segs[0].ds_addr;

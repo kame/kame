@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_types.h	8.3 (Berkeley) 4/28/95
- * $FreeBSD: src/sys/net/if_types.h,v 1.14 2003/10/26 14:29:04 ume Exp $
+ * $FreeBSD: src/sys/net/if_types.h,v 1.16 2004/04/07 20:46:11 imp Exp $
  * $NetBSD: if_types.h,v 1.16 2000/04/19 06:30:53 itojun Exp $
  */
 
@@ -249,4 +245,6 @@
 #define	IFT_GIF		0xf0
 #define	IFT_PVC		0xf1
 #define	IFT_FAITH	0xf2
+#define	IFT_PFLOG	0xf6
+#define	IFT_PFSYNC	0xf7
 #endif /* !_NET_IF_TYPES_H_ */

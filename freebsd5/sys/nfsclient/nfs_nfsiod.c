@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_nfsiod.c,v 1.79 2003/11/14 20:54:08 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_nfsiod.c,v 1.81 2004/04/11 13:30:20 peadar Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -91,7 +87,7 @@ static unsigned int nfs_iodmaxidle = 120;
 SYSCTL_UINT(_vfs_nfs, OID_AUTO, iodmaxidle, CTLFLAG_RW, &nfs_iodmaxidle, 0, "");
 
 /* Maximum number of nfsiod kthreads */
-static unsigned int nfs_iodmax = 20;
+unsigned int nfs_iodmax = 20;
 
 /* Minimum number of nfsiod kthreads to keep as spares */
 static unsigned int nfs_iodmin = 4;
@@ -284,7 +280,9 @@ finish:
 	    nmp->nm_bufqiods--;
 	nfs_iodwant[myiod] = NULL;
 	nfs_iodmount[myiod] = NULL;
-	nfs_numasync--;
+	/* Someone may be waiting for the last nfsiod to terminate. */
+	if (--nfs_numasync == 0)
+		wakeup(&nfs_numasync);
 	if ((error == 0) || (error == EWOULDBLOCK))
 		kthread_exit(0);
 	/* Abnormal termination */

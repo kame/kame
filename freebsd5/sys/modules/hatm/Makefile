@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/hatm/Makefile,v 1.1 2003/06/17 16:12:49 harti Exp $
+# $FreeBSD: src/sys/modules/hatm/Makefile,v 1.2 2004/02/13 10:11:00 ru Exp $
 #
 # Author: Harti Brandt <harti@freebsd.org>
 #
@@ -9,8 +9,7 @@ SRCS=	if_hatm.c if_hatm_intr.c if_hatm_ioctl.c if_hatm_tx.c if_hatm_rx.c \
 	device_if.h bus_if.h pci_if.h opt_inet.h opt_natm.h
 
 CFLAGS+= -DENABLE_BPF
-# CFLAGS+= -DHATM_DEBUG -DINVARIANT_SUPPORT -DINVARIANTS -g
-# LDFLAGS+= -g
+# CFLAGS+= -DHATM_DEBUG -DINVARIANT_SUPPORT -DINVARIANTS
 
 opt_inet.h:
 	echo "#define INET 1" > opt_inet.h

@@ -26,7 +26,7 @@
  *
  *	from: NetBSD: profile.h,v 1.9 1997/04/06 08:47:37 cgd Exp
  *	from: FreeBSD: src/sys/alpha/include/profile.h,v 1.4 1999/12/29
- * $FreeBSD: src/sys/sparc64/include/profile.h,v 1.5 2002/07/30 06:14:34 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/profile.h,v 1.6 2004/05/19 15:41:26 bde Exp $
  */
 
 #ifndef _MACHINE_PROFILE_H_
@@ -46,38 +46,9 @@ typedef u_long	fptrdiff_t;
 #define	MCOUNT_ENTER(s)	s = rdpr(pil); wrpr(pil, 0, 14)
 #define	MCOUNT_EXIT(s)	wrpr(pil, 0, s)
 
-#ifdef GUPROF
-
-#define	CALIB_SCALE	1000
-#define	KCOUNT(p,index) \
-	((p)->kcount[(index) / (HISTFRACTION * sizeof(HISTCOUNTER))])
-#define	PC_TO_I(p, pc)	((uintfptr_t)(pc) - (uintfptr_t)(p)->lowpc)
-
-struct gmonparam;
-
-extern	int cputime_bias;
-
-int	cputime(void);
-void	nullfunc_loop_profiled(void);
-void	nullfunc_profiled(void);
-void	startguprof(struct gmonparam *p);
-void	stopguprof(struct gmonparam *p);
-
-#else /* GUPROF */
-
-#define startguprof(p)
-#define stopguprof(p)
-
-#endif /* GUPROF */
-
-void	empty_loop(void);
-void	kmupetext(uintfptr_t nhighpc);
 void	mcount(uintfptr_t frompc, uintfptr_t selfpc);
-void	mexitcount(uintfptr_t selfpc);
-void	nullfunc(void);
-void	nullfunc_loop(void);
 
-#else /* _KERNEL */
+#else /* !_KERNEL */
 
 typedef u_long	uintfptr_t;
 

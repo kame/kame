@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/sys_socket.c,v 1.55 2003/06/18 18:16:39 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/sys_socket.c,v 1.63 2004/07/22 20:40:23 rwatson Exp $");
 
 #include "opt_mac.h"
 
@@ -79,16 +75,18 @@ soo_read(fp, uio, active_cred, flags, td)
 	struct socket *so = fp->f_data;
 	int error;
 
-	mtx_lock(&Giant);
+	NET_LOCK_GIANT();
 #ifdef MAC
+	SOCK_LOCK(so);
 	error = mac_check_socket_receive(active_cred, so);
+	SOCK_UNLOCK(so);
 	if (error) {
-		mtx_unlock(&Giant);
+		NET_UNLOCK_GIANT();
 		return (error);
 	}
 #endif
 	error = so->so_proto->pr_usrreqs->pru_soreceive(so, 0, uio, 0, 0, 0);
-	mtx_unlock(&Giant);
+	NET_UNLOCK_GIANT();
 	return (error);
 }
 
@@ -104,17 +102,19 @@ soo_write(fp, uio, active_cred, flags, td)
 	struct socket *so = fp->f_data;
 	int error;
 
-	mtx_lock(&Giant);
+	NET_LOCK_GIANT();
 #ifdef MAC
+	SOCK_LOCK(so);
 	error = mac_check_socket_send(active_cred, so);
+	SOCK_UNLOCK(so);
 	if (error) {
-		mtx_unlock(&Giant);
+		NET_UNLOCK_GIANT();
 		return (error);
 	}
 #endif
 	error = so->so_proto->pr_usrreqs->pru_sosend(so, 0, uio, 0, 0, 0,
 						    uio->uio_td);
-	mtx_unlock(&Giant);
+	NET_UNLOCK_GIANT();
 	return (error);
 }
 
@@ -131,25 +131,46 @@ soo_ioctl(fp, cmd, data, active_cred, td)
 	switch (cmd) {
 
 	case FIONBIO:
+		SOCK_LOCK(so);
 		if (*(int *)data)
 			so->so_state |= SS_NBIO;
 		else
 			so->so_state &= ~SS_NBIO;
+		SOCK_UNLOCK(so);
 		return (0);
 
 	case FIOASYNC:
+		/*
+		 * XXXRW: This code separately acquires SOCK_LOCK(so)
+		 * and SOCKBUF_LOCK(&so->so_rcv) even though they are
+		 * the same mutex to avoid introducing the assumption
+		 * that they are the same.
+		 */
 		if (*(int *)data) {
+			SOCK_LOCK(so);
 			so->so_state |= SS_ASYNC;
+			SOCK_UNLOCK(so);
+			SOCKBUF_LOCK(&so->so_rcv);
 			so->so_rcv.sb_flags |= SB_ASYNC;
+			SOCKBUF_UNLOCK(&so->so_rcv);
+			SOCKBUF_LOCK(&so->so_snd);
 			so->so_snd.sb_flags |= SB_ASYNC;
+			SOCKBUF_UNLOCK(&so->so_snd);
 		} else {
+			SOCK_LOCK(so);
 			so->so_state &= ~SS_ASYNC;
+			SOCK_UNLOCK(so);
+			SOCKBUF_LOCK(&so->so_rcv);
 			so->so_rcv.sb_flags &= ~SB_ASYNC;
+			SOCKBUF_UNLOCK(&so->so_rcv);
+			SOCKBUF_LOCK(&so->so_snd);
 			so->so_snd.sb_flags &= ~SB_ASYNC;
+			SOCKBUF_UNLOCK(&so->so_snd);
 		}
 		return (0);
 
 	case FIONREAD:
+		/* Unlocked read. */
 		*(int *)data = so->so_rcv.sb_cc;
 		return (0);
 
@@ -168,7 +189,8 @@ soo_ioctl(fp, cmd, data, active_cred, td)
 		return (0);
 
 	case SIOCATMARK:
-		*(int *)data = (so->so_state&SS_RCVATMARK) != 0;
+		/* Unlocked read. */
+		*(int *)data = (so->so_rcv.sb_state & SBS_RCVATMARK) != 0;
 		return (0);
 	}
 	/*
@@ -203,22 +225,30 @@ soo_stat(fp, ub, active_cred, td)
 	struct thread *td;
 {
 	struct socket *so = fp->f_data;
+	int error;
 
 	bzero((caddr_t)ub, sizeof (*ub));
 	ub->st_mode = S_IFSOCK;
+	NET_LOCK_GIANT();
 	/*
-	 * If SS_CANTRCVMORE is set, but there's still data left in the
+	 * If SBS_CANTRCVMORE is set, but there's still data left in the
 	 * receive buffer, the socket is still readable.
+	 *
+	 * XXXRW: perhaps should lock socket buffer so st_size result
+	 * is consistent.
 	 */
-	if ((so->so_state & SS_CANTRCVMORE) == 0 ||
+	/* Unlocked read. */
+	if ((so->so_rcv.sb_state & SBS_CANTRCVMORE) == 0 ||
 	    so->so_rcv.sb_cc != 0)
 		ub->st_mode |= S_IRUSR | S_IRGRP | S_IROTH;
-	if ((so->so_state & SS_CANTSENDMORE) == 0)
+	if ((so->so_snd.sb_state & SBS_CANTSENDMORE) == 0)
 		ub->st_mode |= S_IWUSR | S_IWGRP | S_IWOTH;
 	ub->st_size = so->so_rcv.sb_cc - so->so_rcv.sb_ctl;
 	ub->st_uid = so->so_cred->cr_uid;
 	ub->st_gid = so->so_cred->cr_gid;
-	return ((*so->so_proto->pr_usrreqs->pru_sense)(so, ub));
+	error = (*so->so_proto->pr_usrreqs->pru_sense)(so, ub);
+	NET_UNLOCK_GIANT();
+	return (error);
 }
 
 /*
@@ -236,11 +266,13 @@ soo_close(fp, td)
 	int error = 0;
 	struct socket *so;
 
+	NET_LOCK_GIANT();
 	so = fp->f_data;
 	fp->f_ops = &badfileops;
 	fp->f_data = NULL;
 
 	if (so)
 		error = soclose(so);
+	NET_UNLOCK_GIANT();
 	return (error);
 }

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,12 +27,15 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_usrreq.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/raw_usrreq.c,v 1.30 2003/11/18 00:39:03 rwatson Exp $
+ * $FreeBSD: src/sys/net/raw_usrreq.c,v 1.34.4.1 2004/10/21 09:30:46 rwatson Exp $
  */
 
 #include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/mutex.h>
 #include <sys/protosw.h>
 #include <sys/signalvar.h>
 #include <sys/socket.h>
@@ -46,12 +45,15 @@
 
 #include <net/raw_cb.h>
 
+MTX_SYSINIT(rawcb_mtx, &rawcb_mtx, "rawcb", MTX_DEF);
+
 /*
  * Initialize raw connection block q.
  */
 void
 raw_init()
 {
+
 	LIST_INIT(&rawcb_list);
 }
 
@@ -75,6 +77,7 @@ raw_input(m0, proto, src, dst)
 	struct socket *last;
 
 	last = 0;
+	mtx_lock(&rawcb_mtx);
 	LIST_FOREACH(rp, &rawcb_list, list) {
 		if (rp->rcb_proto.sp_family != proto->sp_family)
 			continue;
@@ -119,6 +122,7 @@ raw_input(m0, proto, src, dst)
 		}
 	} else
 		m_freem(m);
+	mtx_unlock(&rawcb_mtx);
 }
 
 /*ARGSUSED*/
@@ -142,8 +146,10 @@ raw_uabort(struct socket *so)
 	if (rp == 0)
 		return EINVAL;
 	raw_disconnect(rp);
+	soisdisconnected(so);
+	ACCEPT_LOCK();
+	SOCK_LOCK(so);
 	sotryfree(so);
-	soisdisconnected(so);	/* XXX huh? called after the sofree()? */
 	return 0;
 }
 
@@ -216,7 +222,7 @@ raw_upeeraddr(struct socket *so, struct sockaddr **nam)
 	if (rp->rcb_faddr == 0) {
 		return ENOTCONN;
 	}
-	*nam = dup_sockaddr(rp->rcb_faddr, 1);
+	*nam = sodupsockaddr(rp->rcb_faddr, M_WAITOK);
 	return 0;
 }
 
@@ -286,7 +292,7 @@ raw_usockaddr(struct socket *so, struct sockaddr **nam)
 		return EINVAL;
 	if (rp->rcb_laddr == 0)
 		return EINVAL;
-	*nam = dup_sockaddr(rp->rcb_laddr, 1);
+	*nam = sodupsockaddr(rp->rcb_laddr, M_WAITOK);
 	return 0;
 }
 

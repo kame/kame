@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_h4.c,v 1.5 2003/05/10 05:51:25 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/h4/ng_h4.c,v 1.5 2003/05/10 22:11:25 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/h4/ng_h4.c,v 1.10 2004/06/26 08:44:04 phk Exp $
  * 
  * Based on:
  * ---------
@@ -51,11 +51,11 @@
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_parse.h>
-#include <ng_bluetooth.h>
-#include <ng_hci.h>
-#include "ng_h4.h"
-#include "ng_h4_var.h"
-#include "ng_h4_prse.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/include/ng_h4.h>
+#include <netgraph/bluetooth/drivers/h4/ng_h4_var.h>
+#include <netgraph/bluetooth/drivers/h4/ng_h4_prse.h>
 
 /*****************************************************************************
  *****************************************************************************
@@ -78,7 +78,7 @@ MALLOC_DEFINE(M_NETGRAPH_H4, "netgraph_h4", "Netgraph Bluetooth H4 node");
 #endif /* NG_SEPARATE_MALLOC */
 
 /* Line discipline methods */
-static int	ng_h4_open	(dev_t, struct tty *);
+static int	ng_h4_open	(struct cdev *, struct tty *);
 static int	ng_h4_close	(struct tty *, int);
 static int	ng_h4_read	(struct tty *, struct uio *, int);
 static int	ng_h4_write	(struct tty *, struct uio *, int);
@@ -97,8 +97,7 @@ static struct linesw		ng_h4_disc = {
 	ng_h4_ioctl,		/* ioctl */
 	ng_h4_input,		/* input */
 	ng_h4_start,		/* start */
-	ttymodem,		/* modem */
-	0 			/* hotchar (don't really care which one) */
+	ttymodem		/* modem */
 };
 
 /* Netgraph methods */
@@ -119,18 +118,17 @@ static int	ng_h4_mod_event		(module_t, int, void *);
 
 /* Netgraph node type descriptor */
 static struct ng_type		typestruct = {
-	NG_ABI_VERSION,
-	NG_H4_NODE_TYPE,	/* typename */
-	ng_h4_mod_event,	/* modevent */
-	ng_h4_constructor,	/* constructor */
-	ng_h4_rcvmsg,		/* control message */
-	ng_h4_shutdown,		/* destructor */
-	ng_h4_newhook,		/* new hook */
-	NULL,			/* find hook */
-	ng_h4_connect,		/* connect hook */
-	ng_h4_rcvdata,		/* data */
-	ng_h4_disconnect,	/* disconnect hook */
-	ng_h4_cmdlist		/* node command list */
+	.version =	NG_ABI_VERSION,
+	.name =		NG_H4_NODE_TYPE,
+	.mod_event =	ng_h4_mod_event,
+	.constructor =	ng_h4_constructor,
+	.rcvmsg =	ng_h4_rcvmsg,
+	.shutdown =	ng_h4_shutdown,
+	.newhook =	ng_h4_newhook,
+	.connect =	ng_h4_connect,
+	.rcvdata =	ng_h4_rcvdata,
+	.disconnect =	ng_h4_disconnect,
+	.cmdlist =	ng_h4_cmdlist
 };
 NETGRAPH_INIT(h4, &typestruct);
 MODULE_VERSION(ng_h4, NG_BLUETOOTH_VERSION);
@@ -148,9 +146,9 @@ static int	ng_h4_node = 0;
  */
 
 static int
-ng_h4_open(dev_t dev, struct tty *tp)
+ng_h4_open(struct cdev *dev, struct tty *tp)
 {
-	char		 name[NG_NODELEN + 1];
+	char		 name[NG_NODESIZ];
 	ng_h4_info_p	 sc = NULL;
 	int		 s, error;
 
@@ -161,13 +159,6 @@ ng_h4_open(dev_t dev, struct tty *tp)
 
 	s = splnet(); /* XXX */
 	spltty(); /* XXX */
-
-	/* Already installed? */
-	if (tp->t_line == H4DISC) {
-		sc = (ng_h4_info_p) tp->t_sc;
-		if (sc != NULL && sc->tp == tp)
-			goto out;
-	}
 
 	/* Initialize private struct */
 	MALLOC(sc, ng_h4_info_p, sizeof(*sc), M_NETGRAPH_H4, M_NOWAIT|M_ZERO);
@@ -244,7 +235,6 @@ ng_h4_close(struct tty *tp, int flag)
 
 	ttyflush(tp, FREAD | FWRITE);
 	clist_free_cblocks(&tp->t_outq);
-	tp->t_line = 0;
 	if (sc != NULL) {
 		tp->t_sc = NULL;
 
@@ -733,7 +723,7 @@ static int
 ng_h4_shutdown(node_p node)
 {
 	ng_h4_info_p	sc = (ng_h4_info_p) NG_NODE_PRIVATE(node);
-	char		name[NG_NODELEN + 1];
+	char		name[NG_NODESIZ];
 
 	/* Let old node go */
 	NG_NODE_SET_PRIVATE(node, NULL);

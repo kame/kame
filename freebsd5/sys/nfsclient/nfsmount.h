@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfsmount.h	8.3 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfsclient/nfsmount.h,v 1.25 2003/11/22 02:21:49 alfred Exp $
+ * $FreeBSD: src/sys/nfsclient/nfsmount.h,v 1.27 2004/07/06 09:12:03 alfred Exp $
  */
 
 #ifndef _NFSCLIENT_NFSMOUNT_H_
@@ -81,6 +77,8 @@ struct	nfsmount {
 	int	nm_bufqiods;		/* number of iods processing queue */
 	u_int64_t nm_maxfilesize;	/* maximum file size */
 	struct nfs_rpcops *nm_rpcops;
+	int	nm_tprintf_initial_delay;	/* initial delay */
+	int	nm_tprintf_delay;		/* interval for messages */
 
 	/* NFSv4 */
 	uint64_t nm_clientid;
@@ -94,6 +92,14 @@ struct	nfsmount {
  * Convert mount ptr to nfsmount ptr.
  */
 #define VFSTONFS(mp)	((struct nfsmount *)((mp)->mnt_data))
+
+#ifndef NFS_TPRINTF_INITIAL_DELAY
+#define NFS_TPRINTF_INITIAL_DELAY       12
+#endif
+
+#ifndef NFS_TPRINTF_DELAY
+#define NFS_TPRINTF_DELAY               30
+#endif
 
 #endif
 

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/uipc_domain.c,v 1.34 2003/09/02 20:59:23 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/uipc_domain.c,v 1.36 2004/04/05 21:03:36 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -134,8 +130,13 @@ domaininit(void *dummy)
 	if (max_linkhdr < 16)		/* XXX */
 		max_linkhdr = 16;
 
-	callout_init(&pffast_callout, 0);
-	callout_init(&pfslow_callout, 0);
+	if (debug_mpsafenet) {
+		callout_init(&pffast_callout, CALLOUT_MPSAFE);
+		callout_init(&pfslow_callout, CALLOUT_MPSAFE);
+	} else {
+		callout_init(&pffast_callout, 0);
+		callout_init(&pfslow_callout, 0);
+	}
 
 	callout_reset(&pffast_callout, 1, pffasttimo, NULL);
 	callout_reset(&pfslow_callout, 1, pfslowtimo, NULL);
@@ -236,6 +237,8 @@ pfslowtimo(arg)
 	register struct domain *dp;
 	register struct protosw *pr;
 
+	NET_ASSERT_GIANT();
+
 	for (dp = domains; dp; dp = dp->dom_next)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 			if (pr->pr_slowtimo)
@@ -249,6 +252,8 @@ pffasttimo(arg)
 {
 	register struct domain *dp;
 	register struct protosw *pr;
+
+	NET_ASSERT_GIANT();
 
 	for (dp = domains; dp; dp = dp->dom_next)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)

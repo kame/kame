@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)un.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/un.h,v 1.25 2002/08/21 16:20:01 mike Exp $
+ * $FreeBSD: src/sys/sys/un.h,v 1.27 2004/04/07 04:19:50 imp Exp $
  */
 
 #ifndef _SYS_UN_H_
@@ -64,10 +60,10 @@ struct mbuf;
 struct socket;
 struct sockopt;
 
+int	uipc_connect2(struct socket *so1, struct socket *so2);
 int	uipc_ctloutput(struct socket *so, struct sockopt *sopt);
 int	uipc_usrreq(struct socket *so, int req, struct mbuf *m,
 		struct mbuf *nam, struct mbuf *control);
-int	unp_connect2(struct socket *so, struct socket *so2);
 void	unp_dispose(struct mbuf *m);
 int	unp_externalize(struct mbuf *mbuf, struct mbuf **controlp);
 void	unp_init(void);

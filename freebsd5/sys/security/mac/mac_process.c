@@ -1,7 +1,7 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
+ * Copyright (c) 1999-2002 Robert N. M. Watson
  * Copyright (c) 2001 Ilmar S. Habibulin
- * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
+ * Copyright (c) 2001-2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson and Ilmar Habibulin for the
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/security/mac/mac_process.c,v 1.105 2003/12/06 21:48:01 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/security/mac/mac_process.c,v 1.106 2004/02/22 00:33:10 rwatson Exp $");
 
 #include "opt_mac.h"
 

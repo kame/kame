@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/device_pager.c,v 1.69 2003/10/05 22:23:44 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/device_pager.c,v 1.75 2004/08/04 08:58:58 dfr Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -78,6 +74,7 @@ static uma_zone_t fakepg_zone;
 
 static vm_page_t dev_pager_getfake(vm_paddr_t);
 static void dev_pager_putfake(vm_page_t);
+static void dev_pager_updatefake(vm_page_t, vm_paddr_t);
 
 struct pagerops devicepagerops = {
 	.pgo_init =	dev_pager_init,
@@ -105,9 +102,10 @@ dev_pager_init()
 static vm_object_t
 dev_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot, vm_ooffset_t foff)
 {
-	dev_t dev;
+	struct cdev *dev;
 	d_mmap_t *mapfunc;
 	vm_object_t object;
+	vm_pindex_t pindex;
 	unsigned int npages;
 	vm_paddr_t paddr;
 	vm_offset_t off;
@@ -119,6 +117,7 @@ dev_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot, vm_ooffset_t fo
 		return (NULL);
 
 	size = round_page(size);
+	pindex = OFF_TO_IDX(foff + size);
 
 	/*
 	 * Make sure this device can be mapped.
@@ -158,8 +157,7 @@ dev_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot, vm_ooffset_t fo
 		/*
 		 * Allocate object and associate it with the pager.
 		 */
-		object = vm_object_allocate(OBJT_DEVICE,
-			OFF_TO_IDX(foff + size));
+		object = vm_object_allocate(OBJT_DEVICE, pindex);
 		object->handle = handle;
 		TAILQ_INIT(&object->un_pager.devp.devp_pglist);
 		mtx_lock(&dev_pager_mtx);
@@ -170,8 +168,8 @@ dev_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot, vm_ooffset_t fo
 		 * Gain a reference to the object.
 		 */
 		vm_object_reference(object);
-		if (OFF_TO_IDX(foff + size) > object->size)
-			object->size = OFF_TO_IDX(foff + size);
+		if (pindex > object->size)
+			object->size = pindex;
 	}
 
 	sx_xunlock(&dev_pager_sx);
@@ -207,7 +205,7 @@ dev_pager_getpages(object, m, count, reqpage)
 	vm_pindex_t offset;
 	vm_paddr_t paddr;
 	vm_page_t page;
-	dev_t dev;
+	struct cdev *dev;
 	int i, ret;
 	d_mmap_t *mapfunc;
 	int prot;
@@ -216,6 +214,7 @@ dev_pager_getpages(object, m, count, reqpage)
 	dev = object->handle;
 	offset = m[reqpage]->pindex;
 	VM_OBJECT_UNLOCK(object);
+	mtx_lock(&Giant);
 	prot = PROT_READ;	/* XXX should pass in? */
 	mapfunc = devsw(dev)->d_mmap;
 
@@ -224,19 +223,38 @@ dev_pager_getpages(object, m, count, reqpage)
 
 	ret = (*mapfunc)(dev, (vm_offset_t)offset << PAGE_SHIFT, &paddr, prot);
 	KASSERT(ret == 0, ("dev_pager_getpage: map function returns error"));
-	/*
-	 * Replace the passed in reqpage page with our own fake page and
-	 * free up the all of the original pages.
-	 */
-	page = dev_pager_getfake(paddr);
-	VM_OBJECT_LOCK(object);
-	TAILQ_INSERT_TAIL(&object->un_pager.devp.devp_pglist, page, pageq);
-	vm_page_lock_queues();
-	for (i = 0; i < count; i++)
-		vm_page_free(m[i]);
-	vm_page_unlock_queues();
-	vm_page_insert(page, object, offset);
-	m[reqpage] = page;
+	mtx_unlock(&Giant);
+
+	if ((m[reqpage]->flags & PG_FICTITIOUS) != 0) {
+		/*
+		 * If the passed in reqpage page is a fake page, update it with
+		 * the new physical address.
+		 */
+		VM_OBJECT_LOCK(object);
+		dev_pager_updatefake(m[reqpage], paddr);
+		if (count > 1) {
+			vm_page_lock_queues();
+			for (i = 0; i < count; i++) {
+				if (i != reqpage)
+					vm_page_free(m[i]);
+			}
+			vm_page_unlock_queues();
+		}
+	} else {
+		/*
+		 * Replace the passed in reqpage page with our own fake page and
+		 * free up the all of the original pages.
+		 */
+		page = dev_pager_getfake(paddr);
+		VM_OBJECT_LOCK(object);
+		TAILQ_INSERT_TAIL(&object->un_pager.devp.devp_pglist, page, pageq);
+		vm_page_lock_queues();
+		for (i = 0; i < count; i++)
+			vm_page_free(m[i]);
+		vm_page_unlock_queues();
+		vm_page_insert(page, object, offset);
+		m[reqpage] = page;
+	}
 
 	return (VM_PAGER_OK);
 }
@@ -295,4 +313,15 @@ dev_pager_putfake(m)
 	if (!(m->flags & PG_FICTITIOUS))
 		panic("dev_pager_putfake: bad page");
 	uma_zfree(fakepg_zone, m);
+}
+
+static void
+dev_pager_updatefake(m, paddr)
+	vm_page_t m;
+	vm_paddr_t paddr;
+{
+	if (!(m->flags & PG_FICTITIOUS))
+		panic("dev_pager_updatefake: bad page");
+	m->phys_addr = paddr;
+	m->valid = VM_PAGE_BITS_ALL;
 }

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_sl.c	8.6 (Berkeley) 2/1/94
- * $FreeBSD: src/sys/net/if_sl.c,v 1.111 2003/10/31 18:32:08 brooks Exp $
+ * $FreeBSD: src/sys/net/if_sl.c,v 1.122.2.2 2004/09/15 15:14:18 andre Exp $
  */
 
 /*
@@ -182,16 +178,22 @@ static timeout_t sl_outfill;
 static l_close_t	slclose;
 static l_rint_t		slinput;
 static l_ioctl_t	sltioctl;
+static l_start_t	sltstart;
 static int	slioctl(struct ifnet *, u_long, caddr_t);
-static int	slopen(dev_t, struct tty *);
+static int	slopen(struct cdev *, struct tty *);
 static int	sloutput(struct ifnet *,
 	    struct mbuf *, struct sockaddr *, struct rtentry *);
-static int	slstart(struct tty *);
+static void	slstart(struct ifnet *);
 
 static struct linesw slipdisc = {
-	slopen,		slclose,	l_noread,	l_nowrite,
-	sltioctl,	slinput,	slstart,	ttymodem,
-	FRAME_END
+	.l_open =	slopen,
+	.l_close =	slclose,
+	.l_read =	l_noread,
+	.l_write =	l_nowrite,
+	.l_ioctl =	sltioctl,
+	.l_rint =	slinput,
+	.l_start =	sltstart,
+	.l_modem =	ttymodem
 };
 
 /*
@@ -202,12 +204,15 @@ sl_modevent(module_t mod, int type, void *data)
 { 
 	switch (type) { 
 	case MOD_LOAD: 
-		linesw[SLIPDISC] = slipdisc;
+		ldisc_register(SLIPDISC, &slipdisc);
 		LIST_INIT(&sl_list);
 		break; 
 	case MOD_UNLOAD: 
+		ldisc_deregister(SLIPDISC);
 		printf("if_sl module unload - not possible for this module type\n"); 
 		return EINVAL; 
+	default:
+		return EOPNOTSUPP;
 	} 
 	return 0; 
 } 
@@ -222,6 +227,18 @@ DECLARE_MODULE(if_sl, sl_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 
 static int *st_unit_list;
 static size_t st_unit_max = 0;
+
+static int
+slisunitfree(int unit)
+{
+	struct sl_softc *nc;
+
+	LIST_FOREACH(nc, &sl_list, sl_next) {
+		if (nc->sc_if.if_dunit == unit)
+			return (0);
+	}
+	return (1);
+}
 
 static int
 slisstatic(unit)
@@ -260,7 +277,7 @@ slmarkstatic(unit)
 static struct sl_softc *
 slcreate()
 {
-	struct sl_softc *sc, *nc;
+	struct sl_softc *sc;
 	int unit;
 	struct mbuf *m;
 
@@ -293,11 +310,12 @@ slcreate()
 #ifdef SLIP_IFF_OPTS
 	    SLIP_IFF_OPTS;
 #else
-	    IFF_POINTOPOINT | SC_AUTOCOMP | IFF_MULTICAST;
+	    IFF_POINTOPOINT | SC_AUTOCOMP | IFF_MULTICAST | IFF_NEEDSGIANT;
 #endif
 	sc->sc_if.if_type = IFT_SLIP;
 	sc->sc_if.if_ioctl = slioctl;
 	sc->sc_if.if_output = sloutput;
+	sc->sc_if.if_start = slstart;
 	sc->sc_if.if_snd.ifq_maxlen = 50;
 	sc->sc_fastq.ifq_maxlen = 32;
 	sc->sc_if.if_linkmib = sc;
@@ -310,10 +328,8 @@ slcreate()
 	for (unit=0; ; unit++) {
 		if (slisstatic(unit))
 			continue;
-		LIST_FOREACH(nc, &sl_list, sl_next) {
-			if (nc->sc_if.if_dunit == unit)
-				continue;
-		}
+		if (!slisunitfree(unit))
+			continue;
 		break;
 	}
 	if_initname(&sc->sc_if, "sl", unit);
@@ -333,7 +349,7 @@ slcreate()
 /* ARGSUSED */
 static int
 slopen(dev, tp)
-	dev_t dev;
+	struct cdev *dev;
 	register struct tty *tp;
 {
 	register struct sl_softc *sc;
@@ -343,17 +359,14 @@ slopen(dev, tp)
 	if (error)
 		return (error);
 
-	if (tp->t_line == SLIPDISC)
-		return (0);
-
 	if ((sc = slcreate()) == NULL)
 		return (ENOBUFS);
 
+	tp->t_hotchar = FRAME_END;
 	tp->t_sc = (caddr_t)sc;
 	sc->sc_ttyp = tp;
 	sc->sc_if.if_baudrate = tp->t_ospeed;
 	ttyflush(tp, FREAD | FWRITE);
-	tp->t_line = SLIPDISC;
 
 	/*
 	 * We don't use t_canq or t_rawq, so reduce their
@@ -410,7 +423,6 @@ slclose(tp,flag)
 	 */
 	s = splimp();		/* actually, max(spltty, splnet) */
 	clist_free_cblocks(&tp->t_outq);
-	tp->t_line = 0;
 	sc = (struct sl_softc *)tp->t_sc;
 	if (sc != NULL) {
 		if (sc->sc_outfill) {
@@ -443,7 +455,7 @@ sltioctl(tp, cmd, data, flag, td)
 	int flag;
 	struct thread *td;
 {
-	struct sl_softc *sc = (struct sl_softc *)tp->t_sc, *nc;
+	struct sl_softc *sc = (struct sl_softc *)tp->t_sc;
 	int s, unit, wasup;
 
 	s = splimp();
@@ -459,11 +471,9 @@ sltioctl(tp, cmd, data, flag, td)
 			return (ENXIO);
 		}
 		if (sc->sc_if.if_dunit != unit) {
-			LIST_FOREACH(nc, &sl_list, sl_next) {
-				if (nc->sc_if.if_dunit == *(u_int *)data) {
-						splx(s);
-						return (ENXIO);
-				}
+			if (!slisunitfree(unit)) {
+				splx(s);
+				return (ENXIO);
 			}
 
 			wasup = sc->sc_if.if_flags & IFF_UP;
@@ -544,8 +554,7 @@ sloutput(ifp, m, dst, rtp)
 {
 	register struct sl_softc *sc = ifp->if_softc;
 	register struct ip *ip;
-	register struct ifqueue *ifq;
-	int s;
+	int error;
 
 	/*
 	 * `Cannot happen' (see slioctl).  Someday we will extend
@@ -566,23 +575,34 @@ sloutput(ifp, m, dst, rtp)
 		m_freem(m);
 		return (EHOSTUNREACH);
 	}
-	ifq = &sc->sc_if.if_snd;
 	ip = mtod(m, struct ip *);
 	if (sc->sc_if.if_flags & SC_NOICMP && ip->ip_p == IPPROTO_ICMP) {
 		m_freem(m);
 		return (ENETRESET);		/* XXX ? */
 	}
-	if (ip->ip_tos & IPTOS_LOWDELAY)
-		ifq = &sc->sc_fastq;
-	if (! IF_HANDOFF(ifq, m, NULL)) {
+	if (ip->ip_tos & IPTOS_LOWDELAY &&
+	    !ALTQ_IS_ENABLED(&sc->sc_if.if_snd))
+		error = !(IF_HANDOFF(&sc->sc_fastq, m, &sc->sc_if));
+	else
+		IFQ_HANDOFF(&sc->sc_if, m, error);
+	if (error) {
 		sc->sc_if.if_oerrors++;
 		return (ENOBUFS);
 	}
+	return (0);
+}
+
+static void
+slstart(ifp)
+	struct ifnet *ifp;
+{
+	struct sl_softc *sc = ifp->if_softc;
+	int s;
+
 	s = splimp();
 	if (sc->sc_ttyp->t_outq.c_cc == 0)
-		slstart(sc->sc_ttyp);
+		sltstart(sc->sc_ttyp);
 	splx(s);
-	return (0);
 }
 
 /*
@@ -591,7 +611,7 @@ sloutput(ifp, m, dst, rtp)
  * the interface before starting output.
  */
 static int
-slstart(tp)
+sltstart(tp)
 	register struct tty *tp;
 {
 	register struct sl_softc *sc = (struct sl_softc *)tp->t_sc;
@@ -600,6 +620,8 @@ slstart(tp)
 	register struct ip *ip;
 	int s;
 	register int len = 0;
+
+	GIANT_REQUIRED;		/* tty */
 
 	for (;;) {
 		/*
@@ -967,7 +989,7 @@ slinput(c, tp)
 			m_freem(m);
 			goto newpack;
 		}
-		if (! netisr_queue(NETISR_IP, m)) {
+		if (netisr_queue(NETISR_IP, m)) {	/* (0) on success. */
 			sc->sc_if.if_ierrors++;
 			sc->sc_if.if_iqdrops++;
 		}

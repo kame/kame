@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_split.c,v 1.3 2001/12/10 08:09:47 obrien Exp $
+ * $FreeBSD: src/sys/netgraph/ng_split.c,v 1.4 2004/05/29 00:51:11 julian Exp $
  *
  */
 
@@ -53,18 +53,13 @@ static ng_disconnect_t ng_split_disconnect;
 
 /* Node type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_SPLIT_NODE_TYPE,
-	NULL,
-	ng_split_constructor,
-	NULL,
-	ng_split_shutdown,
-	ng_split_newhook,
-	NULL,
-	NULL,
-	ng_split_rcvdata,
-	ng_split_disconnect,
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_SPLIT_NODE_TYPE,
+	.constructor =	ng_split_constructor,
+	.shutdown =	ng_split_shutdown,
+	.newhook =	ng_split_newhook,
+	.rcvdata =	ng_split_rcvdata,
+	.disconnect =	ng_split_disconnect,
 };
 NETGRAPH_INIT(ng_split, &typestruct);
 

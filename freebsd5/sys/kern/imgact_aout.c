@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/imgact_aout.c,v 1.92 2003/09/25 01:10:25 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/imgact_aout.c,v 1.94 2004/06/05 02:18:28 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/exec.h>
@@ -177,14 +177,16 @@ exec_aout_imgact(imgp)
 	/*
 	 * text/data/bss must not exceed limits
 	 */
-	mtx_assert(&Giant, MA_OWNED);
+	PROC_LOCK(imgp->proc);
 	if (/* text can't exceed maximum text size */
 	    a_out->a_text > maxtsiz ||
 
 	    /* data + bss can't exceed rlimit */
-	    a_out->a_data + bss_size >
-		imgp->proc->p_rlimit[RLIMIT_DATA].rlim_cur)
+	    a_out->a_data + bss_size > lim_cur(imgp->proc, RLIMIT_DATA)) {
+			PROC_UNLOCK(imgp->proc);
 			return (ENOMEM);
+	}
+	PROC_UNLOCK(imgp->proc);
 
 	/* copy in arguments and/or environment from old process */
 	error = exec_extract_strings(imgp);
@@ -305,7 +307,7 @@ aout_coredump(td, vp, limit)
 		    ctob(vm->vm_ssize)), round_page(ctob(vm->vm_ssize)),
 		    (off_t)ctob(uarea_pages + kstack_pages) +
 		        ctob(vm->vm_dsize), UIO_USERSPACE,
-		    IO_UNIT | IO_DIRECT, cred, NOCRED, (int *) NULL, td);
+		    IO_UNIT | IO_DIRECT, cred, NOCRED, NULL, td);
 	return (error);
 }
 

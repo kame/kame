@@ -8,7 +8,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_jail.c,v 1.34.2.1 2004/02/19 23:26:39 nectar Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_jail.c,v 1.44 2004/06/27 09:03:21 pjd Exp $");
+
+#include "opt_mac.h"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -16,8 +18,10 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_jail.c,v 1.34.2.1 2004/02/19 23:26:39 nect
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/sysproto.h>
+#include <sys/mac.h>
 #include <sys/malloc.h>
 #include <sys/proc.h>
+#include <sys/taskqueue.h>
 #include <sys/jail.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -53,6 +57,16 @@ SYSCTL_INT(_security_jail, OID_AUTO, sysvipc_allowed, CTLFLAG_RW,
     &jail_sysvipc_allowed, 0,
     "Processes in jail can use System V IPC primitives");
 
+int	jail_getfsstatroot_only = 1;
+SYSCTL_INT(_security_jail, OID_AUTO, getfsstatroot_only, CTLFLAG_RW,
+    &jail_getfsstatroot_only, 0,
+    "Processes see only their root file system in getfsstat()");
+
+int	jail_allow_raw_sockets = 0;
+SYSCTL_INT(_security_jail, OID_AUTO, allow_raw_sockets, CTLFLAG_RW,
+    &jail_allow_raw_sockets, 0,
+    "Prison root can create raw sockets");
+
 /* allprison, lastprid, and prisoncount are protected by allprison_mtx. */
 struct	prisonlist allprison;
 struct	mtx allprison_mtx;
@@ -60,6 +74,7 @@ int	lastprid = 0;
 int	prisoncount = 0;
 
 static void		 init_prison(void *);
+static void		 prison_complete(void *context, int pending);
 static struct prison	*prison_find(int);
 static int		 sysctl_jail_list(SYSCTL_HANDLER_ARGS);
 
@@ -255,7 +270,6 @@ void
 prison_free(struct prison *pr)
 {
 
-	mtx_assert(&Giant, MA_OWNED);
 	mtx_lock(&allprison_mtx);
 	mtx_lock(&pr->pr_mtx);
 	pr->pr_ref--;
@@ -264,15 +278,30 @@ prison_free(struct prison *pr)
 		mtx_unlock(&pr->pr_mtx);
 		prisoncount--;
 		mtx_unlock(&allprison_mtx);
-		vrele(pr->pr_root);
-		mtx_destroy(&pr->pr_mtx);
-		if (pr->pr_linux != NULL)
-			FREE(pr->pr_linux, M_PRISON);
-		FREE(pr, M_PRISON);
+
+		TASK_INIT(&pr->pr_task, 0, prison_complete, pr);
+		taskqueue_enqueue(taskqueue_swi, &pr->pr_task);
 		return;
 	}
 	mtx_unlock(&pr->pr_mtx);
 	mtx_unlock(&allprison_mtx);
+}
+
+static void
+prison_complete(void *context, int pending)
+{
+	struct prison *pr;
+
+	pr = (struct prison *)context;
+
+	mtx_lock(&Giant);
+	vrele(pr->pr_root);
+	mtx_unlock(&Giant);
+
+	mtx_destroy(&pr->pr_mtx);
+	if (pr->pr_linux != NULL)
+		FREE(pr->pr_linux, M_PRISON);
+	FREE(pr, M_PRISON);
 }
 
 void
@@ -402,6 +431,21 @@ getcredhostname(struct ucred *cred, char *buf, size_t size)
 		strlcpy(buf, hostname, size);
 }
 
+/*
+ * Return 1 if the passed credential can "see" the passed mountpoint
+ * when performing a getfsstat(); otherwise, 0.
+ */
+int
+prison_check_mount(struct ucred *cred, struct mount *mp)
+{
+
+	if (jail_getfsstatroot_only && cred->cr_prison != NULL) {
+		if (cred->cr_prison->pr_root->v_mount != mp)
+			return (0);
+	}
+	return (1);
+}
+
 static int
 sysctl_jail_list(SYSCTL_HANDLER_ARGS)
 {
@@ -410,6 +454,8 @@ sysctl_jail_list(SYSCTL_HANDLER_ARGS)
 	int count, error;
 
 	mtx_assert(&Giant, MA_OWNED);
+	if (jailed(req->td->td_ucred))
+		return (0);
 retry:
 	mtx_lock(&allprison_mtx);
 	count = prisoncount;
@@ -447,3 +493,16 @@ retry:
 
 SYSCTL_OID(_security_jail, OID_AUTO, list, CTLTYPE_STRUCT | CTLFLAG_RD,
     NULL, 0, sysctl_jail_list, "S", "List of active jails");
+
+static int
+sysctl_jail_jailed(SYSCTL_HANDLER_ARGS)
+{
+	int error, injail;
+
+	injail = jailed(req->td->td_ucred);
+	error = SYSCTL_OUT(req, &injail, sizeof(injail));
+
+	return (error);
+}
+SYSCTL_PROC(_security_jail, OID_AUTO, jailed, CTLTYPE_INT | CTLFLAG_RD,
+    NULL, 0, sysctl_jail_jailed, "I", "Process in jail?");

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/sysarch.h,v 1.3 2003/10/27 22:54:34 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/sysarch.h,v 1.4 2004/01/09 16:52:08 nectar Exp $
  */
 
 #ifndef _MACHINE_SYSARCH_H_
@@ -45,6 +45,7 @@ struct ia64_iodesc {
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
+int	sysarch(int, void *);
 __END_DECLS
 #endif
 

@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_usrreq.c,v 1.39 2003/11/18 00:39:05 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_usrreq.c,v 1.40.4.1 2004/10/21 09:30:47 rwatson Exp $");
 
 #include "opt_ipx.h"
 
@@ -423,8 +423,10 @@ ipx_usr_abort(so)
 	s = splnet();
 	ipx_pcbdetach(ipxp);
 	splx(s);
-	sotryfree(so);
 	soisdisconnected(so);
+	ACCEPT_LOCK();
+	SOCK_LOCK(so);
+	sotryfree(so);
 	return (0);
 }
 

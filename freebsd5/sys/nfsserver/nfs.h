@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfsserver/nfs.h,v 1.69 2003/05/25 06:17:33 truckman Exp $
+ * $FreeBSD: src/sys/nfsserver/nfs.h,v 1.75 2004/05/24 04:06:14 rwatson Exp $
  */
 
 #ifndef _NFSSERVER_NFS_H_
@@ -48,7 +44,7 @@
  * Tunable constants for nfs
  */
 
-#define NFS_TICKINTVL	5		/* Desired time for a tick (msec) */
+#define NFS_TICKINTVL	10		/* Desired time for a tick (msec) */
 #define NFS_HZ		(hz / nfs_ticks) /* Ticks/sec */
 #define	NFS_TIMEO	(1 * NFS_HZ)	/* Default timeout = 1 second */
 #define	NFS_MINTIMEO	(1 * NFS_HZ)	/* Min timeout to use */
@@ -120,6 +116,13 @@ struct nfsd_args {
 
 #ifdef _KERNEL
 
+extern struct mtx nfsd_mtx;
+#define	NFSD_LOCK_ASSERT()	mtx_assert(&nfsd_mtx, MA_OWNED)
+#define	NFSD_UNLOCK_ASSERT()	mtx_assert(&nfsd_mtx, MA_NOTOWNED)
+#define	NFSD_LOCK_DONTCARE()
+#define	NFSD_LOCK()	mtx_lock(&nfsd_mtx)
+#define	NFSD_UNLOCK()	mtx_unlock(&nfsd_mtx)
+
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_NFSRVDESC);
 MALLOC_DECLARE(M_NFSD);
@@ -132,12 +135,13 @@ struct uio;
 struct vattr;
 struct nameidata;
 
-extern struct callout_handle nfsrv_timer_handle;
+extern struct callout nfsrv_callout;
 extern struct nfsrvstats nfsrvstats;
 
 extern int	nfsrv_ticks;
 extern int	nfsrvw_procrastinate;
 extern int	nfsrvw_procrastinate_v3;
+extern int 	nfsrv_numnfsd;
 
 /* Various values converted to XDR form. */
 extern u_int32_t nfsrv_nfs_false, nfsrv_nfs_true, nfsrv_nfs_xdrneg1,
@@ -148,8 +152,8 @@ extern u_int32_t nfsrv_rpc_auth_unix, nfsrv_rpc_msgaccepted, nfsrv_rpc_call,
 	nfsrv_rpc_autherr;
 
 /* Procedure table data */
-extern int	nfsrvv2_procid[NFS_NPROCS];
-extern int	nfsrv_nfsv3_procid[NFS_NPROCS];
+extern const int	nfsrvv2_procid[NFS_NPROCS];
+extern const int	nfsrv_nfsv3_procid[NFS_NPROCS];
 extern int32_t (*nfsrv3_procs[NFS_NPROCS])(struct nfsrv_descript *nd,
 		    struct nfssvc_sock *slp, struct thread *td,
 		    struct mbuf **mreqp);
@@ -197,12 +201,12 @@ struct nfssvc_sock {
 };
 
 /* Bits for "ns_flag" */
-#define	SLP_VALID	0x01
-#define	SLP_DOREC	0x02
-#define	SLP_NEEDQ	0x04
-#define	SLP_DISCONN	0x08
-#define	SLP_GETSTREAM	0x10
-#define	SLP_LASTFRAG	0x20
+#define	SLP_VALID	0x01		/* Socket valid for use (XXX) */
+#define	SLP_DOREC	0x02		/* Socket ready for processing */
+#define	SLP_NEEDQ	0x04		/* Socket has request queued */
+#define	SLP_DISCONN	0x08		/* Error received from stream socket */
+#define	SLP_GETSTREAM	0x10		/* nfsrv_getstream in prog on sock */
+#define	SLP_LASTFRAG	0x20		/* Socket received end-of-record */
 #define SLP_ALLFLAGS	0xff
 
 extern TAILQ_HEAD(nfssvc_sockhead, nfssvc_sock) nfssvc_sockhead;

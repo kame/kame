@@ -69,11 +69,6 @@
  * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
  * contributed to Berkeley.
  *
- * All advertising materials mentioning features or use of this software
- * must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -82,10 +77,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -106,7 +97,7 @@
  *	from: @(#)sbus.c	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: iommu.c,v 1.42 2001/08/06 22:02:58 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/sparc64/iommu.c,v 1.33 2003/07/27 15:19:45 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/iommu.c,v 1.40 2004/07/03 20:56:16 imp Exp $
  */
 
 /*
@@ -137,6 +128,7 @@
  *   flush the streaming cache when coherent mappings are synced.
  * - Add bounce buffers to support machines with more than 16GB of RAM.
  */
+
 #include "opt_iommu.h"
 
 #include <sys/param.h>
@@ -190,7 +182,7 @@ struct mtx iommu_mtx;
  * the IOTSBs are divorced.
  * LRU queue handling for lazy resource allocation.
  */
-static TAILQ_HEAD(, bus_dmamap) iommu_maplruq =
+static TAILQ_HEAD(iommu_maplruq_head, bus_dmamap) iommu_maplruq =
    TAILQ_HEAD_INITIALIZER(iommu_maplruq);
 
 /* DVMA space rman. */
@@ -370,7 +362,7 @@ iommu_init(char *name, struct iommu_state *is, int tsbsize, u_int32_t iovabase,
 		is->is_dvmabase = IOTSB_VSTART(is->is_tsbsize);
 
 	size = IOTSB_BASESZ << is->is_tsbsize;
-	printf("DVMA map: %#lx to %#lx\n",
+	printf("%s: DVMA map: %#lx to %#lx\n", name,
 	    is->is_dvmabase, is->is_dvmabase +
 	    (size << (IO_PAGE_SHIFT - IOTTE_SHIFT)) - 1);
 
@@ -746,7 +738,7 @@ static int
 iommu_dvma_vallocseg(bus_dma_tag_t dt, struct iommu_state *is, bus_dmamap_t map,
     vm_offset_t voffs, bus_size_t size, bus_addr_t amask, bus_addr_t *addr)
 {
-	bus_dmamap_t tm;
+	bus_dmamap_t tm, last;
 	bus_addr_t dvmaddr, freed;
 	int error, complete = 0;
 
@@ -757,7 +749,7 @@ iommu_dvma_vallocseg(bus_dma_tag_t dt, struct iommu_state *is, bus_dmamap_t map,
 		while ((error = iommu_dvma_valloc(dt, is, map,
 			voffs + size)) == ENOMEM && !complete) {
 			/*
-			 * Free the allocated DVMA of a few tags until
+			 * Free the allocated DVMA of a few maps until
 			 * the required size is reached. This is an
 			 * approximation to not have to call the allocation
 			 * function too often; most likely one free run
@@ -766,16 +758,16 @@ iommu_dvma_vallocseg(bus_dma_tag_t dt, struct iommu_state *is, bus_dmamap_t map,
 			 */
 			IS_LOCK(is);
 			freed = 0;
+			last = TAILQ_LAST(&iommu_maplruq, iommu_maplruq_head);
 			do {
 				tm = TAILQ_FIRST(&iommu_maplruq);
-				if (tm == NULL) {
-					complete = 1;
+				complete = tm == last;
+				if (tm == NULL)
 					break;
-				}
 				freed += iommu_dvma_vprune(is, tm);
 				/* Move to the end. */
 				iommu_map_insq(is, tm);
-			} while (freed < size);
+			} while (freed < size && !complete);
 			IS_UNLOCK(is);
 		}
 		if (error != 0)
@@ -898,8 +890,8 @@ iommu_dvmamap_destroy(bus_dma_tag_t dt, bus_dmamap_t map)
  */
 static int
 iommu_dvmamap_load_buffer(bus_dma_tag_t dt, struct iommu_state *is,
-    bus_dmamap_t map, bus_dma_segment_t sgs[], void *buf,
-    bus_size_t buflen, struct thread *td, int flags, int *segp, int align)
+    bus_dmamap_t map, void *buf, bus_size_t buflen, struct thread *td,
+    int flags, int *segp, int align)
 {
 	bus_addr_t amask, dvmaddr;
 	bus_size_t sgsize, esize;
@@ -956,15 +948,14 @@ iommu_dvmamap_load_buffer(bus_dma_tag_t dt, struct iommu_state *is,
 		 */
 		if (!firstpg) {
 			esize = ulmin(sgsize,
-			    dt->dt_maxsegsz - sgs[sgcnt].ds_len);
-			sgs[sgcnt].ds_len += esize;
+			    dt->dt_maxsegsz - dt->dt_segments[sgcnt].ds_len);
+			dt->dt_segments[sgcnt].ds_len += esize;
 			sgsize -= esize;
 			dvmaddr += esize;
 		}
 		while (sgsize > 0) {
 			sgcnt++;
-			if (sgcnt >= dt->dt_nsegments ||
-			    sgcnt >= BUS_DMAMAP_NSEGS)
+			if (sgcnt >= dt->dt_nsegments)
 				return (EFBIG);
 			/*
 			 * No extra alignment here - the common practice in the
@@ -974,8 +965,8 @@ iommu_dvmamap_load_buffer(bus_dma_tag_t dt, struct iommu_state *is,
 			 * that such tags have maxsegsize >= maxsize.
 			 */
 			esize = ulmin(sgsize, dt->dt_maxsegsz);
-			sgs[sgcnt].ds_addr = dvmaddr;
-			sgs[sgcnt].ds_len = esize;
+			dt->dt_segments[sgcnt].ds_addr = dvmaddr;
+			dt->dt_segments[sgcnt].ds_len = esize;
 			sgsize -= esize;
 			dvmaddr += esize;
 		}
@@ -992,11 +983,6 @@ iommu_dvmamap_load(bus_dma_tag_t dt, bus_dmamap_t map, void *buf,
     int flags)
 {
 	struct iommu_state *is = dt->dt_cookie;
-#ifdef __GNUC__
-	bus_dma_segment_t sgs[dt->dt_nsegments];
-#else
-	bus_dma_segment_t sgs[BUS_DMAMAP_NSEGS];
-#endif
 	int error, seg = -1;
 
 	if ((map->dm_flags & DMF_LOADED) != 0) {
@@ -1015,7 +1001,7 @@ iommu_dvmamap_load(bus_dma_tag_t dt, bus_dmamap_t map, void *buf,
 	iommu_map_remq(is, map);
 	IS_UNLOCK(is);
 
-	error = iommu_dvmamap_load_buffer(dt, is, map, sgs, buf, buflen, NULL,
+	error = iommu_dvmamap_load_buffer(dt, is, map, buf, buflen, NULL,
 	    flags, &seg, 1);
 
 	IS_LOCK(is);
@@ -1023,11 +1009,11 @@ iommu_dvmamap_load(bus_dma_tag_t dt, bus_dmamap_t map, void *buf,
 	if (error != 0) {
 		iommu_dvmamap_vunload(is, map);
 		IS_UNLOCK(is);
-		(*cb)(cba, sgs, 0, error);
+		(*cb)(cba, dt->dt_segments, 0, error);
 	} else {
 		IS_UNLOCK(is);
 		map->dm_flags |= DMF_LOADED;
-		(*cb)(cba, sgs, seg + 1, 0);
+		(*cb)(cba, dt->dt_segments, seg + 1, 0);
 	}
 
 	return (error);
@@ -1038,11 +1024,6 @@ iommu_dvmamap_load_mbuf(bus_dma_tag_t dt, bus_dmamap_t map, struct mbuf *m0,
     bus_dmamap_callback2_t *cb, void *cba, int flags)
 {
 	struct iommu_state *is = dt->dt_cookie;
-#ifdef __GNUC__
-	bus_dma_segment_t sgs[dt->dt_nsegments];
-#else
-	bus_dma_segment_t sgs[BUS_DMAMAP_NSEGS];
-#endif
 	struct mbuf *m;
 	int error = 0, first = 1, nsegs = -1;
 
@@ -1063,7 +1044,7 @@ iommu_dvmamap_load_mbuf(bus_dma_tag_t dt, bus_dmamap_t map, struct mbuf *m0,
 		for (m = m0; m != NULL && error == 0; m = m->m_next) {
 			if (m->m_len == 0)
 				continue;
-			error = iommu_dvmamap_load_buffer(dt, is, map, sgs,
+			error = iommu_dvmamap_load_buffer(dt, is, map,
 			    m->m_data, m->m_len, NULL, flags, &nsegs, first);
 			first = 0;
 		}
@@ -1076,11 +1057,11 @@ iommu_dvmamap_load_mbuf(bus_dma_tag_t dt, bus_dmamap_t map, struct mbuf *m0,
 		iommu_dvmamap_vunload(is, map);
 		IS_UNLOCK(is);
 		/* force "no valid mappings" in callback */
-		(*cb)(cba, sgs, 0, 0, error);
+		(*cb)(cba, dt->dt_segments, 0, 0, error);
 	} else {
 		IS_UNLOCK(is);
 		map->dm_flags |= DMF_LOADED;
-		(*cb)(cba, sgs, nsegs + 1, m0->m_pkthdr.len, 0);
+		(*cb)(cba, dt->dt_segments, nsegs + 1, m0->m_pkthdr.len, 0);
 	}
 	return (error);
 }
@@ -1090,11 +1071,6 @@ iommu_dvmamap_load_uio(bus_dma_tag_t dt, bus_dmamap_t map, struct uio *uio,
     bus_dmamap_callback2_t *cb,  void *cba, int flags)
 {
 	struct iommu_state *is = dt->dt_cookie;
-#ifdef __GNUC__
-	bus_dma_segment_t sgs[dt->dt_nsegments];
-#else
-	bus_dma_segment_t sgs[BUS_DMAMAP_NSEGS];
-#endif
 	struct iovec *iov;
 	struct thread *td = NULL;
 	bus_size_t minlen, resid;
@@ -1129,7 +1105,7 @@ iommu_dvmamap_load_uio(bus_dma_tag_t dt, bus_dmamap_t map, struct uio *uio,
 		if (minlen == 0)
 			continue;
 
-		error = iommu_dvmamap_load_buffer(dt, is, map, sgs,
+		error = iommu_dvmamap_load_buffer(dt, is, map,
 		    iov[i].iov_base, minlen, td, flags, &nsegs, first);
 		first = 0;
 
@@ -1142,11 +1118,11 @@ iommu_dvmamap_load_uio(bus_dma_tag_t dt, bus_dmamap_t map, struct uio *uio,
 		iommu_dvmamap_vunload(is, map);
 		IS_UNLOCK(is);
 		/* force "no valid mappings" in callback */
-		(*cb)(cba, sgs, 0, 0, error);
+		(*cb)(cba, dt->dt_segments, 0, 0, error);
 	} else {
 		IS_UNLOCK(is);
 		map->dm_flags |= DMF_LOADED;
-		(*cb)(cba, sgs, nsegs + 1, uio->uio_resid, 0);
+		(*cb)(cba, dt->dt_segments, nsegs + 1, uio->uio_resid, 0);
 	}
 	return (error);
 }

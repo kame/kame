@@ -23,38 +23,39 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/complex.h,v 1.2 2002/03/23 17:24:53 imp Exp $
+ * $FreeBSD: src/include/complex.h,v 1.6 2004/08/14 18:03:21 stefanf Exp $
  */
 
 #ifndef _COMPLEX_H
-#define _COMPLEX_H
+#define	_COMPLEX_H
 
 #ifdef __GNUC__
-#define _Complex	__complex__
-#define _Complex_I	1.0fi
+#if __STDC_VERSION__ < 199901
+#define	_Complex	__complex__
+#endif
+#define	_Complex_I	1.0fi
 #endif
 
-#define complex		_Complex
-#define I		_Complex_I
+#define	complex		_Complex
+#define	I		_Complex_I
 
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
 
-double	cabs(double complex);
-float	cabsf(float complex);
-double	cimag(double complex);
-float	cimagf(float complex);
-double	creal(double complex);
-float	crealf(float complex);
+double		cabs(double complex);
+float		cabsf(float complex);
+double		cimag(double complex);
+float		cimagf(float complex);
+long double	cimagl(long double complex);
+double complex	conj(double complex);
+float complex	conjf(float complex);
+long double complex
+		conjl(long double complex);
+double		creal(double complex);
+float		crealf(float complex);
+long double	creall(long double complex);
 
 __END_DECLS
-
-#ifdef __GNUC__
-#define cimag(z)	(__imag__ (z))
-#define cimagf(z)	(__imag__ (z))
-#define creal(z)	(__real__ (z))
-#define crealf(z)	(__real__ (z))
-#endif
 
 #endif /* _COMPLEX_H */

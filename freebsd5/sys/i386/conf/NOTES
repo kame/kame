@@ -4,7 +4,7 @@
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
 #
-# $FreeBSD: src/sys/i386/conf/NOTES,v 1.1108 2003/12/04 19:57:56 phk Exp $
+# $FreeBSD: src/sys/i386/conf/NOTES,v 1.1168.2.1.2.1 2004/10/24 18:02:52 scottl Exp $
 #
 
 #
@@ -14,8 +14,8 @@
 #
 machine		i386
 
-# 
-# We want LINT to cover profiling as well
+#
+# We want LINT to cover profiling as well.
 profile         2
 
 
@@ -44,7 +44,7 @@ profile         2
 # they are enabled.  However, most HTT systems do not list HTT CPUs
 # in the MP Table if they are enabled, thus we guess at the HTT CPUs
 # for the MP Table case.  However, we shouldn't try to guess and use
-# these CPUs if HTTT is disabled.  Thus, HTT guessing is only enabled
+# these CPUs if HTT is disabled.  Thus, HTT guessing is only enabled
 # for the MP Table if the user explicitly asks for it via the
 # MPTABLE_FORCE_HTT option.  Do NOT use this option if you have HTT
 # disabled in your BIOS.
@@ -66,8 +66,9 @@ options 	NO_MIXED_MODE		# Disable use of mixed mode
 # deleting the specification for CPUs you don't need to use may make
 # parts of the system run faster.
 # I386_CPU is mutually exclusive with the other CPU types.
+# I386_CPU is deprecated and will be removed in 6.0-RELEASE.
 #
-#cpu		I386_CPU		
+#cpu		I386_CPU
 cpu		I486_CPU
 cpu		I586_CPU		# aka Pentium(tm)
 cpu		I686_CPU		# aka Pentium Pro(tm)
@@ -78,38 +79,57 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # CPU_ATHLON_SSE_HACK tries to enable SSE instructions when the BIOS has
 # forgotten to enable them.
 #
+# CPU_BLUELIGHTNING_3X enables triple-clock mode on IBM Blue Lightning
+# CPU if CPU supports it.  The default is double-clock mode on
+# BlueLightning CPU box.
+#
 # CPU_BLUELIGHTNING_FPU_OP_CACHE enables FPU operand cache on IBM
 # BlueLightning CPU.  It works only with Cyrix FPU, and this option
 # should not be used with Intel FPU.
 #
-# CPU_BLUELIGHTNING_3X enables triple-clock mode on IBM Blue Lightning
-# CPU if CPU supports it. The default is double-clock mode on
-# BlueLightning CPU box.
-#
 # CPU_BTB_EN enables branch target buffer on Cyrix 5x86 (NOTE 1).
-#
-# CPU_DIRECT_MAPPED_CACHE sets L1 cache of Cyrix 486DLC CPU in direct
-# mapped mode.  Default is 2-way set associative mode.
 #
 # CPU_CYRIX_NO_LOCK enables weak locking for the entire address space
 # of Cyrix 6x86 and 6x86MX CPUs by setting the NO_LOCK bit of CCR1.
 # Otherwise, the NO_LOCK bit of CCR1 is cleared.  (NOTE 3)
 #
-# CPU_DISABLE_5X86_LSSER disables load store serialize (i.e. enables
+# CPU_DIRECT_MAPPED_CACHE sets L1 cache of Cyrix 486DLC CPU in direct
+# mapped mode.  Default is 2-way set associative mode.
+#
+# CPU_DISABLE_5X86_LSSER disables load store serialize (i.e., enables
 # reorder).  This option should not be used if you use memory mapped
 # I/O device(s).
 #
-# CPU_ELAN enables support for AMDs ElanSC520 CPU.
-#    CPU_ELAN_XTAL sets the clock crystal frequency in Hz
-#    CPU_ELAN_PPS enables precision timestamp code.
+# CPU_DISABLE_CMPXCHG disables the CMPXCHG instruction on > i386 IA32
+# machines.  VmWare 3.x seems to emulate this instruction poorly, causing
+# the guest OS to run very slowly.  This problem appears to be fixed in
+# VmWare 4.x, at least in version 4.5.2, so that enabling this option with
+# VmWare 4.x will result in locking operations to be 20-30 times slower.
+# Enabling this with an SMP kernel will cause the kernel to be unusable.
 #
-# CPU_SOEKRIS enables support www.soekris.com hardware.
+# CPU_DISABLE_SSE explicitly prevents I686_CPU from turning on SSE.
+#
+# CPU_ELAN enables support for AMDs ElanSC520 CPU.
+#    CPU_ELAN_PPS enables precision timestamp code.
+#    CPU_ELAN_XTAL sets the clock crystal frequency in Hz.
+#
+# CPU_ENABLE_LONGRUN enables support for Transmeta Crusoe LongRun
+# technology which allows to restrict power consumption of the CPU by
+# using group of hw.crusoe.* sysctls.
 #
 # CPU_ENABLE_SSE enables SSE/MMX2 instructions support.  This is default
 # on I686_CPU and above.
-# CPU_DISABLE_SSE explicitly prevent I686_CPU from turning on SSE.
+#
+# CPU_ENABLE_TCC enables Thermal Control Circuitry (TCC) found in some
+# Pentium(tm) 4 and (possibly) later CPUs.  When enabled and detected,
+# TCC supports restricting power consumption using the hw.p4tcc.*
+# sysctls.  This operates independently of SpeedStep and is useful on
+# systems where other mechanisms such as apm(4) or acpi(4) don't work.
 #
 # CPU_FASTER_5X86_FPU enables faster FPU exception handler.
+#
+# CPU_GEODE is for the SC1100 Geode embedded processor.  This option
+# is necessary because the i8254 timecounter is toast.
 #
 # CPU_I486_ON_386 enables CPU cache on i486 based CPU upgrade products
 # for i386 machines.
@@ -118,7 +138,7 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # I/O clock delay time on Cyrix 5x86 and 6x86 are 0 and 7,respectively
 # (no clock delay).
 #
-# CPU_L2_LATENCY specifed the L2 cache latency value.  This option is used
+# CPU_L2_LATENCY specifies the L2 cache latency value.  This option is used
 # only when CPU_PPRO2CELERON is defined and Mendocino Celeron is detected.
 # The default value is 5.
 #
@@ -132,13 +152,15 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 #
 # CPU_RSTK_EN enables return stack on Cyrix 5x86 (NOTE 1).
 #
+# CPU_SOEKRIS enables support www.soekris.com hardware.
+#
 # CPU_SUSP_HLT enables suspend on HALT.  If this option is set, CPU
 # enters suspend mode following execution of HALT instruction.
 #
 # CPU_UPGRADE_HW_CACHE eliminates unneeded cache flush instruction(s).
 #
 # CPU_WT_ALLOC enables write allocation on Cyrix 6x86/6x86MX and AMD
-# K5/K6/K6-2 cpus.
+# K5/K6/K6-2 CPUs.
 #
 # CYRIX_CACHE_WORKS enables CPU cache on Cyrix 486 CPUs with cache
 # flush at hold state.
@@ -156,11 +178,6 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # which indicates that the 15-16MB range is *definitely* not being
 # occupied by an ISA memory hole.
 #
-# CPU_DISABLE_CMPXCHG disables the CMPXCHG instruction on > i386 IA32 
-# machines.  VmWare seems to emulate this instruction poorly, causing 
-# the guest OS to run very slowly.  Enabling this with a SMP kernel
-# will cause the kernel to be unusable.
-#
 # NOTE 1: The options, CPU_BTB_EN, CPU_LOOP_EN, CPU_IORT,
 # CPU_LOOP_EN and CPU_RSTK_EN should not be used because of CPU bugs.
 # These options may crash your system.
@@ -173,35 +190,37 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # locked cycles in order to operate correctly.
 #
 options 	CPU_ATHLON_SSE_HACK
-options 	CPU_BLUELIGHTNING_FPU_OP_CACHE
 options 	CPU_BLUELIGHTNING_3X
+options 	CPU_BLUELIGHTNING_FPU_OP_CACHE
 options 	CPU_BTB_EN
 options 	CPU_DIRECT_MAPPED_CACHE
 options 	CPU_DISABLE_5X86_LSSER
-options 	CPU_ELAN
-options 	CPU_SOEKRIS
-options 	CPU_ELAN_XTAL=32768000
-options 	CPU_ELAN_PPS
-options 	CPU_ENABLE_SSE
+options 	CPU_DISABLE_CMPXCHG
 #options 	CPU_DISABLE_SSE
+options 	CPU_ELAN
+options 	CPU_ELAN_PPS
+options 	CPU_ELAN_XTAL=32768000
+options 	CPU_ENABLE_LONGRUN
+options 	CPU_ENABLE_SSE
+options 	CPU_ENABLE_TCC
 options 	CPU_FASTER_5X86_FPU
+options 	CPU_GEODE
 options 	CPU_I486_ON_386
 options 	CPU_IORT
 options 	CPU_L2_LATENCY=5
 options 	CPU_LOOP_EN
 options 	CPU_PPRO2CELERON
 options 	CPU_RSTK_EN
+options 	CPU_SOEKRIS
 options 	CPU_SUSP_HLT
 options 	CPU_UPGRADE_HW_CACHE
 options 	CPU_WT_ALLOC
 options 	CYRIX_CACHE_WORKS
 options 	CYRIX_CACHE_REALLY_WORKS
 #options 	NO_F00F_HACK
-options 	CPU_DISABLE_CMPXCHG
 
 # Debug options
-options 	NPX_DEBUG	# enable npx debugging (FPU/math emu)
-					#new math emulator
+options 	NPX_DEBUG	# enable npx debugging
 
 #
 # PERFMON causes the driver for Pentium/Pentium Pro performance counters
@@ -218,7 +237,7 @@ options 	PERFMON
 # of network device drivers, which has significant benefits in terms
 # of robustness to overloads and responsivity, as well as permitting
 # accurate scheduling of the CPU time between kernel network processing
-# and other activities. The drawback is a moderate (up to 1/HZ seconds)
+# and other activities.  The drawback is a moderate (up to 1/HZ seconds)
 # potential increase in response times.
 # It is strongly recommended to use HZ=1000 or 2000 with DEVICE_POLLING
 # to achieve smoother behaviour.
@@ -227,8 +246,8 @@ options 	PERFMON
 # the CPU fraction reserved to userland with the sysctl variable
 # kern.polling.user_frac (default 50, range 0..100).
 #
-# Only the "dc" "fxp" and "sis" devices support this mode of operation at
-# the time of this writing.
+# Not all device drivers support this mode of operation at the time of
+# this writing.  See polling(4) for more details.
 
 options 	DEVICE_POLLING
 
@@ -238,17 +257,16 @@ options 	DEVICE_POLLING
 
 # The following options are used for debugging clock behavior only, and
 # should not be used for production systems.
-#
-# CLK_CALIBRATION_LOOP will run the clock calibration loop at startup
-# until the user presses a key.
 
+# CLK_CALIBRATION_LOOP causes clock calibration to be run in a loop at
+# startup until the user presses a key.  (The i8254 clock is always
+# calibrated relative to the RTC (mc146818a) and this option causes the
+# calibration to be repeated.)
 options 	CLK_CALIBRATION_LOOP
 
-# The following two options measure the frequency of the corresponding
-# clock relative to the RTC (onboard mc146818a).
-
+# CLK_USE_I8254_CALIBRATION causes the calibrated frequency of the i8254
+# clock to actually be used.
 options 	CLK_USE_I8254_CALIBRATION
-options 	CLK_USE_TSC_CALIBRATION
 
 
 #####################################################################
@@ -257,7 +275,7 @@ options 	CLK_USE_TSC_CALIBRATION
 device		speaker		#Play IBM BASIC-style noises out your speaker
 hint.speaker.0.at="isa"
 hint.speaker.0.port="0x61"
-device		gzip		#Exec gzipped a.out's. REQUIRES COMPAT_AOUT!
+device		gzip		#Exec gzipped a.out's.  REQUIRES COMPAT_AOUT!
 device		apm_saver	# Requires APM
 
 
@@ -267,7 +285,7 @@ device		apm_saver	# Requires APM
 #
 # ISA bus
 #
-device		isa
+device		isa		# Required by npx(4)
 
 #
 # Options for `isa':
@@ -295,14 +313,13 @@ device		isa
 # reset the CPU for reboot.  This is needed on some systems with broken
 # keyboard controllers.
 
-options 	COMPAT_OLDISA	#Use ISA shims and glue for old drivers
 options 	AUTO_EOI_1
 #options 	AUTO_EOI_2
 
 options 	MAXMEM=(128*1024)
 #options 	BROKEN_KEYBOARD_RESET
 
-# 
+#
 # EISA bus
 #
 # The EISA bus device is `eisa'.  It provides auto-detection and
@@ -335,14 +352,11 @@ device		pci
 #
 # AGP GART support
 device		agp
+options 	AGP_AMD64_GART	# Included GART code for AMD64 machines.
 
 
 #####################################################################
 # HARDWARE DEVICE CONFIGURATION
-
-#
-# Mandatory devices:
-#
 
 # To include support for VGA VESA video modes
 options 	VESA
@@ -369,12 +383,7 @@ options 	PCVT_VT220KEYB
 options 	PCVT_GREENSAVER
 
 #
-# The Numeric Processing eXtension driver.  In addition to this, you
-# may configure a math emulator (see above).  If your machine has a
-# hardware FPU and the kernel configuration includes the npx device
-# *and* a math emulator compiled into the kernel, the hardware FPU
-# will be used, unless it is found to be broken or unless "flags" to
-# npx0 includes "0x08", which requests preference for the emulator.
+# The Numeric Processing eXtension driver.  This is non-optional.
 device		npx
 hint.npx.0.flags="0x0"
 hint.npx.0.irq="13"
@@ -384,7 +393,6 @@ hint.npx.0.irq="13"
 #	0x01	don't use the npx registers to optimize bcopy.
 #	0x02	don't use the npx registers to optimize bzero.
 #	0x04	don't use the npx registers to optimize copyin or copyout.
-#	0x08	use emulator even if hardware FPU is available.
 # The npx registers are normally used to optimize copying and zeroing when
 # all of the following conditions are satisfied:
 #	I586_CPU is an option
@@ -402,16 +410,16 @@ hint.npx.0.irq="13"
 # Optional devices:
 #
 
-# 3Dfx Voodoo Graphics, Voodoo II /dev/3dfx CDEV support. This will create
-# the /dev/3dfx0 device to work with glide implementations. This should get
-# linked to /dev/3dfx and /dev/voodoo. Note that this is not the same as
+# 3Dfx Voodoo Graphics, Voodoo II /dev/3dfx CDEV support.  This will create
+# the /dev/3dfx0 device to work with glide implementations.  This should get
+# linked to /dev/3dfx and /dev/voodoo.  Note that this is not the same as
 # the tdfx DRI module from XFree86 and is completely unrelated.
 #
 # To enable Linuxulator support, one must also include COMPAT_LINUX in the
-# config as well, or you will not have the dependencies. The other option
+# config as well, or you will not have the dependencies.  The other option
 # is to load both as modules.
 
-device 		tdfx			# Enable 3Dfx Voodoo support
+device		tdfx			# Enable 3Dfx Voodoo support
 options 	TDFX_LINUX		# Enable Linuxulator support
 
 #
@@ -433,12 +441,24 @@ options 	TDFX_LINUX		# Enable Linuxulator support
 #
 # Note that building ACPI into the kernel is deprecated; the module is
 # normally loaded automatically by the loader.
-#
+
 device		acpi
 options 	ACPI_DEBUG
 options 	ACPI_MAX_THREADS=1
 #!options 	ACPI_NO_SEMAPHORES
 #!options 	ACPICA_PEDANTIC
+
+# ACPI Asus Extras (LCD backlight/brightness, video output, etc.)
+device		acpi_asus
+
+# ACPI Panasonic Extras (LCD backlight/brightness, video output, etc.)
+device		acpi_panasonic
+
+# ACPI Toshiba Extras (LCD backlight/brightness, video output, etc.)
+device		acpi_toshiba
+
+# ACPI Video Extensions (LCD backlight/brightness, video output, etc.)
+device		acpi_video
 
 # DRM options:
 # mgadrm:    AGP Matrox G200, G400, G450, G550
@@ -459,10 +479,6 @@ device		tdfxdrm
 
 options 	DRM_DEBUG
 
-# M-systems DiskOnchip products see src/sys/contrib/dev/fla/README
-device		fla
-hint.fla.0.at="isa"
-
 #
 # mse: Logitech and ATI InPort bus mouse ports
 
@@ -477,26 +493,31 @@ hint.mse.0.irq="5"
 
 # ar:   Arnet SYNC/570i hdlc sync 2/4 port V.35/X.21 serial driver
 #       (requires sppp)
-# ath:	Atheros a/b/g WiFi adapters (requires ath_hal and wlan)
-# cx:   Cronyx/Sigma multiport sync/async (with Cisco or PPP framing)
+# arl:	Aironet Arlan 655 wireless adapters.
+# ath:  Atheros a/b/g WiFi adapters (requires ath_hal and wlan)
+# cp:   Cronyx Tau-PCI sync single/dual/four port
+#       V.35/RS-232/RS-530/RS-449/X.21/G.703/E1/E3/T3/STS-1
+#       serial adaptor (requires sppp (default), or NETGRAPH if
+#       NETGRAPH_CRONYX is configured)
+# ctau: Cronyx Tau sync dual port V.35/RS-232/RS-530/RS-449/X.21/G.703/E1
+#       serial adaptor (requires sppp (default), or NETGRAPH if
+#       NETGRAPH_CRONYX is configured)
+# cx:   Cronyx Sigma multiport sync/async adapter (requires sppp (default),
+#       or NETGRAPH if NETGRAPH_CRONYX is configured)
 # ed:   Western Digital and SMC 80xx; Novell NE1000 and NE2000; 3Com 3C503
-#       HP PC Lan+, various PC Card devices (refer to etc/defauls/pccard.conf)
+#       HP PC Lan+, various PC Card devices (refer to etc/defaults/pccard.conf)
 #       (requires miibus)
 # el:   3Com 3C501 (slow!)
 # ie:   AT&T StarLAN 10 and EN100; 3Com 3C507; unknown NI5210;
 #       Intel EtherExpress
-# le:   Digital Equipment EtherWorks 2 and EtherWorks 3 (DEPCA, DE100,
-#       DE101, DE200, DE201, DE202, DE203, DE204, DE205, DE422)
 # lnc:  Lance/PCnet cards (Isolan, Novell NE2100, NE32-VL, AMD Am7990 and
 #       Am79C960)
-# oltr: Olicom ISA token-ring adapters OC-3115, OC-3117, OC-3118 and OC-3133
-#       (no hints needed).
+# oltr: Olicom ISA token-ring adapters OC-3115, OC-3117, OC-3118 and OC-3133.
 #       Olicom PCI token-ring adapters OC-3136, OC-3137, OC-3139, OC-3140,
-#       OC-3141, OC-3540, OC-3250
-# rdp:  RealTek RTL 8002-based pocket ethernet adapters
-# sbni:	Granch SBNI12-xx ISA and PCI adapters
+#       OC-3141, OC-3540 and OC-3250.
+# sbni: Granch SBNI12-xx ISA and PCI adapters
 # sr:   RISCom/N2 hdlc sync 1/2 port V.35/X.21 serial driver (requires sppp)
-# wl:	Lucent Wavelan (ISA card only).
+# wl:   Lucent Wavelan (ISA card only).
 
 # Order for ISA/EISA devices is important here
 
@@ -505,18 +526,29 @@ hint.ar.0.at="isa"
 hint.ar.0.port="0x300"
 hint.ar.0.irq="10"
 hint.ar.0.maddr="0xd0000"
+device		arl
+hint.arl.0.at="isa"
+hint.arl.0.irq="9"
+hint.arl.0.maddr="0xd0000"
+device		cp
+device		ctau
+hint.ctau.0.at="isa"
+hint.ctau.0.port="0x240"
+hint.ctau.0.irq="15"
+hint.ctau.0.drq="7"
 device		cx
 hint.cx.0.at="isa"
 hint.cx.0.port="0x240"
 hint.cx.0.irq="15"
 hint.cx.0.drq="7"
+#options	NETGRAPH_CRONYX		# Enable NETGRAPH support for Cronyx adapter(s)
 device		ed
 #options 	ED_NO_MIIBUS		# Disable ed miibus support
 hint.ed.0.at="isa"
 hint.ed.0.port="0x280"
 hint.ed.0.irq="5"
 hint.ed.0.maddr="0xd8000"
-device		el	1
+device		el
 hint.el.0.at="isa"
 hint.el.0.port="0x300"
 hint.el.0.irq="9"
@@ -525,21 +557,11 @@ hint.ie.2.at="isa"
 hint.ie.2.port="0x300"
 hint.ie.2.irq="5"
 hint.ie.2.maddr="0xd0000"
-device		le	1
-hint.le.0.at="isa"
-hint.le.0.port="0x300"
-hint.le.0.irq="5"
-hint.le.0.maddr="0xd0000"
 device		lnc
 hint.lnc.0.at="isa"
 hint.lnc.0.port="0x280"
 hint.lnc.0.irq="10"
 hint.lnc.0.drq="0"
-device		rdp	1
-hint.rdp.0.at="isa"
-hint.rdp.0.port="0x378"
-hint.rdp.0.irq="7"
-hint.rdp.0.flags="2"
 device		sbni
 hint.sbni.0.at="isa"
 hint.sbni.0.port="0x210"
@@ -567,16 +589,24 @@ device		ath_hal		# Atheros HAL (includes binary component)
 #
 device		pst
 
-# 
+#
+# 3ware 9000 series PATA/SATA RAID controller driver and options.
+# The driver is implemented as a SIM, and so, needs the CAM infrastructure.
+#
+options		TWA_DEBUG		# 0-10; 10 prints the most messages.
+options		TWA_FLASH_FIRMWARE	# firmware image bundled when defined.
+device		twa			# 3ware 9000 series PATA/SATA RAID
+
+#
 # SCSI host adapters:
-# 
+#
 # ncv: NCR 53C500 based SCSI host adapters.
 # nsp: Workbit Ninja SCSI-3 based PC Card SCSI host adapters.
 # stg: TMC 18C30, 18C50 based SCSI host adapters.
 
-device          ncv
-device          nsp
-device          stg
+device		ncv
+device		nsp
+device		stg
 hint.stg.0.at="isa"
 hint.stg.0.port="0x140"
 hint.stg.0.port="11"
@@ -586,6 +616,11 @@ hint.stg.0.port="11"
 # the Dell PERC 2/QC and the HP NetRAID-4M
 device		aac
 device		aacp	# SCSI Passthrough interface (optional, CAM required)
+
+#
+# Highpoint RocketRAID 182x.  This is really just software RAID on a
+# Marvell SATA chip.
+device		hptmv
 
 #
 # IBM (now Adaptec) ServeRAID controllers
@@ -604,36 +639,15 @@ options		SAFE_RNDTEST	# enable rndtest support
 #
 # Miscellaneous hardware:
 #
-# wt: Wangtek and Archive QIC-02/QIC-36 tape drives
-# ctx: Cortex-I frame grabber
 # apm: Laptop Advanced Power Management (experimental)
 # pmtimer: Timer device driver for power management events (APM or ACPI)
-# spigot: The Creative Labs Video Spigot video-acquisition board
-# dgb: Digiboard PC/Xi and PC/Xe series driver (ALPHA QUALITY!)
+# cy: Cyclades serial driver
 # digi: Digiboard driver
-# gp:  National Instruments AT-GPIB and AT-GPIB/TNT board, PCMCIA-GPIB
-# asc: GI1904-based hand scanners, e.g. the Trust Amiscan Grey
-# gsc: Genius GS-4500 hand scanner.
 # spic: Sony Programmable I/O controller (VAIO notebooks)
-# stl: Stallion EasyIO and EasyConnection 8/32 (cd1400 based)
-# stli: Stallion EasyConnection 8/64, ONboard, Brumby (intelligent)
 
 # Notes on APM
 #  The flags takes the following meaning for apm0:
 #    0x0020  Statclock is broken.
-#  If apm is omitted, some systems require sysctl kern.timecounter.method=1
-#  for correct timekeeping.
-
-# Notes on the spigot:
-#  The video spigot is at 0xad6.  This port address can not be changed.
-#  The irq values may only be 10, 11, or 15
-#  I/O memory is an 8kb region.  Possible values are:
-#    0a0000, 0a2000, ..., 0fffff, f00000, f02000, ..., ffffff
-#    The start address must be on an even boundary.
-#  Add the following option if you want to allow non-root users to be able
-#  to access the spigot.  This option is not secure because it allows users
-#  direct access to the I/O page.
-#  	options SPIGOT_UNSECURE
 
 # Notes on the Specialix SI/XIO driver:
 #  The host card is memory, not IO mapped.
@@ -643,69 +657,25 @@ options		SAFE_RNDTEST	# enable rndtest support
 
 # Notes on the Sony Programmable I/O controller
 #  This is a temporary driver that should someday be replaced by something
-#  that hooks into the ACPI layer. The device is hooked to the PIIX4's
+#  that hooks into the ACPI layer.  The device is hooked to the PIIX4's
 #  General Device 10 decoder, which means you have to fiddle with PCI
 #  registers to map it in, even though it is otherwise treated here as
-#  an ISA device. At the moment, the driver polls, although the device
-#  is capable of generating interrupts. It largely undocumented.
+#  an ISA device.  At the moment, the driver polls, although the device
+#  is capable of generating interrupts.  It largely undocumented.
 #  The port location in the hint is where you WANT the device to be
-#  mapped. 0x10a0 seems to be traditional. At the moment the jogdial
-#  is the only thing truly supported, but aparently a fair percentage
+#  mapped.  0x10a0 seems to be traditional.  At the moment the jogdial
+#  is the only thing truly supported, but apparently a fair percentage
 #  of the Vaio extra features are controlled by this device.
 
-# Notes on the Stallion stl and stli drivers:
-#  See src/i386/isa/README.stl for complete instructions.
-#  This is version 0.0.5alpha, unsupported by Stallion.
-#  The stl driver has a secondary IO port hard coded at 0x280.  You need
-#     to change src/i386/isa/stallion.c if you reconfigure this on the boards.
-#  The "flags" and "msize" settings on the stli driver depend on the board:
-#	EasyConnection 8/64 ISA:     flags 23         msize 0x1000
-#	EasyConnection 8/64 EISA:    flags 24         msize 0x10000
-#	EasyConnection 8/64 MCA:     flags 25         msize 0x1000
-#	ONboard ISA:                 flags 4          msize 0x10000
-#	ONboard EISA:                flags 7          msize 0x10000
-#	ONboard MCA:                 flags 3          msize 0x10000
-#	Brumby:                      flags 2          msize 0x4000
-#	Stallion:                    flags 1          msize 0x10000
-
-# Notes on the Digiboard PC/Xi and PC/Xe series driver
-#               
-# The NDGBPORTS option specifies the number of ports controlled by the
-# dgb(4) driver.  The default value is 16 ports per device.
-#
-# The following flag values have special meanings in dgb:
-#	0x01 - alternate layout of pins
-#	0x02 - use the windowed PC/Xe in 64K mode
-
-device		wt	1
-hint.wt.0.at="isa"
-hint.wt.0.port="0x300"
-hint.wt.0.irq="5"
-hint.wt.0.drq="1"
-device		ctx
-hint.ctx.0.at="isa"
-hint.ctx.0.port="0x230"
-hint.ctx.0.maddr="0xd0000"
-device		spigot	1
-hint.spigot.0.at="isa"
-hint.spigot.0.port="0xad6"
-hint.spigot.0.irq="15"
-hint.spigot.0.maddr="0xee000"
 device		apm
 hint.apm.0.flags="0x20"
 device		pmtimer			# Adjust system timer at wakeup time
-device		gp
-hint.gp.0.at="isa"
-hint.gp.0.port="0x2c0"
-device		gsc	1
-hint.gsc.0.at="isa"
-hint.gsc.0.port="0x270"
-hint.gsc.0.drq="3"
-device		dgb	  1
-options		NDGBPORTS=17
-hint.dgb.0.at="isa"
-hint.dgb.0.port="0x220"
-hint.dgb.0.maddr="0xfc000"
+device		cy
+options 	CY_PCI_FASTINTR		# Use with cy_pci unless irq is shared
+hint.cy.0.at="isa"
+hint.cy.0.irq="10"
+hint.cy.0.maddr="0xd4000"
+hint.cy.0.msize="0x2000"
 device		digi
 hint.digi.0.at="isa"
 hint.digi.0.port="0x104"
@@ -718,28 +688,12 @@ device		digi_EPCX_PCI
 device		digi_Xe
 device		digi_Xem
 device		digi_Xr
-device		asc	1
-hint.asc.0.at="isa"
-hint.asc.0.port="0x3EB"
-hint.asc.0.drq="3"
-hint.asc.0.irq="10"
 device		spic
 hint.spic.0.at="isa"
 hint.spic.0.port="0x10a0"
-device		stl
-hint.stl.0.at="isa"
-hint.stl.0.port="0x2a0"
-hint.stl.0.irq="10"
-device		stli
-hint.stli.0.at="isa"
-hint.stli.0.port="0x2a0"
-hint.stli.0.maddr="0xcc000"
-hint.stli.0.flags="23"
-hint.stli.0.msize="0x1000"
-# You are unlikely to have the hardware for loran <phk@FreeBSD.org>
-device		loran
-hint.loran.0.at="isa"
-hint.loran.0.irq="5"
+# sx device is i386 and pc98 only at the moment.
+device		sx
+options 	SX_DEBUG
 # HOT1 Xilinx 6200 card (http://www.vcc.com/)
 device		xrpu
 
@@ -780,7 +734,7 @@ hint.pcf.0.irq="5"
 #	ifpi  - AVM Fritz!Card PCI driver
 #	ifpi2  - AVM Fritz!Card PCI version 2 driver
 #	ihfc  - Cologne Chip HFC ISA/ISA-PnP chipset driver
-#	ifpnp - AVM Fritz!Card PnP driver 
+#	ifpnp - AVM Fritz!Card PnP driver
 #	itjc  - Siemens ISAC / TJNet Tiger300/320 chipset
 #
 # i4b active ISDN cards support contains the following hardware drivers:
@@ -791,7 +745,7 @@ hint.pcf.0.irq="5"
 # be uncommented to enable support for a given card !
 #
 # In addition to a hardware driver (and probably an option) the mandatory
-# ISDN protocol stack devices and the mandatory support device must be 
+# ISDN protocol stack devices and the mandatory support device must be
 # enabled as well as one or more devices from the optional devices section.
 #
 #---------------------------------------------------------------------------
@@ -868,7 +822,7 @@ options 	DRN_NGO
 options 	SEDLBAUER
 #
 # Dynalink IS64PH
-options 	DYNALINK 
+options 	DYNALINK
 #
 # ELSA QuickStep 1000pro ISA
 options 	ELSA_QS1ISA
@@ -888,24 +842,14 @@ options 	COMPAQ_M610
 # PCI bus Cards:
 # --------------
 #
-# Cyclades Cyclom-Y PCI serial driver
-device		cy	1
-options 	CY_PCI_FASTINTR		# Use with cy_pci unless irq is shared
-hint.cy.0.at="isa"
-hint.cy.0.irq="10"
-hint.cy.0.maddr="0xd4000"
-hint.cy.0.msize="0x2000"
-#
-#---------------------------------------------------------------------------
 # ELSA MicroLink ISDN/PCI (same as ELSA QuickStep 1000pro PCI)
 options 	ELSA_QS1PCI
-#
 #
 #---------------------------------------------------------------------------
 #	ifpnp driver for AVM Fritz!Card PnP
 #
 # AVM Fritz!Card PnP
-device ifpnp
+device		ifpnp
 #
 #---------------------------------------------------------------------------
 #	ihfc driver for Cologne Chip ISA chipsets (experimental!)
@@ -913,37 +857,37 @@ device ifpnp
 # Teles 16.3c ISA PnP
 # AcerISDN P10 ISA PnP
 # TELEINT ISDN SPEED No.1
-device ihfc
+device		ihfc
 #
 #---------------------------------------------------------------------------
 #	ifpi driver for AVM Fritz!Card PCI
 #
 # AVM Fritz!Card PCI
-device  ifpi
+device		ifpi
 #
 #---------------------------------------------------------------------------
 #	ifpi2 driver for AVM Fritz!Card PCI version 2
 #
 # AVM Fritz!Card PCI version 2
-device  "ifpi2"
+device		"ifpi2"
 #
 #---------------------------------------------------------------------------
 #	iwic driver for Winbond W6692 chipset
 #
 # ASUSCOM P-IN100-ST-D (and other Winbond W6692 based cards)
-device  iwic
+device		iwic
 #
 #---------------------------------------------------------------------------
-#	itjc driver for Simens ISAC / TJNet Tiger300/320 chipset
+#	itjc driver for Siemens ISAC / TJNet Tiger300/320 chipset
 #
 # Traverse Technologies NETjet-S
 # Teles PCI-TJ
-device  itjc
+device		itjc
 #
 #---------------------------------------------------------------------------
 #	iavc driver (AVM active cards, needs i4bcapi driver!)
 #
-device	iavc
+device		iavc
 #
 # AVM B1 ISA bus (PnP mode not supported!)
 # ----------------------------------------
@@ -1001,8 +945,13 @@ device		"i4bcapi"
 #---------------------------------------------------------------------------
 
 #
+# System Management Bus (SMB)
+#
+options 	ENABLE_ALART		# Control alarm on Intel intpm driver
+
+#
 # Set the number of PV entries per process.  Increasing this can
-# stop panics related to heavy use of shared memory. However, that can
+# stop panics related to heavy use of shared memory.  However, that can
 # (combined with large amounts of physical memory) cause panics at
 # boot time due the kernel running out of VM space.
 #
@@ -1046,18 +995,18 @@ options 	LINPROCFS
 # SysVR4 ABI emulation
 #
 # The svr4 ABI emulator can be statically compiled into the kernel or loaded as
-# a KLD module.  
-# The STREAMS network emulation code can also be compiled statically or as a 
+# a KLD module.
+# The STREAMS network emulation code can also be compiled statically or as a
 # module.  If loaded as a module, it must be loaded before the svr4 module
 # (the /usr/sbin/svr4 script does this for you).  If compiling statically,
 # the `streams' device must be configured into any kernel which also
-# specifies COMPAT_SVR4.  It is possible to have a statically-configured 
+# specifies COMPAT_SVR4.  It is possible to have a statically-configured
 # STREAMS device and a dynamically loadable svr4 emulator;  the /usr/sbin/svr4
 # script understands that it doesn't need to load the `streams' module under
 # those circumstances.
 # Caveat:  At this time, `options KTRACE' is required for the svr4 emulator
-# (whether static or dynamic).  
-# 
+# (whether static or dynamic).
+#
 options 	COMPAT_SVR4	# build emulator statically
 options 	DEBUG_SVR4	# enable verbose debugging
 device		streams		# STREAMS network driver (required for svr4).
@@ -1067,7 +1016,7 @@ device		streams		# STREAMS network driver (required for svr4).
 # VM OPTIONS
 
 # Disable the 4 MByte page PSE CPU feature.  The PSE feature allows the
-# kernel to use a 4 MByte pages to map the kernel instead of 4k pages.
+# kernel to use 4 MByte pages to map the kernel instead of 4k pages.
 # This saves on the amount of memory needed for page tables needed to
 # map the kernel.  You should only disable this feature as a temporary
 # workaround if you are having problems with it enabled.
@@ -1098,7 +1047,6 @@ options 	FB_INSTALL_CDEV		# install a CDEV entry in /dev
 options 	PECOFF_SUPPORT
 options 	PECOFF_DEBUG
 
-options 	ENABLE_ALART
 options 	I4B_SMP_WORKAROUND
 options 	I586_PMC_GUPROF=0x70000
 options 	KBDIO_DEBUG=2
@@ -1113,3 +1061,7 @@ options 	TIMER_FREQ=((14318182+6)/12)
 options 	VM_KMEM_SIZE
 options 	VM_KMEM_SIZE_MAX
 options 	VM_KMEM_SIZE_SCALE
+
+
+# The I/O device
+device		io

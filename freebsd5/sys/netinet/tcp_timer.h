@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/tcp_timer.h,v 1.24 2003/03/08 22:06:20 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.h,v 1.26 2004/08/16 18:32:07 rwatson Exp $
  */
 
 #ifndef _NETINET_TCP_TIMER_H_
@@ -101,7 +97,7 @@
  * acks (typically 100ms) could create issues so we set the slop
  * to 200ms to try to cover it.  Note that, properly speaking,
  * delayed-acks should not create a major issue for interactive
- * environments which 'P'ush the last segment, at least as 
+ * environments which 'P'ush the last segment, at least as
  * long as implementations do the required 'at least one ack
  * for every two packets' for the non-interactive streaming case.
  * (maybe the RTO calculation should use 2*RTT instead of RTT

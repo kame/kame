@@ -70,7 +70,7 @@
  * Paul Mackerras (paulus@cs.anu.edu.au).
  */
 
-/* $FreeBSD: src/sys/net/ppp_tty.c,v 1.57 2003/10/31 18:32:08 brooks Exp $ */
+/* $FreeBSD: src/sys/net/ppp_tty.c,v 1.61 2004/07/15 20:47:41 phk Exp $ */
 
 #include "opt_ppp.h"		/* XXX for ppp_defs.h */
 
@@ -93,7 +93,7 @@
 #include <net/if_ppp.h>
 #include <net/if_pppvar.h>
 
-static int	pppopen(dev_t dev, struct tty *tp);
+static int	pppopen(struct cdev *dev, struct tty *tp);
 static int	pppclose(struct tty *tp, int flag);
 static int	pppread(struct tty *tp, struct uio *uio, int flag);
 static int	pppwrite(struct tty *tp, struct uio *uio, int flag);
@@ -148,8 +148,7 @@ void		pppasyncdetach(void);
 
 static struct linesw pppdisc = {
 	pppopen,	pppclose,	pppread,	pppwrite,
-	ppptioctl,	pppinput,	pppstart,	ttymodem,
-	PPP_FLAG
+	ppptioctl,	pppinput,	pppstart,	ttymodem
 };
 
 void
@@ -173,7 +172,7 @@ pppasyncdetach()
 /* ARGSUSED */
 static int
 pppopen(dev, tp)
-    dev_t dev;
+    struct cdev *dev;
     register struct tty *tp;
 {
     struct thread *td = curthread;		/* XXX */
@@ -185,13 +184,7 @@ pppopen(dev, tp)
 
     s = spltty();
 
-    if (tp->t_line == PPPDISC) {
-	sc = (struct ppp_softc *) tp->t_sc;
-	if (sc != NULL && sc->sc_devp == (void *) tp) {
-	    splx(s);
-	    return (0);
-	}
-    }
+    tp->t_hotchar = PPP_FLAG;
 
     if ((sc = pppalloc(td->td_proc->p_pid)) == NULL) {
 	splx(s);
@@ -219,6 +212,7 @@ pppopen(dev, tp)
     sc->sc_if.if_baudrate = tp->t_ospeed;
 
     tp->t_sc = (caddr_t) sc;
+    tp->t_hotchar = PPP_FLAG;
     ttyflush(tp, FREAD | FWRITE);
 
     /*
@@ -240,7 +234,7 @@ pppopen(dev, tp)
  * Line specific close routine, called from device close routine
  * and from ttioctl at >= splsofttty().
  * Detach the tty from the ppp unit.
- * Mimics part of ttyclose().
+ * Mimics part of tty_close().
  */
 static int
 pppclose(tp, flag)
@@ -254,7 +248,6 @@ pppclose(tp, flag)
     ttyflush(tp, FREAD | FWRITE);
     clist_free_cblocks(&tp->t_canq);
     clist_free_cblocks(&tp->t_outq);
-    tp->t_line = 0;
     sc = (struct ppp_softc *) tp->t_sc;
     if (sc != NULL) {
 	tp->t_sc = NULL;

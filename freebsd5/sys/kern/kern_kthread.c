@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_kthread.c,v 1.32 2003/06/11 00:56:55 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_kthread.c,v 1.32.4.1 2004/09/09 09:45:26 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -114,7 +114,7 @@ kthread_create(void (*func)(void *), void *arg,
 	/* Delay putting it on the run queue until now. */
 	if (!(flags & RFSTOPPED)) {
 		mtx_lock_spin(&sched_lock);
-		setrunqueue(td); 
+		setrunqueue(td, SRQ_BORING); 
 		mtx_unlock_spin(&sched_lock);
 	}
 

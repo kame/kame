@@ -31,10 +31,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netsmb/smb_dev.c,v 1.19 2003/09/26 20:26:25 fjoe Exp $");
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_dev.c,v 1.24 2004/06/17 17:16:51 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
@@ -87,21 +88,22 @@ int smb_dev_queue(struct smb_dev *ndp, struct smb_rq *rqp, int prio);
 */
 
 static struct cdevsw nsmb_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	nsmb_dev_open,
 	.d_close =	nsmb_dev_close,
 	.d_ioctl =	nsmb_dev_ioctl,
-	.d_name =	NSMB_NAME,
-	.d_maj =	NSMB_MAJOR,
+	.d_name =	NSMB_NAME
 };
 
 static eventhandler_tag nsmb_dev_tag;
 
 static void
-nsmb_dev_clone(void *arg, char *name, int namelen, dev_t *dev)
+nsmb_dev_clone(void *arg, char *name, int namelen, struct cdev **dev)
 {
 	int u;
 
-	if (*dev != NODEV)
+	if (*dev != NULL)
 		return;
 	if (dev_stdclone(name, NULL, NSMB_NAME, &u) != 1)
 		return;
@@ -110,7 +112,7 @@ nsmb_dev_clone(void *arg, char *name, int namelen, dev_t *dev)
 }
 
 static int
-nsmb_dev_open(dev_t dev, int oflags, int devtype, struct thread *td)
+nsmb_dev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	struct smb_dev *sdp;
 	struct ucred *cred = td->td_ucred;
@@ -144,7 +146,7 @@ nsmb_dev_open(dev_t dev, int oflags, int devtype, struct thread *td)
 }
 
 static int
-nsmb_dev_close(dev_t dev, int flag, int fmt, struct thread *td)
+nsmb_dev_close(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct smb_dev *sdp;
 	struct smb_vc *vcp;
@@ -178,7 +180,7 @@ nsmb_dev_close(dev_t dev, int flag, int fmt, struct thread *td)
 
 
 static int
-nsmb_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	struct smb_dev *sdp;
 	struct smb_vc *vcp;
@@ -383,7 +385,7 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 	struct vnode *vp;
 	struct smb_dev *sdp;
 	struct smb_share *ssp;
-	dev_t dev;
+	struct cdev *dev;
 	int error;
 
 	fp = nsmb_getfp(scred->scr_td->td_proc->p_fd, fd, FREAD | FWRITE);
@@ -395,7 +397,7 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 		return EBADF;
 	}
 	dev = vn_todev(vp);
-	if (dev == NODEV) {
+	if (dev == NULL) {
 		fdrop(fp, curthread);
 		return EBADF;
 	}

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -30,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/cpufunc.h,v 1.135 2003/08/06 18:21:27 bde Exp $
+ * $FreeBSD: src/sys/i386/include/cpufunc.h,v 1.142 2004/04/07 20:46:05 imp Exp $
  */
 
 /*
@@ -42,13 +38,8 @@
 #ifndef _MACHINE_CPUFUNC_H_
 #define	_MACHINE_CPUFUNC_H_
 
-#include <sys/cdefs.h>
-#include <machine/psl.h>
-
-struct thread;
 struct region_descriptor;
 
-__BEGIN_DECLS
 #define readb(va)	(*(volatile u_int8_t *) (va))
 #define readw(va)	(*(volatile u_int16_t *) (va))
 #define readl(va)	(*(volatile u_int32_t *) (va))
@@ -57,7 +48,7 @@ __BEGIN_DECLS
 #define writew(va, d)	(*(volatile u_int16_t *) (va) = (d))
 #define writel(va, d)	(*(volatile u_int32_t *) (va) = (d))
 
-#ifdef	__GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 
 static __inline void
 breakpoint(void)
@@ -103,6 +94,8 @@ enable_intr(void)
 	__asm __volatile("sti");
 }
 
+#ifdef _KERNEL
+
 #define	HAVE_INLINE_FFS
 
 static __inline int
@@ -124,6 +117,8 @@ fls(int mask)
 {
 	return (mask == 0 ? mask : (int)bsrl((u_int)mask) + 1);
 }
+
+#endif /* _KERNEL */
 
 static __inline void
 halt(void)
@@ -457,6 +452,14 @@ rgs(void)
 	return (sel);
 }
 
+static __inline u_int
+rss(void)
+{
+	u_int sel;
+	__asm __volatile("movl %%ss,%0" : "=rm" (sel));
+	return (sel);
+}
+
 static __inline void
 load_fs(u_int sel)
 {
@@ -469,21 +472,18 @@ load_gs(u_int sel)
 	__asm __volatile("movl %0,%%gs" : : "rm" (sel));
 }
 
-/* void lidt(struct region_descriptor *addr); */
 static __inline void
 lidt(struct region_descriptor *addr)
 {
 	__asm __volatile("lidt (%0)" : : "r" (addr));
 }
 
-/* void lldt(u_short sel); */
 static __inline void
 lldt(u_short sel)
 {
 	__asm __volatile("lldt %0" : : "r" (sel));
 }
 
-/* void ltr(u_short sel); */
 static __inline void
 ltr(u_short sel)
 {
@@ -618,79 +618,73 @@ intr_restore(register_t eflags)
 	write_eflags(eflags);
 }
 
-#else /* !__GNUC__ */
+#else /* !(__GNUC__ || __INTEL_COMPILER) */
 
 int	breakpoint(void);
 u_int	bsfl(u_int mask);
 u_int	bsrl(u_int mask);
-void	cpu_invlpg(u_int addr);
-void	cpu_invlpg_range(u_int start, u_int end);
 void	disable_intr(void);
 void	do_cpuid(u_int ax, u_int *p);
 void	enable_intr(void);
 void	halt(void);
+void	ia32_pause(void);
 u_char	inb(u_int port);
 u_int	inl(u_int port);
 void	insb(u_int port, void *addr, size_t cnt);
 void	insl(u_int port, void *addr, size_t cnt);
 void	insw(u_int port, void *addr, size_t cnt);
+register_t	intr_disable(void);
+void	intr_restore(register_t ef);
 void	invd(void);
 void	invlpg(u_int addr);
-void	invlpg_range(u_int start, u_int end);
 void	invltlb(void);
 u_short	inw(u_int port);
+void	lidt(struct region_descriptor *addr);
+void	lldt(u_short sel);
 void	load_cr0(u_int cr0);
 void	load_cr3(u_int cr3);
 void	load_cr4(u_int cr4);
+void	load_dr0(u_int dr0);
+void	load_dr1(u_int dr1);
+void	load_dr2(u_int dr2);
+void	load_dr3(u_int dr3);
+void	load_dr4(u_int dr4);
+void	load_dr5(u_int dr5);
+void	load_dr6(u_int dr6);
+void	load_dr7(u_int dr7);
 void	load_fs(u_int sel);
 void	load_gs(u_int sel);
-struct region_descriptor;
-void	lidt(struct region_descriptor *addr);
-void	lldt(u_short sel);
 void	ltr(u_short sel);
 void	outb(u_int port, u_char data);
 void	outl(u_int port, u_int data);
-void	outsb(u_int port, void *addr, size_t cnt);
-void	outsl(u_int port, void *addr, size_t cnt);
-void	outsw(u_int port, void *addr, size_t cnt);
+void	outsb(u_int port, const void *addr, size_t cnt);
+void	outsl(u_int port, const void *addr, size_t cnt);
+void	outsw(u_int port, const void *addr, size_t cnt);
 void	outw(u_int port, u_short data);
-void	ia32_pause(void);
 u_int	rcr0(void);
 u_int	rcr2(void);
 u_int	rcr3(void);
 u_int	rcr4(void);
-u_int	rfs(void);
-u_int	rgs(void);
 u_int64_t rdmsr(u_int msr);
 u_int64_t rdpmc(u_int pmc);
+u_int	rdr0(void);
+u_int	rdr1(void);
+u_int	rdr2(void);
+u_int	rdr3(void);
+u_int	rdr4(void);
+u_int	rdr5(void);
+u_int	rdr6(void);
+u_int	rdr7(void);
 u_int64_t rdtsc(void);
 u_int	read_eflags(void);
+u_int	rfs(void);
+u_int	rgs(void);
 void	wbinvd(void);
 void	write_eflags(u_int ef);
 void	wrmsr(u_int msr, u_int64_t newval);
-u_int	rdr0(void);
-void	load_dr0(u_int dr0);
-u_int	rdr1(void);
-void	load_dr1(u_int dr1);
-u_int	rdr2(void);
-void	load_dr2(u_int dr2);
-u_int	rdr3(void);
-void	load_dr3(u_int dr3);
-u_int	rdr4(void);
-void	load_dr4(u_int dr4);
-u_int	rdr5(void);
-void	load_dr5(u_int dr5);
-u_int	rdr6(void);
-void	load_dr6(u_int dr6);
-u_int	rdr7(void);
-void	load_dr7(u_int dr7);
-register_t	intr_disable(void);
-void	intr_restore(register_t ef);
 
-#endif	/* __GNUC__ */
+#endif	/* __GNUC__ || __INTEL_COMPILER */
 
 void    reset_dbregs(void);
-
-__END_DECLS
 
 #endif /* !_MACHINE_CPUFUNC_H_ */

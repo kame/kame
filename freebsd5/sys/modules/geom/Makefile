@@ -1,14 +1,23 @@
-# $FreeBSD: src/sys/modules/geom/Makefile,v 1.4 2003/06/18 09:29:27 phk Exp $
+# $FreeBSD: src/sys/modules/geom/Makefile,v 1.12 2004/08/16 06:36:21 pjd Exp $
 
 SUBDIR=	geom_apple \
 	geom_bde \
 	geom_bsd \
 	geom_ccd \
+	geom_concat \
 	geom_fox \
+	geom_gate \
 	geom_gpt \
+	geom_label \
 	geom_mbr \
+	geom_mirror \
+	geom_nop \
 	geom_pc98 \
+	geom_raid3 \
+	geom_stripe \
 	geom_sunlabel \
+	geom_uzip \
+	geom_vinum \
 	geom_vol_ffs
 
 .include <bsd.subdir.mk>

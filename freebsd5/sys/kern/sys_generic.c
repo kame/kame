@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/sys_generic.c,v 1.126 2003/11/09 09:17:24 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/sys_generic.c,v 1.132.2.1 2004/09/15 14:56:26 andre Exp $");
 
 #include "opt_ktrace.h"
 
@@ -60,9 +56,11 @@ __FBSDID("$FreeBSD: src/sys/kern/sys_generic.c,v 1.126 2003/11/09 09:17:24 tanim
 #include <sys/poll.h>
 #include <sys/resourcevar.h>
 #include <sys/selinfo.h>
+#include <sys/sleepqueue.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
+#include <sys/vnode.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
 #include <sys/condvar.h>
@@ -138,9 +136,11 @@ pread(td, uap)
 
 	if ((error = fget_read(td, uap->fd, &fp)) != 0)
 		return (error);
-	if (!(fp->f_ops->fo_flags & DFLAG_SEEKABLE)) {
+	if (!(fp->f_ops->fo_flags & DFLAG_SEEKABLE))
 		error = ESPIPE;
-	} else {
+	else if (uap->offset < 0 && fp->f_vnode->v_type != VCHR)
+		error = EINVAL;
+	else {
 		error = dofileread(td, fp, uap->fd, uap->buf, uap->nbyte, 
 			    uap->offset, FOF_OFFSET);
 	}
@@ -164,9 +164,7 @@ dofileread(td, fp, fd, buf, nbyte, offset, flags)
 	struct iovec aiov;
 	long cnt, error = 0;
 #ifdef KTRACE
-	struct iovec ktriov;
-	struct uio ktruio;
-	int didktr = 0;
+	struct uio *ktruio = NULL;
 #endif
 
 	aiov.iov_base = buf;
@@ -181,14 +179,8 @@ dofileread(td, fp, fd, buf, nbyte, offset, flags)
 	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_td = td;
 #ifdef KTRACE
-	/*
-	 * if tracing, save a copy of iovec
-	 */
-	if (KTRPOINT(td, KTR_GENIO)) {
-		ktriov = aiov;
-		ktruio = auio;
-		didktr = 1;
-	}
+	if (KTRPOINT(td, KTR_GENIO))
+		ktruio = cloneuio(&auio);
 #endif
 	cnt = nbyte;
 
@@ -199,10 +191,9 @@ dofileread(td, fp, fd, buf, nbyte, offset, flags)
 	}
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
-	if (didktr && error == 0) {
-		ktruio.uio_iov = &ktriov;
-		ktruio.uio_resid = cnt;
-		ktrgenio(fd, UIO_READ, &ktruio, error);
+	if (ktruio != NULL) {
+		ktruio->uio_resid = cnt;
+		ktrgenio(fd, UIO_READ, ktruio, error);
 	}
 #endif
 	td->td_retval[0] = cnt;
@@ -223,86 +214,46 @@ struct readv_args {
  * MPSAFE
  */
 int
-readv(td, uap)
-	struct thread *td;
-	struct readv_args *uap;
+readv(struct thread *td, struct readv_args *uap)
 {
 	struct file *fp;
-	struct uio auio;
-	struct iovec *iov;
-	struct iovec *needfree;
-	struct iovec aiov[UIO_SMALLIOV];
-	long i, cnt;
+	struct uio *auio = NULL;
+	long cnt;
 	int error;
-	u_int iovlen;
 #ifdef KTRACE
-	struct iovec *ktriov = NULL;
-	struct uio ktruio;
+	struct uio *ktruio = NULL;
 #endif
 
-	if ((error = fget_read(td, uap->fd, &fp)) != 0)
+	error = fget_read(td, uap->fd, &fp);
+	if (error)
 		return (error);
-	needfree = NULL;
-	/* note: can't use iovlen until iovcnt is validated */
-	iovlen = uap->iovcnt * sizeof (struct iovec);
-	if (uap->iovcnt > UIO_SMALLIOV) {
-		if (uap->iovcnt > UIO_MAXIOV) {
-			error = EINVAL;
-			goto done;
-		}
-		MALLOC(iov, struct iovec *, iovlen, M_IOV, M_WAITOK);
-		needfree = iov;
-	} else
-		iov = aiov;
-	auio.uio_iov = iov;
-	auio.uio_iovcnt = uap->iovcnt;
-	auio.uio_rw = UIO_READ;
-	auio.uio_segflg = UIO_USERSPACE;
-	auio.uio_td = td;
-	auio.uio_offset = -1;
-	if ((error = copyin(uap->iovp, iov, iovlen)))
-		goto done;
-	auio.uio_resid = 0;
-	for (i = 0; i < uap->iovcnt; i++) {
-		if (iov->iov_len > INT_MAX - auio.uio_resid) {
-			error = EINVAL;
-			goto done;
-		}
-		auio.uio_resid += iov->iov_len;
-		iov++;
+	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error) {
+		fdrop(fp, td);
+		return (error);
 	}
+	auio->uio_rw = UIO_READ;
+	auio->uio_td = td;
 #ifdef KTRACE
-	/*
-	 * if tracing, save a copy of iovec
-	 */
-	if (KTRPOINT(td, KTR_GENIO))  {
-		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
-		bcopy(auio.uio_iov, ktriov, iovlen);
-		ktruio = auio;
-	}
+	if (KTRPOINT(td, KTR_GENIO)) 
+		ktruio = cloneuio(auio);
 #endif
-	cnt = auio.uio_resid;
-	if ((error = fo_read(fp, &auio, td->td_ucred, 0, td))) {
-		if (auio.uio_resid != cnt && (error == ERESTART ||
+	cnt = auio->uio_resid;
+	if ((error = fo_read(fp, auio, td->td_ucred, 0, td))) {
+		if (auio->uio_resid != cnt && (error == ERESTART ||
 		    error == EINTR || error == EWOULDBLOCK))
 			error = 0;
 	}
-	cnt -= auio.uio_resid;
+	cnt -= auio->uio_resid;
 #ifdef KTRACE
-	if (ktriov != NULL) {
-		if (error == 0) {
-			ktruio.uio_iov = ktriov;
-			ktruio.uio_resid = cnt;
-			ktrgenio(uap->fd, UIO_READ, &ktruio, error);
-		}
-		FREE(ktriov, M_TEMP);
+	if (ktruio != NULL) {
+		ktruio->uio_resid = cnt;
+		ktrgenio(uap->fd, UIO_READ, ktruio, error);
 	}
 #endif
 	td->td_retval[0] = cnt;
-done:
+	free(auio, M_IOV);
 	fdrop(fp, td);
-	if (needfree)
-		FREE(needfree, M_IOV);
 	return (error);
 }
 
@@ -361,9 +312,11 @@ pwrite(td, uap)
 	int error;
 
 	if ((error = fget_write(td, uap->fd, &fp)) == 0) {
-		if (!(fp->f_ops->fo_flags & DFLAG_SEEKABLE)) {
+		if (!(fp->f_ops->fo_flags & DFLAG_SEEKABLE))
 			error = ESPIPE;
-		} else {
+		else if (uap->offset < 0 && fp->f_vnode->v_type != VCHR)
+			error = EINVAL;
+		else {
 			error = dofilewrite(td, fp, uap->fd, uap->buf,
 				    uap->nbyte, uap->offset, FOF_OFFSET);
 		}
@@ -387,9 +340,7 @@ dofilewrite(td, fp, fd, buf, nbyte, offset, flags)
 	struct iovec aiov;
 	long cnt, error = 0;
 #ifdef KTRACE
-	struct iovec ktriov;
-	struct uio ktruio;
-	int didktr = 0;
+	struct uio *ktruio = NULL;
 #endif
 
 	aiov.iov_base = (void *)(uintptr_t)buf;
@@ -404,14 +355,8 @@ dofilewrite(td, fp, fd, buf, nbyte, offset, flags)
 	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_td = td;
 #ifdef KTRACE
-	/*
-	 * if tracing, save a copy of iovec and uio
-	 */
-	if (KTRPOINT(td, KTR_GENIO)) {
-		ktriov = aiov;
-		ktruio = auio;
-		didktr = 1;
-	}
+	if (KTRPOINT(td, KTR_GENIO))
+		ktruio = cloneuio(&auio);
 #endif
 	cnt = nbyte;
 	if (fp->f_type == DTYPE_VNODE)
@@ -429,10 +374,9 @@ dofilewrite(td, fp, fd, buf, nbyte, offset, flags)
 	}
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
-	if (didktr && error == 0) {
-		ktruio.uio_iov = &ktriov;
-		ktruio.uio_resid = cnt;
-		ktrgenio(fd, UIO_WRITE, &ktruio, error);
+	if (ktruio != NULL) {
+		ktruio->uio_resid = cnt;
+		ktrgenio(fd, UIO_WRITE, ktruio, error);
 	}
 #endif
 	td->td_retval[0] = cnt;
@@ -453,68 +397,35 @@ struct writev_args {
  * MPSAFE
  */
 int
-writev(td, uap)
-	struct thread *td;
-	register struct writev_args *uap;
+writev(struct thread *td, struct writev_args *uap)
 {
 	struct file *fp;
-	struct uio auio;
-	register struct iovec *iov;
-	struct iovec *needfree;
-	struct iovec aiov[UIO_SMALLIOV];
-	long i, cnt, error = 0;
-	u_int iovlen;
+	struct uio *auio = NULL;
+	long cnt;
+	int error;
 #ifdef KTRACE
-	struct iovec *ktriov = NULL;
-	struct uio ktruio;
+	struct uio *ktruio = NULL;
 #endif
 
-	if ((error = fget_write(td, uap->fd, &fp)) != 0)
+	error = fget_write(td, uap->fd, &fp);
+	if (error)
 		return (EBADF);
-	needfree = NULL;
-	/* note: can't use iovlen until iovcnt is validated */
-	iovlen = uap->iovcnt * sizeof (struct iovec);
-	if (uap->iovcnt > UIO_SMALLIOV) {
-		if (uap->iovcnt > UIO_MAXIOV) {
-			error = EINVAL;
-			goto done;
-		}
-		MALLOC(iov, struct iovec *, iovlen, M_IOV, M_WAITOK);
-		needfree = iov;
-	} else
-		iov = aiov;
-	auio.uio_iov = iov;
-	auio.uio_iovcnt = uap->iovcnt;
-	auio.uio_rw = UIO_WRITE;
-	auio.uio_segflg = UIO_USERSPACE;
-	auio.uio_td = td;
-	auio.uio_offset = -1;
-	if ((error = copyin(uap->iovp, iov, iovlen)))
-		goto done;
-	auio.uio_resid = 0;
-	for (i = 0; i < uap->iovcnt; i++) {
-		if (iov->iov_len > INT_MAX - auio.uio_resid) {
-			error = EINVAL;
-			goto done;
-		}
-		auio.uio_resid += iov->iov_len;
-		iov++;
+	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error) {
+		fdrop(fp, td);
+		return (error);
 	}
+	auio->uio_rw = UIO_WRITE;
+	auio->uio_td = td;
 #ifdef KTRACE
-	/*
-	 * if tracing, save a copy of iovec and uio
-	 */
-	if (KTRPOINT(td, KTR_GENIO))  {
-		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
-		bcopy(auio.uio_iov, ktriov, iovlen);
-		ktruio = auio;
-	}
+	if (KTRPOINT(td, KTR_GENIO))
+		ktruio = cloneuio(auio);
 #endif
-	cnt = auio.uio_resid;
+	cnt = auio->uio_resid;
 	if (fp->f_type == DTYPE_VNODE)
 		bwillwrite();
-	if ((error = fo_write(fp, &auio, td->td_ucred, 0, td))) {
-		if (auio.uio_resid != cnt && (error == ERESTART ||
+	if ((error = fo_write(fp, auio, td->td_ucred, 0, td))) {
+		if (auio->uio_resid != cnt && (error == ERESTART ||
 		    error == EINTR || error == EWOULDBLOCK))
 			error = 0;
 		if (error == EPIPE) {
@@ -523,22 +434,16 @@ writev(td, uap)
 			PROC_UNLOCK(td->td_proc);
 		}
 	}
-	cnt -= auio.uio_resid;
+	cnt -= auio->uio_resid;
 #ifdef KTRACE
-	if (ktriov != NULL) {
-		if (error == 0) {
-			ktruio.uio_iov = ktriov;
-			ktruio.uio_resid = cnt;
-			ktrgenio(uap->fd, UIO_WRITE, &ktruio, error);
-		}
-		FREE(ktriov, M_TEMP);
+	if (ktruio != NULL) {
+		ktruio->uio_resid = cnt;
+		ktrgenio(uap->fd, UIO_WRITE, ktruio, error);
 	}
 #endif
 	td->td_retval[0] = cnt;
-done:
 	fdrop(fp, td);
-	if (needfree)
-		FREE(needfree, M_IOV);
+	free(auio, M_IOV);
 	return (error);
 }
 
@@ -740,6 +645,10 @@ kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
 	if (nd < 0)
 		return (EINVAL);
 	fdp = td->td_proc->p_fd;
+	/*
+	 * XXX: kern_select() currently requires that we acquire Giant
+	 * even if none of the file descriptors we poll requires Giant.
+	 */
 	mtx_lock(&Giant);
 	FILEDESC_LOCK(fdp);
 
@@ -939,8 +848,8 @@ poll(td, uap)
 	struct thread *td;
 	struct poll_args *uap;
 {
-	caddr_t bits;
-	char smallbits[32 * sizeof(struct pollfd)];
+	struct pollfd *bits;
+	struct pollfd smallbits[32];
 	struct timeval atv, rtv, ttv;
 	int error = 0, timo;
 	u_int ncoll, nfds;
@@ -948,6 +857,10 @@ poll(td, uap)
 
 	nfds = uap->nfds;
 
+	/*
+	 * XXX: poll() currently requires that we acquire Giant even if
+	 * none of the file descriptors we poll requires Giant.
+	 */
 	mtx_lock(&Giant);
 	/*
 	 * This is kinda bogus.  We have fd limits, but that is not
@@ -956,11 +869,14 @@ poll(td, uap)
 	 * least enough for the current limits.  We want to be reasonably
 	 * safe, but not overly restrictive.
 	 */
-	if ((nfds > td->td_proc->p_rlimit[RLIMIT_NOFILE].rlim_cur) &&
+	PROC_LOCK(td->td_proc);
+	if ((nfds > lim_cur(td->td_proc, RLIMIT_NOFILE)) &&
 	    (nfds > FD_SETSIZE)) {
+		PROC_UNLOCK(td->td_proc);
 		error = EINVAL;
 		goto done2;
 	}
+	PROC_UNLOCK(td->td_proc);
 	ni = nfds * sizeof(struct pollfd);
 	if (ni > sizeof(smallbits))
 		bits = malloc(ni, M_TEMP, M_WAITOK);
@@ -992,7 +908,7 @@ retry:
 	mtx_unlock_spin(&sched_lock);
 	mtx_unlock(&sellock);
 
-	error = pollscan(td, (struct pollfd *)bits, nfds);
+	error = pollscan(td, bits, nfds);
 	mtx_lock(&sellock);
 	if (error || td->td_retval[0])
 		goto done;
@@ -1204,15 +1120,9 @@ doselwakeup(sip, pri)
 	TAILQ_REMOVE(&td->td_selq, sip, si_thrlist);
 	sip->si_thread = NULL;
 	mtx_lock_spin(&sched_lock);
-	if (td->td_wchan == &selwait) {
-		cv_waitq_remove(td);
-		TD_CLR_SLEEPING(td);
-		if (pri >= PRI_MIN && pri <= PRI_MAX && td->td_priority > pri)
-			td->td_priority = pri;
-		setrunnable(td);
-	} else
-		td->td_flags &= ~TDF_SELECT;
+	td->td_flags &= ~TDF_SELECT;
 	mtx_unlock_spin(&sched_lock);
+	sleepq_remove(td, &selwait);
 	mtx_unlock(&sellock);
 }
 

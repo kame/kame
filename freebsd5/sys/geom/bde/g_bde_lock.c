@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/bde/g_bde_lock.c,v 1.12 2003/10/07 09:28:07 phk Exp $
+ * $FreeBSD: src/sys/geom/bde/g_bde_lock.c,v 1.12.4.1 2004/09/14 05:59:12 phk Exp $
  *
  * This souce file contains routines which operates on the lock sectors, both
  * for the kernel and the userland program gbde(1).
@@ -428,10 +428,9 @@ g_bde_decrypt_lockx(struct g_bde_softc *sc, u_char *meta, off_t mediasize, u_int
 		return (ENOENT);
 
 	/* If we have an unsorted lock-sequence, refuse */
-	if (gl->lsector[0] > gl->lsector[1] ||
-	    gl->lsector[1] > gl->lsector[2] ||
-	    gl->lsector[2] > gl->lsector[3])
-		return (EINVAL);
+	for (i = 0; i < G_BDE_MAXKEYS - 1; i++)
+		if (gl->lsector[i] >= gl->lsector[i + 1])
+			return (EINVAL);
 
 	/* Finally, find out which key was used by matching the byte offset */
 	for (i = 0; i < G_BDE_MAXKEYS; i++)

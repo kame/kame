@@ -54,10 +54,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -77,7 +73,7 @@
  *	from: @(#)sbusvar.h	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: sbusvar.h,v 1.7 1999/06/05 05:30:43 mrg Exp
  *
- * $FreeBSD: src/sys/sparc64/sbus/sbusvar.h,v 1.2 2002/08/19 22:57:32 mux Exp $
+ * $FreeBSD: src/sys/sparc64/sbus/sbusvar.h,v 1.4 2004/08/12 17:41:33 marius Exp $
  */
 
 #ifndef _SPARC64_SBUS_SBUSVAR_H_
@@ -102,11 +98,7 @@
 enum sbus_device_ivars {
 	SBUS_IVAR_BURSTSZ,
 	SBUS_IVAR_CLOCKFREQ,
-	SBUS_IVAR_COMPAT,
-	SBUS_IVAR_NAME,
-	SBUS_IVAR_NODE,
 	SBUS_IVAR_SLOT,
-	SBUS_IVAR_DEVICE_TYPE,
 };
 
 /*
@@ -117,11 +109,7 @@ enum sbus_device_ivars {
 
 SBUS_ACCESSOR(burstsz,		BURSTSZ,	int)
 SBUS_ACCESSOR(clockfreq,	CLOCKFREQ,	int)
-SBUS_ACCESSOR(compat,		COMPAT,		char *)
-SBUS_ACCESSOR(name,		NAME,		char *)
-SBUS_ACCESSOR(node,		NODE,		phandle_t)
 SBUS_ACCESSOR(slot,		SLOT,		int)
-SBUS_ACCESSOR(device_type,	DEVICE_TYPE,	char *)
 
 #undef SBUS_ACCESSOR
 

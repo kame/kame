@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/atm/sscop/ng_sscop.c,v 1.1 2003/10/24 07:39:11 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/atm/sscop/ng_sscop.c,v 1.2 2004/05/29 00:51:15 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -196,18 +196,16 @@ static ng_rcvdata_t	ng_sscop_rcvmanage;
 static int ng_sscop_mod_event(module_t, int, void *);
 
 static struct ng_type ng_sscop_typestruct = {
-	NG_ABI_VERSION,
-	NG_SSCOP_NODE_TYPE,
-	ng_sscop_mod_event,	/* Module event handler (optional) */
-	ng_sscop_constructor,	/* Node constructor */
-	ng_sscop_rcvmsg,	/* control messages come here */
-	ng_sscop_shutdown,	/* reset, and free resources */
-	ng_sscop_newhook,	/* first notification of new hook */
-	NULL,			/* findhook */
-	NULL,			/* connect */
-	ng_sscop_rcvlower,	/* rcvdata */
-	ng_sscop_disconnect,	/* notify on disconnect */
-	ng_sscop_cmdlist,
+	.version =	NG_ABI_VERSION,
+	.name =		NG_SSCOP_NODE_TYPE,
+	.mod_event =	ng_sscop_mod_event,
+	.constructor =	ng_sscop_constructor,
+	.rcvmsg =	ng_sscop_rcvmsg,
+	.shutdown =	ng_sscop_shutdown,
+	.newhook =	ng_sscop_newhook,
+	.rcvdata =	ng_sscop_rcvlower,
+	.disconnect =	ng_sscop_disconnect,
+	.cmdlist =	ng_sscop_cmdlist,
 };
 NETGRAPH_INIT(sscop, &ng_sscop_typestruct);
 

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  *
  *      @(#)bpfdesc.h	8.1 (Berkeley) 6/10/93
  *
- * $FreeBSD: src/sys/net/bpfdesc.h,v 1.24 2003/11/12 03:14:29 rwatson Exp $
+ * $FreeBSD: src/sys/net/bpfdesc.h,v 1.27.2.1 2004/09/14 02:59:20 rwatson Exp $
  */
 
 #ifndef _NET_BPFDESC_H_
@@ -45,12 +41,13 @@
 
 #include <sys/callout.h>
 #include <sys/selinfo.h>
+#include <sys/queue.h>
 
 /*
  * Descriptor associated with each open bpf file.
  */
 struct bpf_d {
-	struct bpf_d	*bd_next;	/* Linked list of descriptors */
+	LIST_ENTRY(bpf_d) bd_next;	/* Linked list of descriptors */
 	/*
 	 * Buffer slots: two mbuf clusters buffer the incoming packets.
 	 *   The model has three slots.  Sbuf is always occupied.
@@ -102,6 +99,10 @@ struct bpf_d {
 
 #define BPFD_LOCK(bd)		mtx_lock(&(bd)->bd_mtx)
 #define BPFD_UNLOCK(bd)		mtx_unlock(&(bd)->bd_mtx)
+#define BPFD_LOCK_ASSERT(bd)	do {				\
+	mtx_assert(&(bd)->bd_mtx, MA_OWNED);			\
+	NET_ASSERT_GIANT();					\
+} while (0)
 
 /* Test whether a BPF is ready for read(). */
 #define	bpf_ready(bd)						 \
@@ -113,8 +114,8 @@ struct bpf_d {
  * Descriptor associated with each attached hardware interface.
  */
 struct bpf_if {
-	struct bpf_if *bif_next;	/* list of all interfaces */
-	struct bpf_d *bif_dlist;	/* descriptor list */
+	LIST_ENTRY(bpf_if)	bif_next;	/* list of all interfaces */
+	LIST_HEAD(, bpf_d)	bif_dlist;	/* descriptor list */
 	struct bpf_if **bif_driverp;	/* pointer into softc */
 	u_int bif_dlt;			/* link layer type */
 	u_int bif_hdrlen;		/* length of header (with padding) */

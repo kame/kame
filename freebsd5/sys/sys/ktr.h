@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from BSDI $Id: ktr.h,v 1.10.2.7 2000/03/16 21:44:42 cp Exp $
- * $FreeBSD: src/sys/sys/ktr.h,v 1.21 2003/03/11 20:07:22 jhb Exp $
+ * $FreeBSD: src/sys/sys/ktr.h,v 1.22 2004/08/06 21:46:51 rwatson Exp $
  */
 
 /*
@@ -72,7 +72,9 @@
 #define KTR_WITNESS	0x00200000
 #define	KTR_RUNQ	0x00400000		/* Run queue */
 #define	KTR_CONTENTION	0x00800000		/* Lock contention */
-#define	KTR_ALL		0x00ffffff
+#define	KTR_UMA		0x01000000		/* UMA slab allocator */
+#define	KTR_CALLOUT	0x02000000		/* Callouts and timeouts */
+#define	KTR_ALL		0x02ffffff
 
 /*
  * Trace classes which can be assigned to particular use at compile time

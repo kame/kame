@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/npx.c,v 1.144 2003/11/03 21:53:38 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/npx.c,v 1.152 2004/06/19 22:24:16 bde Exp $");
 
 #include "opt_cpu.h"
 #include "opt_debug_npx.h"
@@ -74,7 +70,6 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/npx.c,v 1.144 2003/11/03 21:53:38 jhb Exp $
 #include <machine/segments.h>
 #include <machine/ucontext.h>
 
-#include <i386/isa/icu.h>
 #ifdef PC98
 #include <pc98/pc98/pc98.h>
 #else
@@ -101,7 +96,7 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/npx.c,v 1.144 2003/11/03 21:53:38 jhb Exp $
 #define	NPX_DISABLE_I586_OPTIMIZED_BZERO	(1 << 1)
 #define	NPX_DISABLE_I586_OPTIMIZED_COPYIO	(1 << 2)
 
-#if defined(__GNUC__) && !defined(lint)
+#if (defined(__GNUC__) && !defined(lint)) || defined(__INTEL_COMPILER)
 
 #define	fldcw(addr)		__asm("fldcw %0" : : "m" (*(addr)))
 #define	fnclex()		__asm("fnclex")
@@ -119,7 +114,7 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/npx.c,v 1.144 2003/11/03 21:53:38 jhb Exp $
 				      : : "n" (CR0_TS) : "ax")
 #define	stop_emulating()	__asm("clts")
 
-#else	/* not __GNUC__ */
+#else	/* !((__GNUC__ && !lint ) || __INTEL_COMPILER) */
 
 void	fldcw(caddr_t addr);
 void	fnclex(void);
@@ -136,7 +131,7 @@ void	fxrstor(caddr_t addr);
 void	start_emulating(void);
 void	stop_emulating(void);
 
-#endif	/* __GNUC__ */
+#endif	/* (__GNUC__ && !lint ) || __INTEL_COMPILER */
 
 #ifdef CPU_ENABLE_SSE
 #define GET_FPU_CW(thread) \
@@ -373,6 +368,7 @@ npx_probe(dev)
 #endif
 			npx_traps_while_probing = npx_intrs_while_probing = 0;
 			fp_divide_by_0();
+			DELAY(1000);	/* wait for any IRQ13 */
 			if (npx_traps_while_probing != 0) {
 				/*
 				 * Good, exception 16 works.
@@ -410,18 +406,6 @@ npx_probe(dev)
 no_irq13:
 	idt[IDT_MF] = save_idt_npxtrap;
 	bus_teardown_intr(dev, irq_res, irq_cookie);
-
-	/*
-	 * XXX hack around brokenness of bus_teardown_intr().  If we left the
-	 * irq active then we would get it instead of exception 16.
-	 */
-	{
-		struct intsrc *isrc;
-
-		isrc = intr_lookup_source(irq_num);
-		isrc->is_pic->pic_disable_source(isrc);
-	}
-
 	bus_release_resource(dev, SYS_RES_IRQ, irq_rid, irq_res);
 	bus_release_resource(dev, SYS_RES_IOPORT, ioport_rid, ioport_res);
 	return (0);
@@ -888,6 +872,15 @@ npxdrop()
 {
 	struct thread *td;
 
+	/*
+	 * Discard pending exceptions in the !cpu_fxsr case so that unmasked
+	 * ones don't cause a panic on the next frstor.
+	 */
+#ifdef CPU_ENABLE_SSE
+	if (!cpu_fxsr)
+#endif
+		fnclex();
+
 	td = PCPU_GET(fpcurthread);
 	PCPU_SET(fpcurthread, NULL);
 	td->td_pcb->pcb_flags &= ~PCB_NPXINITDONE;
@@ -951,6 +944,10 @@ npxsetregs(td, addr)
 
 	s = intr_disable();
 	if (td == PCPU_GET(fpcurthread)) {
+#ifdef CPU_ENABLE_SSE
+		if (!cpu_fxsr)
+#endif
+			fnclex();	/* As in npxdrop(). */
 		fpurstor(addr);
 		intr_restore(s);
 	} else {
@@ -1037,13 +1034,13 @@ static driver_t npx_driver = {
 
 static devclass_t npx_devclass;
 
-#ifdef DEV_ISA
 /*
  * We prefer to attach to the root nexus so that the usual case (exception 16)
  * doesn't describe the processor as being `on isa'.
  */
 DRIVER_MODULE(npx, nexus, npx_driver, npx_devclass, 0, 0);
 
+#ifdef DEV_ISA
 /*
  * This sucks up the legacy ISA support assignments from PNPBIOS/ACPI.
  */

@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,9 +27,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/exception.s,v 1.106 2003/11/03 22:08:52 jhb Exp $
+ * $FreeBSD: src/sys/i386/i386/exception.s,v 1.111 2004/05/26 07:43:41 bde Exp $
  */
 
+#include "opt_apic.h"
 #include "opt_npx.h"
 
 #include <machine/asmacros.h>
@@ -133,14 +130,13 @@ alltraps:
 	pushl	%es
 	pushl	%fs
 alltraps_with_regs_pushed:
-	mov	$KDSEL,%ax
-	mov	%ax,%ds
-	mov	%ax,%es
-	mov	$KPSEL,%ax
-	mov	%ax,%fs
-	FAKE_MCOUNT(13*4(%esp))
+	movl	$KDSEL,%eax
+	movl	%eax,%ds
+	movl	%eax,%es
+	movl	$KPSEL,%eax
+	movl	%eax,%fs
+	FAKE_MCOUNT(TF_EIP(%esp))
 calltrap:
-	FAKE_MCOUNT(btrap)		/* init "from" btrap -> calltrap */
 	call	trap
 
 	/*
@@ -171,12 +167,12 @@ IDTVEC(lcall_syscall)
 	pushl	%ds
 	pushl	%es
 	pushl	%fs
-	mov	$KDSEL,%ax		/* switch to kernel segments */
-	mov	%ax,%ds
-	mov	%ax,%es
-	mov	$KPSEL,%ax
-	mov	%ax,%fs
-	FAKE_MCOUNT(13*4(%esp))
+	movl	$KDSEL,%eax		/* switch to kernel segments */
+	movl	%eax,%ds
+	movl	%eax,%es
+	movl	$KPSEL,%eax
+	movl	%eax,%fs
+	FAKE_MCOUNT(TF_EIP(%esp))
 	call	syscall
 	MEXITCOUNT
 	jmp	doreti
@@ -196,12 +192,12 @@ IDTVEC(int0x80_syscall)
 	pushl	%ds
 	pushl	%es
 	pushl	%fs
-	mov	$KDSEL,%ax		/* switch to kernel segments */
-	mov	%ax,%ds
-	mov	%ax,%es
-	mov	$KPSEL,%ax
-	mov	%ax,%fs
-	FAKE_MCOUNT(13*4(%esp))
+	movl	$KDSEL,%eax		/* switch to kernel segments */
+	movl	%eax,%ds
+	movl	%eax,%es
+	movl	$KPSEL,%eax
+	movl	%eax,%fs
+	FAKE_MCOUNT(TF_EIP(%esp))
 	call	syscall
 	MEXITCOUNT
 	jmp	doreti
@@ -222,12 +218,40 @@ ENTRY(fork_trampoline)
 
 
 /*
- * Include vm86 call routines, which want to call doreti.
+ * To efficiently implement classification of trap and interrupt handlers
+ * for profiling, there must be only trap handlers between the labels btrap
+ * and bintr, and only interrupt handlers between the labels bintr and
+ * eintr.  This is implemented (partly) by including files that contain
+ * some of the handlers.  Before including the files, set up a normal asm
+ * environment so that the included files doen't need to know that they are
+ * included.
  */
-#include "i386/i386/vm86bios.s"
 
 	.data
-	ALIGN_DATA
+	.p2align 4
+	.text
+	SUPERALIGN_TEXT
+MCOUNT_LABEL(bintr)
+
+#include <i386/isa/atpic_vector.s>
+
+#ifdef DEV_APIC
+	.data
+	.p2align 4
+	.text
+	SUPERALIGN_TEXT
+
+#include <i386/i386/apic_vector.s>
+#endif
+
+	.data
+	.p2align 4
+	.text
+	SUPERALIGN_TEXT
+#include <i386/i386/vm86bios.s>
+
+	.text
+MCOUNT_LABEL(eintr)
 
 /*
  * void doreti(struct trapframe)
@@ -236,10 +260,9 @@ ENTRY(fork_trampoline)
  */
 	.text
 	SUPERALIGN_TEXT
-	.globl	doreti
 	.type	doreti,@function
 doreti:
-	FAKE_MCOUNT(bintr)		/* init "from" bintr -> doreti */
+	FAKE_MCOUNT($bintr)		/* init "from" bintr -> doreti */
 doreti_next:
 	/*
 	 * Check if ASTs can be handled now.  PSL_VM must be checked first

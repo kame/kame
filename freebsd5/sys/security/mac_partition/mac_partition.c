@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 1999-2002 Robert N. M. Watson
+ * Copyright (c) 2001-2002 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_partition/mac_partition.c,v 1.9 2003/12/06 21:48:02 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_partition/mac_partition.c,v 1.10 2004/02/22 00:33:12 rwatson Exp $
  */
 
 /*

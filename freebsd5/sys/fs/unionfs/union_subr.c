@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_subr.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/fs/unionfs/union_subr.c,v 1.75 2003/07/26 07:32:21 phk Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_subr.c,v 1.79 2004/07/15 08:26:04 phk Exp $
  */
 
 #include <sys/param.h>
@@ -1155,37 +1151,30 @@ union_vn_close(vp, fmode, cred, td)
 	return (VOP_CLOSE(vp, fmode, cred, td));
 }
 
-#if 0
-
 /*
  *	union_removed_upper:
  *
- *	called with union_node unlocked. XXX
+ *	An upper-only file/directory has been removed; un-cache it so
+ *	that unionfs vnode gets reclaimed and the last uppervp reference
+ *	disappears.
+ *
+ *	Called with union_node unlocked.
  */
 
 void
 union_removed_upper(un)
 	struct union_node *un;
 {
-	struct thread *td = curthread;	/* XXX */
-	struct vnode **vpp;
-
-	/*
-	 * Do not set the uppervp to NULLVP.  If lowervp is NULLVP,
-	 * union node will have neither uppervp nor lowervp.  We remove
-	 * the union node from cache, so that it will not be referrenced.
-	 */
-	union_newupper(un, NULLVP);
-	if (un->un_dircache != NULL)
-		union_dircache_free(un);
-
 	if (un->un_flags & UN_CACHED) {
+		int hash = UNION_HASH(un->un_uppervp, un->un_lowervp);
+
+		while (union_list_lock(hash))
+			continue;
 		un->un_flags &= ~UN_CACHED;
 		LIST_REMOVE(un, un_cache);
+		union_list_unlock(hash);
 	}
 }
-
-#endif
 
 /*
  * Determine whether a whiteout is needed
@@ -1374,6 +1363,7 @@ union_modevent(module_t mod, int type, void *data)
 		union_dircheckp = NULL;
 		break;
 	default:
+		return EOPNOTSUPP;
 		break;
 	}
 	return 0;

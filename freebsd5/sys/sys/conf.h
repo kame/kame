@@ -17,10 +17,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -38,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)conf.h	8.5 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/conf.h,v 1.179 2003/10/18 09:03:15 phk Exp $
+ * $FreeBSD: src/sys/sys/conf.h,v 1.190.2.1 2004/09/14 05:49:18 phk Exp $
  */
 
 #ifndef _SYS_CONF_H_
@@ -59,20 +55,24 @@ struct cdev {
 #define SI_ALIAS	0x0002	/* carrier of alias name */
 #define SI_NAMED	0x0004	/* make_dev{_alias} has been called */
 #define SI_CHEAPCLONE	0x0008	/* can be removed_dev'ed when vnode reclaims */
-#define SI_CHILD	0x0010	/* child of another dev_t */
+#define SI_CHILD	0x0010	/* child of another struct cdev **/
 #define SI_DEVOPEN	0x0020	/* opened by device */
 #define SI_CONSOPEN	0x0040	/* opened by console */
 #define SI_DUMPDEV	0x0080	/* is kernel dumpdev */
 #define SI_CANDELETE	0x0100	/* can do BIO_DELETE */
+#define SI_CLONELIST	0x0200	/* on a clone list */
 	struct timespec	si_atime;
 	struct timespec	si_ctime;
 	struct timespec	si_mtime;
-	udev_t		si_udev;
+	dev_t		si_udev;
+	int		si_refcount;
+	LIST_ENTRY(cdev)	si_list;
+	LIST_ENTRY(cdev)	si_clone;
 	LIST_ENTRY(cdev)	si_hash;
 	SLIST_HEAD(, vnode)	si_hlist;
 	LIST_HEAD(, cdev)	si_children;
 	LIST_ENTRY(cdev)	si_siblings;
-	dev_t		si_parent;
+	struct cdev *si_parent;
 	u_int		si_inode;
 	char		*si_name;
 	void		*si_drv1, *si_drv2;
@@ -84,6 +84,7 @@ struct cdev {
 	gid_t		si_gid;
 	mode_t		si_mode;
 	u_long		si_usecount;
+	u_long		si_threadcount;
 	union {
 		struct {
 			struct tty *__sit_tty;
@@ -111,12 +112,6 @@ struct cdev {
 #define si_copyonwrite	__si_u.__si_disk.__sid_copyonwrite
 
 /*
- * Special device management
- */
-#define	SPECHSZ	64
-#define	SPECHASH(rdev)	(((unsigned)(minor(rdev)))%SPECHSZ)
-
-/*
  * Definitions of device driver entry switches
  */
 
@@ -125,6 +120,7 @@ struct buf;
 struct thread;
 struct uio;
 struct knote;
+struct clonedevs;
 
 /*
  * Note: d_thread_t is provided as a transition aid for those drivers
@@ -144,29 +140,22 @@ struct knote;
 
 typedef struct thread d_thread_t;
 
-typedef int d_open_t(dev_t dev, int oflags, int devtype, struct thread *td);
-typedef int d_fdopen_t(dev_t dev, int oflags, struct thread *td, int fdidx);
-typedef int d_close_t(dev_t dev, int fflag, int devtype, struct thread *td);
+typedef int d_open_t(struct cdev *dev, int oflags, int devtype, struct thread *td);
+typedef int d_fdopen_t(struct cdev *dev, int oflags, struct thread *td, int fdidx);
+typedef int d_close_t(struct cdev *dev, int fflag, int devtype, struct thread *td);
 typedef void d_strategy_t(struct bio *bp);
-typedef int d_ioctl_t(dev_t dev, u_long cmd, caddr_t data,
+typedef int d_ioctl_t(struct cdev *dev, u_long cmd, caddr_t data,
 		      int fflag, struct thread *td);
 
-typedef int d_read_t(dev_t dev, struct uio *uio, int ioflag);
-typedef int d_write_t(dev_t dev, struct uio *uio, int ioflag);
-typedef int d_poll_t(dev_t dev, int events, struct thread *td);
-typedef int d_kqfilter_t(dev_t dev, struct knote *kn);
-typedef int d_mmap_t(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr,
+typedef int d_read_t(struct cdev *dev, struct uio *uio, int ioflag);
+typedef int d_write_t(struct cdev *dev, struct uio *uio, int ioflag);
+typedef int d_poll_t(struct cdev *dev, int events, struct thread *td);
+typedef int d_kqfilter_t(struct cdev *dev, struct knote *kn);
+typedef int d_mmap_t(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr,
    		     int nprot);
 
-typedef int l_open_t(dev_t dev, struct tty *tp);
-typedef int l_close_t(struct tty *tp, int flag);
-typedef int l_read_t(struct tty *tp, struct uio *uio, int flag);
-typedef int l_write_t(struct tty *tp, struct uio *uio, int flag);
-typedef int l_ioctl_t(struct tty *tp, u_long cmd, caddr_t data,
-		      int flag, struct thread *td);
-typedef int l_rint_t(int c, struct tty *tp);
-typedef int l_start_t(struct tty *tp);
-typedef int l_modem_t(struct tty *tp, int flag);
+typedef int d_spare1_t(struct cdev *dev);
+typedef int d_spare2_t(struct cdev *dev);
 
 typedef int dumper_t(
 	void *priv,		/* Private to the driver. */
@@ -192,55 +181,54 @@ typedef int dumper_t(
 #define	D_TYPEMASK	0xffff
 
 /*
- * Flags for d_flags.
+ * Flags for d_flags which the drivers can set.
  */
 #define	D_MEMDISK	0x00010000	/* memory type disk */
-#define	D_NAGGED	0x00020000	/* nagged about missing make_dev() */
 #define	D_TRACKCLOSE	0x00080000	/* track all closes */
 #define D_MMAP_ANON	0x00100000	/* special treatment in vm_mmap.c */
-#define D_NOGIANT	0x00400000	/* Doesn't want Giant */
+#define D_PSEUDO	0x00200000	/* make_dev() can return NULL */
+#define D_NEEDGIANT	0x00400000	/* driver want Giant */
+
+/*
+ * Version numbers.
+ */
+#define D_VERSION_00	0x20011966
+#define D_VERSION	D_VERSION_00
+
+/*
+ * Flags used for internal housekeeping
+ */
+#define D_INIT		0x80000000	/* cdevsw initialized */
+#define D_ALLOCMAJ	0x40000000	/* major# is allocated */
 
 /*
  * Character device switch table
  */
 struct cdevsw {
-	int		d_maj;
-	u_int		d_flags;
-	const char	*d_name;
-	d_open_t	*d_open;
-	d_fdopen_t	*d_fdopen;
-	d_close_t	*d_close;
-	d_read_t	*d_read;
-	d_write_t	*d_write;
-	d_ioctl_t	*d_ioctl;
-	d_poll_t	*d_poll;
-	d_mmap_t	*d_mmap;
-	d_strategy_t	*d_strategy;
-	dumper_t	*d_dump;
-	d_kqfilter_t	*d_kqfilter;
+	int			d_version;
+	int			d_maj;
+	u_int			d_flags;
+	const char		*d_name;
+	d_open_t		*d_open;
+	d_fdopen_t		*d_fdopen;
+	d_close_t		*d_close;
+	d_read_t		*d_read;
+	d_write_t		*d_write;
+	d_ioctl_t		*d_ioctl;
+	d_poll_t		*d_poll;
+	d_mmap_t		*d_mmap;
+	d_strategy_t		*d_strategy;
+	dumper_t		*d_dump;
+	d_kqfilter_t		*d_kqfilter;
+	d_spare1_t		*d_spare1;
+	d_spare2_t		*d_spare2;
+
+	/* These fields should not be messed with by drivers */
+	LIST_ENTRY(cdevsw)	d_list;
+	LIST_HEAD(, cdev)	d_devs;
+	int			d_refcount;
 };
 
-/*
- * Line discipline switch table
- */
-struct linesw {
-	l_open_t	*l_open;
-	l_close_t	*l_close;
-	l_read_t	*l_read;
-	l_write_t	*l_write;
-	l_ioctl_t	*l_ioctl;
-	l_rint_t	*l_rint;
-	l_start_t	*l_start;
-	l_modem_t	*l_modem;
-	u_char		l_hotchar;
-};
-
-extern struct linesw linesw[];
-extern int nlinesw;
-
-int ldisc_register(int , struct linesw *);
-void ldisc_deregister(int);
-#define LDISC_LOAD 	-1		/* Loadable line discipline */
 #endif /* _KERNEL */
 
 #ifdef _KERNEL
@@ -252,10 +240,6 @@ void ldisc_deregister(int);
  * should just not initialize .d_maj and that will DTRT.
  */
 #define	MAJOR_AUTO	0	/* XXX: Not GM */
-
-l_ioctl_t	l_nullioctl;
-l_read_t	l_noread;
-l_write_t	l_nowrite;
 
 struct module;
 
@@ -274,25 +258,34 @@ static moduledata_t name##_mod = {					\
 DECLARE_MODULE(name, name##_mod, SI_SUB_DRIVERS, SI_ORDER_MIDDLE)
 
 
-int	count_dev(dev_t _dev);
-void	destroy_dev(dev_t _dev);
-struct cdevsw *devsw(dev_t _dev);
-const char *devtoname(dev_t _dev);
-int	dev_named(dev_t _pdev, const char *_name);
-void	dev_depends(dev_t _pdev, dev_t _cdev);
+void clone_setup(struct clonedevs **cdp);
+void clone_cleanup(struct clonedevs **);
+#define CLONE_UNITMASK 0xfffff
+#define CLONE_FLAG0 (CLONE_UNITMASK + 1)
+int clone_create(struct clonedevs **, struct cdevsw *, int *unit, struct cdev **dev, u_int extra);
+
+int	count_dev(struct cdev *_dev);
+void	destroy_dev(struct cdev *_dev);
+struct cdevsw *devsw(struct cdev *_dev);
+void	cdevsw_ref(struct cdevsw *);
+void	cdevsw_rel(struct cdevsw *);
+const char *devtoname(struct cdev *_dev);
+int	dev_named(struct cdev *_pdev, const char *_name);
+void	dev_depends(struct cdev *_pdev, struct cdev *_cdev);
+void	dev_ref(struct cdev *dev);
+void	dev_rel(struct cdev *dev);
 void	dev_strategy(struct buf *bp);
-void	freedev(dev_t _dev);
-dev_t	makebdev(int _maj, int _min);
-dev_t	make_dev(struct cdevsw *_devsw, int _minor, uid_t _uid, gid_t _gid,
+struct cdev *makebdev(int _maj, int _min);
+struct cdev *make_dev(struct cdevsw *_devsw, int _minor, uid_t _uid, gid_t _gid,
 		int _perms, const char *_fmt, ...) __printflike(6, 7);
-dev_t	make_dev_alias(dev_t _pdev, const char *_fmt, ...) __printflike(2, 3);
-int	dev2unit(dev_t _dev);
+struct cdev *make_dev_alias(struct cdev *_pdev, const char *_fmt, ...) __printflike(2, 3);
+int	dev2unit(struct cdev *_dev);
 int	unit2minor(int _unit);
 void	setconf(void);
-dev_t	getdiskbyname(char *_name);
+struct cdev *getdiskbyname(char *_name);
 
-void devfs_create(dev_t dev);
-void devfs_destroy(dev_t dev);
+void devfs_create(struct cdev *dev);
+void devfs_destroy(struct cdev *dev);
 
 #define		UID_ROOT	0
 #define		UID_BIN		3
@@ -305,7 +298,7 @@ void devfs_destroy(dev_t dev);
 #define		GID_GAMES	13
 #define		GID_DIALER	68
 
-typedef void (*dev_clone_fn)(void *arg, char *name, int namelen, dev_t *result);
+typedef void (*dev_clone_fn)(void *arg, char *name, int namelen, struct cdev **result);
 
 int dev_stdclone(char *_name, char **_namep, const char *_stem, int *_unit);
 EVENTHANDLER_DECLARE(dev_clone, dev_clone_fn);
@@ -323,6 +316,13 @@ struct dumperinfo {
 int set_dumper(struct dumperinfo *);
 void dumpsys(struct dumperinfo *);
 extern int dumping;		/* system is dumping */
+
+/* D_TTY related functions */
+d_ioctl_t	 ttyioctl;
+d_kqfilter_t	 ttykqfilter;
+d_poll_t	 ttypoll;
+d_read_t	 ttyread;
+d_write_t	 ttywrite;
 
 #endif /* _KERNEL */
 

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.40.2.1 2004/01/09 21:13:56 truckman Exp $
+ * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.42 2004/06/29 20:38:44 imp Exp $
  */
 
 /*
@@ -757,11 +757,6 @@ struct dc_softc {
 	int			rxcycles;	/* ... when polling */
 #endif
 	int			suspended;	/* 0 = normal  1 = suspended */
-	u_int32_t		saved_maps[5];	/* pci data */
-	u_int32_t		saved_biosaddr;
-	u_int8_t		saved_intline;
-	u_int8_t		saved_cachelnsz;
-	u_int8_t		saved_lattimer;
 };
 
 

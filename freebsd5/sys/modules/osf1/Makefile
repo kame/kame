@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/osf1/Makefile,v 1.11 2003/02/25 00:42:40 marcel Exp $
+# $FreeBSD: src/sys/modules/osf1/Makefile,v 1.12 2004/02/13 10:11:00 ru Exp $
 
 MAINTAINER=	gallatin@FreeBSD.org
 
@@ -9,8 +9,6 @@ SRCS=	osf1_ioctl.c osf1_misc.c osf1_signal.c osf1_sysent.c \
 	osf1_mount.c imgact_osf1.c osf1_sysvec.c opt_compat.h \
 	opt_ddb.h opt_mac.h opt_nfs.h device_if.h bus_if.h \
 	vnode_if.h
-
-#CFLAGS+=  -g
 
 opt_compat.h:
 	echo "#define COMPAT_43 1" > ${.TARGET}

@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,19 +33,19 @@
  *	from: hp300: @(#)pmap.h 7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h        7.4 (Berkeley) 5/12/91
  *	from: FreeBSD: src/sys/i386/include/pmap.h,v 1.70 2000/11/30
- * $FreeBSD: src/sys/sparc64/include/pmap.h,v 1.37 2003/10/06 01:47:11 bms Exp $
+ * $FreeBSD: src/sys/sparc64/include/pmap.h,v 1.42 2004/08/10 20:53:25 alc Exp $
  */
 
 #ifndef	_MACHINE_PMAP_H_
 #define	_MACHINE_PMAP_H_
 
 #include <sys/queue.h>
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
 #include <machine/cache.h>
 #include <machine/tte.h>
 
 #define	PMAP_CONTEXT_MAX	8192
-
-#define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.tte_list))
 
 typedef	struct pmap *pmap_t;
 
@@ -62,6 +58,7 @@ struct md_page {
 };
 
 struct pmap {
+	struct	mtx pm_mtx;
 	struct	tte *pm_tsb;
 	vm_object_t pm_tsb_obj;
 	u_int	pm_active;
@@ -69,12 +66,24 @@ struct pmap {
 	struct	pmap_statistics pm_stats;
 };
 
+#define	PMAP_LOCK(pmap)		mtx_lock(&(pmap)->pm_mtx)
+#define	PMAP_LOCK_ASSERT(pmap, type) \
+				mtx_assert(&(pmap)->pm_mtx, (type))
+#define	PMAP_LOCK_DESTROY(pmap)	mtx_destroy(&(pmap)->pm_mtx)
+#define	PMAP_LOCK_INIT(pmap)	mtx_init(&(pmap)->pm_mtx, "pmap", \
+				    NULL, MTX_DEF)
+#define	PMAP_LOCKED(pmap)	mtx_owned(&(pmap)->pm_mtx)
+#define	PMAP_MTX(pmap)		(&(pmap)->pm_mtx)
+#define	PMAP_TRYLOCK(pmap)	mtx_trylock(&(pmap)->pm_mtx)
+#define	PMAP_UNLOCK(pmap)	mtx_unlock(&(pmap)->pm_mtx)
+
 void	pmap_bootstrap(vm_offset_t ekva);
 vm_paddr_t pmap_kextract(vm_offset_t va);
 void	pmap_kenter(vm_offset_t va, vm_page_t m);
 void	pmap_kremove(vm_offset_t);
 void	pmap_kenter_flags(vm_offset_t va, vm_paddr_t pa, u_long flags);
 void	pmap_kremove_flags(vm_offset_t va);
+boolean_t pmap_page_is_mapped(vm_page_t m);
 
 int	pmap_cache_enter(vm_page_t m, vm_offset_t va);
 void	pmap_cache_remove(vm_page_t m, vm_offset_t va);
@@ -90,8 +99,6 @@ void	pmap_clear_write(vm_page_t m);
 
 #define	vtophys(va)	pmap_kextract(((vm_offset_t)(va)))
 
-extern	vm_paddr_t avail_start;
-extern	vm_paddr_t avail_end;
 extern	struct pmap kernel_pmap_store;
 #define	kernel_pmap	(&kernel_pmap_store)
 extern	vm_paddr_t phys_avail[];

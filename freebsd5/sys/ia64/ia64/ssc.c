@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/ia64/ssc.c,v 1.16 2003/09/26 10:37:16 phk Exp $
+ *	$FreeBSD: src/sys/ia64/ia64/ssc.c,v 1.23 2004/07/15 20:47:40 phk Exp $
  */
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -55,18 +55,13 @@
 
 static	d_open_t	sscopen;
 static	d_close_t	sscclose;
-static	d_ioctl_t	sscioctl;
 
-#define CDEV_MAJOR 97
 static struct cdevsw ssc_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	sscopen,
 	.d_close =	sscclose,
-	.d_read =	ttyread,
-	.d_write =	ttywrite,
-	.d_ioctl =	sscioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"ssc",
-	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static struct tty *ssc_tp = NULL;
@@ -138,7 +133,7 @@ ssccncheckc(struct consdev *cp)
 }
 
 static int
-sscopen(dev_t dev, int flag, int mode, struct thread *td)
+sscopen(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct tty *tp;
 	int s;
@@ -169,7 +164,7 @@ sscopen(dev_t dev, int flag, int mode, struct thread *td)
 
 	splx(s);
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = ttyld_open(tp, dev);
 
 	if (error == 0 && setuptimeout) {
 		polltime = hz / SSC_POLL_HZ;
@@ -181,7 +176,7 @@ sscopen(dev_t dev, int flag, int mode, struct thread *td)
 }
  
 static int
-sscclose(dev_t dev, int flag, int mode, struct thread *td)
+sscclose(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	int unit = minor(dev);
 	struct tty *tp = ssc_tp;
@@ -190,31 +185,11 @@ sscclose(dev_t dev, int flag, int mode, struct thread *td)
 		return ENXIO;
 
 	untimeout(ssctimeout, tp, ssctimeouthandle);
-	(*linesw[tp->t_line].l_close)(tp, flag);
-	ttyclose(tp);
+	ttyld_close(tp, flag);
+	tty_close(tp);
 	return 0;
 }
  
-static int
-sscioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
-{
-	int unit = minor(dev);
-	struct tty *tp = ssc_tp;
-	int error;
-
-	if (unit != 0)
-		return ENXIO;
-
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td);
-	if (error != ENOIOCTL)
-		return error;
-	error = ttioctl(tp, cmd, data, flag);
-	if (error != ENOIOCTL)
-		return error;
-
-	return ENOTTY;
-}
-
 static int
 sscparam(struct tty *tp, struct termios *t)
 {
@@ -267,7 +242,7 @@ ssctimeout(void *v)
 
 	while ((c = ssccncheckc(NULL)) != -1) {
 		if (tp->t_state & TS_ISOPEN)
-			(*linesw[tp->t_line].l_rint)(c, tp);
+			ttyld_rint(tp, c);
 	}
 	ssctimeouthandle = timeout(ssctimeout, tp, polltime);
 }

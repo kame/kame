@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_wb.c,v 1.66 2003/11/14 19:00:32 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_wb.c,v 1.73.2.1 2004/09/02 20:57:40 rwatson Exp $");
 
 /*
  * Winbond fast ethernet PCI NIC driver
@@ -90,6 +90,7 @@ __FBSDID("$FreeBSD: src/sys/pci/if_wb.c,v 1.66 2003/11/14 19:00:32 sam Exp $");
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
@@ -174,7 +175,6 @@ static int wb_mii_readreg	(struct wb_softc *, struct wb_mii_frame *);
 static int wb_mii_writereg	(struct wb_softc *, struct wb_mii_frame *);
 
 static void wb_setcfg		(struct wb_softc *, u_int32_t);
-static u_int32_t wb_mchash	(caddr_t);
 static void wb_setmulti		(struct wb_softc *);
 static void wb_reset		(struct wb_softc *);
 static void wb_fixmedia		(struct wb_softc *);
@@ -586,36 +586,6 @@ wb_miibus_statchg(dev)
 	return;
 }
 
-static u_int32_t
-wb_mchash(addr)
-	caddr_t		addr;
-{
-	u_int32_t	crc, carry;
-	int		idx, bit;
-	u_int8_t	data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/*
-	 * return the filter bit position
-	 * Note: I arrived at the following nonsense
-	 * through experimentation. It's not the usual way to
-	 * generate the bit position but it's the only thing
-	 * I could come up with that works.
-	 */
-	return(~(crc >> 26) & 0x0000003F);
-}
-
 /*
  * Program the 64-bit multicast hash filter.
  */
@@ -650,7 +620,8 @@ wb_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = wb_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ~ether_crc32_be(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -827,39 +798,13 @@ wb_attach(dev)
 
 	mtx_init(&sc->wb_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-#ifndef BURN_BRIDGES
-	/*
-	 * Handle power management nonsense.
-	 */
-
-	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		u_int32_t		iobase, membase, irq;
-
-		/* Save important PCI config data. */
-		iobase = pci_read_config(dev, WB_PCI_LOIO, 4);
-		membase = pci_read_config(dev, WB_PCI_LOMEM, 4);
-		irq = pci_read_config(dev, WB_PCI_INTLINE, 4);
-
-		/* Reset the power state. */
-		printf("wb%d: chip is in D%d power mode "
-		    "-- setting to D0\n", unit,
-		    pci_get_powerstate(dev));
-		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
-
-		/* Restore PCI config data. */
-		pci_write_config(dev, WB_PCI_LOIO, iobase, 4);
-		pci_write_config(dev, WB_PCI_LOMEM, membase, 4);
-		pci_write_config(dev, WB_PCI_INTLINE, irq, 4);
-	}
-#endif
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
 
 	rid = WB_RID;
-	sc->wb_res = bus_alloc_resource(dev, WB_RES, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->wb_res = bus_alloc_resource_any(dev, WB_RES, &rid, RF_ACTIVE);
 
 	if (sc->wb_res == NULL) {
 		printf("wb%d: couldn't map ports/memory\n", unit);
@@ -872,7 +817,7 @@ wb_attach(dev)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->wb_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->wb_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->wb_irq == NULL) {
@@ -892,11 +837,6 @@ wb_attach(dev)
 	 */
 	wb_read_eeprom(sc, (caddr_t)&eaddr, 0, 3, 0);
 
-	/*
-	 * A Winbond chip was detected. Inform the world.
-	 */
-	printf("wb%d: Ethernet address: %6D\n", unit, eaddr, ":");
-
 	sc->wb_unit = unit;
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
@@ -915,9 +855,9 @@ wb_attach(dev)
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = wb_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = wb_start;
 	ifp->if_watchdog = wb_watchdog;
 	ifp->if_init = wb_init;

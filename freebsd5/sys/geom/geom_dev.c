@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_dev.c,v 1.70 2003/10/19 19:06:54 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_dev.c,v 1.79.2.1 2004/10/15 06:12:29 pjd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD: src/sys/geom/geom_dev.c,v 1.70 2003/10/19 19:06:54 phk Exp $
 #include <sys/bio.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/proc.h>
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/disk.h>
@@ -58,6 +59,7 @@ static d_strategy_t	g_dev_strategy;
 static d_ioctl_t	g_dev_ioctl;
 
 static struct cdevsw g_dev_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	g_dev_open,
 	.d_close =	g_dev_close,
 	.d_read =	physread,
@@ -66,7 +68,7 @@ static struct cdevsw g_dev_cdevsw = {
 	.d_strategy =	g_dev_strategy,
 	.d_name =	"g_dev",
 	.d_maj =	GEOM_MAJOR,
-	.d_flags =	D_DISK | D_TRACKCLOSE | D_NOGIANT,
+	.d_flags =	D_DISK | D_TRACKCLOSE,
 };
 
 static g_taste_t g_dev_taste;
@@ -74,7 +76,9 @@ static g_orphan_t g_dev_orphan;
 
 static struct g_class g_dev_class	= {
 	.name = "DEV",
+	.version = G_VERSION,
 	.taste = g_dev_taste,
+	.orphan = g_dev_orphan,
 };
 
 void
@@ -90,51 +94,8 @@ g_dev_print(void)
 	printf("\n");
 }
 
-/*
- * XXX: This is disgusting and wrong in every way imaginable:  The only reason
- * XXX: we have a clone function is because of the root-mount hack we currently
- * XXX: employ.  An improvment would be to unregister this cloner once we know
- * XXX: we no longer need it.  Ideally, root-fs would be mounted through DEVFS
- * XXX: eliminating the need for this hack.
- */
-static void
-g_dev_clone(void *arg __unused, char *name, int namelen __unused, dev_t *dev)
-{
-	struct g_geom *gp;
-
-	if (*dev != NODEV)
-		return;
-
-	g_waitidle();
-
-	/* g_topology_lock(); */
-	LIST_FOREACH(gp, &g_dev_class.geom, geom) {
-		if (strcmp(gp->name, name))
-			continue;
-		*dev = gp->softc;
-		g_trace(G_T_TOPOLOGY, "g_dev_clone(%s) = %p", name, *dev);
-		return;
-	}
-	/* g_topology_unlock(); */
-	return;
-}
-
-static void
-g_dev_register_cloner(void *foo __unused)
-{
-	static int once;
-
-	/* XXX: why would this happen more than once ?? */
-	if (!once) {
-		EVENTHANDLER_REGISTER(dev_clone, g_dev_clone, 0, 1000);
-		once++;
-	}
-}
-
-SYSINIT(geomdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE,g_dev_register_cloner,NULL);
-
 struct g_provider *
-g_dev_getprovider(dev_t dev)
+g_dev_getprovider(struct cdev *dev)
 {
 	struct g_consumer *cp;
 
@@ -154,7 +115,7 @@ g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	struct g_consumer *cp;
 	static int unit = GEOM_MINOR_PROVIDERS;
 	int error;
-	dev_t dev;
+	struct cdev *dev;
 
 	g_trace(G_T_TOPOLOGY, "dev_taste(%s,%s)", mp->name, pp->name);
 	g_topology_assert();
@@ -162,7 +123,6 @@ g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 		if (cp->geom->class == mp)
 			return (NULL);
 	gp = g_new_geomf(mp, pp->name);
-	gp->orphan = g_dev_orphan;
 	cp = g_new_consumer(gp);
 	error = g_attach(cp, pp);
 	KASSERT(error == 0,
@@ -189,7 +149,7 @@ g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 }
 
 static int
-g_dev_open(dev_t dev, int flags, int fmt, struct thread *td)
+g_dev_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
@@ -202,6 +162,7 @@ g_dev_open(dev_t dev, int flags, int fmt, struct thread *td)
 
 	g_trace(G_T_ACCESS, "g_dev_open(%s, %d, %d, %p)",
 	    gp->name, flags, fmt, td);
+
 	r = flags & FREAD ? 1 : 0;
 	w = flags & FWRITE ? 1 : 0;
 #ifdef notyet
@@ -209,11 +170,20 @@ g_dev_open(dev_t dev, int flags, int fmt, struct thread *td)
 #else
 	e = 0;
 #endif
+	if (w) {
+		/*
+		 * When running in very secure mode, do not allow
+		 * opens for writing of any disks.
+		 */
+		error = securelevel_ge(td->td_ucred, 2);
+		if (error)
+			return (error);
+	}
 	g_topology_lock();
 	if (dev->si_devsw == NULL)
 		error = ENXIO;		/* We were orphaned */
 	else
-		error = g_access_rel(cp, r, w, e);
+		error = g_access(cp, r, w, e);
 	g_topology_unlock();
 	g_waitidle();
 	if (!error)
@@ -222,7 +192,7 @@ g_dev_open(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
+g_dev_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
@@ -245,7 +215,7 @@ g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
 	if (dev->si_devsw == NULL)
 		error = ENXIO;		/* We were orphaned */
 	else
-		error = g_access_rel(cp, r, w, e);
+		error = g_access(cp, r, w, e);
 	for (i = 0; i < 10 * hz;) {
 		if (cp->acr != 0 || cp->acw != 0)
 			break;
@@ -255,7 +225,7 @@ g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
 		i += hz / 10;
 	}
 	if (cp->acr == 0 && cp->acw == 0 && cp->nstart != cp->nend) {
-		printf("WARNING: Final close of geom_dev(%s) %s %s",
+		printf("WARNING: Final close of geom_dev(%s) %s %s\n",
 		    gp->name,
 		    "still has outstanding I/O after 10 seconds.",
 		    "Completing close anyway, panic may happen later.");
@@ -272,7 +242,7 @@ g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
  * XXX: will break (actually: stall) the BSD disklabel hacks.
  */
 static int
-g_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
+g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
@@ -364,7 +334,7 @@ g_dev_strategy(struct bio *bp)
 {
 	struct g_consumer *cp;
 	struct bio *bp2;
-	dev_t dev;
+	struct cdev *dev;
 
 	KASSERT(bp->bio_cmd == BIO_READ ||
 	        bp->bio_cmd == BIO_WRITE ||
@@ -374,6 +344,12 @@ g_dev_strategy(struct bio *bp)
 	cp = dev->si_drv2;
 	KASSERT(cp->acr || cp->acw,
 	    ("Consumer with zero access count in g_dev_strategy"));
+
+	if ((bp->bio_offset % cp->provider->sectorsize) != 0 ||
+	    (bp->bio_bcount % cp->provider->sectorsize) != 0) {
+		biofinish(bp, NULL, EINVAL);
+		return;
+	}
 
 	for (;;) {
 		/*
@@ -403,7 +379,7 @@ g_dev_strategy(struct bio *bp)
  *
  * Called from below when the provider orphaned us.
  * - Clear any dump settings.
- * - Destroy the dev_t to prevent any more request from coming in.  The
+ * - Destroy the struct cdev *to prevent any more request from coming in.  The
  *   provider is already marked with an error, so anything which comes in
  *   in the interrim will be returned immediately.
  * - Wait for any outstanding I/O to finish.
@@ -415,7 +391,7 @@ static void
 g_dev_orphan(struct g_consumer *cp)
 {
 	struct g_geom *gp;
-	dev_t dev;
+	struct cdev *dev;
 
 	g_topology_assert();
 	gp = cp->geom;
@@ -426,7 +402,7 @@ g_dev_orphan(struct g_consumer *cp)
 	if (dev->si_flags & SI_DUMPDEV)
 		set_dumper(NULL);
 
-	/* Destroy the dev_t so we get no more requests */
+	/* Destroy the struct cdev *so we get no more requests */
 	destroy_dev(dev);
 
 	/* Wait for the cows to come home */
@@ -434,7 +410,7 @@ g_dev_orphan(struct g_consumer *cp)
 		msleep(&dev, NULL, PRIBIO, "gdevorphan", hz / 10);
 
 	if (cp->acr > 0 || cp->acw > 0 || cp->ace > 0)
-		g_access_rel(cp, -cp->acr, -cp->acw, -cp->ace);
+		g_access(cp, -cp->acr, -cp->acw, -cp->ace);
 
 	g_detach(cp);
 	g_destroy_consumer(cp);

@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_trap.c,v 1.261 2003/09/05 22:15:26 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_trap.c,v 1.270.2.2 2004/09/03 06:40:25 julian Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -83,7 +83,7 @@ userret(td, frame, oticks)
 
 	CTR3(KTR_SYSC, "userret: thread %p (pid %d, %s)", td, p->p_pid,
             p->p_comm);
-#ifdef INVARIANTS
+#ifdef DIAGNOSTIC
 	/* Check that we called signotify() enough. */
 	PROC_LOCK(p);
 	mtx_lock_spin(&sched_lock);
@@ -114,9 +114,8 @@ userret(td, frame, oticks)
 	/*
 	 * Do special thread processing, e.g. upcall tweaking and such.
 	 */
-	if (p->p_flag & P_SA) {
+	if (p->p_flag & P_SA)
 		thread_userret(td, frame);
-	}
 
 	/*
 	 * Charge system time if profiling.
@@ -141,10 +140,9 @@ ast(struct trapframe *framep)
 {
 	struct thread *td;
 	struct proc *p;
-	struct kse *ke;
 	struct ksegrp *kg;
-	struct rlimit *rlim;
-	u_int prticks, sticks;
+	struct rlimit rlim;
+	u_int sticks;
 	int sflag;
 	int flags;
 	int sig;
@@ -164,6 +162,8 @@ ast(struct trapframe *framep)
 	mtx_assert(&sched_lock, MA_NOTOWNED);
 	td->td_frame = framep;
 
+	if ((p->p_flag & P_SA) && (td->td_mailbox == NULL))
+		thread_user_enter(td);
 	/*
 	 * This updates the p_sflag's for the checks below in one
 	 * "atomic" operation with turning off the astpending flag.
@@ -172,7 +172,6 @@ ast(struct trapframe *framep)
 	 * ast() will be called again.
 	 */
 	mtx_lock_spin(&sched_lock);
-	ke = td->td_kse;
 	sticks = td->td_sticks;
 	flags = td->td_flags;
 	sflag = p->p_sflag;
@@ -181,13 +180,8 @@ ast(struct trapframe *framep)
 	p->p_sflag &= ~PS_MACPEND;
 #endif
 	td->td_flags &= ~(TDF_ASTPENDING | TDF_NEEDSIGCHK |
-	    TDF_NEEDRESCHED | TDF_OWEUPC | TDF_INTERRUPT);
+	    TDF_NEEDRESCHED | TDF_INTERRUPT);
 	cnt.v_soft++;
-	prticks = 0;
-	if (flags & TDF_OWEUPC && p->p_flag & P_PROFIL) {
-		prticks = p->p_stats->p_prof.pr_ticks;
-		p->p_stats->p_prof.pr_ticks = 0;
-	}
 	mtx_unlock_spin(&sched_lock);
 	/*
 	 * XXXKSE While the fact that we owe a user profiling
@@ -199,8 +193,11 @@ ast(struct trapframe *framep)
 
 	if (td->td_ucred != p->p_ucred) 
 		cred_update_thread(td);
-	if (flags & TDF_OWEUPC && p->p_flag & P_PROFIL)
-		addupc_task(td, p->p_stats->p_prof.pr_addr, prticks);
+	if (td->td_pflags & TDP_OWEUPC && p->p_flag & P_PROFIL) {
+		addupc_task(td, td->td_profil_addr, td->td_profil_ticks);
+		td->td_profil_ticks = 0;
+		td->td_pflags &= ~TDP_OWEUPC;
+	}
 	if (sflag & PS_ALRMPEND) {
 		PROC_LOCK(p);
 		psignal(p, SIGVTALRM);
@@ -223,13 +220,13 @@ ast(struct trapframe *framep)
 	}
 	if (sflag & PS_XCPU) {
 		PROC_LOCK(p);
-		rlim = &p->p_rlimit[RLIMIT_CPU];
+		lim_rlimit(p, RLIMIT_CPU, &rlim);
 		mtx_lock_spin(&sched_lock);
-		if (p->p_runtime.sec >= rlim->rlim_max) {
+		if (p->p_runtime.sec >= rlim.rlim_max) {
 			mtx_unlock_spin(&sched_lock);
 			killproc(p, "exceeded maximum CPU limit");
 		} else {
-			if (p->p_cpulimit < rlim->rlim_max)
+			if (p->p_cpulimit < rlim.rlim_max)
 				p->p_cpulimit += 5;
 			mtx_unlock_spin(&sched_lock);
 			psignal(p, SIGXCPU);
@@ -247,8 +244,7 @@ ast(struct trapframe *framep)
 #endif
 		mtx_lock_spin(&sched_lock);
 		sched_prio(td, kg->kg_user_pri);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
+		mi_switch(SW_INVOL, NULL);
 		mtx_unlock_spin(&sched_lock);
 #ifdef KTRACE
 		if (KTRPOINT(td, KTR_CSW))
@@ -265,8 +261,5 @@ ast(struct trapframe *framep)
 	}
 
 	userret(td, framep, sticks);
-#ifdef DIAGNOSTIC
-	cred_free_thread(td);
-#endif
 	mtx_assert(&Giant, MA_NOTOWNED);
 }

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/sched.h,v 1.9 2003/11/15 23:54:49 jeff Exp $
+ * $FreeBSD: src/sys/sys/sched.h,v 1.14.2.5 2004/09/18 04:11:36 julian Exp $
  */
 
 #ifndef _SYS_SCHED_H_
@@ -31,24 +31,31 @@
 
 /*
  * General scheduling info.
+ *
+ * sched_load:
+ *	Total runnable non-ithread threads in the system.
+ *
+ * sched_runnable:
+ *	Runnable threads for this processor.
  */
+int	sched_load(void);
 int	sched_rr_interval(void);
 int	sched_runnable(void);
 
 /* 
  * Proc related scheduling hooks.
  */
-void	sched_exit(struct proc *p, struct proc *child);
-void	sched_fork(struct proc *p, struct proc *child);
+void	sched_exit(struct proc *p, struct thread *childtd);
+void	sched_fork(struct thread *td, struct thread *childtd);
 
 /*
  * KSE Groups contain scheduling priority information.  They record the
  * behavior of groups of KSEs and threads.
  */
 void	sched_class(struct ksegrp *kg, int class);
-void	sched_exit_ksegrp(struct ksegrp *kg, struct ksegrp *child);
-void	sched_fork_ksegrp(struct ksegrp *kg, struct ksegrp *child);
-void	sched_nice(struct ksegrp *kg, int nice);
+void	sched_exit_ksegrp(struct ksegrp *kg, struct thread *childtd);
+void	sched_fork_ksegrp(struct thread *td, struct ksegrp *child);
+void	sched_nice(struct proc *p, int nice);
 
 /*
  * Threads are switched in and out, block on resources, have temporary
@@ -58,16 +65,15 @@ void	sched_exit_thread(struct thread *td, struct thread *child);
 void	sched_fork_thread(struct thread *td, struct thread *child);
 fixpt_t	sched_pctcpu(struct thread *td);
 void	sched_prio(struct thread *td, u_char prio);
-void	sched_sleep(struct thread *td, u_char prio);
-void	sched_switch(struct thread *td);
+void	sched_sleep(struct thread *td);
+void	sched_switch(struct thread *td, struct thread *newtd, int flags);
 void	sched_userret(struct thread *td);
 void	sched_wakeup(struct thread *td);
 
 /*
  * Threads are moved on and off of run queues
  */
-void	sched_add(struct thread *td);
-struct kse *sched_choose(void);		/* XXX Should be thread * */
+void	sched_add(struct thread *td, int flags);
 void	sched_clock(struct thread *td);
 void	sched_rem(struct thread *td);
 
@@ -81,24 +87,12 @@ void	sched_unbind(struct thread *td);
 static __inline void sched_unpin(void);
 
 /*
- * These interfaces will eventually be removed.
- */
-void	sched_exit_kse(struct kse *ke, struct kse *child);
-void	sched_fork_kse(struct kse *ke, struct kse *child);
-
-/*
  * These procedures tell the process data structure allocation code how
  * many bytes to actually allocate.
  */
-int	sched_sizeof_kse(void);
 int	sched_sizeof_ksegrp(void);
 int	sched_sizeof_proc(void);
 int	sched_sizeof_thread(void);
-
-extern struct ke_sched *kse0_sched;
-extern struct kg_sched *ksegrp0_sched;
-extern struct p_sched *proc0_sched;
-extern struct td_sched *thread0_sched;
 
 static __inline void
 sched_pin(void)
@@ -112,4 +106,13 @@ sched_unpin(void)
 	curthread->td_pinned--;
 }
 
+/* temporarily here */
+void schedinit(void);
+void sched_destroyproc(struct proc *p);
+void sched_init_concurrency(struct ksegrp *kg);
+void sched_set_concurrency(struct ksegrp *kg, int cuncurrency);
+void sched_schedinit(void);
+void sched_newproc(struct proc *p, struct ksegrp *kg, struct thread *td);
+void sched_thread_exit(struct thread *td);
+void sched_newthread(struct thread *td);
 #endif /* !_SYS_SCHED_H_ */

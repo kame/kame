@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/key.c,v 1.8 2003/09/29 22:57:43 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/key.c,v 1.16.2.1 2004/10/02 04:55:47 sam Exp $	*/
 /*	$KAME: key.c,v 1.191 2001/06/27 10:46:49 sakane Exp $	*/
 
 /*
@@ -119,7 +119,7 @@ static u_int key_int_random = 60;	/*interval to initialize randseed,1(m)*/
 static u_int key_larval_lifetime = 30;	/* interval to expire acquiring, 30(s)*/
 static int key_blockacq_count = 10;	/* counter for blocking SADB_ACQUIRE.*/
 static int key_blockacq_lifetime = 20;	/* lifetime for blocking SADB_ACQUIRE.*/
-static int key_prefered_oldsa = 1;	/* prefered old sa rather than new sa.*/
+static int key_preferred_oldsa = 1;	/* preferred old sa rather than new sa.*/
 
 static u_int32_t acq_seq = 0;
 
@@ -173,12 +173,11 @@ static struct mtx spacq_lock;
 #define	SPACQ_LOCK_ASSERT()	mtx_assert(&spacq_lock, MA_OWNED)
 
 /* search order for SAs */
-static u_int saorder_state_valid[] = {
+static const u_int saorder_state_valid_prefer_old[] = {
 	SADB_SASTATE_DYING, SADB_SASTATE_MATURE,
-	/*
-	 * This order is important because we must select the oldest SA
-	 * for outbound processing.  For inbound, This is not important.
-	 */
+};
+static const u_int saorder_state_valid_prefer_new[] = {
+	SADB_SASTATE_MATURE, SADB_SASTATE_DYING,
 };
 static u_int saorder_state_alive[] = {
 	/* except DEAD */
@@ -286,8 +285,8 @@ SYSCTL_INT(_net_key, KEYCTL_AH_KEYMIN,	ah_keymin, CTLFLAG_RW, \
 	&ipsec_ah_keymin,	0,	"");
 
 /* perfered old SA rather than new SA */
-SYSCTL_INT(_net_key, KEYCTL_PREFERED_OLDSA,	prefered_oldsa, CTLFLAG_RW,\
-	&key_prefered_oldsa,	0,	"");
+SYSCTL_INT(_net_key, KEYCTL_PREFERED_OLDSA,	preferred_oldsa, CTLFLAG_RW,\
+	&key_preferred_oldsa,	0,	"");
 
 #define __LIST_CHAINED(elm) \
 	(!((elm)->chain.le_next == NULL && (elm)->chain.le_prev == NULL))
@@ -513,6 +512,18 @@ static struct mbuf *key_alloc_mbuf __P((int));
 	IPSEC_ASSERT((p)->refcnt > 0, ("SP refcnt underflow"));		\
 	(p)->refcnt--;							\
 } while (0)
+ 
+
+/*
+ * Update the refcnt while holding the SPTREE lock.
+ */
+void
+key_addref(struct secpolicy *sp)
+{
+	SPTREE_LOCK();
+	SP_ADDREF(sp);
+	SPTREE_UNLOCK();
+}
 
 /*
  * Return 0 when there are known to be no SP's for the specified
@@ -821,15 +832,24 @@ key_checkrequest(struct ipsecrequest *isr, const struct secasindex *saidx)
 static struct secasvar *
 key_allocsa_policy(const struct secasindex *saidx)
 {
+#define	N(a)	_ARRAYLEN(a)
 	struct secashead *sah;
 	struct secasvar *sav;
-	u_int stateidx, state;
+	u_int stateidx, arraysize;
+	const u_int *state_valid;
 
 	SAHTREE_LOCK();
 	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
 		if (key_cmpsaidx(&sah->saidx, saidx, CMP_MODE_REQID)) {
+			if (key_preferred_oldsa) {
+				state_valid = saorder_state_valid_prefer_old;
+				arraysize = N(saorder_state_valid_prefer_old);
+			} else {
+				state_valid = saorder_state_valid_prefer_new;
+				arraysize = N(saorder_state_valid_prefer_new);
+			}
 			SAHTREE_UNLOCK();
 			goto found;
 		}
@@ -839,20 +859,15 @@ key_allocsa_policy(const struct secasindex *saidx)
 	return NULL;
 
     found:
-
 	/* search valid state */
-	for (stateidx = 0;
-	     stateidx < _ARRAYLEN(saorder_state_valid);
-	     stateidx++) {
-
-		state = saorder_state_valid[stateidx];
-
-		sav = key_do_allocsa_policy(sah, state);
+	for (stateidx = 0; stateidx < arraysize; stateidx++) {
+		sav = key_do_allocsa_policy(sah, state_valid[stateidx]);
 		if (sav != NULL)
 			return sav;
 	}
 
 	return NULL;
+#undef N
 }
 
 /*
@@ -893,7 +908,7 @@ key_do_allocsa_policy(struct secashead *sah, u_int state)
 		IPSEC_ASSERT(sav->lft_c != NULL, ("null sav lifetime"));
 
 		/* What the best method is to compare ? */
-		if (key_prefered_oldsa) {
+		if (key_preferred_oldsa) {
 			if (candidate->lft_c->sadb_lifetime_addtime >
 					sav->lft_c->sadb_lifetime_addtime) {
 				candidate = sav;
@@ -902,7 +917,7 @@ key_do_allocsa_policy(struct secashead *sah, u_int state)
 			/*NOTREACHED*/
 		}
 
-		/* prefered new sa rather than old sa */
+		/* preferred new sa rather than old sa */
 		if (candidate->lft_c->sadb_lifetime_addtime <
 				sav->lft_c->sadb_lifetime_addtime) {
 			d = candidate;
@@ -917,12 +932,18 @@ key_do_allocsa_policy(struct secashead *sah, u_int state)
 		 */
 		if (d->lft_c->sadb_lifetime_addtime != 0) {
 			struct mbuf *m, *result;
+			u_int8_t satype;
 
 			key_sa_chgstate(d, SADB_SASTATE_DEAD);
 
 			IPSEC_ASSERT(d->refcnt > 0, ("bogus ref count"));
+
+			satype = key_proto2satype(d->sah->saidx.proto);
+			if (satype == 0)
+				goto msgfail;
+
 			m = key_setsadbmsg(SADB_DELETE, 0,
-			    d->sah->saidx.proto, 0, 0, d->refcnt - 1);
+			    satype, 0, 0, d->refcnt - 1);
 			if (!m)
 				goto msgfail;
 			result = m;
@@ -938,8 +959,8 @@ key_do_allocsa_policy(struct secashead *sah, u_int state)
 
 			/* set sadb_address for saidx's. */
 			m = key_setsadbaddr(SADB_EXT_ADDRESS_DST,
-				&d->sah->saidx.src.sa,
-				d->sah->saidx.src.sa.sa_len << 3,
+				&d->sah->saidx.dst.sa,
+				d->sah->saidx.dst.sa.sa_len << 3,
 				IPSEC_ULPROTO_ANY);
 			if (!m)
 				goto msgfail;
@@ -1006,7 +1027,8 @@ key_allocsa(
 {
 	struct secashead *sah;
 	struct secasvar *sav;
-	u_int stateidx, state;
+	u_int stateidx, arraysize, state;
+	const u_int *saorder_state_valid;
 
 	IPSEC_ASSERT(dst != NULL, ("null dst address"));
 
@@ -1020,11 +1042,16 @@ key_allocsa(
 	 * encrypted so we can't check internal IP header.
 	 */
 	SAHTREE_LOCK();
+	if (key_preferred_oldsa) {
+		saorder_state_valid = saorder_state_valid_prefer_old;
+		arraysize = _ARRAYLEN(saorder_state_valid_prefer_old);
+	} else {
+		saorder_state_valid = saorder_state_valid_prefer_new;
+		arraysize = _ARRAYLEN(saorder_state_valid_prefer_new);
+	}
 	LIST_FOREACH(sah, &sahtree, chain) {
 		/* search valid state */
-		for (stateidx = 0;
-		     stateidx < _ARRAYLEN(saorder_state_valid);
-		     stateidx++) {
+		for (stateidx = 0; stateidx < arraysize; stateidx++) {
 			state = saorder_state_valid[stateidx];
 			LIST_FOREACH(sav, &sah->savtree[state], chain) {
 				/* sanity check */
@@ -1310,7 +1337,7 @@ key_msg2sp(xpl0, len, error)
 	struct secpolicy *newsp;
 
 	IPSEC_ASSERT(xpl0 != NULL, ("null xpl0"));
-	IPSEC_ASSERT(len >= sizeof(*xpl0), ("policy too short: %u", len));
+	IPSEC_ASSERT(len >= sizeof(*xpl0), ("policy too short: %zu", len));
 
 	if (len != PFKEY_EXTLEN(xpl0)) {
 		ipseclog((LOG_DEBUG, "%s: Invalid msg length.\n", __func__));
@@ -2026,7 +2053,6 @@ key_spddelete(so, m, mhp)
 	xpl0->sadb_x_policy_id = sp->id;
 
 	sp->state = IPSEC_SPSTATE_DEAD;
-	SECPOLICY_LOCK_DESTROY(sp);
 	KEY_FREESP(&sp);
 
     {
@@ -2090,7 +2116,6 @@ key_spddelete2(so, m, mhp)
 	}
 
 	sp->state = IPSEC_SPSTATE_DEAD;
-	SECPOLICY_LOCK_DESTROY(sp);
 	KEY_FREESP(&sp);
 
     {
@@ -2909,11 +2934,11 @@ key_getsavbyspi(sah, spi)
 			}
 
 			if (sav->spi == spi)
-				break;
+				return sav;
 		}
 	}
 
-	return sav;
+	return NULL;
 }
 
 /*
@@ -2997,6 +3022,7 @@ key_setsaval(sav, m, mhp)
 		switch (mhp->msg->sadb_msg_satype) {
 		case SADB_SATYPE_AH:
 		case SADB_SATYPE_ESP:
+		case SADB_X_SATYPE_TCPSIGNATURE:
 			if (len == PFKEY_ALIGN8(sizeof(struct sadb_key)) &&
 			    sav->alg_auth != SADB_X_AALG_NULL)
 				error = EINVAL;
@@ -3054,6 +3080,7 @@ key_setsaval(sav, m, mhp)
 			sav->key_enc = NULL;	/*just in case*/
 			break;
 		case SADB_SATYPE_AH:
+		case SADB_X_SATYPE_TCPSIGNATURE:
 		default:
 			error = EINVAL;
 			break;
@@ -3077,6 +3104,9 @@ key_setsaval(sav, m, mhp)
 		break;
 	case SADB_X_SATYPE_IPCOMP:
 		error = xform_init(sav, XF_IPCOMP);
+		break;
+	case SADB_X_SATYPE_TCPSIGNATURE:
+		error = xform_init(sav, XF_TCPSIGNATURE);
 		break;
 	}
 	if (error) {
@@ -3209,6 +3239,14 @@ key_mature(struct secasvar *sav)
 			return(EINVAL);
 		}
 		error = xform_init(sav, XF_IPCOMP);
+		break;
+	case IPPROTO_TCP:
+		if (sav->alg_enc != SADB_EALG_NONE) {
+			ipseclog((LOG_DEBUG, "%s: protocol and algorithm "
+				"mismated.\n", __func__));
+			return(EINVAL);
+		}
+		error = xform_init(sav, XF_TCPSIGNATURE);
 		break;
 	default:
 		ipseclog((LOG_DEBUG, "%s: Invalid satype.\n", __func__));
@@ -3846,8 +3884,8 @@ key_cmpspidx_withmask(
 		 * scope_id check. if sin6_scope_id is 0, we regard it
 		 * as a wildcard scope, which matches any scope zone ID. 
 		 */
-		if (spidx0->src.sin6.sin6_scope_id &&
-		    spidx1->src.sin6.sin6_scope_id &&
+		if (spidx0->dst.sin6.sin6_scope_id &&
+		    spidx1->dst.sin6.sin6_scope_id &&
 		    spidx0->dst.sin6.sin6_scope_id != spidx1->dst.sin6.sin6_scope_id)
 			return 0;
 		if (!key_bbcmp(&spidx0->dst.sin6.sin6_addr,
@@ -4245,6 +4283,8 @@ key_satype2proto(satype)
 		return IPPROTO_ESP;
 	case SADB_X_SATYPE_IPCOMP:
 		return IPPROTO_IPCOMP;
+	case SADB_X_SATYPE_TCPSIGNATURE:
+		return IPPROTO_TCP;
 	default:
 		return 0;
 	}
@@ -4267,6 +4307,8 @@ key_proto2satype(proto)
 		return SADB_SATYPE_ESP;
 	case IPPROTO_IPCOMP:
 		return SADB_X_SATYPE_IPCOMP;
+	case IPPROTO_TCP:
+		return SADB_X_SATYPE_TCPSIGNATURE;
 	default:
 		return 0;
 	}
@@ -6639,11 +6681,6 @@ key_parse(m, so)
 	if (error)
 		return error;
 
-	if (m->m_next) {	/*XXX*/
-		m_freem(m);
-		return ENOBUFS;
-	}
-
 	msg = mh.msg;
 
 	/* check SA type */
@@ -6668,6 +6705,7 @@ key_parse(m, so)
 	case SADB_SATYPE_AH:
 	case SADB_SATYPE_ESP:
 	case SADB_X_SATYPE_IPCOMP:
+	case SADB_X_SATYPE_TCPSIGNATURE:
 		switch (msg->sadb_msg_type) {
 		case SADB_X_SPDADD:
 		case SADB_X_SPDDELETE:

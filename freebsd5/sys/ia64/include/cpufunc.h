@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/cpufunc.h,v 1.17 2003/05/24 21:44:24 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/cpufunc.h,v 1.21 2004/07/30 07:56:53 marcel Exp $
  */
 
 #ifndef _MACHINE_CPUFUNC_H_
@@ -37,13 +37,18 @@
 
 struct thread;
 
+#define	IA64_FIXED_BREAK	0x84B5D
+
 #ifdef __GNUC__
 
 static __inline void
 breakpoint(void)
 {
-	__asm __volatile("break 0x80100"); /* XXX use linux value */
+	__asm __volatile("break.m %0" :: "i"(IA64_FIXED_BREAK));
 }
+
+#define	HAVE_INLINE_FFS
+#define	ffs(x)	__builtin_ffs(x)
 
 #endif
 

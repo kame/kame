@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/fhc/fhc.c,v 1.5 2003/02/19 19:40:40 jake Exp $
+ * $FreeBSD: src/sys/sparc64/fhc/fhc.c,v 1.9 2004/08/12 17:41:32 marius Exp $
  */
 
 #include <sys/param.h>
@@ -33,6 +33,7 @@
 #include <sys/malloc.h>
 #include <sys/pcpu.h>
 
+#include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/openfirm.h>
 
 #include <machine/bus.h>
@@ -56,6 +57,8 @@ struct fhc_clr {
 };
 
 struct fhc_devinfo {
+	char			*fdi_compat;
+	char			*fdi_model;
 	char			*fdi_name;
 	char			*fdi_type;
 	phandle_t		fdi_node;
@@ -127,8 +130,12 @@ fhc_attach(device_t dev)
 			    M_WAITOK | M_ZERO);
 			fdi->fdi_name = name;
 			fdi->fdi_node = child;
+			OF_getprop_alloc(child, "compatible", 1,
+			    (void **)&fdi->fdi_compat);
 			OF_getprop_alloc(child, "device_type", 1,
 			    (void **)&fdi->fdi_type);
+			OF_getprop_alloc(child, "model", 1,
+			    (void **)&fdi->fdi_model);
 			resource_list_init(&fdi->fdi_rl);
 			nreg = OF_getprop_alloc(child, "reg", sizeof(*reg),
 			    (void **)&reg);
@@ -177,47 +184,6 @@ fhc_probe_nomatch(device_t dev, device_t child)
 }
 
 int
-fhc_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
-{
-	struct fhc_devinfo *fdi;
-
-	if ((fdi = device_get_ivars(child)) == 0)
-		return (ENOENT);
-	switch (which) {
-	case FHC_IVAR_NAME:
-		*result = (uintptr_t)fdi->fdi_name;
-		break;
-	case FHC_IVAR_NODE:
-		*result = fdi->fdi_node;
-		break;
-	case FHC_IVAR_TYPE:
-		*result = (uintptr_t)fdi->fdi_type;
-		break;
-	default:
-		return (ENOENT);
-	}
-	return (0);
-}
-
-int
-fhc_write_ivar(device_t dev, device_t child, int which, uintptr_t value)
-{
-	struct fhc_devinfo *fdi;
-
-	if ((fdi = device_get_ivars(child)) == 0)
-		return (ENOENT);
-	switch (which) {
-	case FHC_IVAR_NAME:
-	case FHC_IVAR_NODE:
-	case FHC_IVAR_TYPE:
-		return (EINVAL);
-	default:
-		return (ENOENT);
-	}
-	return (0);
-}
-
-int
 fhc_setup_intr(device_t bus, device_t child, struct resource *r, int flags,
     driver_intr_t *func, void *arg, void **cookiep)
 {
@@ -236,7 +202,7 @@ fhc_setup_intr(device_t bus, device_t child, struct resource *r, int flags,
 	fc->fc_bh = sc->sc_bh[rid];
 
 	bus_space_write_4(sc->sc_bt[rid], sc->sc_bh[rid], FHC_IMAP,
-	    r->r_start);
+	    rman_get_start(r));
 	bus_space_read_4(sc->sc_bt[rid], sc->sc_bh[rid], FHC_IMAP);
 
 	error = bus_generic_setup_intr(bus, child, r, flags, fhc_intr_stub,
@@ -250,7 +216,7 @@ fhc_setup_intr(device_t bus, device_t child, struct resource *r, int flags,
 
 	bus_space_write_4(sc->sc_bt[rid], sc->sc_bh[rid], FHC_ICLR, 0x0);
 	bus_space_write_4(sc->sc_bt[rid], sc->sc_bh[rid], FHC_IMAP,
-	    INTMAP_ENABLE(r->r_start, PCPU_GET(mid)));
+	    INTMAP_ENABLE(rman_get_start(r), PCPU_GET(mid)));
 	bus_space_read_4(sc->sc_bt[rid], sc->sc_bh[rid], FHC_IMAP);
 
 	return (error);
@@ -371,4 +337,49 @@ fhc_release_resource(device_t bus, device_t child, int type, int rid,
 		panic("fhc_release_resource: resource entry is not busy");
 	rle->res = NULL;
 	return (error);
+}
+
+const char *
+fhc_get_compat(device_t bus, device_t dev)
+{   
+	struct fhc_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->fdi_compat);
+}
+
+const char *
+fhc_get_model(device_t bus, device_t dev)
+{
+	struct fhc_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->fdi_model);
+}
+
+const char *
+fhc_get_name(device_t bus, device_t dev)
+{
+	struct fhc_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->fdi_name);
+}
+
+phandle_t
+fhc_get_node(device_t bus, device_t dev)
+{
+	struct fhc_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->fdi_node);
+}
+
+const char *
+fhc_get_type(device_t bus, device_t dev)
+{
+	struct fhc_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	return (dinfo->fdi_type);
 }

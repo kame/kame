@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.37 2003/08/20 22:11:58 hsu Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.46.2.1 2004/09/07 23:09:37 rwatson Exp $
  * $Whistle: ng_ksocket.c,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -492,18 +492,16 @@ static const struct ng_cmdlist ng_ksocket_cmds[] = {
 
 /* Node type descriptor */
 static struct ng_type ng_ksocket_typestruct = {
-	NG_ABI_VERSION,
-	NG_KSOCKET_NODE_TYPE,
-	NULL,
-	ng_ksocket_constructor,
-	ng_ksocket_rcvmsg,
-	ng_ksocket_shutdown,
-	ng_ksocket_newhook,
-	NULL,
-	ng_ksocket_connect,
-	ng_ksocket_rcvdata,
-	ng_ksocket_disconnect,
-	ng_ksocket_cmds
+	.version =	NG_ABI_VERSION,
+	.name =		NG_KSOCKET_NODE_TYPE,
+	.constructor =	ng_ksocket_constructor,
+	.rcvmsg =	ng_ksocket_rcvmsg,
+	.shutdown =	ng_ksocket_shutdown,
+	.newhook =	ng_ksocket_newhook,
+	.connect =	ng_ksocket_connect,
+	.rcvdata =	ng_ksocket_rcvdata,
+	.disconnect =	ng_ksocket_disconnect,
+	.cmdlist =	ng_ksocket_cmds,
 };
 NETGRAPH_INIT(ksocket, &ng_ksocket_typestruct);
 
@@ -549,9 +547,9 @@ ng_ksocket_constructor(node_p node)
 static int
 ng_ksocket_newhook(node_p node, hook_p hook, const char *name0)
 {
-	struct thread *td = curthread ? curthread : &thread0;	/* XXX broken */
+	struct thread *td = curthread;	/* XXX broken */
 	const priv_p priv = NG_NODE_PRIVATE(node);
-	char *s1, *s2, name[NG_HOOKLEN+1];
+	char *s1, *s2, name[NG_HOOKSIZ];
 	int family, type, protocol, error;
 
 	/* Check if we're already connected */
@@ -611,9 +609,15 @@ ng_ksocket_connect(hook_p hook)
 	/* Add our hook for incoming data and other events */
 	priv->so->so_upcallarg = (caddr_t)node;
 	priv->so->so_upcall = ng_ksocket_incoming;
+	SOCKBUF_LOCK(&priv->so->so_rcv);
 	priv->so->so_rcv.sb_flags |= SB_UPCALL;
+	SOCKBUF_UNLOCK(&priv->so->so_rcv);
+	SOCKBUF_LOCK(&priv->so->so_snd);
 	priv->so->so_snd.sb_flags |= SB_UPCALL;
+	SOCKBUF_UNLOCK(&priv->so->so_snd);
+	SOCK_LOCK(priv->so);
 	priv->so->so_state |= SS_NBIO;
+	SOCK_UNLOCK(priv->so);
 	/*
 	 * --Original comment--
 	 * On a cloned socket we may have already received one or more
@@ -658,7 +662,7 @@ ng_ksocket_connect(hook_p hook)
 static int
 ng_ksocket_rcvmsg(node_p node, item_p item, hook_p lasthook)
 {
-	struct thread *td = curthread ? curthread : &thread0;	/* XXX broken */
+	struct thread *td = curthread;	/* XXX broken */
 	const priv_p priv = NG_NODE_PRIVATE(node);
 	struct socket *const so = priv->so;
 	struct ng_mesg *resp = NULL;
@@ -884,14 +888,14 @@ done:
 static int
 ng_ksocket_rcvdata(hook_p hook, item_p item)
 {
-	struct thread *td = curthread ? curthread : &thread0;	/* XXX broken */
+	struct thread *td = curthread;	/* XXX broken */
 	const node_p node = NG_HOOK_NODE(hook);
 	const priv_p priv = NG_NODE_PRIVATE(node);
 	struct socket *const so = priv->so;
 	struct sockaddr *sa = NULL;
-	meta_p meta;
 	int error;
 	struct mbuf *m;
+	struct sa_tag *stag;
 
 	/* Avoid reentrantly sending on the socket */
 	if ((priv->flags & KSF_SENDING) != 0) {
@@ -899,35 +903,20 @@ ng_ksocket_rcvdata(hook_p hook, item_p item)
 		return (EDEADLK);
 	}
 
-	/* Extract data and meta information */
+	/* Extract data */
 	NGI_GET_M(item, m);
-	NGI_GET_META(item, meta);
 	NG_FREE_ITEM(item);
 
-	/* If any meta info, look for peer socket address */
-	if (meta != NULL) {
-		struct meta_field_header *field;
-
-		/* Look for peer socket address */
-		for (field = &meta->options[0];
-		    (caddr_t)field < (caddr_t)meta + meta->used_len;
-		    field = (struct meta_field_header *)
-		      ((caddr_t)field + field->len)) {
-			if (field->cookie != NGM_KSOCKET_COOKIE
-			    || field->type != NG_KSOCKET_META_SOCKADDR)
-				continue;
-			sa = (struct sockaddr *)field->data;
-			break;
-		}
-	}
+	/* Look if socket address is stored in packet tags */
+	if ((stag = (struct sa_tag *)m_tag_locate(m, NGM_KSOCKET_COOKIE,
+	    NG_KSOCKET_TAG_SOCKADDR, NULL)) != NULL)
+		sa = &stag->sa;
 
 	/* Send packet */
 	priv->flags |= KSF_SENDING;
 	error = (*so->so_proto->pr_usrreqs->pru_sosend)(so, sa, 0, m, 0, 0, td);
 	priv->flags &= ~KSF_SENDING;
 
-	/* Clean up and exit */
-	NG_FREE_META(meta);
 	return (error);
 }
 
@@ -943,8 +932,12 @@ ng_ksocket_shutdown(node_p node)
 	/* Close our socket (if any) */
 	if (priv->so != NULL) {
 		priv->so->so_upcall = NULL;
+		SOCKBUF_LOCK(&priv->so->so_rcv);
 		priv->so->so_rcv.sb_flags &= ~SB_UPCALL;
+		SOCKBUF_UNLOCK(&priv->so->so_rcv);
+		SOCKBUF_LOCK(&priv->so->so_snd);
 		priv->so->so_snd.sb_flags &= ~SB_UPCALL;
+		SOCKBUF_UNLOCK(&priv->so->so_snd);
 		soclose(priv->so);
 		priv->so = NULL;
 	}
@@ -1095,7 +1088,6 @@ ng_ksocket_incoming2(node_p node, hook_p hook, void *arg1, int waitflag)
 	flags = MSG_DONTWAIT;
 	while (1) {
 		struct sockaddr *sa = NULL;
-		meta_p meta = NULL;
 		struct mbuf *n;
 
 		/* Try to get next packet from socket */
@@ -1116,38 +1108,30 @@ ng_ksocket_incoming2(node_p node, hook_p hook, void *arg1, int waitflag)
 		for (n = m, m->m_pkthdr.len = 0; n != NULL; n = n->m_next)
 			m->m_pkthdr.len += n->m_len;
 
-		/* Put peer's socket address (if any) into a meta info blob */
+		/* Put peer's socket address (if any) into a tag */
 		if (sa != NULL) {
-			struct meta_field_header *mhead;
-			u_int len;
+			struct sa_tag	*stag;
 
-			len = sizeof(*meta) + sizeof(*mhead) + sa->sa_len;
-			MALLOC(meta, meta_p, len, M_NETGRAPH_META, M_NOWAIT);
-			if (meta == NULL) {
+			stag = (struct sa_tag *)m_tag_alloc(NGM_KSOCKET_COOKIE,
+			    NG_KSOCKET_TAG_SOCKADDR, sa->sa_len, M_NOWAIT);
+			if (stag == NULL) {
 				FREE(sa, M_SONAME);
 				goto sendit;
 			}
-			mhead = &meta->options[0];
-			bzero(meta, sizeof(*meta));
-			bzero(mhead, sizeof(*mhead));
-			meta->allocated_len = len;
-			meta->used_len = len;
-			mhead->cookie = NGM_KSOCKET_COOKIE;
-			mhead->type = NG_KSOCKET_META_SOCKADDR;
-			mhead->len = sizeof(*mhead) + sa->sa_len;
-			bcopy(sa, mhead->data, sa->sa_len);
+			bcopy(sa, &stag->sa, sa->sa_len);
 			FREE(sa, M_SONAME);
+			m_tag_prepend(m, &stag->tag);
 		}
 
-sendit:		/* Forward data with optional peer sockaddr as meta info */
-		NG_SEND_DATA(error, priv->hook, m, meta);
+sendit:		/* Forward data with optional peer sockaddr as packet tag */
+		NG_SEND_DATA_ONLY(error, priv->hook, m);
 	}
 
 	/*
 	 * If the peer has closed the connection, forward a 0-length mbuf
 	 * to indicate end-of-file.
 	 */
-	if (so->so_state & SS_CANTRCVMORE && !(priv->flags & KSF_EOFSEEN)) {
+	if (so->so_rcv.sb_state & SBS_CANTRCVMORE && !(priv->flags & KSF_EOFSEEN)) {
 		MGETHDR(m, waitflag, MT_DATA);
 		if (m != NULL) {
 			m->m_len = m->m_pkthdr.len = 0;
@@ -1172,8 +1156,9 @@ ng_ksocket_check_accept(priv_p priv)
 		head->so_error = 0;
 		return error;
 	}
+	/* Unlocked read. */
 	if (TAILQ_EMPTY(&head->so_comp)) {
-		if (head->so_state & SS_CANTRCVMORE)
+		if (head->so_rcv.sb_state & SBS_CANTRCVMORE)
 			return ECONNABORTED;
 		return EWOULDBLOCK;
 	}
@@ -1197,19 +1182,23 @@ ng_ksocket_finish_accept(priv_p priv)
 	int len;
 	int error;
 
+	ACCEPT_LOCK();
 	so = TAILQ_FIRST(&head->so_comp);
-	if (so == NULL)		/* Should never happen */
+	if (so == NULL) {	/* Should never happen */
+		ACCEPT_UNLOCK();
 		return;
+	}
 	TAILQ_REMOVE(&head->so_comp, so, so_list);
 	head->so_qlen--;
+	so->so_qstate &= ~SQ_COMP;
+	so->so_head = NULL;
+	SOCK_LOCK(so);
+	soref(so);
+	so->so_state |= SS_NBIO;
+	SOCK_UNLOCK(so);
+	ACCEPT_UNLOCK();
 
 	/* XXX KNOTE(&head->so_rcv.sb_sel.si_note, 0); */
-
-	soref(so);
-
-	so->so_state &= ~SS_COMP;
-	so->so_state |= SS_NBIO;
-	so->so_head = NULL;
 
 	soaccept(so, &sa);
 
@@ -1255,8 +1244,12 @@ ng_ksocket_finish_accept(priv_p priv)
 
 	so->so_upcallarg = (caddr_t)node;
 	so->so_upcall = ng_ksocket_incoming;
+	SOCKBUF_LOCK(&so->so_rcv);
 	so->so_rcv.sb_flags |= SB_UPCALL;
+	SOCKBUF_UNLOCK(&so->so_rcv);
+	SOCKBUF_LOCK(&so->so_snd);
 	so->so_snd.sb_flags |= SB_UPCALL;
+	SOCKBUF_UNLOCK(&so->so_snd);
 
 	/* Fill in the response data and send it or return it to the caller */
 	resp_data = (struct ng_ksocket_accept *)resp->data;

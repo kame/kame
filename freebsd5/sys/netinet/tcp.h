@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/tcp.h,v 1.18.6.2 2004/01/09 14:29:52 andre Exp $
+ * $FreeBSD: src/sys/netinet/tcp.h,v 1.26 2004/08/16 18:32:07 rwatson Exp $
  */
 
 #ifndef _NETINET_TCP_H_
@@ -89,11 +85,14 @@ struct tcphdr {
 #define TCPOPT_SACK_PERMITTED	4		/* Experimental */
 #define    TCPOLEN_SACK_PERMITTED	2
 #define TCPOPT_SACK		5		/* Experimental */
+#define    TCPOLEN_SACK			8	/* 2*sizeof(tcp_seq) */
 #define TCPOPT_TIMESTAMP	8
 #define    TCPOLEN_TIMESTAMP		10
 #define    TCPOLEN_TSTAMP_APPA		(TCPOLEN_TIMESTAMP+2) /* appendix A */
 #define    TCPOPT_TSTAMP_HDR		\
     (TCPOPT_NOP<<24|TCPOPT_NOP<<16|TCPOPT_TIMESTAMP<<8|TCPOLEN_TIMESTAMP)
+
+#define	MAX_TCPOPTLEN		40	/* Absolute maximum TCP options len */
 
 #define	TCPOPT_CC		11		/* CC options: RFC-1644 */
 #define TCPOPT_CCNEW		12
@@ -102,6 +101,17 @@ struct tcphdr {
 #define	   TCPOLEN_CC_APPA		(TCPOLEN_CC+2)
 #define	   TCPOPT_CC_HDR(ccopt)		\
     (TCPOPT_NOP<<24|TCPOPT_NOP<<16|(ccopt)<<8|TCPOLEN_CC)
+#define	TCPOPT_SIGNATURE		19	/* Keyed MD5: RFC 2385 */
+#define	   TCPOLEN_SIGNATURE		18
+
+/* Option definitions */
+#define TCPOPT_SACK_PERMIT_HDR	\
+(TCPOPT_NOP<<24|TCPOPT_NOP<<16|TCPOPT_SACK_PERMITTED<<8|TCPOLEN_SACK_PERMITTED)
+#define	TCPOPT_SACK_HDR		(TCPOPT_NOP<<24|TCPOPT_NOP<<16|TCPOPT_SACK<<8)
+/* Miscellaneous constants */
+#define	MAX_SACK_BLKS	6	/* Max # SACK blocks stored at sender side */
+#define	TCP_MAX_SACK	3	/* MAX # SACKs sent in any segment */
+
 
 /*
  * Default maximum segment size for TCP.
@@ -126,7 +136,7 @@ struct tcphdr {
  * for more comments.
  * Setting this to "0" disables the minmssoverload check.
  */
-#define	TCP_MINMSSOVERLOAD 0
+#define	TCP_MINMSSOVERLOAD 0	/* XXX: Disabled until refined */
 
 /*
  * Default maximum segment size for TCP6.
@@ -141,7 +151,7 @@ struct tcphdr {
 
 #define TCP_MAX_WINSHIFT	14	/* maximum window shift */
 
-#define TCP_MAXBURST		4 	/* maximum segments in a burst */
+#define TCP_MAXBURST		4	/* maximum segments in a burst */
 
 #define TCP_MAXHLEN	(0xf<<2)	/* max length of header in bytes */
 #define TCP_MAXOLEN	(TCP_MAXHLEN - sizeof(struct tcphdr))
@@ -156,6 +166,7 @@ struct tcphdr {
 #define	TCP_MAXSEG	0x02	/* set maximum segment size */
 #define TCP_NOPUSH	0x04	/* don't push last block of write */
 #define TCP_NOOPT	0x08	/* don't use TCP options */
+#define TCP_MD5SIG	0x10	/* use MD5 digests (RFC2385) */
 #endif
 
 #endif /* !_NETINET_TCP_H_ */

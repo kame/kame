@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/libkern/iconv.c,v 1.7 2003/09/26 20:26:24 fjoe Exp $");
+__FBSDID("$FreeBSD: src/sys/libkern/iconv.c,v 1.8 2004/07/27 22:32:01 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -518,13 +518,8 @@ iconv_vfs_refcount(const char *fsname)
 {
 	struct vfsconf *vfsp;
 
-	for (vfsp = vfsconf; vfsp; vfsp = vfsp->vfc_next) {
-		if (!strcmp(vfsp->vfc_name, fsname)) {
-			if (vfsp->vfc_refcount > 0)
-				return (EBUSY);
-			else
-				return (0);
-		}
-	}
+	vfsp = vfs_byname(fsname);
+	if (vfsp != NULL && vfsp->vfc_refcount > 0)
+		return (EBUSY);
 	return (0);
 }

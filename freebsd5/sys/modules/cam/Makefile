@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/cam/Makefile,v 1.9 2003/07/29 18:08:16 njl Exp $ 
+# $FreeBSD: src/sys/modules/cam/Makefile,v 1.11 2004/04/19 17:26:46 njl Exp $ 
 
 MAINTAINER=	n_hibma@freebsd.org
 S=	${.CURDIR}/../..
@@ -11,7 +11,6 @@ KMOD=	cam
 SRCS=	opt_cam.h
 SRCS+=	opt_scsi.h
 SRCS+=	opt_cd.h
-SRCS+=	opt_da.h
 SRCS+=	opt_hw_wdog.h
 SRCS+=	opt_pt.h
 SRCS+=	opt_sa.h
@@ -30,6 +29,6 @@ SRCS+=	scsi_targ_bh.c scsi_target.c
 EXPORT_SYMS=	YES	# XXX evaluate
 
 opt_scsi.h:
-	echo '#define SCSI_DELAY 15000' > opt_scsi.h
+	echo "#define SCSI_DELAY 15000" > ${.TARGET}
 
 .include <bsd.kmod.mk>

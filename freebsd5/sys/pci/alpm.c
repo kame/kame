@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/alpm.c,v 1.21 2003/08/22 07:13:20 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/alpm.c,v 1.22 2004/03/17 17:50:53 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -227,8 +227,8 @@ alpm_attach(device_t dev)
 	}
 
 	rid = SMBBA;
-	alpm->res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	alpm->res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
+	    RF_ACTIVE);
 
 	if (alpm->res == NULL) {
 		device_printf(dev,"Could not allocate Bus space\n");

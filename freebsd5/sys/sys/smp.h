@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/smp.h,v 1.76 2003/12/03 14:57:25 jhb Exp $
+ * $FreeBSD: src/sys/sys/smp.h,v 1.77.2.2 2004/09/09 09:56:59 julian Exp $
  */
 
 #ifndef _SYS_SMP_H_
@@ -32,7 +32,7 @@
  */
 
 struct cpu_group {
-	u_int	cg_mask;		/* Mask of cpus in this group. */
+	cpumask_t cg_mask;		/* Mask of cpus in this group. */
 	int	cg_count;		/* Count of cpus in this group. */
 	int	cg_children;		/* Number of children groups. */
 	struct cpu_group *cg_child;	/* Optional child group. */
@@ -47,14 +47,19 @@ extern struct cpu_top *smp_topology;
 extern void (*cpustop_restartfunc)(void);
 extern int smp_active;
 extern int smp_cpus;
-extern volatile u_int started_cpus;
-extern volatile u_int stopped_cpus;
+extern volatile cpumask_t started_cpus;
+extern volatile cpumask_t stopped_cpus;
+extern cpumask_t idle_cpus_mask;
+extern cpumask_t hlt_cpus_mask;
+extern cpumask_t logical_cpus_mask;
 #endif /* SMP */
 
-extern u_int all_cpus;
 extern u_int mp_maxid;
+extern int mp_maxcpus;
 extern int mp_ncpus;
 extern volatile int smp_started;
+
+extern cpumask_t all_cpus;
 
 /*
  * Macro allowing us to determine whether a CPU is absent at any given
@@ -92,9 +97,10 @@ void	cpu_mp_start(void);
 
 void	forward_signal(struct thread *);
 void	forward_roundrobin(void);
-int	restart_cpus(u_int);
-int	stop_cpus(u_int);
+int	restart_cpus(cpumask_t);
+int	stop_cpus(cpumask_t);
 void	smp_rendezvous_action(void);
+extern	struct mtx smp_rv_mtx;
 #endif /* SMP */
 void	smp_rendezvous(void (*)(void *), 
 		       void (*)(void *),

@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_ctl.c,v 1.30 2003/09/27 12:00:59 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_ctl.c,v 1.32 2004/06/16 09:47:05 phk Exp $");
 
 #include "opt_geom.h"
 
@@ -65,6 +65,8 @@ __FBSDID("$FreeBSD: src/sys/geom/geom_ctl.c,v 1.30 2003/09/27 12:00:59 phk Exp $
 static d_ioctl_t g_ctl_ioctl;
 
 static struct cdevsw g_ctl_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_ioctl =	g_ctl_ioctl,
 	.d_name =	"g_ctl",
 };
@@ -442,7 +444,7 @@ g_ctl_req(void *arg, int flag __unused)
 
 
 static int
-g_ctl_ioctl_ctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
+g_ctl_ioctl_ctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 {
 	struct gctl_req *req;
 
@@ -477,7 +479,7 @@ g_ctl_ioctl_ctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *t
 }
 
 static int
-g_ctl_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
+g_ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 {
 	int error;
 

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netsmb/smb_iod.c,v 1.14 2003/08/23 21:43:33 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_iod.c,v 1.15 2004/01/02 22:38:42 tjr Exp $");
  
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -247,6 +247,8 @@ smb_iod_sendrq(struct smbiod *iod, struct smb_rq *rqp)
 		*rqp->sr_rqtid = htole16(ssp ? ssp->ss_tid : SMB_TID_UNKNOWN);
 		*rqp->sr_rquid = htole16(vcp ? vcp->vc_smbuid : 0);
 		mb_fixhdr(&rqp->sr_rq);
+		if (vcp->vc_hflags2 & SMB_FLAGS2_SECURITY_SIGNATURE)
+			smb_rq_sign(rqp);
 	}
 	if (rqp->sr_sendcnt++ > 5) {
 		rqp->sr_flags |= SMBR_RESTART;

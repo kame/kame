@@ -23,10 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/regression.h,v 1.2 2002/03/19 20:18:41 alfred Exp $
+ * $FreeBSD: src/sys/sys/regression.h,v 1.3 2004/05/10 18:38:07 rwatson Exp $
  */
-#ifndef _SYS_REGRESSION_H
-#define	_SYS_REGRESSION_H
+#ifndef _SYS_REGRESSION_H_
+#define	_SYS_REGRESSION_H_
 
 #ifndef _KERNEL
 /*
@@ -35,4 +35,4 @@
 int	__setugid(int _flag);
 #endif /* !_KERNEL */
 
-#endif /* !_SYS_REGRESSION_H */
+#endif /* !_SYS_REGRESSION_H_ */

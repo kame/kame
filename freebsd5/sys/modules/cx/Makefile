@@ -1,11 +1,10 @@
 # Cronyx Id: sys.modules.cx.Makefile,v 1.1.2.2 2003/01/21 15:15:49 rik Exp $
-# $FreeBSD: src/sys/modules/cx/Makefile,v 1.1 2003/12/03 07:29:38 imp Exp $
+# $FreeBSD: src/sys/modules/cx/Makefile,v 1.3 2004/06/23 14:22:13 rik Exp $
 
 .PATH:  ${.CURDIR}/../../dev/cx
 KMOD=   if_cx
 SRCS=   if_cx.c cxddk.c csigma.c opt_netgraph.h opt_ng_cronyx.h bpf.h \
 	sppp.h device_if.h bus_if.h isa_if.h
-NOMAN=
 
 NBPF?=		0
 PROTOS?=	-DINET
@@ -14,7 +13,7 @@ NETGRAPH=	${NG_CRONYX}
 
 
 CFLAGS+= ${PROTOS}
-CLEANFILES+= opt_ng_cronyx.h opt_netgraph.h bpf.h cxddk.c csigma.c sppp.h
+CLEANFILES+= opt_ng_cronyx.h opt_netgraph.h bpf.h sppp.h
 
 opt_netgraph.h:
 	echo "#define NETGRAPH $(NETGRAPH)" > opt_netgraph.h

@@ -58,7 +58,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_itk_ix1.c,v 1.8 2003/06/10 23:45:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_itk_ix1.c,v 1.9 2004/03/17 17:50:50 njl Exp $");
 
 #include "opt_i4b.h"
 
@@ -208,9 +208,9 @@ isic_probe_itkix1(device_t dev)
 	#endif
 	
 	if(!(sc->sc_resources.io_base[0] =
-		bus_alloc_resource(dev, SYS_RES_IOPORT,
+		bus_alloc_resource_any(dev, SYS_RES_IOPORT,
 	        		&sc->sc_resources.io_rid[0],
-	                        0ul, ~0ul, 1, RF_ACTIVE)))
+	                        RF_ACTIVE)))
 	{
 		printf("isic%d: Could not allocate i/o port for ITK IX1.\n", unit);
 		return ENXIO;
@@ -230,9 +230,9 @@ isic_probe_itkix1(device_t dev)
 
 	/* get our irq */
 	if(!(sc->sc_resources.irq =
-			bus_alloc_resource(dev, SYS_RES_IRQ,
+			bus_alloc_resource_any(dev, SYS_RES_IRQ,
 						&sc->sc_resources.irq_rid,
-						0ul, ~0ul, 1, RF_ACTIVE)))
+						RF_ACTIVE)))
 	{
 		printf("isic%d: Could not allocate irq for ITK IX1.\n", unit);
 		bus_release_resource(dev,SYS_RES_IOPORT,

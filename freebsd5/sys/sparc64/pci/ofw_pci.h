@@ -28,7 +28,7 @@
  *
  *	from: NetBSD: psychoreg.h,v 1.8 2001/09/10 16:17:06 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/pci/ofw_pci.h,v 1.6 2003/07/01 14:52:47 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/pci/ofw_pci.h,v 1.8 2004/08/12 17:41:32 marius Exp $
  */
 
 #ifndef _SPARC64_PCI_OFW_PCI_H_
@@ -46,53 +46,6 @@ typedef u_int32_t ofw_pci_intr_t;
 #define	PCI_CS_MEM32	0x02
 #define	PCI_CS_MEM64	0x03
 
-struct ofw_pci_imap {
-	u_int32_t	phys_hi;
-	u_int32_t	phys_mid;
-	u_int32_t	phys_lo;
-	ofw_pci_intr_t	intr;
-	phandle_t	child_node;
-	phandle_t	child_intr;
-};
-
-struct ofw_pci_imap_msk {
-	u_int32_t	phys_hi;
-	u_int32_t	phys_mid;
-	u_int32_t	phys_lo;
-	ofw_pci_intr_t	intr;
-};
-
 u_int8_t ofw_pci_alloc_busno(phandle_t);
-
-#ifdef OFW_NEWPCI
-
-static __inline phandle_t
-ofw_pci_get_node(device_t dev)
-{
-
-	return (OFW_PCI_GET_NODE(device_get_parent(dev), dev));
-}
-
-#else
-
-struct ofw_pci_bdesc;
-typedef void ofw_pci_binit_t(device_t, struct ofw_pci_bdesc *);
-
-struct ofw_pci_bdesc {
-	u_int	obd_bus;
-	u_int	obd_slot;
-	u_int	obd_func;
-	u_int	obd_secbus;
-	u_int	obd_subbus;
-	ofw_pci_binit_t	*obd_init;
-	struct ofw_pci_bdesc	*obd_super;
-};
-
-obr_callback_t ofw_pci_orb_callback;
-ofw_pci_binit_t ofw_pci_binit;
-void ofw_pci_init(device_t, phandle_t, ofw_pci_intr_t, struct ofw_pci_bdesc *);
-phandle_t ofw_pci_find_node(int, int, int);
-phandle_t ofw_pci_node(device_t);
-#endif
 
 #endif /* ! _SPARC64_PCI_OFW_PCI_H_ */

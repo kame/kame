@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/bios/smapi.c,v 1.8 2003/09/27 12:00:59 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/bios/smapi.c,v 1.13 2004/06/16 09:47:07 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD: src/sys/i386/bios/smapi.c,v 1.8 2003/09/27 12:00:59 phk Exp 
 
 /* And all this for BIOS_PADDRTOVADDR() */
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <machine/md_var.h>
 #include <machine/pc/bios.h>
@@ -57,7 +58,7 @@ __FBSDID("$FreeBSD: src/sys/i386/bios/smapi.c,v 1.8 2003/09/27 12:00:59 phk Exp 
 #define	ADDR2HDR(addr)	((struct smapi_bios_header *)BIOS_PADDRTOVADDR(addr))
 
 struct smapi_softc {
-	dev_t			cdev;
+	struct cdev *cdev;
 	device_t		dev;
 	struct resource *	res;
 	int			rid;
@@ -75,10 +76,10 @@ devclass_t smapi_devclass;
 static d_ioctl_t smapi_ioctl;
 
 static struct cdevsw smapi_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_ioctl =	smapi_ioctl,
 	.d_name =	"smapi",
-	.d_maj =	MAJOR_AUTO,
-	.d_flags =	D_MEM,
+	.d_flags =	D_MEM | D_NEEDGIANT,
 };
 
 static void	smapi_identify		(driver_t *, device_t);
@@ -97,7 +98,7 @@ extern int	smapi32_new		(u_long, u_short,
 
 static int
 smapi_ioctl (dev, cmd, data, fflag, td)
-	dev_t		dev;
+	struct cdev *dev;
 	u_long		cmd;
 	caddr_t		data;
 	int		fflag;
@@ -183,8 +184,7 @@ smapi_probe (device_t dev)
 
 	error = 0;
 	rid = 0;
-	res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-		0ul, ~0ul, 1, RF_ACTIVE);
+	res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, RF_ACTIVE);
 	if (res == NULL) {
 		device_printf(dev, "Unable to allocate memory resource.\n");
 		error = ENOMEM;
@@ -214,8 +214,8 @@ smapi_attach (device_t dev)
 
 	sc->dev = dev;
 	sc->rid = 0;
-	sc->res = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->rid,
-		0ul, ~0ul, 1, RF_ACTIVE);
+	sc->res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->rid,
+		 RF_ACTIVE);
 	if (sc->res == NULL) {
 		device_printf(dev, "Unable to allocate memory resource.\n");
 		error = ENOMEM;

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2004 Poul-Henning Kamp.  All rights reserved.
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -15,10 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/tty_conf.c,v 1.19 2003/06/11 00:56:58 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/tty_conf.c,v 1.24 2004/07/15 20:47:40 phk Exp $");
 
 #include "opt_compat.h"
 
@@ -63,36 +60,51 @@ static l_start_t	l_nostart;
  * Reconsider the removal of nullmodem anyway.  It was too much like
  * ttymodem, but a completely null version might be useful.
  */
-#define NODISC(n) \
-	{ l_noopen,	l_noclose,	l_noread,	l_nowrite, \
-	  l_nullioctl,	l_norint,	l_nostart,	ttymodem }
 
-struct	linesw linesw[MAXLDISC] =
-{
-				/* 0- termios */
-	{ ttyopen,	ttylclose,	ttread,		ttwrite,
-	  l_nullioctl,	ttyinput,	ttstart,	ttymodem },
-	NODISC(1),		/* 1- defunct */
-	  			/* 2- NTTYDISC */
+static struct linesw nodisc = {
+	.l_open = 	l_noopen,
+	.l_close =	l_noclose,
+	.l_read = 	l_noread,
+	.l_write = 	l_nowrite, 
+	.l_ioctl = 	l_nullioctl, 
+	.l_rint = 	l_norint, 
+	.l_start = 	l_nostart, 
+	.l_modem = 	ttymodem
+};
+
+static struct linesw termios_disc = {
+	.l_open = 	tty_open,
+	.l_close =	ttylclose,
+	.l_read = 	ttread,
+	.l_write = 	ttwrite, 
+	.l_ioctl = 	l_nullioctl, 
+	.l_rint = 	ttyinput, 
+	.l_start = 	ttstart, 
+	.l_modem = 	ttymodem
+};
+
 #ifdef COMPAT_43
-	{ ttyopen,	ttylclose,	ttread,		ttwrite,
-	  l_nullioctl,	ttyinput,	ttstart,	ttymodem },
+#  define ntty_disc		termios_disc
 #else
-	NODISC(2),
+#  define ntty_disc		nodisc
 #endif
-	NODISC(3),		/* loadable */
-	NODISC(4),		/* SLIPDISC */
-	NODISC(5),		/* PPPDISC */
-	NODISC(6),		/* NETGRAPHDISC */
-	NODISC(7),		/* loadable */
-	NODISC(8),		/* loadable */
+
+struct linesw *linesw[MAXLDISC] = {
+	&termios_disc,		/* 0 - termios */
+	&nodisc,		/* 1 - defunct */
+	&ntty_disc,		/* 2 - NTTYDISC */
+	&nodisc,		/* 3 - loadable */
+	&nodisc,		/* 4 - SLIPDISC */
+	&nodisc,		/* 5 - PPPDISC */
+	&nodisc,		/* 6 - NETGRAPHDISC */
+	&nodisc,		/* 7 - loadable */
+	&nodisc,		/* 8 - loadable */
 };
 
 int	nlinesw = sizeof (linesw) / sizeof (linesw[0]);
 
-static struct linesw nodisc = NODISC(0);
-
 #define LOADABLE_LDISC 7
+
 /*
  * ldisc_register: Register a line discipline.
  *
@@ -101,26 +113,25 @@ static struct linesw nodisc = NODISC(0);
  *
  * Returns: Index used or -1 on failure.
  */
+
 int
-ldisc_register(discipline, linesw_p)
-	int discipline;
-	struct linesw *linesw_p;
+ldisc_register(int discipline, struct linesw *linesw_p)
 {
 	int slot = -1;
 
 	if (discipline == LDISC_LOAD) {
 		int i;
 		for (i = LOADABLE_LDISC; i < MAXLDISC; i++)
-			if (bcmp(linesw + i, &nodisc, sizeof(nodisc)) == 0) {
+			if (linesw[i] == &nodisc) {
 				slot = i;
+				break;
 			}
-	}
-	else if (discipline >= 0 && discipline < MAXLDISC) {
+	} else if (discipline >= 0 && discipline < MAXLDISC) {
 		slot = discipline;
 	}
 
 	if (slot != -1 && linesw_p)
-		linesw[slot] = *linesw_p;
+		linesw[slot] = linesw_p;
 
 	return slot;
 }
@@ -131,81 +142,63 @@ ldisc_register(discipline, linesw_p)
  *
  * discipline: Index for discipline to unload.
  */
+
 void
-ldisc_deregister(discipline)
-	int discipline;
-{
-	if (discipline < MAXLDISC) {
-		linesw[discipline] = nodisc;
-	}
-}
-
-static int
-l_noopen(dev, tp)
-	dev_t dev;
-	struct tty *tp;
+ldisc_deregister(int discipline)
 {
 
-	return (ENODEV);
-}
-
-static int
-l_noclose(tp, flag)
-	struct tty *tp;
-	int flag;
-{
-
-	return (ENODEV);
-}
-
-int
-l_noread(tp, uio, flag)
-	struct tty *tp;
-	struct uio *uio;
-	int flag;
-{
-
-	return (ENODEV);
-}
-
-int
-l_nowrite(tp, uio, flag)
-	struct tty *tp;
-	struct uio *uio;
-	int flag;
-{
-
-	return (ENODEV);
-}
-
-static int
-l_norint(c, tp)
-	int c;
-	struct tty *tp;
-{
-
-	return (ENODEV);
-}
-
-static int
-l_nostart(tp)
-	struct tty *tp;
-{
-
-	return (ENODEV);
+	if (discipline < MAXLDISC)
+		linesw[discipline] = &nodisc;
 }
 
 /*
- * Do nothing specific version of line
- * discipline specific ioctl command.
+ * "no" and "null" versions of line discipline functions
  */
+
+static int
+l_noopen(struct cdev *dev, struct tty *tp)
+{
+
+	return (ENODEV);
+}
+
+static int
+l_noclose(struct tty *tp, int flag)
+{
+
+	return (ENODEV);
+}
+
 int
-l_nullioctl(tp, cmd, data, flags, td)
-	struct tty *tp;
-	u_long cmd;
-	char *data;
-	int flags;
-	struct thread *td;
+l_noread(struct tty *tp, struct uio *uio, int flag)
+{
+
+	return (ENODEV);
+}
+
+int
+l_nowrite(struct tty *tp, struct uio *uio, int flag)
+{
+
+	return (ENODEV);
+}
+
+static int
+l_norint(int c, struct tty *tp)
+{
+
+	return (ENODEV);
+}
+
+static int
+l_nostart(struct tty *tp)
+{
+
+	return (ENODEV);
+}
+
+int
+l_nullioctl(struct tty *tp, u_long cmd, char *data, int flags, struct thread *td)
 {
 
 	return (ENOIOCTL);

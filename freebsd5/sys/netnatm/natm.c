@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netnatm/natm.c,v 1.31 2003/11/18 00:39:05 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/netnatm/natm.c,v 1.34.4.1 2004/10/21 09:30:48 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -61,11 +61,11 @@ __FBSDID("$FreeBSD: src/sys/netnatm/natm.c,v 1.31 2003/11/18 00:39:05 rwatson Ex
 
 #include <netnatm/natm.h>
 
-static u_long natm5_sendspace = 16*1024;
-static u_long natm5_recvspace = 16*1024;
+static const u_long natm5_sendspace = 16*1024;
+static const u_long natm5_recvspace = 16*1024;
 
-static u_long natm0_sendspace = 16*1024;
-static u_long natm0_recvspace = 16*1024;
+static const u_long natm0_sendspace = 16*1024;
+static const u_long natm0_recvspace = 16*1024;
 
 /*
  * user requests
@@ -135,6 +135,8 @@ natm_usr_detach(struct socket *so)
      * we turn on 'drain' *before* we sofree.
      */
     npcb_free(npcb, NPCB_DESTROY);	/* drain */
+    ACCEPT_LOCK();
+    SOCK_LOCK(so);
     so->so_pcb = NULL;
     sotryfree(so);
  out:
@@ -338,7 +340,7 @@ natm_usr_peeraddr(struct socket *so, struct sockaddr **nam)
         sizeof(snatm->snatm_if));
     snatm->snatm_vci = npcb->npcb_vci;
     snatm->snatm_vpi = npcb->npcb_vpi;
-    *nam = dup_sockaddr((struct sockaddr *)snatm, 0);
+    *nam = sodupsockaddr((struct sockaddr *)snatm, M_NOWAIT);
 
  out:
     splx(s);
@@ -463,6 +465,8 @@ struct proc *p;
        */
 
       npcb_free(npcb, NPCB_DESTROY);	/* drain */
+      ACCEPT_LOCK();
+      SOCK_LOCK(so);
       so->so_pcb = NULL;
       sotryfree(so);
 

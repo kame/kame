@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_default.c,v 1.91 2003/11/05 04:30:07 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_default.c,v 1.97 2004/07/12 08:14:08 alfred Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -369,166 +365,6 @@ vop_stdpoll(ap)
 }
 
 /*
- * Stubs to use when there is no locking to be done on the underlying object.
- * A minimal shared lock is necessary to ensure that the underlying object
- * is not revoked while an operation is in progress. So, an active shared
- * count is maintained in an auxillary vnode lock structure.
- */
-int
-vop_sharedlock(ap)
-	struct vop_lock_args /* {
-		struct vnode *a_vp;
-		int a_flags;
-		struct thread *a_td;
-	} */ *ap;
-{
-	/*
-	 * This code cannot be used until all the non-locking filesystems
-	 * (notably NFS) are converted to properly lock and release nodes.
-	 * Also, certain vnode operations change the locking state within
-	 * the operation (create, mknod, remove, link, rename, mkdir, rmdir,
-	 * and symlink). Ideally these operations should not change the
-	 * lock state, but should be changed to let the caller of the
-	 * function unlock them. Otherwise all intermediate vnode layers
-	 * (such as union, umapfs, etc) must catch these functions to do
-	 * the necessary locking at their layer. Note that the inactive
-	 * and lookup operations also change their lock state, but this
-	 * cannot be avoided, so these two operations will always need
-	 * to be handled in intermediate layers.
-	 */
-	struct vnode *vp = ap->a_vp;
-	int vnflags, flags = ap->a_flags;
-
-	switch (flags & LK_TYPE_MASK) {
-	case LK_DRAIN:
-		vnflags = LK_DRAIN;
-		break;
-	case LK_EXCLUSIVE:
-#ifdef DEBUG_VFS_LOCKS
-		/*
-		 * Normally, we use shared locks here, but that confuses
-		 * the locking assertions.
-		 */
-		vnflags = LK_EXCLUSIVE;
-		break;
-#endif
-	case LK_SHARED:
-		vnflags = LK_SHARED;
-		break;
-	case LK_UPGRADE:
-	case LK_EXCLUPGRADE:
-	case LK_DOWNGRADE:
-		return (0);
-	case LK_RELEASE:
-	default:
-		panic("vop_sharedlock: bad operation %d", flags & LK_TYPE_MASK);
-	}
-	vnflags |= flags & (LK_INTERLOCK | LK_EXTFLG_MASK);
-#ifndef	DEBUG_LOCKS
-	return (lockmgr(vp->v_vnlock, vnflags, VI_MTX(vp), ap->a_td));
-#else
-	return (debuglockmgr(vp->v_vnlock, vnflags, VI_MTX(vp), ap->a_td,
-	    "vop_sharedlock", vp->filename, vp->line));
-#endif
-}
-
-/*
- * Stubs to use when there is no locking to be done on the underlying object.
- * A minimal shared lock is necessary to ensure that the underlying object
- * is not revoked while an operation is in progress. So, an active shared
- * count is maintained in an auxillary vnode lock structure.
- */
-int
-vop_nolock(ap)
-	struct vop_lock_args /* {
-		struct vnode *a_vp;
-		int a_flags;
-		struct thread *a_td;
-	} */ *ap;
-{
-#ifdef notyet
-	/*
-	 * This code cannot be used until all the non-locking filesystems
-	 * (notably NFS) are converted to properly lock and release nodes.
-	 * Also, certain vnode operations change the locking state within
-	 * the operation (create, mknod, remove, link, rename, mkdir, rmdir,
-	 * and symlink). Ideally these operations should not change the
-	 * lock state, but should be changed to let the caller of the
-	 * function unlock them. Otherwise all intermediate vnode layers
-	 * (such as union, umapfs, etc) must catch these functions to do
-	 * the necessary locking at their layer. Note that the inactive
-	 * and lookup operations also change their lock state, but this
-	 * cannot be avoided, so these two operations will always need
-	 * to be handled in intermediate layers.
-	 */
-	struct vnode *vp = ap->a_vp;
-	int vnflags, flags = ap->a_flags;
-
-	switch (flags & LK_TYPE_MASK) {
-	case LK_DRAIN:
-		vnflags = LK_DRAIN;
-		break;
-	case LK_EXCLUSIVE:
-	case LK_SHARED:
-		vnflags = LK_SHARED;
-		break;
-	case LK_UPGRADE:
-	case LK_EXCLUPGRADE:
-	case LK_DOWNGRADE:
-		return (0);
-	case LK_RELEASE:
-	default:
-		panic("vop_nolock: bad operation %d", flags & LK_TYPE_MASK);
-	}
-	vnflags |= flags & (LK_INTERLOCK | LK_EXTFLG_MASK);
-	return(lockmgr(vp->v_vnlock, vnflags, VI_MTX(vp), ap->a_td));
-#else /* for now */
-	/*
-	 * Since we are not using the lock manager, we must clear
-	 * the interlock here.
-	 */
-	if (ap->a_flags & LK_INTERLOCK)
-		VI_UNLOCK(ap->a_vp);
-	return (0);
-#endif
-}
-
-/*
- * Do the inverse of vop_nolock, handling the interlock in a compatible way.
- */
-int
-vop_nounlock(ap)
-	struct vop_unlock_args /* {
-		struct vnode *a_vp;
-		int a_flags;
-		struct thread *a_td;
-	} */ *ap;
-{
-
-	/*
-	 * Since we are not using the lock manager, we must clear
-	 * the interlock here.
-	 */
-	if (ap->a_flags & LK_INTERLOCK)
-		VI_UNLOCK(ap->a_vp);
-	return (0);
-}
-
-/*
- * Return whether or not the node is in use.
- */
-int
-vop_noislocked(ap)
-	struct vop_islocked_args /* {
-		struct vnode *a_vp;
-		struct thread *a_td;
-	} */ *ap;
-{
-
-	return (0);
-}
-
-/*
  * Return our mount point, as we will take charge of the writes.
  */
 int
@@ -819,10 +655,12 @@ vop_stdputpages(ap)
  * used to fill the vfs function table to get reasonable default return values.
  */
 int
-vfs_stdroot (mp, vpp)
+vfs_stdroot (mp, vpp, td)
 	struct mount *mp;
 	struct vnode **vpp;
+	struct thread *td;
 {
+
 	return (EOPNOTSUPP);
 }
 
@@ -832,6 +670,7 @@ vfs_stdstatfs (mp, sbp, td)
 	struct statfs *sbp;
 	struct thread *td;
 {
+
 	return (EOPNOTSUPP);
 }
 
@@ -840,6 +679,7 @@ vfs_stdvptofh (vp, fhp)
 	struct vnode *vp;
 	struct fid *fhp;
 {
+
 	return (EOPNOTSUPP);
 }
 
@@ -849,6 +689,7 @@ vfs_stdstart (mp, flags, td)
 	int flags;
 	struct thread *td;
 {
+
 	return (0);
 }
 
@@ -860,6 +701,7 @@ vfs_stdquotactl (mp, cmds, uid, arg, td)
 	caddr_t arg;
 	struct thread *td;
 {
+
 	return (EOPNOTSUPP);
 }
 
@@ -881,15 +723,7 @@ vfs_stdsync(mp, waitfor, cred, td)
 	 */
 	MNT_ILOCK(mp);
 loop:
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
-		/*
-		 * If the vnode that we are about to sync is no longer
-		 * associated with this mount point, start over.
-		 */
-		if (vp->v_mount != mp)
-			goto loop;
-
-		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
+	MNT_VNODE_FOREACH(vp, mp, nvp) {
 
 		VI_LOCK(vp);
 		if (TAILQ_EMPTY(&vp->v_dirtyblkhd)) {
@@ -923,6 +757,7 @@ vfs_stdnosync (mp, waitfor, cred, td)
 	struct ucred *cred;
 	struct thread *td;
 {
+
 	return (0);
 }
 
@@ -933,6 +768,7 @@ vfs_stdvget (mp, ino, flags, vpp)
 	int flags;
 	struct vnode **vpp;
 {
+
 	return (EOPNOTSUPP);
 }
 
@@ -942,6 +778,7 @@ vfs_stdfhtovp (mp, fhp, vpp)
 	struct fid *fhp;
 	struct vnode **vpp;
 {
+
 	return (EOPNOTSUPP);
 }
 
@@ -949,6 +786,7 @@ int
 vfs_stdinit (vfsp)
 	struct vfsconf *vfsp;
 {
+
 	return (0);
 }
 
@@ -956,6 +794,7 @@ int
 vfs_stduninit (vfsp)
 	struct vfsconf *vfsp;
 {
+
 	return(0);
 }
 
@@ -968,9 +807,20 @@ vfs_stdextattrctl(mp, cmd, filename_vp, attrnamespace, attrname, td)
 	const char *attrname;
 	struct thread *td;
 {
+
 	if (filename_vp != NULL)
 		VOP_UNLOCK(filename_vp, 0, td);
-	return(EOPNOTSUPP);
+	return (EOPNOTSUPP);
+}
+
+int
+vfs_stdsysctl(mp, op, req)
+	struct mount *mp;
+	fsctlop_t op;
+	struct sysctl_req *req;
+{
+
+	return (EOPNOTSUPP);
 }
 
 /* end of vfs default ops */

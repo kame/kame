@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/stddef.h,v 1.1.6.1 2003/12/18 00:59:51 peter Exp $
+ * $FreeBSD: src/sys/sys/stddef.h,v 1.2 2003/12/07 21:10:06 marcel Exp $
  */
 
 #ifndef _SYS_STDDEF_H_

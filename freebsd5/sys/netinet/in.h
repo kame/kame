@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.h	8.3 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/in.h,v 1.82 2003/10/25 09:37:10 ume Exp $
+ * $FreeBSD: src/sys/netinet/in.h,v 1.87 2004/08/16 18:32:07 rwatson Exp $
  */
 
 #ifndef _NETINET_IN_H_
@@ -136,8 +132,8 @@ __END_DECLS
 #define	IPPROTO_HOPOPTS		0		/* IP6 hop-by-hop options */
 #define	IPPROTO_IGMP		2		/* group mgmt protocol */
 #define	IPPROTO_GGP		3		/* gateway^2 (deprecated) */
-#define IPPROTO_IPV4		4 		/* IPv4 encapsulation */
-#define IPPROTO_IPIP		IPPROTO_IPV4	/* for compatibility */
+#define	IPPROTO_IPV4		4		/* IPv4 encapsulation */
+#define	IPPROTO_IPIP		IPPROTO_IPV4	/* for compatibility */
 #define	IPPROTO_ST		7		/* Stream protocol II */
 #define	IPPROTO_EGP		8		/* exterior gateway protocol */
 #define	IPPROTO_PIGP		9		/* private interior gateway */
@@ -159,7 +155,7 @@ __END_DECLS
 #define	IPPROTO_LEAF2		26		/* Leaf-2 */
 #define	IPPROTO_RDP		27		/* Reliable Data */
 #define	IPPROTO_IRTP		28		/* Reliable Transaction */
-#define	IPPROTO_TP		29 		/* tp-4 w/ class negotiation */
+#define	IPPROTO_TP		29		/* tp-4 w/ class negotiation */
 #define	IPPROTO_BLT		30		/* Bulk Data Transfer */
 #define	IPPROTO_NSP		31		/* Network Services */
 #define	IPPROTO_INP		32		/* Merit Internodal */
@@ -176,7 +172,7 @@ __END_DECLS
 #define	IPPROTO_ROUTING		43		/* IP6 routing header */
 #define	IPPROTO_FRAGMENT	44		/* IP6 fragmentation header */
 #define	IPPROTO_IDRP		45		/* InterDomain Routing*/
-#define	IPPROTO_RSVP		46 		/* resource reservation */
+#define	IPPROTO_RSVP		46		/* resource reservation */
 #define	IPPROTO_GRE		47		/* General Routing Encap. */
 #define	IPPROTO_MHRP		48		/* Mobile Host Routing */
 #define	IPPROTO_BHA		49		/* BHA */
@@ -185,9 +181,9 @@ __END_DECLS
 #define	IPPROTO_INLSP		52		/* Integ. Net Layer Security */
 #define	IPPROTO_SWIPE		53		/* IP with encryption */
 #define	IPPROTO_NHRP		54		/* Next Hop Resolution */
-#define IPPROTO_MOBILE		55		/* IP Mobility */
-#define IPPROTO_TLSP		56		/* Transport Layer Security */
-#define IPPROTO_SKIP		57		/* SKIP */
+#define	IPPROTO_MOBILE		55		/* IP Mobility */
+#define	IPPROTO_TLSP		56		/* Transport Layer Security */
+#define	IPPROTO_SKIP		57		/* SKIP */
 #define	IPPROTO_ICMPV6		58		/* ICMP6 */
 #define	IPPROTO_NONE		59		/* IP6 no next header */
 #define	IPPROTO_DSTOPTS		60		/* IP6 destination option */
@@ -235,6 +231,7 @@ __END_DECLS
 /* 101-254: Partly Unassigned */
 #define	IPPROTO_PIM		103		/* Protocol Independent Mcast */
 #define	IPPROTO_PGM		113		/* PGM */
+#define	IPPROTO_PFSYNC		240		/* PFSYNC */
 /* 255: Reserved */
 /* BSD Private, local use, namespace incursion, no longer used */
 #define	IPPROTO_OLD_DIVERT	254		/* OLD divert pseudo-proto */
@@ -311,7 +308,7 @@ __END_DECLS
  * 512, but that conflicts with some well-known-services that firewalls may
  * have a fit if we use.
  */
-#define IPPORT_RESERVEDSTART	600
+#define	IPPORT_RESERVEDSTART	600
 
 #define	IPPORT_MAX		65535
 
@@ -354,6 +351,7 @@ __END_DECLS
 #define	INADDR_UNSPEC_GROUP	(u_int32_t)0xe0000000	/* 224.0.0.0 */
 #define	INADDR_ALLHOSTS_GROUP	(u_int32_t)0xe0000001	/* 224.0.0.1 */
 #define	INADDR_ALLRTRS_GROUP	(u_int32_t)0xe0000002	/* 224.0.0.2 */
+#define	INADDR_PFSYNC_GROUP	(u_int32_t)0xe00000f0	/* 224.0.0.240 */
 #define	INADDR_ALLMDNS_GROUP	(u_int32_t)0xe00000fb	/* 224.0.0.251 */
 #define	INADDR_MAX_LOCAL_GROUP	(u_int32_t)0xe00000ff	/* 224.0.0.255 */
 
@@ -377,12 +375,12 @@ __END_DECLS
 #define	IP_MULTICAST_LOOP	11   /* u_char; set/get IP multicast loopback */
 #define	IP_ADD_MEMBERSHIP	12   /* ip_mreq; add an IP group membership */
 #define	IP_DROP_MEMBERSHIP	13   /* ip_mreq; drop an IP group membership */
-#define IP_MULTICAST_VIF	14   /* set/get IP mcast virt. iface */
-#define IP_RSVP_ON		15   /* enable RSVP in kernel */
-#define IP_RSVP_OFF		16   /* disable RSVP in kernel */
-#define IP_RSVP_VIF_ON		17   /* set RSVP per-vif socket */
-#define IP_RSVP_VIF_OFF		18   /* unset RSVP per-vif socket */
-#define IP_PORTRANGE		19   /* int; range to choose for unspec port */
+#define	IP_MULTICAST_VIF	14   /* set/get IP mcast virt. iface */
+#define	IP_RSVP_ON		15   /* enable RSVP in kernel */
+#define	IP_RSVP_OFF		16   /* disable RSVP in kernel */
+#define	IP_RSVP_VIF_ON		17   /* set RSVP per-vif socket */
+#define	IP_RSVP_VIF_OFF		18   /* unset RSVP per-vif socket */
+#define	IP_PORTRANGE		19   /* int; range to choose for unspec port */
 #define	IP_RECVIF		20   /* bool; receive reception if w/dgram */
 /* for IPSEC */
 #define	IP_IPSEC_POLICY		21   /* int; set/get security policy */
@@ -390,11 +388,17 @@ __END_DECLS
 
 #define	IP_ONESBCAST		23   /* bool: send all-ones broadcast */
 
-#define	IP_FW_ADD     		50   /* add a firewall rule to chain */
-#define	IP_FW_DEL    		51   /* delete a firewall rule from chain */
-#define	IP_FW_FLUSH   		52   /* flush firewall rule chain */
-#define	IP_FW_ZERO    		53   /* clear single/all firewall counter(s) */
-#define	IP_FW_GET     		54   /* get entire firewall rule chain */
+#define	IP_FW_TABLE_ADD		40   /* add entry */
+#define	IP_FW_TABLE_DEL		41   /* delete entry */
+#define	IP_FW_TABLE_FLUSH	42   /* flush table */
+#define	IP_FW_TABLE_GETSIZE	43   /* get table size */
+#define	IP_FW_TABLE_LIST	44   /* list table contents */
+
+#define	IP_FW_ADD		50   /* add a firewall rule to chain */
+#define	IP_FW_DEL		51   /* delete a firewall rule from chain */
+#define	IP_FW_FLUSH		52   /* flush firewall rule chain */
+#define	IP_FW_ZERO		53   /* clear single/all firewall counter(s) */
+#define	IP_FW_GET		54   /* get entire firewall rule chain */
 #define	IP_FW_RESETLOG		55   /* reset logging counters */
 
 #define	IP_DUMMYNET_CONFIGURE	60   /* add/configure a dummynet pipe */
@@ -515,12 +519,12 @@ struct ip_mreq {
 #ifdef notyet
 #define	IPCTL_DEFMTU		4	/* default MTU */
 #endif
-#define IPCTL_RTEXPIRE		5	/* cloned route expiration time */
-#define IPCTL_RTMINEXPIRE	6	/* min value for expiration time */
-#define IPCTL_RTMAXCACHE	7	/* trigger level for dynamic expire */
+#define	IPCTL_RTEXPIRE		5	/* cloned route expiration time */
+#define	IPCTL_RTMINEXPIRE	6	/* min value for expiration time */
+#define	IPCTL_RTMAXCACHE	7	/* trigger level for dynamic expire */
 #define	IPCTL_SOURCEROUTE	8	/* may perform source routes */
 #define	IPCTL_DIRECTEDBROADCAST	9	/* may re-broadcast received packets */
-#define IPCTL_INTRQMAXLEN	10	/* max length of netisr queue */
+#define	IPCTL_INTRQMAXLEN	10	/* max length of netisr queue */
 #define	IPCTL_INTRQDROPS	11	/* number of netisr q drops */
 #define	IPCTL_STATS		12	/* ipstat structure */
 #define	IPCTL_ACCEPTSOURCEROUTE	13	/* may accept source routed packets */
@@ -539,7 +543,7 @@ struct ip_mreq {
 	{ "rtminexpire", CTLTYPE_INT }, \
 	{ "rtmaxcache", CTLTYPE_INT }, \
 	{ "sourceroute", CTLTYPE_INT }, \
- 	{ "directed-broadcast", CTLTYPE_INT }, \
+	{ "directed-broadcast", CTLTYPE_INT }, \
 	{ "intr-queue-maxlen", CTLTYPE_INT }, \
 	{ "intr-queue-drops", CTLTYPE_INT }, \
 	{ "stats", CTLTYPE_STRUCT }, \
@@ -556,15 +560,16 @@ struct ifnet; struct mbuf;	/* forward declarations for Standard C */
 int	 in_broadcast(struct in_addr, struct ifnet *);
 int	 in_canforward(struct in_addr);
 int	 in_localaddr(struct in_addr);
-char 	*inet_ntoa(struct in_addr); /* in libkern */
+int	 in_localip(struct in_addr);
+char	*inet_ntoa(struct in_addr); /* in libkern */
 char	*inet_ntoa_r(struct in_addr ina, char *buf); /* in libkern */
 
-#define in_hosteq(s, t)	((s).s_addr == (t).s_addr)
-#define in_nullhost(x)	((x).s_addr == INADDR_ANY)
+#define	in_hosteq(s, t)	((s).s_addr == (t).s_addr)
+#define	in_nullhost(x)	((x).s_addr == INADDR_ANY)
 
-#define satosin(sa)	((struct sockaddr_in *)(sa))
-#define sintosa(sin)	((struct sockaddr *)(sin))
-#define ifatoia(ifa)	((struct in_ifaddr *)(ifa))
+#define	satosin(sa)	((struct sockaddr_in *)(sa))
+#define	sintosa(sin)	((struct sockaddr *)(sin))
+#define	ifatoia(ifa)	((struct in_ifaddr *)(ifa))
 
 #endif /* _KERNEL */
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agppriv.h,v 1.3 2000/07/12 10:13:04 dfr Exp $
+ *	$FreeBSD: src/sys/pci/agppriv.h,v 1.5 2004/06/16 09:47:20 phk Exp $
  */
 
 #ifndef _PCI_AGPPRIV_H_
@@ -75,8 +75,8 @@ struct agp_softc {
 	struct agp_memory_list	as_memory;	/* list of allocated memory */
 	int			as_nextid;	/* next memory block id */
 	int			as_isopen;	/* user device is open */
-	dev_t			as_devnode;	/* from make_dev */
-	struct lock		as_lock;	/* lock for access to GATT */
+	struct cdev *as_devnode;	/* from make_dev */
+	struct mtx		as_lock;	/* lock for access to GATT */
 };
 
 struct agp_gatt {

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/frame.h,v 1.14 2002/10/22 18:03:15 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/frame.h,v 1.15 2004/07/10 23:05:38 marcel Exp $
  */
 
 #ifndef	_MACHINE_FRAME_H_
@@ -89,7 +89,5 @@ struct thread;
 
 int	rwindow_save(struct thread *td);
 int	rwindow_load(struct thread *td, struct trapframe *tf, int n);
-
-int	kdb_trap(struct trapframe *tf);
 
 #endif /* !_MACHINE_FRAME_H_ */

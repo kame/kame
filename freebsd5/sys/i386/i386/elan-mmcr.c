@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/elan-mmcr.c,v 1.21 2003/11/27 20:27:29 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/elan-mmcr.c,v 1.30 2004/07/07 20:02:30 phk Exp $");
 
 #include "opt_cpu.h"
 #include <sys/param.h>
@@ -60,21 +60,25 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/elan-mmcr.c,v 1.21 2003/11/27 20:27:29 phk
 
 #include <dev/led/led.h>
 #include <machine/md_var.h>
+#include <machine/elan_mmcr.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
 static char gpio_config[33];
 
-uint16_t *elan_mmcr;
+static volatile uint16_t *mmcrptr;
+volatile struct elan_mmcr *elan_mmcr;
 
 #ifdef CPU_ELAN_PPS
 static struct pps_state elan_pps;
-u_int	pps_a, pps_d;
-u_int	echo_a, echo_d;
+static volatile uint16_t *pps_ap[3];
+static u_int	pps_a, pps_d;
+static u_int	echo_a, echo_d;
 #endif /* CPU_ELAN_PPS */
-u_int	led_cookie[32];
-dev_t	led_dev[32];
+
+static u_int	led_cookie[32];
+static struct cdev *led_dev[32];
 
 static void
 gpio_led(void *cookie, int state)
@@ -86,7 +90,7 @@ gpio_led(void *cookie, int state)
 	u >>= 16;
 	if (!state)
 		v ^= 0xc;
-	elan_mmcr[v / 2] = u;
+	mmcrptr[v / 2] = u;
 }
 
 static int
@@ -95,7 +99,8 @@ sysctl_machdep_elan_gpio_config(SYSCTL_HANDLER_ARGS)
 	u_int u, v;
 	int i, np, ne;
 	int error;
-	char buf[32], tmp[10];
+	char buf[32];
+	char tmp[10];
 
 	error = SYSCTL_OUT(req, gpio_config, 33);
 	if (error != 0 || req->newptr == NULL)
@@ -108,7 +113,9 @@ sysctl_machdep_elan_gpio_config(SYSCTL_HANDLER_ARGS)
 	/* Disallow any disabled pins and count pps and echo */
 	np = ne = 0;
 	for (i = 0; i < 32; i++) {
-		if (gpio_config[i] == '-' && (buf[i] != '-' && buf[i] != '.'))
+		if (gpio_config[i] == '-' && buf[i] == '.')
+			buf[i] = gpio_config[i];
+		if (gpio_config[i] == '-' && buf[i] != '-')
 			return (EPERM);
 		if (buf[i] == 'P') {
 			np++;
@@ -139,17 +146,25 @@ sysctl_machdep_elan_gpio_config(SYSCTL_HANDLER_ARGS)
 			v = 2;
 		else
 			v = 0;
+#ifdef CPU_SOEKRIS
+		if (i == 9)
+			;
+		else
+#endif
 		if (buf[i] != 'l' && buf[i] != 'L' && led_dev[i] != NULL) {
 			led_destroy(led_dev[i]);	
 			led_dev[i] = NULL;
-			elan_mmcr[(0xc2a + v) / 2] &= ~u;
+			mmcrptr[(0xc2a + v) / 2] &= ~u;
 		}
 		switch (buf[i]) {
 #ifdef CPU_ELAN_PPS
 		case 'P':
 			pps_d = u;
 			pps_a = 0xc30 + v;
-			elan_mmcr[(0xc2a + v) / 2] &= ~u;
+			pps_ap[0] = &mmcrptr[pps_a / 2];
+			pps_ap[1] = &elan_mmcr->GPTMR2CNT;
+			pps_ap[2] = &elan_mmcr->GPTMR1CNT;
+			mmcrptr[(0xc2a + v) / 2] &= ~u;
 			gpio_config[i] = buf[i];
 			break;
 		case 'e':
@@ -159,7 +174,7 @@ sysctl_machdep_elan_gpio_config(SYSCTL_HANDLER_ARGS)
 				echo_a = 0xc34 + v;
 			else
 				echo_a = 0xc38 + v;
-			elan_mmcr[(0xc2a + v) / 2] |= u;
+			mmcrptr[(0xc2a + v) / 2] |= u;
 			gpio_config[i] = buf[i];
 			break;
 #endif /* CPU_ELAN_PPS */
@@ -172,10 +187,10 @@ sysctl_machdep_elan_gpio_config(SYSCTL_HANDLER_ARGS)
 			if (led_dev[i])
 				break;
 			sprintf(tmp, "gpio%d", i);
+			mmcrptr[(0xc2a + v) / 2] |= u;
+			gpio_config[i] = buf[i];
 			led_dev[i] =
 			    led_create(gpio_led, &led_cookie[i], tmp);
-			elan_mmcr[(0xc2a + v) / 2] |= u;
-			gpio_config[i] = buf[i];
 			break;
 		case '.':
 			gpio_config[i] = buf[i];
@@ -197,7 +212,20 @@ elan_poll_pps(struct timecounter *tc)
 {
 	static int state;
 	int i;
-	u_int u;
+	uint16_t u, x, y, z;
+	u_long eflags;
+
+	/*
+	 * Grab the HW state as quickly and compactly as we can.  Disable
+	 * interrupts to avoid measuring our interrupt service time on
+	 * hw with quality clock sources.
+	 */
+	eflags = read_eflags();
+	disable_intr();
+	x = *pps_ap[0];	/* state, must be first, see below */
+	y = *pps_ap[1]; /* timer2 */
+	z = *pps_ap[2]; /* timer1 */
+	write_eflags(eflags);
 
 	/*
 	 * Order is important here.  We need to check the state of the GPIO
@@ -206,13 +234,8 @@ elan_poll_pps(struct timecounter *tc)
 	 * harmlessly read the REVID register and the contents of pps_d is
 	 * of no concern.
 	 */
-	i = elan_mmcr[pps_a / 2] & pps_d;
 
-	/*
-	 * Subtract timer1 from timer2 to compensate for time from the
-	 * edge until now.
-	 */
-	u = elan_mmcr[0xc84 / 2] - elan_mmcr[0xc7c / 2];
+	i = x & pps_d;
 
 	/* If state did not change or we don't have a GPIO pin, return */
 	if (i == state || pps_a == 0)
@@ -223,18 +246,23 @@ elan_poll_pps(struct timecounter *tc)
 	/* If the state is "low", flip the echo GPIO and return.  */
 	if (!i) {
 		if (echo_a)
-			elan_mmcr[(echo_a ^ 0xc) / 2] = echo_d;
+			mmcrptr[(echo_a ^ 0xc) / 2] = echo_d;
 		return;
 	}
 
-	/* State is "high", record the pps data */
+	/*
+	 * Subtract timer1 from timer2 to compensate for time from the
+	 * edge until we read the counters.
+	 */
+	u = y - z;
+
 	pps_capture(&elan_pps);
-	elan_pps.capcount = u & 0xffff;
+	elan_pps.capcount = u;
 	pps_event(&elan_pps, PPS_CAPTUREASSERT);
 
 	/* Twiddle echo bit */
 	if (echo_a)
-		elan_mmcr[echo_a / 2] = echo_d;
+		mmcrptr[echo_a / 2] = echo_d;
 }
 #endif /* CPU_ELAN_PPS */
 
@@ -243,7 +271,7 @@ elan_get_timecount(struct timecounter *tc)
 {
 
 	/* Read timer2, end of story */
-	return (elan_mmcr[0xc84 / 2]);
+	return (elan_mmcr->GPTMR2CNT);
 }
 
 /*
@@ -289,7 +317,8 @@ init_AMD_Elan_sc520(void)
 	u_int new;
 	int i;
 
-	elan_mmcr = pmap_mapdev(0xfffef000, 0x1000);
+	mmcrptr = pmap_mapdev(0xfffef000, 0x1000);
+	elan_mmcr = (volatile struct elan_mmcr *)mmcrptr;
 
 	/*-
 	 * The i8254 is driven with a nonstandard frequency which is
@@ -305,25 +334,112 @@ init_AMD_Elan_sc520(void)
 		printf("sysctl machdep.i8254_freq=%d returns %d\n", new, i);
 
 	/* Start GP timer #2 and use it as timecounter, hz permitting */
-	elan_mmcr[0xc8e / 2] = 0x0;
-	elan_mmcr[0xc82 / 2] = 0xc001;
+	elan_mmcr->GPTMR2MAXCMPA = 0;
+	elan_mmcr->GPTMR2CTL = 0xc001;
 
 #ifdef CPU_ELAN_PPS
 	/* Set up GP timer #1 as pps counter */
-	elan_mmcr[0xc24 / 2] &= ~0x10;
-	elan_mmcr[0xc7a / 2] = 0x8000 | 0x4000 | 0x10 | 0x1;
-	elan_mmcr[0xc7e / 2] = 0x0;
-	elan_mmcr[0xc80 / 2] = 0x0;
+	elan_mmcr->CSPFS &= ~0x10;
+	elan_mmcr->GPTMR1CTL = 0x8000 | 0x4000 | 0x10 | 0x1;
+	elan_mmcr->GPTMR1MAXCMPA = 0x0;
+	elan_mmcr->GPTMR1MAXCMPB = 0x0;
 	elan_pps.ppscap |= PPS_CAPTUREASSERT;
 	pps_init(&elan_pps);
 #endif
 	tc_init(&elan_timecounter);
 }
 
-static d_ioctl_t elan_ioctl;
-static d_mmap_t elan_mmap;
+static void
+elan_watchdog(void *foo __unused, u_int spec, int *error)
+{
+	u_int u, v;
+	static u_int cur;
+
+	u = spec & WD_INTERVAL;
+	if (spec && u <= 35) {
+		u = imax(u - 5, 24);
+		v = 2 << (u - 24);
+		v |= 0xc000;
+
+		/*
+		 * There is a bug in some silicon which prevents us from
+		 * writing to the WDTMRCTL register if the GP echo mode is
+		 * enabled.  GP echo mode on the other hand is desirable
+		 * for other reasons.  Save and restore the GP echo mode
+		 * around our hardware tom-foolery.
+		 */
+		u = elan_mmcr->GPECHO;
+		elan_mmcr->GPECHO = 0;
+		if (v != cur) {
+			/* Clear the ENB bit */
+			elan_mmcr->WDTMRCTL = 0x3333;
+			elan_mmcr->WDTMRCTL = 0xcccc;
+			elan_mmcr->WDTMRCTL = 0;
+
+			/* Set new value */
+			elan_mmcr->WDTMRCTL = 0x3333;
+			elan_mmcr->WDTMRCTL = 0xcccc;
+			elan_mmcr->WDTMRCTL = v;
+			cur = v;
+		} else {
+			/* Just reset timer */
+			elan_mmcr->WDTMRCTL = 0xaaaa;
+			elan_mmcr->WDTMRCTL = 0x5555;
+		}
+		elan_mmcr->GPECHO = u;
+		*error = 0;
+		return;
+	} else {
+		u = elan_mmcr->GPECHO;
+		elan_mmcr->GPECHO = 0;
+		elan_mmcr->WDTMRCTL = 0x3333;
+		elan_mmcr->WDTMRCTL = 0xcccc;
+		elan_mmcr->WDTMRCTL = 0x4080;
+		elan_mmcr->WDTMRCTL = u;
+		elan_mmcr->GPECHO = u;
+		cur = 0;
+		return;
+	}
+}
+
+static int
+elan_mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
+{
+
+	if (offset >= 0x1000) 
+		return (-1);
+	*paddr = 0xfffef000;
+	return (0);
+}
+static int
+elan_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct  thread *tdr)
+{
+	int error;
+
+	error = ENOIOCTL;
+
+#ifdef CPU_ELAN_PPS
+	if (pps_a != 0)
+		error = pps_ioctl(cmd, arg, &elan_pps);
+	/*
+	 * We only want to incur the overhead of the PPS polling if we
+	 * are actually asked to timestamp.
+	 */
+	if (elan_pps.ppsparam.mode & PPS_CAPTUREASSERT) {
+		elan_timecounter.tc_poll_pps = elan_poll_pps;
+	} else {
+		elan_timecounter.tc_poll_pps = NULL;
+	}
+	if (error != ENOIOCTL)
+		return (error);
+#endif
+
+	return(error);
+}
 
 static struct cdevsw elan_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_ioctl =	elan_ioctl,
 	.d_mmap =	elan_mmap,
 	.d_name =	"elan",
@@ -334,11 +450,11 @@ elan_drvinit(void)
 {
 
 	/* If no elan found, just return */
-	if (elan_mmcr == NULL)
+	if (mmcrptr == NULL)
 		return;
 
 	printf("Elan-mmcr driver: MMCR at %p.%s\n", 
-	    elan_mmcr,
+	    mmcrptr,
 #ifdef CPU_ELAN_PPS
 	    " PPS support."
 #else
@@ -360,108 +476,9 @@ elan_drvinit(void)
 	/* We don't know which pins are available so enable them all */
 	strcpy(gpio_config, "................................");
 #endif /* CPU_SOEKRIS */
+
+	EVENTHANDLER_REGISTER(watchdog_list, elan_watchdog, NULL, 0);
 }
 
 SYSINIT(elan, SI_SUB_PSEUDO, SI_ORDER_MIDDLE, elan_drvinit, NULL);
-
-static int
-elan_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
-{
-
-	if (offset >= 0x1000) 
-		return (-1);
-	*paddr = 0xfffef000;
-	return (0);
-}
-
-static int
-elan_watchdog(u_int spec)
-{
-	u_int u, v;
-	static u_int cur;
-
-	if (spec & ~__WD_LEGAL)
-		return (EINVAL);
-	switch (spec & (WD_ACTIVE|WD_PASSIVE)) {
-	case WD_ACTIVE:
-		u = spec & WD_INTERVAL;
-		if (u > 35)
-			return (EINVAL);
-		u = imax(u - 5, 24);
-		v = 2 << (u - 24);
-		v |= 0xc000;
-
-		/*
-		 * There is a bug in some silicon which prevents us from
-		 * writing to the WDTMRCTL register if the GP echo mode is
-		 * enabled.  GP echo mode on the other hand is desirable
-		 * for other reasons.  Save and restore the GP echo mode
-		 * around our hardware tom-foolery.
-		 */
-		u = elan_mmcr[0xc00 / 2];
-		elan_mmcr[0xc00 / 2] = 0;
-		if (v != cur) {
-			/* Clear the ENB bit */
-			elan_mmcr[0xcb0 / 2] = 0x3333;
-			elan_mmcr[0xcb0 / 2] = 0xcccc;
-			elan_mmcr[0xcb0 / 2] = 0;
-
-			/* Set new value */
-			elan_mmcr[0xcb0 / 2] = 0x3333;
-			elan_mmcr[0xcb0 / 2] = 0xcccc;
-			elan_mmcr[0xcb0 / 2] = v;
-			cur = v;
-		} else {
-			/* Just reset timer */
-			elan_mmcr[0xcb0 / 2] = 0xaaaa;
-			elan_mmcr[0xcb0 / 2] = 0x5555;
-		}
-		elan_mmcr[0xc00 / 2] = u;
-		return (0);
-	case WD_PASSIVE:
-		return (EOPNOTSUPP);
-	case 0:
-		u = elan_mmcr[0xc00 / 2];
-		elan_mmcr[0xc00 / 2] = 0;
-		elan_mmcr[0xcb0 / 2] = 0x3333;
-		elan_mmcr[0xcb0 / 2] = 0xcccc;
-		elan_mmcr[0xcb0 / 2] = 0x4080;
-		elan_mmcr[0xc00 / 2] = u;
-		cur = 0;
-		return (0);
-	default:
-		return (EINVAL);
-	}
-
-}
-
-static int
-elan_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct  thread *tdr)
-{
-	int error;
-
-	error = ENOTTY;
-
-#ifdef CPU_ELAN_PPS
-	if (pps_a != 0)
-		error = pps_ioctl(cmd, arg, &elan_pps);
-	/*
-	 * We only want to incur the overhead of the PPS polling if we
-	 * are actually asked to timestamp.
-	 */
-	if (elan_pps.ppsparam.mode & PPS_CAPTUREASSERT) {
-		elan_timecounter.tc_poll_pps = elan_poll_pps;
-	} else {
-		elan_timecounter.tc_poll_pps = NULL;
-	}
-	if (error != ENOTTY)
-		return (error);
-#endif
-
-	if (cmd == WDIOCPATPAT)
-		return elan_watchdog(*((u_int*)arg));
-
-	/* Other future ioctl handling here */
-	return(error);
-}
 

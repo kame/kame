@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)route.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/route.h,v 1.54 2003/11/20 20:07:37 andre Exp $
+ * $FreeBSD: src/sys/net/route.h,v 1.61 2004/07/28 06:51:33 kan Exp $
  */
 
 #ifndef _NET_ROUTE_H_
@@ -104,20 +100,22 @@ struct mbuf;
 #endif
 struct rtentry {
 	struct	radix_node rt_nodes[2];	/* tree glue, and other values */
-#define	rt_key(r)	((struct sockaddr *)((r)->rt_nodes->rn_key))
-#define	rt_mask(r)	((struct sockaddr *)((r)->rt_nodes->rn_mask))
+	/*
+	 * XXX struct rtentry must begin with a struct radix_node (or two!)
+	 * because the code does some casts of a 'struct radix_node *'
+	 * to a 'struct rtentry *'
+	 */
+#define	rt_key(r)	(*((struct sockaddr **)(&(r)->rt_nodes->rn_key)))
+#define	rt_mask(r)	(*((struct sockaddr **)(&(r)->rt_nodes->rn_mask)))
 	struct	sockaddr *rt_gateway;	/* value */
-	long	rt_refcnt;		/* # held references */
 	u_long	rt_flags;		/* up/down?, host/net */
 	struct	ifnet *rt_ifp;		/* the answer: interface to use */
 	struct	ifaddr *rt_ifa;		/* the answer: interface address to use */
+	struct	rt_metrics_lite rt_rmx;	/* metrics used by rx'ing protocols */
+	long	rt_refcnt;		/* # held references */
 	struct	sockaddr *rt_genmask;	/* for generation of cloned routes */
 	caddr_t	rt_llinfo;		/* pointer to link level info cache */
-	struct	rt_metrics_lite rt_rmx;	/* metrics used by rx'ing protocols */
 	struct	rtentry *rt_gwroute;	/* implied entry for gatewayed routes */
-	int	(*rt_output)(struct ifnet *, struct mbuf *, struct sockaddr *,
-		    struct rtentry *);
-					/* output routine for this (rt,if) */
 	struct	rtentry *rt_parent; 	/* cloning parent of this route */
 #ifdef _KERNEL
 	/* XXX ugly, user apps use this definition but don't have a mtx def */
@@ -267,6 +265,18 @@ struct rt_addrinfo {
 	struct	ifnet *rti_ifp;
 };
 
+/*
+ * This macro returns the size of a struct sockaddr when passed
+ * through a routing socket. Basically we round up sa_len to
+ * a multiple of sizeof(long), with a minimum of sizeof(long).
+ * The check for a NULL pointer is just a convenience, probably never used.
+ * The case sa_len == 0 should only apply to empty structures.
+ */
+#define SA_SIZE(sa)						\
+    (  (!(sa) || ((struct sockaddr *)(sa))->sa_len == 0) ?	\
+	sizeof(long)		:				\
+	1 + ( (((struct sockaddr *)(sa))->sa_len - 1) | (sizeof(long) - 1) ) )
+
 #ifdef _KERNEL
 
 #define	RT_LOCK_INIT(_rt) \
@@ -308,17 +318,28 @@ extern struct radix_node_head *rt_tables[AF_MAX+1];
 
 struct ifmultiaddr;
 
-void	 route_init(void);
 int	 rt_getifa(struct rt_addrinfo *);
 void	 rt_ifannouncemsg(struct ifnet *, int);
 void	 rt_ifmsg(struct ifnet *);
 void	 rt_missmsg(int, struct rt_addrinfo *, int, int);
 void	 rt_newaddrmsg(int, struct ifaddr *, int, struct rtentry *);
 void	 rt_newmaddrmsg(int, struct ifmultiaddr *);
-void	 rtalloc(struct route *);
 int	 rt_setgate(struct rtentry *, struct sockaddr *, struct sockaddr *);
-void	 rtalloc_ign(struct route *, u_long);
-/* NB: the rtentry is returned locked */
+
+/*
+ * Note the following locking behavior:
+ *
+ *    rtalloc_ign() and rtalloc() return ro->ro_rt unlocked
+ *
+ *    rtalloc1() returns a locked rtentry
+ *
+ *    rtfree() and RTFREE_LOCKED() require a locked rtentry
+ *
+ *    RTFREE() uses an unlocked entry.
+ */
+
+void	 rtalloc_ign(struct route *ro, u_long ignflags);
+void	 rtalloc(struct route *ro); /* XXX deprecated, use rtalloc_ign(ro, 0) */
 struct rtentry *rtalloc1(struct sockaddr *, int, u_long);
 int	 rtexpunge(struct rtentry *);
 void	 rtfree(struct rtentry *);

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/i386/include/smp.h,v 1.77 2003/11/03 22:32:04 jhb Exp $
+ * $FreeBSD: src/sys/i386/include/smp.h,v 1.78 2003/12/11 03:48:31 jeff Exp $
  *
  */
 
@@ -75,6 +75,7 @@ void	forward_hardclock(void);
 void	forwarded_hardclock(struct clockframe frame);
 u_int	mp_bootaddress(u_int);
 int	mp_grab_cpu_hlt(void);
+void	mp_topology(void);
 void	smp_invlpg(vm_offset_t addr);
 void	smp_masked_invlpg(u_int mask, vm_offset_t addr);
 void	smp_invlpg_range(vm_offset_t startva, vm_offset_t endva);

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/agp_nvidia.c,v 1.2 2003/08/23 19:32:18 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/agp_nvidia.c,v 1.6 2004/05/30 20:00:40 phk Exp $");
 
 /*
  * Written using information gleaned from the
@@ -37,6 +38,7 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/lock.h>
 
@@ -45,7 +47,6 @@
 #endif
 
 #if __FreeBSD_version > 500000
-#include <sys/lockmgr.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #endif
@@ -116,6 +117,8 @@ agp_nvidia_probe (device_t dev)
 {
 	const char *desc;
 
+	if (resource_disabled("agp", device_get_unit(dev)))
+		return (ENXIO);
 	desc = agp_nvidia_match(dev);
 	if (desc) {
 		device_verbose(dev);

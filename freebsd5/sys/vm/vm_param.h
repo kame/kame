@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -61,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_param.h,v 1.17 2003/01/18 21:14:02 obrien Exp $
+ * $FreeBSD: src/sys/vm/vm_param.h,v 1.19 2004/06/17 17:16:53 phk Exp $
  */
 
 /*
@@ -111,7 +107,7 @@
 #define XSWDEV_VERSION	1
 struct xswdev {
 	u_int	xsw_version;
-	udev_t	xsw_dev;
+	dev_t	xsw_dev;
 	int	xsw_flags;
 	int	xsw_nblks;
 	int     xsw_used;

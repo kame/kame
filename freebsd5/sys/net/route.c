@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)route.c	8.3.1.1 (Berkeley) 2/23/95
- * $FreeBSD: src/sys/net/route.c,v 1.92.2.1 2004/01/08 16:31:33 sam Exp $
+ * $FreeBSD: src/sys/net/route.c,v 1.106.2.1 2004/09/02 14:49:34 csjp Exp $
  */
 
 #include "opt_inet.h"
@@ -51,7 +47,7 @@
 #include <netinet/in.h>
 #include <netinet/ip_mroute.h>
 
-#define	SA(p) ((struct sockaddr *)(p))
+#include <vm/uma.h>
 
 static struct rtstat rtstat;
 struct radix_node_head *rt_tables[AF_MAX+1];
@@ -61,6 +57,21 @@ static int	rttrash;		/* routes not in table but not freed */
 static void rt_maskedcopy(struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *);
 static void rtable_init(void **);
+
+/* compare two sockaddr structures */
+#define	sa_equal(a1, a2) (bcmp((a1), (a2), (a1)->sa_len) == 0)
+
+/*
+ * Convert a 'struct radix_node *' to a 'struct rtentry *'.
+ * The operation can be done safely (in this code) because a
+ * 'struct rtentry' starts with two 'struct radix_node''s, the first
+ * one representing leaf nodes in the routing tree, which is
+ * what the code in radix.c passes us as a 'struct radix_node'.
+ *
+ * But because there are a lot of assumptions in this conversion,
+ * do not cast explicitly, but always use the macro below.
+ */
+#define RNTORT(p)	((struct rtentry *)(p))
 
 static void
 rtable_init(void **table)
@@ -72,9 +83,13 @@ rtable_init(void **table)
 			    dom->dom_rtoffset);
 }
 
-void
-route_init()
+static uma_zone_t rtzone;		/* Routing table UMA zone. */
+
+static void
+route_init(void)
 {
+	rtzone = uma_zcreate("rtentry", sizeof(struct rtentry), NULL, NULL,
+	    NULL, NULL, UMA_ALIGN_PTR, 0);
 	rn_init();	/* initialize all zeroes, all ones, mask table */
 	rtable_init((void **)rt_tables);
 }
@@ -121,7 +136,7 @@ rtalloc1(struct sockaddr *dst, int report, u_long ignflags)
 	u_long nflags;
 	int err = 0, msgtype = RTM_MISS;
 
-	newrt = 0;
+	newrt = NULL;
 	bzero(&info, sizeof(info));
 	/*
 	 * Look up the address in the table for that Address Family
@@ -137,7 +152,7 @@ rtalloc1(struct sockaddr *dst, int report, u_long ignflags)
 		 * If we find it and it's not the root node, then
 		 * get a refernce on the rtentry associated.
 		 */
-		newrt = rt = (struct rtentry *)rn;
+		newrt = rt = RNTORT(rn);
 		nflags = rt->rt_flags & ~ignflags;
 		if (report && (nflags & RTF_CLONING)) {
 			/*
@@ -145,8 +160,8 @@ rtalloc1(struct sockaddr *dst, int report, u_long ignflags)
 			 * If it requires that it be cloned, do so.
 			 * (This implies it wasn't a HOST route.)
 			 */
-			err = rtrequest(RTM_RESOLVE, dst, SA(0),
-					      SA(0), 0, &newrt);
+			err = rtrequest(RTM_RESOLVE, dst, NULL,
+					      NULL, 0, &newrt);
 			if (err) {
 				/*
 				 * If the cloning didn't succeed, maybe
@@ -173,7 +188,7 @@ rtalloc1(struct sockaddr *dst, int report, u_long ignflags)
 			info.rti_info[RTAX_GATEWAY] = newrt->rt_gateway;
 			if (newrt->rt_ifp != NULL) {
 				info.rti_info[RTAX_IFP] =
-				    TAILQ_FIRST(&newrt->rt_ifp->if_addrhead)->ifa_addr;
+				    ifaddr_byindex(newrt->rt_ifp->if_index)->ifa_addr;
 				info.rti_info[RTAX_IFA] = newrt->rt_ifa->ifa_addr;
 			}
 			rt_missmsg(RTM_ADD, &info, newrt->rt_flags, 0);
@@ -214,13 +229,14 @@ rtalloc1(struct sockaddr *dst, int report, u_long ignflags)
 void
 rtfree(struct rtentry *rt)
 {
-	/*
-	 * find the tree for that address family
-	 */
-	struct radix_node_head *rnh = rt_tables[rt_key(rt)->sa_family];
+	struct radix_node_head *rnh;
 
-	if (rt == 0 || rnh == 0)
-		panic("rtfree");
+	/* XXX the NULL checks are probably useless */
+	if (rt == NULL)
+		panic("rtfree: NULL rt");
+	rnh = rt_tables[rt_key(rt)->sa_family];
+	if (rnh == NULL)
+		panic("rtfree: NULL rnh");
 
 	RT_LOCK_ASSERT(rt);
 
@@ -282,15 +298,13 @@ rtfree(struct rtentry *rt)
 		 * and the rtentry itself of course
 		 */
 		RT_LOCK_DESTROY(rt);
-		Free(rt);
+		uma_zfree(rtzone, rt);
 		return;
 	}
 done:
 	RT_UNLOCK(rt);
 }
 
-/* compare two sockaddr structures */
-#define	sa_equal(a1, a2) (bcmp((a1), (a2), (a1)->sa_len) == 0)
 
 /*
  * Force a routing table entry to the specified
@@ -307,12 +321,12 @@ rtredirect(struct sockaddr *dst,
 {
 	struct rtentry *rt;
 	int error = 0;
-	short *stat = 0;
+	short *stat = NULL;
 	struct rt_addrinfo info;
 	struct ifaddr *ifa;
 
 	/* verify the gateway is directly reachable */
-	if ((ifa = ifa_ifwithnet(gateway)) == 0) {
+	if ((ifa = ifa_ifwithnet(gateway)) == NULL) {
 		error = ENETUNREACH;
 		goto out;
 	}
@@ -336,7 +350,7 @@ rtredirect(struct sockaddr *dst,
 	 * which use routing redirects generated by smart gateways
 	 * to dynamically build the routing tables.
 	 */
-	if (rt == 0 || (rt_mask(rt) && rt_mask(rt)->sa_len < 2))
+	if (rt == NULL || (rt_mask(rt) && rt_mask(rt)->sa_len < 2))
 		goto create;
 	/*
 	 * Don't listen to the redirect if it's
@@ -402,6 +416,13 @@ out:
 int
 rtioctl(u_long req, caddr_t data)
 {
+
+	/*
+	 * If more ioctl commands are added here, make sure the proper
+	 * super-user checks are being performed because it is possible for
+	 * prison-root to make it this far if raw sockets have been enabled
+	 * in jails.
+	 */
 #ifdef INET
 	/* Multicast goop, grrr... */
 	return mrt_ioctl ? mrt_ioctl(req, data) : EOPNOTSUPP;
@@ -423,11 +444,10 @@ ifa_ifwithroute(int flags, struct sockaddr *dst, struct sockaddr *gateway)
 		 * as our clue to the interface.  Otherwise
 		 * we can use the local address.
 		 */
-		ifa = 0;
-		if (flags & RTF_HOST) {
+		ifa = NULL;
+		if (flags & RTF_HOST)
 			ifa = ifa_ifwithdstaddr(dst);
-		}
-		if (ifa == 0)
+		if (ifa == NULL)
 			ifa = ifa_ifwithaddr(gateway);
 	} else {
 		/*
@@ -437,28 +457,28 @@ ifa_ifwithroute(int flags, struct sockaddr *dst, struct sockaddr *gateway)
 		 */
 		ifa = ifa_ifwithdstaddr(gateway);
 	}
-	if (ifa == 0)
+	if (ifa == NULL)
 		ifa = ifa_ifwithnet(gateway);
-	if (ifa == 0) {
+	if (ifa == NULL) {
 		struct rtentry *rt = rtalloc1(gateway, 0, 0UL);
-		if (rt == 0)
-			return (0);
+		if (rt == NULL)
+			return (NULL);
 		RT_REMREF(rt);
 		RT_UNLOCK(rt);
-		if ((ifa = rt->rt_ifa) == 0)
-			return (0);
+		if ((ifa = rt->rt_ifa) == NULL)
+			return (NULL);
 	}
 	if (ifa->ifa_addr->sa_family != dst->sa_family) {
 		struct ifaddr *oifa = ifa;
 		ifa = ifaof_ifpforaddr(dst, ifa->ifa_ifp);
-		if (ifa == 0)
+		if (ifa == NULL)
 			ifa = oifa;
 	}
 	return (ifa);
 }
 
-static int rt_fixdelete(struct radix_node *, void *);
-static int rt_fixchange(struct radix_node *, void *);
+static walktree_f_t rt_fixdelete;
+static walktree_f_t rt_fixchange;
 
 struct rtfc_arg {
 	struct rtentry *rt0;
@@ -559,7 +579,7 @@ rtexpunge(struct rtentry *rt)
 	 * Find the correct routing tree to use for this Address Family
 	 */
 	rnh = rt_tables[rt_key(rt)->sa_family];
-	if (rnh == 0)
+	if (rnh == NULL)
 		return (EAFNOSUPPORT);
 
 	RADIX_NODE_HEAD_LOCK(rnh);
@@ -569,13 +589,13 @@ rtexpunge(struct rtentry *rt)
 	 * but when callers invoke us blindly it may not (sigh).
 	 */
 	rn = rnh->rnh_deladdr(rt_key(rt), rt_mask(rt), rnh);
-	if (rn == 0) {
+	if (rn == NULL) {
 		error = ESRCH;
 		goto bad;
 	}
 	KASSERT((rn->rn_flags & (RNF_ACTIVE | RNF_ROOT)) == 0,
 		("unexpected flags 0x%x", rn->rn_flags));
-	KASSERT(rt == (struct rtentry *)rn,
+	KASSERT(rt == RNTORT(rn),
 		("lookup mismatch, rt %p rn %p", rt, rn));
 
 	rt->rt_flags &= ~RTF_UP;
@@ -594,9 +614,8 @@ rtexpunge(struct rtentry *rt)
 	 * we held its last reference.
 	 */
 	if (rt->rt_gwroute) {
-		struct rtentry *gwrt = rt->rt_gwroute;
-		RTFREE(gwrt);
-		rt->rt_gwroute = 0;
+		RTFREE(rt->rt_gwroute);
+		rt->rt_gwroute = NULL;
 	}
 
 	/*
@@ -638,7 +657,7 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 	 * Find the correct routing tree to use for this Address Family
 	 */
 	rnh = rt_tables[dst->sa_family];
-	if (rnh == 0)
+	if (rnh == NULL)
 		return (EAFNOSUPPORT);
 	RADIX_NODE_HEAD_LOCK(rnh);
 	/*
@@ -646,7 +665,7 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 	 * a netmask in the tree, nor do we want to clone it.
 	 */
 	if (flags & RTF_HOST) {
-		netmask = 0;
+		netmask = NULL;
 		flags &= ~RTF_CLONING;
 	}
 	switch (req) {
@@ -656,11 +675,11 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 		 * Complain if it is not there and do no more processing.
 		 */
 		rn = rnh->rnh_deladdr(dst, netmask, rnh);
-		if (rn == 0)
+		if (rn == NULL)
 			senderr(ESRCH);
 		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
 			panic ("rtrequest delete");
-		rt = (struct rtentry *)rn;
+		rt = RNTORT(rn);
 		RT_LOCK(rt);
 		RT_ADDREF(rt);
 		rt->rt_flags &= ~RTF_UP;
@@ -681,9 +700,8 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 		 * we held its last reference.
 		 */
 		if (rt->rt_gwroute) {
-			struct rtentry *gwrt = rt->rt_gwroute;
-			RTFREE(gwrt);
-			rt->rt_gwroute = 0;
+			RTFREE(rt->rt_gwroute);
+			rt->rt_gwroute = NULL;
 		}
 
 		/*
@@ -693,8 +711,9 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 			ifa->ifa_rtrequest(RTM_DELETE, rt, info);
 
 		/*
-		 * one more rtentry floating around that is not
-		 * linked to the routing table.
+		 * One more rtentry floating around that is not
+		 * linked to the routing table. rttrash will be decremented
+		 * when RTFREE(rt) is eventually called.
 		 */
 		rttrash++;
 
@@ -711,7 +730,7 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 		break;
 
 	case RTM_RESOLVE:
-		if (ret_nrt == 0 || (rt = *ret_nrt) == 0)
+		if (ret_nrt == NULL || (rt = *ret_nrt) == NULL)
 			senderr(EINVAL);
 		ifa = rt->rt_ifa;
 		/* XXX locking? */
@@ -719,7 +738,7 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 		    ~(RTF_CLONING | RTF_STATIC);
 		flags |= RTF_WASCLONED;
 		gateway = rt->rt_gateway;
-		if ((netmask = rt->rt_genmask) == 0)
+		if ((netmask = rt->rt_genmask) == NULL)
 			flags |= RTF_HOST;
 		goto makeroute;
 
@@ -732,8 +751,8 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 		ifa = info->rti_ifa;
 
 	makeroute:
-		R_Zalloc(rt, struct rtentry *, sizeof(*rt));
-		if (rt == 0)
+		rt = uma_zalloc(rtzone, M_NOWAIT | M_ZERO);
+		if (rt == NULL)
 			senderr(ENOBUFS);
 		RT_LOCK_INIT(rt);
 		rt->rt_flags = RTF_UP | flags;
@@ -744,7 +763,7 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 		RT_LOCK(rt);
 		if ((error = rt_setgate(rt, dst, gateway)) != 0) {
 			RT_LOCK_DESTROY(rt);
-			Free(rt);
+			uma_zfree(rtzone, rt);
 			senderr(error);
 		}
 
@@ -759,7 +778,7 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 		if (netmask) {
 			rt_maskedcopy(dst, ndst, netmask);
 		} else
-			Bcopy(dst, ndst, dst->sa_len);
+			bcopy(dst, ndst, dst->sa_len);
 
 		/*
 		 * Note that we now have a reference to the ifa.
@@ -772,7 +791,7 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 
 		/* XXX mtu manipulation will be done in rnh_addaddr -- itojun */
 		rn = rnh->rnh_addaddr(ndst, netmask, rnh, rt->rt_nodes);
-		if (rn == 0) {
+		if (rn == NULL) {
 			struct rtentry *rt2;
 			/*
 			 * Uh-oh, we already have one of these in the tree.
@@ -797,18 +816,18 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 		 * If it still failed to go into the tree,
 		 * then un-make it (this should be a function)
 		 */
-		if (rn == 0) {
+		if (rn == NULL) {
 			if (rt->rt_gwroute)
 				RTFREE(rt->rt_gwroute);
 			if (rt->rt_ifa)
 				IFAFREE(rt->rt_ifa);
 			Free(rt_key(rt));
 			RT_LOCK_DESTROY(rt);
-			Free(rt);
+			uma_zfree(rtzone, rt);
 			senderr(EEXIST);
 		}
 
-		rt->rt_parent = 0;
+		rt->rt_parent = NULL;
 
 		/*
 		 * If we got here from RESOLVE, then we are cloning
@@ -848,7 +867,7 @@ rtrequest1(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt)
 		 * hasn't been added to the tree yet.
 		 */
 		if (req == RTM_ADD &&
-		    !(rt->rt_flags & RTF_HOST) && rt_mask(rt) != 0) {
+		    !(rt->rt_flags & RTF_HOST) && rt_mask(rt) != NULL) {
 			struct rtfc_arg arg;
 			arg.rnh = rnh;
 			arg.rt0 = rt;
@@ -892,14 +911,13 @@ bad:
 static int
 rt_fixdelete(struct radix_node *rn, void *vp)
 {
-	struct rtentry *rt = (struct rtentry *)rn;
+	struct rtentry *rt = RNTORT(rn);
 	struct rtentry *rt0 = vp;
 
 	if (rt->rt_parent == rt0 &&
 	    !(rt->rt_flags & (RTF_PINNED | RTF_CLONING))) {
-		return rtrequest(RTM_DELETE, rt_key(rt),
-				 (struct sockaddr *)0, rt_mask(rt),
-				 rt->rt_flags, (struct rtentry **)0);
+		return rtrequest(RTM_DELETE, rt_key(rt), NULL, rt_mask(rt),
+				 rt->rt_flags, NULL);
 	}
 	return 0;
 }
@@ -917,42 +935,24 @@ rt_fixdelete(struct radix_node *rn, void *vp)
  * routine just for adds.  I'm not sure why I thought it was necessary to do
  * changes this way.
  */
-#ifdef DEBUG
-static int rtfcdebug = 0;
-#endif
 
 static int
 rt_fixchange(struct radix_node *rn, void *vp)
 {
-	struct rtentry *rt = (struct rtentry *)rn;
+	struct rtentry *rt = RNTORT(rn);
 	struct rtfc_arg *ap = vp;
 	struct rtentry *rt0 = ap->rt0;
 	struct radix_node_head *rnh = ap->rnh;
 	u_char *xk1, *xm1, *xk2, *xmp;
 	int i, len, mlen;
 
-#ifdef DEBUG
-	if (rtfcdebug)
-		printf("rt_fixchange: rt %p, rt0 %p\n", rt, rt0);
-#endif
-
+	/* make sure we have a parent, and route is not pinned or cloning */
 	if (!rt->rt_parent ||
-	    (rt->rt_flags & (RTF_PINNED | RTF_CLONING))) {
-#ifdef DEBUG
-		if(rtfcdebug) printf("no parent, pinned or cloning\n");
-#endif
+	    (rt->rt_flags & (RTF_PINNED | RTF_CLONING)))
 		return 0;
-	}
 
-	if (rt->rt_parent == rt0) {
-#ifdef DEBUG
-		if(rtfcdebug) printf("parent match\n");
-#endif
-		return rtrequest(RTM_DELETE, rt_key(rt),
-				 (struct sockaddr *)0, rt_mask(rt),
-				 rt->rt_flags, (struct rtentry **)0);
-	}
-
+	if (rt->rt_parent == rt0)	/* parent match */
+		goto delete_rt;
 	/*
 	 * There probably is a function somewhere which does this...
 	 * if not, there should be.
@@ -966,54 +966,31 @@ rt_fixchange(struct radix_node *rn, void *vp)
 	/* avoid applying a less specific route */
 	xmp = (u_char *)rt_mask(rt->rt_parent);
 	mlen = rt_key(rt->rt_parent)->sa_len;
-	if (mlen > rt_key(rt0)->sa_len) {
-#ifdef DEBUG
-		if (rtfcdebug)
-			printf("rt_fixchange: inserting a less "
-			       "specific route\n");
-#endif
+	if (mlen > rt_key(rt0)->sa_len)		/* less specific route */
 		return 0;
-	}
-	for (i = rnh->rnh_treetop->rn_offset; i < mlen; i++) {
-		if ((xmp[i] & ~(xmp[i] ^ xm1[i])) != xmp[i]) {
-#ifdef DEBUG
-			if (rtfcdebug)
-				printf("rt_fixchange: inserting a less "
-				       "specific route\n");
-#endif
-			return 0;
-		}
-	}
+	for (i = rnh->rnh_treetop->rn_offset; i < mlen; i++)
+		if ((xmp[i] & ~(xmp[i] ^ xm1[i])) != xmp[i])
+			return 0;	/* less specific route */
 
-	for (i = rnh->rnh_treetop->rn_offset; i < len; i++) {
-		if ((xk2[i] & xm1[i]) != xk1[i]) {
-#ifdef DEBUG
-			if(rtfcdebug) printf("no match\n");
-#endif
-			return 0;
-		}
-	}
+	for (i = rnh->rnh_treetop->rn_offset; i < len; i++)
+		if ((xk2[i] & xm1[i]) != xk1[i])
+			return 0;	/* no match */
 
 	/*
 	 * OK, this node is a clone, and matches the node currently being
 	 * changed/added under the node's mask.  So, get rid of it.
 	 */
-#ifdef DEBUG
-	if(rtfcdebug) printf("deleting\n");
-#endif
-	return rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
-			 rt_mask(rt), rt->rt_flags, (struct rtentry **)0);
+delete_rt:
+	return rtrequest(RTM_DELETE, rt_key(rt), NULL,
+			 rt_mask(rt), rt->rt_flags, NULL);
 }
-
-#define ROUNDUP(a) (a>0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 
 int
 rt_setgate(struct rtentry *rt, struct sockaddr *dst, struct sockaddr *gate)
 {
 	/* XXX dst may be overwritten, can we move this to below */
 	struct radix_node_head *rnh = rt_tables[dst->sa_family];
-	caddr_t new, old;
-	int dlen = ROUNDUP(dst->sa_len), glen = ROUNDUP(gate->sa_len);
+	int dlen = SA_SIZE(dst), glen = SA_SIZE(gate);
 
 	RT_LOCK_ASSERT(rt);
 
@@ -1036,39 +1013,35 @@ rt_setgate(struct rtentry *rt, struct sockaddr *dst, struct sockaddr *gate)
 	}
 
 	/*
-	 * Both dst and gateway are stored in the same malloc'd chunk
-	 * (If I ever get my hands on....)
-	 * if we need to malloc a new chunk, then keep the old one around
-	 * till we don't need it any more.
+	 * Prepare to store the gateway in rt->rt_gateway.
+	 * Both dst and gateway are stored one after the other in the same
+	 * malloc'd chunk. If we have room, we can reuse the old buffer,
+	 * rt_gateway already points to the right place.
+	 * Otherwise, malloc a new block and update the 'dst' address.
 	 */
-	if (rt->rt_gateway == 0 || glen > ROUNDUP(rt->rt_gateway->sa_len)) {
-		old = (caddr_t)rt_key(rt);
+	if (rt->rt_gateway == NULL || glen > SA_SIZE(rt->rt_gateway)) {
+		caddr_t new;
+
 		R_Malloc(new, caddr_t, dlen + glen);
-		if (new == 0)
+		if (new == NULL)
 			return ENOBUFS;
-		rt_key(rt) = new;
-	} else {
 		/*
-		 * otherwise just overwrite the old one
+		 * XXX note, we copy from *dst and not *rt_key(rt) because
+		 * rt_setgate() can be called to initialize a newly
+		 * allocated route entry, in which case rt_key(rt) == NULL
+		 * (and also rt->rt_gateway == NULL).
+		 * Free()/free() handle a NULL argument just fine.
 		 */
-		new = (caddr_t)rt_key(rt);
-		old = 0;
+		bcopy(dst, new, dlen);
+		Free(rt_key(rt));	/* free old block, if any */
+		rt_key(rt) = (struct sockaddr *)new;
+		rt->rt_gateway = (struct sockaddr *)(new + dlen);
 	}
 
 	/*
-	 * copy the new gateway value into the memory chunk
+	 * Copy the new gateway value into the memory chunk.
 	 */
-	Bcopy(gate, (rt->rt_gateway = (struct sockaddr *)(new + dlen)), glen);
-
-	/*
-	 * if we are replacing the chunk (or it's new) we need to
-	 * replace the dst as well
-	 */
-	if (old) {
-		Bcopy(dst, new, dlen);
-		Free(old);
-		old = 0;
-	}
+	bcopy(gate, rt->rt_gateway, glen);
 
 	/*
 	 * If there is already a gwroute, it's now almost definitly wrong
@@ -1090,11 +1063,15 @@ rt_setgate(struct rtentry *rt, struct sockaddr *dst, struct sockaddr *gate)
 	 * XXX: After removal of PRCLONING this is probably not needed anymore.
 	 */
 	if (rt->rt_flags & RTF_GATEWAY) {
-		/* XXX LOR here */
-		rt->rt_gwroute = rtalloc1(gate, 1, 0);
+		struct rtentry *gwrt;
+
+		RT_UNLOCK(rt);		/* XXX workaround LOR */
+		gwrt = rtalloc1(gate, 1, 0);
+		RT_LOCK(rt);
+		rt->rt_gwroute = gwrt;
 		if (rt->rt_gwroute == rt) {
 			RTFREE_LOCKED(rt->rt_gwroute);
-			rt->rt_gwroute = 0;
+			rt->rt_gwroute = NULL;
 			return EDQUOT; /* failure */
 		}
 		if (rt->rt_gwroute != NULL)
@@ -1111,8 +1088,7 @@ rt_setgate(struct rtentry *rt, struct sockaddr *dst, struct sockaddr *gate)
 
 		arg.rnh = rnh;
 		arg.rt0 = rt;
-		/* XXX workaround LOR */
-		RT_UNLOCK(rt);
+		RT_UNLOCK(rt);		/* XXX workaround LOR */
 		RADIX_NODE_HEAD_LOCK(rnh);
 		RT_LOCK(rt);
 		rnh->rnh_walktree_from(rnh, rt_key(rt), rt_mask(rt),
@@ -1149,16 +1125,12 @@ rt_maskedcopy(struct sockaddr *src, struct sockaddr *dst, struct sockaddr *netma
 int
 rtinit(struct ifaddr *ifa, int cmd, int flags)
 {
-	register struct rtentry *rt;
-	register struct sockaddr *dst;
-	register struct sockaddr *deldst;
+	struct sockaddr *dst;
 	struct sockaddr *netmask;
-	struct mbuf *m = 0;
-	struct rtentry *nrt = 0;
-	struct radix_node_head *rnh;
-	struct radix_node *rn;
-	int error;
+	struct mbuf *m = NULL;
+	struct rtentry *rt = NULL;
 	struct rt_addrinfo info;
+	int error;
 
 	if (flags & RTF_HOST) {
 		dst = ifa->ifa_dstaddr;
@@ -1173,6 +1145,10 @@ rtinit(struct ifaddr *ifa, int cmd, int flags)
 	 * be confusing at best and possibly worse.
 	 */
 	if (cmd == RTM_DELETE) {
+		struct sockaddr *deldst;
+		struct radix_node_head *rnh;
+		struct radix_node *rn;
+
 		/*
 		 * It's a delete, so it should already exist..
 		 * If it's a net, mask off the host bits
@@ -1195,8 +1171,8 @@ rtinit(struct ifaddr *ifa, int cmd, int flags)
 		RADIX_NODE_HEAD_LOCK(rnh);
 		error = ((rn = rnh->rnh_lookup(dst, netmask, rnh)) == NULL ||
 		    (rn->rn_flags & RNF_ROOT) ||
-		    ((struct rtentry *)rn)->rt_ifa != ifa ||
-		    !sa_equal(SA(rn->rn_key), dst));
+		    RNTORT(rn)->rt_ifa != ifa ||
+		    !sa_equal((struct sockaddr *)rn->rn_key, dst));
 		RADIX_NODE_HEAD_UNLOCK(rnh);
 		if (error) {
 bad:
@@ -1214,8 +1190,8 @@ bad:
 	info.rti_info[RTAX_DST] = dst;
 	info.rti_info[RTAX_GATEWAY] = ifa->ifa_addr;
 	info.rti_info[RTAX_NETMASK] = netmask;
-	error = rtrequest1(cmd, &info, &nrt);
-	if (error == 0 && (rt = nrt) != NULL) {
+	error = rtrequest1(cmd, &info, &rt);
+	if (error == 0 && rt != NULL) {
 		/*
 		 * notify any listening routing agents of the change
 		 */
@@ -1244,17 +1220,36 @@ bad:
 }
 
 /*
- * Validate the route rt0 to the specified destination.  If the
- * route is marked down try to find a new route.  If the route
+ * rt_check() is invoked on each layer 2 output path, prior to
+ * encapsulating outbound packets.
+ *
+ * The function is mostly used to find a routing entry for the gateway,
+ * which in some protocol families could also point to the link-level
+ * address for the gateway itself (the side effect of revalidating the
+ * route to the destination is rather pointless at this stage, we did it
+ * already a moment before in the pr_output() routine to locate the ifp
+ * and gateway to use).
+ *
+ * When we remove the layer-3 to layer-2 mapping tables from the
+ * routing table, this function can be removed.
+ *
+ * === On input ===
+ *   *dst is the address of the NEXT HOP (which coincides with the
+ *	final destination if directly reachable);
+ *   *lrt0 points to the cached route to the final destination;
+ *   *lrt is not meaningful;
+ *
+ * === Operation ===
+ * If the route is marked down try to find a new route.  If the route
  * to the gateway is gone, try to setup a new route.  Otherwise,
  * if the route is marked for packets to be rejected, enforce that.
  *
- * On return lrt contains the route to the destination and lrt0
- * contains the route to the next hop.  Their values are meaningul
- * ONLY if no error is returned.
+ * === On return ===
+ *   *dst is unchanged;
+ *   *lrt0 points to the (possibly new) route to the final destination
+ *   *lrt points to the route to the next hop
  *
- * This routine is invoked on each layer 2 output path, prior to
- * encapsulating outbound packets.
+ * Their values are meaningful ONLY if no error is returned.
  */
 int
 rt_check(struct rtentry **lrt, struct rtentry **lrt0, struct sockaddr *dst)
@@ -1281,7 +1276,7 @@ rt_check(struct rtentry **lrt, struct rtentry **lrt0, struct sockaddr *dst)
 		}
 		/* XXX BSD/OS checks dst->sa_family != AF_NS */
 		if (rt->rt_flags & RTF_GATEWAY) {
-			if (rt->rt_gwroute == 0)
+			if (rt->rt_gwroute == NULL)
 				goto lookup;
 			rt = rt->rt_gwroute;
 			RT_LOCK(rt);		/* NB: gwroute */
@@ -1293,7 +1288,7 @@ rt_check(struct rtentry **lrt, struct rtentry **lrt0, struct sockaddr *dst)
 				rt = rtalloc1(rt->rt_gateway, 1, 0UL);
 				RT_LOCK(rt0);
 				rt0->rt_gwroute = rt;
-				if (rt == 0) {
+				if (rt == NULL) {
 					RT_UNLOCK(rt0);
 					senderr(EHOSTUNREACH);
 				}

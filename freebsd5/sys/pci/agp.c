@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp.c,v 1.34 2003/11/11 21:49:18 anholt Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp.c,v 1.45 2004/08/16 12:25:48 obrien Exp $");
 
 #include "opt_bus.h"
 
@@ -33,12 +33,12 @@ __FBSDID("$FreeBSD: src/sys/pci/agp.c,v 1.34 2003/11/11 21:49:18 anholt Exp $");
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/ioccom.h>
 #include <sys/agpio.h>
 #include <sys/lock.h>
-#include <sys/lockmgr.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
@@ -63,7 +63,6 @@ MODULE_VERSION(agp, 1);
 
 MALLOC_DEFINE(M_AGP, "agp", "AGP data structures");
 
-#define CDEV_MAJOR	148
 				/* agp_drv.c */
 static d_open_t agp_open;
 static d_close_t agp_close;
@@ -71,13 +70,13 @@ static d_ioctl_t agp_ioctl;
 static d_mmap_t agp_mmap;
 
 static struct cdevsw agp_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	agp_open,
 	.d_close =	agp_close,
 	.d_ioctl =	agp_ioctl,
 	.d_mmap =	agp_mmap,
 	.d_name =	"agp",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_TTY,
 };
 
 static devclass_t agp_devclass;
@@ -88,7 +87,7 @@ static devclass_t agp_devclass;
 void
 agp_flush_cache()
 {
-#ifdef __i386__
+#if defined(__i386__) || defined(__amd64__)
 	wbinvd();
 #endif
 #ifdef __alpha__
@@ -231,8 +230,8 @@ agp_generic_attach(device_t dev)
 	 * Find and map the aperture.
 	 */
 	rid = AGP_APBASE;
-	sc->as_aperture = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-					     0, ~0, 1, RF_ACTIVE);
+	sc->as_aperture = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+						 RF_ACTIVE);
 	if (!sc->as_aperture)
 		return ENOMEM;
 
@@ -252,7 +251,7 @@ agp_generic_attach(device_t dev)
 	 * The lock is used to prevent re-entry to
 	 * agp_generic_bind_memory() since that function can sleep.
 	 */
-	lockinit(&sc->as_lock, PZERO|PCATCH, "agplk", 0, 0);
+	mtx_init(&sc->as_lock, "agp lock", NULL, MTX_DEF);
 
 	/*
 	 * Initialise stuff for the userland device.
@@ -276,8 +275,7 @@ agp_generic_detach(device_t dev)
 {
 	struct agp_softc *sc = device_get_softc(dev);
 	bus_release_resource(dev, SYS_RES_MEMORY, AGP_APBASE, sc->as_aperture);
-	lockmgr(&sc->as_lock, LK_DRAIN, 0, curthread);
-	lockdestroy(&sc->as_lock);
+	mtx_destroy(&sc->as_lock);
 	destroy_dev(sc->as_devnode);
 	agp_flush_cache();
 	return 0;
@@ -490,28 +488,18 @@ agp_generic_bind_memory(device_t dev, struct agp_memory *mem,
 	vm_page_t m;
 	int error;
 
-	lockmgr(&sc->as_lock, LK_EXCLUSIVE, 0, curthread);
-
-	if (mem->am_is_bound) {
-		device_printf(dev, "memory already bound\n");
-		return EINVAL;
-	}
-	
-	if (offset < 0
-	    || (offset & (AGP_PAGE_SIZE - 1)) != 0
-	    || offset + mem->am_size > AGP_GET_APERTURE(dev)) {
+	/* Do some sanity checks first. */
+	if (offset < 0 || (offset & (AGP_PAGE_SIZE - 1)) != 0 ||
+	    offset + mem->am_size > AGP_GET_APERTURE(dev)) {
 		device_printf(dev, "binding memory at bad offset %#x\n",
-			      (int) offset);
+		    (int)offset);
 		return EINVAL;
 	}
 
 	/*
-	 * Bind the individual pages and flush the chipset's
-	 * TLB.
-	 *
-	 * XXX Presumably, this needs to be the pci address on alpha
-	 * (i.e. use alpha_XXX_dmamap()). I don't have access to any
-	 * alpha AGP hardware to check.
+	 * Allocate the pages early, before acquiring the lock,
+	 * because vm_page_grab() used with VM_ALLOC_RETRY may
+	 * block and we can't hold a mutex while blocking.
 	 */
 	for (i = 0; i < mem->am_size; i += PAGE_SIZE) {
 		/*
@@ -525,9 +513,29 @@ agp_generic_bind_memory(device_t dev, struct agp_memory *mem,
 		m = vm_page_grab(mem->am_obj, OFF_TO_IDX(i),
 		    VM_ALLOC_WIRED | VM_ALLOC_ZERO | VM_ALLOC_RETRY);
 		VM_OBJECT_UNLOCK(mem->am_obj);
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
 		AGP_DPF("found page pa=%#x\n", VM_PAGE_TO_PHYS(m));
+	}
+
+	mtx_lock(&sc->as_lock);
+
+	if (mem->am_is_bound) {
+		device_printf(dev, "memory already bound\n");
+		error = EINVAL;
+		goto bad;
+	}
+	
+	/*
+	 * Bind the individual pages and flush the chipset's
+	 * TLB.
+	 *
+	 * XXX Presumably, this needs to be the pci address on alpha
+	 * (i.e. use alpha_XXX_dmamap()). I don't have access to any
+	 * alpha AGP hardware to check.
+	 */
+	for (i = 0; i < mem->am_size; i += PAGE_SIZE) {
+		VM_OBJECT_LOCK(mem->am_obj);
+		m = vm_page_lookup(mem->am_obj, OFF_TO_IDX(i));
+		VM_OBJECT_UNLOCK(mem->am_obj);
 
 		/*
 		 * Install entries in the GATT, making sure that if
@@ -551,17 +559,7 @@ agp_generic_bind_memory(device_t dev, struct agp_memory *mem,
 				vm_page_unlock_queues();
 				for (k = 0; k < i + j; k += AGP_PAGE_SIZE)
 					AGP_UNBIND_PAGE(dev, offset + k);
-				VM_OBJECT_LOCK(mem->am_obj);
-				for (k = 0; k <= i; k += PAGE_SIZE) {
-					m = vm_page_lookup(mem->am_obj,
-							   OFF_TO_IDX(k));
-					vm_page_lock_queues();
-					vm_page_unwire(m, 0);
-					vm_page_unlock_queues();
-				}
-				VM_OBJECT_UNLOCK(mem->am_obj);
-				lockmgr(&sc->as_lock, LK_RELEASE, 0, curthread);
-				return error;
+				goto bad;
 			}
 		}
 		vm_page_lock_queues();
@@ -583,9 +581,21 @@ agp_generic_bind_memory(device_t dev, struct agp_memory *mem,
 	mem->am_offset = offset;
 	mem->am_is_bound = 1;
 
-	lockmgr(&sc->as_lock, LK_RELEASE, 0, curthread);
+	mtx_unlock(&sc->as_lock);
 
 	return 0;
+bad:
+	mtx_unlock(&sc->as_lock);
+	VM_OBJECT_LOCK(mem->am_obj);
+	for (i = 0; i < mem->am_size; i += PAGE_SIZE) {
+		m = vm_page_lookup(mem->am_obj, OFF_TO_IDX(i));
+		vm_page_lock_queues();
+		vm_page_unwire(m, 0);
+		vm_page_unlock_queues();
+	}
+	VM_OBJECT_UNLOCK(mem->am_obj);
+
+	return error;
 }
 
 int
@@ -595,10 +605,11 @@ agp_generic_unbind_memory(device_t dev, struct agp_memory *mem)
 	vm_page_t m;
 	int i;
 
-	lockmgr(&sc->as_lock, LK_EXCLUSIVE, 0, curthread);
+	mtx_lock(&sc->as_lock);
 
 	if (!mem->am_is_bound) {
 		device_printf(dev, "memory is not bound\n");
+		mtx_unlock(&sc->as_lock);
 		return EINVAL;
 	}
 
@@ -624,7 +635,7 @@ agp_generic_unbind_memory(device_t dev, struct agp_memory *mem)
 	mem->am_offset = 0;
 	mem->am_is_bound = 0;
 
-	lockmgr(&sc->as_lock, LK_RELEASE, 0, curthread);
+	mtx_unlock(&sc->as_lock);
 
 	return 0;
 }
@@ -751,7 +762,7 @@ agp_unbind_user(device_t dev, agp_unbind *unbind)
 }
 
 static int
-agp_open(dev_t kdev, int oflags, int devtype, struct thread *td)
+agp_open(struct cdev *kdev, int oflags, int devtype, struct thread *td)
 {
 	device_t dev = KDEV2DEV(kdev);
 	struct agp_softc *sc = device_get_softc(dev);
@@ -765,7 +776,7 @@ agp_open(dev_t kdev, int oflags, int devtype, struct thread *td)
 }
 
 static int
-agp_close(dev_t kdev, int fflag, int devtype, struct thread *td)
+agp_close(struct cdev *kdev, int fflag, int devtype, struct thread *td)
 {
 	device_t dev = KDEV2DEV(kdev);
 	struct agp_softc *sc = device_get_softc(dev);
@@ -788,7 +799,7 @@ agp_close(dev_t kdev, int fflag, int devtype, struct thread *td)
 }
 
 static int
-agp_ioctl(dev_t kdev, u_long cmd, caddr_t data, int fflag, struct thread *td)
+agp_ioctl(struct cdev *kdev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 {
 	device_t dev = KDEV2DEV(kdev);
 
@@ -823,7 +834,7 @@ agp_ioctl(dev_t kdev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 }
 
 static int
-agp_mmap(dev_t kdev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
+agp_mmap(struct cdev *kdev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
 	device_t dev = KDEV2DEV(kdev);
 	struct agp_softc *sc = device_get_softc(dev);

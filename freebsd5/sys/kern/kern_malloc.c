@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,12 +30,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_malloc.c,v 1.130 2003/09/19 04:39:08 jeff Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_malloc.c,v 1.135.2.1 2004/10/03 23:44:31 des Exp $");
 
 #include "opt_vm.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -133,6 +130,16 @@ struct {
 };
 
 u_int vm_kmem_size;
+SYSCTL_UINT(_vm, OID_AUTO, kmem_size, CTLFLAG_RD, &vm_kmem_size, 0,
+    "Size of kernel memory");
+
+u_int vm_kmem_size_max;
+SYSCTL_UINT(_vm, OID_AUTO, kmem_size_max, CTLFLAG_RD, &vm_kmem_size_max, 0,
+    "Maximum size of kernel memory");
+
+u_int vm_kmem_size_scale;
+SYSCTL_UINT(_vm, OID_AUTO, kmem_size_scale, CTLFLAG_RD, &vm_kmem_size_scale, 0,
+    "Scale factor for kernel memory size");
 
 /*
  * The malloc_mtx protects the kmemstatistics linked list.
@@ -177,6 +184,47 @@ malloc_last_fail(void)
 }
 
 /*
+ * Add this to the informational malloc_type bucket.
+ */
+static void
+malloc_type_zone_allocated(struct malloc_type *ksp, unsigned long size,
+    int zindx)
+{
+	mtx_lock(&ksp->ks_mtx);
+	ksp->ks_calls++;
+	if (zindx != -1)
+		ksp->ks_size |= 1 << zindx;
+	if (size != 0) {
+		ksp->ks_memuse += size;
+		ksp->ks_inuse++;
+		if (ksp->ks_memuse > ksp->ks_maxused)
+			ksp->ks_maxused = ksp->ks_memuse;
+	}
+	mtx_unlock(&ksp->ks_mtx);
+}
+
+void
+malloc_type_allocated(struct malloc_type *ksp, unsigned long size)
+{
+	malloc_type_zone_allocated(ksp, size, -1);
+}
+
+/*
+ * Remove this allocation from the informational malloc_type bucket.
+ */
+void
+malloc_type_freed(struct malloc_type *ksp, unsigned long size)
+{
+	mtx_lock(&ksp->ks_mtx);
+	KASSERT(size <= ksp->ks_memuse,
+		("malloc(9)/free(9) confusion.\n%s",
+		 "Probably freeing with wrong type, but maybe not here."));
+	ksp->ks_memuse -= size;
+	ksp->ks_inuse--;
+	mtx_unlock(&ksp->ks_mtx);
+}
+
+/*
  *	malloc:
  *
  *	Allocate a block of memory.
@@ -193,10 +241,10 @@ malloc(size, type, flags)
 	int indx;
 	caddr_t va;
 	uma_zone_t zone;
+	uma_keg_t keg;
 #ifdef DIAGNOSTIC
 	unsigned long osize = size;
 #endif
-	register struct malloc_type *ksp = type;
 
 #ifdef INVARIANTS
 	/*
@@ -209,7 +257,7 @@ malloc(size, type, flags)
 		static	int curerr, once;
 		if (once == 0 && ppsratecheck(&lasterr, &curerr, 1)) {
 			printf("Bad malloc flags: %x\n", indx);
-			backtrace();
+			kdb_backtrace();
 			flags |= M_WAITOK;
 			once++;
 		}
@@ -217,7 +265,7 @@ malloc(size, type, flags)
 #endif
 #if 0
 	if (size == 0)
-		Debugger("zero size malloc");
+		kdb_enter("zero size malloc");
 #endif
 #ifdef MALLOC_MAKE_FAILURES
 	if ((flags & M_NOWAIT) && (malloc_failure_rate != 0)) {
@@ -237,32 +285,21 @@ malloc(size, type, flags)
 			size = (size & ~KMEM_ZMASK) + KMEM_ZBASE;
 		indx = kmemsize[size >> KMEM_ZSHIFT];
 		zone = kmemzones[indx].kz_zone;
+		keg = zone->uz_keg;
 #ifdef MALLOC_PROFILE
 		krequests[size >> KMEM_ZSHIFT]++;
 #endif
 		va = uma_zalloc(zone, flags);
-		mtx_lock(&ksp->ks_mtx);
-		if (va == NULL) 
-			goto out;
-
-		ksp->ks_size |= 1 << indx;
-		size = zone->uz_size;
+		if (va != NULL)
+			size = keg->uk_size;
+		malloc_type_zone_allocated(type, va == NULL ? 0 : size, indx);
 	} else {
 		size = roundup(size, PAGE_SIZE);
 		zone = NULL;
+		keg = NULL;
 		va = uma_large_malloc(size, flags);
-		mtx_lock(&ksp->ks_mtx);
-		if (va == NULL)
-			goto out;
+		malloc_type_allocated(type, va == NULL ? 0 : size);
 	}
-	ksp->ks_memuse += size;
-	ksp->ks_inuse++;
-out:
-	ksp->ks_calls++;
-	if (ksp->ks_memuse > ksp->ks_maxused)
-		ksp->ks_maxused = ksp->ks_memuse;
-
-	mtx_unlock(&ksp->ks_mtx);
 	if (flags & M_WAITOK)
 		KASSERT(va != NULL, ("malloc(M_WAITOK) returned NULL"));
 	else if (va == NULL)
@@ -287,7 +324,6 @@ free(addr, type)
 	void *addr;
 	struct malloc_type *type;
 {
-	register struct malloc_type *ksp = type;
 	uma_slab_t slab;
 	u_long size;
 
@@ -295,7 +331,7 @@ free(addr, type)
 	if (addr == NULL)
 		return;
 
-	KASSERT(ksp->ks_memuse > 0,
+	KASSERT(type->ks_memuse > 0,
 		("malloc(9)/free(9) confusion.\n%s",
 		 "Probably freeing with wrong type, but maybe not here."));
 	size = 0;
@@ -311,7 +347,7 @@ free(addr, type)
 #ifdef INVARIANTS
 		struct malloc_type **mtp = addr;
 #endif
-		size = slab->us_zone->uz_size;
+		size = slab->us_keg->uk_size;
 #ifdef INVARIANTS
 		/*
 		 * Cache a pointer to the malloc_type that most recently freed
@@ -327,18 +363,12 @@ free(addr, type)
 		    sizeof(struct malloc_type *);
 		*mtp = type;
 #endif
-		uma_zfree_arg(slab->us_zone, addr, slab);
+		uma_zfree_arg(LIST_FIRST(&slab->us_keg->uk_zones), addr, slab);
 	} else {
 		size = slab->us_size;
 		uma_large_free(slab);
 	}
-	mtx_lock(&ksp->ks_mtx);
-	KASSERT(size <= ksp->ks_memuse,
-		("malloc(9)/free(9) confusion.\n%s",
-		 "Probably freeing with wrong type, but maybe not here."));
-	ksp->ks_memuse -= size;
-	ksp->ks_inuse--;
-	mtx_unlock(&ksp->ks_mtx);
+	malloc_type_freed(type, size);
 }
 
 /*
@@ -366,8 +396,8 @@ realloc(addr, size, type, flags)
 	    ("realloc: address %p out of range", (void *)addr));
 
 	/* Get the size of the original block */
-	if (slab->us_zone)
-		alloc = slab->us_zone->uz_size;
+	if (slab->us_keg)
+		alloc = slab->us_keg->uk_size;
 	else
 		alloc = slab->us_size;
 
@@ -412,7 +442,6 @@ kmeminit(dummy)
 	void *dummy;
 {
 	u_int8_t indx;
-	u_long npg;
 	u_long mem_size;
 	int i;
  
@@ -430,21 +459,30 @@ kmeminit(dummy)
 	 * Note that the kmem_map is also used by the zone allocator,
 	 * so make sure that there is enough space.
 	 */
-	vm_kmem_size = VM_KMEM_SIZE;
+	vm_kmem_size = VM_KMEM_SIZE + nmbclusters * PAGE_SIZE;
 	mem_size = cnt.v_page_count;
 
 #if defined(VM_KMEM_SIZE_SCALE)
-	if ((mem_size / VM_KMEM_SIZE_SCALE) > (vm_kmem_size / PAGE_SIZE))
-		vm_kmem_size = (mem_size / VM_KMEM_SIZE_SCALE) * PAGE_SIZE;
+	vm_kmem_size_scale = VM_KMEM_SIZE_SCALE;
 #endif
+	TUNABLE_INT_FETCH("vm.kmem_size_scale", &vm_kmem_size_scale);
+	if (vm_kmem_size_scale > 0 &&
+	    (mem_size / vm_kmem_size_scale) > (vm_kmem_size / PAGE_SIZE))
+		vm_kmem_size = (mem_size / vm_kmem_size_scale) * PAGE_SIZE;
 
 #if defined(VM_KMEM_SIZE_MAX)
-	if (vm_kmem_size >= VM_KMEM_SIZE_MAX)
-		vm_kmem_size = VM_KMEM_SIZE_MAX;
+	vm_kmem_size_max = VM_KMEM_SIZE_MAX;
 #endif
+	TUNABLE_INT_FETCH("vm.kmem_size_max", &vm_kmem_size_max);
+	if (vm_kmem_size_max > 0 && vm_kmem_size >= vm_kmem_size_max)
+		vm_kmem_size = vm_kmem_size_max;
 
 	/* Allow final override from the kernel environment */
-	TUNABLE_INT_FETCH("kern.vm.kmem.size", &vm_kmem_size);
+#ifndef BURN_BRIDGES
+	if (TUNABLE_INT_FETCH("kern.vm.kmem.size", &vm_kmem_size) != 0)
+		printf("kern.vm.kmem.size is now called vm.kmem_size!\n");
+#endif
+	TUNABLE_INT_FETCH("vm.kmem_size", &vm_kmem_size);
 
 	/*
 	 * Limit kmem virtual size to twice the physical memory.
@@ -460,17 +498,8 @@ kmeminit(dummy)
 	 */
 	init_param3(vm_kmem_size / PAGE_SIZE);
 
-	/*
-	 * In mbuf_init(), we set up submaps for mbufs and clusters, in which
-	 * case we rounddown() (nmbufs * MSIZE) and (nmbclusters * MCLBYTES),
-	 * respectively. Mathematically, this means that what we do here may
-	 * amount to slightly more address space than we need for the submaps,
-	 * but it never hurts to have an extra page in kmem_map.
-	 */
-	npg = (nmbufs*MSIZE + nmbclusters*MCLBYTES + vm_kmem_size) / PAGE_SIZE; 
-
 	kmem_map = kmem_suballoc(kernel_map, (vm_offset_t *)&kmembase,
-		(vm_offset_t *)&kmemlimit, (vm_size_t)(npg * PAGE_SIZE));
+		(vm_offset_t *)&kmemlimit, vm_kmem_size);
 	kmem_map->system_map = 1;
 
 	uma_startup2();

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_pc98.c,v 1.43 2003/09/01 20:45:32 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_pc98.c,v 1.47 2004/08/08 07:57:51 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -62,7 +62,7 @@ g_pc98_print(int i, struct pc98_partition *dp)
 	strncpy(sname, dp->dp_name, 16);
 	sname[16] = '\0';
 
-	g_hexdump(dp, sizeof(dp[0]));
+	hexdump(dp, sizeof(dp[0]), NULL, 0);
 	printf("[%d] mid:%d(0x%x) sid:%d(0x%x)",
 	       i, dp->dp_mid, dp->dp_mid, dp->dp_sid, dp->dp_sid);
 	printf(" s:%d/%d/%d", dp->dp_scyl, dp->dp_shd, dp->dp_ssect);
@@ -238,8 +238,6 @@ g_pc98_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	if (gp == NULL)
 		return (NULL);
 	g_topology_unlock();
-	gp->dumpconf = g_pc98_dumpconf;
-	gp->ioctl = g_pc98_ioctl;
 	do {
 		if (gp->rank != 2 && flags == G_TF_NORMAL)
 			break;
@@ -273,7 +271,7 @@ g_pc98_taste(struct g_class *mp, struct g_provider *pp, int flags)
 		break;
 	} while (0);
 	g_topology_lock();
-	g_access_rel(cp, -1, 0, 0);
+	g_access(cp, -1, 0, 0);
 	if (LIST_EMPTY(&gp->provider)) {
 		g_slice_spoiled(cp);
 		return (NULL);
@@ -283,7 +281,10 @@ g_pc98_taste(struct g_class *mp, struct g_provider *pp, int flags)
 
 static struct g_class g_pc98_class = {
 	.name = PC98_CLASS_NAME,
+	.version = G_VERSION,
 	.taste = g_pc98_taste,
+	.dumpconf = g_pc98_dumpconf,
+	.ioctl = g_pc98_ioctl,
 };
 
 DECLARE_GEOM_CLASS(g_pc98_class, g_pc98);

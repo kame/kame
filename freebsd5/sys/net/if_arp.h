@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_arp.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_arp.h,v 1.17 2003/03/21 17:53:15 mdodd Exp $
+ * $FreeBSD: src/sys/net/if_arp.h,v 1.20 2004/06/13 10:54:35 dfr Exp $
  */
 
 #ifndef _NET_IF_ARP_H_
@@ -53,6 +49,7 @@ struct	arphdr {
 #define ARPHRD_IEEE802	6	/* token-ring hardware format */
 #define ARPHRD_ARCNET	7	/* arcnet hardware format */
 #define ARPHRD_FRELAY 	15	/* frame relay hardware format */
+#define ARPHRD_IEEE1394	24	/* firewire hardware format */
 	u_short	ar_pro;		/* format of protocol address */
 	u_char	ar_hln;		/* length of hardware address */
 	u_char	ar_pln;		/* length of protocol address */
@@ -104,6 +101,8 @@ struct arpreq {
  * Structure shared between the ethernet driver modules and
  * the address resolution code.  For example, each ec_softc or il_softc
  * begins with this structure.
+ * The code is written so that each *_softc _must_ begin with a
+ * struct arpcom, which in turn _must_ begin with a struct ifnet.
  */
 struct	arpcom {
 	/*
@@ -111,9 +110,11 @@ struct	arpcom {
 	 */
 	struct 	ifnet ac_if;		/* network-visible interface */
 	u_char	ac_enaddr[6];		/* ethernet hardware address */
-	int	ac_multicnt;		/* length of ac_multiaddrs list */
+	int	now_unused;	/* XXX was length of ac_multiaddrs list */
 	void	*ac_netgraph;		/* ng_ether(4) netgraph node info */
 };
+#define IFP2AC(ifp) ((struct arpcom *)(ifp))
+
 #endif
 
 #endif /* !_NET_IF_ARP_H_ */

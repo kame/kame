@@ -16,10 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_extern.h	8.3 (Berkeley) 4/16/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_extern.h,v 1.29 2002/05/18 22:18:17 iedowse Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_extern.h,v 1.31 2004/06/16 09:47:06 phk Exp $
  */
 
 #ifndef _SYS_GNU_EXT2FS_EXT2_EXTERN_H_
@@ -63,11 +59,11 @@ void	ext2_dirbad(struct inode *ip, doff_t offset, char *how);
 void	ext2_ei2i(struct ext2_inode *, struct inode *);
 int	ext2_getlbns(struct vnode *, int32_t, struct indir *, int *);
 void	ext2_i2ei(struct inode *, struct ext2_inode *);
-int	ext2_ihashget(dev_t, ino_t, int, struct vnode **);
+int	ext2_ihashget(struct cdev *, ino_t, int, struct vnode **);
 void	ext2_ihashinit(void);
 void	ext2_ihashins(struct inode *);
 struct vnode *
-	ext2_ihashlookup(dev_t, ino_t);
+	ext2_ihashlookup(struct cdev *, ino_t);
 void	ext2_ihashrem(struct inode *);
 void	ext2_ihashuninit(void);
 void	ext2_itimes(struct vnode *vp);

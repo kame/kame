@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
+ * Copyright (c) 1999-2002 Robert N. M. Watson
+ * Copyright (c) 2001-2004 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_test/mac_test.c,v 1.38 2003/12/06 21:48:02 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_test/mac_test.c,v 1.48 2004/07/10 21:47:53 marcel Exp $
  */
 
 /*
@@ -43,6 +43,7 @@
 #include <sys/param.h>
 #include <sys/acl.h>
 #include <sys/conf.h>
+#include <sys/kdb.h>
 #include <sys/extattr.h>
 #include <sys/kernel.h>
 #include <sys/mac.h>
@@ -104,8 +105,9 @@ SYSCTL_INT(_security_mac_test, OID_AUTO, enabled, CTLFLAG_RW,
 	SLOT(x) == 0, ("%s: Bad INPCB label", __func__ ))
 #define	ASSERT_IPQ_LABEL(x)	KASSERT(SLOT(x) == IPQMAGIC ||	\
 	SLOT(x) == 0, ("%s: Bad IPQ label", __func__ ))
-#define	ASSERT_MBUF_LABEL(x)	KASSERT(SLOT(x) == MBUFMAGIC ||		\
-	SLOT(x) == 0, ("%s: Bad MBUF label", __func__ ))
+#define	ASSERT_MBUF_LABEL(x)	KASSERT(x == NULL ||			\
+	SLOT(x) == MBUFMAGIC ||	SLOT(x) == 0,				\
+	("%s: Bad MBUF label", __func__ ))
 #define	ASSERT_MOUNT_LABEL(x)	KASSERT(SLOT(x) == MOUNTMAGIC ||	\
 	SLOT(x) == 0, ("%s: Bad MOUNT label", __func__ ))
 #define	ASSERT_SOCKET_LABEL(x)	KASSERT(SLOT(x) == SOCKETMAGIC ||	\
@@ -394,9 +396,9 @@ mac_test_destroy_bpfdesc_label(struct label *label)
 		atomic_add_int(&destroy_count_bpfdesc, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_bpfdesc: dup destroy");
+		kdb_enter("mac_test_destroy_bpfdesc: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_bpfdesc: corrupted label");
+		kdb_enter("mac_test_destroy_bpfdesc: corrupted label");
 	}
 }
 
@@ -408,9 +410,9 @@ mac_test_destroy_cred_label(struct label *label)
 		atomic_add_int(&destroy_count_cred, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_cred: dup destroy");
+		kdb_enter("mac_test_destroy_cred: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_cred: corrupted label");
+		kdb_enter("mac_test_destroy_cred: corrupted label");
 	}
 }
 
@@ -422,9 +424,9 @@ mac_test_destroy_devfsdirent_label(struct label *label)
 		atomic_add_int(&destroy_count_devfsdirent, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_devfsdirent: dup destroy");
+		kdb_enter("mac_test_destroy_devfsdirent: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_devfsdirent: corrupted label");
+		kdb_enter("mac_test_destroy_devfsdirent: corrupted label");
 	}
 }
 
@@ -436,9 +438,9 @@ mac_test_destroy_ifnet_label(struct label *label)
 		atomic_add_int(&destroy_count_ifnet, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_ifnet: dup destroy");
+		kdb_enter("mac_test_destroy_ifnet: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_ifnet: corrupted label");
+		kdb_enter("mac_test_destroy_ifnet: corrupted label");
 	}
 }
 
@@ -450,9 +452,9 @@ mac_test_destroy_inpcb_label(struct label *label)
 		atomic_add_int(&destroy_count_inpcb, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_inpcb: dup destroy");
+		kdb_enter("mac_test_destroy_inpcb: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_inpcb: corrupted label");
+		kdb_enter("mac_test_destroy_inpcb: corrupted label");
 	}
 }
 
@@ -464,9 +466,9 @@ mac_test_destroy_ipq_label(struct label *label)
 		atomic_add_int(&destroy_count_ipq, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_ipq: dup destroy");
+		kdb_enter("mac_test_destroy_ipq: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_ipq: corrupted label");
+		kdb_enter("mac_test_destroy_ipq: corrupted label");
 	}
 }
 
@@ -486,9 +488,9 @@ mac_test_destroy_mbuf_label(struct label *label)
 		atomic_add_int(&destroy_count_mbuf, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_mbuf: dup destroy");
+		kdb_enter("mac_test_destroy_mbuf: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_mbuf: corrupted label");
+		kdb_enter("mac_test_destroy_mbuf: corrupted label");
 	}
 }
 
@@ -500,9 +502,9 @@ mac_test_destroy_mount_label(struct label *label)
 		atomic_add_int(&destroy_count_mount, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_mount: dup destroy");
+		kdb_enter("mac_test_destroy_mount: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_mount: corrupted label");
+		kdb_enter("mac_test_destroy_mount: corrupted label");
 	}
 }
 
@@ -514,9 +516,9 @@ mac_test_destroy_mount_fs_label(struct label *label)
 		atomic_add_int(&destroy_count_mount_fslabel, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_mount_fslabel: dup destroy");
+		kdb_enter("mac_test_destroy_mount_fslabel: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_mount_fslabel: corrupted label");
+		kdb_enter("mac_test_destroy_mount_fslabel: corrupted label");
 	}
 }
 
@@ -528,9 +530,9 @@ mac_test_destroy_socket_label(struct label *label)
 		atomic_add_int(&destroy_count_socket, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_socket: dup destroy");
+		kdb_enter("mac_test_destroy_socket: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_socket: corrupted label");
+		kdb_enter("mac_test_destroy_socket: corrupted label");
 	}
 }
 
@@ -542,9 +544,9 @@ mac_test_destroy_socket_peer_label(struct label *label)
 		atomic_add_int(&destroy_count_socket_peerlabel, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_socket_peerlabel: dup destroy");
+		kdb_enter("mac_test_destroy_socket_peerlabel: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_socket_peerlabel: corrupted label");
+		kdb_enter("mac_test_destroy_socket_peerlabel: corrupted label");
 	}
 }
 
@@ -556,9 +558,9 @@ mac_test_destroy_pipe_label(struct label *label)
 		atomic_add_int(&destroy_count_pipe, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_pipe: dup destroy");
+		kdb_enter("mac_test_destroy_pipe: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_pipe: corrupted label");
+		kdb_enter("mac_test_destroy_pipe: corrupted label");
 	}
 }
 
@@ -570,9 +572,9 @@ mac_test_destroy_proc_label(struct label *label)
 		atomic_add_int(&destroy_count_proc, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_proc: dup destroy");
+		kdb_enter("mac_test_destroy_proc: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_proc: corrupted label");
+		kdb_enter("mac_test_destroy_proc: corrupted label");
 	}
 }
 
@@ -584,9 +586,9 @@ mac_test_destroy_vnode_label(struct label *label)
 		atomic_add_int(&destroy_count_vnode, 1);
 		SLOT(label) = EXMAGIC;
 	} else if (SLOT(label) == EXMAGIC) {
-		Debugger("mac_test_destroy_vnode: dup destroy");
+		kdb_enter("mac_test_destroy_vnode: dup destroy");
 	} else {
-		Debugger("mac_test_destroy_vnode: corrupted label");
+		kdb_enter("mac_test_destroy_vnode: corrupted label");
 	}
 }
 
@@ -596,6 +598,14 @@ mac_test_copy_cred_label(struct label *src, struct label *dest)
 
 	ASSERT_CRED_LABEL(src);
 	ASSERT_CRED_LABEL(dest);
+}
+
+static void
+mac_test_copy_ifnet_label(struct label *src, struct label *dest)
+{
+
+	ASSERT_IFNET_LABEL(src);
+	ASSERT_IFNET_LABEL(dest);
 }
 
 static void
@@ -691,7 +701,7 @@ mac_test_associate_vnode_singlelabel(struct mount *mp,
 }
 
 static void
-mac_test_create_devfs_device(struct mount *mp, dev_t dev,
+mac_test_create_devfs_device(struct mount *mp, struct cdev *dev,
     struct devfs_dirent *devfs_dirent, struct label *label)
 {
 
@@ -803,7 +813,7 @@ mac_test_create_socket(struct ucred *cred, struct socket *socket,
 }
 
 static void
-mac_test_create_pipe(struct ucred *cred, struct pipe *pipe,
+mac_test_create_pipe(struct ucred *cred, struct pipepair *pp,
    struct label *pipelabel)
 {
 
@@ -831,7 +841,7 @@ mac_test_relabel_socket(struct ucred *cred, struct socket *socket,
 }
 
 static void
-mac_test_relabel_pipe(struct ucred *cred, struct pipe *pipe,
+mac_test_relabel_pipe(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel, struct label *newlabel)
 {
 
@@ -912,6 +922,15 @@ mac_test_create_ipq(struct mbuf *fragment, struct label *fragmentlabel,
 
 	ASSERT_MBUF_LABEL(fragmentlabel);
 	ASSERT_IPQ_LABEL(ipqlabel);
+}
+
+static void
+mac_test_create_mbuf_from_inpcb(struct inpcb *inp, struct label *inplabel,
+    struct mbuf *m, struct label *mlabel)
+{
+
+	ASSERT_INPCB_LABEL(inplabel);
+	ASSERT_MBUF_LABEL(mlabel);
 }
 
 static void
@@ -1038,7 +1057,9 @@ mac_test_execve_transition(struct ucred *old, struct ucred *new,
 	ASSERT_CRED_LABEL(old->cr_label);
 	ASSERT_CRED_LABEL(new->cr_label);
 	ASSERT_VNODE_LABEL(filelabel);
-	ASSERT_VNODE_LABEL(interpvnodelabel);
+	if (interpvnodelabel != NULL) {
+		ASSERT_VNODE_LABEL(interpvnodelabel);
+	}
 	if (execlabel != NULL) {
 		ASSERT_CRED_LABEL(execlabel);
 	}
@@ -1236,7 +1257,7 @@ mac_test_check_mount_stat(struct ucred *cred, struct mount *mp,
 }
 
 static int
-mac_test_check_pipe_ioctl(struct ucred *cred, struct pipe *pipe,
+mac_test_check_pipe_ioctl(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel, unsigned long cmd, void /* caddr_t */ *data)
 {
 
@@ -1247,7 +1268,7 @@ mac_test_check_pipe_ioctl(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-mac_test_check_pipe_poll(struct ucred *cred, struct pipe *pipe,
+mac_test_check_pipe_poll(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 
@@ -1258,7 +1279,7 @@ mac_test_check_pipe_poll(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-mac_test_check_pipe_read(struct ucred *cred, struct pipe *pipe,
+mac_test_check_pipe_read(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 
@@ -1269,7 +1290,7 @@ mac_test_check_pipe_read(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-mac_test_check_pipe_relabel(struct ucred *cred, struct pipe *pipe,
+mac_test_check_pipe_relabel(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel, struct label *newlabel)
 {
 
@@ -1281,7 +1302,7 @@ mac_test_check_pipe_relabel(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-mac_test_check_pipe_stat(struct ucred *cred, struct pipe *pipe,
+mac_test_check_pipe_stat(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 
@@ -1292,7 +1313,7 @@ mac_test_check_pipe_stat(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-mac_test_check_pipe_write(struct ucred *cred, struct pipe *pipe,
+mac_test_check_pipe_write(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 
@@ -1459,8 +1480,8 @@ mac_test_check_system_swapoff(struct ucred *cred, struct vnode *vp,
 }
 
 static int
-mac_test_check_system_sysctl(struct ucred *cred, int *name, u_int namelen,
-    void *old, size_t *oldlenp, int inkernel, void *new, size_t newlen)
+mac_test_check_system_sysctl(struct ucred *cred, struct sysctl_oid *oidp,
+    void *arg1, int arg2, struct sysctl_req *req)
 {
 
 	ASSERT_CRED_LABEL(cred->cr_label);
@@ -1880,6 +1901,7 @@ static struct mac_policy_ops mac_test_ops =
 	.mpo_destroy_socket_peer_label = mac_test_destroy_socket_peer_label,
 	.mpo_destroy_vnode_label = mac_test_destroy_vnode_label,
 	.mpo_copy_cred_label = mac_test_copy_cred_label,
+	.mpo_copy_ifnet_label = mac_test_copy_ifnet_label,
 	.mpo_copy_mbuf_label = mac_test_copy_mbuf_label,
 	.mpo_copy_pipe_label = mac_test_copy_pipe_label,
 	.mpo_copy_socket_label = mac_test_copy_socket_label,
@@ -1921,6 +1943,7 @@ static struct mac_policy_ops mac_test_ops =
 	.mpo_create_datagram_from_ipq = mac_test_create_datagram_from_ipq,
 	.mpo_create_fragment = mac_test_create_fragment,
 	.mpo_create_ipq = mac_test_create_ipq,
+	.mpo_create_mbuf_from_inpcb = mac_test_create_mbuf_from_inpcb,
 	.mpo_create_mbuf_from_mbuf = mac_test_create_mbuf_from_mbuf,
 	.mpo_create_mbuf_linklayer = mac_test_create_mbuf_linklayer,
 	.mpo_create_mbuf_from_bpfdesc = mac_test_create_mbuf_from_bpfdesc,

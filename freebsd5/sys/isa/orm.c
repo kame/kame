@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/isa/orm.c,v 1.3 2003/06/11 00:32:45 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/isa/orm.c,v 1.5 2004/07/05 17:26:04 imp Exp $");
 
 /*
  * Driver to take care of holes in ISA I/O memory occupied
@@ -101,8 +101,8 @@ orm_identify(driver_t* driver, device_t parent)
 		bus_set_resource(child, SYS_RES_MEMORY, sc->rnum, chunk,
 		    IOMEM_STEP);
 		rid = sc->rnum;
-		res = bus_alloc_resource(child, SYS_RES_MEMORY, &rid, 0ul, 
-		    ~0ul, 1, RF_ACTIVE);
+		res = bus_alloc_resource_any(child, SYS_RES_MEMORY, &rid,
+		    RF_ACTIVE);
 		if (res == NULL) {
 			bus_delete_resource(child, SYS_RES_MEMORY, sc->rnum);
 			chunk += IOMEM_STEP;
@@ -133,8 +133,7 @@ orm_identify(driver_t* driver, device_t parent)
 		bus_set_resource(child, SYS_RES_MEMORY, sc->rnum, chunk,
 		    rom_size);
 		rid = sc->rnum;
-		res = bus_alloc_resource(child, SYS_RES_MEMORY, &rid, 0ul,
-		    ~0ul, 1, 0);
+		res = bus_alloc_resource_any(child, SYS_RES_MEMORY, &rid, 0);
 		if (res == NULL) {
 			bus_delete_resource(child, SYS_RES_MEMORY, sc->rnum);
 			chunk += IOMEM_STEP;
@@ -149,9 +148,9 @@ orm_identify(driver_t* driver, device_t parent)
 	if (sc->rnum == 0)
 		device_delete_child(parent, child);
 	else if (sc->rnum == 1)
-		device_set_desc(child, "Option ROM");
+		device_set_desc(child, "ISA Option ROM");
 	else
-		device_set_desc(child, "Option ROMs");
+		device_set_desc(child, "ISA Option ROMs");
 }
 
 static int

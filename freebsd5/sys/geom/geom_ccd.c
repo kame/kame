@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_ccd.c,v 1.148 2003/11/12 09:46:54 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_ccd.c,v 1.152 2004/08/08 07:57:51 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -168,12 +168,12 @@ g_ccd_access(struct g_provider *pp, int dr, int dw, int de)
 	gp = pp->geom;
 	error = ENXIO;
 	LIST_FOREACH(cp1, &gp->consumer, consumer) {
-		error = g_access_rel(cp1, dr, dw, de);
+		error = g_access(cp1, dr, dw, de);
 		if (error) {
 			LIST_FOREACH(cp2, &gp->consumer, consumer) {
 				if (cp1 == cp2)
 					break;
-				g_access_rel(cp2, -dr, -dw, -de);
+				g_access(cp2, -dr, -dw, -de);
 			}
 			break;
 		}
@@ -718,9 +718,6 @@ g_ccd_create(struct gctl_req *req, struct g_class *mp)
 	}
 
 	gp = g_new_geomf(mp, "ccd%d", *unit);
-	gp->start = g_ccd_start;
-	gp->orphan = g_ccd_orphan;
-	gp->access = g_ccd_access;
 	sc = g_malloc(sizeof *sc, M_WAITOK | M_ZERO);
 	gp->softc = sc;
 	sc->sc_ndisks = *nprovider;
@@ -772,7 +769,6 @@ g_ccd_create(struct gctl_req *req, struct g_class *mp)
 	g_error_provider(pp, 0);
 
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
-	sbuf_clear(sb);
 	sbuf_printf(sb, "ccd%d: %d components ", sc->sc_unit, *nprovider);
 	for (i = 0; i < *nprovider; i++) {
 		sbuf_printf(sb, "%s%s",
@@ -823,7 +819,6 @@ g_ccd_list(struct gctl_req *req, struct g_class *mp)
 	up = gctl_get_paraml(req, "unit", sizeof (int));
 	unit = *up;
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
-	sbuf_clear(sb);
 	LIST_FOREACH(gp, &mp->geom, geom) {
 		cs = gp->softc;
 		if (cs == NULL || (unit >= 0 && unit != cs->sc_unit))
@@ -863,8 +858,12 @@ g_ccd_config(struct gctl_req *req, struct g_class *mp, char const *verb)
 
 static struct g_class g_ccd_class = {
 	.name = "CCD",
+	.version = G_VERSION,
 	.ctlreq = g_ccd_config,
 	.destroy_geom = g_ccd_destroy_geom,
+	.start = g_ccd_start,
+	.orphan = g_ccd_orphan,
+	.access = g_ccd_access,
 };
 
 DECLARE_GEOM_CLASS(g_ccd_class, g_ccd);

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.40 2003/11/26 01:40:44 sam Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.51 2004/08/06 03:45:45 rwatson Exp $	*/
 /*	$KAME: udp6_usrreq.c,v 1.27 2001/05/21 05:45:10 jinmei Exp $	*/
 
 /*
@@ -42,10 +42,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -120,47 +116,22 @@
  */
 
 extern	struct protosw inetsw[];
-static	int in6_mcmatch __P((struct inpcb *, struct in6_addr *, struct ifnet *));
 static	int udp6_detach __P((struct socket *so));
-
-static int
-in6_mcmatch(in6p, ia6, ifp)
-	struct inpcb *in6p;
-	register struct in6_addr *ia6;
-	struct ifnet *ifp;
-{
-	struct ip6_moptions *im6o = in6p->in6p_moptions;
-	struct in6_multi_mship *imm;
-
-	if (im6o == NULL)
-		return 0;
-
-	for (imm = im6o->im6o_memberships.lh_first; imm != NULL;
-	     imm = imm->i6mm_chain.le_next) {
-		if ((ifp == NULL ||
-		     imm->i6mm_maddr->in6m_ifp == ifp) &&
-		    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
-				       ia6))
-			return 1;
-	}
-	return 0;
-}
 
 int
 udp6_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
 {
-	struct mbuf *m = *mp;
+	struct mbuf *m = *mp, *opts;
 	register struct ip6_hdr *ip6;
 	register struct udphdr *uh;
 	register struct inpcb *in6p;
-	struct  mbuf *opts = NULL;
 	int off = *offp;
 	int plen, ulen;
 	struct sockaddr_in6 fromsa;
 
-	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
+	opts = NULL;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 
@@ -170,10 +141,19 @@ udp6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
+	ip6 = mtod(m, struct ip6_hdr *);
+	uh = (struct udphdr *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(uh, struct udphdr *, m, off, sizeof(*uh));
+	if (!uh)
+		return IPPROTO_DONE;
+#endif
+
 	udpstat.udps_ipackets++;
 
 	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6);
-	uh = (struct udphdr *)((caddr_t)ip6 + off);
 	ulen = ntohs((u_short)uh->uh_ulen);
 
 	if (plen != ulen) {
@@ -184,9 +164,11 @@ udp6_input(mp, offp, proto)
 	/*
 	 * Checksum extended UDP header and data.
 	 */
-	if (uh->uh_sum == 0)
+	if (uh->uh_sum == 0) {
 		udpstat.udps_nosum++;
-	else if (in6_cksum(m, IPPROTO_UDP, off, ulen) != 0) {
+		goto bad;
+	}
+	if (in6_cksum(m, IPPROTO_UDP, off, ulen) != 0) {
 		udpstat.udps_badsum++;
 		goto bad;
 	}
@@ -223,7 +205,7 @@ udp6_input(mp, offp, proto)
 		/*
 		 * Construct sockaddr format source address.
 		 */
-		init_sin6(&fromsa, m); /* general init */
+		init_sin6(&fromsa, m);
 		fromsa.sin6_port = uh->uh_sport;
 		/*
 		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
@@ -242,38 +224,30 @@ udp6_input(mp, offp, proto)
 				continue;
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
-							&ip6->ip6_dst) &&
-				    !in6_mcmatch(in6p, &ip6->ip6_dst,
-						 m->m_pkthdr.rcvif))
+							&ip6->ip6_dst))
 					continue;
 			}
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
 							&ip6->ip6_src) ||
-				   in6p->in6p_fport != uh->uh_sport)
+				    in6p->in6p_fport != uh->uh_sport)
 					continue;
 			}
 
 			if (last != NULL) {
-				struct	mbuf *n;
+				struct mbuf *n;
 
+#if defined(IPSEC) || defined(FAST_IPSEC)
+				/*
+				 * Check AH/ESP integrity.
+				 */
+				if (ipsec6_in_reject(m, last)) {
 #ifdef IPSEC
-				/*
-				 * Check AH/ESP integrity.
-				 */
-				if (ipsec6_in_reject_so(m, last->inp_socket))
 					ipsec6stat.in_polvio++;
-					/* do not inject data into pcb */
-				else
 #endif /* IPSEC */
-#ifdef FAST_IPSEC
-				/*
-				 * Check AH/ESP integrity.
-				 */
-				if (ipsec6_in_reject(m, last))
-					;
-				else
-#endif /* FAST_IPSEC */
+					/* do not inject data into pcb */
+				} else
+#endif /*IPSEC || FAST_IPSEC*/
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
 					/*
 					 * KAME NOTE: do not
@@ -288,7 +262,7 @@ udp6_input(mp, offp, proto)
 
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
-							 (struct sockaddr *)&fromsa,
+							(struct sockaddr *)&fromsa,
 							n, opts) == 0) {
 						m_freem(n);
 						if (opts)
@@ -323,23 +297,17 @@ udp6_input(mp, offp, proto)
 			udpstat.udps_noportmcast++;
 			goto bad;
 		}
-#ifdef IPSEC
-		/*
-		 * Check AH/ESP integrity.
-		 */
-		if (ipsec6_in_reject_so(m, last->inp_socket)) {
-			ipsec6stat.in_polvio++;
-			goto bad;
-		}
-#endif /* IPSEC */
-#ifdef FAST_IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 		/*
 		 * Check AH/ESP integrity.
 		 */
 		if (ipsec6_in_reject(m, last)) {
+#ifdef IPSEC
+			ipsec6stat.in_polvio++;
+#endif /* IPSEC */
 			goto bad;
 		}
-#endif /* FAST_IPSEC */
+#endif /*IPSEC || FAST_IPSEC*/
 		if (last->in6p_flags & IN6P_CONTROLOPTS
 		    || last->in6p_socket->so_options & SO_TIMESTAMP)
 			ip6_savecontrol(last, m, &opts);
@@ -379,37 +347,30 @@ udp6_input(mp, offp, proto)
 		icmp6_error(m, ICMP6_DST_UNREACH, ICMP6_DST_UNREACH_NOPORT, 0);
 		return IPPROTO_DONE;
 	}
-#ifdef IPSEC
-	/*
-	 * Check AH/ESP integrity.
-	 */
-	if (ipsec6_in_reject_so(m, in6p->inp_socket)) {
-		ipsec6stat.in_polvio++;
-		goto bad;
-	}
-#endif /* IPSEC */
-#ifdef FAST_IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 	/*
 	 * Check AH/ESP integrity.
 	 */
 	if (ipsec6_in_reject(m, in6p)) {
+#ifdef IPSEC
+		ipsec6stat.in_polvio++;
+#endif /* IPSEC */
 		goto bad;
 	}
-#endif /* FAST_IPSEC */
+#endif /*IPSEC || FAST_IPSEC*/
 
 	/*
 	 * Construct sockaddr format source address.
 	 * Stuff source address and datagram in user buffer.
 	 */
-	init_sin6(&fromsa, m); /* general init */
+	init_sin6(&fromsa, m);
 	fromsa.sin6_port = uh->uh_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS
 	    || in6p->in6p_socket->so_options & SO_TIMESTAMP)
 		ip6_savecontrol(in6p, m, &opts);
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
-			(struct sockaddr *)&fromsa,
-			m, opts) == 0) {
+			(struct sockaddr *)&fromsa, m, opts) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
 	}
@@ -435,6 +396,7 @@ udp6_ctlinput(cmd, sa, d)
 	int off = 0;
 	struct ip6ctlparam *ip6cp = NULL;
 	const struct sockaddr_in6 *sa6_src = NULL;
+	void *cmdarg;
 	struct inpcb *(*notify) __P((struct inpcb *, int)) = udp_notify;
 	struct udp_portonly {
 		u_int16_t uh_sport;
@@ -460,10 +422,12 @@ udp6_ctlinput(cmd, sa, d)
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
+		cmdarg = ip6cp->ip6c_cmdarg;
 		sa6_src = ip6cp->ip6c_src;
 	} else {
 		m = NULL;
 		ip6 = NULL;
+		cmdarg = NULL;
 		sa6_src = &sa6_any;
 	}
 
@@ -480,13 +444,13 @@ udp6_ctlinput(cmd, sa, d)
 		bzero(&uh, sizeof(uh));
 		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
 
-		(void) in6_pcbnotify(&udb, sa, uh.uh_dport,
-				     (struct sockaddr *)ip6cp->ip6c_src, 
-				     uh.uh_sport, cmd, notify);
+		(void) in6_pcbnotify(&udbinfo, sa, uh.uh_dport,
+				     (struct sockaddr *)ip6cp->ip6c_src,
+				     uh.uh_sport, cmd, cmdarg, notify);
 	} else
-		(void) in6_pcbnotify(&udb, sa, 0,
+		(void) in6_pcbnotify(&udbinfo, sa, 0,
 				     (const struct sockaddr *)sa6_src,
-				     0, cmd, notify);
+				     0, cmd, cmdarg, notify);
 }
 
 static int
@@ -550,21 +514,30 @@ udp6_attach(struct socket *so, int proto, struct thread *td)
 	struct inpcb *inp;
 	int s, error;
 
+	INP_INFO_WLOCK(&udbinfo);
 	inp = sotoinpcb(so);
-	if (inp != 0)
+	if (inp != 0) {
+		INP_INFO_WUNLOCK(&udbinfo);
 		return EINVAL;
+	}
 
 	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
 		error = soreserve(so, udp_sendspace, udp_recvspace);
-		if (error)
+		if (error) {
+			INP_INFO_WUNLOCK(&udbinfo);
 			return error;
+		}
 	}
 	s = splnet();
-	error = in_pcballoc(so, &udbinfo, td, "udp6inp");
+	error = in_pcballoc(so, &udbinfo, "udp6inp");
 	splx(s);
-	if (error)
+	if (error) {
+		INP_INFO_WUNLOCK(&udbinfo);
 		return error;
+	}
 	inp = (struct inpcb *)so->so_pcb;
+	INP_LOCK(inp);
+	INP_INFO_WUNLOCK(&udbinfo);
 	inp->inp_vflag |= INP_IPV6;
 	if (!ip6_v6only)
 		inp->inp_vflag |= INP_IPV4;
@@ -577,6 +550,7 @@ udp6_attach(struct socket *so, int proto, struct thread *td)
 	 * which may match an IPv4-mapped IPv6 address.
 	 */
 	inp->inp_ip_ttl = ip_defttl;
+	INP_UNLOCK(inp);
 	return 0;
 }
 
@@ -586,9 +560,13 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	struct inpcb *inp;
 	int s, error;
 
+	INP_INFO_WLOCK(&udbinfo);
 	inp = sotoinpcb(so);
-	if (inp == 0)
+	if (inp == 0) {
+		INP_INFO_WUNLOCK(&udbinfo);
 		return EINVAL;
+	}
+	INP_LOCK(inp);
 
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
@@ -606,14 +584,17 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 			inp->inp_vflag |= INP_IPV4;
 			inp->inp_vflag &= ~INP_IPV6;
 			s = splnet();
-			error = in_pcbbind(inp, (struct sockaddr *)&sin, td);
-			splx(s);
-			return error;
+			error = in_pcbbind(inp, (struct sockaddr *)&sin,
+			    td->td_ucred);
+			goto out;
 		}
 	}
 
 	s = splnet();
-	error = in6_pcbbind(inp, nam, td);
+	error = in6_pcbbind(inp, nam, td->td_ucred);
+out:
+	INP_UNLOCK(inp);
+	INP_INFO_WUNLOCK(&udbinfo);
 	splx(s);
 	return error;
 }
@@ -624,9 +605,13 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 	struct inpcb *inp;
 	int s, error;
 
+	INP_INFO_WLOCK(&udbinfo);
 	inp = sotoinpcb(so);
-	if (inp == 0)
+	if (inp == 0) {
+		INP_INFO_WUNLOCK(&udbinfo);
 		return EINVAL;
+	}
+	INP_LOCK(inp);
 
 	if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
 		struct sockaddr_in6 *sin6_p;
@@ -639,20 +624,23 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 				return EISCONN;
 			in6_sin6_2_sin(&sin, sin6_p);
 			s = splnet();
-			error = in_pcbconnect(inp, (struct sockaddr *)&sin, td);
+			error = in_pcbconnect(inp, (struct sockaddr *)&sin,
+			    td->td_ucred);
 			splx(s);
 			if (error == 0) {
 				inp->inp_vflag |= INP_IPV4;
 				inp->inp_vflag &= ~INP_IPV6;
 				soisconnected(so);
 			}
-			return error;
+			goto out;
 		}
 	}
-	if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
-		return EISCONN;
+	if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr)) {
+		error = EISCONN;
+		goto out;
+	}
 	s = splnet();
-	error = in6_pcbconnect(inp, nam, td);
+	error = in6_pcbconnect(inp, nam, td->td_ucred);
 	splx(s);
 	if (error == 0) {
 		if (!ip6_v6only) { /* should be non mapped addr */
@@ -661,6 +649,9 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		}
 		soisconnected(so);
 	}
+out:
+	INP_UNLOCK(inp);
+	INP_INFO_WUNLOCK(&udbinfo);
 	return error;
 }
 
@@ -670,12 +661,17 @@ udp6_detach(struct socket *so)
 	struct inpcb *inp;
 	int s;
 
+	INP_INFO_WLOCK(&udbinfo);
 	inp = sotoinpcb(so);
-	if (inp == 0)
+	if (inp == 0) {
+		INP_INFO_WUNLOCK(&udbinfo);
 		return EINVAL;
+	}
+	INP_LOCK(inp);
 	s = splnet();
 	in6_pcbdetach(inp);
 	splx(s);
+	INP_INFO_WUNLOCK(&udbinfo);
 	return 0;
 }
 
@@ -683,27 +679,40 @@ static int
 udp6_disconnect(struct socket *so)
 {
 	struct inpcb *inp;
-	int s;
+	int error, s;
 
+	INP_INFO_WLOCK(&udbinfo);
 	inp = sotoinpcb(so);
-	if (inp == 0)
+	if (inp == 0) {
+		INP_INFO_WUNLOCK(&udbinfo);
 		return EINVAL;
+	}
+	INP_LOCK(inp);
 
+#ifdef INET
 	if (inp->inp_vflag & INP_IPV4) {
 		struct pr_usrreqs *pru;
 
 		pru = inetsw[ip_protox[IPPROTO_UDP]].pr_usrreqs;
-		return ((*pru->pru_disconnect)(so));
+		error = (*pru->pru_disconnect)(so);
+		goto out;
 	}
+#endif
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
-		return ENOTCONN;
+	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr)) {
+		error = ENOTCONN;
+		goto out;
+	}
 
 	s = splnet();
 	in6_pcbdisconnect(inp);
 	inp->in6p_laddr = in6addr_any;
 	splx(s);
+	/* XXXRW: so_state locking? */
 	so->so_state &= ~SS_ISCONNECTED;		/* XXX */
+out:
+	INP_UNLOCK(inp);
+	INP_INFO_WUNLOCK(&udbinfo);
 	return 0;
 }
 
@@ -714,11 +723,14 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	struct inpcb *inp;
 	int error = 0;
 
+	INP_INFO_WLOCK(&udbinfo);
 	inp = sotoinpcb(so);
 	if (inp == 0) {
-		error = EINVAL;
-		goto bad;
+		INP_INFO_WUNLOCK(&udbinfo);
+		m_freem(m);
+		return EINVAL;
 	}
+	INP_LOCK(inp);
 
 	if (addr) {
 		if (addr->sa_len != sizeof(struct sockaddr_in6)) { 
@@ -731,6 +743,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		}
 	}
 
+#ifdef INET
 	if (!ip6_v6only) {
 		int hasv4addr;
 		struct sockaddr_in6 *sin6 = 0;
@@ -745,19 +758,47 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		if (hasv4addr) {
 			struct pr_usrreqs *pru;
 
+			if ((inp->inp_flags & IN6P_IPV6_V6ONLY)) {
+				/*
+				 * since a user of this socket set the
+				 * IPV6_V6ONLY flag, we discard this
+				 * datagram destined to a v4 addr.
+				 */
+				error = EINVAL;
+				goto out;
+			}
+			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr) &&
+			    !IN6_IS_ADDR_V4MAPPED(&inp->in6p_laddr)) {
+				/*
+				 * when remote addr is IPv4-mapped
+				 * address, local addr should not be
+				 * an IPv6 address; since you cannot
+				 * determine how to map IPv6 source
+				 * address to IPv4.
+				 */
+				error = EINVAL;
+				goto out;
+			}
 			if (sin6)
 				in6_sin6_2_sin_in_sock(addr);
 			pru = inetsw[ip_protox[IPPROTO_UDP]].pr_usrreqs;
 			error = ((*pru->pru_send)(so, flags, m, addr, control,
 						  td));
 			/* addr will just be freed in sendit(). */
-			return error;
+			goto out;
 		}
 	}
+#endif
 
-	return udp6_output(inp, m, addr, control, td);
+	error = udp6_output(inp, m, addr, control, td);
+out:
+	INP_UNLOCK(inp);
+	INP_INFO_WUNLOCK(&udbinfo);
+	return error;
 
   bad:
+	INP_UNLOCK(inp);
+	INP_INFO_WUNLOCK(&udbinfo);
 	m_freem(m);
 	return (error);
 }

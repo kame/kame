@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_kern.c,v 1.33 2003/06/18 10:33:09 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_kern.c,v 1.34.2.1 2004/09/28 18:16:51 pjd Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -174,7 +174,6 @@ sysctl_kern_geom_conftxt(SYSCTL_HANDLER_ARGS)
 	struct sbuf *sb;
 
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
-	sbuf_clear(sb);
 	g_waitfor_event(g_conftxt, sb, M_WAITOK, NULL);
 	error = SYSCTL_OUT(req, sbuf_data(sb), sbuf_len(sb) + 1);
 	sbuf_delete(sb);
@@ -188,7 +187,6 @@ sysctl_kern_geom_confdot(SYSCTL_HANDLER_ARGS)
 	struct sbuf *sb;
 
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
-	sbuf_clear(sb);
 	g_waitfor_event(g_confdot, sb, M_WAITOK, NULL);
 	error = SYSCTL_OUT(req, sbuf_data(sb), sbuf_len(sb) + 1);
 	sbuf_delete(sb);
@@ -202,7 +200,6 @@ sysctl_kern_geom_confxml(SYSCTL_HANDLER_ARGS)
 	struct sbuf *sb;
 
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
-	sbuf_clear(sb);
 	g_waitfor_event(g_confxml, sb, M_WAITOK, NULL);
 	error = SYSCTL_OUT(req, sbuf_data(sb), sbuf_len(sb) + 1);
 	sbuf_delete(sb);
@@ -223,6 +220,7 @@ SYSCTL_PROC(_kern_geom, OID_AUTO, conftxt, CTLTYPE_STRING|CTLFLAG_RD,
 	0, 0, sysctl_kern_geom_conftxt, "",
 	"Dump the GEOM config in txt");
 
+TUNABLE_INT("kern.geom.debugflags", &g_debugflags);
 SYSCTL_INT(_kern_geom, OID_AUTO, debugflags, CTLFLAG_RW,
 	&g_debugflags, 0, "");
 

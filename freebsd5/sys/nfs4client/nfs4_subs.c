@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/nfs4client/nfs4_subs.c,v 1.2 2003/11/15 01:25:26 alfred Exp $ */
+/* $FreeBSD: src/sys/nfs4client/nfs4_subs.c,v 1.4 2004/02/27 19:37:43 rees Exp $ */
 /* $Id: nfs4_subs.c,v 1.52 2003/11/05 14:58:59 rees Exp $ */
 
 /*
@@ -108,34 +108,34 @@ nfsm_v4init(void)
 {
 
 	/* Set up bitmasks */
-        FA4_SET(FA4_FSID, __fsinfo_bm);
-        FA4_SET(FA4_MAXREAD, __fsinfo_bm);
-        FA4_SET(FA4_MAXWRITE, __fsinfo_bm);
-        FA4_SET(FA4_LEASE_TIME, __fsinfo_bm);
+	FA4_SET(FA4_FSID, __fsinfo_bm);
+	FA4_SET(FA4_MAXREAD, __fsinfo_bm);
+	FA4_SET(FA4_MAXWRITE, __fsinfo_bm);
+	FA4_SET(FA4_LEASE_TIME, __fsinfo_bm);
 
 	FA4_SET(FA4_FSID, __fsattr_bm);
-        FA4_SET(FA4_FILES_FREE, __fsattr_bm);
-        FA4_SET(FA4_FILES_TOTAL, __fsattr_bm);
-        FA4_SET(FA4_SPACE_AVAIL, __fsattr_bm);
-        FA4_SET(FA4_SPACE_FREE, __fsattr_bm);
-        FA4_SET(FA4_SPACE_TOTAL, __fsattr_bm);
+	FA4_SET(FA4_FILES_FREE, __fsattr_bm);
+	FA4_SET(FA4_FILES_TOTAL, __fsattr_bm);
+	FA4_SET(FA4_SPACE_AVAIL, __fsattr_bm);
+	FA4_SET(FA4_SPACE_FREE, __fsattr_bm);
+	FA4_SET(FA4_SPACE_TOTAL, __fsattr_bm);
 
 	FA4_SET(FA4_TYPE, __getattr_bm);
-        FA4_SET(FA4_FSID, __getattr_bm);
-        FA4_SET(FA4_SIZE, __getattr_bm);
-        FA4_SET(FA4_MODE, __getattr_bm);
-        FA4_SET(FA4_RAWDEV, __getattr_bm);
-        FA4_SET(FA4_NUMLINKS, __getattr_bm);
-        FA4_SET(FA4_OWNER, __getattr_bm);
-        FA4_SET(FA4_OWNER_GROUP, __getattr_bm);
-        FA4_SET(FA4_FILEID, __getattr_bm);
-        FA4_SET(FA4_TIME_MODIFY, __getattr_bm);
-        FA4_SET(FA4_TIME_ACCESS, __getattr_bm);
-/*        FA4_SET(FA4_TIME_CREATE, __getattr_bm);*/
+	FA4_SET(FA4_FSID, __getattr_bm);
+	FA4_SET(FA4_SIZE, __getattr_bm);
+	FA4_SET(FA4_MODE, __getattr_bm);
+	FA4_SET(FA4_RAWDEV, __getattr_bm);
+	FA4_SET(FA4_NUMLINKS, __getattr_bm);
+	FA4_SET(FA4_OWNER, __getattr_bm);
+	FA4_SET(FA4_OWNER_GROUP, __getattr_bm);
+	FA4_SET(FA4_FILEID, __getattr_bm);
+	FA4_SET(FA4_TIME_MODIFY, __getattr_bm);
+	FA4_SET(FA4_TIME_ACCESS, __getattr_bm);
 
 	FA4_SET(FA4_TYPE, __readdir_bm);
 	FA4_SET(FA4_FSID, __readdir_bm);
-        FA4_SET(FA4_FILEID, __readdir_bm);
+	FA4_SET(FA4_FILEID, __readdir_bm);
+	FA4_SET(FA4_RDATTR_ERROR, __readdir_bm);
 }
 
 /*
@@ -421,10 +421,11 @@ nfsm_v4build_setattr_xx(struct nfs4_compound *cp, struct vattr *vap,
     struct nfs4_fctx *fcp, struct mbuf **mb, caddr_t *bpos)
 {
 	int error;
+	static char zero_stateid[NFSX_V4STATEID];
 
 	nfsm_buildf_xx(mb, bpos, "uo",
 	    NFSV4OP_SETATTR,
-	    NFSX_V4STATEID, fcp->stateid);
+	    NFSX_V4STATEID, fcp ? fcp->stateid : zero_stateid);
 	error = nfsm_v4build_attrs_xx(vap, mb, bpos);
 	if (error == 0)
 		cp->req_nops++;
@@ -1217,6 +1218,12 @@ nfsm_v4dissect_attrs_xx(struct nfsv4_fattr *fa, struct mbuf **md, caddr_t *dpos)
 		NFSM_DISSECT(NFSX_UNSIGNED);
 		fa->fa4_lease_time = fxdr_unsigned(uint32_t, *tl++);
 		fa->fa4_valid |= FA4V_LEASE_TIME;
+		len += NFSX_UNSIGNED;
+	}
+	if (FA4_ISSET(FA4_RDATTR_ERROR, bmval)) {
+		/* ignore for now; we only ask for it so the compound won't fail */
+		NFSM_DISSECT(NFSX_UNSIGNED);
+		tl++;
 		len += NFSX_UNSIGNED;
 	}
 	if (FA4_ISSET(FA4_FILEID, bmval)) {

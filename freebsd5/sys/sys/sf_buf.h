@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/sf_buf.h,v 1.1 2003/11/16 06:11:26 alc Exp $
+ * $FreeBSD: src/sys/sys/sf_buf.h,v 1.4 2004/04/03 09:16:27 alc Exp $
  */
 
 #ifndef _SYS_SF_BUF_H_
@@ -33,8 +33,13 @@
 
 struct vm_page;
 
+extern  int nsfbufs;                    /* Number of sendfile(2) bufs alloced */
+extern  int nsfbufspeak;                /* Peak of nsfbufsused */
+extern  int nsfbufsused;                /* Number of sendfile(2) bufs in use */
+
 struct sf_buf *
-	sf_buf_alloc(struct vm_page *m);
-void	sf_buf_free(void *addr, void *args);
+	sf_buf_alloc(struct vm_page *m, int pri);
+void	sf_buf_free(struct sf_buf *sf);
+void	sf_buf_mext(void *addr, void *args);
 
 #endif /* !_SYS_SF_BUF_H_ */

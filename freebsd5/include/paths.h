@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)paths.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/include/paths.h,v 1.24 2003/06/29 18:35:36 gordon Exp $
+ * $FreeBSD: src/include/paths.h,v 1.25 2004/01/04 17:17:46 iedowse Exp $
  */
 
 #ifndef _PATHS_H_
@@ -71,6 +71,7 @@
 #define	_PATH_MAN	"/usr/share/man"
 #define	_PATH_MDCONFIG	"/sbin/mdconfig"
 #define	_PATH_MEM	"/dev/mem"
+#define	_PATH_MKSNAP_FFS	"/sbin/mksnap_ffs"
 #define	_PATH_MOUNT	"/sbin/mount"
 #define	_PATH_NEWFS	"/sbin/newfs"
 #define	_PATH_NOLOGIN	"/var/run/nologin"

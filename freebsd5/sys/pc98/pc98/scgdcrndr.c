@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/scgdcrndr.c,v 1.11 2002/02/10 10:14:39 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/scgdcrndr.c,v 1.12 2004/06/04 13:04:10 phk Exp $
  */
 
 #include "opt_syscons.h"
@@ -32,6 +32,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/fbio.h>
 #include <sys/consio.h>
 

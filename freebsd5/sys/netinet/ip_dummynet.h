@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.27 2003/10/03 20:58:56 sam Exp $
+ * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.32 2004/08/17 22:05:54 andre Exp $
  */
 
 #ifndef _IP_DUMMYNET_H
@@ -111,24 +111,12 @@ struct dn_heap {
 
 #ifdef _KERNEL
 /*
- * struct dn_pkt identifies a packet in the dummynet queue, but
- * is also used to tag packets passed back to the various destinations
- * (ip_input(), ip_output(), bdg_forward()  and so on).
- * As such the first part of the structure must be a struct m_hdr,
- * followed by dummynet-specific parameters. The m_hdr must be
- * initialized with
- *   mh_type	= MT_TAG;
- *   mh_flags	= PACKET_TYPE_DUMMYNET;
- *   mh_next	= <pointer to the actual mbuf>
- *
- * mh_nextpkt, mh_data are free for dummynet use (mh_nextpkt is used to
- * build a linked list of packets in a dummynet queue).
+ * Packets processed by dummynet have an mbuf tag associated with
+ * them that carries their dummynet state.  This is used within
+ * the dummynet code as well as outside when checking for special
+ * processing requirements.
  */
-struct dn_pkt {
-    struct m_hdr hdr ;
-#define DN_NEXT(x)	(struct dn_pkt *)(x)->hdr.mh_nextpkt
-#define dn_m	hdr.mh_next	/* packet to be forwarded */
-
+struct dn_pkt_tag {
     struct ip_fw *rule;		/* matching rule */
     int dn_dir;			/* action when packet comes out. */
 #define DN_TO_IP_OUT	1
@@ -139,8 +127,6 @@ struct dn_pkt {
 
     dn_key output_time;		/* when the pkt is due for delivery	*/
     struct ifnet *ifp;		/* interface, for ip_output		*/
-    struct sockaddr_in *dn_dst ;
-    struct route ro;		/* route, for ip_output. MUST COPY	*/
     int flags ;			/* flags, for ip_output (IPv6 ?)	*/
 };
 #endif /* _KERNEL */
@@ -217,7 +203,7 @@ struct dn_flow_queue {
     struct dn_flow_queue *next ;
     struct ipfw_flow_id id ;
 
-    struct dn_pkt *head, *tail ;	/* queue of packets */
+    struct mbuf *head, *tail ;	/* queue of packets */
     u_int len ;
     u_int len_bytes ;
     u_long numbytes ;		/* credit for transmission (dynamic queues) */
@@ -330,7 +316,7 @@ struct dn_pipe {		/* a pipe */
     int bandwidth;		/* really, bytes/tick.	*/
     int	delay ;			/* really, ticks	*/
 
-    struct	dn_pkt *head, *tail ;	/* packets in delay line */
+    struct	mbuf *head, *tail ;	/* packets in delay line */
 
     /* WF2Q+ */
     struct dn_heap scheduler_heap ; /* top extract - key Finish time*/
@@ -363,6 +349,20 @@ extern	ip_dn_ctl_t *ip_dn_ctl_ptr;
 extern	ip_dn_ruledel_t *ip_dn_ruledel_ptr;
 extern	ip_dn_io_t *ip_dn_io_ptr;
 #define	DUMMYNET_LOADED	(ip_dn_io_ptr != NULL)
-#endif
 
+/*
+ * Return the IPFW rule associated with the dummynet tag; if any.
+ * Make sure that the dummynet tag is not reused by lower layers.
+ */
+static __inline struct ip_fw *
+ip_dn_claim_rule(struct mbuf *m)
+{
+	struct m_tag *mtag = m_tag_find(m, PACKET_TAG_DUMMYNET, NULL);
+	if (mtag != NULL) {
+		mtag->m_tag_id = PACKET_TAG_NONE;
+		return (((struct dn_pkt_tag *)(mtag+1))->rule);
+	} else
+		return (NULL);
+}
+#endif
 #endif /* _IP_DUMMYNET_H */

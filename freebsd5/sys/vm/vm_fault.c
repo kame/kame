@@ -72,7 +72,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_fault.c,v 1.182 2003/11/10 00:44:00 mini Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_fault.c,v 1.192 2004/08/16 06:16:12 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -168,8 +168,12 @@ _unlock_things(struct faultstate *fs, int dealloc)
 	unlock_map(fs);	
 	if (fs->vp != NULL) { 
 		vput(fs->vp);
+		if (debug_mpsafevm)
+			mtx_unlock(&Giant);
 		fs->vp = NULL;
 	}
+	if (dealloc)
+		VM_UNLOCK_GIANT();
 }
 
 #define unlock_things(fs) _unlock_things(fs, 0)
@@ -220,7 +224,6 @@ vm_fault(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 	growstack = TRUE;
 	atomic_add_int(&cnt.v_vm_faults, 1);
 
-	mtx_lock(&Giant);
 RetryFault:;
 
 	/*
@@ -236,14 +239,11 @@ RetryFault:;
 			if (growstack && result == KERN_INVALID_ADDRESS &&
 			    map != kernel_map && curproc != NULL) {
 				result = vm_map_growstack(curproc, vaddr);
-				if (result != KERN_SUCCESS) {
-					mtx_unlock(&Giant);
+				if (result != KERN_SUCCESS)
 					return (KERN_FAILURE);
-				}
 				growstack = FALSE;
 				goto RetryFault;
 			}
-			mtx_unlock(&Giant);
 			return (result);
 		}
 
@@ -257,10 +257,8 @@ RetryFault:;
 		result = vm_map_lookup(&fs.map, vaddr,
 			VM_PROT_READ|VM_PROT_WRITE|VM_PROT_OVERRIDE_WRITE,
 			&fs.entry, &fs.first_object, &fs.first_pindex, &prot, &wired);
-		if (result != KERN_SUCCESS) {
-			mtx_unlock(&Giant);
+		if (result != KERN_SUCCESS)
 			return (result);
-		}
 
 		/*
 		 * If we don't COW now, on a user wire, the user will never
@@ -293,9 +291,12 @@ RetryFault:;
 	 *
 	 * XXX vnode_pager_lock() can block without releasing the map lock.
 	 */
-	vm_object_reference(fs.first_object);
+	mtx_lock(&Giant);
 	VM_OBJECT_LOCK(fs.first_object);
+	vm_object_reference_locked(fs.first_object);
 	fs.vp = vnode_pager_lock(fs.first_object);
+	if (fs.vp == NULL && debug_mpsafevm)
+		mtx_unlock(&Giant);
 	vm_object_pip_add(fs.first_object, 1);
 
 	fs.lookup_still_valid = TRUE;
@@ -316,7 +317,6 @@ RetryFault:;
 		 */
 		if (fs.object->flags & OBJ_DEAD) {
 			unlock_and_deallocate(&fs);
-			mtx_unlock(&Giant);
 			return (KERN_PROTECTION_FAILURE);
 		}
 
@@ -325,7 +325,7 @@ RetryFault:;
 		 */
 		fs.m = vm_page_lookup(fs.object, fs.pindex);
 		if (fs.m != NULL) {
-			int queue, s;
+			int queue;
 
 			/* 
 			 * check for page-based copy on write.
@@ -340,9 +340,7 @@ RetryFault:;
 			if ((fs.m->cow) && 
 			    (fault_type & VM_PROT_WRITE) &&
 			    (fs.object == fs.first_object)) {
-				s = splvm();
 				vm_page_cowfault(fs.m);
-				splx(s);
 				vm_page_unlock_queues();
 				unlock_and_deallocate(&fs);
 				goto RetryFault;
@@ -370,15 +368,14 @@ RetryFault:;
 				vm_page_lock_queues();
 				if (!vm_page_sleep_if_busy(fs.m, TRUE, "vmpfw"))
 					vm_page_unlock_queues();
-				cnt.v_intrans++;
+				atomic_add_int(&cnt.v_intrans, 1);
+				VM_UNLOCK_GIANT();
 				vm_object_deallocate(fs.first_object);
 				goto RetryFault;
 			}
 			queue = fs.m->queue;
 
-			s = splvm();
 			vm_pageq_remove_nowakeup(fs.m);
-			splx(s);
 
 			if ((queue - fs.m->pc) == PQ_CACHE && vm_page_count_severe()) {
 				vm_page_activate(fs.m);
@@ -411,7 +408,6 @@ RetryFault:;
 		if (TRYPAGER || fs.object == fs.first_object) {
 			if (fs.pindex >= fs.object->size) {
 				unlock_and_deallocate(&fs);
-				mtx_unlock(&Giant);
 				return (KERN_PROTECTION_FAILURE);
 			}
 
@@ -492,10 +488,8 @@ readrest:
 						mt->hold_count ||
 						mt->wire_count) 
 						continue;
-					if (mt->dirty == 0)
-						vm_page_test_dirty(mt);
+					pmap_remove_all(mt);
 					if (mt->dirty) {
-						pmap_remove_all(mt);
 						vm_page_deactivate(mt);
 					} else {
 						vm_page_cache(mt);
@@ -598,7 +592,6 @@ readrest:
 				vm_page_unlock_queues();
 				fs.m = NULL;
 				unlock_and_deallocate(&fs);
-				mtx_unlock(&Giant);
 				return ((rv == VM_PAGER_ERROR) ? KERN_FAILURE : KERN_PROTECTION_FAILURE);
 			}
 			if (fs.object != fs.first_object) {
@@ -648,9 +641,9 @@ readrest:
 			if ((fs.m->flags & PG_ZERO) == 0) {
 				pmap_zero_page(fs.m);
 			} else {
-				cnt.v_ozfod++;
+				atomic_add_int(&cnt.v_ozfod, 1);
 			}
-			cnt.v_zfod++;
+			atomic_add_int(&cnt.v_zfod, 1);
 			fs.m->valid = VM_PAGE_BITS_ALL;
 			break;	/* break to PAGE HAS BEEN FOUND */
 		} else {
@@ -733,7 +726,7 @@ readrest:
 				vm_page_unlock_queues();
 				fs.first_m = fs.m;
 				fs.m = NULL;
-				cnt.v_cow_optim++;
+				atomic_add_int(&cnt.v_cow_optim, 1);
 			} else {
 				/*
 				 * Oh, well, lets copy it.
@@ -761,7 +754,7 @@ readrest:
 			fs.m = fs.first_m;
 			if (!is_first_object_locked)
 				VM_OBJECT_LOCK(fs.object);
-			cnt.v_cow_faults++;
+			atomic_add_int(&cnt.v_cow_faults, 1);
 		} else {
 			prot &= ~VM_PROT_WRITE;
 		}
@@ -771,84 +764,56 @@ readrest:
 	 * We must verify that the maps have not changed since our last
 	 * lookup.
 	 */
-	if (!fs.lookup_still_valid &&
-		(fs.map->timestamp != map_generation)) {
+	if (!fs.lookup_still_valid) {
 		vm_object_t retry_object;
 		vm_pindex_t retry_pindex;
 		vm_prot_t retry_prot;
 
-		/*
-		 * Since map entries may be pageable, make sure we can take a
-		 * page fault on them.
-		 */
-
-		/*
-		 * Unlock vnode before the lookup to avoid deadlock.   E.G.
-		 * avoid a deadlock between the inode and exec_map that can
-		 * occur due to locks being obtained in different orders.
-		 */
-		if (fs.vp != NULL) {
-			vput(fs.vp);
-			fs.vp = NULL;
-		}
-		
-		if (fs.map->infork) {
+		if (!vm_map_trylock_read(fs.map)) {
 			release_page(&fs);
 			unlock_and_deallocate(&fs);
 			goto RetryFault;
-		}
-		VM_OBJECT_UNLOCK(fs.object);
-
-		/*
-		 * To avoid trying to write_lock the map while another process
-		 * has it read_locked (in vm_map_wire), we do not try for
-		 * write permission.  If the page is still writable, we will
-		 * get write permission.  If it is not, or has been marked
-		 * needs_copy, we enter the mapping without write permission,
-		 * and will merely take another fault.
-		 */
-		result = vm_map_lookup(&fs.map, vaddr, fault_type & ~VM_PROT_WRITE,
-		    &fs.entry, &retry_object, &retry_pindex, &retry_prot, &wired);
-		map_generation = fs.map->timestamp;
-
-		VM_OBJECT_LOCK(fs.object);
-		/*
-		 * If we don't need the page any longer, put it on the active
-		 * list (the easiest thing to do here).  If no one needs it,
-		 * pageout will grab it eventually.
-		 */
-		if (result != KERN_SUCCESS) {
-			release_page(&fs);
-			unlock_and_deallocate(&fs);
-			mtx_unlock(&Giant);
-			return (result);
 		}
 		fs.lookup_still_valid = TRUE;
+		if (fs.map->timestamp != map_generation) {
+			result = vm_map_lookup_locked(&fs.map, vaddr, fault_type,
+			    &fs.entry, &retry_object, &retry_pindex, &retry_prot, &wired);
 
-		if ((retry_object != fs.first_object) ||
-		    (retry_pindex != fs.first_pindex)) {
-			release_page(&fs);
-			unlock_and_deallocate(&fs);
-			goto RetryFault;
+			/*
+			 * If we don't need the page any longer, put it on the active
+			 * list (the easiest thing to do here).  If no one needs it,
+			 * pageout will grab it eventually.
+			 */
+			if (result != KERN_SUCCESS) {
+				release_page(&fs);
+				unlock_and_deallocate(&fs);
+
+				/*
+				 * If retry of map lookup would have blocked then
+				 * retry fault from start.
+				 */
+				if (result == KERN_FAILURE)
+					goto RetryFault;
+				return (result);
+			}
+			if ((retry_object != fs.first_object) ||
+			    (retry_pindex != fs.first_pindex)) {
+				release_page(&fs);
+				unlock_and_deallocate(&fs);
+				goto RetryFault;
+			}
+
+			/*
+			 * Check whether the protection has changed or the object has
+			 * been copied while we left the map unlocked. Changing from
+			 * read to write permission is OK - we leave the page
+			 * write-protected, and catch the write fault. Changing from
+			 * write to read permission means that we can't mark the page
+			 * write-enabled after all.
+			 */
+			prot &= retry_prot;
 		}
-		/*
-		 * Check whether the protection has changed or the object has
-		 * been copied while we left the map unlocked. Changing from
-		 * read to write permission is OK - we leave the page
-		 * write-protected, and catch the write fault. Changing from
-		 * write to read permission means that we can't mark the page
-		 * write-enabled after all.
-		 */
-		prot &= retry_prot;
 	}
-
-	/*
-	 * Put this page into the physical map. We had to do the unlock above
-	 * because pmap_enter may cause other faults.   We don't put the page
-	 * back on the active queue until later so that the page-out daemon
-	 * won't find us (yet).
-	 */
-
 	if (prot & VM_PROT_WRITE) {
 		vm_page_lock_queues();
 		vm_page_flag_set(fs.m, PG_WRITEABLE);
@@ -877,11 +842,8 @@ readrest:
 		}
 		vm_page_unlock_queues();
 		if (fault_flags & VM_FAULT_DIRTY) {
-			int s;
 			vm_page_dirty(fs.m);
-			s = splvm();
 			vm_pager_page_unswapped(fs.m);
-			splx(s);
 		}
 	}
 
@@ -898,14 +860,20 @@ readrest:
 		vm_page_zero_invalid(fs.m, TRUE);
 		printf("Warning: page %p partially invalid on fault\n", fs.m);
 	}
-	unlock_things(&fs);
+	VM_OBJECT_UNLOCK(fs.object);
 
+	/*
+	 * Put this page into the physical map.  We had to do the unlock above
+	 * because pmap_enter() may sleep.  We don't put the page
+	 * back on the active queue until later so that the pageout daemon
+	 * won't find it (yet).
+	 */
 	pmap_enter(fs.map->pmap, vaddr, fs.m, prot, wired);
 	if (((fault_flags & VM_FAULT_WIRE_MASK) == 0) && (wired == 0)) {
 		vm_fault_prefault(fs.map->pmap, vaddr, fs.entry);
 	}
+	VM_OBJECT_LOCK(fs.object);
 	vm_page_lock_queues();
-	vm_page_flag_clear(fs.m, PG_ZERO);
 	vm_page_flag_set(fs.m, PG_REFERENCED);
 
 	/*
@@ -923,6 +891,10 @@ readrest:
 	vm_page_wakeup(fs.m);
 	vm_page_unlock_queues();
 
+	/*
+	 * Unlock everything, and return
+	 */
+	unlock_and_deallocate(&fs);
 	PROC_LOCK(curproc);
 	if ((curproc->p_sflag & PS_INMEM) && curproc->p_stats) {
 		if (hardfault) {
@@ -933,11 +905,6 @@ readrest:
 	}
 	PROC_UNLOCK(curproc);
 
-	/*
-	 * Unlock everything, and return
-	 */
-	vm_object_deallocate(fs.first_object);
-	mtx_unlock(&Giant);
 	return (KERN_SUCCESS);
 }
 
@@ -1047,10 +1014,8 @@ vm_fault_quick(caddr_t v, int prot)
  *	Wire down a range of virtual addresses in a map.
  */
 int
-vm_fault_wire(map, start, end, user_wire)
-	vm_map_t map;
-	vm_offset_t start, end;
-	boolean_t user_wire;
+vm_fault_wire(vm_map_t map, vm_offset_t start, vm_offset_t end,
+    boolean_t user_wire, boolean_t fictitious)
 {
 	vm_offset_t va;
 	int rv;
@@ -1066,7 +1031,7 @@ vm_fault_wire(map, start, end, user_wire)
 		    user_wire ? VM_FAULT_USER_WIRE : VM_FAULT_CHANGE_WIRING);
 		if (rv) {
 			if (va != start)
-				vm_fault_unwire(map, start, va);
+				vm_fault_unwire(map, start, va, fictitious);
 			return (rv);
 		}
 	}
@@ -1079,9 +1044,8 @@ vm_fault_wire(map, start, end, user_wire)
  *	Unwire a range of virtual addresses in a map.
  */
 void
-vm_fault_unwire(map, start, end)
-	vm_map_t map;
-	vm_offset_t start, end;
+vm_fault_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
+    boolean_t fictitious)
 {
 	vm_paddr_t pa;
 	vm_offset_t va;
@@ -1089,7 +1053,8 @@ vm_fault_unwire(map, start, end)
 
 	pmap = vm_map_pmap(map);
 
-	mtx_lock(&Giant);
+	if (pmap != kernel_pmap)
+		mtx_lock(&Giant);
 	/*
 	 * Since the pages are wired down, we must be able to get their
 	 * mappings from the physical map system.
@@ -1098,12 +1063,15 @@ vm_fault_unwire(map, start, end)
 		pa = pmap_extract(pmap, va);
 		if (pa != 0) {
 			pmap_change_wiring(pmap, va, FALSE);
-			vm_page_lock_queues();
-			vm_page_unwire(PHYS_TO_VM_PAGE(pa), 1);
-			vm_page_unlock_queues();
+			if (!fictitious) {
+				vm_page_lock_queues();
+				vm_page_unwire(PHYS_TO_VM_PAGE(pa), 1);
+				vm_page_unlock_queues();
+			}
 		}
 	}
-	mtx_unlock(&Giant);
+	if (pmap != kernel_pmap)
+		mtx_unlock(&Giant);
 }
 
 /*

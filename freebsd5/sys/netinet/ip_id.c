@@ -34,10 +34,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_id.c,v 1.3 2003/11/07 23:31:29 sam Exp $
+ * $FreeBSD: src/sys/netinet/ip_id.c,v 1.6 2004/08/16 18:32:07 rwatson Exp $
  */
 
-/* 
+/*
  * seed = random 15bit
  * n = prime, g0 = generator to n,
  * j = random so that gcd(j,n-1) == 1
@@ -45,7 +45,7 @@
  *
  * X[0] = random seed.
  * X[n] = a*X[n-1]+b mod m is a Linear Congruential Generator
- * with a = 7^(even random) mod m, 
+ * with a = 7^(even random) mod m,
  *      b = random with gcd(b,m) == 1
  *      m = 31104 and a maximal period of m-1.
  *
@@ -57,13 +57,12 @@
  * This avoids reuse issues caused by reseeding.
  */
 
-#include "opt_random_ip_id.h"
+#include "opt_pf.h"
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/random.h>
 
-#ifdef RANDOM_IP_ID
 #define RU_OUT  180		/* Time after wich will be reseeded */
 #define RU_MAX	30000		/* Uniq cycle, avoid blackjack prediction */
 #define RU_GEN	2		/* Starting generator */
@@ -73,7 +72,7 @@
 
 #define PFAC_N 3
 const static u_int16_t pfacts[PFAC_N] = {
-	2, 
+	2,
 	3,
 	2729
 };
@@ -120,15 +119,15 @@ pmod(gen, exp, mod)
 	return (s);
 }
 
-/* 
- * Initalizes the seed and chooses a suitable generator. Also toggles 
+/*
+ * Initalizes the seed and chooses a suitable generator. Also toggles
  * the msb flag. The msb flag is used to generate two distinct
  * cycles of random numbers and thus avoiding reuse of ids.
  *
- * This function is called from id_randomid() when needed, an 
+ * This function is called from id_randomid() when needed, an
  * application does not have to worry about it.
  */
-static void 
+static void
 ip_initid(void)
 {
 	u_int16_t j, i;
@@ -151,12 +150,12 @@ ip_initid(void)
 	ru_a = pmod(RU_AGEN, (tmp >> 16) & 0xfffe, RU_M);
 	while (ru_b % 3 == 0)
 	  ru_b += 2;
-	
+
 	read_random((void *) &tmp, sizeof(tmp));
 	j = tmp % RU_N;
 	tmp = tmp >> 16;
 
-	/* 
+	/*
 	 * Do a fast gcd(j,RU_N-1), so we can find a j with
 	 * gcd(j, RU_N-1) == 1, giving a new generator for
 	 * RU_GEN^j mod RU_N
@@ -169,7 +168,7 @@ ip_initid(void)
 
 		if (i>=PFAC_N)
 			noprime = 0;
-		else 
+		else
 			j = (j+1) % RU_N;
 	}
 
@@ -177,7 +176,7 @@ ip_initid(void)
 	ru_counter = 0;
 
 	ru_reseed = time.tv_sec + RU_OUT;
-	ru_msb = ru_msb == 0x8000 ? 0 : 0x8000; 
+	ru_msb = ru_msb == 0x8000 ? 0 : 0x8000;
 }
 
 u_int16_t
@@ -208,4 +207,3 @@ ip_randomid(void)
 	return (ru_seed ^ pmod(ru_g,ru_seed2 ^ ru_x,RU_N)) | ru_msb;
 }
 
-#endif /* RANDOM_IP_ID */

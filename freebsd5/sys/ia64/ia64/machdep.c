@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003,2004 Marcel Moolenaar
  * Copyright (c) 2000,2001 Doug Rabson
  * All rights reserved.
  *
@@ -23,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/machdep.c,v 1.172 2003/11/20 16:42:39 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/machdep.c,v 1.185.2.1 2004/09/09 10:03:19 julian Exp $
  */
 
 #include "opt_compat.h"
@@ -34,6 +35,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/eventhandler.h>
+#include <sys/kdb.h>
 #include <sys/sysproto.h>
 #include <sys/signalvar.h>
 #include <sys/imgact.h>
@@ -125,8 +127,7 @@ SYSCTL_STRING(_hw, OID_AUTO, family, CTLFLAG_RD, cpu_family, 0,
     "The CPU family name");
 
 #ifdef DDB
-/* start and end of kernel symbol table */
-void	*ksym_start, *ksym_end;
+extern vm_offset_t ksym_start, ksym_end;
 #endif
 
 static void cpu_startup(void *);
@@ -145,14 +146,16 @@ void mi_startup(void);		/* XXX should be in a MI header */
 
 struct kva_md_info kmi;
 
+#define	Mhz	1000000L
+#define	Ghz	(1000L*Mhz)
+
 static void
 identifycpu(void)
 {
 	char vendor[17];
 	char *family_name, *model_name;
-	u_int64_t t;
+	u_int64_t features, tmp;
 	int number, revision, model, family, archrev;
-	u_int64_t features;
 
 	/*
 	 * Assumes little-endian.
@@ -161,12 +164,12 @@ identifycpu(void)
 	*(u_int64_t *) &vendor[8] = ia64_get_cpuid(1);
 	vendor[16] = '\0';
 
-	t = ia64_get_cpuid(3);
-	number = (t >> 0) & 0xff;
-	revision = (t >> 8) & 0xff;
-	model = (t >> 16) & 0xff;
-	family = (t >> 24) & 0xff;
-	archrev = (t >> 32) & 0xff;
+	tmp = ia64_get_cpuid(3);
+	number = (tmp >> 0) & 0xff;
+	revision = (tmp >> 8) & 0xff;
+	model = (tmp >> 16) & 0xff;
+	family = (tmp >> 24) & 0xff;
+	archrev = (tmp >> 32) & 0xff;
 
 	family_name = model_name = "unknown";
 	switch (family) {
@@ -181,7 +184,18 @@ identifycpu(void)
 			model_name = "McKinley";
 			break;
 		case 0x01:
-			model_name = "Madison";
+			/*
+			 * Deerfield is a low-voltage variant based on the
+			 * Madison core. We need circumstantial evidence
+			 * (i.e. the clock frequency) to identify those.
+			 * Allow for roughly 1% error margin.
+			 */
+			tmp = processor_frequency >> 7;
+			if ((processor_frequency - tmp) < 1*Ghz &&
+			    (processor_frequency + tmp) >= 1*Ghz)
+				model_name = "Deerfield";
+			else
+				model_name = "Madison";
 			break;
 		}
 		break;
@@ -194,8 +208,8 @@ identifycpu(void)
 	printf("CPU: %s (", model_name);
 	if (processor_frequency) {
 		printf("%ld.%02ld-Mhz ",
-		    (processor_frequency + 4999) / 1000000,
-		    ((processor_frequency + 4999) / 10000) % 100);
+		    (processor_frequency + 4999) / Mhz,
+		    ((processor_frequency + 4999) / (Mhz/100)) % 100);
 	}
 	printf("%s)\n", family_name);
 	printf("  Origin = \"%s\"  Revision = %d\n", vendor, revision);
@@ -308,7 +322,7 @@ cpu_switch(struct thread *old, struct thread *new)
 	struct pcb *oldpcb, *newpcb;
 
 	oldpcb = old->td_pcb;
-#if IA32
+#if COMPAT_IA32
 	ia32_savectx(oldpcb);
 #endif
 	if (PCPU_GET(fpcurthread) == old)
@@ -318,7 +332,7 @@ cpu_switch(struct thread *old, struct thread *new)
 		oldpcb->pcb_current_pmap =
 		    pmap_switch(newpcb->pcb_current_pmap);
 		PCPU_SET(curthread, new);
-#if IA32
+#if COMPAT_IA32
 		ia32_restorectx(newpcb);
 #endif
 		if (PCPU_GET(fpcurthread) == new)
@@ -338,7 +352,7 @@ cpu_throw(struct thread *old __unused, struct thread *new)
 	newpcb = new->td_pcb;
 	(void)pmap_switch(newpcb->pcb_current_pmap);
 	PCPU_SET(curthread, new);
-#if IA32
+#if COMPAT_IA32
 	ia32_restorectx(newpcb);
 #endif
 	restorectx(newpcb);
@@ -396,37 +410,6 @@ map_pal_code(void)
 	__asm __volatile("itr.i	itr[%0]=%1" :: "r"(1), "r"(*(u_int64_t*)&pte));
 	__asm __volatile("mov	psr.l=%0" :: "r" (psr));
 	__asm __volatile("srlz.i");
-}
-
-void
-map_port_space(void)
-{
-	struct ia64_pte pte;
-	u_int64_t psr;
-
-	/* XXX we should fail hard if there's no I/O port space. */
-	if (ia64_port_base == 0)
-		return;
-
-	bzero(&pte, sizeof(pte));
-	pte.pte_p = 1;
-	pte.pte_ma = PTE_MA_UC;
-	pte.pte_a = 1;
-	pte.pte_d = 1;
-	pte.pte_pl = PTE_PL_KERN;
-	pte.pte_ar = PTE_AR_RW;
-	pte.pte_ppn = ia64_port_base >> 12;
-
-	__asm __volatile("ptr.d %0,%1" :: "r"(ia64_port_base), "r"(24 << 2));
-
-	__asm __volatile("mov	%0=psr" : "=r" (psr));
-	__asm __volatile("rsm	psr.ic|psr.i");
-	__asm __volatile("srlz.d");
-	__asm __volatile("mov	cr.ifa=%0" :: "r"(ia64_port_base));
-	__asm __volatile("mov	cr.itir=%0" :: "r"(IA64_ID_PAGE_SHIFT << 2));
-	__asm __volatile("itr.d dtr[%0]=%1" :: "r"(2), "r"(*(u_int64_t*)&pte));
-	__asm __volatile("mov	psr.l=%0" :: "r" (psr));
-	__asm __volatile("srlz.d");
 }
 
 void
@@ -545,8 +528,6 @@ ia64_init(void)
 			ia64_pal_base = mdp->PhysicalStart;
 	}
 
-	map_port_space();
-
 	metadata_missing = 0;
 	if (bootinfo.bi_modulep)
 		preload_metadata = (caddr_t)bootinfo.bi_modulep;
@@ -605,8 +586,8 @@ ia64_init(void)
 	 */
 	kernstart = trunc_page(kernel_text);
 #ifdef DDB
-	ksym_start = (void *)bootinfo.bi_symtab;
-	ksym_end = (void *)bootinfo.bi_esymtab;
+	ksym_start = bootinfo.bi_symtab;
+	ksym_end = bootinfo.bi_esymtab;
 	kernend = (vm_offset_t)round_page(ksym_end);
 #else
 	kernend = (vm_offset_t)round_page(_end);
@@ -743,7 +724,7 @@ ia64_init(void)
 	msgbufp = (struct msgbuf *)pmap_steal_memory(MSGBUF_SIZE);
 	msgbufinit(msgbufp, MSGBUF_SIZE);
 
-	proc_linkup(&proc0, &ksegrp0, &kse0, &thread0);
+	proc_linkup(&proc0, &ksegrp0, &thread0);
 	/*
 	 * Init mapping for u page(s) for proc 0
 	 */
@@ -785,13 +766,13 @@ ia64_init(void)
 	/*
 	 * Initialize debuggers, and break into them if appropriate.
 	 */
-#ifdef DDB
 	kdb_init();
-	if (boothowto & RB_KDB) {
-		printf("Boot flags requested debugger\n");
-		breakpoint();
-	}
+
+#ifdef KDB
+	if (boothowto & RB_KDB)
+		kdb_enter("Boot flags requested debugger\n");
 #endif
+
 	ia64_set_tpr(0);
 
 	/*
@@ -881,8 +862,8 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	/* save user context */
 	bzero(&sf, sizeof(struct sigframe));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack = p->p_sigstk;
-	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	sf.sf_uc.uc_stack = td->td_sigstk;
+	sf.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 
 	/*
@@ -892,13 +873,13 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	 * will fail if the process has not already allocated
 	 * the space with a `brk'.
 	 */
-	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sbs = (u_int64_t)p->p_sigstk.ss_sp;
+		sbs = (u_int64_t)td->td_sigstk.ss_sp;
 		sbs = (sbs + 15) & ~15;
-		sfp = (struct sigframe *)(sbs + p->p_sigstk.ss_size);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		sfp = (struct sigframe *)(sbs + td->td_sigstk.ss_size);
+#if defined(COMPAT_43)
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else
 		sfp = (struct sigframe *)sp;
@@ -915,7 +896,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
-	get_mcontext(td, &sf.sf_uc.uc_mcontext, GET_MC_IA64_SCRATCH);
+	get_mcontext(td, &sf.sf_uc.uc_mcontext, 0);
 
 	/* Copy the frame out to userland. */
 	if (copyout(&sf, sfp, sizeof(sf)) != 0) {
@@ -1013,11 +994,11 @@ sigreturn(struct thread *td,
 	set_mcontext(td, &uc.uc_mcontext);
 
 	PROC_LOCK(p);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	if (sigonstack(tf->tf_special.sp))
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
+		td->td_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 	td->td_sigmask = uc.uc_sigmask;
 	SIG_CANTMASK(td->td_sigmask);
@@ -1036,55 +1017,66 @@ freebsd4_sigreturn(struct thread *td, struct freebsd4_sigreturn_args *uap)
 }
 #endif
 
+/*
+ * Construct a PCB from a trapframe. This is called from kdb_trap() where
+ * we want to start a backtrace from the function that caused us to enter
+ * the debugger. We have the context in the trapframe, but base the trace
+ * on the PCB. The PCB doesn't have to be perfect, as long as it contains
+ * enough for a backtrace.
+ */
+void
+makectx(struct trapframe *tf, struct pcb *pcb)
+{
+
+	pcb->pcb_special = tf->tf_special;
+	pcb->pcb_special.__spare = ~0UL;	/* XXX see unwind.c */
+	save_callee_saved(&pcb->pcb_preserved);
+	save_callee_saved_fp(&pcb->pcb_preserved_fp);
+}
+
+void
+ia64_flush_dirty(struct thread *td, struct _special *r)
+{
+	uint64_t bspst, kstk, rnat;
+
+	if (r->ndirty == 0)
+		return;
+
+	kstk = td->td_kstack + (r->bspstore & 0x1ffUL);
+	__asm __volatile("mov	ar.rsc=0;;");
+	__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
+	/* Make sure we have all the user registers written out. */
+	if (bspst - kstk < r->ndirty) {
+		__asm __volatile("flushrs;;");
+		__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
+	}
+	__asm __volatile("mov	%0=ar.rnat;;" : "=r"(rnat));
+	__asm __volatile("mov	ar.rsc=3");
+	copyout((void*)kstk, (void*)r->bspstore, r->ndirty);
+	kstk += r->ndirty;
+	r->rnat = (bspst > kstk && (bspst & 0x1ffUL) < (kstk & 0x1ffUL))
+	    ? *(uint64_t*)(kstk | 0x1f8UL) : rnat;
+	r->bspstore += r->ndirty;
+	r->ndirty = 0;
+}
+
 int
 get_mcontext(struct thread *td, mcontext_t *mc, int flags)
 {
 	struct trapframe *tf;
-	uint64_t bspst, kstk, rnat;
 
 	tf = td->td_frame;
 	bzero(mc, sizeof(*mc));
-	if (tf->tf_special.ndirty != 0) {
-		kstk = td->td_kstack + (tf->tf_special.bspstore & 0x1ffUL);
-		__asm __volatile("mov	ar.rsc=0;;");
-		__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
-		/* Make sure we have all the user registers written out. */
-		if (bspst - kstk < tf->tf_special.ndirty) {
-			__asm __volatile("flushrs;;");
-			__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
-		}
-		__asm __volatile("mov	%0=ar.rnat;;" : "=r"(rnat));
-		__asm __volatile("mov	ar.rsc=3");
-		copyout((void*)kstk, (void*)tf->tf_special.bspstore,
-		    tf->tf_special.ndirty);
-		kstk += tf->tf_special.ndirty;
-		mc->mc_special = tf->tf_special;
-		mc->mc_special.rnat =
-		    (bspst > kstk && (bspst & 0x1ffUL) < (kstk & 0x1ffUL))
-		    ? *(uint64_t*)(kstk | 0x1f8UL) : rnat;
-		mc->mc_special.bspstore += mc->mc_special.ndirty;
-		mc->mc_special.ndirty = 0;
-	} else
-		mc->mc_special = tf->tf_special;
+	mc->mc_special = tf->tf_special;
+	ia64_flush_dirty(td, &mc->mc_special);
 	if (tf->tf_flags & FRAME_SYSCALL) {
-		if (flags & GET_MC_IA64_SCRATCH) {
-			mc->mc_flags |= _MC_FLAGS_SCRATCH_VALID;
-			mc->mc_scratch = tf->tf_scratch;
-		} else {
-			/*
-			 * Put the syscall return values in the context.  We
-			 * need this for swapcontext() to work.  Note that we
-			 * don't use gr11 in the kernel, but the runtime
-			 * specification defines it as a return register,
-			 * just like gr8-gr10.
-			 */
-			mc->mc_flags |= _MC_FLAGS_RETURN_VALID;
-			if ((flags & GET_MC_CLEAR_RET) == 0) {
-				mc->mc_scratch.gr8 = tf->tf_scratch.gr8;
-				mc->mc_scratch.gr9 = tf->tf_scratch.gr9;
-				mc->mc_scratch.gr10 = tf->tf_scratch.gr10;
-				mc->mc_scratch.gr11 = tf->tf_scratch.gr11;
-			}
+		mc->mc_flags |= _MC_FLAGS_SYSCALL_CONTEXT;
+		mc->mc_scratch = tf->tf_scratch;
+		if (flags & GET_MC_CLEAR_RET) {
+			mc->mc_scratch.gr8 = 0;
+			mc->mc_scratch.gr9 = 0;
+			mc->mc_scratch.gr10 = 0;
+			mc->mc_scratch.gr11 = 0;
 		}
 	} else {
 		mc->mc_flags |= _MC_FLAGS_ASYNC_CONTEXT;
@@ -1128,29 +1120,28 @@ set_mcontext(struct thread *td, const mcontext_t *mc)
 	if (mc->mc_flags & _MC_FLAGS_ASYNC_CONTEXT) {
 		/*
 		 * We can get an async context passed to us while we
-		 * entered the kernel through a syscall: sigreturn(2).
+		 * entered the kernel through a syscall: sigreturn(2)
+		 * and kse_switchin(2) both take contexts that could
+		 * previously be the result of a trap or interrupt.
 		 * Hence, we cannot assert that the trapframe is not
-		 * a syscall frame, but we can assert that if it is
-		 * the syscall is sigreturn(2).
+		 * a syscall frame, but we can assert that it's at
+		 * least an expected syscall.
 		 */
-		if (tf->tf_flags & FRAME_SYSCALL)
-			KASSERT(tf->tf_scratch.gr15 == SYS_sigreturn, ("foo"));
+		if (tf->tf_flags & FRAME_SYSCALL) {
+			KASSERT(tf->tf_scratch.gr15 == SYS_sigreturn ||
+			    tf->tf_scratch.gr15 == SYS_kse_switchin, ("foo"));
+			tf->tf_flags &= ~FRAME_SYSCALL;
+		}
 		tf->tf_scratch = mc->mc_scratch;
 		tf->tf_scratch_fp = mc->mc_scratch_fp;
 		if (mc->mc_flags & _MC_FLAGS_HIGHFP_VALID)
 			td->td_pcb->pcb_high_fp = mc->mc_high_fp;
 	} else {
 		KASSERT((tf->tf_flags & FRAME_SYSCALL) != 0, ("foo"));
-		if ((mc->mc_flags & _MC_FLAGS_SCRATCH_VALID) == 0) {
+		if ((mc->mc_flags & _MC_FLAGS_SYSCALL_CONTEXT) == 0) {
 			s.cfm = tf->tf_special.cfm;
 			s.iip = tf->tf_special.iip;
 			tf->tf_scratch.gr15 = 0;	/* Clear syscall nr. */
-			if (mc->mc_flags & _MC_FLAGS_RETURN_VALID) {
-				tf->tf_scratch.gr8 = mc->mc_scratch.gr8;
-				tf->tf_scratch.gr9 = mc->mc_scratch.gr9;
-				tf->tf_scratch.gr10 = mc->mc_scratch.gr10;
-				tf->tf_scratch.gr11 = mc->mc_scratch.gr11;
-			}
 		} else
 			tf->tf_scratch = mc->mc_scratch;
 	}
@@ -1263,8 +1254,36 @@ ptrace_set_pc(struct thread *td, unsigned long addr)
 int
 ptrace_single_step(struct thread *td)
 {
+	struct trapframe *tf;
 
-	td->td_frame->tf_special.psr |= IA64_PSR_SS;
+	/*
+	 * There's no way to set single stepping when we're leaving the
+	 * kernel through the EPC syscall path. The way we solve this is
+	 * by enabling the lower-privilege trap so that we re-enter the
+	 * kernel as soon as the privilege level changes. See trap.c for
+	 * how we proceed from there.
+	 */
+	tf = td->td_frame;
+	if (tf->tf_flags & FRAME_SYSCALL)
+		tf->tf_special.psr |= IA64_PSR_LP;
+	else
+		tf->tf_special.psr |= IA64_PSR_SS;
+	return (0);
+}
+
+int
+ptrace_clear_single_step(struct thread *td)
+{
+	struct trapframe *tf;
+
+	/*
+	 * Clear any and all status bits we may use to implement single
+	 * stepping.
+	 */
+	tf = td->td_frame;
+	tf->tf_special.psr &= ~IA64_PSR_SS;
+	tf->tf_special.psr &= ~IA64_PSR_LP;
+	tf->tf_special.psr &= ~IA64_PSR_TB;
 	return (0);
 }
 
@@ -1286,7 +1305,10 @@ set_regs(struct thread *td, struct reg *regs)
 	struct trapframe *tf;
 
 	tf = td->td_frame;
+	ia64_flush_dirty(td, &tf->tf_special);
 	tf->tf_special = regs->r_special;
+	tf->tf_special.bspstore += tf->tf_special.ndirty;
+	tf->tf_special.ndirty = 0;
 	tf->tf_scratch = regs->r_scratch;
 	restore_callee_saved(&regs->r_preserved);
 	return (0);
@@ -1393,14 +1415,6 @@ ia64_highfp_save(struct thread *td)
 	KASSERT(thr == td, ("Inconsistent high FP state"));
 	return (1);
 }
-
-#ifndef DDB
-void
-Debugger(const char *msg)
-{
-	printf("Debugger(\"%s\") called.\n", msg);
-}
-#endif /* no DDB */
 
 int
 sysbeep(int pitch, int period)

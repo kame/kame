@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.199 2003/09/30 20:54:12 mux Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.213 2004/08/05 07:15:35 cperciva Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -67,10 +63,8 @@ extern struct cv selwait;	/* select conditional variable */
 
 extern long physmem;		/* physical memory */
 
-extern dev_t rootdev;		/* root device */
-extern dev_t rootdevs[2];	/* possible root devices */
+extern struct cdev *rootdev;		/* root device */
 extern char *rootdevnames[2];	/* names of possible root devices */
-extern struct vnode *rootvp;	/* vnode equivalent to above */
 
 extern int boothowto;		/* reboot flags, from console subsystem */
 extern int bootverbose;		/* nonzero to print verbose messages */
@@ -126,7 +120,6 @@ struct _jmp_buf;
 
 int	setjmp(struct _jmp_buf *);
 void	longjmp(struct _jmp_buf *, int) __dead2;
-void	Debugger(const char *msg) __nonnull(1);
 int	dumpstatus(vm_offset_t addr, off_t count);
 int	nullop(void);
 int	eopnotsupp(void);
@@ -141,7 +134,6 @@ void	panic(const char *, ...) __printflike(1, 2);
 void	panic(const char *, ...) __dead2 __printflike(1, 2);
 #endif
 
-void	backtrace(void);
 void	cpu_boot(int);
 void	cpu_rootconf(void);
 extern uint32_t crc32_tab[];
@@ -172,6 +164,12 @@ u_long	strtoul(const char *, char **, int) __nonnull(1);
 quad_t	strtoq(const char *, char **, int) __nonnull(1);
 u_quad_t strtouq(const char *, char **, int) __nonnull(1);
 void	tprintf(struct proc *p, int pri, const char *, ...) __printflike(3, 4);
+void	hexdump(void *ptr, int length, const char *hdr, int flags);
+#define	HD_COLUMN_MASK	0xff
+#define	HD_DELIM_MASK	0xff00
+#define	HD_OMIT_COUNT	(1 << 16)
+#define	HD_OMIT_HEX	(1 << 17)
+#define	HD_OMIT_CHARS	(1 << 18)
 
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
 void	bcopy(const void *from, void *to, size_t len) __nonnull(1) __nonnull(2);
@@ -179,12 +177,16 @@ void	bzero(void *buf, size_t len) __nonnull(1);
 
 void	*memcpy(void *to, const void *from, size_t len) __nonnull(1) __nonnull(2);
 
-int	copystr(const void *kfaddr, void *kdaddr, size_t len,
-	    size_t *lencopied) __nonnull(1) __nonnull(2);
-int	copyinstr(const void *udaddr, void *kaddr, size_t len,
-	    size_t *lencopied) __nonnull(1) __nonnull(2);
-int	copyin(const void *udaddr, void *kaddr, size_t len) __nonnull(1) __nonnull(2);
-int	copyout(const void *kaddr, void *udaddr, size_t len) __nonnull(1) __nonnull(2);
+int	copystr(const void * __restrict kfaddr, void * __restrict kdaddr,
+	    size_t len, size_t * __restrict lencopied)
+	    __nonnull(1) __nonnull(2);
+int	copyinstr(const void * __restrict udaddr, void * __restrict kaddr,
+	    size_t len, size_t * __restrict lencopied)
+	    __nonnull(1) __nonnull(2);
+int	copyin(const void * __restrict udaddr, void * __restrict kaddr,
+	    size_t len) __nonnull(1) __nonnull(2);
+int	copyout(const void * __restrict kaddr, void * __restrict udaddr,
+	    size_t len) __nonnull(1) __nonnull(2);
 
 int	fubyte(const void *base);
 long	fuword(const void *base);
@@ -212,7 +214,8 @@ void	cpu_startprofclock(void);
 void	cpu_stopprofclock(void);
 
 /* flags for suser() and suser_cred() */
-#define PRISON_ROOT	1
+#define SUSER_ALLOWJAIL	1
+#define SUSER_RUID	2
 
 int	suser(struct thread *td);
 int	suser_cred(struct ucred *cred, int flag);
@@ -300,23 +303,20 @@ extern watchdog_tickle_fn	wdog_tickler;
  */
 int	msleep(void *chan, struct mtx *mtx, int pri, const char *wmesg,
 	    int timo);
-void	abortsleep(struct thread *td);
 #define	tsleep(chan, pri, wmesg, timo)	msleep(chan, NULL, pri, wmesg, timo)
 void	wakeup(void *chan) __nonnull(1);
 void	wakeup_one(void *chan) __nonnull(1);
 
 /*
- * Common `dev_t' stuff are declared here to avoid #include poisoning
+ * Common `struct cdev *' stuff are declared here to avoid #include poisoning
  */
 
-int major(dev_t x);
-int minor(dev_t x);
-dev_t makedev(int x, int y);
-udev_t dev2udev(dev_t x);
-dev_t udev2dev(udev_t x, int b);
-int uminor(udev_t dev);
-int umajor(udev_t dev);
-udev_t makeudev(int x, int y);
+int major(struct cdev *x);
+int minor(struct cdev *x);
+dev_t dev2udev(struct cdev *x);
+struct cdev *findcdev(dev_t x);
+int uminor(dev_t dev);
+int umajor(dev_t dev);
 
 /* XXX: Should be void nanodelay(u_int nsec); */
 void	DELAY(int usec);

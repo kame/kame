@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp_i810.c,v 1.25 2003/10/23 17:48:30 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp_i810.c,v 1.30 2004/05/30 20:00:40 phk Exp $");
 
 #include "opt_bus.h"
 
@@ -39,9 +39,9 @@ __FBSDID("$FreeBSD: src/sys/pci/agp_i810.c,v 1.25 2003/10/23 17:48:30 jhb Exp $"
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/lock.h>
-#include <sys/lockmgr.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
@@ -183,6 +183,8 @@ agp_i810_probe(device_t dev)
 {
 	const char *desc;
 
+	if (resource_disabled("agp", device_get_unit(dev)))
+		return (ENXIO);
 	desc = agp_i810_match(dev);
 	if (desc) {
 		device_t bdev;
@@ -274,8 +276,8 @@ agp_i810_attach(device_t dev)
 
 	/* Same for i810 and i830 */
 	rid = AGP_I810_MMADR;
-	sc->regs = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-				      0, ~0, 1, RF_ACTIVE);
+	sc->regs = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+					  RF_ACTIVE);
 	if (!sc->regs) {
 		agp_generic_detach(dev);
 		return ENOMEM;
@@ -610,8 +612,6 @@ agp_i810_alloc_memory(device_t dev, int type, vm_size_t size)
 		m = vm_page_grab(mem->am_obj, 0,
 		    VM_ALLOC_WIRED | VM_ALLOC_ZERO | VM_ALLOC_RETRY);
 		VM_OBJECT_UNLOCK(mem->am_obj);
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
 		vm_page_lock_queues();
 		mem->am_physical = VM_PAGE_TO_PHYS(m);
 		vm_page_wakeup(m);

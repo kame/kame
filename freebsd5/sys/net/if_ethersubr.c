@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.155 2003/11/14 21:02:22 andre Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.177.2.1 2004/10/16 07:04:49 scottl Exp $
  */
 
 #include "opt_atalk.h"
@@ -47,6 +43,7 @@
 #include <sys/kernel.h>
 #include <sys/mac.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/mbuf.h>
 #include <sys/random.h>
 #include <sys/socket.h>
@@ -54,6 +51,7 @@
 #include <sys/sysctl.h>
 
 #include <net/if.h>
+#include <net/if_arp.h>
 #include <net/netisr.h>
 #include <net/route.h>
 #include <net/if_llc.h>
@@ -111,19 +109,20 @@ bdg_forward_t *bdg_forward_ptr;
 bdgtakeifaces_t *bdgtakeifaces_ptr;
 struct bdg_softc *ifp2sc;
 
-static u_char etherbroadcastaddr[ETHER_ADDR_LEN] =
+static const u_char etherbroadcastaddr[ETHER_ADDR_LEN] =
 			{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 static	int ether_resolvemulti(struct ifnet *, struct sockaddr **,
 		struct sockaddr *);
 
 #define senderr(e) do { error = (e); goto bad;} while (0)
-#define IFP2AC(IFP) ((struct arpcom *)IFP)
 
+#if defined(INET) || defined(INET6)
 int
 ether_ipfw_chk(struct mbuf **m0, struct ifnet *dst,
 	struct ip_fw **rule, int shared);
 static int ether_ipfw;
+#endif
 
 /*
  * Ethernet output routine.
@@ -137,13 +136,11 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	struct sockaddr *dst, struct rtentry *rt0)
 {
 	short type;
-	int error = 0, hdrcmplt = 0;
+	int error, hdrcmplt = 0;
 	u_char esrc[ETHER_ADDR_LEN], edst[ETHER_ADDR_LEN];
-	struct rtentry *rt;
 	struct ether_header *eh;
 	int loop_copy = 0;
 	int hlen;	/* link layer header length */
-	struct arpcom *ac = IFP2AC(ifp);
 
 #ifdef MAC
 	error = mac_check_ifnet_transmit(ifp, m);
@@ -156,25 +153,48 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
 
-	error = rt_check(&rt, &rt0, dst);
-	if (error)
-		goto bad;
-
 	hlen = ETHER_HDR_LEN;
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
-		if (!arpresolve(ifp, rt, m, dst, edst, rt0))
-			return (0);	/* if not yet resolved */
+		error = arpresolve(ifp, rt0, m, dst, edst);
+		if (error)
+			return (error == EWOULDBLOCK ? 0 : error);
 		type = htons(ETHERTYPE_IP);
 		break;
+	case AF_ARP:
+	{
+		struct arphdr *ah;
+		ah = mtod(m, struct arphdr *);
+		ah->ar_hrd = htons(ARPHRD_ETHER);
+
+		loop_copy = -1; /* if this is for us, don't do it */
+
+		switch(ntohs(ah->ar_op)) {
+		case ARPOP_REVREQUEST:
+		case ARPOP_REVREPLY:
+			type = htons(ETHERTYPE_REVARP);
+			break;
+		case ARPOP_REQUEST:
+		case ARPOP_REPLY:
+		default:
+			type = htons(ETHERTYPE_ARP);
+			break;
+		}
+
+		if (m->m_flags & M_BCAST)
+			bcopy(ifp->if_broadcastaddr, edst, ETHER_ADDR_LEN);
+		else
+			bcopy(ar_tha(ah), edst, ETHER_ADDR_LEN);
+
+	}
+	break;
 #endif
 #ifdef INET6
 	case AF_INET6:
-		if (!nd6_storelladdr(&ac->ac_if, rt, m, dst, (u_char *)edst)) {
-			/* Something bad happened */
-			return(0);
-		}
+		error = nd6_storelladdr(ifp, rt0, m, dst, (u_char *)edst);
+		if (error)
+			return error;
 		type = htons(ETHERTYPE_IPV6);
 		break;
 #endif
@@ -195,15 +215,12 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	  {
 	    struct at_ifaddr *aa;
 
-	    if ((aa = at_ifawithnet((struct sockaddr_at *)dst)) == NULL) {
-		    goto bad;
-	    }
-	    if (!aarpresolve(ac, m, (struct sockaddr_at *)dst, edst))
+	    if ((aa = at_ifawithnet((struct sockaddr_at *)dst)) == NULL)
+		    senderr(EHOSTUNREACH); /* XXX */
+	    if (!aarpresolve(ifp, m, (struct sockaddr_at *)dst, edst))
 		    return (0);
 	    /*
 	     * In the phase 2 case, need to prepend an mbuf for the llc header.
-	     * Since we must preserve the value of m, which is passed to us by
-	     * value, we m_copy() the first mbuf, and use it for our llc header.
 	     */
 	    if ( aa->aa_flags & AFA_PHASE2 ) {
 		struct llc llc;
@@ -258,7 +275,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 		(void)memcpy(eh->ether_shost, esrc,
 			sizeof(eh->ether_shost));
 	else
-		(void)memcpy(eh->ether_shost, ac->ac_enaddr,
+		(void)memcpy(eh->ether_shost, IFP2AC(ifp)->ac_enaddr,
 			sizeof(eh->ether_shost));
 
 	/*
@@ -322,12 +339,12 @@ bad:			if (m != NULL)
 int
 ether_output_frame(struct ifnet *ifp, struct mbuf *m)
 {
-	struct ip_fw *rule = NULL;
-
-	/* Extract info from dummynet tag, ignore others */
-	for (; m->m_type == MT_TAG; m = m->m_next)
-		if (m->m_flags == PACKET_TAG_DUMMYNET)
-			rule = ((struct dn_pkt *)m)->rule;
+#if defined(INET) || defined(INET6)
+	struct ip_fw *rule = ip_dn_claim_rule(m);
+#else
+	void *rule = NULL;
+#endif
+	int error;
 
 	if (rule == NULL && BDG_ACTIVE(ifp)) {
 		/*
@@ -341,23 +358,27 @@ ether_output_frame(struct ifnet *ifp, struct mbuf *m)
 			m_freem(m);
 		return (0);
 	}
+#if defined(INET) || defined(INET6)
 	if (IPFW_LOADED && ether_ipfw != 0) {
 		if (ether_ipfw_chk(&m, ifp, &rule, 0) == 0) {
 			if (m) {
 				m_freem(m);
-				return ENOBUFS;	/* pkt dropped */
+				return EACCES;	/* pkt dropped */
 			} else
 				return 0;	/* consumed e.g. in a pipe */
 		}
 	}
+#endif
 
 	/*
 	 * Queue message on interface, update output statistics if
 	 * successful, and start output if interface not yet active.
 	 */
-	return (IF_HANDOFF(&ifp->if_snd, m, ifp) ? 0 : ENOBUFS);
+	IFQ_HANDOFF(ifp, m, error);
+	return (error);
 }
 
+#if defined(INET) || defined(INET6)
 /*
  * ipfw processing for ethernet packets (in and out).
  * The second parameter is NULL from ether_demux, and ifp from
@@ -397,7 +418,6 @@ ether_ipfw_chk(struct mbuf **m0, struct ifnet *dst,
 
 	args.m = m;		/* the packet we are looking at		*/
 	args.oif = dst;		/* destination, if any			*/
-	args.divert_rule = 0;	/* we do not support divert yet		*/
 	args.rule = *rule;	/* matching rule to restart		*/
 	args.next_hop = NULL;	/* we do not support forward yet	*/
 	args.eh = &save_eh;	/* MAC header for bridged/MAC packets	*/
@@ -452,6 +472,7 @@ ether_ipfw_chk(struct mbuf **m0, struct ifnet *dst,
 	 */
 	return 0;
 }
+#endif
 
 /*
  * Process a received Ethernet packet; the packet is in the
@@ -593,10 +614,10 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 		}
 	}
 
-	ether_demux(ifp, m);
 	/* First chunk of an mbuf contains good entropy */
 	if (harvest.ethernet)
 		random_harvest(m, 16, 3, 0, RANDOM_NET);
+	ether_demux(ifp, m);
 }
 
 /*
@@ -611,28 +632,33 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 #if defined(NETATALK)
 	struct llc *l;
 #endif
-	struct ip_fw *rule = NULL;
-
-	/* Extract info from dummynet tag, ignore others */
-	for (;m->m_type == MT_TAG; m = m->m_next)
-		if (m->m_flags == PACKET_TAG_DUMMYNET) {
-			rule = ((struct dn_pkt *)m)->rule;
-			ifp = m->m_next->m_pkthdr.rcvif;
-		}
+#if defined(INET) || defined(INET6)
+	struct ip_fw *rule = ip_dn_claim_rule(m);
+#endif
 
 	KASSERT(ifp != NULL, ("ether_demux: NULL interface pointer"));
 
 	eh = mtod(m, struct ether_header *);
+	ether_type = ntohs(eh->ether_type);
 
+#if defined(INET) || defined(INET6)
 	if (rule)	/* packet was already bridged */
 		goto post_stats;
+#endif
 
-	if (!(BDG_ACTIVE(ifp))) {
+	if (!(BDG_ACTIVE(ifp)) &&
+	    !(ether_type == ETHERTYPE_VLAN && ifp->if_nvlans > 0)) {
 		/*
 		 * Discard packet if upper layers shouldn't see it because it
 		 * was unicast to a different Ethernet address. If the driver
 		 * is working properly, then this situation can only happen
 		 * when the interface is in promiscuous mode.
+		 *
+		 * If VLANs are active, and this packet has a VLAN tag, do
+		 * not drop it here but pass it on to the VLAN layer, to
+		 * give them a chance to consider it as well (e. g. in case
+		 * bridging is only active on a VLAN).  They will drop it if
+		 * it's undesired.
 		 */
 		if ((ifp->if_flags & IFF_PROMISC) != 0
 		    && (eh->ether_dhost[0] & 1) == 0
@@ -659,6 +685,7 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 	if (m->m_flags & (M_BCAST|M_MCAST))
 		ifp->if_imcasts++;
 
+#if defined(INET) || defined(INET6)
 post_stats:
 	if (IPFW_LOADED && ether_ipfw != 0) {
 		if (ether_ipfw_chk(&m, NULL, &rule, 0) == 0) {
@@ -667,6 +694,7 @@ post_stats:
 			return;
 		}
 	}
+#endif
 
 	/*
 	 * If VLANs are configured on the interface, check to
@@ -683,8 +711,6 @@ post_stats:
 		(*vlan_input_p)(ifp, m);
 		return;
 	}
-
-	ether_type = ntohs(eh->ether_type);
 
 	/*
 	 * Handle protocols that expect to have the Ethernet header
@@ -760,14 +786,14 @@ post_stats:
 		if (l->llc_dsap == LLC_SNAP_LSAP &&
 		    l->llc_ssap == LLC_SNAP_LSAP &&
 		    l->llc_control == LLC_UI) {
-			if (Bcmp(&(l->llc_snap_org_code)[0], at_org_code,
+			if (bcmp(&(l->llc_snap_org_code)[0], at_org_code,
 			    sizeof(at_org_code)) == 0 &&
 			    ntohs(l->llc_snap_ether_type) == ETHERTYPE_AT) {
 				m_adj(m, LLC_SNAPFRAMELEN);
 				isr = NETISR_ATALK2;
 				break;
 			}
-			if (Bcmp(&(l->llc_snap_org_code)[0], aarp_org_code,
+			if (bcmp(&(l->llc_snap_org_code)[0], aarp_org_code,
 			    sizeof(aarp_org_code)) == 0 &&
 			    ntohs(l->llc_snap_ether_type) == ETHERTYPE_AARP) {
 				m_adj(m, LLC_SNAPFRAMELEN);
@@ -821,6 +847,7 @@ ether_sprintf(const u_char *ap)
 void
 ether_ifattach(struct ifnet *ifp, const u_int8_t *llc)
 {
+	int i;
 	struct ifaddr *ifa;
 	struct sockaddr_dl *sdl;
 
@@ -854,6 +881,15 @@ ether_ifattach(struct ifnet *ifp, const u_int8_t *llc)
 		(*ng_ether_attach_p)(ifp);
 	if (BDG_LOADED)
 		bdgtakeifaces_ptr();
+
+	/* Announce Ethernet MAC address if non-zero. */
+	for (i = 0; i < ifp->if_addrlen; i++)
+		if (llc[i] != 0)
+			break; 
+	if (i != ifp->if_addrlen)
+		if_printf(ifp, "Ethernet address: %6D\n", llc, ":");
+	if (debug_mpsafenet && (ifp->if_flags & IFF_NEEDSGIANT) != 0)
+		if_printf(ifp, "if_start running deferred for Giant\n");
 }
 
 /*
@@ -872,8 +908,83 @@ ether_ifdetach(struct ifnet *ifp)
 
 SYSCTL_DECL(_net_link);
 SYSCTL_NODE(_net_link, IFT_ETHER, ether, CTLFLAG_RW, 0, "Ethernet");
+#if defined(INET) || defined(INET6)
 SYSCTL_INT(_net_link_ether, OID_AUTO, ipfw, CTLFLAG_RW,
 	    &ether_ipfw,0,"Pass ether pkts through firewall");
+#endif
+
+#if 0
+/*
+ * This is for reference.  We have a table-driven version
+ * of the little-endian crc32 generator, which is faster
+ * than the double-loop.
+ */
+uint32_t
+ether_crc32_le(const uint8_t *buf, size_t len)
+{
+	size_t i;
+	uint32_t crc;
+	int bit;
+	uint8_t data;
+
+	crc = 0xffffffff;	/* initial value */
+
+	for (i = 0; i < len; i++) {
+		for (data = *buf++, bit = 0; bit < 8; bit++, data >>= 1)
+			carry = (crc ^ data) & 1;
+			crc >>= 1;
+			if (carry)
+				crc = (crc ^ ETHER_CRC_POLY_LE);
+	}
+
+	return (crc);
+}
+#else
+uint32_t
+ether_crc32_le(const uint8_t *buf, size_t len)
+{
+	static const uint32_t crctab[] = {
+		0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
+		0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
+		0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
+		0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
+	};
+	size_t i;
+	uint32_t crc;
+
+	crc = 0xffffffff;	/* initial value */
+
+	for (i = 0; i < len; i++) {
+		crc ^= buf[i];
+		crc = (crc >> 4) ^ crctab[crc & 0xf];
+		crc = (crc >> 4) ^ crctab[crc & 0xf];
+	}
+
+	return (crc);
+}
+#endif
+
+uint32_t
+ether_crc32_be(const uint8_t *buf, size_t len)
+{
+	size_t i;
+	uint32_t crc, carry;
+	int bit;
+	uint8_t data;
+
+	crc = 0xffffffff;	/* initial value */
+
+	for (i = 0; i < len; i++) {
+		for (data = *buf++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
+			crc <<= 1;
+			if (carry)
+				crc = (crc ^ ETHER_CRC_POLY_BE) | carry;
+		}
+	}
+
+	return (crc);
+}
 
 int
 ether_ioctl(struct ifnet *ifp, int command, caddr_t data)
@@ -957,7 +1068,9 @@ ether_resolvemulti(struct ifnet *ifp, struct sockaddr **llsa,
 	struct sockaddr *sa)
 {
 	struct sockaddr_dl *sdl;
+#ifdef INET
 	struct sockaddr_in *sin;
+#endif
 #ifdef INET6
 	struct sockaddr_in6 *sin6;
 #endif
@@ -970,7 +1083,7 @@ ether_resolvemulti(struct ifnet *ifp, struct sockaddr **llsa,
 		 */
 		sdl = (struct sockaddr_dl *)sa;
 		e_addr = LLADDR(sdl);
-		if ((e_addr[0] & 1) != 1)
+		if (!ETHER_IS_MULTICAST(e_addr))
 			return EADDRNOTAVAIL;
 		*llsa = 0;
 		return 0;

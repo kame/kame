@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_ioctl.h,v 1.7 2003/07/29 13:32:10 harti Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_ioctl.h,v 1.9 2004/06/08 13:46:31 stefanf Exp $
  *
  */
 
@@ -421,18 +421,10 @@ struct air_phy_stat_rsp {
 /*
  * PF_ATM ioctls
  */
-#if !defined(__GNUC__)
-#define	AIOCCFG		_IOW(A, 128, struct atmcfgreq)	/* Configure i/f */
-#define	AIOCADD		_IOW(A, 129, struct atmaddreq)	/* Add (e.g. PVC) */
-#define	AIOCDEL		_IOW(A, 130, struct atmdelreq)	/* Delete */
-#define	AIOCSET		_IOW(A, 132, struct atmsetreq)	/* Set (e.g. net i/f) */
-#define	AIOCINFO	_IOWR(A, 133, struct atminfreq)	/* Show kernel info */
-#else
 #define	AIOCCFG		_IOW('A', 128, struct atmcfgreq)/* Configure i/f */
 #define	AIOCADD		_IOW('A', 129, struct atmaddreq)/* Add (e.g. PVC) */
 #define	AIOCDEL		_IOW('A', 130, struct atmdelreq)/* Delete */
 #define	AIOCSET		_IOW('A', 132, struct atmsetreq)/* Set (e.g. net i/f) */
 #define	AIOCINFO	_IOWR('A', 133, struct atminfreq)/* Show kernel info */
-#endif
 
 #endif	/* _NETATM_ATM_IOCTL_H */

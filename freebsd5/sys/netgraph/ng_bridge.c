@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.20 2003/10/31 18:32:11 brooks Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.28 2004/08/17 22:05:53 andre Exp $
  */
 
 /*
@@ -77,7 +77,6 @@
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_parse.h>
 #include <netgraph/ng_bridge.h>
-#include <netgraph/ng_ether.h>
 
 #ifdef NG_SEPARATE_MALLOC
 MALLOC_DEFINE(M_NETGRAPH_BRIDGE, "netgraph_bridge", "netgraph bridge node ");
@@ -172,7 +171,7 @@ ng_bridge_getTableLength(const struct ng_parse_type *type,
 
 /* Parse type for struct ng_bridge_host_ary */
 static const struct ng_parse_struct_field ng_bridge_host_type_fields[]
-	= NG_BRIDGE_HOST_TYPE_INFO(&ng_ether_enaddr_type);
+	= NG_BRIDGE_HOST_TYPE_INFO(&ng_parse_enaddr_type);
 static const struct ng_parse_type ng_bridge_host_type = {
 	&ng_parse_struct_type,
 	&ng_bridge_host_type_fields
@@ -272,23 +271,17 @@ static const struct ng_cmdlist ng_bridge_cmdlist[] = {
 
 /* Node type descriptor */
 static struct ng_type ng_bridge_typestruct = {
-	NG_ABI_VERSION,
-	NG_BRIDGE_NODE_TYPE,
-	NULL,
-	ng_bridge_constructor,
-	ng_bridge_rcvmsg,
-	ng_bridge_shutdown,
-	ng_bridge_newhook,
-	NULL,
-	NULL,
-	ng_bridge_rcvdata,
-	ng_bridge_disconnect,
-	ng_bridge_cmdlist,
+	.version =	NG_ABI_VERSION,
+	.name =		NG_BRIDGE_NODE_TYPE,
+	.constructor =	ng_bridge_constructor,
+	.rcvmsg =	ng_bridge_rcvmsg,
+	.shutdown =	ng_bridge_shutdown,
+	.newhook =	ng_bridge_newhook,
+	.rcvdata =	ng_bridge_rcvdata,
+	.disconnect =	ng_bridge_disconnect,
+	.cmdlist =	ng_bridge_cmdlist,
 };
 NETGRAPH_INIT(bridge, &ng_bridge_typestruct);
-
-/* Depend on ng_ether so we can use the Ethernet parse type */
-MODULE_DEPEND(ng_bridge, ng_ether, 1, 1, 1);
 
 /******************************************************************
 		    NETGRAPH NODE METHODS
@@ -524,10 +517,9 @@ ng_bridge_rcvdata(hook_p hook, item_p item)
 	struct ng_bridge_host *host;
 	struct ng_bridge_link *link;
 	struct ether_header *eh;
-	int error = 0, linkNum;
+	int error = 0, linkNum, linksSeen;
 	int manycast;
 	struct mbuf *m;
-	meta_p meta;
 	struct ng_bridge_link *firstLink;
 
 	NGI_GET_M(item, m);
@@ -637,9 +629,11 @@ ng_bridge_rcvdata(hook_p hook, item_p item)
 	}
 
 	/* Run packet through ipfw processing, if enabled */
+#if 0
 	if (priv->conf.ipfw[linkNum] && fw_enable && ip_fw_chk_ptr != NULL) {
 		/* XXX not implemented yet */
 	}
+#endif
 
 	/*
 	 * If unicast and destination host known, deliver to host's link,
@@ -673,18 +667,16 @@ ng_bridge_rcvdata(hook_p hook, item_p item)
 	}
 
 	/* Distribute unknown, multicast, broadcast pkts to all other links */
-	meta = NGI_META(item); /* peek.. */
 	firstLink = NULL;
-	for (linkNum = 0; linkNum <= priv->numLinks; linkNum++) {
+	for (linkNum = linksSeen = 0; linksSeen <= priv->numLinks; linkNum++) {
 		struct ng_bridge_link *destLink;
-		meta_p meta2 = NULL;
 		struct mbuf *m2 = NULL;
 
 		/*
 		 * If we have checked all the links then now
 		 * send the original on its reserved link
 		 */
-		if (linkNum == priv->numLinks) {
+		if (linksSeen == priv->numLinks) {
 			/* If we never saw a good link, leave. */
 			if (firstLink == NULL) {
 				NG_FREE_ITEM(item);
@@ -694,6 +686,8 @@ ng_bridge_rcvdata(hook_p hook, item_p item)
 			destLink = firstLink;
 		} else {
 			destLink = priv->links[linkNum];
+			if (destLink != NULL)
+				linksSeen++;
 			/* Skip incoming link and disconnected links */
 			if (destLink == NULL || destLink == link) {
 				continue;
@@ -710,7 +704,7 @@ ng_bridge_rcvdata(hook_p hook, item_p item)
 
 			/*
 			 * It's usable link but not the reserved (first) one.
-			 * Copy mbuf and meta info for sending.
+			 * Copy mbuf info for sending.
 			 */
 			m2 = m_dup(m, M_DONTWAIT);	/* XXX m_copypacket() */
 			if (m2 == NULL) {
@@ -718,14 +712,6 @@ ng_bridge_rcvdata(hook_p hook, item_p item)
 				NG_FREE_ITEM(item);
 				NG_FREE_M(m);
 				return (ENOBUFS);
-			}
-			if (meta != NULL
-			    && (meta2 = ng_copy_meta(meta)) == NULL) {
-				link->stats.memoryFailures++;
-				m_freem(m2);
-				NG_FREE_ITEM(item);
-				NG_FREE_M(m);
-				return (ENOMEM);
 			}
 		}
 
@@ -752,7 +738,7 @@ ng_bridge_rcvdata(hook_p hook, item_p item)
 			NG_FWD_NEW_DATA(error, item, destLink->hook, m);
 			break; /* always done last - not really needed. */
 		} else {
-			NG_SEND_DATA(error, destLink->hook, m2, meta2);
+			NG_SEND_DATA_ONLY(error, destLink->hook, m2);
 		}
 	}
 	return (error);
@@ -776,7 +762,7 @@ ng_bridge_shutdown(node_p node)
 	    __func__, priv->numLinks, priv->numHosts));
 	FREE(priv->tab, M_NETGRAPH_BRIDGE);
 
-	/* NG_INVALID flag is now set so node will be freed at next timeout */
+	/* NGF_INVALID flag is now set so node will be freed at next timeout */
 	return (0);
 }
 
@@ -817,8 +803,6 @@ ng_bridge_disconnect(hook_p hook)
 
 /*
  * Hash algorithm
- *
- * Only hashing bytes 3-6 of the Ethernet address is sufficient and fast.
  */
 #define HASH(addr,mask)		( (((const u_int16_t *)(addr))[0] 	\
 				 ^ ((const u_int16_t *)(addr))[1] 	\
@@ -972,7 +956,7 @@ ng_bridge_remove_hosts(priv_p priv, int linkNum)
  * a detected loopback condition, and we remove any hosts from
  * the hashtable whom we haven't heard from in a long while.
  *
- * If the node has the NG_INVALID flag set, our job is to kill it.
+ * If the node has the NGF_INVALID flag set, our job is to kill it.
  */
 static void
 ng_bridge_timeout(void *arg)
@@ -1058,7 +1042,7 @@ ng_bridge_timeout(void *arg)
 static const char *
 ng_bridge_nodename(node_p node)
 {
-	static char name[NG_NODELEN+1];
+	static char name[NG_NODESIZ];
 
 	if (NG_NODE_NAME(node) != NULL)
 		snprintf(name, sizeof(name), "%s", NG_NODE_NAME(node));

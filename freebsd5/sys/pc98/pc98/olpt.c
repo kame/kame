@@ -46,7 +46,7 @@
  * SUCH DAMAGE.
  *
  *	from: unknown origin, 386BSD 0.1
- * $FreeBSD: src/sys/pc98/pc98/olpt.c,v 1.21 2003/06/16 07:41:47 phk Exp $
+ * $FreeBSD: src/sys/pc98/pc98/olpt.c,v 1.26 2004/06/16 09:47:19 phk Exp $
  */
 
 /*
@@ -106,6 +106,7 @@
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/uio.h>
 #include <sys/syslog.h>
 #include <sys/malloc.h>
@@ -229,14 +230,14 @@ static	d_close_t	lptclose;
 static	d_write_t	lptwrite;
 static	d_ioctl_t	lptioctl;
 
-#define CDEV_MAJOR 16
 static struct cdevsw lpt_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	lptopen,
 	.d_close =	lptclose,
 	.d_write =	lptwrite,
 	.d_ioctl =	lptioctl,
 	.d_name =	"lpt",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static bus_addr_t lpt_iat[] = {0, 2, 4, 6};
@@ -431,8 +432,8 @@ lpt_attach(device_t dev)
 	sc->sc_irq = 0;
 	if (isa_get_irq(dev) != -1) {
 		rid = 0;
-		sc->res_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-						 0, ~0, 1, RF_ACTIVE);
+		sc->res_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+						     RF_ACTIVE);
 		if (sc->res_irq == NULL) {
 			bus_release_resource(dev, SYS_RES_IOPORT, 0,
 					     sc->res_port);
@@ -465,7 +466,7 @@ lpt_attach(device_t dev)
  */
 
 static	int
-lptopen (dev_t dev, int flags, int fmt, struct thread *td)
+lptopen (struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct lpt_softc *sc;
 	int s;
@@ -604,7 +605,7 @@ lptout (void *arg)
  */
 
 static	int
-lptclose(dev_t dev, int flags, int fmt, struct thread *td)
+lptclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct lpt_softc *sc;
 #ifndef PC98
@@ -717,7 +718,7 @@ pushbytes(struct lpt_softc * sc)
  */
 
 static	int
-lptwrite(dev_t dev, struct uio * uio, int ioflag)
+lptwrite(struct cdev *dev, struct uio * uio, int ioflag)
 {
 	register unsigned n;
 	int pl, err;
@@ -775,7 +776,7 @@ lpt_intr(void *arg)
 }
 
 static	int
-lptioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
+lptioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *td)
 {
 	int	error = 0;
         struct	lpt_softc *sc;

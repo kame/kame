@@ -1,5 +1,5 @@
-/*	$NetBSD: if_gre.c,v 1.42 2002/08/14 00:23:27 itojun Exp $ */
-/*	 $FreeBSD: src/sys/net/if_gre.c,v 1.14 2003/11/14 20:58:00 bms Exp $ */
+/*	$NetBSD: if_gre.c,v 1.49 2003/12/11 00:22:29 itojun Exp $ */
+/*	 $FreeBSD: src/sys/net/if_gre.c,v 1.28 2004/08/05 08:12:46 sobomax Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -53,6 +53,7 @@
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
@@ -62,6 +63,7 @@
 
 #include <net/ethernet.h>
 #include <net/if.h>
+#include <net/if_clone.h>
 #include <net/if_types.h>
 #include <net/route.h>
 
@@ -91,6 +93,11 @@
 
 #define GRENAME	"gre"
 
+/*
+ * gre_mtx protects all global variables in if_gre.c.
+ * XXX: gre_softc data not protected yet.
+ */
+struct mtx gre_mtx;
 static MALLOC_DEFINE(M_GRE, GRENAME, "Generic Routing Encapsulation");
 
 struct gre_softc_head gre_softc_list;
@@ -101,8 +108,7 @@ static int	gre_ioctl(struct ifnet *, u_long, caddr_t);
 static int	gre_output(struct ifnet *, struct mbuf *, struct sockaddr *,
 		    struct rtentry *rt);
 
-static struct if_clone gre_cloner =
-    IF_CLONE_INITIALIZER("gre", gre_clone_create, gre_clone_destroy, 0, IF_MAXUNIT);
+IFC_SIMPLE_DECLARE(gre, 0);
 
 static int gre_compute_route(struct gre_softc *sc);
 
@@ -127,7 +133,7 @@ static const struct protosw in_mobile_protosw =
 #endif
 
 SYSCTL_DECL(_net_link);
-SYSCTL_NODE(_net_link, IFT_OTHER, gre, CTLFLAG_RW, 0,
+SYSCTL_NODE(_net_link, IFT_TUNNEL, gre, CTLFLAG_RW, 0,
     "Generic Routing Encapsulation");
 #ifndef MAX_GRE_NEST
 /*
@@ -149,6 +155,7 @@ static void
 greattach(void)
 {
 
+	mtx_init(&gre_mtx, "gre_mtx", NULL, MTX_DEF);
 	LIST_INIT(&gre_softc_list);
 	if_clone_attach(&gre_cloner);
 }
@@ -160,13 +167,12 @@ gre_clone_create(ifc, unit)
 {
 	struct gre_softc *sc;
 
-	sc = malloc(sizeof(struct gre_softc), M_GRE, M_WAITOK);
-	memset(sc, 0, sizeof(struct gre_softc));
+	sc = malloc(sizeof(struct gre_softc), M_GRE, M_WAITOK | M_ZERO);
 
 	if_initname(&sc->sc_if, ifc->ifc_name, unit);
 	sc->sc_if.if_softc = sc;
 	sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
-	sc->sc_if.if_type = IFT_OTHER;
+	sc->sc_if.if_type = IFT_TUNNEL;
 	sc->sc_if.if_addrlen = 0;
 	sc->sc_if.if_hdrlen = 24; /* IP + GRE */
 	sc->sc_if.if_mtu = GREMTU;
@@ -178,10 +184,26 @@ gre_clone_create(ifc, unit)
 	sc->sc_if.if_flags |= IFF_LINK0;
 	sc->encap = NULL;
 	sc->called = 0;
+	sc->wccp_ver = WCCP_V1;
 	if_attach(&sc->sc_if);
 	bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int32_t));
+	mtx_lock(&gre_mtx);
 	LIST_INSERT_HEAD(&gre_softc_list, sc, sc_list);
+	mtx_unlock(&gre_mtx);
 	return (0);
+}
+
+static void
+gre_destroy(struct gre_softc *sc)
+{
+
+#ifdef INET
+	if (sc->encap != NULL)
+		encap_detach(sc->encap);
+#endif
+	bpfdetach(&sc->sc_if);
+	if_detach(&sc->sc_if);
+	free(sc, M_GRE);
 }
 
 static void
@@ -190,14 +212,10 @@ gre_clone_destroy(ifp)
 {
 	struct gre_softc *sc = ifp->if_softc;
 
-#ifdef INET
-	if (sc->encap != NULL)
-		encap_detach(sc->encap);
-#endif
+	mtx_lock(&gre_mtx);
 	LIST_REMOVE(sc, sc_list);
-	bpfdetach(ifp);
-	if_detach(ifp);
-	free(sc, M_GRE);
+	mtx_unlock(&gre_mtx);
+	gre_destroy(sc);
 }
 
 /*
@@ -212,8 +230,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	struct gre_softc *sc = ifp->if_softc;
 	struct greip *gh;
 	struct ip *ip;
-	u_char osrc;
-	u_short etype = 0;
+	u_int16_t etype = 0;
 	struct mobile_h mob_h;
 
 	/*
@@ -237,18 +254,10 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 
 	gh = NULL;
 	ip = NULL;
-	osrc = 0;
 
 	if (ifp->if_bpf) {
-		/* see comment of other if_foo.c files */
-		struct mbuf m0;
 		u_int32_t af = dst->sa_family;
-
-		m0.m_next = m;
-		m0.m_len = 4;
-		m0.m_data = (char *)&af;
-
-		BPF_MTAP(ifp, &m0);
+		bpf_mtap2(ifp->if_bpf, &af, sizeof(af), m);
 	}
 
 	m->m_flags &= ~(M_BCAST|M_MCAST);
@@ -289,7 +298,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 				msiz = MOB_H_SIZ_L;
 			}
 			mob_h.proto = htons(mob_h.proto);
-			mob_h.hcrc = gre_in_cksum((u_short *)&mob_h, msiz);
+			mob_h.hcrc = gre_in_cksum((u_int16_t *)&mob_h, msiz);
 
 			if ((m->m_data - msiz) < m->m_pktdat) {
 				/* need new mbuf */
@@ -350,7 +359,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		goto end;
 	}
 
-	if (m == NULL) {	/* impossible */
+	if (m == NULL) {	/* mbuf allocation failed */
 		_IF_DROP(&ifp->if_snd);
 		error = ENOBUFS;
 		goto end;
@@ -359,8 +368,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	gh = mtod(m, struct greip *);
 	if (sc->g_proto == IPPROTO_GRE) {
 		/* we don't have any GRE flags for now */
-
-		memset((void *)&gh->gi_g, 0, sizeof(struct gre_h));
+		memset((void *)gh, 0, sizeof(struct greip));
 		gh->gi_ptype = htons(etype);
 	}
 
@@ -368,6 +376,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	if (sc->g_proto != IPPROTO_MOBILE) {
 		gh->gi_src = sc->g_src;
 		gh->gi_dst = sc->g_dst;
+		((struct ip*)gh)->ip_v = IPPROTO_IPV4;
 		((struct ip*)gh)->ip_hl = (sizeof(struct ip)) >> 2;
 		((struct ip*)gh)->ip_ttl = GRE_TTL;
 		((struct ip*)gh)->ip_tos = ip->ip_tos;
@@ -377,8 +386,13 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
-	/* send it off */
-	error = ip_output(m, NULL, &sc->route, 0, NULL, NULL);
+	/*
+	 * Send it off and with IP_FORWARD flag to prevent it from
+	 * overwriting the ip_id again.  ip_id is already set to the
+	 * ip_id of the encapsulated packet.
+	 */
+	error = ip_output(m, NULL, &sc->route, IP_FORWARDING,
+	    (struct ip_moptions *)NULL, (struct inpcb *)NULL);
   end:
 	sc->called = 0;
 	if (error)
@@ -406,7 +420,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 		break;
-	case SIOCSIFDSTADDR: 
+	case SIOCSIFDSTADDR:
 		break;
 	case SIOCSIFFLAGS:
 		if ((error = suser(curthread)) != 0)
@@ -415,6 +429,10 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			sc->g_proto = IPPROTO_GRE;
 		else
 			sc->g_proto = IPPROTO_MOBILE;
+		if ((ifr->ifr_flags & IFF_LINK2) != 0)
+			sc->wccp_ver = WCCP_V2;
+		else
+			sc->wccp_ver = WCCP_V1;
 		goto recompute;
 	case SIOCSIFMTU:
 		if ((error = suser(curthread)) != 0)
@@ -497,7 +515,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			    dm.sin_family = AF_INET;
 			sp.sin_addr = sc->g_src;
 			dp.sin_addr = sc->g_dst;
-			sm.sin_addr.s_addr = dm.sin_addr.s_addr = 
+			sm.sin_addr.s_addr = dm.sin_addr.s_addr =
 			    INADDR_BROADCAST;
 #ifdef INET
 			sc->encap = encap_attach(AF_INET, sc->g_proto,
@@ -627,7 +645,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
  * which would be taken by ip_output(), as this one will loop back to
  * us. If the interface is p2p as  a--->b, then a routing entry exists
  * If we now send a packet to b (e.g. ping b), this will come down here
- * gets src=a, dst=b tacked on and would from ip_ouput() sent back to
+ * gets src=a, dst=b tacked on and would from ip_output() sent back to
  * if_gre.
  * Goal here is to compute a route to b that is less specific than
  * a-->b. We know that this one exists as in normal operation we have
@@ -663,7 +681,7 @@ gre_compute_route(struct gre_softc *sc)
 	}
 
 #ifdef DIAGNOSTIC
-	printf("%s: searching a route to %s", if_name(&sc->sc_if),
+	printf("%s: searching for a route to %s", if_name(&sc->sc_if),
 	    inet_ntoa(((struct sockaddr_in *)&ro->ro_dst)->sin_addr));
 #endif
 
@@ -703,10 +721,10 @@ gre_compute_route(struct gre_softc *sc)
  * do a checksum of a buffer - much like in_cksum, which operates on
  * mbufs.
  */
-u_short
-gre_in_cksum(u_short *p, u_int len)
+u_int16_t
+gre_in_cksum(u_int16_t *p, u_int len)
 {
-	u_int sum = 0;
+	u_int32_t sum = 0;
 	int nwords = len >> 1;
 
 	while (nwords-- != 0)
@@ -731,6 +749,7 @@ gre_in_cksum(u_short *p, u_int len)
 static int
 gremodevent(module_t mod, int type, void *data)
 {
+	struct gre_softc *sc;
 
 	switch (type) {
 	case MOD_LOAD:
@@ -739,9 +758,18 @@ gremodevent(module_t mod, int type, void *data)
 	case MOD_UNLOAD:
 		if_clone_detach(&gre_cloner);
 
-		while (!LIST_EMPTY(&gre_softc_list))
-			gre_clone_destroy(&LIST_FIRST(&gre_softc_list)->sc_if);
+		mtx_lock(&gre_mtx);
+		while ((sc = LIST_FIRST(&gre_softc_list)) != NULL) {
+			LIST_REMOVE(sc, sc_list);
+			mtx_unlock(&gre_mtx);
+			gre_destroy(sc);
+			mtx_lock(&gre_mtx);
+		}
+		mtx_unlock(&gre_mtx);
+		mtx_destroy(&gre_mtx);
 		break;
+	default:
+		return EOPNOTSUPP;
 	}
 	return 0;
 }

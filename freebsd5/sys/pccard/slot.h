@@ -32,7 +32,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/slot.h,v 1.38 2003/04/23 23:39:21 imp Exp $
+ * $FreeBSD: src/sys/pccard/slot.h,v 1.39 2004/06/16 09:47:19 phk Exp $
  */
 
 #ifndef _PCCARD_SLOT_H
@@ -125,7 +125,7 @@ struct slot {
 	void		*cdata;		/* Controller specific data */
 	int		pwr_off_pending;/* Power status of slot */
 	device_t	dev;		/* Config system device. */
-	dev_t		d;		/* fs device */
+	struct cdev *d;		/* fs device */
 };
 
 #define PCCARD_DEVICE2SOFTC(d)	((struct slot *) device_get_softc(d))

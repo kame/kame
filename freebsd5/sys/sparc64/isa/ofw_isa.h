@@ -28,7 +28,7 @@
  *
  *	from: NetBSD: ebus.c,v 1.26 2001/09/10 16:27:53 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/isa/ofw_isa.h,v 1.2 2003/07/01 14:52:47 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/isa/ofw_isa.h,v 1.4 2004/05/08 13:53:47 marius Exp $
  */
 
 #ifndef _SPARC64_ISA_OFW_ISA_H_
@@ -59,29 +59,16 @@ struct isa_ranges {
 #define	ISA_RANGE_CHILD(r) \
 	((((u_int64_t)((r)->child_hi)) << 32) | ((u_int64_t)(r)->child_lo))
 #define	ISA_RANGE_PS(r)	(((r)->phys_hi >> 24) & 0x03)
+#define	ISA_RANGE_PHYS(r) \
+	((((u_int64_t)(r)->phys_mid) << 32) | ((u_int64_t)(r)->phys_lo))
 
 typedef u_int32_t ofw_isa_intr_t;
 
-struct isa_imap {
-	u_int32_t	phys_hi;	/* high phys addr mask */
-	u_int32_t	phys_lo;	/* low phys addr mask */
-	ofw_isa_intr_t	intr;		/* interrupt mask */
-	phandle_t	cnode;		/* child node */
-	ofw_pci_intr_t	cintr;		/* child interrupt */
-};
-
-struct isa_imap_msk {
-	u_int32_t	phys_hi;	/* high phys addr */
-	u_int32_t	phys_lo;	/* low phys addr */
-	ofw_isa_intr_t	intr;		/* interrupt */
-};
-
+int ofw_isa_range_restype(struct isa_ranges *);
 /* Map an IO range. Returns the resource type of the range. */
-int ofw_isa_map_iorange(struct isa_ranges *, int, u_long *, u_long *);
+int ofw_isa_range_map(struct isa_ranges *, int, u_long *, u_long *, int *);
 
-#ifdef OFW_NEWPCI
 ofw_pci_intr_t ofw_isa_route_intr(device_t, phandle_t, struct ofw_bus_iinfo *,
     ofw_isa_intr_t);
-#endif
 
 #endif /* !_SPARC64_ISA_OFW_ISA_H_ */

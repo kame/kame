@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/capi/iavc/iavc_isa.c,v 1.7 2003/06/10 23:10:44 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/capi/iavc/iavc_isa.c,v 1.8 2004/03/17 17:50:49 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -193,9 +193,8 @@ iavc_isa_attach(device_t dev)
 	sc->sc_resources.irq_rid = 0;
 	
 	if(!(sc->sc_resources.irq =
-		bus_alloc_resource(dev, SYS_RES_IRQ,
-			&sc->sc_resources.irq_rid,
-			0UL, ~0UL, 1, RF_ACTIVE)))
+		bus_alloc_resource_any(dev, SYS_RES_IRQ,
+			&sc->sc_resources.irq_rid, RF_ACTIVE)))
 	{
 		printf("iavc%d: can't allocate irq\n",unit);
 		bus_release_resource(dev, SYS_RES_IOPORT,

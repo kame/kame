@@ -23,37 +23,38 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/i386/include/db_machdep.h,v 1.17 2001/09/15 11:06:07 dfr Exp $
+ * $FreeBSD: src/sys/i386/include/db_machdep.h,v 1.18.2.1 2004/10/09 05:20:18 julian Exp $
  */
 
 #ifndef _MACHINE_DB_MACHDEP_H_
 #define	_MACHINE_DB_MACHDEP_H_
 
 #include <machine/frame.h>
-#include <machine/psl.h>
 #include <machine/trap.h>
-
-#define i386_saved_state trapframe
 
 typedef	vm_offset_t	db_addr_t;	/* address - unsigned */
 typedef	int		db_expr_t;	/* expression - signed */
 
-typedef struct i386_saved_state db_regs_t;
-extern db_regs_t	ddb_regs;	/* register state */
-#define	DDB_REGS	(&ddb_regs)
-
-#define	PC_REGS(regs)	((db_addr_t)(regs)->tf_eip)
+#define	PC_REGS()	((db_addr_t)kdb_thrctx->pcb_eip)
 
 #define	BKPT_INST	0xcc		/* breakpoint instruction */
 #define	BKPT_SIZE	(1)		/* size of breakpoint inst */
 #define	BKPT_SET(inst)	(BKPT_INST)
 
-#define BKPT_SKIP		ddb_regs.tf_eip += 1
+#define BKPT_SKIP				\
+do {						\
+	kdb_frame->tf_eip += 1;			\
+	kdb_thrctx->pcb_eip += 1;		\
+} while(0)
 
-#define	FIXUP_PC_AFTER_BREAK	ddb_regs.tf_eip -= 1;
+#define	FIXUP_PC_AFTER_BREAK			\
+do {						\
+	kdb_frame->tf_eip -= 1;			\
+	kdb_thrctx->pcb_eip -= 1;		\
+} while(0);
 
-#define	db_clear_single_step(regs)	((regs)->tf_eflags &= ~PSL_T)
-#define	db_set_single_step(regs)	((regs)->tf_eflags |=  PSL_T)
+#define	db_clear_single_step	kdb_cpu_clear_singlestep
+#define	db_set_single_step	kdb_cpu_set_singlestep
 
 #define	IS_BREAKPOINT_TRAP(type, code)	((type) == T_BPTFLT)
 /*

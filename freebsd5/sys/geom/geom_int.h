@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_int.h,v 1.26 2003/04/23 20:54:42 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_int.h,v 1.28 2004/07/08 16:17:14 phk Exp $
  */
 
 LIST_HEAD(class_list_head, g_class);
@@ -44,7 +44,7 @@ extern int g_debugflags;
  * 1	G_T_TOPOLOGY
  * 2	G_T_BIO
  * 4	G_T_ACCESS
- * 8	Enable sanity checks
+ * 8	(unused)
  * 16	Allow footshooting on rank#1 providers
  * 32	G_T_DETAILS
  */
@@ -68,12 +68,12 @@ void g_conftxt(void *, int flag);
 /* geom_event.c */
 void g_event_init(void);
 void g_run_events(void);
-void g_stall_events(void);
-void g_release_events(void);
+void g_do_wither(void);
 
 /* geom_subr.c */
 extern struct class_list_head g_classes;
 extern char *g_wait_event, *g_wait_sim, *g_wait_up, *g_wait_down;
+int g_wither_washer(void);
 
 /* geom_io.c */
 void g_io_init(void);

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000 - 2003 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 2000 - 2004 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/ata.h,v 1.21 2003/09/08 08:30:43 sos Exp $
+ * $FreeBSD: src/sys/sys/ata.h,v 1.23 2004/05/20 15:09:41 des Exp $
  */
 
 #ifndef _SYS_ATA_H_
@@ -35,7 +35,7 @@
 
 /* ATA/ATAPI device parameters */
 struct ata_params {
-/*000*/ u_int16_t	config; 		/* configuration info */
+/*000*/ u_int16_t	config;		/* configuration info */
 #define ATA_PROTO_MASK			0x8003
 #define ATA_PROTO_ATA			0x0002
 #define ATA_PROTO_ATAPI_12		0x8000
@@ -45,7 +45,7 @@ struct ata_params {
 #define ATA_ATAPI_TYPE_TAPE		0x0100	/* streaming tape */
 #define ATA_ATAPI_TYPE_CDROM		0x0500	/* CD-ROM device */
 #define ATA_ATAPI_TYPE_OPTICAL		0x0700	/* optical disk */
-#define ATA_DRQ_MASK			0x0060  
+#define ATA_DRQ_MASK			0x0060
 #define ATA_DRQ_SLOW			0x0000  /* cpu 3 ms delay */
 #define ATA_DRQ_INTR			0x0020  /* interrupt 10 ms delay */
 #define ATA_DRQ_FAST			0x0040  /* accel 50 us delay */
@@ -89,8 +89,8 @@ struct ata_params {
 /*060*/	u_int16_t	lba_size_1;
 	u_int16_t	lba_size_2;
 	u_int16_t	obsolete62;
-/*063*/	u_int16_t	mwdmamodes;		/* multiword DMA modes */ 
-/*064*/	u_int16_t	apiomodes;		/* advanced PIO modes */ 
+/*063*/	u_int16_t	mwdmamodes;		/* multiword DMA modes */
+/*064*/	u_int16_t	apiomodes;		/* advanced PIO modes */
 
 /*065*/	u_int16_t	mwdmamin;		/* min. M/W DMA time/word ns */
 /*066*/	u_int16_t	mwdmarec;		/* rec. M/W DMA time ns */
@@ -105,10 +105,20 @@ struct ata_params {
 /*075*/	u_int16_t	queue;
 #define	ATA_QUEUE_LEN(x)		((x) & 0x001f)
 
-	u_int16_t	reserved76;
+	u_int16_t	satacapabilities;
+#define ATA_SATA_GEN1			0x0002
+#define ATA_SATA_GEN2			0x0004
+#define ATA_SUPPORT_NCQ			0x0100
+#define ATA_SUPPORT_IFPWRMNGTRCV	0x0200
+
 	u_int16_t	reserved77;
-	u_int16_t	reserved78;
-	u_int16_t	reserved79;
+	u_int16_t	satasupport;
+#define ATA_SUPPORT_NONZERO		0x0002
+#define ATA_SUPPORT_AUTOACTIVATE	0x0004
+#define ATA_SUPPORT_IFPWRMNGT		0x0008
+#define ATA_SUPPORT_INORDERDATA		0x0010
+	u_int16_t	sataenabled;
+
 /*080*/	u_int16_t	version_major;
 /*081*/	u_int16_t	version_minor;
 
@@ -210,7 +220,7 @@ struct ata_params {
 #define	ATA_READ			0x20	/* read command */
 #define	ATA_READ48			0x24	/* read command */
 #define	ATA_READ_DMA48			0x25	/* read w/DMA command */
-#define	ATA_READ_DMA_QUEUED48	 	0x26	/* read w/DMA QUEUED command */
+#define	ATA_READ_DMA_QUEUED48		0x26	/* read w/DMA QUEUED command */
 #define	ATA_READ_MUL48			0x29	/* read multi command */
 #define	ATA_WRITE			0x30	/* write command */
 #define	ATA_WRITE48			0x34	/* write command */
@@ -250,17 +260,17 @@ struct ata_params {
 #define ATAPI_READ			0x08	/* read data */
 #define ATAPI_WRITE			0x0a	/* write data */
 #define ATAPI_WEOF			0x10	/* write filemark */
-#define 	ATAPI_WF_WRITE		0x01
+#define	ATAPI_WF_WRITE		0x01
 #define ATAPI_SPACE			0x11	/* space command */
-#define	    	ATAPI_SP_FM		0x01
-#define	    	ATAPI_SP_EOD		0x03
+#define		ATAPI_SP_FM		0x01
+#define		ATAPI_SP_EOD		0x03
 #define ATAPI_MODE_SELECT		0x15	/* mode select */
 #define ATAPI_ERASE			0x19	/* erase */
 #define ATAPI_MODE_SENSE		0x1a	/* mode sense */
 #define ATAPI_START_STOP		0x1b	/* start/stop unit */
-#define	    	ATAPI_SS_LOAD		0x01
-#define	    	ATAPI_SS_RETENSION	0x02
-#define	    	ATAPI_SS_EJECT		0x04
+#define		ATAPI_SS_LOAD		0x01
+#define		ATAPI_SS_RETENSION	0x02
+#define		ATAPI_SS_EJECT		0x04
 #define ATAPI_PREVENT_ALLOW		0x1e	/* media removal */
 #define ATAPI_READ_FORMAT_CAPACITIES	0x23	/* get format capacities */
 #define ATAPI_READ_CAPACITY		0x25	/* get volume capacity */
@@ -335,13 +345,13 @@ struct ata_cmd {
 	struct {
 	    union {
 		struct {
-	    	    u_int8_t            command;
-            	    u_int8_t            feature;
-            	    u_int64_t           lba;
-            	    u_int16_t           count;
+		    u_int8_t            command;
+		    u_int8_t            feature;
+		    u_int64_t           lba;
+		    u_int16_t           count;
 		} ata;
 		struct {
-	    	    char		ccb[16];
+		    char		ccb[16];
 		} atapi;
 	    } u;
 	    caddr_t		data;

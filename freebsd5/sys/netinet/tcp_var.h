@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,13 +27,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.93.2.1 2004/01/09 12:32:36 andre Exp $
+ * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.109 2004/08/16 18:32:07 rwatson Exp $
  */
 
 #ifndef _NETINET_TCP_VAR_H_
 #define _NETINET_TCP_VAR_H_
 
-#include <netinet/in_pcb.h>		/* needed for in_conninfo, inp_gen_t */
 #include <netinet/tcp.h>
 
 /*
@@ -54,9 +49,20 @@ struct tseg_qent {
 	struct	mbuf	*tqe_m;		/* mbuf contains packet */
 };
 LIST_HEAD(tsegqe_head, tseg_qent);
-#ifdef MALLOC_DECLARE
-MALLOC_DECLARE(M_TSEGQ);
-#endif
+extern int	tcp_reass_qsize;
+extern struct uma_zone *tcp_reass_zone;
+
+struct sackblk {
+	tcp_seq start;		/* start seq no. of sack block */
+	tcp_seq end;		/* end seq no. */
+};
+
+struct sackhole {
+	tcp_seq start;		/* start seq no. of hole */
+	tcp_seq end;		/* end seq no. */
+	tcp_seq rxmit;		/* next seq. no in hole to be retransmitted */
+	struct sackhole *next;	/* next in list */
+};
 
 struct tcptemp {
 	u_char	tt_ipgen[40]; /* the size must be of max ip header, now IPv6 */
@@ -70,7 +76,8 @@ struct tcptemp {
  * Organized for 16 byte cacheline efficiency.
  */
 struct tcpcb {
-	struct	tsegqe_head t_segq;
+	struct	tsegqe_head t_segq;	/* segment reassembly queue */
+	int	t_segqlen;		/* segment reassembly queue length */
 	int	t_dupacks;		/* consecutive dup acks recd */
 	struct	tcptemp	*unused;	/* unused */
 
@@ -105,6 +112,7 @@ struct tcpcb {
 #define	TF_RXWIN0SENT	0x080000	/* sent a receiver win 0 in response */
 #define	TF_FASTRECOVERY	0x100000	/* in NewReno Fast Recovery */
 #define	TF_WASFRECOVERY	0x200000	/* was in NewReno Fast Recovery */
+#define	TF_SIGNATURE	0x400000	/* require MD5 digests (RFC2385) */
 	int	t_force;		/* 1 if forcing out a byte */
 
 	tcp_seq	snd_una;		/* send unacknowledged */
@@ -183,11 +191,35 @@ struct tcpcb {
 	u_long	rcv_second;		/* start of interval second */
 	u_long	rcv_pps;		/* received packets per second */
 	u_long	rcv_byps;		/* received bytes per second */
+/* SACK related state */
+	int	sack_enable;		/* enable SACK for this connection */
+	int	snd_numholes;		/* number of holes seen by sender */
+	struct sackhole *snd_holes;	/* linked list of holes (sorted) */
+	tcp_seq	rcv_laststart;		/* start of last segment recd. */
+	tcp_seq	rcv_lastend;		/* end of ... */
+	tcp_seq	rcv_lastsack;		/* last seq number(+1) sack'd by rcv'r*/
+	int	rcv_numsacks;		/* # distinct sack blks present */
+	struct sackblk sackblks[MAX_SACK_BLKS]; /* seq nos. of sack blocks */
 };
 
 #define IN_FASTRECOVERY(tp)	(tp->t_flags & TF_FASTRECOVERY)
 #define ENTER_FASTRECOVERY(tp)	tp->t_flags |= TF_FASTRECOVERY
 #define EXIT_FASTRECOVERY(tp)	tp->t_flags &= ~TF_FASTRECOVERY
+
+#ifdef TCP_SIGNATURE
+/*
+ * Defines which are needed by the xform_tcp module and tcp_[in|out]put
+ * for SADB verification and lookup.
+ */
+#define	TCP_SIGLEN	16	/* length of computed digest in bytes */
+#define	TCP_KEYLEN_MIN	1	/* minimum length of TCP-MD5 key */
+#define	TCP_KEYLEN_MAX	80	/* maximum length of TCP-MD5 key */
+/*
+ * Only a single SA per host may be specified at this time. An SPI is
+ * needed in order for the KEY_ALLOCSA() lookup to work.
+ */
+#define	TCP_SIG_SPI	0x1000
+#endif /* TCP_SIGNATURE */
 
 /*
  * Structure to hold TCP options that are only used during segment
@@ -203,30 +235,35 @@ struct tcpopt {
 #define	TOF_CCECHO	0x0008
 #define	TOF_MSS		0x0010
 #define	TOF_SCALE	0x0020
+#define	TOF_SIGNATURE	0x0040		/* signature option present */
+#define	TOF_SIGLEN	0x0080		/* signature length valid (RFC2385) */
+#define	TOF_SACK	0x0100		/* Peer sent SACK option */
 	u_int32_t	to_tsval;
 	u_int32_t	to_tsecr;
 	tcp_cc		to_cc;		/* holds CC or CCnew */
 	tcp_cc		to_ccecho;
 	u_int16_t	to_mss;
-	u_int8_t 	to_requested_s_scale;
-	u_int8_t 	to_pad;
+	u_int8_t	to_requested_s_scale;
+	u_int8_t	to_pad;
 };
 
+#ifdef _NETINET_IN_PCB_H_
 struct syncache {
 	inp_gen_t	sc_inp_gencnt;		/* pointer check */
-	struct 		tcpcb *sc_tp;		/* tcb for listening socket */
+	struct		tcpcb *sc_tp;		/* tcb for listening socket */
 	struct		mbuf *sc_ipopts;	/* source route */
-	struct 		in_conninfo sc_inc;	/* addresses */
+	struct		in_conninfo sc_inc;	/* addresses */
 	u_int32_t	sc_tsrecent;
+	u_int32_t	sc_flowlabel;		/* IPv6 flowlabel */
 	tcp_cc		sc_cc_send;		/* holds CC or CCnew */
 	tcp_cc		sc_cc_recv;
-	tcp_seq 	sc_irs;			/* seq from peer */
-	tcp_seq 	sc_iss;			/* our ISS */
+	tcp_seq		sc_irs;			/* seq from peer */
+	tcp_seq		sc_iss;			/* our ISS */
 	u_long		sc_rxttime;		/* retransmit time */
-	u_int16_t	sc_rxtslot; 		/* retransmit counter */
+	u_int16_t	sc_rxtslot;		/* retransmit counter */
 	u_int16_t	sc_peer_mss;		/* peer's MSS */
 	u_int16_t	sc_wnd;			/* advertised window */
-	u_int8_t 	sc_requested_s_scale:4,
+	u_int8_t	sc_requested_s_scale:4,
 			sc_request_r_scale:4;
 	u_int8_t	sc_flags;
 #define SCF_NOOPT	0x01			/* no TCP options */
@@ -234,6 +271,8 @@ struct syncache {
 #define SCF_TIMESTAMP	0x04			/* negotiated timestamps */
 #define SCF_CC		0x08			/* negotiated CC */
 #define SCF_UNREACH	0x10			/* icmp unreachable received */
+#define SCF_SIGNATURE	0x20			/* send MD5 digests */
+#define SCF_SACK	0x80			/* send SACK option */
 	TAILQ_ENTRY(syncache)	sc_hash;
 	TAILQ_ENTRY(syncache)	sc_timerq;
 };
@@ -242,6 +281,9 @@ struct syncache_head {
 	TAILQ_HEAD(, syncache)	sch_bucket;
 	u_int		sch_length;
 };
+#else
+struct in_conninfo;
+#endif /* _NETINET_IN_PCB_H_ */
 
 struct hc_metrics_lite {	/* must stay in sync with hc_metrics */
 	u_long	rmx_mtu;	/* MTU for this path */
@@ -265,12 +307,12 @@ struct tcptw {
 	u_short		last_win;	/* cached window value */
 	u_short		tw_so_options;	/* copy of so_options */
 	struct ucred	*tw_cred;	/* user credentials */
-	u_long 		t_recent;
+	u_long		t_recent;
 	u_long		t_starttime;
 	int		tw_time;
 	LIST_ENTRY(tcptw) tw_2msl;
 };
- 
+
 /*
  * The TAO cache entry which is stored in the tcp hostcache.
  */
@@ -396,6 +438,7 @@ struct	tcpstat {
 	u_long	tcps_badsyn;		/* bogus SYN, e.g. premature ACK */
 	u_long	tcps_mturesent;		/* resends due to MTU discovery */
 	u_long	tcps_listendrop;	/* listen queue overflows */
+	u_long	tcps_badrst;		/* ignored RSTs in the window */
 
 	u_long	tcps_sc_added;		/* entry added to syncache */
 	u_long	tcps_sc_retransmitted;	/* syncache entry was retransmitted */
@@ -415,6 +458,13 @@ struct	tcpstat {
 
 	u_long	tcps_hc_added;		/* entry added to hostcache */
 	u_long	tcps_hc_bucketoverflow;	/* hostcache per bucket limit hit */
+
+	/* SACK related stats */
+	u_long	tcps_sack_recovery_episode; /* SACK recovery episodes */
+	u_long  tcps_sack_rexmits;	    /* SACK rexmit segments   */
+	u_long  tcps_sack_rexmit_bytes;	    /* SACK rexmit bytes      */
+	u_long  tcps_sack_rcv_blocks;	    /* SACK blocks (options) received */
+	u_long  tcps_sack_send_blocks;	    /* SACK blocks (options) sent     */
 };
 
 /*
@@ -448,7 +498,8 @@ struct	xtcpcb {
 #define	TCPCTL_PCBLIST		11	/* list of all outstanding PCBs */
 #define	TCPCTL_DELACKTIME	12	/* time before sending delayed ACK */
 #define	TCPCTL_V6MSSDFLT	13	/* MSS default for IPv6 */
-#define	TCPCTL_MAXID		14
+#define	TCPCTL_SACK		14	/* Selective Acknowledgement,rfc 2018 */
+#define	TCPCTL_MAXID		15
 
 #define TCPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -486,6 +537,8 @@ extern	int path_mtu_discovery;
 extern	int ss_fltsz;
 extern	int ss_fltsz_local;
 
+extern	int tcp_do_sack;	/* SACK enabled/disabled */
+
 void	 tcp_canceltimers(struct tcpcb *);
 struct tcpcb *
 	 tcp_close(struct tcpcb *);
@@ -500,12 +553,14 @@ struct tcpcb *
 void	 tcp_drain(void);
 void	 tcp_fasttimo(void);
 void	 tcp_init(void);
+void	 tcp_fini(void *);
+void	 tcp_reass_init(void);
 void	 tcp_input(struct mbuf *, int);
 u_long	 tcp_maxmtu(struct in_conninfo *);
 u_long	 tcp_maxmtu6(struct in_conninfo *);
 void	 tcp_mss(struct tcpcb *, int);
 int	 tcp_mssopt(struct in_conninfo *);
-struct inpcb *	 
+struct inpcb *
 	 tcp_drop_syn_sent(struct inpcb *, int);
 struct inpcb *
 	 tcp_mtudisc(struct inpcb *, int);
@@ -516,8 +571,11 @@ struct inpcb *
 	 tcp_quench(struct inpcb *, int);
 void	 tcp_respond(struct tcpcb *, void *,
 	    struct tcphdr *, struct mbuf *, tcp_seq, tcp_seq, int);
-int	 tcp_twrespond(struct tcptw *, struct socket *, struct mbuf *, int);
+int	 tcp_twrespond(struct tcptw *, int);
 void	 tcp_setpersist(struct tcpcb *);
+#ifdef TCP_SIGNATURE
+int	 tcp_signature_compute(struct mbuf *, int, int, int, u_char *, u_int);
+#endif
 void	 tcp_slowtimo(void);
 struct tcptemp *
 	 tcpip_maketemplate(struct inpcb *);
@@ -553,6 +611,20 @@ extern	struct pr_usrreqs tcp_usrreqs;
 extern	u_long tcp_sendspace;
 extern	u_long tcp_recvspace;
 tcp_seq tcp_new_isn(struct tcpcb *);
+
+int	 tcp_sack_option(struct tcpcb *,struct tcphdr *,u_char *,int);
+void	 tcp_update_sack_list(struct tcpcb *tp);
+void	 tcp_del_sackholes(struct tcpcb *, struct tcphdr *);
+void	 tcp_clean_sackreport(struct tcpcb *tp);
+void	 tcp_sack_adjust(struct tcpcb *tp);
+struct sackhole *tcp_sack_output(struct tcpcb *tp);
+void	 tcp_sack_partialack(struct tcpcb *, struct tcphdr *);
+void	 tcp_free_sackholes(struct tcpcb *tp);
+int	 tcp_newreno(struct tcpcb *, struct tcphdr *);
+u_long	 tcp_seq_subtract(u_long, u_long );
+#ifdef TCP_SACK_DEBUG
+void	 tcp_print_holes(struct tcpcb *tp);
+#endif /* TCP_SACK_DEBUG */
 
 #endif /* _KERNEL */
 

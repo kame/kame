@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/smp.h,v 1.16 2003/04/08 06:35:08 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/smp.h,v 1.16.6.1 2004/10/01 04:04:22 kensmith Exp $
  */
 
 #ifndef	_MACHINE_SMP_H_
@@ -45,7 +45,7 @@
 #define	IPI_RENDEZVOUS	PIL_RENDEZVOUS
 #define	IPI_STOP	PIL_STOP
 
-#define	IPI_RETRIES	100
+#define	IPI_RETRIES	5000
 
 struct cpu_start_args {
 	u_int	csa_count;

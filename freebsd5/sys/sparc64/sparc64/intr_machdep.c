@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -61,7 +57,7 @@
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
  *	form: src/sys/i386/isa/intr_machdep.c,v 1.57 2001/07/20
  *
- * $FreeBSD: src/sys/sparc64/sparc64/intr_machdep.c,v 1.17 2003/08/22 07:38:08 imp Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/intr_machdep.c,v 1.19 2004/07/02 20:21:43 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -234,11 +230,7 @@ sched_ithd(void *cookie)
 	int error;
 
 	iv = cookie;
-#ifdef notyet
 	error = ithread_schedule(iv->iv_ithd);
-#else
-	error = ithread_schedule(iv->iv_ithd, 0);
-#endif
 	if (error == EINVAL)
 		intr_stray_vector(iv);
 }

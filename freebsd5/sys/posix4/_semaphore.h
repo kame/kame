@@ -23,12 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/posix4/_semaphore.h,v 1.1 2002/09/19 00:43:32 alfred Exp $
+ *	$FreeBSD: src/sys/posix4/_semaphore.h,v 1.3 2004/02/03 22:27:03 deischen Exp $
  */
 #ifndef __SEMAPHORE_H_
 #define __SEMAPHORE_H_
 
 typedef intptr_t semid_t;
+struct timespec;
 
 #ifndef _KERNEL
 
@@ -57,6 +58,7 @@ int ksem_close(semid_t id);
 int ksem_post(semid_t id);
 int ksem_wait(semid_t id);
 int ksem_trywait(semid_t id);
+int ksem_timedwait(semid_t id, struct timespec *abstime);
 int ksem_init(semid_t *idp, unsigned int value);
 int ksem_open(semid_t *idp, const char *name, int oflag, mode_t mode,
     unsigned int value);

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/nfs4client/nfs4_socket.c,v 1.1 2003/11/14 20:54:08 alfred Exp $ */
+/* $FreeBSD: src/sys/nfs4client/nfs4_socket.c,v 1.3 2004/04/07 20:46:16 imp Exp $ */
 /* $Id: nfs_socket.c,v 1.12 2003/11/05 14:59:01 rees Exp $ */
 
 /*
@@ -40,10 +40,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -64,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_socket.c,v 1.1 2003/11/14 20:54:08 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfs4client/nfs4_socket.c,v 1.3 2004/04/07 20:46:16 imp Exp $");
 
 /*
  * Socket operations for use by nfs
@@ -112,6 +108,62 @@ static struct rpc_program nfs_program = {
 };
 #endif
 
+
+static struct {
+	short	nfserr;
+	short	syserr;
+} nfs_errtbl[] = {
+	{ NFS_OK,		0 },
+	{ NFSERR_PERM,		EPERM },
+	{ NFSERR_NOENT,		ENOENT },
+	{ NFSERR_IO,		EIO },
+	{ NFSERR_NXIO,		ENXIO },
+	{ NFSERR_ACCES,		EACCES },
+	{ NFSERR_EXIST,		EEXIST },
+	{ NFSERR_XDEV,		EXDEV },
+	{ NFSERR_MLINK,		EMLINK },
+	{ NFSERR_NODEV,		ENODEV },
+	{ NFSERR_NOTDIR,	ENOTDIR },
+	{ NFSERR_ISDIR,		EISDIR },
+	{ NFSERR_INVAL,		EINVAL },
+	{ NFSERR_FBIG,		EFBIG },
+	{ NFSERR_NOSPC,		ENOSPC },
+	{ NFSERR_ROFS,		EROFS },
+	{ NFSERR_MLINK,		EMLINK },
+	{ NFSERR_NAMETOL,	ENAMETOOLONG },
+	{ NFSERR_NOTEMPTY,	ENOTEMPTY },
+	{ NFSERR_NOTSUPP,	EOPNOTSUPP },
+#ifdef EDQUOT
+	{ NFSERR_DQUOT,		EDQUOT },
+#endif
+	{ NFSERR_STALE,		ESTALE },
+	{ NFSERR_DENIED,	EAGAIN },
+	{ NFSERR_SYMLINK,	ELOOP },
+	{ NFSERR_BADXDR,	EBADRPC },
+	{ NFSERR_WRONGSEC,	EPERM },
+	{ -1,			EIO }
+};
+
+static int
+nfs4_nfserr_to_syserr(int nfserr)
+{
+	int i, syserr;
+	
+	/* XXX : not the optimal algorithm, but will do for now! */
+	for (i = 0; nfs_errtbl[i].nfserr != -1; i++) {
+		if (nfs_errtbl[i].nfserr == nfserr)
+			break;
+	}
+#ifdef NFS4_MAP_UNKNOWN_ERR
+	syserr = nfs_errtbl[i].syserr;
+#else
+	if (nfs_errtbl[i].nfserr != -1)
+		syserr = nfs_errtbl[i].syserr;
+	else
+		syserr = nfserr;
+#endif
+	return syserr;
+}
 
 int
 nfs4_connect(struct nfsmount *nmp)
@@ -198,61 +250,17 @@ nfs4_request(struct vnode *vp, struct mbuf *mrest, int procnum,
     struct mbuf **mdp, caddr_t *dposp)
 {
 	int error;
-	u_int32_t *tl;
-	struct nfsmount * nmp = VFSTONFS(vp->v_mount);
-	struct rpcclnt * clnt = &nmp->nm_rpcclnt;
-	struct mbuf *md, *mrep;
-	caddr_t dpos;
-	struct rpc_reply reply;
 
-	if ((error = rpcclnt_request(clnt, mrest, procnum, td, cred,
-	    &reply)) != 0) {
-		goto out;
-	}
+	error = nfs4_request_mnt(VFSTONFS(vp->v_mount), mrest, procnum,
+				 td, cred, mrp, mdp, dposp);
 
-	/* XXX: don't free mrest if an error occured, to allow caller to retry*/
-	m_freem(mrest);
-	mrep = reply.mrep;
-	md = reply.result_md;
-	dpos = reply.result_dpos;
+	/*
+	 ** If the File Handle was stale, invalidate the
+	 ** lookup cache, just in case.
+	 **/
+	if (error == ESTALE)
+		cache_purge(vp);
 
-	tl = nfsm_dissect(u_int32_t *, NFSX_UNSIGNED);
-	if (*tl != 0) {
-		error = fxdr_unsigned(int, *tl);
-
-		#if 0
-		if ((nmp->nm_flag & NFSMNT_NFSV3) &&
-		    error == NFSERR_TRYLATER) {
-			m_freem(mrep);
-			error = 0;
-			waituntil = time_second + trylater_delay;
-			while (time_second < waituntil)
-				(void) tsleep(&lbolt, PSOCK, "nqnfstry", 0);
-			trylater_delay *= nfs_backoff[trylater_cnt];
-			if (trylater_cnt < NFS_NBACKOFF - 1)
-				trylater_cnt++;
-			goto tryagain;
-		}
-		#endif
-
-		/*
- 		** If the File Handle was stale, invalidate the
- 		** lookup cache, just in case.
- 		**/
-		if (error == ESTALE)
-			cache_purge(vp);
-		goto out;
-	}
-
-	*mrp = mrep;
-	*mdp = md;
-	*dposp = dpos;
-	return (0);
-nfsmout:
-out:
-	m_freem(reply.mrep);
-	*mrp = NULL;
-	*mdp = NULL;
 	return (error);
 }
 
@@ -309,7 +317,7 @@ out:
 	m_freem(reply.mrep);
 	*mrp = NULL;
 	*mdp = NULL;
-	return (error);
+	return (nfs4_nfserr_to_syserr(error));
 }
 
 

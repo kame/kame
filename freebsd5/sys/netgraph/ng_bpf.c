@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bpf.c,v 1.16 2002/05/31 23:48:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bpf.c,v 1.18 2004/06/23 02:37:10 archie Exp $
  * $Whistle: ng_bpf.c,v 1.3 1999/12/03 20:30:23 archie Exp $
  */
 
@@ -190,18 +190,15 @@ static const struct ng_cmdlist ng_bpf_cmdlist[] = {
 
 /* Netgraph type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_BPF_NODE_TYPE,
-	NULL,
-	ng_bpf_constructor,
-	ng_bpf_rcvmsg,
-	ng_bpf_shutdown,
-	ng_bpf_newhook,
-	NULL,
-	NULL,
-	ng_bpf_rcvdata,
-	ng_bpf_disconnect,
-	ng_bpf_cmdlist
+	.version =	NG_ABI_VERSION,
+	.name =		NG_BPF_NODE_TYPE,
+	.constructor =	ng_bpf_constructor,
+	.rcvmsg =	ng_bpf_rcvmsg,
+	.shutdown =	ng_bpf_shutdown,
+	.newhook =	ng_bpf_newhook,
+	.rcvdata =	ng_bpf_rcvdata,
+	.disconnect =	ng_bpf_disconnect,
+	.cmdlist =	ng_bpf_cmdlist,
 };
 NETGRAPH_INIT(bpf, &typestruct);
 
@@ -406,7 +403,10 @@ ng_bpf_rcvdata(hook_p hook, item_p item)
 		data = mtod(m, u_char *);
 
 	/* Run packet through filter */
-	len = bpf_filter(hip->prog->bpf_prog, data, totlen, totlen);
+	if (totlen == 0)
+		len = 0;	/* don't call bpf_filter() with totlen == 0! */
+	else
+		len = bpf_filter(hip->prog->bpf_prog, data, totlen, totlen);
 	if (needfree)
 		FREE(data, M_NETGRAPH_BPF);
 

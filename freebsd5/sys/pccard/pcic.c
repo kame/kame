@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic.c,v 1.184 2003/11/09 09:17:25 tanimura Exp $
+ * $FreeBSD: src/sys/pccard/pcic.c,v 1.185 2004/08/13 06:57:31 imp Exp $
  */
 
 #define OBSOLETE_IN_6
@@ -48,7 +48,6 @@
 
 /* Get pnp IDs */
 #include <isa/isavar.h>
-#include <dev/pcic/i82365reg.h>
 
 #include <dev/pccard/pccardvar.h>
 #include "card_if.h"

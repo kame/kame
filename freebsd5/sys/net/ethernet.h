@@ -1,7 +1,7 @@
 /*
  * Fundamental constants relating to ethernet.
  *
- * $FreeBSD: src/sys/net/ethernet.h,v 1.22 2002/11/14 23:28:47 sam Exp $
+ * $FreeBSD: src/sys/net/ethernet.h,v 1.23 2004/06/02 21:34:14 naddy Exp $
  *
  */
 
@@ -350,6 +350,8 @@ struct mbuf;
 struct rtentry;
 struct sockaddr;
 
+extern	uint32_t ether_crc32_le(const uint8_t *, size_t);
+extern	uint32_t ether_crc32_be(const uint8_t *, size_t);
 extern	void ether_demux(struct ifnet *, struct mbuf *);
 extern	void ether_ifattach(struct ifnet *, const u_int8_t *);
 extern	void ether_ifdetach(struct ifnet *);

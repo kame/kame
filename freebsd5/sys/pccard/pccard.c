@@ -29,7 +29,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard.c,v 1.160 2003/11/09 09:17:25 tanimura Exp $
+ * $FreeBSD: src/sys/pccard/pccard.c,v 1.163 2004/06/16 09:47:19 phk Exp $
  */
 
 #define OBSOLETE_IN_6
@@ -80,12 +80,9 @@ static	d_write_t	crdwrite;
 static	d_ioctl_t	crdioctl;
 static	d_poll_t	crdpoll;
 
-#if __FreeBSD_version < 500000
-#define CDEV_MAJOR 50
-#else
-#define CDEV_MAJOR MAJOR_AUTO
-#endif
 static struct cdevsw crd_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	crdopen,
 	.d_close =	crdclose,
 	.d_read =	crdread,
@@ -93,7 +90,6 @@ static struct cdevsw crd_cdevsw = {
 	.d_ioctl =	crdioctl,
 	.d_poll =	crdpoll,
 	.d_name =	"crd",
-	.d_maj =	CDEV_MAJOR,
 };
 
 /*
@@ -353,7 +349,7 @@ pccard_event(struct slot *slt, enum card_event event)
  *	Device driver interface.
  */
 static	int
-crdopen(dev_t dev, int oflags, int devtype, d_thread_t *td)
+crdopen(struct cdev *dev, int oflags, int devtype, d_thread_t *td)
 {
 	struct slot *slt = PCCARD_DEV2SOFTC(dev);
 
@@ -369,7 +365,7 @@ crdopen(dev_t dev, int oflags, int devtype, d_thread_t *td)
  *	slots may be assigned to drivers already.
  */
 static	int
-crdclose(dev_t dev, int fflag, int devtype, d_thread_t *td)
+crdclose(struct cdev *dev, int fflag, int devtype, d_thread_t *td)
 {
 	return (0);
 }
@@ -379,7 +375,7 @@ crdclose(dev_t dev, int fflag, int devtype, d_thread_t *td)
  *	then transfer to user space.
  */
 static	int
-crdread(dev_t dev, struct uio *uio, int ioflag)
+crdread(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct slot *slt = PCCARD_DEV2SOFTC(dev);
 	struct mem_desc *mp, oldmap;
@@ -425,7 +421,7 @@ crdread(dev_t dev, struct uio *uio, int ioflag)
  *	window is used.
  */
 static	int
-crdwrite(dev_t dev, struct uio *uio, int ioflag)
+crdwrite(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct slot *slt = PCCARD_DEV2SOFTC(dev);
 	struct mem_desc *mp, oldmap;
@@ -470,7 +466,7 @@ crdwrite(dev_t dev, struct uio *uio, int ioflag)
  *	descriptors, and assignment of drivers.
  */
 static	int
-crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, d_thread_t *td)
+crdioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, d_thread_t *td)
 {
 	u_int32_t	addr;
 	int		err;
@@ -671,7 +667,7 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, d_thread_t *td)
  *	when a change in card status occurs.
  */
 static	int
-crdpoll(dev_t dev, int events, d_thread_t *td)
+crdpoll(struct cdev *dev, int events, d_thread_t *td)
 {
 	int	revents = 0;
 	int	s;

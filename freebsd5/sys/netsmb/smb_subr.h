@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_subr.h,v 1.10 2003/08/23 21:43:33 marcel Exp $
+ * $FreeBSD: src/sys/netsmb/smb_subr.h,v 1.11 2004/01/02 22:38:42 tjr Exp $
  */
 #ifndef _NETSMB_SMB_SUBR_H_
 #define _NETSMB_SMB_SUBR_H_
@@ -114,6 +114,7 @@ void smb_strfree(char *s);
 void smb_memfree(void *s);
 void *smb_zmalloc(unsigned long size, struct malloc_type *type, int flags);
 
+int  smb_calcmackey(struct smb_vc *vcp);
 int  smb_encrypt(const u_char *apwd, u_char *C8, u_char *RN);
 int  smb_ntencrypt(const u_char *apwd, u_char *C8, u_char *RN);
 int  smb_maperror(int eclass, int eno);
@@ -123,5 +124,7 @@ int  smb_put_dstring(struct mbchain *mbp, struct smb_vc *vcp,
 	const char *src, int caseopt);
 int  smb_put_string(struct smb_rq *rqp, const char *src);
 int  smb_put_asunistring(struct smb_rq *rqp, const char *src);
+int  smb_rq_sign(struct smb_rq *rqp);
+int  smb_rq_verify(struct smb_rq *rqp);
 
 #endif /* !_NETSMB_SMB_SUBR_H_ */

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdio.h	8.5 (Berkeley) 4/29/95
- * $FreeBSD: src/include/stdio.h,v 1.51.4.1 2003/12/18 00:59:50 peter Exp $
+ * $FreeBSD: src/include/stdio.h,v 1.56 2004/06/20 10:01:30 tjr Exp $
  */
 
 #ifndef	_STDIO_H_
@@ -98,8 +98,6 @@ struct __sFILEX;
  * that does not match the previous one in _bf.  When this happens,
  * _ub._base becomes non-nil (i.e., a stream has ungetc() data iff
  * _ub._base!=NULL) and _up and _ur save the current values of _p and _r.
- *
- * NB: see WARNING above before changing the layout of this structure!
  */
 typedef	struct __sFILE {
 	unsigned char *_p;	/* current position in (some) buffer */
@@ -131,14 +129,17 @@ typedef	struct __sFILE {
 
 	/* Unix stdio files get aligned to block boundaries on fseek() */
 	int	_blksize;	/* stat.st_blksize (may be != _bf._size) */
-	fpos_t	_offset;	/* current lseek offset (see WARNING) */
+	fpos_t	_offset;	/* current lseek offset */
 } FILE;
 
+#ifndef _STDSTREAM_DECLARED
 __BEGIN_DECLS
 extern FILE *__stdinp;
 extern FILE *__stdoutp;
 extern FILE *__stderrp;
 __END_DECLS
+#define	_STDSTREAM_DECLARED
+#endif
 
 #define	__SLBF	0x0001		/* line buffered */
 #define	__SNBF	0x0002		/* unbuffered */
@@ -415,6 +416,22 @@ static __inline int __sputc(int _c, FILE *_p) {
 #define	__sferror(p)	(((p)->_flags & __SERR) != 0)
 #define	__sclearerr(p)	((void)((p)->_flags &= ~(__SERR|__SEOF)))
 #define	__sfileno(p)	((p)->_file)
+
+extern int __isthreaded;
+
+#define	feof(p)		(!__isthreaded ? __sfeof(p) : (feof)(p))
+#define	ferror(p)	(!__isthreaded ? __sferror(p) : (ferror)(p))
+#define	clearerr(p)	(!__isthreaded ? __sclearerr(p) : (clearerr)(p))
+
+#if __POSIX_VISIBLE
+#define	fileno(p)	(!__isthreaded ? __sfileno(p) : (fileno)(p))
+#endif
+
+#define	getc(fp)	(!__isthreaded ? __sgetc(fp) : (getc)(fp))
+#define	putc(x, fp)	(!__isthreaded ? __sputc(x, fp) : (putc)(x, fp))
+
+#define	getchar()	getc(stdin)
+#define	putchar(x)	putc(x, stdout)
 
 #if __BSD_VISIBLE
 /*

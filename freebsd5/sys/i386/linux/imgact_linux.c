@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/linux/imgact_linux.c,v 1.50 2003/09/07 13:23:45 bde Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/linux/imgact_linux.c,v 1.52 2004/06/24 02:24:39 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -106,10 +106,13 @@ exec_linux_imgact(struct image_params *imgp)
     /*
      * text/data/bss must not exceed limits
      */
-    mtx_assert(&Giant, MA_OWNED);
+    PROC_LOCK(imgp->proc);
     if (a_out->a_text > maxtsiz ||
-	a_out->a_data + bss_size > imgp->proc->p_rlimit[RLIMIT_DATA].rlim_cur)
+	a_out->a_data + bss_size > lim_cur(imgp->proc, RLIMIT_DATA)) {
+	PROC_UNLOCK(imgp->proc);
 	return (ENOMEM);
+    }
+    PROC_UNLOCK(imgp->proc);
 
     VOP_UNLOCK(imgp->vp, 0, td);
 
@@ -189,7 +192,7 @@ exec_linux_imgact(struct image_params *imgp)
 
 #ifdef DEBUG
 	printf("imgact: startaddr=%08lx, length=%08lx\n",
-	    (u_long)vmaddr, a_out->a_text + a_out->a_data);
+	    (u_long)vmaddr, (u_long)a_out->a_text + (u_long)a_out->a_data);
 #endif
 	/*
 	 * allow read/write of data

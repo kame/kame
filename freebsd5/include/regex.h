@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)regex.h	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/include/regex.h,v 1.6 2002/10/03 18:12:03 mike Exp $
+ * $FreeBSD: src/include/regex.h,v 1.11 2004/07/12 06:07:26 tjr Exp $
  */
 
 #ifndef _REGEX_H_
@@ -75,6 +75,7 @@ typedef struct {
 #define	REG_DUMP	0200
 
 /* regerror() flags */
+#define	REG_ENOSYS	(-1)
 #define	REG_NOMATCH	 1
 #define	REG_BADPAT	 2
 #define	REG_ECOLLATE	 3
@@ -91,6 +92,7 @@ typedef struct {
 #define	REG_EMPTY	14
 #define	REG_ASSERT	15
 #define	REG_INVARG	16
+#define	REG_ILLSEQ	17
 #define	REG_ATOI	255	/* convert name to number (!) */
 #define	REG_ITOA	0400	/* convert number to name (!) */
 

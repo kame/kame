@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.c,v 1.58 2003/02/19 05:47:31 imp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.c,v 1.67 2004/08/01 20:39:33 glebius Exp $
  * $Whistle: ng_pppoe.c,v 1.10 1999/11/01 09:24:52 julian Exp $
  */
 #if 0
@@ -54,6 +54,7 @@
 #include <sys/malloc.h>
 #include <sys/errno.h>
 #include <sys/sysctl.h>
+#include <sys/syslog.h>
 #include <net/ethernet.h>
 
 #include <netgraph/ng_message.h>
@@ -150,23 +151,35 @@ static const struct ng_cmdlist ng_pppoe_cmds[] = {
 	  &ng_pppoe_sts_state_type,
 	  NULL
 	},
+	{
+	  NGM_PPPOE_COOKIE,
+	  NGM_PPPOE_SETMODE,
+	  "pppoe_setmode",
+	  &ng_parse_string_type,
+	  NULL
+	},
+	{
+	  NGM_PPPOE_COOKIE,
+	  NGM_PPPOE_GETMODE,
+	  "pppoe_getmode",
+	  NULL,
+	  &ng_parse_string_type
+	},
 	{ 0 }
 };
 
 /* Netgraph node type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_PPPOE_NODE_TYPE,
-	NULL,
-	ng_pppoe_constructor,
-	ng_pppoe_rcvmsg,
-	ng_pppoe_shutdown,
-	ng_pppoe_newhook,
-	NULL,
-	ng_pppoe_connect,
-	ng_pppoe_rcvdata,
-	ng_pppoe_disconnect,
-	ng_pppoe_cmds
+	.version =	NG_ABI_VERSION,
+	.name =		NG_PPPOE_NODE_TYPE,
+	.constructor =	ng_pppoe_constructor,
+	.rcvmsg =	ng_pppoe_rcvmsg,
+	.shutdown =	ng_pppoe_shutdown,
+	.newhook =	ng_pppoe_newhook,
+	.connect =	ng_pppoe_connect,
+	.rcvdata =	ng_pppoe_rcvdata,
+	.disconnect =	ng_pppoe_disconnect,
+	.cmdlist =	ng_pppoe_cmds,
 };
 NETGRAPH_INIT(pppoe, &typestruct);
 /* Depend on ng_ether so we can use the Ethernet parse type */
@@ -225,6 +238,35 @@ struct sess_con {
 };
 typedef struct sess_con *sessp;
 
+#define	NG_PPPOE_SESSION_NODE(sp) NG_HOOK_NODE(sp->hook)
+
+enum {
+	PPPOE_STANDARD	= 1,	/* standard RFC2516 mode */
+	PPPOE_NONSTANDARD,	/* 3Com proprietary mode */
+};
+
+struct ng_pppoe_mode_t {
+	u_int8_t        		id;
+	const struct ether_header	*eh_prototype;
+	const char      		*name;
+};
+
+static const struct ether_header eh_standard =
+	{{0xff,0xff,0xff,0xff,0xff,0xff},
+	{0x00,0x00,0x00,0x00,0x00,0x00},
+	ETHERTYPE_PPPOE_DISC};
+
+static const struct ether_header eh_3Com =
+	{{0xff,0xff,0xff,0xff,0xff,0xff},
+	{0x00,0x00,0x00,0x00,0x00,0x00},
+	ETHERTYPE_PPPOE_STUPID_DISC};
+
+static const struct ng_pppoe_mode_t ng_pppoe_modes[] = {
+	{ PPPOE_STANDARD,	&eh_standard,	NG_PPPOE_STANDARD },
+	{ PPPOE_NONSTANDARD,	&eh_3Com,	NG_PPPOE_NONSTANDARD },
+	{ 0, NULL},
+};
+
 /*
  * Information we store for each node
  */
@@ -235,33 +277,42 @@ struct PPPOE {
 	u_int   	packets_in;	/* packets in from ethernet */
 	u_int   	packets_out;	/* packets out towards ethernet */
 	u_int32_t	flags;
+	const struct ng_pppoe_mode_t	*mode;	/* standard PPPoE or 3Com? */
 	/*struct sess_con *buckets[HASH_SIZE];*/	/* not yet used */
 };
 typedef struct PPPOE *priv_p;
 
-struct ether_header eh_prototype =
-	{{0xff,0xff,0xff,0xff,0xff,0xff},
-	 {0x00,0x00,0x00,0x00,0x00,0x00},
-	 ETHERTYPE_PPPOE_DISC};
+/* Deprecated sysctl, leaved here to keep compatibility for some time */
+#define PPPOE_SYSCTL_KEEPSTANDARD	-1
+#define PPPOE_SYSCTL_STANDARD		0
+#define PPPOE_SYSCTL_NONSTANDARD	1
+static int pppoe_mode = PPPOE_SYSCTL_KEEPSTANDARD;
+static const struct ng_pppoe_mode_t *sysctl_mode = ng_pppoe_modes;
 
-static int nonstandard;
 static int
 ngpppoe_set_ethertype(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	int val;
 
-	val = nonstandard;
+	val = pppoe_mode;
 	error = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (error != 0 || req->newptr == NULL)
 		return (error);
-	if (val == 1) {
-		nonstandard = 1;
-		eh_prototype.ether_type = ETHERTYPE_PPPOE_STUPID_DISC;
-	} else {
-		nonstandard = 0;
-		eh_prototype.ether_type = ETHERTYPE_PPPOE_DISC;
+	switch (val) {
+	case PPPOE_SYSCTL_NONSTANDARD:
+		sysctl_mode = ng_pppoe_modes + 1;
+		break;
+	case PPPOE_SYSCTL_STANDARD:
+	case PPPOE_SYSCTL_KEEPSTANDARD:
+		sysctl_mode = ng_pppoe_modes;
+		break;
+	default:
+		return (EINVAL);
 	}
+
+	pppoe_mode = val;
+	printf("net.graph.nonstandard_pppoe is deprecated. See ng_pppoe(4), ppp(8).\n");
 	return (0);
 }
 
@@ -584,6 +635,10 @@ AAA
 	/* Link structs together; this counts as our one reference to *nodep */
 	NG_NODE_SET_PRIVATE(node, privdata);
 	privdata->node = node;
+
+	/* Initialize to standard mode (the first one in ng_pppoe_modes[]). */
+	privdata->mode = sysctl_mode;
+ 
 	return (0);
 }
 
@@ -741,7 +796,9 @@ AAA
 			callout_handle_init( &neg->timeout_handle);
 			neg->m->m_len = sizeof(struct pppoe_full_hdr);
 			neg->pkt = mtod(neg->m, union packet*);
-			neg->pkt->pkt_header.eh = eh_prototype;
+			memcpy((void *)&neg->pkt->pkt_header.eh,
+			    (const void *)privp->mode->eh_prototype,
+			    sizeof(struct ether_header));
 			neg->pkt->pkt_header.ph.ver = 0x1;
 			neg->pkt->pkt_header.ph.type = 0x1;
 			neg->pkt->pkt_header.ph.sid = 0x0000;
@@ -844,6 +901,38 @@ AAA
 				    ourmsg->data_len);
 			neg->service_len = ourmsg->data_len;
 			break;
+		case NGM_PPPOE_SETMODE:
+		    {
+			const struct ng_pppoe_mode_t *mode;
+			char *s;
+			size_t len;
+
+			if (msg->header.arglen == 0)
+				LEAVE(EINVAL);
+
+			s = (char *)msg->data;
+			len = msg->header.arglen - 1;
+
+			/* Search for matching mode string */
+			for (mode = ng_pppoe_modes; mode->id != 0; mode++ )
+				if ((strlen(mode->name) == len) &&
+				    !strncmp(mode->name, s, len))
+					break;	/* found */
+
+			if (mode->id != 0)
+				privp->mode = mode;
+			else
+				LEAVE(EINVAL);
+			break;
+		    }
+		case NGM_PPPOE_GETMODE:
+			NG_MKRESPONSE(resp, msg, strlen(privp->mode->name) + 1,
+			    M_NOWAIT);
+			if (resp == NULL)
+				LEAVE(ENOMEM);
+			strlcpy((char *)resp->data, privp->mode->name,
+			    strlen(privp->mode->name) + 1);
+			break;
 		default:
 			LEAVE(EINVAL);
 		}
@@ -867,6 +956,7 @@ quit:
 static void
 pppoe_start(sessp sp)
 {
+	priv_p	privp = NG_NODE_PRIVATE(NG_PPPOE_SESSION_NODE(sp));
 	struct {
 		struct pppoe_tag hdr;
 		union	uniq	data;
@@ -877,8 +967,11 @@ pppoe_start(sessp sp)
 	 */
 AAA
 	sp->state = PPPOE_SINIT;
-	/* reset the packet header to broadcast */
-	sp->neg->pkt->pkt_header.eh = eh_prototype;
+	/* Reset the packet header to broadcast. Since we are in a client
+	 * mode use configured ethertype. */
+	memcpy((void *)&sp->neg->pkt->pkt_header.eh,
+	    (const void *)privp->mode->eh_prototype,
+	    sizeof(struct ether_header));
 	sp->neg->pkt->pkt_header.ph.code = PADI_CODE;
 	uniqtag.hdr.tag_type = PTT_HOST_UNIQ;
 	uniqtag.hdr.tag_len = htons((u_int16_t)sizeof(uniqtag.data));
@@ -903,7 +996,7 @@ send_acname(sessp sp, const struct pppoe_tag *tag)
 		return (ENOMEM);
 
 	sts = (struct ngpppoe_sts *)msg->data;
-	tlen = min(NG_HOOKLEN, ntohs(tag->tag_len));
+	tlen = min(NG_HOOKSIZ - 1, ntohs(tag->tag_len));
 	strncpy(sts->hook, tag->tag_data, tlen);
 	sts->hook[tlen] = '\0';
 	NG_SEND_MSG_ID(error, NG_HOOK_NODE(sp->hook), msg, sp->creator, 0);
@@ -930,8 +1023,8 @@ send_sessionid(sessp sp)
 
 /*
  * Receive data, and do something with it.
- * The caller will never free m or meta, so
- * if we use up this data or abort we must free BOTH of these.
+ * The caller will never free m, so if we use up this data
+ * or abort we must free it.
  */
 static int
 ng_pppoe_rcvdata(hook_p hook, item_p item)
@@ -981,10 +1074,7 @@ AAA
 		wh = mtod(m, struct pppoe_full_hdr *);
 		length = ntohs(wh->ph.length);
 		switch(wh->eh.ether_type) {
-		case	ETHERTYPE_PPPOE_STUPID_DISC:
-			nonstandard = 1;
-			eh_prototype.ether_type = ETHERTYPE_PPPOE_STUPID_DISC;
-			/* fall through */
+		case	ETHERTYPE_PPPOE_STUPID_DISC: /* fall through */
 		case	ETHERTYPE_PPPOE_DISC:
 			/*
 			 * We need to try to make sure that the tag area
@@ -1185,7 +1275,10 @@ AAA
 				 * from NEWCONNECTED to CONNECTED
 				 */
 				sp->pkt_hdr = neg->pkt->pkt_header;
-				if (nonstandard)
+				/* Configure ethertype depending on what
+				 * ethertype was used at discovery phase */
+				if (sp->pkt_hdr.eh.ether_type ==
+				    ETHERTYPE_PPPOE_STUPID_DISC)
 					sp->pkt_hdr.eh.ether_type
 						= ETHERTYPE_PPPOE_STUPID_SESS;
 				else
@@ -1237,7 +1330,7 @@ AAA
 				 * Keep a copy of the header we will be using.
 				 */
 				sp->pkt_hdr = neg->pkt->pkt_header;
-				if (nonstandard)
+				if (privp->mode->id == PPPOE_NONSTANDARD)
 					sp->pkt_hdr.eh.ether_type
 						= ETHERTYPE_PPPOE_STUPID_SESS;
 				else
@@ -1378,6 +1471,8 @@ AAA
 			session = ntohs(wh->ph.sid);
 			length = ntohs(wh->ph.length);
 			code = wh->ph.code; 
+			/* Use peers mode in session */
+			neg->pkt->pkt_header.eh.ether_type = wh->eh.ether_type;
 			if ( code != PADI_CODE) {
 				LEAVE(EINVAL);
 			};
@@ -1519,7 +1614,10 @@ AAA
 			/* revert the stored header to DISC/PADT mode */
 		 	wh = &sp->pkt_hdr;
 			wh->ph.code = PADT_CODE;
-			if (nonstandard)
+			/* Configure ethertype depending on what was used during
+			 * sessions stage. */
+			if (sp->pkt_hdr.eh.ether_type ==
+			    ETHERTYPE_PPPOE_STUPID_SESS)
 				wh->eh.ether_type = ETHERTYPE_PPPOE_STUPID_DISC;
 			else
 				wh->eh.ether_type = ETHERTYPE_PPPOE_DISC;
@@ -1736,7 +1834,7 @@ AAA
 	if (msg == NULL)
 		return (ENOMEM);
 	sts = (struct ngpppoe_sts *)msg->data;
-	strncpy(sts->hook, NG_HOOK_NAME(sp->hook), NG_HOOKLEN + 1);
+	strncpy(sts->hook, NG_HOOK_NAME(sp->hook), NG_HOOKSIZ);
 	NG_SEND_MSG_ID(error, NG_HOOK_NODE(sp->hook), msg, sp->creator, 0);
 	return (error);
 }

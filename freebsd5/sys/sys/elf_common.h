@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/elf_common.h,v 1.14 2003/06/18 16:38:22 kan Exp $
+ * $FreeBSD: src/sys/sys/elf_common.h,v 1.15 2004/05/05 02:38:54 marcel Exp $
  */
 
 #ifndef _SYS_ELF_COMMON_H_
@@ -136,7 +136,7 @@ typedef struct {
 #define EM_PPC64	21	/* PowerPC 64-bit */
 #define EM_ARM		40	/* ARM */
 #define EM_SPARCV9	43	/* SPARC v9 64-bit */
-#define EM_IA_64	50	/* Intel IA-46 Processor */
+#define EM_IA_64	50	/* Intel IA-64 Processor */
 #define EM_X86_64	62	/* Advanced Micro Devices x86-64 */
 #define EM_ALPHA	0x9026	/* Alpha (written in the absence of an ABI */
 

@@ -1,20 +1,20 @@
-# $FreeBSD: src/sys/modules/syscons/Makefile,v 1.13 2002/03/23 12:36:19 amorita Exp $
+# $FreeBSD: src/sys/modules/syscons/Makefile,v 1.14 2004/01/19 12:36:08 ru Exp $
 
-SUBDIR =
-SUBDIR += blank
-SUBDIR += daemon
-SUBDIR += dragon
-SUBDIR += fade
-SUBDIR += fire
-SUBDIR += green
-SUBDIR += logo
-SUBDIR += rain
-SUBDIR += snake
-SUBDIR += star
-SUBDIR += warp
+SUBDIR=	${_apm} \
+	blank \
+	daemon \
+	dragon \
+	fade \
+	fire \
+	green \
+	logo \
+	rain \
+	snake \
+	star \
+	warp
 
 .if ${MACHINE_ARCH} == "i386"
-SUBDIR += apm
+_apm=	apm
 .endif
 
 .include <bsd.subdir.mk>

@@ -1,7 +1,7 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
+ * Copyright (c) 1999-2002 Robert N. M. Watson
  * Copyright (c) 2001 Ilmar S. Habibulin
- * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
+ * Copyright (c) 2001-2004 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson and Ilmar Habibulin for the
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_mac.c,v 1.107 2003/11/16 23:31:44 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_mac.c,v 1.113.4.1 2004/10/30 21:03:46 rwatson Exp $");
 
 #include "opt_mac.h"
 #include "opt_devfs.h"
@@ -166,9 +166,11 @@ MALLOC_DEFINE(M_MACTEMP, "mactemp", "MAC temporary label storage");
  * exclusive consumers that they should try to acquire the lock if a
  * first attempt at exclusive access fails.
  */
+#ifndef MAC_STATIC
 static struct mtx mac_policy_mtx;
 static struct cv mac_policy_cv;
 static int mac_policy_count;
+#endif
 struct mac_policy_list_head mac_policy_list;
 struct mac_policy_list_head mac_static_policy_list;
 
@@ -185,45 +187,69 @@ void
 mac_policy_grab_exclusive(void)
 {
 
+#ifndef MAC_STATIC
+	if (!mac_late)
+		return;
+
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
  	    "mac_policy_grab_exclusive() at %s:%d", __FILE__, __LINE__);
 	mtx_lock(&mac_policy_mtx);
 	while (mac_policy_count != 0)
 		cv_wait(&mac_policy_cv, &mac_policy_mtx);
+#endif
 }
 
 void
 mac_policy_assert_exclusive(void)
 {
 
+#ifndef MAC_STATIC
+	if (!mac_late)
+		return;
+
 	mtx_assert(&mac_policy_mtx, MA_OWNED);
 	KASSERT(mac_policy_count == 0,
 	    ("mac_policy_assert_exclusive(): not exclusive"));
+#endif
 }
 
 void
 mac_policy_release_exclusive(void)
 {
 
+#ifndef MAC_STATIC
+	if (!mac_late)
+		return;
+
 	KASSERT(mac_policy_count == 0,
 	    ("mac_policy_release_exclusive(): not exclusive"));
 	mtx_unlock(&mac_policy_mtx);
 	cv_signal(&mac_policy_cv);
+#endif
 }
 
 void
 mac_policy_list_busy(void)
 {
 
+#ifndef MAC_STATIC
+	if (!mac_late)
+		return;
+
 	mtx_lock(&mac_policy_mtx);
 	mac_policy_count++;
 	mtx_unlock(&mac_policy_mtx);
+#endif
 }
 
 int
 mac_policy_list_conditional_busy(void)
 {
+#ifndef MAC_STATIC
 	int ret;
+
+	if (!mac_late)
+		return (1);
 
 	mtx_lock(&mac_policy_mtx);
 	if (!LIST_EMPTY(&mac_policy_list)) {
@@ -233,11 +259,21 @@ mac_policy_list_conditional_busy(void)
 		ret = 0;
 	mtx_unlock(&mac_policy_mtx);
 	return (ret);
+#else
+	if (!mac_late)
+		return (1);
+
+	return (1);
+#endif
 }
 
 void
 mac_policy_list_unbusy(void)
 {
+
+#ifndef MAC_STATIC
+	if (!mac_late)
+		return;
 
 	mtx_lock(&mac_policy_mtx);
 	mac_policy_count--;
@@ -245,6 +281,7 @@ mac_policy_list_unbusy(void)
 	if (mac_policy_count == 0)
 		cv_signal(&mac_policy_cv);
 	mtx_unlock(&mac_policy_mtx);
+#endif
 }
 
 /*
@@ -258,8 +295,10 @@ mac_init(void)
 	LIST_INIT(&mac_policy_list);
 	mac_labelzone_init();
 
+#ifndef MAC_STATIC
 	mtx_init(&mac_policy_mtx, "mac_policy_mtx", NULL, MTX_DEF);
 	cv_init(&mac_policy_cv, "mac_policy_cv");
+#endif
 }
 
 /*
@@ -314,6 +353,13 @@ mac_policy_modevent(module_t mod, int type, void *data)
 	error = 0;
 	mpc = (struct mac_policy_conf *) data;
 
+#ifdef MAC_STATIC
+	if (mac_late) {
+		printf("mac_policy_modevent: MAC_STATIC and late\n");
+		return (EBUSY);
+	}
+#endif
+
 	switch (type) {
 	case MOD_LOAD:
 		if (mpc->mpc_loadtime_flags & MPC_LOADTIME_FLAG_NOTLATE &&
@@ -334,6 +380,7 @@ mac_policy_modevent(module_t mod, int type, void *data)
 			error = 0;
 		break;
 	default:
+		error = EOPNOTSUPP;
 		break;
 	}
 
@@ -745,7 +792,7 @@ __mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 		pipe = fp->f_data;
 		intlabel = mac_pipe_label_alloc();
 		PIPE_LOCK(pipe);
-		mac_copy_pipe_label(pipe->pipe_label, intlabel);
+		mac_copy_pipe_label(pipe->pipe_pair->pp_label, intlabel);
 		PIPE_UNLOCK(pipe);
 		error = mac_externalize_pipe_label(intlabel, elements,
 		    buffer, mac.m_buflen);
@@ -953,8 +1000,8 @@ __mac_set_fd(struct thread *td, struct __mac_set_fd_args *uap)
 		if (error == 0) {
 			pipe = fp->f_data;
 			PIPE_LOCK(pipe);
-			error = mac_pipe_label_set(td->td_ucred, pipe,
-			    intlabel);
+			error = mac_pipe_label_set(td->td_ucred,
+			    pipe->pipe_pair, intlabel);
 			PIPE_UNLOCK(pipe);
 		}
 		mac_pipe_label_free(intlabel);
@@ -1206,4 +1253,4 @@ mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 	return (ENOSYS);
 }
 
-#endif
+#endif /* !MAC */

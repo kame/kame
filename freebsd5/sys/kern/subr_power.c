@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_power.c,v 1.4 2003/06/11 00:56:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_power.c,v 1.5 2004/01/02 18:24:13 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -96,8 +96,11 @@ power_profile_set_state(int state)
 	if (state != power_profile_state) {
 		power_profile_state = state;
 		changed = 1;
-		printf("system power profile changed to '%s'\n",
-		       (state == POWER_PROFILE_PERFORMANCE) ? "performance" : "economy");
+		if (bootverbose) {
+			printf("system power profile changed to '%s'\n",
+				(state == POWER_PROFILE_PERFORMANCE) ?
+				"performance" : "economy");
+		}
 	} else {
 		changed = 0;
 	}

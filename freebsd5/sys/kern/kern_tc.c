@@ -8,13 +8,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_tc.c,v 1.158 2003/11/13 10:03:58 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_tc.c,v 1.162 2004/08/14 08:33:49 phk Exp $");
 
 #include "opt_ntp.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
+#include <sys/syslog.h>
 #include <sys/systm.h>
 #include <sys/timepps.h>
 #include <sys/timetc.h>
@@ -95,6 +96,10 @@ SYSCTL_STRUCT(_kern, KERN_BOOTTIME, boottime, CTLFLAG_RD,
     &boottime, timeval, "System boottime");
 
 SYSCTL_NODE(_kern, OID_AUTO, timecounter, CTLFLAG_RW, 0, "");
+
+static int timestepwarnings;
+SYSCTL_INT(_kern_timecounter, OID_AUTO, stepwarnings, CTLFLAG_RW,
+    &timestepwarnings, 0, "");
 
 #define TC_STATS(foo) \
 	static u_int foo; \
@@ -334,26 +339,31 @@ tc_getfrequency(void)
 
 /*
  * Step our concept of UTC.  This is done by modifying our estimate of
- * when we booted.  XXX: needs further work.
+ * when we booted.
+ * XXX: not locked.
  */
 void
 tc_setclock(struct timespec *ts)
 {
 	struct timespec ts2;
+	struct bintime bt, bt2;
 
 	nsetclock++;
-	nanouptime(&ts2);
-	boottime.tv_sec = ts->tv_sec - ts2.tv_sec;
-	/* XXX boottime should probably be a timespec. */
-	boottime.tv_usec = (ts->tv_nsec - ts2.tv_nsec) / 1000;
-	if (boottime.tv_usec < 0) {
-		boottime.tv_usec += 1000000;
-		boottime.tv_sec--;
-	}
-	timeval2bintime(&boottime, &boottimebin);
+	binuptime(&bt2);
+	timespec2bintime(ts, &bt);
+	bintime_sub(&bt, &bt2);
+	bintime_add(&bt2, &boottimebin);
+	boottimebin = bt;
+	bintime2timeval(&bt, &boottime);
 
 	/* XXX fiddle all the little crinkly bits around the fiords... */
 	tc_windup();
+	if (timestepwarnings) {
+		bintime2timespec(&bt2, &ts2);
+		log(LOG_INFO, "Time stepped from %jd.%09ld to %jd.%09ld\n",
+		    (intmax_t)ts2.tv_sec, ts2.tv_nsec,
+		    (intmax_t)ts->tv_sec, ts->tv_nsec);
+	}
 }
 
 /*
@@ -548,6 +558,7 @@ pps_ioctl(u_long cmd, caddr_t data, struct pps_state *pps)
 	struct pps_kcbind_args *kapi;
 #endif
 
+	KASSERT(pps != NULL, ("NULL pps pointer in pps_ioctl"));
 	switch (cmd) {
 	case PPS_IOC_CREATE:
 		return (0);
@@ -611,6 +622,7 @@ pps_capture(struct pps_state *pps)
 {
 	struct timehands *th;
 
+	KASSERT(pps != NULL, ("NULL pps pointer in pps_capture"));
 	th = timehands;
 	pps->capgen = th->th_generation;
 	pps->capth = th;
@@ -628,6 +640,7 @@ pps_event(struct pps_state *pps, int event)
 	int foff, fhard;
 	pps_seq_t *pseq;
 
+	KASSERT(pps != NULL, ("NULL pps pointer in pps_event"));
 	/* If the timecounter was wound up underneath us, bail out. */
 	if (pps->capgen == 0 || pps->capgen != pps->capth->th_generation)
 		return;
@@ -659,10 +672,6 @@ pps_event(struct pps_state *pps, int event)
 		pps->ppscount[2] = pps->capcount;
 		return;
 	}
-
-	/* Return if nothing really happened. */
-	if (*pcount == pps->capcount)
-		return;
 
 	/* Convert the count to a timespec. */
 	tcount = pps->capcount - pps->capth->th_offset_count;

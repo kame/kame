@@ -13,7 +13,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/isa/mse.c,v 1.63 2003/11/09 09:17:23 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/isa/mse.c,v 1.68 2004/06/16 09:47:08 phk Exp $");
 
 /*
  * Driver for the Logitech and ATI Inport Bus mice for use with 386bsd and
@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD: src/sys/i386/isa/mse.c,v 1.63 2003/11/09 09:17:23 tanimura E
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/poll.h>
 #include <sys/selinfo.h>
@@ -95,8 +96,8 @@ typedef struct mse_softc {
 	u_char		sc_bytes[MOUSE_SYS_PACKETSIZE];
 	struct		callout_handle sc_callout;
 	int		sc_watchdog;
-	dev_t		sc_dev;
-	dev_t		sc_ndev;
+	struct cdev *sc_dev;
+	struct cdev *sc_ndev;
 	mousehw_t	hw;
 	mousemode_t	mode;
 	mousestatus_t	status;
@@ -139,15 +140,15 @@ static	d_read_t	mseread;
 static  d_ioctl_t	mseioctl;
 static	d_poll_t	msepoll;
 
-#define CDEV_MAJOR 27
 static struct cdevsw mse_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	mseopen,
 	.d_close =	mseclose,
 	.d_read =	mseread,
 	.d_ioctl =	mseioctl,
 	.d_poll =	msepoll,
 	.d_name =	"mse",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static	void		mseintr(void *);
@@ -331,8 +332,7 @@ mse_attach(dev)
 					 MSE_IOSIZE, RF_ACTIVE);
 	if (sc->sc_port == NULL)
 		return ENXIO;
-	sc->sc_intr = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
-					 RF_ACTIVE);
+	sc->sc_intr = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
 	if (sc->sc_intr == NULL) {
 		bus_release_resource(dev, SYS_RES_IOPORT, rid, sc->sc_port);
 		return ENXIO;
@@ -386,7 +386,7 @@ mse_detach(dev)
  */
 static	int
 mseopen(dev, flags, fmt, td)
-	dev_t dev;
+	struct cdev *dev;
 	int flags;
 	int fmt;
 	struct thread *td;
@@ -426,7 +426,7 @@ mseopen(dev, flags, fmt, td)
  */
 static	int
 mseclose(dev, flags, fmt, td)
-	dev_t dev;
+	struct cdev *dev;
 	int flags;
 	int fmt;
 	struct thread *td;
@@ -450,7 +450,7 @@ mseclose(dev, flags, fmt, td)
  */
 static	int
 mseread(dev, uio, ioflag)
-	dev_t dev;
+	struct cdev *dev;
 	struct uio *uio;
 	int ioflag;
 {
@@ -517,7 +517,7 @@ mseread(dev, uio, ioflag)
  */
 static int
 mseioctl(dev, cmd, addr, flag, td)
-	dev_t dev;
+	struct cdev *dev;
 	u_long cmd;
 	caddr_t addr;
 	int flag;
@@ -634,7 +634,7 @@ mseioctl(dev, cmd, addr, flag, td)
  */
 static	int
 msepoll(dev, events, td)
-	dev_t dev;
+	struct cdev *dev;
 	int events;
 	struct thread *td;
 {
@@ -667,10 +667,10 @@ static void
 msetimeout(arg)
 	void *arg;
 {
-	dev_t dev;
+	struct cdev *dev;
 	mse_softc_t *sc;
 
-	dev = (dev_t)arg;
+	dev = (struct cdev *)arg;
 	sc = devclass_get_softc(mse_devclass, MSE_UNIT(dev));
 	if (sc->sc_watchdog) {
 		if (bootverbose)

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_ktrace.c,v 1.91 2003/11/11 09:09:26 jkoshy Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_ktrace.c,v 1.96 2004/07/26 07:24:03 cperciva Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -42,7 +38,6 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_ktrace.c,v 1.91 2003/11/11 09:09:26 jkoshy
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/fcntl.h>
-#include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/lock.h>
@@ -54,7 +49,6 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_ktrace.c,v 1.91 2003/11/11 09:09:26 jkoshy
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 #include <sys/ktrace.h>
-#include <sys/sema.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
@@ -108,7 +102,7 @@ SYSCTL_UINT(_kern_ktrace, OID_AUTO, genio_size, CTLFLAG_RW, &ktr_geniosize,
 
 static int print_message = 1;
 struct mtx ktrace_mtx;
-static struct sema ktrace_sema;
+static struct cv ktrace_cv;
 
 static void ktrace_init(void *dummy);
 static int sysctl_kern_ktrace_request_pool(SYSCTL_HANDLER_ARGS);
@@ -129,7 +123,7 @@ ktrace_init(void *dummy)
 	int i;
 
 	mtx_init(&ktrace_mtx, "ktrace", NULL, MTX_DEF | MTX_QUIET);
-	sema_init(&ktrace_sema, 0, "ktrace");
+	cv_init(&ktrace_cv, "ktrace");
 	STAILQ_INIT(&ktr_todo);
 	STAILQ_INIT(&ktr_free);
 	for (i = 0; i < ktr_requestpool; i++) {
@@ -263,8 +257,8 @@ ktr_submitrequest(struct ktr_request *req)
 
 	mtx_lock(&ktrace_mtx);
 	STAILQ_INSERT_TAIL(&ktr_todo, req, ktr_list);
+	cv_signal(&ktrace_cv);
 	mtx_unlock(&ktrace_mtx);
-	sema_post(&ktrace_sema);
 	curthread->td_pflags &= ~TDP_INKTRACE;
 }
 
@@ -296,8 +290,9 @@ ktr_loop(void *dummy)
 	td = curthread;
 	cred = td->td_ucred;
 	for (;;) {
-		sema_wait(&ktrace_sema);
 		mtx_lock(&ktrace_mtx);
+		while (STAILQ_EMPTY(&ktr_todo))
+			cv_wait(&ktrace_cv, &ktrace_mtx);
 		req = STAILQ_FIRST(&ktr_todo);
 		STAILQ_REMOVE_HEAD(&ktr_todo, ktr_list);
 		KASSERT(req != NULL, ("got a NULL request"));
@@ -418,13 +413,17 @@ ktrgenio(fd, rw, uio, error)
 	int datalen;
 	char *buf;
 
-	if (error)
+	if (error) {
+		free(uio, M_IOV);
 		return;
+	}
 	uio->uio_offset = 0;
 	uio->uio_rw = UIO_WRITE;
 	datalen = imin(uio->uio_resid, ktr_geniosize);
 	buf = malloc(datalen, M_KTRACE, M_WAITOK);
-	if (uiomove(buf, datalen, uio)) {
+	error = uiomove(buf, datalen, uio);
+	free(uio, M_IOV);
+	if (error) {
 		free(buf, M_KTRACE);
 		return;
 	}
@@ -896,7 +895,7 @@ ktrcanset(td, targetp)
 
 	PROC_LOCK_ASSERT(targetp, MA_OWNED);
 	if (targetp->p_traceflag & KTRFAC_ROOT &&
-	    suser_cred(td->td_ucred, PRISON_ROOT))
+	    suser_cred(td->td_ucred, SUSER_ALLOWJAIL))
 		return (0);
 
 	if (p_candebug(td, targetp) != 0)

@@ -71,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_pageout.c,v 1.249 2003/10/24 06:43:04 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_pageout.c,v 1.261 2004/07/18 04:38:11 alc Exp $");
 
 #include "opt_vm.h"
 #include <sys/param.h>
@@ -148,7 +148,7 @@ static int vm_daemon_needed;
 static int vm_max_launder = 32;
 static int vm_pageout_stats_max=0, vm_pageout_stats_interval = 0;
 static int vm_pageout_full_stats_interval = 0;
-static int vm_pageout_stats_free_max=0, vm_pageout_algorithm=0;
+static int vm_pageout_algorithm=0;
 static int defer_swap_pageouts=0;
 static int disable_swap_pageouts=0;
 
@@ -174,9 +174,6 @@ SYSCTL_INT(_vm, OID_AUTO, pageout_full_stats_interval,
 
 SYSCTL_INT(_vm, OID_AUTO, pageout_stats_interval,
 	CTLFLAG_RW, &vm_pageout_stats_interval, 0, "Interval for partial stats scan");
-
-SYSCTL_INT(_vm, OID_AUTO, pageout_stats_free_max,
-	CTLFLAG_RW, &vm_pageout_stats_free_max, 0, "Not implemented");
 
 #if defined(NO_SWAPPING)
 SYSCTL_INT(_vm, VM_SWAPPING_ENABLED, swap_enabled,
@@ -397,6 +394,8 @@ vm_pageout_flush(vm_page_t *mc, int count, int flags)
 	for (i = 0; i < count; i++) {
 		vm_page_t mt = mc[i];
 
+		KASSERT((mt->flags & PG_WRITEABLE) == 0,
+		    ("vm_pageout_flush: page %p is not write protected", mt));
 		switch (pageout_status[i]) {
 		case VM_PAGER_OK:
 		case VM_PAGER_PEND:
@@ -433,8 +432,8 @@ vm_pageout_flush(vm_page_t *mc, int count, int flags)
 		if (pageout_status[i] != VM_PAGER_PEND) {
 			vm_object_pip_wakeup(object);
 			vm_page_io_finish(mt);
-			if (!vm_page_count_severe() || !vm_page_try_to_cache(mt))
-				pmap_page_protect(mt, VM_PROT_READ);
+			if (vm_page_count_severe())
+				vm_page_try_to_cache(mt);
 		}
 	}
 	return numpagedout;
@@ -609,11 +608,8 @@ vm_pageout_map_deactivate_pages(map, desired)
 	 * table pages.
 	 */
 	if (desired == 0 && nothingwired) {
-		GIANT_REQUIRED;
-		vm_page_lock_queues();
 		pmap_remove(vm_map_pmap(map), vm_map_min(map),
 		    vm_map_max(map));
-		vm_page_unlock_queues();
 	}
 	vm_map_unlock(map);
 }
@@ -659,13 +655,12 @@ vm_pageout_scan(int pass)
 	int page_shortage, maxscan, pcount;
 	int addl_page_shortage, addl_page_shortage_init;
 	struct proc *p, *bigproc;
+	struct thread *td;
 	vm_offset_t size, bigsize;
 	vm_object_t object;
 	int actcount;
 	int vnodes_skipped = 0;
 	int maxlaunder;
-	int s;
-	struct thread *td;
 
 	mtx_lock(&Giant);
 	/*
@@ -801,11 +796,26 @@ rescan0:
 		 * far as the VM code knows, any partially dirty pages are 
 		 * fully dirty.
 		 */
-		if (m->dirty == 0) {
-			vm_page_test_dirty(m);
+		if (m->dirty == 0 && !pmap_is_modified(m)) {
+			/*
+			 * Avoid a race condition: Unless write access is
+			 * removed from the page, another processor could
+			 * modify it before all access is removed by the call
+			 * to vm_page_cache() below.  If vm_page_cache() finds
+			 * that the page has been modified when it removes all
+			 * access, it panics because it cannot cache dirty
+			 * pages.  In principle, we could eliminate just write
+			 * access here rather than all access.  In the expected
+			 * case, when there are no last instant modifications
+			 * to the page, removing all access will be cheaper
+			 * overall.
+			 */
+			if ((m->flags & PG_WRITEABLE) != 0)
+				pmap_remove_all(m);
 		} else {
 			vm_page_dirty(m);
 		}
+
 		object = m->object;
 		if (!VM_OBJECT_TRYLOCK(object))
 			continue;
@@ -966,17 +976,13 @@ rescan0:
 			 * the (future) cleaned page.  Otherwise we could wind
 			 * up laundering or cleaning too many pages.
 			 */
-			s = splvm();
 			TAILQ_INSERT_AFTER(&vm_page_queues[PQ_INACTIVE].pl, m, &marker, pageq);
-			splx(s);
 			if (vm_pageout_clean(m) != 0) {
 				--page_shortage;
 				--maxlaunder;
 			}
-			s = splvm();
 			next = TAILQ_NEXT(&marker, pageq);
 			TAILQ_REMOVE(&vm_page_queues[PQ_INACTIVE].pl, &marker, pageq);
-			splx(s);
 unlock_and_continue:
 			VM_OBJECT_UNLOCK(object);
 			if (vp) {
@@ -1077,7 +1083,6 @@ unlock_and_continue:
 		}
 		m = next;
 	}
-	s = splvm();
 
 	/*
 	 * We try to maintain some *really* free pages, this allows interrupt
@@ -1094,12 +1099,10 @@ unlock_and_continue:
 		object = m->object;
 		VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 		vm_page_busy(m);
-		pmap_remove_all(m);
 		vm_page_free(m);
 		VM_OBJECT_UNLOCK(object);
 		cnt.v_dfree++;
 	}
-	splx(s);
 	vm_page_unlock_queues();
 #if !defined(NO_SWAPPING)
 	/*
@@ -1153,9 +1156,7 @@ unlock_and_continue:
 		sx_slock(&allproc_lock);
 		FOREACH_PROC_IN_SYSTEM(p) {
 			int breakout;
-			/*
-			 * If this process is already locked, skip it.
-			 */
+
 			if (PROC_TRYLOCK(p) == 0)
 				continue;
 			/*
@@ -1168,8 +1169,8 @@ unlock_and_continue:
 				continue;
 			}
 			/*
-			 * if the process is in a non-running type state,
-			 * don't touch it. Check all the threads individually.
+			 * If the process is in a non-running type state,
+			 * don't touch it.  Check all the threads individually.
 			 */
 			mtx_lock_spin(&sched_lock);
 			breakout = 0;
@@ -1211,12 +1212,9 @@ unlock_and_continue:
 		}
 		sx_sunlock(&allproc_lock);
 		if (bigproc != NULL) {
-			struct ksegrp *kg;
 			killproc(bigproc, "out of swap space");
 			mtx_lock_spin(&sched_lock);
-			FOREACH_KSEGRP_IN_PROC(bigproc, kg) {
-				sched_nice(kg, PRIO_MIN); /* XXXKSE ??? */
-			}
+			sched_nice(bigproc, PRIO_MIN);
 			mtx_unlock_spin(&sched_lock);
 			PROC_UNLOCK(bigproc);
 			wakeup(&cnt.v_free_count);
@@ -1238,8 +1236,8 @@ vm_pageout_page_stats()
 	int pcount,tpcount;		/* Number of pages to check */
 	static int fullintervalcount = 0;
 	int page_shortage;
-	int s0;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	page_shortage = 
 	    (cnt.v_inactive_target + cnt.v_cache_max + cnt.v_free_min) -
 	    (cnt.v_free_count + cnt.v_inactive_count + cnt.v_cache_count);
@@ -1247,8 +1245,6 @@ vm_pageout_page_stats()
 	if (page_shortage <= 0)
 		return;
 
-	s0 = splvm();
-	vm_page_lock_queues();
 	pcount = cnt.v_active_count;
 	fullintervalcount += vm_pageout_stats_interval;
 	if (fullintervalcount < vm_pageout_full_stats_interval) {
@@ -1311,8 +1307,6 @@ vm_pageout_page_stats()
 
 		m = next;
 	}
-	vm_page_unlock_queues();
-	splx(s0);
 }
 
 /*
@@ -1321,7 +1315,7 @@ vm_pageout_page_stats()
 static void
 vm_pageout()
 {
-	int error, pass, s;
+	int error, pass;
 
 	/*
 	 * Initialize some paging parameters.
@@ -1390,19 +1384,12 @@ vm_pageout()
 	if (vm_pageout_full_stats_interval == 0)
 		vm_pageout_full_stats_interval = vm_pageout_stats_interval * 4;
 
-	/*
-	 * Set maximum free per pass
-	 */
-	if (vm_pageout_stats_free_max == 0)
-		vm_pageout_stats_free_max = 5;
-
 	swap_pager_swap_init();
 	pass = 0;
 	/*
 	 * The pageout daemon is never done, so loop forever.
 	 */
 	while (TRUE) {
-		s = splvm();
 		vm_page_lock_queues();
 		/*
 		 * If we have enough free memory, wakeup waiters.  Do
@@ -1437,17 +1424,15 @@ vm_pageout()
 			error = msleep(&vm_pages_needed, &vm_page_queue_mtx, PVM,
 				    "psleep", vm_pageout_stats_interval * hz);
 			if (error && !vm_pages_needed) {
-				vm_page_unlock_queues();
-				splx(s);
 				pass = 0;
 				vm_pageout_page_stats();
+				vm_page_unlock_queues();
 				continue;
 			}
 		}
 		if (vm_pages_needed)
 			cnt.v_pdwakeups++;
 		vm_page_unlock_queues();
-		splx(s);
 		vm_pageout_scan(pass);
 	}
 }
@@ -1483,9 +1468,10 @@ vm_req_vmdaemon()
 static void
 vm_daemon()
 {
+	struct rlimit rsslim;
 	struct proc *p;
-	int breakout;
 	struct thread *td;
+	int breakout;
 
 	mtx_lock(&Giant);
 	while (TRUE) {
@@ -1533,9 +1519,9 @@ vm_daemon()
 			/*
 			 * get a limit
 			 */
+			lim_rlimit(p, RLIMIT_RSS, &rsslim);
 			limit = OFF_TO_IDX(
-			    qmin(p->p_rlimit[RLIMIT_RSS].rlim_cur,
-				p->p_rlimit[RLIMIT_RSS].rlim_max));
+			    qmin(rsslim.rlim_cur, rsslim.rlim_max));
 
 			/*
 			 * let processes that are swapped out really be

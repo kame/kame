@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.85.2.1 2004/01/09 12:32:36 andre Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.96.2.1 2004/09/23 16:38:53 andre Exp $
  */
 
 #include "opt_ipsec.h"
@@ -82,7 +78,7 @@
  * host table maintenance routines.
  */
 
-static struct	icmpstat icmpstat;
+struct	icmpstat icmpstat;
 SYSCTL_STRUCT(_net_inet_icmp, ICMPCTL_STATS, stats, CTLFLAG_RW,
 	&icmpstat, icmpstat, "");
 
@@ -95,11 +91,11 @@ SYSCTL_UINT(_net_inet_icmp, OID_AUTO, maskfake, CTLFLAG_RW,
 	&icmpmaskfake, 0, "Fake reply to ICMP Address Mask Request packets.");
 
 static int	drop_redirect = 0;
-SYSCTL_INT(_net_inet_icmp, OID_AUTO, drop_redirect, CTLFLAG_RW, 
+SYSCTL_INT(_net_inet_icmp, OID_AUTO, drop_redirect, CTLFLAG_RW,
 	&drop_redirect, 0, "");
 
 static int	log_redirect = 0;
-SYSCTL_INT(_net_inet_icmp, OID_AUTO, log_redirect, CTLFLAG_RW, 
+SYSCTL_INT(_net_inet_icmp, OID_AUTO, log_redirect, CTLFLAG_RW,
 	&log_redirect, 0, "");
 
 static int      icmplim = 200;
@@ -109,6 +105,10 @@ SYSCTL_INT(_net_inet_icmp, ICMPCTL_ICMPLIM, icmplim, CTLFLAG_RW,
 static int	icmplim_output = 1;
 SYSCTL_INT(_net_inet_icmp, OID_AUTO, icmplim_output, CTLFLAG_RW,
 	&icmplim_output, 0, "");
+
+static char	reply_src[IFNAMSIZ];
+SYSCTL_STRING(_net_inet_icmp, OID_AUTO, reply_src, CTLFLAG_RW,
+	&reply_src, IFNAMSIZ, "icmp reply source for non-local packets.");
 
 /*
  * ICMP broadcast echo sysctl
@@ -153,10 +153,13 @@ icmp_error(n, type, code, dest, destifp)
 	if (type != ICMP_REDIRECT)
 		icmpstat.icps_error++;
 	/*
+	 * Don't send error if the original packet was encrypted.
 	 * Don't send error if not the first fragment of message.
 	 * Don't error if the old packet protocol was ICMP
 	 * error message, only known informational types.
 	 */
+	if (n->m_flags & M_DECRYPTED)
+		goto freeit;
 	if (oip->ip_off &~ (IP_MF|IP_DF))
 		goto freeit;
 	if (oip->ip_p == IPPROTO_ICMP && type != ICMP_REDIRECT &&
@@ -220,6 +223,11 @@ icmp_error(n, type, code, dest, destifp)
 	 */
 	if (m->m_data - sizeof(struct ip) < m->m_pktdat)
 		panic("icmp len");
+	/*
+	 * If the original mbuf was meant to bypass the firewall, the error
+	 * reply should bypass as well.
+	 */
+	m->m_flags |= n->m_flags & M_SKIP_FIREWALL;
 	m->m_data -= sizeof(struct ip);
 	m->m_len += sizeof(struct ip);
 	m->m_pkthdr.len = m->m_len;
@@ -408,7 +416,7 @@ icmp_input(m, off)
 		 * (if given) and then notify as usual.  The ULPs will
 		 * notice that the MTU has changed and adapt accordingly.
 		 * If no new MTU was suggested, then we guess a new one
-		 * less than the current value.  If the new MTU is 
+		 * less than the current value.  If the new MTU is
 		 * unreasonably small (defined by sysctl tcp_minmss), then
 		 * we don't update the MTU value.
 		 *
@@ -545,7 +553,11 @@ reflect:
 			       (int)(gw >> 24), (int)((gw >> 16) & 0xff),
 			       (int)((gw >> 8) & 0xff), (int)(gw & 0xff));
 		}
-		if (drop_redirect)
+		/*
+		 * RFC1812 says we must ignore ICMP redirects if we
+		 * are acting as router.
+		 */
+		if (drop_redirect || ipforwarding)
 			break;
 		if (code > 3)
 			goto badcode;
@@ -614,6 +626,7 @@ icmp_reflect(m)
 {
 	struct ip *ip = mtod(m, struct ip *);
 	struct ifaddr *ifa;
+	struct ifnet *ifn;
 	struct in_ifaddr *ia;
 	struct in_addr t;
 	struct mbuf *opts = 0;
@@ -628,15 +641,21 @@ icmp_reflect(m)
 	}
 	t = ip->ip_dst;
 	ip->ip_dst = ip->ip_src;
+
 	/*
-	 * If the incoming packet was addressed directly to us,
-	 * use dst as the src for the reply.  Otherwise (broadcast
-	 * or anonymous), use the address which corresponds
-	 * to the incoming interface.
+	 * Source selection for ICMP replies:
+	 *
+	 * If the incoming packet was addressed directly to one of our
+	 * own addresses, use dst as the src for the reply.
 	 */
 	LIST_FOREACH(ia, INADDR_HASH(t.s_addr), ia_hash)
 		if (t.s_addr == IA_SIN(ia)->sin_addr.s_addr)
 			goto match;
+	/*
+	 * If the incoming packet was addressed to one of our broadcast
+	 * addresses, use the first non-broadcast address which corresponds
+	 * to the incoming interface.
+	 */
 	if (m->m_pkthdr.rcvif != NULL &&
 	    m->m_pkthdr.rcvif->if_flags & IFF_BROADCAST) {
 		TAILQ_FOREACH(ifa, &m->m_pkthdr.rcvif->if_addrhead, ifa_link) {
@@ -648,8 +667,27 @@ icmp_reflect(m)
 				goto match;
 		}
 	}
+	/*
+	 * If the incoming packet was not addressed directly to us, use
+	 * designated interface for icmp replies specified by sysctl
+	 * net.inet.icmp.reply_src (default not set). Otherwise continue
+	 * with normal source selection.
+	 */
+	if (reply_src[0] != '\0' && (ifn = ifunit(reply_src))) {
+		TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+			if (ifa->ifa_addr->sa_family != AF_INET)
+				continue;
+			ia = ifatoia(ifa);
+			goto match;
+		}
+	}
+	/*
+	 * If the packet was transiting through us, use the address of
+	 * the interface that is the closest to the packet source.
+	 * When we don't have a route back to the packet source, stop here
+	 * and drop the packet.
+	 */
 	ia = ip_rtaddr(ip->ip_dst);
-	/* We need a route to do anything useful. */
 	if (ia == NULL) {
 		m_freem(m);
 		icmpstat.icps_noroute++;
@@ -673,7 +711,7 @@ match:
 		 * add on any record-route or timestamp options.
 		 */
 		cp = (u_char *) (ip + 1);
-		if ((opts = ip_srcroute()) == 0 &&
+		if ((opts = ip_srcroute(m)) == 0 &&
 		    (opts = m_gethdr(M_DONTWAIT, MT_HEADER))) {
 			opts->m_len = sizeof(struct in_addr);
 			mtod(opts, struct in_addr *)->s_addr = 0;
@@ -831,7 +869,7 @@ ip_next_mtu(mtu, dir)
  * badport_bandlim() - check for ICMP bandwidth limit
  *
  *	Return 0 if it is ok to send an ICMP error response, -1 if we have
- *	hit our bandwidth limit and it is not ok.  
+ *	hit our bandwidth limit and it is not ok.
  *
  *	If icmplim is <= 0, the feature is disabled and 0 is returned.
  *
@@ -842,7 +880,7 @@ ip_next_mtu(mtu, dir)
  *	Note that the printing of the error message is delayed so we can
  *	properly print the icmp error rate that the system was trying to do
  *	(i.e. 22000/100 pps, etc...).  This can cause long delays in printing
- *	the 'final' error, but it doesn't make sense to solve the printing 
+ *	the 'final' error, but it doesn't make sense to solve the printing
  *	delay with more complex code.
  */
 
@@ -853,7 +891,7 @@ badport_bandlim(int which)
 	static struct rate {
 		const char	*type;
 		struct timeval	lasttime;
-		int		curpps;;
+		int		curpps;
 	} rates[BANDLIM_MAX+1] = {
 		{ "icmp unreach response" },
 		{ "icmp ping response" },

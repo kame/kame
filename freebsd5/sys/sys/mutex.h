@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from BSDI $Id: mutex.h,v 2.7.2.35 2000/04/27 03:10:26 cp Exp $
- * $FreeBSD: src/sys/sys/mutex.h,v 1.68 2003/11/05 23:42:50 sam Exp $
+ * $FreeBSD: src/sys/sys/mutex.h,v 1.73 2004/08/04 20:18:45 jhb Exp $
  */
 
 #ifndef _SYS_MUTEX_H_
@@ -100,17 +100,19 @@ void	mtx_init(struct mtx *m, const char *name, const char *type, int opts);
 void	mtx_destroy(struct mtx *m);
 void	mtx_sysinit(void *arg);
 void	mutex_init(void);
-void	_mtx_lock_sleep(struct mtx *m, int opts, const char *file, int line);
+void	_mtx_lock_sleep(struct mtx *m, struct thread *td, int opts,
+	    const char *file, int line);
 void	_mtx_unlock_sleep(struct mtx *m, int opts, const char *file, int line);
-void	_mtx_lock_spin(struct mtx *m, int opts, const char *file, int line);
+void	_mtx_lock_spin(struct mtx *m, struct thread *td, int opts,
+	    const char *file, int line);
 void	_mtx_unlock_spin(struct mtx *m, int opts, const char *file, int line);
 int	_mtx_trylock(struct mtx *m, int opts, const char *file, int line);
 void	_mtx_lock_flags(struct mtx *m, int opts, const char *file, int line);
 void	_mtx_unlock_flags(struct mtx *m, int opts, const char *file, int line);
 void	_mtx_lock_spin_flags(struct mtx *m, int opts, const char *file,
-			     int line);
+	     int line);
 void	_mtx_unlock_spin_flags(struct mtx *m, int opts, const char *file,
-			     int line);
+	     int line);
 #ifdef INVARIANT_SUPPORT
 void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
 #endif
@@ -144,8 +146,10 @@ void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
  */
 #ifndef _get_sleep_lock
 #define _get_sleep_lock(mp, tid, opts, file, line) do {			\
-	if (!_obtain_lock((mp), (tid)))					\
-		_mtx_lock_sleep((mp), (opts), (file), (line));		\
+	struct thread *_tid = (tid);					\
+									\
+	if (!_obtain_lock((mp), _tid))					\
+		_mtx_lock_sleep((mp), _tid, (opts), (file), (line));	\
 } while (0)
 #endif
 
@@ -158,12 +162,14 @@ void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
  */
 #ifndef _get_spin_lock
 #define _get_spin_lock(mp, tid, opts, file, line) do {			\
+	struct thread *_tid = (tid);					\
+									\
 	critical_enter();						\
-	if (!_obtain_lock((mp), (tid))) {				\
-		if ((mp)->mtx_lock == (uintptr_t)(tid))			\
+	if (!_obtain_lock((mp), _tid)) {				\
+		if ((mp)->mtx_lock == (uintptr_t)_tid)			\
 			(mp)->mtx_recurse++;				\
 		else							\
-			_mtx_lock_spin((mp), (opts), (file), (line));	\
+			_mtx_lock_spin((mp), _tid, (opts), (file), (line)); \
 	}								\
 } while (0)
 #endif
@@ -195,7 +201,7 @@ void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
 		(mp)->mtx_recurse--;					\
 	else								\
 		_release_lock_quick((mp));				\
-	critical_exit();					\
+	critical_exit();						\
 } while (0)
 #endif
 
@@ -345,19 +351,28 @@ do {									\
  * input path and protocols that require Giant must collect it
  * on entry.  When 0 Giant is grabbed in the network interface
  * ISR's and in the netisr path and there is no need to grab
- * the Giant lock.
+ * the Giant lock.  Note that, unlike GIANT_PICKUP() and
+ * GIANT_DROP(), these macros directly wrap mutex operations
+ * without special recursion handling.
  *
  * This mechanism is intended as temporary until everything of
- * importance is properly locked.
+ * importance is properly locked.  Note: the semantics for
+ * NET_{LOCK,UNLOCK}_GIANT() are not the same as DROP_GIANT()
+ * and PICKUP_GIANT(), as they are plain mutex operations
+ * without a recursion counter.
  */
 extern	int debug_mpsafenet;		/* defined in net/netisr.c */
-#define	NET_PICKUP_GIANT() do {						\
-	if (debug_mpsafenet)						\
+#define	NET_LOCK_GIANT() do {						\
+	if (!debug_mpsafenet)						\
 		mtx_lock(&Giant);					\
 } while (0)
-#define	NET_DROP_GIANT() do {						\
-	if (debug_mpsafenet)						\
+#define	NET_UNLOCK_GIANT() do {						\
+	if (!debug_mpsafenet)						\
 		mtx_unlock(&Giant);					\
+} while (0)
+#define	NET_ASSERT_GIANT() do {						\
+	if (!debug_mpsafenet)						\
+		mtx_assert(&Giant, MA_OWNED);				\
 } while (0)
 
 #define	UGAR(rval) do {							\

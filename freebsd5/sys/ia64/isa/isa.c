@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/isa/isa.c,v 1.2 2001/12/21 21:54:56 tmm Exp $
+ * $FreeBSD: src/sys/ia64/isa/isa.c,v 1.3 2004/03/17 21:45:55 jmg Exp $
  */
 
 /*
@@ -97,9 +97,7 @@ isa_alloc_resource(device_t bus, device_t child, int type, int *rid,
 		   u_long start, u_long end, u_long count, u_int flags)
 {
 	/*
-	 * Consider adding a resource definition. We allow rid 0-1 for
-	 * irq and drq, 0-3 for memory and 0-7 for ports which is
-	 * sufficient for isapnp.
+	 * Consider adding a resource definition.
 	 */
 	int passthrough = (device_get_parent(child) != bus);
 	int isdefault = (start == 0UL && end == ~0UL);

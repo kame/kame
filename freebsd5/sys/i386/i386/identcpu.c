@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/identcpu.c,v 1.132 2003/11/03 22:38:00 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/identcpu.c,v 1.139 2004/06/03 21:14:53 phk Exp $");
 
 #include "opt_cpu.h"
 
@@ -82,7 +82,6 @@ static void print_AMD_features(void);
 static void print_AMD_info(void);
 static void print_AMD_assoc(int i);
 static void print_transmeta_info(void);
-static void setup_tmx86_longrun(void);
 
 int	cpu_class;
 u_int	cpu_exthigh;		/* Highest arg to extended CPUID */
@@ -117,7 +116,10 @@ static const char *cpu_brandtable[MAX_BRAND_INDEX + 1] = {
 };
 #endif
 
-static struct cpu_nameclass i386_cpus[] = {
+static struct {
+	char	*cpu_name;
+	int	cpu_class;
+} i386_cpus[] = {
 	{ "Intel 80286",	CPUCLASS_286 },		/* CPU_286   */
 	{ "i386SX",		CPUCLASS_386 },		/* CPU_386SX */
 	{ "i386DX",		CPUCLASS_386 },		/* CPU_386   */
@@ -548,6 +550,16 @@ printcpuinfo(void)
 			break;
 		case 0x690:
 			strcpy(cpu_model, "VIA C3 Nehemiah");
+			do_cpuid(0xc0000000, regs);
+			if (regs[0] == 0xc0000001) {
+				do_cpuid(0xc0000001, regs);
+				if ((cpu_id & 0xf) >= 3)
+					if ((regs[3] & 0x0c) == 0x0c)
+						strcat(cpu_model, "+RNG");
+				if ((cpu_id & 0xf) >= 8)
+					if ((regs[3] & 0xc0) == 0xc0)
+						strcat(cpu_model, "+ACE");
+			}
 			break;
 		default:
 			strcpy(cpu_model, "VIA/IDT Unknown");
@@ -558,6 +570,7 @@ printcpuinfo(void)
 		switch (cpu_id & 0xfff) {
 		case 0x540:
 			strcpy(cpu_model, "Geode SC1100");
+			cpu = CPU_GEODE1100;
 			tsc_is_broken = 1;
 			break;
 		default:
@@ -624,8 +637,11 @@ printcpuinfo(void)
 
 	if (strcmp(cpu_vendor, "GenuineIntel") == 0 ||
 	    strcmp(cpu_vendor, "AuthenticAMD") == 0 ||
+	    strcmp(cpu_vendor, "GenuineTMx86") == 0 ||
+	    strcmp(cpu_vendor, "TransmetaCPU") == 0 ||
 	    strcmp(cpu_vendor, "RiseRiseRise") == 0 ||
 	    strcmp(cpu_vendor, "CentaurHauls") == 0 ||
+	    strcmp(cpu_vendor, "Geode by NSC") == 0 ||
 		((strcmp(cpu_vendor, "CyrixInstead") == 0) &&
 		 ((cpu_id & 0xf00) > 0x500))) {
 		printf("  Stepping = %u", cpu_id & 0xf);
@@ -702,10 +718,6 @@ printcpuinfo(void)
 		printf("\n");
 
 #endif
-	if (strcmp(cpu_vendor, "GenuineTMx86") == 0 ||
-	    strcmp(cpu_vendor, "TransmetaCPU") == 0) {
-		setup_tmx86_longrun();
-	}
 
 	if (!bootverbose)
 		return;
@@ -773,7 +785,7 @@ static	volatile u_int trap_by_rdmsr;
  * be advanced.
  */
 inthand_t	bluetrap6;
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 __asm
 ("									\n\
 	.text								\n\
@@ -792,7 +804,7 @@ __asm
  * Accessing non-existent MSR generates general protection fault.
  */
 inthand_t	bluetrap13;
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 __asm
 ("									\n\
 	.text								\n\
@@ -1110,258 +1122,6 @@ print_AMD_features(void)
 }
 #endif
 
-/*
- * Transmeta Crusoe LongRun Support by Tamotsu Hattori. 
- */
-
-#define MSR_TMx86_LONGRUN		0x80868010
-#define MSR_TMx86_LONGRUN_FLAGS		0x80868011
-
-#define LONGRUN_MODE_MASK(x)		((x) & 0x000000007f)
-#define LONGRUN_MODE_RESERVED(x)	((x) & 0xffffff80)
-#define LONGRUN_MODE_WRITE(x, y)	(LONGRUN_MODE_RESERVED(x) | LONGRUN_MODE_MASK(y))
-
-#define LONGRUN_MODE_MINFREQUENCY	0x00
-#define LONGRUN_MODE_ECONOMY		0x01
-#define LONGRUN_MODE_PERFORMANCE	0x02
-#define LONGRUN_MODE_MAXFREQUENCY	0x03
-#define LONGRUN_MODE_UNKNOWN		0x04
-#define LONGRUN_MODE_MAX		0x04
-
-union msrinfo {
-	u_int64_t	msr;
-	u_int32_t	regs[2];
-};
-
-static u_int32_t longrun_modes[LONGRUN_MODE_MAX][3] = {
-	/*  MSR low, MSR high, flags bit0 */
-	{	  0,	  0,		0},	/* LONGRUN_MODE_MINFREQUENCY */
-	{	  0,	100,		0},	/* LONGRUN_MODE_ECONOMY */
-	{	  0,	100,		1},	/* LONGRUN_MODE_PERFORMANCE */
-	{	100,	100,		1},	/* LONGRUN_MODE_MAXFREQUENCY */
-};
-
-static u_int 
-tmx86_get_longrun_mode(void)
-{
-	u_long		eflags;
-	union msrinfo	msrinfo;
-	u_int		low, high, flags, mode;
-
-	eflags = read_eflags();
-	disable_intr();
-
-	msrinfo.msr = rdmsr(MSR_TMx86_LONGRUN);
-	low = LONGRUN_MODE_MASK(msrinfo.regs[0]);
-	high = LONGRUN_MODE_MASK(msrinfo.regs[1]);
-	flags = rdmsr(MSR_TMx86_LONGRUN_FLAGS) & 0x01;
-
-	for (mode = 0; mode < LONGRUN_MODE_MAX; mode++) {
-		if (low   == longrun_modes[mode][0] &&
-		    high  == longrun_modes[mode][1] &&
-		    flags == longrun_modes[mode][2]) {
-			goto out;
-		}
-	}
-	mode = LONGRUN_MODE_UNKNOWN;
-out:
-	write_eflags(eflags);
-	return (mode);
-}
-
-static u_int 
-tmx86_get_longrun_status(u_int * frequency, u_int * voltage, u_int * percentage)
-{
-	u_long		eflags;
-	u_int		regs[4];
-
-	eflags = read_eflags();
-	disable_intr();
-
-	do_cpuid(0x80860007, regs);
-	*frequency = regs[0];
-	*voltage = regs[1];
-	*percentage = regs[2];
-
-	write_eflags(eflags);
-	return (1);
-}
-
-static u_int 
-tmx86_set_longrun_mode(u_int mode)
-{
-	u_long		eflags;
-	union msrinfo	msrinfo;
-
-	if (mode >= LONGRUN_MODE_UNKNOWN) {
-		return (0);
-	}
-
-	eflags = read_eflags();
-	disable_intr();
-
-	/* Write LongRun mode values to Model Specific Register. */
-	msrinfo.msr = rdmsr(MSR_TMx86_LONGRUN);
-	msrinfo.regs[0] = LONGRUN_MODE_WRITE(msrinfo.regs[0],
-					     longrun_modes[mode][0]);
-	msrinfo.regs[1] = LONGRUN_MODE_WRITE(msrinfo.regs[1],
-					     longrun_modes[mode][1]);
-	wrmsr(MSR_TMx86_LONGRUN, msrinfo.msr);
-
-	/* Write LongRun mode flags to Model Specific Register. */
-	msrinfo.msr = rdmsr(MSR_TMx86_LONGRUN_FLAGS);
-	msrinfo.regs[0] = (msrinfo.regs[0] & ~0x01) | longrun_modes[mode][2];
-	wrmsr(MSR_TMx86_LONGRUN_FLAGS, msrinfo.msr);
-
-	write_eflags(eflags);
-	return (1);
-}
-
-static u_int			 crusoe_longrun;
-static u_int			 crusoe_frequency;
-static u_int	 		 crusoe_voltage;
-static u_int	 		 crusoe_percentage;
-static u_int	 		 crusoe_performance_longrun = LONGRUN_MODE_PERFORMANCE;
-static u_int	 		 crusoe_economy_longrun = LONGRUN_MODE_ECONOMY;
-static struct sysctl_ctx_list	 crusoe_sysctl_ctx;
-static struct sysctl_oid	*crusoe_sysctl_tree;
-
-static void
-tmx86_longrun_power_profile(void *arg)
-{
-	int	state;
-	u_int	new;
-
-	state = power_profile_get_state();
-	if (state != POWER_PROFILE_PERFORMANCE &&
-	    state != POWER_PROFILE_ECONOMY) {
-		return;
-	}
-
-	switch (state) {
-	case POWER_PROFILE_PERFORMANCE:
-		new =crusoe_performance_longrun;
-		break;
-	case POWER_PROFILE_ECONOMY:
-		new = crusoe_economy_longrun;
-		break;
-	default:
-		new = tmx86_get_longrun_mode();
-		break;
-	}
-
-	if (tmx86_get_longrun_mode() != new) {
-		tmx86_set_longrun_mode(new);
-	}
-}
-
-static int
-tmx86_longrun_sysctl(SYSCTL_HANDLER_ARGS)
-{
-	u_int	mode;
-	int	error;
-
-	crusoe_longrun = tmx86_get_longrun_mode();
-	mode = crusoe_longrun;
-	error = sysctl_handle_int(oidp, &mode, 0, req);
-	if (error || !req->newptr) {
-		return (error);
-	}
-	if (mode >= LONGRUN_MODE_UNKNOWN) {
-		error = EINVAL;
-		return (error);
-	}
-	if (crusoe_longrun != mode) {
-		crusoe_longrun = mode;
-		tmx86_set_longrun_mode(crusoe_longrun);
-	}
-
-	return (error);
-}
-
-static int
-tmx86_status_sysctl(SYSCTL_HANDLER_ARGS)
-{
-	u_int	val;
-	int	error;
-
-	tmx86_get_longrun_status(&crusoe_frequency,
-				 &crusoe_voltage, &crusoe_percentage);
-	val = *(u_int *)oidp->oid_arg1;
-	error = sysctl_handle_int(oidp, &val, 0, req);
-	return (error);
-}
-
-static int
-tmx86_longrun_profile_sysctl(SYSCTL_HANDLER_ARGS)
-{
-	u_int32_t *argp;
-	u_int32_t arg;
-	int	error;
-
-	argp = (u_int32_t *)oidp->oid_arg1;
-	arg = *argp;
-	error = sysctl_handle_int(oidp, &arg, 0, req);
-
-	/* error or no new value */
-	if ((error != 0) || (req->newptr == NULL))
-		return (error);
-
-	/* range check */
-	if (arg >= LONGRUN_MODE_UNKNOWN)
-		return (EINVAL);
-
-	/* set new value and possibly switch */
-	*argp = arg;
-
-	tmx86_longrun_power_profile(NULL);
-
-	return (0);
-
-}
-
-static void
-setup_tmx86_longrun(void)
-{
-	static int	done = 0;
-
-	if (done)
-		return;
-	done++;
-
-	sysctl_ctx_init(&crusoe_sysctl_ctx);
-	crusoe_sysctl_tree = SYSCTL_ADD_NODE(&crusoe_sysctl_ctx,
-				SYSCTL_STATIC_CHILDREN(_hw), OID_AUTO,
-				"crusoe", CTLFLAG_RD, 0,
-				"Transmeta Crusoe LongRun support");
-	SYSCTL_ADD_PROC(&crusoe_sysctl_ctx, SYSCTL_CHILDREN(crusoe_sysctl_tree),
-		OID_AUTO, "longrun", CTLTYPE_INT | CTLFLAG_RW,
-		&crusoe_longrun, 0, tmx86_longrun_sysctl, "I",
-		"LongRun mode [0-3]");
-	SYSCTL_ADD_PROC(&crusoe_sysctl_ctx, SYSCTL_CHILDREN(crusoe_sysctl_tree),
-		OID_AUTO, "frequency", CTLTYPE_INT | CTLFLAG_RD,
-		&crusoe_frequency, 0, tmx86_status_sysctl, "I",
-		"Current frequency (MHz)");
-	SYSCTL_ADD_PROC(&crusoe_sysctl_ctx, SYSCTL_CHILDREN(crusoe_sysctl_tree),
-		OID_AUTO, "voltage", CTLTYPE_INT | CTLFLAG_RD,
-		&crusoe_voltage, 0, tmx86_status_sysctl, "I",
-		"Current voltage (mV)");
-	SYSCTL_ADD_PROC(&crusoe_sysctl_ctx, SYSCTL_CHILDREN(crusoe_sysctl_tree),
-		OID_AUTO, "percentage", CTLTYPE_INT | CTLFLAG_RD,
-		&crusoe_percentage, 0, tmx86_status_sysctl, "I",
-		"Processing performance (%)");
-	SYSCTL_ADD_PROC(&crusoe_sysctl_ctx, SYSCTL_CHILDREN(crusoe_sysctl_tree),
-		OID_AUTO, "performance_longrun", CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_RW,
-		&crusoe_performance_longrun, 0, tmx86_longrun_profile_sysctl, "I", "");
-	SYSCTL_ADD_PROC(&crusoe_sysctl_ctx, SYSCTL_CHILDREN(crusoe_sysctl_tree),
-		OID_AUTO, "economy_longrun", CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_RW,
-		&crusoe_economy_longrun, 0, tmx86_longrun_profile_sysctl, "I", "");
-
-	/* register performance profile change handler */
-	EVENTHANDLER_REGISTER(power_profile_change, tmx86_longrun_power_profile, NULL, 0);
-
-}
-
 static void
 print_transmeta_info()
 {
@@ -1395,10 +1155,4 @@ print_transmeta_info()
 		info[64] = 0;
 		printf("  %s\n", info);
 	}
-
-	crusoe_longrun = tmx86_get_longrun_mode();
-	tmx86_get_longrun_status(&crusoe_frequency,
-				 &crusoe_voltage, &crusoe_percentage);
-	printf("  LongRun mode: %d  <%dMHz %dmV %d%%>\n", crusoe_longrun,
-	       crusoe_frequency, crusoe_voltage, crusoe_percentage);
 }

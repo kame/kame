@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.8 2003/11/11 12:30:37 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.10 2004/06/25 22:59:59 julian Exp $
  * $Whistle: ng_ksocket.h,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -94,7 +94,16 @@ enum {
 	NGM_KSOCKET_GETOPT,
 };
 
-/* Meta information ID's */
-#define NG_KSOCKET_META_SOCKADDR	1	/* data is struct sockaddr */
+#ifdef _KERNEL
 
+/* Structure for sockaddr tag */
+struct sa_tag {
+	struct m_tag	tag;
+	struct sockaddr	sa;
+};
+
+/* Tag information ID's */
+#define NG_KSOCKET_TAG_SOCKADDR	1	/* data is struct sockaddr */
+
+#endif /* _KERNEL */
 #endif /* _NETGRAPH_NG_KSOCKET_H_ */

@@ -33,7 +33,7 @@
  *	related support functions residing
  *	in <arch>/<arch>/critical.c	- prototyped
  *
- * $FreeBSD: src/sys/ia64/include/critical.h,v 1.3 2003/08/12 23:24:04 imp Exp $
+ * $FreeBSD: src/sys/ia64/include/critical.h,v 1.5 2004/07/27 16:41:01 rwatson Exp $
  */
 
 #ifndef _MACHINE_CRITICAL_H_
@@ -55,11 +55,9 @@ void cpu_critical_fork_exit(void);
  *	of td_critnest, prior to it being incremented to 1.
  */
 static __inline void
-cpu_critical_enter(void)
+cpu_critical_enter(struct thread *td)
 {
-	struct thread *td;
 
-	td = curthread;
 	td->td_md.md_savecrit = intr_disable();
 }
 
@@ -71,19 +69,17 @@ cpu_critical_enter(void)
  *	exiting the last critical section.
  */
 static __inline void
-cpu_critical_exit(void)
+cpu_critical_exit(struct thread *td)
 {
-	struct thread *td;
 
-	td = curthread;
 	intr_restore(td->td_md.md_savecrit);
 }
 
 
 #else /* !__GNUC__ */
 
-void cpu_critical_enter(void)
-void cpu_critical_exit(void)
+void cpu_critical_enter(struct thread *td)
+void cpu_critical_exit(struct thread *td)
 
 #endif	/* __GNUC__ */
 

@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -61,7 +57,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_page.h,v 1.125 2003/10/25 18:33:04 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_page.h,v 1.132 2004/07/19 06:21:27 green Exp $
  */
 
 /*
@@ -150,19 +146,10 @@ CTASSERT(sizeof(u_long) >= 8);
 #endif
 #endif
 
-/*
- * note: currently use SWAPBLK_NONE as an absolute value rather then 
- * a flag bit.
- */
-
-#define SWAPBLK_MASK	((daddr_t)((u_daddr_t)-1 >> 1))		/* mask */
-#define SWAPBLK_NONE	((daddr_t)((u_daddr_t)SWAPBLK_MASK + 1))/* flag */
-
 #if !defined(KLD_MODULE)
 /*
  * Page coloring parameters
  */
-/* Each of PQ_FREE, and PQ_CACHE have PQ_HASH_SIZE entries */
 
 /* Backward compatibility for existing PQ_*CACHE config options. */
 #if !defined(PQ_CACHESIZE)
@@ -182,28 +169,28 @@ CTASSERT(sizeof(u_long) >= 8);
 #endif			/* !defined(PQ_CACHESIZE) */
 
 #if PQ_CACHESIZE >= 1024
-#define PQ_PRIME1 31	/* Prime number somewhat less than PQ_HASH_SIZE */
-#define PQ_PRIME2 23	/* Prime number somewhat less than PQ_HASH_SIZE */
+#define PQ_PRIME1 31	/* Prime number somewhat less than PQ_L2_SIZE */
+#define PQ_PRIME2 23	/* Prime number somewhat less than PQ_L2_SIZE */
 #define PQ_L2_SIZE 256	/* A number of colors opt for 1M cache */
 
 #elif PQ_CACHESIZE >= 512
-#define PQ_PRIME1 31	/* Prime number somewhat less than PQ_HASH_SIZE */
-#define PQ_PRIME2 23	/* Prime number somewhat less than PQ_HASH_SIZE */
+#define PQ_PRIME1 31	/* Prime number somewhat less than PQ_L2_SIZE */
+#define PQ_PRIME2 23	/* Prime number somewhat less than PQ_L2_SIZE */
 #define PQ_L2_SIZE 128	/* A number of colors opt for 512K cache */
 
 #elif PQ_CACHESIZE >= 256
-#define PQ_PRIME1 13	/* Prime number somewhat less than PQ_HASH_SIZE */
-#define PQ_PRIME2 7	/* Prime number somewhat less than PQ_HASH_SIZE */
+#define PQ_PRIME1 13	/* Prime number somewhat less than PQ_L2_SIZE */
+#define PQ_PRIME2 7	/* Prime number somewhat less than PQ_L2_SIZE */
 #define PQ_L2_SIZE 64	/* A number of colors opt for 256K cache */
 
 #elif PQ_CACHESIZE >= 128
 #define PQ_PRIME1 9	/* Produces a good PQ_L2_SIZE/3 + PQ_PRIME1 */
-#define PQ_PRIME2 5	/* Prime number somewhat less than PQ_HASH_SIZE */
+#define PQ_PRIME2 5	/* Prime number somewhat less than PQ_L2_SIZE */
 #define PQ_L2_SIZE 32	/* A number of colors opt for 128k cache */
 
 #elif PQ_CACHESIZE >= 64
-#define PQ_PRIME1 5	/* Prime number somewhat less than PQ_HASH_SIZE */
-#define PQ_PRIME2 3	/* Prime number somewhat less than PQ_HASH_SIZE */
+#define PQ_PRIME1 5	/* Prime number somewhat less than PQ_L2_SIZE */
+#define PQ_PRIME2 3	/* Prime number somewhat less than PQ_L2_SIZE */
 #define PQ_L2_SIZE 16	/* A reasonable number of colors (opt for 64K cache) */
 
 #else
@@ -215,6 +202,7 @@ CTASSERT(sizeof(u_long) >= 8);
 
 #define PQ_L2_MASK (PQ_L2_SIZE - 1)
 
+/* PQ_CACHE and PQ_FREE represent PQ_L2_SIZE consecutive queues. */
 #define PQ_NONE 0
 #define PQ_FREE	1
 #define PQ_INACTIVE (1 + 1*PQ_L2_SIZE)
@@ -236,8 +224,6 @@ extern struct mtx vm_page_queue_free_mtx;
 
 /*
  * These are the flags defined for vm_page.
- *
- * Note: PG_FILLED and PG_DIRTY are added for the filesystems.
  *
  * Note: PG_UNMANAGED (used by OBJT_PHYS) indicates that the page is
  * 	 not under PV management but otherwise should be treated as a
@@ -267,8 +253,6 @@ extern struct mtx vm_page_queue_free_mtx;
 #define ACT_ADVANCE		3
 #define ACT_INIT		5
 #define ACT_MAX			64
-#define PFCLUSTER_BEHIND	3
-#define PFCLUSTER_AHEAD		3
 
 #ifdef _KERNEL
 /*
@@ -358,6 +342,9 @@ void vm_pageq_requeue(vm_page_t m);
 
 void vm_page_activate (vm_page_t);
 vm_page_t vm_page_alloc (vm_object_t, vm_pindex_t, int);
+vm_page_t vm_page_alloc_contig (vm_pindex_t, vm_paddr_t, vm_paddr_t,
+	    vm_offset_t, vm_offset_t);
+void vm_page_release_contig (vm_page_t, vm_pindex_t);
 vm_page_t vm_page_grab (vm_object_t, vm_pindex_t, int);
 void vm_page_cache (register vm_page_t);
 int vm_page_try_to_cache (vm_page_t);
@@ -370,7 +357,7 @@ void vm_page_remove (vm_page_t);
 void vm_page_rename (vm_page_t, vm_object_t, vm_pindex_t);
 vm_page_t vm_page_select_cache(int);
 vm_page_t vm_page_splay(vm_pindex_t, vm_page_t);
-vm_offset_t vm_page_startup (vm_offset_t, vm_offset_t, vm_offset_t);
+vm_offset_t vm_page_startup(vm_offset_t vaddr);
 void vm_page_unmanage (vm_page_t);
 void vm_page_unwire (vm_page_t, int);
 void vm_page_wire (vm_page_t);

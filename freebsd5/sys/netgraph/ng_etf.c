@@ -28,7 +28,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_etf.c,v 1.3 2003/11/17 19:13:44 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_etf.c,v 1.6 2004/06/26 22:24:16 julian Exp $
  */
 
 #include <sys/param.h>
@@ -112,18 +112,16 @@ static const struct ng_cmdlist ng_etf_cmdlist[] = {
 
 /* Netgraph node type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_ETF_NODE_TYPE,
-	NULL,
-	ng_etf_constructor,
-	ng_etf_rcvmsg,
-	ng_etf_shutdown,
-	ng_etf_newhook,
-	NULL,
-	ng_etf_connect,
-	ng_etf_rcvdata,
-	ng_etf_disconnect,
-	ng_etf_cmdlist
+	.version =	NG_ABI_VERSION,
+	.name =		NG_ETF_NODE_TYPE,
+	.constructor =	ng_etf_constructor,
+	.rcvmsg =	ng_etf_rcvmsg,
+	.shutdown =	ng_etf_shutdown,
+	.newhook =	ng_etf_newhook,
+	.connect =	ng_etf_connect,
+	.rcvdata =	ng_etf_rcvdata,
+	.disconnect =	ng_etf_disconnect,
+	.cmdlist =	ng_etf_cmdlist,
 };
 NETGRAPH_INIT(etf, &typestruct);
 
@@ -353,12 +351,12 @@ ng_etf_rcvmsg(node_p node, item_p item, hook_p lasthook)
 /*
  * Receive data, and do something with it.
  * Actually we receive a queue item which holds the data.
- * If we free the item it wil also froo the data and metadata unless
- * we have previously disassociated them using the NGI_GET_etf() macros.
+ * If we free the item it will also free the data unless we have previously
+ * disassociated it using the NGI_GET_etf() macro.
  * Possibly send it out on another link after processing.
  * Possibly do something different if it comes from different
- * hooks. the caller will never free m or meta, so
- * if we use up this data or abort we must free BOTH of these.
+ * hooks. The caller will never free m , so if we use up this data
+ * or abort we must free it.
  *
  * If we want, we may decide to force this data to be queued and reprocessed
  * at the netgraph NETISR time.
@@ -466,15 +464,18 @@ ng_etf_disconnect(hook_p hook)
 {
 	const etf_p etfp = NG_NODE_PRIVATE(NG_HOOK_NODE(hook));
 	int i;
-	struct filter *fil;
+	struct filter *fil1, *fil2;
 
 	/* purge any rules that refer to this filter */
 	for (i = 0; i < HASHSIZE; i++) {
-		LIST_FOREACH(fil, (etfp->hashtable + i), next) {
-			if (fil->match_hook == hook) {
-				LIST_REMOVE(fil, next);
-				FREE(fil, M_NETGRAPH_ETF);
+		fil1 = LIST_FIRST(&etfp->hashtable[i]);
+		while (fil1 != NULL) {
+			fil2 = LIST_NEXT(fil1, next);
+			if (fil1->match_hook == hook) {
+				LIST_REMOVE(fil1, next);
+				FREE(fil1, M_NETGRAPH_ETF);
 			}
+			fil1 = fil2;
 		}
 	}
 		

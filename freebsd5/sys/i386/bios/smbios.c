@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/bios/smbios.c,v 1.2 2003/06/02 06:02:49 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/bios/smbios.c,v 1.4 2004/06/10 20:30:57 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD: src/sys/i386/bios/smbios.c,v 1.2 2003/06/02 06:02:49 obrien 
 #include <sys/rman.h>
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <machine/md_var.h>
 #include <machine/pc/bios.h>
@@ -130,8 +131,7 @@ smbios_probe (device_t dev)
 
 	error = 0;
 	rid = 0;
-	res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-		0ul, ~0ul, 1, RF_ACTIVE);
+	res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, RF_ACTIVE);
 	if (res == NULL) {
 		device_printf(dev, "Unable to allocate memory resource.\n");
 		error = ENOMEM;
@@ -161,8 +161,8 @@ smbios_attach (device_t dev)
 
 	sc->dev = dev;
 	sc->rid = 0;
-	sc->res = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->rid,
-		0ul, ~0ul, 1, RF_ACTIVE);
+	sc->res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->rid,
+		RF_ACTIVE);
 	if (sc->res == NULL) {
 		device_printf(dev, "Unable to allocate memory resource.\n");
 		error = ENOMEM;

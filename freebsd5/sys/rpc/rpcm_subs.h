@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/rpc/rpcm_subs.h,v 1.1 2003/11/14 20:54:10 alfred Exp $ */
+/* $FreeBSD: src/sys/rpc/rpcm_subs.h,v 1.2 2004/04/07 05:00:00 imp Exp $ */
 /*	$OpenBSD: nfsm_subs.h,v 1.11 2000/01/05 20:50:52 millert Exp $	*/
 /*	$NetBSD: nfsm_subs.h,v 1.10 1996/03/20 21:59:56 fvdl Exp $	*/
 
@@ -41,10 +41,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.

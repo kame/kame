@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/intr_machdep.c,v 1.4 2003/11/17 06:10:14 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/intr_machdep.c,v 1.9 2004/08/02 15:31:10 scottl Exp $
  */
 
 /*
@@ -138,6 +138,17 @@ intr_remove_handler(void *cookie)
 	return (error);
 }
 
+int
+intr_config_intr(int vector, enum intr_trigger trig, enum intr_polarity pol)
+{
+	struct intsrc *isrc;
+
+	isrc = intr_lookup_source(vector);
+	if (isrc == NULL)
+		return (EINVAL);
+	return (isrc->is_pic->pic_config_intr(isrc, trig, pol));
+}
+
 void
 intr_execute_handlers(struct intsrc *isrc, struct intrframe *iframe)
 {
@@ -172,7 +183,6 @@ intr_execute_handlers(struct intsrc *isrc, struct intrframe *iframe)
 	if (vector == 0)
 		clkintr_pending = 1;
 
-	critical_enter();
 	if (ih != NULL && ih->ih_flags & IH_FAST) {
 		/*
 		 * Execute fast interrupt handlers directly.
@@ -180,6 +190,7 @@ intr_execute_handlers(struct intsrc *isrc, struct intrframe *iframe)
 		 * with a NULL argument, then we pass it a pointer to
 		 * a trapframe as its argument.
 		 */
+		critical_enter();
 		TAILQ_FOREACH(ih, &it->it_handlers, ih_next) {
 			MPASS(ih->ih_flags & IH_FAST);
 			CTR3(KTR_INTR, "%s: executing handler %p(%p)",
@@ -193,19 +204,20 @@ intr_execute_handlers(struct intsrc *isrc, struct intrframe *iframe)
 		}
 		isrc->is_pic->pic_eoi_source(isrc);
 		error = 0;
+		/* XXX */
+		td->td_pflags &= ~TDP_OWEPREEMPT;
+		critical_exit();
 	} else {
 		/*
 		 * For stray and threaded interrupts, we mask and EOI the
 		 * source.
 		 */
-		isrc->is_pic->pic_disable_source(isrc);
-		isrc->is_pic->pic_eoi_source(isrc);
+		isrc->is_pic->pic_disable_source(isrc, PIC_EOI);
 		if (ih == NULL)
 			error = EINVAL;
 		else
-			error = ithread_schedule(it, !cold);
+			error = ithread_schedule(it);
 	}
-	critical_exit();
 	if (error == EINVAL) {
 		atomic_add_long(isrc->is_straycount, 1);
 		if (*isrc->is_straycount < MAX_STRAY_LOG)

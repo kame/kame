@@ -25,13 +25,16 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/link_elf.c,v 1.76 2003/08/11 07:14:07 bms Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/link_elf.c,v 1.81 2004/08/09 18:46:13 green Exp $");
 
-#include "opt_ddb.h"
+#include "opt_gdb.h"
 #include "opt_mac.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#ifdef GPROF
+#include <sys/gmon.h>
+#endif
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mac.h>
@@ -44,9 +47,6 @@ __FBSDID("$FreeBSD: src/sys/kern/link_elf.c,v 1.76 2003/08/11 07:14:07 bms Exp $
 #include <sys/linker.h>
 
 #include <machine/elf.h>
-#ifdef GPROF
-#include <machine/profile.h>
-#endif
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -94,7 +94,7 @@ typedef struct elf_file {
     long		ddbstrcnt;	/* number of bytes in string table */
     caddr_t		symbase;	/* malloc'ed symbold base */
     caddr_t		strbase;	/* malloc'ed string base */
-#ifdef DDB
+#ifdef GDB
     struct link_map	gdb;		/* hooks for gdb */
 #endif
 } *elf_file_t;
@@ -118,6 +118,7 @@ static int	link_elf_each_function_name(linker_file_t,
 				int (*)(const char *, void *),
 				void *);
 static void	link_elf_reloc_local(linker_file_t);
+static Elf_Addr	elf_lookup(linker_file_t lf, Elf_Word symidx, int deps);
 
 static kobj_method_t link_elf_methods[] = {
     KOBJMETHOD(linker_lookup_symbol,	link_elf_lookup_symbol),
@@ -145,7 +146,7 @@ static int		parse_dynamic(elf_file_t ef);
 static int		relocate_file(elf_file_t ef);
 static int		link_elf_preload_parse_symbols(elf_file_t ef);
 
-#ifdef DDB
+#ifdef GDB
 static void		r_debug_state(struct r_debug *dummy_one,
 				      struct link_map *dummy_two);
 
@@ -198,7 +199,7 @@ link_elf_delete_gdb(struct link_map *l)
 	    l->l_next->l_prev = l->l_prev;
     }
 }
-#endif /* DDB */
+#endif /* GDB */
 
 #ifdef __ia64__
 Elf_Addr link_elf_get_gp(linker_file_t);
@@ -222,7 +223,7 @@ link_elf_error(const char *s)
 static int
 link_elf_link_common_finish(linker_file_t lf)
 {
-#ifdef DDB
+#ifdef GDB
     elf_file_t ef = (elf_file_t)lf;
     char *newfilename;
 #endif
@@ -233,7 +234,7 @@ link_elf_link_common_finish(linker_file_t lf)
     if (error)
 	return (error);
 
-#ifdef DDB
+#ifdef GDB
     GDB_STATE(RT_ADD);
     ef->gdb.l_addr = lf->address;
     newfilename = malloc(strlen(lf->filename) + 1, M_LINKER, M_WAITOK);
@@ -294,7 +295,7 @@ link_elf_init(void* arg)
     }
     (void)link_elf_preload_parse_symbols(ef);
 
-#ifdef DDB
+#ifdef GDB
     r_debug.r_map = NULL;
     r_debug.r_brk = r_debug_state;
     r_debug.r_state = RT_CONSISTENT;
@@ -422,7 +423,7 @@ parse_dynamic(elf_file_t ef)
 	    if (plttype != DT_REL && plttype != DT_RELA)
 		return ENOEXEC;
 	    break;
-#ifdef DDB
+#ifdef GDB
 	case DT_DEBUG:
 	    dp->d_un.d_ptr = (Elf_Addr) &r_debug;
 	    break;
@@ -491,7 +492,7 @@ link_elf_link_preload(linker_class_t cls,
 
     error = parse_dynamic(ef);
     if (error) {
-	linker_file_unload(lf);
+	linker_file_unload(lf, LINKER_UNLOAD_FORCE);
 	return error;
     }
     link_elf_reloc_local(lf);
@@ -709,6 +710,15 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 			(vm_offset_t *) &ef->address,
 			mapsize, 1,
 			VM_PROT_ALL, VM_PROT_ALL, 0);
+#ifdef SPARSE_MAPPING
+	/*
+	 * Wire down the pages
+	 */
+    if (error == 0)
+	error = vm_map_wire(kernel_map, (vm_offset_t) ef->address,
+			    (vm_offset_t) ef->address + mapsize,
+			    VM_MAP_WIRE_SYSTEM|VM_MAP_WIRE_NOHOLES);
+#endif
     if (error) {
 	vm_object_deallocate(ef->object);
 	ef->object = 0;
@@ -737,16 +747,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	}
 	bzero(segbase + segs[i]->p_filesz,
 	      segs[i]->p_memsz - segs[i]->p_filesz);
-
-#ifdef SPARSE_MAPPING
-	/*
-	 * Wire down the pages
-	 */
-	vm_map_wire(kernel_map,
-		    (vm_offset_t) segbase,
-		    (vm_offset_t) segbase + segs[i]->p_memsz,
-		    VM_MAP_WIRE_SYSTEM|VM_MAP_WIRE_NOHOLES);
-#endif
     }
 
 #ifdef GPROF
@@ -845,7 +845,7 @@ nosyms:
 
 out:
     if (error && lf)
-	linker_file_unload(lf);
+	linker_file_unload(lf, LINKER_UNLOAD_FORCE);
     if (shdr)
 	free(shdr, M_LINKER);
     if (firstpage)
@@ -861,7 +861,7 @@ link_elf_unload_file(linker_file_t file)
 {
     elf_file_t ef = (elf_file_t) file;
 
-#ifdef DDB
+#ifdef GDB
     if (ef->gdb.l_ld) {
 	GDB_STATE(RT_DELETE);
 	free((void *)(uintptr_t)ef->gdb.l_name, M_LINKER);
@@ -880,6 +880,14 @@ link_elf_unload_file(linker_file_t file)
 
 #ifdef SPARSE_MAPPING
     if (ef->object) {
+	/*
+	 * Unwire the pages
+	 */
+	vm_map_unwire(kernel_map,
+		    (vm_offset_t) ef->address,
+		    (vm_offset_t) ef->address
+		    + (ef->object->size << PAGE_SHIFT),
+		    VM_MAP_WIRE_SYSTEM|VM_MAP_WIRE_NOHOLES);
 	vm_map_remove(kernel_map, (vm_offset_t) ef->address,
 		      (vm_offset_t) ef->address
 		      + (ef->object->size << PAGE_SHIFT));
@@ -928,7 +936,8 @@ relocate_file(elf_file_t ef)
     if (rel) {
 	rellim = (const Elf_Rel *)((const char *)ef->rel + ef->relsize);
 	while (rel < rellim) {
-	    if (elf_reloc(&ef->lf, rel, ELF_RELOC_REL)) {
+	    if (elf_reloc(&ef->lf, (Elf_Addr)ef->address, rel, ELF_RELOC_REL,
+			  elf_lookup)) {
 		symname = symbol_name(ef, rel->r_info);
 		printf("link_elf: symbol %s undefined\n", symname);
 		return ENOENT;
@@ -942,7 +951,8 @@ relocate_file(elf_file_t ef)
     if (rela) {
 	relalim = (const Elf_Rela *)((const char *)ef->rela + ef->relasize);
 	while (rela < relalim) {
-	    if (elf_reloc(&ef->lf, rela, ELF_RELOC_RELA)) {
+	    if (elf_reloc(&ef->lf, (Elf_Addr)ef->address, rela, ELF_RELOC_RELA,
+			  elf_lookup)) {
 		symname = symbol_name(ef, rela->r_info);
 		printf("link_elf: symbol %s undefined\n", symname);
 		return ENOENT;
@@ -956,7 +966,8 @@ relocate_file(elf_file_t ef)
     if (rel) {
 	rellim = (const Elf_Rel *)((const char *)ef->pltrel + ef->pltrelsize);
 	while (rel < rellim) {
-	    if (elf_reloc(&ef->lf, rel, ELF_RELOC_REL)) {
+	    if (elf_reloc(&ef->lf, (Elf_Addr)ef->address, rel, ELF_RELOC_REL,
+			  elf_lookup)) {
 		symname = symbol_name(ef, rel->r_info);
 		printf("link_elf: symbol %s undefined\n", symname);
 		return ENOENT;
@@ -970,7 +981,8 @@ relocate_file(elf_file_t ef)
     if (rela) {
 	relalim = (const Elf_Rela *)((const char *)ef->pltrela + ef->pltrelasize);
 	while (rela < relalim) {
-	    if (elf_reloc(&ef->lf, rela, ELF_RELOC_RELA)) {
+	    if (elf_reloc(&ef->lf, (Elf_Addr)ef->address, rela, ELF_RELOC_RELA,
+			  elf_lookup)) {
 		symname = symbol_name(ef, rela->r_info);
 		printf("link_elf: symbol %s undefined\n", symname);
 		return ENOENT;
@@ -1244,7 +1256,7 @@ elf_get_symname(linker_file_t lf, Elf_Word symidx)
  * This is not only more efficient, it's also more correct. It's not always
  * the case that the symbol can be found through the hash table.
  */
-Elf_Addr
+static Elf_Addr
 elf_lookup(linker_file_t lf, Elf_Word symidx, int deps)
 {
 	elf_file_t ef = (elf_file_t)lf;
@@ -1297,7 +1309,8 @@ link_elf_reloc_local(linker_file_t lf)
     if ((rel = ef->rel) != NULL) {
 	rellim = (const Elf_Rel *)((const char *)ef->rel + ef->relsize);
 	while (rel < rellim) {
-	    elf_reloc_local(lf, rel, ELF_RELOC_REL);
+	    elf_reloc_local(lf, (Elf_Addr)ef->address, rel, ELF_RELOC_REL,
+			    elf_lookup);
 	    rel++;
 	}
     }
@@ -1306,7 +1319,8 @@ link_elf_reloc_local(linker_file_t lf)
     if ((rela = ef->rela) != NULL) {
 	relalim = (const Elf_Rela *)((const char *)ef->rela + ef->relasize);
 	while (rela < relalim) {
-	    elf_reloc_local(lf, rela, ELF_RELOC_RELA);
+	    elf_reloc_local(lf, (Elf_Addr)ef->address, rela, ELF_RELOC_RELA,
+			    elf_lookup);
 	    rela++;
 	}
     }

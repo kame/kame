@@ -6,7 +6,7 @@
  * As long as the above copyright statement and this notice remain
  * unchanged, you can do what ever you want with this file.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/identcpu.c,v 1.11 2003/08/22 07:38:08 imp Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/identcpu.c,v 1.12 2004/04/30 14:04:21 marius Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -78,7 +78,7 @@ cpu_identify(u_long vers, u_int freq, u_int id)
 		printf(
 		    "CPU: unknown; please e-mail the following value together\n"
 		    "     with the exact name of your processor to "
-		    "<freebsd-sparc@FreeBSD.org>.\n"
+		    "<freebsd-sparc64@FreeBSD.org>.\n"
 		    "     version register: <0x%lx>\n", vers);
 		return;
 	}

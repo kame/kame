@@ -80,7 +80,7 @@
 /*static char *sccsid = "from: @(#)xdr.c	2.1 88/07/29 4.0 RPCSRC";*/
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_kxdr.c,v 1.13 2003/06/11 07:11:35 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_kxdr.c,v 1.14 2004/07/28 06:52:26 kan Exp $");
 
 /*
  * xdr.c, Generic XDR routines implementation.
@@ -502,7 +502,7 @@ xdrmbuf_getlong(xdrs, lp)
 	/*
 	 * Advance the data stream
 	 */
-	((long *)xdrs->x_private)++;
+	xdrs->x_private = (long *)xdrs->x_private + 1;
 	return (TRUE);
 }
 
@@ -558,7 +558,7 @@ xdrmbuf_putlong(xdrs, lp)
 	/*
 	 * Advance the data stream
 	 */
-	((long *)xdrs->x_private)++;
+	xdrs->x_private = (long *)xdrs->x_private + 1;
 	return (TRUE);
 }
 
@@ -605,7 +605,7 @@ xdrmbuf_getbytes(xdrs, addr, len)
 		/*
 		 * Update data stream controls
 		 */
-		((char *)xdrs->x_private) += copy;
+		xdrs->x_private = (char *)xdrs->x_private + copy;
 		xdrs->x_handy -= copy;
 		addr += copy;
 		len -= copy;
@@ -656,7 +656,7 @@ xdrmbuf_putbytes(xdrs, addr, len)
 		/*
 		 * Update data stream controls
 		 */
-		((char *)xdrs->x_private)++;
+		xdrs->x_private = (char *)xdrs->x_private + 1; /*XXXKAN:copy? */
 		xdrs->x_handy -= copy;
 		addr += copy;
 		len -= copy;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/taskqueue.h,v 1.9 2003/09/05 23:09:22 sam Exp $
+ * $FreeBSD: src/sys/sys/taskqueue.h,v 1.11 2004/08/08 02:37:22 jmg Exp $
  */
 
 #ifndef _SYS_TASKQUEUE_H_
@@ -34,16 +34,9 @@
 #endif
 
 #include <sys/queue.h>
+#include <sys/_task.h>
 
 struct taskqueue;
-
-/*
- * Each task includes a function which is called from
- * taskqueue_run().  The first argument is taken from the 'ta_context'
- * field of struct task and the second argument is a count of how many
- * times the task was enqueued before the call to taskqueue_run().
- */
-typedef void task_fn_t(void *context, int pending);
 
 /*
  * A notification callback function which is called from
@@ -54,14 +47,6 @@ typedef void task_fn_t(void *context, int pending);
  */
 typedef void (*taskqueue_enqueue_fn)(void *context);
 
-struct task {
-	STAILQ_ENTRY(task) ta_link;	/* link for queue */
-	int	ta_pending;		/* count times queued */
-	int	ta_priority;		/* priority of task in queue */
-	task_fn_t *ta_func;		/* task handler */
-	void	*ta_context;		/* argument for handler */
-};
-
 struct taskqueue *taskqueue_create(const char *name, int mflags,
 				    taskqueue_enqueue_fn enqueue,
 				    void *context);
@@ -69,6 +54,12 @@ int	taskqueue_enqueue(struct taskqueue *queue, struct task *task);
 struct taskqueue *taskqueue_find(const char *name);
 void	taskqueue_free(struct taskqueue *queue);
 void	taskqueue_run(struct taskqueue *queue);
+
+/*
+ * Functions for dedicated thread taskqueues
+ */
+void	taskqueue_thread_loop(void *arg);
+void	taskqueue_thread_enqueue(void *context);
 
 /*
  * Initialise a task structure.
@@ -105,6 +96,11 @@ SYSINIT(taskqueue_##name, SI_SUB_CONFIGURE, SI_ORDER_SECOND,		\
 	taskqueue_define_##name, NULL)					\
 									\
 struct __hack
+#define TASKQUEUE_DEFINE_THREAD(name)					\
+static struct proc *taskqueue_##name##_proc;				\
+TASKQUEUE_DEFINE(name, taskqueue_thread_enqueue, &taskqueue_##name,	\
+	kthread_create(taskqueue_thread_loop, &taskqueue_##name,	\
+	&taskqueue_##name##_proc, 0, 0, #name " taskq"))
 
 /*
  * These queues are serviced by software interrupt handlers.  To enqueue

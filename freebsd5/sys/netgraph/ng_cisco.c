@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_cisco.c,v 1.21 2003/02/19 05:47:31 imp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_cisco.c,v 1.23 2004/05/29 00:51:10 julian Exp $
  * $Whistle: ng_cisco.c,v 1.25 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -171,18 +171,15 @@ static const struct ng_cmdlist ng_cisco_cmdlist[] = {
 
 /* Node type */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_CISCO_NODE_TYPE,
-	NULL,
-	cisco_constructor,
-	cisco_rcvmsg,
-	cisco_shutdown,
-	cisco_newhook,
-	NULL,
-	NULL,
-	cisco_rcvdata,
-	cisco_disconnect,
-	ng_cisco_cmdlist
+	.version =	NG_ABI_VERSION,
+	.name =		NG_CISCO_NODE_TYPE,
+	.constructor =	cisco_constructor,
+	.rcvmsg =	cisco_rcvmsg,
+	.shutdown =	cisco_shutdown,
+	.newhook =	cisco_newhook,
+	.rcvdata =	cisco_rcvdata,
+	.disconnect =	cisco_disconnect,
+	.cmdlist =	ng_cisco_cmdlist,
 };
 NETGRAPH_INIT(cisco, &typestruct);
 
@@ -604,13 +601,13 @@ cisco_send(sc_p sc, int type, long par1, long par2)
 	int     error = 0;
 	struct timeval time;
 
-	getmicrotime(&time);
+	getmicrouptime(&time);
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (!m)
 		return (ENOBUFS);
 
-	t = (time.tv_sec - boottime.tv_sec) * 1000;
+	t = time.tv_sec * 1000 + time.tv_usec / 1000;
 	m->m_pkthdr.len = m->m_len = CISCO_HEADER_LEN + CISCO_PACKET_LEN;
 	m->m_pkthdr.rcvif = 0;
 

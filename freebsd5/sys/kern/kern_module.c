@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_module.c,v 1.42 2003/06/11 00:56:56 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_module.c,v 1.45.2.1 2004/08/30 08:11:03 truckman Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_module.c,v 1.42 2003/06/11 00:56:56 obrien
 #include <sys/proc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/reboot.h>
 #include <sys/sx.h>
 #include <sys/module.h>
 #include <sys/linker.h>
@@ -66,7 +67,15 @@ static void module_shutdown(void *, int);
 static int
 modevent_nop(module_t mod, int what, void *arg)
 {
-	return (0);
+
+	switch(what) {
+	case MOD_LOAD:
+		return (0);
+	case MOD_UNLOAD:
+		return (EBUSY);
+	default:
+		return (EOPNOTSUPP);
+	}
 }
 
 static void
@@ -86,6 +95,8 @@ module_shutdown(void *arg1, int arg2)
 {
 	module_t mod;
 
+	if (arg2 & RB_NOSYNC)
+		return;
 	MOD_SLOCK;
 	TAILQ_FOREACH(mod, &modules, link)
 		MOD_EVENT(mod, MOD_SHUTDOWN);
@@ -215,9 +226,15 @@ module_lookupbyid(int modid)
 }
 
 int
-module_unload(module_t mod)
+module_unload(module_t mod, int flags)
 {
+	int error;
 
+	error = MOD_EVENT(mod, MOD_QUIESCE);
+	if (error == EOPNOTSUPP || error == EINVAL)
+		error = 0;
+	if (flags == LINKER_UNLOAD_NORMAL && error != 0)
+		return (error);
         return (MOD_EVENT(mod, MOD_UNLOAD));
 }
 

@@ -21,10 +21,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -43,7 +39,7 @@
  *
  *	@(#)ufs_vnops.c	8.7 (Berkeley) 2/3/94
  *	@(#)ufs_vnops.c 8.27 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.81 2003/10/18 14:10:25 phk Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.85 2004/08/15 06:24:40 jmg Exp $
  */
 
 #include "opt_suiddir.h"
@@ -484,7 +480,7 @@ ext2_setattr(ap)
 		 * Privileged non-jail processes may not modify system flags
 		 * if securelevel > 0 and any existing system flags are set.
 		 */
-		if (!suser_cred(cred, PRISON_ROOT)) {
+		if (!suser_cred(cred, SUSER_ALLOWJAIL)) {
 			if (ip->i_flags
 			    & (SF_NOUNLINK | SF_IMMUTABLE | SF_APPEND)) {
 				error = securelevel_gt(cred, 0);
@@ -574,7 +570,7 @@ ext2_setattr(ap)
 			return (EROFS);
 		error = ext2_chmod(vp, (int)vap->va_mode, cred, td);
 	}
-	VN_KNOTE(vp, NOTE_ATTRIB);
+	VN_KNOTE_UNLOCKED(vp, NOTE_ATTRIB);
 	return (error);
 }
 
@@ -603,7 +599,7 @@ ext2_chmod(vp, mode, cred, td)
 	 * as well as set the setgid bit on a file with a group that the
 	 * process is not a member of.
 	 */
-	if (suser_cred(cred, PRISON_ROOT)) {
+	if (suser_cred(cred, SUSER_ALLOWJAIL)) {
 		if (vp->v_type != VDIR && (mode & S_ISTXT))
 			return (EFTYPE);
 		if (!groupmember(ip->i_gid, cred) && (mode & ISGID))
@@ -649,14 +645,14 @@ ext2_chown(vp, uid, gid, cred, td)
 	 */
 	if ((uid != ip->i_uid || 
 	    (gid != ip->i_gid && !groupmember(gid, cred))) &&
-	    (error = suser_cred(cred, PRISON_ROOT)))
+	    (error = suser_cred(cred, SUSER_ALLOWJAIL)))
 		return (error);
 	ogid = ip->i_gid;
 	ouid = ip->i_uid;
 	ip->i_gid = gid;
 	ip->i_uid = uid;
 	ip->i_flag |= IN_CHANGE;
-	if (suser_cred(cred, PRISON_ROOT) && (ouid != uid || ogid != gid))
+	if (suser_cred(cred, SUSER_ALLOWJAIL) && (ouid != uid || ogid != gid))
 		ip->i_mode &= ~(ISUID | ISGID);
 	return (0);
 }
@@ -1750,8 +1746,10 @@ ext2_vinit(mntp, specops, fifoops, vpp)
 	vp = *vpp;
 	ip = VTOI(vp);
 	switch(vp->v_type = IFTOVT(ip->i_mode)) {
-	case VCHR:
 	case VBLK:
+		vp->v_op = specops;
+		break;
+	case VCHR:
 		vp->v_op = specops;
 		vp = addaliasu(vp, ip->i_rdev);
 		ip->i_vnode = vp;
@@ -1831,7 +1829,7 @@ ext2_makeinode(mode, dvp, vpp, cnp)
 	tvp->v_type = IFTOVT(mode);	/* Rest init'd in getnewvnode(). */
 	ip->i_nlink = 1;
 	if ((ip->i_mode & ISGID) && !groupmember(ip->i_gid, cnp->cn_cred) &&
-	    suser_cred(cnp->cn_cred, PRISON_ROOT))
+	    suser_cred(cnp->cn_cred, SUSER_ALLOWJAIL))
 		ip->i_mode &= ~ISGID;
 
 	if (cnp->cn_flags & ISWHITEOUT)
@@ -1896,9 +1894,9 @@ ext2_kqfilter(ap)
 
 	if (vp->v_pollinfo == NULL)
 		v_addpollinfo(vp);
-	mtx_lock(&vp->v_pollinfo->vpi_lock);
-	SLIST_INSERT_HEAD(&vp->v_pollinfo->vpi_selinfo.si_note, kn, kn_selnext);
-	mtx_unlock(&vp->v_pollinfo->vpi_lock);
+	if (vp->v_pollinfo == NULL)
+		return ENOMEM;
+	knlist_add(&vp->v_pollinfo->vpi_selinfo.si_note, kn, 0);
 
 	return (0);
 }
@@ -1909,10 +1907,7 @@ filt_ext2detach(struct knote *kn)
 	struct vnode *vp = (struct vnode *)kn->kn_hook;
 
 	KASSERT(vp->v_pollinfo != NULL, ("Mising v_pollinfo"));
-	mtx_lock(&vp->v_pollinfo->vpi_lock);
-	SLIST_REMOVE(&vp->v_pollinfo->vpi_selinfo.si_note,
-	    kn, knote, kn_selnext);
-	mtx_unlock(&vp->v_pollinfo->vpi_lock);
+	knlist_remove(&vp->v_pollinfo->vpi_selinfo.si_note, kn, 0);
 }
 
 /*ARGSUSED*/

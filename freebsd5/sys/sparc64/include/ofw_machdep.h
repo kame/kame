@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/ofw_machdep.h,v 1.3.2.1 2004/01/25 05:23:21 scottl Exp $
+ * $FreeBSD: src/sys/sparc64/include/ofw_machdep.h,v 1.5 2004/08/14 21:43:37 marius Exp $
  */
 
 #ifndef _MACHINE_OFW_MACHDEP_H_
@@ -32,7 +32,6 @@
 
 int  OF_decode_addr(phandle_t, int *, bus_addr_t *);
 void OF_getetheraddr(device_t, u_char *);
-int  OF_getetheraddr2(device_t, u_char *);
 void cpu_shutdown(void *);
 void openfirmware_exit(void *);
 

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	from: FreeBSD: src/sys/i386/include/sysarch.h,v 1.14 2000/09/21
- * $FreeBSD: src/sys/sparc64/include/sysarch.h,v 1.2 2002/04/29 18:08:26 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/sysarch.h,v 1.4 2004/04/07 05:00:00 imp Exp $
  */
 
 /*
@@ -69,6 +65,7 @@ int __sparc_utrap_install(utrap_entry_t type, utrap_handler_t new_precise,
 			  utrap_handler_t new_deferred,
 			  utrap_handler_t *old_precise,
 			  utrap_handler_t *old_deferred);
+int sysarch(int, void *);
 __END_DECLS
 #endif
 

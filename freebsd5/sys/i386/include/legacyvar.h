@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/legacyvar.h,v 1.4 2003/06/06 17:56:30 jhb Exp $
+ * $FreeBSD: src/sys/i386/include/legacyvar.h,v 1.5 2004/05/03 14:49:43 jhb Exp $
  */
 
 #ifndef _MACHINE_LEGACYVAR_H_
@@ -40,7 +40,6 @@ LEGACY_ACCESSOR(pcibus,			PCIBUS,		u_int32_t)
 
 #undef LEGACY_ACCESSOR
 
-int	legacy_pcib_attach(device_t dev);
 int	legacy_pcib_maxslots(device_t dev);
 u_int32_t legacy_pcib_read_config(device_t dev, int bus, int slot, int func,
     int reg, int bytes);

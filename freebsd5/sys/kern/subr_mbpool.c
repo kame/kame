@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_mbpool.c,v 1.1 2003/07/15 08:59:37 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_mbpool.c,v 1.2 2003/12/07 21:53:41 truckman Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -138,7 +138,7 @@ mbp_create(struct mbpool **pp, const char *name, bus_dma_tag_t dmat,
 	(*pp)->nchunks = nchunks;
 
 	SLIST_INIT(&(*pp)->free_list);
-	mtx_init(&(*pp)->free_lock, name, NULL, 0);
+	mtx_init(&(*pp)->free_lock, name, NULL, MTX_DEF);
 
 	return (0);
 }

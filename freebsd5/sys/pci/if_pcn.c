@@ -32,10 +32,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_pcn.c,v 1.52 2003/11/14 19:00:31 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_pcn.c,v 1.59.2.2 2004/09/09 13:19:39 brueffer Exp $");
 
 /*
- * AMD Am79c972 fast ethernet PCI NIC driver. Datatheets are available
+ * AMD Am79c972 fast ethernet PCI NIC driver. Datasheets are available
  * from http://www.amd.com.
  *
  * The AMD PCnet/PCI controllers are more advanced and functional
@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD: src/sys/pci/if_pcn.c,v 1.52 2003/11/14 19:00:31 sam Exp $");
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -136,7 +137,6 @@ static void pcn_miibus_statchg	(device_t);
 
 static void pcn_setfilt		(struct ifnet *);
 static void pcn_setmulti	(struct pcn_softc *);
-static u_int32_t pcn_mchash	(caddr_t);
 static void pcn_reset		(struct pcn_softc *);
 static int pcn_list_rx_init	(struct pcn_softc *);
 static int pcn_list_tx_init	(struct pcn_softc *);
@@ -306,27 +306,6 @@ pcn_miibus_statchg(dev)
 	return;
 }
 
-#define DC_POLY		0xEDB88320
-
-static u_int32_t
-pcn_mchash(addr)
-	caddr_t		addr;
-{
-	u_int32_t	crc;
-	int		idx, bit;
-	u_int8_t	data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1)
-			crc = (crc >> 1) ^ (((crc ^ data) & 1) ? DC_POLY : 0);
-	}
-
-	return ((crc >> 26) & 0x3F);
-}
-
 static void
 pcn_setmulti(sc)
 	struct pcn_softc	*sc;
@@ -355,7 +334,8 @@ pcn_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = pcn_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ether_crc32_le(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		hashes[h >> 4] |= 1 << (h & 0xF);
 	}
 
@@ -417,8 +397,8 @@ pcn_probe(dev)
 			 * so we can read the chip ID register.
 			 */
 			rid = PCN_RID;
-			sc->pcn_res = bus_alloc_resource(dev, PCN_RES, &rid,
-			    0, ~0, 1, RF_ACTIVE);
+			sc->pcn_res = bus_alloc_resource_any(dev, PCN_RES, &rid,
+			    RF_ACTIVE);
 			if (sc->pcn_res == NULL) {
 				device_printf(dev,
 				    "couldn't map ports/memory\n");
@@ -456,8 +436,8 @@ pcn_probe(dev)
 			 * Note III: the test for 0x10001000 is a hack to
 			 * pacify VMware, who's pseudo-PCnet interface is
 			 * broken. Reading the subsystem register from PCI
-			 * config space yeilds 0x00000000 while reading the
-			 * same value from I/O space yeilds 0x10001000. It's
+			 * config space yields 0x00000000 while reading the
+			 * same value from I/O space yields 0x10001000. It's
 			 * not supposed to be that way.
 			 */
 			if (chip_id == pci_read_config(dev,
@@ -517,38 +497,13 @@ pcn_attach(dev)
 	/* Initialize our mutex. */
 	mtx_init(&sc->pcn_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-#ifndef BURN_BRIDGES
-	/*
-	 * Handle power management nonsense.
-	 */
-	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		u_int32_t		iobase, membase, irq;
-
-		/* Save important PCI config data. */
-		iobase = pci_read_config(dev, PCN_PCI_LOIO, 4);
-		membase = pci_read_config(dev, PCN_PCI_LOMEM, 4);
-		irq = pci_read_config(dev, PCN_PCI_INTLINE, 4);
-
-		/* Reset the power state. */
-		printf("pcn%d: chip is in D%d power mode "
-		    "-- setting to D0\n", unit,
-		    pci_get_powerstate(dev));
-		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
-
-		/* Restore PCI config data. */
-		pci_write_config(dev, PCN_PCI_LOIO, iobase, 4);
-		pci_write_config(dev, PCN_PCI_LOMEM, membase, 4);
-		pci_write_config(dev, PCN_PCI_INTLINE, irq, 4);
-	}
-#endif
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
 
 	rid = PCN_RID;
-	sc->pcn_res = bus_alloc_resource(dev, PCN_RES, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->pcn_res = bus_alloc_resource_any(dev, PCN_RES, &rid, RF_ACTIVE);
 
 	if (sc->pcn_res == NULL) {
 		printf("pcn%d: couldn't map ports/memory\n", unit);
@@ -561,7 +516,7 @@ pcn_attach(dev)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->pcn_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->pcn_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->pcn_irq == NULL) {
@@ -580,12 +535,6 @@ pcn_attach(dev)
 	eaddr[1] = CSR_READ_4(sc, PCN_IO32_APROM01);
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
-	/*
-	 * An AMD chip was detected. Inform the world.
-	 */
-	printf("pcn%d: Ethernet address: %6D\n", unit,
-	    sc->arpcom.ac_enaddr, ":");
-
 	sc->pcn_unit = unit;
 	callout_handle_init(&sc->pcn_stat_ch);
 
@@ -603,9 +552,9 @@ pcn_attach(dev)
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = pcn_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = pcn_start;
 	ifp->if_watchdog = pcn_watchdog;
 	ifp->if_init = pcn_init;
@@ -953,7 +902,7 @@ pcn_intr(arg)
 	sc = arg;
 	ifp = &sc->arpcom.ac_if;
 
-	/* Supress unwanted interrupts */
+	/* Suppress unwanted interrupts */
 	if (!(ifp->if_flags & IFF_UP)) {
 		pcn_stop(sc);
 		return;

@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)wd.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/pc98/pc98/wd.c,v 1.135 2003/10/18 17:45:44 phk Exp $
+ * $FreeBSD: src/sys/pc98/pc98/wd.c,v 1.137 2004/04/07 04:59:58 imp Exp $
  */
 
 /* TODO:
@@ -184,7 +180,7 @@ struct softc {
 	struct diskgeom dk_dd;	/* device configuration data */
 	struct diskslices *dk_slices;	/* virtual drives */
 	void	*dk_dmacookie;	/* handle for DMA services */
-	struct disk disk;
+	struct disk *disk;
 };
 
 #define WD_COUNT_RETRIES
@@ -562,12 +558,15 @@ wdattach(struct isa_device *dvp)
 			/*
 			 * Register this media as a disk
 			 */
-			du->disk.d_open = wdopen;
-			du->disk.d_strategy = wdstrategy;
-			du->disk.d_drv1 = du;
-			du->disk.d_maxsize = 248 * 512;
-			du->disk.d_name = "wd";
-			disk_create(lunit, &du->disk, 0, NULL, NULL);
+			du->disk = disk_alloc();
+			du->disk->d_open = wdopen;
+			du->disk->d_strategy = wdstrategy;
+			du->disk->d_drv1 = du;
+			du->disk->d_maxsize = 248 * 512;
+			du->disk->d_name = "wd";
+			du->disk->d_unit = lunit;
+			du->disk->d_flags = DISKFLAG_NEEDSGIANT;
+			disk_create(du->disk, DISK_VERSION);
 			
 		} else {
 			free(du, M_TEMP);
@@ -1218,10 +1217,10 @@ wdopen(struct disk *dp)
 	du->dk_flags |= DKFL_LABELLING;
 	du->dk_state = WANTOPEN;
 
-	du->disk.d_sectorsize = du->dk_dd.d_secsize;
-	du->disk.d_mediasize = du->dk_dd.d_secperunit * du->dk_dd.d_secsize;
-	du->disk.d_fwsectors = du->dk_dd.d_nsectors;
-	du->disk.d_fwheads = du->dk_dd.d_ntracks;
+	du->disk->d_sectorsize = du->dk_dd.d_secsize;
+	du->disk->d_mediasize = du->dk_dd.d_secperunit * du->dk_dd.d_secsize;
+	du->disk->d_fwsectors = du->dk_dd.d_nsectors;
+	du->disk->d_fwheads = du->dk_dd.d_ntracks;
 
 	du->dk_flags &= ~DKFL_LABELLING;
 	wdsleep(du->dk_ctrlr, "wdopn2");

@@ -25,7 +25,7 @@
  *
  *	from: FreeBSD: src/sys/i386/i386/busdma_machdep.c,v 1.25 2002/01/05
  *
- * $FreeBSD: src/sys/sparc64/include/bus_private.h,v 1.6 2003/07/10 23:27:35 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/bus_private.h,v 1.7 2004/06/28 04:04:43 scottl Exp $
  */
 
 #ifndef	_MACHINE_BUS_PRIVATE_H_
@@ -40,13 +40,6 @@ int sparc64_bus_mem_map(bus_space_tag_t, bus_space_handle_t, bus_size_t,
     int, vm_offset_t, void **);
 int sparc64_bus_mem_unmap(void *, bus_size_t);
 bus_space_handle_t sparc64_fake_bustag(int, bus_addr_t, struct bus_space_tag *);
-
-/*
- * This is more or less arbitrary, except for the stack space consumed by
- * the segments array. Choose more than ((BUS_SPACE_MAXSIZE / PAGE_SIZE) + 1),
- * since in practice we could be map pages more than once.
- */
-#define	BUS_DMAMAP_NSEGS	64
 
 struct bus_dmamap_res {
 	struct resource		*dr_res;

@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vnops.c	8.32 (Berkeley) 6/23/95
- * $FreeBSD: src/sys/fs/unionfs/union_vnops.c,v 1.103 2003/11/14 08:23:13 das Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_vnops.c,v 1.108 2004/07/12 08:14:07 alfred Exp $
  */
 
 #include <sys/param.h>
@@ -51,6 +47,11 @@
 #include <sys/buf.h>
 #include <sys/lock.h>
 #include <sys/sysctl.h>
+#include <sys/unistd.h>
+#include <sys/acl.h>
+#include <sys/event.h>
+#include <sys/extattr.h>
+#include <sys/mac.h>
 #include <fs/unionfs/union.h>
 
 #include <vm/vm.h>
@@ -68,18 +69,24 @@ SYSCTL_INT(_vfs, OID_AUTO, uniondebug, CTLFLAG_RD, &uniondebug, 0, "");
 #endif
 
 static int	union_access(struct vop_access_args *ap);
+static int	union_aclcheck(struct vop_aclcheck_args *ap);
 static int	union_advlock(struct vop_advlock_args *ap);
 static int	union_close(struct vop_close_args *ap);
+static int	union_closeextattr(struct vop_closeextattr_args *ap);
 static int	union_create(struct vop_create_args *ap);
 static int	union_createvobject(struct vop_createvobject_args *ap);
+static int	union_deleteextattr(struct vop_deleteextattr_args *ap);
 static int	union_destroyvobject(struct vop_destroyvobject_args *ap);
 static int	union_fsync(struct vop_fsync_args *ap);
+static int	union_getacl(struct vop_getacl_args *ap);
 static int	union_getattr(struct vop_getattr_args *ap);
+static int	union_getextattr(struct vop_getextattr_args *ap);
 static int	union_getvobject(struct vop_getvobject_args *ap);
 static int	union_inactive(struct vop_inactive_args *ap);
 static int	union_ioctl(struct vop_ioctl_args *ap);
 static int	union_lease(struct vop_lease_args *ap);
 static int	union_link(struct vop_link_args *ap);
+static int	union_listextattr(struct vop_listextattr_args *ap);
 static int	union_lookup(struct vop_lookup_args *ap);
 static int	union_lookup1(struct vnode *udvp, struct vnode **dvp,
 				   struct vnode **vpp,
@@ -87,6 +94,7 @@ static int	union_lookup1(struct vnode *udvp, struct vnode **dvp,
 static int	union_mkdir(struct vop_mkdir_args *ap);
 static int	union_mknod(struct vop_mknod_args *ap);
 static int	union_open(struct vop_open_args *ap);
+static int	union_openextattr(struct vop_openextattr_args *ap);
 static int	union_pathconf(struct vop_pathconf_args *ap);
 static int	union_print(struct vop_print_args *ap);
 static int	union_read(struct vop_read_args *ap);
@@ -99,7 +107,10 @@ static int	union_rename(struct vop_rename_args *ap);
 static int	union_revoke(struct vop_revoke_args *ap);
 static int	union_rmdir(struct vop_rmdir_args *ap);
 static int	union_poll(struct vop_poll_args *ap);
+static int	union_setacl(struct vop_setacl_args *ap);
 static int	union_setattr(struct vop_setattr_args *ap);
+static int	union_setlabel(struct vop_setlabel_args *ap);
+static int	union_setextattr(struct vop_setextattr_args *ap);
 static int	union_strategy(struct vop_strategy_args *ap);
 static int	union_symlink(struct vop_symlink_args *ap);
 static int	union_whiteout(struct vop_whiteout_args *ap);
@@ -257,7 +268,7 @@ union_lookup1(udvp, pdvp, vpp, cnp)
 			relock_pdvp = 1;
 		vput(dvp);
 		dvp = NULL;
-		error = VFS_ROOT(mp, &dvp);
+		error = VFS_ROOT(mp, &dvp, td);
 
 		vfs_unbusy(mp, td);
 
@@ -1209,12 +1220,12 @@ union_remove(ap)
 	if ((uppervp = union_lock_upper(un, td)) != NULLVP) {
 		if (union_dowhiteout(un, cnp->cn_cred, td))
 			cnp->cn_flags |= DOWHITEOUT;
-		error = VOP_REMOVE(upperdvp, uppervp, cnp);
-#if 0
-		/* XXX */
+		if (cnp->cn_flags & DOWHITEOUT)		/* XXX fs corruption */
+			error = EOPNOTSUPP;
+		else
+			error = VOP_REMOVE(upperdvp, uppervp, cnp);
 		if (!error)
 			union_removed_upper(un);
-#endif
 		union_unlock_upper(uppervp, td);
 	} else {
 		error = union_mkwhiteout(
@@ -1526,7 +1537,12 @@ union_rmdir(ap)
 	if ((uppervp = union_lock_upper(un, td)) != NULLVP) {
 		if (union_dowhiteout(un, cnp->cn_cred, td))
 			cnp->cn_flags |= DOWHITEOUT;
-		error = VOP_RMDIR(upperdvp, uppervp, ap->a_cnp);
+		if (cnp->cn_flags & DOWHITEOUT)		/* XXX fs corruption */
+			error = EOPNOTSUPP;
+		else
+			error = VOP_RMDIR(upperdvp, uppervp, ap->a_cnp);
+		if (!error)
+			union_removed_upper(un);
 		union_unlock_upper(uppervp, td);
 	} else {
 		error = union_mkwhiteout(
@@ -1836,6 +1852,220 @@ union_strategy(ap)
 	return (VOP_STRATEGY(othervp, bp));
 }
 
+static int
+union_getacl(ap)
+	struct vop_getacl_args /* {
+		struct vnode *a_vp;
+		acl_type_t a_type;
+		struct acl *a_aclp;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	int error;
+	struct union_node *un = VTOUNION(ap->a_vp);
+	struct vnode *vp;
+
+	vp = union_lock_other(un, ap->a_td);
+	ap->a_vp = vp;
+	error = VCALL(vp, VOFFSET(vop_getacl), ap);
+	union_unlock_other(vp, ap->a_td);
+
+	return (error);
+}
+
+static int
+union_setacl(ap)
+	struct vop_setacl_args /* {
+		struct vnode *a_vp;
+		acl_type_t a_type;
+		struct acl *a_aclp;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	int error;
+	struct union_node *un = VTOUNION(ap->a_vp);
+	struct vnode *vp;
+
+	vp = union_lock_other(un, ap->a_td);
+	ap->a_vp = vp;
+	error = VCALL(vp, VOFFSET(vop_setacl), ap);
+	union_unlock_other(vp, ap->a_td);
+
+	return (error);
+}
+
+static int
+union_aclcheck(ap)
+	struct vop_aclcheck_args /* {
+		struct vnode *a_vp;
+		acl_type_t a_type;
+		struct acl *a_aclp;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	struct vnode *ovp = OTHERVP(ap->a_vp);
+
+	ap->a_vp = ovp;
+	return (VCALL(ovp, VOFFSET(vop_aclcheck), ap));
+}
+
+static int
+union_closeextattr(ap)
+	struct vop_closeextattr_args /* {
+		struct vnode *a_vp;
+		int a_commit;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	int error;
+	struct union_node *un = VTOUNION(ap->a_vp);
+	struct vnode *vp;
+
+	vp = union_lock_other(un, ap->a_td);
+	ap->a_vp = vp;
+	error = VCALL(vp, VOFFSET(vop_closeextattr), ap);
+	union_unlock_other(vp, ap->a_td);
+
+	return (error);
+}
+
+static int
+union_getextattr(ap)
+	struct vop_getextattr_args /* {
+		struct vnode *a_vp;
+		int a_attrnamespace;
+		const char *a_name;
+		struct uio *a_uio;
+		size_t *a_size;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	int error;
+	struct union_node *un = VTOUNION(ap->a_vp);
+	struct vnode *vp;
+
+	vp = union_lock_other(un, ap->a_td);
+	ap->a_vp = vp;
+	error = VCALL(vp, VOFFSET(vop_getextattr), ap);
+	union_unlock_other(vp, ap->a_td);
+
+	return (error);
+}
+
+static int
+union_listextattr(ap)
+	struct vop_listextattr_args /* {
+		struct vnode *a_vp;
+		int a_attrnamespace;
+		struct uio *a_uio;
+		size_t *a_size;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	int error;
+	struct union_node *un = VTOUNION(ap->a_vp);
+	struct vnode *vp;
+
+	vp = union_lock_other(un, ap->a_td);
+	ap->a_vp = vp;
+	error = VCALL(vp, VOFFSET(vop_listextattr), ap);
+	union_unlock_other(vp, ap->a_td);
+
+	return (error);
+}
+
+static int
+union_openextattr(ap)
+	struct vop_openextattr_args /* {
+		struct vnode *a_vp;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	int error;
+	struct union_node *un = VTOUNION(ap->a_vp);
+	struct vnode *vp;
+
+	vp = union_lock_other(un, ap->a_td);
+	ap->a_vp = vp;
+	error = VCALL(vp, VOFFSET(vop_openextattr), ap);
+	union_unlock_other(vp, ap->a_td);
+
+	return (error);
+}
+
+static int
+union_deleteextattr(ap)
+	struct vop_deleteextattr_args /* {
+		struct vnode *a_vp;
+		int a_attrnamespace;
+		const char *a_name;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	int error;
+	struct union_node *un = VTOUNION(ap->a_vp);
+	struct vnode *vp;
+
+	vp = union_lock_other(un, ap->a_td);
+	ap->a_vp = vp;
+	error = VCALL(vp, VOFFSET(vop_deleteextattr), ap);
+	union_unlock_other(vp, ap->a_td);
+
+	return (error);
+}
+
+static int
+union_setextattr(ap)
+	struct vop_setextattr_args /* {
+		struct vnode *a_vp;
+		int a_attrnamespace;
+		const char *a_name;
+		struct uio *a_uio;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	int error;
+	struct union_node *un = VTOUNION(ap->a_vp);
+	struct vnode *vp;
+
+	vp = union_lock_other(un, ap->a_td);
+	ap->a_vp = vp;
+	error = VCALL(vp, VOFFSET(vop_setextattr), ap);
+	union_unlock_other(vp, ap->a_td);
+
+	return (error);
+}
+
+static int
+union_setlabel(ap)
+	struct vop_setlabel_args /* {
+		struct vnode *a_vp;
+		struct label *a_label;
+		struct ucred *a_cred;
+		struct thread *a_td;
+	} */ *ap;
+{
+	int error;
+	struct union_node *un = VTOUNION(ap->a_vp);
+	struct vnode *vp;
+
+	vp = union_lock_other(un, ap->a_td);
+	ap->a_vp = vp;
+	error = VCALL(vp, VOFFSET(vop_setlabel), ap);
+	union_unlock_other(vp, ap->a_td);
+
+	return (error);
+}
+
 /*
  * Global vfs data structures
  */
@@ -1843,23 +2073,30 @@ vop_t **union_vnodeop_p;
 static struct vnodeopv_entry_desc union_vnodeop_entries[] = {
 	{ &vop_default_desc,		(vop_t *) vop_defaultop },
 	{ &vop_access_desc,		(vop_t *) union_access },
+	{ &vop_aclcheck_desc,		(vop_t *) union_aclcheck },
 	{ &vop_advlock_desc,		(vop_t *) union_advlock },
 	{ &vop_bmap_desc,		(vop_t *) vop_eopnotsupp },
 	{ &vop_close_desc,		(vop_t *) union_close },
+	{ &vop_closeextattr_desc,	(vop_t *) union_closeextattr },
 	{ &vop_create_desc,		(vop_t *) union_create },
 	{ &vop_createvobject_desc,	(vop_t *) union_createvobject },
+	{ &vop_deleteextattr_desc,	(vop_t *) union_deleteextattr },
 	{ &vop_destroyvobject_desc,	(vop_t *) union_destroyvobject },
 	{ &vop_fsync_desc,		(vop_t *) union_fsync },
 	{ &vop_getattr_desc,		(vop_t *) union_getattr },
+	{ &vop_getacl_desc,		(vop_t *) union_getacl },
+	{ &vop_getextattr_desc,		(vop_t *) union_getextattr },
 	{ &vop_getvobject_desc,		(vop_t *) union_getvobject },
 	{ &vop_inactive_desc,		(vop_t *) union_inactive },
 	{ &vop_ioctl_desc,		(vop_t *) union_ioctl },
 	{ &vop_lease_desc,		(vop_t *) union_lease },
 	{ &vop_link_desc,		(vop_t *) union_link },
+	{ &vop_listextattr_desc,	(vop_t *) union_listextattr },
 	{ &vop_lookup_desc,		(vop_t *) union_lookup },
 	{ &vop_mkdir_desc,		(vop_t *) union_mkdir },
 	{ &vop_mknod_desc,		(vop_t *) union_mknod },
 	{ &vop_open_desc,		(vop_t *) union_open },
+	{ &vop_openextattr_desc,	(vop_t *) union_openextattr },
 	{ &vop_pathconf_desc,		(vop_t *) union_pathconf },
 	{ &vop_poll_desc,		(vop_t *) union_poll },
 	{ &vop_print_desc,		(vop_t *) union_print },
@@ -1872,7 +2109,10 @@ static struct vnodeopv_entry_desc union_vnodeop_entries[] = {
 	{ &vop_rename_desc,		(vop_t *) union_rename },
 	{ &vop_revoke_desc,		(vop_t *) union_revoke },
 	{ &vop_rmdir_desc,		(vop_t *) union_rmdir },
+	{ &vop_setacl_desc,		(vop_t *) union_setacl },
 	{ &vop_setattr_desc,		(vop_t *) union_setattr },
+	{ &vop_setextattr_desc,		(vop_t *) union_setextattr },
+	{ &vop_setlabel_desc,		(vop_t *) union_setlabel },
 	{ &vop_strategy_desc,		(vop_t *) union_strategy },
 	{ &vop_symlink_desc,		(vop_t *) union_symlink },
 	{ &vop_whiteout_desc,		(vop_t *) union_whiteout },

@@ -44,7 +44,7 @@
  *
  *	Last Edit-Date: [Sun Mar 26 10:38:52 2000]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_vtf.c,v 1.13 2000/06/10 11:03:31 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_vtf.c,v 1.14 2004/06/04 20:04:51 phk Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -2078,8 +2078,7 @@ respond(struct video_state *svsp)
 
         while (*svsp->report_chars && svsp->report_count > 0)
         {
-		(*linesw[svsp->vs_tty->t_line].l_rint)
-			(*svsp->report_chars++ & 0xff, svsp->vs_tty);
+		ttyld_rint(svsp->vs_tty, *svsp->report_chars++ & 0xff);
 		svsp->report_count--;
         }
 }

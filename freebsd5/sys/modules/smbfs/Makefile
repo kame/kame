@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.6 2003/11/19 05:08:26 imp Exp $
+# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.7 2004/01/19 14:00:26 ru Exp $
 
 .PATH:	${.CURDIR}/../../crypto/des \
 	${.CURDIR}/../../crypto/des/arch/${MACHINE_ARCH} \
@@ -59,8 +59,5 @@ opt_netsmb.h:
 .if defined(NETSMBCRYPTO)
 	echo "#define NETSMBCRYPTO 1" >> ${.TARGET}
 .endif
-
-unload:
-	@(if kldunload ${KMOD}; then true; else true; fi)
 
 .include <bsd.kmod.mk>

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/viapm.c,v 1.6 2003/08/22 07:13:22 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/viapm.c,v 1.7 2004/03/17 17:50:54 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -321,8 +321,8 @@ viapm_pro_attach(device_t dev)
 	struct viapm_softc *viapm = (struct viapm_softc *)device_get_softc(dev);
 	u_int32_t l;
 
-	if (!(viapm->iores = bus_alloc_resource(dev, SYS_RES_IOPORT,
-		&viapm->iorid, 0l, ~0l, 1, RF_ACTIVE))) {
+	if (!(viapm->iores = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+		&viapm->iorid, RF_ACTIVE))) {
 		device_printf(dev, "could not allocate bus space\n");
 		goto error;
 	}
@@ -389,8 +389,8 @@ viapm_586b_attach(device_t dev)
 {
 	struct viapm_softc *viapm = (struct viapm_softc *)device_get_softc(dev);
 	
-	if (!(viapm->iores = bus_alloc_resource(dev, SYS_RES_IOPORT,
-		&viapm->iorid, 0ul, ~0ul, 1, RF_ACTIVE | RF_SHAREABLE))) {
+	if (!(viapm->iores = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+		&viapm->iorid, RF_ACTIVE | RF_SHAREABLE))) {
 		device_printf(dev, "could not allocate bus resource\n");
 		return ENXIO;
 	}

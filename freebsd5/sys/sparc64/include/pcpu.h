@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	from: FreeBSD: src/sys/i386/include/globaldata.h,v 1.27 2001/04/27
- * $FreeBSD: src/sys/sparc64/include/pcpu.h,v 1.18 2003/03/18 08:15:24 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/pcpu.h,v 1.19 2004/05/26 12:06:51 tmm Exp $
  */
 
 #ifndef	_MACHINE_PCPU_H_
@@ -38,7 +38,7 @@
 
 #define	ALT_STACK_SIZE	128
 
-struct vmspace;
+struct pmap;
 
 /*
  * Inside the kernel, the globally reserved register g7 is used to
@@ -49,7 +49,7 @@ struct vmspace;
 	struct	intr_request *pc_irhead;				\
 	struct	intr_request **pc_irtail;				\
 	struct	intr_request *pc_irfree;				\
-	struct	vmspace *pc_vmspace;					\
+	struct 	pmap *pc_pmap;						\
 	vm_offset_t pc_addr;						\
 	u_int 	pc_mid;							\
 	u_int	pc_node;						\

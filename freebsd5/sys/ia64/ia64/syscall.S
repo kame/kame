@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/syscall.S,v 1.11 2003/11/11 09:25:19 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/syscall.S,v 1.12 2004/08/07 21:55:15 marcel Exp $
  */
 
 #include <sys/syscall.h>
@@ -378,6 +378,8 @@ ENTRY(epc_syscall, 8)
 	br.call.sptk	rp=syscall
 	;;
 }
+	.global		epc_syscall_return
+epc_syscall_return:
 {	.mfb
 	add		out0=16,sp
 	nop		0
@@ -402,9 +404,6 @@ ENTRY(epc_syscall, 8)
 (p15)	br.spnt		exception_restore
 	;;
 }
-
-	.global		epc_syscall_return
-epc_syscall_return:
 {	.mmi
 	alloc		r31=ar.pfs,0,0,0,0
 	add		r14=32,sp

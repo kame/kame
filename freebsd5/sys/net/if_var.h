@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.62 2003/11/12 03:14:29 rwatson Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.84.4.3 2004/10/30 22:01:43 rwatson Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -78,12 +74,18 @@ struct	ether_header;
 
 #ifdef _KERNEL
 #include <sys/mbuf.h>
+#include <sys/eventhandler.h>
 #endif /* _KERNEL */
 #include <sys/lock.h>		/* XXX */
 #include <sys/mutex.h>		/* XXX */
 #include <sys/event.h>		/* XXX */
+#include <sys/_task.h>
 
 #define	IF_DUNIT_NONE	-1
+
+#if 1 /* ALTQ */
+#include <altq/if_altq.h>
+#endif
 
 TAILQ_HEAD(ifnethead, ifnet);	/* we use TAILQs so that the order of */
 TAILQ_HEAD(ifaddrhead, ifaddr);	/* instantiation is preserved in the list */
@@ -134,8 +136,19 @@ struct ifnet {
 	const char *if_dname;		/* driver name */
 	int	if_dunit;		/* unit or IF_DUNIT_NONE */
 	struct	ifaddrhead if_addrhead;	/* linked list of addresses per if */
-	struct	klist if_klist;		/* events attached to this if */
+		/*
+		 * if_addrhead is the list of all addresses associated to
+		 * an interface.
+		 * Some code in the kernel assumes that first element
+		 * of the list has type AF_LINK, and contains sockaddr_dl
+		 * addresses which store the link-level address and the name
+		 * of the interface.
+		 * However, access to the AF_LINK address through this
+		 * field is deprecated. Use ifaddr_byindex() instead.
+		 */
+	struct	knlist if_klist;	/* events attached to this if */
 	int	if_pcount;		/* number of promiscuous listeners */
+	void	*if_carp;		/* carp (tbd) interface pointer */
 	struct	bpf_if *if_bpf;		/* packet filter structure */
 	u_short	if_index;		/* numeric abbreviation for this if  */
 	short	if_timer;		/* time 'til if_watchdog called */
@@ -143,7 +156,6 @@ struct ifnet {
 	int	if_flags;		/* up/down, broadcast, etc. */
 	int	if_capabilities;	/* interface capabilities */
 	int	if_capenable;		/* enabled features */
-	int	if_ipending;		/* interrupts pending */
 	void	*if_linkmib;		/* link-type-specific MIB data */
 	size_t	if_linkmiblen;		/* length of above data */
 	struct	if_data if_data;
@@ -157,43 +169,51 @@ struct ifnet {
 		(struct ifnet *, struct mbuf *);
 	void	(*if_start)		/* initiate output routine */
 		(struct ifnet *);
-	int	(*if_done)		/* output complete routine */
-		(struct ifnet *);	/* (XXX not used; fake prototype) */
 	int	(*if_ioctl)		/* ioctl routine */
 		(struct ifnet *, u_long, caddr_t);
 	void	(*if_watchdog)		/* timer routine */
 		(struct ifnet *);
-	int	(*if_poll_recv)		/* polled receive routine */
-		(struct ifnet *, int *);
-	int	(*if_poll_xmit)		/* polled transmit routine */
-		(struct ifnet *, int *);
-	void	(*if_poll_intren)	/* polled interrupt reenable routine */
-		(struct ifnet *);
-	void	(*if_poll_slowinput)	/* input routine for slow devices */
-		(struct ifnet *, struct mbuf *);
 	void	(*if_init)		/* Init routine */
 		(void *);
 	int	(*if_resolvemulti)	/* validate/resolve multicast */
 		(struct ifnet *, struct sockaddr **, struct sockaddr *);
+	void	*if_spare1;		/* spare pointer 1 */
+	void	*if_spare2;		/* spare pointer 2 */
+	void	*if_spare3;		/* spare pointer 3 */
+	u_int	if_spare_flags1;	/* spare flags 1 */
+	u_int	if_spare_flags2;	/* spare flags 2 */
+#if 1 /* ALTQ */
+	struct  ifaltq if_snd;		/* output queue (includes altq) */
+#else
 	struct	ifqueue if_snd;		/* output queue */
-	struct	ifqueue *if_poll_slowq;	/* input queue for slow devices */
-	struct	ifprefixhead if_prefixhead; /* list of prefixes per if */
-	u_int8_t *if_broadcastaddr;	/* linklevel broadcast bytestring */
+#endif
+	const u_int8_t *if_broadcastaddr; /* linklevel broadcast bytestring */
+
+	struct	lltable *lltables;	/* list of L3-L2 resolution tables */
+
 	struct	label *if_label;	/* interface MAC label */
 
+	/* these are only used by IPv6 */
+	struct	ifprefixhead if_prefixhead; /* list of prefixes per if */
 	void	*if_afdata[AF_MAX];
 	int	if_afdata_initialized;
 	struct	mtx if_afdata_mtx;
+	struct	task if_starttask;	/* task for IFF_NEEDSGIANT */
 };
 
 typedef void if_init_f_t(void *);
 
+/*
+ * XXX These aliases are terribly dangerous because they could apply
+ * to anything.
+ */
 #define	if_mtu		if_data.ifi_mtu
 #define	if_type		if_data.ifi_type
 #define if_physical	if_data.ifi_physical
 #define	if_addrlen	if_data.ifi_addrlen
 #define	if_hdrlen	if_data.ifi_hdrlen
 #define	if_metric	if_data.ifi_metric
+#define	if_link_state	if_data.ifi_link_state
 #define	if_baudrate	if_data.ifi_baudrate
 #define	if_hwassist	if_data.ifi_hwassist
 #define	if_ipackets	if_data.ifi_ipackets
@@ -217,12 +237,6 @@ typedef void if_init_f_t(void *);
 #define	if_list		if_link
 
 /*
- * Bit values in if_ipending
- */
-#define	IFI_RECV	1	/* I want to receive */
-#define	IFI_XMIT	2	/* I want to transmit */
-
-/*
  * Output queues (ifp->if_snd) and slow device input queues (*ifp->if_slowq)
  * are queues of messages stored on ifqueue structures
  * (defined above).  Entries are added to and deleted from these structures
@@ -230,6 +244,7 @@ typedef void if_init_f_t(void *);
  */
 #define IF_LOCK(ifq)		mtx_lock(&(ifq)->ifq_mtx)
 #define IF_UNLOCK(ifq)		mtx_unlock(&(ifq)->ifq_mtx)
+#define	IF_LOCK_ASSERT(ifq)	mtx_assert(&(ifq)->ifq_mtx, MA_OWNED)
 #define	_IF_QFULL(ifq)		((ifq)->ifq_len >= (ifq)->ifq_maxlen)
 #define	_IF_DROP(ifq)		((ifq)->ifq_drops++)
 #define	_IF_QLEN(ifq)		((ifq)->ifq_len)
@@ -280,19 +295,36 @@ typedef void if_init_f_t(void *);
 	IF_UNLOCK(ifq); 					\
 } while (0)
 
-#define IF_DRAIN(ifq) do { 					\
+#define	_IF_POLL(ifq, m)	((m) = (ifq)->ifq_head)
+#define	IF_POLL(ifq, m)		_IF_POLL(ifq, m)
+
+#define _IF_DRAIN(ifq) do { 					\
 	struct mbuf *m; 					\
-	IF_LOCK(ifq); 						\
 	for (;;) { 						\
 		_IF_DEQUEUE(ifq, m); 				\
 		if (m == NULL) 					\
 			break; 					\
 		m_freem(m); 					\
 	} 							\
-	IF_UNLOCK(ifq); 					\
 } while (0)
 
+#define IF_DRAIN(ifq) do {					\
+	IF_LOCK(ifq);						\
+	_IF_DRAIN(ifq);						\
+	IF_UNLOCK(ifq);						\
+} while(0)
+
 #ifdef _KERNEL
+/* interface address change event */
+typedef void (*ifaddr_event_handler_t)(void *, struct ifnet *);
+EVENTHANDLER_DECLARE(ifaddr_event, ifaddr_event_handler_t);
+/* new interface arrival event */
+typedef void (*ifnet_arrival_event_handler_t)(void *, struct ifnet *);
+EVENTHANDLER_DECLARE(ifnet_arrival_event, ifnet_arrival_event_handler_t);
+/* interface departure event */
+typedef void (*ifnet_departure_event_handler_t)(void *, struct ifnet *);
+EVENTHANDLER_DECLARE(ifnet_departure_event, ifnet_departure_event_handler_t);
+
 #define	IF_AFDATA_LOCK_INIT(ifp)	\
     mtx_init(&(ifp)->if_afdata_mtx, "if_afdata", NULL, MTX_DEF)
 #define	IF_AFDATA_LOCK(ifp)	mtx_lock(&(ifp)->if_afdata_mtx)
@@ -300,33 +332,204 @@ typedef void if_init_f_t(void *);
 #define	IF_AFDATA_UNLOCK(ifp)	mtx_unlock(&(ifp)->if_afdata_mtx)
 #define	IF_AFDATA_DESTROY(ifp)	mtx_destroy(&(ifp)->if_afdata_mtx)
 
-#define	IF_HANDOFF(ifq, m, ifp)			if_handoff(ifq, m, ifp, 0)
-#define	IF_HANDOFF_ADJ(ifq, m, ifp, adj)	if_handoff(ifq, m, ifp, adj)
+#define	IFF_LOCKGIANT(ifp) do {						\
+	if ((ifp)->if_flags & IFF_NEEDSGIANT)				\
+		mtx_lock(&Giant);					\
+} while (0)
 
-static __inline int
-if_handoff(struct ifqueue *ifq, struct mbuf *m, struct ifnet *ifp, int adjust)
-{
-	int active = 0;
+#define	IFF_UNLOCKGIANT(ifp) do {					\
+	if ((ifp)->if_flags & IFF_NEEDSGIANT)				\
+		mtx_unlock(&Giant);					\
+} while (0)
 
-	IF_LOCK(ifq);
-	if (_IF_QFULL(ifq)) {
-		_IF_DROP(ifq);
-		IF_UNLOCK(ifq);
-		m_freem(m);
-		return (0);
-	}
-	if (ifp != NULL) {
-		ifp->if_obytes += m->m_pkthdr.len + adjust;
-		if (m->m_flags & M_MCAST)
-			ifp->if_omcasts++;
-		active = ifp->if_flags & IFF_OACTIVE;
-	}
-	_IF_ENQUEUE(ifq, m);
-	IF_UNLOCK(ifq);
-	if (ifp != NULL && !active)
-		(*ifp->if_start)(ifp);
-	return (1);
-}
+int	if_handoff(struct ifqueue *ifq, struct mbuf *m, struct ifnet *ifp,
+	    int adjust);
+#define	IF_HANDOFF(ifq, m, ifp)			\
+	if_handoff((struct ifqueue *)ifq, m, ifp, 0)
+#define	IF_HANDOFF_ADJ(ifq, m, ifp, adj)	\
+	if_handoff((struct ifqueue *)ifq, m, ifp, adj)
+
+void	if_start(struct ifnet *);
+
+#if 1 /* ALTQ */
+#define	IFQ_ENQUEUE(ifq, m, err)					\
+do {									\
+	IF_LOCK(ifq);							\
+	if (ALTQ_IS_ENABLED(ifq))					\
+		ALTQ_ENQUEUE(ifq, m, NULL, err);			\
+	else {								\
+		if (_IF_QFULL(ifq)) {					\
+			m_freem(m);					\
+			(err) = ENOBUFS;				\
+		} else {						\
+			_IF_ENQUEUE(ifq, m);				\
+			(err) = 0;					\
+		}							\
+	}								\
+	if (err)							\
+		(ifq)->ifq_drops++;					\
+	IF_UNLOCK(ifq);							\
+} while (0)
+
+#define	IFQ_DEQUEUE_NOLOCK(ifq, m)					\
+do {									\
+	if (TBR_IS_ENABLED(ifq))					\
+		(m) = tbr_dequeue_ptr(ifq, ALTDQ_REMOVE);		\
+	else if (ALTQ_IS_ENABLED(ifq))					\
+		ALTQ_DEQUEUE(ifq, m);					\
+	else								\
+		_IF_DEQUEUE(ifq, m);					\
+} while (0)
+
+#define	IFQ_DEQUEUE(ifq, m)						\
+do {									\
+	IF_LOCK(ifq);							\
+	IFQ_DEQUEUE_NOLOCK(ifq, m);					\
+	IF_UNLOCK(ifq);							\
+} while (0)
+
+#define	IFQ_POLL_NOLOCK(ifq, m)						\
+do {									\
+	if (TBR_IS_ENABLED(ifq))					\
+		(m) = tbr_dequeue_ptr(ifq, ALTDQ_POLL);			\
+	else if (ALTQ_IS_ENABLED(ifq))					\
+		ALTQ_POLL(ifq, m);					\
+	else								\
+		_IF_POLL(ifq, m);					\
+} while (0)
+
+#define	IFQ_POLL(ifq, m)						\
+do {									\
+	IF_LOCK(ifq);							\
+	IFQ_POLL_NOLOCK(ifq, m);					\
+	IF_UNLOCK(ifq);							\
+} while (0)
+
+#define	IFQ_PURGE_NOLOCK(ifq)						\
+do {									\
+	if (ALTQ_IS_ENABLED(ifq)) {					\
+		ALTQ_PURGE(ifq);					\
+	} else								\
+		_IF_DRAIN(ifq);						\
+} while (0)
+
+#define	IFQ_PURGE(ifq)							\
+do {									\
+	IF_LOCK(ifq);							\
+	IFQ_PURGE_NOLOCK(ifq);						\
+	IF_UNLOCK(ifq);							\
+} while (0)
+
+#define	IFQ_SET_READY(ifq)						\
+	do { ((ifq)->altq_flags |= ALTQF_READY); } while (0)
+
+#else /* !ALTQ */
+#define	IFQ_ENQUEUE(ifq, m, err)					\
+do {									\
+	IF_LOCK(ifq);							\
+	if (_IF_QFULL(ifq)) {						\
+		m_freem(m);						\
+		(err) = ENOBUFS;					\
+	} else {							\
+		_IF_ENQUEUE(ifq, m);					\
+		(err) = 0;						\
+	}								\
+	if (err)							\
+		(ifq)->ifq_drops++;					\
+	IF_UNLOCK(ifq);							\
+} while (0)
+
+#define	IFQ_DEQUEUE_NOLOCK(ifq, m)	_IF_DEQUEUE(ifq, m)
+#define	IFQ_DEQUEUE(ifq, m)		IF_DEQUEUE(ifq, m)
+#define	IFQ_POLL_NOLOCK(ifq, m)		_IF_POLL(ifq, m)
+#define	IFQ_POLL(ifq, m)		IF_POLL(ifq, m)
+#define	IFQ_PURGE_NOLOCK(ifq)		_IF_DRAIN(ifq)
+#define	IFQ_PURGE(ifq)			IF_DRAIN(ifq)
+
+#define	IFQ_SET_READY(ifq)		/* nothing */
+
+#endif /* !ALTQ */
+
+#define	IFQ_LOCK(ifq)			IF_LOCK(ifq)
+#define	IFQ_UNLOCK(ifq)			IF_UNLOCK(ifq)
+#define	IFQ_LOCK_ASSERT(ifq)		IF_LOCK_ASSERT(ifq)
+#define	IFQ_IS_EMPTY(ifq)		((ifq)->ifq_len == 0)
+#define	IFQ_INC_LEN(ifq)		((ifq)->ifq_len++)
+#define	IFQ_DEC_LEN(ifq)		(--(ifq)->ifq_len)
+#define	IFQ_INC_DROPS(ifq)		((ifq)->ifq_drops++)
+#define	IFQ_SET_MAXLEN(ifq, len)	((ifq)->ifq_maxlen = (len))
+
+#define	IFQ_HANDOFF_ADJ(ifp, m, adj, err)				\
+do {									\
+	int len;							\
+	short mflags;							\
+									\
+	len = (m)->m_pkthdr.len;					\
+	mflags = (m)->m_flags;						\
+	IFQ_ENQUEUE(&(ifp)->if_snd, m, err);				\
+	if ((err) == 0) {						\
+		(ifp)->if_obytes += len + (adj);			\
+		if (mflags & M_MCAST)					\
+			(ifp)->if_omcasts++;				\
+		if (((ifp)->if_flags & IFF_OACTIVE) == 0)		\
+			if_start(ifp);					\
+	}								\
+} while (0)
+
+#define	IFQ_HANDOFF(ifp, m, err)					\
+	IFQ_HANDOFF_ADJ(ifp, m, 0, err)
+
+#define	IFQ_DRV_DEQUEUE(ifq, m)						\
+do {									\
+	(m) = (ifq)->ifq_drv_head;					\
+	if (m) {							\
+		if (((ifq)->ifq_drv_head = (m)->m_nextpkt) == NULL)	\
+			(ifq)->ifq_drv_tail = NULL;			\
+		(m)->m_nextpkt = NULL;					\
+		(ifq)->ifq_drv_len--;					\
+	} else {							\
+		IFQ_LOCK(ifq);						\
+		IFQ_DEQUEUE_NOLOCK(ifq, m);				\
+		while ((ifq)->ifq_drv_len < (ifq)->ifq_drv_maxlen) {	\
+			struct mbuf *m0;				\
+			IFQ_DEQUEUE_NOLOCK(ifq, m0);			\
+			if (m0 == NULL)					\
+				break;					\
+			m0->m_nextpkt = NULL;				\
+			if ((ifq)->ifq_drv_tail == NULL)		\
+				(ifq)->ifq_drv_head = m0;		\
+			else						\
+				(ifq)->ifq_drv_tail->m_nextpkt = m0;	\
+			(ifq)->ifq_drv_tail = m0;			\
+			(ifq)->ifq_drv_len++;				\
+		}							\
+		IFQ_UNLOCK(ifq);					\
+	}								\
+} while (0)
+
+#define	IFQ_DRV_PREPEND(ifq, m)						\
+do {									\
+	(m)->m_nextpkt = (ifq)->ifq_drv_head;				\
+	if ((ifq)->ifq_drv_tail == NULL)				\
+		(ifq)->ifq_drv_tail = (m);				\
+	(ifq)->ifq_drv_head = (m);					\
+	(ifq)->ifq_drv_len++;						\
+} while (0)
+
+#define	IFQ_DRV_IS_EMPTY(ifq)						\
+	(((ifq)->ifq_drv_len == 0) && ((ifq)->ifq_len == 0))
+
+#define	IFQ_DRV_PURGE(ifq)						\
+do {									\
+	struct mbuf *m, *n = (ifq)->ifq_drv_head;			\
+	while((m = n) != NULL) {					\
+		n = m->m_nextpkt;					\
+		m_freem(m);						\
+	}								\
+	(ifq)->ifq_drv_head = (ifq)->ifq_drv_tail = NULL;		\
+	(ifq)->ifq_drv_len = 0;						\
+	IFQ_PURGE(ifq);							\
+} while (0)
 
 /*
  * 72 was chosen below because it is the size of a TCP/IP
@@ -342,6 +545,10 @@ if_handoff(struct ifqueue *ifq, struct mbuf *m, struct ifnet *ifp, int adjust)
  * of an interface.  They are maintained by the different address families,
  * are allocated and attached when an address is set, and are linked
  * together so all addresses for an interface can be located.
+ *
+ * NOTE: a 'struct ifaddr' is always at the beginning of a larger
+ * chunk of malloc'ed memory, where we store the three addresses
+ * (ifa_addr, ifa_dstaddr and ifa_netmask) referenced here.
  */
 struct ifaddr {
 	struct	sockaddr *ifa_addr;	/* address of interface */
@@ -356,9 +563,6 @@ struct ifaddr {
 	u_short	ifa_flags;		/* mostly rt_flags for cloning */
 	u_int	ifa_refcnt;		/* references to this structure */
 	int	ifa_metric;		/* cost of going out this interface */
-#ifdef notdef
-	struct	rtentry *ifa_rt;	/* XXXX for ROUTETOIF ????? */
-#endif
 	int (*ifa_claim_addr)		/* check if an addr goes to this if */
 		(struct ifaddr *, struct sockaddr *);
 	struct mtx ifa_mtx;
@@ -434,10 +638,15 @@ extern	struct mtx ifnet_lock;
 struct ifindex_entry {
 	struct	ifnet *ife_ifnet;
 	struct	ifaddr *ife_ifnet_addr;
-	dev_t	ife_dev;
+	struct cdev *ife_dev;
 };
 
 #define ifnet_byindex(idx)	ifindex_table[(idx)].ife_ifnet
+/*
+ * Given the index, ifaddr_byindex() returns the one and only
+ * link-level ifaddr for the interface. You are not supposed to use
+ * it to traverse the list of addresses associated to the interface.
+ */
 #define ifaddr_byindex(idx)	ifindex_table[(idx)].ife_ifnet_addr
 #define ifdev_byindex(idx)	ifindex_table[(idx)].ife_dev
 
@@ -455,22 +664,12 @@ void	if_detach(struct ifnet *);
 void	if_down(struct ifnet *);
 void	if_initname(struct ifnet *, const char *, int);
 int	if_printf(struct ifnet *, const char *, ...) __printflike(2, 3);
-void	if_route(struct ifnet *, int flag, int fam);
 int	if_setlladdr(struct ifnet *, const u_char *, int);
-void	if_unroute(struct ifnet *, int flag, int fam);
 void	if_up(struct ifnet *);
 /*void	ifinit(void);*/ /* declared in systm.h for main() */
 int	ifioctl(struct socket *, u_long, caddr_t, struct thread *);
 int	ifpromisc(struct ifnet *, int);
 struct	ifnet *ifunit(const char *);
-struct	ifnet *if_withname(struct sockaddr *);
-
-int	if_poll_recv_slow(struct ifnet *ifp, int *quotap);
-void	if_poll_xmit_slow(struct ifnet *ifp, int *quotap);
-void	if_poll_throttle(void);
-void	if_poll_unthrottle(void *);
-void	if_poll_init(void);
-void	if_poll(void);
 
 struct	ifaddr *ifa_ifwithaddr(struct sockaddr *);
 struct	ifaddr *ifa_ifwithdstaddr(struct sockaddr *);
@@ -480,12 +679,6 @@ struct	ifaddr *ifaof_ifpforaddr(struct sockaddr *, struct ifnet *);
 
 struct	ifmultiaddr *ifmaof_ifpforaddr(struct sockaddr *, struct ifnet *);
 int	if_simloop(struct ifnet *ifp, struct mbuf *m, int af, int hlen);
-
-void	if_clone_attach(struct if_clone *);
-void	if_clone_detach(struct if_clone *);
-
-int	if_clone_create(char *, int);
-int	if_clone_destroy(const char *);
 
 #define IF_LLADDR(ifp)							\
     LLADDR((struct sockaddr_dl *) ifaddr_byindex((ifp)->if_index)->ifa_addr)

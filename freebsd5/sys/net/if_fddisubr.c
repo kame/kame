@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	from: if_ethersubr.c,v 1.5 1994/12/13 22:31:45 wollman Exp
- * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.87 2003/11/14 21:02:22 andre Exp $
+ * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.95 2004/06/15 23:57:41 mlaier Exp $
  */
 
 #include "opt_atalk.h"
@@ -89,7 +89,7 @@ extern u_char	at_org_code[ 3 ];
 extern u_char	aarp_org_code[ 3 ];
 #endif /* NETATALK */
 
-static u_char fddibroadcastaddr[FDDI_ADDR_LEN] =
+static const u_char fddibroadcastaddr[FDDI_ADDR_LEN] =
 			{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 static int fddi_resolvemulti(struct ifnet *, struct sockaddr **,
@@ -98,7 +98,6 @@ static int fddi_output(struct ifnet *, struct mbuf *, struct sockaddr *,
 		       struct rtentry *); 
 static void fddi_input(struct ifnet *ifp, struct mbuf *m);
 
-#define	IFP2AC(IFP)	((struct arpcom *)IFP)
 #define	senderr(e)	do { error = (e); goto bad; } while (0)
 
 /*
@@ -118,9 +117,7 @@ fddi_output(ifp, m, dst, rt0)
 	u_int16_t type;
 	int loop_copy = 0, error = 0, hdrcmplt = 0;
  	u_char esrc[FDDI_ADDR_LEN], edst[FDDI_ADDR_LEN];
-	struct rtentry *rt;
 	struct fddi_header *fh;
-	struct arpcom *ac = IFP2AC(ifp);
 
 #ifdef MAC
 	error = mac_check_ifnet_transmit(ifp, m);
@@ -134,25 +131,48 @@ fddi_output(ifp, m, dst, rt0)
 		senderr(ENETDOWN);
 	getmicrotime(&ifp->if_lastchange);
 
-	error = rt_check(&rt, &rt0, dst);
-	if (error)
-		goto bad;
-
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET: {
-		if (!arpresolve(ifp, rt, m, dst, edst, rt0))
-			return (0);	/* if not yet resolved */
+		error = arpresolve(ifp, rt0, m, dst, edst);
+		if (error)
+			return (error == EWOULDBLOCK ? 0 : error);
 		type = htons(ETHERTYPE_IP);
 		break;
 	}
+	case AF_ARP:
+	{
+		struct arphdr *ah;
+		ah = mtod(m, struct arphdr *);
+		ah->ar_hrd = htons(ARPHRD_ETHER);
+
+		loop_copy = -1; /* if this is for us, don't do it */
+
+		switch (ntohs(ah->ar_op)) {
+		case ARPOP_REVREQUEST:
+		case ARPOP_REVREPLY:
+			type = htons(ETHERTYPE_REVARP);
+			break;
+		case ARPOP_REQUEST:
+		case ARPOP_REPLY:
+		default:
+			type = htons(ETHERTYPE_ARP);
+			break;
+		}
+
+		if (m->m_flags & M_BCAST)
+			bcopy(ifp->if_broadcastaddr, edst, FDDI_ADDR_LEN);
+                else
+			bcopy(ar_tha(ah), edst, FDDI_ADDR_LEN);
+
+	}
+	break;
 #endif /* INET */
 #ifdef INET6
 	case AF_INET6:
-		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)edst)) {
-			/* Something bad happened */
-			return (0);
-		}
+		error = nd6_storelladdr(ifp, rt0, m, dst, (u_char *)edst);
+		if (error)
+			return (error); /* Something bad happened */
 		type = htons(ETHERTYPE_IPV6);
 		break;
 #endif /* INET6 */
@@ -166,7 +186,7 @@ fddi_output(ifp, m, dst, rt0)
 #ifdef NETATALK
 	case AF_APPLETALK: {
 	    struct at_ifaddr *aa;
-            if (!aarpresolve(ac, m, (struct sockaddr_at *)dst, edst))
+            if (!aarpresolve(ifp, m, (struct sockaddr_at *)dst, edst))
                 return (0);
 	    /*
 	     * ifaddr is the first thing in at_ifaddr
@@ -288,7 +308,7 @@ fddi_output(ifp, m, dst, rt0)
 	if (hdrcmplt)
 		bcopy((caddr_t)esrc, (caddr_t)fh->fddi_shost, FDDI_ADDR_LEN);
 	else
-		bcopy((caddr_t)ac->ac_enaddr, (caddr_t)fh->fddi_shost,
+		bcopy(IFP2AC(ifp)->ac_enaddr, (caddr_t)fh->fddi_shost,
 			FDDI_ADDR_LEN);
 
 	/*
@@ -314,8 +334,10 @@ fddi_output(ifp, m, dst, rt0)
 		}
 	}
 
-	if (! IF_HANDOFF(&ifp->if_snd, m, ifp))
-		senderr(ENOBUFS);
+	IFQ_HANDOFF(ifp, m, error);
+	if (error)
+		ifp->if_oerrors++;
+
 	return (error);
 
 bad:
@@ -442,7 +464,7 @@ fddi_input(ifp, m)
 			goto dropanyway;
 		}
 #ifdef NETATALK
-		if (Bcmp(&(l->llc_snap.org_code)[0], at_org_code,
+		if (bcmp(&(l->llc_snap.org_code)[0], at_org_code,
 		    sizeof(at_org_code)) == 0 &&
 		    ntohs(l->llc_snap.ether_type) == ETHERTYPE_AT) {
 			isr = NETISR_ATALK2;
@@ -450,7 +472,7 @@ fddi_input(ifp, m)
 			break;
 		}
 
-		if (Bcmp(&(l->llc_snap.org_code)[0], aarp_org_code,
+		if (bcmp(&(l->llc_snap.org_code)[0], aarp_org_code,
 		    sizeof(aarp_org_code)) == 0 &&
 		    ntohs(l->llc_snap.ether_type) == ETHERTYPE_AARP) {
 			m_adj(m, LLC_SNAPFRAMELEN);

@@ -28,21 +28,18 @@
  *
  *	from: NetBSD: ebus.c,v 1.26 2001/09/10 16:27:53 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/isa/ofw_isa.c,v 1.6 2003/08/23 00:11:15 imp Exp $
+ * $FreeBSD: src/sys/sparc64/isa/ofw_isa.c,v 1.8 2004/05/08 13:53:47 marius Exp $
  */
 
 /*
  * Helper functions which can be used in both ISA and EBus code.
  */
 
-#include "opt_ofw_pci.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 
 #include <dev/ofw/openfirm.h>
-#include <dev/ofw/ofw_pci.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -53,18 +50,35 @@
 
 #include "pcib_if.h"
 
+int
+ofw_isa_range_restype(struct isa_ranges *range)
+{
+	int ps = ISA_RANGE_PS(range);
+
+	switch (ps) {
+	case PCI_CS_IO:
+		return (SYS_RES_IOPORT);
+	case PCI_CS_MEM32:
+		return (SYS_RES_MEMORY);
+	default:
+		panic("ofw_isa_range_restype: illegal space %x", ps);
+	}
+
+}
+
 /* XXX: this only supports PCI as parent bus right now. */
 int
-ofw_isa_map_iorange(struct isa_ranges *range, int nrange, u_long *start,
-    u_long *end)
+ofw_isa_range_map(struct isa_ranges *range, int nrange, u_long *start,
+    u_long *end, int *which)
 {
+	struct isa_ranges *r;
 	u_int64_t offs, cstart, cend;
 	int i;
 
 	for (i = 0; i < nrange; i++) {
-		cstart = ((u_int64_t)range[i].child_hi << 32) |
-		    range[i].child_lo;
-		cend = cstart + range[i].size;
+		r = &range[i];
+		cstart = ISA_RANGE_CHILD(r);
+		cend = cstart + r->size;
 		if (*start < cstart || *start > cend)
 			continue;
 		if (*end < cstart || *end > cend) {
@@ -72,27 +86,17 @@ ofw_isa_map_iorange(struct isa_ranges *range, int nrange, u_long *start,
 			    "ranges (%#lx not in %#lx - %#lx)", *end, cstart,
 			    cend);
 		}
-		offs = (((u_int64_t)range[i].phys_mid << 32) |
-		    range[i].phys_lo);
+		offs = ISA_RANGE_PHYS(r);
 		*start = *start + offs - cstart;
 		*end  = *end + offs - cstart;
-		/* Isolate address space and find the right tag */
-		switch (ISA_RANGE_PS(&range[i])) {
-		case PCI_CS_IO:
-			return (SYS_RES_IOPORT);
-		case PCI_CS_MEM32:
-			return (SYS_RES_MEMORY);
-		default:
-			panic("ofw_isa_map_iorange: illegal space %x",
-			    ISA_RANGE_PS(&range[i]));
-			break;
-		}
+		if (which != NULL)
+			*which = i;
+		return (ofw_isa_range_restype(r));
 	}
 	panic("ofw_isa_map_iorange: could not map range %#lx - %#lx",
 	    *start, *end);
 }
 
-#ifdef OFW_NEWPCI
 ofw_pci_intr_t
 ofw_isa_route_intr(device_t bridge, phandle_t node, struct ofw_bus_iinfo *ii,
     ofw_isa_intr_t intr)
@@ -114,4 +118,3 @@ ofw_isa_route_intr(device_t bridge, phandle_t node, struct ofw_bus_iinfo *ii,
 	}
 	return (mintr);
 }
-#endif /* OFW_NEWPCI */

@@ -25,7 +25,7 @@
  *
  *	citrus Id: wctype.h,v 1.4 2000/12/21 01:50:21 itojun Exp
  *	$NetBSD: wctype.h,v 1.3 2000/12/22 14:16:16 itojun Exp $
- * $FreeBSD: src/include/wctype.h,v 1.10 2002/08/21 16:19:55 mike Exp $
+ * $FreeBSD: src/include/wctype.h,v 1.13 2004/08/12 10:29:14 tjr Exp $
  */
 
 #ifndef _WCTYPE_H_
@@ -34,7 +34,7 @@
 #include <sys/cdefs.h>
 #include <sys/_types.h>
 
-#include <ctype.h>
+#include <_ctype.h>
 
 #ifndef _WCTRANS_T
 typedef	int	wctrans_t;
@@ -85,6 +85,7 @@ wint_t	iswnumber(wint_t);
 wint_t	iswphonogram(wint_t);
 wint_t	iswrune(wint_t);
 wint_t	iswspecial(wint_t);
+wint_t	nextwctype(wint_t, wctype_t);
 #endif
 __END_DECLS
 
@@ -93,14 +94,14 @@ __END_DECLS
 #define	iswblank(wc)		__istype((wc), _CTYPE_B)
 #define	iswcntrl(wc)		__istype((wc), _CTYPE_C)
 #define	iswctype(wc, charclass)	__istype((wc), (charclass))
-#define	iswdigit(wc)		__istype((wc), _CTYPE_D)
+#define	iswdigit(wc)		__isctype((wc), _CTYPE_D)
 #define	iswgraph(wc)		__istype((wc), _CTYPE_G)
 #define	iswlower(wc)		__istype((wc), _CTYPE_L)
 #define	iswprint(wc)		__istype((wc), _CTYPE_R)
 #define	iswpunct(wc)		__istype((wc), _CTYPE_P)
 #define	iswspace(wc)		__istype((wc), _CTYPE_S)
 #define	iswupper(wc)		__istype((wc), _CTYPE_U)
-#define	iswxdigit(wc)		__istype((wc), _CTYPE_X)
+#define	iswxdigit(wc)		__isctype((wc), _CTYPE_X)
 #define	towlower(wc)		__tolower(wc)
 #define	towupper(wc)		__toupper(wc)
 

@@ -12,10 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_cluster.c,v 1.148 2003/11/12 08:01:39 mckusick Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_cluster.c,v 1.150 2004/07/25 21:24:21 phk Exp $");
 
 #include "opt_debug_cluster.h"
 
@@ -973,7 +969,7 @@ cluster_wbuild(vp, size, start_lbn, len)
 			tbp->b_ioflags &= ~BIO_ERROR;
 			tbp->b_flags |= B_ASYNC;
 			tbp->b_iocmd = BIO_WRITE;
-			reassignbuf(tbp, tbp->b_vp);	/* put on clean list */
+			reassignbuf(tbp);		/* put on clean list */
 			VI_LOCK(tbp->b_vp);
 			++tbp->b_vp->v_numoutput;
 			VI_UNLOCK(tbp->b_vp);

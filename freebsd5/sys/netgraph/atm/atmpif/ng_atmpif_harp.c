@@ -33,7 +33,7 @@
  *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netgraph/atm/atmpif/ng_atmpif_harp.c,v 1.1 2003/08/11 08:40:01 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/netgraph/atm/atmpif/ng_atmpif_harp.c,v 1.1.4.1 2004/09/15 15:14:19 andre Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -915,7 +915,7 @@ vatmpif_harp_recv_drain(Vatmpif_unit *vup, KBuffer *m,
 	/*
 	 * Schedule callback
 	 */
-	if (!netisr_queue(NETISR_ATM, m)) {
+	if ((err = netisr_queue(NETISR_ATM, m))) {	/* (0) on success. */
 		/*
 		 * queue is full. Unable to pass up to the HARP stack
 		 * Update the stats.

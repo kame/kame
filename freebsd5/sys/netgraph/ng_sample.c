@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_sample.c,v 1.20 2002/05/31 23:48:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_sample.c,v 1.24 2004/07/29 08:05:02 glebius Exp $
  * $Whistle: ng_sample.c,v 1.13 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -104,18 +104,17 @@ static const struct ng_cmdlist ng_xxx_cmdlist[] = {
 
 /* Netgraph node type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_XXX_NODE_TYPE,
-	NULL,
-	ng_xxx_constructor,
-	ng_xxx_rcvmsg,
-	ng_xxx_shutdown,
-	ng_xxx_newhook,
-	NULL,
-	ng_xxx_connect,
-	ng_xxx_rcvdata,
-	ng_xxx_disconnect,
-	ng_xxx_cmdlist
+	.version =	NG_ABI_VERSION,
+	.name =		NG_XXX_NODE_TYPE,
+	.constructor =	ng_xxx_constructor,
+	.rcvmsg =	ng_xxx_rcvmsg,
+	.shutdown =	ng_xxx_shutdown,
+	.newhook =	ng_xxx_newhook,
+/*	.findhook =	ng_xxx_findhook, 	*/
+	.connect =	ng_xxx_connect,
+	.rcvdata =	ng_xxx_rcvdata,
+	.disconnect =	ng_xxx_disconnect,
+	.cmdlist =	ng_xxx_cmdlist,
 };
 NETGRAPH_INIT(xxx, &typestruct);
 
@@ -311,12 +310,12 @@ ng_xxx_rcvmsg(node_p node, item_p item, hook_p lasthook)
 /*
  * Receive data, and do something with it.
  * Actually we receive a queue item which holds the data.
- * If we free the item it wil also froo the data and metadata unless
- * we have previously disassociated them using the NGI_GET_xxx() macros.
+ * If we free the item it will also free the data unless we have
+ * previously disassociated it using the NGI_GET_M() macro.
  * Possibly send it out on another link after processing.
  * Possibly do something different if it comes from different
- * hooks. the caller will never free m or meta, so
- * if we use up this data or abort we must free BOTH of these.
+ * hooks. The caller will never free m, so if we use up this data or
+ * abort we must free it.
  *
  * If we want, we may decide to force this data to be queued and reprocessed
  * at the netgraph NETISR time.
@@ -359,15 +358,15 @@ ng_xxx_rcvdata(hook_p hook, item_p item )
 				return (ENETUNREACH);
 			}
 			/* If we were called at splnet, use the following:
-			 * NG_SEND_DATA(error, otherhook, m, meta); if this
+			 * NG_SEND_DATA_ONLY(error, otherhook, m); if this
 			 * node is running at some SPL other than SPLNET
 			 * then you should use instead: error =
-			 * ng_queueit(otherhook, m, meta); m = NULL: meta =
-			 * NULL; this queues the data using the standard
-			 * NETISR system and schedules the data to be picked
+			 * ng_queueit(otherhook, m, NULL); m = NULL;
+			 * This queues the data using the standard NETISR
+			 * system and schedules the data to be picked
 			 * up again once the system has moved to SPLNET and
-			 * the processing of the data can continue. after
-			 * these are run 'm' and 'meta' should be considered
+			 * the processing of the data can continue. After
+			 * these are run 'm' should be considered
 			 * as invalid and NG_SEND_DATA actually zaps them. */
 			NG_FWD_NEW_DATA(error, item,
 				xxxp->channel[chan].hook, m);
@@ -409,8 +408,8 @@ devintr()
  * All our links and the name have already been removed.
  * If we are a persistant device, we might refuse to go away.
  * In the case of a persistant node we signal the framework that we
- * are still in business by clearing the NG_INVALID bit. However
- * If we find the NG_REALLY_DIE bit set, this means that
+ * are still in business by clearing the NGF_INVALID bit. However
+ * If we find the NGF_REALLY_DIE bit set, this means that
  * we REALLY need to die (e.g. hardware removed).
  * This would have been set using the NG_NODE_REALLY_DIE(node)
  * macro in some device dependent function (not shown here) before
@@ -423,10 +422,10 @@ ng_xxx_shutdown(node_p node)
 
 #ifndef PERSISTANT_NODE
 	NG_NODE_SET_PRIVATE(node, NULL);
-	NG_NODE_UNREF(privdata->node);
+	NG_NODE_UNREF(node);
 	FREE(privdata, M_NETGRAPH);
 #else
-	if (node->nd_flags & NG_REALLY_DIE) {
+	if (node->nd_flags & NGF_REALLY_DIE) {
 		/*
 		 * WE came here because the widget card is being unloaded,
 		 * so stop being persistant.
@@ -437,7 +436,7 @@ ng_xxx_shutdown(node_p node)
 		FREE(privdata, M_NETGRAPH);
 		return (0);   
         }
-	node->nd_flags &= ~NG_INVALID;		/* reset invalid flag */
+	NG_NODE_REVIVE(node);		/* tell ng_rmnode() we will persist */
 #endif /* PERSISTANT_NODE */
 	return (0);
 }

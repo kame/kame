@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/phys_pager.c,v 1.19 2003/08/05 06:51:26 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/phys_pager.c,v 1.22 2004/04/25 07:58:59 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,6 +65,7 @@ phys_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 		 vm_ooffset_t foff)
 {
 	vm_object_t object;
+	vm_pindex_t pindex;
 
 	/*
 	 * Offset should be page aligned.
@@ -72,7 +73,7 @@ phys_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 	if (foff & PAGE_MASK)
 		return (NULL);
 
-	size = round_page(size);
+	pindex = OFF_TO_IDX(foff + PAGE_MASK + size);
 
 	if (handle != NULL) {
 		mtx_lock(&Giant);
@@ -93,8 +94,7 @@ phys_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 			/*
 			 * Allocate object and associate it with the pager.
 			 */
-			object = vm_object_allocate(OBJT_PHYS,
-				OFF_TO_IDX(foff + size));
+			object = vm_object_allocate(OBJT_PHYS, pindex);
 			object->handle = handle;
 			mtx_lock(&phys_pager_mtx);
 			TAILQ_INSERT_TAIL(&phys_pager_object_list, object,
@@ -105,16 +105,15 @@ phys_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 			 * Gain a reference to the object.
 			 */
 			vm_object_reference(object);
-			if (OFF_TO_IDX(foff + size) > object->size)
-				object->size = OFF_TO_IDX(foff + size);
+			if (pindex > object->size)
+				object->size = pindex;
 		}
 		if (phys_pager_alloc_lock == -1)
 			wakeup(&phys_pager_alloc_lock);
 		phys_pager_alloc_lock = 0;
 		mtx_unlock(&Giant);
 	} else {
-		object = vm_object_allocate(OBJT_PHYS,
-			OFF_TO_IDX(foff + size));
+		object = vm_object_allocate(OBJT_PHYS, pindex);
 	}
 
 	return (object);
@@ -134,26 +133,28 @@ phys_pager_dealloc(vm_object_t object)
 	}
 }
 
+/*
+ * Fill as many pages as vm_fault has allocated for us.
+ */
 static int
 phys_pager_getpages(vm_object_t object, vm_page_t *m, int count, int reqpage)
 {
-	int i, s;
+	int i;
 
-	s = splvm();
-	vm_page_lock_queues();
-	/*
-	 * Fill as many pages as vm_fault has allocated for us.
-	 */
+	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 	for (i = 0; i < count; i++) {
-		if ((m[i]->flags & PG_ZERO) == 0) {
-			vm_page_unlock_queues();
-			pmap_zero_page(m[i]);
-			vm_page_lock_queues();
+		if (m[i]->valid == 0) {
+			if ((m[i]->flags & PG_ZERO) == 0)
+				pmap_zero_page(m[i]);
+			m[i]->valid = VM_PAGE_BITS_ALL;
 		}
-		vm_page_flag_set(m[i], PG_ZERO);
+		KASSERT(m[i]->valid == VM_PAGE_BITS_ALL,
+		    ("phys_pager_getpages: partially valid page %p", m[i]));
+	}
+	vm_page_lock_queues();
+	for (i = 0; i < count; i++) {
 		/* Switch off pv_entries */
 		vm_page_unmanage(m[i]);
-		m[i]->valid = VM_PAGE_BITS_ALL;
 		m[i]->dirty = 0;
 		/* The requested page must remain busy, the others not. */
 		if (reqpage != i) {
@@ -162,8 +163,6 @@ phys_pager_getpages(vm_object_t object, vm_page_t *m, int count, int reqpage)
 		}
 	}
 	vm_page_unlock_queues();
-	splx(s);
-
 	return (VM_PAGER_OK);
 }
 

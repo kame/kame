@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/cputypes.h,v 1.16 2002/08/02 18:45:39 phk Exp $
+ * $FreeBSD: src/sys/i386/include/cputypes.h,v 1.18 2004/06/03 21:14:52 phk Exp $
  */
 
 #ifndef _MACHINE_CPUTYPES_H_
@@ -59,13 +59,9 @@
 #define	CPU_PII		14	/* Intel Pentium II */
 #define	CPU_PIII	15	/* Intel Pentium III */
 #define	CPU_P4		16	/* Intel Pentium 4 */
+#define	CPU_GEODE1100	17	/* NS Geode SC1100 */
 
 #ifndef LOCORE
-struct cpu_nameclass {
-	char	*cpu_name;
-	int	cpu_class;
-};
-
 extern int	cpu;
 extern int	cpu_class;
 #endif

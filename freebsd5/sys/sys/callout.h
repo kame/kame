@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)callout.h	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/callout.h,v 1.24 2002/03/19 20:18:36 alfred Exp $
+ * $FreeBSD: src/sys/sys/callout.h,v 1.27 2004/04/20 15:49:31 cperciva Exp $
  */
 
 #ifndef _SYS_CALLOUT_H_
@@ -77,10 +73,12 @@ extern struct mtx callout_lock;
 
 #define	callout_active(c)	((c)->c_flags & CALLOUT_ACTIVE)
 #define	callout_deactivate(c)	((c)->c_flags &= ~CALLOUT_ACTIVE)
+#define	callout_drain(c)	_callout_stop_safe(c, 1)
 void	callout_init(struct callout *, int);
 #define	callout_pending(c)	((c)->c_flags & CALLOUT_PENDING)
 void	callout_reset(struct callout *, int, void (*)(void *), void *);
-int	callout_stop(struct callout *);
+#define	callout_stop(c)		_callout_stop_safe(c, 0)
+int	_callout_stop_safe(struct callout *, int);
 
 #endif
 

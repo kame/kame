@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/creator/creator_upa.c,v 1.2 2003/11/11 06:47:00 jake Exp $
+ * $FreeBSD: src/sys/sparc64/creator/creator_upa.c,v 1.6 2004/07/09 23:12:22 marius Exp $
  */
 
 #include <sys/param.h>
@@ -32,10 +32,12 @@
 #include <sys/consio.h>
 #include <sys/conf.h>
 #include <sys/fbio.h>
-#include <sys/interrupt.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
+
 #include <machine/bus.h>
 #include <machine/resource.h>
+
 #include <sys/rman.h>
 
 #include <dev/ofw/openfirm.h>
@@ -74,6 +76,8 @@ static driver_t creator_upa_driver = {
 static devclass_t creator_upa_devclass;
 
 static struct cdevsw creator_devsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	creator_open,
 	.d_close =	creator_close,
 	.d_ioctl =	creator_ioctl,
@@ -156,7 +160,7 @@ creator_upa_attach(device_t dev)
 	struct upa_regs *reg;
 	video_switch_t *sw;
 	phandle_t chosen;
-	phandle_t stdout;
+	ihandle_t stdout;
 	bus_addr_t phys;
 	bus_size_t size;
 	phandle_t node;
@@ -210,19 +214,19 @@ creator_upa_attach(device_t dev)
 }
 
 static int
-creator_open(dev_t dev, int flags, int mode, struct thread *td)
+creator_open(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	return (0);
 }
 
 static int
-creator_close(dev_t dev, int flags, int mode, struct thread *td)
+creator_close(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	return (0);
 }
 
 static int
-creator_ioctl(dev_t dev, u_long cmd, caddr_t data, int flags,
+creator_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
     struct thread *td)
 {
 	struct creator_softc *sc;
@@ -260,7 +264,7 @@ creator_ioctl(dev_t dev, u_long cmd, caddr_t data, int flags,
 }
 
 static int
-creator_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
+creator_mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
 	struct creator_softc *sc;
 	struct ffb_map *fm;

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/linker_set.h,v 1.13 2002/09/23 06:11:29 peter Exp $
+ * $FreeBSD: src/sys/sys/linker_set.h,v 1.15 2004/07/28 07:07:16 kan Exp $
  */
 
 #ifndef _SYS_LINKER_SET_H_
@@ -39,16 +39,16 @@
 /*
  * Private macros, not to be used outside this header file.
  */
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 #define __MAKE_SET(set, sym)						\
 	static void const * const __set_##set##_sym_##sym 		\
-	__section("set_" #set) __unused = &sym
-#else /* !__GNUC__ */
+	__section("set_" #set) __used = &sym
+#else /* !(__GNUC__ || __INTEL_COMPILER) */
 #ifndef lint
-#error "This file needs to be compiled by GCC or lint"
+#error "This file needs to be compiled by GCC, an Intel compiler or lint"
 #endif /* lint */
 #define __MAKE_SET(set, sym)	extern void const * const (__set_##set##_sym_##sym)
-#endif /* __GNUC__ */
+#endif /* __GNUC__ || __INTEL_COMPILER */
 
 /*
  * Public macros.

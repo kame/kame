@@ -1,4 +1,3 @@
-
 /*
  * ng_rfc1490.h
  *
@@ -36,7 +35,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_rfc1490.h,v 1.4 2003/11/11 12:30:37 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_rfc1490.h,v 1.6 2004/06/13 15:43:59 julian Exp $
  * $Whistle: ng_rfc1490.h,v 1.7 1999/01/20 00:54:15 archie Exp $
  */
 
@@ -45,11 +44,18 @@
 
 /* Node type name */
 #define NG_RFC1490_NODE_TYPE		"rfc1490"
-#define NGM_RFC1490_COOKIE		861060632
+#define NGM_RFC1490_COOKIE		1086947474
 
 /* Hook names */
 #define NG_RFC1490_HOOK_DOWNSTREAM	"downstream"
 #define NG_RFC1490_HOOK_INET		"inet"
 #define NG_RFC1490_HOOK_PPP		"ppp"
+#define NG_RFC1490_HOOK_ETHERNET	"ethernet"
+
+/* Netgraph commands */
+enum {
+	NGM_RFC1490_SET_ENCAP,		/* sets encapsulation method */
+	NGM_RFC1490_GET_ENCAP,		/* gets current encapsulation method */
+};
 
 #endif /* _NETGRAPH_NG_RFC1490_H_ */

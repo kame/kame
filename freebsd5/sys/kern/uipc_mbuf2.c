@@ -41,10 +41,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -65,7 +61,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/uipc_mbuf2.c,v 1.21 2003/10/29 05:40:07 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/uipc_mbuf2.c,v 1.26 2004/07/21 07:12:24 alfred Exp $");
 
 /*#define PULLDOWN_DEBUG*/
 
@@ -234,14 +230,10 @@ m_pulldown(struct mbuf *m, int off, int len, int *offp)
 	 * now, we need to do the hard way.  don't m_copy as there's no room
 	 * on both end.
 	 */
-	MGET(o, M_DONTWAIT, m->m_type);
-	if (o && len > MLEN) {
-		MCLGET(o, M_DONTWAIT);
-		if ((o->m_flags & M_EXT) == 0) {
-			m_free(o);
-			o = NULL;
-		}
-	}
+	if (len > MLEN)
+		o = m_getcl(M_DONTWAIT, m->m_type, 0);
+	else
+		o = m_get(M_DONTWAIT, m->m_type);
 	if (!o) {
 		m_freem(m);
 		return NULL;	/* ENOBUFS */
@@ -278,58 +270,40 @@ static struct mbuf *
 m_dup1(struct mbuf *m, int off, int len, int wait)
 {
 	struct mbuf *n;
-	int l;
 	int copyhdr;
 
 	if (len > MCLBYTES)
 		return NULL;
-	if (off == 0 && (m->m_flags & M_PKTHDR) != 0) {
+	if (off == 0 && (m->m_flags & M_PKTHDR) != 0)
 		copyhdr = 1;
-		MGETHDR(n, wait, m->m_type);
-		l = MHLEN;
-	} else {
+	else
 		copyhdr = 0;
-		MGET(n, wait, m->m_type);
-		l = MLEN;
-	}
-	if (n && len > l) {
-		MCLGET(n, wait);
-		if ((n->m_flags & M_EXT) == 0) {
-			m_free(n);
-			n = NULL;
-		}
+	if (len >= MINCLSIZE) {
+		if (copyhdr == 1)
+			n = m_getcl(wait, m->m_type, M_PKTHDR);
+		else
+			n = m_getcl(wait, m->m_type, 0);
+	} else {
+		if (copyhdr == 1)
+			n = m_gethdr(wait, m->m_type);
+		else
+			n = m_get(wait, m->m_type);
 	}
 	if (!n)
-		return NULL;
+		return NULL; /* ENOBUFS */
 
 	if (copyhdr && !m_dup_pkthdr(n, m, wait)) {
 		m_free(n);
 		return NULL;
 	}
 	m_copydata(m, off, len, mtod(n, caddr_t));
+	n->m_len = len;
 	return n;
 }
 
-/* Get a packet tag structure along with specified data following. */
-struct m_tag *
-m_tag_alloc(u_int32_t cookie, int type, int len, int wait)
-{
-	struct m_tag *t;
-
-	if (len < 0)
-		return NULL;
-	t = malloc(len + sizeof(struct m_tag), M_PACKET_TAGS, wait);
-	if (t == NULL)
-		return NULL;
-	t->m_tag_id = type;
-	t->m_tag_len = len;
-	t->m_tag_cookie = cookie;
-	return t;
-}
-
 /* Free a packet tag. */
-void
-m_tag_free(struct m_tag *t)
+static void
+_m_tag_free(struct m_tag *t)
 {
 #ifdef MAC
 	if (t->m_tag_id == PACKET_TAG_MACLABEL)
@@ -338,26 +312,28 @@ m_tag_free(struct m_tag *t)
 	free(t, M_PACKET_TAGS);
 }
 
-/* Prepend a packet tag. */
-void
-m_tag_prepend(struct mbuf *m, struct m_tag *t)
+/* Get a packet tag structure along with specified data following. */
+struct m_tag *
+m_tag_alloc(u_int32_t cookie, int type, int len, int wait)
 {
-	KASSERT(m && t, ("m_tag_prepend: null argument, m %p t %p", m, t));
-	SLIST_INSERT_HEAD(&m->m_pkthdr.tags, t, m_tag_link);
-}
+	struct m_tag *t;
 
-/* Unlink a packet tag. */
-void
-m_tag_unlink(struct mbuf *m, struct m_tag *t)
-{
-	KASSERT(m && t, ("m_tag_unlink: null argument, m %p t %p", m, t));
-	SLIST_REMOVE(&m->m_pkthdr.tags, t, m_tag, m_tag_link);
+	MBUF_CHECKSLEEP(wait);
+	if (len < 0)
+		return NULL;
+	t = malloc(len + sizeof(struct m_tag), M_PACKET_TAGS, wait);
+	if (t == NULL)
+		return NULL;
+	m_tag_setup(t, cookie, type, len);
+	t->m_tag_free = _m_tag_free;
+	return t;
 }
 
 /* Unlink and free a packet tag. */
 void
 m_tag_delete(struct mbuf *m, struct m_tag *t)
 {
+
 	KASSERT(m && t, ("m_tag_delete: null argument, m %p t %p", m, t));
 	m_tag_unlink(m, t);
 	m_tag_free(t);
@@ -423,6 +399,7 @@ m_tag_copy(struct m_tag *t, int how)
 {
 	struct m_tag *p;
 
+	MBUF_CHECKSLEEP(how);
 	KASSERT(t, ("m_tag_copy: null tag"));
 	p = m_tag_alloc(t->m_tag_cookie, t->m_tag_id, t->m_tag_len, how);
 	if (p == NULL)
@@ -456,6 +433,7 @@ m_tag_copy_chain(struct mbuf *to, struct mbuf *from, int how)
 {
 	struct m_tag *p, *t, *tprev = NULL;
 
+	MBUF_CHECKSLEEP(how);
 	KASSERT(to && from,
 		("m_tag_copy_chain: null argument, to %p from %p", to, from));
 	m_tag_delete_chain(to, NULL);
@@ -472,25 +450,4 @@ m_tag_copy_chain(struct mbuf *to, struct mbuf *from, int how)
 		tprev = t;
 	}
 	return 1;
-}
-
-/* Initialize tags on an mbuf. */
-void
-m_tag_init(struct mbuf *m)
-{
-	SLIST_INIT(&m->m_pkthdr.tags);
-}
-
-/* Get first tag in chain. */
-struct m_tag *
-m_tag_first(struct mbuf *m)
-{
-	return SLIST_FIRST(&m->m_pkthdr.tags);
-}
-
-/* Get next tag in chain. */
-struct m_tag *
-m_tag_next(struct mbuf *m, struct m_tag *t)
-{
-	return SLIST_NEXT(t, m_tag_link);
 }

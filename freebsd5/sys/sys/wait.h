@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)wait.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/wait.h,v 1.17 2002/06/05 02:21:01 mike Exp $
+ * $FreeBSD: src/sys/sys/wait.h,v 1.20 2004/04/09 13:14:32 bde Exp $
  */
 
 #ifndef _SYS_WAIT_H_
@@ -96,19 +92,22 @@
 #define	WAIT_MYPGRP	0	/* any process in my process group */
 #endif /* __BSD_VISIBLE */
 
-#ifndef _KERNEL
+#ifdef _KERNEL
+struct rusage;
+int	kern_wait(struct thread *td, pid_t pid, int *status, int options,
+	    struct rusage *rup);
+#else /* !_KERNEL */
 #include <sys/types.h>
 
 __BEGIN_DECLS
-struct rusage;	/* forward declaration */
-
 pid_t	wait(int *);
 pid_t	waitpid(pid_t, int *, int);
 #if __BSD_VISIBLE
+struct rusage;
 pid_t	wait3(int *, int, struct rusage *);
 pid_t	wait4(pid_t, int *, int, struct rusage *);
 #endif
 __END_DECLS
-#endif
+#endif /* _KERNEL */
 
 #endif /* !_SYS_WAIT_H_ */

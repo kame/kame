@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_message.h,v 1.21 2003/11/12 17:03:40 harti Exp $
+ * $FreeBSD: src/sys/netgraph/ng_message.h,v 1.23.2.1 2004/08/26 20:58:46 julian Exp $
  * $Whistle: ng_message.h,v 1.12 1999/01/25 01:17:44 archie Exp $
  */
 
@@ -67,11 +67,12 @@ struct ng_mesg {
 		u_char		version;		/*  == NGM_VERSION */
 		u_char		spare;			/* pad to 2 bytes */
 		u_int16_t	arglen;			/* length of data */
+		u_int32_t	cmd;			/* command identifier */
 		u_int32_t	flags;			/* message status */
+		u_int32_t	spare2;			/* pad to 8 bytes */
 		u_int32_t	token;			/* match with reply */
 		u_int32_t	typecookie;		/* node's type cookie */
-		u_int32_t	cmd;			/* command identifier */
-		u_char		cmdstr[NG_CMDSTRLEN+1];	/* cmd string + \0 */
+		u_char		cmdstr[NG_CMDSTRSIZ];	/* cmd string + \0 */
 	} header;
 	char	data[];			/* placeholder for actual data */
 };
@@ -84,10 +85,11 @@ struct ng_mesg {
 	  { "version",		&ng_parse_uint8_type	},	\
 	  { "spare",		&ng_parse_uint8_type	},	\
 	  { "arglen",		&ng_parse_uint16_type	},	\
+	  { "cmd",		&ng_parse_uint32_type	},	\
 	  { "flags",		&ng_parse_hint32_type	},	\
+	  { "spare2",		&ng_parse_uint32_type	},	\
 	  { "token",		&ng_parse_uint32_type	},	\
 	  { "typecookie",	&ng_parse_uint32_type	},	\
-	  { "cmd",		&ng_parse_uint32_type	},	\
 	  { "cmdstr",		&ng_parse_cmdbuf_type	},	\
 	  { "data",		(dtype)			},	\
 	  { NULL }						\
@@ -98,7 +100,7 @@ struct ng_mesg {
  * Interfaces within the kernel are defined by a different 
  * value (see NG_ABI_VERSION in netgraph.g)
  */
-#define NG_VERSION	6
+#define NG_VERSION	7
 
 /* Flags field flags */
 #define NGF_ORIG	0x00000000	/* the msg is the original request */
@@ -162,9 +164,9 @@ struct ng_mesg {
 #define NGM_SET_FLOW_MANAGER	48	/* send flow control here */ 
 /* Structure used for NGM_MKPEER */
 struct ngm_mkpeer {
-	char	type[NG_TYPELEN + 1];			/* peer type */
-	char	ourhook[NG_HOOKLEN + 1];		/* hook name */
-	char	peerhook[NG_HOOKLEN + 1];		/* peer hook name */
+	char	type[NG_TYPESIZ];		/* peer type */
+	char	ourhook[NG_HOOKSIZ];		/* hook name */
+	char	peerhook[NG_HOOKSIZ];		/* peer hook name */
 };
 
 /* Keep this in sync with the above structure definition */
@@ -177,9 +179,9 @@ struct ngm_mkpeer {
 
 /* Structure used for NGM_CONNECT */
 struct ngm_connect {
-	char	path[NG_PATHLEN + 1];			/* peer path */
-	char	ourhook[NG_HOOKLEN + 1];		/* hook name */
-	char	peerhook[NG_HOOKLEN + 1];		/* peer hook name */
+	char	path[NG_PATHSIZ];		/* peer path */
+	char	ourhook[NG_HOOKSIZ];		/* hook name */
+	char	peerhook[NG_HOOKSIZ];		/* peer hook name */
 };
 
 /* Keep this in sync with the above structure definition */
@@ -192,7 +194,7 @@ struct ngm_connect {
 
 /* Structure used for NGM_NAME */
 struct ngm_name {
-	char	name[NG_NODELEN + 1];			/* node name */
+	char	name[NG_NODESIZ];			/* node name */
 };
 
 /* Keep this in sync with the above structure definition */
@@ -203,7 +205,7 @@ struct ngm_name {
 
 /* Structure used for NGM_RMHOOK */
 struct ngm_rmhook {
-	char	ourhook[NG_HOOKLEN + 1];		/* hook name */
+	char	ourhook[NG_HOOKSIZ];		/* hook name */
 };
 
 /* Keep this in sync with the above structure definition */
@@ -214,8 +216,8 @@ struct ngm_rmhook {
 
 /* Structure used for NGM_NODEINFO */
 struct nodeinfo {
-	char		name[NG_NODELEN + 1];	/* node name (if any) */
-        char    	type[NG_TYPELEN + 1];   /* peer type */
+	char		name[NG_NODESIZ];	/* node name (if any) */
+        char    	type[NG_TYPESIZ];	/* peer type */
 	ng_ID_t		id;			/* unique identifier */
 	u_int32_t	hooks;			/* number of active hooks */
 };
@@ -231,8 +233,8 @@ struct nodeinfo {
 
 /* Structure used for NGM_LISTHOOKS */
 struct linkinfo {
-	char		ourhook[NG_HOOKLEN + 1];	/* hook name */
-	char		peerhook[NG_HOOKLEN + 1];	/* peer hook */
+	char		ourhook[NG_HOOKSIZ];	/* hook name */
+	char		peerhook[NG_HOOKSIZ];	/* peer hook */
 	struct nodeinfo	nodeinfo;
 };
 
@@ -271,8 +273,8 @@ struct namelist {
 
 /* Structure used for NGM_LISTTYPES */
 struct typeinfo {
-	char		type_name[NG_TYPELEN + 1];	/* name of type */
-	u_int32_t	numnodes;			/* number alive */
+	char		type_name[NG_TYPESIZ];	/* name of type */
+	u_int32_t	numnodes;		/* number alive */
 };
 
 /* Keep this in sync with the above structure definition */
@@ -371,10 +373,6 @@ struct flow_manager {
  */
 #define NG_MKMESSAGE(msg, cookie, cmdid, len, how)			\
 	do {								\
-	  KASSERT(!(how & M_DONTWAIT),					\
-	      ("NG_MKMESSAGE() with how=M_DONTWAIT (%d)\n", how));	\
-	  KASSERT(!(how & M_TRYWAIT),					\
-	      ("NG_MKMESSAGE() with how=M_TRYWAIT (%d)\n", how));	\
 	  MALLOC((msg), struct ng_mesg *, sizeof(struct ng_mesg)	\
 	    + (len), M_NETGRAPH_MSG, (how) | M_ZERO);			\
 	  if ((msg) == NULL)						\

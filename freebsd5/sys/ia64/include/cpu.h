@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/include/cpu.h,v 1.40 2003/09/19 07:48:22 marcel Exp $ */
+/* $FreeBSD: src/sys/ia64/include/cpu.h,v 1.44 2004/08/03 18:44:26 mux Exp $ */
 /* From: NetBSD: cpu.h,v 1.18 1997/09/23 23:17:49 mjacob Exp */
 
 /*
@@ -18,10 +18,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -90,6 +86,7 @@ struct clockframe {
 
 /* Used by signaling code. */
 #define	cpu_getstack(td)	((td)->td_frame->tf_special.sp)
+#define	cpu_spinwait()		/* nothing */
 
 void	cpu_halt(void);
 void	cpu_reset(void);

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/umass/Makefile,v 1.12 2002/01/11 15:49:00 ru Exp $ 
+# $FreeBSD: src/sys/modules/umass/Makefile,v 1.13 2004/06/27 12:33:18 imp Exp $ 
 
 MAINTAINER=	n_hibma@freebsd.org
 
@@ -7,6 +7,6 @@ MAINTAINER=	n_hibma@freebsd.org
 KMOD=	umass
 SRCS=	bus_if.h device_if.h \
 	opt_usb.h opt_cam.h opt_scsi.h \
-	umass.c
+	umass.c usbdevs.h
 
 .include <bsd.kmod.mk>

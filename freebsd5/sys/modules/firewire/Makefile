@@ -1,9 +1,9 @@
-# $FreeBSD: src/sys/modules/firewire/Makefile,v 1.3 2003/10/18 05:41:31 simokawa Exp $
+# $FreeBSD: src/sys/modules/firewire/Makefile,v 1.5 2004/07/12 13:13:17 dfr Exp $
 
-SUBDIR =
-SUBDIR += firewire
-SUBDIR += sbp
-SUBDIR += sbp_targ
-SUBDIR += fwe
+SUBDIR=	firewire \
+	fwe \
+	fwip \
+	sbp \
+	sbp_targ
 
 .include <bsd.subdir.mk>

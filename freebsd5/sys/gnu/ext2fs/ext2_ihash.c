@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_ihash.c	8.7 (Berkeley) 5/17/95
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_ihash.c,v 1.36 2002/10/14 03:20:34 mckusick Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_ihash.c,v 1.38 2004/06/16 09:47:06 phk Exp $
  */
 
 #include <sys/param.h>
@@ -84,7 +80,7 @@ ext2_ihashuninit()
  */
 struct vnode *
 ext2_ihashlookup(dev, inum)
-	dev_t dev;
+	struct cdev *dev;
 	ino_t inum;
 {
 	struct inode *ip;
@@ -106,7 +102,7 @@ ext2_ihashlookup(dev, inum)
  */
 int
 ext2_ihashget(dev, inum, flags, vpp)
-	dev_t dev;
+	struct cdev *dev;
 	ino_t inum;
 	int flags;
 	struct vnode **vpp;

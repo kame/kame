@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_bio.c,v 1.126 2003/11/22 02:21:48 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_bio.c,v 1.133.2.1 2004/10/09 17:11:22 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -218,8 +214,6 @@ nfs_getpages(struct vop_getpages_args *ap)
 		vm_page_t m;
 		nextoff = toff + PAGE_SIZE;
 		m = pages[i];
-
-		m->flags &= ~PG_ZERO;
 
 		if (nextoff <= size) {
 			/*
@@ -436,13 +430,15 @@ nfs_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 		error = VOP_GETATTR(vp, &vattr, cred, td);
 		if (error)
 			return (error);
-		if (np->n_mtime != vattr.va_mtime.tv_sec) {
+		if ((np->n_flag & NSIZECHANGED)
+		    || (np->n_mtime != vattr.va_mtime.tv_sec)) {
 			if (vp->v_type == VDIR)
 				(nmp->nm_rpcops->nr_invaldir)(vp);
 			error = nfs_vinvalbuf(vp, V_SAVE, cred, td, 1);
 			if (error)
 				return (error);
 			np->n_mtime = vattr.va_mtime.tv_sec;
+			np->n_flag &= ~NSIZECHANGED;
 		}
 	}
 	do {
@@ -461,8 +457,10 @@ nfs_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 			rabn = lbn + 1 + nra;
 			if (incore(vp, rabn) == NULL) {
 			    rabp = nfs_getcacheblk(vp, rabn, biosize, td);
-			    if (!rabp)
-				return (EINTR);
+			    if (!rabp) {
+				error = nfs_sigintr(nmp, NULL, td);
+				return (error ? error : EINTR);
+			    }
 			    if ((rabp->b_flags & (B_CACHE|B_DELWRI)) == 0) {
 				rabp->b_flags |= B_ASYNC;
 				rabp->b_iocmd = BIO_READ;
@@ -505,6 +503,8 @@ again:
 			case ENOLCK:
 				goto again;
 				/* not reached */
+			case EIO:
+				return (EIO);
 			case EINTR:
 			case ERESTART:
 				return(EINTR);
@@ -518,8 +518,10 @@ again:
 
 		if (bcount != biosize)
 			nfs_rsunlock(np, td);
-		if (!bp)
-			return (EINTR);
+		if (!bp) {
+			error = nfs_sigintr(nmp, NULL, td);
+			return (error ? error : EINTR);
+		}
 
 		/*
 		 * If B_CACHE is not set, we must issue the read.  If this
@@ -551,8 +553,10 @@ again:
 	    case VLNK:
 		nfsstats.biocache_readlinks++;
 		bp = nfs_getcacheblk(vp, (daddr_t)0, NFS_MAXPATHLEN, td);
-		if (!bp)
-			return (EINTR);
+		if (!bp) {
+			error = nfs_sigintr(nmp, NULL, td);
+			return (error ? error : EINTR);
+		}
 		if ((bp->b_flags & B_CACHE) == 0) {
 		    bp->b_iocmd = BIO_READ;
 		    vfs_busy_pages(bp, 0);
@@ -575,8 +579,10 @@ again:
 		lbn = (uoff_t)uio->uio_offset / NFS_DIRBLKSIZ;
 		on = uio->uio_offset & (NFS_DIRBLKSIZ - 1);
 		bp = nfs_getcacheblk(vp, lbn, NFS_DIRBLKSIZ, td);
-		if (!bp)
-		    return (EINTR);
+		if (!bp) {
+		    error = nfs_sigintr(nmp, NULL, td);
+		    return (error ? error : EINTR);
+		}
 		if ((bp->b_flags & B_CACHE) == 0) {
 		    bp->b_iocmd = BIO_READ;
 		    vfs_busy_pages(bp, 0);
@@ -585,7 +591,6 @@ again:
 			    brelse(bp);
 		    }
 		    while (error == NFSERR_BAD_COOKIE) {
-			printf("got bad cookie vp %p bp %p\n", vp, bp);
 			(nmp->nm_rpcops->nr_invaldir)(vp);
 			error = nfs_vinvalbuf(vp, 0, cred, td, 1);
 			/*
@@ -603,8 +608,10 @@ again:
 				&& (i * NFS_DIRBLKSIZ) >= np->n_direofoffset)
 				    return (0);
 			    bp = nfs_getcacheblk(vp, i, NFS_DIRBLKSIZ, td);
-			    if (!bp)
-				return (EINTR);
+			    if (!bp) {
+				error = nfs_sigintr(nmp, NULL, td);
+				return (error ? error : EINTR);
+			    }
 			    if ((bp->b_flags & B_CACHE) == 0) {
 				    bp->b_iocmd = BIO_READ;
 				    vfs_busy_pages(bp, 0);
@@ -795,6 +802,8 @@ restart:
 		case ENOLCK:
 			goto restart;
 			/* not reached */
+		case EIO:
+			return (EIO);
 		case EINTR:
 		case ERESTART:
 			return(EINTR);
@@ -809,14 +818,17 @@ restart:
 	 * Maybe this should be above the vnode op call, but so long as
 	 * file servers have no limits, i don't think it matters
 	 */
-	if (p && uio->uio_offset + uio->uio_resid >
-	      p->p_rlimit[RLIMIT_FSIZE].rlim_cur) {
+	if (p != NULL) {
 		PROC_LOCK(p);
-		psignal(p, SIGXFSZ);
+		if (uio->uio_offset + uio->uio_resid >
+		    lim_cur(p, RLIMIT_FSIZE)) {
+			psignal(p, SIGXFSZ);
+			PROC_UNLOCK(p);
+			if (haverslock)
+				nfs_rsunlock(np, td);
+			return (EFBIG);
+		}
 		PROC_UNLOCK(p);
-		if (haverslock)
-			nfs_rsunlock(np, td);
-		return (EFBIG);
 	}
 
 	biosize = vp->v_mount->mnt_stat.f_iosize;
@@ -880,7 +892,9 @@ again:
 		}
 
 		if (!bp) {
-			error = EINTR;
+			error = nfs_sigintr(nmp, NULL, td);
+			if (!error)
+				error = EINTR;
 			break;
 		}
 
@@ -919,7 +933,9 @@ again:
 			}
 		}
 		if (!bp) {
-			error = EINTR;
+			error = nfs_sigintr(nmp, NULL, td);
+			if (!error)
+				error = EINTR;
 			break;
 		}
 		if (bp->b_wcred == NOCRED)
@@ -964,7 +980,7 @@ again:
 
 		if (bp->b_dirtyend > 0 &&
 		    (on > bp->b_dirtyend || (on + n) < bp->b_dirtyoff)) {
-			if (BUF_WRITE(bp) == EINTR) {
+			if (bwrite(bp) == EINTR) {
 				error = EINTR;
 				break;
 			}
@@ -1011,7 +1027,7 @@ again:
 		if ((ioflag & IO_SYNC)) {
 			if (ioflag & IO_INVAL)
 				bp->b_flags |= B_NOCACHE;
-			error = BUF_WRITE(bp);
+			error = bwrite(bp);
 			if (error)
 				break;
 		} else if ((n + on) == biosize) {
@@ -1122,14 +1138,13 @@ nfs_vinvalbuf(struct vnode *vp, int flags, struct ucred *cred,
 	np->n_flag |= NFLUSHINPROG;
 	error = vinvalbuf(vp, flags, cred, td, slpflag, 0);
 	while (error) {
-		if (intrflg &&
-		    nfs_sigintr(nmp, NULL, td)) {
+		if (intrflg && (error = nfs_sigintr(nmp, NULL, td))) {
 			np->n_flag &= ~NFLUSHINPROG;
 			if (np->n_flag & NFLUSHWANT) {
 				np->n_flag &= ~NFLUSHWANT;
 				wakeup(&np->n_flag);
 			}
-			return (EINTR);
+			return (error);
 		}
 		error = vinvalbuf(vp, flags, cred, td, 0, slptimeo);
 	}
@@ -1157,7 +1172,7 @@ nfs_asyncio(struct buf *bp, struct ucred *cred, struct thread *td)
 	int gotiod;
 	int slpflag = 0;
 	int slptimeo = 0;
-	int error;
+	int error, error2;
 
 	nmp = VFSTONFS(bp->b_vp->v_mount);
 
@@ -1236,8 +1251,9 @@ again:
 			error = tsleep(&nmp->nm_bufq, slpflag | PRIBIO,
 				       "nfsaio", slptimeo);
 			if (error) {
-				if (nfs_sigintr(nmp, NULL, td))
-					return (EINTR);
+				error2 = nfs_sigintr(nmp, NULL, td);
+				if (error2)
+					return (error2);
 				if (slpflag == PCATCH) {
 					slpflag = 0;
 					slptimeo = 2 * hz;
@@ -1344,10 +1360,8 @@ nfs_doio(struct buf *bp, struct ucred *cr, struct thread *td)
 		/* ASSERT_VOP_LOCKED(vp, "nfs_doio"); */
 		if (p && (vp->v_vflag & VV_TEXT) &&
 			(np->n_mtime != np->n_vattr.va_mtime.tv_sec)) {
-			uprintf("Process killed due to text file modification\n");
 			PROC_LOCK(p);
-			psignal(p, SIGKILL);
-			_PHOLD(p);
+			killproc(p, "text file modification");
 			PROC_UNLOCK(p);
 		}
 		break;
@@ -1476,7 +1490,7 @@ nfs_doio(struct buf *bp, struct ucred *cr, struct thread *td)
 		 * bp in this case is not an NFS cache block so we should
 		 * be safe. XXX
 		 */
-    		if (error == EINTR
+    		if (error == EINTR || error == EIO
 		    || (!error && (bp->b_flags & B_NEEDCOMMIT))) {
 			int s;
 

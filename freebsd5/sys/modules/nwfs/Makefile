@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/nwfs/Makefile,v 1.12 2003/11/19 05:08:26 imp Exp $
+# $FreeBSD: src/sys/modules/nwfs/Makefile,v 1.13 2004/01/19 14:00:26 ru Exp $
 
 .PATH: ${.CURDIR}/../../fs/nwfs
 
@@ -14,14 +14,5 @@ CFLAGS+= -DVNPRINT
 
 opt_ncp.h:
 	echo "#define NCP	1"  > ${.TARGET}
-
-load: nwfs.ko
-	kldload ./nwfs.ko
-
-unload:
-	@(if kldunload nwfs; then true; else true; fi)
-
-deinstall:
-	rm -f /modules/nwfs.ko
 
 .include <bsd.kmod.mk>

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,12 +32,13 @@
  * SUCH DAMAGE.
  *
  *	@(#)ioctl_compat.h	8.4 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/ioctl_compat.h,v 1.5 1999/08/28 00:51:48 peter Exp $
+ * $FreeBSD: src/sys/sys/ioctl_compat.h,v 1.7 2004/06/21 22:57:16 phk Exp $
  */
 
 #ifndef _SYS_IOCTL_COMPAT_H_
 #define	_SYS_IOCTL_COMPAT_H_
 
+#ifndef BURN_BRIDGES
 #include <sys/ttychars.h>
 #include <sys/ttydev.h>
 
@@ -165,4 +162,5 @@ struct sgttyb {
 #define	NETLDISC	1
 #define	NTTYDISC	2
 
+#endif /* BURN_BRIDGES */
 #endif /* !_SYS_IOCTL_COMPAT_H_ */

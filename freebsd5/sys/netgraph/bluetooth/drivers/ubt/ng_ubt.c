@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_ubt.c,v 1.16 2003/10/10 19:15:06 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/ubt/ng_ubt.c,v 1.9 2003/10/12 22:04:20 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/ubt/ng_ubt.c,v 1.19 2004/06/27 16:51:01 imp Exp $
  */
 
 #include <sys/param.h>
@@ -39,6 +39,7 @@
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/poll.h>
 #include <sys/uio.h>
 #include <machine/bus.h>
@@ -47,15 +48,16 @@
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/usbdivar.h>
-#include <dev/usb/usbdevs.h>
 
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_parse.h>
-#include <ng_bluetooth.h>
-#include <ng_hci.h>
-#include "ng_ubt.h"
-#include "ng_ubt_var.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/include/ng_ubt.h>
+#include <netgraph/bluetooth/drivers/ubt/ng_ubt_var.h>
+
+#include "usbdevs.h"
 
 /*
  * USB methods
@@ -193,18 +195,16 @@ Static const struct ng_cmdlist	ng_ubt_cmdlist[] = {
 
 /* Netgraph node type */
 Static struct ng_type	typestruct = {
-	NG_ABI_VERSION,
-	NG_UBT_NODE_TYPE,	/* typename */
-	NULL,			/* modevent */
-	ng_ubt_constructor,	/* constructor */
-	ng_ubt_rcvmsg,		/* control message */
-	ng_ubt_shutdown,	/* destructor */
-	ng_ubt_newhook,		/* new hook */
-	NULL,			/* find hook */
-	ng_ubt_connect,		/* connect hook */
-	ng_ubt_rcvdata,		/* data */
-	ng_ubt_disconnect,	/* disconnect hook */
-	ng_ubt_cmdlist,		/* node command list */
+	.version =	NG_ABI_VERSION,
+	.name =		NG_UBT_NODE_TYPE,
+	.constructor =	ng_ubt_constructor,
+	.rcvmsg =	ng_ubt_rcvmsg,
+	.shutdown =	ng_ubt_shutdown,
+	.newhook =	ng_ubt_newhook,
+	.connect =	ng_ubt_connect,
+	.rcvdata =	ng_ubt_rcvdata,
+	.disconnect =	ng_ubt_disconnect,
+	.cmdlist =	ng_ubt_cmdlist	
 };
 
 /*
@@ -225,13 +225,9 @@ Static d_poll_t		ubt_poll;
 Static void		ubt_create_device_nodes  (ubt_softc_p);
 Static void		ubt_destroy_device_nodes (ubt_softc_p);
 
-#if __FreeBSD_version < 500104
-#define CDEV_MAJOR	222
-#else
-#define CDEV_MAJOR	MAJOR_AUTO
-#endif
-
 Static struct cdevsw	ubt_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	ubt_open,
 	.d_close =	ubt_close,
 	.d_read =	ubt_read,
@@ -239,7 +235,6 @@ Static struct cdevsw	ubt_cdevsw = {
 	.d_ioctl =	ubt_ioctl,
 	.d_poll =	ubt_poll,
 	.d_name =	"ubt",
-	.d_maj =	CDEV_MAJOR,
 };
 
 /*
@@ -414,7 +409,7 @@ USB_ATTACH(ubt)
 	sc->sc_hook = NULL;
 
 	/* Device part */
-	sc->sc_ctrl_dev = sc->sc_intr_dev = sc->sc_bulk_dev = NODEV;
+	sc->sc_ctrl_dev = sc->sc_intr_dev = sc->sc_bulk_dev = NULL;
 	sc->sc_refcnt = sc->sc_dying = 0;
 
 	/*
@@ -924,7 +919,7 @@ ubt_request_start(ubt_softc_p sc)
 
 	if (m->m_pkthdr.len > UBT_CTRL_BUFFER_SIZE)
 		panic(
-"%s: %s - HCI command frame too big, size=%d, len=%d\n",
+"%s: %s - HCI command frame too big, size=%zd, len=%d\n",
 			__func__, USBDEVNAME(sc->sc_dev), UBT_CTRL_BUFFER_SIZE,
 			m->m_pkthdr.len);
 
@@ -1909,8 +1904,8 @@ ng_ubt_newhook(node_p node, hook_p hook, char const *name)
 	ubt_softc_p	sc = (ubt_softc_p) NG_NODE_PRIVATE(node);
 
 	/* Refuse to create new hook if device interface is active */
-	if (sc->sc_ctrl_dev != NODEV || sc->sc_intr_dev != NODEV ||
-	    sc->sc_bulk_dev != NODEV)
+	if (sc->sc_ctrl_dev != NULL || sc->sc_intr_dev != NULL ||
+	    sc->sc_bulk_dev != NULL)
 		return (EBUSY);
 
 	if (strcmp(name, NG_UBT_HOOK) != 0)
@@ -1935,8 +1930,8 @@ ng_ubt_connect(hook_p hook)
 	usbd_status	status;
 
 	/* Refuse to connect hook if device interface is active */
-	if (sc->sc_ctrl_dev != NODEV || sc->sc_intr_dev != NODEV ||
-	    sc->sc_bulk_dev != NODEV)
+	if (sc->sc_ctrl_dev != NULL || sc->sc_intr_dev != NULL ||
+	    sc->sc_bulk_dev != NULL)
 		return (EBUSY);
 
 	NG_HOOK_FORCE_QUEUE(NG_HOOK_PEER(hook));
@@ -2297,7 +2292,7 @@ done:
  */
 
 Static int
-ubt_open(dev_t dev, int flag, int mode, usb_proc_ptr p)
+ubt_open(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	ubt_softc_p	sc = NULL;
 	int		ep = UBT_ENDPOINT(dev);
@@ -2337,7 +2332,7 @@ ubt_open(dev_t dev, int flag, int mode, usb_proc_ptr p)
  */
 
 Static int
-ubt_close(dev_t dev, int flag, int mode, usb_proc_ptr p)
+ubt_close(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	ubt_softc_p	sc = NULL;
 	int		ep = UBT_ENDPOINT(dev);
@@ -2374,7 +2369,7 @@ ubt_close(dev_t dev, int flag, int mode, usb_proc_ptr p)
  */
 
 Static int
-ubt_read(dev_t dev, struct uio *uio, int flag)
+ubt_read(struct cdev *dev, struct uio *uio, int flag)
 {
 	ubt_softc_p		sc = NULL;
 	int			error = 0, n, tn, ep = UBT_ENDPOINT(dev);
@@ -2442,7 +2437,7 @@ ubt_read(dev_t dev, struct uio *uio, int flag)
  */
 
 Static int
-ubt_write(dev_t dev, struct uio *uio, int flag)
+ubt_write(struct cdev *dev, struct uio *uio, int flag)
 {
 	ubt_softc_p	sc = NULL;
 	int		error = 0, n, ep = UBT_ENDPOINT(dev);
@@ -2501,7 +2496,7 @@ ubt_write(dev_t dev, struct uio *uio, int flag)
  */
 
 Static int
-ubt_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
+ubt_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 {
 	ubt_softc_p		 sc = NULL;
 	int			 len, error = 0, ep = UBT_ENDPOINT(dev);
@@ -2530,7 +2525,7 @@ ubt_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 	case USB_GET_STRING_DESC:
 		si = (struct usb_string_desc *) data;
 		status = usbd_get_string_desc(sc->sc_udev, si->usd_string_index,
-				si->usd_language_id, &si->usd_desc);
+				si->usd_language_id, &si->usd_desc, &len);
 		if (status != USBD_NORMAL_COMPLETION)
 			error = EINVAL;
 		break;
@@ -2619,7 +2614,7 @@ ret:
  */
 
 Static int
-ubt_poll(dev_t dev, int events, usb_proc_ptr p)
+ubt_poll(struct cdev *dev, int events, usb_proc_ptr p)
 {
 	ubt_softc_p	sc = NULL;
 	int		revents = 0, ep = UBT_ENDPOINT(dev);
@@ -2664,14 +2659,14 @@ ubt_create_device_nodes(ubt_softc_p sc)
 "%s: %s - hook != NULL!\n", __func__, USBDEVNAME(sc->sc_dev)));
 
 	/* Control device */
-	if (sc->sc_ctrl_dev == NODEV)
+	if (sc->sc_ctrl_dev == NULL)
 		sc->sc_ctrl_dev = make_dev(&ubt_cdevsw,
 					UBT_MINOR(USBDEVUNIT(sc->sc_dev), 0),
 					UID_ROOT, GID_OPERATOR, 0644,
 					"%s", USBDEVNAME(sc->sc_dev));
 
 	/* Interrupt device */
-	if (sc->sc_intr_dev == NODEV && sc->sc_intr_ep != -1) {
+	if (sc->sc_intr_dev == NULL && sc->sc_intr_ep != -1) {
 		ep = UE_GET_ADDR(sc->sc_intr_ep);
 		sc->sc_intr_dev = make_dev(&ubt_cdevsw,
 					UBT_MINOR(USBDEVUNIT(sc->sc_dev), ep),
@@ -2685,7 +2680,7 @@ ubt_create_device_nodes(ubt_softc_p sc)
 	 * XXX note that address of the in and out endpoint should be the same
 	 */
 
-	if (sc->sc_bulk_dev == NODEV && 
+	if (sc->sc_bulk_dev == NULL && 
 	    sc->sc_bulk_in_ep != -1 && sc->sc_bulk_out_ep != -1 &&
 	    UE_GET_ADDR(sc->sc_bulk_in_ep) == UE_GET_ADDR(sc->sc_bulk_out_ep)) {
 		ep = UE_GET_ADDR(sc->sc_bulk_in_ep);
@@ -2718,19 +2713,19 @@ ubt_destroy_device_nodes(ubt_softc_p sc)
 	sc->sc_refcnt = 0;
 
 	/* Destroy device nodes */
-	if (sc->sc_bulk_dev != NODEV) {
+	if (sc->sc_bulk_dev != NULL) {
 		destroy_dev(sc->sc_bulk_dev);
-		sc->sc_bulk_dev = NODEV;
+		sc->sc_bulk_dev = NULL;
 	}
 
-	if (sc->sc_intr_dev != NODEV) {
+	if (sc->sc_intr_dev != NULL) {
 		destroy_dev(sc->sc_intr_dev);
-		sc->sc_intr_dev = NODEV;
+		sc->sc_intr_dev = NULL;
 	}
 
-	if (sc->sc_ctrl_dev != NODEV) {
+	if (sc->sc_ctrl_dev != NULL) {
 		destroy_dev(sc->sc_ctrl_dev);
-		sc->sc_ctrl_dev = NODEV;
+		sc->sc_ctrl_dev = NULL;
 	}
 } /* ubt_destroy_device_nodes */
 

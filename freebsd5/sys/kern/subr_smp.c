@@ -33,13 +33,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_smp.c,v 1.180 2003/12/03 14:55:31 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_smp.c,v 1.188.2.2 2004/09/09 09:56:58 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/proc.h>
+#include <sys/bus.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/pcpu.h>
@@ -48,20 +49,32 @@ __FBSDID("$FreeBSD: src/sys/kern/subr_smp.c,v 1.180 2003/12/03 14:55:31 jhb Exp 
 
 #include <machine/smp.h>
 
+#include "opt_sched.h"
+
 #ifdef SMP
-volatile u_int stopped_cpus;
-volatile u_int started_cpus;
+volatile cpumask_t stopped_cpus;
+volatile cpumask_t started_cpus;
+cpumask_t idle_cpus_mask;
+cpumask_t hlt_cpus_mask;
+cpumask_t logical_cpus_mask;
 
 void (*cpustop_restartfunc)(void);
 #endif
+/* This is used in modules that need to work in both SMP and UP. */
+cpumask_t all_cpus;
 
 int mp_ncpus;
+/* export this for libkvm consumers. */
+int mp_maxcpus = MAXCPU;
 
+struct cpu_top *smp_topology;
 volatile int smp_started;
-u_int all_cpus;
 u_int mp_maxid;
 
 SYSCTL_NODE(_kern, OID_AUTO, smp, CTLFLAG_RD, NULL, "Kernel SMP");
+
+SYSCTL_INT(_kern_smp, OID_AUTO, maxcpus, CTLFLAG_RD, &mp_maxcpus, 0,
+    "Max number of CPUs that the system was compiled for.");
 
 int smp_active = 0;	/* are the APs allowed to run? */
 SYSCTL_INT(_kern_smp, OID_AUTO, active, CTLFLAG_RW, &smp_active, 0,
@@ -95,7 +108,14 @@ static void (*smp_rv_action_func)(void *arg);
 static void (*smp_rv_teardown_func)(void *arg);
 static void *smp_rv_func_arg;
 static volatile int smp_rv_waiters[2];
-static struct mtx smp_rv_mtx;
+
+/* 
+ * Shared mutex to restrict busywaits between smp_rendezvous() and
+ * smp(_targeted)_tlb_shootdown().  A deadlock occurs if both of these
+ * functions trigger at once and cause multiple CPUs to busywait with
+ * interrupts disabled. 
+ */
+struct mtx smp_rv_mtx;
 
 /*
  * Let the MD SMP code initialize mp_maxid very early if it can.
@@ -165,7 +185,7 @@ forward_roundrobin(void)
 {
 	struct pcpu *pc;
 	struct thread *td;
-	u_int id, map;
+	cpumask_t id, map, me;
 
 	mtx_assert(&sched_lock, MA_OWNED);
 
@@ -176,10 +196,11 @@ forward_roundrobin(void)
 	if (!forward_roundrobin_enabled)
 		return;
 	map = 0;
+	me = PCPU_GET(cpumask);
 	SLIST_FOREACH(pc, &cpuhead, pc_allcpu) {
 		td = pc->pc_curthread;
 		id = pc->pc_cpumask;
-		if (id != PCPU_GET(cpumask) && (id & stopped_cpus) == 0 &&
+		if (id != me && (id & stopped_cpus) == 0 &&
 		    td != pc->pc_idlethread) {
 			td->td_flags |= TDF_NEEDRESCHED;
 			map |= id;
@@ -206,7 +227,7 @@ forward_roundrobin(void)
  *            from executing at same time.
  */
 int
-stop_cpus(u_int map)
+stop_cpus(cpumask_t map)
 {
 	int i;
 
@@ -217,7 +238,7 @@ stop_cpus(u_int map)
 
 	/* send the stop IPI to all CPUs in map */
 	ipi_selected(map, IPI_STOP);
-	
+
 	i = 0;
 	while ((atomic_load_acq_int(&stopped_cpus) & map) != map) {
 		/* spin */
@@ -248,7 +269,7 @@ stop_cpus(u_int map)
  *   1: ok
  */
 int
-restart_cpus(u_int map)
+restart_cpus(cpumask_t map)
 {
 
 	if (!smp_started)

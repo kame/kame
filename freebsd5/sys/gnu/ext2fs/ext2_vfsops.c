@@ -16,10 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.8 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.114 2003/11/05 11:56:58 bde Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.126 2004/07/30 22:08:51 phk Exp $
  */
 
 #include <sys/param.h>
@@ -77,7 +73,7 @@ static vfs_fhtovp_t		ext2_fhtovp;
 static vfs_vptofh_t		ext2_vptofh;
 static vfs_init_t		ext2_init;
 static vfs_uninit_t		ext2_uninit;
-static vfs_nmount_t		ext2_mount;
+static vfs_mount_t		ext2_mount;
 
 MALLOC_DEFINE(M_EXT2NODE, "EXT2 node", "EXT2 vnode private part");
 static MALLOC_DEFINE(M_EXT2MNT, "EXT2 mount", "EXT2 mount structure");
@@ -85,7 +81,7 @@ static MALLOC_DEFINE(M_EXT2MNT, "EXT2 mount", "EXT2 mount structure");
 static struct vfsops ext2fs_vfsops = {
 	.vfs_fhtovp =		ext2_fhtovp,
 	.vfs_init =		ext2_init,
-	.vfs_nmount =		ext2_mount,
+	.vfs_mount =		ext2_mount,
 	.vfs_root =		ext2_root,	/* root inode via vget */
 	.vfs_statfs =		ext2_statfs,
 	.vfs_sync =		ext2_sync,
@@ -101,7 +97,7 @@ VFS_SET(ext2fs_vfsops, ext2fs, 0);
 
 static int ext2fs_inode_hash_lock;
 
-static int	ext2_check_sb_compat(struct ext2_super_block *es, dev_t dev,
+static int	ext2_check_sb_compat(struct ext2_super_block *es, struct cdev *dev,
 		    int ronly);
 static int	compute_sb_data(struct vnode * devvp,
 		    struct ext2_super_block * es, struct ext2_sb_info * fs);
@@ -121,6 +117,7 @@ ext2_mountroot()
 {
 	struct ext2_sb_info *fs;
 	struct mount *mp;
+	struct vnode *rootvp;
 	struct thread *td = curthread;
 	struct ext2mount *ump;
 	u_int size;
@@ -133,7 +130,6 @@ ext2_mountroot()
 	mp = bsd_malloc((u_long)sizeof(struct mount), M_MOUNT, M_WAITOK);
 	bzero((char *)mp, (u_long)sizeof(struct mount));
 	TAILQ_INIT(&mp->mnt_nvnodelist);
-	TAILQ_INIT(&mp->mnt_reservedvnlist);
 	mp->mnt_op = &ext2fs_vfsops;
 	mp->mnt_flag = MNT_RDONLY;
 	if (error = ext2_mountfs(rootvp, mp, td)) {
@@ -170,9 +166,8 @@ ext2_mountroot()
  * mount system call
  */
 static int
-ext2_mount(mp, ndp, td)
+ext2_mount(mp, td)
 	struct mount *mp;
-	struct nameidata *ndp;
 	struct thread *td;
 {
 	struct export_args *export;
@@ -184,6 +179,7 @@ ext2_mount(mp, ndp, td)
 	size_t size;
 	int error, flags, len;
 	mode_t accessmode;
+	struct nameidata nd, *ndp = &nd;
 
 	opts = mp->mnt_optnew;
 
@@ -220,7 +216,7 @@ ext2_mount(mp, ndp, td)
 			fs->s_rd_only = 1;
 		}
 		if (!error && (mp->mnt_flag & MNT_RELOAD))
-			error = ext2_reload(mp, ndp->ni_cnd.cn_cred, td);
+			error = ext2_reload(mp, td->td_ucred, td);
 		if (error)
 			return (error);
 		devvp = ump->um_devvp;
@@ -270,7 +266,7 @@ ext2_mount(mp, ndp, td)
 	}
 	/*
 	 * Not an update, or updating the name: look up the name
-	 * and verify that it refers to a sensible block device.
+	 * and verify that it refers to a sensible disk device.
 	 */
 	if (fspec == NULL)
 		return (EINVAL);
@@ -383,7 +379,7 @@ static int ext2_check_descriptors (struct ext2_sb_info * sb)
 static int
 ext2_check_sb_compat(es, dev, ronly)
 	struct ext2_super_block *es;
-	dev_t dev;
+	struct cdev *dev;
 	int ronly;
 {
 
@@ -506,6 +502,11 @@ static int compute_sb_data(devvp, es, fs)
     }
     fs->s_loaded_inode_bitmaps = 0;
     fs->s_loaded_block_bitmaps = 0;
+    if (es->s_rev_level == EXT2_GOOD_OLD_REV || (es->s_feature_ro_compat &
+        EXT2_FEATURE_RO_COMPAT_LARGE_FILE) == 0)
+	fs->fs_maxfilesize = 0x7fffffff;
+    else
+	fs->fs_maxfilesize = 0x7fffffffffffffff;
     return 0;
 }
 
@@ -541,8 +542,11 @@ ext2_reload(mp, cred, td)
 	 * Step 1: invalidate all cached meta-data.
 	 */
 	devvp = VFSTOEXT2(mp)->um_devvp;
-	if (vinvalbuf(devvp, 0, cred, td, 0, 0))
+	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
+	if (vinvalbuf(devvp, 0, cred, td, 0, 0) != 0)
 		panic("ext2_reload: dirty1");
+	VOP_UNLOCK(devvp, 0, td);
+
 	/*
 	 * Step 2: re-read superblock from disk.
 	 * constants have been adjusted for ext2
@@ -569,12 +573,7 @@ ext2_reload(mp, cred, td)
 
 loop:
 	MNT_ILOCK(mp);
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
-		if (vp->v_mount != mp) {
-			MNT_IUNLOCK(mp);
-			goto loop;
-		}
-		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
+	MNT_VNODE_FOREACH(vp, mp, nvp) {
 		VI_LOCK(vp);
 		if (vp->v_iflag & VI_XLOCK) {
 			VI_UNLOCK(vp);
@@ -632,7 +631,7 @@ ext2_mountfs(devvp, mp, td)
 	struct buf *bp;
 	struct ext2_sb_info *fs;
 	struct ext2_super_block * es;
-	dev_t dev = devvp->v_rdev;
+	struct cdev *dev = devvp->v_rdev;
 	int error;
 	int ronly;
 
@@ -644,18 +643,27 @@ ext2_mountfs(devvp, mp, td)
 	 */
 	if ((error = vfs_mountedon(devvp)) != 0)
 		return (error);
-	if (vcount(devvp) > 1 && devvp != rootvp)
+	if (vcount(devvp) > 1)
 		return (EBUSY);
-	if ((error = vinvalbuf(devvp, V_SAVE, td->td_ucred, td, 0, 0)) != 0)
+	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
+	error = vinvalbuf(devvp, V_SAVE, td->td_ucred, td, 0, 0);
+	if (error) {
+		VOP_UNLOCK(devvp, 0, td);
 		return (error);
-#ifdef READONLY
-/* turn on this to force it to be read-only */
-	mp->mnt_flag |= MNT_RDONLY;
-#endif
+	}
 
 	ronly = (mp->mnt_flag & MNT_RDONLY) != 0;
-	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
-	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, td, -1);
+	/*
+	 * XXX: open the device with read and write access even if only
+	 * read access is needed now.  Write access is needed if the
+	 * filesystem is ever mounted read/write, and we don't change the
+	 * access mode for remounts.
+	 */
+#ifdef notyet
+	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD | FWRITE, FSCRED, td, -1);
+#else
+	error = VOP_OPEN(devvp, FREAD | FWRITE, FSCRED, td, -1);
+#endif
 	VOP_UNLOCK(devvp, 0, td);
 	if (error)
 		return (error);
@@ -735,7 +743,12 @@ ext2_mountfs(devvp, mp, td)
 out:
 	if (bp)
 		brelse(bp);
-	(void)VOP_CLOSE(devvp, ronly ? FREAD : FREAD|FWRITE, NOCRED, td);
+	/* XXX: see comment above VOP_OPEN. */
+#ifdef notyet
+	(void)VOP_CLOSE(devvp, ronly ? FREAD : FREAD | FWRITE, NOCRED, td);
+#else
+	(void)VOP_CLOSE(devvp, FREAD | FWRITE, NOCRED, td);
+#endif
 	if (ump) {
 		bsd_free(ump->um_e2fs->s_es, M_EXT2MNT);
 		bsd_free(ump->um_e2fs, M_EXT2MNT);
@@ -790,8 +803,13 @@ ext2_unmount(mp, mntflags, td)
 			ULCK_BUF(fs->s_block_bitmap[i])
 
 	ump->um_devvp->v_rdev->si_mountpoint = NULL;
-	error = VOP_CLOSE(ump->um_devvp, ronly ? FREAD : FREAD|FWRITE,
-		NOCRED, td);
+	/* XXX: see comment above VOP_OPEN. */
+#ifdef notyet
+	error = VOP_CLOSE(ump->um_devvp, ronly ? FREAD : FREAD | FWRITE,
+	    NOCRED, td);
+#else
+	error = VOP_CLOSE(ump->um_devvp, FREAD | FWRITE, NOCRED, td);
+#endif
 	vrele(ump->um_devvp);
 	bsd_free(fs->s_es, M_EXT2MNT);
 	bsd_free(fs, M_EXT2MNT);
@@ -812,7 +830,7 @@ ext2_flushfiles(mp, flags, td)
 {
 	int error;
 
-	error = vflush(mp, 0, flags);
+	error = vflush(mp, 0, flags, td);
 	return (error);
 }
 
@@ -902,14 +920,7 @@ ext2_sync(mp, waitfor, cred, td)
 	 */
 	MNT_ILOCK(mp);
 loop:
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
-		/*
-		 * If the vnode that we are about to sync is no longer
-		 * associated with this mount point, start over.
-		 */
-		if (vp->v_mount != mp)
-			goto loop;
-		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
+	MNT_VNODE_FOREACH(vp, mp, nvp) {
 		VI_LOCK(vp);
 		if (vp->v_iflag & VI_XLOCK) {
 			VI_UNLOCK(vp);
@@ -978,7 +989,7 @@ ext2_vget(mp, ino, flags, vpp)
 	struct ext2mount *ump;
 	struct buf *bp;
 	struct vnode *vp;
-	dev_t dev;
+	struct cdev *dev;
 	int i, error;
 	int used_blocks;
 
@@ -1205,9 +1216,10 @@ printf("\nupdating superblock, waitfor=%s\n", waitfor == MNT_WAIT ? "yes":"no");
  * Return the root of a filesystem.
  */
 static int
-ext2_root(mp, vpp)
+ext2_root(mp, vpp, td)
 	struct mount *mp;
 	struct vnode **vpp;
+	struct thread *td;
 {
 	struct vnode *nvp;
 	int error;

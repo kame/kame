@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -32,22 +28,21 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/libkern/ffs.c,v 1.7 2003/06/11 05:23:04 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/libkern/ffs.c,v 1.11 2004/04/07 20:46:10 imp Exp $");
 
 #include <sys/libkern.h>
 
 /*
- * ffs -- vax ffs instruction
+ * Find First Set bit
  */
 int
-ffs(mask)
-	register int mask;
+ffs(int mask)
 {
-	register int bit;
+	int bit;
 
 	if (mask == 0)
-		return(0);
+		return (0);
 	for (bit = 1; !(mask & 1); bit++)
-		mask >>= 1;
-	return(bit);
+		mask = (unsigned int)mask >> 1;
+	return (bit);
 }

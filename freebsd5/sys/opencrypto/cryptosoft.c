@@ -22,7 +22,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/cryptosoft.c,v 1.4 2003/06/27 20:07:09 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/cryptosoft.c,v 1.7 2004/02/02 17:06:34 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,13 +88,6 @@ static	int swcr_newsession(void *, u_int32_t *, struct cryptoini *);
 static	int swcr_freesession(void *, u_int64_t);
 
 /*
- * NB: These came over from openbsd and are kept private
- *     to the crypto code for now.
- */
-extern	int m_apply(struct mbuf *m, int off, int len,
-		    int (*f)(caddr_t, caddr_t, unsigned int), caddr_t fstate);
-
-/*
  * Apply a symmetric encryption/decryption algorithm.
  */
 static int
@@ -155,6 +148,16 @@ swcr_encdec(struct cryptodesc *crd, struct swcr_data *sw, caddr_t buf,
 		}
 	}
 
+	if (crd->crd_flags & CRD_F_KEY_EXPLICIT) {
+		int error; 
+
+		if (sw->sw_kschedule)
+			exf->zerokey(&(sw->sw_kschedule));
+		error = exf->setkey(&sw->sw_kschedule,
+				crd->crd_key, crd->crd_klen / 8);
+		if (error)
+			return (error);
+	}
 	ivp = iv;
 
 	if (outtype == CRYPTO_BUF_CONTIG) {
@@ -460,7 +463,7 @@ swcr_authcompute(struct cryptop *crp, struct cryptodesc *crd,
 		break;
 	case CRYPTO_BUF_MBUF:
 		err = m_apply((struct mbuf *) buf, crd->crd_skip, crd->crd_len,
-		    (int (*)(caddr_t, caddr_t, unsigned int)) axf->Update,
+		    (int (*)(void *, void *, unsigned int)) axf->Update,
 		    (caddr_t) &ctx);
 		if (err)
 			return err;

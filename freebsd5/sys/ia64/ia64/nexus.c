@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/nexus.c,v 1.6 2003/09/10 22:49:38 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/nexus.c,v 1.7.2.1 2004/08/31 05:26:37 njl Exp $
  */
 
 /*
@@ -39,6 +39,8 @@
  * ISA code but it's easier to do it here for now), I/O port addresses,
  * and I/O memory address space.
  */
+
+#define __RMAN_RESOURCE_VISIBLE
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -95,6 +97,7 @@ static	int nexus_setup_intr(device_t, device_t, struct resource *, int flags,
 			     void (*)(void *), void *, void **);
 static	int nexus_teardown_intr(device_t, device_t, struct resource *,
 				void *);
+static struct resource_list *nexus_get_reslist(device_t dev, device_t child);
 static	int nexus_set_resource(device_t, device_t, int, int, u_long, u_long);
 static	int nexus_get_resource(device_t, device_t, int, int, u_long *,
 			       u_long *);
@@ -122,6 +125,7 @@ static device_method_t nexus_methods[] = {
 	DEVMETHOD(bus_deactivate_resource, nexus_deactivate_resource),
 	DEVMETHOD(bus_setup_intr,	nexus_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	nexus_teardown_intr),
+	DEVMETHOD(bus_get_resource_list, nexus_get_reslist),
 	DEVMETHOD(bus_set_resource,	nexus_set_resource),
 	DEVMETHOD(bus_get_resource,	nexus_get_resource),
 	DEVMETHOD(bus_delete_resource,	nexus_delete_resource),
@@ -498,6 +502,14 @@ nexus_teardown_intr(device_t dev, device_t child, struct resource *r, void *ih)
 #else
 	return 0;
 #endif
+}
+
+static struct resource_list *
+nexus_get_reslist(device_t dev, device_t child)
+{
+	struct nexus_device *ndev = DEVTONX(child);
+
+	return (&ndev->nx_resources);
 }
 
 static int

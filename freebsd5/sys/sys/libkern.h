@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)libkern.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/sys/libkern.h,v 1.39 2003/02/25 22:11:39 rwatson Exp $
+ * $FreeBSD: src/sys/sys/libkern.h,v 1.46 2004/07/15 23:58:23 glebius Exp $
  */
 
 #ifndef _SYS_LIBKERN_H_
@@ -74,16 +70,24 @@ void	 arc4rand(void *ptr, u_int len, int reseed);
 int	 bcmp(const void *, const void *, size_t);
 void	*bsearch(const void *, const void *, size_t,
 	    size_t, int (*)(const void *, const void *));
-#ifndef HAVE_INLINE_FFS
+#ifndef	HAVE_INLINE_FFS
 int	 ffs(int);
+#endif
+#ifndef	HAVE_INLINE_FFSL
+int	 ffsl(long);
 #endif
 #ifndef	HAVE_INLINE_FLS
 int	 fls(int);
+#endif
+#ifndef	HAVE_INLINE_FLSL
+int	 flsl(long);
 #endif
 int	 fnmatch(const char *, const char *, int);
 int	 locc(int, char *, u_int);
 void	 qsort(void *base, size_t nmemb, size_t size,
 	    int (*compar)(const void *, const void *));
+void	 qsort_r(void *base, size_t nmemb, size_t size, void *thunk,
+	    int (*compar)(void *, const void *, const void *));
 u_long	 random(void);
 char	*index(const char *, int);
 char	*rindex(const char *, int);

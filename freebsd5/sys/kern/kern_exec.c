@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_exec.c,v 1.232 2003/11/12 03:14:29 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_exec.c,v 1.249.2.2 2004/10/09 04:33:02 julian Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_exec.c,v 1.232 2003/11/12 03:14:29 rwatson
 #include <sys/proc.h>
 #include <sys/pioctl.h>
 #include <sys/namei.h>
+#include <sys/sf_buf.h>
 #include <sys/sysent.h>
 #include <sys/shm.h>
 #include <sys/sysctl.h>
@@ -79,6 +80,8 @@ static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int kern_execve(struct thread *td, char *fname, char **argv,
 	char **envv, struct mac *mac_p);
+static int do_execve(struct thread *td, char *fname, char **argv,
+	char **envv, struct mac *mac_p);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD,
@@ -95,27 +98,42 @@ u_long ps_arg_cache_limit = PAGE_SIZE / 16;
 SYSCTL_ULONG(_kern, OID_AUTO, ps_arg_cache_limit, CTLFLAG_RW, 
     &ps_arg_cache_limit, 0, "");
 
-int ps_argsopen = 1;
-SYSCTL_INT(_kern, OID_AUTO, ps_argsopen, CTLFLAG_RW, &ps_argsopen, 0, "");
-
 static int
 sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
 {
 	struct proc *p;
+	int error;
 
 	p = curproc;
-	return (SYSCTL_OUT(req, &p->p_sysent->sv_psstrings,
-	   sizeof(p->p_sysent->sv_psstrings)));
+#if defined(__amd64__) || defined(__ia64__)
+	if (req->oldlen == sizeof(unsigned int)) {
+		unsigned int val;
+		val = (unsigned int)p->p_sysent->sv_psstrings;
+		error = SYSCTL_OUT(req, &val, sizeof(val));
+	} else
+#endif
+		error = SYSCTL_OUT(req, &p->p_sysent->sv_psstrings,
+		   sizeof(p->p_sysent->sv_psstrings));
+	return error;
 }
 
 static int
 sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS)
 {
 	struct proc *p;
+	int error;
 
 	p = curproc;
-	return (SYSCTL_OUT(req, &p->p_sysent->sv_usrstack,
-	    sizeof(p->p_sysent->sv_usrstack)));
+#if defined(__amd64__) || defined(__ia64__)
+	if (req->oldlen == sizeof(unsigned int)) {
+		unsigned int val;
+		val = (unsigned int)p->p_sysent->sv_usrstack;
+		error = SYSCTL_OUT(req, &val, sizeof(val));
+	} else
+#endif
+		error = SYSCTL_OUT(req, &p->p_sysent->sv_usrstack,
+		    sizeof(p->p_sysent->sv_usrstack));
+	return error;
 }
 
 static int
@@ -134,6 +152,99 @@ sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS)
  */
 static const struct execsw **execsw;
 
+#ifndef _SYS_SYSPROTO_H_
+struct execve_args {
+	char    *fname; 
+	char    **argv;
+	char    **envv; 
+};
+#endif
+
+/*
+ * MPSAFE
+ */
+int
+execve(td, uap)
+	struct thread *td;
+	struct execve_args /* {
+		char *fname;
+		char **argv;
+		char **envv;
+	} */ *uap;
+{
+
+	return (kern_execve(td, uap->fname, uap->argv, uap->envv, NULL));
+}
+
+#ifndef _SYS_SYSPROTO_H_
+struct __mac_execve_args {
+	char	*fname;
+	char	**argv;
+	char	**envv;
+	struct mac	*mac_p;
+};
+#endif
+
+/*
+ * MPSAFE
+ */
+int
+__mac_execve(td, uap)
+	struct thread *td;
+	struct __mac_execve_args /* {
+		char *fname;
+		char **argv;
+		char **envv;
+		struct mac *mac_p;
+	} */ *uap;
+{
+
+#ifdef MAC
+	return (kern_execve(td, uap->fname, uap->argv, uap->envv,
+	    uap->mac_p));
+#else
+	return (ENOSYS);
+#endif
+}
+
+static int
+kern_execve(td, fname, argv, envv, mac_p)
+	struct thread *td;
+	char *fname;
+	char **argv;
+	char **envv;
+	struct mac *mac_p;
+{
+	struct proc *p = td->td_proc;
+	int error;
+
+	if (p->p_flag & P_HADTHREADS) {
+		PROC_LOCK(p);
+		if (thread_single(SINGLE_BOUNDARY)) {
+			PROC_UNLOCK(p);
+			return (ERESTART);	/* Try again later. */
+		}
+		PROC_UNLOCK(p);
+	}
+
+	error = do_execve(td, fname, argv, envv, mac_p);
+
+	if (p->p_flag & P_HADTHREADS) {
+		PROC_LOCK(p);
+		/*
+		 * If success, we upgrade to SINGLE_EXIT state to
+		 * force other threads to suicide.
+		 */
+		if (error == 0)
+			thread_single(SINGLE_EXIT);		
+		else
+			thread_single_end();
+		PROC_UNLOCK(p);
+	}
+
+	return (error);
+}
+
 /*
  * In-kernel implementation of execve().  All arguments are assumed to be
  * userspace pointers from the passed thread.
@@ -141,7 +252,7 @@ static const struct execsw **execsw;
  * MPSAFE
  */
 static int
-kern_execve(td, fname, argv, envv, mac_p)
+do_execve(td, fname, argv, envv, mac_p)
 	struct thread *td;
 	char *fname;
 	char **argv;
@@ -183,19 +294,6 @@ kern_execve(td, fname, argv, envv, mac_p)
 	PROC_LOCK(p);
 	KASSERT((p->p_flag & P_INEXEC) == 0,
 	    ("%s(): process already has P_INEXEC flag", __func__));
-	if (p->p_flag & P_SA || p->p_numthreads > 1) {
-		if (thread_single(SINGLE_EXIT)) {
-			PROC_UNLOCK(p);
-			return (ERESTART);	/* Try again later. */
-		}
-		/*
-		 * If we get here all other threads are dead,
-		 * so unset the associated flags and lose KSE mode.
-		 */
-		p->p_flag &= ~P_SA;
-		td->td_mailbox = NULL;
-		thread_single_end();
-	}
 	p->p_flag |= P_INEXEC;
 	PROC_UNLOCK(p);
 
@@ -232,8 +330,7 @@ kern_execve(td, fname, argv, envv, mac_p)
 	 * Allocate temporary demand zeroed space for argument and
 	 *	environment strings
 	 */
-	imgp->stringbase = (char *)kmem_alloc_wait(exec_map, ARG_MAX +
-	    PAGE_SIZE);
+	imgp->stringbase = (char *)kmem_alloc_wait(exec_map, ARG_MAX);
 	if (imgp->stringbase == NULL) {
 		error = ENOMEM;
 		mtx_lock(&Giant);
@@ -241,7 +338,7 @@ kern_execve(td, fname, argv, envv, mac_p)
 	}
 	imgp->stringp = imgp->stringbase;
 	imgp->stringspace = ARG_MAX;
-	imgp->image_header = imgp->stringbase + ARG_MAX;
+	imgp->image_header = NULL;
 
 	/*
 	 * Translate the file name. namei() returns a vnode pointer
@@ -257,7 +354,7 @@ interpret:
 	error = namei(ndp);
 	if (error) {
 		kmem_free_wakeup(exec_map, (vm_offset_t)imgp->stringbase,
-		    ARG_MAX + PAGE_SIZE);
+		    ARG_MAX);
 		goto exec_fail;
 	}
 
@@ -360,7 +457,7 @@ interpret:
 	 * let it do the stack setup.
 	 * Else stuff argument count as first item on stack
 	 */
-	if (p->p_sysent->sv_fixup)
+	if (p->p_sysent->sv_fixup != NULL)
 		(*p->p_sysent->sv_fixup)(&stack_base, imgp);
 	else
 		suword(--stack_base, imgp->argc);
@@ -464,7 +561,7 @@ interpret:
 		 */
 		setsugid(p);
 #ifdef KTRACE
-		if (p->p_tracevp != NULL && suser_cred(oldcred, PRISON_ROOT)) {
+		if (p->p_tracevp != NULL && suser_cred(oldcred, SUSER_ALLOWJAIL)) {
 			mtx_lock(&ktrace_mtx);
 			p->p_traceflag = 0;
 			tracevp = p->p_tracevp;
@@ -551,15 +648,19 @@ interpret:
 	 * Notify others that we exec'd, and clear the P_INEXEC flag
 	 * as we're now a bona fide freshly-execed process.
 	 */
-	KNOTE(&p->p_klist, NOTE_EXEC);
+	KNOTE_LOCKED(&p->p_klist, NOTE_EXEC);
 	p->p_flag &= ~P_INEXEC;
 
 	/*
 	 * If tracing the process, trap to debugger so breakpoints
 	 * can be set before the program executes.
+	 * Use tdsignal to deliver signal to current thread, use
+	 * psignal may cause the signal to be delivered to wrong thread
+	 * because that thread will exit, remember we are going to enter
+	 * single thread mode.
 	 */
 	if (p->p_flag & P_TRACED)
-		psignal(p, SIGTRAP);
+		tdsignal(td, SIGTRAP, SIGTARGET_TD);
 
 	/* clear "fork but no exec" flag, as we _are_ execing */
 	p->p_acflag &= ~AFORK;
@@ -618,19 +719,19 @@ exec_fail_dealloc:
 	/*
 	 * free various allocated resources
 	 */
-	if (imgp->firstpage)
+	if (imgp->firstpage != NULL)
 		exec_unmap_first_page(imgp);
 
-	if (imgp->vp) {
+	if (imgp->vp != NULL) {
 		NDFREE(ndp, NDF_ONLY_PNBUF);
 		vput(imgp->vp);
 	}
 
 	if (imgp->stringbase != NULL)
 		kmem_free_wakeup(exec_map, (vm_offset_t)imgp->stringbase,
-		    ARG_MAX + PAGE_SIZE);
+		    ARG_MAX);
 
-	if (imgp->object)
+	if (imgp->object != NULL)
 		vm_object_deallocate(imgp->object);
 
 	if (error == 0) {
@@ -669,61 +770,6 @@ done2:
 	return (error);
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct execve_args {
-        char    *fname; 
-        char    **argv;
-        char    **envv; 
-};
-#endif
-
-/*
- * MPSAFE
- */
-int
-execve(td, uap)
-	struct thread *td;
-	struct execve_args /* {
-		char *fname;
-		char **argv;
-		char **envv;
-	} */ *uap;
-{
-
-	return (kern_execve(td, uap->fname, uap->argv, uap->envv, NULL));
-}
-
-#ifndef _SYS_SYSPROTO_H_
-struct __mac_execve_args {
-	char	*fname;
-	char	**argv;
-	char	**envv;
-	struct mac	*mac_p;
-};
-#endif
-
-/*
- * MPSAFE
- */
-int
-__mac_execve(td, uap)
-	struct thread *td;
-	struct __mac_execve_args /* {
-		char *fname;
-		char **argv;
-		char **envv;
-		struct mac *mac_p;
-	} */ *uap;
-{
-
-#ifdef MAC
-	return (kern_execve(td, uap->fname, uap->argv, uap->envv,
-	    uap->mac_p));
-#else
-	return (ENOSYS);
-#endif
-}
-
 int
 exec_map_first_page(imgp)
 	struct image_params *imgp;
@@ -735,9 +781,8 @@ exec_map_first_page(imgp)
 
 	GIANT_REQUIRED;
 
-	if (imgp->firstpage) {
+	if (imgp->firstpage != NULL)
 		exec_unmap_first_page(imgp);
-	}
 
 	VOP_GETVOBJECT(imgp->vp, &object);
 	VM_OBJECT_LOCK(object);
@@ -780,13 +825,13 @@ exec_map_first_page(imgp)
 		}
 	}
 	vm_page_lock_queues();
-	vm_page_wire(ma[0]);
+	vm_page_hold(ma[0]);
 	vm_page_wakeup(ma[0]);
 	vm_page_unlock_queues();
 	VM_OBJECT_UNLOCK(object);
 
-	pmap_qenter((vm_offset_t)imgp->image_header, ma, 1);
-	imgp->firstpage = ma[0];
+	imgp->firstpage = sf_buf_alloc(ma[0], 0);
+	imgp->image_header = (char *)sf_buf_kva(imgp->firstpage);
 
 	return (0);
 }
@@ -795,14 +840,15 @@ void
 exec_unmap_first_page(imgp)
 	struct image_params *imgp;
 {
-	GIANT_REQUIRED;
+	vm_page_t m;
 
-	if (imgp->firstpage) {
-		pmap_qremove((vm_offset_t)imgp->image_header, 1);
-		vm_page_lock_queues();
-		vm_page_unwire(imgp->firstpage, 1);
-		vm_page_unlock_queues();
+	if (imgp->firstpage != NULL) {
+		m = sf_buf_page(imgp->firstpage);
+		sf_buf_free(imgp->firstpage);
 		imgp->firstpage = NULL;
+		vm_page_lock_queues();
+		vm_page_unhold(m);
+		vm_page_unlock_queues();
 	}
 }
 
@@ -826,6 +872,7 @@ exec_new_vmspace(imgp, sv)
 
 	imgp->vmspace_destroyed = 1;
 
+	/* Called with Giant held, do not depend on it! */
 	EVENTHANDLER_INVOKE(process_exec, p);
 
 	/*
@@ -834,7 +881,7 @@ exec_new_vmspace(imgp, sv)
 	 * data size limit may need to be changed to a value that makes
 	 * sense for the 32 bit binary.
 	 */
-	if (sv->sv_fixlimits)
+	if (sv->sv_fixlimits != NULL)
 		sv->sv_fixlimits(imgp);
 
 	/*
@@ -846,10 +893,8 @@ exec_new_vmspace(imgp, sv)
 	if (vmspace->vm_refcnt == 1 && vm_map_min(map) == sv->sv_minuser &&
 	    vm_map_max(map) == sv->sv_maxuser) {
 		shmexit(vmspace);
-		vm_page_lock_queues();
 		pmap_remove_pages(vmspace_pmap(vmspace), vm_map_min(map),
 		    vm_map_max(map));
-		vm_page_unlock_queues();
 		vm_map_remove(map, vm_map_min(map), vm_map_max(map));
 	} else {
 		vmspace_exec(p, sv->sv_minuser, sv->sv_maxuser);
@@ -925,7 +970,8 @@ exec_extract_strings(imgp)
 				imgp->argc++;
 			} while ((argp = (caddr_t)(intptr_t)fuword(argv++)));
 		}
-	}	
+	} else
+		return (EFAULT);
 
 	imgp->endargs = imgp->stringp;
 

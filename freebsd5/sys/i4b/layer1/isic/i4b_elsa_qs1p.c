@@ -33,7 +33,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_qs1p.c,v 1.11 2003/09/02 17:30:39 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_qs1p.c,v 1.13 2004/05/30 20:27:16 phk Exp $");
 
 #include "opt_i4b.h"
 
@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_qs1p.c,v 1.11 2003/09/02 17
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
 
@@ -260,9 +261,9 @@ eqs1p_pci_attach(device_t dev)
 	sc->sc_resources.io_rid[0] = ELSA_PORT0_MAPOFF;
 	
 	if(!(sc->sc_resources.io_base[0] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-						&sc->sc_resources.io_rid[0],
-						0UL, ~0UL, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[0],
+					       RF_ACTIVE)))
 	{
 		printf("isic%d: Couldn't get first iobase for ELSA MicroLink ISDN/PCI!\n", unit);
 		return(ENXIO);                                       
@@ -271,9 +272,9 @@ eqs1p_pci_attach(device_t dev)
 	sc->sc_resources.io_rid[1] = ELSA_PORT1_MAPOFF;
 	
 	if(!(sc->sc_resources.io_base[1] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-						&sc->sc_resources.io_rid[1],
-						0UL, ~0UL, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[1],
+					       RF_ACTIVE)))
 	{
 		printf("isic%d: Couldn't get second iobase for ELSA MicroLink ISDN/PCI!\n", unit);
 		isic_detach_common(dev);
@@ -283,9 +284,9 @@ eqs1p_pci_attach(device_t dev)
 	sc->sc_port = rman_get_start(sc->sc_resources.io_base[1]);
 
 	if(!(sc->sc_resources.irq =
-			bus_alloc_resource(dev, SYS_RES_IRQ,
-					   &sc->sc_resources.irq_rid,
-					   0UL, ~0UL, 1, RF_ACTIVE | RF_SHAREABLE)))
+			bus_alloc_resource_any(dev, SYS_RES_IRQ,
+					       &sc->sc_resources.irq_rid,
+					       RF_ACTIVE | RF_SHAREABLE)))
 	{
 		printf("isic%d: Could not get irq for ELSA MicroLink ISDN/PCI!\n",unit);
 		isic_detach_common(dev);

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)icmp_var.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/icmp_var.h,v 1.21 2002/03/19 21:25:46 alfred Exp $
+ * $FreeBSD: src/sys/netinet/icmp_var.h,v 1.24 2004/08/16 18:32:07 rwatson Exp $
  */
 
 #ifndef _NETINET_ICMP_VAR_H_
@@ -49,16 +45,16 @@ struct	icmpstat {
 	u_long	icps_oldicmp;		/* no error 'cuz old was icmp */
 	u_long	icps_outhist[ICMP_MAXTYPE + 1];
 /* statistics related to input messages processed */
- 	u_long	icps_badcode;		/* icmp_code out of range */
+	u_long	icps_badcode;		/* icmp_code out of range */
 	u_long	icps_tooshort;		/* packet < ICMP_MINLEN */
 	u_long	icps_checksum;		/* bad checksum */
 	u_long	icps_badlen;		/* calculated bound mismatch */
 	u_long	icps_reflect;		/* number of responses */
 	u_long	icps_inhist[ICMP_MAXTYPE + 1];
-	u_long	icps_bmcastecho; 	/* b/mcast echo requests dropped */
-	u_long	icps_bmcasttstamp; 	/* b/mcast tstamp requests dropped */
+	u_long	icps_bmcastecho;	/* b/mcast echo requests dropped */
+	u_long	icps_bmcasttstamp;	/* b/mcast tstamp requests dropped */
 	u_long	icps_badaddr;		/* bad return address */
-	u_long	icps_noroute; 		/* no route back */
+	u_long	icps_noroute;		/* no route back */
 };
 
 /*
@@ -78,6 +74,7 @@ struct	icmpstat {
 
 #ifdef _KERNEL
 SYSCTL_DECL(_net_inet_icmp);
+extern struct icmpstat icmpstat;	/* icmp statistics */
 extern int badport_bandlim(int);
 #define BANDLIM_UNLIMITED -1
 #define BANDLIM_ICMP_UNREACH 0

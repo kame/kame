@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)gmon.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/sys/gmon.h,v 1.16 2002/02/21 05:52:47 bde Exp $
+ * $FreeBSD: src/sys/sys/gmon.h,v 1.19 2004/06/14 18:39:28 bms Exp $
  */
 
 #ifndef _SYS_GMON_H_
@@ -201,5 +197,46 @@ extern struct gmonparam _gmonparam;
 #define	GPROF_FROMS	2	/* struct: from location hash bucket */
 #define	GPROF_TOS	3	/* struct: destination/count structure */
 #define	GPROF_GMONPARAM	4	/* struct: profiling parameters (see above) */
+
+#ifdef _KERNEL
+
+#ifdef GUPROF
+
+#define	CALIB_SCALE	1000
+#define	KCOUNT(p,index) \
+	((p)->kcount[(index) / (HISTFRACTION * sizeof(HISTCOUNTER))])
+#define	PC_TO_I(p, pc)	((uintfptr_t)(pc) - (uintfptr_t)(p)->lowpc)
+
+extern int	cputime_bias;
+
+int	cputime(void);
+void	nullfunc_loop_profiled(void);
+void	nullfunc_profiled(void);
+void	startguprof(struct gmonparam *p);
+void	stopguprof(struct gmonparam *p);
+
+#else /* !GUPROF */
+
+#define	startguprof(p)
+#define	stopguprof(p)
+
+#endif /* GUPROF */
+
+void	empty_loop(void);
+void	kmupetext(uintfptr_t nhighpc);
+void	mexitcount(uintfptr_t selfpc);
+void	nullfunc(void);
+void	nullfunc_loop(void);
+
+#else /* !_KERNEL */
+
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+void	moncontrol(int);
+void	monstartup(u_long, u_long);
+__END_DECLS
+
+#endif /* _KERNEL */
 
 #endif /* !_SYS_GMON_H_ */

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/pcpu.h,v 1.11 2003/11/20 22:50:26 peter Exp $
+ * $FreeBSD: src/sys/sys/pcpu.h,v 1.13 2004/03/27 18:21:24 marcel Exp $
  */
 
 #ifndef _SYS_PCPU_H_
@@ -63,8 +63,8 @@ struct pcpu {
 	struct bintime	pc_switchtime;	
 	int		pc_switchticks;
 	u_int		pc_cpuid;		/* This cpu number */
-	u_int		pc_cpumask;		/* This cpu mask */
-	u_int		pc_other_cpus;		/* Mask of all other cpus */
+	cpumask_t	pc_cpumask;		/* This cpu mask */
+	cpumask_t	pc_other_cpus;		/* Mask of all other cpus */
 	SLIST_ENTRY(pcpu) pc_allcpu;
 	struct lock_list_entry *pc_spinlocks;
 #ifdef KTR_PERCPU
@@ -73,6 +73,7 @@ struct pcpu {
 #endif
 	PCPU_MD_FIELDS;
 	struct vmmeter	pc_cnt;			/* VM stats counters */
+	struct device	*pc_device;
 };
 
 SLIST_HEAD(cpuhead, pcpu);

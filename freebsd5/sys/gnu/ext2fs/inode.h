@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)inode.h	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/gnu/ext2fs/inode.h,v 1.38 2002/05/18 19:12:38 iedowse Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/inode.h,v 1.41 2004/06/20 03:36:31 bde Exp $
  */
 
 #ifndef _SYS_GNU_EXT2FS_INODE_H_
@@ -69,7 +65,7 @@ struct inode {
 	struct	vnode  *i_vnode;/* Vnode associated with this inode. */
 	struct	vnode  *i_devvp;/* Vnode for block I/O. */
 	u_int32_t i_flag;	/* flags, see below */
-	dev_t	  i_dev;	/* Device associated with the inode. */
+	struct	cdev *i_dev;	/* Device associated with the inode. */
 	ino_t	  i_number;	/* The identity of the inode. */
 
 	struct	ext2_sb_info *i_e2fs;	/* EXT2FS */

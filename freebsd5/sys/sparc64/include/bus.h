@@ -69,7 +69,7 @@
  *	and
  *	from: FreeBSD: src/sys/alpha/include/bus.h,v 1.9 2001/01/09
  *
- * $FreeBSD: src/sys/sparc64/include/bus.h,v 1.32 2003/09/23 08:22:34 nyan Exp $
+ * $FreeBSD: src/sys/sparc64/include/bus.h,v 1.33 2004/06/28 03:49:13 scottl Exp $
  */
 
 #ifndef	_MACHINE_BUS_H_
@@ -1020,6 +1020,7 @@ struct bus_dma_tag {
 	int		dt_map_count;
 	bus_dma_lock_t	*dt_lockfunc;
 	void *		*dt_lockfuncarg;
+	bus_dma_segment_t *dt_segments;
 
 	struct bus_dma_methods	*dt_mt;
 };

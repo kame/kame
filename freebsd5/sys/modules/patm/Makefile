@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/patm/Makefile,v 1.1 2003/07/15 11:57:24 harti Exp $
+# $FreeBSD: src/sys/modules/patm/Makefile,v 1.2 2004/02/13 10:11:00 ru Exp $
 #
 # Author: Harti Brandt <harti@freebsd.org>
 #
@@ -10,8 +10,7 @@ SRCS=	if_patm.c if_patm_attach.c if_patm_ioctl.c if_patm_intr.c \
 	device_if.h bus_if.h pci_if.h opt_inet.h opt_natm.h
 
 CFLAGS+= -DENABLE_BPF
-# CFLAGS+= -DPATM_DEBUG=0x0 -DINVARIANT_SUPPORT -DINVARIANTS -g -DDIAGNOSTIC
-# LDFLAGS+= -g
+# CFLAGS+= -DPATM_DEBUG=0x0 -DINVARIANT_SUPPORT -DINVARIANTS -DDIAGNOSTIC
 
 opt_inet.h:
 	echo "#define INET 1" > opt_inet.h

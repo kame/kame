@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/rpc/rpcclnt.h,v 1.1 2003/11/14 20:54:10 alfred Exp $ */
+/* $FreeBSD: src/sys/rpc/rpcclnt.h,v 1.3 2004/04/07 05:00:00 imp Exp $ */
 /*	$OpenBSD: nfsmount.h,v 1.11 2002/03/14 01:27:13 millert Exp $	*/
 /*	$NetBSD: nfsmount.h,v 1.10 1996/02/18 11:54:03 fvdl Exp $	*/
 
@@ -41,10 +41,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -92,7 +88,7 @@
 #endif
 
 /* from nfs/nfs.h */
-#define RPC_TICKINTVL     5
+#define RPC_TICKINTVL     10
 
 
 /* from nfs/nfsproto.h */

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/netinet/accf_http.c,v 1.13 2002/06/18 07:42:02 tanimura Exp $
+ *	$FreeBSD: src/sys/netinet/accf_http.c,v 1.15 2004/06/14 18:16:21 rwatson Exp $
  */
 
 #define ACCEPT_FILTER_MOD
@@ -32,6 +32,7 @@
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/mbuf.h>
+#include <sys/module.h>
 #include <sys/signalvar.h>
 #include <sys/sysctl.h>
 #include <sys/socketvar.h>
@@ -160,7 +161,7 @@ static void
 sohashttpget(struct socket *so, void *arg, int waitflag)
 {
 
-	if ((so->so_state & SS_CANTRCVMORE) == 0 && !sbfull(&so->so_rcv)) {
+	if ((so->so_rcv.sb_state & SBS_CANTRCVMORE) == 0 && !sbfull(&so->so_rcv)) {
 		struct mbuf *m;
 		char *cmp;
 		int	cmplen, cc;
@@ -213,7 +214,7 @@ soparsehttpvers(struct socket *so, void *arg, int waitflag)
 	struct mbuf *m, *n;
 	int	i, cc, spaces, inspaces;
 
-	if ((so->so_state & SS_CANTRCVMORE) != 0 || sbfull(&so->so_rcv))
+	if ((so->so_rcv.sb_state & SBS_CANTRCVMORE) != 0 || sbfull(&so->so_rcv))
 		goto fallout;
 
 	m = so->so_rcv.sb_mb;
@@ -300,7 +301,7 @@ soishttpconnected(struct socket *so, void *arg, int waitflag)
 	int ccleft, copied;
 
 	DPRINT("start");
-	if ((so->so_state & SS_CANTRCVMORE) != 0 || sbfull(&so->so_rcv))
+	if ((so->so_rcv.sb_state & SBS_CANTRCVMORE) != 0 || sbfull(&so->so_rcv))
 		goto gotit;
 
 	/*

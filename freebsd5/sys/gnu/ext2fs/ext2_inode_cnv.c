@@ -19,7 +19,7 @@
  * improvements that they make and grant CSL redistribution rights.
  *
  *      Utah $Hdr$
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode_cnv.c,v 1.12 2002/05/16 19:07:59 iedowse Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode_cnv.c,v 1.13 2004/02/18 14:08:25 tjr Exp $
  */
 
 /*
@@ -77,6 +77,8 @@ ext2_ei2i(ei, ip)
 	*/
 	ip->i_mode = ei->i_links_count ? ei->i_mode : 0;
 	ip->i_size = ei->i_size;
+	if (S_ISREG(ip->i_mode))
+		ip->i_size |= ((u_int64_t)ei->i_size_high) << 32;
 	ip->i_atime = ei->i_atime;
 	ip->i_mtime = ei->i_mtime;
 	ip->i_ctime = ei->i_ctime;
@@ -112,6 +114,8 @@ ext2_i2ei(ip, ei)
 	 */
 	ei->i_dtime = ei->i_links_count ? 0 : ip->i_mtime;
 	ei->i_size = ip->i_size;
+	if (S_ISREG(ip->i_mode))
+		ei->i_size_high = ip->i_size >> 32;
 	ei->i_atime = ip->i_atime;
 	ei->i_mtime = ip->i_mtime;
 	ei->i_ctime = ip->i_ctime;

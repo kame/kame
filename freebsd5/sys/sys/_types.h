@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/_types.h,v 1.14 2003/03/28 15:27:30 mike Exp $
+ * $FreeBSD: src/sys/sys/_types.h,v 1.19 2004/06/19 17:58:32 marcel Exp $
  */
 
 #ifndef _SYS__TYPES_H_
@@ -43,6 +43,7 @@ typedef	__uint32_t	__gid_t;
 typedef	__int64_t	__id_t;		/* can hold a gid_t, pid_t, or uid_t */
 typedef	__uint32_t	__ino_t;	/* inode number */
 typedef	long		__key_t;	/* IPC key (for Sys V IPC) */
+typedef	__int32_t	__lwpid_t;	/* Thread ID (a.k.a. LWP) */
 typedef	__uint16_t	__mode_t;	/* permissions */
 typedef	int		__nl_item;
 typedef	__uint16_t	__nlink_t;	/* link count */
@@ -53,7 +54,6 @@ typedef	__uint8_t	__sa_family_t;
 typedef	__uint32_t	__socklen_t;
 typedef	long		__suseconds_t;	/* microseconds (signed) */
 typedef	__int32_t	__timer_t;	/* timer_gettime()... */
-typedef	__uint32_t	__udev_t;	/* device number */
 typedef	__uint32_t	__uid_t;
 typedef	unsigned int	__useconds_t;	/* microseconds (unsigned) */
 
@@ -75,20 +75,14 @@ typedef	unsigned int	__useconds_t;	/* microseconds (unsigned) */
  * wchar_t, and should be able to hold all members of the largest
  * character set plus one extra value (WEOF), and must be at least 16 bits.
  */
-typedef	int		__ct_rune_t;
-typedef	__ct_rune_t	__rune_t;
-typedef	__ct_rune_t	__wchar_t;
-typedef	__ct_rune_t	__wint_t;
+typedef	int		__ct_rune_t;	/* arg type for ctype funcs */
+typedef	__ct_rune_t	__rune_t;	/* rune_t (see above) */
+typedef	__ct_rune_t	__wchar_t;	/* wchar_t (see above) */
+typedef	__ct_rune_t	__wint_t;	/* wint_t (see above) */
 
-/*
- * dev_t has differing meanings in userland and the kernel.
- */
-#ifdef _KERNEL
-struct cdev;
-typedef	struct cdev	*__dev_t;
-#else
-typedef	__udev_t	__dev_t;		/* device number */
-#endif
+typedef	__uint32_t	__dev_t;	/* device number */
+
+typedef	__uint32_t	__fixpt_t;	/* fixed point number */
 
 /*
  * mbstate_t is an opaque object to keep conversion state during multibyte
@@ -96,7 +90,7 @@ typedef	__udev_t	__dev_t;		/* device number */
  */
 typedef union {
 	char		__mbstate8[128];
-	__int64_t	_mbstateL;		/* for alignment */
+	__int64_t	_mbstateL;	/* for alignment */
 } __mbstate_t;
 
 #endif /* !_SYS__TYPES_H_ */

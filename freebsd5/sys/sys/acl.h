@@ -25,15 +25,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/acl.h,v 1.26 2003/08/04 02:13:04 rwatson Exp $
+ * $FreeBSD: src/sys/sys/acl.h,v 1.27 2004/05/10 18:38:07 rwatson Exp $
  */
 /* 
  * Developed by the TrustedBSD Project.
  * Support for POSIX.1e access control lists.
  */
 
-#ifndef _SYS_ACL_H
-#define	_SYS_ACL_H
+#ifndef _SYS_ACL_H_
+#define	_SYS_ACL_H_
 
 /*
  * POSIX.1e ACL types and related constants.
@@ -226,4 +226,4 @@ __END_DECLS
 
 #endif /* !_KERNEL */
 
-#endif /* !_SYS_ACL_H */
+#endif /* !_SYS_ACL_H_ */

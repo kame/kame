@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -40,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_lookup.c,v 1.37 2003/09/26 20:26:23 fjoe Exp $");
+__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_lookup.c,v 1.39 2004/07/03 16:56:45 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -94,9 +90,9 @@ cd9660_lookup(ap)
 		struct componentname *a_cnp;
 	} */ *ap;
 {
-	register struct vnode *vdp;	/* vnode for directory being searched */
-	register struct iso_node *dp;	/* inode for directory being searched */
-	register struct iso_mnt *imp;	/* filesystem that directory is in */
+	struct vnode *vdp;		/* vnode for directory being searched */
+	struct iso_node *dp;		/* inode for directory being searched */
+	struct iso_mnt *imp;		/* filesystem that directory is in */
 	struct buf *bp;			/* a buffer of directory entries */
 	struct iso_directory_record *ep = 0;/* the current directory entry */
 	int entryoffsetinblock;		/* offset of ep in bp's buffer */
@@ -171,7 +167,7 @@ cd9660_lookup(ap)
 		nchstats.ncs_2passes++;
 	}
 	endsearch = dp->i_size;
-	
+
 searchloop:
 	while (dp->i_offset < endsearch) {
 		/*
@@ -192,7 +188,7 @@ searchloop:
 		 */
 		ep = (struct iso_directory_record *)
 			((char *)bp->b_data + entryoffsetinblock);
-		
+
 		reclen = isonum_711(ep->length);
 		if (reclen == 0) {
 			/* skip to next block, if any */
@@ -208,7 +204,7 @@ searchloop:
 		if (entryoffsetinblock + reclen > imp->logical_block_size)
 			/* entries are not allowed to cross boundaries */
 			break;
-		
+
 		namelen = isonum_711(ep->name_len);
 		isoflags = isonum_711(imp->iso_ftype == ISO_FTYPE_HIGH_SIERRA?
 				      &ep->date[6]: ep->flags);
@@ -216,7 +212,7 @@ searchloop:
 		if (reclen < ISO_DIRECTORY_RECORD_SIZE + namelen)
 			/* illegal entry, stop */
 			break;
-		
+
 		/*
 		 * Check for a name match.
 		 */
@@ -321,7 +317,7 @@ notfound:
 found:
 	if (numdirpasses == 2)
 		nchstats.ncs_pass2++;
-	
+
 	/*
 	 * Found component in pathname.
 	 * If the final component of path name, save information
@@ -412,7 +408,7 @@ cd9660_blkatoff(vp, offset, res, bpp)
 	struct buf **bpp;
 {
 	struct iso_node *ip;
-	register struct iso_mnt *imp;
+	struct iso_mnt *imp;
 	struct buf *bp;
 	daddr_t lbn;
 	int bsize, bshift, error;

@@ -55,7 +55,7 @@
 /*
  *      @(#)netdb.h	8.1 (Berkeley) 6/2/93
  *      From: Id: netdb.h,v 8.9 1996/11/19 08:39:29 vixie Exp $
- * $FreeBSD: src/include/netdb.h,v 1.30 2003/10/24 06:53:12 ume Exp $
+ * $FreeBSD: src/include/netdb.h,v 1.32 2004/02/25 21:03:44 green Exp $
  */
 
 #ifndef _NETDB_H_
@@ -82,7 +82,7 @@ typedef	__socklen_t	socklen_t;
 #define	_PATH_PROTOCOLS	"/etc/protocols"
 #define	_PATH_SERVICES	"/etc/services"
 
-extern int h_errno;
+#define	h_errno (*__h_error())
 
 /*
  * Structures returned by network data base library.  All addresses are
@@ -135,7 +135,7 @@ struct addrinfo {
 
 /*
  * Error return codes from gethostbyname() and gethostbyaddr()
- * (left in extern int h_errno).
+ * (left in h_errno).
  */
 
 #define	NETDB_INTERNAL	-1	/* see errno */
@@ -163,7 +163,6 @@ struct addrinfo {
 #define	EAI_NODATA	 7	/* no address associated with hostname */
 #endif
 #define	EAI_NONAME	 8	/* hostname nor servname provided, or not known */
-#define	EAI_NODATA	EAI_NONAME	/* to be removed on 23 Apr 2004 */
 #define	EAI_SERVICE	 9	/* servname not supported for ai_socktype */
 #define	EAI_SOCKTYPE	10	/* ai_socktype not supported */
 #define	EAI_SYSTEM	11	/* system error returned in errno */
@@ -255,6 +254,7 @@ void		setservent(int);
  */
 
 /* DO NOT USE THESE, THEY ARE SUBJECT TO CHANGE AND ARE NOT PORTABLE!!! */
+int	* __h_error(void);
 void	_sethosthtent(int);
 void	_endhosthtent(void);
 void	_sethostdnsent(int);

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_ubt_var.h,v 1.2 2003/03/22 23:44:36 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/ubt/ng_ubt_var.h,v 1.2 2003/05/10 21:44:40 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/ubt/ng_ubt_var.h,v 1.3 2004/06/16 09:47:15 phk Exp $
  */
 
 #ifndef _NG_UBT_VAR_H_
@@ -139,9 +139,9 @@ struct ubt_softc {
 	hook_p			 sc_hook;	/* upstream hook */
 
 	/* Device specific */
-	dev_t			 sc_ctrl_dev;	/* control device */
-	dev_t			 sc_intr_dev;	/* interrupt device */
-	dev_t			 sc_bulk_dev;	/* bulk device */
+	struct cdev *sc_ctrl_dev;	/* control device */
+	struct cdev *sc_intr_dev;	/* interrupt device */
+	struct cdev *sc_bulk_dev;	/* bulk device */
 
 	int			 sc_refcnt;	/* device ref. count */
 	int			 sc_dying;

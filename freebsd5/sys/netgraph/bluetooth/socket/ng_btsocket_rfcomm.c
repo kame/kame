@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_btsocket_rfcomm.c,v 1.28 2003/09/14 23:29:06 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_rfcomm.c,v 1.3 2003/10/12 22:04:21 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_rfcomm.c,v 1.12.4.1 2004/10/21 09:30:47 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -52,12 +52,12 @@
 #include <sys/uio.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
-#include "ng_bluetooth.h"
-#include "ng_hci.h"
-#include "ng_l2cap.h"
-#include "ng_btsocket.h"
-#include "ng_btsocket_l2cap.h"
-#include "ng_btsocket_rfcomm.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/include/ng_l2cap.h>
+#include <netgraph/bluetooth/include/ng_btsocket.h>
+#include <netgraph/bluetooth/include/ng_btsocket_l2cap.h>
+#include <netgraph/bluetooth/include/ng_btsocket_rfcomm.h>
 
 /* MALLOC define */
 #ifdef NG_SEPARATE_MALLOC
@@ -724,6 +724,8 @@ ng_btsocket_rfcomm_detach(struct socket *so)
 	FREE(pcb, M_NETGRAPH_BTSOCKET_RFCOMM);
 
 	soisdisconnected(so);
+	ACCEPT_LOCK();
+	SOCK_LOCK(so);
 	so->so_pcb = NULL;
 	sotryfree(so);
 
@@ -879,7 +881,7 @@ ng_btsocket_rfcomm_peeraddr(struct socket *so, struct sockaddr **nam)
 	sa.rfcomm_len = sizeof(sa);
 	sa.rfcomm_family = AF_BLUETOOTH;
 
-	*nam = dup_sockaddr((struct sockaddr *) &sa, 0);
+	*nam = sodupsockaddr((struct sockaddr *) &sa, M_NOWAIT);
 
 	return ((*nam == NULL)? ENOMEM : 0);
 } /* ng_btsocket_rfcomm_peeraddr */
@@ -945,7 +947,7 @@ ng_btsocket_rfcomm_sockaddr(struct socket *so, struct sockaddr **nam)
 	sa.rfcomm_len = sizeof(sa);
 	sa.rfcomm_family = AF_BLUETOOTH;
 
-	*nam = dup_sockaddr((struct sockaddr *) &sa, 0);
+	*nam = sodupsockaddr((struct sockaddr *) &sa, M_NOWAIT);
 
 	return ((*nam == NULL)? ENOMEM : 0);
 } /* ng_btsocket_rfcomm_sockaddr */
@@ -996,8 +998,12 @@ ng_btsocket_rfcomm_sessions_task(void *ctx, int pending)
 			/* Close L2CAP socket */
 			s->l2so->so_upcallarg = NULL;
 			s->l2so->so_upcall = NULL;
+			SOCKBUF_LOCK(&s->l2so->so_rcv);
 			s->l2so->so_rcv.sb_flags &= ~SB_UPCALL;
+			SOCKBUF_UNLOCK(&s->l2so->so_rcv);
+			SOCKBUF_LOCK(&s->l2so->so_snd);
 			s->l2so->so_snd.sb_flags &= ~SB_UPCALL;
+			SOCKBUF_UNLOCK(&s->l2so->so_snd);
 			soclose(s->l2so);
 
 			mtx_unlock(&s->session_mtx);
@@ -1023,7 +1029,7 @@ ng_btsocket_rfcomm_session_task(ng_btsocket_rfcomm_session_p s)
 {
 	mtx_assert(&s->session_mtx, MA_OWNED);
 
-	if (s->l2so->so_state & SS_CANTRCVMORE) {
+	if (s->l2so->so_rcv.sb_state & SBS_CANTRCVMORE) {
 		NG_BTSOCKET_RFCOMM_INFO(
 "%s: L2CAP connection has been terminated, so=%p, so_state=%#x, so_count=%d, " \
 "state=%d, flags=%#x\n", __func__, s->l2so, s->l2so->so_state, 
@@ -1236,8 +1242,12 @@ ng_btsocket_rfcomm_session_create(ng_btsocket_rfcomm_session_p *sp,
 	/* Prepare L2CAP socket */
 	l2so->so_upcallarg = NULL;
 	l2so->so_upcall = ng_btsocket_rfcomm_upcall;
+	SOCKBUF_LOCK(&l2so->so_rcv);
 	l2so->so_rcv.sb_flags |= SB_UPCALL;
+	SOCKBUF_UNLOCK(&l2so->so_rcv);
+	SOCKBUF_LOCK(&l2so->so_snd);
 	l2so->so_snd.sb_flags |= SB_UPCALL;
+	SOCKBUF_UNLOCK(&l2so->so_snd);
 	l2so->so_state |= SS_NBIO;
 	s->l2so = l2so;
 
@@ -1316,8 +1326,12 @@ bad:
 	/* Return L2CAP socket back to its original state */
 	l2so->so_upcallarg = NULL;
 	l2so->so_upcall = NULL;
+	SOCKBUF_LOCK(&l2so->so_rcv);
 	l2so->so_rcv.sb_flags &= ~SB_UPCALL;
+	SOCKBUF_UNLOCK(&l2so->so_rcv);
+	SOCKBUF_LOCK(&l2so->so_snd);
 	l2so->so_snd.sb_flags &= ~SB_UPCALL;
+	SOCKBUF_UNLOCK(&l2so->so_snd);
 	l2so->so_state &= ~SS_NBIO;
 
 	mtx_destroy(&s->session_mtx);
@@ -1353,10 +1367,11 @@ ng_btsocket_rfcomm_session_accept(ng_btsocket_rfcomm_session_p s0)
 		return (error);
 	}
 
+	ACCEPT_LOCK();
 	if (TAILQ_EMPTY(&s0->l2so->so_comp)) {
-		if (s0->l2so->so_state & SS_CANTRCVMORE)
+		ACCEPT_UNLOCK();
+		if (s0->l2so->so_rcv.sb_state & SBS_CANTRCVMORE)
 			return (ECONNABORTED);
-
 		return (EWOULDBLOCK);
 	}
 
@@ -1367,11 +1382,13 @@ ng_btsocket_rfcomm_session_accept(ng_btsocket_rfcomm_session_p s0)
 
 	TAILQ_REMOVE(&s0->l2so->so_comp, l2so, so_list);
 	s0->l2so->so_qlen --;
-
-	soref(l2so);
-	l2so->so_state &= ~SS_COMP;
-	l2so->so_state |= SS_NBIO;
+	l2so->so_qstate &= ~SQ_COMP;
 	l2so->so_head = NULL;
+	SOCK_LOCK(l2so);
+	soref(l2so);
+	l2so->so_state |= SS_NBIO;
+	SOCK_UNLOCK(l2so);
+	ACCEPT_UNLOCK();
 
 	error = soaccept(l2so, (struct sockaddr **) &l2sa);
 	if (error != 0) {
@@ -2065,9 +2082,12 @@ ng_btsocket_rfcomm_receive_disc(ng_btsocket_rfcomm_session_p s, int dlci)
 	if (dlci == 0) {
 		/* XXX FIXME assume that remote side will close the socket */
 		error = ng_btsocket_rfcomm_send_command(s, RFCOMM_FRAME_UA, 0);
-		if (error == 0)
-			s->state = NG_BTSOCKET_RFCOMM_SESSION_DISCONNECTING;
-		else
+		if (error == 0) {
+			if (s->state == NG_BTSOCKET_RFCOMM_SESSION_DISCONNECTING)
+				s->state = NG_BTSOCKET_RFCOMM_SESSION_CLOSED; /* XXX */
+			else
+				s->state = NG_BTSOCKET_RFCOMM_SESSION_DISCONNECTING;
+		} else
 			s->state = NG_BTSOCKET_RFCOMM_SESSION_CLOSED; /* XXX */
 
 		ng_btsocket_rfcomm_session_clean(s);

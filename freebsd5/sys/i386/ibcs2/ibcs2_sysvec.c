@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_sysvec.c,v 1.27 2003/09/25 01:10:24 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_sysvec.c,v 1.28 2004/07/15 08:26:04 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -116,7 +116,7 @@ ibcs2_modevent(module_t mod, int type, void *unused)
 		}
 		sx_sunlock(&allproc_lock);
 	default:
-	        /* do not care */
+	        return (EOPNOTSUPP);
 		break;
 	}
 	return (rval);

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.h	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/sys/cons.h,v 1.33 2003/10/18 02:13:39 rwatson Exp $
+ * $FreeBSD: src/sys/sys/cons.h,v 1.36 2004/04/07 04:19:49 imp Exp $
  */
 
 #ifndef _MACHINE_CONS_H_
@@ -83,9 +79,9 @@ struct consdev {
 
 /* Values for cn_flags. */
 #define	CN_FLAG_NODEBUG	0x00000001	/* Not supported with debugger. */
+#define	CN_FLAG_NOAVAIL	0x00000002	/* Temporarily not available. */
 
 #ifdef _KERNEL
-extern int cons_unavail;
 
 #define CONS_DRIVER(name, probe, init, term, getc, checkc, putc, dbctl)	\
 	static struct consdev name##_consdev = {			\
@@ -97,12 +93,14 @@ extern int cons_unavail;
 void	cninit(void);
 void	cninit_finish(void);
 int	cnadd(struct consdev *);
+void	cnavailable(struct consdev *, int);
 void	cnremove(struct consdev *);
 void	cnselect(struct consdev *);
 int	cncheckc(void);
 int	cngetc(void);
 void	cndbctl(int);
 void	cnputc(int);
+int	cnunavailable(void);
 
 #endif /* _KERNEL */
 

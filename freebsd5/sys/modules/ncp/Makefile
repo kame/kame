@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/ncp/Makefile,v 1.9 2002/01/11 15:48:51 ru Exp $
+# $FreeBSD: src/sys/modules/ncp/Makefile,v 1.10 2004/01/19 14:00:26 ru Exp $
 
 .PATH: ${.CURDIR}/../../netncp
 
@@ -11,14 +11,5 @@ SRCS=	ncp_conn.c ncp_sock.c ncp_ncp.c ncp_subr.c ncp_crypt.c ncp_mod.c \
 SRCS+=	ncp_burst.c
 CFLAGS+= -DNCPBURST
 .endif
-
-load: ${KMOD}.ko
-	kldload ./${KMOD}.ko
-
-unload:
-	@(if kldunload ${KMOD}; then true; else true; fi)
-
-deinstall:
-	rm -f /modules/ncp.ko
 
 .include <bsd.kmod.mk>

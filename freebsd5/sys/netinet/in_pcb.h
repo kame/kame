@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.68 2003/11/26 01:40:43 sam Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.76 2004/08/16 18:32:07 rwatson Exp $
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -247,11 +243,10 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define INP_LOCK_DESTROY(inp)	mtx_destroy(&(inp)->inp_mtx)
 #define INP_LOCK(inp)		mtx_lock(&(inp)->inp_mtx)
 #define INP_UNLOCK(inp)		mtx_unlock(&(inp)->inp_mtx)
-#ifndef INET6
-#define INP_LOCK_ASSERT(inp)	mtx_assert(&(inp)->inp_mtx, MA_OWNED)
-#else
-#define INP_LOCK_ASSERT(inp)
-#endif
+#define INP_LOCK_ASSERT(inp)	do {					\
+	mtx_assert(&(inp)->inp_mtx, MA_OWNED);				\
+	NET_ASSERT_GIANT();						\
+} while (0)
 
 #define INP_INFO_LOCK_INIT(ipi, d) \
 	mtx_init(&(ipi)->ipi_mtx, (d), NULL, MTX_DEF | MTX_RECURSE)
@@ -259,13 +254,14 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define INP_INFO_WLOCK(ipi)	mtx_lock(&(ipi)->ipi_mtx)
 #define INP_INFO_RUNLOCK(ipi)	mtx_unlock(&(ipi)->ipi_mtx)
 #define INP_INFO_WUNLOCK(ipi)	mtx_unlock(&(ipi)->ipi_mtx)
-#ifndef INET6
-#define INP_INFO_RLOCK_ASSERT(ipi)	mtx_assert(&(ipi)->ipi_mtx, MA_OWNED)
-#define INP_INFO_WLOCK_ASSERT(ipi)	mtx_assert(&(ipi)->ipi_mtx, MA_OWNED)
-#else
-#define INP_INFO_RLOCK_ASSERT(ipi)
-#define INP_INFO_WLOCK_ASSERT(ipi)
-#endif
+#define INP_INFO_RLOCK_ASSERT(ipi)	do {				\
+	mtx_assert(&(ipi)->ipi_mtx, MA_OWNED);				\
+	NET_ASSERT_GIANT();						\
+} while (0)
+#define INP_INFO_WLOCK_ASSERT(ipi)	do {				\
+	mtx_assert(&(ipi)->ipi_mtx, MA_OWNED);				\
+	NET_ASSERT_GIANT();						\
+} while (0)
 
 #define INP_PCBHASH(faddr, lport, fport, mask) \
 	(((faddr) ^ ((faddr) >> 16) ^ ntohs((lport) ^ (fport))) & (mask))
@@ -326,7 +322,7 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 
 #define	INP_SOCKAF(so) so->so_proto->pr_domain->dom_family
 
-#define	INP_CHECK_SOCKAF(so, af) 	(INP_SOCKAF(so) == af)
+#define	INP_CHECK_SOCKAF(so, af)	(INP_SOCKAF(so) == af)
 
 #ifdef _KERNEL
 extern int	ipport_lowfirstauto;
@@ -337,15 +333,14 @@ extern int	ipport_hifirstauto;
 extern int	ipport_hilastauto;
 
 void	in_pcbpurgeif0(struct inpcbinfo *, struct ifnet *);
-int	in_pcballoc(struct socket *, struct inpcbinfo *, struct thread *,
-	    const char *);
-int	in_pcbbind(struct inpcb *, struct sockaddr *, struct thread *);
+int	in_pcballoc(struct socket *, struct inpcbinfo *, const char *);
+int	in_pcbbind(struct inpcb *, struct sockaddr *, struct ucred *);
 int	in_pcbbind_setup(struct inpcb *, struct sockaddr *, in_addr_t *,
-	    u_short *, struct thread *);
-int	in_pcbconnect(struct inpcb *, struct sockaddr *, struct thread *);
+	    u_short *, struct ucred *);
+int	in_pcbconnect(struct inpcb *, struct sockaddr *, struct ucred *);
 int	in_pcbconnect_setup(struct inpcb *, struct sockaddr *, in_addr_t *,
 	    u_short *, in_addr_t *, u_short *, struct inpcb **,
-	    struct thread *);
+	    struct ucred *);
 void	in_pcbdetach(struct inpcb *);
 void	in_pcbdisconnect(struct inpcb *);
 int	in_pcbinshash(struct inpcb *);
@@ -360,12 +355,11 @@ void	in_pcbnotifyall(struct inpcbinfo *pcbinfo, struct in_addr,
 void	in_pcbrehash(struct inpcb *);
 void	in_pcbsetsolabel(struct socket *so);
 int	in_setpeeraddr(struct socket *so, struct sockaddr **nam, struct inpcbinfo *pcbinfo);
-int	in_setsockaddr(struct socket *so, struct sockaddr **nam, struct inpcbinfo *pcbinfo);;
+int	in_setsockaddr(struct socket *so, struct sockaddr **nam, struct inpcbinfo *pcbinfo);
 struct sockaddr *
 	in_sockaddr(in_port_t port, struct in_addr *addr);
 void	in_pcbsosetlabel(struct socket *so);
 void	in_pcbremlists(struct inpcb *inp);
-int	prison_xinpcb(struct thread *td, struct inpcb *inp);
 #endif /* _KERNEL */
 
 #endif /* !_NETINET_IN_PCB_H_ */

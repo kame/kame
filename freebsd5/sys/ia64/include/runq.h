@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/runq.h,v 1.2 2002/06/20 06:21:20 peter Exp $
+ * $FreeBSD: src/sys/ia64/include/runq.h,v 1.4 2003/12/10 22:59:03 peter Exp $
  */
 
 #ifndef	_MACHINE_RUNQ_H_
@@ -36,23 +36,30 @@
 #define	RQB_BIT(pri)	(1UL << ((pri) & (RQB_BPW - 1)))
 #define	RQB_WORD(pri)	((pri) >> RQB_L2BPW)
 
-#define	RQB_FFS(word)	(ffs64(word) - 1)
+#define	RQB_FFS(word)	(__ffsl(word) - 1)
 
 /*
  * Type of run queue status word.
  */
 typedef	u_int64_t	rqb_word_t;
 
-static __inline u_long
-ffs64(u_long mask)
+static __inline u_int64_t
+__popcnt(u_int64_t bits)
 {
-	u_long bit;
+        u_int64_t result;
 
-	if (mask == 0)
+	__asm __volatile("popcnt %0=%1" : "=r" (result) : "r" (bits));
+	return result;
+}
+
+
+static __inline int
+__ffsl(u_long mask)
+{
+
+	if (__predict_false(mask == 0ul))
 		return (0);
-	for (bit = 1; (mask & 1UL) == 0; bit++)
-		mask >>= 1UL;
-	return (bit);
+	return (__popcnt(mask ^ (mask - 1)));
 }
 
 #endif

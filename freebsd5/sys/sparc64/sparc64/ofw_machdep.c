@@ -22,20 +22,20 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/ofw_machdep.c,v 1.5.2.1 2004/01/25 05:23:21 scottl Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/ofw_machdep.c,v 1.12 2004/08/16 15:45:27 marius Exp $
  */
 
 /*
- * Some OpenFirmware helper functions that are likely machine dependent.
+ * Some Open Firmware helper functions that are likely machine dependent.
  */
 
-#include "opt_ofw_pci.h"
-
 #include <sys/param.h>
+#include <sys/bus.h>
 #include <sys/systm.h>
 
 #include <net/ethernet.h>
 
+#include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/openfirm.h>
 
 #include <machine/bus.h>
@@ -51,28 +51,24 @@
 void
 OF_getetheraddr(device_t dev, u_char *addr)
 {
+	char buf[sizeof("true")];
 	phandle_t node;
 	struct idprom idp;
+
+	if ((node = OF_finddevice("/options")) > 0 &&
+	    OF_getprop(node, "local-mac-address?", buf, sizeof(buf)) > 0) {
+		buf[sizeof(buf) - 1] = '\0';
+		if (strcmp(buf, "true") == 0 &&
+		    (node = ofw_bus_get_node(dev)) > 0 &&
+		    OF_getprop(node, "local-mac-address", addr,
+		    ETHER_ADDR_LEN) == ETHER_ADDR_LEN)
+			return;
+	}
 
 	node = OF_peer(0);
 	if (node <= 0 || OF_getprop(node, "idprom", &idp, sizeof(idp)) == -1)
 		panic("Could not determine the machine ethernet address");
 	bcopy(&idp.id_ether, addr, ETHER_ADDR_LEN);
-}
-
-int
-OF_getetheraddr2(device_t dev, u_char *addr)
-{
-	phandle_t node;
-
-#ifdef OFW_NEWPCI
-	node = ofw_pci_get_node(dev);
-#else
-	node = ofw_pci_node(dev);
-#endif
-	if (node <= 0)
-	       return (-1);
-	return (OF_getprop(node, "local-mac-address", addr, ETHER_ADDR_LEN));
 }
 
 int
@@ -106,8 +102,8 @@ OF_decode_addr(phandle_t node, int *space, bus_addr_t *addr)
 			return (ENXIO);
 		phys = ISA_REG_PHYS(&reg.isa);
 		dummy = phys + 1;
-		type = ofw_isa_map_iorange(range.isa, rsz / sizeof(*range.isa),
-		    &phys, &dummy);
+		type = ofw_isa_range_map(range.isa, rsz / sizeof(*range.isa),
+		    &phys, &dummy, NULL);
 		if (type == SYS_RES_MEMORY) {
 			cs = PCI_CS_MEM32;
 			*space = PCI_MEMORY_BUS_SPACE;

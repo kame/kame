@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)umap_vnops.c	8.6 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/fs/umapfs/umap_vnops.c,v 1.38 2003/03/03 19:15:39 njl Exp $
+ * $FreeBSD: src/sys/fs/umapfs/umap_vnops.c,v 1.40 2004/04/07 20:46:02 imp Exp $
  */
 
 /*
@@ -363,6 +359,15 @@ umap_lock(ap)
 	} */ *ap;
 {
 
+	/*
+	 * vop_nolock no longer exists.  I could have pasted the code
+	 * in so that it compiles, but that would be doing our users a
+	 * great disservice.  umapfs is about 5 years behind the nullfs
+	 * code that it is derived from.  The stub locking here guarantees
+	 * a deadlock the moment a VOP_INACTIVE arrives.  There is no point
+	 * pasting the code that makes it compile either, because that just
+	 * makes it Even More Wrong.
+	 */
 	vop_nolock(ap);
 	if ((ap->a_flags & LK_TYPE_MASK) == LK_DRAIN)
 		return (0);

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_cb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/raw_cb.h,v 1.16 2002/03/19 21:54:18 alfred Exp $
+ * $FreeBSD: src/sys/net/raw_cb.h,v 1.18 2004/06/15 04:13:59 rwatson Exp $
  */
 
 #ifndef _NET_RAW_CB_H_
@@ -61,6 +57,7 @@ struct rawcb {
 
 #ifdef _KERNEL
 extern LIST_HEAD(rawcb_list_head, rawcb) rawcb_list;
+extern struct mtx rawcb_mtx;
 
 /* protosw entries */
 pr_ctlinput_t	raw_ctlinput;

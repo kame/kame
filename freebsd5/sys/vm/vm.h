@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -59,7 +55,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm.h,v 1.22 2002/12/16 19:24:43 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm.h,v 1.24 2004/08/16 06:16:12 alc Exp $
  */
 
 #ifndef VM_H
@@ -113,6 +109,19 @@ typedef int boolean_t;
 struct vm_page;
 typedef struct vm_page *vm_page_t;
 #endif				/* _KERNEL */
+
+/*
+ * Virtual memory MPSAFE temporary workarounds.
+ */
+extern int debug_mpsafevm;		/* defined in vm/vm_meter.c */
+#define	VM_LOCK_GIANT() do {						\
+	if (!debug_mpsafevm)						\
+		mtx_lock(&Giant);					\
+} while (0)
+#define	VM_UNLOCK_GIANT() do {						\
+	if (!debug_mpsafevm)						\
+		mtx_unlock(&Giant);					\
+} while (0)
 
 /*
  * Information passed from the machine-independant VM initialization code

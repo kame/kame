@@ -10,11 +10,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -31,13 +27,21 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.128 2003/11/24 03:57:03 sam Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.157.2.2 2004/10/15 21:45:13 jmg Exp $
  */
 
 #ifndef _SYS_MBUF_H_
 #define	_SYS_MBUF_H_
 
+/* XXX: These includes suck. Sorry! */
 #include <sys/queue.h>
+#ifdef _KERNEL
+#include <sys/systm.h>
+#include <vm/uma.h>
+#ifdef WITNESS
+#include <sys/lock.h>
+#endif
+#endif
 
 /*
  * Mbufs are of a single size, MSIZE (sys/param.h), which
@@ -61,6 +65,15 @@
  */
 #define	mtod(m, t)	((t)((m)->m_data))
 #define	dtom(x)		((struct mbuf *)((intptr_t)(x) & ~(MSIZE-1)))
+
+/*
+ * Argument structure passed to UMA routines during mbuf and packet
+ * allocations.
+ */
+struct mb_args {
+	int	flags;	/* Flags for mbuf being allocated */
+	short	type;	/* Type of mbuf being allocated */
+};
 #endif /* _KERNEL */
 
 /*
@@ -83,6 +96,7 @@ struct m_tag {
 	u_int16_t		m_tag_id;	/* Tag ID */
 	u_int16_t		m_tag_len;	/* Length of data */
 	u_int32_t		m_tag_cookie;	/* ABI/Module ID */
+	void			(*m_tag_free)(struct m_tag *);
 };
 
 /*
@@ -153,7 +167,7 @@ struct mbuf {
 #define	M_PROTO3	0x0040	/* protocol-specific */
 #define	M_PROTO4	0x0080	/* protocol-specific */
 #define	M_PROTO5	0x0100	/* protocol-specific */
-#define M_PROTO6	0x4000	/* protocol-specific (avoid M_BCAST conflict) */
+#define	M_SKIP_FIREWALL	0x4000	/* skip firewall processing */
 #define	M_FREELIST	0x8000	/* mbuf is on the free list */
 
 /*
@@ -170,16 +184,17 @@ struct mbuf {
  */
 #define	EXT_CLUSTER	1	/* mbuf cluster */
 #define	EXT_SFBUF	2	/* sendfile(2)'s sf_bufs */
+#define	EXT_PACKET	3	/* came out of Packet zone */
 #define	EXT_NET_DRV	100	/* custom ext_buf provided by net driver(s) */
 #define	EXT_MOD_TYPE	200	/* custom module's ext_buf type */
 #define	EXT_DISPOSABLE	300	/* can throw this buffer away w/page flipping */
-#define	EXT_EXTREF	400	/* has externally maintained ref_cnt ptr*/
+#define	EXT_EXTREF	400	/* has externally maintained ref_cnt ptr */
 
 /*
  * Flags copied when copying m_pkthdr.
  */
 #define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_RDONLY|M_PROTO1|M_PROTO1|M_PROTO2|\
-			    M_PROTO3|M_PROTO4|M_PROTO5|M_PROTO6|\
+			    M_PROTO3|M_PROTO4|M_PROTO5|M_SKIP_FIREWALL|\
 			    M_BCAST|M_MCAST|M_FRAG|M_FIRSTFRAG|M_LASTFRAG)
 
 /*
@@ -221,34 +236,17 @@ struct mbuf {
 #define	MT_RIGHTS	12	/* access rights */
 #define	MT_IFADDR	13	/* interface address */
 #endif
-#define	MT_TAG		13	/* volatile metadata associated to pkts */
 #define	MT_CONTROL	14	/* extra-data protocol message */
 #define	MT_OOBDATA	15	/* expedited data  */
 #define	MT_NTYPES	16	/* number of mbuf types for mbtypes[] */
 
 /*
- * Mbuf and cluster allocation statistics PCPU structure.
- */
-struct mbpstat {
-	u_long	mb_mbfree;
-	u_long	mb_mbbucks;
-	u_long	mb_clfree;
-	u_long	mb_clbucks;
-	long	mb_mbtypes[MT_NTYPES];
-	short	mb_active;
-};
-
-/*
  * General mbuf allocator statistics structure.
- * XXX: Modifications of these are not protected by any mutex locks nor by
- * any atomic() manipulations.  As a result, we may occasionally lose
- * a count or two.  Luckily, not all of these fields are modified at all
- * and remain static, and those that are manipulated are only manipulated
- * in failure situations, which do not occur (hopefully) very often.
  */
 struct mbstat {
-	u_long	m_drops;	/* times failed to allocate */
-	u_long	m_wait;		/* times succesfully returned from wait */
+	u_long	m_mbufs;	/* XXX */
+	u_long	m_mclusts;	/* XXX */
+
 	u_long	m_drain;	/* times drained protocols for space */
 	u_long	m_mcfail;	/* XXX: times m_copym failed */
 	u_long	m_mpfail;	/* XXX: times m_pullup failed */
@@ -257,22 +255,35 @@ struct mbstat {
 	u_long	m_minclsize;	/* min length of data to allocate a cluster */
 	u_long	m_mlen;		/* length of data in an mbuf */
 	u_long	m_mhlen;	/* length of data in a header mbuf */
-	u_int	m_mbperbuck;	/* number of mbufs per "bucket" */
-	u_int	m_clperbuck;	/* number of clusters per "bucket" */
-	/* Number of mbtypes (gives # elems in mbpstat's mb_mbtypes[] array: */
+
+	/* Number of mbtypes (gives # elems in mbtypes[] array: */
 	short	m_numtypes;
+
+	/* XXX: Sendfile stats should eventually move to their own struct */
+	u_long	sf_iocnt;	/* times sendfile had to do disk I/O */
+	u_long	sf_allocfail;	/* times sfbuf allocation failed */
+	u_long	sf_allocwait;	/* times sfbuf allocation had to wait */
 };
 
 /*
  * Flags specifying how an allocation should be made.
- * M_DONTWAIT means "don't block if nothing is available" whereas
- * M_TRYWAIT means "block for mbuf_wait ticks at most if nothing is
- * available."
+ *
+ * The flag to use is as follows:
+ * - M_DONTWAIT or M_NOWAIT from an interrupt handler to not block allocation.
+ * - M_WAIT or M_WAITOK or M_TRYWAIT from wherever it is safe to block.
+ *
+ * M_DONTWAIT/M_NOWAIT means that we will not block the thread explicitly
+ * and if we cannot allocate immediately we may return NULL,
+ * whereas M_WAIT/M_WAITOK/M_TRYWAIT means that if we cannot allocate
+ * resources we will block until they are available, and thus never
+ * return NULL.
+ *
+ * XXX Eventually just phase this out to use M_WAITOK/M_NOWAIT.
  */
-#define	M_DONTWAIT	0x4		/* don't conflict with M_NOWAIT */
-#define	M_TRYWAIT	0x8		/* or M_WAITOK */
-#define	M_WAIT		M_TRYWAIT	/* XXX: deprecated */
-#define	MBTOM(how)	((how) & M_TRYWAIT ? M_WAITOK : M_NOWAIT)
+#define	MBTOM(how)	(how)
+#define	M_DONTWAIT	M_NOWAIT
+#define	M_TRYWAIT	M_WAITOK
+#define	M_WAIT		M_WAITOK
 
 #ifdef _KERNEL
 /*-
@@ -295,35 +306,127 @@ struct mbstat {
 
 #define	MEXT_ADD_REF(m)	atomic_add_int((m)->m_ext.ref_cnt, 1)
 
+#ifdef WITNESS
+#define MBUF_CHECKSLEEP(how) do {					\
+	if (how == M_WAITOK)						\
+		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,		\
+		    "Sleeping in \"%s\"", __func__);			\
+} while(0)
+#else
+#define MBUF_CHECKSLEEP(how)
+#endif
+
+/*
+ * Network buffer allocation API
+ *
+ * The rest of it is defined in kern/subr_mbuf.c
+ */
+
+extern uma_zone_t	zone_mbuf;
+extern uma_zone_t	zone_clust;
+extern uma_zone_t	zone_pack;
+
+static __inline struct mbuf	*m_get(int how, short type);
+static __inline struct mbuf	*m_gethdr(int how, short type);
+static __inline struct mbuf	*m_getcl(int how, short type, int flags);
+static __inline struct mbuf	*m_getclr(int how, short type);	/* XXX */
+static __inline struct mbuf	*m_free(struct mbuf *m);
+static __inline void		 m_clget(struct mbuf *m, int how);
+static __inline void		 m_chtype(struct mbuf *m, short new_type);
+void				 mb_free_ext(struct mbuf *);
+
+static __inline
+struct mbuf *
+m_get(int how, short type)
+{
+	struct mb_args args;
+
+	args.flags = 0;
+	args.type = type;
+	return (uma_zalloc_arg(zone_mbuf, &args, how));
+}
+
+/* XXX This should be depracated, very little use */
+static __inline
+struct mbuf *
+m_getclr(int how, short type)
+{
+	struct mbuf *m;
+	struct mb_args args;
+
+	args.flags = 0;
+	args.type = type;
+	m = uma_zalloc_arg(zone_mbuf, &args, how);
+	if (m != NULL)
+		bzero(m->m_data, MLEN);
+	return m;
+}
+
+static __inline
+struct mbuf *
+m_gethdr(int how, short type)
+{
+	struct mb_args args;
+
+	args.flags = M_PKTHDR;
+	args.type = type;
+	return (uma_zalloc_arg(zone_mbuf, &args, how));
+}
+
+static __inline
+struct mbuf *
+m_getcl(int how, short type, int flags)
+{
+	struct mb_args args;
+
+	args.flags = flags;
+	args.type = type;
+	return (uma_zalloc_arg(zone_pack, &args, how));
+}
+
+static __inline
+struct mbuf *
+m_free(struct mbuf *m)
+{
+	struct mbuf *n = m->m_next;
+
+#ifdef INVARIANTS
+	m->m_flags |= M_FREELIST;
+#endif
+	if (m->m_flags & M_EXT)
+		mb_free_ext(m);
+	else
+		uma_zfree(zone_mbuf, m);
+	return n;
+}
+
+static __inline
+void
+m_clget(struct mbuf *m, int how)
+{
+
+	m->m_ext.ext_buf = NULL;
+	uma_zalloc_arg(zone_clust, m, how);
+}
+
+static __inline
+void
+m_chtype(struct mbuf *m, short new_type)
+{
+	m->m_type = new_type;
+}
+
 /*
  * mbuf, cluster, and external object allocation macros
  * (for compatibility purposes).
  */
 /* NB: M_COPY_PKTHDR is deprecated.  Use M_MOVE_PKTHDR or m_dup_pktdr. */
 #define	M_MOVE_PKTHDR(to, from)	m_move_pkthdr((to), (from))
-#define	m_getclr(how, type)	m_get_clrd((how), (type))
 #define	MGET(m, how, type)	((m) = m_get((how), (type)))
 #define	MGETHDR(m, how, type)	((m) = m_gethdr((how), (type)))
 #define	MCLGET(m, how)		m_clget((m), (how))
 #define	MEXTADD(m, buf, size, free, args, flags, type) 			\
     m_extadd((m), (caddr_t)(buf), (size), (free), (args), (flags), (type))
-
-/*
- * MEXTFREE(m): disassociate (and possibly free) an external object from (m).
- * 
- * If the atomic_cmpset_int() returns 0, then we effectively do nothing
- * in terms of "cleaning up" (freeing the ext buf and ref. counter) as
- * this means that either there are still references, or another thread
- * is taking care of the clean-up.
- */
-#define	MEXTFREE(m) do {						\
-	struct mbuf *_mb = (m);						\
-									\
-	MEXT_REM_REF(_mb);						\
-	if (atomic_cmpset_int(_mb->m_ext.ref_cnt, 0, 1))		\
-		_mext_free(_mb);					\
-	_mb->m_flags &= ~M_EXT;						\
-} while (0)
 
 /*
  * Evaluate TRUE if it's safe to write to the mbuf m's data region (this
@@ -333,19 +436,15 @@ struct mbstat {
 #define	M_WRITABLE(m)	(!((m)->m_flags & M_RDONLY) && (!((m)->m_flags  \
 			    & M_EXT) || !MEXT_IS_REF(m)))
 
-/*
- * Check if the supplied mbuf has a packet header, or else panic.
- */
-#define M_ASSERTPKTHDR(m)				\
-	KASSERT(m != NULL && m->m_flags & M_PKTHDR,	\
-		("%s: no mbuf packet header!", __func__))
+/* Check if the supplied mbuf has a packet header, or else panic. */
+#define	M_ASSERTPKTHDR(m)						\
+	KASSERT(m != NULL && m->m_flags & M_PKTHDR,			\
+	    ("%s: no mbuf packet header!", __func__))
 
-/*
- * Ensure that the supplied mbuf is a valid, non-free mbuf.
- */
-#define M_ASSERTVALID(m)					\
-	KASSERT((((struct mbuf *)m)->m_flags & M_FREELIST) == 0,			\
-		("%s: attempted use of a free mbuf!", __func__))
+/* Ensure that the supplied mbuf is a valid, non-free mbuf. */
+#define	M_ASSERTVALID(m)						\
+	KASSERT((((struct mbuf *)m)->m_flags & M_FREELIST) == 0,	\
+	    ("%s: attempted use of a free mbuf!", __func__))
 
 /*
  * Set the m_data pointer of a newly-allocated mbuf (m_get/MGET) to place
@@ -401,6 +500,7 @@ struct mbstat {
 	int _mplen = (plen);						\
 	int __mhow = (how);						\
 									\
+	MBUF_CHECKSLEEP(how);						\
 	if (M_LEADINGSPACE(_mm) >= _mplen) {				\
 		_mm->m_data -= _mplen;					\
 		_mm->m_len += _mplen;					\
@@ -429,18 +529,16 @@ extern	int max_linkhdr;		/* Largest link-level header */
 extern	int max_protohdr;		/* Largest protocol header */
 extern	struct mbstat mbstat;		/* General mbuf stats/infos */
 extern	int nmbclusters;		/* Maximum number of clusters */
-extern	int nmbcnt;			/* Scale kmem_map for counter space */
-extern	int nmbufs;			/* Maximum number of mbufs */
-extern	int nsfbufs;			/* Number of sendfile(2) bufs */
 
-void		 _mext_free(struct mbuf *);
+struct uio;
+
 void		 m_adj(struct mbuf *, int);
+int		 m_apply(struct mbuf *, int, int,
+		    int (*)(void *, void *, u_int), void *);
 void		 m_cat(struct mbuf *, struct mbuf *);
-void		 m_chtype(struct mbuf *, short);
-void		 m_clget(struct mbuf *, int);
 void		 m_extadd(struct mbuf *, caddr_t, u_int,
 		    void (*)(void *, void *), void *, int, int);
-void		 m_copyback(struct mbuf *, int, int, caddr_t);
+void		 m_copyback(struct mbuf *, int, int, c_caddr_t);
 void		 m_copydata(const struct mbuf *, int, int, caddr_t);
 struct	mbuf	*m_copym(struct mbuf *, int, int, int);
 struct	mbuf	*m_copypacket(struct mbuf *, int);
@@ -452,24 +550,20 @@ struct	mbuf	*m_dup(struct mbuf *, int);
 int		 m_dup_pkthdr(struct mbuf *, struct mbuf *, int);
 u_int		 m_fixhdr(struct mbuf *);
 struct	mbuf	*m_fragment(struct mbuf *, int, int);
-struct	mbuf	*m_free(struct mbuf *);
 void		 m_freem(struct mbuf *);
-struct	mbuf	*m_get(int, short);
-struct	mbuf	*m_get_clrd(int, short);
-struct	mbuf	*m_getcl(int, short, int);
-struct	mbuf	*m_gethdr(int, short);
-struct	mbuf	*m_gethdr_clrd(int, short);
 struct	mbuf	*m_getm(struct mbuf *, int, int, short);
+struct	mbuf	*m_getptr(struct mbuf *, int, int *);
 u_int		 m_length(struct mbuf *, struct mbuf **);
 void		 m_move_pkthdr(struct mbuf *, struct mbuf *);
 struct	mbuf	*m_prepend(struct mbuf *, int, int);
-void		 m_print(const struct mbuf *);
+void		 m_print(const struct mbuf *, int);
 struct	mbuf	*m_pulldown(struct mbuf *, int, int, int *);
 struct	mbuf	*m_pullup(struct mbuf *, int);
 struct	mbuf	*m_split(struct mbuf *, int, int);
+struct	mbuf	*m_uiotombuf(struct uio *, int, int);
 
-/*
- * Packets may have annotations attached by affixing a list
+/*-
+ * Network packets may have annotations attached by affixing a list
  * of "packet tags" to the pkthdr structure.  Packet tags are
  * dynamically allocated semi-opaque data structures that have
  * a fixed header (struct m_tag) that specifies the size of the
@@ -487,11 +581,11 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  * a private cookie value so that packet tag-related definitions
  * can be maintained privately.
  *
- * Note that the packet tag returned by m_tag_allocate has the default
+ * Note that the packet tag returned by m_tag_alloc has the default
  * memory alignment implemented by malloc.  To reference private data
  * one can use a construct like:
  *
- *	struct m_tag *mtag = m_tag_allocate(...);
+ *	struct m_tag *mtag = m_tag_alloc(...);
  *	struct foo *p = (struct foo *)(mtag+1);
  *
  * if the alignment of struct m_tag is sufficient for referencing members
@@ -502,7 +596,7 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  *		struct m_tag	tag;
  *		...
  *	};
- *	struct foo *p = (struct foo *) m_tag_allocate(...);
+ *	struct foo *p = (struct foo *) m_tag_alloc(...);
  *	struct m_tag *mtag = &p->tag;
  */
 
@@ -523,7 +617,7 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
 
 #define	PACKET_TAG_NONE				0  /* Nadda */
 
-/* Packet tag for use with PACKET_ABI_COMPAT. */
+/* Packet tags for use with PACKET_ABI_COMPAT. */
 #define	PACKET_TAG_IPSEC_IN_DONE		1  /* IPsec applied, in */
 #define	PACKET_TAG_IPSEC_OUT_DONE		2  /* IPsec applied, out */
 #define	PACKET_TAG_IPSEC_IN_CRYPTO_DONE		3  /* NIC IPsec crypto done */
@@ -538,43 +632,95 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
 #define	PACKET_TAG_IPSEC_SOCKET			12 /* IPSEC socket ref */
 #define	PACKET_TAG_IPSEC_HISTORY		13 /* IPSEC history */
 #define	PACKET_TAG_IPV6_INPUT			14 /* IPV6 input processing */
-
-/*
- * As a temporary and low impact solution to replace the even uglier
- * approach used so far in some parts of the network stack (which relies
- * on global variables), packet tag-like annotations are stored in MT_TAG
- * mbufs (or lookalikes) prepended to the actual mbuf chain.
- *
- *	m_type	= MT_TAG
- *	m_flags = m_tag_id
- *	m_next	= next buffer in chain.
- *
- * BE VERY CAREFUL not to pass these blocks to the mbuf handling routines.
- */
-#define	_m_tag_id	m_hdr.mh_flags
-
-/* Packet tags used in the FreeBSD network stack. */
 #define	PACKET_TAG_DUMMYNET			15 /* dummynet info */
-#define	PACKET_TAG_IPFW				16 /* ipfw classification */
 #define	PACKET_TAG_DIVERT			17 /* divert info */
 #define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
 #define	PACKET_TAG_MACLABEL	(19 | MTAG_PERSISTENT) /* MAC label */
-#define	PACKET_TAG_IPFASTFWD_OURS		20 /* IP fastforward dropback */
+#define	PACKET_TAG_PF_ROUTED			21 /* PF routed, avoid loops */
+#define	PACKET_TAG_PF_FRAGCACHE			22 /* PF fragment cached */
+#define	PACKET_TAG_PF_QID			23 /* PF ALTQ queue id */
+#define	PACKET_TAG_PF_TAG			24 /* PF tagged */
+#define	PACKET_TAG_RTSOCKFAM			25 /* rtsock sa family */
+#define	PACKET_TAG_PF_TRANSLATE_LOCALHOST	26 /* PF translate localhost */
+#define	PACKET_TAG_IPOPTIONS			27 /* Saved IP options */
 
 /* Packet tag routines. */
-struct	m_tag 	*m_tag_alloc(u_int32_t, int, int, int);
-void		 m_tag_free(struct m_tag *);
-void		 m_tag_prepend(struct mbuf *, struct m_tag *);
-void		 m_tag_unlink(struct mbuf *, struct m_tag *);
+struct	m_tag	*m_tag_alloc(u_int32_t, int, int, int);
 void		 m_tag_delete(struct mbuf *, struct m_tag *);
 void		 m_tag_delete_chain(struct mbuf *, struct m_tag *);
 struct	m_tag	*m_tag_locate(struct mbuf *, u_int32_t, int, struct m_tag *);
 struct	m_tag	*m_tag_copy(struct m_tag *, int);
 int		 m_tag_copy_chain(struct mbuf *, struct mbuf *, int);
-void		 m_tag_init(struct mbuf *);
-struct	m_tag	*m_tag_first(struct mbuf *);
-struct	m_tag	*m_tag_next(struct mbuf *, struct m_tag *);
 void		 m_tag_delete_nonpersistent(struct mbuf *);
+
+/*
+ * Initialize the list of tags associated with an mbuf.
+ */
+static __inline void
+m_tag_init(struct mbuf *m)
+{
+	SLIST_INIT(&m->m_pkthdr.tags);
+}
+
+/*
+ * Set up the contents of a tag.  Note that this does not
+ * fill in the free method; the caller is expected to do that.
+ *
+ * XXX probably should be called m_tag_init, but that was
+ * already taken.
+ */
+static __inline void
+m_tag_setup(struct m_tag *t, u_int32_t cookie, int type, int len)
+{
+	t->m_tag_id = type;
+	t->m_tag_len = len;
+	t->m_tag_cookie = cookie;
+}
+
+/*
+ * Reclaim resources associated with a tag.
+ */
+static __inline void
+m_tag_free(struct m_tag *t)
+{
+	(*t->m_tag_free)(t);
+}
+
+/*
+ * Return the first tag associated with an mbuf.
+ */
+static __inline struct m_tag *
+m_tag_first(struct mbuf *m)
+{
+	return (SLIST_FIRST(&m->m_pkthdr.tags));
+}
+
+/*
+ * Return the next tag in the list of tags associated with an mbuf.
+ */
+static __inline struct m_tag *
+m_tag_next(struct mbuf *m, struct m_tag *t)
+{
+	return (SLIST_NEXT(t, m_tag_link));
+}
+
+/*
+ * Prepend a tag to the list of tags associated with an mbuf.
+ */
+static __inline void
+m_tag_prepend(struct mbuf *m, struct m_tag *t)
+{
+	SLIST_INSERT_HEAD(&m->m_pkthdr.tags, t, m_tag_link);
+}
+
+/*
+ * Unlink a tag from the list of tags associated with an mbuf.
+ */
+static __inline void
+m_tag_unlink(struct mbuf *m, struct m_tag *t)
+{
+	SLIST_REMOVE(&m->m_pkthdr.tags, t, m_tag, m_tag_link);
+}
 
 /* These are for OpenBSD compatibility. */
 #define	MTAG_ABI_COMPAT		0		/* compatibility ABI */
@@ -582,14 +728,16 @@ void		 m_tag_delete_nonpersistent(struct mbuf *);
 static __inline struct m_tag *
 m_tag_get(int type, int length, int wait)
 {
-	return m_tag_alloc(MTAG_ABI_COMPAT, type, length, wait);
+	return (m_tag_alloc(MTAG_ABI_COMPAT, type, length, wait));
 }
 
 static __inline struct m_tag *
 m_tag_find(struct mbuf *m, int type, struct m_tag *start)
 {
-	return m_tag_locate(m, MTAG_ABI_COMPAT, type, start);
+	return (SLIST_EMPTY(&m->m_pkthdr.tags) ?
+	    NULL : m_tag_locate(m, MTAG_ABI_COMPAT, type, start));
 }
+
 #endif /* _KERNEL */
 
 #endif /* !_SYS_MBUF_H_ */

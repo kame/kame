@@ -41,13 +41,14 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_isic_pnp.c,v 1.9 2003/06/10 23:45:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_isic_pnp.c,v 1.11 2004/05/30 20:27:16 phk Exp $");
 
 #include "opt_i4b.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <net/if.h>
 
@@ -188,9 +189,9 @@ isic_pnp_attach(device_t dev)
 
 	/* get io_base */
 	if(!(sc->sc_resources.io_base[0] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-						&sc->sc_resources.io_rid[0],
-						0UL, ~0UL, 1, RF_ACTIVE ) ))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[0],
+					       RF_ACTIVE ) ))
 	{
 		printf("isic_pnp_attach: Couldn't get my io_base.\n");
 		return ENXIO;                                       
@@ -203,9 +204,9 @@ isic_pnp_attach(device_t dev)
 	/* get irq, release io_base if we don't get it */
 
 	if(!(sc->sc_resources.irq =
-			bus_alloc_resource(dev, SYS_RES_IRQ,
-					   &sc->sc_resources.irq_rid,
-					   0UL, ~0UL, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IRQ,
+					       &sc->sc_resources.irq_rid,
+					       RF_ACTIVE)))
 	{
 		printf("isic%d: Could not get irq.\n",unit);
 		isic_detach_common(dev);

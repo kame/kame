@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_aes.c,v 1.23 2003/06/11 06:49:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_aes.c,v 1.26 2004/08/08 07:57:51 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -266,7 +266,7 @@ g_aes_access(struct g_provider *pp, int dr, int dw, int de)
 	/* ... and let go of it on last close */
 	if ((cp->acr + dr) == 0 && (cp->acw + dw) == 0 && (cp->ace + de) == 1)
 		de--;
-	return (g_access_rel(cp, dr, dw, de));
+	return (g_access(cp, dr, dw, de));
 }
 
 static struct g_geom *
@@ -283,12 +283,9 @@ g_aes_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	g_trace(G_T_TOPOLOGY, "aes_taste(%s,%s)", mp->name, pp->name);
 	g_topology_assert();
 	gp = g_new_geomf(mp, "%s.aes", pp->name);
-	gp->start = g_aes_start;
-	gp->orphan = g_aes_orphan;
-	gp->spoiled = g_std_spoiled;
 	cp = g_new_consumer(gp);
 	g_attach(cp, pp);
-	error = g_access_rel(cp, 1, 0, 0);
+	error = g_access(cp, 1, 0, 0);
 	if (error) {
 		g_detach(cp);
 		g_destroy_consumer(cp);
@@ -321,7 +318,6 @@ g_aes_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 		}
 		g_free(buf);
 		gp->softc = sc;
-		gp->access = g_aes_access;
 		sc->sectorsize = sectorsize;
 		sc->mediasize = mediasize - sectorsize;
 		rijndael_cipherInit(&sc->ci, MODE_CBC, NULL);
@@ -357,7 +353,7 @@ g_aes_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	g_topology_lock();
 	if (buf)
 		g_free(buf);
-	g_access_rel(cp, -1, 0, 0);
+	g_access(cp, -1, 0, 0);
 	if (gp->softc != NULL) 
 		return (gp);
 	g_detach(cp);
@@ -368,7 +364,12 @@ g_aes_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 
 static struct g_class g_aes_class	= {
 	.name = AES_CLASS_NAME,
+	.version = G_VERSION,
 	.taste = g_aes_taste,
+	.start = g_aes_start,
+	.orphan = g_aes_orphan,
+	.spoiled = g_std_spoiled,
+	.access = g_aes_access,
 };
 
 DECLARE_GEOM_CLASS(g_aes_class, g_aes);

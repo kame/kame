@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_pager.h	8.4 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_pager.h,v 1.44 2003/10/24 06:43:04 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_pager.h,v 1.47 2004/04/08 19:08:49 alc Exp $
  */
 
 /*
@@ -95,7 +91,6 @@ MALLOC_DECLARE(M_VMPGDATA);
 #endif
 
 extern vm_map_t pager_map;
-extern int pager_map_size;
 extern struct pagerops *pagertab[];
 extern struct mtx pbuf_mtx;
 
@@ -106,8 +101,6 @@ static __inline int vm_pager_get_pages(vm_object_t, vm_page_t *, int, int);
 static __inline boolean_t vm_pager_has_page(vm_object_t, vm_pindex_t, int *, int *);
 void vm_pager_init(void);
 vm_object_t vm_pager_object_lookup(struct pagerlst *, void *);
-vm_offset_t vm_pager_map_page(vm_page_t);
-void vm_pager_unmap_page(vm_offset_t);
 
 /*
  *	vm_page_get_pages:

@@ -1,7 +1,7 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
+ * Copyright (c) 1999-2002 Robert N. M. Watson
  * Copyright (c) 2001 Ilmar S. Habibulin
- * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
+ * Copyright (c) 2001-2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson and Ilmar Habibulin for the
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/security/mac/mac_vfs.c,v 1.104 2003/11/12 03:14:30 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/security/mac/mac_vfs.c,v 1.106 2004/06/16 09:47:20 phk Exp $");
 
 #include "opt_mac.h"
 #include "opt_devfs.h"
@@ -938,7 +938,7 @@ mac_check_mount_stat(struct ucred *cred, struct mount *mount)
 }
 
 void
-mac_create_devfs_device(struct mount *mp, dev_t dev, struct devfs_dirent *de)
+mac_create_devfs_device(struct mount *mp, struct cdev *dev, struct devfs_dirent *de)
 {
 
 	MAC_PERFORM(create_devfs_device, mp, dev, de, de->de_label);

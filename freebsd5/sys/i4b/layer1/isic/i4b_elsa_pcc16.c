@@ -31,7 +31,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_pcc16.c,v 1.8 2003/06/10 23:45:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_pcc16.c,v 1.9 2004/03/17 17:50:50 njl Exp $");
 
 #include "opt_i4b.h"
 
@@ -237,9 +237,9 @@ isic_probe_Epcc16(device_t dev)
 	/* see if an io base was supplied */
 	
 	if(!(sc->sc_resources.io_base[0] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-	                                   &sc->sc_resources.io_rid[0],
-	                                   0ul, ~0ul, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[0],
+					       RF_ACTIVE)))
 	{
 		printf("isic%d: Could not get iobase for ELSA PCC-16.\n",
 				unit);
@@ -321,9 +321,9 @@ isic_probe_Epcc16(device_t dev)
 	/* get our irq */
 
 	if(!(sc->sc_resources.irq =
-			bus_alloc_resource(dev, SYS_RES_IRQ,
-					&sc->sc_resources.irq_rid,
-					0ul, ~0ul, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IRQ,
+					       &sc->sc_resources.irq_rid,
+					       RF_ACTIVE)))
 	{
 		printf("isic%d: Could not get an irq.\n",unit);
 		isic_detach_Epcc16(dev);

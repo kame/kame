@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,14 +27,14 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)exec.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/sys/imgact_aout.h,v 1.18 2002/09/05 07:54:03 bde Exp $
+ * $FreeBSD: src/sys/sys/imgact_aout.h,v 1.21 2004/06/22 17:05:37 obrien Exp $
  */
 
 #ifndef	_IMGACT_AOUT_H_
 #define	_IMGACT_AOUT_H_
 
 #define N_GETMAGIC(ex) \
-	( (ex).a_midmag & 0xffff )
+	( le32toh((ex).a_midmag) & 0xffff )
 #define N_GETMID(ex) \
 	( (N_GETMAGIC_NET(ex) == ZMAGIC) ? N_GETMID_NET(ex) : \
 	((ex).a_midmag >> 16) & 0x03ff )
@@ -46,8 +42,9 @@
 	( (N_GETMAGIC_NET(ex) == ZMAGIC) ? N_GETFLAG_NET(ex) : \
 	((ex).a_midmag >> 26) & 0x3f )
 #define N_SETMAGIC(ex,mag,mid,flag) \
-	( (ex).a_midmag = (((flag) & 0x3f) <<26) | (((mid) & 0x03ff) << 16) | \
-	((mag) & 0xffff) )
+	( (ex).a_midmag = htole32((((flag) & 0x3f) <<26) | \
+	(((mid) & 0x03ff) << 16) | \
+	((mag) & 0xffff)) )
 
 #define N_GETMAGIC_NET(ex) \
 	(ntohl((ex).a_midmag) & 0xffff)
@@ -62,7 +59,7 @@
 #define N_ALIGN(ex,x) \
 	(N_GETMAGIC(ex) == ZMAGIC || N_GETMAGIC(ex) == QMAGIC || \
 	 N_GETMAGIC_NET(ex) == ZMAGIC || N_GETMAGIC_NET(ex) == QMAGIC ? \
-	 ((x) + __LDPGSZ - 1) & ~(unsigned long)(__LDPGSZ - 1) : (x))
+	 ((x) + __LDPGSZ - 1) & ~(uint32_t)(__LDPGSZ - 1) : (x))
 
 /* Valid magic number check. */
 #define	N_BADMAG(ex) \
@@ -79,11 +76,12 @@
 #define N_TXTADDR(ex) \
 	((N_GETMAGIC(ex) == OMAGIC || N_GETMAGIC(ex) == NMAGIC || \
 	N_GETMAGIC(ex) == ZMAGIC) ? \
-	((ex).a_entry < (ex).a_text ? 0 : (ex).a_entry & ~__LDPGSZ) : __LDPGSZ)
+	(le32toh((ex).a_entry) < le32toh((ex).a_text) ? 0 : \
+	le32toh((ex).a_entry) & ~__LDPGSZ) : __LDPGSZ)
 
 /* Address of the bottom of the data segment. */
 #define N_DATADDR(ex) \
-	N_ALIGN(ex, N_TXTADDR(ex) + (ex).a_text)
+	N_ALIGN(ex, N_TXTADDR(ex) + le32toh((ex).a_text))
 
 /* Text segment offset. */
 #define	N_TXTOFF(ex) \
@@ -92,18 +90,18 @@
 
 /* Data segment offset. */
 #define	N_DATOFF(ex) \
-	N_ALIGN(ex, N_TXTOFF(ex) + (ex).a_text)
+	N_ALIGN(ex, N_TXTOFF(ex) + le32toh((ex).a_text))
 
 /* Relocation table offset. */
 #define N_RELOFF(ex) \
-	N_ALIGN(ex, N_DATOFF(ex) + (ex).a_data)
+	N_ALIGN(ex, N_DATOFF(ex) + le32toh((ex).a_data))
 
 /* Symbol table offset. */
 #define N_SYMOFF(ex) \
-	(N_RELOFF(ex) + (ex).a_trsize + (ex).a_drsize)
+	(N_RELOFF(ex) + le32toh((ex).a_trsize) + le32toh((ex).a_drsize))
 
 /* String table offset. */
-#define	N_STROFF(ex) 	(N_SYMOFF(ex) + (ex).a_syms)
+#define	N_STROFF(ex) 	(N_SYMOFF(ex) + le32toh((ex).a_syms))
 
 /*
  * Header prepended to each a.out file.
@@ -112,14 +110,14 @@
  */
 
 struct exec {
-     unsigned long	a_midmag;	/* flags<<26 | mid<<16 | magic */
-     unsigned long	a_text;		/* text segment size */
-     unsigned long	a_data;		/* initialized data size */
-     unsigned long	a_bss;		/* uninitialized data size */
-     unsigned long	a_syms;		/* symbol table size */
-     unsigned long	a_entry;	/* entry point */
-     unsigned long	a_trsize;	/* text relocation size */
-     unsigned long	a_drsize;	/* data relocation size */
+     uint32_t	a_midmag;	/* flags<<26 | mid<<16 | magic */
+     uint32_t	a_text;		/* text segment size */
+     uint32_t	a_data;		/* initialized data size */
+     uint32_t	a_bss;		/* uninitialized data size */
+     uint32_t	a_syms;		/* symbol table size */
+     uint32_t	a_entry;	/* entry point */
+     uint32_t	a_trsize;	/* text relocation size */
+     uint32_t	a_drsize;	/* data relocation size */
 };
 #define a_magic a_midmag /* XXX Hack to work with current kern_execve.c */
 
@@ -135,6 +133,7 @@ struct exec {
 #define	MID_SUN020	2	/* sun 68020-only binary */
 #define MID_I386	134	/* i386 BSD binary */
 #define MID_SPARC	138	/* sparc */
+#define MID_ARM6	143	/* ARM6 */
 #define	MID_HP200	200	/* hp200 (68010) BSD binary */
 #define	MID_HP300	300	/* hp300 (68020+68881) BSD binary */
 #define	MID_HPUX	0x20C	/* hp200/300 HP-UX binary */

@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
+ * Copyright (c) 1999-2002 Robert N. M. Watson
+ * Copyright (c) 2001-2004 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,13 +31,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/mac_policy.h,v 1.46 2003/12/06 21:48:03 rwatson Exp $
+ * $FreeBSD: src/sys/sys/mac_policy.h,v 1.55 2004/06/24 03:34:43 rwatson Exp $
  */
 /*
  * Kernel interface for MAC policy modules.
  */
-#ifndef _SYS_MAC_POLICY_H
-#define _SYS_MAC_POLICY_H
+#ifndef _SYS_MAC_POLICY_H_
+#define _SYS_MAC_POLICY_H_
 
 /*-
  * Pluggable access control policy definition structure.
@@ -52,19 +52,28 @@
  * alphabetically.
  */
 struct acl;
+struct bpf_d;
 struct componentname;
 struct devfs_dirent;
+struct ifnet;
+struct image_params;
 struct inpcb;
 struct ipq;
 struct label;
 struct mac_policy_conf;
 struct mbuf;
 struct mount;
-struct pipe;
+struct pipepair;
+struct proc;
 struct sbuf;
+struct sockaddr;
 struct socket;
+struct sysctl_oid;
+struct sysctl_req;
+struct thread;
 struct ucred;
 struct uio;
+struct vattr;
 struct vnode;
 struct mac_policy_ops {
 	/*
@@ -113,6 +122,8 @@ struct mac_policy_ops {
 	void	(*mpo_destroy_vnode_label)(struct label *label);
 	void	(*mpo_copy_cred_label)(struct label *src,
 		    struct label *dest);
+	void	(*mpo_copy_ifnet_label)(struct label *src,
+		    struct label *dest);
 	void	(*mpo_copy_mbuf_label)(struct label *src,
 		    struct label *dest);
 	void	(*mpo_copy_pipe_label)(struct label *src,
@@ -158,7 +169,7 @@ struct mac_policy_ops {
 	void	(*mpo_associate_vnode_singlelabel)(struct mount *mp,
 		    struct label *fslabel, struct vnode *vp,
 		    struct label *vlabel);
-	void	(*mpo_create_devfs_device)(struct mount *mp, dev_t dev,
+	void	(*mpo_create_devfs_device)(struct mount *mp, struct cdev *dev,
 		    struct devfs_dirent *de, struct label *label);
 	void	(*mpo_create_devfs_directory)(struct mount *mp, char *dirname,
 		    int dirnamelen, struct devfs_dirent *de,
@@ -199,7 +210,7 @@ struct mac_policy_ops {
 		    struct label *newsocketlabel);
 	void	(*mpo_relabel_socket)(struct ucred *cred, struct socket *so,
 		    struct label *oldlabel, struct label *newlabel);
-	void	(*mpo_relabel_pipe)(struct ucred *cred, struct pipe *pipe,
+	void	(*mpo_relabel_pipe)(struct ucred *cred, struct pipepair *pp,
 		    struct label *oldlabel, struct label *newlabel);
 	void	(*mpo_set_socket_peer_from_mbuf)(struct mbuf *mbuf,
 		    struct label *mbuflabel, struct socket *so,
@@ -207,7 +218,7 @@ struct mac_policy_ops {
 	void	(*mpo_set_socket_peer_from_socket)(struct socket *oldsocket,
 		    struct label *oldsocketlabel, struct socket *newsocket,
 		    struct label *newsocketpeerlabel);
-	void	(*mpo_create_pipe)(struct ucred *cred, struct pipe *pipe,
+	void	(*mpo_create_pipe)(struct ucred *cred, struct pipepair *pp,
 		    struct label *pipelabel);
 
 	/*
@@ -229,6 +240,9 @@ struct mac_policy_ops {
 	void	(*mpo_create_fragment)(struct mbuf *datagram,
 		    struct label *datagramlabel, struct mbuf *fragment,
 		    struct label *fragmentlabel);
+	void	(*mpo_create_mbuf_from_inpcb)(struct inpcb *inp,
+		    struct label *inplabel, struct mbuf *m,
+		    struct label *mlabel);
 	void	(*mpo_create_mbuf_from_mbuf)(struct mbuf *oldmbuf,
 		    struct label *oldlabel, struct mbuf *newmbuf,
 		    struct label *newlabel);
@@ -309,19 +323,20 @@ struct mac_policy_ops {
 	int	(*mpo_check_kld_unload)(struct ucred *cred);
 	int	(*mpo_check_mount_stat)(struct ucred *cred, struct mount *mp,
 		    struct label *mntlabel);
-	int	(*mpo_check_pipe_ioctl)(struct ucred *cred, struct pipe *pipe,
-		    struct label *pipelabel, unsigned long cmd, void *data); 
-	int	(*mpo_check_pipe_poll)(struct ucred *cred, struct pipe *pipe,
-		    struct label *pipelabel);
-	int	(*mpo_check_pipe_read)(struct ucred *cred, struct pipe *pipe,
-		    struct label *pipelabel);
+	int	(*mpo_check_pipe_ioctl)(struct ucred *cred,
+		    struct pipepair *pp, struct label *pipelabel,
+		    unsigned long cmd, void *data); 
+	int	(*mpo_check_pipe_poll)(struct ucred *cred,
+		    struct pipepair *pp, struct label *pipelabel);
+	int	(*mpo_check_pipe_read)(struct ucred *cred,
+		    struct pipepair *pp, struct label *pipelabel);
 	int	(*mpo_check_pipe_relabel)(struct ucred *cred,
-		    struct pipe *pipe, struct label *pipelabel,
+		    struct pipepair *pp, struct label *pipelabel,
 		    struct label *newlabel);
-	int	(*mpo_check_pipe_stat)(struct ucred *cred, struct pipe *pipe,
-		    struct label *pipelabel);
-	int	(*mpo_check_pipe_write)(struct ucred *cred, struct pipe *pipe,
-		    struct label *pipelabel);
+	int	(*mpo_check_pipe_stat)(struct ucred *cred,
+		    struct pipepair *pp, struct label *pipelabel);
+	int	(*mpo_check_pipe_write)(struct ucred *cred,
+		    struct pipepair *pp, struct label *pipelabel);
 	int	(*mpo_check_proc_debug)(struct ucred *cred,
 		    struct proc *proc);
 	int	(*mpo_check_proc_sched)(struct ucred *cred,
@@ -358,9 +373,9 @@ struct mac_policy_ops {
 		    struct vnode *vp, struct label *label);
 	int	(*mpo_check_system_swapoff)(struct ucred *cred,
 		    struct vnode *vp, struct label *label);
-	int	(*mpo_check_system_sysctl)(struct ucred *cred, int *name,
-		    u_int namelen, void *old, size_t *oldlenp, int inkernel,
-		    void *new, size_t newlen);
+	int	(*mpo_check_system_sysctl)(struct ucred *cred,
+		    struct sysctl_oid *oidp, void *arg1, int arg2,
+		    struct sysctl_req *req);
 	int	(*mpo_check_vnode_access)(struct ucred *cred,
 		    struct vnode *vp, struct label *label, int acc_mode);
 	int	(*mpo_check_vnode_chdir)(struct ucred *cred,
@@ -489,4 +504,4 @@ int	mac_policy_modevent(module_t mod, int type, void *data);
 
 #define	LABEL_TO_SLOT(l, s)	(l)->l_perpolicy[s]
 
-#endif /* !_SYS_MAC_POLICY_H */
+#endif /* !_SYS_MAC_POLICY_H_ */

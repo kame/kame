@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/wchar.h,v 1.35.4.1 2003/12/18 00:59:50 peter Exp $
+ * $FreeBSD: src/include/wchar.h,v 1.45 2004/08/12 12:19:10 tjr Exp $
  */
 
 /*-
@@ -71,6 +71,7 @@
 #include <sys/_null.h>
 #include <sys/_types.h>
 #include <machine/_limits.h>
+#include <_ctype.h>
 
 #ifndef _MBSTATE_T_DECLARED
 typedef	__mbstate_t	mbstate_t;
@@ -137,24 +138,25 @@ int	vswprintf(wchar_t * __restrict, size_t n, const wchar_t * __restrict,
 int	vwprintf(const wchar_t * __restrict, __va_list);
 size_t	wcrtomb(char * __restrict, wchar_t, mbstate_t * __restrict);
 wchar_t	*wcscat(wchar_t * __restrict, const wchar_t * __restrict);
-wchar_t	*wcschr(const wchar_t *, wchar_t);
-int	wcscmp(const wchar_t *, const wchar_t *);
+wchar_t	*wcschr(const wchar_t *, wchar_t) __pure;
+int	wcscmp(const wchar_t *, const wchar_t *) __pure;
 int	wcscoll(const wchar_t *, const wchar_t *);
 wchar_t	*wcscpy(wchar_t * __restrict, const wchar_t * __restrict);
-size_t	wcscspn(const wchar_t *, const wchar_t *);
+size_t	wcscspn(const wchar_t *, const wchar_t *) __pure;
 size_t	wcsftime(wchar_t * __restrict, size_t, const wchar_t * __restrict,
 	    const struct tm * __restrict);
-size_t	wcslen(const wchar_t *);
+size_t	wcslen(const wchar_t *) __pure;
 wchar_t	*wcsncat(wchar_t * __restrict, const wchar_t * __restrict,
 	    size_t);
-int	wcsncmp(const wchar_t *, const wchar_t *, size_t);
+int	wcsncmp(const wchar_t *, const wchar_t *, size_t) __pure;
 wchar_t	*wcsncpy(wchar_t * __restrict , const wchar_t * __restrict, size_t);
-wchar_t	*wcspbrk(const wchar_t *, const wchar_t *);
-wchar_t	*wcsrchr(const wchar_t *, wchar_t);
+wchar_t	*wcspbrk(const wchar_t *, const wchar_t *) __pure;
+wchar_t	*wcsrchr(const wchar_t *, wchar_t) __pure;
 size_t	wcsrtombs(char * __restrict, const wchar_t ** __restrict, size_t,
 	    mbstate_t * __restrict);
-size_t	wcsspn(const wchar_t *, const wchar_t *);
-wchar_t	*wcsstr(const wchar_t * __restrict, const wchar_t * __restrict);
+size_t	wcsspn(const wchar_t *, const wchar_t *) __pure;
+wchar_t	*wcsstr(const wchar_t * __restrict, const wchar_t * __restrict)
+	    __pure;
 size_t	wcsxfrm(wchar_t * __restrict, const wchar_t * __restrict, size_t);
 int	wctob(wint_t);
 double	wcstod(const wchar_t * __restrict, wchar_t ** __restrict);
@@ -163,13 +165,25 @@ wchar_t	*wcstok(wchar_t * __restrict, const wchar_t * __restrict,
 long	 wcstol(const wchar_t * __restrict, wchar_t ** __restrict, int);
 unsigned long
 	 wcstoul(const wchar_t * __restrict, wchar_t ** __restrict, int);
-wchar_t	*wmemchr(const wchar_t *, wchar_t, size_t);
-int	wmemcmp(const wchar_t *, const wchar_t *, size_t);
+wchar_t	*wmemchr(const wchar_t *, wchar_t, size_t) __pure;
+int	wmemcmp(const wchar_t *, const wchar_t *, size_t) __pure;
 wchar_t	*wmemcpy(wchar_t * __restrict, const wchar_t * __restrict, size_t);
 wchar_t	*wmemmove(wchar_t *, const wchar_t *, size_t);
 wchar_t	*wmemset(wchar_t *, wchar_t, size_t);
 int	wprintf(const wchar_t * __restrict, ...);
 int	wscanf(const wchar_t * __restrict, ...);
+
+#ifndef _STDSTREAM_DECLARED
+extern struct __sFILE *__stdinp;
+extern struct __sFILE *__stdoutp;
+extern struct __sFILE *__stderrp;
+#define	_STDSTREAM_DECLARED
+#endif
+
+#define	getwc(fp)	fgetwc(fp)
+#define	getwchar()	fgetwc(__stdinp)
+#define	putwc(wc, fp)	fputwc(wc, fp)
+#define	putwchar(wc)	fputwc(wc, __stdoutp)
 
 #if __ISO_C_VISIBLE >= 1999
 int	vfwscanf(struct __sFILE * __restrict, const wchar_t * __restrict,
@@ -193,9 +207,15 @@ unsigned long long
 #if __XSI_VISIBLE
 int	wcswidth(const wchar_t *, size_t);
 int	wcwidth(wchar_t);
+#define	wcwidth(_c)	__wcwidth(_c)
 #endif
 
 #if __BSD_VISIBLE
+wchar_t	*fgetwln(struct __sFILE * __restrict, size_t * __restrict);
+size_t	mbsnrtowcs(wchar_t * __restrict, const char ** __restrict, size_t,
+	    size_t, mbstate_t * __restrict);
+size_t	wcsnrtombs(char * __restrict, const wchar_t ** __restrict, size_t,
+	    size_t, mbstate_t * __restrict);
 size_t	wcslcat(wchar_t *, const wchar_t *, size_t);
 size_t	wcslcpy(wchar_t *, const wchar_t *, size_t);
 #endif

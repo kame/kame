@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ctype.h	8.4 (Berkeley) 1/21/94
- *      $FreeBSD: src/include/ctype.h,v 1.24 2002/09/09 05:38:05 mike Exp $
+ *      $FreeBSD: src/include/ctype.h,v 1.28 2004/08/12 09:33:47 tjr Exp $
  */
 
 #ifndef _CTYPE_H_
@@ -47,25 +47,7 @@
 
 #include <sys/cdefs.h>
 #include <sys/_types.h>
-
-#define	_CTYPE_A	0x00000100L		/* Alpha */
-#define	_CTYPE_C	0x00000200L		/* Control */
-#define	_CTYPE_D	0x00000400L		/* Digit */
-#define	_CTYPE_G	0x00000800L		/* Graph */
-#define	_CTYPE_L	0x00001000L		/* Lower */
-#define	_CTYPE_P	0x00002000L		/* Punct */
-#define	_CTYPE_S	0x00004000L		/* Space */
-#define	_CTYPE_U	0x00008000L		/* Upper */
-#define	_CTYPE_X	0x00010000L		/* X digit */
-#define	_CTYPE_B	0x00020000L		/* Blank */
-#define	_CTYPE_R	0x00040000L		/* Print */
-#define	_CTYPE_I	0x00080000L		/* Ideogram */
-#define	_CTYPE_T	0x00100000L		/* Special */
-#define	_CTYPE_Q	0x00200000L		/* Phonogram */
-#define	_CTYPE_SW0	0x20000000L		/* 0 width character */
-#define	_CTYPE_SW1	0x40000000L		/* 1 width character */
-#define	_CTYPE_SW2	0x80000000L		/* 2 width character */
-#define	_CTYPE_SW3	0xc0000000L		/* 3 width character */
+#include <_ctype.h>
 
 __BEGIN_DECLS
 int	isalnum(int);
@@ -89,9 +71,12 @@ int	isascii(int);
 int	toascii(int);
 #endif
 
+#if __ISO_C_VISIBLE >= 1999
+int	isblank(int);
+#endif
+
 #if __BSD_VISIBLE
 int	digittoint(int);
-int	isblank(int);
 int	ishexnumber(int);
 int	isideogram(int);
 int	isnumber(int);
@@ -133,9 +118,12 @@ __END_DECLS
 #define	toascii(c)	((c) & 0x7F)
 #endif
 
+#if __ISO_C_VISIBLE >= 1999
+#define	isblank(c)	__istype((c), _CTYPE_B)
+#endif
+
 #if __BSD_VISIBLE
 #define	digittoint(c)	__maskrune((c), 0xFF)
-#define	isblank(c)	__istype((c), _CTYPE_B)
 #define	ishexnumber(c)	__istype((c), _CTYPE_X)
 #define	isideogram(c)	__istype((c), _CTYPE_I)
 #define	isnumber(c)	__istype((c), _CTYPE_D)
@@ -143,86 +131,5 @@ __END_DECLS
 #define	isrune(c)	__istype((c), 0xFFFFFF00L)
 #define	isspecial(c)	__istype((c), _CTYPE_T)
 #endif
-
-/* See comments in <sys/_types.h> about __ct_rune_t. */
-__BEGIN_DECLS
-unsigned long	___runetype(__ct_rune_t);
-__ct_rune_t	___tolower(__ct_rune_t);
-__ct_rune_t	___toupper(__ct_rune_t);
-__END_DECLS
-
-/*
- * _EXTERNALIZE_CTYPE_INLINES_ is defined in locale/nomacros.c to tell us
- * to generate code for extern versions of all our inline functions.
- */
-#ifdef _EXTERNALIZE_CTYPE_INLINES_
-#define	_USE_CTYPE_INLINE_
-#define	static
-#define	__inline
-#endif
-
-/*
- * <runetype.h> brings namespace pollution (struct member names).  This prevents
- * us from using the inline optimizations in the more strict __POSIX_VISIBLE and
- * __XSI_VISIBLE namespaces.  To fix this properly would require that we rename
- * member names of long-standing structs, or something equally evil.
- */
-#if !__BSD_VISIBLE && !defined(_USE_CTYPE_INLINE_) && \
-    !defined(_DONT_USE_CTYPE_INLINE_)
-#define	_DONT_USE_CTYPE_INLINE_
-#endif
-
-/*
- * Use inline functions if we are allowed to and the compiler supports them.
- */
-#if !defined(_DONT_USE_CTYPE_INLINE_) && \
-    (defined(_USE_CTYPE_INLINE_) || defined(__GNUC__) || defined(__cplusplus))
-
-#include <runetype.h>
-
-static __inline int
-__maskrune(__ct_rune_t _c, unsigned long _f)
-{
-	return ((_c < 0 || _c >= _CACHED_RUNES) ? ___runetype(_c) :
-		_CurrentRuneLocale->runetype[_c]) & _f;
-}
-
-static __inline int
-__istype(__ct_rune_t _c, unsigned long _f)
-{
-	return (!!__maskrune(_c, _f));
-}
-
-static __inline int
-__isctype(__ct_rune_t _c, unsigned long _f)
-{
-	return (_c < 0 || _c >= _CACHED_RUNES) ? 0 :
-	       !!(_DefaultRuneLocale.runetype[_c] & _f);
-}
-
-static __inline __ct_rune_t
-__toupper(__ct_rune_t _c)
-{
-	return (_c < 0 || _c >= _CACHED_RUNES) ? ___toupper(_c) :
-	       _CurrentRuneLocale->mapupper[_c];
-}
-
-static __inline __ct_rune_t
-__tolower(__ct_rune_t _c)
-{
-	return (_c < 0 || _c >= _CACHED_RUNES) ? ___tolower(_c) :
-	       _CurrentRuneLocale->maplower[_c];
-}
-
-#else /* not using inlines */
-
-__BEGIN_DECLS
-int		__maskrune(__ct_rune_t, unsigned long);
-int		__istype(__ct_rune_t, unsigned long);
-int		__isctype(__ct_rune_t, unsigned long);
-__ct_rune_t	__toupper(__ct_rune_t);
-__ct_rune_t	__tolower(__ct_rune_t);
-__END_DECLS
-#endif /* using inlines */
 
 #endif /* !_CTYPE_H_ */

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/module.h,v 1.20 2002/03/18 07:45:30 arr Exp $
+ * $FreeBSD: src/sys/sys/module.h,v 1.21 2004/07/13 19:36:59 phk Exp $
  */
 
 #ifndef _SYS_MODULE_H_
@@ -42,7 +42,8 @@
 typedef enum modeventtype {
 	MOD_LOAD,
 	MOD_UNLOAD,
-	MOD_SHUTDOWN
+	MOD_SHUTDOWN,
+	MOD_QUIESCE
 } modeventtype_t;
 
 typedef struct module *module_t;
@@ -142,7 +143,7 @@ module_t	module_lookupbyname(const char *);
 module_t	module_lookupbyid(int);
 void	module_reference(module_t);
 void	module_release(module_t);
-int	module_unload(module_t);
+int	module_unload(module_t, int flags);
 int	module_getid(module_t);
 module_t	module_getfnext(module_t);
 void	module_setspecific(module_t, modspecific_t *);

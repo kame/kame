@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec.c,v 1.7 2003/09/29 22:57:42 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec.c,v 1.8.2.1 2004/10/02 04:55:47 sam Exp $	*/
 /*	$KAME: ipsec.c,v 1.103 2001/05/24 07:14:18 sakane Exp $	*/
 
 /*
@@ -220,7 +220,7 @@ key_allocsp_default(const char* where, int tag)
 		    sp->policy, IPSEC_POLICY_NONE));
 		sp->policy = IPSEC_POLICY_NONE;
 	}
-	sp->refcnt++;
+	key_addref(sp);
 
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 		printf("DP key_allocsp_default returns SP:%p (%u)\n",
@@ -317,7 +317,7 @@ ipsec_getpolicybysock(m, dir, inp, error)
 		switch (currsp->policy) {
 		case IPSEC_POLICY_BYPASS:
 		case IPSEC_POLICY_IPSEC:
-			currsp->refcnt++;
+			key_addref(currsp);
 			sp = currsp;
 			break;
 
@@ -350,7 +350,7 @@ ipsec_getpolicybysock(m, dir, inp, error)
 				break;
 
 			case IPSEC_POLICY_IPSEC:
-				currsp->refcnt++;
+				key_addref(currsp);
 				sp = currsp;
 				break;
 
@@ -403,7 +403,6 @@ ipsec_getpolicybyaddr(m, dir, flag, error)
 		if (*error != 0) {
 			DPRINTF(("%s: setpidx failed, dir %u flag %u\n",
 				__func__, dir, flag));
-			bzero(&spidx, sizeof (spidx));
 			return NULL;
 		}
 		spidx.dir = dir;
@@ -1298,6 +1297,7 @@ ipsec_get_reqlevel(isr)
 				level = ah_net_deflev;
 			else
 				level = ah_trans_deflev;
+			break;
 		case IPPROTO_IPCOMP:
 			/*
 			 * we don't really care, as IPcomp document says that
@@ -1890,6 +1890,15 @@ ipsec_dumpmbuf(m)
 		printf("\n");
 	printf("---\n");
 }
+
+static void
+ipsec_attach(void)
+{
+	SECPOLICY_LOCK_INIT(&ip4_def_policy);
+	ip4_def_policy.refcnt = 1;			/* NB: disallow free */
+}
+SYSINIT(ipsec, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST, ipsec_attach, NULL)
+
 
 /* XXX this stuff doesn't belong here... */
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agpreg.h,v 1.9 2003/08/23 18:00:31 mdodd Exp $
+ *	$FreeBSD: src/sys/pci/agpreg.h,v 1.13 2004/08/16 12:25:48 obrien Exp $
  */
 
 #ifndef _PCI_AGPREG_H_
@@ -46,6 +46,28 @@
 
 #define AGP_STATUS		0x4
 #define AGP_COMMAND		0x8
+#define AGP_STATUS_AGP3		0x0008
+#define AGP_STATUS_RQ_MASK	0xff000000
+#define AGP_COMMAND_RQ_MASK	0xff000000
+#define AGP_STATUS_ARQSZ_MASK	0xe000
+#define AGP_COMMAND_ARQSZ_MASK	0xe000
+#define AGP_STATUS_CAL_MASK	0x1c00
+#define AGP_COMMAND_CAL_MASK	0x1c00
+#define AGP_STATUS_ISOCH	0x10000
+#define AGP_STATUS_SBA		0x0200
+#define AGP_STATUS_ITA_COH	0x0100
+#define AGP_STATUS_GART64	0x0080
+#define AGP_STATUS_HTRANS	0x0040
+#define AGP_STATUS_64BIT	0x0020
+#define AGP_STATUS_FW		0x0010
+#define AGP_COMMAND_RQ_MASK 	0xff000000
+#define AGP_COMMAND_ARQSZ_MASK	0xe000
+#define AGP_COMMAND_CAL_MASK	0x1c00
+#define AGP_COMMAND_SBA		0x0200
+#define AGP_COMMAND_AGP		0x0100
+#define AGP_COMMAND_GART64	0x0080
+#define AGP_COMMAND_64BIT	0x0020
+#define AGP_COMMAND_FW		0x0010
 
 /*
  * Config offsets for Intel AGP chipsets.
@@ -65,11 +87,19 @@
 #define AGP_INTEL_I8XX_ERRSTS	0xc8
 
 /*
- * Config offsets for VIA AGP chipsets.
+ * Config offsets for VIA AGP 2.x chipsets.
  */
 #define AGP_VIA_GARTCTRL	0x80
 #define AGP_VIA_APSIZE		0x84
 #define AGP_VIA_ATTBASE		0x88
+
+/*
+ * Config offsets for VIA AGP 3.0 chipsets.
+ */
+#define AGP3_VIA_GARTCTRL        0x90
+#define AGP3_VIA_APSIZE          0x94
+#define AGP3_VIA_ATTBASE         0x98
+#define AGP_VIA_AGPSEL		 0xfd
 
 /*
  * Config offsets for SiS AGP chipsets.
@@ -214,5 +244,22 @@
 #define	AGP_NVIDIA_2_ATTBASE(i)		(0xe0 + (i) * 4)
 #define	AGP_NVIDIA_3_APBASE		0x50
 #define	AGP_NVIDIA_3_APLIMIT		0x54
+
+/*
+ * AMD64 GART registers
+ */
+#define	AGP_AMD64_APCTRL		0x90
+#define	AGP_AMD64_APBASE		0x94
+#define	AGP_AMD64_ATTBASE		0x98
+#define	AGP_AMD64_CACHECTRL		0x9c
+#define	AGP_AMD64_APCTRL_GARTEN		0x00000001
+#define	AGP_AMD64_APCTRL_SIZE_MASK	0x0000000e
+#define	AGP_AMD64_APCTRL_DISGARTCPU	0x00000010
+#define	AGP_AMD64_APCTRL_DISGARTIO	0x00000020
+#define	AGP_AMD64_APCTRL_DISWLKPRB	0x00000040
+#define	AGP_AMD64_APBASE_MASK		0x00007fff
+#define	AGP_AMD64_ATTBASE_MASK		0xfffffff0
+#define	AGP_AMD64_CACHECTRL_INVGART	0x00000001
+#define	AGP_AMD64_CACHECTRL_PTEERR	0x00000002
 
 #endif /* !_PCI_AGPREG_H_ */

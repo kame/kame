@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_tl.c,v 1.88 2003/11/14 19:00:32 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_tl.c,v 1.93.2.1 2004/09/02 20:57:40 rwatson Exp $");
 
 /*
  * Texas Instruments ThunderLAN driver for FreeBSD 2.2.6 and 3.x.
@@ -183,6 +183,7 @@ __FBSDID("$FreeBSD: src/sys/pci/if_tl.c,v 1.88 2003/11/14 19:00:32 sam Exp $");
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -298,7 +299,7 @@ static int tl_miibus_writereg	(device_t, int, int, int);
 static void tl_miibus_statchg	(device_t);
 
 static void tl_setmode		(struct tl_softc *, int);
-static u_int32_t tl_mchash	(caddr_t);
+static uint32_t tl_mchash	(const uint8_t *);
 static void tl_setmulti		(struct tl_softc *);
 static void tl_setfilt		(struct tl_softc *, caddr_t, int);
 static void tl_softreset	(struct tl_softc *, int);
@@ -887,11 +888,11 @@ tl_setmode(sc, media)
  * Bytes 0-2 and 3-5 are symmetrical, so are folded together.  Then
  * the folded 24-bit value is split into 6-bit portions and XOR'd.
  */
-static u_int32_t
+static uint32_t
 tl_mchash(addr)
-	caddr_t		addr;
+	const uint8_t *addr;
 {
-	int		t;
+	int t;
 
 	t = (addr[0] ^ addr[3]) << 16 | (addr[1] ^ addr[4]) << 8 |
 		(addr[2] ^ addr[5]);
@@ -1146,8 +1147,8 @@ tl_attach(dev)
 #ifdef TL_USEIOSPACE
 
 	rid = TL_PCI_LOIO;
-	sc->tl_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-		0, ~0, 1, RF_ACTIVE);
+	sc->tl_res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
+		RF_ACTIVE);
 
 	/*
 	 * Some cards have the I/O and memory mapped address registers
@@ -1155,17 +1156,17 @@ tl_attach(dev)
 	 */
 	if (sc->tl_res == NULL) {
 		rid = TL_PCI_LOMEM;
-		sc->tl_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-		    0, ~0, 1, RF_ACTIVE);
+		sc->tl_res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
+		    RF_ACTIVE);
 	}
 #else
 	rid = TL_PCI_LOMEM;
-	sc->tl_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->tl_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+	    RF_ACTIVE);
 	if (sc->tl_res == NULL) {
 		rid = TL_PCI_LOIO;
-		sc->tl_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-		    0, ~0, 1, RF_ACTIVE);
+		sc->tl_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+		    RF_ACTIVE);
 	}
 #endif
 
@@ -1192,7 +1193,7 @@ tl_attach(dev)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->tl_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->tl_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->tl_irq == NULL) {
@@ -1258,18 +1259,12 @@ tl_attach(dev)
                 }
         }
 
-	/*
-	 * A ThunderLAN chip was detected. Inform the world.
-	 */
-	device_printf(dev, "Ethernet address: %6D\n",
-				sc->arpcom.ac_enaddr, ":");
-
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = tl_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = tl_start;
 	ifp->if_watchdog = tl_watchdog;
 	ifp->if_init = tl_init;

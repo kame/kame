@@ -31,7 +31,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ctl.c,v 1.22 2003/06/10 23:14:55 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ctl.c,v 1.25 2004/06/16 09:47:10 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/ioccom.h>
@@ -56,15 +56,15 @@ static	d_close_t	i4bctlclose;
 static	d_ioctl_t	i4bctlioctl;
 static	d_poll_t	i4bctlpoll;
 
-#define CDEV_MAJOR 55
 
 static struct cdevsw i4bctl_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	i4bctlopen,
 	.d_close =	i4bctlclose,
 	.d_ioctl =	i4bctlioctl,
 	.d_poll =	i4bctlpoll,
 	.d_name =	"i4bctl",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static void i4bctlattach(void *);
@@ -84,7 +84,7 @@ i4bctlattach(void *dummy)
  *	i4bctlopen - device driver open routine
  *---------------------------------------------------------------------------*/
 static int
-i4bctlopen(dev_t dev, int flag, int fmt, struct thread *td)
+i4bctlopen(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	if(minor(dev))
 		return (ENXIO);
@@ -101,7 +101,7 @@ i4bctlopen(dev_t dev, int flag, int fmt, struct thread *td)
  *	i4bctlclose - device driver close routine
  *---------------------------------------------------------------------------*/
 static int
-i4bctlclose(dev_t dev, int flag, int fmt, struct thread *td)
+i4bctlclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	openflag = 0;
 	return (0);
@@ -111,7 +111,7 @@ i4bctlclose(dev_t dev, int flag, int fmt, struct thread *td)
  *	i4bctlioctl - device driver ioctl routine
  *---------------------------------------------------------------------------*/
 static int
-i4bctlioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+i4bctlioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 #if DO_I4B_DEBUG
 	ctl_debug_t *cdbg;	
@@ -206,7 +206,7 @@ i4bctlioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
  *	i4bctlpoll - device driver poll routine
  *---------------------------------------------------------------------------*/
 static int
-i4bctlpoll (dev_t dev, int events, struct thread *td)
+i4bctlpoll (struct cdev *dev, int events, struct thread *td)
 {
 	return (ENODEV);
 }

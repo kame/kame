@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/security/mac/mac_label.c,v 1.1 2003/11/12 03:14:29 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/security/mac/mac_label.c,v 1.2 2004/08/02 00:18:35 green Exp $");
 
 #include "opt_mac.h"
 
@@ -45,7 +45,7 @@ __FBSDID("$FreeBSD: src/sys/security/mac/mac_label.c,v 1.1 2003/11/12 03:14:29 r
 
 uma_zone_t	zone_label;
 
-static void	mac_labelzone_ctor(void *mem, int size, void *arg);
+static int	mac_labelzone_ctor(void *mem, int size, void *arg, int flags);
 static void	mac_labelzone_dtor(void *mem, int size, void *arg);
 
 void
@@ -57,8 +57,8 @@ mac_labelzone_init(void)
 	    UMA_ALIGN_PTR, 0);
 }
 
-static void
-mac_labelzone_ctor(void *mem, int size, void *arg)
+static int
+mac_labelzone_ctor(void *mem, int size, void *arg, int flags)
 {
 	struct label *label;
 
@@ -66,6 +66,7 @@ mac_labelzone_ctor(void *mem, int size, void *arg)
 	label = mem;
 	bzero(label, sizeof(*label));
 	label->l_flags = MAC_FLAG_INITIALIZED;
+	return (0);
 }
 
 static void

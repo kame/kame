@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_sunlabel.c,v 1.40 2003/06/11 06:49:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_sunlabel.c,v 1.43 2004/08/08 07:57:51 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -194,19 +194,19 @@ g_sunlabel_config(struct gctl_req *req, struct g_class *mp, const char *verb)
 		h0h0.label = label;
 		h0h0.error = -1;
 		/* XXX: Does this reference register with our selfdestruct code ? */
-		error = g_access_rel(cp, 1, 1, 1);
+		error = g_access(cp, 1, 1, 1);
 		if (error) {
 			gctl_error(req, "could not access consumer");
 			return;
 		}
 		g_sunlabel_callconfig(&h0h0, 0);
-		g_access_rel(cp, -1, -1, -1);
+		g_access(cp, -1, -1, -1);
 	} else if (!strcmp(verb, "write bootcode")) {
 		label = gctl_get_paraml(req, "bootcode", SUN_BOOTSIZE);
 		if (label == NULL)
 			return;
 		/* XXX: Does this reference register with our selfdestruct code ? */
-		error = g_access_rel(cp, 1, 1, 1);
+		error = g_access(cp, 1, 1, 1);
 		if (error) {
 			gctl_error(req, "could not access consumer");
 			return;
@@ -218,7 +218,7 @@ g_sunlabel_config(struct gctl_req *req, struct g_class *mp, const char *verb)
 			    gsp->slices[i].offset + SUN_SIZE, label + SUN_SIZE,
 			    SUN_BOOTSIZE - SUN_SIZE);
 		}
-		g_access_rel(cp, -1, -1, -1);
+		g_access(cp, -1, -1, -1);
 	} else {
 		gctl_error(req, "Unknown verb parameter");
 	}
@@ -243,7 +243,6 @@ g_sunlabel_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	if (gp == NULL)
 		return (NULL);
 	gsp = gp->softc;
-	gp->dumpconf = g_sunlabel_dumpconf;
 	do {
 		if (gp->rank != 2 && flags == G_TF_NORMAL)
 			break;
@@ -261,7 +260,7 @@ g_sunlabel_taste(struct g_class *mp, struct g_provider *pp, int flags)
 
 		break;
 	} while (0);
-	g_access_rel(cp, -1, 0, 0);
+	g_access(cp, -1, 0, 0);
 	if (LIST_EMPTY(&gp->provider)) {
 		g_slice_spoiled(cp);
 		return (NULL);
@@ -274,8 +273,10 @@ g_sunlabel_taste(struct g_class *mp, struct g_provider *pp, int flags)
 
 static struct g_class g_sunlabel_class = {
 	.name = SUNLABEL_CLASS_NAME,
+	.version = G_VERSION,
 	.taste = g_sunlabel_taste,
 	.ctlreq = g_sunlabel_config,
+	.dumpconf = g_sunlabel_dumpconf,
 };
 
 DECLARE_GEOM_CLASS(g_sunlabel_class, g_sunlabel);

@@ -16,10 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_inode.c	8.5 (Berkeley) 12/30/93
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode.c,v 1.43 2003/10/18 14:10:25 phk Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode.c,v 1.47 2004/04/07 20:46:03 imp Exp $
  */
 
 #include <sys/param.h>
@@ -96,16 +92,12 @@ ext2_update(vp, waitfor)
 	}
 	ext2_i2ei(ip, (struct ext2_inode *)((char *)bp->b_data +
 	    EXT2_INODE_SIZE * ino_to_fsbo(fs, ip->i_number)));
-/*
 	if (waitfor && (vp->v_mount->mnt_flag & MNT_ASYNC) == 0)
 		return (bwrite(bp));
 	else {
-*/
 		bdwrite(bp);
 		return (0);
-/*
 	}
-*/
 }
 
 #define	SINGLE	0	/* index of single indirect block */
@@ -168,6 +160,8 @@ printf("ext2_truncate called %d to %d\n", VTOI(ovp)->i_number, length);
 	 * value of oszie is 0, length will be at least 1.
 	 */
 	if (osize < length) {
+		if (length > oip->i_e2fs->fs_maxfilesize)
+			return (EFBIG);
 		offset = blkoff(fs, length - 1);
 		lbn = lblkno(fs, length - 1);
 		aflags = B_CLRBUF;

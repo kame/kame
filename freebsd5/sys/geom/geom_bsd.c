@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_bsd.c,v 1.66 2003/09/01 20:45:32 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_bsd.c,v 1.70 2004/08/08 07:57:51 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -490,13 +490,6 @@ g_bsd_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	if (gp == NULL)
 		return (NULL);
 
-	/*
-	 * Fill in the optional details, in our case we have a dumpconf
-	 * routine which the "slice" code should call at the right time
-	 */
-	gp->dumpconf = g_bsd_dumpconf;
-	gp->ioctl = g_bsd_ioctl;
-
 	/* Get the geom_slicer softc from the geom. */
 	gsp = gp->softc;
 
@@ -569,7 +562,7 @@ g_bsd_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	} while (0);
 
 	/* Success or failure, we can close our provider now. */
-	error = g_access_rel(cp, -1, 0, 0);
+	g_access(cp, -1, 0, 0);
 
 	/* If we have configured any providers, return the new geom. */
 	if (gsp->nprovider > 0) {
@@ -639,26 +632,26 @@ g_bsd_config(struct gctl_req *req, struct g_class *mp, char const *verb)
 		h0h0.label = label;
 		h0h0.error = -1;
 		/* XXX: Does this reference register with our selfdestruct code ? */
-		error = g_access_rel(cp, 1, 1, 1);
+		error = g_access(cp, 1, 1, 1);
 		if (error) {
 			gctl_error(req, "could not access consumer");
 			return;
 		}
 		g_bsd_callconfig(&h0h0, 0);
 		error = h0h0.error;
-		g_access_rel(cp, -1, -1, -1);
+		g_access(cp, -1, -1, -1);
 	} else if (!strcmp(verb, "write bootcode")) {
 		label = gctl_get_paraml(req, "bootcode", BBSIZE);
 		if (label == NULL)
 			return;
 		/* XXX: Does this reference register with our selfdestruct code ? */
-		error = g_access_rel(cp, 1, 1, 1);
+		error = g_access(cp, 1, 1, 1);
 		if (error) {
 			gctl_error(req, "could not access consumer");
 			return;
 		}
 		error = g_bsd_writelabel(gp, label);
-		g_access_rel(cp, -1, -1, -1);
+		g_access(cp, -1, -1, -1);
 	} else {
 		gctl_error(req, "Unknown verb parameter");
 	}
@@ -669,8 +662,11 @@ g_bsd_config(struct gctl_req *req, struct g_class *mp, char const *verb)
 /* Finally, register with GEOM infrastructure. */
 static struct g_class g_bsd_class = {
 	.name = BSD_CLASS_NAME,
+	.version = G_VERSION,
 	.taste = g_bsd_taste,
 	.ctlreq = g_bsd_config,
+	.dumpconf = g_bsd_dumpconf,
+	.ioctl = g_bsd_ioctl,
 };
 
 DECLARE_GEOM_CLASS(g_bsd_class, g_bsd);

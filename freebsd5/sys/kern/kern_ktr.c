@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_ktr.c,v 1.43 2003/09/10 01:09:32 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_ktr.c,v 1.44 2004/07/23 17:41:44 rwatson Exp $");
 
 #include "opt_ddb.h"
 #include "opt_ktr.h"
@@ -87,6 +87,9 @@ SYSCTL_INT(_debug_ktr, OID_AUTO, cpumask, CTLFLAG_RW, &ktr_cpumask, 0, "");
 int	ktr_mask = KTR_MASK;
 TUNABLE_INT("debug.ktr.mask", &ktr_mask);
 SYSCTL_INT(_debug_ktr, OID_AUTO, mask, CTLFLAG_RW, &ktr_mask, 0, "");
+
+int	ktr_compile = KTR_COMPILE;
+SYSCTL_INT(_debug_ktr, OID_AUTO, compile, CTLFLAG_RD, &ktr_compile, 0, "");
 
 int	ktr_entries = KTR_ENTRIES;
 SYSCTL_INT(_debug_ktr, OID_AUTO, entries, CTLFLAG_RD, &ktr_entries, 0, "");

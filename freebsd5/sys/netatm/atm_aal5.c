@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netatm/atm_aal5.c,v 1.18 2003/11/18 00:39:03 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/netatm/atm_aal5.c,v 1.19 2004/06/14 18:16:20 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -767,7 +767,7 @@ atm_aal5_cpcs_data(tok, m)
 	 * that there's room in the socket buffer
 	 */
 	if (((so->so_state & SS_ISCONNECTED) == 0) ||
-	    (so->so_state & SS_CANTRCVMORE) ||
+	    (so->so_rcv.sb_state & SBS_CANTRCVMORE) ||
 	    (len > sbspace(&so->so_rcv))) {
 		atm_sock_stat.as_indrop[atp->atp_type]++;
 		KB_FREEALL(m);

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,19 +35,22 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/vfs_export.c,v 1.324 2003/07/26 07:23:24 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/vfs_export.c,v 1.327 2004/07/12 08:14:08 alfred Exp $");
 
 #include <sys/param.h>
-#include <sys/systm.h>
+#include <sys/dirent.h>
+#include <sys/domain.h>
 #include <sys/kernel.h>
-#include <sys/socket.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/mount.h>
-#include <net/radix.h>
-#include <sys/domain.h>
-#include <sys/dirent.h>
+#include <sys/mutex.h>
+#include <sys/socket.h>
+#include <sys/systm.h>
 #include <sys/vnode.h>
+
+#include <net/radix.h>
 
 static MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");
 
@@ -297,7 +296,7 @@ vfs_setpublicfs(mp, nep, argp)
 	bzero(&nfs_pub.np_handle, sizeof(nfs_pub.np_handle));
 	nfs_pub.np_handle.fh_fsid = mp->mnt_stat.f_fsid;
 
-	if ((error = VFS_ROOT(mp, &rvp)))
+	if ((error = VFS_ROOT(mp, &rvp, curthread /* XXX */)))
 		return (error);
 
 	if ((error = VFS_VPTOFH(rvp, &nfs_pub.np_handle.fh_fid)))

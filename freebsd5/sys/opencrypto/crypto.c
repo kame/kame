@@ -21,7 +21,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/opencrypto/crypto.c,v 1.13 2003/06/30 05:09:32 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/opencrypto/crypto.c,v 1.15 2004/05/30 20:27:18 phk Exp $");
 
 #define	CRYPTO_TIMING				/* enable timing support */
 
@@ -31,6 +31,7 @@ __FBSDID("$FreeBSD: src/sys/opencrypto/crypto.c,v 1.13 2003/06/30 05:09:32 sam E
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/lock.h>
+#include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/malloc.h>
 #include <sys/proc.h>
@@ -1055,7 +1056,6 @@ crypto_finis(void *chan)
 	CRYPTO_DRIVER_LOCK();
 	wakeup_one(chan);
 	CRYPTO_DRIVER_UNLOCK();
-	mtx_lock(&Giant);
 	kthread_exit(0);
 }
 

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_extern.h	8.10 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_extern.h,v 1.48 2002/10/18 22:52:41 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_extern.h,v 1.50 2004/06/16 09:47:25 phk Exp $
  */
 
 #ifndef _UFS_UFS_EXTERN_H_
@@ -76,11 +72,11 @@ int	 ufs_direnter(struct vnode *, struct vnode *, struct direct *,
 int	 ufs_dirremove(struct vnode *, struct inode *, int, int);
 int	 ufs_dirrewrite(struct inode *, struct inode *, ino_t, int, int);
 int	 ufs_getlbns(struct vnode *, ufs2_daddr_t, struct indir *, int *);
-int	 ufs_ihashget(dev_t, ino_t, int, struct vnode **);
+int	 ufs_ihashget(struct cdev *, ino_t, int, struct vnode **);
 void	 ufs_ihashinit(void);
 int	 ufs_ihashins(struct inode *, int, struct vnode **);
 struct vnode *
-	 ufs_ihashlookup(dev_t, ino_t);
+	 ufs_ihashlookup(struct cdev *, ino_t);
 void	 ufs_ihashrem(struct inode *);
 void	 ufs_ihashuninit(void);
 int	 ufs_inactive(struct vop_inactive_args *);

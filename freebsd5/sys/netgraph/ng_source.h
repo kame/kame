@@ -43,7 +43,7 @@ EXEMPLARY,
  *
  * Author: Dave Chapeskie <dchapeskie@sandvine.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_source.h,v 1.2 2003/11/11 12:30:37 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_source.h,v 1.3 2004/01/26 14:54:39 harti Exp $
  */
 
 #ifndef _NETGRAPH_NG_SOURCE_H_
@@ -89,6 +89,7 @@ enum {
 	NGM_SOURCE_START,		/* start sending queued data */
 	NGM_SOURCE_STOP,		/* stop sending queued data */
 	NGM_SOURCE_CLR_DATA,		/* clear the queued data */
+	NGM_SOURCE_START_NOW,		/* start on non-ether output */
 };
 
 #endif /* _NETGRAPH_NG_SOURCE_H_ */

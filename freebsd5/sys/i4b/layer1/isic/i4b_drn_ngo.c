@@ -31,7 +31,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_drn_ngo.c,v 1.7 2003/06/10 23:45:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_drn_ngo.c,v 1.8 2004/03/17 17:50:50 njl Exp $");
 
 #include "opt_i4b.h"
 
@@ -224,9 +224,9 @@ isic_attach_drnngo(device_t dev)
 	 */
 
 	if(!(sc->sc_resources.io_base[1] =
-			bus_alloc_resource(dev, SYS_RES_IOPORT,
-					&sc->sc_resources.io_rid[1],
-					0UL, ~0UL, 1, RF_ACTIVE)))
+			bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+					       &sc->sc_resources.io_rid[1],
+					       RF_ACTIVE)))
 	{
 		printf("isic%d: Failed to get second io base.\n", unit);
 		isic_detach_common(dev);

@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_io.c,v 1.50.2.2 2004/02/11 08:31:23 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_io.c,v 1.57.2.2.2.1 2004/10/21 17:49:45 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -96,20 +96,13 @@ g_bioq_first(struct g_bioq *bq)
 
 	bp = TAILQ_FIRST(&bq->bio_queue);
 	if (bp != NULL) {
+		KASSERT((bp->bio_flags & BIO_ONQUEUE),
+		    ("Bio not on queue bp=%p target %p", bp, bq));
+		bp->bio_flags &= ~BIO_ONQUEUE;
 		TAILQ_REMOVE(&bq->bio_queue, bp, bio_queue);
 		bq->bio_queue_length--;
 	}
 	return (bp);
-}
-
-static void
-g_bioq_enqueue_tail(struct bio *bp, struct g_bioq *rq)
-{
-
-	g_bioq_lock(rq);
-	TAILQ_INSERT_TAIL(&rq->bio_queue, bp, bio_queue);
-	rq->bio_queue_length++;
-	g_bioq_unlock(rq);
 }
 
 struct bio *
@@ -118,6 +111,15 @@ g_new_bio(void)
 	struct bio *bp;
 
 	bp = uma_zalloc(biozone, M_NOWAIT | M_ZERO);
+	return (bp);
+}
+
+struct bio *
+g_alloc_bio(void)
+{
+	struct bio *bp;
+
+	bp = uma_zalloc(biozone, M_WAITOK | M_ZERO);
 	return (bp);
 }
 
@@ -166,7 +168,7 @@ g_io_getattr(const char *attr, struct g_consumer *cp, int *len, void *ptr)
 	int error;
 
 	g_trace(G_T_BIO, "bio_getattr(%s)", attr);
-	bp = g_new_bio();
+	bp = g_alloc_bio();
 	bp->bio_cmd = BIO_GETATTR;
 	bp->bio_done = NULL;
 	bp->bio_attribute = attr;
@@ -243,22 +245,46 @@ g_io_request(struct bio *bp, struct g_consumer *cp)
 	pp = cp->provider;
 	KASSERT(pp != NULL, ("consumer not attached in g_io_request"));
 
+#ifdef DIAGNOSTIC
+	if (bp->bio_cmd & (BIO_READ|BIO_WRITE|BIO_DELETE)) {
+		KASSERT(bp->bio_offset % cp->provider->sectorsize == 0,
+		    ("wrong offset %jd for sectorsize %u",
+		    bp->bio_offset, cp->provider->sectorsize));
+		KASSERT(bp->bio_length % cp->provider->sectorsize == 0,
+		    ("wrong length %jd for sectorsize %u",
+		    bp->bio_length, cp->provider->sectorsize));
+	}
+#endif /* DIAGNOSTIC */
+
+	g_trace(G_T_BIO, "bio_request(%p) from %p(%s) to %p(%s) cmd %d",
+	    bp, cp, cp->geom->name, pp, pp->name, bp->bio_cmd);
+
 	bp->bio_from = cp;
 	bp->bio_to = pp;
 	bp->bio_error = 0;
 	bp->bio_completed = 0;
 
-	if (g_collectstats) {
-		devstat_start_transaction_bio(cp->stat, bp);
-		devstat_start_transaction_bio(pp->stat, bp);
-	}
-	cp->nstart++;
+	KASSERT(!(bp->bio_flags & BIO_ONQUEUE),
+	    ("Bio already on queue bp=%p", bp));
+	bp->bio_flags |= BIO_ONQUEUE;
+
+	binuptime(&bp->bio_t0);
+	if (g_collectstats & 4)
+		g_bioq_lock(&g_bio_run_down);
+	if (g_collectstats & 1)
+		devstat_start_transaction(pp->stat, &bp->bio_t0);
+	if (g_collectstats & 2)
+		devstat_start_transaction(cp->stat, &bp->bio_t0);
+
+	if (!(g_collectstats & 4))
+		g_bioq_lock(&g_bio_run_down);
 	pp->nstart++;
+	cp->nstart++;
+	TAILQ_INSERT_TAIL(&g_bio_run_down.bio_queue, bp, bio_queue);
+	g_bio_run_down.bio_queue_length++;
+	g_bioq_unlock(&g_bio_run_down);
 
 	/* Pass it on down. */
-	g_trace(G_T_BIO, "bio_request(%p) from %p(%s) to %p(%s) cmd %d",
-	    bp, cp, cp->geom->name, pp, pp->name, bp->bio_cmd);
-	g_bioq_enqueue_tail(bp, &g_bio_run_down);
 	wakeup(&g_wait_down);
 }
 
@@ -279,31 +305,52 @@ g_io_deliver(struct bio *bp, int error)
 	}
 	KASSERT(cp != NULL, ("NULL bio_from in g_io_deliver"));
 	KASSERT(cp->geom != NULL, ("NULL bio_from->geom in g_io_deliver"));
+	KASSERT(bp->bio_completed >= 0, ("bio_completed can't be less than 0"));
+	KASSERT(bp->bio_completed <= bp->bio_length,
+	    ("bio_completed can't be greater than bio_length"));
 
 	g_trace(G_T_BIO,
 "g_io_deliver(%p) from %p(%s) to %p(%s) cmd %d error %d off %jd len %jd",
 	    bp, cp, cp->geom->name, pp, pp->name, bp->bio_cmd, error,
 	    (intmax_t)bp->bio_offset, (intmax_t)bp->bio_length);
 
+	KASSERT(!(bp->bio_flags & BIO_ONQUEUE),
+	    ("Bio already on queue bp=%p", bp));
+
+	/*
+	 * XXX: next two doesn't belong here
+	 */
 	bp->bio_bcount = bp->bio_length;
-	if (g_collectstats) {
-		bp->bio_resid = bp->bio_bcount - bp->bio_completed;
-		devstat_end_transaction_bio(cp->stat, bp);
+	bp->bio_resid = bp->bio_bcount - bp->bio_completed;
+
+	if (g_collectstats & 4)
+		g_bioq_lock(&g_bio_run_up);
+	if (g_collectstats & 1)
 		devstat_end_transaction_bio(pp->stat, bp);
-	}
+	if (g_collectstats & 2)
+		devstat_end_transaction_bio(cp->stat, bp);
+	if (!(g_collectstats & 4))
+		g_bioq_lock(&g_bio_run_up);
 	cp->nend++;
 	pp->nend++;
-
-	if (error == ENOMEM) {
-		if (bootverbose)
-			printf("ENOMEM %p on %p(%s)\n", bp, pp, pp->name);
-		g_io_request(bp, cp);
-		pace++;
+	if (error != ENOMEM) {
+		bp->bio_error = error;
+		TAILQ_INSERT_TAIL(&g_bio_run_up.bio_queue, bp, bio_queue);
+		bp->bio_flags |= BIO_ONQUEUE;
+		g_bio_run_up.bio_queue_length++;
+		g_bioq_unlock(&g_bio_run_up);
+		wakeup(&g_wait_up);
 		return;
 	}
-	bp->bio_error = error;
-	g_bioq_enqueue_tail(bp, &g_bio_run_up);
-	wakeup(&g_wait_up);
+	g_bioq_unlock(&g_bio_run_up);
+
+	if (bootverbose)
+		printf("ENOMEM %p on %p(%s)\n", bp, pp, pp->name);
+	bp->bio_children = 0;
+	bp->bio_inbed = 0;
+	g_io_request(bp, cp);
+	pace++;
+	return;
 }
 
 void
@@ -312,10 +359,12 @@ g_io_schedule_down(struct thread *tp __unused)
 	struct bio *bp;
 	off_t excess;
 	int error;
+#ifdef WITNESS
 	struct mtx mymutex;
  
 	bzero(&mymutex, sizeof mymutex);
 	mtx_init(&mymutex, "g_xdown", NULL, MTX_DEF);
+#endif
 
 	for(;;) {
 		g_bioq_lock(&g_bio_run_down);
@@ -354,9 +403,13 @@ g_io_schedule_down(struct thread *tp __unused)
 		default:
 			break;
 		}
+#ifdef WITNESS
 		mtx_lock(&mymutex);
+#endif
 		bp->bio_to->geom->start(bp);
+#ifdef WITNESS
 		mtx_unlock(&mymutex);
+#endif
 	}
 }
 
@@ -370,6 +423,9 @@ bio_taskqueue(struct bio *bp, bio_task_t *func, void *arg)
 	 * queue, so we use the same lock.
 	 */
 	g_bioq_lock(&g_bio_run_up);
+	KASSERT(!(bp->bio_flags & BIO_ONQUEUE),
+	    ("Bio already on queue bp=%p target taskq", bp));
+	bp->bio_flags |= BIO_ONQUEUE;
 	TAILQ_INSERT_TAIL(&g_bio_run_task.bio_queue, bp, bio_queue);
 	g_bio_run_task.bio_queue_length++;
 	wakeup(&g_wait_up);
@@ -381,26 +437,36 @@ void
 g_io_schedule_up(struct thread *tp __unused)
 {
 	struct bio *bp;
+#ifdef WITNESS
 	struct mtx mymutex;
  
 	bzero(&mymutex, sizeof mymutex);
 	mtx_init(&mymutex, "g_xup", NULL, MTX_DEF);
+#endif
 	for(;;) {
 		g_bioq_lock(&g_bio_run_up);
 		bp = g_bioq_first(&g_bio_run_task);
 		if (bp != NULL) {
 			g_bioq_unlock(&g_bio_run_up);
+#ifdef WITNESS
 			mtx_lock(&mymutex);
+#endif
 			bp->bio_task(bp->bio_task_arg);
+#ifdef WITNESS
 			mtx_unlock(&mymutex);
+#endif
 			continue;
 		}
 		bp = g_bioq_first(&g_bio_run_up);
 		if (bp != NULL) {
 			g_bioq_unlock(&g_bio_run_up);
+#ifdef WITNESS
 			mtx_lock(&mymutex);
+#endif
 			biodone(bp);
+#ifdef WITNESS
 			mtx_unlock(&mymutex);
+#endif
 			continue;
 		}
 		msleep(&g_wait_up, &g_bio_run_up.bio_queue_lock,
@@ -415,10 +481,11 @@ g_read_data(struct g_consumer *cp, off_t offset, off_t length, int *error)
 	void *ptr;
 	int errorc;
 
-	KASSERT(length >= 512 && length <= DFLTPHYS,
-		("g_read_data(): invalid length %jd", (intmax_t)length));
+	KASSERT(length > 0 && length >= cp->provider->sectorsize &&
+	    length <= MAXPHYS, ("g_read_data(): invalid length %jd",
+	    (intmax_t)length));
 
-	bp = g_new_bio();
+	bp = g_alloc_bio();
 	bp->bio_cmd = BIO_READ;
 	bp->bio_done = NULL;
 	bp->bio_offset = offset;
@@ -443,10 +510,11 @@ g_write_data(struct g_consumer *cp, off_t offset, void *ptr, off_t length)
 	struct bio *bp;
 	int error;
 
-	KASSERT(length >= 512 && length <= DFLTPHYS,
-		("g_write_data(): invalid length %jd", (intmax_t)length));
+	KASSERT(length > 0 && length >= cp->provider->sectorsize &&
+	    length <= MAXPHYS, ("g_write_data(): invalid length %jd",
+	    (intmax_t)length));
 
-	bp = g_new_bio();
+	bp = g_alloc_bio();
 	bp->bio_cmd = BIO_WRITE;
 	bp->bio_done = NULL;
 	bp->bio_offset = offset;
@@ -456,4 +524,38 @@ g_write_data(struct g_consumer *cp, off_t offset, void *ptr, off_t length)
 	error = biowait(bp, "gwrite");
 	g_destroy_bio(bp);
 	return (error);
+}
+
+void
+g_print_bio(struct bio *bp)
+{
+	const char *pname, *cmd = NULL;
+
+	if (bp->bio_to != NULL)
+		pname = bp->bio_to->name;
+	else
+		pname = "[unknown]";
+
+	switch (bp->bio_cmd) {
+	case BIO_GETATTR:
+		cmd = "GETATTR";
+		printf("%s[%s(attr=%s)]", pname, cmd, bp->bio_attribute);
+		return;
+	case BIO_READ:
+		cmd = "READ";
+	case BIO_WRITE:
+		if (cmd == NULL)
+			cmd = "WRITE";
+	case BIO_DELETE:
+		if (cmd == NULL)
+			cmd = "DELETE";
+		printf("%s[%s(offset=%jd, length=%jd)]", pname, cmd,
+		    (intmax_t)bp->bio_offset, (intmax_t)bp->bio_length);
+		return;
+	default:
+		cmd = "UNKNOWN";
+		printf("%s[%s()]", pname, cmd);
+		return;
+	}
+	/* NOTREACHED */
 }

@@ -35,7 +35,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.27 2003/10/31 18:32:11 brooks Exp $
+ * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.34 2004/07/14 20:24:21 rwatson Exp $
  * $Whistle: ng_iface.c,v 1.33 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -59,8 +59,10 @@
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/mutex.h>
 #include <sys/errno.h>
 #include <sys/random.h>
 #include <sys/sockio.h>
@@ -186,23 +188,27 @@ static const struct ng_cmdlist ng_iface_cmds[] = {
 	  NULL,
 	  &ng_cisco_ipaddr_type
 	},
+	{
+	  NGM_IFACE_COOKIE,
+	  NGM_IFACE_GET_IFINDEX,
+	  "getifindex",
+	  NULL,
+	  &ng_parse_uint32_type
+	},
 	{ 0 }
 };
 
 /* Node type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_IFACE_NODE_TYPE,
-	NULL,
-	ng_iface_constructor,
-	ng_iface_rcvmsg,
-	ng_iface_shutdown,
-	ng_iface_newhook,
-	NULL,
-	NULL,
-	ng_iface_rcvdata,
-	ng_iface_disconnect,
-	ng_iface_cmds
+	.version =	NG_ABI_VERSION,
+	.name =		NG_IFACE_NODE_TYPE,
+	.constructor =	ng_iface_constructor,
+	.rcvmsg =	ng_iface_rcvmsg,
+	.shutdown =	ng_iface_shutdown,
+	.newhook =	ng_iface_newhook,
+	.rcvdata =	ng_iface_rcvdata,
+	.disconnect =	ng_iface_disconnect,
+	.cmdlist =	ng_iface_cmds,
 };
 NETGRAPH_INIT(iface, &typestruct);
 
@@ -214,6 +220,9 @@ static int	ng_units_in_use = 0;
 
 #define UNITS_BITSPERWORD	(sizeof(*ng_iface_units) * NBBY)
 
+static struct mtx	ng_iface_mtx;
+MTX_SYSINIT(ng_iface, &ng_iface_mtx, "ng_iface", MTX_DEF);
+
 /************************************************************************
 			HELPER STUFF
  ************************************************************************/
@@ -221,7 +230,7 @@ static int	ng_units_in_use = 0;
 /*
  * Get the family descriptor from the family ID
  */
-static __inline__ iffam_p
+static __inline iffam_p
 get_iffam_from_af(sa_family_t family)
 {
 	iffam_p iffam;
@@ -238,7 +247,7 @@ get_iffam_from_af(sa_family_t family)
 /*
  * Get the family descriptor from the hook
  */
-static __inline__ iffam_p
+static __inline iffam_p
 get_iffam_from_hook(priv_p priv, hook_p hook)
 {
 	int k;
@@ -253,7 +262,7 @@ get_iffam_from_hook(priv_p priv, hook_p hook)
  * Get the hook from the iffam descriptor
  */
 
-static __inline__ hook_p *
+static __inline hook_p *
 get_hook_from_iffam(priv_p priv, iffam_p iffam)
 {
 	return (&priv->hooks[iffam - gFamilies]);
@@ -262,7 +271,7 @@ get_hook_from_iffam(priv_p priv, iffam_p iffam)
 /*
  * Get the iffam descriptor from the name
  */
-static __inline__ iffam_p
+static __inline iffam_p
 get_iffam_from_name(const char *name)
 {
 	iffam_p iffam;
@@ -280,11 +289,12 @@ get_iffam_from_name(const char *name)
  * Find the first free unit number for a new interface.
  * Increase the size of the unit bitmap as necessary.
  */
-static __inline__ int
+static __inline int
 ng_iface_get_unit(int *unit)
 {
 	int index, bit;
 
+	mtx_lock(&ng_iface_mtx);
 	for (index = 0; index < ng_iface_units_len
 	    && ng_iface_units[index] == 0; index++);
 	if (index == ng_iface_units_len) {		/* extend array */
@@ -293,8 +303,10 @@ ng_iface_get_unit(int *unit)
 		newlen = (2 * ng_iface_units_len) + 4;
 		MALLOC(newarray, int *, newlen * sizeof(*ng_iface_units),
 		    M_NETGRAPH_IFACE, M_NOWAIT);
-		if (newarray == NULL)
+		if (newarray == NULL) {
+			mtx_unlock(&ng_iface_mtx);
 			return (ENOMEM);
+		}
 		bcopy(ng_iface_units, newarray,
 		    ng_iface_units_len * sizeof(*ng_iface_units));
 		for (i = ng_iface_units_len; i < newlen; i++)
@@ -310,19 +322,21 @@ ng_iface_get_unit(int *unit)
 	ng_iface_units[index] &= ~(1 << bit);
 	*unit = (index * UNITS_BITSPERWORD) + bit;
 	ng_units_in_use++;
+	mtx_unlock(&ng_iface_mtx);
 	return (0);
 }
 
 /*
  * Free a no longer needed unit number.
  */
-static __inline__ void
+static __inline void
 ng_iface_free_unit(int unit)
 {
 	int index, bit;
 
 	index = unit / UNITS_BITSPERWORD;
 	bit = unit % UNITS_BITSPERWORD;
+	mtx_lock(&ng_iface_mtx);
 	KASSERT(index < ng_iface_units_len,
 	    ("%s: unit=%d len=%d", __func__, unit, ng_iface_units_len));
 	KASSERT((ng_iface_units[index] & (1 << bit)) == 0,
@@ -340,6 +354,7 @@ ng_iface_free_unit(int unit)
 		ng_iface_units_len = 0;
 		ng_iface_units = NULL;
 	}
+	mtx_unlock(&ng_iface_mtx);
 }
 
 /************************************************************************
@@ -424,7 +439,6 @@ ng_iface_output(struct ifnet *ifp, struct mbuf *m,
 {
 	const priv_p priv = (priv_p) ifp->if_softc;
 	const iffam_p iffam = get_iffam_from_af(dst->sa_family);
-	meta_p meta = NULL;
 	int len, error = 0;
 
 	/* Check interface flags */
@@ -458,7 +472,7 @@ ng_iface_output(struct ifnet *ifp, struct mbuf *m,
 	len = m->m_pkthdr.len;
 
 	/* Send packet; if hook is not connected, mbuf will get freed. */
-	NG_SEND_DATA(error, *get_hook_from_iffam(priv, iffam), m, meta);
+	NG_SEND_DATA_ONLY(error, *get_hook_from_iffam(priv, iffam), m);
 
 	/* Update stats */
 	if (error == 0) {
@@ -485,16 +499,10 @@ ng_iface_start(struct ifnet *ifp)
 static void
 ng_iface_bpftap(struct ifnet *ifp, struct mbuf *m, sa_family_t family)
 {
-	int32_t family4 = (int32_t)family;
-	struct mbuf m0;
-
 	KASSERT(family != AF_UNSPEC, ("%s: family=AF_UNSPEC", __func__));
 	if (ifp->if_bpf != NULL) {
-		bzero(&m0, sizeof(m0));
-		m0.m_next = m;
-		m0.m_len = sizeof(family4);
-		m0.m_data = (char *)&family4;
-		BPF_MTAP(ifp, &m0);
+		int32_t family4 = (int32_t)family;
+		bpf_mtap2(ifp->if_bpf, &family4, sizeof(family4), m);
 	}
 }
 
@@ -673,6 +681,15 @@ ng_iface_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			break;
 		    }
 
+		case NGM_IFACE_GET_IFINDEX:
+			NG_MKRESPONSE(resp, msg, sizeof(uint32_t), M_NOWAIT);
+			if (resp == NULL) {
+				error = ENOMEM;
+				break;
+			}
+			*((uint32_t *)resp->data) = priv->ifp->if_index;
+			break;
+
 		default:
 			error = EINVAL;
 			break;
@@ -739,8 +756,6 @@ ng_iface_rcvdata(hook_p hook, item_p item)
 	/* Sanity checks */
 	KASSERT(iffam != NULL, ("%s: iffam", __func__));
 	M_ASSERTPKTHDR(m);
-	if (m == NULL)
-		return (EINVAL);
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		NG_FREE_M(m);
 		return (ENETDOWN);

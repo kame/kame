@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/scterm-sck.c,v 1.14 2002/02/10 10:27:37 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/scterm-sck.c,v 1.15 2004/06/04 13:04:10 phk Exp $
  */
 
 #include "opt_syscons.h"
@@ -31,6 +31,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/consio.h>
 
 #include <machine/pc/display.h>

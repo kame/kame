@@ -25,10 +25,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_umtx.c,v 1.13 2003/09/07 11:14:52 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_umtx.c,v 1.16 2004/07/12 15:28:31 mtm Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
@@ -62,6 +63,7 @@ MTX_SYSINIT(umtx, &umtx_lock, "umtx", MTX_DEF);
 #define	UMTX_LOCK()	mtx_lock(&umtx_lock);
 #define	UMTX_UNLOCK()	mtx_unlock(&umtx_lock);
 
+#define	UMTX_CONTESTED	LONG_MIN
 
 static struct umtx_q *umtx_lookup(struct thread *, struct umtx *umtx);
 static struct umtx_q *umtx_insert(struct thread *, struct umtx *umtx);
@@ -161,7 +163,7 @@ _umtx_lock(struct thread *td, struct _umtx_lock_args *uap)
 		 * Try the uncontested case.  This should be done in userland.
 		 */
 		owner = casuptr((intptr_t *)&umtx->u_owner,
-		    UMTX_UNOWNED, (intptr_t)td);
+		    UMTX_UNOWNED, td->td_tid);
 
 		/* The address was invalid. */
 		if (owner == -1)
@@ -174,7 +176,7 @@ _umtx_lock(struct thread *td, struct _umtx_lock_args *uap)
 		/* If no one owns it but it is contested try to acquire it. */
 		if (owner == UMTX_CONTESTED) {
 			owner = casuptr((intptr_t *)&umtx->u_owner,
-			    UMTX_CONTESTED, ((intptr_t)td | UMTX_CONTESTED));
+			    UMTX_CONTESTED, td->td_tid | UMTX_CONTESTED);
 
 			/* The address was invalid. */
 			if (owner == -1)
@@ -214,18 +216,18 @@ _umtx_lock(struct thread *td, struct _umtx_lock_args *uap)
 		 * and we need to retry or we lost a race to the thread
 		 * unlocking the umtx.
 		 */
-		UMTX_LOCK();
-		mtx_lock_spin(&sched_lock);
-		if (old == owner && (td->td_flags & TDF_UMTXWAKEUP) == 0) {
-			mtx_unlock_spin(&sched_lock);
-			error = msleep(td, &umtx_lock,
+		PROC_LOCK(td->td_proc);
+		if (old == owner && (td->td_flags & TDF_UMTXWAKEUP) == 0)
+			error = msleep(td, &td->td_proc->p_mtx,
 			    td->td_priority | PCATCH, "umtx", 0);
-			mtx_lock_spin(&sched_lock);
-		} else
+		else
 			error = 0;
+		mtx_lock_spin(&sched_lock);
 		td->td_flags &= ~TDF_UMTXWAKEUP;
 		mtx_unlock_spin(&sched_lock);
+		PROC_UNLOCK(td->td_proc);
 
+		UMTX_LOCK();
 		umtx_remove(uq, td);
 		UMTX_UNLOCK();
 
@@ -261,7 +263,7 @@ _umtx_unlock(struct thread *td, struct _umtx_unlock_args *uap)
 	if ((owner = fuword(&umtx->u_owner)) == -1)
 		return (EFAULT);
 
-	if ((struct thread *)(owner & ~UMTX_CONTESTED) != td)
+	if ((owner & ~UMTX_CONTESTED) != td->td_tid)
 		return (EPERM);
 
 	/* We should only ever be in here for contested locks */
@@ -317,9 +319,11 @@ _umtx_unlock(struct thread *td, struct _umtx_unlock_args *uap)
 	 * If there is a thread waiting on the umtx, wake it up.
 	 */
 	if (blocked != NULL) {
+		PROC_LOCK(blocked->td_proc);
 		mtx_lock_spin(&sched_lock);
 		blocked->td_flags |= TDF_UMTXWAKEUP;
 		mtx_unlock_spin(&sched_lock);
+		PROC_UNLOCK(blocked->td_proc);
 		wakeup(blocked);
 	}
 

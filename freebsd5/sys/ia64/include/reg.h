@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/include/reg.h,v 1.12 2003/05/16 21:26:41 marcel Exp $
+ *	$FreeBSD: src/sys/ia64/include/reg.h,v 1.13 2004/03/20 05:27:14 marcel Exp $
  */
 
 #ifndef _MACHINE_REG_H_
@@ -44,8 +44,8 @@ struct fpreg {
 };
 
 struct dbreg {
-	uint64_t	dbr_data[8];
-	uint64_t	dbr_inst[8];
+	unsigned long	dbr_data[8];
+	unsigned long	dbr_inst[8];
 };
 
 #ifdef _KERNEL

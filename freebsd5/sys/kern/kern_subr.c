@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_subr.c,v 1.77 2003/10/02 15:00:55 nectar Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_subr.c,v 1.88 2004/07/10 15:42:16 phk Exp $");
 
 #include "opt_zero.h"
 
@@ -143,12 +139,8 @@ uiomove(void *cp, int n, struct uio *uio)
 	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
 	    ("uiomove proc"));
 
-	if (td) {
-		mtx_lock_spin(&sched_lock);
-		save = td->td_flags & TDF_DEADLKTREAT;
-		td->td_flags |= TDF_DEADLKTREAT;
-		mtx_unlock_spin(&sched_lock);
-	}
+	save = td->td_pflags & TDP_DEADLKTREAT;
+	td->td_pflags |= TDP_DEADLKTREAT;
 
 	while (n > 0 && uio->uio_resid) {
 		iov = uio->uio_iov;
@@ -191,11 +183,8 @@ uiomove(void *cp, int n, struct uio *uio)
 		n -= cnt;
 	}
 out:
-	if (td && save == 0) {
-		mtx_lock_spin(&sched_lock);
-		td->td_flags &= ~TDF_DEADLKTREAT;
-		mtx_unlock_spin(&sched_lock);
-	}
+	if (save == 0)
+		td->td_pflags &= ~TDP_DEADLKTREAT;
 	return (error);
 }
 
@@ -441,14 +430,14 @@ uio_yield(void)
 	mtx_lock_spin(&sched_lock);
 	DROP_GIANT();
 	sched_prio(td, td->td_ksegrp->kg_user_pri); /* XXXKSE */
-	td->td_proc->p_stats->p_ru.ru_nivcsw++;
-	mi_switch();
+	mi_switch(SW_INVOL, NULL);
 	mtx_unlock_spin(&sched_lock);
 	PICKUP_GIANT();
 }
 
 int
-copyinfrom(const void *src, void *dst, size_t len, int seg)
+copyinfrom(const void * __restrict src, void * __restrict dst, size_t len,
+    int seg)
 {
 	int error = 0;
 
@@ -466,7 +455,8 @@ copyinfrom(const void *src, void *dst, size_t len, int seg)
 }
 
 int
-copyinstrfrom(const void *src, void *dst, size_t len, size_t *copied, int seg)
+copyinstrfrom(const void * __restrict src, void * __restrict dst, size_t len,
+    size_t * __restrict copied, int seg)
 {
 	int error = 0;
 
@@ -481,4 +471,72 @@ copyinstrfrom(const void *src, void *dst, size_t len, size_t *copied, int seg)
 		panic("copyinstrfrom: bad seg %d\n", seg);
 	}
 	return (error);
+}
+
+int
+copyiniov(struct iovec *iovp, u_int iovcnt, struct iovec **iov, int error)
+{
+	u_int iovlen;
+
+	*iov = NULL;
+	if (iovcnt > UIO_MAXIOV)
+		return (error);
+	iovlen = iovcnt * sizeof (struct iovec);
+	*iov = malloc(iovlen, M_IOV, M_WAITOK);
+	error = copyin(iovp, *iov, iovlen);
+	if (error) {
+		free(*iov, M_IOV);
+		*iov = NULL;
+	}
+	return (error);
+}
+
+int
+copyinuio(struct iovec *iovp, u_int iovcnt, struct uio **uiop)
+{
+	struct iovec *iov;
+	struct uio *uio;
+	u_int iovlen;
+	int error, i;
+
+	*uiop = NULL;
+	if (iovcnt > UIO_MAXIOV)
+		return (EINVAL);
+	iovlen = iovcnt * sizeof (struct iovec);
+	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
+	iov = (struct iovec *)(uio + 1);
+	error = copyin(iovp, iov, iovlen);
+	if (error) {
+		free(uio, M_IOV);
+		return (error);
+	}
+	uio->uio_iov = iov;
+	uio->uio_iovcnt = iovcnt;
+	uio->uio_segflg = UIO_USERSPACE;
+	uio->uio_offset = -1;
+	uio->uio_resid = 0;
+	for (i = 0; i < iovcnt; i++) {
+		if (iov->iov_len > INT_MAX - uio->uio_resid) {
+			free(uio, M_IOV);
+			return (EINVAL);
+		}
+		uio->uio_resid += iov->iov_len;
+		iov++;
+	}
+	*uiop = uio;
+	return (0);
+}
+
+struct uio *
+cloneuio(struct uio *uiop)
+{
+	struct uio *uio;
+	int iovlen;
+
+	iovlen = uiop->uio_iovcnt * sizeof (struct iovec);
+	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
+	*uio = *uiop;
+	uio->uio_iov = (struct iovec *)(uio + 1);
+	bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
+	return (uio);
 }

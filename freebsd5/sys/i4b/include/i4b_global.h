@@ -27,7 +27,7 @@
  *	i4b_global.h - i4b global include file
  *	--------------------------------------
  *
- * $FreeBSD: src/sys/i4b/include/i4b_global.h,v 1.11 2003/11/10 14:20:34 gj Exp $
+ * $FreeBSD: src/sys/i4b/include/i4b_global.h,v 1.12 2004/07/15 08:26:05 phk Exp $
  *
  *	last edit-date: [Sun Mar 17 09:55:26 2002]
  *
@@ -57,6 +57,8 @@
 		case MOD_UNLOAD: \
 			printf(#name " module unload - not possible for this module type\n"); \
 			return EINVAL; \
+		default: \
+			return EOPNOTSUPP; \
 		} \
 		return 0; \
 	} \

@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/elf_machdep.c,v 1.17 2003/09/25 01:10:23 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/elf_machdep.c,v 1.20 2004/08/11 02:35:05 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -78,20 +78,43 @@ static Elf32_Brandinfo freebsd_brand_info = {
 						ELFOSABI_FREEBSD,
 						EM_386,
 						"FreeBSD",
-						"",
+						NULL,
 						"/libexec/ld-elf.so.1",
-						&elf32_freebsd_sysvec
+						&elf32_freebsd_sysvec,
+						NULL,
 					  };
 
 SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_ANY,
 	(sysinit_cfunc_t) elf32_insert_brand_entry,
 	&freebsd_brand_info);
 
+static Elf32_Brandinfo freebsd_brand_oinfo = {
+						ELFOSABI_FREEBSD,
+						EM_386,
+						"FreeBSD",
+						NULL,
+						"/usr/libexec/ld-elf.so.1",
+						&elf32_freebsd_sysvec,
+						NULL,
+					  };
+
+SYSINIT(oelf32, SI_SUB_EXEC, SI_ORDER_ANY,
+	(sysinit_cfunc_t) elf32_insert_brand_entry,
+	&freebsd_brand_oinfo);
+
+
+void
+elf32_dump_thread(struct thread *td __unused, void *dst __unused,
+    size_t *off __unused)
+{
+}
+
+
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
+elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+    int type, int local, elf_lookup_fn lookup)
 {
-	Elf_Addr relocbase = (Elf_Addr) lf->address;
 	Elf_Addr *where;
 	Elf_Addr addr;
 	Elf_Addr addend;
@@ -133,7 +156,7 @@ elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
 			break;
 
 		case R_386_32:		/* S + A */
-			addr = elf_lookup(lf, symidx, 1);
+			addr = lookup(lf, symidx, 1);
 			if (addr == 0)
 				return -1;
 			addr += addend;
@@ -142,7 +165,7 @@ elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
 			break;
 
 		case R_386_PC32:	/* S + A - P */
-			addr = elf_lookup(lf, symidx, 1);
+			addr = lookup(lf, symidx, 1);
 			if (addr == 0)
 				return -1;
 			addr += addend - (Elf_Addr)where;
@@ -160,7 +183,7 @@ elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
 			break;
 
 		case R_386_GLOB_DAT:	/* S */
-			addr = elf_lookup(lf, symidx, 1);
+			addr = lookup(lf, symidx, 1);
 			if (addr == 0)
 				return -1;
 			if (*where != addr)
@@ -179,17 +202,19 @@ elf_reloc_internal(linker_file_t lf, const void *data, int type, int local)
 }
 
 int
-elf_reloc(linker_file_t lf, const void *data, int type)
+elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+    elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, data, type, 0));
+	return (elf_reloc_internal(lf, relocbase, data, type, 0, lookup));
 }
 
 int
-elf_reloc_local(linker_file_t lf, const void *data, int type)
+elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+    int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, data, type, 1));
+	return (elf_reloc_internal(lf, relocbase, data, type, 1, lookup));
 }
 
 int

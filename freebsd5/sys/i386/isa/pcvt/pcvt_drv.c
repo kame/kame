@@ -50,7 +50,7 @@
  *
  *	Last Edit-Date: [Sat Jul 15 15:06:06 2000]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_drv.c,v 1.80 2003/09/26 08:51:54 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_drv.c,v 1.89 2004/07/15 20:47:40 phk Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -93,20 +93,14 @@ static	d_close_t	pcvt_close;
 static	d_ioctl_t	pcvt_ioctl;
 static	d_mmap_t	pcvt_mmap;
 
-#define	CDEV_MAJOR	12
-
 static struct cdevsw vt_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	pcvt_open,
 	.d_close =	pcvt_close,
-	.d_read =	ttyread,
-	.d_write =	ttywrite,
 	.d_ioctl =	pcvt_ioctl,
-	.d_poll =	ttypoll,
 	.d_mmap =	pcvt_mmap,
 	.d_name =	"vt",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_TTY,
-	.d_kqfilter =	ttykqfilter,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static int pcvt_probe(device_t dev);
@@ -263,8 +257,8 @@ pcvt_attach(device_t dev)
 
 	for(i = 0; i < totalscreens; i++)
 	{
-		ttyregister(&pcvt_tty[i]);
-		vs[i].vs_tty = &pcvt_tty[i];
+		pcvt_tty[i] = ttymalloc(pcvt_tty[i]);
+		vs[i].vs_tty = pcvt_tty[i];
 		make_dev(&vt_cdevsw, i, UID_ROOT, GID_WHEEL, 0600, "ttyv%r", i);
 	}
 
@@ -277,7 +271,7 @@ pcvt_attach(device_t dev)
  *	driver open
  *---------------------------------------------------------------------------*/
 static int
-pcvt_open(dev_t dev, int flag, int mode, struct thread *td)
+pcvt_open(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	register struct tty *tp;
 	register struct video_state *vsx;
@@ -290,7 +284,7 @@ pcvt_open(dev_t dev, int flag, int mode, struct thread *td)
 	if(i >= PCVT_NSCREENS)
 		return ENXIO;
 
-	tp = &pcvt_tty[i];
+	tp = pcvt_tty[i];
 
 	dev->si_tty = tp;
 
@@ -310,7 +304,7 @@ pcvt_open(dev_t dev, int flag, int mode, struct thread *td)
 		tp->t_lflag = TTYDEF_LFLAG;
 		tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
 		pcvt_param(tp, &tp->t_termios);
-		(*linesw[tp->t_line].l_modem)(tp, 1);	/* fake connection */
+		ttyld_modem(tp, 1);	/* fake connection */
 		winsz = 1;			/* set winsize later */
 	}
 	else if (tp->t_state & TS_XCLUDE && suser(td))
@@ -318,7 +312,7 @@ pcvt_open(dev_t dev, int flag, int mode, struct thread *td)
 		return (EBUSY);
 	}
 
-	retval = ((*linesw[tp->t_line].l_open)(dev, tp));
+	retval = (ttyld_open(tp, dev));
 
 	if(winsz == 1)
 	{
@@ -345,7 +339,7 @@ pcvt_open(dev_t dev, int flag, int mode, struct thread *td)
  *	driver close
  *---------------------------------------------------------------------------*/
 static int
-pcvt_close(dev_t dev, int flag, int mode, struct thread *td)
+pcvt_close(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	register struct tty *tp;
 	register struct video_state *vsx;
@@ -356,11 +350,11 @@ pcvt_close(dev_t dev, int flag, int mode, struct thread *td)
 	if(i >= PCVT_NSCREENS)
 		return ENXIO;
 
-	tp = &pcvt_tty[i];
+	tp = pcvt_tty[i];
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	ttyld_close(tp, flag);
 
-	ttyclose(tp);
+	tty_close(tp);
 
 	vsx->openf = 0;
 
@@ -375,7 +369,7 @@ pcvt_close(dev_t dev, int flag, int mode, struct thread *td)
  *	driver ioctl
  *---------------------------------------------------------------------------*/
 static int
-pcvt_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+pcvt_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	register int error;
 	register struct tty *tp;
@@ -384,7 +378,7 @@ pcvt_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	if(i >= PCVT_NSCREENS)
 		return ENXIO;
 
-	tp = &pcvt_tty[i];
+	tp = pcvt_tty[i];
 
 	/* note that some ioctl's are global, e.g.  KBSTPMAT: There is
 	 * only one keyboard and different repeat rates for instance between
@@ -403,21 +397,14 @@ pcvt_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	if((error = vgaioctl(dev,cmd,data,flag)) >= 0)
 		return error;
 
-	if((error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td))
-	    != ENOIOCTL)
-		return (error);
-
-	if((error = ttioctl(tp, cmd, data, flag)) != ENOIOCTL)
-		return (error);
-
-	return (ENOTTY);
+	return (ttyioctl(dev, cmd, data, flag, td));
 }
 
 /*---------------------------------------------------------------------------*
  *	driver mmap
  *---------------------------------------------------------------------------*/
 static int
-pcvt_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
+pcvt_mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	if (offset > 0x20000 - PAGE_SIZE)
 		return -1;
@@ -432,6 +419,7 @@ static void
 pcvt_timeout(void *arg)
 {
 	u_char *cp;
+	struct tty *tp;
 
 #if PCVT_SLOW_INTERRUPT
 	int	s;
@@ -443,6 +431,7 @@ pcvt_timeout(void *arg)
 	pcvt_scrnsv_reset();
 #endif /* PCVT_SCREENSAVER */
 
+	tp = pcvt_tty[current_video_screen];
 	while (pcvt_kbd_count)
 	{
 		if (((cp = sgetc(1)) != 0) &&
@@ -453,13 +442,13 @@ pcvt_timeout(void *arg)
 			if(*cp == '\0')
 			{
 				/* pass a NULL character */
-				(*linesw[pcvt_ttyp->t_line].l_rint)('\0', pcvt_ttyp);
+				ttyld_rint(tp, '\0');
 			}
 /* XXX */		else
 #endif /* PCVT_NULLCHARS */
 
 			while (*cp)
-				(*linesw[pcvt_ttyp->t_line].l_rint)(*cp++ & 0xff, pcvt_ttyp);
+				ttyld_rint(tp, *cp++ & 0xff);
 		}
 
 		PCVT_DISABLE_INTR ();
@@ -660,7 +649,8 @@ pcvt_cn_probe(struct consdev *cp)
 
 	sprintf(cp->cn_name, "ttyv%r", 0);
 	cp->cn_pri = CN_INTERNAL;
-	cp->cn_tp = &pcvt_tty[0];
+	pcvt_tty[0] = ttymalloc(pcvt_tty[0]);
+	cp->cn_tp = pcvt_tty[0];
 }
 
 /*---------------------------------------------------------------------------*
@@ -673,6 +663,7 @@ pcvt_cn_init(struct consdev *cp)
 	int i;
 
 	pcvt_is_console = 1;
+	pcvt_consptr = cp;
 
 	/*
 	 * Don't reset the keyboard via `kbdio' just yet.

@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/ipx_cksum.c,v 1.10 2003/06/11 05:25:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_cksum.c,v 1.11 2004/07/28 06:58:23 kan Exp $");
 
 #include <sys/param.h>
 #include <sys/mbuf.h>
@@ -50,7 +50,7 @@ __FBSDID("$FreeBSD: src/sys/netipx/ipx_cksum.c,v 1.10 2003/06/11 05:25:14 obrien
 u_short
 ipx_cksum(struct mbuf *m, int len) {
 	u_int32_t sum = 0;
-	u_short *w;
+	u_char *w;
 	u_char oldtc;
 	int mlen, words;
 	struct ipx *ipx;
@@ -62,7 +62,7 @@ ipx_cksum(struct mbuf *m, int len) {
 	ipx = mtod(m, struct ipx*);
 	oldtc = ipx->ipx_tc;
 	ipx->ipx_tc = 0;
-	w = &ipx->ipx_len;
+	w = (u_char *)&ipx->ipx_len;
 	len -= 2;
 	mlen = 2;
 
@@ -83,7 +83,7 @@ ipx_cksum(struct mbuf *m, int len) {
 			break;
 		mlen &= 1;
 		if (mlen) {
-			buf.b[0] = *(u_char*)w;
+			buf.b[0] = *w;
 			if (--len == 0) {
 				buf.b[1] = 0;
 				sum += buf.w;
@@ -93,11 +93,11 @@ ipx_cksum(struct mbuf *m, int len) {
 		m = m->m_next;
 		if (m == NULL)
 			break;
-		w = mtod(m, u_short*);
+		w = mtod(m, u_char *);
 		if (mlen) {
-			buf.b[1] = *(u_char*)w;
+			buf.b[1] = *w;
 			sum += buf.w;
-			((u_char*)w)++;
+			w++;
 			if (--len == 0)
 				break;
 		} 

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_l2cap_misc.c,v 1.5 2003/09/08 19:11:45 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_misc.c,v 1.5 2003/10/12 22:04:21 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/l2cap/ng_l2cap_misc.c,v 1.7 2004/04/27 16:38:15 emax Exp $
  */
 
 #include <sys/param.h>
@@ -37,15 +37,15 @@
 #include <sys/queue.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
-#include "ng_bluetooth.h"
-#include "ng_hci.h"
-#include "ng_l2cap.h"
-#include "ng_l2cap_var.h"
-#include "ng_l2cap_cmds.h"
-#include "ng_l2cap_evnt.h"
-#include "ng_l2cap_llpi.h"
-#include "ng_l2cap_ulpi.h"
-#include "ng_l2cap_misc.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/include/ng_l2cap.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_var.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_cmds.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_evnt.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_llpi.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_ulpi.h>
+#include <netgraph/bluetooth/l2cap/ng_l2cap_misc.h>
 
 static u_int16_t	ng_l2cap_get_cid	(ng_l2cap_p);
 
@@ -79,7 +79,7 @@ ng_l2cap_send_hook_info(node_p node, hook_p hook, void *arg1, int arg2)
 		sizeof(bdaddr_t), M_NOWAIT);
 	if (msg != NULL) {
 		bcopy(&l2cap->bdaddr, msg->data, sizeof(bdaddr_t));
-		NG_SEND_MSG_HOOK(error, node, msg, hook, NULL);
+		NG_SEND_MSG_HOOK(error, node, msg, hook, 0);
 	} else
 		error = ENOMEM;
 

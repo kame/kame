@@ -1,9 +1,9 @@
-# $FreeBSD: src/sys/modules/ipfw/Makefile,v 1.16 2002/06/28 08:10:07 julian Exp $
+# $FreeBSD: src/sys/modules/ipfw/Makefile,v 1.17 2004/08/17 22:05:53 andre Exp $
 
 .PATH: ${.CURDIR}/../../netinet
 
 KMOD=	ipfw
-SRCS=	ip_fw2.c
+SRCS=	ip_fw2.c ip_fw_pfil.c
 
 CFLAGS+= -DIPFIREWALL
 #

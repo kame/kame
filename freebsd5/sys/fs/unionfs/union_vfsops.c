@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vfsops.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/fs/unionfs/union_vfsops.c,v 1.64 2003/11/01 15:04:50 kan Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_vfsops.c,v 1.67 2004/07/30 22:08:51 phk Exp $
  */
 
 /*
@@ -59,7 +55,7 @@ static MALLOC_DEFINE(M_UNIONFSMNT, "UNION mount", "UNION mount structure");
 
 extern vfs_init_t       union_init;
 static vfs_root_t       union_root;
-static vfs_nmount_t	union_mount;
+static vfs_mount_t	union_mount;
 static vfs_statfs_t	union_statfs;
 static vfs_unmount_t    union_unmount;
 
@@ -67,9 +63,8 @@ static vfs_unmount_t    union_unmount;
  * Mount union filesystem.
  */
 static int
-union_mount(mp, ndp, td)
+union_mount(mp, td)
 	struct mount *mp;
-	struct nameidata *ndp;
 	struct thread *td;
 {
 	int error = 0;
@@ -83,6 +78,7 @@ union_mount(mp, ndp, td)
 	int len;
 	size_t size;
 	struct componentname fakecn;
+	struct nameidata nd, *ndp = &nd;
 
 	UDEBUG(("union_mount(mp = %p)\n", (void *)mp));
 
@@ -346,7 +342,7 @@ union_unmount(mp, mntflags, td)
 	 * (d) times, where (d) is the maximum tree depth
 	 * in the filesystem.
 	 */
-	for (freeing = 0; (error = vflush(mp, 0, flags)) != 0;) {
+	for (freeing = 0; (error = vflush(mp, 0, flags, td)) != 0;) {
 		int n;
 
 		/* count #vnodes held on mount list */
@@ -382,9 +378,10 @@ union_unmount(mp, mntflags, td)
 }
 
 static int
-union_root(mp, vpp)
+union_root(mp, vpp, td)
 	struct mount *mp;
 	struct vnode **vpp;
+	struct thread *td;
 {
 	struct union_mount *um = MOUNTTOUNIONMOUNT(mp);
 	int error;
@@ -489,7 +486,7 @@ union_statfs(mp, sbp, td)
 
 static struct vfsops union_vfsops = {
 	.vfs_init = 		union_init,
-	.vfs_nmount =		union_mount,
+	.vfs_mount =		union_mount,
 	.vfs_root =		union_root,
 	.vfs_statfs =		union_statfs,
 	.vfs_unmount =		union_unmount,

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,13 +27,15 @@
  * SUCH DAMAGE.
  *
  *	@(#)ttydev.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/sys/ttydev.h,v 1.9 2001/06/20 03:26:41 ache Exp $
+ * $FreeBSD: src/sys/sys/ttydev.h,v 1.11 2004/06/21 22:57:16 phk Exp $
  */
 
 /* COMPATIBILITY HEADER FILE */
 
 #ifndef _SYS_TTYDEV_H_
 #define	_SYS_TTYDEV_H_
+
+#ifndef BURN_BRIDGES
 
 #ifdef USE_OLD_TTY
 #define B0	0
@@ -62,5 +60,7 @@
 #define B460800	19
 #define B921600	20
 #endif /* USE_OLD_TTY */
+
+#endif /* BURN_BRIDGES */
 
 #endif /* !_SYS_TTYDEV_H_ */

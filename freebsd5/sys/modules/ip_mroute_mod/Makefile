@@ -1,21 +1,13 @@
-# $FreeBSD: src/sys/modules/ip_mroute_mod/Makefile,v 1.11 2002/10/20 22:59:17 rwatson Exp $
+# $FreeBSD: src/sys/modules/ip_mroute_mod/Makefile,v 1.12 2004/08/14 15:32:19 dwmalone Exp $
 
 .PATH: ${.CURDIR}/../../netinet
 
 KMOD=	ip_mroute
-SRCS=	ip_mroute.c opt_mac.h opt_mrouting.h opt_random_ip_id.h
+SRCS=	ip_mroute.c opt_mac.h opt_mrouting.h
 
 CFLAGS+= -DMROUTE_KLD
 
-RANDOM_IP_ID?=	0	# 0/1 - should jibe with kernel configuration
-
 opt_mrouting.h:
 	echo "#define	MROUTING 1" > ${.TARGET}
-
-opt_random_ip_id.h:
-	touch ${.TARGET}
-.if ${RANDOM_IP_ID} > 0
-	echo "#define	RANDOM_IP_ID 1" > ${.TARGET}
-.endif
 
 .include <bsd.kmod.mk>

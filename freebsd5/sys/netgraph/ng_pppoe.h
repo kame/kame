@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.17 2003/11/11 12:30:37 ru Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.20 2004/07/27 19:47:13 glebius Exp $
  * $Whistle: ng_pppoe.h,v 1.7 1999/10/16 10:16:43 julian Exp $
  */
 
@@ -49,7 +49,7 @@
 /* Node type name. This should be unique among all netgraph node types */
 #define NG_PPPOE_NODE_TYPE	"pppoe"
 
-#define NGM_PPPOE_COOKIE		939032003
+#define NGM_PPPOE_COOKIE		1089893072
 
 /* Number of active sessions we can handle */
 #define	PPPOE_NUM_SESSIONS		16 /* for now */
@@ -61,6 +61,10 @@
 #define NG_PPPOE_HOOK_S_LEADIN	"service" /* PADO responses from PADI */
 #define NG_PPPOE_HOOK_C_LEADIN	"client"  /* Connect message starts this */
 #define NG_PPPOE_HOOK_DEBUG	"debug"
+
+/* Mode names */
+#define	NG_PPPOE_STANDARD	"standard"
+#define	NG_PPPOE_NONSTANDARD	"3Com"
 
 /**********************************************************************
  * Netgraph commands understood by this node type.
@@ -77,7 +81,9 @@ enum cmd {
 	NGM_PPPOE_SERVICE  = 8,	/* additional Service to advertise (in PADO) */
 	NGM_PPPOE_ACNAME   = 9,	/* AC_NAME for informational purposes */
 	NGM_PPPOE_GET_STATUS = 10, /* data in/out */
-	NGM_PPPOE_SESSIONID  = 11  /* Session_ID for informational purposes */
+	NGM_PPPOE_SESSIONID  = 11,  /* Session_ID for informational purposes */
+	NGM_PPPOE_SETMODE  = 12, /* set to standard or 3Com mode */
+	NGM_PPPOE_GETMODE  = 13, /* see current mode */
 };
 
 /***********************
@@ -115,7 +121,7 @@ struct ngpppoestat {
  * and begin negotiation.
  */
 struct ngpppoe_init_data {
-	char		hook[NG_HOOKLEN + 1];	/* hook to monitor on */
+	char		hook[NG_HOOKSIZ];	/* hook to monitor on */
 	u_int16_t	data_len;		/* Length of the service name */
 	char		data[0];		/* init data goes here */
 };
@@ -133,7 +139,7 @@ struct ngpppoe_init_data {
  * to whoever requested the connection. (close may use this too).
  */
 struct ngpppoe_sts {
-	char	hook[NG_HOOKLEN + 1]; /* hook associated with event session */
+	char	hook[NG_HOOKSIZ];	/* hook associated with event session */
 };
 
 /* Keep this in sync with the above structure definition */
@@ -166,7 +172,7 @@ struct ngpppoe_sts {
 #define PTT_HOST_UNIQ	(0x0103)
 #define PTT_AC_COOKIE	(0x0104)
 #define PTT_VENDOR 	(0x0105)
-#define PTT_RELAY_SID	(0x0106)
+#define PTT_RELAY_SID	(0x0110)
 #define PTT_SRV_ERR     (0x0201)
 #define PTT_SYS_ERR  	(0x0202)
 #define PTT_GEN_ERR  	(0x0203)
@@ -182,7 +188,7 @@ struct ngpppoe_sts {
 #define PTT_HOST_UNIQ	(0x0301)
 #define PTT_AC_COOKIE	(0x0401)
 #define PTT_VENDOR 	(0x0501)
-#define PTT_RELAY_SID	(0x0601)
+#define PTT_RELAY_SID	(0x1001)
 #define PTT_SRV_ERR     (0x0102)
 #define PTT_SYS_ERR  	(0x0202)
 #define PTT_GEN_ERR  	(0x0302)

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,15 +32,15 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_rrip.h	8.2 (Berkeley) 12/5/94
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_rrip.h,v 1.6 1999/08/28 00:46:06 peter Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_rrip.h,v 1.8 2004/07/03 16:56:45 phk Exp $
  */
-  
+
 typedef struct {
 	char   type			[ISODCL (  0,    1)];
 	u_char length			[ISODCL (  2,    2)]; /* 711 */
 	u_char version			[ISODCL (  3,    3)];
 } ISO_SUSP_HEADER;
-  
+
 typedef struct {
 	ISO_SUSP_HEADER			h;
 	char mode			[ISODCL (  4,   11)]; /* 733 */
@@ -52,13 +48,13 @@ typedef struct {
 	char uid			[ISODCL ( 20,   27)]; /* 733 */
 	char gid			[ISODCL ( 28,   35)]; /* 733 */
 } ISO_RRIP_ATTR;
-  
+
 typedef struct {
 	ISO_SUSP_HEADER			h;
 	char dev_t_high			[ISODCL (  4,   11)]; /* 733 */
 	char dev_t_low			[ISODCL ( 12,   19)]; /* 733 */
 } ISO_RRIP_DEVICE;
-  
+
 #define	ISO_SUSP_CFLAG_CONTINUE	0x01
 #define	ISO_SUSP_CFLAG_CURRENT	0x02
 #define	ISO_SUSP_CFLAG_PARENT	0x04

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if.h,v 1.83 2003/10/31 18:32:08 brooks Exp $
+ * $FreeBSD: src/sys/net/if.h,v 1.88.2.2 2004/09/13 05:11:40 brooks Exp $
  */
 
 #ifndef _NET_IF_H_
@@ -64,28 +60,6 @@ struct ifnet;
 #define		IFNAMSIZ	IF_NAMESIZE
 #define		IF_MAXUNIT	0x7fff	/* historical value */
 #endif
-
-#ifdef _KERNEL
-/*
- * Structure describing a `cloning' interface.
- */
-struct if_clone {
-	LIST_ENTRY(if_clone) ifc_list;	/* on list of cloners */
-	const char *ifc_name;		/* name of device, e.g. `gif' */
-	size_t ifc_namelen;		/* length of name */
-	int ifc_minifs;			/* minimum number of interfaces */
-	int ifc_maxunit;		/* maximum unit number */
-	unsigned char *ifc_units;	/* bitmap to handle units */
-	int ifc_bmlen;			/* bitmap length */
-
-	int	(*ifc_create)(struct if_clone *, int);
-	void	(*ifc_destroy)(struct ifnet *);
-};
-
-#define IF_CLONE_INITIALIZER(name, create, destroy, minifs, maxunit)	\
-    { { 0 }, name, sizeof(name) - 1, minifs, maxunit, NULL, 0, create, destroy }
-#endif
-
 #if __BSD_VISIBLE
 
 /*
@@ -108,8 +82,10 @@ struct if_data {
 	u_char	ifi_physical;		/* e.g., AUI, Thinnet, 10base-T, etc */
 	u_char	ifi_addrlen;		/* media address length */
 	u_char	ifi_hdrlen;		/* media header length */
+	u_char	ifi_link_state;		/* current link state */
 	u_char	ifi_recvquota;		/* polling quota for receive intrs */
 	u_char	ifi_xmitquota;		/* polling quota for xmit intrs */
+	u_char	ifi_datalen;		/* length of this data struct */
 	u_long	ifi_mtu;		/* maximum transmission unit */
 	u_long	ifi_metric;		/* routing metric (external only) */
 	u_long	ifi_baudrate;		/* linespeed */
@@ -126,7 +102,10 @@ struct if_data {
 	u_long	ifi_iqdrops;		/* dropped on input, this interface */
 	u_long	ifi_noproto;		/* destined for unsupported protocol */
 	u_long	ifi_hwassist;		/* HW offload capabilities */
-	u_long	ifi_unused;		/* XXX was ifi_xmittiming */
+	time_t	ifi_epoch;		/* time of attach or stat reset */
+#ifdef __alpha__
+	u_int	ifi_timepad;		/* time_t is int, not long on alpha */
+#endif
 	struct	timeval ifi_lastchange;	/* time of last administrative change */
 };
 
@@ -151,12 +130,20 @@ struct if_data {
 #define	IFF_PPROMISC	0x20000		/* user-requested promisc mode */
 #define	IFF_MONITOR	0x40000		/* user-requested monitor mode */
 #define	IFF_STATICARP	0x80000		/* static ARP */
+#define	IFF_NEEDSGIANT	0x100000	/* hold Giant over if_start calls */
 
 /* flags set internally only: */
 #define	IFF_CANTCHANGE \
 	(IFF_BROADCAST|IFF_POINTOPOINT|IFF_RUNNING|IFF_OACTIVE|\
 	    IFF_SIMPLEX|IFF_MULTICAST|IFF_ALLMULTI|IFF_SMART|IFF_PROMISC|\
 	    IFF_POLLING)
+
+/*
+ * Values for if_link_state.
+ */
+#define	LINK_STATE_UNKNOWN	0	/* link invalid/unknown */
+#define	LINK_STATE_DOWN		1	/* link is down */
+#define	LINK_STATE_UP		2	/* link is up */
 
 /*
  * Some convenience macros used for setting ifi_baudrate.
@@ -173,6 +160,7 @@ struct if_data {
 #define	IFCAP_VLAN_MTU		0x0008	/* VLAN-compatible MTU */
 #define	IFCAP_VLAN_HWTAGGING	0x0010	/* hardware VLAN tag support */
 #define	IFCAP_JUMBO_MTU		0x0020	/* 9000 byte MTU supported */
+#define	IFCAP_POLLING		0x0040	/* driver supports polling */
 
 #define IFCAP_HWCSUM		(IFCAP_RXCSUM | IFCAP_TXCSUM)
 

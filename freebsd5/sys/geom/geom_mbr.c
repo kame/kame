@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/geom/geom_mbr.c,v 1.55 2003/09/01 20:45:32 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/geom/geom_mbr.c,v 1.60 2004/08/08 07:57:51 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -241,11 +241,14 @@ g_mbr_taste(struct g_class *mp, struct g_provider *pp, int insist)
 	if (gp == NULL)
 		return (NULL);
 	g_topology_unlock();
-	gp->dumpconf = g_mbr_dumpconf;
-	gp->ioctl = g_mbr_ioctl;
 	do {
-		if (gp->rank != 2 && insist == 0)
+		/* XXX: phk think about this! */
+		if (gp->rank != 2 &&
+		    strcmp(pp->geom->class->name, "LABEL") != 0 &&
+		    strcmp(pp->geom->class->name, "MIRROR") != 0 &&
+		    strcmp(pp->geom->class->name, "NOP") != 0) {
 			break;
+		}
 		error = g_getattr("GEOM::fwsectors", cp, &fwsectors);
 		if (error)
 			fwsectors = 17;
@@ -263,7 +266,7 @@ g_mbr_taste(struct g_class *mp, struct g_provider *pp, int insist)
 		break;
 	} while (0);
 	g_topology_lock();
-	g_access_rel(cp, -1, 0, 0);
+	g_access(cp, -1, 0, 0);
 	if (LIST_EMPTY(&gp->provider)) {
 		g_slice_spoiled(cp);
 		return (NULL);
@@ -273,7 +276,10 @@ g_mbr_taste(struct g_class *mp, struct g_provider *pp, int insist)
 
 static struct g_class g_mbr_class	= {
 	.name = MBR_CLASS_NAME,
+	.version = G_VERSION,
 	.taste = g_mbr_taste,
+	.dumpconf = g_mbr_dumpconf,
+	.ioctl = g_mbr_ioctl,
 };
 
 DECLARE_GEOM_CLASS(g_mbr_class, g_mbr);
@@ -343,7 +349,6 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	if (gp == NULL)
 		return (NULL);
 	g_topology_unlock();
-	gp->dumpconf = g_mbrext_dumpconf;
 	off = 0;
 	slice = 0;
 	do {
@@ -403,7 +408,7 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 		break;
 	} while (0);
 	g_topology_lock();
-	g_access_rel(cp, -1, 0, 0);
+	g_access(cp, -1, 0, 0);
 	if (LIST_EMPTY(&gp->provider)) {
 		g_slice_spoiled(cp);
 		return (NULL);
@@ -414,7 +419,9 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 
 static struct g_class g_mbrext_class	= {
 	.name = MBREXT_CLASS_NAME,
+	.version = G_VERSION,
 	.taste = g_mbrext_taste,
+	.dumpconf = g_mbrext_dumpconf,
 };
 
 DECLARE_GEOM_CLASS(g_mbrext_class, g_mbrext);

@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netipx/spx_usrreq.c,v 1.40 2003/11/18 00:39:05 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/netipx/spx_usrreq.c,v 1.46 2004/07/12 19:35:29 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -77,7 +77,7 @@ static struct	spx_istat spx_istat;
 #define spxstat spx_istat.newstats
 #endif  
 
-static int spx_backoff[SPX_MAXRXTSHIFT+1] =
+static const int spx_backoff[SPX_MAXRXTSHIFT+1] =
     { 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64, 64 };
 
 static	struct spxpcb *spx_close(struct spxpcb *cb);
@@ -314,8 +314,19 @@ spx_input(m, ipxp)
 	return;
 
 dropwithreset:
-	if (dropsocket)
+	if (dropsocket) {
+		struct socket *head;
+		ACCEPT_LOCK();
+		KASSERT((so->so_qstate & SQ_INCOMP) != 0,
+		    ("spx_input: nascent socket not SQ_INCOMP on soabort()"));
+		head = so->so_head;
+		TAILQ_REMOVE(&head->so_incomp, so, so_list);
+		head->so_incqlen--;
+		so->so_qstate &= ~SQ_INCOMP;
+		so->so_head = NULL;
+		ACCEPT_UNLOCK();
 		soabort(so);
+	}
 	si->si_seq = ntohs(si->si_seq);
 	si->si_ack = ntohs(si->si_ack);
 	si->si_alo = ntohs(si->si_alo);
@@ -564,10 +575,12 @@ present:
 			m = dtom(q);
 			if (SI(q)->si_cc & SPX_OB) {
 				cb->s_oobflags &= ~SF_IOOB;
+				SOCKBUF_LOCK(&so->so_rcv);
 				if (so->so_rcv.sb_cc)
 					so->so_oobmark = so->so_rcv.sb_cc;
 				else
-					so->so_state |= SS_RCVATMARK;
+					so->so_rcv.sb_state |= SBS_RCVATMARK;
+				SOCKBUF_UNLOCK(&so->so_rcv);
 			}
 			q = q->si_prev;
 			remque(q->si_next);
@@ -596,8 +609,10 @@ present:
 				if (sp->spx_cc & SPX_OB) {
 					MCHTYPE(m, MT_OOBDATA);
 					spx_newchecks[1]++;
+					SOCKBUF_LOCK(&so->so_rcv);
 					so->so_oobmark = 0;
-					so->so_state &= ~SS_RCVATMARK;
+					so->so_rcv.sb_state &= ~SBS_RCVATMARK;
+					SOCKBUF_UNLOCK(&so->so_rcv);
 				}
 				if (packetp == 0) {
 					m->m_data += SPINC;
@@ -1302,7 +1317,7 @@ spx_accept(so, nam)
 	sipx->sipx_len = sizeof *sipx;
 	sipx->sipx_family = AF_IPX;
 	sipx->sipx_addr = ipxp->ipxp_faddr;
-	*nam = dup_sockaddr((struct sockaddr *)sipx, 0);
+	*nam = sodupsockaddr((struct sockaddr *)sipx, M_NOWAIT);
 	return (0);
 }
 
@@ -1537,7 +1552,7 @@ spx_rcvoob(so, m, flags)
 	cb = ipxtospxpcb(ipxp);
 
 	if ((cb->s_oobflags & SF_IOOB) || so->so_oobmark ||
-	    (so->so_state & SS_RCVATMARK)) {
+	    (so->so_rcv.sb_state & SBS_RCVATMARK)) {
 		m->m_len = 1;
 		*mtod(m, caddr_t) = cb->s_iobc;
 		return (0);

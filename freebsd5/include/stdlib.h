@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdlib.h	8.5 (Berkeley) 5/19/95
- * $FreeBSD: src/include/stdlib.h,v 1.54.2.1 2003/12/18 00:59:50 peter Exp $
+ * $FreeBSD: src/include/stdlib.h,v 1.56 2004/02/23 03:16:58 ache Exp $
  */
 
 #ifndef _STDLIB_H_
@@ -177,10 +177,7 @@ double	 drand48(void);
 double	 erand48(unsigned short[3]);
 /* char	*fcvt(double, int, int * __restrict, int * __restrict); */
 /* char	*gcvt(double, int, int * __restrict, int * __restrict); */
-#ifndef _GETSUBOPT_DECLARED
 int	 getsubopt(char **, char *const *, char **);
-#define	_GETSUBOPT_DECLARED
-#endif
 int	 grantpt(int);
 char	*initstate(unsigned long /* XSI requires u_int */, char *, long);
 long	 jrand48(unsigned short[3]);
@@ -277,6 +274,8 @@ __int64_t
 	 strtoq(const char *, char **, int);
 __uint64_t
 	 strtouq(const char *, char **, int);
+
+extern char *suboptarg;			/* getsubopt(3) external variable */
 #endif /* __BSD_VISIBLE */
 __END_DECLS
 

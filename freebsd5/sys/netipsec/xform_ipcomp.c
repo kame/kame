@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/xform_ipcomp.c,v 1.6 2003/09/29 22:57:43 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/xform_ipcomp.c,v 1.7 2004/01/27 17:43:49 sam Exp $	*/
 /* $OpenBSD: ip_ipcomp.c,v 1.1 2001/07/05 12:08:52 jjbg Exp $ */
 
 /*
@@ -596,4 +596,4 @@ ipcomp_attach(void)
 {
 	xform_register(&ipcomp_xformsw);
 }
-SYSINIT(ipcomp_xform_init, SI_SUB_DRIVERS, SI_ORDER_FIRST, ipcomp_attach, NULL)
+SYSINIT(ipcomp_xform_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_MIDDLE, ipcomp_attach, NULL);

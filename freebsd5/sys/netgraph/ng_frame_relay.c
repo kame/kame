@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_frame_relay.c,v 1.21 2003/02/19 05:47:31 imp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_frame_relay.c,v 1.23 2004/07/12 04:35:42 rwatson Exp $
  * $Whistle: ng_frame_relay.c,v 1.20 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -99,7 +99,7 @@ typedef struct frmrel_softc *sc_p;
 #define LASTBYTE_D_C	0x02	/* last byte is dl_core or dlci info */
 
 /* Used to do headers */
-static struct segment {
+const static struct segment {
 	u_char  mask;
 	u_char  shift;
 	u_char  width;
@@ -137,18 +137,13 @@ static int ngfrm_allocate_CTX(sc_p sc, int dlci);
 
 /* Netgraph type */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_FRAMERELAY_NODE_TYPE,
-	NULL,
-	ngfrm_constructor,
-	NULL,
-	ngfrm_shutdown,
-	ngfrm_newhook,
-	NULL,
-	NULL,
-	ngfrm_rcvdata,
-	ngfrm_disconnect,
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_FRAMERELAY_NODE_TYPE,
+	.constructor =	ngfrm_constructor,
+	.shutdown =	ngfrm_shutdown,
+	.newhook =	ngfrm_newhook,
+	.rcvdata =	ngfrm_rcvdata,
+	.disconnect =	ngfrm_disconnect,
 };
 NETGRAPH_INIT(framerelay, &typestruct);
 

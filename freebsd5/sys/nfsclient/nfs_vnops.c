@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vnops.c,v 1.215 2003/11/14 20:54:09 alfred Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vnops.c,v 1.220 2004/07/25 21:24:22 phk Exp $");
 
 /*
  * vnode op calls for Sun NFS version 2 and 3
@@ -443,8 +439,8 @@ nfs_open(struct vop_open_args *ap)
 	 * Get a valid lease. If cached data is stale, flush it.
 	 */
 	if (np->n_flag & NMODIFIED) {
-		if ((error = nfs_vinvalbuf(vp, V_SAVE, ap->a_cred,
-			ap->a_td, 1)) == EINTR)
+		error = nfs_vinvalbuf(vp, V_SAVE, ap->a_cred, ap->a_td, 1);
+		if (error == EINTR || error == EIO)
 			return (error);
 		np->n_attrstamp = 0;
 		if (vp->v_type == VDIR)
@@ -460,8 +456,9 @@ nfs_open(struct vop_open_args *ap)
 		if (np->n_mtime != vattr.va_mtime.tv_sec) {
 			if (vp->v_type == VDIR)
 				np->n_direofoffset = 0;
-			if ((error = nfs_vinvalbuf(vp, V_SAVE,
-				ap->a_cred, ap->a_td, 1)) == EINTR)
+			error = nfs_vinvalbuf(vp, V_SAVE,
+				ap->a_cred, ap->a_td, 1);
+			if (error == EINTR || error == EIO)
 				return (error);
 			np->n_mtime = vattr.va_mtime.tv_sec;
 		}
@@ -673,7 +670,7 @@ nfs_setattr(struct vop_setattr_args *ap)
 		vap->va_atime.tv_sec != VNOVAL) && (np->n_flag & NMODIFIED) &&
 		vp->v_type == VREG &&
   		(error = nfs_vinvalbuf(vp, V_SAVE, ap->a_cred,
-		 ap->a_td, 1)) == EINTR)
+		 ap->a_td, 1)) != 0 && (error == EINTR || error == EIO))
 		return (error);
 	error = nfs_setattrrpc(vp, vap, ap->a_cred, ap->a_td);
 	if (error && vap->va_size != VNOVAL) {
@@ -691,6 +688,7 @@ nfs_setattrrpc(struct vnode *vp, struct vattr *vap, struct ucred *cred,
     struct thread *td)
 {
 	struct nfsv2_sattr *sp;
+	struct nfsnode *np = VTONFS(vp);
 	caddr_t bpos, dpos;
 	u_int32_t *tl;
 	int error = 0, wccflag = NFSV3_WCCRATTR;
@@ -726,6 +724,7 @@ nfs_setattrrpc(struct vnode *vp, struct vattr *vap, struct ucred *cred,
 	}
 	nfsm_request(vp, NFSPROC_SETATTR, td, cred);
 	if (v3) {
+		np->n_modestamp = 0;
 		nfsm_wcc_data(vp, wccflag);
 	} else
 		nfsm_loadattr(vp, NULL);
@@ -1449,7 +1448,7 @@ nfs_remove(struct vop_remove_args *ap)
 		 */
 		error = nfs_vinvalbuf(vp, 0, cnp->cn_cred, cnp->cn_thread, 1);
 		/* Do the rpc */
-		if (error != EINTR)
+		if (error != EINTR && error != EIO)
 			error = nfs_removerpc(dvp, cnp->cn_nameptr,
 				cnp->cn_namelen, cnp->cn_cred, cnp->cn_thread);
 		/*
@@ -2826,10 +2825,9 @@ loop:
 				panic("nfs_fsync: inconsistent lock");
 			if (error == ENOLCK)
 				goto loop;
-			if (nfs_sigintr(nmp, NULL, td)) {
-				error = EINTR;
+			error = nfs_sigintr(nmp, NULL, td);
+			if (error)
 				goto done;
-			}
 			if (slpflag == PCATCH) {
 				slpflag = 0;
 				slptimeo = 2 * hz;
@@ -2849,7 +2847,7 @@ loop:
 		else
 		    bp->b_flags |= B_ASYNC | B_WRITEINPROG;
 		splx(s);
-		BUF_WRITE(bp);
+		bwrite(bp);
 		goto loop;
 	}
 	splx(s);
@@ -2865,10 +2863,9 @@ loop:
 				slpflag | (PRIBIO + 1), "nfsfsync", slptimeo);
 			if (error) {
 			    VI_UNLOCK(vp);
-			    if (nfs_sigintr(nmp, NULL, td)) {
-				error = EINTR;
+			    error = nfs_sigintr(nmp, NULL, td);
+			    if (error)
 				goto done;
-			    }
 			    if (slpflag == PCATCH) {
 				slpflag = 0;
 				slptimeo = 2 * hz;
@@ -2983,7 +2980,7 @@ nfs_writebp(struct buf *bp, int force, struct thread *td)
 
 		if (oldflags & B_DELWRI) {
 			s = splbio();
-			reassignbuf(bp, bp->b_vp);
+			reassignbuf(bp);
 			splx(s);
 		}
 

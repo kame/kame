@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *      from:   @(#)pmap.c      7.7 (Berkeley)  5/12/91
- * $FreeBSD: src/sys/sparc64/sparc64/pmap.c,v 1.126 2003/10/03 22:46:53 alc Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/pmap.c,v 1.139 2004/08/13 18:54:21 alc Exp $
  */
 
 /*
@@ -113,12 +113,6 @@
  */
 struct msgbuf *msgbufp;
 vm_paddr_t msgbuf_phys;
-
-/*
- * Physical addresses of first and last available physical page.
- */
-vm_paddr_t avail_start;
-vm_paddr_t avail_end;
 
 int pmap_pagedaemon_waken;
 
@@ -434,13 +428,11 @@ pmap_bootstrap(vm_offset_t ekva)
 	}
 
 	/*
-	 * Calculate the first and last available physical addresses.
+	 * Calculate the last available physical address.
 	 */
-	avail_start = phys_avail[0];
 	for (i = 0; phys_avail[i + 2] != 0; i += 2)
 		;
-	avail_end = phys_avail[i + 1];
-	Maxmem = sparc64_btop(avail_end);
+	Maxmem = sparc64_btop(phys_avail[i + 1]);
 
 	/*
 	 * Add the prom mappings to the kernel tsb.
@@ -493,6 +485,9 @@ pmap_bootstrap(vm_offset_t ekva)
 
 	/*
 	 * Initialize the kernel pmap (which is statically allocated).
+	 * NOTE: PMAP_LOCK_INIT() is needed as part of the initialization
+	 * but sparc64 start up is not ready to initialize mutexes yet.
+	 * It is called in machdep.c.
 	 */
 	pm = kernel_pmap;
 	for (i = 0; i < MAXCPU; i++)
@@ -563,7 +558,7 @@ pmap_bootstrap_alloc(vm_size_t size)
  * Initialize the pmap module.
  */
 void
-pmap_init(vm_paddr_t phys_start, vm_paddr_t phys_end)
+pmap_init(void)
 {
 	vm_offset_t addr;
 	vm_size_t size;
@@ -610,14 +605,18 @@ vm_paddr_t
 pmap_extract(pmap_t pm, vm_offset_t va)
 {
 	struct tte *tp;
+	vm_paddr_t pa;
 
 	if (pm == kernel_pmap)
 		return (pmap_kextract(va));
+	PMAP_LOCK(pm);
 	tp = tsb_tte_lookup(pm, va);
 	if (tp == NULL)
-		return (0);
+		pa = 0;
 	else
-		return (TTE_GET_PA(tp) | (va & TTE_GET_PAGE_MASK(tp)));
+		pa = TTE_GET_PA(tp) | (va & TTE_GET_PAGE_MASK(tp));
+	PMAP_UNLOCK(pm);
+	return (pa);
 }
 
 /*
@@ -626,20 +625,35 @@ pmap_extract(pmap_t pm, vm_offset_t va)
  * protection.
  */
 vm_page_t
-pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
+pmap_extract_and_hold(pmap_t pm, vm_offset_t va, vm_prot_t prot)
 {
-	vm_paddr_t pa;
+	struct tte *tp;
 	vm_page_t m;
 
 	m = NULL;
-	mtx_lock(&Giant);
-	if ((pa = pmap_extract(pmap, va)) != 0) {
-		m = PHYS_TO_VM_PAGE(pa);
-		vm_page_lock_queues();
-		vm_page_hold(m);
-		vm_page_unlock_queues();
+	vm_page_lock_queues();
+	if (pm == kernel_pmap) {
+		if (va >= VM_MIN_DIRECT_ADDRESS) {
+			tp = NULL;
+			m = PHYS_TO_VM_PAGE(TLB_DIRECT_TO_PHYS(va));
+			vm_page_hold(m);
+		} else {
+			tp = tsb_kvtotte(va);
+			if ((tp->tte_data & TD_V) == 0)
+				tp = NULL;
+		}
+	} else {
+		PMAP_LOCK(pm);
+		tp = tsb_tte_lookup(pm, va);
 	}
-	mtx_unlock(&Giant);
+	if (tp != NULL && ((tp->tte_data & TD_SW) ||
+	    (prot & VM_PROT_WRITE) == 0)) {
+		m = PHYS_TO_VM_PAGE(TTE_GET_PA(tp));
+		vm_page_hold(m);
+	}
+	vm_page_unlock_queues();
+	if (pm != kernel_pmap)
+		PMAP_UNLOCK(pm);
 	return (m);
 }
 
@@ -970,6 +984,7 @@ pmap_pinit0(pmap_t pm)
 {
 	int i;
 
+	PMAP_LOCK_INIT(pm);
 	for (i = 0; i < MAXCPU; i++)
 		pm->pm_context[i] = 0;
 	pm->pm_active = 0;
@@ -989,11 +1004,13 @@ pmap_pinit(pmap_t pm)
 	vm_page_t m;
 	int i;
 
+	PMAP_LOCK_INIT(pm);
+
 	/*
 	 * Allocate kva space for the tsb.
 	 */
 	if (pm->pm_tsb == NULL) {
-		pm->pm_tsb = (struct tte *)kmem_alloc_pageable(kernel_map,
+		pm->pm_tsb = (struct tte *)kmem_alloc_nofault(kernel_map,
 		    TSB_BSIZE);
 	}
 
@@ -1007,8 +1024,6 @@ pmap_pinit(pmap_t pm)
 	for (i = 0; i < TSB_PAGES; i++) {
 		m = vm_page_grab(pm->pm_tsb_obj, i,
 		    VM_ALLOC_RETRY | VM_ALLOC_WIRED | VM_ALLOC_ZERO);
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
 
 		vm_page_lock_queues();
 		vm_page_flag_clear(m, PG_BUSY);
@@ -1027,12 +1042,6 @@ pmap_pinit(pmap_t pm)
 	bzero(&pm->pm_stats, sizeof(pm->pm_stats));
 }
 
-void
-pmap_pinit2(pmap_t pmap)
-{
-	/* XXX: Remove this stub when no longer called */
-}
-
 /*
  * Release any resources held by the given physical map.
  * Called when a pmap initialized by pmap_pinit is being released.
@@ -1043,12 +1052,33 @@ pmap_release(pmap_t pm)
 {
 	vm_object_t obj;
 	vm_page_t m;
+	struct pcpu *pc;
 
 	CTR2(KTR_PMAP, "pmap_release: ctx=%#x tsb=%p",
 	    pm->pm_context[PCPU_GET(cpuid)], pm->pm_tsb);
 	KASSERT(pmap_resident_count(pm) == 0,
 	    ("pmap_release: resident pages %ld != 0",
 	    pmap_resident_count(pm)));
+
+	/*
+	 * After the pmap was freed, it might be reallocated to a new process.
+	 * When switching, this might lead us to wrongly assume that we need
+	 * not switch contexts because old and new pmap pointer are equal.
+	 * Therefore, make sure that this pmap is not referenced by any PCPU
+	 * pointer any more. This could happen in two cases:
+	 * - A process that referenced the pmap is currently exiting on a CPU.
+	 *   However, it is guaranteed to not switch in any more after setting
+	 *   its state to PRS_ZOMBIE.
+	 * - A process that referenced this pmap ran on a CPU, but we switched
+	 *   to a kernel thread, leaving the pmap pointer unchanged.
+	 */
+	mtx_lock_spin(&sched_lock);
+	SLIST_FOREACH(pc, &cpuhead, pc_allcpu) {
+		if (pc->pc_pmap == pm)
+			pc->pc_pmap = NULL;
+	}
+	mtx_unlock_spin(&sched_lock);
+
 	obj = pm->pm_tsb_obj;
 	VM_OBJECT_LOCK(obj);
 	KASSERT(obj->ref_count == 1, ("pmap_release: tsbobj ref count != 1"));
@@ -1068,6 +1098,7 @@ pmap_release(pmap_t pm)
 	}
 	VM_OBJECT_UNLOCK(obj);
 	pmap_qremove((vm_offset_t)pm->pm_tsb, TSB_PAGES);
+	PMAP_LOCK_DESTROY(pm);
 }
 
 /*
@@ -1120,11 +1151,12 @@ pmap_remove(pmap_t pm, vm_offset_t start, vm_offset_t end)
 	struct tte *tp;
 	vm_offset_t va;
 
-	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	CTR3(KTR_PMAP, "pmap_remove: ctx=%#lx start=%#lx end=%#lx",
 	    pm->pm_context[PCPU_GET(cpuid)], start, end);
 	if (PMAP_REMOVE_DONE(pm))
 		return;
+	vm_page_lock_queues();
+	PMAP_LOCK(pm);
 	if (end - start > PMAP_TSB_THRESH) {
 		tsb_foreach(pm, NULL, start, end, pmap_remove_tte);
 		tlb_context_demap(pm);
@@ -1137,6 +1169,8 @@ pmap_remove(pmap_t pm, vm_offset_t start, vm_offset_t end)
 		}
 		tlb_range_demap(pm, start, end - 1);
 	}
+	PMAP_UNLOCK(pm);
+	vm_page_unlock_queues();
 }
 
 void
@@ -1154,6 +1188,7 @@ pmap_remove_all(vm_page_t m)
 			continue;
 		pm = TTE_GET_PMAP(tp);
 		va = TTE_GET_VA(tp);
+		PMAP_LOCK(pm);
 		if ((tp->tte_data & TD_WIRED) != 0)
 			pm->pm_stats.wired_count--;
 		if ((tp->tte_data & TD_REF) != 0)
@@ -1167,6 +1202,7 @@ pmap_remove_all(vm_page_t m)
 		pm->pm_stats.resident_count--;
 		pmap_cache_remove(m, va);
 		TTE_ZERO(tp);
+		PMAP_UNLOCK(pm);
 	}
 	vm_page_flag_clear(m, PG_WRITEABLE);
 }
@@ -1209,6 +1245,8 @@ pmap_protect(pmap_t pm, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 	if (prot & VM_PROT_WRITE)
 		return;
 
+	vm_page_lock_queues();
+	PMAP_LOCK(pm);
 	if (eva - sva > PMAP_TSB_THRESH) {
 		tsb_foreach(pm, NULL, sva, eva, pmap_protect_tte);
 		tlb_context_demap(pm);
@@ -1219,6 +1257,8 @@ pmap_protect(pmap_t pm, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 		}
 		tlb_range_demap(pm, sva, eva - 1);
 	}
+	PMAP_UNLOCK(pm);
+	vm_page_unlock_queues();
 }
 
 /*
@@ -1254,6 +1294,9 @@ pmap_enter(pmap_t pm, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	CTR6(KTR_PMAP,
 	    "pmap_enter: ctx=%p m=%p va=%#lx pa=%#lx prot=%#x wired=%d",
 	    pm->pm_context[PCPU_GET(cpuid)], m, va, pa, prot, wired);
+
+	vm_page_lock_queues();
+	PMAP_LOCK(pm);
 
 	/*
 	 * If there is an existing mapping, and the physical address has not
@@ -1319,9 +1362,7 @@ pmap_enter(pmap_t pm, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		if (tp != NULL) {
 			CTR0(KTR_PMAP, "pmap_enter: replace");
 			PMAP_STATS_INC(pmap_nenter_replace);
-			vm_page_lock_queues();
 			pmap_remove_tte(pm, NULL, tp, va);
-			vm_page_unlock_queues();
 			tlb_page_demap(pm, va);
 		} else {
 			CTR0(KTR_PMAP, "pmap_enter: new");
@@ -1354,13 +1395,17 @@ pmap_enter(pmap_t pm, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 
 		tsb_tte_enter(pm, m, va, TS_8K, data);
 	}
+	vm_page_unlock_queues();
+	PMAP_UNLOCK(pm);
 }
 
 vm_page_t
 pmap_enter_quick(pmap_t pm, vm_offset_t va, vm_page_t m, vm_page_t mpte)
 {
 
+	mtx_lock(&Giant);
 	pmap_enter(pm, va, m, VM_PROT_READ | VM_PROT_EXECUTE, FALSE);
+	mtx_unlock(&Giant);
 	return (NULL);
 }
 
@@ -1384,6 +1429,7 @@ pmap_change_wiring(pmap_t pm, vm_offset_t va, boolean_t wired)
 	struct tte *tp;
 	u_long data;
 
+	PMAP_LOCK(pm);
 	if ((tp = tsb_tte_lookup(pm, va)) != NULL) {
 		if (wired) {
 			data = atomic_set_long(&tp->tte_data, TD_WIRED);
@@ -1395,6 +1441,7 @@ pmap_change_wiring(pmap_t pm, vm_offset_t va, boolean_t wired)
 				pm->pm_stats.wired_count--;
 		}
 	}
+	PMAP_UNLOCK(pm);
 }
 
 static int
@@ -1423,6 +1470,8 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
 
 	if (dst_addr != src_addr)
 		return;
+	vm_page_lock_queues();
+	PMAP_LOCK(dst_pmap);
 	if (len > PMAP_TSB_THRESH) {
 		tsb_foreach(src_pmap, dst_pmap, src_addr, src_addr + len,
 		    pmap_copy_tte);
@@ -1434,6 +1483,8 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
 		}
 		tlb_range_demap(dst_pmap, src_addr, src_addr + len - 1);
 	}
+	vm_page_unlock_queues();
+	PMAP_UNLOCK(dst_pmap);
 }
 
 void
@@ -1640,6 +1691,24 @@ pmap_remove_pages(pmap_t pm, vm_offset_t sva, vm_offset_t eva)
 }
 
 /*
+ * Returns TRUE if the given page has a managed mapping.
+ */
+boolean_t
+pmap_page_is_mapped(vm_page_t m)
+{
+	struct tte *tp;
+
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
+	if ((m->flags & (PG_FICTITIOUS | PG_UNMANAGED)) != 0)
+		return (FALSE);
+	TAILQ_FOREACH(tp, &m->md.tte_list, tte_link) {
+		if ((tp->tte_data & TD_PV) != 0)
+			return (TRUE);
+	}
+	return (FALSE);
+}
+
+/*
  * Lower the permission for all mappings to a given page.
  */
 void
@@ -1823,7 +1892,7 @@ pmap_activate(struct thread *td)
 
 	pm->pm_context[PCPU_GET(cpuid)] = context;
 	pm->pm_active |= PCPU_GET(cpumask);
-	PCPU_SET(vmspace, vm);
+	PCPU_SET(pmap, pm);
 
 	stxa(AA_DMMU_TSB, ASI_DMMU, pm->pm_tsb);
 	stxa(AA_IMMU_TSB, ASI_IMMU, pm->pm_tsb);

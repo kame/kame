@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.h,v 1.7 2000/10/24 17:32:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.h,v 1.10 2004/02/20 08:26:27 pjd Exp $
  * $Whistle: ng_ether.h,v 1.1 1999/02/02 03:17:22 julian Exp $
  */
 
@@ -64,11 +64,6 @@ enum {
 	NGM_ETHER_GET_AUTOSRC,		/* get source address override */
 	NGM_ETHER_SET_AUTOSRC,		/* enable/disable src addr override */
 };
-
-#ifdef _KERNEL
-/* Ethernet address parse type */
-extern	const struct ng_parse_type ng_ether_enaddr_type;
-#endif /* _KERNEL */
 
 #endif /* _NETGRAPH_NG_ETHER_H_ */
 

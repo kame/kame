@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  *
  *	@(#)umap_vfsops.c	8.8 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/fs/umapfs/umap_vfsops.c,v 1.55 2003/06/12 20:48:37 phk Exp $
+ * $FreeBSD: src/sys/fs/umapfs/umap_vfsops.c,v 1.58 2004/07/30 22:08:51 phk Exp $
  */
 
 /*
@@ -57,7 +53,7 @@
 
 static MALLOC_DEFINE(M_UMAPFSMNT, "UMAP mount", "UMAP mount structure");
 
-static vfs_mount_t		umapfs_mount;
+static vfs_omount_t		umapfs_omount;
 static vfs_start_t		umapfs_start;
 static vfs_root_t		umapfs_root;
 static vfs_quotactl_t		umapfs_quotactl;
@@ -73,7 +69,7 @@ static vfs_extattrctl_t	umapfs_extattrctl;
  * Mount umap layer
  */
 static int
-umapfs_mount(mp, path, data, ndp, td)
+umapfs_omount(mp, path, data, ndp, td)
 	struct mount *mp;
 	char *path;
 	caddr_t data;
@@ -283,7 +279,7 @@ umapfs_unmount(mp, mntflags, td)
 		return (EBUSY);
 #endif
 	/* There is 1 extra root vnode reference (umapm_rootvp). */
-	error = vflush(mp, 1, flags);
+	error = vflush(mp, 1, flags, td);
 	if (error)
 		return (error);
 
@@ -296,9 +292,10 @@ umapfs_unmount(mp, mntflags, td)
 }
 
 static int
-umapfs_root(mp, vpp)
+umapfs_root(mp, vpp, td)
 	struct mount *mp;
 	struct vnode **vpp;
+	struct thread *td;
 {
 	struct thread *td = curthread;	/* XXX */
 	struct vnode *vp;
@@ -433,7 +430,7 @@ static struct vfsops umap_vfsops = {
 	.vfs_extattrctl =		umapfs_extattrctl,
 	.vfs_fhtovp =    		umapfs_fhtovp,
 	.vfs_init =      		umapfs_init,
-	.vfs_mount =    		umapfs_mount,
+	.vfs_omount =    		umapfs_omount,
 	.vfs_quotactl = 		umapfs_quotactl,
 	.vfs_root =     		umapfs_root,
 	.vfs_start =    		umapfs_start,

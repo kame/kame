@@ -31,7 +31,7 @@
  *---------------------------------------------------------------------------*/ 
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ing.c,v 1.17 2003/06/10 23:14:55 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ing.c,v 1.22 2004/07/06 06:43:45 ru Exp $");
 
 #include "i4bing.h"
 
@@ -96,7 +96,7 @@ struct ing_softc {
 	struct ifqueue  xmitq;	  /* transmit queue */
 		
 	node_p		node;		/* back pointer to node */
-	char		nodename[NG_NODELEN + 1]; /* store our node name */
+	char		nodename[NG_NODESIZ]; /* store our node name */
 	hook_p  	debughook;
 	hook_p  	hook;	
 
@@ -198,18 +198,16 @@ static const struct ng_cmdlist ng_ing_cmdlist[] = {
 
 /* Netgraph node type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_ING_NODE_TYPE,
-	NULL,
-	ng_ing_constructor,
-	ng_ing_rcvmsg,
-	ng_ing_shutdown,
-	ng_ing_newhook,
-	NULL,
-	ng_ing_connect,
-	ng_ing_rcvdata,
-	ng_ing_disconnect,
-	ng_ing_cmdlist
+	.version =	NG_ABI_VERSION,
+	.name =		NG_ING_NODE_TYPE,
+	.constructor =	ng_ing_constructor,
+	.rcvmsg =	ng_ing_rcvmsg,
+	.shutdown =	ng_ing_shutdown,
+	.newhook =	ng_ing_newhook,
+	.connect =	ng_ing_connect,
+	.rcvdata =	ng_ing_rcvdata,
+	.disconnect =	ng_ing_disconnect,
+	.cmdlist =	ng_ing_cmdlist,
 };
 
 NETGRAPH_INIT_ORDERED(ing, &typestruct, SI_SUB_DRIVERS, SI_ORDER_ANY);
@@ -736,16 +734,14 @@ ng_ing_rcvdata(hook_p hook, item_p item)
 	struct ifqueue  *xmitq_p;
 	int s;
 	struct mbuf *m;
-	meta_p meta;
+	struct ng_tag_prio *ptag;
 	
 	NGI_GET_M(item, m);
-	NGI_GET_META(item, meta);
 	NG_FREE_ITEM(item);
 
 	if(NG_HOOK_PRIVATE(hook) == NULL)
 	{
 		NG_FREE_M(m);
-		NG_FREE_META(meta);
 		return(ENETDOWN);
 	}
 	
@@ -760,15 +756,11 @@ ng_ing_rcvdata(hook_p hook, item_p item)
        /*
 	* Now queue the data for when it can be sent
 	*/
-
-	if (meta && meta->priority > 0)
-	{
+	if ((ptag = (struct ng_tag_prio *)m_tag_locate(m, NGM_GENERIC_COOKIE,
+	    NG_TAG_PRIO, NULL)) != NULL && (ptag->priority > NG_PRIO_CUTOFF) )
 		xmitq_p = (&sc->xmitq_hipri);
-	}
 	else
-	{
 		xmitq_p = (&sc->xmitq);
-	}
 
 	s = splimp();
 
@@ -779,7 +771,6 @@ ng_ing_rcvdata(hook_p hook, item_p item)
 		IF_UNLOCK(xmitq_p);
 		splx(s);
 		NG_FREE_M(m);
-		NG_FREE_META(meta);
 		return(ENOBUFS);
 	}
 

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netncp/ncp_subr.c,v 1.12 2003/06/11 05:30:35 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_subr.c,v 1.13 2004/03/14 02:06:28 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -85,6 +85,7 @@ ncp_at_exit(void *arg, struct proc *p)
 	struct ncp_conn *ncp, *nncp;
 	struct thread *td;
 
+	mtx_lock(&Giant);
 	FOREACH_THREAD_IN_PROC(p, td) {
 		if (ncp_conn_putprochandles(td) == 0)
 			continue;
@@ -100,6 +101,7 @@ ncp_at_exit(void *arg, struct proc *p)
 		}
 		ncp_conn_unlocklist(td);
 	}
+	mtx_unlock(&Giant);
 }
 
 int

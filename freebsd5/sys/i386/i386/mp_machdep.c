@@ -24,11 +24,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.227 2003/12/03 14:57:25 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.235.2.3 2004/09/24 15:02:33 rik Exp $");
 
 #include "opt_apic.h"
 #include "opt_cpu.h"
 #include "opt_kstack_pages.h"
+#include "opt_mp_watchdog.h"
 
 #if !defined(lint)
 #if !defined(SMP)
@@ -73,6 +74,7 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.227 2003/12/03 14:57:25 j
 #include <machine/apicreg.h>
 #include <machine/clock.h>
 #include <machine/md_var.h>
+#include <machine/mp_watchdog.h>
 #include <machine/pcb.h>
 #include <machine/smp.h>
 #include <machine/smptests.h>	/** COUNT_XINVLTLB_HITS */
@@ -154,11 +156,10 @@ int	boot_cpu_id = -1;	/* designated BSP */
 extern	int nkpt;
 
 /*
- * CPU topology map datastructures for HTT. (XXX)
+ * CPU topology map datastructures for HTT.
  */
-struct cpu_group mp_groups[MAXCPU];
-struct cpu_top mp_top;
-struct cpu_top *smp_topology;
+static struct cpu_group mp_groups[MAXCPU];
+static struct cpu_top mp_top;
 
 /* AP uses this during bootstrap.  Do not staticize.  */
 char *bootSTK;
@@ -176,14 +177,12 @@ struct pcb stoppcbs[MAXCPU];
 vm_offset_t smp_tlb_addr1;
 vm_offset_t smp_tlb_addr2;
 volatile int smp_tlb_wait;
-struct mtx smp_tlb_mtx;
 
 /*
  * Local data and functions.
  */
 
 static u_int logical_cpus;
-static u_int logical_cpus_mask;
 
 /* used to hold the AP's until we are ready to release them */
 static struct mtx ap_boot_mtx;
@@ -209,9 +208,55 @@ static void	install_ap_tramp(void);
 static int	start_ap(int apic_id);
 static void	release_aps(void *dummy);
 
-static int	hlt_cpus_mask;
 static int	hlt_logical_cpus;
 static struct	sysctl_ctx_list logical_cpu_clist;
+
+static void
+mem_range_AP_init(void)
+{
+	if (mem_range_softc.mr_op && mem_range_softc.mr_op->initAP)
+		mem_range_softc.mr_op->initAP(&mem_range_softc);
+}
+
+void
+mp_topology(void)
+{
+	struct cpu_group *group;
+	int logical_cpus;
+	int apic_id;
+	int groups;
+	int cpu;
+
+	/* Build the smp_topology map. */
+	/* Nothing to do if there is no HTT support. */
+	if ((cpu_feature & CPUID_HTT) == 0)
+		return;
+	logical_cpus = (cpu_procinfo & CPUID_HTT_CORES) >> 16;
+	if (logical_cpus <= 1)
+		return;
+	group = &mp_groups[0];
+	groups = 1;
+	for (cpu = 0, apic_id = 0; apic_id < MAXCPU; apic_id++) {
+		if (!cpu_info[apic_id].cpu_present)
+			continue;
+		/*
+		 * If the current group has members and we're not a logical
+		 * cpu, create a new group.
+		 */
+		if (group->cg_count != 0 && (apic_id % logical_cpus) == 0) {
+			group++;
+			groups++;
+		}
+		group->cg_count++;
+		group->cg_mask |= 1 << cpu;
+		cpu++;
+	}
+
+	mp_top.ct_count = groups;
+	mp_top.ct_group = mp_groups;
+	smp_topology = &mp_top;
+}
+
 
 /*
  * Calculate usable address in base memory for AP trampoline code.
@@ -232,9 +277,9 @@ void
 cpu_add(u_int apic_id, char boot_cpu)
 {
 
-	if (apic_id > MAXCPU) {
+	if (apic_id >= MAXCPU) {
 		printf("SMP: CPU %d exceeds maximum CPU %d, ignoring\n",
-		    apic_id, MAXCPU);
+		    apic_id, MAXCPU - 1);
 		return;
 	}
 	KASSERT(cpu_info[apic_id].cpu_present == 0, ("CPU %d added twice",
@@ -339,7 +384,6 @@ cpu_mp_start(void)
 	setidt(IPI_STOP, IDTVEC(cpustop),
 	       SDT_SYS386IGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 
-	mtx_init(&smp_tlb_mtx, "tlb", NULL, MTX_SPIN);
 
 	/* Set boot_cpu_id if needed. */
 	if (boot_cpu_id == -1) {
@@ -693,8 +737,9 @@ install_ap_tramp(void)
 {
 	int     x;
 	int     size = *(int *) ((u_long) & bootMP_size);
+	vm_offset_t va = boot_address + KERNBASE;
 	u_char *src = (u_char *) ((u_long) bootMP);
-	u_char *dst = (u_char *) boot_address + KERNBASE;
+	u_char *dst = (u_char *) va;
 	u_int   boot_base = (u_int) bootMP;
 	u_int8_t *dst8;
 	u_int16_t *dst16;
@@ -702,7 +747,10 @@ install_ap_tramp(void)
 
 	POSTCODE(INSTALL_AP_TRAMP_POST);
 
-	pmap_kenter(boot_address + KERNBASE, boot_address);
+	KASSERT (size <= PAGE_SIZE,
+	    ("'size' do not fit into PAGE_SIZE, as expected."));
+	pmap_kenter(va, boot_address);
+	pmap_invalidate_page (kernel_pmap, va);
 	for (x = 0; x < size; ++x)
 		*dst++ = *src++;
 
@@ -713,7 +761,7 @@ install_ap_tramp(void)
 	 */
 
 	/* boot code is located in KERNEL space */
-	dst = (u_char *) boot_address + KERNBASE;
+	dst = (u_char *) va;
 
 	/* modify the lgdt arg */
 	dst32 = (u_int32_t *) (dst + ((u_int) & mp_gdtbase - boot_base));
@@ -864,7 +912,7 @@ smp_tlb_shootdown(u_int vector, vm_offset_t addr1, vm_offset_t addr2)
 	ncpu = mp_ncpus - 1;	/* does not shootdown self */
 	if (ncpu < 1)
 		return;		/* no other cpus */
-	mtx_assert(&smp_tlb_mtx, MA_OWNED);
+	mtx_assert(&smp_rv_mtx, MA_OWNED);
 	smp_tlb_addr1 = addr1;
 	smp_tlb_addr2 = addr2;
 	atomic_store_rel_int(&smp_tlb_wait, 0);
@@ -950,7 +998,7 @@ smp_targeted_tlb_shootdown(u_int mask, u_int vector, vm_offset_t addr1, vm_offse
 		if (ncpu < 1)
 			return;
 	}
-	mtx_assert(&smp_tlb_mtx, MA_OWNED);
+	mtx_assert(&smp_rv_mtx, MA_OWNED);
 	smp_tlb_addr1 = addr1;
 	smp_tlb_addr2 = addr2;
 	atomic_store_rel_int(&smp_tlb_wait, 0);
@@ -1191,7 +1239,8 @@ sysctl_hlt_cpus(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_machdep, OID_AUTO, hlt_cpus, CTLTYPE_INT|CTLFLAG_RW,
-    0, 0, sysctl_hlt_cpus, "IU", "");
+    0, 0, sysctl_hlt_cpus, "IU",
+    "Bitmap of CPUs to halt.  101 (binary) will halt CPUs 0 and 2.");
 
 static int
 sysctl_hlt_logical_cpus(SYSCTL_HANDLER_ARGS)
@@ -1242,7 +1291,14 @@ int
 mp_grab_cpu_hlt(void)
 {
 	u_int mask = PCPU_GET(cpumask);
+#ifdef MP_WATCHDOG
+	u_int cpuid = PCPU_GET(cpuid);
+#endif
 	int retval;
+
+#ifdef MP_WATCHDOG
+	ap_watchdog(cpuid);
+#endif
 
 	retval = mask & hlt_cpus_mask;
 	while (mask & hlt_cpus_mask)

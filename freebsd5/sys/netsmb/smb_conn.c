@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/netsmb/smb_conn.c,v 1.9 2003/08/23 21:43:33 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_conn.c,v 1.13 2004/07/28 06:59:18 kan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -118,13 +118,16 @@ smb_sm_lookupint(struct smb_vcspec *vcspec, struct smb_sharespec *shspec,
 	struct smb_cred *scred,	struct smb_vc **vcpp)
 {
 	struct thread *td = scred->scr_td;
+	struct smb_connobj *scp;
 	struct smb_vc *vcp;
 	int exact = 1;
 	int error;
 
 	vcspec->shspec = shspec;
 	error = ENOENT;
-	SMBCO_FOREACH((struct smb_connobj*)vcp, &smb_vclist) {
+	vcp = NULL;
+	SMBCO_FOREACH(scp, &smb_vclist) {
+		vcp = (struct smb_vc *)scp;
 		error = smb_vc_lock(vcp, LK_EXCLUSIVE, td);
 		if (error)
 			continue;
@@ -405,6 +408,9 @@ smb_vc_create(struct smb_vcspec *vcspec,
 	vcp->vc_mode = vcspec->rights & SMBM_MASK;
 	vcp->obj.co_flags = vcspec->flags & (SMBV_PRIVATE | SMBV_SINGLESHARE);
 	vcp->vc_tdesc = &smb_tran_nbtcp_desc;
+	vcp->vc_seqno = 0;
+	vcp->vc_mackey = NULL;
+	vcp->vc_mackeylen = 0;
 
 	if (uid == SMBM_ANY_OWNER)
 		uid = realuid;
@@ -416,10 +422,10 @@ smb_vc_create(struct smb_vcspec *vcspec,
 	smb_sl_init(&vcp->vc_stlock, "vcstlock");
 	error = ENOMEM;
 
-	vcp->vc_paddr = dup_sockaddr(vcspec->sap, 1);
+	vcp->vc_paddr = sodupsockaddr(vcspec->sap, M_WAITOK);
 	if (vcp->vc_paddr == NULL)
 		goto fail;
-	vcp->vc_laddr = dup_sockaddr(vcspec->lap, 1);
+	vcp->vc_laddr = sodupsockaddr(vcspec->lap, M_WAITOK);
 	if (vcp->vc_laddr == NULL)
 		goto fail;
 	vcp->vc_pass = smb_strdup(vcspec->pass);
@@ -474,6 +480,8 @@ smb_vc_free(struct smb_connobj *cp)
 	SMB_STRFREE(vcp->vc_srvname);
 	SMB_STRFREE(vcp->vc_pass);
 	SMB_STRFREE(vcp->vc_domain);
+	if (vcp->vc_mackey)
+		free(vcp->vc_mackey, M_SMBTEMP);
 	if (vcp->vc_paddr)
 		free(vcp->vc_paddr, M_SONAME);
 	if (vcp->vc_laddr)
@@ -589,12 +597,14 @@ smb_vc_lookupshare(struct smb_vc *vcp, struct smb_sharespec *dp,
 	struct smb_cred *scred,	struct smb_share **sspp)
 {
 	struct thread *td = scred->scr_td;
+	struct smb_connobj *scp = NULL;
 	struct smb_share *ssp = NULL;
 	int error;
 
 	*sspp = NULL;
 	dp->scred = scred;
-	SMBCO_FOREACH((struct smb_connobj*)ssp, VCTOCP(vcp)) {
+	SMBCO_FOREACH(scp, VCTOCP(vcp)) {
+		ssp = (struct smb_share *)scp;
 		error = smb_share_lock(ssp, LK_EXCLUSIVE, td);
 		if (error)
 			continue;
@@ -843,6 +853,7 @@ smb_sysctl_treedump(SYSCTL_HANDLER_ARGS)
 {
 	struct thread *td = req->td;
 	struct smb_cred scred;
+	struct smb_connobj *scp1, *scp2;
 	struct smb_vc *vcp;
 	struct smb_share *ssp;
 	struct smb_vc_info vci;
@@ -850,11 +861,14 @@ smb_sysctl_treedump(SYSCTL_HANDLER_ARGS)
 	int error, itype;
 
 	smb_makescred(&scred, td, td->td_ucred);
-	sysctl_wire_old_buffer(req, 0);
+	error = sysctl_wire_old_buffer(req, 0);
+	if (error)
+		return (error);
 	error = smb_sm_lockvclist(LK_SHARED, td);
 	if (error)
 		return error;
-	SMBCO_FOREACH((struct smb_connobj*)vcp, &smb_vclist) {
+	SMBCO_FOREACH(scp1, &smb_vclist) {
+		vcp = (struct smb_vc *)scp1;
 		error = smb_vc_lock(vcp, LK_SHARED, td);
 		if (error)
 			continue;
@@ -864,7 +878,8 @@ smb_sysctl_treedump(SYSCTL_HANDLER_ARGS)
 			smb_vc_unlock(vcp, 0, td);
 			break;
 		}
-		SMBCO_FOREACH((struct smb_connobj*)ssp, VCTOCP(vcp)) {
+		SMBCO_FOREACH(scp2, VCTOCP(vcp)) {
+			ssp = (struct smb_share *)scp2;
 			error = smb_share_lock(ssp, LK_SHARED, td);
 			if (error) {
 				error = 0;

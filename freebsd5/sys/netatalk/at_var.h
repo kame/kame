@@ -20,7 +20,7 @@
  *	+1-313-763-0525
  *	netatalk@itd.umich.edu
  *
- * $FreeBSD: src/sys/netatalk/at_var.h,v 1.11 2003/03/04 23:19:51 jlemon Exp $
+ * $FreeBSD: src/sys/netatalk/at_var.h,v 1.12 2004/03/22 04:50:36 rwatson Exp $
  */
 
 #ifndef _NETATALK_AT_VAR_H_
@@ -60,7 +60,7 @@ struct at_aliasreq {
 #define AFA_PHASE2	0x0004
 
 #ifdef _KERNEL
-extern struct at_ifaddr	*at_ifaddr;
+extern struct at_ifaddr	*at_ifaddr_list;
 #endif
 
 #endif /* _NETATALK_AT_VAR_H_ */

@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,13 +35,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/subr_prf.c,v 1.107 2003/07/22 10:36:36 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/subr_prf.c,v 1.113 2004/07/10 21:39:15 marcel Exp $");
 
 #include "opt_ddb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
+#include <sys/kdb.h>
 #include <sys/mutex.h>
 #include <sys/sx.h>
 #include <sys/kernel.h>
@@ -101,7 +98,12 @@ int msgbuftrigger;
 static int      log_console_output = 1;
 TUNABLE_INT("kern.log_console_output", &log_console_output);
 SYSCTL_INT(_kern, OID_AUTO, log_console_output, CTLFLAG_RW,
-    &log_console_output, 0, "");
+    &log_console_output, 0, "Duplicate console output to the syslog.");
+
+static int	always_console_output = 0;
+TUNABLE_INT("kern.always_console_output", &always_console_output);
+SYSCTL_INT(_kern, OID_AUTO, always_console_output, CTLFLAG_RW,
+    &always_console_output, 0, "Always output to console despite TIOCCONS.");
 
 /*
  * Warn that a system table is full.
@@ -242,9 +244,7 @@ log(int level, const char *fmt, ...)
 void
 log_console(struct uio *uio)
 {
-	int c, i, error, iovlen, nl;
-	struct uio muio;
-	struct iovec *miov = NULL;
+	int c, i, error, nl;
 	char *consbuffer;
 	int pri;
 
@@ -252,13 +252,8 @@ log_console(struct uio *uio)
 		return;
 
 	pri = LOG_INFO | LOG_CONSOLE;
-	muio = *uio;
-	iovlen = uio->uio_iovcnt * sizeof (struct iovec);
-	MALLOC(miov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
-	MALLOC(consbuffer, char *, CONSCHUNK, M_TEMP, M_WAITOK);
-	bcopy(muio.uio_iov, miov, iovlen);
-	muio.uio_iov = miov;
-	uio = &muio;
+	uio = cloneuio(uio);
+	consbuffer = malloc(CONSCHUNK, M_TEMP, M_WAITOK);
 
 	nl = 0;
 	while (uio->uio_resid > 0) {
@@ -277,8 +272,8 @@ log_console(struct uio *uio)
 	if (!nl)
 		msglogchar('\n', pri);
 	msgbuftrigger = 1;
-	FREE(miov, M_TEMP);
-	FREE(consbuffer, M_TEMP);
+	free(uio, M_IOV);
+	free(consbuffer, M_TEMP);
 	return;
 }
 
@@ -339,18 +334,20 @@ putchar(int c, void *arg)
 	/* Don't use the tty code after a panic or while in ddb. */
 	if (panicstr)
 		consdirect = 1;
-#ifdef DDB
-	if (db_active)
+	if (kdb_active)
 		consdirect = 1;
-#endif
 	if (consdirect) {
 		if (c != '\0')
 			cnputc(c);
 	} else {
 		if ((flags & TOTTY) && tp != NULL)
 			tputchar(c, tp);
-		if ((flags & TOCONS) && constty != NULL)
-			msgbuf_addchar(&consmsgbuf, c);
+		if (flags & TOCONS) {
+			if (constty != NULL)
+				msgbuf_addchar(&consmsgbuf, c);
+			if (always_console_output && c != '\0')
+				cnputc(c);
+		}
 	}
 	if ((flags & TOLOG))
 		msglogchar(c, ap->pri);
@@ -503,7 +500,7 @@ kvprintf(char const *fmt, void (*func)(int, void*), void *arg, int radix, va_lis
 	int ch, n;
 	uintmax_t num;
 	int base, lflag, qflag, tmp, width, ladjust, sharpflag, neg, sign, dot;
-	int jflag, tflag, zflag;
+	int cflag, hflag, jflag, tflag, zflag;
 	int dwidth;
 	char padc;
 	int retval = 0;
@@ -531,7 +528,7 @@ kvprintf(char const *fmt, void (*func)(int, void*), void *arg, int radix, va_lis
 		percent = fmt - 1;
 		qflag = 0; lflag = 0; ladjust = 0; sharpflag = 0; neg = 0;
 		sign = 0; dot = 0; dwidth = 0;
-		jflag = 0; tflag = 0; zflag = 0;
+		cflag = 0; hflag = 0; jflag = 0; tflag = 0; zflag = 0;
 reswitch:	switch (ch = (u_char)*fmt++) {
 		case '.':
 			dot = 1;
@@ -622,6 +619,13 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			base = 10;
 			sign = 1;
 			goto handle_sign;
+		case 'h':
+			if (hflag) {
+				hflag = 0;
+				cflag = 1;
+			} else
+				hflag = 1;
+			goto reswitch;
 		case 'j':
 			jflag = 1;
 			goto reswitch;
@@ -641,6 +645,10 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				*(va_arg(ap, long *)) = retval;
 			else if (zflag)
 				*(va_arg(ap, size_t *)) = retval;
+			else if (hflag)
+				*(va_arg(ap, short *)) = retval;
+			else if (cflag)
+				*(va_arg(ap, char *)) = retval;
 			else
 				*(va_arg(ap, int *)) = retval;
 			break;
@@ -711,6 +719,10 @@ handle_nosign:
 				num = va_arg(ap, u_long);
 			else if (zflag)
 				num = va_arg(ap, size_t);
+			else if (hflag)
+				num = (u_short)va_arg(ap, int);
+			else if (cflag)
+				num = (u_char)va_arg(ap, int);
 			else
 				num = va_arg(ap, u_int);
 			goto number;
@@ -725,6 +737,10 @@ handle_sign:
 				num = va_arg(ap, long);
 			else if (zflag)
 				num = va_arg(ap, size_t);
+			else if (hflag)
+				num = (short)va_arg(ap, int);
+			else if (cflag)
+				num = (char)va_arg(ap, int);
 			else
 				num = va_arg(ap, int);
 number:
@@ -898,3 +914,56 @@ DB_SHOW_COMMAND(msgbuf, db_show_msgbuf)
 }
 
 #endif /* DDB */
+
+void
+hexdump(void *ptr, int length, const char *hdr, int flags)
+{
+	int i, j, k;
+	int cols;
+	unsigned char *cp;
+	char delim;
+
+	if ((flags & HD_DELIM_MASK) != 0)
+		delim = (flags & HD_DELIM_MASK) >> 8;
+	else
+		delim = ' ';
+
+	if ((flags & HD_COLUMN_MASK) != 0)
+		cols = flags & HD_COLUMN_MASK;
+	else
+		cols = 16;
+
+	cp = ptr;
+	for (i = 0; i < length; i+= cols) {
+		if (hdr != NULL)
+			printf("%s", hdr);
+
+		if ((flags & HD_OMIT_COUNT) == 0)
+			printf("%04x  ", i);
+
+		if ((flags & HD_OMIT_HEX) == 0) {
+			for (j = 0; j < cols; j++) {
+				k = i + j;
+				if (k < length)
+					printf("%c%02x", delim, cp[k]);
+				else
+					printf("   ");
+			}
+		}
+
+		if ((flags & HD_OMIT_CHARS) == 0) {
+			printf("  |");
+			for (j = 0; j < cols; j++) {
+				k = i + j;
+				if (k >= length)
+					printf(" ");
+				else if (cp[k] >= ' ' && cp[k] <= '~')
+					printf("%c", cp[k]);
+				else
+					printf(".");
+			}
+			printf("|\n");
+		}
+	}
+}
+

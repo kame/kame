@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.h	8.3 (Berkeley) 4/4/95
- * $FreeBSD: src/sys/sys/param.h,v 1.174.2.4 2004/02/23 05:34:20 scottl Exp $
+ * $FreeBSD: src/sys/sys/param.h,v 1.209.2.4 2004/10/03 17:04:41 mlaier Exp $
  */
 
 #ifndef _SYS_PARAM_H_
@@ -59,7 +55,7 @@
  * scheme is:  <major><two digit minor><0 if release branch, otherwise 1>xx
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 502010	/* Master, propagated to newvers */
+#define __FreeBSD_version 503001	/* Master, propagated to newvers */
 
 #ifndef LOCORE
 #include <sys/types.h>
@@ -189,11 +185,8 @@
 #define	NBPW	sizeof(int)	/* number of bytes per word (integer) */
 
 #define	CMASK	022		/* default file mask: S_IWGRP|S_IWOTH */
+
 #define	NODEV	(dev_t)(-1)	/* non-existent device */
-#ifdef _KERNEL
-#define	NOUDEV	(udev_t)(-1)	/* non-existent device */
-#define	NOMAJ	256		/* non-existent device */
-#endif
 
 #define	CBLOCK	128		/* Clist block size, must be a power of 2. */
 #define CBQSIZE	(CBLOCK/NBBY)	/* Quote bytes/cblock - can do better. */

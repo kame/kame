@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_btsocket_l2cap.c,v 1.16 2003/09/14 23:29:06 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_l2cap.c,v 1.8 2003/10/12 22:04:21 emax Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_l2cap.c,v 1.13.4.1 2004/10/21 09:30:47 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -50,11 +50,11 @@
 #include <sys/taskqueue.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
-#include "ng_bluetooth.h"
-#include "ng_hci.h"
-#include "ng_l2cap.h"
-#include "ng_btsocket.h"
-#include "ng_btsocket_l2cap.h"
+#include <netgraph/bluetooth/include/ng_bluetooth.h>
+#include <netgraph/bluetooth/include/ng_hci.h>
+#include <netgraph/bluetooth/include/ng_l2cap.h>
+#include <netgraph/bluetooth/include/ng_btsocket.h>
+#include <netgraph/bluetooth/include/ng_btsocket_l2cap.h>
 
 /* MALLOC define */
 #ifdef NG_SEPARATE_MALLOC
@@ -78,18 +78,15 @@ static void		ng_btsocket_l2cap_rtclean (void *, int);
 
 /* Netgraph type descriptor */
 static struct ng_type	typestruct = {
-	NG_ABI_VERSION,
-	NG_BTSOCKET_L2CAP_NODE_TYPE,		/* typename */
-	NULL,					/* modevent */
-	ng_btsocket_l2cap_node_constructor,	/* constructor */
-	ng_btsocket_l2cap_node_rcvmsg,		/* control message */
-	ng_btsocket_l2cap_node_shutdown,	/* destructor */
-	ng_btsocket_l2cap_node_newhook,		/* new hook */
-	NULL,					/* find hook */
-	ng_btsocket_l2cap_node_connect,		/* connect hook */
-	ng_btsocket_l2cap_node_rcvdata,		/* data */
-	ng_btsocket_l2cap_node_disconnect,	/* disconnect hook */
-	NULL					/* node command list */
+	.version =	NG_ABI_VERSION,
+	.name =		NG_BTSOCKET_L2CAP_NODE_TYPE,
+	.constructor =	ng_btsocket_l2cap_node_constructor,
+	.rcvmsg =	ng_btsocket_l2cap_node_rcvmsg,
+	.shutdown =	ng_btsocket_l2cap_node_shutdown,
+	.newhook =	ng_btsocket_l2cap_node_newhook,
+	.connect =	ng_btsocket_l2cap_node_connect,
+	.rcvdata =	ng_btsocket_l2cap_node_rcvdata,
+	.disconnect =	ng_btsocket_l2cap_node_disconnect,
 };
 
 /* Globals */
@@ -250,7 +247,7 @@ ng_btsocket_l2cap_node_shutdown(node_p node)
 
 	error = ng_name_node(ng_btsocket_l2cap_node,
 				NG_BTSOCKET_L2CAP_NODE_TYPE);
-	if (error != NULL) {
+	if (error != 0) {
 		NG_BTSOCKET_L2CAP_ALERT(
 "%s: Could not name Netgraph node, error=%d\n", __func__, error);
 
@@ -1194,7 +1191,7 @@ ng_btsocket_l2cap_send_l2ca_con_req(ng_btsocket_l2cap_pcb_p pcb)
 	bcopy(&pcb->dst, &ip->bdaddr, sizeof(ip->bdaddr));
 	ip->psm = pcb->psm;
 
-	NG_SEND_MSG_HOOK(error,ng_btsocket_l2cap_node,msg,pcb->rt->hook,NULL);
+	NG_SEND_MSG_HOOK(error, ng_btsocket_l2cap_node, msg,pcb->rt->hook, 0);
 
 	return (error);
 } /* ng_btsocket_l2cap_send_l2ca_con_req */
@@ -1229,7 +1226,7 @@ ng_btsocket_l2cap_send_l2ca_con_rsp_req(u_int32_t token,
 	ip->result = result;
 	ip->status = 0;
 
-	NG_SEND_MSG_HOOK(error, ng_btsocket_l2cap_node, msg, rt->hook, NULL);
+	NG_SEND_MSG_HOOK(error, ng_btsocket_l2cap_node, msg, rt->hook, 0);
 
 	return (error);
 } /* ng_btsocket_l2cap_send_l2ca_con_rsp_req */
@@ -1265,7 +1262,7 @@ ng_btsocket_l2cap_send_l2ca_cfg_req(ng_btsocket_l2cap_pcb_p pcb)
 	ip->flush_timo = pcb->flush_timo;
 	ip->link_timo = pcb->link_timo;
 
-	NG_SEND_MSG_HOOK(error,ng_btsocket_l2cap_node,msg,pcb->rt->hook,NULL);
+	NG_SEND_MSG_HOOK(error, ng_btsocket_l2cap_node, msg,pcb->rt->hook, 0);
 
 	return (error);
 } /* ng_btsocket_l2cap_send_l2ca_cfg_req */
@@ -1299,7 +1296,7 @@ ng_btsocket_l2cap_send_l2ca_cfg_rsp(ng_btsocket_l2cap_pcb_p pcb)
 	ip->omtu = pcb->omtu;
 	bcopy(&pcb->iflow, &ip->iflow, sizeof(ip->iflow));
 
-	NG_SEND_MSG_HOOK(error,ng_btsocket_l2cap_node,msg,pcb->rt->hook,NULL);
+	NG_SEND_MSG_HOOK(error, ng_btsocket_l2cap_node, msg, pcb->rt->hook, 0);
 
 	return (error);
 } /* ng_btsocket_l2cap_send_l2ca_cfg_rsp */
@@ -1332,7 +1329,7 @@ ng_btsocket_l2cap_send_l2ca_discon_req(u_int32_t token,
 	ip = (ng_l2cap_l2ca_discon_ip *)(msg->data);
 	ip->lcid = pcb->cid;
 
-	NG_SEND_MSG_HOOK(error,ng_btsocket_l2cap_node,msg,pcb->rt->hook,NULL);
+	NG_SEND_MSG_HOOK(error, ng_btsocket_l2cap_node, msg,pcb->rt->hook, 0);
 
 	return (error);
 } /* ng_btsocket_l2cap_send_l2ca_discon_req */
@@ -1807,6 +1804,8 @@ ng_btsocket_l2cap_rtclean(void *context, int pending)
 				FREE(pcb, M_NETGRAPH_BTSOCKET_L2CAP);
 
 				soisdisconnected(so);
+				ACCEPT_LOCK();
+				SOCK_LOCK(so);
 				so->so_pcb = NULL;
 				sotryfree(so);
 
@@ -2349,6 +2348,8 @@ ng_btsocket_l2cap_detach(struct socket *so)
 	FREE(pcb, M_NETGRAPH_BTSOCKET_L2CAP);
 
 	soisdisconnected(so);
+	ACCEPT_LOCK();
+	SOCK_LOCK(so);
 	so->so_pcb = NULL;
 	sotryfree(so);
 
@@ -2435,7 +2436,7 @@ ng_btsocket_l2cap_peeraddr(struct socket *so, struct sockaddr **nam)
 	sa.l2cap_len = sizeof(sa);
 	sa.l2cap_family = AF_BLUETOOTH;
 
-	*nam = dup_sockaddr((struct sockaddr *) &sa, 0);
+	*nam = sodupsockaddr((struct sockaddr *) &sa, M_NOWAIT);
 
 	return ((*nam == NULL)? ENOMEM : 0);
 } /* ng_btsocket_l2cap_peeraddr */
@@ -2588,7 +2589,7 @@ ng_btsocket_l2cap_sockaddr(struct socket *so, struct sockaddr **nam)
 	sa.l2cap_len = sizeof(sa);
 	sa.l2cap_family = AF_BLUETOOTH;
 
-	*nam = dup_sockaddr((struct sockaddr *) &sa, 0);
+	*nam = sodupsockaddr((struct sockaddr *) &sa, M_NOWAIT);
 
 	return ((*nam == NULL)? ENOMEM : 0);
 } /* ng_btsocket_l2cap_sockaddr */

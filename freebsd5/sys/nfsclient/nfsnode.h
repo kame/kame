@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfsnode.h	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/nfsclient/nfsnode.h,v 1.41 2003/11/22 02:21:49 alfred Exp $
+ * $FreeBSD: src/sys/nfsclient/nfsnode.h,v 1.43 2004/04/14 23:23:55 peadar Exp $
  */
 
 #ifndef _NFSCLIENT_NFSNODE_H_
@@ -153,6 +149,7 @@ struct nfsnode {
 #define	NCHG		0x0400	/* Special file times changed */
 #define	NCREATED	0x0800	/* Opened by nfs_create() */
 #define	NTRUNCATE	0x1000	/* Opened by nfs_setattr() */
+#define	NSIZECHANGED	0x2000  /* File size has changed: need cache inval */
 
 /*
  * Convert between nfsnode pointers and vnode pointers

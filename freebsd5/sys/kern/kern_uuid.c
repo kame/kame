@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_uuid.c,v 1.6 2003/06/11 00:56:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_uuid.c,v 1.7 2004/01/22 13:34:11 rse Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -110,7 +110,7 @@ uuid_node(uint16_t *node)
 
 	for (i = 0; i < (UUID_NODE_LEN>>1); i++)
 		node[i] = (uint16_t)arc4random();
-	*((uint8_t*)node) |= 0x80;
+	*((uint8_t*)node) |= 0x01;
 }
 
 /*

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fs.h	8.13 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.40 2003/11/16 07:08:27 wes Exp $
+ * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.43.2.1 2004/09/03 15:19:06 jhb Exp $
  */
 
 #ifndef _UFS_FFS_FS_H_
@@ -172,7 +168,7 @@
  * which tell the system the average file size and the average number
  * of files per directory. These defaults are well selected for typical
  * filesystems, but may need to be tuned for odd cases like filesystems
- * being used for sqiud caches or news spools.
+ * being used for squid caches or news spools.
  */
 #define AVFILESIZ	16384	/* expected average file size */
 #define AFPDIR		64	/* expected number of files per directory */
@@ -361,7 +357,7 @@ CTASSERT(sizeof(struct fs) == 1376);
  */
 #define	FS_UFS1_MAGIC	0x011954	/* UFS1 fast filesystem magic number */
 #define	FS_UFS2_MAGIC	0x19540119	/* UFS2 fast filesystem magic number */
-#define	FS_BAD2_MAGIC	0x19960408	/* UFS2 incomplete newfs magic number */
+#define	FS_BAD_MAGIC	0x19960408	/* UFS incomplete newfs magic number */
 #define	FS_OKAY		0x7c269d38	/* superblock checksum */
 #define FS_42INODEFMT	-1		/* 4.2BSD inode format */
 #define FS_44INODEFMT	2		/* 4.4BSD inode format */
@@ -484,7 +480,7 @@ struct cg {
 #define cg_clustersfree(cgp) \
     ((u_int8_t *)((u_int8_t *)(cgp) + (cgp)->cg_clusteroff))
 #define cg_clustersum(cgp) \
-    ((int32_t *)((u_int8_t *)(cgp) + (cgp)->cg_clustersumoff))
+    ((int32_t *)((uintptr_t)(cgp) + (cgp)->cg_clustersumoff))
 
 /*
  * Turn filesystem block numbers into disk block addresses.

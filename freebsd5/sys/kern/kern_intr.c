@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_intr.c,v 1.103 2003/11/20 15:35:48 markm Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_intr.c,v 1.113.2.2 2004/09/09 10:03:19 julian Exp $");
 
 #include "opt_ddb.h"
 
@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD: src/sys/kern/kern_intr.c,v 1.103 2003/11/20 15:35:48 markm E
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/ktr.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
@@ -61,15 +62,21 @@ struct	int_entropy {
 	uintptr_t vector;
 };
 
-void	*vm_ih;
-void	*softclock_ih;
 struct	ithd *clk_ithd;
 struct	ithd *tty_ithd;
+void	*softclock_ih;
+void	*vm_ih;
 
 static MALLOC_DEFINE(M_ITHREAD, "ithread", "Interrupt Threads");
 
-static void	ithread_update(struct ithd *);
+static int intr_storm_threshold = 500;
+TUNABLE_INT("hw.intr_storm_threshold", &intr_storm_threshold);
+SYSCTL_INT(_hw, OID_AUTO, intr_storm_threshold, CTLFLAG_RW,
+    &intr_storm_threshold, 0,
+    "Number of consecutive interrupts before storm protection is enabled");
+
 static void	ithread_loop(void *);
+static void	ithread_update(struct ithd *);
 static void	start_softintr(void *);
 
 u_char
@@ -233,7 +240,7 @@ ithread_destroy(struct ithd *ithread)
 	mtx_lock_spin(&sched_lock);
 	if (TD_AWAITING_INTR(td)) {
 		TD_CLR_IWAIT(td);
-		setrunqueue(td);
+		setrunqueue(td, SRQ_INTR);
 	}
 	mtx_unlock_spin(&sched_lock);
 	mtx_unlock(&ithread->it_lock);
@@ -331,9 +338,13 @@ ok:
 	/*
 	 * If the interrupt thread is already running, then just mark this
 	 * handler as being dead and let the ithread do the actual removal.
+	 *
+	 * During a cold boot while cold is set, msleep() does not sleep,
+	 * so we have to remove the handler here rather than letting the
+	 * thread do it.
 	 */
 	mtx_lock_spin(&sched_lock);
-	if (!TD_AWAITING_INTR(ithread->it_td)) {
+	if (!TD_AWAITING_INTR(ithread->it_td) && !cold) {
 		handler->ih_flags |= IH_DEAD;
 
 		/*
@@ -354,7 +365,7 @@ ok:
 }
 
 int
-ithread_schedule(struct ithd *ithread, int do_switch)
+ithread_schedule(struct ithd *ithread)
 {
 	struct int_entropy entropy;
 	struct thread *td;
@@ -368,19 +379,21 @@ ithread_schedule(struct ithd *ithread, int do_switch)
 		return (EINVAL);
 
 	ctd = curthread;
+	td = ithread->it_td;
+	p = td->td_proc;
 	/*
 	 * If any of the handlers for this ithread claim to be good
 	 * sources of entropy, then gather some.
 	 */
 	if (harvest.interrupt && ithread->it_flags & IT_ENTROPY) {
+		CTR3(KTR_INTR, "%s: pid %d (%s) gathering entropy", __func__,
+		    p->p_pid, p->p_comm);
 		entropy.vector = ithread->it_vector;
 		entropy.proc = ctd->td_proc;
 		random_harvest(&entropy, sizeof(entropy), 2, 0,
 		    RANDOM_INTERRUPT);
 	}
 
-	td = ithread->it_td;
-	p = td->td_proc;
 	KASSERT(p != NULL, ("ithread %s has no process", ithread->it_name));
 	CTR4(KTR_INTR, "%s: pid %d: (%s) need = %d",
 	    __func__, p->p_pid, p->p_comm, ithread->it_need);
@@ -388,28 +401,14 @@ ithread_schedule(struct ithd *ithread, int do_switch)
 	/*
 	 * Set it_need to tell the thread to keep running if it is already
 	 * running.  Then, grab sched_lock and see if we actually need to
-	 * put this thread on the runqueue.  If so and the do_switch flag is
-	 * true and it is safe to switch, then switch to the ithread
-	 * immediately.  Otherwise, set the needresched flag to guarantee
-	 * that this ithread will run before any userland processes.
+	 * put this thread on the runqueue.
 	 */
 	ithread->it_need = 1;
 	mtx_lock_spin(&sched_lock);
 	if (TD_AWAITING_INTR(td)) {
 		CTR2(KTR_INTR, "%s: setrunqueue %d", __func__, p->p_pid);
 		TD_CLR_IWAIT(td);
-		setrunqueue(td);
-		if (do_switch &&
-		    (ctd->td_critnest == 1) ) {
-			KASSERT((TD_IS_RUNNING(ctd)),
-			    ("ithread_schedule: Bad state for curthread."));
-			ctd->td_proc->p_stats->p_ru.ru_nivcsw++;
-			if (ctd->td_flags & TDF_IDLETD)
-				ctd->td_state = TDS_CAN_RUN; /* XXXKSE */
-			mi_switch();
-		} else {
-			curthread->td_flags |= TDF_NEEDRESCHED;
-		}
+		setrunqueue(td, SRQ_INTR);
 	} else {
 		CTR4(KTR_INTR, "%s: pid %d: it_need %d, state %d",
 		    __func__, p->p_pid, ithread->it_need, td->td_state);
@@ -445,6 +444,7 @@ swi_add(struct ithd **ithdp, const char *name, driver_intr_t handler,
 	}
 	return (ithread_add_handler(ithd, name, handler, arg,
 		    (pri * RQ_PPQ) + PI_SOFT, flags, cookiep));
+		    /* XXKSE.. think of a better way to get separate queues */
 }
 
 
@@ -470,7 +470,7 @@ swi_sched(void *cookie, int flags)
 	 */
 	atomic_store_rel_int(&ih->ih_need, 1);
 	if (!(flags & SWI_DELAY)) {
-		error = ithread_schedule(it, !cold && !dumping);
+		error = ithread_schedule(it);
 		KASSERT(error == 0, ("stray software interrupt"));
 	}
 }
@@ -485,12 +485,15 @@ ithread_loop(void *arg)
 	struct intrhand *ih;		/* and our interrupt handler chain */
 	struct thread *td;
 	struct proc *p;
+	int count, warming, warned;
 	
 	td = curthread;
 	p = td->td_proc;
 	ithd = (struct ithd *)arg;	/* point to myself */
 	KASSERT(ithd->it_td == td && td->td_ithd == ithd,
 	    ("%s: ithread and proc linkage out of sync", __func__));
+	warming = 10 * intr_storm_threshold;
+	warned = 0;
 
 	/*
 	 * As long as we have interrupts outstanding, go through the
@@ -505,13 +508,13 @@ ithread_loop(void *arg)
 			    p->p_pid, p->p_comm);
 			td->td_ithd = NULL;
 			mtx_destroy(&ithd->it_lock);
-			mtx_lock(&Giant);
 			free(ithd, M_ITHREAD);
 			kthread_exit(0);
 		}
 
 		CTR4(KTR_INTR, "%s: pid %d: (%s) need=%d", __func__,
 		     p->p_pid, p->p_comm, ithd->it_need);
+		count = 0;
 		while (ithd->it_need) {
 			/*
 			 * Service interrupts.  If another interrupt
@@ -545,26 +548,70 @@ restart:
 				if ((ih->ih_flags & IH_MPSAFE) == 0)
 					mtx_unlock(&Giant);
 			}
+			if (ithd->it_enable != NULL) {
+				ithd->it_enable(ithd->it_vector);
+
+				/*
+				 * Storm detection needs a delay here
+				 * to see slightly delayed interrupts
+				 * on some machines, but we don't
+				 * want to always delay, so only delay
+				 * while warming up.
+				 *
+				 * XXXRW: Calling DELAY() in the interrupt
+				 * path surely needs to be revisited.
+				 */
+				if (warming != 0) {
+					DELAY(1);
+					--warming;
+				}
+			}
+
+			/*
+			 * If we detect an interrupt storm, sleep until
+			 * the next hardclock tick.  We sleep at the
+			 * end of the loop instead of at the beginning
+			 * to ensure that we see slightly delayed
+			 * interrupts.
+			 */
+			if (count >= intr_storm_threshold) {
+				if (!warned) {
+					printf(
+	"Interrupt storm detected on \"%s\"; throttling interrupt source\n",
+					    p->p_comm);
+					warned = 1;
+				}
+				tsleep(&count, td->td_priority, "istorm", 1);
+
+				/*
+				 * Fudge the count to re-throttle if the
+				 * interrupt is still active.  Our storm
+				 * detection is too primitive to detect
+				 * whether the storm has gone away
+				 * reliably, even if we were to waste a
+				 * lot of time spinning for the next
+				 * intr_storm_threshold interrupts, so
+				 * we assume that the storm hasn't gone
+				 * away unless the interrupt repeats
+				 * less often the hardclock interrupt.
+				 */
+				count = INT_MAX - 1;
+			}
+			count++;
 		}
+		WITNESS_WARN(WARN_PANIC, NULL, "suspending ithread");
+		mtx_assert(&Giant, MA_NOTOWNED);
 
 		/*
 		 * Processed all our interrupts.  Now get the sched
 		 * lock.  This may take a while and it_need may get
 		 * set again, so we have to check it again.
 		 */
-		WITNESS_WARN(WARN_PANIC, NULL, "suspending ithread");
-		mtx_assert(&Giant, MA_NOTOWNED);
 		mtx_lock_spin(&sched_lock);
 		if (!ithd->it_need) {
-			/*
-			 * Should we call this earlier in the loop above?
-			 */
-			if (ithd->it_enable != NULL)
-				ithd->it_enable(ithd->it_vector);
-			TD_SET_IWAIT(td); /* we're idle */
-			p->p_stats->p_ru.ru_nvcsw++;
+			TD_SET_IWAIT(td);
 			CTR2(KTR_INTR, "%s: pid %d: done", __func__, p->p_pid);
-			mi_switch();
+			mi_switch(SW_VOL, NULL);
 			CTR2(KTR_INTR, "%s: pid %d: resumed", __func__, p->p_pid);
 		}
 		mtx_unlock_spin(&sched_lock);

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/fnmatch.h,v 1.11 2002/09/17 22:25:40 mike Exp $
+ * $FreeBSD: src/include/fnmatch.h,v 1.15 2003/12/18 10:41:39 jkh Exp $
  *	@(#)fnmatch.h	8.1 (Berkeley) 6/2/93
  */
 
@@ -44,6 +44,10 @@
 #define	FNM_NOESCAPE	0x01	/* Disable backslash escaping. */
 #define	FNM_PATHNAME	0x02	/* Slash must be matched by slash. */
 #define	FNM_PERIOD	0x04	/* Period must be matched by period. */
+
+#if __XSI_VISIBLE
+#define	FNM_NOSYS	(-1)	/* Reserved. */
+#endif
 
 #if __BSD_VISIBLE
 #define	FNM_LEADING_DIR	0x08	/* Ignore /<tail> after Imatch. */

@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
+ * Copyright (c) 1999-2002 Robert N. M. Watson
+ * Copyright (c) 2001-2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_lomac/mac_lomac.c,v 1.25 2003/12/06 21:48:02 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_lomac/mac_lomac.c,v 1.32 2004/07/28 07:01:33 kan Exp $
  */
 
 /*
@@ -125,8 +125,10 @@ TUNABLE_INT("security.mac.lomac.revocation_enabled", &revocation_enabled);
 
 static int	mac_lomac_slot;
 #define	SLOT(l)	((struct mac_lomac *)LABEL_TO_SLOT((l), mac_lomac_slot).l_ptr)
+#define	SLOT_SET(l, val) (LABEL_TO_SLOT((l), mac_lomac_slot).l_ptr = (val))
 #define	PSLOT(l) ((struct mac_lomac_proc *)				\
     LABEL_TO_SLOT((l), mac_lomac_slot).l_ptr)
+#define	PSLOT_SET(l, val) (LABEL_TO_SLOT((l), mac_lomac_slot).l_ptr = (val))
 
 MALLOC_DEFINE(M_MACLOMAC, "lomac label", "MAC/LOMAC labels");
 
@@ -612,14 +614,14 @@ static void
 mac_lomac_init_label(struct label *label)
 {
 
-	SLOT(label) = lomac_alloc(M_WAITOK);
+	SLOT_SET(label, lomac_alloc(M_WAITOK));
 }
 
 static int
 mac_lomac_init_label_waitcheck(struct label *label, int flag)
 {
 
-	SLOT(label) = lomac_alloc(flag);
+	SLOT_SET(label, lomac_alloc(flag));
 	if (SLOT(label) == NULL)
 		return (ENOMEM);
 
@@ -630,8 +632,8 @@ static void
 mac_lomac_init_proc_label(struct label *label)
 {
 
-	PSLOT(label) = malloc(sizeof(struct mac_lomac_proc), M_MACLOMAC,
-	    M_ZERO | M_WAITOK);
+	PSLOT_SET(label, malloc(sizeof(struct mac_lomac_proc), M_MACLOMAC,
+	    M_ZERO | M_WAITOK));
 	mtx_init(&PSLOT(label)->mtx, "MAC/Lomac proc lock", NULL, MTX_DEF);
 }
 
@@ -640,7 +642,7 @@ mac_lomac_destroy_label(struct label *label)
 {
 
 	lomac_free(SLOT(label));
-	SLOT(label) = NULL;
+	SLOT_SET(label, NULL);
 }
 
 static void
@@ -649,7 +651,7 @@ mac_lomac_destroy_proc_label(struct label *label)
 
 	mtx_destroy(&PSLOT(label)->mtx);
 	FREE(PSLOT(label), M_MACLOMAC);
-	PSLOT(label) = NULL;
+	PSLOT_SET(label, NULL);
 }
 
 static int
@@ -897,7 +899,7 @@ mac_lomac_copy_label(struct label *src, struct label *dest)
  * a lot like file system objects.
  */
 static void
-mac_lomac_create_devfs_device(struct mount *mp, dev_t dev,
+mac_lomac_create_devfs_device(struct mount *mp, struct cdev *dev,
     struct devfs_dirent *devfs_dirent, struct label *label)
 {
 	struct mac_lomac *mac_lomac;
@@ -1156,7 +1158,7 @@ mac_lomac_create_socket(struct ucred *cred, struct socket *socket,
 }
 
 static void
-mac_lomac_create_pipe(struct ucred *cred, struct pipe *pipe,
+mac_lomac_create_pipe(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 	struct mac_lomac *source, *dest;
@@ -1193,7 +1195,7 @@ mac_lomac_relabel_socket(struct ucred *cred, struct socket *socket,
 }
 
 static void
-mac_lomac_relabel_pipe(struct ucred *cred, struct pipe *pipe,
+mac_lomac_relabel_pipe(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel, struct label *newlabel)
 {
 	struct mac_lomac *source, *dest;
@@ -1335,6 +1337,18 @@ mac_lomac_create_fragment(struct mbuf *datagram, struct label *datagramlabel,
 
 	source = SLOT(datagramlabel);
 	dest = SLOT(fragmentlabel);
+
+	mac_lomac_copy_single(source, dest);
+}
+
+static void
+mac_lomac_create_mbuf_from_inpcb(struct inpcb *inp, struct label *inplabel,
+    struct mbuf *m, struct label *mlabel)
+{
+	struct mac_lomac *source, *dest;
+
+	source = SLOT(inplabel);
+	dest = SLOT(mlabel);
 
 	mac_lomac_copy_single(source, dest);
 }
@@ -1786,7 +1800,7 @@ mac_lomac_check_kld_unload(struct ucred *cred)
 }
 
 static int
-mac_lomac_check_pipe_ioctl(struct ucred *cred, struct pipe *pipe,
+mac_lomac_check_pipe_ioctl(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel, unsigned long cmd, void /* caddr_t */ *data)
 {
 
@@ -1799,7 +1813,7 @@ mac_lomac_check_pipe_ioctl(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-mac_lomac_check_pipe_read(struct ucred *cred, struct pipe *pipe,
+mac_lomac_check_pipe_read(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 	struct mac_lomac *subj, *obj;
@@ -1817,7 +1831,7 @@ mac_lomac_check_pipe_read(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-mac_lomac_check_pipe_relabel(struct ucred *cred, struct pipe *pipe,
+mac_lomac_check_pipe_relabel(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel, struct label *newlabel)
 {
 	struct mac_lomac *subj, *obj, *new;
@@ -1868,7 +1882,7 @@ mac_lomac_check_pipe_relabel(struct ucred *cred, struct pipe *pipe,
 }
 
 static int
-mac_lomac_check_pipe_write(struct ucred *cred, struct pipe *pipe,
+mac_lomac_check_pipe_write(struct ucred *cred, struct pipepair *pp,
     struct label *pipelabel)
 {
 	struct mac_lomac *subj, *obj;
@@ -2051,8 +2065,8 @@ mac_lomac_check_system_swapon(struct ucred *cred, struct vnode *vp,
 }
 
 static int
-mac_lomac_check_system_sysctl(struct ucred *cred, int *name, u_int namelen,
-    void *old, size_t *oldlenp, int inkernel, void *new, size_t newlen)
+mac_lomac_check_system_sysctl(struct ucred *cred, struct sysctl_oid *oidp,
+    void *arg1, int arg2, struct sysctl_req *req)
 {
 	struct mac_lomac *subj;
 
@@ -2062,16 +2076,10 @@ mac_lomac_check_system_sysctl(struct ucred *cred, int *name, u_int namelen,
 	subj = SLOT(cred->cr_label);
 
 	/*
-	 * In general, treat sysctl variables as lomac/high, but also
-	 * require privilege to change them, since they are a
-	 * communications channel between grades.  Exempt MIB
-	 * queries from this due to undocmented sysctl magic.
-	 * XXXMAC: This probably requires some more review.
+	 * Treat sysctl variables without CTLFLAG_ANYBODY flag as
+	 * lomac/high, but also require privilege to change them.
 	 */
-	if (new != NULL) {
-		if (namelen > 0 && name[0] == 0)
-			return (0);
-
+	if (req->newptr != NULL && (oidp->oid_kind & CTLFLAG_ANYBODY) == 0) {
 #ifdef notdef
 		if (!mac_lomac_subject_dominate_high(subj))
 			return (EACCES);
@@ -2637,6 +2645,7 @@ static struct mac_policy_ops mac_lomac_ops =
 	.mpo_destroy_socket_peer_label = mac_lomac_destroy_label,
 	.mpo_destroy_vnode_label = mac_lomac_destroy_label,
 	.mpo_copy_cred_label = mac_lomac_copy_label,
+	.mpo_copy_ifnet_label = mac_lomac_copy_label,
 	.mpo_copy_mbuf_label = mac_lomac_copy_label,
 	.mpo_copy_pipe_label = mac_lomac_copy_label,
 	.mpo_copy_socket_label = mac_lomac_copy_label,
@@ -2680,6 +2689,7 @@ static struct mac_policy_ops mac_lomac_ops =
 	.mpo_create_ifnet = mac_lomac_create_ifnet,
 	.mpo_create_inpcb_from_socket = mac_lomac_create_inpcb_from_socket,
 	.mpo_create_ipq = mac_lomac_create_ipq,
+	.mpo_create_mbuf_from_inpcb = mac_lomac_create_mbuf_from_inpcb,
 	.mpo_create_mbuf_from_mbuf = mac_lomac_create_mbuf_from_mbuf,
 	.mpo_create_mbuf_linklayer = mac_lomac_create_mbuf_linklayer,
 	.mpo_create_mbuf_from_bpfdesc = mac_lomac_create_mbuf_from_bpfdesc,

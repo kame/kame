@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/acpica/OsdEnvironment.c,v 1.5 2003/08/28 16:30:31 njl Exp $
+ *	$FreeBSD: src/sys/ia64/acpica/OsdEnvironment.c,v 1.7 2004/05/06 02:18:58 njl Exp $
  */
 
 /*
@@ -39,7 +39,7 @@
 extern u_int64_t ia64_efi_acpi_table;
 extern u_int64_t ia64_efi_acpi20_table;
 
-u_long ia64_acpi_root;
+static u_long ia64_acpi_root;
 
 SYSCTL_ULONG(_machdep, OID_AUTO, acpi_root, CTLFLAG_RD, &ia64_acpi_root, 0,
 	     "The physical address of the RSDP");
@@ -47,13 +47,13 @@ SYSCTL_ULONG(_machdep, OID_AUTO, acpi_root, CTLFLAG_RD, &ia64_acpi_root, 0,
 ACPI_STATUS
 AcpiOsInitialize(void)
 {
-	return(NULL);
+	return(AE_OK);
 }
 
 ACPI_STATUS
 AcpiOsTerminate(void)
 {
-	return(NULL);
+	return(AE_OK);
 }
 
 ACPI_STATUS

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,11 +27,15 @@
  * SUCH DAMAGE.
  *
  *	@(#)resource.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/resource.h,v 1.20 2003/11/02 03:50:16 jeff Exp $
+ * $FreeBSD: src/sys/sys/resource.h,v 1.23 2004/06/13 22:07:58 das Exp $
  */
 
 #ifndef _SYS_RESOURCE_H_
 #define	_SYS_RESOURCE_H_
+
+#include <sys/cdefs.h>
+#include <sys/_timeval.h>
+#include <sys/_types.h>
 
 /*
  * Process priority specifications to get/setpriority.
@@ -89,10 +89,12 @@ struct rusage {
 #define	RLIMIT_NOFILE	8		/* number of open files */
 #define	RLIMIT_SBSIZE	9		/* maximum size of all socket buffers */
 #define RLIMIT_VMEM	10		/* virtual process size (inclusive of mmap) */
+#define	RLIMIT_AS	RLIMIT_VMEM	/* standard name for RLIMIT_VMEM */
 
 #define	RLIM_NLIMITS	11		/* number of resource limits */
 
 #define	RLIM_INFINITY	((rlim_t)(((u_quad_t)1 << 63) - 1))
+/* XXX Missing: RLIM_SAVED_MAX, RLIM_SAVED_CUR */
 
 
 /*
@@ -115,20 +117,26 @@ static char *rlimit_ident[] = {
 };
 #endif
 
-struct orlimit {
-	int32_t	rlim_cur;		/* current (soft) limit */
-	int32_t	rlim_max;		/* maximum value for rlim_cur */
-};
+#ifndef _RLIM_T_DECLARED
+typedef	__rlim_t	rlim_t;
+#define	_RLIM_T_DECLARED
+#endif
 
 struct rlimit {
 	rlim_t	rlim_cur;		/* current (soft) limit */
 	rlim_t	rlim_max;		/* maximum value for rlim_cur */
 };
 
-/* Load average structure. */
+#if __BSD_VISIBLE
+
+struct orlimit {
+	__int32_t	rlim_cur;	/* current (soft) limit */
+	__int32_t	rlim_max;	/* maximum value for rlim_cur */
+};
+
 struct loadavg {
-	fixpt_t	ldavg[3];
-	long	fscale;
+	__fixpt_t	ldavg[3];
+	long		fscale;
 };
 
 #define	CP_USER		0
@@ -138,16 +146,18 @@ struct loadavg {
 #define	CP_IDLE		4
 #define	CPUSTATES	5
 
+#endif	/* __BSD_VISIBLE */
+
 #ifdef _KERNEL
 extern struct loadavg averunnable;
 extern long cp_time[CPUSTATES];
 
-int	dosetrlimit(struct thread *, u_int, struct rlimit *);
+int	kern_setrlimit(struct thread *, u_int, struct rlimit *);
 
 #else
-#include <sys/cdefs.h>
 
 __BEGIN_DECLS
+/* XXX 2nd arg to [gs]etpriority() should be an id_t */
 int	getpriority(int, int);
 int	getrlimit(int, struct rlimit *);
 int	getrusage(int, struct rusage *);

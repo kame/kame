@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 1999-2002 Robert N. M. Watson
+ * Copyright (c) 2001-2002 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,10 +31,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/_label.h,v 1.4 2003/05/08 19:49:42 rwatson Exp $
+ * $FreeBSD: src/sys/sys/_label.h,v 1.6 2004/05/10 18:38:07 rwatson Exp $
  */
-#ifndef _SYS__LABEL_H
-#define	_SYS__LABEL_H
+#ifndef _SYS__LABEL_H_
+#define	_SYS__LABEL_H_
 
 /*
  * XXXMAC: This shouldn't be exported to userland, but is because of ucred.h
@@ -53,4 +53,4 @@ struct label {
 	}	l_perpolicy[MAC_MAX_SLOTS];
 };
 
-#endif /* !_SYS__LABEL_H */
+#endif /* !_SYS__LABEL_H_ */

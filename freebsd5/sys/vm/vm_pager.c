@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -68,7 +64,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_pager.c,v 1.92 2003/10/20 05:16:27 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_pager.c,v 1.95 2004/04/08 19:08:49 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -180,9 +176,6 @@ int npagers = sizeof(pagertab) / sizeof(pagertab[0]);
  * cleaning requests (NPENDINGIO == 64) * the maximum swap cluster size
  * (MAXPHYS == 64k) if you want to get the most efficiency.
  */
-#define PAGER_MAP_SIZE	(8 * 1024 * 1024)
-
-int pager_map_size = PAGER_MAP_SIZE;
 vm_map_t pager_map;
 static int bswneeded;
 static vm_offset_t swapbkva;		/* swap buffers kva */
@@ -266,26 +259,6 @@ vm_pager_deallocate(object)
  * vm_pager_put_pages() - inline, see vm/vm_pager.h
  * vm_pager_has_page() - inline, see vm/vm_pager.h
  */
-
-vm_offset_t
-vm_pager_map_page(m)
-	vm_page_t m;
-{
-	vm_offset_t kva;
-
-	kva = kmem_alloc_wait(pager_map, PAGE_SIZE);
-	pmap_qenter(kva, &m, 1);
-	return (kva);
-}
-
-void
-vm_pager_unmap_page(kva)
-	vm_offset_t kva;
-{
-
-	pmap_qremove(kva, 1);
-	kmem_free_wakeup(pager_map, kva, PAGE_SIZE);
-}
 
 vm_object_t
 vm_pager_object_lookup(pg_list, handle)

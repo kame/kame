@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,12 +35,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/kern/kern_timeout.c,v 1.83 2003/11/15 18:33:54 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/kern/kern_timeout.c,v 1.91 2004/08/06 21:49:00 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
+#include <sys/condvar.h>
 #include <sys/kernel.h>
+#include <sys/ktr.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/sysctl.h>
@@ -75,6 +73,34 @@ struct mtx dont_sleep_in_callout;
 #endif
 
 static struct callout *nextsoftcheck;	/* Next callout to be checked. */
+
+/*-
+ * Locked by callout_lock:
+ *   curr_callout    - If a callout is in progress, it is curr_callout.
+ *                     If curr_callout is non-NULL, threads waiting on
+ *                     callout_wait will be woken up as soon as the 
+ *                     relevant callout completes.
+ *   wakeup_ctr      - Incremented every time a thread wants to wait
+ *                     for a callout to complete.  Modified only when
+ *                     curr_callout is non-NULL.
+ *   wakeup_needed   - If a thread is waiting on callout_wait, then
+ *                     wakeup_needed is nonzero.  Increased only when
+ *                     cutt_callout is non-NULL.
+ */
+static struct callout *curr_callout;
+static int wakeup_ctr;
+static int wakeup_needed;
+
+/*-
+ * Locked by callout_wait_lock:
+ *   callout_wait    - If wakeup_needed is set, callout_wait will be
+ *                     triggered after the current callout finishes.
+ *   wakeup_done_ctr - Set to the current value of wakeup_ctr after
+ *                     callout_wait is triggered.
+ */
+static struct mtx callout_wait_lock;
+static struct cv callout_wait;
+static int wakeup_done_ctr;
 
 /*
  * kern_timeout_callwheel_alloc() - kernel low level callwheel initialization 
@@ -126,6 +152,8 @@ kern_timeout_callwheel_init(void)
 #ifdef DIAGNOSTIC
 	mtx_init(&dont_sleep_in_callout, "dont_sleep_in_callout", NULL, MTX_DEF);
 #endif
+	mtx_init(&callout_wait_lock, "callout_wait_lock", NULL, MTX_DEF);
+	cv_init(&callout_wait, "callout_wait");
 }
 
 /*
@@ -133,7 +161,7 @@ kern_timeout_callwheel_init(void)
  * George Varghese, published in a technical report entitled "Redesigning
  * the BSD Callout and Timer Facilities" and modified slightly for inclusion
  * in FreeBSD by Justin T. Gibbs.  The original work on the data structures
- * used in this implementation was published by G.Varghese and A. Lauck in
+ * used in this implementation was published by G. Varghese and T. Lauck in
  * the paper "Hashed and Hierarchical Timing Wheels: Data Structures for
  * the Efficient Implementation of a Timer Facility" in the Proceedings of
  * the 11th ACM Annual Symposium on Operating Systems Principles,
@@ -154,10 +182,12 @@ softclock(void *dummy)
 	int depth;
 	int mpcalls;
 	int gcalls;
+	int wakeup_cookie;
 #ifdef DIAGNOSTIC
 	struct bintime bt1, bt2;
 	struct timespec ts2;
 	static uint64_t maxdt = 36893488147419102LL;	/* 2 msec */
+	static timeout_t *lastfunc;
 #endif
 
 #ifndef MAX_SOFTCLOCK_STEPS
@@ -211,12 +241,16 @@ softclock(void *dummy)
 					c->c_flags =
 					    (c->c_flags & ~CALLOUT_PENDING);
 				}
+				curr_callout = c;
 				mtx_unlock_spin(&callout_lock);
 				if (!(c_flags & CALLOUT_MPSAFE)) {
 					mtx_lock(&Giant);
 					gcalls++;
+					CTR1(KTR_CALLOUT, "callout %p", c_func);
 				} else {
 					mpcalls++;
+					CTR1(KTR_CALLOUT, "callout mpsafe %p",
+					    c_func);
 				}
 #ifdef DIAGNOSTIC
 				binuptime(&bt1);
@@ -228,17 +262,37 @@ softclock(void *dummy)
 				binuptime(&bt2);
 				bintime_sub(&bt2, &bt1);
 				if (bt2.frac > maxdt) {
+					if (lastfunc != c_func ||
+					    bt2.frac > maxdt * 2) {
+						bintime2timespec(&bt2, &ts2);
+						printf(
+			"Expensive timeout(9) function: %p(%p) %jd.%09ld s\n",
+						    c_func, c_arg,
+						    (intmax_t)ts2.tv_sec,
+						    ts2.tv_nsec);
+					}
 					maxdt = bt2.frac;
-					bintime2timespec(&bt2, &ts2);
-					printf(
-			"Expensive timeout(9) function: %p(%p) %ld.%09ld s\n",
-					c_func, c_arg,
-					(long)ts2.tv_sec, ts2.tv_nsec);
+					lastfunc = c_func;
 				}
 #endif
 				if (!(c_flags & CALLOUT_MPSAFE))
 					mtx_unlock(&Giant);
 				mtx_lock_spin(&callout_lock);
+				curr_callout = NULL;
+				if (wakeup_needed) {
+					/*
+					 * There might be someone waiting
+					 * for the callout to complete.
+					 */
+					wakeup_cookie = wakeup_ctr;
+					mtx_unlock_spin(&callout_lock);
+					mtx_lock(&callout_wait_lock);
+					cv_broadcast(&callout_wait);
+					wakeup_done_ctr = wakeup_cookie;
+					mtx_unlock(&callout_wait_lock);
+					mtx_lock_spin(&callout_lock);
+					wakeup_needed = 0;
+				}
 				steps = 0;
 				c = nextsoftcheck;
 			}
@@ -342,8 +396,31 @@ callout_reset(c, to_ticks, ftn, arg)
 {
 
 	mtx_lock_spin(&callout_lock);
-	if (c->c_flags & CALLOUT_PENDING)
-		callout_stop(c);
+	if (c == curr_callout && wakeup_needed) {
+		/*
+		 * We're being asked to reschedule a callout which is
+		 * currently in progress, and someone has called
+		 * callout_drain to kill that callout.  Don't reschedule.
+		 */
+		mtx_unlock_spin(&callout_lock);
+		return;
+	}
+	if (c->c_flags & CALLOUT_PENDING) {
+		if (nextsoftcheck == c) {
+			nextsoftcheck = TAILQ_NEXT(c, c_links.tqe);
+		}
+		TAILQ_REMOVE(&callwheel[c->c_time & callwheelmask], c,
+		    c_links.tqe);
+
+		/*
+		 * Part of the normal "stop a pending callout" process
+		 * is to clear the CALLOUT_ACTIVE and CALLOUT_PENDING
+		 * flags.  We're not going to bother doing that here,
+		 * because we're going to be setting those flags ten lines
+		 * after this point, and we're holding callout_lock
+		 * between now and then.
+		 */
+	}
 
 	/*
 	 * We could unlock callout_lock here and lock it again before the
@@ -363,9 +440,11 @@ callout_reset(c, to_ticks, ftn, arg)
 }
 
 int
-callout_stop(c)
+_callout_stop_safe(c, safe)
 	struct	callout *c;
+	int	safe;
 {
+	int wakeup_cookie;
 
 	mtx_lock_spin(&callout_lock);
 	/*
@@ -373,7 +452,24 @@ callout_stop(c)
 	 */
 	if (!(c->c_flags & CALLOUT_PENDING)) {
 		c->c_flags &= ~CALLOUT_ACTIVE;
-		mtx_unlock_spin(&callout_lock);
+		if (c == curr_callout && safe) {
+			/* We need to wait until the callout is finished. */
+			wakeup_needed = 1;
+			wakeup_cookie = wakeup_ctr++;
+			mtx_unlock_spin(&callout_lock);
+			mtx_lock(&callout_wait_lock);
+
+			/*
+			 * Check to make sure that softclock() didn't
+			 * do the wakeup in between our dropping
+			 * callout_lock and picking up callout_wait_lock
+			 */
+			if (wakeup_cookie - wakeup_done_ctr > 0)
+				cv_wait(&callout_wait, &callout_wait_lock);
+
+			mtx_unlock(&callout_wait_lock);
+		} else
+			mtx_unlock_spin(&callout_lock);
 		return (0);
 	}
 	c->c_flags &= ~(CALLOUT_ACTIVE | CALLOUT_PENDING);

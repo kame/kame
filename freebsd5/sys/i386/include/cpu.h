@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cpu.h	5.4 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/include/cpu.h,v 1.68 2003/08/16 16:57:56 marcel Exp $
+ * $FreeBSD: src/sys/i386/include/cpu.h,v 1.73 2004/08/03 18:44:26 mux Exp $
  */
 
 #ifndef _MACHINE_CPU_H_
@@ -54,9 +50,10 @@
 #undef	COPY_SIGCODE		/* don't copy sigcode above user stack in exec */
 
 #define	cpu_exec(p)	/* nothing */
-#define cpu_swapin(p)	/* nothing */
+#define	cpu_swapin(p)	/* nothing */
 #define	cpu_getstack(td)		((td)->td_frame->tf_esp)
-#define cpu_setstack(td, ap)		((td)->td_frame->tf_esp = (ap))
+#define	cpu_setstack(td, ap)		((td)->td_frame->tf_esp = (ap))
+#define	cpu_spinwait()			ia32_pause()
 
 #define	TRAPF_USERMODE(framep) \
 	((ISPL((framep)->tf_cs) == SEL_UPL) || ((framep)->tf_eflags & PSL_VM))
@@ -102,7 +99,7 @@ void	swi_vm(void *);
 static __inline u_int64_t
 get_cyclecount(void)
 {
-#if defined(I386_CPU) || defined(I486_CPU)
+#if defined(I386_CPU) || defined(I486_CPU) || defined(KLD_MODULE)
 	struct bintime bt;
 
 	if (!tsc_present) {

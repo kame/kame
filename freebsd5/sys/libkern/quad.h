@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,11 +31,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)quad.h	8.1 (Berkeley) 6/4/93
- * $FreeBSD: src/sys/libkern/quad.h,v 1.14 2003/04/29 13:36:03 kan Exp $
+ * $FreeBSD: src/sys/libkern/quad.h,v 1.18 2004/05/05 15:12:55 bde Exp $
  */
 
-#ifndef _LIBKERN_QUAD_H
-#define _LIBKERN_QUAD_H
+#ifndef _LIBKERN_QUAD_H_
+#define	_LIBKERN_QUAD_H_
 
 /*
  * Quad arithmetic.
@@ -101,22 +97,16 @@ union uu {
 #define	LHALF(x)	((x) & ((1 << HALF_BITS) - 1))
 #define	LHUP(x)		((x) << HALF_BITS)
 
+typedef unsigned int	qshift_t;
+
+quad_t		__ashldi3(quad_t, qshift_t);
+quad_t		__ashrdi3(quad_t, qshift_t);
 quad_t		__divdi3(quad_t a, quad_t b);
+quad_t		__lshrdi3(quad_t, qshift_t);
 quad_t		__moddi3(quad_t a, quad_t b);
 u_quad_t	__qdivrem(u_quad_t u, u_quad_t v, u_quad_t *rem);
 u_quad_t	__udivdi3(u_quad_t a, u_quad_t b);
 u_quad_t	__umoddi3(u_quad_t a, u_quad_t b);
 int		__ucmpdi2(u_quad_t a, u_quad_t b);
 
-/*
- * XXX
- * Compensate for gcc 1 vs gcc 2.  Gcc 1 defines ?sh?di3's second argument
- * as u_quad_t, while gcc 2 correctly uses int.  Unfortunately, we still use
- * both compilers.
- */
-#if __GNUC__ >= 2
-typedef unsigned int	qshift_t;
-#else
-typedef u_quad_t	qshift_t;
-#endif
-#endif /* _LIBKERN_QUAD_H */
+#endif /* !_LIBKERN_QUAD_H_ */

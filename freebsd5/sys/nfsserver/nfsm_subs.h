@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfsm_subs.h	8.2 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfsserver/nfsm_subs.h,v 1.34 2002/10/31 22:35:03 jeff Exp $
+ * $FreeBSD: src/sys/nfsserver/nfsm_subs.h,v 1.36 2004/05/24 04:06:14 rwatson Exp $
  */
 
 #ifndef _NFSSERVER_NFSM_SUBS_H_
@@ -164,7 +160,7 @@ void	nfsm_srvfhtom_xx(fhandle_t *f, int v3, struct mbuf **mb,
 	    caddr_t *bpos);
 void	nfsm_srvpostop_fh_xx(fhandle_t *f, struct mbuf **mb, caddr_t *bpos);
 void	nfsm_clget_xx(u_int32_t **tl, struct mbuf *mb, struct mbuf **mp,
-	    char **bp, char **be, caddr_t bpos);
+	    char **bp, char **be, caddr_t bpos, int droplock);
 
 #define nfsm_srvfhtom(f, v3) \
 	nfsm_srvfhtom_xx((f), (v3), &mb, &bpos)
@@ -182,6 +178,9 @@ void	nfsm_clget_xx(u_int32_t **tl, struct mbuf *mb, struct mbuf **mp,
 	nfsm_srvfattr(nfsd, (a), (f))
 
 #define nfsm_clget \
-	nfsm_clget_xx(&tl, mb, &mp, &bp, &be, bpos)
+	nfsm_clget_xx(&tl, mb, &mp, &bp, &be, bpos, 1)
+
+#define nfsm_clget_nolock \
+	nfsm_clget_xx(&tl, mb, &mp, &bp, &be, bpos, 0)
 
 #endif

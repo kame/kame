@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/i386/i386/autoconf.c,v 1.174 2003/11/03 22:20:50 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/i386/i386/autoconf.c,v 1.178 2004/07/28 21:54:56 phk Exp $");
 
 /*
  * Setup the system to run on the current machine.
@@ -49,8 +45,6 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/autoconf.c,v 1.174 2003/11/03 22:20:50 jhb
  */
 #include "opt_bootp.h"
 #include "opt_isa.h"
-#include "opt_nfs.h"
-#include "opt_nfsroot.h"
 #include "opt_bus.h"
 
 #include <sys/param.h>
@@ -70,10 +64,6 @@ __FBSDID("$FreeBSD: src/sys/i386/i386/autoconf.c,v 1.174 2003/11/03 22:20:50 jhb
 #include <net/if_var.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
-#include <nfs/rpcv2.h>
-#include <nfs/nfsproto.h>
-#include <nfsclient/nfs.h>
-#include <nfsclient/nfsdiskless.h>
 
 #include <machine/bootinfo.h>
 #include <machine/md_var.h>
@@ -178,22 +168,3 @@ configure_final(dummy)
 	}
 	cold = 0;
 }
-
-/*
- * Do legacy root filesystem discovery.
- */
-void
-cpu_rootconf()
-{
-#ifdef BOOTP
-        bootpc_init();
-#endif
-#if defined(NFSCLIENT) && defined(NFS_ROOT)
-#if !defined(BOOTP_NFSROOT)
-	nfs_setup_diskless();
-	if (nfs_diskless_valid)
-#endif
-		rootdevnames[0] = "nfs:";
-#endif
-}
-SYSINIT(cpu_rootconf, SI_SUB_ROOT_CONF, SI_ORDER_FIRST, cpu_rootconf, NULL)

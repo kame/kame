@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/agp_amd.c,v 1.16 2003/08/22 07:13:20 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/agp_amd.c,v 1.21 2004/08/16 12:23:53 obrien Exp $");
 
 #include "opt_bus.h"
 
@@ -33,9 +33,9 @@ __FBSDID("$FreeBSD: src/sys/pci/agp_amd.c,v 1.16 2003/08/22 07:13:20 imp Exp $")
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/lock.h>
-#include <sys/lockmgr.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
@@ -67,12 +67,12 @@ struct agp_amd_gatt {
 };
 
 struct agp_amd_softc {
-	struct agp_softc agp;
-	struct resource *regs;	/* memory mapped control registers */
-	bus_space_tag_t bst;	/* bus_space tag */
-	bus_space_handle_t bsh;	/* bus_space handle */
-	u_int32_t	initial_aperture; /* aperture size at startup */
-	struct agp_amd_gatt *gatt;
+	struct agp_softc	agp;
+	struct resource	       *regs;	/* memory mapped control registers */
+	bus_space_tag_t		bst;	/* bus_space tag */
+	bus_space_handle_t	bsh;	/* bus_space handle */
+	u_int32_t		initial_aperture; /* aperture size at startup */
+	struct agp_amd_gatt    *gatt;
 };
 
 static struct agp_amd_gatt *
@@ -187,16 +187,12 @@ agp_amd_match(device_t dev)
 		return NULL;
 
 	switch (pci_get_devid(dev)) {
-
-	case 0x700e1022:
-		return ("AMD 761 host to AGP bridge");
-		
 	case 0x70061022:
 		return ("AMD 751 host to AGP bridge");
-	
+	case 0x700e1022:
+		return ("AMD 761 host to AGP bridge");
 	case 0x700c1022:
 		return ("AMD 762 host to AGP bridge");
-
 	};
 
 	return NULL;
@@ -207,6 +203,8 @@ agp_amd_probe(device_t dev)
 {
 	const char *desc;
 
+	if (resource_disabled("agp", device_get_unit(dev)))
+		return (ENXIO);
 	desc = agp_amd_match(dev);
 	if (desc) {
 		device_verbose(dev);
@@ -229,8 +227,8 @@ agp_amd_attach(device_t dev)
 		return error;
 
 	rid = AGP_AMD751_REGISTERS;
-	sc->regs = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-				      0, ~0, 1, RF_ACTIVE);
+	sc->regs = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+					  RF_ACTIVE);
 	if (!sc->regs) {
 		agp_generic_detach(dev);
 		return ENOMEM;

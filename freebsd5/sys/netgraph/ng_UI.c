@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_UI.c,v 1.17 2003/02/19 05:47:31 imp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_UI.c,v 1.19 2004/06/25 21:11:14 julian Exp $
  * $Whistle: ng_UI.c,v 1.14 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -77,18 +77,14 @@ static ng_disconnect_t	ng_UI_disconnect;
 
 /* Node type descriptor */
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_UI_NODE_TYPE,
-	NULL,
-	ng_UI_constructor,
-	ng_UI_rcvmsg,
-	ng_UI_shutdown,
-	ng_UI_newhook,
-	NULL,
-	NULL,
-	ng_UI_rcvdata,
-	ng_UI_disconnect,
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_UI_NODE_TYPE,
+	.constructor =	ng_UI_constructor,
+	.rcvmsg =	ng_UI_rcvmsg,
+	.shutdown =	ng_UI_shutdown,
+	.newhook =	ng_UI_newhook,
+	.rcvdata =	ng_UI_rcvdata,
+	.disconnect =	ng_UI_disconnect,
 };
 NETGRAPH_INIT(UI, &typestruct);
 
@@ -182,8 +178,8 @@ ng_UI_rcvdata(hook_p hook, item_p item)
 	if (hook == priv->downlink) {
 		u_char *start, *ptr;
 
-		if (!m || (m->m_len < MAX_ENCAPS_HDR
-		    && !(m = m_pullup(m, MAX_ENCAPS_HDR))))
+		if (m->m_len < MAX_ENCAPS_HDR
+		    && !(m = m_pullup(m, MAX_ENCAPS_HDR)))
 			ERROUT(ENOBUFS);
 		ptr = start = mtod(m, u_char *);
 

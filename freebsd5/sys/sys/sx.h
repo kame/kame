@@ -24,15 +24,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  *
- * $FreeBSD: src/sys/sys/sx.h,v 1.17 2002/04/02 18:18:56 arr Exp $
+ * $FreeBSD: src/sys/sys/sx.h,v 1.20 2004/07/11 16:07:07 darrenr Exp $
  */
 
 #ifndef	_SYS_SX_H_
 #define	_SYS_SX_H_
 
-#ifndef	LOCORE
+#include <sys/queue.h>
 #include <sys/_lock.h>
-#include <sys/_mutex.h>
 #include <sys/condvar.h>	/* XXX */
 
 struct sx {
@@ -83,19 +82,27 @@ struct sx_args {
 #define	sx_xunlock(sx)		_sx_xunlock((sx), LOCK_FILE, LOCK_LINE)
 #define	sx_try_upgrade(sx)	_sx_try_upgrade((sx), LOCK_FILE, LOCK_LINE)
 #define	sx_downgrade(sx)	_sx_downgrade((sx), LOCK_FILE, LOCK_LINE)
+#define	sx_unlock(sx)	\
+		do { \
+			if ((sx)->sx_cnt < 0) \
+				sx_xunlock(sx); \
+			else \
+				sx_sunlock(sx); \
+		} while (0)
 
 #if defined(INVARIANTS) || defined(INVARIANT_SUPPORT)
 #define	SX_LOCKED		LA_LOCKED
 #define	SX_SLOCKED		LA_SLOCKED
 #define	SX_XLOCKED		LA_XLOCKED
-#endif	/* INVARIANTS || INVARIANT_SUPPORT */
+#define	SX_UNLOCKED		LA_UNLOCKED
+#endif
 
 #ifdef INVARIANTS
 #define	sx_assert(sx, what)	_sx_assert((sx), (what), LOCK_FILE, LOCK_LINE)
-#else	/* INVARIANTS */
+#else
 #define	sx_assert(sx, what)
-#endif	/* INVARIANTS */
+#endif
 
-#endif	/* _KERNEL */
-#endif	/* !LOCORE */
-#endif	/* _SYS_SX_H_ */
+#endif /* _KERNEL */
+
+#endif /* !_SYS_SX_H_ */
