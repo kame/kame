@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/02/03 09:41:58 $
+			$Date: 2000/02/03 19:44:15 $
 
 1. IPv6
 
@@ -175,10 +175,12 @@ packet.  KAME code tries to address the issue in several ways.
 
 Site-local address is very vaguely defined in the specs, and both specification
 and KAME code need tons of improvements to enable its actual use.
-Specifically, we have almost no code for site boundary node support
-(both forwarding nor routing).  We recommend, at this moment, you to use global
-addresses for experiments - there are way too many pitfalls if you use
-site-local addresses.
+For example, it is still very unclear how we define a site, or how we resolve
+hostnames in a site.  There are work underway to define behavior of routers
+at site border, however, we have almost no code for site boundary node support
+(both forwarding nor routing) and we bet almost noone has.
+We recommend, at this moment, you to use global addresses for experiments -
+there are way too many pitfalls if you use site-local addresses.
 
 1.3.1 Kernel internal
 
