@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.105 2001/11/14 09:22:42 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.106 2001/11/16 01:40:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -972,8 +972,8 @@ rip6_usrreq(so, req, m, nam, control, p)
 				 * compatibility to buggy applications that
 				 * rely on old (and wrong) kernel behavior.
 				 */
-				log(LOG_INFO,
-				    "rip6 SEND: address family is unspec\n");
+				log(LOG_INFO, "rip6 SEND: address family is "
+				    "unspec. Assume AF_INET6\n");
 			} else if (dst->sin6_family != AF_INET6) {
 				error = EAFNOSUPPORT;
 				break;

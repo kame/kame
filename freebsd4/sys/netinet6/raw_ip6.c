@@ -685,8 +685,8 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 			 * compatibility to buggy applications that
 			 * rely on old (and wrong) kernel behavior.
 			 */
-			log(LOG_INFO,
-			    "rip6 SEND: address family is unspec\n");
+			log(LOG_INFO, "rip6 SEND: address family is "
+			    "unspec. Assume AF_INET6\n");
 		} else if (dst->sin6_family != AF_INET6) {
 			m_freem(m);
 			return(EAFNOSUPPORT);
