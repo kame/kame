@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.71 2001/10/19 03:04:53 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.72 2001/10/19 06:26:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,6 +122,24 @@ struct	in6_defrouter {
 	u_long	expire;
 	u_short if_index;
 };
+
+#ifdef _KERNEL
+struct	in6_oprlist {
+	char ifname[IFNAMSIZ];
+	struct {
+		struct	in6_addr prefix;
+		struct prf_ra raflags;
+		u_char	prefixlen;
+		u_char	origin;
+		u_long vltime;
+		u_long pltime;
+		u_long expire;
+		u_short if_index;
+		u_short advrtrs; /* number of advertisement routers */
+		struct	in6_addr advrtr[DRLSTSIZ]; /* XXX: explicit limit */
+	} prefix[PRLSTSIZ];
+};
+#endif
 
 struct	in6_prlist {
 	char ifname[IFNAMSIZ];

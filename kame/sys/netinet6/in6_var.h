@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.68 2001/09/24 15:28:52 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.69 2001/10/19 06:26:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -417,7 +417,7 @@ struct	in6_rrenumreq {
 #define SIOCGIFAFLAG_IN6	_IOWR('i', 73, struct in6_ifreq)
 
 #define SIOCGDRLST_IN6		_IOWR('i', 74, struct in6_drlist)
-#define SIOCGPRLST_IN6		_IOWR('i', 75, struct in6_prlist)
+#define SIOCGPRLST_IN6		_IOWR('i', 75, struct in6_oprlist)
 #ifdef _KERNEL
 #define OSIOCGIFINFO_IN6	_IOWR('i', 76, struct in6_ondireq)
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.209 2001/10/19 06:18:20 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.210 2001/10/19 06:26:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1531,7 +1531,7 @@ nd6_ioctl(cmd, data, ifp)
 	struct ifnet *ifp;
 {
 	struct in6_drlist *drl = (struct in6_drlist *)data;
-	struct in6_prlist *prl = (struct in6_prlist *)data;
+	struct in6_oprlist *oprl = (struct in6_oprlist *)data;
 	struct in6_ndireq *ndi = (struct in6_ndireq *)data;
 	struct in6_nbrinfo *nbi = (struct in6_nbrinfo *)data;
 	struct in6_ndifreq *ndif = (struct in6_ndifreq *)data;
@@ -1578,15 +1578,15 @@ nd6_ioctl(cmd, data, ifp)
 		 * obsolete API, use sysctl under net.inet6.icmp6
 		 *
 		 * XXX the structure in6_prlist was changed in backward-
-		 * incompatible manner.  luckily, SIOCGPRLST_IN6 is obsolete
-		 * and we don't need to merge it.
+		 * incompatible manner.  in6_oprlist is used for SIOCGPRLST_IN6,
+		 * in6_prlist is used for nd6_sysctl() - fill_prlist().
 		 */
 		/*
 		 * XXX meaning of fields, especialy "raflags", is very
 		 * differnet between RA prefix list and RR/static prefix list.
 		 * how about separating ioctls into two?
 		 */
-		bzero(prl, sizeof(*prl));
+		bzero(oprl, sizeof(*oprl));
 #ifdef __NetBSD__
 		s = splsoftnet();
 #else
@@ -1597,15 +1597,15 @@ nd6_ioctl(cmd, data, ifp)
 			struct nd_pfxrouter *pfr;
 			int j;
 
-			(void)in6_embedscope(&prl->prefix[i].prefix,
+			(void)in6_embedscope(&oprl->prefix[i].prefix,
 			    &pr->ndpr_prefix, NULL, NULL);
-			prl->prefix[i].raflags = pr->ndpr_raf;
-			prl->prefix[i].prefixlen = pr->ndpr_plen;
-			prl->prefix[i].vltime = pr->ndpr_vltime;
-			prl->prefix[i].pltime = pr->ndpr_pltime;
-			prl->prefix[i].if_index = pr->ndpr_ifp->if_index;
+			oprl->prefix[i].raflags = pr->ndpr_raf;
+			oprl->prefix[i].prefixlen = pr->ndpr_plen;
+			oprl->prefix[i].vltime = pr->ndpr_vltime;
+			oprl->prefix[i].pltime = pr->ndpr_pltime;
+			oprl->prefix[i].if_index = pr->ndpr_ifp->if_index;
 			if (pr->ndpr_vltime == ND6_INFINITE_LIFETIME)
-				prl->prefix[i].expire = 0;
+				oprl->prefix[i].expire = 0;
 			else {
 				time_t maxexpire;
 
@@ -1614,17 +1614,17 @@ nd6_ioctl(cmd, data, ifp)
 					~(1 << ((sizeof(maxexpire) * 8) - 1));
 				if (pr->ndpr_vltime <
 				    maxexpire - pr->ndpr_lastupdate) {
-					prl->prefix[i].expire =
+					oprl->prefix[i].expire =
 						 pr->ndpr_lastupdate +
 						pr->ndpr_vltime;
 				} else
-					prl->prefix[i].expire = maxexpire;
+					oprl->prefix[i].expire = maxexpire;
 			}
 			pfr = pr->ndpr_advrtrs.lh_first;
 			j = 0;
 			while (pfr) {
 				if (j < DRLSTSIZ) {
-#define RTRADDR prl->prefix[i].advrtr[j]
+#define RTRADDR oprl->prefix[i].advrtr[j]
 					RTRADDR = pfr->router->rtaddr;
 					if (IN6_IS_ADDR_LINKLOCAL(&RTRADDR)) {
 						/* XXX: hack for KAME */
@@ -1640,8 +1640,8 @@ nd6_ioctl(cmd, data, ifp)
 				j++;
 				pfr = pfr->pfr_next;
 			}
-			prl->prefix[i].advrtrs = j;
-			prl->prefix[i].origin = PR_ORIG_RA;
+			oprl->prefix[i].advrtrs = j;
+			oprl->prefix[i].origin = PR_ORIG_RA;
 
 			i++;
 			pr = pr->ndpr_next;
