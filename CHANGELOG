@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1517 2001/01/29 20:05:22 itojun Exp $
+$KAME: CHANGELOG,v 1.1518 2001/01/31 01:56:59 jinmei Exp $
 
 <200101>
 Tue Jan 30 05:03:01 JST 2001  itojun@iijlab.net
@@ -111,19 +111,19 @@ Tue Jan 23 18:09:08 JST 2001  itojun@iijlab.net
 	  p2p interface.
 	This mean you can now invoke the following command:
 
-	# ifconfig gif0 inet6 3ffe::ffff::1
+	# ifconfig gif0 inet6 3ffe:ffff::1
 
 	Note that there is no destination address specified, and the
 	prefix length is implicitly set 64.  Also note that the
 	corresponding interface route of the address would have the
 	cloning bit, and neighbor caches would be created when you try to
 	communicate with a destination that matches the prefix
-	3ffe::ffff::/64.
+	3ffe:ffff::/64.
 	
 	In summary, by the two consecutive changes, the only possible
 	commands you can type are:
 	# ifconfig gif0 inet6 IPv6address prefixlen plen
-	(where IPv6address is an IPv6 address, plen < 128,) and
+	(where IPv6address is an IPv6 address, plen < 128) and
 	# ifconfig gif0 inet6 IPv6address IPv6dstaddress prefixlen 128	
 	(where IPv6address and IPv6dstaddress are IPv6 addresses)
 
