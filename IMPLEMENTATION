@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/05/31 17:47:31 $
+			$Date: 2000/06/01 02:42:10 $
 
 1. IPv6
 
@@ -948,9 +948,11 @@ the use of IPv4 mapped addresses:
 - rshd/rlogind do not accept connections from IPv4 mapped address.
   This is to avoid malicious use of IPv4 mapped address in IPv6 native
   packet, to bypass source-address based authentication.
-- ftpd/ftp assume that an IPv4 mapped address identifies IPv4 node, not a
-  native IPv6 node.  Hence, ftpd/ftp does not support network environment
-  with SIIT translator.
+- ftpd/ftp assume that an IPv4 mapped address identifies IPv4 node, and
+  AF_INET socket is available for talking to that IPv4 node.
+  Hence, ftpd/ftp does not support network environment with SIIT translator.
+  To support SIIT environment, we need to pass IPv4 mapped address to AF_INET6
+  socket directly, AND use PASV/PORT.
 
 1.13 sockaddr_storage
 
