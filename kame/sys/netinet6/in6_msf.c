@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.7 2002/10/10 05:36:22 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.8 2002/10/17 10:26:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2139,7 +2139,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	struct group_filter ogrpf;
 	struct group_filter *grpf;
 	struct sockaddr *sa_grp;
-	struct sockaddr_storage *ss, *ss_src, *old_ss;
+	struct sockaddr_in6 *ss, *ss_src, *old_ss;
 	u_int16_t add_num, old_num;
 	u_int old_mode;
 	struct sockaddr *dst;
@@ -2299,7 +2299,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			splx(s);
 			return error;
 		}
-		MALLOC(ss, struct sockaddr_storage *, sizeof(*ss),
+		MALLOC(ss, struct sockaddr_in6 *, sizeof(*ss),
 		       M_IPMOPTS, M_NOWAIT);
 		if (ss == NULL) {
 			error = ENOBUFS;
@@ -2311,7 +2311,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 				       (*grpfp)->gf_slist[j].ss_len);
 			if (error != 0) /* EFAULT */
 				break;
-			if (ss->ss_family == AF_INET) {
+			if (ss->sin6_family == AF_INET) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 				if (IN_BADCLASS(SIN_ADDR(ss)) || 
 				    (SIN_ADDR(ss) & IN_CLASSA_NET) == 0) 
@@ -2323,7 +2323,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 					error = EINVAL;
 					break;
 				}
-			} else if (ss->ss_family == AF_INET6) {
+			} else if (ss->sin6_family == AF_INET6) {
 #if 0
 				IN6_SG_ADDR_SCOPE_CHECK(SIN6_ADDR(sa_grp),
 							SIN6_ADDR(ss));
@@ -2369,9 +2369,9 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		/*
 		 * Copy source lists to ss_src.
 		 */
-		MALLOC(ss_src, struct sockaddr_storage *,
-			sizeof(struct sockaddr_storage) * grpf->gf_numsrc,
-			M_IPMOPTS, M_NOWAIT);
+		MALLOC(ss_src, struct sockaddr_in6 *,
+		       sizeof(struct sockaddr_in6) * grpf->gf_numsrc,
+		       M_IPMOPTS, M_NOWAIT);
 		if (ss_src == NULL) {
 			in6_free_msf_source_list(iasl->head);
 			FREE(iasl->head, M_MSFILTER);
@@ -2416,7 +2416,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		}
 		old_mode = MCAST_INCLUDE;
 	} else if (msf->msf_blknumsrc != 0) {
-		MALLOC(old_ss, struct sockaddr_storage *,
+		MALLOC(old_ss, struct sockaddr_in6 *,
 			sizeof(*old_ss) * msf->msf_blknumsrc,
 			M_IPMOPTS, M_NOWAIT);
 		if (old_ss == NULL) {
@@ -2434,11 +2434,8 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	 */
 	add_num = old_num = 0;
 	error = in6_setmopt_source_list(msf, grpf->gf_numsrc,
-					(struct sockaddr_in6 *)ss_src,
-					grpf->gf_fmode,
-					&add_num,
-					&old_num,
-					(struct sockaddr_in6 *)old_ss);
+					ss_src, grpf->gf_fmode,
+					&add_num, &old_num, old_ss);
 	if (error != 0) {
 		if (old_ss != NULL)
 			FREE(old_ss, M_IPMOPTS);
@@ -2473,8 +2470,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			}
 		} else {
 			in6_delmulti(imm->i6mm_maddr, &error, old_num,
-				     (struct sockaddr_in6 *)old_ss,
-				     old_mode, final);
+				     old_ss, old_mode, final);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
 				printf("sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> IN{NULL}\n", error);
@@ -2492,8 +2488,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			imm->i6mm_maddr = 
 				in6_modmulti(SIN6(sa_grp), ifp, &error,
 					     0, NULL, MCAST_EXCLUDE, old_num,
-					     (struct sockaddr_in6 *)old_ss,
-					     old_mode, init, 0);
+					     old_ss, old_mode, init, 0);
 		} else {
 			imm->i6mm_maddr =
 				in6_addmulti(SIN6(sa_grp), ifp, &error,
@@ -2522,8 +2517,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 				return EOPNOTSUPP;
 			}
 			in6_delmulti(imm->i6mm_maddr, &error, old_num,
-				     (struct sockaddr_in6 *)old_ss,
-				     old_mode, final);
+				     old_ss, old_mode, final);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
 				printf("sock6_setmopt_srcfilter: in6_delmulti retuned error=%d. undo.\n", error);
@@ -2538,12 +2532,10 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		} else {
 			imm->i6mm_maddr =
 				in6_modmulti(SIN6(sa_grp), ifp, &error,
-					   grpf->gf_numsrc,
-					   (struct sockaddr_in6 *)ss_src,
-					   grpf->gf_fmode, old_num,
-					   (struct sockaddr_in6 *)old_ss,
-					   old_mode, init,
-					   msf->msf_grpjoin);
+					     grpf->gf_numsrc, ss_src,
+					     grpf->gf_fmode, old_num,
+					     old_ss, old_mode, init,
+					     msf->msf_grpjoin);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
 				printf("sock6_setmopt_srcfilter: in6_modmulti returned error=%d. undo.\n", error);
