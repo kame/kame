@@ -1,14 +1,14 @@
 # $NetBSD$
 
-DISTNAME=	tcpdump-2000.08.28
-PKGNAME=	tcpdump-20000828
+DISTNAME=	tcpdump-2000.09.18
+PKGNAME=	tcpdump-20000918
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
 MAINTAINER=	itojun@itojun.org
 HOMEPAGE=	http://www.tcpdump.org/
 
-DEPENDS+=	libpcap-*:../../net/libpcap
+DEPENDS+=	libpcap-20000918:../../net/libpcap
 BUILD_DEPENDS+=	autoconf:../../devel/autoconf
 
 GNU_CONFIGURE=	yes
