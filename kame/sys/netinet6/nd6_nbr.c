@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.82 2001/12/06 06:53:53 k-sugyou Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.83 2001/12/18 02:06:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -489,7 +489,6 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 
 		if (ln && ln->ln_hold) {
 			hip6 = mtod(ln->ln_hold, struct ip6_hdr *);
-			/* XXX pullup? */
 			if (sizeof(*hip6) < ln->ln_hold->m_len) {
 				int zone;
 
@@ -504,8 +503,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 				sin6_in.sin6_scope_id = zone;
 				in6_embedscope(&sin6_in.sin6_addr, &sin6_in);
 				saddr6 = &sin6_in.sin6_addr;
-			}
-			else
+			} else
 				saddr6 = NULL;
 		} else
 			saddr6 = NULL;
