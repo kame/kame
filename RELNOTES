@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/21 04:48:04 $
+		     $Date: 2000/04/21 04:50:32 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -12,7 +12,7 @@ BACKWARD COMPATIBILITY NOTICE
 Please understand that the KAME kit is, from its nature, a
 distribution of very experimental set of software.  Do not assume ANY
 backward copmatibility, for source, binary nor configuration file,
-between different version of KAME kits.  This means that MUST
+between different version of KAME kits.  This means that you MUST
 recompile everything every time you upgrade KAME kit, to ensure it
 works.  We are not ignoring backward compatibility issues, however, we
 are sometimes unable to maintain backward compatibility.
