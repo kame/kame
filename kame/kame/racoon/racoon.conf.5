@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.95 2002/02/21 14:23:57 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.96 2002/02/21 14:30:21 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -542,6 +542,10 @@ the peer if you do not specify it(them).
 See the
 .Ic proposal_check
 directive.
+.\"
+.It Ic my_identifier Ar idtype ... ;
+is obsolete.
+It does not make sense to specify a identifier in the phase 2.
 .El
 .\"
 .Pp
