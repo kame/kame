@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.94 2000/10/16 12:08:55 kjc Exp $	*/
+/*	$KAME: ping6.c,v 1.95 2000/10/19 18:16:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -184,6 +184,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define F_FQDNOLD	0x20000
 #define F_NIGROUP	0x40000
 #define F_SUPTYPES	0x80000
+#define F_NOMINMTU	0x100000
 #define F_NOUSERDATA	(F_NODEADDR | F_FQDN | F_FQDNOLD | F_SUPTYPES)
 u_int options;
 
@@ -309,15 +310,16 @@ main(argc, argv)
 	preload = 0;
 	datap = &outpack[ICMP6ECHOLEN + ICMP6ECHOTMLEN];
 #ifndef IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:tvwW")) != EOF)
+#define ADDOPTS
 #else
 #ifdef IPSEC_POLICY_IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:tvwWP:")) != EOF)
+#define ADDOPTS	"P:"
 #else
-	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:tvwWAE")) != EOF)
+#define ADDOPTS	"AE"
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
-	{
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:mnNp:qRS:s:tvwW" ADDOPTS)) != EOF) {
+#undef ADDOPTS
 		switch (ch) {
 		case 'a':
 		{
@@ -426,6 +428,14 @@ main(argc, argv)
 			if (preload < 0 || *optarg == '\0' || *e != '\0')
 				errx(1, "illegal preload value -- %s", optarg);
 			break;
+		case 'm':
+#ifdef IPV6_USE_MIN_MTU
+			options |= F_NOMINMTU;
+			break;
+#else
+			errx(1, "-%c is not supported on this platform", ch);
+			/*NOTREACHED*/
+#endif
 		case 'n':
 			options |= F_NUMERIC;
 			break;
@@ -602,6 +612,14 @@ main(argc, argv)
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
 			       &optval, sizeof(optval)) == -1)
 			err(1, "IPV6_MULTICAST_HOPS");
+#ifdef IPV6_USE_MIN_MTU
+	if ((options & F_NOMINMTU) == 0) {
+		optval = 1;
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
+				&optval, sizeof(optval)) == -1)
+			err(1, "setsockopt(IPV6_USE_MIN_MTU)");
+	}
+#endif
 
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
@@ -2399,7 +2417,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-"usage: ping6 [-dfHnNqvwW"
+"usage: ping6 [-dfHmnNqvwW"
 #ifdef IPV6_REACHCONF
 		      "R"
 #endif
