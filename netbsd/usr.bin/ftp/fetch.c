@@ -677,7 +677,7 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 			if (getnameinfo(res->ai_addr, res->ai_addrlen,
 					hbuf, sizeof(hbuf), NULL, 0,
 					NI_NUMERICHOST) != 0)
-				strcpy(hbuf, "invalid");
+				strncpy(hbuf, "invalid", sizeof(hbuf));
 
 			if (verbose && res != res0)
 				fprintf(ttyout, "Trying %s...\n", hbuf);
