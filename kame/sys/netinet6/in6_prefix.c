@@ -551,7 +551,7 @@ in6_prefix_remove_ifid(int iilen, struct in6_ifaddr *ia)
 		splx(s);
 		free(rap, M_RR_ADDR);
 	}
-	if (LIST_FIRST(&rr_prefix) == NULL)
+	if (LIST_FIRST(&ifpr2rp(ia->ia6_ifpr)->rp_addrhead) == NULL)
 		rp_remove(ifpr2rp(ia->ia6_ifpr));
 }
 
