@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.11 2001/06/21 11:00:36 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.12 2001/11/30 11:47:50 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -200,10 +200,6 @@ static struct cdevsw altq_cdevsw =
 #endif
 #elif defined(__NetBSD__)
 static struct cdevsw altq_cdevsw = cdev__oci_init(1,altq);
-#elif defined(__OpenBSD__)
-static struct cdevsw altq_cdevsw = {
-	altqopen, altqclose, 0, 0, altqioctl, 0,
-	0, 0, 0, 0 };
 #endif
 
 #if !defined(__OpenBSD__)
@@ -305,8 +301,9 @@ altqioctl(dev, cmd, addr, flag, p)
 	return ENXIO;
 }
 
-
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 static int altq_devsw_installed = 0;
+#endif
 
 #ifdef __FreeBSD__
 #if (__FreeBSD_version < 400000)
@@ -359,7 +356,7 @@ altq_drvinit(unused)
 
 SYSINIT(altqdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,altq_drvinit,NULL)
 
-#elif defined(__NetBSD__)||defined(__OpenBSD__)
+#elif defined(__NetBSD__)
 
 void
 altqattach(int unused)
@@ -372,8 +369,7 @@ altqattach(int unused)
 		printf("altq: major number is %d\n", CDEV_MAJOR);
 	}
 }
-#else
-#error altqattach()??
+
 #endif
 
 #ifdef ALTQ_KLD
