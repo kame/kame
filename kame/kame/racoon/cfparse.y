@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.78 2000/12/16 14:50:35 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.79 2000/12/17 21:46:52 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -277,7 +277,7 @@ logging_statement
 log_level
 	:	HEXSTRING
 		{
-			yywarn("such a log specification will be obsoleted.");
+			yywarn("see racoon.conf(5), such a log specification will be obsoleted.");
 			vfree($1);
 
 			/* command line option has a priority than it. */
