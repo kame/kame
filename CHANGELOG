@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1644 2001/04/10 16:00:28 thorpej Exp $
+$KAME: CHANGELOG,v 1.1645 2001/04/11 01:26:41 jinmei Exp $
 
 <200104>
+2001-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_pcbopt):
+	* kame/sys/netinet6/ip6_output.c (ip6_setpktoptions):
+	prevented invalid (anycast or unready) addresses from being
+	specified as the packet's source address using the IPV6_PKTINFO
+	socket option or ancillary data.
+
 2001-04-10  Jason R. Thorpe  <thorpej@zembu.com>
 
 	* racoon/pfkey.c: pk_recvacquire(): Make sure the phase1
