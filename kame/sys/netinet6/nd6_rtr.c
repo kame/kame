@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.211 2002/07/30 23:20:41 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.212 2002/07/30 23:22:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -767,21 +767,24 @@ defrouter_delreq(dr)
 	struct sockaddr_in6 def, mask, gw;
 	struct rtentry *oldrt = NULL;
 
+#ifdef DIAGNOSTIC
+	if (!dr)
+		panic("dr == NULL in defrouter_delreq");
+#endif
+
 	Bzero(&def, sizeof(def));
 	Bzero(&mask, sizeof(mask));
 	Bzero(&gw, sizeof(gw));	/* for safety */
 
 	def.sin6_len = mask.sin6_len = sizeof(struct sockaddr_in6);
 	def.sin6_family = mask.sin6_family = AF_INET6;
-	if (dr) {
-		gw = dr->rtaddr;
+	gw = dr->rtaddr;
 #ifndef SCOPEDROUTING
-		gw.sin6_scope_id = 0;	/* XXX */
+	gw.sin6_scope_id = 0;	/* XXX */
 #endif
-	}
 
 	rtrequest(RTM_DELETE, (struct sockaddr *)&def,
-	    dr ? (struct sockaddr *)&gw : NULL,
+	    (struct sockaddr *)&gw,
 	    (struct sockaddr *)&mask, RTF_GATEWAY, &oldrt);
 	if (oldrt) {
 		nd6_rtmsg(RTM_DELETE, oldrt);
@@ -795,8 +798,7 @@ defrouter_delreq(dr)
 		}
 	}
 
-	if (dr)
-		dr->installed = 0;
+	dr->installed = 0;
 }
 
 /*
