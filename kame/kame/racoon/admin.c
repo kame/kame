@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.6 2000/02/01 16:57:44 sumikawa Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.7 2000/05/11 09:38:20 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -68,7 +68,6 @@
 
 static int admin_process __P((int so2, char *combuf));
 static int admin_reply __P((int so, struct admin_com *combuf, vchar_t *buf));
-static u_int admin2pfkey_proto __P((u_int proto));
 
 int
 admin_handler()
@@ -210,7 +209,7 @@ admin_process(so2, combuf)
 			    {
 				u_int p;
 				p = admin2pfkey_proto(com->ac_proto);
-				if (p == ~0)
+				if (p == -1)
 					goto bad;
 				buf = pfkey_dump_sadb(p);
 				if (buf == NULL)
@@ -373,7 +372,8 @@ admin_reply(so, combuf, buf)
 	return 0;
 }
 
-static u_int
+/* ADMIN_PROTO -> SADB_SATYPE */
+int
 admin2pfkey_proto(proto)
 	u_int proto;
 {
@@ -386,8 +386,8 @@ admin2pfkey_proto(proto)
 		return SADB_SATYPE_ESP;
 	default:
 		plog(logp, LOCATION, NULL,
-			"Invalid proto for admin: %u\n", proto);
-		return ~0;
+			"unsupported proto for admin: %d\n", proto);
+		return -1;
 	}
 	/*NOTREACHED*/
 }

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.h,v 1.4 2000/01/11 21:22:14 itojun Exp $ */
+/* YIPS @(#)$Id: admin.h,v 1.5 2000/05/11 09:38:20 sakane Exp $ */
 
 /* command for administration. */
 /* NOTE: host byte order. */
@@ -73,3 +73,4 @@ struct admin_com_indexes {
 	struct sockaddr_storage dst;
 };
 
+extern int admin2pfkey_proto __P((u_int proto));

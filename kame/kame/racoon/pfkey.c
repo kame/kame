@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.34 2000/05/11 09:29:55 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.35 2000/05/11 09:38:20 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -82,7 +82,6 @@
 static int pfkey_setspidxbymsg __P((caddr_t *mhp, struct policyindex *spidx));
 static int pfkey_spidxinfo __P((struct sadb_ident *id, struct sockaddr *saddr,
 	u_int8_t *pref, u_int16_t *ul_proto)); 
-static int admin2pfkey_proto __P((u_int proto));
 static u_int ipsecdoi2pfkey_aalg __P((u_int hashtype));
 static u_int ipsecdoi2pfkey_ealg __P((u_int t_id));
 static u_int ipsecdoi2pfkey_calg __P((u_int t_id));
@@ -413,25 +412,6 @@ pfkey_init()
 }
 
 /* %%% for conversion */
-/* ADMIN_PROTO -> SADB_SATYPE */
-static int
-admin2pfkey_proto(proto)
-	u_int proto;
-{
-	switch (proto) {
-	case ADMIN_PROTO_IPSEC:
-		return SADB_SATYPE_UNSPEC;
-	case ADMIN_PROTO_AH:
-		return SADB_SATYPE_AH;
-	case ADMIN_PROTO_ESP:
-		return SADB_SATYPE_ESP;
-	default:
-		plog(logp, LOCATION, NULL, "unsupported proto %d\n", proto);
-		return -1;
-	}
-	/*NOTREACHED*/
-}
-
 /* IPSECDOI_ATTR_AUTH -> SADB_AALG */
 static u_int
 ipsecdoi2pfkey_aalg(hashtype)
