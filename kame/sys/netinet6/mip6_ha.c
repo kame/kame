@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.21 2001/08/07 07:55:16 keiichi Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.22 2001/08/14 12:59:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -79,7 +79,6 @@ int mip6_ha_count = 0;
 static void mip6_ha_timeout __P((void *));
 static void mip6_ha_starttimer __P((void));
 static void mip6_ha_stoptimer __P((void));
-static void mip6_ha_restarttimer __P((void));
 
 void
 mip6_ha_init()
@@ -281,7 +280,72 @@ static void
 mip6_ha_timeout(dummy)
      void *dummy;
 {
-	printf("%s: TBD.\n", __FUNCTION__);
+	struct mip6_ha *mha, *mha_next;
+	struct hif_softc *sc;
+	struct mip6_bu *mbu;
+	int s, error = 0;
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	mip6_ha_starttimer();
+
+	for (mha = LIST_FIRST(&mip6_ha_list); mha;
+	     mha = mha_next) {
+		mha_next = LIST_NEXT(mha, mha_entry);
+
+		if (!(mha->mha_flags & ND_RA_FLAG_HOME_AGENT)) {
+			/* this is not a home agent. */
+			continue;
+		}
+	
+		/* cout down HA lifetime remain. */
+		mha->mha_remain -= MIP6_HA_TIMEOUT_INTERVAL;
+		
+		if (mha->mha_remain < 0) {
+			/* this HA is not valid any more. */
+			for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+			     /*
+			      * XXX.  no need to walk all hif bacause
+			      * home agent cannot exist on differnt
+			      * two links at the same time.
+			      */
+			     sc = TAILQ_NEXT(sc, hif_entry)) {
+				for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
+				     mbu = LIST_NEXT(mbu, mbu_entry)) {
+					if (!(mbu->mbu_flags & IP6_BUF_HOME)) {
+						/*
+						 * this is not a home
+						 * registration entry.
+						 */
+						continue;
+					}
+					if (IN6_ARE_ADDR_EQUAL(&mbu->mbu_paddr,
+							       &mha->mha_gaddr)) {
+						/*
+						 * the haaddr of this
+						 * BU entry is no
+						 * longer valid.
+						 * set haaddr to ANY.
+						 */
+						mbu->mbu_paddr = in6addr_any;
+					}
+				}
+			}
+			error = mip6_ha_list_remove(&mip6_ha_list, mha);
+			if (error) {
+				mip6log((LOG_ERR,
+					 "%s: mha deletion failed "
+					 "(code %d).\n",
+					 __FUNCTION__, error));
+			}
+		}
+	}
+
+	splx(s);
 }
 
 static void

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.4 2001/08/07 07:55:16 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.5 2001/08/14 12:59:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -68,6 +68,12 @@
 struct mip6_subnet_list mip6_subnet_list;
 
 extern struct mip6_prefix_list mip6_prefix_list;
+
+void
+mip6_subnet_init(void)
+{
+	LIST_INIT(&mip6_subnet_list);
+}
 
 struct mip6_subnet *
 mip6_subnet_create(void)

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.46 2001/08/09 07:55:21 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.47 2001/08/14 12:59:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -142,9 +142,10 @@ mip6_init()
 	mip6_bu_init(); /* binding update routine initialize */
 	mip6_ha_init(); /* homeagent list management initialize */
 	mip6_bc_init(); /* binding cache routine initailize */
+	mip6_prefix_init();
+	mip6_subnet_init();
 
 	LIST_INIT(&mip6_subnet_list);
-	LIST_INIT(&mip6_prefix_list);
 }
 
 /*
@@ -199,7 +200,7 @@ mip6_process_defrouter_change(dr)
 		}
 	}
 
-	coa_changed = mip6_select_coa(dr->ifp);
+	coa_change = mip6_select_coa(dr->ifp);
 	if (coa_changed == -1) {
 		error = -1;
 		goto process_defrouter_change_done;

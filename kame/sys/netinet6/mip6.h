@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.17 2001/08/09 07:55:21 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.18 2001/08/14 12:59:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -170,6 +170,7 @@ int mip6_tunneled_rs_output		__P((struct hif_softc *,
 					     struct mip6_pfx *));
 
 /* mip6_prefix management */
+void mip6_prefix_init			__P((void));
 struct mip6_prefix *mip6_prefix_create	__P((struct in6_addr *,
 					     u_int8_t, u_int32_t));
 int mip6_prefix_haddr_assign		__P((struct mip6_prefix *,
@@ -185,6 +186,7 @@ struct mip6_prefix *mip6_prefix_list_find_withhaddr
 					     struct in6_addr *haddr));
 
 /* subnet information management */
+void mip6_subnet_init			__P((void));
 struct mip6_subnet *mip6_subnet_create	__P((void));
 int mip6_subnet_delete			__P((struct mip6_subnet *));
 int mip6_subnet_list_insert		__P((struct mip6_subnet_list *,
@@ -278,6 +280,9 @@ void mip6_bc_init			__P((void));
 int mip6_bc_list_remove			__P((struct mip6_bc_list *,
 					     struct mip6_bc *));
 struct mip6_bc *mip6_bc_list_find_withphaddr
+					__P((struct mip6_bc_list *,
+					     struct in6_addr *));
+struct mip6_bc *mip6_bc_list_find_withpcoa
 					__P((struct mip6_bc_list *,
 					     struct in6_addr *));
 

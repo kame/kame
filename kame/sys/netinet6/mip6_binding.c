@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.7 2001/08/09 07:55:21 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.8 2001/08/14 12:59:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -253,6 +253,11 @@ mip6_home_registration(sc)
 	}
 	msha = mip6_subnet_ha_list_find_preferable(&ms->ms_msha_list);
 	if (msha == NULL) {
+		/*
+		 * XXX.  create bu at now, leave ha part blank and
+		 * start ha discov.  when ha discov rep received, send
+		 * bu seems reasonable to me.  reconsider later...
+		 */
 		mip6log((LOG_INFO,
 			 "%s: no home agent.  start ha discovery.\n",
 			 __FUNCTION__));
@@ -1790,6 +1795,22 @@ mip6_bc_list_find_withphaddr(mbc_list, haddr)
 	for (mbc = LIST_FIRST(mbc_list); mbc;
 	     mbc = LIST_NEXT(mbc, mbc_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(&mbc->mbc_phaddr, haddr))
+			break;
+	}
+
+	return (mbc);
+}
+
+struct mip6_bc *
+mip6_bc_list_find_withcoa(mbc_list, pcoa)
+     struct mip6_bc_list *mbc_list;
+     struct in6_addr *pcoa;
+{
+	struct mip6_bc *mbc;
+
+	for (mbc = LIST_FIRST(mbc_list); mbc;
+	     mbc = LIST_NEXT(mbc, mbc_entry)) {
+		if (IN6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa, pcoa))
 			break;
 	}
 

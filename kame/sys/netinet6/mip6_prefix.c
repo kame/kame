@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.4 2001/08/07 07:55:16 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.5 2001/08/14 12:59:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -66,8 +66,26 @@
 #include <netinet6/mip6.h>
 
 struct mip6_prefix_list mip6_prefix_list;
+int mip6_prefix_count = 0;
+
+#ifdef __NetBSD__
+struct callout mip6_prefix_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+struct callout mip6_prefix_ch;
+#endif
 
 extern struct mip6_subnet_list mip6_subnet_list;
+
+void
+mip6_prefix_init(void)
+{
+	mip6_prefix_count = 0;
+	LIST_INIT(&mip6_prefix_list);
+
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
+        callout_init(&mip6_prefix_ch);
+#endif
+}
 
 struct mip6_prefix *
 mip6_prefix_create(prefix, prefixlen, lifetime)
