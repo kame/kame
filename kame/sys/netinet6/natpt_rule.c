@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.28 2001/10/24 06:10:44 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.29 2001/10/24 15:33:38 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -70,8 +70,8 @@ MALLOC_DECLARE(M_NATPT);
  *
  */
 
-static int	 natpt_matchIn4addr	__P((struct pcv *, struct pAddr *));
-static int	 natpt_matchIn6addr	__P((struct pcv *, struct pAddr *));
+static int	 natpt_matchIn4addr	__P((struct pcv *, struct mAddr *));
+static int	 natpt_matchIn6addr	__P((struct pcv *, struct mAddr *));
 void		 natpt_expireCSlot	__P((void *));
 
 
@@ -106,7 +106,7 @@ natpt_lookForRule6(struct pcv *cv6)
 				continue;
 		}
 
-		if (natpt_matchIn6addr(cv6, &acs->Local) != 0) {
+		if (natpt_matchIn6addr(cv6, &acs->local) != 0) {
 			if (isDump(D_MATCHINGRULE6))
 				natpt_logIp6(LOG_DEBUG, cv6->ip.ip6, "%s():", fn);
 			cv6->fromto = NATPT_FROM;
@@ -146,7 +146,7 @@ natpt_lookForRule4(struct pcv *cv4)
 				continue;
 		}
 
-		if (natpt_matchIn4addr(cv4, &csl->Local) != 0) {
+		if (natpt_matchIn4addr(cv4, &csl->local) != 0) {
 			if (isDump(D_MATCHINGRULE4))
 				natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
 			cv4->fromto = NATPT_FROM;
@@ -160,28 +160,28 @@ natpt_lookForRule4(struct pcv *cv4)
 
 
 static int
-natpt_matchIn6addr(struct pcv *cv6, struct pAddr *from)
+natpt_matchIn6addr(struct pcv *cv6, struct mAddr *from)
 {
 	struct in6_addr	*in6from = &cv6->ip.ip6->ip6_src;
 	struct in6_addr	 match;
 
-	switch (from->aType) {
+	switch (from->saddr.aType) {
 	case ADDR_ANY:
 		goto proto;
 
 	case ADDR_SINGLE:
-		if (IN6_ARE_ADDR_EQUAL(in6from, &from->in6Addr))
+		if (IN6_ARE_ADDR_EQUAL(in6from, &from->saddr.in6Addr))
 			goto proto;
 		return (0);
 
 	case ADDR_MASK:
 		bcopy(in6from, &match, sizeof(struct in6_addr));
-		match.s6_addr32[0] &= from->in6Mask.s6_addr32[0];
-		match.s6_addr32[1] &= from->in6Mask.s6_addr32[1];
-		match.s6_addr32[2] &= from->in6Mask.s6_addr32[2];
-		match.s6_addr32[3] &= from->in6Mask.s6_addr32[3];
+		match.s6_addr32[0] &= from->saddr.in6Mask.s6_addr32[0];
+		match.s6_addr32[1] &= from->saddr.in6Mask.s6_addr32[1];
+		match.s6_addr32[2] &= from->saddr.in6Mask.s6_addr32[2];
+		match.s6_addr32[3] &= from->saddr.in6Mask.s6_addr32[3];
 
-		if (IN6_ARE_ADDR_EQUAL(&match, &from->in6Addr))
+		if (IN6_ARE_ADDR_EQUAL(&match, &from->saddr.in6Addr))
 			goto proto;
 		return (0);
 
@@ -194,55 +194,38 @@ natpt_matchIn6addr(struct pcv *cv6, struct pAddr *from)
 	    && (cv6->ip_p != IPPROTO_TCP))
 		return (1);
 
-	if (from->port[0] == 0) {
-		if (from->port[1] == 0) {
-			return (1);
-		} else {
-			if (cv6->pyld.tcp6->th_dport == from->port[1])
-				return (1);
-		}
-	} else {
-		if (from->port[1] == 0) {
-			if (cv6->pyld.tcp6->th_sport == from->port[0])
-				return (1);
-		} else {
-			u_short	dport = ntohs(cv6->pyld.tcp6->th_sport);
-			u_short	port0 = ntohs(from->port[0]);
-			u_short	port1 = ntohs(from->port[1]);
-
-			if ((dport >= port0) && (dport <= port1))
-				return (1);
-		}
-	}
+	if ((from->dport == 0)
+	    || (cv6->pyld.tcp6->th_dport == from->dport))
+		return (1);
 
 	return (0);
 }
 
 
 static int
-natpt_matchIn4addr(struct pcv *cv4, struct pAddr *from)
+natpt_matchIn4addr(struct pcv *cv4, struct mAddr *from)
 {
 	struct in_addr	in4from = cv4->ip.ip4->ip_src;
 	struct in_addr	in4masked;
 
-	switch (from->aType) {
+	switch (from->saddr.aType) {
 	case ADDR_ANY:
 		goto proto;
 
 	case ADDR_SINGLE:
-		if (in4from.s_addr == from->in4Addr.s_addr)
+		if (in4from.s_addr == from->saddr.in4Addr.s_addr)
 			goto proto;
 		return (0);
 
 	case ADDR_MASK:
-		in4masked.s_addr = in4from.s_addr & from->in4Mask.s_addr;
-		if (in4masked.s_addr == from->in4Addr.s_addr)
+		in4masked.s_addr = in4from.s_addr & from->saddr.in4Mask.s_addr;
+		if (in4masked.s_addr == from->saddr.in4Addr.s_addr)
 			goto proto;
 		return (0);
 
 	case ADDR_RANGE:
-		if ((in4from.s_addr >= from->in4RangeStart.s_addr)
-		    && (in4from.s_addr <= from->in4RangeEnd.s_addr))
+		if ((in4from.s_addr >= from->saddr.in4RangeStart.s_addr)
+		    && (in4from.s_addr <= from->saddr.in4RangeEnd.s_addr))
 			goto proto;
 		return (0);
 
@@ -255,26 +238,9 @@ natpt_matchIn4addr(struct pcv *cv4, struct pAddr *from)
 	    && (cv4->ip_p != IPPROTO_TCP))
 		return (1);
 
-	if (from->port[0] == 0) {
-		if (from->port[1] == 0) {
-			return (1);
-		} else {
-			if (cv4->pyld.tcp4->th_dport == from->port[1])
-				return (1);
-		}
-	} else {
-		if (from->port[1] == 0) {
-			if (cv4->pyld.tcp4->th_sport == from->port[0])
-				return (1);
-		} else {
-			u_short	dport = ntohs(cv4->pyld.tcp4->th_sport);
-			u_short	port0 = ntohs(from->port[0]);
-			u_short	port1 = ntohs(from->port[1]);
-
-			if ((dport >= port0) && (dport <= port1))
-				return (1);
-		}
-	}
+	if ((from->dport == 0)
+	    || (cv4->pyld.tcp4->th_dport == from->dport))
+		return (1);
 
 	return (0);
 }

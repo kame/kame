@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.7 2001/10/19 05:29:50 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.8 2001/10/24 15:34:23 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -71,10 +71,10 @@ extern char	*tcpstates[];
  */
 
 void	 makeCSlotLine		__P((char *, int, struct cSlot *));
-void	 appendPAddr		__P((struct logmsg *, struct pAddr *));
-void	 appendPAddr4		__P((struct logmsg *, struct pAddr *));
-void	 appendPAddr6		__P((struct logmsg *, struct pAddr *));
-void	 appendPort		__P((struct logmsg *, struct pAddr *));
+void	 appendPAddr		__P((struct logmsg *, struct mAddr *));
+void	 appendPAddr4		__P((struct logmsg *, struct mAddr *));
+void	 appendPAddr6		__P((struct logmsg *, struct mAddr *));
+void	 appendPort		__P((struct logmsg *, struct mAddr *));
 void	 makeTSlotLine		__P((char *, int, struct tSlot *,
 				     struct tcpstate *, int));
 void	 appendPAddrXL		__P((struct logmsg *, struct pAddr *, int));
@@ -103,9 +103,9 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 	lmsg.lmsg_last = lmsg.lmsg_data;
 
 	concat(&lmsg, " from");
-	appendPAddr(&lmsg, &csl->local.saddr);
+	appendPAddr(&lmsg, &csl->local);
 	concat(&lmsg, " to");
-	appendPAddr(&lmsg, &csl->remote.saddr);
+	appendPAddr(&lmsg, &csl->remote);
 
 	if (csl->proto) {
 		int	found = 0;
@@ -143,72 +143,71 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 
 
 void
-appendPAddr(struct logmsg *lmsg, struct pAddr *pad)
+appendPAddr(struct logmsg *lmsg, struct mAddr *mpad)
 {
-	if (pad->sa_family == AF_INET)
-		appendPAddr4(lmsg, pad);
+	if (mpad->saddr.sa_family == AF_INET)
+		appendPAddr4(lmsg, mpad);
 	else
-		appendPAddr6(lmsg, pad);
+		appendPAddr6(lmsg, mpad);
 }
 
 
 void
-appendPAddr4(struct logmsg *lmsg, struct pAddr *pad)
+appendPAddr4(struct logmsg *lmsg, struct mAddr *mpad)
 {
 	char	Wow[128];
 
-	if (pad->aType == ADDR_ANY)
+	if (mpad->saddr.aType == ADDR_ANY)
 		concat(lmsg, " any4");
 	else
 		concat(lmsg, " %s",
-		       inet_ntop(AF_INET, &pad->in4Addr, Wow, sizeof(Wow)));
+		       inet_ntop(AF_INET, &mpad->saddr.in4Addr, Wow, sizeof(Wow)));
 
-	if (pad->prefix != 0)
-		concat(lmsg, "/%d", pad->prefix);
-	else if (pad->in4RangeEnd.s_addr != 0)
+	if (mpad->saddr.prefix != 0)
+		concat(lmsg, "/%d", mpad->saddr.prefix);
+	else if (mpad->saddr.in4RangeEnd.s_addr != 0)
 		concat(lmsg, " - %s",
-		       inet_ntop(AF_INET, &pad->in4RangeEnd, Wow, sizeof(Wow)));
+		       inet_ntop(AF_INET, &mpad->saddr.in4RangeEnd, Wow, sizeof(Wow)));
 
-	appendPort(lmsg, pad);
+	appendPort(lmsg, mpad);
 }
 
 
 void
-appendPAddr6(struct logmsg *lmsg, struct pAddr *pad)
+appendPAddr6(struct logmsg *lmsg, struct mAddr *mpad)
 {
 	struct in6_addr	in6addr = IN6ADDR_ANY_INIT;
 	char		Wow[128];
 
-	if (IN6_ARE_ADDR_EQUAL(&pad->in6Addr, &in6addr))
+	if (IN6_ARE_ADDR_EQUAL(&mpad->saddr.in6Addr, &in6addr))
 		concat(lmsg, " any6");
 	else
 		concat(lmsg, " %s",
-		       inet_ntop(AF_INET6, &pad->in6Addr, Wow, sizeof(Wow)));
+		       inet_ntop(AF_INET6, &mpad->saddr.in6Addr, Wow, sizeof(Wow)));
 
-	if (pad->prefix != 0)
-		concat(lmsg, "/%d", pad->prefix);
+	if (mpad->saddr.prefix != 0)
+		concat(lmsg, "/%d", mpad->saddr.prefix);
 
-	appendPort(lmsg, pad);
+	appendPort(lmsg, mpad);
 }
 
 
 void
-appendPort(struct logmsg *lmsg, struct pAddr *pad)
+appendPort(struct logmsg *lmsg, struct mAddr *mpad)
 {
-	if (pad->port[0] == 0) {
-		if (pad->port[1] == 0)
-			;
-		else
-			concat(lmsg, " dport %d", ntohs(pad->port[1]));
-	} else {
-		concat(lmsg, " port %d", ntohs(pad->port[0]));
-		if (pad->port[1] != 0) {
-			if (pad->pType == PORT_MINUS)
-				concat(lmsg, " - %d", ntohs(pad->port[1]));
+	if (mpad->Port[0]) {
+		concat(lmsg, " port %d", ntohs(mpad->saddr.port[0]));
+		if (mpad->Port[1] != 0) {
+			if (mpad->saddr.pType == PORT_MINUS)
+				concat(lmsg, " - %d", ntohs(mpad->Port[1]));
 			else
 				concat(lmsg, " : %d",
-				       ntohs(pad->port[1]) - ntohs(pad->port[0]));
+				       ntohs(mpad->Port[1]) - ntohs(mpad->Port[0]));
 		}
+	}
+
+	if (mpad->dport) {
+		concat(lmsg, " dport %d", ntohs(mpad->dport));
 	}
 }
 
