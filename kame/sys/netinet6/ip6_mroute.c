@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.80 2002/09/15 09:47:39 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.81 2002/09/23 13:16:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -396,20 +396,15 @@ mrt6_ioctl(cmd, data)
 	int cmd;
 	caddr_t data;
 {
-	int error = 0;
 
 	switch (cmd) {
 	case SIOCGETSGCNT_IN6:
 		return (get_sg_cnt((struct sioc_sg_req6 *)data));
-		break;		/* for safety */
 	case SIOCGETMIFCNT_IN6:
 		return (get_mif6_cnt((struct sioc_mif_req6 *)data));
-		break;		/* for safety */
 	default:
 		return (EINVAL);
-		break;
 	}
-	return error;
 }
 
 /*

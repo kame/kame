@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.115 2002/07/08 06:22:47 ono Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.116 2002/09/23 13:16:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1207,7 +1207,6 @@ nd6_ifptomac(ifp)
 #else
 		return ((caddr_t)(ifp + 1));
 #endif
-		break;
 	default:
 		return NULL;
 	}
