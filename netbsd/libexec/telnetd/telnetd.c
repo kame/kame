@@ -548,7 +548,7 @@ main(argc, argv)
 	}
 
 #if	defined(IPPROTO_IP) && defined(IP_TOS)
-	if (from.__ss_family == AF_INET) {
+	if (((struct sockaddr *)&from)->sa_family == AF_INET) {
 # if	defined(HAS_GETTOS)
 		struct tosent *tp;
 		if (tos < 0 && (tp = gettosbyname("telnet", "tcp")))

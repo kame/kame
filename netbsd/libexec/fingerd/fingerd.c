@@ -122,7 +122,7 @@ main(argc, argv)
 		sval = sizeof(ss);
 		if (getpeername(0, (struct sockaddr *)&ss, &sval) < 0)
 			err("getpeername: %s", strerror(errno));
-		(void)getnameinfo((struct sockaddr *)&ss, ss.__ss_len,
+		(void)getnameinfo((struct sockaddr *)&ss, sval,
 				hostbuf, sizeof(hostbuf), NULL, 0, 0);
 		lp = hostbuf;
 	}
