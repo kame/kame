@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.8 2001/11/13 10:28:31 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.9 2002/01/21 08:15:46 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -62,7 +62,7 @@ addr2scopetype(sa)
 		sa6 = (struct sockaddr_in6 *)sa;
 		if (IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
 			/* just use the scope field of the multicast address */
-			return(sa6->sin6_addr.s6_addr[2] & 0x0f);
+			return(sa6->sin6_addr.s6_addr[1] & 0x0f);
 		}
 		/*
 		 * Unicast addresses: map scope type to corresponding scope
