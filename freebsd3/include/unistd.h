@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	8.12 (Berkeley) 4/27/95
+ * $FreeBSD: src/include/unistd.h,v 1.24.2.2 1999/12/23 17:46:52 jhb Exp $
  */
 
 #ifndef _UNISTD_H_
@@ -151,6 +152,7 @@ int	 lockf __P((int, int, off_t));
 char	*mkdtemp __P((char *));
 int	 mknod __P((const char *, mode_t, dev_t));
 int	 mkstemp __P((char *));
+int	 mkstemps __P((char *, int));
 char	*mktemp __P((char *));
 int	 nfssvc __P((int, void *));
 int	 nice __P((int));
