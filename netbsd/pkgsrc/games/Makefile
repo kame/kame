@@ -4,6 +4,7 @@
 .include "../mk/bsd.prefs.mk"
 
     SUBDIR += netris
+    SUBDIR += quake6
     SUBDIR += xtris
 
 .include "../mk/bsd.pkg.subdir.mk"
