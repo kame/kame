@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2433 2003/07/10 12:18:28 kjc Exp $
+$KAME: CHANGELOG,v 1.2434 2003/07/10 12:41:49 keiichi Exp $
 
 <200307>
+Thu Jul 10 21:35:04 JST 2003	keiichi@iij.ad.jp
+	* kame/kame/had/halist.c
+	fixed a bug that a DHAAD reply message only includes one global
+	address per home agent.  the message must include all global
+	addresses of all home agents.
+	reported by Yukiyo.Akisada@jp.yokogawa.com.
+
 2003/07/10 21:07:50 JST kjc@csl.sony.co.jp
 	the first step for transition to pf/altq.
 	marge pf/altq into the existing altq-3.
