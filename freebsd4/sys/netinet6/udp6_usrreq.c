@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.34 2001/07/25 16:44:21 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.35 2001/08/16 08:47:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -735,14 +735,17 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		if (hasv4addr) {
 			struct pr_usrreqs *pru;
 
-			/*
-			 * when remote addr is IPv4-mapped address, 
-			 * local addr should not be an IPv6 address;
-			 * since you cannot determine how to map IPv6 
-			 * source address to IPv4.
-			 */
-			if (!IN6_IS_ADDR_V4MAPPED(&inp->in6p_laddr))
+			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)
+			    && !IN6_IS_ADDR_V4MAPPED(&inp->in6p_laddr)) {
+				/*
+				 * when remote addr is IPv4-mapped
+				 * address, local addr should not be
+				 * an IPv6 address; since you cannot
+				 * determine how to map IPv6 source
+				 * address to IPv4.
+				 */
 				return EINVAL;
+			}
 			if (sin6)
 				in6_sin6_2_sin_in_sock(addr);
 			pru = inetsw[ip_protox[IPPROTO_UDP]].pr_usrreqs;
