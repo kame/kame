@@ -1360,7 +1360,7 @@ bgp_process_update(struct rpcb *bnp)
 
 	/*  check aggregate routes  */
 	if (find_rte(rte, aggregations)) {
-#ifdef DEBUG
+#ifdef DEBUG_BGP
 	  syslog(LOG_DEBUG,
 		 "<%s>: aggregate route %s/%d cannot overwritten",
 		 __FUNCTION__,
