@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.337 2002/09/27 09:21:24 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.338 2002/09/27 15:27:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -746,7 +746,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	    {
 		struct ip6_rthdr *rh = NULL;
 		int segleft_org = 0;
+#ifdef MIP6
 		int segleft2_org = 0;
+#endif
 		struct ipsec_output_state state;
 
 		if (exthdrs.ip6e_rthdr) {
