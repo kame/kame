@@ -581,6 +581,7 @@ file crypto/blowfish/bf_skey.c		ipsec & ipsec_esp
 file crypto/cast128/cast128.c		ipsec & ipsec_esp
 file crypto/rijndael/rijndael-alg-fst.c		ipsec & ipsec_esp
 file crypto/rijndael/rijndael-api-fst.c		ipsec & ipsec_esp
+file crypto/twofish/twofish2.c		ipsec & ipsec_esp
 file ddb/db_access.c			ddb | kgdb
 file ddb/db_aout.c			ddb
 file ddb/db_break.c			ddb
