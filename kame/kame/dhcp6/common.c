@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.40 2002/05/08 10:36:16 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.41 2002/05/08 11:16:31 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -422,8 +422,8 @@ get_duid(idfile, duid)
 		}
 
 		dprintf(LOG_DEBUG,
-			"get_duid: extracted an existing DUID from %s",
-			idfile);
+			"get_duid: extracted an existing DUID from %s: %s",
+			idfile, duidstr(duid));
 	} else {
 		u_int64_t t64;
 
@@ -435,7 +435,8 @@ get_duid(idfile, duid)
 		dp->dh6duid1_time = htonl((u_long)(t64 & 0xffffffff));
 		memcpy((void *)(dp + 1), tmpbuf, (len - sizeof(*dp)));
 
-		dprintf(LOG_DEBUG, "get_duid: generated a new DUID");
+		dprintf(LOG_DEBUG, "get_duid: generated a new DUID: %s",
+			duidstr(duid));
 	}
 
 	/* save the (new) ID to the file for next time */
@@ -585,12 +586,16 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			optinfo->clientID.duid_len = optlen;
 			optinfo->clientID.duid_id = cp;
+			dprintf(LOG_DEBUG, "  DUID: %s",
+				duidstr(&optinfo->clientID));
 			break;
 		case DH6OPT_SERVERID:
 			if (optlen == 0)
 				goto malformed;
 			optinfo->serverID.duid_len = optlen;
 			optinfo->serverID.duid_id = cp;
+			dprintf(LOG_DEBUG, "  DUID: %s",
+				duidstr(&optinfo->serverID));
 			break;
 		case DH6OPT_ORO:
 			if ((optlen % 2) != 0 || optlen == 0)
@@ -798,6 +803,25 @@ dhcpmsgstr(type)
 		sprintf(genstr, "msg%d", type);
 		return(genstr);
 	}
+}
+
+char *
+duidstr(duid)
+	struct duid *duid;
+{
+	int i;
+	char *cp;
+	static char duidstr[sizeof("xx:") * 3 + sizeof("...")];
+
+	cp = duidstr;
+	for (i = 0; i < duid->duid_len && i <= 256; i++) {
+		cp += sprintf(cp, "%s%02x", i == 0 ? "" : ":",
+			      duid->duid_id[i] & 0xff);
+	}
+	if (i < duid->duid_len)
+		sprintf(cp, "%s", "...");
+
+	return(duidstr);
 }
 
 void
