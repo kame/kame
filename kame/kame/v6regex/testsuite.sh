@@ -6,7 +6,8 @@ echo '==> valid IPv4 address'
 ./v6regex 255.255.255.255
 
 echo '==> still valid'
-./v6regex
+./v6regex 10
+./v6regex 10.1
 
 echo '==> invalid IPv4 address'
 ./v6regex 999.999.999.999

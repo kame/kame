@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 /*
- * KAME $Id: scanner.l,v 1.3 2000/02/04 04:51:41 itojun Exp $
+ * KAME $Id: scanner.l,v 1.4 2000/02/04 04:54:04 itojun Exp $
  */
 
 /*
@@ -238,7 +238,16 @@ main(argc, argv)
 
 	printf("input: %s\t", argv[1]);
 
-	printf("inet_pton:");
+	printf("inet_aton:");
+	i = 0;
+	if (inet_aton(argv[1], &in) == 1) {
+		printf(" IPv4");
+		i++;
+	}
+	if (i == 0)
+		printf(" invalid");
+
+	printf("  inet_pton:");
 	i = 0;
 	if (inet_pton(AF_INET6, argv[1], &in6) == 1) {
 		printf(" IPv6");
