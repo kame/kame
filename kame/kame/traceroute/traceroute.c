@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.1 1999/08/08 23:32:27 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.2 1999/09/01 05:36:01 sakane Exp $ (LBL)";
 #endif
 
 /*
@@ -577,11 +577,19 @@ main(int argc, char **argv)
     {
 	int len;
 	char buf[16];
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "bypass")) < 0) {
+	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0) {
 		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
 		exit(1);
 	}
-	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0) {
+	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN, buf, len) < 0) {
+		Fprintf(stderr, "%s: setsockopt(IP_IPSEC_POLICY 1): %s\n", prog, strerror(errno));
+		exit(1);
+	}
+	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0) {
+		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
+		exit(1);
+	}
+	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_OUT, buf, len) < 0) {
 		Fprintf(stderr, "%s: setsockopt(IP_IPSEC_POLICY 1): %s\n", prog, strerror(errno));
 		exit(1);
 	}
@@ -692,11 +700,19 @@ main(int argc, char **argv)
     {
 	int len;
 	char buf[16];
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "bypass")) < 0) {
+	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0) {
 		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
 		exit(1);
 	}
-	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0) {
+	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN, buf, len) < 0) {
+		Fprintf(stderr, "%s: setsockopt(IP_IPSEC_POLICY 2): %s\n", prog, strerror(errno));
+		exit(1);
+	}
+	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0) {
+		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
+		exit(1);
+	}
+	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_OUT, buf, len) < 0) {
 		Fprintf(stderr, "%s: setsockopt(IP_IPSEC_POLICY 2): %s\n", prog, strerror(errno));
 		exit(1);
 	}

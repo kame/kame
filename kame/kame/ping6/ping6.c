@@ -249,7 +249,8 @@ main(argc, argv)
 	struct cmsghdr *scmsgp = NULL;
 	int sockbufsize = 0;
 #ifdef IPSEC_POLICY_IPSEC
-	char *policy = NULL;
+	char *policy_in = NULL;
+	char *policy_out = NULL;
 #endif
 
 	/* just to be sure */
@@ -378,7 +379,12 @@ main(argc, argv)
 #ifdef IPSEC_POLICY_IPSEC
 		case 'P':
 			options |= F_POLICY;
-			policy = strdup(optarg);
+			if (!strncmp("in", optarg, 2))
+				policy_in = strdup(optarg);
+			else if (!strncmp("out", optarg, 3))
+				policy_out = strdup(optarg);
+			else
+				usage();
 			break;
 #else
 		case 'A':
@@ -459,15 +465,30 @@ main(argc, argv)
 	if (options & F_POLICY) {
 		int len;
 		char *buf;
-		if ((len = ipsec_get_policylen(policy)) < 0)
-			errx(1, ipsec_strerror());
-		if ((buf = malloc(len)) == NULL)
-			err(1, "malloc");
-		if ((len = ipsec_set_policy(buf, len, policy)) < 0)
-			errx(1, ipsec_strerror());
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len) < 0)
-			warnx("Unable to set IPSec policy");
-		free(buf);
+		if (policy_in != NULL) {
+			if ((len = ipsec_get_policylen(policy_in)) < 0)
+				errx(1, ipsec_strerror());
+			if ((buf = malloc(len)) == NULL)
+				err(1, "malloc");
+			if ((len = ipsec_set_policy(buf, len, policy_in)) < 0)
+				errx(1, ipsec_strerror());
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY_IN,
+					buf, len) < 0)
+				warnx("Unable to set IPSec policy");
+			free(buf);
+		}
+		if (policy_out != NULL) {
+			if ((len = ipsec_get_policylen(policy_out)) < 0)
+				errx(1, ipsec_strerror());
+			if ((buf = malloc(len)) == NULL)
+				err(1, "malloc");
+			if ((len = ipsec_set_policy(buf, len, policy_out)) < 0)
+				errx(1, ipsec_strerror());
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY_OUT,
+					buf, len) < 0)
+				warnx("Unable to set IPSec policy");
+			free(buf);
+		}
 	}
 #else
 	if (options & F_AUTHHDR) {
