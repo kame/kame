@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.57 2002/09/20 21:59:55 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.58 2003/01/17 00:38:26 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,7 +72,7 @@ static int fflag = 0;
 #define MAX_RTR_SOLICITATIONS		3 /* times */
 
 /* implementation dependent constants */
-#define PROBE_INTERVAL 60	/* secondes XXX: should be configurable */
+#define PROBE_INTERVAL 60	/* seconds XXX: should be configurable */
 
 /* utility macros */
 /* a < b */
