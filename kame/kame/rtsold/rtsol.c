@@ -1,4 +1,4 @@
-/*	$KAME: rtsol.c,v 1.12 2001/11/12 11:47:11 jinmei Exp $	*/
+/*	$KAME: rtsol.c,v 1.13 2001/11/12 12:29:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -176,8 +176,19 @@ sendpacket(struct ifinfo *ifinfo)
 	int i;
 	struct cmsghdr *cm;
 	struct in6_pktinfo *pi;
+	struct sockaddr_in6 dst;
 
-	sndmhdr.msg_name = (caddr_t)&sin6_allrouters;
+	dst = sin6_allrouters;
+	/*
+	 * XXX: we assume
+	 * - there is a one-to-one mapping between links and interfaces.
+	 * - we use interface indices as link IDs.
+	 * (We need to define some standard functions to deal with scopes and
+	 * use it here.) 
+	 */
+	dst.sin6_scope_id = ifinfo->sdl->sdl_index;
+
+	sndmhdr.msg_name = (caddr_t)&dst;
 	sndmhdr.msg_iov[0].iov_base = (caddr_t)ifinfo->rs_data;
 	sndmhdr.msg_iov[0].iov_len = ifinfo->rs_datalen;
 
