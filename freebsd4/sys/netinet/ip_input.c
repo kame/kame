@@ -43,6 +43,7 @@
 #include "opt_ipfilter.h"
 #include "opt_ipstealth.h"
 #include "opt_ipsec.h"
+#include "opt_natpt.h"
 
 #include <stddef.h>
 
@@ -197,7 +198,11 @@ struct sockaddr_in *ip_fw_fwd_addr;
 
 static void	save_rte __P((u_char *, struct in_addr));
 static int	ip_dooptions __P((struct mbuf *));
+#ifdef NATPT
+       void	ip_forward __P((struct mbuf *, int));
+#else
 static void	ip_forward __P((struct mbuf *, int));
+#endif
 static void	ip_freef __P((struct ipq *));
 #ifdef IPDIVERT
 static struct	mbuf *ip_reass __P((struct mbuf *,
@@ -207,6 +212,12 @@ static struct	mbuf *ip_reass __P((struct mbuf *, struct ipq *, struct ipq *));
 #endif
 static struct	in_ifaddr *ip_rtaddr __P((struct in_addr));
 static void	ipintr __P((void));
+
+#ifdef NATPT
+extern	int			ip6_protocol_tr;
+int	natpt_in4		__P((struct mbuf *, struct mbuf **));
+extern	void ip6_forward	__P((struct mbuf *, int));
+#endif	/* NATPT */
 
 /*
  * IP initialization: fill in IP protocol switch table.
@@ -557,6 +568,34 @@ pass:
 		m_freem(m);
 		return;
 	}
+#endif
+
+#ifdef NATPT
+	/*
+	 *
+	 */
+	if (ip6_protocol_tr)
+	{
+	    struct mbuf	*m1 = NULL;
+	    
+	    switch (natpt_in4(m, &m1))
+	    {
+	      case IPPROTO_IP:					goto forwarding;
+	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
+	      case IPPROTO_IPV6:	ip6_forward(m1, 1);	break;
+	      case IPPROTO_MAX:			/* discard this packet	*/
+	      default:						break;
+
+	      case IPPROTO_DONE:		/* discard without free	*/
+		return;
+	    }
+
+	    if (m != m1)
+		m_freem(m);
+
+	    return;
+	}
+  forwarding:
 #endif
 	/*
 	 * Not for us; forward if possible and desirable.
@@ -1467,7 +1506,11 @@ u_char inetctlerrmap[PRC_NCMDS] = {
  * The srcrt parameter indicates whether the packet is being forwarded
  * via a source route.
  */
+#ifdef NATPT
+void
+#else
 static void
+#endif
 ip_forward(m, srcrt)
 	struct mbuf *m;
 	int srcrt;
