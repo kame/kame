@@ -1377,27 +1377,31 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 				break;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifndef __bsdi__
 		case IPV6_PORTRANGE:
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			error = sooptcopyin(sopt, &optval, sizeof optval,
 					    sizeof optval);
 			if (error)
 				break;
+#else
+			optval = *mtod(m, int *);
+#endif
 
 			switch (optval) {
 			case IPV6_PORTRANGE_DEFAULT:
-				in6p->inp_flags &= ~(INP_LOWPORT);
-				in6p->inp_flags &= ~(INP_HIGHPORT);
+				in6p->in6p_flags &= ~(IN6P_LOWPORT);
+				in6p->in6p_flags &= ~(IN6P_HIGHPORT);
 				break;
 
 			case IPV6_PORTRANGE_HIGH:
-				in6p->inp_flags &= ~(INP_LOWPORT);
-				in6p->inp_flags |= INP_HIGHPORT;
+				in6p->in6p_flags &= ~(IN6P_LOWPORT);
+				in6p->in6p_flags |= IN6P_HIGHPORT;
 				break;
 
 			case IPV6_PORTRANGE_LOW:
-				in6p->inp_flags &= ~(INP_HIGHPORT);
-				in6p->inp_flags |= INP_LOWPORT;
+				in6p->in6p_flags &= ~(IN6P_HIGHPORT);
+				in6p->in6p_flags |= IN6P_LOWPORT;
 				break;
 
 			default:
@@ -1487,11 +1491,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RETOPTS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #if 0
-				if (in6p->inp_options) {
+				if (in6p->in6p_options) {
 					error = sooptcopyout(sopt, 
-						     mtod(in6p->inp_options,
+						     mtod(in6p->in6p_options,
 							  char *),
-						     in6p->inp_options->m_len);
+						     in6p->in6p_options->m_len);
 				} else
 					sopt->sopt_valsize = 0;
 				break;
@@ -1518,9 +1522,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 			case IPV6_PKTOPTIONS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				if (in6p->inp_options) {
+				if (in6p->in6p_options) {
 					error = soopt_mcopyout(sopt, 
-							       in6p->inp_options);
+							       in6p->in6p_options);
 				} else
 					sopt->sopt_valsize = 0;
 #else
@@ -1611,18 +1615,14 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 #endif /* MAPPED_ADDR_ENABLED */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifndef __bsdi__
 				case IPV6_PORTRANGE:
 				    {
 					int flags;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-					flags = in6p->inp_flags;
-#else
 					flags = in6p->in6p_flags;
-#endif
-					if (flags & INP_HIGHPORT)
+					if (flags & IN6P_HIGHPORT)
 						optval = IPV6_PORTRANGE_HIGH;
-					else if (flags & INP_LOWPORT)
+					else if (flags & IN6P_LOWPORT)
 						optval = IPV6_PORTRANGE_LOW;
 					else
 						optval = 0;
