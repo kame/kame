@@ -14,5 +14,4 @@ DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 # kame NI_WITHSCOPEID hack
 CPPFLAGS+=-DKAME_SCOPEID
 
-CFLAGS+=	-g
 .include <bsd.prog.mk>
