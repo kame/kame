@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.6 2000/05/13 07:27:59 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.7 2000/05/13 07:45:43 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -640,7 +640,7 @@ in6_status(force)
 	int niflags = NI_NUMERICHOST;
 
 	memset(&null_sin, 0, sizeof(null_sin));
-#ifdef __KAME__
+#ifdef NI_WITHSCOPEID
 	niflags |= NI_WITHSCOPEID;
 #endif
 
