@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.113 2002/07/30 10:50:15 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.114 2002/08/01 11:29:12 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -282,6 +282,7 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
 	mbu->mbu_hif = sc;
 	/* *mbu->mbu_encap = NULL; */
+	mbu->mbu_mobile_cookie = arc4random();
 
 	return (mbu);
 }
