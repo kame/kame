@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2381 2003/04/11 12:37:40 jinmei Exp $
+$KAME: CHANGELOG,v 1.2382 2003/04/11 13:12:22 jinmei Exp $
 
 <200304>
+2003-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c: added the -p pid-file option.
+
 2003-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtsold/if.c (interface_status): considered IEEE 802.11
 	interfaces correctly.
