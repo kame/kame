@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.31 2003/06/26 05:54:52 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.32 2003/08/22 05:45:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -403,10 +403,12 @@ key_sendup_mbuf(so, m, target)
 			return ENOBUFS;
 		}
 
-		if ((error = key_sendup0(rp, n, 0)) != 0) {
-			m_freem(m);
-			return error;
-		}
+		/*
+		 * ignore error even if queue is full.  PF_KEY does not
+		 * guarantee the delivery of the message.
+		 * this is important when target == KEY_SENDUP_ALL.
+		 */
+		key_sendup0(rp, n, 0);
 
 		n = NULL;
 	}
