@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.4 2000/02/22 14:01:47 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.5 2000/03/01 11:23:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: pfkeyv2.h,v 1.4 2000/02/22 14:01:47 itojun Exp $ */
+/* $Id: pfkeyv2.h,v 1.5 2000/03/01 11:23:22 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -405,7 +405,7 @@ int pfkey_send_promisc_toggle __P((int, int));
 int pfkey_send_spdadd __P((int, struct sockaddr *, u_int,
 	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
 int pfkey_send_spddelete __P((int, struct sockaddr *, u_int,
-	struct sockaddr *, u_int, u_int, u_int32_t));
+	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
 int pfkey_send_spdflush __P((int));
 int pfkey_send_spddump __P((int));
 
