@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.155 2002/05/26 13:18:25 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.156 2002/05/30 21:29:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -633,7 +633,7 @@ main(argc, argv)
 
 		error = getaddrinfo(gateway, NULL, &hints, &gres);
 		if (error) {
-			errx(1, "getaddrinfo for the gateway %s",
+			errx(1, "getaddrinfo for the gateway %s: %s",
 			     gateway, gai_strerror(error));
 		}
 		if (gres->ai_next && (options & F_VERBOSE))
