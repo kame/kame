@@ -415,9 +415,9 @@ extern int ipsec6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif /*_KERNEL*/
 
 #ifndef _KERNEL
-extern caddr_t ipsec_set_policy __P((char *policy, int buflen));
-extern int ipsec_get_policylen __P((caddr_t buf));
-extern char *ipsec_dump_policy __P((caddr_t buf, char *delimiter));
+extern caddr_t ipsec_set_policy __P((char *, int));
+extern int ipsec_get_policylen __P((caddr_t));
+extern char *ipsec_dump_policy __P((caddr_t, char *));
 
 extern char *ipsec_strerror __P((void));
 #endif /*!_KERNEL*/
