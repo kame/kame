@@ -1,6 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1659 2001/04/29 03:27:04 itojun Exp $
+$KAME: CHANGELOG,v 1.1660 2001/05/01 07:50:41 itojun Exp $
+
+<200105>
+Tue May  1 16:49:24 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_forward.c: turn on PROHIBIT_P2PREDIRECT by default,
+	  based on discussion on ipngwg mailing list.  see changelog on
+	  sep 12 2000 by jinmei@kame.net
 
 <200104>
 Sun Apr 29 12:25:48 JST 2001  itojun@iijlab.net
