@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.269 1999/11/17 04:44:18 sumikawa Exp $
+$Id: CHANGELOG,v 1.270 1999/11/17 14:02:05 sakane Exp $
 
 <199911>
 Wed Nov 17 13:38:40 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -23,6 +23,13 @@ Wed Nov 17 13:38:40 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	zero ttl when matching an incoming IPv4-maaped IPv6 address.
 	This fix was in response to a problem report from
 	kurotsu@violet.plala.or.jp.
+
+Wed Nov 10 22:42:37 JST 1999 sakane@ydc.co.jp
+	Support a behavior of kernel when policy description is omited peer's
+	addresses in transport mode case.  If you define protocol/mode//level
+	as policy then kernel get addresses from IP header to match SPD.
+	XXX should be considered the relative between inner and outer IP
+	addresses when packet will launch from own interface by tunnel mode.
 
 Tue Nov  9 EST 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp_input.c: backout previous change for
