@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.24 2000/07/04 17:23:17 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.25 2000/07/06 12:00:45 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -116,7 +116,6 @@ struct ph1handle {
 
 	struct sched *sce;		/* schedule for expire */
 	struct sched *scr;		/* schedule for resend */
-	struct sched *scg;		/* schedule for release half connect */
 	int retry_counter;		/* for resend. */
 	vchar_t *sendbuf;		/* buffer for re-sending */
 	time_t time_sent;		/* timestamp to sent packet */
@@ -222,7 +221,7 @@ struct ph2handle {
 	u_int8_t flags;			/* Flags for phase 2 */
 	u_int32_t msgid;		/* msgid for phase 2 */
 
-	struct sainfo *sainfo;		/* parameter for phase 2 */
+	struct sainfo *sainfo;		/* place holder of sainfo */
 	struct saprop *proposal;	/* SA(s) proposal. */
 	struct saprop *approval;	/* SA(s) approved. */
 
