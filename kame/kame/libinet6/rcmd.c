@@ -164,8 +164,14 @@ rcmd_af(ahost, rport, locuser, remuser, cmd, fd2p, af)
 			else
 				(void)fprintf(stderr, "rcmd: socket: %s\n",
 				    strerror(errno));
-			ai = ai->ai_next;
-			continue;
+			if (ai->ai_next) {
+				ai = ai->ai_next;
+				continue;
+			} else {
+				freeaddrinfo(res);
+				sigsetmask(oldmask);
+				return (-1);
+			}
 		}
 		fcntl(s, F_SETOWN, pid);
 		if (connect(s, ai->ai_addr, ai->ai_addrlen) >= 0)
