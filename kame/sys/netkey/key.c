@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.186 2001/05/24 07:19:10 sakane Exp $	*/
+/*	$KAME: key.c,v 1.187 2001/05/24 07:41:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -431,6 +431,8 @@ static int key_ismyaddr6 __P((struct sockaddr_in6 *));
 static int key_cmpsaidx_exactly
 	__P((struct secasindex *, struct secasindex *));
 static int key_cmpsaidx_withmode
+	__P((struct secasindex *, struct secasindex *));
+static int key_cmpsaidx_withoutmode2
 	__P((struct secasindex *, struct secasindex *));
 static int key_cmpsaidx_withoutmode
 	__P((struct secasindex *, struct secasindex *));
@@ -4005,7 +4007,7 @@ key_cmpsaidx_withmode(saidx0, saidx1)
  *	1 : equal
  *	0 : not equal
  */
-  static int
+static int
 key_cmpsaidx_withoutmode2(saidx0, saidx1)
 	struct secasindex *saidx0, *saidx1;
 {
