@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.42 2001/12/03 12:19:23 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.43 2001/12/04 10:32:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1168,16 +1168,25 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				continue;
 
 			/* remove rtable for proxy ND */
-			mip6_bc_proxy_control(&mbc->mbc_phaddr, haaddr,
-					      RTM_DELETE);
+			error = mip6_bc_proxy_control(&mbc->mbc_phaddr, haaddr,
+						      RTM_DELETE);
+			if (error) {
+				mip6log((LOG_ERR,
+					 "%s:%d: proxy control error (%d)\n",
+					 __FILE__, __LINE__, error));
+			}
 
 			/* remove encapsulation entry */
-			if (mip6_tunnel_control(MIP6_TUNNEL_DELETE,
-						mbc,
-						mip6_bc_encapcheck,
-						&mbc->mbc_encap)) {
+			error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
+						    mbc,
+						    mip6_bc_encapcheck,
+						    &mbc->mbc_encap);
+			if (error) {
 				/* XXX UNSPECIFIED */
-				return (-1);
+				mip6log((LOG_ERR,
+					 "%s:%d: tunnel control error (%d)\n",
+					 __FILE__, __LINE__, error));
+				return (error);
 			}
 
 			/* remove a BC entry. */
@@ -1478,10 +1487,8 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
-#if 0
-	struct ip6_rthdr *pktopt_rthdr;
-#endif
 	struct ip6_dest *pktopt_badest2;
+	int error = 0;
 
 	init_ip6pktopts(&opt);
 
@@ -1490,32 +1497,29 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		mip6log((LOG_ERR,
 			 "%s:%d: creating ip6hdr failed.\n",
 			 __FILE__, __LINE__));
-		return (-1);
+		return (ENOMEM);
 	}
 
-#if 0 /* rthdr will be added in ip6_output. */
-	/* create a rthdr. */
-	if (mip6_rthdr_create(&pktopt_rthdr, dstcoa)) {
-		return (-1);
-	}
-	opt.ip6po_rthdr = pktopt_rthdr;
-#endif
-
-	if(mip6_ba_destopt_create(&pktopt_badest2,
-				  status, seqno, lifetime, refresh)) {
-		free(opt.ip6po_rthdr, M_TEMP);
-		return (NULL);
+	error =  mip6_ba_destopt_create(&pktopt_badest2,
+					status, seqno, lifetime, refresh);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s:%d: ba destopt creation error (%d)\n",
+			 __FILE__, __LINE__, error));
+		return (error);
 	}
 	opt.ip6po_dest2 = pktopt_badest2;
 
-	if (ip6_output(m, &opt, NULL, 0, NULL, NULL)) {
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
+	if (error) {
 		mip6log((LOG_ERR,
-			 "%s:%d: sending ip packet error.\n",
-			 __FILE__, __LINE__));
+			 "%s:%d: sending ip packet error. (%d)\n",
+			 __FILE__, __LINE__, error));
+		free(opt.ip6po_dest2, M_TEMP);
+		return (error);
 	}
 
 	free(opt.ip6po_dest2, M_TEMP);
-
 	return (0);
 }
 
@@ -1962,15 +1966,6 @@ success:
 				return (error);
 			}
 
-			/* remove a binding update entry for our homeagent. */
-			error = mip6_bu_list_remove(&sc->hif_bu_list, mbu);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: can't remove BU.\n",
-					 __FILE__, __LINE__));
-				return (error);
-			}
-
 			/* remove a tunnel to our homeagent. */
 			error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
 						   mbu,
@@ -2013,8 +2008,6 @@ success:
 				 "%s:%d: send a unsolicited na to %s\n",
 				 __FILE__, __LINE__, if_name(ifa->ifa_ifp)));
 		}
-			/* for safty. */
-			mbu->mbu_reg_state = MIP6_BU_REG_STATE_NOTREG;
 		} else if (mbu->mbu_reg_state
 			   == MIP6_BU_REG_STATE_REGWAITACK) {
 			/* home registration completed */
