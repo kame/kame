@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.h,v 1.8 2001/01/31 05:32:55 sakane Exp $	*/
+/*	$KAME: cfparse.h,v 1.9 2001/01/31 05:43:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,14 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#define DEFAULT_CF_FILE	SYSCONFDIR "/racoon.conf"
-
-#define CF_PATHTYPE_INCLUDE	0
-#define CF_PATHTYPE_PSK		1
-#define CF_PATHTYPE_CERT	2
-#define CF_PATHTYPE_BACKUPSA	3
-#define CF_PATHTYPE_MAX		4
 
 #define CF_PLADDR_ASSOCIATION	0
 #define CF_PLADDR_NEGOTIATION	1

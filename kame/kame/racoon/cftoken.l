@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.48 2001/01/31 05:32:55 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.49 2001/01/31 05:43:42 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -117,13 +117,13 @@ octetstring	{octet}({dot}{octet})+
 
 	/* path */
 <S_INI>path		{ BEGIN S_PTH; YYDB; return(PATH); }
-<S_PTH>include		{ YYD; yylval.num = CF_PATHTYPE_INCLUDE;
+<S_PTH>include		{ YYD; yylval.num = LC_PATHTYPE_INCLUDE;
 				return(PATHTYPE); }
-<S_PTH>pre_shared_key	{ YYD; yylval.num = CF_PATHTYPE_PSK;
+<S_PTH>pre_shared_key	{ YYD; yylval.num = LC_PATHTYPE_PSK;
 				return(PATHTYPE); }
-<S_PTH>certificate	{ YYD; yylval.num = CF_PATHTYPE_CERT;
+<S_PTH>certificate	{ YYD; yylval.num = LC_PATHTYPE_CERT;
 				return(PATHTYPE); }
-<S_PTH>backupsa		{ YYD; yylval.num = CF_PATHTYPE_BACKUPSA;
+<S_PTH>backupsa		{ YYD; yylval.num = LC_PATHTYPE_BACKUPSA;
 				return(PATHTYPE); }
 <S_PTH>{semi}		{ BEGIN S_INI; YYDB; return(EOS); }
 
