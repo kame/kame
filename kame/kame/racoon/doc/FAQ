@@ -1,6 +1,6 @@
 racoon FAQ
 KAME team
-$KAME: FAQ,v 1.4 2000/09/13 06:35:54 itojun Exp $
+$KAME: FAQ,v 1.5 2000/09/13 06:36:20 itojun Exp $
 
 
 Q: With what other IKE/IPsec implementation racoon is known to be interoperable?
@@ -59,7 +59,7 @@ A:
 	- probabaly, tcpdump trace
 	http://orange.kame.net/dev/send-pr.html has the guideline.
 
-	If you do not identify your version, we will not help you.
+	If you do not identify the version you are using, we will not help you.
 
 	If your question is not confidential, send your questions to:
 	- as KAME problem report from http://orange.kame.net/dev/send-pr.html
