@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.185 2001/04/27 07:22:22 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.186 2001/05/17 07:15:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -957,7 +957,8 @@ in6_update_ifa(ifp, ifra, ia)
 	}
 	else {
 		/*
-		 * in this, ia must not be NULL. we just use its prefix length.
+		 * In this case, ia must not be NULL. We just use its prefix
+		 * length.
 		 */
 		plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL);
 	}
