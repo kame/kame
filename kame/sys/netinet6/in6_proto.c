@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.128 2002/10/09 18:01:23 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.129 2002/10/10 11:21:47 k-sugyou Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -853,8 +853,10 @@ SYSCTL_INT(_net_inet6_ip6, IPV6CTL_AUTO_FLOWLABEL,
 	auto_flowlabel, CTLFLAG_RW,	&ip6_auto_flowlabel,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_DEFMCASTHLIM,
 	defmcasthlim, CTLFLAG_RW,	&ip6_defmcasthlim,	0, "");
+#if NGIF > 0
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_GIF_HLIM,
 	gifhlim, CTLFLAG_RW,	&ip6_gif_hlim,			0, "");
+#endif
 SYSCTL_STRING(_net_inet6_ip6, IPV6CTL_KAME_VERSION,
 	kame_version, CTLFLAG_RD,	__KAME_VERSION,		0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_USE_DEPRECATED,
