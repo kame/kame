@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.26 2001/08/09 08:46:56 suz Exp $	*/
+/*	$KAME: config.c,v 1.27 2002/05/29 05:08:21 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -185,9 +185,10 @@ config_vifs_from_kernel()
 		 * already installed in the uvifs array, just add the address
 		 * to the list of addresses of the uvif.
 		 */
-		for(vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
+		for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
 		{
-			if(strcmp(v->uv_name, ifa->ifa_name) == 0 )
+			if (strlen(v->uv_name) == strlen(ifa->ifa_name) &&
+			    strcmp(v->uv_name, ifa->ifa_name) == 0)
 			{
 				add_phaddr(v, &addr, &mask);
 				break;
@@ -393,9 +394,10 @@ config_vifs_from_kernel()
 		 * already installed in the uvifs array, just add the address
 		 * to the list of addresses of the uvif.
 		 */
-		for(vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
+		for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
 		{
-			if( strcmp(v->uv_name , ifr.ifr_name) == 0 )
+			if (strlen(v->uv_name) == strlen(ifr.ifr_name) &&
+			    strcmp(v->uv_name , ifr.ifr_name) == 0)
 			{
 				add_phaddr(v, &addr,&mask);
 				break;
