@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.50 2003/07/28 07:36:05 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.51 2003/07/28 11:04:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,7 +155,6 @@ t.
 static int hif_ha_list_update_withmpfx __P((struct hif_softc *, caddr_t));
 static int hif_ha_list_update_withioctl __P((struct hif_softc *, caddr_t));
 
-struct sockaddr_in6 hif_coa;
 struct hif_softc_list hif_softc_list;
 
 #ifdef __FreeBSD__
@@ -180,11 +179,6 @@ hifattach(dummy)
 	int i;
 
 	TAILQ_INIT(&hif_softc_list);
-
-	bzero(&hif_coa, sizeof(hif_coa));
-	hif_coa.sin6_len = sizeof(hif_coa);
-	hif_coa.sin6_family = AF_INET6;
-	hif_coa.sin6_addr = in6addr_any;
 
 	sc = malloc(NHIF * sizeof(struct hif_softc), M_DEVBUF, M_WAIT);
 	bzero(sc, NHIF * sizeof(struct hif_softc));
@@ -220,10 +214,14 @@ hifattach(dummy)
 #endif /* NBPFILTER > 0 */
 
 		sc->hif_location = HIF_LOCATION_UNKNOWN;
+		sc->hif_coa_ifa = NULL;
 
-		/* Initialize home prefix list, HA list, BU list */
+		/* binding update list and home agent list. */
 		LIST_INIT(&sc->hif_bu_list);
+		LIST_INIT(&sc->hif_ha_list_home);
+		LIST_INIT(&sc->hif_ha_list_foreign);
 
+		/* DHAAD related. */
 		sc->hif_dhaad_id = 0;
 		sc->hif_dhaad_lastsent = 0;
 		sc->hif_dhaad_count = 0;
@@ -399,27 +397,17 @@ hif_ioctl(ifp, cmd, data)
 }
 
 void
-hif_save_location(void)
-{
+hif_save_location(sc)
 	struct hif_softc *sc;
-
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		sc->hif_location_prev = sc->hif_location;
-	}
+{
+	sc->hif_location_prev = sc->hif_location;
 }
 
 void
-hif_restore_location(void)
-{
+hif_restore_location(sc)
 	struct hif_softc *sc;
-
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		sc->hif_location = sc->hif_location_prev;
-	}
+{
+	sc->hif_location = sc->hif_location_prev;
 }
 
 struct hif_ha *

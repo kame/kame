@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.340 2003/05/09 08:40:55 suz Exp $	*/
+/*	$KAME: in6.c,v 1.341 2003/07/28 11:04:32 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -853,12 +853,7 @@ in6_control(so, cmd, data, ifp)
 		if (pr0.ndpr_plen == 128) {
 #if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 			if (MIP6_IS_MN)
-				if (mip6_process_movement()) {
-					mip6log((LOG_WARNING,
-					    "%s:%d: mip6_process_movement failed.\n",
-					    __FILE__, __LINE__));
-					/* ignore this error... */
-				}
+				mip6_process_movement();
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 			break;	/* we don't need to install a host route. */
 		}

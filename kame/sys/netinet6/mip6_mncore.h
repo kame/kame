@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.5 2003/07/24 07:11:18 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.6 2003/07/28 11:04:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -67,9 +67,9 @@ void mip6_prefix_init(void);
 int mip6_prelist_update(struct sockaddr_in6 *, union nd_opts *,
     struct nd_defrouter *, struct mbuf *);
 void mip6_probe_routers(void);
-int mip6_process_movement(void);
-int mip6_process_pfxlist_status_change(struct sockaddr_in6 *);
-int mip6_select_coa2(void);
+void mip6_process_movement(void);
+int mip6_process_pfxlist_status_change(struct hif_softc *);
+int mip6_select_coa2(struct hif_softc *);
 int mip6_detach_haddrs(struct hif_softc *);
 int mip6_ifa_need_dad(struct in6_ifaddr *);
 int mip6_route_optimize(struct mbuf *);

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.236 2003/06/03 10:09:05 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.237 2003/07/28 11:04:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1839,12 +1839,7 @@ pfxlist_onlink_check()
 
 #if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	if (MIP6_IS_MN)
-		if (mip6_process_movement()) {
-			mip6log((LOG_WARNING,
-				 "%s:%d: mip6_process_movement failed.\n",
-				 __FILE__, __LINE__));
-			/* ignore this error... */
-		}
+		mip6_process_movement();
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.69 2003/07/24 07:11:18 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.70 2003/07/28 11:04:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -585,6 +585,7 @@ int
 mip6_icmp6_dhaad_req_output(sc)
 	struct hif_softc *sc;
 {
+	struct sockaddr_in6 hif_coa;
 	struct sockaddr_in6 haanyaddr;
 	struct mip6_prefix *mpfx;
 	struct mbuf *m;
@@ -601,6 +602,16 @@ mip6_icmp6_dhaad_req_output(sc)
 		if (sc->hif_dhaad_lastsent + (1 << sc->hif_dhaad_count)
 		   > time_second)
 			return (0);
+	}
+
+	/* get current CoA and recover its scope information. */
+	hif_coa = sc->hif_coa_ifa->ia_addr;
+	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
+	    &hif_coa.sin6_scope_id)) {
+		/* must not happen. */
+	}
+	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
+		/* must not happen. */
 	}
 
 	/*

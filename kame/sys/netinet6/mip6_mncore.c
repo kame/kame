@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.16 2003/07/28 07:36:05 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.17 2003/07/28 11:04:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -106,7 +106,7 @@ static int mip6_bu_count = 0;
 /* movement processing. */
 static int mip6_prelist_update_sub(struct hif_softc *, struct sockaddr_in6 *,
     union nd_opts *, struct nd_defrouter *, struct mbuf *);
-static int mip6_register_current_location(void);
+static int mip6_register_current_location(struct hif_softc *);
 static int mip6_haddr_config(struct hif_softc *);
 static int mip6_attach_haddrs(struct hif_softc *);
 static int mip6_add_haddrs(struct hif_softc *, struct ifnet *);
@@ -523,70 +523,74 @@ mip6_probe_routers(void)
  * in6_control().  if the CoA has changed, call
  * mip6_register_current_location() to make a home registration.
  */
-int
+void
 mip6_process_movement(void)
 {
-	int error = 0;
+	struct hif_softc *sc;
 	int coa_changed = 0;
 
-	/* sanity check */
-	if (LIST_EMPTY(&mip6_prefix_list))
-		return (ENOENT);
-
-	hif_save_location();
-	coa_changed = mip6_select_coa2();
-	if (coa_changed == 1)
-		error = mip6_process_pfxlist_status_change(&hif_coa);
-	if (coa_changed == 1)
-		error = mip6_register_current_location();
-	else
-		hif_restore_location();
-
-	return (error);
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		hif_save_location(sc);
+		coa_changed = mip6_select_coa2(sc);
+		if (coa_changed == 1) {
+			if (mip6_process_pfxlist_status_change(sc)) {
+				hif_restore_location(sc);
+				continue;
+			}
+			if (mip6_register_current_location(sc)) {
+				hif_restore_location(sc);
+				continue;
+			}
+		} else
+			hif_restore_location(sc);
+	}
 }
 
 int
-mip6_process_pfxlist_status_change(hif_coa)
-	struct sockaddr_in6 *hif_coa; /* newly selected CoA. */
-{
+mip6_process_pfxlist_status_change(sc)
 	struct hif_softc *sc;
+{
 	struct mip6_prefix *mpfx;
+	struct sockaddr_in6 hif_coa;
 	int error = 0;
 
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		sc->hif_location = HIF_LOCATION_UNKNOWN;
+	sc->hif_location = HIF_LOCATION_UNKNOWN;
 
-		for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
-		     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-			if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home,
-				mpfx) == NULL)
-				continue;
-			if (in6_are_prefix_equal(&hif_coa->sin6_addr,
-				&mpfx->mpfx_prefix.sin6_addr,
-				mpfx->mpfx_prefixlen)) {
-				sc->hif_location = HIF_LOCATION_HOME;
-				goto i_know_where_i_am;
-			}
-			
+	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
+		if (hif_ha_list_find_withmpfx(&sc->hif_ha_list_home,
+		    mpfx) == NULL)
+			continue;
+		hif_coa = sc->hif_coa_ifa->ia_addr;
+		if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp,
+		    &hif_coa.sin6_addr,	&hif_coa.sin6_scope_id)) {
+			/* must not happen. */
 		}
-		sc->hif_location = HIF_LOCATION_FOREIGN;
-	i_know_where_i_am:
-		mip6log((LOG_INFO,
-			 "location = %d\n", sc->hif_location));
+		if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
+		    /* must not happen. */
+		}
+		if (in6_are_prefix_equal(&hif_coa.sin6_addr,
+		    &mpfx->mpfx_prefix.sin6_addr, mpfx->mpfx_prefixlen)) {
+			sc->hif_location = HIF_LOCATION_HOME;
+			goto i_know_where_i_am;
+		}
+	}
+	sc->hif_location = HIF_LOCATION_FOREIGN;
+ i_know_where_i_am:
+	mip6log((LOG_INFO,
+	    "location = %d\n", sc->hif_location));
 
-		/*
-		 * configure home addresses according to the home
-		 * prefixes and the current location determined above.
-		 */
-		error = mip6_haddr_config(sc);
-		if (error) {
-			mip6log((LOG_ERR,
-				"%s:%d: home address configuration error.\n",
-				 __FILE__, __LINE__));
-			return (error);
-		}
+	/*
+	 * configure home addresses according to the home
+	 * prefixes and the current location determined above.
+	 */
+	error = mip6_haddr_config(sc);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: home address configuration error.\n",
+		     __FILE__, __LINE__));
+		return (error);
 	}
 
 	return (0);
@@ -598,42 +602,38 @@ mip6_process_pfxlist_status_change(hif_coa)
  * case because we must have moved from somewhere to somewhere.
  */
 static int
-mip6_register_current_location(void)
-{
+mip6_register_current_location(sc)
 	struct hif_softc *sc;
+{
 	int error = 0;
 
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		switch (sc->hif_location) {
-		case HIF_LOCATION_HOME:
-			/*
-			 * we moved to home.  unregister our home
-			 * address.
-			 */
-			error = mip6_home_registration(sc);
-			break;
+	switch (sc->hif_location) {
+	case HIF_LOCATION_HOME:
+		/*
+		 * we moved to home.  unregister our home address.
+		 */
+		error = mip6_home_registration(sc);
+		break;
 
-		case HIF_LOCATION_FOREIGN:
-			/*
-			 * we moved to foreign.  register the current
-			 * CoA to our home agent.
-			 */
-			/* XXX: TODO register to the old subnet's AR. */
-			error = mip6_home_registration(sc);
-			break;
+	case HIF_LOCATION_FOREIGN:
+		/*
+		 * we moved to foreign.  register the current CoA to
+		 * our home agent.
+		 */
+		/* XXX: TODO register to the old subnet's AR. */
+		error = mip6_home_registration(sc);
+		break;
 
-		case HIF_LOCATION_UNKNOWN:
-			break;
-		}
+	case HIF_LOCATION_UNKNOWN:
+		break;
 	}
 
 	return (error);
 }
 
 int
-mip6_select_coa2(void)
+mip6_select_coa2(sc)
+	struct hif_softc *sc;
 {
 	struct ifnet *ifp;
 	struct ifaddr *ia;
@@ -726,7 +726,7 @@ mip6_select_coa2(void)
 				score += 2;
 
 			/* keep CoA same as possible. */
-			if (SA6_ARE_ADDR_EQUAL(&hif_coa, &ia6_addr))
+			if (sc->hif_coa_ifa == ia6)
 				score += 1;
 
 			if (score > score_best) {
@@ -750,12 +750,15 @@ mip6_select_coa2(void)
 	}
 
 	/* check if the CoA has been changed. */
-	if (SA6_ARE_ADDR_EQUAL(&hif_coa, &ia6_addr)) {
+	if (sc->hif_coa_ifa == ia6_best) {
 		/* CoA has not been changed. */
 		return (0);
 	}
 
-	hif_coa = ia6_addr;
+	if (sc->hif_coa_ifa != NULL)
+		IFAFREE(&sc->hif_coa_ifa->ia_ifa);
+	sc->hif_coa_ifa = ia6_best;
+	IFAREF(&sc->hif_coa_ifa->ia_ifa);
 	mip6log((LOG_INFO,
 		 "%s:%d: CoA has changed to %s\n",
 		 __FILE__, __LINE__,
@@ -1197,6 +1200,7 @@ mip6_route_optimize(m)
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu;
 	struct hif_softc *sc;
+	struct sockaddr_in6 hif_coa;
 	int error = 0;
 
 	if (!MIP6_IS_MN) {
@@ -1263,6 +1267,16 @@ mip6_route_optimize(m)
 		 * that is not a home address.
 		 */
 		return (0);
+	}
+
+	/* get current CoA and recover its scope information. */
+	hif_coa = sc->hif_coa_ifa->ia_addr;
+	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
+		&hif_coa.sin6_scope_id)) {
+		/* must not happen. */
+	}
+	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
+		/* must not happen. */
 	}
 
 	/*
@@ -1521,10 +1535,21 @@ static int
 mip6_home_registration(sc)
 	struct hif_softc *sc;
 {
+	struct sockaddr_in6 hif_coa;
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu;
 	const struct sockaddr_in6 *haaddr;
 	struct hif_ha *hha;
+
+	/* get current CoA and recover its scope information. */
+	hif_coa = sc->hif_coa_ifa->ia_addr;
+	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
+		&hif_coa.sin6_scope_id)) {
+		/* must not happen. */
+	}
+	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
+		/* must not happen. */
+	}
 
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
@@ -1631,9 +1656,10 @@ int
 mip6_home_registration2(mbu)
 	struct mip6_bu *mbu;
 {
-	int error;
+	struct sockaddr_in6 hif_coa;
 	struct mip6_prefix *mpfx;
 	int32_t coa_lifetime, prefix_lifetime;
+	int error;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct timeval mono_time;
 #endif
@@ -1645,6 +1671,16 @@ mip6_home_registration2(mbu)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	mono_time.tv_sec = time_second;
 #endif
+
+	/* get current CoA and recover its scope information. */
+	hif_coa = mbu->mbu_hif->hif_coa_ifa->ia_addr;
+	if (in6_addr2zoneid(mbu->mbu_hif->hif_coa_ifa->ia_ifp,
+	    &hif_coa.sin6_addr, &hif_coa.sin6_scope_id)) {
+		/* must not happen. */
+	}
+	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
+		/* must not happen. */
+	}
 
 	/*
 	 * a binding update entry exists. update information.
@@ -1756,12 +1792,23 @@ mip6_bu_list_notify_binding_change(sc, home)
 	struct hif_softc *sc;
 	int home;
 {
+	struct sockaddr_in6 hif_coa;
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu, *mbu_next;
 	int32_t coa_lifetime;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+
+	/* get current CoA and recover its scope information. */
+	hif_coa = sc->hif_coa_ifa->ia_addr;
+	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
+	    &hif_coa.sin6_scope_id)) {
+		/* must not happen. */
+	}
+	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
+		/* must not happen. */
+	}
 
 	/* for each BU entry, update COA and make them about to send. */
 	for (mbu = LIST_FIRST(&sc->hif_bu_list);
@@ -2225,6 +2272,7 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	struct sockaddr_in6 *dst;
 	struct hif_softc *sc;
 {
+	struct sockaddr_in6 hif_coa;
 	struct ip6_opt_home_address haddr_opt;
 	struct mip6_buffer optbuf;
 	struct mip6_bu *mbu;
@@ -2233,6 +2281,16 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	if (*pktopt_haddr) {
 		/* already allocated ? */
 		return (0);
+	}
+
+	/* get current CoA and recover its scope information. */
+	hif_coa = sc->hif_coa_ifa->ia_addr;
+	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
+	    &hif_coa.sin6_scope_id)) {
+		/* must not happen. */
+	}
+	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
+		/* must not happen. */
 	}
 
 	bzero(&haddr_opt, sizeof(struct ip6_opt_home_address));

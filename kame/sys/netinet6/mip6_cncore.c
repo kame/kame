@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.18 2003/07/28 05:38:35 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.19 2003/07/28 11:04:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -296,12 +296,7 @@ mip6_ioctl(cmd, data)
 				 "%s:%d: MN function enabled\n",
 				 __FILE__, __LINE__));
 			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_MOBILENODE;
-			if (mip6_process_movement()) {
-				mip6log((LOG_WARNING,
-				    "%s:%d: mip6_process_movement failed.\n",
-				    __FILE__, __LINE__));
-				/* ignore this error... */
-			}
+			mip6_process_movement();
 			break;
 
 		case SIOCSMIP6CFG_DISABLEMN:
@@ -311,6 +306,9 @@ mip6_ioctl(cmd, data)
 			for (sc = TAILQ_FIRST(&hif_softc_list);
 			     sc;
 			     sc = TAILQ_NEXT(sc, hif_entry)) {
+				if (sc->hif_coa_ifa != NULL)
+					IFAFREE(&sc->hif_coa_ifa->ia_ifa);
+				sc->hif_coa_ifa = NULL;
 				mip6_detach_haddrs(sc);
 				mip6_bu_list_remove_all(&sc->hif_bu_list, 1);
 				while (!LIST_EMPTY(&mip6_prefix_list))
@@ -322,10 +320,6 @@ mip6_ioctl(cmd, data)
 					    &mip6_ha_list,
 					    LIST_FIRST(&mip6_ha_list));
 			}
-			bzero(&hif_coa, sizeof(hif_coa));
-			hif_coa.sin6_len = sizeof(hif_coa);
-			hif_coa.sin6_family = AF_INET6;
-			hif_coa.sin6_addr = in6addr_any;
 			mip6_config.mcfg_type = 0;
 			break;
 #endif /* MIP6_MOBILE_NODE */
@@ -479,12 +473,7 @@ mip6_ioctl(cmd, data)
 		 */
 		bcopy(&mr->mip6r_ru.mip6r_ifnames, &mip6_preferred_ifnames,
 		    sizeof(mr->mip6r_ru.mip6r_ifnames));
-		if (mip6_process_movement()) {
-			mip6log((LOG_WARNING,
-			    "%s:%d: mip6_process_movement failed.\n",
-			    __FILE__, __LINE__));
-				/* ignore this error... */
-		}
+		mip6_process_movement();
 	}
 
 		break;

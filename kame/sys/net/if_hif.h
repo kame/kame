@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.17 2003/07/28 07:36:05 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.18 2003/07/28 11:04:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,6 +112,7 @@ struct hif_softc {
 	TAILQ_ENTRY(hif_softc) hif_entry;
 	int                    hif_location;             /* cur location */
 	int                    hif_location_prev; /* XXX */
+	struct in6_ifaddr      *hif_coa_ifa;
 	LIST_HEAD(mip6_bu_list, mip6_bu) hif_bu_list;    /* list of BUs */
 	struct hif_ha_list     hif_ha_list_home;
 	struct hif_ha_list     hif_ha_list_foreign;
@@ -124,7 +125,6 @@ TAILQ_HEAD(hif_softc_list, hif_softc);
 
 #ifdef _KERNEL
 
-extern struct sockaddr_in6 hif_coa;
 extern struct hif_softc_list hif_softc_list;
 extern struct hif_coa_list hif_coa_list;
 
@@ -133,8 +133,8 @@ struct hif_softc *hif_list_find_withhaddr __P((struct sockaddr_in6 *));
 int hif_ioctl(struct ifnet *, u_long, caddr_t);
 int hif_output(struct ifnet *, struct mbuf *, struct sockaddr *,
     struct rtentry *);
-void hif_save_location(void);
-void hif_restore_location(void);
+void hif_save_location(struct hif_softc *);
+void hif_restore_location(struct hif_softc *);
 
 struct hif_ha *hif_ha_list_insert(struct hif_ha_list *,	struct mip6_ha *);
 void hif_ha_list_remove(struct hif_ha_list *, struct hif_ha *);
