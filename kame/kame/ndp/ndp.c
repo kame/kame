@@ -143,7 +143,6 @@ void plist __P((void));
 void pfx_flush __P((void));
 void rtr_flush __P((void));
 void harmonize_rtr __P((void));
-void quit __P((char *));
 static char *sec2str __P((time_t t));
 static char *ether_str __P((struct sockaddr_dl *sdl));
 static void ts_print __P((const struct timeval *));
@@ -503,14 +502,17 @@ again:;
 	mib[4] = NET_RT_FLAGS;
 	mib[5] = RTF_LLINFO;
 	if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0)
-		quit("route-sysctl-estimate");
-	if ((buf = malloc(needed)) == NULL)
-		quit("malloc");
-	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
-		quit("actual retrieval of routing table");
-	lim = buf + needed;
+		err(1, "sysctl(PF_ROUTE estimate)");
+	if (needed > 0) {
+		if ((buf = malloc(needed)) == NULL)
+			errx(1, "malloc");
+		if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
+			err(1, "sysctl(PF_ROUTE, NET_RT_FLAGS)");
+		lim = buf + needed;
+	} else
+		buf = lim = NULL;
 
-	for (next = buf; next < lim; next += rtm->rtm_msglen) {
+	for (next = buf; next && next < lim; next += rtm->rtm_msglen) {
 		int isrouter = 0, prbs = 0;
 
 		rtm = (struct rt_msghdr *)next;
@@ -938,14 +940,6 @@ harmonize_rtr()
  		perror("ioctl (SIOCSNDFLUSH_IN6)");
  		exit(1);
  	}
-}
-
-void
-quit(msg)
-	char *msg;
-{
-	fprintf(stderr, "%s\n", msg);
-	exit(1);
 }
 
 static char *
