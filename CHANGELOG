@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.843 2000/04/30 10:38:14 jinmei Exp $
+$Id: CHANGELOG,v 1.844 2000/04/30 10:51:41 jinmei Exp $
 
 <200004>
 2000-04-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/kame/pim6sd: did timeout the MLD querier correctly.
+	* kame/kame/pim6[ds]d: did timeout the MLD querier correctly.
 
 2000-04-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet6/raw_ipv6.c: call ip6_mrouter_done() when the
