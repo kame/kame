@@ -1,4 +1,4 @@
-#	$OpenBSD: files,v 1.161 2000/04/26 19:04:59 chris Exp $
+#	$OpenBSD: files,v 1.178 2000/09/28 19:16:14 mickey Exp $
 #	$NetBSD: files,v 1.87 1996/05/19 17:17:50 jonathan Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
@@ -40,14 +40,17 @@ define	token
 # of device drivers.
 define	ncr5380sbc	# NCR 5380 SCSI Bus Controller
 define	ncr53c7xx	# NCR 53c7xx SCSI Bus Controller
-define	ncr53c9x	# NCR 53c9x or Emulex ESP SCSI Controller
 define	pdq		# DEC FDDI chipset
 define	dp8390nic	# 8390-family Ethernet controllers
 define	rtl80x9		# RealTek 8019/8029 NE2000-compatible
 
 # a wscons output device; used later, but needs to be near the top for
 # common file (e.g. vga) definitions.
-define  wsconsdev {[console = -1]}
+define	wsdisplaydev {}
+define	wsemuldisplaydev {[console = -1]}
+define	wskbddev {[console = -1], [mux = -1]}
+define	wsmousedev {[mux = -1]}
+define	wsrasteremulops
 
 define  wdc_base
 define  ata {[channel = -1], [drive = -1]}
@@ -87,6 +90,10 @@ file	dev/ic/bha.c		bha
 device	gdt: scsi
 file	dev/ic/gdt_common.c	gdt
 
+# 3ware Escalade RAID controllers
+device	twe: scsi
+file	dev/ic/twe.c		twe
+
 # Qlogic ISP 10x0 SCSI Controllers
 device	isp: scsi
 file	dev/ic/isp.c			isp
@@ -96,8 +103,13 @@ file	dev/ic/isp_openbsd.c		isp
 device	uha: scsi
 file	dev/ic/uha.c		uha
 
+# NCR 53c9x or Emulex ESP SCSI Controller
+define	ncr53c9x
+device	esp: scsi, ncr53c9x
+file	dev/ic/ncr53c9x.c	ncr53c9x
+
 # 3Com Etherlink-III Ethernet controller
-device	ep: ether, ifnet, ifmedia
+device	ep: ether, ifnet, ifmedia, mii
 file	dev/ic/elink3.c		ep
 
 # WaveLan
@@ -167,13 +179,12 @@ device	lpt
 file	dev/ic/lpt.c		lpt & (lpt_isa | lpt_pica | lpt_algor | lpt_gsc | lpt_puc) needs-flag
 
 # VGA
-device	vga: wsconsdev
+device	vga: wsemuldisplaydev
 file	dev/ic/vga.c		vga & (vga_isa | vga_pci)
 
-# VGA framebuffer
-device	vgafb: wsconsdev
-file	dev/ic/vgafb.c		vgafb & (vgafb_isa | vgafb_pci)
-file	dev/ic/font_8x16.c	vgafb & (vgafb_isa | vgafb_pci)
+# STI (hp graphics)
+device	sti: wsemuldisplaydev
+file	dev/ic/sti.c		sti & (sti_pci | sti_sgc)	needs-flag
 
 # Attributes which machine-independent bus support can be attached to.
 # These should be defined here, because some of these busses can have
@@ -212,7 +223,6 @@ pseudo-device ppp: ifnet
 pseudo-device tun: ifnet
 pseudo-device bpfilter: ifnet
 pseudo-device strip: ifnet
-pseudo-device random
 pseudo-device enc: ifnet
 pseudo-device bridge: ifnet, ether
 pseudo-device vlan: ifnet, ether
@@ -274,7 +284,6 @@ file dev/audio.c			audio 			needs-flag
 file dev/ccd.c				ccd			needs-flag
 file dev/ic/ncr5380sbc.c		ncr5380sbc
 file dev/ic/ncr53c7xx.c			ncr53c7xx
-file dev/ic/ncr53c9x.c			ncr53c9x
 file dev/ic/pdq.c			pdq
 file dev/ic/pdq_ifsubr.c		pdq
 file dev/ic/dp8390.c			dp8390nic
@@ -374,6 +383,7 @@ file kern/kern_lock.c
 file kern/kern_lkm.c			lkm
 file kern/kern_ntptime.c
 file kern/kern_malloc.c
+file kern/kern_malloc_debug.c		malloc_debug
 file kern/kern_physio.c
 file kern/kern_proc.c
 file kern/kern_prot.c
@@ -439,8 +449,24 @@ file miscfs/kernfs/kernfs_vnops.c	kernfs
 file miscfs/nullfs/null_subr.c		nullfs
 file miscfs/nullfs/null_vfsops.c	nullfs
 file miscfs/nullfs/null_vnops.c		nullfs
+file miscfs/tcfs/tcfs_subr.c		tcfs
+file miscfs/tcfs/tcfs_vfsops.c		tcfs
+file miscfs/tcfs/tcfs_vnops.c		tcfs
+file miscfs/tcfs/tcfs_attr.c		tcfs
+file miscfs/tcfs/tcfs_cipher_TDES.c	tcfs
+file miscfs/tcfs/tcfs_cipher_BLOWFISH.c	tcfs
+file miscfs/tcfs/tcfs_cipher_conf.c	tcfs
+file miscfs/tcfs/tcfs_cipher_none.c	tcfs
+file miscfs/tcfs/tcfs_cmd.c		tcfs
+file miscfs/tcfs/tcfs_crypto.c		tcfs
+file miscfs/tcfs/tcfs_dir.c		tcfs
+file miscfs/tcfs/tcfs_fileinfo.c	tcfs
+file miscfs/tcfs/tcfs_interp.c		tcfs
+file miscfs/tcfs/tcfs_keytab.c		tcfs
+file miscfs/tcfs/tcfs_rw.c		tcfs
 file miscfs/portal/portal_vfsops.c	portal
 file miscfs/portal/portal_vnops.c	portal
+file miscfs/procfs/procfs_cmdline.c	procfs
 file miscfs/procfs/procfs_ctl.c		procfs
 file miscfs/procfs/procfs_fpregs.c
 file miscfs/procfs/procfs_mem.c
@@ -540,19 +566,22 @@ file netinet/ip_proxy.c			ipfilter
 file netinet/ip_auth.c			ipfilter
 file netinet/ip_log.c			ipfilter
 file netinet/ip_ipsp.c			(inet | inet6) & (ipsec | tcp_signature)
+file netinet/ip_spd.c			(inet | inet6) & (ipsec | tcp_signature)
 file netinet/ip_ipip.c			inet | inet6
 file netinet/ip_ether.c			inet & ipsec
 file netinet/ipsec_input.c		(inet | inet6) & ipsec
+file netinet/ipsec_output.c             (inet | inet6) & ipsec
 file netinet/ip_esp.c			inet & ipsec
 file netinet/ip_ah.c			inet & ipsec
+file crypto/rijndael.c			(inet & ipsec) | crypto | uvm_swap_encrypt
 file crypto/rmd160.c			(inet & ipsec) | crypto
 file crypto/sha1.c			(inet & ipsec) | crypto
-file crypto/blf.c			(inet & ipsec) | crypto | uvm_swap_encrypt
+file crypto/blf.c			(inet & ipsec) | crypto | tcfs | vnd
 file crypto/cast.c			(inet & ipsec) | crypto
 file crypto/skipjack.c			(inet & ipsec) | crypto
-file crypto/ecb_enc.c			(inet & ipsec) | crypto
-file crypto/set_key.c			(inet & ipsec) | crypto
-file crypto/ecb3_enc.c			(inet & ipsec) | crypto
+file crypto/ecb_enc.c			(inet & ipsec) | crypto | tcfs
+file crypto/set_key.c			(inet & ipsec) | crypto | tcfs
+file crypto/ecb3_enc.c			(inet & ipsec) | crypto | tcfs
 file crypto/crypto.c			(inet & ipsec) | crypto
 file crypto/cryptosoft.c		(inet & ipsec) | crypto
 file crypto/mbuf.c			(inet & ipsec) | crypto

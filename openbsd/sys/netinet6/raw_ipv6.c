@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ipv6.c,v 1.22 2000/06/18 19:11:17 itojun Exp $	*/
+/*	$OpenBSD: raw_ipv6.c,v 1.27 2000/07/27 06:29:10 itojun Exp $	*/
 
 /*
 %%% copyright-nrl-95
@@ -44,7 +44,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- *	$Id: raw_ipv6.c,v 1.22 2000/06/18 19:11:17 itojun Exp $
+ *	$Id: raw_ipv6.c,v 1.27 2000/07/27 06:29:10 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -333,7 +333,7 @@ rip6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	int off;
 	void *cmdarg;
-	struct sockaddr_in6 *sa6_src = NULL;
+	const struct sockaddr_in6 *sa6_src = NULL;
 	void (*notify) __P((struct inpcb *, int)) = in_rtchange;
 
 	if (sa->sa_family != AF_INET6 ||
@@ -364,9 +364,8 @@ rip6_ctlinput(cmd, sa, d)
 		sa6_src = &sa6_any;
 	}
 
-	(void) in6_pcbnotify(&rawin6pcbtable, sa, 0,
-			     (struct sockaddr *)sa6_src,, 0, cmd,
-			     cmdarg, notify);
+	(void) in6_pcbnotify(&rawin6pcbtable, sa, 0, (struct sockaddr *)sa6_src,
+	    0, cmd, cmdarg, notify);
 }
 
 /*

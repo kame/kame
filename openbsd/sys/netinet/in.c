@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.c,v 1.17 2000/03/22 03:48:30 itojun Exp $	*/
+/*	$OpenBSD: in.c,v 1.18 2000/10/06 05:52:00 itojun Exp $	*/
 /*	$NetBSD: in.c,v 1.26 1996/02/13 23:41:39 christos Exp $	*/
 
 /*
@@ -45,7 +45,6 @@
 #include <sys/systm.h>
 
 #include <net/if.h>
-#include <net/if_types.h>
 #include <net/route.h>
 
 #include <netinet/in_systm.h>

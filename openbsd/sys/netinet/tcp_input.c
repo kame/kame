@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_input.c,v 1.60 2000/04/28 00:31:48 itojun Exp $	*/
+/*	$OpenBSD: tcp_input.c,v 1.79 2000/10/14 01:04:10 itojun Exp $	*/
 /*	$NetBSD: tcp_input.c,v 1.23 1996/02/13 23:43:44 christos Exp $	*/
 
 /*
@@ -82,6 +82,8 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/ip_ipsp.h>
 #endif /* IPSEC */
 
+#define PI_MAGIC 0xdeadbeef  /* XXX the horror! */
+
 #ifdef INET6
 #ifndef INET
 #include <netinet/in.h>
@@ -112,6 +114,10 @@ struct	tcpiphdr tcp_saveti;
 int	tcptv_keep_init = TCPTV_KEEP_INIT;
 
 extern u_long sb_max;
+
+int tcp_rst_ppslim = 100;		/* 100pps */
+int tcp_rst_ppslim_count = 0;
+struct timeval tcp_rst_ppslim_last;
 
 #endif /* TUBA_INCLUDE */
 #define TCP_PAWS_IDLE	(24 * 24 * 60 * 60 * PR_SLOWHZ)
@@ -390,14 +396,22 @@ tcp_input(m, va_alist)
 	int iphlen;
 	va_list ap;
 	register struct tcphdr *th;
-#ifdef IPSEC
-	struct tdb *tdb = NULL;
-#endif /* IPSEC */
 #ifdef INET6
 	struct in6_addr laddr6;
 	struct ip6_hdr *ipv6 = NULL;
 #endif /* INET6 */
+#ifdef IPSEC
+	struct tdb_ident *tdbi;
+	struct tdb *tdb;
+	int error, s;
+#endif /* IPSEC */
 	int af;
+
+#ifdef IPSEC
+	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
+	if (tdbi == (void *) PI_MAGIC)
+	        tdbi = NULL;
+#endif /* IPSEC */
 
 	va_start(ap, m);
 	iphlen = va_arg(ap, int);
@@ -405,17 +419,6 @@ tcp_input(m, va_alist)
 
 	tcpstat.tcps_rcvtotal++;
 
-#ifdef IPSEC
-	/* Save the last SA which was used to process the mbuf */
-	if ((m->m_flags & (M_CONF|M_AUTH)) && m->m_pkthdr.tdbi) {
-		struct tdb_ident *tdbi = m->m_pkthdr.tdbi;
-		/* XXX gettdb() should really be called at spltdb().      */
-		/* XXX this is splsoftnet(), currently they are the same. */
-		tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
-		free(m->m_pkthdr.tdbi, M_TEMP);
-		m->m_pkthdr.tdbi = NULL;
-	}
-#endif /* IPSEC */
 	/*
 	 * Before we do ANYTHING, we have to figure out if it's TCP/IPv6 or
 	 * TCP/IPv4.
@@ -430,6 +433,10 @@ tcp_input(m, va_alist)
 		af = AF_INET;
 		break;
 	default:
+#ifdef IPSEC
+	        if (tdbi)
+		        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 		m_freem(m);
 		return;	/*EAFNOSUPPORT*/
 	}
@@ -442,6 +449,10 @@ tcp_input(m, va_alist)
 	case AF_INET:
 #ifdef DIAGNOSTIC
 		if (iphlen < sizeof(struct ip)) {
+#ifdef IPSEC
+		        if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			m_freem(m);
 			return;
 		}
@@ -452,6 +463,10 @@ tcp_input(m, va_alist)
 			iphlen = sizeof(struct ip);
 #else
 			printf("extension headers are not allowed\n");
+#ifdef IPSEC
+		        if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			m_freem(m);
 			return;
 #endif
@@ -462,6 +477,10 @@ tcp_input(m, va_alist)
 #ifdef DIAGNOSTIC
 		if (iphlen < sizeof(struct ip6_hdr)) {
 			m_freem(m);
+#ifdef IPSEC
+			if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			return;
 		}
 #endif /* DIAGNOSTIC */
@@ -471,6 +490,10 @@ tcp_input(m, va_alist)
 			iphlen = sizeof(struct ip6_hdr);
 #else
 			printf("extension headers are not allowed\n");
+#ifdef IPSEC
+		        if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			m_freem(m);
 			return;
 #endif
@@ -478,6 +501,10 @@ tcp_input(m, va_alist)
 		break;
 #endif
 	default:
+#ifdef IPSEC
+	        if (tdbi)
+		        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 		m_freem(m);
 		return;
 	}
@@ -486,6 +513,10 @@ tcp_input(m, va_alist)
 		m = m_pullup2(m, iphlen + sizeof(struct tcphdr));
 		if (m == 0) {
 			tcpstat.tcps_rcvshort++;
+#ifdef IPSEC
+		        if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			return;
 		}
 	}
@@ -573,6 +604,10 @@ tcp_input(m, va_alist)
 		if (m->m_len < iphlen + off) {
 			if ((m = m_pullup2(m, iphlen + off)) == 0) {
 				tcpstat.tcps_rcvshort++;
+#ifdef IPSEC
+				if (tdbi)
+			                free(tdbi, M_TEMP);
+#endif /* IPSEC */
 				return;
 			}
 			switch (af) {
@@ -656,13 +691,13 @@ findpcb:
 		 */
 		if (inp == 0) {
 			++tcpstat.tcps_noport;
-			goto dropwithreset;
+			goto dropwithreset_ratelim;
 		}
 	}
 
 	tp = intotcpcb(inp);
 	if (tp == 0)
-		goto dropwithreset;
+		goto dropwithreset_ratelim;
 	if (tp->t_state == TCPS_CLOSED)
 		goto drop;
 	
@@ -784,16 +819,6 @@ findpcb:
 			  struct inpcb *oldinpcb = inp;
 			  
 			  inp = (struct inpcb *)so->so_pcb;
-
-			  /*
-			   * inp still has the OLD in_pcb stuff, set the
-			   * v6-related flags on the new guy, too.   This is
-			   * done particularly for the case where an AF_INET6
-			   * socket is bound only to a port, and a v4 connection
-			   * comes in on that port.
-			   * we also copy the flowinfo from the original pcb 
-			   * to the new one.
-			   */
 			  inp->inp_flags |= (flags & INP_IPV6);
 			  if ((inp->inp_flags & INP_IPV6) != 0) {
 			    inp->inp_ipv6.ip6_hlim = 
@@ -841,9 +866,7 @@ findpcb:
 
 			/* Compute proper scaling value from buffer space
 			 */
-			while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
-			   TCP_MAXWIN << tp->request_r_scale < so->so_rcv.sb_hiwat)
-				tp->request_r_scale++;
+			tcp_rscale(tp, so->so_rcv.sb_hiwat);
 		}
 	}
 
@@ -866,30 +889,24 @@ findpcb:
 #endif
 
 #ifdef IPSEC
-	/* Check if this socket requires security for incoming packets */
-	if ((inp->inp_seclevel[SL_AUTH] >= IPSEC_LEVEL_REQUIRE &&
-	     !(m->m_flags & M_AUTH)) ||
-	    (inp->inp_seclevel[SL_ESP_TRANS] >= IPSEC_LEVEL_REQUIRE &&
-	     !(m->m_flags & M_CONF))) {
-#ifdef notyet
-		switch (af) {
-#ifdef INET6
-		case AF_INET6:
-			icmp6_error(m, ICMPV6_BLAH, ICMPV6_BLAH, 0);
-			break;
-#endif /* INET6 */
-		case AF_INET:
-			icmp_error(m, ICMP_BLAH, ICMP_BLAH, 0, 0);
-			break;
-		}
-#endif /* notyet */
-		tcpstat.tcps_rcvnosec++;
+        s = splnet();
+        if (tdbi == NULL)
+                tdb = NULL;
+        else
+	        tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
+
+	ipsp_spd_lookup(m, af, iphlen, &error, IPSP_DIRECTION_IN,
+			tdb, inp);
+        splx(s);
+
+	if (tdbi)
+	        free(tdbi, M_TEMP);
+	tdbi = NULL;
+
+	/* Error or otherwise drop-packet indication */
+	if (error)
 		goto drop;
-	}
-	/* Use tdb_bind_out for this inp's outbound communication */
-	if (tdb)
-		tdb_add_inp(tdb, inp);
-#endif /*IPSEC */
+#endif /* IPSEC */
 
 	/*
 	 * Segment received on connection.
@@ -1650,9 +1667,7 @@ trimthenstep6:
 						 * False fast retx after 
 						 * timeout.  Do not cut window.
 						 */
-						tp->snd_cwnd += tp->t_maxseg;
 						tp->t_dupacks = 0;
-						(void) tcp_output(tp); 
 						goto drop;
 					}
 #endif
@@ -1668,13 +1683,13 @@ trimthenstep6:
 						tp->t_rtt = 0;
 						tcpstat.tcps_sndrexmitfast++;
 #if defined(TCP_SACK) && defined(TCP_FACK) 
+						tp->t_dupacks = tcprexmtthresh;
 						(void) tcp_output(tp);
 						/*
 						 * During FR, snd_cwnd is held
 						 * constant for FACK.
 						 */
 						tp->snd_cwnd = tp->snd_ssthresh;
-						tp->t_dupacks = tcprexmtthresh;
 #else
 						/* 
 						 * tcp_output() will send
@@ -1750,7 +1765,7 @@ trimthenstep6:
 					    th->th_ack) < tp->snd_ssthresh)
 						tp->snd_cwnd = 
 						   tcp_seq_subtract(tp->snd_max,
-					           th->th_ack) + tp->t_maxseg;
+					           th->th_ack);
 					tp->t_dupacks = 0;
 #if defined(TCP_SACK) && defined(TCP_FACK)
 					if (SEQ_GT(th->th_ack, tp->snd_fack))
@@ -1767,7 +1782,7 @@ trimthenstep6:
 			  	    tp->snd_ssthresh)
 					tp->snd_cwnd = 
 					    tcp_seq_subtract(tp->snd_max,
-					    th->th_ack) + tp->t_maxseg;
+					    th->th_ack);
 				tp->t_dupacks = 0;
 			}
 		}
@@ -1826,9 +1841,9 @@ trimthenstep6:
 		if (cw > tp->snd_ssthresh)
 			incr = incr * incr / cw;
 #if defined (TCP_SACK)
-		if (SEQ_GEQ(th->th_ack, tp->snd_last)) 
+		if (tp->t_dupacks < tcprexmtthresh)
 #endif
-		tp->snd_cwnd = min(cw + incr, TCP_MAXWIN<<tp->snd_scale);
+		tp->snd_cwnd = ulmin(cw + incr, TCP_MAXWIN<<tp->snd_scale);
 		}
 		ND6_HINT(tp);
 		if (acked > so->so_snd.sb_cc) {
@@ -1846,8 +1861,14 @@ trimthenstep6:
 		if (SEQ_LT(tp->snd_nxt, tp->snd_una))
 			tp->snd_nxt = tp->snd_una;
 #if defined (TCP_SACK) && defined (TCP_FACK)
-		if (SEQ_GT(tp->snd_una, tp->snd_fack))
+		if (SEQ_GT(tp->snd_una, tp->snd_fack)) {
 			tp->snd_fack = tp->snd_una;
+			/* Update snd_awnd for partial ACK
+			 * without any SACK blocks.
+			 */
+			tp->snd_awnd = tcp_seq_subtract(tp->snd_nxt,
+				tp->snd_fack) + tp->retran_data;
+		}
 #endif
 
 		switch (tp->t_state) {
@@ -2128,6 +2149,20 @@ dropafterack:
 	(void) tcp_output(tp);
 	return;
 
+dropwithreset_ratelim:
+	/*
+	 * We may want to rate-limit RSTs in certain situations,
+	 * particularly if we are sending an RST in response to
+	 * an attempt to connect to or otherwise communicate with
+	 * a port for which we have no socket.
+	 */
+	if (ppsratecheck(&tcp_rst_ppslim_last, &tcp_rst_ppslim_count,
+	    tcp_rst_ppslim) == 0) {
+		/* XXX stat */
+		goto drop;
+	}
+	/* ...fall into dropwithreset... */
+
 dropwithreset:
 	/*
 	 * Generate a RST, dropping incoming segment.
@@ -2163,6 +2198,11 @@ dropwithreset:
 	return;
 
 drop:
+#ifdef IPSEC
+	if (tdbi)
+	        free(tdbi, M_TEMP);
+#endif
+
 	/*
 	 * Drop space held by incoming segment and return.
 	 */
@@ -2273,8 +2313,12 @@ tcp_dooptions(tp, cp, cnt, th, ts_present, ts_val, ts_ecr)
 		}
 	}
 	/* Update t_maxopd and t_maxseg after all options are processed */
-	if (th->th_flags & TH_SYN)
+	if (th->th_flags & TH_SYN) {
 		(void) tcp_mss(tp, mss);	/* sets t_maxseg */
+
+		if (mss)
+			tcp_mss_update(tp);
+	}
 }
 
 #if defined(TCP_SACK)
@@ -2633,6 +2677,8 @@ tcp_del_sackholes(tp, th)
 				tp->snd_numholes--;
 			} else if (SEQ_LT(cur->start, lastack)) {
 				cur->start = lastack;
+				if (SEQ_LT(cur->rxmit, cur->start))
+					cur->rxmit = cur->start;
 				break;
 			} else
 				break;
@@ -2675,7 +2721,11 @@ tcp_sack_partialack(tp, th)
 		 * fact that tp->snd_una has not been updated yet.  In FACK
 		 * hold snd_cwnd constant during fast recovery.
 		 */
-		tp->snd_cwnd -= (th->th_ack - tp->snd_una - tp->t_maxseg);
+		if (tp->snd_cwnd > (th->th_ack - tp->snd_una)) {
+			tp->snd_cwnd -= th->th_ack - tp->snd_una;
+			tp->snd_cwnd += tp->t_maxseg;
+		} else
+			tp->snd_cwnd = tp->t_maxseg;
 #endif
 		return 1;
 	}
@@ -2816,66 +2866,168 @@ tcp_xmit_timer(tp, rtt)
  * that we can send maxseg amount of data even when the options
  * are present.  Store the upper limit of the length of options plus
  * data in maxopd.
+ *
+ * NOTE: offer == -1 indicates that the maxseg size changed due to
+ * Path MTU discovery.
  */
 int
 tcp_mss(tp, offer)
 	register struct tcpcb *tp;
-	u_int offer;
+	int offer;
 {
-	struct route *ro;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	struct ifnet *ifp;
-	register int rtt, mss;
-	u_long bufsize;
+	int mss, mssopt;
+	int iphlen;
+#ifdef INET6
+	int is_ipv6 = 0;
+#endif
 	struct inpcb *inp;
-	struct socket *so;
 
 	inp = tp->t_inpcb;
-	ro = &inp->inp_route;
-	so = inp->inp_socket;
 
-	if ((rt = ro->ro_rt) == (struct rtentry *)0) {
-		/* No route yet, so try to acquire one */
+	mssopt = mss = tcp_mssdflt;
+
+	rt = in_pcbrtentry(inp);
+
+	if (rt == NULL)
+		goto out;
+
+	ifp = rt->rt_ifp;
+
+	switch (tp->pf) {
 #ifdef INET6
-#ifdef NEW_STRUCT_ROUTE
-		bzero(ro, sizeof(*ro));
-#else
-		bzero(ro, sizeof(struct route_in6));		
+	case AF_INET6:
+		iphlen = sizeof(struct ip6_hdr);
+		is_ipv6 = 1;
+		break;
 #endif
-#else
-		bzero(ro, sizeof(struct route));
-#endif
+	case AF_INET:
+		iphlen = sizeof(struct ip);
+		break;
+	default:
+		/* the family does not support path MTU discovery */
+		goto out;
+	}
+
+#ifdef RTV_MTU
+	/*
+	 * if there's an mtu associated with the route and we support
+	 * path MTU discovery for the underlying protocol family, use it.
+	 */
+	if (rt->rt_rmx.rmx_mtu) {
 		/*
-		 * Get a new IPv6 route if an IPv6 destination, otherwise, get
-		 * and IPv4 route (including those pesky IPv4-mapped addresses).
+		 * One may wish to lower MSS to take into account options,
+		 * especially security-related options.
 		 */
-		switch (sotopf(so)) {
+		mss = rt->rt_rmx.rmx_mtu - iphlen - sizeof(struct tcphdr);
+	} else
+#endif /* RTV_MTU */
+	if (!ifp)
+		/*
+		 * ifp may be null and rmx_mtu may be zero in certain
+		 * v6 cases (e.g., if ND wasn't able to resolve the 
+		 * destination host.
+		 */
+		goto out;
+	else if (ip_mtudisc || ifp->if_flags & IFF_LOOPBACK)
+		mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 #ifdef INET6
-		case AF_INET6:
-			if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6))
-				break;
-			ro->ro_dst.sa_family = AF_INET6;
-			ro->ro_dst.sa_len = sizeof(struct sockaddr_in6);
-			((struct sockaddr_in6 *) &ro->ro_dst)->sin6_addr =
-			    inp->inp_faddr6;
-			rtalloc(ro);
-			break;
-#endif /* INET6 */
-		case AF_INET:
-			if (inp->inp_faddr.s_addr == INADDR_ANY)
-				break;
-			ro->ro_dst.sa_family = AF_INET;
-			ro->ro_dst.sa_len = sizeof(ro->ro_dst);
-			satosin(&ro->ro_dst)->sin_addr = inp->inp_faddr;
-			rtalloc(ro);
-			break;
-		}
-		if ((rt = ro->ro_rt) == (struct rtentry *)0) {
-			tp->t_maxopd = tp->t_maxseg = tcp_mssdflt;
-			return (tcp_mssdflt);
+	else if (is_ipv6) {
+		if (IN6_IS_ADDR_V4MAPPED(&inp->inp_faddr6)) {
+			/* mapped addr case */
+			struct in_addr d;
+			bcopy(&inp->inp_faddr6.s6_addr32[3], &d, sizeof(d));
+			if (in_localaddr(d))
+				mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+		} else {
+			if (in6_localaddr(&inp->inp_faddr6))
+				mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 		}
 	}
-	ifp = rt->rt_ifp;
+#endif /* INET6 */
+	else if (inp && in_localaddr(inp->inp_faddr))
+		mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+
+	/* Calculate the value that we offer in TCPOPT_MAXSEG */
+	if (offer != -1) {
+		mssopt = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+		mssopt = max(tcp_mssdflt, mssopt);
+	}
+
+ out:
+	/*
+	 * The current mss, t_maxseg, is initialized to the default value.
+	 * If we compute a smaller value, reduce the current mss.
+	 * If we compute a larger value, return it for use in sending
+	 * a max seg size option, but don't store it for use
+	 * unless we received an offer at least that large from peer.
+	 * However, do not accept offers under 32 bytes.
+	 */
+	if (offer > 0)
+		tp->t_peermss = offer;
+	if (tp->t_peermss)
+		mss = min(mss, tp->t_peermss);
+	mss = max(mss, 64);		/* sanity - at least max opt. space */
+
+	/*
+	 * maxopd stores the maximum length of data AND options
+	 * in a segment; maxseg is the amount of data in a normal
+	 * segment.  We need to store this value (maxopd) apart
+	 * from maxseg, because now every segment carries options
+	 * and thus we normally have somewhat less data in segments.
+	 */
+	tp->t_maxopd = mss;
+
+ 	if ((tp->t_flags & (TF_REQ_TSTMP|TF_NOOPT)) == TF_REQ_TSTMP &&
+	    (tp->t_flags & TF_RCVD_TSTMP) == TF_RCVD_TSTMP)
+		mss -= TCPOLEN_TSTAMP_APPA;
+
+	if (offer == -1) {
+		/* mss changed due to Path MTU discovery */
+		if (mss < tp->t_maxseg) {
+			/*
+			 * Follow suggestion in RFC 2414 to reduce the
+			 * congestion window by the ratio of the old
+			 * segment size to the new segment size.
+			 */
+			tp->snd_cwnd = ulmax((tp->snd_cwnd / tp->t_maxseg) *
+					     mss, mss);
+		} 
+	} else
+		tp->snd_cwnd = mss;
+
+	tp->t_maxseg = mss;
+
+	return (offer != -1 ? mssopt : mss);
+}
+
+/*
+ * Set connection variables based on the effective MSS.
+ * We are passed the TCPCB for the actual connection.  If we
+ * are the server, we are called by the compressed state engine
+ * when the 3-way handshake is complete.  If we are the client,
+ * we are called when we recieve the SYN,ACK from the server.
+ *
+ * NOTE: The t_maxseg value must be initialized in the TCPCB
+ * before this routine is called!
+ */
+void
+tcp_mss_update(tp)
+	struct tcpcb *tp;
+{
+	int mss, rtt;
+	u_long bufsize;
+	struct rtentry *rt;
+	struct socket *so;
+
+	so = tp->t_inpcb->inp_socket;
+	mss = tp->t_maxseg;
+
+	rt = in_pcbrtentry(tp->t_inpcb);
+
+	if (rt == NULL)
+		return;
 
 #ifdef RTV_MTU	/* if route characteristics exist ... */
 	/*
@@ -2904,82 +3056,8 @@ tcp_mss(tp, offer)
 		    ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1,
 		    tp->t_rttmin, TCPTV_REXMTMAX);
 	}
-	/*
-	 * if there's an mtu associated with the route and we support
-	 * path MTU discovery for the underlying protocol family, use it.
-	 */
-	if (rt->rt_rmx.rmx_mtu) {
-		/*
-		 * One may wish to lower MSS to take into account options,
-		 * especially security-related options.
-		 */
-		mss = rt->rt_rmx.rmx_mtu - sizeof(struct tcphdr);
-		switch (tp->pf) {
-#ifdef INET6
-		case AF_INET6:
-			mss -= sizeof(struct ip6_hdr);
-			break;
 #endif
-#ifdef notdef	/* no IPv4 path MTU discovery yet */
-		case AF_INET:
-			mss -= sizeof(struct ip);
-			break;
-#endif
-		default:
-			/* the family does not support path MTU discovery */
-			mss = 0;
-			break;
-		}
-	} else
-		mss = 0;
-#else
-	mss = 0;
-#endif /* RTV_MTU */
-	if (mss == 0) {
-		/*
-		 * ifp may be null and rmx_mtu may be zero in certain
-		 * v6 cases (e.g., if ND wasn't able to resolve the 
-		 * destination host.
-		 */
-		mss = ifp ? ifp->if_mtu - sizeof(struct tcpiphdr) : 0;
-		switch (tp->pf) {
-		case AF_INET:
-			if (!in_localaddr(inp->inp_faddr))
-				mss = min(mss, tcp_mssdflt);
-			break;
-		}
-	}
-	/*
-	 * The current mss, t_maxseg, is initialized to the default value.
-	 * If we compute a smaller value, reduce the current mss.
-	 * If we compute a larger value, return it for use in sending
-	 * a max seg size option, but don't store it for use
-	 * unless we received an offer at least that large from peer.
-	 * However, do not accept offers under 32 bytes.
-	 */
-	if (offer)
-		mss = min(mss, offer);
-	mss = max(mss, 64);		/* sanity - at least max opt. space */
-	/*
-	 * maxopd stores the maximum length of data AND options
-	 * in a segment; maxseg is the amount of data in a normal
-	 * segment.  We need to store this value (maxopd) apart
-	 * from maxseg, because now every segment carries options
-	 * and thus we normally have somewhat less data in segments.
-	 */
-	tp->t_maxopd = mss;
 
- 	if ((tp->t_flags & (TF_REQ_TSTMP|TF_NOOPT)) == TF_REQ_TSTMP &&
-	    (tp->t_flags & TF_RCVD_TSTMP) == TF_RCVD_TSTMP)
-		mss -= TCPOLEN_TSTAMP_APPA;
-
-#if	(MCLBYTES & (MCLBYTES - 1)) == 0
-		if (mss > MCLBYTES)
-			mss &= ~(MCLBYTES-1);
-#else
-		if (mss > MCLBYTES)
-			mss = mss / MCLBYTES * MCLBYTES;
-#endif
 	/*
 	 * If there's a pipesize, change the socket buffer
 	 * to that size.  Make the socket buffers an integral
@@ -2990,15 +3068,16 @@ tcp_mss(tp, offer)
 	if ((bufsize = rt->rt_rmx.rmx_sendpipe) == 0)
 #endif
 		bufsize = so->so_snd.sb_hiwat;
-	if (bufsize < mss)
+	if (bufsize < mss) {
 		mss = bufsize;
-	else {
+		/* Update t_maxseg and t_maxopd */
+		tcp_mss(tp, mss);
+	} else {
 		bufsize = roundup(bufsize, mss);
 		if (bufsize > sb_max)
 			bufsize = sb_max;
 		(void)sbreserve(&so->so_snd, bufsize);
 	}
-	tp->t_maxseg = mss;
 
 #ifdef RTV_RPIPE
 	if ((bufsize = rt->rt_rmx.rmx_recvpipe) == 0)
@@ -3009,8 +3088,11 @@ tcp_mss(tp, offer)
 		if (bufsize > sb_max)
 			bufsize = sb_max;
 		(void)sbreserve(&so->so_rcv, bufsize);
+#ifdef RTV_RPIPE
+		if (rt->rt_rmx.rmx_recvpipe > 0)
+			tcp_rscale(tp, so->so_rcv.sb_hiwat);
+#endif
 	}
-	tp->snd_cwnd = mss;
 
 #ifdef RTV_SSTHRESH
 	if (rt->rt_rmx.rmx_ssthresh) {
@@ -3023,7 +3105,6 @@ tcp_mss(tp, offer)
 		tp->snd_ssthresh = max(2 * mss, rt->rt_rmx.rmx_ssthresh);
 	}
 #endif /* RTV_MTU */
-	return (mss);
 }
 #endif /* TUBA_INCLUDE */
 

@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.183 2000/04/27 02:19:42 millert Exp $
+#	$OpenBSD: GENERIC,v 1.212 2000/10/26 20:50:44 aaron Exp $
 #	$NetBSD: GENERIC,v 1.48 1996/05/20 18:17:23 mrg Exp $
 #
 #	GENERIC -- everything that's currently supported
@@ -23,6 +23,8 @@ option		APERTURE	# in-kernel aperture driver for XFree86
 
 #option		DUMMY_NOPS	# speed hack; recommended
 
+option		FFS_SOFTUPDATES	# Soft updates
+
 option		COMPAT_SVR4	# binary compatibility with SVR4
 option		COMPAT_IBCS2	# binary compatibility with SCO and ISC
 option		COMPAT_LINUX	# binary compatibility with Linux
@@ -36,7 +38,8 @@ config		bsd	swap generic
 mainbus0 at root
 
 bios0	at mainbus0
-apm0	at bios0
+apm0	at bios0 flags 0x0000	# flags 0x0101 to force protocol version 1.1
+pcibios0 at bios0 flags 0x0000
 
 isa0	at mainbus0
 isa0	at pcib?
@@ -47,7 +50,7 @@ option		PCIVERBOSE
 option		EISAVERBOSE
 #option		PCMCIAVERBOSE
 #option		USBVERBOSE
-
+#option		PCIBIOSVERBOSE
 
 pchb*	at pci? dev ? function ?	# PCI-Host bridges
 ppb*	at pci? dev ? function ?	# PCI-PCI bridges
@@ -59,58 +62,64 @@ pcib*	at pci? dev ? function ?	# PCI-ISA bridges (do nothing)
 pcic0	at isa? port 0x3e0 iomem 0xd0000 iosiz 0x10000
 pcic1	at isa? port 0x3e2 iomem 0xe0000 iosiz 0x4000
 pcic2	at isa? port 0x3e4 iomem 0xe0000 iosiz 0x4000
+#tcic0	at isa? port 0x240 iomem 0xd0000 iosiz 0x10000
+
+# PCI PCMCIA controllers
+pcic*	at pci? dev? function ?
 
 # PCMCIA bus support
 pcmcia*	at pcic? controller ? socket ?
+#pcmcia* at tcic? controller ? socket ?
 
-# CardBus bus support (also see NOTE below)
-#cardbus*	at cardslot?
-#pcmcia*		at cardslot?
-#cbb*		at pci? dev ? function ?
-#cardslot*	at cbb?
-
-# NOTE: You may need to uncomment the following line for CardBus to work
-#option	BIOS32,PCIBIOS,PCIBIOS_INTR_FIXUP,PCIBIOS_BUS_FIXUP
+# CardBus bus support
+cardbus*	at cardslot?
+pcmcia*		at cardslot?
+cbb*		at pci? dev ? function ?
+cardslot*	at cbb?
 
 # PCI USB Controllers
-#uhci*	at pci?				# Universal Host Controller (Intel)
-#ohci*	at pci?				# Open Host Controller
+uhci*	at pci? disable			# Universal Host Controller (Intel)
+ohci*	at pci? disable			# Open Host Controller
 
 # USB bus support
-#usb*	at uhci?
-#usb*	at ohci?
+usb*	at uhci?
+usb*	at ohci?
 
 # USB Hubs
-#uhub*	at usb?
-#uhub*	at uhub? port ? configuration ? interface ?
+uhub*	at usb?
+uhub*	at uhub? port ? configuration ? interface ?
 
 # USB Generic HID devices
-#uhid*	at uhub? port ? configuration ? interface ?
+uhid*	at uhub? port ? configuration ? interface ?
 
 # USB Printers
-#ulpt*	at uhub? port ? configuration ? interface ?
+ulpt*	at uhub? port ? configuration ? interface ?
 
 # USB Mass Storage devices
-#umass*	at uhub? port ? configuration ? interface ?
-#scsibus* at umass?
+umass*	at uhub? port ? configuration ? interface ?
+scsibus* at umass?
 
 # USB Modems
-#umodem*	at uhub? port ? configuration ?
-#ucom*	at umodem?
+umodem*	at uhub? port ? configuration ?
+ucom*	at umodem?
 
 # USB Audio
-#uaudio* at uhub? port ? configuration ?
+uaudio* at uhub? port ? configuration ?
 
 # USB Ethernet adapters
-#aue*	at uhub? port ?			# ADMtek AN986 Pegasus based adapters
-#cue*	at uhub? port ?			# CATC USB-EL1201A based adapters
-#kue*	at uhub? port ?			# Kawasaki KL5KUSB101B based adapters
+aue*	at uhub? port ?			# ADMtek AN986 Pegasus based adapters
+cue*	at uhub? port ?			# CATC USB-EL1201A based adapters
+kue*	at uhub? port ?			# Kawasaki KL5KUSB101B based adapters
 
 # Diamond Multimedia Rio 500
-#urio*	at uhub? port ?
+urio*	at uhub? port ?
+
+# Handspring Visor
+uvisor*	at uhub? port ? configuration ?
+ucom*	at uvisor?
 
 # USB Generic driver
-#ugen*	at uhub? port ? configuration ? interface ?
+ugen*	at uhub? port ? configuration ? interface ?
 
 puc*	at pci?				# PCI "universal" communication device
 
@@ -177,11 +186,15 @@ dpt*	at eisa? slot ?			# DPT SmartCache/SmartRAID EISA
 scsibus* at dpt?
 gdt*	at pci? dev ? function ?	# ICP Vortex GDT RAID controllers
 scsibus* at gdt?
+twe*	at pci? dev ? function ?	# 3ware Escalade RAID controllers
+scsibus* at twe?
 isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
 scsibus* at isp?
 aic0	at isa? port 0x340 irq 11	# Adaptec 152[02] SCSI controllers
 aic*	at pcmcia? function ?		# PCMCIA based aic SCSI controllers
 scsibus* at aic?
+#esp*	at pcmcia? function ?		# PCMCIA based NCR 53C9X SCSI
+#scsibus* at esp?
 ncr*	at pci? dev ? function ?	# NCR 538XX SCSI controllers
 scsibus* at ncr?
 adv*	at pci? dev ? function ?	# AdvanSys 1200A/B and ULTRA SCSI
@@ -261,6 +274,7 @@ le*	at pci? dev ? function ?		# PCnet-PCI based ethernet
 le*	at isapnp?
 de*	at pci? dev ? function ?		# DC21X4X-based ethernet
 fxp*	at pci? dev ? function ?		# EtherExpress 10/100B ethernet
+fxp*	at cardbus? dev ? function ?		# Intel PRO/100 ethernet
 ne*	at pci? dev ? function ?		# NE2000-compat ethernet
 ep0	at pci? dev ? function ?		# 3C59x ethernet
 ep*	at pci? dev ? function ?		# 3C59x ethernet
@@ -269,18 +283,19 @@ ep*	at pcmcia? function ?			# PCMCIA based 3C5xx ethernet
 sm*	at pcmcia? function ?			# PCMCIA based sm ethernet
 xe*	at pcmcia? function ?			# Xircom ethernet
 fpa*	at pci? dev ? function ?		# DEC DEFPA FDDI
-xl*	at pci? dev ? function ?		# 3c9xx ethernet
-#xl*	at cardbus? dev ? function ?		# 3c575 ethernet
+xl*	at pci? dev ? function ?		# 3C9xx ethernet
+xl*	at cardbus? dev ? function ?		# 3C575/3C656 ethernet
 rl*	at pci? dev ? function ?		# RealTek 81[23]9 ethernet
 tx*	at pci? dev ? function ?		# SMC 83C170 EPIC ethernet
 tl*	at pci? dev ? function ?		# Compaq Thunderlan ethernet
 vr*	at pci? dev ? function ?		# VIA Rhine ethernet
 wb*	at pci? dev ? function ?		# Winbond W89C840F ethernet
-ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
 sf*	at pci? dev ? function ?		# Adaptec AIC-6915 ethernet
 sis*	at pci? dev ? function ?		# SiS 900/7016 ethernet
 ste*	at pci? dev ? function ?		# Sundance ST201 ethernet
 dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
+dc*	at cardbus? dev ? function ?		# 21143, "tulip" clone ethernet
+ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
 skc*	at pci? dev ? function ?		# SysKonnect GEnesis 984x
 sk*	at skc?					#  each port of above
 wx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
@@ -305,6 +320,10 @@ sqphy*	at mii? phy ?				# Seeq 8x220 PHYs
 rlphy* at mii? phy ?				# RealTek 8139 internal PHYs
 #mtdphy*	at mii? phy ?			# Myson MTD972 PHYs
 dcphy*	at mii? phy ?				# Digital Clone PHYs
+amphy*	at mii? phy ?				# AMD 79C873 PHYs
+tqphy*	at mii? phy ?				# TDK 78Q212x PHYs
+brgphy*	at mii? phy ?				# Broadcom Gigabit PHYs
+xmphy*	at mii? phy ?				# XaQti XMAC-II PHYs
 ukphy*	at mii? phy ?				# "unknown" PHYs
 
 pss0	at isa? port 0x220 irq 7 drq 6		# Personal Sound System
@@ -315,6 +334,10 @@ eso*	at pci? dev ? function ?		# ESS Solo-1 PCI AudioDrive
 sv*	at pci? dev ? function ?		# S3 SonicVibes (S3 617)
 neo*	at pci? dev ? function ?		# NeoMagic 256AV/ZX
 cmpci*	at pci? dev ? function ?		# C-Media CMI8338/8738
+ich*	at pci? dev ? function ?		# i82801 ICH AC'97 audio
+clcs*	at pci? dev ? function ?		# CS4280 CrystalClear audio
+fms*	at pci? dev ? function ?		# Forte Media FM801
+auvia*	at pci? dev ? function ?		# VIA VT82C686A
 sb0	at isa? port 0x220 irq 5 drq 1		# SoundBlaster
 sb*	at isapnp?
 ess*	at isapnp?				# ESS Tech ES188[78], ES888
@@ -354,6 +377,10 @@ audio*	at eso?
 audio*  at sv?
 audio*	at neo?
 audio*	at cmpci?
+audio*	at clcs?
+audio*	at ich?
+audio*	at fms?
+audio*	at auvia?
 #audio*	at uaudio?
 
 bktr0   at pci? dev ? function ?
@@ -366,6 +393,7 @@ joy*	at isapnp?
 
 # crypto support
 hifn*	at pci? dev ? function ?	# Hi/fn 7751 crypto card
+ubsec*	at pci? dev ? function ?	# Bluesteel Networks 5xxx crypto card
 
 pseudo-device	pctr		1
 pseudo-device	mtrr		1	# Memory range attributes control

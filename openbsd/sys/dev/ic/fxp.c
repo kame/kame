@@ -1,4 +1,4 @@
-/*	$OpenBSD: fxp.c,v 1.5 2000/04/27 00:29:51 chris Exp $	*/
+/*	$OpenBSD: fxp.c,v 1.10 2000/10/16 17:08:07 aaron Exp $	*/
 /*	$NetBSD: if_fxp.c,v 1.2 1997/06/05 02:01:55 thorpej Exp $	*/
 
 /*
@@ -46,6 +46,7 @@
 #include <sys/kernel.h>
 #include <sys/socket.h>
 #include <sys/syslog.h>
+#include <sys/timeout.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -90,10 +91,6 @@
 
 #include <dev/ic/fxpreg.h>
 #include <dev/ic/fxpvar.h>
-
-#include <dev/pci/pcivar.h>
-#include <dev/pci/pcireg.h>
-#include <dev/pci/pcidevs.h>
 
 #ifdef __alpha__		/* XXX */
 /* XXX XXX NEED REAL DMA MAPPING SUPPORT XXX XXX */
@@ -252,10 +249,6 @@ void fxp_attach __P((struct device *, struct device *, void *));
 void	fxp_shutdown __P((void *));
 void	fxp_power __P((int, void *));
 
-/* Compensate for lack of a generic ether_ioctl() */
-int	fxp_ether_ioctl __P((struct ifnet *, u_long, caddr_t));
-#define	ether_ioctl	fxp_ether_ioctl
-
 struct cfdriver fxp_cd = {
 	NULL, "fxp", DV_IFNET
 };
@@ -296,55 +289,6 @@ fxp_power(why, arg)
 			fxp_init(sc);
 	}
 	splx(s);
-}
-
-int
-fxp_ether_ioctl(ifp, cmd, data)
-	struct ifnet *ifp;
-	u_long cmd;
-	caddr_t data;
-{
-	struct ifaddr *ifa = (struct ifaddr *) data;
-	struct fxp_softc *sc = ifp->if_softc;
-
-	switch (cmd) {
-	case SIOCSIFADDR:
-		ifp->if_flags |= IFF_UP;
-
-		switch (ifa->ifa_addr->sa_family) {
-#ifdef INET
-		case AF_INET:
-			fxp_init(sc);
-			arp_ifinit(&sc->arpcom, ifa);
-			break;
-#endif
-#ifdef NS
-		case AF_NS:
-		    {
-			 register struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
-
-			 if (ns_nullhost(*ina))
-				ina->x_host = *(union ns_host *)
-				    LLADDR(ifp->if_sadl);
-			 else
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
-				    ifp->if_addrlen);
-			 /* Set new address. */
-			 fxp_init(sc);
-			 break;
-		    }
-#endif
-		default:
-			fxp_init(sc);
-			break;
-		}
-		break;
-
-	default:
-		return (EINVAL);
-	}
-
-	return (0);
 }
 
 /*************************************************************
@@ -433,7 +377,8 @@ fxp_attach_common(sc, enaddr, intrstr)
 	sc->sc_mii.mii_statchg = fxp_statchg;
 	ifmedia_init(&sc->sc_mii.mii_media, 0, fxp_mediachange,
 	    fxp_mediastatus);
-	mii_phy_probe(&sc->sc_dev, &sc->sc_mii, 0xffffffff);
+	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
+	    MII_OFFSET_ANY, MIIF_NOISOLATE);
 	/* If no phy found, just use auto mode */
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_MANUAL,
@@ -469,12 +414,17 @@ fxp_attach_common(sc, enaddr, intrstr)
 	 * doing do could allow DMA to corrupt kernel memory during the
 	 * reboot before the driver initializes.
 	 */
-	shutdownhook_establish(fxp_shutdown, sc);
+	sc->sc_sdhook = shutdownhook_establish(fxp_shutdown, sc);
 
 	/*
 	 * Add suspend hook, for similiar reasons..
 	 */
-	powerhook_establish(fxp_power, sc);
+	sc->sc_powerhook = powerhook_establish(fxp_power, sc);
+
+	/*
+	 * Initialize timeout for statistics update.
+	 */
+	timeout_set(&sc->stats_update_to, fxp_stats_update, sc);
 
 	return (0);
 
@@ -491,6 +441,31 @@ fxp_attach_common(sc, enaddr, intrstr)
 		m_freem(sc->rfa_headm);
 
 	return (ENOMEM);
+}
+
+int
+fxp_detach(sc)
+	struct fxp_softc *sc;
+{
+	struct ifnet *ifp = &sc->arpcom.ac_if;
+
+	/* Unhook our tick handler. */
+	timeout_del(&sc->stats_update_to);
+
+	/* Detach any PHYs we might have. */
+	if (LIST_FIRST(&sc->sc_mii.mii_phys) != NULL)
+		mii_detach(&sc->sc_mii, MII_PHY_ANY, MII_OFFSET_ANY);
+
+	/* Delete any remaining media. */
+	ifmedia_delete_instance(&sc->sc_mii.mii_media, IFM_INST_ANY);
+
+	ether_ifdetach(ifp);
+	if_detach(ifp);
+
+	shutdownhook_disestablish(sc->sc_sdhook);
+	powerhook_disestablish(sc->sc_powerhook);
+
+	return (0);
 }
 
 /*
@@ -996,7 +971,7 @@ fxp_stats_update(arg)
 	/*
 	 * Schedule another timeout one second from now.
 	 */
-	timeout(fxp_stats_update, sc, hz);
+	timeout_add(&sc->stats_update_to, hz);
 }
 
 /*
@@ -1022,7 +997,7 @@ fxp_stop(sc, drain)
 	/*
 	 * Cancel stats updater.
 	 */
-	untimeout(fxp_stats_update, sc);
+	timeout_del(&sc->stats_update_to);
 
 	/*
 	 * Issue software reset
@@ -1238,7 +1213,7 @@ fxp_init(xsc)
 	/*
 	 * Start stats updater.
 	 */
-	timeout(fxp_stats_update, sc, hz);
+	timeout_add(&sc->stats_update_to, hz);
 }
 
 /*
@@ -1415,15 +1390,47 @@ fxp_ioctl(ifp, command, data)
 {
 	struct fxp_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
+	struct ifaddr *ifa = (struct ifaddr *)data;
 	int s, error = 0;
 
 	s = splimp();
 
-	switch (command) {
+	if ((error = ether_ioctl(ifp, &sc->arpcom, command, data)) > 0) {
+		splx(s);
+		return (error);
+	}
 
+	switch (command) {
 	case SIOCSIFADDR:
-	case SIOCGIFADDR:
-		error = ether_ioctl(ifp, command, data);
+		ifp->if_flags |= IFF_UP;
+
+		switch (ifa->ifa_addr->sa_family) {
+#ifdef INET
+		case AF_INET:
+			fxp_init(sc);
+			arp_ifinit(&sc->arpcom, ifa);
+			break;
+#endif
+#ifdef NS
+		case AF_NS:
+		    {
+			 register struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
+
+			 if (ns_nullhost(*ina))
+				ina->x_host = *(union ns_host *)
+				    LLADDR(ifp->if_sadl);
+			 else
+				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
+				    ifp->if_addrlen);
+			 /* Set new address. */
+			 fxp_init(sc);
+			 break;
+		    }
+#endif
+		default:
+			fxp_init(sc);
+			break;
+		}
 		break;
 
 	case SIOCSIFMTU:

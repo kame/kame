@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_usrreq.c,v 1.39 1999/12/21 17:49:28 provos Exp $	*/
+/*	$OpenBSD: tcp_usrreq.c,v 1.48 2000/10/14 01:04:11 itojun Exp $	*/
 /*	$NetBSD: tcp_usrreq.c,v 1.20 1996/02/13 23:44:16 christos Exp $	*/
 
 /*
@@ -56,13 +56,13 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/protosw.h>
-#include <sys/domain.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/proc.h>
 #include <sys/ucred.h>
 #include <vm/vm.h>
 #include <sys/sysctl.h>
+#include <sys/domain.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -82,15 +82,13 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/tcp_debug.h>
 #include <dev/rndvar.h>
 
-#ifdef IPSEC
-extern int	check_ipsec_policy __P((struct inpcb *, u_int32_t));
-#endif
-
 /*
  * TCP protocol interface to socket abstraction.
  */
 extern	char *tcpstates[];
 extern	int tcptv_keep_init;
+
+extern int tcp_rst_ppslim;
 
 /* from in_pcb.c */
 extern	struct baddynamicports baddynamicports;
@@ -300,9 +298,8 @@ tcp_usrreq(so, req, m, nam, control)
 
 		so->so_state |= SS_CONNECTOUT;
 		/* Compute window scaling to request.  */
-		while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
-		    (TCP_MAXWIN << tp->request_r_scale) < so->so_rcv.sb_hiwat)
-			tp->request_r_scale++;
+		tcp_rscale(tp, so->so_rcv.sb_hiwat);
+
 		soisconnecting(so);
 		tcpstat.tcps_connattempt++;
 		tp->t_state = TCPS_SYN_SENT;
@@ -394,9 +391,7 @@ tcp_usrreq(so, req, m, nam, control)
 	 */
 	case PRU_SEND:
 #ifdef IPSEC
-		error = check_ipsec_policy(inp, 0);
-		if (error)
-			break;
+	    /* XXX Find IPsec TDB */
 #endif
 		sbappend(&so->so_snd, m);
 		error = tcp_output(tp);
@@ -780,9 +775,14 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 	size_t newlen;
 {
 	int error = 0, s;
+	int is_ipv6 = 0;
 	struct tcp_ident_mapping tir;
 	struct inpcb *inp;
 	struct sockaddr_in *fin, *lin;
+#ifdef INET6
+	struct sockaddr_in6 *fin6, *lin6;
+	struct in6_addr f6, l6;
+#endif
 
 	if (oldp == NULL || newp != NULL || newlen != 0)
 		return (EINVAL);
@@ -790,20 +790,58 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 		return (ENOMEM);
 	if ((error = copyin(oldp, &tir, sizeof (tir))) != 0 )
 		return (error);
-	if (tir.faddr.sa_len != sizeof (struct sockaddr) ||
-	    tir.faddr.sa_family != AF_INET)
-		return (EINVAL);
-	fin = (struct sockaddr_in *)&tir.faddr;
-	lin = (struct sockaddr_in *)&tir.laddr;
+	switch (tir.faddr.ss_family) {
+#ifdef INET6
+	case AF_INET6:
+		is_ipv6 = 1;
+		fin6 = (struct sockaddr_in6 *)&tir.faddr;
+		error = in6_embedscope(&f6, fin6, NULL, NULL);
+		if (error)
+			return EINVAL;	/*?*/
+		lin6 = (struct sockaddr_in6 *)&tir.laddr;
+		error = in6_embedscope(&l6, lin6, NULL, NULL);
+		if (error)
+			return EINVAL;	/*?*/
+		break;
+#endif
+	case AF_INET:
+	  	fin = (struct sockaddr_in *)&tir.faddr;
+		lin = (struct sockaddr_in *)&tir.laddr;
+		break;
+	default:
+		return(EINVAL);
+	}
 
 	s = splsoftnet();
-	inp = in_pcbhashlookup(&tcbtable,  fin->sin_addr, fin->sin_port,
-	    lin->sin_addr, lin->sin_port);
+	if (is_ipv6) {
+#ifdef INET6
+		inp = in6_pcbhashlookup(&tcbtable, &f6,
+		    fin6->sin6_port, &l6, lin6->sin6_port);
+#else
+		panic("tcp_ident: cannot happen");
+#endif
+	}
+	else 
+		inp = in_pcbhashlookup(&tcbtable,  fin->sin_addr, 
+		    fin->sin_port, lin->sin_addr, lin->sin_port);
+
 	if (inp == NULL) {
 		++tcpstat.tcps_pcbhashmiss;
-		inp = in_pcblookup(&tcbtable, &fin->sin_addr, fin->sin_port,
-		    &lin->sin_addr, lin->sin_port, 0);
-	}
+		if (is_ipv6) {
+#ifdef INET6
+			inp = in_pcblookup(&tcbtable, &f6,
+			    fin6->sin6_port, &l6, lin6->sin6_port,
+			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
+#else
+			panic("tcp_ident: cannot happen");
+#endif
+		}
+		else
+			inp = in_pcblookup(&tcbtable, &fin->sin_addr,
+			    fin->sin_port, &lin->sin_addr, lin->sin_port, 
+			    INPLOOKUP_WILDCARD);
+	}	
+
 	if (inp != NULL && (inp->inp_socket->so_state & SS_CONNECTOUT)) {
 		tir.ruid = inp->inp_socket->so_ruid;
 		tir.euid = inp->inp_socket->so_euid;
@@ -873,6 +911,9 @@ tcp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return (sysctl_int(oldp, oldlenp, newp, newlen,&tcp_sendspace));
 	case TCPCTL_IDENT:
 		return (tcp_ident(oldp, oldlenp, newp, newlen));
+	case TCPCTL_RSTPPSLIMIT:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &tcp_rst_ppslim));
 	default:
 		return (ENOPROTOOPT);
 	}

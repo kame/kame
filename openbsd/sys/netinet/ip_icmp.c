@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_icmp.c,v 1.20 1999/12/28 07:43:40 itojun Exp $	*/
+/*	$OpenBSD: ip_icmp.c,v 1.30 2000/10/17 22:33:51 provos Exp $	*/
 /*	$NetBSD: ip_icmp.c,v 1.19 1996/02/13 23:42:22 christos Exp $	*/
 
 /*
@@ -85,12 +85,12 @@ int	icmpbmcastecho = 0;
 #ifdef ICMPPRINTFS
 int	icmpprintfs = 0;
 #endif
+int	icmperrppslim = 100;
+int	icmperrpps_count = 0;
+struct timeval icmperrppslim_last;
 
-#if 0
-static int	ip_next_mtu __P((int, int));
-#else
-/*static*/ int	ip_next_mtu __P((int, int));
-#endif
+void icmp_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
+int icmp_ratelimit __P((const struct in_addr *, const int, const int));
 
 extern	struct protosw inetsw[];
 
@@ -135,8 +135,17 @@ icmp_error(n, type, code, dest, destifp)
 	/* Don't send error in response to a multicast or broadcast packet */
 	if (n->m_flags & (M_BCAST|M_MCAST))
 		goto freeit;
+
 	/*
-	 * First, formulate icmp message
+	 * First, do a rate limitation check.
+ 	 */
+	if (icmp_ratelimit(&oip->ip_src, type, code)) {
+		/* XXX stat */
+		goto freeit;
+	}
+
+	/*
+	 * Now, formulate icmp message
 	 */
 	m = m_gethdr(M_DONTWAIT, MT_HEADER);
 	if (m == NULL)
@@ -555,13 +564,34 @@ icmp_reflect(m)
 	icmpdst.sin_addr = t;
 	if (ia == (struct in_ifaddr *)0)
 		ia = ifatoia(ifaof_ifpforaddr(sintosa(&icmpdst),
-		    m->m_pkthdr.rcvif));
+					      m->m_pkthdr.rcvif));
 	/*
 	 * The following happens if the packet was not addressed to us,
-	 * and was received on an interface with no IP address.
+	 * and was received on an interface with no IP address (like an
+	 * enc interface).
 	 */
-	if (ia == (struct in_ifaddr *)0)
-		ia = in_ifaddr.tqh_first;
+	if (ia == (struct in_ifaddr *)0) {
+	        struct sockaddr_in *dst;
+		struct route ro;
+
+		bzero((caddr_t) &ro, sizeof(ro));
+		dst = satosin(&ro.ro_dst);
+		dst->sin_family = AF_INET;
+		dst->sin_len = sizeof(*dst);
+		dst->sin_addr = t;
+
+		rtalloc(&ro);
+		if (ro.ro_rt == 0) 
+		{
+		    ipstat.ips_noroute++;
+		    goto done;
+		}
+
+		ia = ifatoia(ro.ro_rt->rt_ifa);
+		ro.ro_rt->rt_use++;
+                RTFREE(ro.ro_rt);
+        }
+
 	t = ia->ia_addr.sin_addr;
 	ip->ip_src = t;
 	ip->ip_ttl = MAXTTL;
@@ -707,8 +737,154 @@ icmp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return (sysctl_int(oldp, oldlenp, newp, newlen, &icmpmaskrepl));
 	case ICMPCTL_BMCASTECHO:
 		return (sysctl_int(oldp, oldlenp, newp, newlen, &icmpbmcastecho));
+	case ICMPCTL_ERRPPSLIMIT:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &icmperrppslim));
+		break;
 	default:
 		return (ENOPROTOOPT);
 	}
 	/* NOTREACHED */
+}
+
+void
+icmp_mtudisc(icp)
+	struct icmp *icp;
+{
+	struct rtentry *rt;
+	struct sockaddr *dst = sintosa(&icmpsrc);
+	u_long mtu = ntohs(icp->icmp_nextmtu);  /* Why a long?  IPv6 */
+	int    error;
+	
+	/* Table of common MTUs: */
+
+	static u_short mtu_table[] = {65535, 65280, 32000, 17914, 9180, 8166, 
+				      4352, 2002, 1492, 1006, 508, 296, 68, 0};
+    
+	rt = rtalloc1(dst, 1);
+	if (rt == 0)
+		return;
+    
+	/* If we didn't get a host route, allocate one */
+    
+	if ((rt->rt_flags & RTF_HOST) == 0) {
+		struct rtentry *nrt;
+
+		error = rtrequest((int) RTM_ADD, dst, 
+		    (struct sockaddr *) rt->rt_gateway,
+		    (struct sockaddr *) 0, 
+		    RTF_GATEWAY | RTF_HOST | RTF_DYNAMIC, &nrt);
+		if (error) {
+			rtfree(rt);
+			rtfree(nrt);
+			return;
+		}
+		nrt->rt_rmx = rt->rt_rmx;
+		rtfree(rt);
+		rt = nrt;
+	}
+	error = rt_timer_add(rt, icmp_mtudisc_timeout, ip_mtudisc_timeout_q);
+	if (error) {
+		rtfree(rt);
+		return;
+	}
+
+	if (mtu == 0) {
+		int i = 0;
+
+		mtu = icp->icmp_ip.ip_len; /* NTOHS happened in deliver: */
+		/* Some 4.2BSD-based routers incorrectly adjust the ip_len */
+		if (mtu > rt->rt_rmx.rmx_mtu && rt->rt_rmx.rmx_mtu != 0)
+			mtu -= (icp->icmp_ip.ip_hl << 2);
+
+		/* If we still can't guess a value, try the route */
+
+		if (mtu == 0) {
+			mtu = rt->rt_rmx.rmx_mtu;
+
+			/* If no route mtu, default to the interface mtu */
+
+			if (mtu == 0)
+				mtu = rt->rt_ifp->if_mtu;
+		}
+
+		for (i = 0; i < sizeof(mtu_table) / sizeof(mtu_table[0]); i++)
+			if (mtu > mtu_table[i]) {
+				mtu = mtu_table[i];
+				break;
+			}
+	}
+
+	/*
+	 * XXX:   RTV_MTU is overloaded, since the admin can set it
+	 *	  to turn off PMTU for a route, and the kernel can
+	 *	  set it to indicate a serious problem with PMTU
+	 *	  on a route.  We should be using a separate flag
+	 *	  for the kernel to indicate this.
+	 */
+
+	if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0) {
+		if (mtu < 296 || mtu > rt->rt_ifp->if_mtu)
+			rt->rt_rmx.rmx_locks |= RTV_MTU;
+		else if (rt->rt_rmx.rmx_mtu > mtu || 
+			 rt->rt_rmx.rmx_mtu == 0)
+			rt->rt_rmx.rmx_mtu = mtu;
+	}
+
+	if (rt)
+		rtfree(rt);
+}
+
+void
+icmp_mtudisc_timeout(rt, r)
+	struct rtentry *rt;
+	struct rttimer *r;
+{
+	if (rt == NULL)
+		panic("icmp_mtudisc_timeout:  bad route to timeout");
+	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) == 
+	    (RTF_DYNAMIC | RTF_HOST)) {
+		void *(*ctlfunc) __P((int, struct sockaddr *, void *));
+		extern u_char ip_protox[];
+		struct sockaddr_in sa;
+
+		sa = *(struct sockaddr_in *)rt_key(rt);
+		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
+		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
+
+		/* Notify TCP layer of increased Path MTU estimate */
+		ctlfunc = inetsw[ip_protox[IPPROTO_TCP]].pr_ctlinput;
+		if (ctlfunc)
+			(*ctlfunc)(PRC_MTUINC,(struct sockaddr *)&sa, NULL);
+	} else {
+		if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0) {
+			rt->rt_rmx.rmx_mtu = 0;
+		}
+	}
+}
+
+/*
+ * Perform rate limit check.
+ * Returns 0 if it is okay to send the icmp packet.
+ * Returns 1 if the router SHOULD NOT send this icmp packet due to rate
+ * limitation.
+ *
+ * XXX per-destination/type check necessary?
+ */
+int
+icmp_ratelimit(dst, type, code)
+	const struct in_addr *dst;
+	const int type;			/* not used at this moment */
+	const int code;			/* not used at this moment */
+{
+
+	/* PPS limit */
+	if (!ppsratecheck(&icmperrppslim_last, &icmperrpps_count,
+	    icmperrppslim)) {
+		/* The packet is subject to rate limit */
+		return 1;
+	}
+
+	/*okay to send*/
+	return 0;
 }

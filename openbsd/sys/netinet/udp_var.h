@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_var.h,v 1.9 1999/12/08 06:50:20 itojun Exp $	*/
+/*	$OpenBSD: udp_var.h,v 1.10 2000/06/18 17:32:48 itojun Exp $	*/
 /*	$NetBSD: udp_var.h,v 1.12 1996/02/13 23:44:41 christos Exp $	*/
 
 /*

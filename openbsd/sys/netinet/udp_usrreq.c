@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.40 2000/04/09 17:43:02 angelos Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.51 2000/10/13 17:58:37 itojun Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -82,8 +82,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 
 #ifdef IPSEC
 #include <netinet/ip_ipsp.h>
-
-extern int     	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 #endif
 
 #include <machine/stdarg.h>
@@ -100,6 +98,8 @@ extern int     	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 
 extern int ip6_defhlim;
 #endif /* INET6 */
+
+#define PI_MAGIC 0xdeadbeef  /* XXX the horror! */
 
 /*
  * UDP protocol implementation.
@@ -181,7 +181,13 @@ udp_input(m, va_alist)
 	struct ip6_recvpktopts opts6;
 #endif /* INET6 */
 #ifdef IPSEC
-	struct tdb  *tdb = NULL;
+	struct tdb_ident *tdbi;
+	struct tdb *tdb;
+	int error, s;
+
+	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
+	if (tdbi == (void *) PI_MAGIC)
+	        tdbi = NULL;
 #endif /* IPSEC */
 
 	va_start(ap, m);
@@ -247,6 +253,10 @@ udp_input(m, va_alist)
 	if (m->m_len < iphlen + sizeof(struct udphdr)) {
 		if ((m = m_pullup2(m, iphlen + sizeof(struct udphdr))) == 0) {
 			udpstat.udps_hdrops++;
+#ifdef IPSEC
+			if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			return;
 		}
 #ifdef INET6
@@ -315,6 +325,10 @@ udp_input(m, va_alist)
 		if ((uh->uh_sum = in_cksum(m, len + sizeof (struct ip))) != 0) {
 			udpstat.udps_badsum++;
 			m_freem(m);
+#ifdef IPSEC
+			if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			return;
 		}
 	} else
@@ -496,6 +510,10 @@ udp_input(m, va_alist)
 			goto bad;
 		}
 		sorwakeup(last);
+#ifdef IPSEC
+		if (tdbi)
+		        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 		return;
 	}
 	/*
@@ -540,31 +558,37 @@ udp_input(m, va_alist)
 				icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT,
 					0, 0);
 			}
+#ifdef IPSEC
+			if (tdbi)
+			        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 			return;
 		}
 	}
 
 #ifdef IPSEC
-	/* Check if this socket requires security for incoming packets */
-	if ((inp->inp_seclevel[SL_AUTH] >= IPSEC_LEVEL_REQUIRE &&
-	     !(m->m_flags & M_AUTH)) ||
-	    (inp->inp_seclevel[SL_ESP_TRANS] >= IPSEC_LEVEL_REQUIRE &&
-	     !(m->m_flags & M_CONF))) {
-#ifdef notyet
-#ifdef INET6
-		if (ipv6)
-			ipv6_icmp_error(m, ICMPV6_BLAH, ICMPV6_BLAH, 0);
-		else
-#endif /* INET6 */
-		icmp_error(m, ICMP_BLAH, ICMP_BLAH, 0, 0);
-		m = NULL;
-#endif /* notyet */
-		udpstat.udps_nosec++;
+#define PI_MAGIC 0xdeadbeef  /* XXX the horror! */
+	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
+	if (tdbi == (void *) PI_MAGIC)
+	        tdbi = NULL;
+
+        s = splnet();
+        if (tdbi == NULL)
+                tdb = NULL;
+        else
+	        tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
+
+	ipsp_spd_lookup(m, srcsa.sa.sa_family, iphlen, &error,
+			IPSP_DIRECTION_IN, tdb, inp);
+        splx(s);
+
+	if (tdbi)
+	        free(tdbi, M_TEMP);
+	tdbi = NULL;
+
+	/* Error or otherwise drop-packet indication */
+	if (error)
 		goto bad;
-	}
-	/* Use tdb_bind_out for this inp's outbound communication */
-	if (tdb)
-		tdb_add_inp(tdb, inp);
 #endif /*IPSEC */
 
 	opts = NULL;
@@ -610,6 +634,10 @@ udp_input(m, va_alist)
 	sorwakeup(inp->inp_socket);
 	return;
 bad:
+#ifdef IPSEC
+	if (tdbi)
+	        free(tdbi, M_TEMP);
+#endif /* IPSEC */
 	m_freem(m);
 	if (opts)
 		m_freem(opts);
@@ -818,11 +846,16 @@ udp6_ctlinput(cmd, sa, d)
 		}
 
 		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6,
-				     uh.uh_dport, &sa6_src.sin6_addr,
-				     uh.uh_sport, cmd, cmdarg, notify);
+		     uh.uh_dport, (struct sockaddr *)&sa6_src,
+		     uh.uh_sport, cmd, cmdarg, notify);
 	} else {
+		struct sockaddr_in6 zero;
+
+		bzero(&zero, sizeof(zero));
+		zero.sin6_family = AF_INET6;
+		zero.sin6_len = sizeof(zero);
 		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6, 0,
-				     &zeroin6_addr, 0, cmd, cmdarg, notify);
+		     (struct sockaddr *)&zero, 0, cmd, cmdarg, notify);
 	}
 }
 #endif
@@ -1302,12 +1335,10 @@ udp_usrreq(so, req, m, addr, control)
 
 	case PRU_SEND:
 #ifdef IPSEC
-		error = check_ipsec_policy(inp,0);
-		if (error)
-			return (error);
+	    /* XXX Find IPsec TDB */
 #endif
 #ifdef INET6
-		if ((inp->inp_flags & INP_IPV6) != 0)
+		if (inp->inp_flags & INP_IPV6)
 			return (udp6_output(inp, m, addr, control));
 		else
 			return (udp_output(m, inp, addr, control));

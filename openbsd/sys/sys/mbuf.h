@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbuf.h,v 1.16 2000/04/26 18:40:50 chris Exp $	*/
+/*	$OpenBSD: mbuf.h,v 1.18 2000/09/26 17:50:26 angelos Exp $	*/
 /*	$NetBSD: mbuf.h,v 1.19 1996/02/09 18:25:14 christos Exp $	*/
 
 /*
@@ -219,6 +219,7 @@ struct mbuf {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_pktdat; \
 		(m)->m_flags = M_PKTHDR; \
+ 		(m)->m_pkthdr.tdbi = NULL; \
 		(m)->m_pkthdr.aux = (struct mbuf *)NULL; \
 	} else \
 		(m) = m_retryhdr((how), (type)); \

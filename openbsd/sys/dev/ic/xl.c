@@ -1,4 +1,4 @@
-/*	$OpenBSD: xl.c,v 1.3 2000/06/22 08:24:02 itojun Exp $	*/
+/*	$OpenBSD: xl.c,v 1.17 2000/10/19 16:33:51 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: if_xl.c,v 1.72 2000/01/09 21:12:59 wpaul Exp $
+ * $FreeBSD: if_xl.c,v 1.77 2000/08/28 20:40:03 wpaul Exp $
  */
 
 /*
@@ -54,11 +54,19 @@
  * 3Com 3c900-FL/FX	10/100Mbps/Fiber-optic
  * 3Com 3c905C-TX	10/100Mbps/RJ-45 (Tornado ASIC)
  * 3Com 3c450-TX	10/100Mbps/RJ-45 (Tornado ASIC)
+ * 3Com 3c555		10/100Mbps/RJ-45 (MiniPCI, Hurricane ASIC)
+ * 3Com 3c556		10/100Mbps/RJ-45 (MiniPCI, Hurricane ASIC)
+ * 3Com 3c556B		10/100Mbps/RJ-45 (MiniPCI, Hurricane ASIC)
  * 3Com 3c980-TX	10/100Mbps server adapter (Hurricane ASIC)
  * 3Com 3c980C-TX	10/100Mbps server adapter (Tornado ASIC)
  * 3Com 3C575TX		10/100Mbps LAN CardBus PC Card
- * 3Com 3C575BTX	10/100Mbps LAN CardBus PC Card
+ * 3Com 3CCFE575BT	10/100Mbps LAN CardBus PC Card
  * 3Com 3CCFE575CT	10/100Mbps LAN CardBus PC Card
+ * 3Com 3C3FE575CT	10/100Mbps LAN CardBus Type III PC Card
+ * 3Com 3CCFEM656	10/100Mbps LAN+56k Modem CardBus PC Card
+ * 3Com 3CCFEM656B	10/100Mbps LAN+56k Modem CardBus PC Card
+ * 3Com 3CCFEM656C	10/100Mbps LAN+56k Global Modem CardBus PC Card
+ * 3Com 3C3FEM656C	10/100Mbps LAN+56k Global Modem CardBus Type III PC Card
  * 3Com 3cSOHO100-TX	10/100Mbps/RJ-45 (Hurricane ASIC)
  * Dell Optiplex GX1 on-board 3c918 10/100Mbps/RJ-45
  * Dell on-board 3c920	10/100Mbps/RJ-45
@@ -98,6 +106,7 @@
  */
 
 #include "bpfilter.h"
+#include "vlan.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -157,6 +166,7 @@ void xl_start_90xB	__P((struct ifnet *));
 int xl_ioctl		__P((struct ifnet *, u_long, caddr_t));
 void xl_init		__P((void *));
 void xl_stop		__P((struct xl_softc *));
+void xl_freetxrx	__P((struct xl_softc *));
 void xl_watchdog	__P((struct ifnet *));
 void xl_shutdown	__P((void *));
 int xl_ifmedia_upd	__P((struct ifnet *));
@@ -439,7 +449,7 @@ xl_miibus_readreg(self, phy, reg)
 	struct xl_softc *sc = (struct xl_softc *)self;
 	struct xl_mii_frame	frame;
 
-	if (sc->xl_bustype != XL_BUS_CARDBUS && phy != 24)
+	if (!(sc->xl_flags & XL_FLAG_PHYOK) && phy != 24)
 		return (0);
 
 	bzero((char *)&frame, sizeof(frame));
@@ -459,7 +469,7 @@ xl_miibus_writereg(self, phy, reg, data)
 	struct xl_softc *sc = (struct xl_softc *)self;
 	struct xl_mii_frame	frame;
 
-	if (sc->xl_bustype != XL_BUS_CARDBUS && phy != 24)
+	if (!(sc->xl_flags & XL_FLAG_PHYOK) && phy != 24)
 		return;
 
 	bzero((char *)&frame, sizeof(frame));
@@ -524,21 +534,25 @@ int xl_read_eeprom(sc, dest, off, cnt, swap)
 {
 	int			err = 0, i;
 	u_int16_t		word = 0, *ptr;
-
+#define EEPROM_5BIT_OFFSET(A) ((((A) << 2) & 0x7F00) | ((A) & 0x003F))
+	/* WARNING! DANGER!
+	 * It's easy to accidentally overwrite the rom content!
+	 * Note: the 3c575 uses 8bit EEPROM offsets.
+	 */
 	XL_SEL_WIN(0);
 
 	if (xl_eeprom_wait(sc))
 		return(1);
 
+	if (sc->xl_flags & XL_FLAG_EEPROM_OFFSET_30)
+		off += 0x30;
+
 	for (i = 0; i < cnt; i++) {
-		switch (sc->xl_bustype) {
-		case XL_BUS_PCI:
-			CSR_WRITE_2(sc, XL_W0_EE_CMD, XL_EE_READ | (off + i));
-			break;
-		case XL_BUS_CARDBUS:
-			CSR_WRITE_2(sc, XL_W0_EE_CMD, 0x230 + (off + i));
-			break;
-		}
+		if (sc->xl_flags & XL_FLAG_8BITROM)
+			CSR_WRITE_2(sc, XL_W0_EE_CMD, (2<<8) | (off + i ));
+		else
+			CSR_WRITE_2(sc, XL_W0_EE_CMD,
+			    XL_EE_READ | EEPROM_5BIT_OFFSET(off + i));
 		err = xl_eeprom_wait(sc);
 		if (err)
 			break;
@@ -673,6 +687,7 @@ allmulti:
 			goto allmulti;
 		}
 		h = xl_calchash(enm->enm_addrlo);
+		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RX_SET_HASH|XL_HASH_SET|h);
 		mcnt++;
 		ETHER_NEXT_MULTI(step, enm);
 	}
@@ -839,8 +854,10 @@ void xl_reset(sc, hard)
 	register int		i;
 
 	XL_SEL_WIN(0);
-	if (hard)
-		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RESET);
+	if (hard || (sc->xl_flags & XL_FLAG_WEIRDRESET)) {
+		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RESET |
+		    ((sc->xl_flags & XL_FLAG_WEIRDRESET)?0xFF:0));
+	}
 	else
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RESET | 0x0010);
 	xl_wait(sc);
@@ -858,6 +875,12 @@ void xl_reset(sc, hard)
 	xl_wait(sc);
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_TX_RESET);
 	xl_wait(sc);
+
+	if (sc->xl_flags & XL_FLAG_WEIRDRESET) {
+		XL_SEL_WIN(2);
+		CSR_WRITE_2(sc, XL_W2_RESET_OPTIONS, CSR_READ_2(sc,
+		    XL_W2_RESET_OPTIONS) | 0x4010);
+	}
 
 	/* Wait a little while for the chip to get its brains in order. */
 	DELAY(100000);
@@ -956,6 +979,9 @@ void xl_choose_xcvr(sc, verbose)
 			printf("xl%d: guessing 10baseFL\n", sc->xl_unit);
 		break;
 	case TC_DEVICEID_BOOMERANG_10_100BT:	/* 3c905-TX */
+	case TC_DEVICEID_HURRICANE_555:		/* 3c555 */
+	case TC_DEVICEID_HURRICANE_556:		/* 3c556 */
+	case TC_DEVICEID_HURRICANE_556B:	/* 3c556B */
 		sc->xl_media = XL_MEDIAOPT_MII;
 		sc->xl_xcvr = XL_XCVR_MII;
 		if (verbose)
@@ -987,9 +1013,12 @@ void xl_choose_xcvr(sc, verbose)
 			printf("xl%d: guessing 10/100 plus BNC/AUI\n",
 			    sc->xl_unit);
 		break;
-	case TC_DEVICEID_3CCFE575_CARDBUS:
+	case TC_DEVICEID_3C575_CARDBUS:
 	case TC_DEVICEID_3CCFE575BT_CARDBUS:
 	case TC_DEVICEID_3CCFE575CT_CARDBUS:
+	case TC_DEVICEID_3CCFEM656_CARDBUS:
+	case TC_DEVICEID_3CCFEM656B_CARDBUS:
+	case TC_DEVICEID_3CCFEM656C_CARDBUS:
 		sc->xl_media = XL_MEDIAOPT_MII;
 		sc->xl_xcvr = XL_XCVR_MII;
 		break;
@@ -1438,8 +1467,8 @@ int xl_intr(arg)
 		CSR_WRITE_2(sc, XL_COMMAND,
 		    XL_CMD_INTR_ACK|(status & XL_INTRS));
 
-		if (sc->xl_bustype == XL_BUS_CARDBUS)
-			bus_space_write_4(sc->xl_funct,sc->xl_funch, 4, 0x8000);
+		if (sc->intr_ack)
+			(*sc->intr_ack)(sc);
 
 		if (status & XL_STAT_UP_COMPLETE) {
 			int curpkts;
@@ -2008,6 +2037,12 @@ void xl_init(xsc)
 	else
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_COAX_STOP);
 
+#if NVLAN > 0
+	/* Set max packet size to handle VLAN frames, only on 3c905B */
+	if (sc->xl_type == XL_TYPE_905B)
+		CSR_WRITE_2(sc, XL_W3_MAX_PKT_SIZE, 1514 + 4);
+#endif
+
 	/* Clear out the stats counters. */
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_STATS_DISABLE);
 	sc->xl_stats_no_timeout = 1;
@@ -2021,12 +2056,11 @@ void xl_init(xsc)
 	 * Enable interrupts.
 	 */
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_INTR_ACK|0xFF);
-
-	if (sc->xl_bustype == XL_BUS_CARDBUS)
-		bus_space_write_4(sc->xl_funct, sc->xl_funch, 4, 0x8000);
-
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_STAT_ENB|XL_INTRS);
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_INTR_ENB|XL_INTRS);
+
+	if (sc->intr_ack)
+		(*sc->intr_ack)(sc);
 
 	/* Set the RX early threshold */
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RX_SET_THRESH|(XL_PACKET_SIZE >>2));
@@ -2296,6 +2330,36 @@ void xl_watchdog(ifp)
 	return;
 }
 
+void
+xl_freetxrx(sc)
+	struct xl_softc *sc;
+{
+	int i;
+
+	/*
+	 * Free data in the RX lists.
+	 */
+	for (i = 0; i < XL_RX_LIST_CNT; i++) {
+		if (sc->xl_cdata.xl_rx_chain[i].xl_mbuf != NULL) {
+			m_freem(sc->xl_cdata.xl_rx_chain[i].xl_mbuf);
+			sc->xl_cdata.xl_rx_chain[i].xl_mbuf = NULL;
+		}
+	}
+	bzero((char *)&sc->xl_ldata->xl_rx_list,
+		sizeof(sc->xl_ldata->xl_rx_list));
+	/*
+	 * Free the TX list buffers.
+	 */
+	for (i = 0; i < XL_TX_LIST_CNT; i++) {
+		if (sc->xl_cdata.xl_tx_chain[i].xl_mbuf != NULL) {
+			m_freem(sc->xl_cdata.xl_tx_chain[i].xl_mbuf);
+			sc->xl_cdata.xl_tx_chain[i].xl_mbuf = NULL;
+		}
+	}
+	bzero((char *)&sc->xl_ldata->xl_tx_list,
+		sizeof(sc->xl_ldata->xl_tx_list));
+}
+
 /*
  * Stop the adapter and free any mbufs allocated to the
  * RX and TX lists.
@@ -2303,7 +2367,6 @@ void xl_watchdog(ifp)
 void xl_stop(sc)
 	struct xl_softc *sc;
 {
-	int i;
 	struct ifnet *ifp;
 
 	ifp = &sc->arpcom.ac_if;
@@ -2329,34 +2392,13 @@ void xl_stop(sc)
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_STAT_ENB|0);
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_INTR_ENB|0);
 
-	if (sc->xl_bustype == XL_BUS_CARDBUS)
-		bus_space_write_4(sc->xl_funct, sc->xl_funch, 4, 0x8000);
+	if (sc->intr_ack)
+		(*sc->intr_ack)(sc);
 
 	/* Stop the stats updater. */
 	untimeout(xl_stats_update, sc);
 
-	/*
-	 * Free data in the RX lists.
-	 */
-	for (i = 0; i < XL_RX_LIST_CNT; i++) {
-		if (sc->xl_cdata.xl_rx_chain[i].xl_mbuf != NULL) {
-			m_freem(sc->xl_cdata.xl_rx_chain[i].xl_mbuf);
-			sc->xl_cdata.xl_rx_chain[i].xl_mbuf = NULL;
-		}
-	}
-	bzero((char *)&sc->xl_ldata->xl_rx_list,
-		sizeof(sc->xl_ldata->xl_rx_list));
-	/*
-	 * Free the TX list buffers.
-	 */
-	for (i = 0; i < XL_TX_LIST_CNT; i++) {
-		if (sc->xl_cdata.xl_tx_chain[i].xl_mbuf != NULL) {
-			m_freem(sc->xl_cdata.xl_tx_chain[i].xl_mbuf);
-			sc->xl_cdata.xl_tx_chain[i].xl_mbuf = NULL;
-		}
-	}
-	bzero((char *)&sc->xl_ldata->xl_tx_list,
-		sizeof(sc->xl_ldata->xl_tx_list));
+	xl_freetxrx(sc);
 
 	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
 
@@ -2389,17 +2431,16 @@ xl_attach(sc)
 
 	printf(" address %s\n", ether_sprintf(sc->arpcom.ac_enaddr));
 
-	if (sc->xl_bustype == XL_BUS_CARDBUS) {
-		u_int16_t devid;
+	if (sc->xl_flags & (XL_FLAG_INVERT_LED_PWR|XL_FLAG_INVERT_MII_PWR)) {
 		u_int16_t n;
 
 		XL_SEL_WIN(2);
 		n = CSR_READ_2(sc, 12);
-		xl_read_eeprom(sc, (caddr_t)&devid, XL_EE_PRODID, 1, 0);
 
-		if (devid != 0x5257)
+		if (sc->xl_flags & XL_FLAG_INVERT_LED_PWR)
 			n |= 0x0010;
-		if (devid == 0x5257 || devid == 0x6560 || devid == 0x6562)
+
+		if (sc->xl_flags & XL_FLAG_INVERT_MII_PWR)
 			n |= 0x4000;
 
 		CSR_WRITE_2(sc, 12, n);
@@ -2462,18 +2503,15 @@ xl_attach(sc)
 	sc->xl_xcvr &= XL_ICFG_CONNECTOR_MASK;
 	sc->xl_xcvr >>= XL_ICFG_CONNECTOR_BITS;
 
-	if (sc->xl_bustype == XL_BUS_CARDBUS) {
-		XL_SEL_WIN(2);
-		CSR_WRITE_2(sc, 12, 0x4000 | CSR_READ_2(sc, 12));
-	}
 	DELAY(100000);
 
 	xl_mediacheck(sc);
 
-	if (sc->xl_bustype == XL_BUS_CARDBUS) {
+	if (sc->xl_flags & XL_FLAG_INVERT_MII_PWR) {
 		XL_SEL_WIN(2);
 		CSR_WRITE_2(sc, 12, 0x4000 | CSR_READ_2(sc, 12));
 	}
+
 	DELAY(100000);
 
 	if (sc->xl_media & XL_MEDIAOPT_MII || sc->xl_media & XL_MEDIAOPT_BTX
@@ -2486,7 +2524,8 @@ xl_attach(sc)
 		sc->sc_mii.mii_writereg = xl_miibus_writereg;
 		sc->sc_mii.mii_statchg = xl_miibus_statchg;
 		xl_setcfg(sc);
-		mii_phy_probe((struct device *)sc, &sc->sc_mii, 0xffffffff);
+		mii_attach((struct device *)sc, &sc->sc_mii, 0xffffffff,
+		    MII_PHY_ANY, MII_OFFSET_ANY, 0);
 
 		if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
 			ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE,
@@ -2518,8 +2557,7 @@ xl_attach(sc)
 		ifmedia_add(ifm, IFM_ETHER|IFM_10_T, 0, NULL);
 		ifmedia_add(ifm, IFM_ETHER|IFM_10_T|IFM_HDX, 0, NULL);
 		if (sc->xl_caps & XL_CAPS_FULL_DUPLEX)
-			ifmedia_add(&sc->ifmedia,
-			    IFM_ETHER|IFM_10_T|IFM_FDX, 0, NULL);
+			ifmedia_add(ifm, IFM_ETHER|IFM_10_T|IFM_FDX, 0, NULL);
 	}
 
 	if (sc->xl_media & (XL_MEDIAOPT_AUI|XL_MEDIAOPT_10FL)) {
@@ -2601,7 +2639,33 @@ xl_attach(sc)
 	bpfattach(&sc->arpcom.ac_if.if_bpf, ifp,
 	    DLT_EN10MB, sizeof(struct ether_header));
 #endif
-	shutdownhook_establish(xl_shutdown, sc);
+	sc->sc_sdhook = shutdownhook_establish(xl_shutdown, sc);
+}
+
+int
+xl_detach(sc)
+	struct xl_softc *sc;
+{
+	struct ifnet *ifp = &sc->arpcom.ac_if;
+
+	/* Unhook our tick handler. */
+	untimeout(xl_stats_update, sc);
+
+	xl_freetxrx(sc);
+
+	/* Detach all PHYs */
+	if (sc->xl_hasmii)
+		mii_detach(&sc->sc_mii, MII_PHY_ANY, MII_OFFSET_ANY);
+
+	/* Delete all remaining media. */
+	ifmedia_delete_instance(&sc->sc_mii.mii_media, IFM_INST_ANY);
+
+	ether_ifdetach(ifp);
+	if_detach(ifp);
+
+	shutdownhook_disestablish(sc->sc_sdhook);
+
+	return (0);
 }
 
 void

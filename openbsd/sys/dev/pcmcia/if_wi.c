@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi.c,v 1.10 2000/04/24 19:43:36 niklas Exp $	*/
+/*	$OpenBSD: if_wi.c,v 1.16 2000/09/17 19:10:55 provos Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -108,8 +108,6 @@
 #include <dev/pcmcia/if_wireg.h>
 #include <dev/pcmcia/if_wavelan_ieee.h>
 
-#define TIMEOUT(handle,func,arg,time) timeout((func), (arg), (time))
-#define UNTIMEOUT(func,arg,handle) untimeout((func), (arg))
 #define BPF_MTAP(if,mbuf) bpf_mtap((if)->if_bpf, (mbuf))
 #define BPFATTACH(if_bpf,if,dlt,sz) bpfattach((if_bpf), (if), (dlt), (sz))
 #define STATIC
@@ -135,7 +133,7 @@ u_int32_t	widebug = WIDEBUG;
 
 #if !defined(lint) && !defined(__OpenBSD__)
 static const char rcsid[] =
-	"$OpenBSD: if_wi.c,v 1.10 2000/04/24 19:43:36 niklas Exp $";
+	"$OpenBSD: if_wi.c,v 1.16 2000/09/17 19:10:55 provos Exp $";
 #endif	/* lint */
 
 #ifdef foo
@@ -397,7 +395,8 @@ wi_pcmcia_activate(dev, act)
 	return (0);
 }
 
-int wi_intr(vsc)
+int
+wi_intr(vsc)
 	void			*vsc;
 {
 	struct wi_softc		*sc = vsc;
@@ -461,7 +460,8 @@ int wi_intr(vsc)
 	return (1);
 }
 
-STATIC void wi_rxeof(sc)
+STATIC void
+wi_rxeof(sc)
 	struct wi_softc		*sc;
 {
 	struct ifnet		*ifp;
@@ -566,7 +566,8 @@ STATIC void wi_rxeof(sc)
 	return;
 }
 
-STATIC void wi_txeof(sc, status)
+STATIC void
+wi_txeof(sc, status)
 	struct wi_softc		*sc;
 	int			status;
 {
@@ -585,7 +586,8 @@ STATIC void wi_txeof(sc, status)
 	return;
 }
 
-void wi_inquire(xsc)
+void
+wi_inquire(xsc)
 	void			*xsc;
 {
 	struct wi_softc		*sc;
@@ -594,7 +596,7 @@ void wi_inquire(xsc)
 	sc = xsc;
 	ifp = &sc->arpcom.ac_if;
 
-	TIMEOUT(sc->wi_stat_ch, wi_inquire, sc, hz * 60);
+	timeout_add(&sc->sc_timo, hz * 60);
 
 	/* Don't do this while we're transmitting */
 	if (ifp->if_flags & IFF_OACTIVE)
@@ -605,7 +607,8 @@ void wi_inquire(xsc)
 	return;
 }
 
-void wi_update_stats(sc)
+void
+wi_update_stats(sc)
 	struct wi_softc		*sc;
 {
 	struct wi_ltv_gen	gen;
@@ -643,7 +646,8 @@ void wi_update_stats(sc)
 	return;
 }
 
-STATIC int wi_cmd(sc, cmd, val)
+STATIC int
+wi_cmd(sc, cmd, val)
 	struct wi_softc		*sc;
 	int			cmd;
 	int			val;
@@ -679,7 +683,8 @@ STATIC int wi_cmd(sc, cmd, val)
 	return(0);
 }
 
-STATIC void wi_reset(sc)
+STATIC void
+wi_reset(sc)
 	struct wi_softc		*sc;
 {
 	DPRINTF(WID_RESET, ("wi_reset: sc %p\n", sc));
@@ -698,7 +703,8 @@ STATIC void wi_reset(sc)
 /*
  * Read an LTV record from the NIC.
  */
-STATIC int wi_read_record(sc, ltv)
+STATIC int
+wi_read_record(sc, ltv)
 	struct wi_softc		*sc;
 	struct wi_ltv_gen	*ltv;
 {
@@ -739,7 +745,8 @@ STATIC int wi_read_record(sc, ltv)
 /*
  * Same as read, except we inject data instead of reading it.
  */
-STATIC int wi_write_record(sc, ltv)
+STATIC int
+wi_write_record(sc, ltv)
 	struct wi_softc		*sc;
 	struct wi_ltv_gen	*ltv;
 {
@@ -762,7 +769,8 @@ STATIC int wi_write_record(sc, ltv)
 	return(0);
 }
 
-STATIC int wi_seek(sc, id, off, chan)
+STATIC int
+wi_seek(sc, id, off, chan)
 	struct wi_softc		*sc;
 	int			id, off, chan;
 {
@@ -798,7 +806,8 @@ STATIC int wi_seek(sc, id, off, chan)
 	return(0);
 }
 
-STATIC int wi_read_data(sc, id, off, buf, len)
+STATIC int
+wi_read_data(sc, id, off, buf, len)
 	struct wi_softc		*sc;
 	int			id, off;
 	caddr_t			buf;
@@ -829,7 +838,8 @@ STATIC int wi_read_data(sc, id, off, buf, len)
  * attempt to read then back. If we fail to locate the guard words where
  * we expect them, we preform the transfer over again.
  */
-STATIC int wi_write_data(sc, id, off, buf, len)
+STATIC int
+wi_write_data(sc, id, off, buf, len)
 	struct wi_softc		*sc;
 	int			id, off;
 	caddr_t			buf;
@@ -868,7 +878,8 @@ again:
  * Allocate a region of memory inside the NIC and zero
  * it out.
  */
-STATIC int wi_alloc_nicmem(sc, len, id)
+STATIC int
+wi_alloc_nicmem(sc, len, id)
 	struct wi_softc		*sc;
 	int			len;
 	int			*id;
@@ -901,7 +912,8 @@ STATIC int wi_alloc_nicmem(sc, len, id)
 	return(0);
 }
 
-STATIC void wi_setmulti(sc)
+STATIC void
+wi_setmulti(sc)
 	struct wi_softc		*sc;
 {
 	struct ifnet		*ifp;
@@ -945,7 +957,8 @@ STATIC void wi_setmulti(sc)
 	return;
 }
 
-STATIC void wi_setdef(sc, wreq)
+STATIC void
+wi_setdef(sc, wreq)
 	struct wi_softc		*sc;
 	struct wi_req		*wreq;
 {
@@ -1023,7 +1036,8 @@ STATIC void wi_setdef(sc, wreq)
 	return;
 }
 
-STATIC int wi_ioctl(ifp, command, data)
+STATIC int
+wi_ioctl(ifp, command, data)
 	struct ifnet		*ifp;
 	u_long			command;
 	caddr_t			data;
@@ -1032,7 +1046,7 @@ STATIC int wi_ioctl(ifp, command, data)
 	struct wi_softc		*sc;
 	struct wi_req		wreq;
 	struct ifreq		*ifr;
-	struct proc *p = curproc;
+	struct proc		*p = curproc;
 	struct ifaddr		*ifa = (struct ifaddr *)data;
 
 	s = splimp();
@@ -1040,8 +1054,10 @@ STATIC int wi_ioctl(ifp, command, data)
 	sc = ifp->if_softc;
 	ifr = (struct ifreq *)data;
 
-	if (sc->wi_gone)
+	if (sc->wi_gone) {
+		splx(s);
 		return(ENODEV);
+	}
 
 	DPRINTF (WID_IOCTL, ("wi_ioctl: command %lu data %p", command, data));
 
@@ -1063,6 +1079,14 @@ STATIC int wi_ioctl(ifp, command, data)
 		default:
 			wi_init(sc);
 			break;
+		}
+		break;
+
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu > ETHERMTU || ifr->ifr_mtu < ETHERMIN) {
+			error = EINVAL;
+		} else if (ifp->if_mtu != ifr->ifr_mtu) {
+			ifp->if_mtu = ifr->ifr_mtu;
 		}
 		break;
 
@@ -1154,7 +1178,8 @@ STATIC int wi_ioctl(ifp, command, data)
 	return(error);
 }
 
-STATIC void wi_init(xsc)
+STATIC void
+wi_init(xsc)
 	void			*xsc;
 {
 	struct wi_softc		*sc = xsc;
@@ -1258,12 +1283,14 @@ STATIC void wi_init(xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	TIMEOUT(sc->wi_stat_ch, wi_inquire, sc, hz * 60);
+	timeout_set(&sc->sc_timo, wi_inquire, sc);
+	timeout_add(&sc->sc_timo, hz * 60);
 
 	return;
 }
 
-STATIC void wi_start(ifp)
+STATIC void
+wi_start(ifp)
 	struct ifnet		*ifp;
 {
 	struct wi_softc		*sc;
@@ -1357,7 +1384,8 @@ STATIC void wi_start(ifp)
 	return;
 }
 
-STATIC int wi_mgmt_xmit(sc, data, len)
+STATIC int
+wi_mgmt_xmit(sc, data, len)
 	struct wi_softc		*sc;
 	caddr_t			data;
 	int			len;
@@ -1394,7 +1422,8 @@ STATIC int wi_mgmt_xmit(sc, data, len)
 	return(0);
 }
 
-STATIC void wi_stop(sc)
+STATIC void 
+wi_stop(sc)
 	struct wi_softc		*sc;
 {
 	struct ifnet		*ifp;
@@ -1409,14 +1438,15 @@ STATIC void wi_stop(sc)
 	CSR_WRITE_2(sc, WI_INT_EN, 0);
 	wi_cmd(sc, WI_CMD_DISABLE|sc->wi_portnum, 0);
 
-	UNTIMEOUT(wi_inquire, sc, sc->wi_stat_ch);
+	timeout_del(&sc->sc_timo);
 
 	ifp->if_flags &= ~(IFF_RUNNING|IFF_OACTIVE);
 
 	return;
 }
 
-STATIC void wi_watchdog(ifp)
+STATIC void
+wi_watchdog(ifp)
 	struct ifnet		*ifp;
 {
 	struct wi_softc		*sc;
@@ -1432,7 +1462,8 @@ STATIC void wi_watchdog(ifp)
 	return;
 }
 
-STATIC void wi_shutdown(arg)
+STATIC void
+wi_shutdown(arg)
 	void			*arg;
 {
 	struct wi_softc		*sc;
