@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.25 2003/12/08 14:34:27 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.26 2003/12/08 15:12:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -207,8 +207,8 @@ struct sioc_mif_req6 {
  */
 struct mif6 {
         u_char   	m6_flags;     	/* MIFF_ flags defined above         */
-#ifdef notyet
 	u_int      	m6_rate_limit; 	/* max rate			     */
+#ifdef notyet
 	struct tbf      *m6_tbf;      	/* token bucket structure at intf.   */
 #endif
 	struct ifnet    *m6_ifp;     	/* pointer to interface              */
