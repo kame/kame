@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.172 2004/06/14 05:45:29 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.173 2004/07/26 08:04:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1038,7 +1038,7 @@ main(argc, argv)
 		itimer.it_interval = interval;
 		itimer.it_value = interval;
 		(void)setitimer(ITIMER_REAL, &itimer, NULL);
-		if (ntransmitted)
+		if (ntransmitted == 0)
 			retransmit();
 	}
 
