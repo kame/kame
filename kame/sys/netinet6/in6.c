@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.132 2001/01/22 11:47:18 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.133 2001/01/22 11:48:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -329,7 +329,8 @@ in6_ifremloop(struct ifaddr *ifa)
 		 * route surely exists. With this check, we can avoid to
 		 * delete an interface direct route whose destination is same
 		 * as the address being removed. This can happen when remofing
-		 * a subnet-router anycast address on a shared interface. 
+		 * a subnet-router anycast address on an interface attahced
+		 * to a shared medium.
 		 */
 		rt = rtalloc1(ifa->ifa_addr, 0
 #ifdef __FreeBSD__
