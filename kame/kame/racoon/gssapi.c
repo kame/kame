@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.13 2001/01/29 23:09:30 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.14 2001/01/29 23:18:52 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -92,6 +92,43 @@ gssapi_error(OM_uint32 status_code, const char *where,
 				"%s\n", status_string.value);
 		gss_release_buffer(&min_stat, &status_string);
 	} while (message_context != 0);
+}
+
+/*
+ * vmbufs and gss_buffer_descs are really just the same on NetBSD, but
+ * this is to be portable.
+ */
+static int
+gssapi_vm2gssbuf(vchar_t *vmbuf, gss_buffer_t *gsstoken)
+{
+	if (*gsstoken == NULL) {
+		*gsstoken = (gss_buffer_t)malloc(sizeof (gss_buffer_desc));
+		if (*gsstoken == NULL)
+			return -1;
+	}
+
+	(*gsstoken)->value = malloc(vmbuf->l);
+	if ((*gsstoken)->value == NULL) {
+		free(*gsstoken);
+		return -1;
+	}
+
+	memcpy((*gsstoken)->value, vmbuf->v, vmbuf->l);
+	(*gsstoken)->length = vmbuf->l;
+
+	return 0;
+}
+
+static int
+gssapi_gss2vmbuf(gss_buffer_t gsstoken, vchar_t **vmbuf)
+{
+	*vmbuf = vmalloc(gsstoken->length);
+	if (*vmbuf == NULL)
+		return -1;
+	memcpy((*vmbuf)->v, gsstoken->value, gsstoken->length);
+	(*vmbuf)->l = gsstoken->length;
+
+	return 0;
 }
 
 static int
@@ -327,43 +364,6 @@ gssapi_get_rtoken(struct ph1handle *iph1, int *lenp)
 
 	if (lenp)
 		*lenp = itoken->length;
-
-	return 0;
-}
-
-/*
- * vmbufs and gss_buffer_descs are really just the same on NetBSD, but
- * this is to be portable.
- */
-int
-gssapi_vm2gssbuf(vchar_t *vmbuf, gss_buffer_t *gsstoken)
-{
-	if (*gsstoken == NULL) {
-		*gsstoken = (gss_buffer_t)malloc(sizeof (gss_buffer_desc));
-		if (*gsstoken == NULL)
-			return -1;
-	}
-
-	(*gsstoken)->value = malloc(vmbuf->l);
-	if ((*gsstoken)->value == NULL) {
-		free(*gsstoken);
-		return -1;
-	}
-
-	memcpy((*gsstoken)->value, vmbuf->v, vmbuf->l);
-	(*gsstoken)->length = vmbuf->l;
-
-	return 0;
-}
-
-int
-gssapi_gss2vmbuf(gss_buffer_t gsstoken, vchar_t **vmbuf)
-{
-	*vmbuf = vmalloc(gsstoken->length);
-	if (*vmbuf == NULL)
-		return -1;
-	memcpy((*vmbuf)->v, gsstoken->value, gsstoken->length);
-	(*vmbuf)->l = gsstoken->length;
 
 	return 0;
 }
