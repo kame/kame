@@ -180,8 +180,7 @@ sncconfig(sc, media, nmedia, defmedia, myea)
 	ifp->if_watchdog = sncwatchdog;
         ifp->if_init = sncinit;
         ifp->if_mtu = ETHERMTU;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-	IFQ_SET_READY(&ifp->if_snd);
+        ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 	bcopy(myea, sc->sc_ethercom.ac_enaddr, ETHER_ADDR_LEN);
 
 	/* Initialize media goo. */
@@ -339,12 +338,9 @@ outloop:
 		return;
 	}
 
-	IFQ_LOCK(&ifp->if_snd);
-	IFQ_POLL_NOLOCK(&ifp->if_snd, m);
-	if (m == 0) {
-		IFQ_UNLOCK(&ifp->if_snd);
+	IF_DEQUEUE(&ifp->if_snd, m);
+	if (m == 0)
 		return;
-	}
 
 	/* We need the header for m_pkthdr.len. */
 	M_ASSERTPKTHDR(m);
@@ -361,12 +357,9 @@ outloop:
 	 * it to the o/p queue.
 	 */
 	if ((sonicput(sc, m, mtd_next)) == 0) {
-		IFQ_UNLOCK(&ifp->if_snd);
+		IF_PREPEND(&ifp->if_snd, m);
 		return;
 	}
-
-	IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m);
-	IFQ_UNLOCK(&ifp->if_snd);
 
 	sc->mtd_prev = sc->mtd_free;
 	sc->mtd_free = mtd_next;

@@ -425,7 +425,6 @@ sr_attach(device_t device)
 		ifp->if_ioctl = srioctl;
 		ifp->if_start = srstart;
 		ifp->if_watchdog = srwatchdog;
-		IFQ_SET_READY(&ifp->if_snd);
 
 		sc->ifsppp.pp_flags = PP_KEEPALIVE;
 		sppp_attach((struct ifnet *)&sc->ifsppp);

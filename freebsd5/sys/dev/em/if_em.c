@@ -617,7 +617,6 @@ em_start_locked(struct ifnet *ifp)
                 if (m_head == NULL) break;
                         
 		if (em_encap(adapter, m_head)) { 
-			m_freem(m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
 			break;
@@ -1898,9 +1897,9 @@ em_setup_interface(device_t dev, struct adapter * adapter)
 	IFQ_SET_READY(&ifp->if_snd);
 
 #if __FreeBSD_version < 500000
-	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
+        ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 #else
-	ether_ifattach(ifp, adapter->interface_data.ac_enaddr);
+        ether_ifattach(ifp, adapter->interface_data.ac_enaddr);
 #endif
 
 	ifp->if_capabilities = ifp->if_capenable = 0;

@@ -206,8 +206,7 @@ sn_attach(device_t dev)
 	ifp->if_ioctl = snioctl;
 	ifp->if_watchdog = snwatchdog;
 	ifp->if_init = sninit;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 	ifp->if_timer = 0;
 
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
@@ -384,12 +383,9 @@ startagain:
 	/*
 	 * Sneak a peek at the next packet
 	 */
-	IFQ_LOCK(&sc->arpcom.ac_if.if_snd);
-	IFQ_POLL_NOLOCK(&sc->arpcom.ac_if.if_snd, m);
-	if (m == 0) {
-		IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
+	m = sc->arpcom.ac_if.if_snd.ifq_head;
+	if (m == 0)
 		return;
-	}
 	/*
 	 * Compute the frame length and set pad to give an overall even
 	 * number of bytes.  Below we assume that the packet length is even.
@@ -406,12 +402,10 @@ startagain:
 	if (len + pad > ETHER_MAX_LEN - ETHER_CRC_LEN) {
 		if_printf(ifp, "large packet discarded (A)\n");
 		++sc->arpcom.ac_if.if_oerrors;
-		IFQ_DEQUEUE_NOLOCK(&sc->arpcom.ac_if.if_snd, m);
-		IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
+		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 		m_freem(m);
 		goto readcheck;
 	}
-
 #ifdef SW_PAD
 
 	/*
@@ -468,8 +462,6 @@ startagain:
 		sc->arpcom.ac_if.if_timer = 1;
 		sc->arpcom.ac_if.if_flags |= IFF_OACTIVE;
 		sc->pages_wanted = numPages;
-
-		IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
 		return;
 	}
 	/*
@@ -479,7 +471,6 @@ startagain:
 	if (packet_no & ARR_FAILED) {
 		if (junk++ > 10)
 			if_printf(ifp, "Memory allocation failed\n");
-		IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
 		goto startagain;
 	}
 	/*
@@ -504,8 +495,7 @@ startagain:
 	 * Get the packet from the kernel.  This will include the Ethernet
 	 * frame header, MAC Addresses etc.
 	 */
-	IFQ_DEQUEUE_NOLOCK(&sc->arpcom.ac_if.if_snd, m);
-	IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
+	IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 
 	/*
 	 * Push out the data to the card.
@@ -607,10 +597,8 @@ snresume(struct ifnet *ifp)
 	/*
 	 * Sneak a peek at the next packet
 	 */
-	IFQ_LOCK(&sc->arpcom.ac_if.if_snd);
-	IFQ_POLL_NOLOCK(&sc->arpcom.ac_if.if_snd, m);
+	m = sc->arpcom.ac_if.if_snd.ifq_head;
 	if (m == 0) {
-		IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
 		if_printf(ifp, "snresume() with nothing to send\n");
 		return;
 	}
@@ -630,8 +618,7 @@ snresume(struct ifnet *ifp)
 	if (len + pad > ETHER_MAX_LEN - ETHER_CRC_LEN) {
 		if_printf(ifp, "large packet discarded (B)\n");
 		++sc->arpcom.ac_if.if_oerrors;
-		IFQ_DEQUEUE_NOLOCK(&sc->arpcom.ac_if.if_snd, m);
-		IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
+		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 		m_freem(m);
 		return;
 	}
@@ -665,7 +652,6 @@ snresume(struct ifnet *ifp)
 	 */
 	packet_no = CSR_READ_1(sc, ALLOC_RESULT_REG_B);
 	if (packet_no & ARR_FAILED) {
-		IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
 		if_printf(ifp, "Memory allocation failed.  Weird.\n");
 		sc->arpcom.ac_if.if_timer = 1;
 		goto try_start;
@@ -680,7 +666,6 @@ snresume(struct ifnet *ifp)
 	 * memory allocation was initiated.
 	 */
 	if (pages_wanted != numPages) {
-		IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
 		if_printf(ifp, "memory allocation wrong size.  Weird.\n");
 		/*
 		 * If the allocation was the wrong size we simply release the
@@ -709,8 +694,7 @@ snresume(struct ifnet *ifp)
 	 * Get the packet from the kernel.  This will include the Ethernet
 	 * frame header, MAC Addresses etc.
 	 */
-	IFQ_DEQUEUE_NOLOCK(&sc->arpcom.ac_if.if_snd, m);
-	IFQ_UNLOCK(&sc->arpcom.ac_if.if_snd);
+	IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 
 	/*
 	 * Push out the data to the card.

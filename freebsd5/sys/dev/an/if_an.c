@@ -2807,8 +2807,6 @@ an_start(ifp)
 		/* Re-enable interrupts. */
 		CSR_WRITE_2(sc, AN_INT_EN(sc->mpi350), AN_INTRS(sc->mpi350));
 	}
-	if (idx == sc->an_rdata.an_tx_prod)
-		return;
 
 	if (m0 != NULL)
 		ifp->if_flags |= IFF_OACTIVE;

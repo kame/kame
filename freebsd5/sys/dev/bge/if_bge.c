@@ -2384,8 +2384,7 @@ bge_attach(dev)
 	ifp->if_watchdog = bge_watchdog;
 	ifp->if_init = bge_init;
 	ifp->if_mtu = ETHERMTU;
-	IFQ_SET_MAXLEN(&ifp->if_snd, BGE_TX_RING_CNT - 1);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = BGE_TX_RING_CNT - 1;
 	ifp->if_hwassist = BGE_CSUM_FEATURES;
 	/* NB: the code for RX csum offload is disabled for now */
 	ifp->if_capabilities = IFCAP_TXCSUM | IFCAP_VLAN_HWTAGGING |
@@ -2983,7 +2982,7 @@ bge_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, BGE_MBX_IRQ0_LO, 0);
 
-	if (ifp->if_flags & IFF_RUNNING && !IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
 		bge_start_locked(ifp);
 
 	BGE_UNLOCK(sc);
@@ -3022,7 +3021,7 @@ bge_tick_locked(sc)
 				    BGE_MACMODE_TBI_SEND_CFGS);
 			CSR_WRITE_4(sc, BGE_MAC_STS, 0xFFFFFFFF);
 			printf("bge%d: gigabit link up\n", sc->bge_unit);
-			if (!IFQ_IS_EMPTY(&ifp->if_snd))
+			if (ifp->if_snd.ifq_head != NULL)
 				bge_start_locked(ifp);
 		}
 		return;
@@ -3200,7 +3199,6 @@ bge_start_locked(ifp)
 	struct bge_softc *sc;
 	struct mbuf *m_head = NULL;
 	u_int32_t prodidx = 0;
-	int pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -3210,12 +3208,9 @@ bge_start_locked(ifp)
 	prodidx = CSR_READ_4(sc, BGE_MBX_TX_HOST_PROD0_LO);
 
 	while(sc->bge_cdata.bge_tx_chain[prodidx] == NULL) {
-		IFQ_LOCK(&ifp->if_snd);
-		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
-		if (m_head == NULL) {
-			IFQ_UNLOCK(&ifp->if_snd);
+		IF_DEQUEUE(&ifp->if_snd, m_head);
+		if (m_head == NULL)
 			break;
-		}
 
 		/*
 		 * XXX
@@ -3234,7 +3229,7 @@ bge_start_locked(ifp)
 		    m_head->m_pkthdr.csum_flags & (CSUM_DELAY_DATA)) {
 			if ((BGE_TX_RING_CNT - sc->bge_txcnt) <
 			    m_head->m_pkthdr.csum_data + 16) {
-				IFQ_UNLOCK(&ifp->if_snd);
+				IF_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
@@ -3246,15 +3241,10 @@ bge_start_locked(ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (bge_encap(sc, m_head, &prodidx)) {
-			IFQ_UNLOCK(&ifp->if_snd);
+			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
-
-		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
-		IFQ_UNLOCK(&ifp->if_snd);
-		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -3262,8 +3252,6 @@ bge_start_locked(ifp)
 		 */
 		BPF_MTAP(ifp, m_head);
 	}
-	if (pkts == 0)
-		return;
 
 	/* Transmit */
 	CSR_WRITE_4(sc, BGE_MBX_TX_HOST_PROD0_LO, prodidx);

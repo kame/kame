@@ -298,7 +298,6 @@ ar_attach(device_t device)
 		ifp->if_ioctl = arioctl;
 		ifp->if_start = arstart;
 		ifp->if_watchdog = arwatchdog;
- 		IFQ_SET_READY(&ifp->if_snd);
 
 		sc->ifsppp.pp_flags = PP_KEEPALIVE;
 

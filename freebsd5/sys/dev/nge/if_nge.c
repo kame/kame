@@ -860,8 +860,7 @@ nge_attach(dev)
 	ifp->if_watchdog = nge_watchdog;
 	ifp->if_init = nge_init;
 	ifp->if_baudrate = 1000000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, NGE_TX_LIST_CNT - 1);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = NGE_TX_LIST_CNT - 1;
 	ifp->if_hwassist = NGE_CSUM_FEATURES;
 	ifp->if_capabilities = IFCAP_HWCSUM | IFCAP_VLAN_HWTAGGING;
 #ifdef DEVICE_POLLING
@@ -1608,7 +1607,6 @@ nge_start_locked(ifp)
 	struct nge_softc	*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		idx;
-	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -1621,23 +1619,15 @@ nge_start_locked(ifp)
 		return;
 
 	while(sc->nge_ldata->nge_tx_list[idx].nge_mbuf == NULL) {
-		IFQ_LOCK(&ifp->if_snd);
-		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
-		if (m_head == NULL) {
-			IFQ_UNLOCK(&ifp->if_snd);
+		IF_DEQUEUE(&ifp->if_snd, m_head);
+		if (m_head == NULL)
 			break;
-		}
 
 		if (nge_encap(sc, m_head, &idx)) {
-			IFQ_UNLOCK(&ifp->if_snd);
+			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
-
-		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
-		IFQ_UNLOCK(&ifp->if_snd);
-		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1646,8 +1636,6 @@ nge_start_locked(ifp)
 		BPF_MTAP(ifp, m_head);
 
 	}
-	if (pkts == 0)
-		return;
 
 	/* Transmit */
 	sc->nge_cdata.nge_tx_prod = idx;

@@ -92,7 +92,7 @@ Static void usbintr(void)
 
 		/* Re-arm the receiver */
 		(*q->if_rxstart)(ifp);
-		if (!IFQ_IS_EMPTY(&ifp->if_snd))
+		if (ifp->if_snd.ifq_head != NULL)
 			(*ifp->if_start)(ifp);
 	}
 
@@ -103,7 +103,7 @@ Static void usbintr(void)
 			break;
 		ifp = m->m_pkthdr.rcvif;
 		m_freem(m);
-		if (!IFQ_IS_EMPTY(&ifp->if_snd))
+		if (ifp->if_snd.ifq_head != NULL)
 			(*ifp->if_start)(ifp);
 	}
 

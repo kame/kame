@@ -514,8 +514,7 @@ USB_ATTACH(cue)
 	ifp->if_watchdog = cue_watchdog;
 	ifp->if_init = cue_init;
 	ifp->if_baudrate = 10000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
 	sc->cue_qdat.ifp = ifp;
 	sc->cue_qdat.if_rxstart = cue_rxstart;
@@ -883,23 +882,18 @@ cue_start(struct ifnet *ifp)
 		return;
 	}
 
-	IFQ_LOCK(&ifp->if_snd);
-	IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
+	IF_DEQUEUE(&ifp->if_snd, m_head);
 	if (m_head == NULL) {
-		IFQ_UNLOCK(&ifp->if_snd);
 		CUE_UNLOCK(sc);
 		return;
 	}
 
 	if (cue_encap(sc, m_head, 0)) {
-		IFQ_UNLOCK(&ifp->if_snd);
+		IF_PREPEND(&ifp->if_snd, m_head);
 		ifp->if_flags |= IFF_OACTIVE;
 		CUE_UNLOCK(sc);
 		return;
 	}
-
-	IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
-	IFQ_UNLOCK(&ifp->if_snd);
 
 	/*
 	 * If there's a BPF listener, bounce a copy of this frame
@@ -1083,7 +1077,7 @@ cue_watchdog(struct ifnet *ifp)
 	usbd_get_xfer_status(c->cue_xfer, NULL, NULL, NULL, &stat);
 	cue_txeof(c->cue_xfer, c, stat);
 
-	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
+	if (ifp->if_snd.ifq_head != NULL)
 		cue_start(ifp);
 	CUE_UNLOCK(sc);
 

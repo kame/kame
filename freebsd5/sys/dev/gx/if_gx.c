@@ -1447,7 +1447,7 @@ gx_intr(void *xsc)
 	/* Turn interrupts on. */
 	CSR_WRITE_4(gx, GX_INT_MASK_SET, GX_INT_WANTED);
 
-	if (ifp->if_flags & IFF_RUNNING && !IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
 		gx_start(ifp);
 
 	splx(s);
@@ -1582,12 +1582,9 @@ gx_start(struct ifnet *ifp)
 	gx = ifp->if_softc;
 
 	for (;;) {
-		IFQ_LOCK(&ifp->if_snd);
-		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
-		if (m_head == NULL) {
-			IFQ_UNLOCK(&ifp->if_snd);
+		IF_DEQUEUE(&ifp->if_snd, m_head);
+		if (m_head == NULL)
 			break;
-		}
 
 		/*
 		 * Pack the data into the transmit ring. If we
@@ -1595,13 +1592,10 @@ gx_start(struct ifnet *ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (gx_encap(gx, m_head) != 0) {
-			IFQ_UNLOCK(&ifp->if_snd);
+			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
-
-		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
-		IFQ_UNLOCK(&ifp->if_snd);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame

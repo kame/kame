@@ -2501,6 +2501,7 @@ wi_write_bap(struct wi_softc *sc, int id, int off, void *buf, int buflen)
 		CSR_WRITE_2(sc, WI_DATA0, ptr[i]);
 	sc->sc_bap_off += cnt * 2;
 
+#ifdef WI_HERMES_AUTOINC_WAR
 	/*
 	 * According to the comments in the HCF Light code, there is a bug
 	 * in the Hermes (or possibly in certain Hermes firmware revisions)
@@ -2526,6 +2527,7 @@ wi_write_bap(struct wi_softc *sc, int id, int off, void *buf, int buflen)
 			goto again;
 		}
 	}
+#endif
 	return 0;
 }
 

@@ -243,8 +243,6 @@ xe_attach (device_t dev)
   scp->ifp->if_init = xe_init;
   scp->ifp->if_baudrate = 100000000;
   scp->ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
-  IFQ_SET_MAXLEN(&scp->ifp->if_snd, IFQ_MAXLEN);
-  IFQ_SET_READY(&scp->ifp->if_snd);
 
   /* Initialise the ifmedia structure */
   ifmedia_init(scp->ifm, 0, xe_media_change, xe_media_status);
@@ -444,8 +442,7 @@ xe_start(struct ifnet *ifp) {
    */
   while (1) {
     /* Suck a packet off the send queue */
-    IFQ_LOCK(&ifp->if_snd);
-    IFQ_POLL_NOLOCK(&ifp->if_snd, mbp);
+    IF_DEQUEUE(&ifp->if_snd, mbp);
 
     if (mbp == NULL) {
       /*
@@ -455,7 +452,6 @@ xe_start(struct ifnet *ifp) {
        * we haven't filled all the buffers with data then we still want to
        * accept more.
        */
-      IFQ_UNLOCK(&ifp->if_snd);
       ifp->if_flags &= ~IFF_OACTIVE;
       return;
     }
@@ -466,9 +462,6 @@ xe_start(struct ifnet *ifp) {
       ifp->if_flags |= IFF_OACTIVE;
       return;
     }
-
-    IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, mbp);
-    IFQ_UNLOCK(&ifp->if_snd);
 
     /* Tap off here if there is a bpf listener */
     BPF_MTAP(ifp, mbp);

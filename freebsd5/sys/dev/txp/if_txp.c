@@ -339,8 +339,7 @@ txp_attach(dev)
 	ifp->if_watchdog = txp_watchdog;
 	ifp->if_init = txp_init;
 	ifp->if_baudrate = 100000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, TX_ENTRIES);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = TX_ENTRIES;
 	ifp->if_hwassist = 0;
 	txp_capabilities(sc);
 
@@ -1272,12 +1271,9 @@ txp_start(ifp)
 	cnt = r->r_cnt;
 
 	while (1) {
-		IFQ_LOCK(&ifp->if_snd);
-		IFQ_POLL_NOLOCK(&ifp->if_snd, m);
-		if (m == NULL) {
-			IFQ_UNLOCK(&ifp->if_snd);
+		IF_DEQUEUE(&ifp->if_snd, m);
+		if (m == NULL)
 			break;
-		}
 
 		firstprod = prod;
 		firstcnt = cnt;
@@ -1285,10 +1281,8 @@ txp_start(ifp)
 		sd = sc->sc_txd + prod;
 		sd->sd_mbuf = m;
 
-		if ((TX_ENTRIES - cnt) < 4) {
-			IFQ_UNLOCK(&ifp->if_snd);
+		if ((TX_ENTRIES - cnt) < 4)
 			goto oactive;
-		}
 
 		txd = r->r_desc + prod;
 
@@ -1302,10 +1296,8 @@ txp_start(ifp)
 		if (++prod == TX_ENTRIES)
 			prod = 0;
 
-		if (++cnt >= (TX_ENTRIES - 4)) {
-			IFQ_UNLOCK(&ifp->if_snd);
+		if (++cnt >= (TX_ENTRIES - 4))
 			goto oactive;
-		}
 
 		mtag = VLAN_OUTPUT_TAG(ifp, m);
 		if (mtag != NULL) {
@@ -1327,10 +1319,8 @@ txp_start(ifp)
 		for (m0 = m; m0 != NULL; m0 = m0->m_next) {
 			if (m0->m_len == 0)
 				continue;
-			if (++cnt >= (TX_ENTRIES - 4)) {
-				IFQ_UNLOCK(&ifp->if_snd);
+			if (++cnt >= (TX_ENTRIES - 4))
 				goto oactive;
-			}
 
 			txd->tx_numdesc++;
 
@@ -1349,10 +1339,6 @@ txp_start(ifp)
 
 		}
 
-		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m);
-		IFQ_UNLOCK(&ifp->if_snd);
-
 		ifp->if_timer = 5;
 
 		BPF_MTAP(ifp, m);
@@ -1367,6 +1353,7 @@ oactive:
 	ifp->if_flags |= IFF_OACTIVE;
 	r->r_prod = firstprod;
 	r->r_cnt = firstcnt;
+	IF_PREPEND(&ifp->if_snd, m);
 	return;
 }
 

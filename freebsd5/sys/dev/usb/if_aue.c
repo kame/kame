@@ -724,8 +724,7 @@ USB_ATTACH(aue)
 	ifp->if_watchdog = aue_watchdog;
 	ifp->if_init = aue_init;
 	ifp->if_baudrate = 10000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
 	/*
 	 * Do MII setup.
@@ -1108,7 +1107,7 @@ aue_tick(void *xsc)
 	if (!sc->aue_link && mii->mii_media_status & IFM_ACTIVE &&
 	    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 		sc->aue_link++;
-		if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
+		if (ifp->if_snd.ifq_head != NULL)
 			aue_start(ifp);
 	}
 
@@ -1180,23 +1179,18 @@ aue_start(struct ifnet *ifp)
 		return;
 	}
 
-	IFQ_LOCK(&ifp->if_snd);
-	IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
+	IF_DEQUEUE(&ifp->if_snd, m_head);
 	if (m_head == NULL) {
-		IFQ_UNLOCK(&ifp->if_snd);
 		AUE_UNLOCK(sc);
 		return;
 	}
 
 	if (aue_encap(sc, m_head, 0)) {
-		IFQ_UNLOCK(&ifp->if_snd);
+		IF_PREPEND(&ifp->if_snd, m_head);
 		ifp->if_flags |= IFF_OACTIVE;
 		AUE_UNLOCK(sc);
 		return;
 	}
-
-	IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
-	IFQ_UNLOCK(&ifp->if_snd);
 
 	/*
 	 * If there's a BPF listener, bounce a copy of this frame
@@ -1427,7 +1421,7 @@ aue_watchdog(struct ifnet *ifp)
 	usbd_get_xfer_status(c->aue_xfer, NULL, NULL, NULL, &stat);
 	aue_txeof(c->aue_xfer, c, stat);
 
-	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
+	if (ifp->if_snd.ifq_head != NULL)
 		aue_start(ifp);
 	AUE_UNLOCK(sc);
 	return;

@@ -294,8 +294,7 @@ ep_attach(struct ep_softc *sc)
 	ifp->if_ioctl = epioctl;
 	ifp->if_watchdog = epwatchdog;
 	ifp->if_init = epinit;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
 	if (!sc->epb.mii_trans) {
 		ifmedia_init(&sc->ifmedia, 0, ep_ifmedia_upd, ep_ifmedia_sts);
@@ -566,7 +565,7 @@ readcheck:
 		 * we check if we have packets left, in that case
 		 * we prepare to come back later
 		 */
-		if (!IFQ_IS_EMPTY(&ifp->if_snd))
+		if (ifp->if_snd.ifq_head)
 			CSR_WRITE_2(sc, EP_COMMAND, SET_TX_AVAIL_THRESH | 8);
 		goto done;
 	}
@@ -675,7 +674,7 @@ rescan:
 				         * To have a tx_avail_int but giving
 					 * the chance to the Reception
 				         */
-					if (!IFQ_IS_EMPTY(&ifp->if_snd))
+					if (ifp->if_snd.ifq_head)
 						CSR_WRITE_2(sc, EP_COMMAND,
 						    SET_TX_AVAIL_THRESH | 8);
 				}

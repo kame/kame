@@ -314,11 +314,7 @@ ie_attach(device_t dev)
 	ifp->if_start = iestart;
 	ifp->if_ioctl = ieioctl;
 	ifp->if_init = ieinit;
-	ifp->if_type = IFT_ETHER;
-	ifp->if_addrlen = 6;
-	ifp->if_hdrlen = 14;
-	IFQ_SET_READY(&ifp->if_snd);
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
 	if (sc->hard_type == IE_EE16)
 		EVENTHANDLER_REGISTER(shutdown_post_sync, ee16_shutdown,
@@ -932,7 +928,7 @@ iestart(struct ifnet *ifp)
 		return;
 
 	do {
-		IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 		if (!m)
 			break;
 

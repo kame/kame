@@ -233,8 +233,7 @@ sbni_attach(struct sbni_softc *sc, int unit, struct sbni_flags flags)
 	ifp->if_start	= sbni_start;
 	ifp->if_ioctl	= sbni_ioctl;
 	ifp->if_watchdog	= sbni_watchdog;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen	= IFQ_MAXLEN;
 
 	/* report real baud rate */
 	csr0 = sbni_inb(sc, CSR0);
@@ -661,7 +660,7 @@ prepare_to_send(struct sbni_softc *sc)
 	sc->state &= ~(FL_WAIT_ACK | FL_NEED_RESEND);
 
 	for (;;) {
-		IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, sc->tx_buf_p);
+		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, sc->tx_buf_p);
 		if (!sc->tx_buf_p) {
 			/* nothing to transmit... */
 			sc->pktlen     = 0;
@@ -695,13 +694,21 @@ prepare_to_send(struct sbni_softc *sc)
 static void
 drop_xmit_queue(struct sbni_softc *sc)
 {
+	struct mbuf *m;
+
 	if (sc->tx_buf_p) {
 		m_freem(sc->tx_buf_p);
 		sc->tx_buf_p = NULL;
 		sc->arpcom.ac_if.if_oerrors++;
 	}
 
-	IFQ_PURGE(&sc->arpcom.ac_if.if_snd);
+	for (;;) {
+		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+		if (m == NULL)
+			break;
+		m_freem(m);
+		sc->arpcom.ac_if.if_oerrors++;
+	}
 
 	sc->tx_frameno	= 0;
 	sc->framelen	= 0;

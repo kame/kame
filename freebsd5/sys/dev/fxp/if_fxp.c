@@ -741,7 +741,6 @@ fxp_attach(device_t dev)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
-	IFQ_SET_READY(&ifp->if_snd);
 
 	ifp->if_capabilities = ifp->if_capenable = 0;
 
@@ -1455,11 +1454,6 @@ fxp_start_body(struct ifnet *ifp)
 	 * going again if suspended.
 	 */
 	if (txp != NULL) {
-#ifdef ALTQ
-		/* if tb regulator is used, we need tx complete interrupt */
-		if (TBR_IS_ENABLED(&ifp->if_snd))
-			txp->tx_cb->cb_command |= FXP_CB_COMMAND_I;
-#endif
 		fxp_scb_wait(sc);
 		fxp_scb_cmd(sc, FXP_SCB_COMMAND_CU_RESUME);
 	}
