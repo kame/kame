@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.12 2000/03/25 07:23:33 sumikawa Exp $	*/
+/*	$KAME: if_faith.c,v 1.13 2000/05/05 11:00:55 sumikawa Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -41,7 +41,11 @@
 /*
  * Loopback interface driver for protocol testing and timing.
  */
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

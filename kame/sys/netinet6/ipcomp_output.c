@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_output.c,v 1.12 2000/03/25 07:23:49 sumikawa Exp $	*/
+/*	$KAME: ipcomp_output.c,v 1.13 2000/05/05 11:01:01 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -33,7 +33,11 @@
  * RFC2393 IP payload compression protocol (IPComp).
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

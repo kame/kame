@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.14 2000/03/27 05:11:06 sumikawa Exp $	*/
+/*	$KAME: keysock.c,v 1.15 2000/05/05 11:01:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,6 +31,7 @@
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #endif
 
 /* This code has derived from sys/net/rtsock.c on FreeBSD2.2.5 */

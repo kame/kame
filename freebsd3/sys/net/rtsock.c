@@ -65,6 +65,7 @@
 
 /* for MIP6 */
 #include "opt_inet.h"
+#include "opt_inet6.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>

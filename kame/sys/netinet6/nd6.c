@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.60 2000/04/29 05:57:47 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.61 2000/05/05 11:01:03 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,7 +37,11 @@
  * I left the code mostly as it was in 970310.  -- itojun
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

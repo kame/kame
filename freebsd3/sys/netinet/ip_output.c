@@ -41,6 +41,7 @@
 #include "opt_ipdivert.h"
 #include "opt_ipfilter.h"
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #include "opt_pm.h"
 
 #include <sys/param.h>

@@ -28,6 +28,7 @@
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #include "opt_ipx.h"
 #endif
 

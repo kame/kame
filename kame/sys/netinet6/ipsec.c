@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.58 2000/04/11 08:46:48 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.59 2000/05/05 11:01:01 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,11 +33,13 @@
  * IPsec controller part.
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
-#ifdef __NetBSD__	/*XXX*/
-#include "opt_ipsec.h"
+#include "opt_inet6.h"
 #endif
+#ifdef __NetBSD__
+#include "opt_inet.h"
+#include "opt_ipsec.h"
 #endif
 
 #include <sys/param.h>

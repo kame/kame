@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.18 2000/03/25 07:23:54 sumikawa Exp $	*/
+/*	$KAME: mld6.c,v 1.19 2000/05/05 11:01:03 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -68,7 +68,11 @@
  *	@(#)igmp.c	8.1 (Berkeley) 7/19/93
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.16 2000/03/27 05:11:05 sumikawa Exp $	*/
+/*	$KAME: key_debug.c,v 1.17 2000/05/05 11:01:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,11 @@
  */
 
 #ifdef _KERNEL
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 #endif

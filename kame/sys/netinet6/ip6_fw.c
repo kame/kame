@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.12 2000/03/25 07:23:46 sumikawa Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.13 2000/05/05 11:01:00 sumikawa Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -14,7 +14,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.12 2000/03/25 07:23:46 sumikawa Exp $
+ *	$Id: ip6_fw.c,v 1.13 2000/05/05 11:01:00 sumikawa Exp $
  */
 
 /*
@@ -25,6 +25,7 @@
 #include "opt_ip6fw.h"
 #if __FreeBSD__ >= 3
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #endif
 #endif
 

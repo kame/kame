@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.79 2000/04/27 16:43:21 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.80 2000/05/05 11:00:59 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,11 @@
  *	@(#)in.c	8.2 (Berkeley) 11/15/93
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

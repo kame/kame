@@ -62,9 +62,8 @@
  *	@(#)raw_ip.c	8.2 (Berkeley) 1/4/94
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
-#endif
+#include "opt_inet6.h"
 
 #include <stddef.h>
 

@@ -57,6 +57,7 @@
 #include "vlan.h"
 #if NVLAN > 0
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #include "bpfilter.h"
 
 #include <sys/param.h>

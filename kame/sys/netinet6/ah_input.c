@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.24 2000/03/26 23:08:59 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.25 2000/05/05 11:00:57 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,7 +33,11 @@
  * RFC1826/2402 authentication header.
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.11 2000/03/25 07:23:59 sumikawa Exp $	*/
+/*	$KAME: route6.c,v 1.12 2000/05/05 11:01:04 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,11 @@
  * SUCH DAMAGE.
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.62 2000/03/27 05:11:05 sumikawa Exp $	*/
+/*	$KAME: keydb.c,v 1.63 2000/05/05 11:01:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,11 +29,13 @@
  * SUCH DAMAGE.
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
-#ifdef __NetBSD__
-#include "opt_ipsec.h"
+#include "opt_inet6.h"
 #endif
+#ifdef __NetBSD__
+#include "opt_inet.h"
+#include "opt_ipsec.h"
 #endif
 
 #include <sys/types.h>

@@ -24,6 +24,7 @@
 #include "opt_ipdn.h"
 #include "opt_ipdivert.h"
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #ifndef INET
 #error IPFIREWALL requires INET.
 #endif /* INET */

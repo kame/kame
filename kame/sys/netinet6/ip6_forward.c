@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.30 2000/03/25 07:23:46 sumikawa Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.31 2000/05/05 11:01:00 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,9 +29,12 @@
  * SUCH DAMAGE.
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 #include "opt_ip6fw.h"
+#if __FreeBSD__ >= 3
 #include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
 #endif
 
 #include <sys/param.h>

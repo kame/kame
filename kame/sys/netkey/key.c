@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.78 2000/04/19 17:50:49 sakane Exp $	*/
+/*	$KAME: key.c,v 1.79 2000/05/05 11:01:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,11 +33,13 @@
  * This code is referd to RFC 2367
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
-#ifdef __NetBSD__
-#include "opt_ipsec.h"
+#include "opt_inet6.h"
 #endif
+#ifdef __NetBSD__
+#include "opt_inet.h"
+#include "opt_ipsec.h"
 #endif
 
 /* this is for backward compatibility. we should not touch those. */

@@ -240,7 +240,7 @@ BRIDGE			opt_bdg.h
 MROUTING		opt_mrouting.h
 GATEWAY6		opt_inet.h
 INET			opt_inet.h
-INET6			opt_inet.h
+INET6			opt_inet6.h
 MIP6			opt_inet.h
 MIP6_DEBUG		opt_inet.h
 IPSEC			opt_inet.h

@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.23 2000/03/25 07:23:40 sumikawa Exp $	*/
+/*	$KAME: esp_input.c,v 1.24 2000/05/05 11:00:58 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,7 +33,11 @@
  * RFC1827/2406 Encapsulated Security Payload.
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

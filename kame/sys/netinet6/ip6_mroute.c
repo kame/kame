@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.20 2000/04/23 03:38:26 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.21 2000/05/05 11:01:01 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -44,7 +44,11 @@
  * MROUTING Revision: 3.5.1.2 + PIM-SMv2 (pimd) Support
  */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.39 2000/04/26 05:33:31 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.40 2000/05/05 11:00:56 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,14 +29,15 @@
  * SUCH DAMAGE.
  */
 
-/*
- * in_gif.c
- */
-
 #ifdef __FreeBSD__
 #include "opt_mrouting.h"
+#if __FreeBSD__ >= 3
+#include "opt_inet.h"
+#include "opt_inet6.h"
 #endif
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#endif
+#ifdef __NetBSD__
+#include "opt_mrouting.h"
 #include "opt_inet.h"
 #endif
 

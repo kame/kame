@@ -66,6 +66,7 @@
 #include "opt_ipdivert.h"
 #include "opt_ipx.h"
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #include "opt_pm.h"
 #include "opt_natpt.h"
 

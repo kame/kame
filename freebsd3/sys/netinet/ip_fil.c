@@ -12,6 +12,7 @@ static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_fil.c,v 1.7.2.1 19
 
 #if (defined(_KERNEL) || defined(KERNEL)) && defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #endif
 #include "opt_ipfilter.h"
 
