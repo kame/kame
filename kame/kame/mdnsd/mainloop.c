@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.37 2000/06/04 05:18:23 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.38 2000/06/12 03:16:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -992,10 +992,12 @@ serve(sd, buf, len, from)
 		if (encode_name(&p, sizeof(replybuf) - (p - replybuf), n)
 		    == NULL)
 			goto fail;
+		if (p + 10 - replybuf > sizeof(replybuf))
+			goto fail;
 		/* XXX alignment */
-		*(u_int16_t *)p = htons(type);
+		*(u_int16_t *)p = htons(type);	/*PTR*/
 		p += sizeof(u_int16_t);
-		*(u_int16_t *)p = htons(class);
+		*(u_int16_t *)p = htons(class);	/*IN*/
 		p += sizeof(u_int16_t);
 		*(int32_t *)p = htonl(30);	/*TTL*/
 		p += sizeof(int32_t);
@@ -1038,10 +1040,12 @@ serve(sd, buf, len, from)
 				== NULL) {
 			goto fail;
 		}
+		if (p + 16 - replybuf > sizeof(replybuf))
+			goto fail;
 		/* XXX alignment */
-		*(u_int16_t *)p = htons(type);
+		*(u_int16_t *)p = htons(type);	/*SRV*/
 		p += sizeof(u_int16_t);
-		*(u_int16_t *)p = htons(class);
+		*(u_int16_t *)p = htons(class);	/*IN*/
 		p += sizeof(u_int16_t);
 		*(int32_t *)p = htonl(30);	/*TTL*/
 		p += sizeof(int32_t);
