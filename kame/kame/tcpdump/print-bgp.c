@@ -177,8 +177,8 @@ static const char *bgpattr_origin[] = {
 static const char *bgpattr_type[] = {
 	NULL, "ORIGIN", "AS_PATH", "NEXT_HOP",
 	"MULTI_EXIT_DISC", "LOCAL_PREF", "ATOMIC_AGGREGATE", "AGGREGATOR",
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, "MP_REACH_NLRI", "MP_UNREACH_NLRI",
+	"COMMUNITIES", "ORIGINATOR_ID", "CLUSTER_LIST", "DPA",
+	"ADVERTISERS", "RCID_PATH", "MP_REACH_NLRI", "MP_UNREACH_NLRI",
 };
 #define bgp_attr_type(x) \
 	num_or_str(bgpattr_type, \
@@ -191,6 +191,11 @@ static const char *bgpattr_nlri_safi[] = {
 #define bgp_attr_nlri_safi(x) \
 	num_or_str(bgpattr_nlri_safi, \
 		sizeof(bgpattr_nlri_safi)/sizeof(bgpattr_nlri_safi[0]), (x))
+
+/* well-known community */
+#define BGP_COMMUNITY_NO_EXPORT			0xffffff01
+#define BGP_COMMUNITY_NO_ADVERT			0xffffff02
+#define BGP_COMMUNITY_NO_EXPORT_SUBCONFED	0xffffff03
 
 /* RFC1700 address family numbers */
 #define AFNUM_INET	1
@@ -326,13 +331,20 @@ bgp_attr_print(const struct bgp_attr *attr, const u_char *dat, int len)
 			break;
 		}
 		while (p < dat + len) {
+			/*
+			 * under RFC1965, p[0] means:
+			 * 1: AS_SET 2: AS_SEQUENCE
+			 * 3: AS_CONFED_SET 4: AS_CONFED_SEQUENCE
+			 */
 			printf(" ");
-			printf("%s", (p[0] == 1) ? "{" : "");
+			if (p[0] == 3 || p[0] == 4)
+				printf("confed");
+			printf("%s", (p[0] & 1) ? "{" : "");
 			for (i = 0; i < p[1]; i += 2) {
 				printf("%s%u", i == 0 ? "" : " ",
 					ntohs(*(u_int16_t *)&p[2 + i]));
 			}
-			printf("%s", (p[0] == 1) ? "}" : "");
+			printf("%s", (p[0] & 1) ? "}" : "");
 			p += 2 + p[1] * 2;
 		}
 		break;
@@ -360,6 +372,31 @@ bgp_attr_print(const struct bgp_attr *attr, const u_char *dat, int len)
 		}
 		printf(" AS #%u, origin %s", ntohs(*(u_int16_t *)p),
 			getname(p + 2));
+		break;
+	case BGPTYPE_COMMUNITIES:
+		if (len % 4) {
+			printf(" invalid len");
+			break;
+		}
+		for (i = 0; i < len; i++) {
+			u_int32_t comm;
+			comm = (u_int32_t)ntohl(*(u_int32_t *)&p[i]);
+			switch (comm) {
+			case BGP_COMMUNITY_NO_EXPORT:
+				printf(" NO_EXPORT");
+				break;
+			case BGP_COMMUNITY_NO_ADVERT:
+				printf(" NO_ADVERTISE");
+				break;
+			case BGP_COMMUNITY_NO_EXPORT_SUBCONFED:
+				printf(" NO_EXPORT_SUBCONFED");
+				break;
+			default:
+				printf(" (AS #%d value 0x%04x)",
+					(comm >> 16) & 0xffff, comm & 0xfffff);
+				break;
+			}
+		}
 		break;
 	case BGPTYPE_MP_REACH_NLRI:
 		af = ntohs(*(u_int16_t *)p);
