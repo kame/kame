@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.25 2001/04/08 21:30:36 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.26 2001/05/05 12:10:13 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,6 +37,7 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 #include <sys/syslog.h>
 #include <sys/systm.h>
 
@@ -266,15 +267,15 @@ fakeTimxceed(struct _cv *cv4from, struct mbuf *m4)
 	bcopy(&ats->remote.in4src, &Dum.a, sizeof(Dum.a));
 	bcopy(&ats->remote.in4dst, &Dee.a, sizeof(Dee.a));
 	cksum = adjustChecksum(ntohs(innerip4to->ip_sum),
-			       &Dum.a, sizeof(Dum.a),
-			       &Dee.a, sizeof(Dee.a));
+			       (u_char *)&Dum.a, sizeof(Dum.a),
+			       (u_char *)&Dee.a, sizeof(Dee.a));
 	innerip4to->ip_sum = htons(cksum);
 
 	Dum.p = ats->remote._sport;
 	Dum.p = ats->local._sport;	/*XXX BUG? */
 	cksum = adjustChecksum(ntohs(icmp4to->icmp_cksum),
-			       &Dum, sizeof(Dum),
-			       &Dee, sizeof(Dee));
+			       (u_char *)&Dum, sizeof(Dum),
+			       (u_char *)&Dee, sizeof(Dee));
 	icmp4to->icmp_cksum = htons(cksum);
     }
     

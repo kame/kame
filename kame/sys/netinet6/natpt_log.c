@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.c,v 1.9 2001/04/04 05:22:56 itojun Exp $	*/
+/*	$KAME: natpt_log.c,v 1.10 2001/05/05 12:10:12 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,7 +160,6 @@ natpt_lbuf(int type, int priorities, size_t size)
 {
     struct	mbuf	*m;
     struct	lbuf	*p;
-    int l;
 
     if (size + sizeof(struct l_hdr) > MCLBYTES)
 	return NULL;
