@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.8 2000/05/30 16:33:02 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.9 2000/05/30 18:18:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -262,6 +262,10 @@ hexdump(title, buf, len, from)
 	if (len % 16 != 0)
 		printf("\n");
 
+	if (sizeof(*hp) > len) {
+		printf("packet too short, %d\n", len);
+		return -1;
+	}
 	hp = (HEADER *)buf;
 	printf("id: %04x qr: %u opcode: %u rcode: %u %u/%u/%u/%u/%u/%u/%u\n",
 	    ntohs(hp->id), hp->qr, hp->opcode, hp->rcode,
@@ -269,6 +273,7 @@ hexdump(title, buf, len, from)
 	printf("qd: %u an: %u ns: %u ar: %u\n",
 	    ntohs(hp->qdcount), ntohs(hp->ancount), ntohs(hp->nscount), 
 	    ntohs(hp->arcount));
+
 	if (len > sizeof(*hp)) {
 		d = (char *)(hp + 1);
 
@@ -514,9 +519,11 @@ getans(buf, len, from)
 	int len;
 	struct sockaddr *from;
 {
-	HEADER *hp;
+	HEADER *ohp, *hp;
 	struct qcache *qc;
 
+	if (sizeof(*hp) > len)
+		return -1;
 	hp = (HEADER *)buf;
 
 	hexdump("getans I", buf, len, from);
@@ -531,10 +538,12 @@ getans(buf, len, from)
 	}
 	if (!qc)
 		return -1;
+	ohp = (HEADER *)qc->qbuf;
 
 	/* XXX validate reply against original query */
-	hp->id = ((HEADER *)qc->qbuf)->id;
-	hp->rd = 0;
+
+	hp->id = ohp->id;
+	hp->rd = 0;	/* recursion not supported */
 	hexdump("getans O", buf, len, (struct sockaddr *)&qc->from);
 	if (sendto(insock, buf, len, 0, (struct sockaddr *)&qc->from,
 	    qc->from.ss_len) != len) {
@@ -543,31 +552,6 @@ getans(buf, len, from)
 	}
 	delqcache(qc);
 	return 0;
-#if 0
-	if (hp->qr == 0 && hp->opcode == QUERY) {
-		/* query, no recurse - multicast it */
-		qc = newqcache(from, buf, len);
-
-		/* never ask for recursion */
-		hp->rd = 0;
-
-		qc->id = hp->id = htons(dnsid);
-		dnsid = (dnsid + 1) % 0x10000;
-
-		sa = getsa(MDNS_GROUP6, dstport, SOCK_DGRAM);
-		if (!sa) {
-			delqcache(qc);
-			return -1;
-		}
-		hexdump("relay O", buf, len, sa);
-		if (sendto(insock, buf, len, 0, sa, sa->sa_len) != len) {
-			delqcache(qc);
-			return -1;
-		}
-		return 0;
-	} else
-		return -1;
-#endif
 }
 
 static int
@@ -580,6 +564,8 @@ relay(buf, len, from)
 	HEADER *hp;
 	struct qcache *qc;
 
+	if (sizeof(*hp) > len)
+		return -1;
 	hp = (HEADER *)buf;
 
 	hexdump("relay I", buf, len, from);
@@ -630,6 +616,8 @@ serve(buf, len, from)
 	hexdump("serve I", buf, len, from);
 
 	/* we handle queries only */
+	if (sizeof(*hp) > len)
+		return -1;
 	hp = (HEADER *)buf;
 	if (hp->qr != 0 || hp->opcode != QUERY)
 		goto fail;
