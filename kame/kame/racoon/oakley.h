@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.3 2000/01/09 01:31:29 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.4 2000/01/12 20:57:28 sakane Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -150,11 +150,14 @@ extern vchar_t *oakley_compute_hash3
 	__P((struct ph1handle *iph1, u_int32_t msgid, vchar_t *body));
 extern vchar_t *oakley_compute_hash1
 	__P((struct ph1handle *iph1, u_int32_t msgid, vchar_t *body));
-extern vchar_t *oakley_compute_hash __P((struct ph1handle *iph1, int sw));
+extern vchar_t *oakley_ph1hash_common __P((struct ph1handle *iph1, int sw));
+extern vchar_t *oakley_ph1hash_base_i __P((struct ph1handle *iph1, int sw));
+extern vchar_t *oakley_ph1hash_base_r __P((struct ph1handle *iph1, int sw));
 
 extern int oakley_validate_auth __P((struct ph1handle *iph1));
 extern int oakley_getcert __P((struct ph1handle *iph1));
-extern int oakley_compute_skeyids __P((struct ph1handle *iph1));
+extern int oakley_skeyid __P((struct ph1handle *iph1));
+extern int oakley_skeyid_dae __P((struct ph1handle *iph1));
 
 extern int oakley_compute_enckey __P((struct ph1handle *iph1));
 extern int oakley_newiv __P((struct ph1handle *iph1));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.42 2000/01/12 15:10:31 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.43 2000/01/12 20:57:26 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -311,6 +311,7 @@ isakmp_main(msg, remote, local)
 	switch (isakmp->etype) {
 	case ISAKMP_ETYPE_IDENT:
 	case ISAKMP_ETYPE_AGG:
+	case ISAKMP_ETYPE_BASE:
 		/* phase 1 validity check */
 		if (isakmp->msgid != 0) {
 			plog(logp, LOCATION, NULL,
@@ -413,7 +414,6 @@ isakmp_main(msg, remote, local)
 
 		break;
 
-	case ISAKMP_ETYPE_BASE:
 	case ISAKMP_ETYPE_AUTH:
 		YIPSDEBUG(DEBUG_NOTIFY,
 			plog(logp, LOCATION, remote,

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.3 2000/01/12 17:23:08 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.4 2000/01/12 20:57:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -127,14 +127,15 @@ getpsk(id0)
 		return NULL;
 	}
 
-	id = CALLOC(1 + id0->l, char *);
+	id = CALLOC(1 + id0->l - sizeof(struct ipsecdoi_id_b), char *);
 	if (id == NULL) {
 		plog(logp, LOCATION, NULL,
 			"calloc (%s)\n", strerror(errno)); 
 		goto end;
 	}
-	memcpy(id, id0->v, id0->l);
-	id[id0->l] = '\0';
+	memcpy(id, id0->v + sizeof(struct ipsecdoi_id_b),
+		id0->l - sizeof(struct ipsecdoi_id_b));
+	id[id0->l - sizeof(struct ipsecdoi_id_b)] = '\0';
 
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		/* search the end of 1st string. */

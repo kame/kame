@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.9 2000/01/12 15:09:05 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.10 2000/01/12 20:57:27 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -295,7 +295,9 @@ agg_i2recv(iph1, msg)
 		sizeof(cookie_t));
 
 	/* generate SKEYIDs & IV & final cipher key */
-	if (oakley_compute_skeyids(iph1) < 0)
+	if (oakley_skeyid(iph1) < 0)
+		goto end;
+	if (oakley_skeyid_dae(iph1) < 0)
 		goto end;
 	if (oakley_compute_enckey(iph1) < 0)
 		goto end;
@@ -355,7 +357,7 @@ agg_i2send(iph1, msg)
 
 	/* generate HASH to send */
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_I\n"));
-	iph1->hash = oakley_compute_hash(iph1, GENERATE);
+	iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
 	if (iph1->hash == NULL)
 		goto end;
 
@@ -582,7 +584,9 @@ agg_r1send(iph1, msg)
 		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */
-	if (oakley_compute_skeyids(iph1) < 0)
+	if (oakley_skeyid(iph1) < 0)
+		goto end;
+	if (oakley_skeyid_dae(iph1) < 0)
 		goto end;
 	if (oakley_compute_enckey(iph1) < 0)
 		goto end;
@@ -591,7 +595,7 @@ agg_r1send(iph1, msg)
 
 	/* generate HASH to send */
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_R\n"));
-	iph1->hash = oakley_compute_hash(iph1, GENERATE);
+	iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
 	if (iph1->hash == NULL)
 		goto end;
 

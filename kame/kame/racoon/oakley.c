@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.4 2000/01/12 17:23:08 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.5 2000/01/12 20:57:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -81,9 +81,6 @@ do {                                                                           \
 } while(0);
 
 struct dhgroup dhgroup[MAXDHGROUP];
-
-static vchar_t *oakley_ph1hash_common __P((struct ph1handle *iph1, int sw));
-static vchar_t *oakley_ph1hash_base __P((struct ph1handle *iph1, int sw));
 
 static vchar_t oakley_prime768;
 static vchar_t oakley_prime1024;
@@ -714,36 +711,10 @@ end:
 /*
  * compute phase1 HASH
  * main/aggressive
- *   oakley_ph1hash_common();
- * base:psk
- *   oakley_ph1hash_base();
- */
-vchar_t *
-oakley_compute_hash(iph1, sw)
-	struct ph1handle *iph1;
-	int sw;
-{
-	switch (iph1->etype) {
-	case ISAKMP_ETYPE_AGG:
-	case ISAKMP_ETYPE_IDENT:
-		return oakley_ph1hash_common(iph1, sw);
-	case ISAKMP_ETYPE_BASE:
-		return oakley_ph1hash_base(iph1, sw);
-	default:
-		plog(logp, LOCATION, NULL,
-			"invalid exchange type %d\n", iph1->etype);
-		return NULL;
-	}
-	return NULL;
-}
-
-/*
- * compute phase1 HASH
- * main/aggressive
  *   I-digest = prf(SKEYID, g^i | g^r | CKY-I | CKY-R | SAi_b | ID_i1_b)
  *   R-digest = prf(SKEYID, g^r | g^i | CKY-R | CKY-I | SAi_b | ID_r1_b)
  */
-static vchar_t *
+vchar_t *
 oakley_ph1hash_common(iph1, sw)
 	struct ph1handle *iph1;
 	int sw;
@@ -752,6 +723,14 @@ oakley_ph1hash_common(iph1, sw)
 	char *p, *bp2;
 	int len, bl;
 	int error = -1;
+
+	if (iph1->etype != ISAKMP_ETYPE_AGG
+	 && iph1->etype != ISAKMP_ETYPE_IDENT) {
+		YIPSDEBUG(DEBUG_KEY,
+			plog(logp, LOCATION, NULL,
+				"invalid etype for this hash function\n"));
+			return NULL;
+	}
 
 	/* create buffer */
 	len = iph1->dhpub->l
@@ -823,38 +802,39 @@ end:
 }
 
 /*
+ * compute HASH_I on base mode.
  * base:psk
  *   HASH_I = prf(SKEYID, g^xi | CKY-I | CKY-R | SAi_b | IDii_b)
  * base:sig
  *   HASH_I = prf(hash(Ni_b | Nr_b), g^xi | CKY-I | CKY-R | SAi_b | IDii_b)
  * base:rsa
  *   HASH_I = prf(SKEYID, g^xi | CKY-I | CKY-R | SAi_b | IDii_b)
- * base:
- * HASH_R = prf(hash(Ni_b | Nr_b), g^xi | g^xr | CKY-I | CKY-R | SAi_b | IDii_b)
- *
  */
-static vchar_t *
-oakley_ph1hash_base(iph1, sw)
+vchar_t *
+oakley_ph1hash_base_i(iph1, sw)
 	struct ph1handle *iph1;
 	int sw;
 {
-	vchar_t *buf = NULL, *res = NULL;
+	vchar_t *buf = NULL, *res = NULL, *bp;
 	char *p;
 	int len;
 	int error = -1;
 
-	vchar_t *dhpub = (sw == GENERATE ? iph1->dhpub : iph1->dhpub_p);
-	vchar_t *dhpub_p = (sw == GENERATE ? iph1->dhpub_p : iph1->dhpub);
-	vchar_t *nonce = (sw == GENERATE ? iph1->nonce : iph1->nonce_p);
-	vchar_t *nonce_p = (sw == GENERATE ? iph1->nonce_p : iph1->nonce);
-	vchar_t *id = (sw == GENERATE ? iph1->id : iph1->id_p);
-	char *cki = (sw == GENERATE
-			? (char *)&iph1->index.i_ck
-			: (char *)&iph1->index.r_ck);
-	char *ckr = (sw == GENERATE
-			? (char *)&iph1->index.r_ck
-			: (char *)&iph1->index.i_ck);
+	/* sanity check */
+	if (iph1->etype != ISAKMP_ETYPE_BASE) {
+		YIPSDEBUG(DEBUG_KEY,
+			plog(logp, LOCATION, NULL,
+				"invalid etype for this hash function\n"));
+		return NULL;
+	}
+	if (iph1->skeyid == NULL) {
+		YIPSDEBUG(DEBUG_KEY,
+			plog(logp, LOCATION, NULL,
+				"no SKEYID found.\n"));
+		return NULL;
+	}
 
+	/* XXX psk only */
 	if (iph1->approval->authmethod != OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
 		plog(logp, LOCATION, NULL,
 			"not supported authentication method %d\n",
@@ -862,82 +842,36 @@ oakley_ph1hash_base(iph1, sw)
 		return NULL;
 	}
 
-	/* XXX psk only */
-	if (iph1->side == INITIATOR) {
-		len = iph1->skeyid->l
-			+ dhpub->l
-			+ sizeof(cookie_t) * 2
-			+ iph1->sa->l
-			+ id->l;
-		buf = vmalloc(len);
-		if (buf == NULL) {
-			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
-			goto end;
-		}
-		p = buf->v;
-                memcpy(p, iph1->skeyid->v, iph1->skeyid->l);
-                p += iph1->skeyid->l;
-		memcpy(p, cki, sizeof(cookie_t));
-                p += sizeof(cookie_t);
-		memcpy(p, ckr, sizeof(cookie_t));
-                p += sizeof(cookie_t);
-                memcpy(p, iph1->sa->v, iph1->sa->l);
-                p += iph1->sa->l;
-                memcpy(p, id->v, id->l);
-                p += id->l;
-	} else {
-		vchar_t *hash;
-
-                len = nonce_p->l + nonce->l;
-                buf = vmalloc(len);
-                if (buf == NULL) {
-                        plog(logp, LOCATION, NULL,
-                                "vmalloc (%s)\n", strerror(errno));
-                        goto end;
-                }
-		p = buf->v;
-                memcpy(p, nonce_p->v, nonce_p->l);
-                p += nonce_p->l;
-                memcpy(p, nonce->v, nonce->l);
-                p += nonce->l;
-                hash = oakley_hash(buf, iph1);
-                if (hash == NULL)
-                        goto end;
-		vfree(buf);
-
-		len = hash->l
-			+ dhpub_p->l
-			+ dhpub->l
-			+ sizeof(cookie_t) * 2
-			+ iph1->sa->l
-			+ iph1->id_p->l;
-		buf = vmalloc(len);
-		if (buf == NULL) {
-			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
-			goto end;
-		}
-		p = buf->v;
-                memcpy(p, hash->v, hash->l);
-                p += hash->l;
-                memcpy(p, dhpub_p->v, dhpub_p->l);
-                p += dhpub_p->l;
-                memcpy(p, dhpub->v, dhpub->l);
-                p += dhpub->l;
-		memcpy(p, cki, sizeof(cookie_t));
-                p += sizeof(cookie_t);
-		memcpy(p, ckr, sizeof(cookie_t));
-                p += sizeof(cookie_t);
-                memcpy(p, iph1->sa->v, iph1->sa->l);
-                p += iph1->sa->l;
-                memcpy(p, id->v, id->l);
-                p += id->l;
-		vfree(hash);
+	len = (sw == GENERATE ? iph1->dhpub->l : iph1->dhpub_p->l)
+		+ sizeof(cookie_t) * 2
+		+ iph1->sa->l
+		+ (sw == GENERATE ? iph1->id->l : iph1->id_p->l);
+	buf = vmalloc(len);
+	if (buf == NULL) {
+		plog(logp, LOCATION, NULL,
+			"vmalloc (%s)\n", strerror(errno));
+		goto end;
 	}
+	p = buf->v;
 
-	YIPSDEBUG(DEBUG_DKEY, plog(logp, LOCATION, NULL, "HASH with:\n");
-		PVDUMP(buf));
+	bp = (sw == GENERATE ? iph1->dhpub : iph1->dhpub_p);
+	memcpy(p, bp->v, bp->l);
+	p += bp->l;
+
+	memcpy(p, &iph1->index.i_ck, sizeof(cookie_t));
+	p += sizeof(cookie_t);
+	memcpy(p, &iph1->index.r_ck, sizeof(cookie_t));
+	p += sizeof(cookie_t);
+
+	memcpy(p, iph1->sa->v, iph1->sa->l);
+	p += iph1->sa->l;
+
+	bp = (sw == GENERATE ? iph1->id : iph1->id_p);
+	memcpy(p, bp->v, bp->l);
+	p += bp->l;
+
+	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH_I with:\n"));
+	YIPSDEBUG(DEBUG_KEY, PVDUMP(buf));
 
 	/* compute HASH */
 	res = oakley_prf(iph1->skeyid, buf, iph1);
@@ -946,8 +880,119 @@ oakley_ph1hash_base(iph1, sw)
 
 	error = 0;
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH computed: "));
-	YIPSDEBUG(DEBUG_DKEY, PVDUMP(res));
+	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH_I computed:"));
+	YIPSDEBUG(DEBUG_KEY, PVDUMP(res));
+
+end:
+	if (buf != NULL)
+		vfree(buf);
+	return res;
+}
+
+/*
+ * compute HASH_R on base mode.
+ * base:
+ * HASH_R = prf(hash(Ni_b | Nr_b), g^xi | g^xr | CKY-I | CKY-R | SAi_b | IDii_b)
+ */
+vchar_t *
+oakley_ph1hash_base_r(iph1, sw)
+	struct ph1handle *iph1;
+	int sw;
+{
+	vchar_t *buf = NULL, *res = NULL, *bp;
+	vchar_t *hash;
+	char *p;
+	int len;
+	int error = -1;
+
+	/* sanity check */
+	if (iph1->etype != ISAKMP_ETYPE_BASE) {
+		YIPSDEBUG(DEBUG_KEY,
+			plog(logp, LOCATION, NULL,
+				"invalid etype for this hash function\n"));
+			return NULL;
+	}
+
+	/* XXX psk only */
+	if (iph1->approval->authmethod != OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
+		plog(logp, LOCATION, NULL,
+			"not supported authentication method %d\n",
+			iph1->approval->authmethod);
+		return NULL;
+	}
+
+	/* make hash for seed */
+	len = iph1->nonce->l + iph1->nonce_p->l;
+	buf = vmalloc(len);
+	if (buf == NULL) {
+		plog(logp, LOCATION, NULL,
+			"vmalloc (%s)\n", strerror(errno));
+		goto end;
+	}
+	p = buf->v;
+
+	bp = (sw == GENERATE ? iph1->nonce_p : iph1->nonce);
+	memcpy(p, bp->v, bp->l);
+	p += bp->l;
+
+	bp = (sw == GENERATE ? iph1->nonce : iph1->nonce_p);
+	memcpy(p, bp->v, bp->l);
+	p += bp->l;
+
+	hash = oakley_hash(buf, iph1);
+	if (hash == NULL)
+		goto end;
+	vfree(buf);
+	buf = NULL;
+
+	/* make really hash */
+	len = (sw == GENERATE ? iph1->dhpub_p->l : iph1->dhpub->l)
+		+ (sw == GENERATE ? iph1->dhpub->l : iph1->dhpub_p->l)
+		+ sizeof(cookie_t) * 2
+		+ iph1->sa->l
+		+ (sw == GENERATE ? iph1->id_p->l : iph1->id->l);
+	buf = vmalloc(len);
+	if (buf == NULL) {
+		plog(logp, LOCATION, NULL,
+			"vmalloc (%s)\n", strerror(errno));
+		goto end;
+	}
+	p = buf->v;
+
+
+	bp = (sw == GENERATE ? iph1->dhpub_p : iph1->dhpub);
+	memcpy(p, bp->v, bp->l);
+	p += bp->l;
+
+	bp = (sw == GENERATE ? iph1->dhpub : iph1->dhpub_p);
+	memcpy(p, bp->v, bp->l);
+	p += bp->l;
+
+	memcpy(p, &iph1->index.i_ck, sizeof(cookie_t));
+	p += sizeof(cookie_t);
+	memcpy(p, &iph1->index.r_ck, sizeof(cookie_t));
+	p += sizeof(cookie_t);
+
+	memcpy(p, iph1->sa->v, iph1->sa->l);
+	p += iph1->sa->l;
+
+	bp = (sw == GENERATE ? iph1->id_p : iph1->id);
+	memcpy(p, bp->v, bp->l);
+	p += bp->l;
+
+	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH with:\n"));
+	YIPSDEBUG(DEBUG_KEY, PVDUMP(buf));
+
+	/* compute HASH */
+	res = oakley_prf(hash, buf, iph1);
+	vfree(hash);
+	if (res == NULL)
+		goto end;
+
+	error = 0;
+
+	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH computed:"));
+	YIPSDEBUG(DEBUG_KEY, PVDUMP(res));
 
 end:
 	if (buf != NULL)
@@ -983,13 +1028,28 @@ oakley_validate_auth(iph1)
 
 		r_hash = (caddr_t)(iph1->pl_hash + 1);
 
-		YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH validate: "));
+		YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH received:"));
 		YIPSDEBUG(DEBUG_DKEY,
 			hexdump(r_hash,
 				ntohs(iph1->pl_hash->h.len)
 				- sizeof(*iph1->pl_hash)));
 
-		my_hash = oakley_compute_hash(iph1, VALIDATE);
+		switch (iph1->etype) {
+		case ISAKMP_ETYPE_IDENT:
+		case ISAKMP_ETYPE_AGG:
+			my_hash = oakley_ph1hash_common(iph1, VALIDATE);
+			break;
+		case ISAKMP_ETYPE_BASE:
+			if (iph1->side == INITIATOR)
+				my_hash = oakley_ph1hash_base_r(iph1, VALIDATE);
+			else
+				my_hash = oakley_ph1hash_base_i(iph1, VALIDATE);
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"invalid etype %d\n", iph1->etype);
+			return -1;
+		}
 		if (my_hash == NULL)
 			return -1;
 
@@ -1094,7 +1154,22 @@ oakley_validate_auth(iph1)
 		signature_size = ntohs(iph1->pl_sig->h.len)
 				- sizeof(struct isakmp_gen);
 		
-		my_hash = oakley_compute_hash(iph1, VALIDATE);
+		switch (iph1->etype) {
+		case ISAKMP_ETYPE_IDENT:
+		case ISAKMP_ETYPE_AGG:
+			my_hash = oakley_ph1hash_common(iph1, VALIDATE);
+			break;
+		case ISAKMP_ETYPE_BASE:
+			if (iph1->side == INITIATOR)
+				my_hash = oakley_ph1hash_base_r(iph1, VALIDATE);
+			else
+				my_hash = oakley_ph1hash_base_i(iph1, VALIDATE);
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"invalid etype %d\n", iph1->etype);
+			return -1;
+		}
 		if (my_hash == NULL)
 			return -1;
 
@@ -1199,12 +1274,16 @@ oakley_getcert(iph1)
 
 	return 0;
 }
+
 /*
- * compute skeyids
+ * compute SKEYID
  * see seciton 5. Exchanges in RFC 2409
+ * psk: SKEYID = prf(pre-shared-key, Ni_b | Nr_b)
+ * sig: SKEYID = prf(Ni_b | Nr_b, g^ir)
+ * enc: SKEYID = prf(H(Ni_b | Nr_b), CKY-I | CKY-R)
  */
 int
-oakley_compute_skeyids(iph1)
+oakley_skeyid(iph1)
 	struct ph1handle *iph1;
 {
 	vchar_t *buf = NULL, *bp;
@@ -1212,17 +1291,9 @@ oakley_compute_skeyids(iph1)
 	int len;
 	int error = -1;
 
-	/* compute sharing secret of DH */
-	if (oakley_dh_compute(iph1->etype == ISAKMP_ETYPE_AGG
-				? iph1->rmconf->dhgrp : iph1->approval->dhgrp,
-			iph1->dhpub,
-			iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
-		goto end;
-
 	/* SKEYID */
 	switch(iph1->approval->authmethod) {
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
-		/* SKEYID = prf(pre-shared-key, Ni_b | Nr_b) */
 		if (iph1->etype != ISAKMP_ETYPE_IDENT)
 			iph1->authstr = getpsk(iph1->id_p);
 		if (iph1->authstr == NULL) {
@@ -1269,7 +1340,6 @@ oakley_compute_skeyids(iph1)
 
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
-		/* SKEYID = prf(Ni_b | Nr_b, g^ir) */
 		len = iph1->nonce->l + iph1->nonce_p->l;
 		buf = vmalloc(len);
 		if (buf == NULL) {
@@ -1299,7 +1369,6 @@ oakley_compute_skeyids(iph1)
 		break;
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
-		/* SKEYID = prf(H(Ni_b | Nr_b), CKY-I | CKY-R) */
 		plog(logp, LOCATION, NULL,
 			"not supported authentication method %s\n",
 			s_oakley_attr_method(iph1->approval->authmethod));
@@ -1311,11 +1380,46 @@ oakley_compute_skeyids(iph1)
 		goto end;
 	}
 
-	vfree(buf);
-	buf = 0;
-
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "SKEYID computed: "));
 	YIPSDEBUG(DEBUG_DKEY, PVDUMP(iph1->skeyid));
+
+	error = 0;
+
+end:
+	if (buf != NULL)
+		vfree(buf);
+	return error;
+}
+
+/*
+ * compute SKEYID_[dae]
+ * see seciton 5. Exchanges in RFC 2409
+ * SKEYID_d = prf(SKEYID, g^ir | CKY-I | CKY-R | 0)
+ * SKEYID_a = prf(SKEYID, SKEYID_d | g^ir | CKY-I | CKY-R | 1)
+ * SKEYID_e = prf(SKEYID, SKEYID_a | g^ir | CKY-I | CKY-R | 2)
+ */
+int
+oakley_skeyid_dae(iph1)
+	struct ph1handle *iph1;
+{
+	vchar_t *buf = NULL;
+	char *p;
+	int len;
+	int error = -1;
+
+	if (iph1->skeyid == NULL) {
+		YIPSDEBUG(DEBUG_KEY,
+			plog(logp, LOCATION, NULL, "no SKEYID found.\n"));
+		goto end;
+	}
+
+	/* compute sharing secret of DH */
+	if (oakley_dh_compute(iph1->etype == ISAKMP_ETYPE_AGG
+					? iph1->rmconf->dhgrp
+					: iph1->approval->dhgrp,
+				iph1->dhpub,
+				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
+		goto end;
 
 	/* SKEYID D */
 	/* SKEYID_d = prf(SKEYID, g^xy | CKY-I | CKY-R | 0) */
@@ -1369,7 +1473,7 @@ oakley_compute_skeyids(iph1)
 		goto end;
 
 	vfree(buf);
-	buf = 0;
+	buf = NULL;
 
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "SKEYID_a computed: "));
 	YIPSDEBUG(DEBUG_DKEY, PVDUMP(iph1->skeyid_a));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.7 2000/01/12 15:09:06 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.8 2000/01/12 20:57:27 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -225,6 +225,11 @@ base_i2recv(iph1, msg)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
+			if (ipsecdoi_checkid1(iph1) < 0) {
+				plog(logp, LOCATION, iph1->remote,
+					"invalid ID payload.\n");
+				goto end;
+			}
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -301,9 +306,13 @@ base_i2send(iph1, msg)
 				&iph1->dhpub, &iph1->dhpriv) < 0)
 		goto end;
 
+	/* generate SKEYID */
+	if (oakley_skeyid(iph1) < 0)
+		goto end;
+
 	/* generate HASH to send */
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_I\n"));
-	iph1->hash = oakley_compute_hash(iph1, GENERATE);
+	iph1->hash = oakley_ph1hash_base_i(iph1, GENERATE);
 	if (iph1->hash == NULL)
 		goto end;
 
@@ -402,7 +411,7 @@ base_i3recv(iph1, msg)
     }
 
 	/* generate SKEYIDs & IV & final cipher key */
-	if (oakley_compute_skeyids(iph1) < 0)
+	if (oakley_skeyid_dae(iph1) < 0)
 		goto end;
 	if (oakley_compute_enckey(iph1) < 0)
 		goto end;
@@ -495,6 +504,11 @@ base_r1recv(iph1, msg)
 		case ISAKMP_NPTYPE_ID:
 			if (isakmp_p2ph(&iph1->id_p, pa->ptr) < 0)
 				goto end;
+			if (ipsecdoi_checkid1(iph1) < 0) {
+				plog(logp, LOCATION, iph1->remote,
+					"invalid ID payload.\n");
+				goto end;
+			}
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -576,6 +590,10 @@ base_r1send(iph1, msg)
 	/* set responder's cookie */
 	isakmp_newcookie((caddr_t)&iph1->index.r_ck, iph1->remote, iph1->local);
 
+	/* make ID payload into isakmp status */
+	if (ipsecdoi_setid1(iph1) < 0)
+		goto end;
+
 	/* generate NONCE value */
 	iph1->nonce = eay_set_random(iph1->rmconf->nonce_size);
 	if (iph1->nonce == NULL)
@@ -600,7 +618,7 @@ base_r1send(iph1, msg)
 		goto end;
 
 	/* set SA payload to reply */
-	p = set_isakmp_payload(p, iph1->sa_ret, ISAKMP_NPTYPE_NONE);
+	p = set_isakmp_payload(p, iph1->sa_ret, ISAKMP_NPTYPE_ID);
 
 	/* create isakmp ID payload */
 	p = set_isakmp_payload(p, iph1->id, ISAKMP_NPTYPE_NONCE);
@@ -697,6 +715,15 @@ base_r2recv(iph1, msg)
 		}
 	}
 
+	/* generate SKEYID */
+	if (oakley_skeyid(iph1) < 0)
+		goto end;
+
+	/* generate DH public value */
+	if (oakley_dh_generate(iph1->approval->dhgrp,
+				&iph1->dhpub, &iph1->dhpriv) < 0)
+		goto end;
+
 	/* payload existency check */
 	/* validate authentication value */
     {
@@ -745,14 +772,9 @@ base_r2send(iph1, msg)
 		goto end;
 	}
 
-	/* generate DH public value */
-	if (oakley_dh_generate(iph1->approval->dhgrp,
-				&iph1->dhpub, &iph1->dhpriv) < 0)
-		goto end;
-
 	/* generate HASH to send */
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_I\n"));
-	iph1->hash = oakley_compute_hash(iph1, GENERATE);
+	iph1->hash = oakley_ph1hash_base_r(iph1, GENERATE);
 	if (iph1->hash == NULL)
 		goto end;
 
@@ -762,7 +784,7 @@ base_r2send(iph1, msg)
 		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */
-	if (oakley_compute_skeyids(iph1) < 0)
+	if (oakley_skeyid_dae(iph1) < 0)
 		goto end;
 	if (oakley_compute_enckey(iph1) < 0)
 		goto end;
