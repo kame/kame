@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.19 2000/06/04 03:31:27 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.20 2000/06/13 02:38:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1284,6 +1284,7 @@ mip6_delete_ifaddr(struct in6_addr *addr,
 			oia->ia_next = ia;
 		} else
 			in6_ifaddr = ia;
+		/* gain a refcnt for the link from in6_ifaddr */
 		ia->ia_ifa.ifa_refcnt++;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -1297,6 +1298,7 @@ mip6_delete_ifaddr(struct in6_addr *addr,
 		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
 				  ifa_list);
 #endif
+		/* gain another refcnt for the link from if_addrlist */
 		ia->ia_ifa.ifa_refcnt++;
 	}
 

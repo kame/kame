@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.59 2000/05/27 02:57:05 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.60 2000/06/13 02:38:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -387,6 +387,7 @@ in6_ifattach_addaddr(ifp, ia)
 #else
 	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
+	/* gain a refcnt for the link from if_addrlist */
 	ia->ia_ifa.ifa_refcnt++;
 
 	/*
@@ -399,6 +400,7 @@ in6_ifattach_addaddr(ifp, ia)
 		oia->ia_next = ia;
 	} else
 		in6_ifaddr = ia;
+	/* gain another refcnt for the link from in6_ifaddr */
 	ia->ia_ifa.ifa_refcnt++;
 
 	/*

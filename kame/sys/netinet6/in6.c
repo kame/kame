@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.83 2000/06/12 14:50:47 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.84 2000/06/13 02:38:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -631,7 +631,7 @@ in6_control(so, cmd, data, ifp)
 			TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
 			    ifa_list);
 #endif
-			/* gain another recnt for the link from if_addrlist */
+			/* gain another refcnt for the link from if_addrlist */
 			ia->ia_ifa.ifa_refcnt++;
 
 			newifaddr = 1;
