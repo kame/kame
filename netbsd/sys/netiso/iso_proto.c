@@ -81,6 +81,9 @@ __KERNEL_RCSID(0, "$NetBSD: iso_proto.c,v 1.13 2001/11/13 01:10:49 lukem Exp $")
 #include <sys/mbuf.h>
 
 #include <net/radix.h>
+#ifdef NEW_STRUCT_ROUTE
+#include <net/route.h>
+#endif
 
 #include <netiso/iso.h>
 

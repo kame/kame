@@ -97,6 +97,9 @@ __KERNEL_RCSID(0, "$NetBSD: tp_input.c,v 1.14 2001/11/13 01:10:50 lukem Exp $");
 #include <sys/kernel.h>
 
 #include <net/if.h>
+#ifdef NEW_STRUCT_ROUTE
+#include <net/route.h>
+#endif
 
 #include <netiso/iso.h>
 #include <netiso/iso_errno.h>

@@ -88,6 +88,9 @@ __KERNEL_RCSID(0, "$NetBSD: tp_emit.c,v 1.15 2001/11/13 01:10:49 lukem Exp $");
 #include <sys/time.h>
 
 #include <net/if.h>
+#ifdef NEW_STRUCT_ROUTE
+#include <net/route.h>
+#endif
 
 #include <netiso/iso.h>
 #include <netiso/iso_pcb.h>
