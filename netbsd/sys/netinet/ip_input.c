@@ -1848,6 +1848,10 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return (error);
 #endif
 
+	case IPCTL_MAXFRAGPACKETS:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip_maxfragpackets));
+
 	default:
 		return (EOPNOTSUPP);
 	}
