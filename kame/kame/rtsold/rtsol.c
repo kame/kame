@@ -71,18 +71,17 @@ sockopen()
 	int on;
 	struct icmp6_filter filt;
 	static u_char answer[1500];
+	int rcvcmsglen, sndcmsglen;
 	static u_char *rcvcmsgbuf = NULL, *sndcmsgbuf = NULL;
 
-	if (rcvcmsgbuf == NULL &&
-	    (rcvcmsgbuf = malloc(CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-				 CMSG_SPACE(sizeof(int)))) == NULL) {
+	sndcmsglen = rcvcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+		CMSG_SPACE(sizeof(int));
+	if (rcvcmsgbuf == NULL && (rcvcmsgbuf = malloc(rcvcmsglen)) == NULL) {
 		warnmsg(LOG_ERR, __FUNCTION__,
 			"malloc for receive msghdr failed");
 		return(-1);
 	}
-	if (sndcmsgbuf == NULL &&
-	    (sndcmsgbuf = malloc(CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
-				 CMSG_SPACE(sizeof(int)))) == NULL) {
+	if (sndcmsgbuf == NULL && (sndcmsgbuf = malloc(sndcmsglen)) == NULL) { 
 		warnmsg(LOG_ERR, __FUNCTION__,
 			"malloc for send msghdr failed");
 		return(-1);
@@ -154,14 +153,14 @@ sockopen()
 	rcvmhdr.msg_iov = rcviov;
 	rcvmhdr.msg_iovlen = 1;
 	rcvmhdr.msg_control = (caddr_t) rcvcmsgbuf;
-	rcvmhdr.msg_controllen = sizeof(rcvcmsgbuf);
+	rcvmhdr.msg_controllen = rcvcmsglen;
 
 	/* initialize msghdr for sending packets */
 	sndmhdr.msg_namelen = sizeof(struct sockaddr_in6);
 	sndmhdr.msg_iov = sndiov;
 	sndmhdr.msg_iovlen = 1;
 	sndmhdr.msg_control = (caddr_t)sndcmsgbuf;
-	sndmhdr.msg_controllen = sizeof(sndcmsgbuf);
+	sndmhdr.msg_controllen = sndcmsglen;
 
 	return(rssock);
 }

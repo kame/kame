@@ -61,12 +61,11 @@ static void sendprobe __P((struct in6_addr *addr, int ifindex));
 int
 probe_init()
 {
-	int scmsglen;
+	int scmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+		CMSG_SPACE(sizeof(int));
 	static u_char *sndcmsgbuf = NULL;
 	
-	if (sndcmsgbuf == NULL &&
-	    (sndcmsgbuf = malloc(CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-				 CMSG_SPACE(sizeof(int)))) == NULL) {
+	if (sndcmsgbuf == NULL && (sndcmsgbuf = malloc(scmsglen)) == NULL) {
 		warnmsg(LOG_ERR, __FUNCTION__, "malloc failed");
 		return(-1);
 	}
@@ -87,7 +86,7 @@ probe_init()
 	sndmhdr.msg_iov = sndiov;
 	sndmhdr.msg_iovlen = 1;
 	sndmhdr.msg_control = (caddr_t)sndcmsgbuf;
-	sndmhdr.msg_controllen = sizeof(sndcmsgbuf);
+	sndmhdr.msg_controllen = scmsglen;
 
 	return(0);
 }
