@@ -94,8 +94,8 @@ static int relay6_recv __P((int, char *));
 static void relay6_react __P((size_t, char *, char *, int));
 static void relay6_react_solicit __P((char *, size_t, char *));
 static void relay6_react_advert __P((char *, size_t, char *));
-static void relay6_forward_response __P((char *, size_t,
-					 struct in6_addr *, char *));
+static void relay6_forward_response __P((char *, size_t, struct in6_addr *,
+	const char *));
 
 int
 main(argc, argv)
@@ -179,8 +179,12 @@ make_prefix(pstr0)
 			"prefix string too long (maybe bogus): %s", pstr0);
 		return(NULL);
 	}
+#ifndef USE_STRLCPY
 	strncpy(pstr, pstr0, sizeof(pstr));
 	pstr[sizeof(pstr) - 1] = '\0';
+#else
+	strlcpy(pstr, pstr0, sizeof(pstr));
+#endif
 
 	/* parse the string */
 	if ((p = strchr(pstr, '/')) == NULL)
@@ -631,7 +635,7 @@ relay6_react_advert(buf, siz, dev)
 {
 	struct dhcp6_advert *dh6a;
 	struct sockaddr_in6 sa6_relay;
-	char *sdev;
+	const char *sdev;
 
 	dprintf(LOG_DEBUG, "relay6_react_advert");
 
@@ -672,9 +676,10 @@ relay6_react_advert(buf, siz, dev)
 
 static void
 relay6_forward_response(buf, siz, cliaddr, dev)
-	char *buf, *dev;
+	char *buf;
 	size_t siz;
 	struct in6_addr *cliaddr;
+	const char *dev;
 {
 	static struct iovec iov[2];
 

@@ -641,6 +641,7 @@ server6_react_solicit(buf, siz, rcvpi)
 
 /* 11.6.1. Receipt of Request messages */
 /* 11.6.3. Creation and sending of Reply messages */
+/* XXX insufficient boundary checks! */
 static int
 server6_react_request(buf, siz, rcvpi)
 	char *buf;

@@ -1109,10 +1109,16 @@ client6_recvreply(s, serv)
 				 */
 				memcpy(&in6, ap, sizeof(struct in6_addr));
 
+#ifndef USE_STRLCPY
 				strncpy(mediator_msg.serveraddr,
 				    in6addr2str(&in6, 0),
 				    sizeof(mediator_msg.serveraddr));
 				mediator_msg.serveraddr[sizeof(mediator_msg.serveraddr) - 1] = '\0';
+#else
+				strlcpy(mediator_msg.serveraddr,
+				    in6addr2str(&in6, 0),
+				    sizeof(mediator_msg.serveraddr));
+#endif
 			       
 				dprintf(LOG_DEBUG,
 					"Notifing to mediator: server %s",
@@ -1147,9 +1153,14 @@ client6_recvreply(s, serv)
 				memset(&buf, 0, sizeof(buf));
 				memcpy(buf, &cp[4], elen);
 				buf[elen] = '\0';
-			} else
+			} else {
+#ifndef USE_STRLCPY
 				strncpy(buf, "?", sizeof(buf));
-			buf[sizeof(buf) - 1] = '\0';
+				buf[sizeof(buf) - 1] = '\0';
+#else
+				strlcpy(buf, "?", sizeof(buf));
+#endif
+			}
 			dprintf(LOG_DEBUG, "  %s", buf);
 			break;
 		case OT6_NUM:

@@ -68,6 +68,9 @@ AC_REPLACE_FUNCS(getaddrinfo)
 AC_REPLACE_FUNCS(getnameinfo)
 AC_REPLACE_FUNCS(getifaddrs)
 AC_CHECK_FUNCS(if_nametoindex)
+AC_DEFINE(USE_STRLCPY)
+AC_DEFINE(USE_STRLCAT)
+AC_REPLACE_FUNCS(strlcpy strlcat)
 
 dnl Checks for header files.
 AC_HEADER_STDC

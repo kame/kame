@@ -294,7 +294,7 @@ in6_addrscopebyif(addr, ifnam)
 }
 
 /* XXX: this code assumes getifaddrs(3) */
-char *
+const char *
 getdev(addr)
 	struct sockaddr_in6 *addr;
 {
@@ -319,9 +319,14 @@ getdev(addr)
 		break;
 	}
 
-	if (ifa)
+	if (ifa) {
+#ifdef USE_STRLCPY
+		strlcpy(ret_ifname, ifa->ifa_name, sizeof(ret_ifname));
+#else
 		strncpy(ret_ifname, ifa->ifa_name, sizeof(ret_ifname));
-	ret_ifname[sizeof(ret_ifname) - 1] = '\0';
+		ret_ifname[sizeof(ret_ifname) - 1] = '\0';
+#endif
+	}
 	freeifaddrs(ifap);
 
 	return(ifa ? ret_ifname : NULL);
