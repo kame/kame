@@ -1,8 +1,23 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1532 2001/02/04 11:29:50 jinmei Exp $
+$KAME: CHANGELOG,v 1.1533 2001/02/04 17:46:24 jinmei Exp $
 
 <200102>
+2001-02-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *BSD/sbin/ifconfig/ifconfig.c: marked "temporary" for temporary
+	IPv6 addresses (see the next log).
+
+2001-02-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/: implemented RFC 3014 Privacy Extensions for
+	Stateless Address Autoconfiguration.  You can enable this by
+	# sysctl -w net.inet6.ip6.use_tempaddr=1
+	before accepting an RA.  Once enabled, the kernel will configure
+	temporary addresses as well as public autoconfigured ones, as
+	described in the RFC.  Also, the kernel will prefer temporary
+	addresses to public autoconfigured ones as the source address for
+	a new communication.  For more details about the selection
+	algorithm, see 1.6 of the KAME IMPLEMENTATION file.
+
 2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6 (bunch of files): completely revisited address
 	and prefix manipulation:
@@ -18,6 +33,10 @@ $KAME: CHANGELOG,v 1.1532 2001/02/04 11:29:50 jinmei Exp $
 	    "D" bit of the output from "ndp -p".
 	- more conformance to RFC 2462 address autoconfiguration.
 	- clarify a notion of autoconfigured addresses.
+
+	Note: the change is so drastic, so you will probably have to clean
+	all your source tree up, and then rebuild the entire kernel and
+	applications.
 
 2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.h (IFA6_IS_{DEPRECATED, INVALID}): added
