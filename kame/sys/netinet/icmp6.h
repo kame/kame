@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.12 2000/05/19 06:16:40 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.13 2000/05/22 13:57:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -600,7 +600,7 @@ struct icmp6stat {
 	&icmp6_redirtimeout,  \
 	0, \
 	0, \
-	&icmp6errratelim, \
+	0, \
 	&nd6_prune,	\
 	0, \
 	&nd6_delay,	\
