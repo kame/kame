@@ -367,6 +367,7 @@ struct ip_mreq {
 #endif /* !_XOPEN_SOURCE */
 
 /* INET6 stuff */
+#define __KAME_NETINET_IN_H_INCLUDED_
 #include <netinet6/in6.h>
 
 #ifdef _KERNEL
