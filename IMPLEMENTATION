@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/02/24 16:53:19 $
+			$Date: 2000/02/28 13:47:40 $
 
 1. IPv6
 
@@ -88,8 +88,7 @@ RFC2732: Format for Literal IPv6 Addresses in URL's
 RFC2766: Network Address Translation - Protocol Translation (NAT-PT)
     * Section 4.2 is implemented by totd (see ports/totd, or pkgsrc/net/totd).
 draft-ietf-ipngwg-router-renum-08: Router renumbering for IPv6
-draft-ietf-ipngwg-icmp-namelookups-02: IPv6 Name Lookups Through ICMP
-draft-ietf-ipngwg-icmp-name-lookups-03: IPv6 Name Lookups Through ICMP
+draft-ietf-ipngwg-icmp-name-lookups-05: IPv6 Name Lookups Through ICMP
 draft-ietf-pim-ipv6-01.txt: PIM for IPv6
     * pim6dd implements dense mode.  pim6sd implements sparse mode.
 draft-ietf-dhc-dhcpv6-14.txt: DHCPv6
