@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.38 2001/08/13 12:53:22 itojun Exp $	*/
+/*	$KAME: main.c,v 1.39 2001/08/13 12:55:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,7 +95,7 @@ static void cleanup_pidfile __P((void));
 void
 Usage()
 {
-	printf("Usage: %s [-dFv%s] %s[-f (file)] [-l (file)] [-p (port)]\n",
+	printf("Usage: %s [-BdFv%s] %s[-f (file)] [-l (file)] [-p (port)]\n",
 		pname,
 #ifdef INET6
 		"46",
@@ -107,23 +107,22 @@ Usage()
 #else
 		""
 #endif
-		"[-B]"
 		);
+	printf("   -B: install SA to the kernel from the file "
+		"specified by the configuration file.\n");
 	printf("   -d: debug level, more -d will generate more debug message.\n");
 	printf("   -F: run in foreground, do not become daemon.\n");
 	printf("   -v: be more verbose\n");
+#ifdef INET6
+	printf("   -4: IPv4 mode.\n");
+	printf("   -6: IPv6 mode.\n");
+#endif
 #ifdef ENABLE_ADMINPORT
 	printf("   -a: port number for admin port.\n");
 #endif
 	printf("   -f: pathname for configuration file.\n");
 	printf("   -l: pathname for log file.\n");
 	printf("   -p: port number for isakmp (default: %d).\n", PORT_ISAKMP);
-#ifdef INET6
-	printf("   -6: IPv6 mode.\n");
-	printf("   -4: IPv4 mode.\n");
-#endif
-	printf("   -B: install SA to the kernel from the file "
-		"specified by the configuration file.\n");
 	exit(1);
 }
 
