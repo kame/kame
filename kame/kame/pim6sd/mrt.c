@@ -1079,6 +1079,12 @@ create_mrtentry(srcentry_ptr, grpentry_ptr, flags)
 	insert_grpmrtlink(r_new, r_grp_insert, grpentry_ptr);
 	insert_srcmrtlink(r_new, r_src_insert, srcentry_ptr);
 	r_new->flags |= MRTF_SG;
+
+	IF_DEBUG(DEBUG_MFC)
+	    log(LOG_DEBUG, 0, "create SG entry, source %s, group %s",
+		inet6_fmt(&source->sin6_addr),
+		inet6_fmt(&group->sin6_addr));
+
 	return (r_new);
     }
 
