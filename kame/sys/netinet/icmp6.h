@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.73 2002/08/05 11:49:16 k-sugyou Exp $	*/
+/*	$KAME: icmp6.h,v 1.74 2002/08/15 03:11:53 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -318,8 +318,6 @@ struct ind_neighbor_advert {	/* inverse neighbor advertisement */
 
 struct ha_discov_req {          /* HA Address Discovery Request */
 	struct icmp6_hdr	ha_dreq_hdr;
-	u_int32_t		ha_dreq_reserved2;
-	u_int32_t		ha_dreq_reserved3;
 } __attribute__((__packed__));
 
 #define discov_req_type		ha_dreq_hdr.icmp6_type
