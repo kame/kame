@@ -36,6 +36,7 @@
 
 #include <netinet/ip6.h>
 
+#include <netdb.h>
 #include <arpa/inet.h>
 
 #include <ctype.h>
@@ -47,7 +48,16 @@
 
 #define DEFPORT 9079
 
-void usage();
+int dsthdr1len, dsthdr2len, hbhlen;
+char *hlimp = NULL;
+int hlim;
+
+struct msghdr msg;
+struct cmsghdr *cmsgp = NULL;
+
+static int calc_opthlen __P((int));
+static void setopthdr __P((int, int));
+static void usage __P((void));
 
 int
 main(argc, argv)
@@ -55,21 +65,34 @@ main(argc, argv)
     char *argv[];
 {
 	int i, s;
+	int rthlen = 0, ip6optlen = 0, hops = 0, error;
+	char *portstr = DEFAULTPORT;
 	char *finaldst;
-	struct sockaddr_in6 local, remote;
-	struct in6_addr middle;
-	struct cmsghdr *cmsgp;
-	struct msghdr msg;
 	struct iovec msgiov;
-	void *ptr;
 	char *e, *databuf;
 	int datalen = 1, ch;
+	struct addrinfo hints, *res;
 	extern int optind;
 	extern void *malloc();
 	extern char *optarg;
 
-	while ((ch = getopt(argc, argv, "s:")) != EOF)
+	while ((ch = getopt(argc, argv, "d:D:h:l:p:s:")) != EOF)
 		switch(ch) {
+		case 'd':
+			dsthdr1len = atoi(optarg);
+			break;
+		case 'D':
+			dsthdr2len = atoi(optarg);
+			break;
+		case 'h':
+			hbhlen = atoi(optarg);
+			break;
+		case 'l':
+			hlimp = optarg;
+			break;
+		case 'p':
+			portstr = optarg;
+			break;
 		case 's':
 			datalen = strtol(optarg, &e, 10);
 			if (datalen <= 0 || *optarg == '\0' || *e != '\0')
@@ -81,75 +104,173 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
+	memset(&msg, 0, sizeof(msg));
+
 	if ((databuf = (char *)malloc(datalen)) == 0)
 		errx(1, "can't allocate memory\n");
 
-	memset(&msg, 0, sizeof(msg));
+	if (hbhlen > 0) ip6optlen += CMSG_SPACE(calc_opthlen(hbhlen));
+	if (dsthdr1len > 0) ip6optlen += CMSG_SPACE(calc_opthlen(dsthdr1len));
+	if (dsthdr2len > 0) ip6optlen += CMSG_SPACE(calc_opthlen(dsthdr2len));
+	if (hlimp != NULL) {
+		hlim = atoi(hlimp);
+#if 0
+		/* intentionally omit the check to see the kernel behavior. */
+		if (hlim < 0 || hlim > 255)
+			errx(1, "invalid hop limit: %d", hlim);
+#endif
+		ip6optlen += CMSG_SPACE(sizeof(int));
+	}
+	if (argc > 1) {		/* intermediate node(s) exist(s) */
+		hops = argc - 1;
+		rthlen = inet6_rth_space(IPV6_RTHDR_TYPE_0, hops);
+		ip6optlen += CMSG_SPACE(rthlen);
+	}
+	if (ip6optlen) {
+		char *scmsg;
 
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0){
-		perror("socket");
-		exit(-1);
+		if ((scmsg = (char *)malloc(ip6optlen)) == 0)
+			errx(1, "can't allocate enough memory");
+		msg.msg_control = (caddr_t)scmsg;
+		msg.msg_controllen = ip6optlen;
+		cmsgp = (struct cmsghdr *)scmsg;
 	}
 
 	if (argc == 0)
 		usage();
 
+	if (hlimp != NULL) {
+		cmsgp->cmsg_len = CMSG_LEN(sizeof(int));
+		cmsgp->cmsg_level = IPPROTO_IPV6;
+		cmsgp->cmsg_type = IPV6_HOPLIMIT;
+
+		/* I believe there should be no alignment problem here */
+		*(int *)CMSG_DATA(cmsgp) = hlim;
+		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
+	}
+	if (hbhlen > 0) setopthdr(hbhlen, IPV6_HOPOPTS);
+	if (dsthdr1len > 0) setopthdr(dsthdr1len, IPV6_RTHDRDSTOPTS);
+	if (dsthdr2len > 0) setopthdr(dsthdr2len, IPV6_DSTOPTS);
 	if (argc > 1) {
-		if ((ptr = malloc(inet6_rthdr_space(IPV6_RTHDR_TYPE_0, argc - 1))) == 0) {
-			fprintf(stderr, "sender: can't alloca memory\n");
-			exit(1);
-		}
-		if ((cmsgp = inet6_rthdr_init(ptr, IPV6_RTHDR_TYPE_0)) == 0) {
-			fprintf(stderr, "sender: can't initialize rthdr.\n");
-			exit(1);
-		}
-		for (i = 0; i < argc - 1; i++) {
+		struct ip6_rthdr *rthdr;
+		struct in6_addr middle;
+
+		cmsgp->cmsg_len = CMSG_LEN(rthlen);
+		cmsgp->cmsg_level = IPPROTO_IPV6;
+		cmsgp->cmsg_type = IPV6_RTHDR;
+		rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsgp);
+
+		rthdr = inet6_rth_init((void *)rthdr, rthlen,
+				       IPV6_RTHDR_TYPE_0, argc - 1);
+		if (rthdr == NULL)
+			errx(1, "can't initialize rthdr");
+		
+		inet6_rth_init((void *)rthdr, rthlen, IPV6_RTHDR_TYPE_0, hops);
+
+		for (i = 0; i < hops; i++) {
 			inet_pton(AF_INET6, argv[i], &middle);
-			if (inet6_rthdr_add(cmsgp, &middle, IPV6_RTHDR_STRICT)) {
-				fprintf(stderr, "sender: can't add a node\n");
-				exit(1);
-			}
+
+			if (inet6_rth_add(rthdr, &middle))
+				errx(1, "inet6_rth_add failed");
 		}
-		if (inet6_rthdr_lasthop(cmsgp, IPV6_RTHDR_STRICT)) {
-			fprintf(stderr, "sender: can't set the last flag.\n");
-			exit(1);
-		}
-		msg.msg_control = (caddr_t)cmsgp;
-		msg.msg_controllen = ALIGN(cmsgp->cmsg_len);
+
+		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
 	}
 	finaldst = argv[argc - 1];
 
-	remote.sin6_family = AF_INET6;
-	remote.sin6_port =  DEFPORT;
-	inet_pton(AF_INET6, finaldst, &remote.sin6_addr);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
 
+	error = getaddrinfo(finaldst, portstr, &hints, &res);
+	if (error)
+		errx(1, "getaddrinfo: %s", gai_strerror(error));
+	if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol))
+	    < 0)
+		err(1, "socket");
+	freeaddrinfo(res);
+
+#if 0
 	bzero(&local, sizeof(local));
 	local.sin6_family = AF_INET6;
+	if (bind(s, (struct sockaddr *)&local, sizeof(local)) < 0)
+		err(1, "bind");
+#endif
 
-	if (bind(s, (struct sockaddr *)&local, sizeof(local)) < 0){
-		perror("bind");
-		exit(-1);
-	}
-
-	msg.msg_name = (void *)&remote;
-	msg.msg_namelen = sizeof(struct sockaddr_in6);
+	msg.msg_name = res->ai_addr;
+	msg.msg_namelen = res->ai_addrlen;
 	msgiov.iov_base = (void *)databuf;
 	msgiov.iov_len = datalen;
 	msg.msg_iov = &msgiov;
 	msg.msg_iovlen = 1;
 	msg.msg_flags = 0;
 
-	if (sendmsg(s, &msg, 0) != datalen) {
-		perror("sendmsg");
-		exit(-1);
-	}
+	if (sendmsg(s, &msg, 0) != datalen)
+		err(1, "sendmsg");
 
 	exit(0);
 }
 
-void
+static int
+calc_opthlen(optlen)
+	int optlen;
+{
+	int opthlen;
+
+	if ((opthlen = inet6_opt_init(NULL, 0)) == -1)
+		errx(1, "inet6_opt_init(NULL) failed");
+	if ((opthlen = inet6_opt_append(NULL, 0, opthlen,
+					10, /* dummy opt */
+					optlen, 1,
+					NULL)) == -1)
+		errx(1, "inet6_opt_append(NULL, %d)", optlen);
+	if ((opthlen = inet6_opt_finish(NULL, 0, opthlen)) == -1)
+		errx(1, "inet6_opt_finish(NULL, %d)", opthlen);
+
+	return(opthlen);
+}
+
+static void
+setopthdr(optlen, hdrtype)
+	int optlen, hdrtype;
+{
+	int i, opthlen = 0, curlen;
+	char *hdrbuf, *optbuf;
+	void *optp = NULL;
+
+	opthlen = calc_opthlen(optlen);	/* XXX: duplicated calculation */
+	cmsgp->cmsg_len = CMSG_LEN(opthlen);
+	cmsgp->cmsg_level = IPPROTO_IPV6;
+	cmsgp->cmsg_type = hdrtype;
+	hdrbuf = CMSG_DATA(cmsgp);
+
+	if ((curlen = inet6_opt_init(hdrbuf, opthlen)) == -1)
+		errx(1, "inet6_opt_init(opth, %d)", opthlen);
+	if ((curlen = inet6_opt_append(hdrbuf, opthlen, curlen,
+				       10, /* dummy */
+				       optlen, 1, &optp)) == -1)
+		errx(1, "inet6_opt_append (cur=%d, optlen=%d, opthlen=%d)",
+		     curlen, optlen, opthlen);
+	/* make option buffer */
+	if ((optbuf = malloc(optlen)) == NULL)
+		err(1, "memory allocation for option buffer failed");
+	for (i = 0; i < optlen; i++)
+		optbuf[i] = i % 256;
+	(void)inet6_opt_set_val(optp, 0, (void *)optbuf, optlen);
+	if (inet6_opt_finish(hdrbuf, opthlen, curlen) == -1)
+		errx(1, "inet6_opt_finish(opthlen=%d, curlen=%d)",
+		     opthlen, curlen);
+
+	free(optbuf);
+
+	cmsgp = CMSG_NXTHDR(&msg, cmsgp);
+}
+
+static void
 usage()
 {
-	fprintf(stderr, "usage: sender [-s packetsize] IPv6addrs...\n");
+	fprintf(stderr, "usage: sender [-d optlen] [-D optlen] [-h optlen] "
+		"[-l hoplimit] [-p port] [-s packetsize] IPv6addrs...\n");
 	exit(1);
 }

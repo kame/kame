@@ -51,7 +51,7 @@ main(argc, argv)
 {
 	int ch, ret_ga, hlim = -1;
 	struct addrinfo hints, *res;
-	char readbuf[1024], *port = NULL;
+	char readbuf[1024], *port = DEFAULTPORT;
 
 	while((ch = getopt(argc, argv, "h:p:")) != -1)
 		switch(ch) {
@@ -69,11 +69,6 @@ main(argc, argv)
 	argv += optind;
 	if (argc < 1)
 		usage();
-	if (port == NULL) {
-		static char portbuf[16];
-		sprintf(portbuf, "%d", DEFAULTPORT); /* XXX */
-		port = portbuf;
-	}
 
 	bzero(&hints, sizeof(struct addrinfo));
 	hints.ai_family = PF_INET6;
@@ -85,6 +80,7 @@ main(argc, argv)
 
 	if ((s = socket(res->ai_family, res->ai_socktype, 0)) < 0)
 		err(1, "socket");
+	freeaddrinfo(res);
 
 	if (hlim > 0 &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &hlim, sizeof(hlim))) {
@@ -125,7 +121,7 @@ main(argc, argv)
 
 			rthlen = inet6_rth_space(IPV6_RTHDR_TYPE_0, hops);
 			if ((rthdr = malloc(rthlen)) == NULL) {
-				warnx("malloca (%d) failed", rthlen);
+				warnx("malloc (%d) failed", rthlen);
 				goto sendbuf;
 			}
 			inet6_rth_init((void *)rthdr, rthlen,
@@ -160,60 +156,60 @@ setopthdr(optlen, hdrtype)
 	int optlen, hdrtype;
 {
 	struct ip6_hbh *hbh = NULL;
-	int hbhlen = 0, curlen;
+	int opthlen = 0, curlen;
 	void *optp = NULL;
 	static char optbuf[128]; /* XXX */
 
 	if (optlen == 0)
 		goto sethbh;
 
-	if ((hbhlen = inet6_opt_init(NULL, 0)) == -1) {
+	if ((opthlen = inet6_opt_init(NULL, 0)) == -1) {
 		warnx("inet6_opt_init(NULL) failed");
 		return;
 	}
-	if ((hbhlen = inet6_opt_append(NULL, 0, hbhlen,
+	if ((opthlen = inet6_opt_append(NULL, 0, opthlen,
 				       10, /* dummy opt */
 				       optlen, 1,
 				       NULL)) == -1) {
 		warnx("inet6_opt_append(NULL, %d)", optlen);
 		return;
 	}
-	if ((hbhlen = inet6_opt_finish(NULL, 0, hbhlen)) == -1) {
-		warnx("inet6_opt_finish(NULL, %d)", hbhlen);
+	if ((opthlen = inet6_opt_finish(NULL, 0, opthlen)) == -1) {
+		warnx("inet6_opt_finish(NULL, %d)", opthlen);
 		return;
 	}
-	if ((hbh = malloc(hbhlen)) == NULL) {
+	if ((hbh = malloc(opthlen)) == NULL) {
 		warnx("malloc %d bytes for hbhopt failed",
-		      hbhlen);
+		      opthlen);
 		return;
 	}
-	if ((curlen = inet6_opt_init(hbh, hbhlen)) == -1) {
-		warnx("inet6_opt_init(hbh, %d)", hbhlen);
+	if ((curlen = inet6_opt_init(hbh, opthlen)) == -1) {
+		warnx("inet6_opt_init(hbh, %d)", opthlen);
 		free(hbh);
 		return;
 	}
-	if ((curlen = inet6_opt_append(hbh, hbhlen, curlen,
+	if ((curlen = inet6_opt_append(hbh, opthlen, curlen,
 				       10, /* dummy */
 				       optlen, 1,
 				       &optp)) == -1) {
 		warnx("inet6_opt_append"
-		      "(cur=%d, optlen=%d, hbhlen=%d)",
-		      curlen, optlen, hbhlen);
+		      "(cur=%d, optlen=%d, opthlen=%d)",
+		      curlen, optlen, opthlen);
 		free(hbh);
 		return;
 	}
 	(void)inet6_opt_set_val(optp, 0, (void *)optbuf,
 				optlen);
-	if (inet6_opt_finish(hbh, hbhlen, curlen) == -1) {
-		warnx("inet6_opt_finish(hbhlen=%d, curlen=%d)",
-		      hbhlen, curlen);
+	if (inet6_opt_finish(hbh, opthlen, curlen) == -1) {
+		warnx("inet6_opt_finish(opthlen=%d, curlen=%d)",
+		      opthlen, curlen);
 		free(hbh);
 		return;
 	}
 
   sethbh:
 	if (setsockopt(s, IPPROTO_IPV6, hdrtype,
-		       (void *)hbh, hbhlen)) {
+		       (void *)hbh, opthlen)) {
 		switch(hdrtype) {
 		case IPV6_HOPOPTS:
 			warn("setsockopt(IPV6_HOPOPTS)");

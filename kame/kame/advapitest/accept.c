@@ -31,6 +31,8 @@
 #include <sys/uio.h>
 #include <sys/ioctl.h>
 
+#include <net/if.h>
+
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netdb.h>
@@ -42,128 +44,138 @@
 #include <unistd.h>
 #include <err.h>
 
-#define COMPAT_RFC2292
-
 static u_char *rcvmsgbuf;
 static int rcvmsglen; 
+int aflag, dflag, Dflag, hflag, iflag, lflag, rflag, uflag; 
 
 void print_options __P((struct msghdr *));
 void print_opthdr __P((void *));
 void print_rthdr __P((void *));
+void usage __P((void));
 
 int
 main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	int s, s0, remotelen, on, optlen;
-	short port;
-	struct sockaddr_in6 local, remote;
+	int ch, s, s0, remotelen, on, proto, error;
+	char *portstr = DEFAULTPORT;
+	struct sockaddr_in6 remote;
 	struct msghdr rcvmh;
-	struct fd_set allsocks, readsocks;
 	struct iovec iov[2];
 	char recvbuf[1024];	/* xxx hardcoding */
+	struct addrinfo hints, *res;
 
-	if (argc < 2)
-		port = DEFAULTPORT;
-	else
-		port = (short)atoi(argv[1]);
-
-	if ((s = socket(AF_INET6, SOCK_STREAM, 0)) < 0)
-		err(1, "socket");
-	memset(&local, 0, sizeof(local));
-	local.sin6_family = AF_INET6;
-	local.sin6_len = sizeof(local);
-	local.sin6_port = htons(port);
-
-	on = 1;
-	if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &on,
-		       sizeof(on)) < 0)
-		err(1, "setsockopt(SO_REUSEPORT)");
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
-		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_RECVPKTINFO)");
-	/* specify to tell value of hoplimit field of received IP6 hdr */
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
-		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_RECVHOPLIMIT)");
-	/* specify to show a received dst opts header after a rthdr (if any) */
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, &on,
-		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_RECVRTHDRDSTOPTS)");
-	/* specify to show a received dst opts header after a rthdr (if any) */
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &on,
-		       sizeof(on)) < 0)
-		err(1, "setsockot(IPV6_RECVDSTOPTS)");
-	/* specify to show a received hop-by-hop options header (if any) */
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, &on, sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_RECVHOPOPTS)");
-	/* specify to show received routing headers (if any) */
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDR, &on, sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_RECVRTHDR)");
-
-	if (bind(s, (struct sockaddr *)&local, sizeof(local)) < 0)
-		err(1, "bind");
-
-	if (listen(s, 5) < 0)
-		err(1, "listen");
-	sleep(10);
-
-	FD_ZERO(&allsocks);
-	FD_SET(s, &allsocks);
-
-	while(1) {
-		int cc;
-
-		FD_COPY(&readsocks, &allsocks);
-		if (select(s + 1, &readsocks, NULL, NULL, NULL) < 0)
-			err(1, "select");
-
-		if (FD_SET(s, &readsocks)) {
-			/* purge ancillary data on the listening socket */
-			if (ioctl(s, FIONREAD, &cc) < 0)
-				err(1, "ioctl(FIONREAD)");
-			else
-				printf("socket buffer size = %d\n", cc);
-
-			if (cc > 0) {
-				if (read(s, NULL, 0) < 0)
-					err(1, "read");
-				continue;
-			}
-
+	while ((ch = getopt(argc, argv, "adDhilpru")) != EOF)
+		switch(ch) {
+		case 'a':
+			aflag++;
 			break;
+		case 'd':
+			dflag++;
+			break;
+		case 'D':
+			Dflag++;
+			break;
+		case 'h':
+			hflag++;
+			break;
+		case 'l':
+			lflag++;
+			break;
+		case 'p':
+			portstr = optarg;
+			break;
+		case 'r':
+			rflag++;
+			break;
+		case 'u':
+			uflag++;
+			break;
+		default:
+			usage();
 		}
-	}
-
-	if ((s0 = accept(s, (struct sockaddr *)&remote, &remotelen)) < 0)
-		err(1, "accept");
-
-	/* close(s); */
-
-	s = s0;
 
 	rcvmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 		CMSG_SPACE(sizeof(int)) + 4096;	/* XXX hardcoding */
 	if (rcvmsgbuf == NULL &&
 	    (rcvmsgbuf = (u_char *)malloc(rcvmsglen)) == NULL)
 		errx(1, "malloc failed");
-#ifdef COMPAT_RFC2292
-	if (getsockopt(s, IPPROTO_IPV6, IPV6_PKTOPTIONS, (void *)rcvmsgbuf,
-		       &rcvmsglen) <0 )
-		err(1, "getsockopt(IPV6_PKTOPTIONS)");
-	rcvmh.msg_controllen = optlen;
-	rcvmh.msg_control = (caddr_t)rcvmsgbuf;
-#else  /* new advanced API */
-	memset(&rcvmh, 0, sizeof(rcvmh));
-	rcvmh.msg_controllen = rcvmsglen;
-	rcvmh.msg_control = (caddr_t)rcvmsgbuf;
 
-	if (recvmsg(s, &rcvmh, 0) < 0)
-		err(1, "recvmsg");
-#endif
+	proto = uflag ? IPPROTO_UDP : IPPROTO_TCP;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = uflag ? SOCK_DGRAM : SOCK_STREAM;
+	hints.ai_protocol = proto;
+	hints.ai_flags = AI_PASSIVE;
 
-	print_options(&rcvmh);
+	error = getaddrinfo(NULL, portstr, &hints, &res);
+	if (error)
+		errx(1, "getaddrinfo: %s", gai_strerror(error));
+
+	if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol))
+	    < 0)
+		err(1, "socket");
+
+	on = 1;
+	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(SO_REUSEADDR)");
+	if ((aflag || iflag) &&
+	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVPKTINFO)");
+	/* specify to tell value of hoplimit field of received IP6 hdr */
+	if ((aflag || lflag) &&
+	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVHOPLIMIT)");
+	/* specify to show received dst opts hdrs before a rthdr (if any) */
+	if ((aflag || Dflag) &&
+	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVRTHDRDSTOPTS)");
+	/* specify to show a received dst opts header after a rthdr (if any) */
+	if ((aflag || dflag) &&
+	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockot(IPV6_RECVDSTOPTS)");
+	/* specify to show a received hop-by-hop options header (if any) */
+	if ((aflag || hflag) &&
+	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, &on, sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVHOPOPTS)");
+	/* specify to show received routing headers (if any) */
+	if ((aflag || rflag) &&
+	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDR, &on, sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVRTHDR)");
+
+	if (bind(s, res->ai_addr, res->ai_addrlen) < 0)
+		err(1, "bind");
+
+	freeaddrinfo(res);
+
+	if (proto == IPPROTO_TCP) {
+		if (listen(s, 1) < 0)
+			err(1, "listen");
+
+		if ((s0 = accept(s, (struct sockaddr *)&remote, &remotelen))
+		    < 0)
+			err(1, "accept");
+		close(s);
+		s = s0;
+
+		/*
+		 * issue recvmsg with an empty data buffer to get optional
+		 * (ancillary) data upon accepting a connection.
+		 */
+		memset(&rcvmh, 0, sizeof(rcvmh));
+		rcvmh.msg_controllen = rcvmsglen;
+		rcvmh.msg_control = (caddr_t)rcvmsgbuf;
+		if (recvmsg(s, &rcvmh, 0) < 0)
+			err(1, "recvmsg");
+
+		print_options(&rcvmh);
+	}
 
 	while(1) {
 		int cc;
@@ -184,7 +196,8 @@ main(argc, argv)
 
 		print_options(&rcvmh);
 		recvbuf[cc] = '\0';
-		printf("Data: %s\n", recvbuf);
+		if (proto == IPPROTO_TCP) /* XXX */
+			printf("Data: %s\n", recvbuf);
 	}
 
 	close(s);
@@ -200,6 +213,7 @@ print_options(mh)
 	int *hlimp = NULL;
 	char ntop_buf[INET6_ADDRSTRLEN];
 	void *hbh = NULL, *dst1 = NULL, *dst2 = NULL, *rthdr = NULL;
+	char ifnambuf[IF_NAMESIZE];
 
 	if (mh->msg_controllen == 0) {
 		printf("No IPv6 option is received\n");
@@ -256,9 +270,10 @@ print_options(mh)
 
 	printf("Received IPv6 options (size %d):\n", mh->msg_controllen);
 	if (pi) {
-		printf("  Packetinfo: dst = %s, I/Fid = %d\n",
+		printf("  Packetinfo: dst=%s, I/F=(%s, id=%d)\n",
 		       inet_ntop(AF_INET6, &pi->ipi6_addr, ntop_buf,
 				 sizeof(ntop_buf)),
+		       if_indextoname(pi->ipi6_ifindex, ifnambuf),
 		       pi->ipi6_ifindex);
 	}
 	if (hlimp)
@@ -295,7 +310,7 @@ print_opthdr(void *extbuf)
 
 	ext = (struct ip6_hbh *)extbuf;
 	extlen = (ext->ip6h_len + 1) * 8;
-	printf("nxt %u, len %u (%d bytes)\n", ext->ip6h_nxt,
+	printf("    nxt %u, len %u (%d bytes)\n", ext->ip6h_nxt,
 	       ext->ip6h_len, extlen);
 
 	currentlen = 0;
@@ -340,7 +355,7 @@ print_rthdr(void *extbuf)
 	int i, segments;
 
 	/* print fixed part of the header */
-	printf("nxt %u, len %u (%d bytes), type %u, ", rh->ip6r_nxt,
+	printf("    nxt %u, len %u (%d bytes), type %u, ", rh->ip6r_nxt,
 	       rh->ip6r_len, (rh->ip6r_len + 1) << 3, rh->ip6r_type);
 	if ((segments = inet6_rth_segments(extbuf)) >= 0)
 		printf("%d segments, ", segments);
@@ -359,4 +374,11 @@ print_rthdr(void *extbuf)
 	}
 
 	return;
+}
+
+void
+usage()
+{
+	fprintf(stderr, "usage: accept [-adDhlru] [-p port]\n");
+	exit(1);
 }
