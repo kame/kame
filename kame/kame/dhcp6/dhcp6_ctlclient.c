@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6_ctlclient.c,v 1.1 2004/09/07 04:20:18 jinmei Exp $	*/
+/*	$KAME: dhcp6_ctlclient.c,v 1.2 2004/09/07 04:37:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -61,7 +61,7 @@
 static char *ctladdr;
 static char *ctlport;
 
-static enum { CTLCLIENT, CTLSERVER } ctltype;
+static enum { CTLCLIENT, CTLSERVER } ctltype = CTLCLIENT;
 
 static inline int put16 __P((char **, int *, u_int16_t));
 static inline int put32 __P((char **, int *, u_int32_t));
@@ -90,7 +90,7 @@ main(argc, argv)
 	size_t clen;
 	struct addrinfo hints, *res0, *res;
 	int digestlen;
-	char *keyfile;
+	char *keyfile = NULL;
 	struct keyinfo key;
 
 	while ((ch = getopt(argc, argv, "CSa:k:p:")) != -1) {
