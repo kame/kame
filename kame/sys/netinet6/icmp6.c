@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.134 2000/08/19 02:01:46 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.135 2000/08/29 07:51:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1212,7 +1212,7 @@ ni6_input(m, off)
 		replylen += sizeof(u_int32_t);
 		break;
 	case NI_QTYPE_FQDN:
-		/* XXX will append a mbuf */
+		/* XXX will append an mbuf */
 		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_namelen);
 		break;
 	case NI_QTYPE_NODEADDR:
