@@ -420,6 +420,33 @@ rtrequest(req, dst, gateway, netmask, flags, ret_nrt)
 	struct sockaddr *dst, *gateway, *netmask;
 	struct rtentry **ret_nrt;
 {
+	struct rt_addrinfo info;
+
+	bzero(&info, sizeof(info));
+	info.rti_flags = flags;
+	info.rti_info[RTAX_DST] = dst;
+	info.rti_info[RTAX_GATEWAY] = gateway;
+	info.rti_info[RTAX_NETMASK] = netmask;
+	return rtrequest1(req, &info, ret_nrt);
+}
+
+/*
+ * These (questionable) definitions of apparent local variables apply
+ * to the next function.  XXXXXX!!!
+ */
+#define dst	info->rti_info[RTAX_DST]
+#define gateway	info->rti_info[RTAX_GATEWAY]
+#define netmask	info->rti_info[RTAX_NETMASK]
+#define ifaaddr	info->rti_info[RTAX_IFA]
+#define ifpaddr	info->rti_info[RTAX_IFP]
+#define flags	info->rti_flags
+
+int
+rtrequest1(req, info, ret_nrt)
+	int req;
+	struct rt_addrinfo *info;
+	struct rtentry **ret_nrt;
+{
 	int s = splsoftnet(); int error = 0;
 	struct rtentry *rt;
 	struct radix_node *rn;
@@ -518,6 +545,13 @@ bad:
 	splx(s);
 	return (error);
 }
+
+#undef dst
+#undef gateway
+#undef netmask
+#undef ifaaddr
+#undef ifpaddr
+#undef flags
 
 int
 rt_setgate(rt0, dst, gate)

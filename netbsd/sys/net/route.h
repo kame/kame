@@ -240,6 +240,10 @@ struct rt_msghdr {
 struct rt_addrinfo {
 	int	rti_addrs;
 	struct	sockaddr *rti_info[RTAX_MAX];
+	int	rti_flags;
+	struct	ifaddr *rti_ifa;
+	struct	ifnet *rti_ifp;
+	struct	rt_msghdr *rti_rtm;
 };
 
 struct route_cb {
@@ -325,6 +329,7 @@ void	 rtredirect __P((struct sockaddr *, struct sockaddr *,
 	    struct sockaddr *, int, struct sockaddr *, struct rtentry **));
 int	 rtrequest __P((int, struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *, int, struct rtentry **));
+int	 rtrequest1 __P((int, struct rt_addrinfo *, struct rtentry **));
 
 #ifdef MIP6
 void	rt_mip6msg __P((int, struct ifnet *, struct rtentry *));
