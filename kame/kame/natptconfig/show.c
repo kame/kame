@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.28 2002/05/30 08:03:13 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.29 2002/06/19 06:07:33 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -185,9 +185,23 @@ showXlate(int type, int interval)
 void
 writeXlateHeader(int type)
 {
-	if (type == SLONG) {
-		;
-	} else {
+	/* 22 means strlen("255.255.255.255.65535 ") */
+	/* 46 means strlen("0123:4567:89ab:cdef:0123:4567:89ab:cdef.65535 ") */
+
+	switch (type) {
+	case XLATE_SHORT:
+		printf("%-6s",	"Proto");
+		printf("%-22s", "Local Address (src)");
+		printf("%-22s", "Remote Address (src)");
+		printf("%6s",  "Ipkts");
+		printf("%6s",  "Opkts");
+		printf(" ");
+
+		printf("%-8s",	"  Idle");
+		printf("%-8s",	" (state)");
+		break;
+
+	case XLATE_REGULAR:
 		printf("%-6s",	"Proto");
 		printf("%-22s", "Local Address (src)");
 		printf("%-22s", "Local Address (dst)");
@@ -199,9 +213,24 @@ writeXlateHeader(int type)
 
 		printf("%-8s",	"  Idle");
 		printf("%-8s",	" (state)");
-		printf("\n");
+		break;
+
+	case XLATE_LONG:
+		printf("%-6s",	"Proto");
+		printf("%-46s", "Local Address (src)");
+		printf("%-46s", "Local Address (dst)");
+		printf("%-46s", "Remote Address (src)");
+		printf("%-46s", "Remote Address (dst)");
+		printf("%6s",  "Ipkts");
+		printf("%6s",  "Opkts");
+		printf(" ");
+
+		printf("%-8s",	"  Idle");
+		printf("%-8s",	" (state)");
+		break;
 	}
 
+	printf("\n");
 }
 
 
