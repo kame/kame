@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.98 2002/01/11 07:52:21 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.99 2002/01/11 08:44:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -611,6 +611,29 @@ in6_selectif(dstsock, opts, mopts, ro, retifp)
 				     &rt, clone)) != 0) {
 		return(error);
 	}
+
+	/*
+	 * do not use a rejected or black route.
+	 * XXX: this check should be done in the L2 output routine.
+	 * However, if we skipped this check here, we'd see the following
+	 * scenario:
+	 * - install a rejected route for a scoped address prefix
+	 *   (like fe80::/10)
+	 * - send a packet to a destination that matches the scoped prefix,
+	 *   with ambiguity about the scope zone.
+	 * - pick the outgoing interface from the route, and disambiguate the
+	 *   scope zone with the interface.
+	 * - ip6_output() would try to get another route with the "new"
+	 *   destination, which may be valid.
+	 * - we'd see no error on output.
+	 * Although this may not be very harmful, it should still be confusing.
+	 * We thus reject the case here.
+	 */
+	if (rt && (rt->rt_flags & (RTF_REJECT | RTF_BLACKHOLE))) {
+		return(rt->rt_flags & RTF_BLACKHOLE ? 0 :
+		       rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
+	}
+
 	/*
 	 * Adjust the "outgoing" interface.  If we're going to loop the packet
 	 * back to ourselves, the ifp would be the loopback interface.
