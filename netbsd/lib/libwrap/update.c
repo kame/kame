@@ -1,4 +1,4 @@
-/*	$NetBSD: update.c,v 1.3 1997/10/09 21:20:55 christos Exp $	*/
+/*	$NetBSD: update.c,v 1.6 1999/08/31 13:58:58 itojun Exp $	*/
 
  /*
   * Routines for controlled update/initialization of request structures.
@@ -20,7 +20,7 @@
 #if 0
 static char sccsid[] = "@(#) update.c 1.1 94/12/28 17:42:56";
 #else
-__RCSID("$NetBSD: update.c,v 1.3 1997/10/09 21:20:55 christos Exp $");
+__RCSID("$NetBSD: update.c,v 1.6 1999/08/31 13:58:58 itojun Exp $");
 #endif
 #endif
 

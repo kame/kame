@@ -1,4 +1,4 @@
-/*	$NetBSD: scaffold.c,v 1.3 1997/11/16 21:30:25 christos Exp $	*/
+/*	$NetBSD: scaffold.c,v 1.7 1999/08/31 13:58:58 itojun Exp $	*/
 
  /*
   * Routines for testing only. Not really industrial strength.
@@ -9,9 +9,9 @@
 #include <sys/cdefs.h>
 #ifndef lint
 #if 0
-static char sccs_id[] = "@(#) scaffold.c 1.5 95/01/03 09:13:48";
+static char sccs_id[] = "@(#) scaffold.c 1.6 97/03/21 19:27:24";
 #else
-__RCSID("$NetBSD: scaffold.c,v 1.3 1997/11/16 21:30:25 christos Exp $");
+__RCSID("$NetBSD: scaffold.c,v 1.7 1999/08/31 13:58:58 itojun Exp $");
 #endif
 #endif
 
@@ -89,6 +89,7 @@ struct hostent *find_inet_addr(host)
 char   *host;
 {
     struct in_addr addr;
+    unsigned long addr_num;
     struct hostent *hp;
     static struct hostent h;
     static char *addr_list[2];
@@ -99,7 +100,8 @@ char   *host;
     /*
      * Host address: translate it to internal form.
      */
-    if ((addr.s_addr = dot_quad_addr(host)) != INADDR_NONE) {
+    if (dot_quad_addr(host, &addr_num) == 0) {
+	addr.s_addr = (addr_num & 0xffffffff);
 	h.h_addr_list = addr_list;
 	h.h_addr_list[0] = (char *) &addr;
 	h.h_length = sizeof(addr);
@@ -132,6 +134,12 @@ char   *host;
 	return (0);
     }
 #ifdef INET6
+    /*
+     * XXX this behavior may, or may not be desirable.
+     * - we may better use getipnodebyname() to addresses of get both AFs,
+     *   however, getipnodebyname() is not widely implemented.
+     * - it may be better to have a way to specify the AF to use.
+     */
     if ((hp = gethostbyname2(host, AF_INET)) == 0
      && (hp = gethostbyname2(host, AF_INET6)) == 0) {
 	tcpd_warn("%s: host not found", host);
@@ -149,7 +157,7 @@ char   *host;
 #endif
     if (STR_NE(host, hp->h_name)) {
 	tcpd_warn("%s: hostname alias", host);
-	tcpd_warn("(official name: %s)", hp->h_name);
+	tcpd_warn("(official name: %.*s)", STRING_LENGTH, hp->h_name);
     }
     return (dup_hostent(hp));
 }

@@ -19,4 +19,6 @@ MKPIC=	no
 
 .include "Makefile.cflags"
 
+MKPIC=no
+
 .include <bsd.lib.mk>

@@ -1,4 +1,4 @@
-/*	$NetBSD: rfc931.c,v 1.3 1997/10/21 05:39:00 mrg Exp $	*/
+/*	$NetBSD: rfc931.c,v 1.6.8.1 2001/03/11 20:19:13 he Exp $	*/
 
  /*
   * rfc931() speaks a common subset of the RFC 931, AUTH, TAP, IDENT and RFC
@@ -16,7 +16,7 @@
 #if 0
 static char sccsid[] = "@(#) rfc931.c 1.10 95/01/02 16:11:34";
 #else
-__RCSID("$NetBSD: rfc931.c,v 1.3 1997/10/21 05:39:00 mrg Exp $");
+__RCSID("$NetBSD: rfc931.c,v 1.6.8.1 2001/03/11 20:19:13 he Exp $");
 #endif
 #endif
 
@@ -97,11 +97,6 @@ char   *dest;
     u_short *rmt_portp;
     u_short *our_portp;
 
-#ifdef __GNUC__
-    (void)&result; /* Avoid longjmp clobbering */
-    (void)&fp;	/* XXX gcc */
-#endif
-
     /* address family must be the same */
     if (rmt_sin->sa_family != our_sin->sa_family) {
 	STRN_CPY(dest, result, STRING_LENGTH);
@@ -110,12 +105,12 @@ char   *dest;
     switch (rmt_sin->sa_family) {
     case AF_INET:
 	salen = sizeof(struct sockaddr_in);
-	rmt_portp = &((struct sockaddr_in *)&rmt_sin)->sin_port;
+	rmt_portp = &(((struct sockaddr_in *)rmt_sin)->sin_port);
 	break;
 #ifdef INET6
     case AF_INET6:
 	salen = sizeof(struct sockaddr_in6);
-	rmt_portp = &((struct sockaddr_in6 *)&rmt_sin)->sin6_port;
+	rmt_portp = &(((struct sockaddr_in6 *)rmt_sin)->sin6_port);
 	break;
 #endif
     default:
@@ -124,11 +119,11 @@ char   *dest;
     }
     switch (our_sin->sa_family) {
     case AF_INET:
-	our_portp = &((struct sockaddr_in *)&our_sin)->sin_port;
+	our_portp = &(((struct sockaddr_in *)our_sin)->sin_port);
 	break;
 #ifdef INET6
     case AF_INET6:
-	our_portp = &((struct sockaddr_in6 *)&our_sin)->sin6_port;
+	our_portp = &(((struct sockaddr_in6 *)our_sin)->sin6_port);
 	break;
 #endif
     default:

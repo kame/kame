@@ -1,4 +1,4 @@
-/*	$NetBSD: hosts_access.c,v 1.5 1999/01/18 20:21:19 christos Exp $	*/
+/*	$NetBSD: hosts_access.c,v 1.11 2000/01/21 17:08:34 mycroft Exp $	*/
 
  /*
   * This module implements a simple access control language that is based on
@@ -22,9 +22,9 @@
 #include <sys/cdefs.h>
 #ifndef lint
 #if 0
-static char sccsid[] = "@(#) hosts_access.c 1.20 96/02/11 17:01:27";
+static char sccsid[] = "@(#) hosts_access.c 1.21 97/02/12 02:13:22";
 #else
-__RCSID("$NetBSD: hosts_access.c,v 1.5 1999/01/18 20:21:19 christos Exp $");
+__RCSID("$NetBSD: hosts_access.c,v 1.11 2000/01/21 17:08:34 mycroft Exp $");
 #endif
 #endif
 
@@ -32,7 +32,9 @@ __RCSID("$NetBSD: hosts_access.c,v 1.5 1999/01/18 20:21:19 christos Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
+#ifdef INET6
 #include <sys/socket.h>
+#endif
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -47,8 +49,6 @@ __RCSID("$NetBSD: hosts_access.c,v 1.5 1999/01/18 20:21:19 christos Exp $");
 #include <netgroup.h>
 #include <rpcsvc/ypclnt.h>
 #endif
-
-extern int errno;
 
 #ifndef	INADDR_NONE
 #define	INADDR_NONE	(-1)		/* XXX should be 0xffffffff */
@@ -130,7 +130,8 @@ struct request_info *request;
 
     if (resident <= 0)
 	resident++;
-    if ((verdict = setjmp(tcpd_buf)) != 0)
+    verdict = setjmp(tcpd_buf);
+    if (verdict != 0)
 	return (verdict == AC_PERMIT);
     if (table_match(hosts_allow_table, request))
 	return (YES);
@@ -318,7 +319,7 @@ char   *rbl_hostaddr;				/* hostaddr */
     int ret = NO;
     size_t len = strlen(rbl_domain) + (4 * 4) + 2;
  
-    if ((host_address = dot_quad_addr(rbl_hostaddr)) == INADDR_NONE) {
+    if (dot_quad_addr(rbl_hostaddr, &host_address) != 0) {
 	tcpd_warn("unable to convert %s to address", rbl_hostaddr);
 	return (NO);
     }
@@ -375,9 +376,9 @@ char   *string;
 #ifndef INET6
     return masked_match4(net_tok, mask_tok, string);
 #else
-    if (dot_quad_addr(net_tok) != INADDR_NONE
-     && dot_quad_addr(mask_tok) != INADDR_NONE
-     && dot_quad_addr(string) != INADDR_NONE) {
+    if (dot_quad_addr(net_tok, NULL) != INADDR_NONE
+     && dot_quad_addr(mask_tok, NULL) != INADDR_NONE
+     && dot_quad_addr(string, NULL) != INADDR_NONE) {
 	return masked_match4(net_tok, mask_tok, string);
     } else
 	return masked_match6(net_tok, mask_tok, string);
@@ -399,10 +400,10 @@ char   *string;
      * access control language. John P. Rouillard <rouilj@cs.umb.edu>.
      */
 
-    if ((addr = dot_quad_addr(string)) == INADDR_NONE)
+    if (dot_quad_addr(string, &addr) != 0)
 	return (NO);
-    if ((net = dot_quad_addr(net_tok)) == INADDR_NONE
-	|| (mask = dot_quad_addr(mask_tok)) == INADDR_NONE) {
+    if (dot_quad_addr(net_tok, &net) != 0
+	|| dot_quad_addr(mask_tok, &mask) != 0) {
 	tcpd_warn("bad net/mask expression: %s/%s", net_tok, mask_tok);
 	return (NO);				/* not tcpd_jump() */
     }

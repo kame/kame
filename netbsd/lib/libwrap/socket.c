@@ -1,4 +1,4 @@
-/*	$NetBSD: socket.c,v 1.3 1997/10/09 21:20:50 christos Exp $	*/
+/*	$NetBSD: socket.c,v 1.8 1999/09/10 08:59:47 itojun Exp $	*/
 
  /*
   * This module determines the type of socket (datagram, stream), the client
@@ -20,9 +20,9 @@
 #include <sys/cdefs.h>
 #ifndef lint
 #if 0
-static char sccsid[] = "@(#) socket.c 1.14 95/01/30 19:51:50";
+static char sccsid[] = "@(#) socket.c 1.15 97/03/21 19:27:24";
 #else
-__RCSID("$NetBSD: socket.c,v 1.3 1997/10/09 21:20:50 christos Exp $");
+__RCSID("$NetBSD: socket.c,v 1.8 1999/09/10 08:59:47 itojun Exp $");
 #endif
 #endif
 
@@ -225,8 +225,8 @@ struct host_info *host;
 	     * may be a transient problem or a botched name server setup.
 	     */
 
-	    tcpd_warn("can't verify hostname: gethostbyname(%s) failed",
-		      host->name);
+	    tcpd_warn("can't verify hostname: gethostbyname2(%s, %d) failed",
+		      host->name, af);
 
 	} else if (STR_NE(host->name, hp->h_name)
 		   && STR_NE(host->name, "localhost")) {
@@ -237,8 +237,8 @@ struct host_info *host;
 	     * problem. It could also be that someone is trying to spoof us.
 	     */
 
-	    tcpd_warn("host name/name mismatch: %s != %s",
-		      host->name, hp->h_name);
+	    tcpd_warn("host name/name mismatch: %s != %.*s",
+		      host->name, STRING_LENGTH, hp->h_name);
 
 	} else {
 
@@ -260,8 +260,9 @@ struct host_info *host;
 	     * server.
 	     */
 
-	    tcpd_warn("host name/address mismatch: %s != %s",
-		      inet_ntop(af, ap, hbuf, sizeof(hbuf)), hp->h_name);
+	    tcpd_warn("host name/address mismatch: %s != %.*s",
+		      inet_ntop(af, ap, hbuf, sizeof(hbuf)),
+		      STRING_LENGTH, hp->h_name);
 	}
 	/* name is bad, clobber it */
 	(void)strncpy(host->name, paranoid, sizeof(host->name) - 1);

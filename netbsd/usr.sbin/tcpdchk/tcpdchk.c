@@ -1,4 +1,4 @@
-/*	$NetBSD: tcpdchk.c,v 1.5 1999/01/18 18:01:26 christos Exp $	*/
+/*	$NetBSD: tcpdchk.c,v 1.9 1999/08/31 13:58:58 itojun Exp $	*/
 
  /*
   * tcpdchk - examine all tcpd access control rules and inetd.conf entries
@@ -19,9 +19,9 @@
 #include <sys/cdefs.h>
 #ifndef lint
 #if 0
-static char sccsid[] = "@(#) tcpdchk.c 1.7 96/02/11 17:01:34";
+static char sccsid[] = "@(#) tcpdchk.c 1.8 97/02/12 02:13:25";
 #else
-__RCSID("$NetBSD: tcpdchk.c,v 1.5 1999/01/18 18:01:26 christos Exp $");
+__RCSID("$NetBSD: tcpdchk.c,v 1.9 1999/08/31 13:58:58 itojun Exp $");
 #endif
 #endif
 
@@ -29,7 +29,9 @@ __RCSID("$NetBSD: tcpdchk.c,v 1.5 1999/01/18 18:01:26 christos Exp $");
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef INET6
 #include <sys/socket.h>
+#endif
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -258,7 +260,8 @@ struct request_info *request;
 #ifdef PROCESS_OPTIONS
 	    real_verdict = defl_verdict;
 	    if (sh_cmd) {
-		if ((verdict = setjmp(tcpd_buf)) != 0) {
+		verdict = setjmp(tcpd_buf);
+		if (verdict != 0) {
 		    real_verdict = (verdict == AC_PERMIT);
 		} else {
 		    dry_run = 1;
@@ -457,8 +460,8 @@ char   *pat;
 #ifdef INET6
 	struct in6_addr in6;
 #endif
-	if (dot_quad_addr(pat) != INADDR_NONE
-	    || dot_quad_addr(mask) != INADDR_NONE)
+	if (dot_quad_addr(pat, NULL) != INADDR_NONE
+	    || dot_quad_addr(mask, NULL) != INADDR_NONE)
 	    ; /*okay*/
 #ifdef INET6
 	else if (inet_pton(AF_INET6, pat, &in6) == 1
