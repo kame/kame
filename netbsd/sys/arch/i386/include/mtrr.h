@@ -106,13 +106,13 @@ struct mtrr_state {
 #define mtrr_base_value(mtrrp) \
     (((uint64_t)(mtrrp)->base) | ((uint64_t)(mtrrp)->type))
 #define mtrr_mask_value(mtrrp) \
-    ((~((mtrrp)->len - 1) & 0x0000000ffffff000))
+    ((~((mtrrp)->len - 1) & 0x0000000ffffff000ULL))
 	
 
 #define mtrr_len(val) \
-    ((~((val) & 0x0000000ffffff000)+1) & 0x0000000ffffff000)
-#define mtrr_base(val)		((val) & 0x0000000ffffff000)
-#define mtrr_type(val)		((uint8_t)((val) & 0x00000000000000ff))
+    ((~((val) & 0x0000000ffffff000ULL)+1) & 0x0000000ffffff000ULL)
+#define mtrr_base(val)		((val) & 0x0000000ffffff000ULL)
+#define mtrr_type(val)		((uint8_t)((val) & 0x00000000000000ffULL))
 #define mtrr_valid(val)		(((val) & MTRR_I686_MASK_VALID) != 0)
 
 struct proc;
