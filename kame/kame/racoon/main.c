@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.36 2001/06/01 08:26:05 sakane Exp $	*/
+/*	$KAME: main.c,v 1.37 2001/08/13 12:45:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -134,6 +134,11 @@ main(ac, av)
 {
 	int error;
 
+	if (geteuid() != 0) {
+		errx(1, "must be root to invoke this program.");
+		/* NOTREACHED*/
+	}
+
 	/*
 	 * Don't let anyone read files I write.  Although some files (such as
 	 * the PID file) can be other readable, we dare to use the global mask,
@@ -141,8 +146,10 @@ main(ac, av)
 	 * at the creation time.
 	 */
 	umask(077);
-	if (umask(077) != 077)
+	if (umask(077) != 077) {
 		errx(1, "could not set umask");
+		/* NOTREACHED*/
+	}
 
 	initlcconf();
 	initrmconf();
@@ -159,12 +166,14 @@ main(ac, av)
 #endif
 	plog(LLV_INFO, LOCATION, NULL, "%s\n", version);
 	plog(LLV_INFO, LOCATION, NULL, "@(#)"
-	"This product linked %s (http://www.openssl.org/)"
-	"\n", eay_version());
+	    "This product linked %s (http://www.openssl.org/)"
+	    "\n", eay_version());
 
-	if (pfkey_init() < 0)
+	if (pfkey_init() < 0) {
 		errx(1, "something error happened "
 			"while pfkey initializing.");
+		/* NOTREACHED*/
+	}
 
 	/*
 	 * in order to prefer the parameters by command line,
