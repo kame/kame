@@ -1038,7 +1038,7 @@ sysctl_inet(string, bufpp, mib, flags, typep)
 struct ctlname inet6name[] = CTL_IPV6PROTO_NAMES;
 struct ctlname ip6name[] = IPV6CTL_NAMES;
 struct ctlname icmp6name[] = ICMPV6CTL_NAMES;
-struct ctlname pim6name[] = PIMCTL_NAMES;
+struct ctlname pim6name[] = PIM6CTL_NAMES;
 struct list inet6list = { inet6name, IPV6PROTO_MAXID };
 struct list inet6vars[] = {
 /*0*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
@@ -1076,7 +1076,7 @@ struct list inet6vars[] = {
 /*100*/	{ 0, 0 },
 	{ 0, 0 },
 	{ 0, 0 },
-	{ pim6name, PIMCTL_MAXID },	/* pim6 */
+	{ pim6name, PIM6CTL_MAXID },	/* pim6 */
 };
 
 /*
