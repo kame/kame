@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1726 2001/06/15 00:25:07 itojun Exp $
+$KAME: CHANGELOG,v 1.1727 2001/06/15 04:00:22 itojun Exp $
 
 <200106>
+Fri Jun 15 13:14:31 JST 2001  itojun@iijlab.net
+	* openbsd/sys/net/if.[ch]: change meaning of ifnet.if_lastchange
+	  to meet with RFC1573 ifLastChange.  sync with openbsd-current.
+
 Thu Jun 14 18:12:57 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/sys/netinet/icmp6.h: 
           - add new types and codes defined in RFC3122(Inverse NDP). they
