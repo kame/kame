@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.21 2000/05/23 14:58:02 itojun Exp $ */
+/* KAME $Id: parse.y,v 1.22 2000/05/24 13:35:59 itojun Exp $ */
 
 %{
 #include <sys/types.h>
@@ -439,7 +439,7 @@ sp_selector_spec
 				break;
 #endif
 			default:
-				/*XXX*/
+				exit(1); /*XXX*/
 			}
 		}
 		ipaddress { p_dst = pp_addr; }
@@ -458,7 +458,7 @@ sp_selector_spec
 				break;
 #endif
 			default:
-				/*XXX*/
+				exit(1); /*XXX*/
 			}
 		}
 		upper_spec
