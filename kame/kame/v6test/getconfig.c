@@ -148,7 +148,7 @@ make_ip6(char *name)
 		     "IPv6 version traffic class must be between 0 and 255");
 	ip6->ip6_vfc |= (val32 >> 4) & 0x0f;
 	*(&ip6->ip6_vfc + 1) |= (val32 & 0x0f) << 4; /* XXX: ugly... */
-	if (tgetnum("ip6_plen", ip6buf, (int *) &val16)) < 0) {
+	if (tgetnum("ip6_plen", ip6buf, (int *) &val16) < 0) {
 		if ((addr = tgetstr("ip6_plen", &bp, ip6buf)) &&
 		    strcmp(addr, "auto") == 0)
 			ip6plenauto = 1;
