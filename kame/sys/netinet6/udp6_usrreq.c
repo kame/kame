@@ -606,15 +606,14 @@ udp6_output(in6p, m, addr6, control)
 			 */
 			if (optp && (pi = optp->ip6po_pktinfo) &&
 			    pi->ipi6_ifindex) {
-				ip6->ip6_dst.s6_addr16[1] =
-					htons(pi->ipi6_ifindex);
+				faddr->s6_addr16[1] = htons(pi->ipi6_ifindex);
 				oifp = ifindex2ifnet[pi->ipi6_ifindex];
 			}
-			else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
+			else if (IN6_IS_ADDR_MULTICAST(faddr) &&
 				 (mopt = in6p->in6p_moptions) &&
 				 mopt->im6o_multicast_ifp) {
 				oifp = mopt->im6o_multicast_ifp;
-				ip6->ip6_dst.s6_addr16[1] = oifp->if_index;
+				faddr->s6_addr16[1] = oifp->if_index;
 			} else if (sin6->sin6_scope_id) {
 				/* boundary check */
 				if (sin6->sin6_scope_id < 0 
@@ -623,8 +622,8 @@ udp6_output(in6p, m, addr6, control)
 					goto release;
 				}
 				/* XXX */
-				ip6->ip6_dst.s6_addr16[1]
-					= htons(sin6->sin6_scope_id & 0xffff);
+				faddr->s6_addr16[1] =
+					htons(sin6->sin6_scope_id & 0xffff);
 			}
 		}
 		
@@ -649,6 +648,7 @@ udp6_output(in6p, m, addr6, control)
 		faddr = &in6p->in6p_faddr;
 		fport = in6p->in6p_fport;
 	}
+
 	/*
 	 * Calculate data length and get a mbuf
 	 * for UDP and IP6 headers.
