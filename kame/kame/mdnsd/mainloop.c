@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.82 2001/09/03 10:08:39 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.83 2001/09/03 10:09:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * multicast DNS resolver, based on draft-ietf-dnsext-mdns-00.txt.
+ * multicast DNS resolver, based on draft-ietf-dnsext-mdns-03.txt.
  *
  * TODO:
  * - query timeout - naive code is checked in
