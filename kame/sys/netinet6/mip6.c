@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.68 2001/10/24 04:44:17 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.69 2001/10/24 09:25:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1244,11 +1244,12 @@ mip6_exthdr_create(m, opt, mip6opt)
 		/*
 		 * XXX: todo.
 		 *
-		 * recently the multiple rthdrs (one is specified by
-		 * the caller of ip6_output, and the other is MIP6's)
-		 * should be merged.  see the thread of discussion on
-		 * the mopbile-ip mailing list started at Tue, 04 Sep
-		 * 2001 12:51:34 -0700 with the subject 'Coexistence
+		 * recent discussion in the mobileip-wg concluded that
+		 * the multiple rthdrs (one is specified by the caller
+		 * of ip6_output, and the other is MIP6's) should be
+		 * merged.  see the thread of discussion on the
+		 * mopbile-ip mailing list started at 'Tue, 04 Sep
+		 * 2001 12:51:34 -0700' with the subject 'Coexistence
 		 * with other uses for routing header'.
 		 */
 #ifdef __NetBSD__
@@ -1532,6 +1533,9 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	mip6_align_destopt(&optbuf);
 
 	*pktopt_mip6dest2 = (struct ip6_dest *)optbuf.buf;
+
+	/* hoping that the binding update will be sent with no accident. */
+	mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT;
 
 	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.24 2001/10/24 04:44:17 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.25 2001/10/24 09:25:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -822,7 +822,7 @@ mip6_bu_send_bu(mbu)
 	/*
 	 * XXX when we reset waitsent flag ?  is it correct to clear here ?
 	 */
-	mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT;
+	/* mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT; */
 
 	return (error);
 }
@@ -2692,15 +2692,17 @@ mip6_route_optimize(m)
 	}
 
 	/*
-	 * search all BUs including peer address.
+	 * search all binding update entries with the address of the
+	 * peer sending this un-optimized packet.
 	 */
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
 					  &ip6->ip6_src);
-	/*
-	 * if no BU entry is found, this is a first packet
-	 * from the peer.  create an BU entry.
-	 */
 	if (mbu == NULL) {
+		/*
+		 * if no binding update entry is found, this is a
+		 * first packet from the peer.  create a new binding
+		 * update entry for this peer.
+		 */
 		mbu = mip6_bu_create(&ip6->ip6_src,
 				     mpfx,
 				     &hif_coa,
@@ -2717,6 +2719,11 @@ mip6_route_optimize(m)
 		LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
 #endif
 	} else {
+		/*
+		 * found a binding update entry.  we should resend a
+		 * binding update to this peer because he is not add
+		 * routing header for the route optimization.
+		 */
 		mbu->mbu_coa = hif_coa;
 		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa);
 		if (coa_lifetime < mpfx->mpfx_lifetime) {
