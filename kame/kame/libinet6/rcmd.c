@@ -313,8 +313,7 @@ ruserok(rhost, superuser, ruser, luser)
 		return (-1);
 	ret = -1;
 	for (res = res0; res; res = res->ai_next) {
-		if (iruserok_sa(res->ai_addr, res->ai_addrlen, superuser,
-				ruser, luser) == 0) {
+		if (iruserok_sa(res->ai_addr, superuser, ruser, luser) == 0) {
 			ret = 0;
 			break;
 		}
