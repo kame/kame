@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.231 2001/09/14 06:05:10 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.232 2001/09/17 15:00:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1964,7 +1964,7 @@ in6_ifinit(ifp, ia, sin6, newhost)
 		ia->ia_ifa.ifa_flags |= RTF_CLONING;
 	}
 
-	/* Add ownaddr as loopback rtentry, if necessary(ex. on p2p link). */
+	/* Add ownaddr as loopback rtentry, if necessary (ex. on p2p link). */
 	if (newhost) {
 		/* set the rtrequest function to create llinfo */
 		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
