@@ -625,11 +625,7 @@ sendit:
 
 	/* be sure to update variables that are affected by ipsec4_output() */
 	ip = mtod(m, struct ip *);
-#ifdef _IP_VHL
-	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
-#else
 	hlen = ip->ip_hl << 2;
-#endif
 	ip_len = ntohs(ip->ip_len);
 
 	if (ro->ro_rt == NULL) {
@@ -653,13 +649,13 @@ skip_ipsec:
 	/*
 	 * Run through list of hooks for output packets.
 	 */
-	if ((error = pfil_run_hooks(&inet_pfil_hook, &m, ifp,
-				    PFIL_OUT)) != 0)
+	if ((error = pfil_run_hooks(&inet_pfil_hook, &m, ifp, PFIL_OUT)) != 0)
 		goto done;
 	if (m == NULL)
 		goto done;
 
 	ip = mtod(m, struct ip *);
+	hlen = ip->ip_hl << 2;
 #endif /* PFIL_HOOKS */
 
 #if NPF > 0
