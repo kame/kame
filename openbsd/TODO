@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 KAME project
-$Id: TODO,v 1.5 1999/09/20 15:08:23 itojun Exp $
+$Id: TODO,v 1.6 1999/09/21 15:06:08 itojun Exp $
 
 
 Things we can do with the current code:
@@ -14,14 +14,7 @@ Things we can do with the current code:
 - udp6 socket input/output (need testing)
 
 Things we can't do with the current code:
-- some part of setsockopt()
-	because of this, ping6 to multicast address is not able to send packets
-	out.
-- most of advapi
-	because of this, ping6 cannot get the hoplimit value for incoming
-	packet.
-- some of ioctl
-	SIOCGIFNETMASK_IN6 does not work correctly.
+- setsockopt(), ioctl and advapi needs checking
 - multicast related items need checking
 - "options IPSEC" does not even compile
 	I was told that OpenBSD guys will never replace IPsec code.
