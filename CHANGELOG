@@ -1,11 +1,15 @@
-2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-
-
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.905 2000/05/19 07:32:32 jinmei Exp $
+$Id: CHANGELOG,v 1.906 2000/05/19 07:38:39 jinmei Exp $
 
 <200005>
+2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): loosened scope check
+	in ip6_mdq() for packets forwarded to a register I/F. Without
+	this, such packet could be mistakenly discarded.
+	In response to: a report from Noriaki Takamiya
+	<takamiya@po.ntts.co.jp>
+	
 Fri May 19 11:41:05 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_mroute.[ch]: add backward compatibility code with
 	  for 2000/4/12 mrt6msg change (is not used in kame tree).
