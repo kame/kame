@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2166 2002/05/27 21:47:28 itojun Exp $
+$KAME: CHANGELOG,v 1.2167 2002/05/27 22:41:22 itojun Exp $
 
 <200205>
+Tue May 28 07:38:29 JST 2002  itojun@iijlab.net
+	* sys/netinet/tcp_subr.c: PMTUD blackhole detection.  sync w/netbsd-
+	  current.
+
 Tue May 28 06:46:23 JST 2002  itojun@iijlab.net
 	* sys/netinet6/frag6.c: enforce max # of fragments (not fragment
 	  queues) to defend against DoS.  similar logic should be incorporated
