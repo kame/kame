@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.26 2004/12/01 12:30:15 suz Exp $	*/
+/*	$KAME: keydb.h,v 1.27 2004/12/02 08:39:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,7 +57,7 @@ struct secasindex {
 	struct sockaddr_storage dst;	/* destination address for SA */
 	u_int16_t proto;		/* IPPROTO_ESP or IPPROTO_AH */
 	u_int8_t mode;			/* mode of protocol, see ipsec.h */
-	u_int32_t reqid;		/* reqid id who owned this SA */
+	u_int16_t reqid;		/* reqid id who owned this SA */
 					/* see IPSEC_MANUAL_REQID_MAX. */
 };
 

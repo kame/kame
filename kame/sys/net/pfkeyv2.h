@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.39 2004/11/11 22:34:45 suz Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.40 2004/12/02 08:39:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -213,7 +213,7 @@ struct sadb_x_sa2 {
   u_int8_t sadb_x_sa2_reserved1;
   u_int16_t sadb_x_sa2_reserved2;
   u_int32_t sadb_x_sa2_sequence;	/* lowermost 32bit of sequence number */
-  u_int32_t sadb_x_sa2_reqid;
+  u_int32_t sadb_x_sa2_reqid;		/* topmost 16bits are always 0 */
 };
 
 #if 0	/* not fixed yet */
