@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.349 2003/08/06 23:34:03 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.350 2003/08/06 23:35:52 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -262,8 +262,6 @@ draft-ietf-idmr-msf-api-03.txt: Socket Interface Extensions for Multicast Source
     * IPv6 works for kame/freebsd4, kame/netbsd, and kame/openbsd.
 draft-ietf-ngtrans-isatap-08.txt: Intra-Site Automatic Tunnel Addressing Protocol (ISATAP)
     * Working for freebsd4, netbsd, and openbsd, and bsdi4.
-
-
 
 1.2 Neighbor Discovery
 
