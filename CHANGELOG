@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.928 2000/05/24 12:27:00 jinmei Exp $
+$Id: CHANGELOG,v 1.929 2000/05/24 13:37:05 itojun Exp $
 
 <200005>
+Wed May 24 22:42:40 JST 2000  itojun@iijab.net
+	* bsdi4/sys/net/if_ppp.c: IPv6 support.  highly experimental.
+	* bsdi4/usr.bin/ppp: IPv6CP support.  highly experimental.  solicit
+	  test/experience reports.
+
 2000-05-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6s.c: the "-n dnsserv" option can now be
 	specified multiple times, when a user wants to set more than one
