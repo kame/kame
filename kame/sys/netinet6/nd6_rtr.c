@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.129 2001/07/21 02:35:48 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.130 2001/07/21 03:54:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,9 +74,7 @@
 
 #define SDL(s)	((struct sockaddr_dl *)s)
 
-#ifdef	RTPREF
 static __inline__ int rtpref __P((struct nd_defrouter *));
-#endif
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
 static struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *,
 	struct in6_addr *));
@@ -88,6 +86,7 @@ static struct nd_pfxrouter *find_pfxlist_reachable_router
 	__P((struct nd_prefix *));
 static void defrouter_delreq __P((struct nd_defrouter *));
 static void defrouter_addifreq __P((struct ifnet *));
+static void defrouter_delifreq __P((void));
 static void nd6_rtmsg __P((int, struct rtentry *));
 
 static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
@@ -99,6 +98,7 @@ extern int nd6_recalc_reachtm_interval;
 
 static struct ifnet *nd6_defifp;
 int nd6_defifindex;
+static struct ifnet *nd6_defif_installed = NULL;
 
 int ip6_use_tempaddr = 0;
 
@@ -276,6 +276,7 @@ nd6_ra_input(m, off, icmp6len)
 	long time_second = time.tv_sec;
 #endif
 
+	Bzero(&dr0, sizeof(dr0));
 	dr0.rtaddr = saddr6;
 	dr0.flags  = nd_ra->nd_ra_flags_reserved;
 	dr0.rtlifetime = ntohs(nd_ra->nd_ra_router_lifetime);
@@ -491,6 +492,7 @@ defrouter_addreq(new)
 	struct sockaddr_in6 def, mask, gate;
 	struct rtentry *newrt = NULL;
 	int s;
+	int error;
 
 	Bzero(&def, sizeof(def));
 	Bzero(&mask, sizeof(mask));
@@ -506,13 +508,15 @@ defrouter_addreq(new)
 #else
 	s = splnet();
 #endif
-	(void)rtrequest(RTM_ADD, (struct sockaddr *)&def,
+	error = rtrequest(RTM_ADD, (struct sockaddr *)&def,
 		(struct sockaddr *)&gate, (struct sockaddr *)&mask,
 		RTF_GATEWAY, &newrt);
 	if (newrt) {
 		nd6_rtmsg(RTM_ADD, newrt); /* tell user process */
 		newrt->rt_refcnt--;
 	}
+	if (error == 0)
+		new->installed = 1;
 	splx(s);
 	return;
 }
@@ -529,6 +533,10 @@ defrouter_addifreq(ifp)
 #if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 	struct rt_addrinfo info;
 #endif
+
+	/* remove one if we have already installed one */
+	if (nd6_defif_installed)
+		defrouter_delifreq();
 
 	bzero(&def, sizeof(def));
 	bzero(&mask, sizeof(mask));
@@ -575,6 +583,56 @@ defrouter_addifreq(ifp)
 			newrt->rt_refcnt--;
 		}
 	}
+
+	nd6_defif_installed = ifp;
+}
+
+/* Remove a default route points to interface */
+static void
+defrouter_delifreq()
+{
+	struct sockaddr_in6 def, mask;
+	struct rtentry *oldrt = NULL;
+	struct ifaddr *ifa;
+	struct ifnet *ifp = nd6_defif_installed;
+
+	if (!ifp)
+		return;
+
+	Bzero(&def, sizeof(def));
+	Bzero(&mask, sizeof(mask));
+
+	def.sin6_len = mask.sin6_len = sizeof(struct sockaddr_in6);
+	def.sin6_family = mask.sin6_family = AF_INET6;
+
+	/*
+	 * Search for an ifaddr beloging to the specified interface.
+	 * XXX: An IPv6 address are required to be assigned on the interface.
+	 */
+	if ((ifa = ifaof_ifpforaddr((struct sockaddr *)&def, ifp)) == NULL) {
+		nd6log((LOG_ERR,	/* better error? */
+		    "defrouter_delifreq: failed to find an ifaddr "
+		    "to install a route to interface %s\n",
+		    if_name(ifp)));
+		return;
+	}
+
+	rtrequest(RTM_DELETE, (struct sockaddr *)&def,
+	    (struct sockaddr *)ifa->ifa_addr,
+	    (struct sockaddr *)&mask, RTF_GATEWAY, &oldrt);
+	if (oldrt) {
+		nd6_rtmsg(RTM_DELETE, oldrt);
+		if (oldrt->rt_refcnt <= 0) {
+			/*
+			 * XXX: borrowed from the RTM_DELETE case of
+			 * rtrequest().
+			 */
+			oldrt->rt_refcnt++;
+			rtfree(oldrt);
+		}
+	}
+
+	nd6_defif_installed = NULL;
 }
 
 struct nd_defrouter *
@@ -609,11 +667,9 @@ defrtrlist_del(dr)
 		rt6_flush(&dr->rtaddr, dr->ifp);
 	}
 
-	if (dr == nd_defrouter_primary) {
-		deldr = dr;	/* The router is primary. */
-#ifdef	RTPREF
-		nd_defrouter_primary = NULL;
-#endif
+	if (dr->installed) {
+		deldr = dr;
+		defrouter_delreq(dr);
 	}
 	TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
 
@@ -674,17 +730,20 @@ defrouter_delreq(dr)
 			rtfree(oldrt);
 		}
 	}
+
+	if (dr)
+		dr->installed = 0;
 }
 
 /*
  * Default Router Selection according to Section 6.3.6 of RFC 2461:
- * 1) Routers that are reachable or probably reachable should be
+ * 1) If the Default Router List is empty, assume that all
+ *    destinations are on-link.
+ * 2) Routers that are reachable or probably reachable should be
  *    preferred.
- * 2) When no routers on the list are known to be reachable or
+ * 3) When no routers on the list are known to be reachable or
  *    probably reachable, routers SHOULD be selected in a round-robin
  *    fashion.
- * 3) If the Default Router List is empty, assume that all
- *    destinations are on-link.
  */
 void
 defrouter_select()
@@ -697,6 +756,7 @@ defrouter_select()
 	struct nd_defrouter *dr;
 	struct rtentry *rt = NULL;
 	struct llinfo_nd6 *ln = NULL;
+	int installedpref, installcount, install;
 
 	/*
 	 * This function should be called only when acting as an autoconfigured
@@ -718,35 +778,70 @@ defrouter_select()
 	 * of the list, in case of all the entries are not
 	 * "probably reachable".
 	 */
-	nd_defrouter_primary = TAILQ_FIRST(&nd_defrouter);
+	installedpref = -2;	/* invalid preference XXX should #define */
+	installcount = 0;
+
+	/*
+	 * shortcut - default router list is empty,
+	 * no need to chase the chain
+	 */
+	if (!TAILQ_FIRST(&nd_defrouter))
+		goto empty;
+
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
+		install = 0;
+
 		if ((rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
-			/* Got it, and move it to the head */
-#ifdef	RTPREF
-			nd_defrouter_primary = dr;
-#else
-			TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
-			TAILQ_INSERT_HEAD(&nd_defrouter, dr, dr_entry);
-#endif
-			break;
+			/*
+			 * if it is the fresh default router, or it has the
+			 * same preference as the previously instaled one,
+			 * we install it.
+			 */
+			if (installedpref == -2) {
+				installedpref = rtpref(dr);
+				install++;
+			} else if (installedpref == rtpref(dr))
+				install++;
+		}
+
+		if (install && !dr->installed)
+			defrouter_addreq(dr);
+		else if (!install && dr->installed)
+			defrouter_delreq(dr);
+
+		if (dr->installed)
+			installcount++;
+	}
+
+	if (installcount == 0) {
+		/*
+		 * None of the default router was found to be reachable.
+		 * Install all routers with highest preference.
+		 */
+		installedpref = rtpref(TAILQ_FIRST(&nd_defrouter));
+		for (dr = TAILQ_FIRST(&nd_defrouter); dr;
+		     dr = TAILQ_NEXT(dr, dr_entry)) {
+			/* the list is sorted based on preference */
+			if (installedpref != rtpref(dr))
+				break;
+
+			if (!dr->installed)
+				defrouter_addreq(dr);
+
+			if (dr->installed)
+				installcount++;
 		}
 	}
 
-	if ((dr = nd_defrouter_primary) != NULL) {
-		/*
-		 * De-install the previous default gateway and install
-		 * a new one.
-		 * Note that if there is no reachable router in the list,
-		 * the head entry will be used anyway.
-		 * XXX: do we have to check the current routing table entry?
-		 */
-		defrouter_delreq(NULL);
-		defrouter_addreq(dr);
-	}
-	else {
+	/*
+	 * If no default route was installed, we should probably install
+	 * interface route and assume that all destinations are on-link.
+	 */
+ empty:
+	if (installcount == 0) {
 		/*
 		 * The Default Router List is empty, so install the default
 		 * route to an interface.
@@ -762,7 +857,6 @@ defrouter_select()
 			 * De-install the current default route
 			 * in advance.
 			 */
-			defrouter_delreq(NULL);
 			if (nd6_defifp) {
 				/*
 				 * Install a route to the default interface
@@ -785,8 +879,6 @@ defrouter_select()
 	return;
 }
 
-
-#ifdef	RTPREF
 /* 
  * for default router selection
  * regards router-preference field as a 2-bit signed integer 
@@ -794,6 +886,7 @@ defrouter_select()
 static __inline__ int
 rtpref(struct nd_defrouter *dr)
 {
+#ifdef RTPREF
 	switch (dr->flags & ND_RA_FLAG_RTPREF_MASK) {
 	case ND_RA_FLAG_RTPREF_HIGH:
 		return 1;
@@ -808,8 +901,10 @@ rtpref(struct nd_defrouter *dr)
 		return -2;
 	}
 	/* NOT REACH HERE */
+#else
+	return 0;
+#endif
 }
-#endif	/* RTPREF */
 
 static struct nd_defrouter *
 defrtrlist_update(new)
@@ -821,9 +916,6 @@ defrtrlist_update(new)
 #else
 	int s = splnet();
 #endif
-#ifdef	RTPREF
-	char found_primary = 0;
-#endif
 
 	if ((dr = defrouter_lookup(&new->rtaddr, new->ifp)) != NULL) {
 		/* entry exists */
@@ -831,18 +923,16 @@ defrtrlist_update(new)
 			defrtrlist_del(dr);
 			dr = NULL;
 		} else {
-#ifdef	RTPREF
 			int oldpref = rtpref(dr);
-#endif
+
 			/* override */
 			dr->flags = new->flags; /* xxx flag check */
 			dr->rtlifetime = new->rtlifetime;
 			dr->expire = new->expire;
 
-#ifdef	RTPREF
 			/* 
-			 * since router preference does not change, preferred 
-			 * router does not change either.
+			 * If the preference does not change, there's no need
+			 * to sort the entries.
 			 */
 			if (rtpref(new) == oldpref) {
 				splx(s);
@@ -855,8 +945,7 @@ defrtrlist_update(new)
 			 */
 			TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
 			n = dr;
-			goto choose_best;
-#endif
+			goto insert;
 		}
 		splx(s);
 		return(dr);
@@ -876,47 +965,26 @@ defrtrlist_update(new)
 	bzero(n, sizeof(*n));
 	*n = *new;
 
-#ifdef	RTPREF
-choose_best:
+insert:
 	/*
 	 * Insert the new router in the Default Router List;
 	 * The Default Router List should be in the descending order
 	 * of router-preferece.  Routers with the same preference are
 	 * sorted in the arriving time order.
-	 * 
-	 * If the new router is much more preferred to the current
-	 * primary router, then recalculate the best router.
 	 */
-	/* 
-	 * if the default router list is NULL, you just have to insert the
-	 * new one
-	 */
-	if (nd_defrouter_primary == NULL) {
-		TAILQ_INSERT_HEAD(&nd_defrouter, n, dr_entry);
-		defrouter_select();
-		splx(s);
-		return(n);
-	}
 
+	/* insert at the end of the group */
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
 		if (rtpref(dr) < rtpref(n))
 			break;
-		if (nd_defrouter_primary == dr)
-			found_primary = 1;
 	}
 	if (dr)
 		TAILQ_INSERT_BEFORE(dr, n, dr_entry);
 	else
 		TAILQ_INSERT_TAIL(&nd_defrouter, n, dr_entry);
-		
-	if (found_primary == 0)
-		defrouter_select();
-#else
-	TAILQ_INSERT_TAIL(&nd_defrouter, n, dr_entry);
-	if (nd_defrouter_primary == n)
-		defrouter_select();
-#endif
+
+	defrouter_select();
 
 	splx(s);
 		
@@ -2172,15 +2240,9 @@ nd6_setdefaultiface(ifindex)
 			nd6_defifp = NULL;
 
 		/*
-		 * If the Default Router List is empty, install a route
-		 * to the specified interface as default or remove the default
-		 * route when the default interface becomes canceled.
-		 * The check for the queue is actually redundant, but
-		 * we do this here to avoid re-install the default route
-		 * if the list is NOT empty.
+		 * Pick the default router again.
 		 */
-		if (nd_defrouter_primary == NULL)
-			defrouter_select();
+		defrouter_select();
 
 		/*
 		 * Our current implementation assumes one-to-one maping between

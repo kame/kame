@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.61 2001/07/18 11:51:57 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.62 2001/07/21 03:54:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,13 +216,14 @@ TAILQ_HEAD(nd_drhead, nd_defrouter);
 struct	nd_defrouter {
 	TAILQ_ENTRY(nd_defrouter) dr_entry;
 	struct	in6_addr rtaddr;
-	u_char	flags;
+	u_char	flags;		/* flags on RA message */
 	u_short	rtlifetime;
 	u_long	expire;
 	u_long	advint;		/* Mobile IPv6 addition (milliseconds) */
 	u_long	advint_expire;	/* Mobile IPv6 addition */
 	int	advints_lost;	/* Mobile IPv6 addition */
 	struct  ifnet *ifp;
+	int	installed;	/* is installed into kernel routing table */
 };
 
 struct nd_prefix {
@@ -303,11 +304,6 @@ extern int nd6_gctimer;
 extern struct llinfo_nd6 llinfo_nd6;
 extern struct nd_ifinfo *nd_ifinfo;
 extern struct nd_drhead nd_defrouter;
-#ifdef	RTPREF
-extern struct nd_defrouter *nd_defrouter_primary;
-#else
-#define	nd_defrouter_primary	TAILQ_FIRST(&nd_defrouter)
-#endif
 extern struct nd_prhead nd_prefix;
 extern int nd6_debug;
 

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.166 2001/07/20 19:57:35 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.167 2001/07/21 03:54:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,9 +142,6 @@ struct llinfo_nd6 llinfo_nd6 = {&llinfo_nd6, &llinfo_nd6};
 static size_t nd_ifinfo_indexlim = 8;
 struct nd_ifinfo *nd_ifinfo = NULL;
 struct nd_drhead nd_defrouter;
-#ifdef	RTPREF
-struct nd_defrouter *nd_defrouter_primary;
-#endif
 struct nd_prhead nd_prefix = { 0 };
 
 int nd6_recalc_reachtm_interval = ND6_RECALC_REACHTM_INTERVAL;
@@ -818,20 +815,25 @@ nd6_purge(ifp)
 	/* Nuke default router list entries toward ifp */
 	if ((dr = TAILQ_FIRST(&nd_defrouter)) != NULL) {
 		/*
-		 * The primary entry of the list may be stored in
-		 * the routing table, so we'll delete it later.
+		 * We defer removal of default router list entries, as
+		 * they may have routes installed into the kernel.
 		 */
 		for (; dr; dr = ndr) {
 			ndr = TAILQ_NEXT(dr, dr_entry);
-			if (dr == nd_defrouter_primary)
+			if (dr->installed)
 				continue;
 
 			if (dr->ifp == ifp)
 				defrtrlist_del(dr);
 		}
-		dr = nd_defrouter_primary;
-		if (dr && dr->ifp == ifp)
-			defrtrlist_del(dr);
+		for (; dr; dr = ndr) {
+			ndr = TAILQ_NEXT(dr, dr_entry);
+			if (!dr->installed)
+				continue;
+
+			if (dr->ifp == ifp)
+				defrtrlist_del(dr);
+		}
 	}
 
 	/* Nuke prefix list entries toward ifp */
@@ -1121,23 +1123,8 @@ nd6_free(rt, gc)
 			 */
 			pfxlist_onlink_check();
 
-			if (dr == nd_defrouter_primary) {
-				/*
-				 * It is used as the current default router,
-				 * so we have to move it to the end of the
-				 * list and choose a new one.
-				 * XXX: it is not very efficient if this is
-				 *      the only router.
-				 */
-#ifdef	RTPREF
-				nd_defrouter_primary = NULL;
-#else
-				TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
-				TAILQ_INSERT_TAIL(&nd_defrouter, dr, dr_entry);
-#endif
-
+			if (dr->installed)
 				defrouter_select();
-			}
 		}
 		splx(s);
 	}
@@ -1680,17 +1667,21 @@ nd6_ioctl(cmd, data, ifp)
 #endif
 		if ((dr = TAILQ_FIRST(&nd_defrouter)) != NULL) {
 			/*
-			 * The primary entry of the list may be stored in
-			 * the routing table, so we'll delete it later.
+			 * We remove default router list entries with
+			 * routing entry, afterwards.
 			 */
 			for (; dr; dr = next) {
 				next = TAILQ_NEXT(dr, dr_entry);
-				if (dr == nd_defrouter_primary)
+				if (dr->installed)
 					continue;
 				defrtrlist_del(dr);
 			}
-			if (nd_defrouter_primary)
-					defrtrlist_del(nd_defrouter_primary);
+			for (; dr; dr = next) {
+				next = TAILQ_NEXT(dr, dr_entry);
+				if (!dr->installed)
+					continue;
+				defrtrlist_del(dr);
+			}
 		}
 		splx(s);
 		break;
