@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.15 2005/02/18 17:22:41 t-momose Exp $  */
+/*      $KAME: common.c,v 1.16 2005/03/02 02:47:52 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1207,7 +1207,7 @@ mipsock_nodetype_request(nodetype, enable)
 
 static const char *binding_ack_status_desc[] = {
 	"binding update accepted",
-	"#1",
+	"Accepted but prefix discovery necessary",
 	"#2",
 	"#3",
 	"#4",
@@ -1345,7 +1345,7 @@ static const char *binding_ack_status_desc[] = {
 	"expired home nonce index",
 	"expired care-of nonce index",
 	"expired Nonces",
-	"#139"
+	"Registration type change disallowed",
 	"#140",
 	"#141",
 	"#142",
