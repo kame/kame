@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.73 2004/08/01 03:30:44 sumikawa Exp $	*/
+/*	$KAME: ipsec.h,v 1.74 2004/08/01 03:38:58 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -174,6 +174,7 @@ struct ipsecaux {
 #define	IPSEC_MODE_ANY		0	/* i.e. wildcard. */
 #define	IPSEC_MODE_TRANSPORT	1
 #define	IPSEC_MODE_TUNNEL	2
+#define	IPSEC_MODE_TCPMD5		3	/* TCP MD5 mode */
 
 /*
  * Direction of security policy.
