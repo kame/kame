@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.27 2001/11/16 04:34:57 sakane Exp $	*/
+/*	$KAME: session.c,v 1.28 2001/12/10 18:11:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,6 +101,9 @@ session(void)
 	int error;
 	struct myaddrs *p;
 
+	/* initialize schedular */
+	sched_init();
+
 	init_signal();
 
 #ifdef ENABLE_ADMINPORT
@@ -115,9 +118,6 @@ session(void)
 		exit(1);
 
 	initfds();
-
-	/* initialize schedular */
-	sched_init();
 
 	sigreq = 0;
 	while (1) {
