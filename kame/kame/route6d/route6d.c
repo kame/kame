@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.14 2000/02/25 06:15:57 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.15 2000/03/11 23:28:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.14 2000/02/25 06:15:57 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.15 2000/03/11 23:28:18 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2191,8 +2191,10 @@ rt_entry(rtm, again)
 	s = rtm->rtm_index;
 	if (s < nindex2ifc && index2ifc[s])
 		ifname = index2ifc[s]->ifc_name;
-	else
-		fatal("Unknown interface %d", s);
+	else {
+		trace(1, " not configured\n");
+		return;
+	}
 	trace(1, " if %s sock %d\n", ifname, s);
 	rrt->rrt_index = s;
 
