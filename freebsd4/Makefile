@@ -1,6 +1,6 @@
 .include <bsd.own.mk>			# for configuration variables.
 
-SUBDIR=	lib share usr.bin usr.sbin sbin
+SUBDIR= lib sbin share usr.bin usr.sbin
 #SUBDIR=	libexec
 
 includes:
