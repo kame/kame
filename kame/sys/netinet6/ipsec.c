@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.64 2000/05/24 16:22:38 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.65 2000/06/03 15:51:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1569,7 +1569,7 @@ ipsec_get_reqlevel(isr)
 			((struct sockaddr *)&isr->sp->spidx.src)->sa_family);
 	}
 
-#undef IPSEC_CHECK_DEFAULT(lev)
+#undef IPSEC_CHECK_DEFAULT
 
 	/* set level */
 	switch (isr->level) {
