@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.26 2000/03/25 07:23:36 sumikawa Exp $	*/
+/*	$KAME: in_gif.c,v 1.27 2000/03/30 01:29:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -437,11 +437,8 @@ in_gif_ioctl(ifp, cmd, data)
 
 		break;
 
-#ifdef INET
 	case SIOCSIFPHYADDR:
-#endif
 		switch (ifr->ifr_addr.sa_family) {
-#ifdef INET
 		case AF_INET:
 			src = (struct sockaddr *)
 				&(((struct in_aliasreq *)data)->ifra_addr);
@@ -458,7 +455,6 @@ in_gif_ioctl(ifp, cmd, data)
 			}
 			size = sizeof(struct sockaddr_in);
 			break;
-#endif /* INET */
 		default:
 			error = EAFNOSUPPORT;
 			goto bad;
