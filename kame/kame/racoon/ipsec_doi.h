@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.13 2000/04/24 18:34:42 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.14 2000/05/11 08:05:08 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -72,6 +72,7 @@
 #define   IPSECDOI_IPCOMP_LZS                          3
 
 /* 4.5 IPSEC Security Association Attributes */
+/* NOTE: default value is not included in a packet. */
 #define IPSECDOI_ATTR_SA_LD_TYPE              1 /* B */
 #define   IPSECDOI_ATTR_SA_LD_TYPE_DEFAULT      1
 #define   IPSECDOI_ATTR_SA_LD_TYPE_SEC          1
