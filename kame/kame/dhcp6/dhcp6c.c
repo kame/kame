@@ -163,7 +163,7 @@ mainloop()
 	FD_ZERO(&fds0);
 	for (i = 0; i < ncallbacks; i++) {
 		if (callbacks[i].cap)
-			FD_SET(callbacks[i].cap->fd, &fds0);	/*XXX*/
+			FD_SET(callbacks[i].cap->fd, &fds0);	/* XXX */
 		else if (callbacks[i].fd)
 			FD_SET(callbacks[i].fd, &fds0);
 	}
