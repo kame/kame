@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.119 2000/10/25 07:44:07 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.120 2000/11/01 10:39:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3093,6 +3093,11 @@ ipsecdoi_setid1(iph1)
 		}
 		memcpy(ident->v, p, ident->l);
 	    }
+	}
+	if (!ident) {
+		plog(logp, LOCATION, NULL,
+			"failed to get ID buffer.\n");
+		return NULL;
 	}
 
 	ret = vmalloc(sizeof(id_b) + ident->l);
