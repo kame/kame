@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: defs.h,v 1.4 2000/06/04 13:46:04 fujisawa Exp $
+ *	$Id: defs.h,v 1.5 2000/10/29 13:31:08 fujisawa Exp $
  */
 
 #ifndef TRUE
@@ -160,6 +160,12 @@ struct msgHndl
     /*	  int			 socket;					*/
     time_t		 tstamp;
     struct ifaddrs	*ifap;
+    struct sockaddr	*hook;
+		    /* if ptrself == 1						*/
+		    /*    hold IPv4 address that inquired own addresss.		*/
+		    /* if ptrprefixed == 1					*/
+		    /*    hold IPv4 address that NATPT prefix was removed.	*/
+
     /*	struct svrInfo	*server;						*/
     /*	struct msgHndl	*queryOriginal;		*//* back link to queryOriginal	*/
     /*	u_int		 queryOriginalID;	*//* msgID of queryOriginal	*/

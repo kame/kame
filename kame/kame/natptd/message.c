@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: message.c,v 1.2 2000/05/22 10:01:49 fujisawa Exp $
+ *	$Id: message.c,v 1.3 2000/10/29 13:31:09 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -67,7 +67,7 @@ int		 parseQuestion		__P((struct dnpExpand *, u_char *));
 int		 parseAnswer		__P((struct dnpExpand *, u_char *, int));
 void		 parseRData		__P((struct dnpExpand *, struct _RR *, u_char *));
 
-struct msgHndl	*sendBackSelfPTR	__P((int, struct msgHndl *));
+struct msgHndl	*sendBackSelfPTR	__P((int, struct msgHndl *, char *));
 
 void		 queryCNAME1		__P((struct sdesc *));
 void		 queryCNAME4		__P((struct sdesc *));
@@ -369,7 +369,16 @@ processQuery(struct sdesc *desc)
 
     if (qry->b.ptrself)
     {
-	sendBackSelfPTR(desc->sockfd, qry);
+	int	rv;
+	int	niflags = 0;
+	char	hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+
+	rv = getnameinfo(qry->hook, qry->hook->sa_len,
+			 (char *)&hbuf, sizeof(hbuf),
+			 (char *)&sbuf, sizeof(sbuf), niflags);
+
+	if (rv == 0)
+	    sendBackSelfPTR(desc->sockfd, qry, hbuf);
     }
     else if (isOff(useTAny))
 	sendQuery(qry, desc);
@@ -392,7 +401,7 @@ processQuery(struct sdesc *desc)
 
 
 struct msgHndl *
-sendBackSelfPTR(int sockfd, struct msgHndl *msg)
+sendBackSelfPTR(int sockfd, struct msgHndl *msg, char *name)
 {
     int			 rv;
     struct msgHndl	*rsp;
@@ -403,6 +412,9 @@ sendBackSelfPTR(int sockfd, struct msgHndl *msg)
     rsp = (struct msgHndl *)xmalloc(sizeof(struct msgHndl));
     bzero(rsp, sizeof(struct msgHndl));
     rsp->hdr = msg->hdr;
+    rsp->hdr.qr = 1;					/* this is response	*/
+    rsp->hdr.ra = 0;			/* recursion not available, of course	*/
+    rsp->f = msg->f;
 
     /* Assemble query section							*/
     qst0 = (struct _question *)CAR(msg->question);
@@ -422,15 +434,15 @@ sendBackSelfPTR(int sockfd, struct msgHndl *msg)
     rr0->RRclass  = C_IN;
     rr0->RRttl	  = 32767;
     rr0->RDlength = 0;
-    rr0->RData	  = xmalloc(ROUNDUP(strlen("sumire.kame.net")+1));	/* XXX	*/
-    strcpy(rr0->RData, "sumire.kame.net");				/* XXX	*/
+    rr0->RData	  = xmalloc(ROUNDUP(strlen(name)+1));
+    strcpy(rr0->RData, name);
     LST_hookup_list(&rsp->answer, rr0);
     rsp->hdr.ancount = htons(1);
 
     rv = composeMessage(rsp, Wow, sizeof(Wow));
-    sendResponse(sockfd, &msg->f.from, Wow, rv);
+    sendResponse(sockfd, &rsp->f.from, Wow, rv);
     if (isDebug(DEBUG_NS))
-	dumpNs("to", (struct sockaddr *)&msg->f.from, msg);
+	dumpNs("to", (struct sockaddr *)&rsp->f.from, rsp);
 
     freeMessage(rsp);
 
