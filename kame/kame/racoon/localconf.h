@@ -1,4 +1,4 @@
-/*	$KAME: localconf.h,v 1.24 2001/02/21 05:19:11 sakane Exp $	*/
+/*	$KAME: localconf.h,v 1.25 2001/02/21 05:20:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,12 +100,13 @@ struct localconf {
 
 	int complex_bundle;
 		/*
-		 * If we want "IP2 AH ESP IP1 ULP", KAME's SPD expresses AH
-		 * transport + ESP tunnel.  So racoon sent a proposal which
-		 * was the format in above order.
-		 * But lots of implementation interprets AH tunnel + ESP tunnel
-		 * in this case.  racoon usually uses this format usually.
-		 * If the option is enable, racoon uses old format.
+		 * If we want to make a packet "IP2 AH ESP IP1 ULP",
+		 * the SPD in KAME expresses AH transport + ESP tunnel.
+		 * So racoon sent the proposal contained such the order.
+		 * But lots of implementation interprets AH tunnel + ESP
+		 * tunnel in this case.  racoon has changed the format,
+		 * usually uses this format.  If the option, 'complex_bundle'
+		 * is enable, racoon uses old format.
 		 */
 };
 
