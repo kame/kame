@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.51 2002/09/05 08:09:37 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.52 2002/09/05 09:07:07 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -554,7 +554,7 @@ mld6_input(m, off)
 		 * (MLDv1 implementation must accept only the first 24
 		 * octets of the query message)
 		 */
-		mldlen = ntohs(ip6->ip6_plen);
+		mldlen = m->m_pkthdr.len - off;
 		if (mldlen == MLD_MINLEN)
 			query_type = MLD_V1_QUERY;
 		else if (mldlen > MLD_MINLEN && mldlen < MLD_V2_QUERY_MINLEN) {
@@ -576,7 +576,7 @@ mld6_input(m, off)
 				query_type = MLD_V2_GROUP_SOURCE_QUERY;
 			else {
 #ifdef MLDV2_DEBUG
-				printf("mld_input: ignores MLD packet with invalid format(%d)\n", ip6->ip6_plen);
+				printf("mld_input: ignores MLD packet with invalid format(%d)\n", mldlen);
 #endif
 				m_freem(m);
 				return;
