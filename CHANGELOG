@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.896 2000/05/17 17:20:02 itojun Exp $
+$Id: CHANGELOG,v 1.897 2000/05/18 07:34:37 itojun Exp $
 
 <200005>
+Thu May 18 16:34:18 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.4.0.
+
 Wed May 17 23:58:14 JST 2000  itojun@iijlab.net
 	* {netbsd/pkgsrc, freebsd[23]/ports}/net/{libpcap,tcpdump}: use 5/15
 	  weekly snap.
