@@ -59,9 +59,13 @@ struct radix_node_head *rt_tables[AF_MAX+1];
 
 static int	rttrash;		/* routes not in table but not freed */
 
+static struct callout rt_timer_ch;
+
 static void rt_maskedcopy __P((struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *));
 static void rtable_init __P((void **));
+
+static void rt_timer_init __P((void));
 
 static void
 rtable_init(table)
@@ -1151,6 +1155,204 @@ rtinit(ifa, cmd, flags)
 	if (m)
 		(void) m_free(m);
 	return (error);
+}
+
+/*
+ * Route timer routines.  These routes allow functions to be called
+ * for various routes at any time.  This is useful in supporting
+ * path MTU discovery and redirect route deletion.
+ *
+ * This is similar to some BSDI internal functions, but it provides
+ * for multiple queues for efficiency's sake...
+ */
+
+LIST_HEAD(, rttimer_queue) rttimer_queue_head;
+static int rt_init_done = 0;
+
+#define RTTIMER_CALLOUT(r)	{				\
+	if (r->rtt_func != NULL) {				\
+		(*r->rtt_func)(r->rtt_rt, r);			\
+	} else {						\
+		rtrequest((int) RTM_DELETE,			\
+			  (struct sockaddr *)rt_key(r->rtt_rt),	\
+			  0, 0, 0, 0);				\
+	}							\
+}
+
+/* 
+ * Some subtle order problems with domain initialization mean that
+ * we cannot count on this being run from rt_init before various
+ * protocol initializations are done.  Therefore, we make sure
+ * that this is run when the first queue is added...
+ */
+
+static void
+rt_timer_init()
+{
+	if (rt_init_done)
+		panic("rt_timer_init");
+
+	LIST_INIT(&rttimer_queue_head);
+	callout_init(&rt_timer_ch);
+	callout_reset(&rt_timer_ch, hz, rt_timer_timer, NULL);
+	rt_init_done = 1;
+}
+
+struct rttimer_queue *
+rt_timer_queue_create(timeout)
+	u_int	timeout;
+{
+	struct rttimer_queue *rtq;
+
+	if (rt_init_done == 0)
+		rt_timer_init();
+
+	R_Malloc(rtq, struct rttimer_queue *, sizeof *rtq);
+	if (rtq == NULL)
+		return (NULL);		
+	Bzero(rtq, sizeof *rtq);
+
+	rtq->rtq_timeout = timeout;
+	rtq->rtq_count = 0;
+	TAILQ_INIT(&rtq->rtq_head);
+	LIST_INSERT_HEAD(&rttimer_queue_head, rtq, rtq_link);
+
+	return (rtq);
+}
+
+void
+rt_timer_queue_change(rtq, timeout)
+	struct rttimer_queue *rtq;
+	long timeout;
+{
+
+	rtq->rtq_timeout = timeout;
+}
+
+void
+rt_timer_queue_destroy(rtq, destroy)
+	struct rttimer_queue *rtq;
+	int destroy;
+{
+	struct rttimer *r;
+
+	while ((r = TAILQ_FIRST(&rtq->rtq_head)) != NULL) {
+		LIST_REMOVE(r, rtt_link);
+		TAILQ_REMOVE(&rtq->rtq_head, r, rtt_next);
+		if (destroy)
+			RTTIMER_CALLOUT(r);
+		Free(r);
+		if (rtq->rtq_count > 0)
+			rtq->rtq_count--;
+		else
+			printf("rt_timer_queue_destroy: rtq_count reached 0\n");
+	}
+
+	LIST_REMOVE(rtq, rtq_link);
+
+	/*
+	 * Caller is responsible for freeing the rttimer_queue structure.
+	 */
+}
+
+unsigned long
+rt_timer_count(rtq)
+	struct rttimer_queue *rtq;
+{
+
+	return rtq->rtq_count;
+}
+
+void     
+rt_timer_remove_all(rt)
+	struct rtentry *rt;
+{
+	struct rttimer *r;
+
+	while ((r = LIST_FIRST(&rt->rt_timer)) != NULL) {
+		LIST_REMOVE(r, rtt_link);
+		TAILQ_REMOVE(&r->rtt_queue->rtq_head, r, rtt_next);
+		if (r->rtt_queue->rtq_count > 0)
+			r->rtt_queue->rtq_count--;
+		else
+			printf("rt_timer_remove_all: rtq_count reached 0\n");
+		Free(r);
+	}
+}
+
+int      
+rt_timer_add(rt, func, queue)
+	struct rtentry *rt;
+	void(*func) __P((struct rtentry *, struct rttimer *));
+	struct rttimer_queue *queue;
+{
+	struct rttimer *r;
+	long current_time = time_second;
+
+	/*
+	 * If there's already a timer with this action, destroy it before
+	 * we add a new one.
+	 */
+	for (r = LIST_FIRST(&rt->rt_timer); r != NULL;
+	     r = LIST_NEXT(r, rtt_link)) {
+		if (r->rtt_func == func) {
+			LIST_REMOVE(r, rtt_link);
+			TAILQ_REMOVE(&r->rtt_queue->rtq_head, r, rtt_next);
+			if (r->rtt_queue->rtq_count > 0)
+				r->rtt_queue->rtq_count--;
+			else
+				printf("rt_timer_add: rtq_count reached 0\n");
+			Free(r);
+			break;  /* only one per list, so we can quit... */
+		}
+	}
+
+	R_Malloc(r, struct rttimer *, sizeof(struct rttimer));
+	if (r == NULL)
+		return (ENOBUFS);
+	Bzero(r, sizeof(*r));
+
+	r->rtt_rt = rt;
+	r->rtt_time = current_time;
+	r->rtt_func = func;
+	r->rtt_queue = queue;
+	LIST_INSERT_HEAD(&rt->rt_timer, r, rtt_link);
+	TAILQ_INSERT_TAIL(&queue->rtq_head, r, rtt_next);
+	r->rtt_queue->rtq_count++;
+	
+	return (0);
+}
+
+/* ARGSUSED */
+void
+rt_timer_timer(arg)
+	void *arg;
+{
+	struct rttimer_queue *rtq;
+	struct rttimer *r;
+	long current_time;
+	int s;
+
+	current_time = time_second;
+
+	s = splnet();
+	for (rtq = LIST_FIRST(&rttimer_queue_head); rtq != NULL; 
+	     rtq = LIST_NEXT(rtq, rtq_link)) {
+		while ((r = TAILQ_FIRST(&rtq->rtq_head)) != NULL &&
+		    (r->rtt_time + rtq->rtq_timeout) < current_time) {
+			LIST_REMOVE(r, rtt_link);
+			TAILQ_REMOVE(&rtq->rtq_head, r, rtt_next);
+			RTTIMER_CALLOUT(r);
+			Free(r);
+			if (rtq->rtq_count > 0)
+				rtq->rtq_count--;
+			else
+				printf("rt_timer_timer: rtq_count reached 0\n");
+		}
+	}
+	splx(s);
+
+	callout_reset(&rt_timer_ch, hz, rt_timer_timer, NULL);
 }
 
 /* This must be before ip6_init2(), which is now SI_ORDER_MIDDLE */

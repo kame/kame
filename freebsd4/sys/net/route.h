@@ -125,6 +125,7 @@ struct rtentry {
 					/* output routine for this (rt,if) */
 	struct	rtentry *rt_parent; 	/* cloning parent of this route */
 	void	*rt_filler2;		/* more filler */
+	LIST_HEAD(, rttimer) rt_timer;  /* queue of timeouts for misc funcs */
 };
 
 /*
@@ -272,6 +273,29 @@ struct route_cb {
 	int	any_count;
 };
 
+/* 
+ * This structure, and the prototypes for the rt_timer_{init,remove_all,
+ * add,timer} functions all used with the kind permission of BSDI.
+ * These allow functions to be called for routes at specific times.
+ */
+
+struct rttimer {
+	TAILQ_ENTRY(rttimer)	rtt_next;  /* entry on timer queue */
+	LIST_ENTRY(rttimer) 	rtt_link;  /* multiple timers per rtentry */
+	struct rttimer_queue	*rtt_queue;/* back pointer to queue */
+	struct rtentry  	*rtt_rt;   /* Back pointer to the route */
+	void            	(*rtt_func) __P((struct rtentry *, 
+						 struct rttimer *));
+	time_t          	rtt_time; /* When this timer was registered */
+};
+
+struct rttimer_queue {
+	long				rtq_timeout;
+	unsigned long			rtq_count;
+	TAILQ_HEAD(, rttimer)		rtq_head;
+	LIST_ENTRY(rttimer_queue)	rtq_link;
+};
+
 #ifdef _KERNEL
 #define	RTFREE(rt) \
 	do { \
@@ -295,6 +319,15 @@ void	 rt_newaddrmsg __P((int, struct ifaddr *, int, struct rtentry *));
 void	 rt_newmaddrmsg __P((int, struct ifmultiaddr *));
 int	 rt_setgate __P((struct rtentry *,
 	    struct sockaddr *, struct sockaddr *));
+int	 rt_timer_add __P((struct rtentry *,
+			  void(*)(struct rtentry *, struct rttimer *),
+			  struct rttimer_queue *));
+struct	 rttimer_queue *rt_timer_queue_create __P((u_int));
+void	 rt_timer_queue_change __P((struct rttimer_queue *, long));
+void	 rt_timer_queue_destroy __P((struct rttimer_queue *, int));
+void	 rt_timer_remove_all __P((struct rtentry *));
+unsigned long rt_timer_count __P((struct rttimer_queue *));
+void	 rt_timer_timer __P((void *));
 void	 rtalloc __P((struct route *));
 void	 rtalloc_ign __P((struct route *, u_long));
 struct rtentry *
