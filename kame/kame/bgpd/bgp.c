@@ -74,6 +74,7 @@ bgp_connect_start(struct rpcb *bnp)
   /*  "New" socket()  */ 
   if ((bnp->rp_socket = socket(AF_INET6, SOCK_STREAM, 0)) == -1)
     fatal("<bgp_connect_start>: socket");
+  printf("Opening a BGP socket for a new connection(%s)\n", bgp_peerstr(bnp));
 
   bnp->rp_adj_ribs_in = NULL;           /*  <--- for safety.          */
   bnp->rp_stat.rps_connretry++;
