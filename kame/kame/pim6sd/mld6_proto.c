@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.40 2004/06/09 19:09:21 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.41 2004/06/14 04:33:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -327,15 +327,6 @@ accept_listener_report(src, dst, group)
 
 	v->uv_in_mld_report++;
 
-#ifdef MLDV2_LISTENER_REPORT
-	if (v->uv_mld_version & MLDv2) {
-		log_msg(LOG_DEBUG, 0,
-		    "shift to MLDv1 compat-mode for %s on Mif %s",
-		    inet6_fmt(group), v->uv_name);
-		mld_shift_to_v1mode(mifi, src, &group_sa);
-		return;
-	}
-#endif
 	recv_listener_report(mifi, src, &group_sa, MLDv1);
 }
 
@@ -350,7 +341,11 @@ recv_listener_report(mifi, src, grp, mld_version)
 	register struct listaddr *g;
 
 	/*
-	 * Look for the group in our group list; if found, just reset its timer
+	 * Look for the group in our group list; if found, 
+	 *  1) if necessary, shift to MLDv1-compat-mode
+	 *  2) just reset MLD-related timers (nothing special is necessary 
+	 *     regarding compat-mode, since an MLDv2 TO_EX{NULL} message 
+	 *     is also handled in here in the same manner as MLDv1 report).
 	 */
 	for (g = v->uv_groups; g != NULL; g = g->al_next) {
 		if (!inet6_equal(grp, &g->al_addr))
@@ -362,15 +357,26 @@ recv_listener_report(mifi, src, grp, mld_version)
 		g->al_reporter = *src;
 
 		/* delete old timers, set a timer for expiration */
-
 		g->al_timer = MLD6_LISTENER_INTERVAL;
 		if (g->al_query)
 			g->al_query = DeleteTimer(g->al_query);
 		if (g->al_timerid)
 			g->al_timerid = DeleteTimer(g->al_timerid);
 		g->al_timerid = SetTimer(mifi, g);
-		add_leaf(mifi, NULL, grp);
-		return;
+#ifdef MLDV2_LISTENER_REPORT
+		/* shift to or continues MLDv1 compatible mode */
+		if ((v->uv_mld_version & MLDv2) && mld_version == MLDv1) {
+			log_msg(LOG_DEBUG, 0,
+				"goes into MLDv1-compat-mode for %s on Mif %s",
+				sa6_fmt(grp), v->uv_name);
+			g->comp_mode = MLDv1;
+			if (g->al_comp)
+				g->al_comp = DeleteTimerV1compat(g->al_comp);
+			g->al_comp = SetTimerV1compat(mifi, g,
+					MLD6_OLDER_VERSION_HOST_PRESENT);
+		}
+#endif /* MLDV2_LISTENER_REPORT */
+		goto reflect_it_to_mrt;
 	}
 
 	if (g != NULL)
@@ -379,30 +385,39 @@ recv_listener_report(mifi, src, grp, mld_version)
 
 	/* add it to the list and update kernel cache. */
 	IF_DEBUG(DEBUG_MLD)
-		log_msg(LOG_DEBUG,0,
-		    "The group doesn't exist , trying to add it");
+		log_msg(LOG_DEBUG, 0,
+		    "The group doesn't exist, trying to add it");
 
 	g = (struct listaddr *) malloc(sizeof(struct listaddr));
 	if (g == NULL)
 		log_msg(LOG_ERR, 0, "ran out of memory");	/* fatal */
-
+	memset(g, 0, sizeof(*g));
 	g->al_addr = *grp;
 	g->sources = NULL;
-
-	/** set a timer for expiration **/
-	g->al_query = 0;
-	g->al_timer = MLD6_LISTENER_INTERVAL;
-	g->al_comp = 0;	/* specified by mld_shift_to_v1mode() */
 	g->al_reporter = *src;
+
+	/* set a timer for expiration */
+	g->al_timer = MLD6_LISTENER_INTERVAL;
 	g->al_timerid = SetTimer(mifi, g);
-	g->al_next = v->uv_groups;
+#ifdef MLDV2_LISTENER_REPORT
 	g->comp_mode = mld_version;
 	if (g->comp_mode == MLDv2)
 		g->filter_mode = MODE_IS_EXCLUDE;
+	if ((v->uv_mld_version & MLDv2) && g->comp_mode == MLDv1) {
+		log_msg(LOG_DEBUG, 0,
+			"creates a group in MLDv1 compat-mode for %s on Mif %s",
+			sa6_fmt(grp), v->uv_name);
+		g->al_comp = SetTimerV1compat(mifi, g,
+				MLD6_OLDER_VERSION_HOST_PRESENT);
+	}
+#endif
+	g->al_next = v->uv_groups;
 	v->uv_groups = g;
 	time(&g->al_ctime);
 
+reflect_it_to_mrt:
 	add_leaf(mifi, NULL, grp);
+	return;
 }
 
 /* TODO: send PIM prune message if the last member? */

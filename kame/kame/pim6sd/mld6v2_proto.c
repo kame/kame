@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.39 2004/06/09 19:09:22 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.40 2004/06/14 04:33:46 suz Exp $
  */
 
 /*
@@ -973,69 +973,6 @@ check_multicastV2_listener(v, group, g, source)
     }
 
     return NULL;	/* group not found, source not found */
-}
-
-void
-mld_shift_to_v1mode(mifi, src, grp)
-	mifi_t mifi;
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *grp;
-{
-	struct uvif *v = &uvifs[mifi];
-	struct listaddr *g, *s, *s_next;
-
-	/* locate group info from this interface */
-	for (g = v->uv_groups; g != NULL; g = g->al_next)
-		if (inet6_equal(&g->al_addr, grp))
-			break;
-
-	/* create MLDv1 group entry since this is the first MLD report */
-	if (g == NULL) {
-		g = (struct listaddr *) malloc(sizeof(struct listaddr));
-		if (g == NULL)
-			log_msg(LOG_ERR, 0, "ran out of memory"); /* fatal */
-
-		memset(g, 0, sizeof(*g));
-		g->al_addr = *grp;
-
-		/** set a timer for expiration **/
-		g->al_reporter = *src;
-		g->al_next = v->uv_groups;
-		g->comp_mode = MLDv1;
-		v->uv_groups = g;
-		time(&g->al_ctime);
-
-		add_leaf(mifi, NULL, grp);
-	}
-
-	if (g->comp_mode == MLDv1) {
-		goto update_timer;
-	}
-
-	/* dispose of learned source info for this group */
-	for (s = g->sources; s != NULL; s = s_next) {
-		s_next = s->al_next;
-
-		/* delete specific-query timer */
-		if (s->al_timerid)
-			timer_clearTimer(s->al_timerid);
-		delete_leaf(mifi, &s->al_addr, &g->al_addr);
-		free(s);
-	}
-	g->sources = NULL;
-	g->comp_mode = MLDv1;
-	/* 
-	 * MLDv2 router send a MLD query in MLDv2 regardless of compat-mode.
-	 * draft-vida-mld-v2-08.txt (sec 8.3.2 p.47)
-	 */
-	query_groupsV2(v);
-
-	/* set timer to disable v1-compat-mode later */
-update_timer:
-	if (g->al_comp)
-		g->al_comp = DeleteTimerV1compat(g->al_comp);
-	g->al_comp = SetTimerV1compat(mifi, g, MLD6_OLDER_VERSION_HOST_PRESENT);
-	return;
 }
 
 void

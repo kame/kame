@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.h,v 1.13 2004/06/09 14:54:23 suz Exp $	*/
+/*	$KAME: mld6_proto.h,v 1.14 2004/06/14 04:33:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -78,6 +78,11 @@ typedef struct
 #define MLD6_TIMER_SCALE 1000
 #endif
 
+/*
+ * MLD6_LISTENER_INTERVAL corresponds to the following same value.
+ *  - Multicast Listener Interval (MLDv1, RFC2710 sec 7.4)
+ *  - Multicast Address Listening Interval (MLDv2, RFC3810 sec 9.4)
+ */
 #define MLD6_LISTENER_INTERVAL (MLD6_ROBUSTNESS_VARIABLE * \
                 MLD6_QUERY_INTERVAL + \
                 MLD6_QUERY_RESPONSE_INTERVAL / MLD6_TIMER_SCALE)
