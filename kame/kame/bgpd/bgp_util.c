@@ -145,10 +145,11 @@ bgp_new_peer()
   bnp->rp_next   = bnp;
   bnp->rp_prev   = bnp;
   bnp->rp_state  = BGPSTATE_IDLE;
-#ifdef DEBUG_BGPSTATE
-  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
-	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
-#endif 
+
+  IFLOG(LOG_BGPSTATE)
+    syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	   bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
+
   bnp->rp_socket = -1;    /* none */
   bnp->rp_prefer = htonl(BGP_DEF_LOCALPREF);
   bnp->rp_sfd[0] = -1;    /* none */
@@ -210,10 +211,9 @@ bgp_enable_rte(rte)
 	      }
 	      if (set_nexthop(&rte->rt_bgw, rte) == 1) {
 		  if (addroute(rte, &rte->rt_gw, rte->rt_gwif) == 0) {
-#ifdef DEBUG
+		    IFLOG(LOG_BGPROUTE)
 			  syslog(LOG_DEBUG, "<%s>:succeed (maybe third-party)",
 				 __FUNCTION__);
-#endif
 			  rte->rt_flags |= RTF_INSTALLED;
 		  }
 		  else {
@@ -253,9 +253,9 @@ bgp_disable_rte(rte)
     fatalx("<bgp_disable_rte>: BUG !");
 
   if (rte->rt_flags & RTF_INSTALLED) {
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "<%s>: delroute()...", __FUNCTION__);
-#endif
+    IFLOG(LOG_BGPROUTE)
+      syslog(LOG_DEBUG, "<%s>: delroute()...", __FUNCTION__);
+
     if (delroute(rte, &rte->rt_gw) != 0)
 	    syslog(LOG_ERR, "<%s>: route couldn't be deleted: dst=%s/%d, "
 		   "gw=%s", __FUNCTION__,
@@ -318,43 +318,43 @@ bgp_recover_rte(drte)
     if (bgp_enable_rte(rrte) == 0) {
 	    struct rpcb *obnp = rrte->rt_proto.rtp_bgp;
 
-#ifdef DEBUG_BGP
-	    syslog(LOG_NOTICE,
-		   "<%s>: failed route recovery for %s/%d, origin: %s(deleted)",
-		   __FUNCTION__,
-		   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
-		   drte->rt_ripinfo.rip6_plen,
-		   bgp_peerstr(rrte->rt_proto.rtp_bgp));
-#endif
+	    IFLOG(LOG_BGPROUTE)
+		    syslog(LOG_DEBUG,
+			   "<%s>: failed route recovery for %s/%d, origin: %s(deleted)",
+			   __FUNCTION__,
+			   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
+			   drte->rt_ripinfo.rip6_plen,
+			   bgp_peerstr(rrte->rt_proto.rtp_bgp));
+
 	    obnp->rp_adj_ribs_in = rte_remove(rrte, obnp->rp_adj_ribs_in);
     }
     else if (!(rrte->rt_flags & RTF_INSTALLED)) {
-#ifdef DEBUG_BGP
-	    syslog(LOG_NOTICE,
-		   "<%s>: route recover for %s/%d, origin: %s (not installed)",
-		   __FUNCTION__,
-		   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
-		   drte->rt_ripinfo.rip6_plen,
-		   bgp_peerstr(rrte->rt_proto.rtp_bgp));
-#endif 
+	    IFLOG(LOG_BGPROUTE)
+		    syslog(LOG_DEBUG,
+			   "<%s>: route recover for %s/%d, origin: %s (not installed)",
+			   __FUNCTION__,
+			   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
+			   drte->rt_ripinfo.rip6_plen,
+			   bgp_peerstr(rrte->rt_proto.rtp_bgp));
     }
     else {
-#ifdef DEBUG_BGP
-	    syslog(LOG_NOTICE, "<%s>: route recover for %s/%d, origin: %s",
-		   __FUNCTION__,
-		   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
-		   drte->rt_ripinfo.rip6_plen,
-		   bgp_peerstr(rrte->rt_proto.rtp_bgp));
-#endif
+	    IFLOG(LOG_BGPROUTE)
+		    syslog(LOG_DEBUG,
+			   "<%s>: route recover for %s/%d, origin: %s",
+			   __FUNCTION__,
+			   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
+			   drte->rt_ripinfo.rip6_plen,
+			   bgp_peerstr(rrte->rt_proto.rtp_bgp));
 	    crte = *rrte;
 	    crte.rt_next = crte.rt_prev = &crte;
 	    redistribute(&crte); /* XXX: this might hevily modify the peer list */
     }
   } else {
-#ifdef DEBUG_BGP
-    syslog(LOG_NOTICE, "<%s>: no recover for %s/%d", __FUNCTION__,
-	   ip6str(&drte->rt_ripinfo.rip6_dest, 0), drte->rt_ripinfo.rip6_plen);
-#endif
+	  IFLOG(LOG_BGPROUTE)
+		  syslog(LOG_DEBUG,
+			 "<%s>: no recover for %s/%d", __FUNCTION__,
+			 ip6str(&drte->rt_ripinfo.rip6_dest, 0),
+			 drte->rt_ripinfo.rip6_plen);
   }
   return;
 }
@@ -437,15 +437,15 @@ bgp_enable_rte_by_igp(rte)
 					if (bgp_enable_rte(brte) == 1 &&
 					    (brte->rt_flags & RTF_INSTALLED)) {
 						struct rt_entry crte;
-#ifdef DEBUG_BGP
-						syslog(LOG_NOTICE,
-						       "<%s>: BGP route(%s/%d) "
-						       "was enabled",
-						       __FUNCTION__,
-						       ip6str(&brte->rt_ripinfo.rip6_dest,
-							      0),
-						       brte->rt_ripinfo.rip6_plen);
-#endif 
+						/* XXX long line... */
+						IFLOG(LOG_BGPROUTE)
+							syslog(LOG_DEBUG,
+							       "<%s>: BGP route(%s/%d) "
+							       "was enabled",
+							       __FUNCTION__,
+							       ip6str(&brte->rt_ripinfo.rip6_dest, 0),
+							       brte->rt_ripinfo.rip6_plen);
+
 						/* redistribute this route */
 						crte = *brte;
 						crte.rt_next = crte.rt_prev = &crte;
@@ -519,14 +519,12 @@ bgp_disable_rte_by_igp(rte)
 				    (brte->rt_flags & (RTF_UP|RTF_INSTALLED)) ==
 				    (RTF_UP|RTF_INSTALLED)) {
 					struct rt_entry crte;
-#ifdef DEBUG_BGP
-					syslog(LOG_NOTICE,
-					       "<%s>: BGP route(%s/%d) was disabled",
-					       __FUNCTION__,
-					       ip6str(&brte->rt_ripinfo.rip6_dest,
-						      0),
-					       brte->rt_ripinfo.rip6_plen);
-#endif 
+					IFLOG(LOG_BGPROUTE)
+						syslog(LOG_DEBUG,
+						       "<%s>: BGP route(%s/%d) was disabled",
+						       __FUNCTION__,
+						       ip6str(&brte->rt_ripinfo.rip6_dest, 0),
+						       brte->rt_ripinfo.rip6_plen);
 					bgp_disable_rte(brte);
 
 					/* flush gateway information */
@@ -791,9 +789,13 @@ find_aopen_peer(key)
 		bnp = find_apeer_by_addr(&key->rp_laddr);
 
 	if (bnp == NULL) {
+		/*
+		 * we can't call bgp_peerstr here, since it causes an
+		 * infinite loop.
+		 */
 		syslog(LOG_NOTICE,
-		       "<%s>: can't find an actively opened peer for %s",
-		       __FUNCTION__, bgp_peerstr(key));
+		       "<%s>: can't find an actively opened peer for %x",
+		       __FUNCTION__, key);
 	}
 
 	return(bnp);
@@ -1143,9 +1145,6 @@ bgpd_sendfile(sockfd, fd)
   int    slen;
   u_char buf[sizeof(int)];
   u_int  netfd;
-#if 0
-  syslog(LOG_DEBUG, "<bgpd_sendfile>: Invoked. (sockfd=%d, fd=%d)", sockfd, fd);
-#endif
   netfd = htonl(fd);
   memcpy(buf, (u_char *)&netfd, sizeof(int));
 
@@ -1155,9 +1154,6 @@ bgpd_sendfile(sockfd, fd)
     return -1;
   }
 
-#if 0
-  syslog(LOG_DEBUG, "<bgpd_sendfile>: End.");
-#endif
   return 0;
 }
 
@@ -1168,18 +1164,13 @@ recvfile(sockfd)
   int    rlen;
   u_char buf[sizeof(int)];
 
-#if 0
-  syslog(LOG_DEBUG, "<recvfile>: Invoked. (sockfd=%d)", sockfd);
-#endif
   memset(buf, 0, sizeof(int));
 
   if ((rlen = read(sockfd, buf, sizeof(int))) < 0) {
     dperror("<recvfile>: read");
     return -1;
   }
-#if 0
-  syslog(LOG_DEBUG, "<recvfile>: End.");
-#endif
+
   return ntohl(*(int *)buf);/* <-- the FD !! */
 }
 
@@ -1276,11 +1267,12 @@ bgp_input_filter(bnp, rte)
 	/* Check filters. Site-locals are always filtered. */
 	if (input_filter_check(&abnp->rp_filterset, 0,
 				&rte->rt_ripinfo)) {
-		syslog(LOG_DEBUG,
-		       "<%s>: input route %s/%d to %s was filtered",
-		       __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-		       rte->rt_ripinfo.rip6_plen,
-		       bgp_peerstr(bnp));
+		IFLOG(LOG_BGPINPUT)
+			syslog(LOG_DEBUG,
+			       "<%s>: input route %s/%d to %s was filtered",
+			       __FUNCTION__, &rte->rt_ripinfo.rip6_dest,
+			       rte->rt_ripinfo.rip6_plen,
+			       bgp_peerstr(bnp));
 		return(1);
 	}
 	return 0;
@@ -1303,11 +1295,12 @@ bgp_output_filter(bnp, rte)
 	/* Check filters. Site-locals are always filtered. */
 	if (output_filter_check(&abnp->rp_filterset, 0,
 				&rte->rt_ripinfo)) {
-		syslog(LOG_DEBUG,
-		       "<%s>: output route %s/%d to %s was filtered",
-		       __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-		       rte->rt_ripinfo.rip6_plen,
-		       bgp_peerstr(bnp));
+		IFLOG(LOG_BGPOUTPUT)
+			syslog(LOG_DEBUG,
+			       "<%s>: output route %s/%d to %s was filtered",
+			       __FUNCTION__, &rte->rt_ripinfo.rip6_dest,
+			       rte->rt_ripinfo.rip6_plen,
+			       bgp_peerstr(bnp));
 		return(1);
 	}
 	return 0;

@@ -68,6 +68,7 @@
 */
 #include "defs.h"
 #include "config.h"
+#include "debug.h"
 
 #ifndef IPV6_HDRLEN
 #define IPV6_HDRLEN 40

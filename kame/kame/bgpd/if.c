@@ -315,10 +315,9 @@ get_32id()
     strcpy(ifr.ifr_name, ifni->if_name);
 
     if (ioctl(s, SIOCGIFADDR, &ifr) < 0) {   /* IPv4 */
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "<get_32id>: SIOCGIFADDR (%s): %s",
-	     ifr.ifr_name, strerror(errno));
-#endif
+      IFLOG(LOG_INTERFACE)
+	syslog(LOG_DEBUG, "<get_32id>: SIOCGIFADDR (%s): %s",
+	       ifr.ifr_name, strerror(errno));
       ifni++;  /* next I/F */
     } else {
 	    id = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr;

@@ -33,10 +33,23 @@
 #define YIPSDEBUG(lev,arg)
 #endif /* defined(YIPS_DEBUG) */
 
+#define LOG_ASPATH	0x00000001
+#define LOG_BGPSTATE	0x00000002
+#define LOG_BGPCONNECT	0x00000004
+#define LOG_BGPINPUT	0x00000008
+#define LOG_BGPOUTPUT	0x00000010
+#define LOG_BGPROUTE	0x00000020
+
+#define LOG_INTERFACE	0x00000040
+
+#define LOG_INET6	0x00000080
+
 #define LOG_BGP 0x00000001
 #define LOG_RIP 0x00000002
 #define LOG_ALL 0xffffffff
 
 #define DEBUG_CONF 0x01000000
 
-extern unsigned long debug;
+#define IFLOG(l) if ((logflags & (l)))
+
+extern unsigned long logflags;

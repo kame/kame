@@ -1153,8 +1153,8 @@ param_config()
 	struct in_addr ipv4id;
 
 	if (yy_debug >= 0) {	/* debug flag */
-		debug = yy_debug;
-		cprint("set %x to the debug flag\n", (u_int)debug);
+		logflags = yy_debug;
+		cprint("set %x to the debug flag\n", (u_int)logflags);
 	}
 	if (yy_asnum >= 0) {	/* our AS number */
 		my_as_number = yy_asnum;

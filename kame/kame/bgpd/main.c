@@ -56,7 +56,7 @@ task            *taskhead;
 
 byte             bgpyes, ripyes, ospfyes;
 
-unsigned long debug;
+unsigned long logflags;
 
 time_t last_rip_dump;
 
@@ -237,17 +237,10 @@ main_listen_accept()
   int                   on;          /* socket option          */
 #endif
 
-#ifdef DEBUG
-  char                in6txt[INET6_ADDRSTRLEN];
-#endif
-
   extern struct rpcb *bgb;
   extern int          bgpsock, ripsock, ospfsock;
 
   memset(&fromaddr, 0, sizeof(fromaddr));
-#ifdef DEBUG
-  memset(in6txt,    0, INET6_ADDRSTRLEN);
-#endif
 
   while (1) {                                            /* outer */
     sigset_t set, oset;
@@ -312,11 +305,10 @@ main_listen_accept()
       bnp->rp_socket  = s;
       bnp->rp_addr    = fromaddr;          /* copy */  /* passive */
 
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "<main_listen_accept>: %s now accepted",
-	     inet_ntop(AF_INET6, &bnp->rp_addr.sin6_addr,
-		       in6txt, INET6_ADDRSTRLEN));
-#endif
+      IFLOG(LOG_BGPINPUT)
+	      syslog(LOG_DEBUG, "<main_listen_accept>: %s now accepted",
+		     bgp_peerstr(bnp));
+
       if (IN6_IS_ADDR_LINKLOCAL(&fromaddr.sin6_addr))
 	bnp->rp_laddr = fromaddr.sin6_addr; /* copy */
       else
@@ -476,9 +468,8 @@ alarm_handler()
  */
 void pipe_handler()
 {
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "SIGPIPE received.");
-#endif
+	IFLOG(LOG_BGPCONNECT)
+		syslog(LOG_DEBUG, "SIGPIPE received.");
 
   return;
 }

@@ -143,17 +143,13 @@ aspath2msg(aspath, i)
   u_int16_t     netasnum;
   int           j;                /* tracer (local) */
   int           palen, slen;
-#ifdef DEBUG
   int           l, bufwlen;
   char          buf[LINE_MAX];   /* debugging   */ 
-#endif
 
   extern byte   outpkt[];
 
-#ifdef DEBUG
   l = 0;
   memset(buf, 0, LINE_MAX);
-#endif
 
   j = i;
   if (aspath == NULL)
@@ -163,15 +159,12 @@ aspath2msg(aspath, i)
     return 0;
 
   for (palen = 0 ; palen < aspath->asp_len ; palen++ ) {
-
     if (!asg)
       fatalx("<aspath2msg>: internal error");
-#ifdef DEBUG
     if (asg->asg_type == PA_PATH_SET) {
       strcpy(&buf[l], "set(");
       l += 4;
     }
-#endif
 
     outpkt[j++] = asg->asg_type; /* path segment type   (1-octet) */
     outpkt[j++] = asg->asg_len;  /* path segment length (1-octet) */
@@ -183,25 +176,20 @@ aspath2msg(aspath, i)
 	fatalx("<aspath2msg>: internal error");
       netasnum = htons(asn->asn_num);
       memcpy(&outpkt[j], &netasnum, PA_LEN_AS);
-#ifdef DEBUG
       bufwlen = sprintf(&buf[l], "%u ", asn->asn_num);
       l += bufwlen;
-#endif
       j += PA_LEN_AS;
       asn = asn->asn_next;
     }
-#ifdef DEBUG
     if (asg->asg_type == PA_PATH_SET) {
       strcpy(&buf[l-1], ") ");
       l++;
     }
-#endif
     asg = asg->asg_next;
   }
 
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "BGP+ SEND\t\t%s", buf);
-#endif
+  if ((logflags & LOG_ASPATH) != 0)
+    syslog(LOG_DEBUG, "BGP+ SEND\t\t%s", buf);
 
   if (j - i > 0xff)
     fatalx("<aspath2msg>: Too long ASpath");
@@ -304,9 +292,8 @@ msg2aspath(bnp, i, len, errorp)
     }
 
     if (j-i == len) {
-#ifdef DEBUG_BGP
-      syslog(LOG_NOTICE, "BGP+ RECV\t\t%s", buf);
-#endif
+      if ((logflags & LOG_ASPATH) != 0)
+	syslog(LOG_NOTICE, "BGP+ RECV\t\t%s", buf);
       return asp;
     }
   }
@@ -500,7 +487,7 @@ asnumcpy(asn, len)
      struct asnum *asn;
      int           len;
 {
-  struct asnum *cpy, *cpy2, *src;
+  struct asnum *cpy = NULL, *cpy2, *src;
   int           i;
 
   /* by jinmei */
@@ -819,9 +806,8 @@ msg2clstrlist(bnp, i, len)
     if ((j += PA_LEN_CLUSTER) >= len)
       break;
   }
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "BGP+ RECV\t\t%s", buf);
-#endif
+  if ((logflags & LOG_ASPATH) != 0)
+    syslog(LOG_DEBUG, "BGP+ RECV\t\t%s", buf);
   return cllhead;
   
 }
@@ -843,18 +829,13 @@ clstrlist2msg(cll, i)
 {
   struct clstrlist *icll;
   int               j;         /* tracer (local) */
-
-#ifdef DEBUG
   int           l, bufwlen;
   char          buf[LINE_MAX];   /* debugging   */ 
-#endif
 
   extern byte   outpkt[];
 
-#ifdef DEBUG
   l = 0;
   memset(buf, 0, LINE_MAX);
-#endif
 
   j = i;
   if (cll == NULL)
@@ -863,19 +844,16 @@ clstrlist2msg(cll, i)
   icll = cll;
   while(1) {
     memcpy(&outpkt[j], &icll->cll_id, PA_LEN_CLUSTER);
-#ifdef DEBUG
     bufwlen = sprintf(&buf[l], "%u ", icll->cll_id);
     l += bufwlen;
-#endif
     j += PA_LEN_CLUSTER;
     
     if ((icll = icll->cll_next) == cll)
       break;
   }
 
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "BGP+ SEND\t\t%s", buf);
-#endif
+  if ((logflags & LOG_ASPATH) != 0)
+    syslog(LOG_DEBUG, "BGP+ SEND\t\t%s", buf);
 
   if (j - i > 0xff)
     fatalx("<clstrlist2msg>: Too long CLUSTER_LIST");

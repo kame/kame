@@ -116,9 +116,7 @@ bgp_read_data(bnp)
 {
 	struct bgphdr *bh;
 	int length;
-#if (defined(DEBUG_BGP) || defined(DEBUG_BGPINPUT))
 	extern char *bgp_msgstr[], *bgp_statestr[];
-#endif
 
 	/* read remaining data(if any) */
 	if (bnp->rp_incc < bnp->rp_inlen &&
@@ -132,22 +130,22 @@ bgp_read_data(bnp)
 	bnp->rp_inlen = 0;
 
 	bh = (struct bgphdr *)bnp->rp_inpkt;
-#if (defined(DEBUG_BGP) || defined(DEBUG_BGPINPUT))
-	syslog(LOG_DEBUG,
-	       "BGP+ RECV %s+%d -> %s+%d",
-	       ip6str(&bnp->rp_addr.sin6_addr, 0),
-	       ntohs(bnp->rp_addr.sin6_port),
-	       ip6str(&bnp->rp_myaddr.sin6_addr, 0),
-	       ntohs(bnp->rp_myaddr.sin6_port));
+	IFLOG(LOG_BGPINPUT) {
+	  syslog(LOG_DEBUG,
+		 "BGP+ RECV %s+%d -> %s+%d",
+		 ip6str(&bnp->rp_addr.sin6_addr, 0),
+		 ntohs(bnp->rp_addr.sin6_port),
+		 ip6str(&bnp->rp_myaddr.sin6_addr, 0),
+		 ntohs(bnp->rp_myaddr.sin6_port));
 
-	if (BGP_TYPE_VALID(bh->bh_type))
-		syslog(LOG_DEBUG,
-		       "BGP+ RECV message type %d (%s) length %d, state=%s",
-		       bh->bh_type,
-		       bgp_msgstr[bh->bh_type],
-		       length,
-		       bgp_statestr[bnp->rp_state]);
-#endif
+	  if (BGP_TYPE_VALID(bh->bh_type))
+	    syslog(LOG_DEBUG,
+		   "BGP+ RECV message type %d (%s) length %d, state=%s",
+		   bh->bh_type,
+		   bgp_msgstr[bh->bh_type],
+		   length,
+		   bgp_statestr[bnp->rp_state]);
+	}
 
 	switch (bh->bh_type) {
 	 case BGP_OPEN:

@@ -297,8 +297,9 @@ get_in6_addr(addr, sap)
 
 	ret_ga = getaddrinfo(addr, NULL, &hints, &res);
 	if (ret_ga) {
-		syslog(LOG_DEBUG, "getaddrinfo failed for %s: %s",
-		       addr, gai_strerror(ret_ga));
+		IFLOG(LOG_INET6)
+			syslog(LOG_DEBUG, "getaddrinfo failed for %s: %s",
+			       addr, gai_strerror(ret_ga));
 		return(-1);
 	}
 
@@ -310,8 +311,10 @@ get_in6_addr(addr, sap)
 		}
 	}
 	if (res == NULL) {	/* no inet6 addr */
-		syslog(LOG_DEBUG, "getaddrinfo returns no INET6 addr for %s",
-		       addr);
+		IFLOG(LOG_INET6)
+			syslog(LOG_DEBUG,
+			       "getaddrinfo returns no INET6 addr for %s",
+			       addr);
 		error = -1;
 		goto end;
 	}

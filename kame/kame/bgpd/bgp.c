@@ -90,7 +90,6 @@ bgp_connect_start(struct rpcb *bnp)
   tsk->tsk_timename         = BGP_CONNECT_TIMER;
   tsk->tsk_bgp              = bnp;
 
-
 #ifdef DEBUG
   tsk->tsk_timefull.tv_sec  = BGPCONN_SHORT;
 #else
@@ -106,10 +105,9 @@ bgp_connect_start(struct rpcb *bnp)
   bnp->rp_connect_timer     = tsk;
   bnp->rp_state             = BGPSTATE_CONNECT;
 
-#ifdef DEBUG_BGPSTATE
-  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
-	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
-#endif 
+  if ((logflags & LOG_BGPSTATE) != 0)
+    syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	   bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
 
   if (!(bnp->rp_mode & BGPO_IFSTATIC))  /* <--- need.   */
     bnp->rp_ife = NULL;
@@ -143,10 +141,9 @@ connect_try(struct rpcb *bnp)
 
   /* CONNECT state - trying to connect */
   bnp->rp_state = BGPSTATE_CONNECT;
-#ifdef DEBUG_BGPSTATE
-  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
-	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
-#endif 
+  if ((logflags & LOG_BGPSTATE) != 0)
+    syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	   bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
 
   /* If specfied, set source address */
   if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_lcladdr.sin6_addr) &&
@@ -218,11 +215,9 @@ connect_try(struct rpcb *bnp)
   if (s_pipe(bnp->rp_sfd) < 0)
     terminate();
 
-#if 0
-  syslog(LOG_DEBUG, "<connect_try>: <s_pipe>: sfd[0]=%d, sfd[1]=%d ",
-	 bnp->rp_sfd[0], bnp->rp_sfd[1]);
-#endif
-
+  if ((logflags & LOG_BGPCONNECT) != 0)
+    syslog(LOG_DEBUG, "<connect_try>: <s_pipe>: sfd[0]=%d, sfd[1]=%d ",
+	   bnp->rp_sfd[0], bnp->rp_sfd[1]);
 
   if ((childpid = fork()) < 0) {
     dperror("<connect_try>: fork");
@@ -237,21 +232,21 @@ connect_try(struct rpcb *bnp)
 		(struct sockaddr *)&bnp->rp_addr, /* global or linklocal*/
 		sizeof(bnp->rp_addr)) == 0)    {
 
-      syslog(LOG_DEBUG,
-	     "<%s>: <child>: connection succeed with %s (%s AS %d)",
-	     __FUNCTION__, ip6str(&bnp->rp_addr.sin6_addr, 0),
-	     ((bnp->rp_mode & BGPO_IGP) ? "Internal" : "External"),
-	     bnp->rp_as);
+      if ((logflags & LOG_BGPCONNECT) != 0) 
+	syslog(LOG_DEBUG,
+	       "<%s>: <child>: connection succeed with %s (%s AS %d)",
+	       __FUNCTION__, ip6str(&bnp->rp_addr.sin6_addr, 0),
+	       ((bnp->rp_mode & BGPO_IGP) ? "Internal" : "External"),
+	       bnp->rp_as);
     } else {
       syslog(LOG_NOTICE,
 	     "<%s>: <child>: connect failed for %s: %s", __FUNCTION__,
 	     bgp_peerstr(bnp), strerror(errno));
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "\t\t\t by %s %s",
-	     ip6str(&bnp->rp_addr.sin6_addr, 0),
-	     (bnp->rp_mode & BGPO_IFSTATIC) ?
+      if ((logflags & LOG_BGPCONNECT) != 0)
+	syslog(LOG_DEBUG, "\t\t\t by %s %s",
+	       ip6str(&bnp->rp_addr.sin6_addr, 0),
+	       (bnp->rp_mode & BGPO_IFSTATIC) ?
 	       bnp->rp_ife->ifi_ifn->if_name : "");
-#endif
       close(bnp->rp_socket);
       bnp->rp_socket = -1;
     }
@@ -259,9 +254,6 @@ connect_try(struct rpcb *bnp)
     if ((bgpd_sendfile(bnp->rp_sfd[1], bnp->rp_socket)) < 0) {
       exit(1);
     } else {
-#if 0
-      syslog(LOG_DEBUG, "<connect_try>: <child>: EXIT.");
-#endif
       exit(0);
     }
   } /***  End of child  ***/
@@ -311,10 +303,10 @@ connect_process(struct rpcb *bnp)
       close(bnp->rp_socket);
       bnp->rp_socket = -1;
       bnp->rp_state = BGPSTATE_IDLE;
-#ifdef DEBUG_BGPSTATE
-  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
-	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
-#endif 
+
+      if ((logflags & LOG_BGPSTATE))
+	syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	       bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
 
       if (!(bnp->rp_mode & BGPO_IGP)) /* EBGP */
 	bnp->rp_id = 0;
@@ -464,10 +456,9 @@ bgp_process_open(struct rpcb *bnp) {
   /* My Autonomous System (2-octet) */
   rcvas = ntohs(*(u_short *)&bnp->rp_inpkt[i]);
   i += 2;
-#ifdef DEBUG
-  syslog(LOG_DEBUG,
-	 "BGP+ RECV\t\tAutonomous System = %d", rcvas);
-#endif
+  if ((logflags & LOG_BGPINPUT))
+    syslog(LOG_DEBUG,
+	   "BGP+ RECV\t\tAutonomous System = %d", rcvas);
   /* Hold Time            (2-octet) */
   rcvht = ntohs(*(u_short *)&bnp->rp_inpkt[i]);
   if ( !HOLDTIME_ISCORRECT(rcvht) ) {
@@ -478,11 +469,11 @@ bgp_process_open(struct rpcb *bnp) {
 
   /* BGP Identifier       (4-octet) */
   rcvid = *(u_long *)&bnp->rp_inpkt[i];
-#ifdef DEBUG
-  syslog(LOG_DEBUG,
-	 "BGP+ RECV\t\tBGP Identifier = %s",
-	 inet_ntoa(*(struct in_addr *)&rcvid));
-#endif
+  if ((logflags & LOG_BGPINPUT))
+    syslog(LOG_DEBUG,
+	   "BGP+ RECV\t\tBGP Identifier = %s",
+	   inet_ntoa(*(struct in_addr *)&rcvid));
+
   if (rcvid == 0) {
     bgp_notify(bnp, BGP_ERR_OPEN, BGP_ERROPN_BGPID, 0, NULL);/* Bad BGPID */
     return;
@@ -689,10 +680,9 @@ bgp_process_open(struct rpcb *bnp) {
 
   /***  Finally, the state is changed to  OpenConfirm.   ***/
   p->rp_state = BGPSTATE_OPENCONFIRM;
-#ifdef DEBUG_BGPSTATE
-  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
-	 bgp_statestr[p->rp_state], bgp_peerstr(p));
-#endif 
+  if ((logflags & LOG_BGPSTATE))
+    syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	   bgp_statestr[p->rp_state], bgp_peerstr(p));
 }
 
 /*
@@ -738,9 +728,7 @@ bgp_process_update(struct rpcb *bnp)
 
   extern struct ifinfo   *ifentry;
   extern struct rt_entry *aggregations; 
-#ifdef DEBUG
   extern char   *pa_typestr[], *origin_str[];
-#endif
  
   bitstr_t bit_decl(parsedflag, PA4_MAXTYPE);
   bit_nclear(parsedflag, 0, PA4_MAXTYPE);
@@ -796,8 +784,7 @@ bgp_process_update(struct rpcb *bnp)
   while (pa_p + tpalen > i) {    /* Malformation is detected ASAP */
 	  int error;
 
-#ifdef DEBUG
-	  {
+	  IFLOG(LOG_BGPINPUT) {
 		  struct in_addr peerid;
 
 		  peerid = *(struct in_addr *)&bnp->rp_id;
@@ -808,8 +795,7 @@ bgp_process_update(struct rpcb *bnp)
 				 pa_typestr[bnp->rp_inpkt[i + 1]],
 				 bnp->rp_inpkt[i + 1], inet_ntoa(peerid));
 	  }
-#endif
-    
+	  
 #define PA4_TYPE_CODE_CHECK \
     { i++;\
       if (bit_test(parsedflag, bnp->rp_inpkt[i]))\
@@ -860,9 +846,8 @@ bgp_process_update(struct rpcb *bnp)
       /* V */
       switch (bnp->rp_inpkt[i]) {
       case PATH_ORG_IGP: case PATH_ORG_EGP: case PATH_ORG_XX:
-#ifdef DEBUG
-	syslog(LOG_DEBUG, "BGP+ RECV\t\t%s", origin_str[bnp->rp_inpkt[i]]);
-#endif
+	if ((logflags & LOG_BGPINPUT))
+	  syslog(LOG_DEBUG, "BGP+ RECV\t\t%s", origin_str[bnp->rp_inpkt[i]]);
 	origin = bnp->rp_inpkt[i++];
 	break;
       default:
@@ -903,8 +888,6 @@ bgp_process_update(struct rpcb *bnp)
       }
       i += atrdatalen;
       break;
-
-
 
     case PA4_TYPE_NEXTHOP:
       /* NEXT_HOP (Type Code 3) well-known mandatory */   
@@ -950,10 +933,9 @@ bgp_process_update(struct rpcb *bnp)
 	goto done;
       }
       /* V */
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "BGP+ RECV\t\t%d",
-	     ntohl(*(u_int32_t *)&bnp->rp_inpkt[i]));
-#endif
+      if ((logflags & LOG_BGPINPUT))
+	syslog(LOG_DEBUG, "BGP+ RECV\t\t%d",
+	       ntohl(*(u_int32_t *)&bnp->rp_inpkt[i]));
       med = *(u_int32_t *)&bnp->rp_inpkt[i];     /* net-order */
 
       i += atrdatalen;
@@ -981,16 +963,14 @@ bgp_process_update(struct rpcb *bnp)
 	  goto done;
 	}
 	/* V */
-#ifdef DEBUG
-	syslog(LOG_DEBUG, "BGP+ RECV\t\t%d",
-	       ntohl(*(u_int32_t *)&bnp->rp_inpkt[i]));
-#endif
+	if ((logflags & LOG_BGPINPUT))
+	  syslog(LOG_DEBUG, "BGP+ RECV\t\t%d",
+		 ntohl(*(u_int32_t *)&bnp->rp_inpkt[i]));
 	if (bnp->rp_mode & BGPO_IGP)
 	  localpref = *(u_int32_t *)&bnp->rp_inpkt[i]; /* net-order */
       }
       i += atrdatalen;
       break;
-
 
     case PA4_TYPE_ATOMICAGG:
       /* ATOMIC_AGGREGATE (Type Code 6) well-known discretinary */
@@ -1079,11 +1059,10 @@ bgp_process_update(struct rpcb *bnp)
       /* V */
       /* This attribute is 4 bytes long and it will be created by a RR. 
 	 [rfc1966] */
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "BGP+ RECV\t\t%s", 
-	     /*	     ntohl(*(u_int32_t *)&bnp->rp_inpkt[i])); */
-	     inet_ntoa(*(struct in_addr *)&bnp->rp_inpkt[i]));
-#endif
+      if ((logflags & LOG_BGPINPUT))
+	syslog(LOG_DEBUG, "BGP+ RECV\t\t%s", 
+	       /*	     ntohl(*(u_int32_t *)&bnp->rp_inpkt[i])); */
+	       inet_ntoa(*(struct in_addr *)&bnp->rp_inpkt[i]));
       if ( (bnp->rp_mode & BGPO_IGP) &&
 	  !(bnp->rp_mode & BGPO_RRCLIENT))
 	originatorid = *(u_int32_t *)&bnp->rp_inpkt[i];
@@ -1166,11 +1145,10 @@ bgp_process_update(struct rpcb *bnp)
       /* Network Address of Next Hop          (variable)  */
       gnhaddr = *(struct in6_addr *)&bnp->rp_inpkt[i]; /* (normally) */
 
-#ifdef DEBUG_BGP
-      syslog(LOG_DEBUG, "BGP+ RECV\t\tNextHop");
-      syslog(LOG_DEBUG, "BGP+ RECV\t\t%s",
-	     inet_ntop(AF_INET6, &gnhaddr, in6txt, INET6_ADDRSTRLEN));
-#endif
+      if ((logflags & LOG_BGPINPUT)) {
+	syslog(LOG_DEBUG, "BGP+ RECV\t\tNextHop");
+	syslog(LOG_DEBUG, "BGP+ RECV\t\t%s", ip6str(&gnhaddr, 0));
+      }
 
       /*
        * A BGP speaker shall advertise to its peer in the Network Address of
@@ -1185,13 +1163,13 @@ bgp_process_update(struct rpcb *bnp)
 	break;			/* go to next attribute */
       }
 
-#ifdef DEBUG_BGP
-      if (!(IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_gaddr)) &&   /* global */
-	  !(IN6_ARE_ADDR_EQUAL(&bnp->rp_gaddr, &gnhaddr)))
-	syslog(LOG_DEBUG,
-	       "<%s>: Third Party NextHop %s from %s", __FUNCTION__,
-	       ip6str(&gnhaddr, 0), bgp_peerstr(bnp));
-#endif
+      IFLOG(LOG_BGPINPUT) {
+	if (!(IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_gaddr)) &&   /* global */
+	    !(IN6_ARE_ADDR_EQUAL(&bnp->rp_gaddr, &gnhaddr)))
+	  syslog(LOG_DEBUG,
+		 "<%s>: Third Party NextHop %s from %s", __FUNCTION__,
+		 ip6str(&gnhaddr, 0), bgp_peerstr(bnp));
+      }
 
       i += sizeof(struct in6_addr);
 
@@ -1222,20 +1200,19 @@ bgp_process_update(struct rpcb *bnp)
 	}
 	else {
 	  lnhaddr = *(struct in6_addr *)&bnp->rp_inpkt[i];
-#ifdef DEBUG_BGP
-	  syslog(LOG_DEBUG, "BGP+ RECV\t\t%s",
-		 ip6str(&lnhaddr, 0));
-
-	  if (!(IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_laddr)) &&
-	      !(IN6_ARE_ADDR_EQUAL(&bnp->rp_laddr, &lnhaddr)))
-	    syslog(LOG_DEBUG,
-		   "<%s>: Third Party NextHop %s", __FUNCTION__,
+	  IFLOG(LOG_BGPINPUT) {
+	    syslog(LOG_DEBUG, "BGP+ RECV\t\t%s",
 		   ip6str(&lnhaddr, 0));
-#endif
+
+	    if (!(IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_laddr)) &&
+		!(IN6_ARE_ADDR_EQUAL(&bnp->rp_laddr, &lnhaddr)))
+	      syslog(LOG_DEBUG,
+		     "<%s>: Third Party NextHop %s", __FUNCTION__,
+		     ip6str(&lnhaddr, 0));
+	  }
 	}
 	i += sizeof(struct in6_addr);
       }
-
 
       /* Number of SNPAs (1 octet) */
       snpanum = bnp->rp_inpkt[i++];
@@ -1255,11 +1232,10 @@ bgp_process_update(struct rpcb *bnp)
       }
 #endif
 
-
       /***  NLRI (4+) ***/
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "BGP+ RECV\t\tNLRI");
-#endif
+      if ((logflags & LOG_BGPINPUT))
+	syslog(LOG_DEBUG, "BGP+ RECV\t\tNLRI");
+
       while (i < k + atrlen) {      /* Malformation is detected ASAP */
 	struct rt_entry *rte;       /* to be installed               */
 	int              poctets;   /* (minimum len in octet bound)  */
@@ -1293,14 +1269,14 @@ bgp_process_update(struct rpcb *bnp)
 	       poctets);
 	i += poctets;
 
-#ifdef DEBUG_BGP
-	syslog(LOG_NOTICE, "BGP+ RECV\t\t%s/%d(nxthop=%s and %s) from %s",
-	       ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-	       rte->rt_ripinfo.rip6_plen,
-	       ip6str(&gnhaddr, 0),
-	       IN6_IS_ADDR_UNSPECIFIED(&lnhaddr) ? "none" : ip6str(&lnhaddr, 0),
-	       bgp_peerstr(bnp));
-#endif
+	if ((logflags & LOG_BGPINPUT))
+	  syslog(LOG_DEBUG, "BGP+ RECV\t\t%s/%d(nxthop=%s and %s) from %s",
+		 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		 rte->rt_ripinfo.rip6_plen,
+		 ip6str(&gnhaddr, 0),
+		 IN6_IS_ADDR_UNSPECIFIED(&lnhaddr) ? "none" :
+		 ip6str(&lnhaddr, 0),
+		 bgp_peerstr(bnp));
 
 	if (!IN6_IS_ADDR_ROUTABLE(&rte->rt_ripinfo.rip6_dest)) {
 	  syslog(LOG_NOTICE,
@@ -1313,10 +1289,11 @@ bgp_process_update(struct rpcb *bnp)
 	}
 
 	if (bgp_input_filter(bnp, rte)) {
-	  syslog(LOG_DEBUG, "<%s>: NLRI %s/%d from %s was filtered",
-		 __FUNCTION__,
-		 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-		 rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
+	  if ((logflags & LOG_BGPINPUT))
+	    syslog(LOG_DEBUG, "<%s>: NLRI %s/%d from %s was filtered",
+		   __FUNCTION__,
+		   ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		   rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
 	  free(rte);
 	  continue;		/* to next rte */
 	}
@@ -1365,27 +1342,24 @@ bgp_process_update(struct rpcb *bnp)
 	    break;
 	}
 	if (orte != NULL) {  /* I/F direct route (most preferable) */
-#if 0
-	  syslog(LOG_DEBUG,
-		 "<%s>: I/F direct %s/%d not overwritten", __FUNCTION__,
-		 inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest, in6txt,
-			   INET6_ADDRSTRLEN),
-		 rte->rt_ripinfo.rip6_plen);
-#endif
+	  if ((logflags & LOG_BGPINPUT))
+	    syslog(LOG_DEBUG,
+		   "<%s>: I/F direct %s/%d not overwritten", __FUNCTION__,
+		   inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest, in6txt,
+			     INET6_ADDRSTRLEN),
+		   rte->rt_ripinfo.rip6_plen);
 	  free(rte);
 	  continue;  /* to next rte */
 	}
 
 	/*  check aggregate routes  */
 	if (find_rte(rte, aggregations)) {
-#ifdef DEBUG_BGP
-	  syslog(LOG_DEBUG,
-		 "<%s>: aggregate route %s/%d cannot overwritten",
-		 __FUNCTION__,
-		 inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest, in6txt,
-			   INET6_ADDRSTRLEN),
-		 rte->rt_ripinfo.rip6_plen);
-#endif
+	  if ((logflags & LOG_BGPINPUT))
+	    syslog(LOG_DEBUG,
+		   "<%s>: aggregate route %s/%d cannot overwritten",
+		   __FUNCTION__,
+		   ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		   rte->rt_ripinfo.rip6_plen);
 	  free(rte);
 	  continue;  /* to next rte */
 	}
@@ -1481,28 +1455,28 @@ bgp_process_update(struct rpcb *bnp)
 	memcpy(rte->rt_ripinfo.rip6_dest.s6_addr, &bnp->rp_inpkt[i], poctets);
 	i += poctets;
 
-#ifdef DEBUG
-	syslog(LOG_DEBUG, "BGP+ RECV\t\t%s/%d",
-	       inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest.s6_addr,
-			 in6txt, INET6_ADDRSTRLEN),
-	       rte->rt_ripinfo.rip6_plen);
-#endif
+	if ((logflags & LOG_BGPINPUT))
+	  syslog(LOG_DEBUG, "BGP+ RECV\t\t%s/%d",
+		 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		 rte->rt_ripinfo.rip6_plen);
 
 	if (!IN6_IS_ADDR_ROUTABLE(&rte->rt_ripinfo.rip6_dest)) {
-	  syslog(LOG_DEBUG,
-		 "<%s>: Invalid prefix(%s/%d) in UNLRI (ignored) from %s",
-		 __FUNCTION__,
-		 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-		 rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
+	  if ((logflags & LOG_BGPINPUT))
+	    syslog(LOG_DEBUG,
+		   "<%s>: Invalid prefix(%s/%d) in UNLRI (ignored) from %s",
+		   __FUNCTION__,
+		   ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		   rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
 	  free(rte);
 	  continue;  /* to next rte */
 	}
 
 	if (bgp_input_filter(bnp, rte)) {
-	  syslog(LOG_DEBUG, "<%s>: UNLRI %s/%d from %s was filtered",
-		 __FUNCTION__,
-		 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-		 rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
+	  IFLOG(LOG_BGPINPUT)
+	    syslog(LOG_DEBUG, "<%s>: UNLRI %s/%d from %s was filtered",
+		   __FUNCTION__,
+		   ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		   rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
 	  free(rte);
 	  continue;		/* to next rte */
 	}
@@ -1539,11 +1513,10 @@ bgp_process_update(struct rpcb *bnp)
        */
       if ((bnp->rp_inpkt[k] & PA_FLAG_OPT) &&
 	  (bnp->rp_inpkt[k] & PA_FLAG_TRANS)) {
-#ifdef DEBUG_BGP
-	syslog(LOG_DEBUG,
-	       "<%s>: BGP+ RECV\t\tUnrecognized Attribute: type=%d,len=%d",
-	       __FUNCTION__, bnp->rp_inpkt[k + 1], atrdatalen);
-#endif 
+	IFLOG(LOG_BGPINPUT)
+	  syslog(LOG_DEBUG,
+		 "<%s>: BGP+ RECV\t\tUnrecognized Attribute: type=%d,len=%d",
+		 __FUNCTION__, bnp->rp_inpkt[k + 1], atrdatalen);
 	optatr = add_optatr(optatr, &bnp->rp_inpkt[k], atrlen);
       }
 
@@ -1632,14 +1605,15 @@ bgp_process_update(struct rpcb *bnp)
 		  goto done;
 
 	  if (bgp_enable_rte(uprte) == 0) {
-#ifdef DEBUG_BGP
-		  syslog(LOG_NOTICE,
-			 "<%s>: MP_REACH_NLRI %s/%d: from %s, not enabled",
-			 __FUNCTION__,
-			 ip6str(&uprte->rt_ripinfo.rip6_dest, 0),
-			 uprte->rt_ripinfo.rip6_plen,
-			 bgp_peerstr(bnp));
-#endif
+		  IFLOG(LOG_BGPINPUT)
+			  syslog(LOG_NOTICE,
+				 "<%s>: MP_REACH_NLRI %s/%d: from %s, "
+				 "not enabled",
+				 __FUNCTION__,
+				 ip6str(&uprte->rt_ripinfo.rip6_dest, 0),
+				 uprte->rt_ripinfo.rip6_plen,
+				 bgp_peerstr(bnp));
+
 		  nrte = uprte->rt_prev; /* XXX */
 		  remque(uprte);
 		  free(uprte);
@@ -1649,15 +1623,16 @@ bgp_process_update(struct rpcb *bnp)
 		  /* Copy enable route into adj-ribs-in list */
 		  struct rt_entry *irte;
 
-#ifdef DEBUG_BGP
-		  syslog(LOG_NOTICE,
-			 "<%s>: MP_REACH_NLRI %s/%d: from %s, enabled(%s)",
-			 __FUNCTION__,
-			 ip6str(&uprte->rt_ripinfo.rip6_dest, 0),
-			 uprte->rt_ripinfo.rip6_plen,
-			 bgp_peerstr(bnp),
-			 (uprte->rt_flags & RTF_UP) ? "installed" : "backup");
-#endif 
+		  IFLOG(LOG_BGPINPUT)
+			  syslog(LOG_DEBUG,
+				 "<%s>: MP_REACH_NLRI %s/%d: from %s, "
+				 "enabled(%s)",
+				 __FUNCTION__,
+				 ip6str(&uprte->rt_ripinfo.rip6_dest, 0),
+				 uprte->rt_ripinfo.rip6_plen,
+				 bgp_peerstr(bnp),
+				 (uprte->rt_flags & RTF_UP) ? "installed" :
+				 "backup");
 
 		  MALLOC(irte, struct rt_entry);
 		  memcpy(irte, uprte, sizeof(struct rt_entry));
@@ -1697,14 +1672,13 @@ bgp_process_update(struct rpcb *bnp)
 	  if ((drte = find_rte(wdrte, bnp->rp_adj_ribs_in))) {
 		  if (drte->rt_flags & RTF_UP) {
 			  struct rt_entry rte;
-#ifdef DEBUG_BGP
-			  syslog(LOG_NOTICE,
-				 "<%s>: MP_UNREACH_NLRI %s/%d: from %s (deleted)",
-				 __FUNCTION__,
-				 ip6str(&wdrte->rt_ripinfo.rip6_dest, 0),
-				 wdrte->rt_ripinfo.rip6_plen,
-				 bgp_peerstr(bnp));
-#endif 
+			  IFLOG(LOG_BGPINPUT)
+			    syslog(LOG_NOTICE,
+				   "<%s>: MP_UNREACH_NLRI %s/%d: from %s "
+				   "(deleted)", __FUNCTION__,
+				   ip6str(&wdrte->rt_ripinfo.rip6_dest, 0),
+				   wdrte->rt_ripinfo.rip6_plen,
+				   bgp_peerstr(bnp));
 			  bgp_disable_rte(drte);
 
 			  /* (also copy "back-pointer" ASpath pointer) */
@@ -1877,11 +1851,10 @@ bgp_selectroute(rte, bnp)
 					 * Don't activate Kernel table
 					 */
 					rte->rt_flags &= ~RTF_UP;
-#ifdef DEBUG
-					syslog(LOG_DEBUG,
-					       "<%s>: to be backup.",
-					       __FUNCTION__);
-#endif
+					IFLOG(LOG_BGPINPUT)
+					  syslog(LOG_DEBUG,
+						 "<%s>: to be backup.",
+						 __FUNCTION__);
 				}
 			}
 		}
@@ -1922,9 +1895,9 @@ bgp_selectroute(rte, bnp)
 						 * install even if "rte"
 						 * becomes syncronized
 						 */
-#ifdef DEBUG
-						syslog(LOG_DEBUG, "<%s>: now synchronized.", __FUNCTION__);
-#endif		  
+						IFLOG(LOG_BGPINPUT)
+						  syslog(LOG_DEBUG,
+							 "<%s>: now synchronized.", __FUNCTION__);
 						nrte = rip_disable_rte(orte);
 						free(nrte);
 						rte->rt_flags |=
@@ -1934,10 +1907,10 @@ bgp_selectroute(rte, bnp)
 					} else {  /* tag differ */
 						if (orte->rt_flags & RTF_IGP_EGP_SYNC &&
 						    rte->rt_flags & RTF_UP) {
-#ifdef DEBUG
-							syslog(LOG_DEBUG, "<%s>: a new iBGP RTE prefered.",
-							       __FUNCTION__);
-#endif
+						  IFLOG(LOG_BGPINPUT)
+						    syslog(LOG_DEBUG,
+							   "<%s>: a new iBGP RTE prefered.",
+							   __FUNCTION__);
 							rip_erase_rte(orte);
 						}
 					}
@@ -1945,9 +1918,10 @@ bgp_selectroute(rte, bnp)
 
 					if (rte->rt_ripinfo.rip6_tag ==
 					    orte->rt_ripinfo.rip6_tag) {
-#ifdef DEBUG
-						syslog(LOG_DEBUG, "<%s>: fear.", __FUNCTION__);
-#endif
+						IFLOG(LOG_BGPINPUT)
+							syslog(LOG_DEBUG,
+							       "<%s>: fear.",
+							       __FUNCTION__);
 						rip_erase_rte(orte);
 					} else {  /* tag differ */
 						if (orte->rt_flags & RTF_IGP_EGP_SYNC &&
@@ -1956,9 +1930,8 @@ bgp_selectroute(rte, bnp)
 							       __FUNCTION__);
 							rip_erase_rte(orte);
 						} else {
-#ifdef DEBUG
-							syslog(LOG_DEBUG, "<%s>: to be Backup.", __FUNCTION__);
-#endif		  
+							IFLOG(LOG_BGPINPUT)
+								syslog(LOG_DEBUG, "<%s>: to be Backup.", __FUNCTION__);	/* XXX long... */
 							rte->rt_flags &= ~RTF_UP;
 						}
 					}
@@ -2115,10 +2088,10 @@ bgp_process_keepalive (struct rpcb *bnp) {
 
   case BGPSTATE_OPENCONFIRM:
     bnp->rp_state = BGPSTATE_ESTABLISHED;
-#ifdef DEBUG_BGPSTATE
-  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
-	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
-#endif 
+    IFLOG(LOG_BGPSTATE)
+	    syslog(LOG_NOTICE,
+		   "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+		   bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
     if (bgpsbsize &&
 	setsockopt(bnp->rp_socket, SOL_SOCKET, SO_SNDBUF, &bgpsbsize,
 		   sizeof(bgpsbsize)) < 0) {
@@ -2149,9 +2122,8 @@ collision_resolv(newconn, oldconn)
      struct rpcb *oldconn;
 {
 
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "<collision_resolv>: invoked.");
-#endif
+  IFLOG(LOG_BGPSTATE)
+    syslog(LOG_DEBUG, "<collision_resolv>: invoked.");
 
   if (newconn->rp_id > bgpIdentifier) {
 
@@ -2164,15 +2136,9 @@ collision_resolv(newconn, oldconn)
     return oldconn;  
   } 
 
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "<collision_resolv>: end.");
-#endif
-
-
+  IFLOG(LOG_BGPSTATE)
+    syslog(LOG_DEBUG, "<collision_resolv>: end.");
 }
-
-
-
 
 /*
  *  bgp_holdtimer_expired()
@@ -2180,17 +2146,13 @@ collision_resolv(newconn, oldconn)
 void
 bgp_holdtimer_expired(task *t)
 {
-#ifdef DEBUG
-  char in6txt[INET6_ADDRSTRLEN];
-
-  syslog(LOG_DEBUG,
-	 "<%s>: holdtime expired for %s (%s AS %d)",
-	 __FUNCTION__,
-	 inet_ntop(AF_INET6, &t->tsk_bgp->rp_addr.sin6_addr,
-		   in6txt, INET6_ADDRSTRLEN),
-	 ((t->tsk_bgp->rp_mode & BGPO_IGP) ? "Internal" : "External"),
-	 (int)t->tsk_bgp->rp_as);
-#endif
+  IFLOG(LOG_BGPSTATE)
+    syslog(LOG_DEBUG,
+	   "<%s>: holdtime expired for %s (%s AS %d)",
+	   __FUNCTION__,
+	   ip6str2(&t->tsk_bgp->rp_addr),
+	   ((t->tsk_bgp->rp_mode & BGPO_IGP) ? "Internal" : "External"),
+	   (int)t->tsk_bgp->rp_as);
 
   bgp_notify(t->tsk_bgp, BGP_ERR_HOLDTIME, BGP_ERR_UNSPEC, 0, NULL);
 }
@@ -2296,10 +2258,9 @@ bgp_flush(struct rpcb *bnp)
   bgp_update_stat(bnp, BGPS_CLOSED);/* this must be done before state change */
 
   bnp->rp_state = BGPSTATE_IDLE;       /* (1998/7/15) */
-#ifdef DEBUG_BGPSTATE
-  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
-	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
-#endif 
+  IFLOG(LOG_BGPSTATE)
+    syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	   bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
 
   close(bnp->rp_socket);
 

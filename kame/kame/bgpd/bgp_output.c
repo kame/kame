@@ -37,29 +37,17 @@
 #include "in6.h"
 #include "ripng.h"
 
-#ifdef DEBUG
-static char myin6txt[INET6_ADDRSTRLEN];
-#endif
-static char   in6txt[INET6_ADDRSTRLEN];
-
-#ifdef DEBUG
-#define BGP_LOG_SEND(type, len) \
+#define BGP_LOG_SEND(type, len) IFLOG(LOG_BGPOUTPUT) \
           { syslog(LOG_DEBUG,\
 		   "BGP+ SEND %s+%d -> %s+%d",\
-		   inet_ntop(AF_INET6, &bnp->rp_myaddr.sin6_addr,\
-			     myin6txt, INET6_ADDRSTRLEN),\
+		   ip6str2(&bnp->rp_myaddr),\
 		   ntohs(bnp->rp_myaddr.sin6_port),\
-		   inet_ntop(AF_INET6, &bnp->rp_addr.sin6_addr,\
-			     in6txt, INET6_ADDRSTRLEN),\
+		   bgp_peerstr(bnp),\
 		   ntohs(bnp->rp_addr.sin6_port));\
 	      syslog(LOG_DEBUG,\
 		     "BGP+ SEND message type %d (%s) length %d",\
 		     (type), bgp_msgstr[(type)], (len));\
 	  }
-#else
-#define BGP_LOG_SEND(type, len)
-#endif
-
 
 /*
  *   bgp_send_open()
@@ -73,9 +61,7 @@ bgp_send_open(struct rpcb *bnp)
   task          *tsk;
 
   extern byte       outpkt[];
-#ifdef DEBUG
   extern char      *bgp_msgstr[];
-#endif
   extern u_int16_t  my_as_number, bgpHoldtime;
   extern u_int32_t  bgpIdentifier;
   extern fd_set     fdmask;
@@ -83,10 +69,6 @@ bgp_send_open(struct rpcb *bnp)
 
 
   memset(outpkt, 0, BGPMAXPACKETSIZE);
-#ifdef DEBUG
-  memset(myin6txt, 0, INET6_ADDRSTRLEN);
-  memset(  in6txt, 0, INET6_ADDRSTRLEN);
-#endif
 
   bh = (struct bgphdr *)outpkt;
   /** fixed-size header **/
@@ -134,13 +116,11 @@ bgp_send_open(struct rpcb *bnp)
   bgp_update_stat(bnp, BGPS_OPENSENT);
   BGP_LOG_SEND(BGP_OPEN, i);
 
-
   /***   OpenSent   ***/
   bnp->rp_state = BGPSTATE_OPENSENT;
-#ifdef DEBUG_BGPSTATE
-  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
-	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
-#endif 
+  IFLOG(LOG_BGPSTATE)
+    syslog(LOG_DEBUG, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	   bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
 
   FD_SET(bnp->rp_socket, &fdmask);  /* open-sent Socket (to the global) */
 
@@ -188,14 +168,8 @@ bgp_send_notification(bnp, errcode, subcode, len, data)
   extern char *bgp_hdrerrstr[];
   extern char *bgp_opnerrstr[];
   extern char *bgp_upderrstr[];
-
-#ifdef DEBUG
   extern char *bgp_msgstr[];
-
-  memset(myin6txt, 0, INET6_ADDRSTRLEN);
-#endif
   memset(outpkt, 0, BGPMAXPACKETSIZE);
-  memset(in6txt, 0, INET6_ADDRSTRLEN);
 
   bh = (struct bgphdr *)outpkt;
   /** fixed-size header **/
@@ -221,15 +195,13 @@ bgp_send_notification(bnp, errcode, subcode, len, data)
   /****   send  NOTIFICATION  message   ****/ 
   if ((wlen = write(bnp->rp_socket, outpkt, i)) != i)
     syslog(LOG_ERR, "%s: write to %s (%s AS %d) failed: %s", __FUNCTION__,
-	   inet_ntop(AF_INET6, &bnp->rp_addr.sin6_addr,
-		     in6txt, INET6_ADDRSTRLEN),
+	   bgp_peerstr(bnp),
 	   ((bnp->rp_mode & BGPO_IGP) ? "Internal" : "External"),
 	   (int)bnp->rp_as, strerror(errno));
   else
     syslog(LOG_NOTICE,
 	   "NOTIFICATION sent to %s (%s AS %d): code %d (%s) data %s",
-	   inet_ntop(AF_INET6, &bnp->rp_addr.sin6_addr,
-		     in6txt, INET6_ADDRSTRLEN),
+	   bgp_peerstr(bnp),
 	   ((bnp->rp_mode & BGPO_IGP) ? "Internal" : "External"),
 	   (int)bnp->rp_as,
 	   errcode,
@@ -261,10 +233,9 @@ bgp_send_notification(bnp, errcode, subcode, len, data)
   BGP_LOG_SEND(BGP_NOTIFY, i);
 
   bnp->rp_state = BGPSTATE_IDLE;
-#ifdef DEBUG_BGPSTATE
-  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
-	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
-#endif 
+  IFLOG(LOG_BGPSTATE)
+    syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	   bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
 
   return NULL;    /* End of bgp_send_notification() */
 }
@@ -279,16 +250,9 @@ bgp_send_keepalive(struct rpcb *bnp)
   struct bgphdr *bh;
 
   extern byte       outpkt[];
-
-#ifdef DEBUG
   extern char      *bgp_msgstr[];
-#endif
 
   memset(outpkt,   0, BGPMAXPACKETSIZE);
-#ifdef DEBUG
-  memset(myin6txt, 0, INET6_ADDRSTRLEN);
-  memset(  in6txt, 0, INET6_ADDRSTRLEN);
-#endif
 
   bh = (struct bgphdr *)outpkt;  
   /** fixed-size header **/
@@ -327,16 +291,11 @@ bgp_send_keepalive(struct rpcb *bnp)
   return NULL;
 }
 
-
-#ifdef DEBUG
-#define BGP_LOG_ATTR  syslog(LOG_DEBUG,\
+#define BGP_LOG_ATTR  IFLOG(LOG_BGPOUTPUT) { syslog(LOG_DEBUG,\
 			 "BGP+ SEND flags 0x%x code %s(%d):\\",\
 			 outpkt[i-2],\
 			 pa_typestr[outpkt[i-1]],\
-			 outpkt[i-1])
-#else
-#define BGP_LOG_ATTR
-#endif
+			 outpkt[i-1]); }
 
 /*
  *
@@ -367,28 +326,23 @@ bgp_send_update(bnp, rte, headrte)
   extern u_int16_t  my_as_number;
   extern byte       IamRR;
   extern u_int32_t  bgpIdentifier;
-  
-#ifdef DEBUG
   extern char      *bgp_msgstr[], *bgp_statestr[];
   extern char      *pa_typestr[], *origin_str[];
-  syslog(LOG_DEBUG,
-	 "<%s>: invoked. AS=%u, ID=%s, state=%s",  /* iw97  */
-	 __FUNCTION__,
-	 bnp->rp_as, inet_ntoa(*(struct in_addr *)&bnp->rp_id),
-	 bgp_statestr[bnp->rp_state]);
 
-  memset(myin6txt, 0, INET6_ADDRSTRLEN);
-  memset(  in6txt, 0, INET6_ADDRSTRLEN);
-#endif
+  IFLOG(LOG_BGPOUTPUT)
+    syslog(LOG_DEBUG,
+	   "<%s>: invoked. AS=%u, ID=%s, state=%s",  /* iw97  */
+	   __FUNCTION__,
+	   bnp->rp_as, inet_ntoa(*(struct in_addr *)&bnp->rp_id),
+	   bgp_statestr[bnp->rp_state]);
 
   if (bnp->rp_state != BGPSTATE_ESTABLISHED)
     fatalx("<bgp_send_update>: internal error: invalid state");
 
 
   if (rte == NULL) {                /* argument */
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "<%s>: Nothing to be sent.", __FUNCTION__);
-#endif
+    IFLOG(LOG_BGPOUTPUT)
+      syslog(LOG_DEBUG, "<%s>: Nothing to be sent.", __FUNCTION__);
     return NULL;
   }
 
@@ -462,9 +416,8 @@ bgp_send_update(bnp, rte, headrte)
   switch (origin) {
   case PATH_ORG_IGP: case PATH_ORG_EGP: case PATH_ORG_XX:
     outpkt[i] = origin;
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "BGP+ SEND\t\t%s", origin_str[origin]);
-#endif
+    IFLOG(LOG_BGPOUTPUT)
+      syslog(LOG_DEBUG, "BGP+ SEND\t\t%s", origin_str[origin]);
     break;
   default:
     fatalx("BUG ! Invalid ORIGIN attribute");
@@ -595,10 +548,9 @@ bgp_send_update(bnp, rte, headrte)
       outpkt[i++] =  PA4_TYPE_ORIGINATOR;     /* T */
       BGP_LOG_ATTR;
       outpkt[i++] =  PA4_LEN_ORIGINATOR;      /* L */
-#ifdef DEBUG
-      syslog(LOG_DEBUG, "BGP+ SEND\t\t%s",
-	     inet_ntoa(*(struct in_addr *)&netorigid));
-#endif
+      IFLOG(LOG_BGPOUTPUT)
+	syslog(LOG_DEBUG, "BGP+ SEND\t\t%s",
+	       inet_ntoa(*(struct in_addr *)&netorigid));
       memcpy(&outpkt[i], &netorigid, PA4_LEN_ORIGINATOR);
       i += PA4_LEN_ORIGINATOR;
 
@@ -673,9 +625,8 @@ bgp_send_update(bnp, rte, headrte)
   lennh_p = i++;
 
   /* Network Address of Next Hop (variable)       */
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "BGP+ SEND\t\tNextHop");
-#endif
+  IFLOG(LOG_BGPOUTPUT)
+    syslog(LOG_DEBUG, "BGP+ SEND\t\tNextHop");
 
 #define PUT_NEXTHOP(nexthop)  \
   { outpkt[lennh_p] += (byte)sizeof(struct in6_addr);  \
@@ -739,16 +690,16 @@ bgp_send_update(bnp, rte, headrte)
     PUT_NEXTHOP(&bnp->rp_ife->ifi_laddr);
   }
 
-#ifdef DEBUG_BGP
-  if (outpkt[lennh_p] == 0)
-    syslog(LOG_DEBUG, "BGP+ SEND\t\t(I have no Nexthop address)");
-  if (outpkt[lennh_p] >= 16)
-    syslog(LOG_DEBUG, "BGP+ SEND\t\t%s",
-	   ip6str((struct in6_addr *)&outpkt[lennh_p + 1], 0));
-  if (outpkt[lennh_p] >= 32)
-    syslog(LOG_DEBUG, "BGP+ SEND\t\t%s",
-	   ip6str((struct in6_addr *)&outpkt[lennh_p + 1 + 16], 0));
-#endif
+  IFLOG(LOG_BGPOUTPUT) {
+    if (outpkt[lennh_p] == 0)
+      syslog(LOG_DEBUG, "BGP+ SEND\t\t(I have no Nexthop address)");
+    if (outpkt[lennh_p] >= 16)
+      syslog(LOG_DEBUG, "BGP+ SEND\t\t%s",
+	     ip6str((struct in6_addr *)&outpkt[lennh_p + 1], 0));
+    if (outpkt[lennh_p] >= 32)
+      syslog(LOG_DEBUG, "BGP+ SEND\t\t%s",
+	     ip6str((struct in6_addr *)&outpkt[lennh_p + 1 + 16], 0));
+  }
 
   /* Number of SNPAs (1 octet) */
   outpkt[i++] = 0;                           /* NOT implmntd  */ 
@@ -761,9 +712,9 @@ bgp_send_update(bnp, rte, headrte)
   nlri_p = i;
 
   /*** NLRI (4+) ***/
-#ifdef DEBUG
-  syslog(LOG_DEBUG, "BGP+ SEND\t\tNLRI");
-#endif
+  IFLOG(LOG_BGPOUTPUT)
+    syslog(LOG_DEBUG, "BGP+ SEND\t\tNLRI");
+
   rt = rte;          /* rte:argument */
   while(rt) {
     int poctets;     /* (minimum len in octet bound) */
@@ -793,11 +744,11 @@ bgp_send_update(bnp, rte, headrte)
       outpkt[i++] = agg->rt_ripinfo.rip6_plen;
       memcpy(&outpkt[i], agg->rt_ripinfo.rip6_dest.s6_addr, poctets);
       i +=  poctets;
-#ifdef DEBUG_BGP
-      syslog(LOG_NOTICE, "BGP+ SENDING MP_REACH\t\t%s/%d to %s",
-	     ip6str(&agg->rt_ripinfo.rip6_dest, 0), agg->rt_ripinfo.rip6_plen,
-	     bgp_peerstr(bnp));
-#endif
+      IFLOG(LOG_BGPOUTPUT)
+	syslog(LOG_DEBUG, "BGP+ SENDING MP_REACH\t\t%s/%d to %s",
+	       ip6str(&agg->rt_ripinfo.rip6_dest, 0),
+	       agg->rt_ripinfo.rip6_plen,
+	       bgp_peerstr(bnp));
       agg->rt_aggr.ag_flags |= AGGR_ADVDONE;
     }
 
@@ -811,29 +762,25 @@ bgp_send_update(bnp, rte, headrte)
 	(rt->rt_flags & RTF_IGP_EGP_SYNC || !(rt->rt_flags & RTF_UP)))
       goto next_rte;
 
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "BGP+ SEND\t\t%s/%d",
-	   inet_ntop(AF_INET6, &rt->rt_ripinfo.rip6_dest,
-		     in6txt, INET6_ADDRSTRLEN),
-	   rt->rt_ripinfo.rip6_plen);	       
-#endif
-
+    IFLOG(LOG_BGPOUTPUT)
+      syslog(LOG_DEBUG, "BGP+ SEND\t\t%s/%d",
+	     ip6str(&rt->rt_ripinfo.rip6_dest, 0),
+	     rt->rt_ripinfo.rip6_plen);	       
 
     if (rtp->rtp_type == RTPROTO_BGP) {
       if ((rt->rt_flags & (RTF_UP|RTF_INSTALLED)) != (RTF_UP|RTF_INSTALLED)) {
-#ifdef DEBUG
-	    syslog(LOG_DEBUG, "BGP+ SEND\t\t\t(was skipped since unavaiable)");
-#endif
-	    goto next_rte;
+	IFLOG(LOG_BGPOUTPUT)
+	  syslog(LOG_DEBUG, "BGP+ SEND\t\t\t(was skipped since unavaiable)");
+	goto next_rte;
       }
 
       /* XXX: is there any case of INSTALLED but not SYNCHRONIZED? */
       if ((rtp->rtp_bgp->rp_mode & BGPO_IGP) &&
 	  !(rtp->rtp_bgp->rp_mode & BGPO_NOSYNC) &&
 	  (!(rt->rt_flags & RTF_IGP_EGP_SYNC))) {
-#ifdef DEBUG
-	      syslog(LOG_DEBUG, "BGP+ SEND\t\t\t(was skipped since not synchronized)");
-#endif
+	IFLOG(LOG_BGPOUTPUT)
+	  syslog(LOG_DEBUG,
+		 "BGP+ SEND\t\t\t(was skipped since not synchronized)");
 	      goto next_rte;
 	    }
     }
@@ -848,13 +795,10 @@ bgp_send_update(bnp, rte, headrte)
     outpkt[i++] = rt->rt_ripinfo.rip6_plen;
     memcpy(&outpkt[i], rt->rt_ripinfo.rip6_dest.s6_addr, poctets);
     i +=  poctets;
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "BGP+ SEND\t\t%s/%d",
-	   inet_ntop(AF_INET6, &rt->rt_ripinfo.rip6_dest,
-		     in6txt, INET6_ADDRSTRLEN),
-	   rt->rt_ripinfo.rip6_plen);	       
-#endif
-    
+    IFLOG(LOG_BGPOUTPUT)
+      syslog(LOG_DEBUG, "BGP+ SEND\t\t%s/%d",
+	     ip6str(&rt->rt_ripinfo.rip6_dest, 0),
+	     rt->rt_ripinfo.rip6_plen);	       
   next_rte:
 
     if (rt->rt_next == headrte ||
@@ -872,18 +816,16 @@ bgp_send_update(bnp, rte, headrte)
 
   if (IamRR &&
       netorigid == bnp->rp_id) {
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "<%s>: Don't re-send to originator.", __FUNCTION__);
-#endif
+    IFLOG(LOG_BGPOUTPUT)
+      syslog(LOG_DEBUG, "<%s>: Don't re-send to originator.", __FUNCTION__);
     return rt;  /* pointer */
   }
 
   /* Network Layer Reachability Information Length (2 Octets) */
   if ((netnlrilen = htons(i - nlri_p)) == 0) {
-#ifdef DEBUG_BGP
-    syslog(LOG_NOTICE, "<%s>: Nothing to be sent for %s",
-	   __FUNCTION__, bgp_peerstr(bnp));
-#endif 
+    IFLOG(LOG_BGPOUTPUT)
+      syslog(LOG_DEBUG, "<%s>: Nothing to be sent for %s",
+	     __FUNCTION__, bgp_peerstr(bnp));
     return rt;           /* (1998/06/16) */
   }
 #ifdef DRAFT_IETF_00
@@ -932,8 +874,7 @@ bgp_send_update(bnp, rte, headrte)
   /****  send UPDATE message  ****/
   if ((write(bnp->rp_socket, outpkt, i)) != i) {
     syslog(LOG_ERR, "<%s>: write to %s failed: %s",__FUNCTION__,
-	   inet_ntop(AF_INET6, &bnp->rp_addr.sin6_addr, in6txt,
-		     INET6_ADDRSTRLEN), strerror(errno));
+	   bgp_peerstr(bnp),strerror(errno));
 #if 0
     /*
      * we don't have to(even MUST NOT) call bgp_cease() here, since
@@ -973,17 +914,13 @@ bgp_send_withdrawn(bnp, rte, headrte)
   struct rt_entry *rt;
 
   extern byte       outpkt[];
-
-#ifdef DEBUG
   extern char      *bgp_msgstr[], *bgp_statestr[];
   extern char      *pa_typestr[];
-  syslog(LOG_DEBUG, "<bgp_send_withdrawn>: invoked. AS=%u, ID=%s, state=%s",
-	 bnp->rp_as, inet_ntoa(*(struct in_addr *)&bnp->rp_id),
-	 bgp_statestr[bnp->rp_state]);
 
-  memset(myin6txt, 0, INET6_ADDRSTRLEN);
-  memset(  in6txt, 0, INET6_ADDRSTRLEN);
-#endif
+  IFLOG(LOG_BGPOUTPUT)
+    syslog(LOG_DEBUG, "<bgp_send_withdrawn>: invoked. AS=%u, ID=%s, state=%s",
+	   bnp->rp_as, inet_ntoa(*(struct in_addr *)&bnp->rp_id),
+	   bgp_statestr[bnp->rp_state]);
 
   if (bnp->rp_state != BGPSTATE_ESTABLISHED)
     fatalx("<bgp_send_withdrawn>: internal error: invalid state");
@@ -1058,12 +995,12 @@ bgp_send_withdrawn(bnp, rte, headrte)
 	goto next_rte;
 
       outpkt[i++] = rt->rt_ripinfo.rip6_plen;
-#ifdef DEBUG_BGP
-      syslog(LOG_NOTICE, "BGP+ SEND MP_UNREACH\t\t%s/%d to %s",
-	     ip6str(&rt->rt_ripinfo.rip6_dest, 0),
-	     rt->rt_ripinfo.rip6_plen,
-	     bgp_peerstr(bnp));
-#endif
+      IFLOG(LOG_BGPOUTPUT)
+	syslog(LOG_DEBUG, "BGP+ SEND MP_UNREACH\t\t%s/%d to %s",
+	       ip6str(&rt->rt_ripinfo.rip6_dest, 0),
+	       rt->rt_ripinfo.rip6_plen,
+	       bgp_peerstr(bnp));
+
       pbytes = POCTETS(rt->rt_ripinfo.rip6_plen);
 
       if (i + pbytes > BGPMAXPACKETSIZE ) {
@@ -1141,14 +1078,14 @@ bgp_dump(struct rpcb *bnp) {
     struct rtproto     *rtp;
     struct rt_entry    *rtehead, *rte;  /*  advertising  */
     struct rt_entry    *last;           /*  (1998/05/29) */
-
-#ifdef DEBUG
     extern char        *bgp_statestr[];
-    syslog(LOG_DEBUG,
-	   "<bgp_dump>: invoked. AS=%u, ID=%s, state=%s",
-	   bnp->rp_as, inet_ntoa(*(struct in_addr *)&bnp->rp_id),
-	   bgp_statestr[bnp->rp_state]);
-#endif
+
+    IFLOG(LOG_BGPOUTPUT)
+      syslog(LOG_DEBUG,
+	     "<bgp_dump>: invoked for %s (AS=%u, ID=%s, state=%s)",
+	     bgp_peerstr(bnp), bnp->rp_as,
+	     inet_ntoa(*(struct in_addr *)&bnp->rp_id),
+	     bgp_statestr[bnp->rp_state]);
 
     aggr_flush();
 
@@ -1215,9 +1152,9 @@ bgp_dump(struct rpcb *bnp) {
 	break;
     } /*  while(rtp) */
 
-#ifdef DEBUG
-    syslog(LOG_DEBUG, "<bgp_dump>: done.");
-#endif
+    IFLOG(LOG_BGPOUTPUT)
+      syslog(LOG_DEBUG, "<bgp_dump>: done.");
+
     return;
 }
 
