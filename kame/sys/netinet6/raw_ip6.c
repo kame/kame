@@ -309,7 +309,7 @@ rip6_output(m, va_alist)
 
 		/*
 		 * XXX Boundary check is assumed to be already done in
-		 * in6_setpktoptions().
+		 * ip6_setpktoptions().
 		 */
 		if (optp && (pi = optp->ip6po_pktinfo) && pi->ipi6_ifindex) {
 			ip6->ip6_dst.s6_addr16[1] = htons(pi->ipi6_ifindex);
