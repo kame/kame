@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1751 2001/06/28 12:59:33 sakane Exp $
+$KAME: CHANGELOG,v 1.1752 2001/06/29 14:16:58 jinmei Exp $
 
 <200106>
+2001-06-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_forward.c (ip6_forward): do not drop the
+	packet (nor send an icmp6 error) on a "p2p redirect" case, unless
+	the packet's destination address is regarded as on-link.  With
+	this check, we can distinguish a routing loop from a packet sent to
+	a nonexistent address.  For the former case, we'd rather let the
+	packet go to the loop, and detect the loop by traceroute.
+	Clarification based on a recent discussion about the p2p-pingpong
+	draft.
+
 Thu Jun 28 21:56:12 JST 2001 sakane@kame.net
 	* kame/libipsec/pfkey.c:
 	Fixed to calculate the length of the sadb extension in the function
