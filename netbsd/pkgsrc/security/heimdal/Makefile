@@ -1,28 +1,22 @@
 # New ports collection makefile for:	heimdal
-# Version required:	0.1c
+# Version required:	0.2f
 # Date created:		Fri Jun 19 15:07:04 JST 1998
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.2 1999/12/08 03:09:49 itojun Exp $
+# $Id: Makefile,v 1.3 1999/12/13 01:28:40 itojun Exp $
 #
 
-DISTNAME=	heimdal-0.1c
+DISTNAME=	heimdal-0.2f
 CATEGORIES=	security
 MASTER_SITES=	ftp://ftp.pdc.kth.se/pub/heimdal/src/
 
+HOMEPAGE=	http://www.pdc.kth.se/heimdal/
 MAINTAINER=	itojun@itojun.org
-
-BROKEN=		"use of nonstandard header field, old version"
 
 GNU_CONFIGURE=	yes
 
-MAN3=	krb5_warn.3 krb5_openlog.3 krb5_425_conv_principal.3 \
-	krb5_build_principal.3 krb5_free_principal.3 \
-	krb5_parse_name.3 krb5_sname_to_principal.3 \
-	krb5_unparse_name.3
-MAN5=	krb5.conf.5
-MAN1=	kinit.1 klist.1 kdestroy.1 kpasswd.1
-MAN8=	kdc.8 kstash.8 hprop.8 hpropd.8 ktutil.8 kpasswdd.8
+# for bin/des
+CONFLICTS=	openssl-0.9.2b
 
 post-install:
 	${MKDIR} ${PREFIX}/share/heimdal/examples
