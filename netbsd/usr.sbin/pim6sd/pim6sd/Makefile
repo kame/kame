@@ -44,12 +44,9 @@ DPADD+=	${.CURDIR}/../../../lib/libinet6/libinet6.a \
 LDADD+=-ly -ll
 YFLAGS+=-d
 CLEANFILES+=	y.tab.h
+SCRIPTS=pim6stat
 
 MAN=	pim6stat.1 pim6sd.8 pim6sd.conf.5
-
-afterinstall:
-	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
-		${INSTALLFLAGS} ${SRCDIR}/pim6stat ${DESTDIR}${BINDIR}
 
 .PATH:	${SRCDIR}
 
