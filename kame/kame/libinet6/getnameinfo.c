@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.41 2000/05/22 07:38:00 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.42 2000/06/12 02:51:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,13 +99,13 @@ static int ip6_parsenumeric __P((const struct sockaddr *, const char *, char *,
 static int ip6_sa2str __P((const struct sockaddr_in6 *, char *, size_t, int));
 #endif
 
-#define ENI_NOSOCKET 	0
-#define ENI_NOSERVNAME	1
-#define ENI_NOHOSTNAME	2
-#define ENI_MEMORY	3
-#define ENI_SYSTEM	4
-#define ENI_FAMILY	5
-#define ENI_SALEN	6
+#define ENI_NOSOCKET 	EAI_FAIL		/*XXX*/
+#define ENI_NOSERVNAME	EAI_NONAME
+#define ENI_NOHOSTNAME	EAI_NONAME
+#define ENI_MEMORY	EAI_MEMORY
+#define ENI_SYSTEM	EAI_SYSTEM
+#define ENI_FAMILY	EAI_FAMILY
+#define ENI_SALEN	EAI_FAIL		/*XXX*/
 
 int
 getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
