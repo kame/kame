@@ -66,7 +66,7 @@
 
 #define PULLDOWN_STAT
 
-#ifdef PULLDOWN_TEST
+#ifdef PULLDOWN_STAT
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include "opt_inet.h"
 #endif
