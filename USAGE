@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/29 04:07:09 $
+		     $Date: 2000/05/22 03:24:23 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -546,7 +546,8 @@ How to install and use ALTQ:
 EDNS0 is defined in RFC2671.  With EDNS0, the resolver library can tell DNS
 server of its receiving buffer size, and permit DNS server to transmit large
 reply packet.  EDNS0 is necessary to take advantage of larger minimum MTU
-in IPv6.  Server side support for EDNS0 is included in by BIND9.
+in IPv6.  KAME libinet6 includes resolver side support for EDNS0.
+Server side support for EDNS0 is included in ISC BIND9.
 
 	query packet with EDNS0
 	tells receive buffer size
@@ -568,10 +569,10 @@ Caveats:
   turn the option on if you have BIND 4/8 DNS server.  If you enable
   "options edns0" against BIND 4/8 DNS server, you will never be able
   to resolve names.
-- if you use IPv6 UDP as DNS transport, path MTU discovery may
+- If you use IPv6 UDP as DNS transport, path MTU discovery may
   affect the traffic.  KAME box tries to fragment packet to 1280
   bytes, however, BIND9 may not.
-- kame/freebsd4 and kame/bsdi4 do not support EDNS0 queries, due to
-  differences in resolver code.
+- Some of our platforms do not use our extended resolver code in libinet6.
+  See COVERAGE for detail.
 
 							<end of USAGE>
