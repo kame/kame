@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.60 2002/05/21 14:26:55 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.61 2002/05/21 23:23:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,8 +161,10 @@ main(argc, argv)
 	struct timeval *timeout;
 	int i, ch;
 	int fflag = 0, logopt;
+#if !defined(__NetBSD__) && !defined(__OpenBSD__)
 	FILE *pidfp;
 	pid_t pid;
+#endif
 
 	/* get command line options and arguments */
 #ifdef MIP6
@@ -251,6 +253,13 @@ main(argc, argv)
 	sock_open();
 
 	/* record the current PID */
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	if (pidfile(NULL) < 0) {
+		syslog(LOG_ERR,
+		    "<%s> failed to open a log file, run anyway.",
+		    __FUNCTION__, pidfilename);
+	}
+#else
 	pid = getpid();
 	if ((pidfp = fopen(pidfilename, "w")) == NULL) {
 		syslog(LOG_ERR,
@@ -260,6 +269,7 @@ main(argc, argv)
 		fprintf(pidfp, "%d\n", pid);
 		fclose(pidfp);
 	}
+#endif
 
 	FD_ZERO(&fdset);
 	FD_SET(sock, &fdset);
