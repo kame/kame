@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.677 2000/03/09 21:13:56 itojun Exp $
+$Id: CHANGELOG,v 1.678 2000/03/10 14:04:05 itojun Exp $
 
 <200003>
+Fri Mar 10 23:00:45 JST 2000  itojun@iijlab.net
+	* netbsd/sys/net/rtsock.c: fix problem when rnh_lookup returned
+	  RNF_ROOT, in route_output().  This seems to be BSD problem, not
+	  KAME problem.  we'll try to check other platforms soon.
+
 Fri Mar 10 06:11:03 JST 2000  itojun@iijlab.net
 	* sys/netinet/icmp6.h: fix member name of icmp6_filter to be
 	  compatible with RFC2292. (member name is icmp6_filt, not icmp6_filter)
