@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.986 2000/06/07 13:24:49 itojun Exp $
+$Id: CHANGELOG,v 1.987 2000/06/08 14:00:27 itojun Exp $
 
 <200006>
+Thu Jun  8 22:58:24 JST 2000  itojun@iijlab.net
+	* kame/ping6/ping6.c: make sure to clear ni_flags on ping6 -w
+	  or ping6 -W.  From: yoshfuji
+
+Thu Jun  8 21:40:55 JST 2000  itojun@iijlab.net
+	* *bsd*/sys/netinet6/{udp6_output,raw_ip6,in6_pcb}.c:
+	  do not overwrite sockaddr on PRU_SEND nor PRU_CONNECT.
+	  (the change is very important)
+
 Wed Jun  7 22:21:43 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_prefix.c: check interface matches when adding
 	  new interface addresses, based on new link-local address and
