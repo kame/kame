@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.194 2001/09/13 13:39:08 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.195 2001/09/13 15:56:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -564,7 +564,7 @@ nd6_timer(ignored_arg)
 				if (m) {
 					struct ip6_hdr *ip6_in;
 					struct sockaddr_in6 sin6_in;
-					int64_t zoneid;
+					int64_t szoneid, dzoneid;
 
 					/*
 					 * Fake rcvif to make the ICMP error
@@ -582,15 +582,27 @@ nd6_timer(ignored_arg)
 					 * data in the mbuf.
 					 */
 					ip6_in = mtod(m, struct ip6_hdr *);
-					zoneid = in6_addr2zoneid(rt->rt_ifp,
-								 &ip6_in->ip6_dst);
-					if (zoneid < 0) { /* impossible... */
+					szoneid = in6_addr2zoneid(rt->rt_ifp,
+								  &ip6_in->ip6_src);
+					dzoneid = in6_addr2zoneid(rt->rt_ifp,
+								  &ip6_in->ip6_dst);
+					if (szoneid < 0 || dzoneid < 0) {
+						/* impossible... */
 						m_freem(m);
 					} else {
 						bzero(&sin6_in,
 						      sizeof(sin6_in));
+						sin6_in.sin6_addr = ip6_in->ip6_src;
+						sin6_in.sin6_scope_id = szoneid;
+#ifndef SCOPEDROUTING
+						in6_embedscope(&ip6_in->ip6_src,
+							       &sin6_in,
+							       NULL, NULL);
+#endif
+						bzero(&sin6_in,
+						      sizeof(sin6_in));
 						sin6_in.sin6_addr = ip6_in->ip6_dst;
-						sin6_in.sin6_scope_id = zoneid;
+						sin6_in.sin6_scope_id = dzoneid;
 #ifndef SCOPEDROUTING
 						in6_embedscope(&ip6_in->ip6_dst,
 							       &sin6_in,
