@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_mn.c,v 1.5 2000/02/10 03:24:18 itojun Exp $
+ * $Id: mip6_mn.c,v 1.6 2000/02/10 03:50:57 itojun Exp $
  *
  */
 
@@ -510,13 +510,11 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 
         mip6_debug("Sub-options present (TLV coded)\n");
         for (ii = IP6OPT_BALEN; ii < mip6_indatap->ba_opt->len; ii++) {
-	    if (m->m_len < offset + 2 + ii + 1)
-		break;
             if ((ii - IP6OPT_BALEN) % 16 == 0)
                 mip6_debug("\t0x:");
             if ((ii - IP6OPT_BALEN) % 4 == 0)
                 mip6_debug(" ");
-            bcopy(mtod(m_in, caddr_t) + offset + 2 + ii, (caddr_t)&var, 1);
+	    m_copydata(m_in, offset + 2 + ii, sizeof(var), (caddr_t)&var);
             mip6_debug("%02x", var);
             if ((ii - IP6OPT_BALEN + 1) % 16 == 0)
                 mip6_debug("\n");
@@ -671,7 +669,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
                 mip6_debug("\t0x:");
             if ((ii - IP6OPT_BRLEN) % 4 == 0)
                 mip6_debug(" ");
-            bcopy(mtod(m_in, caddr_t) + offset + 2 + ii, (caddr_t)&var, 1);
+	    m_copydata(m_in, offset + 2 + ii, sizeof(var), (caddr_t)&var);
             mip6_debug("%02x", var);
             if ((ii - IP6OPT_BRLEN + 1) % 16 == 0)
                 mip6_debug("\n");

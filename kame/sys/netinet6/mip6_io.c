@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_io.c,v 1.1 2000/02/07 17:22:54 itojun Exp $
+ * $Id: mip6_io.c,v 1.2 2000/02/10 03:50:57 itojun Exp $
  *
  */
 
@@ -253,23 +253,23 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             bzero(mip6_indatap->bu_opt, sizeof(struct mip6_opt_bu));
 
             bu_opt = mip6_indatap->bu_opt;
-            bcopy(mtod(mp, caddr_t) + optoff,
-                  (caddr_t)&bu_opt->type, sizeof(bu_opt->type));
+	    m_copydata(mp, optoff, sizeof(bu_opt->type),
+	        (caddr_t)&bu_opt->type);
             tmplen = sizeof(bu_opt->type);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&bu_opt->len, sizeof(bu_opt->len));
+            m_copydata(mp, optoff + tmplen, sizeof(bu_opt->len),
+                (caddr_t)&bu_opt->len);
             tmplen += sizeof(bu_opt->len);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&bu_opt->flags, sizeof(bu_opt->flags));
+            m_copydata(mp, optoff + tmplen, sizeof(bu_opt->flags),
+                (caddr_t)&bu_opt->flags);
             tmplen += sizeof(bu_opt->flags);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&bu_opt->prefix_len, sizeof(bu_opt->prefix_len));
+	    m_copydata(mp, optoff + tmplen, sizeof(bu_opt->prefix_len),
+		(caddr_t)&bu_opt->prefix_len);
             tmplen += sizeof(bu_opt->prefix_len);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&bu_opt->seqno, sizeof(bu_opt->seqno));
+	    m_copydata(mp, optoff + tmplen, sizeof(bu_opt->seqno),
+                (caddr_t)&bu_opt->seqno);
             tmplen += sizeof(bu_opt->seqno);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&bu_opt->lifetime, sizeof(bu_opt->lifetime));
+	    m_copydata(mp, optoff + tmplen, sizeof(bu_opt->lifetime),
+                (caddr_t)&bu_opt->lifetime);
             tmplen += sizeof(bu_opt->lifetime);
 
             bu_opt->seqno = ntohs(bu_opt->seqno);
@@ -295,23 +295,23 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             bzero(mip6_indatap->ba_opt, sizeof(struct mip6_opt_ba));
 
             ba_opt = mip6_indatap->ba_opt;
-            bcopy(mtod(mp, caddr_t) + optoff,
-                  (caddr_t)&ba_opt->type, sizeof(ba_opt->type));
+	    m_copydata(mp, optoff, sizeof(ba_opt->type),
+		(caddr_t)&ba_opt->type);
             tmplen = sizeof(ba_opt->type);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&ba_opt->len, sizeof(ba_opt->len));
+	    m_copydata(mp, optoff + tmplen, sizeof(ba_opt->len),
+                (caddr_t)&ba_opt->len);
             tmplen += sizeof(ba_opt->len);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&ba_opt->status, sizeof(ba_opt->status));
+	    m_copydata(mp, optoff + tmplen, sizeof(ba_opt->status),
+		(caddr_t)&ba_opt->status);
             tmplen += sizeof(ba_opt->status);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&ba_opt->seqno, sizeof(ba_opt->seqno));
+	    m_copydata(mp, optoff + tmplen, sizeof(ba_opt->seqno),
+		(caddr_t)&ba_opt->seqno);
             tmplen += sizeof(ba_opt->seqno);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&ba_opt->lifetime, sizeof(ba_opt->lifetime));
+	    m_copydata(mp, optoff + tmplen, sizeof(ba_opt->lifetime),
+                (caddr_t)&ba_opt->lifetime);
             tmplen += sizeof(ba_opt->lifetime);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&ba_opt->refresh, sizeof(ba_opt->refresh));
+	    m_copydata(mp, optoff + tmplen, sizeof(ba_opt->refresh),
+                  (caddr_t)&ba_opt->refresh);
             tmplen += sizeof(ba_opt->refresh);
 
             ba_opt->seqno = ntohs(ba_opt->seqno);
@@ -338,11 +338,11 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             bzero(mip6_indatap->br_opt, sizeof(struct mip6_opt_br));
 
             br_opt = mip6_indatap->br_opt;
-            bcopy(mtod(mp, caddr_t) + optoff,
-                  (caddr_t)&br_opt->type, sizeof(br_opt->type));
+	    m_copydata(mp, optoff, sizeof(br_opt->type),
+                (caddr_t)&br_opt->type);
             tmplen = sizeof(br_opt->type);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&br_opt->len, sizeof(br_opt->len));
+	    m_copydata(mp, optoff + tmplen, sizeof(br_opt->len),
+		(caddr_t)&br_opt->len);
             tmplen += sizeof(br_opt->len);
 
             /* Set the BR option present flag */
@@ -366,14 +366,14 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
 
             /* Store Home Address option data */
             ha_opt = mip6_indatap->ha_opt;
-            bcopy(mtod(mp, caddr_t) + optoff,
-                  (caddr_t)&ha_opt->type, sizeof(ha_opt->type));
+	    m_copydata(mp, optoff, sizeof(ha_opt->type),
+                (caddr_t)&ha_opt->type);
             tmplen = sizeof(ha_opt->type);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&ha_opt->len, sizeof(ha_opt->len));
+	    m_copydata(mp, optoff + tmplen, sizeof(ha_opt->len),
+                (caddr_t)&ha_opt->len);
             tmplen += sizeof(ha_opt->len);
-            bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                  (caddr_t)&ha_opt->home_addr, sizeof(ha_opt->home_addr));
+	    m_copydata(mp, optoff + tmplen, sizeof(ha_opt->home_addr),
+		(caddr_t)&ha_opt->home_addr);
             tmplen += sizeof(ha_opt->home_addr);
 
             /* Set the HA option present flag */
@@ -408,7 +408,6 @@ int          tmplen;  /* Tmp length for positioning in option */
 {
     struct mip6_subopt_hal *hal;
     struct mip6_subopt_coa *coa;
-    struct in6_addr        *adr;
     int                     ii, len;
 
     /* Loop over the sub-options. */
@@ -434,9 +433,8 @@ int          tmplen;  /* Tmp length for positioning in option */
                     return ENOBUFS;
                 bzero(mip6_indatap->uid, sizeof(struct mip6_subopt_id));
 
-                bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                      (caddr_t)mip6_indatap->uid,
-                      sizeof(struct mip6_subopt_id));
+		m_copydata(mp, optoff + tmplen, sizeof(struct mip6_subopt_id),
+                    (caddr_t)mip6_indatap->uid);
                 tmplen += sizeof(struct mip6_subopt_id);
                 mip6_indatap->uid->id = ntohs(mip6_indatap->uid->id);
 
@@ -462,18 +460,16 @@ int          tmplen;  /* Tmp length for positioning in option */
                 }
 
                 hal = mip6_indatap->hal;
-                bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                      (caddr_t)&hal->type, sizeof(hal->type));
+		m_copydata(mp, optoff + tmplen, sizeof(hal->type),
+                    (caddr_t)&hal->type);
                 tmplen += sizeof(hal->type);
-                bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                      (caddr_t)&hal->len, sizeof(hal->len));
+		m_copydata(mp, optoff + tmplen, sizeof(hal->len),
+                    (caddr_t)&hal->len);
                 tmplen += sizeof(hal->len);
 
                 /* Loop over the addresses */                
                 for (ii = 0; ii < len; ii++) {
-                    adr = (struct in6_addr *)
-                        (mtod(mp, caddr_t) + optoff + tmplen);
-                    hal->halist[ii] = *adr;
+		    m_copydata(mp, optoff, tmplen, (caddr_t)&hal->halist[ii]);
                     tmplen += sizeof(struct in6_addr);
                 }
 
@@ -495,14 +491,14 @@ int          tmplen;  /* Tmp length for positioning in option */
                 bzero(mip6_indatap->coa, sizeof(struct mip6_subopt_coa));
 
                 coa = mip6_indatap->coa;
-                bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                      (caddr_t)&coa->type, sizeof(coa->type));
+		m_copydata(mp, optoff + tmplen, sizeof(coa->type),
+                    (caddr_t)&coa->type);
                 tmplen += sizeof(coa->type);
-                bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                      (caddr_t)&coa->len, sizeof(coa->len));
+		m_copydata(mp, optoff + tmplen, sizeof(coa->len),
+                    (caddr_t)&coa->len);
                 tmplen += sizeof(coa->len);
-                bcopy(mtod(mp, caddr_t) + optoff + tmplen,
-                      (caddr_t)&coa->coa, sizeof(coa->coa));
+		m_copydata(mp, optoff + tmplen, sizeof(coa->coa),
+                    (caddr_t)&coa->coa);
                 tmplen += sizeof(coa->coa);
 
                 /* Set the Alternate COA sub-option present flag */

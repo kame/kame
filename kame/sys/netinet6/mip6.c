@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.6 2000/02/09 13:48:40 itojun Exp $
+ * $Id: mip6.c,v 1.7 2000/02/10 03:50:56 itojun Exp $
  *
  */
 
@@ -601,7 +601,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
                 mip6_debug("\t0x:");
             if ((ii - IP6OPT_BULEN) % 4 == 0)
                 mip6_debug(" ");
-            bcopy(mtod(m_in, caddr_t) + offset + 2 + ii, (caddr_t)&var, 1);
+	    m_copydata(m_in, offset + 2 + ii, sizeof(var), (caddr_t)&var);
             mip6_debug("%02x", var);
             if ((ii - IP6OPT_BULEN + 1) % 16 == 0)
                 mip6_debug("\n");
@@ -1295,14 +1295,15 @@ int          type;  /* Type of option to look for */
     u_int8_t   opttype;	 /* Option type found in Destination Header*/
     u_int8_t   optlen;   /* Option length incl type and length */
     u_int32_t  len;      /* Length of Destination Header in bytes */
+    u_int8_t   len8;      /* Length of Destination Header in bytes */
     u_int32_t  offset;   /* Offset to BU option from beginning of m_in */
 
-    bcopy(mtod(m_in, caddr_t) + off + 1, (caddr_t)&len, 1);
-    len = (len + 1) << 3;
+    m_copydata(m_in, off + 1, sizeof(len8), (caddr_t)&len8);
+    len = (len8 + 1) << 3;
 
     offset = 0;
     for (ii = 2; ii < len;) {
-	bcopy(mtod(m_in, caddr_t) + off + ii, (caddr_t)&opttype, 1);
+	m_copydata(m_in, off + ii, sizeof(opttype), (caddr_t)&opttype);
 	if (opttype == type) {
 	    offset = off + ii;
 	    break;
@@ -1313,7 +1314,7 @@ int          type;  /* Type of option to look for */
 	    ii += 1;
 	}
 	
-	bcopy(mtod(m_in, caddr_t) + off + ii, (caddr_t)&optlen, 1);
+	m_copydata(m_in, off + ii, sizeof(optlen), (caddr_t)&optlen);
 	ii += 1 + optlen;
     }
     return offset;
