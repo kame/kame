@@ -166,7 +166,7 @@ found:
 			first_ifid[4] & 0xff, first_ifid[5] & 0xff,
 			first_ifid[6] & 0xff, first_ifid[7] & 0xff);
 
-		/* invert u bit, as suggested in RFC2373. */
+		/* invert u bit to convert EUI64 to RFC2373 interface ID. */
 		first_ifid[0] ^= 0x02;
 
 		return 0;
