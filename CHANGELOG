@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.908 2000/05/19 20:01:03 itojun Exp $
+$Id: CHANGELOG,v 1.909 2000/05/19 20:04:00 itojun Exp $
 
 <200005>
 Sat May 20 04:59:26 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_{forward,output,input}.c:
-	  correct link-local scope manipulation on looopback interface.
+	  correct link-local scoped address handling on looopback interface.
 	  broken on FAKE_LOOPBACK_IF code committed on 17 May 2000.
 
 2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
