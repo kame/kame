@@ -185,6 +185,7 @@ route_output(m, so)
 	struct socket *so;
 {
 	register struct rt_msghdr *rtm = 0;
+	register struct radix_node *rn = 0;
 	register struct rtentry *rt = 0;
 	struct rtentry *saved_nrt = 0;
 	struct radix_node_head *rnh;
@@ -195,7 +196,8 @@ route_output(m, so)
 	struct ifaddr *ifa = 0;
 #endif
 
-#define senderr(e) { error = e; goto flush;}
+	bzero(&info, sizeof(info));
+#define senderr(e) do { error = e; goto flush;} while (0)
 	if (m == 0 || ((m->m_len < sizeof(long)) &&
 		       (m = m_pullup(m, sizeof(long))) == 0))
 		return (ENOBUFS);
@@ -299,11 +301,14 @@ route_output(m, so)
 	case RTM_LOCK:
 		if ((rnh = rt_tables[dst->sa_family]) == 0) {
 			senderr(EAFNOSUPPORT);
-		} else if (rt = (struct rtentry *)
-				rnh->rnh_lookup(dst, netmask, rnh))
-			rt->rt_refcnt++;
-		else
+		}
+		rn = rnh->rnh_lookup(dst, netmask, rnh);
+		if (rn == NULL || (rn->rn_flags & RNF_ROOT) != 0) {
 			senderr(ESRCH);
+		}
+		rt = (struct rtentry *)rn;
+		rt->rt_refcnt++;
+
 		switch(rtm->rtm_type) {
 
 		case RTM_GET:
@@ -321,7 +326,7 @@ route_output(m, so)
 				} else {
 					ifpaddr = 0;
 					ifaaddr = 0;
-			    }
+				}
 			}
 			len = rt_msg2(rtm->rtm_type, &info, (caddr_t)0,
 				(struct walkarg *)0);
