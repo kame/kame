@@ -12,7 +12,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.6 1999/08/12 09:42:32 itojun Exp $
+ *	$Id: ip6_fw.c,v 1.7 1999/08/31 12:25:57 shin Exp $
  */
 
 /*
@@ -76,10 +76,10 @@
 #include <net/net_osdep.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-MALLOC_DEFINE(M_IPFW, "Ip6Fw/Ip6Acct", "Ip6Fw/Ip6Acct chain's");
+MALLOC_DEFINE(M_IP6FW, "Ip6Fw/Ip6Acct", "Ip6Fw/Ip6Acct chain's");
 #else
-#ifndef M_IPFW
-#define M_IPFW	M_TEMP
+#ifndef M_IP6FW
+#define M_IP6FW	M_TEMP
 #endif
 #endif
 
@@ -833,12 +833,12 @@ add_entry6(struct ip6_fw_head *chainptr, struct ip6_fw *frwl)
 	u_short nbr = 0;
 	int s;
 
-	fwc = malloc(sizeof *fwc, M_IPFW, M_DONTWAIT);
-	ftmp = malloc(sizeof *ftmp, M_IPFW, M_DONTWAIT);
+	fwc = malloc(sizeof *fwc, M_IP6FW, M_DONTWAIT);
+	ftmp = malloc(sizeof *ftmp, M_IP6FW, M_DONTWAIT);
 	if (!fwc || !ftmp) {
 		dprintf(("%s malloc said no\n", err_prefix));
-		if (fwc)  free(fwc, M_IPFW);
-		if (ftmp) free(ftmp, M_IPFW);
+		if (fwc)  free(fwc, M_IP6FW);
+		if (ftmp) free(ftmp, M_IP6FW);
 		return (ENOSPC);
 	}
 
@@ -855,8 +855,8 @@ add_entry6(struct ip6_fw_head *chainptr, struct ip6_fw *frwl)
 		splx(s);
 		return(0);
         } else if (ftmp->fw_number == (u_short)-1) {
-		if (fwc)  free(fwc, M_IPFW);
-		if (ftmp) free(ftmp, M_IPFW);
+		if (fwc)  free(fwc, M_IP6FW);
+		if (ftmp) free(ftmp, M_IP6FW);
 		splx(s);
 		dprintf(("%s bad rule number\n", err_prefix));
 		return (EINVAL);
@@ -907,8 +907,8 @@ del_entry6(struct ip6_fw_head *chainptr, u_short number)
 			if (fcp->rule->fw_number == number) {
 				LIST_REMOVE(fcp, chain);
 				splx(s);
-				free(fcp->rule, M_IPFW);
-				free(fcp, M_IPFW);
+				free(fcp->rule, M_IP6FW);
+				free(fcp, M_IP6FW);
 				return 0;
 			}
 		}
@@ -1149,8 +1149,8 @@ ip6_fw_ctl(int stage, struct mbuf **mm)
 			int s = splnet();
 			LIST_REMOVE(ip6_fw_chain.lh_first, chain);
 			splx(s);
-			free(fcp->rule, M_IPFW);
-			free(fcp, M_IPFW);
+			free(fcp->rule, M_IP6FW);
+			free(fcp, M_IP6FW);
 		}
 		if (m) {
 			(void)m_freem(m);

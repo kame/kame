@@ -14,6 +14,10 @@ static const char rcsid[] = "@(#)$Id: ip_auth.c,v 1.6 1998/11/26 18:54:51 eivind
 #endif
 #define __FreeBSD_version 300000	/* just a hack - no <sys/osreldate.h> */
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#endif
+
 #if !defined(_KERNEL) && !defined(KERNEL)
 # include <stdlib.h>
 # include <string.h>
@@ -92,7 +96,6 @@ extern struct ifqueue   ipintrq;                /* ip packet input queue */
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 #include "netinet/ip_compat.h"
-#include <netinet/tcpip.h>
 #include "netinet/ip_fil.h"
 #include "netinet/ip_auth.h"
 #if !SOLARIS && !defined(linux)
@@ -374,6 +377,9 @@ fr_authioctlloop:
 #  if SOLARIS
 			error = fr_qout(fr_auth[i].fra_q, m);
 #  else /* SOLARIS */
+#ifdef IPSEC
+			m->m_pkthdr.rcvif = NULL;
+#endif /*IPSEC*/
 			error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL);
 #  endif /* SOLARIS */
 			if (error)

@@ -10,6 +10,9 @@ static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-1995 Darren Reed
 static const char rcsid[] = "@(#)$Id: ip_fil.c,v 1.7 1998/12/04 22:54:54 archie Exp $";
 #endif
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet.h"
+#endif
 #include "opt_ipfilter.h"
 
 #ifndef	SOLARIS
@@ -81,6 +84,9 @@ static const char rcsid[] = "@(#)$Id: ip_fil.c,v 1.7 1998/12/04 22:54:54 archie 
 #endif
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#ifdef INET6
+#include <netinet/ip6.h>
+#endif
 #include <netinet/ip_var.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
@@ -843,6 +849,10 @@ struct tcpiphdr *ti;
 # else
 	ip->ip_ttl = ip_defttl;
 # endif
+
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = NULL;
+#endif
 
 # if defined(__FreeBSD_version) && (__FreeBSD_version >= 220000)
 	bzero((char *)&ro, sizeof(ro));
