@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.21 2000/11/08 14:12:33 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.22 2000/11/08 15:26:32 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -342,9 +342,10 @@ ok:
  * we don't allow clusters at this moment. 
  */
 struct mbuf *
-m_aux_add(m, af, type)
+m_aux_add2(m, af, type, p)
 	struct mbuf *m;
 	int af, type;
+	void *p;
 {
 	struct mbuf *n;
 	struct mauxtag *t;
@@ -364,6 +365,7 @@ m_aux_add(m, af, type)
 	bzero(t, sizeof(*t));
 	t->af = af;
 	t->type = type;
+	t->p = p;
 	n->m_data += sizeof(struct mauxtag);
 	n->m_len = 0;
 	n->m_next = m->m_pkthdr.aux;
@@ -372,9 +374,10 @@ m_aux_add(m, af, type)
 }
 
 struct mbuf *
-m_aux_find(m, af, type)
+m_aux_find2(m, af, type, p)
 	struct mbuf *m;
 	int af, type;
+	void *p;
 {
 	struct mbuf *n;
 	struct mauxtag *t;
@@ -388,10 +391,28 @@ m_aux_find(m, af, type)
 			printf("m_aux_find: invalid m_data for mbuf=%p (%p %p)\n", n, t, n->m_data);
 			continue;
 		}
-		if (t->af == af && t->type == type)
+		if (t->af == af && t->type == type && t->p == p)
 			return n;
 	}
 	return NULL;
+}
+
+struct mbuf *
+m_aux_find(m, af, type)
+	struct mbuf *m;
+	int af, type;
+{
+
+	return m_aux_find2(m, af, type, NULL);
+}
+
+struct mbuf *
+m_aux_add(m, af, type)
+	struct mbuf *m;
+	int af, type;
+{
+
+	return m_aux_add2(m, af, type, NULL);
 }
 
 void
