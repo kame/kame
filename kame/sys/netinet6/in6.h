@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.106 2001/11/10 09:13:55 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.107 2001/11/10 09:22:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -775,8 +775,8 @@ struct ip6_mtuinfo {
 	{ "auto_linklocal", CTLTYPE_INT }, \
 	{ 0, 0 }, \
 	{ "prefer_tempaddr", CTLTYPE_INT }, \
-	{ "use_defaultzone", CTLTYPE_INT }, \
 	{ 0, 0 }, \
+	{ "use_defaultzone", CTLTYPE_INT }, \
 }
 
 #ifdef __bsdi__
@@ -820,6 +820,7 @@ struct ip6_mtuinfo {
 	0, \
 	&ip6_prefer_tempaddr, \
 	0, \
+	&ip6_use_defzone,\
 }
 #endif
 #endif /* !_XOPEN_SOURCE */
