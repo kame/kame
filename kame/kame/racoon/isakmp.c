@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.81 2000/07/04 17:23:17 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.82 2000/07/06 09:22:25 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -596,7 +596,8 @@ ph1_main(iph1, msg)
 		iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
 		/* INITIAL-CONTACT processing */
-		if (!getcontacted(iph1->remote)) {
+		/* don't anything if local test mode. */
+		if (!f_local && !getcontacted(iph1->remote)) {
 			/* send INITIAL-CONTACT */
 			isakmp_info_send_n1(iph1,
 					ISAKMP_NTYPE_INITIAL_CONTACT, NULL);
