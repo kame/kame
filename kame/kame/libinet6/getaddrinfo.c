@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.113 2001/07/04 11:42:09 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.114 2001/07/04 11:45:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -665,7 +665,11 @@ globcopy:
 	 */
 	if (error == 0) {
 		if (sentinel.ai_next) {
+#ifndef USE_LOG_REORDER
 			if (getenv("GAI_USE_ORDERING") != NULL &&
+#else
+			if (
+#endif
 			    (hints == NULL ||
 			     !(hints->ai_flags & AI_PASSIVE))) {
 				int n;
