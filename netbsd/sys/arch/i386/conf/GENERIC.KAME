@@ -1,6 +1,11 @@
 include	"arch/i386/conf/GENERIC"
 
-# INET6 and IPSEC items are defined in GENERIC
+# INET6 and IPSEC items are defined in GENERIC.
+# however, GENERIC does not define IPSEC, and is not useful for our
+# experiments.  declare it here.
+options 	IPSEC		# IP security
+options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
+#options 	IPSEC_DEBUG	# debug for IP security
 
 # these options will become the default behavior soon.
 options 	NEW_STRUCT_ROUTE
