@@ -37,3 +37,4 @@ exclude ipcomp_input.c
 exclude ipcomp_output.c
 exclude ipcomp_core.c
 exclude ipcomp.h
+exclude raw_ip6.c
