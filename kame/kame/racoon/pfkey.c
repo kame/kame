@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.49 2000/06/14 09:48:29 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.50 2000/06/14 20:45:23 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1051,7 +1051,7 @@ pk_recvupdate(mhp)
 		if (pr->proto_id == proto_id
 		 && pr->spi == sa->sadb_sa_spi) {
 			pr->ok = 1;
-			YIPSDEBUG(DEBUG_MISC,
+			YIPSDEBUG(DEBUG_PFKEY,
 				char *xsrc = strdup(saddrwop2str(iph2->src));
 				plog(logp, LOCATION, NULL,
 					"pfkey %s success %s/%s/%s->%s\n",
@@ -1216,17 +1216,17 @@ pk_recvadd(mhp)
 	 * because they must be updated by SADB_UPDATE message
 	 */
 
-    {
-	char *xsrc = strdup(saddrwop2str(iph2->src));
-	plog(logp, LOCATION, NULL,
-		"pfkey %s success %s/%s/%s->%s\n",
-		s_pfkey_type(msg->sadb_msg_type),
-		s_pfkey_satype(msg->sadb_msg_satype),
-		s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
-		xsrc,
-		saddrwop2str(iph2->dst));
-	free(xsrc);
-    }
+	YIPSDEBUG(DEBUG_PFKEY,
+		char *xsrc = strdup(saddrwop2str(iph2->src));
+		plog(logp, LOCATION, NULL,
+			"pfkey %s success %s/%s/%s->%s\n",
+			s_pfkey_type(msg->sadb_msg_type),
+			s_pfkey_satype(msg->sadb_msg_satype),
+			s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
+			xsrc,
+			saddrwop2str(iph2->dst));
+		free(xsrc););
+
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 	return 0;
 }
@@ -1268,16 +1268,22 @@ pk_recvexpire(mhp)
 
 	iph2 = getph2bysaidx(src, dst, proto_id, sa->sadb_sa_spi);
 	if (iph2 == NULL) {
-		char *xsrc = strdup(saddrwop2str(src));
-		plog(logp, LOCATION, NULL,
-			"ERROR: no such a SA found %s/%s/%s->%s spi:%ld\n",
-			s_pfkey_satype(msg->sadb_msg_satype),
-			s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
-			xsrc,
-			saddrwop2str(dst),
-			ntohl(sa->sadb_sa_spi));
-		free(xsrc);
-		return -1;
+		/*
+		 * Ignore it because two expire messages are come up.
+		 * phase2 handler has been deleted already when 2nd message
+		 * is received.
+		 */
+		YIPSDEBUG(DEBUG_PFKEY,
+			char *xsrc = strdup(saddrwop2str(src));
+			plog(logp, LOCATION, NULL,
+				"no such a SA found %s/%s/%s->%s spi:%ld\n",
+				s_pfkey_satype(msg->sadb_msg_satype),
+				s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
+				xsrc,
+				saddrwop2str(dst),
+				ntohl(sa->sadb_sa_spi));
+			free(xsrc));
+		return 0;
 	}
 
 	SCHED_KILL(iph2->sce);
