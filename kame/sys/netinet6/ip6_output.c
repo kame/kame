@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.123 2000/08/20 04:44:19 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.124 2000/08/22 07:31:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2338,6 +2338,7 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 				 M_WAITOK);
 		bzero(*pktopt, sizeof(struct ip6_pktopts));
 		(*pktopt)->ip6po_hlim = -1;
+		(*pktopt)->needfree = 1;
 	}
 	opt = *pktopt;
 
