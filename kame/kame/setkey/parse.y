@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.25 2000/06/07 00:29:14 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.26 2000/06/07 03:10:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -78,6 +78,7 @@ extern char cmdarg[8192];
 extern int f_debug;
 
 int setkeymsg __P((void));
+static struct addrinfo *parse_addr __P((char *, char *, int));
 static int setvarbuf __P((int *, struct sadb_ext *, int, caddr_t, int));
 void parse_init __P((void));
 void free_buffer __P((void));
