@@ -1,7 +1,7 @@
-/*	$KAME: bindtest.c,v 1.14 2000/11/11 18:22:35 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.15 2000/11/22 02:32:39 itojun Exp $	*/
 
 /*
- * Copyright (C) 2000 USAGI Project.
+ * Copyright (C) 2000 USAGI/WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -114,9 +114,15 @@ main(argc, argv)
 		switch (ch) {
 		case 'A':
 			reuseaddr = 1;
+#ifndef SO_REUSEADDR
+			errx("SO_REUSEADDR is not supported");
+#endif
 			break;
 		case 'P':
 			reuseport = 1;
+#ifndef SO_REUSEPORT
+			errx("SO_REUSEPORT is not supported");
+#endif
 			break;
 		case 'p':
 			port = strdup(optarg);
@@ -247,6 +253,7 @@ test(t1, t2)
 		goto fail;
 	}
 
+#ifdef SO_REUSEADDR
 	if (reuseaddr) {
 		if (setsockopt(sa, SOL_SOCKET, SO_REUSEADDR, &yes,
 		    sizeof(yes)) < 0) {
@@ -269,7 +276,9 @@ test(t1, t2)
 			goto fail;
 		}
 	}
+#endif
 
+#ifdef SO_REUSEPORT
 	if (reuseport) {
 		if (setsockopt(sa, SOL_SOCKET, SO_REUSEPORT, &yes,
 		    sizeof(yes)) < 0) {
@@ -292,6 +301,7 @@ test(t1, t2)
 			goto fail;
 		}
 	}
+#endif
 
 	if (!summary)
 		printf("\tbind socket for %s\n", printres(a));
