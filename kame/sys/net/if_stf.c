@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.86 2002/09/27 09:31:12 k-sugyou Exp $	*/
+/*	$KAME: if_stf.c,v 1.87 2002/10/07 05:33:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -424,7 +424,7 @@ stfattach(dummy)
 #endif
 		if_attach(&sc->sc_if);
 #if NBPFILTER > 0
-#ifdef HAVE_NEW_BPF
+#ifdef HAVE_NEW_BPFATTACH
 		bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
 #else
 		bpfattach(&sc->sc_if.if_bpf, &sc->sc_if, DLT_NULL, sizeof(u_int));
