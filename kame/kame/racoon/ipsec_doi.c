@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.69 2000/05/23 16:25:08 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.70 2000/05/29 08:46:31 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2587,14 +2587,14 @@ ipsecdoi_setid1(iph1)
 		case AF_INET:
 			id_b.type = IPSECDOI_ID_IPV4_ADDR;
 			id_b.port = ((struct sockaddr_in *)iph1->local)->sin_port;
-			idtmp.l = sizeof(struct sockaddr_in);
+			idtmp.l = sizeof(struct in_addr);
 			idtmp.v = (caddr_t)&((struct sockaddr_in *)iph1->local)->sin_addr;
 			break;
 #ifdef INET6
 		case AF_INET6:
 			id_b.type = IPSECDOI_ID_IPV6_ADDR;
 			id_b.port = ((struct sockaddr_in6 *)iph1->local)->sin6_port;
-			idtmp.l = sizeof(struct sockaddr_in6);
+			idtmp.l = sizeof(struct in6_addr);
 			idtmp.v = (caddr_t)&((struct sockaddr_in6 *)iph1->local)->sin6_addr;
 			break;
 #endif
