@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.658 2000/03/06 22:18:25 sakane Exp $
+$Id: CHANGELOG,v 1.659 2000/03/07 02:25:23 jinmei Exp $
 
 <200003>
+2000-03-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6dd/pim6.c (init_pim6): corrected the initilization
+	process so that pim6dd does not access to NULL pointers.
+	From: Olivier TOGNI <togni@dpt-info.u-strasbg.fr>
+
 Tue Mar  7 07:16:29 JST 2000 sakane@ydc.co.jp
 	* kame/kame/setkey:
 	Fix replay window size as default to 0 when manual setting.
