@@ -385,8 +385,12 @@ main(argc, argv)
 			options |= F_QUIET;
 			break;
 		case 'R':
+#ifdef IPV6_REACHCONF
 			options |= F_REACHCONF;
 			break;
+#else
+			errx(1, "-R is not supported in this configuration");
+#endif
 		case 'S':
 			/* XXX: use getaddrinfo? */
 			if (inet_pton(AF_INET6, optarg, (void *)&srcaddr) != 1)
@@ -602,8 +606,10 @@ main(argc, argv)
 	if (hoplimit != -1)
 		ip6optlen += CMSG_SPACE(sizeof(int));
 
+#ifdef IPV6_REACHCONF
 	if (options & F_REACHCONF)
 		ip6optlen += CMSG_SPACE(0);
+#endif
 
 	/* set IP6 packet options */
 	if (ip6optlen) {
@@ -645,6 +651,7 @@ main(argc, argv)
 
 		scmsgp = CMSG_NXTHDR(&smsghdr, scmsgp);
 	}
+#ifdef IPV6_REACHCONF
 	if (options & F_REACHCONF) {
 		scmsgp->cmsg_len = CMSG_LEN(0);
 		scmsgp->cmsg_level = IPPROTO_IPV6;
@@ -652,6 +659,7 @@ main(argc, argv)
 
 		scmsgp = CMSG_NXTHDR(&smsghdr, scmsgp);
 	}
+#endif
 
 	if (argc > 1) {	/* some intermediate addrs are specified */
 		int hops, error;
