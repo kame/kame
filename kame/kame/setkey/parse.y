@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.71 2002/05/29 10:06:52 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.72 2003/04/24 10:34:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1103,7 +1103,8 @@ parse_addr(host, port)
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = p_aifamily;
-	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
+	hints.ai_protocol = IPPROTO_UDP;	/*dummy*/
 	hints.ai_flags = p_aiflags;
 	error = getaddrinfo(host, port, &hints, &res);
 	if (error != 0) {
