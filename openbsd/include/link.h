@@ -1,4 +1,4 @@
-/*	$OpenBSD: link.h,v 1.5 1999/12/09 18:10:23 espie Exp $	*/
+/*	$OpenBSD: link.h,v 1.8 2001/06/08 07:45:18 art Exp $	*/
 /*	$NetBSD: link.h,v 1.10 1996/01/09 00:00:11 pk Exp $	*/
 
 /*
@@ -41,6 +41,11 @@
 
 #ifndef _LINK_H_
 #define _LINK_H_
+
+/* XXXART - ? */
+#ifndef DT_PROCNUM
+#define DT_PROCNUM 0
+#endif
 
 /*
  * A `Shared Object Descriptor' describes a shared object that is needed
@@ -161,6 +166,36 @@ struct so_debug {
 	char   	 *dd_bpt_addr;		/* Address of rtld-generated bpt */
 	int	dd_bpt_shadow;		/* Original contents of bpt */
 	struct rt_symbol *dd_cc;	/* Allocated commons/copied data */
+};
+
+/*
+ *	Debug rendezvous struct. Pointer to this is set up in the
+ *	target code pointed by the DT_DEBUG tag. If it is
+ *	defined.
+ */
+struct r_debug {
+	int	r_version;		/* Protocol version. */
+	struct link_map *r_map;		/* Head of list of loaded objects. */
+
+	/*
+	 * This is the address of a function internal to the run-time linker,
+	 * that will always be called when the linker begins to map in a
+	 * library or unmap it, and again when the mapping change is complete.
+	 * The debugger can set a breakpoint at this address if it wants to
+	 * notice shared object mapping changes.
+	 */
+	unsigned long r_brk;
+	enum {
+		/*
+		 * This state value describes the mapping change taking place
+		 * when the `r_brk' address is called.
+		 */
+		RT_CONSISTENT,		/* Mapping change is complete.  */
+		RT_ADD,			/* Adding a new object.  */
+		RT_DELETE,		/* Removing an object mapping.  */
+	} r_state;
+
+	unsigned long r_ldbase;		/* Base address the linker is loaded at.  */
 };
 
 /*
