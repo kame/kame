@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.86 2000/05/11 00:52:52 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.87 2000/05/11 00:57:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1059,11 +1059,13 @@ icmp6_mtudisc_update(dst, icmp6, m)
  * 
  * Spec incompatibilities:
  * - IPv6 destination address validation
+ *	we ignore it on purpose - see comment below
  * - IPv6 Subject address handling
  * - FQDN Subject name handling (drop it if it's not for me)
  * - IPv4 Subject address handling support missing
+ * - Proxy reply (answer even if it's not for me)
  * - FQDN reply is not an DNS format, but pascal string (03 draft)
- * - Supported Qtypes packet support missing
+ * - "Supported Qtypes" support missing
  */
 #ifdef __FreeBSD__
 #define hostnamelen	strlen(hostname)
@@ -1195,7 +1197,7 @@ ni6_input(m, off)
 			 * Validate Subject address.
 			 *
 			 * Not sure what exactly does "address belongs to the
-			 * node" means in the spec, is it just unicast, or what?
+			 * node" mean in the spec, is it just unicast, or what?
 			 *
 			 * At this moment we consider Subject address as
 			 * "belong to the node" if the Subject address equals
