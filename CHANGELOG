@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1830 2001/08/06 20:22:11 suz Exp $
+$KAME: CHANGELOG,v 1.1831 2001/08/07 00:46:07 itojun Exp $
 
 <200108>
+Tue Aug  7 09:42:23 JST 2001  itojun@iijlab.net
+	* libinet6/getrrsetbyname.c: libc implementation of getrrsetbyname(3).
+	  useful for racoon(8) cert-on-DNS handling.  from openbsd.
+
 Mon Aug  6 21:18:58 BST 2001	suz@sdl.hitachi.co.jp
 	* kame/kame/v6test/getconfig.c: you can build up a packet from 
 	multiple raw-data entries.
