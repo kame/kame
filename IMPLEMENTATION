@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.159 2000/09/20 18:26:40 sakane Exp $
+	$KAME: IMPLEMENTATION,v 1.160 2000/09/20 23:37:31 sakane Exp $
 
 1. IPv6
 
@@ -1680,7 +1680,7 @@ list just for reference purposes.
 	Ericsson, Fitel, FreeS/WAN, hifn, HITACHI, IBM AIX, IIJ, Intel Canada,
 	Intel Packet Protect, MEW NetCocoon , MGCS, Microsoft WinNT/2000,
 	NAI PGPnet, NIST (linux IPsec + plutoplus), NEC IX5000, Netscreen,
-	NxNetworks, OpenBSD isakmpd, Radguard, RapidStream, RedCreek,
+	NxNetworks, OpenBSD isakmpd, Pivotal, Radguard, RapidStream, RedCreek,
 	Routerware, SSH (both IPv4/IPv6), Secure Computing, Soliton,
 	Sun Solaris8, TIS/NAI Gauntret, Toshiba, VPNet, Yamaha RT series
 
