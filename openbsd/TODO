@@ -1,15 +1,11 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.30 1999/12/02 07:37:22 itojun Exp $
+$Id: TODO,v 1.31 1999/12/03 00:58:50 itojun Exp $
 
-
-Caveats:
-- can't ping6 my own interface.
 
 Things we can do with the current code:
 - ip6 layer
 	ip6 output, ip6 input
-	"goto ours" hack needs to be revisited
 - icmp6 layer
 	replies to ping, DAD
 - raw6 socket input/output
@@ -27,7 +23,6 @@ Things we can't do with the current code:
 - ipv4 mapped address
 - check advanced APIs (both userland and kernel)
 - multicast related items need checking
-- enable KAME "goto ours" hack (check routing table code)
 - ip6_output() does not consult /128 routes, and will not obey icmp6 redir.
 - if you login via ssh, over IPv4 traffic to AF_INET6 socket (using IPv4
   mapped addres), login(1) or some other program *sometimes* dies with SEGV
