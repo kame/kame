@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.20 2001/10/17 08:24:24 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.21 2001/10/18 08:16:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -760,8 +760,9 @@ mip6_bu_timeout(arg)
 }
 
 /*
- * Some BU is sent with IP datagram.  But when we have no
- * traffic to the BU destination, we may have some BUs left in the BU list.
+ * Some BUs are sent with IPv6 datagram.  But when we have no traffic to
+ * the BU destination, we may have some BUs left in the BU list.  Push
+ * them out.
  */
 static int
 mip6_bu_send_bu(mbu)
@@ -770,16 +771,31 @@ mip6_bu_send_bu(mbu)
 	struct mbuf *m;
 	int error = 0;
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_haddr)) {
-		mip6log((LOG_INFO,
-			 "%s:%d: no home agent.  start ha discovery.\n",
-			 __FILE__, __LINE__));
-		mip6_icmp6_ha_discov_req_output(mbu->mbu_hif);
+	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
+		if ((mbu->mbu_flags & IP6_BUF_HOME) != 0) {
+			mip6log((LOG_INFO,
+				 "%s:%d: "
+				 "no home agent.  start ha discovery.\n",
+				 __FILE__, __LINE__));
+			mip6_icmp6_ha_discov_req_output(mbu->mbu_hif);
+		}
+
+		/* return immediately.  we need WAITSENT flag being set. */
 		return (0);
 	}
+
+	/* create ipv6 header to send a binding update destination opt */
 	m = mip6_create_ip6hdr(&mbu->mbu_haddr, &mbu->mbu_paddr,
 			       IPPROTO_NONE, 0);
+	if (m == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
+		error = ENOBUFS;
+		goto send_bu_end;
+	}
 
+	/* output a null packet. */
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -787,9 +803,12 @@ mip6_bu_send_bu(mbu)
 			 "when sending NULL packet to send BU.\n",
 			 __FILE__, __LINE__,
 			 error));
+		goto send_bu_end;
 	}
+
+ send_bu_end:
 	/*
-	 * XXX when we reset waitsent flag 
+	 * XXX when we reset waitsent flag ?  is it correct to clear here ?
 	 */
 	mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT;
 
@@ -981,7 +1000,7 @@ mip6_validate_bu(m, opt)
 		error = mip6_bc_send_ba(&mbc->mbc_addr,
 					&mbc->mbc_phaddr, &mbc->mbc_pcoa,
 					MIP6_BA_STATUS_SEQNO_TOO_SMALL,
-					bu_opt->ip6ou_seqno,
+					mbc->mbc_seqno,
 					0, 0);
 		if (error) {
 			mip6log((LOG_ERR,
@@ -1770,7 +1789,10 @@ mip6_validate_ba(m, opt)
 		return (1);
 	}
 
-	/* The sent BU sequence number == received BA sequence number. */
+	/*
+	 * check if the seq number of the send BU == the seq number of
+	 * the received BA.
+	 */
 	sc = hif_list_find_withhaddr(&ip6->ip6_dst);
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &ip6->ip6_src);
 	if (mbu == NULL) {
@@ -1780,7 +1802,16 @@ mip6_validate_ba(m, opt)
 		/* silently ignore */
 		return (1);
 	}
-	if (ba_opt->ip6oa_seqno != mbu->mbu_seqno) {
+	if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
+		/*
+		 * our HA has a greater seq number in her binging
+		 * cache entriy of mine.  we should resent binding
+		 * update with greater than the seq number of the
+		 * already exists binding cache.  this binding ack is
+		 * valid though the seq number doesn't match.
+		 */
+		goto validate_ba_valid;
+	} else if (ba_opt->ip6oa_seqno != mbu->mbu_seqno) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
 			 "%s:%d: unmached sequence no "
@@ -1793,6 +1824,7 @@ mip6_validate_ba(m, opt)
 		return (1);
 	}
 
+ validate_ba_valid:
 	/* we have a valid BA */
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.23 2001/10/17 07:26:17 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.24 2001/10/18 08:16:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -140,7 +140,7 @@ int mip6_ba_destopt_create		 __P((struct ip6_dest **,
 					      u_int8_t,
 					      u_int32_t,
 					      u_int32_t));
-int mip6_destopt_discard		__P((struct mip6_pktopts *));
+void mip6_destopt_discard		__P((struct mip6_pktopts *));
 int mip6_addr_exchange			__P((struct mbuf *,
 					     struct mbuf *));
 int mip6_process_destopt		__P((struct mbuf *,

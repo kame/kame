@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.17 2001/10/17 08:24:24 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.18 2001/10/18 08:16:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -853,7 +853,7 @@ mip6_tunneled_rs_output(sc, mpfx)
 	}
 
 	/* get inner packet header. */
-	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	MGETHDR(m, M_DONTWAIT, MT_HEADER);
 	if (m && max_linkhdr + maxlen >= MHLEN) {
 		MCLGET(m, M_DONTWAIT);
 		if ((m->m_flags & M_EXT) == 0) {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.64 2001/10/17 08:27:39 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.65 2001/10/18 08:16:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1160,7 +1160,7 @@ mip6_create_ip6hdr(ip6_src, ip6_dst, next, plen)
 	struct in6_addr *ip6_src; /* Source address for packet */
 	struct in6_addr *ip6_dst; /* Destination address for packet */
 	u_int8_t next;            /* Next header following the IPv6 header */
-	u_int32_t plen;           /* Payload length (zero if no payload */
+	u_int32_t plen;           /* Payload length (zero if no payload) */
 {
 	struct ip6_hdr *ip6; /* IPv6 header */
 	struct mbuf *mo;     /* Ptr to mbuf allocated for output data */
@@ -1177,15 +1177,15 @@ mip6_create_ip6hdr(ip6_src, ip6_dst, next, plen)
 	ip6->ip6_vfc |= IPV6_VERSION;
 	ip6->ip6_plen = 0;
 	ip6->ip6_nxt = next;
-	ip6->ip6_hlim = IPV6_DEFHLIM;
+	ip6->ip6_hlim = ip6_defhlim;
 
 	ip6->ip6_src = *ip6_src;
 	ip6->ip6_dst = *ip6_dst;
 
 	/* Allocate memory for mbuf and copy IPv6 header to mbuf. */
-	maxlen = sizeof(struct ip6_hdr) + plen;
-	MGETHDR(mo, M_DONTWAIT, MT_DATA);
-	if (mo && (maxlen >= MHLEN)) {
+	maxlen = sizeof(*ip6) + plen;
+	MGETHDR(mo, M_DONTWAIT, MT_HEADER);
+	if (mo && (max_linkhdr + maxlen >= MHLEN)) {
 		MCLGET(mo, M_DONTWAIT);
 		if ((mo->m_flags & M_EXT) == 0) {
 			m_free(mo);
@@ -1196,10 +1196,12 @@ mip6_create_ip6hdr(ip6_src, ip6_dst, next, plen)
 		free(ip6, M_TEMP);
 		return NULL;
 	}
+	mo->m_pkthdr.rcvif = NULL;
 
 	mo->m_len = maxlen;
 	mo->m_pkthdr.len = mo->m_len;
-	mo->m_pkthdr.rcvif = NULL;
+	mo->m_data += max_linkhdr;
+
 	bcopy((caddr_t)ip6, mtod(mo, caddr_t), sizeof(*ip6));
 	free(ip6, M_TEMP);
 	return mo;
@@ -1555,7 +1557,7 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	return (0);
 }
 
-int
+void
 mip6_destopt_discard(mip6opt)
 	struct mip6_pktopts *mip6opt;
 {
