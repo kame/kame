@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1382 2000/11/09 05:22:08 itojun Exp $
+$KAME: CHANGELOG,v 1.1383 2000/11/09 06:45:51 sakane Exp $
 
 <200011>
+Thu Nov  9 15:30:42 JST 2000 sakane@ydc.co.jp
+	* racoon:
+	Use both the source address and the destination address to get
+	phase1-sa.
+
 Thu Nov  9 09:53:54 JST 2000  itojun@iijlab.net
 	* netbsd/libexec/{rshd,rlogind}: do not refer free'ed memory region.
 	  KAME PR 302 from ryo@iij.ad.jp
