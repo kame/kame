@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/01/30 12:34:20 $
+		     $Date: 2000/02/10 04:36:28 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -434,9 +434,8 @@ spdadd 10.2.3.4 10.6.7.8 any -P out ipsec
 
 At B:
 spdadd 10.6.7.8 10.2.3.4 any -P out ipsec
-	esp/transport/10.6.7.8-10.2.3.4/require ;
-spdadd 10.6.7.8 10.2.3.4 any -P out ipsec
-	ah/transport/10.6.7.8-10.2.3.4/require ;
+	esp/transport//require
+	ah/transport//require ;
 ^D
 
 To utilize the security associations installed into the kernel, you
@@ -446,7 +445,7 @@ the "ping" command has the -P option with parameter to enable AH and/or ESP.
 
 For example:
 % ping -P "out ipsec \
-	ah/transport/10.0.1.1-10.0.2.2/use \
+	ah/transport//use \
 	esp/tunnel/10.0.1.1-10.0.1.2/require" 10.0.2.2
 
 If there are proper SAs, this policy specification causes ICMP packet
