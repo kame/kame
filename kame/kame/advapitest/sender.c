@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.30 2002/07/30 04:42:42 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.31 2003/06/12 09:58:27 suz Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -258,8 +258,8 @@ main(argc, argv)
 		hints.ai_family = AF_INET6;
 		hints.ai_socktype = SOCK_DGRAM; /* not used */
 		hints.ai_protocol = IPPROTO_UDP; /* not used */
-		if ((error = getaddrinfo(nexthop, NULL, &hints, &res)) < 0) {
-			errx(1, "getaddrinfo for nexthop: %s",
+		if ((error = getaddrinfo(stickynexthop, NULL, &hints, &res)) < 0) {
+			errx(1, "getaddrinfo for sticky nexthop: %s",
 			     gai_strerror(error));
 		}
 		memcpy(&sticky_ss_next, res->ai_addr, res->ai_addrlen);
