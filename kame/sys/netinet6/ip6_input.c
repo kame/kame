@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.80 2000/04/12 05:41:28 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.81 2000/04/28 16:00:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -289,7 +289,12 @@ ip6_init2(dummy)
 
 #ifdef __FreeBSD__
 /* cheat */
+#if __FreeBSD__ < 4
 SYSINIT(netinet6init2, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, ip6_init2, NULL);
+#else
+/* This must be after route_init(), which is now SI_ORDER_THIRD */
+SYSINIT(netinet6init2, SI_SUB_PROTO_DOMAIN, SI_ORDER_MIDDLE, ip6_init2, NULL);
+#endif
 #endif
 
 /*
