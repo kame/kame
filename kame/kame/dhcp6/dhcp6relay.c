@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.52 2005/03/02 04:51:29 suz Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.53 2005/03/16 16:35:25 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -575,7 +575,7 @@ relay6_recv(s, fromclient)
 			break;
 		case DH6_RELAY_REPLY:
 			/*
-			 * The server may send a replay reply to the client
+			 * The server may send a relay reply to the client
 			 * port.
 			 * XXX: need to clarify the port issue
 			 */
