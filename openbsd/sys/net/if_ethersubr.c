@@ -296,13 +296,8 @@ ether_output(ifp, m0, dst, rt0)
 #endif
 #ifdef INET6
 	case AF_INET6:
-#ifndef OLDIP6OUTPUT
 		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)edst))
 			return(0); /* it must be impossible, but... */
-#else
-		if (!nd6_resolve(ifp, rt, m, dst, (u_char *)edst))
-			return(0);	/* if not yet resolves */
-#endif
 		etype = htons(ETHERTYPE_IPV6);
 		break;
 #endif
