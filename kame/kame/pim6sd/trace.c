@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: trace.c,v 1.4 1999/09/10 16:26:48 jinmei Exp $
+ *  $Id: trace.c,v 1.5 1999/09/10 16:39:51 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -325,7 +325,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	 */
 	resp = (struct tr6_resp *)p;
 	bzero(resp, sizeof(struct tr6_resp));
-	datalen += RLEN;
+	datalen += (RLEN + sizeof(struct mld6_hdr));
 
 	resp->tr_qarr    = htonl(((tp.tv_sec + JAN_1970) << 16) + 
 				 ((tp.tv_usec << 10) / 15625));
