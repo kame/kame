@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.157 1999/10/05 11:49:17 itojun Exp $
+$Id: CHANGELOG,v 1.158 1999/10/05 15:58:43 jinmei Exp $
 
 <199910>
+1999-10-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/v6test/v6test.c (bpf_open): use pcap_lookupdev (if
+	possible) to choose the outgoing interface when the user does not
+	specify one.
+
 Tue Oct  5 20:46:33 JST 1999  itojun@iijlab.net
 	* bsdi3/sys/i386/isa/if_mz.c: drop faulty multicast loopback packet
 	  on promiscuous mode.  this is to make the driver always behave as
