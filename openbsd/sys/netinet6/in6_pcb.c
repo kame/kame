@@ -69,6 +69,9 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h> 
+#endif
 
 #undef IPSEC
 
@@ -163,6 +166,11 @@ in6_pcbbind(inp, nam)
        */
       if (sin6->sin6_family != AF_INET6)
 	return EAFNOSUPPORT;
+#ifdef ENABLE_DEFAULT_SCOPE
+      if (sin6->sin6_scope_id == 0) /* do not override if already specified */
+	sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
+#endif
+
       lport = sin6->sin6_port;
 
       if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
@@ -713,9 +721,15 @@ in6_pcbconnect(inp, nam)
 			return EINVAL;
 	}
 
+#ifdef ENABLE_DEFAULT_SCOPE
+      if (sin6->sin6_scope_id == 0) /* do not override if already specified */
+	sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
+#endif
+
 	/*
 	 * If the scope of the destination is link-local, embed the interface
 	 * index in the address.
+	 * XXX: rewrite this block to be more generic for all scoped addresses.
 	 */
 	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr)) {
 		/* XXX boundary check is assumed to be already done. */

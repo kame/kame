@@ -77,6 +77,10 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6protosw.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h>
+#endif
+
 
 #if __OpenBSD__
 #undef IPSEC
@@ -851,6 +855,11 @@ MAYBESTATIC MAYBEINLINE int rip6_usrreq_bind(struct socket *so,
 
           return EADDRNOTAVAIL;
 
+#ifdef ENABLE_DEFAULT_SCOPE
+   if (addr->sin6_scope_id == 0) /* do not override if already specified */
+     addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
+#endif
+
    inp->inp_laddr6 = addr->sin6_addr;
    return 0; 
 }
@@ -870,6 +879,11 @@ MAYBESTATIC MAYBEINLINE int rip6_usrreq_connect(struct socket *so,
 
    if (addr->sin6_family != AF_INET6)
        return EAFNOSUPPORT;
+
+#ifdef ENABLE_DEFAULT_SCOPE
+	if (addr->sin6_scope_id == 0) /* do not override if already specified */
+		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
+#endif
 
 	in6a = in6_selectsrc(addr, inp->inp_outputopts6,
 		inp->inp_moptions6, &inp->inp_route6, &inp->inp_laddr6,
@@ -940,6 +954,11 @@ static int rip6_usrreq_send(struct socket *so, int flags, struct mbuf *m,
 
        dst = (struct sockaddr_in6 *)addr;
      }
+
+#ifdef ENABLE_DEFAULT_SCOPE
+   if (dst->sin6_scope_id == 0) /* do not override if already specified */
+     dst->sin6_scope_id = scope6_addr2default(&dst->sin6_addr);
+#endif
 
    error = rip6_output(m,so,dst,control);
    /* m = NULL; */
