@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1323 2000/10/07 07:09:23 itojun Exp $
+$KAME: CHANGELOG,v 1.1324 2000/10/07 12:14:17 itojun Exp $
 
 <200010>
 Sat Oct  7 16:01:12 JST 2000  itojun@iijlab.net
@@ -12,6 +12,8 @@ Thu Oct  5 12:31:12 JST 2000  itojun@iijlab.net
 	  where possible (netbsd/freebsd4).  for other operating systems, we
 	  have no good random number source like rnd(4), and random() will
 	  be used.  you will see one-line warning when you start using IPsec.
+	  XXX we may need to think about how IV should be stirred.  the current
+	  code uses too much entropy out of rnd(4).
 
 Thu Oct  5 07:41:18 JST 2000  itojun@iijlab.net
 	* *bsd*/sys/net/if.c: make sure we have root privilege on SIOCSPHY*
