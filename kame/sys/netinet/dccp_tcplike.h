@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.h,v 1.3 2003/10/18 07:52:00 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.h,v 1.4 2003/10/18 07:58:34 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -26,106 +26,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *
+ */
+/*
  * Headerfile for TCP-like congestion control for DCCP
- *
- * Current Revision:
- *
- * $Source: /usr/home/sumikawa/kame/kame/kame/sys/netinet/dccp_tcplike.h,v $
- * $Revision: 1.3 $
- * $Author: itojun $
- * $Date: 2003/10/18 07:52:00 $
- *
- * Revision history:
- *
- * $Log: dccp_tcplike.h,v $
- * Revision 1.3  2003/10/18 07:52:00  itojun
- * $KAME$
- *
- * Revision 1.27  2003/06/01 13:16:30  magerx-9
- * Correct(?) handling of Ack Ratio
- *
- * Revision 1.26  2003/05/31 23:30:49  magerx-9
- * Not sure whats new.. Something is, I guess
- *
- * Revision 1.25  2003/05/29 09:38:09  magerx-9
- * Minor improvement on congestion control
- *
- * Revision 1.24  2003/05/28 08:27:59  magerx-9
- * cwndlist back to type charlist
- *
- * Revision 1.23  2003/05/26 13:35:28  magerx-9
- * checkin before i change cwndvector (again)
- *
- * Revision 1.22  2003/05/26 08:19:28  magerx-9
- * fixors
- *
- * Revision 1.21  2003/05/26 01:21:18  magerx-9
- * bah
- *
- * Revision 1.19  2003/05/15 19:46:44  magerx-9
- * Dont halt
- *
- * Revision 1.18  2003/05/13 15:15:02  magerx-9
- * Changed name on some dccp_cc_sw functions
- *
- * Revision 1.17  2003/05/13 11:49:22  joahag-9
- * Added copyright text
- *
- * Revision 1.16  2003/05/13 00:40:24  magerx-9
- * Barf barf barf
- *
- * Revision 1.15  2003/05/05 23:47:08  magerx-9
- * Bug fixing. Redesign of cwndvector
- *
- * Revision 1.14  2003/04/25 15:48:09  nilmat-8
- * DCCP: Fixed get_option, added buflen check
- *       Exchange connection establishment och cc recv packet in dccp_input
- * TFRC: Receiver sends feedback
- * REST: Update type on cc_send_ack_recv
- *
- * Revision 1.13  2003/04/23 15:58:47  magerx-9
- * Changed def of cc_recv_packet. options is now an argument
- *
- * Revision 1.12  2003/04/23 14:22:36  magerx-9
- * Changed definition of cc_recv_packet
- *
- * Revision 1.11  2003/04/22 00:48:51  magerx-9
- * Changed cwndvector
- *
- * Revision 1.10  2003/04/21 11:46:44  nilmat-8
- * Change type and meaning on cc_send_packet_sent.
- *
- * Revision 1.9  2003/04/21 01:39:44  magerx-9
- * Minor updates
- *
- * Revision 1.8  2003/04/20 16:30:40  magerx-9
- * Minor adjustments according to nilmat
- *
- * Revision 1.7  2003/04/20 15:33:18  magerx-9
- * Adjustments to conform to new code standards
- *
- * Revision 1.6  2003/04/04 22:35:41  magerx-9
- * Added cwndvector_t
- *
- * Revision 1.5  2003/04/02 23:26:09  magerx-9
- * Removed unused vars and defines
- *
- * Revision 1.4  2003/03/31 11:34:16  magerx-9
- * Minor fixes, for initial compilation
- *
- * Revision 1.3  2003/03/31 11:30:40  magerx-9
- * Minor fixes, for initial compilation
- *
- * Revision 1.2  2003/03/31 11:29:21  magerx-9
- * Minor fixes, for initial compilation
- *
- * Revision 1.1  2003/03/31 11:06:48  magerx-9
- * Initial revision
- *
- *
- **/
+ */
 
 #ifndef _NETINET_DCCP_TCPLIKE_H_
 #define _NETINET_DCCP_TCPLIKE_H_
