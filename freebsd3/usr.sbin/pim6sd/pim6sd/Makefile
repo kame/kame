@@ -30,9 +30,12 @@ PROG=	pim6sd
 SRCS=	mld6.c mld6_proto.c\
 	inet6.c kern.c main.c config.c debug.c routesock.c vers.c callout.c\
 	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c
-
+	cfparse.y cftoken.l
+CLEANFILES+= lex.yy.c y.tab.h y.tab.c
 CFLAGS+= -g
+CFLAGS+=-I.
 CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -I${SRCDIR}
+CFLAGS+=-DHAVE_STDARG_H
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
 DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
@@ -40,6 +43,9 @@ DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 
 MAN5=	pim6sd.conf.5
 MAN8=	pim6sd.8
+
+# FreeBSD special
+SRCS+=y.tab.h
 
 afterinstall:
 	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
