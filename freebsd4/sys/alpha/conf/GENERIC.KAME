@@ -191,7 +191,7 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
 # these options will become the default behavior soon.
-options 	NEW_STRUCT_ROUTE
+#options 	NEW_STRUCT_ROUTE
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"
