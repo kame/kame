@@ -7,8 +7,8 @@ BINOWN=	root
 BINGRP=	bin
 BINMODE=4555
 
-LDADD+=	-lcrypt
-DPADD+=	${LIBCRYPT}
+LDADD+=	-lm -lcrypt
+DPADD+=	${LIBM} ${LIBCRYPT}
 LDADD+=	-L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -lipsec -linet6
