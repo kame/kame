@@ -18,7 +18,7 @@
 
 BINDIR=	$(PREFIX)/sbin
 PROG=	rtadvd
-SRCS=	rtadvd.c rrenum.c advcap.c if.c config.c timer.c
+SRCS=	rtadvd.c rrenum.c advcap.c if.c config.c timer.c dump.c
 
 CC=	gcc
 

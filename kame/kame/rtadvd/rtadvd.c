@@ -63,11 +63,13 @@ static u_char *rcvcmsgbuf;
 static size_t rcvcmsgbuflen;
 static u_char *sndcmsgbuf = NULL;
 static size_t sndcmsgbuflen;
+static int do_dump;
 struct msghdr sndmhdr;
 struct iovec rcviov[2];
 struct iovec sndiov[2];
 struct sockaddr_in6 from;
 struct sockaddr_in6 sin6_allnodes = {sizeof(sin6_allnodes), AF_INET6};
+static char *dumpfilename = "/var/run/rtadvd.dump"; /* XXX: should be configurable */
 int sock, rtsock;
 #ifdef MIP6
 int mobileip6 = 0;
@@ -129,8 +131,11 @@ static void free_ndopts __P((union nd_opts *));
 static struct rainfo *if_indextorainfo __P((int));
 static void ra_output __P((struct rainfo *));
 static void rtmsg_input __P((void));
+static void rtadvd_set_dump_file __P((void));
+
 struct prefix *find_prefix __P((struct rainfo *, struct in6_addr *, int));
 
+extern void rtadvd_dump_file __P((char *));
 
 int
 main(argc, argv)
@@ -229,10 +234,16 @@ main(argc, argv)
 			maxfd = rtsock;
 	}
 
-	signal(SIGTERM, die);
+	signal(SIGTERM, (void *)die);
+	signal(SIGUSR1, (void *)rtadvd_set_dump_file);
 
 	while (1) {
 		struct fd_set select_fd = fdset; /* reinitialize */
+
+		if (do_dump) {	/* SIGUSR1 */
+			do_dump = 0;
+			rtadvd_dump_file(dumpfilename);
+		}
 
 		/* timer expiration check and reset the timer */
 		timeout = rtadvd_check_timer();
@@ -257,6 +268,12 @@ main(argc, argv)
 			rtadvd_input();
 	}
 	exit(0);		/* NOTREACHED */
+}
+
+static void
+rtadvd_set_dump_file()
+{
+	do_dump = 1;
 }
 
 static void
