@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.132 2000/06/15 13:41:49 itojun Exp $	*/
+/*	$KAME: key.c,v 1.133 2000/06/22 08:38:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -342,7 +342,7 @@ do { \
 	bzero((idx), sizeof(struct secasindex));                             \
 	(idx)->proto = (p);                                                  \
 	(idx)->mode = (m);                                                   \
-	(idx)->reqid = (r);                  ;                               \
+	(idx)->reqid = (r);                                                  \
 	bcopy((s), &(idx)->src, ((struct sockaddr *)(s))->sa_len);           \
 	bcopy((d), &(idx)->dst, ((struct sockaddr *)(d))->sa_len);           \
 } while (0)
@@ -2083,7 +2083,6 @@ int
 key_spdacquire(sp)
 	struct secpolicy *sp;
 {
-	union sadb_x_ident_id id;
 	struct mbuf *result = NULL, *m;
 	struct secspacq *newspacq;
 	int error;
@@ -2122,29 +2121,6 @@ key_spdacquire(sp)
 		goto fail;
 	}
 	result = m;
-
-	/* set sadb_address for spidx's. */
-	bzero(&id, sizeof(id));
-	id.sadb_x_ident_id_addr.prefix = sp->spidx.prefs;
-	id.sadb_x_ident_id_addr.ul_proto = sp->spidx.ul_proto;
-	m = key_setsadbident(SADB_EXT_IDENTITY_SRC, SADB_X_IDENTTYPE_ADDR,
-	    (caddr_t)&sp->spidx.src, sp->spidx.src.ss_len, *(u_int64_t *)&id);
-	if (!m) {
-		error = ENOBUFS;
-		goto fail;
-	}
-	m_cat(result, m);
-
-	bzero(&id, sizeof(id));
-	id.sadb_x_ident_id_addr.prefix = sp->spidx.prefd;
-	id.sadb_x_ident_id_addr.ul_proto = sp->spidx.ul_proto;
-	m = key_setsadbident(SADB_EXT_IDENTITY_DST, SADB_X_IDENTTYPE_ADDR,
-	    (caddr_t)&sp->spidx.dst, sp->spidx.dst.ss_len, *(u_int64_t *)&id);
-	if (!m) {
-		error = ENOBUFS;
-		goto fail;
-	}
-	m_cat(result, m);
 
 	result->m_pkthdr.len = 0;
 	for (m = result; m; m = m->m_next)
@@ -5074,15 +5050,6 @@ key_setident(sah, m, mhp)
 	}
 
 	switch (idsrc->sadb_ident_type) {
-	case SADB_X_IDENTTYPE_ADDR:
-#define IDENTXID(a) (((union sadb_x_ident_id *)(a))->sadb_x_ident_id_addr)
-		if (IDENTXID(idsrc).ul_proto != IDENTXID(iddst).ul_proto) {
-#ifdef IPSEC_DEBUG
-			printf("key_setident: ul_proto mismatch.\n");
-#endif
-			return EINVAL;
-		}
-#undef IDENTXID
 		break;
 	case SADB_IDENTTYPE_PREFIX:
 	case SADB_IDENTTYPE_FQDN:
@@ -5583,7 +5550,6 @@ key_acquire(saidx, sp)
 	u_int8_t satype;
 	int error = -1;
 	u_int32_t seq;
-	union sadb_x_ident_id id;
 
 	/* sanity check */
 	if (saidx == NULL || sp == NULL)
@@ -5662,39 +5628,7 @@ key_acquire(saidx, sp)
 	}
 	m_cat(result, m);
 
-	/* set sadb_address for spidx's. */
-	bzero(&id, sizeof(id));
-	id.sadb_x_ident_id_addr.prefix = spidx->prefs;
-	id.sadb_x_ident_id_addr.ul_proto = spidx->ul_proto;
-	m = key_setsadbident(SADB_EXT_IDENTITY_SRC, SADB_X_IDENTTYPE_ADDR,
-	    (caddr_t)&spidx->src, spidx->src.ss_len, *(u_int64_t *)&id);
-	if (!m) {
-		error = ENOBUFS;
-		goto fail;
-	}
-	m_cat(result, m);
-
-	bzero(&id, sizeof(id));
-	id.sadb_x_ident_id_addr.prefix = spidx->prefd;
-	id.sadb_x_ident_id_addr.ul_proto = spidx->ul_proto;
-	m = key_setsadbident(SADB_EXT_IDENTITY_DST, SADB_X_IDENTTYPE_ADDR,
-	    (caddr_t)&spidx->dst, spidx->dst.ss_len, *(u_int64_t *)&id);
-	if (!m) {
-		error = ENOBUFS;
-		goto fail;
-	}
-	m_cat(result, m);
-
-	/* XXX sensitivity (optional) */
-
-	/* create proposal/combination extension */
-	m = key_getprop(saidx);
-	if (!m) {
-		error = ENOBUFS;
-		goto fail;
-	}
-	m_cat(result, m);
-
+	/* XXX identity (optional) */
 #if 0
 	if (idexttype && fqdn) {
 		/* create identity extension (FQDN) */
@@ -5734,6 +5668,16 @@ key_acquire(saidx, sp)
 		p += sizeof(struct sadb_ident) + PFKEY_ALIGN8(userfqdnlen);
 	}
 #endif
+
+	/* XXX sensitivity (optional) */
+
+	/* create proposal/combination extension */
+	m = key_getprop(saidx);
+	if (!m) {
+		error = ENOBUFS;
+		goto fail;
+	}
+	m_cat(result, m);
 
 	if ((result->m_flags & M_PKTHDR) == 0) {
 		error = EINVAL;
