@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.31 2000/06/04 17:03:06 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.32 2000/06/18 06:22:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -547,6 +547,13 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 	inp->inp_vflag |= INP_IPV6;
 	inp->in6p_hops = -1;	/* use kernel default */
 	inp->in6p_cksum = -1;	/* just to be sure */
+	/*
+	 * XXX: ugly!!
+	 * IPv4 TTL initialization is necessary for an IPv6 socket as well,
+	 * because the socket may be bound to an IPv6 wildcard address,
+	 * which may match an IPv4-mapped IPv6 address.
+	 */
+	inp->inp_ip_ttl = ip_defttl;
 #ifdef IPSEC
 	error = ipsec_init_policy(so, &inp->in6p_sp);
 	if (error != 0) {
