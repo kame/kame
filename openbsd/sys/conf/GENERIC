@@ -99,3 +99,8 @@ pseudo-device	bridge	2	# network bridging support
 pseudo-device	gre	1	# GRE encapsulation interface
 
 option		BOOT_CONFIG	# add support for boot -c
+
+# KAME
+# these options will become the default behavior soon.
+option		NEW_STRUCT_ROUTE
+option		FAKE_LOOPBACK_IF

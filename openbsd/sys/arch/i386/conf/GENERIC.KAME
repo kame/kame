@@ -1,9 +1,5 @@
 include	"arch/i386/conf/GENERIC"
 
-# these options will become the default behavior soon.
-option		NEW_STRUCT_ROUTE
-option		USE_FIXED_P2P_PLEN
-
 pseudo-device	faith	1	# dummy
 #pseudo-device	dummy	1	# dummy
 #pseudo-device	stf		# 6to4 interface
