@@ -2,12 +2,13 @@
 #
 
 DISTNAME=	totd-1.1
-WRKSRC=         ${WRKDIR}/totd-1.1
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.pasta.cs.uit.no/pub/Vermicelli/
 
 MAINTAINER=	feico@pasta.cs.uit.no
 HOMEPAGE=	http://www.vermicelli.cs.uit.no/ipv6/software.html
+
+WRKSRC=         ${WRKDIR}/totd-1.1
 
 GNU_CONFIGURE=	YES
 
