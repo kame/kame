@@ -544,12 +544,12 @@ explore_fqdn(pai, hostname, servname, res)
 	if (pai->ai_family != AF_INET)
 		return 0;
 	hp = gethostbyname(hostname);
+#endif /*HAVE_GETHOSTBYNAME2*/
 #ifdef HAVE_H_ERRNO
 	h_error = h_errno;
 #else
 	h_error = EINVAL;
 #endif
-#endif /*HAVE_GETHOSTBYNAME2*/
 #endif /*USE_GETIPNODEBY*/
 
 	if (hp == NULL) {
