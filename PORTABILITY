@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.15 1999/10/20 14:26:37 itojun Exp $
+$Id: PORTABILITY,v 1.16 1999/10/20 14:30:19 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -160,5 +160,8 @@ across those possibilities.
   Avoid xx_FOREACH(), which is only available in FreeBSD3.  Just use
 	for (x = xx_FIRST(); x; x = xx_NEXT(x))
   and do not try to do #ifdef (FreeBSD3).  More #ifdef introduces more bugs.
+
+- It is better to avoid insque() and rmque(), they are from old VAX days
+  and some platform now tries to avoid these.
 
 - For portability in networking code, look at kame/sys/net/net_osdep.h.
