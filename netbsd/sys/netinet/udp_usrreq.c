@@ -141,6 +141,9 @@ __KERNEL_RCSID(0, "$NetBSD: udp_usrreq.c,v 1.93 2002/05/12 20:33:51 matt Exp $")
 #include <netinet6/in6_pcb.h>
 #include <netinet6/mld6_var.h>
 #include <netinet6/udp6_var.h>
+#ifdef MLDV2
+#include <netinet6/in6_msf.h>
+#endif
 #endif
 
 #ifdef PULLDOWN_TEST
