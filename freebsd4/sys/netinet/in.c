@@ -113,7 +113,6 @@ extern struct inpcbinfo	ripcbinfo;
 extern struct inpcbinfo udbinfo;
 
 #define SIN_ADDR(x) (((struct sockaddr_in *)(x))->sin_addr.s_addr)
-#define IN_LOCAL_GROUP(s) (s == htonl(INADDR_ALLHOSTS_GROUP))
 
 /*
  * Return 1 if an internet address is for a ``local'' host

@@ -305,6 +305,8 @@ struct in_addr {
 #define	IN_EXPERIMENTAL(i)	(((u_int32_t)(i) & 0xf0000000) == 0xf0000000)
 #define	IN_BADCLASS(i)		(((u_int32_t)(i) & 0xf0000000) == 0xf0000000)
 
+#define IN_LOCAL_GROUP(i)	(((u_int32_t)(i) & 0xffffff00) == 0xe0000000)
+
 #define	INADDR_ANY		(u_int32_t)0x00000000
 #define	INADDR_LOOPBACK		(u_int32_t)0x7f000001
 #define	INADDR_BROADCAST	(u_int32_t)0xffffffff	/* must be masked */

@@ -161,7 +161,6 @@ extern	struct protosw inetsw[];
 #ifdef IGMPV3
 #define SIN(x)	((struct sockaddr_in *)(x))
 #define SIN_ADDR_H(x)	(ntohl(SIN(x)->sin_addr.s_addr))
-#define IN_LOCAL_GROUP(s) ((s) >> 24 == 224)
 #endif
 
 /*
