@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.64 2000/11/05 18:30:20 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.65 2000/11/07 15:10:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -721,11 +721,6 @@ udp6_usrreq(so, req, m, addr6, control)
 		s = splnet();
 #endif
 		error = in6_pcbconnect(in6p, addr6);
-		if (in6p->in6p_flags & IN6P_AUTOFLOWLABEL) {
-			in6p->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
-			in6p->in6p_flowinfo |=
-				(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
-		}
 		splx(s);
 		if (error == 0)
 			soisconnected(so);

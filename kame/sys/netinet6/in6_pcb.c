@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.66 2000/11/01 08:13:52 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.67 2000/11/06 02:45:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,7 +303,9 @@ in6_pcbbind(in6p, nam)
 	else
 		in6p->in6p_lport = lport;
 
-	in6p->in6p_flowinfo = sin6 ? sin6->sin6_flowinfo : 0;	/*XXX*/
+#if 0
+	in6p->in6p_flowinfo = 0;	/*XXX*/
+#endif
 	return(0);
 }
 
@@ -441,11 +443,11 @@ in6_pcbconnect(in6p, nam)
 	}
 	in6p->in6p_faddr = sin6->sin6_addr;
 	in6p->in6p_fport = sin6->sin6_port;
-	/*
-	 * xxx kazu flowlabel is necessary for connect?
-	 * but if this line is missing, the garbage value remains.
-	 */
-	in6p->in6p_flowinfo = sin6->sin6_flowinfo;
+	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
+	in6p->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
+	if (in6p->in6p_flags & IN6P_AUTOFLOWLABEL)
+		in6p->in6p_flowinfo |=
+		    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	return(0);
 }
 
@@ -455,6 +457,8 @@ in6_pcbdisconnect(in6p)
 {
 	bzero((caddr_t)&in6p->in6p_faddr, sizeof(in6p->in6p_faddr));
 	in6p->in6p_fport = 0;
+	/* clear flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
+	in6p->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 	if (in6p->in6p_socket->so_state & SS_NOFDREF)
 		in6_pcbdetach(in6p);
 }
