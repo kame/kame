@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.57 2001/08/16 16:19:19 itojun Exp $
+.\"	$KAME: setkey.8,v 1.58 2001/08/16 17:19:32 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -117,9 +117,7 @@ hashmarks ('#') are treated as comment lines.
 .Bl -tag -width Ds
 .It Xo
 .Li add
-.Op Fl 4
-.Op Fl 6
-.Op Fl n
+.Op Fl 46n
 .Ar src Ar dst Ar protocol Ar spi
 .Op Ar extensions
 .Ar algorithm...
@@ -129,9 +127,7 @@ Add an SAD entry.
 .\"
 .It Xo
 .Li get
-.Op Fl 4
-.Op Fl 6
-.Op Fl n
+.Op Fl 46n
 .Ar src Ar dst Ar protocol Ar spi
 .Li ;
 .Xc
@@ -139,9 +135,7 @@ Show an SAD entry.
 .\"
 .It Xo
 .Li delete
-.Op Fl 4
-.Op Fl 6
-.Op Fl n
+.Op Fl 46n
 .Ar src Ar dst Ar protocol Ar spi
 .Li ;
 .Xc
@@ -149,9 +143,7 @@ Remove an SAD entry.
 .\"
 .It Xo
 .Li deleteall
-.Op Fl 4
-.Op Fl 6
-.Op Fl n
+.Op Fl 46n
 .Ar src Ar dst Ar protocol
 .Li ;
 .Xc
@@ -173,9 +165,7 @@ Dumps all SAD entries matched by the options.
 .\"
 .It Xo
 .Li spdadd
-.Op Fl 4
-.Op Fl 6
-.Op Fl n
+.Op Fl 46n
 .Ar src_range Ar dst_range Ar upperspec Ar policy
 .Li ;
 .Xc
@@ -183,9 +173,7 @@ Add an SPD entry.
 .\"
 .It Xo
 .Li spddelete
-.Op Fl 4
-.Op Fl 6
-.Op Fl n
+.Op Fl 46n
 .Ar src_range Ar dst_range Ar upperspec Fl P Ar direction
 .Li ;
 .Xc

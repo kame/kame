@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.44 2001/08/16 16:19:19 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.45 2001/08/16 17:19:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -110,17 +110,18 @@ extern void yyerror __P((const char *));
 	/* SPD management */
 %token SPDADD SPDDELETE SPDDUMP SPDFLUSH
 %token F_POLICY PL_REQUESTS
-%token F_AIFAMILY F_AIFLAGS
+%token F_AIFLAGS
 
 %type <s> command flush_command dump_command spdflush_command spddump_command
 %type <num> PREFIX EXTENSION MODE
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
-%type <num> DECSTRING F_AIFAMILY F_AIFLAGS
+%type <num> DECSTRING
 %type <intnum> prefix port protocol_spec
 %type <val> PORT PL_REQUESTS
 %type <val> key_string policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
+%type <val> F_AIFLAGS
 %type <sa> ipaddress
 
 %%
@@ -547,11 +548,25 @@ ipaddropt
 	:	/* nothing */
 	|	F_AIFLAGS
 		{
-			p_aiflags = $1;
-		}
-	|	F_AIFAMILY
-		{
-			p_aifamily = $1;
+			char *p;
+
+			for (p = $1.buf + 1; *p; p++)
+				switch (*p) {
+				case '4':
+					p_aifamily = AF_INET;
+					break;
+#ifdef INET6
+				case '6':
+					p_aifamily = AF_INET6;
+					break;
+#endif
+				case 'n':
+					p_aiflags = AI_NUMERICHOST;
+					break;
+				default:
+					yyerror("invalid flag");
+					return -1;
+				}
 		}
 	;
 

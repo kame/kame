@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.26 2001/08/16 16:19:19 itojun Exp $	*/
+/*	$KAME: token.l,v 1.27 2001/08/16 17:19:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -135,27 +135,30 @@ spddump		{ PREPROC; return(SPDDUMP); }
 spdflush	{ PREPROC; return(SPDFLUSH); }
 {hyphen}P	{ BEGIN S_PL; PREPROC; return(F_POLICY); }
 <S_PL>[a-zA-Z0-9:\.\-_/ \n\t][a-zA-Z0-9:\.\-_/ \n\t]* {
-		yymore();
+			yymore();
 
-		/* count up for nl */
-		    {
-			char *p;
-			for (p = yytext; *p != NULL; p++)
-				if (*p == '\n')
-					lineno++;
-		    }
+			/* count up for nl */
+			    {
+				char *p;
+				for (p = yytext; *p != NULL; p++)
+					if (*p == '\n')
+						lineno++;
+			    }
 
-		yylval.val.len = strlen(yytext);
-		yylval.val.buf = strdup(yytext);
+			yylval.val.len = strlen(yytext);
+			yylval.val.buf = strdup(yytext);
 
-		return(PL_REQUESTS);
-}
+			return(PL_REQUESTS);
+		}
 <S_PL>{semi}	{ PREPROC; BEGIN INITIAL; return(EOT); }
 
 	/* address resolution flags */
-{hyphen}n	{ PREPROC; yylval.num = AI_NUMERICHOST; return(F_AIFLAGS); }
-{hyphen}4	{ PREPROC; yylval.num = AF_INET; return(F_AIFAMILY); }
-{hyphen}6	{ PREPROC; yylval.num = AF_INET6; return(F_AIFAMILY); }
+{hyphen}[n46][n46]*	{
+			PREPROC;
+			yylval.val.len = strlen(yytext);
+			yylval.val.buf = strdup(yytext);
+			return(F_AIFLAGS);
+		}
 
 	/* security protocols */
 ah		{ PREPROC; yylval.num = 0; return(PR_AH); }
@@ -270,7 +273,7 @@ any		{ PREPROC; return(ANY); }
 			return(QUOTEDSTRING);
 		}
 
-[A-Za-z0-9][A-Za-z0-9:%-\.]* {
+[A-Za-z0-9:][A-Za-z0-9:%\.-]* {
 			yylval.val.len = yyleng;
 			yylval.val.buf = strdup(yytext);
 			return(STRING);
