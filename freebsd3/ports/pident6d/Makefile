@@ -3,7 +3,7 @@
 # Date created:		19 Oct 1994
 # Whom:			torstenb
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:21 itojun Exp $
+# $Id: Makefile,v 1.2 1999/12/07 08:03:32 sumikawa Exp $
 #
 
 DISTNAME=       pidentd-2.8.5
@@ -13,8 +13,8 @@ MASTER_SITES=	ftp://ftp.lysator.liu.se/pub/ident/servers/ \
 		ftp://ftp.fu-berlin.de/unix/security/ident/servers/
 
 PATCH_SITES=	http://www.imasy.or.jp/~ume/ipv6/
-PATCHFILES=	pidentd-2.8.5-ipv6-1.0.diff.gz
-PATCH_DIST_STRIP=	-p0
+PATCHFILES=	pidentd-2.8.5-ipv6-1.4.diff.gz
+PATCH_DIST_STRIP=	-p2
 
 MAINTAINER=	ume@mahoroba.org
 
