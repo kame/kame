@@ -147,9 +147,6 @@ int	explicit_prefix = 0;
 #ifdef INET6
 int	Lflag = 1;
 #endif
-#ifndef INET_ONLY
-char ntop_buf[INET6_ADDRSTRLEN];	/*inet_ntop()*/
-#endif /* INET_ONLY */
 
 void 	notealias __P((char *, int));
 void 	notrailers __P((char *, int));
@@ -289,6 +286,7 @@ void	init_current_media __P((void));
 void	in_status __P((int));
 void 	in_getaddr __P((char *, int));
 #ifdef INET6
+void	in6_fillscopeid __P((struct sockaddr_in6 *sin6));
 void	in6_alias __P((struct in6_ifreq *));
 void	in6_status __P((int));
 void 	in6_getaddr __P((char *, int));
@@ -1245,6 +1243,19 @@ setifprefixlen(addr, d)
 }
 
 #ifdef INET6
+void
+in6_fillscopeid(sin6)
+	struct sockaddr_in6 *sin6;
+{
+#if defined(__KAME__) && defined(KAME_SCOPEID)
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+		sin6->sin6_scope_id =
+			ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
+		sin6->sin6_addr.s6_addr[2] = sin6->sin6_addr.s6_addr[3] = 0;
+	}
+#endif
+}
+
 /* XXX not really an alias */
 void
 in6_alias(creq)
@@ -1252,6 +1263,13 @@ in6_alias(creq)
 {
 	struct sockaddr_in6 *sin6;
 	struct	in6_ifreq ifr6;		/* shadows file static variable */
+	u_int32_t scopeid;
+	char hbuf[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif
 
 	/* Get the non-alias address for this interface. */
 	getsock(AF_INET6);
@@ -1263,8 +1281,12 @@ in6_alias(creq)
 
 	sin6 = (struct sockaddr_in6 *)&creq->ifr_addr;
 
-	printf("\tinet6 %s", inet_ntop(AF_INET6, &sin6->sin6_addr,
-				       ntop_buf, sizeof(ntop_buf)));
+	in6_fillscopeid(sin6);
+	scopeid = sin6->sin6_scope_id;
+	if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
+			hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
+		strcpy(hbuf, "");
+	printf("\tinet6 %s", hbuf);
 
 	if (flags & IFF_POINTOPOINT) {
 		(void) memset(&ifr6, 0, sizeof(ifr6));
@@ -1278,8 +1300,11 @@ in6_alias(creq)
 			ifr6.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
 		}
 		sin6 = (struct sockaddr_in6 *)&ifr6.ifr_addr;
-		printf(" -> %s", inet_ntop(AF_INET6, &sin6->sin6_addr,
-					   ntop_buf, sizeof(ntop_buf)));
+		in6_fillscopeid(sin6);
+		if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
+				hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
+			strcpy(hbuf, "");
+		printf(" -> %s", hbuf);
 	}
 
 	(void) memset(&ifr6, 0, sizeof(ifr6));
@@ -1310,6 +1335,9 @@ in6_alias(creq)
 		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED)
 			printf(" detached");
 	}
+
+	if (scopeid)
+		printf(" scopeid 0x%x", scopeid);
 
 	if (Lflag) {
 		struct in6_addrlifetime *lifetime;
@@ -1574,6 +1602,7 @@ in_getaddr(s, which)
 	char *s;
 	int which;
 {
+#ifndef KAME_SCOPEID
 	register struct sockaddr_in *sin = sintab[which];
 	struct hostent *hp;
 	struct netent *np;
@@ -1590,6 +1619,41 @@ in_getaddr(s, which)
 		else
 			errx(1, "%s: bad value", s);
 	}
+#else
+	/*
+	 * XXX
+	 * we can't use gethostbyname() nor getnetbyname() here due to
+	 * library conflicts between libinet6 and libc.
+	 * #if 0 should be modified when we do
+	 * the complete merger of libinet6 into libc.
+	 */
+	register struct sockaddr_in *sin = sintab[which];
+	struct addrinfo hints, *res;
+	int error;
+	struct netent *np;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_RAW;
+	error = getaddrinfo(s, "NULL", &hints, &res);
+	if (error) {
+#if 0	/* incompatible behavior! */
+		if ((np = getnetbyname(s)) != NULL) {
+			memset(sin, 0, sizeof(*sin));
+			sin->sin_family = AF_INET;
+			sin->sin_len = sizeof(struct sockaddr_in);
+			sin->sin_addr = inet_makeaddr(np->n_net, INADDR_ANY);
+			return;
+		}
+#endif
+
+		errx(1, "%s: %s", s, gai_strerror(error));
+	}
+	if (res->ai_addrlen != sizeof(struct sockaddr_in))
+		errx(1, "%s: bad value", s);
+	memcpy(sin, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+#endif
 }
 
 /*

@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.280 1999/11/20 20:50:34 itojun Exp $
+$Id: CHANGELOG,v 1.281 1999/11/21 13:03:00 itojun Exp $
 
 <199911>
+Sun Nov 21 22:01:25 JST 1999  itojun@iijlab.net
+	* openbsd/sbin/ifconfig/ifconfig.c: support KAME scopeid hack.
+	  this will make the behavior slightly incompatible
+	  (we can't use getnetbyname due to library conflict).  Be warned.
+
 Sun Nov 21 05:49:14 JST 1999  itojun@iijlab.net
 	* openbsd/sys/dev/ic/am7990.c: for inbound packets, allocate mbuf
 	  cluster whenever desired.  this is to make "le" driver conform to
