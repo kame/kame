@@ -1,4 +1,4 @@
-/*	$KAME: qop_hfsc.c,v 1.11 2003/09/17 14:27:37 kjc Exp $	*/
+/*	$KAME: qop_hfsc.c,v 1.12 2005/01/05 04:53:47 itojun Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -752,7 +752,9 @@ validate_sc(struct service_curve *sc)
 /*
  * admission control using generalized service curve
  */
+#ifndef INFINITY
 #define	INFINITY	HUGE_VAL  /* positive infinity defined in <math.h> */
+#endif
 
 /* add a new service curve to a generilized service curve */
 static void
