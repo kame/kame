@@ -2326,8 +2326,9 @@ tn(argc, argv)
 	    setuid(getuid());
 	    return 0;
 	}
-	if (res->ai_canonname)
-	    (void) strncpy(_hostname, res->ai_canonname, sizeof(_hostname) - 1);
+	if (res0->ai_canonname)
+	    (void) strncpy(_hostname, res0->ai_canonname,
+		sizeof(_hostname) - 1);
 	_hostname[sizeof(_hostname) - 1] = '\0';
     }
     hostname = _hostname;
