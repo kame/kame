@@ -179,7 +179,8 @@ make_prefix(pstr0)
 			"prefix string too long (maybe bogus): %s", pstr0);
 		return(NULL);
 	}
-	strcpy(pstr, pstr0);
+	strncpy(pstr, pstr0, sizeof(pstr));
+	pstr[sizeof(pstr) - 1] = '\0';
 
 	/* parse the string */
 	if ((p = strchr(pstr, '/')) == NULL)
