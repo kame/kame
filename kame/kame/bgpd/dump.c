@@ -74,16 +74,22 @@ dump_rip_rtable(FILE *fp, struct rt_entry *base)
 	while(rte) {
 		fprintf(fp, "    "); /* indentation */
 		fprintf(fp,
-			"%s/%d(%d) [%d] gw = %s\n",
+			"%s/%d(%d) [%d] gw = %s",
 			ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 			rte->rt_ripinfo.rip6_plen,
 			rte->rt_ripinfo.rip6_metric,
 			rte->rt_ripinfo.rip6_tag,
 			ip6str(&rte->rt_gw, 0));
 
-			if ((rte = rte->rt_next) == base)
-				break;
+		if (rte->rt_riptime) {
+			fprintf(fp, " timeout=%d:%d",
+				(int)(rte->rt_riptime->tsk_timeval.tv_sec / 60),
+				(int)(rte->rt_riptime->tsk_timeval.tv_sec % 60));
 		}
+		fputc('\n', fp);
+		if ((rte = rte->rt_next) == base)
+			break;
+	}
 }
 
 #define FILTERTYPE_FILTER 0
