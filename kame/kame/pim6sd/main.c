@@ -381,7 +381,9 @@ usage:
 
 #ifdef LOG_DAEMON
     (void) openlog("pim6sd", LOG_PID, LOG_DAEMON);
-//  (void) setlogmask(LOG_UPTO(LOG_NOTICE));
+#if 0
+    (void) setlogmask(LOG_UPTO(LOG_NOTICE));
+#endif
 #else
     (void) openlog("pim6sd", LOG_PID);
 #endif				/* LOG_DAEMON */

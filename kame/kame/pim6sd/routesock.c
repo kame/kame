@@ -136,8 +136,8 @@ init_routesock()
 	log(LOG_ERR, 0, "\n Routing socket error");
 	return -1;
     }
-// TODO : UTILITY ?
 #if 0
+// TODO : UTILITY ?
     {
 	int             off;
 

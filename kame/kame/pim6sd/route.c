@@ -999,8 +999,8 @@ process_cache_miss(im)
 	    else
 		rp_addr = mrtentry_ptr->group->rpaddr;
 	    mfc_source = source;
-// TODO 
 #ifdef KERNEL_MFC_WC_G
+// TODO 
 	    if (mrtentry_ptr->flags & (MRTF_WC | MRTF_PMBR))
 		if (!(mrtentry_ptr->flags & MRTF_MFC_CLONE_SG))
 		    mfc_source = IN6ADDR_ANY_N;
