@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.200 2001/07/23 06:09:37 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.201 2001/07/23 17:43:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,6 +153,8 @@ const struct in6_addr in6mask128 = IN6MASK128;
 
 const struct sockaddr_in6 sa6_any = {sizeof(sa6_any), AF_INET6,
 				     0, 0, IN6ADDR_ANY_INIT, 0};
+const struct sockaddr_in6 sa6_loop = {sizeof(sa6_loop), AF_INET6,
+				     0, 0, IN6ADDR_LOOPBACK_INIT, 0};
 
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
@@ -1216,7 +1218,7 @@ in6_update_ifa(ifp, ifra, ia)
 		if (!in6m) {
 			rtrequest(RTM_ADD,
 				  (struct sockaddr *)&mltaddr,
-				  (struct sockaddr *)&ia->ia_addr,
+				  (struct sockaddr *)&sa6_loop,
 				  (struct sockaddr *)&mltmask,
 				  RTF_UP,
 				  (struct rtentry **)0);
