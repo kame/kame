@@ -37,6 +37,7 @@
 #include <unistd.h>
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
 
@@ -380,8 +381,13 @@ if6_addrlist(ifap)
 
 		KREAD(ifap0, &ifa, struct ifaddr);
 		KREAD(ifa.ifa_ifp, &ifnet, struct ifnet);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		if (TAILQ_EMPTY(&ifnet.if_multiaddrs))
+			ifmp = TAILQ_FIRST(&ifnet.if_multiaddrs);
+#else
 		if (ifnet.if_multiaddrs.lh_first)
 			ifmp = ifnet.if_multiaddrs.lh_first;
+#endif
 		while (ifmp) {
 			KREAD(ifmp, &ifm, struct ifmultiaddr);
 			if (ifm.ifma_addr == NULL)
@@ -398,7 +404,11 @@ if6_addrlist(ifap)
 			       ether_ntoa((struct ether_addr *)LLADDR(&sdl)),
 			       ifm.ifma_refcount);
 		    nextmulti:
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			ifmp = TAILQ_NEXT(&ifm, ifma_link);
+#else
 			ifmp = ifm.ifma_link.le_next;
+#endif
 		}
 	}
 #else
@@ -578,8 +588,13 @@ if_addrlist(ifap)
 
 		KREAD(ifap0, &ifa, struct ifaddr);
 		KREAD(ifa.ifa_ifp, &ifnet, struct ifnet);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		if (TAILQ_EMPTY(&ifnet.if_multiaddrs))
+			ifmp = TAILQ_FIRST(&ifnet.if_multiaddrs);
+#else
 		if (ifnet.if_multiaddrs.lh_first)
 			ifmp = ifnet.if_multiaddrs.lh_first;
+#endif
 		while (ifmp) {
 			KREAD(ifmp, &ifm, struct ifmultiaddr);
 			if (ifm.ifma_addr == NULL)
@@ -596,7 +611,11 @@ if_addrlist(ifap)
 			       ether_ntoa((struct ether_addr *)LLADDR(&sdl)),
 			       ifm.ifma_refcount);
 		    nextmulti:
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			ifmp = TAILQ_NEXT(&ifm, ifma_link);
+#else
 			ifmp = ifm.ifma_link.le_next;
+#endif
 		}
 	}
 #else
