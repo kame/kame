@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.833 2000/04/28 13:49:25 jinmei Exp $
+$Id: CHANGELOG,v 1.834 2000/04/28 17:12:25 itojun Exp $
 
 <200004>
+Sat Apr 29 02:11:18 JST 2000  itojun@iijlab.net
+	* freebsd4: fix kame/freebsd4 sync issue - KAME PR 244.
+	* */libinet6/getaddrinfo.c, kame/libinet6/name6.c: correct
+	  FILTER_V4MAPPED code.  avoid unaligned memory accesses.
+
 2000-04-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd: filled the suggested hash mask length in
 	bootstrap messages. Also, that field is now configurable.
