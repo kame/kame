@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: cfparse.y,v 1.8 2000/05/05 16:48:59 itojun Exp $
+ *	$Id: cfparse.y,v 1.9 2000/10/29 11:56:09 fujisawa Exp $
  */
 
 #include <sys/types.h>
@@ -424,7 +424,6 @@ port
 		    {
 			u_short	*optPort;
 
-			debugProbe("<port> ::= SPORT SDECIMAL\n");
 			optPort = (u_short *)malloc(sizeof(u_short[2]));
 			optPort[0] = htons((u_short)($2));
 			optPort[1] = 0;
@@ -434,7 +433,6 @@ port
 		    {
 			u_short	*optPort;
 
-			debugProbe("<port> ::= SPORT SDECIMAL SCOLON SDECIMAL\n");
 			optPort = (u_short *)malloc(sizeof(u_short[2]));
 			optPort[0] = htons((u_short)($2));
 			optPort[1] = htons((u_short)($2 + $4));
@@ -444,7 +442,6 @@ port
 		    {
 			u_short	*optPort;
 
-			debugProbe("<port> ::= SPORT SDECIMAL SMINUS SDECIMAL\n");
 			optPort = (u_short *)malloc(sizeof(u_short[2]));
 			optPort[0] = htons((u_short)($2));
 			optPort[1] = htons((u_short)($4));
