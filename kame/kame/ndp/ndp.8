@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ndp.8,v 1.10 2000/04/17 04:06:53 itojun Exp $
+.\"     $Id: ndp.8,v 1.11 2000/04/21 02:06:00 sumikawa Exp $
 .\"
 .Dd May 17, 1998
 .Dt NDP 8
@@ -33,7 +33,7 @@
 .\"
 .Sh NAME
 .Nm ndp
-.Nd control/diagnose  IPv6 neighbor discovery protocol
+.Nd control/diagnose IPv6 neighbor discovery protocol
 .\"
 .Sh SYNOPSIS
 .Nm ndp
@@ -79,6 +79,7 @@
 .Op Li proxy
 .\"
 .Sh DESCRIPTION
+The
 .Nm
 command manipulates the address mapping table
 used by Neighbor Discovery Protocol (NDP).
@@ -163,8 +164,9 @@ Most useful when used with
 .El
 .\"
 .Sh RETURN VALUES
-.Nm Ndp
-will exit with 0 on success, and non-zero on errors.
+The
+.Nm
+command will exit with 0 on success, and non-zero on errors.
 .\"
 .Sh SEE ALSO
 .Xr arp 8
