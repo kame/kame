@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.135 2002/07/12 05:39:09 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.136 2002/07/24 05:31:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -800,12 +800,12 @@ natpt_watchUDP6(struct pcv *cv4)
 
 		cst->Local.sa_family = AF_INET;
 		cst->Local.in4Addr = cv4->ats->remote.in4src;
-		cst->Local.port[1] = cv4->ats->remote.port[1];
+		cst->local.dport   = cv4->ats->remote.port[1];
 		cst->Local.aType   = ADDR_SINGLE;
 
 		cst->Remote.sa_family = AF_INET6;
 		cst->Remote.in6Addr = cv4->ats->local.in6src;
-		cst->Remote.port[1] = cv4->ats->local.port[0];
+		cst->remote.dport   = cv4->ats->local.port[0];
 		cst->Remote.aType   = ADDR_SINGLE;
 
 		natpt_prependRule(cst);
