@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1639 2001/04/04 22:23:03 thorpej Exp $
+$KAME: CHANGELOG,v 1.1640 2001/04/06 14:27:45 sakane Exp $
 
 <200104>
+Fri Apr  6 23:25:19 JST 2001 sakane@ydc.co.jp
+	* racoon:
+	implemented to generate the policy in the responder side automatically.
+	If the responder does not have any policy in SPD during phase 2
+	negotiation, and the directive is set on, then racoon will choice
+	the first proposal in the SA payload from the initiator, and generate
+	policy entries from the proposal.  This function is for the responder,
+	and ignored in the initiator case.
+	XXX should be checked tunnel mode case.
+
 2001-04-04  Jason R. Thorpe  <thorpej@zembu.com>
 
 	* racoon: Add support for the Dmalloc debugging malloc
