@@ -550,6 +550,11 @@ gif_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCSIFFLAGS:
+		/* sync "running" with "up" */
+		if (ifp->if_flags & IFF_UP)
+			ifp->if_flags |= IFF_RUNNING;
+		else
+			ifp->if_flags &= ~IFF_RUNNING;
 		break;
 
 	default:
