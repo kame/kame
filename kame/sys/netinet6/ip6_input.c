@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.336 2004/02/11 10:48:27 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.337 2004/02/11 10:54:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -857,8 +857,8 @@ ip6_input(m)
 
 		bzero(&ip6_forward_rt.ro_dst, sizeof(struct sockaddr_in6));
 		dst6 = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
-		dst6->sin6_family = AF_INET6;
 		dst6->sin6_len = sizeof(struct sockaddr_in6);
+		dst6->sin6_family = AF_INET6;
 		dst6->sin6_addr = ip6->ip6_dst;
 		dst6->sin6_scope_id = 0; /* XXX */
 
