@@ -10,11 +10,11 @@
 # For more information on this file, please read the handbook section on
 # Kernel Configuration Files:
 #
-#    http://www.freebsd.org/handbook/kernelconfig-config.html
+#    http://www.FreeBSD.org/handbook/kernelconfig-config.html
 #
 # The handbook is also available locally in /usr/share/doc/handbook
 # if you've installed the doc distribution, otherwise always see the
-# FreeBSD World Wide Web server (http://www.FreeBSD.ORG/) for the
+# FreeBSD World Wide Web server (http://www.FreeBSD.org/) for the
 # latest information.
 #
 # An exhaustive list of options and more detailed explanations of the
@@ -25,7 +25,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71 2000/02/27 07:35:36 green Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71.2.7 2000/07/20 00:19:38 obrien Exp $
 
 machine		alpha
 cpu		EV4
@@ -36,21 +36,26 @@ maxusers	32
 #makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
 
 # Platforms supported
+options		API_UP1000		# UP1000 (Nautilus)
 options 	DEC_AXPPCI_33		# UDB, Multia, AXPpci33, Noname
 options 	DEC_EB164		# EB164, PC164, PC164LX, PC164SX
 options 	DEC_EB64PLUS		# EB64+, Aspen Alpine, etc
 options 	DEC_2100_A50		# AlphaStation 200, 250, 255, 400
+options 	DEC_2100_A500		# AlphaServer 2000, 2100, 2100A
 options 	DEC_KN20AA		# AlphaStation 500, 600
 options 	DEC_ST550		# Personal Workstation 433, 500, 600
 options 	DEC_ST6600		# xp1000, dp264, ds20, ds10, family
 options 	DEC_3000_300		# DEC3000/300* Pelic* family
 options 	DEC_3000_500		# DEC3000/[4-9]00 Flamingo/Sandpiper family
 options 	DEC_1000A		# AlphaServer 1000, 1000A, 800
+options 	DEC_KN8AE		# AlphaServer 8200/8400 (Turbolaser)
+options 	DEC_KN300		# AlphaServer 4100 (Rawhide)
 
 options 	INET			#InterNETworking
 options 	INET6			#IPv6 communications protocols
 options 	FFS			#Berkeley Fast Filesystem
 options 	FFS_ROOT		#FFS usable as root device [keep this!]
+options 	SOFTUPDATES		#Enable FFS soft updates support
 options 	MFS			#Memory Filesystem
 options 	MD_ROOT			#MD is a potential root device
 options 	NFS			#Network Filesystem
@@ -119,6 +124,14 @@ device		mcclock0 at isa? port 0x70
 device		sio0	at isa? port IO_COM1 irq 4
 device		sio1	at isa? port IO_COM2 irq 3 flags 0x50
 
+# Parallel port
+device          ppc0    at isa? irq 7
+device          ppbus           # Parallel port bus (required)
+device          lpt             # Printer
+device          plip            # TCP/IP over parallel
+device          ppi             # Parallel port interface device
+#device         vpo             # Requires scbus and da
+ 
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
 device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
@@ -153,19 +166,21 @@ pseudo-device	gif	4	# IPv6 and IPv4 tunneling
 pseudo-device	bpf		#Berkeley packet filter
 
 # USB support
-#device		uhci		# UHCI PCI->USB interface
-#device		ohci		# OHCI PCI->USB interface
-#device		usb		# USB Bus (required)
-#device		ugen		# Generic
-#device		uhid		# "Human Interface Devices"
-#device		ukbd		# Keyboard
-#device		ulpt		# Printer
-#device		umass		# Disks/Mass storage - Requires scbus and da0
-#device		ums		# Mouse
+# (if you add any USB devices to this list, they must be added to the Alpha
+#  section of src/release/scripts/dokern.sh)
+device		uhci		# UHCI PCI->USB interface
+device		ohci		# OHCI PCI->USB interface
+device		usb		# USB Bus (required)
+device		ugen		# Generic
+device		uhid		# "Human Interface Devices"
+device		ukbd		# Keyboard
+device		ulpt		# Printer
+device		umass		# Disks/Mass storage - Requires scbus and da0
+device		ums		# Mouse
 # USB Ethernet
-#device		aue		# ADMtek USB ethernet
-#device		cue		# CATC USB ethernet
-#device		kue		# Kawasaki LSI USB ethernet
+device		aue		# ADMtek USB ethernet
+device		cue		# CATC USB ethernet
+device		kue		# Kawasaki LSI USB ethernet
 
 
 # KAME extensions
