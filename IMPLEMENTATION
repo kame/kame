@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.379 2004/12/09 10:35:39 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.380 2004/12/09 12:28:11 t-momose Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -274,6 +274,8 @@ draft-itojun-ipv6-transition-abuse-01.txt:
     * See section 1.12.6 and 1.14 for more details.
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
+draft-ietf-nemo-basic-03.txt:
+	Network Mobility (NEMO) Basic Support Protocol
 
 1.2 Neighbor Discovery
 
