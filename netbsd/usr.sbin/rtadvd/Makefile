@@ -14,6 +14,6 @@ MAN=	rtadvd.8 rtadvd.conf.5
 
 .PATH:	${SRCDIR}
 
-CFLAGS+=	-Wall -Werror -Dlint -Wmissing-prototypes
+CFLAGS+=	-Wall -Werror -Wmissing-prototypes
 
 .include <bsd.prog.mk>
