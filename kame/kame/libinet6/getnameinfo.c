@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.69 2004/05/16 05:55:05 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.70 2004/05/16 06:12:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,7 +31,6 @@
 
 /*
  * Issues to be discussed:
- * - Thread safe-ness must be checked
  * - RFC2553 says that we should raise error on short buffer.  X/Open says
  *   we need to truncate the result.  We obey RFC2553 (and X/Open should be
  *   modified).  ipngwg rough consensus seems to follow RFC2553.  RFC3493 says
@@ -42,6 +41,16 @@
  * - (KAME extension) always attach textual scopeid (fe80::1%lo0), if
  *   sin6_scope_id is filled - standardization status?
  * - what should we do if we should do getservbyport("sctp")?
+ */
+
+/*
+ * Considerations about thread-safeness
+ *   The code in this file is thread-safe, and so the thread-safeness of
+ *   getnameinfo() depends on the property of backend functions.
+ *     - getservbyport() is not thread safe for most systems we are targeting.
+ *     - getipnodebyaddr() is thread safe.  However, many resolver libraries
+ *       used in the function are not thread safe.
+ *     - gethostbyaddr() is usually not thread safe.
  */
 
 #ifdef HAVE_CONFIG_H
