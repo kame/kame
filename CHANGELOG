@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.854 2000/05/05 16:48:37 sumikawa Exp $
+$Id: CHANGELOG,v 1.855 2000/05/06 11:21:08 jinmei Exp $
 
 <200005>
 Sat May  6 01:48:14 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -23,6 +23,10 @@ Fri May  5 15:59:21 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/in6_ifattach.c: stabilize in6_ifdetach() again.
 	  previous code touched uninitialized pointers.
 	* openbsd/sys/net/if.c: cope with pcmcia card removal.
+
+2000-05-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6[ds]d/mld6_proto.c (accept_listener_query): 
+	corrected incoming MLD query message handling.
 
 Thu May  4 13:10:16 JST 2000  itojun@iijlab.net
 	* openbsd/lib/libinet6/getaddrinfo.c: translate resolver error codes
