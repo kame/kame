@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.104 2000/05/22 11:25:21 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.105 2000/05/27 05:05:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1063,7 +1063,8 @@ icmp6_mtudisc_update(dst, icmp6, m)
  * - IPv4 Subject address handling support missing
  * - Proxy reply (answer even if it's not for me)
  * - "Supported Qtypes" support missing
- * - NI group address (join multicast group based on MD5(hostname))
+ * - joins NI group address at in6_ifattach() time only, does not cope
+ *   with hostname changes by sethostname(3)
  */
 #ifdef __FreeBSD__
 #define hostnamelen	strlen(hostname)

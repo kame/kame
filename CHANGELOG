@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.938 2000/05/25 16:40:20 itojun Exp $
+$Id: CHANGELOG,v 1.939 2000/05/27 05:05:15 itojun Exp $
 
 <200005>
+Sat May 27 14:01:29 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6_ifattach.c: on in6_ifattach(), join NI group address
+	  specified in icmp-name-lookup-04 and beyond.
+	  TODO: cope with hostname change events, like sethostname(3).
+
 Fri May 26 00:02:15 JST 2000  itojun@iijlab.net
 	* netbsd/usr.bin/ftp/fetch.c: do not transmit scope identifier
 	  on HTTP Host: directive.  disallow scoped address if the access is
