@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.50 2001/12/12 05:46:52 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.51 2001/12/12 05:56:58 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -2454,7 +2454,7 @@ bypass_rp:
 
     /* Now process the (*,*,RP) Join/Prune */
 
-    if (star_star_rp_found == TRUE)
+    if (star_star_rp_found == FALSE)
 	return (TRUE);
     data_ptr = data_ptr_start;
     while (num_groups--)
