@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2372 2003/04/07 00:50:20 itojun Exp $
+$KAME: CHANGELOG,v 1.2373 2003/04/09 08:20:53 suz Exp $
 
 <200304>
+Wed Apr  9 17:19:41 JST 2003	suz@crl.hitachi.co.jp
+	* kame/freebsd4: sync with FreeBSD 4.8-RELEASE
+
 Wed Apr  2 20:29:23 JST 2003	suz@crl.hitachi.co.jp
 	* kame/kame/mld6query: always advertise group-specific query from
 	  link-local address
