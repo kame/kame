@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.65 2002/11/01 05:53:12 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.66 2002/11/01 05:56:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -219,8 +219,6 @@ struct mip6_bu {
 #define MIP6_BU_SAWAIT_INTERVAL 4
 
 #define MIP6_HOT_TIMEOUT 5
-
-#define MIP6_MAX_RETRANS 10
 
 /* the binding cache entry. */
 struct mip6_bc {
