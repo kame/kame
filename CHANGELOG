@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1870 2001/09/12 07:20:37 sakane Exp $
+$KAME: CHANGELOG,v 1.1871 2001/09/12 16:54:20 jinmei Exp $
 
 <200109>
+2001-09-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/scope6.c (in6_addr2zoneid): changed the return
+	value type from u_int32_t to int64_t, so that the caller can tell
+	an error from valid "4+28" ID values.  All the callers of this
+	function were also modified accordingly, with stricter validation
+	checks.
+
 Wed Sep 12 16:19:42 JST 2001 sakane@kame.net
 	* kame/racoon/proposal.c:
 	fixed to compare pfs values in two proposals in the case of
