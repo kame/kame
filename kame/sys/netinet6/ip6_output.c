@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.430 2004/02/25 06:01:12 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.431 2004/02/28 06:37:04 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4227,7 +4227,8 @@ ip6_setmoptions(optname, im6op, m)
 	}
 
 	/*
-	 * If all options have default values, no need to keep the mbuf.
+	 * If all options have default values, no need to keep the option
+	 * structure.
 	 */
 	if (im6o->im6o_multicast_ifp == NULL &&
 	    im6o->im6o_multicast_hlim == ip6_defmcasthlim &&
