@@ -14,7 +14,6 @@ INCS+=	ip6mh.h
 INCS+=	in_msf.h
 INCS+=	sctp.h sctp_uio.h sctp_var.h
 INCS+=	dccp.h dccp_cc_sw.h dccp_tcplike.h \
-	dccp_tfrc.h dccp_tfrc_lookup.h dccp_tfrc_print.h  \
 	dccp_var.h
 
 .include <bsd.kinc.mk>
