@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.562 2000/02/16 03:18:21 itojun Exp $
+$Id: CHANGELOG,v 1.563 2000/02/16 13:46:47 sakane Exp $
 
 <200002>
+Wed Feb 16 22:45:13 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	  stop racoon to start when it's failed to open addresses specified
+	  in racoon.conf.
+
 Wed Feb 16 12:17:05 JST 2000  itojun@iijlab.net
 	* libinet6/getaddrinfo.c: add experimental support for post-RFC2553
 	  getaddrinfo(AI_ADDRCONFIG).  the semantics of AI_ADDRCONFIG is
