@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.299 2002/09/20 13:56:03 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.300 2002/09/23 13:12:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1775,7 +1775,6 @@ nd6_ioctl(cmd, data, ifp)
 		break;
 	case SIOCSDEFIFACE_IN6:	/* XXX: should be implemented as a sysctl? */
 		return (nd6_setdefaultiface(ndif->ifindex));
-		break;
 	}
 	return (error);
 }
