@@ -167,7 +167,9 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define F_FQDN		0x1000
 #define F_INTERFACE	0x2000
 #define F_SRCADDR	0x4000
+#ifdef IPV6_REACHCONF
 #define F_REACHCONF	0x8000
+#endif
 u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
