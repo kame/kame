@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.165 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.166 2002/09/17 05:56:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1641,7 +1641,6 @@ mip6_exthdr_create(m, opt, mip6opt)
 	struct ip6_pktopts *opt;          /* pktopt passed to ip6_output */
 	struct mip6_pktopts *mip6opt;
 {
-	struct ip6_mobility *mh;
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src;
 	struct sockaddr_in6 *dst;
@@ -1669,8 +1668,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 	 * we have a valid binding cache entry for the mobile node who
 	 * have sent the corresponding HoTI message.
 	 */
-	if ((opt != NULL) && ((mh = opt->ip6po_mobility) != NULL)) {
-		if (mh->ip6m_type == IP6M_HOME_TEST)
+	if ((opt != NULL) && (opt->ip6po_mobility != NULL)) {
+		if (opt->ip6po_mobility->ip6m_type == IP6M_HOME_TEST)
 			goto skip_rthdr2;
 	}
 
