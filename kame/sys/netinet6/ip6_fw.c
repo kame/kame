@@ -12,7 +12,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.2 1999/08/06 14:17:28 itojun Exp $
+ *	$Id: ip6_fw.c,v 1.3 1999/08/06 17:05:39 itojun Exp $
  */
 
 /*
@@ -307,8 +307,13 @@ iface_match(struct ifnet *ifp, union ip6_fw_if *ifu, int byname)
 	/* Check by name or by IP address */
 	if (byname) {
 #ifdef __NetBSD__
-		if (strcmp(ifp->if_xname, ifu->fu_via_if.name))
+	    {
+		char xname[IFNAMSIZ];
+		snprintf(xname, sizeof(xname), "%s%d", ifu->fu_via_if.name,
+			ifu->fu_via_if.unit);
+		if (strcmp(ifp->if_xname, xname))
 			return(0);
+	    }
 #else
 		/* Check unit number (-1 is wildcard) */
 		if (ifu->fu_via_if.unit != -1
@@ -742,7 +747,7 @@ got_match:
 	    && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		switch (rule->fw_reject_code) {
 		case IPV6_FW_REJECT_RST:
-#if 0
+#if 0	/*not tested*/
 		  {
 			struct tcphdr *const tcp =
 				(struct tcphdr *) ((caddr_t)ip6 + off);
@@ -750,6 +755,8 @@ got_match:
 				struct ip6_hdr ip6;
 				struct tcphdr th;
 			} ti;
+			tcp_seq ack, seq;
+			int flags;
 
 			if (offset != 0 || (tcp->th_flags & TH_RST))
 				break;
@@ -759,45 +766,42 @@ got_match:
 			NTOHL(ti.th.th_seq);
 			NTOHL(ti.th.th_ack);
 			ti.ip6.ip6_nxt = IPPROTO_TCP;
-			ti.ip6.ip6_plen = ntohs(ip6->ip6_plen)
-				- off + sizeof(*ip6) - (ti.th.th_off << 2);
+			if (ti.th.th_flags & TH_ACK) {
+				ack = 0;
+				seq = ti.th.th_ack;
+				flags = TH_RST;
+			} else {
+				ack = ti.th.th_seq;
+				if (((*m)->m_flags & M_PKTHDR) != 0) {
+					ack += (*m)->m_pkthdr.len - off
+						- (ti.th.th_off << 2);
+				} else if (ip6->ip6_plen) {
+					ack += ntohs(ip6->ip6_plen) + sizeof(*ip6)
+						- off - (ti.th.th_off << 2);
+				} else {
+					m_freem(*m);
+					*m = 0;
+					break;
+				}
+				seq = 0;
+				flags = TH_RST|TH_ACK;
+			}
 			bcopy(&ti, ip6, sizeof(ti));
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-			tip->ti6_i.ip6_plen = ntohs(ip6->ip6_plen)
-				- off + sizeof(*ip6) - (tip->ti6_t.th_off << 2);
-			if (tip->ti6_t.th_flags & TH_ACK) {
-				tcp_respond(NULL, ip6, &tip->ti6_t, *m,
-					    (tcp6_seq)0, ntohl(tcp->th_ack),
-					    TH_RST, 1);
-			} else {
-				if (tip->ti6_t.th_flags & TH_SYN)
-					tip->ti6_i.ip6_plen++;
-				tcp_respond(NULL, ip6, &tip->ti6_t, *m,
-					    tip->ti6_t.th_seq
-					    + tip->ti6_i.ip6_plen,
-					    (tcp6_seq)0, TH_RST|TH_ACK, 1);
-			}
+#ifdef TCP6
+			tcp6_respond(NULL, ip6, (struct tcphdr *)(ip6 + 1),
+				*m, ack, seq, flags);
+#elif defined(__NetBSD__)
+			tcp_respond(NULL, NULL, *m, (struct tcphdr *)(ip6 + 1),
+				ack, seq, flags);
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+			tcp_respond(NULL, ip6, (struct tcphdr *)(ip6 + 1),
+				*m, ack, seq, flags, 1);
 #else
-			tip->i6t_i.ip6_plen = ntohs(ip6->ip6_plen)
-				- off + sizeof(*ip6) - (tip->i6t_t.th_off << 2);
-			if (tip->i6t_t.th_flags & TH_ACK) {
-				tcp6_respond(NULL, ip6, &tip->i6t_t, *m,
-				    (tcp6_seq)0, ntohl(tcp->th_ack), TH_RST);
-			} else {
-				if (tip->i6t_t.th_flags & TH_SYN)
-					tip->i6t_i.ip6_plen++;
-				tcp6_respond(NULL, ip6, &tip->i6t_t, *m,
-				    tip->i6t_t.th_seq + tip->i6t_i.ip6_plen,
-				    (tcp6_seq)0, TH_RST|TH_ACK);
-			}
+			m_freem(*m);
 #endif
 			*m = NULL;
 			break;
 		  }
-#else
-			m_freem(*m);
-			*m = NULL;
-			break;
 #endif
 		default:	/* Send an ICMP unreachable using code */
 			icmp6_error(*m, ICMP6_DST_UNREACH,
