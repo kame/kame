@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_prot.c	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53.2.9 2002/03/09 05:20:26 dd Exp $
+ * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53.2.10 2003/09/23 18:22:13 silby Exp $
  */
 
 /*
@@ -1008,6 +1008,9 @@ void
 crfree(cr)
 	struct ucred *cr;
 {
+	int s;
+
+	s = splhigh();
 	if (cr->cr_ref == 0)
 		panic("Freeing already free credential! %p", cr);
 	
@@ -1021,6 +1024,7 @@ crfree(cr)
 			uifree(cr->cr_uidinfo);
 		FREE((caddr_t)cr, M_CRED);
 	}
+	splx(s);
 }
 
 /*

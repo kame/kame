@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_socket.c,v 1.4 1999/08/28 00:48:37 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_socket.c,v 1.4.2.1 2003/08/11 07:08:30 harti Exp $
  *
  */
 
@@ -38,7 +38,7 @@
 #include <netatm/kern_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_socket.c,v 1.4 1999/08/28 00:48:37 peter Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_socket.c,v 1.4.2.1 2003/08/11 07:08:30 harti Exp $");
 #endif
 
 
@@ -811,7 +811,9 @@ atm_sock_setopt(so, sopt, atp)
 			return (EINVAL);
 		if ((p.brr.traffic_type != T_ATM_NULL) &&
 		    (p.brr.traffic_type != T_ATM_CBR) &&
-		    (p.brr.traffic_type != T_ATM_VBR))
+		    (p.brr.traffic_type != T_ATM_VBR) &&
+		    (p.brr.traffic_type != T_ATM_ABR) &&
+		    (p.brr.traffic_type != T_ATM_UBR))
 			return (EINVAL);
 		if ((p.brr.timing_requirements != T_ATM_NULL) &&
 		    (p.brr.timing_requirements != T_ATM_END_TO_END) &&

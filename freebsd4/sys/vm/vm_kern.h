@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_kern.h,v 1.22 2000/02/16 21:11:31 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_kern.h,v 1.22.2.1 2003/08/09 16:21:21 luoqi Exp $
  */
 
 #ifndef _VM_VM_KERN_H_
@@ -80,7 +80,7 @@ extern u_int vm_kmem_size;
 extern vm_offset_t kernel_vm_end;
 /* XXX - elsewhere? */
 struct malloc_type;
-extern void *contigmalloc1(u_long, struct malloc_type *, int, u_long, u_long,
-			   u_long, u_long, vm_map_t);
+extern void *contigmalloc1(u_long, struct malloc_type *, int,
+			   vm_paddr_t, vm_paddr_t, u_long, u_long, vm_map_t);
 
 #endif				/* _VM_VM_KERN_H_ */

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_ioctl.c,v 1.55.2.10 2002/02/11 04:48:51 marcel Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_ioctl.c,v 1.55.2.12 2003/07/03 07:43:50 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -66,6 +66,7 @@ static linux_ioctl_function_t linux_ioctl_socket;
 static linux_ioctl_function_t linux_ioctl_sound;
 static linux_ioctl_function_t linux_ioctl_termio;
 static linux_ioctl_function_t linux_ioctl_private;
+static linux_ioctl_function_t linux_ioctl_drm;
 static linux_ioctl_function_t linux_ioctl_special;
 
 static struct linux_ioctl_handler cdrom_handler =
@@ -82,6 +83,8 @@ static struct linux_ioctl_handler termio_handler =
 { linux_ioctl_termio, LINUX_IOCTL_TERMIO_MIN, LINUX_IOCTL_TERMIO_MAX };
 static struct linux_ioctl_handler private_handler =
 { linux_ioctl_private, LINUX_IOCTL_PRIVATE_MIN, LINUX_IOCTL_PRIVATE_MAX };
+static struct linux_ioctl_handler drm_handler =
+{ linux_ioctl_drm, LINUX_IOCTL_DRM_MIN, LINUX_IOCTL_DRM_MAX };
 
 DATA_SET(linux_ioctl_handler_set, cdrom_handler);
 DATA_SET(linux_ioctl_handler_set, console_handler);
@@ -90,6 +93,7 @@ DATA_SET(linux_ioctl_handler_set, socket_handler);
 DATA_SET(linux_ioctl_handler_set, sound_handler);
 DATA_SET(linux_ioctl_handler_set, termio_handler);
 DATA_SET(linux_ioctl_handler_set, private_handler);
+DATA_SET(linux_ioctl_handler_set, drm_handler);
 
 struct handler_element 
 {
@@ -323,7 +327,8 @@ bsd_to_linux_termios(struct termios *bios, struct linux_termios *lios)
 	lios->c_cc[LINUX_VLNEXT] = bios->c_cc[VLNEXT];
 
 	for (i=0; i<LINUX_NCCS; i++) {
-		if (lios->c_cc[i] == _POSIX_VDISABLE)
+		if (i != LINUX_VMIN && i != LINUX_VTIME &&
+		    lios->c_cc[i] == _POSIX_VDISABLE)
 			lios->c_cc[i] = LINUX_POSIX_VDISABLE;
 	}
 	lios->c_line = 0;
@@ -462,7 +467,8 @@ linux_to_bsd_termios(struct linux_termios *lios, struct termios *bios)
 	bios->c_cc[VLNEXT] = lios->c_cc[LINUX_VLNEXT];
 
 	for (i=0; i<NCCS; i++) {
-		if (bios->c_cc[i] == LINUX_POSIX_VDISABLE)
+		if (i != VMIN && i != VTIME &&
+		    bios->c_cc[i] == LINUX_POSIX_VDISABLE)
 			bios->c_cc[i] = _POSIX_VDISABLE;
 	}
 
@@ -1787,6 +1793,16 @@ linux_ioctl_private(struct proc *p, struct linux_ioctl_args *args)
 	if (type == DTYPE_SOCKET)
 		return (linux_ioctl_socket(p, args));
 	return (ENOIOCTL);
+}
+
+/*
+ * DRM ioctl handler (sys/dev/drm)
+ */
+static int
+linux_ioctl_drm(struct proc *p, struct linux_ioctl_args *args)
+{
+	args->cmd = SETDIR(args->cmd);
+	return ioctl(p, (struct ioctl_args *)args);
 }
 
 /*

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/i386/include/smp.h,v 1.50.2.5 2001/02/13 22:32:45 tegge Exp $
+ * $FreeBSD: src/sys/i386/include/smp.h,v 1.50.2.6 2003/10/22 19:04:09 jhb Exp $
  *
  */
 
@@ -121,6 +121,7 @@ int	apic_src_bus_irq	__P((int, int));
 int	apic_int_type		__P((int, int));
 int	apic_trigger		__P((int, int));
 int	apic_polarity		__P((int, int));
+int	mp_grab_cpu_hlt		__P((void));
 void	assign_apic_irq		__P((int apic, int intpin, int irq));
 void	revoke_apic_irq		__P((int irq));
 void	bsp_apic_configure	__P((void));

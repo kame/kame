@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.15 2003/01/24 10:52:50 hsu Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.18 2003/09/16 05:43:56 silby Exp $
  */
 
 #include "opt_inet6.h"
@@ -257,6 +257,8 @@ rip_output(struct mbuf *m, struct socket *so, u_long dst)
 			return(EMSGSIZE);
 		}
 		M_PREPEND(m, sizeof(struct ip), M_WAIT);
+		if (m == NULL)
+			return(ENOBUFS);
 		ip = mtod(m, struct ip *);
 		ip->ip_tos = inp->inp_ip_tos;
 		ip->ip_off = 0;
@@ -290,6 +292,9 @@ rip_output(struct mbuf *m, struct socket *so, u_long dst)
 		flags |= IP_RAWOUTPUT;
 		ipstat.ips_rawout++;
 	}
+
+	if (inp->inp_flags & INP_ONESBCAST)
+		flags |= IP_SENDONES;
 
 	return (ip_output(m, inp->inp_options, &inp->inp_route, flags,
 			  inp->inp_moptions, inp));
@@ -340,6 +345,10 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 		case MRT_DEL_MFC:
 		case MRT_VERSION:
 		case MRT_ASSERT:
+		case MRT_API_SUPPORT:
+		case MRT_API_CONFIG:
+		case MRT_ADD_BW_UPCALL:
+		case MRT_DEL_BW_UPCALL:
 			error = ip_mrouter_get ? ip_mrouter_get(so, sopt) :
 				EOPNOTSUPP;
 			break;
@@ -405,6 +414,10 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 		case MRT_DEL_MFC:
 		case MRT_VERSION:
 		case MRT_ASSERT:
+		case MRT_API_SUPPORT:
+		case MRT_API_CONFIG:
+		case MRT_ADD_BW_UPCALL:
+		case MRT_DEL_BW_UPCALL:
 			error = ip_mrouter_set ? ip_mrouter_set(so, sopt) :
 					EOPNOTSUPP;
 			break;

@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60.2.13 2002/08/05 15:05:15 des Exp $
+ * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60.2.18 2003/10/14 05:01:04 jmg Exp $
  */
 
 /*
@@ -545,7 +545,8 @@ pipe_build_write_buffer(wpipe, uio)
 {
 	u_int size;
 	int i;
-	vm_offset_t addr, endaddr, paddr;
+	vm_offset_t addr, endaddr;
+	vm_paddr_t paddr;
 
 	size = (u_int) uio->uio_iov->iov_len;
 	if (size > wpipe->pipe_buffer.size)
@@ -561,12 +562,12 @@ pipe_build_write_buffer(wpipe, uio)
 			int j;
 
 			for (j = 0; j < i; j++)
-				vm_page_unwire(wpipe->pipe_map.ms[j], 1);
+				vm_page_unhold(wpipe->pipe_map.ms[j]);
 			return (EFAULT);
 		}
 
 		m = PHYS_TO_VM_PAGE(paddr);
-		vm_page_wire(m);
+		vm_page_hold(m);
 		wpipe->pipe_map.ms[i] = m;
 	}
 
@@ -627,7 +628,7 @@ pipe_destroy_write_buffer(wpipe)
 		}
 	}
 	for (i = 0; i < wpipe->pipe_map.npages; i++)
-		vm_page_unwire(wpipe->pipe_map.ms[i], 1);
+		vm_page_unhold(wpipe->pipe_map.ms[i]);
 	wpipe->pipe_map.npages = 0;
 }
 
@@ -860,7 +861,7 @@ pipe_write(fp, uio, cred, flags, p)
 		if ((space < uio->uio_resid) && (orig_resid <= PIPE_BUF))
 			space = 0;
 
-		if (space > 0 && (wpipe->pipe_buffer.cnt < PIPE_SIZE)) {
+		if (space > 0) {
 			if ((error = pipelock(wpipe,1)) == 0) {
 				int size;	/* Transfer size */
 				int segsize;	/* first segment to transfer */
@@ -1239,12 +1240,11 @@ pipe_kqfilter(struct file *fp, struct knote *kn)
 		cpipe = cpipe->pipe_peer;
 		if (cpipe == NULL)
 			/* other end of pipe has been closed */
-			return (EBADF);
+			return (EPIPE);
 		break;
 	default:
 		return (1);
 	}
-	kn->kn_hook = (caddr_t)cpipe;
 
 	SLIST_INSERT_HEAD(&cpipe->pipe_sel.si_note, kn, kn_selnext);
 	return (0);
@@ -1253,7 +1253,13 @@ pipe_kqfilter(struct file *fp, struct knote *kn)
 static void
 filt_pipedetach(struct knote *kn)
 {
-	struct pipe *cpipe = (struct pipe *)kn->kn_hook;
+	struct pipe *cpipe = (struct pipe *)kn->kn_fp->f_data;
+
+	if (kn->kn_filter == EVFILT_WRITE) {
+		if (cpipe->pipe_peer == NULL)
+			return;
+		cpipe = cpipe->pipe_peer;
+	}
 
 	SLIST_REMOVE(&cpipe->pipe_sel.si_note, kn, knote, kn_selnext);
 }

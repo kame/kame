@@ -11,7 +11,7 @@
  * 2. Absolutely no warranty of function or purpose is made by the author
  *		John S. Dyson.
  *
- * $FreeBSD: src/sys/kern/vfs_bio.c,v 1.242.2.19 2003/01/25 19:02:23 dillon Exp $
+ * $FreeBSD: src/sys/kern/vfs_bio.c,v 1.242.2.21 2003/08/09 16:21:19 luoqi Exp $
  */
 
 /*
@@ -3208,14 +3208,15 @@ int
 vmapbuf(struct buf *bp)
 {
 	caddr_t addr, v, kva;
-	vm_offset_t pa;
+	vm_paddr_t pa;
 	int pidx;
 	int i;
 	struct vm_page *m;
 
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vmapbuf");
-
+	if (bp->b_bufsize < 0)
+		return (-1);
 	for (v = bp->b_saveaddr,
 		     addr = (caddr_t)trunc_page((vm_offset_t)bp->b_data),
 		     pidx = 0;
@@ -3229,7 +3230,6 @@ retry:
 		i = vm_fault_quick((addr >= bp->b_data) ? addr : bp->b_data,
 			(bp->b_flags&B_READ)?(VM_PROT_READ|VM_PROT_WRITE):VM_PROT_READ);
 		if (i < 0) {
-			printf("vmapbuf: warning, bad user address during I/O\n");
 			for (i = 0; i < pidx; ++i) {
 			    vm_page_unhold(bp->b_pages[i]);
 			    bp->b_pages[i] = NULL;
@@ -3245,7 +3245,7 @@ retry:
 #ifdef __sparc64__
 #error "If MFCing sparc support use pmap_extract"
 #endif
-		pa = trunc_page(pmap_kextract((vm_offset_t) addr));
+		pa = pmap_kextract((vm_offset_t)addr);
 		if (pa == 0) {
 			printf("vmapbuf: warning, race against user address during I/O");
 			goto retry;

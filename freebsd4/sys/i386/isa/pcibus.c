@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57.2.11 2002/11/13 21:40:40 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57.2.12 2003/08/07 06:19:26 imp Exp $
  *
  */
 
@@ -261,6 +261,8 @@ nexus_pcib_identify(driver_t *driver, device_t parent)
 	for (probe.slot = 0; probe.slot <= PCI_SLOTMAX; probe.slot++) {
 		probe.func = 0;
 		hdrtype = pci_cfgread(&probe, PCIR_HEADERTYPE, 1);
+		if ((hdrtype & ~PCIM_MFDEV) > 2)
+			continue;
 		if (hdrtype & PCIM_MFDEV && (!found_orion || hdrtype != 0xff) )
 			pcifunchigh = 7;
 		else

@@ -26,9 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ahc_eisa.c,v 1.1.1.7 2003/04/09 04:14:25 suz Exp $
+ * $Id: ahc_eisa.c,v 1.1.1.8 2003/11/05 12:59:18 suz Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.15.2.10 2003/01/20 23:59:19 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.15.2.11 2003/06/10 03:26:07 gibbs Exp $
  */
 
 #include <dev/aic7xxx/aic7xxx_osm.h>
@@ -139,7 +139,7 @@ aic7770_attach(device_t dev)
 				   /*maxsize*/BUS_SPACE_MAXSIZE_32BIT,
 				   /*nsegments*/AHC_NSEG,
 				   /*maxsegsz*/AHC_MAXTRANSFER_SIZE,
-				   /*flags*/BUS_DMA_ALLOCNOW,
+				   /*flags*/0,
 				   &ahc->parent_dmat);
 
 	if (error != 0) {

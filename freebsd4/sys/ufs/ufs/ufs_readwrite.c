@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.11 (Berkeley) 5/8/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.13 2002/10/18 23:20:07 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.14 2003/04/04 22:21:29 tegge Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -49,9 +49,14 @@
 #include <vm/vnode_pager.h>
 #include <sys/event.h>
 #include <sys/vmmeter.h>
+#include "opt_directio.h"
 
 #define VN_KNOTE(vp, b) \
 	KNOTE((struct klist *)&vp->v_pollinfo.vpi_selinfo.si_note, (b))
+
+#ifdef DIRECTIO
+extern int ffs_rawread(struct vnode *vp, struct uio *uio, int *workdone);
+#endif
 
 /*
  * Vnode op for reading.
@@ -86,6 +91,15 @@ READ(ap)
 	mode = ip->i_mode;
 	uio = ap->a_uio;
 	ioflag = ap->a_ioflag;
+#ifdef DIRECTIO
+	if ((ioflag & IO_DIRECT) != 0) {
+		int workdone;
+
+		error = ffs_rawread(vp, uio, &workdone);
+		if (error || workdone)
+			return error;
+	}
+#endif
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_READ)

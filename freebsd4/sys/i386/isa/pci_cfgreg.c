@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pci_cfgreg.c,v 1.1.2.7 2001/11/28 05:47:03 imp Exp $
+ * $FreeBSD: src/sys/i386/isa/pci_cfgreg.c,v 1.1.2.8 2003/08/07 06:17:43 imp Exp $
  *
  */
 
@@ -640,4 +640,3 @@ pcireg_cfgopen(void)
     devmax = 0;
     return (cfgmech);
 }
-

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-all.h,v 1.22.2.10 2002/10/31 23:10:33 thomas Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-all.h,v 1.22.2.12 2003/09/05 18:27:39 dg Exp $
  */
 
 /* ATAPI misc defines */
@@ -166,12 +166,11 @@ struct atapi_request {
 
     caddr_t			data;		/* pointer to data buf */
     atapi_callback_t		*callback;	/* ptr to callback func */
-    struct ata_dmaentry		*dmatab;	/* DMA transfer table */
     void			*driver;	/* driver specific */
     TAILQ_ENTRY(atapi_request)	chain;		/* list management */
 };
 
-void atapi_attach(struct ata_device *);
+void atapi_attach(struct ata_device *, int);
 void atapi_cam_attach_bus(struct ata_channel *);
 void atapi_detach(struct ata_device *);
 void atapi_cam_detach_bus(struct ata_channel *);

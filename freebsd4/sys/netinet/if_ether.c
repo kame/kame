@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.22 2002/12/12 23:19:02 orion Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.26 2003/09/24 21:48:00 bms Exp $
  */
 
 /*
@@ -371,6 +371,7 @@ arprequest(ifp, sip, tip, enaddr)
 	ah->ar_pln = sizeof(struct in_addr);	/* protocol address length */
 	ah->ar_op = htons(ARPOP_REQUEST);
 	(void)memcpy(ar_sha(ah), enaddr, ah->ar_hln);
+	memset(ar_tha(ah), 0, ah->ar_hln);
 	(void)memcpy(ar_spa(ah), sip, ah->ar_pln);
 	(void)memcpy(ar_tpa(ah), tip, ah->ar_pln);
 
@@ -555,10 +556,15 @@ arpintr()
  * but formerly didn't normally send requests.
  */
 static int log_arp_wrong_iface = 1;
+static int log_arp_movements = 1;
 
 SYSCTL_INT(_net_link_ether_inet, OID_AUTO, log_arp_wrong_iface, CTLFLAG_RW,
 	&log_arp_wrong_iface, 0,
 	"log arp packets arriving on the wrong interface");
+SYSCTL_INT(_net_link_ether_inet, OID_AUTO, log_arp_movements, CTLFLAG_RW,
+	&log_arp_movements, 0,
+	"log arp replies from MACs different than the one in the cache");
+
 
 static void
 in_arpinput(m)
@@ -663,13 +669,14 @@ match:
 		}
 		if (sdl->sdl_alen &&
 		    bcmp(ar_sha(ah), LLADDR(sdl), sdl->sdl_alen)) {
-			if (rt->rt_expire)
-			    log(LOG_INFO, "arp: %s moved from %*D to %*D on %s%d\n",
-				inet_ntoa(isaddr),
-				ifp->if_addrlen, (u_char *)LLADDR(sdl), ":",
-				ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
-				ifp->if_name, ifp->if_unit);
-			else {
+			if (rt->rt_expire) {
+			    if (log_arp_movements)
+				log(LOG_INFO, "arp: %s moved from %*D to %*D on %s%d\n",
+				    inet_ntoa(isaddr),
+				    ifp->if_addrlen, (u_char *)LLADDR(sdl), ":",
+				    ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
+				    ifp->if_name, ifp->if_unit);
+			} else {
 			    log(LOG_ERR,
 				"arp: %*D attempts to modify permanent entry for %s on %s%d\n",
 				ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
@@ -889,12 +896,20 @@ arplookup(addr, create, proxy)
 	else if (rt->rt_gateway->sa_family != AF_LINK)
 		why = "gateway route is not ours";
 
-	if (why && create) {
-		log(LOG_DEBUG, "arplookup %s failed: %s\n",
-		    inet_ntoa(sin.sin_addr), why);
-		return 0;
-	} else if (why) {
-		return 0;
+	if (why) {
+		if (create)
+			log(LOG_DEBUG, "arplookup %s failed: %s\n",
+			    inet_ntoa(sin.sin_addr), why);
+
+		/* If there are no references to this route, purge it */
+		if (rt->rt_refcnt <= 0 &&
+		    (rt->rt_flags & RTF_WASCLONED) == RTF_WASCLONED) {
+			rtrequest(RTM_DELETE,
+					(struct sockaddr *)rt_key(rt),
+					rt->rt_gateway, rt_mask(rt),
+					rt->rt_flags, 0);
+		}
+		return (0);
 	}
 	return ((struct llinfo_arp *)rt->rt_llinfo);
 }

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.2.2.9 2003/02/06 13:17:11 sobomax Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.2.2.15 2003/09/07 21:39:22 pb Exp $");
 
 /*
  * PCI "universal" communications card driver configuration data (used to
@@ -694,6 +694,15 @@ const struct puc_device_description puc_devices[] = {
             },
         },
 
+	{   "Titan VScom PCI-200HV2",	/* 2S */
+	    {	0x14d2,	0xe020,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8 },
+	    },
+	},
+
 	/* NEC PK-UG-X001 K56flex PCI Modem card.
 	   NEC MARTH bridge chip and Rockwell RCVDL56ACF/SP using. */
 	{   "NEC PK-UG-X001 K56flex PCI Modem",
@@ -792,7 +801,7 @@ const struct puc_device_description puc_devices[] = {
 	 */
 
 	/* Oxford Semiconductor OX16PCI954 PCI UARTs */
-	{   "Qxford Semiconductor OX16PCI954 UARTs",
+	{   "Oxford Semiconductor OX16PCI954 UARTs",
 	    {	0x1415,	0x9501,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0	},
 	    {
@@ -804,7 +813,7 @@ const struct puc_device_description puc_devices[] = {
 	},
 
 	/* Oxford Semiconductor OX16PCI954 PCI Parallel port */
-	{   "Qxford Semiconductor OX16PCI954 Parallel port",
+	{   "Oxford Semiconductor OX16PCI954 Parallel port",
 	    {	0x1415,	0x9513,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0	},
 	    {
@@ -820,6 +829,18 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+	    },
+	},
+
+	/* NetMos 4S0P PCI: 4S, 0P */
+	{   "NetMos NM9845 Quad UART",
+	    {	0x9710,	0x9845,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
 	    },
 	},
 
@@ -864,6 +885,22 @@ const struct puc_device_description puc_devices[] = {
 	/* Moxa Technologies Co., Ltd. PCI I/O Card 8S RS232 */
 	{   "Moxa Technologies, C168H/PCI",
 	    {	0x1393,	0x1680,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0,	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x20, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x28, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x30, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x38, COM_FREQ * 8 },
+	    },
+	},
+
+	/* Moxa Technologies Co., Ltd. PCI I/O Card 8S RS232 */
+	{   "Moxa Technologies, C168U/PCI",
+	    {	0x1393,	0x1681,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0,	},
 	    {
 		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
@@ -940,6 +977,31 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x70, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x10, 0x78, COM_FREQ },
 	    },
+	    PUC_ILR_TYPE_DIGI, { 0x07, 0x47 },
+	},
+
+	{   "IC Book Labs Dreadnought x16 Pro",
+	    {   0xb00c, 0x081c, 0,      0       },
+	    {   0xffff, 0xffff, 0,      0       },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x20, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x28, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x30, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x38, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x40, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x48, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x50, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x58, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x60, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x68, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x70, COM_FREQ * 8, 0x200000 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x78, COM_FREQ * 8, 0x200000 },
+	    },
+	    PUC_ILR_TYPE_DIGI, { 0x07, 0x47 },
 	},
 
 	{ 0 }

@@ -33,7 +33,7 @@
 #include <dev/sound/pci/ds1.h>
 #include <dev/sound/pci/ds1-fw.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.8.2.8 2002/04/22 15:49:32 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.8.2.9 2003/04/28 03:59:03 simokawa Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -828,7 +828,7 @@ ds_init(struct sc_info *sc)
 
 	if (sc->regbase == NULL) {
 		if (bus_dma_tag_create(NULL, 2, 0, BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR,
-				       NULL, NULL, memsz, 1, 1, 0, &sc->control_dmat))
+				       NULL, NULL, memsz, 1, memsz, 0, &sc->control_dmat))
 			return -1;
 		if (bus_dmamem_alloc(sc->control_dmat, &buf, BUS_DMA_NOWAIT, &sc->map))
 			return -1;

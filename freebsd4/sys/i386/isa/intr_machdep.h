@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/intr_machdep.h,v 1.19.2.2 2001/10/14 20:05:50 luigi Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.h,v 1.19.2.3 2003/08/18 20:22:22 jhb Exp $
  */
 
 #ifndef _I386_ISA_INTR_MACHDEP_H_
@@ -192,6 +192,7 @@ int	isa_nmi __P((int cd));
 int	icu_setup __P((int intr, inthand2_t *func, void *arg, 
 		       u_int *maskptr, int flags));
 int	icu_unset __P((int intr, inthand2_t *handler));
+void	icu_reinit __P((void));
 int	update_intr_masks __P((void));
 
 intrmask_t splq __P((intrmask_t mask));

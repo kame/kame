@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_var.h,v 1.3 1999/08/28 00:49:09 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_var.h,v 1.3.2.1 2003/08/08 15:45:37 harti Exp $
  *
  */
 
@@ -310,6 +310,9 @@ int		unisig_vc_state __P((struct unisig *,
 				int,
 				struct unisig_msg *));
 
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_harp_uni);
+#endif
 
 /*
  * External variables

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/spans/spans_cls.c,v 1.6 1999/08/28 00:48:49 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/spans/spans_cls.c,v 1.6.2.2 2003/08/08 11:24:46 harti Exp $
  *
  */
 
@@ -35,6 +35,10 @@
  *
  */
 
+#include <sys/param.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
+
 #include <netatm/kern_include.h>
 
 #include <netatm/ipatm/ipatm_var.h>
@@ -44,7 +48,7 @@
 #include <netatm/spans/spans_cls.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_cls.c,v 1.6 1999/08/28 00:48:49 peter Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_cls.c,v 1.6.2.2 2003/08/08 11:24:46 harti Exp $");
 #endif
 
 
@@ -52,6 +56,8 @@ __RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_cls.c,v 1.6 1999/08/28 00:48:
  * Global variables
  */
 int	spanscls_print = 0;
+SYSCTL_INT(_net_harp_spans, OID_AUTO, spanscls_print, CTLFLAG_RW,
+    &spanscls_print, 0, "dump SPANS packets");
 
 struct spanscls	*spanscls_head = NULL;
 
@@ -77,8 +83,8 @@ static void	spanscls_cpcs_data __P((void *, KBuffer *));
 static void	spanscls_connected __P((void *));
 static void	spanscls_cleared __P((void *, struct t_atm_cause *));
 static caddr_t	spanscls_getname __P((void *));
-static void	spanscls_pdu_print __P((struct spanscls *, KBuffer *,
-			char *));
+static void	spanscls_pdu_print __P((const struct spanscls *,
+		    const KBuffer *, const char *));
 
 /*
  * Local variables
@@ -592,10 +598,8 @@ spanscls_bcast_output(inp, m)
 	*(u_short *)&chp->ch_oui[1] = *(u_short *)&spanscls_hdr.ch_oui[1];
 	chp->ch_pid = htons(ETHERTYPE_IP);
 
-#ifdef DIAGNOSTIC
 	if (spanscls_print)
 		spanscls_pdu_print(clp, m, "output");
-#endif
 
 	/*
 	 * Finally, send the pdu via the CLS service
@@ -641,10 +645,8 @@ spanscls_cpcs_data(tok, m)
 		return;
 	}
 
-#ifdef DIAGNOSTIC
 	if (spanscls_print)
 		spanscls_pdu_print(clp, m, "input");
-#endif
 
 	/*
 	 * Get CLS header into buffer
@@ -670,9 +672,7 @@ spanscls_cpcs_data(tok, m)
 		if (bcmp((char *)&chp->ch_proto, (char *)spanscls_bridged, 
 				sizeof(spanscls_bridged))) {
 			log(LOG_ERR, "spanscls_input: bad format\n");
-#ifdef DIAGNOSTIC
 			spanscls_pdu_print(clp, m, "input error"); 
-#endif
 		}
 
 		KB_FREEALL(m);
@@ -835,14 +835,11 @@ spanscls_getname(tok)
  *
  */
 static void
-spanscls_pdu_print(clp, m, msg)
-	struct spanscls	*clp;
-	KBuffer		*m;
-	char		*msg;
+spanscls_pdu_print(const struct spanscls *clp, const KBuffer *m,
+    const char *msg)
 {
 	char		buf[128];
 
 	snprintf(buf, sizeof(buf), "spanscls %s:\n", msg);
 	atm_pdu_print(m, buf);
 }
-

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.8 2002/09/09 19:27:58 sam Exp $
+ * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.9 2003/05/01 22:48:09 trhodes Exp $
  */
 
 #include "opt_compat.h"
@@ -303,6 +303,8 @@ sysctl_remove_oid(struct sysctl_oid *oidp, int del, int recurse)
 		}
 		sysctl_unregister_oid(oidp);
 		if (del) {
+			if (oidp->oid_descr)
+				free((void *)(uintptr_t)(const void *)oidp->oid_descr, M_SYSCTLOID);
 			free((void *)(uintptr_t)(const void *)oidp->oid_name,
 			     M_SYSCTLOID);
 			free(oidp, M_SYSCTLOID);
@@ -364,6 +366,12 @@ sysctl_add_oid(struct sysctl_ctx_list *clist, struct sysctl_oid_list *parent,
 		oidp->oid_arg2 = arg2;
 	}
 	oidp->oid_fmt = fmt;
+	if (descr) {
+		int len = strlen(descr) + 1;
+		oidp->oid_descr = malloc(len, M_SYSCTLOID, M_WAITOK);
+		if (oidp->oid_descr)
+			strcpy((char *)(uintptr_t)(const void *)oidp->oid_descr, descr);
+	};
 	/* Update the context, if used */
 	if (clist != NULL)
 		sysctl_ctx_entry_add(clist, oidp);
@@ -718,6 +726,24 @@ sysctl_sysctl_oidfmt(SYSCTL_HANDLER_ARGS)
 
 
 SYSCTL_NODE(_sysctl, 4, oidfmt, CTLFLAG_RD, sysctl_sysctl_oidfmt, "");
+
+static int
+sysctl_sysctl_oiddescr(SYSCTL_HANDLER_ARGS)
+{
+	struct sysctl_oid *oid;
+	int error;
+
+	error = sysctl_find_oid(arg1, arg2, &oid, NULL, req);
+	if (error)
+		return (error);
+	
+	if (!oid->oid_descr)
+		return (ENOENT);
+	error = SYSCTL_OUT(req, oid->oid_descr, strlen(oid->oid_descr) + 1);
+	return (error);
+}
+
+SYSCTL_NODE(_sysctl, 5, oiddescr, CTLFLAG_RD, sysctl_sysctl_oiddescr, "");
 
 /*
  * Default "handler" functions.

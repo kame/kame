@@ -22,11 +22,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.15 2003/03/14 21:22:35 jhb Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.19 2003/10/22 20:15:10 jhb Exp $
  */
 
 #include "opt_cpu.h"
-#include "opt_htt.h"
 #include "opt_user_ldt.h"
 
 #ifdef SMP
@@ -236,10 +235,9 @@ typedef struct BASETABLE_ENTRY {
 
 #define MP_ANNOUNCE_POST	0x19
 
-#ifdef HTT
 static int need_hyperthreading_fixup;
 static u_int logical_cpus;
-#endif
+u_int logical_cpus_mask;		/* bit mask of logical cpu's */
 
 /** XXX FIXME: where does this really belong, isa.h/isa.c perhaps? */
 int	current_postcode;
@@ -330,9 +328,7 @@ static mpfps_t	mpfps;
 static int	search_for_sig(u_int32_t target, int count);
 static void	mp_enable(u_int boot_addr);
 
-#ifdef HTT
 static void	mptable_hyperthread_fixup(u_int id_mask);
-#endif
 static void	mptable_pass1(void);
 static int	mptable_pass2(void);
 static void	default_mp_table(int type);
@@ -343,6 +339,10 @@ static int	start_all_aps(u_int boot_addr);
 static void	install_ap_tramp(u_int boot_addr);
 static int	start_ap(int logicalCpu, u_int boot_addr);
 static int	apic_int_is_bus_type(int intr, int bus_type);
+
+static int	hlt_cpus_mask;
+static int	hlt_logical_cpus = 1;
+static struct	sysctl_ctx_list logical_cpu_clist;
 
 /*
  * Calculate usable address in base memory for AP trampoline code.
@@ -434,7 +434,7 @@ mp_announce(void)
 
 	POSTCODE(MP_ANNOUNCE_POST);
 
-	printf("FreeBSD/SMP: Multiprocessor motherboard\n");
+	printf("FreeBSD/SMP: Multiprocessor motherboard: %d CPUs\n", mp_ncpus);
 	printf(" cpu0 (BSP): apic id: %2d", CPU_TO_ID(0));
 	printf(", version: 0x%08x", cpu_apic_versions[0]);
 	printf(", at 0x%08x\n", cpu_apic_address);
@@ -765,9 +765,7 @@ mptable_pass1(void)
 	void*	position;
 	int	count;
 	int	type;
-#ifdef HTT
 	u_int	id_mask;
-#endif
 
 	POSTCODE(MPTABLE_PASS1_POST);
 
@@ -781,9 +779,7 @@ mptable_pass1(void)
 	mp_nbusses = 0;
 	mp_napics = 0;
 	nintrs = 0;
-#ifdef HTT
 	id_mask = 0;
-#endif
 
 	/* check for use of 'default' configuration */
 	if (MPFPS_MPFB1 != 0) {
@@ -816,10 +812,8 @@ mptable_pass1(void)
 				if (((proc_entry_ptr)position)->cpu_flags
 				    & PROCENTRY_FLAG_EN) {
 					++mp_naps;
-#ifdef HTT
 					id_mask |= 1 <<
 					    ((proc_entry_ptr)position)->apic_id;
-#endif
 				}
 				break;
 			case 1: /* bus_entry */
@@ -854,10 +848,8 @@ mptable_pass1(void)
 		mp_naps = MAXCPU;
 	}
 
-#ifdef HTT
 	/* See if we need to fixup HT logical CPUs. */
 	mptable_hyperthread_fixup(id_mask);
-#endif
 	
 	/*
 	 * Count the BSP.
@@ -883,9 +875,7 @@ mptable_pass1(void)
 static int
 mptable_pass2(void)
 {
-#ifdef HTT
 	struct PROCENTRY proc;
-#endif
 	int     x;
 	mpcth_t cth;
 	int     totalSize;
@@ -898,12 +888,10 @@ mptable_pass2(void)
 
 	POSTCODE(MPTABLE_PASS2_POST);
 
-#ifdef HTT
 	/* Initialize fake proc entry for use with HT fixup. */
 	bzero(&proc, sizeof(proc));
 	proc.type = 0;
 	proc.cpu_flags = PROCENTRY_FLAG_EN;
-#endif
 
 	pgeflag = 0;		/* XXX - Not used under SMP yet.  */
 
@@ -983,7 +971,6 @@ mptable_pass2(void)
 			if (processor_entry(position, cpu))
 				++cpu;
 
-#ifdef HTT
 			if (need_hyperthreading_fixup) {
 				/*
 				 * Create fake mptable processor entries
@@ -994,10 +981,10 @@ mptable_pass2(void)
 				for (i = 1; i < logical_cpus; i++) {
 					proc.apic_id++;
 					(void)processor_entry(&proc, cpu);
+					logical_cpus_mask |= (1 << cpu);
 					cpu++;
 				}
 			}
-#endif
 			break;
 		case 1:
 			if (bus_entry(position, bus))
@@ -1030,7 +1017,6 @@ mptable_pass2(void)
 	return 0;
 }
 
-#ifdef HTT
 /*
  * Check if we should perform a hyperthreading "fix-up" to
  * enumerate any logical CPU's that aren't already listed
@@ -1079,7 +1065,6 @@ mptable_hyperthread_fixup(u_int id_mask)
 	need_hyperthreading_fixup = 1;
 	mp_naps *= logical_cpus;
 }
-#endif
 
 void
 assign_apic_irq(int apic, int intpin, int irq)
@@ -2133,13 +2118,14 @@ start_all_aps(u_int boot_addr)
 		/* allocate and set up an idle stack data page */
 		stack = (char *)kmem_alloc(kernel_map, UPAGES*PAGE_SIZE);
 		for (i = 0; i < UPAGES; i++)
-			SMPpt[pg + 5 + i] = (pt_entry_t)
+			SMPpt[pg + 6 + i] = (pt_entry_t)
 			    (PG_V | PG_RW | vtophys(PAGE_SIZE * i + stack));
 
 		SMPpt[pg + 1] = 0;		/* *prv_CMAP1 */
 		SMPpt[pg + 2] = 0;		/* *prv_CMAP2 */
 		SMPpt[pg + 3] = 0;		/* *prv_CMAP3 */
 		SMPpt[pg + 4] = 0;		/* *prv_PMAP1 */
+		SMPpt[pg + 5] = 0;		/* *prv_PMAP2 */
 
 		/* prime data page for it to use */
 		gd->gd_cpuid = x;
@@ -2147,11 +2133,13 @@ start_all_aps(u_int boot_addr)
 		gd->gd_prv_CMAP1 = &SMPpt[pg + 1];
 		gd->gd_prv_CMAP2 = &SMPpt[pg + 2];
 		gd->gd_prv_CMAP3 = &SMPpt[pg + 3];
-		gd->gd_prv_PMAP1 = &SMPpt[pg + 4];
+		gd->gd_prv_PMAP1 = (pd_entry_t *)&SMPpt[pg + 4];
+		gd->gd_prv_PMAP2 = (pd_entry_t *)&SMPpt[pg + 5];
 		gd->gd_prv_CADDR1 = SMP_prvspace[x].CPAGE1;
 		gd->gd_prv_CADDR2 = SMP_prvspace[x].CPAGE2;
 		gd->gd_prv_CADDR3 = SMP_prvspace[x].CPAGE3;
-		gd->gd_prv_PADDR1 = (unsigned *)SMP_prvspace[x].PPAGE1;
+		gd->gd_prv_PADDR1 = (pt_entry_t *)SMP_prvspace[x].PPAGE1;
+		gd->gd_prv_PADDR2 = (pt_entry_t *)SMP_prvspace[x].PPAGE2;
 
 		/* setup a vector to our boot code */
 		*((volatile u_short *) WARMBOOT_OFF) = WARMBOOT_TARGET;
@@ -2205,7 +2193,7 @@ start_all_aps(u_int boot_addr)
 	/* Allocate and setup BSP idle stack */
 	stack = (char *)kmem_alloc(kernel_map, UPAGES * PAGE_SIZE);
 	for (i = 0; i < UPAGES; i++)
-		SMPpt[5 + i] = (pt_entry_t)
+		SMPpt[6 + i] = (pt_entry_t)
 		    (PG_V | PG_RW | vtophys(PAGE_SIZE * i + stack));
 
 	for (x = 0; x < NKPT; x++)
@@ -2536,7 +2524,7 @@ ap_init()
 	if (cpuid != apic_id) {
 		printf("SMP: cpuid = %d\n", cpuid);
 		printf("SMP: apic_id = %d\n", apic_id);
-		printf("PTD[MPPTDI] = %p\n", (void *)PTD[MPPTDI]);
+		printf("PTD[MPPTDI] = %llx\n", (u_int64_t)PTD[MPPTDI]);
 		panic("cpuid mismatch! boom!!");
 	}
 
@@ -2707,7 +2695,7 @@ forward_statclock(int pscnt)
 
 	/* Step 1: Probe state   (user, cpu, interrupt, spinlock, idle ) */
 	
-	map = other_cpus & ~stopped_cpus ;
+	map = other_cpus & ~(stopped_cpus|hlt_cpus_mask);
 	checkstate_probed_cpus = 0;
 	if (map != 0)
 		selected_apic_ipi(map,
@@ -2782,7 +2770,7 @@ forward_hardclock(int pscnt)
 
 	/* Step 1: Probe state   (user, cpu, interrupt, spinlock, idle) */
 	
-	map = other_cpus & ~stopped_cpus ;
+	map = other_cpus & ~(stopped_cpus|hlt_cpus_mask);
 	checkstate_probed_cpus = 0;
 	if (map != 0)
 		selected_apic_ipi(map,
@@ -2911,7 +2899,7 @@ forward_roundrobin(void)
 	if (!forward_roundrobin_enabled)
 		return;
 	resched_cpus |= other_cpus;
-	map = other_cpus & ~stopped_cpus ;
+	map = other_cpus & ~(stopped_cpus|hlt_cpus_mask);
 #if 1
 	selected_apic_ipi(map, XCPUAST_OFFSET, APIC_DELMODE_FIXED);
 #else
@@ -3019,4 +3007,91 @@ smp_rendezvous(void (* setup_func)(void *),
 
 	/* release lock */
 	s_unlock(&smp_rv_lock);
+}
+
+static int
+sysctl_htl_cpus(SYSCTL_HANDLER_ARGS)
+{
+	u_int mask;
+	int error;
+
+	mask = hlt_cpus_mask;
+	error = sysctl_handle_int(oidp, &mask, 0, req);
+	if (error || !req->newptr)
+		return (error);
+
+	if (logical_cpus_mask != 0 &&
+	    (mask & logical_cpus_mask) == logical_cpus_mask)
+		hlt_logical_cpus = 1;
+	else
+		hlt_logical_cpus = 0;
+
+	if ((mask & all_cpus) == all_cpus)
+		mask &= ~(1<<0);
+	hlt_cpus_mask = mask;
+	return (error);
+}
+SYSCTL_PROC(_machdep, OID_AUTO, hlt_cpus, CTLTYPE_INT|CTLFLAG_RW,
+    0, 0, sysctl_htl_cpus, "IU", "");
+
+static int
+sysctl_hlt_logical_cpus(SYSCTL_HANDLER_ARGS)
+{
+	int disable, error;
+
+	disable = hlt_logical_cpus;
+	error = sysctl_handle_int(oidp, &disable, 0, req);
+	if (error || !req->newptr)
+		return (error);
+
+	if (disable)
+		hlt_cpus_mask |= logical_cpus_mask;
+	else
+		hlt_cpus_mask &= ~logical_cpus_mask;
+
+	if ((hlt_cpus_mask & all_cpus) == all_cpus)
+		hlt_cpus_mask &= ~(1<<0);
+
+	hlt_logical_cpus = disable;
+	return (error);
+}
+
+static void
+cpu_hlt_setup(void *dummy __unused)
+{
+
+	if (logical_cpus_mask != 0) {
+		TUNABLE_INT_FETCH("machdep.hlt_logical_cpus",
+		    &hlt_logical_cpus);
+		sysctl_ctx_init(&logical_cpu_clist);
+		SYSCTL_ADD_PROC(&logical_cpu_clist,
+		    SYSCTL_STATIC_CHILDREN(_machdep), OID_AUTO,
+		    "hlt_logical_cpus", CTLTYPE_INT|CTLFLAG_RW, 0, 0,
+		    sysctl_hlt_logical_cpus, "IU", "");
+		SYSCTL_ADD_UINT(&logical_cpu_clist,
+		    SYSCTL_STATIC_CHILDREN(_machdep), OID_AUTO,
+		    "logical_cpus_mask", CTLTYPE_INT|CTLFLAG_RD,
+		    &logical_cpus_mask, 0, "");
+
+		if (hlt_logical_cpus)
+			hlt_cpus_mask |= logical_cpus_mask;
+	}
+}
+SYSINIT(cpu_hlt, SI_SUB_SMP, SI_ORDER_ANY, cpu_hlt_setup, NULL);
+
+int
+mp_grab_cpu_hlt(void)
+{
+	u_int mask = 1 << cpuid;
+	u_int temp;
+	int retval;
+
+	retval = mask & hlt_cpus_mask;
+	while (mask & hlt_cpus_mask) {
+		temp = lapic.tpr;
+		lapic.tpr = LOPRIO_LEVEL;
+		__asm __volatile("sti; hlt" : : : "memory");
+		lapic.tpr = temp;
+	}
+	return (retval);
 }

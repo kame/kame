@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_uid16.c,v 1.4.2.1 2001/10/21 03:57:35 marcel Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_uid16.c,v 1.4.2.2 2003/10/22 13:51:46 tjr Exp $
  */
 
 #include "opt_compat.h"
@@ -111,7 +111,7 @@ linux_setgroups16(struct proc *p, struct linux_setgroups16_args *args)
 	if ((error = suser_xxx(oldcred, NULL, PRISON_ROOT)) != 0)
 		return (error);
 
-	if (ngrp >= NGROUPS)
+	if (ngrp < 0 || ngrp >= NGROUPS)
 		return (EINVAL);
 
 	newcred = crdup(oldcred);

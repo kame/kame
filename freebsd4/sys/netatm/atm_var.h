@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_var.h,v 1.2 1999/08/28 00:48:39 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_var.h,v 1.2.2.2 2003/08/08 08:44:10 harti Exp $
  *
  */
 
@@ -121,8 +121,8 @@ void		atm_dma_free __P((caddr_t, int));
 #endif
 KBuffer *	atm_dev_compress __P((KBuffer *));
 Cmn_vcc *	atm_dev_vcc_find __P((Cmn_unit *, u_int, u_int, u_int));
-void		atm_dev_pdu_print __P((Cmn_unit *, Cmn_vcc *, KBuffer *,
-			char *));
+void		atm_dev_pdu_print __P((const Cmn_unit *, const Cmn_vcc *,
+		    const KBuffer *, const char *));
 
 	/* atm_if.c */
 int		atm_physif_register __P((Cmn_unit *, char *,
@@ -195,12 +195,17 @@ int		atm_stack_enq __P((int, void (*) __P((int, void *, int, int)),
 			void *, Atm_connvc *, int, int));
 void		atm_stack_drain __P((void));
 void		atm_intr __P((void));
-void		atm_pdu_print __P((KBuffer *, char *));
+void		atm_pdu_print __P((const KBuffer *, const char *));
 
 	/* atm_usrreq.c */
 #if (!(defined(__FreeBSD__) && (BSD >= 199506)))
 int		atm_dgram_usrreq __P((struct socket *, int, KBuffer *,
 			KBuffer *, KBuffer *));
+#endif
+
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_harp);
+SYSCTL_DECL(_net_harp_atm);
 #endif
 
 #endif	/* ATM_KERNEL */

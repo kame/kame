@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vm_page.c	7.4 (Berkeley) 5/7/91
- * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.18 2002/03/10 05:03:19 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.20 2003/09/25 18:55:27 silby Exp $
  */
 
 /*
@@ -152,7 +152,7 @@ vm_set_page_size(void)
  *	Must be called at splhigh().
  */
 vm_page_t
-vm_add_new_page(vm_offset_t pa)
+vm_add_new_page(vm_paddr_t pa)
 {
 	vm_page_t m;
 
@@ -183,18 +183,19 @@ vm_page_startup(vm_offset_t starta, vm_offset_t enda, vm_offset_t vaddr)
 {
 	vm_offset_t mapped;
 	struct vm_page **bucket;
-	vm_size_t npages, page_range;
-	vm_offset_t new_end;
+	vm_size_t npages;
+	vm_paddr_t page_range;
+	vm_paddr_t new_end;
 	int i;
-	vm_offset_t pa;
+	vm_paddr_t pa;
 	int nblocks;
-	vm_offset_t last_pa;
+	vm_paddr_t last_pa;
 
 	/* the biggest memory array is the second group of pages */
-	vm_offset_t end;
-	vm_offset_t biggestone, biggestsize;
+	vm_paddr_t end;
+	vm_paddr_t biggestone, biggestsize;
 
-	vm_offset_t total;
+	vm_paddr_t total;
 
 	total = 0;
 	biggestsize = 0;
@@ -208,7 +209,7 @@ vm_page_startup(vm_offset_t starta, vm_offset_t enda, vm_offset_t vaddr)
 	}
 
 	for (i = 0; phys_avail[i + 1]; i += 2) {
-		int size = phys_avail[i + 1] - phys_avail[i];
+		vm_paddr_t size = phys_avail[i + 1] - phys_avail[i];
 
 		if (size > biggestsize) {
 			biggestone = i;
@@ -1784,14 +1785,15 @@ contigmalloc1(
 	unsigned long size,	/* should be size_t here and for malloc() */
 	struct malloc_type *type,
 	int flags,
-	unsigned long low,
-	unsigned long high,
+	vm_paddr_t low,
+	vm_paddr_t high,
 	unsigned long alignment,
 	unsigned long boundary,
 	vm_map_t map)
 {
 	int i, s, start;
-	vm_offset_t addr, phys, tmp_addr;
+	vm_offset_t addr, tmp_addr;
+	vm_paddr_t phys;
 	int pass;
 	vm_page_t pga = vm_page_array;
 
@@ -1916,7 +1918,8 @@ again1:
 			m->valid = VM_PAGE_BITS_ALL;
 			if (m->flags & PG_ZERO)
 				vm_page_zero_count--;
-			m->flags = 0;
+			/* Don't clear the PG_ZERO flag, we'll need it later. */
+			m->flags &= PG_ZERO;
 			KASSERT(m->dirty == 0, ("contigmalloc1: page %p was dirty", m));
 			m->wire_count = 0;
 			m->busy = 0;
@@ -1950,6 +1953,9 @@ again1:
 			vm_page_t m = &pga[i];
 			vm_page_insert(m, kernel_object,
 				OFF_TO_IDX(tmp_addr - VM_MIN_KERNEL_ADDRESS));
+			if ((flags & M_ZERO) && !(m->flags & PG_ZERO))
+				pmap_zero_page(VM_PAGE_TO_PHYS(m));
+			m->flags = 0;
 			tmp_addr += PAGE_SIZE;
 		}
 		vm_map_pageable(map, addr, addr + size, FALSE);
@@ -1965,8 +1971,8 @@ contigmalloc(
 	unsigned long size,	/* should be size_t here and for malloc() */
 	struct malloc_type *type,
 	int flags,
-	unsigned long low,
-	unsigned long high,
+	vm_paddr_t low,
+	vm_paddr_t high,
 	unsigned long alignment,
 	unsigned long boundary)
 {
@@ -1983,8 +1989,8 @@ contigfree(void *addr, unsigned long size, struct malloc_type *type)
 vm_offset_t
 vm_page_alloc_contig(
 	vm_offset_t size,
-	vm_offset_t low,
-	vm_offset_t high,
+	vm_paddr_t low,
+	vm_paddr_t high,
 	vm_offset_t alignment)
 {
 	return ((vm_offset_t)contigmalloc1(size, M_DEVBUF, M_NOWAIT, low, high,

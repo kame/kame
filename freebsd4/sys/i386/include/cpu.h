@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cpu.h	5.4 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/include/cpu.h,v 1.43.2.2 2001/06/15 09:37:57 scottl Exp $
+ * $FreeBSD: src/sys/i386/include/cpu.h,v 1.43.2.3 2003/08/09 16:21:19 luoqi Exp $
  */
 
 #ifndef _MACHINE_CPU_H_
@@ -135,6 +135,7 @@
 #ifdef _KERNEL
 extern char	btext[];
 extern char	etext[];
+extern char	KERNend[];
 extern u_char	intr_nesting_level;
 
 void	fork_trampoline __P((void));

@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/pci/agp_if.m,v 1.1.2.1 2000/07/19 09:48:04 ru Exp $
+# $FreeBSD: src/sys/pci/agp_if.m,v 1.1.2.2 2003/04/12 20:38:37 murray Exp $
 #
 
 #include <sys/bus.h>
@@ -32,7 +32,7 @@
 # The AGP interface is used internally to the agp driver to isolate the
 # differences between various AGP chipsets into chipset mini drivers. It
 # should not be used outside the AGP driver. The kernel api for accessing
-# AGP functionality is described in <pci/agpvar,h>
+# AGP functionality is described in <pci/agpvar.h>
 #
 INTERFACE agp;
 

@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.138.2.1 2003/03/28 20:05:39 scottl Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.153 2003/10/22 19:04:08 jhb Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -122,7 +122,6 @@ options 	ROOTDEVNAME=\"ufs:da0s2e\"
 # Mandatory:
 options 	SMP			# Symmetric MultiProcessor Kernel
 options 	APIC_IO			# Symmetric (APIC) I/O
-options 	HTT			# HyperThreading Technology
 
 #
 # Rogue SMP hardware:
@@ -294,7 +293,7 @@ options 	USER_LDT		#allow user-level control of i386 ldt
 # System V shared memory and tunable parameters
 options 	SYSVSHM		# include support for shared memory
 options 	SHMMAXPGS=1025	# max amount of shared memory pages (4k on i386)
-options 	SHMALL=1025	# max amount of shared memory (bytes)
+options 	SHMALL=1025	# max number of shared memory pages system wide
 options 	SHMMAX="(SHMMAXPGS*PAGE_SIZE+1)"
 				# max shared memory segment size (bytes)
 options 	SHMMIN=2	# min shared memory segment size (bytes)
@@ -566,6 +565,9 @@ pseudo-device	stf			#6to4 IPv6 over IPv4 encapsulation
 # MROUTING enables the kernel multicast packet forwarder, which works
 # with mrouted(8).
 #
+# PIM enables Protocol Independent Multicast in the kernel.
+# Requires MROUTING enabled.
+#
 # IPFIREWALL enables support for IP firewall construction, in
 # conjunction with the `ipfw' program.  IPFIREWALL_VERBOSE sends
 # logged packets to the system logger.  IPFIREWALL_VERBOSE_LIMIT
@@ -595,6 +597,7 @@ pseudo-device	stf			#6to4 IPv6 over IPv4 encapsulation
 # TCPDEBUG is undocumented.
 #
 options 	MROUTING		# Multicast routing
+options 	PIM			# Protocol Independent Multicast
 options 	IPFIREWALL		#firewall
 options 	IPFIREWALL_VERBOSE	#enable logging to syslogd(8)
 options 	IPFIREWALL_FORWARD	#enable transparent proxy support
@@ -610,6 +613,12 @@ options 	IPFILTER_LOG		#ipfilter logging
 options 	IPFILTER_DEFAULT_BLOCK	#block all packets by default
 options 	IPSTEALTH		#support for stealth forwarding
 options 	TCPDEBUG
+
+# The MBUF_STRESS_TEST option enables options which create
+# various random failures / extreme cases related to mbuf
+# functions.  See the mbuf(9) manpage for a list of available
+# test cases.
+options         MBUF_STRESS_TEST
 
 # RANDOM_IP_ID causes the ID field in IP packets to be randomized
 # instead of incremented by 1 with each packet generated.  This
@@ -668,6 +677,9 @@ options 	BRIDGE
 # The `hfa' driver provides support for the FORE Systems, Inc.
 # PCA-200E ATM PCI Adapter.
 #
+# The `proatm' driver provides support for cards based on the IDT77252 chip
+# like ProSum's ProATM cards.
+#
 options 	ATM_CORE		#core ATM protocol family
 options 	ATM_IP			#IP over ATM support
 options 	ATM_SIGPVC		#SIGPVC signalling manager
@@ -675,6 +687,7 @@ options 	ATM_SPANS		#SPANS signalling manager
 options 	ATM_UNI			#UNI signalling manager
 device		hea			#Efficient ENI-155p ATM PCI
 device		hfa			#FORE PCA-200E ATM PCI
+device		proatm			#ProSum's ProATM-155
 
 # DEVICE_POLLING adds support for mixed interrupt-polling handling
 # of network device drivers, which has significant benefits in terms
@@ -930,6 +943,12 @@ options 	CAM_MAX_HIGHPOWER=4
 options 	SCSI_NO_SENSE_STRINGS
 options 	SCSI_NO_OP_STRINGS
 options 	SCSI_DELAY=8000	# Be pessimistic about Joe SCSI device
+
+# Options for the CAM SCSI disk driver:
+# DA_OLD_QUIRKS: Restore old USB quirks that have been deprecated.
+#		 Please also email scsi@freebsd.org if you
+#		 have a device that needs this option.
+options 	DA_OLD_QUIRKS
 
 # Options for the CAM CDROM driver:
 # CHANGER_MIN_BUSY_SECONDS: Guaranteed minimum time quantum for a changer LUN
@@ -1439,6 +1458,7 @@ options 	PUC_FASTINTR
 # lnc: Lance/PCnet cards (Isolan, Novell NE2100, NE32-VL, AMD Am7990 & Am79C960)
 # rdp: RealTek RTL 8002-based pocket ethernet adapters
 # sbni: Granch SBNI12-xx adapters
+# sbsh: Granch SBNI16 SHDSL modem PCI adapters
 # sr: RISCom/N2 hdlc sync 1/2 port V.35/X.21 serial driver (requires sppp)
 # wl: Lucent Wavelan (ISA card only).
 # awi: IEEE 802.11b PRISM I cards.
@@ -2060,6 +2080,7 @@ device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
 device		my		# Myson Fast Ethernet (MTD80X, MTD89X)
 device		pcn		# AMD Am79C97x PCI 10/100 NICs
 device		rl		# RealTek 8129/8139
+device		sbsh		# Granch SBNI16 SHDSL modem
 device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
 device		ste		# Sundance ST201 (D-Link DFE-550TX)
@@ -2179,6 +2200,21 @@ device		iic
 device		iicsmb		# smb over i2c bridge
 
 device		pcf0	at isa? port 0x320 irq 5
+
+#
+# ACPI support using the Intel ACPI Component Architecture reference
+# implementation.
+#
+# ACPI_DEBUG enables the use of the debug.acpi.level and debug.acpi.layer
+# kernel environment variables to select initial debugging levels for the
+# Intel ACPICA code.  (Note that the Intel code must also have USE_DEBUGGER
+# defined when it is built).
+#
+# Note that this ACPI support is experimental and it's use may result in
+# machine hangs or kernel panics.
+#
+device		acpica
+options		ACPI_DEBUG
 
 #---------------------------------------------------------------------------
 # ISDN4BSD
@@ -2548,6 +2584,19 @@ options 	DEBUG_LOCKS
 # console.
 options 	PANIC_REBOOT_WAIT_TIME=16
 
+# Attempt to bypass the buffer cache and put data directly into the
+# userland buffer for read operation when O_DIRECT flag is set on the
+# file.  Both offset and length of the read operation must be
+# multiples of the physical media sector size. 
+#
+#options		DIRECTIO
+
+# Specify a lower limit for the number of swap I/O buffers.  They are
+# (among other things) used when bypassing the buffer cache due to
+# DIRECTIO kernel option enabled and O_DIRECT flag set on file.
+#
+#options		NSWBUF_MIN=120
+
 #
 # SysVR4 ABI emulation
 #
@@ -2684,6 +2733,10 @@ device		cue
 # the Netgear EA101, the D-Link DSB-650, the SMC 2102USB
 # and 2104USB, and the Corega USB-T.
 device		kue
+#
+# RealTek RTL8150 USB to fast ethernet. Supports the Melco LUA-KTX
+# and the GREEN HOUSE GH-USB100B.
+device		rue
 
 # debugging options for the USB subsystem
 #
@@ -2692,6 +2745,9 @@ options 	USB_DEBUG
 # options for ukbd:
 options 	UKBD_DFLT_KEYMAP	# specify the built-in keymap
 makeoptions	UKBD_DFLT_KEYMAP=it.iso
+
+# options for uvscom:
+options		UVSCOM_DEFAULT_OPKTSIZE=8	# default output packet size
 
 # Firewire support
 device		firewire	# Firewire bus code
@@ -2711,8 +2767,36 @@ device		fwe		# Ethernet over Firewire (non-standard!)
 pseudo-device	crypto		# core crypto support
 pseudo-device	cryptodev	# /dev/crypto for access to h/w
 
+device		rndtest		# FIPS 140-2 entropy tester
+
 device		hifn		# Hifn 7951, 7781, etc.
+options		HIFN_DEBUG	# enable debugging support: hw.hifn.debug
+options		HIFN_RNDTEST	# enable rndtest support
+
 device		ubsec		# Broadcom 5501, 5601, 58xx
+options		UBSEC_DEBUG	# enable debugging support: hw.ubsec.debug
+options		UBSEC_RNDTEST	# enable rndtest support
+
+device		safe		# SafeNet 1141
+options		SAFE_DEBUG	# enable debugging support: hw.safe.debug
+options		SAFE_RNDTEST	# enable rndtest support
+
+# DRM options:
+# mgadrm:    AGP Matrox G200, G400, G450, G550
+# tdfxdrm:   3dfx Voodoo 3/4/5 and Banshee
+# r128drm:   ATI Rage 128
+# radeondrm: ATI Radeon up to 9000/9100
+# DRM_DEBUG: include debug printfs, very slow
+#
+# mga requires AGP in the kernel, and it is recommended
+# for AGP r128 and radeon cards.
+
+device		mgadrm
+device		"r128drm"
+device		radeondrm
+device		tdfxdrm
+
+options 	DRM_DEBUG
 
 #
 # Embedded system options:

@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_ep_isa.c,v 1.8.2.1 2000/12/16 03:47:57 nyan Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep_isa.c,v 1.8.2.2 2003/10/06 02:53:51 imp Exp $
  */
 
 #include <sys/param.h>
@@ -358,4 +358,4 @@ static driver_t ep_isa_driver = {
 
 extern devclass_t ep_devclass;
 
-DRIVER_MODULE(ep, isa, ep_isa_driver, ep_devclass, 0, 0);
+DRIVER_MODULE(if_ep, isa, ep_isa_driver, ep_devclass, 0, 0);

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_machdep.c,v 1.6.2.4 2001/11/05 19:08:23 marcel Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_machdep.c,v 1.6.2.5 2003/09/14 16:25:23 sobomax Exp $
  */
 
 #include <sys/param.h>
@@ -788,4 +788,20 @@ linux_sigaltstack(struct proc *p, struct linux_sigaltstack_args *uap)
 	}
 
 	return (error);
+}
+
+int
+linux_ftruncate64(struct proc *p, struct linux_ftruncate64_args *args)
+{
+	struct ftruncate_args sa;
+
+#ifdef DEBUG
+	if (ldebug(ftruncate64))
+		printf(ARGS(ftruncate64, "%d, %d"), args->fd, args->length);
+#endif
+
+	sa.fd = args->fd;
+	sa.pad = 0;
+	sa.length = args->length;
+	return ftruncate(p, &sa);
 }

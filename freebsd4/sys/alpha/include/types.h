@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/types.h,v 1.11.2.2 2001/03/21 10:50:58 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/types.h,v 1.11.2.3 2003/08/12 05:41:54 luoqi Exp $ */
 /* From: NetBSD: types.h,v 1.8 1997/04/06 08:47:45 cgd Exp */
 
 /*-
@@ -53,6 +53,7 @@ typedef struct label_t {
 
 typedef	unsigned long	vm_offset_t;
 typedef	long		vm_ooffset_t;
+typedef	unsigned long	vm_paddr_t;
 typedef	unsigned long	vm_pindex_t;
 typedef	unsigned long	vm_size_t;
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/socketvar.h,v 1.46.2.9 2002/08/14 22:23:10 dg Exp $
+ * $FreeBSD: src/sys/sys/socketvar.h,v 1.46.2.10 2003/08/24 08:24:39 hsu Exp $
  */
 
 #ifndef _SYS_SOCKETVAR_H_
@@ -380,7 +380,7 @@ struct socket *
 	sonewconn3 __P((struct socket *head, int connstatus, struct proc *p));
 int	sooptcopyin __P((struct sockopt *sopt, void *buf, size_t len,
 			 size_t minlen));
-int	sooptcopyout __P((struct sockopt *sopt, void *buf, size_t len));
+int	sooptcopyout __P((struct sockopt *sopt, const void *buf, size_t len));
 
 /* XXX; prepare mbuf for (__FreeBSD__ < 3) routines. */
 int	soopt_getm __P((struct sockopt *sopt, struct mbuf **mp));

@@ -1,6 +1,8 @@
-# $FreeBSD: src/sys/modules/aac/Makefile,v 1.2.2.3.6.1 2003/03/28 20:03:52 scottl Exp $
+# $FreeBSD: src/sys/modules/aac/Makefile,v 1.2.2.4 2003/03/28 19:51:37 scottl Exp $
 
 .PATH: ${.CURDIR}/../../dev/aac
+
+SUBDIR= aac_linux
 
 KMOD=	aac
 SRCS=	aac.c aac_pci.c aac_disk.c aac_cam.c

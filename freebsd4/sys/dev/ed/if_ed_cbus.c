@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_cbus.c,v 1.1.2.1 2000/09/10 08:45:11 nyan Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_cbus.c,v 1.1.2.2 2003/10/06 02:53:52 imp Exp $
  */
 
 #include <sys/param.h>
@@ -297,7 +297,7 @@ static driver_t ed_isa_driver = {
 
 static devclass_t ed_isa_devclass;
 
-DRIVER_MODULE(ed, isa, ed_isa_driver, ed_isa_devclass, 0, 0);
+DRIVER_MODULE(if_ed, isa, ed_isa_driver, ed_isa_devclass, 0, 0);
 
 #ifdef PC98
 /*

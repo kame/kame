@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wivar.h,v 1.8.2.3 2002/08/02 07:11:34 imp Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wivar.h,v 1.8.2.4 2003/07/26 21:03:55 jdp Exp $
  */
 
 #define WICACHE			/* turn on signal strength cache code */  
@@ -220,5 +220,6 @@ int wi_generic_detach(device_t);
 void wi_shutdown(device_t);
 int wi_alloc(device_t, int);
 void wi_free(device_t);
+void wi_stop(struct wi_softc *);
 extern devclass_t wi_devclass;
 int wi_mgmt_xmit(struct wi_softc *, caddr_t, int);

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.17 2003/01/13 22:51:17 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.23 2003/10/02 02:22:58 silby Exp $
  */
 
 /*
@@ -75,6 +75,7 @@
 #include <sys/mman.h>
 #include <sys/vnode.h>
 #include <sys/resourcevar.h>
+#include <sys/file.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -186,7 +187,9 @@ vmspace_alloc(min, max)
 void
 vm_init2(void) {
 	zinitna(kmapentzone, &kmapentobj,
-		NULL, 0, cnt.v_page_count / 4, ZONE_INTERRUPT, 1);
+		NULL, 0, lmin((VM_MAX_KERNEL_ADDRESS - KERNBASE) / PAGE_SIZE,
+		cnt.v_page_count) / 8 + maxproc * 2 + maxfiles,
+		ZONE_INTERRUPT, 1);
 	zinitna(mapentzone, &mapentobj,
 		NULL, 0, 0, 0, 1);
 	zinitna(mapzone, &mapobj,
@@ -1658,6 +1661,7 @@ vm_map_user_pageable(map, start, real_end, new_pageable)
 		 * becomes completely unwired, unwire its physical pages and
 		 * mappings.
 		 */
+		entry = start_entry;
 		while ((entry != &map->header) && (entry->start < end)) {
 			KASSERT(entry->eflags & MAP_ENTRY_USER_WIRED, ("expected USER_WIRED on entry %p", entry));
 			entry->eflags &= ~MAP_ENTRY_USER_WIRED;
@@ -2287,7 +2291,7 @@ vm_map_split(entry)
 	source = orig_object->backing_object;
 	if (source != NULL) {
 		vm_object_reference(source);	/* Referenced by new_object */
-		TAILQ_INSERT_TAIL(&source->shadow_head,
+		LIST_INSERT_HEAD(&source->shadow_head,
 				  new_object, shadow_list);
 		vm_object_clear_flag(source, OBJ_ONEMAPPING);
 		new_object->backing_object_offset = 
@@ -2542,7 +2546,8 @@ vm_map_stack (vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 
 	if (VM_MIN_ADDRESS > 0 && addrbos < VM_MIN_ADDRESS)
 		return (KERN_NO_SPACE);
-
+	if (addrbos > map->max_offset)
+		return (KERN_NO_SPACE);
 	if (max_ssize < sgrowsiz)
 		init_ssize = max_ssize;
 	else
@@ -3194,14 +3199,14 @@ vm_uiomove(mapa, srcobject, cp, cnta, uaddra, npages)
 					vm_object_reference(srcobject);
 
 					if (oldobject) {
-						TAILQ_REMOVE(&oldobject->shadow_head,
+						LIST_REMOVE(
 							first_object, shadow_list);
 						oldobject->shadow_count--;
 						/* XXX bump generation? */
 						vm_object_deallocate(oldobject);
 					}
 
-					TAILQ_INSERT_TAIL(&srcobject->shadow_head,
+					LIST_INSERT_HEAD(&srcobject->shadow_head,
 						first_object, shadow_list);
 					srcobject->shadow_count++;
 					/* XXX bump generation? */
@@ -3284,7 +3289,7 @@ vm_freeze_copyopts(object, froma, toa)
 	if (object->shadow_count > object->ref_count)
 		panic("vm_freeze_copyopts: sc > rc");
 
-	while((robject = TAILQ_FIRST(&object->shadow_head)) != NULL) {
+	while((robject = LIST_FIRST(&object->shadow_head)) != NULL) {
 		vm_pindex_t bo_pindex;
 		vm_page_t m_in, m_out;
 
@@ -3330,7 +3335,7 @@ vm_freeze_copyopts(object, froma, toa)
 
 		object->shadow_count--;
 		object->ref_count--;
-		TAILQ_REMOVE(&object->shadow_head, robject, shadow_list);
+		LIST_REMOVE(robject, shadow_list);
 		robject->backing_object = NULL;
 		robject->backing_object_offset = 0;
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/vm86bios.s,v 1.15.2.1 2000/05/16 06:58:07 dillon Exp $
+ * $FreeBSD: src/sys/i386/i386/vm86bios.s,v 1.15.2.2 2003/08/09 16:21:18 luoqi Exp $
  */
 
 #include <machine/asmacros.h>		/* miscellaneous asm macros */
@@ -125,6 +125,9 @@ ENTRY(vm86_bioscall)
 	movl	SCR_NEWPTD(%edx),%eax	/* mapping for vm86 page table */
 	movl	%eax,0(%ebx)		/* ... install as PTD entry 0 */
 
+#ifdef PAE
+	movl	$_IdlePDPT-KERNBASE,%ecx
+#endif
 	movl	%ecx,%cr3		/* new page tables */
 	movl	SCR_VMFRAME(%edx),%esp	/* switch to new stack */
 	

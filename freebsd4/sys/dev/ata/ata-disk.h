@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.22.2.7 2002/03/18 08:37:33 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.22.2.9 2003/09/05 18:27:39 dg Exp $
  */
 
 /* structure describing an ATA disk request */
@@ -48,7 +48,6 @@ struct ad_request {
     struct buf			*bp;		/* associated bio ptr */
     u_int8_t			tag;		/* tag ID of this request */
     int				serv;		/* request had service */
-    struct ata_dmaentry		*dmatab;	/* DMA transfer table */
     TAILQ_ENTRY(ad_request)	chain;		/* list management */
 };
 
@@ -76,7 +75,7 @@ struct ad_softc {
     dev_t			dev;		/* device place holder */
 };
 
-void ad_attach(struct ata_device *);
+void ad_attach(struct ata_device *, int);
 void ad_detach(struct ata_device *, int);
 void ad_reinit(struct ata_device *);
 void ad_start(struct ata_device *);

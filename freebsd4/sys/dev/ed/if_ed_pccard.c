@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_pccard.c,v 1.9.2.6 2001/07/25 18:06:01 iedowse Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_pccard.c,v 1.9.2.7 2003/10/06 02:53:52 imp Exp $
  */
 
 #include <sys/param.h>
@@ -99,7 +99,7 @@ static driver_t ed_pccard_driver = {
 
 static devclass_t ed_pccard_devclass;
 
-DRIVER_MODULE(ed, pccard, ed_pccard_driver, ed_pccard_devclass, 0, 0);
+DRIVER_MODULE(if_ed, pccard, ed_pccard_driver, ed_pccard_devclass, 0, 0);
 DRIVER_MODULE(miibus, ed, miibus_driver, miibus_devclass, 0, 0);
 
 /*

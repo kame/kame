@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.33 2002/08/12 11:57:09 sobomax Exp $
+ * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.35 2003/05/18 08:51:15 murray Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.234
  */
@@ -144,6 +144,7 @@
 #define COM_NOPROBE(flags)	((flags) & COM_C_NOPROBE)
 #define COM_C_IIR_TXRDYBUG	(0x80000)
 #define COM_IIR_TXRDYBUG(flags)	((flags) & COM_C_IIR_TXRDYBUG)
+#define	COM_TI16754(flags)	((flags) & 0x200000)
 #define	COM_FIFOSIZE(flags)	(((flags) & 0xff000000) >> 24)
 
 #define	com_scr		7	/* scratch register for 16450-16550 (R/W) */
@@ -720,6 +721,7 @@ static struct isa_pnp_id sio_ids[] = {
 	{0x0100440e, NULL},	/* CRD0001 - Cardinal MVP288IV ? */
 	{0x01308c0e, NULL},	/* CTL3001 - Creative Labs Phoneblaster */
 	{0x36033610, NULL},     /* DAV0336 - DAVICOM 336PNP MODEM */
+	{0x01009416, NULL},     /* ETT0001 - E-Tech Bullet 33k6 PnP */
 	{0x0000aa1a, NULL},	/* FUJ0000 - FUJITSU Modem 33600 PNP/I2 */
 	{0x1200c31e, NULL},	/* GVC0012 - VF1128HV-R9 (win modem?) */
 	{0x0303c31e, NULL},	/* GVC0303 - MaxTech 33.6 PnP D/F/V */
@@ -916,6 +918,29 @@ sioprobe(dev, xrid, rclk)
 	 */
 	disable_intr();
 /* EXTRA DELAY? */
+
+	/*
+	 * For the TI16754 chips, set prescaler to 1 (4 is often the
+	 * default after-reset value) as otherwise it's impossible to
+	 * get highest baudrates.
+	 */
+	if (COM_TI16754(flags)) {
+		u_char cfcr, efr;
+
+		cfcr = sio_getreg(com, com_cfcr);
+		sio_setreg(com, com_cfcr, CFCR_EFR_ENABLE);
+		efr = sio_getreg(com, com_efr);
+		/* Unlock extended features to turn off prescaler. */
+		sio_setreg(com, com_efr, efr | EFR_EFE);
+		/* Disable EFR. */
+		sio_setreg(com, com_cfcr, (cfcr != CFCR_EFR_ENABLE) ? cfcr : 0);
+		/* Turn off prescaler. */
+		sio_setreg(com, com_mcr,
+			   sio_getreg(com, com_mcr) & ~MCR_PRESCALE);
+		sio_setreg(com, com_cfcr, CFCR_EFR_ENABLE);
+		sio_setreg(com, com_efr, efr);
+		sio_setreg(com, com_cfcr, cfcr);
+	}
 
 	/*
 	 * Initialize the speed and the word size and wait long enough to
@@ -1308,6 +1333,9 @@ sioattach(dev, xrid, rclk)
 				com->st16650a = 1;
 				com->tx_fifo_size = 32;
 				printf(" ST16650A");
+			} else if (COM_TI16754(flags)) {
+				com->tx_fifo_size = 64;
+				printf(" TI16754");
 			} else {
 				com->tx_fifo_size = COM_FIFOSIZE(flags);
 				printf(" 16550A");
@@ -1320,7 +1348,7 @@ sioattach(dev, xrid, rclk)
 				break;
 			}
 #endif
-		if (!com->st16650a) {
+		if (!com->st16650a && !COM_TI16754(flags)) {
 			if (!com->tx_fifo_size)
 				com->tx_fifo_size = 16;
 			else

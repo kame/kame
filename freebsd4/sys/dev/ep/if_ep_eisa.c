@@ -19,7 +19,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/dev/ep/if_ep_eisa.c,v 1.18 2000/01/14 07:14:00 peter Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep_eisa.c,v 1.18.2.1 2003/10/06 02:53:51 imp Exp $
  */
 
 #include <sys/param.h>
@@ -263,4 +263,4 @@ static driver_t ep_eisa_driver = {
 
 extern devclass_t ep_devclass;
 
-DRIVER_MODULE(ep, eisa, ep_eisa_driver, ep_devclass, 0, 0);
+DRIVER_MODULE(if_ep, eisa, ep_eisa_driver, ep_devclass, 0, 0);

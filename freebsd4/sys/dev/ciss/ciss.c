@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ciss/ciss.c,v 1.2.2.6 2003/02/18 22:27:41 ps Exp $
+ *	$FreeBSD: src/sys/dev/ciss/ciss.c,v 1.2.2.8 2003/07/30 06:36:13 ps Exp $
  */
 
 /*
@@ -242,9 +242,10 @@ static struct
     { 0x0e11, 0x4080, CISS_BOARD_SA5B,	"Compaq Smart Array 5i" },
     { 0x0e11, 0x4082, CISS_BOARD_SA5B,	"Compaq Smart Array 532" },
     { 0x0e11, 0x4083, CISS_BOARD_SA5B,	"HP Smart Array 5312" },
-    { 0x0e11, 0x409A, CISS_BOARD_SA5B,	"HP Smart Array 641" },
-    { 0x0e11, 0x409B, CISS_BOARD_SA5B,	"HP Smart Array 642" },
-    { 0x0e11, 0x409C, CISS_BOARD_SA5B,	"HP Smart Array 6400" },
+    { 0x0e11, 0x409A, CISS_BOARD_SA5,	"HP Smart Array 641" },
+    { 0x0e11, 0x409B, CISS_BOARD_SA5,	"HP Smart Array 642" },
+    { 0x0e11, 0x409C, CISS_BOARD_SA5,	"HP Smart Array 6400" },
+    { 0x0e11, 0x409D, CISS_BOARD_SA5,	"HP Smart Array 6400 EM" },
     { 0, 0, 0, NULL }
 };
 
@@ -725,7 +726,7 @@ ciss_init_requests(struct ciss_softc *sc)
      */
     sc->ciss_max_requests = min(CISS_MAX_REQUESTS, sc->ciss_cfg->max_outstanding_commands);
     
-    if (1/*bootverbose*/)
+    if (bootverbose)
 	ciss_printf(sc, "using %d of %d available commands\n",
 		    sc->ciss_max_requests, sc->ciss_cfg->max_outstanding_commands);
 
@@ -841,7 +842,7 @@ ciss_identify_adapter(struct ciss_softc *sc)
     sc->ciss_flags |= CISS_FLAG_BMIC_ABORT;
     
     /* print information */
-    if (1/*bootverbose*/) {
+    if (bootverbose) {
 	ciss_printf(sc, "  %d logical drive%s configured\n",
 		    sc->ciss_id->configured_logical_drives,
 		    (sc->ciss_id->configured_logical_drives == 1) ? "" : "s");
@@ -977,7 +978,7 @@ ciss_init_logical(struct ciss_softc *sc)
     /*
      * Save logical drive information.
      */
-    if (1/*bootverbose*/)
+    if (bootverbose)
 	ciss_printf(sc, "%d logical drive%s\n", ndrives, (ndrives > 1) ? "s" : "");
     if (ndrives != sc->ciss_id->configured_logical_drives)
 	ciss_printf(sc, "logical drive map claims %d drives, but adapter claims %d\n",
@@ -1141,7 +1142,7 @@ ciss_identify_logical(struct ciss_softc *sc, struct ciss_ldrive *ld)
     /*
      * Print the drive's basic characteristics.
      */
-    if (1/*bootverbose*/) {
+    if (bootverbose) {
 	ciss_printf(sc, "logical drive %d: %s, %dMB ",
 		    cbc->log_drive, ciss_name_ldrive_org(ld->cl_ldrive->fault_tolerance),
 		    ((ld->cl_ldrive->blocks_available / (1024 * 1024)) *
@@ -1909,7 +1910,7 @@ ciss_user_command(struct ciss_softc *sc, IOCTL_Command_struct *ioc)
     struct ciss_request		*cr;
     struct ciss_command		*cc;
     struct ciss_error_info	*ce;
-    int				error;
+    int				error = 0;
 
     debug_called(1);
 
@@ -1954,9 +1955,17 @@ ciss_user_command(struct ciss_softc *sc, IOCTL_Command_struct *ioc)
     }
 
     /*
-     * Copy the results back to the user.
+     * Check to see if the command succeeded.
      */
     ce = (struct ciss_error_info *)&(cc->sg[0]);
+    if (ciss_report_request(cr, NULL, NULL) == 0)
+	bzero(ce, sizeof(*ce));
+    else
+	error = EIO;
+
+    /*
+     * Copy the results back to the user.
+     */
     bcopy(ce, &ioc->error_info, sizeof(*ce));
     if ((ioc->buf_size > 0) &&
 	(error = copyout(cr->cr_data, ioc->buf, ioc->buf_size))) {

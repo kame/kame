@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44.2.8 2003/01/22 20:14:53 jhb Exp $
+ * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44.2.9 2003/08/09 16:21:19 luoqi Exp $
  */
 
 #ifndef _MACHINE_ASNAMES_H_
@@ -52,11 +52,10 @@
 
 #ifdef __ELF__
 
-#define _APTD				APTD
-#define _APTDpde			APTDpde
-#define _APTmap				APTmap
 #define _CONST_QNaN			CONST_QNaN
+#define _IdlePDPT			IdlePDPT
 #define _IdlePTD			IdlePTD
+#define _KERNend			KERNend
 #define _KPTphys			KPTphys
 #define _MP_GDT				MP_GDT
 #define _MPgetlock			MPgetlock

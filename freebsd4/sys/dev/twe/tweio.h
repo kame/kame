@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/twe/tweio.h,v 1.1.2.2 2002/03/07 09:57:02 msmith Exp $
+ *	$FreeBSD: src/sys/dev/twe/tweio.h,v 1.1.2.3 2003/08/10 20:25:46 ps Exp $
  */
 
 
@@ -90,3 +90,13 @@ struct twe_paramcommand {
  * Request a controller soft-reset
  */
 #define TWEIO_RESET		_IO  ('T', 106)
+
+/*
+ * Request a drive addition or deletion
+ */
+struct twe_drivecommand {
+    int		td_unit;
+};
+
+#define TWEIO_ADD_UNIT		_IOW ('U', 107, int)
+#define TWEIO_DEL_UNIT		_IOW ('U', 108, int)

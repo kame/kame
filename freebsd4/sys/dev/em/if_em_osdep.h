@@ -31,7 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em_osdep.h,v 1.1.2.9 2003/01/03 18:18:56 pdeuskar Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em_osdep.h,v 1.1.2.12 2003/09/03 16:36:46 pdeuskar Exp $*/
 
 #ifndef _FREEBSD_OS_H_
 #define _FREEBSD_OS_H_
@@ -92,24 +92,15 @@ struct em_osdep
 #define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS)
 
 #define E1000_READ_REG(a, reg) (\
- ((a)->mac_type >= em_82543) ? \
    bus_space_read_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
                      ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-                     E1000_##reg): \
-   bus_space_read_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
-                      ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-                       E1000_82542_##reg))
-
+                     ((a)->mac_type >= em_82543) ? E1000_##reg : E1000_82542_##reg))
 
 #define E1000_WRITE_REG(a, reg, value) (\
- ((a)->mac_type >= em_82543) ? \
    bus_space_write_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
                      ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-                     E1000_##reg, value): \
-   bus_space_write_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
-                      ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-                       E1000_82542_##reg, value))
-
+		     ((a)->mac_type >= em_82543) ? E1000_##reg : E1000_82542_##reg, \
+                     value))
 
 #define E1000_READ_REG_ARRAY(a, reg, offset) (\
  ((a)->mac_type >= em_82543) ? \

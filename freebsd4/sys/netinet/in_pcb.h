@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.7 2003/01/24 05:11:34 sam Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.8 2003/09/09 19:09:22 bms Exp $
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -144,6 +144,7 @@ struct inpcb {
 	u_char	inp_vflag;
 #define	INP_IPV4	0x1
 #define	INP_IPV6	0x2
+#define	INP_ONESBCAST	0x10		/* send all-ones broadcast */
 	u_char	inp_ip_ttl;		/* time to live proto */
 	u_char	inp_ip_p;		/* protocol proto */
 

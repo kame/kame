@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_msg.c,v 1.6 2000/01/17 20:49:56 mks Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_msg.c,v 1.6.2.1 2003/08/08 15:45:37 harti Exp $
  *
  */
 
@@ -35,6 +35,10 @@
  *
  */
 
+#include <sys/param.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
+
 #include <netatm/kern_include.h>
 
 #include <netatm/uni/unisig_var.h>
@@ -43,7 +47,7 @@
 #include <netatm/uni/unisig_print.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_msg.c,v 1.6 2000/01/17 20:49:56 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_msg.c,v 1.6.2.1 2003/08/08 15:45:37 harti Exp $");
 #endif
 
 
@@ -55,12 +59,15 @@ static void	unisig_rcv_setup __P((struct unisig *, struct unisig_msg *));
 
 
 /*
- * Local variables
+ * net.harp.uni.unisig_print_msg
+ *
+ * 0 - disable
+ * 1 - dump UNI message
+ * 2 - dump UNI message + print decoded form
  */
-#ifdef DIAGNOSTIC
 static int	unisig_print_msg = 0;
-#endif
-
+SYSCTL_INT(_net_harp_uni, OID_AUTO, unisig_print_msg, CTLFLAG_RW,
+    &unisig_print_msg, 0, "dump UNI messages");
 
 /*
  * Set a Cause IE based on information in an ATM attribute block
@@ -190,13 +197,11 @@ unisig_send_msg(usp, msg)
 	if (usp->us_state != UNISIG_ACTIVE)
 		return(ENETDOWN);
 
-#ifdef DIAGNOSTIC
 	/*
 	 * Print the message we're sending.
 	 */
 	if (unisig_print_msg)
 		usp_print_msg(msg, UNISIG_MSG_OUT);
-#endif
 
 	/*
 	 * Convert message to network order
@@ -214,13 +219,11 @@ unisig_send_msg(usp, msg)
 		return(EIO);
 	}
 
-#ifdef DIAGNOSTIC
 	/*
 	 * Print the converted message
 	 */
 	if (unisig_print_msg > 1)
 		unisig_print_mbuf(usf.usf_m_base);
-#endif
 
 	/*
 	 * Send the message
@@ -848,13 +851,11 @@ unisig_rcv_msg(usp, m)
 		goto done;
 	}
 
-#ifdef DIAGNOSTIC
 	/*
 	 * Debug--print some information about the message
 	 */
 	if (unisig_print_msg)
 		usp_print_msg(msg, UNISIG_MSG_IN);
-#endif
 
 	/*
 	 * Get the call reference value

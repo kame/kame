@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_stat.c,v 1.10 1999/12/15 23:01:45 eivind Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_stat.c,v 1.10.2.1 2003/08/10 23:30:18 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -82,6 +82,10 @@ cvt_statfs(sp, buf, len)
 {
 	struct ibcs2_statfs ssfs;
 
+	if (len < 0)
+		return (EINVAL);
+	else if (len > sizeof(ssfs))
+		len = sizeof(ssfs);
 	bzero(&ssfs, sizeof ssfs);
 	ssfs.f_fstyp = 0;
 	ssfs.f_bsize = sp->f_bsize;

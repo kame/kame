@@ -31,7 +31,7 @@
  * mpboot.s:	FreeBSD machine support for the Intel MP Spec
  *		multiprocessor systems.
  *
- * $FreeBSD: src/sys/i386/i386/mpboot.s,v 1.13.2.3 2000/09/07 01:18:26 tegge Exp $
+ * $FreeBSD: src/sys/i386/i386/mpboot.s,v 1.13.2.4 2003/08/09 16:21:18 luoqi Exp $
  */
 
 #include <machine/asmacros.h>		/* miscellaneous asm macros */
@@ -39,6 +39,8 @@
 #include <machine/specialreg.h>
 
 #include "assym.s"
+
+#define	R(x)	((x)-KERNBASE)
 
 /*
  * this code MUST be enabled here and in mp_machdep.c
@@ -74,7 +76,14 @@
 NON_GPROF_ENTRY(MPentry)
 	CHECKPOINT(0x36, 3)
 	/* Now enable paging mode */
-	movl	_IdlePTD-KERNBASE, %eax
+#ifdef PAE
+	movl	%cr4,%eax
+	orl	$CR4_PAE,%eax
+	movl	%eax,%cr4
+	movl	$R(_IdlePDPT),%eax
+#else
+	movl	R(_IdlePTD),%eax
+#endif
 	movl	%eax,%cr3	
 	movl	%cr0,%eax
 	orl	$CR0_PE|CR0_PG,%eax		/* enable paging */

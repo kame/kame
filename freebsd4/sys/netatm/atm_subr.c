@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_subr.c,v 1.7 2000/02/13 03:31:59 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_subr.c,v 1.7.2.2 2003/08/08 08:44:10 harti Exp $
  *
  */
 
@@ -35,11 +35,13 @@
  *
  */
 
+#include <sys/param.h>
+#include <sys/sysctl.h>
 #include <netatm/kern_include.h>
 #include <net/intrq.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_subr.c,v 1.7 2000/02/13 03:31:59 peter Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_subr.c,v 1.7.2.2 2003/08/08 08:44:10 harti Exp $");
 #endif
 
 
@@ -56,9 +58,6 @@ int			atm_intr_index;
 #endif
 struct atm_sock_stat	atm_sock_stat = { { 0 } };
 int			atm_init = 0;
-int			atm_debug = 0;
-int			atm_dev_print = 0;
-int			atm_print_data = 0;
 int			atm_version = ATM_VERSION;
 struct timeval		atm_debugtime = {0, 0};
 const int		atmintrq_present = 1;
@@ -70,6 +69,26 @@ struct sp_info	atm_attributes_pool = {
 	100				/* si_maxallow */
 };
 
+/*
+ * net.harp.atm.atm_debug
+ */
+int atm_debug;
+SYSCTL_INT(_net_harp_atm, OID_AUTO, atm_debug, CTLFLAG_RW,
+    &atm_debug, 0, "HARP ATM layer debugging flag");
+
+/*
+ * net.harp.atm.atm_dev_print
+ */
+int atm_dev_print;
+SYSCTL_INT(_net_harp_atm, OID_AUTO, atm_dev_print, CTLFLAG_RW,
+    &atm_dev_print, 0, "display ATM CPCS headers");
+
+/*
+ * net.harp.atm.atm_print_data
+ */
+int atm_print_data;
+SYSCTL_INT(_net_harp_atm, OID_AUTO, atm_print_data, CTLFLAG_RW,
+    &atm_print_data, 0, "display ATM CPCS payloads");
 
 /*
  * Local functions
@@ -942,23 +961,21 @@ atm_intr()
  *
  */
 void
-atm_pdu_print(m, msg)
-	KBuffer		*m;
-	char		*msg;
+atm_pdu_print(const KBuffer *m, const char *msg)
 {
-	caddr_t		cp;
+	const u_char	*cp;
 	int		i;
 	char		c = ' ';
 
 	printf("%s:", msg);
 	while (m) { 
-		KB_DATASTART(m, cp, caddr_t);
+		KB_DATASTART(m, cp, const u_char *);
 		printf("%cbfr=%p data=%p len=%d: ",
 			c, m, cp, KB_LEN(m));
 		c = '\t';
 		if (atm_print_data) {
 			for (i = 0; i < KB_LEN(m); i++) {
-				printf("%2x ", (u_char)*cp++);
+				printf("%2x ", *cp++);
 			}
 			printf("<end_bfr>\n");
 		} else {
@@ -967,4 +984,3 @@ atm_pdu_print(m, msg)
 		m = KB_NEXT(m);
 	}
 }
-

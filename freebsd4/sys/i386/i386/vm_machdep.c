@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.132.2.9 2003/01/25 19:02:23 dillon Exp $
+ * $FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.132.2.11 2003/08/31 00:16:27 luoqi Exp $
  */
 
 #include "npx.h"
@@ -162,7 +162,11 @@ cpu_fork(p1, p2, flags)
 	 * Set registers for trampoline to user mode.  Leave space for the
 	 * return address on stack.  These are the kernel mode register values.
 	 */
+#ifdef PAE
+	pcb2->pcb_cr3 = vtophys(vmspace_pmap(p2->p_vmspace)->pm_pdpt);
+#else
 	pcb2->pcb_cr3 = vtophys(vmspace_pmap(p2->p_vmspace)->pm_pdir);
+#endif
 	pcb2->pcb_edi = 0;
 	pcb2->pcb_esi = (int)fork_return;	/* fork_trampoline argument */
 	pcb2->pcb_ebp = 0;
@@ -318,15 +322,15 @@ setredzone(pte, vaddr)
 /*
  * Convert kernel VA to physical address
  */
-u_long
+vm_paddr_t
 kvtop(void *addr)
 {
-	vm_offset_t va;
+	vm_paddr_t pa;
 
-	va = pmap_kextract((vm_offset_t)addr);
-	if (va == 0)
+	pa = pmap_kextract((vm_offset_t)addr);
+	if (pa == 0)
 		panic("kvtop: zero page frame");
-	return((int)va);
+	return (pa);
 }
 
 /*
@@ -564,7 +568,7 @@ swi_vm()
 
 int
 is_physical_memory(addr)
-	vm_offset_t addr;
+	vm_paddr_t addr;
 {
 
 #if NISA > 0

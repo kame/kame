@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/sys_process.c,v 1.51.2.6 2003/01/08 03:06:45 kan Exp $
+ * $FreeBSD: src/sys/kern/sys_process.c,v 1.51.2.7 2003/08/10 23:09:28 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -404,7 +404,8 @@ kern_ptrace(struct proc *curp, int req, pid_t pid, void *addr, int data)
 	case PT_STEP:
 	case PT_CONTINUE:
 	case PT_DETACH:
-		if ((req != PT_STEP) && ((unsigned)data > _SIG_MAXSIG))
+		/* Zero means do not send any signal */
+		if (data < 0 || data > _SIG_MAXSIG)
 			return EINVAL;
 
 		PHOLD(p);

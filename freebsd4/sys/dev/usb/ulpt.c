@@ -1,5 +1,5 @@
 /*	$NetBSD: ulpt.c,v 1.29 1999/11/17 23:00:50 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.26.2.13 2002/11/06 20:23:50 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.26.2.14 2003/06/22 13:54:30 iedowse Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -408,8 +408,13 @@ ulptopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 #endif
 
 
-	if ((flags & ULPT_NOPRIME) == 0)
+	if ((flags & ULPT_NOPRIME) == 0) {
 		ulpt_reset(sc);
+		if (sc->sc_dying) {
+			sc->sc_state = 0;
+			return (ENXIO);
+		}
+	}
 
 	for (spin = 0; (ulpt_status(sc) & LPS_SELECT) == 0; spin += STEP) {
 		if (spin >= TIMEOUT) {

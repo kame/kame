@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.h	8.3 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/in.h,v 1.48.2.9 2002/12/01 14:03:10 sobomax Exp $
+ * $FreeBSD: src/sys/netinet/in.h,v 1.48.2.11 2003/09/09 19:09:22 bms Exp $
  */
 
 #ifndef _NETINET_IN_H_
@@ -321,6 +321,8 @@ struct sockaddr_in {
 #define	IP_IPSEC_POLICY		21   /* int; set/get security policy */
 #define	IP_FAITH		22   /* bool; accept FAITH'ed connections */
 
+#define	IP_ONESBCAST		23   /* bool: send all-ones broadcast */
+
 #define	IP_FW_ADD     		50   /* add a firewall rule to chain */
 #define	IP_FW_DEL    		51   /* delete a firewall rule from chain */
 #define	IP_FW_FLUSH   		52   /* flush firewall rule chain */
@@ -417,6 +419,22 @@ struct ip_mreq {
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ "ipsec", CTLTYPE_NODE }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ "pim", CTLTYPE_NODE }, \
 }
 
 /*

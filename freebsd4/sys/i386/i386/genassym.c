@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/i386/i386/genassym.c,v 1.86.2.3 2002/03/03 05:42:49 nyan Exp $
+ * $FreeBSD: src/sys/i386/i386/genassym.c,v 1.86.2.5 2003/08/30 15:39:07 tegge Exp $
  */
 
 #include "opt_user_ldt.h"
@@ -96,6 +96,10 @@ ASSYM(NPTEPG, NPTEPG);
 ASSYM(NPDEPG, NPDEPG);
 ASSYM(PDESIZE, PDESIZE);
 ASSYM(PTESIZE, PTESIZE);
+ASSYM(PDESHIFT, PDESHIFT);
+ASSYM(PTESHIFT, PTESHIFT);
+ASSYM(NPGPTD, NPGPTD);
+ASSYM(NPDEPTD, NPDEPTD);
 ASSYM(PAGE_SHIFT, PAGE_SHIFT);
 ASSYM(PAGE_MASK, PAGE_MASK);
 ASSYM(PDRSHIFT, PDRSHIFT);
@@ -194,10 +198,12 @@ ASSYM(GD_PRV_CMAP1, offsetof(struct globaldata, gd_prv_CMAP1));
 ASSYM(GD_PRV_CMAP2, offsetof(struct globaldata, gd_prv_CMAP2));
 ASSYM(GD_PRV_CMAP3, offsetof(struct globaldata, gd_prv_CMAP3));
 ASSYM(GD_PRV_PMAP1, offsetof(struct globaldata, gd_prv_PMAP1));
+ASSYM(GD_PRV_PMAP2, offsetof(struct globaldata, gd_prv_PMAP2));
 ASSYM(GD_PRV_CADDR1, offsetof(struct globaldata, gd_prv_CADDR1));
 ASSYM(GD_PRV_CADDR2, offsetof(struct globaldata, gd_prv_CADDR2));
 ASSYM(GD_PRV_CADDR3, offsetof(struct globaldata, gd_prv_CADDR3));
 ASSYM(GD_PRV_PADDR1, offsetof(struct globaldata, gd_prv_PADDR1));
+ASSYM(GD_PRV_PADDR2, offsetof(struct globaldata, gd_prv_PADDR2));
 ASSYM(PS_IDLESTACK, offsetof(struct privatespace, idlestack));
 ASSYM(PS_IDLESTACK_TOP, sizeof(struct privatespace));
 #endif

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/uniarp.c,v 1.8 2000/01/15 20:46:07 mks Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/uniarp.c,v 1.8.2.1 2003/08/08 15:45:37 harti Exp $
  *
  */
 
@@ -34,6 +34,9 @@
  * UNI ATMARP support (RFC1577)
  *
  */
+#include <sys/param.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 
 #include <netatm/kern_include.h>
 
@@ -43,7 +46,7 @@
 #include <netatm/uni/uniip_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniarp.c,v 1.8 2000/01/15 20:46:07 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniarp.c,v 1.8.2.1 2003/08/08 15:45:37 harti Exp $");
 #endif
 
 
@@ -55,7 +58,13 @@ struct uniarp		*uniarp_nomaptab = NULL;
 struct uniarp		*uniarp_pvctab = NULL;
 struct atm_time		uniarp_timer = {0, 0};		/* Aging timer */
 struct uniarp_stat	uniarp_stat = {0};
+
+/*
+ * net.harp.uni.uniarp_print
+ */
 int			uniarp_print = 0;
+SYSCTL_INT(_net_harp_uni, OID_AUTO, uniarp_print, CTLFLAG_RW,
+    &uniarp_print, 0, "dump UNI/ARP messages");
 
 Atm_endpoint	uniarp_endpt = {
 	NULL,

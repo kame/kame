@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.19.2.8 2003/01/22 20:14:52 jhb Exp $
+ * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.19.2.9 2003/04/05 13:47:19 dwmalone Exp $
  */
 
 #include "opt_cpu.h"
@@ -578,7 +578,8 @@ initializecpu(void)
 			 */
 			if ((cpu_feature & CPUID_XMM) == 0 &&
 			    ((cpu_id & ~0xf) == 0x660 ||
-			     (cpu_id & ~0xf) == 0x670)) {
+			     (cpu_id & ~0xf) == 0x670 ||
+			     (cpu_id & ~0xf) == 0x680)) {
 				u_int regs[4];
 				wrmsr(0xC0010015, rdmsr(0xC0010015) & ~0x08000);
 				do_cpuid(1, regs);

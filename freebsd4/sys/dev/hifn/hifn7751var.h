@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/hifn/hifn7751var.h,v 1.1.2.1 2002/11/21 23:37:11 sam Exp $ */
+/* $FreeBSD: src/sys/dev/hifn/hifn7751var.h,v 1.1.2.3 2003/10/08 23:52:00 sam Exp $ */
 /*	$OpenBSD: hifn7751var.h,v 1.42 2002/04/08 17:49:42 jason Exp $	*/
 
 /*
@@ -67,6 +67,8 @@
 #define HIFN_3DES_KEY_LENGTH		24
 #define HIFN_MAX_CRYPT_KEY_LENGTH	HIFN_3DES_KEY_LENGTH
 #define HIFN_IV_LENGTH			8
+#define	HIFN_AES_IV_LENGTH		16
+#define HIFN_MAX_IV_LENGTH		HIFN_AES_IV_LENGTH
 
 /*
  *  Length values for authentication
@@ -111,7 +113,7 @@ struct hifn_dma {
 struct hifn_session {
 	int hs_state;
 	int hs_prev_op; /* XXX collapse into hs_flags? */
-	u_int8_t hs_iv[HIFN_IV_LENGTH];
+	u_int8_t hs_iv[HIFN_MAX_IV_LENGTH];
 };
 
 #define	HIFN_RING_SYNC(sc, r, i, f)					\
@@ -165,11 +167,16 @@ struct hifn_softc {
 	int			sc_flags;
 #define	HIFN_HAS_RNG		0x1	/* includes random number generator */
 #define	HIFN_HAS_PUBLIC		0x2	/* includes public key support */
-#define	HIFN_IS_7811		0x4	/* Hifn 7811 part */
+#define	HIFN_HAS_AES		0x4	/* includes AES support */
+#define	HIFN_IS_7811		0x8	/* Hifn 7811 part */
+#define	HIFN_IS_7956		0x10	/* Hifn 7956/7955 don't have SDRAM */
 	struct callout		sc_rngto;	/* for polling RNG */
 	struct callout		sc_tickto;	/* for managing DMA */
 	int			sc_rngfirst;
 	int			sc_rnghz;	/* RNG polling frequency */
+	struct rndtest_state	*sc_rndtest;	/* RNG test state */
+	void			(*sc_harvest)(struct rndtest_state *,
+					void *, u_int);
 	int			sc_c_busy;	/* command ring busy */
 	int			sc_s_busy;	/* source data ring busy */
 	int			sc_d_busy;	/* destination data ring busy */
@@ -259,7 +266,7 @@ struct hifn_operand {
 struct hifn_command {
 	u_int16_t session_num;
 	u_int16_t base_masks, cry_masks, mac_masks;
-	u_int8_t iv[HIFN_IV_LENGTH], *ck, mac[HIFN_MAC_KEY_LENGTH];
+	u_int8_t iv[HIFN_MAX_IV_LENGTH], *ck, mac[HIFN_MAC_KEY_LENGTH];
 	int cklen;
 	int sloplen, slopidx;
 

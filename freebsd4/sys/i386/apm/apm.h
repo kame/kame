@@ -15,7 +15,7 @@
  *
  * Sep, 1994	Implemented on FreeBSD 1.1.5.1R (Toshiba AVS001WD)
  *
- * $FreeBSD: src/sys/i386/apm/apm.h,v 1.1 1999/10/02 03:34:15 nsayer Exp $
+ * $FreeBSD: src/sys/i386/apm/apm.h,v 1.1.4.1 2003/08/18 20:22:22 jhb Exp $
  */
 
 #define APM_NEVENTS 16
@@ -26,6 +26,7 @@ struct apm_softc {
 	int	initialized, active, bios_busy;
 	int	always_halt_cpu, slow_idle_cpu;
 	int	disabled, disengaged;
+	int	suspending;
 	int	standby_countdown, suspend_countdown;
 	u_int	minorversion, majorversion;
 	u_int	intversion, connectmode;

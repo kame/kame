@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002
+ * Copyright (c) 2002-2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/if_fwevar.h,v 1.1.2.2 2003/03/12 10:59:00 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/if_fwevar.h,v 1.1.2.3 2003/04/28 03:29:18 simokawa Exp $
  */
 
 #ifndef _NET_IF_FWEVAR_H_

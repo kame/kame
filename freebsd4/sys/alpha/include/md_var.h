@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/md_var.h,v 1.9.2.2 2000/07/04 01:50:44 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/include/md_var.h,v 1.9.2.3 2003/08/31 00:16:26 luoqi Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -49,7 +49,7 @@ struct pcicfg;
 void	busdma_swi __P((void));
 void	cpu_halt __P((void));
 void	cpu_reset __P((void));
-int	is_physical_memory __P((vm_offset_t addr));
+int	is_physical_memory __P((vm_paddr_t addr));
 void	swi_vm __P((void));
 int	vm_page_zero_idle __P((void));
 int	fill_regs __P((struct proc *, struct reg *));

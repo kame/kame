@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.11 2002/07/30 19:05:00 silby Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.15 2003/09/28 11:08:31 iedowse Exp $
  */
 
 #include "opt_ktrace.h"
@@ -183,9 +183,11 @@ fork1(p1, flags, procp)
 	struct proc *p2, *pptr;
 	uid_t uid;
 	struct proc *newproc;
-	int ok;
-	static int pidchecked = 0;
+	int ok, s;
+	static int curfail = 0, pidchecked = 0;
+	static struct timeval lastfail;
 	struct forklist *ep;
+	struct filedesc_to_leader *fdtol;
 
 	if ((flags & (RFFDG|RFCFDG)) == (RFFDG|RFCFDG))
 		return (EINVAL);
@@ -232,6 +234,8 @@ fork1(p1, flags, procp)
 	 */
 	uid = p1->p_cred->p_ruid;
 	if ((nprocs >= maxproc - 10 && uid != 0) || nprocs >= maxproc) {
+		if (ppsratecheck(&lastfail, &curfail, 1))
+			printf("maxproc limit exceeded by uid %d, please see tuning(7) and login.conf(5).\n", uid);
 		tsleep(&forksleep, PUSER, "fork", hz / 2);
 		return (EAGAIN);
 	}
@@ -252,6 +256,8 @@ fork1(p1, flags, procp)
 		 * Back out the process count
 		 */
 		nprocs--;
+		if (ppsratecheck(&lastfail, &curfail, 1))
+			printf("maxproc limit exceeded by uid %d, please see tuning(7) and login.conf(5).\n", uid);
 		tsleep(&forksleep, PUSER, "fork", hz / 2);
 		return (EAGAIN);
 	}
@@ -410,12 +416,35 @@ again:
 	if (p2->p_textvp)
 		VREF(p2->p_textvp);
 
-	if (flags & RFCFDG)
+	if (flags & RFCFDG) {
 		p2->p_fd = fdinit(p1);
-	else if (flags & RFFDG)
+		fdtol = NULL;
+	} else if (flags & RFFDG) {
 		p2->p_fd = fdcopy(p1);
-	else
+		fdtol = NULL;
+	} else {
 		p2->p_fd = fdshare(p1);
+		if (p1->p_fdtol == NULL)
+			p1->p_fdtol =
+				filedesc_to_leader_alloc(NULL,
+							 p1->p_leader);
+		if ((flags & RFTHREAD) != 0) {
+			/*
+			 * Shared file descriptor table and
+			 * shared process leaders.
+			 */
+			fdtol = p1->p_fdtol;
+			fdtol->fdl_refcount++;
+		} else {
+			/* 
+			 * Shared file descriptor table, and
+			 * different process leaders 
+			 */
+			fdtol = filedesc_to_leader_alloc(p1->p_fdtol,
+							 p2);
+		}
+	}
+	p2->p_fdtol = fdtol;
 
 	/*
 	 * If p_limit is still copy-on-write, bump refcnt,
@@ -515,10 +544,10 @@ again:
 	 */
 	microtime(&(p2->p_stats->p_start));
 	p2->p_acflag = AFORK;
-	(void) splhigh();
+	s = splhigh();
 	p2->p_stat = SRUN;
 	setrunqueue(p2);
-	(void) spl0();
+	splx(s);
 
 	/*
 	 * Now can be swapped.

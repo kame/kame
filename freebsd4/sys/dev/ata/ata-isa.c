@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-isa.c,v 1.4.2.1 2002/03/18 08:37:33 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-isa.c,v 1.4.2.3 2003/10/01 04:02:18 luoqi Exp $
  */
 
 #include <sys/param.h>
@@ -107,33 +107,41 @@ DRIVER_MODULE(ata, isa, ata_isa_driver, ata_devclass, 0, 0);
  */
 #include "pci.h"
 #if NPCI == 0
-void *
-ata_dmaalloc(struct ata_channel *ch, int device)
+int
+ata_dmaalloc(struct ata_device *atadev)
 {
-    return 0;
+    return ENXIO;
 }
 
 void
-ata_dmainit(struct ata_channel *ch, int device,
-	    int piomode, int wdmamode, int udmamode)
+ata_dmafree(struct ata_device *atadev)
+{
+}
+
+void
+ata_dmafreetags(struct ata_channel *ch)
+{
+}
+
+void
+ata_dmainit(struct ata_device *atadev, int piomode, int wdmamode, int udmamode)
 {
 }
 
 int
-ata_dmasetup(struct ata_channel *ch, int device, struct ata_dmaentry *dmatab,
-	     caddr_t data, int32_t count)
+ata_dmasetup(struct ata_device *atadev, caddr_t data, int32_t count)
 {
     return -1;
 }
 
-void
-ata_dmastart(struct ata_channel *ch, int device, 
-	     struct ata_dmaentry *dmatab, int dir)
+int
+ata_dmastart(struct ata_device *atadev, caddr_t data, int32_t count, int dir)
 {
+    return -1;
 }
 
 int
-ata_dmadone(struct ata_channel *ch)
+ata_dmadone(struct ata_device *atadev)
 {
     return -1;
 }

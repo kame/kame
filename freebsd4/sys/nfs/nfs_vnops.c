@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_vnops.c	8.16 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.150.2.5 2001/12/20 19:56:28 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.150.2.6 2003/06/20 00:54:11 iedowse Exp $
  */
 
 
@@ -1558,6 +1558,12 @@ nfs_removeit(sp)
 	register struct sillyrename *sp;
 {
 
+	/*
+	 * Make sure that the directory vnode is still valid.
+	 * XXX we should lock sp->s_dvp here.
+	 */
+	if (sp->s_dvp->v_type == VBAD)
+		return (0);
 	return (nfs_removerpc(sp->s_dvp, sp->s_name, sp->s_namlen, sp->s_cred,
 		(struct proc *)0));
 }

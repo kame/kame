@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.21.2.7 2003/01/02 20:41:33 kan Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.21.2.8 2003/09/14 16:25:23 sobomax Exp $
  */
 
 #include <sys/param.h>
@@ -66,7 +66,6 @@ DUMMY(capset);
 DUMMY(sendfile);
 DUMMY(mmap2);
 DUMMY(truncate64);
-DUMMY(ftruncate64);
 DUMMY(setfsuid);
 DUMMY(setfsgid);
 DUMMY(pivot_root);

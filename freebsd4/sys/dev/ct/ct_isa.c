@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.3.2.2 2001/10/17 14:00:34 nyan Exp $ */
+/* $FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.3.2.3 2003/06/01 04:26:44 nyan Exp $ */
 /*	$NecBSD: ct_isa.c,v 1.6 1999/07/26 06:32:01 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -144,6 +144,15 @@ ct_isa_match(device_t dev)
 
 	if (ISA_PNP_PROBE(device_get_parent(dev), dev, ct_pnp_ids) == ENXIO)
 		return ENXIO;
+
+	switch (isa_get_logicalid(dev)) {
+	case 0x0100e7b1:	/* LHA-301 */
+	case 0x110154dc:	/* SC-98III */
+	case 0x4120acb4:	/* IFC-NN */
+		/* XXX - force to SMIT mode */
+		device_set_flags(dev, device_get_flags(dev) | 0x40000);
+		break;
+	}
 
 	if (isa_get_port(dev) == -1)
 		bus_set_resource(dev, SYS_RES_IOPORT, 0,

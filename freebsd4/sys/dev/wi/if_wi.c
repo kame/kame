@@ -103,7 +103,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/wi/if_wi.c,v 1.103.2.2 2002/08/02 07:11:34 imp Exp $";
+  "$FreeBSD: src/sys/dev/wi/if_wi.c,v 1.103.2.5 2003/08/07 04:31:14 imp Exp $";
 #endif
 
 static void wi_intr(void *);
@@ -111,7 +111,6 @@ static void wi_reset(struct wi_softc *);
 static int wi_ioctl(struct ifnet *, u_long, caddr_t);
 static void wi_init(void *);
 static void wi_start(struct ifnet *);
-static void wi_stop(struct wi_softc *);
 static void wi_watchdog(struct ifnet *);
 static void wi_rxeof(struct wi_softc *);
 static void wi_txeof(struct wi_softc *, int);
@@ -198,7 +197,6 @@ wi_generic_detach(dev)
 	ifmedia_removeall(&sc->ifmedia);
 
 	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
-	bus_teardown_intr(dev, sc->irq, sc->wi_intrhand);
 	wi_free(dev);
 	sc->wi_gone = 1;
 
@@ -2345,7 +2343,6 @@ nextpkt:
 
 		if (sc->wi_ptype == WI_PORTTYPE_AP && sc->wi_use_wep) {
 			/* Do host encryption. */
-			printf( "XXX: host encrypt not implemented for 802.3\n" );
 		} else {
 			eh->ether_type = htons(m0->m_pkthdr.len -
 			    WI_SNAPHDR_LEN);
@@ -2422,7 +2419,7 @@ wi_mgmt_xmit(sc, data, len)
 	return(0);
 }
 
-static void
+void
 wi_stop(sc)
 	struct wi_softc		*sc;
 {
@@ -2533,6 +2530,10 @@ wi_free(dev)
 {
 	struct wi_softc		*sc = device_get_softc(dev);
 
+	if (sc->wi_intrhand != NULL) {
+		bus_teardown_intr(dev, sc->irq, sc->wi_intrhand);
+		sc->wi_intrhand = NULL;
+	}
 	if (sc->iobase != NULL) {
 		bus_release_resource(dev, SYS_RES_IOPORT, sc->iobase_rid, sc->iobase);
 		sc->iobase = NULL;

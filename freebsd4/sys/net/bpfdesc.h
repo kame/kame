@@ -37,7 +37,7 @@
  *
  *      @(#)bpfdesc.h	8.1 (Berkeley) 6/10/93
  *
- * $FreeBSD: src/sys/net/bpfdesc.h,v 1.14.2.2 2001/12/17 19:32:33 jdp Exp $
+ * $FreeBSD: src/sys/net/bpfdesc.h,v 1.14.2.3 2003/08/21 23:50:54 jmg Exp $
  */
 
 #ifndef _NET_BPFDESC_H_
@@ -98,6 +98,12 @@ struct bpf_d {
 #define BPF_WAITING	1		/* waiting for read timeout in select */
 #define BPF_TIMED_OUT	2		/* read timeout has expired in select */
 
+/* Test whether a BPF is ready for read(). */
+#define	bpf_ready(bd)							\
+	((bd)->bd_hlen != 0 ||						\
+	 (((bd)->bd_immediate || (bd)->bd_state == BPF_TIMED_OUT) &&	\
+	 (bd)->bd_slen != 0))
+                           
 /*
  * Descriptor associated with each attached hardware interface.
  */

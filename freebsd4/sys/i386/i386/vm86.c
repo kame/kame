@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/vm86.c,v 1.31.2.2 2001/10/05 06:18:55 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/vm86.c,v 1.31.2.3 2003/08/09 16:21:18 luoqi Exp $
  */
 
 #include <sys/param.h>
@@ -584,8 +584,8 @@ vm86_datacall(intnum, vmf, vmc)
 	struct vm86frame *vmf;
 	struct vm86context *vmc;
 {
-	pt_entry_t pte = (pt_entry_t)vm86paddr;
-	u_int page;
+	pt_entry_t *pte = (pt_entry_t *)vm86paddr;
+	vm_paddr_t page;
 	int i, entry, retval;
 
 	for (i = 0; i < vmc->npages; i++) {

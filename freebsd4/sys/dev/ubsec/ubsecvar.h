@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/ubsec/ubsecvar.h,v 1.2.2.4 2003/03/11 18:51:50 sam Exp $ */
+/* $FreeBSD: src/sys/dev/ubsec/ubsecvar.h,v 1.2.2.5 2003/06/04 17:56:59 sam Exp $ */
 /*	$OpenBSD: ubsecvar.h,v 1.35 2002/09/24 18:33:26 jason Exp $	*/
 
 /*
@@ -200,6 +200,9 @@ struct ubsec_softc {
 	struct callout		sc_rngto;	/* rng timeout */
 	int			sc_rnghz;	/* rng poll time */
 	struct ubsec_q2_rng	sc_rng;
+	struct rndtest_state	*sc_rndtest;	/* RNG test state */
+	void			(*sc_harvest)(struct rndtest_state *,
+					void *, u_int);
 	struct ubsec_dma	sc_dmaa[UBS_MAX_NQUEUE];
 	struct ubsec_q		*sc_queuea[UBS_MAX_NQUEUE];
 	SIMPLEQ_HEAD(,ubsec_q2)	sc_q2free;	/* free list */

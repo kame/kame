@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.85.2.22 2003/01/28 11:19:05 fjoe Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.85.2.24 2003/07/26 11:43:37 ume Exp $
  */
 
 #include "opt_compat.h"
@@ -58,6 +58,7 @@
 #include <net/if_var.h>
 #include <net/radix.h>
 #include <net/route.h>
+#include <machine/stdarg.h>
 
 #if defined(INET) || defined(INET6)
 /*XXX*/
@@ -1481,8 +1482,10 @@ if_addmulti(ifp, sa, retifma)
 			       M_IFMADDR, M_WAITOK);
 			bcopy(llsa, dupsa, llsa->sa_len);
 			ifma->ifma_addr = dupsa;
+			ifma->ifma_lladdr = NULL;
 			ifma->ifma_ifp = ifp;
 			ifma->ifma_refcount = 1;
+			ifma->ifma_protospec = 0;
 			s = splimp();
 			LIST_INSERT_HEAD(&ifp->if_multiaddrs, ifma, ifma_link);
 			splx(s);
@@ -1647,6 +1650,19 @@ ifmaof_ifpforaddr(sa, ifp)
 			break;
 
 	return ifma;
+}
+
+int
+if_printf(struct ifnet *ifp, const char *fmt, ...)
+{
+	va_list ap;
+	int retval;
+
+	retval = printf("%s%d: ", ifp->if_name, ifp->if_unit);
+	va_start(ap, fmt);
+	retval += vprintf(fmt, ap);
+	va_end(ap);
+	return (retval);
 }
 
 SYSCTL_NODE(_net, PF_LINK, link, CTLFLAG_RW, 0, "Link layers");

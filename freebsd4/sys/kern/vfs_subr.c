@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.29 2002/10/13 16:19:12 iedowse Exp $
+ * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.31 2003/08/09 16:21:20 luoqi Exp $
  */
 
 /*
@@ -72,6 +72,7 @@
 #include <vm/vm.h>
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
@@ -176,7 +177,15 @@ void
 vntblinit()
 {
 
-	desiredvnodes = maxproc + cnt.v_page_count / 4;
+	/*
+	 * Desiredvnodes is a function of the physical memory size and
+	 * the kernel's heap size.  Specifically, desiredvnodes scales
+	 * in proportion to the physical memory size until two fifths
+	 * of the kernel's heap size is consumed by vnodes and vm
+	 * objects.  
+	 */
+	desiredvnodes = min(maxproc + cnt.v_page_count / 4, 2 * vm_kmem_size /
+	    (5 * (sizeof(struct vm_object) + sizeof(struct vnode))));
 	minvnodes = desiredvnodes / 4;
 	simple_lock_init(&mntvnode_slock);
 	simple_lock_init(&mntid_slock);
@@ -273,6 +282,7 @@ vfs_rootmountalloc(fstypename, devname, mpp)
 	(void)vfs_busy(mp, LK_NOWAIT, 0, p);
 	TAILQ_INIT(&mp->mnt_nvnodelist);
 	TAILQ_INIT(&mp->mnt_reservedvnlist);
+	mp->mnt_nvnodelistsize = 0;
 	mp->mnt_vfc = vfsp;
 	mp->mnt_op = vfsp->vfc_vfsops;
 	mp->mnt_flag = MNT_RDONLY;
@@ -461,12 +471,13 @@ vattr_null(vap)
  * you set kern.maxvnodes to.  Do not set kern.maxvnodes too low.
  */
 static int
-vlrureclaim(struct mount *mp, int count)
+vlrureclaim(struct mount *mp)
 {
 	struct vnode *vp;
 	int done;
 	int trigger;
 	int usevnodes;
+	int count;
 
 	/*
 	 * Calculate the trigger point, don't allow user
@@ -482,6 +493,7 @@ vlrureclaim(struct mount *mp, int count)
 
 	done = 0;
 	simple_lock(&mntvnode_slock);
+	count = mp->mnt_nvnodelistsize / 10 + 1;
 	while (count && (vp = TAILQ_FIRST(&mp->mnt_nvnodelist)) != NULL) {
 		TAILQ_REMOVE(&mp->mnt_nvnodelist, vp, v_nmntvnodes);
 		TAILQ_INSERT_TAIL(&mp->mnt_nvnodelist, vp, v_nmntvnodes);
@@ -531,6 +543,7 @@ vnlru_proc(void)
 		kproc_suspend_loop(p);
 		if (numvnodes - freevnodes <= desiredvnodes * 9 / 10) {
 			vnlruproc_sig = 0;
+			wakeup(&vnlruproc_sig);
 			tsleep(vnlruproc, PVFS, "vlruwt", hz);
 			continue;
 		}
@@ -541,7 +554,7 @@ vnlru_proc(void)
 				nmp = TAILQ_NEXT(mp, mnt_list);
 				continue;
 			}
-			done += vlrureclaim(mp, 10);
+			done += vlrureclaim(mp);
 			simple_lock(&mountlist_slock);
 			nmp = TAILQ_NEXT(mp, mnt_list);
 			vfs_unbusy(mp, p);
@@ -590,9 +603,12 @@ getnewvnode(tag, mp, vops, vpp)
 	 * attempt to directly reclaim vnodes due to nasty recursion
 	 * problems.
 	 */
-	if (vnlruproc_sig == 0 && numvnodes - freevnodes > desiredvnodes) {
-		vnlruproc_sig = 1;	/* avoid unnecessary wakeups */
-		wakeup(vnlruproc);
+	while (numvnodes - freevnodes > desiredvnodes) {
+		if (vnlruproc_sig == 0) {
+			vnlruproc_sig = 1;	/* avoid unnecessary wakeups */
+			wakeup(vnlruproc);
+		}
+		tsleep(&vnlruproc_sig, PVFS, "vlruwk", hz);
 	}
 
 
@@ -727,8 +743,12 @@ insmntque(vp, mp)
 	/*
 	 * Delete from old mount point vnode list, if on one.
 	 */
-	if (vp->v_mount != NULL)
+	if (vp->v_mount != NULL) {
+		KASSERT(vp->v_mount->mnt_nvnodelistsize > 0,
+			("bad mount point vnode list size"));
 		TAILQ_REMOVE(&vp->v_mount->mnt_nvnodelist, vp, v_nmntvnodes);
+		vp->v_mount->mnt_nvnodelistsize--;
+	}
 	/*
 	 * Insert into list of vnodes for the new mount point, if available.
 	 */
@@ -737,6 +757,7 @@ insmntque(vp, mp)
 		return;
 	}
 	TAILQ_INSERT_TAIL(&mp->mnt_nvnodelist, vp, v_nmntvnodes);
+	mp->mnt_nvnodelistsize++;
 	simple_unlock(&mntvnode_slock);
 }
 

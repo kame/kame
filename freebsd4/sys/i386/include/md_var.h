@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/md_var.h,v 1.35.2.4 2003/01/22 20:14:53 jhb Exp $
+ * $FreeBSD: src/sys/i386/include/md_var.h,v 1.35.2.6 2003/08/31 00:16:27 luoqi Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -72,6 +72,7 @@ struct  dbreg;
 void	bcopyb __P((const void *from, void *to, size_t len));
 void	busdma_swi __P((void));
 void	cpu_halt __P((void));
+void	cpu_idle __P((void));
 void	cpu_reset __P((void));
 void	cpu_setregs __P((void));
 void	cpu_switch_load_gs __P((void)) __asm(__STRING(cpu_switch_load_gs));
@@ -95,8 +96,8 @@ int	i586_copyin __P((const void *udaddr, void *kaddr, size_t len));
 int	i586_copyout __P((const void *kaddr, void *udaddr, size_t len));
 void	i686_pagezero __P((void *addr));
 void	init_AMD_Elan_sc520(void);
-int	is_physical_memory __P((vm_offset_t addr));
-u_long	kvtop __P((void *addr));
+int	is_physical_memory __P((vm_paddr_t addr));
+vm_paddr_t kvtop __P((void *addr));
 void	setidt __P((int idx, alias_for_inthand_t *func, int typ, int dpl,
 		    int selec));
 void	swi_vm __P((void));

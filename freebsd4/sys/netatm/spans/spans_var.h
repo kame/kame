@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/spans/spans_var.h,v 1.2 1999/08/28 00:48:52 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/spans/spans_var.h,v 1.2.2.1 2003/08/08 11:24:46 harti Exp $
  *
  */
 
@@ -253,6 +253,10 @@ extern struct spans_addr	spans_bcastaddr;
 extern struct sp_info		spans_vcpool;
 extern struct sp_info		spans_msgpool;
 extern struct t_atm_cause	spans_cause;
+
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_harp_spans);
+#endif
 
 #endif	/* ATM_KERNEL */
 

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.4 2000/01/17 20:49:43 mks Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.4.2.1 2003/08/08 12:06:20 harti Exp $
  *
  */
 
@@ -40,7 +40,7 @@
 #include <netatm/ipatm/ipatm_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.4 2000/01/17 20:49:43 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.4.2.1 2003/08/08 12:06:20 harti Exp $");
 #endif
 
 
@@ -62,11 +62,9 @@ ipatm_cpcs_data(tok, m)
 {
 	struct ipvcc	*ivp = tok;
 
-#ifdef DIAGNOSTIC
 	if (ipatm_print) {
 		atm_pdu_print(m, "ipatm_input");
 	}
-#endif
 
 	/*
 	 * Handle input packet
@@ -114,11 +112,9 @@ ipatm_ipinput(inp, m)
 	int		space;
 #endif
 
-#ifdef DIAGNOSTIC
 	if (ipatm_print) {
 		atm_pdu_print(m, "ipatm_ipinput");
 	}
-#endif
 
 #if defined(BSD)
 #if BSD >= 199103

@@ -28,7 +28,7 @@
  * sys/kern/kern_clock.c.   Some of the comments below may be (even more)
  * confusing and/or plain wrong in that context.
  *
- * $FreeBSD: src/sys/kern/kern_ntptime.c,v 1.32.2.2 2001/04/22 11:19:46 jhay Exp $
+ * $FreeBSD: src/sys/kern/kern_ntptime.c,v 1.32.2.4 2003/08/22 22:11:36 imp Exp $
  */
 
 #include "opt_ntp.h"
@@ -426,10 +426,10 @@ ntp_adjtime(struct proc *p, struct ntp_adjtime_args *uap)
 void
 ntp_update_second(struct timecounter *tcp)
 {
-	u_int32_t *newsec;
+	time_t *newsec;
 	l_fp ftemp;		/* 32/64-bit temporary */
 
-	newsec = &tcp->tc_offset_sec;
+	newsec = &tcp->tc_nanotime.tv_sec;
 	/*
 	 * On rollover of the second both the nanosecond and microsecond
 	 * clocks are updated and the state machine cranked as
@@ -469,6 +469,7 @@ ntp_update_second(struct timecounter *tcp)
 		else if ((*newsec) % 86400 == 0) {
 			(*newsec)--;
 			time_state = TIME_OOP;
+			time_tai++;
 		}
 		break;
 
@@ -489,7 +490,6 @@ ntp_update_second(struct timecounter *tcp)
 		 * Insert second in progress.
 		 */
 		case TIME_OOP:
-			time_tai++;
 			time_state = TIME_WAIT;
 		break;
 

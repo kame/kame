@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.85.2.9 2002/09/24 08:11:41 mdodd Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.85.2.10 2003/10/22 13:51:46 tjr Exp $
  */
 
 #include "opt_compat.h"
@@ -979,7 +979,7 @@ linux_setgroups(struct proc *p, struct linux_setgroups_args *args)
 	if ((error = suser_xxx(oldcred, NULL, PRISON_ROOT)) != 0)
 		return (error);
 
-	if (ngrp >= NGROUPS)
+	if (ngrp < 0 || ngrp >= NGROUPS)
 		return (EINVAL);
 
 	newcred = crdup(oldcred);

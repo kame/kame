@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.11.2.18 2003/03/14 13:23:05 ru Exp $
+ *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.11.2.21 2003/08/25 17:51:07 njl Exp $
  *	$NetBSD: umass.c,v 1.28 2000/04/02 23:46:53 augustss Exp $
  */
 
@@ -612,12 +612,17 @@ umass_match_proto(struct umass_softc *sc, usbd_interface_handle iface,
 		return(UMATCH_VENDOR_PRODUCT);
 	}
 
+	if (UGETW(dd->idVendor) == USB_VENDOR_SIGMATEL &&
+	    UGETW(dd->idProduct) == USB_PRODUCT_SIGMATEL_I_BEAD100) {
+		/* XXX Really need SHUTTLE_INIT quirk from FreeBSD-current */
+		sc->drive = SHUTTLE_EUSB;
+	}
+
 	/*
-	 * The Pentax Optio 230 requires RS_NO_CLEAR_UA
-	 * PR: kern/46369
+	 * The Pentax Optio cameras require RS_NO_CLEAR_UA
+	 * PR: kern/46369, kern/50271
 	 */
-	if (UGETW(dd->idVendor) == USB_VENDOR_ASAHIOPTICAL
-	    && UGETW(dd->idProduct) == USB_PRODUCT_ASAHIOPTICAL_OPTIO230) {
+	if (UGETW(dd->idVendor) == USB_VENDOR_ASAHIOPTICAL) {
 		sc->quirks |= RS_NO_CLEAR_UA;
 	}
 
@@ -2357,7 +2362,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 		cpi->version_num = 1;
 		cpi->hba_inquiry = 0;
 		cpi->target_sprt = 0;
-		cpi->hba_misc = 0;
+		cpi->hba_misc = PIM_NO_6_BYTE;
 		cpi->hba_eng_cnt = 0;
 		cpi->max_target = UMASS_SCSIID_MAX;	/* one target */
 		if (sc == NULL)

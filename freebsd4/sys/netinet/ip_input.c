@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.52 2003/03/07 07:01:28 silby Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.54 2003/10/06 18:25:59 sam Exp $
  */
 
 #define	_IP_VHL
@@ -429,6 +429,13 @@ tooshort:
 	 * Bypass packet filtering for packets from a tunnel (gif).
 	 */
 	if (ipsec_gethist(m, NULL))
+		goto pass;
+#endif
+#if defined(FAST_IPSEC) && !defined(IPSEC_FILTERGIF)
+	/*
+	 * Bypass packet filtering for packets from a tunnel (gif).
+	 */
+	if (m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL) != NULL)
 		goto pass;
 #endif
 
@@ -1687,7 +1694,7 @@ u_char inetctlerrmap[PRC_NCMDS] = {
 	0,		EMSGSIZE,	EHOSTDOWN,	EHOSTUNREACH,
 	EHOSTUNREACH,	EHOSTUNREACH,	ECONNREFUSED,	ECONNREFUSED,
 	EMSGSIZE,	EHOSTUNREACH,	0,		0,
-	0,		0,		0,		0,
+	0,		0,		EHOSTUNREACH,	0,
 	ENOPROTOOPT,	ECONNREFUSED
 };
 

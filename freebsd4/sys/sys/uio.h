@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uio.h	8.5 (Berkeley) 2/22/94
- * $FreeBSD: src/sys/sys/uio.h,v 1.11.2.1 2001/09/28 16:58:35 dillon Exp $
+ * $FreeBSD: src/sys/sys/uio.h,v 1.11.2.2 2003/10/02 16:49:49 nectar Exp $
  */
 
 #ifndef _SYS_UIO_H_
@@ -78,6 +78,7 @@ struct vm_object;
 
 void	uio_yield __P((void));
 int	uiomove __P((caddr_t, int, struct uio *));
+int	uiomove_frombuf __P((void *buf, int buflen, struct uio *uio));
 int	uiomoveco __P((caddr_t, int, struct uio *, struct vm_object *));
 int	uioread __P((int, struct uio *, struct vm_object *, int *));
 

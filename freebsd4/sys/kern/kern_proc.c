@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_proc.c	8.7 (Berkeley) 2/14/95
- * $FreeBSD: src/sys/kern/kern_proc.c,v 1.63.2.8 2001/05/01 13:39:06 dwmalone Exp $
+ * $FreeBSD: src/sys/kern/kern_proc.c,v 1.63.2.9 2003/05/08 07:47:16 kbyanc Exp $
  */
 
 #include <sys/param.h>
@@ -403,7 +403,7 @@ fill_eproc(p, ep)
 	}
 }
 
-static struct proc *
+struct proc *
 zpfind(pid_t pid)
 {
 	struct proc *p;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.12 2003/02/27 04:50:02 silby Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.14 2003/09/09 19:09:22 bms Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
@@ -134,6 +134,7 @@ struct	ipstat {
 /* flags passed to ip_output as last parameter */
 #define	IP_FORWARDING		0x1		/* most of ip header exists */
 #define	IP_RAWOUTPUT		0x2		/* raw ip header exists */
+#define	IP_SENDONES		0x4		/* send all-ones broadcast */
 #define	IP_ROUTETOIF		SO_DONTROUTE	/* bypass routing tables */
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
 
@@ -159,6 +160,8 @@ extern struct	pr_usrreqs rip_usrreqs;
 
 int	 ip_ctloutput(struct socket *, struct sockopt *sopt);
 void	 ip_drain(void);
+int	 ip_fragment(struct ip *ip, struct mbuf **m_frag, int mtu,
+	    u_long if_hwassist_flags, int sw_csum);
 void	 ip_freemoptions(struct ip_moptions *);
 void	 ip_init(void);
 extern int	 (*ip_mforward)(struct ip *, struct ifnet *, struct mbuf *,

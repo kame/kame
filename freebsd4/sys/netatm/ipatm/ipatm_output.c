@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_output.c,v 1.4.2.1 2000/06/02 22:39:08 archie Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_output.c,v 1.4.2.2 2003/08/08 12:06:20 harti Exp $
  *
  */
 
@@ -41,7 +41,7 @@
 #include <netatm/ipatm/ipatm_serv.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_output.c,v 1.4.2.1 2000/06/02 22:39:08 archie Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_output.c,v 1.4.2.2 2003/08/08 12:06:20 harti Exp $");
 #endif
 
 
@@ -73,11 +73,9 @@ ipatm_ifoutput(ifp, m, dst)
 	struct ipvcc	*ivp;
 	int	err = 0;
 
-#ifdef DIAGNOSTIC
 	if (ipatm_print) {
 		atm_pdu_print(m, "ipatm_ifoutput");
 	}
-#endif
 
 	/*
 	 * See if we've already got an appropriate VCC
@@ -212,4 +210,3 @@ ipatm_ifoutput(ifp, m, dst)
 done:
 	return (err);
 }
-

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.3 1999/08/28 00:41:50 peter Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.3.2.1 2003/08/20 11:05:28 harti Exp $
  *
  */
 
@@ -38,7 +38,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.3 1999/08/28 00:41:50 peter Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.3.2.1 2003/08/20 11:05:28 harti Exp $");
 #endif
 
 #if defined(sun)
@@ -174,6 +174,10 @@ fore_intr(arg)
 		 * Device initialization handled separately
 		 */
 		if ((fup->fu_flags & CUF_INITED) == 0) {
+
+			if (fup->fu_ft4)
+				/* may not happen */
+				goto done;
 
 			/*
 			 * We're just initializing device now, so see if

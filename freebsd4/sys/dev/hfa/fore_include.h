@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_include.h,v 1.2 1999/08/28 00:41:50 peter Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_include.h,v 1.2.2.1 2003/08/22 14:49:24 harti Exp $
  *
  */
 
@@ -39,6 +39,9 @@
 #define _FORE_INCLUDE_H
 
 #include <netatm/kern_include.h>
+#ifdef __FreeBSD__
+#include <sys/sysctl.h>
+#endif
 
 /*
  * If not specified elsewhere, guess which type of bus support we want

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002
+ * Copyright (C) 2002-2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwmem.h,v 1.1.2.3 2003/02/10 07:17:25 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwmem.h,v 1.1.2.4 2003/04/28 03:29:18 simokawa Exp $
  */
 
 struct fw_xfer *fwmem_read_quad(struct fw_device *, caddr_t, u_int8_t,

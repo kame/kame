@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)wd.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/isa/wd.c,v 1.219.2.2 2000/08/04 22:31:07 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/wd.c,v 1.219.2.4 2003/08/31 00:16:28 luoqi Exp $
  */
 
 /* TODO:
@@ -1831,7 +1831,7 @@ wddump(dev_t dev)
 	static int wddoingadump = 0;
 	long	cylin, head, sector;
 	long	secpertrk, secpercyl;
-	char   *addr;
+	vm_paddr_t addr;
 
 	/* Toss any characters present prior to dump. */
 	while (cncheckc() != -1)
@@ -1887,7 +1887,7 @@ wddump(dev_t dev)
 	}
 
 	du->dk_flags |= DKFL_SINGLE;
-	addr = (char *) 0;
+	addr = 0;
 	blknum = dumplo + blkoff;
 	while (num > 0) {
 		blkcnt = num;
@@ -1927,12 +1927,12 @@ wddump(dev_t dev)
 			return (EIO);
 		}
 		while (blkcnt != 0) {
-			if (is_physical_memory((vm_offset_t)addr))
-				pmap_kenter((vm_offset_t)CADDR1,
-					   trunc_page((vm_offset_t)addr));
+			caddr_t va;
+
+			if (is_physical_memory(addr))
+				va = pmap_kenter_temporary(trunc_page(addr), 0);
 			else
-				pmap_kenter((vm_offset_t)CADDR1,
-					   trunc_page(0));
+				va = pmap_kenter_temporary(trunc_page(0), 0);
 
 			/* Ready to send data? */
 			DELAY(5);	/* ATA spec */
@@ -1944,11 +1944,11 @@ wddump(dev_t dev)
 			}
 			if (du->dk_flags & DKFL_32BIT)
 				outsl(du->dk_port + wd_data,
-				      CADDR1 + ((int)addr & PAGE_MASK),
+				      va + ((int)addr & PAGE_MASK),
 				      DEV_BSIZE / sizeof(long));
 			else
 				outsw(du->dk_port + wd_data,
-				      CADDR1 + ((int)addr & PAGE_MASK),
+				      va + ((int)addr & PAGE_MASK),
 				      DEV_BSIZE / sizeof(short));
 			addr += DEV_BSIZE;
 			/*

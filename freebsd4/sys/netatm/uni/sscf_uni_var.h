@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni_var.h,v 1.2 1999/08/28 00:48:58 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni_var.h,v 1.2.2.1 2003/08/07 15:44:59 harti Exp $
  *
  */
 
@@ -95,8 +95,8 @@ struct univcc {
 int		sscf_uni_start __P((void));
 int		sscf_uni_stop __P((void));
 void		sscf_uni_abort __P((struct univcc *, char *));
-void		sscf_uni_pdu_print __P((struct univcc *, KBuffer *,
-			char *));
+void		sscf_uni_pdu_print __P((const struct univcc *, const KBuffer *,
+		    const char *));
 
 	/* sscf_uni_lower.c */
 void		sscf_uni_lower __P((int, void *, int, int));

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.18 2002/12/17 18:04:02 sam Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.19 2003/08/31 00:16:28 luoqi Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -101,7 +101,7 @@ struct tty;
 struct uio;
 
 void	Debugger __P((const char *msg));
-int	dumpstatus __P((vm_offset_t addr, off_t count));
+int	dumpstatus __P((vm_paddr_t addr, off_t count));
 int	nullop __P((void));
 int	eopnotsupp __P((void));
 int	einval __P((void));

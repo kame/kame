@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.5 2001/10/14 06:54:27 luigi Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.6 2003/08/18 20:22:22 jhb Exp $
  */
 /*
  * This file contains an aggregated module marked:
@@ -142,6 +142,7 @@ static inthand_t *slowintr[ICU_LEN] = {
 };
 
 static inthand2_t isa_strayintr;
+static void	init_i8259(void);
 
 #ifdef PC98
 #define NMI_PARITY 0x04
@@ -225,6 +226,19 @@ isa_nmi(cd)
 }
 
 /*
+ *  ICU reinitialize when ICU configuration has lost.
+ */
+void
+icu_reinit()
+{
+	int i;
+
+	init_i8259();
+	for(i=0;i<ICU_LEN;i++)
+		if(intr_handler[i] != isa_strayintr)
+			INTREN(1<<i);
+}
+/*
  * Fill in default interrupt table (in case of spuruious interrupt
  * during configuration of kernel, setup interrupt control unit
  */
@@ -236,7 +250,12 @@ isa_defaultirq()
 	/* icu vectors */
 	for (i = 0; i < ICU_LEN; i++)
 		icu_unset(i, (inthand2_t *)NULL);
+	init_i8259();
+}
 
+static void
+init_i8259(void)
+{
 	/* initialize 8259's */
 #if NMCA > 0
 	if (MCA_system)
@@ -546,7 +565,7 @@ icu_unset(intr, handler)
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.5 2001/10/14 06:54:27 luigi Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.6 2003/08/18 20:22:22 jhb Exp $
  *
  */
 

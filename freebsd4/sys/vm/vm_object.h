@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_object.h,v 1.63.2.2 2001/11/03 19:59:28 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_object.h,v 1.63.2.3 2003/05/26 19:17:56 alc Exp $
  */
 
 /*
@@ -87,8 +87,8 @@ typedef u_char objtype_t;
 
 struct vm_object {
 	TAILQ_ENTRY(vm_object) object_list; /* list of all objects */
-	TAILQ_HEAD(, vm_object) shadow_head; /* objects that this is a shadow for */
-	TAILQ_ENTRY(vm_object) shadow_list; /* chain of shadow objects */
+	LIST_HEAD(, vm_object) shadow_head; /* objects that this is a shadow for */
+	LIST_ENTRY(vm_object) shadow_list; /* chain of shadow objects */
 	TAILQ_HEAD(, vm_page) memq;	/* list of resident pages */
 	int generation;			/* generation ID */
 	vm_size_t size;			/* Object size */

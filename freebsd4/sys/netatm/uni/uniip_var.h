@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/uniip_var.h,v 1.2 1999/08/28 00:49:04 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/uniip_var.h,v 1.2.2.1 2003/08/07 15:44:59 harti Exp $
  *
  */
 
@@ -282,7 +282,8 @@ int		uniarp_validate_ip __P((struct uniip *, struct in_addr *,
 
 	/* uniarp_input.c */
 void		uniarp_cpcs_data __P((void *, KBuffer *));
-void		uniarp_pdu_print __P((struct ipvcc *, KBuffer *, char *));
+void		uniarp_pdu_print __P((const struct ipvcc *,
+		    const KBuffer *, const char *));
 
 	/* uniarp_output.c */
 int		uniarp_arp_req __P((struct uniip *, struct in_addr *));

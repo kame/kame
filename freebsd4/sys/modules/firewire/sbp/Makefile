@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/firewire/sbp/Makefile,v 1.2.2.1 2002/11/03 10:58:21 simokawa Exp $
+# $FreeBSD: src/sys/modules/firewire/sbp/Makefile,v 1.2.2.2 2003/07/25 05:01:39 simokawa Exp $
 
 # Makefile for the SBP-II (Serial Bus Protocol 2/SCSI over IEEE1394)
 
@@ -10,6 +10,7 @@ SRCS	= bus_if.h device_if.h \
 	  sbp.c \
 	  firewire.h firewirereg.h \
 	  iec13213.h
+KMODDEPS = firewire
 
 .include <bsd.kmod.mk>
 

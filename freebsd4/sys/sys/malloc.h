@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)malloc.h	8.5 (Berkeley) 5/3/95
- * $FreeBSD: src/sys/sys/malloc.h,v 1.48.2.2 2002/03/16 02:19:16 archie Exp $
+ * $FreeBSD: src/sys/sys/malloc.h,v 1.48.2.3 2003/08/09 16:21:20 luoqi Exp $
  */
 
 #ifndef _SYS_MALLOC_H_
@@ -170,7 +170,7 @@ MALLOC_DECLARE(M_IOV);
 void	contigfree __P((void *addr, unsigned long size,
 			struct malloc_type *type));
 void	*contigmalloc __P((unsigned long size, struct malloc_type *type,
-			   int flags, unsigned long low, unsigned long high,
+			   int flags, vm_paddr_t low, vm_paddr_t high,
 			   unsigned long alignment, unsigned long boundary));
 void	free __P((void *addr, struct malloc_type *type));
 void	*malloc __P((unsigned long size, struct malloc_type *type, int flags));

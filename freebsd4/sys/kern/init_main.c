@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)init_main.c	8.9 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/init_main.c,v 1.134.2.7 2002/05/01 22:56:08 iedowse Exp $
+ * $FreeBSD: src/sys/kern/init_main.c,v 1.134.2.8 2003/06/06 20:21:32 tegge Exp $
  */
 
 #include "opt_init_path.h"
@@ -321,6 +321,7 @@ proc0_init(void *dummy __unused)
 	/* Create the file descriptor table. */
 	fdp = &filedesc0;
 	p->p_fd = &fdp->fd_fd;
+	p->p_fdtol = NULL;
 	fdp->fd_fd.fd_refcnt = 1;
 	fdp->fd_fd.fd_cmask = cmask;
 	fdp->fd_fd.fd_ofiles = fdp->fd_dfiles;

@@ -1,5 +1,5 @@
 /*	$NetBSD: pucvar.h,v 1.2 1999/02/06 06:29:54 cgd Exp $	*/
-/*	$FreeBSD: src/sys/dev/puc/pucvar.h,v 1.1.2.3 2003/02/06 13:17:11 sobomax Exp $ */
+/*	$FreeBSD: src/sys/dev/puc/pucvar.h,v 1.1.2.4 2003/04/04 08:42:17 sobomax Exp $ */
 
 /*-
  * Copyright (c) 2002 JF Hay.  All rights reserved.
@@ -75,7 +75,10 @@ struct puc_device_description {
 		int	bar;
 		int	offset;
 		u_int	serialfreq;
+		u_int	flags;
 	} ports[PUC_MAX_PORTS];
+	uint32_t	ilr_type;
+	uint32_t	ilr_offset[2];
 };
 
 #define	PUC_REG_VEND		0
@@ -86,6 +89,10 @@ struct puc_device_description {
 #define	PUC_PORT_TYPE_NONE	0
 #define	PUC_PORT_TYPE_COM	1
 #define	PUC_PORT_TYPE_LPT	2
+
+/* Interrupt Latch Register (ILR) types */
+#define	PUC_ILR_TYPE_NONE	0
+#define	PUC_ILR_TYPE_DIGI	1
 
 #define	PUC_PORT_VALID(desc, port) \
   ((port) < PUC_MAX_PORTS && (desc)->ports[(port)].type != PUC_PORT_TYPE_NONE)

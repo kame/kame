@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/kern_physio.c,v 1.46.2.2 2003/01/25 19:04:40 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_physio.c,v 1.46.2.3 2003/05/29 06:15:35 alc Exp $
  */
 
 #include <sys/param.h>
@@ -51,7 +51,7 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 
 	bp = getpbuf(NULL);
 	sa = bp->b_data;
-	error = bp->b_error = 0;
+	error = 0;
 
 	/* XXX: sanity check */
 	if(dev->si_iosize_max < PAGE_SIZE) {
@@ -98,18 +98,11 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 			}
 			bp->b_blkno = blockno;
 
-			if (uio->uio_segflg == UIO_USERSPACE) {
-				if (!useracc(bp->b_data, bp->b_bufsize,
-				    bp->b_flags & B_READ ?
-				    VM_PROT_WRITE : VM_PROT_READ)) {
-					error = EFAULT;
-					goto doerror;
-				}
+			if (uio->uio_segflg == UIO_USERSPACE)
 				if (vmapbuf(bp) < 0) {
 					error = EFAULT;
 					goto doerror;
 				}
-			}
 
 			BUF_STRATEGY(bp, 0);
 			spl = splbio();

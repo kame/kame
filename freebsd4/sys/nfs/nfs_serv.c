@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_serv.c  8.8 (Berkeley) 7/31/95
- * $FreeBSD: src/sys/nfs/nfs_serv.c,v 1.93.2.6 2002/12/29 18:19:53 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_serv.c,v 1.93.2.7 2003/07/01 19:00:23 iedowse Exp $
  */
 
 /*
@@ -991,7 +991,7 @@ nfsrv_read(nfsd, slp, procp, mrq)
 		nfsm_adj(mb, len - tlen, tlen - cnt);
 	if (v3) {
 		*tl++ = txdr_unsigned(cnt);
-		if (len < reqlen)
+		if (cnt < reqlen)
 			*tl++ = nfs_true;
 		else
 			*tl++ = nfs_false;

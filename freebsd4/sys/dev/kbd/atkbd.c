@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.25.2.4 2002/04/08 19:21:38 asmodai Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.25.2.5 2003/07/19 12:48:35 simokawa Exp $
  */
 
 #include "opt_kbd.h"
@@ -423,8 +423,10 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		kbd->kb_config = flags & ~KB_CONF_PROBE_ONLY;
 		if (KBD_HAS_DEVICE(kbd)
 	    	    && init_keyboard(state->kbdc, &kbd->kb_type, kbd->kb_config)
-	    	    && (kbd->kb_config & KB_CONF_FAIL_IF_NO_KBD))
+	    	    && (kbd->kb_config & KB_CONF_FAIL_IF_NO_KBD)) {
+			kbd_unregister(kbd);
 			return ENXIO;
+		}
 		atkbd_ioctl(kbd, KDSETLED, (caddr_t)&state->ks_state);
 		get_typematic(kbd);
 		delay[0] = kbd->kb_delay1;

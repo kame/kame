@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pcireg.h,v 1.24.2.5 2002/08/31 10:06:51 gibbs Exp $
+ * $FreeBSD: src/sys/pci/pcireg.h,v 1.24.2.6 2003/09/09 23:14:53 jhb Exp $
  *
  */
 
@@ -86,6 +86,8 @@
 /* config registers for header type 0 devices */
 
 #define PCIR_MAPS	0x10
+#define PCIR_BARS	PCIR_MAPS
+#define	PCIR_BAR(x)	(PCIR_BARS + (x) * 4)
 #define PCIR_CARDBUSCIS	0x28
 #define PCIR_SUBVEND_0	0x2c
 #define PCIR_SUBDEV_0	0x2e

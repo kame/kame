@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.28.2.7 2003/01/25 19:02:22 dillon Exp $
+ * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.28.2.8 2003/08/31 00:16:26 luoqi Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -410,7 +410,7 @@ swi_vm()
 
 int
 is_physical_memory(addr)
-	vm_offset_t addr;
+	vm_paddr_t addr;
 {
 	/*
 	 * stuff other tests for known memory-mapped devices (PCI?)

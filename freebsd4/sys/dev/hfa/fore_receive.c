@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.5.2.2 2003/01/23 21:06:43 sam Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.5.2.3 2003/08/22 10:32:20 harti Exp $
  *
  */
 
@@ -38,7 +38,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.5.2.2 2003/01/23 21:06:43 sam Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_receive.c,v 1.5.2.3 2003/08/22 10:32:20 harti Exp $");
 #endif
 
 
@@ -393,6 +393,16 @@ retry:
 		if (type0 != BHT_S1_SMALL) {
 
 			/*
+			 * Do this here tot, because atm_subr will just
+			 * drop the new mbuf without copying over the
+			 * header.
+			 */
+			mhead->m_pkthdr.rcvif = NULL;
+			mhead->m_pkthdr.csum_flags = 0;
+			SLIST_INIT(&mhead->m_pkthdr.tags);
+			KB_PLENSET(mhead, pdulen);
+
+			/*
 			 * Small buffers already have headroom built-in, but
 			 * if CP had to use a large buffer for the first 
 			 * buffer, then we have to allocate a buffer here to
@@ -409,8 +419,12 @@ retry:
 
 			/*
 			 * Put new buffer at head of PDU chain
+			 * We cannot use LINKHEAD here, because LINKHEAD
+			 * move the packet header from mhead to m. atm_intr
+			 * on the other hand simply throws away the mbuf that
+			 * we have just prepended, so the header is lost.
 			 */
-			KB_LINKHEAD(m, mhead);
+			m->m_next = mhead;
 			KB_LEN(m) = 0;
 			KB_HEADSET(m, BUF1_SM_DOFF);
 			mhead = m;

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/mchain.h,v 1.1.2.1 2001/05/18 11:01:23 bp Exp $
+ * $FreeBSD: src/sys/sys/mchain.h,v 1.1.2.2 2003/07/19 06:27:29 silby Exp $
  */
 #ifndef _SYS_MCHAIN_H_
 #define _SYS_MCHAIN_H_
@@ -110,8 +110,6 @@ struct mdchain {
 	struct mbuf * 	md_cur;		/* current mbuf */
 	u_char *	md_pos;		/* offset in the current mbuf */
 };
-
-int  m_fixhdr(struct mbuf *m);
 
 int  mb_init(struct mbchain *mbp);
 void mb_initm(struct mbchain *mbp, struct mbuf *m);

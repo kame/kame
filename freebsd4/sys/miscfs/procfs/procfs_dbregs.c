@@ -40,7 +40,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_dbregs.c,v 1.4.2.3 2002/01/22 17:22:59 nectar Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_dbregs.c,v 1.4.2.4 2003/10/02 16:49:48 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -59,30 +59,17 @@ procfs_dodbregs(curp, p, pfs, uio)
 {
 	int error;
 	struct dbreg r;
-	char *kv;
-	int kl;
 
 	/* Can't trace a process that's currently exec'ing. */ 
 	if ((p->p_flag & P_INEXEC) != 0)
 		return EAGAIN;
 	if (!CHECKIO(curp, p) || p_trespass(curp, p))
 		return (EPERM);
-	kl = sizeof(r);
-	kv = (char *) &r;
-
-	kv += uio->uio_offset;
-	kl -= uio->uio_offset;
-	if (kl > uio->uio_resid)
-		kl = uio->uio_resid;
 
 	PHOLD(p);
-
-	if (kl < 0)
-		error = EINVAL;
-	else
-		error = procfs_read_dbregs(p, &r);
+	error = procfs_read_dbregs(p, &r);
 	if (error == 0)
-		error = uiomove(kv, kl, uio);
+		error = uiomove_frombuf(&r, sizeof(r), uio);
 	if (error == 0 && uio->uio_rw == UIO_WRITE) {
 		if (p->p_stat != SSTOP)
 			error = EBUSY;

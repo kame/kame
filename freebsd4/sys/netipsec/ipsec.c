@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec.c,v 1.2.2.1 2003/01/24 05:11:35 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec.c,v 1.2.2.2 2003/07/01 01:38:13 sam Exp $	*/
 /*	$KAME: ipsec.c,v 1.103 2001/05/24 07:14:18 sakane Exp $	*/
 
 /*
@@ -1930,6 +1930,8 @@ xform_init(struct secasvar *sav, int xftype)
 {
 	struct xformsw *xsp;
 
+	if (sav->tdb_xform != NULL)	/* previously initialized */
+		return 0;
 	for (xsp = xforms; xsp; xsp = xsp->xf_next)
 		if (xsp->xf_type == xftype)
 			return (*xsp->xf_init)(sav, xsp);

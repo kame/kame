@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60.2.6 2002/09/12 21:33:38 trhodes Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60.2.7 2003/08/16 18:43:21 trhodes Exp $ */
 /*	$NetBSD: msdosfs_vfsops.c,v 1.51 1997/11/17 15:36:58 ws Exp $	*/
 
 /*-
@@ -113,6 +113,7 @@ update_mp(mp, argp)
 	pmp->pm_gid = argp->gid;
 	pmp->pm_uid = argp->uid;
 	pmp->pm_mask = argp->mask & ALLPERMS;
+	pmp->pm_dirmask = argp->dirmask & ALLPERMS;
 	pmp->pm_flags |= argp->flags & MSDOSFSMNT_MNTOPT;
 	if (pmp->pm_flags & MSDOSFSMNT_U2WTABLE) {
 		bcopy(argp->u2w, pmp->pm_u2w, sizeof(pmp->pm_u2w));
@@ -184,7 +185,7 @@ msdosfs_mountroot()
 	args.flags = 0;
 	args.uid = 0;
 	args.gid = 0;
-	args.mask = 0777;
+	args.mask = args.dirmask = 0777;
 
 	if ((error = mountmsdosfs(rootvp, mp, p, &args)) != 0) {
 		free(mp, M_MOUNT);

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_proto.c,v 1.3 1999/08/28 00:48:36 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_proto.c,v 1.3.2.1 2003/08/08 08:44:10 harti Exp $
  *
  */
 
@@ -36,9 +36,10 @@
  */
 
 #include <netatm/kern_include.h>
+#include <sys/sysctl.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_proto.c,v 1.3 1999/08/28 00:48:36 peter Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_proto.c,v 1.3.2.1 2003/08/08 08:44:10 harti Exp $");
 #endif
 
 
@@ -112,6 +113,8 @@ struct domain atmdomain = {
 DOMAIN_SET(atm);
 #endif
 
+SYSCTL_NODE(_net, PF_ATM, harp, CTLFLAG_RW, 0, "HARP/ATM family");
+SYSCTL_NODE(_net_harp, OID_AUTO, atm, CTLFLAG_RW, 0, "ATM layer");
 
 #if (defined(__FreeBSD__) && (BSD >= 199506))
 /*

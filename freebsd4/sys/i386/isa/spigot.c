@@ -42,7 +42,7 @@
  *
  * Version 1.7, December 1995.
  *
- * $FreeBSD: src/sys/i386/isa/spigot.c,v 1.44 2000/01/29 16:17:36 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/spigot.c,v 1.44.2.1 2003/08/10 23:09:28 nectar Exp $
  *
  */
 
@@ -221,6 +221,8 @@ struct	spigot_info	*info;
 	if(!data) return(EINVAL);
 	switch(cmd){
 	case	SPIGOT_SETINT:
+		if (*(int *)data < 0 || *(int *)data > _SIG_MAXSIG)
+			return (EINVAL);
 		ss->p = p;
 		ss->signal_num = *((int *)data);
 		break;

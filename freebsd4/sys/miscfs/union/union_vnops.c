@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vnops.c	8.32 (Berkeley) 6/23/95
- * $FreeBSD: src/sys/miscfs/union/union_vnops.c,v 1.72 1999/12/15 23:02:14 eivind Exp $
+ * $FreeBSD: src/sys/miscfs/union/union_vnops.c,v 1.72.2.1 2003/06/18 07:55:47 das Exp $
  */
 
 #include <sys/param.h>
@@ -670,12 +670,24 @@ union_whiteout(ap)
 	struct union_node *un = VTOUNION(ap->a_dvp);
 	struct componentname *cnp = ap->a_cnp;
 	struct vnode *uppervp;
-	int error = EOPNOTSUPP;
+	int error;
 
-	if ((uppervp = union_lock_upper(un, cnp->cn_proc)) != NULLVP) {
-		error = VOP_WHITEOUT(un->un_uppervp, cnp, ap->a_flags);
-		union_unlock_upper(uppervp, cnp->cn_proc);
-	}
+	switch (ap->a_flags) {
+	case CREATE:
+	case DELETE:
+		uppervp = union_lock_upper(un, cnp->cn_proc);
+		if (uppervp != NULLVP) {
+			error = VOP_WHITEOUT(un->un_uppervp, cnp, ap->a_flags);
+			union_unlock_upper(uppervp, cnp->cn_proc);
+		} else
+			error = EOPNOTSUPP;
+		break;
+	case LOOKUP:
+		error = EOPNOTSUPP;
+		break;
+	default:
+		panic("union_whiteout: unknown op");
+        }
 	return(error);
 }
 
@@ -1711,12 +1723,8 @@ union_inactive(ap)
 	 * That's too much work for now.
 	 */
 
-	if (un->un_dircache != 0) {
-		for (vpp = un->un_dircache; *vpp != NULLVP; vpp++)
-			vrele(*vpp);
-		free (un->un_dircache, M_TEMP);
-		un->un_dircache = 0;
-	}
+	if (un->un_dircache != NULL)
+		union_dircache_free(un);
 
 #if 0
 	if ((un->un_flags & UN_ULOCK) && un->un_uppervp) {

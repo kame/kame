@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.4.2.3 2003/02/26 00:14:05 sam Exp $	*/
+/*	$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.4.2.4 2003/06/03 00:09:02 sam Exp $	*/
 /*	$OpenBSD: cryptodev.c,v 1.52 2002/06/19 07:22:46 deraadt Exp $	*/
 
 /*
@@ -415,7 +415,7 @@ cryptodev_op(
 
 	s = splcrypto();	/* NB: only needed with CRYPTO_F_CBIMM */
 	error = crypto_dispatch(crp);
-	if (error == 0)
+	if (error == 0 && (crp->crp_flags & CRYPTO_F_DONE) == 0)
 		error = tsleep(crp, PSOCK, "crydev", 0);
 	splx(s);
 	if (error)

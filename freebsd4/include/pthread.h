@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/pthread.h,v 1.20.2.3 2003/03/04 16:53:05 phantom Exp $
+ * $FreeBSD: src/include/pthread.h,v 1.20.2.4 2003/05/27 18:18:01 jdp Exp $
  */
 #ifndef _PTHREAD_H_
 #define _PTHREAD_H_
@@ -308,6 +308,8 @@ int		pthread_getschedparam __P((pthread_t pthread, int *,
 			struct sched_param *));
 int		pthread_setschedparam __P((pthread_t, int,
 			const struct sched_param *));
+int		pthread_getconcurrency __P((void));
+int		pthread_setconcurrency __P((int));
 
 int		pthread_attr_setfloatstate __P((pthread_attr_t *, int));
 int		pthread_attr_getfloatstate __P((pthread_attr_t *, int *));

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_var.h,v 1.2 1999/08/28 00:41:53 peter Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_var.h,v 1.2.2.2 2003/08/22 14:49:24 harti Exp $
  *
  */
 
@@ -47,6 +47,7 @@
 struct fore_vcc {
         struct cmn_vcc  fv_cmn;		/* Common VCC stuff */
 	Fore_aal	fv_aal;		/* CP version of AAL */
+	uint32_t	rate;		/* Rate control (data/idle cell ratio) */
 };
 typedef struct fore_vcc  Fore_vcc;
 
@@ -234,6 +235,17 @@ struct fore_unit {
 	Fore_prom	*fu_promd;	/* Device PROM buffer (DMA) */
 #endif
 	struct callout_handle fu_thandle;	/* Timer handle */
+	int		fu_ft4;		/* Running ForeThought 4 firmware */
+
+	/* shaping enable */
+	u_int		fu_shape;
+	u_int		fu_num_shaped;	/* number of shaped VCCs */
+
+#ifdef __FreeBSD__
+	/* sysctl support */
+	struct sysctl_ctx_list	sysctl_ctx;
+	struct sysctl_oid	*sysctl_tree;
+#endif
 };
 typedef struct fore_unit	Fore_unit;
 
@@ -259,6 +271,12 @@ typedef struct fore_unit	Fore_unit;
  */
 #define	FUF_STATCMD	0x80		/* Statistics request in progress */
 
+/*
+ * Shaping values
+ */
+#define FUS_NO_SHAPING	0
+#define FUS_SHAPE_ONE	1
+#define FUS_SHAPE_ALL	2
 
 /*
  * Macros to access CP memory

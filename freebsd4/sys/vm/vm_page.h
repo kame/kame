@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_page.h,v 1.75.2.8 2002/03/06 01:07:09 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_page.h,v 1.75.2.9 2003/08/09 16:21:21 luoqi Exp $
  */
 
 /*
@@ -116,7 +116,7 @@ struct vm_page {
 
 	vm_object_t object;		/* which object am I in (O,P)*/
 	vm_pindex_t pindex;		/* offset into object (O,P) */
-	vm_offset_t phys_addr;		/* physical address of page */
+	vm_paddr_t phys_addr;		/* physical address of page */
 	struct md_page md;		/* machine dependant stuff */
 	u_short	queue;			/* page queue index */
 	u_short	flags,			/* see below */
@@ -411,7 +411,7 @@ vm_page_t vm_page_lookup (vm_object_t, vm_pindex_t);
 void vm_page_remove (vm_page_t);
 void vm_page_rename (vm_page_t, vm_object_t, vm_pindex_t);
 vm_offset_t vm_page_startup (vm_offset_t, vm_offset_t, vm_offset_t);
-vm_page_t vm_add_new_page (vm_offset_t pa);
+vm_page_t vm_add_new_page (vm_paddr_t pa);
 void vm_page_unmanage (vm_page_t);
 void vm_page_unwire (vm_page_t, int);
 void vm_page_wire (vm_page_t);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.16 2003/01/23 21:06:48 sam Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.22 2003/09/13 05:52:47 silby Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -63,6 +63,8 @@
 #define	mtocl(x)	(((uintptr_t)(x) - (uintptr_t)mbutl) >> MCLSHIFT)
 #define	cltom(x)	((caddr_t)((uintptr_t)mbutl + \
 			    ((uintptr_t)(x) << MCLSHIFT)))
+#define mcl_valid(x)	((uintptr_t)(x) >= (uintptr_t)mbutl &&		\
+			 (uintptr_t)(x) < (uintptr_t)mbutltop)
 
 /*
  * Header present at the beginning of every mbuf.
@@ -388,6 +390,13 @@ union mcluster {
 		(void)m_clalloc(1, _mhow);				\
 	_mp = (caddr_t)mclfree;						\
 	if (_mp != NULL) {						\
+		KASSERT(mcl_valid(_mp),					\
+			("MCLALLOC junk pointer: %x < %x < %x.",	\
+			(uintptr_t)mbutl, (uintptr_t)_mp,		\
+			(uintptr_t)mbutltop));				\
+		KASSERT(mclrefcnt[mtocl(_mp)] == 0,			\
+			("free cluster with refcount %d.",		\
+			mclrefcnt[mtocl(_mp)]));			\
 		mclrefcnt[mtocl(_mp)]++;				\
 		mbstat.m_clfree--;					\
 		mclfree = ((union mcluster *)_mp)->mcl_next;		\
@@ -418,7 +427,13 @@ union mcluster {
 #define	MCLFREE1(p) do {						\
 	union mcluster *_mp = (union mcluster *)(p);			\
 									\
-	KASSERT(mclrefcnt[mtocl(_mp)] > 0, ("freeing free cluster"));	\
+	KASSERT(mcl_valid(_mp),						\
+		("MCLFREE1 junk pointer: %x < %x < %x.",		\
+		(uintptr_t)mbutl, (uintptr_t)_mp,			\
+		(uintptr_t)mbutltop));					\
+	KASSERT(mclrefcnt[mtocl(_mp)] > 0,				\
+		("freeing free cluster, refcount: %d.",			\
+		mclrefcnt[mtocl(_mp)]));				\
 	if (--mclrefcnt[mtocl(_mp)] == 0) {				\
 		_mp->mcl_next = mclfree;				\
 		mclfree = _mp;						\
@@ -558,6 +573,7 @@ extern	struct mbstat	 mbstat;
 extern	u_long		 mbtypes[MT_NTYPES]; /* per-type mbuf allocations */
 extern	int		 mbuf_wait;	/* mbuf sleep time */
 extern	struct mbuf	*mbutl;		/* virtual address of mclusters */
+extern	struct mbuf	*mbutltop;	/* highest address of mclusters */
 extern	char		*mclrefcnt;	/* cluster reference counts */
 extern	union mcluster	*mclfree;
 extern	struct mbuf	*mmbfree;
@@ -573,10 +589,13 @@ void		 m_copyback(struct mbuf *, int, int, caddr_t);
 void		 m_copydata(struct mbuf *, int, int, caddr_t);
 struct	mbuf	*m_copym(struct mbuf *, int, int, int);
 struct	mbuf	*m_copypacket(struct mbuf *, int);
+struct	mbuf	*m_defrag(struct mbuf *, int);
 struct	mbuf	*m_devget(char *, int, int, struct ifnet *,
 		    void (*copy)(char *, caddr_t, u_int));
 struct	mbuf	*m_dup(struct mbuf *, int);
 int		 m_dup_pkthdr(struct mbuf *, struct mbuf *, int);
+u_int		 m_fixhdr(struct mbuf *);
+struct	mbuf	*m_fragment(struct mbuf *, int, int);
 struct	mbuf	*m_free(struct mbuf *);
 void		 m_freem(struct mbuf *);
 struct	mbuf	*m_get(int, int);
@@ -584,6 +603,7 @@ struct  mbuf	*m_getcl(int how, short type, int flags);
 struct	mbuf	*m_getclr(int, int);
 struct	mbuf	*m_gethdr(int, int);
 struct	mbuf	*m_getm(struct mbuf *, int, int, int);
+u_int		m_length(struct mbuf *, struct mbuf **);
 int		 m_mballoc(int, int);
 struct	mbuf	*m_mballoc_wait(int, int);
 void		 m_move_pkthdr(struct mbuf *, struct mbuf *);

@@ -19,7 +19,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71.2.26 2003/03/03 23:12:48 gallatin Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71.2.29 2003/08/31 17:17:13 wilko Exp $
 
 machine		alpha
 cpu		EV4
@@ -87,7 +87,6 @@ device		atapist		# ATAPI tape drives
 
 # SCSI Controllers
 device		ahc		# AHA2940 and onboard AIC7xxx devices
-#device		esp		# 53C94 & friends, not CAM-ified
 device		isp		# Qlogic family
 device		mpt		# LSI-Logic MPT/Fusion
 device		ncr		# NCR/Symbios Logic

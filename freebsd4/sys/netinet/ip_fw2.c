@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.6.2.11 2003/01/27 13:45:20 maxim Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw2.c,v 1.6.2.18 2003/10/17 11:01:03 scottl Exp $
  */
 
 #define        DEB(x)
@@ -72,6 +72,10 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif
+
 #include <netinet/if_ether.h> /* XXX for ETHERTYPE_IP */
 
 #include <machine/in_cksum.h>	/* XXX for in_cksum */
@@ -87,8 +91,10 @@
 /*
  * set_disable contains one bit per set value (0..31).
  * If the bit is set, all rules with the corresponding set
- * are disabled. Set 31 is reserved for the default rule
+ * are disabled. Set RESVD_SET(31) is reserved for the default rule
+ * and rules that are not deleted by the flush command,
  * and CANNOT be disabled.
+ * Rules in set RESVD_SET can only be deleted explicitly.
  */
 static u_int32_t set_disable;
 
@@ -110,16 +116,20 @@ static int autoinc_step = 100; /* bounded to 1..1000 in add_rule() */
 
 #ifdef SYSCTL_NODE
 SYSCTL_NODE(_net_inet_ip, OID_AUTO, fw, CTLFLAG_RW, 0, "Firewall");
-SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, enable, CTLFLAG_RW,
+SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, enable,
+    CTLFLAG_RW|CTLFLAG_SECURE,
     &fw_enable, 0, "Enable ipfw");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, autoinc_step, CTLFLAG_RW,
     &autoinc_step, 0, "Rule number autincrement step");
-SYSCTL_INT(_net_inet_ip_fw, OID_AUTO,one_pass,CTLFLAG_RW,
+SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, one_pass,
+    CTLFLAG_RW|CTLFLAG_SECURE,
     &fw_one_pass, 0,
     "Only do a single pass through ipfw when using dummynet(4)");
-SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, debug, CTLFLAG_RW,
+SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, debug,
+    CTLFLAG_RW,
     &fw_debug, 0, "Enable printing of debug ip_fw statements");
-SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose, CTLFLAG_RW,
+SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose,
+    CTLFLAG_RW|CTLFLAG_SECURE,
     &fw_verbose, 0, "Log matches to ipfw rules");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose_limit, CTLFLAG_RW,
     &verbose_limit, 0, "Set upper limit of matches of ipfw rules logged");
@@ -398,6 +408,48 @@ iface_match(struct ifnet *ifp, ipfw_insn_if *cmd)
 	return(0);	/* no match, fail ... */
 }
 
+/*
+ * The 'verrevpath' option checks that the interface that an IP packet
+ * arrives on is the same interface that traffic destined for the
+ * packet's source address would be routed out of. This is a measure
+ * to block forged packets. This is also commonly known as "anti-spoofing"
+ * or Unicast Reverse Path Forwarding (Unicast RFP) in Cisco-ese. The
+ * name of the knob is purposely reminisent of the Cisco IOS command,
+ *
+ *   ip verify unicast reverse-path
+ *
+ * which implements the same functionality. But note that syntax is
+ * misleading. The check may be performed on all IP packets whether unicast,
+ * multicast, or broadcast.
+ */
+static int
+verify_rev_path(struct in_addr src, struct ifnet *ifp)
+{
+	static struct route ro;
+	struct sockaddr_in *dst;
+
+	dst = (struct sockaddr_in *)&(ro.ro_dst);
+
+	/* Check if we've cached the route from the previous call. */
+	if (src.s_addr != dst->sin_addr.s_addr) {
+		ro.ro_rt = NULL;
+
+		bzero(dst, sizeof(*dst));
+		dst->sin_family = AF_INET;
+		dst->sin_len = sizeof(*dst);
+		dst->sin_addr = src;
+
+		rtalloc_ign(&ro, RTF_CLONING|RTF_PRCLONING);
+	}
+
+	if ((ro.ro_rt == NULL) || (ifp == NULL) ||
+	    (ro.ro_rt->rt_ifp->if_index != ifp->if_index))
+		return 0;
+
+	return 1;
+}
+
+
 static u_int64_t norule_counter;	/* counter for ipfw_log(NULL...) */
 
 #define SNPARGS(buf, len) buf + len, sizeof(buf) > len ? sizeof(buf) - len : 0
@@ -618,7 +670,7 @@ hash_packet(struct ipfw_flow_id *id)
 	/* remove a refcount to the parent */				\
 	if (q->dyn_type == O_LIMIT)					\
 		q->parent->count--;					\
-	DEB(printf("-- unlink entry 0x%08x %d -> 0x%08x %d, %d left\n",	\
+	DEB(printf("ipfw: unlink entry 0x%08x %d -> 0x%08x %d, %d left\n",\
 		(q->id.src_ip), (q->id.src_port),			\
 		(q->id.dst_ip), (q->id.dst_port), dyn_count-1 ); )	\
 	if (prev != NULL)						\
@@ -684,7 +736,7 @@ next_pass:
 					goto next;
 				if (FORCE && q->count != 0 ) {
 					/* XXX should not happen! */
-					printf( "OUCH! cannot remove rule,"
+					printf("ipfw: OUCH! cannot remove rule,"
 					     " count %d\n", q->count);
 				}
 			} else {
@@ -692,8 +744,10 @@ next_pass:
 				    !TIME_LEQ( q->expire, time_second ))
 					goto next;
 			}
-			UNLINK_DYN_RULE(prev, ipfw_dyn_v[i], q);
-			continue;
+			if (q->dyn_type != O_LIMIT_PARENT || !q->count) {
+				UNLINK_DYN_RULE(prev, ipfw_dyn_v[i], q);
+				continue;
+			}
 next:
 			prev=q;
 			q=q->next;
@@ -726,13 +780,14 @@ lookup_dyn_rule(struct ipfw_flow_id *pkt, int *match_direction,
 		goto done;	/* not found */
 	i = hash_packet( pkt );
 	for (prev=NULL, q = ipfw_dyn_v[i] ; q != NULL ; ) {
-		if (q->dyn_type == O_LIMIT_PARENT)
+		if (q->dyn_type == O_LIMIT_PARENT && q->count)
 			goto next;
 		if (TIME_LEQ( q->expire, time_second)) { /* expire entry */
 			UNLINK_DYN_RULE(prev, ipfw_dyn_v[i], q);
 			continue;
 		}
-		if ( pkt->proto == q->id.proto) {
+		if (pkt->proto == q->id.proto &&
+		    q->dyn_type != O_LIMIT_PARENT) {
 			if (pkt->src_ip == q->id.src_ip &&
 			    pkt->dst_ip == q->id.dst_ip &&
 			    pkt->src_port == q->id.src_port &&
@@ -879,7 +934,7 @@ add_dyn_rule(struct ipfw_flow_id *id, u_int8_t dyn_type, struct ip_fw *rule)
 
 	r = malloc(sizeof *r, M_IPFW, M_NOWAIT | M_ZERO);
 	if (r == NULL) {
-		printf ("sorry cannot allocate state\n");
+		printf ("ipfw: sorry cannot allocate state\n");
 		return NULL;
 	}
 
@@ -904,7 +959,7 @@ add_dyn_rule(struct ipfw_flow_id *id, u_int8_t dyn_type, struct ip_fw *rule)
 	r->next = ipfw_dyn_v[i];
 	ipfw_dyn_v[i] = r;
 	dyn_count++;
-	DEB(printf("-- add dyn entry ty %d 0x%08x %d -> 0x%08x %d, total %d\n",
+	DEB(printf("ipfw: add dyn entry ty %d 0x%08x %d -> 0x%08x %d, total %d\n",
 	   dyn_type,
 	   (r->id.src_ip), (r->id.src_port),
 	   (r->id.dst_ip), (r->id.dst_port),
@@ -933,7 +988,7 @@ lookup_dyn_parent(struct ipfw_flow_id *pkt, struct ip_fw *rule)
 			    pkt->src_port == q->id.src_port &&
 			    pkt->dst_port == q->id.dst_port) {
 				q->expire = time_second + dyn_short_lifetime;
-				DEB(printf("lookup_dyn_parent found 0x%p\n",q);)
+				DEB(printf("ipfw: lookup_dyn_parent found 0x%p\n",q);)
 				return q;
 			}
 	}
@@ -954,7 +1009,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 
 	ipfw_dyn_rule *q;
 
-	DEB(printf("-- install state type %d 0x%08x %u -> 0x%08x %u\n",
+	DEB(printf("ipfw: install state type %d 0x%08x %u -> 0x%08x %u\n",
 	    cmd->o.opcode,
 	    (args->f_id.src_ip), (args->f_id.src_port),
 	    (args->f_id.dst_ip), (args->f_id.dst_port) );)
@@ -964,7 +1019,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 	if (q != NULL) { /* should never occur */
 		if (last_log != time_second) {
 			last_log = time_second;
-			printf(" install_state: entry already present, done\n");
+			printf("ipfw: install_state: entry already present, done\n");
 		}
 		return 0;
 	}
@@ -978,7 +1033,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 	if (dyn_count >= dyn_max) {
 		if (last_log != time_second) {
 			last_log = time_second;
-			printf("install_state: Too many dynamic rules\n");
+			printf("ipfw: install_state: Too many dynamic rules\n");
 		}
 		return 1; /* cannot install, notify caller */
 	}
@@ -994,7 +1049,8 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 		struct ipfw_flow_id id;
 		ipfw_dyn_rule *parent;
 
-		DEB(printf("installing dyn-limit rule %d\n", cmd->conn_limit);)
+		DEB(printf("ipfw: installing dyn-limit rule %d\n",
+		    cmd->conn_limit);)
 
 		id.dst_ip = id.src_ip = 0;
 		id.dst_port = id.src_port = 0;
@@ -1010,7 +1066,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 			id.dst_port = args->f_id.dst_port;
 		parent = lookup_dyn_parent(&id, rule);
 		if (parent == NULL) {
-			printf("add parent failed\n");
+			printf("ipfw: add parent failed\n");
 			return 1;
 		}
 		if (parent->count >= cmd->conn_limit) {
@@ -1031,7 +1087,7 @@ install_state(struct ip_fw *rule, ipfw_insn_limit *cmd,
 	    }
 		break;
 	default:
-		printf("unknown dynamic rule type %u\n", cmd->o.opcode);
+		printf("ipfw: unknown dynamic rule type %u\n", cmd->o.opcode);
 		return 1;
 	}
 	lookup_dyn_rule(&args->f_id, NULL, NULL); /* XXX just set lifetime */
@@ -1293,6 +1349,7 @@ ipfw_chk(struct ip_fw_args *args)
 	u_int16_t src_port = 0, dst_port = 0;	/* NOTE: host format	*/
 	struct in_addr src_ip, dst_ip;		/* NOTE: network format	*/
 	u_int16_t ip_len=0;
+	int pktlen;
 	int dyn_dir = MATCH_UNKNOWN;
 	ipfw_dyn_rule *q = NULL;
 
@@ -1304,6 +1361,7 @@ ipfw_chk(struct ip_fw_args *args)
 	 *	MATCH_FORWARD or MATCH_REVERSE otherwise (q != NULL)
 	 */
 
+	pktlen = m->m_pkthdr.len;
 	if (args->eh == NULL ||		/* layer 3 packet */
 		( m->m_pkthdr.len >= sizeof(struct ip) &&
 		    ntohs(args->eh->ether_type) == ETHERTYPE_IP))
@@ -1327,6 +1385,7 @@ ipfw_chk(struct ip_fw_args *args)
 		offset = ip->ip_off & IP_OFFMASK;
 		ip_len = ip->ip_len;
 	}
+	pktlen = ip_len < pktlen ? ip_len : pktlen;
 
 #define PULLUP_TO(len)						\
 		do {						\
@@ -1506,11 +1565,11 @@ check_body:
 				if (pcb == NULL || pcb->inp_socket == NULL)
 					break;
 #if __FreeBSD_version < 500034
-#define socheckuid(a,b)	((a)->so_cred->cr_uid == (b))
+#define socheckuid(a,b)	((a)->so_cred->cr_uid != (b))
 #endif
 				if (cmd->opcode == O_UID) {
 					match =
-					  socheckuid(pcb->inp_socket,
+					  !socheckuid(pcb->inp_socket,
 					   (uid_t)((ipfw_insn_u32 *)cmd)->d[0]);
 				} else  {
 					match = groupmember(
@@ -1590,10 +1649,17 @@ check_body:
 				break;
 
 			case O_IP_SRC_MASK:
-				match = (hlen > 0 &&
-				    ((ipfw_insn_ip *)cmd)->addr.s_addr ==
-				     (src_ip.s_addr &
-				     ((ipfw_insn_ip *)cmd)->mask.s_addr));
+			case O_IP_DST_MASK:
+				if (hlen > 0) {
+				    uint32_t a =
+					(cmd->opcode == O_IP_DST_MASK) ?
+					    dst_ip.s_addr : src_ip.s_addr;
+				    uint32_t *p = ((ipfw_insn_u32 *)cmd)->d;
+				    int i = cmdlen-1;
+
+				    for (; !match && i>0; i-= 2, p+= 2)
+					match = (p[0] == (a & p[1]));
+				}
 				break;
 
 			case O_IP_SRC_ME:
@@ -1627,13 +1693,6 @@ check_body:
 				match = (hlen > 0 &&
 				    ((ipfw_insn_ip *)cmd)->addr.s_addr ==
 				    dst_ip.s_addr);
-				break;
-
-			case O_IP_DST_MASK:
-				match = (hlen > 0) &&
-				    (((ipfw_insn_ip *)cmd)->addr.s_addr ==
-				     (dst_ip.s_addr &
-				     ((ipfw_insn_ip *)cmd)->mask.s_addr));
 				break;
 
 			case O_IP_DST_ME:
@@ -1680,17 +1739,30 @@ check_body:
 				match = (hlen > 0 && cmd->arg1 == ip->ip_v);
 				break;
 
-			case O_IPTTL:
-				match = (hlen > 0 && cmd->arg1 == ip->ip_ttl);
-				break;
-
 			case O_IPID:
-				match = (hlen > 0 &&
-				    cmd->arg1 == ntohs(ip->ip_id));
-				break;
-
 			case O_IPLEN:
-				match = (hlen > 0 && cmd->arg1 == ip_len);
+			case O_IPTTL:
+				if (hlen > 0) {	/* only for IP packets */
+				    uint16_t x;
+				    uint16_t *p;
+				    int i;
+
+				    if (cmd->opcode == O_IPLEN)
+					x = ip_len;
+				    else if (cmd->opcode == O_IPTTL)
+					x = ip->ip_ttl;
+				    else /* must be IPID */
+					x = ntohs(ip->ip_id);
+				    if (cmdlen == 1) {
+					match = (cmd->arg1 == x);
+					break;
+				    }
+				    /* otherwise we have ranges */
+				    p = ((ipfw_insn_u16 *)cmd)->ports;
+				    i = cmdlen - 1;
+				    for (; !match && i>0; i--, p += 2)
+					match = (x >= p[0] && x <= p[1]);
+				}
 				break;
 
 			case O_IPPRECEDENCE:
@@ -1748,6 +1820,24 @@ check_body:
 
 			case O_PROB:
 				match = (random()<((ipfw_insn_u32 *)cmd)->d[0]);
+				break;
+
+			case O_VERREVPATH:
+				/* Outgoing packets automatically pass/match */
+				match = ((oif != NULL) ||
+				    (m->m_pkthdr.rcvif == NULL) ||
+				    verify_rev_path(src_ip, m->m_pkthdr.rcvif));
+				break;
+
+			case O_IPSEC:
+#ifdef FAST_IPSEC
+				match = (m_tag_find(m,
+				    PACKET_TAG_IPSEC_IN_DONE, NULL) != NULL);
+#endif
+#ifdef IPSEC
+				match = (ipsec_gethist(m, NULL) != NULL);
+#endif
+				/* otherwise no match */
 				break;
 
 			/*
@@ -1820,7 +1910,7 @@ check_body:
 					 * the parent rule.
 					 */
 					q->pcnt++;
-					q->bcnt += ip_len;
+					q->bcnt += pktlen;
 					f = q->rule;
 					cmd = ACTION_PTR(f);
 					l = f->cmd_len - f->act_ofs;
@@ -1859,7 +1949,7 @@ check_body:
 			case O_COUNT:
 			case O_SKIPTO:
 				f->pcnt++;	/* update stats */
-				f->bcnt += ip_len;
+				f->bcnt += pktlen;
 				f->timestamp = time_second;
 				if (cmd->opcode == O_COUNT)
 					goto next_rule;
@@ -1918,19 +2008,19 @@ check_body:
 next_rule:;		/* try next rule		*/
 
 	}		/* end of outer for, scan rules */
-	printf("+++ ipfw: ouch!, skip past end of rules, denying packet\n");
+	printf("ipfw: ouch!, skip past end of rules, denying packet\n");
 	return(IP_FW_PORT_DENY_FLAG);
 
 done:
 	/* Update statistics */
 	f->pcnt++;
-	f->bcnt += ip_len;
+	f->bcnt += pktlen;
 	f->timestamp = time_second;
 	return retval;
 
 pullup_failed:
 	if (fw_verbose)
-		printf("pullup failed\n");
+		printf("ipfw: pullup failed\n");
 	return(IP_FW_PORT_DENY_FLAG);
 }
 
@@ -1963,8 +2053,15 @@ flush_pipe_ptrs(struct dn_flow_set *match)
 
 		if (cmd->o.opcode != O_PIPE && cmd->o.opcode != O_QUEUE)
 			continue;
-		if (match == NULL || cmd->pipe_ptr == match)
-			cmd->pipe_ptr = NULL;
+		/*
+		 * XXX Use bcmp/bzero to handle pipe_ptr to overcome
+		 * possible alignment problems on 64-bit architectures.
+		 * This code is seldom used so we do not worry too
+		 * much about efficiency.
+		 */
+		if (match == NULL ||
+		    !bcmp(&cmd->pipe_ptr, &match, sizeof(match)) )
+			bzero(&cmd->pipe_ptr, sizeof(cmd->pipe_ptr));
 	}
 }
 
@@ -2045,7 +2142,7 @@ done:
 	static_count++;
 	static_len += l;
 	splx(s);
-	DEB(printf("++ installed rule %d, static count now %d\n",
+	DEB(printf("ipfw: installed rule %d, static count now %d\n",
 		rule->rulenum, static_count);)
 	return (0);
 }
@@ -2081,24 +2178,28 @@ delete_rule(struct ip_fw **head, struct ip_fw *prev, struct ip_fw *rule)
 }
 
 /*
- * Deletes all rules from a chain (including the default rule
- * if the second argument is set).
+ * Deletes all rules from a chain (except rules in set RESVD_SET
+ * unless kill_default = 1).
  * Must be called at splimp().
  */
 static void
 free_chain(struct ip_fw **chain, int kill_default)
 {
-	struct ip_fw *rule;
+	struct ip_fw *prev, *rule;
 
 	flush_rule_ptrs(); /* more efficient to do outside the loop */
-
-	while ( (rule = *chain) != NULL &&
-	    (kill_default || rule->rulenum != IPFW_DEFAULT_RULE) )
-		delete_rule(chain, NULL, rule);
+	for (prev = NULL, rule = *chain; rule ; )
+		if (kill_default || rule->set != RESVD_SET)
+			rule = delete_rule(chain, prev, rule);
+		else {
+			prev = rule;
+			rule = rule->next;
+		}
 }
 
 /**
  * Remove all rules with given number, and also do set manipulation.
+ * Assumes chain != NULL && *chain != NULL.
  *
  * The argument is an u_int32_t. The low 16 bit are the rule or set number,
  * the next 8 bits are the new set, the top 8 bits are the command:
@@ -2112,9 +2213,9 @@ free_chain(struct ip_fw **chain, int kill_default)
 static int
 del_entry(struct ip_fw **chain, u_int32_t arg)
 {
-	struct ip_fw *prev, *rule;
+	struct ip_fw *prev = NULL, *rule = *chain;
 	int s;
-	u_int16_t rulenum;
+	u_int16_t rulenum;	/* rule or old_set */
 	u_int8_t cmd, new_set;
 
 	rulenum = arg & 0xffff;
@@ -2123,13 +2224,13 @@ del_entry(struct ip_fw **chain, u_int32_t arg)
 
 	if (cmd > 4)
 		return EINVAL;
-	if (new_set > 30)
+	if (new_set > RESVD_SET)
 		return EINVAL;
 	if (cmd == 0 || cmd == 2) {
-		if (rulenum == IPFW_DEFAULT_RULE)
+		if (rulenum >= IPFW_DEFAULT_RULE)
 			return EINVAL;
 	} else {
-		if (rulenum > 30)
+		if (rulenum > RESVD_SET)	/* old_set */
 			return EINVAL;
 	}
 
@@ -2138,9 +2239,7 @@ del_entry(struct ip_fw **chain, u_int32_t arg)
 		/*
 		 * locate first rule to delete
 		 */
-		for (prev = NULL, rule = *chain;
-		    rule && rule->rulenum < rulenum;
-		     prev = rule, rule = rule->next)
+		for (; rule->rulenum < rulenum; prev = rule, rule = rule->next)
 			;
 		if (rule->rulenum != rulenum)
 			return EINVAL;
@@ -2151,7 +2250,7 @@ del_entry(struct ip_fw **chain, u_int32_t arg)
 		 * rules. prev remains the same throughout the cycle.
 		 */
 		flush_rule_ptrs();
-		while (rule && rule->rulenum == rulenum)
+		while (rule->rulenum == rulenum)
 			rule = delete_rule(chain, prev, rule);
 		splx(s);
 		break;
@@ -2159,7 +2258,7 @@ del_entry(struct ip_fw **chain, u_int32_t arg)
 	case 1:	/* delete all rules with given set number */
 		s = splimp();
 		flush_rule_ptrs();
-		for (prev = NULL, rule = *chain; rule ; )
+		while (rule->rulenum < IPFW_DEFAULT_RULE)
 			if (rule->set == rulenum)
 				rule = delete_rule(chain, prev, rule);
 			else {
@@ -2171,7 +2270,7 @@ del_entry(struct ip_fw **chain, u_int32_t arg)
 
 	case 2:	/* move rules with given number to new set */
 		s = splimp();
-		for (rule = *chain; rule ; rule = rule->next)
+		for (; rule->rulenum < IPFW_DEFAULT_RULE; rule = rule->next)
 			if (rule->rulenum == rulenum)
 				rule->set = new_set;
 		splx(s);
@@ -2179,7 +2278,7 @@ del_entry(struct ip_fw **chain, u_int32_t arg)
 
 	case 3: /* move rules with given set number to new set */
 		s = splimp();
-		for (rule = *chain; rule ; rule = rule->next)
+		for (; rule->rulenum < IPFW_DEFAULT_RULE; rule = rule->next)
 			if (rule->set == rulenum)
 				rule->set = new_set;
 		splx(s);
@@ -2187,7 +2286,7 @@ del_entry(struct ip_fw **chain, u_int32_t arg)
 
 	case 4: /* swap two sets */
 		s = splimp();
-		for (rule = *chain; rule ; rule = rule->next)
+		for (; rule->rulenum < IPFW_DEFAULT_RULE; rule = rule->next)
 			if (rule->set == rulenum)
 				rule->set = new_set;
 			else if (rule->set == new_set)
@@ -2297,7 +2396,6 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 		}
 		DEB(printf("ipfw: opcode %d\n", cmd->opcode);)
 		switch (cmd->opcode) {
-		case O_NOP:
 		case O_PROBE_STATE:
 		case O_KEEP_STATE:
 		case O_PROTO:
@@ -2307,16 +2405,15 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 		case O_IN:
 		case O_FRAG:
 		case O_IPOPT:
-		case O_IPLEN:
-		case O_IPID:
 		case O_IPTOS:
 		case O_IPPRECEDENCE:
-		case O_IPTTL:
 		case O_IPVER:
 		case O_TCPWIN:
 		case O_TCPFLAGS:
 		case O_TCPOPTS:
 		case O_ESTAB:
+		case O_VERREVPATH:
+		case O_IPSEC:
 			if (cmdlen != F_INSN_SIZE(ipfw_insn))
 				goto bad_size;
 			break;
@@ -2349,13 +2446,9 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 
 		case O_IP_SRC_MASK:
 		case O_IP_DST_MASK:
-			if (cmdlen != F_INSN_SIZE(ipfw_insn_ip))
+			/* only odd command lengths */
+			if ( !(cmdlen & 1) || cmdlen > 31)
 				goto bad_size;
-			if (((ipfw_insn_ip *)cmd)->mask.s_addr == 0) {
-				printf("ipfw: opcode %d, useless rule\n",
-					cmd->opcode);
-				return EINVAL;
-			}
 			break;
 
 		case O_IP_SRC_SET:
@@ -2372,6 +2465,14 @@ check_ipfw_struct(struct ip_fw *rule, int size)
 
 		case O_MACADDR2:
 			if (cmdlen != F_INSN_SIZE(ipfw_insn_mac))
+				goto bad_size;
+			break;
+
+		case O_NOP:
+		case O_IPID:
+		case O_IPTTL:
+		case O_IPLEN:
+			if (cmdlen < 1 || cmdlen > 31)
 				goto bad_size;
 			break;
 
@@ -2504,11 +2605,8 @@ ipfw_ctl(struct sockopt *sopt)
 		for (rule = layer3_chain; rule ; rule = rule->next) {
 			int i = RULESIZE(rule);
 			bcopy(rule, bp, i);
-			/*
-			 * abuse 'next_rule' to store the set_disable word
-			 */
-			(u_int32_t)(((struct ip_fw *)bp)->next_rule) =
-				set_disable;
+			bcopy(&set_disable, &(bp->next_rule),
+			    sizeof(set_disable));
 			bp = (struct ip_fw *)((char *)bp + i);
 		}
 		if (ipfw_dyn_v) {
@@ -2520,21 +2618,22 @@ ipfw_ctl(struct sockopt *sopt)
 				for ( p = ipfw_dyn_v[i] ; p != NULL ;
 				    p = p->next, dst++ ) {
 					bcopy(p, dst, sizeof *p);
-					(int)dst->rule = p->rule->rulenum ;
+					bcopy(&(p->rule->rulenum), &(dst->rule),
+					    sizeof(p->rule->rulenum));
 					/*
 					 * store a non-null value in "next".
 					 * The userland code will interpret a
 					 * NULL here as a marker
 					 * for the last dynamic rule.
 					 */
-					dst->next = dst ;
+					bcopy(&dst, &dst->next, sizeof(dst));
 					last = dst ;
 					dst->expire =
 					    TIME_LEQ(dst->expire, time_second) ?
 						0 : dst->expire - time_second ;
 				}
 			if (last != NULL) /* mark last dynamic rule */
-				last->next = NULL;
+				bzero(&last->next, sizeof(last));
 		}
 		splx(s);
 
@@ -2598,7 +2697,7 @@ ipfw_ctl(struct sockopt *sopt)
 		else if (size == 2*sizeof(u_int32_t)) /* set enable/disable */
 			set_disable =
 			    (set_disable | rule_buf[0]) & ~rule_buf[1] &
-			    ~(1<<31); /* set 31 always enabled */
+			    ~(1<<RESVD_SET); /* set RESVD_SET always enabled */
 		else
 			error = EINVAL;
 		break;
@@ -2617,7 +2716,7 @@ ipfw_ctl(struct sockopt *sopt)
 		break;
 
 	default:
-		printf("ipfw_ctl invalid option %d\n", sopt->sopt_name);
+		printf("ipfw: ipfw_ctl invalid option %d\n", sopt->sopt_name);
 		error = EINVAL;
 	}
 
@@ -2685,7 +2784,7 @@ ipfw_init(void)
 	default_rule.act_ofs = 0;
 	default_rule.rulenum = IPFW_DEFAULT_RULE;
 	default_rule.cmd_len = 1;
-	default_rule.set = 31;
+	default_rule.set = RESVD_SET;
 
 	default_rule.cmd[0].len = 1;
 	default_rule.cmd[0].opcode =

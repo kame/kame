@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.5 1999/08/28 00:48:35 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.5.2.2 2003/08/07 15:44:59 harti Exp $
  *
  */
 
@@ -36,9 +36,10 @@
  */
 
 #include <netatm/kern_include.h>
+#include <net/bpf.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.5 1999/08/28 00:48:35 peter Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.5.2.2 2003/08/07 15:44:59 harti Exp $");
 #endif
 
 
@@ -351,6 +352,17 @@ atm_dev_lower(cmd, tok, arg1, arg2)
 				tok, state );
 			KB_FREEALL((KBuffer *)arg1);
 			break;
+		}
+
+		/*
+		 * Send the packet to the interface's bpf if this vc has one.
+		 */
+		if (cvcp->cvc_vcc != NULL && cvcp->cvc_vcc->vc_nif != NULL) {
+			struct ifnet *ifp =
+			    (struct ifnet *)cvcp->cvc_vcc->vc_nif;
+
+			if (ifp->if_bpf)
+				bpf_mtap(ifp, (KBuffer *)arg1);
 		}
 
 		/*
@@ -866,11 +878,8 @@ atm_unload()
  *
  */
 void
-atm_dev_pdu_print(cup, cvp, m, msg)
-	Cmn_unit	*cup;
-	Cmn_vcc		*cvp;
-	KBuffer		*m;
-	char		*msg;
+atm_dev_pdu_print(const Cmn_unit *cup, const Cmn_vcc *cvp,
+    const KBuffer *m, const char *msg)
 {
 	char		buf[128];
 
@@ -880,4 +889,3 @@ atm_dev_pdu_print(cup, cvp, m, msg)
 
 	atm_pdu_print(m, buf);
 }
-

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fifo_vnops.c	8.10 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/miscfs/fifofs/fifo_vnops.c,v 1.45.2.3 2001/06/15 21:20:55 jlemon Exp $
+ * $FreeBSD: src/sys/miscfs/fifofs/fifo_vnops.c,v 1.45.2.4 2003/04/22 10:11:24 bde Exp $
  */
 
 #include <sys/param.h>
@@ -224,13 +224,18 @@ fifo_open(ap)
 		}
 	}
 	if ((ap->a_mode & FREAD) && (ap->a_mode & O_NONBLOCK) == 0) {
-		while (fip->fi_writers == 0) {
+		if (fip->fi_writers == 0) {
 			VOP_UNLOCK(vp, 0, p);
 			error = tsleep((caddr_t)&fip->fi_readers,
 			    PCATCH | PSOCK, "fifoor", 0);
 			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 			if (error)
 				goto bad;
+			/*
+			 * We must have got woken up because we had a writer.
+			 * That (and not still having one) is the condition
+			 * that we must wait for.
+			 */
 		}
 	}
 	if (ap->a_mode & FWRITE) {
@@ -240,13 +245,18 @@ fifo_open(ap)
 				goto bad;
 			}
 		} else {
-			while (fip->fi_readers == 0) {
+			if (fip->fi_readers == 0) {
 				VOP_UNLOCK(vp, 0, p);
 				error = tsleep((caddr_t)&fip->fi_writers,
 				    PCATCH | PSOCK, "fifoow", 0);
 				vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 				if (error)
 					goto bad;
+				/*
+				 * We must have got woken up because we had
+				 * a reader.  That (and not still having one)
+				 * is the condition that we must wait for.
+				 */
 			}
 		}
 	}

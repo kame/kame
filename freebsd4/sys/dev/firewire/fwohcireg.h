@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 1998-2001 Katsushi Kobayashi and Hidetoshi Shimokawa
+ * Copyright (c) 2003 Hidetoshi Shimokawa
+ * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.2.2.5 2003/02/24 07:31:28 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.2.2.9 2003/08/22 07:46:58 simokawa Exp $
  *
  */
 #define		PCI_CBMEM		0x10
@@ -45,15 +46,21 @@
 
 #define		FW_DEVICE_UPD861	(0x0063 << 16)
 #define		FW_DEVICE_UPD871	(0x00ce << 16)
+#define		FW_DEVICE_UPD72870	(0x00cd << 16)
+#define		FW_DEVICE_UPD72874	(0x00f2 << 16)
 #define		FW_DEVICE_TITSB22	(0x8009 << 16)
 #define		FW_DEVICE_TITSB23	(0x8019 << 16)
 #define		FW_DEVICE_TITSB26	(0x8020 << 16)
 #define		FW_DEVICE_TITSB43	(0x8021 << 16)
 #define		FW_DEVICE_TITSB43A	(0x8023 << 16)
-#define		FW_DEVICE_TIPCI4450	(0x8011 << 16)
+#define		FW_DEVICE_TITSB43AB23	(0x8024 << 16)
+#define		FW_DEVICE_TITSB82AA2	(0x8025 << 16)
 #define		FW_DEVICE_TIPCI4410A	(0x8017 << 16)
+#define		FW_DEVICE_TIPCI4450	(0x8011 << 16)
+#define		FW_DEVICE_TIPCI4451	(0x8027 << 16)
 #define		FW_DEVICE_CX3022	(0x8039 << 16)
 #define		FW_DEVICE_VT6306	(0x3044 << 16)
+#define		FW_DEVICE_R5C551	(0x0551 << 16)
 #define		FW_DEVICE_R5C552	(0x0552 << 16)
 #define		FW_DEVICE_PANGEA	(0x0030 << 16)
 #define		FW_DEVICE_UNINORTH	(0x0031 << 16)
@@ -71,55 +78,68 @@
 
 typedef volatile u_int32_t 	fwohcireg_t;
 
+/* for PCI */
+#if BYTE_ORDER == BIG_ENDIAN
+#define FWOHCI_DMA_WRITE(x, y)	((x) = htole32(y))
+#define FWOHCI_DMA_READ(x)	le32toh(x)
+#define FWOHCI_DMA_SET(x, y)	((x) |= htole32(y))
+#define FWOHCI_DMA_CLEAR(x, y)	((x) &= htole32(~(y)))
+#else
+#define FWOHCI_DMA_WRITE(x, y)	((x) = (y))
+#define FWOHCI_DMA_READ(x)	(x)
+#define FWOHCI_DMA_SET(x, y)	((x) |= (y))
+#define FWOHCI_DMA_CLEAR(x, y)	((x) &= ~(y))
+#endif
+
 struct fwohcidb {
 	union {
 		struct {
-			volatile u_int32_t reqcount:16,
-					   control:16;
+			volatile u_int32_t cmd;
 			volatile u_int32_t addr;
 			volatile u_int32_t depend;
-			volatile u_int32_t count:16,
-					   status:16;
+			volatile u_int32_t res;
 		} desc;
 		volatile u_int32_t immed[4];
 	} db;
-#define OHCI_OUTPUT_MORE	(0 << 12)
-#define OHCI_OUTPUT_LAST	(1 << 12)
-#define OHCI_INPUT_MORE		(2 << 12)
-#define OHCI_INPUT_LAST		(3 << 12)
-#define OHCI_STORE_QUAD		(4 << 12)
-#define OHCI_LOAD_QUAD		(5 << 12)
-#define OHCI_NOP		(6 << 12)
-#define OHCI_STOP		(7 << 12)
-#define OHCI_STORE		(8 << 12)
-#define OHCI_CMD_MASK		(0xf << 12)
+#define OHCI_STATUS_SHIFT	16
+#define OHCI_COUNT_MASK		0xffff
+#define OHCI_OUTPUT_MORE	(0 << 28)
+#define OHCI_OUTPUT_LAST	(1 << 28)
+#define OHCI_INPUT_MORE		(2 << 28)
+#define OHCI_INPUT_LAST		(3 << 28)
+#define OHCI_STORE_QUAD		(4 << 28)
+#define OHCI_LOAD_QUAD		(5 << 28)
+#define OHCI_NOP		(6 << 28)
+#define OHCI_STOP		(7 << 28)
+#define OHCI_STORE		(8 << 28)
+#define OHCI_CMD_MASK		(0xf << 28)
 
-#define	OHCI_UPDATE		(1 << 11)
+#define	OHCI_UPDATE		(1 << 27)
 
-#define OHCI_KEY_ST0		(0 << 8)
-#define OHCI_KEY_ST1		(1 << 8)
-#define OHCI_KEY_ST2		(2 << 8)
-#define OHCI_KEY_ST3		(3 << 8)
-#define OHCI_KEY_REGS		(5 << 8)
-#define OHCI_KEY_SYS		(6 << 8)
-#define OHCI_KEY_DEVICE		(7 << 8)
-#define OHCI_KEY_MASK		(7 << 8)
+#define OHCI_KEY_ST0		(0 << 24)
+#define OHCI_KEY_ST1		(1 << 24)
+#define OHCI_KEY_ST2		(2 << 24)
+#define OHCI_KEY_ST3		(3 << 24)
+#define OHCI_KEY_REGS		(5 << 24)
+#define OHCI_KEY_SYS		(6 << 24)
+#define OHCI_KEY_DEVICE		(7 << 24)
+#define OHCI_KEY_MASK		(7 << 24)
 
-#define OHCI_INTERRUPT_NEVER	(0 << 4)
-#define OHCI_INTERRUPT_TRUE	(1 << 4)
-#define OHCI_INTERRUPT_FALSE	(2 << 4)
-#define OHCI_INTERRUPT_ALWAYS	(3 << 4)
+#define OHCI_INTERRUPT_NEVER	(0 << 20)
+#define OHCI_INTERRUPT_TRUE	(1 << 20)
+#define OHCI_INTERRUPT_FALSE	(2 << 20)
+#define OHCI_INTERRUPT_ALWAYS	(3 << 20)
 
-#define OHCI_BRANCH_NEVER	(0 << 2)
-#define OHCI_BRANCH_TRUE	(1 << 2)
-#define OHCI_BRANCH_FALSE	(2 << 2)
-#define OHCI_BRANCH_ALWAYS	(3 << 2)
-#define OHCI_BRANCH_MASK	(3 << 2)
+#define OHCI_BRANCH_NEVER	(0 << 18)
+#define OHCI_BRANCH_TRUE	(1 << 18)
+#define OHCI_BRANCH_FALSE	(2 << 18)
+#define OHCI_BRANCH_ALWAYS	(3 << 18)
+#define OHCI_BRANCH_MASK	(3 << 18)
 
-#define OHCI_WAIT_NEVER		(0)
-#define OHCI_WAIT_TRUE		(1)
-#define OHCI_WAIT_FALSE		(2)
-#define OHCI_WAIT_ALWAYS	(3)
+#define OHCI_WAIT_NEVER		(0 << 16)
+#define OHCI_WAIT_TRUE		(1 << 16)
+#define OHCI_WAIT_FALSE		(2 << 16)
+#define OHCI_WAIT_ALWAYS	(3 << 16)
 };
 
 #define OHCI_SPD_S100 0x4
@@ -267,7 +287,7 @@ struct ohci_registers {
 		fwohcireg_t	dummy1;
 		fwohcireg_t	dummy2;
 		fwohcireg_t	dummy3;
-	};
+	} dummy8;
 	/*       0x180, 0x184, 0x188, 0x18c */
 	/*       0x190, 0x194, 0x198, 0x19c */
 	/*       0x1a0, 0x1a4, 0x1a8, 0x1ac */
@@ -285,7 +305,7 @@ struct ohci_registers {
 		fwohcireg_t	cntl_clr;
 		fwohcireg_t	dummy0;
 		fwohcireg_t	cmd;
-	};
+	} dummy9;
 	struct ohci_itdma dma_itch[0x20];
 
 	/*       0x400, 0x404, 0x408, 0x40c */
@@ -298,8 +318,9 @@ struct fwohcidb_tr{
 	STAILQ_ENTRY(fwohcidb_tr) link;
 	struct fw_xfer *xfer;
 	volatile struct fwohcidb *db;
+	bus_dmamap_t dma_map;
 	caddr_t buf;
-	caddr_t dummy;
+	bus_addr_t bus_addr;
 	int dbcnt;
 };
 
@@ -310,31 +331,53 @@ struct fwohci_txpkthdr{
 	union{
 		u_int32_t ld[4];
 		struct {
-			u_int32_t res3:4,
+#if BYTE_ORDER == BIG_ENDIAN
+			u_int32_t spd:16, /* XXX include reserved field */
+				  :8,
 				  tcode:4,
-				  res2:8,
-				  spd:3,
-				  res1:13;
+				  :4;
+#else
+			u_int32_t :4,
+				  tcode:4,
+				  :8,
+				  spd:16; /* XXX include reserved fields */
+#endif
 		}common;
 		struct {
-			u_int32_t res3:4,
-				 tcode:4,
-				 tlrt:8,
-				 spd:3,
-				 res2:4,
-				 srcbus:1,
-				 res1:8;
-		  	u_int32_t res4:16,
-				 dst:16;
+#if BYTE_ORDER == BIG_ENDIAN
+			u_int32_t :8,
+				  srcbus:1,
+				  :4,
+				  spd:3,
+				  tlrt:8,
+				  tcode:4,
+				  :4;
+#else
+			u_int32_t :4,
+				  tcode:4,
+				  tlrt:8,
+				  spd:3,
+				  :4,
+				  srcbus:1,
+				  :8;
+#endif
+			BIT16x2(dst, );
 		}asycomm;
 		struct {
+#if BYTE_ORDER == BIG_ENDIAN
+			u_int32_t :13,
+			          spd:3,
+				  chtag:8,
+				  tcode:4,
+				  sy:4;
+#else
 			u_int32_t sy:4,
 				  tcode:4,
 				  chtag:8,
 			          spd:3,
-				  res1:13;
-			u_int32_t res2:16,
-				  len:16;
+				  :13;
+#endif
+			BIT16x2(len, );
 		}stream;
 	}mode;
 };

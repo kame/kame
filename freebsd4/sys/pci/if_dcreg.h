@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.4.2.21 2003/02/12 22:19:34 mbr Exp $
+ * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.4.2.23 2003/08/27 13:40:36 mbr Exp $
  */
 
 /*
@@ -731,6 +731,7 @@ struct dc_softc {
 #define DC_64BIT_HASH		0x00002000
 #define DC_TULIP_LEDS		0x00004000
 #define DC_TX_ONE		0x00008000
+#define DC_TX_ALIGN		0x00010000      /* align mbuf on tx */
 
 /*
  * register space access macros
@@ -838,6 +839,17 @@ struct dc_softc {
  */
 #define DC_DEVICEID_AL981	0x0981
 #define DC_DEVICEID_AN985	0x0985
+
+
+/*
+ * 3COM PCI vendor ID
+ */
+#define DC_VENDORID_3COM	0x10b7
+
+/*
+ * 3COM OfficeConnect 10/100B (3CSOHO100B-TX)
+ */
+#define DC_DEVICEID_3CSOHOB	0x9300
 
 /*
  * ASIX vendor ID.

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.i386,v 1.132.2.18 2003/03/14 21:22:35 jhb Exp $
+# $FreeBSD: src/sys/conf/options.i386,v 1.132.2.21 2003/10/22 19:04:08 jhb Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -32,10 +32,10 @@ DEBUG_SVR4		opt_svr4.h
 
 # i386 SMP options
 APIC_IO			opt_global.h
-HTT
 
 # Change KVM size.  Changes things all over the kernel.
 KVA_PAGES		opt_global.h
+PAE			opt_global.h
 
 CLK_CALIBRATION_LOOP		opt_clock.h
 CLK_USE_I8254_CALIBRATION	opt_clock.h
@@ -66,6 +66,7 @@ CYRIX_CACHE_REALLY_WORKS	opt_cpu.h
 NO_MEMORY_HOLE			opt_cpu.h
 CPU_ENABLE_SSE			opt_cpu.h
 CPU_ATHLON_SSE_HACK		opt_cpu.h
+NO_PSE_HACK			opt_cpu.h
 
 # The CPU type affects the endian conversion functions all over the kernel.
 I386_CPU		opt_global.h

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.41 2003/03/05 18:42:33 njl Exp $
+ * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.50 2003/08/27 13:40:35 mbr Exp $
  */
 
 /*
@@ -134,7 +134,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.41 2003/03/05 18:42:33 njl Exp $";
+  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.50 2003/08/27 13:40:35 mbr Exp $";
 #endif
 
 /*
@@ -187,6 +187,8 @@ static struct dc_type dc_devs[] = {
 		"Accton EN2242 MiniPCI 10/100BaseTX" },
 	{ DC_VENDORID_CONEXANT, DC_DEVICEID_RS7112,
 		"Conexant LANfinity MiniPCI 10/100BaseTX" },
+	{ DC_VENDORID_3COM, DC_DEVICEID_3CSOHOB,
+		"3Com OfficeConnect 10/100B" },
 	{ 0, 0, NULL }
 };
 
@@ -200,7 +202,6 @@ static struct dc_type *dc_devtype	__P((device_t));
 static int dc_newbuf		__P((struct dc_softc *, int, struct mbuf *));
 static int dc_encap		__P((struct dc_softc *, struct mbuf *,
 					u_int32_t *));
-static int dc_coal		__P((struct dc_softc *, struct mbuf **));
 static void dc_pnic_rx_bug_war	__P((struct dc_softc *, int));
 static int dc_rx_resync		__P((struct dc_softc *));
 static void dc_rxeof		__P((struct dc_softc *));
@@ -1181,7 +1182,10 @@ void dc_setfilt_admtek(sc)
 	    ifma = ifma->ifma_link.le_next) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = dc_crc_be(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		if (DC_IS_CENTAUR(sc))
+			h = dc_crc_le(sc, LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		else
+			h = dc_crc_be(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -1717,10 +1721,30 @@ static void dc_parse_21143_srom(sc)
 	struct dc_eblock_hdr	*hdr;
 	int			i, loff;
 	char			*ptr;
+	int			have_mii;
 
+	have_mii = 0;
 	loff = sc->dc_srom[27];
 	lhdr = (struct dc_leaf_hdr *)&(sc->dc_srom[loff]);
 
+	ptr = (char *)lhdr;
+	ptr += sizeof(struct dc_leaf_hdr) - 1;
+	/*
+	 * Look if we got a MII media block.
+	 */
+	for (i = 0; i < lhdr->dc_mcnt; i++) {
+		hdr = (struct dc_eblock_hdr *)ptr;
+		if (hdr->dc_type == DC_EBLOCK_MII)
+		    have_mii++;
+
+		ptr += (hdr->dc_len & 0x7F);
+		ptr++;
+	}
+
+	/*
+	 * Do the same thing again. Only use SIA and SYM media
+	 * blocks if no MII media block is available.
+	 */
 	ptr = (char *)lhdr;
 	ptr += sizeof(struct dc_leaf_hdr) - 1;
 	for (i = 0; i < lhdr->dc_mcnt; i++) {
@@ -1730,10 +1754,14 @@ static void dc_parse_21143_srom(sc)
 			dc_decode_leaf_mii(sc, (struct dc_eblock_mii *)hdr);
 			break;
 		case DC_EBLOCK_SIA:
-			dc_decode_leaf_sia(sc, (struct dc_eblock_sia *)hdr);
+			if (! have_mii)
+				dc_decode_leaf_sia(sc,
+				    (struct dc_eblock_sia *)hdr);
 			break;
 		case DC_EBLOCK_SYM:
-			dc_decode_leaf_sym(sc, (struct dc_eblock_sym *)hdr);
+			if (! have_mii)
+				dc_decode_leaf_sym(sc,
+				    (struct dc_eblock_sym *)hdr);
 			break;
 		default:
 			/* Don't care. Yet. */
@@ -1851,6 +1879,7 @@ static int dc_attach(dev)
 		sc->dc_type = DC_TYPE_DM9102;
 		sc->dc_flags |= DC_TX_COALESCE|DC_TX_INTR_ALWAYS;
 		sc->dc_flags |= DC_REDUCED_MII_POLL|DC_TX_STORENFWD;
+		sc->dc_flags |= DC_TX_ALIGN;
 		sc->dc_pmode = DC_PMODE_MII;
 		/* Increase the latency timer value. */
 		command = pci_read_config(dev, DC_PCI_CFLT, 4);
@@ -1867,7 +1896,9 @@ static int dc_attach(dev)
 		break;
 	case DC_DEVICEID_AN985:
 	case DC_DEVICEID_EN2242:
+	case DC_DEVICEID_3CSOHOB:
 		sc->dc_type = DC_TYPE_AN985;
+		sc->dc_flags |= DC_64BIT_HASH;
 		sc->dc_flags |= DC_TX_USE_TX_INTR;
 		sc->dc_flags |= DC_TX_ADMTEK_WAR;
 		sc->dc_pmode = DC_PMODE_MII;
@@ -2360,7 +2391,7 @@ static void dc_pnic_rx_bug_war(sc, idx)
 	i = sc->dc_pnic_rx_bug_save;
 	cur_rx = &sc->dc_ldata->dc_rx_list[idx];
 	ptr = sc->dc_pnic_rx_buf;
-	bzero(ptr, sizeof(DC_RXLEN * 5));
+	bzero(ptr, DC_RXLEN * 5);
 
 	/* Copy all the bytes from the bogus buffers. */
 	while (1) {
@@ -2952,8 +2983,32 @@ static int dc_encap(sc, m_head, txidx)
 {
 	struct dc_desc		*f = NULL;
 	struct mbuf		*m;
-	int			frag, cur, cnt = 0;
+	int			frag, cur, cnt = 0, chainlen = 0;
 
+	/*
+	 * If there's no way we can send any packets, return now.
+	 */
+	if (DC_TX_LIST_CNT - sc->dc_cdata.dc_tx_cnt < 6)
+		return (ENOBUFS);
+
+	/*
+	 * Count the number of frags in this chain to see if
+	 * we need to m_defrag.  Since the descriptor list is shared
+	 * by all packets, we'll m_defrag long chains so that they
+	 * do not use up the entire list, even if they would fit.
+	 */
+
+	for (m = m_head; m != NULL; m = m->m_next)
+		chainlen++;
+
+	if ((chainlen > DC_TX_LIST_CNT / 4) ||
+	    ((DC_TX_LIST_CNT - (chainlen + sc->dc_cdata.dc_tx_cnt)) < 6)) {
+		m = m_defrag(m_head, M_DONTWAIT);
+		if (m == NULL)
+			return (ENOBUFS);
+		m_head = m;
+	}
+       
 	/*
  	 * Start packing the mbufs in this chain into
 	 * the fragment pointers. Stop when we run out
@@ -3006,36 +3061,6 @@ static int dc_encap(sc, m_head, txidx)
 }
 
 /*
- * Coalesce an mbuf chain into a single mbuf cluster buffer.
- * Needed for some really badly behaved chips that just can't
- * do scatter/gather correctly.
- */
-static int dc_coal(sc, m_head)
-	struct dc_softc		*sc;
-	struct mbuf		**m_head;
-{
-        struct mbuf		*m_new, *m;
-
-	m = *m_head;
-	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-	if (m_new == NULL)
-		return(ENOBUFS);
-	if (m->m_pkthdr.len > MHLEN) {
-		MCLGET(m_new, M_DONTWAIT);
-		if (!(m_new->m_flags & M_EXT)) {
-			m_freem(m_new);
-			return(ENOBUFS);
-		}
-	}
-	m_copydata(m, 0, m->m_pkthdr.len, mtod(m_new, caddr_t));
-	m_new->m_pkthdr.len = m_new->m_len = m->m_pkthdr.len;
-	m_freem(m);
-	*m_head = m_new;
-
-	return(0);
-}
-
-/*
  * Main transmit routine. To avoid having to do mbuf copies, we put pointers
  * to the mbuf data regions directly in the transmit lists. We also save a
  * copy of the pointers since the transmit list fragment pointers are
@@ -3046,7 +3071,7 @@ static void dc_start(ifp)
 	struct ifnet		*ifp;
 {
 	struct dc_softc		*sc;
-	struct mbuf		*m_head = NULL;
+	struct mbuf		*m_head = NULL, *m;
 	int			idx;
 
 	sc = ifp->if_softc;
@@ -3065,12 +3090,15 @@ static void dc_start(ifp)
 			break;
 
 		if (sc->dc_flags & DC_TX_COALESCE &&
-		    m_head->m_next != NULL) {
-			/* only coalesce if have >1 mbufs */
-			if (dc_coal(sc, &m_head)) {
+		    (m_head->m_next != NULL ||
+			sc->dc_flags & DC_TX_ALIGN)) {
+			m = m_defrag(m_head, M_DONTWAIT);
+			if (m == NULL) {
 				IF_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
+			} else {
+				m_head = m;
 			}
 		}
 
@@ -3459,8 +3487,10 @@ static void dc_stop(sc)
 	 */
 	for (i = 0; i < DC_TX_LIST_CNT; i++) {
 		if (sc->dc_cdata.dc_tx_chain[i] != NULL) {
-			if (sc->dc_ldata->dc_tx_list[i].dc_ctl &
-			    DC_TXCTL_SETUP) {
+			if ((sc->dc_ldata->dc_tx_list[i].dc_ctl &
+			    DC_TXCTL_SETUP) ||
+			    !(sc->dc_ldata->dc_tx_list[i].dc_ctl & 
+			    DC_TXCTL_LASTFRAG)) {
 				sc->dc_cdata.dc_tx_chain[i] = NULL;
 				continue;
 			}

@@ -37,7 +37,7 @@
  *	@(#)procfs_fpregs.c	8.2 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_fpregs.c,v 1.11.2.3 2002/01/22 17:22:59 nectar Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_fpregs.c,v 1.11.2.4 2003/10/02 16:49:49 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -56,30 +56,18 @@ procfs_dofpregs(curp, p, pfs, uio)
 {
 	int error;
 	struct fpreg r;
-	char *kv;
-	int kl;
 
 	/* Can't trace a process that's currently exec'ing. */ 
 	if ((p->p_flag & P_INEXEC) != 0)
 		return EAGAIN;
 	if (!CHECKIO(curp, p) || p_trespass(curp, p))
 		return EPERM;
-	kl = sizeof(r);
-	kv = (char *) &r;
-
-	kv += uio->uio_offset;
-	kl -= uio->uio_offset;
-	if (kl > uio->uio_resid)
-		kl = uio->uio_resid;
 
 	PHOLD(p);
 
-	if (kl < 0)
-		error = EINVAL;
-	else
-		error = procfs_read_fpregs(p, &r);
+	error = procfs_read_fpregs(p, &r);
 	if (error == 0)
-		error = uiomove(kv, kl, uio);
+		error = uiomove_frombuf(&r, sizeof(r), uio);
 	if (error == 0 && uio->uio_rw == UIO_WRITE) {
 		if (p->p_stat != SSTOP)
 			error = EBUSY;

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_generic.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/sys_generic.c,v 1.55.2.10 2001/03/17 10:39:32 peter Exp $
+ * $FreeBSD: src/sys/kern/sys_generic.c,v 1.55.2.11 2003/10/02 15:08:01 nectar Exp $
  */
 
 #include "opt_ktrace.h"
@@ -231,7 +231,7 @@ readv(p, uap)
 	register struct filedesc *fdp = p->p_fd;
 	struct uio auio;
 	register struct iovec *iov;
-	struct iovec *needfree;
+	struct iovec *needfree = NULL;
 	struct iovec aiov[UIO_SMALLIOV];
 	long i, cnt, error = 0;
 	u_int iovlen;
@@ -245,14 +245,14 @@ readv(p, uap)
 	/* note: can't use iovlen until iovcnt is validated */
 	iovlen = uap->iovcnt * sizeof (struct iovec);
 	if (uap->iovcnt > UIO_SMALLIOV) {
-		if (uap->iovcnt > UIO_MAXIOV)
-			return (EINVAL);
+		if (uap->iovcnt > UIO_MAXIOV) {
+			error = EINVAL;
+			goto done;
+		}
 		MALLOC(iov, struct iovec *, iovlen, M_IOV, M_WAITOK);
 		needfree = iov;
-	} else {
+	} else
 		iov = aiov;
-		needfree = NULL;
-	}
 	auio.uio_iov = iov;
 	auio.uio_iovcnt = uap->iovcnt;
 	auio.uio_rw = UIO_READ;

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5.2.12 2002/07/02 23:44:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5.2.14 2003/08/24 08:24:38 hsu Exp $
  * $Whistle: ng_ksocket.c,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -148,6 +148,7 @@ static const struct ng_ksocket_alias ng_ksocket_protos[] = {
 	{ "swipe",	IPPROTO_SWIPE,		PF_INET		},
 	{ "encap",	IPPROTO_ENCAP,		PF_INET		},
 	{ "divert",	IPPROTO_DIVERT,		PF_INET		},
+	{ "pim",	IPPROTO_PIM,		PF_INET		},
 	{ "ddp",	ATPROTO_DDP,		PF_APPLETALK	},
 	{ "aarp",	ATPROTO_AARP,		PF_APPLETALK	},
 	{ NULL,		-1					},
@@ -732,12 +733,13 @@ ng_ksocket_rcvmsg(node_p node, struct ng_mesg *msg,
 				so->so_state &= ~SS_ISCONNECTING;
 				ERROUT(error);
 			}
-			if ((so->so_state & SS_ISCONNECTING) != 0)
+			if ((so->so_state & SS_ISCONNECTING) != 0) {
 				/* We will notify the sender when we connect */
 				priv->response_token = msg->header.token;
 				strcpy(priv->response_addr, raddr);
 				priv->flags |= KSF_CONNECTING;
 				ERROUT(EINPROGRESS);
+			}
 			break;
 		    }
 

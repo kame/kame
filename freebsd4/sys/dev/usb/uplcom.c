@@ -1,5 +1,5 @@
 /*	$NetBSD: uplcom.c,v 1.20 2001/07/31 12:33:11 ichiro Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.8.2.1 2002/08/08 18:45:04 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.8.2.3 2003/07/21 11:29:43 akiyama Exp $	*/
 
 /*-
  * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
@@ -220,7 +220,7 @@ Static device_method_t uplcom_methods[] = {
 };
 
 Static driver_t uplcom_driver = {
-	"uplcom",
+	"ucom",
 	uplcom_methods,
 	sizeof (struct uplcom_softc)
 };

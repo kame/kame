@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_mchain.c,v 1.2.2.2 2002/04/13 12:46:40 bp Exp $
+ * $FreeBSD: src/sys/kern/subr_mchain.c,v 1.2.2.3 2003/07/19 06:27:29 silby Exp $
  */
 
 
@@ -51,23 +51,6 @@ MODULE_VERSION(libmchain, 1);
 
 #define MBPANIC(format, args...) printf("%s(%d): "format, __FUNCTION__ , \
 				    __LINE__ ,## args)
-
-/*
- * Various helper functions
- */
-int
-m_fixhdr(struct mbuf *m0)
-{
-	struct mbuf *m = m0;
-	int len = 0;
-
-	while (m) {
-		len += m->m_len;
-		m = m->m_next;
-	}
-	m0->m_pkthdr.len = len;
-	return len;
-}
 
 int
 mb_init(struct mbchain *mbp)

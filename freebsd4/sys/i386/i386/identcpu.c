@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: Id: machdep.c,v 1.193 1996/06/18 01:22:04 bde Exp
- * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80.2.14 2003/01/22 20:14:52 jhb Exp $
+ * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80.2.16 2003/08/05 07:05:39 bde Exp $
  */
 
 #include "opt_cpu.h"
@@ -80,7 +80,7 @@ static void print_AMD_assoc(int i);
 static void print_transmeta_info(void);
 static void setup_tmx86_longrun(void);
 
-int	cpu_class;
+int	cpu_class = CPUCLASS_386;
 u_int	cpu_exthigh;		/* Highest arg to extended CPUID */
 u_int	cyrix_did;		/* Device ID of Cyrix CPU */
 char machine[] = "i386";
@@ -732,15 +732,15 @@ static	volatile u_int trap_by_rdmsr;
  */
 inthand_t	bluetrap6;
 __asm
-("
-	.text
-	.p2align 2,0x90
-	.type	" __XSTRING(CNAME(bluetrap6)) ",@function
-" __XSTRING(CNAME(bluetrap6)) ":
-	ss
-	movl	$0xa8c1d," __XSTRING(CNAME(trap_by_rdmsr)) "
-	addl	$2, (%esp)		  # I know rdmsr is a 2-bytes instruction.
-	iret
+("									\n\
+	.text								\n\
+	.p2align 2,0x90							\n\
+	.type	" __XSTRING(CNAME(bluetrap6)) ",@function		\n\
+" __XSTRING(CNAME(bluetrap6)) ":					\n\
+	ss								\n\
+	movl	$0xa8c1d," __XSTRING(CNAME(trap_by_rdmsr)) "		\n\
+	addl	$2, (%esp)	/* rdmsr is a 2-byte instruction */	\n\
+	iret								\n\
 ");
 
 /*
@@ -749,16 +749,16 @@ __asm
  */
 inthand_t	bluetrap13;
 __asm
-("
-	.text
-	.p2align 2,0x90
-	.type " __XSTRING(CNAME(bluetrap13)) ",@function
-" __XSTRING(CNAME(bluetrap13)) ":
-	ss
-	movl	$0xa89c4," __XSTRING(CNAME(trap_by_rdmsr)) "
-	popl	%eax				# discard errorcode.
-	addl	$2, (%esp)			# I know rdmsr is a 2-bytes instruction.
-	iret
+("									\n\
+	.text								\n\
+	.p2align 2,0x90							\n\
+	.type	" __XSTRING(CNAME(bluetrap13)) ",@function		\n\
+" __XSTRING(CNAME(bluetrap13)) ":					\n\
+	ss								\n\
+	movl	$0xa89c4," __XSTRING(CNAME(trap_by_rdmsr)) "		\n\
+	popl	%eax		/* discard error code */		\n\
+	addl	$2, (%esp)	/* rdmsr is a 2-byte instruction */	\n\
+	iret								\n\
 ");
 
 /*

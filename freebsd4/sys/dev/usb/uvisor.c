@@ -1,5 +1,5 @@
 /*	$NetBSD: uvisor.c,v 1.9 2001/01/23 14:04:14 augustss Exp $	*/
-/*      $FreeBSD: src/sys/dev/usb/uvisor.c,v 1.7.2.3 2002/08/27 13:46:28 joe Exp $	*/
+/*      $FreeBSD: src/sys/dev/usb/uvisor.c,v 1.7.2.6 2003/09/02 14:35:17 joe Exp $	*/
 
 /* This version of uvisor is heavily based upon the version in NetBSD
  * but is missing the following patches:
@@ -143,7 +143,17 @@ struct uvisor_connection_info {
 #define UVISOR_GET_PALM_INFORMATION_LEN		0x14
 
 
-#define UVISORIBUFSIZE 1024
+/*
+ * Crank down UVISORBUFSIZE from 1024 to 64 to avoid a problem where
+ * the Palm device and the USB host controller deadlock. The USB host
+ * controller is expecting an early-end-of-transmission packet with 0
+ * data, and the Palm doesn't send one because it's already
+ * communicated the amount of data it's going to send in a header
+ * (which ucom/uvisor are oblivious to). This is the problem that has
+ * been known on the pilot-link lists as the "[Free]BSD USB problem",
+ * but not understood.
+ */
+#define UVISORIBUFSIZE 64
 #define UVISOROBUFSIZE 1024
 
 struct uvisor_softc {
@@ -185,6 +195,7 @@ Static driver_t uvisor_driver = {
 };
 
 DRIVER_MODULE(uvisor, uhub, uvisor_driver, ucom_devclass, usbd_driver_load, 0);
+MODULE_DEPEND(uvisor, usb, 1, 1, 1);
 MODULE_DEPEND(uvisor, ucom, UCOM_MINVER, UCOM_PREFVER, UCOM_MAXVER);
 MODULE_VERSION(uvisor, UVISOR_MODVER);
 
@@ -195,12 +206,20 @@ struct uvisor_type {
 };
 static const struct uvisor_type uvisor_devs[] = {
 	{{ USB_VENDOR_HANDSPRING, USB_PRODUCT_HANDSPRING_VISOR }, 0 },
+	{{ USB_VENDOR_HANDSPRING, USB_PRODUCT_HANDSPRING_TREO }, PALM4 },
 	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M500 }, PALM4 },
 	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M505 }, PALM4 },
 	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M515 }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_I705 }, PALM4 },
 	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M125 }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M130 }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_TUNGSTEN_Z }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_TUNGSTEN_T }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_ZIRE }, PALM4 },
 	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_40 }, PALM4 },
 	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_41 }, 0 },
+	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_S360 }, PALM4 },
+	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_NX60 }, PALM4 },
 /*	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_25 }, PALM4 },*/
 };
 #define uvisor_lookup(v, p) ((const struct uvisor_type *)usb_lookup(uvisor_devs, v, p))

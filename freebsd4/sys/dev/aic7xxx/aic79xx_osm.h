@@ -30,9 +30,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic79xx_osm.h#19 $
+ * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic79xx_osm.h#20 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.h,v 1.4.2.2 2003/01/20 23:59:19 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.h,v 1.4.2.3 2003/06/10 03:26:07 gibbs Exp $
  */
 
 #ifndef _AIC79XX_FREEBSD_H_
@@ -332,7 +332,7 @@ ahd_done_unlock(struct ahd_softc *ahd, unsigned long *flags)
 
 /* Lock held during ahd_list manipulation and ahd softc frees */
 static __inline void
-ahd_list_lockinit()
+ahd_list_lockinit(void)
 {
 }
 

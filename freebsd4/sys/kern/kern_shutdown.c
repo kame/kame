@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.12 2002/02/21 19:15:10 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.13 2003/08/31 00:16:28 luoqi Exp $
  */
 
 #include "opt_ddb.h"
@@ -537,7 +537,7 @@ dumpsys(void)
 }
 
 int
-dumpstatus(vm_offset_t addr, off_t count)
+dumpstatus(vm_paddr_t addr, off_t count)
 {
 	int c;
 

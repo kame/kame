@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_buffer.c,v 1.5 2000/01/15 21:01:04 mks Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_buffer.c,v 1.5.2.1 2003/08/22 10:32:20 harti Exp $
  *
  */
 
@@ -38,7 +38,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_buffer.c,v 1.5 2000/01/15 21:01:04 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_buffer.c,v 1.5.2.1 2003/08/22 10:32:20 harti Exp $");
 #endif
 
 
@@ -509,7 +509,14 @@ fore_buf_supply_1l(fup)
 			/*
 			 * Get a cluster buffer
 			 */
-			KB_ALLOCEXT(m, BUF1_LG_SIZE, KB_F_NOWAIT, KB_T_DATA);
+			MGETHDR(m, KB_F_NOWAIT, KB_T_DATA);
+			if (m != NULL) {
+				MCLGET(m, KB_F_NOWAIT);
+				if ((m->m_flags & M_EXT) == 0) {
+					m_freem(m);
+					m = NULL;
+				}
+			}
 			if (m == 0) {
 				break;
 			}

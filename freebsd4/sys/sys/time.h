@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)time.h	8.5 (Berkeley) 5/4/95
- * $FreeBSD: src/sys/sys/time.h,v 1.42 1999/12/29 04:24:48 peter Exp $
+ * $FreeBSD: src/sys/sys/time.h,v 1.42.2.1 2003/06/25 21:20:27 silby Exp $
  */
 
 #ifndef _SYS_TIME_H_
@@ -276,6 +276,8 @@ void	getnanotime __P((struct timespec *tv));
 void	init_timecounter __P((struct timecounter *tc));
 int	itimerdecr __P((struct itimerval *itp, int usec));
 int	itimerfix __P((struct timeval *tv));
+int	ppsratecheck __P((struct timeval *, int *, int));
+int	ratecheck __P((struct timeval *, const struct timeval *));
 void	microuptime __P((struct timeval *tv));
 void	microtime __P((struct timeval *tv));
 void	nanouptime __P((struct timespec *ts));

@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/alpha/include/bus.h,v 1.5 1999/08/28 00:38:40 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/bus.h,v 1.5.2.2 2003/09/25 18:55:26 silby Exp $ */
 
 #ifndef _ALPHA_BUS_H_
 #define _ALPHA_BUS_H_
@@ -1034,6 +1034,7 @@ bus_space_barrier(bus_space_tag_t tag, bus_space_handle_t bsh,
 #define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
 #define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
 #define	BUS_DMAMEM_NOSYNC	0x04	/* map memory to not require sync */
+#define BUS_DMA_ZERO		0x08	/* allocate zero'ed memory */
 #define	BUS_DMA_ISA		0x10	/* map memory for ISA dma */
 #define	BUS_DMA_BUS2		0x20	/* placeholders for bus functions... */
 #define	BUS_DMA_BUS3		0x40
@@ -1156,6 +1157,29 @@ typedef void bus_dmamap_callback_t(void *, bus_dma_segment_t *, int, int);
 int bus_dmamap_load(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 		    bus_size_t buflen, bus_dmamap_callback_t *callback,
 		    void *callback_arg, int flags);
+
+/*
+ * Like bus_dmamap_callback but includes map size in bytes.  This is
+ * defined as a separate interface to maintain compatiiblity for users
+ * of bus_dmamap_callback_t--at some point these interfaces should be merged.
+ */
+typedef void bus_dmamap_callback2_t(void *, bus_dma_segment_t *, int, bus_size_t, int);
+/*
+ * Like bus_dmamap_load but for mbufs.  Note the use of the
+ * bus_dmamap_callback2_t interface.
+ */
+int bus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map,
+			 struct mbuf *mbuf,
+			 bus_dmamap_callback2_t *callback, void *callback_arg,
+			 int flags);
+/*
+ * Like bus_dmamap_load but for uios.  Note the use of the
+ * bus_dmamap_callback2_t interface.
+ */
+int bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map,
+			struct uio *ui,
+			bus_dmamap_callback2_t *callback, void *callback_arg,
+			int flags);
 
 /*
  * Perform a syncronization operation on the given map.

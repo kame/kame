@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.5 2000/01/15 21:01:04 mks Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.5.2.1 2003/08/22 14:49:24 harti Exp $
  *
  */
 
@@ -38,7 +38,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.5 2000/01/15 21:01:04 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.5.2.1 2003/08/22 14:49:24 harti Exp $");
 #endif
 
 
@@ -170,7 +170,7 @@ fore_output(cup, cvp, m)
 	xdp = hxp->hxq_descr;
 	xdp->xd_cell_hdr = ATM_HDR_SET(vcp->vc_vpi, vcp->vc_vci, 0, 0);
 	xdp->xd_spec = XDS_SET_SPEC(0, fvp->fv_aal, nsegs, pdulen);
-	xdp->xd_rate = FORE_DEF_RATE;
+	xdp->xd_rate = fvp->rate;
 
 	/*
 	 * Everything is ready to go, so officially claim the host queue

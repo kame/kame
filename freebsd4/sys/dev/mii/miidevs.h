@@ -1,10 +1,10 @@
-/*	$FreeBSD: src/sys/dev/mii/miidevs.h,v 1.4.2.10 2002/12/11 21:26:56 ps Exp $	*/
+/*	$FreeBSD: src/sys/dev/mii/miidevs.h,v 1.4.2.14 2003/10/14 18:22:42 wilko Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.9 2002/04/11 07:03:27 wpaul Exp 
+ *	FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.13 2003/07/22 02:12:55 ps Exp 
  */
 /*$NetBSD: miidevs,v 1.6 1999/05/14 11:37:30 drochner Exp $*/
 
@@ -127,6 +127,10 @@
 #define	MII_STR_xxBROADCOM_BCM5701	"BCM5701 10/100/1000baseTX PHY"
 #define	MII_MODEL_xxBROADCOM_BCM5703	0x0016
 #define	MII_STR_xxBROADCOM_BCM5703	"BCM5703 10/100/1000baseTX PHY"
+#define	MII_MODEL_xxBROADCOM_BCM5704	0x0019
+#define	MII_STR_xxBROADCOM_BCM5704	"BCM5704 10/100/1000baseTX PHY"
+#define	MII_MODEL_xxBROADCOM_BCM5705	0x001a
+#define	MII_STR_xxBROADCOM_BCM5705	"BCM5705 10/100/1000baseTX PHY"
 
 /* Davicom Semiconductor PHYs */
 #define	MII_MODEL_xxDAVICOM_DM9101	0x0000
@@ -201,3 +205,5 @@
 /* Marvell Semiconductor PHYs */
 #define	MII_MODEL_MARVELL_E1000	0x0000
 #define	MII_STR_MARVELL_E1000	"Marvell Semiconductor 88E1000* gigabit PHY"
+#define	MII_MODEL_MARVELL_E1011	0x0002
+#define	MII_STR_MARVELL_E1011	"Marvell Semiconductor 88E1011 Gigabit PHY"

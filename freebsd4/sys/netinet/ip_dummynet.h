@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.10.2.8 2002/12/23 10:10:42 maxim Exp $
+ * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.10.2.9 2003/05/13 09:31:06 maxim Exp $
  */
 
 #ifndef _IP_DUMMYNET_H
@@ -218,7 +218,7 @@ struct dn_flow_queue {
     struct dn_pkt *head, *tail ;	/* queue of packets */
     u_int len ;
     u_int len_bytes ;
-    long numbytes ;		/* credit for transmission (dynamic queues) */
+    u_long numbytes ;		/* credit for transmission (dynamic queues) */
 
     u_int64_t tot_pkts ;	/* statistics counters	*/
     u_int64_t tot_bytes ;

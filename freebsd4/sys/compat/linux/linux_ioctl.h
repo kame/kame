@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_ioctl.h,v 1.4.2.3 2001/11/22 12:36:33 iedowse Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_ioctl.h,v 1.4.2.4 2003/05/01 20:16:09 anholt Exp $
  */
 
 #ifndef _LINUX_IOCTL_H_
@@ -623,6 +623,9 @@
 #define	LINUX_ASYNC_PGRP_LOCKOUT	0x0200
 #define	LINUX_ASYNC_CALLOUT_NOHUP	0x0400
 #define	LINUX_ASYNC_FLAGS		0x0FFF
+
+#define	LINUX_IOCTL_DRM_MIN	0x6400
+#define	LINUX_IOCTL_DRM_MAX	0x64ff
 
 /*
  * This doesn't really belong here, but I can't think of a better

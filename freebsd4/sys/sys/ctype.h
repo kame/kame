@@ -35,7 +35,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/ctype.h,v 1.2 1999/12/29 04:24:39 peter Exp $
+ * $FreeBSD: src/sys/sys/ctype.h,v 1.2.2.1 2003/05/07 15:25:26 jhb Exp $
  */
 
 #ifndef _SYS_CTYPE_H_
@@ -52,6 +52,7 @@
 #define isxdigit(c)	(isdigit(c) \
 			  || ((c) >= 'A' && (c) <= 'F') \
 			  || ((c) >= 'a' && (c) <= 'f'))
+#define isprint(c)	((c) >= ' ' && (c) <= '~')
 
 #define toupper(c)	((c) - 0x20 * (((c) >= 'a') && ((c) <= 'z')))
 #define tolower(c)	((c) + 0x20 * (((c) >= 'A') && ((c) <= 'Z')))

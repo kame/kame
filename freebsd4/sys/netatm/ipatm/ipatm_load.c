@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.6 2000/01/17 20:49:43 mks Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.6.2.1 2003/08/08 12:06:20 harti Exp $
  *
  */
 
@@ -39,13 +39,17 @@
 #include "opt_atm.h"
 #endif
 
+#include <sys/param.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
+
 #include <netatm/kern_include.h>
 
 #include <netatm/ipatm/ipatm.h>
 #include <netatm/ipatm/ipatm_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.6 2000/01/17 20:49:43 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.6.2.1 2003/08/08 12:06:20 harti Exp $");
 #endif
 
 
@@ -54,7 +58,6 @@ __RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.6 2000/01/17 20:49
  */
 int		ipatm_vccnt = 0;		
 int		ipatm_vcidle = IPATM_VCIDLE;		
-int		ipatm_print = 0;
 u_long		last_map_ipdst = 0;
 struct ipvcc*	last_map_ipvcc = NULL;
 
@@ -96,6 +99,17 @@ struct sp_info	ipatm_nifpool = {
 	52				/* si_maxallow */
 };
 
+/*
+ * net.harp.ip
+ */
+SYSCTL_NODE(_net_harp, OID_AUTO, ip, CTLFLAG_RW, 0, "IPv4 over ATM");
+
+/*
+ * net.harp.ip.ipatm_print
+ */
+int		ipatm_print = 0;
+SYSCTL_INT(_net_harp_ip, OID_AUTO, ipatm_print, CTLFLAG_RW,
+    &ipatm_print, 0, "dump IPv4-over-ATM packets");
 
 /*
  * Local functions

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp_intel.c,v 1.1.2.4 2003/02/02 21:13:24 anholt Exp $
+ *	$FreeBSD: src/sys/pci/agp_intel.c,v 1.1.2.7 2003/09/17 06:57:15 anholt Exp $
  */
 
 #include "opt_bus.h"
@@ -45,10 +45,13 @@
 #include <vm/vm_object.h>
 #include <vm/pmap.h>
 
+#define	MAX_APSIZE	0x3f		/* 256 MB */
+
 struct agp_intel_softc {
 	struct agp_softc agp;
 	u_int32_t	initial_aperture; /* aperture size at startup */
 	struct agp_gatt *gatt;
+	u_int		aperture_mask;
 };
 
 static const char*
@@ -86,16 +89,25 @@ agp_intel_match(device_t dev)
 		return ("Intel 82830 host to AGP bridge");
 
 	case 0x1a218086:
- 		return ("Intel 82840 host to AGP bridge");
+		return ("Intel 82840 host to AGP bridge");
 
 	case 0x1a308086:
- 		return ("Intel 82845 host to AGP bridge");
+		return ("Intel 82845 host to AGP bridge");
 
 	case 0x25308086:
- 		return ("Intel 82850 host to AGP bridge");
+		return ("Intel 82850 host to AGP bridge");
+
+	case 0x33408086:
+		return ("Intel 82855 host to AGP bridge");
 
 	case 0x25318086:
- 		return ("Intel 82860 host to AGP bridge");
+		return ("Intel 82860 host to AGP bridge");
+
+	case 0x25708086:
+		return ("Intel 82865 host to AGP bridge");
+
+	case 0x25788086:
+		return ("Intel 82875P host to AGP bridge");
 	};
 
 	if (pci_get_vendor(dev) == 0x8086)
@@ -125,12 +137,19 @@ agp_intel_attach(device_t dev)
 	struct agp_intel_softc *sc = device_get_softc(dev);
 	struct agp_gatt *gatt;
 	u_int32_t type = pci_get_devid(dev);
+	u_int32_t value;
 	int error;
 
 	error = agp_generic_attach(dev);
 	if (error)
 		return error;
 
+	/* Determine maximum supported aperture size. */
+	value = pci_read_config(dev, AGP_INTEL_APSIZE, 1);
+	pci_write_config(dev, AGP_INTEL_APSIZE, MAX_APSIZE, 1);
+	sc->aperture_mask = pci_read_config(dev, AGP_INTEL_APSIZE, 1) &
+	    MAX_APSIZE;
+	pci_write_config(dev, AGP_INTEL_APSIZE, value, 1);
 	sc->initial_aperture = AGP_GET_APERTURE(dev);
 
 	for (;;) {
@@ -151,7 +170,7 @@ agp_intel_attach(device_t dev)
 
 	/* Install the gatt. */
 	pci_write_config(dev, AGP_INTEL_ATTBASE, gatt->ag_physical, 4);
-	
+
 	/* Enable the GLTB and setup the control register. */
 	switch (type) {
 	case 0x71908086: /* 440LX/EX */
@@ -165,7 +184,8 @@ agp_intel_attach(device_t dev)
 		pci_write_config(dev, AGP_INTEL_AGPCTRL, 0x2280, 4);
 		break;
 	default:
-		pci_write_config(dev, AGP_INTEL_AGPCTRL, 0x0080, 4);
+		value = pci_read_config(dev, AGP_INTEL_AGPCTRL, 4);
+		pci_write_config(dev, AGP_INTEL_AGPCTRL, value | 0x80, 4);
 	}
 
 	/* Enable things, clear errors etc. */
@@ -186,6 +206,9 @@ agp_intel_attach(device_t dev)
 		break;
 
 	case 0x1a308086: /* i845 */
+	case 0x33408086: /* i855 */
+	case 0x25708086: /* i865 */
+	case 0x25788086: /* i875P */
 		pci_write_config(dev, AGP_INTEL_I845_MCHCFG,
 				 (pci_read_config(dev, AGP_INTEL_I845_MCHCFG, 1)
 				  | (1 << 1)), 1);
@@ -206,8 +229,11 @@ agp_intel_attach(device_t dev)
 	case 0x25018086: /* i820 */
 	case 0x1a308086: /* i845 */
 	case 0x25308086: /* i850 */
+	case 0x33408086: /* i855 */
 	case 0x25318086: /* i860 */
-		pci_write_config(dev, AGP_INTEL_I8XX_ERRSTS, 0x001c, 2);
+	case 0x25708086: /* i865 */
+	case 0x25788086: /* i875P */
+		pci_write_config(dev, AGP_INTEL_I8XX_ERRSTS, 0x00ff, 2);
 		break;
 
 	default: /* Intel Generic (maybe) */
@@ -249,6 +275,9 @@ agp_intel_detach(device_t dev)
 				& ~(1 << 1)), 1);
 
 	case 0x1a308086: /* i845 */
+	case 0x33408086: /* i855 */
+	case 0x25708086: /* i865 */
+	case 0x25788086: /* i875P */
 		printf("%s: set MCHCFG to %x\n", __FUNCTION__, (unsigned)
 				(pci_read_config(dev, AGP_INTEL_I845_MCHCFG, 1)
 				& ~(1 << 1)));
@@ -274,9 +303,10 @@ agp_intel_detach(device_t dev)
 static u_int32_t
 agp_intel_get_aperture(device_t dev)
 {
+	struct agp_intel_softc *sc = device_get_softc(dev);
 	u_int32_t apsize;
 
-	apsize = pci_read_config(dev, AGP_INTEL_APSIZE, 1) & 0x1f;
+	apsize = pci_read_config(dev, AGP_INTEL_APSIZE, 1) & sc->aperture_mask;
 
 	/*
 	 * The size is determined by the number of low bits of
@@ -285,23 +315,24 @@ agp_intel_get_aperture(device_t dev)
 	 * field just read forces the corresponding bit in the 27:22
 	 * to be zero. We calculate the aperture size accordingly.
 	 */
-	return (((apsize ^ 0x1f) << 22) | ((1 << 22) - 1)) + 1;
+	return (((apsize ^ sc->aperture_mask) << 22) | ((1 << 22) - 1)) + 1;
 }
 
 static int
 agp_intel_set_aperture(device_t dev, u_int32_t aperture)
 {
+	struct agp_intel_softc *sc = device_get_softc(dev);
 	u_int32_t apsize;
 
 	/*
 	 * Reverse the magic from get_aperture.
 	 */
-	apsize = ((aperture - 1) >> 22) ^ 0x1f;
+	apsize = ((aperture - 1) >> 22) ^ sc->aperture_mask;
 
 	/*
 	 * Double check for sanity.
 	 */
-	if ((((apsize ^ 0x1f) << 22) | ((1 << 22) - 1)) + 1 != aperture)
+	if ((((apsize ^ sc->aperture_mask) << 22) | ((1 << 22) - 1)) + 1 != aperture)
 		return EINVAL;
 
 	pci_write_config(dev, AGP_INTEL_APSIZE, apsize, 1);
@@ -339,7 +370,7 @@ agp_intel_flush_tlb(device_t dev)
 	u_int32_t val;
 
 	val = pci_read_config(dev, AGP_INTEL_AGPCTRL, 4);
-	pci_write_config(dev, AGP_INTEL_AGPCTRL, val & ~(1 << 8), 4);
+	pci_write_config(dev, AGP_INTEL_AGPCTRL, val & ~(1 << 7), 4);
 	pci_write_config(dev, AGP_INTEL_AGPCTRL, val, 4);
 }
 

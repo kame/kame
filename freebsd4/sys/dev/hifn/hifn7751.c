@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/hifn/hifn7751.c,v 1.5.2.4 2003/03/19 23:39:17 sam Exp $ */
+/* $FreeBSD: src/sys/dev/hifn/hifn7751.c,v 1.5.2.7 2003/10/08 23:52:00 sam Exp $ */
 /*	$OpenBSD: hifn7751.c,v 1.120 2002/05/17 00:33:34 deraadt Exp $	*/
 
 /*
@@ -7,6 +7,7 @@
  * Copyright (c) 1999 Theo de Raadt
  * Copyright (c) 2000-2001 Network Security Technologies, Inc.
  *			http://www.netsec.net
+ * Copyright (c) 2003 Hifn Inc.
  *
  * This driver is based on a previous driver by Invertex, for which they
  * requested:  Please send any comments, feedback, bug-fixes, or feature
@@ -41,11 +42,10 @@
  *
  */
 
-#define HIFN_DEBUG
-
 /*
- * Driver for the Hifn 7751 encryption processor.
+ * Driver for various Hifn encryption processors.
  */
+#include "opt_hifn.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -70,6 +70,10 @@
 
 #include <pci/pcivar.h>
 #include <pci/pcireg.h>
+
+#ifdef HIFN_RNDTEST
+#include <dev/rndtest/rndtest.h>
+#endif
 #include <dev/hifn/hifn7751reg.h>
 #include <dev/hifn/hifn7751var.h>
 
@@ -107,6 +111,9 @@ static devclass_t hifn_devclass;
 
 DRIVER_MODULE(hifn, pci, hifn_driver, hifn_devclass, 0, 0);
 MODULE_DEPEND(hifn, crypto, 1, 1, 1);
+#ifdef HIFN_RNDTEST
+MODULE_DEPEND(hifn, rndtest, 1, 1, 1);
+#endif
 
 static	void hifn_reset_board(struct hifn_softc *, int);
 static	void hifn_reset_puc(struct hifn_softc *);
@@ -188,6 +195,8 @@ hifn_probe(device_t dev)
 	if (pci_get_vendor(dev) == PCI_VENDOR_HIFN &&
 	    (pci_get_device(dev) == PCI_PRODUCT_HIFN_7751 ||
 	     pci_get_device(dev) == PCI_PRODUCT_HIFN_7951 ||
+	     pci_get_device(dev) == PCI_PRODUCT_HIFN_7955 ||
+	     pci_get_device(dev) == PCI_PRODUCT_HIFN_7956 ||
 	     pci_get_device(dev) == PCI_PRODUCT_HIFN_7811))
 		return (0);
 	if (pci_get_vendor(dev) == PCI_VENDOR_NETSEC &&
@@ -214,6 +223,8 @@ hifn_partname(struct hifn_softc *sc)
 		case PCI_PRODUCT_HIFN_7751:	return "Hifn 7751";
 		case PCI_PRODUCT_HIFN_7811:	return "Hifn 7811";
 		case PCI_PRODUCT_HIFN_7951:	return "Hifn 7951";
+		case PCI_PRODUCT_HIFN_7955:	return "Hifn 7955";
+		case PCI_PRODUCT_HIFN_7956:	return "Hifn 7956";
 		}
 		return "Hifn unknown-part";
 	case PCI_VENDOR_INVERTEX:
@@ -228,6 +239,14 @@ hifn_partname(struct hifn_softc *sc)
 		return "NetSec unknown-part";
 	}
 	return "Unknown-vendor unknown-part";
+}
+
+static void
+default_harvest(struct rndtest_state *rsp, void *buf, u_int count)
+{
+	u_int32_t *p = (u_int32_t *)buf;
+	for (count /= sizeof (u_int32_t); count; count--)
+		add_true_randomness(*p++);
 }
 
 /*
@@ -250,11 +269,13 @@ hifn_attach(device_t dev)
 	/* XXX handle power management */
 
 	/*
-	 * The 7951 has a random number generator and
+	 * The 7951 and 795x have a random number generator and
 	 * public key support; note this.
 	 */
 	if (pci_get_vendor(dev) == PCI_VENDOR_HIFN &&
-	    pci_get_device(dev) == PCI_PRODUCT_HIFN_7951)
+	    (pci_get_device(dev) == PCI_PRODUCT_HIFN_7951 ||
+	     pci_get_device(dev) == PCI_PRODUCT_HIFN_7955 ||
+	     pci_get_device(dev) == PCI_PRODUCT_HIFN_7956))
 		sc->sc_flags = HIFN_HAS_RNG | HIFN_HAS_PUBLIC;
 	/*
 	 * The 7811 has a random number generator and
@@ -263,6 +284,14 @@ hifn_attach(device_t dev)
 	if (pci_get_vendor(dev) == PCI_VENDOR_HIFN &&
 	    pci_get_device(dev) == PCI_PRODUCT_HIFN_7811)
 		sc->sc_flags |= HIFN_IS_7811 | HIFN_HAS_RNG;
+
+	/*
+	 * The 795x parts support AES.
+	 */
+	if (pci_get_vendor(dev) == PCI_VENDOR_HIFN &&
+	    (pci_get_device(dev) == PCI_PRODUCT_HIFN_7955 ||
+	     pci_get_device(dev) == PCI_PRODUCT_HIFN_7956))
+		sc->sc_flags |= HIFN_IS_7956 | HIFN_HAS_AES;
 
 	/*
 	 * Configure support for memory-mapped access to
@@ -378,7 +407,10 @@ hifn_attach(device_t dev)
 	hifn_init_dma(sc);
 	hifn_init_pci_registers(sc);
 
-	if (hifn_ramtype(sc))
+	/* XXX can't dynamically determine ram type for 795x; force dram */
+	if (sc->sc_flags & HIFN_IS_7956)
+		sc->sc_drammodel = 1;
+	else if (hifn_ramtype(sc))
 		goto fail_mem;
 
 	if (sc->sc_drammodel == 0)
@@ -450,6 +482,10 @@ hifn_attach(device_t dev)
 		    hifn_newsession, hifn_freesession, hifn_process, sc);
 		crypto_register(sc->sc_cid, CRYPTO_ARC4, 0, 0,
 		    hifn_newsession, hifn_freesession, hifn_process, sc);
+		if (sc->sc_flags & HIFN_HAS_AES)
+			crypto_register(sc->sc_cid, CRYPTO_AES_CBC,  0, 0,
+				hifn_newsession, hifn_freesession,
+				hifn_process, sc);
 		/*FALLTHROUGH*/
 	case HIFN_PUSTAT_ENA_1:
 		crypto_register(sc->sc_cid, CRYPTO_MD5, 0, 0,
@@ -515,6 +551,10 @@ hifn_detach(device_t dev)
 	/*XXX other resources */
 	callout_stop(&sc->sc_tickto);
 	callout_stop(&sc->sc_rngto);
+#ifdef HIFN_RNDTEST
+	if (sc->sc_rndtest)
+		rndtest_detach(sc->sc_rndtest);
+#endif
 
 	/* Turn off DMA polling */
 	WRITE_REG_1(sc, HIFN_1_DMA_CNFG, HIFN_DMACNFG_MSTRESET |
@@ -617,6 +657,15 @@ hifn_init_pubrng(struct hifn_softc *sc)
 	u_int32_t r;
 	int i;
 
+#ifdef HIFN_RNDTEST
+	sc->sc_rndtest = rndtest_attach(sc->sc_dev);
+	if (sc->sc_rndtest)
+		sc->sc_harvest = rndtest_harvest;
+	else
+		sc->sc_harvest = default_harvest;
+#else
+	sc->sc_harvest = default_harvest;
+#endif
 	if ((sc->sc_flags & HIFN_IS_7811) == 0) {
 		/* Reset 7951 public key/rng engine */
 		WRITE_REG_1(sc, HIFN_1_PUB_RESET,
@@ -703,10 +752,9 @@ hifn_rng(void *vsc)
 			/* NB: discard first data read */
 			if (sc->sc_rngfirst)
 				sc->sc_rngfirst = 0;
-			else {
-				add_true_randomness(num[0]);
-				add_true_randomness(num[1]);
-			}
+			else
+				(*sc->sc_harvest)(sc->sc_rndtest,
+					num, sizeof (num));
 		}
 	} else {
 		num[0] = READ_REG_1(sc, HIFN_1_RNG_DATA);
@@ -715,7 +763,8 @@ hifn_rng(void *vsc)
 		if (sc->sc_rngfirst)
 			sc->sc_rngfirst = 0;
 		else
-			add_true_randomness(num[0]);
+			(*sc->sc_harvest)(sc->sc_rndtest,
+				num, sizeof (num[0]));
 	}
 
 	callout_reset(&sc->sc_rngto, sc->sc_rnghz, hifn_rng, sc);
@@ -847,6 +896,16 @@ static struct pci2id pci2id[] = {
 	{
 		PCI_VENDOR_HIFN,
 		PCI_PRODUCT_HIFN_7951,
+		{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		  0x00, 0x00, 0x00, 0x00, 0x00 }
+	}, {
+		PCI_VENDOR_HIFN,
+		PCI_PRODUCT_HIFN_7955,
+		{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		  0x00, 0x00, 0x00, 0x00, 0x00 }
+	}, {
+		PCI_VENDOR_HIFN,
+		PCI_PRODUCT_HIFN_7956,
 		{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		  0x00, 0x00, 0x00, 0x00, 0x00 }
 	}, {
@@ -1030,10 +1089,18 @@ hifn_init_pci_registers(struct hifn_softc *sc)
 	sc->sc_dmaier &= ~HIFN_DMAIER_C_WAIT;
 	WRITE_REG_1(sc, HIFN_1_DMA_IER, sc->sc_dmaier);
 
-	WRITE_REG_0(sc, HIFN_0_PUCNFG, HIFN_PUCNFG_COMPSING |
-	    HIFN_PUCNFG_DRFR_128 | HIFN_PUCNFG_TCALLPHASES |
-	    HIFN_PUCNFG_TCDRVTOTEM | HIFN_PUCNFG_BUS32 |
-	    (sc->sc_drammodel ? HIFN_PUCNFG_DRAM : HIFN_PUCNFG_SRAM));
+
+	if (sc->sc_flags & HIFN_IS_7956) {
+		WRITE_REG_0(sc, HIFN_0_PUCNFG, HIFN_PUCNFG_COMPSING |
+		    HIFN_PUCNFG_TCALLPHASES |
+		    HIFN_PUCNFG_TCDRVTOTEM | HIFN_PUCNFG_BUS32);
+		WRITE_REG_1(sc, HIFN_1_PLL, HIFN_PLL_7956);
+	} else {
+		WRITE_REG_0(sc, HIFN_0_PUCNFG, HIFN_PUCNFG_COMPSING |
+		    HIFN_PUCNFG_DRFR_128 | HIFN_PUCNFG_TCALLPHASES |
+		    HIFN_PUCNFG_TCDRVTOTEM | HIFN_PUCNFG_BUS32 |
+		    (sc->sc_drammodel ? HIFN_PUCNFG_DRAM : HIFN_PUCNFG_SRAM));
+	}
 
 	WRITE_REG_0(sc, HIFN_0_PUISR, HIFN_PUISR_DSTOVER);
 	WRITE_REG_1(sc, HIFN_1_DMA_CNFG, HIFN_DMACNFG_MSTRESET |
@@ -1062,8 +1129,14 @@ hifn_sessions(struct hifn_softc *sc)
 			ctxsize = 128;
 		else
 			ctxsize = 512;
-		sc->sc_maxses = 1 +
-		    ((sc->sc_ramsize - 32768) / ctxsize);
+		/*
+		 * 7955/7956 has internal context memory of 32K
+		 */
+		if (sc->sc_flags & HIFN_IS_7956)
+			sc->sc_maxses = 32768 / ctxsize;
+		else
+			sc->sc_maxses = 1 +
+			    ((sc->sc_ramsize - 32768) / ctxsize);
 	} else
 		sc->sc_maxses = sc->sc_ramsize / 16384;
 
@@ -1150,9 +1223,16 @@ hifn_dramsize(struct hifn_softc *sc)
 {
 	u_int32_t cnfg;
 
-	cnfg = READ_REG_0(sc, HIFN_0_PUCNFG) &
-	    HIFN_PUCNFG_DRAMMASK;
-	sc->sc_ramsize = 1 << ((cnfg >> 13) + 18);
+	if (sc->sc_flags & HIFN_IS_7956) {
+		/*
+		 * 7955/7956 have a fixed internal ram of only 32K.
+		 */
+		sc->sc_ramsize = 32768;
+	} else {
+		cnfg = READ_REG_0(sc, HIFN_0_PUCNFG) &
+		    HIFN_PUCNFG_DRAMMASK;
+		sc->sc_ramsize = 1 << ((cnfg >> 13) + 18);
+	}
 	return (0);
 }
 
@@ -1369,7 +1449,7 @@ hifn_write_command(struct hifn_command *cmd, u_int8_t *buf)
 	hifn_base_command_t *base_cmd;
 	hifn_mac_command_t *mac_cmd;
 	hifn_crypt_command_t *cry_cmd;
-	int using_mac, using_crypt, len;
+	int using_mac, using_crypt, len, ivlen;
 	u_int32_t dlen, slen;
 
 	buf_pos = buf;
@@ -1429,7 +1509,7 @@ hifn_write_command(struct hifn_command *cmd, u_int8_t *buf)
 			break;
 		case HIFN_CRYPT_CMD_ALG_DES:
 			bcopy(cmd->ck, buf_pos, HIFN_DES_KEY_LENGTH);
-			buf_pos += cmd->cklen;
+			buf_pos += HIFN_DES_KEY_LENGTH;
 			break;
 		case HIFN_CRYPT_CMD_ALG_RC4:
 			len = 256;
@@ -1444,12 +1524,28 @@ hifn_write_command(struct hifn_command *cmd, u_int8_t *buf)
 			bzero(buf_pos, 4);
 			buf_pos += 4;
 			break;
+		case HIFN_CRYPT_CMD_ALG_AES:
+			/*
+			 * AES keys are variable 128, 192 and
+			 * 256 bits (16, 24 and 32 bytes).
+			 */
+			bcopy(cmd->ck, buf_pos, cmd->cklen);
+			buf_pos += cmd->cklen;
+			break;
 		}
 	}
 
 	if (using_crypt && cmd->cry_masks & HIFN_CRYPT_CMD_NEW_IV) {
-		bcopy(cmd->iv, buf_pos, HIFN_IV_LENGTH);
-		buf_pos += HIFN_IV_LENGTH;
+		switch (cmd->cry_masks & HIFN_CRYPT_CMD_ALG_MASK) {
+		case HIFN_CRYPT_CMD_ALG_AES:
+			ivlen = HIFN_AES_IV_LENGTH;
+			break;
+		default:
+			ivlen = HIFN_IV_LENGTH;
+			break;
+		}
+		bcopy(cmd->iv, buf_pos, ivlen);
+		buf_pos += ivlen;
 	}
 
 	if ((cmd->base_masks & (HIFN_BASE_CMD_MAC|HIFN_BASE_CMD_CRYPT)) == 0) {
@@ -2131,8 +2227,11 @@ hifn_newsession(void *arg, u_int32_t *sidp, struct cryptoini *cri)
 			break;
 		case CRYPTO_DES_CBC:
 		case CRYPTO_3DES_CBC:
+		case CRYPTO_AES_CBC:
 			/* XXX this may read fewer, does it matter? */
-			read_random(sc->sc_sessions[i].hs_iv, HIFN_IV_LENGTH);
+			read_random(sc->sc_sessions[i].hs_iv,
+				c->cri_alg == CRYPTO_AES_CBC ?
+					HIFN_AES_IV_LENGTH : HIFN_IV_LENGTH);
 			/*FALLTHROUGH*/
 		case CRYPTO_ARC4:
 			if (cry)
@@ -2162,7 +2261,7 @@ hifn_freesession(void *arg, u_int64_t tid)
 {
 	struct hifn_softc *sc = arg;
 	int session;
-	u_int32_t sid = ((u_int32_t) tid) & 0xffffffff;
+	u_int32_t sid = CRYPTO_SESID2LID(tid);
 
 	KASSERT(sc != NULL, ("hifn_freesession: null softc"));
 	if (sc == NULL)
@@ -2181,7 +2280,7 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 {
 	struct hifn_softc *sc = arg;
 	struct hifn_command *cmd = NULL;
-	int session, err;
+	int session, err, ivlen;
 	struct cryptodesc *crd1, *crd2, *maccrd, *enccrd;
 
 	if (crp == NULL || crp->crp_callback == NULL) {
@@ -2229,6 +2328,7 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 			enccrd = NULL;
 		} else if (crd1->crd_alg == CRYPTO_DES_CBC ||
 		    crd1->crd_alg == CRYPTO_3DES_CBC ||
+		    crd1->crd_alg == CRYPTO_AES_CBC ||
 		    crd1->crd_alg == CRYPTO_ARC4) {
 			if ((crd1->crd_flags & CRD_F_ENCRYPT) == 0)
 				cmd->base_masks |= HIFN_BASE_CMD_DECODE;
@@ -2245,6 +2345,7 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
                      crd1->crd_alg == CRYPTO_SHA1) &&
 		    (crd2->crd_alg == CRYPTO_DES_CBC ||
 		     crd2->crd_alg == CRYPTO_3DES_CBC ||
+		     crd2->crd_alg == CRYPTO_AES_CBC ||
 		     crd2->crd_alg == CRYPTO_ARC4) &&
 		    ((crd2->crd_flags & CRD_F_ENCRYPT) == 0)) {
 			cmd->base_masks = HIFN_BASE_CMD_DECODE;
@@ -2252,7 +2353,8 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 			enccrd = crd2;
 		} else if ((crd1->crd_alg == CRYPTO_DES_CBC ||
 		     crd1->crd_alg == CRYPTO_ARC4 ||
-		     crd1->crd_alg == CRYPTO_3DES_CBC) &&
+		     crd1->crd_alg == CRYPTO_3DES_CBC ||
+		     crd1->crd_alg == CRYPTO_AES_CBC) &&
 		    (crd2->crd_alg == CRYPTO_MD5_HMAC ||
                      crd2->crd_alg == CRYPTO_SHA1_HMAC ||
                      crd2->crd_alg == CRYPTO_MD5 ||
@@ -2290,47 +2392,71 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 			    HIFN_CRYPT_CMD_MODE_CBC |
 			    HIFN_CRYPT_CMD_NEW_IV;
 			break;
+		case CRYPTO_AES_CBC:
+			cmd->cry_masks |= HIFN_CRYPT_CMD_ALG_AES |
+			    HIFN_CRYPT_CMD_MODE_CBC |
+			    HIFN_CRYPT_CMD_NEW_IV;
+			break;
 		default:
 			err = EINVAL;
 			goto errout;
 		}
 		if (enccrd->crd_alg != CRYPTO_ARC4) {
+			ivlen = ((enccrd->crd_alg == CRYPTO_AES_CBC) ?
+				HIFN_AES_IV_LENGTH : HIFN_IV_LENGTH);
 			if (enccrd->crd_flags & CRD_F_ENCRYPT) {
 				if (enccrd->crd_flags & CRD_F_IV_EXPLICIT)
-					bcopy(enccrd->crd_iv, cmd->iv,
-					    HIFN_IV_LENGTH);
+					bcopy(enccrd->crd_iv, cmd->iv, ivlen);
 				else
 					bcopy(sc->sc_sessions[session].hs_iv,
-					    cmd->iv, HIFN_IV_LENGTH);
+					    cmd->iv, ivlen);
 
 				if ((enccrd->crd_flags & CRD_F_IV_PRESENT)
 				    == 0) {
 					if (crp->crp_flags & CRYPTO_F_IMBUF)
 						m_copyback(cmd->src_m,
 						    enccrd->crd_inject,
-						    HIFN_IV_LENGTH, cmd->iv);
+						    ivlen, cmd->iv);
 					else if (crp->crp_flags & CRYPTO_F_IOV)
 						cuio_copyback(cmd->src_io,
 						    enccrd->crd_inject,
-						    HIFN_IV_LENGTH, cmd->iv);
+						    ivlen, cmd->iv);
 				}
 			} else {
 				if (enccrd->crd_flags & CRD_F_IV_EXPLICIT)
-					bcopy(enccrd->crd_iv, cmd->iv,
-					    HIFN_IV_LENGTH);
+					bcopy(enccrd->crd_iv, cmd->iv, ivlen);
 				else if (crp->crp_flags & CRYPTO_F_IMBUF)
 					m_copydata(cmd->src_m,
-					    enccrd->crd_inject,
-					    HIFN_IV_LENGTH, cmd->iv);
+					    enccrd->crd_inject, ivlen, cmd->iv);
 				else if (crp->crp_flags & CRYPTO_F_IOV)
 					cuio_copydata(cmd->src_io,
-					    enccrd->crd_inject,
-					    HIFN_IV_LENGTH, cmd->iv);
+					    enccrd->crd_inject, ivlen, cmd->iv);
 			}
 		}
 
 		cmd->ck = enccrd->crd_key;
 		cmd->cklen = enccrd->crd_klen >> 3;
+
+		/* 
+		 * Need to specify the size for the AES key in the masks.
+		 */
+		if ((cmd->cry_masks & HIFN_CRYPT_CMD_ALG_MASK) ==
+		    HIFN_CRYPT_CMD_ALG_AES) {
+			switch (cmd->cklen) {
+			case 16:
+				cmd->cry_masks |= HIFN_CRYPT_CMD_KSZ_128;
+				break;
+			case 24:
+				cmd->cry_masks |= HIFN_CRYPT_CMD_KSZ_192;
+				break;
+			case 32:
+				cmd->cry_masks |= HIFN_CRYPT_CMD_KSZ_256;
+				break;
+			default:
+				err = EINVAL;
+				goto errout;
+			}
+		}
 
 		if (sc->sc_sessions[session].hs_state == HS_STATE_USED)
 			cmd->cry_masks |= HIFN_CRYPT_CMD_NEW_KEY;
@@ -2497,7 +2623,7 @@ hifn_callback(struct hifn_softc *sc, struct hifn_command *cmd, u_int8_t *macbuf)
 	struct cryptop *crp = cmd->crp;
 	struct cryptodesc *crd;
 	struct mbuf *m;
-	int totlen, i, u;
+	int totlen, i, u, ivlen;
 
 	if (cmd->src_map == cmd->dst_map) {
 		bus_dmamap_sync(sc->sc_dmat, cmd->src_map,
@@ -2557,17 +2683,18 @@ hifn_callback(struct hifn_softc *sc, struct hifn_command *cmd, u_int8_t *macbuf)
 	    HIFN_BASE_CMD_CRYPT) {
 		for (crd = crp->crp_desc; crd; crd = crd->crd_next) {
 			if (crd->crd_alg != CRYPTO_DES_CBC &&
-			    crd->crd_alg != CRYPTO_3DES_CBC)
+			    crd->crd_alg != CRYPTO_3DES_CBC &&
+			    crd->crd_alg != CRYPTO_AES_CBC)
 				continue;
+			ivlen = ((crd->crd_alg == CRYPTO_AES_CBC) ?
+				HIFN_AES_IV_LENGTH : HIFN_IV_LENGTH);
 			if (crp->crp_flags & CRYPTO_F_IMBUF)
 				m_copydata((struct mbuf *)crp->crp_buf,
-				    crd->crd_skip + crd->crd_len - HIFN_IV_LENGTH,
-				    HIFN_IV_LENGTH,
+				    crd->crd_skip + crd->crd_len - ivlen, ivlen,
 				    cmd->softc->sc_sessions[cmd->session_num].hs_iv);
 			else if (crp->crp_flags & CRYPTO_F_IOV) {
 				cuio_copydata((struct uio *)crp->crp_buf,
-				    crd->crd_skip + crd->crd_len - HIFN_IV_LENGTH,
-				    HIFN_IV_LENGTH,
+				    crd->crd_skip + crd->crd_len - ivlen, ivlen,
 				    cmd->softc->sc_sessions[cmd->session_num].hs_iv);
 			}
 			break;

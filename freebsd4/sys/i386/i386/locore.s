@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)locore.s	7.3 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132.2.10 2003/02/03 20:54:49 jhb Exp $
+ * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132.2.13 2003/10/17 06:54:00 peter Exp $
  *
  *		originally from: locore.s, by William F. Jolitz
  *
@@ -75,15 +75,6 @@
 	.set	_PTDpde,_PTD + (PTDPTDI * PDESIZE)
 
 /*
- * APTmap, APTD is the alternate recursive pagemap.
- * It's used when modifying another process's page tables.
- */
-	.globl	_APTmap,_APTD,_APTDpde
-	.set	_APTmap,APTDPTDI << PDRSHIFT
-	.set	_APTD,_APTmap + (APTDPTDI * PAGE_SIZE)
-	.set	_APTDpde,_PTD + (APTDPTDI * PDESIZE)
-
-/*
  * Compiled KERNBASE location
  */
 	.globl	_kernbase
@@ -95,9 +86,9 @@
 	.data
 	ALIGN_DATA		/* just to be sure */
 
-	.globl	HIDENAME(tmpstk)
+	.globl	tmpstk
 	.space	0x2000		/* space for tmpstk - temporary stack */
-HIDENAME(tmpstk):
+tmpstk:
 
 	.globl	_boothowto,_bootdev
 
@@ -112,21 +103,28 @@ _cpu_procinfo:	.long	0			/* brand index / HTT info */
 _cpu_vendor:	.space	20			/* CPU origin code */
 _bootinfo:	.space	BOOTINFO_SIZE		/* bootinfo that we can handle */
 
+	    .globl	_KERNend
 _KERNend:	.long	0			/* phys addr end of kernel (just after bss) */
 physfree:	.long	0			/* phys addr of next free page */
 
 #ifdef SMP
-		.globl	_cpu0prvpage
+	    .globl	_cpu0prvpage
 cpu0pp:		.long	0			/* phys addr cpu0 private pg */
 _cpu0prvpage:	.long	0			/* relocated version */
 
-		.globl	_SMPpt
+	    .globl	_SMPpt
 SMPptpa:	.long	0			/* phys addr SMP page table */
 _SMPpt:		.long	0			/* relocated version */
 #endif /* SMP */
 
 	.globl	_IdlePTD
 _IdlePTD:	.long	0			/* phys addr of kernel PTD */
+
+#ifdef PAE
+	.globl	_IdlePDPT
+	.p2align 5
+_IdlePDPT:	.space	32
+#endif
 
 #ifdef SMP
 	.globl	_KPTphys
@@ -183,13 +181,13 @@ _pc98_system_parameter:
  *	prot = protection bits
  */
 #define	fillkpt(base, prot)		  \
-	shll	$2,%ebx			; \
+	shll	$PTESHIFT,%ebx		; \
 	addl	base,%ebx		; \
 	orl	$PG_V,%eax		; \
 	orl	prot,%eax		; \
 1:	movl	%eax,(%ebx)		; \
 	addl	$PAGE_SIZE,%eax		; /* increment physical address */ \
-	addl	$4,%ebx			; /* next pte */ \
+	addl	$PTESIZE,%ebx		; /* next pte */ \
 	loop	1b
 
 /*
@@ -250,6 +248,27 @@ NON_GPROF_ENTRY(btext)
 	mov	%ax, %fs
 	mov	%ax, %gs
 
+/*
+ * Clear the bss.  Not all boot programs do it, and it is our job anyway.
+ *
+ * XXX we don't check that there is memory for our bss and page tables
+ * before using it.
+ *
+ * Note: we must be careful to not overwrite an active gdt or idt.  In
+ * the !BDE_DEBUGGER case they are inactive from now until we switch to
+ * new ones, since we don't load any more segment registers or permit
+ * interrupts until after the switch.  In the BDE_DEBUGGER case, we depend
+ * on the convention that the boot program is below 1MB and we are above
+ * 1MB to keep the gdt and idt away from the bss and page tables.
+ */
+	movl	$R(_end),%ecx
+	movl	$R(_edata),%edi
+	subl	%edi,%ecx
+	xorl	%eax,%eax
+	cld
+	rep
+	stosb
+
 	call	recover_bootinfo
 
 /* Get onto a stack that we can trust. */
@@ -258,7 +277,7 @@ NON_GPROF_ENTRY(btext)
  * the old stack, but it need not be, since recover_bootinfo actually
  * returns via the old frame.
  */
-	movl	$R(HIDENAME(tmpstk)),%esp
+	movl	$R(tmpstk),%esp
 
 #ifdef PC98
 	/* pc98_machine_type & M_EPSON_PC98 */
@@ -288,31 +307,6 @@ NON_GPROF_ENTRY(btext)
 #endif
 
 	call	identify_cpu
-
-/* clear bss */
-/*
- * XXX this should be done a little earlier.
- *
- * XXX we don't check that there is memory for our bss and page tables
- * before using it.
- *
- * XXX the boot program somewhat bogusly clears the bss.  We still have
- * to do it in case we were unzipped by kzipboot.  Then the boot program
- * only clears kzipboot's bss.
- *
- * XXX the gdt and idt are still somewhere in the boot program.  We
- * depend on the convention that the boot program is below 1MB and we
- * are above 1MB to keep the gdt and idt  away from the bss and page
- * tables.  The idt is only used if BDE_DEBUGGER is enabled.
- */
-	movl	$R(_end),%ecx
-	movl	$R(_edata),%edi
-	subl	%edi,%ecx
-	xorl	%eax,%eax
-	cld
-	rep
-	stosb
-
 	call	create_pagetables
 
 /*
@@ -334,7 +328,14 @@ NON_GPROF_ENTRY(btext)
 #endif
 
 /* Now enable paging */
-	movl	R(_IdlePTD), %eax
+#ifdef PAE
+	movl	%cr4,%eax
+	orl	$CR4_PAE,%eax
+	movl	%eax,%cr4
+	movl	$R(_IdlePDPT),%eax
+#else
+	movl	R(_IdlePTD),%eax
+#endif
 	movl	%eax,%cr3			/* load ptd addr into mmu */
 	movl	%cr0,%eax			/* get control word */
 	orl	$CR0_PE|CR0_PG,%eax		/* enable paging */
@@ -357,10 +358,10 @@ begin:
 	/* set up bootstrap stack */
 	movl	_proc0paddr,%esp	/* location of in-kernel pages */
 	addl	$UPAGES*PAGE_SIZE,%esp	/* bootstrap stack end location */
-	xorl	%eax,%eax			/* mark end of frames */
+	xorl	%eax,%eax		/* mark end of frames */
 	movl	%eax,%ebp
 	movl	_proc0paddr,%eax
-	movl	_IdlePTD, %esi
+	movl	%cr3,%esi
 	movl	%esi,PCB_CR3(%eax)
 
 	testl	$CPUID_PGE, R(_cpu_feature)
@@ -371,11 +372,11 @@ begin:
 1:
 
 	movl	physfree, %esi
-	pushl	%esi				/* value of first for init386(first) */
-	call	_init386			/* wire 386 chip for unix operation */
+	pushl	%esi			/* value of first for init386(first) */
+	call	_init386		/* wire 386 chip for unix operation */
 	popl	%esi
 
-	call	_mi_startup			/* autoconfiguration, mountroot etc */
+	call	_mi_startup		/* autoconfiguration, mountroot etc */
 
 	hlt		/* never returns to here */
 
@@ -741,7 +742,7 @@ no_kernend:
 	movl	%esi,R(_KPTphys)
 
 /* Allocate Page Table Directory */
-	ALLOCPAGES(1)
+	ALLOCPAGES(NPGPTD)
 	movl	%esi,R(_IdlePTD)
 
 /* Allocate UPAGES */
@@ -772,15 +773,20 @@ no_kernend:
 	movl	%esi, R(_SMPpt)		/* relocated to KVM space */
 #endif	/* SMP */
 
-/* Map read-only from zero to the end of the kernel text section */
+/* Map page zero read-write so bios32 calls can use it */
 	xorl	%eax, %eax
 #ifdef BDE_DEBUGGER
 /* If the debugger is present, actually map everything read-write. */
 	cmpl	$0,R(_bdb_exists)
 	jne	map_read_write
 #endif
+	movl	$PG_RW,%edx
+	movl	$1,%ecx
+	fillkptphys(%edx)
+	
+/* Map read-only from page 1 to the end of the kernel text section */
+	movl	$PAGE_SIZE, %eax
 	xorl	%edx,%edx
-
 #if !defined(SMP)
 	testl	$CPUID_PGE, R(_cpu_feature)
 	jz	2f
@@ -789,6 +795,7 @@ no_kernend:
 	
 2:	movl	$R(_etext),%ecx
 	addl	$PAGE_MASK,%ecx
+	subl	%eax,%ecx
 	shrl	$PAGE_SHIFT,%ecx
 	fillkptphys(%edx)
 
@@ -811,7 +818,7 @@ map_read_write:
 
 /* Map page directory. */
 	movl	R(_IdlePTD), %eax
-	movl	$1, %ecx
+	movl	$NPGPTD, %ecx
 	fillkptphys($PG_RW)
 
 /* Map proc0's UPAGES in the physical way ... */
@@ -890,9 +897,15 @@ map_read_write:
 /* install a pde recursively mapping page directory as a page table */
 	movl	R(_IdlePTD), %eax
 	movl	$PTDPTDI, %ebx
-	movl	$1,%ecx
+	movl	$NPGPTD, %ecx
 	fillkpt(R(_IdlePTD), $PG_RW)
 
+#ifdef PAE
+	movl	R(_IdlePTD),%eax
+	xorl	%ebx,%ebx
+	movl	$NPGPTD,%ecx
+	fillkpt($R(_IdlePDPT), $0)
+#endif
 	ret
 
 #ifdef BDE_DEBUGGER

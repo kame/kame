@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida.c,v 1.7.2.3 2001/03/01 01:57:32 ps Exp $
+ * $FreeBSD: src/sys/dev/ida/ida.c,v 1.7.2.4 2003/09/01 16:21:57 scottl Exp $
  */
 
 /*
@@ -37,8 +37,6 @@
  *	pci/ida_pci.c		
  *	i386/eisa/ida_eisa.c
  */
-
-#include <pci.h>
 
 #include <sys/param.h>
 #include <sys/kernel.h>

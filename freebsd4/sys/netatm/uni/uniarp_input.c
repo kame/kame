@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/uniarp_input.c,v 1.6 2000/01/17 20:49:55 mks Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/uniarp_input.c,v 1.6.2.2 2003/08/08 15:45:37 harti Exp $
  *
  */
 
@@ -42,7 +42,7 @@
 #include <netatm/uni/uniip_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniarp_input.c,v 1.6 2000/01/17 20:49:55 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniarp_input.c,v 1.6.2.2 2003/08/08 15:45:37 harti Exp $");
 #endif
 
 
@@ -88,10 +88,8 @@ uniarp_cpcs_data(tok, m)
 	KBuffer		*n;
 	int		len, plen = sizeof(struct atmarp_hdr);
 
-#ifdef DIAGNOSTIC
 	if (uniarp_print)
 		uniarp_pdu_print(ivp, m, "receive");
-#endif
 
 	/*
 	 * Verify IP's VCC state
@@ -836,10 +834,7 @@ drop:
  *
  */
 void
-uniarp_pdu_print(ivp, m, msg)
-	struct ipvcc	*ivp;
-	KBuffer		*m;
-	char		*msg;
+uniarp_pdu_print(const struct ipvcc *ivp, const KBuffer *m, const char *msg)
 {
 	char		buf[128];
 	struct vccb	*vcp;
@@ -849,4 +844,3 @@ uniarp_pdu_print(ivp, m, msg)
 	    "uniarp %s: vcc=(%d,%d)\n", msg, vcp->vc_vpi, vcp->vc_vci);
 	atm_pdu_print(m, buf);
 }
-

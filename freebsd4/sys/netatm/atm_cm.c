@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.6 1999/08/28 00:48:34 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.6.2.1 2003/08/07 13:14:57 harti Exp $
  *
  */
 
@@ -36,9 +36,10 @@
  */
 
 #include <netatm/kern_include.h>
+#include <net/bpf.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.6 1999/08/28 00:48:34 peter Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.6.2.1 2003/08/07 13:14:57 harti Exp $");
 #endif
 
 
@@ -2871,6 +2872,19 @@ atm_cm_cpcs_upper(cmd, tok, arg1, arg2)
 				atm_cm_stat.cms_rcvconnvc++;
 				return;
 			}
+		}
+
+		/*
+		 * Send the packet to the interface's bpf if this
+		 * vc has one.
+		 */
+		if (cvp->cvc_vcc != NULL &&
+		    cvp->cvc_vcc->vc_nif != NULL) {
+			struct ifnet *ifp =
+			    (struct ifnet *)cvp->cvc_vcc->vc_nif;
+
+			if (ifp->if_bpf)
+				bpf_mtap(ifp, m);
 		}
 
 		/*

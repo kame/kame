@@ -33,7 +33,7 @@
  * 
  *	@(#)ipx.c
  *
- * $FreeBSD: src/sys/netipx/ipx.c,v 1.17.2.1 2001/02/22 09:44:18 bp Exp $
+ * $FreeBSD: src/sys/netipx/ipx.c,v 1.17.2.3 2003/04/04 09:35:43 tjr Exp $
  */
 
 #include <sys/param.h>

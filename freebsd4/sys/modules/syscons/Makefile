@@ -1,8 +1,9 @@
-# $FreeBSD: src/sys/modules/syscons/Makefile,v 1.11.2.1 2000/05/06 02:09:48 obrien Exp $
+# $FreeBSD: src/sys/modules/syscons/Makefile,v 1.11.2.2 2003/05/15 02:02:39 murray Exp $
 
 SUBDIR =
 SUBDIR += blank
 SUBDIR += daemon
+SUBDIR += dragon
 SUBDIR += fade
 SUBDIR += fire
 SUBDIR += green

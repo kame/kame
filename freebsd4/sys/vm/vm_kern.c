@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_kern.c,v 1.61.2.2 2002/03/12 18:25:26 tegge Exp $
+ * $FreeBSD: src/sys/vm/vm_kern.c,v 1.61.2.3 2003/08/09 16:21:20 luoqi Exp $
  */
 
 /*
@@ -265,7 +265,6 @@ kmem_suballoc(parent, min, max, size)
 		panic("kmem_suballoc");
 	}
 	*max = *min + size;
-	pmap_reference(vm_map_pmap(parent));
 	result = vm_map_create(vm_map_pmap(parent), *min, *max);
 	if (result == NULL)
 		panic("kmem_suballoc: cannot create submap");

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.24 2003/03/05 18:42:33 njl Exp $
+ * $FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.26 2003/10/06 18:29:23 sam Exp $
  */
 
 /*
@@ -101,7 +101,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.24 2003/03/05 18:42:33 njl Exp $";
+  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.26 2003/10/06 18:29:23 sam Exp $";
 #endif
 
 /*
@@ -1681,8 +1681,32 @@ static int sis_encap(sc, m_head, txidx)
 {
 	struct sis_desc		*f = NULL;
 	struct mbuf		*m;
-	int			frag, cur, cnt = 0;
+	int			frag, cur, cnt = 0, chainlen = 0;
 
+	/*
+	 * If there's no way we can send any packets, return now.
+	 */
+	if (SIS_TX_LIST_CNT - sc->sis_cdata.sis_tx_cnt < 2)
+		return (ENOBUFS);
+
+	/*
+	 * Count the number of frags in this chain to see if
+	 * we need to m_defrag.  Since the descriptor list is shared
+	 * by all packets, we'll m_defrag long chains so that they
+	 * do not use up the entire list, even if they would fit.
+	 */
+
+	for (m = m_head; m != NULL; m = m->m_next)
+		chainlen++;
+
+	if ((chainlen > SIS_TX_LIST_CNT / 4) ||
+	    ((SIS_TX_LIST_CNT - (chainlen + sc->sis_cdata.sis_tx_cnt)) < 2)) {
+		m = m_defrag(m_head, M_DONTWAIT);
+		if (m == NULL)
+			return (ENOBUFS);
+		m_head = m;
+	}
+	
 	/*
  	 * Start packing the mbufs in this chain into
 	 * the fragment pointers. Stop when we run out
@@ -1904,6 +1928,29 @@ static void sis_init(xsc)
 		SIS_CLRBIT(sc, SIS_TX_CFG,
 		    (SIS_TXCFG_IGN_HBEAT|SIS_TXCFG_IGN_CARR));
 		SIS_CLRBIT(sc, SIS_RX_CFG, SIS_RXCFG_RX_TXPKTS);
+	}
+
+	if (sc->sis_type == SIS_TYPE_83815 &&
+	     IFM_SUBTYPE(mii->mii_media_active) == IFM_100_TX) {
+		uint32_t reg;
+
+		/*
+		 * Some DP83815s experience problems when used with short
+		 * (< 30m/100ft) Ethernet cables in 100BaseTX mode.  This
+		 * sequence adjusts the DSP's signal attenuation to fix the
+		 * problem.
+		 */
+		CSR_WRITE_4(sc, NS_PHY_PAGE, 0x0001);
+
+		reg = CSR_READ_4(sc, NS_PHY_DSPCFG);
+		CSR_WRITE_4(sc, NS_PHY_DSPCFG, (reg & 0xfff) | 0x1000);
+		DELAY(100);
+		reg = CSR_READ_4(sc, NS_PHY_TDATA);
+		if ((reg & 0x0080) == 0 || (reg & 0xff) >= 0xd8) {
+			CSR_WRITE_4(sc, NS_PHY_TDATA, 0x00e8);
+			SIS_SETBIT(sc, NS_PHY_DSPCFG, 0x20);
+		}
+		CSR_WRITE_4(sc, NS_PHY_PAGE, 0);
 	}
 
 	/*

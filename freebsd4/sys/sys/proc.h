@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)proc.h	8.15 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/proc.h,v 1.99.2.7 2002/01/31 18:40:29 dillon Exp $
+ * $FreeBSD: src/sys/sys/proc.h,v 1.99.2.10 2003/07/06 16:35:47 tegge Exp $
  */
 
 #ifndef _SYS_PROC_H_
@@ -244,6 +244,7 @@ struct	proc {
 	struct proc *p_leader;
 	struct	pasleep p_asleep;	/* Used by asleep()/await(). */
 	void	*p_emuldata;	/* process-specific emulator state data */
+	struct filedesc_to_leader *p_fdtol; /* Ptr to tracking node */
 };
 
 #define	p_session	p_pgrp->pg_session
@@ -418,6 +419,7 @@ extern	int ps_argsopen;
 
 struct proc *pfind __P((pid_t));	/* Find process by id. */
 struct pgrp *pgfind __P((pid_t));	/* Find process group by id. */
+struct proc *zpfind __P((pid_t));	/* Find zombie process by id. */
 
 struct vm_zone;
 extern struct vm_zone *proc_zone;

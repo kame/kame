@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_ep_pccard.c,v 1.12.2.2 2000/08/08 23:55:02 peter Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep_pccard.c,v 1.12.2.3 2003/10/06 02:53:51 imp Exp $
  */
 
 /*
@@ -252,4 +252,4 @@ static driver_t ep_pccard_driver = {
 
 extern devclass_t ep_devclass;
 
-DRIVER_MODULE(ep, pccard, ep_pccard_driver, ep_devclass, 0, 0);
+DRIVER_MODULE(if_ep, pccard, ep_pccard_driver, ep_devclass, 0, 0);

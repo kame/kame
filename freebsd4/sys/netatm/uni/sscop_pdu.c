@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_pdu.c,v 1.5 2000/01/17 20:49:52 mks Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_pdu.c,v 1.5.2.1 2003/08/07 15:44:59 harti Exp $
  *
  */
 
@@ -43,7 +43,7 @@
 #include <netatm/uni/sscop_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop_pdu.c,v 1.5 2000/01/17 20:49:52 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop_pdu.c,v 1.5.2.1 2003/08/07 15:44:59 harti Exp $");
 #endif
 
 /*
@@ -1221,10 +1221,7 @@ sscop_send_ud(sop, m)
  *
  */
 void
-sscop_pdu_print(sop, m, msg)
-	struct sscop	*sop;
-	KBuffer		*m;
-	char		*msg;
+sscop_pdu_print(const struct sscop *sop, const KBuffer *m, const char *msg)
 {
 	char		buf[128];
 	struct vccb	*vcp;
@@ -1234,4 +1231,3 @@ sscop_pdu_print(sop, m, msg)
 	    "sscop %s: vcc=(%d,%d)\n", msg, vcp->vc_vpi, vcp->vc_vci);
 	atm_pdu_print(m, buf);
 }
-
