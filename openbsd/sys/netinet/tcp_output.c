@@ -103,6 +103,7 @@
 #endif /* INET6 */
 
 #if defined(INET6) && defined(MIP6)
+#include <netinet/ip6mh.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6_cncore.h>
@@ -1262,6 +1263,6 @@ mip6_hdrsiz_tcp(tp)
 	if ((tp == NULL) || ((inp = tp->t_inpcb) == NULL))
 		return (0);
 
-	return (mip6_exthdr_size(&inp->inp_lsa6, &inp->inp_fsa6));
+	return (mip6_exthdr_size(&inp->inp_laddr6, &inp->inp_faddr6));
 }
 #endif /* INET6 && MIP6 */
