@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.58 2000/04/24 12:09:11 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.59 2000/04/24 14:25:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2623,6 +2623,7 @@ ipsecdoi_setid2(iph2)
 {
 	int lctype;
 	vchar_t *ident = NULL;
+	struct secpolicy *sp;
 
 	/* local side */
 	lctype = doi2idtype(iph2->sainfo->myidenttype);
@@ -2641,13 +2642,22 @@ ipsecdoi_setid2(iph2)
 		ident = NULL;
 	}
 
+	/* check there is phase 2 handler ? */
+	sp = getspbyspid(iph2->spid);
+	if (sp == NULL) {
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL,
+				"no policy found for spid:%lu.\n", iph2->spid));
+		return -1;
+	}
+
 	if (ident == NULL) {
-		iph2->id = sockaddr2id(iph2->src,
-				_INALENBYAF(iph2->src->sa_family) << 3,
-				IPSEC_ULPROTO_ANY);
+		iph2->id = sockaddr2id((struct sockaddr *)&sp->spidx.src,
+					sp->spidx.prefs, sp->spidx.ul_proto);
 		if (iph2->id == NULL) {
 			plog(logp, LOCATION, NULL,
-				"failed to get ID for %s\n", saddr2str(iph2->src));
+				"failed to get ID for %s\n",
+				spidx2str(&sp->spidx));
 			return -1;
 		}
 		YIPSDEBUG(DEBUG_MISC,
@@ -2672,12 +2682,12 @@ ipsecdoi_setid2(iph2)
 	}
 
 	/* remote side */
-	iph2->id_p = sockaddr2id(iph2->dst,
-			_INALENBYAF(iph2->dst->sa_family) << 3,
-			IPSEC_ULPROTO_ANY);
+	iph2->id_p = sockaddr2id((struct sockaddr *)&sp->spidx.dst,
+				sp->spidx.prefd, sp->spidx.ul_proto);
 	if (iph2->id_p == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to get ID for %s\n", saddr2str(iph2->dst));
+			"failed to get ID for %s\n",
+			spidx2str(&sp->spidx));
 		vfree(iph2->id);
 		iph2->id = NULL;
 		return -1;

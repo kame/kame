@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.17 2000/04/24 07:41:01 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.18 2000/04/24 14:25:47 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -135,6 +135,20 @@ getsp_r(spidx, iph2)
 	return NULL;
 }
 #endif
+
+struct secpolicy *
+getspbyspid(spid)
+	u_int32_t spid;
+{
+	struct secpolicy *p;
+
+	for (p = TAILQ_FIRST(&sptree); p; p = TAILQ_NEXT(p, chain)) {
+		if (p->id == spid)
+			return p;
+	}
+
+	return NULL;
+}
 
 /*
  * compare policyindex.

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.9 2000/04/24 07:37:44 sakane Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.10 2000/04/24 14:25:47 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -105,6 +105,7 @@ extern struct secpolicy *getsp_r __P((struct policyindex *));
 #else
 extern struct secpolicy *getsp_r __P((struct policyindex *, struct ph2handle *));
 #endif
+struct secpolicy *getspbyspid __P((u_int32_t));
 extern int cmpspidx __P((struct policyindex *, struct policyindex *));
 extern int cmpspidx_wild __P((struct policyindex *, struct policyindex *));
 extern struct secpolicy *newsp __P((void));
