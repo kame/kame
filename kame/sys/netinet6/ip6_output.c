@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.113 2000/06/19 05:49:07 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.114 2000/06/19 09:45:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1583,7 +1583,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 					error = sooptcopyin(sopt, &optval,
 						sizeof optval, sizeof optval);
-					if (error == 0)
+					if (error)
 						break;
 #else
 					optval = *mtod(m, int *);
