@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.18 2000/02/16 06:04:57 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.19 2000/02/16 07:30:10 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1368,6 +1368,9 @@ oakley_getidstr(id, len)
 }
 #endif
 
+/*
+ * save certificate including certificate type.
+ */
 int
 oakley_savecert(iph1, gen)
 	struct ph1handle *iph1;
@@ -1391,6 +1394,9 @@ oakley_savecert(iph1, gen)
 			return -1;
 		}
 		memcpy(iph1->cert_p->v, data, len);
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL, "CERT saved:\n"));
+		YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p));
 		break;
 	case ISAKMP_CERT_CRL:
 		iph1->crl_p = vmalloc(len);
@@ -1400,6 +1406,9 @@ oakley_savecert(iph1, gen)
 			return -1;
 		}
 		memcpy(iph1->crl_p->v, data, len);
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL, "CRL saved:\n"));
+		YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->crl_p));
 		break;
 	case ISAKMP_CERT_X509KE:
 	case ISAKMP_CERT_X509ATTR:
