@@ -236,7 +236,7 @@ main(argc, argv)
 		}
 
 		if ((e = select(s + 1, &select_fd, NULL, NULL, timeout)) < 1) {
-			if (e < 0) {
+			if (e < 0 && errno != EINTR) {
 				warnmsg(LOG_ERR, __FUNCTION__, "select: %s",
 				       strerror(errno));
 			}
