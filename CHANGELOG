@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1021 2000/06/14 17:40:38 jinmei Exp $
+$Id: CHANGELOG,v 1.1022 2000/06/15 01:04:28 itojun Exp $
 
 <200006>
+Thu Jun 15 10:01:47 JST 2000  itojun@iijlab.net
+	* libinet6/resolv/res_init.c: make _res.nsaddr_list initialization
+	  more conservative when resolv.conf is missing (or there is no
+	  "nameserver" line).  previous code chokes on IPv4-only kernel.
+	  merge from netbsd-current.
+
 2000-06-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (defrouter_msg): was added to tell
 	user processes changes about the default router (including
