@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.3 2000/04/18 12:36:03 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.4 2000/04/20 02:21:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -102,11 +102,23 @@ scope6_set(ifp, idlist)
 	struct ifnet *ifp;
 	u_int32_t *idlist;
 {
-	int i;
+	int i, s;
 	int error = 0;
 
 	if (scope6_ids == NULL)	/* paranoid? */
 		return(EINVAL);
+
+	/*
+	 * XXX: We need more consistency checks of the relationship among
+	 * scopes (e.g. an organization should be larger than a site).
+	 */
+
+	/*
+	 * TODO(XXX): after setting, we should reflect the changes to
+	 * interface addresses, routing table entries, PCB entries... 
+	 */
+
+	s = splnet();
 
 	for (i = 0; i < 16; i++) {
 		if (idlist[i] &&
@@ -119,6 +131,7 @@ scope6_set(ifp, idlist)
 				 * IDs, but we check the consistency for
 				 * safety in later use.
 				 */
+				splx(s);
 				return(EINVAL);
 			}
 
@@ -130,6 +143,7 @@ scope6_set(ifp, idlist)
 			scope6_ids[ifp->if_index].s6id_list[i] = idlist[i];
 		}
 	}
+	splx(s);
 
 	return(error);
 }
