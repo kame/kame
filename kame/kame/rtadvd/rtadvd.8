@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.8,v 1.10 2000/10/15 13:16:46 itojun Exp $
+.\"	$KAME: rtadvd.8,v 1.11 2000/11/08 14:59:00 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -36,7 +36,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl c Ar configfile
-.Op Fl dDfmRs
+.Op Fl dDfMmRs
 .Ar interface ...
 .Sh DESCRIPTION
 .Nm
@@ -92,6 +92,14 @@ Print debugging information.
 Even more debugging information is printed.
 .It Fl f
 Foreground mode (useful when debugging).
+.It Fl M
+Specify an interface to join the all-site routers multicast group.
+By default,
+.Nm
+tries to join the first advertising interface appeared in the command
+line. This option has meaning only with the
+.Fl R
+option, which enables auto routing renumbering.
 .It Fl m
 Enables mobile IPv6 support.
 This changes the content of router advertisement option, as well as
