@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.135 2004/02/03 07:25:23 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.136 2004/02/05 05:55:05 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -543,7 +543,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 			ip6_initpktopts(&opts);
 			opts.ip6po_flags |= IP6PO_USECOA;
 #endif /* MIP6 */
-			src = in6_selectsrc(&((struct sockaddr_in6 *)&ro.ro_dst)->sin6_addr,
+			src = in6_selectsrc(&ip6->ip6_dst,
 #ifdef MIP6
 			    &opts,
 #else /* !MIP6 */
