@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.28 2000/11/09 03:04:08 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.29 2000/11/23 23:03:26 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -222,13 +222,12 @@ command first appeared in WIDE/KAME IPv6 protocol stack kit.
 .\"
 .Sh BUGS
 Specification conformance is still very low.
-.Pp
-.Nm
-does not handle DNS queries/replies over TCP transport.
-.Pp
 Some of
 .Pq or most of
 the features are not implemented yet.
+.Pp
+.Nm
+does not handle DNS queries/replies over TCP transport.
 .Pp
 Since there is no standard IPv6 multicast address assigned for multicast DNS,
 we use linklocal all-node multicast address at this moment.
