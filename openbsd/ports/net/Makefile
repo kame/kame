@@ -1,7 +1,9 @@
-# $Id: Makefile,v 1.2 1999/11/22 20:48:58 itojun Exp $
+# $Id: Makefile,v 1.3 2000/04/20 09:22:22 itojun Exp $
 
      SUBDIR += bind8
+     SUBDIR += libpcap
      SUBDIR += pchar
+     SUBDIR += tcpdump
      SUBDIR += totd
      SUBDIR += ucd-snmp
      SUBDIR += zebra
