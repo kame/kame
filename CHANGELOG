@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2303 2003/01/11 07:20:19 suz Exp $
+$KAME: CHANGELOG,v 1.2304 2003/01/13 13:07:32 jinmei Exp $
 
 <200301>
 Sat Jan 11 16:25:06 JST 2003	suz@crl.hitachi.co.jp
@@ -20,12 +20,11 @@ Wed Jan  8 14:33:42 JST 2003	suz@crl.hitachi.co.jp
 	* kame/kame/man/man4/stf.4, kame/sys/net/if_stf.[ch],
 	  kame/sys/netinet6/in6.h, in6_ifattach.c, ip6_input.c,
 	  freebsd4/sys/sys/sockio.h, freebsd4/sys/net/if.h:
-	  ISATAP kernel implementation based on draft-ietf-ngtrans-isatap-08.txt
-	  for FreeBSD-4 
-
+	  ISATAP kernel implementation based on
+	  draft-ietf-ngtrans-isatap-08.txt for FreeBSD-4.
 	* kame/kame/rtadvd, kame/kame/rtsold, freebsd4/sbin/ifconfig
 	  ISATAP userland implementation based on 
-	  draft-ietf-ngtrans-isatap-08.txt for FreeBSD-4 
+	  draft-ietf-ngtrans-isatap-08.txt for FreeBSD-4.
 	  
 	please see "man stf" for further detail.
 
