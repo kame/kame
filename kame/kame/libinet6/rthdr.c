@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.12 2003/06/06 06:23:31 itojun Exp $	*/
+/*	$KAME: rthdr.c,v 1.13 2003/06/06 06:31:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -281,7 +281,7 @@ inet6_rthdr_getaddr(cmsg, idx)
 #ifdef COMPAT_RFC2292
 	return(((struct in6_addr *)(rt0 + 1)) + idx - 1);
 #else
-	return(((struct in6_addr *)(rt0 + 1)) + idx;
+	return(((struct in6_addr *)(rt0 + 1)) + idx);
 #endif
       }
 
