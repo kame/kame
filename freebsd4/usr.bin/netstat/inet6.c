@@ -345,13 +345,13 @@ static char *srcrule_str[] = {
 	"outgoing interface",
 	"matching label",
 	"public/temporary address",
-	"longest match",
+	"alive interface",
 	"rule #9",
 	"rule #10",
 	"rule #11",
 	"rule #12",
 	"rule #13",
-	"rule #14",
+	"longest match",
 	"rule #15",
 };
 
