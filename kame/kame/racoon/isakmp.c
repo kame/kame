@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.43 2000/01/12 20:57:26 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.44 2000/01/12 23:09:30 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -191,6 +191,7 @@ isakmp_handler(so_isakmp)
 		goto end;
 	}
 
+	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 	YIPSDEBUG(DEBUG_NET,
 		plog(logp, LOCATION, (struct sockaddr *)&local,
 			"%d bytes message received from %s\n",
@@ -368,7 +369,6 @@ isakmp_main(msg, remote, local)
 			/* inogre it */
 			return -1;
 		}
-		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 		if ((ph1exchange[etypesw(iph1->etype)]
 		                [iph1->side]
 		                [iph1->status])(iph1, msg) < 0) {
@@ -492,7 +492,6 @@ isakmp_main(msg, remote, local)
 			/* ignore it */
 			return -1;
 		}
-		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 		error = (ph2exchange[etypesw(isakmp->etype)]
 		                    [iph2->side]
 		                    [iph2->status])(iph2, msg);
