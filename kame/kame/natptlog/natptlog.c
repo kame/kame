@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.8 2000/04/16 18:06:26 itojun Exp $
+ *	$Id: natptlog.c,v 1.9 2000/04/19 08:15:31 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -53,6 +53,10 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/tcp.h>
+#include <netinet/tcp_fsm.h>
+#include <netinet/udp.h>
 
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
@@ -116,11 +120,13 @@ void	 printLogIP4		__P((struct lbuf *));
 void	 printLogIP6		__P((struct lbuf *));
 void	 printLogIN6addr	__P((struct lbuf *));
 void	 printLogCSlot		__P((struct lbuf *));
+void	 printLogTCPFSM		__P((struct lbuf *));
 
 char	*displaySockaddr	__P((struct sockaddr *));
 char	*displaySockaddrIn4	__P((struct sockaddr_in *));
 char	*displaySockaddrIn6	__P((struct sockaddr_in6 *));
 char	*displaySockaddrDl	__P((struct sockaddr_dl *));
+char	*displayTcpflags	__P((int));
 
 int	 hexdump16		__P((int, char *, int));
 void	 quitting		__P((int));
@@ -137,6 +143,10 @@ void	 initSignal		__P((void));
 void	 sighandler		__P((int));
 void	 preinit		__P((void));
 void	 init_main		__P((void));
+
+
+extern	char	*tcpstates[];	/* defined in <netinet/tcp_fsm.h>	*/
+
 
 
 /*
@@ -254,6 +264,7 @@ recvMesg(int sockfd)
 		  case LOG_IP6:		printLogIP6(lbuf);	break;
 		  case LOG_IN6ADDR:	printLogIN6addr(lbuf);	break;
 		  case LOG_CSLOT:	printLogCSlot(lbuf);	break;
+		  case LOG_TCPFSM:	printLogTCPFSM(lbuf);	break;
 		    
 		  default:
 		    log(lbuf->l_hdr.lh_pri, "%d uninstalled", lbuf->l_hdr.lh_type);
@@ -305,7 +316,53 @@ printLogIP4(struct lbuf *lbuf)
     ip4 = (struct ip *)lbuf->l_dat.__buf;
     inet_ntop(AF_INET, (char *)&ip4->ip_src, from, INET_ADDRSTRLEN);
     inet_ntop(AF_INET, (char *)&ip4->ip_dst, to,   INET_ADDRSTRLEN);
-    log(lbuf->l_hdr.lh_pri, "from %s to %s", from, to);
+
+    switch (ip4->ip_p)
+    {
+      case IPPROTO_ICMP:
+	{
+	    char		*type;
+	    struct icmp		*icmp4;
+
+	    icmp4 = (struct icmp *)(ip4 + 1);
+	    switch (icmp4->icmp_type)
+	    {
+	      case ICMP_ECHOREPLY:	type = "echo reply";	break;
+	      case ICMP_ECHO:		type = "echo";		break;
+	      default:			type = "unknown";	break;
+	    }
+
+	    log(lbuf->l_hdr.lh_pri, "from %s to %s icmp: %s",
+		from, to, type);
+	}
+	break;
+
+      case IPPROTO_TCP:
+	{
+	    int			 tlen;
+	    struct tcphdr	*tcp4;
+
+	    tcp4 = (struct tcphdr *)(ip4 + 1);
+	    tlen = ip4->ip_len - (tcp4->th_off << 2);
+	    log(lbuf->l_hdr.lh_pri, "from %s.%d to %s.%d tcp %d",
+		from, ntohs(tcp4->th_sport), to, ntohs(tcp4->th_dport), tlen);
+	}
+	break;
+
+      case IPPROTO_UDP:
+	{
+	    struct udphdr	*udp4;
+	    
+	    udp4 = (struct udphdr *)(ip4 + 1);
+	    log(lbuf->l_hdr.lh_pri, "from %s.%d to %s.%d udp %d",
+		from, ntohs(udp4->uh_sport), to, ntohs(udp4->uh_dport), udp4->uh_ulen);
+	}
+	break;
+	
+      default:
+	log(lbuf->l_hdr.lh_pri, "from %s to %s", from, to);
+	break;
+    }
 }
 
 
@@ -362,6 +419,49 @@ printLogCSlot(struct lbuf *lbuf)
 }
 
 
+void
+printLogTCPFSM(struct lbuf *lbuf)
+{
+    int	*wow = (int *)lbuf->l_dat.__buf;
+    char	*session;
+    char	*inout;
+    char	*oldstate;
+    char	*flags;
+    char	*newstate;
+
+    switch (wow[0])
+    {
+      case NATPT_INBOUND:	session = "inbound";		break;
+      case NATPT_OUTBOUND:	session = "outbound";		break;
+      default:			session = "unspecified";	break;
+    }
+    
+    switch (wow[1])
+    {
+      case NATPT_INBOUND:	inout = "inbound";		break;
+      case NATPT_OUTBOUND:	inout = "outbound";		break;
+      default:			inout = "unspecified";		break;
+    }
+
+    oldstate = "unknown";
+    if (wow[2] >= 0 && wow[2] < TCP_NSTATES)
+	oldstate = tcpstates[wow[2]];
+
+    flags = displayTcpflags(wow[3]);
+
+    newstate = "unknown";
+    if (wow[4] >= 0 && wow[4] < TCP_NSTATES)
+	newstate = tcpstates[wow[4]];
+
+    log(lbuf->l_hdr.lh_pri, "%9s%9s%13s%9s%13s",
+	session,
+	inout,
+	oldstate,
+	flags,
+	newstate);
+}
+
+
 char *
 displaySockaddrIn4(struct sockaddr_in *from)
 {
@@ -393,6 +493,26 @@ displaySockaddrDl(struct sockaddr_dl *from)
     sprintf(dltxt, "%02x:%02x:%02x:%02x:%02x:%02x",
 	    cp[0], cp[1], cp[2], cp[3], cp[4], cp[5]);
     return (dltxt);
+}
+
+
+char *
+displayTcpflags(int flags)
+{
+    static	char	th_flags[8];
+
+    strcpy(th_flags, "------");
+    th_flags[6] = '\0';
+    th_flags[7] = '\0';
+
+    if (flags & TH_FIN)		th_flags[5] = 'f';
+    if (flags & TH_SYN)		th_flags[4] = 's';
+    if (flags & TH_RST)		th_flags[3] = 'r';
+    if (flags & TH_PUSH)	th_flags[2] = 'p';
+    if (flags & TH_ACK)		th_flags[1] = 'a';
+    if (flags & TH_URG)		th_flags[0] = 'u';
+
+    return (th_flags);
 }
 
 
