@@ -2096,5 +2096,19 @@ in6_sin6_2_sin(struct sockaddr_in *sin, struct sockaddr_in6 *sin6)
 	sin->sin_port = sin6->sin6_port;
 	sin->sin_addr.s_addr = sin6->sin6_addr.s6_addr32[3];	
 }
+
+/* Convert sockaddr_in to sockaddr_in6 in v4 mapped addr format. */
+void
+in6_sin_2_v4mapsin6(struct sockaddr_in *sin, struct sockaddr_in6 *sin6)
+{
+	bzero(sin6, sizeof(*sin6));
+	sin6->sin6_len = sizeof(struct sockaddr_in6);
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_port = sin->sin_port;
+	sin6->sin6_addr.s6_addr32[0] = 0;
+	sin6->sin6_addr.s6_addr32[1] = 0;
+	sin6->sin6_addr.s6_addr32[2] = IPV6_ADDR_INT32_SMP;
+	sin6->sin6_addr.s6_addr32[3] = sin->sin_addr.s_addr;
+}
 #endif /* MAPPED_ADDR_ENABLED */
 

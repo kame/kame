@@ -557,6 +557,8 @@ extern void in6_if_up __P((struct ifnet *));
 #ifdef MAPPED_ADDR_ENABLED
 void	in6_sin6_2_sin __P((struct sockaddr_in *sin,
 			    struct sockaddr_in6 *sin6));
+void	in6_sin_2_v4mapsin6 __P((struct sockaddr_in *sin,
+				 struct sockaddr_in6 *sin6));
 #endif /* MAPPED_ADDR_ENABLED */
 
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))

@@ -38,6 +38,9 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <sys/malloc.h>
+#endif
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
