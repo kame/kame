@@ -1,7 +1,7 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2709 2005/01/01 01:45:36 suz Exp $
+$KAME: CHANGELOG,v 1.2710 2005/01/01 01:46:53 suz Exp $
 
 <200501>
-Mon Jan  1 JST 2004  suz@crl.hitachi.co.jp
+2005-01-01  suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/mldv2.c: fixed a kernel crash by an MLDv2
 	  Query (Multicast Address and Source Specific Query).
