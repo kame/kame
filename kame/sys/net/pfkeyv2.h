@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.26 2001/06/27 10:49:49 sakane Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.27 2001/07/31 06:41:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -286,7 +286,7 @@ struct sadb_x_ipsecrequest {
 #define SADB_SATYPE_RIPV2	7
 #define SADB_SATYPE_MIP		8
 #define SADB_X_SATYPE_IPCOMP	9
-#define SADB_X_SATYPE_POLICY	10
+/*#define SADB_X_SATYPE_POLICY	10	obsolete, do not reuse */
 #define SADB_SATYPE_MAX		11
 
 #define SADB_SASTATE_LARVAL   0
