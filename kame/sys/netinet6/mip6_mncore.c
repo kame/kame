@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.51 2004/06/02 05:53:16 itojun Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.52 2004/06/09 07:17:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1446,7 +1446,7 @@ mip6_route_optimize(m)
 	} else {
 #if 0
 		int32_t coa_lifetime;
-#ifndef __FreeBSD__
+#ifdef __FreeBSD__
 		long time_second = time.tv_sec;
 #endif
 		/*
@@ -1793,7 +1793,7 @@ mip6_home_registration2(mbu)
 	struct mip6_prefix *mpfx;
 	int32_t coa_lifetime, prefix_lifetime;
 	int error;
-#ifndef __FreeBSD__
+#ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif
 
