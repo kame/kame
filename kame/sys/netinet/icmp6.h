@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.23 2000/10/10 15:35:45 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.24 2000/10/18 19:24:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -554,6 +554,7 @@ struct icmp6stat {
 #define icp6s_oparamprob_option icp6s_outerrhist.icp6errs_paramprob_option
 #define icp6s_oredirect icp6s_outerrhist.icp6errs_redirect
 #define icp6s_ounknown icp6s_outerrhist.icp6errs_unknown
+	u_quad_t icp6s_pmtuchg;		/* path MTU changes */
 };
 
 /*
