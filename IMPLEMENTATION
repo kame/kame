@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.245 2001/07/22 17:08:36 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.246 2001/07/23 07:29:06 sakane Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -10,6 +10,77 @@ of the latest KAME/*BSD stack (like KAME/NetBSD 1.5.1).  The description
 here may not be applicable to KAME-integrated *BSD releases (like stock
 NetBSD 1.5.1), as we have certain amount of changes between them.  Still,
 some of the content can be useful for KAME-integrated *BSD releases.
+
+Table of Contents
+
+	1. IPv6
+	1.1 Conformance
+	1.2 Neighbor Discovery
+	1.3 Scope Zone Index
+	1.3.1 Kernel internal
+	1.3.2 Interaction with API
+	1.3.3 Interaction with users (command line)
+	1.4 Plug and Play
+	1.4.1 Assignment of link-local, and special addresses
+	1.4.2 Stateless address autoconfiguration on hosts
+	1.4.3 DHCPv6
+	1.5 Generic tunnel interface
+	1.6 Source Address Selection
+	1.7 Jumbo Payload
+	1.8 Loop prevention in header processing
+	1.9 ICMPv6
+	1.10 Applications
+	1.11 Kernel Internals
+	1.12 IPv4 mapped address and IPv6 wildcard socket
+	1.12.1 KAME/BSDI3 and KAME/FreeBSD228
+	1.12.2 KAME/FreeBSD[34]x
+	1.12.2.1 KAME/FreeBSD[34]x, listening side
+	1.12.2.2 KAME/FreeBSD[34]x, initiating side
+	1.12.3 KAME/NetBSD
+	1.12.3.1 KAME/NetBSD, listening side
+	1.12.3.2 KAME/NetBSD, initiating side
+	1.12.4 KAME/BSDI4
+	1.12.4.1 KAME/BSDI4, listening side
+	1.12.4.2 KAME/BSDI4, initiating side
+	1.12.5 KAME/OpenBSD
+	1.12.5.1 KAME/OpenBSD, listening side
+	1.12.5.2 KAME/OpenBSD, initiating side
+	1.12.6 More issues
+	1.12.7 Interaction with SIIT translator
+	1.13 sockaddr_storage
+	1.14 Invalid addresses on the wire
+	1.15 Node's required addresses
+	1.15.1 Host case
+	1.15.2 Router case
+	1.16 Advanced API
+	1.17 DNS resolver
+	2. Network Drivers
+	2.1 FreeBSD 2.2.x-RELEASE
+	2.2 BSD/OS 3.x
+	2.3 NetBSD
+	2.4 FreeBSD 3.x-RELEASE
+	2.5 FreeBSD 4.x-RELEASE
+	2.6 OpenBSD 2.x
+	2.7 BSD/OS 4.x
+	3. Translator
+	3.1 FAITH TCP relay translator
+	3.2 IPv6-to-IPv4 header translator
+	4. IPsec
+	4.1 Policy Management
+	4.2 Key Management
+	4.3 AH and ESP handling
+	4.4 IPComp handling
+	4.5 Conformance to RFCs and IDs
+	4.6 ECN consideration on IPsec tunnels
+	4.7 Interoperability
+	5. ALTQ
+	6. mobile-ip6
+	6.1 KAME node as correspondent node
+	6.2 KAME node as home agent/mobile node
+	7. Routing table extensions
+	7.1 ART routing table lookup algorithm
+	7.2 Multipath routing support
+	8. Coding style
 
 1. IPv6
 
