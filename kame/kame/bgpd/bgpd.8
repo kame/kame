@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: bgpd.8,v 1.1 1999/08/08 23:29:11 itojun Exp $
+.\"     $Id: bgpd.8,v 1.2 1999/10/13 05:34:33 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt BGPD 8
@@ -70,14 +70,11 @@ it receives a SIGUSR1 signal.
 The information includes per-interface
 RIPng routes and per-peer base BGP information.
 By default, the dump file is
-.Ar /var/log/bgpd.dump ,
+.Ar /var/tmp/bgpd.dump ,
 which is configurable in the configuration file.
 If the dump file does not exist,
 .Nm
 creates a new one and dump to it.
-If the dump file already exists,
-.Nm
-adds a new dump at the end of the file.
 .\"
 .Sh "ERROR MESSAGES"
 The
@@ -92,7 +89,7 @@ default configuration file.
 .It Pa /var/run/bgpd.pid
 the pid of the currently running
 .Nm bgpd .
-.It Pa /var/log/bgpd.dump
+.It Pa /var/tmp/bgpd.dump
 default dump file.
 .El
 .\"
