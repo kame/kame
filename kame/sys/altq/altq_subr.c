@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.20 2003/09/17 14:37:38 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.21 2003/11/06 06:32:53 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -122,7 +122,7 @@ static void 	ip4f_free(struct ip4_frag *);
  * alternate queueing support routines
  */
 
-/* look up the queue state by the interface name and the queuing type. */
+/* look up the queue state by the interface name and the queueing type. */
 void *
 altq_lookup(name, type)
 	char *name;
