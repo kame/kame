@@ -1,9 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.564 2000/02/16 14:58:27 sumikawa Exp $
+$Id: CHANGELOG,v 1.565 2000/02/16 15:27:50 sumikawa Exp $
 
 <200002>
 Wed Feb 16 23:57:53 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/lib/libftpio: add '229 Entering Extended Passive
+	  Mode' from RFC2426
 	* freebsd2/ports/mpg123: upgrade to latest IPv6 patch and sync
 	  with FreeBSD-current.
 
