@@ -3,7 +3,7 @@
 # Date created:		Sat Jun  6 00:09:52 JST 1998
 # Whom:			Jun-ichiro itojun Itoh <itojun@itojun.org>
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:37:11 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/24 14:45:59 itojun Exp $
 #
 
 DISTNAME=	mrt-${VERBASE}${VERADD}-src
@@ -16,8 +16,8 @@ MAINTAINER=	itojun@itojun.org
 WRKSRC=		${WRKDIR}/mrt-${VERBASE}/src.kame
 GNU_CONFIGURE=	yes
 
-VERBASE=	1.5.2a
-VERADD=		-990308
+VERBASE=	2.0.0a
+VERADD=
 
 MAN8=	mrtd.8
 EXAMPLES=	programs/bgpsim/bgpsim.conf programs/bgpsim/bgpsim6.conf \

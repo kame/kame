@@ -1,30 +1,13 @@
---- lib/rip/ripng.c-	Tue Jan  5 18:19:37 1999
-+++ lib/rip/ripng.c	Tue Jan  5 18:20:25 1999
-@@ -397,8 +397,13 @@
- {
-     struct ipv6_mreq mreq;
-     char tmp6[INET6_ADDRSTRLEN];
-+#ifdef IPV6_LEAVE_MEMBERSHIP
-+    int cmd = IPV6_LEAVE_MEMBERSHIP;
-+    char *s_cmd = "IPV6_LEAVE_MEMBERSHIP";
-+#else
-     int cmd = IPV6_DROP_MEMBERSHIP;
-     char *s_cmd = "IPV6_DROP_MEMBERSHIP";
-+#endif
-     interface_t *interface = rip_interface->interface;
- 
-     /* 
-@@ -442,8 +447,13 @@
- 	    }
- 	}
- #endif /* SOLARIS_IPV6 */
-+#ifdef IPV6_JOIN_MEMBERSHIP
-+        cmd = IPV6_JOIN_MEMBERSHIP;
-+        s_cmd = "IPV6_JOIN_MEMBERSHIP";
-+#else
-         cmd = IPV6_ADD_MEMBERSHIP;
-         s_cmd = "IPV6_ADD_MEMBERSHIP";
-+#endif
+--- lib/rip/ripng.c.orig	Tue Aug  3 12:33:56 1999
++++ lib/rip/ripng.c	Tue Aug 24 23:13:41 1999
+@@ -187,8 +187,8 @@
+         memcpy (&ripng.sin6_addr, 
+ 		prefix_toaddr6 (interface->link_local->prefix), 16);
+ #ifdef __KAME__
+-	ripng.sin6_addr.s6_addr8[2] = (interface->index >> 8) & 0xff;
+-	ripng.sin6_addr.s6_addr8[3] = interface->index & 0xff;
++	ripng.sin6_addr.s6_addr[2] = (interface->index >> 8) & 0xff;
++	ripng.sin6_addr.s6_addr[3] = interface->index & 0xff;
+ #endif /* __KAME__ */
      }
  
- 	if (rip_interface->sockfd >= 0) {

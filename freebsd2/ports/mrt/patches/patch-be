@@ -1,0 +1,14 @@
+--- lib/config/multiconf.c-	Tue Aug 24 23:30:37 1999
++++ lib/config/multiconf.c	Tue Aug 24 23:30:46 1999
+@@ -237,9 +237,11 @@
+ 		      "Disables IP multicast routing protocol");
+ 
+ #ifdef HAVE_IPV6
++#ifndef __KAME__
+     uii_add_command_schedule (UII_NORMAL, COMMAND_NORM, "show ipv6 igmp groups",
+ 		      igmp6_show_group, "Show IPV6 igmp group membership table",
+ 		      IGMPv6->schedule);
++#endif
+ 
+     uii_add_command2 (UII_CONFIG, COMMAND_NORM, 
+ 		      "ipv6 multicast-routing",
