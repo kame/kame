@@ -12,7 +12,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.7 1999/08/31 12:25:57 shin Exp $
+ *	$Id: ip6_fw.c,v 1.8 2000/01/17 09:03:01 itojun Exp $
  */
 
 /*
@@ -49,10 +49,14 @@
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include <netinet/in_pcb.h>
+
+#include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/ip6.h>
 #include <netinet6/icmp6.h>
+
+#include <netinet/in_pcb.h>
+
 #include <netinet6/ip6_fw.h>
 #ifdef TCP6
 #include <netinet6/tcp6.h>
