@@ -1466,7 +1466,7 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 #endif /* __FreeBSD__ */
 #endif /* __NetBSD__ || __OpenBSD__ */
 
-      if (notify)
+      if (notify || notify2)
 #ifdef IPSEC
 	{
 	  /* Pretend the packet came in for this source/destination port pair,
@@ -1482,10 +1482,13 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 			          (struct sockaddr *)&dstsa, nexthdr, m, NULL,
 				   NULL))
 #endif /* IPSEC */
-	  (*notify)(oinp, errno);
+	    {
+	      if (notify)
+		(*notify)(oinp, errno);
 
-	  if (notify2)
-	    (*notify2)(oin6p, errno);
+	      if (notify2)
+		(*notify2)(oinp, errno);
+	    }
 #ifdef IPSEC
 	}
 #endif /* IPSEC */
