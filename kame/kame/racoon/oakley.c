@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.67 2000/10/04 17:41:02 itojun Exp $	*/
+/*	$KAME: oakley.c,v 1.68 2000/10/18 09:37:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -168,8 +168,11 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 
 	switch (dh->type) {
 	case OAKLEY_ATTR_GRP_TYPE_MODP:
-		if (eay_dh_compute(dh->prime, dh->gen1, pub, priv, pub_p, gxy) < 0)
+		if (eay_dh_compute(dh->prime, dh->gen1, pub, priv, pub_p, gxy) < 0) {
+			plog(logp, LOCATION, NULL,
+				"failed to compute dh value.\n");
 			return -1;
+		}
 		break;
 	case OAKLEY_ATTR_GRP_TYPE_ECP:
 	case OAKLEY_ATTR_GRP_TYPE_EC2N:
@@ -183,8 +186,7 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 	}
 
 	YIPSDEBUG(DEBUG_KEY,
-		plog(logp, LOCATION, NULL,
-			"compute DH's shared.\n"));
+		plog(logp, LOCATION, NULL, "compute DH's shared.\n"));
 	YIPSDEBUG(DEBUG_DKEY, PVDUMP(*gxy));
 
 	return 0;
@@ -202,8 +204,11 @@ oakley_dh_generate(dh, pub, priv)
 {
 	switch (dh->type) {
 	case OAKLEY_ATTR_GRP_TYPE_MODP:
-		if (eay_dh_generate(dh->prime, dh->gen1, dh->gen2, pub, priv) < 0)
+		if (eay_dh_generate(dh->prime, dh->gen1, dh->gen2, pub, priv) < 0) {
+			plog(logp, LOCATION, NULL,
+				"failed to compute dh value.\n");
 			return -1;
+		}
 		break;
 
 	case OAKLEY_ATTR_GRP_TYPE_ECP:
@@ -218,13 +223,11 @@ oakley_dh_generate(dh, pub, priv)
 	}
 
 	YIPSDEBUG(DEBUG_KEY,
-		plog(logp, LOCATION, NULL,
-			"compute DH's private.\n"));
+		plog(logp, LOCATION, NULL, "compute DH's private.\n"));
 	YIPSDEBUG(DEBUG_DKEY, PVDUMP(*priv));
 
 	YIPSDEBUG(DEBUG_KEY,
-		plog(logp, LOCATION, NULL,
-			"compute DH's public.\n"));
+		plog(logp, LOCATION, NULL, "compute DH's public.\n"));
 	YIPSDEBUG(DEBUG_DKEY, PVDUMP(*pub));
 
 	return 0;
