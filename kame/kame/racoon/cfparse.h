@@ -26,9 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: cfparse.h,v 1.1 1999/08/08 23:31:19 itojun Exp $ */
+/* YIPS @(#)$Id: cfparse.h,v 1.2 1999/08/13 10:40:19 sakane Exp $ */
 
-#define YIPSD_CONF_FILE "/etc/racoon.conf"
+#define YIPSD_CONF_FILE "/usr/local/v6/etc/racoon.conf"
 #define BUFSIZE    5120
 
 struct isakmp_cf_t {
