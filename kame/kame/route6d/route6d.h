@@ -1,4 +1,4 @@
-/*	$KAME: route6d.h,v 1.6 2003/05/28 08:41:12 itojun Exp $	*/
+/*	$KAME: route6d.h,v 1.7 2003/05/28 09:09:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,7 +40,7 @@
 #define	IFC_CHANGED	1
 
 struct netinfo6 {
-	struct	in6_addr	rip6_dest;
+	struct	in6_addr rip6_dest;
 	u_short	rip6_tag;
 	u_char	rip6_plen;
 	u_char	rip6_metric;
@@ -50,7 +50,7 @@ struct	rip6 {
 	u_char	rip6_cmd;
 	u_char	rip6_vers;
 	u_char	rip6_res1[2];
-	struct	netinfo6	rip6_nets[1];
+	struct	netinfo6 rip6_nets[1];
 };
 
 #define	HOPCNT_INFINITY6	16
