@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.12 2000/02/23 12:13:22 jinmei Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.13 2000/10/07 06:59:52 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -909,24 +909,29 @@ int
 wait_for_reply(register int sock, register struct sockaddr_in *fromp,
     register struct timeval *tp)
 {
-	fd_set fds;
+	fd_set *fdsp;
+	size_t nfds;
 	struct timeval now, wait;
 	struct timezone tz;
 	register int cc = 0;
 	int fromlen = sizeof(*fromp);
 
-	FD_ZERO(&fds);
-	FD_SET(sock, &fds);
+	nfds = howmany(sock + 1, NFDBITS);
+	if ((fdsp = malloc(nfds)) == NULL)
+		err(1, "malloc");
+	memset(fdsp, 0, nfds);
+	FD_SET(sock, fdsp);
 
 	wait.tv_sec = tp->tv_sec + waittime;
 	wait.tv_usec = tp->tv_usec;
 	(void)gettimeofday(&now, &tz);
 	tvsub(&wait, &now);
 
-	if (select(sock + 1, &fds, NULL, NULL, &wait) > 0)
+	if (select(sock + 1, fdsp, NULL, NULL, &wait) > 0)
 		cc = recvfrom(s, (char *)packet, sizeof(packet), 0,
 			    (struct sockaddr *)fromp, &fromlen);
 
+	free(fdsp);
 	return(cc);
 }
 

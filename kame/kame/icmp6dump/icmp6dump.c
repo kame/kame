@@ -51,7 +51,8 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	fd_set fdset;
+	fd_set *fdsetp;
+	size_t nfdset;
 	int i;
 	struct icmp6_filter filt;
 	
@@ -78,10 +79,13 @@ main(argc, argv)
 	}
 #endif /*ICMP6_FILTER*/
 
-	FD_ZERO(&fdset);
+	nfdset = howmany(sock, NFDBITS);
+	if ((fdsetp = malloc(nfdset)) == NULL)
+		err(1, "malloc");
+	memset(fdsetp, 0, nfdset);
 	for (;;) {
-		FD_SET(sock, &fdset);
-		if ((i = select(sock + 1, &fdset, NULL, NULL, NULL)) < 0)
+		FD_SET(sock, fdsetp);
+		if ((i = select(sock + 1, fdsetp, NULL, NULL, NULL)) < 0)
 			perror("select");
 		if(i == 0)
 			continue;

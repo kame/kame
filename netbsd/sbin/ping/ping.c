@@ -667,8 +667,8 @@ doit(void)
 	int fromlen;
 	double sec, last, d_last;
 	struct timeval timeout;
-	fd_set fdmask;
-
+	fd_set *fdmaskp;
+	size_t nfdmask;
 
 	(void)gettimeofday(&clear_cache,0);
 	if (maxwait != 0) {
@@ -679,7 +679,10 @@ doit(void)
 		d_last = 365*24*60*60;
 	}
 
-	FD_ZERO(&fdmask);
+	nfdmask = howmany(s + 1, NFDBITS);
+	if ((fdmaskp = malloc(nfdmask)) == NULL)
+		err(1, "malloc");
+	memset(fdmaskp, 0, nfdmask);
 	do {
 		(void)gettimeofday(&now,0);
 
@@ -714,8 +717,8 @@ doit(void)
 
 		sec_to_timeval(sec, &timeout);
 
-		FD_SET(s, &fdmask);
-		cc = select(s+1, &fdmask, 0, 0, &timeout);
+		FD_SET(s, fdmaskp);
+		cc = select(s+1, fdmaskp, 0, 0, &timeout);
 		if (cc <= 0) {
 			if (cc < 0) {
 				if (errno == EINTR)
@@ -743,6 +746,7 @@ doit(void)
 
 	} while (nreceived < npackets
 		 && (nreceived == 0 || !(pingflags & F_ONCE)));
+	free(fdmaskp);
 
 	finish(0);
 }
