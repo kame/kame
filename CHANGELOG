@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1345 2000/10/19 02:28:20 jinmei Exp $
+$KAME: CHANGELOG,v 1.1346 2000/10/19 05:12:55 sakane Exp $
 
 <200010>
+Thu Oct 19 14:12:04 JST 2000 sakane@ydc.co.jp
+	* racoon:
+	- check whether the initial contact is acceptable.
+	when both ends are using "use" as the policy level, both ends initiate
+	the phase 1 and send initial-contacts under each phase 1 SA.  In this
+	case, each phase 1 SA will be banished by the another initial-contact.
+	Simply calling getcontacted() is the solution to avoid the case.
+
 2000-10-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (add_m6fc): made sure to reset
 	the outgoing interfaces list in all cases where a multicast
