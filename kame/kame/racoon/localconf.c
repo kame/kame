@@ -1,4 +1,4 @@
-/*	$KAME: localconf.c,v 1.24 2000/09/22 15:46:36 sakane Exp $	*/
+/*	$KAME: localconf.c,v 1.25 2000/09/22 17:25:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.24 2000/09/22 15:46:36 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.25 2000/09/22 17:25:03 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -306,7 +306,6 @@ static int lc_idtype2doi[] = {
 	IPSECDOI_ID_KEY_ID,
 	-1,	/* if type is "address", it expands to 4 types. */
 	IPSECDOI_ID_DER_ASN1_DN,
-	-1,	/* if type is "certaltname", it expands to a lot of type. */
 };
 
 /*

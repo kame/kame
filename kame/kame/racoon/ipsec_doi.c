@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.111 2000/09/22 08:59:33 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.112 2000/09/22 17:25:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.111 2000/09/22 08:59:33 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.112 2000/09/22 17:25:03 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2951,23 +2951,6 @@ err:
 	return -1;
 }
 
-static int
-genid2doi(genid)
-	int genid;
-{
-	switch (genid) {
-	case GENT_IPADD:
-		return 0;
-	case GENT_DNS:
-		return IPSECDOI_ID_FQDN;
-	case GENT_EMAIL:
-		return IPSECDOI_ID_USER_FQDN;
-	default:
-		return -1;
-	}
-	/*NOTREACHED*/
-}
-
 /*
  * create ID payload for phase 1 and set into iph1->id.
  * NOT INCLUDING isakmp general header.
@@ -2980,9 +2963,6 @@ ipsecdoi_setid1(iph1)
 	vchar_t *ret = NULL;
 	struct ipsecdoi_id_b id_b;
 	vchar_t *ident, idtmp;
-	char idbuf[128]; /* XXX */
-	char *altname;
-	int len, type;
 
 	/* init */
 	id_b.proto_id = 0;
@@ -3001,25 +2981,6 @@ ipsecdoi_setid1(iph1)
 		if (oakley_getmycert(iph1) < 0)
 			goto err;
 		ident = eay_get_x509asn1subjectname(&iph1->cert->cert);
-		break;
-	case LC_IDENTTYPE_CERTALTNAME:
-		if (oakley_getmycert(iph1) < 0)
-			goto err;
-		/* XXX fix it to get any position of altname. */
-		if (eay_get_x509subjectaltname(&iph1->cert->cert,
-				&altname, &type, 1) < 0)
-			goto err;
-		id_b.type = genid2doi(type);
-		if (id_b.type == 0) {
-			plog(logp, LOCATION, NULL,
-				"ERROR: failed to get GeneralName.\n");
-			goto err;
-		}
-		len = snprintf(idbuf, sizeof(idbuf), "%s", altname);
-		idtmp.l = strlen(altname);
-		idtmp.v = idbuf;
-		ident = &idtmp;
-		free(altname);
 		break;
 	case LC_IDENTTYPE_ADDRESS:
 	default:

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.68 2000/09/22 08:13:05 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.69 2000/09/22 17:25:03 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -779,8 +779,7 @@ sainfo_id
 		{
 			struct ipsecdoi_id_b *id_b;
 
-			if ($1 == LC_IDENTTYPE_CERTNAME
-			 || $1 == LC_IDENTTYPE_CERTALTNAME) {
+			if ($1 == LC_IDENTTYPE_CERTNAME) {
 				yyerror("forbidden using such id type: %d", $1);
 				return -1;
 			}
@@ -838,8 +837,7 @@ sainfo_spec
 		algorithms EOS
 	|	IDENTIFIER IDENTIFIERTYPE
 		{
-			if ($2 == LC_IDENTTYPE_CERTNAME
-			 || $2 == LC_IDENTTYPE_CERTALTNAME) {
+			if ($2 == LC_IDENTTYPE_CERTNAME) {
 				yyerror("forbidden using such id type: %d", $2);
 				return -1;
 			}
@@ -937,8 +935,7 @@ remote_statement
 		}
 		BOC remote_specs EOC
 		{
-			if ((cur_rmconf->identtype == LC_IDENTTYPE_CERTNAME
-			  || cur_rmconf->identtype == LC_IDENTTYPE_CERTALTNAME)
+			if (cur_rmconf->identtype == LC_IDENTTYPE_CERTNAME
 			 && cur_rmconf->mycertfile == NULL) {
 				yyerror("id type mismatched due to "
 					"no CERT defined.\n");

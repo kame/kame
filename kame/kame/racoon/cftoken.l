@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.36 2000/09/22 08:13:05 itojun Exp $	*/
+/*	$KAME: cftoken.l,v 1.37 2000/09/22 17:25:03 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -400,7 +400,6 @@ fqdn		{ YYD; yylval.num = LC_IDENTTYPE_FQDN; return(IDENTIFIERTYPE); }
 keyid		{ YYD; yylval.num = LC_IDENTTYPE_KEYID; return(IDENTIFIERTYPE); }
 address		{ YYD; yylval.num = LC_IDENTTYPE_ADDRESS; return(IDENTIFIERTYPE); }
 certname	{ YYD; yylval.num = LC_IDENTTYPE_CERTNAME; return(IDENTIFIERTYPE); }
-certaltname	{ YYD; yylval.num = LC_IDENTTYPE_CERTALTNAME; return(IDENTIFIERTYPE); }
 
 	/* units */
 B|byte|bytes		{ YYD; yylval.num = CF_UNITTYPE_B; return(UNITTYPE); }

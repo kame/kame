@@ -1,4 +1,4 @@
-/*	$KAME: localconf.h,v 1.17 2000/09/13 04:50:27 itojun Exp $	*/
+/*	$KAME: localconf.h,v 1.18 2000/09/22 17:25:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.h,v 1.17 2000/09/13 04:50:27 itojun Exp $ */
+/* YIPS @(#)$Id: localconf.h,v 1.18 2000/09/22 17:25:03 sakane Exp $ */
 
 /* local configuration */
 
@@ -46,8 +46,7 @@
 #define LC_IDENTTYPE_KEYID		2
 #define LC_IDENTTYPE_ADDRESS		3
 #define LC_IDENTTYPE_CERTNAME		4
-#define LC_IDENTTYPE_CERTALTNAME	5
-#define LC_IDENTTYPE_MAX		6
+#define LC_IDENTTYPE_MAX		5
 
 #define LC_DEFAULT_PAD_MAXSIZE		20
 #define LC_DEFAULT_PAD_RANDOM		TRUE
