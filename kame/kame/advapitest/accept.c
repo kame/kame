@@ -1,4 +1,4 @@
-/*	$KAME: accept.c,v 1.15 2001/05/08 04:36:25 itojun Exp $ */
+/*	$KAME: accept.c,v 1.16 2001/08/04 01:28:29 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -79,6 +79,9 @@ main(argc, argv)
 			break;
 		case 'h':
 			hflag++;
+			break;
+		case 'i':
+			iflag++;
 			break;
 		case 'l':
 			lflag++;
@@ -207,6 +210,6 @@ main(argc, argv)
 void
 usage()
 {
-	fprintf(stderr, "usage: accept [-adDhlru] [-p port]\n");
+	fprintf(stderr, "usage: accept [-adDhilru] [-p port]\n");
 	exit(1);
 }
