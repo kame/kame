@@ -752,6 +752,7 @@ dump_pim_mrt(fp)
 		    for (j = 0; j < 10 && vifi < numvifs; j++, vifi++)
 			    fprintf(fp, " %3d", r->vif_timers[vifi]);
 		    fprintf(fp, "\n");
+	    }
 	}
     }				/* for all groups */
 
@@ -838,6 +839,7 @@ dump_pim_mrt(fp)
 		    for (j = 0; j < 10 && vifi < numvifs; j++, vifi++)
 			    fprintf(fp, " %3d", r->vif_timers[vifi]);
 		    fprintf(fp, "\n");
+	    }
 	}
     }				/* For all (*,*,RP) */
 
