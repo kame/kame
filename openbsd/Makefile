@@ -27,6 +27,8 @@ beforeinstall:
 afterinstall:
 	cp kame/rtadvd/rtadvd.conf $(PREFIX)/etc/rtadvd.conf.sample
 	cp kame/bgpd/bgpd.conf $(PREFIX)/etc/bgpd.conf.sample
+	cp kame/racoon/samples/racoon.conf.sample $(PREFIX)/etc/
+	cp kame/racoon/samples/psk.txt.sample $(PREFIX)/etc/
 	if test -x $(PREFIX)/sbin/inet6d; then \
 		cp kame/inet6d/inet6d.conf $(PREFIX)/etc/inet6d.conf.sample; \
 	fi

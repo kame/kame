@@ -33,6 +33,10 @@ afterinstall:
 		${DESTDIR}$(PREFIX)/etc/rtadvd.conf.sample
 	cp ${.CURDIR}/kame/bgpd/bgpd.conf \
 		${DESTDIR}$(PREFIX)/etc/bgpd.conf.sample
+	cp ${.CURDIR}/kame/racoon/samples/racoon.conf.sample \
+		${DESTDIR}$(PREFIX)/etc/
+	cp ${.CURDIR}/kame/racoon/samples/psk.txt.sample \
+		${DESTDIR}$(PREFIX)/etc/
 	if test -x ${DESTDIR}$(PREFIX)/sbin/inet6d || \
 	test -x ${DESTDIR}$(PREFIX)/sbin/inet46d; then \
 		cp ${.CURDIR}/kame/inet6d/inet6d.conf \
