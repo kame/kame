@@ -749,7 +749,7 @@ udp6_output(in6p, m, addr6, control)
 
 		udp6stat.udp6s_opackets++;
 #ifdef IPSEC
-		m->m_pkthdr.rcvif = (struct ifnet *)in6p->in6p_socket;
+		ipsec_setsocket(m, in6p->in6p_socket);
 #endif /*IPSEC*/
 		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
 			    0, in6p->in6p_moptions, NULL);
@@ -777,7 +777,7 @@ udp6_output(in6p, m, addr6, control)
 
 		udpstat.udps_opackets++;
 #ifdef IPSEC
-		m->m_pkthdr.rcvif = NULL;	/*XXX*/
+		ipsec_setsocket(m, NULL);	/*XXX*/
 #endif /*IPSEC*/
 		error = ip_output(m, NULL, &in6p->in6p_route, 0 /*XXX*/);
 		break;

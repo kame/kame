@@ -77,7 +77,6 @@ SOFTWARE.
  */
 
 #include "opt_inet.h"
-#include "opt_ipsec.h"
 #include "opt_iso.h"
 
 #ifdef INET
@@ -482,9 +481,6 @@ tpip_output_dg(m0, va_alist)
 	}
 #endif
 
-#ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
-#endif
 	error = ip_output(m, (struct mbuf *) 0, ro, IP_ALLOWBROADCAST, NULL);
 
 #ifdef ARGO_DEBUG

@@ -696,7 +696,7 @@ icmp_send(m, opts)
 		printf("icmp_send dst %x src %x\n", ip->ip_dst, ip->ip_src);
 #endif
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
+	ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 	(void) ip_output(m, opts, NULL, 0, NULL);
 }

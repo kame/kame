@@ -1022,7 +1022,7 @@ send:
 		}
 	}
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = (struct ifnet *)so;
+	ipsec_setsocket(m, so);
 #endif /*IPSEC*/
 
 	switch (af) {

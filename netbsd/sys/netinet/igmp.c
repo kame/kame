@@ -39,7 +39,6 @@
  * MULTICAST Revision: 1.3
  */
 
-#include "opt_ipsec.h"
 #include "opt_mrouting.h"
 
 #include <sys/param.h>
@@ -555,9 +554,6 @@ igmp_sendpkt(inm, type)
 	imo.imo_multicast_loop = 0;
 #endif /* MROUTING */
 
-#ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
-#endif /*IPSEC*/
 	ip_output(m, (struct mbuf *)0, (struct route *)0, IP_MULTICASTOPTS,
 	    &imo);
 

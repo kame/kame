@@ -421,11 +421,6 @@ mld6_sendpkt(in6m, type, dst)
 	}
 	mh->m_next = md;
 
-#ifdef IPSEC
-#ifndef __OpenBSD__ /*KAME IPSEC*/
-	mh->m_pkthdr.rcvif = NULL;
-#endif
-#endif 
 	mh->m_pkthdr.len = sizeof(struct ip6_hdr) + sizeof(struct mld6_hdr);
 	mh->m_len = sizeof(struct ip6_hdr);
 	MH_ALIGN(mh, sizeof(struct ip6_hdr));

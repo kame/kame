@@ -484,11 +484,6 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	nd_ns->nd_ns_cksum
 		= in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6), icmp6len);
 
-#ifdef IPSEC
-#ifndef __OpenBSD__ /*KAME IPSEC*/
-	m->m_pkthdr.rcvif = NULL;
-#endif
-#endif /*IPSEC*/
 	ip6_output(m, NULL, NULL, dad ? IPV6_DADOUTPUT : 0, &im6o, &outif);
 	if (outif) {
 		icmp6_ifstat_inc(outif, ifs6_out_msg);
@@ -874,11 +869,6 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
 	nd_na->nd_na_cksum =
 		in6_cksum(m, IPPROTO_ICMPV6, sizeof(struct ip6_hdr), icmp6len);
 
-#ifdef IPSEC
-#ifndef __OpenBSD__ /*KAME IPSEC*/
-	m->m_pkthdr.rcvif = NULL;
-#endif
-#endif /*IPSEC*/
 	ip6_output(m, NULL, NULL, 0, &im6o, &outif);
 	if (outif) {
 		icmp6_ifstat_inc(outif, ifs6_out_msg);

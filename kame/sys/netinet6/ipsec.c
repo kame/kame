@@ -3273,6 +3273,14 @@ ipsec_copypkt(m)
 					if (mnew == NULL)
 						goto fail;
 					mnew->m_pkthdr = n->m_pkthdr;
+#if 0
+					if (n->m_pkthdr.aux) {
+						mnew->m_pkthdr.aux =
+						    m_copym(n->m_pkthdr.aux,
+						    0, M_COPYALL, M_DONTWAIT);
+					}
+#endif
+					M_COPY_PKTHDR(mnew, n);
 					mnew->m_flags = n->m_flags & M_COPYFLAGS;
 				}
 				else {
@@ -3344,6 +3352,28 @@ ipsec_copypkt(m)
   fail:
 	m_freem(m);
 	return(NULL);
+}
+
+/*
+ * XXX will allocate aux mbufs and put the socket information there.
+ */
+void
+ipsec_setsocket(m, so)
+	struct mbuf *m;
+	struct socket *so;
+{
+	if ((m->m_flags & M_PKTHDR) != 0)
+		m->m_pkthdr.aux = (void *)so;
+}
+
+struct socket *
+ipsec_getsocket(m)
+	struct mbuf *m;
+{
+	if ((m->m_flags & M_PKTHDR) != 0)
+		return (struct socket *)m->m_pkthdr.aux;
+	else
+		return NULL;
 }
 
 #ifdef __bsdi__

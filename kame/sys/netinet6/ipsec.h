@@ -406,6 +406,8 @@ extern int ipsec6_tunnel_validate __P((struct ip6_hdr *, u_int,
 	struct secasvar *));
 #endif
 extern struct mbuf *ipsec_copypkt __P((struct mbuf *));
+extern void ipsec_setsocket __P((struct mbuf *, struct socket *));
+extern struct socket *ipsec_getsocket __P((struct mbuf *));
 
 #if defined(__bsdi__) || defined(__NetBSD__)
 extern int ipsec_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));

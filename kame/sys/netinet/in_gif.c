@@ -36,9 +36,6 @@
 #endif
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
-#ifdef __NetBSD__	/*XXX*/
-#include "opt_ipsec.h"
-#endif
 #endif
 
 #include <sys/param.h>
@@ -227,11 +224,6 @@ in_gif_output(ifp, family, m, rt)
 #endif 
 	}
 
-#ifdef IPSEC
-#ifndef __OpenBSD__	/*KAME IPSEC*/
-	m->m_pkthdr.rcvif = NULL;
-#endif
-#endif /*IPSEC*/
 #ifndef __OpenBSD__
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);
 #else

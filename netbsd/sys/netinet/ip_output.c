@@ -183,7 +183,7 @@ ip_output(m0, va_alist)
 	int rv;
 #endif /* PFIL_HOOKS */
 #ifdef IPSEC
-	struct socket *so = (struct socket *)m->m_pkthdr.rcvif;
+	struct socket *so;
 	struct secpolicy *sp = NULL;
 #endif /*IPSEC*/
 
@@ -199,7 +199,8 @@ ip_output(m0, va_alist)
 	va_end(ap);
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = NULL;
+	so = ipsec_getsocket(m);
+	ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 
 #ifdef	DIAGNOSTIC

@@ -206,11 +206,6 @@ in6_gif_output(ifp, family, m, rt)
 #endif
 	}
 	
-#ifdef IPSEC
-#ifndef __OpenBSD__ /*KAME IPSEC*/
-	m->m_pkthdr.rcvif = NULL;
-#endif
-#endif /*IPSEC*/
 	return(ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL));
 }
 
