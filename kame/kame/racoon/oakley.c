@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.15 2000/02/16 03:45:34 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.16 2000/02/16 04:31:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1107,7 +1107,7 @@ oakley_validate_auth(iph1)
 					idstr, CERTFILE);
 				YIPSDEBUG(DEBUG_CERT,
 					plog(logp, LOCATION, NULL,
-						"filename: %s", path));
+						"filename: %s\n", path));
 				cert = eay_get_x509cert(path);
 				break;
 			default:
@@ -1246,7 +1246,7 @@ oakley_getmycert(iph1)
 			s_ipsecdoi_ident(iph1->rmconf->identtype),
 			idstr, CERTFILE);
 		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "filename: %s", path));
+			plog(logp, LOCATION, NULL, "filename: %s\n", path));
 		cert = eay_get_x509cert(path);
 		break;
 	default:
@@ -1306,7 +1306,7 @@ oakley_getsign(iph1)
 			s_ipsecdoi_ident(iph1->rmconf->identtype),
 			idstr, PRIVKEYFILE);
 		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "filename: %s", path));
+			plog(logp, LOCATION, NULL, "filename: %s\n", path));
 		privkey = eay_get_asn1privkey(path);
 		if (privkey == NULL) {
 			plog(logp, LOCATION, NULL,
