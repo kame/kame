@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.257 1999/11/05 00:45:18 itojun Exp $
+$Id: CHANGELOG,v 1.258 1999/11/05 01:42:37 itojun Exp $
 
 <199911>
+Fri Nov  5 10:41:26 JST 1999  itojun@iijlab.net
+	* netbsd/sys/dev/pcmcia/if_awi_pcmcia.c (and others):
+	  bring in awk driver for BayStack 650 card from NetBSD-currnt.
+	  we need this for IETF washington DC:-)
+
 Fri Nov  5 01:22:42 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet: rename in_cksum4() into in4_cksum(), to match
 	  in6_cksum().
