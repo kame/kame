@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.26 2000/04/18 08:00:33 itojun Exp $
+$Id: COVERAGE,v 1.27 2000/04/19 06:57:23 itojun Exp $
 
 
 x: supported/integrated
@@ -104,7 +104,7 @@ source address selection
 		latest	feb00	feb00	nov99	notyet	notyet	nov99
 					+ sitelocal		+ sitelocal
 
-6to4 intface	x	-	-	gifhack	notyet	notyet	gifhack
+6to4 intface	x	x	-	gifhack	notyet	notyet	gifhack
 
 basic userland	x	x	x	x	notyet	notyet	x
 
