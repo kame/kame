@@ -139,6 +139,7 @@
 #include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/ip6protosw.h>
 #endif
 
 #include <netinet/tcp.h>
@@ -1055,12 +1056,10 @@ tcp6_notify(in6p, error)
 
 #if defined(INET6) && !defined(TCP6)
 void
-tcp6_ctlinput(cmd, sa, ip6, m, off)
+tcp6_ctlinput(cmd, sa, d)
 	int cmd;
 	struct sockaddr *sa;
-	register struct ip6_hdr *ip6;
-	struct mbuf *m;
-	int off;
+	void *d;
 {
 	register struct tcphdr *thp;
 	struct tcphdr th;
@@ -1068,22 +1067,42 @@ tcp6_ctlinput(cmd, sa, ip6, m, off)
 	int nmatch;
 	extern struct in6_addr zeroin6_addr;	/* netinet6/in6_pcb.c */
 	struct sockaddr_in6 sa6;
+	register struct ip6_hdr *ip6;
+	struct mbuf *m;
+	int off;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
 		return;
-	if (cmd == PRC_QUENCH)
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return;
+	else if (cmd == PRC_QUENCH) {
+		/* XXX there's no PRC_QUENCH in IPv6 */
 		notify = tcp6_quench;
+	} else if (PRC_IS_REDIRECT(cmd))
+		notify = in6_rtchange, d = NULL;
 	else if (cmd == PRC_MSGSIZE)
-		notify = tcp6_mtudisc;
-	else if (!PRC_IS_REDIRECT(cmd) &&
-		 ((unsigned)cmd > PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
+		notify = tcp6_mtudisc, d = NULL;
+	else if (cmd == PRC_HOSTDEAD)
+		d = NULL;
+	else if (inet6ctlerrmap[cmd] == 0)
 		return;
 
 	/* translate addresses into internal form */
 	sa6 = *(struct sockaddr_in6 *)sa;
 	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr))
 		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+
+	/* if the parameter is from icmp6, decode it. */
+	if (d != NULL) {
+		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		m = ip6cp->ip6c_m;
+		ip6 = ip6cp->ip6c_ip6;
+		off = ip6cp->ip6c_off;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+	}
 
 	if (ip6) {
 		/*

@@ -151,8 +151,7 @@ struct	udp6stat {
 struct	in6pcb udb6;
 struct	udp6stat udp6stat;
 
-void	udp6_ctlinput __P((int, struct sockaddr *, struct ip6_hdr *,
-			   struct mbuf *, int));
+void	udp6_ctlinput __P((int, struct sockaddr *, void *));
 void	udp6_init __P((void));
 int	udp6_input __P((struct mbuf **, int *, int));
 int	udp6_output __P((struct in6pcb *,

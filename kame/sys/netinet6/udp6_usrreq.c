@@ -97,6 +97,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
 #include <netinet6/udp6_var.h>
+#include <netinet6/ip6protosw.h>
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -473,28 +474,41 @@ udp6_notify(in6p, errno)
 }
 
 void
-udp6_ctlinput(cmd, sa, ip6, m, off)
+udp6_ctlinput(cmd, sa, d)
 	int cmd;
 	struct sockaddr *sa;
-	register struct ip6_hdr *ip6;
-	struct mbuf *m;
-	int off;
+	void *d;
 {
 	register struct udphdr *uhp;
 	struct udphdr uh;
 	struct sockaddr_in6 sa6;
+	register struct ip6_hdr *ip6;
+	struct mbuf *m;
+	int off;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
 		return;
+
 #if 0
 	if (cmd == PRC_IFNEWADDR)
 		in6_mrejoin(&udb6);
-	else
+	} else
 #endif
 	if (!PRC_IS_REDIRECT(cmd) &&
 	    ((unsigned)cmd >= PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
 		return;
+
+	/* if the parameter is from icmp6, decode it. */
+	if (d != NULL) {
+		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		m = ip6cp->ip6c_m;
+		ip6 = ip6cp->ip6c_ip6;
+		off = ip6cp->ip6c_off;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+	}
 
 	/* translate addresses into internal form */
 	sa6 = *(struct sockaddr_in6 *)sa;

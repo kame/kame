@@ -83,6 +83,16 @@ struct ip6_hdr;
 struct pr_usrreqs;
 #endif
 
+/*
+ * argument type for the last arg of pr_ctlinput().
+ * should be consulted only with AF_INET6 family.
+ */
+struct ip6ctlparam {
+	struct mbuf *ip6c_m;		/* start of mbuf chain */
+	struct ip6_hdr *ip6c_ip6;	/* ip6 header of target packet */
+	int ip6c_off;			/* offset of the target proto header */
+};
+
 struct ip6protosw {
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 	short 	pr_type;		/* socket type used for */
@@ -103,8 +113,7 @@ struct ip6protosw {
 			__P((struct mbuf *, ...));
 #endif
 	void	(*pr_ctlinput)		/* control input (from below) */
-			__P((int, struct sockaddr *, struct ip6_hdr *,
-				struct mbuf *, int));
+			__P((int, struct sockaddr *, void *));
 	int	(*pr_ctloutput)		/* control output (from above) */
 			__P((int, struct socket *, int, int, struct mbuf **));
 

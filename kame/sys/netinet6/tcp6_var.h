@@ -391,8 +391,7 @@ int	 tcp6_attach __P((struct socket *));
 void	 tcp6_canceltimers __P((struct tcp6cb *));
 struct tcp6cb *
 	 tcp6_close __P((struct tcp6cb *));
-void	 tcp6_ctlinput __P((int, struct sockaddr *, struct ip6_hdr *,
-			    struct mbuf *, int));
+void	 tcp6_ctlinput __P((int, struct sockaddr *, void *));
 int	 tcp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 struct tcp6cb *
 	 tcp6_disconnect __P((struct tcp6cb *));

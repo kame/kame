@@ -735,13 +735,12 @@ icmp6_input(mp, offp, proto)
 
 		/* Detect the upper level protocol */
 	    {
-		void (*ctlfunc) __P((int, struct sockaddr *,
-				     struct ip6_hdr *,
-				     struct mbuf *, int)); /* XXX */
+		void (*ctlfunc) __P((int, struct sockaddr *, void *));
 		struct ip6_hdr *eip6 = (struct ip6_hdr *)(icmp6 + 1);
 		u_int8_t nxt = eip6->ip6_nxt;
 		int eoff = off + sizeof(struct icmp6_hdr) +
 			sizeof(struct ip6_hdr);
+		struct ip6ctlparam ip6cp;
 
 		while (1) { /* XXX: should avoid inf. loop explicitly? */
 			struct ip6_ext *eh;
@@ -774,14 +773,14 @@ icmp6_input(mp, offp, proto)
 		}
 	    notify:
 		icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
-		ctlfunc = (void (*) __P((int, struct sockaddr *,
-					 struct ip6_hdr *,
-					 struct mbuf *, int)))
+		ctlfunc = (void (*) __P((int, struct sockaddr *, void *)))
 			(inet6sw[ip6_protox[nxt]].pr_ctlinput);
-		if (ctlfunc)
-			(*ctlfunc)(code, (struct sockaddr *)&icmp6src,
-				   (struct ip6_hdr *)(icmp6 + 1),
-				   m, eoff);
+		if (ctlfunc) {
+			ip6cp.ip6c_m = m;
+			ip6cp.ip6c_ip6 = (struct ip6_hdr *)(icmp6 + 1);
+			ip6cp.ip6c_off = eoff;
+			(*ctlfunc)(code, (struct sockaddr *)&icmp6src, &ip6cp);
+		}
 	    }
 		break;
 
@@ -1592,7 +1591,7 @@ icmp6_redirect_input(m, off)
 	/* finally update cached route in each socket via pfctlinput */
     {
 	struct sockaddr_in6 sdst;
-#if 0
+#if 1
 #else
 	struct ip6protosw *pr;
 #endif
@@ -1601,7 +1600,7 @@ icmp6_redirect_input(m, off)
 	sdst.sin6_family = AF_INET6;
 	sdst.sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&reddst6, &sdst.sin6_addr, sizeof(struct in6_addr));
-#if 0
+#if 1
 	pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&sdst);
 #else
 	/*

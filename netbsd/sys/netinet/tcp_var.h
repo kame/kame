@@ -617,8 +617,7 @@ void	 tcp_canceltimers __P((struct tcpcb *));
 struct tcpcb *
 	 tcp_close __P((struct tcpcb *));
 #if defined(INET6) && !defined(TCP6)
-void	 tcp6_ctlinput __P((int, struct sockaddr *, struct ip6_hdr *,
-		struct mbuf *, int));
+void	 tcp6_ctlinput __P((int, struct sockaddr *, void *));
 #endif
 void	 *tcp_ctlinput __P((int, struct sockaddr *, void *));
 int	 tcp_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
