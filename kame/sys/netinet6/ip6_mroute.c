@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.79 2002/09/15 07:32:49 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.80 2002/09/15 09:47:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -711,7 +711,7 @@ add_m6if(mifcp)
 			reg_mif_num = mifcp->mif6c_mifi;
 			if (inet6domain.dom_ifattach) {
 				ifp->if_afdata[AF_INET6]
-				    = inet6domain.dom_ifattach(&ifp);
+				    = inet6domain.dom_ifattach(ifp);
 			}
 		}
 
