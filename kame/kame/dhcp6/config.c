@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.8 2002/05/08 15:53:18 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.9 2002/05/08 17:40:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -494,6 +494,8 @@ clear_hostconf(hlist)
 			np = TAILQ_NEXT(p, link);
 			free(p);
 		}
+		if (host->duid.duid_id)
+			free(host->duid.duid_id);
 		free(host);
 	}
 }
