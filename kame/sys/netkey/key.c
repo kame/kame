@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.323 2004/01/13 22:58:25 itojun Exp $	*/
+/*	$KAME: key.c,v 1.324 2004/01/14 04:10:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4601,6 +4601,9 @@ key_timehandler(arg)
 			}
 		}
 	}
+
+	/* invalidate all cached SPD pointers on pcb */
+	ipsec_invalpcbcacheall();
     }
 
 	/* SAD */
