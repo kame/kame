@@ -62,7 +62,6 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
-#include <netkey/key_debug.h>
 #endif /* IPSEC */
 
 struct	in_addr zeroin_addr;
