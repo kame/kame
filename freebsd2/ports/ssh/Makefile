@@ -3,7 +3,7 @@
 # Date created:		30 Jul 1995
 # Whom:			torstenb@FreeBSD.ORG
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:37:35 itojun Exp $
+# $Id: Makefile,v 1.2 2001/02/09 06:00:59 itojun Exp $
 #
 # Maximal ssh package requires YES values for
 # USE_PERL, USE_TCPWRAP
@@ -20,6 +20,8 @@ PATCHFILES=	ssh-1.2.27-IPv6-1.5-patch.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@itojun.org
+
+BROKEN=		"obsolete, security issues"
 
 # You can set USA_RESIDENT appropriately in /etc/make.conf if this bugs you..
 

@@ -3,7 +3,7 @@
 # Whom:			torstenb@FreeBSD.org
 #
 # $FreeBSD: ports/security/ssh/Makefile,v 1.90 2000/02/20 17:30:53 sumikawa Exp $
-# $KAME: Makefile,v 1.5 2000/06/25 10:58:46 sumikawa Exp $
+# $KAME: Makefile,v 1.6 2001/02/09 06:00:59 itojun Exp $
 #
 # Maximal ssh package requires YES values for
 # USE_PERL, USE_TCPWRAP
@@ -15,6 +15,8 @@ CATEGORIES=	security net #ipv6
 MASTER_SITES=	ftp://ftp.cs.hut.fi/pub/ssh/
 
 MAINTAINER=	sumikawa@kame.net
+
+BROKEN=		"obsolete, security issues"
 
 USE_AUTOCONF=	YES	# unfortunately... see comments in patch-xa for details
 
