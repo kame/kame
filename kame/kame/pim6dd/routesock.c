@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.6 2001/06/25 04:54:13 itojun Exp $	*/
+/*	$KAME: routesock.c,v 1.7 2002/06/19 16:58:37 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -225,7 +225,6 @@ k_req_incoming(source, rpfp)
     return (TRUE);
 }
 
-
 /*
  * Returns TRUE on success, FALSE otherwise. rpfinfo contains the result.
  */
@@ -243,15 +242,13 @@ getmsg(rtm, msglen, rpfinfop)
     struct sockaddr_in6 *sin6;
     vifi_t vifi;
     struct uvif *v;
-    char in6txt[INET6_ADDRSTRLEN];
     
     if (rpfinfop == (struct rpfctl *)NULL)
 	return(FALSE);
     
     sin6 = (struct sockaddr_in6 *)&so_dst;
     IF_DEBUG(DEBUG_RPF)
-	log(LOG_DEBUG, 0, "route to: %s",
-	    inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+	log(LOG_DEBUG, 0, "route to: %s", inet6_fmt(&sin6->sin6_addr));
     cp = ((char *)(rtm + 1));
     if (rtm->rtm_addrs)
 	for (i = 1; i; i <<= 1)
@@ -280,7 +277,7 @@ getmsg(rtm, msglen, rpfinfop)
 	IF_DEBUG(DEBUG_RPF)
 	    log(LOG_DEBUG, 0,
 		"No incoming interface for destination %s",
-		inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+		inet6_fmt(&sin6->sin6_addr));
 	return(FALSE);
     }
     if (dst && mask)
@@ -289,13 +286,12 @@ getmsg(rtm, msglen, rpfinfop)
 	sin6 = (struct sockaddr_in6 *)dst;
 	IF_DEBUG(DEBUG_RPF)
 	    log(LOG_DEBUG, 0, " destination is: %s",
-		inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+		inet6_fmt(&sin6->sin6_addr));
     }
     if (gate && rtm->rtm_flags & RTF_GATEWAY) {
 	sin6 = (struct sockaddr_in6 *)gate;
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0, " gateway is: %s",
-		inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+	    log(LOG_DEBUG, 0, " gateway is: %s", inet6_fmt(&sin6->sin6_addr));
 	rpfinfop->rpfneighbor = *sin6;
 
 	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
@@ -328,7 +324,7 @@ getmsg(rtm, msglen, rpfinfop)
 	IF_DEBUG(DEBUG_RPF)
 	    log(LOG_DEBUG, 0,
 		"Invalid incoming interface for destination %s, because of invalid virtual interface",
-		inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+		inet6_fmt(&sin6->sin6_addr));
 	return(FALSE);/* invalid iif */
     }
     

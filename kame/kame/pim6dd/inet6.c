@@ -1,4 +1,4 @@
-/*	$KAME: inet6.c,v 1.4 2001/08/20 08:25:37 itojun Exp $	*/
+/*	$KAME: inet6.c,v 1.5 2002/06/19 16:58:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -28,6 +28,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <netdb.h>
 
 #include "defs.h"
 
@@ -208,15 +210,28 @@ inet6_match_prefix(sa1, sa2, mask)
 char *
 inet6_fmt(struct in6_addr *addr)
 {
-	static char ip6buf[8][INET6_ADDRSTRLEN];
+	static char ip6buf[8][NI_MAXHOST];
 	static int ip6round = 0;
+	struct sockaddr_in6 sin6;
 	char *cp;
 	
 	ip6round = (ip6round + 1) & 7;
 	cp = ip6buf[ip6round];
 
-	inet_ntop(AF_INET6, addr, cp, INET6_ADDRSTRLEN);
-	return(cp);
+	memset(&sin6, 0, sizeof(sin6));
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_addr = *addr;
+	if (IN6_IS_ADDR_LINKLOCAL(addr) || IN6_IS_ADDR_MC_LINKLOCAL(addr)) {
+		sin6.sin6_scope_id = addr->s6_addr[2] << 8 | addr->s6_addr[3];
+		sin6.sin6_addr.s6_addr[2] = sin6.sin6_addr.s6_addr[3] = 0;
+	}
+
+	if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, cp,
+	    sizeof(ip6buf[ip6round]), NULL, 0, NI_NUMERICHOST))
+		return (NULL);
+	else
+		return (cp);
 }
 
 char *
@@ -271,16 +286,18 @@ inet6_mask2plen(struct in6_addr *mask)
 char *
 net6name(struct in6_addr *prefix, struct in6_addr *mask)
 {
-	static char ip6buf[8][INET6_ADDRSTRLEN + 4]; /* length of addr/plen */
+	static char ip6buf[8][NI_MAXHOST + 4]; /* length of addr/plen */
 	static int ip6round = 0;
-	char *cp;
-	char *ep;
+	char *cp, *ep, *p;
 	
 	ip6round = (ip6round + 1) & 7;
 	cp = ip6buf[ip6round];
 	ep = &ip6buf[ip6round][sizeof(ip6buf[ip6round])];
 
-	inet_ntop(AF_INET6, prefix, cp, INET6_ADDRSTRLEN);
+	p = inet6_fmt(prefix);
+	if (!p)
+		return NULL;
+	strlcpy(cp, p, sizeof(ip6buf[ip6round]));
 	cp += strlen(cp);
 	snprintf(cp, ep - cp, "/%d", inet6_mask2plen(mask));
 
