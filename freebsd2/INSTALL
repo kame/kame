@@ -1,13 +1,13 @@
 Installation procedure - FreeBSD 2.2.8
 KAME project
-$Id: INSTALL,v 1.2 1999/08/20 12:44:48 itojun Exp $
+$Id: INSTALL,v 1.3 1999/08/23 07:31:10 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
 sections - kernel build and userland build.
 
 Be sure to perform "tree preparation" procedure, described in
-../INSTALL.prepare, prior to taking the steps below.
+../INSTALL, prior to taking the steps below.
 
 
 A. Backup
