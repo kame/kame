@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)netstat.h	8.2 (Berkeley) 1/4/94
+ * $FreeBSD: src/usr.bin/netstat/netstat.h,v 1.10.2.2 2000/01/03 19:05:20 guido Exp $
  */
 
 #include <sys/cdefs.h>
@@ -41,6 +42,7 @@ int	bflag;		/* show i/f total bytes in/out */
 int	dflag;		/* show i/f dropped packets */
 int	gflag;		/* show group (multicast) routing or stats */
 int	iflag;		/* show interfaces */
+int	Lflag;		/* show listen queue lengths */
 int	lflag;		/* show routing table with use and ref */
 int	mflag;		/* show memory stats */
 int	nflag;		/* show addresses numerically */

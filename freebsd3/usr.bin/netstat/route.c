@@ -36,7 +36,7 @@
 static char sccsid[] = "From: @(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.33.2.1 1999/08/29 15:31:32 peter Exp $";
+  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.33.2.2 2000/01/25 15:29:14 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -421,8 +421,11 @@ p_sockaddr(sa, mask, flags, width)
 	    {
 		register struct sockaddr_in *sin = (struct sockaddr_in *)sa;
 
-		if (sin->sin_addr.s_addr == INADDR_ANY)
-			cp = "default";
+		if ((sin->sin_addr.s_addr == INADDR_ANY) &&
+			mask &&
+			ntohl(((struct sockaddr_in *)mask)->sin_addr.s_addr)
+				==0L)
+				cp = "default" ;
 		else if (flags & RTF_HOST)
 			cp = routename(sin->sin_addr.s_addr);
 		else if (mask)

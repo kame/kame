@@ -42,7 +42,7 @@ char const copyright[] =
 static char sccsid[] = "@(#)main.c	8.4 (Berkeley) 3/1/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.23.2.3 1999/08/29 15:31:31 peter Exp $";
+  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.23.2.5 2000/03/20 18:34:54 guido Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -274,7 +274,7 @@ main(argc, argv)
 
 	af = AF_UNSPEC;
 
-	while ((ch = getopt(argc, argv, "Aabdf:ghI:liM:mN:np:rstuw:")) != -1)
+	while ((ch = getopt(argc, argv, "Aabdf:ghI:ilLM:mN:np:rstuw:")) != -1)
 		switch(ch) {
 		case 'A':
 			Aflag = 1;
@@ -331,6 +331,9 @@ main(argc, argv)
 			break;
 		case 'l':
 			lflag = 1;
+			break;
+		case 'L':
+			Lflag = 1;
 			break;
 		case 'M':
 			memf = optarg;
@@ -516,7 +519,7 @@ main(argc, argv)
 		for (tp = isoprotox; tp->pr_name; tp++)
 			printproto(tp, tp->pr_name);
 #endif
-	if ((af == AF_UNIX || af == AF_UNSPEC) && !sflag)
+	if ((af == AF_UNIX || af == AF_UNSPEC) && !Lflag && !sflag)
 		unixpr();
 	exit(0);
 }
@@ -663,7 +666,7 @@ static void
 usage()
 {
 	(void)fprintf(stderr, "%s\n%s\n%s\n%s\n",
-"usage: netstat [-Aan] [-f address_family] [-M core] [-N system]",
+"usage: netstat [-AaLn] [-f address_family] [-M core] [-N system]",
 "       netstat [-bdghimnrs] [-f address_family] [-M core] [-N system]",
 "       netstat [-bdn] [-I interface] [-M core] [-N system] [-w wait]",
 "       netstat [-M core] [-N system] [-p protocol]");

@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.bin/fetch/http.c,v 1.24.2.4 1999/08/29 15:27:37 peter Exp $
+ * $FreeBSD: src/usr.bin/fetch/http.c,v 1.24.2.5 2000/03/20 15:45:19 cracauer Exp $
  */
 
 #include <sys/types.h>
@@ -1056,7 +1056,12 @@ spewerror:
 		goto out;
 
 	status = errno;		/* save errno for warn(), below, if needed */
-	display(fs, total_length, -1); /* do here in case we have to warn */
+	if (display(fs, total_length, -1) != 0) {
+		/* Check for truncated file */
+		errno = status;
+		status = EX_PROTOCOL;
+		goto out;
+	}
 	errno = status;
 
 	if (ferror(remote)) {
