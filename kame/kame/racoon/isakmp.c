@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.127 2001/02/02 12:17:23 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.128 2001/03/05 01:59:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -426,7 +426,7 @@ isakmp_main(msg, remote, local)
 		/* call main process of phase 1 */
 		if (ph1_main(iph1, msg) < 0) {
 			plog(LLV_ERROR, LOCATION, iph1->remote,
-				"delete phase1 handler due to error.\n");
+				"phase1 negotiation failed.\n");
 			remph1(iph1);
 			delph1(iph1);
 			return -1;
@@ -519,7 +519,7 @@ isakmp_main(msg, remote, local)
 		/* call main process of quick mode */
 		if (quick_main(iph2, msg) < 0) {
 			plog(LLV_ERROR, LOCATION, iph1->remote,
-				"delete phase2 handler due to error.\n");
+				"phase2 negotiation failed.\n");
 			unbindph12(iph2);
 			remph2(iph2);
 			delph2(iph2);
@@ -1367,7 +1367,7 @@ isakmp_ph1resend(iph1)
 	iph1->retry_counter--;
 	if (iph1->retry_counter < 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"give up phase1 negotiation %s\n",
+			"phase1 negotiation failed due to time up. %s\n",
 			isakmp_pindex(&iph1->index, iph1->msgid));
 
 		remph1(iph1);
@@ -1403,7 +1403,7 @@ isakmp_ph2resend(iph2)
 	iph2->retry_counter--;
 	if (iph2->retry_counter < 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"give up phase2 negotiation %s\n",
+			"phase2 negotiation failed due to time up. %s\n",
 				isakmp_pindex(&iph2->ph1->index, iph2->msgid));
 		unbindph12(iph2);
 		remph2(iph2);
@@ -1660,9 +1660,8 @@ isakmp_chkph1there(iph2)
 
 	iph2->retry_checkph1--;
 	if (iph2->retry_checkph1 < 0) {
-		/* give up phase 1 */
 		plog(LLV_ERROR, LOCATION, iph2->dst,
-			"give up to wait isakmp-sa negotiation.\n");
+			"phase1 negotiation failed due to time up. %s\n");
 		plog(LLV_INFO, LOCATION, NULL,
 			"delete phase 2 handler.\n");
 
