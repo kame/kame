@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.15 2002/01/10 13:10:04 jinmei Exp $ */
+/*	$KAME: common.c,v 1.16 2002/04/19 07:36:46 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -184,10 +184,8 @@ dump_localopt(s, socktype, proto)
 	optlen = sizeof(optbuf);
 	if (getsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU, optbuf, &optlen))
 		warn("getsockopt(IPV6_USE_MIN_MTU)");
-	else if (optlen == sizeof(int)) {
-		printf("IPV6_USE_MIN_MTU: %s\n",
-		       *(int *)optbuf ? "on" : "off");
-	}
+	else if (optlen == sizeof(int))
+		printf("IPV6_USE_MIN_MTU: %d\n", *(int *)optbuf);
 	else
 		warnx("IPV6_USE_MIN_MTU: invalid option length: %d", optlen);
 #endif

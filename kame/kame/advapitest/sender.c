@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.28 2002/02/05 03:10:24 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.29 2002/04/19 07:36:46 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -86,7 +86,8 @@ main(argc, argv)
 	char *e, *databuf, *stickybuf;
 	int stickylen;
 	int datalen = 1, ch;
-	int minmtu = -1, stickyminmtu = -1;
+	int Mflag = 0, sMflag = 0;
+	int minmtu, stickyminmtu;
 	int dontfrag = -1, stickydontfrag = -1;
 	struct addrinfo hints, *res;
 	extern int optind;
@@ -149,11 +150,19 @@ main(argc, argv)
 			break;
 		case 'M':
 			STICKYCHECK;
-			if (sticky)
-				stickyminmtu = atoi(optarg);
-			else
-				minmtu = atoi(optarg);
-			break;
+			if (sticky) {
+				sMflag++;
+				if (*optarg == 'd')
+					stickyminmtu = -1;
+				else
+					stickyminmtu = atoi(optarg);
+			} else {
+				Mflag++;
+				if (*optarg == 'd')
+					minmtu = -1;
+				else
+					minmtu = atoi(optarg);
+			} break;
 		case 'm':
  			mflag++;
 			break;
@@ -212,7 +221,7 @@ main(argc, argv)
 	}
 	if (dontfrag >= 0)
 		ip6optlen += CMSG_SPACE(sizeof(int));
-	if (minmtu >= 0)
+	if (Mflag)
 		ip6optlen += CMSG_SPACE(sizeof(int));
 	if (tclassp)
 		ip6optlen += CMSG_SPACE(sizeof(int));
@@ -425,7 +434,7 @@ main(argc, argv)
 #endif
 
 #ifdef IPV6_USE_MIN_MTU
-	if (minmtu >= 0) {
+	if (Mflag) {
 		cmsgp->cmsg_len = CMSG_LEN(sizeof(int));
 		cmsgp->cmsg_level = IPPROTO_IPV6;
 		cmsgp->cmsg_type = IPV6_USE_MIN_MTU;
@@ -434,7 +443,7 @@ main(argc, argv)
 		*(int *)CMSG_DATA(cmsgp) = minmtu;
 		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
 	}
-	if (stickyminmtu >= 0) {
+	if (sMflag) {
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
 			       &stickyminmtu, sizeof(int)) != 0) {
 			err(1, "setsockopt(IPV6_USE_MIN_MTU)");
@@ -629,11 +638,11 @@ usage()
 		"usage: sender [-c] (connect socket)\n"
 		"              [-d dstoptlen] [-d sticky sticky_dstoptlen]\n"
 		"              [-D rhdstoptlen] [-D sticky sticky_rhdstoptlen]\n"
-		"              [-f [01]] [-f sticky [01]] (dontfrag flag)\n"
+		"              [-f (0|1)] [-f sticky (0|1)] (dontfrag flag)\n"
 		"              [-h hbhoptlen] [-h sticky sticky_hbhoptlen]\n"
 		"              [-l hoplimit] [-l sticky sticky_hoplimit]\n"
 		"              [-m] (enable recvpathmtu)\n"
-		"              [-M [01]] [-M sticky [01]] (minmtu flag)\n"
+		"              [-M (d|0|1)] [-M sticky (d|0|1)] (minmtu flag)\n"
 		"              [-n nexthop] [-n sticky sticky_nexthop]\n"
 		"              [-P] (get current path MTU)\n"
 		"              [-p portnum|\'echo\']\n"
