@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.159 2003/05/23 06:18:18 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.160 2003/05/23 06:24:31 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2215,6 +2215,15 @@ ahmismatch:
 	 && !attrseen[IPSECDOI_ATTR_AUTH]) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"attr AUTH must be present for AH.\n", type);
+		return -1;
+	}
+
+	if (proto_id == IPSECDOI_PROTO_IPSEC_ESP
+	 && trns->t_id == IPSECDOI_ESP_NULL
+	 && !attrseen[IPSECDOI_ATTR_AUTH]) {
+		plog(LLV_ERROR, LOCATION, NULL,
+		    "attr AUTH must be present "
+		    "for ESP NULL encryption.\n");
 		return -1;
 	}
 
