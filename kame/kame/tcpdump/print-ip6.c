@@ -128,10 +128,12 @@ ip6_print(register const u_char *bp, register int length)
 			nh = *cp;
 			break;
 		case IPPROTO_TCP:
-			tcp_print(cp, len, (const u_char *)ip6);
+			tcp_print(cp, len + sizeof(struct ip6_hdr) - (cp - bp),
+				(const u_char *)ip6);
 			goto end;
 		case IPPROTO_UDP:
-			udp_print(cp, len, (const u_char *)ip6);
+			udp_print(cp, len + sizeof(struct ip6_hdr) - (cp - bp),
+				(const u_char *)ip6);
 			goto end;
 		case IPPROTO_ICMPV6:
 			icmp6_print(cp, (const u_char *)ip6);
