@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.h,v 1.10 2000/01/11 05:24:50 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.h,v 1.11 2000/01/18 04:59:32 sakane Exp $ */
 
 /* refer to RFC 2408 */
 
@@ -99,8 +99,9 @@ struct isakmp {
 #define ISAKMP_ETYPE_AGG	4	/* Aggressive */
 #define ISAKMP_ETYPE_INFO	5	/* Informational */
 /* Additional Exchange Type */
-#define ISAKMP_ETYPE_QUICK	32
-#define ISAKMP_ETYPE_NEWGRP	33
+#define ISAKMP_ETYPE_QUICK	32	/* Quick Mode */
+#define ISAKMP_ETYPE_NEWGRP	33	/* New group Mode */
+#define ISAKMP_ETYPE_ACKINFO	34	/* Acknowledged Informational */
 
 /* Flags */
 #define ISAKMP_FLAG_E 0x01 /* Encryption Bit */
