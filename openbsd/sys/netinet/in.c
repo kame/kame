@@ -693,6 +693,8 @@ in_ifinit(ifp, ia, sin, scrub)
 	register u_int32_t i = sin->sin_addr.s_addr;
 	struct sockaddr_in oldaddr;
 	int s = splimp(), flags = RTF_UP, error;
+	int ifacount;
+	struct ifaddr *ifa;
 
 	oldaddr = ia->ia_addr;
 	ia->ia_addr = *sin;
@@ -701,7 +703,15 @@ in_ifinit(ifp, ia, sin, scrub)
 	 * if this is its first address,
 	 * and to validate the address if necessary.
 	 */
-	if (ifp->if_ioctl &&
+	ifacount = 0;
+	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next) {
+		if (ifa->ifa_addr == NULL)
+			continue;
+		if (ifa->ifa_addr->sa_family != AF_INET)
+			continue;
+		ifacount++;
+	}
+	if (ifacount <= 1 && ifp->if_ioctl &&
 	    (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (caddr_t)ia))) {
 		ia->ia_addr = oldaddr;
 		splx(s);
