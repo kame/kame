@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.7 2002/08/08 07:18:01 k-sugyou Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.8 2002/09/06 10:27:55 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -200,7 +200,7 @@ mip6_bu_fsm(mbu, event, data)
 				/*
 				 * start retrans timer.
 				 */
-				
+
 				/* XXX */
 
 				*mbu_fsm_state = MIP6_BU_FSM_STATE_WAITA;

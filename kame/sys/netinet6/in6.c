@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.300 2002/09/06 05:48:41 suz Exp $	*/
+/*	$KAME: in6.c,v 1.301 2002/09/06 10:27:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3146,7 +3146,7 @@ in6_delmulti(in6m)
 #endif
 	struct ifmultiaddr *ifma = in6m->in6m_ifma;
 	int	s = splnet();
-	
+
 #ifdef MLDV2
 	if ((mode == MCAST_INCLUDE) && (numsrc == 0)) {
 		*error = EINVAL;

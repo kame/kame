@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.147 2002/08/22 07:13:52 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.148 2002/09/06 10:27:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -342,7 +342,7 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 				:  icmp6->icmp6_pptr -
 					(sizeof(struct ip6_hdr) - sizeof(struct ip));
 		}
-		
+
 		natpt_icmp6MimicPayload(cv6, &cv4, pad);
 		break;
 
@@ -629,7 +629,7 @@ natpt_revertICMPv6To4address(struct pcv *cv6, struct mbuf *m4)
 		if ((sin4 = natpt_reverseLookForRule6(&sin6)) != NULL) {
 			u_short		ip_sum;
 			struct in_addr	ip_old, ip_new;
-			
+
 			ip_sum = icmpip4->ip_sum;
 			ip_old = icmpip4->ip_dst;
 			ip_new = sin4->sin_addr;
@@ -1258,7 +1258,7 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 		icmpip6->ip6_src  = pad->in6src;
 		icmpip6->ip6_dst  = pad->in6dst;
 	}
-	
+
 #endif
 
 	switch (cv4->pyld.icmp4->icmp_type) {

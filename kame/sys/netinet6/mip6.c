@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.163 2002/09/05 09:50:10 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.164 2002/09/06 10:27:54 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1567,7 +1567,7 @@ mip6_ioctl(cmd, data)
 		bcopy(&mr->mip6r_ru.mip6r_ifnames, &mip6_preferred_ifnames,
 		    sizeof(mr->mip6r_ru.mip6r_ifnames));
 	}
-		
+
 		break;
 	}
 
@@ -2602,7 +2602,7 @@ mip6_update_nonce_nodekey(ignored_arg)
 	nonce_index++;
 	if (++nonce_head >= mip6_nonce + MIP6_NONCE_HISTORY)
 		nonce_head = mip6_nonce;
-	
+
 	mip6_create_nonce(nonce_head);
 	mip6_create_nodekey(mip6_nodekey + (nonce_head - mip6_nonce));
 
@@ -2618,10 +2618,10 @@ mip6_get_nonce(index, nonce)
 
 	if (offset > 0)
 		return (-1);
-	
+
 	if (nonce_head + offset >= mip6_nonce + MIP6_NONCE_HISTORY)
 		offset = offset - MIP6_NONCE_HISTORY;
-	
+
 	if (nonce_head + offset < mip6_nonce)
 		return (-1);
 
@@ -2639,10 +2639,10 @@ mip6_get_nodekey(index, nodekey)
 
 	if (offset > 0)
 		return (-1);
-	
+
 	if (nonce_head + offset >= mip6_nonce + MIP6_NONCE_HISTORY)
 		offset = offset - MIP6_NONCE_HISTORY;
-	
+
 	if (nonce_head + offset < mip6_nonce)
 		return (-1);
 
@@ -2791,7 +2791,7 @@ mip6_get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 
 #define check_mopt_len(mopt_len)	\
 	if (*(mh + 1) != mopt_len) goto bad;
-  
+
 	while (mh < mhend) {
 		valid_option = 0;
 		switch (*mh) {
@@ -2834,13 +2834,13 @@ mip6_get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 				 */
 				break;
 		}
-		
+
 		mh += *(mh + 1) + 2;
 		mopt->valid_options |= valid_option;
 	}
 
 #undef check_mopt_len
-	
+
 	return (0);
 
  bad:
@@ -2858,7 +2858,7 @@ mip6_create_cookie(addr, nodekey, nonce, cookie)
 	/* cookie = MAC_Kcn(saddr | nonce) */
 	HMAC_CTX hmac_ctx;
 	u_int8_t result[HMACSIZE];
-	
+
 	hmac_init(&hmac_ctx, (u_int8_t *)nodekey,
 		  sizeof(mip6_nodekey_t), HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)addr, sizeof(struct in6_addr));

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.129 2002/09/06 10:05:30 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.130 2002/09/06 10:27:55 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2075,7 +2075,7 @@ mip6_bc_register(hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
 			 __FILE__, __LINE__));
 		return (ENOMEM);
 	}
-	
+
 	return (mip6_bc_list_insert(&mip6_bc_list, mbc));
 }
 
@@ -2126,7 +2126,7 @@ mip6_bc_delete(mbc)
 		/* There was no Binding Cache entry */
 		/* Is there someting to do ? */
 	}
-		
+
 	return (0);
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.1 2002/09/05 08:09:36 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.2 2002/09/06 10:27:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -867,7 +867,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 	free_source_list_2:
 		in6_free_msf_source_list(in6mm_src->i6ms_cur->head);
 		in6mm_src->i6ms_cur->numsrc = 0;
-	
+
 	change_state_2:
 		*newmode = MCAST_INCLUDE;
 		*newnumsrc = 0;
@@ -2788,7 +2788,7 @@ in6_cleanmopt_source_addr(msf, optname)
 	    optname != MCAST_BLOCK_SOURCE &&
 	    optname != MCAST_UNBLOCK_SOURCE)
 		return;
-	
+
 	in_cleanmopt_source_addr(msf, optname);
 }
 
@@ -2815,7 +2815,7 @@ static void
 print_in6_addr_slist(struct in6_addr_slist *ias, char *heading)
 {
 	struct in6_addr_source *tmp;
-	
+
 	if (ias == NULL) {
 		log(LOG_DEBUG, "\t\t%s(none)\n", heading);
 		return;
@@ -2828,7 +2828,7 @@ print_in6_addr_slist(struct in6_addr_slist *ias, char *heading)
 		    ip6_sprintf(&dummy), tmp->i6as_refcount);
 	}
 }
-	
+
 void
 dump_in6_multisrc(void)
 {

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.327 2002/09/06 05:50:41 sakane Exp $	*/
+/*	$KAME: ip6_output.c,v 1.328 2002/09/06 10:27:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3862,7 +3862,7 @@ ip6_setmoptions(optname, im6op, m)
 			error = EADDRINUSE;
 			break;
 		}
-		
+
 		/* ToDo: upper limit */
 
 		/*
@@ -3913,9 +3913,9 @@ ip6_setmoptions(optname, im6op, m)
 			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
 				break;
 		}
-		
+
 		/* ToDo: upper limit check */
-		
+
 		if (imm != NULL) {
 			/*
 			 * If Any-Source join was already requested, return

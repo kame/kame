@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.58 2002/09/06 06:21:07 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.59 2002/09/06 10:27:55 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -643,7 +643,7 @@ mld6_input(m, off)
 			    IPV6_ADDR_MC_SCOPE(&in6m->in6m_sa.sin6_addr) <
 			    IPV6_ADDR_SCOPE_LINKLOCAL)
 				continue;
-     
+
 			if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
 			    !IN6_ARE_ADDR_EQUAL(&mldh->mld_addr,
 						&in6m->in6m_sa.sin6_addr))
@@ -1076,7 +1076,7 @@ mld_sendbuf(mh, ifp)
 	struct mbuf *md;
 	struct in6_ifaddr *ia = NULL;
 	struct sockaddr_in6 src_sa, dst_sa;
- 
+
 #ifdef IFT_VRRP
 	if (ifp->if_type == IFT_VRRP) {
 		ifp = ((struct ifvrrp *)ifp->if_softc)->ifv_p;

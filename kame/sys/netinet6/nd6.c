@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.296 2002/09/05 08:09:37 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.297 2002/09/06 10:27:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2097,7 +2097,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		return ((*sc->hif_if.if_output)((struct ifnet *)sc, m,
 		    (struct sockaddr *)dst, rt));
 	}
-		
+
 #endif /* MIP6 */
 
 	if (IN6_IS_ADDR_MULTICAST(&dst->sin6_addr))
@@ -2427,13 +2427,13 @@ nd6_drain()
 	int count = 0;
 	struct mbuf *mold;
 	int s;
-	
+
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
 #endif
-	
+
 	for (ln = llinfo_nd6.ln_next; ln; ln = nln) {
 		nln = ln->ln_next;
 

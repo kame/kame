@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.46 2002/09/02 06:08:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.47 2002/09/06 10:27:55 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -186,7 +186,7 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	if ((mip6_get_nonce(nonce_index, &home_nonce) != 0) ||
 	    (mip6_get_nodekey(nonce_index, &home_nodekey) != 0))
 		return (EINVAL);
-	    
+
 	MALLOC(ip6mh, struct ip6m_home_test *, ip6mh_size,
 	    M_IP6OPT, M_NOWAIT);
 	if (ip6mh == NULL)
@@ -297,7 +297,7 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	if ((mip6_get_nonce(nonce_index, &careof_nonce) != 0) ||
 	    (mip6_get_nodekey(nonce_index, &careof_nodekey) != 0))
 		return (EINVAL);
-	    
+
 	MALLOC(ip6mc, struct ip6m_careof_test *, ip6mc_size,
 	    M_IP6OPT, M_NOWAIT);
 	if (ip6mc == NULL)
@@ -312,7 +312,7 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	mip6_create_cookie(&dst->sin6_addr,
 			   &careof_nodekey, &careof_nonce,
 			   ip6mc->ip6mc_cookie);
-	
+
 	/* calculate checksum. */
 	ip6mc->ip6mc_cksum = mip6_cksum(src, dst,
 	    ip6mc_size, IPPROTO_MOBILITY, (char *)ip6mc);
@@ -566,7 +566,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		haseen = 1;
 		coa_sa.sin6_addr = ip6a->ip6a_coa;
 	}
-		
+
 	/*
 	 *              HAO          no HAO
 	 * IPseced      HR     -> o  HR     -> x
