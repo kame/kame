@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.181 2001/03/29 05:34:30 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.182 2001/04/09 06:29:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1178,8 +1178,9 @@ in6_update_ifa(ifp, ifra, ia)
 			if (error != 0) {
 				log(LOG_WARNING,
 				    "in6_update_ifa: addmulti failed for "
-				    "%s on %s\n", ip6_sprintf(&llsol), 
-				    if_name(ifp));
+				    "%s on %s (errno=%d)\n",
+				    ip6_sprintf(&llsol), if_name(ifp),
+				    error);
 				in6_purgeaddr((struct ifaddr *)ia);
 				return(error);
 			}
@@ -1226,9 +1227,9 @@ in6_update_ifa(ifp, ifra, ia)
 			if (error != 0) {
 				log(LOG_WARNING,
 				    "in6_update_ifa: addmulti failed for "
-				    "%s on %s\n",
+				    "%s on %s (errno=%d)\n",
 				    ip6_sprintf(&mltaddr.sin6_addr), 
-				    if_name(ifp));
+				    if_name(ifp), error);
 			}
 		}
 
@@ -1274,9 +1275,10 @@ in6_update_ifa(ifp, ifra, ia)
 						   &error);
 				if (error != 0) {
 					log(LOG_WARNING, "in6_update_ifa: "
-					    "addmulti failed for %s on %s\n",
+					    "addmulti failed for %s on %s "
+					    "(errno=%d)\n",
 					    ip6_sprintf(&mltaddr.sin6_addr), 
-					    if_name(ifp));
+					    if_name(ifp), error);
 				}
 			}
 		}
