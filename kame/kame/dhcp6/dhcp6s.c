@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.85 2002/05/23 11:08:57 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.86 2002/05/24 02:47:27 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -521,7 +521,7 @@ server6_recv(s)
 	 */
 	dhcp6_init_options(&optinfo);
 	if (dhcp6_get_options((struct dhcp6opt *)(dh6 + 1),
-		(struct dhcp6opt *)(rdatabuf + len), &optinfo) < 0) {
+	    (struct dhcp6opt *)(rdatabuf + len), &optinfo) < 0) {
 		dprintf(LOG_INFO, "%s" "failed to parse options", FNAME);
 		return -1;
 	}
@@ -900,7 +900,7 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 
 		/* add the prefix */
 		if (dhcp6_add_listval(&roptinfo.prefix_list, binding->val,
-			DHCP6_LISTVAL_PREFIX6) == NULL) {
+		    DHCP6_LISTVAL_PREFIX6) == NULL) {
 			dprintf(LOG_ERR, "%s" "failed to add a renewed prefix",
 			    FNAME);
 			goto fail;
