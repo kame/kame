@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2501 2003/11/06 10:40:53 suz Exp $
+$KAME: CHANGELOG,v 1.2502 2003/11/09 16:13:31 itojun Exp $
 
-<200310>
+<200311>
+Mon Nov 10 01:46:40 JST 2003  itojun@iijlab.net
+	* openbsd: upgrade to 3.4.  reboot still unconfirmed so snap kit will
+	  not be generated until reboot is confirmed.
+
 2003-11-05  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/dhcp6: changed the default values of the IA_PD and
 	and IA_PD_PREFIX option to those officially assigned by IANA.
@@ -14,6 +18,7 @@ $KAME: CHANGELOG,v 1.2501 2003/11/06 10:40:53 suz Exp $
 	* kame/sys/netinet/dccp_*, kame/sys/netinet6/dccp6_*:
 	makes DCCP compilable on netbsd.
 
+<200310>
 Wed Oct 22 18:35:16 JST 2003  itojun@iijlab.net
 	* netbsd/sys/sys/null.h: define NULL as (void *)0.  misuse of NULL as
 	  integer value will be punished with compilation error.
