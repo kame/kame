@@ -17,6 +17,6 @@ DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 
 .include <bsd.prog.mk>
 
-.if (${UVM} == "yes")
+.if defined(UVM) && (${UVM} == "yes")
 CFLAGS+=-DUVM
 .endif
