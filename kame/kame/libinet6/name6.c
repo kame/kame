@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.15 2000/03/13 12:29:43 itojun Exp $ */
+/* $Id: name6.c,v 1.16 2000/03/21 09:43:12 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -8,8 +8,6 @@
  *	use mutex for _hostconf, _hostconf_init if HOSTCONF is defined.
  *	rewrite resolvers to be thread safe
  */
-
-#define FILTER_V4MAPPED
 
 #ifdef __KAME__
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)

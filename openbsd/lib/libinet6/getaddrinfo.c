@@ -76,8 +76,6 @@
  *	  friends.
  */
 
-#define FILTER_V4MAPPED
-
 #ifndef INET6
 #define INET6
 #endif
