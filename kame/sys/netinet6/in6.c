@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.318 2002/09/26 09:26:12 t-momose Exp $	*/
+/*	$KAME: in6.c,v 1.319 2002/10/02 03:02:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1577,7 +1577,7 @@ in6_unlink_ifa(ia, ifp)
 {
 	struct in6_ifaddr *oia;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	int	s = splsoftnet();
+	int	s = splsoftnet();	/* XXX {Net,Open}BSD is splnet() */
 #else
 	int	s = splnet();
 #endif
@@ -3065,6 +3065,7 @@ in6_addmulti(maddr6, ifp, errorp)
 		 }
 		 *errorp = 0;
 #endif
+		splx(s);
 		return ifma->ifma_protospec;
 	}
 
