@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.30 2000/05/17 11:51:35 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.31 2000/05/17 11:52:54 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -1135,7 +1135,7 @@ icmp6_stats(off, name)
 
 	p(icp6s_error, "\t%llu call%s to icmp6_error\n");
 	p(icp6s_canterror,
-	    "\t%llu error%s not generated because old message was icmp or so\n");
+	    "\t%llu error%s not generated because old message was icmp6 or so\n");
 	for (first = 1, i = 0; i < 256; i++)
 		if (icmp6stat.icp6s_outhist[i] != 0) {
 			if (first) {

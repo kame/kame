@@ -847,7 +847,7 @@ icmp6_stats(off, name)
 
 	p(icp6s_error, "\t%qu call%s to icmp6_error\n");
 	p(icp6s_canterror,
-	    "\t%qu error%s not generated because old message was icmp error or so\n");
+	    "\t%qu error%s not generated because old message was icmp6 error or so\n");
 	p(icp6s_toofreq,
 	  "\t%qu error%s not generated because rate limitation\n");
 	for (first = 1, i = 0; i < 256; i++)
