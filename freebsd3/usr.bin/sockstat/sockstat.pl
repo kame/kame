@@ -56,7 +56,7 @@ open FSTAT, "fstat |" or die "'fstat' failed: $!\n";
 while (<FSTAT>) {
     ($user, $cmd, $pid, $fd, $inet, $type, $proto, $sock) = split;
     chop $fd;
-    next unless ($inet =~ m/^internet6?$/);
+    next unless ($inet =~ m/^internet6?$/) && ($type ne "raw");
     ($proto, $laddr, $faddr) =
 	($proto{$sock}, $myaddr{$sock}, $hisaddr{$sock});
     write STDOUT;
