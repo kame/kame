@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.40 2004/11/28 10:48:38 jinmei Exp $
+# $Id: Makefile.in,v 1.41 2004/11/28 13:38:22 jinmei Exp $
 #
 
 prefix=	@prefix@
@@ -104,7 +104,7 @@ install::
 	$(INSTALL_DATA) -o bin -g bin dhcp6c.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin dhcp6s.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin dhcp6relay.8 $(mandir)/man8
-	$(INSTALL_DATA) -o bin -g bin dhcp6sctl.8 $(mandir)/man8
+	$(INSTALL_DATA) -o bin -g bin dhcp6ctl.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin dhcp6c.conf.5 $(mandir)/man5
 	$(INSTALL_DATA) -o bin -g bin dhcp6s.conf.5 $(mandir)/man5
 
