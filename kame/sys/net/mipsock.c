@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.2 2005/01/21 17:30:36 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.3 2005/01/25 02:44:05 ryuji Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -350,6 +350,7 @@ mipus_output(m, va_alist)
 #if NMIP > 0
 	struct mipm_bul_info *mipu = NULL;
 	struct mip6_bul_internal *mbul = NULL;
+        struct mipm_md_info *mipmd = NULL;
 #endif
 	u_int16_t bid = 0;
 
@@ -447,8 +448,11 @@ mipus_output(m, va_alist)
 
 	case MIPM_HOME_HINT:
 	case MIPM_MD_INFO:
-		/* do nothing in kernel, just forward it to all receivers */
-		break;
+                mipmd = (struct mipm_md_info *)miph;
+                if (mipmd->mipm_md_command == MIPM_MD_SCAN) {
+                        mip6_md_scan(mipmd->mipm_md_ifindex);
+                } 
+                break;
 #endif /* NMIP > 0 */
 
 	default:

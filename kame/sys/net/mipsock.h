@@ -1,4 +1,4 @@
-/* $Id: mipsock.h,v 1.1 2004/12/09 02:18:59 t-momose Exp $ */
+/* $Id: mipsock.h,v 1.2 2005/01/25 02:44:05 ryuji Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -133,6 +133,7 @@ struct mipm_md_info {
 #define MIPM_MD_REREG 		0x01
 #define MIPM_MD_DEREGHOME 	0x02
 #define MIPM_MD_DEREGFOREIGN 	0x03
+#define MIPM_MD_SCAN            0x04
 	
 	u_char mipm_md_hint;
 #define MIPM_MD_INDEX 		0x01
