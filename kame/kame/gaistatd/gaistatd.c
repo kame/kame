@@ -1,4 +1,4 @@
-/*	$KAME: gaistatd.c,v 1.5 2001/07/20 01:22:58 itojun Exp $	*/
+/*	$KAME: gaistatd.c,v 1.6 2001/07/20 17:58:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -46,13 +46,16 @@
 #include <err.h>
 #include <stdlib.h>
 
-struct gai_orderstat
+struct gai_orderstat		/* XXX: for statistics only */
 {
-	struct timeval start;
-	struct timeval end;
+	struct timeval start0;
+	struct timeval end0;
+	struct timeval start1;
+	struct timeval end1;
 	pid_t pid;
 	int numeric;
 	int entries;
+	int rulestat[16];
 };
 
 #define PATH_STATFILE "/var/run/gaistat"
@@ -65,7 +68,7 @@ static void timeval_sub __P((struct timeval *, struct timeval *,
 int
 main()
 {
-	int s;
+	int i, s;
 	struct sockaddr_un sun;
 	struct gai_orderstat st;
 	char buf[_POSIX2_LINE_MAX];
@@ -91,7 +94,7 @@ main()
 	while(1) {
 		int cc, cnt;
 		struct sockaddr_un from;
-		struct timeval delay;
+		struct timeval delay0, delay1;
 		socklen_t fromlen;
 		static char timebuf[64], *timestr, *crp;
 		struct kinfo_proc *proc;
@@ -112,10 +115,11 @@ main()
 		if (procname == NULL)
 			procname = "???";
 
-		memset(&delay, 0, sizeof(delay));
-		timeval_sub(&st.end, &st.start, &delay);
-
-		timestr = ctime(&st.start.tv_sec);
+		memset(&delay0, 0, sizeof(delay0));
+		timeval_sub(&st.end0, &st.start0, &delay0);
+		memset(&delay1, 0, sizeof(delay1));
+		timeval_sub(&st.end1, &st.start1, &delay1);
+		timestr = ctime(&st.start0.tv_sec);
 		strncpy(timebuf, timestr, sizeof(timebuf));
 		if (timebuf[sizeof(timebuf) - 1] != '\0')
 			timebuf[sizeof(timebuf) - 1] = '\0';
@@ -125,10 +129,18 @@ main()
 		if ((fp = fopen(PATH_LOGIFLE, "a+")) == NULL)
 			continue;
 		fprintf(fp, "%s (%lu.%06lu): pid=%d, proc=%s, "
-			"delay=%lu.%06lu, numeric=%d, entries=%d\n", timebuf,
-			(u_long)st.start.tv_sec, (u_long)st.start.tv_usec,
-			st.pid, procname, (u_long)delay.tv_sec,
-			(u_long)delay.tv_usec, st.numeric, st.entries);
+			"delay0=%lu.%06lu, delay1=%lu.%06lu, numeric=%d, "
+			"entries=%d, ", timebuf,
+			(u_long)st.start0.tv_sec,
+			(u_long)st.start0.tv_usec,
+			st.pid, procname, (u_long)delay0.tv_sec,
+			(u_long)delay0.tv_usec, (u_long)delay1.tv_sec,
+			(u_long)delay1.tv_usec, st.numeric, st.entries);
+		fprintf(fp, " rulestat: ");
+		for (i = 0; i < 16; i++) {
+			fprintf(fp, "%d, ", st.rulestat[i]);
+		}
+		fputc('\n', fp);
 		fclose(fp);
 	}
 }
