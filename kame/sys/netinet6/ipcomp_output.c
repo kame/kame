@@ -143,9 +143,9 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 		return EINVAL;
 	}
 	if ((sav->flags & SADB_X_EXT_RAWCPI) == 0)
-		cpi = ntohl(sav->spi) & 0xffff;
-	else
 		cpi = sav->alg_enc;
+	else
+		cpi = ntohl(sav->spi) & 0xffff;
 	algo = &ipcomp_algorithms[sav->alg_enc];	/*XXX*/
 
 	/* compute original payload length */
