@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.167 2003/02/03 10:14:32 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.168 2003/02/05 06:02:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -135,6 +135,11 @@ static void mip6_bc_timeout(void *);
 static void mip6_bc_starttimer(void);
 static void mip6_bc_stoptimer(void);
 static int mip6_bc_encapcheck(const struct mbuf *, int, int, void *);
+
+#ifdef MIP6_HAIPSEC
+static int mip6_update_ipsecdb(struct sockaddr_in6 *,
+    struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
+#endif /* MIP6_HAIPSEC */
 
 #ifdef MIP6_CALLOUTTEST
 static struct mip6_timeout_entry *mip6_timeoutentry_insert(time_t, caddr_t);
@@ -3130,7 +3135,7 @@ mip6_route_optimize(m)
 #ifdef MIP6_HAIPSEC
 #ifdef IPSEC
 #ifndef __OpenBSD__
-int
+static int
 mip6_update_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct sockaddr_in6 *haddr;
 	struct sockaddr_in6 *ocoa;
