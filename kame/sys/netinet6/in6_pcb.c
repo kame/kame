@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.83 2001/02/07 05:04:51 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.84 2001/02/08 18:02:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -245,10 +245,17 @@ in6_pcbbind(in6p, nam)
 				return(EADDRNOTAVAIL);
 
 			/*
-			 * XXX: bind to an anycast address might accidentally
-			 * cause sending a packet with anycast source address.
-			 * We should allow to bind to a deprecated address, since
-			 * the application dare to use it.
+			 * bind to an anycast address might accidentally
+			 * cause sending a packet with anycast source address,
+			 * so we forbid it.
+			 *
+			 * We should allow to bind to a deprecated address,
+			 * since the application dare to use it.
+			 * But, can we assume that they are careful enough
+			 * to check if the address is deprecated or not?
+			 * Maybe, as a safeguard, we should have a setsockopt
+			 * flag to control the bind(2) behavior against
+			 * deprecated addresses (default: forbid bind(2)).
 			 */
 			if (ia &&
 			    ((struct in6_ifaddr *)ia)->ia6_flags &
