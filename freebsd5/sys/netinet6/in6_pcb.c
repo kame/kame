@@ -847,7 +847,7 @@ in6_pcbpurgeif0(head, ifp)
 						continue;
 					}
 					final = 1;
-					in6_delmulti(imm->i6mm_maddr, &error,
+					in6_delmulti2(imm->i6mm_maddr, &error,
 						     numsrc, del_ss, mode,
 						     final);
 					if (del_ss != NULL)
