@@ -327,8 +327,10 @@ icmp6_input(mp, offp, proto)
 	int code, sum, noff;
 	struct sockaddr_in6 icmp6src;
 
+#ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct icmp6_hdr), IPPROTO_DONE);
 	/* m might change if M_LOOP. So, call mtod after this */
+#endif
 
 	/*
 	 * Locate icmp6 structure in mbuf, and check
@@ -344,8 +346,15 @@ icmp6_input(mp, offp, proto)
 	/*
 	 * calculate the checksum
 	 */
-
+#ifndef PULLDOWN_TEST
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off, sizeof(*icmp6));
+	if (icmp6 == NULL) {
+		icmp6stat.icp6s_tooshort++;
+		return IPPROTO_DONE;
+	}
+#endif
 	code = icmp6->icmp6_code;
 
 	if ((sum = in6_cksum(m, IPPROTO_ICMPV6, off, icmp6len)) != 0) {
@@ -430,10 +439,19 @@ icmp6_input(mp, offp, proto)
 			icmp6stat.icp6s_tooshort++;
 			goto freeit;
 		}
+#ifndef PULLUP_TEST
 		IP6_EXTHDR_CHECK(m, off,
 			sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr),
 			IPPROTO_DONE);
 		icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
+#else
+		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off,
+			sizeof(*icmp6) + sizeof(struct ip6_hdr));
+		if (icmp6 == NULL) {
+			icmp6stat.icp6s_tooshort++;
+			return IPPROTO_DONE;
+		}
+#endif
 		code = PRC_MSGSIZE;
 		bzero(&sin6, sizeof(sin6));
 		sin6.sin6_family = PF_INET6;
@@ -512,8 +530,8 @@ icmp6_input(mp, offp, proto)
 			/* Give up remote */
 			break;
 		}
-		if (n->m_flags & M_EXT) {
-			int gap, move;
+		if ((n->m_flags & M_EXT) != 0
+		 || n->m_len < off + sizeof(struct icmp6_hdr)) {
 			struct mbuf *n0 = n;
 
 			/*
@@ -527,8 +545,6 @@ icmp6_input(mp, offp, proto)
 				break;
 			}
 			M_COPY_PKTHDR(n, n0);
-			n0->m_flags &= ~M_PKTHDR;
-			n->m_next = n0;
 			/*
 			 * Copy IPv6 and ICMPv6 only.
 			 */
@@ -536,17 +552,17 @@ icmp6_input(mp, offp, proto)
 			bcopy(ip6, nip6, sizeof(struct ip6_hdr));
 			nicmp6 = (struct icmp6_hdr *)(nip6 + 1);
 			bcopy(icmp6, nicmp6, sizeof(struct icmp6_hdr));
+			noff = sizeof(struct ip6_hdr);
+			n->m_pkthdr.len = n->m_len =
+				noff + sizeof(struct icmp6_hdr);
 			/*
 			 * Adjust mbuf. ip6_plen will be adjusted in
 			 * ip6_output().
 			 */
-			noff = sizeof(struct ip6_hdr);
-			n->m_len = noff + sizeof(struct icmp6_hdr);
-			move = off + sizeof(struct icmp6_hdr);
-			n0->m_len -= move;
-			n0->m_data += move;
-			gap = off - noff;
-			n->m_pkthdr.len -= gap;
+			m_adj(n0, off + sizeof(struct icmp6_hdr));
+			n->m_pkthdr.len += n0->m_pkthdr.len;
+			n->m_next = n0;
+			n0->m_flags &= ~M_PKTHDR;
 		} else {
 			nip6 = mtod(n, struct ip6_hdr *);
 			nicmp6 = (struct icmp6_hdr *)((caddr_t)nip6 + off);
@@ -733,10 +749,19 @@ icmp6_input(mp, offp, proto)
 			icmp6stat.icp6s_tooshort++;
 			goto freeit;
 		}
+#ifndef PULLUP_TEST
 		IP6_EXTHDR_CHECK(m, off,
 			sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr),
 			IPPROTO_DONE);
 		icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
+#else
+		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off,
+			sizeof(*icmp6) + sizeof(struct ip6_hdr));
+		if (icmp6 == NULL) {
+			icmp6stat.icp6s_tooshort++;
+			return IPPROTO_DONE;
+		}
+#endif
 		bzero(&icmp6src, sizeof(icmp6src));
 		icmp6src.sin6_len = sizeof(struct sockaddr_in6);
 		icmp6src.sin6_family = AF_INET6;
@@ -763,11 +788,20 @@ icmp6_input(mp, offp, proto)
 			case IPPROTO_ROUTING:
 			case IPPROTO_AH:
 			case IPPROTO_FRAGMENT:
+#ifndef PULLUP_TEST
 				IP6_EXTHDR_CHECK(m, 0, eoff +
 						 sizeof(struct ip6_ext),
 						 IPPROTO_DONE);
 				eh = (struct ip6_ext *)(mtod(m, caddr_t)
 							+ eoff);
+#else
+				IP6_EXTHDR_GET(eh, struct ip6_ext *, m,
+					eoff, sizeof(*eh));
+				if (eh == NULL) {
+					icmp6stat.icp6s_tooshort++;
+					return IPPROTO_DONE;
+				}
+#endif
 				if (nxt == IPPROTO_AH)
 					eoff += (eh->ip6e_len + 2) << 2;
 				else if (nxt == IPPROTO_FRAGMENT)
@@ -781,7 +815,16 @@ icmp6_input(mp, offp, proto)
 			}
 		}
 	    notify:
+#ifndef PULLUP_TEST
 		icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
+#else
+		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off,
+			sizeof(*icmp6) + sizeof(struct ip6_hdr));
+		if (icmp6 == NULL) {
+			icmp6stat.icp6s_tooshort++;
+			return IPPROTO_DONE;
+		}
+#endif
 		ctlfunc = (void (*) __P((int, struct sockaddr *, void *)))
 			(inet6sw[ip6_protox[nxt]].pr_ctlinput);
 		if (ctlfunc) {
@@ -1232,11 +1275,11 @@ icmp6_reflect(m, off)
 	struct	mbuf *m;
 	size_t off;
 {
-	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	struct ip6_hdr *ip6;
 	struct icmp6_hdr *icmp6;
 	struct in6_ifaddr *ia;
 	struct in6_addr t, *src = 0;
-	int plen = m->m_pkthdr.len - sizeof(struct ip6_hdr);
+	int plen;
 	int type, code;
 	struct ifnet *outif = NULL;
 #ifdef COMPAT_RFC1885
@@ -1244,41 +1287,42 @@ icmp6_reflect(m, off)
 	struct sockaddr_in6 *sin6 = &icmp6_reflect_rt.ro_dst;
 #endif 
 
+	/* too short to reflect */
+	if (off < sizeof(struct ip6_hdr)) {
+		printf("sanity fail: off=%lx, sizeof(ip6)=%lx in %s:%d\n",
+		       (u_long)off, (u_long)sizeof(struct ip6_hdr),
+		       __FILE__, __LINE__);
+		goto bad;
+	}
+
 	/*
 	 * If there are extra headers between IPv6 and ICMPv6, strip
 	 * off that header first.
 	 */
-	if (off != sizeof(struct ip6_hdr)) {
-		size_t siz;
+	if (off > sizeof(struct ip6_hdr)) {
+		size_t l;
+		struct ip6_hdr nip6;
 
-		/* sanity checks */
-		if (off < sizeof(struct ip6_hdr)) {
-			printf("sanity fail: off=%x, sizeof(ip6)=%x in %s:%d\n",
-			       (unsigned int)off,
-			       (unsigned int)sizeof(struct ip6_hdr),
-			       __FILE__, __LINE__);
-			goto bad;
+		l = off - sizeof(struct ip6_hdr);
+		m_copydata(m, 0, sizeof(nip6), (caddr_t)&nip6);
+		m_adj(m, l);
+		l = sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr);
+		if (m->m_len < l) {
+			if ((m = m_pullup(m, l)) == NULL)
+				return;
 		}
-		siz = off - sizeof(struct ip6_hdr);
-		if (plen < siz) {
-			printf("sanity fail: siz=%x, payloadlen=%x in %s:%d\n",
-			       (unsigned int)siz, plen, __FILE__, __LINE__);
-			goto bad;
+		bcopy((caddr_t)&nip6, mtod(m, caddr_t), sizeof(nip6));
+	} else /* off == sizeof(struct ip6_hdr) */ {
+		size_t l;
+		l = sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr);
+		if (m->m_len < l) {
+			if ((m = m_pullup(m, l)) == NULL)
+				return;
 		}
-		IP6_EXTHDR_CHECK(m, 0, off, /*nothing*/);
-		IP6_EXTHDR_CHECK(m, off, sizeof(struct icmp6_hdr), /*nothing*/);
-
-		ovbcopy((caddr_t)ip6,
-			(caddr_t)(mtod(m, u_char *) + siz),
-			sizeof(struct ip6_hdr));
-		m->m_data += siz;
-		m->m_len -= siz;
-		m->m_pkthdr.len -= siz;
-		ip6 = mtod(m, struct ip6_hdr *);
-		ip6->ip6_nxt = IPPROTO_ICMPV6;
-		plen -= siz;
 	}
-
+	plen = m->m_pkthdr.len - sizeof(struct ip6_hdr);
+	ip6 = mtod(m, struct ip6_hdr *);
+	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	icmp6 = (struct icmp6_hdr *)(ip6 + 1);
 	type = icmp6->icmp6_type; /* keep type for statistics */
 	code = icmp6->icmp6_code; /* ditto. */
