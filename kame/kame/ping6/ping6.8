@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.12 2000/02/28 09:08:29 jinmei Exp $
+.\"     $Id: ping6.8,v 1.13 2000/02/28 13:33:19 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -80,19 +80,19 @@ Generate ICMPv6 Node Information Node Addresses query, rather than echo-request.
 must be a string constructed of the following charaters.
 .Bl -tag -width Ds -compact
 .It Ic a
-requires all the responder's unicast addresses. If the charater is ommited,
+requests all the responder's unicast addresses. If the charater is ommited,
 only those addresses which belong to the interface which has the
-responder's address are required.
+responder's address are requests.
 .It Ic c
-requires responder's IPv4-compatible and IPv4-mapped addresses.
+requests responder's IPv4-compatible and IPv4-mapped addresses.
 .It Ic g
-requires responder's global-scope addresses.
+requests responder's global-scope addresses.
 .It Ic s
-requires responder's site-local addresses.
+requests responder's site-local addresses.
 .It Ic l
-requires responder's link-local addresses.
+requests responder's link-local addresses.
 .It Ic A
-requires responder's anycast addresses. Without this character, the responder
+requests responder's anycast addresses. Without this character, the responder
 will return unicast addresses only. With this character, the responder
 will return anycast addresses only.
 Note that the specification does not specify how to get responder's
