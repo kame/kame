@@ -107,7 +107,7 @@ task_timer_update(argtask)
 
   if (setitimer(ITIMER_REAL, &itimer, NULL) == 0) {
     IFLOG(LOG_TIMER)
-      syslog(LOG_DEBUG, "<task_timer_update>: %s (%d.%d sec) set",
+      syslog(LOG_DEBUG, "<task_timer_update>: %s (%ld.%ld sec) set",
 	     task_timerstr[taskhead->tsk_timename],
 	     taskhead->tsk_timeval.tv_sec,
 	     taskhead->tsk_timeval.tv_usec);

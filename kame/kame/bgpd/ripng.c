@@ -882,7 +882,7 @@ rip_process_response(ripif, nn)
 
 	      if (!(orte->rt_flags & RTF_IGP_EGP_SYNC)) {
 		IFLOG(LOG_RIP)
-		  syslog(LOG_DEBUG, "<%s>: synchronized...%s/%d on %s, tag=%d",
+		  syslog(LOG_DEBUG, "<%s>: synchronized...%s/%d on %s, tag=%u",
 			 __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 			 rte->rt_ripinfo.rip6_plen, ifname,
 			 ntohs(rte->rt_ripinfo.rip6_tag));
@@ -904,7 +904,7 @@ rip_process_response(ripif, nn)
 
 	  if (rte->rt_ripinfo.rip6_tag == 0) {   /* purely internal */
 	    IFLOG(LOG_RIP)
-	      syslog(LOG_DEBUG, "<%s>: %s/%d on %s is purely internal.",
+	      syslog(LOG_DEBUG, "<%s>: %s/%d on %s is purely internal, tag=%u.",
 		     __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 		     rte->rt_ripinfo.rip6_plen, ifname,
 		     ntohs(rte->rt_ripinfo.rip6_tag));
@@ -1050,7 +1050,7 @@ rip_process_response(ripif, nn)
 	  } else {
 	    IFLOG(LOG_RIP)
 	      syslog(LOG_DEBUG, "<%s>: nexthop for %s/%d changes "
-		     "from %s to %s on %d",
+		     "from %s to %s on %s",
 		     __FUNCTION__,
 		     ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 		     rte->rt_ripinfo.rip6_plen,

@@ -710,11 +710,11 @@ chroute(rte, gw, ife)
 
         if ((wlen = write(rtsock, buf, len)) == len) {
 	  IFLOG(LOG_ROUTE)
-	    syslog(LOG_DEBUG, "<%s>: %s/%d gw=%s met=%d, succeed",
+	    syslog(LOG_DEBUG, "<%s>: %s/%d gw=%s met=%lu, succeed",
 		   __FUNCTION__,
 		   ip6str(&np->rip6_dest, 0), np->rip6_plen,
 		   ip6str((struct in6_addr *)gw, 0),
-		   rtm->rtm_rmx.rmx_hopcount);
+		   (u_long)rtm->rtm_rmx.rmx_hopcount);
 	} else {
 	  syslog(LOG_ERR,
 		 "<chroute>: %s/%d gw=%s met=%lu, failed: %s",
