@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.30 1999/02/24 22:56:01 angelos Exp $	*/
+/*	$OpenBSD: route.c,v 1.34 1999/09/22 05:10:04 deraadt Exp $	*/
 /*	$NetBSD: route.c,v 1.16 1996/04/15 18:27:05 cgd Exp $	*/
 
 /*
@@ -44,12 +44,11 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)route.c	8.3 (Berkeley) 3/19/94";
 #else
-static char rcsid[] = "$OpenBSD: route.c,v 1.30 1999/02/24 22:56:01 angelos Exp $";
+static char rcsid[] = "$OpenBSD: route.c,v 1.34 1999/09/22 05:10:04 deraadt Exp $";
 #endif
 #endif /* not lint */
 
 #include <sys/param.h>
-#include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/mbuf.h>
@@ -67,6 +66,7 @@ static char rcsid[] = "$OpenBSD: route.c,v 1.30 1999/02/24 22:56:01 angelos Exp 
 #include <netdb.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -122,7 +122,7 @@ usage(cp)
 	if (cp)
 		(void) fprintf(stderr, "route: botched keyword: %s\n", cp);
 	(void) fprintf(stderr,
-	    "usage: route [ -nqv ] cmd [[ -<qualifers> ] args ]\n");
+	    "usage: route [ -nqv ] cmd [[ -<modifiers> ] args ]\n");
 	(void) fprintf(stderr,
 	    "keywords: get, add, change, delete, show, flush, monitor.\n");
 	exit(1);
@@ -144,7 +144,7 @@ quit(s)
 }
 
 #define ROUNDUP(a) \
-	((a) > 0 ? (1 + (((a) - 1) | (sizeof(in_addr_t) - 1))) : sizeof(in_addr_t))
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
 int
@@ -184,7 +184,7 @@ main(argc, argv)
 	pid = getpid();
 	uid = getuid();
 	if (tflag)
-		s = open("/dev/null", O_WRONLY, 0);
+		s = open("/dev/null", O_WRONLY);
 	else
 		s = socket(PF_ROUTE, SOCK_RAW, 0);
 	if (s < 0)
@@ -231,6 +231,7 @@ flushroutes(argc, argv)
 	int mib[6], rlen, seqno;
 	char *buf = NULL, *next, *lim;
 	register struct rt_msghdr *rtm;
+	struct sockaddr *sa;
 
 	if (uid) {
 		errno = EACCES;
@@ -258,7 +259,7 @@ flushroutes(argc, argv)
 				af = AF_ISO;
 				break;
 			case K_ENCAP:
-				af = PF_KEY;
+				af = AF_KEY;
 				break;
 			case K_X25:
 				af = AF_CCITT;
@@ -298,10 +299,16 @@ bad:			usage(*argv);
 			print_rtmsg(rtm, rtm->rtm_msglen);
 		if ((rtm->rtm_flags & (RTF_GATEWAY|RTF_STATIC|RTF_LLINFO)) == 0)
 			continue;
+		sa = (struct sockaddr *)(rtm + 1);
 		if (af) {
-			struct sockaddr *sa = (struct sockaddr *)(rtm + 1);
-
 			if (sa->sa_family != af)
+				continue;
+		} else {
+			/*
+			 * A general 'flush' should not touch PF_KEY flows,
+			 * as the flows' SPIs would be left behind.
+			 */
+			if (sa->sa_family == AF_KEY)
 				continue;
 		}
 		if (debugonly)
@@ -325,7 +332,7 @@ bad:			usage(*argv);
 			struct sockaddr *sa = (struct sockaddr *)(rtm + 1);
 			(void) printf("%-20.20s ", rtm->rtm_flags & RTF_HOST ?
 			    routename(sa) : netname(sa));
-			sa = (struct sockaddr *)(sa->sa_len + (char *)sa);
+			sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
 			(void) printf("%-20.20s ", routename(sa));
 			(void) printf("done\n");
 		}

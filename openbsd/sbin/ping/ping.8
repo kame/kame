@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ping.8,v 1.13 1999/03/18 11:11:06 aaron Exp $
+.\"	$OpenBSD: ping.8,v 1.19 1999/07/18 16:21:55 hugh Exp $
 .\"	$NetBSD: ping.8,v 1.10 1995/12/31 04:55:35 ghudson Exp $
 .\"
 .\" Copyright (c) 1985, 1991, 1993
@@ -36,7 +36,7 @@
 .\"
 .Dd December 11, 1993
 .Dt PING 8
-.Os BSD 4.3
+.Os
 .Sh NAME
 .Nm ping
 .Nd send
@@ -50,7 +50,6 @@ packets to network hosts
 .Op Fl i Ar wait
 .Op Fl l Ar preload
 .Op Fl p Ar pattern
-.Op Fl S Ar ifaddr
 .Op Fl s Ar packetsize
 .Op Fl t Ar ttl
 .Op Fl w Ar maxwait
@@ -116,6 +115,8 @@ Wait
 seconds
 between sending each packet .
 The default is to wait for one second between each packet.
+The wait time may be fractional, but only the super-user may specify
+a value less than one second.
 This option is incompatible with the
 .Fl f
 option.
@@ -159,18 +160,18 @@ spot.  Many hosts ignore or discard this option.
 .It Fl r
 Bypass the normal routing tables and send directly to a host on an attached
 network.
-If the host is not on a directly-attached network, an error is returned.
+If the host is not on a directly attached network, an error is returned.
 This option can be used to ping a local host through an interface
 that has no route through it (e.g., after the interface was dropped by
 .Xr routed 8 ) .
 .It Fl s Ar packetsize
-Specifies the number of data bytes to be sent.  
+Specifies the number of data bytes to be sent.
 The default is 56, which translates into 64
 .Tn ICMP
 data bytes when combined
 with the 8 bytes of
 .Tn ICMP
-header data. If the 
+header data. If the
 .Fl D
 or
 .Fl T
@@ -210,9 +211,9 @@ Then, hosts and gateways further and further away should be
 Round trip times and packet loss statistics are computed.
 If duplicate packets are received, they are not included in the packet
 loss calculation, although the round trip time of these packets is used
-in calculating the minimum/average/maximum round trip time numbers.
-When the specified number of packets have been sent (and received), or
-if the program is terminated with a
+in calculating the minimum/average/maximum round trip time numbers and
+the standard deviation.  When the specified number of packets have been
+sent (and received), or if the program is terminated with a
 .Dv SIGINT ,
 a brief summary is displayed.
 .Pp
@@ -371,8 +372,8 @@ broadcast address should only be done under very controlled conditions.
 .Sh SEE ALSO
 .Xr netstat 1 ,
 .Xr ifconfig 8 ,
-.Xr spray 8 ,
-.Xr routed 8
+.Xr routed 8 ,
+.Xr spray 8
 .Sh HISTORY
 The
 .Nm
