@@ -311,9 +311,6 @@ div_output(so, m, addr, control)
 
 		/* Send packet to output processing */
 		ipstat.ips_rawout++;			/* XXX */
-#ifdef IPSEC
-		m->m_pkthdr.rcvif = NULL;
-#endif /*IPSEC*/
 		error = ip_output(m, inp->inp_options, &inp->inp_route,
 			(so->so_options & SO_DONTROUTE) |
 			IP_ALLOWBROADCAST | IP_RAWOUTPUT, inp->inp_moptions);

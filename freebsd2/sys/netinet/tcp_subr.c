@@ -274,7 +274,7 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 		tcp_trace(TA_OUTPUT, 0, tp, ti, 0);
 #endif
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = tp ? (struct ifnet *)tp->t_inpcb->inp_socket : NULL;
+	ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL);
 #endif /*IPSEC*/
 	(void) ip_output(m, NULL, ro, 0, NULL);
 	if (ro == &sro && ro->ro_rt) {

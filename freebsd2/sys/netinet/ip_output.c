@@ -127,7 +127,7 @@ ip_output(m0, opt, ro, flags, imo)
 	int isbroadcast;
 #ifdef IPSEC
 	struct route iproute;
-	struct socket *so = (struct socket *)m->m_pkthdr.rcvif;
+	struct socket *so;
 	struct secpolicy *sp = NULL;
 #endif /*IPSEC*/
 
@@ -139,14 +139,8 @@ ip_output(m0, opt, ro, flags, imo)
 #endif
 
 #ifdef IPSEC
-	/*
-	 * NOTE: This code is just to prevent ipfw code from SEGV.
-	 * ipfw code uses rcvif to determine incoming interface, and
-	 * KAME uses rcvif for ipsec processing.
-	 * ipfw may not be working right with KAME at this moment.
-	 * We need more tests.
-	 */
-	m->m_pkthdr.rcvif = NULL;
+	so = ipsec_getsocket(m);
+	ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 
 #if defined(IPFIREWALL) && defined (DUMMYNET)

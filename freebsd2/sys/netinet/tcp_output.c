@@ -738,9 +738,8 @@ send:
 #endif
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = (struct ifnet *)so;
+	ipsec_setsocket(m, so);
 #endif /*IPSEC*/
-
 	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
 	    so->so_options & SO_DONTROUTE, 0);
     }
