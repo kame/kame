@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.54 2001/03/23 08:08:47 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.55 2001/04/19 07:43:28 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -305,7 +305,9 @@ ah4_input(m, va_alist)
 #ifndef __NetBSD__
 	ip->ip_len = htons(ip->ip_len + hlen);
 #if !(defined(__bsdi__) && _BSDI_VERSION >= 199802) /* i.e. !bsdi4 */
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	ip->ip_id = htons(ip->ip_id);
+#endif
 #endif
 #else
 	ip->ip_len = htons(ip->ip_len);
