@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: rc.mobileip6,v 1.4 2002/12/03 13:42:47 keiichi Exp $
+# $Id: rc.mobileip6,v 1.5 2002/12/04 05:39:05 keiichi Exp $
 
 # Mobile IPv6 startup
 
@@ -15,10 +15,13 @@ mobileip6_pass1() {
 			echo -n ' Mobile Node:'
 			# setup SPD/SA
 			echo -n ' security'
-			for config_dir in ${ipv6_mobile_config_dir}/[0-9][0-9][0-9][0-9][0-9]
+			for node_dir in ${ipv6_mobile_config_dir}/*
 			do
-				setkey -f ${config_dir}/add
-				setkey -f ${config_dir}/spdadd_mobile_node
+				if [ ! -e ${node_dir}/add ]; then
+					continue;
+				fi
+				setkey -f ${node_dir}/add
+				setkey -f ${node_dir}/spdadd_mobile_node
 			done
 			for home_prefix in ${ipv6_mobile_home_prefixes}
 			do
@@ -41,10 +44,13 @@ mobileip6_pass1() {
 			echo -n ' Home Agent:'
 			# setup SPD/SA
 			echo ' security'
-			for config_dir in ${ipv6_mobile_config_dir}/[0-9][0-9][0-9][0-9][0-9]
+			for node_dir in ${ipv6_mobile_config_dir}/*
 			do
-				setkey -f ${config_dir}/add
-				setkey -f ${config_dir}/spdadd_home_agent
+				if [ ! -e ${node_dir}/add ]; then
+					continue;
+				fi
+				setkey -f ${node_dir}/add
+				setkey -f ${node_dir}/spdadd_home_agent
 			done
 			# mip6control -S 1
 			echo -n ' enable'

@@ -1,14 +1,14 @@
 #!/bin/sh
 #
-# $Id: mip6makeconfig.sh,v 1.1 2002/12/03 14:02:42 keiichi Exp $
+# $Id: mip6makeconfig.sh,v 1.2 2002/12/04 05:39:05 keiichi Exp $
 
 cat=/bin/cat
 basename=/usr/bin/basename
 
 if [ -r /etc/defaults/rc.conf ]; then
 	. /etc/defaults/rc.conf
-	source_rc_confs
-elif [ -r /etc/rc.conf ]; then
+fi
+if [ -r /etc/rc.conf ]; then
 	. /etc/rc.conf
 fi
 
@@ -16,15 +16,10 @@ if [ $# -ne 1 ]; then
 	${cat} <<EOF
 Usage: ${0} node_dir
 
-	node_dir must be consist of 5 digits.  This value is used as a
-	SPI number.  Because we need 2 SPIs for one bi-directional
-	connection, the number 'node_dir + 1' is reserved for internal
-	use.  If you have multiple node_dir, you must skip at least 1
-	when creating a new node_dir.
-
 	The default config directory is ${ipv6_mobile_config_dir}.
-	This value can be changed by modifing ipv6_mobile_config_dir
-	variable in /etc/rc.conf.
+	each node_dir must reside in this directory.  This value can
+	be changed by modifing ipv6_mobile_config_dir variable in
+	/etc/rc.conf.
 EOF
 	exit 1
 fi
@@ -32,16 +27,20 @@ fi
 ipv6_mobile_config_dir=${ipv6_mobile_config_dir:-/usr/local/v6/etc/mobileip6}
 
 #
-# source parameters
+# check node_dir
 #
-client=${ipv6_mobile_config_dir}/${1}
-. ${client}/config
+if [ ! -d ${ipv6_mobile_config_dir}/${1} ]; then
+	cat << EOF
+No configuration directory for the node ${1}.
+EOF
+	exit 1
+fi
+node_dir=${ipv6_mobile_config_dir}/${1}
 
 #
-# determine SPIs
+# source parameters
 #
-spi_mn=$((`${basename} ${client}`))
-spi_ha=$((${spi_mn} + 1))
+. ${node_dir}/config
 
 #
 # write security association configuration files
@@ -50,21 +49,21 @@ spi_ha=$((${spi_mn} + 1))
 #
 # SA addition
 #
-${cat} << EOF > ${client}/add
+${cat} << EOF > ${node_dir}/add
 add ${mobile_node} ${home_agent}
-	esp ${spi_mn} -E ${algorithm} "${secret}";
+	esp ${spi_mn_to_ha} -E ${algorithm} "${secret}";
 add ${home_agent} ${mobile_node}
-	esp ${spi_ha} -E ${algorithm} "${secret}";
+	esp ${spi_ha_to_mn} -E ${algorithm} "${secret}";
 EOF
 
 #
 # SA deletion
 #
-${cat} << EOF > ${client}/delete
+${cat} << EOF > ${node_dir}/delete
 delete ${mobile_node} ${home_agent}
-	esp ${spi_mn};
+	esp ${spi_mn_to_ha};
 delete ${home_agent} ${mobile_node}
-	esp ${spi_ha};
+	esp ${spi_ha_to_mn};
 EOF
 
 #
@@ -74,7 +73,7 @@ EOF
 #
 # policy addition of a home agent
 #
-${cat} <<EOF > ${client}/spdadd_home_agent
+${cat} <<EOF > ${node_dir}/spdadd_home_agent
 spdadd ${home_agent} ${mobile_node}
 	62 -P out ipsec
 	esp/transport//require;
@@ -86,7 +85,7 @@ EOF
 #
 # policy deletion of a home agent
 #
-${cat} <<EOF > ${client}/spddelete_home_agent
+${cat} <<EOF > ${node_dir}/spddelete_home_agent
 spddelete ${home_agent} ${mobile_node}
 	62 -P out ipsec;
 spddelete ${mobile_node} ${home_agent}
@@ -96,7 +95,7 @@ EOF
 #
 # tunnel policy addtion of a home agent
 #
-${cat} <<EOF >> ${client}/spdadd_home_agent
+${cat} <<EOF >> ${node_dir}/spdadd_home_agent
 spdadd ::/0 ${mobile_node}
 	62 -P out ipsec
 	esp/tunnel/${home_agent}-${mobile_node}/require;
@@ -108,7 +107,7 @@ EOF
 #
 # tunnel policy deletion of a home agent
 #
-${cat} <<EOF >> ${client}/spddelete_home_agent
+${cat} <<EOF >> ${node_dir}/spddelete_home_agent
 spddelete ::/0 ${mobile_node}
 	62 -P out ipsec;
 spddelete ${mobile_node} ::/0
@@ -118,7 +117,7 @@ EOF
 #
 # policy addition of a mobile node
 #
-${cat} <<EOF > ${client}/spdadd_mobile_node
+${cat} <<EOF > ${node_dir}/spdadd_mobile_node
 spdadd ${mobile_node} ${home_agent}
 	62 -P out ipsec
 	esp/transport//require;
@@ -130,7 +129,7 @@ EOF
 #
 # policy deletion of a mobile node
 #
-${cat} <<EOF > ${client}/spddelete_mobile_node
+${cat} <<EOF > ${node_dir}/spddelete_mobile_node
 spddelete ${mobile_node} ${home_agent}
 	62 -P out ipsec;
 spddelete ${home_agent} ${mobile_node}
@@ -140,7 +139,7 @@ EOF
 #
 # tunnel policy addition of a mobile node
 #
-${cat} <<EOF >> ${client}/spdadd_mobile_node
+${cat} <<EOF >> ${node_dir}/spdadd_mobile_node
 spdadd ${mobile_node} ::/0
 	62 -P out ipsec
 	esp/tunnel/${mobile_node}-${home_agent}/require;
@@ -152,7 +151,7 @@ EOF
 #
 # tunnel policy deletion of a mobile node
 #
-${cat} <<EOF >> ${client}/spddelete_mobile_node
+${cat} <<EOF >> ${node_dir}/spddelete_mobile_node
 spddelete ${mobile_node} ::/0
 	62 -P out ipsec;
 spddelete ::/0 ${mobile_node}
