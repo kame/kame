@@ -4,7 +4,7 @@
 # Date created:         4 Nov 1994
 # Whom:                 ache
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:10 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/25 10:40:59 sumikawa Exp $
 #
 
 DISTNAME=       ncftp-3.0beta19-src
@@ -13,7 +13,7 @@ CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.ncftp.com/ncftp/3.0BETA/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	ncftp-30b19-19990719.diff.gz
+PATCHFILES=	ncftp-30b19-19990825.diff.gz
 PATCH_DIST_STRIP=	-p
 
 MAINTAINER=	sumikawa@kame.net
