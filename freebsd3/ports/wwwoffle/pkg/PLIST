@@ -5,9 +5,7 @@ bin/wwwoffle-read
 bin/wwwoffle-rm
 bin/wwwoffle-tools
 bin/wwwoffle-write
-etc/rc.d/wwwoffle.sh
-etc/wwwoffle/wwwoffle.conf.default
-@exec if [ ! -f %D/etc/wwwoffle/wwwoffle.conf ]; then cp -p %D/etc/wwwoffle/wwwoffle.conf.default %D/etc/wwwoffle/wwwoffle.conf; fi
+etc/rc.d/wwwoffled.sh.sample
 sbin/wwwoffled
 share/doc/wwwoffle/CHANGES.CONF
 share/doc/wwwoffle/CONVERT
@@ -24,4 +22,133 @@ share/doc/wwwoffle/README.lang
 share/doc/wwwoffle/README.win32
 share/doc/wwwoffle/UPGRADE
 @dirrm share/doc/wwwoffle
-@unexec rm -rf /var/wwwoffle
+@cwd %%SPOOL%%
+wwwoffle/html/FAQ.html
+wwwoffle/html/Welcome.html
+wwwoffle/html/htdig/button1.gif
+wwwoffle/html/htdig/button10.gif
+wwwoffle/html/htdig/button2.gif
+wwwoffle/html/htdig/button3.gif
+wwwoffle/html/htdig/button4.gif
+wwwoffle/html/htdig/button5.gif
+wwwoffle/html/htdig/button6.gif
+wwwoffle/html/htdig/button7.gif
+wwwoffle/html/htdig/button8.gif
+wwwoffle/html/htdig/button9.gif
+wwwoffle/html/htdig/buttonl.gif
+wwwoffle/html/htdig/buttonr.gif
+wwwoffle/html/htdig/conf/htdig-full.conf
+wwwoffle/html/htdig/conf/htdig-incr.conf
+wwwoffle/html/htdig/conf/htdig-lasttime.conf
+wwwoffle/html/htdig/conf/htfuzzy.conf
+wwwoffle/html/htdig/conf/htmerge.conf
+wwwoffle/html/htdig/conf/htsearch.conf
+wwwoffle/html/htdig/htdig.gif
+wwwoffle/html/htdig/index.html
+wwwoffle/html/htdig/scripts/wwwoffle-htdig-full
+wwwoffle/html/htdig/scripts/wwwoffle-htdig-incr
+wwwoffle/html/htdig/scripts/wwwoffle-htdig-lasttime
+wwwoffle/html/htdig/scripts/wwwoffle-htfuzzy
+wwwoffle/html/htdig/scripts/wwwoffle-htsearch
+wwwoffle/html/htdig/search.html
+wwwoffle/html/htdig/star.gif
+wwwoffle/html/htdig/star_blank.gif
+wwwoffle/html/htdig/start-lt2.html
+wwwoffle/html/htdig/start-lt3.html
+wwwoffle/html/htdig/start-lt4.html
+wwwoffle/html/htdig/start1.html
+wwwoffle/html/htdig/start2.html
+wwwoffle/html/htdig/start3.html
+wwwoffle/html/htdig/start4.html
+wwwoffle/html/index.html
+wwwoffle/html/local/images/trans-1x1.gif
+wwwoffle/html/messages/AddCacheInfo.html
+wwwoffle/html/messages/CantRefreshPosted.html
+wwwoffle/html/messages/ConfigEditPage-Body.html
+wwwoffle/html/messages/ConfigEditPage-Head.html
+wwwoffle/html/messages/ConfigEditPage-Tail.html
+wwwoffle/html/messages/ConfigError.html
+wwwoffle/html/messages/ConfigUpdate.html
+wwwoffle/html/messages/ConfirmRequest.html
+wwwoffle/html/messages/ControlAuthFail.html
+wwwoffle/html/messages/ControlDelete-Body.html
+wwwoffle/html/messages/ControlDelete-Head.html
+wwwoffle/html/messages/ControlDelete-Tail.html
+wwwoffle/html/messages/ControlIllegal.html
+wwwoffle/html/messages/ControlPage.html
+wwwoffle/html/messages/ControlWWWOFFLE-Head.html
+wwwoffle/html/messages/ControlWWWOFFLE-Tail.html
+wwwoffle/html/messages/FTPDir-Head.html
+wwwoffle/html/messages/FTPDir-Tail.html
+wwwoffle/html/messages/FTPDirRedirect.html
+wwwoffle/html/messages/FTPPut.html
+wwwoffle/html/messages/FileLocked.html
+wwwoffle/html/messages/HostNotGot.html
+wwwoffle/html/messages/IllegalProtocol.html
+wwwoffle/html/messages/Index-Head.html
+wwwoffle/html/messages/Index-Tail.html
+wwwoffle/html/messages/IndexError-Body.html
+wwwoffle/html/messages/IndexHost-Body.html
+wwwoffle/html/messages/IndexHost-Head.html
+wwwoffle/html/messages/IndexHost-Tail.html
+wwwoffle/html/messages/IndexIllegal.html
+wwwoffle/html/messages/IndexLastTime-Body.html
+wwwoffle/html/messages/IndexLastTime-Head.html
+wwwoffle/html/messages/IndexLastTime-Tail.html
+wwwoffle/html/messages/IndexLatest-Body.html
+wwwoffle/html/messages/IndexLatest-Head.html
+wwwoffle/html/messages/IndexLatest-Tail.html
+wwwoffle/html/messages/IndexMonitor-Body.html
+wwwoffle/html/messages/IndexMonitor-Head.html
+wwwoffle/html/messages/IndexMonitor-Tail.html
+wwwoffle/html/messages/IndexOutgoing-Body.html
+wwwoffle/html/messages/IndexOutgoing-Head.html
+wwwoffle/html/messages/IndexOutgoing-Tail.html
+wwwoffle/html/messages/IndexProtocol-Body.html
+wwwoffle/html/messages/IndexProtocol-Head.html
+wwwoffle/html/messages/IndexProtocol-Tail.html
+wwwoffle/html/messages/IndexRedirect.html
+wwwoffle/html/messages/IndexRoot-Body.html
+wwwoffle/html/messages/IndexSeparator-Body.html
+wwwoffle/html/messages/IndexURLRedirect.html
+wwwoffle/html/messages/LocalDirRedirect.html
+wwwoffle/html/messages/MethodUnsupported.html
+wwwoffle/html/messages/MonitorFormError.html
+wwwoffle/html/messages/MonitorIllegal.html
+wwwoffle/html/messages/MonitorPage.html
+wwwoffle/html/messages/MonitorWillGet.html
+wwwoffle/html/messages/PageNotFound.html
+wwwoffle/html/messages/ProxyAuthFail.html
+wwwoffle/html/messages/README
+wwwoffle/html/messages/RefreshFormError.html
+wwwoffle/html/messages/RefreshIllegal.html
+wwwoffle/html/messages/RefreshPage.html
+wwwoffle/html/messages/RefreshRedirect.html
+wwwoffle/html/messages/RefreshWillGet.html
+wwwoffle/html/messages/RefusedRequest.html
+wwwoffle/html/messages/RemoteHostError.html
+wwwoffle/html/messages/ServerError.html
+wwwoffle/html/messages/UserNeedsPass.html
+wwwoffle/html/messages/WillGet.html
+wwwoffle/html/robots.txt
+wwwoffle/html/wwwoffle.pac
+wwwoffle/outgoing/Owwwoffle-browser
+wwwoffle/outgoing/Owwwoffle-user
+wwwoffle/outgoing/Uwwwoffle-browser
+wwwoffle/outgoing/Uwwwoffle-user
+wwwoffle/upgrade-config.pl
+wwwoffle/wwwoffle.conf.default
+@dirrm wwwoffle/html/htdig/conf
+@dirrm wwwoffle/html/htdig/db
+@dirrm wwwoffle/html/htdig/db-lasttime
+@dirrm wwwoffle/html/htdig/scripts
+@dirrm wwwoffle/html/htdig
+@dirrm wwwoffle/html/local/images
+@dirrm wwwoffle/html/local
+@dirrm wwwoffle/html/messages
+@dirrm wwwoffle/html
+@dirrm wwwoffle/http
+@dirrm wwwoffle/lasttime
+@dirrm wwwoffle/monitor
+@dirrm wwwoffle/outgoing
+@dirrm wwwoffle/prevtime1

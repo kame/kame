@@ -1,54 +1,66 @@
 # New ports collection makefile for:	wwwoffle
-# Date created:		Thu Oct 28 13:39:54 JST 1999
-# Whom:			jinmei@kame.net
+# Date created:		1 Jun 1998
+# Whom:			Peter Mutsaers
 #
-# $KAME: Makefile,v 1.4 2000/06/25 10:58:51 sumikawa Exp $
+# $FreeBSD: ports/www/wwwoffle/Makefile,v 1.10 2000/07/10 22:35:32 ben Exp $
+# $KAME: Makefile,v 1.5 2000/09/23 19:12:48 sumikawa Exp $
 #
 
 PORTNAME=	wwwoffle
-PORTVERSION=	2.5
+PORTVERSION= 	2.5e
 CATEGORIES=	www
 MASTER_SITES=	ftp://ftp.demon.co.uk/pub/unix/httpd/ \
-		${MASTER_SITE_SUNSITE:=apps/www/servers/} \
-		ftp://ftp.pasta.cs.uit.no/pub/Vermicelli/
-DISTFILES=	wwwoffle-2.5.tgz \
-		wwwoffle-2.5-patches.v6.tar.gz
+		${MASTER_SITE_SUNSITE}
+MASTER_SITE_SUBDIR=	apps/www/servers
+EXTRACT_SUFX=	.tgz
+
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
+		ftp://ftp.pasta.cs.uit.no/pub/IPv6/misc/
+PATCHFILES=	wwwoffle-25e-v6-20000924.diff.gz
+PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	jinmei@kame.net
 
-USE_GMAKE=	yes
+USE_PERL5=	yes
 
-PATCHDIR=       ${WRKDIR}/.patches
-MESSAGE_FILE=	${WRKDIR}/MESSAGE
+# IPv6 support
+MAKE_ENV+=	LIBRARY="-L/usr/local/v6/lib -linet6"
+
+# $SPOOL seems like a common name which could be used for other things, so
+# use $WWWOFFLE_SPOOL as the overriding setting.
+WWWOFFLE_SPOOL?=	/var/spool
+SPOOL=		${WWWOFFLE_SPOOL}
+
+PLIST_SUB+=	SPOOL=${SPOOL}
+
+MAKE_ENV+=	SPOOL="${SPOOL}" \
+		BINOWN="${BINOWN}" \
+		BINGRP="${BINGRP}" \
+		INSTALL_PROGRAM="${INSTALL_PROGRAM}" \
+		INSTALL_DATA="${INSTALL_DATA}" \
+		INSTALL_MAN="${INSTALL_MAN}"
 
 MAN1=		wwwoffle.1
 MAN5=		wwwoffle.conf.5
 MAN8=		wwwoffled.8
 
-pre-patch:
-	${MKDIR} ${PATCHDIR}
-	${CP} ${.CURDIR}/patches/patch-* ${PATCHDIR}
-	${CP} ${WRKDIR}/wwwoffle-2.5-patches.v6/patch-* ${PATCHDIR}
+.if ${SPOOL} != "/var/spool"
+# If using a non-standard spool, change all the documentation (and anything
+# else) to reflect that.
+PKGMESSAGE=${WRKDIR}/MESSAGE
 
-post-build:
-	@${SED} -e 's#@PREFIX@#${PREFIX}#g' <${FILESDIR}/wwwoffle.sh \
-	  >${WRKDIR}/wwwoffle.sh
-	@${SED} -e 's#@PREFIX@#${PREFIX}#g' <${PKGDIR}/MESSAGE \
-	  >${MESSAGE_FILE}
-#	@${SED} -e 's#@GTAR@#${TAR}#g' <${PKGDIR}/PLIST >${PLIST_SRC}
-
-pre-install:
-	${MKDIR} ${PREFIX}/etc/wwwoffle
+do-configure:
+	@find ${WRKSRC} | xargs ${CHMOD} u+w
+	@find ${WRKSRC} -type f | \
+	  xargs perl -pi -e 's@/var/spool/wwwoffle@${SPOOL}/wwwoffle@g'
+	@${SED} 's@/var/spool/wwwoffle@${SPOOL}/wwwoffle@g' \
+	  ${PKGDIR}/MESSAGE > ${PKGMESSAGE}
+.endif
 
 post-install:
-	if [ -f ${PREFIX}/etc/wwwoffle/wwwoffle.conf.install ]; then \
-	  ${MV} ${PREFIX}/etc/wwwoffle/wwwoffle.conf.install \
-		${PREFIX}/etc/wwwoffle/wwwoffle.conf.default; \
-	else \
-	  ${CP} -p ${PREFIX}/etc/wwwoffle/wwwoffle.conf \
-	    ${PREFIX}/etc/wwwoffle/wwwoffle.conf.default; \
-	fi
-	${INSTALL_SCRIPT} ${WRKDIR}/wwwoffle.sh ${PREFIX}/etc/rc.d
-	${CHOWN} -R ${BINOWN}:${BINGRP} /var/wwwoffle
+	@${MKDIR} ${SPOOL}/wwwoffle
+	@${INSTALL_SCRIPT} ${WRKSRC}/upgrade-config.pl ${SPOOL}/wwwoffle
+	@${INSTALL_SCRIPT} ${FILESDIR}/wwwoffled.sh ${PREFIX}/etc/rc.d/wwwoffled.sh.sample
+	@${CAT} ${PKGMESSAGE}
 
 .include <bsd.port.mk>
