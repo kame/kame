@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.30 2000/06/08 03:37:06 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.31 2000/06/08 08:35:25 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -383,6 +383,12 @@ ident_i3recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+	if (error) {
+		VPTRINIT(iph1->dhpub_p);
+		VPTRINIT(iph1->nonce_p);
+		VPTRINIT(iph1->id_p);
+	}
+
 	return error;
 }
 
@@ -575,8 +581,15 @@ ident_i4recv(iph1, msg0)
 end:
 	if (pbuf)
 		vfree(pbuf);
-	if (msg != NULL)
+	if (msg)
 		vfree(msg);
+
+	if (error) {
+		VPTRINIT(iph1->id_p);
+		VPTRINIT(iph1->cert_p);
+		VPTRINIT(iph1->crl_p);
+		VPTRINIT(iph1->sig_p);
+	}
 
 	return error;
 }
@@ -709,6 +722,9 @@ ident_r1recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+	if (error) {
+		VPTRINIT(iph1->sa);
+	}
 
 	return error;
 }
@@ -778,11 +794,6 @@ ident_r1send(iph1, msg)
 	error = 0;
 
 end:
-	if (iph1->sa_ret) {
-		vfree(iph1->sa_ret);
-		iph1->sa_ret = NULL;
-	}
-
 	return error;
 }
 
@@ -865,6 +876,13 @@ ident_r2recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+
+	if (error) {
+		VPTRINIT(iph1->dhpub_p);
+		VPTRINIT(iph1->nonce_p);
+		VPTRINIT(iph1->id_p);
+	}
+
 	return error;
 }
 
@@ -1093,8 +1111,15 @@ ident_r3recv(iph1, msg0)
 end:
 	if (pbuf)
 		vfree(pbuf);
-	if (msg != NULL)
+	if (msg)
 		vfree(msg);
+
+	if (error) {
+		VPTRINIT(iph1->id_p);
+		VPTRINIT(iph1->cert_p);
+		VPTRINIT(iph1->crl_p);
+		VPTRINIT(iph1->sig_p);
+	}
 
 	return error;
 }

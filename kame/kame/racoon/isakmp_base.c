@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.22 2000/06/08 03:37:06 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.23 2000/06/08 08:35:25 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -271,6 +271,12 @@ end:
 		vfree(pbuf);
 	if (satmp)
 		vfree(satmp);
+
+	if (error) {
+		VPTRINIT(iph1->nonce_p);
+		VPTRINIT(iph1->id_p);
+	}
+
 	return error;
 }
 
@@ -457,6 +463,14 @@ base_i3recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+
+	if (error) {
+		VPTRINIT(iph1->dhpub_p);
+		VPTRINIT(iph1->cert_p);
+		VPTRINIT(iph1->crl_p);
+		VPTRINIT(iph1->sig_p);
+	}
+
 	return error;
 }
 
@@ -561,6 +575,12 @@ base_r1recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+
+	if (error) {
+		VPTRINIT(iph1->sa);
+		VPTRINIT(iph1->nonce_p);
+		VPTRINIT(iph1->id_p);
+	}
 
 	return error;
 }
@@ -759,6 +779,14 @@ base_r2recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+
+	if (error) {
+		VPTRINIT(iph1->dhpub_p);
+		VPTRINIT(iph1->cert_p);
+		VPTRINIT(iph1->crl_p);
+		VPTRINIT(iph1->sig_p);
+	}
+
 	return error;
 }
 

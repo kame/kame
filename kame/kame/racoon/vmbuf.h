@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vmbuf.h,v 1.2 2000/01/09 01:31:34 itojun Exp $ */
+/* YIPS @(#)$Id: vmbuf.h,v 1.3 2000/06/08 08:35:25 sakane Exp $ */
 
 /*
  *	bp      v
@@ -47,6 +47,14 @@ typedef struct _vchar_t_ {
 } vchar_t;
 
 #define VREALLOC(ptr, size) ((ptr) = vrealloc((ptr), (size)))
+
+#define VPTRINIT(p) \
+do { \
+	if (p) { \
+		vfree(p); \
+		(p) = NULL; \
+	} \
+} while (1);
 
 extern vchar_t *vmalloc __P((size_t));
 extern vchar_t *vrealloc __P((vchar_t *, size_t));

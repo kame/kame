@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.30 2000/06/08 06:43:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.31 2000/06/08 08:35:24 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -345,6 +345,15 @@ end:
 		vfree(pbuf);
 	if (satmp)
 		vfree(satmp);
+	if (error) {
+		VPTRINIT(iph1->dhpub_p);
+		VPTRINIT(iph1->nonce_p);
+		VPTRINIT(iph1->id_p);
+		VPTRINIT(iph1->cert_p);
+		VPTRINIT(iph1->crl_p);
+		VPTRINIT(iph1->sig_p);
+	}
+
 	return error;
 }
 
@@ -578,6 +587,12 @@ agg_r1recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+	if (error) {
+		VPTRINIT(iph1->sa);
+		VPTRINIT(iph1->dhpub_p);
+		VPTRINIT(iph1->nonce_p);
+		VPTRINIT(iph1->id_p);
+	}
 
 	return error;
 }
@@ -881,8 +896,13 @@ agg_r2recv(iph1, msg0)
 end:
 	if (pbuf)
 		vfree(pbuf);
-	if (msg != NULL)
+	if (msg)
 		vfree(msg);
+	if (error) {
+		VPTRINIT(iph1->cert_p);
+		VPTRINIT(iph1->crl_p);
+		VPTRINIT(iph1->sig_p);
+	}
 
 	return error;
 }
