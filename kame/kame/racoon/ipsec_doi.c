@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.74 2000/05/31 17:45:47 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.75 2000/05/31 22:21:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1978,7 +1978,7 @@ ipsecdoi_setph1proposal(props)
 	vchar_t *mysa;
 	int sablen;
 
-	/* count total size of SA minus isakpm general header */
+	/* count total size of SA minus isakmp general header */
 	/* not including isakmp general header of SA payload */
 	sablen = sizeof(struct ipsecdoi_sa_b);
 	sablen += setph1prop(props, NULL);
