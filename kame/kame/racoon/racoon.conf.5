@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.51 2000/09/22 18:03:12 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.52 2000/09/22 18:21:49 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -216,10 +216,10 @@ If it is specifyed,
 will only listen to its address.
 Default port is 500 as IANA defines.
 You can define more than one definition.
-.It Ic admin Ic [ Ar port ] ;
-specify the port for connecting to
-.Xr kmpstat 8 .
-Default port is 61225.
+.\".It Ic admin Ic [ Ar port ] ;
+.\"specify the port for connecting to
+.\".Xr kmpstat 8 .
+.\"Default port is 61225.
 .It Ic strict_address ;
 require all addresses for ISAKMP must be bound.
 It will be ignored when you don't specify any addresses.
@@ -568,7 +568,7 @@ remote 172.168.2.2 [7000]
 .Ed
 .\"
 .Sh SEE ALSO
-.Xr kmpstat 8 ,
+.\".Xr kmpstat 8 ,
 .Xr racoon 8
 .\"
 .Sh HISTORY
