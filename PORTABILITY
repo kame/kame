@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.10 1999/09/26 07:07:43 itojun Exp $
+$Id: PORTABILITY,v 1.11 1999/09/26 07:09:47 itojun Exp $
 
 
 Source code in "kame" directory will be shared among operating systems
@@ -79,6 +79,11 @@ across those possibilities.
   For FreeBSD and BSDI, there's no distinction.
 	CFLAGS+=-I/usr/local/include
 	CFLAGS+=-g
+
+- To refer objects and machine-generated source code, FreeBSD needs to use
+  ${.OBJDIR}  This is because because FreeBSD completely separates "obj" tree
+  and "src" tree and has no symlink from ${.CURDIR}/obj to /usr/obj/foobaa.
+  On other platforms, ${.CURDIR}/obj should do.
 
 - On manpage installation.
   for BSDI3, you need to set MAN[0-9] in Makefile like below.  MANDIR must
