@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.31 2000/01/11 02:23:32 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.32 2000/01/11 02:32:04 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1821,10 +1821,10 @@ copy_ph1addresses(iph1, rmconf, remote)
 	}
 
 	/*
-	 * if remote has no port # (in case of initiator - from ACQUIRE msg,
+	 * if remote has no port # (in case of initiator - from ACQUIRE msg)
 	 * - if remote.conf specifies port #, use that
 	 * - if remote.conf does not, use 500
-	 * if remote has port # (in case of responder - from recvfrom(),
+	 * if remote has port # (in case of responder - from recvfrom(2))
 	 * respect content of "remote".
 	 */
 	if (!_INPORTBYSA(iph1->remote)) {
