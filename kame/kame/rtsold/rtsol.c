@@ -1,4 +1,4 @@
-/*	$KAME: rtsol.c,v 1.16 2002/06/10 20:00:36 itojun Exp $	*/
+/*	$KAME: rtsol.c,v 1.17 2002/12/05 02:45:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,8 +311,8 @@ rtsol_input(int s)
 	/* xxx: more validation? */
 
 	if ((ifi = find_ifinfo(pi->ipi6_ifindex)) == NULL) {
-		warnmsg(LOG_NOTICE, __func__,
-		    "received RA from %s on an unexpeced IF(%s)",
+		warnmsg(LOG_INFO, __func__,
+		    "received RA from %s on an unexpected IF(%s)",
 		    inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
 		    INET6_ADDRSTRLEN),
 		    if_indextoname(pi->ipi6_ifindex, ifnamebuf));
