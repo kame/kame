@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.15 2001/04/02 06:56:20 jinmei Exp $
+$Id: INSTALL,v 1.16 2001/04/02 06:59:12 jinmei Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -111,7 +111,7 @@ E-5. /etc/rc.d/network executes "route -n flush" by default, which removes
      Although this would not be so harmful for daily use, you might want to
      change the line as follows:
      route -n flush -inet
-     so that only IPv6 routes would be removed, or add the following
+     so that only IPv4 routes would be removed, or add the following
      line in /etc/rc.conf:
      flushroutes=NO
      Note that the latter approach suppresses the flush of IPv4
