@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.87 2000/12/02 17:57:10 itojun Exp $
+$KAME: COVERAGE,v 1.88 2000/12/04 05:43:07 itojun Exp $
 
 
 x: supported/integrated
@@ -15,7 +15,9 @@ TCP/UDP		see IMPLEMENTATION for details
 ALTQ		x	x	x	x	x	-	-
 
 IPsec		x	(*1)	x	x	x	x	x
-    (*1) OpenBSD IPsec is available for IPv4 IPsec.  no IPv6 IPsec.
+    (*1) OpenBSD IPsec is available for both IPv4/IPv6.  Not really tested.
+	 If you would like to use OpenBSD IPsec for production system,
+	 use unpatched (non-KAME) OpenBSD.
 
 NAT/PT		-	(*1)	x	(*1)	?	(*1)	(*1)
     (*1) compilable but not tested
