@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.144 2002/10/22 01:59:22 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.145 2002/10/22 05:34:03 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1588,7 +1588,7 @@ mip6_dad_error(ifa, err)
 	if (!my)
 		return (ENOENT);
 
-	if ((mbc->mbc_flags & IP6MU_CLONED) == 0)
+	if ((my->mbc_flags & IP6MU_CLONED) == 0)
 		prim = my;
 	free(ifa, M_IFADDR);
 	my->mbc_dad = NULL;
