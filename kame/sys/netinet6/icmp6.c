@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.228 2001/07/24 02:21:31 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.229 2001/07/24 02:58:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -400,7 +400,18 @@ icmp6_error(m, type, code, param)
 		} else {
 			/* ICMPv6 informational - send the error */
 		}
-	} else {
+	}
+#if 0 /* controversial */
+	else if (off >= 0 && nxt == IPPROTO_ESP) {
+		/*
+		 * It could be ICMPv6 error inside ESP.  Take a safer side,
+		 * don't respond.
+		 */
+		icmp6stat.icp6s_canterror++;
+		goto freeit;
+	}
+#endif
+	else {
 		/* non-ICMPv6 - send the error */
 	}
 
