@@ -71,6 +71,9 @@
 #include <net/if_var.h>
 #endif
 #include <netinet6/in6_var.h>
+#ifdef HAVE_GETIFADDRS
+#include <ifaddrs.h>
+#endif 
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
@@ -85,18 +88,170 @@ void add_phaddr(struct uvif *v, struct sockaddr_in6 *addr,
 void
 config_vifs_from_kernel()
 {
-	struct ifreq *ifrp,*ifend;
 	register struct uvif *v;
 	register vifi_t vifi;
-	int n,i;
+	int i;
 	struct sockaddr_in6 addr;
 	struct in6_addr mask;
 	short flags;
+#ifdef HAVE_GETIFADDRS
+	struct ifaddrs *ifap, *ifa;
+#else
+	int n;
 	int num_ifreq = 64;
 	struct ifconf ifc;
+	struct ifreq *ifrp,*ifend;
+#endif
 
 	total_interfaces= 0;	/* The total number of physical interfaces */
 
+#ifdef HAVE_GETIFADDRS
+	if (getifaddrs(&ifap))
+		log(LOG_ERR, errno, "getifaddrs");
+
+	/*
+	 * Loop through all of the interfaces.
+	 */
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		struct in6_ifreq ifr6;
+
+		/*
+		 * Ignore any interface for an address family other than IPv6.
+		 */
+		if (ifa->ifa_addr->sa_family != AF_INET6) {
+			/* Eventually may have IPv6 address later */
+			total_interfaces++;
+			continue;
+		}
+
+		memcpy(&addr, &ifa->ifa_addr, sizeof(struct sockaddr_in6));
+
+		flags = ifa->ifa_flags;
+
+
+		/*
+		 * Get netmask of the address.
+		 */
+		memcpy(&mask,
+		       &((struct sockaddr_in6 *)ifa->ifa_netmask)->sin6_addr,
+		       sizeof(mask));
+
+		/*
+		 * Get IPv6 specific flags, and ignore an anycast address.
+		 * XXX: how about a deprecated, tentative, duplicated or
+		 * detached address?
+		 */
+		memcpy(ifr6.ifr_name, ifa->ifa_name, sizeof(ifr6.ifr_name));
+		ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifa->ifa_addr;
+		if (ioctl(udp_socket, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
+			log(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
+			    inet6_fmt(&ifr6.ifr_addr.sin6_addr));
+		}
+		else {
+			if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST) {
+				log(LOG_DEBUG, 0, "config_vifs_from_kernel: "
+				    "%s on %s is an anycast address, ignored",
+				    inet6_fmt(&ifr6.ifr_addr.sin6_addr),
+				    ifa->ifa_name);
+				continue;
+			}
+		}
+
+		if (IN6_IS_ADDR_LINKLOCAL(&addr.sin6_addr))
+		{
+			addr.sin6_scope_id = if_nametoindex(ifa->ifa_name);
+#ifdef __KAME__
+			/*
+			 * Hack for KAME kernel.
+			 * Set sin6_scope_id field of a link local address and clear
+			 * the index embedded in the address.
+			 */
+			/* clear interface index */
+			addr.sin6_addr.s6_addr[2] = 0;
+			addr.sin6_addr.s6_addr[3] = 0;
+#endif
+		}
+
+		/*
+		 * If the address is connected to the same subnet as one
+		 * already installed in the uvifs array, just add the address
+		 * to the list of addresses of the uvif.
+		 */
+		for(vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
+		{
+			if( strcmp(v->uv_name , ifa->ifa_name) == 0 )
+			{
+				add_phaddr(v, &addr, &mask);
+				break;
+			}
+		}	
+
+		if (vifi != numvifs)
+			continue;
+
+		/*
+		 * If there is room in the uvifs array, install this interface.
+		 */
+		if (numvifs == MAXMIFS)
+		{
+			log(LOG_WARNING, 0,
+			    "too many vifs, ignoring %s", ifa->ifa_name);
+			continue;
+		}
+
+		/*
+		 * Everyone below is a potential vif interface.
+		 * We don't care if it has wrong configuration or not
+		 * configured at all.
+		 */
+		total_interfaces++;
+
+		v  = &uvifs[numvifs];
+		v->uv_dst_addr = allpim6routers_group;
+		v->uv_subnetmask = mask;
+		strncpy(v->uv_name, ifa->ifa_name, IFNAMSIZ);
+		v->uv_ifindex = if_nametoindex(v->uv_name);
+		add_phaddr(v, &addr,&mask);
+	
+		/* prefix local calc. (and what about add_phaddr?...) */
+		for (i = 0; i < sizeof(struct in6_addr); i++)
+			v->uv_prefix.sin6_addr.s6_addr[i] =
+				addr.sin6_addr.s6_addr[i] & mask.s6_addr[i];
+	
+		if(flags & IFF_POINTOPOINT)
+			v->uv_flags |=(VIFF_REXMIT_PRUNES | VIFF_POINT_TO_POINT);
+
+		/*
+		 * Disable multicast routing on loopback interfaces and
+		 * interfaces that do not support multicast. But they are
+		 * still necessary, since global addresses maybe assigned only
+		 * on such interfaces.
+		 */
+		if ((flags & IFF_LOOPBACK) != 0 ||
+		    (flags & IFF_MULTICAST) == 0)
+			v->uv_flags |= VIFF_DISABLED;
+
+		IF_DEBUG(DEBUG_IF)
+			log(LOG_DEBUG,0,
+			    "Installing %s (%s on subnet %s) ,"
+			    "as vif #%u - rate = %d",
+			    v->uv_name,inet6_fmt(&addr.sin6_addr),
+			    net6name(&v->uv_prefix.sin6_addr,&mask),
+			    numvifs,v->uv_rate_limit);
+
+		++numvifs;
+
+		
+		if( !(flags & IFF_UP)) 
+		{
+			v->uv_flags |= VIFF_DOWN;
+			vifs_down = TRUE;
+		}
+
+	}
+
+	free(ifap);
+#else  /* !HAVE_GETIFADDRS */
 	ifc.ifc_len = num_ifreq * sizeof (struct ifreq);
 	ifc.ifc_buf = calloc(ifc.ifc_len,sizeof(char));
 	while (ifc.ifc_buf) {
@@ -301,6 +456,7 @@ config_vifs_from_kernel()
 		}
 
 	}
+#endif /* HAVE_GETIFADDRS */
 }
 
 void
