@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2329 2003/02/05 01:36:06 keiichi Exp $
+$KAME: CHANGELOG,v 1.2330 2003/02/05 05:42:17 jinmei Exp $
 
 <200302>
+2003-02-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {freebsd4,kame}/sys/netinet6/udp6_usrreq.c (udp6_input)
+	* {freebsd4,kame}/sys/netinet6/raw_ip6.c (rip6_input)
+	removed redundant code fragments; we do not have to copy mtag back
+	to the source any more.
+	(There should be no change on behavior.)
+
 Wed Feb  5 10:31:48 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/ip6_forward.c,ip6_output.c
 	* freebsd4/sys/sys/mbuf.h
