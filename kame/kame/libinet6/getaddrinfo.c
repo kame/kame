@@ -351,8 +351,7 @@ getaddrinfo(hostname, servname, hints, res)
 	 || MATCH_FAMILY(pai->ai_family, PF_INET6, 1)
 #endif
 	    ) {
-		/* call to get_portmatch() can conterminate *pai */
-		ai0 = *pai;
+		ai0 = *pai;	/* backup *pai */
 
 		if (pai->ai_family == PF_UNSPEC) {
 #ifdef PF_INET6
