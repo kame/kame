@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.45 2001/04/25 12:29:29 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.46 2001/04/25 12:31:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -195,11 +195,16 @@ mainloop0(sd)
 	char buf[8 * 1024];
 	ssize_t l;
 	struct nsdb *ns;
+	u_int16_t vclen;
 
 	if (sd->type == S_TCP) {
-		/* XXX dummy read for length */
-		(void)read(sd->s, buf, 2);
-	}
+		if (read(sd->s, &vclen, sizeof(vclen)) < 0) {
+			if (dflag)
+				warn("read");
+			return -1;
+		}
+	} else
+		vclen = 0;
 
 	/*
 	 * XXX we need to get destination address of incoming packet.
@@ -219,6 +224,11 @@ mainloop0(sd)
 	if (l < 0) {
 		if (dflag)
 			warn("recvfrom");
+		return -1;
+	}
+	if (vclen && ntohs(vclen) != l) {
+		if (dflag)
+			warnx("length mismatch");
 		return -1;
 	}
 
