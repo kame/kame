@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.408 2000/01/06 05:03:32 itojun Exp $
+$Id: CHANGELOG,v 1.409 2000/01/06 07:45:17 itojun Exp $
 
 <200001>
+Thu Jan  6 16:43:52 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: when searching IPsec SA for inbound IPsec traffic,
+	  do not check src match according to RFC2401.  it looks that IPsec
+	  specs do not really agree with each other about what should be
+	  in IPsec SA, and what should be matched.  see comment lines near
+	  key_allocsa().
+
 Thu Jan  6 13:49:43 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_input.c: add missing case for net.inet6.ip6.rr_prune
 	  for openbsd and netbsd.
