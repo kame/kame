@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.76 2000/06/27 16:56:34 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.77 2000/06/28 09:58:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1386,8 +1386,8 @@ isakmp_ph1delete(iph1)
 }
 
 /* called from scheduler.
- * this function will call only isakmp_ph2expire2().
- * phase 2 handler remain forever if kernel doesn't send phase SA expires
+ * this function will call only isakmp_ph2delete().
+ * phase 2 handler remain forever if kernel doesn't cry a expire of phase 2 SA
  * by something cause.  That's why this function is called after phase 2 SA
  * expires in the userland.
  */
