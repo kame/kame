@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.46 2001/04/27 15:09:48 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.47 2001/06/01 03:09:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -359,8 +359,9 @@ struct nd_opt_route_info {	/* route info */
 	u_int8_t	nd_opt_rti_prefixlen;
 	u_int8_t	nd_opt_rti_flags;
 	u_int32_t	nd_opt_rti_lifetime;
-	/* followed by prefix */
+	struct in6_addr	nd_opt_rti_prefix;
 } __attribute__((__packed__));
+
 /*
  * icmp6 namelookup
  */
