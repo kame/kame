@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1727 2001/06/15 04:00:22 itojun Exp $
+$KAME: CHANGELOG,v 1.1728 2001/06/16 16:28:11 jinmei Exp $
 
 <200106>
+2001-06-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c: re-enabled clarification on the
+	dependency between the 1st dst opt header and the routing header,
+	based on rfc2292bis-02.
+	This part was disabled when merging a recent mip6 patch from Ericsson,
+	without much consideration about the rationale.  Actually,
+	disabling this part just for MIP6 convenience is a bad idea (or at
+	least not a good idea).  We need to think carefully about a way to
+	make the advanced API coexist with MIP6 options.
+
 Fri Jun 15 13:14:31 JST 2001  itojun@iijlab.net
 	* openbsd/sys/net/if.[ch]: change meaning of ifnet.if_lastchange
 	  to meet with RFC1573 ifLastChange.  sync with openbsd-current.
