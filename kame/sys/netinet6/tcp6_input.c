@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.57 2002/06/11 17:54:30 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.58 2002/06/11 21:52:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -753,7 +753,7 @@ findpcb:
 							M_NOWAIT);
 #ifdef IPSEC
 			/* copy old policy into new socket's */
-			if (ipsec_deepcopy_pcbpolicy(sotoin6pcb(oso)->in6p_sp,
+			if (ipsec_copy_pcbpolicy(sotoin6pcb(oso)->in6p_sp,
 			                      in6p->in6p_sp))
 				printf("tcp6_input: could not copy policy\n");
 #endif
@@ -2550,7 +2550,7 @@ syn_cache_get6(so, m, off, len, src, dst)
 	in6p->in6p_fport = sc->sc_sport;
 #ifdef IPSEC
 	/* copy old policy into new socket's */
-	if (ipsec_deepcopy_pcbpolicy(sotoin6pcb(oso)->in6p_sp, in6p->in6p_sp))
+	if (ipsec_copy_pcbpolicy(sotoin6pcb(oso)->in6p_sp, in6p->in6p_sp))
 		printf("syn_cache_get6: could not copy policy\n");
 #endif
 

@@ -583,7 +583,7 @@ syncache_socket(sc, lso)
 	}
 #ifdef IPSEC
 	/* copy old policy into new socket's */
-	if (ipsec_deepcopy_pcbpolicy(sotoinpcb(lso)->inp_sp, inp->inp_sp))
+	if (ipsec_copy_pcbpolicy(sotoinpcb(lso)->inp_sp, inp->inp_sp))
 		printf("syncache_expand: could not copy policy\n");
 #endif
 #ifdef INET6

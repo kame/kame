@@ -913,7 +913,7 @@ findpcb:
 			inp->inp_options = ip_srcroute();
 #ifdef IPSEC
 			/* copy old policy into new socket's */
-			if (ipsec_deepcopy_pcbpolicy(sotoinpcb(oso)->inp_sp,
+			if (ipsec_copy_pcbpolicy(sotoinpcb(oso)->inp_sp,
 			                      inp->inp_sp))
 				printf("tcp_input: could not copy policy\n");
 #endif
