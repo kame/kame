@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.1 2000/11/01 14:03:37 itojun Exp $
+#	$KAME: Makefile,v 1.2 2000/11/01 15:28:10 itojun Exp $
 
 .include "../Makefile.inc"
 .include <bsd.own.mk>
@@ -17,6 +17,6 @@ CFLAGS+=	-I${SYSDIR}
 .PATH:	${SYSDIR}/crypto/cast128
 
 regress:
-	@./casttest
+	@${.OBJDIR}/${PROG}
 
 .include <bsd.prog.mk>

@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.1 2000/11/01 14:27:57 itojun Exp $
+#	$KAME: Makefile,v 1.2 2000/11/01 15:28:11 itojun Exp $
 
 .include "../Makefile.inc"
 .include <bsd.own.mk>
@@ -17,6 +17,6 @@ CFLAGS+=	-I${SYSDIR} "-Dpanic(x)=abort()"
 .PATH:	${SYSDIR}/crypto/rijndael
 
 regress:
-	@./rijndaeltest
+	@${.OBJDIR}/${PROG}
 
 .include <bsd.prog.mk>
