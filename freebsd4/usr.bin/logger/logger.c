@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)logger.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/logger/logger.c,v 1.5.2.1 2000/08/08 03:11:22 ps Exp $";
+  "$FreeBSD: src/usr.bin/logger/logger.c,v 1.7 2000/12/16 18:33:08 ume Exp $";
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -74,7 +74,7 @@ struct socks {
 #ifdef INET6
 int	family = PF_UNSPEC;	/* protocol family (IPv4, IPv6 or both) */
 #else
-int	family = PF_INET;	/* protocol family (IPv4, IPv6 or both) */
+int	family = PF_INET;	/* protocol family (IPv4 only) */
 #endif
 int	send_to_all = 0;	/* send message to all IPv4/IPv6 addresses */
 
@@ -216,10 +216,10 @@ logmessage(int pri, char *host, char *buf)
 			errx(1, "socket");
 	}
 
-	for (i = 0; i < nsock; ++i) {
-		if ((len = asprintf(&line, "<%d>%s", pri, buf)) == -1)
-			errx(1, "asprintf");
+	if ((len = asprintf(&line, "<%d>%s", pri, buf)) == -1)
+		errx(1, "asprintf");
 
+	for (i = 0; i < nsock; ++i) {
 		lsent = sendto(socks[i].sock, line, len, 0,
 			       (struct sockaddr *)&socks[i].addr,
 			       socks[i].addrlen);
