@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.67 2001/08/16 11:41:57 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.68 2001/08/31 01:03:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -436,7 +436,12 @@ int	rip6_ctloutput __P((struct socket *so, struct sockopt *sopt));
 #else
 int	rip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+int	rip6_output __P((struct mbuf *, struct socket *,
+			 struct sockaddr_in6 *, struct mbuf *));
+#else
 int	rip6_output __P((struct mbuf *, ...));
+#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 int	rip6_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
 
