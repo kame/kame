@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1745 2001/06/27 13:13:19 sakane Exp $
+$KAME: CHANGELOG,v 1.1746 2001/06/27 17:34:38 sakane Exp $
 
 <200106>
+Thu Jun 28 02:33:32 JST 2001 sakane@kame.net
+	* kame/setkey:
+	enabled to use a service name as a port number.
+	but these operation should use getaddrinfo().
+
 Wed Jun 27 22:10:43 JST 2001 sakane@kame.net
 	* sys/netkey/key.c:
 	* kame/libipsec/pfkey_dump.c:
