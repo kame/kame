@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2260 2002/10/24 10:14:59 suz Exp $
+$KAME: CHANGELOG,v 1.2261 2002/10/26 07:19:53 kjc Exp $
 
 <200210>
+Sat Oct 26 16:14:22 JST 2002	kjc@csl.sony.co.jp
+	* add a new queueing discipline, JoBS, to ALTQ
+	JoBS is contributed by Nicolas Christin <nicolas@cs.virginia.edu>
+	and has been in the altq distribution since altq-3.1
+
 Thu Oct 24 19:14:11 JST 2002	suz@crl.hitachi.co.jp
 	* freebsd4: sync with FreeBSD 4.7-RELEASE.
 
