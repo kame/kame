@@ -1,8 +1,36 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1149 2000/07/25 06:02:52 jinmei Exp $
+$Id: CHANGELOG,v 1.1150 2000/07/25 10:27:38 kjc Exp $
 
-<200006>
+<200007>
+Tue 25 Jul 19:12:42 JST 2000  kjc@csl.sony.co.jp
+	* the first round of ALTQ interface mega cleanup:
+	  - cleanup the system interface to the rest of the kernel.
+	  (the second round cleans up altq internals.)
+	* bring in the new output queue model.
+	  the new model removes "#ifdef ALTQ" from most of the
+	  drivers, and thus, touches all the drivers used by ALTQ.
+	  - the type of if_snd in struct ifnet is changed from
+	    struct ifqueue to struct ifaltq.
+	  - the altq related fields are moved from struct ifnet
+	    to struct ifaltq.
+	  - use the newly introduced IFQ_XXX macros instead of
+	    IF_XXX macros
+	* the new altq mechanism consists of classifier, queueing
+	  discipline, and token bucket regulator.
+	  - add token bucket regulator to control network devices.
+	    tbr decouples driver tuning from disciplines.
+	* other changes:
+	  - removed 2 kernel config options
+	    ALTQ_ACCOUNT: should be part of classifier
+	    AFMAP: doesn't really belong to altq
+	  - added kernel option
+	    ALTQ_NOPPC: do not use processor cycle counter
+	  - support alpha architecture on netbsd/openbsd.
+	    make use of alpha_rpcc() for a high resolution clock.
+	  - add new driver support: ex, wi, tun, ppp
+	  - some other style(9) cleanup
+
 Mon Jul 24 23:34:26 JST 2000  itojun@iijlab.net
 	* *bsd*/usr.bin/telnet/commands.c: do not use IPV6_PKTOPTIONS in
 	  2292bis API environment.  IPv6 source route is temporarily disabled.
@@ -396,6 +424,7 @@ Sat Jul  1 20:57:57 JST 2000  itojun@iijlab.net
 		per-single-process enhancement.  current faithd(8) needs 1
 		process per 1 connection anyways.
 
+<200006>
 Fri Jun 30 17:45:23 JST 2000 sakane@ydc.co.jp
 	* freebsd[34]/usr.bin/whois.c:
 	ported whois for IPv6/4.
