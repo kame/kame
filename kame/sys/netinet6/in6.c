@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.355 2004/01/13 11:15:57 suz Exp $	*/
+/*	$KAME: in6.c,v 1.356 2004/01/13 11:18:04 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2231,7 +2231,7 @@ in6_purgemkludge(ifp)
 #ifdef MLDV2
 			int error;
 			/* ToDo: should remove all multicast entries */
-			in6_delmulti(in6m, &error, 0, NULL, MCAST_EXCLUDE, 0);
+			in6_delmulti(in6m, &error, 0, NULL, MCAST_EXCLUDE, 1);
 #else
 			in6_delmulti(in6m);
 #endif
