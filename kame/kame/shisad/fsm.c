@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.14 2005/03/01 00:41:48 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.15 2005/03/01 02:01:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2118,15 +2118,12 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	u_int16_t seqno;
 	int ip6mhbalen;
 	u_int16_t lifetime, refresh;
-	time_t curtime;
 	struct mip6_mobility_options mopt;
 
 	ip6mhba = (struct ip6_mh_binding_ack *)(fsmmsg->fsmm_data);
 	ip6mhbalen = fsmmsg->fsmm_datalen;
 
 	mip6stat.mip6s_ba_hist[ip6mhba->ip6mhba_status]++;
-
-	curtime = time(NULL);
 
 	/* check Sequence Number */
 	seqno = ntohs(ip6mhba->ip6mhba_seqno);
@@ -2162,6 +2159,19 @@ bul_fsm_back_preprocess(bul, fsmmsg)
                 /* silently ignore. */
 		mip6stat.mip6s_seqno++;
                 return (-1);
+	}
+	if (ip6mhba->ip6mhba_status == IP6_MH_BAS_NOT_HA) {
+		if ((bul->bul_reg_fsm_state == MIP6_BUL_REG_FSM_STATE_WAITD)
+		    && (bul->bul_retrans_time >= (initial_bindack_timeout_first_reg * 2))) {
+			/*
+			 * A mobile node may receive a binding ack
+			 * message with NOT_HA status, if the first
+			 * deregistration message is successfully
+			 * processed on a home agent but the first
+			 * binding ack message lost.
+			 */
+			return (0);
+		}
 	}
 	/* check the status code */
 	if (ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
@@ -2217,7 +2227,6 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 
 	/* update lifetime and refresh time. */
 	lifetime = ntohs(ip6mhba->ip6mhba_lifetime);
-/*	bul->bul_expire = curtime + (lifetime << 2); */
 	if (bul->bul_flags & IP6_MH_BU_HOME) {
 		if (mopt.opt_refresh != NULL) {
 			refresh = ntohs(*(u_int16_t *)((struct ip6_mh_opt_refresh_advice *)(mopt.opt_refresh)->ip6mora_interval));
