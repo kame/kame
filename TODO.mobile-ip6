@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.15 2001/10/09 11:45:12 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.16 2001/10/15 00:18:47 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -6,32 +6,39 @@ KAME project
 
 <<Notice>>
 
-This is the alpha version of MIP6 (draft-14) for KAME.  The code is
-tested with FreeBSD.  On Net/OpenBSD, MIP6 code is compilable but not
-tested.  I have not trid to make it on BSD/OS box yet.
+This is the alpha release of KAME/MIP6.  The code is based on draft-14
+(in the sense of the packet format) with no authentication.
 
-This version supports very basic functions of MIP6.  Current status is
+This release supports very basic functions of MIP6.  Current status is
 described below.
+
+Currently, the supported OS is only FreeBSD.  The main reason of this
+is that I don't have other OSes running in my office.  Though the code
+is compilable with other OSes than FreeBSD, they are not tested.  If
+you can be a volunteer, I will appreciate you much.
 
 
 <<Status>>
 
 todo
+- think again about home/care-of address swap.  at least the current code in
+  sys/netinet6/dest6.c is not friendly with (1) icmp6 error generator, (2)
+  tunnels used for PIM, and maybe others.
+- define the behavior of the socket API for homeaddress.
 - security mechanism.
 - DAD when registering CoA.
 - mobile prefix advertisement.
+- NA when returning to home.
 - complete dynamic home agent discovery.
+- rate limit.
 - BR.
 - homeagent info handling.
 - ICMP against tunneled packet handling.
 - registration to the old AR.
 - path mtu discovery when triangle routing.
 - some timeout routines.
-- BSD/OS support.
-- draft-15 (or later).
-- think again about home/care-of address swap.  at least the current code in
-  sys/netinet6/dest6.c is not friendly with (1) icmp6 error generator, (2)
-  tunnels used for PIM, and maybe others.
+- other OSes support.
+- draft-13/draft-15 (or newer) support.
 - may be others.
 
 MN side
@@ -40,18 +47,18 @@ MN side
 - dynamic home agent discovery.
 
 CN side
-- recieve binding update.
+- recieving binding update.
 - insertion of a routing header.
 
 HA side
 - home registration.
-- encapsulate packets destined to MN.
+- encapsulate packets destined to MNs.
 - dynamic home agent discovery.
 
 
 <<Usage>>
 
-- build kernel with MIP6 and hif pseudo-if
+- build kernel with MIP6 and hif pseudo-if.
 	options MIP6
 	pseudo-device hif 1
 - build rtadvd with -DMIP6 to become a HA.  The easiest way is to add
@@ -62,15 +69,17 @@ HA side
 - to become a HA.
 	invoke rtadvd with -m option
 	mip6control -g
-- to become a MN
+- to become a MN.
 	mip6control -H your_home_prefix -P64
 	mip6control -m
 
 
 <<Schedule>>
 
-- NetBSD support (the end of October)
-- Beta release (for FreeBSD/NetBSD, the end of this year)
+- Beta release at the end of this year.
+  - More stable.
+  - Draft-13/Draft-15 (or newer) support.
+  - NetBSD support.
 
 
 <<Old MIP6 code>>
