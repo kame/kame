@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1540 2001/02/07 07:21:35 itojun Exp $
+$KAME: CHANGELOG,v 1.1541 2001/02/07 12:27:35 jinmei Exp $
 
 <200102>
+2001-02-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/usr.sbin/netstat/route.c (p_sockaddr): removed special
+	cases of ::/plen (plen > 0).  I believe it is better than the
+	original behavior, which printed those routes "v6-in-v4 default".
+
 Wed Feb  7 16:19:19 JST 2001  itojun@iiljab.net
 	* sys/netinet6/raw_ip6.c (netbsd/openbsd): validate/notify path MTU
 	  discovery correctly for raw ip6 sockets.
