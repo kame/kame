@@ -713,7 +713,6 @@ rt_timer_queue_change(rtq, timeout)
 	rtq->rtq_timeout = timeout;
 }
 
-
 void
 rt_timer_queue_destroy(rtq, destroy)
 	struct rttimer_queue *rtq;
@@ -734,6 +733,22 @@ rt_timer_queue_destroy(rtq, destroy)
 	/*
 	 * Caller is responsible for freeing the rttimer_queue structure.
 	 */
+}
+
+/* XXX should we maintain counter in rttimer_queue? */
+unsigned long
+rt_timer_count(rtq)
+	struct rttimer_queue *rtq;
+{
+	struct rttimer *r;
+	unsigned long cnt;
+
+	cnt = 0;
+	for (r = TAILQ_FIRST(&rtq->rtq_head); r != NULL;
+	     r = TAILQ_NEXT(r, rtt_next))
+		cnt++;
+
+	return cnt;
 }
 
 void     
