@@ -1,4 +1,4 @@
-$Id: question,v 1.20 2000/09/21 19:25:46 itojun Exp $
+$Id: question,v 1.21 2000/09/21 20:05:00 sakane Exp $
 
 Q: how may policy matters are.  can we interoperate ?
 
@@ -222,6 +222,10 @@ Q: Delete payload.
 	When a DELETE notify packet is dropped, SA will get inconsistent
 	between peers.
 		We can prevent from it by using "heartbeat" ?
+
+	when there is no phase 1 SA, should I negotiate phase 1 SA before
+	sending delete notify ?
+	A: no need.  (the consensus made at the mailing list ?)
 
 Q: "heartbeat"
 	It means a signal of "I'm alive".
