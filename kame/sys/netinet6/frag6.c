@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.26 2000/11/10 13:01:03 jinmei Exp $	*/
+/*	$KAME: frag6.c,v 1.27 2000/11/10 23:54:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,6 +72,7 @@ static void frag6_insque __P((struct ip6q *, struct ip6q *));
 static void frag6_remque __P((struct ip6q *));
 static void frag6_freef __P((struct ip6q *));
 
+/* XXX we eventually need splreass6, or some real semaphore */
 int frag6_doing_reass;
 u_int frag6_nfragpackets;
 struct	ip6q ip6q;	/* ip6 reassemble queue */
@@ -228,6 +229,8 @@ frag6_input(mp, offp, proto)
 	/* offset now points to data portion */
 	offset += sizeof(struct ip6_frag);
 
+	frag6_doing_reass = 1;
+
 	for (q6 = ip6q.ip6q_next; q6 != &ip6q; q6 = q6->ip6q_next)
 		if (ip6f->ip6f_ident == q6->ip6q_ident &&
 		    IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &q6->ip6q_src) &&
@@ -296,6 +299,7 @@ frag6_input(mp, offp, proto)
 			icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
 				    offset - sizeof(struct ip6_frag) +
 					offsetof(struct ip6_frag, ip6f_offlg));
+			frag6_doing_reass = 0;
 			return(IPPROTO_DONE);
 		}
 	}
@@ -303,6 +307,7 @@ frag6_input(mp, offp, proto)
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
 			    offset - sizeof(struct ip6_frag) +
 				offsetof(struct ip6_frag, ip6f_offlg));
+		frag6_doing_reass = 0;
 		return(IPPROTO_DONE);
 	}
 	/*
@@ -547,6 +552,7 @@ insert:
 	in6_ifstat_inc(dstifp, ifs6_reass_fail);
 	ip6stat.ip6s_fragdropped++;
 	m_freem(m);
+	frag6_doing_reass = 0;
 	return IPPROTO_DONE;
 }
 
