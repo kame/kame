@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.20 2000/12/15 13:43:57 sakane Exp $	*/
+/*	$KAME: sockmisc.c,v 1.21 2000/12/16 14:19:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -598,13 +598,6 @@ saddr2str(saddr)
 {
 	static char buf[NI_MAXHOST + NI_MAXSERV + 10];
 	char addr[NI_MAXHOST], port[NI_MAXSERV];
-#if 0
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else   
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif      
-#endif
 
 	if (saddr == NULL)
 		return NULL;
@@ -621,13 +614,6 @@ saddrwop2str(saddr)
 {
 	static char buf[NI_MAXHOST + NI_MAXSERV + 10];
 	char addr[NI_MAXHOST];
-#if 0
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else   
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif      
-#endif
 
 	if (saddr == NULL)
 		return NULL;
