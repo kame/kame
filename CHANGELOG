@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1137 2000/07/17 09:49:30 itojun Exp $
+$Id: CHANGELOG,v 1.1138 2000/07/19 12:35:54 itojun Exp $
 
 <200006>
 Mon Jul 17 18:45:11 JST 2000  itojun@iijlab.net
@@ -22,7 +22,7 @@ Sun Jul 16 14:32:58 JST 2000  itojun@iijlab.net
 	  - fill nonce field for node information query (*)
 	  - use generic icmp6 printer for echo/echo reply/ni reply/ni reply,
 	    when ident/nonce does not match
-	  - clarlify outgoign packet construction a bit
+	  - clarlify outgoing packet construction a bit
 	  (*) based on patch from yoshfuji, cleaned up by itojun
 
 Sun Jul 16 13:26:12 JST 2000  itojun@iijlab.net
