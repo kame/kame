@@ -10,18 +10,18 @@
 # For more information on this file, please read the handbook section on
 # Kernel Configuration Files:
 #
-#    http://www.freebsd.org/handbook/kernelconfig-config.html
+#    http://www.FreeBSD.org/handbook/kernelconfig-config.html
 #
 # The handbook is also available locally in /usr/share/doc/handbook
 # if you've installed the doc distribution, otherwise always see the
-# FreeBSD World Wide Web server (http://www.FreeBSD.ORG/) for the
+# FreeBSD World Wide Web server (http://www.FreeBSD.org/) for the
 # latest information.
 #
 # An exhaustive list of options and more detailed explanations of the
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.246 2000/03/09 16:32:55 jlemon Exp $
+# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.246.2.8 2000/07/20 02:51:02 msmith Exp $
 
 machine		i386
 cpu		I386_CPU
@@ -38,6 +38,7 @@ options 	INET			#InterNETworking
 options 	INET6			#IPv6 communications protocols
 options 	FFS			#Berkeley Fast Filesystem
 options 	FFS_ROOT		#FFS usable as root device [keep this!]
+options 	SOFTUPDATES		#Enable FFS soft updates support
 options 	MFS			#Memory Filesystem
 options 	MD_ROOT			#MD is a potential root device
 options 	NFS			#Network Filesystem
@@ -55,9 +56,10 @@ options 	KTRACE			#ktrace(1) support
 options 	SYSVSHM			#SYSV-style shared memory
 options 	SYSVMSG			#SYSV-style message queues
 options 	SYSVSEM			#SYSV-style semaphores
-options 	P1003_1B		#Posix P1003_1B real-time extentions
+options 	P1003_1B		#Posix P1003_1B real-time extensions
 options 	_KPOSIX_PRIORITY_SCHEDULING
 options		ICMP_BANDLIM		#Rate limit bad replies
+options 	KBD_INSTALL_CDEV	# install a CDEV entry in /dev
 
 # To make an SMP kernel, the next two are needed
 #options 	SMP			# Symmetric MultiProcessor Kernel
@@ -96,6 +98,9 @@ device		dpt		# DPT Smartcache - See LINT for options!
 device		isp		# Qlogic family
 device		ncr		# NCR/Symbios Logic
 device		sym		# NCR/Symbios Logic (newer chipsets)
+options		SYM_SETUP_LP_PROBE_MAP=0x40
+				# Allow ncr to attach legacy NCR devices when 
+				# both sym and ncr are configured
 
 device		adv0	at isa?
 device		adw
@@ -114,10 +119,11 @@ device		pass		# Passthrough device (direct SCSI access)
 device		ida		# Compaq Smart RAID
 device		amr		# AMI MegaRAID
 device		mlx		# Mylex DAC960 family
+device		twe		# 3ware Escalade
 
 # atkbdc0 controls both the keyboard and the PS/2 mouse
 device		atkbdc0	at isa? port IO_KBD
-device		atkbd0	at atkbdc? irq 1
+device		atkbd0	at atkbdc? irq 1 flags 0x1
 device		psm0	at atkbdc? irq 12
 
 device		vga0	at isa?
@@ -126,7 +132,7 @@ device		vga0	at isa?
 pseudo-device	splash
 
 # syscons is the default console driver, resembling an SCO console
-device		sc0	at isa?
+device		sc0	at isa? flags 0x100
 
 # Enable this and PCVT_FREEBSD for pcvt vt220 compatible console driver
 #device		vt0	at isa?
@@ -194,6 +200,8 @@ device		wi
 # card for a manually chosen I/O address and IRQ, you must specify
 # those paremeters here.
 device		an
+# Xircom Ethernet
+device		xe
 # The probe order of these is presently determined by i386/isa/isa_compat.c.
 device		ie0	at isa? port 0x300 irq 10 iomem 0xd0000
 device		fe0	at isa? port 0x300
@@ -201,8 +209,6 @@ device		le0	at isa? port 0x300 irq 5 iomem 0xd0000
 device		lnc0	at isa? port 0x280 irq 10 drq 0
 device		cs0	at isa? port 0x300
 device		sn0	at isa? port 0x300 irq 10
-# requires PCCARD (PCMCIA) support to be activated
-#device		xe0	at isa?
 
 # Pseudo devices - the number indicates how many units to allocated.
 pseudo-device	loop		# Network loopback
@@ -213,26 +219,26 @@ pseudo-device	tun		# Packet tunnel.
 pseudo-device	pty		# Pseudo-ttys (telnet etc)
 pseudo-device	md		# Memory "disks"
 pseudo-device	gif	4	# IPv6 and IPv4 tunneling
-#pseudo-device	faith	1	# IPv6-to-IPv4 relaying (translation)
+pseudo-device	faith	1	# IPv6-to-IPv4 relaying (translation)
 
 # The `bpf' pseudo-device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!
 pseudo-device	bpf		#Berkeley packet filter
 
 # USB support
-#device		uhci		# UHCI PCI->USB interface
-#device		ohci		# OHCI PCI->USB interface
-#device		usb		# USB Bus (required)
-#device		ugen		# Generic
-#device		uhid		# "Human Interface Devices"
-#device		ukbd		# Keyboard
-#device		ulpt		# Printer
-#device		umass		# Disks/Mass storage - Requires scbus and da
-#device		ums		# Mouse
+device		uhci		# UHCI PCI->USB interface
+device		ohci		# OHCI PCI->USB interface
+device		usb		# USB Bus (required)
+device		ugen		# Generic
+device		uhid		# "Human Interface Devices"
+device		ukbd		# Keyboard
+device		ulpt		# Printer
+device		umass		# Disks/Mass storage - Requires scbus and da
+device		ums		# Mouse
 # USB Ethernet, requires mii
-#device		aue		# ADMtek USB ethernet
-#device		cue		# CATC USB ethernet
-#device		kue		# Kawasaki LSI USB ethernet
+device		aue		# ADMtek USB ethernet
+device		cue		# CATC USB ethernet
+device		kue		# Kawasaki LSI USB ethernet
 
 
 # KAME extensions
