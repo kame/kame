@@ -8,4 +8,7 @@ MACROS=	-ms
 paper.ps: ${SRCS}
 	${SOELIM} -I${.CURDIR} ${.ALLSRC} | ${TBL} | ${ROFF} > ${.TARGET}
 
+beforeinstall:
+	mkdir -p ${DESTDIR}${DOCDIR}/${DIR}
+
 .include <bsd.doc.mk>

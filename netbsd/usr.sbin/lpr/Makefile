@@ -10,4 +10,7 @@ SUBDIR+= SMM.doc
 all-lp all-lpc all-lpd all-lpq all-lpr all-lprm all-lptest \
     all-pac all-filters: all-common_source
 
+beforeinstall:
+	mkdir -p ${DESTDIR}/usr/local/v6/libexec/lpr
+
 .include <bsd.subdir.mk>

@@ -3,6 +3,6 @@
 
 PROG=	lpf
 MKMAN=	no
-BINDIR=	/usr/libexec/lpr
+BINDIR=	/usr/local/v6/libexec/lpr
 
 .include <bsd.prog.mk>

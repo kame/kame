@@ -135,59 +135,52 @@ getport(rhost, rport)
 	char *rhost;
 	int rport;
 {
-	struct hostent *hp;
-	struct servent *sp;
-	struct sockaddr_in sin;
-	int s, timo = 1, lport = IPPORT_RESERVED - 1;
-	int err;
+	struct addrinfo hints, *res, *r;
+	int lport = IPPORT_RESERVEDMAX;
+	int error, s;
+	int timo = 1;
 
 	/*
 	 * Get the host address and port number to connect to.
 	 */
 	if (rhost == NULL)
 		fatal("no remote host to connect to");
-	memset((char *)&sin, 0, sizeof(sin));
-	if (inet_aton(rhost, &sin.sin_addr) == 1)
-		sin.sin_family = AF_INET;
-	else {
-		hp = gethostbyname(rhost);
-		if (hp == NULL)
-			fatal("unknown host %s", rhost);
-		memmove((caddr_t)&sin.sin_addr, hp->h_addr, hp->h_length);
-		sin.sin_family = hp->h_addrtype;
-	}
-	if (rport == 0) {
-		sp = getservbyname("printer", "tcp");
-		if (sp == NULL)
-			fatal("printer/tcp: unknown service");
-		sin.sin_port = sp->s_port;
-	} else
-		sin.sin_port = htons(rport);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	error = getaddrinfo(rhost, "printer", &hints, &res);
+	if (error)
+		fatal(gai_strerror(error));
 
 	/*
 	 * Try connecting to the server.
 	 */
+	for (r = res; r; r = r->ai_next) {
 retry:
-	seteuid(euid);
-	s = rresvport(&lport);
-	seteuid(uid);
-	if (s < 0)
-		return(-1);
-	if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-		err = errno;
-		(void)close(s);
-		errno = err;
-		if (errno == EADDRINUSE) {
-			lport--;
-			goto retry;
-		}
-		if (errno == ECONNREFUSED && timo <= 16) {
-			sleep(timo);
-			timo *= 2;
-			goto retry;
-		}
-		return(-1);
+		seteuid(euid);
+		s = rresvport_af(&lport, r->ai_family);
+		seteuid(uid);
+		if (s < 0)
+			continue;
+		if (connect(s, r->ai_addr, r->ai_addrlen) < 0) {
+			error = errno;
+			(void)close(s);
+			errno = error;
+			if (errno == EADDRINUSE) {
+				lport--;
+				goto retry;
+			}
+			if (errno == ECONNREFUSED && timo <= 16) {
+				sleep(timo);
+				timo *= 2;
+				goto retry;
+			}
+			continue;
+		} else
+			break;
 	}
+	if (res)
+		freeaddrinfo(res);
 	return(s);
 }
 
@@ -305,45 +298,62 @@ compar(p1, p2)
 /*
  * Figure out whether the local machine is the same
  * as the remote machine (RM) entry (if it exists).
+ *
+ * XXX not really the right way to determine.
  */
 char *
 checkremote()
 {
 	char name[MAXHOSTNAMELEN + 1];
-	struct hostent *hp;
+	struct addrinfo hints, *res;
 	static char errbuf[128];
+	int error;
 
 	remote = 0;	/* assume printer is local */
 	if (RM != NULL) {
 		/* get the official name of the local host */
 		gethostname(name, sizeof(name));
 		name[sizeof(name)-1] = '\0';
-		hp = gethostbyname(name);
-		if (hp == (struct hostent *) NULL) {
-		    (void)snprintf(errbuf, sizeof(errbuf),
-			"unable to get official name for local machine %s",
-			name);
-		    return errbuf;
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_flags = AI_CANONNAME;
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+		res = NULL;
+		error = getaddrinfo(name, NULL, &hints, &res);
+		if (error) {
+			(void)snprintf(errbuf, sizeof(errbuf),
+				"unable to get official name for local machine %s: %s",
+				name, gai_strerror(error));
+			return errbuf;
 		} else {
-			(void)strncpy(name, hp->h_name, sizeof(name) - 1);
+			strncpy(name, res->ai_canonname, sizeof(name) - 1);
 			name[sizeof(name) - 1] = '\0';
+			freeaddrinfo(res);
 		}
-
+  
 		/* get the official name of RM */
-		hp = gethostbyname(RM);
-		if (hp == (struct hostent *) NULL) {
-		    (void)snprintf(errbuf, sizeof(errbuf),
-			"unable to get official name for remote machine %s",
-			RM);
-		    return errbuf;
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_flags = AI_CANONNAME;
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+		res = NULL;
+		error = getaddrinfo(RM, NULL, &hints, &res);
+		if (error) {
+			(void)snprintf(errbuf, sizeof(errbuf),
+				"unable to get official name for local machine %s: %s",
+				name, gai_strerror(error));
+			return errbuf;
 		}
-
+  
 		/*
 		 * if the two hosts are not the same,
 		 * then the printer must be remote.
 		 */
-		if (strcasecmp(name, hp->h_name) != 0)
+		if (strcasecmp(name, res->ai_canonname) != 0)
 			remote = 1;
+
+		freeaddrinfo(res);
 	}
 	return NULL;
 }

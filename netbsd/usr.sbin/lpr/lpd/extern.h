@@ -39,6 +39,7 @@
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
+#include <sys/socket.h>
 
 /*
  * from stty.h
@@ -62,6 +63,3 @@ void       sttyclearflags __P((struct termios *tp, int flags));
 void       sttysetflags __P((struct termios *tp, int flags));
 void       sttyclearlflags __P((struct termios *tp, int flags));
 void       sttysetlflags __P((struct termios *tp, int flags));
-
-/* XXX from libc/net/rcmd.c */
-int        __ivaliduser __P((FILE *, u_int32_t, const char *, const char *));
