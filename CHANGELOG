@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.222 1999/10/27 05:21:56 jinmei Exp $
+$Id: CHANGELOG,v 1.223 1999/10/27 05:57:01 sakane Exp $
 
 <199910>
+Wed Oct 27 14:49:09 JST 1999 sakane@ydc.co.jp
+	* kame/sys/netkey/key.c:
+	We don't always try to allocate new SA.  It's no need if the state
+	of SA in the holder is SADB_SASTATE_MATURE, and if this is newer one.
+
 1999-10-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/in6.c (mask2len): changed the argument from
 	in6_addr{} to sockaddr_in6{} so that the function could handle
