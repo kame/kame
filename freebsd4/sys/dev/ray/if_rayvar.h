@@ -28,12 +28,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ray/if_rayvar.h,v 1.12.2.1 2001/01/02 22:33:02 dmlb Exp $
+ * $FreeBSD: src/sys/dev/ray/if_rayvar.h,v 1.12.2.4 2001/08/14 22:54:07 dmlb Exp $
  *
  */
 
 /*
- * Network parameters, used twice in sotfc to store what we want and what
+ * Network parameters, used twice in softc to store what we want and what
  * we have.
  *
  * The current parameters are ONLY valid in a function called from the runq
@@ -44,7 +44,10 @@ struct ray_nw_param {
     struct ray_net_params \
     			p_2;
     u_int8_t		np_ap_status;
-    int			np_promisc;
+    int			np_promisc;	/* Promiscious mode status	*/
+    int			np_framing;	/* Packet framing types		*/
+    int			np_auth;	/* Authentication status	*/
+    int			np_havenet;	/* True if we have a network	*/
 };
 #define np_upd_param	p_1.c_upd_param
 #define	np_bss_id	p_1.c_bss_id
@@ -80,9 +83,8 @@ struct ray_softc {
     struct resource*	irq_res;	/* Resource for irq */
     void *		irq_handle;	/* Handle for irq handler */
 
-    u_char		gone;		/* 1 = Card bailed out		*/
-
-    int			framing;	/* Packet framing types		*/
+    u_int8_t		sc_ccsinuse[64];/* ccss' in use -- not for tx	*/
+    u_char		sc_gone;	/* 1 = Card bailed out		*/
 
     struct ray_ecf_startup_v5
     			sc_ecf_startup; /* Startup info from card	*/
@@ -92,8 +94,6 @@ struct ray_softc {
 
     struct ray_nw_param	sc_c;		/* current network params 	*/
     struct ray_nw_param sc_d;		/* desired network params	*/
-    int			sc_havenet;	/* true if we have a network	*/
-    u_int8_t		sc_ccsinuse[64];/* ccss' in use -- not for tx	*/
 
     int			sc_checkcounters;
     u_int64_t		sc_rxoverflow;	/* Number of rx overflows	*/
@@ -128,12 +128,6 @@ struct ray_comq_entry {
 };
 
 /*
- * Framing types
- */
-/* XXX maybe better as part of the if structure? */
-#define SC_FRAMING_WEBGEAR	0
-
-/*
  * Macro's and constants
  */
 static int mib_info[RAY_MIB_MAX+1][3] = RAY_MIB_INFO;
@@ -144,23 +138,11 @@ static int mib_info[RAY_MIB_MAX+1][3] = RAY_MIB_INFO;
     ((size_t)(&((type *)0)->member))
 #endif /* offsetof */
 
-#if RAY_NEED_CM_REMAPPING
-
-#define ATTR_READ_1(sc, off) \
-    ray_attr_read_1((sc), (off))
-
-#define ATTR_WRITE_1(sc, off, val) \
-    ray_attr_write_1((sc), (off), (val))
-
-#else
-
 #define ATTR_READ_1(sc, off) \
     ((u_int8_t)bus_space_read_1((sc)->am_bst, (sc)->am_bsh, (off)))
 
 #define ATTR_WRITE_1(sc, off, val) \
     bus_space_write_1((sc)->am_bst, (sc)->am_bsh, (off), (val))
-
-#endif /* RAY_NEED_CM_REMAPPING */
 
 #define	SRAM_READ_1(sc, off) \
     ((u_int8_t)bus_space_read_1((sc)->cm_bst, (sc)->cm_bsh, (off)))
@@ -194,6 +176,17 @@ static int mib_info[RAY_MIB_MAX+1][3] = RAY_MIB_INFO;
 
 #define	SRAM_WRITE_FIELD_N(sc, off, s, f, p, n)	\
     SRAM_WRITE_REGION((sc), (off) + offsetof(struct s, f), (p), (n))
+
+/* Framing types */
+/* XXX maybe better as part of the if structure? */
+#define RAY_FRAMING_ENCAPSULATION	0
+#define RAY_FRAMING_TRANSLATION		1
+
+/* Authentication states */
+#define RAY_AUTH_UNAUTH		0
+#define RAY_AUTH_WAITING	1
+#define RAY_AUTH_AUTH		2
+#define RAY_AUTH_NEEDED		3
 
 /* Flags for runq entries */
 #define RAY_COM_FWOK		0x0001		/* Wakeup on completion	*/
@@ -275,6 +268,24 @@ static int mib_info[RAY_MIB_MAX+1][3] = RAY_MIB_INFO;
 	    RAY_PRINTF(sc, "got error from runq 0x%x", (error));	\
 } while (0)
 
+/*
+ * There are a number of entry points into the ray_init_xxx routines.
+ * These can be classed into two types: a) those that happen as a result
+ * of a change to the cards operating parameters (e.g. BSSID change), and
+ * b) those that happen as a result of a change to the interface parameters
+ * (e.g. a change to the IP address). The second set of entries need not
+ * send a command to the card when the card is IFF_RUNNING. The
+ * RAY_COM_FCHKRUNNING flags indicates when the RUNNING flag should be
+ * checked, and this macro does the necessary check and command abort.
+ */
+#define RAY_COM_CHKRUNNING(sc, com, ifp) do {				\
+    if (((com)->c_flags & RAY_COM_FCHKRUNNING) &&			\
+	((ifp)->if_flags & IFF_RUNNING)) {				\
+	    ray_com_runq_done(sc);					\
+	    return;							\
+} } while (0)
+    
+    
 
 #define RAY_COM_INIT(com, function, flags)	\
     ray_com_init((com), (function), (flags), __STRING(function));
@@ -296,15 +307,19 @@ static int mib_info[RAY_MIB_MAX+1][3] = RAY_MIB_INFO;
 } } while (0)
 #endif /* RAY_RECERR */
 
-/*
- * The driver assumes that the common memory is always mapped in,
- * for the moment we ensure this with the following macro at the
- * head of each function and by using functions to access attribute
- * memory. Hysterical raisins led to the non-"reflexive" approach.
- * Roll on NEWCARD and it can all die...
- */
-#if RAY_NEED_CM_REMAPPING
-#define	RAY_MAP_CM(sc)		ray_attr_mapcm(sc)
-#else
+/* XXX this should be in CCSERR but don't work - probably need to use ##ifp->(iferrcounter)++;						\*/
+#ifndef RAY_CCSERR
+#define RAY_CCSERR(sc, status, iferrcounter) do {			\
+    struct ifnet *ifp = &(sc)->arpcom.ac_if;				\
+    char *ss[] = RAY_CCS_STATUS_STRINGS;				\
+    if ((status) != RAY_CCS_STATUS_COMPLETE) {				\
+	if (ifp->if_flags & IFF_DEBUG) {				\
+	    device_printf((sc)->dev,					\
+	        "%s(%d) ECF command completed with status %s\n",	\
+		__FUNCTION__ , __LINE__ , ss[(status)]);		\
+} } } while (0)
+#endif /* RAY_CCSERR */
+
+#ifndef RAY_MAP_CM
 #define RAY_MAP_CM(sc)
-#endif /* RAY_NEED_CM_REMAPPING */
+#endif /* RAY_MAP_CM */

@@ -28,9 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aicasm.h,v 1.1.1.2 2001/04/23 13:09:50 sumikawa Exp $
+ * $Id: aicasm.h,v 1.1.1.3 2001/09/25 04:58:42 keiichi Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm.h,v 1.11.2.2 2001/01/07 22:52:35 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm.h,v 1.11.2.3 2001/07/28 18:46:44 gibbs Exp $
  */
 
 #ifdef __linux__
@@ -69,6 +69,7 @@ extern int includes_search_curdir;		/* False if we've seen -I- */
 extern char *appname;
 extern int yylineno;
 extern char *yyfilename;
+extern char *versions;
 
 void stop(const char *errstring, int err_code);
 void include_file(char *file_name, include_type type);

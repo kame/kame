@@ -38,7 +38,7 @@
  * from: Utah $Hdr: vm_mmap.c 1.6 91/10/21$
  *
  *	@(#)vm_mmap.c	8.4 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_mmap.c,v 1.108.2.3 2000/11/26 02:30:09 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_mmap.c,v 1.108.2.4 2001/05/18 09:58:52 bp Exp $
  */
 
 /*
@@ -198,6 +198,7 @@ mmap(p, uap)
 	int disablexworkaround;
 	off_t pos;
 	struct vmspace *vms = p->p_vmspace;
+	vm_object_t obj;
 
 	addr = (vm_offset_t) uap->addr;
 	size = uap->len;
@@ -295,6 +296,14 @@ mmap(p, uap)
 		vp = (struct vnode *) fp->f_data;
 		if (vp->v_type != VREG && vp->v_type != VCHR)
 			return (EINVAL);
+		if (vp->v_type == VREG) {
+			/*
+			 * Get the proper underlying object
+			 */
+			if (VOP_GETVOBJECT(vp, &obj) != 0)
+				return (EINVAL);
+			vp = (struct vnode*)obj->handle;
+		}
 
 		/*
 		 * don't let the descriptor disappear on us if we block

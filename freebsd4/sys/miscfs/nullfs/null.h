@@ -35,7 +35,7 @@
  *
  *	@(#)null.h	8.3 (Berkeley) 8/20/94
  *
- * $FreeBSD: src/sys/miscfs/nullfs/null.h,v 1.11.2.2 2000/10/25 04:26:30 bp Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null.h,v 1.11.2.3 2001/06/26 04:20:09 bp Exp $
  */
 
 struct null_args {
@@ -52,6 +52,8 @@ struct null_mount {
  * A cache of vnode references
  */
 struct null_node {
+	struct lock		null_lock;	/* Lock for this vnode. MBF */
+	struct lock		*null_vnlock;	/* lock of lower vnode in the stack */
 	LIST_ENTRY(null_node)	null_hash;	/* Hash list */
 	struct vnode	        *null_lowervp;	/* VREFed once */
 	struct vnode		*null_vnode;	/* Back pointer */

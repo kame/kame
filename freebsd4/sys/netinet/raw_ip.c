@@ -31,11 +31,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.3 2000/10/17 13:44:57 ru Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.8 2001/07/29 19:32:40 ume Exp $
  */
 
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_random_ip_id.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -137,6 +138,15 @@ rip_input(m, off, proto)
 			continue;
 		if (last) {
 			struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
+
+#ifdef IPSEC
+			/* check AH/ESP integrity. */
+			if (n && ipsec4_in_reject_so(n, last->inp_socket)) {
+				m_freem(n);
+				ipsecstat.in_polvio++;
+				/* do not inject data to pcb */
+			} else
+#endif /*IPSEC*/
 			if (n) {
 				if (last->inp_flags & INP_CONTROLOPTS ||
 				    last->inp_socket->so_options & SO_TIMESTAMP)
@@ -155,6 +165,15 @@ rip_input(m, off, proto)
 		}
 		last = inp;
 	}
+#ifdef IPSEC
+	/* check AH/ESP integrity. */
+	if (last && ipsec4_in_reject_so(m, last->inp_socket)) {
+		m_freem(m);
+		ipsecstat.in_polvio++;
+		ipstat.ips_delivered--;
+		/* do not inject data to pcb */
+	} else
+#endif /*IPSEC*/
 	if (last) {
 		if (last->inp_flags & INP_CONTROLOPTS ||
 		    last->inp_socket->so_options & SO_TIMESTAMP)
@@ -168,9 +187,9 @@ rip_input(m, off, proto)
 			sorwakeup(last->inp_socket);
 	} else {
 		m_freem(m);
-              ipstat.ips_noproto++;
-              ipstat.ips_delivered--;
-      }
+		ipstat.ips_noproto++;
+		ipstat.ips_delivered--;
+	}
 }
 
 /*
@@ -198,13 +217,13 @@ rip_output(m, so, dst)
 		}
 		M_PREPEND(m, sizeof(struct ip), M_WAIT);
 		ip = mtod(m, struct ip *);
-		ip->ip_tos = 0;
+		ip->ip_tos = inp->inp_ip_tos;
 		ip->ip_off = 0;
 		ip->ip_p = inp->inp_ip_p;
 		ip->ip_len = m->m_pkthdr.len;
 		ip->ip_src = inp->inp_laddr;
 		ip->ip_dst.s_addr = dst;
-		ip->ip_ttl = MAXTTL;
+		ip->ip_ttl = inp->inp_ip_ttl;
 	} else {
 		if (m->m_pkthdr.len > IP_MAXPACKET) {
 			m_freem(m);
@@ -221,14 +240,21 @@ rip_output(m, so, dst)
 			return EINVAL;
 		}
 		if (ip->ip_id == 0)
+#ifdef RANDOM_IP_ID
+			ip->ip_id = ip_randomid();
+#else
 			ip->ip_id = htons(ip_id++);
+#endif
 		/* XXX prevent ip_output from overwriting header fields */
 		flags |= IP_RAWOUTPUT;
 		ipstat.ips_rawout++;
 	}
 
 #ifdef IPSEC
-	ipsec_setsocket(m, so);
+	if (ipsec_setsocket(m, so) != 0) {
+		m_freem(m);
+		return ENOBUFS;
+	}
 #endif /*IPSEC*/
 
 	return (ip_output(m, inp->inp_options, &inp->inp_route, flags,
@@ -400,7 +426,7 @@ rip_ctlinput(cmd, sa, vip)
 				 * thing to do, but at least if we are running
 				 * a routing process they will come back.
 				 */
-				in_ifadown(&ia->ia_ifa);
+				in_ifadown(&ia->ia_ifa, 0);
 				break;
 			}
 		}
@@ -459,13 +485,7 @@ rip_attach(struct socket *so, int proto, struct proc *p)
 	inp = (struct inpcb *)so->so_pcb;
 	inp->inp_vflag |= INP_IPV4;
 	inp->inp_ip_p = proto;
-#ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->inp_sp);
-	if (error != 0) {
-		in_pcbdetach(inp);
-		return error;
-	}
-#endif /*IPSEC*/
+	inp->inp_ip_ttl = ip_defttl;
 	return 0;
 }
 

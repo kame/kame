@@ -27,28 +27,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/csareg.h,v 1.2 1999/12/10 01:20:08 tanimura Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/csareg.h,v 1.2.2.1 2001/08/01 03:40:57 cg Exp $
  */
 
 #ifndef _CSA_REG_H
 #define _CSA_REG_H
-
-/* This is the pci device id. */
-#define CS4610_PCI_ID 0x60011013
-#define CS4614_PCI_ID 0x60031013
-#define CS4615_PCI_ID 0x60041013
-#define CS4281_PCI_ID 0x60051013
-
-/* And the offsets in pci configuration space. */
-#define CS461x_IO_OFFSET  0x10
-#define CS461x_IO_SIZE    (4 * 1024)
-#define CS461x_MEM_OFFSET 0x14
-#define CS461x_MEM_SIZE   (1024 * 1024)
-
-/* Buffer size on dma transfer. Fixed for CS416x. */
-#define CS461x_BUFFSIZE   (4 * 1024)
-
-#define GOF_PER_SEC 200
 
 /*
  * The following constats are orginally in the sample by Crystal Semiconductor.

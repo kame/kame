@@ -1,10 +1,10 @@
-/*	$FreeBSD: src/sys/dev/mii/miidevs.h,v 1.4.2.3 2000/10/03 18:32:07 wpaul Exp $	*/
+/*	$FreeBSD: src/sys/dev/mii/miidevs.h,v 1.4.2.6 2001/06/18 18:49:43 wpaul Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.3 2000/10/03 18:31:47 wpaul Exp 
+ *	FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.6 2001/06/18 18:49:13 wpaul Exp 
  */
 /*$NetBSD: miidevs,v 1.6 1999/05/14 11:37:30 drochner Exp $*/
 
@@ -62,16 +62,22 @@
 #define	MII_OUI_DAVICOM	0x00606e	/* Davicom Semiconductor */
 #define	MII_OUI_ICS	0x00a0be	/* Integrated Circuit Systems */
 #define	MII_OUI_INTEL	0x00aa00	/* Intel */
+#define	MII_OUI_JATO	0x00e083	/* Jato Technologies */
 #define	MII_OUI_LEVEL1	0x00207b	/* Level 1 */
 #define	MII_OUI_NATSEMI	0x080017	/* National Semiconductor */
 #define	MII_OUI_QUALSEMI	0x006051	/* Quality Semiconductor */
 #define	MII_OUI_SEEQ	0x00a07d	/* Seeq */
 #define	MII_OUI_SIS	0x00e006	/* Silicon Integrated Systems */
+#define	MII_OUI_TDK	0x00c039	/* TDK */
 #define	MII_OUI_TI	0x080028	/* Texas Instruments */
 #define	MII_OUI_XAQTI	0x00e0ae	/* XaQti Corp. */
+#define	MII_OUI_MARVELL	0x005043	/* Marvell Semiconductor */
 
 /* in the 79c873, AMD uses another OUI (which matches Davicom!) */
 #define	MII_OUI_xxAMD	0x00606e	/* Advanced Micro Devices */
+
+/* Intel 82553 A/B steppings */
+#define	MII_OUI_xxINTEL	0x00f800	/* Intel */
 
 /* some vendors have the bits swapped within bytes
 	(ie, ordered as on the wire) */
@@ -122,8 +128,20 @@
 #define	MII_STR_xxICS_1890	"ICS1890 10/100 media interface"
 
 /* Intel PHYs */
+#define	MII_MODEL_xxINTEL_I82553AB	0x0000
+#define	MII_STR_xxINTEL_I82553AB	"i83553 10/100 media interface"
 #define	MII_MODEL_INTEL_I82555	0x0015
 #define	MII_STR_INTEL_I82555	"i82555 10/100 media interface"
+#define	MII_MODEL_INTEL_I82562EM	0x0032
+#define	MII_STR_INTEL_I82562EM	"i82562EM 10/100 media interface"
+#define	MII_MODEL_INTEL_I82562ET	0x0033
+#define	MII_STR_INTEL_I82562ET	"i82562ET 10/100 media interface"
+#define	MII_MODEL_INTEL_I82553C	0x0035
+#define	MII_STR_INTEL_I82553C	"i82553 10/100 media interface"
+
+/* Jato Technologies PHYs */
+#define	MII_MODEL_JATO_BASEX	0x0000
+#define	MII_STR_JATO_BASEX	"Jato 1000baseX media interface"
 
 /* Level 1 PHYs */
 #define	MII_MODEL_xxLEVEL1_LXT970	0x0000
@@ -134,6 +152,10 @@
 #define	MII_STR_NATSEMI_DP83840	"DP83840 10/100 media interface"
 #define	MII_MODEL_NATSEMI_DP83843	0x0001
 #define	MII_STR_NATSEMI_DP83843	"DP83843 10/100 media interface"
+#define	MII_MODEL_NATSEMI_DP83891	0x0005
+#define	MII_STR_NATSEMI_DP83891	"DP83891 10/100/1000 media interface"
+#define	MII_MODEL_NATSEMI_DP83861	0x0006
+#define	MII_STR_NATSEMI_DP83861	"DP83861 10/100/1000 media interface"
 
 /* Quality Semiconductor PHYs */
 #define	MII_MODEL_QUALSEMI_QS6612	0x0000
@@ -149,6 +171,10 @@
 #define	MII_MODEL_xxSIS_900	0x0000
 #define	MII_STR_xxSIS_900	"SiS 900 10/100 media interface"
 
+/* TDK */
+#define	MII_MODEL_TDK_78Q2120	0x0014
+#define	MII_STR_TDK_78Q2120	"TDK 78Q2120 media interface"
+
 /* Texas Instruments PHYs */
 #define	MII_MODEL_xxTI_TLAN10T	0x0001
 #define	MII_STR_xxTI_TLAN10T	"ThunderLAN 10baseT media interface"
@@ -158,3 +184,7 @@
 /* XaQti Corp. PHYs. */
 #define	MII_MODEL_XAQTI_XMACII	0x0000
 #define	MII_STR_XAQTI_XMACII	"XaQti Corp. XMAC II gigabit interface"
+
+/* Marvell Semiconductor PHYs */
+#define	MII_MODEL_MARVELL_E1000	0x0000
+#define	MII_STR_MARVELL_E1000	"Marvell Semiconductor 88E1000* gigabit PHY"

@@ -40,7 +40,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_dbregs.c,v 1.4.2.1 2000/11/01 20:19:48 sef Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_dbregs.c,v 1.4.2.2 2001/08/04 13:12:24 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -96,5 +96,6 @@ int
 procfs_validdbregs(p)
 	struct proc *p;
 {
+
 	return ((p->p_flag & P_SYSTEM) == 0);
 }

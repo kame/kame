@@ -31,7 +31,7 @@
  *
  *
  **********************************************************************
- * $FreeBSD: src/sys/gnu/dev/sound/pci/emu10k1.h,v 1.2.2.2 2000/08/20 00:43:55 cg Exp $
+ * $FreeBSD: src/sys/gnu/dev/sound/pci/emu10k1.h,v 1.2.2.3 2001/08/01 03:41:09 cg Exp $
  */
 
 

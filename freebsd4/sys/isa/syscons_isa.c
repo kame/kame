@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/syscons_isa.c,v 1.11.2.1 2000/04/03 13:03:43 yokota Exp $
+ * $FreeBSD: src/sys/isa/syscons_isa.c,v 1.11.2.2 2001/08/01 10:42:28 yokota Exp $
  */
 
 #include "opt_syscons.h"
@@ -64,12 +64,10 @@ static devclass_t	sc_devclass;
 
 static int	scprobe(device_t dev);
 static int	scattach(device_t dev);
-static int	scresume(device_t dev);
 
 static device_method_t sc_methods[] = {
 	DEVMETHOD(device_probe,         scprobe),
 	DEVMETHOD(device_attach,        scattach),
-	DEVMETHOD(device_resume,        scresume),
 	{ 0, 0 }
 };
 
@@ -96,12 +94,6 @@ static int
 scattach(device_t dev)
 {
 	return sc_attach_unit(device_get_unit(dev), device_get_flags(dev));
-}
-
-static int
-scresume(device_t dev)
-{
-	return sc_resume_unit(device_get_unit(dev));
 }
 
 int

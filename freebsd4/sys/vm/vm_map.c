@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.8 2001/03/14 07:05:05 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.9 2001/06/13 07:26:58 dillon Exp $
  */
 
 /*
@@ -218,6 +218,41 @@ vmspace_free(vm)
 		zfree(vmspace_zone, vm);
 	}
 }
+
+/*
+ * vmspace_swap_count() - count the approximate swap useage in pages for a
+ *			  vmspace.
+ *
+ *	Swap useage is determined by taking the proportional swap used by
+ *	VM objects backing the VM map.  To make up for fractional losses,
+ *	if the VM object has any swap use at all the associated map entries
+ *	count for at least 1 swap page.
+ */
+int
+vmspace_swap_count(struct vmspace *vmspace)
+{
+	vm_map_t map = &vmspace->vm_map;
+	vm_map_entry_t cur;
+	int count = 0;
+
+	for (cur = map->header.next; cur != &map->header; cur = cur->next) {
+		vm_object_t object;
+
+		if ((cur->eflags & MAP_ENTRY_IS_SUB_MAP) == 0 &&
+		    (object = cur->object.vm_object) != NULL &&
+		    object->type == OBJT_SWAP
+		) {
+			int n = (cur->end - cur->start) / PAGE_SIZE;
+
+			if (object->un_pager.swp.swp_bcount) {
+				count += object->un_pager.swp.swp_bcount *
+				    SWAP_META_PAGES * n / object->size + 1;
+			}
+		}
+	}
+	return(count);
+}
+
 
 /*
  *	vm_map_create:

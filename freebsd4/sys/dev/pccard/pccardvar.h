@@ -1,5 +1,5 @@
 /*	$NetBSD: pcmciavar.h,v 1.9 1998/12/29 09:00:28 marc Exp $	*/
-/* $FreeBSD: src/sys/dev/pccard/pccardvar.h,v 1.6.2.1 2000/05/23 03:57:00 imp Exp $ */
+/* $FreeBSD: src/sys/dev/pccard/pccardvar.h,v 1.6.2.2 2001/06/21 05:32:36 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -285,7 +285,10 @@ pccard_get_ether(device_t dev, u_char *enaddr)
 	    PCCARD_IVAR_ETHADDR, (uintptr_t *)enaddr);
 }
 
+/* shared memory flags */
 enum {
-	PCCARD_A_MEM_ATTR = 0x1
+	PCCARD_A_MEM_ATTR=1,    /* attribute */
+	PCCARD_A_MEM_COM,       /* common */
+	PCCARD_A_MEM_8BIT,      /* 8 bit */
+	PCCARD_A_MEM_16BIT      /* 16 bit */
 };
-

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/support.s,v 1.67.2.3 2000/09/30 02:49:33 ps Exp $
+ * $FreeBSD: src/sys/i386/i386/support.s,v 1.67.2.5 2001/08/15 01:23:50 peter Exp $
  */
 
 #include "npx.h"
@@ -954,7 +954,7 @@ ENTRY(i586_copyin)
 ENTRY(fastmove)
 	pushl	%ebp
 	movl	%esp,%ebp
-	subl	$PCB_SAVEFPU_SIZE+3*4,%esp
+	subl	$PCB_SAVE87_SIZE+3*4,%esp
 
 	movl	8(%ebp),%ecx
 	cmpl	$63,%ecx
@@ -993,7 +993,7 @@ ENTRY(fastmove)
 	movl	_curpcb,%esi
 	addl	$PCB_SAVEFPU,%esi
 	cld
-	movl	$PCB_SAVEFPU_SIZE>>2,%ecx
+	movl	$PCB_SAVE87_SIZE>>2,%ecx
 	rep
 	movsl
 	movl	-12(%ebp),%ecx
@@ -1070,7 +1070,7 @@ fastmove_loop:
 	addl	$PCB_SAVEFPU,%edi
 	movl	%esp,%esi
 	cld
-	movl	$PCB_SAVEFPU_SIZE>>2,%ecx
+	movl	$PCB_SAVE87_SIZE>>2,%ecx
 	rep
 	movsl
 	movl	-12(%ebp),%ecx
@@ -1109,7 +1109,7 @@ fastmove_fault:
 	addl	$PCB_SAVEFPU,%edi
 	movl	%esp,%esi
 	cld
-	movl	$PCB_SAVEFPU_SIZE>>2,%ecx
+	movl	$PCB_SAVE87_SIZE>>2,%ecx
 	rep
 	movsl
 
@@ -1604,12 +1604,6 @@ ENTRY(rcr4)
 ENTRY(load_cr4)
 	movl	4(%esp),%eax
 	movl	%eax,%cr4
-	ret
-
-/* void load_dr6(u_int dr6) */
-ENTRY(load_dr6)
-	movl    4(%esp),%eax
-	movl    %eax,%dr6
 	ret
 
 /* void reset_dbregs() */

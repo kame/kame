@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/usb/ukbd.c,v 1.24.2.2 2000/07/02 11:43:59 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ukbd.c,v 1.24.2.4 2001/08/01 10:42:31 yokota Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -64,6 +64,7 @@
 #include <dev/usb/usb_quirks.h>
 #include <dev/usb/hid.h>
 
+#include <sys/kbio.h>
 #include <dev/kbd/kbdreg.h>
 
 #define UKBD_EMULATE_ATSCANCODE	1
@@ -111,10 +112,11 @@ typedef struct ukbd_softc {
 typedef void usbd_intr_t(usbd_xfer_handle, usbd_private_handle, usbd_status);
 typedef void usbd_disco_t(void *);
 
+Static int		ukbd_resume(device_t self);
 Static usbd_intr_t	ukbd_intr;
 Static int		ukbd_driver_load(module_t mod, int what, void *arg);
 
-USB_DECLARE_DRIVER(ukbd);
+USB_DECLARE_DRIVER_INIT(ukbd, DEVMETHOD(device_resume, ukbd_resume));
 
 USB_MATCH(ukbd)
 {
@@ -205,6 +207,18 @@ ukbd_detach(device_t self)
 	return (0);
 }
 
+Static int
+ukbd_resume(device_t self)
+{
+	keyboard_t *kbd;
+
+	kbd = kbd_get_keyboard(kbd_find_keyboard(DRIVER_NAME,
+						 device_get_unit(self)));
+	if (kbd)
+		(*kbdsw[kbd->kb_index]->clear_state)(kbd);
+	return (0);
+}
+
 void
 ukbd_intr(usbd_xfer_handle xfer, usbd_private_handle addr, usbd_status status)
 {
@@ -216,7 +230,6 @@ ukbd_intr(usbd_xfer_handle xfer, usbd_private_handle addr, usbd_status status)
 DRIVER_MODULE(ukbd, uhub, ukbd_driver, ukbd_devclass, ukbd_driver_load, 0);
 
 #include <machine/limits.h>
-#include <machine/console.h>
 #include <machine/clock.h>
 
 #define UKBD_DEFAULT	0

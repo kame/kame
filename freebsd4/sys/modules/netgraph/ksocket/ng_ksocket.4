@@ -32,7 +32,7 @@
 .\" 
 .\" Author: Archie Cobbs <archie@freebsd.org>
 .\"
-.\" $FreeBSD: src/sys/modules/netgraph/ksocket/ng_ksocket.4,v 1.6.2.2 2000/10/24 22:31:04 julian Exp $
+.\" $FreeBSD: src/sys/modules/netgraph/ksocket/ng_ksocket.4,v 1.6.2.3 2001/06/18 08:42:17 sobomax Exp $
 .\"
 .Dd November 15, 1999
 .Dt NG_KSOCKET 4
@@ -107,7 +107,7 @@ destination address parameter should be supplied as an argument.
 Currently unimplemented.
 .It Dv NGM_KSOCKET_GETNAME
 Equivalent to the
-.Xr getname 2
+.Xr getsockname 2
 system call.  The name is returned as a
 .Dv "struct sockaddr"
 in the arguments field of the reply.

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.14 1999/10/21 19:42:03 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.14.2.1 2001/07/19 18:33:07 wpaul Exp $
  */
 
 /*
@@ -431,6 +431,16 @@ struct rl_softc {
  * Addtron device IDs.
  */
 #define ADDTRON_DEVICEID_8139			0x1360
+
+/*
+ * D-Link vendor ID.
+ */
+#define DLINK_VENDORID				0x1186
+ 
+/*
+ * D-Link DFE-530TX+ device ID
+ */
+#define DLINK_DEVICEID_530TXPLUS		0x1300
 
 /*
  * PCI low memory base and low I/O base register, and

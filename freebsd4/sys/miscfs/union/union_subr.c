@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_subr.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/miscfs/union/union_subr.c,v 1.43 1999/12/15 23:02:12 eivind Exp $
+ * $FreeBSD: src/sys/miscfs/union/union_subr.c,v 1.43.2.1 2001/06/14 10:01:18 bp Exp $
  */
 
 #include <sys/param.h>
@@ -301,7 +301,7 @@ union_newsize(vp, uppersz, lowersz)
  *		not locked, and will be dereferenced on return.
  *
  *	lowervp	Holds the new lowervp vnode to be stored in the
- *		union_node we are allocating.  uppervp is referenced but
+ *		union_node we are allocating.  lowervp is referenced but
  *		not locked, and will be dereferenced on return.
  * 
  *	cnp	Holds path component information to be coupled with
@@ -343,7 +343,6 @@ union_allocvp(vpp, mp, dvp, upperdvp, cnp, uppervp, lowervp, docache)
 {
 	int error;
 	struct union_node *un = 0;
-	struct vnode *xlowervp = NULLVP;
 	struct union_mount *um = MOUNTTOUNIONMOUNT(mp);
 	struct proc *p = (cnp) ? cnp->cn_proc : curproc;
 	int hash = 0;
@@ -354,7 +353,7 @@ union_allocvp(vpp, mp, dvp, upperdvp, cnp, uppervp, lowervp, docache)
 		panic("union: unidentifiable allocation");
 
 	if (uppervp && lowervp && (uppervp->v_type != lowervp->v_type)) {
-		xlowervp = lowervp;
+		vrele(lowervp);
 		lowervp = NULLVP;
 	}
 
@@ -597,9 +596,6 @@ loop:
 	}
 
 out:
-	if (xlowervp)
-		vrele(xlowervp);
-
 	if (docache)
 		union_list_unlock(hash);
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.6 2001/02/18 15:41:10 ume Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.7 2001/05/10 17:54:16 knu Exp $
  */
 
 #include "opt_ktrace.h"
@@ -434,7 +434,7 @@ again:
 	 * Preserve some more flags in subprocess.  P_PROFIL has already
 	 * been preserved.
 	 */
-	p2->p_flag |= p1->p_flag & P_SUGID;
+	p2->p_flag |= p1->p_flag & (P_SUGID | P_ALTSTACK);
 	if (p1->p_session->s_ttyvp != NULL && p1->p_flag & P_CONTROLT)
 		p2->p_flag |= P_CONTROLT;
 	if (flags & RFPPWAIT)

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.5 2000/10/29 16:59:29 dwmalone Exp $
+ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.8 2001/08/23 10:32:29 bde Exp $
  */
 
 #include "opt_ddb.h"
@@ -48,6 +48,7 @@
 #include <sys/systm.h>
 #include <sys/eventhandler.h>
 #include <sys/buf.h>
+#include <sys/disklabel.h>
 #include <sys/reboot.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
@@ -225,7 +226,7 @@ boot(howto)
 	 */
 	if (!cold && (howto & RB_NOSYNC) == 0 && waittime < 0) {
 		register struct buf *bp;
-		int iter, nbusy;
+		int iter, nbusy, pbusy;
 
 		waittime = 0;
 		printf("\nsyncing disks... ");
@@ -237,7 +238,7 @@ boot(howto)
 		 * written will be remarked as dirty until other
 		 * buffers are written.
 		 */
-		for (iter = 0; iter < 20; iter++) {
+		for (iter = pbusy = 0; iter < 20; iter++) {
 			nbusy = 0;
 			for (bp = &buf[nbuf]; --bp >= buf; ) {
 				if ((bp->b_flags & B_INVAL) == 0 &&
@@ -252,6 +253,9 @@ boot(howto)
 			if (nbusy == 0)
 				break;
 			printf("%d ", nbusy);
+			if (nbusy < pbusy)
+				iter = 0;
+			pbusy = nbusy;
 			sync(&proc0, NULL);
 			DELAY(50000 * iter);
 		}
@@ -418,8 +422,8 @@ setdumpdev(dev)
 	/*
 	 * XXX should clean up checking in dumpsys() to be more like this.
 	 */
-	newdumplo = psize - Maxmem * PAGE_SIZE / DEV_BSIZE;
-	if (newdumplo < 0)
+	newdumplo = psize - Maxmem * (PAGE_SIZE / DEV_BSIZE);
+	if (newdumplo <= LABELSECTOR)
 		return (ENOSPC);
 	dumpdev = dev;
 	dumplo = newdumplo;
@@ -516,6 +520,27 @@ dumpsys(void)
 		printf("unknown, error = %d\n", error);
 		break;
 	}
+}
+
+int
+dumpstatus(vm_offset_t addr, long count)
+{
+	int c;
+
+	if (addr % (1024 * 1024) == 0) {
+#ifdef HW_WDOG
+		if (wdog_tickler)
+			(*wdog_tickler)();
+#endif   
+		printf("%ld ", count / (1024 * 1024));
+	}
+
+	if ((c = cncheckc()) == 0x03)
+		return -1;
+	else if (c != -1)
+		printf("[CTRL-C to abort] ");
+	
+	return 0;
 }
 
 /*

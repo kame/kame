@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.36.2.6 2001/02/25 21:35:21 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.36.2.7 2001/08/28 17:56:14 sos Exp $
  */
 
 #include <sys/param.h>
@@ -627,7 +627,7 @@ ast_load_unload(struct ast_softc *stp, u_int8_t function)
 static int
 ast_rewind(struct ast_softc *stp)
 {
-    int8_t ccb[16] = { ATAPI_REWIND, 0x01, 0, 0, 0, 0, 0, 0,
+    int8_t ccb[16] = { ATAPI_REZERO, 0x01, 0, 0, 0, 0, 0, 0,
 		       0, 0, 0, 0, 0, 0, 0, 0 };
     int error;
 

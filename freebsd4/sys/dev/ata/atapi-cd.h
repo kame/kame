@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.15.2.6 2001/02/25 21:35:20 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.15.2.7 2001/08/28 17:56:14 sos Exp $
  */
 
 /* CDROM Table Of Contents */
@@ -167,6 +167,8 @@ struct cappage {
     u_int8_t			:3;
     u_int16_t	max_write_speed;	/* max raw data rate in bytes/1000 */
     u_int16_t	cur_write_speed;	/* current data rate in bytes/1000  */
+    u_int16_t   copy_protect_rev;
+    u_int16_t   reserved4;
 };
 
 /* CDROM Changer mechanism status structure */
@@ -259,12 +261,10 @@ struct write_param {
     u_int8_t	sub_hdr_byte1;
     u_int8_t	sub_hdr_byte2;
     u_int8_t	sub_hdr_byte3;
-/*
     u_int8_t	vendor_specific_byte0;
     u_int8_t	vendor_specific_byte1;
     u_int8_t	vendor_specific_byte2;
     u_int8_t	vendor_specific_byte3;
-*/
 } __attribute__((packed));
 
 /* CDROM Read Track Information structure */
@@ -300,10 +300,6 @@ struct acd_softc {
 
     struct buf_queue_head	bio_queue;	/* Queue of i/o requests */
     struct toc			toc;		/* table of disc contents */
-    struct {
-	u_int32_t	volsize;		/* volume size in blocks */
-	u_int32_t	blksize;		/* block size in bytes */
-    } info;
     struct audiopage		au;		/* audio page info */
     struct audiopage		aumask;		/* audio page mask */
     struct cappage		cap;		/* capabilities page info */
@@ -322,6 +318,7 @@ struct acd_softc {
     struct acd_softc		**driver;	/* softc's of changer slots */
     int				slot;		/* this instance slot number */
     time_t			timestamp;	/* this instance timestamp */
+    int				disk_size;	/* size of current media */
     int				block_size;	/* blocksize currently used */
     struct disklabel		disklabel;	/* fake disk label */
     struct devstat		*stats;		/* devstat entry */

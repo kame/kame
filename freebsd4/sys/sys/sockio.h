@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sockio.h	8.1 (Berkeley) 3/28/94
- * $FreeBSD: src/sys/sys/sockio.h,v 1.14.2.2 2000/08/22 18:06:21 archie Exp $
+ * $FreeBSD: src/sys/sys/sockio.h,v 1.14.2.4 2001/07/24 19:10:19 brooks Exp $
  */
 
 #ifndef	_SYS_SOCKIO_H_
@@ -91,11 +91,17 @@
 #define	SIOCGIFPSRCADDR	_IOWR('i', 71, struct ifreq)	/* get gif psrc addr */
 #define	SIOCGIFPDSTADDR	_IOWR('i', 72, struct ifreq)	/* get gif pdst addr */
 #define	SIOCDIFPHYADDR	 _IOW('i', 73, struct ifreq)	/* delete gif addrs */
+#define	SIOCSLIFPHYADDR	 _IOW('i', 74, struct if_laddrreq) /* set gif addrs */
+#define	SIOCGLIFPHYADDR	_IOWR('i', 75, struct if_laddrreq) /* get gif addrs */
 
 #define	SIOCSIFGENERIC	 _IOW('i', 57, struct ifreq)	/* generic IF set op */
 #define	SIOCGIFGENERIC	_IOWR('i', 58, struct ifreq)	/* generic IF get op */
 
 #define	SIOCGIFSTATUS	_IOWR('i', 59, struct ifstat)	/* get IF status */
 #define	SIOCSIFLLADDR	_IOW('i', 60, struct ifreq)	/* set link level addr */
+
+#define SIOCIFCREATE	_IOWR('i', 122, struct ifreq)	/* create clone if */
+#define SIOCIFDESTROY	 _IOW('i', 121, struct ifreq)	/* destroy clone if */
+#define SIOCIFGCLONERS	_IOWR('i', 120, struct if_clonereq) /* get cloners */
 
 #endif /* !_SYS_SOCKIO_H_ */

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/ccd/ccd.c,v 1.73 2000/01/29 14:29:56 peter Exp $ */
+/* $FreeBSD: src/sys/dev/ccd/ccd.c,v 1.73.2.1 2001/09/11 09:49:52 kris Exp $ */
 
 /*	$NetBSD: ccd.c,v 1.22 1995/12/08 19:13:26 thorpej Exp $	*/
 
@@ -1280,6 +1280,9 @@ ccdioctl(dev, cmd, data, flag, p)
 		if ((error = ccdlock(cs)) != 0)
 			return (error);
 
+		if (ccio->ccio_ndisks > CCD_MAXNDISKS)
+			return (EINVAL);
+ 
 		/* Fill in some important bits. */
 		ccd.ccd_unit = unit;
 		ccd.ccd_interleave = ccio->ccio_ileave;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.13 2001/03/11 22:18:00 iedowse Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.16 2001/07/19 06:37:26 kris Exp $
  */
 
 #define _IP_VHL
@@ -41,6 +41,7 @@
 #include "opt_ipdivert.h"
 #include "opt_ipfilter.h"
 #include "opt_ipsec.h"
+#include "opt_random_ip_id.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -97,6 +98,7 @@ static MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 u_short ip_id;
 
 static struct mbuf *ip_insertoptions __P((struct mbuf *, struct mbuf *, int *));
+static struct ifnet *ip_multicast_if __P((struct in_addr *, int *));
 static void	ip_mloopback
 	__P((struct ifnet *, struct mbuf *, struct sockaddr_in *, int));
 static int	ip_getmoptions
@@ -175,7 +177,7 @@ ip_output(m0, opt, ro, flags, imo)
             m0 = m = m->m_next ;
 #ifdef IPSEC
 	    so = ipsec_getsocket(m);
-	    ipsec_setsocket(m, NULL);
+	    (void)ipsec_setsocket(m, NULL);
 #endif
             ip = mtod(m, struct ip *);
             hlen = IP_VHL_HL(ip->ip_vhl) << 2 ;
@@ -187,7 +189,7 @@ ip_output(m0, opt, ro, flags, imo)
 #endif
 #ifdef IPSEC
 	so = ipsec_getsocket(m);
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif
 
 #ifdef	DIAGNOSTIC
@@ -208,7 +210,11 @@ ip_output(m0, opt, ro, flags, imo)
 	if ((flags & (IP_FORWARDING|IP_RAWOUTPUT)) == 0) {
 		ip->ip_vhl = IP_MAKE_VHL(IPVERSION, hlen >> 2);
 		ip->ip_off &= IP_DF;
+#ifdef RANDOM_IP_ID
+		ip->ip_id = ip_randomid();
+#else
 		ip->ip_id = htons(ip_id++);
+#endif
 		ipstat.ips_localout++;
 	} else {
 		hlen = IP_VHL_HL(ip->ip_vhl) << 2;
@@ -425,6 +431,133 @@ ip_output(m0, opt, ro, flags, imo)
 	}
 
 sendit:
+#ifdef IPSEC
+	/* get SP for this packet */
+	if (so == NULL)
+		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, flags, &error);
+	else
+		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
+
+	if (sp == NULL) {
+		ipsecstat.out_inval++;
+		goto bad;
+	}
+
+	error = 0;
+
+	/* check policy */
+	switch (sp->policy) {
+	case IPSEC_POLICY_DISCARD:
+		/*
+		 * This packet is just discarded.
+		 */
+		ipsecstat.out_polvio++;
+		goto bad;
+
+	case IPSEC_POLICY_BYPASS:
+	case IPSEC_POLICY_NONE:
+		/* no need to do IPsec. */
+		goto skip_ipsec;
+	
+	case IPSEC_POLICY_IPSEC:
+		if (sp->req == NULL) {
+			/* acquire a policy */
+			error = key_spdacquire(sp);
+			goto bad;
+		}
+		break;
+
+	case IPSEC_POLICY_ENTRUST:
+	default:
+		printf("ip_output: Invalid policy found. %d\n", sp->policy);
+	}
+    {
+	struct ipsec_output_state state;
+	bzero(&state, sizeof(state));
+	state.m = m;
+	if (flags & IP_ROUTETOIF) {
+		state.ro = &iproute;
+		bzero(&iproute, sizeof(iproute));
+	} else
+		state.ro = ro;
+	state.dst = (struct sockaddr *)dst;
+
+	ip->ip_sum = 0;
+
+	/*
+	 * XXX
+	 * delayed checksums are not currently compatible with IPsec
+	 */
+	if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
+		in_delayed_cksum(m);
+		m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
+	}
+
+	HTONS(ip->ip_len);
+	HTONS(ip->ip_off);
+
+	error = ipsec4_output(&state, sp, flags);
+
+	m = state.m;
+	if (flags & IP_ROUTETOIF) {
+		/*
+		 * if we have tunnel mode SA, we may need to ignore
+		 * IP_ROUTETOIF.
+		 */
+		if (state.ro != &iproute || state.ro->ro_rt != NULL) {
+			flags &= ~IP_ROUTETOIF;
+			ro = state.ro;
+		}
+	} else
+		ro = state.ro;
+	dst = (struct sockaddr_in *)state.dst;
+	if (error) {
+		/* mbuf is already reclaimed in ipsec4_output. */
+		m0 = NULL;
+		switch (error) {
+		case EHOSTUNREACH:
+		case ENETUNREACH:
+		case EMSGSIZE:
+		case ENOBUFS:
+		case ENOMEM:
+			break;
+		default:
+			printf("ip4_output (ipsec): error code %d\n", error);
+			/*fall through*/
+		case ENOENT:
+			/* don't show these error codes to the user */
+			error = 0;
+			break;
+		}
+		goto bad;
+	}
+    }
+
+	/* be sure to update variables that are affected by ipsec4_output() */
+	ip = mtod(m, struct ip *);
+#ifdef _IP_VHL
+	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
+#else
+	hlen = ip->ip_hl << 2;
+#endif
+	if (ro->ro_rt == NULL) {
+		if ((flags & IP_ROUTETOIF) == 0) {
+			printf("ip_output: "
+				"can't update route after IPsec processing\n");
+			error = EHOSTUNREACH;	/*XXX*/
+			goto bad;
+		}
+	} else {
+		ia = ifatoia(ro->ro_rt->rt_ifa);
+		ifp = ro->ro_rt->rt_ifp;
+	}
+
+	/* make it flipped, again. */
+	NTOHS(ip->ip_len);
+	NTOHS(ip->ip_off);
+skip_ipsec:
+#endif /*IPSEC*/
+
 	/*
 	 * IpHack's section.
 	 * - Xlate: translate packet's addr/port (NAT).
@@ -635,141 +768,13 @@ sendit:
 	}
 
 pass:
-#ifdef IPSEC
-	/* get SP for this packet */
-	if (so == NULL)
-		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, flags, &error);
-	else
-		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
-
-	if (sp == NULL) {
-		ipsecstat.out_inval++;
-		goto bad;
-	}
-
-	error = 0;
-
-	/* check policy */
-	switch (sp->policy) {
-	case IPSEC_POLICY_DISCARD:
-		/*
-		 * This packet is just discarded.
-		 */
-		ipsecstat.out_polvio++;
-		goto bad;
-
-	case IPSEC_POLICY_BYPASS:
-	case IPSEC_POLICY_NONE:
-		/* no need to do IPsec. */
-		goto skip_ipsec;
-	
-	case IPSEC_POLICY_IPSEC:
-		if (sp->req == NULL) {
-			/* XXX should be panic ? */
-			printf("ip_output: No IPsec request specified.\n");
-			error = EINVAL;
-			goto bad;
-		}
-		break;
-
-	case IPSEC_POLICY_ENTRUST:
-	default:
-		printf("ip_output: Invalid policy found. %d\n", sp->policy);
-	}
-    {
-	struct ipsec_output_state state;
-	bzero(&state, sizeof(state));
-	state.m = m;
-	if (flags & IP_ROUTETOIF) {
-		state.ro = &iproute;
-		bzero(&iproute, sizeof(iproute));
-	} else
-		state.ro = ro;
-	state.dst = (struct sockaddr *)dst;
-
-	ip->ip_sum = 0;
-
-	/*
-	 * XXX
-	 * delayed checksums are not currently compatible with IPsec
-	 */
-	if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
-		in_delayed_cksum(m);
-		m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
-	}
-
-	HTONS(ip->ip_len);
-	HTONS(ip->ip_off);
-
-	error = ipsec4_output(&state, sp, flags);
-
-	m = state.m;
-	if (flags & IP_ROUTETOIF) {
-		/*
-		 * if we have tunnel mode SA, we may need to ignore
-		 * IP_ROUTETOIF.
-		 */
-		if (state.ro != &iproute || state.ro->ro_rt != NULL) {
-			flags &= ~IP_ROUTETOIF;
-			ro = state.ro;
-		}
-	} else
-		ro = state.ro;
-	dst = (struct sockaddr_in *)state.dst;
-	if (error) {
-		/* mbuf is already reclaimed in ipsec4_output. */
-		m0 = NULL;
-		switch (error) {
-		case EHOSTUNREACH:
-		case ENETUNREACH:
-		case EMSGSIZE:
-		case ENOBUFS:
-		case ENOMEM:
-			break;
-		default:
-			printf("ip4_output (ipsec): error code %d\n", error);
-			/*fall through*/
-		case ENOENT:
-			/* don't show these error codes to the user */
-			error = 0;
-			break;
-		}
-		goto bad;
-	}
-    }
-
-	/* be sure to update variables that are affected by ipsec4_output() */
-	ip = mtod(m, struct ip *);
-#ifdef _IP_VHL
-	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
-#else
-	hlen = ip->ip_hl << 2;
-#endif
-	if (ro->ro_rt == NULL) {
-		if ((flags & IP_ROUTETOIF) == 0) {
-			printf("ip_output: "
-				"can't update route after IPsec processing\n");
-			error = EHOSTUNREACH;	/*XXX*/
-			goto bad;
-		}
-	} else {
-		ia = ifatoia(ro->ro_rt->rt_ifa);
-		ifp = ro->ro_rt->rt_ifp;
-	}
-
-	/* make it flipped, again. */
-	NTOHS(ip->ip_len);
-	NTOHS(ip->ip_off);
-skip_ipsec:
-#endif /*IPSEC*/
-
-	sw_csum = m->m_pkthdr.csum_flags | CSUM_IP;
-	m->m_pkthdr.csum_flags = sw_csum & ifp->if_hwassist;
-	sw_csum &= ~ifp->if_hwassist;
+	m->m_pkthdr.csum_flags |= CSUM_IP;
+	sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_hwassist;
 	if (sw_csum & CSUM_DELAY_DATA) {
 		in_delayed_cksum(m);
 		sw_csum &= ~CSUM_DELAY_DATA;
 	}
+	m->m_pkthdr.csum_flags &= ifp->if_hwassist;
 
 	/*
 	 * If small enough for interface, or the interface will take
@@ -793,6 +798,11 @@ skip_ipsec:
 			ia->ia_ifa.if_opackets++;
 			ia->ia_ifa.if_obytes += m->m_pkthdr.len;
 		}
+
+#ifdef IPSEC
+		/* clean ipsec history once it goes out of the node */
+		ipsec_delaux(m);
+#endif
 
 		error = (*ifp->if_output)(ifp, m,
 				(struct sockaddr *)dst, ro->ro_rt);
@@ -922,6 +932,10 @@ sendorfree:
 	for (m = m0; m; m = m0) {
 		m0 = m->m_nextpkt;
 		m->m_nextpkt = 0;
+#ifdef IPSEC
+		/* clean ipsec history once it goes out of the node */
+		ipsec_delaux(m);
+#endif
 		if (error == 0) {
 			/* Record statistics for this interface address. */
 			if (ia != NULL) {
@@ -965,6 +979,8 @@ in_delayed_cksum(struct mbuf *m)
 	ip = mtod(m, struct ip *);
 	offset = IP_VHL_HL(ip->ip_vhl) << 2 ;
 	csum = in_cksum_skip(m, ip->ip_len, offset);
+	if (m->m_pkthdr.csum_flags & CSUM_UDP && csum == 0)
+		csum = 0xffff;
 	offset += m->m_pkthdr.csum_data;	/* checksum offset */
 
 	if (offset + sizeof(u_short) > m->m_len) {
@@ -1458,6 +1474,33 @@ bad:
  * transmission, and one (IP_MULTICAST_TTL) totally duplicates a
  * standard option (IP_TTL).
  */
+
+/*
+ * following RFC1724 section 3.3, 0.0.0.0/8 is interpreted as interface index.
+ */
+static struct ifnet *
+ip_multicast_if(a, ifindexp)
+	struct in_addr *a;
+	int *ifindexp;
+{
+	int ifindex;
+	struct ifnet *ifp;
+
+	if (ifindexp)
+		*ifindexp = 0;
+	if (ntohl(a->s_addr) >> 24 == 0) {
+		ifindex = ntohl(a->s_addr) & 0xffffff;
+		if (ifindex < 0 || if_index < ifindex)
+			return NULL;
+		ifp = ifindex2ifnet[ifindex];
+		if (ifindexp)
+			*ifindexp = ifindex;
+	} else {
+		INADDR_TO_IFP(*a, ifp);
+	}
+	return ifp;
+}
+
 /*
  * Set the IP multicast options in response to user setsockopt().
  */
@@ -1474,6 +1517,7 @@ ip_setmoptions(sopt, imop)
 	struct ip_moptions *imo = *imop;
 	struct route ro;
 	struct sockaddr_in *dst;
+	int ifindex;
 	int s;
 
 	if (imo == NULL) {
@@ -1488,6 +1532,7 @@ ip_setmoptions(sopt, imop)
 			return (ENOBUFS);
 		*imop = imo;
 		imo->imo_multicast_ifp = NULL;
+		imo->imo_multicast_addr.s_addr = INADDR_ANY;
 		imo->imo_multicast_vif = -1;
 		imo->imo_multicast_ttl = IP_DEFAULT_MULTICAST_TTL;
 		imo->imo_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
@@ -1533,13 +1578,17 @@ ip_setmoptions(sopt, imop)
 		 * it supports multicasting.
 		 */
 		s = splimp();
-		INADDR_TO_IFP(addr, ifp);
+		ifp = ip_multicast_if(&addr, &ifindex);
 		if (ifp == NULL || (ifp->if_flags & IFF_MULTICAST) == 0) {
 			splx(s);
 			error = EADDRNOTAVAIL;
 			break;
 		}
 		imo->imo_multicast_ifp = ifp;
+		if (ifindex)
+			imo->imo_multicast_addr = addr;
+		else
+			imo->imo_multicast_addr.s_addr = INADDR_ANY;
 		splx(s);
 		break;
 
@@ -1626,7 +1675,7 @@ ip_setmoptions(sopt, imop)
 			rtfree(ro.ro_rt);
 		}
 		else {
-			INADDR_TO_IFP(mreq.imr_interface, ifp);
+			ifp = ip_multicast_if(&mreq.imr_interface, NULL);
 		}
 
 		/*
@@ -1694,7 +1743,7 @@ ip_setmoptions(sopt, imop)
 		if (mreq.imr_interface.s_addr == INADDR_ANY)
 			ifp = NULL;
 		else {
-			INADDR_TO_IFP(mreq.imr_interface, ifp);
+			ifp = ip_multicast_if(&mreq.imr_interface, NULL);
 			if (ifp == NULL) {
 				error = EADDRNOTAVAIL;
 				splx(s);
@@ -1776,7 +1825,10 @@ ip_getmoptions(sopt, imo)
 	case IP_MULTICAST_IF:
 		if (imo == NULL || imo->imo_multicast_ifp == NULL)
 			addr.s_addr = INADDR_ANY;
-		else {
+		else if (imo->imo_multicast_addr.s_addr) {
+			/* return the value user has set */
+			addr = imo->imo_multicast_addr;
+		} else {
 			IFP_TO_IA(imo->imo_multicast_ifp, ia);
 			addr.s_addr = (ia == NULL) ? INADDR_ANY
 				: IA_SIN(ia)->sin_addr.s_addr;

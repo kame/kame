@@ -95,7 +95,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.2.2.1 2001/02/09 09:50:15 asmodai Exp $";
+  "$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.2.2.2 2001/07/29 22:48:37 kris Exp $";
 #endif
 
 struct tlphy_softc {
@@ -216,7 +216,7 @@ static int tlphy_attach(dev)
 	PRINT("10base5/AUI");
 
 	if (sc->sc_mii.mii_capabilities & BMSR_MEDIAMASK) {
-		printf(sep);
+		printf("%s", sep);
 		mii_add_media(mii, sc->sc_mii.mii_capabilities,
 		    sc->sc_mii.mii_inst);
 	}

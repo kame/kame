@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/disk.h,v 1.16 2000/01/28 20:49:35 phk Exp $
+ * $FreeBSD: src/sys/sys/disk.h,v 1.16.2.3 2001/06/20 16:11:01 scottl Exp $
  *
  */
 
@@ -28,6 +28,7 @@ struct disk {
 	dev_t			d_dev;
 	struct diskslices	*d_slice;
 	struct disklabel	d_label;
+	LIST_ENTRY(disk)	d_list;
 };
 
 #define DISKFLAG_LOCK		0x1
@@ -36,6 +37,7 @@ struct disk {
 dev_t disk_create __P((int unit, struct disk *disk, int flags, struct cdevsw *cdevsw, struct cdevsw *diskdevsw));
 void disk_destroy __P((dev_t dev));
 int disk_dumpcheck __P((dev_t dev, u_int *count, u_int *blkno, u_int *secsize));
+struct disk *disk_enumerate __P((struct disk *disk));
 void disk_invalidate __P((struct disk *disk));
 
 #endif /* _SYS_DISK_H_ */

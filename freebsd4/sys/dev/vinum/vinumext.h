@@ -34,7 +34,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumext.h,v 1.26 2000/05/16 07:38:08 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumext.h,v 1.25.2.2 2001/03/13 02:59:43 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumext.h,v 1.25.2.3 2001/05/11 02:11:06 grog Exp $
  */
 
 /* vinumext.h: external definitions */
@@ -254,7 +254,7 @@ void FFree(void *mem, char *, int);
 #define LOCKDRIVE(d) lockdrive (d, __FILE__, __LINE__)
 #else
 #define Malloc(x)  malloc((x), M_DEVBUF, \
-	curproc->p_intr_nesting_level == 0? M_WAITOK: M_NOWAIT)
+	intr_nesting_level == 0? M_WAITOK: M_NOWAIT)
 #define Free(x)    free((x), M_DEVBUF)
 #define LOCKDRIVE(d) lockdrive (d)
 #endif

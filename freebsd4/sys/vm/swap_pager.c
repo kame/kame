@@ -64,7 +64,7 @@
  *
  *	@(#)swap_pager.c	8.9 (Berkeley) 3/21/94
  *
- * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130.2.8 2001/03/24 20:28:24 dwmalone Exp $
+ * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130.2.9 2001/08/24 22:54:33 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -303,7 +303,7 @@ swap_pager_swap_init()
 	 * can hold 16 pages, so this is probably overkill.
 	 */
 
-	n = cnt.v_page_count * 2;
+	n = cnt.v_page_count;
 
 	swap_zone = zinit(
 	    "SWAPMETA", 

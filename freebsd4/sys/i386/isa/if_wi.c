@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.6 2001/03/12 11:03:45 assar Exp $
  */
 
 /*
@@ -68,6 +66,8 @@
 #define WI_HERMES_STATS_WAR	/* Work around stats counter bug. */
 #define WICACHE			/* turn on signal strength cache code */  
 
+#include "pci.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -89,12 +89,18 @@
 #include <machine/bus_pio.h>
 #include <sys/rman.h>
 
+#if NPCI > 0
+#include <pci/pcireg.h>
+#include <pci/pcivar.h>
+#endif
+
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/ethernet.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_types.h>
+#include <net/if_ieee80211.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -107,9 +113,10 @@
 #include <machine/if_wavelan_ieee.h>
 #include <i386/isa/if_wireg.h>
 
+
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.6 2001/03/12 11:03:45 assar Exp $";
+  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.12 2001/08/28 06:21:14 imp Exp $";
 #endif
 
 #ifdef foo
@@ -147,13 +154,22 @@ void wi_cache_store __P((struct wi_softc *, struct ether_header *,
 	struct mbuf *, unsigned short));
 #endif
 
+static int wi_generic_attach	__P((device_t));
 static int wi_pccard_probe	__P((device_t));
 static int wi_pccard_attach	__P((device_t));
+#if NPCI > 0
+static int wi_pci_probe		__P((device_t));
+static int wi_pci_attach	__P((device_t));
+#endif
 static int wi_pccard_detach	__P((device_t));
 static void wi_shutdown		__P((device_t));
 
-static int wi_alloc		__P((device_t));
+static int wi_alloc		__P((device_t, int));
 static void wi_free		__P((device_t));
+
+static int wi_get_cur_ssid	__P((struct wi_softc *, char *, int *));
+static int wi_media_change	__P((struct ifnet *));
+static void wi_media_status	__P((struct ifnet *, struct ifmediareq *));
 
 static device_method_t wi_pccard_methods[] = {
 	/* Device interface */
@@ -165,15 +181,49 @@ static device_method_t wi_pccard_methods[] = {
 	{ 0, 0 }
 };
 
+#if NPCI > 0
+static device_method_t wi_pci_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		wi_pci_probe),
+	DEVMETHOD(device_attach,	wi_pci_attach),
+	DEVMETHOD(device_detach,	wi_pccard_detach),
+	DEVMETHOD(device_shutdown,	wi_shutdown),
+
+	{ 0, 0 }
+};
+#endif
+
 static driver_t wi_pccard_driver = {
 	"wi",
 	wi_pccard_methods,
 	sizeof(struct wi_softc)
 };
 
-static devclass_t wi_pccard_devclass;
+#if NPCI > 0
+static driver_t wi_pci_driver = {
+	"wi",
+	wi_pci_methods,
+	sizeof(struct wi_softc)
+};
 
-DRIVER_MODULE(if_wi, pccard, wi_pccard_driver, wi_pccard_devclass, 0, 0);
+static struct {
+	unsigned int vendor,device;
+	char *desc;
+} pci_ids[] = {
+	{0x1638, 0x1100,	"PRISM2STA PCI WaveLAN/IEEE 802.11"},
+	{0x1385, 0x4100,	"Netgear MA301 PCI IEEE 802.11b"},
+	{0,	 0,	NULL}
+};
+#endif
+
+static devclass_t wi_devclass;
+
+DRIVER_MODULE(if_wi, pccard, wi_pccard_driver, wi_devclass, 0, 0);
+#if NPCI > 0
+DRIVER_MODULE(if_wi, pci, wi_pci_driver, wi_devclass, 0, 0);
+#endif
+
+static char wi_device_desc[] = "WaveLAN/IEEE 802.11";
 
 static int wi_pccard_probe(dev)
 	device_t	dev;
@@ -184,11 +234,11 @@ static int wi_pccard_probe(dev)
 	sc = device_get_softc(dev);
 	sc->wi_gone = 0;
 
-	error = wi_alloc(dev);
+	error = wi_alloc(dev, 0);
 	if (error)
 		return (error);
 
-	device_set_desc(dev, "WaveLAN/IEEE 802.11");
+	device_set_desc(dev, wi_device_desc);
 	wi_free(dev);
 
 	/* Make sure interrupts are disabled. */
@@ -197,6 +247,27 @@ static int wi_pccard_probe(dev)
 
 	return (0);
 }
+
+#if NPCI > 0
+static int
+wi_pci_probe(dev)
+	device_t	dev;
+{
+	struct wi_softc		*sc;
+	int i;
+
+	sc = device_get_softc(dev);
+	for(i=0; pci_ids[i].vendor != 0; i++) {
+		if ((pci_get_vendor(dev) == pci_ids[i].vendor) &&
+			(pci_get_device(dev) == pci_ids[i].device)) {
+			sc->wi_prism2 = 1;
+			device_set_desc(dev, pci_ids[i].desc);
+			return (0);
+		}
+	}
+	return(ENXIO);
+}
+#endif
 
 static int wi_pccard_detach(dev)
 	device_t		dev;
@@ -212,22 +283,153 @@ static int wi_pccard_detach(dev)
 
 	if (sc->wi_gone) {
 		device_printf(dev, "already unloaded\n");
+		splx(s);
 		return(ENODEV);
 	}
 
 	wi_stop(sc);
+
+	/* Delete all remaining media. */
+	ifmedia_removeall(&sc->ifmedia);
+
 	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	bus_teardown_intr(dev, sc->irq, sc->wi_intrhand);
 	wi_free(dev);
 	sc->wi_gone = 1;
 
 	splx(s);
-	device_printf(dev, "unload\n");
-
 	return(0);
 }
 
 static int wi_pccard_attach(device_t dev)
+{
+	struct wi_softc		*sc;
+	int			error;
+	u_int32_t		flags;
+
+	sc = device_get_softc(dev);
+
+	/*
+	 *	XXX: quick hack to support Prism II chip.
+	 *	Currently, we need to set a flags in pccard.conf to specify
+	 *	which type chip is used.
+	 *
+	 *	We need to replace this code in a future.
+	 *	It is better to use CIS than using a flag.
+	 */
+	flags = device_get_flags(dev);
+#define	WI_FLAGS_PRISM2	0x10000
+	if (flags & WI_FLAGS_PRISM2) {
+		sc->wi_prism2 = 1;
+		if (bootverbose) {
+			device_printf(dev, "found PrismII chip\n");
+		}
+	}
+	else {
+		sc->wi_prism2 = 0;
+		if (bootverbose) {
+			device_printf(dev, "found Lucent chip\n");
+		}
+	}
+
+	error = wi_alloc(dev, 0);
+	if (error) {
+		device_printf(dev, "wi_alloc() failed! (%d)\n", error);
+		return (error);
+	}
+	return (wi_generic_attach(dev));
+}
+
+#if NPCI > 0
+static int
+wi_pci_attach(device_t dev)
+{
+	struct wi_softc		*sc;
+	u_int32_t		command, wanted;
+	u_int16_t		reg;
+	int			error;
+
+	sc = device_get_softc(dev);
+
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
+	wanted = PCIM_CMD_PORTEN|PCIM_CMD_MEMEN;
+	command |= wanted;
+	pci_write_config(dev, PCIR_COMMAND, command, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
+	if ((command & wanted) != wanted) {
+		device_printf(dev, "wi_pci_attach() failed to enable pci!\n");
+		return (ENXIO);
+	}
+
+	error = wi_alloc(dev, WI_PCI_IORES);
+	if (error)
+		return (error);
+
+	/* Make sure interrupts are disabled. */
+	CSR_WRITE_2(sc, WI_INT_EN, 0);
+	CSR_WRITE_2(sc, WI_EVENT_ACK, 0xFFFF);
+
+	/* We have to do a magic PLX poke to enable interrupts */
+	sc->local_rid = WI_PCI_LOCALRES;
+	sc->local = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->local_rid,
+				0, ~0, 1, RF_ACTIVE);
+	sc->wi_localtag = rman_get_bustag(sc->local);
+	sc->wi_localhandle = rman_get_bushandle(sc->local);
+	command = bus_space_read_4(sc->wi_localtag, sc->wi_localhandle,
+		WI_LOCAL_INTCSR);
+	command |= WI_LOCAL_INTEN;
+	bus_space_write_4(sc->wi_localtag, sc->wi_localhandle,
+		WI_LOCAL_INTCSR, command);
+	bus_release_resource(dev, SYS_RES_IOPORT, sc->local_rid, sc->local);
+	sc->local = NULL;
+	
+	sc->mem_rid = WI_PCI_MEMRES;
+	sc->mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->mem_rid,
+				0, ~0, 1, RF_ACTIVE);
+	if (sc->mem == NULL) {
+		device_printf(dev, "couldn't allocate memory\n");
+		wi_free(dev);
+		return (ENXIO);
+	}
+	sc->wi_bmemtag = rman_get_bustag(sc->mem);
+	sc->wi_bmemhandle = rman_get_bushandle(sc->mem);
+
+	/*
+	 * From Linux driver:
+	 * Write COR to enable PC card
+	 * This is a subset of the protocol that the pccard bus code
+	 * would do.
+	 */
+	CSM_WRITE_1(sc, WI_COR_OFFSET, WI_COR_VALUE); 
+	reg = CSM_READ_1(sc, WI_COR_OFFSET);
+	if (reg != WI_COR_VALUE) {
+		device_printf(dev,
+		    "CSM_READ_1(WI_COR_OFFSET) "
+		    "wanted %d, got %d\n", WI_COR_VALUE, reg);
+		wi_free(dev);
+		return (ENXIO);
+	}
+
+	CSR_WRITE_2(sc, WI_HFA384X_SWSUPPORT0_OFF, WI_PRISM2STA_MAGIC);
+	reg = CSR_READ_2(sc, WI_HFA384X_SWSUPPORT0_OFF);
+	if (reg != WI_PRISM2STA_MAGIC) {
+		device_printf(dev,
+		    "CSR_READ_2(WI_HFA384X_SWSUPPORT0_OFF) "
+		    "wanted %d, got %d\n", WI_PRISM2STA_MAGIC, reg);
+		wi_free(dev);
+		return (ENXIO);
+	}
+
+	error = wi_generic_attach(dev);
+	if (error != 0)
+		return (error);
+
+	return (0);
+}
+#endif
+
+static int
+wi_generic_attach(device_t dev)
 {
 	struct wi_softc		*sc;
 	struct wi_ltv_macaddr	mac;
@@ -238,14 +440,8 @@ static int wi_pccard_attach(device_t dev)
 	sc = device_get_softc(dev);
 	ifp = &sc->arpcom.ac_if;
 
-	error = wi_alloc(dev);
-	if (error) {
-		device_printf(dev, "wi_alloc() failed! (%d)\n", error);
-		return (error);
-	}
-
 	error = bus_setup_intr(dev, sc->irq, INTR_TYPE_NET,
-			       wi_intr, sc, &sc->wi_intrhand);
+	    wi_intr, sc, &sc->wi_intrhand);
 
 	if (error) {
 		device_printf(dev, "bus_setup_intr() failed! (%d)\n", error);
@@ -256,10 +452,20 @@ static int wi_pccard_attach(device_t dev)
 	/* Reset the NIC. */
 	wi_reset(sc);
 
-	/* Read the station address. */
+	/*
+	 * Read the station address.
+	 * And do it twice. I've seen PRISM-based cards that return
+	 * an error when trying to read it the first time, which causes
+	 * the probe to fail.
+	 */
 	mac.wi_type = WI_RID_MAC_NODE;
 	mac.wi_len = 4;
 	wi_read_record(sc, (struct wi_ltv_gen *)&mac);
+	if ((error = wi_read_record(sc, (struct wi_ltv_gen *)&mac)) != 0) {
+		device_printf(dev, "mac read failed %d\n", error);
+		wi_free(dev);
+		return (error);
+	}
 	bcopy((char *)&mac.wi_mac_addr,
 	   (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
@@ -320,10 +526,39 @@ static int wi_pccard_attach(device_t dev)
 	wi_read_record(sc, &gen);
 	sc->wi_has_wep = gen.wi_val;
 
+	if (bootverbose) {
+		device_printf(sc->dev,
+				__FUNCTION__ ":wi_has_wep = %d\n",
+				sc->wi_has_wep);
+	}
+
 	bzero((char *)&sc->wi_stats, sizeof(sc->wi_stats));
 
 	wi_init(sc);
 	wi_stop(sc);
+
+	ifmedia_init(&sc->ifmedia, 0, wi_media_change, wi_media_status);
+	/* XXX: Should read from card capabilities */
+#define ADD(m, c)       ifmedia_add(&sc->ifmedia, (m), (c), NULL)
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_IEEE80211_DS1,
+	    IFM_IEEE80211_ADHOC, 0), 0);
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_IEEE80211_DS1, 0, 0), 0);
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_IEEE80211_DS2,
+	    IFM_IEEE80211_ADHOC, 0), 0);
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_IEEE80211_DS2, 0, 0), 0);
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_IEEE80211_DS5,
+	    IFM_IEEE80211_ADHOC, 0), 0);
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_IEEE80211_DS5, 0, 0), 0);
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_IEEE80211_DS11,
+	    IFM_IEEE80211_ADHOC, 0), 0);
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_IEEE80211_DS11, 0, 0), 0);
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_AUTO, 
+		IFM_IEEE80211_ADHOC, 0), 0);
+	ADD(IFM_MAKEWORD(IFM_IEEE80211, IFM_AUTO, 0, 0), 0);
+#undef	ADD
+	ifmedia_set(&sc->ifmedia, IFM_MAKEWORD(IFM_IEEE80211, IFM_AUTO,
+	    0, 0));
+
 
 	/*
 	 * Call MI attach routine.
@@ -387,6 +622,7 @@ static void wi_rxeof(sc)
 		m->m_pkthdr.len = m->m_len =
 		    rx_frame.wi_dat_len + WI_SNAPHDR_LEN;
 
+#if 0
 		bcopy((char *)&rx_frame.wi_addr1,
 		    (char *)&eh->ether_dhost, ETHER_ADDR_LEN);
 		if (sc->wi_ptype == WI_PORTTYPE_ADHOC) {
@@ -396,8 +632,15 @@ static void wi_rxeof(sc)
 			bcopy((char *)&rx_frame.wi_addr3,
 			    (char *)&eh->ether_shost, ETHER_ADDR_LEN);
 		}
+#else
+		bcopy((char *)&rx_frame.wi_dst_addr,
+			(char *)&eh->ether_dhost, ETHER_ADDR_LEN);
+		bcopy((char *)&rx_frame.wi_src_addr,
+			(char *)&eh->ether_shost, ETHER_ADDR_LEN);
+#endif
+
 		bcopy((char *)&rx_frame.wi_type,
-		    (char *)&eh->ether_type, sizeof(u_int16_t));
+		    (char *)&eh->ether_type, ETHER_TYPE_LEN);
 
 		if (wi_read_data(sc, id, WI_802_11_OFFSET,
 		    mtod(m, caddr_t) + sizeof(struct ether_header),
@@ -483,7 +726,7 @@ void wi_update_stats(sc)
 	u_int16_t		id;
 	struct ifnet		*ifp;
 	u_int32_t		*ptr;
-	int			i;
+	int			len, i;
 	u_int16_t		t;
 
 	ifp = &sc->arpcom.ac_if;
@@ -492,13 +735,14 @@ void wi_update_stats(sc)
 
 	wi_read_data(sc, id, 0, (char *)&gen, 4);
 
-	if (gen.wi_type != WI_INFO_COUNTERS ||
-	    gen.wi_len > (sizeof(sc->wi_stats) / 4) + 1)
+	if (gen.wi_type != WI_INFO_COUNTERS)
 		return;
 
+	len = (gen.wi_len - 1 < sizeof(sc->wi_stats) / 4) ?
+		gen.wi_len - 1 : sizeof(sc->wi_stats) / 4;
 	ptr = (u_int32_t *)&sc->wi_stats;
 
-	for (i = 0; i < gen.wi_len - 1; i++) {
+	for (i = 0; i < len - 1; i++) {
 		t = CSR_READ_2(sc, WI_DATA1);
 #ifdef WI_HERMES_STATS_WAR
 		if (t > 0xF000)
@@ -523,7 +767,7 @@ static void wi_intr(xsc)
 
 	ifp = &sc->arpcom.ac_if;
 
-	if (!(ifp->if_flags & IFF_UP)) {
+	if (sc->wi_gone || !(ifp->if_flags & IFF_UP)) {
 		CSR_WRITE_2(sc, WI_EVENT_ACK, 0xFFFF);
 		CSR_WRITE_2(sc, WI_INT_EN, 0);
 		return;
@@ -547,6 +791,7 @@ static void wi_intr(xsc)
 
 	if (status & WI_EV_ALLOC) {
 		int			id;
+
 		id = CSR_READ_2(sc, WI_ALLOC_FID);
 		CSR_WRITE_2(sc, WI_EVENT_ACK, WI_EV_ALLOC);
 		if (id == sc->wi_tx_data_id)
@@ -570,8 +815,9 @@ static void wi_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, WI_INT_EN, WI_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (ifp->if_snd.ifq_head != NULL) {
 		wi_start(ifp);
+	}
 
 	return;
 }
@@ -583,7 +829,20 @@ static int wi_cmd(sc, cmd, val)
 {
 	int			i, s = 0;
 
+	/* wait for the busy bit to clear */
+	for (i = 500; i > 0; i--) {	/* 5s */
+		if (!(CSR_READ_2(sc, WI_COMMAND) & WI_CMD_BUSY)) {
+			break;
+		}
+		DELAY(10*1000);	/* 10 m sec */
+	}
+	if (i == 0) {
+		return(ETIMEDOUT);
+	}
+
 	CSR_WRITE_2(sc, WI_PARAM0, val);
+	CSR_WRITE_2(sc, WI_PARAM1, 0);
+	CSR_WRITE_2(sc, WI_PARAM2, 0);
 	CSR_WRITE_2(sc, WI_COMMAND, cmd);
 
 	for (i = 0; i < WI_TIMEOUT; i++) {
@@ -606,8 +865,9 @@ static int wi_cmd(sc, cmd, val)
 		}
 	}
 
-	if (i == WI_TIMEOUT)
+	if (i == WI_TIMEOUT) {
 		return(ETIMEDOUT);
+	}
 
 	return(0);
 }
@@ -615,19 +875,23 @@ static int wi_cmd(sc, cmd, val)
 static void wi_reset(sc)
 	struct wi_softc		*sc;
 {
-	wi_cmd(sc, WI_CMD_INI, 0);
-	DELAY(100000);
-	wi_cmd(sc, WI_CMD_INI, 0);
-	DELAY(100000);
-#ifdef foo
-	if (wi_cmd(sc, WI_CMD_INI, 0))
+#define WI_INIT_TRIES 5
+	int i;
+	
+	for (i = 0; i < WI_INIT_TRIES; i++) {
+		if (wi_cmd(sc, WI_CMD_INI, 0) == 0)
+			break;
+		DELAY(50 * 1000);	/* 50ms */
+	}
+	if (i == WI_INIT_TRIES)
 		device_printf(sc->dev, "init failed\n");
+
 	CSR_WRITE_2(sc, WI_INT_EN, 0);
 	CSR_WRITE_2(sc, WI_EVENT_ACK, 0xFFFF);
 
 	/* Calibrate timer. */
 	WI_SETVAL(WI_RID_TICK_TIME, 8);
-#endif
+
 	return;
 }
 
@@ -640,6 +904,23 @@ static int wi_read_record(sc, ltv)
 {
 	u_int16_t		*ptr;
 	int			i, len, code;
+	struct wi_ltv_gen	*oltv, p2ltv;
+
+	oltv = ltv;
+	if (sc->wi_prism2) {
+		switch (ltv->wi_type) {
+		case WI_RID_ENCRYPTION:
+			p2ltv.wi_type = WI_RID_P2_ENCRYPTION;
+			p2ltv.wi_len = 2;
+			ltv = &p2ltv;
+			break;
+		case WI_RID_TX_CRYPT_KEY:
+			p2ltv.wi_type = WI_RID_P2_TX_CRYPT_KEY;
+			p2ltv.wi_len = 2;
+			ltv = &p2ltv;
+			break;
+		}
+	}
 
 	/* Tell the NIC to enter record read mode. */
 	if (wi_cmd(sc, WI_CMD_ACCESS|WI_ACCESS_READ, ltv->wi_type))
@@ -669,6 +950,35 @@ static int wi_read_record(sc, ltv)
 	for (i = 0; i < ltv->wi_len - 1; i++)
 		ptr[i] = CSR_READ_2(sc, WI_DATA1);
 
+	if (sc->wi_prism2) {
+		switch (oltv->wi_type) {
+		case WI_RID_TX_RATE:
+		case WI_RID_CUR_TX_RATE:
+			switch (ltv->wi_val) {
+			case 1: oltv->wi_val = 1; break;
+			case 2: oltv->wi_val = 2; break;
+			case 3:	oltv->wi_val = 6; break;
+			case 4: oltv->wi_val = 5; break;
+			case 7: oltv->wi_val = 7; break;
+			case 8: oltv->wi_val = 11; break;
+			case 15: oltv->wi_val = 3; break;
+			default: oltv->wi_val = 0x100 + ltv->wi_val; break;
+			}
+			break;
+		case WI_RID_ENCRYPTION:
+			oltv->wi_len = 2;
+			if (ltv->wi_val & 0x01)
+				oltv->wi_val = 1;
+			else
+				oltv->wi_val = 0;
+			break;
+		case WI_RID_TX_CRYPT_KEY:
+			oltv->wi_len = 2;
+			oltv->wi_val = ltv->wi_val;
+			break;
+		}
+	}
+
 	return(0);
 }
 
@@ -681,6 +991,62 @@ static int wi_write_record(sc, ltv)
 {
 	u_int16_t		*ptr;
 	int			i;
+	struct wi_ltv_gen	p2ltv;
+
+	if (sc->wi_prism2) {
+		switch (ltv->wi_type) {
+		case WI_RID_TX_RATE:
+			p2ltv.wi_type = WI_RID_TX_RATE;
+			p2ltv.wi_len = 2;
+			switch (ltv->wi_val) {
+			case 1: p2ltv.wi_val = 1; break;
+			case 2: p2ltv.wi_val = 2; break;
+			case 3:	p2ltv.wi_val = 15; break;
+			case 5: p2ltv.wi_val = 4; break;
+			case 6: p2ltv.wi_val = 3; break;
+			case 7: p2ltv.wi_val = 7; break;
+			case 11: p2ltv.wi_val = 8; break;
+			default: return EINVAL;
+			}
+			ltv = &p2ltv;
+			break;
+		case WI_RID_ENCRYPTION:
+			p2ltv.wi_type = WI_RID_P2_ENCRYPTION;
+			p2ltv.wi_len = 2;
+			if (ltv->wi_val)
+				p2ltv.wi_val = 0x03;
+			else
+				p2ltv.wi_val = 0x90;
+			ltv = &p2ltv;
+			break;
+		case WI_RID_TX_CRYPT_KEY:
+			p2ltv.wi_type = WI_RID_P2_TX_CRYPT_KEY;
+			p2ltv.wi_len = 2;
+			p2ltv.wi_val = ltv->wi_val;
+			ltv = &p2ltv;
+			break;
+		case WI_RID_DEFLT_CRYPT_KEYS:
+		    {
+			int error;
+			struct wi_ltv_str	ws;
+			struct wi_ltv_keys	*wk =
+			    (struct wi_ltv_keys *)ltv;
+
+			for (i = 0; i < 4; i++) {
+				ws.wi_len = 4;
+				ws.wi_type = WI_RID_P2_CRYPT_KEY0 + i;
+				memcpy(ws.wi_str,
+				    &wk->wi_keys[i].wi_keydat, 5);
+				ws.wi_str[5] = '\0';
+				error = wi_write_record(sc,
+				    (struct wi_ltv_gen *)&ws);
+				if (error)
+					return error;
+			}
+			return 0;
+		    }
+		}
+	}
 
 	if (wi_seek(sc, ltv->wi_type, 0, WI_BAP1))
 		return(EIO);
@@ -704,6 +1070,7 @@ static int wi_seek(sc, id, off, chan)
 {
 	int			i;
 	int			selreg, offreg;
+	int			status;
 
 	switch (chan) {
 	case WI_BAP0:
@@ -723,12 +1090,16 @@ static int wi_seek(sc, id, off, chan)
 	CSR_WRITE_2(sc, offreg, off);
 
 	for (i = 0; i < WI_TIMEOUT; i++) {
-		if (!(CSR_READ_2(sc, offreg) & (WI_OFF_BUSY|WI_OFF_ERR)))
+		status = CSR_READ_2(sc, offreg);
+		if (!(status & (WI_OFF_BUSY|WI_OFF_ERR)))
 			break;
 	}
 
-	if (i == WI_TIMEOUT)
+	if (i == WI_TIMEOUT) {
+		device_printf(sc->dev, "timeout in wi_seek to %x/%x; last status %x\n",
+			id, off, status);
 		return(ETIMEDOUT);
+	}
 
 	return(0);
 }
@@ -772,8 +1143,10 @@ static int wi_write_data(sc, id, off, buf, len)
 {
 	int			i;
 	u_int16_t		*ptr;
-
 #ifdef WI_HERMES_AUTOINC_WAR
+	int			retries;
+
+	retries = 512;
 again:
 #endif
 
@@ -792,8 +1165,12 @@ again:
 		return(EIO);
 
 	if (CSR_READ_2(sc, WI_DATA0) != 0x1234 ||
-	    CSR_READ_2(sc, WI_DATA0) != 0x5678)
-		goto again;
+	    CSR_READ_2(sc, WI_DATA0) != 0x5678) {
+		if (--retries >= 0)
+			goto again;
+		device_printf(sc->dev, "wi_write_data device timeout\n");
+		return (EIO);
+	}
 #endif
 
 	return(0);
@@ -811,7 +1188,8 @@ static int wi_alloc_nicmem(sc, len, id)
 	int			i;
 
 	if (wi_cmd(sc, WI_CMD_ALLOC_MEM, len)) {
-		device_printf(sc->dev, "failed to allocate %d bytes on NIC\n", len);
+		device_printf(sc->dev,
+		    "failed to allocate %d bytes on NIC\n", len);
 		return(ENOMEM);
 	}
 
@@ -820,14 +1198,18 @@ static int wi_alloc_nicmem(sc, len, id)
 			break;
 	}
 
-	if (i == WI_TIMEOUT)
+	if (i == WI_TIMEOUT) {
+		device_printf(sc->dev, "time out allocating memory on card\n");
 		return(ETIMEDOUT);
+	}
 
 	CSR_WRITE_2(sc, WI_EVENT_ACK, WI_EV_ALLOC);
 	*id = CSR_READ_2(sc, WI_ALLOC_FID);
 
-	if (wi_seek(sc, *id, 0, WI_BAP0))
+	if (wi_seek(sc, *id, 0, WI_BAP0)) {
+		device_printf(sc->dev, "seek failed while allocating memory on card\n");
 		return(EIO);
+	}
 
 	for (i = 0; i < len / 2; i++)
 		CSR_WRITE_2(sc, WI_DATA0, 0);
@@ -855,8 +1237,7 @@ static void wi_setmulti(sc)
 		return;
 	}
 
-	for (ifma = ifp->if_multiaddrs.lh_first; ifma != NULL;
-				ifma = ifma->ifma_link.le_next) {
+	LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		if (i < 16) {
@@ -958,15 +1339,20 @@ static int wi_ioctl(ifp, command, data)
 	caddr_t			data;
 {
 	int			s, error = 0;
+	int			len;
+	u_int8_t		tmpkey[14];
+	char			tmpssid[IEEE80211_NWID_LEN];
 	struct wi_softc		*sc;
 	struct wi_req		wreq;
 	struct ifreq		*ifr;
+	struct ieee80211req	*ireq;
 	struct proc		*p = curproc;
 
 	s = splimp();
 
 	sc = ifp->if_softc;
 	ifr = (struct ifreq *)data;
+	ireq = (struct ieee80211req *)data;
 
 	if (sc->wi_gone) {
 		error = ENODEV;
@@ -998,6 +1384,10 @@ static int wi_ioctl(ifp, command, data)
 		}
 		sc->wi_if_flags = ifp->if_flags;
 		error = 0;
+		break;
+	case SIOCSIFMEDIA:
+	case SIOCGIFMEDIA:
+		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
@@ -1060,6 +1450,203 @@ static int wi_ioctl(ifp, command, data)
 				wi_setdef(sc, &wreq);
 		}
 		break;
+	case SIOCG80211:
+		switch(ireq->i_type) {
+		case IEEE80211_IOC_SSID:
+			if(ireq->i_val == -1) {
+				bzero(tmpssid, IEEE80211_NWID_LEN);
+				error = wi_get_cur_ssid(sc, tmpssid, &len);
+				if (error != 0)
+					break;
+				error = copyout(tmpssid, ireq->i_data,
+					IEEE80211_NWID_LEN);
+				ireq->i_len = len;
+			} else if (ireq->i_val == 0) {
+				error = copyout(sc->wi_net_name,
+				    ireq->i_data,
+				    IEEE80211_NWID_LEN);
+				ireq->i_len = IEEE80211_NWID_LEN;
+			} else
+				error = EINVAL;
+			break;
+		case IEEE80211_IOC_NUMSSIDS:
+			ireq->i_val = 1;
+			break;
+		case IEEE80211_IOC_WEP:
+			if(!sc->wi_has_wep) {
+				ireq->i_val = IEEE80211_WEP_NOSUP; 
+			} else {
+				if(sc->wi_use_wep) {
+					ireq->i_val =
+					    IEEE80211_WEP_MIXED;
+				} else {
+					ireq->i_val =
+					    IEEE80211_WEP_OFF;
+				}
+			}
+			break;
+		case IEEE80211_IOC_WEPKEY:
+			if(!sc->wi_has_wep ||
+			    ireq->i_val < 0 || ireq->i_val > 3) {
+				error = EINVAL;
+				break;
+			}
+			len = sc->wi_keys.wi_keys[ireq->i_val].wi_keylen;
+			if (suser(p))
+				bcopy(sc->wi_keys.wi_keys[ireq->i_val].wi_keydat,
+				    tmpkey, len);
+			else
+				bzero(tmpkey, len);
+
+			ireq->i_len = len;
+			error = copyout(tmpkey, ireq->i_data, len);
+
+			break;
+		case IEEE80211_IOC_NUMWEPKEYS:
+			if(!sc->wi_has_wep)
+				error = EINVAL;
+			else
+				ireq->i_val = 4;
+			break;
+		case IEEE80211_IOC_WEPTXKEY:
+			if(!sc->wi_has_wep)
+				error = EINVAL;
+			else
+				ireq->i_val = sc->wi_tx_key;
+			break;
+		case IEEE80211_IOC_AUTHMODE:
+			ireq->i_val = IEEE80211_AUTH_NONE;
+			break;
+		case IEEE80211_IOC_STATIONNAME:
+			error = copyout(sc->wi_node_name,
+			    ireq->i_data, IEEE80211_NWID_LEN);
+			ireq->i_len = IEEE80211_NWID_LEN;
+			break;
+		case IEEE80211_IOC_CHANNEL:
+			wreq.wi_type = WI_RID_CURRENT_CHAN;
+			wreq.wi_len = WI_MAX_DATALEN;
+			if (wi_read_record(sc, (struct wi_ltv_gen *)&wreq))
+				error = EINVAL;
+			else {
+				ireq->i_val = wreq.wi_val[0];
+			}
+			break;
+		case IEEE80211_IOC_POWERSAVE:
+			if(sc->wi_pm_enabled)
+				ireq->i_val = IEEE80211_POWERSAVE_ON;
+			else
+				ireq->i_val = IEEE80211_POWERSAVE_OFF;
+			break;
+		case IEEE80211_IOC_POWERSAVESLEEP:
+			ireq->i_val = sc->wi_max_sleep;
+			break;
+		default:
+			error = EINVAL;
+		}
+		break;
+	case SIOCS80211:
+		if ((error = suser(p)))
+			goto out;
+		switch(ireq->i_type) {
+		case IEEE80211_IOC_SSID:
+			if (ireq->i_val != 0 ||
+			    ireq->i_len > IEEE80211_NWID_LEN) {
+				error = EINVAL;
+				break;
+			}
+			/* We set both of them */
+			bzero(sc->wi_net_name, IEEE80211_NWID_LEN);
+			error = copyin(ireq->i_data,
+			    sc->wi_net_name, ireq->i_len);
+			bcopy(sc->wi_net_name, sc->wi_ibss_name, IEEE80211_NWID_LEN);
+			break;
+		case IEEE80211_IOC_WEP:
+			/*
+			 * These cards only support one mode so
+			 * we just turn wep on what ever is
+			 * passed in if it's not OFF.
+			 */
+			if (ireq->i_val == IEEE80211_WEP_OFF) {
+				sc->wi_use_wep = 0;
+			} else {
+				sc->wi_use_wep = 1;
+			}
+			break;
+		case IEEE80211_IOC_WEPKEY:
+			if (ireq->i_val < 0 || ireq->i_val > 3 ||
+				ireq->i_len > 13) {
+				error = EINVAL;
+				break;
+			} 
+			bzero(sc->wi_keys.wi_keys[ireq->i_val].wi_keydat, 13);
+			error = copyin(ireq->i_data, 
+			    sc->wi_keys.wi_keys[ireq->i_val].wi_keydat,
+			    ireq->i_len);
+			if(error)
+				break;
+			sc->wi_keys.wi_keys[ireq->i_val].wi_keylen =
+				    ireq->i_len;
+			break;
+		case IEEE80211_IOC_WEPTXKEY:
+			if (ireq->i_val < 0 || ireq->i_val > 3) {
+				error = EINVAL;
+				break;
+			}
+			sc->wi_tx_key = ireq->i_val;
+			break;
+		case IEEE80211_IOC_AUTHMODE:
+			error = EINVAL;
+			break;
+		case IEEE80211_IOC_STATIONNAME:
+			if (ireq->i_len > 32) {
+				error = EINVAL;
+				break;
+			}
+			bzero(sc->wi_node_name, 32);
+			error = copyin(ireq->i_data,
+			    sc->wi_node_name, ireq->i_len);
+			break;
+		case IEEE80211_IOC_CHANNEL:
+			/*
+			 * The actual range is 1-14, but if you
+			 * set it to 0 you get the default. So
+			 * we let that work too.
+			 */
+			if (ireq->i_val < 0 || ireq->i_val > 14) {
+				error = EINVAL;
+				break;
+			}
+			sc->wi_channel = ireq->i_val;
+			break;
+		case IEEE80211_IOC_POWERSAVE:
+			switch (ireq->i_val) {
+			case IEEE80211_POWERSAVE_OFF:
+				sc->wi_pm_enabled = 0;
+				break;
+			case IEEE80211_POWERSAVE_ON:
+				sc->wi_pm_enabled = 1;
+				break;
+			default:
+				error = EINVAL;
+				break;
+			}
+			break;
+		case IEEE80211_IOC_POWERSAVESLEEP:
+			if (ireq->i_val < 0) {
+				error = EINVAL;
+				break;
+			}
+			sc->wi_max_sleep = ireq->i_val;
+			break;
+		default:
+			error = EINVAL;
+			break;
+		}
+
+		/* Reinitialize WaveLAN. */
+		wi_init(sc);
+
+		break;
 	default:
 		error = EINVAL;
 		break;
@@ -1079,8 +1666,9 @@ static void wi_init(xsc)
 	struct wi_ltv_macaddr	mac;
 	int			id = 0;
 
-	if (sc->wi_gone)
+	if (sc->wi_gone) {
 		return;
+	}
 
 	s = splimp();
 
@@ -1154,11 +1742,11 @@ static void wi_init(xsc)
 	/* Enable desired port */
 	wi_cmd(sc, WI_CMD_ENABLE|sc->wi_portnum, 0);
 
-	if (wi_alloc_nicmem(sc, 1518 + sizeof(struct wi_frame) + 8, &id))
+	if (wi_alloc_nicmem(sc, ETHER_MAX_LEN + sizeof(struct wi_frame) + 8, &id))
 		device_printf(sc->dev, "tx buffer allocation failed\n");
 	sc->wi_tx_data_id = id;
 
-	if (wi_alloc_nicmem(sc, 1518 + sizeof(struct wi_frame) + 8, &id))
+	if (wi_alloc_nicmem(sc, ETHER_MAX_LEN + sizeof(struct wi_frame) + 8, &id))
 		device_printf(sc->dev, "mgmt. buffer allocation failed\n");
 	sc->wi_tx_mgmt_id = id;
 
@@ -1186,15 +1774,18 @@ static void wi_start(ifp)
 
 	sc = ifp->if_softc;
 
-	if (sc->wi_gone)
+	if (sc->wi_gone) {
 		return;
+	}
 
-	if (ifp->if_flags & IFF_OACTIVE)
+	if (ifp->if_flags & IFF_OACTIVE) {
 		return;
+	}
 
 	IF_DEQUEUE(&ifp->if_snd, m0);
-	if (m0 == NULL)
+	if (m0 == NULL) {
 		return;
+	}
 
 	bzero((char *)&tx_frame, sizeof(tx_frame));
 	id = sc->wi_tx_data_id;
@@ -1204,7 +1795,7 @@ static void wi_start(ifp)
 	 * Use RFC1042 encoding for IP and ARP datagrams,
 	 * 802.3 for anything else.
 	 */
-	if (ntohs(eh->ether_type) > 1518) {
+	if (ntohs(eh->ether_type) > ETHER_MAX_LEN) {
 		bcopy((char *)&eh->ether_dhost,
 		    (char *)&tx_frame.wi_addr1, ETHER_ADDR_LEN);
 		bcopy((char *)&eh->ether_shost,
@@ -1305,13 +1896,21 @@ static void wi_stop(sc)
 {
 	struct ifnet		*ifp;
 
-	if (sc->wi_gone)
+	if (sc->wi_gone) {
 		return;
+	}
 
 	ifp = &sc->arpcom.ac_if;
 
-	CSR_WRITE_2(sc, WI_INT_EN, 0);
-	wi_cmd(sc, WI_CMD_DISABLE|sc->wi_portnum, 0);
+	/*
+	 * If the card is gone and the memory port isn't mapped, we will
+	 * (hopefully) get 0xffff back from the status read, which is not
+	 * a valid status value.
+	 */
+	if (CSR_READ_2(sc, WI_STATUS) != 0xffff) {
+		CSR_WRITE_2(sc, WI_INT_EN, 0);
+		wi_cmd(sc, WI_CMD_DISABLE|sc->wi_portnum, 0);
+	}
 
 	untimeout(wi_inquire, sc, sc->wi_stat_ch);
 
@@ -1327,7 +1926,7 @@ static void wi_watchdog(ifp)
 
 	sc = ifp->if_softc;
 
-	device_printf(sc->dev,"device timeout\n");
+	device_printf(sc->dev, "watchdog timeout\n");
 
 	wi_init(sc);
 
@@ -1336,24 +1935,25 @@ static void wi_watchdog(ifp)
 	return;
 }
 
-static int wi_alloc(dev)
+static int wi_alloc(dev, io_rid)
 	device_t		dev;
+	int				io_rid;
 {
 	struct wi_softc		*sc = device_get_softc(dev);
-	int			rid;
 
-	rid = 0;
-	sc->iobase = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
+	sc->iobase_rid = io_rid;
+	sc->iobase = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->iobase_rid,
 					0, ~0, 1, RF_ACTIVE);
 	if (!sc->iobase) {
 		device_printf(dev, "No I/O space?!\n");
 		return (ENXIO);
 	}
 
-	rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
+	sc->irq_rid = 0;
+	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
 				     0, ~0, 1, RF_ACTIVE);
 	if (!sc->irq) {
+		wi_free(dev);
 		device_printf(dev, "No irq?!\n");
 		return (ENXIO);
 	}
@@ -1372,10 +1972,18 @@ static void wi_free(dev)
 {
 	struct wi_softc		*sc = device_get_softc(dev);
 
-	if (sc->iobase != NULL)
-		bus_release_resource(dev, SYS_RES_IOPORT, 0, sc->iobase);
-	if (sc->irq != NULL)
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq);
+	if (sc->iobase != NULL) {
+		bus_release_resource(dev, SYS_RES_IOPORT, sc->iobase_rid, sc->iobase);
+		sc->iobase = NULL;
+	}
+	if (sc->irq != NULL) {
+		bus_release_resource(dev, SYS_RES_IRQ, sc->irq_rid, sc->irq);
+		sc->irq = NULL;
+	}
+	if (sc->mem != NULL) {
+		bus_release_resource(dev, SYS_RES_MEMORY, sc->mem_rid, sc->mem);
+		sc->mem = NULL;
+	}
 
 	return;
 }
@@ -1493,7 +2101,7 @@ void wi_cache_store (struct wi_softc *sc, struct ether_header *eh,
 	 * keep multicast only.
 	 */
  
-	if ((ntohs(eh->ether_type) == 0x800)) {
+	if ((ntohs(eh->ether_type) == ETHERTYPE_IP)) {
 		sawip = 1;
 	}
 
@@ -1597,3 +2205,142 @@ void wi_cache_store (struct wi_softc *sc, struct ether_header *eh,
 	return;
 }
 #endif
+
+static int wi_get_cur_ssid(sc, ssid, len)
+	struct wi_softc		*sc;
+	char			*ssid;
+	int			*len;
+{
+	int			error = 0;
+	struct wi_req		wreq;
+
+	wreq.wi_len = WI_MAX_DATALEN;
+	switch (sc->wi_ptype) {
+	case WI_PORTTYPE_ADHOC:
+		wreq.wi_type = WI_RID_CURRENT_SSID;
+		error = wi_read_record(sc, (struct wi_ltv_gen *)&wreq);
+		if (error != 0)
+			break;
+		if (wreq.wi_val[0] > IEEE80211_NWID_LEN) {
+			error = EINVAL;
+			break;
+		}
+		*len = wreq.wi_val[0];
+		bcopy(&wreq.wi_val[1], ssid, IEEE80211_NWID_LEN);
+		break;
+	case WI_PORTTYPE_BSS:
+		wreq.wi_type = WI_RID_COMMQUAL;
+		error = wi_read_record(sc, (struct wi_ltv_gen *)&wreq);
+		if (error != 0)
+			break;
+		if (wreq.wi_val[0] != 0) /* associated */ {
+			wreq.wi_type = WI_RID_CURRENT_SSID;
+			wreq.wi_len = WI_MAX_DATALEN;
+			error = wi_read_record(sc, (struct wi_ltv_gen *)&wreq);
+			if (error != 0)
+				break;
+			if (wreq.wi_val[0] > IEEE80211_NWID_LEN) {
+				error = EINVAL;
+				break;
+			}
+			*len = wreq.wi_val[0];
+			bcopy(&wreq.wi_val[1], ssid, IEEE80211_NWID_LEN);
+		} else {
+			*len = IEEE80211_NWID_LEN;
+			bcopy(sc->wi_net_name, ssid, IEEE80211_NWID_LEN);
+		}
+		break;
+	default:
+		error = EINVAL;
+		break;
+	}
+
+	return error;
+}
+
+static int wi_media_change(ifp)
+	struct ifnet		*ifp;
+{
+	struct wi_softc		*sc = ifp->if_softc;
+	int			otype = sc->wi_ptype;
+	int			orate = sc->wi_tx_rate;
+
+	if ((sc->ifmedia.ifm_cur->ifm_media & IFM_IEEE80211_ADHOC) != 0)
+		sc->wi_ptype = WI_PORTTYPE_ADHOC;
+	else
+		sc->wi_ptype = WI_PORTTYPE_BSS;
+
+	switch (IFM_SUBTYPE(sc->ifmedia.ifm_cur->ifm_media)) {
+	case IFM_IEEE80211_DS1:
+		sc->wi_tx_rate = 1;
+		break;
+	case IFM_IEEE80211_DS2:
+		sc->wi_tx_rate = 2;
+		break;
+	case IFM_IEEE80211_DS5:
+		sc->wi_tx_rate = 5;
+		break;
+	case IFM_IEEE80211_DS11:
+		sc->wi_tx_rate = 11;
+		break;
+	case IFM_AUTO:
+		sc->wi_tx_rate = 3;
+		break;
+	}
+
+	if (otype != sc->wi_ptype ||
+	    orate != sc->wi_tx_rate)
+		wi_init(sc);
+
+	return(0);
+}
+
+static void wi_media_status(ifp, imr)
+	struct ifnet		*ifp;
+	struct ifmediareq	*imr;
+{
+	struct wi_req		wreq;
+	struct wi_softc		*sc = ifp->if_softc;
+
+	if (sc->wi_tx_rate == 3) {
+		imr->ifm_active = IFM_IEEE80211|IFM_AUTO;
+		if (sc->wi_ptype == WI_PORTTYPE_ADHOC)
+			imr->ifm_active |= IFM_IEEE80211_ADHOC;
+		wreq.wi_type = WI_RID_CUR_TX_RATE;
+		wreq.wi_len = WI_MAX_DATALEN;
+		if (wi_read_record(sc, (struct wi_ltv_gen *)&wreq) == 0) {
+			switch(wreq.wi_val[0]) {
+			case 1:
+				imr->ifm_active |= IFM_IEEE80211_DS1;
+				break;
+			case 2:
+				imr->ifm_active |= IFM_IEEE80211_DS2;
+				break;
+			case 6:
+				imr->ifm_active |= IFM_IEEE80211_DS5;
+				break;
+			case 11:
+				imr->ifm_active |= IFM_IEEE80211_DS11;
+				break;
+				}
+		}
+	} else {
+		imr->ifm_active = sc->ifmedia.ifm_cur->ifm_media;
+	}
+
+	imr->ifm_status = IFM_AVALID;
+	if (sc->wi_ptype == WI_PORTTYPE_ADHOC)
+		/*
+		 * XXX: It would be nice if we could give some actually
+		 * useful status like whether we joined another IBSS or
+		 * created one ourselves.
+		 */
+		imr->ifm_status |= IFM_ACTIVE;
+	else {
+		wreq.wi_type = WI_RID_COMMQUAL;
+		wreq.wi_len = WI_MAX_DATALEN;
+		if (wi_read_record(sc, (struct wi_ltv_gen *)&wreq) == 0 &&
+		    wreq.wi_val[0] != 0)
+			imr->ifm_status |= IFM_ACTIVE;
+	}
+}

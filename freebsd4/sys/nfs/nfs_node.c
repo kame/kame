@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_node.c	8.6 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/nfs/nfs_node.c,v 1.36.2.1 2001/03/21 10:50:59 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfs_node.c,v 1.36.2.2 2001/06/26 04:20:10 bp Exp $
  */
 
 
@@ -175,6 +175,7 @@ loop:
 	bcopy((caddr_t)fhp, (caddr_t)np->n_fhp, fhsize);
 	np->n_fhsize = fhsize;
 	lockinit(&np->n_rslock, PVFS | rsflags, "nfrslk", 0, LK_NOPAUSE);
+	lockinit(&np->n_lock, PVFS, "nfsnlk", 0, LK_NOPAUSE);
 	*npp = np;
 
 	if (nfs_node_hash_lock < 0)

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/xmphyreg.h,v 1.1.2.1 2000/04/27 14:43:42 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/xmphyreg.h,v 1.1.2.2 2001/06/18 18:49:13 wpaul Exp $
  */
 
 #ifndef _DEV_MII_XMPHYREG_H_
@@ -44,6 +44,7 @@
 #define XMPHY_BMCR_LOOP		0x4000
 #define XMPHY_BMCR_AUTOEN	0x1000	/* Autoneg enabled */
 #define XMPHY_BMCR_PDOWN	0x0800	/* Power down */
+#define XMPHY_BMCR_ISO		0x0400	/* Isolate */
 #define XMPHY_BMCR_STARTNEG	0x0200	/* Restart autoneg */
 #define XMPHY_BMCR_FDX		0x0100	/* Duplex mode */
 

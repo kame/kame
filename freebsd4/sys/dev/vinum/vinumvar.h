@@ -38,7 +38,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumvar.h,v 1.24 2000/03/01 02:34:57 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumvar.h,v 1.32.2.3 2001/04/08 02:18:14 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumvar.h,v 1.32.2.4 2001/05/28 05:56:27 grog Exp $
  */
 
 #include <sys/time.h>
@@ -258,6 +258,7 @@ enum objflags {
     VF_DAEMONOPEN = 0x80000,				    /* the daemon has us open (only superdev) */
     VF_CREATED = 0x100000,				    /* for volumes: freshly created, more then new */
     VF_HOTSPARE = 0x200000,				    /* for drives: use as hot spare */
+    VF_RETRYERRORS = 0x400000,				    /* don't down subdisks on I/O errors */
 };
 
 /* Global configuration information for the vinum subsystem */

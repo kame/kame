@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.5 2001/02/22 05:15:04 marcel Exp $
+ * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.8 2001/07/27 14:06:01 iedowse Exp $
  */
 
 #include "opt_compat.h"
@@ -433,6 +433,7 @@ execsigs(p)
 	p->p_sigstk.ss_flags = SS_DISABLE;
 	p->p_sigstk.ss_size = 0;
 	p->p_sigstk.ss_sp = 0;
+	p->p_flag &= ~P_ALTSTACK;
 	/*
 	 * Reset no zombies if child dies flag as Solaris does.
 	 */

@@ -1,5 +1,5 @@
 /*	$NecBSD: bsif.h,v 1.5 1997/10/23 20:52:34 honda Exp $	*/
-/* $FreeBSD: src/sys/i386/isa/bs/bsif.h,v 1.12.2.1 2000/11/23 07:06:02 nyan Exp $ */
+/* $FreeBSD: src/sys/i386/isa/bs/bsif.h,v 1.12.2.2 2001/07/26 02:32:18 nyan Exp $ */
 /*
  * Copyright (c) HONDA Naofumi, KATO Takenori, 1996.  All rights reserved.
  * 
@@ -152,7 +152,7 @@
 #define	BUS_IOR(offs) (BUS_IO_DELAY, inb(bsc->sc_iobase + (offs)))
 #define	BUS_IOW(offs, val) (BUS_IO_DELAY, outb(bsc->sc_iobase + (offs), (val)))
 
-#include <i386/isa/ic/wd33c93.h>
+#include <dev/ic/wd33c93reg.h>
 #include <i386/isa/ccbque.h>
 
 #include <cam/scsi/scsi_dvcfg.h>

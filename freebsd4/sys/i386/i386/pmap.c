@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
- * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.9 2001/03/17 10:48:59 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.10 2001/07/30 23:27:59 peter Exp $
  */
 
 /*
@@ -75,6 +75,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/msgbuf.h>
 #include <sys/vmmeter.h>
@@ -517,7 +518,10 @@ pmap_init(phys_start, phys_end)
 void
 pmap_init2()
 {
-	pv_entry_max = PMAP_SHPGPERPROC * maxproc + vm_page_array_size;
+	int shpgperproc = PMAP_SHPGPERPROC;
+
+	TUNABLE_INT_FETCH("vm.pmap.shpgperproc", &shpgperproc);
+	pv_entry_max = shpgperproc * maxproc + vm_page_array_size;
 	pv_entry_high_water = 9 * (pv_entry_max / 10);
 	zinitna(pvzone, &pvzone_obj, NULL, 0, pv_entry_max, ZONE_INTERRUPT, 1);
 }

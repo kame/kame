@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.1 2001/01/22 18:10:27 iedowse Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.3 2001/07/26 20:37:31 iedowse Exp $
  */
 
 #include "opt_quota.h"
@@ -858,7 +858,7 @@ ffs_flushfiles(mp, flags, p)
 #ifdef QUOTA
 	if (mp->mnt_flag & MNT_QUOTA) {
 		int i;
-		error = vflush(mp, NULLVP, SKIPSYSTEM|flags);
+		error = vflush(mp, 0, SKIPSYSTEM|flags);
 		if (error)
 			return (error);
 		for (i = 0; i < MAXQUOTAS; i++) {
@@ -875,7 +875,7 @@ ffs_flushfiles(mp, flags, p)
         /*
 	 * Flush all the files.
 	 */
-	if ((error = vflush(mp, NULL, flags)) != 0)
+	if ((error = vflush(mp, 0, flags)) != 0)
 		return (error);
 	/*
 	 * Flush filesystem metadata.
@@ -1078,6 +1078,10 @@ restart:
 	bzero((caddr_t)ip, sizeof(struct inode));
 	lockinit(&ip->i_lock, PINOD, "inode", 0, LK_CANRECURSE);
 	vp->v_data = ip;
+	/*
+	 * FFS supports lock sharing in the stack of vnodes
+	 */
+	vp->v_vnlock = &ip->i_lock;
 	ip->i_vnode = vp;
 	ip->i_fs = fs = ump->um_fs;
 	ip->i_dev = dev;

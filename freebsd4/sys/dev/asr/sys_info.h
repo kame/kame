@@ -1,6 +1,4 @@
-/* $FreeBSD: src/sys/dev/asr/sys_info.h,v 1.1.2.1 2000/09/21 20:33:50 msmith Exp $ */
-/*	BSDI sys_info.h,v 1.6 1998/06/03 19:14:59 karels Exp	*/
-
+/* $FreeBSD: src/sys/dev/asr/sys_info.h,v 1.1.2.2 2001/08/23 05:21:29 scottl Exp $ */
 /*
  * Copyright (c) 1996-1999 Distributed Processing Technology Corporation
  * All rights reserved.

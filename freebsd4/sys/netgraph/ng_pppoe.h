@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.7.2.1 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.7.2.3 2001/09/03 06:38:16 julian Exp $
  * $Whistle: ng_pppoe.h,v 1.7 1999/10/16 10:16:43 julian Exp $
  */
 
@@ -74,6 +74,7 @@ enum cmd {
 	NGM_PPPOE_SUCCESS  = 5,	/* State machine connected */
 	NGM_PPPOE_FAIL     = 6,	/* State machine could not connect */
 	NGM_PPPOE_CLOSE    = 7,	/* Session closed down */
+	NGM_PPPOE_SERVICE  = 8,	/* additional Service to advertise (in PADO) */
 	NGM_PPPOE_GET_STATUS
 };
 
@@ -92,7 +93,7 @@ struct ngpppoestat {
  * The session sends out a PADI request for the named service.
  *
  *
- * When this structure is accepted by the NGM_PPPOE_WAIT command.
+ * When this structure is accepted by the NGM_PPPOE_LISTEN command.
  * If no service is given this is assumed to accept ALL PADI requests.
  * This may at some time take a regexp expression, but not yet.
  * Matching PADI requests will be passed up the named hook.
@@ -150,6 +151,8 @@ struct ngpppoe_sts {
 
 #define ETHERTYPE_PPPOE_DISC	0x8863	/* pppoe discovery packets     */
 #define ETHERTYPE_PPPOE_SESS	0x8864	/* pppoe session packets       */
+#define ETHERTYPE_PPPOE_STUPID_DISC 0x3c12 /* pppoe discovery packets 3com? */
+#define ETHERTYPE_PPPOE_STUPID_SESS 0x3c13 /* pppoe session packets   3com? */
 #else
 #define PTT_EOL		(0x0000)
 #define PTT_SRV_NAME	(0x0101)
@@ -164,6 +167,8 @@ struct ngpppoe_sts {
 
 #define ETHERTYPE_PPPOE_DISC	0x6388	/* pppoe discovery packets     */
 #define ETHERTYPE_PPPOE_SESS	0x6488	/* pppoe session packets       */
+#define ETHERTYPE_PPPOE_STUPID_DISC 0x123c /* pppoe discovery packets 3com? */
+#define ETHERTYPE_PPPOE_STUPID_SESS 0x133c /* pppoe session packets   3com? */
 #endif
 
 struct pppoe_tag {

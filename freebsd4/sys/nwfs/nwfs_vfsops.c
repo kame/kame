@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6.2.4 2001/02/22 09:21:20 bp Exp $
+ * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6.2.5 2001/07/26 20:37:29 iedowse Exp $
  */
 #include "opt_ncp.h"
 #ifndef NCP
@@ -236,35 +236,16 @@ nwfs_unmount(struct mount *mp, int mntflags, struct proc *p)
 {
 	struct nwmount *nmp = VFSTONWFS(mp);
 	struct ncp_conn *conn;
-	struct vnode *vp;
 	int error, flags;
 
 	NCPVODEBUG("nwfs_unmount: flags=%04x\n",mntflags);
 	flags = 0;
 	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
-	error = VFS_ROOT(mp,&vp);
-	if (error) return (error);
-	if (vp->v_usecount > 2) {
-		printf("nwfs_unmount: usecnt=%d\n",vp->v_usecount);
-		vput(vp);
-		return (EBUSY);
-	}
-	error = vflush(mp, vp, flags);
-	if (error) {
-		vput(vp);
+	/* There is 1 extra root vnode reference from nwfs_mount(). */
+	error = vflush(mp, 1, flags);
+	if (error)
 		return (error);
-	}
-	/*
-	 * There are two reference counts and one lock to get rid of here.
-	 */
-	NCPVODEBUG("v_use: %d\n",vp->v_usecount);
-	vput(vp);
-	NCPVODEBUG("v_use after vput: %d\n",vp->v_usecount);
-	vrele(vp);
-	NCPVODEBUG("v_use after vrele: %d\n",vp->v_usecount);
-	vgone(vp);
-	NCPVODEBUG("v_gone finished !!!!\n");
 	conn = NWFSTOCONN(nmp);
 	ncp_conn_puthandle(nmp->connh,NULL,0);
 	if (ncp_conn_lock(conn,p,p->p_ucred,NCPM_WRITE | NCPM_EXECUTE) == 0) {

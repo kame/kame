@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.16 2001/03/12 13:47:29 sanpei Exp $
+ * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.20 2001/09/01 05:52:38 murray Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.234
  */
@@ -582,6 +582,9 @@ struct pci_ids {
 static struct pci_ids pci_ids[] = {
 	{ 0x100812b9, "3COM PCI FaxModem", 0x10 },
 	{ 0x048011c1, "ActionTec 56k FAX PCI Modem", 0x14 },
+	{ 0x0000151f, "SmartLink 5634PCV SurfRider", 0x10 },
+	{ 0x01101407, "Koutech IOFLEX-2S PCI Dual Port Serial", 0x10 },
+	{ 0x01111407, "Koutech IOFLEX-2S PCI Dual Port Serial", 0x10 },
 	{ 0x00000000, NULL, 0 }
 };
 
@@ -661,6 +664,7 @@ static struct isa_pnp_id sio_ids[] = {
 	{0x00007905, NULL},	/* AKY0000 - 56K Plug&Play Modem */
 	{0x01405407, NULL},	/* AZT4001 - AZT3000 PnP SOUND DEVICE, MODEM */
 	{0x56039008, NULL},	/* BDP0356 - Best Data 56x2 */
+	{0x56159008, NULL},	/* BDP1556 - B.D. Smart One 56SPS,Voice Modem*/
 	{0x36339008, NULL},	/* BDP3336 - Best Data Prods. 336F */
 	{0x0014490a, NULL},	/* BRI1400 - Boca 33.6 PnP */
 	{0x0015490a, NULL},	/* BRI1500 - Internal Fax Data */
@@ -688,8 +692,10 @@ static struct isa_pnp_id sio_ids[] = {
  	{0x08804f3f, NULL},	/* OZO8008 - Zoom  (33.6k Modem) */
 	{0x0f804f3f, NULL},	/* OZO800f - Zoom 2812 (56k Modem) */
 	{0x39804f3f, NULL},	/* OZO8039 - Zoom 56k flex */
+	{0x00914f3f, NULL},	/* OZO9100 - Zoom 2919 (K56 Faxmodem) */
 	{0x3024a341, NULL},	/* PMC2430 - Pace 56 Voice Internal Modem */
 	{0x1000eb49, NULL},	/* ROK0010 - Rockwell ? */
+	{0x1200b23d, NULL},     /* RSS0012 - OMRON ME5614ISA */
 	{0x5002734a, NULL},	/* RSS0250 - 5614Jx3(G) Internal Modem */
 	{0x6202734a, NULL},	/* RSS0262 - 5614Jx3[G] V90+K56Flex Modem */
 	{0xc100ad4d, NULL},	/* SMM00C1 - Leopard 56k PnP */
@@ -947,11 +953,13 @@ sioprobe(dev, xrid)
 			} else {
 				/* Unknown, Just omit this chip.. XXX */
 				result = ENXIO;
+				sio_setreg(com, com_mcr, 0);
 			}
 		} else {
 			/* OK. this is well-known guys */
 			CLR_FLAG(dev, COM_C_IIR_TXRDYBUG);
 		}
+		sio_setreg(com, com_ier, 0);
 		sio_setreg(com, com_cfcr, CFCR_8BITS);
 		enable_intr();
 		bus_release_resource(dev, SYS_RES_IOPORT, rid, port);
@@ -1349,6 +1357,16 @@ determined_type: ;
 		}
 		if (ret)
 			device_printf(dev, "could not activate interrupt\n");
+#if defined(DDB) && (defined(BREAK_TO_DEBUGGER) || \
+    defined(ALT_BREAK_TO_DEBUGGER))
+		/*
+		 * Enable interrupts for early break-to-debugger support
+		 * on the console.
+		 */
+		if (ret == 0 && unit == comconsole)
+			outb(siocniobase + com_ier, IER_ERXRDY | IER_ERLS |
+			    IER_EMSC);
+#endif
 	}
 
 	return (0);
@@ -1590,9 +1608,19 @@ comhardclose(com)
 	com->do_dcd_timestamp = FALSE;
 	com->pps.ppsparam.mode = 0;
 	sio_setreg(com, com_cfcr, com->cfcr_image &= ~CFCR_SBREAK);
+	tp = com->tp;
+
+#if defined(DDB) && (defined(BREAK_TO_DEBUGGER) || \
+    defined(ALT_BREAK_TO_DEBUGGER))
+	/*
+	 * Leave interrupts enabled and don't clear DTR if this is the
+	 * console. This allows us to detect break-to-debugger events
+	 * while the console device is closed.
+	 */
+	if (com->unit != comconsole)
+#endif
 	{
 		sio_setreg(com, com_ier, 0);
-		tp = com->tp;
 		if (tp->t_cflag & HUPCL
 		    /*
 		     * XXX we will miss any carrier drop between here and the

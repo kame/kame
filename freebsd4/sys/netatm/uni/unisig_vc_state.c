@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.6 2000/01/17 20:49:59 mks Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.6.2.1 2001/07/25 20:53:44 pirzyk Exp $
  *
  */
 
@@ -41,7 +41,7 @@
 #include <netatm/uni/unisig_msg.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.6 2000/01/17 20:49:59 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.6.2.1 2001/07/25 20:53:44 pirzyk Exp $");
 #endif
 
 
@@ -645,9 +645,9 @@ unisig_vc_act06(usp, uvp, msg)
 		uvp->uv_vci = vci;
 	} else {
 		/*
-		 * No--VPI/VCI must have been specified earlier
+		 * No--VCI must have been specified earlier
 		 */
-		if (!uvp->uv_vpi || !uvp->uv_vci) {
+		if (!uvp->uv_vci) {
 			iep = (struct ie_generic *)atm_allocate(
 					&unisig_iepool);
 			if (!iep)

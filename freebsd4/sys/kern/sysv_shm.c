@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45.2.3 2000/11/01 17:58:06 rwatson Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45.2.4 2001/05/15 03:15:17 dillon Exp $ */
 /*	$NetBSD: sysv_shm.c,v 1.23 1994/07/04 23:25:12 glass Exp $	*/
 
 /*
@@ -101,7 +101,7 @@ static void shminit __P((void *));
  * Tuneable values
  */
 #ifndef SHMMAXPGS
-#define	SHMMAXPGS	1024	/* XXX increase this, it's not in kva! */
+#define	SHMMAXPGS	8192	/* note: sysv shared memory is swap backed */
 #endif
 #ifndef SHMMAX
 #define	SHMMAX	(SHMMAXPGS*PAGE_SIZE)
@@ -110,10 +110,10 @@ static void shminit __P((void *));
 #define	SHMMIN	1
 #endif
 #ifndef SHMMNI
-#define	SHMMNI	96
+#define	SHMMNI	192
 #endif
 #ifndef SHMSEG
-#define	SHMSEG	64
+#define	SHMSEG	128
 #endif
 #ifndef SHMALL
 #define	SHMALL	(SHMMAXPGS)

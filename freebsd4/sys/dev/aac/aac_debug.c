@@ -24,13 +24,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_debug.c,v 1.2.2.1 2001/01/09 01:03:09 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_debug.c,v 1.2.2.2 2001/08/08 19:41:39 scottl Exp $
  */
 
 /*
  * Debugging support.
  */
+#include "opt_aac.h"
 
+#ifdef AAC_DEBUG
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -434,3 +436,4 @@ aac_print_aif(struct aac_softc *sc, struct aac_aif_command *aif)
 	break;
     }
 }
+#endif /* AAC_DEBUG */

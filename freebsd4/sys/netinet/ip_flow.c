@@ -33,7 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_flow.c,v 1.9 1999/08/28 00:49:22 peter Exp $
+ * $FreeBSD: src/sys/netinet/ip_flow.c,v 1.9.2.1 2001/08/08 08:20:35 ru Exp $
  */
 
 #include <sys/param.h>
@@ -109,6 +109,7 @@ ipflow_fastforward(
 	struct ip *ip;
 	struct ipflow *ipf;
 	struct rtentry *rt;
+	struct sockaddr *dst;
 	int error;
 
 	/*
@@ -158,7 +159,12 @@ ipflow_fastforward(
 	 */
 	ipf->ipf_uses++;
 	ipf->ipf_timer = IPFLOW_TIMER;
-	if ((error = (*rt->rt_ifp->if_output)(rt->rt_ifp, m, &ipf->ipf_ro.ro_dst, rt)) != 0) {
+
+	if (rt->rt_flags & RTF_GATEWAY)
+		dst = rt->rt_gateway;
+	else
+		dst = &ipf->ipf_ro.ro_dst;
+	if ((error = (*rt->rt_ifp->if_output)(rt->rt_ifp, m, dst, rt)) != 0) {
 		if (error == ENOBUFS)
 			ipf->ipf_dropped++;
 		else

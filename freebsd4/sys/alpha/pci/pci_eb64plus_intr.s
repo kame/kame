@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/pci/pci_eb64plus_intr.s,v 1.1.6.1 2000/08/03 00:48:05 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/pci/pci_eb64plus_intr.s,v 1.1.6.2 2001/06/29 15:29:47 mjacob Exp $ */
 /* $NetBSD: pci_eb64plus_intr.s,v 1.2 1997/09/02 13:19:43 thorpej Exp $ */
 
 /*
@@ -61,4 +61,4 @@ LEAF(eb64plus_intr_disable,1)
 	ldiq	a0, 0x35
 	call_pal PAL_cserve
 	RET
-	END(eb64plus_intr_enable)
+	END(eb64plus_intr_disable)

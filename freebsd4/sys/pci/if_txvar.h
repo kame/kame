@@ -1,5 +1,5 @@
 /*	$OpenBSD: if_txvar.h,v 1.7 1999/11/17 05:21:19 jason Exp $	*/
-/* $FreeBSD: src/sys/pci/if_txvar.h,v 1.5.2.1 2000/09/10 19:51:07 semenu Exp $ */
+/* $FreeBSD: src/sys/pci/if_txvar.h,v 1.5.2.4 2001/09/01 07:17:25 semenu Exp $ */
 
 /*-
  * Copyright (c) 1997 Semen Ustimenko
@@ -49,6 +49,8 @@
 #define TX_RING_MASK		(TX_RING_SIZE - 1)
 #define RX_RING_MASK		(RX_RING_SIZE - 1)
 #define ETHER_MAX_FRAME_LEN	(ETHER_MAX_LEN + ETHER_CRC_LEN)
+
+#define	EPIC_MAX_MTU		1600	/* This is experiment-derived value */
 
 /* PCI aux configuration registers */
 #if defined(__FreeBSD__)
@@ -206,6 +208,19 @@
 #define	RXCON_DEFAULT		(RXCON_EARLY | \
 				 RXCON_RECEIVE_MULTICAST_FRAMES | \
 				 RXCON_RECEIVE_BROADCAST_FRAMES)
+/*
+ * EEPROM structure
+ * SMC9432* eeprom is organized by words and only first 8 words
+ * have distinctive meaning (according to datasheet)
+ */
+#define	EEPROM_MAC0		0x0000	/* Byte 0 / Byte 1 */
+#define	EEPROM_MAC1		0x0001	/* Byte 2 / Byte 3 */
+#define	EEPROM_MAC2		0x0002	/* Byte 4 / Byte 5 */
+#define	EEPROM_BID_CSUM		0x0003	/* Board Id / Check Sum */
+#define	EEPROM_NVCTL		0x0004	/* NVCTL (bits 0-5) / nothing */
+#define	EEPROM_PCI_MGD_MLD	0x0005	/* PCI MinGrant / MaxLatency. Desired */
+#define	EEPROM_SSVENDID		0x0006	/* Subsystem Vendor Id */
+#define	EEPROM_SSID		0x0006	/* Subsystem Id */
 
 /*
  * Structures definition and Functions prototypes
@@ -257,6 +272,26 @@ struct epic_tx_buffer {
  * epic_rx_desc, epic_tx_desc, epic_frag_list - must be aligned on dword
  */
 
+/* PHY, known by tx driver */
+#define	EPIC_UNKN_PHY		0x0000
+#define	EPIC_QS6612_PHY		0x0001
+#define	EPIC_AC101_PHY		0x0002
+#define	EPIC_LXT970_PHY		0x0003
+#define	EPIC_SERIAL		0x0004
+
+#define	SMC9432DMT		0xA010
+#define	SMC9432TX		0xA011
+#define	SMC9032TXM		0xA012
+#define	SMC9032TX		0xA013
+#define	SMC9432TXPWR		0xA014
+#define	SMC9432BTX		0xA015
+#define	SMC9432FTX		0xA016
+#define	SMC9432FTX_SC		0xA017
+#define	SMC9432TX_XG_ADHOC	0xA020
+#define	SMC9434TX_XG_ADHOC	0xA021
+#define	SMC9432FTX_ADHOC	0xA022
+#define	SMC9432BTX1		0xA024
+
 /* Driver status structure */
 typedef struct {
 	struct arpcom		arpcom;
@@ -288,11 +323,16 @@ typedef struct {
 	u_int32_t		flags;
 	u_int32_t		tx_threshold;
 	u_int32_t		txcon;
-	u_int32_t		phyid;
+	u_int32_t		miicfg;
 	u_int32_t		cur_tx;
 	u_int32_t		cur_rx;
 	u_int32_t		dirty_tx;
 	u_int32_t		pending_txs;
+	u_int16_t		cardvend;
+	u_int16_t		cardid;
+	struct mii_softc 	*physc;
+	u_int32_t		phyid;
+	int			serinst;
 	void 			*pool;
 } epic_softc_t;
 

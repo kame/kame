@@ -24,14 +24,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98_machdep.h,v 1.8.2.1 2000/03/19 08:09:19 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98_machdep.h,v 1.8.2.2 2001/06/02 06:12:39 nyan Exp $
  */
 
 #ifndef __PC98_PC98_PC98_MACHDEP_H__
 #define __PC98_PC98_PC98_MACHDEP_H__
 
 void	pc98_init_dmac __P((void));
-void	pc98_getmemsize __P((unsigned *, unsigned *, unsigned *));
+unsigned int	pc98_getmemsize __P((unsigned *, unsigned *));
 
 struct	ccb_calc_geometry;
 int	scsi_da_bios_params __P((struct ccb_calc_geometry *));

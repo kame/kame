@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.42.2.3 2001/02/27 09:41:15 phk Exp $
+ * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.42.2.4 2001/07/29 19:32:40 ume Exp $
  */
 
 #include "opt_inet.h"
@@ -362,13 +362,6 @@ div_attach(struct socket *so, int proto, struct proc *p)
 	/* The socket is always "connected" because
 	   we always know "where" to send the packet */
 	so->so_state |= SS_ISCONNECTED;
-#ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->inp_sp);
-	if (error != 0) {
-		in_pcbdetach(inp);
-		return error;
-	}
-#endif /*IPSEC*/
 	return 0;
 }
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_proc.c	8.7 (Berkeley) 2/14/95
- * $FreeBSD: src/sys/kern/kern_proc.c,v 1.63.2.7 2000/09/07 19:13:36 truckman Exp $
+ * $FreeBSD: src/sys/kern/kern_proc.c,v 1.63.2.8 2001/05/01 13:39:06 dwmalone Exp $
  */
 
 #include <sys/param.h>
@@ -157,10 +157,10 @@ enterpgrp(p, pgid, mksess)
 		 */
 		KASSERT(p->p_pid == pgid,
 		    ("enterpgrp: new pgrp and pid != pgid"));
-		MALLOC(pgrp, struct pgrp *, sizeof(struct pgrp), M_PGRP,
-		    M_WAITOK);
 		if ((np = pfind(savepid)) == NULL || np != p)
 			return (ESRCH);
+		MALLOC(pgrp, struct pgrp *, sizeof(struct pgrp), M_PGRP,
+		    M_WAITOK);
 		if (mksess) {
 			register struct session *sess;
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.3.2.3 2001/03/01 01:57:33 ps Exp $
+ * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.3.2.4 2001/07/30 20:29:58 jlemon Exp $
  */
 
 /*
@@ -185,6 +185,7 @@ struct ida_board {
 	u_int32_t	board;
 	char 		*desc;
 	struct		ida_access *accessor;
+	int		flags;
 };
 
 extern int ida_detach(device_t dev);

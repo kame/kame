@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.3 2000/12/20 21:25:31 archie Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.4 2001/07/04 00:12:32 brooks Exp $
  */
 
 /*
@@ -62,10 +62,11 @@
 #include <net/ethernet.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#include <net/if_media.h>
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.3 2000/12/20 21:25:31 archie Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.4 2001/07/04 00:12:32 brooks Exp $";
 #endif
 
 #include <dev/an/if_aironet_ieee.h>
@@ -109,6 +110,7 @@ an_pccard_detach(device_t dev)
 		return(0);
 	}
 	an_stop(sc);
+	ifmedia_removeall(&sc->an_ifmedia);
 	ifp->if_flags &= ~IFF_RUNNING;
 	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	sc->an_gone = 1;

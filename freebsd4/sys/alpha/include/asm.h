@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/asm.h,v 1.6.2.1 2000/10/24 16:09:36 gallatin Exp $ */
+/* $FreeBSD: src/sys/alpha/include/asm.h,v 1.6.2.3 2001/08/03 07:16:07 obrien Exp $ */
 /* From: NetBSD: asm.h,v 1.18 1997/11/03 04:22:06 ross Exp */
 
 /* 
@@ -222,6 +222,12 @@
  *
  */
 
+ /*
+  * for `.loc' uses
+  */
+
+	.file	1 __FILE__
+
 /*
  * MCOUNT
  */
@@ -246,8 +252,8 @@
 #define PALVECT(_name_)						\
 	ESETUP(_name_);						\
 	ERSAVE();						\
-	br	pv, _name_##lgp;				\
-_name_##lgp:;							\
+	br	pv, 1001f;					\
+1001:;								\
 	LDGP(pv)
 
 #define	ESETUP(_name_)						\

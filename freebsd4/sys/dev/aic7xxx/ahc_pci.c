@@ -28,9 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ahc_pci.c,v 1.1.1.3 2001/04/23 13:09:46 sumikawa Exp $
+ * $Id: ahc_pci.c,v 1.1.1.4 2001/09/25 04:58:28 keiichi Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/ahc_pci.c,v 1.29.2.6 2001/03/12 14:57:40 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/ahc_pci.c,v 1.29.2.8 2001/07/28 18:46:39 gibbs Exp $
  */
 
 #include <dev/aic7xxx/aic7xxx_freebsd.h>
@@ -59,6 +59,8 @@ static devclass_t ahc_devclass;
 
 DRIVER_MODULE(ahc, pci, ahc_pci_driver, ahc_devclass, 0, 0);
 DRIVER_MODULE(ahc, cardbus, ahc_pci_driver, ahc_devclass, 0, 0);
+MODULE_DEPEND(ahc_pci, ahc, 1, 1, 1);
+MODULE_VERSION(ahc_pci, 1);
 
 static int
 ahc_pci_probe(device_t dev)
@@ -100,11 +102,20 @@ ahc_pci_attach(device_t dev)
 
 	ahc_set_unit(ahc, device_get_unit(dev));
 
+	/*
+	 * Should we bother disabling 39Bit addressing
+	 * based on installed memory?
+	 */
+	if (sizeof(bus_addr_t) > 4)
+                ahc->flags |= AHC_39BIT_ADDRESSING;
+
 	/* Allocate a dmatag for our SCB DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
 	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
 				   /*boundary*/0,
-				   /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
+				   (ahc->flags & AHC_39BIT_ADDRESSING)
+				   ? 0x7FFFFFFFFF
+				   : BUS_SPACE_MAXADDR_32BIT,
 				   /*highaddr*/BUS_SPACE_MAXADDR,
 				   /*filter*/NULL, /*filterarg*/NULL,
 				   /*maxsize*/MAXBSIZE, /*nsegments*/AHC_NSEG,
@@ -180,22 +191,22 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 		regs_id = AHC_PCI_IOADDR;
 		regs = bus_alloc_resource(ahc->dev_softc, regs_type,
 					  &regs_id, 0, ~0, 1, RF_ACTIVE);
-		ahc->tag = rman_get_bustag(regs);
-		ahc->bsh = rman_get_bushandle(regs);
-		command &= ~PCIM_CMD_MEMEN;
-		ahc_pci_write_config(ahc->dev_softc,
-				     PCIR_COMMAND,
-				     command, /*bytes*/1);
+		if (regs != NULL) {
+			ahc->tag = rman_get_bustag(regs);
+			ahc->bsh = rman_get_bushandle(regs);
+			command &= ~PCIM_CMD_MEMEN;
+			ahc_pci_write_config(ahc->dev_softc, PCIR_COMMAND,
+					     command, /*bytes*/1);
+		}
 	}
-	ahc->platform_data->regs_res_type = regs_type;
-	ahc->platform_data->regs_res_id = regs_id;
-	ahc->platform_data->regs = regs;
- 
 	if (regs == NULL) {
 		device_printf(ahc->dev_softc,
 			      "can't allocate register resources\n");
 		return (ENOMEM);
 	}
+	ahc->platform_data->regs_res_type = regs_type;
+	ahc->platform_data->regs_res_id = regs_id;
+	ahc->platform_data->regs = regs;
 	return (0);
 }
 

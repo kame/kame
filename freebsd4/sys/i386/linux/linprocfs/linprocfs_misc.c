@@ -38,7 +38,7 @@
  *
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  *
- * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_misc.c,v 1.3.2.5 2000/12/07 13:17:55 des Exp $
+ * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_misc.c,v 1.3.2.8 2001/06/25 19:46:47 pirzyk Exp $
  */
 
 #include <sys/param.h>
@@ -71,7 +71,7 @@
 /*
  * Various conversion macros
  */
-#define T2J(x) (((x) * 100) / (stathz ? stathz : hz))	/* ticks to jiffies */
+#define T2J(x) (((x) * 100UL) / (stathz ? stathz : hz))	/* ticks to jiffies */
 #define T2S(x) ((x) / (stathz ? stathz : hz))		/* ticks to seconds */
 #define B2K(x) ((x) >> 10)				/* bytes to kbytes */
 #define P2B(x) ((x) << PAGE_SHIFT)			/* pages to bytes */
@@ -92,9 +92,9 @@ linprocfs_domeminfo(curp, p, pfs, uio)
 	unsigned long memfree;		/* free memory in bytes */
 	unsigned long memshared;	/* shared memory ??? */
 	unsigned long buffers, cached;	/* buffer / cache memory ??? */
-	unsigned long swaptotal;	/* total swap space in bytes */
-	unsigned long swapused;		/* used swap space in bytes */
-	unsigned long swapfree;		/* free swap space in bytes */
+	unsigned long long swaptotal;	/* total swap space in bytes */
+	unsigned long long swapused;		/* used swap space in bytes */
+	unsigned long long swapfree;		/* free swap space in bytes */
 	vm_object_t object;
 
 	if (uio->uio_rw != UIO_READ)
@@ -117,8 +117,8 @@ linprocfs_domeminfo(curp, p, pfs, uio)
 		swaptotal = 0;
 		swapfree = 0;
 	} else {
-		swaptotal = swapblist->bl_blocks * 1024; /* XXX why 1024? */
-		swapfree = swapblist->bl_root->u.bmu_avail * PAGE_SIZE;
+		swaptotal = (unsigned long long) swapblist->bl_blocks * 1024ULL; /* XXX why 1024? */
+		swapfree = (unsigned long long) swapblist->bl_root->u.bmu_avail * PAGE_SIZE;
 	}
 	swapused = swaptotal - swapfree;
 	memshared = 0;
@@ -142,14 +142,14 @@ linprocfs_domeminfo(curp, p, pfs, uio)
 	ps += sprintf(ps,
 		"        total:    used:    free:  shared: buffers:  cached:\n"
 		"Mem:  %lu %lu %lu %lu %lu %lu\n"
-		"Swap: %lu %lu %lu\n"
+		"Swap: %llu %llu %llu\n"
 		"MemTotal: %9lu kB\n"
 		"MemFree:  %9lu kB\n"
 		"MemShared:%9lu kB\n"
 		"Buffers:  %9lu kB\n"
 		"Cached:   %9lu kB\n"
-		"SwapTotal:%9lu kB\n"
-		"SwapFree: %9lu kB\n",
+		"SwapTotal:%9llu kB\n"
+		"SwapFree: %9llu kB\n",
 		memtotal, memused, memfree, memshared, buffers, cached,
 		swaptotal, swapused, swapfree,
 		B2K(memtotal), B2K(memfree),
@@ -495,4 +495,37 @@ linprocfs_doprocstatus(curp, p, pfs, uio)
 	ps = psbuf + uio->uio_offset;
 	xlen = imin(xlen, uio->uio_resid);
 	return (xlen <= 0 ? 0 : uiomove(ps, xlen, uio));
+}
+
+int
+linprocfs_doloadavg(curp, p, pfs, uio)
+	struct proc *curp;
+	struct proc *p;
+	struct pfsnode *pfs;
+	struct uio *uio;
+{
+     char *ps, psbuf[512];
+     int xlen;
+	extern int nextpid;
+
+	ps=psbuf;
+
+	ps += sprintf(ps,
+		"%d.%02d %d.%02d %d.%02d %d/%d %d\n",
+		(int)(averunnable.ldavg[0] / averunnable.fscale),
+		(int)(averunnable.ldavg[0] * 100 / averunnable.fscale % 100),
+		(int)(averunnable.ldavg[1] / averunnable.fscale),
+		(int)(averunnable.ldavg[1] * 100 / averunnable.fscale % 100),
+		(int)(averunnable.ldavg[2] / averunnable.fscale),
+		(int)(averunnable.ldavg[2] * 100 / averunnable.fscale % 100),
+		1,			/* number of running tasks */
+		-1,			/* number of tasks */
+		nextpid		/* The last pid */
+	);
+
+	xlen = ps - psbuf;
+	xlen -= uio->uio_offset;
+	ps = psbuf + uio->uio_offset;
+	xlen = imin(xlen, uio->uio_resid);
+     return (xlen <= 0 ? 0 : uiomove(ps, xlen, uio));
 }

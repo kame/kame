@@ -4,6 +4,7 @@
  *	June 1995, Andrew McRae (andrew@mega.com.au)
  *-------------------------------------------------------------------------
  *
+ * Copyright (c) 2001 M. Warner Losh.  All rights reserved.
  * Copyright (c) 1995 Andrew McRae.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,50 +29,38 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard.c,v 1.106.2.4 2001/03/25 15:32:39 iedowse Exp $
+ * $FreeBSD: src/sys/pccard/pccard.c,v 1.106.2.10 2001/09/13 17:54:50 imp Exp $
  */
 
 #include "opt_pcic.h"
 
 #include <sys/param.h>
+#include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/proc.h>
 #include <sys/malloc.h>
-#include <sys/select.h>
 #include <sys/sysctl.h>
 #include <sys/conf.h>
 #include <sys/uio.h>
 #include <sys/poll.h>
 #include <sys/bus.h>
+#include <sys/proc.h>
 #include <machine/bus.h>
 
 #include <pccard/cardinfo.h>
 #include <pccard/driver.h>
-#include <pccard/pcic.h>
 #include <pccard/slot.h>
 #include <pccard/pccard_nbk.h>
 
 #include <machine/md_var.h>
 
-/*
- * XXX We shouldn't be using processor-specific/bus-specific code in
- * here, but we need the start of the ISA hole (IOM_BEGIN).
- */
-#ifdef PC98
-#include <pc98/pc98/pc98.h>
-#else
-#include <i386/isa/isa.h>
-#endif
-
 SYSCTL_NODE(_machdep, OID_AUTO, pccard, CTLFLAG_RW, 0, "pccard");
 
+/* The following might now be obsolete */
 static int pcic_resume_reset = 1;
 
 SYSCTL_INT(_machdep_pccard, OID_AUTO, pcic_resume_reset, CTLFLAG_RW,
     &pcic_resume_reset, 0, "");
-
-#define	PCCARD_MEMSIZE	(4*1024)
 
 #define MIN(a,b)	((a)<(b)?(a):(b))
 
@@ -79,18 +68,20 @@ static int		allocate_driver(struct slot *, struct dev_desc *);
 static void		inserted(void *);
 static void		disable_slot(struct slot *);
 static void		disable_slot_to(struct slot *);
-static int		invalid_io_memory(unsigned long, int);
 static void		power_off_slot(void *);
-
-static struct slot	*pccard_slots[MAXSLOT];	/* slot entries */
 
 /*
  *	The driver interface for read/write uses a block
  *	of memory in the ISA I/O memory space allocated via
  *	an ioctl setting.
+ *
+ *	Now that we have different bus attachments, we should really
+ *	use a better algorythm to allocate memory.
  */
 static unsigned long pccard_mem;	/* Physical memory */
 static unsigned char *pccard_kmem;	/* Kernel virtual address */
+static struct resource *pccard_mem_res;
+static int pccard_mem_rid;
 
 static	d_open_t	crdopen;
 static	d_close_t	crdclose;
@@ -114,7 +105,6 @@ static struct cdevsw crd_cdevsw = {
 	/* dump */	nodump,
 	/* psize */	nopsize,
 	/* flags */	0,
-	/* bmaj */	-1
 };
 
 /*
@@ -132,6 +122,8 @@ power_off_slot(void *arg)
 	 * the interrupt unitl after disable runs so that we can get rid
 	 * rid of the interrupt before it becomes unsafe to touch the
 	 * device.
+	 *
+	 * XXX In current, the spl stuff is a nop.
 	 */
 	s = splhigh();
 	/* Power off the slot. */
@@ -147,7 +139,6 @@ power_off_slot(void *arg)
 static void
 disable_slot(struct slot *slt)
 {
-	/* XXX Need to store pccarddev in slt. */
 	device_t pccarddev;
 	device_t *kids;
 	int nkids;
@@ -159,7 +150,7 @@ disable_slot(struct slot *slt)
 	 * driver is accessing the device and it is removed, then
 	 * all bets are off...
 	 */
-	pccarddev = devclass_get_device(pccard_devclass, slt->slotnum);
+	pccarddev = slt->dev;
 	device_get_children(pccarddev, &kids, &nkids);
 	for (i = 0; i < nkids; i++) {
 		if ((ret = device_delete_child(pccarddev, kids[i])) != 0)
@@ -176,41 +167,37 @@ disable_slot(struct slot *slt)
 static void
 disable_slot_to(struct slot *slt)
 {
-	slt->state = empty;
 	disable_slot(slt);
-	printf("pccard: card removed, slot %d\n", slt->slotnum);
+	if (slt->state == empty)
+		printf("pccard: card removed, slot %d\n", slt->slotnum);
+	else
+		printf("pccard: card deactivated, slot %d\n", slt->slotnum);
 	pccard_remove_beep();
 	selwakeup(&slt->selp);
 }
 
 /*
- *	pccard_alloc_slot - Called from controller probe
- *	routine, this function allocates a new PC-CARD slot
- *	and initialises the data structures using the data provided.
- *	It returns the allocated structure to the probe routine
- *	to allow the controller specific data to be initialised.
+ *	pccard_init_slot - Initialize the slot controller and attach various
+ * things to it.  We also make the device for it.  We create the device that
+ * will be exported to devfs.
  */
 struct slot *
-pccard_alloc_slot(struct slot_ctrl *ctrl)
+pccard_init_slot(device_t dev, struct slot_ctrl *ctrl)
 {
-	struct slot *slt;
-	int slotno;
+	int		slotno;
+	struct slot	*slt;
 
-	for (slotno = 0; slotno < MAXSLOT; slotno++)
-		if (pccard_slots[slotno] == 0)
-			break;
-	if (slotno == MAXSLOT)
-		return(0);
-
-	MALLOC(slt, struct slot *, sizeof(*slt), M_DEVBUF, M_WAITOK);
-	bzero(slt, sizeof(*slt));
-	make_dev(&crd_cdevsw, slotno, 0, 0, 0600, "card%d", slotno);
+	slt = PCCARD_DEVICE2SOFTC(dev);
+	slotno = device_get_unit(dev);
+	slt->dev = dev;
+	slt->d = make_dev(&crd_cdevsw, slotno, 0, 0, 0600, "card%d", slotno);
+	slt->d->si_drv1 = slt;
 	slt->ctrl = ctrl;
 	slt->slotnum = slotno;
-	pccard_slots[slotno] = slt;
 	callout_handle_init(&slt->insert_ch);
 	callout_handle_init(&slt->poff_ch);
-	return(slt);
+
+	return (slt);
 }
 
 /*
@@ -224,11 +211,22 @@ allocate_driver(struct slot *slt, struct dev_desc *desc)
 	device_t pccarddev;
 	int err, irq = 0;
 	device_t child;
+	device_t *devs;
+	int count;
 
-	pccarddev = devclass_get_device(pccard_devclass, slt->slotnum);
+	pccarddev = slt->dev;
+	err = device_get_children(pccarddev, &devs, &count);
+	if (err != 0)
+		return (err);
+	free(devs, M_TEMP);
+	if (count) {
+		device_printf(pccarddev,
+		    "Can not attach more than one child.\n");
+		return (EIO);
+	}
 	irq = ffs(desc->irqmask) - 1;
-	MALLOC(devi, struct pccard_devinfo *, sizeof(*devi), M_DEVBUF, M_WAITOK);
-	bzero(devi, sizeof(*devi));
+	MALLOC(devi, struct pccard_devinfo *, sizeof(*devi), M_DEVBUF,
+	    M_WAITOK | M_ZERO);
 	strcpy(devi->name, desc->name);
 	/*
 	 *	Create an entry for the device under this slot.
@@ -240,6 +238,13 @@ allocate_driver(struct slot *slt, struct dev_desc *desc)
 	child = device_add_child(pccarddev, devi->name, desc->unit);
 	device_set_flags(child, desc->flags);
 	device_set_ivars(child, devi);
+	if (bootverbose) {
+		device_printf(pccarddev,
+		    "Assigning %s: io 0x%x-0x%x irq %d mem 0x%lx-0x%lx\n",
+		    device_get_nameunit(child),
+		    desc->iobase, desc->iobase + desc->iosize - 1,
+		    irq, desc->mem, desc->mem + desc->memsize - 1); 
+	}
 	err = bus_set_resource(child, SYS_RES_IOPORT, 0, desc->iobase,
 	    desc->iosize);
 	if (err)
@@ -255,8 +260,15 @@ allocate_driver(struct slot *slt, struct dev_desc *desc)
 			goto err;
 	}
 	err = device_probe_and_attach(child);
-	snprintf(desc->name, sizeof(desc->name), "%s",
-		 device_get_nameunit(child));
+	/*
+	 * XXX We unwisely assume that the detach code won't run while the
+	 * XXX the attach code is attaching.  Someone should put some
+	 * XXX interlock code.  This can happen if probe/attach takes a while
+	 * XXX and the user ejects the card, which causes the detach
+	 * XXX function to be called.
+	 */
+	strncpy(desc->name, device_get_nameunit(child), sizeof(desc->name));
+	desc->name[sizeof(desc->name) - 1] = '\0';
 err:
 	if (err)
 		device_delete_child(pccarddev, child);
@@ -310,12 +322,12 @@ pccard_event(struct slot *slt, enum card_event event)
 
 	switch(event) {
 	case card_removed:
-		/*
-		 *	The slot and devices are disabled, but the
-		 *	data structures are not unlinked.
-		 */
+	case card_deactivated:
 		if (slt->state == filled || slt->state == inactive) {
-			slt->state = empty;
+			if (event == card_removed)
+				slt->state = empty;
+			else
+				slt->state = inactive;
 			disable_slot_to(slt);
 		}
 		break;
@@ -332,16 +344,13 @@ pccard_event(struct slot *slt, enum card_event event)
 static	int
 crdopen(dev_t dev, int oflags, int devtype, struct proc *p)
 {
-	struct slot *slt;
+	struct slot *slt = PCCARD_DEV2SOFTC(dev);
 
-	if (minor(dev) >= MAXSLOT)
-		return(ENXIO);
-	slt = pccard_slots[minor(dev)];
-	if (slt == 0)
-		return(ENXIO);
+	if (slt == NULL)
+		return (ENXIO);
 	if (slt->rwmem == 0)
 		slt->rwmem = MDF_ATTR;
-	return(0);
+	return (0);
 }
 
 /*
@@ -351,7 +360,7 @@ crdopen(dev_t dev, int oflags, int devtype, struct proc *p)
 static	int
 crdclose(dev_t dev, int fflag, int devtype, struct proc *p)
 {
-	return(0);
+	return (0);
 }
 
 /*
@@ -361,24 +370,24 @@ crdclose(dev_t dev, int fflag, int devtype, struct proc *p)
 static	int
 crdread(dev_t dev, struct uio *uio, int ioflag)
 {
-	struct slot *slt = pccard_slots[minor(dev)];
+	struct slot *slt = PCCARD_DEV2SOFTC(dev);
 	struct mem_desc *mp, oldmap;
 	unsigned char *p;
 	unsigned int offs;
 	int error = 0, win, count;
 
 	if (slt == 0 || slt->state != filled)
-		return(ENXIO);
+		return (ENXIO);
 	if (pccard_mem == 0)
-		return(ENOMEM);
+		return (ENOMEM);
 	for (win = 0; win < slt->ctrl->maxmem; win++)
 		if ((slt->mem[win].flags & MDF_ACTIVE) == 0)
 			break;
 	if (win >= slt->ctrl->maxmem)
-		return(EBUSY);
+		return (EBUSY);
 	mp = &slt->mem[win];
 	oldmap = *mp;
-	mp->flags = slt->rwmem|MDF_ACTIVE;
+	mp->flags = slt->rwmem | MDF_ACTIVE;
 	while (uio->uio_resid && error == 0) {
 		mp->card = uio->uio_offset;
 		mp->size = PCCARD_MEMSIZE;
@@ -396,7 +405,7 @@ crdread(dev_t dev, struct uio *uio, int ioflag)
 	*mp = oldmap;
 	slt->ctrl->mapmem(slt, win);
 
-	return(error);
+	return (error);
 }
 
 /*
@@ -407,24 +416,24 @@ crdread(dev_t dev, struct uio *uio, int ioflag)
 static	int
 crdwrite(dev_t dev, struct uio *uio, int ioflag)
 {
-	struct slot *slt = pccard_slots[minor(dev)];
+	struct slot *slt = PCCARD_DEV2SOFTC(dev);
 	struct mem_desc *mp, oldmap;
 	unsigned char *p;
 	unsigned int offs;
 	int error = 0, win, count;
 
 	if (slt == 0 || slt->state != filled)
-		return(ENXIO);
+		return (ENXIO);
 	if (pccard_mem == 0)
-		return(ENOMEM);
+		return (ENOMEM);
 	for (win = 0; win < slt->ctrl->maxmem; win++)
 		if ((slt->mem[win].flags & MDF_ACTIVE) == 0)
 			break;
 	if (win >= slt->ctrl->maxmem)
-		return(EBUSY);
+		return (EBUSY);
 	mp = &slt->mem[win];
 	oldmap = *mp;
-	mp->flags = slt->rwmem|MDF_ACTIVE;
+	mp->flags = slt->rwmem | MDF_ACTIVE;
 	while (uio->uio_resid && error == 0) {
 		mp->card = uio->uio_offset;
 		mp->size = PCCARD_MEMSIZE;
@@ -442,7 +451,7 @@ crdwrite(dev_t dev, struct uio *uio, int ioflag)
 	*mp = oldmap;
 	slt->ctrl->mapmem(slt, win);
 
-	return(error);
+	return (error);
 }
 
 /*
@@ -452,24 +461,22 @@ crdwrite(dev_t dev, struct uio *uio, int ioflag)
 static	int
 crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 {
-	struct slot *slt = pccard_slots[minor(dev)];
+	u_int32_t	addr;
+	int		err;
+	struct io_desc	*ip;
 	struct mem_desc *mp;
-	struct io_desc *ip;
-	struct pccard_resource *pr;
-	struct resource *r;
-	device_t pcicdev;
-	int s, err;
-	int rid = 1;
-	int i;
-	int	pwval;
+	device_t	pccarddev;
+	int		pwval;
+	int		s;
+	struct slot	*slt = PCCARD_DEV2SOFTC(dev);
 
 	if (slt == 0 && cmd != PIOCRWMEM)
-		return(ENXIO);
+		return (ENXIO);
 	switch(cmd) {
 	default:
 		if (slt->ctrl->ioctl)
-			return(slt->ctrl->ioctl(slt, cmd, data));
-		return(ENOTTY);
+			return (slt->ctrl->ioctl(slt, cmd, data));
+		return (ENOTTY);
 	/*
 	 * Get slot state.
 	 */
@@ -489,7 +496,7 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 	case PIOCGMEM:
 		s = ((struct mem_desc *)data)->window;
 		if (s < 0 || s >= slt->ctrl->maxmem)
-			return(EINVAL);
+			return (EINVAL);
 		mp = &slt->mem[s];
 		((struct mem_desc *)data)->flags = mp->flags;
 		((struct mem_desc *)data)->start = mp->start;
@@ -503,21 +510,21 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 	 */
 	case PIOCSMEM:
 		if (suser(p))
-			return(EPERM);
+			return (EPERM);
 		if (slt->state != filled)
-			return(ENXIO);
+			return (ENXIO);
 		s = ((struct mem_desc *)data)->window;
 		if (s < 0 || s >= slt->ctrl->maxmem)
-			return(EINVAL);
+			return (EINVAL);
 		slt->mem[s] = *((struct mem_desc *)data);
-		return(slt->ctrl->mapmem(slt, s));
+		return (slt->ctrl->mapmem(slt, s));
 	/*
 	 * Get I/O port context.
 	 */
 	case PIOCGIO:
 		s = ((struct io_desc *)data)->window;
 		if (s < 0 || s >= slt->ctrl->maxio)
-			return(EINVAL);
+			return (EINVAL);
 		ip = &slt->io[s];
 		((struct io_desc *)data)->flags = ip->flags;
 		((struct io_desc *)data)->start = ip->start;
@@ -528,15 +535,15 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 	 */
 	case PIOCSIO:
 		if (suser(p))
-			return(EPERM);
+			return (EPERM);
 		if (slt->state != filled)
-			return(ENXIO);
+			return (ENXIO);
 		s = ((struct io_desc *)data)->window;
 		if (s < 0 || s >= slt->ctrl->maxio)
-			return(EINVAL);
+			return (EINVAL);
 		slt->io[s] = *((struct io_desc *)data);
 		/* XXX Don't actually map */
-		return 0;
+		return (0);
 		break;
 	/*
 	 * Set memory window flags for read/write interface.
@@ -544,54 +551,55 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 	case PIOCRWFLAG:
 		slt->rwmem = *(int *)data;
 		break;
-#ifndef	__alpha__
 	/*
 	 * Set the memory window to be used for the read/write interface.
 	 * Not available on the alpha.
 	 */
 	case PIOCRWMEM:
 		if (*(unsigned long *)data == 0) {
-			if (pccard_mem)
-				*(unsigned long *)data = pccard_mem;
+			*(unsigned long *)data = pccard_mem;
 			break;
 		}
 		if (suser(p))
-			return(EPERM);
+			return (EPERM);
 		/*
 		 * Validate the memory by checking it against the I/O
 		 * memory range. It must also start on an aligned block size.
 		 */
-		if (invalid_io_memory(*(unsigned long *)data, PCCARD_MEMSIZE))
-			return(EINVAL);
 		if (*(unsigned long *)data & (PCCARD_MEMSIZE-1))
-			return(EINVAL);
-		/*
-		 *	Map it to kernel VM.
-		 */
-		pccard_mem = *(unsigned long *)data;
-		pccard_kmem =
-		    (unsigned char *)(void *)(uintptr_t)
-		    (pccard_mem + atdevbase - IOM_BEGIN);
+			return (EINVAL);
+		pccarddev = PCCARD_DEV2SOFTC(dev)->dev;
+		pccard_mem_rid = 0;
+		addr = *(unsigned long *)data;
+		if (pccard_mem_res)
+			bus_release_resource(pccarddev, SYS_RES_MEMORY,
+			    pccard_mem_rid, pccard_mem_res);
+		pccard_mem_res = bus_alloc_resource(pccarddev, SYS_RES_MEMORY,
+		    &pccard_mem_rid, addr, addr, PCCARD_MEMSIZE,
+		    RF_ACTIVE | rman_make_alignment_flags(PCCARD_MEMSIZE));
+		if (pccard_mem_res == NULL)
+			return (EINVAL);
+		pccard_mem = rman_get_start(pccard_mem_res);
+		pccard_kmem = rman_get_virtual(pccard_mem_res);
 		break;
-#endif
 	/*
 	 * Set power values.
 	 */
 	case PIOCSPOW:
 		slt->pwr = *(struct power *)data;
-		return(slt->ctrl->power(slt));
+		return (slt->ctrl->power(slt));
 	/*
 	 * Allocate a driver to this slot.
 	 */
 	case PIOCSDRV:
 		if (suser(p))
-			return(EPERM);
+			return (EPERM);
 		err = allocate_driver(slt, (struct dev_desc *)data);
 		if (!err)
 			pccard_success_beep();
 		else
 			pccard_failure_beep();
-		return err;
+		return (err);
 	/*
 	 * Virtual removal/insertion
 	 */
@@ -599,53 +607,21 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 		pwval = *(int *)data;
 		if (!pwval) {
 			if (slt->state != filled)
-				return EINVAL;
-			pccard_event(slt, card_removed);
-			slt->state = inactive;
+				return (EINVAL);
+			pccard_event(slt, card_deactivated);
 		} else {
 			if (slt->state != empty && slt->state != inactive)
-				return EINVAL;
+				return (EINVAL);
 			pccard_event(slt, card_inserted);
 		}
 		break;
 	case PIOCSBEEP:
 		if (pccard_beep_select(*(int *)data)) {
-			return EINVAL;
-		}
-		break;
-	case PIOCSRESOURCE:
-		pr = (struct pccard_resource *)data;
-		pr->resource_addr = ~0ul;
-		/*
-		 * pccard_devclass does not have soft_c
-		 * so we use pcic_devclass
-		 */
-		pcicdev = devclass_get_device(pcic_devclass, 0);
-		switch(pr->type) {
-		default:
-			return EINVAL;
-		case SYS_RES_IOPORT:
-		case SYS_RES_MEMORY:
-		case SYS_RES_IRQ:
-			for (i = pr->min; i + pr->size - 1 <= pr->max; i++) {
-				/* already allocated to pcic? */
-				if (bus_get_resource_start(pcicdev, pr->type, 0) == i)
-					continue;
-				err = bus_set_resource(pcicdev, pr->type, rid, i, pr->size);
-				if (!err) {
-					r = bus_alloc_resource(pcicdev, pr->type, &rid, 0ul, ~0ul, pr->size, 0);
-					if (r) { 
-						pr->resource_addr = (u_long)rman_get_start(r);
-			                        bus_release_resource(pcicdev, pr->type, rid, r);
-						break;
-					}
-				}
-			}
-			break;
+			return (EINVAL);
 		}
 		break;
 	}
-	return(0);
+	return (0);
 }
 
 /*
@@ -655,9 +631,9 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 static	int
 crdpoll(dev_t dev, int events, struct proc *p)
 {
-	int s;
-	struct slot *slt = pccard_slots[minor(dev)];
-	int revents = 0;
+	int	revents = 0;
+	int	s;
+	struct slot *slt = PCCARD_DEV2SOFTC(dev);
 
 	if (events & (POLLIN | POLLRDNORM))
 		revents |= events & (POLLIN | POLLRDNORM);
@@ -681,41 +657,19 @@ crdpoll(dev_t dev, int events, struct proc *p)
 }
 
 /*
- *	invalid_io_memory - verify that the ISA I/O memory block
- *	is a valid and unallocated address.
- *	A simple check of the range is done, and then a
- *	search of the current devices is done to check for
- *	overlapping regions.
- */
-static int
-invalid_io_memory(unsigned long adr, int size)
-{
-	/* XXX - What's magic about 0xC0000?? */
-	if (adr < 0xC0000 || (adr+size) > IOM_END)
-		return(1);
-	return(0);
-}
-
-static struct slot *
-pccard_dev2slot(device_t dev)
-{
-	return pccard_slots[device_get_unit(dev)];
-}
-
-/*
  *	APM hooks for suspending and resuming.
  */
 int
 pccard_suspend(device_t dev)
 {
-	struct slot *slt = pccard_dev2slot(dev);
+	struct slot *slt = PCCARD_DEVICE2SOFTC(dev);
 
 	/* This code stolen from pccard_event:card_removed */
 	if (slt->state == filled) {
-		int s = splhigh();
+		int s = splhigh();		/* nop on current */
 		disable_slot(slt);
-		slt->laststate = filled;
-		slt->state = suspend;
+		slt->laststate = suspend;	/* for pccardd */
+		slt->state = empty;
 		splx(s);
 		printf("pccard: card disabled, slot %d\n", slt->slotnum);
 	}
@@ -731,18 +685,8 @@ pccard_suspend(device_t dev)
 int
 pccard_resume(device_t dev)
 {
-	struct slot *slt = pccard_dev2slot(dev);
+	struct slot *slt = PCCARD_DEVICE2SOFTC(dev);
 
-	if (pcic_resume_reset)
-		slt->ctrl->resume(slt);
-	/* This code stolen from pccard_event:card_inserted */
-	if (slt->state == suspend) {
-		slt->laststate = suspend;
-		slt->state = empty;
-		slt->insert_seq = 1;
-		untimeout(inserted, (void *)slt, slt->insert_ch);
-		inserted((void *) slt);
-		selwakeup(&slt->selp);
-	}
+	slt->ctrl->resume(slt);
 	return (0);
 }

@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/sound/pcm/mixer_if.m,v 1.1.2.1 2001/02/03 01:29:12 cg Exp $
+# $FreeBSD: src/sys/dev/sound/pcm/mixer_if.m,v 1.1.2.2 2001/08/01 03:41:03 cg Exp $
 #
 
 #include <dev/sound/pcm/sound.h>
@@ -34,7 +34,7 @@ INTERFACE mixer;
 CODE {
 
 	static int
-	mixer_noreinit(snd_mixer *m)
+	mixer_noreinit(struct snd_mixer *m)
 	{
 		return 0;
 	}
@@ -42,26 +42,26 @@ CODE {
 };
 
 METHOD int init {
-	snd_mixer *m;
+	struct snd_mixer *m;
 };
 
 METHOD int reinit {
-	snd_mixer *m;
+	struct snd_mixer *m;
 } DEFAULT mixer_noreinit;
 
 METHOD int uninit {
-	snd_mixer *m;
+	struct snd_mixer *m;
 };
 
 METHOD int set {
-	snd_mixer *m;
+	struct snd_mixer *m;
 	unsigned dev;
 	unsigned left;
 	unsigned right;
 };
 
 METHOD u_int32_t setrecsrc {
-	snd_mixer *m;
+	struct snd_mixer *m;
 	u_int32_t src
 };
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.8 2001/03/05 13:09:03 obrien Exp $
+ * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.10 2001/07/07 04:30:38 silby Exp $
  */
 
 #include "opt_inet6.h"
@@ -374,7 +374,7 @@ send:
 	 * NOTE: we assume that the IP/TCP header plus TCP options
 	 * always fit in a single mbuf, leaving room for a maximum
 	 * link header, i.e.
-	 *	max_linkhdr + sizeof (struct tcpiphdr) + optlen <= MHLEN
+	 *	max_linkhdr + sizeof (struct tcpiphdr) + optlen <= MCLBYTES
 	 */
 	optlen = 0;
 #ifdef INET6
@@ -630,16 +630,11 @@ send:
 		m->m_len = hdrlen;
 	}
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
-	if (tp->t_template == 0)
-		panic("tcp_output");
 #ifdef INET6
 	if (isipv6) {
 		ip6 = mtod(m, struct ip6_hdr *);
 		th = (struct tcphdr *)(ip6 + 1);
-		bcopy((caddr_t)tp->t_template->tt_ipgen, (caddr_t)ip6,
-		      sizeof(struct ip6_hdr));
-		bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
-		      sizeof(struct tcphdr));
+		tcp_fillheaders(tp, ip6, th);
 	} else
 #endif /* INET6 */
       {
@@ -647,10 +642,7 @@ send:
 	ipov = (struct ipovly *)ip;
 	th = (struct tcphdr *)(ip + 1);
 	/* this picks up the pseudo header (w/o the length) */
-	bcopy((caddr_t)tp->t_template->tt_ipgen, (caddr_t)ip,
-	      sizeof(struct ip));
-	bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
-	      sizeof(struct tcphdr));
+	tcp_fillheaders(tp, ip, th);
       }
 
 	/*
@@ -821,7 +813,11 @@ send:
 
 		/* TODO: IPv6 IP6TOS_ECT bit on */
 #ifdef IPSEC
-		ipsec_setsocket(m, so);
+		if (ipsec_setsocket(m, so) != 0) {
+			m_freem(m);
+			error = ENOBUFS;
+			goto out;
+		}
 #endif /*IPSEC*/
 		error = ip6_output(m,
 			    tp->t_inpcb->in6p_outputopts,

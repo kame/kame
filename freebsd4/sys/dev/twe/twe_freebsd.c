@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.2.2.2 2000/12/07 08:08:44 ps Exp $
+ * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.2.2.3 2001/07/26 21:54:54 ps Exp $
  */
 
 /*
@@ -729,20 +729,12 @@ twed_dump(dev_t dev)
 	    return(error);
 
 
-	if (addr % (1024 * 1024) == 0) {
-#ifdef HW_WDOG
-	    if (wdog_tickler)
-		(*wdog_tickler)();
-#endif
-	    printf("%ld ", (long)(count * DEV_BSIZE) / (1024 * 1024));
-	}
+	if (dumpstatus(addr, (long)(count * DEV_BSIZE)) < 0)
+	    return(EINTR);
 
 	blkno += blkcnt * dumppages;
 	count -= blkcnt * dumppages;
 	addr += PAGE_SIZE * dumppages;
-	
-	if (cncheckc() != -1)
-	    return(EINTR);
     }
     return(0);
 }

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ntfs/ntfs_vfsops.c,v 1.20 2000/01/10 12:04:22 phk Exp $
+ * $FreeBSD: src/sys/ntfs/ntfs_vfsops.c,v 1.20.2.1 2001/07/26 20:37:27 iedowse Exp $
  */
 
 
@@ -603,7 +603,7 @@ out1:
 	for(i=0;i<NTFS_SYSNODESNUM;i++)
 		if(ntmp->ntm_sysvn[i]) vrele(ntmp->ntm_sysvn[i]);
 
-	if (vflush(mp,NULLVP,0))
+	if (vflush(mp, 0, 0))
 		dprintf(("ntfs_mountfs: vflush failed\n"));
 
 out:
@@ -651,7 +651,7 @@ ntfs_unmount(
 		flags |= FORCECLOSE;
 
 	dprintf(("ntfs_unmount: vflushing...\n"));
-	error = vflush(mp,NULLVP,flags | SKIPSYSTEM);
+	error = vflush(mp, 0, flags | SKIPSYSTEM);
 	if (error) {
 		printf("ntfs_unmount: vflush failed: %d\n",error);
 		return (error);
@@ -667,7 +667,7 @@ ntfs_unmount(
 		 if(ntmp->ntm_sysvn[i]) vrele(ntmp->ntm_sysvn[i]);
 
 	/* vflush system vnodes */
-	error = vflush(mp,NULLVP,flags);
+	error = vflush(mp, 0, flags);
 	if (error)
 		printf("ntfs_unmount: vflush failed(sysnodes): %d\n",error);
 

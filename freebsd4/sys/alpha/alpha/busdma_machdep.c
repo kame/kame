@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/busdma_machdep.c,v 1.7.2.1 2000/07/04 01:46:11 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/alpha/busdma_machdep.c,v 1.7.2.2 2001/08/14 21:58:04 wpaul Exp $
  */
 
 #include <sys/param.h>
@@ -325,7 +325,13 @@ bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map)
 	if (map != NULL) {
 		if (STAILQ_FIRST(&map->bpages) != NULL)
 			return (EBUSY);
-		free(map, M_DEVBUF);
+		/*
+		 * The nobounce_dmamap map is not dynamically
+		 * allocated, thus we should on no account try to
+		 * free it.
+		 */
+		if (map != &nobounce_dmamap)
+			free(map, M_DEVBUF);
 	}
 	dmat->map_count--;
 	return (0);

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/atkbd_isa.c,v 1.7.2.1 2000/03/31 12:52:04 yokota Exp $
+ * $FreeBSD: src/sys/isa/atkbd_isa.c,v 1.7.2.3 2001/08/01 10:42:28 yokota Exp $
  */
 
 #include "opt_kbd.h"
@@ -37,6 +37,7 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
+#include <sys/kbio.h>
 #include <dev/kbd/kbdreg.h>
 #include <dev/kbd/atkbdreg.h>
 #include <dev/kbd/atkbdcreg.h>
@@ -53,11 +54,13 @@ devclass_t	atkbd_devclass;
 
 static int	atkbdprobe(device_t dev);
 static int	atkbdattach(device_t dev);
+static int	atkbdresume(device_t dev);
 static void	atkbd_isa_intr(void *arg);
 
 static device_method_t atkbd_methods[] = {
 	DEVMETHOD(device_probe,		atkbdprobe),
 	DEVMETHOD(device_attach,	atkbdattach),
+	DEVMETHOD(device_resume,	atkbdresume),
 	{ 0, 0 }
 };
 
@@ -113,6 +116,18 @@ atkbdattach(device_t dev)
 	BUS_SETUP_INTR(device_get_parent(dev), dev, sc->intr, INTR_TYPE_TTY,
 		       atkbd_isa_intr, kbd, &sc->ih);
 
+	return 0;
+}
+
+static int
+atkbdresume(device_t dev)
+{
+	keyboard_t *kbd;
+
+	kbd = kbd_get_keyboard(kbd_find_keyboard(ATKBD_DRIVER_NAME,
+						 device_get_unit(dev)));
+	if (kbd)
+		(*kbdsw[kbd->kb_index]->clear_state)(kbd);
 	return 0;
 }
 

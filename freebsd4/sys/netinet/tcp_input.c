@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.8 2001/04/18 17:55:23 kris Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.16 2001/08/22 00:59:12 silby Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
@@ -101,7 +101,6 @@ struct tcphdr tcp_savetcp;
 MALLOC_DEFINE(M_TSEGQ, "tseg_qent", "TCP segment queue entry");
 
 static int	tcprexmtthresh = 3;
-tcp_seq	tcp_iss;
 tcp_cc	tcp_ccgen;
 
 struct	tcpstat tcpstat;
@@ -130,12 +129,6 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, tcp_lq_overflow, CTLFLAG_RW,
 static int drop_synfin = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, drop_synfin, CTLFLAG_RW,
     &drop_synfin, 0, "Drop TCP packets with SYN+FIN set");
-#endif
-
-#ifdef TCP_RESTRICT_RST
-static int restrict_rst = 0;
-SYSCTL_INT(_net_inet_tcp, OID_AUTO, restrict_rst, CTLFLAG_RW,
-    &restrict_rst, 0, "Restrict RST emission");
 #endif
 
 struct inpcbhead tcb;
@@ -169,38 +162,6 @@ do { \
  */
 #define DELAY_ACK(tp) \
 	(tcp_delack_enabled && !callout_pending(tp->tt_delack))
-
-/*
- * Insert segment which inludes th into reassembly queue of tcp with
- * control block tp.  Return TH_FIN if reassembly now includes
- * a segment with FIN.  The macro form does the common case inline
- * (segment is the next to be received on an established connection,
- * and the queue is empty), avoiding linkage into and removal
- * from the queue and repetition of various conversions.
- * Set DELACK for segments received in order, but ack immediately
- * when segments are out of order (so fast retransmit can work).
- */
-#define	TCP_REASS(tp, th, tlenp, m, so, flags) { \
-	if ((th)->th_seq == (tp)->rcv_nxt && \
-	    LIST_EMPTY(&(tp)->t_segq) && \
-	    (tp)->t_state == TCPS_ESTABLISHED) { \
-		if (DELAY_ACK(tp)) \
-			callout_reset(tp->tt_delack, tcp_delacktime, \
-			    tcp_timer_delack, tp); \
-		else \
-			tp->t_flags |= TF_ACKNOW; \
-		(tp)->rcv_nxt += *(tlenp); \
-		flags = (th)->th_flags & TH_FIN; \
-		tcpstat.tcps_rcvpack++;\
-		tcpstat.tcps_rcvbyte += *(tlenp);\
-		ND6_HINT(tp); \
-		sbappend(&(so)->so_rcv, (m)); \
-		sorwakeup(so); \
-	} else { \
-		(flags) = tcp_reass((tp), (th), (tlenp), (m)); \
-		tp->t_flags |= TF_ACKNOW; \
-	} \
-}
 
 static int
 tcp_reass(tp, th, tlenp, m)
@@ -343,6 +304,7 @@ tcp6_input(mp, offp, proto)
 	int *offp, proto;
 {
 	register struct mbuf *m = *mp;
+	struct in6_ifaddr *ia6;
 
 	IP6_EXTHDR_CHECK(m, *offp, sizeof(struct tcphdr), IPPROTO_DONE);
 
@@ -350,7 +312,8 @@ tcp6_input(mp, offp, proto)
 	 * draft-itojun-ipv6-tcp-to-anycast
 	 * better place to put this in?
 	 */
-	if (m->m_flags & M_ANYCAST6) {
+	ia6 = ip6_getdstifaddr(m);
+	if (ia6 && (ia6->ia6_flags & IN6_IFF_ANYCAST)) {		
 		struct ip6_hdr *ip6;
 
 		ip6 = mtod(m, struct ip6_hdr *);
@@ -417,6 +380,19 @@ tcp_input(m, off0, proto)
 			goto drop;
 		}
 		th = (struct tcphdr *)((caddr_t)ip6 + off0);
+
+		/*
+		 * Be proactive about unspecified IPv6 address in source.
+		 * As we use all-zero to indicate unbounded/unconnected pcb,
+		 * unspecified IPv6 address can be used to confuse us.
+		 *
+		 * Note that packets with unspecified IPv6 destination is
+		 * already dropped in ip6_input.
+		 */
+		if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
+			/* XXX stat */
+			goto drop;
+		}
 	} else
 #endif /* INET6 */
       {
@@ -665,18 +641,6 @@ findpcb:
 	else
 		tiwin = th->th_win;
 
-#ifdef INET6
-	/* save packet options if user wanted */
-	if (isipv6 && inp->in6p_flags & INP_CONTROLOPTS) {
-		if (inp->in6p_options) {
-			m_freem(inp->in6p_options);
-			inp->in6p_options = 0;
-		}
-		ip6_savecontrol(inp, &inp->in6p_options, ip6, m);
-	}
-        /* else, should also do ip_srcroute() here? */
-#endif /* INET6 */
-
 	so = inp->inp_socket;
 	if (so->so_options & (SO_DEBUG|SO_ACCEPTCONN)) {
 #ifdef TCPDEBUG
@@ -721,6 +685,50 @@ findpcb:
 				goto drop;
 			}
 #endif
+
+#ifdef INET6
+			/*
+			 * If deprecated address is forbidden,
+			 * we do not accept SYN to deprecated interface
+			 * address to prevent any new inbound connection from
+			 * getting established.
+			 * When we do not accept SYN, we send a TCP RST,
+			 * with deprecated source address (instead of dropping
+			 * it).  We compromise it as it is much better for peer
+			 * to send a RST, and RST will be the final packet
+			 * for the exchange.
+			 *
+			 * If we do not forbid deprecated addresses, we accept
+			 * the SYN packet.  RFC2462 does not suggest dropping
+			 * SYN in this case.
+			 * If we decipher RFC2462 5.5.4, it says like this:
+			 * 1. use of deprecated addr with existing
+			 *    communication is okay - "SHOULD continue to be
+			 *    used"
+			 * 2. use of it with new communication:
+			 *   (2a) "SHOULD NOT be used if alternate address
+			 *        with sufficient scope is available"
+			 *   (2b) nothing mentioned otherwise.
+			 * Here we fall into (2b) case as we have no choice in
+			 * our source address selection - we must obey the peer.
+			 *
+			 * The wording in RFC2462 is confusing, and there are
+			 * multiple description text for deprecated address
+			 * handling - worse, they are not exactly the same.
+			 * I believe 5.5.4 is the best one, so we follow 5.5.4.
+			 */
+			if (isipv6 && !ip6_use_deprecated) {
+				struct in6_ifaddr *ia6;
+
+				if ((ia6 = ip6_getdstifaddr(m)) &&
+				    (ia6->ia6_flags & IN6_IFF_DEPRECATED)) {
+					tp = NULL;
+					rstreason = BANDLIM_RST_OPENPORT;
+					goto dropwithreset;
+				}
+			}
+#endif
+
 			so2 = sonewconn(so, 0);
 			if (so2 == 0) {
 				tcpstat.tcps_listendrop++;
@@ -756,10 +764,8 @@ findpcb:
 			if (isipv6)
 				inp->in6p_laddr = ip6->ip6_dst;
 			else {
-				if (ip6_mapped_addr_on) {
-					inp->inp_vflag &= ~INP_IPV6;
-					inp->inp_vflag |= INP_IPV4;
-				}
+				inp->inp_vflag &= ~INP_IPV6;
+				inp->inp_vflag |= INP_IPV4;
 #endif /* INET6 */
 			inp->inp_laddr = ip->ip_dst;
 #ifdef INET6
@@ -804,21 +810,25 @@ findpcb:
 #endif
 #ifdef INET6
 			if (isipv6) {
-				/*
-				 * inherit socket options from the listening
-				 * socket.
-				 */
+  				/*
+ 				 * Inherit socket options from the listening
+  				 * socket.
+ 				 * Note that in6p_inputopts are not (even
+ 				 * should not be) copied, since it stores
+				 * previously received options and is used to
+ 				 * detect if each new option is different than
+ 				 * the previous one and hence should be passed
+ 				 * to a user.
+ 				 * If we copied in6p_inputopts, a user would
+ 				 * not be able to receive options just after
+ 				 * calling the accept system call.
+ 				 */
 				inp->inp_flags |=
 					oinp->inp_flags & INP_CONTROLOPTS;
-				if (inp->inp_flags & INP_CONTROLOPTS) {
-					if (inp->in6p_options) {
-						m_freem(inp->in6p_options);
-						inp->in6p_options = 0;
-					}
-					ip6_savecontrol(inp,
-							&inp->in6p_options,
-							ip6, m);
-				}
+ 				if (oinp->in6p_outputopts)
+ 					inp->in6p_outputopts =
+ 						ip6_copypktopts(oinp->in6p_outputopts,
+ 								M_NOWAIT);
 			} else
 #endif /* INET6 */
 			inp->inp_options = ip_srcroute();
@@ -1104,12 +1114,6 @@ findpcb:
 		}
 		FREE(sin, M_SONAME);
 	      }
-		tp->t_template = tcp_template(tp);
-		if (tp->t_template == 0) {
-			tp = tcp_drop(tp, ENOBUFS);
-			dropsocket = 0;		/* socket is already gone */
-			goto drop;
-		}
 		if ((taop = tcp_gettaocache(inp)) == NULL) {
 			taop = &tao_noncached;
 			bzero(taop, sizeof(*taop));
@@ -1118,12 +1122,7 @@ findpcb:
 		if (iss)
 			tp->iss = iss;
 		else {
-#ifdef TCP_COMPAT_42
-			tcp_iss += TCP_ISSINCR/2;
-			tp->iss = tcp_iss;
-#else
-			tp->iss = tcp_rndiss_next();
-#endif /* TCP_COMPAT_42 */
+			tp->iss = tcp_new_isn(tp);
  		}
 		tp->irs = th->th_seq;
 		tcp_sendseqinit(tp);
@@ -1655,11 +1654,7 @@ trimthenstep6:
 			if (thflags & TH_SYN &&
 			    tp->t_state == TCPS_TIME_WAIT &&
 			    SEQ_GT(th->th_seq, tp->rcv_nxt)) {
-#ifdef TCP_COMPAT_42
-				iss = tp->snd_nxt + TCP_ISSINCR;
-#else
-				iss = tcp_rndiss_next();
-#endif /* TCP_COMPAT_42 */
+				iss = tcp_new_isn(tp);
 				tp = tcp_close(tp);
 				goto findpcb;
 			}
@@ -2160,7 +2155,36 @@ dodata:							/* XXX */
 	if ((tlen || (thflags&TH_FIN)) &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
 		m_adj(m, drop_hdrlen);	/* delayed header drop */
-		TCP_REASS(tp, th, &tlen, m, so, thflags);
+		/*
+		 * Insert segment which inludes th into reassembly queue of tcp with
+		 * control block tp.  Return TH_FIN if reassembly now includes
+		 * a segment with FIN.  This handle the common case inline (segment
+		 * is the next to be received on an established connection, and the
+		 * queue is empty), avoiding linkage into and removal from the queue
+		 * and repetition of various conversions.
+		 * Set DELACK for segments received in order, but ack immediately
+		 * when segments are out of order (so fast retransmit can work).
+		 */
+		if (th->th_seq == tp->rcv_nxt &&
+		    LIST_EMPTY(&tp->t_segq) &&
+		    TCPS_HAVEESTABLISHED(tp->t_state)) {
+			if (DELAY_ACK(tp))
+				callout_reset(tp->tt_delack, tcp_delacktime,
+				    tcp_timer_delack, tp);
+			else
+				tp->t_flags |= TF_ACKNOW;
+			tp->rcv_nxt += tlen;
+			thflags = th->th_flags & TH_FIN;
+			tcpstat.tcps_rcvpack++;
+			tcpstat.tcps_rcvbyte += tlen;
+			ND6_HINT(tp);
+			sbappend(&so->so_rcv, m);
+			sorwakeup(so);
+		} else {
+			thflags = tcp_reass(tp, th, &tlen, m);
+			tp->t_flags |= TF_ACKNOW;
+		}
+
 		/*
 		 * Note the amount of data that peer has sent into
 		 * our window, in order to estimate the sender's
@@ -2313,14 +2337,8 @@ dropwithreset:
 	/* IPv6 anycast check is done at tcp6_input() */
 
 	/* 
-	 * Perform bandwidth limiting (and RST blocking
-	 * if kernel is so configured.)
+	 * Perform bandwidth limiting.
 	 */
-#ifdef TCP_RESTRICT_RST
-	if (restrict_rst)
-		goto drop;
-#endif
-
 #ifdef ICMP_BANDLIM
 	if (badport_bandlim(rstreason) < 0)
 		goto drop;
@@ -2381,8 +2399,10 @@ tcp_dooptions(tp, cp, cnt, th, to)
 		if (opt == TCPOPT_NOP)
 			optlen = 1;
 		else {
+			if (cnt < 2)
+				break;
 			optlen = cp[1];
-			if (optlen <= 0)
+			if (optlen < 2 || optlen > cnt)
 				break;
 		}
 		switch (opt) {

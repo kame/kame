@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.h	8.3 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/in.h,v 1.48.2.1 2000/07/15 07:14:30 kris Exp $
+ * $FreeBSD: src/sys/netinet/in.h,v 1.48.2.2 2001/04/21 14:53:06 ume Exp $
  */
 
 #ifndef _NETINET_IN_H_
@@ -230,7 +230,7 @@
  * Internet address (a structure for historical reasons)
  */
 struct in_addr {
-	u_int32_t s_addr;
+	in_addr_t s_addr;
 };
 
 /*

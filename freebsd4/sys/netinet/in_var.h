@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in_var.h,v 1.33 1999/12/29 04:41:00 peter Exp $
+ * $FreeBSD: src/sys/netinet/in_var.h,v 1.33.2.2 2001/07/17 10:50:01 ru Exp $
  */
 
 #ifndef _NETINET_IN_VAR_H_
@@ -94,20 +94,11 @@ extern	u_char	inetctlerrmap[];
 	/* struct in_addr addr; */ \
 	/* struct ifnet *ifp; */ \
 { \
-	register struct in_ifaddr *ia; \
+	struct in_ifaddr *ia; \
 \
-	for (ia = in_ifaddrhead.tqh_first; \
-	    ia != NULL && ((ia->ia_ifp->if_flags & IFF_POINTOPOINT)? \
-		IA_DSTSIN(ia):IA_SIN(ia))->sin_addr.s_addr != (addr).s_addr; \
-	    ia = ia->ia_link.tqe_next) \
-		 continue; \
-	if (ia == NULL) \
-	    for (ia = in_ifaddrhead.tqh_first; \
-		ia != NULL; \
-		ia = ia->ia_link.tqe_next) \
-		    if (ia->ia_ifp->if_flags & IFF_POINTOPOINT && \
-			IA_SIN(ia)->sin_addr.s_addr == (addr).s_addr) \
-			    break; \
+	TAILQ_FOREACH(ia, &in_ifaddrhead, ia_link) \
+		if (IA_SIN(ia)->sin_addr.s_addr == (addr).s_addr) \
+			break; \
 	(ifp) = (ia == NULL) ? NULL : ia->ia_ifp; \
 }
 
@@ -119,9 +110,9 @@ extern	u_char	inetctlerrmap[];
 	/* struct ifnet *ifp; */ \
 	/* struct in_ifaddr *ia; */ \
 { \
-	for ((ia) = in_ifaddrhead.tqh_first; \
+	for ((ia) = TAILQ_FIRST(&in_ifaddrhead); \
 	    (ia) != NULL && (ia)->ia_ifp != (ifp); \
-	    (ia) = (ia)->ia_link.tqe_next) \
+	    (ia) = TAILQ_NEXT((ia), ia_link)) \
 		continue; \
 }
 #endif
@@ -182,10 +173,9 @@ struct in_multistep {
 	/* struct ifnet *ifp; */ \
 	/* struct in_multi *inm; */ \
 do { \
-	register struct ifmultiaddr *ifma; \
+	struct ifmultiaddr *ifma; \
 \
-	for (ifma = (ifp)->if_multiaddrs.lh_first; ifma; \
-	     ifma = ifma->ifma_link.le_next) { \
+	LIST_FOREACH(ifma, &((ifp)->if_multiaddrs), ifma_link) { \
 		if (ifma->ifma_addr->sa_family == AF_INET \
 		    && ((struct sockaddr_in *)ifma->ifma_addr)->sin_addr.s_addr == \
 		    (addr).s_addr) \
@@ -206,14 +196,14 @@ do { \
 	/* struct in_multi *inm; */ \
 do { \
 	if (((inm) = (step).i_inm) != NULL) \
-		(step).i_inm = (step).i_inm->inm_link.le_next; \
+		(step).i_inm = LIST_NEXT((step).i_inm, inm_link); \
 } while(0)
 
 #define IN_FIRST_MULTI(step, inm) \
 	/* struct in_multistep step; */ \
 	/* struct in_multi *inm; */ \
 do { \
-	(step).i_inm = in_multihead.lh_first; \
+	(step).i_inm = LIST_FIRST(&in_multihead); \
 	IN_NEXT_MULTI((step), (inm)); \
 } while(0)
 
@@ -224,7 +214,7 @@ int	in_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
 			struct proc *));
 void	in_rtqdrain __P((void));
 void	ip_input __P((struct mbuf *));
-int	in_ifadown __P((struct ifaddr *ifa));
+int	in_ifadown __P((struct ifaddr *ifa, int));
 void	in_ifscrub __P((struct ifnet *, struct in_ifaddr *));
 int	ipflow_fastforward __P((struct mbuf *));
 void	ipflow_create __P((const struct route *, struct mbuf *));

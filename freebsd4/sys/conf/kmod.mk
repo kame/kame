@@ -1,5 +1,5 @@
 #	From: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD: src/sys/conf/kmod.mk,v 1.82.2.5 2001/03/05 06:14:21 imp Exp $
+# $FreeBSD: src/sys/conf/kmod.mk,v 1.82.2.9 2001/08/01 07:50:49 roam Exp $
 #
 # The include file <bsd.kmod.mk> handles installing Kernel Loadable Device
 # drivers (KLD's).
@@ -155,14 +155,17 @@ ${KMOD}.kld: ${OBJS}
 	${LD} ${LDFLAGS} -r -o ${.TARGET} ${OBJS}
 
 .if !defined(NOMAN)
-.include <bsd.man.mk>
-.if !defined(_MANPAGES) || empty(_MANPAGES)
-MAN1=	${KMOD}.4
+.if 0
+MAN?=	${KMOD}.4
 .endif
-
-.elif !target(maninstall)
+.include <bsd.man.mk>
+.else
+.if !target(all-man)
+all-man: _SUBDIR
+.endif
+.if !target(maninstall)
 maninstall: _SUBDIR
-all-man:
+.endif
 .endif
 
 _ILINKS=@ machine
@@ -185,7 +188,7 @@ ${OBJS}: ${_link}
 SYSDIR=	${_dir}
 .endif
 .endfor
-.if !defined(SYSDIR) || !exists(${SYSDIR}/kern/)
+.if !defined(SYSDIR) || !exists(${SYSDIR}/kern)
 .error "can't find kernel source tree"
 .endif
 
@@ -217,7 +220,7 @@ _INSTALLFLAGS:=	${_INSTALLFLAGS${ie}}
 
 realinstall: _SUBDIR
 	${INSTALL} ${COPY} -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
-	    ${_INSTALLFLAGS} ${PROG} ${DESTDIR}${KMODDIR}
+	    ${_INSTALLFLAGS} ${PROG} ${DESTDIR}${KMODDIR}/
 .if defined(LINKS) && !empty(LINKS)
 	@set ${LINKS}; \
 	while test $$# -ge 2; do \
@@ -282,6 +285,7 @@ MFILES?= kern/bus_if.m kern/device_if.m dev/iicbus/iicbb_if.m \
     dev/ppbus/ppbus_if.m dev/smbus/smbus_if.m dev/usb/usb_if.m \
     dev/sound/pcm/ac97_if.m dev/sound/pcm/channel_if.m \
     dev/sound/pcm/feeder_if.m dev/sound/pcm/mixer_if.m \
+    libkern/iconv_converter_if.m \
     pci/agp_if.m
 
 .for _srcsrc in ${MFILES}

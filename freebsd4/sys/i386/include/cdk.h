@@ -3,7 +3,7 @@
 /*
  * cdk.h  -- CDK interface definitions.
  *
- * Copyright (c) 1994-1996 Greg Ungerer (gerg@stallion.oz.au).
+ * Copyright (c) 1994-1998 Greg Ungerer (gerg@stallion.oz.au).
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/cdk.h,v 1.5 1999/08/28 00:44:08 peter Exp $
+ * $FreeBSD: src/sys/i386/include/cdk.h,v 1.5.2.1 2001/08/30 12:29:57 murray Exp $
  */
 
 /*****************************************************************************/
@@ -318,6 +318,10 @@ typedef struct asyport {
 #define	P_LOOPBACK	0x10
 #define	P_DTRFOLLOW	0x20
 #define	P_FAKEDCD	0x40
+
+#define	P_RXIMIN	0x10000
+#define	P_RXITIME	0x20000
+#define	P_RXTHOLD	0x40000
 
 /*
  *	Define a structure to communicate serial port signal and data state

@@ -38,7 +38,7 @@
  *
  *	@(#)procfs_vnops.c	8.18 (Berkeley) 5/21/95
  *
- * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_vnops.c,v 1.3.2.3 2000/10/30 19:57:04 des Exp $
+ * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_vnops.c,v 1.3.2.5 2001/08/12 14:29:19 rwatson Exp $
  */
 
 /*
@@ -64,7 +64,6 @@
 #include <sys/pioctl.h>
 
 extern struct vnode *procfs_findtextvp __P((struct proc *));
-extern int	procfs_kmemaccess __P((struct proc *));
 
 static int	linprocfs_access __P((struct vop_access_args *));
 static int	linprocfs_badop __P((void));
@@ -143,8 +142,7 @@ linprocfs_open(ap)
 			return (EBUSY);
 
 		p1 = ap->a_p;
-		if (p_trespass(p1, p2) &&
-		    !procfs_kmemaccess(p1))
+		if (p_trespass(p1, p2))
 			return (EPERM);
 
 		if (ap->a_mode & FWRITE)
@@ -455,21 +453,6 @@ linprocfs_getattr(ap)
 	vap->va_atime = vap->va_mtime = vap->va_ctime;
 
 	/*
-	 * If the process has exercised some setuid or setgid
-	 * privilege, then rip away read/write permission so
-	 * that only root can gain access.
-	 */
-	switch (pfs->pfs_type) {
-	case Pmem:
-		/* Retain group kmem readablity. */
-		if (procp->p_flag & P_SUGID)
-			vap->va_mode &= ~(VREAD|VWRITE);
-		break;
-	default:
-		break;
-	}
-
-	/*
 	 * now do the object specific fields
 	 *
 	 * The size could be set from struct reg, but it's hardly
@@ -529,6 +512,7 @@ linprocfs_getattr(ap)
 	case Pstat:
 	case Puptime:
 	case Pversion:
+	case Ploadavg:
 		vap->va_bytes = vap->va_size = 0;
 		vap->va_uid = 0;
 		vap->va_gid = 0;
@@ -544,7 +528,6 @@ linprocfs_getattr(ap)
 			vap->va_uid = 0;
 		else
 			vap->va_uid = procp->p_ucred->cr_uid;
-		vap->va_gid = KMEM_GROUP;
 		break;
 
 	case Pprocstat:
@@ -706,6 +689,8 @@ linprocfs_lookup(ap)
 			return (linprocfs_allocvp(dvp->v_mount, vpp, 0, Puptime));
 		if (CNEQ(cnp, "version", 7))
 			return (linprocfs_allocvp(dvp->v_mount, vpp, 0, Pversion));
+		if (CNEQ(cnp, "loadavg", 7))
+			return (linprocfs_allocvp(dvp->v_mount, vpp, 0, Ploadavg));
 
 		pid = atopid(pname, cnp->cn_namelen);
 		if (pid == NO_PID)
@@ -901,6 +886,14 @@ linprocfs_readdir(ap)
 				bcopy("version", dp->d_name, 8);
 				dp->d_type = DT_REG;
 				break;
+
+			case 8:
+				dp->d_fileno = PROCFS_FILENO(0, Ploadavg);
+				dp->d_namlen = 7;
+				bcopy("loadavg", dp->d_name, 8);
+				dp->d_type = DT_REG;
+				break;
+
 
 			default:
 				while (pcnt < i) {

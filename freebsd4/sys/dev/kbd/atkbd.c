@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.25.2.2 2000/05/28 12:48:22 ache Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.25.2.3 2001/07/30 16:46:43 yokota Exp $
  */
 
 #include "opt_kbd.h"
@@ -49,6 +49,7 @@
 #include <vm/pmap.h>
 #endif /* __i386__ */
 
+#include <sys/kbio.h>
 #include <dev/kbd/kbdreg.h>
 #include <dev/kbd/atkbdreg.h>
 #include <dev/kbd/atkbdcreg.h>
@@ -167,7 +168,6 @@ atkbd_timeout(void *arg)
 /* LOW-LEVEL */
 
 #include <machine/limits.h>
-#include <machine/console.h>
 #include <machine/clock.h>
 
 #define ATKBD_DEFAULT	0

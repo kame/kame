@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/aureal.h,v 1.2 1999/09/01 06:58:27 peter Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/aureal.h,v 1.2.2.1 2001/08/01 03:40:57 cg Exp $
  */
 
 #ifndef _AU8820_REG_H

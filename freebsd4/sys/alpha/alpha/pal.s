@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/pal.s,v 1.2.6.1 2000/08/03 00:48:03 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/pal.s,v 1.2.6.2 2001/08/03 17:36:03 obrien Exp $ */
 /* $NetBSD: pal.s,v 1.12 1998/02/27 03:44:53 thorpej Exp $ */
 
 /*
@@ -44,7 +44,10 @@
 
 __KERNEL_RCSID(1, "$NetBSD: pal.s,v 1.12 1998/02/27 03:44:53 thorpej Exp $");
 
-inc2:	.stabs	__FILE__,132,0,0,inc2; .loc	1 __LINE__
+inc2:	.stabs	__FILE__,132,0,0,inc2
+	.text
+	.loc	1 __LINE__
+
 /*
  * alpha_rpcc: read process cycle counter (XXX INSTRUCTION, NOT PALcode OP)
  */

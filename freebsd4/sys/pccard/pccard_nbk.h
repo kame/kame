@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 1999, M. Warner Losh.
- * All rights reserved.
+ * Copyright (c) 1999, 2001 M. Warner Losh.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard_nbk.h,v 1.4 1999/10/25 02:41:55 imp Exp $
+ * $FreeBSD: src/sys/pccard/pccard_nbk.h,v 1.4.2.1 2001/06/05 19:16:37 imp Exp $
  */
 
 #ifndef PCCARD_PCCARD_NBK_H

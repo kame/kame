@@ -37,7 +37,7 @@
  * Authors: Archie Cobbs <archie@freebsd.org>
  *	    Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.2.2.9 2000/12/12 23:15:23 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.2.2.10 2001/09/01 08:22:29 yar Exp $
  */
 
 /*
@@ -770,7 +770,8 @@ ng_ether_mod_event(module_t mod, int event, void *data)
 
 		/* Create nodes for any already-existing Ethernet interfaces */
 		TAILQ_FOREACH(ifp, &ifnet, if_link) {
-			if (ifp->if_type == IFT_ETHER)
+			if (ifp->if_type == IFT_ETHER ||
+			    ifp->if_type == IFT_L2VLAN)
 				ng_ether_attach(ifp);
 		}
 		break;

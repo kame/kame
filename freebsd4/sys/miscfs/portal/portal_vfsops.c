@@ -35,7 +35,7 @@
  *
  *	@(#)portal_vfsops.c	8.11 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/miscfs/portal/portal_vfsops.c,v 1.26.2.1 2000/11/26 04:32:41 dillon Exp $
+ * $FreeBSD: src/sys/miscfs/portal/portal_vfsops.c,v 1.26.2.2 2001/07/26 20:37:16 iedowse Exp $
  */
 
 /*
@@ -155,7 +155,6 @@ portal_unmount(mp, mntflags, p)
 	int mntflags;
 	struct proc *p;
 {
-	struct vnode *rootvp = VFSTOPORTAL(mp)->pm_root;
 	int error, flags = 0;
 
 
@@ -172,20 +171,11 @@ portal_unmount(mp, mntflags, p)
 	if (mntinvalbuf(mp, 1))
 		return (EBUSY);
 #endif
-	if (rootvp->v_usecount > 1)
-		return (EBUSY);
-	error = vflush(mp, rootvp, flags);
+	/* There is 1 extra root vnode reference (pm_root). */
+	error = vflush(mp, 1, flags);
 	if (error)
 		return (error);
 
-	/*
-	 * Release reference on underlying root vnode
-	 */
-	vrele(rootvp);
-	/*
-	 * And blow it away for future re-use
-	 */
-	vgone(rootvp);
 	/*
 	 * Shutdown the socket.  This will cause the select in the
 	 * daemon to wake up, and then the accept will get ECONNABORTED

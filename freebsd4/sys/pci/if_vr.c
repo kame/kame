@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.6 2001/03/07 21:00:15 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.7 2001/05/14 19:13:43 wpaul Exp $
  */
 
 /*
@@ -100,7 +100,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.6 2001/03/07 21:00:15 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.7 2001/05/14 19:13:43 wpaul Exp $";
 #endif
 
 /*
@@ -728,6 +728,13 @@ static int vr_attach(dev)
 		printf("vr%d: couldn't set up irq\n", unit);
 		goto fail;
 	}
+
+	/*
+	 * Windows may put the chip in suspend mode when it
+	 * shuts down. Be sure to kick it in the head to wake it
+	 * up again.
+	 */
+	VR_CLRBIT(sc, VR_STICKHW, (VR_STICKHW_DS0|VR_STICKHW_DS1));
 
 	/* Reset the adapter. */
 	vr_reset(sc);

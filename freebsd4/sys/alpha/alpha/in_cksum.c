@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/in_cksum.c,v 1.2.2.1 2000/05/05 13:37:02 jlemon Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/in_cksum.c,v 1.2.2.2 2001/05/04 15:36:43 ru Exp $ */
 /* $NetBSD: in_cksum.c,v 1.7 1997/09/02 13:18:15 thorpej Exp $ */
 
 /*
@@ -69,7 +69,6 @@
 	sum = l_util.s[0] + l_util.s[1];				  \
 	ADDCARRY(sum);							  \
     }
-#define INVERT		sum == 0xffff ? sum : ~sum & 0xffff
 
 static const u_int32_t in_masks[] = {
 	/*0 bytes*/ /*1 byte*/	/*2 bytes*/ /*3 bytes*/
@@ -267,7 +266,7 @@ skip_start:
 		len -= mlen;
 	}
 	REDUCE16;
-	return (INVERT);
+	return (~sum & 0xffff);
 }
 
 u_int in_cksum_hdr(ip)

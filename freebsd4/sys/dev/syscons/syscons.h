@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.60.2.1 2000/04/03 13:03:54 yokota Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.60.2.5 2001/08/01 10:42:32 yokota Exp $
  */
 
 #ifndef _DEV_SYSCONS_SYSCONS_H_
@@ -54,6 +54,20 @@
 
 #ifdef SC_NO_MODE_CHANGE
 #undef SC_PIXEL_MODE
+#endif
+
+/* Always load font data if the pixel (raster text) mode is to be used. */
+#ifdef SC_PIXEL_MODE
+#undef SC_NO_FONT_LOADING
+#endif
+
+/* 
+ * If font data is not available, the `arrow'-shaped mouse cursor cannot
+ * be drawn.  Use the alternative drawing method.
+ */
+#ifdef SC_NO_FONT_LOADING
+#undef SC_ALT_MOUSE_IMAGE
+#define SC_ALT_MOUSE_IMAGE 1
 #endif
 
 #ifndef SC_CURSOR_CHAR
@@ -120,7 +134,7 @@
 #define PCBURST		128
 
 #ifndef BELL_DURATION
-#define BELL_DURATION	5
+#define BELL_DURATION	((5 * hz + 99) / 100)
 #define BELL_PITCH	800
 #endif
 
@@ -128,6 +142,7 @@
 typedef struct sc_vtb {
 	int		vtb_flags;
 #define VTB_VALID	(1 << 0)
+#define VTB_ALLOCED	(1 << 1)
 	int		vtb_type;
 #define VTB_INVALID	0
 #define VTB_MEMORY	1
@@ -461,15 +476,9 @@ typedef struct {
 			  == PIXEL_MODE)
 #define ISUNKNOWNSC(scp) ((scp)->status & UNKNOWN_MODE)
 
-#ifndef ISMOUSEAVAIL
-#ifdef SC_ALT_MOUSE_IMAGE
-#define ISMOUSEAVAIL(af) (1)
-#else
 #define ISMOUSEAVAIL(af) ((af) & V_ADP_FONT)
-#endif /* SC_ALT_MOUSE_IMAGE */
 #define ISFONTAVAIL(af)	((af) & V_ADP_FONT)
 #define ISPALAVAIL(af)	((af) & V_ADP_PALETTE)
-#endif /* ISMOUSEAVAIL */
 
 #define ISSIGVALID(sig)	((sig) > 0 && (sig) < NSIG)
 
@@ -499,7 +508,6 @@ extern int 	(*sc_user_ioctl)(dev_t dev, u_long cmd, caddr_t data,
 
 int		sc_probe_unit(int unit, int flags);
 int		sc_attach_unit(int unit, int flags);
-int		sc_resume_unit(int unit);
 
 int		set_mode(scr_stat *scp);
 

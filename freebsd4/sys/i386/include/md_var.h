@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/md_var.h,v 1.35 2000/02/20 20:51:23 bsd Exp $
+ * $FreeBSD: src/sys/i386/include/md_var.h,v 1.35.2.2 2001/08/15 01:23:52 peter Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -47,6 +47,7 @@ extern	int	(*copyout_vector) __P((const void *kaddr, void *udaddr,
 extern	u_int	cpu_feature;
 extern	u_int	cpu_high;
 extern	u_int	cpu_id;
+extern	u_int	cpu_fxsr;
 extern	char	cpu_vendor[];
 extern	u_int	cyrix_did;
 extern	char	kstack[];
@@ -70,6 +71,7 @@ void	bcopyb __P((const void *from, void *to, size_t len));
 void	busdma_swi __P((void));
 void	cpu_halt __P((void));
 void	cpu_reset __P((void));
+void	cpu_setregs __P((void));
 void	cpu_switch_load_gs __P((void)) __asm(__STRING(cpu_switch_load_gs));
 void	doreti_iret __P((void)) __asm(__STRING(doreti_iret));
 void	doreti_iret_fault __P((void)) __asm(__STRING(doreti_iret_fault));

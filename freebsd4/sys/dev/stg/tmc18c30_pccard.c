@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/stg/tmc18c30_pccard.c,v 1.2.2.2 2001/03/03 14:45:00 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/stg/tmc18c30_pccard.c,v 1.2.2.5 2001/09/04 04:45:24 non Exp $	*/
 /*	$NecBSD: tmc18c30_pisa.c,v 1.22 1998/11/26 01:59:21 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -148,7 +148,7 @@ stg_alloc_resource(DEVPORT_PDEVICE dev)
 
 	sc->port_rid = 0;
 	sc->port_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->port_rid,
-					  0, ~0, 0, RF_ACTIVE);
+					  0, ~0, STGIOSZ, RF_ACTIVE);
 	if (sc->port_res == NULL) {
 		stg_release_resource(dev);
 		return(ENOMEM);
@@ -174,7 +174,7 @@ stg_alloc_resource(DEVPORT_PDEVICE dev)
 
 	sc->mem_rid = 0;
 	sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->mem_rid,
-					 0, ~0, msize, RF_ACTIVE);
+					 0, ~0, 1, RF_ACTIVE);
 	if (sc->mem_res == NULL) {
 		stg_release_resource(dev);
 		return(ENOMEM);
@@ -319,10 +319,13 @@ static	void
 stg_card_unload(DEVPORT_PDEVICE devi)
 {
 	struct stg_softc *sc = DEVPORT_PDEVGET_SOFTC(devi);
+	intrmask_t s;
 
 	printf("%s: unload\n",sc->sc_sclow.sl_xname);
+	s = splcam();
 	scsi_low_deactivate((struct scsi_low_softc *)sc);
         scsi_low_dettach(&sc->sc_sclow);
+	splx(s);
 }
 
 static	int
@@ -353,7 +356,7 @@ stgattach(DEVPORT_PDEVICE devi)
 	struct scsi_low_softc *slp;
 	u_int32_t flags = DEVPORT_PDEVFLAGS(devi);
 	u_int iobase = DEVPORT_PDEVIOBASE(devi);
-
+	intrmask_t s;
 	char	dvname[16];
 
 	strcpy(dvname,"stg");
@@ -393,9 +396,9 @@ stgattach(DEVPORT_PDEVICE devi)
 	slp->sl_hostid = STG_HOSTID;
 	slp->sl_cfgflags = flags;
 
+	s = splcam();
 	stgattachsubr(sc);
-
-	sc->sc_ih = stgintr;
+	splx(s);
 
 	return(STGIOSZ);
 }

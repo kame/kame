@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/t4dwave.h,v 1.3.2.1 2001/02/03 01:29:10 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/t4dwave.h,v 1.3.2.3 2001/08/30 23:10:50 greid Exp $
  */
 
 #ifndef _T4DWAVE_REG_H
@@ -62,6 +62,13 @@
 #define		TDX_CDC_DACON	0x02
 #define		TDX_CDC_RESET	0x01
 #define		TDX_CDC_ON	(TDX_CDC_ADCON|TDX_CDC_DACON)
+
+#define SPA_REG_CODECRD	0x44
+#define SPA_REG_CODECWR	0x40
+#define SPA_REG_CODECST	0x48
+#define SPA_RST_OFF	0x0f0000
+#define SPA_REG_GPIO	0x48
+#define SPA_CDC_RWSTAT	0x00008000
 
 #define TNX_REG_CODECWR	0x44
 #define TNX_REG_CODEC1RD 0x48

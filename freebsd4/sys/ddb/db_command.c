@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_command.c,v 1.34 1999/08/28 00:41:06 peter Exp $
+ * $FreeBSD: src/sys/ddb/db_command.c,v 1.34.2.2 2001/07/29 22:48:36 kris Exp $
  */
 
 /*
@@ -393,6 +393,8 @@ static struct command db_command_table[] = {
 	{ "break",	db_breakpoint_cmd,	0,	0 },
 	{ "dwatch",	db_deletewatch_cmd,	0,	0 },
 	{ "watch",	db_watchpoint_cmd,	CS_MORE,0 },
+	{ "dhwatch",	db_deletehwatch_cmd,	0,      0 },
+	{ "hwatch",	db_hwatchpoint_cmd,	0,      0 },
 	{ "step",	db_single_step_cmd,	0,	0 },
 	{ "s",		db_single_step_cmd,	0,	0 },
 	{ "continue",	db_continue_cmd,	0,	0 },
@@ -462,7 +464,7 @@ db_error(s)
 	char *s;
 {
 	if (s)
-	    db_printf(s);
+	    db_printf("%s", s);
 	db_flush_lex();
 	longjmp(db_jmpbuf, 1);
 }

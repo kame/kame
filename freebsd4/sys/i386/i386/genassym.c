@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/i386/i386/genassym.c,v 1.86.2.1 2000/05/16 06:58:06 dillon Exp $
+ * $FreeBSD: src/sys/i386/i386/genassym.c,v 1.86.2.2 2001/08/15 01:23:50 peter Exp $
  */
 
 #include "opt_user_ldt.h"
@@ -132,8 +132,9 @@ ASSYM(PCB_MPNEST, offsetof(struct pcb, pcb_mpnest));
 
 ASSYM(PCB_SPARE, offsetof(struct pcb, __pcb_spare));
 ASSYM(PCB_FLAGS, offsetof(struct pcb, pcb_flags));
-ASSYM(PCB_SAVEFPU, offsetof(struct pcb, pcb_savefpu));
-ASSYM(PCB_SAVEFPU_SIZE, sizeof(struct save87));
+ASSYM(PCB_SAVEFPU, offsetof(struct pcb, pcb_save));
+ASSYM(PCB_SAVEFPU_SIZE, sizeof(union savefpu));
+ASSYM(PCB_SAVE87_SIZE, sizeof(struct save87));
 ASSYM(PCB_ONFAULT, offsetof(struct pcb, pcb_onfault));
 
 #ifdef SMP

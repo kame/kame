@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.19.2.2 2000/10/15 03:09:32 nyan Exp $
+ * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.19.2.5 2001/08/27 04:17:58 peter Exp $
  */
 
 #include "opt_cpu.h"
@@ -34,6 +34,7 @@
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 
 #include <machine/cputypes.h>
 #include <machine/md_var.h>
@@ -61,6 +62,16 @@ static void init_6x86(void);
 static void	init_6x86MX(void);
 static void	init_ppro(void);
 static void	init_mendocino(void);
+#endif
+void	enable_sse(void);
+
+int	hw_instruction_sse = 0;
+SYSCTL_INT(_hw, OID_AUTO, instruction_sse, CTLFLAG_RD,
+	   &hw_instruction_sse, 0,
+	   "SIMD/MMX2 instructions available in CPU");
+
+#ifdef CPU_ENABLE_SSE
+u_int	cpu_fxsr;		/* SSE enabled */
 #endif
 
 #ifdef I486_CPU
@@ -500,8 +511,22 @@ init_mendocino(void)
 	write_eflags(eflags);
 #endif /* CPU_PPRO2CELERON */
 }
-	
+
 #endif /* I686_CPU */
+
+/*
+ * Initialize CR4 (Control register 4) to enable SSE instructions.
+ */
+void
+enable_sse(void)
+{
+#if defined(CPU_ENABLE_SSE)
+	if ((cpu_feature & CPUID_XMM) && (cpu_feature & CPUID_FXSR)) {
+		load_cr4(rcr4() | CR4_FXSR | CR4_XMM);
+		cpu_fxsr = hw_instruction_sse = 1;
+	}
+#endif
+}
 
 void
 initializecpu(void)
@@ -550,6 +575,7 @@ initializecpu(void)
 	default:
 		break;
 	}
+	enable_sse();
 
 #if defined(PC98) && !defined(CPU_UPGRADE_HW_CACHE)
 	/*

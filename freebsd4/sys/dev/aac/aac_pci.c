@@ -24,12 +24,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.3.2.1 2001/01/09 01:03:09 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.3.2.6 2001/08/17 21:44:47 scottl Exp $
  */
 
 /*
  * PCI bus interface and resource allocation.
  */
+
+#include "opt_aac.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -90,9 +92,15 @@ struct aac_ident
     {0x1028, 0x0001, 0x1028, 0x0001, AAC_HWIF_I960RX,    "Dell PERC 2/Si"},
     {0x1028, 0x0002, 0x1028, 0x0002, AAC_HWIF_I960RX,    "Dell PERC 3/Di"},
     {0x1028, 0x0003, 0x1028, 0x0003, AAC_HWIF_I960RX,    "Dell PERC 3/Si"},
+    {0x1028, 0x0004, 0x1028, 0x00d0, AAC_HWIF_I960RX,    "Dell PERC 3/Si"},
+    {0x1028, 0x0002, 0x1028, 0x00d1, AAC_HWIF_I960RX,    "Dell PERC 3/Di"},
+    {0x1028, 0x0002, 0x1028, 0x00d9, AAC_HWIF_I960RX,    "Dell PERC 3/Di"},
+    {0x1028, 0x0008, 0x1028, 0x00cf, AAC_HWIF_I960RX,    "Dell PERC 3/Di"},
+    {0x1028, 0x000a, 0x1028, 0x0106, AAC_HWIF_I960RX,    "Dell PERC 3/Di"},
     {0x9005, 0x0282, 0x9005, 0x0282, AAC_HWIF_I960RX,    "Adaptec AAC-2622"},
     {0x1011, 0x0046, 0x9005, 0x0364, AAC_HWIF_STRONGARM, "Adaptec AAC-364"},
-    {0x1011, 0x0046, 0x9005, 0x0365, AAC_HWIF_STRONGARM, "Adaptec AAC-3642"},
+    {0x1011, 0x0046, 0x9005, 0x0365, AAC_HWIF_STRONGARM,
+     "Adaptec SCSI RAID 5400S"},
     {0x1011, 0x0046, 0x9005, 0x1364, AAC_HWIF_STRONGARM, "Dell PERC 2/QC"},
     {0x1011, 0x0046, 0x9005, 0x1365, AAC_HWIF_STRONGARM, "Dell PERC 3/QC"},	/* XXX guess */
     {0x1011, 0x0046, 0x103c, 0x10c2, AAC_HWIF_STRONGARM, "HP NetRaid-4M"},

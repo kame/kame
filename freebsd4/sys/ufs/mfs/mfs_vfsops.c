@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mfs_vfsops.c	8.11 (Berkeley) 6/19/95
- * $FreeBSD: src/sys/ufs/mfs/mfs_vfsops.c,v 1.81 1999/12/19 06:08:07 rwatson Exp $
+ * $FreeBSD: src/sys/ufs/mfs/mfs_vfsops.c,v 1.81.2.3 2001/07/04 17:35:21 tegge Exp $
  */
 
 
@@ -180,7 +180,7 @@ mfs_mount(mp, path, data, ndp, p)
 		 ***
 		 */
 
-		/* you loose */
+		/* you lose */
 		panic("mfs_mount: mount MFS as root: not configured!");
 	}
 

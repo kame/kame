@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)disklabel.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/disklabel.h,v 1.49.2.6 2001/03/05 03:15:09 obrien Exp $
+ * $FreeBSD: src/sys/sys/disklabel.h,v 1.49.2.7 2001/05/27 05:58:26 jkh Exp $
  */
 
 #ifndef _SYS_DISKLABEL_H_
@@ -431,6 +431,9 @@ struct dos_partition {
     |    TYPE     |UNIT_2 | SLICE   |  MAJOR?       |  UNIT   |PART |
     -----------------------------------------------------------------
 */
+
+#define DKMAXUNIT 0x1ff		/* Highest disk unit number */
+
 #define	dkmakeminor(unit, slice, part) \
 				(((slice) << 16) | (((unit) & 0x1e0) << 16) | \
 				(((unit) & 0x1f) << 3) | (part))

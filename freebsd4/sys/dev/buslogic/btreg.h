@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/buslogic/btreg.h,v 1.10.2.1 2000/08/02 22:32:26 peter Exp $
+ * $FreeBSD: src/sys/dev/buslogic/btreg.h,v 1.10.2.2 2001/09/03 02:45:22 peter Exp $
  */
 
 #ifndef _BTREG_H_
@@ -112,7 +112,7 @@ typedef enum {
 #define GEOMETRY_REG			0x03
 #define		DISK0_GEOMETRY		0x03
 #define		DISK1_GEOMETRY		0x0c
-#define		EXTENDED_TRANSLATION	0x10
+#define		EXTENDED_TRANSLATION	0x80
 #define		GEOMETRY_DISK0(g_reg) (greg & DISK0_GEOMETRY)
 #define		GEOMETRY_DISK1(g_reg) ((greg & DISK1_GEOMETRY) >> 2)
 

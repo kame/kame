@@ -1,4 +1,4 @@
- $FreeBSD: src/sys/alpha/linux/syscalls.master,v 1.40.2.4 2000/11/22 16:20:13 gallatin Exp $
+ $FreeBSD: src/sys/alpha/linux/syscalls.master,v 1.40.2.5 2001/08/27 08:51:01 alc Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 ; System call name/number master file (or rather, slave, from LINUX).
@@ -423,8 +423,8 @@
 			    const struct sched_param *param); }
 333	STD	POSIX	{ int linux_sched_getscheduler (pid_t pid); }
 334	NOPROTO	POSIX	{ int sched_yield (void); }
-335	NOPROTO	POSIX	{ int sched_get_priority_max (int policy); }
-336	NOPROTO	POSIX	{ int sched_get_priority_min (int policy); }
+335	STD	POSIX	{ int linux_sched_get_priority_max (int policy); }
+336	STD	POSIX	{ int linux_sched_get_priority_min (int policy); }
 337	NOPROTO	POSIX	{ int sched_rr_get_interval (pid_t pid, \
 			    struct timespec *interval); }
 338	UNIMPL	LINUX	afs_syscall

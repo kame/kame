@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/alpha/common/Makefile.common,v 1.4.2.3 2000/07/12 05:16:49 jhb Exp $
+# $FreeBSD: src/sys/boot/alpha/common/Makefile.common,v 1.4.2.4 2001/05/28 05:16:26 obrien Exp $
 #
 # Common Alpha loader build rules
 
@@ -55,6 +55,7 @@ ${BASE}.sym: ${OBJS} ${LIBSTAND} ${LIBFICL} ${LIBALPHA} ${CRT} vers.o setdef0.o 
 	-L${DESTDIR}${LIBDIR} ${LIBSTAND} ${LIBALPHA} ${LIBFICL} ${LIBSTAND} \
 	>${.OBJDIR}/${BASE}.list
 
+CLEANFILES+=	${BASE}.help
 ${BASE}.help: help.common help.alpha
 	cat ${.ALLSRC} | awk -f ${.CURDIR}/../../common/merge_help.awk > ${.TARGET}
 

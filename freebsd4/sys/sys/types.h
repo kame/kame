@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)types.h	8.6 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/types.h,v 1.40.2.1 2001/03/05 13:09:13 obrien Exp $
+ * $FreeBSD: src/sys/sys/types.h,v 1.40.2.2 2001/04/21 14:53:06 ume Exp $
  */
 
 #ifndef _SYS_TYPES_H_
@@ -73,6 +73,8 @@ typedef	int32_t		daddr_t;	/* disk address */
 typedef	u_int32_t	u_daddr_t;	/* unsigned disk address */
 typedef	u_int32_t	fixpt_t;	/* fixed point number */
 typedef	u_int32_t	gid_t;		/* group id */
+typedef	u_int32_t	in_addr_t;	/* base type for internet address */
+typedef	u_int16_t	in_port_t;
 typedef	u_int32_t	ino_t;		/* inode number */
 typedef	long		key_t;		/* IPC key (for Sys V IPC) */
 typedef	u_int16_t	mode_t;		/* permissions */

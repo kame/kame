@@ -34,7 +34,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumparser.c,v 1.21 2000/12/20 03:44:13 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumparser.c,v 1.20.2.4 2001/03/13 02:59:43 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumparser.c,v 1.20.2.5 2001/05/28 05:56:27 grog Exp $
  */
 
 /*
@@ -160,7 +160,8 @@ struct _keywords keywords[] =
     keypair(setstate),
     keypair(checkparity),
     keypair(rebuildparity),
-    keypair(dumpconfig)
+    keypair(dumpconfig),
+    keypair(retryerrors)
 };
 struct keywordset keyword_set = KEYWORDSET(keywords);
 

@@ -31,7 +31,7 @@
  *
  * Routines to prepare request and fetch reply
  *
- * $FreeBSD: src/sys/netncp/ncp_rq.c,v 1.1 1999/10/02 04:06:17 bp Exp $
+ * $FreeBSD: src/sys/netncp/ncp_rq.c,v 1.1.2.1 2001/05/21 16:27:20 ru Exp $
  */ 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,8 +45,6 @@
 #include <netncp/ncp_subr.h>
 #include <netncp/ncp_ncp.h>
 #include <netncp/ncp_nls.h>
-
-static struct mbuf* m_getm(struct mbuf *top, int len);
 
 int
 ncp_rq_head(struct ncp_rq *rqp, u_int32_t ptype, u_int8_t fn,struct proc *p,
@@ -96,29 +94,6 @@ ncp_rq_done(struct ncp_rq *rqp) {
 	if (rqp->rp) m_freem(rqp->rp);
 	rqp->rp=NULL;
 	return (0);
-}
-
-static struct mbuf*
-m_getm(struct mbuf *top, int len) {
-	int rest = len, mlen;
-	struct mbuf *m=0,*mp;
-	
-	mp = top;
-	while (rest > 0) {
-/*	NCPSDEBUG("%d\n",rest);*/
-		m = m_get(M_WAIT, MT_DATA);
-		if (rest > MINCLSIZE) {
-			MCLGET(m,M_WAIT);
-			mlen = ( (m->m_flags & M_EXT) == 0) ? MLEN : MCLBYTES;
-		} else { 
-			mlen = MLEN;
-		}
-		m->m_len = 0/*min(mlen,rest)*/;
-		mp->m_next = m;
-		mp = m;
-		rest -= mlen;
-	}
-	return top;
 }
 
 /*
@@ -182,7 +157,7 @@ ncp_rq_pathstring(struct ncp_rq *rqp, int size, char *name, struct ncp_nlstables
 		m->m_len += cplen;
 	}
 	if (size) {
-		m_getm(m, size);
+		m = m_getm(m, size, MT_DATA, M_WAIT);
 		while (size > 0){
 			m = m->m_next;
 			cplen = min(size, M_TRAILINGSPACE(m));
@@ -215,7 +190,7 @@ ncp_rq_putanymem(struct ncp_rq *rqp, caddr_t source, int size, int type) {
 		m->m_len += cplen;
 	}
 	if (size) {
-		m_getm(m, size);
+		m = m_getm(m, size, MT_DATA, M_WAIT);
 		while (size > 0){
 			m = m->m_next;
 			cplen = min(size, M_TRAILINGSPACE(m));

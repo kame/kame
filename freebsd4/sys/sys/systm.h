@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.5 2001/01/16 12:26:21 phk Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.8 2001/07/30 23:28:01 peter Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -74,6 +74,8 @@ extern struct vnode *rootvp;	/* vnode equivalent to above */
 extern int boothowto;		/* reboot flags, from console subsystem */
 extern int bootverbose;		/* nonzero to print verbose messages */
 
+extern int maxusers;		/* system tune hint */
+
 #ifdef	INVARIANTS		/* The option is always available */
 #define	KASSERT(exp,msg)	do { if (!(exp)) panic msg; } while (0)
 #define	SPLASSERT(level, msg)	__CONCAT(__CONCAT(spl,level),assert)(msg)
@@ -99,6 +101,7 @@ struct tty;
 struct uio;
 
 void	Debugger __P((const char *msg));
+int	dumpstatus __P((vm_offset_t addr, long count));
 int	nullop __P((void));
 int	eopnotsupp __P((void));
 int	einval __P((void));
@@ -109,6 +112,7 @@ void	*phashinit __P((int count, struct malloc_type *type, u_long *nentries));
 
 void	cpu_boot __P((int));
 void	cpu_rootconf __P((void));
+void	init_param __P((void));
 void	tablefull __P((const char *));
 int	addlog __P((const char *, ...)) __printflike(1, 2);
 int	kvprintf __P((char const *, void (*)(int, void*), void *, int,
@@ -167,9 +171,9 @@ void	startprofclock __P((struct proc *));
 void	stopprofclock __P((struct proc *));
 void	setstatclockrate __P((int hzrate));
 
-char	*getenv __P((char *name));
-int	getenv_int __P((char *name, int *data));
-quad_t	getenv_quad __P((char *name, quad_t *data));
+char	*getenv __P((const char *name));
+int	getenv_int __P((const char *name, int *data));
+quad_t	getenv_quad __P((const char *name, quad_t *data));
 extern char *kern_envp;
 
 #ifdef APM_FIXUP_CALLTODO 

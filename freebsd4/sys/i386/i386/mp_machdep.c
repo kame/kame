@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.7 2001/03/17 10:48:59 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.9 2001/08/15 01:23:50 peter Exp $
  */
 
 #include "opt_cpu.h"
@@ -485,8 +485,6 @@ init_secondary(void)
 	common_tssd = *tss_gdt;
 	ltr(gsel_tss);
 
-	load_cr0(0x8005003b);		/* XXX! */
-
 	pmap_set_opt();
 }
 
@@ -621,13 +619,6 @@ mp_enable(u_int boot_addr)
 
 	/* start each Application Processor */
 	start_all_aps(boot_addr);
-
-	/* 
-	 * The init process might be started on a different CPU now,
-	 * and the boot CPU might not call prepare_usermode to get
-	 * cr0 correctly configured. Thus we initialize cr0 here.
-	 */
-	load_cr0(rcr0() | CR0_WP | CR0_AM);
 }
 
 
@@ -2272,6 +2263,8 @@ start_ap(int logical_cpu, u_int boot_addr)
  *
  * XXX: Needs to handshake and wait for completion before proceding.
  */
+extern void	enable_sse(void);
+
 void
 smp_invltlb(void)
 {
@@ -2421,11 +2414,14 @@ ap_init()
 
 	printf("SMP: AP CPU #%d Launched!\n", cpuid);
 
-	/* XXX FIXME: i386 specific, and redundant: Setup the FPU. */
-	load_cr0((rcr0() & ~CR0_EM) | CR0_MP | CR0_NE | CR0_TS);
+	/* set up CPU registers and state */
+	cpu_setregs();
 
 	/* set up FPU state on the AP */
 	npxinit(__INITIAL_NPXCW__);
+
+	/* set up SSE registers */
+	enable_sse();
 
 	/* A quick check from sanity claus */
 	apic_id = (apic_id_to_logical[(lapic.id & 0x0f000000) >> 24]);

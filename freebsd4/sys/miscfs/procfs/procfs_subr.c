@@ -36,7 +36,7 @@
  *
  *	@(#)procfs_subr.c	8.6 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_subr.c,v 1.26.2.1 2000/06/21 09:33:43 des Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_subr.c,v 1.26.2.2 2001/08/04 13:12:24 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -250,7 +250,7 @@ procfs_rw(ap)
 	int rtval;
 
 	p = PFIND(pfs->pfs_pid);
-	if (p == 0)
+	if (p == NULL)
 		return (EINVAL);
 	if (p->p_pid == 1 && securelevel > 0 && uio->uio_rw == UIO_WRITE)
 		return (EACCES);

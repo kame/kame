@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)protosw.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/protosw.h,v 1.28.2.1 2001/03/01 20:00:08 jlemon Exp $
+ * $FreeBSD: src/sys/sys/protosw.h,v 1.28.2.2 2001/07/03 11:02:01 ume Exp $
  */
 
 #ifndef _SYS_PROTOSW_H_
@@ -113,6 +113,7 @@ struct protosw {
 #define	PR_WANTRCVD	0x08		/* want PRU_RCVD calls */
 #define	PR_RIGHTS	0x10		/* passes capabilities */
 #define PR_IMPLOPCL	0x20		/* implied open/close */
+#define	PR_LASTHDR	0x40		/* enforce ipsec policy; last header */
 
 /*
  * The arguments to usrreq are:
@@ -313,6 +314,7 @@ char	*prcorequests[] = {
 
 #ifdef _KERNEL
 void	pfctlinput __P((int, struct sockaddr *));
+void	pfctlinput2 __P((int, struct sockaddr *, void *));
 struct protosw *pffindproto __P((int family, int protocol, int type));
 struct protosw *pffindtype __P((int family, int type));
 #endif

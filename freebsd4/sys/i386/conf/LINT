@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.49 2001/04/17 19:55:44 alfred Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.78 2001/08/30 12:29:56 murray Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -56,11 +56,13 @@ makeoptions	CONF_CFLAGS=-fno-builtin  #Don't allow use of memcmp, etc.
 # allow that limit to grow to 256MB, and can be increased further
 # with changing the parameters.  MAXDSIZ is the maximum that the
 # limit can be set to, and the DFLDSIZ is the default value for
-# the limit.  You might want to set the default lower than the
-# max, and explicitly set the maximum with a shell command for processes
+# the limit.  MAXSSIZ is the maximum that the stack limit can be
+# set to.  You might want to set the default lower than the max, 
+# and explicitly set the maximum with a shell command for processes
 # that regularly exceed the limit like INND.
 #
 options 	MAXDSIZ="(256*1024*1024)"
+options 	MAXSSIZ="(256*1024*1024)"
 options 	DFLDSIZ="(256*1024*1024)"
 
 #
@@ -164,6 +166,8 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # reorder).  This option should not be used if you use memory mapped
 # I/O device(s).
 #
+# CPU_ENABLE_SSE enables SSE/MMX2 instructions support.
+#
 # CPU_FASTER_5X86_FPU enables faster FPU exception handler.
 #
 # CPU_I486_ON_386 enables CPU cache on i486 based CPU upgrade products
@@ -225,6 +229,7 @@ options 	CPU_BLUELIGHTNING_3X
 options 	CPU_BTB_EN
 options 	CPU_DIRECT_MAPPED_CACHE
 options 	CPU_DISABLE_5X86_LSSER
+options 	CPU_ENABLE_SSE
 options 	CPU_FASTER_5X86_FPU
 options 	CPU_I486_ON_386
 options 	CPU_IORT
@@ -261,9 +266,9 @@ options 	GPL_MATH_EMULATE	#Support for x87 emulation via
 options 	COMPAT_43
 
 #
-# Allow user-mode programs to manipulate their local descriptor tables.
-# This option is required for the WINE Windows(tm) emulator, and is
-# not used by anything else (that we know of).
+# Allow applications running in user space to control the Local Descriptor
+# Table (LDT).  This is required by some ports.  Future versions of FreeBSD
+# may require this option for some programs in the base system.
 #
 options 	USER_LDT		#allow user-level control of i386 ldt
 
@@ -409,6 +414,17 @@ options 	NETATALK		#Appletalk communications protocols
 #options 	NS			#Xerox NS protocols
 #options 	NSIP			#XNS over IP
 
+#
+# SMB/CIFS requester
+# NETSMB enables support for SMB protocol, it requires LIBMCHAIN and LIBICONV
+# options.
+# NETSMBCRYPTO enables support for encrypted passwords.
+options 	NETSMB			#SMB/CIFS requester
+options 	NETSMBCRYPTO		#encrypted password support for SMB
+
+# mchain library. It can be either loaded as KLD or compiled into kernel
+options 	LIBMCHAIN		#mbuf management library
+
 # netgraph(4). Enable the base netgraph code with the NETGRAPH option.
 # Individual node types can be enabled with the corresponding option
 # listed below; however, this is not strictly necessary as netgraph
@@ -498,16 +514,12 @@ options 	ETHER_8022		# enable Ethernet_802.2 frame
 options 	ETHER_SNAP		# enable Ethernet_802.2/SNAP frame
 
 # for IPv6
-pseudo-device	gif	4		#IPv6 and IPv4 tunneling
+pseudo-device	gif			#IPv6 and IPv4 tunneling
 pseudo-device	faith	1		#for IPv6 and IPv4 translation
-pseudo-device	stf	1		#6to4 IPv6 over IPv4 encapsulation
+pseudo-device	stf			#6to4 IPv6 over IPv4 encapsulation
 
 #
 # Internet family options:
-#
-# TCP_COMPAT_42 causes the TCP code to emulate certain bugs present in
-# 4.2BSD.  This option should not be used unless you have a 4.2BSD
-# machine and TCP connections fail.
 #
 # MROUTING enables the kernel multicast packet forwarder, which works
 # with mrouted(8).
@@ -540,7 +552,6 @@ pseudo-device	stf	1		#6to4 IPv6 over IPv4 encapsulation
 #
 # TCPDEBUG is undocumented.
 #
-options 	TCP_COMPAT_42		#emulate 4.2BSD TCP bugs
 options 	MROUTING		# Multicast routing
 options 	IPFIREWALL		#firewall
 options 	IPFIREWALL_VERBOSE	#print information about
@@ -559,23 +570,23 @@ options		IPFILTER_DEFAULT_BLOCK	#block all packets by default
 options 	IPSTEALTH		#support for stealth forwarding
 options 	TCPDEBUG
 
+# RANDOM_IP_ID causes the ID field in IP packets to be randomized
+# instead of incremented by 1 with each packet generated.  This
+# option closes a minor information leak which allows remote
+# observers to determine the rate of packet generation on the
+# machine by watching the counter.
+options		RANDOM_IP_ID
+
 # Statically Link in accept filters
 options                ACCEPT_FILTER_DATA
 options                ACCEPT_FILTER_HTTP
 
-# The following options add sysctl variables for controlling how certain
-# TCP packets are handled.
 #
 # TCP_DROP_SYNFIN adds support for ignoring TCP packets with SYN+FIN. This
 # prevents nmap et al. from identifying the TCP/IP stack, but breaks support
 # for RFC1644 extensions and is not recommended for web servers.
 #
-# TCP_RESTRICT_RST adds support for blocking the emission of TCP RST packets.
-# This is useful on systems which are exposed to SYN floods (e.g. IRC servers)
-# or any system which one does not want to be easily portscannable.
-#
 options 	TCP_DROP_SYNFIN		#drop TCP packets with SYN+FIN
-options 	TCP_RESTRICT_RST	#restrict emission of TCP RST
 
 # ICMP_BANDLIM enables icmp error response bandwidth limiting.   You
 # typically want this option as it will help protect the machine from
@@ -653,19 +664,22 @@ options 	NULLFS			#NULL filesystem
 options 	NWFS			#NetWare filesystem
 options 	PORTAL			#Portal filesystem
 options 	PROCFS			#Process filesystem
+options		SMBFS			#SMB/CIFS filesystem
 options 	UMAPFS			#UID map filesystem
 options 	UNION			#Union filesystem
 # The xFS_ROOT options REQUIRE the associated ``options xFS''
 options 	CD9660_ROOT		#CD-ROM usable as root device
 options 	FFS_ROOT		#FFS usable as root device
 options 	NFS_ROOT		#NFS usable as root device
-# This code is still experimental (e.g. doesn't handle disk slices well).
-# Also, 'options MFS' is currently incompatible with DEVFS.
-options 	DEVFS			#devices filesystem
 
 # Soft updates is technique for improving file system speed and
 # making abrupt shutdown less risky.
 options 	SOFTUPDATES
+
+# Directory hashing improves the speed of operations on very large
+# directories at the expense of some memory.
+# Warning: this is experimental code!
+options		UFS_DIRHASH
 
 # Make space in the kernel for a root filesystem on a md device.
 # Define to the number of kilobytes to reserve for the filesystem.
@@ -841,10 +855,12 @@ options 	CHANGER_MIN_BUSY_SECONDS=2
 options 	CHANGER_MAX_BUSY_SECONDS=10
 
 # Options for the CAM sequential access driver:
+# SA_IO_TIMEOUT: Timeout for read/write/wfm  operations, in minutes
 # SA_SPACE_TIMEOUT: Timeout for space operations, in minutes
 # SA_REWIND_TIMEOUT: Timeout for rewind operations, in minutes
 # SA_ERASE_TIMEOUT: Timeout for erase operations, in minutes
 # SA_1FM_AT_EOD: Default to model which only has a default one filemark at EOT.
+options 	SA_IO_TIMEOUT="(4)"
 options 	SA_SPACE_TIMEOUT="(60)"
 options 	SA_REWIND_TIMEOUT="(2*60)"
 options 	SA_ERASE_TIMEOUT="(4*60)"
@@ -891,6 +907,9 @@ pseudo-device	ccd	4	#Concatenated disk driver
 # see vinum(4) for more reasons not to use these options.
 pseudo-device	vinum		#Vinum concat/mirror/raid driver
 options 	VINUMDEBUG	#enable Vinum debugging hooks
+
+# Kernel side iconv library
+options 	LIBICONV
 
 # Size of the kernel message buffer.  Should be N * pagesize.
 options 	MSGBUF_SIZE=40960
@@ -1134,6 +1153,11 @@ device		mlx		# Mylex DAC960
 device		amr		# AMI MegaRAID
 
 #
+# 3ware ATA RAID
+#
+device		twe		# 3ware ATA RAID
+
+#
 # The 'ATA' driver supports all ATA and ATAPI devices.
 # It can reuse the majors of wd.c for booting purposes.
 # You only need one "device ata" for it to find all
@@ -1277,7 +1301,8 @@ device		sio0	at isa? port IO_COM1 flags 0x10 irq 4
 # Options for serial drivers that support consoles (only for sio now):
 options 	BREAK_TO_DEBUGGER	#a BREAK on a comconsole goes to
 					#DDB, if available.
-options 	CONSPEED=9600		#default speed for serial console (default 9600)
+options 	CONSPEED=115200		# speed for serial console
+					# (default 9600)
 
 # Solaris implements a new BREAK which is initiated by a character
 # sequence CR ~ ^b which is similar to a familiar pattern used on
@@ -1488,9 +1513,9 @@ device		pca0 at isa? port IO_TIMER1
 #
 # Miscellaneous hardware:
 #
-# mcd: Mitsumi CD-ROM
-# scd: Sony CD-ROM
-# matcd: Matsushita/Panasonic CD-ROM
+# mcd: Mitsumi CD-ROM using proprietary (non-ATAPI) interface
+# scd: Sony CD-ROM using proprietary (non-ATAPI) interface
+# matcd: Matsushita/Panasonic CD-ROM using proprietary (non-ATAPI) interface
 # wt: Wangtek and Archive QIC-02/QIC-36 tape drives
 # ctx: Cortex-I frame grabber
 # apm: Laptop Advanced Power Management (experimental)
@@ -1509,8 +1534,8 @@ device		pca0 at isa? port IO_TIMER1
 # rp: Comtrol Rocketport(ISA) - single card
 # tw: TW-523 power line interface for use with X-10 home control products
 # si: Specialix SI/XIO 4-32 port terminal multiplexor
-# stl: Stallion EasyIO and EasyConnection 8/32 (cd1400 based)
-# stli: Stallion EasyConnection 8/64, ONboard, Brumby (intelligent)
+# stl: Stallion EasyIO and EasyConnection 8/32 (ISA and PCI), EasyConnection 8/64 PCI
+# stli: Stallion EasyConnection 8/64 ISA/EISA, ONboard, Brumby (intelligent)
 
 # Notes on APM
 #  The flags takes the following meaning for apm0:
@@ -1570,7 +1595,7 @@ device		pca0 at isa? port IO_TIMER1
 
 # Notes on the Stallion stl and stli drivers:
 #  See src/i386/isa/README.stl for complete instructions.
-#  This is version 0.0.5alpha, unsupported by Stallion.
+#  This is version 2.0.0, unsupported by Stallion.
 #  The stl driver has a secondary IO port hard coded at 0x280.  You need
 #     to change src/i386/isa/stallion.c if you reconfigure this on the boards.
 #  The "flags" and "iosiz" settings on the stli driver depend on the board:
@@ -1582,6 +1607,7 @@ device		pca0 at isa? port IO_TIMER1
 #	ONboard MCA:                 flags 3          iosiz 0x10000
 #	Brumby:                      flags 2          iosiz 0x4000
 #	Stallion:                    flags 1          iosiz 0x10000
+#  For the PCI cards, "device stl" will suffice.
 
 device		mcd0	at isa? port 0x300 irq 10
 # for the Sony CDU31/33A CDROM
@@ -1711,7 +1737,17 @@ device		pci
 # The `fxp' device provides support for the Intel EtherExpress Pro/100B
 # PCI Fast Ethernet adapters.
 #
-# The pcn device provides support for PCI fast ethernet adapters based
+# The 'lge' device provides support for PCI gigabit ethernet adapters
+# based on the Level 1 LXT1001 NetCellerator chipset. This includes the
+# D-Link DGE-500SX, SMC TigerCard 1000 (SMC9462SX), and some Addtron cards.
+#
+# The 'nge' device provides support for PCI gigabit ethernet adapters
+# based on the National Semiconductor DP83820 and DP83821 chipset. This
+# includes the SMC EZ Card 1000 (SMC9462TX), D-Link DGE-500T, Asante
+# FriendlyNet GigaNIX 1000TA and 1000TPC, the Addtron AEG320T, the
+# LinkSys EG1032 and EG1064, the Surecom EP-320G-TX and the Netgear GA622T.
+#
+# The 'pcn' device provides support for PCI fast ethernet adapters based
 # on the AMD Am79c97x chipsets, including the PCnet/FAST, PCnet/FAST+,
 # PCnet/PRO and PCnet/Home. These were previously handled by the lnc
 # driver (and still will be if you leave this driver out of the kernel).
@@ -1759,7 +1795,10 @@ device		pci
 # Deskpro systems. It also supports several Olicom 10Mbps and 10/100
 # boards.
 #
-# The `tx' device provides support for the SMC 9432 TX, BTX and TX_2 cards.
+# The `tx' device provides support for the SMC 9432 TX, BTX and FTX cards.
+#
+# The `txp' device provides support for the 3Com 3cR990 "Typhoon"
+# 10/100 adapters.
 #
 # The `vr' device provides support for various fast ethernet adapters
 # based on the VIA Technologies VT3043 `Rhine I' and VT86C100A `Rhine II'
@@ -1877,8 +1916,9 @@ device		miibus
 
 # PCI Ethernet NICs that use the common MII bus controller code.
 device		dc		# DEC/Intel 21143 and various workalikes
+device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
+device		pcn		# AMD Am79C97x PCI 10/100 NICs
 device		rl		# RealTek 8129/8139
-device		pcn		# AMD Am79C79x PCI 10/100 NICs
 device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
 device		ste		# Sundance ST201 (D-Link DFE-550TX)
@@ -1890,12 +1930,15 @@ device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
-device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
+device		txp		# 3Com 3cR990 (``Typhoon'')
 device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 
+# Gigabit Ethernet NICs.
 device		sk
 device		ti
 device		wx
+
+
 device		fpa
 device		meteor
 #The oltr driver in the ISA section will also find PCI cards.
@@ -1987,16 +2030,34 @@ device		iicsmb		# smb over i2c bridge
 
 device		pcf0	at isa? port 0x320 irq 5
 
-# ISDN4BSD section
+#---------------------------------------------------------------------------
+# ISDN4BSD
 #
 # See /usr/share/examples/isdn/ROADMAP for an introduction to isdn4bsd.
 #
-# i4b passive ISDN cards support (isic - I4b Siemens Isdn Chipset driver)
-# note that the ``options'' and ``device'' lines must BOTH be defined !
+# i4b passive ISDN cards support contains the following hardware drivers:
 #
-# Driver entries marked "(not supported yet!)" are not working currently
-# due to not being converted to newbus. We hope to get them back to support
-# in the near future.
+#       isic  - Siemens/Infineon ISDN ISAC/HSCX/IPAC chipset driver
+#       iwic  - Winbond W6692 PCI bus ISDN S/T interface controller
+#       ifpi  - AVM Fritz!Card PCI driver
+#       ihfc  - Cologne Chip HFC ISA/ISA-PnP chipset driver
+#       ifpnp - AVM Fritz!Card PnP driver 
+#       itjc  - Siemens ISAC / TJNet Tiger300/320 chipset
+#
+# i4b active ISDN cards support contains the following hardware drivers:
+#
+#       iavc  - AVM B1 PCI, AVM B1 ISA, AVM T1
+#
+# Note that the ``options'' (if given) and ``device'' lines must BOTH
+# be uncommented to enable support for a given card !
+#
+# In addition to a hardware driver (and probably an option) the mandatory
+# ISDN protocol stack devices and the mandatory support device must be 
+# enabled as well as one or more devices from the optional devices section.
+#
+#---------------------------------------------------------------------------
+# isic driver (Siemens/Infineon chipsets)
+#---------------------------------------------------------------------------
 #
 # ISA bus non-PnP Cards:
 # ----------------------
@@ -2017,12 +2078,12 @@ options 	TEL_S0_16_3
 options 	AVM_A1
 #device		isic0	at isa? port 0x340 irq 5 flags 4
 #
-# USRobotics Sportster ISDN TA intern (not supported yet!)
-#options 	USR_STI
+# USRobotics Sportster ISDN TA intern
+options 	USR_STI
 #device		isic0	at isa? port 0x268 irq 5 flags 7
 #
-# ITK ix1 Micro ( < V.3, non-PnP version ) (not supported yet!)
-#options 	ITKIX1
+# ITK ix1 Micro ( < V.3, non-PnP version )
+options 	ITKIX1
 #device		isic0	at isa? port 0x398 irq 10 flags 18
 #
 # ELSA PCC-16
@@ -2048,28 +2109,28 @@ options 	DRN_NGO
 options 	SEDLBAUER
 #device		isic
 #
-# Dynalink IS64PH (not supported yet!)
-#options 	DYNALINK 
+# Dynalink IS64PH
+options 	DYNALINK 
 #device		isic
 #
 # ELSA QuickStep 1000pro ISA
 options 	ELSA_QS1ISA
 #device		isic
 #
-# ITK ix1 Micro ( V.3, PnP version ) (not supported yet!)
-#options 	ITKIX1
+# ITK ix1 Micro ( V.3, PnP version )
+options 	ITKIX1
 #device		isic
-#
-# AVM Fritz!Card PnP (not supported yet!)
-#options 	AVM_PNP
-#device 	isic
 #
 # Siemens I-Surf 2.0
 options 	SIEMENS_ISURF2
 #device		isic
 #
 # Asuscom ISDNlink 128K ISAC
-#options 	ASUSCOM_IPAC
+options 	ASUSCOM_IPAC
+#device 	isic
+#
+# Eicon Diehl DIVA 2.0 and 2.02
+options       EICON_DIVA
 #device 	isic
 #
 # PCI bus Cards:
@@ -2079,26 +2140,59 @@ options 	SIEMENS_ISURF2
 options 	ELSA_QS1PCI
 #device		isic
 #
-# AVM Fritz!Card PCI
-options 	AVM_A1_PCI
-#device		isic
+#---------------------------------------------------------------------------
+#       ifpnp driver for AVM Fritz!Card ISA PnP
+#---------------------------------------------------------------------------
 #
-# PCMCIA Cards:
-# -------------
+# AVM Fritz!Card ISA PnP
+device ifpnp
 #
-# AVM PCMCIA Fritz!Card (not supported yet!)
-#options 	AVM_A1_PCMCIA
-#device		isic0	at isa? port 0x340 irq 5 flags 10
+#---------------------------------------------------------------------------
+#       ihfc driver for Cologne Chip ISA chipsets (experimental!)
+#---------------------------------------------------------------------------
 #
-# Active Cards:
-# -------------
+# Teles 16.3c ISA PnP
+# AcerISDN P10 ISA PnP
+# TELEINT ISDN SPEED No.1
+device ihfc
 #
-# Stollmann Tina-dd control device 
-# (driver under development, not fully functional!)
-device		tina0	at isa? port 0x260 irq 10
+#---------------------------------------------------------------------------
+#       ifpi driver for AVM Fritz!Card PCI 1.0 (2.0 unsupported!)
+#---------------------------------------------------------------------------
 #
-# ISDN Protocol Stack
-# -------------------
+# AVM Fritz!Card PCI 1.0
+device  ifpi
+#
+#---------------------------------------------------------------------------
+#       iwic driver for Winbond W6692 chipset
+#---------------------------------------------------------------------------
+#
+# ASUSCOM P-IN100-ST-D (and other Winbond W6692 based cards)
+device  iwic
+#
+#---------------------------------------------------------------------------
+#       itjc driver for Simens ISAC / TJNet Tiger300/320 chipset
+#---------------------------------------------------------------------------
+#
+# Traverse Technologies NETjet-S
+# Teles PCI-TJ
+device  itjc
+#
+#---------------------------------------------------------------------------
+#       iavc driver (AVM active cards, needs i4bcapi driver!)
+#---------------------------------------------------------------------------
+#
+pseudo-device   "i4bcapi"	2
+#
+# AVM B1 PCI
+device          iavc0
+#
+# AVM B1 ISA bus (PnP mode not supported!)
+#device  iavc0 at isa? port 0x150 irq 5
+#
+#
+# ISDN Protocol Stack (mandatory)
+# -------------------------------
 #
 # Q.921 / layer 2 - i4b passive cards D channel handling
 pseudo-device	"i4bq921"
@@ -2115,7 +2209,7 @@ pseudo-device	"i4b"
 # userland driver to do ISDN tracing (for passive cards only)
 pseudo-device	"i4btrc"	4
 #
-# userland driver to control the whole thing
+# userland driver to control the whole thing (mandatory)
 pseudo-device	"i4bctl"
 #
 # userland driver for access to raw B channel
@@ -2131,8 +2225,7 @@ options 	IPR_VJ
 # enable logging of the first n IP packets to isdnd (n=32 here)
 #options	IPR_LOG=32
 #
-# network driver for sync PPP over ISDN; requires an equivalent
-# number of sppp pseudo-devices to be configured
+# network driver for sync PPP over ISDN
 pseudo-device	"i4bisppp"	4
 
 
@@ -2233,6 +2326,12 @@ options 	NSFBUFS=1024
 #
 options 	DEBUG_LOCKS
 
+# Set the amount of time (in seconds) the system will wait before
+# rebooting automatically when a kernel panic occurs.  If set to (-1),
+# the system will wait indefinitely until a key is pressed on the
+# console.
+options 	PANIC_REBOOT_WAIT_TIME=16
+
 #
 # SysVR4 ABI emulation
 #
@@ -2317,7 +2416,7 @@ device		uhid
 device		ukbd
 # USB printer
 device		ulpt
-# USB Iomega Zip 100 Drive
+# USB Iomega Zip 100 Drive (Requires scbus and da)
 device		umass
 # USB modem support
 device		umodem
@@ -2408,7 +2507,6 @@ options 	NMBCLUSTERS=1024
 #options 	OLTR_NO_BULLSEYE_MAC
 #options 	OLTR_NO_HAWKEYE_MAC
 #options 	OLTR_NO_TMS_MAC
-options 	PANIC_REBOOT_WAIT_TIME=16
 options 	PNPBIOS
 options 	PSM_DEBUG=1
 options 	SCSI_NCR_DEBUG

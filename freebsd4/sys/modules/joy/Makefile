@@ -1,9 +1,9 @@
-# $FreeBSD: src/sys/modules/joy/Makefile,v 1.15 1999/12/12 20:40:56 peter Exp $
+# $FreeBSD: src/sys/modules/joy/Makefile,v 1.15.2.1 2001/04/25 11:24:03 ru Exp $
 
 .PATH:	${.CURDIR}/../../isa
 KMOD	= joy
 SRCS	= bus_if.h device_if.h isa_if.h joy.c
-MAN8	= joy.8
+MAN	= joy.8
 
 afterinstall:
 	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \

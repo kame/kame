@@ -35,7 +35,7 @@
  *
  *	@(#)umap_vfsops.c	8.8 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/miscfs/umapfs/umap_vfsops.c,v 1.31 2000/01/19 06:07:32 rwatson Exp $
+ * $FreeBSD: src/sys/miscfs/umapfs/umap_vfsops.c,v 1.31.2.2 2001/09/11 09:49:53 kris Exp $
  */
 
 /*
@@ -165,6 +165,12 @@ umapfs_mount(mp, path, data, ndp, p)
 	/*
 	 * Now copy in the number of entries and maps for umap mapping.
 	 */
+	if (args.nentries > MAPFILEENTRIES || args.gnentries >
+	    GMAPFILEENTRIES) {
+		vput(lowerrootvp);
+		return (error);
+	}
+
 	amp->info_nentries = args.nentries;
 	amp->info_gnentries = args.gnentries;
 	error = copyin(args.mapdata, (caddr_t)amp->info_mapdata,
@@ -260,7 +266,6 @@ umapfs_unmount(mp, mntflags, p)
 	int mntflags;
 	struct proc *p;
 {
-	struct vnode *umapm_rootvp = MOUNTTOUMAPMOUNT(mp)->umapm_rootvp;
 	int error;
 	int flags = 0;
 
@@ -281,23 +286,11 @@ umapfs_unmount(mp, mntflags, p)
 	if (mntinvalbuf(mp, 1))
 		return (EBUSY);
 #endif
-	if (umapm_rootvp->v_usecount > 1)
-		return (EBUSY);
-	error = vflush(mp, umapm_rootvp, flags);
+	/* There is 1 extra root vnode reference (umapm_rootvp). */
+	error = vflush(mp, 1, flags);
 	if (error)
 		return (error);
 
-#ifdef DEBUG
-	vprint("alias root of lower", umapm_rootvp);
-#endif
-	/*
-	 * Release reference on underlying root vnode
-	 */
-	vrele(umapm_rootvp);
-	/*
-	 * And blow it away for future re-use
-	 */
-	vgone(umapm_rootvp);
 	/*
 	 * Finally, throw away the umap_mount structure
 	 */

@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.7 2001/01/08 09:21:01 nyan Exp $
+ ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.8 2001/07/26 02:32:19 nyan Exp $
  **/
 
 /**
@@ -337,7 +337,8 @@ static DEVCLASS_INFO devclass_names[] = {
 static DEV_INFO device_info[] = {
 /*---Name-----   ---Description---------------------------------------------- */
 #ifdef PC98
-{"bs",          "PC-9801-55 SCSI Interface",        0, CLS_STORAGE},
+{"bs",		"PC-9801-55 SCSI Interface",		0,		CLS_STORAGE},
+{"ct",		"WD33C93 SCSI Interface",		0,		CLS_STORAGE},
 #endif
 {"adv",         "AdvanSys SCSI narrow controller",	0,		CLS_STORAGE},
 {"bt",          "Buslogic SCSI controller",		0,		CLS_STORAGE},
@@ -2447,7 +2448,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.7 2001/01/08 09:21:01 nyan Exp $
+ * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.8 2001/07/26 02:32:19 nyan Exp $
  */
 
 #include "scbus.h"

@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/netgraph.h,v 1.6.2.4 2001/03/08 05:08:25 julian Exp $
+ * $FreeBSD: src/sys/netgraph/netgraph.h,v 1.6.2.5 2001/09/03 06:38:15 julian Exp $
  * $Whistle: netgraph.h,v 1.29 1999/11/01 07:56:13 julian Exp $
  */
 
@@ -296,6 +296,12 @@ DECLARE_MODULE(ng_##typename, ng_##typename##_mod, sub, order)
 
 /* Special malloc() type for netgraph structs and ctrl messages */
 MALLOC_DECLARE(M_NETGRAPH);
+
+/* declare the base of the netgraph sysctl hierarchy */
+/* but only if this file cares about sysctls */
+#ifdef	SYSCTL_DECL
+SYSCTL_DECL(_net_graph);
+#endif
 
 int	ng_bypass(hook_p hook1, hook_p hook2);
 void	ng_cutlinks(node_p node);

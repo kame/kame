@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/endian.h,v 1.3 1999/08/28 00:38:43 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/endian.h,v 1.3.2.1 2001/04/21 14:53:05 ume Exp $ */
 /* From: NetBSD: endian.h,v 1.5 1997/10/09 15:42:19 bouyer Exp */
 
 /*
@@ -58,9 +58,6 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
-
-typedef u_int32_t in_addr_t;
-typedef u_int16_t in_port_t;
 
 __BEGIN_DECLS
 in_addr_t	htonl __P((in_addr_t));

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
- * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.9 2001/03/05 13:09:03 obrien Exp $
+ * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.13 2001/08/08 18:59:54 ghelmer Exp $
  */
 
 #include "opt_ipsec.h"
@@ -232,7 +232,8 @@ udp_input(m, off, proto)
 			m_freem(m);
 			return;
 		}
-	}
+	} else
+		udpstat.udps_nosum++;
 
 	if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)) ||
 	    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif)) {
@@ -391,8 +392,7 @@ udp_input(m, off, proto)
 #endif
 		ip_savecontrol(inp, &opts, ip, m);
 	}
-	iphlen += sizeof(struct udphdr);
-	m_adj(m, iphlen);
+ 	m_adj(m, iphlen + sizeof(struct udphdr));
 #ifdef INET6
 	if (inp->inp_vflag & INP_IPV6) {
 		in6_sin_2_v4mapsin6(&udp_in, &udp_in6.uin6_sin);
@@ -736,7 +736,10 @@ udp_output(inp, m, addr, control, p)
 	udpstat.udps_opackets++;
 
 #ifdef IPSEC
-	ipsec_setsocket(m, inp->inp_socket);
+	if (ipsec_setsocket(m, inp->inp_socket) != 0) {
+		error = ENOBUFS;
+		goto release;
+	}
 #endif /*IPSEC*/
 	error = ip_output(m, inp->inp_options, &inp->inp_route,
 	    (inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST)),
@@ -807,13 +810,6 @@ udp_attach(struct socket *so, int proto, struct proc *p)
 	inp = (struct inpcb *)so->so_pcb;
 	inp->inp_vflag |= INP_IPV4;
 	inp->inp_ip_ttl = ip_defttl;
-#ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->inp_sp);
-	if (error != 0) {
-		in_pcbdetach(inp);
-		return error;
-	}
-#endif /*IPSEC*/
 	return 0;
 }
 
@@ -844,10 +840,15 @@ udp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		return EINVAL;
 	if (inp->inp_faddr.s_addr != INADDR_ANY)
 		return EISCONN;
+	error = 0;
 	s = splnet();
-	sin = (struct sockaddr_in *)nam;
-	prison_remote_ip(p, 0, &sin->sin_addr.s_addr);
-	error = in_pcbconnect(inp, nam, p);
+	if (inp->inp_laddr.s_addr == INADDR_ANY && p->p_prison != NULL)
+		error = in_pcbbind(inp, NULL, p);
+	if (error == 0) {
+		sin = (struct sockaddr_in *)nam;
+		prison_remote_ip(p, 0, &sin->sin_addr.s_addr);
+		error = in_pcbconnect(inp, nam, p);
+	}
 	splx(s);
 	if (error == 0)
 		soisconnected(so);

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_prot.c	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53.2.6 2000/12/09 02:44:47 ps Exp $
+ * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53.2.7 2001/05/17 03:51:28 dillon Exp $
  */
 
 /*
@@ -991,6 +991,16 @@ crget()
 }
 
 /*
+ * Claim another reference to a ucred structure
+ */
+void
+crhold(cr) 
+        struct ucred *cr;
+{
+	cr->cr_ref++;
+}
+
+/*
  * Free a cred structure.
  * Throws away space when ref count gets to 0.
  */
@@ -998,6 +1008,9 @@ void
 crfree(cr)
 	struct ucred *cr;
 {
+	if (cr->cr_ref == 0)
+		panic("Freeing already free credential! %p", cr);
+	
 	if (--cr->cr_ref == 0) {
 		/*
 		 * Some callers of crget(), such as nfs_statfs(),

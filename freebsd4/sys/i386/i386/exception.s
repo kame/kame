@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/exception.s,v 1.65.2.2 2000/07/07 00:38:46 obrien Exp $
+ * $FreeBSD: src/sys/i386/i386/exception.s,v 1.65.2.3 2001/08/15 01:23:49 peter Exp $
  */
 
 #include "npx.h"
@@ -200,6 +200,9 @@ IDTVEC(fpu)
 IDTVEC(align)
 	TRAP(T_ALIGNFLT)
 
+IDTVEC(xmm)
+	pushl $0; TRAP(T_XMMFLT)
+	
 	/*
 	 * _alltraps entry point.  Interrupts are enabled if this was a trap
 	 * gate (TGT), else disabled if this was an interrupt gate (IGT).

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.7 2000/11/26 02:55:11 dillon Exp $
+ * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.11 2001/09/11 09:49:53 kris Exp $
  */
 
 /*
@@ -55,6 +55,7 @@
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/malloc.h>
+#include <sys/mbuf.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
@@ -497,8 +498,8 @@ getnewvnode(tag, mp, vops, vpp)
 			if (vp->v_usecount)
 				panic("free vnode isn't");
 
-			object = vp->v_object;
-			if (object && (object->resident_page_count || object->ref_count)) {
+			if (VOP_GETVOBJECT(vp, &object) == 0 &&
+			    (object->resident_page_count || object->ref_count)) {
 				printf("object inconsistant state: RPC: %d, RC: %d\n",
 					object->resident_page_count, object->ref_count);
 				/* Don't recycle if it's caching some pages */
@@ -731,8 +732,7 @@ vinvalbuf(vp, flags, cred, p, slpflag, slptimeo)
 	 * Destroy the copy in the VM cache, too.
 	 */
 	simple_lock(&vp->v_interlock);
-	object = vp->v_object;
-	if (object != NULL) {
+	if (VOP_GETVOBJECT(vp, &object) == 0) {
 		vm_object_page_remove(object, 0, 0,
 			(flags & V_SAVE) ? TRUE : FALSE);
 	}
@@ -1529,10 +1529,22 @@ vdrop(vp)
 /*
  * Remove any vnodes in the vnode table belonging to mount point mp.
  *
- * If MNT_NOFORCE is specified, there should not be any active ones,
+ * If FORCECLOSE is not specified, there should not be any active ones,
  * return error if any are found (nb: this is a user error, not a
- * system error). If MNT_FORCE is specified, detach any active vnodes
+ * system error). If FORCECLOSE is specified, detach any active vnodes
  * that are found.
+ *
+ * If WRITECLOSE is set, only flush out regular file vnodes open for
+ * writing.
+ *
+ * SKIPSYSTEM causes any vnodes marked VSYSTEM to be skipped.
+ *
+ * `rootrefs' specifies the base reference count for the root vnode
+ * of this filesystem. The root vnode is considered busy if its
+ * v_usecount exceeds this value. On a successful return, vflush()
+ * will call vrele() on the root vnode exactly rootrefs times.
+ * If the SKIPSYSTEM or WRITECLOSE flags are specified, rootrefs must
+ * be zero.
  */
 #ifdef DIAGNOSTIC
 static int busyprt = 0;		/* print out busy vnodes */
@@ -1540,15 +1552,32 @@ SYSCTL_INT(_debug, OID_AUTO, busyprt, CTLFLAG_RW, &busyprt, 0, "");
 #endif
 
 int
-vflush(mp, skipvp, flags)
+vflush(mp, rootrefs, flags)
 	struct mount *mp;
-	struct vnode *skipvp;
+	int rootrefs;
 	int flags;
 {
 	struct proc *p = curproc;	/* XXX */
-	struct vnode *vp, *nvp;
-	int busy = 0;
+	struct vnode *vp, *nvp, *rootvp = NULL;
+	int busy = 0, error;
 
+	/* Hack to prevent crashes with old filesystem modules. */
+	if (rootrefs < 0 || rootrefs > 10) {
+		printf("vflush: %s: bad rootrefs %d\n",
+		    mp->mnt_stat.f_fstypename, rootrefs);
+		return (EBUSY);
+	}
+	if (rootrefs > 0) {
+		KASSERT((flags & (SKIPSYSTEM | WRITECLOSE)) == 0,
+		    ("vflush: bad args"));
+		/*
+		 * Get the filesystem root vnode. We can vput() it
+		 * immediately, since with rootrefs > 0, it won't go away.
+		 */
+		if ((error = VFS_ROOT(mp, &rootvp)) != 0)
+			return (error);
+		vput(rootvp);
+	}
 	simple_lock(&mntvnode_slock);
 loop:
 	for (vp = LIST_FIRST(&mp->mnt_vnodelist); vp; vp = nvp) {
@@ -1559,11 +1588,6 @@ loop:
 		if (vp->v_mount != mp)
 			goto loop;
 		nvp = LIST_NEXT(vp, v_mntvnodes);
-		/*
-		 * Skip over a selected vnode.
-		 */
-		if (vp == skipvp)
-			continue;
 
 		simple_lock(&vp->v_interlock);
 		/*
@@ -1619,8 +1643,24 @@ loop:
 		busy++;
 	}
 	simple_unlock(&mntvnode_slock);
+	if (rootrefs > 0 && (flags & FORCECLOSE) == 0) {
+		/*
+		 * If just the root vnode is busy, and if its refcount
+		 * is equal to `rootrefs', then go ahead and kill it.
+		 */
+		simple_lock(&rootvp->v_interlock);
+		KASSERT(busy > 0, ("vflush: not busy"));
+		KASSERT(rootvp->v_usecount >= rootrefs, ("vflush: rootrefs"));
+		if (busy == 1 && rootvp->v_usecount == rootrefs) {
+			vgonel(rootvp, p);
+			busy = 0;
+		} else
+			simple_unlock(&rootvp->v_interlock);
+	}
 	if (busy)
 		return (EBUSY);
+	for (; rootrefs > 0; rootrefs--)
+		vrele(rootvp);
 	return (0);
 }
 
@@ -1634,7 +1674,6 @@ vclean(vp, flags, p)
 	struct proc *p;
 {
 	int active;
-	vm_object_t obj;
 
 	/*
 	 * Check to see if the vnode is in use. If so we have to reference it
@@ -1665,21 +1704,8 @@ vclean(vp, flags, p)
 	 * Clean out any buffers associated with the vnode.
 	 */
 	vinvalbuf(vp, V_SAVE, NOCRED, p, 0, 0);
-	if ((obj = vp->v_object) != NULL) {
-		if (obj->ref_count == 0) {
-			/*
-			 * vclean() may be called twice.  The first time removes the
-			 * primary reference to the object, the second time goes
-			 * one further and is a special-case to terminate the object.
-			 */
-			vm_object_terminate(obj);
-		} else {
-			/*
-			 * Woe to the process that tries to page now :-).
-			 */
-			vm_pager_deallocate(obj);
-		}
-	}
+
+	VOP_DESTROYVOBJECT(vp);
 
 	/*
 	 * If purging an active vnode, it must be closed and
@@ -1722,10 +1748,7 @@ vclean(vp, flags, p)
 	}
 
 	cache_purge(vp);
-	if (vp->v_vnlock) {
-		FREE(vp->v_vnlock, M_VNODE);
-		vp->v_vnlock = NULL;
-	}
+	vp->v_vnlock = NULL;
 
 	if (VSHOULDFREE(vp))
 		vfree(vp);
@@ -2256,6 +2279,10 @@ vfs_hang_addrlist(mp, nep, argp)
 		mp->mnt_flag |= MNT_DEFEXPORTED;
 		return (0);
 	}
+
+	if (argp->ex_addrlen > MLEN)
+		return (EINVAL);
+
 	i = sizeof(struct netcred) + argp->ex_addrlen + argp->ex_masklen;
 	np = (struct netcred *) malloc(i, M_NETADDR, M_WAITOK);
 	bzero((caddr_t) np, i);
@@ -2506,20 +2533,19 @@ loop:
 			continue;
 
 		if (flags != MNT_WAIT) {
-			obj = vp->v_object;
-			if (obj == NULL || (obj->flags & OBJ_MIGHTBEDIRTY) == 0)
-				continue;
+			if (VOP_GETVOBJECT(vp, &obj) != 0 ||
+			    (obj->flags & OBJ_MIGHTBEDIRTY) == 0)
 			if (VOP_ISLOCKED(vp, NULL))
 				continue;
 		}
 
 		simple_lock(&vp->v_interlock);
-		if (vp->v_object &&
-		   (vp->v_object->flags & OBJ_MIGHTBEDIRTY)) {
+		if (VOP_GETVOBJECT(vp, &obj) == 0 &&
+		    (obj->flags & OBJ_MIGHTBEDIRTY)) {
 			if (!vget(vp,
 				LK_INTERLOCK | LK_EXCLUSIVE | LK_RETRY | LK_NOOBJ, curproc)) {
-				if (vp->v_object) {
-					vm_object_page_clean(vp->v_object, 0, 0, flags == MNT_WAIT ? OBJPC_SYNC : OBJPC_NOSYNC);
+				if (VOP_GETVOBJECT(vp, &obj) == 0) {
+					vm_object_page_clean(obj, 0, 0, flags == MNT_WAIT ? OBJPC_SYNC : OBJPC_NOSYNC);
 					anyio = 1;
 				}
 				vput(vp);
@@ -2546,49 +2572,7 @@ vfs_object_create(vp, p, cred)
 	struct proc *p;
 	struct ucred *cred;
 {
-	struct vattr vat;
-	vm_object_t object;
-	int error = 0;
-
-	if (!vn_isdisk(vp, NULL) && vn_canvmio(vp) == FALSE)
-		return 0;
-
-retry:
-	if ((object = vp->v_object) == NULL) {
-		if (vp->v_type == VREG || vp->v_type == VDIR) {
-			if ((error = VOP_GETATTR(vp, &vat, cred, p)) != 0)
-				goto retn;
-			object = vnode_pager_alloc(vp, vat.va_size, 0, 0);
-		} else if (devsw(vp->v_rdev) != NULL) {
-			/*
-			 * This simply allocates the biggest object possible
-			 * for a disk vnode.  This should be fixed, but doesn't
-			 * cause any problems (yet).
-			 */
-			object = vnode_pager_alloc(vp, IDX_TO_OFF(INT_MAX), 0, 0);
-		} else {
-			goto retn;
-		}
-		/*
-		 * Dereference the reference we just created.  This assumes
-		 * that the object is associated with the vp.
-		 */
-		object->ref_count--;
-		vp->v_usecount--;
-	} else {
-		if (object->flags & OBJ_DEAD) {
-			VOP_UNLOCK(vp, 0, p);
-			tsleep(object, PVM, "vodead", 0);
-			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
-			goto retry;
-		}
-	}
-
-	KASSERT(vp->v_object != NULL, ("vfs_object_create: NULL object"));
-	vp->v_flag |= VOBJBUF;
-
-retn:
-	return error;
+	return (VOP_CREATEVOBJECT(vp, cred, p));
 }
 
 static void

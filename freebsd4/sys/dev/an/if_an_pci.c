@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.3 2000/12/20 21:25:31 archie Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.5 2001/08/16 23:52:23 brooks Exp $
  */
 
 /*
@@ -76,13 +76,14 @@
 #include <net/if_arp.h>
 #include <net/ethernet.h>
 #include <net/if_dl.h>
+#include <net/if_media.h>
 
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.3 2000/12/20 21:25:31 archie Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.5 2001/08/16 23:52:23 brooks Exp $";
 #endif
 
 #include <dev/an/if_aironet_ieee.h>
@@ -95,6 +96,7 @@ struct an_type {
 };
 
 #define AIRONET_VENDORID	0x14B9
+#define AIRONET_DEVICEID_35x	0x0350
 #define AIRONET_DEVICEID_4500	0x4500
 #define AIRONET_DEVICEID_4800	0x4800
 #define AIRONET_DEVICEID_4xxx	0x0001
@@ -102,6 +104,7 @@ struct an_type {
 #define AN_PCI_LOIO		0x18	/* Aironet iobase */
 
 static struct an_type an_devs[] = {
+	{ AIRONET_VENDORID, AIRONET_DEVICEID_35x, "Cisco Aironet 350 Series" },
 	{ AIRONET_VENDORID, AIRONET_DEVICEID_4500, "Aironet PCI4500" },
 	{ AIRONET_VENDORID, AIRONET_DEVICEID_4800, "Aironet PCI4800" },
 	{ AIRONET_VENDORID, AIRONET_DEVICEID_4xxx, "Aironet PCI4500/PCI4800" },
@@ -200,6 +203,7 @@ an_detach_pci(device_t dev)
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 
 	an_stop(sc);
+	ifmedia_removeall(&sc->an_ifmedia);
 	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	bus_teardown_intr(dev, sc->irq_res, sc->irq_handle);
 	an_release_resources(dev);

@@ -26,9 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ahc_eisa.c,v 1.1.1.3 2001/04/23 13:09:46 sumikawa Exp $
+ * $Id: ahc_eisa.c,v 1.1.1.4 2001/09/25 04:58:27 keiichi Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.15.2.4 2001/03/12 14:57:40 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.15.2.5 2001/07/28 18:46:39 gibbs Exp $
  */
 
 #include <dev/aic7xxx/aic7xxx_freebsd.h>
@@ -211,3 +211,5 @@ static driver_t ahc_eisa_driver = {
 static devclass_t ahc_devclass;
 
 DRIVER_MODULE(ahc, eisa, ahc_eisa_driver, ahc_devclass, 0, 0);
+MODULE_DEPEND(ahc_eisa, ahc, 1, 1, 1);
+MODULE_VERSION(ahc_eisa, 1);

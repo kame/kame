@@ -23,13 +23,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_exec.c,v 1.107.2.5 2000/09/21 09:06:43 truckman Exp $
+ * $FreeBSD: src/sys/kern/kern_exec.c,v 1.107.2.8 2001/07/09 19:03:13 guido Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
-#include <sys/signalvar.h>
 #include <sys/kernel.h>
 #include <sys/mount.h>
 #include <sys/filedesc.h>
@@ -39,9 +38,10 @@
 #include <sys/imgact.h>
 #include <sys/imgact_elf.h>
 #include <sys/wait.h>
-#include <sys/proc.h>
-#include <sys/pioctl.h>
 #include <sys/malloc.h>
+#include <sys/proc.h>
+#include <sys/signalvar.h>
+#include <sys/pioctl.h>
 #include <sys/namei.h>
 #include <sys/sysent.h>
 #include <sys/shm.h>
@@ -59,6 +59,7 @@
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
 
+#include <sys/user.h>
 #include <machine/reg.h>
 
 MALLOC_DEFINE(M_PARGS, "proc-args", "Process arguments");
@@ -246,6 +247,28 @@ interpret:
 		p->p_fd = tmp;
 	}
 
+	/*
+	 * For security and other reasons, signal handlers cannot
+	 * be shared after an exec. The new proces gets a copy of the old
+	 * handlers. In execsigs(), the new process wll have its signals
+	 * reset.
+	 */
+	if (p->p_procsig->ps_refcnt > 1) {
+		struct procsig *newprocsig;
+
+		MALLOC(newprocsig, struct procsig *, sizeof(struct procsig),
+		       M_SUBPROC, M_WAITOK);
+		bcopy(p->p_procsig, newprocsig, sizeof(*newprocsig));
+		p->p_procsig->ps_refcnt--;
+		p->p_procsig = newprocsig;
+		p->p_procsig->ps_refcnt = 1;
+		if (p->p_sigacts == &p->p_addr->u_sigacts)
+			panic("shared procsig but private sigacts?\n");
+
+		p->p_addr->u_sigacts = *p->p_sigacts;
+		p->p_sigacts = &p->p_addr->u_sigacts;
+	}
+
 	/* Stop profiling */
 	stopprofclock(p);
 
@@ -282,8 +305,10 @@ interpret:
 	    (p->p_flag & P_TRACED) == 0) {
 		/*
 		 * Turn off syscall tracing for set-id programs, except for
-		 * root.
+		 * root.  Record any set-id flags first to make sure that
+		 * we do not regain any tracing during a possible block.
 		 */
+		setsugid(p);
 		if (p->p_tracep && suser(p)) {
 			p->p_traceflag = 0;
 			vrele(p->p_tracep);
@@ -297,7 +322,6 @@ interpret:
 			change_euid(p, attr.va_uid);
 		if (attr.va_mode & VSGID)
 			p->p_ucred->cr_gid = attr.va_gid;
-		setsugid(p);
 		setugidsafety(p);
 	} else {
 		if (p->p_ucred->cr_uid == p->p_cred->p_ruid &&
@@ -400,7 +424,7 @@ exec_map_first_page(imgp)
 		exec_unmap_first_page(imgp);
 	}
 
-	object = imgp->vp->v_object;
+	VOP_GETVOBJECT(imgp->vp, &object);
 	s = splvm();
 
 	ma[0] = vm_page_grab(object, 0, VM_ALLOC_NORMAL | VM_ALLOC_RETRY);

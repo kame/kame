@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.7 2000/08/24 00:07:58 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.10 2001/08/01 01:08:25 fenner Exp $
  */
 
 /*
@@ -138,7 +138,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.7 2000/08/24 00:07:58 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.10 2001/08/01 01:08:25 fenner Exp $";
 #endif
 
 /*
@@ -1253,7 +1253,7 @@ static int ti_chipinit(sc)
 	/* Do special setup for Tigon 2. */
 	if (sc->ti_hwrev == TI_HWREV_TIGON_II) {
 		TI_SETBIT(sc, TI_CPU_CTL_B, TI_CPUSTATE_HALT);
-		TI_SETBIT(sc, TI_MISC_LOCAL_CTL, TI_MLC_SRAM_BANK_256K);
+		TI_SETBIT(sc, TI_MISC_LOCAL_CTL, TI_MLC_SRAM_BANK_512K);
 		TI_SETBIT(sc, TI_MISC_CONF, TI_MCR_SRAM_SYNCHRONOUS);
 	}
 
@@ -1846,7 +1846,7 @@ static void ti_rxeof(sc)
 #if NVLAN > 0
 		if (cur_rx->ti_flags & TI_BDFLAG_VLAN_TAG) {
 			have_tag = 1;
-			vlan_tag = cur_rx->ti_vlan_tag;
+			vlan_tag = cur_rx->ti_vlan_tag & 0xfff;
 		}
 #endif
 
@@ -2058,7 +2058,7 @@ static int ti_encap(sc, m_head, txidx)
 
 	if ((m_head->m_flags & (M_PROTO1|M_PKTHDR)) == (M_PROTO1|M_PKTHDR) &&
 	    m_head->m_pkthdr.rcvif != NULL &&
-	    m_head->m_pkthdr.rcvif->if_type == IFT_8021_VLAN)
+	    m_head->m_pkthdr.rcvif->if_type == IFT_L2VLAN)
 		ifv = m_head->m_pkthdr.rcvif->if_softc;
 #endif
 
@@ -2106,7 +2106,7 @@ static int ti_encap(sc, m_head, txidx)
 #if NVLAN > 0
 			if (ifv != NULL) {
 				f->ti_flags |= TI_BDFLAG_VLAN_TAG;
-				f->ti_vlan_tag = ifv->ifv_tag;
+				f->ti_vlan_tag = ifv->ifv_tag & 0xfff;
 			} else {
 				f->ti_vlan_tag = 0;
 			}

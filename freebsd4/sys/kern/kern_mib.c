@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_mib.c,v 1.29.2.2 2000/08/03 00:09:32 ps Exp $
+ * $FreeBSD: src/sys/kern/kern_mib.c,v 1.29.2.4 2001/07/30 23:28:00 peter Exp $
  */
 
 #include <sys/param.h>
@@ -95,6 +95,9 @@ SYSCTL_INT(_kern, KERN_MAXPROC, maxproc, CTLFLAG_RD,
 
 SYSCTL_INT(_kern, KERN_MAXPROCPERUID, maxprocperuid, CTLFLAG_RW, 
     &maxprocperuid, 0, "Maximum processes allowed per userid");
+
+SYSCTL_INT(_kern, OID_AUTO, maxusers, CTLFLAG_RD, 
+    &maxusers, 0, "Hint for kernel tuning");
 
 SYSCTL_INT(_kern, KERN_ARGMAX, argmax, CTLFLAG_RD, 
     0, ARG_MAX, "Maximum bytes of argument to execve(2)");
@@ -186,9 +189,8 @@ char domainname[MAXHOSTNAMELEN];
 SYSCTL_STRING(_kern, KERN_NISDOMAINNAME, domainname, CTLFLAG_RW,
     &domainname, sizeof(domainname), "Name of the current YP/NIS domain");
 
-long hostid;
-/* Some trouble here, if sizeof (int) != sizeof (long) */
-SYSCTL_INT(_kern, KERN_HOSTID, hostid, CTLFLAG_RW, &hostid, 0, "Host ID");
+unsigned long hostid;
+SYSCTL_ULONG(_kern, KERN_HOSTID, hostid, CTLFLAG_RW, &hostid, 0, "Host ID");
 
 /*
  * This is really cheating.  These actually live in the libc, something

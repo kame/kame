@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $FreeBSD: src/sys/sys/vnode.h,v 1.111.2.4 2000/12/30 01:51:10 dillon Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.111.2.11 2001/07/26 20:37:33 iedowse Exp $
  */
 
 #ifndef _SYS_VNODE_H_
 #define	_SYS_VNODE_H_
 
 #include <sys/queue.h>
+#include <sys/lock.h>
 #include <sys/select.h>
 #include <sys/uio.h>
 #include <sys/acl.h>
@@ -63,8 +64,8 @@ enum vtype	{ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VSOCK, VFIFO, VBAD };
 enum vtagtype	{
 	VT_NON, VT_UFS, VT_NFS, VT_MFS, VT_PC, VT_LFS, VT_LOFS, VT_FDESC,
 	VT_PORTAL, VT_NULL, VT_UMAP, VT_KERNFS, VT_PROCFS, VT_AFS, VT_ISOFS,
-	VT_UNION, VT_MSDOSFS, VT_DEVFS, VT_TFS, VT_VFS, VT_CODA, VT_NTFS,
-	VT_HPFS, VT_NWFS
+	VT_UNION, VT_MSDOSFS, VT_TFS, VT_VFS, VT_CODA, VT_NTFS,
+	VT_HPFS, VT_NWFS, VT_SMBFS
 };
 
 /*
@@ -213,6 +214,7 @@ struct vattr {
 #define	IO_VMIO		0x20		/* data already in VMIO space */
 #define	IO_INVAL	0x40		/* invalidate after I/O */
 #define IO_ASYNC	0x80		/* bawrite rather then bdwrite */
+#define IO_DIRECT	0x100		/* attempt to bypass buffer cache */
 
 /*
  *  Modes.  Some values same as Ixxx entries from inode.h for now.
@@ -302,6 +304,10 @@ extern void	(*lease_updatetime) __P((int deltat));
 #define VSHOULDBUSY(vp)	\
 	(((vp)->v_flag & (VFREE|VTBFREE)) && \
 	 ((vp)->v_holdcnt || (vp)->v_usecount))
+
+#define	VI_LOCK(vp)	simple_lock(&(vp)->v_interlock)
+#define	VI_TRYLOCK(vp)	simple_lock_try(&(vp)->v_interlock)
+#define	VI_UNLOCK(vp)	simple_unlock(&(vp)->v_interlock)
 
 #endif /* _KERNEL */
 
@@ -422,8 +428,7 @@ struct vop_generic_args {
 				 || (vp)->v_tag == VT_NFS	\
 				 || (vp)->v_tag == VT_LFS	\
 				 || (vp)->v_tag == VT_ISOFS	\
-				 || (vp)->v_tag == VT_MSDOSFS	\
-				 || (vp)->v_tag == VT_DEVFS)
+				 || (vp)->v_tag == VT_MSDOSFS)
 
 #define ASSERT_VOP_LOCKED(vp, str)					\
 do {									\
@@ -559,7 +564,7 @@ void	vdrop __P((struct vnode *));
 int	vfinddev __P((dev_t dev, enum vtype type, struct vnode **vpp));
 void	vfs_add_vnodeops __P((const void *));
 void	vfs_rm_vnodeops __P((const void *));
-int	vflush __P((struct mount *mp, struct vnode *skipvp, int flags));
+int	vflush __P((struct mount *mp, int rootrefs, int flags));
 int 	vget __P((struct vnode *vp, int lockflag, struct proc *p));
 void 	vgone __P((struct vnode *vp));
 void	vgonel __P((struct vnode *vp, struct proc *p));
@@ -614,6 +619,9 @@ int	vop_enotty __P((struct vop_generic_args *ap));
 int	vop_defaultop __P((struct vop_generic_args *ap));
 int	vop_null __P((struct vop_generic_args *ap));
 int	vop_panic __P((struct vop_generic_args *ap));
+int	vop_stdcreatevobject __P((struct vop_createvobject_args *ap));
+int	vop_stddestroyvobject __P((struct vop_destroyvobject_args *ap));
+int	vop_stdgetvobject __P((struct vop_getvobject_args *ap));
 
 void 	vput __P((struct vnode *vp));
 void 	vrele __P((struct vnode *vp));

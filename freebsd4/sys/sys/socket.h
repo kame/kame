@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socket.h	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/sys/socket.h,v 1.39.2.6 2001/02/26 07:24:22 ume Exp $
+ * $FreeBSD: src/sys/sys/socket.h,v 1.39.2.7 2001/07/03 11:02:01 ume Exp $
  */
 
 #ifndef _SYS_SOCKET_H_
@@ -382,6 +382,10 @@ struct cmsgcred {
 	
 #define	CMSG_SPACE(l)		(_ALIGN(sizeof(struct cmsghdr)) + _ALIGN(l))
 #define	CMSG_LEN(l)		(_ALIGN(sizeof(struct cmsghdr)) + (l))
+
+#ifdef _KERNEL
+#define	CMSG_ALIGN(n)	_ALIGN(n)
+#endif
 
 /* "Socket"-level control message types: */
 #define	SCM_RIGHTS	0x01		/* access rights (array of int) */

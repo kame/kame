@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.7 2001/03/20 11:45:01 bde Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.9 2001/08/12 10:48:00 iedowse Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -1080,7 +1080,7 @@ open(p, uap)
 		fp->f_flag |= FHASLOCK;
 	}
 	/* assert that vn_open created a backing object if one is needed */
-	KASSERT(!vn_canvmio(vp) || vp->v_object != NULL,
+	KASSERT(!vn_canvmio(vp) || VOP_GETVOBJECT(vp, NULL) == 0,
 		("open: vmio vnode has no backing object after vn_open"));
 	VOP_UNLOCK(vp, 0, p);
 
@@ -2592,14 +2592,15 @@ fsync(p, uap)
 {
 	register struct vnode *vp;
 	struct file *fp;
+	vm_object_t obj;
 	int error;
 
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	vp = (struct vnode *)fp->f_data;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
-	if (vp->v_object)
-		vm_object_page_clean(vp->v_object, 0, 0, 0);
+	if (VOP_GETVOBJECT(vp, &obj) == 0)
+		vm_object_page_clean(obj, 0, 0, 0);
 	if ((error = VOP_FSYNC(vp, fp->f_cred, MNT_WAIT, p)) == 0 &&
 	    vp->v_mount && (vp->v_mount->mnt_flag & MNT_SOFTDEP) &&
 	    bioops.io_fsync)
@@ -2854,6 +2855,9 @@ ogetdirentries(p, uap)
 	int error, eofflag, readcnt;
 	long loff;
 
+	/* XXX arbitrary sanity limit on `count'. */
+	if (SCARG(uap, count) > 64 * 1024)
+		return (EINVAL);
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	if ((fp->f_flag & FREAD) == 0)
@@ -3345,7 +3349,7 @@ fhopen(p, uap)
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 		fp->f_flag |= FHASLOCK;
 	}
-	if ((vp->v_type == VREG) && (vp->v_object == NULL))
+	if ((vp->v_type == VREG) && (VOP_GETVOBJECT(vp, NULL) != 0))
 		vfs_object_create(vp, p, p->p_ucred);
 
 	VOP_UNLOCK(vp, 0, p);

@@ -37,7 +37,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_parse.c,v 1.3 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.c,v 1.3.2.4 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.c,v 1.3.2.5 2001/05/26 16:41:37 jdp Exp $
  */
 
 #include <sys/types.h>
@@ -338,7 +338,7 @@ ng_int8_parse(const struct ng_parse_type *type,
 	char *eptr;
 
 	val = strtol(s + *off, &eptr, 0);
-	if (val < -0x80 || val > 0xff || eptr == s + *off)
+	if (val < (int8_t)0x80 || val > (u_int8_t)0xff || eptr == s + *off)
 		return (EINVAL);
 	*off = eptr - s;
 	val8 = (int8_t)val;
@@ -431,7 +431,8 @@ ng_int16_parse(const struct ng_parse_type *type,
 	char *eptr;
 
 	val = strtol(s + *off, &eptr, 0);
-	if (val < -0x8000 || val > 0xffff || eptr == s + *off)
+	if (val < (int16_t)0x8000
+	    || val > (u_int16_t)0xffff || eptr == s + *off)
 		return (EINVAL);
 	*off = eptr - s;
 	val16 = (int16_t)val;
@@ -524,8 +525,8 @@ ng_int32_parse(const struct ng_parse_type *type,
 	char *eptr;
 
 	val = strtol(s + *off, &eptr, 0);
-	if (val < (long)-0x80000000
-	    || val > (u_long)0xffffffff || eptr == s + *off)
+	if (val < (int32_t)0x80000000
+	    || val > (u_int32_t)0xffffffff || eptr == s + *off)
 		return (EINVAL);
 	*off = eptr - s;
 	val32 = (int32_t)val;

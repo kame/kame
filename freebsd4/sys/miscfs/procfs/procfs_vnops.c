@@ -36,7 +36,7 @@
  *
  *	@(#)procfs_vnops.c	8.18 (Berkeley) 5/21/95
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_vnops.c,v 1.76.2.3 2000/11/07 23:40:07 alfred Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_vnops.c,v 1.76.2.5 2001/08/12 14:29:19 rwatson Exp $
  */
 
 /*
@@ -148,8 +148,7 @@ procfs_open(ap)
 			return (EBUSY);
 
 		p1 = ap->a_p;
-		if ((!CHECKIO(p1, p2) || p_trespass(p1, p2)) &&
-		    !procfs_kmemaccess(p1))
+		if (!CHECKIO(p1, p2) || p_trespass(p1, p2))
 			return (EPERM);
 
 		if (ap->a_mode & FWRITE)
@@ -437,7 +436,7 @@ procfs_getattr(ap)
 
 	default:
 		procp = PFIND(pfs->pfs_pid);
-		if (procp == 0 || procp->p_cred == NULL ||
+		if (procp == NULL || procp->p_cred == NULL ||
 		    procp->p_ucred == NULL)
 			return (ENOENT);
 	}
@@ -477,15 +476,11 @@ procfs_getattr(ap)
 	case Pregs:
 	case Pfpregs:
 	case Pdbregs:
+	case Pmem:
 		if (procp->p_flag & P_SUGID)
 			vap->va_mode &= ~((VREAD|VWRITE)|
 					  ((VREAD|VWRITE)>>3)|
 					  ((VREAD|VWRITE)>>6));
-		break;
-	case Pmem:
-		/* Retain group kmem readablity. */
-		if (procp->p_flag & P_SUGID)
-			vap->va_mode &= ~(VREAD|VWRITE);
 		break;
 	default:
 		break;
@@ -556,7 +551,6 @@ procfs_getattr(ap)
 			vap->va_uid = 0;
 		else
 			vap->va_uid = procp->p_ucred->cr_uid;
-		vap->va_gid = KMEM_GROUP;
 		break;
 
 	case Pregs:
@@ -730,7 +724,7 @@ procfs_lookup(ap)
 			break;
 
 		p = PFIND(pid);
-		if (p == 0)
+		if (p == NULL)
 			break;
 
 		return (procfs_allocvp(dvp->v_mount, vpp, pid, Pproc));
@@ -740,7 +734,7 @@ procfs_lookup(ap)
 			return (procfs_root(dvp->v_mount, vpp));
 
 		p = PFIND(pfs->pfs_pid);
-		if (p == 0)
+		if (p == NULL)
 			break;
 
 		for (pt = proc_targets, i = 0; i < nproc_targets; pt++, i++) {
@@ -912,7 +906,7 @@ procfs_readdir(ap)
 	done:
 
 #ifdef PROCFS_ZOMBIE
-		if (p == 0 && doingzomb == 0) {
+		if (p == NULL && doingzomb == 0) {
 			doingzomb = 1;
 			p = zombproc.lh_first;
 			goto again;

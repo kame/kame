@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.h	5.4 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/include/trap.h,v 1.10.2.1 2000/03/20 10:27:52 cracauer Exp $
+ * $FreeBSD: src/sys/i386/include/trap.h,v 1.10.2.2 2001/08/15 01:23:52 peter Exp $
  */
 
 #ifndef _MACHINE_TRAP_H_
@@ -65,7 +65,8 @@
 #define	T_SEGNPFLT	26	/* segment not present fault */
 #define	T_STKFLT	27	/* stack fault */
 #define	T_MCHK		28	/* machine check trap */
-#define	T_RESERVED	29	/* reserved (unknown) */
+#define	T_XMMFLT	29	/* SIMD floating-point exception */
+#define	T_RESERVED	30	/* reserved (unknown) */
 
 /* XXX most of the following codes aren't used, but could be. */
 

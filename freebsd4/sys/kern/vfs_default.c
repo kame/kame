@@ -36,12 +36,13 @@
  * SUCH DAMAGE.
  *
  *
- * $FreeBSD: src/sys/kern/vfs_default.c,v 1.28 2000/01/19 06:07:28 rwatson Exp $
+ * $FreeBSD: src/sys/kern/vfs_default.c,v 1.28.2.4 2001/07/04 17:32:40 tegge Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
+#include <sys/conf.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -49,6 +50,14 @@
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 #include <sys/poll.h>
+
+#include <machine/limits.h>
+
+#include <vm/vm.h>
+#include <vm/vm_object.h>
+#include <vm/vm_page.h>
+#include <vm/vm_pager.h>
+#include <vm/vnode_pager.h>
 
 static int vop_nostrategy __P((struct vop_strategy_args *));
 
@@ -66,7 +75,10 @@ static struct vnodeopv_entry_desc default_vnodeop_entries[] = {
 	{ &vop_advlock_desc,		(vop_t *) vop_einval },
 	{ &vop_bwrite_desc,		(vop_t *) vop_stdbwrite },
 	{ &vop_close_desc,		(vop_t *) vop_null },
+	{ &vop_createvobject_desc,	(vop_t *) vop_stdcreatevobject },
+	{ &vop_destroyvobject_desc,	(vop_t *) vop_stddestroyvobject },
 	{ &vop_fsync_desc,		(vop_t *) vop_null },
+	{ &vop_getvobject_desc,		(vop_t *) vop_stdgetvobject },
 	{ &vop_ioctl_desc,		(vop_t *) vop_enotty },
 	{ &vop_islocked_desc,		(vop_t *) vop_noislocked },
 	{ &vop_lease_desc,		(vop_t *) vop_null },
@@ -307,9 +319,9 @@ vop_stdpoll(ap)
 		struct proc *a_p;
 	} */ *ap;
 {
-	if ((ap->a_events & ~POLLSTANDARD) == 0)
-		return (ap->a_events & (POLLRDNORM|POLLWRNORM));
-	return (vn_pollrecord(ap->a_vp, ap->a_p, ap->a_events));
+	if (ap->a_events & ~POLLSTANDARD)
+		return (vn_pollrecord(ap->a_vp, ap->a_p, ap->a_events));
+	return (ap->a_events & (POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM));
 }
 
 int
@@ -348,14 +360,13 @@ vop_sharedlock(ap)
 	 * to be handled in intermediate layers.
 	 */
 	struct vnode *vp = ap->a_vp;
+	struct lock *l = (struct lock *)vp->v_data;
 	int vnflags, flags = ap->a_flags;
 
-	if (vp->v_vnlock == NULL) {
-		if ((flags & LK_TYPE_MASK) == LK_DRAIN)
-			return (0);
-		MALLOC(vp->v_vnlock, struct lock *, sizeof(struct lock),
-		    M_VNODE, M_WAITOK);
-		lockinit(vp->v_vnlock, PVFS, "vnlock", 0, LK_NOPAUSE);
+	if (l == NULL) {
+		if (ap->a_flags & LK_INTERLOCK)
+			simple_unlock(&ap->a_vp->v_interlock);
+		return 0;
 	}
 	switch (flags & LK_TYPE_MASK) {
 	case LK_DRAIN:
@@ -384,9 +395,9 @@ vop_sharedlock(ap)
 	if (flags & LK_INTERLOCK)
 		vnflags |= LK_INTERLOCK;
 #ifndef	DEBUG_LOCKS
-	return (lockmgr(vp->v_vnlock, vnflags, &vp->v_interlock, ap->a_p));
+	return (lockmgr(l, vnflags, &vp->v_interlock, ap->a_p));
 #else
-	return (debuglockmgr(vp->v_vnlock, vnflags, &vp->v_interlock, ap->a_p,
+	return (debuglockmgr(l, vnflags, &vp->v_interlock, ap->a_p,
 	    "vop_sharedlock", vp->filename, vp->line));
 #endif
 }
@@ -423,13 +434,6 @@ vop_nolock(ap)
 	struct vnode *vp = ap->a_vp;
 	int vnflags, flags = ap->a_flags;
 
-	if (vp->v_vnlock == NULL) {
-		if ((flags & LK_TYPE_MASK) == LK_DRAIN)
-			return (0);
-		MALLOC(vp->v_vnlock, struct lock *, sizeof(struct lock),
-		    M_VNODE, M_WAITOK);
-		lockinit(vp->v_vnlock, PVFS, "vnlock", 0, LK_NOPAUSE);
-	}
 	switch (flags & LK_TYPE_MASK) {
 	case LK_DRAIN:
 		vnflags = LK_DRAIN;
@@ -473,13 +477,9 @@ vop_nounlock(ap)
 {
 	struct vnode *vp = ap->a_vp;
 
-	if (vp->v_vnlock == NULL) {
-		if (ap->a_flags & LK_INTERLOCK)
-			simple_unlock(&ap->a_vp->v_interlock);
-		return (0);
-	}
-	return (lockmgr(vp->v_vnlock, LK_RELEASE | ap->a_flags,
-		&ap->a_vp->v_interlock, ap->a_p));
+	if (ap->a_flags & LK_INTERLOCK)
+		simple_unlock(&vp->v_interlock);
+	return (0);
 }
 
 /*
@@ -492,11 +492,107 @@ vop_noislocked(ap)
 		struct proc *a_p;
 	} */ *ap;
 {
-	struct vnode *vp = ap->a_vp;
+	return (0);
+}
 
-	if (vp->v_vnlock == NULL)
+int
+vop_stdcreatevobject(ap)
+	struct vop_createvobject_args /* {
+		struct vnode *vp;
+		struct ucred *cred;
+		struct proc *p;
+	} */ *ap;
+{
+	struct vnode *vp = ap->a_vp;
+	struct ucred *cred = ap->a_cred;
+	struct proc *p = ap->a_p;
+	struct vattr vat;
+	vm_object_t object;
+	int error = 0;
+
+	if (!vn_isdisk(vp, NULL) && vn_canvmio(vp) == FALSE)
 		return (0);
-	return (lockstatus(vp->v_vnlock, ap->a_p));
+
+retry:
+	if ((object = vp->v_object) == NULL) {
+		if (vp->v_type == VREG || vp->v_type == VDIR) {
+			if ((error = VOP_GETATTR(vp, &vat, cred, p)) != 0)
+				goto retn;
+			object = vnode_pager_alloc(vp, vat.va_size, 0, 0);
+		} else if (devsw(vp->v_rdev) != NULL) {
+			/*
+			 * This simply allocates the biggest object possible
+			 * for a disk vnode.  This should be fixed, but doesn't
+			 * cause any problems (yet).
+			 */
+			object = vnode_pager_alloc(vp, IDX_TO_OFF(INT_MAX), 0, 0);
+		} else {
+			goto retn;
+		}
+		/*
+		 * Dereference the reference we just created.  This assumes
+		 * that the object is associated with the vp.
+		 */
+		object->ref_count--;
+		vp->v_usecount--;
+	} else {
+		if (object->flags & OBJ_DEAD) {
+			VOP_UNLOCK(vp, 0, p);
+			tsleep(object, PVM, "vodead", 0);
+			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+			goto retry;
+		}
+	}
+
+	KASSERT(vp->v_object != NULL, ("vfs_object_create: NULL object"));
+	vp->v_flag |= VOBJBUF;
+
+retn:
+	return (error);
+}
+
+int
+vop_stddestroyvobject(ap)
+	struct vop_destroyvobject_args /* {
+		struct vnode *vp;
+	} */ *ap;
+{
+	struct vnode *vp = ap->a_vp;
+	vm_object_t obj = vp->v_object;
+
+	if (vp->v_object == NULL)
+		return (0);
+
+	if (obj->ref_count == 0) {
+		/*
+		 * vclean() may be called twice. The first time
+		 * removes the primary reference to the object,
+		 * the second time goes one further and is a
+		 * special-case to terminate the object.
+		 */
+		vm_object_terminate(obj);
+	} else {
+		/*
+		 * Woe to the process that tries to page now :-).
+		 */
+		vm_pager_deallocate(obj);
+	}
+	return (0);
+}
+
+int
+vop_stdgetvobject(ap)
+	struct vop_getvobject_args /* {
+		struct vnode *vp;
+		struct vm_object **objpp;
+	} */ *ap;
+{
+	struct vnode *vp = ap->a_vp;
+	struct vm_object **objpp = ap->a_objpp;
+
+	if (objpp)
+		*objpp = vp->v_object;
+	return (vp->v_object ? 0 : EINVAL);
 }
 
 /* 

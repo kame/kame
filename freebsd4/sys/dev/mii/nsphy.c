@@ -92,7 +92,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/nsphy.c,v 1.2.2.2 2000/12/12 19:29:14 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/mii/nsphy.c,v 1.2.2.5 2001/06/08 19:58:33 semenu Exp $";
 #endif
 
 static int nsphy_probe		__P((device_t));
@@ -131,12 +131,6 @@ static int nsphy_probe(dev)
 	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_NATSEMI &&
 	    MII_MODEL(ma->mii_id2) == MII_MODEL_NATSEMI_DP83840) {
 		device_set_desc(dev, MII_STR_NATSEMI_DP83840);
-	} else if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_QUALSEMI &&
-	    MII_MODEL(ma->mii_id2) == MII_MODEL_QUALSEMI_QS6612) {
-		device_set_desc(dev, MII_STR_QUALSEMI_QS6612);
-	} else if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxALTIMA &&
-	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxALTIMA_AC101) {
-		device_set_desc(dev, MII_STR_xxALTIMA_AC101);
 	} else 
 		return (ENXIO);
 
@@ -270,17 +264,22 @@ nsphy_service(sc, mii, cmd)
 		 */
 		reg |= PCR_FLINK100;
 
-#if 0
 		/*
 		 * Mystery bits which are supposedly `reserved',
 		 * but we seem to need to set them when the PHY
-		 * is connected to some interfaces!
+		 * is connected to some interfaces:
+		 *
+		 * 0x0400 is needed for fxp
+		 *        (Intel EtherExpress Pro 10+/100B, 82557 chip)
+		 *        (nsphy with a DP83840 chip)
+		 * 0x0100 may be needed for some other card
 		 */
 		reg |= 0x0100 | 0x0400;
-#endif
-/*
-		PHY_WRITE(sc, MII_NSPHY_PCR, reg);
-*/
+
+		if (strcmp(device_get_name(device_get_parent(sc->mii_dev)),
+		    "fxp") == 0)
+			PHY_WRITE(sc, MII_NSPHY_PCR, reg);
+
 		switch (IFM_SUBTYPE(ife->ifm_media)) {
 		case IFM_AUTO:
 			/*

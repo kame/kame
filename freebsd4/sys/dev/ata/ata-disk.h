@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.22.2.3 2001/02/25 21:35:20 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.22.2.4 2001/05/31 15:20:34 sos Exp $
  */
 
 /* structure describing an ATA disk request */
@@ -74,7 +74,7 @@ struct ad_softc {
     struct buf_queue_head	queue;		/* head of request queue */
     struct devstat		stats;		/* devstat entry */
     struct disk			disk;		/* disklabel/slice stuff */
-    dev_t			dev1, dev2;	/* device place holder */
+    dev_t			dev;		/* device place holder */
 };
 
 void ad_attach(struct ata_softc *, int);

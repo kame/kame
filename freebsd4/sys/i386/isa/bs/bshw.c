@@ -30,6 +30,8 @@
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Naofumi HONDA.  All rights reserved.
+ *
+ * $FreeBSD: src/sys/i386/isa/bs/bshw.c,v 1.7.2.1 2001/07/26 02:32:18 nyan Exp $
  */
 
 #ifdef	__NetBSD__
@@ -286,17 +288,17 @@ bshw_board_probe(bsc, drq, irq)
 		break;
 
 	case 1:
-		bsc->sc_cspeed &= ~(IDR_FS_12_15 | IDR_FS_15_20);
+		bsc->sc_cspeed &= ~(IDR_FS_12_15 | IDR_FS_16_20);
 		break;
 
 	case 2:
-		bsc->sc_cspeed &= ~(IDR_FS_12_15 | IDR_FS_15_20);
+		bsc->sc_cspeed &= ~(IDR_FS_12_15 | IDR_FS_16_20);
 		bsc->sc_cspeed |= IDR_FS_12_15;
 		break;
 
 	case 3:
-		bsc->sc_cspeed &= ~(IDR_FS_12_15 | IDR_FS_15_20);
-		bsc->sc_cspeed |= IDR_FS_15_20;
+		bsc->sc_cspeed &= ~(IDR_FS_12_15 | IDR_FS_16_20);
+		bsc->sc_cspeed |= IDR_FS_16_20;
 		break;
 	}
 

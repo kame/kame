@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.11 2001/03/05 13:08:49 obrien Exp $
+ * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.12 2001/07/30 23:27:58 peter Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -688,6 +688,13 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	 */
 	cycles_per_sec = hwrpb->rpb_cc_freq;
 
+	/* Get the loader(8) metadata */
+	preload_metadata = (caddr_t)bootinfo.modptr;
+	kern_envp = bootinfo.envp;
+
+	/* Do basic tuning, hz etc */
+	init_param();
+
 	/*
 	 * Initalize the (temporary) bootstrap console interface, so
 	 * we can use printf until the VM system starts being setup.
@@ -786,8 +793,6 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	/* But if the bootstrap tells us otherwise, believe it! */
 	if (bootinfo.kernend)
 		kernend = round_page(bootinfo.kernend);
-	preload_metadata = (caddr_t)bootinfo.modptr;
-	kern_envp = bootinfo.envp;
 
 	p = getenv("kernelname");
 	if (p)

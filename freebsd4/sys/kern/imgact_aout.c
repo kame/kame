@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_aout.c,v 1.59.2.1 2001/02/22 05:15:03 marcel Exp $
+ * $FreeBSD: src/sys/kern/imgact_aout.c,v 1.59.2.2 2001/05/18 09:58:40 bp Exp $
  */
 
 #include <sys/param.h>
@@ -182,7 +182,7 @@ exec_aout_imgact(imgp)
 	vp = imgp->vp;
 	map = &vmspace->vm_map;
 	vm_map_lock(map);
-	object = vp->v_object;
+	VOP_GETVOBJECT(vp, &object);
 	vm_object_reference(object);
 
 	text_end = virtual_offset + a_out->a_text;

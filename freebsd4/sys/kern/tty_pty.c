@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty_pty.c	8.4 (Berkeley) 2/20/95
- * $FreeBSD: src/sys/kern/tty_pty.c,v 1.74.2.1 2001/02/26 04:23:16 jlemon Exp $
+ * $FreeBSD: src/sys/kern/tty_pty.c,v 1.74.2.3 2001/07/24 09:49:41 dd Exp $
  */
 
 /*
@@ -159,6 +159,7 @@ ptyinit(n)
 
 	devs->si_drv1 = devc->si_drv1 = pt;
 	devs->si_tty = devc->si_tty = &pt->pt_tty;
+	pt->pt_tty.t_dev = devs;
 	ttyregister(&pt->pt_tty);
 }
 
@@ -177,6 +178,7 @@ ptsopen(dev, flag, devtype, p)
 
 	/*
 	 * XXX: Gross hack for DEVFS:
+	 * XXX: DEVFS is no more, should this be removed?
 	 * If we openned this device, ensure we have the
 	 * next one too, so people can open it.
 	 */
@@ -825,6 +827,7 @@ ptc_drvinit(unused)
 	cdevsw_add(&pts_cdevsw);
 	cdevsw_add(&ptc_cdevsw);
 	/* XXX: Gross hack for DEVFS */
+	/* XXX: DEVFS is no more, should this be removed? */
 	ptyinit(0);
 }
 

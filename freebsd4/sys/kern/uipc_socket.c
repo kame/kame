@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket.c	8.3 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.15 2001/03/09 16:41:20 jlemon Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.16 2001/06/14 20:46:06 ume Exp $
  */
 
 #include "opt_inet.h"
@@ -205,8 +205,8 @@ sodealloc(so)
 		if (so->so_accf->so_accept_filter_str != NULL)
 			FREE(so->so_accf->so_accept_filter_str, M_ACCF);
 		FREE(so->so_accf, M_ACCF);
-#endif /* INET */
 	}
+#endif /* INET */
 	crfree(so->so_cred);
 	zfreei(so->so_zone, so);
 }

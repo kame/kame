@@ -37,7 +37,7 @@
  *	@(#)procfs_regs.c	8.4 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_regs.c,v 1.10.2.1 2000/11/01 20:19:48 sef Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_regs.c,v 1.10.2.2 2001/08/04 13:12:24 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -94,5 +94,6 @@ int
 procfs_validregs(p)
 	struct proc *p;
 {
+
 	return ((p->p_flag & P_SYSTEM) == 0);
 }

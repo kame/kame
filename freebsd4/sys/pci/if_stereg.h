@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_stereg.h,v 1.5 1999/12/07 20:14:42 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_stereg.h,v 1.5.2.1 2001/08/23 20:04:06 wpaul Exp $
  */
 
 /*
@@ -88,7 +88,9 @@
 #define STE_TX_RECLAIM_THRESH	0x5D
 #define STE_PHYCTL		0x5E
 #define STE_MAR0		0x60
-#define STE_MAR1		0x64
+#define STE_MAR1		0x62
+#define STE_MAR2		0x64
+#define STE_MAR3		0x66
 #define STE_STATS		0x68
 
 #define STE_DMACTL_RXDMA_STOPPED	0x00000001

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.5.2.3 2000/10/05 05:07:49 cg Exp $
+ *	$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.5.2.4 2001/08/01 03:40:55 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -167,8 +167,6 @@ static driver_t es1888_driver = {
 	es1888_methods,
 	1,			/* no softc */
 };
-
-static devclass_t pcm_devclass;
 
 DRIVER_MODULE(snd_es1888, isa, es1888_driver, pcm_devclass, 0, 0);
 MODULE_DEPEND(snd_es1888, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);

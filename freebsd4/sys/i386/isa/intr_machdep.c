@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.2 2000/08/16 05:35:34 ps Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.3 2001/08/24 17:39:12 imp Exp $
  */
 /*
  * This file contains an aggregated module marked:
@@ -546,7 +546,7 @@ icu_unset(intr, handler)
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.2 2000/08/16 05:35:34 ps Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.3 2001/08/24 17:39:12 imp Exp $
  *
  */
 
@@ -651,15 +651,9 @@ update_masks(intrmask_t *maskptr, int irq)
 
 	if (find_idesc(maskptr, irq) == NULL) {
 		/* no reference to this maskptr was found in this irq's chain */
-		if ((*maskptr & mask) == 0)
-			return;
-		/* the irq was included in the classes mask, remove it */
 		*maskptr &= ~mask;
 	} else {
 		/* a reference to this maskptr was found in this irq's chain */
-		if ((*maskptr & mask) != 0)
-			return;
-		/* put the irq into the classes mask */
 		*maskptr |= mask;
 	}
 	/* we need to update all values in the intr_mask[irq] array */

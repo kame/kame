@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)syslog.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/syslog.h,v 1.19.2.1 2001/01/09 06:51:34 phk Exp $
+ * $FreeBSD: src/sys/sys/syslog.h,v 1.19.2.2 2001/05/29 13:15:08 dwmalone Exp $
  */
 
 #ifndef _SYS_SYSLOG_H_
@@ -68,8 +68,8 @@
 				/* mark "facility" */
 #define	INTERNAL_MARK	LOG_MAKEPRI((LOG_NFACILITIES<<3), 0)
 typedef struct _code {
-	char	*c_name;
-	int	c_val;
+	const char	*c_name;
+	int		c_val;
 } CODE;
 
 CODE prioritynames[] = {

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/modules/syscons/snake/snake_saver.c,v 1.26.2.1 2000/05/09 13:42:14 nyan Exp $
+ * $FreeBSD: src/sys/modules/syscons/snake/snake_saver.c,v 1.26.2.2 2001/05/06 05:44:29 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -47,7 +47,7 @@
 #include <pc98/pc98/pc98_machdep.h>
 #endif
 
-static char	*message;
+static u_char	*message;
 static int	*messagep;
 static int	messagelen;
 static int	blanked;

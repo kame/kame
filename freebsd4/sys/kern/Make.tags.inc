@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/kern/Make.tags.inc,v 1.6 2000/01/27 01:21:58 mckusick Exp $
+# $FreeBSD: src/sys/kern/Make.tags.inc,v 1.6.2.1 2001/07/24 09:49:41 dd Exp $
 #	@(#)Make.tags.inc	8.1 (Berkeley) 6/11/93
 
 SYS?=	/sys
@@ -32,7 +32,6 @@ COMM=	${SYS}/conf/*.[ch] \
 	${SYS}/isofs/cd9660/*.[ch] \
 	${SYS}/kern/*.[ch] \
 	${SYS}/miscfs/deadfs/*.[ch] \
-	${SYS}/miscfs/devfs/*.[ch] \
 	${SYS}/miscfs/fdesc/*.[ch] \
 	${SYS}/miscfs/fifofs/*.[ch] \
 	${SYS}/miscfs/kernfs/*.[ch] \
@@ -97,7 +96,6 @@ COMMDIR2= ${SYS}/contrib/softupdates \
 	${SYS}/dev/vx \
 	${SYS}/isofs/cd9660 \
 	${SYS}/miscfs/deadfs \
-	${SYS}/miscfs/devfs \
 	${SYS}/miscfs/fdesc \
 	${SYS}/miscfs/fifofs \
 	${SYS}/miscfs/kernfs \

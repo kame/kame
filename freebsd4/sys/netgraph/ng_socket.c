@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11.2.3 2001/02/02 11:59:27 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11.2.4 2001/09/03 06:38:16 julian Exp $
  * $Whistle: ng_socket.c,v 1.28 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -1012,7 +1012,6 @@ ngs_mod_event(module_t mod, int event, void *data)
 	return (error);
 }
 
-SYSCTL_NODE(_net, AF_NETGRAPH, graph, CTLFLAG_RW, 0, "netgraph Family");
 SYSCTL_INT(_net_graph, OID_AUTO, family, CTLFLAG_RD, 0, AF_NETGRAPH, "");
 SYSCTL_NODE(_net_graph, OID_AUTO, data, CTLFLAG_RW, 0, "DATA");
 SYSCTL_INT(_net_graph_data, OID_AUTO, proto, CTLFLAG_RD, 0, NG_DATA, "");

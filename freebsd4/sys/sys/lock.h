@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)lock.h	8.12 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/lock.h,v 1.17.2.1 2000/09/30 02:49:37 ps Exp $
+ * $FreeBSD: src/sys/sys/lock.h,v 1.17.2.2 2001/06/26 04:20:11 bp Exp $
  */
 
 #ifndef	_LOCK_H_
@@ -141,6 +141,7 @@ struct lock {
 				   getting lk_interlock */
 #define LK_RETRY	0x00020000 /* vn_lock: retry until locked */
 #define	LK_NOOBJ	0x00040000 /* vget: don't create object */
+#define	LK_THISLAYER	0x00080000 /* vn_lock: lock/unlock only current layer */
 
 /*
  * Internal state flags corresponding to lk_sharecount, and lk_waitcount

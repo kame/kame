@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.2.2.2 2001/03/05 17:47:30 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.2.2.6 2001/09/03 14:48:41 orion Exp $
  *
  * The order of pokes in the initiation sequence is based on Linux
  * driver by Thomas Sailer, gw boynton (wesb@crystal.cirrus.com), tom
@@ -68,8 +68,8 @@ struct sc_info;
 struct sc_chinfo {
     struct sc_info *parent;
 
-    snd_dbuf *buffer;
-    pcm_channel *channel;
+    struct snd_dbuf *buffer;
+    struct pcm_channel *channel;
 
     u_int32_t spd, fmt, bps, blksz;
 
@@ -134,7 +134,7 @@ static u_int32_t cs4281_fmts[] = {
     0
 };
 
-static pcmchan_caps cs4281_caps = {6024, 48000, cs4281_fmts, 0};
+static struct pcmchan_caps cs4281_caps = {6024, 48000, cs4281_fmts, 0};
 
 /* -------------------------------------------------------------------- */
 /* Hardware */
@@ -310,7 +310,7 @@ AC97_DECLARE(cs4281_ac97);
 /* shared rec/play channel interface */
 
 static void *
-cs4281chan_init(kobj_t obj, void *devinfo, snd_dbuf *b, pcm_channel *c, int dir)
+cs4281chan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *c, int dir)
 {
     struct sc_info *sc = devinfo;
     struct sc_chinfo *ch = (dir == PCMDIR_PLAY) ? &sc->pch : &sc->rch;
@@ -354,7 +354,7 @@ cs4281chan_setblocksize(kobj_t obj, void *data, u_int32_t blocksize)
 
     DEB(printf("cs4281chan_setblocksize: bufsz %d Setting %d\n", blocksize, ch->blksz));
 
-    return sndbuf_getsize(ch->buffer);
+    return ch->blksz;
 }
 
 static int
@@ -437,7 +437,7 @@ cs4281chan_trigger(kobj_t obj, void *data, int go)
     return 0;
 }
 
-static pcmchan_caps *
+static struct pcmchan_caps *
 cs4281chan_getcaps(kobj_t obj, void *data)
 {
     return &cs4281_caps;
@@ -754,20 +754,17 @@ cs4281_pci_attach(device_t dev)
     u_int32_t data;
     char status[SND_STATUSLEN];
 
-    if ((sc = malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT)) == NULL) {
+    if ((sc = malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT | M_ZERO)) == NULL) {
 	device_printf(dev, "cannot allocate softc\n");
 	return ENXIO;
     }
 
-    bzero(sc, sizeof(*sc));
     sc->dev = dev;
     sc->type = pci_get_devid(dev);
 
     data = pci_read_config(dev, PCIR_COMMAND, 2);
     data |= (PCIM_CMD_PORTEN | PCIM_CMD_MEMEN | PCIM_CMD_BUSMASTEREN);
     pci_write_config(dev, PCIR_COMMAND, data, 2);
-
-    data = pci_read_config(dev, PCIR_COMMAND, 2);
 
 #if __FreeBSD_version > 500000
     if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
@@ -777,7 +774,18 @@ cs4281_pci_attach(device_t dev)
 
 	pci_set_powerstate(dev, PCI_POWERSTATE_D0);
     }
+#else
+    data = pci_read_config(dev, CS4281PCI_PMCS_OFFSET, 4);
+    if (data & CS4281PCI_PMCS_PS_MASK) {
+	    /* Reset the power state. */
+	    device_printf(dev, "chip is in D%d power mode "
+			  "-- setting to D0\n",
+			  data & CS4281PCI_PMCS_PS_MASK);
+	    pci_write_config(dev, CS4281PCI_PMCS_OFFSET,
+			     data & ~CS4281PCI_PMCS_PS_MASK, 4);
+    }
 #endif
+
     sc->regid   = PCIR_MAPS;
     sc->regtype = SYS_RES_MEMORY;
     sc->reg = bus_alloc_resource(dev, sc->regtype, &sc->regid,
@@ -810,7 +818,7 @@ cs4281_pci_attach(device_t dev)
 	goto bad;
     }
 
-    if (bus_setup_intr(dev, sc->irq, INTR_TYPE_TTY, cs4281_intr, sc, &sc->ih)) {
+    if (snd_setup_intr(dev, sc->irq, 0, cs4281_intr, sc, &sc->ih)) {
 	device_printf(dev, "unable to setup interrupt\n");
 	goto bad;
     }
@@ -962,10 +970,8 @@ static device_method_t cs4281_methods[] = {
 static driver_t cs4281_driver = {
     "pcm",
     cs4281_methods,
-    sizeof(snddev_info),
+    sizeof(struct snddev_info),
 };
-
-static devclass_t pcm_devclass;
 
 DRIVER_MODULE(snd_cs4281, pci, cs4281_driver, pcm_devclass, 0, 0);
 MODULE_DEPEND(snd_cs4281, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);

@@ -28,7 +28,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/pccard/cardinfo.h,v 1.16.2.2 2000/10/15 04:12:43 sanpei Exp $ */
+/* $FreeBSD: src/sys/pccard/cardinfo.h,v 1.16.2.5 2001/07/28 03:52:15 imp Exp $ */
 
 #ifndef	_PCCARD_CARDINFO_H_
 #define	_PCCARD_CARDINFO_H_
@@ -58,6 +58,40 @@
 
 /*
  *	Slot states for PIOCGSTATE
+ *
+ *	Here's a state diagram of all the possible states:
+ *
+ *                             power x 1
+ *                       -------------------
+ *                      /                   \
+ *                     /                     v
+ *    resume    +----------+   power x 0   +----------+
+ *      ------->| inactive |<--------------| filled   |
+ *     /        +----------+               +----------+
+ *    /           /     \                   ^   |
+ *  nil <---------       \        insert or |   | suspend or
+ *        suspend         \       power x 1 |   | eject
+ *                         \                |   v
+ *                          \            +----------+
+ *                           ----------->|  empty   |
+ *                             eject     +----------+
+ *
+ *	Note, the above diagram is for the state.  On suspend, the laststate
+ * gets set to suspend to tell pccardd what happened.  Also the nil state
+ * means that when the no state change has happened.  Note: if you eject
+ * while suspended in the inactive state, you will return to the
+ * empty state if you do not insert a new card and to the inactive state
+ * if you do insert a new card.
+ *
+ * Some might argue that inactive should be sticky forever and
+ * eject/insert shouldn't take it out of that state.  They might be
+ * right.  On the other hand, some would argue that eject resets all
+ * state.  They might be right.  They both can't be right.  The above
+ * represents a reasonable compromise between the two.
+ *
+ * Some bridges allow one to query to see if the card was changed while
+ * we were suspended.  Others do not.  We make no use of this functionality
+ * at this time.
  */
 enum cardstate { noslot, empty, suspend, filled, inactive };
 
@@ -138,7 +172,7 @@ struct power {
 };
 
 /*
- *	Th PC-Card resource IOC_GET_RESOURCE_RANGE
+ *	The PC-Card resource IOC_GET_RESOURCE_RANGE
  */
 struct pccard_resource {
 	int		type;
@@ -155,6 +189,7 @@ struct pccard_resource {
 #define MAXSLOT 16
 #define	NUM_MEM_WINDOWS	10
 #define	NUM_IO_WINDOWS	6
-#define	CARD_DEVICE	"/dev/card%d"		/* String for sprintf */
+#define	CARD_DEVICE	"/dev/card%d"		/* String for snprintf */
+#define	PCCARD_MEMSIZE	(4*1024)
 
 #endif /* !_PCCARD_CARDINFO_H_ */

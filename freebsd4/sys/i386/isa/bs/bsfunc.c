@@ -1,6 +1,6 @@
 /*	$NecBSD: bsfunc.c,v 1.2 1997/10/31 17:43:37 honda Exp $	*/
 /*	$NetBSD$	*/
-/* $FreeBSD: src/sys/i386/isa/bs/bsfunc.c,v 1.7.2.1 2000/10/21 07:44:26 nyan Exp $ */
+/* $FreeBSD: src/sys/i386/isa/bs/bsfunc.c,v 1.7.2.2 2001/07/26 02:32:18 nyan Exp $ */
 /*
  * [NetBSD for NEC PC98 series]
  *  Copyright (c) 1994, 1995, 1996 NetBSD/pc98 porting staff.
@@ -782,7 +782,7 @@ bs_setup_ctrl(ti, quirks, flags)
 	period = BS_SCSI_PERIOD(flags);
 	offset = (flags & BS_SCSI_SYNC) ? BS_SCSI_OFFSET(flags) : 0;
 
-	maxperiod = (bsc->sc_cspeed & IDR_FS_15_20) ? 100 : 50;
+	maxperiod = (bsc->sc_cspeed & IDR_FS_16_20) ? 100 : 50;
 	if (period > maxperiod)
 		period = maxperiod;
 

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/ncv/ncr53c500reg.h,v 1.1.2.1 2000/10/29 11:05:42 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/ncv/ncr53c500reg.h,v 1.1.2.2 2001/07/22 00:21:39 non Exp $	*/
 /*	$NecBSD: ncr53c500reg.h,v 1.5 1998/12/26 11:50:01 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -84,11 +84,6 @@
 
 /* cfg4 */
 #define	C4_ANE		0x04
-
-/* cfg3 */
-#define	C3_NULL		0x00
-#define	C3_FCLK		0x08	/* Fast SCSI		*/
-#define	C3_FSCSI	0x10	/* Fast Clock (>25Mhz)	*/
 
 /* cfg2 */
 #define	C2_SCSI2	0x08	/* SCSI-2 Enable	*/

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_targ_bh.c,v 1.4.2.4 2001/03/05 13:08:50 obrien Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_targ_bh.c,v 1.4.2.5 2001/07/30 00:15:22 mjacob Exp $
  */
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -262,7 +262,7 @@ targbhenlun(struct cam_periph *periph)
 	status = immed_ccb.ccb_h.status;
 	if (status != CAM_REQ_CMP) {
 		xpt_print_path(periph->path);
-		printf("targbhenlun - Enable Lun Rejected for status 0x%x\n",
+		printf("targbhenlun - Enable Lun Rejected with status 0x%x\n",
 		       status);
 		return (status);
 	}

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/consio.h,v 1.5.2.1 2000/05/05 09:16:15 nyan Exp $
+ * $FreeBSD: src/sys/sys/consio.h,v 1.5.2.4 2001/07/28 12:51:37 yokota Exp $
  */
 
 #ifndef	_SYS_CONSIO_H_
@@ -116,6 +116,9 @@ typedef struct ssaver	ssaver_t;
 /* set the history (scroll back) buffer size (in lines) */
 #define CONS_HISTORY	_IOW('c', 9, int)
 
+/* clear the history (scroll back) buffer */
+#define CONS_CLRHIST	_IO('c', 10)
+
 /* mouse cursor ioctl */
 struct mouse_data {
 	int		x;
@@ -164,6 +167,7 @@ typedef struct mouse_info mouse_info_t;
 #define CONS_IDLE	_IOR('c', 11, int)
 
 /* set the screen saver mode */
+#define CONS_NO_SAVER	(-1)
 #define CONS_LKM_SAVER	0
 #define CONS_USR_SAVER	1
 #define CONS_SAVERMODE	_IOW('c', 12, int)
@@ -238,6 +242,16 @@ typedef struct vid_info vid_info_t;
 
 /* release the current keyboard */
 #define CONS_RELKBD	_IO('c', 111)
+
+/* Snapshot the current video buffer */
+#define CONS_SCRSHOT	_IOWR('c', 105, scrshot_t)
+
+struct scrshot {
+	int		xsize;
+	int		ysize;
+	u_int16_t*	buf;
+};
+typedef struct scrshot scrshot_t;
 
 /* get/set the current terminal emulator info. */
 #define TI_NAME_LEN	32

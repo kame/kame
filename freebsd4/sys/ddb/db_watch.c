@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_watch.c,v 1.20 1999/10/29 18:08:25 phk Exp $
+ * $FreeBSD: src/sys/ddb/db_watch.c,v 1.20.2.1 2001/07/25 01:00:08 bsd Exp $
  */
 
 /*
@@ -65,6 +65,10 @@ static boolean_t	db_find_watchpoint __P((vm_map_t map, db_addr_t addr,
 static void		db_list_watchpoints __P((void));
 static void		db_set_watchpoint __P((vm_map_t map, db_addr_t addr,
 				       vm_size_t size));
+
+int  db_md_set_watchpoint   __P((db_expr_t addr, db_expr_t size));
+int  db_md_clr_watchpoint   __P((db_expr_t addr, db_expr_t size));
+void db_md_list_watchpoints __P((void));
 
 
 db_watchpoint_t
@@ -219,6 +223,7 @@ db_watchpoint_cmd(addr, have_addr, count, modif)
 DB_SHOW_COMMAND(watches, db_listwatch_cmd)
 {
 	db_list_watchpoints();
+	db_md_list_watchpoints();
 }
 
 void
@@ -281,3 +286,43 @@ db_find_watchpoint(map, addr, regs)
 	return (FALSE);
 }
 #endif
+
+
+
+/* Delete hardware watchpoint */
+/*ARGSUSED*/
+void
+db_deletehwatch_cmd(addr, have_addr, count, modif)
+	db_expr_t	addr;
+	boolean_t	have_addr;
+	db_expr_t	count;
+	char *		modif;
+{
+	int rc;
+
+        if (count < 0)
+                count = 4;
+
+	rc = db_md_clr_watchpoint(addr, count);
+	if (rc < 0)
+		db_printf("hardware watchpoint could not be deleted\n");
+}
+
+/* Set hardware watchpoint */
+/*ARGSUSED*/
+void
+db_hwatchpoint_cmd(addr, have_addr, count, modif)
+	db_expr_t	addr;
+	boolean_t	have_addr;
+	db_expr_t	count;
+	char *		modif;
+{
+	int rc;
+
+        if (count < 0)
+                count = 4;
+
+	rc = db_md_set_watchpoint(addr, count);
+	if (rc < 0)
+		db_printf("hardware watchpoint could not be set\n");
+}

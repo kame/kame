@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/trap.c,v 1.147.2.3 2000/08/16 05:35:34 ps Exp $
+ * $FreeBSD: src/sys/i386/i386/trap.c,v 1.147.2.5 2001/08/15 01:23:50 peter Exp $
  */
 
 /*
@@ -432,6 +432,11 @@ restart:
 		case T_FPOPFLT:		/* FPU operand fetch fault */
 			ucode = T_FPOPFLT;
 			i = SIGILL;
+			break;
+
+		case T_XMMFLT:		/* SIMD floating-point exception */
+			ucode = 0; /* XXX */
+			i = SIGFPE;
 			break;
 		}
 	} else {
@@ -948,7 +953,7 @@ trap_fatal(frame, eva)
 #endif
 	printf("trap number		= %d\n", type);
 	if (type <= MAX_TRAP_MSG)
-		panic(trap_msg[type]);
+		panic("%s", trap_msg[type]);
 	else
 		panic("unknown/reserved trap");
 }

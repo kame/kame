@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.16.2.3 2000/07/07 21:12:29 jhb Exp $
+# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.16.2.4 2001/08/14 22:55:29 jhb Exp $
 
 PROG=		boot2
 NOMAN=
@@ -6,8 +6,10 @@ STRIP=
 BINDIR?=	/boot
 BINMODE=	444
 CLEANFILES+=	boot1 boot1.out boot1.o \
-		boot2.ldr boot2.bin boot2.ld boot2.out boot2.o \
+		boot2.ldr boot2.bin boot2.ld boot2.out boot2.o boot2.h \
 		sio.o
+
+NM?=		nm
 
 # A value of 0x80 enables LBA support.
 B1FLAGS=	0x80
@@ -46,6 +48,11 @@ boot1.out: boot1.o
 boot1.o: boot1.s
 	${AS} ${AFLAGS} --defsym FLAGS=${B1FLAGS} ${.IMPSRC} -o ${.TARGET}
 
+boot2.h: boot1.out
+	${NM} -t d ${.ALLSRC} | awk '/([0-9])+ T xread/ \
+	 	{ x = $$1 - ORG1; printf("#define XREADORG 0x7%x\n", x) }' \
+	 	ORG1=`printf "%d" ${ORG1}` > boot2.h
+
 boot2: boot2.ldr boot2.bin ${BTX}/btx/btx
 	btxld -v -E ${ORG2} -f bin -b ${BTX}/btx/btx -l boot2.ldr \
 		-o boot2.ld -P 1 boot2.bin
@@ -62,6 +69,8 @@ boot2.bin: boot2.out
 boot2.out: boot2.o sio.o
 	${LD} ${LDFLAGS} -Ttext ${ORG2} -o ${.TARGET} \
 		${BTX}/lib/crt0.o boot2.o sio.o
+
+boot2.o: boot2.h
 
 sio.o: sio.s
 	${AS} ${AFLAGS} --defsym SIOPRT=${BOOT_COMCONSOLE_PORT} \

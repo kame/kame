@@ -37,7 +37,7 @@
  *	@(#)procfs.h	8.9 (Berkeley) 5/14/95
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs.h,v 1.32.2.1 2000/11/01 20:19:48 sef Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs.h,v 1.32.2.2 2001/08/12 14:29:19 rwatson Exp $
  */
 
 /*
@@ -87,8 +87,6 @@ struct pfsnode {
 #define CNEQ(cnp, s, len) \
 	 ((cnp)->cn_namelen == (len) && \
 	  (bcmp((s), (cnp)->cn_nameptr, (len)) == 0))
-
-#define KMEM_GROUP 2
 
 #define PROCFS_FILENO(pid, type) \
 	(((type) < Pproc) ? \
@@ -147,9 +145,6 @@ int procfs_domap __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct
 int procfs_dotype __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
 int procfs_docmdline __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
 int procfs_dorlimit __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
-
-/* Return 1 if process has special kernel digging privileges */
-int procfs_kmemaccess __P((struct proc *));
 
 /* functions to check whether or not files should be displayed */
 int procfs_validfile __P((struct proc *));

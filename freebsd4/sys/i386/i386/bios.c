@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/bios.c,v 1.29.2.2 2000/06/14 18:03:11 iwasaki Exp $
+ * $FreeBSD: src/sys/i386/i386/bios.c,v 1.29.2.3 2001/07/19 18:07:35 imp Exp $
  */
 
 /*
@@ -166,6 +166,7 @@ bios32_SDlookup(struct bios32_SDentry *ent)
 	ent->base = args.ebx;
 	ent->len = args.ecx;
 	ent->entry = args.edx;
+	ent->ventry = BIOS_PADDRTOVADDR(ent->base + ent->entry);
 	return (0);			/* all OK */
     }
     return (1);				/* failed */

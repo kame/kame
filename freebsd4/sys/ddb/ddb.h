@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ddb/ddb.h,v 1.24 2000/01/11 14:53:53 yokota Exp $
+ * $FreeBSD: src/sys/ddb/ddb.h,v 1.24.2.1 2001/07/25 01:00:08 bsd Exp $
  */
 
 /*
@@ -109,8 +109,10 @@ void		kdb_init __P((void));
 db_cmdfcn_t	db_breakpoint_cmd;
 db_cmdfcn_t	db_continue_cmd;
 db_cmdfcn_t	db_delete_cmd;
+db_cmdfcn_t	db_deletehwatch_cmd;
 db_cmdfcn_t	db_deletewatch_cmd;
 db_cmdfcn_t	db_examine_cmd;
+db_cmdfcn_t	db_hwatchpoint_cmd;
 db_cmdfcn_t	db_listbreak_cmd;
 db_cmdfcn_t	db_print_cmd;
 db_cmdfcn_t	db_ps;

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_conf.c,v 1.73 2000/01/23 15:47:46 bp Exp $
+ * $FreeBSD: src/sys/kern/kern_conf.c,v 1.73.2.1 2001/07/24 09:49:41 dd Exp $
  */
 
 #include <sys/param.h>
@@ -67,9 +67,6 @@ static struct specinfo devt_stash[DEVT_STASH];
 static LIST_HEAD(, specinfo) dev_hash[DEVT_HASH];
 
 static LIST_HEAD(, specinfo) dev_free;
-
-devfs_create_t *devfs_create_hook;
-devfs_remove_t *devfs_remove_hook;
 
 static int free_devt;
 SYSCTL_INT(_debug, OID_AUTO, free_devt, CTLFLAG_RW, &free_devt, 0, "");
@@ -305,16 +302,12 @@ make_dev(struct cdevsw *devsw, int minor, uid_t uid, gid_t gid, int perms, char 
 	va_end(ap);
 	dev->si_devsw = devsw;
 
-	if (devfs_create_hook)
-		devfs_create_hook(dev, uid, gid, perms);
 	return (dev);
 }
 
 void
 destroy_dev(dev_t dev)
 {
-	if (devfs_remove_hook)
-		devfs_remove_hook(dev);
 	dev->si_drv1 = 0;
 	dev->si_drv2 = 0;
 	dev->si_devsw = 0;

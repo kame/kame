@@ -23,13 +23,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/sc_machdep.h,v 1.4 2000/01/20 15:16:48 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/sc_machdep.h,v 1.4.2.1 2001/07/29 11:07:21 nyan Exp $
  */
 
 #ifndef _PC98_PC98_SC_MACHDEP_H_
 #define	_PC98_PC98_SC_MACHDEP_H_
 
-#undef SC_ALT_MOUSE_IMAGE
 #undef SC_DFLT_FONT
 #undef SC_MOUSE_CHAR
 #undef SC_PIXEL_MODE
@@ -53,9 +52,5 @@
 
 #define PRINTABLE(c)		((c) > 0x1b || ((c) > 0x0f && (c) < 0x1b) \
 				 || (c) < 0x07)
-
-#define ISMOUSEAVAIL(af)	(1)
-#define ISFONTAVAIL(af)		((af) & V_ADP_FONT)
-#define ISPALAVAIL(af)		((af) & V_ADP_PALETTE)
 
 #endif /* !_PC98_PC98_SC_MACHDEP_H_ */

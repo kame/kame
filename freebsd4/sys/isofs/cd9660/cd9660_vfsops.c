@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74.2.4 2001/03/14 12:03:50 bp Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74.2.5 2001/07/26 20:36:57 iedowse Exp $
  */
 
 #include <sys/param.h>
@@ -542,7 +542,7 @@ cd9660_unmount(mp, mntflags, p)
 	if (mntinvalbuf(mp))
 		return EBUSY;
 #endif
-	if ((error = vflush(mp, NULLVP, flags)))
+	if ((error = vflush(mp, 0, flags)))
 		return (error);
 
 	isomp = VFSTOISOFS(mp);

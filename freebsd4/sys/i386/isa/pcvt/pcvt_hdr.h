@@ -41,7 +41,7 @@
  *
  *	Last Edit-Date: [Mon Dec 27 14:06:31 1999]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_hdr.h,v 1.36.2.2 2000/05/11 16:33:23 obrien Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_hdr.h,v 1.36.2.3 2001/08/06 15:30:21 joerg Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -67,6 +67,15 @@
 #include <sys/syslog.h>
 #include <sys/malloc.h>
 #include <sys/time.h>
+/*
+ * XXX sys/kbio.h declares a lot of junk, but we need it for NUM_KEYS which
+ * is used in dev/kbd/kbdreg.h.
+ */
+#include <sys/kbio.h>
+#undef KB_OTHER
+#undef S
+#undef F
+
 #if PCVT_FREEBSD > 210
 #include <sys/random.h>
 #endif	/* PCVT_FREEBSD > 210 */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_proto.c	8.2 (Berkeley) 2/9/95
- * $FreeBSD: src/sys/netinet/in_proto.c,v 1.53.2.2 2000/08/16 20:07:46 archie Exp $
+ * $FreeBSD: src/sys/netinet/in_proto.c,v 1.53.2.4 2001/07/24 19:10:18 brooks Exp $
  */
 
 #include "opt_ipdivert.h"
@@ -75,17 +75,8 @@
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
 #endif
+#include <netinet6/ipcomp.h>
 #endif /* IPSEC */
-
-#include "gif.h"
-#if NGIF > 0
-#include <netinet/in_gif.h>
-#endif
-
-#include "stf.h"
-#if NSTF > 0
-#include <net/if_stf.h>
-#endif
 
 #ifdef IPXIP
 #include <netipx/ipx_ip.h>
@@ -125,19 +116,19 @@ struct ipprotosw inetsw[] = {
   0,		0,		0,		0,
   &rip_usrreqs
 },
-{ SOCK_RAW,	&inetdomain,	IPPROTO_ICMP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_ICMP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   icmp_input,	0,		0,		rip_ctloutput,
   0,
   0,		0,		0,		0,
   &rip_usrreqs
 },
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IGMP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IGMP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   igmp_input,	0,		0,		rip_ctloutput,
   0,
   igmp_init,	igmp_fasttimo,	igmp_slowtimo,	0,
   &rip_usrreqs
 },
-{ SOCK_RAW,	&inetdomain,	IPPROTO_RSVP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_RSVP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   rsvp_input,	0,		0,		rip_ctloutput,
   0,
   0,		0,		0,		0,
@@ -158,19 +149,25 @@ struct ipprotosw inetsw[] = {
   &nousrreqs
 },
 #endif
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
+  ipcomp4_input, 0,	 	0,		0,
+  0,	  
+  0,		0,		0,		0,
+  &nousrreqs
+},
 #endif /* IPSEC */
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   encap4_input,	0,	 	0,		rip_ctloutput,
   0,
   encap_init,		0,		0,		0,
-  &nousrreqs
+  &rip_usrreqs
 },
 # ifdef INET6
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   encap4_input,	0,	 	0,		rip_ctloutput,
   0,
-  0,		0,		0,		0,
-  &nousrreqs
+  encap_init,	0,		0,		0,
+  &rip_usrreqs
 },
 #endif
 #ifdef IPDIVERT
@@ -182,7 +179,7 @@ struct ipprotosw inetsw[] = {
 },
 #endif
 #ifdef IPXIP
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   ipxip_input,	0,		ipxip_ctlinput,	0,
   0,
   0,		0,		0,		0,
@@ -190,7 +187,7 @@ struct ipprotosw inetsw[] = {
 },
 #endif
 #ifdef NSIP
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   idpip_input,	0,		nsip_ctlinput,	0,
   0,
   0,		0,		0,		0,
@@ -205,26 +202,6 @@ struct ipprotosw inetsw[] = {
   &rip_usrreqs
 },
 };
-
-#if NGIF > 0
-struct ipprotosw in_gif_protosw =
-{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
-  in_gif_input, rip_output,	0,		rip_ctloutput,
-  0,
-  0,            0,              0,              0,
-  &rip_usrreqs
-};
-#endif /*NGIF*/
-
-#if NSTF > 0
-struct ipprotosw in_stf_protosw =
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_stf_input, rip_output,	0,		rip_ctloutput,
-  0,
-  0,            0,              0,              0,
-  &rip_usrreqs
-};
-#endif /*NSTF*/
 
 extern int in_inithead __P((void **, int));
 

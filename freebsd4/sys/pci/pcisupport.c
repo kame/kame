@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.4 2000/11/01 19:19:36 alc Exp $
+** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.7 2001/08/15 04:04:59 imp Exp $
 **
 **  Device driver for DEC/INTEL PCI chipsets.
 **
@@ -97,13 +97,13 @@ fixwsc_natoma(device_t dev)
 	if (pmccfg & 0x8000) {
 		printf("Correcting Natoma config for SMP\n");
 		pmccfg &= ~0x8000;
-		pci_write_config(dev, 0x50, 2, pmccfg);
+		pci_write_config(dev, 0x50, pmccfg, 2);
 	}
 #else
 	if ((pmccfg & 0x8000) == 0) {
 		printf("Correcting Natoma config for non-SMP\n");
 		pmccfg |= 0x8000;
-		pci_write_config(dev, 0x50, 2, pmccfg);
+		pci_write_config(dev, 0x50, pmccfg, 2);
 	}
 #endif
 }
@@ -682,12 +682,16 @@ pcib_match(device_t dev)
 		return ("Intel 82443GX (440 GX) PCI-PCI (AGP) bridge");
 	case 0x84cb8086:
 		return ("Intel 82454NX PCI Expander Bridge");
+	case 0x11318086:
+		return ("Intel 82801BA/BAM (ICH2) PCI-PCI (AGP) bridge");
 	case 0x124b8086:
 		return ("Intel 82380FB mobile PCI to PCI bridge");
 	case 0x24188086:
 		return ("Intel 82801AA (ICH) Hub to PCI bridge");
 	case 0x24288086:
 		return ("Intel 82801AB (ICH0) Hub to PCI bridge");
+	case 0x244e8086:
+		return ("Intel 82801BA/BAM (ICH2) Hub to PCI bridge");
 	
 	/* VLSI -- vendor 0x1004 */
 	case 0x01021004:
@@ -780,6 +784,43 @@ pcib_read_ivar(device_t dev, device_t child, int which, u_long *result)
 	return ENOENT;
 }
 
+/*
+ * Route an interrupt across a PCI bridge.
+ */
+static int
+pcib_route_interrupt(device_t pcib, device_t dev, int pin)
+{
+	device_t	bus;
+	int		parent_intpin;
+	int		intnum;
+
+	device_printf(pcib, "Hi!\n");
+
+	/*	
+	 *
+	 * The PCI standard defines a swizzle of the child-side device/intpin
+	 * to the parent-side intpin as follows.
+	 *
+	 * device = device on child bus
+	 * child_intpin = intpin on child bus slot (0-3)
+	 * parent_intpin = intpin on parent bus slot (0-3)
+	 *
+	 * parent_intpin = (device + child_intpin) % 4
+	 */
+	parent_intpin = (pci_get_slot(pcib) + (pin - 1)) % 4;
+
+	/*
+	 * Our parent is a PCI bus.  Its parent must export the pci interface
+	 * which includes the ability to route interrupts.
+	 */
+	bus = device_get_parent(pcib);
+	intnum = PCI_ROUTE_INTERRUPT(device_get_parent(bus), pcib,
+	    parent_intpin + 1);
+	device_printf(pcib, "routed slot %d INT%c to irq %d\n",
+	    pci_get_slot(dev), 'A' + pin - 1, intnum);
+	return(intnum);
+}
+
 static device_method_t pcib_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		pcib_probe),
@@ -798,6 +839,8 @@ static device_method_t pcib_methods[] = {
 	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
 
+	/* pci interface */
+	DEVMETHOD(pci_route_interrupt,	pcib_route_interrupt),
 	{ 0, 0 }
 };
 
@@ -847,6 +890,8 @@ isab_match(device_t dev)
 		return ("Intel 82801AA (ICH) PCI to LPC bridge");
 	case 0x24208086:
 		return ("Intel 82801AB (ICH0) PCI to LPC bridge");
+	case 0x24408086:
+		return ("Intel 82801BA/BAM (ICH2) PCI to LPC bridge");
 	
 	/* VLSI -- vendor 0x1004 */
 	case 0x00061004:
@@ -988,6 +1033,10 @@ pci_usb_match(device_t dev)
 		return ("Intel 82801AA (ICH) USB controller");
 	case 0x24228086:
 		return ("Intel 82801AB (ICH0) USB controller");
+	case 0x24428086:
+		return ("Intel 82801BA/BAM (ICH2) USB controller USB-A");
+	case 0x24448086:
+		return ("Intel 82801BA/BAM (ICH2) USB controller USB-B");
 
 	/* VIA Technologies -- vendor 0x1106 (0x1107 on the Apollo Master) */
 	case 0x30381106:

@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_elf.c,v 1.73.2.4 2001/03/05 09:11:58 obrien Exp $
+ * $FreeBSD: src/sys/kern/imgact_elf.c,v 1.73.2.5 2001/05/18 09:58:40 bp Exp $
  */
 
 #include "opt_rlimit.h"
@@ -190,7 +190,7 @@ elf_load_section(struct proc *p, struct vmspace *vmspace, struct vnode *vp, vm_o
 	vm_offset_t file_addr;
 	vm_offset_t data_buf = 0;
 
-	object = vp->v_object;
+	VOP_GETVOBJECT(vp, &object);
 	error = 0;
 
 	/*

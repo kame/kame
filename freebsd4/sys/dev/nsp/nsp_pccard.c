@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/nsp/nsp_pccard.c,v 1.2.2.2 2001/03/03 14:44:55 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/nsp/nsp_pccard.c,v 1.2.2.5 2001/09/04 04:45:20 non Exp $	*/
 /*	$NecBSD: nsp_pisa.c,v 1.4 1999/04/15 01:35:54 kmatsuda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -143,7 +143,7 @@ nsp_alloc_resource(DEVPORT_PDEVICE dev)
 
 	sc->port_rid = 0;
 	sc->port_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->port_rid,
-					  0, ~0, 0, RF_ACTIVE);
+					  0, ~0, NSP_IOSIZE, RF_ACTIVE);
 	if (sc->port_res == NULL) {
 		nsp_release_resource(dev);
 		return(ENOMEM);
@@ -175,7 +175,7 @@ nsp_alloc_resource(DEVPORT_PDEVICE dev)
 
 	sc->mem_rid = 0;
 	sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->mem_rid,
-					 0, ~0, msize, RF_ACTIVE);
+					 0, ~0, 1, RF_ACTIVE);
 	if (sc->mem_res == NULL) {
 		nsp_release_resource(dev);
 		return(ENOMEM);
@@ -318,10 +318,13 @@ static	void
 nsp_card_unload(DEVPORT_PDEVICE devi)
 {
 	struct nsp_softc *sc = DEVPORT_PDEVGET_SOFTC(devi);
+	intrmask_t s;
 
 	printf("%s: unload\n",sc->sc_sclow.sl_xname);
+	s = splcam();
 	scsi_low_deactivate((struct scsi_low_softc *)sc);
         scsi_low_dettach(&sc->sc_sclow);
+	splx(s);
 }
 
 static	int
@@ -352,6 +355,7 @@ nspattach(DEVPORT_PDEVICE devi)
 	struct scsi_low_softc *slp;
 	u_int32_t flags = DEVPORT_PDEVFLAGS(devi);
 	u_int	iobase = DEVPORT_PDEVIOBASE(devi);
+	intrmask_t s;
 	char	dvname[16];
 
 	strcpy(dvname,"nsp");
@@ -406,9 +410,9 @@ nspattach(DEVPORT_PDEVICE devi)
 	slp->sl_hostid = NSP_HOSTID;
 	slp->sl_cfgflags = flags;
 
+	s = splcam();
 	nspattachsubr(sc);
-
-	sc->sc_ih = nspintr;
+	splx(s);
 
 	return(NSP_IOSIZE);
 }

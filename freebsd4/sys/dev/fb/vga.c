@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/vga.c,v 1.9 2000/01/29 14:43:47 peter Exp $
+ * $FreeBSD: src/sys/dev/fb/vga.c,v 1.9.2.1 2001/08/11 02:58:44 yokota Exp $
  */
 
 #include "opt_vga.h"
@@ -2405,6 +2405,7 @@ vga_blank_display(video_adapter_t *adp, int mode)
 
     case KD_EGA:
 	/* no support yet */
+	splx(s);
 	return ENODEV;
 
     case KD_CGA:

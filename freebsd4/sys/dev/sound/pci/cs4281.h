@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/cs4281.h,v 1.2.2.1 2001/02/27 03:57:52 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/cs4281.h,v 1.2.2.3 2001/08/01 03:40:57 cg Exp $
  */
 
 #ifndef _CS4281_H_
@@ -103,6 +103,7 @@
 
 #define CS4281PCI_PMCS		0x344
 #	define CS4281PCI_PMCS_PS_MASK		0x00000003
+#define CS4281PCI_PMCS_OFFSET	(CS4281PCI_PMCS - 0x300)
 
 #define CS4281PCI_CWPR		0x3e0
 #	define CS4281PCI_CWPR_MAGIC		0x00004281

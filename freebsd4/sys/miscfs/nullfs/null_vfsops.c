@@ -36,7 +36,7 @@
  *	@(#)null_vfsops.c	8.2 (Berkeley) 1/21/94
  *
  * @(#)lofs_vfsops.c	1.2 (Berkeley) 6/18/92
- * $FreeBSD: src/sys/miscfs/nullfs/null_vfsops.c,v 1.35.2.2 2000/10/25 04:26:30 bp Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null_vfsops.c,v 1.35.2.3 2001/07/26 20:37:11 iedowse Exp $
  */
 
 /*
@@ -227,7 +227,6 @@ nullfs_unmount(mp, mntflags, p)
 	int mntflags;
 	struct proc *p;
 {
-	struct vnode *vp = MOUNTTONULLMOUNT(mp)->nullm_rootvp;
 	void *mntdata;
 	int error;
 	int flags = 0;
@@ -237,31 +236,11 @@ nullfs_unmount(mp, mntflags, p)
 	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
 
-	error = VFS_ROOT(mp, &vp);
-	if (error)
-		return (error);
-	if (vp->v_usecount > 2) {
-		NULLFSDEBUG("nullfs_unmount: rootvp is busy(%d)\n",
-		    vp->v_usecount);
-		vput(vp);
-		return (EBUSY);
-	}
-	error = vflush(mp, vp, flags);
+	/* There is 1 extra root vnode reference (nullm_rootvp). */
+	error = vflush(mp, 1, flags);
 	if (error)
 		return (error);
 
-#ifdef NULLFS_DEBUG
-	vprint("alias root of lower", vp);
-#endif
-	vput(vp);
-	/*
-	 * Release reference on underlying root vnode
-	 */
-	vrele(vp);
-	/*
-	 * And blow it away for future re-use
-	 */
-	vgone(vp);
 	/*
 	 * Finally, throw away the null_mount structure
 	 */

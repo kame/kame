@@ -1,8 +1,8 @@
-# $FreeBSD: src/sys/modules/if_tun/Makefile,v 1.19 2000/01/29 01:11:03 brian Exp $
+# $FreeBSD: src/sys/modules/if_tun/Makefile,v 1.19.2.1 2001/07/24 09:49:42 dd Exp $
 
 .PATH:  ${.CURDIR}/../../net
 KMOD=   if_tun
-SRCS=   if_tun.c opt_devfs.h opt_inet.h vnode_if.h
+SRCS=   if_tun.c opt_inet.h vnode_if.h
 NOMAN=
 
 NBPF?=	1

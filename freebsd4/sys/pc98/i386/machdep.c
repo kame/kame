@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.151.2.14 2001/03/05 13:09:07 obrien Exp $
+ * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.151.2.20 2001/08/15 01:23:53 peter Exp $
  */
 
 #include "apm.h"
@@ -104,6 +104,7 @@
 #ifdef PERFMON
 #include <machine/perfmon.h>
 #endif
+#include <machine/cputypes.h>
 
 #ifdef OLD_BUS_ARCH
 #include <i386/isa/isa_device.h>
@@ -130,6 +131,10 @@ extern void panicifcpuunsupported(void);
 extern void initializecpu(void);
 
 static void cpu_startup __P((void *));
+#ifdef CPU_ENABLE_SSE
+static void set_fpregs_xmm __P((struct save87 *, struct savexmm *));
+static void fill_fpregs_xmm __P((struct savexmm *, struct save87 *));
+#endif /* CPU_ENABLE_SSE */
 SYSINIT(cpu, SI_SUB_CPU, SI_ORDER_FIRST, cpu_startup, NULL)
 
 static MALLOC_DEFINE(M_MBUF, "mbuf", "mbuf");
@@ -248,6 +253,7 @@ vm_offset_t phys_avail[10];
 static vm_offset_t buffer_sva, buffer_eva;
 vm_offset_t clean_sva, clean_eva;
 static vm_offset_t pager_sva, pager_eva;
+static struct trapframe proc0_tf;
 
 static void
 cpu_startup(dummy)
@@ -441,6 +447,7 @@ again:
 	mp_start();			/* fire up the APs and APICs */
 	mp_announce();
 #endif  /* SMP */
+	cpu_setregs();
 }
 
 int
@@ -1078,6 +1085,22 @@ setregs(p, entry, stack, ps_strings)
       p->p_retval[1] = 0;
 }
 
+void
+cpu_setregs(void)
+{
+	unsigned int cr0;
+
+	cr0 = rcr0();
+	cr0 |= CR0_NE;			/* Done by npxinit() */
+	cr0 |= CR0_MP | CR0_TS;		/* Done at every execve() too. */
+#ifdef I386_CPU
+	if (cpu_class != CPUCLASS_386)
+#endif
+		cr0 |= CR0_WP | CR0_AM;
+	load_cr0(cr0);
+	load_gs(_udatasel);
+}
+
 static int
 sysctl_machdep_adjkerntz(SYSCTL_HANDLER_ARGS)
 {
@@ -1359,7 +1382,7 @@ extern inthand_t
 	IDTVEC(bnd), IDTVEC(ill), IDTVEC(dna), IDTVEC(fpusegm),
 	IDTVEC(tss), IDTVEC(missing), IDTVEC(stk), IDTVEC(prot),
 	IDTVEC(page), IDTVEC(mchk), IDTVEC(rsvd), IDTVEC(fpu), IDTVEC(align),
-	IDTVEC(syscall), IDTVEC(int0x80_syscall);
+	IDTVEC(xmm), IDTVEC(syscall), IDTVEC(int0x80_syscall);
 
 void
 sdtossd(sd, ssd)
@@ -1388,92 +1411,30 @@ sdtossd(sd, ssd)
  * Total memory size may be set by the kernel environment variable
  * hw.physmem or the compile-time define MAXMEM.
  */
-#ifdef PC98
 static void
 getmemsize(int first)
 {
-	u_int	biosbasemem, biosextmem;
-	u_int	pagesinbase, pagesinext;
-	int	pa_indx;
-	int	pg_n;
-	int	speculative_mprobe;
-#if	NNPX > 0
-	int	msize;
-#endif
-	unsigned	under16;
-	vm_offset_t	target_page;
-
-	pc98_getmemsize(&biosbasemem, &biosextmem, &under16);
-
-#ifdef SMP
-	/* make hole for AP bootstrap code */
-	pagesinbase = mp_bootaddress(biosbasemem) / PAGE_SIZE;
+	int i, physmap_idx, pa_indx;
+	u_int basemem, extmem;
+#ifdef PC98
+	int pg_n;
+	u_int under16;
 #else
-	pagesinbase = biosbasemem * 1024 / PAGE_SIZE;
+	struct vm86frame vmf;
+	struct vm86context vmc;
 #endif
-	pagesinext = biosextmem * 1024 / PAGE_SIZE;
-
- 	Maxmem_under16M = under16 * 1024 / PAGE_SIZE;
-
-#ifndef MAXMEM
-	/*
-	 * Maxmem isn't the "maximum memory", it's one larger than the
-	 * highest page of the physical address space.  It should be
-	 * called something like "Maxphyspage".
-	 */
-	Maxmem = pagesinext + 0x100000/PAGE_SIZE;
-	/*
-	 * Indicate that we wish to do a speculative search for memory beyond
-	 * the end of the reported size if the indicated amount is 64MB (0x4000
-	 * pages) - which is the largest amount that the BIOS/bootblocks can
-	 * currently report. If a specific amount of memory is indicated via
-	 * the MAXMEM option or the npx0 "msize", then don't do the speculative
-	 * memory probe.
-	 */
-	if (Maxmem >= 0x4000)
-		speculative_mprobe = TRUE;
-	else
-		speculative_mprobe = FALSE;
-#else
-	Maxmem = MAXMEM/4;
-	speculative_mprobe = FALSE;
+	vm_offset_t pa, physmap[PHYSMAP_SIZE];
+	pt_entry_t pte;
+	const char *cp;
+#ifndef PC98
+	struct {
+		u_int64_t base;
+		u_int64_t length;
+		u_int32_t type;
+	} *smap;
 #endif
 
-#if NNPX > 0
-	if (resource_int_value("npx", 0, "msize", &msize) == 0) {
-		if (msize != 0) {
-			Maxmem = msize / 4;
-			speculative_mprobe = FALSE;
-		}
-	}
-#endif
-
-#ifdef SMP
-	/* look for the MP hardware - needed for apic addresses */
-	mp_probe();
-#endif
-
-	/* call pmap initialization to make new kernel address space */
-	pmap_bootstrap (first, 0);
-
-	/*
-	 * Size up each available chunk of physical memory.
-	 */
-
-	/*
-	 * We currently don't bother testing base memory.
-	 * XXX  ...but we probably should.
-	 */
-	pa_indx = 0;
-	if (pagesinbase > 1) {
-		phys_avail[pa_indx++] = PAGE_SIZE;	/* skip first page of memory */
-		phys_avail[pa_indx] = ptoa(pagesinbase);/* memory up to the ISA hole */
-		physmem = pagesinbase - 1;
-	} else {
-		/* point at first chunk end */
-		pa_indx++;
-	}
-
+#ifdef PC98
 	/* XXX - some of EPSON machines can't use PG_N */
 	pg_n = PG_N;
 	if (pc98_machine_type & M_EPSON_PC98) {
@@ -1488,218 +1449,20 @@ getmemsize(int first)
 			break;
 		}
 	}
-
-	speculative_mprobe = FALSE;
-#ifdef notdef	/* XXX - see below */
-	/*
-	 * Certain 'CPU accelerator' supports over 16MB memory on the machines
-	 * whose BIOS doesn't store true size.  
-	 * To support this, we don't trust BIOS values if Maxmem <= 16MB (0x1000
-	 * pages) - which is the largest amount that the OLD PC-98 can report.
-	 *
-	 * OK: PC-9801NS/R(9.6M)
-	 * OK: PC-9801DA(5.6M)+EUD-H(32M)+Cyrix 5x86
-	 * OK: PC-9821Ap(14.6M)+EUA-T(8M)+Cyrix 5x86-100
-	 * NG: PC-9821Ap(14.6M)+EUA-T(8M)+AMD DX4-100 -> freeze
-	 */
-	if (Maxmem <= 0x1000) {
-		int tmp, page_bad;
-
-		page_bad = FALSE;
-
-		/*
-		 * For Max14.6MB machines, the 0x10f0 page is same as 0x00f0,
-		 * which is BIOS ROM, by overlapping.
-		 * So, we check that page's ability of writing.
-		 */
-		target_page = ptoa(0x10f0);
-
-		/*
-		 * map page into kernel: valid, read/write, non-cacheable
-		 */
-		*(int *)CMAP1 = PG_V | PG_RW | pg_n | target_page;
-		invltlb();
-
-		tmp = *(int *)CADDR1;
-		/*
-		 * Test for alternating 1's and 0's
-		 */
-		*(volatile int *)CADDR1 = 0xaaaaaaaa;
-		if (*(volatile int *)CADDR1 != 0xaaaaaaaa)
-			page_bad = TRUE;
-		/*
-		 * Test for alternating 0's and 1's
-		 */
-		*(volatile int *)CADDR1 = 0x55555555;
-		if (*(volatile int *)CADDR1 != 0x55555555)
-			page_bad = TRUE;
-		/*
-		 * Test for all 1's
-		 */
-		*(volatile int *)CADDR1 = 0xffffffff;
-		if (*(volatile int *)CADDR1 != 0xffffffff)
-			page_bad = TRUE;
-		/*
-		 * Test for all 0's
-		 */
-		*(volatile int *)CADDR1 = 0x0;
-		if (*(volatile int *)CADDR1 != 0x0) {
-			/*
-			 * test of page failed
-			 */
-			page_bad = TRUE;
-		}
-		/*
-		 * Restore original value.
-		 */
-		*(int *)CADDR1 = tmp;
-
-		/*
-		 * Adjust Maxmem if valid/good page.
-		 */
-		if (page_bad == FALSE) {
-			/* '+ 2' is needed to make speculative_mprobe sure */
-			Maxmem = 0x1000 + 2;
-			speculative_mprobe = TRUE;
-		}
-	}
-#endif
-
-	for (target_page = avail_start; target_page < ptoa(Maxmem); target_page += PAGE_SIZE) {
-		int tmp, page_bad;
-
-		page_bad = FALSE;
-
-		/* skip system area */
-		if (target_page >= ptoa(Maxmem_under16M) &&
-				target_page < ptoa(4096))
-			continue;
-
-		/*
-		 * map page into kernel: valid, read/write, non-cacheable
-		 */
-		*(int *)CMAP1 = PG_V | PG_RW | pg_n | target_page;
-		invltlb();
-
-		tmp = *(int *)CADDR1;
-		/*
-		 * Test for alternating 1's and 0's
-		 */
-		*(volatile int *)CADDR1 = 0xaaaaaaaa;
-		if (*(volatile int *)CADDR1 != 0xaaaaaaaa) {
-			page_bad = TRUE;
-		}
-		/*
-		 * Test for alternating 0's and 1's
-		 */
-		*(volatile int *)CADDR1 = 0x55555555;
-		if (*(volatile int *)CADDR1 != 0x55555555) {
-			page_bad = TRUE;
-		}
-		/*
-		 * Test for all 1's
-		 */
-		*(volatile int *)CADDR1 = 0xffffffff;
-		if (*(volatile int *)CADDR1 != 0xffffffff) {
-			page_bad = TRUE;
-		}
-		/*
-		 * Test for all 0's
-		 */
-		*(volatile int *)CADDR1 = 0x0;
-		if (*(volatile int *)CADDR1 != 0x0) {
-			/*
-			 * test of page failed
-			 */
-			page_bad = TRUE;
-		}
-		/*
-		 * Restore original value.
-		 */
-		*(int *)CADDR1 = tmp;
-
-		/*
-		 * Adjust array of valid/good pages.
-		 */
-		if (page_bad == FALSE) {
-			/*
-			 * If this good page is a continuation of the
-			 * previous set of good pages, then just increase
-			 * the end pointer. Otherwise start a new chunk.
-			 * Note that "end" points one higher than end,
-			 * making the range >= start and < end.
-			 * If we're also doing a speculative memory
-			 * test and we at or past the end, bump up Maxmem
-			 * so that we keep going. The first bad page
-			 * will terminate the loop.
-			 */
-			if (phys_avail[pa_indx] == target_page) {
-				phys_avail[pa_indx] += PAGE_SIZE;
-				if (speculative_mprobe == TRUE &&
-				    phys_avail[pa_indx] >= (16*1024*1024))
-					Maxmem++;
-			} else {
-				pa_indx++;
-				if (pa_indx == PHYS_AVAIL_ARRAY_END) {
-					printf("Too many holes in the physical address space, giving up\n");
-					pa_indx--;
-					break;
-				}
-				phys_avail[pa_indx++] = target_page;	/* start */
-				phys_avail[pa_indx] = target_page + PAGE_SIZE;	/* end */
-			}
-			physmem++;
-		}
-	}
-
-	*(int *)CMAP1 = 0;
-	invltlb();
-
-	/*
-	 * XXX
-	 * The last chunk must contain at least one page plus the message
-	 * buffer to avoid complicating other code (message buffer address
-	 * calculation, etc.).
-	 */
-	while (phys_avail[pa_indx - 1] + PAGE_SIZE +
-	    round_page(MSGBUF_SIZE) >= phys_avail[pa_indx]) {
-		physmem -= atop(phys_avail[pa_indx] - phys_avail[pa_indx - 1]);
-		phys_avail[pa_indx--] = 0;
-		phys_avail[pa_indx--] = 0;
-	}
-
-	Maxmem = atop(phys_avail[pa_indx]);
-
-	/* Trim off space for the message buffer. */
-	phys_avail[pa_indx] -= round_page(MSGBUF_SIZE);
-
-	avail_end = phys_avail[pa_indx];
-}
 #else
-static void
-getmemsize(int first)
-{
-	int i, physmap_idx, pa_indx;
-	u_int basemem, extmem;
-	struct vm86frame vmf;
-	struct vm86context vmc;
-	vm_offset_t pa, physmap[PHYSMAP_SIZE];
-	pt_entry_t pte;
-	const char *cp;
-	struct {
-		u_int64_t base;
-		u_int64_t length;
-		u_int32_t type;
-	} *smap;
-
 	bzero(&vmf, sizeof(struct vm86frame));
+#endif
 	bzero(physmap, sizeof(physmap));
 
 	/*
 	 * Perform "base memory" related probes & setup
 	 */
+#ifdef PC98
+	under16 = pc98_getmemsize(&basemem, &extmem);
+#else
 	vm86_intcall(0x12, &vmf);
 	basemem = vmf.vmf_ax;
+#endif
 	if (basemem > 640) {
 		printf("Preposterous BIOS basemem of %uK, truncating to 640K\n",
 			basemem);
@@ -1740,6 +1503,7 @@ getmemsize(int first)
 	for (i = basemem / 4; i < 160; i++)
 		pte[i] = (i << PAGE_SHIFT) | PG_V | PG_RW | PG_U;
 
+#ifndef PC98
 	/*
 	 * map page 1 R/W into the kernel page table so we can use it
 	 * as a buffer.  The kernel will unmap this page later.
@@ -1845,6 +1609,7 @@ next_run:
 	 */
 	if ((extmem > 15 * 1024) && (extmem < 16 * 1024))
 		extmem = 15 * 1024;
+#endif
 
 	physmap[0] = 0;
 	physmap[1] = basemem * 1024;
@@ -1852,7 +1617,17 @@ next_run:
 	physmap[physmap_idx] = 0x100000;
 	physmap[physmap_idx + 1] = physmap[physmap_idx] + extmem * 1024;
 
+#ifdef PC98
+        if ((under16 != 16 * 1024) && (extmem > 15 * 1024)) {
+		/* 15M - 16M region is cut off, so need to divide chunk */
+                physmap[physmap_idx + 1] = under16 * 1024;
+                physmap_idx += 2;
+                physmap[physmap_idx] = 0x1000000;
+                physmap[physmap_idx + 1] = physmap[2] + extmem * 1024;
+        }
+#else
 physmap_done:
+#endif
 	/*
 	 * Now, physmap contains a map of physical memory.
 	 */
@@ -1878,7 +1653,7 @@ physmap_done:
 #endif
 
 	/*
-	 * hw.maxmem is a size in bytes; we also allow k, m, and g suffixes
+	 * hw.physmem is a size in bytes; we also allow k, m, and g suffixes
 	 * for the appropriate modifiers.  This overrides MAXMEM.
 	 */
 	if ((cp = getenv("hw.physmem")) != NULL) {
@@ -1966,7 +1741,11 @@ physmap_done:
 			/*
 			 * map page into kernel: valid, read/write,non-cacheable
 			 */
+#ifdef PC98
+			*pte = pa | PG_V | PG_RW | pg_n;
+#else
 			*pte = pa | PG_V | PG_RW | PG_N;
+#endif
 			invltlb();
 
 			tmp = *(int *)ptr;
@@ -2058,7 +1837,6 @@ physmap_done:
 
 	avail_end = phys_avail[pa_indx];
 }
-#endif
 
 void
 init386(first)
@@ -2095,6 +1873,9 @@ init386(first)
 	}
 	if (bootinfo.bi_envp)
 		kern_envp = (caddr_t)bootinfo.bi_envp + KERNBASE;
+
+	/* Init basic tunables, hz etc */
+	init_param();
 
 	/*
 	 * make gdt memory segments, the code segment goes up to end of the
@@ -2184,6 +1965,7 @@ init386(first)
 	setidt(16, &IDTVEC(fpu),  SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 	setidt(17, &IDTVEC(align), SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 	setidt(18, &IDTVEC(mchk),  SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
+	setidt(19, &IDTVEC(xmm), SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
  	setidt(0x80, &IDTVEC(int0x80_syscall),
 			SDT_SYS386TGT, SEL_UPL, GSEL(GCODE_SEL, SEL_KPL));
 
@@ -2275,6 +2057,7 @@ init386(first)
 	proc0.p_addr->u_pcb.pcb_mpnest = 1;
 #endif
 	proc0.p_addr->u_pcb.pcb_ext = 0;
+	proc0.p_md.md_regs = &proc0_tf;
 }
 
 #if defined(I586_CPU) && !defined(NO_F00F_HACK)
@@ -2377,8 +2160,8 @@ int ptrace_write_u(p, off, data)
 		*(int*)((char *)p->p_addr + off) = data;
 		return (0);
 	}
-	min = offsetof(struct user, u_pcb) + offsetof(struct pcb, pcb_savefpu);
-	if (off >= min && off <= min + sizeof(struct save87) - sizeof(int)) {
+	min = offsetof(struct user, u_pcb) + offsetof(struct pcb, pcb_save);
+	if (off >= min && off <= min + sizeof(union savefpu) - sizeof(int)) {
 		*(int*)((char *)p->p_addr + off) = data;
 		return (0);
 	}
@@ -2446,12 +2229,73 @@ set_regs(p, regs)
 	return (0);
 }
 
+#ifdef CPU_ENABLE_SSE
+static void
+fill_fpregs_xmm(sv_xmm, sv_87)
+	struct savexmm *sv_xmm;
+	struct save87 *sv_87;
+{
+	register struct env87 *penv_87 = &sv_87->sv_env;
+	register struct envxmm *penv_xmm = &sv_xmm->sv_env;
+	int i;
+
+	/* FPU control/status */
+	penv_87->en_cw = penv_xmm->en_cw;
+	penv_87->en_sw = penv_xmm->en_sw;
+	penv_87->en_tw = penv_xmm->en_tw;
+	penv_87->en_fip = penv_xmm->en_fip;
+	penv_87->en_fcs = penv_xmm->en_fcs;
+	penv_87->en_opcode = penv_xmm->en_opcode;
+	penv_87->en_foo = penv_xmm->en_foo;
+	penv_87->en_fos = penv_xmm->en_fos;
+
+	/* FPU registers */
+	for (i = 0; i < 8; ++i)
+		sv_87->sv_ac[i] = sv_xmm->sv_fp[i].fp_acc;
+
+	sv_87->sv_ex_sw = sv_xmm->sv_ex_sw;
+}
+
+static void
+set_fpregs_xmm(sv_87, sv_xmm)
+	struct save87 *sv_87;
+	struct savexmm *sv_xmm;
+{
+	register struct env87 *penv_87 = &sv_87->sv_env;
+	register struct envxmm *penv_xmm = &sv_xmm->sv_env;
+	int i;
+
+	/* FPU control/status */
+	penv_xmm->en_cw = penv_87->en_cw;
+	penv_xmm->en_sw = penv_87->en_sw;
+	penv_xmm->en_tw = penv_87->en_tw;
+	penv_xmm->en_fip = penv_87->en_fip;
+	penv_xmm->en_fcs = penv_87->en_fcs;
+	penv_xmm->en_opcode = penv_87->en_opcode;
+	penv_xmm->en_foo = penv_87->en_foo;
+	penv_xmm->en_fos = penv_87->en_fos;
+
+	/* FPU registers */
+	for (i = 0; i < 8; ++i)
+		sv_xmm->sv_fp[i].fp_acc = sv_87->sv_ac[i];
+
+	sv_xmm->sv_ex_sw = sv_87->sv_ex_sw;
+}
+#endif /* CPU_ENABLE_SSE */
+
 int
 fill_fpregs(p, fpregs)
 	struct proc *p;
 	struct fpreg *fpregs;
 {
-	bcopy(&p->p_addr->u_pcb.pcb_savefpu, fpregs, sizeof *fpregs);
+#ifdef CPU_ENABLE_SSE
+	if (cpu_fxsr) {
+		fill_fpregs_xmm(&p->p_addr->u_pcb.pcb_save.sv_xmm,
+						(struct save87 *)fpregs);
+		return (0);
+	}
+#endif /* CPU_ENABLE_SSE */
+	bcopy(&p->p_addr->u_pcb.pcb_save.sv_87, fpregs, sizeof *fpregs);
 	return (0);
 }
 
@@ -2460,7 +2304,14 @@ set_fpregs(p, fpregs)
 	struct proc *p;
 	struct fpreg *fpregs;
 {
-	bcopy(fpregs, &p->p_addr->u_pcb.pcb_savefpu, sizeof *fpregs);
+#ifdef CPU_ENABLE_SSE
+	if (cpu_fxsr) {
+		set_fpregs_xmm((struct save87 *)fpregs,
+					   &p->p_addr->u_pcb.pcb_save.sv_xmm);
+		return (0);
+	}
+#endif /* CPU_ENABLE_SSE */
+	bcopy(fpregs, &p->p_addr->u_pcb.pcb_save.sv_87, sizeof *fpregs);
 	return (0);
 }
 
@@ -2471,15 +2322,27 @@ fill_dbregs(p, dbregs)
 {
 	struct pcb *pcb;
 
-	pcb = &p->p_addr->u_pcb;
-	dbregs->dr0 = pcb->pcb_dr0;
-	dbregs->dr1 = pcb->pcb_dr1;
-	dbregs->dr2 = pcb->pcb_dr2;
-	dbregs->dr3 = pcb->pcb_dr3;
-	dbregs->dr4 = 0;
-	dbregs->dr5 = 0;
-	dbregs->dr6 = pcb->pcb_dr6;
-	dbregs->dr7 = pcb->pcb_dr7;
+        if (p == NULL) {
+                dbregs->dr0 = rdr0();
+                dbregs->dr1 = rdr1();
+                dbregs->dr2 = rdr2();
+                dbregs->dr3 = rdr3();
+                dbregs->dr4 = rdr4();
+                dbregs->dr5 = rdr5();
+                dbregs->dr6 = rdr6();
+                dbregs->dr7 = rdr7();
+        }
+        else {
+                pcb = &p->p_addr->u_pcb;
+                dbregs->dr0 = pcb->pcb_dr0;
+                dbregs->dr1 = pcb->pcb_dr1;
+                dbregs->dr2 = pcb->pcb_dr2;
+                dbregs->dr3 = pcb->pcb_dr3;
+                dbregs->dr4 = 0;
+                dbregs->dr5 = 0;
+                dbregs->dr6 = pcb->pcb_dr6;
+                dbregs->dr7 = pcb->pcb_dr7;
+        }
 	return (0);
 }
 
@@ -2492,73 +2355,80 @@ set_dbregs(p, dbregs)
 	int i;
 	u_int32_t mask1, mask2;
 
-	/*
-	 * Don't let an illegal value for dr7 get set.  Specifically,
-	 * check for undefined settings.  Setting these bit patterns
-	 * result in undefined behaviour and can lead to an unexpected
-	 * TRCTRAP.
-	 */
-	for (i = 0, mask1 = 0x3<<16, mask2 = 0x2<<16; i < 8; 
-	     i++, mask1 <<= 2, mask2 <<= 2)
-		if ((dbregs->dr7 & mask1) == mask2)
-			return (EINVAL);
-
-	if (dbregs->dr7 & 0x0000fc00)
-		return (EINVAL);
-
-
-
-	pcb = &p->p_addr->u_pcb;
-
-	/*
-	 * Don't let a process set a breakpoint that is not within the
-	 * process's address space.  If a process could do this, it
-	 * could halt the system by setting a breakpoint in the kernel
-	 * (if ddb was enabled).  Thus, we need to check to make sure
-	 * that no breakpoints are being enabled for addresses outside
-	 * process's address space, unless, perhaps, we were called by
-	 * uid 0.
-	 *
-	 * XXX - what about when the watched area of the user's
-	 * address space is written into from within the kernel
-	 * ... wouldn't that still cause a breakpoint to be generated
-	 * from within kernel mode?
-	 */
-
-	if (p->p_ucred->cr_uid != 0) {
-		if (dbregs->dr7 & 0x3) {
-			/* dr0 is enabled */
-			if (dbregs->dr0 >= VM_MAXUSER_ADDRESS)
-				return (EINVAL);
-		}
-
-		if (dbregs->dr7 & (0x3<<2)) {
-			/* dr1 is enabled */
-			if (dbregs->dr1 >= VM_MAXUSER_ADDRESS)
-				return (EINVAL);
-		}
-
-		if (dbregs->dr7 & (0x3<<4)) {
-			/* dr2 is enabled */
-			if (dbregs->dr2 >= VM_MAXUSER_ADDRESS)
-       				return (EINVAL);
-		}
-
-		if (dbregs->dr7 & (0x3<<6)) {
-			/* dr3 is enabled */
-			if (dbregs->dr3 >= VM_MAXUSER_ADDRESS)
-				return (EINVAL);
-		}
+	if (p == NULL) {
+		load_dr0(dbregs->dr0);
+		load_dr1(dbregs->dr1);
+		load_dr2(dbregs->dr2);
+		load_dr3(dbregs->dr3);
+		load_dr4(dbregs->dr4);
+		load_dr5(dbregs->dr5);
+		load_dr6(dbregs->dr6);
+		load_dr7(dbregs->dr7);
 	}
-
-	pcb->pcb_dr0 = dbregs->dr0;
-	pcb->pcb_dr1 = dbregs->dr1;
-	pcb->pcb_dr2 = dbregs->dr2;
-	pcb->pcb_dr3 = dbregs->dr3;
-	pcb->pcb_dr6 = dbregs->dr6;
-	pcb->pcb_dr7 = dbregs->dr7;
-
-	pcb->pcb_flags |= PCB_DBREGS;
+	else {
+		/*
+		 * Don't let an illegal value for dr7 get set.	Specifically,
+		 * check for undefined settings.  Setting these bit patterns
+		 * result in undefined behaviour and can lead to an unexpected
+		 * TRCTRAP.
+		 */
+		for (i = 0, mask1 = 0x3<<16, mask2 = 0x2<<16; i < 8; 
+		     i++, mask1 <<= 2, mask2 <<= 2)
+			if ((dbregs->dr7 & mask1) == mask2)
+				return (EINVAL);
+		
+		pcb = &p->p_addr->u_pcb;
+		
+		/*
+		 * Don't let a process set a breakpoint that is not within the
+		 * process's address space.  If a process could do this, it
+		 * could halt the system by setting a breakpoint in the kernel
+		 * (if ddb was enabled).  Thus, we need to check to make sure
+		 * that no breakpoints are being enabled for addresses outside
+		 * process's address space, unless, perhaps, we were called by
+		 * uid 0.
+		 *
+		 * XXX - what about when the watched area of the user's
+		 * address space is written into from within the kernel
+		 * ... wouldn't that still cause a breakpoint to be generated
+		 * from within kernel mode?
+		 */
+		
+		if (suser(p) != 0) {
+			if (dbregs->dr7 & 0x3) {
+				/* dr0 is enabled */
+				if (dbregs->dr0 >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+			
+			if (dbregs->dr7 & (0x3<<2)) {
+				/* dr1 is enabled */
+				if (dbregs->dr1 >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+			
+			if (dbregs->dr7 & (0x3<<4)) {
+				/* dr2 is enabled */
+				if (dbregs->dr2 >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+			
+			if (dbregs->dr7 & (0x3<<6)) {
+				/* dr3 is enabled */
+				if (dbregs->dr3 >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+		}
+		
+		pcb->pcb_dr0 = dbregs->dr0;
+		pcb->pcb_dr1 = dbregs->dr1;
+		pcb->pcb_dr2 = dbregs->dr2;
+		pcb->pcb_dr3 = dbregs->dr3;
+		pcb->pcb_dr6 = dbregs->dr6;
+		pcb->pcb_dr7 = dbregs->dr7;
+		
+		pcb->pcb_flags |= PCB_DBREGS;
+	}
 
 	return (0);
 }

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/isa_compat.h,v 1.27.2.7 2001/01/25 20:13:52 imp Exp $
+ * $FreeBSD: src/sys/i386/isa/isa_compat.h,v 1.27.2.8 2001/08/09 01:12:49 obrien Exp $
  */
 
 #include "vt.h"
@@ -69,7 +69,6 @@
 #include "stl.h"
 #include "stli.h"
 #include "loran.h"
-#include "tina.h"
 #include "fla.h"
 
 struct old_isa_driver {
@@ -120,7 +119,6 @@ extern struct isa_driver ascdriver;
 extern struct isa_driver stldriver;
 extern struct isa_driver stlidriver;
 extern struct isa_driver lorandriver;
-extern struct isa_driver tinadriver;
 
 
 static struct old_isa_driver old_drivers[] = {
@@ -221,9 +219,6 @@ static struct old_isa_driver old_drivers[] = {
 #endif
 #if NWL > 0
 	{ INTR_TYPE_NET, &wldriver },
-#endif
-#if NTINA > 0
-	{ INTR_TYPE_NET, &tinadriver },
 #endif
 
 /* MISC */

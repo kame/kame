@@ -29,9 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aicasm_scan.l,v 1.1.1.2 2001/04/23 13:09:50 sumikawa Exp $
+ * $Id: aicasm_scan.l,v 1.1.1.3 2001/09/25 04:58:43 keiichi Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_scan.l,v 1.13.2.2 2001/01/07 22:52:36 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_scan.l,v 1.13.2.3 2001/07/28 18:46:44 gibbs Exp $
  */
 
 #include <sys/types.h>
@@ -54,6 +54,7 @@
 char string_buf[MAX_STR_CONST];
 char *string_buf_ptr;
 int  parren_count;
+int  quote_count;
 %}
 
 PATH		[-/A-Za-z0-9_.]*[./][-/A-Za-z0-9_.]*
@@ -63,6 +64,7 @@ SPACE		[ \t]+
 %x COMMENT
 %x CEXPR
 %x INCLUDE
+%x STRING
 
 %%
 \n			{ ++yylineno; }
@@ -94,8 +96,9 @@ if[ \t]*\(		{
 			}
 <CEXPR>\n		{ ++yylineno; }
 <CEXPR>[^()\n]+	{
-				char *yptr = yytext;
+				char *yptr;
 
+				yptr = yytext;
 				while (*yptr != '\0') {
 					/* Remove duplicate spaces */
 					if (*yptr == '\t')
@@ -109,6 +112,25 @@ if[ \t]*\(		{
 				}
 			}
 
+VERSION			{ return T_VERSION; }
+\"			{
+				string_buf_ptr = string_buf;
+				BEGIN STRING;
+			}
+<STRING>[^"]+		{
+				char *yptr;
+
+				yptr = yytext;
+				while (*yptr)
+					*string_buf_ptr++ = *yptr++;
+			}
+<STRING>\"		{
+				/* All done */
+				BEGIN INITIAL;
+				*string_buf_ptr = '\0';
+				yylval.str = string_buf;
+				return T_STRING;
+			}
 {SPACE}			;
 
 	/* Register/SCB/SRAM definition keywords */
@@ -175,7 +197,7 @@ nop			{ return T_NOP; }
 else			{ return T_ELSE; }
 
 	/* Allowed Symbols */
-[-+,:()~|&."{};<>[\]!]	{ return yytext[0]; }
+[-+,:()~|&."{};<>[\]!=]	{ return yytext[0]; }
 
 	/* Number processing */
 0[0-7]*			{
@@ -194,17 +216,36 @@ else			{ return T_ELSE; }
 			}
 
 	/* Include Files */
-#include		{ return T_INCLUDE; BEGIN INCLUDE;}
-<INCLUDE>[<>\"]		{ return yytext[0]; }
-<INCLUDE>{PATH}		{ yylval.str = strdup(yytext); return T_PATH; }
-<INCLUDE>;		{ BEGIN INITIAL; return yytext[0]; }
+#include{SPACE}		{
+				BEGIN INCLUDE;
+				quote_count = 0;
+				return T_INCLUDE;
+			}
+<INCLUDE>[<]		{ return yytext[0]; }
+<INCLUDE>[>]		{ BEGIN INITIAL; return yytext[0]; }
+<INCLUDE>[\"]		{
+				if (quote_count != 0)
+					BEGIN INITIAL;
+				quote_count++;
+				return yytext[0];
+			}
 <INCLUDE>.		{ stop("Invalid include line", EX_DATAERR); }
 
 	/* For parsing C include files with #define foo */
 #define			{ yylval.value = TRUE; return T_CONST; }
 	/* Throw away macros */
 #define[^\n]*[()]+[^\n]* ;
-{PATH}			{ yylval.str = strdup(yytext); return T_PATH; }
+<INITIAL,INCLUDE>{PATH}	{
+				char *yptr;
+
+				yptr = yytext;
+				string_buf_ptr = string_buf;
+				while (*yptr)
+					*string_buf_ptr++ = *yptr++;
+				yylval.str = string_buf;
+				*string_buf_ptr = '\0';
+				return T_PATH;
+			}
 
 {WORD}			{ yylval.sym = symtable_get(yytext);  return T_SYMBOL; }
 

@@ -1,4 +1,4 @@
- $FreeBSD: src/sys/i386/linux/syscalls.master,v 1.30.2.3 2001/02/21 23:01:57 gallatin Exp $
+ $FreeBSD: src/sys/i386/linux/syscalls.master,v 1.30.2.5 2001/08/27 08:51:16 alc Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 ; System call name/number master file (or rather, slave, from LINUX).
@@ -176,7 +176,7 @@
 114	STD	LINUX	{ int linux_wait4(int pid, int *status, \
 				int options, struct rusage *rusage); }
 115	STD	LINUX	{ int linux_swapoff(void); }
-116	STD	LINUX	{ int linux_sysinfo(void); }
+116	STD	LINUX	{ int linux_sysinfo(struct sysinfo *info); }
 117	STD	LINUX	{ int linux_ipc(int what, int arg1, int arg2, \
 				int arg3, caddr_t ptr); }
 118	NOPROTO	LINUX	{ int fsync(int fd); }
@@ -233,8 +233,8 @@
 				const struct sched_param *param); }
 157	STD	POSIX	{ int linux_sched_getscheduler(pid_t pid); }
 158	NOPROTO	POSIX	{ int sched_yield (void); }
-159	NOPROTO	POSIX	{ int sched_get_priority_max (int policy); }
-160	NOPROTO	POSIX	{ int sched_get_priority_min (int policy); }
+159	STD	POSIX	{ int linux_sched_get_priority_max(int policy); }
+160	STD	POSIX	{ int linux_sched_get_priority_min(int policy); }
 161	NOPROTO	POSIX	{ int sched_rr_get_interval (pid_t pid, \
 				struct timespec *interval); }
 162	NOPROTO	POSIX	{ int nanosleep(const struct timespec *rqtp, \

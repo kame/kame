@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34.2.5 2000/11/22 16:20:12 gallatin Exp $
+# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34.2.6 2001/04/25 11:24:04 ru Exp $
 
 .PATH:	${.CURDIR}/../../compat/linux ${.CURDIR}/../../${MACHINE_ARCH}/linux
 
@@ -10,7 +10,7 @@ SRCS=	linux_file.c linux_ioctl.c linux_ipc.c linux_machdep.c linux_misc.c \
 	linux_dummy.c linux_sysvec.c linux_util.c \
 	opt_compat.h opt_linux.h opt_vmpage.h vnode_if.h
 OBJS=	linux_locore.o
-MAN8=	linux.8
+MAN=	linux.8
 
 .if ${MACHINE_ARCH} != "alpha"
 SRCS+=  imgact_linux.c

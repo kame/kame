@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  *  	@(#) src/sys/coda/coda_vnops.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_vnops.c,v 1.22 1999/12/15 23:01:33 eivind Exp $
+ * $FreeBSD: src/sys/coda/coda_vnops.c,v 1.22.2.1 2001/06/29 16:26:22 shafeeq Exp $
  * 
  */
 
@@ -146,6 +146,9 @@ struct vnodeopv_entry_desc coda_vnodeop_entries[] = {
     { &vop_poll_desc, (vop_t *) vop_stdpoll },
     { &vop_getpages_desc, coda_fbsd_getpages },	/* pager intf.*/
     { &vop_putpages_desc, coda_fbsd_putpages },	/* pager intf.*/
+    { &vop_createvobject_desc,      (vop_t *) vop_stdcreatevobject },
+    { &vop_destroyvobject_desc,     (vop_t *) vop_stddestroyvobject },
+    { &vop_getvobject_desc,         (vop_t *) vop_stdgetvobject },
 
 #if	0
 

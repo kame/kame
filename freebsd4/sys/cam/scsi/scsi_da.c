@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.10 2001/04/18 03:48:53 imp Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.12 2001/07/30 00:48:20 mjacob Exp $
  */
 
 #ifdef _KERNEL
@@ -38,6 +38,7 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/buf.h>
+#include <sys/sysctl.h>
 #endif /* _KERNEL */
 
 #include <sys/devicestat.h>
@@ -275,6 +276,21 @@ static void		dashutdown(void *arg, int howto);
 #ifndef DA_DEFAULT_TIMEOUT
 #define DA_DEFAULT_TIMEOUT 60	/* Timeout in seconds */
 #endif
+
+#ifndef	DA_DEFAULT_RETRY
+#define	DA_DEFAULT_RETRY	4
+#endif
+
+static int da_retry_count = DA_DEFAULT_RETRY;
+static int da_default_timeout = DA_DEFAULT_TIMEOUT;
+
+SYSCTL_NODE(_kern, OID_AUTO, cam, CTLFLAG_RD, 0, "CAM Subsystem");
+SYSCTL_NODE(_kern_cam, OID_AUTO, da, CTLFLAG_RD, 0,
+            "CAM Direct Access Disk driver");
+SYSCTL_INT(_kern_cam_da, OID_AUTO, retry_count, CTLFLAG_RW,
+           &da_retry_count, 0, "Normal I/O retry count");
+SYSCTL_INT(_kern_cam_da, OID_AUTO, default_timeout, CTLFLAG_RW,
+           &da_default_timeout, 0, "Normal I/O timeout (in seconds)");
 
 /*
  * DA_ORDEREDTAG_INTERVAL determines how often, relative
@@ -723,24 +739,13 @@ dadump(dev_t dev)
 			return(EIO);
 		}
 		
-		if (addr % (1024 * 1024) == 0) {
-#ifdef	HW_WDOG
-			if (wdog_tickler)
-				(*wdog_tickler)();
-#endif /* HW_WDOG */
-			/* Count in MB of data left to write */
-			printf("%d ", (num  * softc->params.secsize)
-				     / (1024 * 1024));
-		}
-		
+		if (dumpstatus(addr, (long)(num * softc->params.secsize)) < 0)
+			return (EINTR);
+
 		/* update block count */
 		num -= blkcnt * dumppages;
 		blknum += blkcnt * dumppages;
 		addr += PAGE_SIZE * dumppages;
-
-		/* operator aborting dump? */
-		if (cncheckc() != -1)
-			return (EINTR);
 	}
 
 	/*
@@ -825,7 +830,7 @@ dainit(void)
 	} else {
 
 		/*
-		 * Schedule a periodic event to occasioanly send an
+		 * Schedule a periodic event to occasionally send an
 		 * ordered tag to a device.
 		 */
 		timeout(dasendorderedtag, NULL,
@@ -1124,7 +1129,7 @@ dastart(struct cam_periph *periph, union ccb *start_ccb)
 				tag_code = MSG_SIMPLE_Q_TAG;
 			}
 			scsi_read_write(&start_ccb->csio,
-					/*retries*/4,
+					/*retries*/da_retry_count,
 					dadone,
 					tag_code,
 					bp->b_flags & B_READ,
@@ -1135,7 +1140,7 @@ dastart(struct cam_periph *periph, union ccb *start_ccb)
 					bp->b_data,
 					bp->b_bcount,
 					/*sense_len*/SSD_FULL_SIZE,
-					DA_DEFAULT_TIMEOUT * 1000);
+					da_default_timeout * 1000);
 			start_ccb->ccb_h.ccb_state = DA_CCB_BUFFER_IO;
 
 			/*
@@ -1552,7 +1557,7 @@ dasendorderedtag(void *arg)
 	}
 	/* Queue us up again */
 	timeout(dasendorderedtag, NULL,
-		(DA_DEFAULT_TIMEOUT * hz) / DA_ORDEREDTAG_INTERVAL);
+		(da_default_timeout * hz) / DA_ORDEREDTAG_INTERVAL);
 }
 
 /*

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/scterm-sck.c,v 1.2.2.5 2000/07/30 08:13:03 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/scterm-sck.c,v 1.2.2.6 2001/06/11 13:10:22 nyan Exp $
  */
 
 #include "opt_syscons.h"
@@ -628,7 +628,8 @@ scterm_scan_esc(scr_stat *scp, term_stat *tcp, u_char c)
 		case 'B':   /* set bell pitch and duration */
 			if (tcp->num_param == 2) {
 				scp->bell_pitch = tcp->param[0];
-				scp->bell_duration = tcp->param[1];
+				scp->bell_duration = 
+				    (tcp->param[1] * hz + 99) / 100;
 			}
 			break;
 

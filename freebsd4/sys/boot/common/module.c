@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/module.c,v 1.13.2.1 2000/12/28 13:12:35 ps Exp $
+ * $FreeBSD: src/sys/boot/common/module.c,v 1.13.2.3 2001/06/12 15:35:14 jesper Exp $
  */
 
 /*
@@ -98,7 +98,7 @@ command_load(int argc, char *argv[])
      * Request to load a raw file?
      */
     if (dofile) {
-	if ((typestr == NULL) || (*typestr == 0)) {
+	if ((argc != 2) || (typestr == NULL) || (*typestr == 0)) {
 	    command_errmsg = "invalid load type";
 	    return(CMD_ERROR);
 	}

@@ -34,7 +34,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumio.c,v 1.30 2000/05/10 23:23:30 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.52.2.4 2001/04/16 05:29:54 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.52.2.5 2001/05/28 05:56:27 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -554,28 +554,32 @@ format_config(char *config, int len)
 	     */
 	    if (drivename[0] == '\0')
 		drivename = "*invalid*";
+	    snprintf(s,
+		configend - s,
+		"sd name %s drive %s plex %s len %llus driveoffset %llus state %s",
+		sd->name,
+		drivename,
+		vinum_conf.plex[sd->plexno].name,
+		(unsigned long long) sd->sectors,
+		(unsigned long long) sd->driveoffset,
+		sd_state(sd->state));
+	    while (*s)
+		s++;					    /* find the end */
 	    if (sd->plexno >= 0)
 		snprintf(s,
 		    configend - s,
-		    "sd name %s drive %s plex %s state %s "
-		    "len %llus driveoffset %llus plexoffset %llds\n",
-		    sd->name,
-		    drivename,
-		    vinum_conf.plex[sd->plexno].name,
-		    sd_state(sd->state),
-		    (unsigned long long) sd->sectors,
-		    (unsigned long long) sd->driveoffset,
+		    " plexoffset %llds",
 		    (long long) sd->plexoffset);
 	    else
-		snprintf(s,
-		    configend - s,
-		    "sd name %s drive %s state %s "
-		    "len %llus driveoffset %llus detached\n",
-		    sd->name,
-		    drivename,
-		    sd_state(sd->state),
-		    (unsigned long long) sd->sectors,
-		    (unsigned long long) sd->driveoffset);
+		snprintf(s, configend - s, " detached");
+	    while (*s)
+		s++;					    /* find the end */
+	    if (sd->flags & VF_RETRYERRORS) {
+		snprintf(s, configend - s, " retryerrors");
+		while (*s)
+		    s++;				    /* find the end */
+	    }
+	    snprintf(s, configend - s, " \n");
 	    while (*s)
 		s++;					    /* find the end */
 	}

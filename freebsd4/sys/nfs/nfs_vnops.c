@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_vnops.c	8.16 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.150.2.2 2001/03/02 16:45:12 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.150.2.4 2001/08/05 00:23:58 iedowse Exp $
  */
 
 
@@ -149,6 +149,7 @@ static struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
 	{ &vop_getpages_desc,		(vop_t *) nfs_getpages },
 	{ &vop_putpages_desc,		(vop_t *) nfs_putpages },
 	{ &vop_inactive_desc,		(vop_t *) nfs_inactive },
+	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_lease_desc,		(vop_t *) vop_null },
 	{ &vop_link_desc,		(vop_t *) nfs_link },
 	{ &vop_lock_desc,		(vop_t *) vop_sharedlock },
@@ -169,6 +170,7 @@ static struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
 	{ &vop_setattr_desc,		(vop_t *) nfs_setattr },
 	{ &vop_strategy_desc,		(vop_t *) nfs_strategy },
 	{ &vop_symlink_desc,		(vop_t *) nfs_symlink },
+	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) nfs_write },
 	{ NULL, NULL }
 };
@@ -187,11 +189,13 @@ static struct vnodeopv_entry_desc nfsv2_specop_entries[] = {
 	{ &vop_fsync_desc,		(vop_t *) nfs_fsync },
 	{ &vop_getattr_desc,		(vop_t *) nfs_getattr },
 	{ &vop_inactive_desc,		(vop_t *) nfs_inactive },
+	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_lock_desc,		(vop_t *) vop_sharedlock },
 	{ &vop_print_desc,		(vop_t *) nfs_print },
 	{ &vop_read_desc,		(vop_t *) nfsspec_read },
 	{ &vop_reclaim_desc,		(vop_t *) nfs_reclaim },
 	{ &vop_setattr_desc,		(vop_t *) nfs_setattr },
+	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) nfsspec_write },
 	{ NULL, NULL }
 };
@@ -207,11 +211,13 @@ static struct vnodeopv_entry_desc nfsv2_fifoop_entries[] = {
 	{ &vop_fsync_desc,		(vop_t *) nfs_fsync },
 	{ &vop_getattr_desc,		(vop_t *) nfs_getattr },
 	{ &vop_inactive_desc,		(vop_t *) nfs_inactive },
+	{ &vop_islocked_desc,		(vop_t *) vop_stdislocked },
 	{ &vop_lock_desc,		(vop_t *) vop_sharedlock },
 	{ &vop_print_desc,		(vop_t *) nfs_print },
 	{ &vop_read_desc,		(vop_t *) nfsfifo_read },
 	{ &vop_reclaim_desc,		(vop_t *) nfs_reclaim },
 	{ &vop_setattr_desc,		(vop_t *) nfs_setattr },
+	{ &vop_unlock_desc,		(vop_t *) vop_stdunlock },
 	{ &vop_write_desc,		(vop_t *) nfsfifo_write },
 	{ NULL, NULL }
 };
@@ -2834,9 +2840,9 @@ again:
 		 * If we can't get memory (for whatever reason), we will end up
 		 * committing the buffers one-by-one in the loop below.
 		 */
+		if (bvec != NULL && bvec != bvec_on_stack)
+			free(bvec, M_TEMP);
 		if (bveccount > NFS_COMMITBVECSIZ) {
-			if (bvec != NULL && bvec != bvec_on_stack)
-				free(bvec, M_TEMP);
 			bvec = (struct buf **)
 				malloc(bveccount * sizeof(struct buf *),
 				       M_TEMP, M_NOWAIT);

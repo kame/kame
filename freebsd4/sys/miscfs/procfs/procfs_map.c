@@ -36,7 +36,7 @@
  *
  *	@(#)procfs_status.c	8.3 (Berkeley) 2/17/94
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_map.c,v 1.24 1999/10/29 18:09:03 phk Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_map.c,v 1.24.2.1 2001/08/04 13:12:24 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -173,6 +173,7 @@ case OBJT_DEVICE:
 	}
 	if (map != &curproc->p_vmspace->vm_map)
 		vm_map_unlock_read(map);
+
 	return error;
 }
 

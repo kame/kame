@@ -32,7 +32,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/slot.h,v 1.25 2000/03/10 05:43:29 imp Exp $
+ * $FreeBSD: src/sys/pccard/slot.h,v 1.25.2.4 2001/07/30 00:11:29 imp Exp $
  */
 
 #ifndef _PCCARD_SLOT_H
@@ -42,40 +42,40 @@
  * Normally we shouldn't include stuff here, but we're trying to be
  * compatible with the long, dark hand of the past.
  */
+#include <sys/param.h>
 #include <sys/bus.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <machine/resource.h>
+#if __FreeBSD_version >= 500000
+#include <sys/selinfo.h>
+#else
+#include <sys/select.h>
+#endif
 
 /*
  *	Controller data - Specific to each slot controller.
  */
 struct slot;
 struct slot_ctrl {
-	int	(*mapmem) __P((struct slot *, int));
+	void	(*mapirq)(struct slot *, int);
+				/* Map irq */
+	int	(*mapmem)(struct slot *, int);
 				/* Map memory */
-	int	(*mapio) __P((struct slot *, int));
+	int	(*mapio)(struct slot *, int);
 				/* Map io */
-	void	(*reset) __P((void *));
+	void	(*reset)(void *);
 				/* init */
-	void	(*disable) __P((struct slot *));
+	void	(*disable)(struct slot *);
 				/* Disable slot */
-	int	(*power) __P((struct slot *));
+	int	(*power)(struct slot *);
 				/* Set power values */
-	int	(*ioctl) __P((struct slot *, int, caddr_t));
+	int	(*ioctl)(struct slot *, int, caddr_t);
 				/* ioctl to lower level */
-	void	(*mapirq) __P((struct slot *, int));
-				/* Map interrupt number */
-	void	(*resume) __P((struct slot *));
+	void	(*resume)(struct slot *);
 				/* suspend/resume support */
 	int	maxmem;		/* Number of allowed memory windows */
 	int	maxio;		/* Number of allowed I/O windows */
-
-	/*
-	 *	The rest is maintained by the mainline PC-CARD code.
-	 */
-	struct slot_ctrl *next;	/* Allows linked list of controllers */
-	int	slots;		/* Slots available */
 };
 
 /*
@@ -118,11 +118,16 @@ struct slot {
 	struct slot_ctrl *ctrl;		/* Per-controller data */
 	void		*cdata;		/* Controller specific data */
 	int		pwr_off_pending;/* Power status of slot */
+	device_t	dev;		/* Config system device. */
+	dev_t		d;		/* fs device */
 };
 
-enum card_event { card_removed, card_inserted };
+#define PCCARD_DEVICE2SOFTC(d)	((struct slot *) device_get_softc(d))
+#define PCCARD_DEV2SOFTC(d)	((struct slot *) (d)->si_drv1)
 
-struct slot	*pccard_alloc_slot(struct slot_ctrl *);
+enum card_event { card_removed, card_inserted, card_deactivated };
+
+struct slot	*pccard_init_slot(device_t, struct slot_ctrl *);
 void		 pccard_event(struct slot *, enum card_event);
 int		 pccard_suspend(device_t);
 int		 pccard_resume(device_t);

@@ -1,5 +1,5 @@
 /*	$NetBSD: uscanner.c,v 1.9 2000/11/14 13:57:16 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.2.2.3 2001/01/06 22:49:41 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.2.2.4 2001/08/05 20:08:26 asmodai Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -142,6 +142,7 @@ static const struct scanner_id {
 	{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_636 },
 	{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_610 },
 	{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1200 },
+	{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1240 },
 	{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1600 },
 	{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1640 },
 

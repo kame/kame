@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/boot/alpha/libalpha/pal.S,v 1.2 1999/08/28 00:39:28 peter Exp $
+ * $FreeBSD: src/sys/boot/alpha/libalpha/pal.S,v 1.2.2.1 2001/08/03 07:14:52 obrien Exp $
  * From: $NetBSD: pal.s,v 1.12 1998/02/27 03:44:53 thorpej Exp $ 
  */
 
@@ -44,7 +44,8 @@
 
 #include <machine/asm.h>
 
-inc2:	.stabs	__FILE__,132,0,0,inc2; .loc	1 __LINE__
+/*inc2:	.stabs	__FILE__,132,0,0,inc2; .loc	1 __LINE__*/
+inc2:	.stabs	__FILE__,132,0,0,inc2
 /*
  * alpha_rpcc: read process cycle counter (XXX INSTRUCTION, NOT PALcode OP)
  */

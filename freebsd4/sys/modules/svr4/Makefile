@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/svr4/Makefile,v 1.13.2.1 2000/07/07 01:30:28 obrien Exp $
+# $FreeBSD: src/sys/modules/svr4/Makefile,v 1.13.2.2 2001/04/25 11:24:16 ru Exp $
 
 MAINTAINER=	newton@FreeBSD.org
 
@@ -12,7 +12,7 @@ SRCS=	svr4_sysent.c svr4_sysvec.c opt_compat.h opt_svr4.h opt_vmpage.h \
 	svr4_stream.c svr4_socket.c svr4_sockio.c svr4_machdep.c \
 	svr4_resource.c svr4_ipc.c
 OBJS=	svr4_locore.o 
-MAN8=	svr4.8
+MAN=	svr4.8
 
 EXPORT_SYMS=_svr4_mod
 CLEANFILES= svr4_assym.h svr4_genassym.o

@@ -1,10 +1,10 @@
-# $FreeBSD: src/sys/modules/if_ef/Makefile,v 1.2.2.1 2000/04/17 09:10:11 bp Exp $
+# $FreeBSD: src/sys/modules/if_ef/Makefile,v 1.2.2.2 2001/04/25 11:24:03 ru Exp $
 
 .PATH:  ${.CURDIR}/../../net
 
 KMOD=   if_ef
 SRCS=   if_ef.c opt_ipx.h opt_inet.h opt_ef.h
-MAN4=	ef.4
+MAN=	ef.4
 
 # If you need only limited number of frames comment out unneeded ones
 # this will reduce number of visible devices

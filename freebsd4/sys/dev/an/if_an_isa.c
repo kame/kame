@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.2 2000/12/20 21:25:31 archie Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.3 2001/07/04 00:12:32 brooks Exp $
  */
 
 /*
@@ -64,6 +64,7 @@
 #include <net/ethernet.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#include <net/if_media.h>
 
 #include <isa/isavar.h>
 #include <isa/pnpvar.h>
@@ -73,7 +74,7 @@
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.2 2000/12/20 21:25:31 archie Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.3 2001/07/04 00:12:32 brooks Exp $";
 #endif
 
 static struct isa_pnp_id an_ids[] = {
@@ -138,6 +139,7 @@ an_detach_isa(device_t dev)
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 
 	an_stop(sc);
+	ifmedia_removeall(&sc->an_ifmedia);
 	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	bus_teardown_intr(dev, sc->irq_res, sc->irq_handle);
 	an_release_resources(dev);

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.8 (Berkeley) 4/18/94
- *	$FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.63.2.1 2000/11/05 19:17:40 bde Exp $
+ *	$FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.63.2.3 2001/08/14 18:03:19 gallatin Exp $
  */
 
 #include "opt_quota.h"
@@ -186,7 +186,7 @@ ext2_mount(mp, path, data, ndp, p)
 	struct ufs_args args;
 	struct ufsmount *ump = 0;
 	register struct ext2_sb_info *fs;
-	u_int size;
+	size_t size;
 	int error, flags;
 	mode_t accessmode;
 
@@ -815,7 +815,7 @@ ext2_flushfiles(mp, flags, p)
 	ump = VFSTOUFS(mp);
 #if QUOTA
 	if (mp->mnt_flag & MNT_QUOTA) {
-		if ((error = vflush(mp, NULLVP, SKIPSYSTEM|flags)) != 0)
+		if ((error = vflush(mp, 0, SKIPSYSTEM|flags)) != 0)
 			return (error);
 		for (i = 0; i < MAXQUOTAS; i++) {
 			if (ump->um_quotas[i] == NULLVP)
@@ -828,7 +828,7 @@ ext2_flushfiles(mp, flags, p)
 		 */
 	}
 #endif
-	error = vflush(mp, NULLVP, flags);
+	error = vflush(mp, 0, flags);
 	return (error);
 }
 

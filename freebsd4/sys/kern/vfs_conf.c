@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/kern/vfs_conf.c,v 1.49.2.2 2000/12/11 01:03:27 obrien Exp $
+ *	$FreeBSD: src/sys/kern/vfs_conf.c,v 1.49.2.3 2001/08/08 19:26:34 dwmalone Exp $
  */
 
 /*
@@ -350,7 +350,7 @@ setrootbyname(char *name)
 	return (2);
 gotit:
 	while (*cp >= '0' && *cp <= '9')
-		unit += 10 * unit + *cp++ - '0';
+		unit = 10 * unit + *cp++ - '0';
 	if (*cp == 's' && cp[1] >= '0' && cp[1] <= '9') {
 		slice = cp[1] - '0' + 1;
 		cp += 2;

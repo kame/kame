@@ -23,8 +23,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: maestro.c,v 1.1.1.2 2001/04/23 13:10:45 sumikawa Exp $
- * $FreeBSD: src/sys/dev/sound/pci/maestro.c,v 1.2.2.2 2001/02/03 01:29:10 cg Exp $
+ *	$Id: maestro.c,v 1.1.1.3 2001/09/25 05:03:12 keiichi Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/maestro.c,v 1.2.2.4 2001/08/01 03:40:58 cg Exp $
  */
 
 /*
@@ -81,8 +81,8 @@
  */
 struct agg_chinfo {
 	struct agg_info		*parent;
-	pcm_channel		*channel;
-	snd_dbuf		*buffer;
+	struct pcm_channel	*channel;
+	struct snd_dbuf		*buffer;
 	bus_addr_t		offset;
 	u_int32_t		blocksize;
 	u_int32_t		speed;
@@ -109,6 +109,7 @@ struct agg_info {
 	bus_addr_t		baseaddr;
 
 	struct ac97_info	*codec;
+	void			*lock;
 
 	u_int			playchns, active;
 	struct agg_chinfo	pch[AGG_MAXPLAYCH];
@@ -637,7 +638,7 @@ set_timer(struct agg_info *ess)
  */
 
 static void *
-aggch_init(kobj_t obj, void *devinfo, snd_dbuf *b, pcm_channel *c, int dir)
+aggch_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *c, int dir)
 {
 	struct agg_info *ess = devinfo;
 	struct agg_chinfo *ch;
@@ -661,8 +662,7 @@ aggch_init(kobj_t obj, void *devinfo, snd_dbuf *b, pcm_channel *c, int dir)
 	if (physaddr < ess->baseaddr || ch->offset > WPWA_MAXADDR) {
 		device_printf(ess->dev,
 		    "offset %#x exceeds limit. ", ch->offset);
-		dma_free(ess, b->buf);
-		b->buf = NULL;
+		dma_free(ess, sndbuf_getbuf(b));
 		return NULL;
 	}
 
@@ -786,7 +786,7 @@ aggch_getplayptr(kobj_t obj, void *data)
 	return cp;
 }
 
-static pcmchan_caps *
+static struct pcmchan_caps *
 aggch_getcaps(kobj_t obj, void *data)
 {
 	static u_int32_t playfmt[] = {
@@ -798,7 +798,7 @@ aggch_getcaps(kobj_t obj, void *data)
 		AFMT_STEREO | AFMT_S16_LE,
 		0
 	};
-	static pcmchan_caps playcaps = {2000, 96000, playfmt, 0};
+	static struct pcmchan_caps playcaps = {2000, 96000, playfmt, 0};
 
 	static u_int32_t recfmt[] = {
 		AFMT_S8,
@@ -807,7 +807,7 @@ aggch_getcaps(kobj_t obj, void *data)
 		AFMT_STEREO | AFMT_S16_LE,
 		0
 	};
-	static pcmchan_caps reccaps = {4000, 48000, recfmt, 0};
+	static struct pcmchan_caps reccaps = {4000, 48000, recfmt, 0};
 
 	return (((struct agg_chinfo*)data)->dir == PCMDIR_PLAY)?
 	    &playcaps : &reccaps;
@@ -956,11 +956,10 @@ agg_attach(device_t dev)
 	void	*ih = NULL;
 	char	status[SND_STATUSLEN];
 
-	if ((ess = malloc(sizeof *ess, M_DEVBUF, M_NOWAIT)) == NULL) {
+	if ((ess = malloc(sizeof *ess, M_DEVBUF, M_NOWAIT | M_ZERO)) == NULL) {
 		device_printf(dev, "cannot allocate softc\n");
 		return ENXIO;
 	}
-	bzero(ess, sizeof *ess);
 	ess->dev = dev;
 
 	if (bus_dma_tag_create(/*parent*/NULL,
@@ -1020,8 +1019,7 @@ agg_attach(device_t dev)
 
 	irq = bus_alloc_resource(dev, SYS_RES_IRQ, &irqid,
 	    0, BUS_SPACE_UNRESTRICTED, 1, RF_ACTIVE | RF_SHAREABLE);
-	if (irq == NULL
-	    || bus_setup_intr(dev, irq, INTR_TYPE_TTY, agg_intr, ess, &ih)) {
+	if (irq == NULL || snd_setup_intr(dev, irq, 0, agg_intr, ess, &ih)) {
 		device_printf(dev, "unable to map interrupt\n");
 		goto bad;
 	}
@@ -1183,10 +1181,8 @@ static device_method_t agg_methods[] = {
 static driver_t agg_driver = {
     "pcm",
     agg_methods,
-    sizeof(snddev_info),
+    sizeof(struct snddev_info),
 };
-
-static devclass_t pcm_devclass;
 
 DRIVER_MODULE(snd_maestro, pci, agg_driver, pcm_devclass, 0, 0);
 MODULE_DEPEND(snd_maestro, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);

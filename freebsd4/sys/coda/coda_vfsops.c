@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  *  	@(#) src/sys/cfs/coda_vfsops.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_vfsops.c,v 1.24 1999/12/19 06:07:26 rwatson Exp $
+ * $FreeBSD: src/sys/coda/coda_vfsops.c,v 1.24.2.1 2001/07/26 20:36:45 iedowse Exp $
  * 
  */
 
@@ -260,7 +260,7 @@ coda_unmount(vfsp, mntflags, p)
 
 	active = coda_kill(vfsp, NOT_DOWNCALL);
 	mi->mi_rootvp->v_flag &= ~VROOT;
-	error = vflush(mi->mi_vfsp, NULLVP, FORCECLOSE);
+	error = vflush(mi->mi_vfsp, 0, FORCECLOSE);
 	printf("coda_unmount: active = %d, vflush active %d\n", active, error);
 	error = 0;
 	/* I'm going to take this out to allow lookups to go through. I'm

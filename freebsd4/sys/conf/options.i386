@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.i386,v 1.132.2.4 2000/09/30 02:49:30 ps Exp $
+# $FreeBSD: src/sys/conf/options.i386,v 1.132.2.7 2001/08/15 01:23:48 peter Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -58,6 +58,7 @@ CPU_WT_ALLOC			opt_cpu.h
 CYRIX_CACHE_WORKS		opt_cpu.h
 CYRIX_CACHE_REALLY_WORKS	opt_cpu.h
 NO_MEMORY_HOLE			opt_cpu.h
+CPU_ENABLE_SSE			opt_cpu.h
 
 # The CPU type affects the endian conversion functions all over the kernel.
 I386_CPU		opt_global.h
@@ -149,7 +150,7 @@ TEL_S0_16		opt_i4b.h
 TEL_S0_16_3		opt_i4b.h
 AVM_A1			opt_i4b.h
 USR_STI			opt_i4b.h
-#ITKIX1			opt_i4b.h
+ITKIX1			opt_i4b.h
 ELSA_PCC16		opt_i4b.h
 # -------------------------------
 # isdn4bsd: passive ISA PnP cards
@@ -158,11 +159,11 @@ CRTX_S0_P		opt_i4b.h
 DRN_NGO                 opt_i4b.h
 TEL_S0_16_3_P		opt_i4b.h
 SEDLBAUER		opt_i4b.h
-#DYNALINK		opt_i4b.h
+DYNALINK		opt_i4b.h
 ASUSCOM_IPAC		opt_i4b.h
 ELSA_QS1ISA		opt_i4b.h
-#AVM_PNP		opt_i4b.h
 SIEMENS_ISURF2		opt_i4b.h
+EICON_DIVA		opt_i4b.h
 # -------------------------------
 # isdn4bsd: passive PCI cards
 # -------------------------------
@@ -195,6 +196,13 @@ NDGBPORTS		opt_dgb.h
 
 # Temporary options for moving to pnpbios
 PNPBIOS			opt_pnp.h
+
+# SMB/CIFS requester
+NETSMB			opt_netsmb.h
+NETSMBCRYPTO		opt_netsmb.h
+
+# SMB/CIFS filesystem
+SMBFS
 
 # -------------------------------
 # EOF

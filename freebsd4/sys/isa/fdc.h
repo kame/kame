@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)fd.c	7.4 (Berkeley) 5/25/91
- * $FreeBSD: src/sys/isa/fdc.h,v 1.20 2000/01/09 17:13:35 bde Exp $
+ * $FreeBSD: src/sys/isa/fdc.h,v 1.20.2.2 2001/08/12 13:13:50 joerg Exp $
  *
  */
 
@@ -54,6 +54,8 @@ struct fdc_data
 #define FDC_HAS_FIFO	0x10
 #define FDC_NEEDS_RESET	0x20
 #define FDC_NODMA	0x40
+#define FDC_ISPNP	0x80
+#define FDC_ISPCMCIA	0x100
 	struct	fd_data *fd;
 	int	fdu;		/* the active drive	*/
 	int	state;
@@ -64,6 +66,7 @@ struct fdc_data
 	int	fdc_errs;	/* number of logged errors */
 	struct	buf_queue_head head;
 	struct	buf *bp;	/* active buffer */
+	int	dma_overruns;	/* number of DMA overruns */
 	struct	resource *res_ioport, *res_ctl, *res_irq, *res_drq;
 	int	rid_ioport, rid_ctl, rid_irq, rid_drq;
 	int	port_off;
@@ -73,7 +76,7 @@ struct fdc_data
 	bus_space_handle_t ctlh;
 	void	*fdc_intr;
 	struct	device *fdc_dev;
-	int	fdc_ispnp;
+	void	(*fdctl_wr)(struct fdc_data *fdc, u_int8_t v);
 };
 
 /***********************************************************************\

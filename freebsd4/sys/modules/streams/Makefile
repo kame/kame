@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/streams/Makefile,v 1.4 1999/11/28 18:53:23 bde Exp $ 
+# $FreeBSD: src/sys/modules/streams/Makefile,v 1.4.2.1 2001/07/24 09:49:43 dd Exp $ 
 
 MAINTAINER  =  newton@atdot.dotat.org
 .if defined(DEBUG)
@@ -7,7 +7,7 @@ CFLAGS+= -DDEBUG_SVR4
 
 .PATH:  ${.CURDIR}/../../dev/streams
 KMOD=   streams
-SRCS=   streams.c opt_streams.h opt_devfs.h
+SRCS=   streams.c opt_streams.h
 
 NOMAN=
 

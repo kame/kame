@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.2.2.2 2001/03/03 14:44:44 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.2.2.4 2001/09/04 04:45:17 non Exp $	*/
 /*	$NecBSD: ncr53c500_pisa.c,v 1.28 1998/11/26 01:59:11 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -198,7 +198,7 @@ ncv_alloc_resource(DEVPORT_PDEVICE dev)
 
 	sc->mem_rid = 0;
 	sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->mem_rid,
-					 0, ~0, msize, RF_ACTIVE);
+					 0, ~0, 1, RF_ACTIVE);
 	if (sc->mem_res == NULL) {
 		ncv_release_resource(dev);
 		return(ENOMEM);
@@ -341,10 +341,13 @@ static void
 ncv_card_unload(DEVPORT_PDEVICE devi)
 {
 	struct ncv_softc *sc = DEVPORT_PDEVGET_SOFTC(devi);
+	intrmask_t s;
 
 	printf("%s: unload\n", sc->sc_sclow.sl_xname);
+	s = splcam();
 	scsi_low_deactivate((struct scsi_low_softc *)sc);
         scsi_low_dettach(&sc->sc_sclow);
+	splx(s);
 }
 
 static int
@@ -384,6 +387,7 @@ ncvattach(DEVPORT_PDEVICE devi)
 	bus_addr_t offset = 0;
 	u_int iobase = DEVPORT_PDEVIOBASE(devi);
 #endif
+	intrmask_t s;
 	char dvname[16]; /* SCSI_LOW_DVNAME_LEN */
 
 	strcpy(dvname, "ncv");
@@ -426,9 +430,9 @@ ncvattach(DEVPORT_PDEVICE devi)
 	slp->sl_hostid = NCV_HOSTID;
 	slp->sl_cfgflags = flags;
 
+	s = splcam();
 	ncvattachsubr(sc);
-
-	sc->sc_ih = ncvintr;
+	splx(s);
 
 	return(NCVIOSZ);
 }

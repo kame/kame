@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vm_page.c	7.4 (Berkeley) 5/7/91
- * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.6 2001/03/03 23:06:09 gallatin Exp $
+ * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.7 2001/06/03 05:00:12 dillon Exp $
  */
 
 /*
@@ -1351,6 +1351,31 @@ vm_page_try_to_cache(vm_page_t m)
 	vm_page_cache(m);
 	return(1);
 }
+
+/*
+ * vm_page_try_to_free()
+ *
+ *	Attempt to free the page.  If we cannot free it, we do nothing.
+ *	1 is returned on success, 0 on failure.
+ */
+
+int
+vm_page_try_to_free(m)
+	vm_page_t m;
+{
+	if (m->dirty || m->hold_count || m->busy || m->wire_count ||
+	    (m->flags & (PG_BUSY|PG_UNMANAGED))) {
+		return(0);
+	}
+	vm_page_test_dirty(m);
+	if (m->dirty)
+		return(0);
+	vm_page_busy(m);
+	vm_page_protect(m, VM_PROT_NONE);
+	vm_page_free(m);
+	return(1);
+}
+
 
 /*
  * vm_page_cache

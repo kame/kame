@@ -36,10 +36,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_inode.c	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_inode.c,v 1.25 1999/08/28 00:52:30 peter Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_inode.c,v 1.25.2.1 2001/08/01 19:33:39 iedowse Exp $
  */
 
 #include "opt_quota.h"
+#include "opt_ufs.h"
 
 #include <sys/param.h>
 #include <sys/vnode.h>
@@ -50,6 +51,10 @@
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/ufs_extern.h>
+#ifdef UFS_DIRHASH
+#include <ufs/ufs/dir.h>
+#include <ufs/ufs/dirhash.h>
+#endif
 
 int	prtactive = 0;		/* 1 => print out reclaim of active vnodes */
 
@@ -143,6 +148,10 @@ ufs_reclaim(ap)
 			ip->i_dquot[i] = NODQUOT;
 		}
 	}
+#endif
+#ifdef UFS_DIRHASH
+	if (ip->i_dirhash != NULL)
+		ufsdirhash_free(ip);
 #endif
 	FREE(vp->v_data, VFSTOUFS(vp->v_mount)->um_malloctype);
 	vp->v_data = 0;

@@ -35,7 +35,7 @@
  *
  *	@(#)null_subr.c	8.7 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/miscfs/nullfs/null_subr.c,v 1.21.2.2 2000/10/25 04:26:30 bp Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null_subr.c,v 1.21.2.4 2001/06/26 04:20:09 bp Exp $
  */
 
 #include <sys/param.h>
@@ -121,7 +121,7 @@ null_node_find(mp, lowervp)
 	hd = NULL_NHASH(lowervp);
 loop:
 	lockmgr(&null_hashlock, LK_EXCLUSIVE, NULL, p);
-	for (a = hd->lh_first; a != 0; a = a->null_hash.le_next) {
+	LIST_FOREACH(a, hd, null_hash) {
 		if (a->null_lowervp == lowervp && NULLTOV(a)->v_mount == mp) {
 			vp = NULLTOV(a);
 			lockmgr(&null_hashlock, LK_RELEASE, NULL, p);
@@ -130,10 +130,11 @@ loop:
 			 * stuff, but we don't want to lock
 			 * the lower node.
 			 */
-			if (vget(vp, 0, p)) {
+			if (vget(vp, LK_EXCLUSIVE | LK_CANRECURSE, p)) {
 				printf ("null_node_find: vget failed.\n");
 				goto loop;
-			};
+			}
+			VOP_UNLOCK(lowervp, 0, p);
 			return (vp);
 		}
 	}
@@ -176,6 +177,7 @@ null_node_alloc(mp, lowervp, vpp)
 	vp = *vpp;
 
 	vp->v_type = lowervp->v_type;
+	lockinit(&xp->null_lock, PINOD, "nullnode", 0, LK_CANRECURSE);
 	xp->null_vnode = vp;
 	vp->v_data = xp;
 	xp->null_lowervp = lowervp;
@@ -192,9 +194,24 @@ null_node_alloc(mp, lowervp, vpp)
 		vrele(vp);
 		*vpp = othervp;
 		return 0;
-	};
-	VREF(lowervp);   /* Extra VREF will be vrele'd in null_node_create */
+	}
+
+	/*
+	 * From NetBSD:
+	 * Now lock the new node. We rely on the fact that we were passed
+	 * a locked vnode. If the lower node is exporting a struct lock
+	 * (v_vnlock != NULL) then we just set the upper v_vnlock to the
+	 * lower one, and both are now locked. If the lower node is exporting
+	 * NULL, then we copy that up and manually lock the new vnode.
+	 */
+
 	lockmgr(&null_hashlock, LK_EXCLUSIVE, NULL, p);
+	vp->v_vnlock = lowervp->v_vnlock;
+	error = VOP_LOCK(vp, LK_EXCLUSIVE | LK_THISLAYER, p);
+	if (error)
+		panic("null_node_alloc: can't lock new vnode\n");
+
+	VREF(lowervp);
 	hd = NULL_NHASH(lowervp);
 	LIST_INSERT_HEAD(hd, xp, null_hash);
 	lockmgr(&null_hashlock, LK_RELEASE, NULL, p);
@@ -221,10 +238,10 @@ null_node_create(mp, lowervp, newvpp)
 		 * null_node_find has taken another reference
 		 * to the alias vnode.
 		 */
+		vrele(lowervp);
 #ifdef NULLFS_DEBUG
 		vprint("null_node_create: exists", aliasvp);
 #endif
-		/* VREF(aliasvp); --- done in null_node_find */
 	} else {
 		int error;
 
@@ -244,8 +261,6 @@ null_node_create(mp, lowervp, newvpp)
 		 * aliasvp is already VREF'd by getnewvnode()
 		 */
 	}
-
-	vrele(lowervp);
 
 #ifdef DIAGNOSTIC
 	if (lowervp->v_usecount < 1) {

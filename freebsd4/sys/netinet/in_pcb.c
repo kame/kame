@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.12 2001/03/12 22:10:51 phk Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.17 2001/08/13 16:26:17 ume Exp $
  */
 
 #include "opt_ipsec.h"
@@ -142,6 +142,9 @@ in_pcballoc(so, pcbinfo, p)
 	struct proc *p;
 {
 	register struct inpcb *inp;
+#ifdef IPSEC
+	int error;
+#endif
 
 	inp = zalloci(pcbinfo->ipi_zone);
 	if (inp == NULL)
@@ -150,9 +153,24 @@ in_pcballoc(so, pcbinfo, p)
 	inp->inp_gencnt = ++pcbinfo->ipi_gencnt;
 	inp->inp_pcbinfo = pcbinfo;
 	inp->inp_socket = so;
+#ifdef IPSEC
+	error = ipsec_init_policy(so, &inp->inp_sp);
+	if (error != 0) {
+		zfreei(pcbinfo->ipi_zone, inp);
+		return error;
+	}
+#endif /*IPSEC*/
+#if defined(INET6)
+	if (INP_SOCKAF(so) == AF_INET6 && !ip6_mapped_addr_on)
+		inp->inp_flags |= IN6P_IPV6_V6ONLY;
+#endif
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);
 	pcbinfo->ipi_count++;
 	so->so_pcb = (caddr_t)inp;
+#ifdef INET6
+	if (ip6_auto_flowlabel)
+		inp->inp_flags |= IN6P_AUTOFLOWLABEL;
+#endif
 	return (0);
 }
 
@@ -229,8 +247,7 @@ in_pcbbind(inp, nam, p)
 				    (so->so_cred->cr_uid !=
 				     t->inp_socket->so_cred->cr_uid)) {
 #if defined(INET6)
-					if (ip6_mapped_addr_on == 0 ||
-					    ntohl(sin->sin_addr.s_addr) !=
+					if (ntohl(sin->sin_addr.s_addr) !=
 					    INADDR_ANY ||
 					    ntohl(t->inp_laddr.s_addr) !=
 					    INADDR_ANY ||
@@ -248,8 +265,7 @@ in_pcbbind(inp, nam, p)
 			if (t &&
 			    (reuseport & t->inp_socket->so_options) == 0) {
 #if defined(INET6)
-				if (ip6_mapped_addr_on == 0 ||
-				    ntohl(sin->sin_addr.s_addr) !=
+				if (ntohl(sin->sin_addr.s_addr) !=
 				    INADDR_ANY ||
 				    ntohl(t->inp_laddr.s_addr) !=
 				    INADDR_ANY ||
@@ -305,7 +321,7 @@ in_pcbbind(inp, nam, p)
 			do {
 				if (count-- < 0) {	/* completely used? */
 					inp->inp_laddr.s_addr = INADDR_ANY;
-					return (EAGAIN);
+					return (EADDRNOTAVAIL);
 				}
 				--*lastport;
 				if (*lastport > first || *lastport < last)
@@ -322,7 +338,7 @@ in_pcbbind(inp, nam, p)
 			do {
 				if (count-- < 0) {	/* completely used? */
 					inp->inp_laddr.s_addr = INADDR_ANY;
-					return (EAGAIN);
+					return (EADDRNOTAVAIL);
 				}
 				++*lastport;
 				if (*lastport < first || *lastport > last)
@@ -667,6 +683,44 @@ in_pcbnotifyall(head, faddr, errno, notify)
 	splx(s);
 }
 
+void
+in_pcbpurgeif0(head, ifp)
+	struct inpcb *head;
+	struct ifnet *ifp;
+{
+	struct inpcb *inp;
+	struct ip_moptions *imo;
+	int i, gap;
+
+	for (inp = head; inp != NULL; inp = LIST_NEXT(inp, inp_list)) {
+		imo = inp->inp_moptions;
+		if ((inp->inp_vflag & INP_IPV4) &&
+		    imo != NULL) {
+			/*
+			 * Unselect the outgoing interface if it is being
+			 * detached.
+			 */
+			if (imo->imo_multicast_ifp == ifp)
+				imo->imo_multicast_ifp = NULL;
+
+			/*
+			 * Drop multicast group membership if we joined
+			 * through the interface being detached.
+			 */
+			for (i = 0, gap = 0; i < imo->imo_num_memberships;
+			    i++) {
+				if (imo->imo_membership[i]->inm_ifp == ifp) {
+					in_delmulti(imo->imo_membership[i]);
+					gap++;
+				} else if (gap != 0)
+					imo->imo_membership[i - gap] =
+					    imo->imo_membership[i];
+			}
+			imo->imo_num_memberships -= gap;
+		}
+	}
+}
+
 /*
  * Check for alternatives when higher level complains
  * about service problems.  For now, invalidate cached
@@ -681,7 +735,6 @@ in_losing(inp)
 	struct rt_addrinfo info;
 
 	if ((rt = inp->inp_route.ro_rt)) {
-		inp->inp_route.ro_rt = 0;
 		bzero((caddr_t)&info, sizeof(info));
 		info.rti_info[RTAX_DST] =
 			(struct sockaddr *)&inp->inp_route.ro_dst;
@@ -692,12 +745,12 @@ in_losing(inp)
 			(void) rtrequest(RTM_DELETE, rt_key(rt),
 				rt->rt_gateway, rt_mask(rt), rt->rt_flags,
 				(struct rtentry **)0);
-		else
+		inp->inp_route.ro_rt = 0;
+		rtfree(rt);
 		/*
 		 * A new route can be allocated
 		 * the next time output is attempted.
 		 */
-			rtfree(rt);
 	}
 }
 

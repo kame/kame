@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.6 2001/02/26 22:24:42 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.7 2001/06/05 20:51:47 wpaul Exp $
  */
 
 /*
@@ -96,7 +96,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.6 2001/02/26 22:24:42 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.7 2001/06/05 20:51:47 wpaul Exp $";
 #endif
 
 /*
@@ -1203,7 +1203,7 @@ static void pcn_init(xsc)
 	PCN_CSR_SETBIT(sc, PCN_CSR_TFEAT, PCN_TFEAT_PAD_TX);
 
 	/* Disable MII autoneg (we handle this ourselves). */
-	PCN_BCR_CLRBIT(sc, PCN_BCR_MIICTL, PCN_MIICTL_DANAS);
+	PCN_BCR_SETBIT(sc, PCN_BCR_MIICTL, PCN_MIICTL_DANAS);
 
 	if (sc->pcn_type == Am79C978)
 		pcn_bcr_write(sc, PCN_BCR_PHYSEL,

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/scvgarndr.c,v 1.5.2.2 2000/04/03 13:03:52 yokota Exp $
+ * $FreeBSD: src/sys/dev/syscons/scvgarndr.c,v 1.5.2.3 2001/07/28 12:51:47 yokota Exp $
  */
 
 #include "opt_syscons.h"
@@ -325,6 +325,7 @@ static void
 draw_txtmouse(scr_stat *scp, int x, int y)
 {
 #ifndef SC_ALT_MOUSE_IMAGE
+    if (ISMOUSEAVAIL(scp->sc->adp->va_flags)) {
 	u_char font_buf[128];
 	u_short cursor[32];
 	u_char c;
@@ -384,7 +385,9 @@ draw_txtmouse(scr_stat *scp, int x, int y)
 		sc_vtb_putc(&scp->scr, pos + scp->xsize + 1, c + 3,
 			    sc_vtb_geta(&scp->scr, pos + scp->xsize + 1));
 	}
-#else /* SC_ALT_MOUSE_IMAGE */
+    } else
+#endif /* SC_ALT_MOUSE_IMAGE */
+    {
 	/* Red, magenta and brown are mapped to green to to keep it readable */
 	static const int col_conv[16] = {
 		6, 6, 6, 6, 2, 2, 2, 6, 14, 14, 14, 14, 10, 10, 10, 14
@@ -401,7 +404,7 @@ draw_txtmouse(scr_stat *scp, int x, int y)
 	else
 		color = ((a & 0xf000) >> 4) | ((a & 0x0f00) << 4);
 	sc_vtb_putc(&scp->scr, pos, sc_vtb_getc(&scp->scr, pos), color);
-#endif /* SC_ALT_MOUSE_IMAGE */
+    }
 }
 
 static void

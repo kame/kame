@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/kern/device_if.m,v 1.7 1999/08/28 00:46:09 peter Exp $
+# $FreeBSD: src/sys/kern/device_if.m,v 1.7.2.1 2001/07/24 09:49:41 dd Exp $
 #
 
 INTERFACE device;
@@ -86,8 +86,8 @@ STATICMETHOD void identify {
 #
 # Attach a device to the system.  The probe method will have been
 # called and will have indicated that the device exists.  This routine
-# should initialise the hardware and allocate other system resources
-# (such as devfs entries).  Returns 0 on success.
+# should initialise the hardware and allocate other system resources.
+# Returns 0 on success.
 #
 METHOD int attach {
 	device_t dev;

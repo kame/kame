@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/schistory.c,v 1.8 2000/01/29 15:08:44 peter Exp $
+ * $FreeBSD: src/sys/dev/syscons/schistory.c,v 1.8.2.1 2001/07/19 06:38:53 dd Exp $
  */
 
 #include "sc.h"
@@ -299,6 +299,12 @@ sc_hist_ioctl(struct tty *tp, u_long cmd, caddr_t data, int flag,
 		DPRINTF(5, ("error:%d, rows:%d, pool:%d\n", error,
 			    sc_vtb_rows(scp->history), extra_history_size));
 		return error;
+
+	case CONS_CLRHIST:
+		scp = SC_STAT(tp->t_dev);
+		sc_vtb_clear(scp->history, scp->sc->scr_map[0x20],
+		    SC_NORM_ATTR << 8);
+		return 0;
 	}
 
 	return ENOIOCTL;

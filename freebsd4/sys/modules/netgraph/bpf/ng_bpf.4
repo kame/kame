@@ -32,7 +32,7 @@
 .\" 
 .\" Author: Archie Cobbs <archie@freebsd.org>
 .\"
-.\" $FreeBSD: src/sys/modules/netgraph/bpf/ng_bpf.4,v 1.3.2.5 2001/02/19 04:08:04 archie Exp $
+.\" $FreeBSD: src/sys/modules/netgraph/bpf/ng_bpf.4,v 1.3.2.8 2001/06/12 10:16:19 sobomax Exp $
 .\" $Whistle: ng_bpf.8,v 1.2 1999/12/03 01:57:12 archie Exp $
 .\"
 .Dd December 2, 1999
@@ -81,7 +81,7 @@ This node type supports the generic control messages, plus the following:
 This command sets the filter program that will be applied to incoming
 data on a hook.  The following structure must be supplied as an argument:
 .Bd -literal -offset 4n
-struct ngm_bpf_hookprog {
+struct ng_bpf_hookprog {
   char            thisHook[NG_HOOKLEN+1];   /* name of hook */
   char            ifMatch[NG_HOOKLEN+1];    /* match dest hook */
   char            ifNotMatch[NG_HOOKLEN+1]; /* !match dest hook */
@@ -111,7 +111,7 @@ This command takes an
 .Tn ASCII
 string argument, the hook name, and returns the
 corresponding
-.Dv "struct ngm_bpf_hookprog"
+.Dv "struct ng_bpf_hookprog"
 as shown above.
 .It Dv NGM_BPF_GET_STATS
 This command takes an
@@ -135,7 +135,7 @@ This node shuts down upon receipt of a
 control message, or when all hooks have been disconnected.
 .Sh EXAMPLE
 It is possible to configure a node from the command line, using
-.Xr tcpdump 8 
+.Xr tcpdump 1
 to generate raw BPF instructions which are then fed into an
 .Xr awk 1
 script to create the ASCII form of a
@@ -164,7 +164,7 @@ END {
 }
 xxENDxx
 
-BPFPROG=`tcpdump -ddd ${PATTERN} | awk -f /tmp/bpf.awk`
+BPFPROG=`tcpdump -s 8192 -ddd ${PATTERN} | awk -f /tmp/bpf.awk`
 
 ngctl msg ${NODEPATH} setprogram { thisHook=\\"${INHOOK}\\" \\
   ifMatch=\\"${MATCHHOOK}\\" \\

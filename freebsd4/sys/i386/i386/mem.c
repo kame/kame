@@ -38,7 +38,7 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/i386/mem.c,v 1.79.2.7 2001/03/25 06:52:46 markm Exp $
+ * $FreeBSD: src/sys/i386/i386/mem.c,v 1.79.2.8 2001/06/12 13:13:31 markm Exp $
  */
 
 /*
@@ -59,6 +59,7 @@
 #include <sys/random.h>
 #include <sys/signalvar.h>
 #include <sys/uio.h>
+#include <sys/vnode.h>
 
 #include <machine/frame.h>
 #include <machine/psl.h>
@@ -237,6 +238,8 @@ mmrw(dev, uio, flags)
 			if (poolsize == 0) {
 				if (buf)
 					free(buf, M_TEMP);
+				if ((flags & IO_NDELAY) != 0)
+					return (EWOULDBLOCK);
 				return (0);
 			}
 			c = min(c, poolsize);

@@ -1,8 +1,8 @@
 /*
  *  Intel PCIC or compatible Controller driver
- *  May be built to make a loadable module.
  *-------------------------------------------------------------------------
  *
+ * Copyright (c) 2001 M. Warner Losh.  All rights reserved.
  * Copyright (c) 1995 Andrew McRae.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,105 +27,97 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic.c,v 1.89.2.5 2001/01/02 22:44:13 dmlb Exp $
+ * $FreeBSD: src/sys/pccard/pcic.c,v 1.89.2.23 2001/09/13 17:54:50 imp Exp $
  */
 
 #include <sys/param.h>
-#include <sys/systm.h>
+#include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
-#include <sys/select.h>
+#include <sys/sysctl.h>
+#include <sys/systm.h>
 
 #include <machine/clock.h>
-
 #include <pccard/i82365.h>
+#include <pccard/pcic_pci.h>
 #include <pccard/cardinfo.h>
 #include <pccard/slot.h>
+#include <pccard/pcicvar.h>
 
 /* Get pnp IDs */
 #include <isa/isavar.h>
 #include <dev/pcic/i82365reg.h>
 
+#include <dev/pccard/pccardvar.h>
 #include "card_if.h"
 
 /*
  *	Prototypes for interrupt handler.
  */
-static inthand2_t	pcicintr;
-static int		pcic_ioctl __P((struct slot *, int, caddr_t));
-static int		pcic_power __P((struct slot *));
+static int		pcic_ioctl(struct slot *, int, caddr_t);
+static int		pcic_power(struct slot *);
+static void		pcic_mapirq(struct slot *, int);
 static timeout_t 	pcic_reset;
 static void		pcic_resume(struct slot *);
-static void		pcic_disable __P((struct slot *));
-static void		pcic_mapirq __P((struct slot *, int));
-static timeout_t 	pcictimeout;
-static struct callout_handle pcictimeout_ch
-    = CALLOUT_HANDLE_INITIALIZER(&pcictimeout_ch);
+static void		pcic_disable(struct slot *);
 static int		pcic_memory(struct slot *, int);
 static int		pcic_io(struct slot *, int);
 
-/*
- *	Per-slot data table.
- */
-static struct pcic_slot {
-	int slotnum;			/* My slot number */
-	int index;			/* Index register */
-	int data;			/* Data register */
-	int offset;			/* Offset value for index */
-	char controller;		/* Device type */
-	char revision;			/* Device Revision */
-	struct slot *slt;		/* Back ptr to slot */
-	u_char (*getb)(struct pcic_slot *, int);
-	void   (*putb)(struct pcic_slot *, int, u_char);
-	u_char	*regs;			/* Pointer to regs in mem */
-} pcic_slots[PCIC_MAX_SLOTS];
+devclass_t	pcic_devclass;
 
-static struct slot_ctrl cinfo;
-
-static struct isa_pnp_id pcic_ids[] = {
-	{PCIC_PNP_82365,		NULL},		/* PNP0E00 */
-	{PCIC_PNP_CL_PD6720,		NULL},		/* PNP0E01 */
-	{PCIC_PNP_VLSI_82C146,		NULL},		/* PNP0E02 */
-	{PCIC_PNP_82365_CARDBUS,	NULL},		/* PNP0E03 */
-	{PCIC_PNP_ACTIONTEC,            NULL},          /* AEI0218 */
-	{PCIC_PNP_SCM_SWAPBOX,		NULL},		/* SCM0469 */ 
-	{PCIC_PNP_SCM_SWAPBOX2,		NULL},		/* SCM SwapBox Classic X2P */
-	{0}
+static struct slot_ctrl pcic_cinfo = {
+	pcic_mapirq,
+	pcic_memory,
+	pcic_io,
+	pcic_reset,
+	pcic_disable,
+	pcic_power,
+	pcic_ioctl,
+	pcic_resume,
+	PCIC_MEM_WIN,
+	PCIC_IO_WIN
 };
 
-static int validunits = 0;
+/* sysctl vars */
+SYSCTL_NODE(_hw, OID_AUTO, pcic, CTLFLAG_RD, 0, "PCIC parameters");
 
-#define GET_UNIT(d)	*(int *)device_get_softc(d)
-#define SET_UNIT(d,u)	*(int *)device_get_softc(d) = (u)
+int pcic_override_irq = 0;
+TUNABLE_INT("machdep.pccard.pcic_irq", &pcic_override_irq);
+TUNABLE_INT("hw.pcic.irq", &pcic_override_irq);
+SYSCTL_INT(_hw_pcic, OID_AUTO, irq, CTLFLAG_RD,
+    &pcic_override_irq, 0,
+    "Override the IRQ configured by the config system for all pcic devices");
 
-/*
- *	Internal inline functions for accessing the PCIC.
- */
 /*
  * Read a register from the PCIC.
  */
-static __inline unsigned char
-getb1(struct pcic_slot *sp, int reg)
+unsigned char
+pcic_getb_io(struct pcic_slot *sp, int reg)
 {
-	outb(sp->index, sp->offset + reg);
-	return inb(sp->data);
+	bus_space_write_1(sp->bst, sp->bsh, PCIC_INDEX, sp->offset + reg);
+	return (bus_space_read_1(sp->bst, sp->bsh, PCIC_DATA));
 }
 
 /*
  * Write a register on the PCIC
  */
-static __inline void
-putb1(struct pcic_slot *sp, int reg, unsigned char val)
+void
+pcic_putb_io(struct pcic_slot *sp, int reg, unsigned char val)
 {
-	outb(sp->index, sp->offset + reg);
-	outb(sp->data, val);
+	/*
+	 * Many datasheets recommend using outw rather than outb to save 
+	 * a microsecond.  Maybe we should do this, but we'd likely only
+	 * save 20-30us on card activation.
+	 */
+	bus_space_write_1(sp->bst, sp->bsh, PCIC_INDEX, sp->offset + reg);
+	bus_space_write_1(sp->bst, sp->bsh, PCIC_DATA, val);
 }
 
 /*
  * Clear bit(s) of a register.
  */
-static __inline void
-clrb(struct pcic_slot *sp, int reg, unsigned char mask)
+__inline void
+pcic_clrb(struct pcic_slot *sp, int reg, unsigned char mask)
 {
 	sp->putb(sp, reg, sp->getb(sp, reg) & ~mask);
 }
@@ -133,8 +125,8 @@ clrb(struct pcic_slot *sp, int reg, unsigned char mask)
 /*
  * Set bit(s) of a register
  */
-static __inline void
-setb(struct pcic_slot *sp, int reg, unsigned char mask)
+__inline void
+pcic_setb(struct pcic_slot *sp, int reg, unsigned char mask)
 {
 	sp->putb(sp, reg, sp->getb(sp, reg) | mask);
 }
@@ -143,10 +135,50 @@ setb(struct pcic_slot *sp, int reg, unsigned char mask)
  * Write a 16 bit value to 2 adjacent PCIC registers
  */
 static __inline void
-putw(struct pcic_slot *sp, int reg, unsigned short word)
+pcic_putw(struct pcic_slot *sp, int reg, unsigned short word)
 {
 	sp->putb(sp, reg, word & 0xFF);
 	sp->putb(sp, reg + 1, (word >> 8) & 0xff);
+}
+
+/*
+ * pc98 cbus cards introduce a slight wrinkle here.  They route the irq7 pin
+ * from the pcic chip to INT 2 on the cbus.  INT 2 is normally mapped to
+ * irq 6 on the pc98 architecture, so if we get a request for irq 6
+ * lie to the hardware and say it is 7.  All the other usual mappings for
+ * cbus INT into irq space are the same as the rest of the system.
+ */
+static __inline int
+host_irq_to_pcic(int irq)
+{
+#ifdef PC98
+	if (irq == 6)
+		irq = 7;
+#endif
+	return (irq);
+}
+
+/*
+ * Free up resources allocated so far.
+ */
+void
+pcic_dealloc(device_t dev)
+{
+	struct pcic_softc *sc;
+
+	sc = (struct pcic_softc *) device_get_softc(dev);
+	if (sc->slot_poll)
+		untimeout(sc->slot_poll, sc, sc->timeout_ch);
+	if (sc->iores)
+		bus_release_resource(dev, SYS_RES_IOPORT, sc->iorid,
+		    sc->iores);
+	if (sc->memres)
+		bus_release_resource(dev, SYS_RES_MEMORY, sc->memrid,
+		    sc->memres);
+	if (sc->ih)
+		bus_teardown_intr(dev, sc->irqres, sc->ih);
+	if (sc->irqres)
+		bus_release_resource(dev, SYS_RES_IRQ, sc->irqrid, sc->irqres);
 }
 
 /*
@@ -157,8 +189,12 @@ pcic_memory(struct slot *slt, int win)
 {
 	struct pcic_slot *sp = slt->cdata;
 	struct mem_desc *mp = &slt->mem[win];
-	int reg = mp->window * PCIC_MEMSIZE + PCIC_MEMBASE;
+	int reg = win * PCIC_MEMSIZE + PCIC_MEMBASE;
 
+	if (win < 0 || win >= slt->ctrl->maxmem) {
+		printf("Illegal PCIC MEMORY window request %d\n", win);
+		return (ENXIO);
+	}
 	if (mp->flags & MDF_ACTIVE) {
 		unsigned long sys_addr = (uintptr_t)(void *)mp->start >> 12;
 		/*
@@ -166,36 +202,36 @@ pcic_memory(struct slot *slt, int win)
 		 * The values are all stored as the upper 12 bits of the
 		 * 24 bit address i.e everything is allocated as 4 Kb chunks.
 		 */
-		putw(sp, reg, sys_addr & 0xFFF);
-		putw(sp, reg+2, (sys_addr + (mp->size >> 12) - 1) & 0xFFF);
-		putw(sp, reg+4, ((mp->card >> 12) - sys_addr) & 0x3FFF);
+		pcic_putw(sp, reg, sys_addr & 0xFFF);
+		pcic_putw(sp, reg+2, (sys_addr + (mp->size >> 12) - 1) & 0xFFF);
+		pcic_putw(sp, reg+4, ((mp->card >> 12) - sys_addr) & 0x3FFF);
 		/*
 		 *	Each 16 bit register has some flags in the upper bits.
 		 */
 		if (mp->flags & MDF_16BITS)
-			setb(sp, reg+1, PCIC_DATA16);
+			pcic_setb(sp, reg+1, PCIC_DATA16);
 		if (mp->flags & MDF_ZEROWS)
-			setb(sp, reg+1, PCIC_ZEROWS);
+			pcic_setb(sp, reg+1, PCIC_ZEROWS);
 		if (mp->flags & MDF_WS0)
-			setb(sp, reg+3, PCIC_MW0);
+			pcic_setb(sp, reg+3, PCIC_MW0);
 		if (mp->flags & MDF_WS1)
-			setb(sp, reg+3, PCIC_MW1);
+			pcic_setb(sp, reg+3, PCIC_MW1);
 		if (mp->flags & MDF_ATTR)
-			setb(sp, reg+5, PCIC_REG);
+			pcic_setb(sp, reg+5, PCIC_REG);
 		if (mp->flags & MDF_WP)
-			setb(sp, reg+5, PCIC_WP);
+			pcic_setb(sp, reg+5, PCIC_WP);
 		/*
 		 * Enable the memory window. By experiment, we need a delay.
 		 */
-		setb(sp, PCIC_ADDRWINE, (1<<win) | PCIC_MEMCS16);
+		pcic_setb(sp, PCIC_ADDRWINE, (1<<win) | PCIC_MEMCS16);
 		DELAY(50);
 	} else {
-		clrb(sp, PCIC_ADDRWINE, 1<<win);
-		putw(sp, reg, 0);
-		putw(sp, reg+2, 0);
-		putw(sp, reg+4, 0);
+		pcic_clrb(sp, PCIC_ADDRWINE, 1<<win);
+		pcic_putw(sp, reg, 0);
+		pcic_putw(sp, reg+2, 0);
+		pcic_putw(sp, reg+4, 0);
 	}
-	return(0);
+	return (0);
 }
 
 /*
@@ -222,13 +258,14 @@ pcic_io(struct slot *slt, int win)
 		reg = PCIC_IO1;
 		break;
 	default:
-		panic("Illegal PCIC I/O window request!");
+		printf("Illegal PCIC I/O window request %d\n", win);
+		return (ENXIO);
 	}
 	if (ip->flags & IODF_ACTIVE) {
 		unsigned char x, ioctlv;
 
-		putw(sp, reg, ip->start);
-		putw(sp, reg+2, ip->start+ip->size-1);
+		pcic_putw(sp, reg, ip->start);
+		pcic_putw(sp, reg+2, ip->start+ip->size-1);
 		x = 0;
 		if (ip->flags & IODF_ZEROWS)
 			x |= PCIC_IO_0WS;
@@ -254,317 +291,160 @@ pcic_io(struct slot *slt, int win)
 			break;
 		}
 		DELAY(100);
-		setb(sp, PCIC_ADDRWINE, mask);
+		pcic_setb(sp, PCIC_ADDRWINE, mask);
 		DELAY(100);
 	} else {
-		clrb(sp, PCIC_ADDRWINE, mask);
+		pcic_clrb(sp, PCIC_ADDRWINE, mask);
 		DELAY(100);
-		putw(sp, reg, 0);
-		putw(sp, reg + 2, 0);
+		pcic_putw(sp, reg, 0);
+		pcic_putw(sp, reg + 2, 0);
 	}
-	return(0);
+	return (0);
 }
 
-/*
- *	Look for an Intel PCIC (or compatible).
- *	For each available slot, allocate a PC-CARD slot.
- */
-
-/*
- *	VLSI 82C146 has incompatibilities about the I/O address of slot 1.
- *	Assume it's the only PCIC whose vendor ID is 0x84,
- *	contact Warner Losh <imp@freebsd.org> if correct.
- */
-static int
-pcic_probe(device_t dev)
+static void
+pcic_do_mgt_irq(struct pcic_slot *sp, int irq)
 {
-	int slotnum, validslots = 0;
-	struct slot *slt;
-	struct pcic_slot *sp;
-	unsigned char c;
-	char *name;
-	int error;
-	struct resource *r;
-	int rid;
-	static int maybe_vlsi = 0;
+	u_int32_t	reg;
 
-	/* Check isapnp ids */
-	error = ISA_PNP_PROBE(device_get_parent(dev), dev, pcic_ids);
-	if (error == ENXIO)
-		return (ENXIO);
-
-	/*
-	 *	Initialise controller information structure.
-	 */
-	cinfo.mapmem = pcic_memory;
-	cinfo.mapio = pcic_io;
-	cinfo.ioctl = pcic_ioctl;
-	cinfo.power = pcic_power;
-	cinfo.mapirq = pcic_mapirq;
-	cinfo.reset = pcic_reset;
-	cinfo.disable = pcic_disable;
-	cinfo.resume = pcic_resume;
-	cinfo.maxmem = PCIC_MEM_WIN;
-	cinfo.maxio = PCIC_IO_WIN;
-
-	if (bus_get_resource_start(dev, SYS_RES_IOPORT, 0) == 0)
-		bus_set_resource(dev, SYS_RES_IOPORT, 0, PCIC_INDEX0, 2);
-	rid = 0;
-	r = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
-	if (!r) {
-		if (bootverbose)
-			device_printf(dev, "Cannot get I/O range\n");
-		return ENOMEM;
+	if (sp->sc->csc_route == pcic_iw_pci) {
+		/* Do the PCI side of things: Enable the Card Change int */
+		reg = CB_SM_CD;
+		bus_space_write_4(sp->bst, sp->bsh, CB_SOCKET_MASK, reg);
+		/*
+		 * TI Chips need us to set the following.  We tell the
+		 * controller to route things via PCI interrupts.  Also
+		 * we clear the interrupt number in the STAT_INT register
+		 * as well.  The TI-12xx and newer chips require one or the
+		 * other of these to happen, depending on what is set in the
+		 * diagnostic register.  I do both on the theory that other
+		 * chips might need one or the other and that no harm will
+		 * come from it.  If there is harm, then I'll make it a bit
+		 * in the tables.
+		 */
+		pcic_setb(sp, PCIC_INT_GEN, PCIC_INTR_ENA);
+		pcic_clrb(sp, PCIC_STAT_INT, PCIC_CSCSELECT);
+	} else {
+		/* Management IRQ changes */
+		/*
+		 * The PCIC_INTR_ENA bit means either "tie the function
+		 * and csc interrupts together" or "Route csc interrupts
+		 * via PCI" or "Reserved".  In any case, we want to clear
+		 * it since we're using ISA interrupts.
+		 */
+		pcic_clrb(sp, PCIC_INT_GEN, PCIC_INTR_ENA);
+		irq = host_irq_to_pcic(irq);
+		sp->putb(sp, PCIC_STAT_INT, (irq << PCIC_SI_IRQ_SHIFT) | 
+		    PCIC_CDEN);
 	}
-
-	sp = &pcic_slots[validunits * PCIC_CARD_SLOTS];
-	for (slotnum = 0; slotnum < PCIC_CARD_SLOTS; slotnum++, sp++) {
-		/*
-		 *	Initialise the PCIC slot table.
-		 */
-		sp->getb = getb1;
-		sp->putb = putb1;
-		sp->index = rman_get_start(r);
-		sp->data = sp->index + 1;
-		sp->offset = slotnum * PCIC_SLOT_SIZE;
-		/*
-		 * XXX - Screwed up slot 1 on the VLSI chips.  According to
-		 * the Linux PCMCIA code from David Hinds, working chipsets
-		 * return 0x84 from their (correct) ID ports, while the broken
-		 * ones would need to be probed at the new offset we set after
-		 * we assume it's broken.
-		 */
-		if (slotnum == 1 && maybe_vlsi && sp->getb(sp, PCIC_ID_REV) != 0x84) {
-			sp->index += 4;
-			sp->data += 4;
-			sp->offset = PCIC_SLOT_SIZE << 1;
-		}
-		/*
-		 * see if there's a PCMCIA controller here
-		 * Intel PCMCIA controllers use 0x82 and 0x83
-		 * IBM clone chips use 0x88 and 0x89, apparently
-		 */
-		c = sp->getb(sp, PCIC_ID_REV);
-		sp->revision = -1;
-		switch(c) {
-		/*
-		 *	82365 or clones.
-		 */
-		case 0x82:
-		case 0x83:
-			sp->controller = PCIC_I82365;
-			sp->revision = c & 1;
-			/*
-			 *	Now check for VADEM chips.
-			 */
-			outb(sp->index, 0x0E);
-			outb(sp->index, 0x37);
-			setb(sp, 0x3A, 0x40);
-			c = sp->getb(sp, PCIC_ID_REV);
-			if (c & 0x08) {
-				switch (sp->revision = c & 7) {
-				case 1:
-					sp->controller = PCIC_VG365;
-					break;
-				case 2:
-					sp->controller = PCIC_VG465;
-					break;
-				case 3:
-					sp->controller = PCIC_VG468;
-					break;
-				default:
-					sp->controller = PCIC_VG469;
-					break;
-				}
-				clrb(sp, 0x3A, 0x40);
-			}
-
-			/*
-			 * Check for RICOH RF5C396 PCMCIA Controller
-			 */
-			c = sp->getb(sp, 0x3a);
-			if (c == 0xb2) {
-				sp->controller = PCIC_RF5C396;
-			}
-
-			break;
-		/*
-		 *	VLSI chips.
-		 */
-		case 0x84:
-			sp->controller = PCIC_VLSI;
-			maybe_vlsi = 1;
-			break;
-		case 0x88:
-		case 0x89:
-			sp->controller = PCIC_IBM;
-			sp->revision = c & 1;
-			break;
-		case 0x8a:
-			sp->controller = PCIC_IBM_KING;
-			sp->revision = c & 1;
-			break;
-		default:
-			continue;
-		}
-		/*
-		 *	Check for Cirrus logic chips.
-		 */
-		sp->putb(sp, 0x1F, 0);
-		c = sp->getb(sp, 0x1F);
-		if ((c & 0xC0) == 0xC0) {
-			c = sp->getb(sp, 0x1F);
-			if ((c & 0xC0) == 0) {
-				if (c & 0x20)
-					sp->controller = PCIC_PD672X;
-				else
-					sp->controller = PCIC_PD6710;
-				sp->revision = 8 - ((c & 0x1F) >> 2);
-			}
-		}
-		switch(sp->controller) {
-		case PCIC_I82365:
-			name = "Intel i82365";
-			break;
-		case PCIC_IBM:
-			name = "IBM PCIC";
-			break;
-		case PCIC_IBM_KING:
-			name = "IBM KING PCMCIA Controller";
-			break;
-		case PCIC_PD672X:
-			name = "Cirrus Logic PD672X";
-			break;
-		case PCIC_PD6710:
-			name = "Cirrus Logic PD6710";
-			break;
-		case PCIC_VG365:
-			name = "Vadem 365";
-			break;
-		case PCIC_VG465:
-			name = "Vadem 465";
-			break;
-		case PCIC_VG468:
-			name = "Vadem 468";
-			break;
-		case PCIC_VG469:
-			name = "Vadem 469";
-			break;
-		case PCIC_RF5C396:
-			name = "Ricoh RF5C396";
-			break;
-		case PCIC_VLSI:
-			name = "VLSI 82C146";
-			break;
-		default:
-			name = "Unknown!";
-			break;
-		}
-		device_set_desc(dev, name);
-		/*
-		 *	OK it seems we have a PCIC or lookalike.
-		 *	Allocate a slot and initialise the data structures.
-		 */
-		validslots++;
-		sp->slotnum = slotnum + validunits * PCIC_CARD_SLOTS;
-		slt = pccard_alloc_slot(&cinfo);
-		if (slt == 0)
-			continue;
-		slt->cdata = sp;
-		sp->slt = slt;
-		/*
-		 * Modem cards send the speaker audio (dialing noises)
-		 * to the host's speaker.  Cirrus Logic PCIC chips must
-		 * enable this.  There is also a Low Power Dynamic Mode bit
-		 * that claims to reduce power consumption by 30%, so
-		 * enable it and hope for the best.
-		 */
-		if (sp->controller == PCIC_PD672X) {
-			setb(sp, PCIC_MISC1, PCIC_SPKR_EN);
-			setb(sp, PCIC_MISC2, PCIC_LPDM_EN);
-		}
-	}
-	bus_release_resource(dev, SYS_RES_IOPORT, rid, r);
-	return(validslots ? 0 : ENXIO);
 }
 
-static int
+int
 pcic_attach(device_t dev)
 {
-	void		 *ih;
-	int rid;
-	struct resource *r;
-	int irq;
-	int error;
+	int		i;
+	device_t	kid;
+	struct pcic_softc *sc;
+	struct slot	*slt;
 	struct pcic_slot *sp;
-	int i;
-	int stat;
 	
-	SET_UNIT(dev, validunits);
-	sp = &pcic_slots[GET_UNIT(dev) * PCIC_CARD_SLOTS];
+	sc = (struct pcic_softc *) device_get_softc(dev);
+	callout_handle_init(&sc->timeout_ch);
+	sp = &sc->slots[0];
 	for (i = 0; i < PCIC_CARD_SLOTS; i++, sp++) {
-		if (sp->slt)
-			device_add_child(dev, NULL, -1);
-	}
-	validunits++;
-
-	rid = 0;
-	r = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
-	if (!r) {
-		return ENXIO;
-	}
-
-	irq = bus_get_resource_start(dev, SYS_RES_IRQ, 0);
-	if (irq == 0) {
-		/* See if the user has requested a specific IRQ */
-		if (!getenv_int("machdep.pccard.pcic_irq", &irq))
-			irq = 0;
-	}
-	rid = 0;
-	r = 0;
-	if (irq >= 0) {
-		r = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, irq,
-		    ~0, 1, RF_ACTIVE);
-	}
-	if (r) {
-		error = bus_setup_intr(dev, r, INTR_TYPE_MISC,
-		    pcicintr, (void *) GET_UNIT(dev), &ih);
-		if (error) {
-			bus_release_resource(dev, SYS_RES_IRQ, rid, r);
-			return error;
+		if (!sp->slt)
+			continue;
+		sp->slt = 0;
+		kid = device_add_child(dev, NULL, -1);
+		if (kid == NULL) {
+			device_printf(dev, "Can't add pccard bus slot %d", i);
+			return (ENXIO);
 		}
-		irq = rman_get_start(r);
-		device_printf(dev, "management irq %d\n", irq);
-	} else {
-		irq = 0;
-	}
-	if (irq == 0) {
-		pcictimeout_ch = timeout(pcictimeout, (void *) GET_UNIT(dev), hz/2);
-		device_printf(dev, "Polling mode\n");
+		device_probe_and_attach(kid);
+		slt = pccard_init_slot(kid, &pcic_cinfo);
+		if (slt == 0) {
+			device_printf(dev, "Can't get pccard info slot %d", i);
+			return (ENXIO);
+		}
+		sc->slotmask |= (1 << i);
+		slt->cdata = sp;
+		sp->slt = slt;
+		sp->sc = sc;
 	}
 
-	sp = &pcic_slots[GET_UNIT(dev) * PCIC_CARD_SLOTS];
+	sp = &sc->slots[0];
 	for (i = 0; i < PCIC_CARD_SLOTS; i++, sp++) {
-		/* Assign IRQ */
-		sp->putb(sp, PCIC_STAT_INT, (irq << 4) | 0xF);
-
-		/* Check for changes */
-		setb(sp, PCIC_POWER, PCIC_PCPWRE| PCIC_DISRST);
 		if (sp->slt == NULL)
 			continue;
-		stat = sp->getb(sp, PCIC_STATUS);
-		if (bootverbose)
-			printf("stat is %x\n", stat);
-		if ((stat & PCIC_CD) != PCIC_CD) {
-			sp->slt->laststate = sp->slt->state = empty;
-		} else {
-			sp->slt->laststate = sp->slt->state = filled;
-			pccard_event(sp->slt, card_inserted);
-		}
-		sp->slt->irq = irq;
+
+		pcic_do_mgt_irq(sp, sc->irq);
+		sp->slt->irq = sc->irq;
+
+		/* Check for changes */
+		pcic_setb(sp, PCIC_POWER, PCIC_PCPWRE | PCIC_DISRST);
+		sp->slt->laststate = sp->slt->state = empty;
+		pcic_do_stat_delta(sp);
 	}
 
 	return (bus_generic_attach(dev));
+}
+
+
+static int
+pcic_sresource(struct slot *slt, caddr_t data)
+{
+	struct pccard_resource *pr;
+	struct resource *r;
+	int flags;
+	int rid = 0;
+	device_t bridgedev = slt->dev;
+	struct pcic_slot *sp = slt->cdata;
+
+	pr = (struct pccard_resource *)data;
+	pr->resource_addr = ~0ul;
+
+	/*
+	 * If we're using PCI interrupt routing, then force the IRQ to
+	 * use and to heck with what the user requested.  If they want
+	 * to be able to request IRQs, they must use ISA interrupt
+	 * routing.  If we don't give them an irq, and it is the
+	 * pccardd 0,0 case, then just return (giving the "bad resource"
+	 * return in pr->resource_addr).
+	 */
+	if (pr->type == SYS_RES_IRQ) {
+		if (sp->sc->func_route >= pcic_iw_pci) {
+			pr->resource_addr = sp->sc->irq;
+			return (0);
+		}
+		if (pr->min == 0 && pr->max == 0)
+			return (0);
+	}
+
+	/*
+	 * Make sure we grok this type.
+	 */
+	switch(pr->type) {
+	default:
+		return (EINVAL);
+	case SYS_RES_MEMORY:
+	case SYS_RES_IRQ:
+	case SYS_RES_IOPORT:
+		break;
+	}
+
+	/*
+	 * Allocate the resource, and align it to the most natural
+	 * size.  If we get it, then tell userland what we actually got
+	 * in the range they requested.
+	 */
+	flags = rman_make_alignment_flags(pr->size);
+	r = bus_alloc_resource(bridgedev, pr->type, &rid, pr->min, pr->max,
+	   pr->size, flags);
+	if (r != NULL) {
+		pr->resource_addr = (u_long)rman_get_start(r);
+		bus_release_resource(bridgedev, pr->type, rid, r);
+	}
+	return (0);
 }
 
 /*
@@ -574,23 +454,85 @@ static int
 pcic_ioctl(struct slot *slt, int cmd, caddr_t data)
 {
 	struct pcic_slot *sp = slt->cdata;
+	struct pcic_reg *preg = (struct pcic_reg *) data;
 
 	switch(cmd) {
 	default:
-		return(ENOTTY);
-	/*
-	 * Get/set PCIC registers
-	 */
-	case PIOCGREG:
-		((struct pcic_reg *)data)->value =
-			sp->getb(sp, ((struct pcic_reg *)data)->reg);
-		break;
+		return (ENOTTY);
+	case PIOCGREG:			/* Get pcic register */
+		preg->value = sp->getb(sp, preg->reg);
+		break;			/* Set pcic register */
 	case PIOCSREG:
-		sp->putb(sp, ((struct pcic_reg *)data)->reg,
-			((struct pcic_reg *)data)->value);
+		sp->putb(sp, preg->reg, preg->value);
+		break;
+	case PIOCSRESOURCE:		/* Can I use this resource? */
+		pcic_sresource(slt, data);
 		break;
 	}
-	return(0);
+	return (0);
+}
+
+/*
+ *	pcic_cardbus_power
+ *
+ *	Power the card up, as specified, using the cardbus power
+ *	registers to control power.  Microsoft recommends that cardbus
+ *	vendors support powering the card via cardbus registers because
+ *	there is no standard for 3.3V cards.  Since at least a few of the
+ *	cardbus bridges have minor issues with power via the ExCA registers,
+ *	go ahead and do it all via cardbus registers.
+ *
+ *	An expamination of the code will show the relative
+ *	ease that we do Vpp as well.
+ *
+ *	Too bad it appears to not work.
+ */
+static int
+pcic_cardbus_power(struct pcic_slot *sp, struct slot *slt)
+{
+	uint32_t reg;
+
+	/*
+	 * Preserve the clock stop bit of the socket power register.
+	 */
+	reg = bus_space_read_4(sp->bst, sp->bsh, CB_SOCKET_POWER);
+	printf("old value 0x%x\n", reg);
+	reg &= CB_SP_CLKSTOP;
+
+	switch(slt->pwr.vpp) {
+	default:
+		return (EINVAL);
+	case 0:
+		reg |= CB_SP_VPP_0V;
+		break;
+	case 33:
+		reg |= CB_SP_VPP_3V;
+		break;
+	case 50:
+		reg |= CB_SP_VPP_5V;
+		break;
+	case 120:
+		reg |= CB_SP_VPP_12V;
+		break;
+	}
+
+	switch(slt->pwr.vcc) {
+	default:
+		return (EINVAL);
+	case 0:
+		reg |= CB_SP_VCC_0V;
+		break;
+	case 33:
+		reg |= CB_SP_VCC_3V;
+		break;
+	case 50:
+		reg |= CB_SP_VCC_5V;
+		break;
+	}
+	printf("Setting power reg to 0x%x", reg);
+	bus_space_write_4(sp->bst, sp->bsh, CB_SOCKET_POWER, reg);
+
+	return (EIO);
 }
 
 /*
@@ -600,66 +542,103 @@ pcic_ioctl(struct slot *slt, int cmd, caddr_t data)
 static int
 pcic_power(struct slot *slt)
 {
-	unsigned char reg = PCIC_DISRST|PCIC_PCPWRE;
+	unsigned char c;
+	unsigned char reg = PCIC_DISRST | PCIC_PCPWRE;
 	struct pcic_slot *sp = slt->cdata;
+	struct pcic_softc *sc = sp->sc;
 
-	switch(sp->controller) {
-	case PCIC_PD672X:
-	case PCIC_PD6710:
-	case PCIC_VG365:
-	case PCIC_VG465:
-	case PCIC_VG468:
-	case PCIC_VG469:
-	case PCIC_RF5C396:
-	case PCIC_VLSI:
-	case PCIC_IBM_KING:
-		switch(slt->pwr.vpp) {
-		default:
-			return(EINVAL);
-		case 0:
-			break;
-		case 50:
-		case 33:
-			reg |= PCIC_VPP_5V;
-			break;
-		case 120:
-			reg |= PCIC_VPP_12V;
+	/*
+	 * Cardbus power registers are completely different.
+	 */
+	if (sc->flags & PCIC_CARDBUS_POWER)
+		return (pcic_cardbus_power(sp, slt));
+
+	if (sc->flags & PCIC_DF_POWER) {
+		/* 
+		 * Look at the VS[12]# bits on the card.  If VS1 is clear
+		 * then we should apply 3.3 volts.
+		 */
+		c = sp->getb(sp, PCIC_CDGC);
+		if ((c & PCIC_VS1STAT) == 0)
+			slt->pwr.vcc = 33;
+	}
+
+	/*
+	 * XXX Note: The Vpp controls varies quit a bit between bridge chips
+	 * and the following might not be right in all cases.  The Linux
+	 * code and wildboar code bases are more complex.  However, most
+	 * applications want vpp == vcc and the following code does appear
+	 * to do that for all bridge sets.
+	 */
+	switch(slt->pwr.vpp) {
+	default:
+		return (EINVAL);
+	case 0:
+		break;
+	case 50:
+	case 33:
+		reg |= PCIC_VPP_5V;
+		break;
+	case 120:
+		reg |= PCIC_VPP_12V;
+		break;
+	}
+
+	if (slt->pwr.vcc)
+		reg |= PCIC_VCC_ON;		/* Turn on Vcc */
+	switch(slt->pwr.vcc) {
+	default:
+		return (EINVAL);
+	case 0:
+		break;
+	case 33:
+		/*
+		 * The wildboar code has comments that state that
+		 * the IBM KING controller doesn't support 3.3V
+		 * on the "IBM Smart PC card drive".  The code
+		 * intemates that's the only place they have seen
+		 * it used and that there's a boatload of issues
+		 * with it.  I'm not even sure this is right because
+		 * the only docs I've been able to find say this is for
+		 * 5V power.  Of course, this "doc" is just code comments
+		 * so who knows for sure.
+		 */
+		if (sc->flags & PCIC_KING_POWER) {
+			reg |= PCIC_VCC_5V_KING;
 			break;
 		}
-		switch(slt->pwr.vcc) {
-		default:
-			return(EINVAL);
-		case 0:
+		if (sc->flags & PCIC_VG_POWER) {
+			pcic_setb(sp, PCIC_CVSR, PCIC_CVSR_VS);
 			break;
-		case 33:
-			if (sp->controller == PCIC_IBM_KING) {
-				reg |= PCIC_VCC_5V_KING;
-				break;
-			}
+		}
+		if (sc->flags & PCIC_PD_POWER) {
+			pcic_setb(sp, PCIC_MISC1, PCIC_MISC1_VCC_33);
+			break;
+		}
+		if (sc->flags & PCIC_RICOH_POWER) {
+			pcic_setb(sp, PCIC_RICOH_MCR2, PCIC_MCR2_VCC_33);
+			break;
+		}
+		if (sc->flags & PCIC_DF_POWER)
 			reg |= PCIC_VCC_3V;
-			if ((sp->controller == PCIC_VG468) ||
-				(sp->controller == PCIC_VG469) ||
-				(sp->controller == PCIC_VG465) ||
-				(sp->controller == PCIC_VG365))
-				setb(sp, 0x2f, 0x03) ;
-			else
-				setb(sp, 0x16, 0x02);
-			break;
-		case 50:
-                        if (sp->controller == PCIC_IBM_KING) {
-                                reg |= PCIC_VCC_5V_KING;
-                                break;
-                        }
-			reg |= PCIC_VCC_5V;
-			if ((sp->controller == PCIC_VG468) ||
-				(sp->controller == PCIC_VG469) ||
-				(sp->controller == PCIC_VG465) ||
-				(sp->controller == PCIC_VG365))
-				clrb(sp, 0x2f, 0x03) ;
-			else
-				clrb(sp, 0x16, 0x02);
-			break;
-		}
+		break;
+	case 50:
+		if (sc->flags & PCIC_KING_POWER)
+			reg |= PCIC_VCC_5V_KING;
+		/*
+		 * For all of the variant power schemes for 3.3V go
+		 * ahead and turn off the 3.3V enable bit.  For all
+		 * bridges, the setting the Vcc on bit does the rest.
+		 * Note that we don't have to turn off the 3.3V bit
+		 * for the '365 step D since with the reg assigments
+		 * to this point it doesn't get turned on.
+		 */
+		if (sc->flags & PCIC_VG_POWER)
+			pcic_clrb(sp, PCIC_CVSR, PCIC_CVSR_VS);
+		if (sc->flags & PCIC_PD_POWER)
+			pcic_clrb(sp, PCIC_MISC1, PCIC_MISC1_VCC_33);
+		if (sc->flags & PCIC_RICOH_POWER)
+			pcic_clrb(sp, PCIC_RICOH_MCR2, PCIC_MCR2_VCC_33);
 		break;
 	}
 	sp->putb(sp, PCIC_POWER, reg);
@@ -669,29 +648,33 @@ pcic_power(struct slot *slt)
 		sp->putb(sp, PCIC_POWER, reg);
 		DELAY(100*1000);
 	}
-	/* Some chips are smarter than us it seems, so if we weren't
-	 * allowed to use 5V, try 3.3 instead
+
+	/*
+	 * Some chipsets will attempt to preclude us from supplying
+	 * 5.0V to cards that only handle 3.3V.  We seem to need to
+	 * try 3.3V to paper over some power handling issues in other
+	 * parts of the system.  I suspect they are in the pccard bus
+	 * driver, but may be in pccardd as well.
 	 */
-	if (!(sp->getb(sp, PCIC_STATUS) &  0x40) && slt->pwr.vcc == 50) {
+	if (!(sp->getb(sp, PCIC_STATUS) & PCIC_POW) && slt->pwr.vcc == 50) {
 		slt->pwr.vcc = 33;
 		slt->pwr.vpp = 0;
 		return (pcic_power(slt));
 	}
-	return(0);
+	return (0);
 }
 
 /*
  * tell the PCIC which irq we want to use.  only the following are legal:
- * 3, 4, 5, 7, 9, 10, 11, 12, 14, 15
+ * 3, 4, 5, 7, 9, 10, 11, 12, 14, 15.  We require the callers of this
+ * routine to do the check for legality.
  */
 static void
 pcic_mapirq(struct slot *slt, int irq)
 {
 	struct pcic_slot *sp = slt->cdata;
-	if (irq == 0)
-		clrb(sp, PCIC_INT_GEN, 0xF);
-	else
-		sp->putb(sp, PCIC_INT_GEN, (sp->getb(sp, PCIC_INT_GEN) & 0xF0) | irq);
+
+	sp->sc->chip->map_irq(sp, irq);
 }
 
 /*
@@ -703,20 +686,36 @@ pcic_reset(void *chan)
 	struct slot *slt = chan;
 	struct pcic_slot *sp = slt->cdata;
 
+	if (bootverbose)
+		device_printf(sp->sc->dev, "reset %d ", slt->insert_seq);
 	switch (slt->insert_seq) {
-	    case 0: /* Something funny happended on the way to the pub... */
+	case 0: /* Something funny happended on the way to the pub... */
+		if (bootverbose)
+			printf("\n");
 		return;
-	    case 1: /* Assert reset */
-		clrb(sp, PCIC_INT_GEN, PCIC_CARDRESET);
+	case 1: /* Assert reset */
+		pcic_clrb(sp, PCIC_INT_GEN, PCIC_CARDRESET);
+		if (bootverbose)
+			printf("int is %x stat is %x\n",
+			    sp->getb(sp, PCIC_INT_GEN),
+			    sp->getb(sp, PCIC_STATUS));
 		slt->insert_seq = 2;
 		timeout(pcic_reset, (void *)slt, hz/4);
 		return;
-	    case 2: /* Deassert it again */
-		setb(sp, PCIC_INT_GEN, PCIC_CARDRESET|PCIC_IOCARD);
+	case 2: /* Deassert it again */
+		pcic_setb(sp, PCIC_INT_GEN, PCIC_CARDRESET | PCIC_IOCARD);
+		if (bootverbose)
+			printf("int is %x stat is %x\n",
+			    sp->getb(sp, PCIC_INT_GEN),
+			    sp->getb(sp, PCIC_STATUS));
 		slt->insert_seq = 3;
 		timeout(pcic_reset, (void *)slt, hz/4);
 		return;
-	    case 3: /* Wait if card needs more time */
+	case 3: /* Wait if card needs more time */
+		if (bootverbose)
+			printf("int is %x stat is %x\n",
+			    sp->getb(sp, PCIC_INT_GEN),
+			    sp->getb(sp, PCIC_STATUS));
 		if (!sp->getb(sp, PCIC_STATUS) & PCIC_READY) {
 			timeout(pcic_reset, (void *)slt, hz/10);
 			return;
@@ -742,52 +741,9 @@ pcic_disable(struct slot *slt)
 {
 	struct pcic_slot *sp = slt->cdata;
 
-	sp->putb(sp, PCIC_INT_GEN, 0);
+	pcic_clrb(sp, PCIC_INT_GEN, PCIC_CARDTYPE | PCIC_CARDRESET);
+	pcic_mapirq(slt, 0);
 	sp->putb(sp, PCIC_POWER, 0);
-}
-
-/*
- *	PCIC timer.  If the controller doesn't have a free IRQ to use
- *	or if interrupt steering doesn't work, poll the controller for
- *	insertion/removal events.
- */
-static void
-pcictimeout(void *chan)
-{
-	pcicintr(chan);
-	pcictimeout_ch = timeout(pcictimeout, chan, hz/2);
-}
-
-/*
- *	PCIC Interrupt handler.
- *	Check each slot in turn, and read the card status change
- *	register. If this is non-zero, then a change has occurred
- *	on this card, so send an event to the main code.
- */
-static void
-pcicintr(void *arg)
-{
-	int	slot, s;
-	unsigned char chg;
-	int unit = (int) arg;
-	struct pcic_slot *sp = &pcic_slots[unit * PCIC_CARD_SLOTS];
-
-	s = splhigh();
-	for (slot = 0; slot < PCIC_CARD_SLOTS; slot++, sp++) {
-		if (sp->slt && (chg = sp->getb(sp, PCIC_STAT_CHG)) != 0) {
-			if (bootverbose)
-				printf("Slot %d chg = 0x%x\n", slot, chg);
-			if (chg & PCIC_CDTCH) {
-				if ((sp->getb(sp, PCIC_STATUS) & PCIC_CD) ==
-						PCIC_CD) {
-					pccard_event(sp->slt, card_inserted);
-				} else {
-					pccard_event(sp->slt, card_removed);
-				}
-			}
-		}
-	}
-	splx(s);
 }
 
 /*
@@ -798,19 +754,25 @@ pcic_resume(struct slot *slt)
 {
 	struct pcic_slot *sp = slt->cdata;
 
-	sp->putb(sp, PCIC_STAT_INT, (slt->irq << 4) | 0xF);
+	pcic_do_mgt_irq(sp, slt->irq);
 	if (sp->controller == PCIC_PD672X) {
-		setb(sp, PCIC_MISC1, PCIC_SPKR_EN);
-		setb(sp, PCIC_MISC2, PCIC_LPDM_EN);
+		pcic_setb(sp, PCIC_MISC1, PCIC_MISC1_SPEAKER);
+		pcic_setb(sp, PCIC_MISC2, PCIC_LPDM_EN);
 	}
+	if (sp->slt->state != inactive)
+		pcic_do_stat_delta(sp);
 }
 
-static int
+int
 pcic_activate_resource(device_t dev, device_t child, int type, int rid,
     struct resource *r)
 {
 	struct pccard_devinfo *devi = device_get_ivars(child);
 	int err;
+
+	if (dev != device_get_parent(device_get_parent(child)) || devi == NULL)
+		return (bus_generic_activate_resource(dev, child, type,
+		    rid, r));
 
 	switch (type) {
 	case SYS_RES_IOPORT: {
@@ -827,7 +789,7 @@ pcic_activate_resource(device_t dev, device_t child, int type, int rid,
 		ip->size = rman_get_end(r) - rman_get_start(r) + 1;
 		err = pcic_io(devi->slt, rid);
 		if (err)
-			return err;
+			return (err);
 		break;
 	}
 	case SYS_RES_IRQ:
@@ -840,38 +802,41 @@ pcic_activate_resource(device_t dev, device_t child, int type, int rid,
 	case SYS_RES_MEMORY: {
 		struct mem_desc *mp;
 		if (rid >= NUM_MEM_WINDOWS)
-			return EINVAL;
+			return (EINVAL);
 		mp = &devi->slt->mem[rid];
 		mp->flags |= MDF_ACTIVE;
 		mp->start = (caddr_t) rman_get_start(r);
 		mp->size = rman_get_end(r) - rman_get_start(r) + 1;
 		err = pcic_memory(devi->slt, rid);
 		if (err)
-			return err;
+			return (err);
 		break;
 	}
 	default:
 		break;
 	}
 	err = bus_generic_activate_resource(dev, child, type, rid, r);
-	return err;
+	return (err);
 }
 
-static int
+int
 pcic_deactivate_resource(device_t dev, device_t child, int type, int rid,
     struct resource *r)
 {
 	struct pccard_devinfo *devi = device_get_ivars(child);
 	int err;
 
+	if (dev != device_get_parent(device_get_parent(child)) || devi == NULL)
+		return (bus_generic_deactivate_resource(dev, child, type,
+		    rid, r));
+
 	switch (type) {
 	case SYS_RES_IOPORT: {
 		struct io_desc *ip = &devi->slt->io[rid];
 		ip->flags &= ~IODF_ACTIVE;
 		err = pcic_io(devi->slt, rid);
-		if (err) {
-			return err;
-		}
+		if (err)
+			return (err);
 		break;
 	}
 	case SYS_RES_IRQ:
@@ -880,24 +845,30 @@ pcic_deactivate_resource(device_t dev, device_t child, int type, int rid,
 		struct mem_desc *mp = &devi->slt->mem[rid];
 		mp->flags &= ~(MDF_ACTIVE | MDF_ATTR);
 		err = pcic_memory(devi->slt, rid);
-		if (err) {
-			return err;
-		}
+		if (err)
+			return (err);
 		break;
 	}
 	default:
 		break;
 	}
 	err = bus_generic_deactivate_resource(dev, child, type, rid, r);
-	return err;
+	return (err);
 }
 
-static int
+int
 pcic_setup_intr(device_t dev, device_t child, struct resource *irq,
     int flags, driver_intr_t *intr, void *arg, void **cookiep)
 {
+	struct pcic_softc *sc = device_get_softc(dev);
 	struct pccard_devinfo *devi = device_get_ivars(child);
 	int err;
+
+	if (((1 << rman_get_start(irq)) & PCIC_INT_MASK_ALLOWED) == 0) {
+		device_printf(dev, "Hardware does not support irq %ld.\n",
+		    rman_get_start(irq));
+		return (EINVAL);
+	}
 
 	err = bus_generic_setup_intr(dev, child, irq, flags, intr, arg,
 	    cookiep);
@@ -909,7 +880,7 @@ pcic_setup_intr(device_t dev, device_t child, struct resource *irq,
 	return (err);
 }
 
-static int
+int
 pcic_teardown_intr(device_t dev, device_t child, struct resource *irq,
     void *cookie)
 {
@@ -919,7 +890,7 @@ pcic_teardown_intr(device_t dev, device_t child, struct resource *irq,
 	return (bus_generic_teardown_intr(dev, child, irq, cookie));
 }
 
-static int
+int
 pcic_set_res_flags(device_t bus, device_t child, int restype, int rid,
     u_long value)
 {
@@ -930,14 +901,17 @@ pcic_set_res_flags(device_t bus, device_t child, int restype, int rid,
 	case SYS_RES_MEMORY: {
 		struct mem_desc *mp = &devi->slt->mem[rid];
 		switch (value) {
-		case 0:
+		case PCCARD_A_MEM_COM:
 			mp->flags &= ~MDF_ATTR;
 			break;
-		case 1:
+		case PCCARD_A_MEM_ATTR:
 			mp->flags |= MDF_ATTR;
 			break;
-		case 2:
+		case PCCARD_A_MEM_8BIT:
 			mp->flags &= ~MDF_16BITS;
+			break;
+		case PCCARD_A_MEM_16BIT:
+			mp->flags |= MDF_16BITS;
 			break;
 		}
 		err = pcic_memory(devi->slt, rid);
@@ -949,7 +923,7 @@ pcic_set_res_flags(device_t bus, device_t child, int restype, int rid,
 	return (err);
 }
 
-static int
+int
 pcic_get_res_flags(device_t bus, device_t child, int restype, int rid,
     u_long *value)
 {
@@ -973,21 +947,28 @@ pcic_get_res_flags(device_t bus, device_t child, int restype, int rid,
 	default:
 		err = EOPNOTSUPP;
 	}
-	return (0);
+	return (err);
 }
 
-static int
-pcic_set_memory_offset(device_t bus, device_t child, int rid, u_int32_t offset)
+int
+pcic_set_memory_offset(device_t bus, device_t child, int rid, u_int32_t offset
+#if __FreeBSD_version >= 500000
+    ,u_int32_t *deltap
+#endif
+    )
 {
 	struct pccard_devinfo *devi = device_get_ivars(child);
 	struct mem_desc *mp = &devi->slt->mem[rid];
 
 	mp->card = offset;
-
+#if __FreeBSD_version >= 500000
+	if (deltap)
+		*deltap = 0;			/* XXX BAD XXX */
+#endif
 	return (pcic_memory(devi->slt, rid));
 }
 
-static int
+int
 pcic_get_memory_offset(device_t bus, device_t child, int rid, u_int32_t *offset)
 {
 	struct pccard_devinfo *devi = device_get_ivars(child);
@@ -1001,39 +982,112 @@ pcic_get_memory_offset(device_t bus, device_t child, int rid, u_int32_t *offset)
 	return (0);
 }
 
-static device_method_t pcic_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_probe,		pcic_probe),
-	DEVMETHOD(device_attach,	pcic_attach),
-	DEVMETHOD(device_detach,	bus_generic_detach),
-	DEVMETHOD(device_shutdown,	bus_generic_shutdown),
-	DEVMETHOD(device_suspend,	bus_generic_suspend),
-	DEVMETHOD(device_resume,	bus_generic_resume),
+struct resource *
+pcic_alloc_resource(device_t dev, device_t child, int type, int *rid,
+    u_long start, u_long end, u_long count, u_int flags)
+{
+	struct pcic_softc *sc = device_get_softc(dev);
 
-	/* Bus interface */
-	DEVMETHOD(bus_print_child,	bus_generic_print_child),
-	DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
-	DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
-	DEVMETHOD(bus_activate_resource, pcic_activate_resource),
-	DEVMETHOD(bus_deactivate_resource, pcic_deactivate_resource),
-	DEVMETHOD(bus_setup_intr,	pcic_setup_intr),
-	DEVMETHOD(bus_teardown_intr,	pcic_teardown_intr),
+	/*
+	 * If we're routing via pci, we can share.
+	 */
+	if (sc->func_route == pcic_iw_pci && type == SYS_RES_IRQ) {
+		if (bootverbose)
+			device_printf(child, "Forcing IRQ to %d\n", sc->irq);
+		start = end = sc->irq;
+		flags |= RF_SHAREABLE;
+	}
 
-	/* Card interface */
-	DEVMETHOD(card_set_res_flags,	pcic_set_res_flags),
-	DEVMETHOD(card_get_res_flags,	pcic_get_res_flags),
-	DEVMETHOD(card_set_memory_offset, pcic_set_memory_offset),
-	DEVMETHOD(card_get_memory_offset, pcic_get_memory_offset),
+	return (bus_generic_alloc_resource(dev, child, type, rid, start, end,
+	    count, flags));
+}
 
-	{ 0, 0 }
-};
+void
+pcic_do_stat_delta(struct pcic_slot *sp)
+{
+	if ((sp->getb(sp, PCIC_STATUS) & PCIC_CD) != PCIC_CD)
+		pccard_event(sp->slt, card_removed);
+	else
+		pccard_event(sp->slt, card_inserted);
+}
+/*
+ * Wrapper function for pcicintr so that signatures match.
+ */
+void
+pcic_isa_intr(void *arg)
+{
+	pcic_isa_intr1(arg);
+}
 
-devclass_t	pcic_devclass;
+/*
+ *	PCIC timer.  If the controller doesn't have a free IRQ to use
+ *	or if interrupt steering doesn't work, poll the controller for
+ *	insertion/removal events.
+ */
+void
+pcic_timeout(void *chan)
+{
+	struct pcic_softc *sc = (struct pcic_softc *) chan;
 
-static driver_t pcic_driver = {
-	"pcic",
-	pcic_methods,
-	sizeof(int)
-};
+	if (pcic_isa_intr1(chan) != 0) {
+		device_printf(sc->dev, 
+		    "Static bug detected, ignoring hardware.");
+		sc->slot_poll = 0;
+		return;
+	}
+	sc->timeout_ch = timeout(sc->slot_poll, chan, hz/2);
+}
 
-DRIVER_MODULE(pcic, isa, pcic_driver, pcic_devclass, 0, 0);
+/*
+ *	PCIC Interrupt handler.
+ *	Check each slot in turn, and read the card status change
+ *	register. If this is non-zero, then a change has occurred
+ *	on this card, so send an event to the main code.
+ */
+int
+pcic_isa_intr1(void *arg)
+{
+	int	slot, s;
+	u_int8_t chg;
+	struct pcic_softc *sc = (struct pcic_softc *) arg;
+	struct pcic_slot *sp = &sc->slots[0];
+
+	s = splhigh();
+	for (slot = 0; slot < PCIC_CARD_SLOTS; slot++, sp++) {
+		if (sp->slt == NULL)
+			continue;
+		if ((chg = sp->getb(sp, PCIC_STAT_CHG)) != 0) {
+			/*
+			 * if chg is 0xff, then we know that we've hit
+			 * the famous "static bug" for some desktop
+			 * pcmcia cards.  This is caused by static
+			 * discharge frying the poor card's mind and
+			 * it starts return 0xff forever.  We return
+			 * an error and stop polling the card.  When
+			 * we're interrupt based, we never see this.
+			 * The card just goes away silently.
+			 */
+			if (chg == 0xff) {
+				splx(s);
+				return (EIO);
+			}
+			if (chg & PCIC_CDTCH)
+				pcic_do_stat_delta(sp);
+		}
+	}
+	splx(s);
+	return (0);
+}
+
+int
+pcic_isa_mapirq(struct pcic_slot *sp, int irq)
+{
+	irq = host_irq_to_pcic(irq);
+	sp->sc->chip->func_intr_way(sp, pcic_iw_isa);
+	if (irq == 0)
+		pcic_clrb(sp, PCIC_INT_GEN, 0xF);
+	else
+		sp->putb(sp, PCIC_INT_GEN,
+		    (sp->getb(sp, PCIC_INT_GEN) & 0xF0) | irq);
+	return (0);
+}

@@ -26,7 +26,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/alpha/alpha/prom_disp.s,v 1.2.2.1 2000/07/03 19:59:44 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/alpha/prom_disp.s,v 1.2.2.2 2001/08/03 18:01:29 obrien Exp $
  */
 
 #ifndef _LOCORE
@@ -41,7 +41,9 @@ __KERNEL_RCSID(2, "$NetBSD: prom_disp.s,v 1.8 1997/11/03 04:22:03 ross Exp $");
 	.text
 	.align	4
 
-inc3:	.stabs	__FILE__,132,0,0,inc3; .loc	1 __LINE__
+inc3:	.stabs	__FILE__,132,0,0,inc3
+	.text 
+	.loc	1 __LINE__
 /*
  * Dispatcher routine.  Implements prom's calling machinery, saves our
  * callee-saved registers as required by C.

@@ -31,11 +31,13 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.2 2000/07/15 07:14:31 kris Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.4 2001/07/19 06:37:26 kris Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
 #define	_NETINET_IP_VAR_H_
+
+#include <sys/queue.h>
 
 /*
  * Overlay for ip header used by other protocols (tcp, udp).
@@ -86,6 +88,7 @@ struct ipoption {
  */
 struct ip_moptions {
 	struct	ifnet *imo_multicast_ifp; /* ifp for outgoing multicasts */
+	struct in_addr imo_multicast_addr; /* ifindex/addr on MULTICAST_IF */
 	u_char	imo_multicast_ttl;	/* TTL for outgoing multicasts */
 	u_char	imo_multicast_loop;	/* 1 => hear sends if a member */
 	u_short	imo_num_memberships;	/* no. memberships this socket */
@@ -122,6 +125,7 @@ struct	ipstat {
 	u_long	ips_toolong;		/* ip length > max ip packet size */
 	u_long	ips_notmember;		/* multicasts for unregistered grps */
 	u_long	ips_nogif;		/* no match gif found */
+	u_long	ips_badaddr;		/* invalid address on header */
 };
 
 #ifdef _KERNEL
@@ -138,7 +142,9 @@ struct route;
 struct sockopt;
 
 extern struct	ipstat	ipstat;
+#ifndef RANDOM_IP_ID
 extern u_short	ip_id;				/* ip packet ctr, for ids */
+#endif
 extern int	ip_defttl;			/* default IP ttl */
 extern int	ipforwarding;			/* ip forwarding */
 extern u_char	ip_protox[];
@@ -163,6 +169,10 @@ void	 ip_slowtimo __P((void));
 struct mbuf *
 	 ip_srcroute __P((void));
 void	 ip_stripoptions __P((struct mbuf *, struct mbuf *));
+#ifdef RANDOM_IP_ID
+u_int16_t	
+	 ip_randomid __P((void));
+#endif
 int	 rip_ctloutput __P((struct socket *, struct sockopt *));
 void	 rip_ctlinput __P((int, struct sockaddr *, void *));
 void	 rip_init __P((void));

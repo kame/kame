@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfs/nfs.h,v 1.53.2.2 2001/03/21 10:50:59 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfs.h,v 1.53.2.3 2001/09/11 09:49:54 kris Exp $
  */
 
 #ifndef _NFS_NFS_H_
@@ -198,9 +198,9 @@ struct nfsd_srvargs {
 	uid_t		nsd_uid;	/* Effective uid mapped to cred */
 	u_int32_t	nsd_haddr;	/* Ip address of client */
 	struct ucred	nsd_cr;		/* Cred. uid maps to */
-	int		nsd_authlen;	/* Length of auth string (ret) */
+	u_int		nsd_authlen;	/* Length of auth string (ret) */
 	u_char		*nsd_authstr;	/* Auth string (ret) */
-	int		nsd_verflen;	/* and the verfier */
+	u_int		nsd_verflen;	/* and the verfier */
 	u_char		*nsd_verfstr;
 	struct timeval	nsd_timestamp;	/* timestamp from verifier */
 	u_int32_t	nsd_ttl;	/* credential ttl (sec) */
@@ -211,9 +211,9 @@ struct nfsd_cargs {
 	char		*ncd_dirp;	/* Mount dir path */
 	uid_t		ncd_authuid;	/* Effective uid */
 	int		ncd_authtype;	/* Type of authenticator */
-	int		ncd_authlen;	/* Length of authenticator string */
+	u_int		ncd_authlen;	/* Length of authenticator string */
 	u_char		*ncd_authstr;	/* Authenticator string */
-	int		ncd_verflen;	/* and the verifier */
+	u_int		ncd_verflen;	/* and the verifier */
 	u_char		*ncd_verfstr;
 	NFSKERBKEY_T	ncd_key;	/* Session key */
 };

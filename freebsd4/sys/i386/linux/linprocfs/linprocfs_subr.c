@@ -38,7 +38,7 @@
  *
  *	@(#)procfs_subr.c	8.6 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_subr.c,v 1.3.2.3 2000/10/30 19:57:04 des Exp $
+ * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_subr.c,v 1.3.2.4 2001/06/25 19:46:47 pirzyk Exp $
  */
 
 #include <sys/param.h>
@@ -184,6 +184,7 @@ loop:
 	case Pstat:
 	case Puptime:
 	case Pversion:
+	case Ploadavg:
 		pfs->pfs_mode = (VREAD) |
 				(VREAD >> 3) |
 				(VREAD >> 6);
@@ -275,6 +276,9 @@ linprocfs_rw(ap)
 		break;
 	case Pversion:
 		rtval = linprocfs_doversion(curp, p, pfs, uio);
+		break;
+	case Ploadavg:
+		rtval = linprocfs_doloadavg(curp, p, pfs, uio);
 		break;
 	default:
 		rtval = EOPNOTSUPP;

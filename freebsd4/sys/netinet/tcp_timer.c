@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.34.2.6 2001/04/18 17:55:23 kris Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.34.2.11 2001/08/22 00:59:12 silby Exp $
  */
 
 #include "opt_compat.h"
@@ -41,6 +41,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/mbuf.h>
 #include <sys/sysctl.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -132,11 +133,6 @@ tcp_slowtimo()
 
 	tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
 
-#ifdef TCP_COMPAT_42
-	tcp_iss += TCP_ISSINCR/PR_SLOWHZ;		/* increment iss */
-	if ((int)tcp_iss < 0)
-		tcp_iss = TCP_ISSINCR;			/* XXX */
-#endif
 	splx(s);
 }
 
@@ -227,6 +223,7 @@ tcp_timer_keep(xtp)
 	void *xtp;
 {
 	struct tcpcb *tp = xtp;
+	struct tcptemp *t_template;
 	int s;
 #ifdef TCPDEBUG
 	int ostate;
@@ -264,19 +261,13 @@ tcp_timer_keep(xtp)
 		 * correspondent TCP to respond.
 		 */
 		tcpstat.tcps_keepprobe++;
-#ifdef TCP_COMPAT_42
-		/*
-		 * The keepalive packet must have nonzero length
-		 * to get a 4.2 host to respond.
-		 */
-		tcp_respond(tp, tp->t_template->tt_ipgen,
-			    &tp->t_template->tt_t, (struct mbuf *)NULL,
-			    tp->rcv_nxt - 1, tp->snd_una - 1, 0);
-#else
-		tcp_respond(tp, tp->t_template->tt_ipgen,
-			    &tp->t_template->tt_t, (struct mbuf *)NULL,
-			    tp->rcv_nxt, tp->snd_una - 1, 0);
-#endif
+		t_template = tcp_maketemplate(tp);
+		if (t_template) {
+			tcp_respond(tp, t_template->tt_ipgen,
+				    &t_template->tt_t, (struct mbuf *)NULL,
+				    tp->rcv_nxt, tp->snd_una - 1, 0);
+			(void) m_free(dtom(t_template));
+		}
 		callout_reset(tp->tt_keep, tcp_keepintvl, tcp_timer_keep, tp);
 	} else
 		callout_reset(tp->tt_keep, tcp_keepidle, tcp_timer_keep, tp);
@@ -402,6 +393,15 @@ tcp_timer_rexmt(xtp)
 		rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
 	TCPT_RANGESET(tp->t_rxtcur, rexmt,
 		      tp->t_rttmin, TCPTV_REXMTMAX);
+	/*
+	 * Disable rfc1323 and rfc1644 if we havn't got any response to
+	 * our third SYN to work-around some broken terminal servers 
+	 * (most of which have hopefully been retired) that have bad VJ 
+	 * header compression code which trashes TCP segments containing 
+	 * unknown-to-them TCP options.
+	 */
+	if ((tp->t_state == TCPS_SYN_SENT) && (tp->t_rxtshift == 3))
+		tp->t_flags &= ~(TF_REQ_SCALE|TF_REQ_TSTMP|TF_REQ_CC);
 	/*
 	 * If losing, let the lower level know and try for
 	 * a better route.  Also, if we backed off this far,

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)pcb.h	5.10 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/include/pcb.h,v 1.32 1999/12/29 04:33:03 peter Exp $
+ * $FreeBSD: src/sys/i386/include/pcb.h,v 1.32.2.1 2001/08/15 01:23:52 peter Exp $
  */
 
 #ifndef _I386_PCB_H_
@@ -67,7 +67,7 @@ struct pcb {
 #else
 	struct	pcb_ldt	*pcb_ldt_dontuse;
 #endif
-	struct	save87	pcb_savefpu;	/* floating point state for 287/387 */
+	union	savefpu	pcb_save;
 	u_char	pcb_flags;
 #define	FP_SOFTFP	0x01	/* process using software fltng pnt emulator */
 #define	PCB_DBREGS	0x02	/* process using debug registers */

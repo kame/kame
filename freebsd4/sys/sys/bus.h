@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/bus.h,v 1.30.2.2 2000/08/03 06:36:38 imp Exp $
+ * $FreeBSD: src/sys/sys/bus.h,v 1.30.2.3 2001/06/16 23:05:02 peter Exp $
  */
 
 #ifndef _SYS_BUS_H_
@@ -60,6 +60,7 @@ enum intr_type {
     INTR_TYPE_MISC = 16,
     INTR_TYPE_FAST = 128
 };
+#define INTR_TYPE_AV INTR_TYPE_TTY	/* for source compatability with 5.x */
 
 typedef int (*devop_t)(void);
 

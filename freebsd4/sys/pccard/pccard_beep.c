@@ -3,7 +3,7 @@
  * Nate Williams, October 1997.
  * This file is in the public domain.
  */
-/* $FreeBSD: src/sys/pccard/pccard_beep.c,v 1.3.2.2 2001/03/25 15:32:39 iedowse Exp $ */
+/* $FreeBSD: src/sys/pccard/pccard_beep.c,v 1.3.2.3 2001/06/05 19:11:34 imp Exp $ */
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -23,7 +23,6 @@ struct tone {
         int pitch;
         int duration;
 };
-
 
 static struct tone silent_beep[] = {
 	{0, 0}
@@ -93,38 +92,43 @@ pccard_beep_start(void *arg)
 	}
 }
 
-void pccard_success_beep(void)
+void
+pccard_success_beep(void)
 {
 	pccard_beep_start(melody_table[melody_type][0]);
 }
 
-void pccard_failure_beep(void)
+void
+pccard_failure_beep(void)
 {
 	pccard_beep_start(melody_table[melody_type][1]);
 }
 
-void pccard_insert_beep(void)
+void
+pccard_insert_beep(void)
 {
 	pccard_beep_start(melody_table[melody_type][2]);
 }
 
-void pccard_remove_beep(void)
+void
+pccard_remove_beep(void)
 {
 	pccard_beep_start(melody_table[melody_type][3]);
 }
 
-int pccard_beep_select(int type)
+int
+pccard_beep_select(int type)
 {
 	int errcode = 0;
 
 	if (type == 0)  {
 		allow_beep = BEEP_OFF;
 		melody_type = 0;
-	} else if (type < 0 || MAX_TONE_MODE - 1 < type)
+	} else if (type < 0 || MAX_TONE_MODE - 1 < type) {
 		errcode = 1;
-	else {
+	} else {
 		allow_beep = BEEP_ON;
 		melody_type = type;
 	}
-	return errcode;
+	return (errcode);
 }

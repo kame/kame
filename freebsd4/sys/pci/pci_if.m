@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/pci/pci_if.m,v 1.2 1999/08/28 00:51:04 peter Exp $
+# $FreeBSD: src/sys/pci/pci_if.m,v 1.2.2.1 2001/07/21 22:40:26 imp Exp $
 #
 
 INTERFACE pci;
@@ -41,4 +41,47 @@ METHOD void write_config {
 	int		reg;
 	u_int32_t	val;
 	int		width;
+};
+
+METHOD int get_powerstate {
+	device_t	dev;
+	device_t	child;
+};
+
+METHOD int set_powerstate {
+	device_t	dev;
+	device_t	child;
+	int		state;
+};
+
+METHOD void enable_busmaster {
+	device_t	dev;
+	device_t	child;
+};
+
+METHOD void disable_busmaster {
+	device_t	dev;
+	device_t	child;
+};
+
+METHOD void enable_io {
+	device_t	dev;
+	device_t	child;
+	int		space;
+};
+
+METHOD void disable_io {
+	device_t	dev;
+	device_t	child;
+	int		space;
+};
+
+#
+# Route an interrupt.  Returns a value suitable for stuffing into 
+# a device's interrupt register.
+#
+METHOD int route_interrupt {
+	device_t pcib;
+	device_t dev;
+	int pin;
 };

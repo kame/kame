@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_lookup.c	8.4 (Berkeley) 2/16/94
- * $FreeBSD: src/sys/kern/vfs_lookup.c,v 1.38.2.1 2000/11/03 15:55:38 bp Exp $
+ * $FreeBSD: src/sys/kern/vfs_lookup.c,v 1.38.2.3 2001/08/31 19:36:49 dillon Exp $
  */
 
 #include "opt_ktrace.h"
@@ -200,6 +200,12 @@ namei(ndp)
 			break;
 		}
 		linklen = MAXPATHLEN - auio.uio_resid;
+		if (linklen == 0) {
+			if (ndp->ni_pathlen > 1)
+				zfree(namei_zone, cp);
+			error = ENOENT;
+			break;
+		}
 		if (linklen + ndp->ni_pathlen >= MAXPATHLEN) {
 			if (ndp->ni_pathlen > 1)
 				zfree(namei_zone, cp);
@@ -404,6 +410,10 @@ dirloop:
 			if ((dp->v_flag & VROOT) == 0 ||
 			    (cnp->cn_flags & NOCROSSMOUNT))
 				break;
+			if (dp->v_mount == NULL) {	/* forced unmount */
+				error = EBADF;
+				goto bad;
+			}
 			tdp = dp;
 			dp = dp->v_mount->mnt_vnodecovered;
 			vput(tdp);
@@ -426,7 +436,7 @@ unionlookup:
 		printf("not found\n");
 #endif
 		if ((error == ENOENT) &&
-		    (dp->v_flag & VROOT) &&
+		    (dp->v_flag & VROOT) && (dp->v_mount != NULL) &&
 		    (dp->v_mount->mnt_flag & MNT_UNION)) {
 			tdp = dp;
 			dp = dp->v_mount->mnt_vnodecovered;
@@ -510,6 +520,12 @@ unionlookup:
 	    ((cnp->cn_flags & FOLLOW) || trailing_slash ||
 	     *ndp->ni_next == '/')) {
 		cnp->cn_flags |= ISSYMLINK;
+		if (dp->v_mount == NULL) {
+			/* We can't know whether the directory was mounted with
+			 * NOSYMFOLLOW, so we can't follow safely. */
+			error = EBADF;
+			goto bad2;
+		}
 		if (dp->v_mount->mnt_flag & MNT_NOSYMFOLLOW) {
 			error = EACCES;
 			goto bad2;

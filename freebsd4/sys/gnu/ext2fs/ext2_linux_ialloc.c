@@ -4,7 +4,7 @@
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  *
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_linux_ialloc.c,v 1.13.2.1 2000/08/03 00:52:57 peter Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_linux_ialloc.c,v 1.13.2.2 2001/08/14 18:03:19 gallatin Exp $
  */
 /*
  *  linux/fs/ext2/ialloc.c
@@ -47,6 +47,8 @@
 
 #ifdef __i386__
 #include <gnu/ext2fs/i386-bitops.h>
+#elif defined(__alpha__)
+#include <gnu/ext2fs/alpha-bitops.h>
 #else
 #error please provide bit operation functions
 #endif

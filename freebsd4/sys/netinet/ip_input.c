@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.21 2001/03/08 23:14:54 iedowse Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.25 2001/08/29 21:41:37 jesper Exp $
  */
 
 #define	_IP_VHL
@@ -43,6 +43,7 @@
 #include "opt_ipfilter.h"
 #include "opt_ipstealth.h"
 #include "opt_ipsec.h"
+#include "opt_random_ip_id.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -121,6 +122,12 @@ static int	ip_keepfaith = 0;
 SYSCTL_INT(_net_inet_ip, IPCTL_KEEPFAITH, keepfaith, CTLFLAG_RW,
 	&ip_keepfaith,	0,
 	"Enable packet capture for FAITH IPv4->IPv6 translater daemon");
+
+static int	ip_nfragpackets = 0;
+static int	ip_maxfragpackets;	/* initialized in ip_init() */
+SYSCTL_INT(_net_inet_ip, OID_AUTO, maxfragpackets, CTLFLAG_RW,
+	&ip_maxfragpackets, 0,
+	"Maximum number of IPv4 fragment reassembly queue entries");
 
 /*
  * XXX - Setting ip_checkinterface mostly implements the receive side of
@@ -248,9 +255,12 @@ ip_init()
 	for (i = 0; i < IPREASS_NHASH; i++)
 	    ipq[i].next = ipq[i].prev = &ipq[i];
 
-	maxnipq = nmbclusters/4;
+	maxnipq = nmbclusters / 4;
+	ip_maxfragpackets = nmbclusters / 4;
 
+#ifndef RANDOM_IP_ID
 	ip_id = time_second & 0xffff;
+#endif
 	ipintrq.ifq_maxlen = ipqmaxlen;
 
 	register_netisr(NETISR_IP, ipintr);
@@ -335,6 +345,16 @@ ip_input(struct mbuf *m)
 		}
 		ip = mtod(m, struct ip *);
 	}
+
+	/* 127/8 must not appear on wire - RFC1122 */
+	if ((ntohl(ip->ip_dst.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET ||
+	    (ntohl(ip->ip_src.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) {
+		if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
+			ipstat.ips_badaddr++;
+			goto bad;
+		}
+	}
+
 	if (m->m_pkthdr.csum_flags & CSUM_IP_CHECKED) {
 		sum = !(m->m_pkthdr.csum_flags & CSUM_IP_VALID);
 	} else {
@@ -378,15 +398,10 @@ tooshort:
 			m_adj(m, ip->ip_len - m->m_pkthdr.len);
 	}
 
-	/*
-	 * Don't accept packets with a loopback destination address
-	 * unless they arrived via the loopback interface.
-	 */
-	if ((ntohl(ip->ip_dst.s_addr) & IN_CLASSA_NET) ==
-	    (IN_LOOPBACKNET << IN_CLASSA_NSHIFT) && 
-	    (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
-		goto bad;
-	}
+#ifdef IPSEC
+	if (ipsec_gethist(m, NULL))
+		goto pass;
+#endif
 
 	/*
 	 * IpHack's section.
@@ -782,6 +797,19 @@ found:
 	}
 #endif
 
+#ifdef IPSEC
+	/*
+	 * enforce IPsec policy checking if we are seeing last header.
+	 * note that we do not visit this with protocols with pcb layer
+	 * code - like udp/tcp/raw ip.
+	 */
+	if ((inetsw[ip_protox[ip->ip_p]].pr_flags & PR_LASTHDR) != 0 &&
+	    ipsec4_in_reject(m, NULL)) {
+		ipsecstat.in_polvio++;
+		goto bad;
+	}
+#endif
+
 	/*
 	 * Switch out to protocol's input routine.
 	 */
@@ -861,6 +889,15 @@ ip_reass(m, fp, where)
 	 * If first fragment to arrive, create a reassembly queue.
 	 */
 	if (fp == 0) {
+		/*
+		 * Enforce upper bound on number of fragmented packets
+		 * for which we attempt reassembly;
+		 * If maxfrag is 0, never accept fragments.
+		 * If maxfrag is -1, accept all fragments without limitation.
+		 */
+		if ((ip_maxfragpackets >= 0) && (ip_nfragpackets >= ip_maxfragpackets))
+			goto dropfrag;
+		ip_nfragpackets++;
 		if ((t = m_get(M_DONTWAIT, MT_FTABLE)) == NULL)
 			goto dropfrag;
 		fp = mtod(t, struct ipq *);
@@ -1009,6 +1046,7 @@ inserted:
 	remque(fp);
 	nipq--;
 	(void) m_free(dtom(fp));
+	ip_nfragpackets--;
 	m->m_len += (IP_VHL_HL(ip->ip_vhl) << 2);
 	m->m_data -= (IP_VHL_HL(ip->ip_vhl) << 2);
 	/* some debugging cruft by sklower, below, will go away soon */
@@ -1049,6 +1087,7 @@ ip_freef(fp)
 	}
 	remque(fp);
 	(void) m_free(dtom(fp));
+	ip_nfragpackets--;
 	nipq--;
 }
 
@@ -1074,6 +1113,20 @@ ip_slowtimo()
 			if (fp->prev->ipq_ttl == 0) {
 				ipstat.ips_fragtimeout++;
 				ip_freef(fp->prev);
+			}
+		}
+	}
+	/*
+	 * If we are over the maximum number of fragments
+	 * (due to the limit being lowered), drain off
+	 * enough to get down to the new limit.
+	 */
+	for (i = 0; i < IPREASS_NHASH; i++) {
+		if (ip_maxfragpackets >= 0) {
+			while ((ip_nfragpackets > ip_maxfragpackets) &&
+				(ipq[i].next != &ipq[i])) {
+				ipstat.ips_fragdropped++;
+				ip_freef(ipq[i].next);
 			}
 		}
 	}
@@ -1153,6 +1206,10 @@ ip_dooptions(m)
 		 */
 		case IPOPT_LSRR:
 		case IPOPT_SSRR:
+			if (optlen < IPOPT_OFFSET + sizeof(*cp)) {
+				code = &cp[IPOPT_OLEN] - (u_char *)ip;
+				goto bad;
+			}
 			if ((off = cp[IPOPT_OFFSET]) < IPOPT_MINOFF) {
 				code = &cp[IPOPT_OFFSET] - (u_char *)ip;
 				goto bad;
@@ -1272,12 +1329,21 @@ nosourcerouting:
 		case IPOPT_TS:
 			code = cp - (u_char *)ip;
 			ipt = (struct ip_timestamp *)cp;
-			if (ipt->ipt_len < 5)
+			if (ipt->ipt_len < 4 || ipt->ipt_len > 40) {
+				code = (u_char *)&ipt->ipt_len - (u_char *)ip;
 				goto bad;
+			}
+			if (ipt->ipt_ptr < 5) {
+				code = (u_char *)&ipt->ipt_ptr - (u_char *)ip;
+				goto bad;
+			}
 			if (ipt->ipt_ptr >
 			    ipt->ipt_len - (int)sizeof(int32_t)) {
-				if (++ipt->ipt_oflw == 0)
+				if (++ipt->ipt_oflw == 0) {
+					code = (u_char *)&ipt->ipt_ptr -
+					    (u_char *)ip;
 					goto bad;
+				}
 				break;
 			}
 			sin = (struct in_addr *)(cp + ipt->ipt_ptr - 1);
@@ -1288,8 +1354,11 @@ nosourcerouting:
 
 			case IPOPT_TS_TSANDADDR:
 				if (ipt->ipt_ptr - 1 + sizeof(n_time) +
-				    sizeof(struct in_addr) > ipt->ipt_len)
+				    sizeof(struct in_addr) > ipt->ipt_len) {
+					code = (u_char *)&ipt->ipt_ptr -
+					    (u_char *)ip;
 					goto bad;
+				}
 				ipaddr.sin_addr = dst;
 				ia = (INA)ifaof_ifpforaddr((SA)&ipaddr,
 							    m->m_pkthdr.rcvif);
@@ -1302,8 +1371,11 @@ nosourcerouting:
 
 			case IPOPT_TS_PRESPEC:
 				if (ipt->ipt_ptr - 1 + sizeof(n_time) +
-				    sizeof(struct in_addr) > ipt->ipt_len)
+				    sizeof(struct in_addr) > ipt->ipt_len) {
+					code = (u_char *)&ipt->ipt_ptr -
+					    (u_char *)ip;
 					goto bad;
+				}
 				(void)memcpy(&ipaddr.sin_addr, sin,
 				    sizeof(struct in_addr));
 				if (ifa_ifwithaddr((SA)&ipaddr) == 0)
@@ -1312,6 +1384,9 @@ nosourcerouting:
 				break;
 
 			default:
+				/* XXX can't take &ipt->ipt_flg */
+				code = (u_char *)&ipt->ipt_ptr -
+				    (u_char *)ip + 1;
 				goto bad;
 			}
 			ntime = iptime();
@@ -1484,7 +1559,7 @@ u_char inetctlerrmap[PRC_NCMDS] = {
 	EHOSTUNREACH,	EHOSTUNREACH,	ECONNREFUSED,	ECONNREFUSED,
 	EMSGSIZE,	EHOSTUNREACH,	0,		0,
 	0,		0,		0,		0,
-	ENOPROTOOPT,	ENETRESET
+	ENOPROTOOPT,	ECONNREFUSED
 };
 
 /*

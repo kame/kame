@@ -54,7 +54,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- * $FreeBSD: src/sys/gnu/i386/fpemul/fpu_system.h,v 1.7 1999/08/28 00:42:51 peter Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/fpu_system.h,v 1.7.2.1 2001/08/15 01:23:49 peter Exp $
  *
  */
 
@@ -69,7 +69,7 @@
 #include <linux/kernel.h>
 */
 
-#define I387 (*(union i387_union *)&(((struct pcb *)curproc->p_addr)->pcb_savefpu))
+#define I387 (*(union i387_union *)&(((struct pcb *)curproc->p_addr)->pcb_save.sv_87))
 #define FPU_info		(I387.soft.frame)
 
 #define FPU_CS			(*(unsigned short *) &(FPU_info->tf_cs))

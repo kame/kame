@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/neomagic.h,v 1.1 2000/01/09 08:14:11 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/neomagic.h,v 1.1.2.1 2001/08/01 03:40:58 cg Exp $
  */
 
 #ifndef _NM256_H_
@@ -41,6 +41,11 @@
 
 /* The base offset of the mixer in the second memory area. */
 #define NM_MIXER_OFFSET 0x600
+
+/* The base offset for the AC97 test */
+#define NM_MIXER_PRESENCE 0xa06
+#define NM_PRESENCE_MASK  0x050
+#define NM_PRESENCE_VALUE 0x040
 
 /* The maximum size of a coefficient entry. */
 #define NM_MAX_COEFFICIENT 0x5000

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_kthread.c,v 1.5.2.1 2001/01/23 13:02:46 asmodai Exp $
+ * $FreeBSD: src/sys/kern/kern_kthread.c,v 1.5.2.2 2001/06/15 09:37:55 scottl Exp $
  */
 
 #include <sys/param.h>
@@ -70,7 +70,7 @@ kthread_create(void (*func)(void *), void *arg,
 	va_list ap;
 	struct proc *p2;
 
-	if (!proc0.p_stats || proc0.p_stats->p_start.tv_sec == 0) {
+	if (!proc0.p_stats /* || proc0.p_stats->p_start.tv_sec == 0 */) {
 		panic("kthread_create called too soon");
 	}
 

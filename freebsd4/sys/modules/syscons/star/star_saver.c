@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/modules/syscons/star/star_saver.c,v 1.23.2.1 2000/05/09 13:42:17 nyan Exp $
+ * $FreeBSD: src/sys/modules/syscons/star/star_saver.c,v 1.23.2.2 2001/05/06 05:44:29 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -59,12 +59,12 @@ star_saver(video_adapter_t *adp, int blank)
 	sc_softc_t	*sc;
 	scr_stat	*scp;
 	int		cell, i;
-	char 		pattern[] = {"...........++++***   "};
+	static u_char	pattern[] = {"...........++++***   "};
 #ifndef PC98
-	char		colors[] = {FG_DARKGREY, FG_LIGHTGREY,
+	static char	colors[] = {FG_DARKGREY, FG_LIGHTGREY,
 				    FG_WHITE, FG_LIGHTCYAN};
 #else
-	char		colors[] = {FG_BLUE, FG_LIGHTGREY,
+	static char	colors[] = {FG_BLUE, FG_LIGHTGREY,
 				    FG_LIGHTGREY, FG_CYAN};
 #endif /* PC98 */
 	static u_short 	stars[NUM_STARS][2];

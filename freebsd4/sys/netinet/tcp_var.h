@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56.2.5 2001/04/18 17:55:24 kris Exp $
+ * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56.2.8 2001/08/22 00:59:13 silby Exp $
  */
 
 #ifndef _NETINET_TCP_VAR_H_
@@ -66,7 +66,7 @@ struct tcptemp {
 struct tcpcb {
 	struct	tsegqe_head t_segq;
 	int	t_dupacks;		/* consecutive dup acks recd */
-	struct	tcptemp	*t_template;	/* skeletal packet for transmit */
+	struct	tcptemp	*unused;	/* unused */
 
 	struct	callout *tt_rexmt;	/* retransmit timer */
 	struct	callout *tt_persist;	/* retransmit persistence */
@@ -400,7 +400,8 @@ struct rtentry *
 void	 tcp_setpersist __P((struct tcpcb *));
 void	 tcp_slowtimo __P((void));
 struct tcptemp *
-	 tcp_template __P((struct tcpcb *));
+	 tcp_maketemplate __P((struct tcpcb *));
+void	 tcp_fillheaders __P((struct tcpcb *, void *, void *));
 struct tcpcb *
 	 tcp_timers __P((struct tcpcb *, int));
 void	 tcp_trace __P((int, int, struct tcpcb *, void *, struct tcphdr *,
@@ -409,10 +410,7 @@ void	 tcp_trace __P((int, int, struct tcpcb *, void *, struct tcphdr *,
 extern	struct pr_usrreqs tcp_usrreqs;
 extern	u_long tcp_sendspace;
 extern	u_long tcp_recvspace;
-void	tcp_rndiss_init __P((void));
-tcp_seq	tcp_rndiss_next __P((void));
-u_int16_t
-	tcp_rndiss_encrypt __P((u_int16_t));
+tcp_seq tcp_new_isn __P((struct tcpcb *));
 
 #endif /* _KERNEL */
 

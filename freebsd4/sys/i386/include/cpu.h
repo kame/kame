@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cpu.h	5.4 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/include/cpu.h,v 1.43.2.1 2000/05/16 06:58:10 dillon Exp $
+ * $FreeBSD: src/sys/i386/include/cpu.h,v 1.43.2.2 2001/06/15 09:37:57 scottl Exp $
  */
 
 #ifndef _MACHINE_CPU_H_
@@ -56,7 +56,6 @@
 #define	cpu_exec(p)	/* nothing */
 #define cpu_swapin(p)	/* nothing */
 #define cpu_setstack(p, ap)		((p)->p_md.md_regs[SP] = (ap))
-#define cpu_set_init_frame(p, fp)	((p)->p_md.md_regs = (fp))
 
 #define	CLKF_USERMODE(framep) \
 	((ISPL((framep)->cf_cs) == SEL_UPL) || (framep->cf_eflags & PSL_VM))

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/tc/am7990.c,v 1.9.2.2 2000/07/17 21:24:24 archie Exp $ */
+/* $FreeBSD: src/sys/alpha/tc/am7990.c,v 1.9.2.3 2001/06/29 15:31:01 mjacob Exp $ */
 /*	$NetBSD: am7990.c,v 1.43 1998/03/29 22:36:42 mycroft Exp $	*/
 
 /*-
@@ -122,7 +122,9 @@ integrate int am7990_put __P((struct am7990_softc *, int, struct mbuf *));
 integrate struct mbuf *am7990_get __P((struct am7990_softc *, int, int));
 integrate void am7990_read __P((struct am7990_softc *, int, int)); 
 
+/*
 hide void am7990_shutdown __P((void *));
+*/
 
 int am7990_mediachange __P((struct ifnet *));
 void am7990_mediastatus __P((struct ifnet *, struct ifmediareq *));
@@ -1050,6 +1052,7 @@ am7990_ioctl(ifp, cmd, data)
 	return (error);
 }
 
+/*
 hide void
 am7990_shutdown(arg)
 	void *arg;
@@ -1057,6 +1060,7 @@ am7990_shutdown(arg)
 
 	am7990_stop((struct am7990_softc *)arg);
 }
+*/
 
 #ifdef LEDEBUG
 void

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.4 2001/02/22 09:29:41 jhb Exp $
+ * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.5 2001/06/18 23:48:13 dd Exp $
  */
 
 #include "opt_compat.h"
@@ -863,7 +863,7 @@ kernel_sysctl(struct proc *p, int *name, u_int namelen, void *old, size_t *oldle
 		req.oldptr= old;
 	}
 
-	if (newlen) {
+	if (new != NULL) {
 		req.newlen = newlen;
 		req.newptr = new;
 	}
@@ -1102,7 +1102,7 @@ userland_sysctl(struct proc *p, int *name, u_int namelen, void *old, size_t *old
 		req.oldptr= old;
 	}
 
-	if (newlen) {
+	if (new != NULL) {
 		if (!useracc(new, req.newlen, VM_PROT_READ))
 			return (EFAULT);
 		req.newlen = newlen;

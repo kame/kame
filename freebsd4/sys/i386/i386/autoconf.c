@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)autoconf.c	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/i386/autoconf.c,v 1.146.2.1 2000/09/19 09:16:28 ps Exp $
+ * $FreeBSD: src/sys/i386/i386/autoconf.c,v 1.146.2.2 2001/06/07 06:05:58 dd Exp $
  */
 
 /*
@@ -281,10 +281,8 @@ setroot()
 	}
 	majdev = B_TYPE(bootdev);
 	dev = makebdev(majdev, 0);
-	if (devsw(dev) == NULL) {
-		printf("no devsw (majdev=%d bootdev=%#lx)\n", majdev, bootdev);
+	if (devsw(dev) == NULL)
 		return;
-	}
 	unit = B_UNIT(bootdev);
 	slice = B_SLICE(bootdev);
 	if (slice == WHOLE_DISK_SLICE)

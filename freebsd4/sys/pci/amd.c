@@ -30,7 +30,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************
- * $FreeBSD: src/sys/pci/amd.c,v 1.3.2.1 2000/04/14 13:16:52 nyan Exp $
+ * $FreeBSD: src/sys/pci/amd.c,v 1.3.2.2 2001/06/02 04:32:50 nyan Exp $
  */
 
 /*
@@ -121,8 +121,10 @@ static void amd_ResetSCSIBus(struct amd_softc *amd);
 static void RequestSense(struct amd_softc *amd, struct amd_srb *pSRB);
 static void amd_InvalidCmd(struct amd_softc *amd);
 
+#if 0
 static void amd_timeout(void *arg1);
 static void amd_reset(struct amd_softc *amd);
+#endif
 static u_int8_t * phystovirt(struct amd_srb *pSRB, u_int32_t xferCnt);
 
 void    amd_linkSRB(struct amd_softc *amd);
@@ -826,6 +828,7 @@ amdsettags(struct amd_softc *amd, u_int target, int tagenb)
 }
 
 
+#if 0
 /*
  **********************************************************************
  * Function : amd_reset (struct amd_softc * amd)
@@ -882,6 +885,7 @@ amd_timeout(void *arg1)
 
 	pSRB = (struct amd_srb *) arg1;
 }
+#endif
 
 static int
 amdstart(struct amd_softc *amd, struct amd_srb *pSRB)

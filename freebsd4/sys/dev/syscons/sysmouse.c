@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/sysmouse.c,v 1.2.2.1 2000/08/27 12:37:36 yokota Exp $
+ * $FreeBSD: src/sys/dev/syscons/sysmouse.c,v 1.2.2.2 2001/07/16 05:21:24 yokota Exp $
  */
 
 #include "opt_syscons.h"
@@ -89,6 +89,7 @@ smopen(dev_t dev, int flag, int mode, struct proc *p)
 
 	tp = dev->si_tty = ttymalloc(dev->si_tty);
 	if (!(tp->t_state & TS_ISOPEN)) {
+		sysmouse_tty = tp;
 		tp->t_oproc = smstart;
 		tp->t_param = smparam;
 		tp->t_stop = nottystop;
@@ -257,7 +258,6 @@ sm_attach_mouse(void *unused)
 
 	dev = make_dev(&sm_cdevsw, SC_MOUSE, UID_ROOT, GID_WHEEL, 0600,
 		       "sysmouse");
-	dev->si_tty = sysmouse_tty = ttymalloc(sysmouse_tty);
 	/* sysmouse doesn't have scr_stat */
 }
 

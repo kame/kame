@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.c	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in.c,v 1.44.2.2 2000/08/19 22:14:05 bde Exp $
+ * $FreeBSD: src/sys/netinet/in.c,v 1.44.2.5 2001/08/13 16:26:17 ume Exp $
  */
 
 #include <sys/param.h>
@@ -49,13 +49,9 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#include <netinet/in_pcb.h>
 
 #include <netinet/igmp_var.h>
-
-#include "gif.h"
-#if NGIF > 0
-#include <net/if_gif.h>
-#endif
 
 static MALLOC_DEFINE(M_IPMADDR, "in_multi", "internet multicast address");
 
@@ -73,6 +69,9 @@ SYSCTL_INT(_net_inet_ip, OID_AUTO, subnets_are_local, CTLFLAG_RW,
 	&subnetsarelocal, 0, "");
 
 struct in_multihead in_multihead; /* XXX BSS initialization */
+
+extern struct inpcbinfo ripcbinfo;
+extern struct inpcbinfo udbinfo;
 
 /*
  * Return 1 if an internet address is for a ``local'' host
@@ -202,21 +201,6 @@ in_control(so, cmd, data, ifp, p)
 	struct sockaddr_in oldaddr;
 	int error, hostIsNew, maskIsNew, s;
 	u_long i;
-
-#if NGIF > 0
-        if (ifp && ifp->if_type == IFT_GIF) {
-                switch (cmd) {
-                case SIOCSIFPHYADDR:
-		case SIOCDIFPHYADDR:
-			if (p &&
-			    (error = suser(p)) != 0)
-        			return(error);
-                case SIOCGIFPSRCADDR:
-                case SIOCGIFPDSTADDR:
-                        return gif_ioctl(ifp, cmd, data);
-                }
-        }
-#endif
 
 	switch (cmd) {
 	case SIOCALIFADDR:
@@ -416,7 +400,26 @@ in_control(so, cmd, data, ifp, p)
 		return (error);
 
 	case SIOCDIFADDR:
+		/*
+		 * in_ifscrub kills the interface route.
+		 */
 		in_ifscrub(ifp, ia);
+		/*
+		 * in_ifadown gets rid of all the rest of
+		 * the routes.  This is not quite the right
+		 * thing to do, but at least if we are running
+		 * a routing process they will come back.
+		 */
+		in_ifadown(&ia->ia_ifa, 1);
+		/*
+		 * XXX horrible hack to detect that we are being called
+		 * from if_detach()
+		 */
+		if (!ifnet_addrs[ifp->if_index - 1]) {
+			in_pcbpurgeif0(LIST_FIRST(ripcbinfo.listhead), ifp);
+			in_pcbpurgeif0(LIST_FIRST(udbinfo.listhead), ifp);
+		}
+
 		/*
 		 * Protect from ipintr() traversing address list
 		 * while we're modifying it.
@@ -707,6 +710,9 @@ in_ifinit(ifp, ia, sin, scrub)
 	}
 	if ((error = rtinit(&(ia->ia_ifa), (int)RTM_ADD, flags)) == 0)
 		ia->ia_flags |= IFA_ROUTE;
+	/* XXX check if the subnet route points to the same interface */
+	if (error == EEXIST)
+		error = 0;
 
 	/*
 	 * If the interface supports multicast, join the "all hosts"

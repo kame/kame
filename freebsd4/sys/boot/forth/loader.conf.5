@@ -22,16 +22,13 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/sys/boot/forth/loader.conf.5,v 1.7.2.4 2001/03/04 05:01:15 obrien Exp $
+.\" $FreeBSD: src/sys/boot/forth/loader.conf.5,v 1.7.2.6 2001/06/02 04:19:07 dd Exp $
 .Dd April 18, 1999
 .Dt LOADER.CONF 5
 .Os
 .Sh NAME
 .Nm loader.conf
 .Nd system bootstrap configuration information
-.Pp
-.Nm loader.conf.local
-.Nd localized system bootstrap configuration information
 .Sh DESCRIPTION
 The file
 .Nm
@@ -68,7 +65,7 @@ The general parsing rules are:
 .It
 Spaces and empty lines are ignored.
 .It
-A # sign will mark the remaining of the line as a comment.
+A # sign will mark the remainder of the line as a comment.
 .It
 Only one setting can be present on each line.
 .El

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_page.h,v 1.75.2.5 2000/12/30 01:51:11 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_page.h,v 1.75.2.6 2001/06/03 05:00:12 dillon Exp $
  */
 
 /*
@@ -406,6 +406,7 @@ vm_page_t vm_page_alloc __P((vm_object_t, vm_pindex_t, int));
 vm_page_t vm_page_grab __P((vm_object_t, vm_pindex_t, int));
 void vm_page_cache __P((register vm_page_t));
 int vm_page_try_to_cache __P((vm_page_t));
+int vm_page_try_to_free __P((vm_page_t));
 void vm_page_dontneed __P((register vm_page_t));
 static __inline void vm_page_copy __P((vm_page_t, vm_page_t));
 static __inline void vm_page_free __P((vm_page_t));

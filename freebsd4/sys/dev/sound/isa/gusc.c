@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/isa/gusc.c,v 1.5.2.3 2001/02/03 01:29:08 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/gusc.c,v 1.5.2.5 2001/08/01 03:40:55 cg Exp $
  */
 
 #include <sys/param.h>
@@ -123,30 +123,27 @@ gusc_probe(device_t dev)
 	switch (logical_id) {
 	case LOGICALID_PCM:
 		s = "Gravis UltraSound Plug & Play PCM";
-		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT);
+		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (func == NULL)
 			return (ENOMEM);
-		bzero(func, sizeof(*func));
 		func->func = SCF_PCM;
 		child = device_add_child(dev, "pcm", -1);
 		device_set_ivars(child, func);
 		break;
 	case LOGICALID_OPL:
 		s = "Gravis UltraSound Plug & Play OPL";
-		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT);
+		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (func == NULL)
 			return (ENOMEM);
-		bzero(func, sizeof(*func));
 		func->func = SCF_SYNTH;
 		child = device_add_child(dev, "midi", -1);
 		device_set_ivars(child, func);
 		break;
 	case LOGICALID_MIDI:
 		s = "Gravis UltraSound Plug & Play MIDI";
-		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT);
+		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (func == NULL)
 			return (ENOMEM);
-		bzero(func, sizeof(*func));
 		func->func = SCF_MIDI;
 		child = device_add_child(dev, "midi", -1);
 		device_set_ivars(child, func);
@@ -272,19 +269,17 @@ gusisa_probe(device_t dev)
 
 		/* We can support the CS4231 and MIDI devices.  */
 
-		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT);
+		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (func == NULL)
 			return ENOMEM;
-		bzero(func, sizeof *func);
 		func->func = SCF_MIDI;
 		child = device_add_child(dev, "midi", -1);
 		device_set_ivars(child, func);
 
-		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT);
+		func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (func == NULL)
 			printf("xxx: gus pcm not attached, out of memory\n");
 		else {
-			bzero(func, sizeof *func);
 			func->func = SCF_PCM;
 			child = device_add_child(dev, "pcm", -1);
 			device_set_ivars(child, func);
@@ -324,7 +319,7 @@ gusc_attach(device_t dev)
 	}
 
 	if (scp->irq != NULL)
-		bus_setup_intr(dev, scp->irq, INTR_TYPE_TTY, gusc_intr, scp, &ih);
+		bus_setup_intr(dev, scp->irq, INTR_TYPE_AV, gusc_intr, scp, &ih);
 	bus_generic_attach(dev);
 
 	return (0);

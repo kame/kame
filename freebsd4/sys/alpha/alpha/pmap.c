@@ -43,7 +43,7 @@
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
  *	from:	i386 Id: pmap.c,v 1.193 1998/04/19 15:22:48 bde Exp
  *		with some ideas from NetBSD's alpha pmap
- * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.5 2000/11/21 00:09:09 ps Exp $
+ * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.6 2001/07/30 23:27:58 peter Exp $
  */
 
 /*
@@ -150,6 +150,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/msgbuf.h>
 #include <sys/vmmeter.h>
@@ -650,7 +651,10 @@ pmap_init(phys_start, phys_end)
 void
 pmap_init2()
 {
-	pv_entry_max = PMAP_SHPGPERPROC * maxproc + vm_page_array_size;
+	int shpgperproc = PMAP_SHPGPERPROC;
+
+	TUNABLE_INT_FETCH("vm.pmap.shpgperproc", &shpgperproc);
+	pv_entry_max = shpgperproc * maxproc + vm_page_array_size;
 	pv_entry_high_water = 9 * (pv_entry_max / 10);
 	zinitna(pvzone, &pvzone_obj, NULL, 0, pv_entry_max, ZONE_INTERRUPT, 1);
 }

@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.c,v 1.23.2.5 2000/11/04 08:23:16 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.c,v 1.23.2.10 2001/09/03 07:02:29 julian Exp $
  * $Whistle: ng_pppoe.c,v 1.10 1999/11/01 09:24:52 julian Exp $
  */
 #if 0
@@ -53,6 +53,7 @@
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/errno.h>
+#include <sys/sysctl.h>
 #include <net/ethernet.h>
 
 #include <netgraph/ng_message.h>
@@ -63,7 +64,7 @@
 
 /*
  * This section contains the netgraph method declarations for the
- * sample node. These methods define the netgraph 'type'.
+ * pppoe node. These methods define the netgraph pppoe 'type'.
  */
 
 static ng_constructor_t	ng_pppoe_constructor;
@@ -159,10 +160,34 @@ struct PPPOE {
 };
 typedef struct PPPOE *priv_p;
 
-const struct ether_header eh_prototype =
+struct ether_header eh_prototype =
 	{{0xff,0xff,0xff,0xff,0xff,0xff},
 	 {0x00,0x00,0x00,0x00,0x00,0x00},
 	 ETHERTYPE_PPPOE_DISC};
+
+static int nonstandard;
+static int
+ngpppoe_set_ethertype(SYSCTL_HANDLER_ARGS)
+{
+	int error;
+	int val;
+
+	val = nonstandard;
+	error = sysctl_handle_int(oidp, &val, sizeof(int), req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+	if (val == 1) {
+		nonstandard = 1;
+		eh_prototype.ether_type = ETHERTYPE_PPPOE_STUPID_DISC;
+	} else {
+		nonstandard = 0;
+		eh_prototype.ether_type = ETHERTYPE_PPPOE_DISC;
+	}
+	return (0);
+}
+
+SYSCTL_PROC(_net_graph, OID_AUTO, nonstandard_pppoe, CTLTYPE_INT | CTLFLAG_RW,
+    0, sizeof(int), ngpppoe_set_ethertype, "I", "nonstandard ethertype");
 
 union uniq {
 	char bytes[sizeof(void *)];
@@ -347,13 +372,18 @@ AAA
  * for testing allow a null string to match 1st found and a null service
  * to match all requests. Also make '*' do the same.
  */
+
+#define NG_MATCH_EXACT	1
+#define NG_MATCH_ANY	2
+
 static hook_p
-pppoe_match_svc(node_p node, char *svc_name, int svc_len)
+pppoe_match_svc(node_p node, char *svc_name, int svc_len, int match)
 {
 	sessp	sp	= NULL;
 	negp	neg	= NULL;
 	priv_p	privp	= node->private;
-	hook_p hook;
+	hook_p	allhook	= NULL;
+	hook_p	hook;
 
 AAA
 	LIST_FOREACH(hook, &node->hooks, hooks) {
@@ -369,17 +399,12 @@ AAA
 			continue;
 
 		neg = sp->neg;
-		/* XXX check validity of this */
-		/* special case, NULL request. match 1st found. */
-		if (svc_len == 0)
-			break;
 
-		/* XXX check validity of this */
 		/* Special case for a blank or "*" service name (wildcard) */
-		if ((neg->service_len == 0)
-		||  ((neg->service_len == 1)
-		  && (neg->service.data[0] == '*'))) {
-			break;
+		if (match == NG_MATCH_ANY && neg->service_len == 1 &&
+		    neg->service.data[0] == '*') {
+			allhook = hook;
+			continue;
 		}
 
 		/* If the lengths don't match, that aint it. */
@@ -387,10 +412,13 @@ AAA
 			continue;
 
 		/* An exact match? */
+		if (svc_len == 0)
+			break;
+
 		if (strncmp(svc_name, neg->service.data, svc_len) == 0)
 			break;
 	}
-	return (hook);
+	return (hook ? hook : allhook);
 }
 /**************************************************************************
  * Routine to find a particular session that matches an incoming packet	  *
@@ -459,10 +487,6 @@ AAA
  * with a single reference for us.. we transfer it to the
  * private structure.. when we free the private struct we must
  * unref the node so it gets freed too.
- *
- * If this were a device node than this work would be done in the attach()
- * routine and the constructor would return EINVAL as you should not be able
- * to creatednodes that depend on hardware (unless you can add the hardware :)
  */
 static int
 ng_pppoe_constructor(node_p *nodep)
@@ -496,6 +520,7 @@ AAA
  * The following hook names are special:
  *  Ethernet:  the hook that should be connected to a NIC.
  *  debug:	copies of data sent out here  (when I write the code).
+ * All other hook names need only be unique. (the framework checks this).
  */
 static int
 ng_pppoe_newhook(node_p node, hook_p hook, const char *name)
@@ -554,6 +579,7 @@ AAA
 		case NGM_PPPOE_CONNECT:
 		case NGM_PPPOE_LISTEN: 
 		case NGM_PPPOE_OFFER: 
+		case NGM_PPPOE_SERVICE: 
 			ourmsg = (struct ngpppoe_init_data *)msg->data;
 			if (( sizeof(*ourmsg) > msg->header.arglen)
 			|| ((sizeof(*ourmsg) + ourmsg->data_len)
@@ -583,6 +609,25 @@ AAA
 				LEAVE(EINVAL);
 			}
 			sp = hook->private;
+
+			if (msg->header.cmd == NGM_PPPOE_LISTEN) {
+				/*
+				 * Ensure we aren't already listening for this
+				 * service.
+				 */
+				if (pppoe_match_svc(node, ourmsg->data,
+				    ourmsg->data_len, NG_MATCH_EXACT) != NULL) {
+					LEAVE(EEXIST);
+				}
+			}
+
+			/*
+			 * PPPOE_SERVICE advertisments are set up
+			 * on sessions that are in PRIMED state.
+			 */
+			if (msg->header.cmd == NGM_PPPOE_SERVICE) {
+				break;
+			}
 			if (sp->state |= PPPOE_SNONE) {
 				printf("pppoe: Session already active\n");
 				LEAVE(EISCONN);
@@ -666,7 +711,6 @@ AAA
 			 * Store the originator of this message so we can send
 			 * a success of fail message to them later.
 			 * Move the hook to 'LISTENING'
-
 			 */
 			neg->service.hdr.tag_type = PTT_SRV_NAME;
 			neg->service.hdr.tag_len =
@@ -704,6 +748,26 @@ AAA
 			 */
 			sp->state = PPPOE_PRIMED;
 			break;
+		case NGM_PPPOE_SERVICE: 
+			/* 
+			 * Check the session is primed.
+			 * for now just allow ONE service to be advertised.
+			 * If you do it twice you just overwrite.
+			 */
+			if (sp->state != PPPOE_PRIMED) {
+				printf("pppoe: Session not primed\n");
+				LEAVE(EISCONN);
+			}
+			neg = sp->neg;
+			neg->service.hdr.tag_type = PTT_SRV_NAME;
+			neg->service.hdr.tag_len =
+			    htons((u_int16_t)ourmsg->data_len);
+
+			if (ourmsg->data_len)
+				bcopy(ourmsg->data, neg->service.data,
+				    ourmsg->data_len);
+			neg->service_len = ourmsg->data_len;
+			break;
 		default:
 			LEAVE(EINVAL);
 		}
@@ -734,7 +798,7 @@ pppoe_start(sessp sp)
 	struct {
 		struct pppoe_tag hdr;
 		union	uniq	data;
-	} uniqtag;
+	} __attribute ((packed)) uniqtag;
 
 	/* 
 	 * kick the state machine into starting up
@@ -776,7 +840,7 @@ ng_pppoe_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 	struct {
 		struct pppoe_tag hdr;
 		union	uniq	data;
-	} uniqtag;
+	} __attribute ((packed)) uniqtag;
 	negp			neg = NULL;
 
 AAA
@@ -808,6 +872,10 @@ AAA
 		length = ntohs(wh->ph.length);
 		code = wh->ph.code; 
 		switch(wh->eh.ether_type) {
+		case	ETHERTYPE_PPPOE_STUPID_DISC:
+			nonstandard = 1;
+			eh_prototype.ether_type = ETHERTYPE_PPPOE_STUPID_DISC;
+			/* fall through */
 		case	ETHERTYPE_PPPOE_DISC:
 			/*
 			 * We need to try to make sure that the tag area
@@ -851,11 +919,11 @@ AAA
 					LEAVE(ENETUNREACH);
 				}
 				sendhook = pppoe_match_svc(hook->node,
-			    		tag->tag_data, ntohs(tag->tag_len));
+			    		tag->tag_data, ntohs(tag->tag_len),
+					NG_MATCH_ANY);
 				if (sendhook) {
 					NG_SEND_DATA(error, sendhook, m, meta);
 				} else {
-					printf("no such service\n");
 					LEAVE(ENETUNREACH);
 				}
 				break;
@@ -987,7 +1055,11 @@ AAA
 				 * from NEWCONNECTED to CONNECTED
 				 */
 				sp->pkt_hdr = neg->pkt->pkt_header;
-				sp->pkt_hdr.eh.ether_type
+				if (nonstandard)
+					sp->pkt_hdr.eh.ether_type
+						= ETHERTYPE_PPPOE_STUPID_SESS;
+				else
+					sp->pkt_hdr.eh.ether_type
 						= ETHERTYPE_PPPOE_SESS;
 				sp->pkt_hdr.ph.code = 0;
 				pppoe_send_event(sp, NGM_PPPOE_SUCCESS);
@@ -1034,7 +1106,11 @@ AAA
 				 * Keep a copy of the header we will be using.
 				 */
 				sp->pkt_hdr = neg->pkt->pkt_header;
-				sp->pkt_hdr.eh.ether_type
+				if (nonstandard)
+					sp->pkt_hdr.eh.ether_type
+						= ETHERTYPE_PPPOE_STUPID_SESS;
+				else
+					sp->pkt_hdr.eh.ether_type
 						= ETHERTYPE_PPPOE_SESS;
 				sp->pkt_hdr.ph.code = 0;
 				m_freem(neg->m);
@@ -1065,6 +1141,7 @@ AAA
 				LEAVE(EPFNOSUPPORT);
 			}
 			break;
+		case	ETHERTYPE_PPPOE_STUPID_SESS:
 		case	ETHERTYPE_PPPOE_SESS:
 			/*
 			 * find matching peer/session combination.
@@ -1200,10 +1277,20 @@ AAA
 			insert_tag(sp, &neg->ac_name.hdr); /* AC_NAME */
 			if ((tag = get_tag(ph, PTT_SRV_NAME)))
 				insert_tag(sp, tag);	  /* return service */
+			/*
+			 * If we have a NULL service request
+			 * and have an extra service defined in this hook,
+			 * then also add a tag for the extra service.
+			 * XXX this is a hack. eventually we should be able
+			 * to support advertising many services, not just one 
+			 */
+			if (((tag == NULL) || (tag->tag_len == 0))
+			&& (neg->service.hdr.tag_len != 0)) {
+				insert_tag(sp, &neg->service.hdr); /* SERVICE */
+			}
 			if ((tag = get_tag(ph, PTT_HOST_UNIQ)))
 				insert_tag(sp, tag); /* returned hostunique */
 			insert_tag(sp, &uniqtag.hdr);
-			/* XXX maybe put the tag in the session store */
 			scan_tags(sp, ph);
 			make_packet(sp);
 			sendpacket(sp);
@@ -1303,7 +1390,10 @@ AAA
 			/* revert the stored header to DISC/PADT mode */
 		 	wh = &sp->pkt_hdr;
 			wh->ph.code = PADT_CODE;
-			wh->eh.ether_type = ETHERTYPE_PPPOE_DISC;
+			if (nonstandard)
+				wh->eh.ether_type = ETHERTYPE_PPPOE_STUPID_DISC;
+			else
+				wh->eh.ether_type = ETHERTYPE_PPPOE_DISC;
 
 			/* generate a packet of that type */
 			MGETHDR(m, M_DONTWAIT, MT_DATA);
@@ -1515,6 +1605,8 @@ pppoe_send_event(sessp sp, enum cmd cmdid)
 AAA
 	NG_MKMESSAGE(msg, NGM_PPPOE_COOKIE, cmdid,
 			sizeof(struct ngpppoe_sts), M_NOWAIT);
+	if (msg == NULL)
+		return (ENOMEM);
 	sts = (struct ngpppoe_sts *)msg->data;
 	strncpy(sts->hook, sp->hook->name, NG_HOOKLEN + 1);
 	error = ng_send_msg(sp->hook->node, msg, sp->creator, NULL);

@@ -24,8 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_disk.c,v 1.3.2.2 2001/03/07 21:58:59 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_disk.c,v 1.3.2.3 2001/08/08 19:41:39 scottl Exp $
  */
+
+#include "opt_aac.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>

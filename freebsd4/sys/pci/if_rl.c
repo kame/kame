@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.6 2000/11/02 00:04:27 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.7 2001/07/19 18:33:07 wpaul Exp $
  */
 
 /*
@@ -132,7 +132,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.6 2000/11/02 00:04:27 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.7 2001/07/19 18:33:07 wpaul Exp $";
 #endif
 
 /*
@@ -149,6 +149,8 @@ static struct rl_type rl_devs[] = {
 		"Delta Electronics 8139 10/100BaseTX" },
 	{ ADDTRON_VENDORID, ADDTRON_DEVICEID_8139,
 		"Addtron Technolgy 8139 10/100BaseTX" },
+	{ DLINK_VENDORID, DLINK_DEVICEID_530TXPLUS,
+		"D-Link DFE-530TX+ 10/100BaseTX" },
 	{ 0, 0, NULL }
 };
 
@@ -898,7 +900,8 @@ static int rl_attach(dev)
 	rl_read_eeprom(sc, (caddr_t)&rl_did, RL_EE_PCI_DID, 1, 0);
 
 	if (rl_did == RT_DEVICEID_8139 || rl_did == ACCTON_DEVICEID_5030 ||
-	    rl_did == DELTA_DEVICEID_8139 || rl_did == ADDTRON_DEVICEID_8139)
+	    rl_did == DELTA_DEVICEID_8139 || rl_did == ADDTRON_DEVICEID_8139 ||
+	    rl_did == DLINK_DEVICEID_530TXPLUS)
 		sc->rl_type = RL_8139;
 	else if (rl_did == RT_DEVICEID_8129)
 		sc->rl_type = RL_8129;

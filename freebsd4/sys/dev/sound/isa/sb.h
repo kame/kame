@@ -1,7 +1,14 @@
 /*
  * file: sbcard.h
- * $FreeBSD: src/sys/dev/sound/isa/sb.h,v 1.12.2.1 2001/02/03 01:29:09 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/sb.h,v 1.12.2.2 2001/08/01 03:40:55 cg Exp $
  */
+
+#ifndef SB_H
+#define SB_H
+
+struct sbc_softc;
+void sbc_lock(struct sbc_softc *);
+void sbc_unlock(struct sbc_softc *);
 
 /*
  * sound blaster registers
@@ -182,6 +189,4 @@
 #define SB16_IMASK_L	0x3d
 #define SB16_IMASK_R	0x3e
 #define SB16_OMASK	0x3c
-
-
-
+#endif

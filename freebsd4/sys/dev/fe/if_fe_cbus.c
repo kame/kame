@@ -19,7 +19,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fe/if_fe_cbus.c,v 1.2.2.3 2000/11/11 00:03:27 nyan Exp $
+ * $FreeBSD: src/sys/dev/fe/if_fe_cbus.c,v 1.2.2.4 2001/07/07 12:29:13 nyan Exp $
  */
 
 #include "opt_fe.h"
@@ -223,8 +223,8 @@ fe98_alloc_port(device_t dev, int type)
 		size = MAXREGISTERS;
 		break;
 	case FE_TYPE_CNET9NE:
-		iat = &ioaddr_cnet9ne[16];
-		size = 16;
+		iat = ioaddr_cnet9ne;
+		size = MAXREGISTERS;
 		break;
 	case FE_TYPE_SSI:
 		iat = ioaddr_generic;
@@ -257,13 +257,6 @@ fe98_alloc_port(device_t dev, int type)
 				  iat, size, RF_ACTIVE);
 	if (res == NULL)
 		return ENOENT;
-
-	switch (type) {
-	case FE_TYPE_CNET9NE:
-		iat = ioaddr_cnet9ne;
-		size = MAXREGISTERS;
-		break;
-	}
 
 	isa_load_resourcev(res, iat, size);
 

@@ -1,6 +1,6 @@
 /*
  *	from: vector.s, 386BSD 0.1 unknown origin
- * $FreeBSD: src/sys/i386/isa/apic_vector.s,v 1.47.2.4 2000/07/18 21:12:41 dfr Exp $
+ * $FreeBSD: src/sys/i386/isa/apic_vector.s,v 1.47.2.5 2001/09/01 22:33:38 tegge Exp $
  */
 
 
@@ -653,7 +653,14 @@ MCOUNT_LABEL(bintr)
 	FAST_INTR(21,fastintr21)
 	FAST_INTR(22,fastintr22)
 	FAST_INTR(23,fastintr23)
-#define	CLKINTR_PENDING	movl $1,CNAME(clkintr_pending)
+	
+#define	CLKINTR_PENDING							\
+	pushl $clock_lock ;						\
+	call s_lock ;							\
+	movl $1,CNAME(clkintr_pending) ;				\
+	call s_unlock ;							\
+	addl $4, %esp
+
 	INTR(0,intr0, CLKINTR_PENDING)
 	INTR(1,intr1,)
 	INTR(2,intr2,)

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/pxeldr/Makefile,v 1.1.2.4 2000/12/22 06:59:23 ps Exp $
+# $FreeBSD: src/sys/boot/i386/pxeldr/Makefile,v 1.1.2.5 2001/04/25 11:24:01 ru Exp $
 
 MAINTAINER=jhb@FreeBSD.org
 
@@ -7,7 +7,7 @@ ORG=		0x7c00
 LDR=		pxeldr
 BOOT=		pxeboot
 PROG=		${BOOT}
-MAN8=		${BOOT}.8
+MAN=		${BOOT}.8
 STRIP=
 BINDIR?=	/boot
 M4?=		m4

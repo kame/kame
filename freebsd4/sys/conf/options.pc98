@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.5 2000/09/30 15:58:26 nyan Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.9 2001/08/22 06:19:24 peter Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -58,6 +58,7 @@ CPU_WT_ALLOC			opt_cpu.h
 CYRIX_CACHE_WORKS		opt_cpu.h
 CYRIX_CACHE_REALLY_WORKS	opt_cpu.h
 NO_MEMORY_HOLE			opt_cpu.h
+CPU_ENABLE_SSE			opt_cpu.h
 
 # The CPU type affects the endian conversion functions all over the kernel.
 I386_CPU		opt_global.h
@@ -139,7 +140,7 @@ TEL_S0_16		opt_i4b.h
 TEL_S0_16_3		opt_i4b.h
 AVM_A1			opt_i4b.h
 USR_STI			opt_i4b.h
-#ITKIX1			opt_i4b.h
+ITKIX1			opt_i4b.h
 ELSA_PCC16		opt_i4b.h
 # -------------------------------
 # isdn4bsd: passive ISA PnP cards
@@ -148,11 +149,11 @@ CRTX_S0_P		opt_i4b.h
 DRN_NGO                 opt_i4b.h
 TEL_S0_16_3_P		opt_i4b.h
 SEDLBAUER		opt_i4b.h
-#DYNALINK		opt_i4b.h
+DYNALINK		opt_i4b.h
 ASUSCOM_IPAC		opt_i4b.h
 ELSA_QS1ISA		opt_i4b.h
-#AVM_PNP		opt_i4b.h
 SIEMENS_ISURF2		opt_i4b.h
+EICON_DIVA		opt_i4b.h
 # -------------------------------
 # isdn4bsd: passive PCI cards
 # -------------------------------
@@ -190,6 +191,10 @@ PNPBIOS			opt_pnp.h
 SCSI_BOUNCE_SIZE	opt_bs.h
 BS_TARG_SAFEMODE	opt_bs.h
 
+# ct driver options
+CT_USE_RELOCATE_OFFSET	opt_ct.h
+CT_BUS_WEIGHT		opt_ct.h
+
 # npx options
 FPU_ERROR_BROKEN	opt_npx.h
 
@@ -198,6 +203,13 @@ PC98			opt_global.h
 EPSON_BOUNCEDMA		opt_pc98.h
 EPSON_MEMWIN		opt_pc98.h
 LINE30			opt_syscons.h
+
+# SMB/CIFS requester
+NETSMB			opt_netsmb.h
+NETSMBCRYPTO		opt_netsmb.h
+
+# SMB/CIFS filesystem
+SMBFS
 
 # -------------------------------
 # EOF

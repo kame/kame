@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.8 2001/01/26 13:52:25 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.10 2001/08/13 04:59:54 nyan Exp $
  */
 
 #include "vt.h"
@@ -70,11 +70,9 @@
 #include "stl.h"
 #include "stli.h"
 #include "loran.h"
-#include "tina.h"
 #include "fla.h"
 #ifdef PC98
 #include "bs.h"
-#include "olpt.h"
 #endif
 
 struct old_isa_driver {
@@ -126,10 +124,8 @@ extern struct isa_driver ascdriver;
 extern struct isa_driver stldriver;
 extern struct isa_driver stlidriver;
 extern struct isa_driver lorandriver;
-extern struct isa_driver tinadriver;
 #ifdef PC98
 extern struct isa_driver bsdriver;
-extern struct isa_driver olptdriver;
 #endif
 
 
@@ -190,9 +186,6 @@ static struct old_isa_driver old_drivers[] = {
 #if NLORAN > 0
 	{ INTR_TYPE_TTY | INTR_TYPE_FAST, &lorandriver },
 #endif
-#if NOLPT > 0
-	{ INTR_TYPE_TTY, &olptdriver },
-#endif
 
 /* BIO */
 
@@ -234,9 +227,6 @@ static struct old_isa_driver old_drivers[] = {
 #endif
 #if NWL > 0
 	{ INTR_TYPE_NET, &wldriver },
-#endif
-#if NTINA > 0
-	{ INTR_TYPE_NET, &tinadriver },
 #endif
 
 /* CAM */

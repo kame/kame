@@ -1,5 +1,5 @@
 /*	$NetBSD: i82365reg.h,v 1.3 1998/12/20 17:53:28 nathanw Exp $	*/
-/* $FreeBSD: src/sys/dev/pcic/i82365reg.h,v 1.3.2.2 2000/12/23 14:09:25 sanpei Exp $ */
+/* $FreeBSD: src/sys/dev/pcic/i82365reg.h,v 1.3.2.4 2001/07/09 07:19:58 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -320,6 +320,15 @@
 /* #define	PCIC_RESERVED			0x3E */
 /* #define	PCIC_RESERVED			0x3F */
 
+/* cardbus extensions - memory window page registers */
+
+#define	PCIC_MEMREG_WIN_SHIFT			24
+#define	PCIC_SYSMEM_ADDR0_WIN			0x40
+#define	PCIC_SYSMEM_ADDR1_WIN			0x41
+#define	PCIC_SYSMEM_ADDR2_WIN			0x42
+#define	PCIC_SYSMEM_ADDR3_WIN			0x43
+#define	PCIC_SYSMEM_ADDR4_WIN			0x44
+
 /* vendor-specific registers */
 
 #define	PCIC_INTEL_GLOBAL_CTL			0x1E	/* RW */
@@ -343,10 +352,14 @@
 #define PCIC_CIRRUS_EXT_CONTROL_1_PCI_INTR_MASK	0x18
 
 /* Plug and play */
+#define PCIC_PNP_ACTIONTEC	0x1802A904	/* AEI0218 */
+#define PCIC_PNP_IBM3765	0x65374d24	/* IBM3765 */
 #define PCIC_PNP_82365		0x000ED041	/* PNP0E00 */
 #define PCIC_PNP_CL_PD6720	0x010ED041	/* PNP0E01 */
 #define PCIC_PNP_VLSI_82C146	0x020ED041	/* PNP0E02 */
 #define PCIC_PNP_82365_CARDBUS	0x030ED041	/* PNP0E03 */
-#define PCIC_PNP_ACTIONTEC	0x1802A904	/* AEI0218 */
-#define PCIC_PNP_SCM_SWAPBOX	0x1802A904	/* SCM0469 */
-#define PCIC_PNP_SCM_SWAPBOX2	0x69046d4c	/* SCM SwapBox Classic X2P */
+#define PCIC_PNP_SCM_SWAPBOX	0x69046d4c	/* SMC0469 */
+
+/* C-Bus PnP Definitions */
+#define PCIC_NEC_PC9801_102	0x9180a3b8	/* NEC8091 PC-9801-102 */
+#define	PCIC_NEC_PC9821RA_E01	0x2181a3b8	/* NEC8121 PC-9821RA-E01 */

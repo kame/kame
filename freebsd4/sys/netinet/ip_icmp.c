@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.7 2001/03/29 10:10:02 jesper Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.9 2001/07/03 11:01:46 ume Exp $
  */
 
 #include "opt_ipsec.h"
@@ -305,15 +305,6 @@ icmp_input(m, off, proto)
 	if (icmpprintfs)
 		printf("icmp_input, type %d code %d\n", icp->icmp_type,
 		    icp->icmp_code);
-#endif
-
-#ifdef IPSEC
-	/* drop it if it does not match the policy */
-	/* XXX Is there meaning of check in here ? */
-	if (ipsec4_in_reject(m, NULL)) {
-		ipsecstat.in_polvio++;
-		goto freeit;
-	}
 #endif
 
 	/*
@@ -653,7 +644,7 @@ icmp_reflect(m)
 		ia = in_ifaddrhead.tqh_first;
 	t = IA_SIN(ia)->sin_addr;
 	ip->ip_src = t;
-	ip->ip_ttl = MAXTTL;
+	ip->ip_ttl = ip_defttl;
 
 	if (optlen > 0) {
 		register u_char *cp;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.3 2000/08/25 23:23:32 peter Exp $
+ * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.7 2001/07/30 23:28:00 peter Exp $
  */
 
 #include "opt_param.h"
@@ -87,13 +87,37 @@ SYSCTL_INT(_kern_ipc, KIPC_NMBCLUSTERS, nmbclusters, CTLFLAG_RD,
 	   &nmbclusters, 0, "Maximum number of mbuf clusters available");
 SYSCTL_INT(_kern_ipc, OID_AUTO, nmbufs, CTLFLAG_RD, &nmbufs, 0,
 	   "Maximum number of mbufs available"); 
-#ifndef NMBCLUSTERS
-#define NMBCLUSTERS	(512 + MAXUSERS * 16)
-#endif
-TUNABLE_INT_DECL("kern.ipc.nmbclusters", NMBCLUSTERS, nmbclusters);
-TUNABLE_INT_DECL("kern.ipc.nmbufs", NMBCLUSTERS * 4, nmbufs);
 
 static void	m_reclaim __P((void));
+
+#ifndef NMBCLUSTERS
+#define NMBCLUSTERS	(512 + maxusers * 16)
+#endif
+#ifndef NMBUFS
+#define NMBUFS		(nmbclusters * 4)
+#endif
+
+/*
+ * Perform sanity checks of tunables declared above.
+ */
+static void
+tunable_mbinit(void *dummy)
+{
+
+	/*
+	 * This has to be done before VM init.
+	 */
+	nmbclusters = NMBCLUSTERS;
+	TUNABLE_INT_FETCH("kern.ipc.nmbclusters", &nmbclusters);
+	nmbufs = NMBUFS;
+	TUNABLE_INT_FETCH("kern.ipc.nmbufs", &nmbufs);
+	/* Sanity checks */
+	if (nmbufs < nmbclusters * 2)
+		nmbufs = nmbclusters * 2;
+
+	return;
+}
+SYSINIT(tunable_mbinit, SI_SUB_TUNABLES, SI_ORDER_ANY, tunable_mbinit, NULL);
 
 /* "number of clusters of pages" */
 #define NCL_INIT	1
@@ -506,6 +530,72 @@ m_getclr(how, type)
 	return (m);
 }
 
+/*
+ * struct mbuf *
+ * m_getm(m, len, how, type)
+ *
+ * This will allocate len-worth of mbufs and/or mbuf clusters (whatever fits
+ * best) and return a pointer to the top of the allocated chain. If m is
+ * non-null, then we assume that it is a single mbuf or an mbuf chain to
+ * which we want len bytes worth of mbufs and/or clusters attached, and so
+ * if we succeed in allocating it, we will just return a pointer to m.
+ *
+ * If we happen to fail at any point during the allocation, we will free
+ * up everything we have already allocated and return NULL.
+ *
+ */
+struct mbuf *
+m_getm(struct mbuf *m, int len, int how, int type)
+{
+	struct mbuf *top, *tail, *mp, *mtail = NULL;
+
+	KASSERT(len >= 0, ("len is < 0 in m_getm"));
+
+	MGET(mp, how, type);
+	if (mp == NULL)
+		return (NULL);
+	else if (len > MINCLSIZE) {
+		MCLGET(mp, how);
+		if ((mp->m_flags & M_EXT) == 0) {
+			m_free(mp);
+			return (NULL);
+		}
+	}
+	mp->m_len = 0;
+	len -= M_TRAILINGSPACE(mp);
+
+	if (m != NULL)
+		for (mtail = m; mtail->m_next != NULL; mtail = mtail->m_next);
+	else
+		m = mp;
+
+	top = tail = mp;
+	while (len > 0) {
+		MGET(mp, how, type);
+		if (mp == NULL)
+			goto failed;
+
+		tail->m_next = mp;
+		tail = mp;
+		if (len > MINCLSIZE) {
+			MCLGET(mp, how);
+			if ((mp->m_flags & M_EXT) == 0)
+				goto failed;
+		}
+
+		mp->m_len = 0;
+		len -= M_TRAILINGSPACE(mp);
+	}
+
+	if (mtail != NULL)
+		mtail->m_next = top;
+	return (m);
+
+failed:
+	m_freem(top);
+	return (NULL);
+}
+
 struct mbuf *
 m_free(m)
 	struct mbuf *m;
@@ -525,15 +615,6 @@ m_freem(m)
 	if (m == NULL)
 		return;
 	do {
-		/*
-		 * we do need to check non-first mbuf, since some of existing
-		 * code does not call M_PREPEND properly.
-		 * (example: call to bpf_mtap from drivers)
-		 */
-		if ((m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.aux) {
-			m_freem(m->m_pkthdr.aux);
-			m->m_pkthdr.aux = NULL;
-		}
 		MFREE(m, n);
 		m = n;
 	} while (m);

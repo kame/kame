@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)locore.s	7.3 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132.2.3 2001/03/17 10:48:59 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132.2.7 2001/08/31 08:19:12 iwasaki Exp $
  *
  *		originally from: locore.s, by William F. Jolitz
  *
@@ -356,59 +356,21 @@ begin:
 	movl	_IdlePTD, %esi
 	movl	%esi,PCB_CR3(%eax)
 
+	testl	$CPUID_PGE, R(_cpu_feature)
+	jz	1f
+	movl	%cr4, %eax
+	orl	$CR4_PGE, %eax
+	movl	%eax, %cr4
+1:
+
 	movl	physfree, %esi
 	pushl	%esi				/* value of first for init386(first) */
 	call	_init386			/* wire 386 chip for unix operation */
 	popl	%esi
 
-	.globl	__ucodesel,__udatasel
-
-	pushl	$0				/* unused */
-	pushl	__udatasel			/* ss */
-	pushl	$0				/* esp - filled in by execve() */
-	pushl	$PSL_USER			/* eflags (IOPL 0, int enab) */
-	pushl	__ucodesel			/* cs */
-	pushl	$0				/* eip - filled in by execve() */
-	subl	$(13*4),%esp			/* space for rest of registers */
-
-	pushl	%esp				/* call main with frame pointer */
 	call	_mi_startup			/* autoconfiguration, mountroot etc */
 
 	hlt		/* never returns to here */
-
-/*
- * When starting init, call this to configure the process for user
- * mode.  This will be inherited by other processes.
- */
-NON_GPROF_ENTRY(prepare_usermode)
-	/*
-	 * Now we've run main() and determined what cpu-type we are, we can
-	 * enable write protection and alignment checking on i486 cpus and
-	 * above.
-	 */
-#if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
-	cmpl    $CPUCLASS_386,_cpu_class
-	je	1f
-	movl	%cr0,%eax			/* get control word */
-	orl	$CR0_WP|CR0_AM,%eax		/* enable i486 features */
-	movl	%eax,%cr0			/* and do it */
-1:
-#endif
-	/*
-	 * on return from main(), we are process 1
-	 * set up address space and stack so that we can 'return' to user mode
-	 */
-	movl	__ucodesel,%eax
-	movl	__udatasel,%ecx
-
-#if 0	/* ds/es/fs are in trap frame */
-	mov	%cx,%ds
-	mov	%cx,%es
-	mov	%cx,%fs
-#endif
-	mov	%cx,%gs				/* and ds to gs */
-	ret					/* goto user! */
-
 
 /*
  * Signal trampoline, copied to top of user stack
@@ -740,13 +702,6 @@ trycpuid:	/* Use the `cpuid' instruction. */
  */
 
 create_pagetables:
-
-	testl	$CPUID_PGE, R(_cpu_feature)
-	jz	1f
-	movl	%cr4, %eax
-	orl	$CR4_PGE, %eax
-	movl	%eax, %cr4
-1:
 
 /* Find end of kernel image (rounded up to a page boundary). */
 	movl	$R(_end),%esi
