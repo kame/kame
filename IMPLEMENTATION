@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.179 2001/02/02 14:25:41 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.180 2001/02/02 18:44:50 itojun Exp $
 
 1. IPv6
 
@@ -92,6 +92,7 @@ RFC2893: Transition Mechanisms for IPv6 Hosts and Routers
       and it covers "configured tunnel" described in the spec.
       See 1.5 in this document for details.
 RFC2894: Router renumbering for IPv6
+RFC3041: Privacy Extensions for Stateless Address Autoconfiguration in IPv6
 draft-ietf-ipngwg-icmp-name-lookups-07: IPv6 Name Lookups Through ICMP
 draft-ietf-pim-ipv6-03.txt: PIM for IPv6
     * pim6dd implements dense mode.  pim6sd implements sparse mode.
@@ -142,8 +143,6 @@ draft-aboba-dnsext-mdns-00.txt: Multicast DNS
 draft-itojun-ipv6-tclass-api-01.txt: Socket API for IPv6 traffic class field
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
-draft-ietf-ipngwg-addrconf-privacy-04.txt: 
-	Privacy Extensions for Stateless Address Autoconfiguration in IPv6
 
 1.2 Neighbor Discovery
 
