@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/07 07:21:18 $
+		     $Date: 1999/10/08 01:34:09 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -278,7 +278,7 @@ ef0: flags=8863<UP,BROADCAST,NOTRAILERS,RUNNING,SIMPLEX,MULTICAST>
 <<<rtsold>>>
 
 rtsold is a daemon version of rtsol.  If you run KAME IPv6 on a laptop
-computer and frequently move with it, the daemon is usuful since it watches
+computer and frequently move with it, the daemon is useful since it watches
 the interface and sends router solicitations when the status of the interface
 changes.  Note, however, that the feature is disabled by default.  Please
 add -m option when invocation of rtsold.
@@ -421,7 +421,7 @@ add 10.6.7.8 10.2.3.4 ah  2000 -m transport -A hmac-sha1 "KAMEKAMEKAMEKAMEKAME" 
 add 10.6.7.8 10.2.3.4 esp 3000 -m transport -E des-cbc "PASSWORD" ;
 ^D
 
-Actually, IPsec communication doesn't proccess until security policy
+Actually, IPsec communication doesn't process until security policy
 entries will be defined.  In this case, you must setup each host.
 
 At A:
