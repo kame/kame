@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.61 2001/06/23 01:56:49 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.62 2001/06/23 03:01:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1204,6 +1204,9 @@ getans_icmp6(buf, len, from)
 	else if (strlen(on) > strlen(n) && strncmp(on, n, strlen(n)) == 0 &&
 	     strcmp(on + strlen(n), "." MDNS_LOCALDOM) == 0)
 		;
+	else if (strlen(on) > strlen(n) && strncmp(on, n, strlen(n)) == 0 &&
+	     strcmp(on + strlen(n), MDNS_LOCALDOM) == 0)
+		;
 	else
 		goto fail;
 
@@ -1516,6 +1519,17 @@ relay_icmp6(sd, buf, len, from)
 		qc->sd = sd;
 		qc->rbuflen = rbuflen;
 
+		/*
+		 * it should be NI group address, however, most of *BSD
+		 * releases do not join NI group at this moment.
+		 */
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = PF_INET6;
+		hints.ai_socktype = SOCK_RAW;
+		hints.ai_protocol = IPPROTO_ICMPV6;
+		if (getaddrinfo("ff02::1", NULL, &hints, &res))
+			return -1;
+
 		ni6 = (struct icmp6_nodeinfo *)buf;
 		memset(ni6, 0, sizeof(*ni6));
 		ni6->ni_type = ICMP6_NI_QUERY;
@@ -1523,22 +1537,13 @@ relay_icmp6(sd, buf, len, from)
 		ni6->ni_qtype = htons(NI_QTYPE_FQDN);
 		qc->id = htons(dnsid);
 		memcpy(ni6->icmp6_ni_nonce, &qc->id, sizeof(qc->id));
+		memcpy(ni6 + 1, &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
+		    sizeof(struct in6_addr));
 		dnsid = (dnsid + 1) % 0x10000;
-		len = sizeof(*ni6);
+		len = sizeof(*ni6) + sizeof(struct in6_addr);
 
 		sd = af2sockdb(PF_INET6, S_ICMP6);
 		if (sd == NULL)
-			return -1;
-
-		memset(&hints, 0, sizeof(hints));
-		hints.ai_family = PF_INET6;
-		hints.ai_socktype = SOCK_RAW;
-		hints.ai_protocol = IPPROTO_ICMPV6;
-		/*
-		 * it should be NI group address, however, most of *BSD
-		 * releases do not join NI group at this moment.
-		 */
-		if (getaddrinfo("ff02::1", NULL, &hints, &res))
 			return -1;
 
 		/* multicast outgoing interface is already configured */
