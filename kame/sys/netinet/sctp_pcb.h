@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.10 2003/04/23 10:26:51 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.11 2003/06/24 05:36:50 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -63,9 +63,10 @@
 #endif
 #endif
 
+
 LIST_HEAD(sctppcbhead, sctp_inpcb);
 LIST_HEAD(sctpasochead, sctp_tcb);
-TAILQ_HEAD(sctpsocketq, sctp_tcb);
+TAILQ_HEAD(sctpsocketq, sctp_socket_q_list);
 LIST_HEAD(sctpladdr, sctp_laddr);
 LIST_HEAD(sctpvtaghead, sctp_tagblock);
 
@@ -159,6 +160,7 @@ struct sctp_epinfo {
 	struct vm_zone *ipi_zone_laddr;
 	struct vm_zone *ipi_zone_raddr;
 	struct vm_zone *ipi_zone_chunk;
+	struct vm_zone *ipi_zone_sockq;
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	struct pool ipi_zone_ep;
@@ -166,6 +168,7 @@ struct sctp_epinfo {
 	struct pool ipi_zone_laddr;
 	struct pool ipi_zone_raddr;
 	struct pool ipi_zone_chunk;
+	struct pool ipi_zone_sockq;
 #endif
 	u_int ipi_count_ep;
 	u_quad_t ipi_gencnt_ep;
@@ -185,6 +188,11 @@ struct sctp_epinfo {
 	/* chunk structure list for output */
 	u_int ipi_count_chunk;
 	u_quad_t ipi_gencnt_chunk;
+
+	/* socket queue zone info */
+	u_int ipi_count_sockq;
+	u_quad_t ipi_gencnt_sockq;
+
 
 #ifdef SCTP_VTAG_TIMEWAIT_PER_STACK
 	struct sctpvtaghead vtag_timewait[SCTP_STACK_VTAG_HASH_SIZE];
@@ -330,14 +338,17 @@ struct sctp_tcb {
 	struct sctp_inpcb *sctp_ep;		/* back pointer to ep */
 	LIST_ENTRY(sctp_tcb) sctp_tcbhash;	/* next link in hash table */
 	LIST_ENTRY(sctp_tcb) sctp_tcblist;	/* list of all of the TCB's */
-	TAILQ_ENTRY(sctp_tcb) sctp_toqueue;	/* list of TCB's that need to
-						 * dequeue into the socket
-						 */
 	struct sctp_association asoc;
 	uint16_t rport;			/* remote port in network format */
-	uint8_t on_toqueue;
-	uint8_t resv;
+	uint16_t resv;
 };
+
+
+struct sctp_socket_q_list {
+	struct sctp_tcb *tcb;
+	TAILQ_ENTRY(sctp_socket_q_list) next_sq;
+};
+
 
 
 #ifdef _KERNEL
@@ -425,6 +436,10 @@ int sctp_is_vtag_good(struct sctp_inpcb *, u_int32_t, struct timeval *);
 void sctp_drain(void);
 
 int sctp_destination_is_reachable(struct sctp_tcb *, struct sockaddr *);
+
+int sctp_add_to_socket_q(struct sctp_inpcb *, struct sctp_tcb *);
+
+struct sctp_tcb *sctp_remove_from_socket_q(struct sctp_inpcb *);
 
 #endif /* _KERNEL */
 #endif /* !__sctp_pcb_h__ */

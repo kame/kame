@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.12 2003/04/23 10:10:19 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.13 2003/06/24 05:36:49 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.c,v 1.72 2002/04/04 15:40:35 randall Exp	*/
 
 /*
@@ -744,7 +744,15 @@ sctp_handle_asconf(struct mbuf *m, int offset, struct sctp_asconf_chunk *cp,
 	/* get pointer to first asconf param in ASCONF */
 	aph = (struct sctp_asconf_paramhdr *)sctp_m_getptr(m, offset, sizeof(struct sctp_asconf_paramhdr), (uint8_t *)&aparam_buf);
 	/* get pointer to first asconf param in ASCONF-ACK */
+	if (aph == NULL) {
+		printf("Gak in asconf\n");
+		return;
+	}
 	ack_aph = (struct sctp_asconf_paramhdr *)(mtod(m_ack, caddr_t) + sizeof(struct sctp_asconf_ack_chunk));
+	if (ack_aph == NULL) {
+		printf("Gak in asconf2\n");
+		return;
+	}
 
 	/* process through all parameters */
 	while (asconf_length >= sizeof(struct sctp_asconf_paramhdr)) {
@@ -779,6 +787,11 @@ sctp_handle_asconf(struct mbuf *m, int offset, struct sctp_asconf_chunk *cp,
 
 		/* get the entire parameter */
 		aph = (struct sctp_asconf_paramhdr *)sctp_m_getptr(m, offset, param_length, aparam_buf);
+		if (aph == NULL) {
+			printf("Gag\n");
+			m_freem(m_ack);
+			return;
+		}
 		switch (param_type) {
 		case SCTP_ADD_IP_ADDRESS:
 			assoc->peer_supports_asconf = 1;
@@ -2902,7 +2915,7 @@ sctp_addr_mgmt_ep_sa(struct sctp_inpcb *ep, struct sockaddr *sa,
 			printf("addr_mgmt_ep_sa: got invalid address!\n");
 		}
 #endif /* SCTP_DEBUG */
-		return (EINVAL);
+		return (EADDRNOTAVAIL);
 	}
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.h,v 1.7 2003/04/21 06:26:10 itojun Exp $	*/
+/*	$KAME: sctp_output.h,v 1.8 2003/06/24 05:36:50 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.h,v 1.33 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_output_h__
@@ -92,16 +92,15 @@ void send_forward_tsn(struct sctp_tcb *, struct sctp_association *);
 
 void sctp_send_sack(struct sctp_tcb *);
 
-void sctp_send_hb(struct sctp_tcb *, int, struct sctp_nets *);
+int sctp_send_hb(struct sctp_tcb *, int, struct sctp_nets *);
 
 void sctp_send_ecn_echo(struct sctp_tcb *, struct sctp_nets *, u_int32_t);
 
-void
-sctp_resend_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net);
 
 void
-sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net, u_int32_t *list, 
-			 int num,u_int8_t data_list[SCTP_MAX_DROP_SAVE_REPORT][3]);
+sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net, 
+			 struct mbuf *m, int iphlen);
+
 
 
 void sctp_send_cwr(struct sctp_tcb *, struct sctp_nets *, u_int32_t);

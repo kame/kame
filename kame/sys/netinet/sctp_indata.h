@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.h,v 1.3 2002/10/09 18:01:21 itojun Exp $	*/
+/*	$KAME: sctp_indata.h,v 1.4 2003/06/24 05:36:49 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.h,v 1.12 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_indata_h__
@@ -44,8 +44,8 @@ void sctp_handle_sack(struct sctp_sack_chunk *, struct sctp_tcb *,
 void sctp_handle_forward_tsn(struct sctp_tcb *,
 	struct sctp_forward_tsn_chunk *);
 
-void sctp_try_advance_peer_ack_point(struct sctp_tcb *,
-	struct sctp_association *);
+struct sctp_tmit_chunk *
+sctp_try_advance_peer_ack_point(struct sctp_tcb *,struct sctp_association *);
 
 void sctp_service_queues(struct sctp_tcb *, struct sctp_association *);
 
@@ -54,5 +54,9 @@ void sctp_update_acked(struct sctp_tcb *, struct sctp_shutdown_chunk *,
 
 int sctp_process_data(struct mbuf **, struct sctp_inpcb *, struct sctp_tcb *,
 	struct sctp_nets *, int, int *, int *, u_int32_t *);
+
+void sctp_sack_check(struct sctp_tcb *, int, int);
+
+
 #endif
 #endif

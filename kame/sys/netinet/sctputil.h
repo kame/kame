@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.8 2003/03/10 05:58:13 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.9 2003/06/24 05:36:50 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.h,v 1.36 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctputil_h__
@@ -38,7 +38,7 @@ u_int32_t sctp_select_initial_TSN(struct sctp_pcb *);
 
 u_int32_t sctp_select_a_tag(struct sctp_inpcb *);
 
-void sctp_init_asoc(struct sctp_inpcb *, struct sctp_association *, int);
+int sctp_init_asoc(struct sctp_inpcb *, struct sctp_association *, int);
 
 void sctp_fill_random_store(struct sctp_pcb *);
 
@@ -71,6 +71,8 @@ void sctp_ulp_notify(u_int32_t, struct sctp_tcb *, u_int32_t, void *);
 
 void sctp_report_all_outbound(struct sctp_tcb *);
 
+int sctp_expand_mapping_array(struct sctp_association *);
+
 void sctp_abort_notification(struct sctp_tcb *, int);
 
 /* We abort responding to an IP packet for some reason */
@@ -84,7 +86,7 @@ void sctp_abort_an_association(struct sctp_inpcb *, struct sctp_tcb *, int,
 void sctp_handle_ootb(struct sctp_inpcb *, struct mbuf *, int, int, int,
 	struct mbuf *);
 
-int sctp_is_there_an_abort_here(struct mbuf *, int);
+int sctp_is_there_an_abort_here(struct mbuf *, int, int *);
 uint32_t sctp_is_same_scope(struct sockaddr_in6 *, struct sockaddr_in6 *);
 struct sockaddr_in6 *sctp_recover_scope(struct sockaddr_in6 *,
 	struct sockaddr_in6 *);
@@ -100,6 +102,11 @@ int sbappendaddr_nocheck __P((struct sockbuf *, struct sockaddr *,
 
 struct rtentry *rtalloc_alternate __P((struct sockaddr *, struct rtentry *,
 	int));
+
+
+int
+sctp_release_pr_sctp_chunk(struct sctp_tcb *, struct sctp_tmit_chunk *, int,
+	struct sctpchunk_listhead *);
 
 
 struct mbuf *sctp_generate_invmanparam(int);
@@ -118,13 +125,14 @@ void sctp_free_bufspace(struct sctp_tcb *, struct sctp_association *,
 	struct sctp_tmit_chunk *);
 
 #ifdef SCTP_CWND_LOGGING
-void sctp_log_cwnd(struct sctp_nets *net,int augment,uint8_t from);
-int sctp_fill_cwnd_log(struct mbuf *m);
+void sctp_log_cwnd(struct sctp_nets *, int, uint8_t);
+int sctp_fill_cwnd_log(struct mbuf *);
 #endif
 
 #ifdef SCTP_AUDITING_ENABLED
-void sctp_auditing(int from,struct sctp_inpcb *ep,struct sctp_tcb *tcb,struct sctp_nets *net);
-void sctp_audit_log(u_int8_t ev, u_int8_t fd);
+void sctp_auditing(int, struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
+void sctp_audit_log(u_int8_t, u_int8_t);
 
 #endif
 

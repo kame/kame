@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.9 2003/04/23 10:26:51 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.10 2003/06/24 05:36:49 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_constants.h,v 1.61 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_constants_h__
@@ -52,7 +52,7 @@
 #define SCTP_TCP_MODEL_SUPPORT	1
 
 /* number of associations by default for zone allocation */
-#define SCTP_MAX_NUM_OF_ASOC	1000
+#define SCTP_MAX_NUM_OF_ASOC	20000
 /* how many addresses per assoc remote and local */
 #define SCTP_SCALE_FOR_ADDR	2
 
@@ -260,7 +260,6 @@
 
 /* Chunk flags */
 #define SCTP_WINDOW_PROBE	0x01
-#define SCTP_FWDTSN_MARKED_DOWN	0x02
 
 /*
  * SCTP states for internal state machine
@@ -308,8 +307,13 @@
 /* max number of unreliable streams sets */
 #define MAX_UNRELSTREAM_SETS	10
 
-/* guess at how big to make the TSN mapping array */
+/* Maximum the mapping array will  grow to (TSN mapping array) */
 #define SCTP_MAPPING_ARRAY	512
+
+/* size of the inital malloc on the mapping array */
+#define SCTP_INITIAL_MAPPING_ARRAY  16
+/* how much we grow the mapping array each call */
+#define SCTP_MAPPING_ARRAY_INCR     32
 
 /*
  * Here we define the timer types used by the implementation
@@ -388,6 +392,15 @@
  * of attemts we make for each respective side (send/init).
  */
 
+/* Maxmium number of chunks a single association can have
+ * on it. Note that this is a squishy number since
+ * the count can run over this if the user sends a large
+ * message down .. the fragmented chunks don't count until
+ * AFTER the message is on queue.. it would be the next
+ * send that blocks things.
+ */
+#define SCTP_ASOC_MAX_CHUNKS_ON_QUEUE 512
+
 /* init timer def = 1 sec */
 #define SCTP_INIT_SEC	(1*hz)
 
@@ -437,21 +450,8 @@
                                                  * window update. Should be a
                                                  * power of 2.
                                                  */
-#define SCTP_RESV_CONTROL_FRM_RWND     (2400) /* Reserve 40 entries of control 60 * 40 */
+#define SCTP_MINIMAL_RWND		(4096) /* minimal rwnd */
 
-/* This constant (SCTP_MAX_READBUFFER) define
- * how big the read/write buffer is
- * when we enter the fd event notification
- * the buffer is put on the stack, so the bigger
- * it is the more stack you chew up, however it
- * has got to be big enough to handle the bigest
- * message this O/S will send you. In solaris
- * with sockets (not TLI) we end up at a value
- * of 64k. In TLI we could do partial reads to
- * get it all in with less hassel.. but we
- * write to sockets for generality.
- */
-#define SCTP_MAX_READBUFFER	65536
 #define SCTP_ADDRMAX		20
 
 
@@ -563,8 +563,8 @@
 #define SCTP_NOTIFY_ASCONF_SET_PRIMARY	17
 #define SCTP_NOTIFY_PARTIAL_DELVIERY_INDICATION 18
 #define SCTP_NOTIFY_ADAPTION_INDICATION         19
-#define SCTP_NOTIFY_MAX			19
-
+#define SCTP_NOTIFY_INTERFACE_CONFIRMED 20
+#define SCTP_NOTIFY_MAX			20
 /* clock variance is 10ms */
 #define SCTP_CLOCK_GRANULARITY	10
 
@@ -592,7 +592,7 @@
 #define SCTP_UNSET_TSN_PRESENT(arry, gap) (arry[(gap>>3)] &= ((~(0x01 << ((gap&0x07)))) & 0xff))
 
 /* pegs */
-#define SCTP_NUMBER_OF_PEGS 40
+#define SCTP_NUMBER_OF_PEGS 64
 /* peg index's */
 #define SCTP_PEG_SACKS_SEEN 0 /* XX */
 #define SCTP_PEG_SACKS_SENT 1 /* XX */
@@ -629,11 +629,35 @@
 #define SCTP_CWND_NOFILL   32 /* XX */
 #define SCTP_CALLS_TO_CO   33 /* XX */
 #define SCTP_CO_NODATASNT  34 /* XX */
-#define SCTP_CWND_INCRS    35 /* XX */
+#define SCTP_CWND_NOUSE_SS 35 /* XX */
 #define SCTP_MAX_BURST_APL 36 /* XX */
 #define SCTP_EXPRESS_ROUTE 37 /* XX */
 #define SCTP_NO_COPY_IN    38 /* XX */
-#define SCTP_CACHED_SRC    39 /* XX */
+#define SCTP_CACHED_SRC    39  
+#define SCTP_CWND_NOCUM	   40
+#define SCTP_CWND_SS	   41
+#define SCTP_CWND_CA	   42
+#define SCTP_CWND_SKIP	   43
+#define SCTP_CWND_NOUSE_CA 44
+#define SCTP_MAX_CWND	   45
+#define SCTP_CWND_DIFF_CA  46
+#define SCTP_CWND_DIFF_SA  47
+#define SCTP_OQS_AT_SS 	   48
+#define SCTP_SQQ_AT_SS 	   49
+#define SCTP_OQS_AT_CA 	   50
+#define SCTP_SQQ_AT_CA 	   51
+#define SCTP_MOVED_MTU     52
+#define SCTP_MOVED_QMAX    53
+#define SCTP_SQC_AT_SS     54
+#define SCTP_SQC_AT_CA     55
+#define SCTP_MOVED_MAX     56
+#define SCTP_MOVED_NLEF    57
+#define SCTP_NAGLE_NOQ     58
+#define SCTP_NAGLE_OFF     59
+#define SCTP_OUTPUT_FRM_SND 60
+#define SCTP_RESV1         61
+#define SCTP_RESV2         62
+#define SCTP_RESV3         63
 /*
  * This value defines the number of vtag block time wait entry's
  * per list element.  Each entry will take 2 4 byte ints (and of

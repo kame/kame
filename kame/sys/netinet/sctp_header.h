@@ -1,4 +1,4 @@
-/*    $KAME: sctp_header.h,v 1.7 2003/04/23 10:26:51 itojun Exp $     */
+/*    $KAME: sctp_header.h,v 1.8 2003/06/24 05:36:49 itojun Exp $     */
 /*	Header: /home/sctpBsd/netinet/sctp_header.h,v 1.34 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_header_h__
@@ -74,6 +74,7 @@ struct sctp_heartbeat_info_param {
 	struct sctp_paramhdr ph;
 	u_int32_t time_value_1;
 	u_int32_t time_value_2;
+	u_int32_t random_value;
 	u_int16_t user_req;
         u_int8_t addr_family;
         u_int8_t addr_len;
@@ -108,6 +109,11 @@ struct sctp_asconf_paramhdr {		/* an ASCONF "parameter" */
 struct sctp_asconf_addr_param {		/* an ASCONF address parameter */
 	struct sctp_asconf_paramhdr aph;	/* asconf "parameter" */
 	struct sctp_ipv6addr_param  addrp;	/* max storage size */
+};
+
+struct sctp_asconf_addrv4_param {		/* an ASCONF address (v4) parameter */
+	struct sctp_asconf_paramhdr aph;	/* asconf "parameter" */
+	struct sctp_ipv4addr_param  addrp;	/* max storage size */
 };
 
 
@@ -366,11 +372,8 @@ struct sctp_packet_drop {
 	u_int32_t bottle_bw;
 	u_int32_t current_onq;
 	u_int16_t trunc_len;
-	u_int16_t num_desc;
-	union{
-		u_int8_t data[0];
-		struct sctp_chunk_desc desc[0];
-	}u;
+	u_int16_t reserved;
+	u_int8_t data[0];
 };
 
 

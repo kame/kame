@@ -1,4 +1,4 @@
-/*    $KAME: sctp.h,v 1.11 2003/04/23 10:26:51 itojun Exp $    */
+/*    $KAME: sctp.h,v 1.12 2003/06/24 05:36:49 itojun Exp $    */
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
 
 
@@ -78,18 +78,17 @@ struct sctp_paramhdr {
 
 #define SCTP_INITMSG			0x00000008
 #define SCTP_AUTOCLOSE			0x00000010
-#define SCTP_SET_PRIMARY_ADDR		0x00000020
-#define SCTP_SET_PEER_PRIMARY_ADDR	0x00000040
+#define SCTP_SET_PEER_PRIMARY_ADDR	0x00000020
+#define SCTP_PRIMARY_ADDR		0x00000040
 
 /* read-only options */
 #define SCTP_STATUS			0x00000080
 #define SCTP_PCB_STATUS			0x00000100
 
 /* ancillary data/notification interest options */
-#define SCTP_SET_EVENTS			0x00000200
+#define SCTP_EVENTS			0x00000200
 /* sctp_opt_info params */
-#define SCTP_SET_PEER_ADDR_PARAMS 	0x00000400
-#define SCTP_GET_PEER_ADDR_PARAMS	0x00000800
+#define SCTP_PEER_ADDR_PARAMS 		0x00000400
 #define SCTP_GET_PEER_ADDR_INFO		0x00001000
 /* Hidden socket option that gets the addresses */
 #define SCTP_GET_PEER_ADDRESSES		0x00002000
@@ -114,7 +113,7 @@ struct sctp_paramhdr {
  */
 #define SCTP_GET_SNDBUF_USE		0x00008000
 /* latter added read/write */
-#define SCTP_SET_ADAPTION_LAYER_BITS	0x00010000
+#define SCTP_ADAPTION_LAYER		0x00010000
 #define SCTP_DISABLE_FRAGMENTS		0x00020000
 /* sctp_bindx() flags as socket options */
 #define SCTP_BINDX_ADD_ADDR		0x00040000
@@ -132,6 +131,7 @@ struct sctp_paramhdr {
 #define SCTP_AUTO_ASCONF		0x08000000
 #define SCTP_MAXBURST			0x10000000
 #define SCTP_GET_CWND_LOG		0x20000000
+#define SCTP_CONNECT_X			0x40000000	/* hidden opt for connectx */
 /* Test/debug get a route */
 
 /* Debug things that need to be purged */

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_structs.h,v 1.7 2003/03/10 05:58:13 itojun Exp $	*/
+/*	$KAME: sctp_structs.h,v 1.8 2003/06/24 05:36:50 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_structs.h,v 1.67 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_structs_h__
@@ -47,6 +47,11 @@
 #include <netinet/sctp_header.h>
 #include <netinet/sctp_uio.h>
 
+/* Turn on HIGH SPEED SCTP per Sally Floyd's draft-02 */
+/*#define SCTP_HIGH_SPEED 1*/
+
+
+
 struct sctp_timer {
 	struct callout timer;
 	int type;
@@ -64,21 +69,34 @@ struct sctp_timer {
  */
 TAILQ_HEAD(sctpnetlisthead, sctp_nets);
 
+union sctp_sockstore {
+#ifdef AF_INET
+	struct sockaddr_in  sin;
+#endif
+#ifdef AF_INET6
+	struct sockaddr_in6 sin6;
+#endif
+	struct sockaddr     sa;
+};
+
 struct sctp_nets {
+	/* This is used for SHUTDOWN/SHUTDOWN-ACK/SEND or INIT timers */
+	struct sctp_timer rxt_timer;
 	/* Ip address and port */
 	TAILQ_ENTRY(sctp_nets) sctp_next;	/* next link */
+	/* last time in seconds I sent to it */
+	struct timeval last_sent_time;
+
 	/*
 	 * The following two in combination equate to a route entry for
 	 * v6 or v4.
 	 */
 	struct sctp_route {
 		struct rtentry *ro_rt;
-		struct sockaddr_storage _l_addr;	/* remote peer addr */
-		struct sockaddr_storage _s_addr;	/* our selected source address */
+		union sctp_sockstore _l_addr;	/* remote peer addr */
+		union sctp_sockstore _s_addr;	/* our selected source address */
 	} ra;
 	int ref_count;
-	/* This is used for SHUTDOWN/SHUTDOWN-ACK/SEND or INIT timers */
-	struct sctp_timer rxt_timer;
 
 	/* smoothed average things for RTT and RTO itself */
 	int lastsa;
@@ -98,9 +116,6 @@ struct sctp_nets {
 	/* mtu discovered so far */
 	int mtu;
 
-	/* last time in seconds I sent to it */
-	struct timeval last_sent_time;
-
 	/* tracking variables to avoid the aloc/free in sack processing */
 	int net_ack;
 	int net_ack2;
@@ -109,6 +124,7 @@ struct sctp_nets {
 	 * SCTP_ADDR_SWITCH_PRIMARY flag
 	 */
 	u_int32_t next_tsn_at_change;
+	u_int32_t heartbeat_random;
 
 	/* if this guy is ok or not ... status */
 	unsigned short dest_state;
@@ -124,6 +140,9 @@ struct sctp_nets {
 	u_int8_t cacc_saw_newack;	/* CACC algorithm flag */
 	u_int8_t src_addr_selected;
 	u_int8_t addr_is_local;		/* its a local address (if known) */
+#ifdef SCTP_HIGH_SPEED
+	u_int8_t last_hs_used;		/* index into the last HS table entry we used */
+#endif
 };
 
 
@@ -175,9 +194,9 @@ struct sctp_tmit_chunk {
 TAILQ_HEAD(sctpwheelunrel_listhead, sctp_stream_in);
 struct sctp_stream_in {
 	struct sctpchunk_listhead inqueue;
+	TAILQ_ENTRY(sctp_stream_in) next_spoke;
 	u_short stream_no;
 	u_short last_sequence_delivered;	/* used for re-order */
-	TAILQ_ENTRY(sctp_stream_in) next_spoke;
 };
 
 /* This struct is used to track the traffic on outbound streams */
@@ -187,7 +206,6 @@ struct sctp_stream_out {
 	TAILQ_ENTRY(sctp_stream_out) next_spoke; /* next link in wheel */
 	u_short stream_no;
 	u_short next_sequence_sent; /* next one I expect to send out */
-	u_short next_unordered_sent;
 };
 
 /* used to keep track of the addresses yet to try to add/delete */
@@ -209,7 +227,8 @@ struct sctp_asconf_addr {
 struct sctp_association {
 	/* association state */
 	int state;
-
+	/* queue of pending addrs to add/delete */
+	struct sctp_asconf_addrhead asconf_queue;
 	struct timeval time_entered;		/* time we entered state */
 	struct timeval time_last_rcvd;
 	struct timeval time_last_sent;
@@ -226,16 +245,43 @@ struct sctp_association {
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	struct sctp_timer delayed_event_timer;	/* timer for delayed events */
 #endif /* SCTP_TCP_MODEL_SUPPORT */
-	/* the cookie life I award for any cookie, in seconds */
-	int cookie_life;
-
-	uint32_t cookie_preserve_req;
-
-	/* if subset bound, type of addresses we have bound (eg. valid) */
-	uint32_t bound_types;
-
 	/* list of local addresses when add/del in progress */
 	struct sctpladdr sctp_local_addr_list;
+	struct sctpnetlisthead nets;
+	/*
+	 * Control chunk queue
+	 */
+	struct sctpchunk_listhead control_send_queue;
+	/* Once a TSN hits the wire it is moved to the sent_queue. We
+	 * maintain two counts here (don't know if any but retran_cnt
+	 * is needed). The idea is that the sent_queue_retran_cnt
+	 * reflects how many chunks have been marked for retranmission
+	 * by either T3-rxt or FR.
+	 */
+	struct sctpchunk_listhead sent_queue;
+	struct sctpchunk_listhead send_queue;
+
+
+	/* re-assembly queue for fragmented chunks on the inbound path */
+	struct sctpchunk_listhead reasmqueue;
+
+	/*
+	 * this queue is used when we reach a condition that we can NOT
+	 * put data into the socket buffer. We track the size of this
+	 * queue and set our rwnd to the space in the socket minus also
+	 * the size_on_delivery_queue.
+	 */
+	struct sctpchunk_listhead delivery_queue;
+
+	struct sctpwheel_listhead out_wheel;
+
+	/* ASCONF destination address last sent to */
+	struct sctp_nets *asconf_last_sent_to;
+
+	/* ASCONF save the last ASCONF-ACK so we can resend it if necessary */
+	struct mbuf *last_asconf_ack_sent;
+
+
 
 	/*
 	 * if Source Address Selection happening, this will rotate through
@@ -243,44 +289,10 @@ struct sctp_association {
 	 */
 	struct sctp_laddr *last_used_address;
 
-	/* amount of data (bytes) currently in flight (on all destinations) */
-	int total_flight;
-
-	/* count of destinaton nets and list of destination nets */
-	int numnets;
-	struct sctpnetlisthead nets;
-
-	/* Total error count on this association */
-	int overall_error_count;
-
-	/* various verification tag information */
-	uint32_t my_vtag;	/*
-				 * The tag to be used. if assoc is
-				 * re-initited by remote end, and
-				 * I have unlocked this will be
-				 * regenrated to a new random value.
-				 */
-	uint32_t peer_vtag;	/* The peers last tag */
-
-
-	/* my maximum number of retrans of INIT and SEND */
-	/* copied from SCTP but should be individually setable */
-	u_short max_init_times;
-	u_short max_send_times;
-	u_short def_net_failure;
-
-	/*
-	 * window state information and smallest MTU that I use to bound
-	 * segmentation
-	 */
-	long peers_rwnd;
-	long my_rwnd;
-	long my_last_reported_rwnd;
-	long my_rwnd_control_len;
-
-	/* This is the SCTP fragmentation threshold */
-	u_int32_t smallest_mtu;
-
+	/* stream arrays */
+        struct sctp_stream_in  *strmin;
+	struct sctp_stream_out *strmout;
+	u_int8_t *mapping_array;
 	/* primary destination to use */
 	struct sctp_nets *primary_destination;
 
@@ -288,6 +300,27 @@ struct sctp_association {
 	struct sctp_nets *last_data_chunk_from;
 	/* last place I got a control from */
 	struct sctp_nets *last_control_chunk_from;
+
+	/* circular looking for output selection */
+	struct sctp_stream_out *last_out_stream;
+
+	u_int32_t cookie_preserve_req;
+	/* ASCONF next seq I am sending out, inits at init-tsn */
+	uint32_t asconf_seq_out;
+	/* ASCONF last received ASCONF from peer, starts at peer's TSN-1 */
+	uint32_t asconf_seq_in;
+
+	/* various verification tag information */
+	u_int32_t my_vtag;	/*
+				 * The tag to be used. if assoc is
+				 * re-initited by remote end, and
+				 * I have unlocked this will be
+				 * regenrated to a new random value.
+				 */
+	u_int32_t peer_vtag;	/* The peers last tag */
+
+	/* This is the SCTP fragmentation threshold */
+	u_int32_t smallest_mtu;
 
 	/*
 	 * Special hook for Fast retransmit, allows us to track the highest
@@ -304,7 +337,7 @@ struct sctp_association {
 	/* The next TSN that I will use in sending. */
 	u_int32_t sending_seq;
 
-	/* Original seq number I used */
+	/* Original seq number I used ??questionable to keep?? */
 	u_int32_t init_seq_number;
 
 	/*
@@ -333,11 +366,29 @@ struct sctp_association {
 	 */
 	u_int32_t highest_tsn_inside_map;
 
+	u_int32_t last_echo_tsn;
+	u_int32_t last_cwr_tsn;
+	u_int32_t fast_recovery_tsn;
+	u_int32_t sat_t3_recovery_tsn;
+
+	u_int32_t tsn_last_delivered;
+
+
 	/*
-	 * Control chunk queue
+	 * window state information and smallest MTU that I use to bound
+	 * segmentation
 	 */
-	struct sctpchunk_listhead control_send_queue;
-	int ctrl_queue_cnt;
+	u_int32_t peers_rwnd;
+	u_int32_t my_rwnd;
+	u_int32_t my_last_reported_rwnd;
+	u_int32_t my_rwnd_control_len;
+
+
+	u_int32_t total_output_queue_size;
+	u_int32_t total_output_mbuf_queue_size;
+
+
+	int ctrl_queue_cnt; /* could be removed  REM */
 
 	/*
 	 * All outbound datagrams queue into this list from the
@@ -345,43 +396,29 @@ struct sctp_association {
 	 * and then await sending. The stream seq comes when it
 	 * is first put in the individual str queue
 	 */
-	struct sctpchunk_listhead send_queue;
-
-	/* Once a TSN hits the wire it is moved to the sent_queue. We
-	 * maintain two counts here (don't know if any but retran_cnt
-	 * is needed). The idea is that the sent_queue_retran_cnt
-	 * reflects how many chunks have been marked for retranmission
-	 * by either T3-rxt or FR.
-	 */
-	struct sctpchunk_listhead sent_queue;
+	int send_queue_cnt;  /* could be removed REM */
 	int sent_queue_cnt;
-	int sent_queue_cnt_removeable;
+	int sent_queue_cnt_removeable; /* could be removed REM */
 	/*
 	 * Number on sent queue that are marked for retran until this
 	 * value is 0 we only send one packet of retran'ed data.
 	 */
 	int sent_queue_retran_cnt;
 
-	/* re-assembly queue for fragmented chunks on the inbound path */
-	struct sctpchunk_listhead reasmqueue;
 	int size_on_reasm_queue;
 	int cnt_on_reasm_queue;
+	/* amount of data (bytes) currently in flight (on all destinations) */
+	int total_flight;
+	/* Total book size in flight */
+	int total_flight_book;
+	int total_flight_count;	/* count of chunks used with book total */
+	/* count of destinaton nets and list of destination nets */
+	int numnets;
 
-	/* For the partial delivery API, if up, invoked
-	 * this is what last TSN I delivered
-	 */
-	u_int32_t tsn_last_delivered;
-	u_int32_t dropped_pkt_reports[SCTP_MAX_DROP_SAVE_REPORT];
-	u_int16_t str_of_pdapi;
-	u_int16_t ssn_of_pdapi;
 
-	/*
-	 * this queue is used when we reach a condition that we can NOT
-	 * put data into the socket buffer. We track the size of this
-	 * queue and set our rwnd to the space in the socket minus also
-	 * the size_on_delivery_queue.
-	 */
-	struct sctpchunk_listhead delivery_queue;
+	/* Total error count on this association */
+	int overall_error_count;
+
 	int size_on_delivery_queue;
 	int cnt_on_delivery_queue;
 
@@ -401,39 +438,14 @@ struct sctp_association {
 	/* How many streams I support coming into me */
 	int max_inbound_streams;
 
-	/* counts of actual built streams. Allocation may be more however */
-	/* could re-arrange to optimize space here. */
-	u_short streamincnt;
-	u_short streamoutcnt;
-	/* circular looking for output selection */
-	struct sctp_stream_out *last_out_stream;
-
-	/* stream arrays */
-	long total_output_queue_size;
-	long total_output_mbuf_queue_size;
-	struct sctpwheel_listhead out_wheel;
-#ifdef SCTP_OLD_USCTP_COMPAT
-	struct sctpwheelunrel_listhead unrel_wheel;
-#endif
-        struct sctp_stream_in  *strmin;
-	struct sctp_stream_out *strmout;
+	/* the cookie life I award for any cookie, in seconds */
+	int cookie_life;
 
 
-	/*
-	 * ASCONF stuff
-	 */
-	/* next seq I am sending out, inits at init-tsn */
-	uint32_t asconf_seq_out;
-	/* last received ASCONF from peer, starts at peer's TSN-1 */
-	uint32_t asconf_seq_in;
-	/* destination address last sent to */
-	struct sctp_nets *asconf_last_sent_to;
-	/* save the last ASCONF-ACK so we can resend it if necessary */
-	struct mbuf *last_asconf_ack_sent;
-	/* queue of pending addrs to add/delete */
-	struct sctp_asconf_addrhead asconf_queue;
-
-
+	int numduptsns;
+	int dup_tsns[SCTP_MAX_DUP_TSNS];
+	int initial_init_rto_max;	/* initial RTO for INIT's */
+	int initial_rto;		/* initial send RTO */
 	/* Being that we have no bag to collect stale cookies, and
 	 * that we really would not want to anyway.. we will count
 	 * them in this counter. We of course feed them to the
@@ -441,22 +453,37 @@ struct sctp_association {
 	 * as flying rats).
 	 */
 	int stale_cookie_count;
-	u_int32_t last_echo_tsn;
-	u_int32_t last_cwr_tsn;
-	u_int32_t fast_recovery_tsn;
-	u_int32_t sat_t3_recovery_tsn;
 
-	int numduptsns;
-	int dup_tsns[SCTP_MAX_DUP_TSNS];
-	int initial_init_rto_max;	/* initial RTO for INIT's */
-	int initial_rto;		/* initial send RTO */
-	struct socketdesc *sb;
+
+	/* For the partial delivery API, if up, invoked
+	 * this is what last TSN I delivered
+	 */
+	u_int16_t str_of_pdapi;
+	u_int16_t ssn_of_pdapi;
+
+
+	/* counts of actual built streams. Allocation may be more however */
+	/* could re-arrange to optimize space here. */
+	u_int16_t streamincnt;
+	u_int16_t streamoutcnt;
+
+
+
+	/* my maximum number of retrans of INIT and SEND */
+	/* copied from SCTP but should be individually setable */
+	u_int16_t max_init_times;
+	u_int16_t max_send_times;
+	u_int16_t def_net_failure;
+
 
 	/*
 	 * lock flag: 0 is ok to send, 1+ (duals as a retran count) is
 	 * awaiting ACK
 	 */
-	uint16_t asconf_sent;
+	u_int16_t asconf_sent;   /* possibly removable REM */
+	u_int16_t mapping_array_size;
+
+	u_int16_t chunks_on_out_queue; /* total chunks floating around */
 
 	/*
 	 * This flag indicates that we need to send the first SACK. If
@@ -467,7 +494,7 @@ struct sctp_association {
 	/* max burst after fast retransmit comletes */
 	u_int8_t max_burst;
 	u_int8_t sat_network;	/* RTT is in range of sat net or greater */
-
+	u_int8_t burst_limit_applied;	/* Burst limit in effect at last send? */
 	/* flag goes on when we are doing a partial delivery api */
 	u_int8_t hb_random_values[4];
 	u_int8_t fragmented_delivery_inprogress;
@@ -487,7 +514,7 @@ struct sctp_association {
 
 	/* flag to indicate if peer can do asconf */
 	uint8_t peer_supports_asconf;
-	uint8_t peer_supports_asconf_setprim;
+	uint8_t peer_supports_asconf_setprim; /* possibly removable REM */
 	/* u-sctp support flag */
 	uint8_t peer_supports_usctp;
 
@@ -507,9 +534,7 @@ struct sctp_association {
 	u_int8_t used_alt_asconfack;
 	u_int8_t fast_retran_loss_recovery;
 	u_int8_t sat_t3_loss_recovery;
-	u_int8_t last_dropped_rep;
         u_int8_t dropped_special_cnt;
-	u_int8_t dropped_pkt_reports_data[SCTP_MAX_DROP_SAVE_REPORT][3];
 	/*
 	 * The mapping array is used to track out of order sequences
 	 * above last_acked_seq. 0 indicates packet missing 1 indicates
@@ -518,7 +543,6 @@ struct sctp_association {
 	 * array mappingArraySz, I discard the datagram and let retransmit
 	 * happen.
 	 */
-	u_int8_t mapping_array[SCTP_MAPPING_ARRAY];
 };
 
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.28 2003/04/21 09:06:28 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.29 2003/06/24 05:36:50 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -149,7 +149,7 @@ ip_2_ip6_hdr(struct ip6_hdr *ip6, struct ip *ip)
 #endif /* INET6 */
 
 static void
-sctp_split_chunks(struct sctp_stream_out *strm,struct sctp_tmit_chunk *chk)
+sctp_split_chunks(struct sctp_stream_out *strm, struct sctp_tmit_chunk *chk)
 {
 	struct sctp_tmit_chunk *new_chk;
 
@@ -171,7 +171,7 @@ sctp_split_chunks(struct sctp_stream_out *strm,struct sctp_tmit_chunk *chk)
 	/* Copy it all */
 	*new_chk = *chk;
 	/*  split the data */
-	new_chk->data = m_split(chk->data, (chk->send_size>>1), M_WAIT);
+	new_chk->data = m_split(chk->data, (chk->send_size>>1), M_DONTWAIT);
 	if (new_chk->data == NULL) {
 		/* Can't split */
 		chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
@@ -208,7 +208,7 @@ sctp_split_chunks(struct sctp_stream_out *strm,struct sctp_tmit_chunk *chk)
 		new_chk->whoTo->ref_count++;
 	}
 	/* now drop it on the end of the list*/
-	TAILQ_INSERT_AFTER(&strm->outqueue,chk,new_chk,sctp_next);
+	TAILQ_INSERT_AFTER(&strm->outqueue, chk, new_chk, sctp_next);
 }
 
 static void
@@ -240,11 +240,6 @@ sctp_notify_mbuf(struct sctp_inpcb *inp,
 	}
 	if (icmph->icmp_code != ICMP_UNREACH_NEEDFRAG) {
 		/* not a unreachable message due to frag. */
-		/* FIX ME : We should check for unreachable protocol,
-		 * destintation and port to clean up any association...
-		 * Destination Unreach - network died.
-		 * Protocol unreach and Port unreach - peer is dead.
-		 */
 		return;
 	}
 	totsz = ip->ip_len;
@@ -298,6 +293,14 @@ sctp_notify_mbuf(struct sctp_inpcb *inp,
 				if (stcb->asoc.total_flight < 0) {
 					stcb->asoc.total_flight = 0;
 				}
+				stcb->asoc.total_flight_book -= chk->book_size;
+				if (stcb->asoc.total_flight_book < 0) {
+					stcb->asoc.total_flight_book = 0;
+				}
+				stcb->asoc.total_flight_count--;
+				if (stcb->asoc.total_flight_count < 0) {
+					stcb->asoc.total_flight_count = 0;
+				}
 				netp->flight_size -= chk->send_size;
 				if (netp->flight_size < 0) {
 					netp->flight_size = 0;
@@ -309,7 +312,7 @@ sctp_notify_mbuf(struct sctp_inpcb *inp,
 			while (chk) {
 				nchk = TAILQ_NEXT(chk, sctp_next);
 				if ((chk->send_size+SCTP_MED_OVERHEAD) > nxtsz) {
-					sctp_split_chunks(strm,chk);
+					sctp_split_chunks(strm, chk);
 				}
 				chk = nchk;
 			}
@@ -767,9 +770,9 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		ret = sctp_output(inp, inp->pkt , addr, inp->control, p);
 		inp->pkt = NULL;
 		inp->control = NULL;
-		return(ret);
+		return (ret);
 	} else {
-		return(0);
+		return (0);
 	}
 }
 
@@ -826,7 +829,7 @@ sctp_disconnect(struct socket *so)
 				}
 				sctp_free_assoc(inp, tcb);
 				splx(s);
-				return(0);
+				return (0);
 			}
 			if (!TAILQ_EMPTY(&asoc->out_wheel)) {
 				/* Check to see if some data queued */
@@ -1047,6 +1050,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 						continue;
 					}
 					memcpy(sas, sin, sizeof(*sin));
+					((struct sockaddr_in *)sas)->sin_port = inp->sctp_lport;
 					sas = (struct sockaddr_storage *)((caddr_t)sas + sizeof(*sin));
 					actual += sizeof(*sin);
 					if (actual >= limit) {
@@ -1078,6 +1082,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 						continue;
 					}
 					memcpy(sas, sin6, sizeof(*sin6));
+					((struct sockaddr_in6 *)sas)->sin6_port = inp->sctp_lport;
 					sas = (struct sockaddr_storage *)((caddr_t)sas + sizeof(*sin6));
 					actual += sizeof(*sin6);
 					if (actual >= limit) {
@@ -1105,6 +1110,8 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 				}
 				if (sctp_fill_user_address(sas, laddr->ifa->ifa_addr))
 					continue;
+
+				((struct sockaddr_in6 *)sas)->sin6_port = inp->sctp_lport;
 				sas = (struct sockaddr_storage *)((caddr_t)sas +
 								  laddr->ifa->ifa_addr->sa_len);
 				actual += laddr->ifa->ifa_addr->sa_len;
@@ -1121,6 +1128,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					if (sctp_fill_user_address(sas,
 								   laddr->ifa->ifa_addr))
 						continue;
+					((struct sockaddr_in6 *)sas)->sin6_port = inp->sctp_lport;
 					sas = (struct sockaddr_storage *)((caddr_t)sas +
 									  laddr->ifa->ifa_addr->sa_len);
 					actual += laddr->ifa->ifa_addr->sa_len;
@@ -1135,6 +1143,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					if (sctp_fill_user_address(sas,
 								   laddr->ifa->ifa_addr))
 						continue;
+					((struct sockaddr_in6 *)sas)->sin6_port = inp->sctp_lport;
 					sas = (struct sockaddr_storage *)((caddr_t)sas +
 									  laddr->ifa->ifa_addr->sa_len);
 					actual += laddr->ifa->ifa_addr->sa_len;
@@ -1180,6 +1189,167 @@ sctp_count_max_addresses(struct sctp_inpcb *inp)
 	}
 	return (cnt);
 }
+static int
+sctp_do_connect_x(struct socket *so,
+		  struct sctp_inpcb *inp,
+		  struct mbuf *m,
+		  struct proc *p)
+{
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
+	int error = 0;
+	struct sctp_tcb *tcb=NULL;
+	struct sockaddr *sa;
+	int num_v6=0, num_v4=0, *totaddrp, totaddr, i, incr, at;
+#ifdef SCTP_DEBUG
+	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
+		printf("Connectx called\n");
+	}
+#endif /* SCTP_DEBUG */
+#ifdef SCTP_TCP_MODEL_SUPPORT
+	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) &&
+	    (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)) {
+		/* We are already connected AND the TCP model */
+		splx(s);
+		return (EADDRINUSE);
+	}
+#endif /* SCTP_TCP_MODEL_SUPPORT */
+#ifdef SCTP_TCP_MODEL_SUPPORT
+	if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)
+		tcb = LIST_FIRST(&inp->sctp_asoc_list);
+	if (tcb) {
+		splx(s);
+		return (EALREADY);
+
+	}
+#endif /* SCTP_TCP_MODEL_SUPPORT */
+
+	totaddrp = mtod(m, int *);
+	totaddr = *totaddrp;
+	sa = (struct sockaddr *)(totaddrp + 1);
+	at = incr = 0;
+	/* account and validate addresses */
+	for (i = 0; i < totaddr; i++) {
+		if (sa->sa_family == AF_INET) {
+			num_v4++;
+			incr = sizeof(struct sockaddr_in);
+		} else if (sa->sa_family == AF_INET6) {
+			struct sockaddr_in6 *sin6;
+			sin6 = (struct sockaddr_in6 *)sa;
+			if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+				/* Must be non-mapped for connectx */
+				splx(s);
+				return EINVAL;
+			}
+			num_v6++;
+			incr = sizeof(struct sockaddr_in6);
+		} else {
+			totaddr = i;
+			break;
+		}
+		tcb = sctp_findassociation_ep_addr(&inp, sa, NULL, NULL);
+		if (tcb != NULL) {
+			/* Already have or am bring up an association */
+			splx(s);
+			return (EALREADY);
+		}
+		if ((at + incr) > m->m_len) {
+			totaddr = i;
+			break;
+		}
+		sa = (struct sockaddr *)((caddr_t)sa + incr);
+	}
+	sa = (struct sockaddr *)(totaddrp + 1);
+#ifdef INET6
+	if (((inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0) &&
+	    (num_v6 > 0)) {
+		splx(s);
+		return (EINVAL);
+	}
+	if ((inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
+	   (num_v4 > 0)) {
+		struct in6pcb *inp6;
+		inp6 = (struct in6pcb *)inp;
+		if (
+#if defined(__OpenBSD__)
+			(0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+			(inp6->in6p_flags & IN6P_IPV6_V6ONLY)
+#else
+			(inp6->inp_flags & IN6P_IPV6_V6ONLY)
+#endif
+			) {
+			/*
+			 * if IPV6_V6ONLY flag, ignore connections
+			 * destined to a v4 addr or v4-mapped addr
+			 */
+			splx(s);
+			return EINVAL;
+		}
+	}
+#endif /* INET6 */
+	if ((inp->sctp_flags & SCTP_PCB_FLAGS_UNBOUND) ==
+	    SCTP_PCB_FLAGS_UNBOUND) {
+		/* Bind a ephemeral port */
+		struct sockaddr_in sin;
+		memset(&sin, 0, sizeof(sin));
+		sin.sin_len = sizeof(sin);
+		sin.sin_family = AF_INET;
+		error = sctp_inpcb_bind(so, (struct sockaddr *)&sin, p);
+		if (error) {
+			splx(s);
+			return (error);
+		}
+	}
+        /* We are GOOD to go */
+	tcb = sctp_aloc_assoc(inp, sa, 1, &error);
+	if (tcb == NULL) {
+		/* Gak! no memory */
+		splx(s);
+		return (error);
+	}
+	/* move to second address */
+	if (sa->sa_family == AF_INET)
+		sa = (struct sockaddr *)((caddr_t)sa + sizeof(struct sockaddr_in));
+	else
+		sa = (struct sockaddr *)((caddr_t)sa + sizeof(struct sockaddr_in6));
+
+	for (i = 1; i < totaddr; i++) {
+		if (sa->sa_family == AF_INET) {
+			incr = sizeof(struct sockaddr_in);
+			if (sctp_add_remote_addr(tcb, sa, 0, 8)) {
+				sctp_free_assoc(inp, tcb);
+				splx(s);
+				return (ENOBUFS);
+			}
+
+		} else if (sa->sa_family == AF_INET6) {
+			incr = sizeof(struct sockaddr_in6);
+			if (sctp_add_remote_addr(tcb, sa, 0, 8)) {
+				sctp_free_assoc(inp, tcb);
+				splx(s);
+				return (ENOBUFS);
+			}
+		}
+		sa = (struct sockaddr *)((caddr_t)sa + incr);
+	}
+#ifdef SCTP_TCP_MODEL_SUPPORT
+	if (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) {
+		tcb->sctp_ep->sctp_flags |= SCTP_PCB_FLAGS_CONNECTED;
+		/* Set the connected flag so we can queue data */
+		soisconnecting(so);
+	}
+#endif
+	tcb->asoc.state = SCTP_STATE_COOKIE_WAIT;
+	SCTP_GETTIME_TIMEVAL(&tcb->asoc.time_entered);
+	sctp_send_initiate(inp, tcb);
+	splx(s);
+	return error;
+}
+
 
 static int
 sctp_optsget(struct socket *so,
@@ -1343,7 +1513,7 @@ sctp_optsget(struct socket *so,
 		memcpy(pt, sctp_pegs, sizeof(sctp_pegs));
 	}
 	break;
-	case SCTP_SET_EVENTS:
+	case SCTP_EVENTS:
 	{
 		struct sctp_event_subscribe *events;
 #ifdef SCTP_DEBUG
@@ -1392,7 +1562,7 @@ sctp_optsget(struct socket *so,
 	}
 	break;
 
-	case SCTP_SET_ADAPTION_LAYER_BITS:
+	case SCTP_ADAPTION_LAYER:
 		if (m->m_len < sizeof(int)) {
 			error = EINVAL;
 			break;
@@ -1520,6 +1690,8 @@ sctp_optsget(struct socket *so,
 				break;
 			}
 			memcpy(sas, &net->ra._l_addr, cpsz);
+			((struct sockaddr_in *)sas)->sin_port = tcb->rport;
+
 			sas = (struct sockaddr_storage *)((caddr_t)sas + cpsz);
 			left -= cpsz;
 			m->m_len += cpsz;
@@ -1573,14 +1745,17 @@ sctp_optsget(struct socket *so,
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);			
 		}
 #endif /* SCTP_TCP_MODEL_SUPPORT */				
+		if (tcb == NULL) {
+			error = EADDRNOTAVAIL;
+			break;
+		}
 		sas = (struct sockaddr_storage *)&saddr->addr[0];
 		limit = m->m_len - sizeof(sctp_assoc_t);
 		actual = sctp_fill_up_addresses(inp, tcb, limit, sas);
 		m->m_len = sizeof(struct sockaddr_storage) + actual;
 	}
 	break;
-	case SCTP_SET_PEER_ADDR_PARAMS:
-	case SCTP_GET_PEER_ADDR_PARAMS:
+	case SCTP_PEER_ADDR_PARAMS:
 	{
 		struct sctp_paddrparams *paddrp;
 		struct sctp_nets *netp;
@@ -1605,7 +1780,7 @@ sctp_optsget(struct socket *so,
 		netp = NULL;
 		if ((((struct sockaddr *)&paddrp->spp_address)->sa_family == AF_INET) ||
 		    (((struct sockaddr *)&paddrp->spp_address)->sa_family == AF_INET6)) {
-				/* Lookup via address */
+			/* Lookup via address */
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_USRREQ1) {
 				printf("Ok we need to lookup a param\n");
@@ -1694,19 +1869,19 @@ sctp_optsget(struct socket *so,
 		netp = NULL;
 		if ((((struct sockaddr *)&paddri->spinfo_address)->sa_family == AF_INET) ||
 		    (((struct sockaddr *)&paddri->spinfo_address)->sa_family == AF_INET6)) {
-				/* Lookup via address */
+			/* Lookup via address */
 #ifdef SCTP_TCP_MODEL_SUPPORT
-		    if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
+			if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
 				tcb = LIST_FIRST(&inp->sctp_asoc_list);
 				if (tcb)
-				    netp = sctp_findnet(tcb, 
-							(struct sockaddr *)&paddri->spinfo_address);
-		    } else {
+					netp = sctp_findnet(tcb, 
+							    (struct sockaddr *)&paddri->spinfo_address);
+			} else {
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 				tcb = sctp_findassociation_ep_addr(&inp,
 								   (struct sockaddr *)&paddri->spinfo_address,
 								   &netp, NULL);
-		    }
+			}
 		} else {
 			tcb = NULL;
 		}
@@ -1714,6 +1889,7 @@ sctp_optsget(struct socket *so,
 			error = ENOENT;
 			break;
 		}
+		
 		paddri->spinfo_state = netp->dest_state & SCTP_REACHABLE_MASK;
 		paddri->spinfo_cwnd = netp->cwnd;
 		paddri->spinfo_srtt = ((netp->lastsa >> 2) + netp->lastsv) >> 1;
@@ -1781,8 +1957,18 @@ sctp_optsget(struct socket *so,
 
 		sstat->sstat_instrms = tcb->asoc.streamincnt;
 		sstat->sstat_outstrms = tcb->asoc.streamoutcnt;
-		sstat->sstat_fragmentation_point = tcb->asoc.smallest_mtu;
-
+		{
+			int ovh;
+			if (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
+				ovh = SCTP_MED_OVERHEAD;
+			} else {
+				ovh = SCTP_MED_V4_OVERHEAD;
+			}
+			if (tcb->sctp_ep->sctp_frag_point > (tcb->asoc.smallest_mtu-ovh))
+				sstat->sstat_fragmentation_point = tcb->asoc.smallest_mtu;
+			else
+				sstat->sstat_fragmentation_point = tcb->sctp_ep->sctp_frag_point;
+		}
 		memcpy(&sstat->sstat_primary.spinfo_address,
 		       &tcb->asoc.primary_destination->ra._l_addr,
 		       ((struct sockaddr *)(&tcb->asoc.primary_destination->ra._l_addr))->sa_len);
@@ -1813,7 +1999,7 @@ sctp_optsget(struct socket *so,
 		}
 		srto = mtod(m, struct sctp_rtoinfo *);
 		if (srto->srto_assoc_id == 0) {
-				/* Endpoint only please */
+			/* Endpoint only please */
 			srto->srto_initial = inp->sctp_ep.initial_rto;
 			srto->srto_max = inp->sctp_ep.sctp_maxrto;
 			srto->srto_min = inp->sctp_ep.sctp_minrto;
@@ -1853,8 +2039,8 @@ sctp_optsget(struct socket *so,
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);
 #endif /* SCTP_MODEL_SUPPORT */
 		if ((sasoc->sasoc_assoc_id) && (tcb == NULL)) {
-				tcb = sctp_findassociation_ep_asocid(inp,
-								     sasoc->sasoc_assoc_id);
+			tcb = sctp_findassociation_ep_asocid(inp,
+							     sasoc->sasoc_assoc_id);
 			if (tcb == NULL) {
 				error = ENOENT;
 				break;
@@ -1918,7 +2104,7 @@ sctp_optsget(struct socket *so,
 		sinit->sinit_max_init_timeo = inp->sctp_ep.initial_init_rto_max;
 	}
 	break;
-	case SCTP_SET_PRIMARY_ADDR:
+	case SCTP_PRIMARY_ADDR:
 		/* we allow a "get" operation on this */
 	{
 		struct sctp_setprim *ssp;
@@ -1940,7 +2126,7 @@ sctp_optsget(struct socket *so,
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 			tcb = sctp_findassociation_ep_asocid(inp, ssp->ssp_assoc_id);
 		if (tcb == NULL) {
-				/* one last shot, try it by the address in */
+			/* one last shot, try it by the address in */
 			struct sctp_nets *netp;
 #ifdef SCTP_TCP_MODEL_SUPPORT
 			if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)
@@ -1955,24 +2141,13 @@ sctp_optsget(struct socket *so,
 				break;
 			}
 		}
-				/* simply copy out the sockaddr_storage... */
+		/* simply copy out the sockaddr_storage... */
 		memcpy(&ssp->ssp_addr,
 		       &tcb->asoc.primary_destination->ra._l_addr,
 		       ((struct sockaddr *)&tcb->asoc.primary_destination->ra._l_addr)->sa_len);
 
 	}
 	break;
-	case SCTP_SET_PEER_PRIMARY_ADDR:
-		/*
-		 * FIX: How can we know what his primary is?
-		 * I don't see anyway to know this!!
-		 */
-#ifdef SCTP_DEBUG
-		if (sctp_debug_on & SCTP_DEBUG_USRREQ1) {
-			printf("Huh how do I get peer primary\n");
-		}
-#endif /* SCTP_DEBUG */
-		break;
 	default:
 		error = ENOPROTOOPT;
 		break;
@@ -2048,7 +2223,7 @@ sctp_optsset(struct socket *so,
 			 * Note this does not effect old associations, only
 			 * new ones.
 			 */
-			inp->sctp_ep.auto_close_time = *mopt;
+			inp->sctp_ep.auto_close_time = (*mopt * hz);
 			break;
 		}
 		if (*mopt != 0) {
@@ -2057,6 +2232,14 @@ sctp_optsset(struct socket *so,
 			inp->sctp_flags &= ~set_opt;
 		}
 		break;
+	case SCTP_CONNECT_X:
+		if (m->m_len < (sizeof(int) + sizeof(struct sockaddr_in))) {
+			error = EINVAL;
+			break;
+		}
+		error = sctp_do_connect_x(so, inp, m, p);
+		break;
+
 	case SCTP_MAXBURST:
 	{
 		u_int8_t *burst;
@@ -2070,7 +2253,7 @@ sctp_optsset(struct socket *so,
 		u_int32_t *segsize;
 		segsize = mtod(m, u_int32_t *);
 		if (*segsize > (SCTP_MAX_OVERHEAD + 4)) {
-			inp->sctp_frag_point = *segsize;
+			inp->sctp_frag_point = (*segsize+SCTP_MAX_OVERHEAD);
 		}
 	}
 	break;
@@ -2094,7 +2277,7 @@ sctp_optsset(struct socket *so,
 	error = EOPNOTSUPP;
 #endif /* SCTP_DEBUG */
 	break;
-	case SCTP_SET_EVENTS:
+	case SCTP_EVENTS:
 	{
 		struct sctp_event_subscribe *events;
 		if (m->m_len < sizeof(struct sctp_event_subscribe)) {
@@ -2152,7 +2335,7 @@ sctp_optsset(struct socket *so,
 	}
 	break;
 
-	case SCTP_SET_ADAPTION_LAYER_BITS:
+	case SCTP_ADAPTION_LAYER:
 	{
 		struct sctp_setadaption *adap_bits;
 		if (m->m_len < sizeof(struct sctp_setadaption)) {
@@ -2201,13 +2384,12 @@ sctp_optsset(struct socket *so,
 		/* Mask off the flags that are allowed */
 		s_info->sinfo_flags = (s_info->sinfo_flags &
 				       (MSG_UNORDERED | MSG_ADDR_OVER |
-					MSG_PR_SCTP | MSG_PR_BUFFER));
+					MSG_PR_SCTP_TTL | MSG_PR_SCTP_BUF));
 		/* Copy it in */
 		tcb->asoc.def_send = *s_info;
 	}
 	break;
-	case SCTP_SET_PEER_ADDR_PARAMS:
-	case SCTP_GET_PEER_ADDR_PARAMS:
+	case SCTP_PEER_ADDR_PARAMS:
 	{
 		struct sctp_paddrparams *paddrp;
 		struct sctp_nets *netp;
@@ -2292,7 +2474,7 @@ sctp_optsset(struct socket *so,
 				/* Use endpoint defaults */
 			if (paddrp->spp_pathmaxrxt)
 				inp->sctp_ep.def_net_failure = paddrp->spp_pathmaxrxt;
-			if (paddrp->spp_hbinterval)
+			if (paddrp->spp_hbinterval != SCTP_ISSUE_HB)
 				inp->sctp_ep.sctp_timeoutticks[SCTP_TIMER_HEARTBEAT] = paddrp->spp_hbinterval;
 		}
 	}
@@ -2401,7 +2583,7 @@ sctp_optsset(struct socket *so,
 			inp->sctp_ep.initial_init_rto_max = sinit->sinit_max_init_timeo;
 	}
 	break;
-	case SCTP_SET_PRIMARY_ADDR:
+	case SCTP_PRIMARY_ADDR:
 	{
 		struct sctp_setprim *spa;
 		struct sctp_nets *net, *lnet;
@@ -2451,6 +2633,7 @@ sctp_optsset(struct socket *so,
 		}
 	}
 	break;
+
 	case SCTP_SET_PEER_PRIMARY_ADDR:
 	{
 		struct sctp_setpeerprim *sspp;
@@ -2503,8 +2686,20 @@ sctp_optsset(struct socket *so,
 		}
 		if (addrs->sget_assoc_id == 0) {
 			/* add the address */
-			error = sctp_addr_mgmt_ep_sa(inp, (struct sockaddr *)addrs->addr,
-						     SCTP_ADD_IP_ADDRESS);
+			struct sctp_inpcb  *lep;
+
+			((struct sockaddr_in *)addrs->addr)->sin_port = inp->sctp_lport;
+			lep = sctp_pcb_findep(addrs->addr);
+			if (lep == inp) {
+				/* already bound to it.. ok */
+				break;
+			} else if (lep == NULL) {
+				((struct sockaddr_in *)addrs->addr)->sin_port = 0;
+				error = sctp_addr_mgmt_ep_sa(inp, (struct sockaddr *)addrs->addr,
+							     SCTP_ADD_IP_ADDRESS);
+			} else {
+				error = EADDRNOTAVAIL;
+			}
 			if (error)
 				break;
 			
@@ -2770,9 +2965,6 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (tcb == NULL) {
 		/* Gak! no memory */
 		splx(s);
-#ifdef SCTP_DEBUG
-		printf("Can't allocate a TCB?\n");
-#endif
 		return (error);
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT
@@ -2793,17 +2985,25 @@ int
 sctp_usr_recvd(struct socket *so, int flags)
 {
 	int s;
+	struct sctp_socket_q_list *sq;
 	/*
 	 * The user has received some data, we may be able to stuff more
 	 * up the socket. And we need to possibly update the rwnd.
 	 */
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *tcb;
+	
 	inp = (struct sctp_inpcb *)so->so_pcb;
+
 	if (inp == 0) {
 		/* I made the same as TCP since we are not setup? */
 		return (ECONNRESET);
 	}
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 	/*
 	 * Grab the first one on the list. It will re-insert itself if
 	 * it runs out of room
@@ -2850,26 +3050,22 @@ sctp_usr_recvd(struct socket *so, int flags)
 		}
 	}
 #endif
-	tcb = TAILQ_FIRST(&inp->sctp_queue_list);
+	sq = TAILQ_FIRST(&inp->sctp_queue_list);
+	if (sq) {
+		tcb = sq->tcb;
+	} else {
+		tcb = NULL;
+	}
 	if (tcb) {
 		long incr;
-		/*
-		 * Question: should we go further than just the first
-		 * entry? By only doing one assoc we limit how long we
-		 * spend here.
-		 */
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		s = splsoftnet();
-#else
-		s = splnet();
-#endif
-
-		TAILQ_REMOVE(&inp->sctp_queue_list, tcb, sctp_toqueue);
-		tcb->on_toqueue = 0;
 		if (flags & MSG_EOR) {
-			tcb->asoc.my_rwnd_control_len -= (sizeof(struct sctp_sndrcvinfo) +
-							  CMSG_ALIGN(sizeof(struct cmsghdr)));
-			if (tcb->asoc.my_rwnd_control_len < 0)
+			tcb = sctp_remove_from_socket_q(inp);
+			tcb->asoc.my_rwnd_control_len -= sizeof(struct mbuf);
+			if (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_RECVDATAIOEVNT) {
+				tcb->asoc.my_rwnd_control_len -=
+				    CMSG_LEN(sizeof(struct sctp_sndrcvinfo));
+			}
+			if (tcb->asoc.my_rwnd_control_len > 0x7fffffff)
 				tcb->asoc.my_rwnd_control_len = 0;
 		}
 		sctp_service_queues(tcb, &tcb->asoc);
@@ -2893,8 +3089,8 @@ sctp_usr_recvd(struct socket *so, int flags)
 			/* Now do the output */
 			sctp_chunk_output(inp, tcb, 10);
 		}
-		splx(s);
 	}
+	splx(s);
 	return (0);
 }
 

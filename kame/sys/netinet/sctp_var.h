@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.15 2003/04/21 09:06:28 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.16 2003/06/24 05:36:50 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -78,7 +78,7 @@ int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 #endif /* __FreeBSD__ */
 
 
-#define	sctp_sbspace(sb) ((long) ((sb)->sb_hiwat - (sb)->sb_cc))
+#define	sctp_sbspace(sb) ((long) (((sb)->sb_hiwat > (sb)->sb_cc) ? ((sb)->sb_hiwat - (sb)->sb_cc) : 0))
 
 extern int	sctp_sendspace;
 extern int	sctp_recvspace;

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_uio.h,v 1.6 2003/04/23 10:26:51 itojun Exp $	*/
+/*	$KAME: sctp_uio.h,v 1.7 2003/06/24 05:36:50 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_uio.h,v 1.40 2002/04/04 16:34:41 lei Exp	*/
 
 #ifndef __sctp_uio_h__
@@ -80,8 +80,8 @@ struct sctp_sndrcvinfo {
 
 /* send/recv flags */
 /* MSG_EOF (0x0100) is reused from sys/socket.h */
-#define MSG_PR_SCTP	0x0400	/* Partial Reliable on this msg */
-#define MSG_PR_BUFFER	0x0800	/* Buffer based PR-SCTP */
+#define MSG_PR_SCTP_TTL	0x0400	/* Partial Reliable on this msg */
+#define MSG_PR_SCTP_BUF	0x0800	/* Buffer based PR-SCTP */
 #ifndef MSG_EOF
 #define MSG_EOF 	0x1000	/* Start shutdown procedures */
 #endif
@@ -96,6 +96,7 @@ struct sctp_pcbinfo {
 	u_int32_t laddr_count;
 	u_int32_t raddr_count;
 	u_int32_t chk_count;
+	u_int32_t sockq_count;
 	u_int32_t mbuf_track;
 };
 
@@ -138,10 +139,11 @@ struct sctp_paddr_change {
 };
 /* paddr state values */
 #define SCTP_ADDR_AVAILABLE	0x0001
-#define SCTP_ADDR_UNREACHABL	0x0002
+#define SCTP_ADDR_UNREACHABLE	0x0002
 #define SCTP_ADDR_REMOVED	0x0003
 #define SCTP_ADDR_ADDED		0x0004
 #define SCTP_ADDR_MADE_PRIM	0x0005
+#define SCTP_ADDR_CONFIRMED	0x0006
 
 
 struct sctp_remote_error {
@@ -149,7 +151,6 @@ struct sctp_remote_error {
 	u_int16_t sre_flags;
 	u_int32_t sre_length;
 	u_int16_t sre_error;
-	u_int16_t sre_len;
 	sctp_assoc_t sre_assoc_id;
 	u_int8_t  sre_data[4];
 };
@@ -180,7 +181,7 @@ struct sctp_adaption_event {
 	u_int16_t	sai_type;
 	u_int16_t	sai_flags;
 	u_int32_t	sai_length;
-        u_int32_t	sai_adaption_bits;
+	u_int32_t	sai_adaption_ind;
 	sctp_assoc_t	sai_assoc_id;
 };
 
@@ -188,11 +189,11 @@ struct sctp_setadaption {
 	u_int32_t	ssb_adaption_ind;
 };
 
-struct sctp_rcv_pdapi_event {
+struct sctp_pdapi_event {
 	u_int16_t	pdapi_type;
 	u_int16_t	pdapi_flags;
 	u_int32_t	pdapi_length;
-        u_int32_t	pdapi_indication;
+	u_int32_t	pdapi_indication;
 	sctp_assoc_t	pdapi_assoc_id;
 };
 
@@ -225,17 +226,20 @@ union sctp_notification {
 	struct sctp_send_failed	sn_send_failed;
 	struct sctp_shutdown_event sn_shutdown_event;
 	struct sctp_adaption_event sn_adaption_event;
-	struct sctp_rcv_pdapi_event sn_pdapi_event;
+	struct sctp_pdapi_event sn_pdapi_event;
 };
 
 /*
  * socket option structs
  */
+#define SCTP_ISSUE_HB 0xffffffff	/* get a on-demand hb */
+#define SCTP_NO_HB    0x0		/* turn off hb's */
+
 struct sctp_paddrparams {
+	sctp_assoc_t spp_assoc_id;
 	struct sockaddr_storage spp_address;
 	u_int32_t spp_hbinterval;
 	u_int16_t spp_pathmaxrxt;
-	sctp_assoc_t spp_assoc_id;
 };
 
 struct sctp_paddrinfo {
@@ -324,13 +328,16 @@ struct sctp_cwnd_log_req{
 __BEGIN_DECLS
 int	sctp_peeloff	__P((int, sctp_assoc_t *));
 int	sctp_bindx	__P((int, struct sockaddr_storage *, int, int));
+int     sctp_connectx   __P((int, struct sockaddr_storage *, int));
 int	sctp_getpaddrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
 void	sctp_freepaddrs	__P((struct sockaddr_storage *));
 int	sctp_getladdrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
 void	sctp_freeladdrs	__P((struct sockaddr_storage *));
 int     sctp_opt_info   __P((int, sctp_assoc_t, int, void *, size_t *));
-int	sctp_sendmsg    __P((int, void *, size_t, struct sockaddr *,
-    uint32_t, uint32_t, uint16_t, uint32_t, uint32_t));
+int     sctp_sendmsg    __P((int, void *, size_t, struct sockaddr *,
+	socklen_t, uint32_t, uint32_t, uint16_t, uint32_t, uint32_t));
+int     sctp_recvmsg	__P((int, void *, size_t *, struct sockaddr *,
+	socklen_t *, struct sctp_sndrcvinfo *, int *));
 
 __END_DECLS
 

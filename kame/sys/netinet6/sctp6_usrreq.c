@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.18 2003/04/23 10:10:20 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.19 2003/06/24 05:36:51 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -249,6 +249,8 @@ sctp6_input(mp, offp, proto)
 		sctp_pegs[SCTP_BAD_CSUM]++;
 		goto out_of;
 	}
+	sh->checksum = calc_check;
+	netp = NULL;
 	/* destination port of 0 is illegal, based on RFC2960. */
 	if (sh->dest_port == 0) {
 		goto out_of;
