@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.19 2000/01/11 16:45:52 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.20 2000/01/11 18:24:57 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -484,6 +484,9 @@ isakmp_info_send_n2(iph2, type, data, flags)
 #endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
+
+	if (!iph2->approval)
+		return EINVAL;
 
 	/* XXX must be get proper spi */
 	tlen = sizeof(*n) + sizeof(iph2->keys->spi);
