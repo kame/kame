@@ -60,7 +60,7 @@ if [ X"${ip6router}" = X"YES" ]; then
 
 	# wait for DAD
 	for i in $iface; do
-		ifconfig $i up
+		$ifconfig $i up
 	done
 	sleep `$sysctl net.inet6.ip6.dad_count | awk '{print $NF}'`
 	sleep 1
