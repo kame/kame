@@ -1,4 +1,4 @@
-;	$OpenBSD: syscalls.master,v 1.34 1999/02/15 21:28:23 millert Exp $
+;	$OpenBSD: syscalls.master,v 1.47 2001/06/26 19:56:52 dugsong Exp $
 ;	$NetBSD: syscalls.master,v 1.32 1996/04/23 10:24:21 mycroft Exp $
 
 ;	@(#)syscalls.master	8.2 (Berkeley) 1/13/94
@@ -70,8 +70,8 @@
 16	STD		{ int sys_chown(const char *path, uid_t uid, \
 			    gid_t gid); }
 17	STD		{ int sys_obreak(char *nsize); } break
-18	STD		{ int sys_getfsstat(struct statfs *buf, long bufsize, \
-			    int flags); }
+18	COMPAT_25	{ int sys_getfsstat(struct statfs *buf, long bufsize, \
+			    int flags); } ogetfsstat
 19	COMPAT_43	{ long sys_lseek(int fd, long offset, int whence); } \
 			    olseek
 20	STD		{ pid_t sys_getpid(void); }
@@ -107,7 +107,7 @@
 40	COMPAT_43	{ int sys_lstat(char *path, \
 			    struct ostat *ub); } olstat
 41	STD		{ int sys_dup(int fd); }
-42	STD		{ int sys_pipe(void); }
+42	STD		{ int sys_opipe(void); }
 43	STD		{ gid_t sys_getegid(void); }
 44	STD		{ int sys_profil(caddr_t samples, size_t size, \
 			    u_long offset, u_int scale); }
@@ -216,11 +216,7 @@
 			    int flags); } orecvmsg
 114	COMPAT_43	{ int sys_sendmsg(int s, caddr_t msg, int flags); } \
 			    osendmsg
-#ifdef TRACE
-115	STD		{ int sys_vtrace(int request, int value); }
-#else
 115	OBSOL		vtrace
-#endif
 116	STD		{ int sys_gettimeofday(struct timeval *tp, \
 			    struct timezone *tzp); }
 117	STD		{ int sys_getrusage(int who, struct rusage *rusage); }
@@ -290,22 +286,19 @@
 #endif
 156	COMPAT_43	{ int sys_getdirentries(int fd, char *buf, \
 			    int count, long *basep); } ogetdirentries
-157	STD		{ int sys_statfs(const char *path, \
-			    struct statfs *buf); }
-158	STD		{ int sys_fstatfs(int fd, struct statfs *buf); }
+157	COMPAT_25	{ int sys_statfs(const char *path, \
+			    struct ostatfs *buf); } ostatfs
+158	COMPAT_25	{ int sys_fstatfs(int fd, struct ostatfs *buf); } \
+			    ostatfs
 159	UNIMPL
 160	UNIMPL
-#if defined(NFSCLIENT) || defined(NFSSERVER)
 161	STD		{ int sys_getfh(const char *fname, fhandle_t *fhp); }
-#else
-161	UNIMPL		getfh
-#endif
 162	COMPAT_09	{ int sys_getdomainname(char *domainname, int len); } \
 			    ogetdomainname
 163	COMPAT_09	{ int sys_setdomainname(char *domainname, int len); } \
 			    osetdomainname
 164	COMPAT_09	{ int sys_uname(struct outsname *name); } ouname
-165	STD		{ int sys_sysarch(int op, char *parms); }
+165	STD		{ int sys_sysarch(int op, void *parms); }
 166	UNIMPL
 167	UNIMPL
 168	UNIMPL
@@ -331,8 +324,10 @@
 171	UNIMPL		1.0 shmsys
 #endif
 172	UNIMPL
-173	UNIMPL
-174	UNIMPL
+173	STD		{ ssize_t sys_pread(int fd, void *buf, \
+			  size_t nbyte, int pad, off_t offset); }
+174	STD		{ ssize_t sys_pwrite(int fd, const void *buf, \
+			  size_t nbyte, int pad, off_t offset); }
 #ifdef NTP
 175	STD		{ int sys_ntp_gettime(struct ntptimeval *ntvp); }
 176	STD		{ int sys_ntp_adjtime(struct timex *tp); }
@@ -345,7 +340,7 @@
 179	UNIMPL
 180	UNIMPL
 
-; Syscalls 180-199 are used by/reserved for BSD
+; Syscalls 181-199 are used by/reserved for BSD
 181	STD		{ int sys_setgid(gid_t gid); }
 182	STD		{ int sys_setegid(gid_t egid); }
 183	STD		{ int sys_seteuid(uid_t euid); }
@@ -367,7 +362,7 @@
 190	STD		{ int sys_lstat(const char *path, struct stat *ub); }
 191	STD		{ long sys_pathconf(const char *path, int name); }
 192	STD		{ long sys_fpathconf(int fd, int name); }
-193	UNIMPL
+193	STD		{ int sys_swapctl(int cmd, const void *arg, int misc); }
 194	STD		{ int sys_getrlimit(int which, \
 			    struct rlimit *rlp); }
 195	STD		{ int sys_setrlimit(int which, \
@@ -390,7 +385,7 @@
 205	STD		{ int sys_undelete(const char *path); }
 206	STD		{ int sys_futimes(int fd, \
 			    const struct timeval *tptr); }
-207	STD		{ int sys_getpgid(pid_t pid); }
+207	STD		{ pid_t sys_getpgid(pid_t pid); }
 208	STD		{ int sys_xfspioctl(int operation, char *a_pathP, \
 			    int a_opcode, struct ViceIoctl *a_paramsP, \
 			    int a_followSymlinks); }
@@ -423,12 +418,12 @@
 #endif	/* !LKM */
 ; System calls 220-240 are reserved for use by OpenBSD
 #ifdef SYSVSEM
-220	STD		{ int sys___osemctl(int semid, int semnum, int cmd, \
-			    union semun *arg); }
+220	COMPAT_23	{ int sys___semctl(int semid, int semnum, int cmd, \
+			    union semun *arg); } __osemctl
 221	STD		{ int sys_semget(key_t key, int nsems, int semflg); }
 222	STD		{ int sys_semop(int semid, struct sembuf *sops, \
 			    u_int nsops); }
-223	STD		{ int sys_semconfig(int flag); }
+223	OBSOL		sys_semconfig
 #else
 220	UNIMPL		semctl
 221	UNIMPL		semget
@@ -436,8 +431,8 @@
 223	UNIMPL		semconfig
 #endif
 #ifdef SYSVMSG
-224	STD		{ int sys_omsgctl(int msqid, int cmd, \
-			    struct omsqid_ds *buf); }
+224	COMPAT_23	{ int sys_msgctl(int msqid, int cmd, \
+			    struct omsqid_ds *buf); } omsgctl
 225	STD		{ int sys_msgget(key_t key, int msgflg); }
 226	STD		{ int sys_msgsnd(int msqid, const void *msgp, size_t msgsz, \
 			    int msgflg); }
@@ -452,8 +447,8 @@
 #ifdef SYSVSHM
 228	STD		{ void *sys_shmat(int shmid, const void *shmaddr, \
 			    int shmflg); }
-229	STD		{ int sys_oshmctl(int shmid, int cmd, \
-			    struct oshmid_ds *buf); }
+229	COMPAT_23	{ int sys_shmctl(int shmid, int cmd, \
+			    struct oshmid_ds *buf); } oshmctl
 230	STD		{ int sys_shmdt(const void *shmaddr); }
 231	STD		{ int sys_shmget(key_t key, int size, int shmflg); }
 #else
@@ -473,6 +468,9 @@
 237	UNIMPL		timer_settime
 238	UNIMPL		timer_gettime
 239	UNIMPL		timer_getoverrun
+;
+; System calls 240-249 are reserved for other IEEE Std1003.1b syscalls
+;
 240	STD		{ int sys_nanosleep(const struct timespec *rqtp, \
 			    struct timespec *rmtp); }
 241	UNIMPL
@@ -491,7 +489,7 @@
 			    unsigned long nfds, int timeout); }
 253	STD		{ int sys_issetugid(void); }
 254	STD		{ int sys_lchown(const char *path, uid_t uid, gid_t gid); }
-255	STD		{ int sys_getsid(pid_t pid); }
+255	STD		{ pid_t sys_getsid(pid_t pid); }
 256	STD		{ int sys_msync(void *addr, size_t len, int flags); }
 #ifdef SYSVSEM
 257	STD		{ int sys___semctl(int semid, int semnum, int cmd, \
@@ -511,3 +509,30 @@
 #else
 259	UNIMPL
 #endif
+260	STD		{ int sys_getfsstat(struct statfs *buf, size_t bufsize, \
+			    int flags); }
+261	STD		{ int sys_statfs(const char *path, \
+			    struct statfs *buf); }
+262	STD		{ int sys_fstatfs(int fd, struct statfs *buf); }
+263	STD		{ int sys_pipe(int *fdp); }
+264	STD		{ int sys_fhopen(const fhandle_t *fhp, int flags); }
+265	STD		{ int sys_fhstat(const fhandle_t *fhp, \
+			    struct stat *sb); }
+266	STD		{ int sys_fhstatfs(const fhandle_t *fhp, \
+			    struct statfs *buf); }
+267	STD		{ ssize_t sys_preadv(int fd, \
+			  const struct iovec *iovp, int iovcnt, \
+			  int pad, off_t offset); }
+268	STD		{ ssize_t sys_pwritev(int fd, \
+			  const struct iovec *iovp, int iovcnt, \
+			  int pad, off_t offset); }                    
+269	STD		{ int sys_kqueue(void); }
+270	STD		{ int sys_kevent(int fd, \
+			    const struct kevent *changelist, int nchanges, \
+			    struct kevent *eventlist, int nevents, \
+			    const struct timespec *timeout); }
+271	STD		{ int sys_mlockall(int flags); }
+272	STD		{ int sys_munlockall(void); }
+273	STD		{ int sys_getpeereid(int fdes, uid_t *euid, gid_t *egid); }
+274	STD		{ int sctp_peeloff(int sd, caddr_t name ); }
+

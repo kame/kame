@@ -144,6 +144,7 @@ struct mbuf {
 #define M_CONF		0x0400  /* packet was encrypted (ESP-transport) */
 #define M_AUTH		0x0800  /* packet was authenticated (AH) */
 #define M_COMP		0x1000  /* packet was compressed (IPCOMP) */
+#define M_NOTIFICATION  0x2000  /* Notification Event */
 
 /* Checksumming flags */
 #define	M_IPV4_CSUM_OUT		0x0001	/* IPv4 checksum needed */
@@ -162,7 +163,7 @@ struct mbuf {
 #define M_AUX		0x0010	/* mbufs pointed to by m->m_pkthdr.aux */
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_COMP|M_AUX|M_LOOP)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_COMP|M_AUX|M_LOOP|M_NOTIFICATION)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */

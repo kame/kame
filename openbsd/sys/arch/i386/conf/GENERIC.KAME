@@ -2,6 +2,12 @@ include	"arch/i386/conf/GENERIC"
 
 #option		ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
 
+#option		SCTP		# adds SCTP stack to kernel - requires INET6
+#option		SCTP_DEBUG	# adds debugging support for SCTP
+#option		SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
+#option		SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
+#option		SCTP_ALTERNATE_ROUTE	# alternate route support - TBD
+
 #pseudo-device	dummy	1	# dummy
 #pseudo-device	stf		# 6to4 interface
 

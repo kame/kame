@@ -106,6 +106,7 @@ struct protosw {
  * Values for pr_flags.
  * PR_ADDR requires PR_ATOMIC;
  * PR_ADDR and PR_CONNREQUIRED are mutually exclusive.
+ * PR_ADDR_OPT requires PR_ATOMIC (like PR_ADDR)
  */
 #define	PR_ATOMIC	0x01		/* exchange atomic messages only */
 #define	PR_ADDR		0x02		/* addresses given with messages */
@@ -114,6 +115,7 @@ struct protosw {
 #define	PR_RIGHTS	0x10		/* passes capabilities */
 #define	PR_ABRTACPTDIS	0x20		/* abort on accept(2) to disconnected
 					   socket */
+#define PR_ADDR_OPT     0x40         /* Allow address during delivery */
 
 /*
  * The arguments to usrreq are:

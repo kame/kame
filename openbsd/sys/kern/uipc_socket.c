@@ -145,12 +145,11 @@ solisten(so, backlog)
 	int backlog;
 {
 	int s = splsoftnet(), error;
+	short oldopt,oldqlimit;
 
-	error = (*so->so_proto->pr_usrreq)(so, PRU_LISTEN, NULL, NULL, NULL);
-	if (error) {
-		splx(s);
-		return (error);
-	}
+	oldopt = so->so_options;
+	oldqlimit = so->so_qlimit;
+
 	if (so->so_q == 0)
 		so->so_options |= SO_ACCEPTCONN;
 	if (backlog < 0 || backlog > somaxconn)
@@ -158,6 +157,19 @@ solisten(so, backlog)
 	if (backlog < sominconn)
 		backlog = sominconn;
 	so->so_qlimit = backlog;
+	/*
+	 * SCTP needs to look at and tweak both
+	 * the inbound backlog paramter AND the
+	 * so_options (UDP model both connect's and
+	 * gets inbound connections .. implicitly).
+	 */
+	error = (*so->so_proto->pr_usrreq)(so, PRU_LISTEN, NULL, NULL, NULL);
+	if (error) {
+		so->so_options = oldopt;
+		so->so_qlimit = oldqlimit;
+		splx(s);
+		return (error);
+	}
 	splx(s);
 	return (0);
 }
@@ -681,6 +693,31 @@ dontblock:
 			}
 		}
 	}
+	if (pr->pr_flags & PR_ADDR_OPT) {
+		/*
+		 * For SCTP we may be getting a
+		 * whole message OR a partial delivery.
+		 */
+		if (m->m_type == MT_SONAME) {
+			orig_resid = 0;
+			if (flags & MSG_PEEK) {
+				if (paddr)
+					*paddr = m_copy(m, 0, m->m_len);
+				m = m->m_next;
+			} else {
+				sbfree(&so->so_rcv, m);
+				if (paddr) {
+					*paddr = m;
+					so->so_rcv.sb_mb = m->m_next;
+					m->m_next = 0;
+					m = so->so_rcv.sb_mb;
+				} else {
+					MFREE(m, so->so_rcv.sb_mb);
+					m = so->so_rcv.sb_mb;
+				}
+			}
+		}
+	}
 	while (m && m->m_type == MT_CONTROL && error == 0) {
 		if (flags & MSG_PEEK) {
 			if (controlp)
@@ -756,6 +793,10 @@ dontblock:
 		} else
 			uio->uio_resid -= len;
 		if (len == m->m_len - moff) {
+#ifdef SCTP
+			if (m->m_flags & M_NOTIFICATION)
+				flags |= MSG_NOTIFICATION;
+#endif /* SCTP */
 			if (m->m_flags & M_EOR)
 				flags |= MSG_EOR;
 			if (flags & MSG_PEEK) {

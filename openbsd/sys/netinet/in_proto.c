@@ -180,6 +180,12 @@
 #include <net/if_gre.h>
 #endif
 
+#ifdef SCTP
+#include <netinet/sctp_pcb.h>
+#include <netinet/sctp.h>
+#include <netinet/sctp_var.h>
+#endif /* SCTP */
+
 extern	struct domain inetdomain;
 
 struct protosw inetsw[] = {
@@ -198,6 +204,25 @@ struct protosw inetsw[] = {
   tcp_usrreq,
   tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,	tcp_sysctl
 },
+#ifdef SCTP
+/* Order is very important here, we add the good one in
+ * in this postion so it maps to the right ip_protox[]
+ * postion for SCTP. Don't move the one above below
+ * this one or IPv6/4 compatability will break
+ */
+{ SOCK_DGRAM,	&inetdomain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+  sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
+  sctp_usrreq,
+  sctp_init,	sctp_fasttim,	0,		sctp_drain,
+  0
+},
+{ SOCK_STREAM,	&inetdomain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+  sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
+  sctp_usrreq,
+  0,		0,		0,		sctp_drain,
+  0
+},
+#endif /* SCTP */
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,
