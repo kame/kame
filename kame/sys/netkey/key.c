@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.251 2002/07/08 09:33:54 sakane Exp $	*/
+/*	$KAME: key.c,v 1.252 2002/07/08 10:57:29 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4337,8 +4337,9 @@ key_timehandler(arg)
 			if (sav->lft_s->sadb_lifetime_addtime != 0
 			 && tv.tv_sec - sav->created > sav->lft_s->sadb_lifetime_addtime) {
 				/*
-				 * check SA to be used whether or not.
-				 * when SA hasn't been used, delete it.
+				 * check the SA if it has been used.
+				 * when it hasn't been used, delete it.
+				 * i don't think such SA will be used.
 				 */
 				if (sav->lft_c->sadb_lifetime_usetime == 0) {
 					key_sa_chgstate(sav, SADB_SASTATE_DEAD);
@@ -4354,6 +4355,7 @@ key_timehandler(arg)
 					key_expire(sav);
 				}
 			}
+
 			/* check SOFT lifetime by bytes */
 			/*
 			 * XXX I don't know the way to delete this SA
