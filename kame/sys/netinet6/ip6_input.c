@@ -1353,7 +1353,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 			default:
 				/*
 			 	 * other cases have been filtered in the above.
-				 * noone will visit this case.  here we supply
+				 * none will visit this case.  here we supply
 				 * the code just in case (nxt overwritten or
 				 * other cases).
 				 */
