@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.37 2000/08/31 07:27:26 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.38 2000/08/31 14:54:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1304,8 +1304,8 @@ esp_rijndael_blockencrypt(algo, sav, s, d)
 }
 #else
 /*
- * twofish actually do not use assymetric scheduled keys, however, AES C
- * syggests assymetric key setup.
+ * twofish actually do not use assymetric scheduled keys, however, AES C API
+ * suggests assymetric key setup.
  */
 static int
 esp_twofish_schedule(algo, sav)
