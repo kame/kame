@@ -1,4 +1,4 @@
-/*	$KAME: des.h,v 1.3 2000/03/27 04:36:31 sumikawa Exp $	*/
+/*	$KAME: des.h,v 1.4 2000/06/14 10:41:17 itojun Exp $	*/
 
 /* lib/des/des.h */
 /* Copyright (C) 1995-1996 Eric Young (eay@mincom.oz.au)
@@ -139,7 +139,7 @@ DES_LONG des_cbc_cksum(des_cblock *input,des_cblock *output,
 void des_cbc_encrypt(des_cblock *input,des_cblock *output,long length,
 	des_key_schedule schedule,des_cblock *ivec,int enc);
 */
-void des_cbc_encrypt(struct mbuf *, size_t, size_t,
+int des_cbc_encrypt(struct mbuf *, size_t, size_t,
 	des_key_schedule schedule,des_cblock *ivec, int enc);
 void des_ncbc_encrypt(des_cblock *input,des_cblock *output,long length,
 	des_key_schedule schedule,des_cblock *ivec,int enc);
@@ -149,7 +149,7 @@ void des_xcbc_encrypt(des_cblock *input,des_cblock *output,long length,
 void des_3cbc_encrypt(des_cblock *input,des_cblock *output,long length,
 	des_key_schedule sk1,des_key_schedule sk2,
 	des_cblock *ivec1,des_cblock *ivec2,int enc);
-extern void des_3cbc_process(struct mbuf *, size_t, size_t,
+extern int des_3cbc_process(struct mbuf *, size_t, size_t,
 	des_key_schedule *schedule, des_cblock *ivec, int mode);
 void des_cfb_encrypt(unsigned char *in,unsigned char *out,int numbits,
 	long length,des_key_schedule schedule,des_cblock *ivec,int enc);

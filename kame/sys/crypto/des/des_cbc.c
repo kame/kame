@@ -1,4 +1,4 @@
-/*	$KAME: des_cbc.c,v 1.3 2000/03/27 04:36:32 sumikawa Exp $	*/
+/*	$KAME: des_cbc.c,v 1.4 2000/06/14 10:41:17 itojun Exp $	*/
 
 /*
  * heavily modified by Yoshifumi Nishida <nishida@sfc.wide.ad.jp>.
@@ -54,9 +54,9 @@
 
 #include <crypto/des/des_locl.h>
 
-#define panic(x) {printf(x); return;}
+#define panic(x) do {printf(x); return EINVAL;} while (0)
 
-void des_cbc_encrypt(m0, skip, length, schedule, ivec, mode)
+int des_cbc_encrypt(m0, skip, length, schedule, ivec, mode)
 	struct mbuf *m0;
 	size_t skip;
 	size_t length;
@@ -75,19 +75,19 @@ void des_cbc_encrypt(m0, skip, length, schedule, ivec, mode)
 	/* sanity checks */
 	if (m0->m_pkthdr.len < skip) {
 		printf("mbuf length < skip\n");
-		return;
+		return EINVAL;
 	}
 	if (m0->m_pkthdr.len < length) {
 		printf("mbuf length < encrypt length\n");
-		return;
+		return EINVAL;
 	}
 	if (m0->m_pkthdr.len < skip + length) {
 		printf("mbuf length < skip + encrypt length\n");
-		return;
+		return EINVAL;
 	}
 	if (length % 8) {
 		printf("length is not multiple of 8\n");
-		return;
+		return EINVAL;
 	}
 
 	m = m0;
@@ -325,4 +325,6 @@ void des_cbc_encrypt(m0, skip, length, schedule, ivec, mode)
 			length -= 8;
 		}
 	}
+
+	return 0;
 }

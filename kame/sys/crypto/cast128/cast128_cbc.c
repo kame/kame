@@ -1,4 +1,4 @@
-/*	$KAME: cast128_cbc.c,v 1.3 2000/03/27 04:36:30 sumikawa Exp $	*/
+/*	$KAME: cast128_cbc.c,v 1.4 2000/06/14 10:41:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,8 +37,9 @@
 #include <sys/mbuf.h>
 #include <crypto/cast128/cast128.h>
 
+#define panic(x)	do { printf(x); return EINVAL; } while (0)
 
-void
+int
 cast128_cbc_process(m0, skip, length, subkey, iv, keylen, mode)
 	struct mbuf *m0;
 	size_t skip;
@@ -55,20 +56,20 @@ cast128_cbc_process(m0, skip, length, subkey, iv, keylen, mode)
 	/* sanity check */
 	if (m0->m_pkthdr.len < skip) {
 		printf("cast128_cbc_process: mbuf length < skip\n");
-		return;
+		return EINVAL;
 	}
 	if (m0->m_pkthdr.len < length) {
 		printf("cast128_cbc_process: mbuf length < encrypt length\n");
-		return;
+		return EINVAL;
 	}
 	if (m0->m_pkthdr.len < skip + length) {
 		printf("cast128_cbc_process: "
 			"mbuf length < skip + encrypt length\n");
-		return;
+		return EINVAL;
 	}
 	if (length % 8) {
 		printf("cast128_cbc_process: length is not multiple of 8\n");
-		return;
+		return EINVAL;
 	}
 
 	m = m0;
@@ -215,5 +216,6 @@ cast128_cbc_process(m0, skip, length, subkey, iv, keylen, mode)
 
 		length -= 8;
 	}
-}
 
+	return 0;
+}

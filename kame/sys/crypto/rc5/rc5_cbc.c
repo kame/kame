@@ -1,4 +1,4 @@
-/*	$KAME: rc5_cbc.c,v 1.3 2000/03/27 04:36:37 sumikawa Exp $	*/
+/*	$KAME: rc5_cbc.c,v 1.4 2000/06/14 10:41:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,8 +33,9 @@
  */
 #include <crypto/rc5/rc5.h>
 
+#define panic(x)	do { printf(x); return EINVAL; } while (0)
 
-void
+int
 rc5_cbc_process(m0, skip, length, e_key, iv, mode)
 	struct mbuf *m0;
 	size_t skip;
@@ -50,21 +51,21 @@ rc5_cbc_process(m0, skip, length, e_key, iv, mode)
 	/* sanity check */
 	if (m0->m_pkthdr.len < skip) {
 		printf("rc5_cbc_process: mbuf length < skip\n");
-		return;
+		return EINVAL;
 	}
 	if (m0->m_pkthdr.len < length) {
 		printf("rc5_cbc_process: mbuf length < encrypt length\n");
-		return;
+		return EINVAL;
 	}
 	if (m0->m_pkthdr.len < skip + length) {
 		printf("rc5_cbc_process: mbuf length < "
 			"skip + encrypt length\n");
-		return;
+		return EINVAL;
 	}
 	if (length % 8) {
 		printf("rc5_cbc_process: length(%lu)is not multipleof 8\n",
 			(u_long)length);
-		return;
+		return EINVAL;
 	}
 
 	m = m0;
@@ -207,5 +208,7 @@ rc5_cbc_process(m0, skip, length, e_key, iv, mode)
 
 		length -= 8;
 	}
+
+	return 0;
 }
 

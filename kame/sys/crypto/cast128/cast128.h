@@ -1,4 +1,4 @@
-/*	$KAME: cast128.h,v 1.3 2000/03/27 04:36:29 sumikawa Exp $	*/
+/*	$KAME: cast128.h,v 1.4 2000/06/14 10:41:16 itojun Exp $	*/
 
 /*
  * heavily modified by Tomomi Suzuki <suzuki@grelot.elec.ryukoku.ac.jp>
@@ -55,7 +55,7 @@ extern void cast128_encrypt_round12 __P((u_int8_t *, const u_int8_t *,
 					u_int32_t *));
 extern void cast128_decrypt_round12 __P((u_int8_t *, const u_int8_t *,
 					u_int32_t *));
-extern void cast128_cbc_process __P((struct mbuf *, size_t, size_t,
+extern int cast128_cbc_process __P((struct mbuf *, size_t, size_t,
 				u_int32_t *, u_int8_t *, size_t, int));
 
 #endif

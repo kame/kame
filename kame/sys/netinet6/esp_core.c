@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.14 2000/05/22 08:50:33 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.15 2000/06/14 10:41:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,19 +111,19 @@ static caddr_t mbuf_find_offset __P((struct mbuf *, size_t, size_t));
 /* NOTE: The order depends on SADB_EALG_x in netkey/keyv2.h */
 struct esp_algorithm esp_algorithms[] = {
 	{ 0, 0, 0, 0, 0, 0, 0, },
-	{ 8, esp_descbc_mature, 64, 64,
+	{ 8, esp_descbc_mature, 64, 64, "des-cbc",
 		esp_descbc_ivlen, esp_descbc_decrypt, esp_descbc_encrypt, },
-	{ 8, esp_cbc_mature, 192, 192,
+	{ 8, esp_cbc_mature, 192, 192, "3des-cbc",
 		esp_3descbc_ivlen, esp_3descbc_decrypt, esp_3descbc_encrypt, },
-	{ 1, esp_null_mature, 0, 2048,
+	{ 1, esp_null_mature, 0, 2048, "null",
 		esp_null_ivlen, esp_null_decrypt, esp_null_encrypt, },
-	{ 8, esp_cbc_mature, 40, 448,
+	{ 8, esp_cbc_mature, 40, 448, "blowfish-cbc",
 		esp_blowfish_cbc_ivlen, esp_blowfish_cbc_decrypt,
 		esp_blowfish_cbc_encrypt, },
-	{ 8, esp_cbc_mature, 40, 128,
+	{ 8, esp_cbc_mature, 40, 128, "cast128-cbc",
 		esp_cast128cbc_ivlen, esp_cast128cbc_decrypt,
 		esp_cast128cbc_encrypt, },
-	{ 8, esp_cbc_mature, 40, 2040,
+	{ 8, esp_cbc_mature, 40, 2040, "rc5-cbc",
 		esp_rc5cbc_ivlen, esp_rc5cbc_decrypt, esp_rc5cbc_encrypt, },
 };
 
@@ -232,6 +232,7 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	size_t plen;
 	u_int8_t tiv[8];
 	int derived;
+	int error;
 
 	derived = 0;
 	/* sanity check */
@@ -311,7 +312,8 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 		return EINVAL;
 	}
 
-	des_cbc_encrypt(m, bodyoff, plen, ks, (C_Block *)iv, DES_DECRYPT);
+	error = des_cbc_encrypt(m, bodyoff, plen, ks, (C_Block *)iv,
+	    DES_DECRYPT);
 
 	/* for safety */
 	bzero(&ks, sizeof(des_key_schedule));
@@ -320,7 +322,7 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	/* for safety */
 	bzero(&tiv[0], sizeof(tiv));
 
-	return 0;
+	return error;
 }
 
 static int
@@ -337,6 +339,7 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	u_int8_t *iv;
 	u_int8_t tiv[8];
 	int derived;
+	int error;
 
 	derived = 0;
 
@@ -430,7 +433,8 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 		return EINVAL;
 	}
 
-	des_cbc_encrypt(m, bodyoff, plen, ks, (C_Block *)iv, DES_ENCRYPT);
+	error = des_cbc_encrypt(m, bodyoff, plen, ks, (C_Block *)iv,
+	    DES_ENCRYPT);
 
 	/* for safety */
 	bzero(&ks, sizeof(des_key_schedule));
@@ -441,7 +445,7 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	/* for safety */
 	bzero(&tiv[0], sizeof(tiv));
 
-	return 0;
+	return error;
 }
 
 static int
@@ -509,6 +513,7 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	size_t plen;
 	static BF_KEY key;	/* made static to avoid kernel stack overflow */
 	int s;
+	int error;
 
 	/* sanity check */
 	if (sav->ivlen != ivlen) {
@@ -560,7 +565,7 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 #endif
 
 	BF_set_key(&key, _KEYBITS(sav->key_enc) / 8, _KEYBUF(sav->key_enc));
-	BF_cbc_encrypt_m(m, bodyoff, plen, &key, iv, BF_DECRYPT);
+	error = BF_cbc_encrypt_m(m, bodyoff, plen, &key, iv, BF_DECRYPT);
 
 	/* for safety */
 	bzero(&key, sizeof(BF_KEY));
@@ -570,7 +575,7 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	/* for safety */
 	bzero(&tiv[0], sizeof(tiv));
 
-	return 0;
+	return error;
 }
 
 static int
@@ -587,6 +592,7 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	u_int8_t *iv;
 	static BF_KEY key;	/* made static to avoid kernel stack overflow */
 	int s;
+	int error;
 
 	/* sanity check */
 	if (plen % 8) {
@@ -637,7 +643,7 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 #endif
 
 	BF_set_key(&key, _KEYBITS(sav->key_enc) / 8, _KEYBUF(sav->key_enc));
-	BF_cbc_encrypt_m(m, bodyoff, plen, &key, iv, BF_ENCRYPT);
+	error = BF_cbc_encrypt_m(m, bodyoff, plen, &key, iv, BF_ENCRYPT);
 
 	/* for safety */
 	bzero(&key, sizeof(BF_KEY));
@@ -646,7 +652,7 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	esp_increment_iv(sav);
 
-	return 0;
+	return error;
 }
 
 static int
@@ -675,6 +681,7 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 	size_t bodyoff;
 	u_int8_t iv[8];
 	size_t plen;
+	int error;
 
 	/* sanity check */
 	if (ivlen != sav->ivlen) {
@@ -729,15 +736,15 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 	bcopy(_KEYBUF(sav->key_enc), key, _KEYLEN(sav->key_enc));
 
 	set_cast128_subkey(subkey, key);
-	cast128_cbc_process(m, bodyoff, plen, subkey, iv,
-				_KEYBITS(sav->key_enc) / 8, CAST128_DECRYPT);
+	error = cast128_cbc_process(m, bodyoff, plen, subkey, iv,
+	    _KEYBITS(sav->key_enc) / 8, CAST128_DECRYPT);
 
 	/* for safety */
 	bzero(subkey, sizeof(subkey));
 	bzero(key, sizeof(key));
     }
 
-	return 0;
+	return error;
 }
 
 static int
@@ -752,6 +759,7 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	size_t ivoff;
 	size_t bodyoff;
 	u_int8_t *iv;
+	int error;
 
 	/* sanity check */
 	if (plen % 8) {
@@ -803,8 +811,8 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	bcopy(_KEYBUF(sav->key_enc), key, _KEYLEN(sav->key_enc));
 
 	set_cast128_subkey(subkey, key);
-	cast128_cbc_process(m, bodyoff, plen, subkey, iv,
-				_KEYBITS(sav->key_enc) / 8, CAST128_ENCRYPT);
+	error = cast128_cbc_process(m, bodyoff, plen, subkey, iv,
+	    _KEYBITS(sav->key_enc) / 8, CAST128_ENCRYPT);
 
 	/* for safety */
 	bzero(subkey, sizeof(subkey));
@@ -813,7 +821,7 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	esp_increment_iv(sav);
 
-	return 0;
+	return error;
 }
 
 static int
@@ -1000,6 +1008,7 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 	size_t bodyoff;
 	u_int8_t iv[8];
 	size_t plen;
+	int error;
 
 	/* sanity check */
 	if (sav->ivlen != ivlen) {
@@ -1049,13 +1058,13 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 
 	set_rc5_expandkey(e_key, _KEYBUF(sav->key_enc),
 			_KEYBITS(sav->key_enc) / 8, 16);
-	rc5_cbc_process(m, bodyoff, plen, e_key, iv, RC5_DECRYPT);
+	error = rc5_cbc_process(m, bodyoff, plen, e_key, iv, RC5_DECRYPT);
 
 	/* for safety */
 	bzero(e_key, sizeof(e_key));
     }
 
-	return 0;
+	return error;
 }
 
 static int
@@ -1070,6 +1079,7 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	size_t ivoff;
 	size_t bodyoff;
 	u_int8_t *iv;
+	int error;
 
 	/* sanity check */
 	if (plen % 8) {
@@ -1118,7 +1128,7 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	set_rc5_expandkey(e_key, _KEYBUF(sav->key_enc),
 			_KEYBITS(sav->key_enc) / 8, 16);
-	rc5_cbc_process(m, bodyoff, plen, e_key, iv, RC5_ENCRYPT);
+	error = rc5_cbc_process(m, bodyoff, plen, e_key, iv, RC5_ENCRYPT);
 
 	/* for safety */
 	bzero(e_key, sizeof(e_key));
@@ -1126,7 +1136,7 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	esp_increment_iv(sav);
 
-	return 0;
+	return error;
 }
 
 /*
