@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.239 2001/07/21 06:07:14 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.240 2001/07/21 06:09:30 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -151,7 +151,7 @@ draft-ietf-ipngwg-p2p-pingpong-00.txt:
 	Avoiding ping-pong packets on point-to-point links
 draft-itojun-ipv6-tcp-to-anycast-01.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
-draft-itojun-ipv6-transition-abuse-02.txt:
+draft-itojun-ipv6-transition-abuse-01.txt:
 	Possible abuse against IPv6 transition technologies (expired)
     * KAME does not implement RFC1933/2893 automatic tunnel.
     * "stf" interface implements some address filters.  Refer to stf(4)
@@ -159,6 +159,7 @@ draft-itojun-ipv6-transition-abuse-02.txt:
       we do not include "stf" interface into GENERIC.v6 compilation.
     * kame/openbsd completely disables IPv4 mapped address support.
     * kame/netbsd makes IPv4 mapped address support off by default.
+    * Latest attack scirpt is available in v6test/conf/transition-abuse.conf.
     * See section 1.12.6 and 1.14 for more details.
 draft-itojun-ipv6-tclass-api-03.txt: Socket API for IPv6 traffic class field
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
