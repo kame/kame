@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.28 2000/03/30 09:01:13 sumikawa Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.29 2000/06/07 05:59:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -460,6 +460,10 @@ assigne_ra_entry(struct rr_prefix *rpp, int iilen, struct in6_ifaddr *ia)
 	return 0;
 }
 
+/*
+ * add a link-local address to an interface.  we will add new interface address
+ * (prefix database + new interface id).
+ */
 static int
 in6_prefix_add_llifid(int iilen, struct in6_ifaddr *ia)
 {
@@ -483,6 +487,12 @@ in6_prefix_add_llifid(int iilen, struct in6_ifaddr *ia)
 	for (rpp = LIST_FIRST(&rr_prefix); rpp; rpp = LIST_NEXT(rpp, rp_entry))
 #endif
 	{
+		/*
+		 * do not attempt to add an address, if ifp does not match
+		 */
+		if (rpp->rp_ifp != ia->ia_ifp)
+			continue;
+
 		s = splnet();
 		LIST_INSERT_HEAD(&rpp->rp_addrhead, rap, ra_entry);
 		splx(s);
@@ -491,7 +501,10 @@ in6_prefix_add_llifid(int iilen, struct in6_ifaddr *ia)
 	return 0;
 }
 
-
+/*
+ * add an address to an interface.  if the interface id portion is new,
+ * we will add new interface address (prefix database + new interface id).
+ */
 int
 in6_prefix_add_ifid(int iilen, struct in6_ifaddr *ia)
 {
